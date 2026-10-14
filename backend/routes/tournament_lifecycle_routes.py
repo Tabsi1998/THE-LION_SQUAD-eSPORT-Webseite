@@ -130,8 +130,9 @@ async def _finalize_stage_previews_for_checkin(db, tournament: dict, actor_id: s
     }
 
 
-async def _finalize_bracket_for_checkin(db, tournament: dict, actor_id: str | None, *,
-                                       checked_in_only: bool = False) -> dict | None:
+async def _finalize_bracket_for_checkin(
+    db, tournament: dict, actor_id: str | None, *, checked_in_only: bool = False,
+) -> dict | None:
     """Run the final bracket mix once: when the check-in ends (only checked-in participants) or, without a check-in,
     when the tournament starts (everyone approved). A fixed bracket stays as it is."""
     tid = tournament["id"]

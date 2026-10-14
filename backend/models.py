@@ -632,6 +632,12 @@ class TournamentCreate(BaseModel):
     default_match_weekday: int = Field(default=6, ge=0, le=6)
     default_match_time: str = "20:00"
     auto_start_enabled: bool = False
+    # Fristen (#1551), leer = Standard (services/match_deadlines): nicht erschienen vor Ort 10 / online 15 Minuten,
+    # Ergebnis gilt online nach 15 Minuten, in der Liga nach 48 Stunden. Je Phase überschreibbar (settings).
+    no_show_minutes_on_site: Optional[int] = Field(default=None, ge=1, le=120)
+    no_show_minutes_online: Optional[int] = Field(default=None, ge=1, le=240)
+    result_confirm_minutes_online: Optional[int] = Field(default=None, ge=1, le=1440)
+    result_confirm_hours_league: Optional[int] = Field(default=None, ge=1, le=336)
     # Phase 7
     season_weight: float = 2.0
     visibility: Literal["public", "community", "members", "internal"] = "public"
@@ -700,6 +706,10 @@ class TournamentUpdate(BaseModel):
     default_match_weekday: Optional[int] = Field(default=None, ge=0, le=6)
     default_match_time: Optional[str] = None
     auto_start_enabled: Optional[bool] = None
+    no_show_minutes_on_site: Optional[int] = Field(default=None, ge=1, le=120)
+    no_show_minutes_online: Optional[int] = Field(default=None, ge=1, le=240)
+    result_confirm_minutes_online: Optional[int] = Field(default=None, ge=1, le=1440)
+    result_confirm_hours_league: Optional[int] = Field(default=None, ge=1, le=336)
     season_weight: Optional[float] = None
     visibility: Optional[Literal["public", "community", "members", "internal"]] = None
     site_banner_enabled: Optional[bool] = None

@@ -150,8 +150,8 @@ CAPABILITIES: tuple[Capability, ...] = (
        ["POST /api/matches/{match_id}/result"], [GRAPH]),
     _c("result.report", "Ergebnis im Einvernehmen bestätigen",
        ["POST /api/matches/{match_id}/report"], [CLASSIC, GRAPH],
-       note="Block 3: auch im Graph-System. Zwei übereinstimmende Meldungen entscheiden, "
-            "eine einzelne nie - sonst könnte sich jemand allein weiterschreiben."),
+       note="Block 3: auch im Graph-System. Zwei übereinstimmende Meldungen entscheiden; eine einzelne erst, "
+            "wenn die Gegenseite bis zur Frist nicht widerspricht (#1551: online 15 Min., Liga 48 h)."),
     _c("result.dispute", "Ergebnis anfechten",
        ["POST /api/matches/{match_id}/dispute"], [CLASSIC, GRAPH],
        note="Block 3: derselbe Endpunkt bedient beide Speicher."),
@@ -171,6 +171,10 @@ CAPABILITIES: tuple[Capability, ...] = (
     _c("lead.read", "Turnierleitung am Handy",
        ["GET /api/tournaments/{tid}/lead"], [GRAPH],
        note="#1156: offene Spiele für die Turnierleitung des Turniers - zuerst, was fehlt, dann nach Station."),
+    _c("lead.no_show", "„Nicht erschienen“ nach Frist entscheiden",
+       ["POST /api/tournaments/{tid}/lead/no-show/{match_id}"], [GRAPH],
+       note="#1551: nach der Frist schlägt der Server „kampflos verloren“ vor; die Turnierleitung bestätigt "
+            "(Forfeit-Weg) oder verlängert."),
 )
 
 

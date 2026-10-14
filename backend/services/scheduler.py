@@ -665,6 +665,18 @@ async def _safe_result_holds():
         _log_task_failure("result_holds", exc)
 
 
+async def _safe_match_deadlines():
+    """Fristen im Spiel (#1551): Vorschlag „nicht erschienen“ an die Turnierleitung und „Ergebnis gilt“ nach Frist."""
+    try:
+        from database import get_db
+        from services.match_deadline_sweep import sweep
+        result = await sweep(get_db())
+        if result.get("proposed") or result.get("confirmed"):
+            logger.info(f"[scheduler] match_deadlines proposed={result['proposed']} confirmed={result['confirmed']}")
+    except Exception as exc:
+        _log_task_failure("match_deadlines", exc)
+
+
 async def _safe_proof_photo_retention():
     """Fotos vom Ergebnis (#1157): nie verwendete nach 24 Stunden, sonst 30 Tage nach dem Hochladen weg."""
     try:
@@ -1071,6 +1083,9 @@ def start_scheduler() -> AsyncIOScheduler:
     # Ergebnisse mit „Rückgängig“ (#1156): nach 10 Sekunden veröffentlichen, auch nach einem Neustart.
     sched.add_job(_single_replica("result_holds", _safe_result_holds, lease_seconds=60.0), IntervalTrigger(seconds=5), id="result_holds",
                   max_instances=1, coalesce=True)
+    # Fristen im Spiel (#1551): „nicht erschienen“ vorschlagen, Ergebnisse nach Frist gelten lassen - jede Minute.
+    sched.add_job(_single_replica("match_deadlines", _safe_match_deadlines, lease_seconds=120.0), IntervalTrigger(seconds=60),
+                  id="match_deadlines", max_instances=1, coalesce=True)
     # Bildprüfung (#415): Sammler für alles, was die sofortige Prüfung nach dem Upload nicht erwischt hat.
     sched.add_job(_single_replica("media_scan", _safe_media_scan, lease_seconds=120.0), IntervalTrigger(seconds=20), id="media_scan",
                   max_instances=1, coalesce=True)

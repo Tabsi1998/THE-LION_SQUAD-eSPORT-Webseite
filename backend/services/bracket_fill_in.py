@@ -1,5 +1,5 @@
-"""Nachrücker nach dem Baubau (#1551, Entscheidung E15): genau ein freier Platz, solange dessen erstes echtes Spiel nicht
-begonnen hat.
+"""Nachrücker nach dem Baubau (#1551, Entscheidung E15): genau ein freier Platz, solange dessen erstes echtes Spiel
+nicht begonnen hat.
 
 Ein freier Platz ist
 - der Platz einer Person mit „Nicht erschienen“ - auch einer mit Freilos: das Freilos zählt dann für den Nachrücker,
@@ -15,7 +15,7 @@ from __future__ import annotations
 
 from services.match_v2_results import _status_after_slot_fill
 
-# Ein Spiel hat begonnen, sobald es läuft, entschieden ist, in Klärung steht, gemeldet wurde oder gerade eingetragen wird.
+# Ein Spiel hat begonnen, sobald es läuft, entschieden ist, in Klärung steht, gemeldet wurde oder eingetragen wird.
 STARTED_STATUSES = {"in_progress", "running", "waiting_result", "completed", "forfeit", "disputed"}
 DECIDED_STATUSES = {"completed", "forfeit"}
 LEAGUE_STAGE_TYPES = {"league", "round_robin_groups", "ffa_league"}
@@ -66,7 +66,8 @@ def replacement_targets(matches: list[dict], old_id: str) -> list[dict]:
         stage_ids = {match.get("stage_id") for match in involved}
         played = {
             match.get("round") for match in _fixed(matches)
-            if match.get("stage_id") in stage_ids and str(match.get("status") or "") in DECIDED_STATUSES and not is_auto_bye(match)
+            if match.get("stage_id") in stage_ids and not is_auto_bye(match)
+            and str(match.get("status") or "") in DECIDED_STATUSES
         }
         if len(played) > 1:
             raise FillInRefused(LEAGUE_DETAIL)
@@ -89,7 +90,8 @@ def swapped(match: dict, old_id: str, new_reg: dict) -> dict:
     change: dict = {"slots": slots}
     if is_auto_bye(match):
         change["results"] = [
-            {**row, "registration_id": new_reg["id"], "user_id": new_reg.get("user_id")} if row.get("registration_id") == old_id else row
+            {**row, "registration_id": new_reg["id"], "user_id": new_reg.get("user_id")}
+            if row.get("registration_id") == old_id else row
             for row in match.get("results") or []
         ]
     elif str(match.get("status") or "") in {"pending", "preview", "ready", "scheduled"}:
@@ -102,7 +104,8 @@ def _bye_target(match: dict, by_id: dict[str, dict]) -> tuple[dict, dict] | None
         if advancement.get("rank") != 1:
             continue
         target = by_id.get(advancement.get("to_match_id"))
-        slot = next((row for row in (target or {}).get("slots") or [] if row.get("slot") == advancement.get("to_slot")), None)
+        slots = (target or {}).get("slots") or []
+        slot = next((row for row in slots if row.get("slot") == advancement.get("to_slot")), None)
         if target and slot:
             return target, slot
     return None
@@ -112,7 +115,8 @@ def free_bye_place(matches: list[dict]) -> dict | None:
     """Der erste leere Platz neben einem Freilos, dessen Folgespiel noch nicht begonnen hat."""
     fixed = _fixed(matches)
     by_id = {match.get("id"): match for match in fixed}
-    ordered = sorted(fixed, key=lambda row: (row.get("stage_number") or 0, row.get("round") or 0, row.get("order") or 0))
+    ordered = sorted(fixed, key=lambda row: (row.get("stage_number") or 0, row.get("round") or 0,
+                                             row.get("order") or 0))
     for match in ordered:
         if not is_auto_bye(match) or len(slot_ids(match)) != 1:
             continue
@@ -137,13 +141,13 @@ def reopened_bye(place: dict, new_reg: dict, now_iso: str) -> tuple[dict, dict]:
         for slot in match.get("slots") or []
     ]
     reopened = {**match, "slots": slots, "status": "pending"}
-    match_set = {"slots": slots, "results": [], "result_meta": None, "status": _status_after_slot_fill(reopened, preserve_terminal=False),
-                 "updated_at": now_iso}
+    match_set = {"slots": slots, "results": [], "result_meta": None, "updated_at": now_iso,
+                 "status": _status_after_slot_fill(reopened, preserve_terminal=False)}
     target_slots = [
         {**slot, "registration_id": None, "user_id": None, "source_result": None, "status": "pending"}
         if slot.get("slot") == place["target_slot"] else dict(slot)
         for slot in target.get("slots") or []
     ]
-    target_set = {"slots": target_slots, "status": _status_after_slot_fill({**target, "slots": target_slots}, preserve_terminal=False),
-                  "updated_at": now_iso}
+    target_status = _status_after_slot_fill({**target, "slots": target_slots}, preserve_terminal=False)
+    target_set = {"slots": target_slots, "status": target_status, "updated_at": now_iso}
     return match_set, target_set
