@@ -172,8 +172,9 @@ async def _attach_live_counts(db, *groups: dict) -> None:
         official = {"challenge_id": {"$in": list(challenges)}, "is_invalid": {"$ne": True},
                     "$or": [{"score_scope": {"$exists": False}}, {"score_scope": {"$ne": "club_reference"}}]}
         drivers: dict[str, set] = {}
-        async for lap in db.f1_lap_times.find(official, {"_id": 0, "challenge_id": 1, "user_id": 1}):
-            drivers.setdefault(lap["challenge_id"], set()).add(lap.get("user_id"))
+        async for lap in db.f1_lap_times.find(official, {"_id": 0, "challenge_id": 1, "user_id": 1, "guest_id": 1}):
+            # Gäste ohne Konto (#1585) zählen je Gast.
+            drivers.setdefault(lap["challenge_id"], set()).add(lap.get("user_id") or f"guest-{lap.get('guest_id')}")
         for cid, rows in challenges.items():
             for row in rows:
                 row["live_counts"] = {"participants": len(drivers.get(cid, set()))}

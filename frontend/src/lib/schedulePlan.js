@@ -56,6 +56,20 @@ export async function updateMatchPlan(matchId, body) {
   }
 }
 
+/**
+ * Feste Termine auf einmal lösen (Praxis 14.10.): „all“ alle von Hand gesetzten, „missing_stations“ nur die Spiele an
+ * einer Station, die es nicht mehr gibt. Der Server löst nur Spiele, die noch nicht begonnen haben, und schreibt ins
+ * Protokoll. Danach plant „Automatisch planen“ neu.
+ */
+export async function releaseSchedule(tournamentId, scope = "all") {
+  try {
+    const { data } = await api.post(`/tournaments/${encodeURIComponent(tournamentId)}/schedule/release`, { scope });
+    return { ok: true, released: Number(data?.released) || 0 };
+  } catch (error) {
+    return { ok: false, message: formatRequestError(error, "Die Termine konnten nicht gelöst werden.") };
+  }
+}
+
 // Spielplaner (#1552), ein Ablauf für Turnierseite und Stationsseite: „Planen“ holt die Vorschau, der Dialog zeigt
 // Zeit und Station je Spiel samt Konflikten, und erst „Übernehmen“ schreibt - mit dem Fingerabdruck der gesehenen
 // Vorschau, damit nie etwas anderes geschrieben wird als gezeigt. Gibt true zurück, wenn geschrieben wurde.

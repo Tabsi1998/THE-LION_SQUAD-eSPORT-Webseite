@@ -38,7 +38,7 @@ test.describe("Sofort zufällig im Web-Turnierbaum", () => {
     await mockBracket(page, holder);
     await page.goto("/tournaments/smash-cup-8-sofort/bracket");
     // Nur die Plätze der gelosten Runde zählen (das Finale wartet regulär auf „Sieger aus E“).
-    const pending = page.getByText("Platz aus Runde 1");
+    const pending = page.getByText("Sieger aus Viertelfinale");
     await expect(pending).toHaveCount(4);
     await expect(page.locator("path[data-rail-spine]")).toHaveCount(1);
     await shot(page, "web-baum-sofort-1-vorher");

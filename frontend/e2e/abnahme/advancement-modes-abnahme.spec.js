@@ -182,7 +182,7 @@ test.describe("Abnahme: Weiterkommen in vier Modi gegen den echten Server", () =
     await login(playerPage, state.accounts.player);
     const playerProblems = watch(playerPage);
     await playerPage.goto(`/tournaments/${slug}/bracket`);
-    await expect(playerPage.getByText("Platz aus Runde 1").first()).toBeVisible();
+    await expect(playerPage.getByText("Weiter aus Runde 1").first()).toBeVisible();
     await shot(playerPage, "show-spieler-baum-vorher-1440.png");
 
     await page.goto(`/tournaments/${slug}/leitung`);
@@ -236,7 +236,7 @@ test.describe("Abnahme: Weiterkommen in vier Modi gegen den echten Server", () =
     await login(playerPage, state.accounts.player);
     const playerProblems = watch(playerPage);
     await playerPage.goto(`/tournaments/${slug}/bracket`);
-    await expect(playerPage.getByText("Platz aus Runde 1")).toHaveCount(4);
+    await expect(playerPage.getByText("Sieger aus Viertelfinale")).toHaveCount(4);
     await shot(playerPage, "sofort-spieler-baum-vorher-1440.png");
 
     await page.goto(`/tournaments/${slug}/leitung`);
@@ -249,7 +249,7 @@ test.describe("Abnahme: Weiterkommen in vier Modi gegen den echten Server", () =
     expect(landed.status).toBe("pending");
     expect(landed.draw).toBeFalsy();
     // Der Baum des Spielers zieht nach (Live-Neuladen): drei Plätze warten noch, der Name steht in E oder F.
-    await expect(playerPage.getByText("Platz aus Runde 1")).toHaveCount(3, { timeout: 40_000 });
+    await expect(playerPage.getByText("Sieger aus Viertelfinale")).toHaveCount(3, { timeout: 40_000 });
     const names = Object.fromEntries((await (await page.request.get(`/api/tournaments/${tid}/registrations`)).json()).map((reg) => [reg.id, reg.display_name]));
     await expect(playerPage.getByTestId(`bracket-match-v2-${landed.id}`)).toContainText(names[winnerA]);
     await shot(playerPage, "sofort-spieler-baum-ein-platz-1440.png");
@@ -258,7 +258,7 @@ test.describe("Abnahme: Weiterkommen in vier Modi gegen den echten Server", () =
     rows = await matchesOf(page, tid);
     const winnerB = rows.B.results.find((row) => row.rank === 1).registration_id;
     expect(Object.values(rows).some((row) => row.round === 2 && seated(row).includes(winnerB))).toBe(true);
-    await expect(playerPage.getByText("Platz aus Runde 1")).toHaveCount(2, { timeout: 40_000 });
+    await expect(playerPage.getByText("Sieger aus Viertelfinale")).toHaveCount(2, { timeout: 40_000 });
     await shot(playerPage, "sofort-spieler-baum-zwei-plaetze-1440.png");
     await shot(page, "sofort-leitung-375.png");
 
@@ -309,11 +309,11 @@ test.describe("Abnahme: Weiterkommen in vier Modi gegen den echten Server", () =
     const freed = freedMatch?.slots.find((slot) => slot.source_result?.removed_registration_id === winnerA);
     expect(freed?.status).toBe("bye");
     // Der Spieler sieht den frei gewordenen Platz als Freilos und den Namen nur noch in Runde 1 - erst dann das Bild
-    // („Platz aus Runde 1“ zählt vorher wie nachher zwei, das reicht nicht als Warten auf das Nachladen).
+    // („Sieger aus Viertelfinale“ zählt vorher wie nachher zwei, das reicht nicht als Warten auf das Nachladen).
     const freedCard = playerPage.getByTestId(`bracket-match-v2-${freedMatch.id}`);
     await expect(freedCard).toContainText("Freilos", { timeout: 40_000 });
     await expect(freedCard).not.toContainText(names[winnerA]);
-    await expect(playerPage.getByText("Platz aus Runde 1")).toHaveCount(2);
+    await expect(playerPage.getByText("Sieger aus Viertelfinale")).toHaveCount(2);
     await shot(playerPage, "sofort-spieler-baum-nach-austritt-1440.png");
     expect(problems).toEqual([]);
     expect(playerProblems).toEqual([]);

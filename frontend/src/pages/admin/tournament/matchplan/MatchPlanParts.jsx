@@ -100,7 +100,7 @@ export function PlanSettings({ tournament, mode, duration, stations, canEdit, on
             {stations.map((station) => (
               <li key={station.id} className="mp-chip" data-status={station.status}>
                 <span>{station.name}</span>
-                <span className="mp-chip__meta">{formatDeviceType(station.device_type)}{station.status === "broken" ? " · defekt" : ""}</span>
+                <span className="mp-chip__meta">{formatDeviceType(station.device_type)}{station.scope === "event" ? " · Event" : ""}{station.status === "broken" ? " · defekt" : ""}</span>
               </li>
             ))}
             {!stations.length && <li className="mp-chip mp-chip--empty">Noch keine Station - ohne Station plant der Planer keine Zeiten.</li>}

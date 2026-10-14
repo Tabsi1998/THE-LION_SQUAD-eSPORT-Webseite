@@ -3,7 +3,9 @@
 // „−1.204 s · persönliche Bestzeit“ an die Zeile, eine erste Zeit „Neu“. Ist es die schnellste Zeit überhaupt (echt
 // schneller, nicht gleich schnell, ohne Strafsekunden), kommt der Bestzeit-Moment: Name, Zeit, Abstand und wer sie
 // vorher hatte. Strafsekunden und ungültige Zeiten sortiert der Server ein (die Zeiten kommen in Millisekunden, mit
-// Strafe) - sie machen nichts schneller und lösen keinen Moment aus.
+// Strafe) - sie machen nichts schneller und lösen keinen Moment aus. Schlüssel einer Zeile ist `participant_id` - so
+// haben auch Gäste ohne Konto (#1585) ihre eigenen Hinweise; `userId` im Ergebnis ist dieser Schlüssel.
+import { participantKey } from "./fastLapEvent";
 
 function byRank(a, b) {
   const rank = (entry) => (Number.isFinite(Number(entry.rank)) ? Number(entry.rank) : Number.POSITIVE_INFINITY);
@@ -11,7 +13,7 @@ function byRank(a, b) {
 }
 
 function entriesOf(board) {
-  return (board?.entries || []).filter((entry) => entry?.user_id && Number.isFinite(Number(entry.time_ms)));
+  return (board?.entries || []).filter((entry) => participantKey(entry) && Number.isFinite(Number(entry.time_ms)));
 }
 
 /**
@@ -22,27 +24,28 @@ export function compareBoards(previous, next) {
   const empty = { improved: [], added: [], best: null };
   if (!previous || !next) return empty;
   if ((previous.track?.id || "") !== (next.track?.id || "")) return empty;
-  const before = new Map(entriesOf(previous).map((entry) => [entry.user_id, entry]));
+  const before = new Map(entriesOf(previous).map((entry) => [participantKey(entry), entry]));
   const improved = [];
   const added = [];
   for (const entry of entriesOf(next)) {
-    const old = before.get(entry.user_id);
-    if (!old) added.push({ userId: entry.user_id, entry });
-    else if (Number(entry.time_ms) < Number(old.time_ms)) improved.push({ userId: entry.user_id, entry, old, deltaMs: Number(entry.time_ms) - Number(old.time_ms) });
+    const key = participantKey(entry);
+    const old = before.get(key);
+    if (!old) added.push({ userId: key, entry });
+    else if (Number(entry.time_ms) < Number(old.time_ms)) improved.push({ userId: key, entry, old, deltaMs: Number(entry.time_ms) - Number(old.time_ms) });
   }
   // Wer vorn liegt, sagt der Rang vom Server (#1584) - bei gleicher Zeit die früher gefahrene.
   const [oldLeader] = entriesOf(previous).sort(byRank);
   const [newLeader] = entriesOf(next).sort(byRank);
   let best = null;
   const changed = new Set([...improved, ...added].map((row) => row.userId));
-  if (newLeader && changed.has(newLeader.user_id) && !(Number(newLeader.penalty_seconds) > 0)) {
+  if (newLeader && changed.has(participantKey(newLeader)) && !(Number(newLeader.penalty_seconds) > 0)) {
     if (!oldLeader || Number(newLeader.time_ms) < Number(oldLeader.time_ms)) {
       best = {
-        userId: newLeader.user_id,
+        userId: participantKey(newLeader),
         entry: newLeader,
         previous: oldLeader || null,
         gapMs: oldLeader ? Number(newLeader.time_ms) - Number(oldLeader.time_ms) : null,
-        ownRecord: Boolean(oldLeader && oldLeader.user_id === newLeader.user_id),
+        ownRecord: Boolean(oldLeader && participantKey(oldLeader) === participantKey(newLeader)),
       };
     }
   }

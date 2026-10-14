@@ -1,3 +1,4 @@
+import { displayRoundLabels } from "@/lib/bracketNames";
 import { useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, createContext } from "react";
 import { Link, useInRouterContext } from "react-router-dom";
 import { AnimatePresence, MotionConfig, motion } from "framer-motion";
@@ -8,8 +9,8 @@ import { finderFor, initials } from "@/lib/slotSource";
 import { buildPodiumMap, finalMatchOf, isBronzeMatch, lastStageId, normalizeSection } from "@/lib/bracketPodium";
 import { bracketEdges, drawRails, isCancelled, isDone, isLive, orderEdges, pathFor, sectionGroup } from "@/lib/bracketGraph";
 import { motionTransition } from "@/lib/motion";
-import { laneCounter, routeBus, routeEdge, toPath } from "@/lib/bracketLines";
-import { TV_LINE, treeBlockUnits, treeBox, treeScale } from "@/lib/tvType";
+import { stageLines } from "@/lib/bracketLines";
+import { TV_LINE, TV_STAGE_UNIT_PX, treeBlockUnits, treeBox, treeScale } from "@/lib/tvType";
 import { effectiveMatchDuration } from "@/lib/matchDuration";
 import { BracketMotionContext, useBracketMotion, useBracketMotionState } from "./bracket/bracketMotion";
 import { LiveClock, MatchCard, getStationLabel, slotLabel, formatNodeDateTime } from "./bracket/BracketCards";
@@ -108,7 +109,8 @@ function usePath(matches, edges) {
 
 export function BracketTree({ data, compact = false, viewMode = "standard", onMatchClick, changedMatchIds = EMPTY_SET, mineId = null, layout = "auto", nodeRenderer = null, tvLayout = null, quietUpdate = false }) {
   const { matches_v2: matchesRaw, stages: stagesRaw, registrations: registrationsRaw } = data || {};
-  const matches_v2 = useMemo(() => matchesRaw || [], [matchesRaw]);
+  // Rundennamen je Abschnitt fortlaufend (#1591): das Loser Bracket beginnt mit „Loser Runde 1“.
+  const matches_v2 = useMemo(() => displayRoundLabels(matchesRaw || []), [matchesRaw]);
   const stages = useMemo(() => stagesRaw || [], [stagesRaw]);
   const registrations = useMemo(() => registrationsRaw || [], [registrationsRaw]);
   const isTv = viewMode === "tv";
@@ -493,6 +495,16 @@ function ChampionCard({ match, regMap }) {
   );
 }
 
+/** Geht es seitlich weiter (#1591)? `data-more` „left“, „right“ oder „both“ blendet den Rand aus (index.css). */
+function markMore(canvas) {
+  if (!canvas) return;
+  const left = canvas.scrollLeft > 1;
+  const right = canvas.scrollLeft + canvas.clientWidth < canvas.scrollWidth - 1;
+  const value = left && right ? "both" : left ? "left" : right ? "right" : "";
+  if (value) canvas.setAttribute("data-more", value);
+  else canvas.removeAttribute("data-more");
+}
+
 /**
  * Die Leinwand einer Phase am Desktop: links Hauptfeld und Loser Bracket untereinander, rechts Grand Final, Pokal und
  * Spiel um Platz 3. Die Linien liegen als ein SVG darüber und werden nur gemessen, wenn sich Daten oder Größen ändern
@@ -526,7 +538,9 @@ function StageCanvas({ stageId, sections, names, regMap, podiumMap, champion, ha
     return map;
   }, [names, sections]);
   // Liegt ein Ziel einer Gruppe in der ersten Spalte (Loser-Runde 1), braucht die Schiene links eine Gasse.
-  const busLead = stageRails.some((rail) => rail.targets.some((id) => columnOf.get(id) === 0));
+  // Ebenso der Eingang eines Abstiegs (#1591), der in die erste Spalte des Loser Brackets führt.
+  const busLead = stageRails.some((rail) => rail.targets.some((id) => columnOf.get(id) === 0))
+    || stageEdges.some((edge) => edge.flow === "L" && edge.cross && columnOf.get(edge.to) === 0);
 
   useLayoutEffect(() => {
     const canvas = canvasRef.current;
@@ -547,6 +561,12 @@ function StageCanvas({ stageId, sections, names, regMap, podiumMap, champion, ha
       });
       const anchors = new Map();
       canvas.querySelectorAll("[data-slot-anchor]").forEach((node) => anchors.set(node.getAttribute("data-slot-anchor"), node.getBoundingClientRect()));
+      // Weiterkommer verlassen einen Lauf an der Zeile „kommen weiter“, die anderen an „Die anderen …“ (#1591).
+      const exits = new Map();
+      canvas.querySelectorAll("[data-exit-anchor]").forEach((node) => {
+        const rect = node.getBoundingClientRect();
+        if (rect.height) exits.set(node.getAttribute("data-exit-anchor"), rect.top + rect.height / 2 + oy);
+      });
       const corridors = [];
       canvas.querySelectorAll("section[data-testid^='bracket-section-']").forEach((node) => {
         const rect = local(node.getBoundingClientRect());
@@ -559,64 +579,29 @@ function StageCanvas({ stageId, sections, names, regMap, podiumMap, champion, ha
         if (rect.width) heads.push(local(rect));
       });
       const obstacles = [...nodes.values(), ...heads];
-      const lanes = laneCounter();
-      const lines = [];
-      const freeCorridors = corridors.filter((y) => y > 2);
-      // Sammelschienen (#1548): je gemischter Gruppe eine senkrechte Linie in der Gasse vor ihren Zielen, je Quelle ein
-      // Ast hinauf, je Ziel ein Ast hinaus - das Gerüst, das auch nach der Auslosung stehen bleibt.
-      const rails = new Map();
-      for (const rail of stageRails) {
-        const targetIds = rail.targets.filter((id) => nodes.has(id) && !isCancelled(byIdMatch(id)));
-        if (!targetIds.length) continue;
-        const section = String(byIdMatch(targetIds[0])?.section || "");
-        const sourceIds = [...new Set(rail.sources.map((source) => source.id))].filter((id) => nodes.has(id) && !isCancelled(byIdMatch(id)));
-        const sources = sourceIds.map((id) => ({ id, rect: nodes.get(id), cross: String(byIdMatch(id)?.section || "") !== section }));
-        const slotYs = [];
-        for (const id of targetIds) {
-          for (const slot of byIdMatch(id)?.slots || []) {
-            const anchor = anchors.get(`${id}:${slot.slot}`);
-            if (anchor && anchor.height) slotYs.push(anchor.top + anchor.height / 2 + oy);
-          }
-        }
-        const bus = routeBus({ sources, targets: targetIds.map((id) => ({ id, rect: nodes.get(id) })), slotYs, obstacles, corridors: freeCorridors, gap: COLUMN_GAP, lanes });
-        rails.set(rail.key, bus);
-        const column = columnOf.get(targetIds[0]) || 0;
-        const node = `rail:${rail.key}`;
-        lines.push({ id: `${node}:spine`, from: node, to: node, flow: "W", spine: rail.key, railGroup: rail.group, d: toPath(bus.spine), column });
-        for (const source of sources) {
-          const flow = rail.sources.find((entry) => entry.id === source.id)?.flow || "W";
-          lines.push({ id: `${node}:in:${source.id}`, from: source.id, to: node, flow, cross: source.cross, scaffold: "in", railKey: `${rail.key}:${source.id}`, rail: rail.key, d: toPath(bus.branchesIn.get(source.id)), column: columnOf.get(source.id) || 0 });
-        }
-        for (const id of targetIds) {
-          lines.push({ id: `${node}:out:${id}`, from: node, to: id, flow: "W", scaffold: "out", rail: rail.key, d: toPath(bus.branchesOut.get(id)), column });
-        }
-      }
-      for (const edge of stageEdges) {
-        const a = nodes.get(edge.from);
-        const b = nodes.get(edge.to);
-        if (!a || !b) continue;
-        const anchor = anchors.get(`${edge.to}:${edge.toSlot}`);
-        if (edge.rail && rails.has(edge.rail)) {
-          // Der echte Weg eines Spielers nach der Auslosung: Ast aus der Quelle, die Schiene entlang, Ast in den Platz.
-          const points = rails.get(edge.rail).via(a, edge.cross, anchor && anchor.height ? anchor.top + anchor.height / 2 + oy : b.top + b.height / 2, b);
-          lines.push({ ...edge, d: toPath(points), column: columnOf.get(edge.from) || 0 });
-          continue;
-        }
-        const drop = edge.flow === "L" && edge.cross;
-        const points = routeEdge({
-          a, b, obstacles, lanes, gap: COLUMN_GAP,
-          corridors: freeCorridors,
-          toY: anchor && anchor.height ? anchor.top + anchor.height / 2 + oy : undefined,
-          // Der Abstieg beginnt unten an der Karte - so liegt er nicht auf dem Knick des Siegers.
-          fromY: drop ? a.bottom - 10 : undefined,
-          preferCorridor: drop,
-        });
-        lines.push({ ...edge, d: toPath(points), column: columnOf.get(edge.from) || 0 });
-      }
+      // Eine Rechnung für Web und TV (lib/bracketLines.stageLines): Sammelschienen (#1548) und echte Linien.
+      const lines = stageLines({
+        edges: stageEdges,
+        rails: stageRails,
+        nodes,
+        slotY: (id, slot) => {
+          const anchor = anchors.get(`${id}:${slot}`);
+          return anchor && anchor.height ? anchor.top + anchor.height / 2 + oy : undefined;
+        },
+        exitY: (id, flow) => exits.get(`${id}:${flow}`),
+        corridors: corridors.filter((y) => y > 2),
+        obstacles,
+        gap: COLUMN_GAP,
+        columnOf,
+        matchOf: byIdMatch,
+        isVoid: (id) => isCancelled(byIdMatch(id)),
+      });
       const w = canvas.scrollWidth;
       const h = canvas.scrollHeight;
-      const key = `${w}x${h}|${lines.map((line) => `${line.id}:${line.d}`).join(";")}`;
-      setGeom((current) => (current.key === key ? current : { lines, w, h, key }));
+      const overflow = w > canvas.clientWidth + 1;
+      markMore(canvas);
+      const key = `${w}x${h}|${overflow}|${lines.map((line) => `${line.id}:${line.d}`).join(";")}`;
+      setGeom((current) => (current.key === key ? current : { lines, w, h, key, overflow }));
     };
     const schedule = () => {
       if (frame || typeof requestAnimationFrame !== "function") { if (!frame) measure(); return; }
@@ -626,6 +611,8 @@ function StageCanvas({ stageId, sections, names, regMap, podiumMap, champion, ha
     if (typeof ResizeObserver === "undefined") return undefined;
     const observer = new ResizeObserver(schedule);
     if (contentRef.current) observer.observe(contentRef.current);
+    // Auch die Leinwand selbst: wird das Fenster schmaler, kommt der Hinweis zum Scrollen (#1591).
+    observer.observe(canvas);
     canvas.querySelectorAll("[data-node]").forEach((node) => observer.observe(node));
     return () => {
       observer.disconnect();
@@ -633,17 +620,49 @@ function StageCanvas({ stageId, sections, names, regMap, podiumMap, champion, ha
     };
   }, [stageEdges, stageRails, columnOf, sections, byIdMatch]);
 
-  const block = (name) => (
+  const onScroll = useCallback((event) => markMore(event.currentTarget), []);
+
+  // Zeigen oder Tippen auf eine Karte (#1591): ihre Abstiege, die Äste in eine Schiene und die Einzelwege erscheinen.
+  // Nur Attribute an den Linien - die Karten rendern dafür nicht neu.
+  const focusRef = useRef(null);
+  const focusOn = useCallback((id) => {
+    const svg = canvasRef.current?.querySelector("[data-testid='bracket-connectors']");
+    if (!svg || focusRef.current === id) return;
+    focusRef.current = id;
+    svg.querySelectorAll("[data-focus]").forEach((node) => node.removeAttribute("data-focus"));
+    if (id) svg.querySelectorAll(`[data-rel~="${id}"]`).forEach((node) => node.setAttribute("data-focus", "1"));
+  }, []);
+  const onPointerOver = useCallback((event) => {
+    const node = event.target?.closest?.("[data-node]");
+    focusOn(node ? node.getAttribute("data-node") : null);
+  }, [focusOn]);
+  const onPointerLeave = useCallback(() => focusOn(null), [focusOn]);
+  useEffect(() => { focusRef.current = null; }, [geom.key]);
+
+  // Kompakt (#1591): hat das Loser Bracket mehr Runden als das Winner Bracket, stehen Grand Final, Reset und Pokal in
+  // der freien Spalte rechts neben dem Winner Bracket (über der letzten Loser-Runde) - untereinander statt nebeneinander.
+  // So passt ein Doppel-K.-o. mit 8 oder 16 Läufen bei 1440 px ohne Abschneiden.
+  const columnsOf = (group) => Math.max(0, ...left.filter((name) => sectionGroup(name) === group).map((name) => roundNumbers(sections[name]).length));
+  const mains = left.filter((name) => sectionGroup(name) === "main");
+  const compact = Boolean(right.length || champion) && mains.length === 1 && columnsOf("loser") > columnsOf("main");
+  const finals = order(right).filter((name) => sectionGroup(name) === "final");
+  // Nur K.-o. ohne Loser Bracket und ohne weitere Abschnitte: der Pokal steht unter dem Finale in der letzten Spalte,
+  // statt eine ganze Spalte breiter zu machen (#1591).
+  const championBelow = Boolean(champion) && !right.length && !left.some((name) => sectionGroup(name) === "loser") && mains.length === 1;
+  const others = order(right).filter((name) => sectionGroup(name) !== "final");
+
+  const block = (name, { stacked = false, trophy = false } = {}) => (
     <section key={name} className="space-y-3" data-testid={`bracket-section-${normalizeSection(name)}`}>
       <SectionTitle section={name} flowHint={sectionFlowHint(name, hasLoser, hasReset)} sticky={left.includes(name)} fit />
-      <div className="flex items-stretch" style={{ gap: COLUMN_GAP }}>
-        {roundNumbers(sections[name]).map((rn) => (
+      <div className={stacked ? "flex flex-col gap-6" : "flex items-stretch"} style={stacked ? undefined : { gap: COLUMN_GAP }}>
+        {roundNumbers(sections[name]).map((rn, index, all) => (
           <div key={rn} className="flex shrink-0 flex-col" style={{ width: CARD_WIDTH }}>
             <div className="mb-3 min-h-[1rem] px-1 text-[11px] font-bold uppercase tracking-wider text-muted-text" data-testid="bracket-round-title">
               {roundHeading(sections[name][rn], rn, formatBracketSection(name))}
             </div>
-            <div className="flex flex-1 flex-col justify-around gap-4">
+            <div className={`flex flex-1 flex-col gap-4 ${trophy && index === all.length - 1 ? "justify-center gap-8" : "justify-around"}`}>
               {sections[name][rn].map((match) => <MatchCard key={match.id} match={match} regMap={regMap} podiumMap={podiumMap} />)}
+              {trophy && index === all.length - 1 ? <ChampionCard match={champion} regMap={regMap} /> : null}
             </div>
           </div>
         ))}
@@ -652,24 +671,35 @@ function StageCanvas({ stageId, sections, names, regMap, podiumMap, champion, ha
   );
 
   return (
-    <div ref={canvasRef} className="tls-bracket-canvas relative overflow-x-auto pb-4" data-testid="bracket-tree" data-stage={stageId}>
+    <>
+    {geom.overflow ? (
+      <p className="mb-2 flex items-center gap-1.5 text-xs text-muted-text" data-testid="bracket-scroll-hint">
+        <ChevronRight className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />Der Baum ist breiter als das Fenster – seitlich scrollen.
+      </p>
+    ) : null}
+    <div ref={canvasRef} className="tls-bracket-canvas relative overflow-x-auto pb-4" data-testid="bracket-tree" data-stage={stageId} onPointerOver={onPointerOver} onPointerLeave={onPointerLeave} onScroll={onScroll}>
       <svg className="pointer-events-none absolute left-0 top-0" width={geom.w || "100%"} height={geom.h || "100%"} aria-hidden="true" data-testid="bracket-connectors">
         {geom.lines.map((line) => {
           // Gerüst der Schiene: an, solange dein Weg (noch vor der Auslosung) hierher führt - danach leuchtet der echte Weg.
           const onRail = !active ? false
             : line.spine ? [...(active.rails || [])].some((key) => key.startsWith(`${line.spine}:`))
-              : line.scaffold === "in" ? active.rails?.has(line.railKey) : false;
+              : line.scaffold === "in" ? (line.railKeys ? line.railKeys.some((key) => active.rails?.has(key)) : active.rails?.has(line.railKey)) : false;
           const state = active ? (onRail || active.edges.has(line.id) || (line.to === CHAMPION_ID && championId && active.ids.has(championId)) ? "on" : "off") : "";
-          const fresh = line.spine || line.scaffold ? undefined : motionState.fresh.get(`${line.from}>${line.to}`);
-          const quiet = line.flow === "L" && line.cross;
-          const real = Boolean(line.rail && !line.scaffold && !line.spine);
+          const fresh = line.spine || line.scaffold || line.fork || line.stub ? undefined : motionState.fresh.get(`${line.from}>${line.to}`);
+          const quiet = line.flow === "L" && line.cross && !line.stub;
+          const real = Boolean(line.rail && !line.scaffold && !line.spine && !line.stub);
           return (
             <path
               key={line.id}
               d={line.d}
-              pathLength={line.void || (quiet && fresh == null && !real) ? undefined : "1"}
-              className={`tls-bracket-line ${line.void ? "tls-bracket-line--void" : fresh != null ? "tls-bracket-line--fresh" : real ? "tls-bracket-line--real" : quiet ? "tls-bracket-line--drop" : "tls-bracket-line--draw"}`}
+              pathLength={line.void || line.stub || (quiet && fresh == null && !real) ? undefined : "1"}
+              className={`tls-bracket-line ${line.void ? "tls-bracket-line--void" : line.stub ? "tls-bracket-line--stub" : fresh != null ? "tls-bracket-line--fresh" : real ? "tls-bracket-line--real" : quiet ? "tls-bracket-line--drop" : "tls-bracket-line--draw"}`}
               style={{ "--tls-i": line.column, ...(fresh != null ? { "--tls-fresh-delay": `${fresh.delay}ms`, "--tls-fresh-duration": `${fresh.duration}ms` } : null) }}
+              data-id={line.id}
+              data-demand={line.demand ? "1" : undefined}
+              data-fork={line.fork ? "1" : undefined}
+              data-stub={line.stub ? "1" : undefined}
+              data-rel={line.rel ? line.rel.join(" ") : undefined}
               data-rail-spine={line.spine || undefined}
               data-rail-group={line.railGroup || undefined}
               data-real={real ? "1" : undefined}
@@ -684,18 +714,37 @@ function StageCanvas({ stageId, sections, names, regMap, podiumMap, champion, ha
             />
           );
         })}
+        {/* Eingang (#1591): ein Marker am freien Ende - hier kommen Plätze aus einem anderen Abschnitt an. */}
+        {geom.lines.filter((line) => line.marker).map((line) => (
+          <circle key={`${line.id}:marker`} className="tls-bracket-marker" cx={line.marker.x} cy={line.marker.y} r={3.5} data-line-marker="1" data-rel={line.rel ? line.rel.join(" ") : undefined} data-path={active ? "off" : undefined} />
+        ))}
       </svg>
-      <div ref={contentRef} className="relative grid w-max items-center" data-rail-lead={busLead ? "1" : undefined} style={{ gridTemplateColumns: right.length || champion ? "max-content max-content" : "max-content", columnGap: COLUMN_GAP, paddingLeft: busLead ? COLUMN_GAP : undefined }}>
-        <div className="space-y-10">{order(left).map(block)}</div>
-        {right.length || champion ? (
-          <div className="flex flex-col justify-center gap-10">
-            {order(right).filter((name) => sectionGroup(name) === "final").map(block)}
-            {champion ? <div style={{ width: CARD_WIDTH }}><ChampionCard match={champion} regMap={regMap} /></div> : null}
-            {order(right).filter((name) => sectionGroup(name) !== "final").map(block)}
+      {compact ? (
+        <div ref={contentRef} className="relative w-max space-y-10" data-rail-lead={busLead ? "1" : undefined} data-layout="compact" style={{ paddingLeft: busLead ? COLUMN_GAP : undefined, paddingRight: COLUMN_GAP }}>
+          <div className="flex items-end" style={{ gap: COLUMN_GAP }}>
+            {block(mains[0])}
+            <div className="flex flex-col gap-8" style={{ width: CARD_WIDTH }}>
+              {finals.map((name) => block(name, { stacked: true }))}
+              {champion ? <ChampionCard match={champion} regMap={regMap} /> : null}
+              {others.map((name) => block(name, { stacked: true }))}
+            </div>
           </div>
-        ) : null}
-      </div>
+          {order(left).filter((name) => name !== mains[0]).map((name) => block(name))}
+        </div>
+      ) : (
+        <div ref={contentRef} className="relative grid w-max items-center" data-rail-lead={busLead ? "1" : undefined} style={{ gridTemplateColumns: right.length || (champion && !championBelow) ? "max-content max-content" : "max-content", columnGap: COLUMN_GAP, paddingLeft: busLead ? COLUMN_GAP : undefined }}>
+          <div className="space-y-10">{order(left).map((name) => block(name, { trophy: championBelow && name === mains[0] }))}</div>
+          {right.length || (champion && !championBelow) ? (
+            <div className="flex flex-col justify-center gap-10">
+              {finals.map((name) => block(name))}
+              {champion && !championBelow ? <div style={{ width: CARD_WIDTH }}><ChampionCard match={champion} regMap={regMap} /></div> : null}
+              {others.map((name) => block(name))}
+            </div>
+          ) : null}
+        </div>
+      )}
     </div>
+    </>
   );
 }
 
@@ -704,29 +753,176 @@ function StageCanvas({ stageId, sections, names, regMap, podiumMap, champion, ha
 function TvStageTree({ stages, matches, regMap, podiumMap, compact, onMatchClick }) {
   const stagesForView = stages.length ? stages : [{ id: "__default", name: "Turnierbaum", number: 1 }];
   const byStage = useMemo(() => groupMatches(matches), [matches]);
-  const tvLayoutValue = useContext(TvLayoutContext);
   return (
     <div className="tv-tree" data-testid="tv-tree" data-season-quiet="bracket">
       {stagesForView.map((stage) => {
-        const stageSections = byStage[stage.id] || {};
+        // Wie im Web-Baum (#1561): eine Runde, die der Umbau ganz gestrichen hat, fällt aus der Ansicht.
+        const stageSections = withoutDroppedRounds(byStage[stage.id] || {});
         const blocks = Object.keys(stageSections).map((name) => ({ name, rounds: stageSections[name] }));
         if (!blocks.length) return null;
-        const hasLoser = blocks.some((block) => sectionGroup(block.name) === "loser");
-        const hasReset = hasResetMatch(stageSections);
         return (
-          <section key={stage.id} className="tv-tree__stage" data-tv-stage={stage.id}>
-            {stagesForView.length > 1 ? <h3 className="tv-tree__phase tv-t-head font-heading">{stage.name || `Phase ${stage.number || ""}`}</h3> : null}
-            {arrangeTvBlocks(blocks, tvLayoutValue).map((row) => (
-              <div key={row.map((block) => block.name).join("+")} className="tv-tree__row">
-                {row.map((block) => (
-                  <TvSection key={`${stage.id}-${block.name}`} section={block.name} rounds={block.rounds} regMap={regMap} podiumMap={podiumMap} compact={compact} onMatchClick={onMatchClick} flowHint={sectionFlowHint(block.name, hasLoser, hasReset)} />
-                ))}
-              </div>
-            ))}
-          </section>
+          <TvStageCanvas key={stage.id} stage={stage} multi={stagesForView.length > 1} blocks={blocks} sections={stageSections}
+            regMap={regMap} podiumMap={podiumMap} compact={compact} onMatchClick={onMatchClick} />
         );
       })}
     </div>
+  );
+}
+
+/**
+ * Eine Phase am TV (#1564): dieselben Linien wie im Web-Baum - aus den Quellen der Plätze (lib/bracketGraph), geführt nur
+ * durch Gassen und Lücken (lib/bracketLines). Ein SVG über der ganzen Phase, deshalb auch über die Blöcke hinweg: der
+ * Abstieg ins Loser Bracket (leise), die Linien aus Winner und Loser Bracket ins Grand Final und in den Reset. Jede Linie
+ * endet in der Zeile ihres Platzes. Gemessen wird nur, wenn sich Daten oder Größen ändern; die Kamera vergrößert die
+ * Bühne, deshalb wird zurückgerechnet. `data-points` trägt den Weg für die Fahrten (TvBracketStage).
+ */
+function TvStageCanvas({ stage, multi, blocks, sections, regMap, podiumMap, compact, onMatchClick }) {
+  const ref = useRef(null);
+  const [geom, setGeom] = useState({ lines: [], w: 0, h: 0, key: "" });
+  const { edges, byId } = useContext(GraphContext);
+  const byIdMatch = useCallback((id) => byId.get(id), [byId]);
+  const tvLayoutValue = useContext(TvLayoutContext);
+  const gap = treeBox(tvLayoutValue.textSize || "normal").colGap * TV_STAGE_UNIT_PX;
+  const hasLoser = blocks.some((block) => sectionGroup(block.name) === "loser");
+  const hasReset = hasResetMatch(sections);
+  const treeBlocks = useMemo(() => blocks.filter((block) => !isTableFormat(Object.values(block.rounds).flat())), [blocks]);
+  const columnOf = useMemo(() => {
+    const map = new Map();
+    for (const block of treeBlocks) roundNumbers(block.rounds).forEach((rn, index) => block.rounds[rn].forEach((match) => map.set(match.id, index)));
+    return map;
+  }, [treeBlocks]);
+  const stageEdges = useMemo(() => edges.filter((edge) => columnOf.has(edge.from) && columnOf.has(edge.to)), [edges, columnOf]);
+  // Gemischte Runden (#1548): dieselben Sammelschienen wie im Web-Baum (bracketGraph.drawRails).
+  const stageRails = useMemo(() => drawRails(treeBlocks.flatMap((block) => Object.values(block.rounds).flat())), [treeBlocks]);
+  // Führt eine Schiene oder ein Eingang (#1591) in die erste Spalte, braucht die Phase links eine Gasse.
+  const lead = stageRails.some((rail) => rail.targets.some((id) => columnOf.get(id) === 0))
+    || stageEdges.some((edge) => edge.flow === "L" && edge.cross && columnOf.get(edge.to) === 0);
+
+  useLayoutEffect(() => {
+    const root = ref.current;
+    if (!root) return undefined;
+    let frame = 0;
+    const measure = () => {
+      frame = 0;
+      const base = root.getBoundingClientRect();
+      const scale = root.offsetWidth && base.width ? base.width / root.offsetWidth : 1;
+      const local = (rect) => {
+        const left = (rect.left - base.left) / scale;
+        const top = (rect.top - base.top) / scale;
+        const width = rect.width / scale;
+        const height = rect.height / scale;
+        return { left, top, right: left + width, bottom: top + height, width, height };
+      };
+      const cards = new Map();
+      root.querySelectorAll("[data-tv-card]").forEach((node) => {
+        const rect = node.getBoundingClientRect();
+        if (rect.width) cards.set(node.getAttribute("data-tv-card"), local(rect));
+      });
+      const anchors = new Map();
+      root.querySelectorAll("[data-slot-anchor]").forEach((node) => {
+        const rect = node.getBoundingClientRect();
+        if (rect.height) anchors.set(node.getAttribute("data-slot-anchor"), local(rect));
+      });
+      // Die Lücken über und unter den Blöcken sind die freien Querbahnen; Köpfe und Rundentitel sind Hindernisse - vom
+      // Blocktitel nur Marke und Text, nicht die ganze Zeile (sonst sperrt er die Gassen darunter).
+      const corridors = [];
+      root.querySelectorAll("[data-tv-block]").forEach((node) => {
+        const rect = node.getBoundingClientRect();
+        if (!rect.height) return;
+        const box = local(rect);
+        corridors.push(box.top - gap / 4, box.bottom + gap / 4);
+      });
+      const heads = [];
+      root.querySelectorAll(".tv-block__title > *, .tv-ko__round, .tv-tree__phase").forEach((node) => {
+        const rect = node.getBoundingClientRect();
+        if (rect.width && rect.height) heads.push(local(rect));
+      });
+      const obstacles = [...cards.values(), ...heads];
+      // Dieselbe Rechnung wie die Leinwand im Web (lib/bracketLines.stageLines) - Schienen, Abstieg, Grand Final.
+      const lines = stageLines({
+        edges: stageEdges,
+        rails: stageRails,
+        nodes: cards,
+        slotY: (id, slot) => {
+          const anchor = anchors.get(`${id}:${slot}`);
+          return anchor ? anchor.top + anchor.height / 2 : undefined;
+        },
+        corridors: corridors.filter((y) => y > 2),
+        obstacles,
+        gap,
+        columnOf,
+        matchOf: byIdMatch,
+        isVoid: (id) => isCancelled(byIdMatch(id)),
+      }).map((line) => ({ ...line, points: line.points.map((point) => `${Math.round(point.x * 10) / 10},${Math.round(point.y * 10) / 10}`).join(" ") }));
+      // Die Leinwand reicht so weit wie der Inhalt (#1591) - auch wenn eine Zeile breiter ist als die Phase.
+      const w = Math.max(root.offsetWidth, root.scrollWidth) || base.width / scale;
+      const h = Math.max(root.offsetHeight, root.scrollHeight) || base.height / scale;
+      const key = `${Math.round(w)}x${Math.round(h)}|${lines.map((line) => `${line.id}:${line.d}`).join(";")}`;
+      setGeom((current) => (current.key === key ? current : { lines, w, h, key }));
+    };
+    const schedule = () => {
+      if (frame || typeof requestAnimationFrame !== "function") { if (!frame) measure(); return; }
+      frame = requestAnimationFrame(measure);
+    };
+    measure();
+    if (typeof ResizeObserver === "undefined") return undefined;
+    const observer = new ResizeObserver(schedule);
+    observer.observe(root);
+    root.querySelectorAll("[data-tv-card]").forEach((node) => observer.observe(node));
+    return () => {
+      observer.disconnect();
+      if (frame && typeof cancelAnimationFrame === "function") cancelAnimationFrame(frame);
+    };
+  }, [stageEdges, stageRails, columnOf, sections, gap, byIdMatch]);
+
+  return (
+    <section ref={ref} className="tv-tree__stage" data-tv-stage={stage.id} data-lead={lead ? "1" : undefined}>
+      <svg className="tv-tree__lines" width={geom.w || "100%"} height={geom.h || "100%"} aria-hidden="true" data-testid="bracket-connectors">
+        {geom.lines.map((line) => {
+          const quiet = line.flow === "L" && line.cross && !line.stub;
+          // Nach der Auslosung (#1548) bleibt die Schiene stehen; der echte Weg über sie ist unsichtbar da - auf ihm fährt
+          // der Name in der Auslosung an seinen gezogenen Platz. Abstiege und Einzelwege einer Gabel stehen nur als Eingang
+          // bzw. Gabel da (#1591).
+          const real = Boolean(line.rail && !line.scaffold && !line.spine && !line.stub);
+          return (
+            // Die Linien zeichnen sich beim ersten Erscheinen einmal, Runde für Runde (#1076); der Abstieg und
+            // Entfallenes stehen leise und gestrichelt.
+            <path
+              key={line.id}
+              d={line.d}
+              pathLength={line.void || quiet || real || line.stub ? undefined : "1"}
+              className={`tls-bracket-line ${line.void ? "tls-bracket-line--void" : line.stub ? "tls-bracket-line--stub" : real ? "tls-bracket-line--real" : quiet ? "tls-bracket-line--drop" : "tls-bracket-line--draw"}`}
+              style={{ "--tls-i": line.column }}
+              data-id={line.id}
+              data-demand={line.demand ? "1" : undefined}
+              data-fork={line.fork ? "1" : undefined}
+              data-stub={line.stub ? "1" : undefined}
+              data-rail-spine={line.spine || undefined}
+              data-rail-group={line.railGroup || undefined}
+              data-real={real ? "1" : undefined}
+              data-from={line.from}
+              data-to={line.to}
+              data-to-slot={line.toSlot || undefined}
+              data-flow={line.flow}
+              data-cross={quiet ? "1" : undefined}
+              data-void={line.void ? "1" : undefined}
+              data-points={line.points}
+            />
+          );
+        })}
+        {geom.lines.filter((line) => line.marker).map((line) => (
+          <circle key={`${line.id}:marker`} className="tls-bracket-marker" cx={line.marker.x} cy={line.marker.y} r={5} data-line-marker="1" />
+        ))}
+      </svg>
+      {multi ? <h3 className="tv-tree__phase tv-t-head font-heading">{stage.name || `Phase ${stage.number || ""}`}</h3> : null}
+      {arrangeTvBlocks(blocks, tvLayoutValue).map((row) => (
+        <div key={row.map((block) => block.name).join("+")} className="tv-tree__row">
+          {row.map((block) => (
+            <TvSection key={`${stage.id}-${block.name}`} section={block.name} rounds={block.rounds} regMap={regMap} podiumMap={podiumMap} compact={compact} onMatchClick={onMatchClick} flowHint={sectionFlowHint(block.name, hasLoser, hasReset)} />
+          ))}
+        </div>
+      ))}
+    </section>
   );
 }
 
@@ -823,78 +1019,17 @@ function TvSection({ section, rounds, regMap, podiumMap, onMatchClick }) {
   );
 }
 
-/**
- * TV: Spalten je Runde mit gemessenen Linien von Karte zu Karte. Die Ziele kommen aus den echten Quellen (#1561) -
- * nur die Linien der Sieger innerhalb des Blocks, je Paar Karten eine.
- */
+/** TV: Spalten je Runde. Die Linien zeichnet die ganze Phase (TvStageCanvas) - auch über die Blöcke hinweg (#1564). */
 function TvKnockoutTree({ roundNums, rounds, regMap, podiumMap, sectionTitle = "" }) {
-  const containerRef = useRef(null);
-  const nodeRefs = useRef(new Map());
-  const [lines, setLines] = useState([]);
-  const { edges } = useContext(GraphContext);
-  const pairs = useMemo(() => {
-    const column = new Map();
-    roundNums.forEach((rn, index) => rounds[rn].forEach((match) => column.set(match.id, index)));
-    const seen = new Set();
-    return edges.filter((edge) => {
-      const key = `${edge.from}>${edge.to}`;
-      if (edge.flow !== "W" || !column.has(edge.from) || !column.has(edge.to) || seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    }).map((edge) => ({ from: edge.from, to: edge.to, round: column.get(edge.from) }));
-  }, [edges, roundNums, rounds]);
-
-  const register = (id) => (node) => {
-    if (node) nodeRefs.current.set(id, node);
-    else nodeRefs.current.delete(id);
-  };
-
-  useLayoutEffect(() => {
-    const container = containerRef.current;
-    if (!container) return undefined;
-    const measure = () => {
-      const base = container.getBoundingClientRect();
-      // Vergrößert die TV-Kamera die Bühne (#1115), sind die gemessenen Maße mit vergrößert - zurückrechnen.
-      const scale = container.offsetWidth ? base.width / container.offsetWidth : 1;
-      const local = (value) => value / (scale || 1);
-      const next = [];
-      for (const pair of pairs) {
-        const a = nodeRefs.current.get(pair.from)?.getBoundingClientRect();
-        const b = nodeRefs.current.get(pair.to)?.getBoundingClientRect();
-        if (!a || !b || !a.width || !b.width) continue;
-        const x1 = local(a.right - base.left) + container.scrollLeft;
-        const y1 = local(a.top + a.height / 2 - base.top) + container.scrollTop;
-        const x2 = local(b.left - base.left) + container.scrollLeft;
-        const y2 = local(b.top + b.height / 2 - base.top) + container.scrollTop;
-        const mid = x1 + (x2 - x1) / 2;
-        next.push({ id: `${pair.from}-${pair.to}`, from: pair.from, to: pair.to, round: pair.round, d: `M${x1} ${y1} H${mid} V${y2} H${x2}` });
-      }
-      setLines(next);
-    };
-    measure();
-    if (typeof ResizeObserver === "undefined") return undefined;
-    const observer = new ResizeObserver(measure);
-    observer.observe(container);
-    for (const node of nodeRefs.current.values()) observer.observe(node);
-    return () => observer.disconnect();
-  }, [pairs]);
-
   return (
-    <div ref={containerRef} className="tv-ko" data-testid="bracket-tree">
-      <svg className="absolute inset-0 pointer-events-none" width="100%" height="100%" aria-hidden="true" data-testid="bracket-connectors">
-        {lines.map((line) => (
-          // Die Linien zeichnen sich beim ersten Erscheinen einmal, Runde für Runde (#1076).
-          <path key={line.id} d={line.d} fill="none" pathLength="1" className="tls-bracket-line tls-bracket-line--draw" style={{ "--tls-i": line.round }} data-from={line.from} data-to={line.to}
-            stroke="rgba(255,255,255,0.22)" strokeWidth={2} />
-        ))}
-      </svg>
+    <div className="tv-ko" data-testid="bracket-tree">
       <div className="tv-ko__cols">
         {roundNums.map((rn) => (
           <div key={rn} className="tv-ko__col" data-tv-round={rn}>
             <div className="tv-ko__round tv-t-meta">{roundTitle(rounds[rn][0], rn, sectionTitle)}</div>
             <div className="tv-ko__cards">
               {rounds[rn].map((match) => (
-                <div key={match.id} ref={register(match.id)} className="tv-ko__card" data-tv-card={match.id}>
+                <div key={match.id} className="tv-ko__card" data-tv-card={match.id}>
                   <TvMatchNode match={match} regMap={regMap} podiumMap={podiumMap} />
                 </div>
               ))}

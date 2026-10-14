@@ -3,6 +3,7 @@ import io
 import csv
 import logging
 import math
+from contextlib import asynccontextmanager
 from urllib.parse import quote, urlencode, urlsplit
 from fastapi import APIRouter, HTTPException, Depends
 from fastapi.responses import RedirectResponse, StreamingResponse
@@ -18,11 +19,18 @@ from services.log_safe import log_safe
 from services.mutation_lock import MutationLockBusy, mutation_lock
 from services.private_fields import private_projection
 from services.csv_safe import safe_cell
-from services.fastlap_standings import REFERENCE_SCOPE, effective_ms, load_laps, official_times, penalty_ms, rank_laps, track_ranking
+from services.fastlap_standings import (
+    REFERENCE_SCOPE, effective_ms, load_laps, official_times, participant_id, penalty_ms, rank_laps, track_ranking,
+)
+from services.fastlap_guests import (
+    challenge_write_resource as write_resource,
+    clean_guest_name, ensure_unique_name, find_guest, guest_participant_id, guest_payload, guests_by_id,
+)
 from services.laptime import format_lap_time, plausibility_warning, plausible_range
 from models import (
     F1ChallengeCreate, F1ChallengeUpdate, F1TrackCreate, F1TrackUpdate,
     F1LapTimeCreate, F1LapTimeDelete, F1LapTimeUpdate,
+    F1GuestCreate, F1GuestLink, F1GuestRename, F1QueueCreate, F1QueueNext, F1QueueStart,
     now_utc, new_id,
 )
 
@@ -91,7 +99,9 @@ async def check_lap_time(db, challenge: dict, lap: dict, *, current: dict | None
     ``confirm_implausible`` durch - ``check_plausibility`` ist bei einer Korrektur aus, wenn die Zeit gleich bleibt.
     Gibt die Zahl der bisherigen Versuche in der Wertung zurück - ohne den korrigierten Eintrag selbst."""
     time_ms = lap.get("time_ms")
-    if isinstance(time_ms, bool) or not isinstance(time_ms, int) or not 0 < time_ms <= MAX_LAP_MS:
+    # Eine ungültige Runde darf ohne Zeit kommen (0, #1585: „Runde nicht beendet“) - sie zählt nur als Versuch.
+    no_time = bool(lap.get("is_invalid")) and time_ms == 0
+    if isinstance(time_ms, bool) or not isinstance(time_ms, int) or not (no_time or 0 < time_ms <= MAX_LAP_MS):
         raise HTTPException(status_code=400, detail="Die Rundenzeit muss größer als null und höchstens 60 Minuten sein.")
     penalty = lap.get("penalty_seconds") or 0
     if isinstance(penalty, bool) or not isinstance(penalty, (int, float)) or not math.isfinite(penalty) \
@@ -103,7 +113,7 @@ async def check_lap_time(db, challenge: dict, lap: dict, *, current: dict | None
                                         {"_id": 0, "id": 1, "min_plausible_ms": 1, "max_plausible_ms": 1})
     if not track:
         raise HTTPException(status_code=400, detail="Strecke gehört nicht zur Challenge")
-    if check_plausibility and not confirm_implausible and plausibility_warning(time_ms, track):
+    if check_plausibility and not no_time and not confirm_implausible and plausibility_warning(time_ms, track):
         low, high = plausible_range(track)
         raise HTTPException(
             status_code=422,
@@ -111,6 +121,10 @@ async def check_lap_time(db, challenge: dict, lap: dict, *, current: dict | None
                    f"und {format_lap_time(high)}) - bitte prüfen und bestätigen.",
         )
     score_scope = lap.get("score_scope") or "official"
+    is_guest = not lap.get("user_id")
+    if is_guest and score_scope == "club_reference":
+        # Gäste (#1585) sind nie Vereinsmitglieder - eine Referenzzeit ohne Konto gibt es nicht.
+        raise HTTPException(status_code=400, detail="Gäste fahren nur in der offiziellen Wertung.")
     if score_scope == "club_reference" and not challenge.get("allow_club_reference_times", True):
         raise HTTPException(
             status_code=400,
@@ -123,7 +137,11 @@ async def check_lap_time(db, challenge: dict, lap: dict, *, current: dict | None
         )
     _validate_penalty_note(penalty, bool(lap.get("is_invalid")), lap.get("admin_note"))
     # Versuche zählen, sobald eine Zeit in eine Wertung kommt: beim Eintragen und wenn eine Korrektur die Wertung wechselt.
-    attempt_query = {"challenge_id": challenge.get("id"), "track_id": lap.get("track_id"), "user_id": lap.get("user_id")}
+    # Je Person - bei Gästen je Gast (#1585), nie über alle Zeiten ohne Konto.
+    who = {"guest_id": lap.get("guest_id")} if is_guest else {"user_id": lap.get("user_id")}
+    if not next(iter(who.values())):
+        raise HTTPException(status_code=400, detail="Bitte einen Fahrer oder einen Gast wählen.")
+    attempt_query = {"challenge_id": challenge.get("id"), "track_id": lap.get("track_id"), **who}
     if score_scope == "club_reference":
         attempt_query["score_scope"] = "club_reference"
     else:
@@ -143,6 +161,25 @@ async def check_lap_time(db, challenge: dict, lap: dict, *, current: dict | None
 
 
 router = APIRouter(prefix="/api/f1", tags=["f1"])
+
+# Eine Sperre je Challenge für alles, was über Wertung und Personen entscheidet (#1585, Nachprüfung): Zeiten eintragen,
+# korrigieren, löschen, Gäste anlegen, umbenennen und verknüpfen, jede Änderung an „Am Start / Als Nächstes“, Challenge
+# oder Strecke löschen und die Challenge ändern (auch Veröffentlichen und Zurücknehmen); dazu der Fristen-Job für
+# Gast-Namen (``expire_guest_names``). Wer sie hält, liest Gast-Status, Veröffentlichung und Begründung frisch - sonst
+# könnte etwa eine Zeit nach dem Verknüpfen noch als Gast landen. Reihenfolge, damit sich nichts gegenseitig blockiert:
+# diese Sperre zuerst, darin die Gast-Sperre, die Listen-Sperre, die Versuchs-Sperre je Person und zuletzt die
+# Abgleich-Sperre (``results_resource``). Keine Route nimmt eine davon und danach diese.
+WRITE_WAIT_SECONDS = 10.0
+WRITE_BUSY = "Gerade wird an dieser Fast Lap gespeichert - bitte gleich noch einmal versuchen."
+
+
+@asynccontextmanager
+async def challenge_write(challenge_id: str):
+    try:
+        async with mutation_lock(get_db(), write_resource(challenge_id), wait_seconds=WRITE_WAIT_SECONDS):
+            yield
+    except MutationLockBusy:
+        raise HTTPException(status_code=409, detail=WRITE_BUSY)
 logger = logging.getLogger("tls.f1")
 # Fast-Lap-Zeiten für alle Challenges: Turnierleitung, Club-Admin, Superadmin; sonst nur mit Einsatz
 # in der Challenge (f1_staff_assignments).
@@ -290,6 +327,14 @@ def _reference_time_query(extra: dict | None = None) -> dict:
     }
 
 
+async def _participant_count(db, challenge_id: str) -> int:
+    """Wer eine gültige offizielle Zeit hat - Konten und Gäste (#1585) je für sich."""
+    query = _official_time_query({"challenge_id": challenge_id})
+    users = [uid for uid in await db.f1_lap_times.distinct("user_id", query) if uid]
+    guests = [gid for gid in await db.f1_lap_times.distinct("guest_id", {**query, "user_id": None}) if gid]
+    return len(users) + len(guests)
+
+
 def _normalize_reference_settings(doc: dict) -> dict:
     """Keep Fast-Lap reference settings explicit and internally consistent."""
     if doc.get("block_club_member_results") is True:
@@ -320,18 +365,25 @@ async def _annotate_reference_policy(challenge: dict, include_counts: bool = Fal
     return challenge
 
 
-def _lap_entries(ranked: list[dict], users: dict[str, dict]) -> list[dict]:
-    """Zeilen der Tabelle aus der einen Rangfunktion (#1584, ``services.fastlap_standings.rank_laps``)."""
+def _lap_entries(ranked: list[dict], users: dict[str, dict], guests: dict[str, dict] | None = None) -> list[dict]:
+    """Zeilen der Tabelle aus der einen Rangfunktion (#1584, ``services.fastlap_standings.rank_laps``). Gäste (#1585)
+    tragen ``guest_id`` und ``is_guest``, ``user_id`` ist dann leer; ``participant_id`` ist bei allen der Schlüssel."""
     leader_ms = ranked[0]["effective_ms"] if ranked else 0
     entries = []
     for row in ranked:
         uid = row["user_id"]
-        u = users.get(uid, {})
+        is_guest = bool(row.get("is_guest"))
+        u = users.get(uid, {}) if uid else {}
+        name = ((guests or {}).get(row.get("guest_id")) or {}).get("display_name") or "Gast" if is_guest \
+            else u.get("display_name") or u.get("username")
         gap = row["effective_ms"] - leader_ms
         entries.append({
             "user_id": uid,
+            "guest_id": row.get("guest_id") if is_guest else None,
+            "participant_id": row.get("participant_id") or uid,
+            "is_guest": is_guest,
             "username": u.get("username"),
-            "display_name": u.get("display_name") or u.get("username"),
+            "display_name": name,
             "avatar_url": u.get("avatar_url"),
             "time_ms": row["effective_ms"],
             "time_str": _ms_to_time_str(row["effective_ms"]),
@@ -450,6 +502,13 @@ async def _get_visible_challenge(slug_or_id: str, user: dict | None = None, incl
     return c
 
 
+def _lap_time_text(lap: dict) -> str:
+    """Die Zeit einer Runde als Text; eine ungültige Runde ohne Zeit (#1585) heißt „ohne Zeit“."""
+    if lap.get("is_invalid") and not lap.get("time_ms"):
+        return "ohne Zeit"
+    return _ms_to_time_str(lap.get("time_ms"))
+
+
 def _ms_to_time_str(ms: int) -> str:
     if ms is None:
         return "—"
@@ -509,7 +568,7 @@ async def list_challenges(
         await _annotate_reference_policy(c, include_counts=True)
         c["public_phase"] = derive_public_phase(c, "f1")
         c["track_count"] = await db.f1_tracks.count_documents({"challenge_id": c["id"]})
-        c["participant_count"] = len(await db.f1_lap_times.distinct("user_id", _official_time_query({"challenge_id": c["id"]})))
+        c["participant_count"] = await _participant_count(db, c["id"])
         visible.append(c)
     # Das Event als Klammer (#1182): die Kennung des Events nur, wenn es für die Person sichtbar ist (#1473).
     await hide_unseen_event_links(db, user, visible)
@@ -530,7 +589,8 @@ async def get_challenge(slug_or_id: str, include_draft: bool = False, access: st
     c["can_manage_times"] = await _has_f1_staff_permission(user, c["id"], F1_RESULT_STAFF_ROLES)
     tracks = await db.f1_tracks.find({"challenge_id": c["id"]}, {"_id": 0}).sort("order_index", 1).to_list(100)
     c["tracks"] = tracks
-    c["participant_count"] = len(await db.f1_lap_times.distinct("user_id", _official_time_query({"challenge_id": c["id"]})))
+    c["participant_count"] = await _participant_count(db, c["id"])
+    c["attempt_limit"] = _max_attempts(c)
     if c.get("event_id"):
         event = await _visible_event_summary(c["event_id"], user)
         if event:
@@ -673,8 +733,13 @@ async def create_challenge_doc(body: F1ChallengeCreate, me: dict) -> dict:
 @router.put("/challenges/{cid}")
 @router.patch("/challenges/{cid}")
 async def update_challenge(cid: str, body: F1ChallengeUpdate, me: dict = Depends(require_admin())):
-    db = get_db()
     cid = await _resolve_cid(cid)
+    async with challenge_write(cid):
+        return await _update_challenge_locked(cid, body, me)
+
+
+async def _update_challenge_locked(cid: str, body: F1ChallengeUpdate, me: dict):
+    db = get_db()
     existing = await db.f1_challenges.find_one({"id": cid}, {"_id": 0}) or {}
     raw = body.model_dump(exclude_unset=True)
     change_reason = raw.pop("change_reason", None)
@@ -884,8 +949,14 @@ async def _award_f1_season_points(challenge: dict):
 
 @router.delete("/challenges/{cid}")
 async def delete_challenge(cid: str, me: dict = Depends(require_admin())):
-    db = get_db()
     cid = await _resolve_cid(cid)
+    async with challenge_write(cid):
+        return await _delete_challenge_locked(cid)
+
+
+async def _delete_challenge_locked(cid: str):
+    db = get_db()
+    # Frisch unter der Schreib-Sperre: der Status kann sich gerade geändert haben.
     current = await db.f1_challenges.find_one({"id": cid}, {"_id": 0, "status": 1}) or {}
     # Veröffentlichte Ergebnisse verschwinden nicht mit der Challenge (#1584) - dafür gibt es „Archiviert“.
     if current.get("status") in LOCKED_STATUSES and await db.f1_lap_times.count_documents({"challenge_id": cid}):
@@ -894,6 +965,8 @@ async def delete_challenge(cid: str, me: dict = Depends(require_admin())):
     await db.f1_tracks.delete_many({"challenge_id": cid})
     await db.f1_lap_times.delete_many({"challenge_id": cid})
     await db.f1_staff_assignments.delete_many({"challenge_id": cid})
+    await db.f1_guests.delete_many({"challenge_id": cid})
+    await db.f1_queue.delete_many({"challenge_id": cid})
     await db.prize_pickups.delete_many({"source_type": "fastlap", "fastlap_challenge_id": cid})
     return {"ok": True}
 
@@ -941,6 +1014,14 @@ async def update_track(tid: str, body: F1TrackUpdate, me: dict = Depends(require
 
 @router.delete("/tracks/{tid}")
 async def delete_track(tid: str, me: dict = Depends(require_admin())):
+    known = await get_db().f1_tracks.find_one({"id": tid}, {"_id": 0, "challenge_id": 1})
+    if not known:
+        return {"ok": True}
+    async with challenge_write(known.get("challenge_id")):
+        return await _delete_track_locked(tid)
+
+
+async def _delete_track_locked(tid: str):
     db = get_db()
     track = await db.f1_tracks.find_one({"id": tid}, {"_id": 0, "challenge_id": 1}) or {}
     challenge = await db.f1_challenges.find_one({"id": track.get("challenge_id")}, {"_id": 0, "status": 1}) or {}
@@ -971,17 +1052,21 @@ async def leaderboard(cid: str, track_id: str | None = None, access: str | None 
         raise HTTPException(status_code=404, detail="Strecke nicht gefunden")
     # Alle Zeiten der Strecke: die Rangfunktion wertet nur gültige, zählt aber jede als Versuch (#1584).
     times = await load_laps(db, {"challenge_id": cid, "track_id": track_id})
-    ranked = rank_laps(times)
+    # Die Tabelle zeigt auch Gäste ohne Konto (#1585) - Gewinne, Saisonpunkte und Erfolge rechnen ohne sie.
+    ranked = rank_laps(times, include_guests=True)
     show_reference = c.get("allow_club_reference_times", True) and c.get("show_club_reference_times", True)
     reference_ranked = rank_laps(times, REFERENCE_SCOPE)[:3] if show_reference else []
-    user_ids = list({row["user_id"] for row in ranked + reference_ranked})
+    user_ids = list({row["user_id"] for row in ranked + reference_ranked if row.get("user_id")})
     users = {u["id"]: u for u in await db.users.find(
         {"id": {"$in": user_ids}}, private_projection()).to_list(len(user_ids) + 10)} if user_ids else {}
-    entries = _lap_entries(ranked, users)
+    guests = await guests_by_id(db, [row.get("guest_id") for row in ranked if row.get("is_guest")])
+    entries = _lap_entries(ranked, users, guests)
     club_reference_entries = _lap_entries(reference_ranked, users)
     return {
         "challenge": c,
         "track": track,
+        # Versuche je Person und Strecke (#1585): Zahl oder None für unbegrenzt - alle Anzeigen lesen diesen Wert.
+        "max_attempts": _max_attempts(c),
         "entries": entries,
         "club_reference_entries": club_reference_entries,
         "club_reference_public": bool(c.get("allow_club_reference_times", True) and c.get("show_club_reference_times", True)),
@@ -1014,28 +1099,40 @@ async def championship_standings(cid: str, access: str | None = None, user=Depen
 
 @router.post("/challenges/{cid}/times")
 async def add_time(cid: str, body: F1LapTimeCreate, me: dict = Depends(get_current_user)):
-    db = get_db()
     cid = await _resolve_cid(cid)
-    # Verify
+    async with challenge_write(cid):
+        return await _add_time_locked(cid, body, me)
+
+
+async def _add_time_locked(cid: str, body: F1LapTimeCreate, me: dict):
+    db = get_db()
+    # Unter der Schreib-Sperre frisch: Veröffentlichung, Begründung und ob der Gast inzwischen verknüpft ist.
     c = await db.f1_challenges.find_one({"id": cid})
     if not c:
         raise HTTPException(status_code=404)
     await _require_f1_result_permission(me, cid)
     reason = _published_change_reason(c, me, body.change_reason)
-    if not await db.users.find_one({"id": body.user_id}, {"_id": 0, "id": 1}):
+    # Genau eine Person: ein Konto oder ein Gast dieser Challenge (#1585).
+    if bool(body.user_id) == bool(body.guest_id):
+        raise HTTPException(status_code=400, detail="Bitte genau einen Fahrer oder einen Gast wählen.")
+    if body.guest_id:
+        await find_guest(db, cid, body.guest_id)
+    elif not await db.users.find_one({"id": body.user_id}, {"_id": 0, "id": 1}):
         raise HTTPException(status_code=400, detail="Spieler nicht gefunden")
     score_scope = body.score_scope or "official"
+    driver_key = body.user_id or guest_participant_id(body.guest_id)
     # Dieselbe Prüfung wie beim Korrigieren (#1038) - Versuche zählen und schreiben unter einer Sperre.
     try:
-        async with mutation_lock(db, lap_attempt_resource(cid, body.track_id, body.user_id, score_scope), wait_seconds=LAP_WAIT_SECONDS):
-            attempt_count = await check_lap_time(db, c, {**body.model_dump(), "score_scope": score_scope},
+        async with mutation_lock(db, lap_attempt_resource(cid, body.track_id, driver_key, score_scope), wait_seconds=LAP_WAIT_SECONDS):
+            attempt_count = await check_lap_time(db, c, {**body.model_dump(), "user_id": body.user_id or None, "score_scope": score_scope},
                                                  confirm_implausible=body.confirm_implausible)
             stamp = now_utc().isoformat()
             doc = {
                 "id": new_id(),
                 "challenge_id": cid,
                 "track_id": body.track_id,
-                "user_id": body.user_id,
+                "user_id": body.user_id or None,
+                "guest_id": body.guest_id or None,
                 "time_ms": body.time_ms,
                 "penalty_seconds": body.penalty_seconds,
                 "is_invalid": body.is_invalid,
@@ -1059,17 +1156,18 @@ async def add_time(cid: str, body: F1LapTimeCreate, me: dict = Depends(get_curre
     if warning:
         doc["resync_warning"] = warning
     doc["proof_url"] = safe_proof_url(doc.get("proof_url"))
-    doc["time_str"] = _ms_to_time_str(body.time_ms)
-    # Discord trigger: if this submission is the new P1 on this track
+    doc["time_str"] = _lap_time_text(doc)
+    # Discord trigger: if this submission is the new P1 on this track. Gäste (#1585) melden wir nicht - ihr Name ginge
+    # an Discord, wo er nicht abläuft; die Bestzeit eines Gastes zählt aber als Zeit, die ein Konto schlagen muss.
     was_new_leader = False
-    if not body.is_invalid and score_scope != "club_reference":
+    if not body.is_invalid and score_scope != "club_reference" and body.user_id:
         try:
             from discord_service import send_public_discord
             effective = effective_ms(doc)
             # Die bisherige Bestzeit aus der einen Rangfunktion (#1584); gleich schnell ist keine neue Bestzeit -
             # bei Gleichstand bleibt die früher gefahrene vorn.
             others = await load_laps(db, {**_official_time_query({"challenge_id": cid, "track_id": body.track_id}), "id": {"$ne": doc["id"]}})
-            ranked_before = rank_laps(others)
+            ranked_before = rank_laps(others, include_guests=True)
             prev_best = ranked_before[0]["effective_ms"] if ranked_before else None
             if prev_best is None or effective < prev_best:
                 was_new_leader = True
@@ -1086,8 +1184,8 @@ async def add_time(cid: str, body: F1LapTimeCreate, me: dict = Depends(get_curre
                 )
         except Exception:
             logger.warning("[f1] Discord-Meldung zur Bestzeit in %s fehlgeschlagen", log_safe(cid), exc_info=True)
-    # Badge trigger
-    if score_scope != "club_reference":
+    # Badge trigger - nur für Konten; Gäste sammeln keine Erfolge (#1585).
+    if score_scope != "club_reference" and body.user_id:
         try:
             from badges import on_lap_submitted
             await on_lap_submitted(body.user_id, cid, body.track_id, was_new_leader, body.is_invalid)
@@ -1107,7 +1205,8 @@ async def list_times(cid: str, track_id: str | None = None, user_id: str | None 
     if user_id:
         q["user_id"] = user_id
     times = await db.f1_lap_times.find(q, {"_id": 0}).sort("created_at", -1).to_list(2000)
-    user_ids = list({t["user_id"] for t in times})
+    user_ids = list({t["user_id"] for t in times if t.get("user_id")})
+    guests = await guests_by_id(db, [t.get("guest_id") for t in times])
     users = {u["id"]: u for u in await db.users.find(
         {"id": {"$in": user_ids}}, private_projection()).to_list(500)}
     memberships = set(await db.memberships.distinct("user_id", {
@@ -1115,20 +1214,39 @@ async def list_times(cid: str, track_id: str | None = None, user_id: str | None 
         "member_status": {"$in": ["active", "honorary"]},
     }))
     for t in times:
-        u = users.get(t["user_id"], {})
         t["score_scope"] = t.get("score_scope") or "official"
-        t["user"] = {"username": u.get("username"), "display_name": u.get("display_name"),
-                      "avatar_url": u.get("avatar_url"), "is_club_member": t["user_id"] in memberships}
-        t["time_str"] = _ms_to_time_str(t["time_ms"])
+        t["participant_id"] = participant_id(t)
+        if not t.get("user_id") and t.get("guest_id"):
+            guest = guests.get(t["guest_id"], {})
+            t["user"] = {"username": None, "display_name": guest.get("display_name") or "Gast", "avatar_url": None,
+                         "is_club_member": False, "is_guest": True}
+        else:
+            u = users.get(t.get("user_id"), {})
+            t["user"] = {"username": u.get("username"), "display_name": u.get("display_name"),
+                          "avatar_url": u.get("avatar_url"), "is_club_member": t.get("user_id") in memberships}
+        t["time_str"] = _lap_time_text(t)
         # Alte Einträge können einen Link ohne http(s) tragen - ausgeliefert wird er dann nicht (#1038).
         t["proof_url"] = safe_proof_url(t.get("proof_url"))
     return times
 
 
+async def _lap_challenge_id(time_id: str) -> str:
+    lap = await get_db().f1_lap_times.find_one({"id": time_id}, {"_id": 0, "challenge_id": 1})
+    if not lap:
+        raise HTTPException(404, "Lap-Time nicht gefunden")
+    return lap.get("challenge_id")
+
+
 @router.put("/times/{time_id}")
 @router.patch("/times/{time_id}")
 async def update_time(time_id: str, body: F1LapTimeUpdate, me: dict = Depends(get_current_user)):
+    async with challenge_write(await _lap_challenge_id(time_id)):
+        return await _update_time_locked(time_id, body, me)
+
+
+async def _update_time_locked(time_id: str, body: F1LapTimeUpdate, me: dict):
     db = get_db()
+    # Frisch unter der Sperre: ein Verknüpfen kann die Zeit gerade einem Konto (und der Mitglieder-Regel) gegeben haben.
     existing = await db.f1_lap_times.find_one({"id": time_id}, {"_id": 0})
     if not existing:
         raise HTTPException(404, "Lap-Time nicht gefunden")
@@ -1146,7 +1264,7 @@ async def update_time(time_id: str, body: F1LapTimeUpdate, me: dict = Depends(ge
     # nur, wenn sich die Zeit ändert (#1584).
     final = {**existing, **updates, "score_scope": updates.get("score_scope", existing.get("score_scope") or "official")}
     new_time = "time_ms" in updates and updates["time_ms"] != existing.get("time_ms")
-    resource = lap_attempt_resource(final.get("challenge_id"), final.get("track_id"), final.get("user_id"), final["score_scope"])
+    resource = lap_attempt_resource(final.get("challenge_id"), final.get("track_id"), participant_id(final), final["score_scope"])
     try:
         async with mutation_lock(db, resource, wait_seconds=LAP_WAIT_SECONDS):
             await check_lap_time(db, challenge, final, current=existing, check_plausibility=new_time,
@@ -1167,13 +1285,18 @@ async def update_time(time_id: str, body: F1LapTimeUpdate, me: dict = Depends(ge
     if t and warning:
         t["resync_warning"] = warning
     if t:
-        t["time_str"] = _ms_to_time_str(t["time_ms"])
+        t["time_str"] = _lap_time_text(t)
         t["proof_url"] = safe_proof_url(t.get("proof_url"))
     return t
 
 
 @router.delete("/times/{time_id}")
 async def delete_time(time_id: str, body: F1LapTimeDelete | None = None, me: dict = Depends(get_current_user)):
+    async with challenge_write(await _lap_challenge_id(time_id)):
+        return await _delete_time_locked(time_id, body, me)
+
+
+async def _delete_time_locked(time_id: str, body: F1LapTimeDelete | None, me: dict):
     db = get_db()
     existing = await db.f1_lap_times.find_one({"id": time_id}, {"_id": 0})
     if not existing:
@@ -1213,3 +1336,461 @@ async def export_csv(cid: str, track_id: str | None = None, me: dict = Depends(r
         media_type="text/csv",
         headers={"Content-Disposition": f"attachment; filename=f1_{c['slug']}.csv"},
     )
+
+
+# --- Gäste ohne Konto (#1585) ---
+GUESTS_BUSY = "Gerade wird ein Gast angelegt oder umbenannt - bitte gleich noch einmal versuchen."
+
+
+def guests_resource(challenge_id: str) -> str:
+    """Eine Sperre je Challenge für Anlegen und Umbenennen: die Prüfung „Name gibt es schon“ und das Schreiben gehören
+    zusammen, sonst kämen zwei gleiche Namen gleichzeitig durch."""
+    return f"fastlap:{challenge_id}:guests"
+
+
+@router.get("/challenges/{cid}/guests")
+async def list_guests(cid: str, me: dict = Depends(get_current_user)):
+    db = get_db()
+    cid = await _resolve_cid(cid)
+    await _require_f1_result_permission(me, cid)
+    rows = await db.f1_guests.find({"challenge_id": cid}, {"_id": 0}).sort("number", 1).to_list(2000)
+    return [guest_payload(row) for row in rows]
+
+
+@router.post("/challenges/{cid}/guests")
+async def create_guest(cid: str, body: F1GuestCreate, me: dict = Depends(get_current_user)):
+    """Einen Gast anlegen - nur mit Anzeigenamen; ein Konto braucht er nicht. Dürfen Leitung und Fast-Lap-Team."""
+    cid = await _resolve_cid(cid)
+    async with challenge_write(cid):
+        return await _create_guest_locked(cid, body, me)
+
+
+async def _create_guest_locked(cid: str, body: F1GuestCreate, me: dict):
+    db = get_db()
+    await _require_f1_result_permission(me, cid)
+    name = clean_guest_name(body.display_name)
+    try:
+        async with mutation_lock(db, guests_resource(cid), wait_seconds=LAP_WAIT_SECONDS):
+            await ensure_unique_name(db, cid, name)
+            last = await db.f1_guests.find_one({"challenge_id": cid}, {"_id": 0, "number": 1}, sort=[("number", -1)])
+            stamp = now_utc().isoformat()
+            doc = {"id": new_id(), "challenge_id": cid, "display_name": name, "number": int((last or {}).get("number") or 0) + 1,
+                   "created_by": me["id"], "created_at": stamp, "updated_at": stamp, "name_expired_at": None}
+            await db.f1_guests.insert_one(doc)
+    except MutationLockBusy:
+        raise HTTPException(status_code=409, detail=GUESTS_BUSY)
+    doc.pop("_id", None)
+    return guest_payload(doc)
+
+
+@router.patch("/guests/{gid}")
+async def rename_guest(gid: str, body: F1GuestRename, me: dict = Depends(get_current_user)):
+    """Umbenennen - auch, wenn ein Gast seinen Namen nicht mehr zeigen will (dann etwa „Gast 3“ eintragen). Der Name
+    steht in Rangliste und Urkunde: nach der Veröffentlichung gilt dieselbe Sperre wie für Zeiten (Helfer nicht, Leitung
+    mit Begründung), und jedes Umbenennen steht im Protokoll - nur mit Kennungen. Den Ablauf nach der Frist macht der
+    Job ``expire_guest_names`` ohne diese Route."""
+    known = await get_db().f1_guests.find_one({"id": gid}, {"_id": 0, "challenge_id": 1})
+    if not known:
+        raise HTTPException(status_code=404, detail="Gast nicht gefunden")
+    async with challenge_write(known["challenge_id"]):
+        return await _rename_guest_locked(gid, body, me)
+
+
+async def _rename_guest_locked(gid: str, body: F1GuestRename, me: dict):
+    db = get_db()
+    guest = await db.f1_guests.find_one({"id": gid}, {"_id": 0})
+    if not guest:
+        raise HTTPException(status_code=404, detail="Gast nicht gefunden")
+    await _require_f1_result_permission(me, guest["challenge_id"])
+    challenge = await db.f1_challenges.find_one({"id": guest["challenge_id"]}, {"_id": 0, "status": 1}) or {}
+    reason = _published_change_reason(challenge, me, body.change_reason)
+    name = clean_guest_name(body.display_name)
+    try:
+        async with mutation_lock(db, guests_resource(guest["challenge_id"]), wait_seconds=LAP_WAIT_SECONDS):
+            await ensure_unique_name(db, guest["challenge_id"], name, current_id=gid)
+            stamp = now_utc().isoformat()
+            await db.f1_guests.update_one({"id": gid}, {"$set": {"display_name": name, "updated_at": stamp}})
+    except MutationLockBusy:
+        raise HTTPException(status_code=409, detail=GUESTS_BUSY)
+    await db.audit_logs.insert_one({"id": new_id(), "action": "fastlap.guest.rename", "actor_id": me.get("id"), "target_id": gid,
+                                    "data": {"challenge_id": guest["challenge_id"], "reason": reason, "after_publishing": reason is not None},
+                                    "created_at": stamp})
+    return guest_payload({**guest, "display_name": name})
+
+
+# --- Gast mit Konto verknüpfen (#1585, Entscheidung 14.10.2026) ---
+# Legt ein Gast später ein Konto an, ordnet die Leitung ihn dem Konto zu: alle Zeiten des Gastes gehören dann dem Konto,
+# das ab da voll zählt (Rangliste, Gewinne, Saisonpunkte, Erfolge). Hat das Konto in der Challenge schon Zeiten, werden
+# sie zusammengeführt - die Versuchsgrenze darf dabei überschritten werden (Hinweis), die Gleichstand-Regel nach
+# ``created_at`` bleibt. Der Gast bleibt als „verknüpft“ stehen (``linked_user_id``), seine Zeiten behalten ``guest_id``
+# als Herkunft. Unter der Gast-Sperre der Challenge und wiederholbar: ein zweites Verknüpfen mit demselben Konto tut
+# nichts. Nach der Veröffentlichung wie eine Korrektur: Begründung, Protokoll, Abgleich von Gewinnen und Saisonpunkten.
+LINK_ALREADY_OTHER = "Der Gast ist schon mit einem anderen Konto verknüpft."
+
+
+async def _guest_for_link(db, gid: str, me: dict) -> dict:
+    guest = await db.f1_guests.find_one({"id": gid}, {"_id": 0})
+    if not guest:
+        raise HTTPException(status_code=404, detail="Gast nicht gefunden")
+    if not _is_staff(me):
+        if lead_without_second_factor(_auth_user(me)):
+            raise HTTPException(status_code=403, detail=MFA_MESSAGE)
+        raise HTTPException(status_code=403, detail="Einen Gast mit einem Konto verknüpfen darf nur die Turnierleitung.")
+    return guest
+
+
+async def _link_plan(db, challenge: dict, guest: dict, user_id: str) -> dict:
+    """Was beim Verknüpfen passiert: wie viele Zeiten wandern, wie viele das Konto schon hat, wo die Grenze reißt."""
+    cid = challenge["id"]
+    guest_laps = await db.f1_lap_times.find({"challenge_id": cid, "guest_id": guest["id"], "user_id": None},
+                                            {"_id": 0, "track_id": 1}).to_list(None)
+    account_laps = await db.f1_lap_times.find({"challenge_id": cid, "user_id": user_id,
+                                               "$or": [{"score_scope": {"$exists": False}}, {"score_scope": "official"}]},
+                                              {"_id": 0, "track_id": 1}).to_list(None)
+    limit = _max_attempts(challenge)
+    over = []
+    if limit is not None:
+        tracks = {row["id"]: row for row in await db.f1_tracks.find({"challenge_id": cid}, {"_id": 0, "id": 1, "name": 1}).to_list(100)}
+        for track_id in sorted({row.get("track_id") for row in guest_laps}):
+            total = sum(1 for row in guest_laps + account_laps if row.get("track_id") == track_id)
+            if total > limit:
+                over.append({"track_id": track_id, "track_name": (tracks.get(track_id) or {}).get("name"),
+                             "attempts": total, "max_attempts": limit})
+    return {"laps": len(guest_laps), "account_laps": len(account_laps), "over_limit": over}
+
+
+@router.get("/guests/{gid}/link-preview")
+async def guest_link_preview(gid: str, user_id: str, me: dict = Depends(get_current_user)):
+    db = get_db()
+    guest = await _guest_for_link(db, gid, me)
+    user = await db.users.find_one({"id": user_id}, {"_id": 0, "id": 1, "display_name": 1, "username": 1})
+    if not user:
+        raise HTTPException(status_code=400, detail="Konto nicht gefunden")
+    challenge = await db.f1_challenges.find_one({"id": guest["challenge_id"]}, {"_id": 0}) or {"id": guest["challenge_id"]}
+    plan = await _link_plan(db, challenge, guest, user_id)
+    return {**plan, "guest_name": guest.get("display_name"), "account_name": user.get("display_name") or user.get("username"),
+            "linked_user_id": guest.get("linked_user_id"), "needs_reason": challenge.get("status") in LOCKED_STATUSES}
+
+
+@router.post("/guests/{gid}/link")
+async def link_guest(gid: str, body: F1GuestLink, me: dict = Depends(get_current_user)):
+    known = await get_db().f1_guests.find_one({"id": gid}, {"_id": 0, "challenge_id": 1})
+    if not known:
+        raise HTTPException(status_code=404, detail="Gast nicht gefunden")
+    async with challenge_write(known["challenge_id"]):
+        return await _link_guest_locked(gid, body, me)
+
+
+async def _link_guest_locked(gid: str, body: F1GuestLink, me: dict):
+    db = get_db()
+    # Alles frisch unter der Schreib-Sperre: Gast, Veröffentlichung und Begründung.
+    guest = await _guest_for_link(db, gid, me)
+    cid = guest["challenge_id"]
+    if not await db.users.find_one({"id": body.user_id}, {"_id": 0, "id": 1}):
+        raise HTTPException(status_code=400, detail="Konto nicht gefunden")
+    challenge = await db.f1_challenges.find_one({"id": cid}, {"_id": 0}) or {}
+    if guest.get("linked_user_id") == body.user_id:
+        return {"ok": True, "already_linked": True, "laps_moved": 0, "over_limit": []}
+    if guest.get("linked_user_id"):
+        raise HTTPException(status_code=409, detail=LINK_ALREADY_OTHER)
+    reason = _published_change_reason(challenge, me, body.change_reason)
+    try:
+        async with mutation_lock(db, guests_resource(cid), wait_seconds=LAP_WAIT_SECONDS):
+            # Frisch lesen: ein zweiter Klick oder ein anderer Leiter kann gerade verknüpft haben.
+            guest = await db.f1_guests.find_one({"id": gid}, {"_id": 0}) or guest
+            if guest.get("linked_user_id") == body.user_id:
+                return {"ok": True, "already_linked": True, "laps_moved": 0, "over_limit": []}
+            if guest.get("linked_user_id"):
+                raise HTTPException(status_code=409, detail=LINK_ALREADY_OTHER)
+            plan = await _link_plan(db, challenge, guest, body.user_id)
+            stamp = now_utc().isoformat()
+            # Vereinsmitglieder bei „nur als Referenz“: dieselbe Regel wie beim Einschalten der Regel (Markierung).
+            member_rule = bool(challenge.get("block_club_member_results")) and await _is_active_club_member(body.user_id)
+            lap_update = {"user_id": body.user_id, "linked_from_guest": gid, "updated_at": stamp, "updated_by": me["id"]}
+            if member_rule:
+                lap_update.update(score_scope="club_reference", moved_by_member_rule=True)
+            moved = await db.f1_lap_times.update_many({"challenge_id": cid, "guest_id": gid, "user_id": None}, {"$set": lap_update})
+            async with mutation_lock(db, queue_resource(cid), wait_seconds=LAP_WAIT_SECONDS):
+                for row in await db.f1_queue.find({"challenge_id": cid, "guest_id": gid}, {"_id": 0}).to_list(None):
+                    twin = await db.f1_queue.find_one({"challenge_id": cid, "track_id": row.get("track_id"), "user_id": body.user_id}, {"_id": 0})
+                    if twin:
+                        # Nie zweimal in der Liste: wer schon am Start ist, bleibt; sonst bleibt der frühere Platz.
+                        keep_guest = row.get("state") == "on_track" or (twin.get("state") != "on_track" and row.get("order", 0) < twin.get("order", 0))
+                        await db.f1_queue.delete_one({"id": twin["id"] if keep_guest else row["id"]})
+                        if not keep_guest:
+                            continue
+                    await db.f1_queue.update_one({"id": row["id"]}, {"$set": {"user_id": body.user_id, "guest_id": None}})
+            await db.f1_guests.update_one({"id": gid}, {"$set": {"linked_user_id": body.user_id, "linked_at": stamp,
+                                                                  "linked_by": me["id"], "updated_at": stamp}})
+    except MutationLockBusy:
+        raise HTTPException(status_code=409, detail=GUESTS_BUSY)
+    laps_moved = getattr(moved, "modified_count", 0) or 0
+    await db.audit_logs.insert_one({"id": new_id(), "action": "fastlap.guest.link", "actor_id": me.get("id"), "target_id": gid,
+                                    "data": {"challenge_id": cid, "user_id": body.user_id, "laps_moved": laps_moved,
+                                             "over_limit": len(plan["over_limit"]), "member_rule": member_rule,
+                                             "reason": reason, "after_publishing": reason is not None},
+                                    "created_at": stamp})
+    result = {"ok": True, "already_linked": False, "laps_moved": laps_moved, "over_limit": plan["over_limit"]}
+    warning = await _resync_published_results(db, cid, me, reason, "fastlap.guest.link")
+    if warning:
+        result["resync_warning"] = warning
+    elif challenge.get("status") == "completed":
+        # „Beendet“ hat schon Gewinne angelegt: dieselbe Rechnung wie nach einer Korrektur, ohne etwas zu entziehen.
+        try:
+            from services.prize_service import review_f1_prizes
+            async with mutation_lock(db, results_resource(cid), wait_seconds=RESYNC_WAIT_SECONDS):
+                await review_f1_prizes(cid)
+        except Exception:
+            logger.warning("[f1] Gewinne nach dem Verknüpfen in %s nicht angeglichen", log_safe(cid), exc_info=True)
+            result["resync_warning"] = RESYNC_WARNING
+    if laps_moved:
+        try:
+            from badges import on_lap_submitted
+            track_ids = await db.f1_lap_times.distinct("track_id", {"challenge_id": cid, "linked_from_guest": gid})
+            for track_id in track_ids:
+                await on_lap_submitted(body.user_id, cid, track_id, False, False)
+        except Exception:
+            logger.warning("[achievements] verknüpfte Zeiten in %s nicht ausgewertet", log_safe(cid), exc_info=True)
+    return result
+
+
+# --- Am Start / Als Nächstes (#1585) ---
+# Je Fast Lap eine Liste: „on_track“ fährt gerade (an einer Station), „next“ wartet in Reihenfolge. Wer fertig ist,
+# verlässt die Liste - eine Geschichte braucht niemand, die Zeiten stehen in der Tabelle. Öffentlich lesbar wie die
+# Tabelle (TV), ändern darf nur, wer Zeiten eintragen darf. Änderungen laufen unter einer Sperre je Challenge, damit zwei
+# Helfer mit „Nächster Fahrer“ nicht zwei Leute gleichzeitig an dieselbe Station schicken.
+QUEUE_BUSY = "Die Liste wird gerade geändert - bitte gleich noch einmal versuchen."
+
+
+def queue_resource(challenge_id: str) -> str:
+    return f"fastlap:{challenge_id}:queue"
+
+
+def _clean_station(value) -> str | None:
+    text = " ".join(str(value or "").split())
+    return text[:40] or None
+
+
+async def _queue_challenge_id(qid: str) -> str:
+    entry = await get_db().f1_queue.find_one({"id": qid}, {"_id": 0, "challenge_id": 1})
+    if not entry:
+        raise HTTPException(status_code=404, detail="Eintrag nicht gefunden")
+    return entry["challenge_id"]
+
+
+async def _queue_entry(db, qid: str, me: dict) -> dict:
+    entry = await db.f1_queue.find_one({"id": qid}, {"_id": 0})
+    if not entry:
+        raise HTTPException(status_code=404, detail="Eintrag nicht gefunden")
+    await _require_f1_result_permission(me, entry["challenge_id"])
+    return entry
+
+
+async def _queue_attempts(db, challenge: dict, entry: dict) -> int:
+    """Wie viele Versuche die Person auf der Strecke schon hat - in der Wertung, in der sie fährt."""
+    query = {"challenge_id": challenge["id"], "track_id": entry.get("track_id")}
+    if entry.get("guest_id"):
+        return await db.f1_lap_times.count_documents({**query, "guest_id": entry["guest_id"], "user_id": None})
+    reference = challenge.get("block_club_member_results") and await _is_active_club_member(entry.get("user_id"))
+    scope = {"score_scope": "club_reference"} if reference else \
+        {"$or": [{"score_scope": {"$exists": False}}, {"score_scope": "official"}]}
+    return await db.f1_lap_times.count_documents({**query, "user_id": entry.get("user_id"), **scope})
+
+
+PUBLIC_QUEUE_FIELDS = ("id", "state", "station", "display_name", "attempts_used")
+
+
+def _public_queue_rows(rows: list[dict]) -> list[dict]:
+    """Was alle sehen (TV, öffentliche Seite): Name, Station, Versuch und Platz - keine Kennungen von Konto oder Gast,
+    keine genaue Startzeit. ``id`` ist die Kennung des Listeneintrags (für die Bewegung beim Wechsel), keine Person."""
+    return [{**{key: row.get(key) for key in PUBLIC_QUEUE_FIELDS}, "position": index + 1} for index, row in enumerate(rows)]
+
+
+async def _queue_payload(db, challenge: dict, rows: list[dict]) -> list[dict]:
+    user_ids = [row["user_id"] for row in rows if row.get("user_id")]
+    users = {u["id"]: u for u in await db.users.find({"id": {"$in": user_ids}}, private_projection()).to_list(len(user_ids) + 10)} if user_ids else {}
+    guests = await guests_by_id(db, [row.get("guest_id") for row in rows])
+    out = []
+    for row in rows:
+        if row.get("guest_id"):
+            name, avatar = (guests.get(row["guest_id"]) or {}).get("display_name") or "Gast", None
+        else:
+            user = users.get(row.get("user_id")) or {}
+            name, avatar = user.get("display_name") or user.get("username") or "Gelöschter User", user.get("avatar_url")
+        out.append({
+            "id": row["id"], "state": row.get("state"), "track_id": row.get("track_id"), "station": row.get("station"),
+            "user_id": row.get("user_id"), "guest_id": row.get("guest_id"), "is_guest": bool(row.get("guest_id")),
+            "participant_id": participant_id(row), "display_name": name, "avatar_url": avatar,
+            "attempts_used": await _queue_attempts(db, challenge, row), "started_at": row.get("started_at"),
+        })
+    return out
+
+
+@router.get("/challenges/{cid}/queue")
+async def get_queue(cid: str, track_id: str | None = None, access: str | None = None, user=Depends(get_optional_user)):
+    db = get_db()
+    c = await _get_visible_challenge(cid, user, access=access)
+    query = {"challenge_id": c["id"], **({"track_id": track_id} if track_id else {})}
+    rows = await db.f1_queue.find(query, {"_id": 0}).sort("order", 1).to_list(500)
+    on_track = sorted([row for row in rows if row.get("state") == "on_track"], key=lambda row: row.get("started_at") or "")
+    waiting = [row for row in rows if row.get("state") != "on_track"]
+    stations = set()
+    if c.get("event_id"):
+        stations.update(row.get("name") for row in await db.stations.find({"event_id": c["event_id"]}, {"_id": 0, "name": 1}).to_list(200))
+    stations.update(row.get("station") for row in rows)
+    on_track_rows, waiting_rows = await _queue_payload(db, c, on_track), await _queue_payload(db, c, waiting)
+    # Kennungen und Startzeit nur für die, die die Liste führen (#1585, Nachprüfung).
+    if not await _has_f1_staff_permission(user, c["id"], F1_RESULT_STAFF_ROLES):
+        on_track_rows, waiting_rows = _public_queue_rows(on_track_rows), _public_queue_rows(waiting_rows)
+    else:
+        for index, row in enumerate(waiting_rows):
+            row["position"] = index + 1
+        for index, row in enumerate(on_track_rows):
+            row["position"] = index + 1
+    return {
+        "challenge_id": c["id"],
+        "max_attempts": _max_attempts(c),
+        "on_track": on_track_rows,
+        "next": waiting_rows,
+        "stations": sorted(name for name in stations if name),
+    }
+
+
+@router.post("/challenges/{cid}/queue")
+async def add_to_queue(cid: str, body: F1QueueCreate, me: dict = Depends(get_current_user)):
+    cid = await _resolve_cid(cid)
+    async with challenge_write(cid):
+        return await _add_to_queue_locked(cid, body, me)
+
+
+async def _add_to_queue_locked(cid: str, body: F1QueueCreate, me: dict):
+    db = get_db()
+    # Unter der Schreib-Sperre: ein Gast, der gerade verknüpft wird, landet nicht mehr als Gast in der Liste.
+    await _require_f1_result_permission(me, cid)
+    if bool(body.user_id) == bool(body.guest_id):
+        raise HTTPException(status_code=400, detail="Bitte genau einen Fahrer oder einen Gast wählen.")
+    if body.guest_id:
+        await find_guest(db, cid, body.guest_id)
+    elif not await db.users.find_one({"id": body.user_id}, {"_id": 0, "id": 1}):
+        raise HTTPException(status_code=400, detail="Spieler nicht gefunden")
+    track = await db.f1_tracks.find_one({"challenge_id": cid, **({"id": body.track_id} if body.track_id else {})},
+                                        {"_id": 0, "id": 1}, sort=[("order_index", 1)])
+    if not track:
+        raise HTTPException(status_code=400, detail="Strecke gehört nicht zur Challenge")
+    who = {"guest_id": body.guest_id} if body.guest_id else {"user_id": body.user_id}
+    try:
+        async with mutation_lock(db, queue_resource(cid), wait_seconds=LAP_WAIT_SECONDS):
+            if await db.f1_queue.find_one({"challenge_id": cid, "track_id": track["id"], **who}, {"_id": 0, "id": 1}):
+                raise HTTPException(status_code=409, detail="Steht schon in der Liste.")
+            last = await db.f1_queue.find_one({"challenge_id": cid}, {"_id": 0, "order": 1}, sort=[("order", -1)])
+            stamp = now_utc().isoformat()
+            doc = {"id": new_id(), "challenge_id": cid, "track_id": track["id"], "user_id": body.user_id or None,
+                   "guest_id": body.guest_id or None, "station": _clean_station(body.station), "state": "next",
+                   "order": float((last or {}).get("order") or 0) + 1, "created_by": me["id"], "created_at": stamp,
+                   "started_at": None}
+            await db.f1_queue.insert_one(doc)
+    except MutationLockBusy:
+        raise HTTPException(status_code=409, detail=QUEUE_BUSY)
+    doc.pop("_id", None)
+    challenge = await db.f1_challenges.find_one({"id": cid}, {"_id": 0})
+    return (await _queue_payload(db, challenge, [doc]))[0]
+
+
+@router.post("/queue/{qid}/up")
+async def move_up_in_queue(qid: str, me: dict = Depends(get_current_user)):
+    async with challenge_write(await _queue_challenge_id(qid)):
+        return await _move_up_locked(qid, me)
+
+
+async def _move_up_locked(qid: str, me: dict):
+    db = get_db()
+    entry = await _queue_entry(db, qid, me)
+    try:
+        async with mutation_lock(db, queue_resource(entry["challenge_id"]), wait_seconds=LAP_WAIT_SECONDS):
+            entry = await db.f1_queue.find_one({"id": qid}, {"_id": 0})
+            if not entry:
+                raise HTTPException(status_code=404, detail="Eintrag nicht gefunden")
+            # Wer schon am Start ist, steht nicht mehr in der Reihenfolge.
+            if entry.get("state") != "next":
+                raise HTTPException(status_code=409, detail="Ist schon am Start - nach oben geht nur, wer wartet.")
+            before = await db.f1_queue.find_one({"challenge_id": entry["challenge_id"], "state": "next", "order": {"$lt": entry["order"]}},
+                                                {"_id": 0, "id": 1, "order": 1}, sort=[("order", -1)])
+            if before:
+                await db.f1_queue.update_one({"id": entry["id"]}, {"$set": {"order": before["order"]}})
+                await db.f1_queue.update_one({"id": before["id"]}, {"$set": {"order": entry["order"]}})
+    except MutationLockBusy:
+        raise HTTPException(status_code=409, detail=QUEUE_BUSY)
+    return {"ok": True}
+
+
+@router.post("/queue/{qid}/start")
+async def start_from_queue(qid: str, body: F1QueueStart | None = None, me: dict = Depends(get_current_user)):
+    async with challenge_write(await _queue_challenge_id(qid)):
+        return await _start_locked(qid, body, me)
+
+
+async def _start_locked(qid: str, body: F1QueueStart | None, me: dict):
+    db = get_db()
+    entry = await _queue_entry(db, qid, me)
+    try:
+        async with mutation_lock(db, queue_resource(entry["challenge_id"]), wait_seconds=LAP_WAIT_SECONDS):
+            # Frisch lesen: ein anderer Helfer kann den Eintrag gerade entfernt oder gestartet haben.
+            current = await db.f1_queue.find_one({"id": qid}, {"_id": 0})
+            if not current:
+                raise HTTPException(status_code=404, detail="Eintrag nicht gefunden")
+            station = _clean_station(body.station if body else None) or current.get("station")
+            await db.f1_queue.update_one({"id": qid}, {"$set": {"state": "on_track", "station": station, "started_at": now_utc().isoformat()}})
+    except MutationLockBusy:
+        raise HTTPException(status_code=409, detail=QUEUE_BUSY)
+    return {"ok": True}
+
+
+@router.delete("/queue/{qid}")
+async def remove_from_queue(qid: str, me: dict = Depends(get_current_user)):
+    async with challenge_write(await _queue_challenge_id(qid)):
+        return await _remove_locked(qid, me)
+
+
+async def _remove_locked(qid: str, me: dict):
+    db = get_db()
+    entry = await _queue_entry(db, qid, me)
+    try:
+        async with mutation_lock(db, queue_resource(entry["challenge_id"]), wait_seconds=LAP_WAIT_SECONDS):
+            result = await db.f1_queue.delete_one({"id": qid})
+    except MutationLockBusy:
+        raise HTTPException(status_code=409, detail=QUEUE_BUSY)
+    if not getattr(result, "deleted_count", 0):
+        raise HTTPException(status_code=404, detail="Eintrag nicht gefunden")
+    return {"ok": True}
+
+
+@router.post("/challenges/{cid}/queue/next")
+async def next_in_queue(cid: str, body: F1QueueNext | None = None, me: dict = Depends(get_current_user)):
+    """„Nächster Fahrer“: wer fertig ist, verlässt die Liste; der Erste, der wartet, geht an dieselbe Station."""
+    cid = await _resolve_cid(cid)
+    async with challenge_write(cid):
+        return await _next_locked(cid, body, me)
+
+
+async def _next_locked(cid: str, body: F1QueueNext | None, me: dict):
+    db = get_db()
+    await _require_f1_result_permission(me, cid)
+    body = body or F1QueueNext()
+    try:
+        async with mutation_lock(db, queue_resource(cid), wait_seconds=LAP_WAIT_SECONDS):
+            done = await db.f1_queue.find_one({"id": body.done_id, "challenge_id": cid}, {"_id": 0}) if body.done_id else None
+            if done:
+                await db.f1_queue.delete_one({"id": done["id"]})
+            track_id = body.track_id or (done or {}).get("track_id")
+            following = await db.f1_queue.find_one({"challenge_id": cid, "state": "next", **({"track_id": track_id} if track_id else {})},
+                                                   {"_id": 0}, sort=[("order", 1)])
+            if not following:
+                return None
+            station = _clean_station(body.station) or (done or {}).get("station") or following.get("station")
+            stamp = now_utc().isoformat()
+            await db.f1_queue.update_one({"id": following["id"]}, {"$set": {"state": "on_track", "station": station, "started_at": stamp}})
+            following.update(state="on_track", station=station, started_at=stamp)
+    except MutationLockBusy:
+        raise HTTPException(status_code=409, detail=QUEUE_BUSY)
+    challenge = await db.f1_challenges.find_one({"id": cid}, {"_id": 0})
+    return (await _queue_payload(db, challenge, [following]))[0]

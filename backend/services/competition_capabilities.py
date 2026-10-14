@@ -131,7 +131,8 @@ CAPABILITIES: tuple[Capability, ...] = (
     _c("planning.check", "Planungsprüfung und Spielplan-Export",
        ["GET /api/tournaments/{tid}/planning-check", "GET /api/tournaments/{tid}/match-plan.csv"], [CLASSIC, GRAPH]),
     _c("planning.schedule", "Spielplan planen (Vorschau) und übernehmen",
-       ["POST /api/tournaments/{tid}/schedule/plan", "POST /api/tournaments/{tid}/schedule/apply"], [GRAPH],
+       ["POST /api/tournaments/{tid}/schedule/plan", "POST /api/tournaments/{tid}/schedule/apply",
+        "POST /api/tournaments/{tid}/schedule/release"], [GRAPH],
        note="Der Spielplaner (#1552) schreibt Zeit und Station zusammen mit schedule_source; die Vorschau "
             "schreibt nichts, Übernehmen alles auf einmal. Online nie Stationen."),
     _c("planning.deadlines", "Fristen je Spiel lesen (Matchplan online und Liga)",

@@ -265,6 +265,20 @@ button.tls-bracket-row[aria-pressed="true"] { background-color: rgb(var(--tls-ho
 /* Gemischte Gruppen (#1548): der echte Weg über die Sammelschiene zeigt sich auf deinem Weg und in der Bewegung. */
 .tls-bracket-canvas .tls-bracket-line--real { opacity: 0; }
 .tls-bracket-canvas .tls-bracket-line--real[data-path="on"] { opacity: 1; }
+/* Übersicht (#1591): Abstiege, Äste aus einem anderen Abschnitt und die Einzelwege einer Gabel erscheinen erst beim
+   Zeigen auf eine Karte, auf deinem Weg oder in der Bewegung. Am Ziel steht dafür ein Eingang: kurzer Strich, Marker. */
+.tls-bracket-canvas .tls-bracket-line[data-demand="1"]:not([data-path="on"]):not([data-focus="1"]):not([data-fresh="1"]) { opacity: 0; }
+.tls-bracket-canvas .tls-bracket-line[data-demand="1"][data-focus="1"]:not([data-path]) { opacity: 0.9; }
+/* Breiter als das Fenster (#1591): der Rand, hinter dem es weitergeht, blendet aus - nie hart abgeschnitten. */
+.tls-bracket-canvas[data-more="right"] { -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 48px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 48px), transparent); }
+.tls-bracket-canvas[data-more="left"] { -webkit-mask-image: linear-gradient(to left, #000 calc(100% - 48px), transparent); mask-image: linear-gradient(to left, #000 calc(100% - 48px), transparent); }
+.tls-bracket-canvas[data-more="both"] { -webkit-mask-image: linear-gradient(to right, transparent, #000 48px, #000 calc(100% - 48px), transparent); mask-image: linear-gradient(to right, transparent, #000 48px, #000 calc(100% - 48px), transparent); }
+/* Zeigen passiert oft: schnell ein- und ausblenden, nie träge. */
+.tls-bracket-canvas .tls-bracket-line[data-demand="1"] { transition-duration: var(--tls-motion-fast); }
+.tls-bracket-canvas .tls-bracket-line--stub { stroke: rgb(var(--tls-quiet-rgb) / 0.6); stroke-width: 1.5px; }
+.tls-bracket-canvas .tls-bracket-marker { fill: var(--tls-surface-0); stroke: rgb(var(--tls-quiet-rgb) / 0.75); stroke-width: 1.5px; transition: opacity var(--tls-motion-mid) var(--tls-ease), stroke var(--tls-motion-mid) var(--tls-ease); }
+.tls-bracket-canvas .tls-bracket-marker[data-path="off"] { opacity: 0.35; }
+.tls-bracket-canvas .tls-bracket-marker[data-focus="1"] { stroke: var(--tls-brand); }
 /* Ankommen: die Zielzeile leuchtet kurz und weich auf (nur Deckkraft einer Fläche). */
 .tls-bracket-row[data-landed]::after {
   content: ""; position: absolute; inset: 0; pointer-events: none; border-radius: 4px;
@@ -2629,6 +2643,80 @@ html[data-season-still-cards] .tls-card[data-season-perch="card"]:focus-visible 
   .tls-lap-board[data-intro="1"] .tls-lap-row > td:first-child::before { animation: none; }
 }
 
+/* Fast Lap vor Ort (#1585) ------------------------------------------------------------------------------------
+   Neue Zeit in der Tabelle: die Zeile leuchtet ruhig auf (nur Deckkraft einer Fläche), bei einer neuen Bestzeit länger und
+   in Gold; das Band „Neue Bestzeit!“ trägt einen Glanz, der einmal durchläuft. Der Hinweis „−0.412 s · persönliche Bestzeit“ blendet ein. Der Abstand
+   ist ein Balken, der beim ersten Auftritt wächst und sich bei neuer Bestzeit weich anpasst (scaleX). Bewegung nur über
+   transform und opacity; „Bewegung reduzieren“ stellt die Dauern zentral ab und --tls-motion-on auf 0. */
+.tls-lap-row--fresh > td, .tls-lap-row--record > td { position: relative; }
+.tls-lap-row--fresh > td::after, .tls-lap-row--record > td::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: rgba(41, 182, 232, 0.14);
+  animation: tls-row-land calc(var(--tls-motion-slow) * 3) var(--tls-ease) both;
+}
+.tls-lap-row--record > td::after {
+  background: rgb(var(--tls-honor-rgb) / 0.16);
+  animation-duration: calc(var(--tls-motion-slow) * 6);
+}
+.tls-lap-chip-web {
+  display: inline-block; margin-top: 2px; font-size: 10px; font-weight: 700; letter-spacing: 0.04em;
+  color: var(--tls-cyan); font-variant-numeric: tabular-nums;
+  animation: tls-chip-in var(--tls-motion-mid) var(--tls-ease) both;
+}
+.tls-lap-chip-web--best { color: var(--tls-honor); }
+@keyframes tls-chip-in {
+  from { opacity: 0; transform: translateY(calc(4px * var(--tls-motion-on))); }
+}
+.tls-best-flash {
+  display: flex; align-items: baseline; gap: 0.75rem; min-width: 0; padding: 0.6rem 1rem;
+  border-bottom: 1px solid rgb(var(--tls-honor-rgb) / 0.25);
+  background: linear-gradient(90deg, rgb(var(--tls-honor-rgb) / 0.12), rgb(var(--tls-honor-rgb) / 0.02));
+  position: relative; overflow: hidden;
+  animation: tls-best-in var(--tls-motion-mid) var(--tls-ease) both;
+}
+.tls-best-flash::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(100deg, transparent 30%, rgb(var(--tls-honor-rgb) / 0.22) 50%, transparent 70%);
+  transform: translateX(-120%);
+  animation: tls-winner-sweep calc(var(--tls-motion-slow) * 3) var(--tls-ease) var(--tls-motion-mid) 1 forwards;
+}
+.tls-best-flash__kicker { color: var(--tls-honor); font-weight: 900; text-transform: uppercase; letter-spacing: 0.08em; font-size: 12px; }
+@keyframes tls-best-in {
+  from { opacity: 0; transform: translateY(calc(-6px * var(--tls-motion-on))); }
+}
+.tls-gap-track { display: block; height: 2px; margin-top: 4px; margin-left: auto; width: 4.5rem; background: rgba(255, 255, 255, 0.06); border-radius: 1px; overflow: hidden; }
+.tls-gap-bar {
+  display: block; height: 100%; background: rgba(41, 182, 232, 0.55); transform-origin: 0 50%;
+  transition: transform var(--tls-motion-slow) var(--tls-ease-move);
+  animation: tls-gap-grow var(--tls-motion-slow) var(--tls-ease) var(--tls-motion-mid) backwards;
+}
+@keyframes tls-gap-grow {
+  from { transform: scaleX(0); }
+}
+/* Schnelleingabe: großer Ziffernblock, Finger- und Tablet-tauglich (mindestens 56 px hoch). */
+.tls-keypad { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.tls-keypad__key {
+  min-height: 56px; border-radius: 3px; border: 1px solid rgba(255, 255, 255, 0.1); background: rgba(255, 255, 255, 0.04);
+  font-size: 1.6rem; font-weight: 700; color: #fff; touch-action: manipulation;
+  transition: background-color var(--tls-motion-fast) var(--tls-ease), transform var(--tls-motion-fast) var(--tls-ease);
+}
+.tls-keypad__key--wide { font-size: 0.8rem; }
+.tls-keypad__key:active { transform: scale(calc(1 - 0.04 * var(--tls-motion-on))); background: rgba(41, 182, 232, 0.18); }
+.tls-keypad__key:focus-visible { outline: 2px solid var(--tls-cyan); outline-offset: 2px; }
+@media (hover: hover) and (pointer: fine) {
+  .tls-keypad__key:hover { background: rgba(255, 255, 255, 0.08); }
+}
+/* „Versuch 2 von 3“: der Zähler tickt beim Wechsel einmal ein (neuer key → neue Animation). */
+.tls-attempt-chip {
+  font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.12em; font-variant-numeric: tabular-nums;
+  border: 1px solid currentColor; border-radius: 2px; padding: 3px 8px;
+  animation: tls-tick-in var(--tls-motion-mid) var(--tls-ease) both;
+}
+@keyframes tls-tick-in {
+  from { opacity: 0; transform: translateY(calc(5px * var(--tls-motion-on))); }
+}
+.tls-reveal { animation: tls-chip-in var(--tls-motion-fast) var(--tls-ease) both; }
+
 /* Schritt-Anzeige (#1081): eine schmale Leiste je Schritt; erledigte und der aktuelle sind gefüllt, der Balken füllt
    sich beim Weitergehen von links. Vorleseprogramme hören „Schritt x von y“ (aria-label am Element). */
 .tls-steps {
@@ -3129,7 +3217,8 @@ html[data-season-still-cards] .tls-card[data-season-perch="card"]:focus-visible 
 .mp-lane__label { position: sticky; left: 0; z-index: 3; display: flex; flex-direction: column; justify-content: center; gap: 2px; padding: 0 12px; min-width: 0; background: var(--tls-surface-1); border-right: 1px solid rgba(255, 255, 255, 0.08); }
 .mp-lane__name { font-size: 14px; font-weight: 600; color: #fff; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .mp-lane__meta { font-size: 12px; color: rgba(255, 255, 255, 0.45); }
-.mp-lane[data-status="broken"] .mp-lane__meta { color: var(--tls-warn); }
+.mp-lane[data-status="broken"] .mp-lane__meta, .mp-lane[data-status="missing"] .mp-lane__meta { color: var(--tls-warn); }
+.mp-lane[data-status="missing"] .mp-lane__name { color: var(--tls-warn); }
 .mp-lane__track { position: relative; background-image: linear-gradient(to right, rgba(255, 255, 255, 0.05) 1px, transparent 1px); background-size: var(--mp-tick) 100%; }
 .mp-lane[data-status="broken"] .mp-lane__track { background-image: repeating-linear-gradient(135deg, rgba(255, 255, 255, 0.035) 0 6px, transparent 6px 12px); }
 .mp-lane__empty { position: absolute; top: 50%; left: 12px; transform: translateY(-50%); font-size: 12.5px; color: rgba(255, 255, 255, 0.4); white-space: nowrap; }

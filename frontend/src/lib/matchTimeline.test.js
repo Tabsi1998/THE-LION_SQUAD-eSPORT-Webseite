@@ -237,3 +237,35 @@ describe("Zeitleiste: wartet auf Auslosung", () => {
     expect(byKey(timelineOf(withMode("draw_show"), { plan })).E.draw).toBe("ready");
   });
 });
+
+// Praxis 14.10. (Fabian): Spiele auf einer gelöschten Station standen auf einer Bahn „Station“, obwohl der Kopf
+// „Noch keine Station“ sagte, und LE stand ohne Warnung vor LC. Die Stationen und Warnungen kommen jetzt vom Planer.
+describe("Stationen, die der Planer kennt - und eine, die es nicht mehr gibt", () => {
+  it("eine gelöschte Station heißt so, ist als fehlend markiert und ihre Spiele tragen die Warnung", () => {
+    const state = fixture.orphan;
+    const timeline = timelineOf(state, { plan: state.plan });
+    const lane = timeline.lanes.find((row) => row.id === state.deleted_station_id);
+    expect(lane).toMatchObject({ name: "Gelöschte Station", missing: true, count: 13 });
+    expect(timeline.lanes.find((row) => row.id === "none")).toMatchObject({ name: "Ohne Station", count: 1 });
+    const items = byKey(timeline);
+    expect(items.A.conflicts.map((row) => row.type)).toContain("unknown_station");
+    expect(items.LE.conflicts.find((row) => row.type === "too_early")).toMatchObject({ otherKey: "LC" });
+    expect(items.FINAL.conflicts.find((row) => row.type === "too_early")).toMatchObject({ otherKey: "LF" });
+    expect(items.G.minutes).toBe(30);
+  });
+
+  it("eine Station des Events steht mit ihrem Namen auf der Bahn, auch wenn die Liste des Turniers sie nicht kennt", () => {
+    const state = fixture.event_stations;
+    const hall = state.plan.stations.find((row) => row.scope === "event");
+    const timeline = timelineOf(state, { plan: state.plan });
+    expect(timeline.lanes.map((lane) => lane.name)).toContain(hall.name);
+    expect(timeline.lanes.find((lane) => lane.id === hall.id)).toMatchObject({ missing: false, scope: "event" });
+  });
+
+  it("auf eine Station, die es nicht mehr gibt, lässt sich nichts legen", () => {
+    const state = fixture.orphan;
+    const timeline = timelineOf(state, { plan: state.plan });
+    const lf = byKey(timeline).LF;
+    expect(dropConflicts(timeline, lf.id, state.deleted_station_id, lf.start)).toEqual([{ key: "gelöscht", missing: true }]);
+  });
+});

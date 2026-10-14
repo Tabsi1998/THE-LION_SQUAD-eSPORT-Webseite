@@ -13,8 +13,8 @@ from services.tournament_permissions import (
 )
 from services.match_calls import notify_match_called
 from services.station_runtime import notify_match_started
-from services.competition_read import find_match_source, load_competition_read_model
-from services.match_scheduler import plan_for_tournament
+from services.competition_read import find_match_source, load_competition_read_model, load_matches_by_query
+from services.match_scheduler import DONE_STATUSES, plan_for_tournament
 from services.mutation_lock import MutationLockBusy, mutation_lock, tournament_write_resource
 
 router = APIRouter(prefix="/api/stations", tags=["stations"])
@@ -220,7 +220,7 @@ async def _assign_match_to_station(db, station: dict, match: dict, collection_na
     # Die Station nur belegen, wenn sie jetzt noch frei (oder schon für dieses Spiel reserviert) ist - nicht gegen
     # den Stand, den der Aufrufer gelesen hat (Compare-and-Set; zwei Zuweisungen zugleich sahen beide „frei“).
     claimed = await db.stations.update_one(
-        {"id": station["id"], "status": {"$ne": "broken"},
+        {"id": station["id"], "status": {"$ne": "broken"}, "deleting": {"$ne": True},
          "$or": [{"current_match_id": None}, {"current_match_id": {"$exists": False}}, {"current_match_id": match["id"]}]},
         station_change,
     )
@@ -422,5 +422,39 @@ async def delete_station(sid: str, me: dict = Depends(require_admin())):
     station = await db.stations.find_one({"id": sid}, {"_id": 0})
     if station and station.get("tournament_id"):
         await _ensure_tournament_unlocked(db, station["tournament_id"])
-    await db.stations.delete_one({"id": sid})
+    # Nicht löschen, solange ein Spiel daran hängt, das nicht vorbei ist (Praxis 14.10.): sonst behielte es die Kennung
+    # einer Station, die es nicht mehr gibt, samt fester Zeit - der Plan wäre nicht mehr zu lesen. Stilles Lösen wäre
+    # die andere Wahl, würfe aber von Hand gesetzte Zeiten weg, ohne dass es jemand sieht. Gespielte Spiele halten die
+    # Station nicht fest, sie behalten nur, wo sie gespielt wurden.
+    if not station:
+        return {"ok": True}
+    # Atomar gegen Zuweisungen (Codex zu #1611): erst markieren - nur wenn die Station gerade kein Spiel hält -, dann
+    # prüfen, dann löschen. Zuweisungen lehnen markierte Stationen ab und prüfen nach dem Schreiben nach.
+    marked = await db.stations.update_one(
+        {"id": sid, "deleting": {"$ne": True}, "$or": [{"current_match_id": None}, {"current_match_id": {"$exists": False}}]},
+        {"$set": {"deleting": True}})
+    if not marked.matched_count:
+        raise HTTPException(status_code=409, detail="Die Station hält gerade ein Spiel oder wird schon gelöscht. Bitte neu laden.")
+    deleted = False
+    try:
+        holding = sorted(
+            await load_matches_by_query(db, {"station_id": sid, "status": {"$nin": list(DONE_STATUSES)}}, per_store_limit=500),
+            key=lambda match: str(match.get("match_key") or ""),
+        )
+        if holding:
+            raise HTTPException(status_code=409, detail=station_in_use_message(station.get("name"), holding))
+        deleted = bool((await db.stations.delete_one({"id": sid, "deleting": True})).deleted_count)
+    finally:
+        # Was nicht gelöscht wurde (Spiele gefunden, Fehler), bleibt benutzbar - sonst wäre es für immer gesperrt.
+        if not deleted:
+            await db.stations.update_one({"id": sid, "deleting": True}, {"$unset": {"deleting": ""}})
     return {"ok": True}
+
+
+def station_in_use_message(name: str | None, matches: list[dict]) -> str:
+    count = len(matches)
+    keys = [str(match.get("match_key")) for match in matches if match.get("match_key")]
+    named = f" ({', '.join(keys[:8])}{' …' if len(keys) > 8 else ''})" if keys else ""
+    games = "1 Spiel" if count == 1 else f"{count} Spiele"
+    return (f"Station „{name or 'ohne Namen'}“ ist noch für {games}{named} eingeplant, die nicht vorbei sind. "
+            "Erst im Matchplan auf eine andere Station legen oder die Termine lösen, dann löschen.")

@@ -42,9 +42,12 @@ function inspectTree(page) {
     const cards = [...stage.querySelectorAll("[data-tv-card]")].map((element) => ({ id: element.getAttribute("data-tv-card"), rect: element.getBoundingClientRect() }));
     const byId = new Map(cards.map((card) => [card.id, card.rect]));
     const inView = (rect) => rect.left >= view.left - 1 && rect.top >= view.top - 1 && rect.right <= view.right + 1 && rect.bottom <= view.bottom + 1;
-    // Linien: Anfang an der rechten Kante der einen Karte, Ende an der linken Kante der nächsten, jeweils auf halber Höhe.
+    // Linien (#1564, wie im Web-Baum): Anfang an der rechten Kante der einen Karte (auf ihrer Höhe), Ende an der Kante der
+    // nächsten - in der Zeile des Platzes, in den der Spieler kommt (ohne Zeile auf halber Höhe der Karte).
     const badLines = [];
-    const paths = [...stage.querySelectorAll("[data-testid='bracket-connectors'] path")];
+    // Gabel und Eingang (#1591) prüft e2e/bracket-lines.spec.js; hier zählen die Linien der Spiele, die zu sehen sind.
+    const paths = [...stage.querySelectorAll("[data-testid='bracket-connectors'] path:not([data-fork]):not([data-stub])")]
+      .filter((path) => Number(getComputedStyle(path).opacity) > 0.05);
     for (const path of paths) {
       const matrix = path.getScreenCTM();
       const length = path.getTotalLength();
@@ -54,9 +57,12 @@ function inspectTree(page) {
       const from = byId.get(path.getAttribute("data-from"));
       const to = byId.get(path.getAttribute("data-to"));
       const tolerance = 3;
+      const rows = [...stage.querySelectorAll(`[data-slot-anchor^="${path.getAttribute("data-to")}:"]`)].map((row) => { const rect = row.getBoundingClientRect(); return rect.top + rect.height / 2; });
+      const targets = rows.length ? rows : to ? [to.top + to.height / 2] : [];
       const ok = from && to
-        && Math.abs(start.x - from.right) <= tolerance && Math.abs(start.y - (from.top + from.height / 2)) <= tolerance
-        && Math.abs(end.x - to.left) <= tolerance && Math.abs(end.y - (to.top + to.height / 2)) <= tolerance;
+        && Math.abs(start.x - from.right) <= tolerance && start.y >= from.top - tolerance && start.y <= from.bottom + tolerance
+        && (Math.abs(end.x - to.left) <= tolerance || Math.abs(end.x - to.right) <= tolerance)
+        && targets.some((y) => Math.abs(end.y - y) <= tolerance);
       if (!ok) badLines.push(`${path.getAttribute("data-from")} → ${path.getAttribute("data-to")}`);
     }
     // Namen: nie „…“, nie breiter als ihr Platz; im Bild mindestens 2 % der Bildhöhe, Nebensachen 1,4 %.

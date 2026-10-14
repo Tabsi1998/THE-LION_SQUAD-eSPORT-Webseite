@@ -1,7 +1,7 @@
 import { SmartLogo } from "@/components/tls/SmartLogo";
 import { resolveMediaUrl } from "@/lib/api";
 import { describeSlot, finderFor } from "@/lib/slotSource";
-import { formatBracketSection, formatRoundName } from "@/lib/tournamentLabels";
+import { formatBracketSection, matchRoundLabel } from "@/lib/tournamentLabels";
 import { matchName } from "@/lib/tvLive";
 import { TvFace } from "./TvParts";
 import { TvLineup } from "./TvStartGrid";
@@ -31,7 +31,7 @@ export function TvSlideBar({ clock, totalMs, paused = false, testId = "tv-slide-
 }
 
 function liveTitle(match) {
-  return [formatBracketSection(match.section), formatRoundName(match.round_name, match.round)].filter(Boolean).join(" · ");
+  return [formatBracketSection(match.section), matchRoundLabel(match)].filter(Boolean).join(" · ");
 }
 
 /** Ein laufendes Spiel: Kopf mit Station und Spielzeit, darunter die Startaufstellung oder „A gegen B“. */

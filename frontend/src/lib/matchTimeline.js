@@ -93,7 +93,9 @@ export function buildTimeline({ matches = [], stations = [], stages = [], tourna
   const stageById = new Map((stages || []).map((stage) => [stage?.id, stage]));
   const assignments = new Map((plan?.assignments || []).map((item) => [item.match_id, item]));
   const findIn = finderFor(rows);
-  const stationById = new Map((stations || []).filter(Boolean).map((station) => [station.id, station]));
+  // Die Stationen: die des Turniers und - aus der Antwort des Planers - auch die des Events (eine Wahrheit, #1557).
+  const known = knownStations(stations, plan);
+  const stationById = new Map(known.map((station) => [station.id, station]));
   const keyById = new Map(rows.map((match) => [match.id, match.match_key || match.round_name || "Spiel"]));
 
   const items = [];
@@ -152,14 +154,22 @@ export function buildTimeline({ matches = [], stations = [], stages = [], tourna
   }
 
   const byId = new Map(items.map((item) => [item.id, item]));
+  const missingIds = new Set();
   for (const warning of plan?.warnings || []) {
-    const item = byId.get(warning.match_id);
-    if (!item) continue;
-    item.conflicts.push({ type: warning.type, otherKey: keyById.get(warning.other_match_id) || null, text: warning.message || "Konflikt" });
+    // Eine Warnung nennt ein Spiel (match_id) oder mehrere (match_ids, z. B. „Station gibt es nicht mehr“).
+    if (warning.type === "unknown_station" && warning.station_id) missingIds.add(warning.station_id);
+    for (const matchId of warning.match_ids || [warning.match_id]) {
+      const item = byId.get(matchId);
+      if (!item) continue;
+      item.conflicts.push({ type: warning.type, otherKey: keyById.get(warning.other_match_id) || null, text: warning.message || "Konflikt" });
+    }
   }
+  // Kennt der Planer seine Stationen (Antwort mit `stations`), ist jede andere Kennung eine Station, die es nicht mehr gibt.
+  const isMissing = (id) => id !== NO_STATION && !stationById.has(id) && (missingIds.has(id) || Array.isArray(plan?.stations));
 
   const laneName = (id) => {
     if (id === NO_STATION) return "Ohne Station";
+    if (isMissing(id)) return "Gelöschte Station";
     const fromPlan = (plan?.assignments || []).find((row) => row.station_id === id)?.station_name;
     return stationById.get(id)?.name || fromPlan || "Station";
   };
@@ -182,14 +192,16 @@ export function buildTimeline({ matches = [], stations = [], stages = [], tourna
 
   const order = (a, b) => a.start - b.start || String(a.key).localeCompare(String(b.key), "de");
   items.sort(order);
-  const laneIds = [...(stations || []).filter(Boolean).map((station) => station.id)];
+  const laneIds = known.map((station) => station.id);
   for (const item of items) if (item.laneId !== NO_STATION && !laneIds.includes(item.laneId)) laneIds.push(item.laneId);
   if (items.some((item) => item.laneId === NO_STATION)) laneIds.push(NO_STATION);
   const lanes = laneIds.map((id) => ({
     id,
     name: laneName(id),
     device: stationById.get(id)?.device_type || null,
-    status: stationById.get(id)?.status || null,
+    status: isMissing(id) ? "missing" : stationById.get(id)?.status || null,
+    scope: stationById.get(id)?.scope || (id === NO_STATION ? null : "tournament"),
+    missing: isMissing(id),
     count: items.filter((item) => item.laneId === id).length,
   }));
 
@@ -197,6 +209,22 @@ export function buildTimeline({ matches = [], stations = [], stages = [], tourna
   const last = items.length ? Math.max(...items.map((item) => item.end)) : first + 60 * MINUTE;
   const range = { start: floorTo(first, 15), end: Math.max(ceilTo(last, 15), floorTo(first, 15) + 60 * MINUTE) };
   return { items, lanes, unscheduled, range, now: nowMs };
+}
+
+/**
+ * Alle Stationen, die gelten: die übergebenen (des Turniers) und die, die der Planer in seiner Antwort nennt (auch die
+ * des Events, `scope: "event"`). Doppelte zählen einmal, die Reihenfolge des Turniers zuerst.
+ */
+export function knownStations(stations = [], plan = null) {
+  const out = [];
+  const seen = new Set();
+  for (const station of [...(stations || []), ...(plan?.stations || [])]) {
+    if (!station?.id || seen.has(station.id)) continue;
+    seen.add(station.id);
+    const fromPlan = (plan?.stations || []).find((row) => row.id === station.id);
+    out.push({ ...station, scope: fromPlan?.scope || station.scope || (station.tournament_id ? "tournament" : station.event_id ? "event" : "tournament") });
+  }
+  return out;
 }
 
 /** Maßstab: Minuten mal `pxPerMinute`. */
@@ -227,6 +255,8 @@ export function laneSchedule(timeline, laneId) {
 export function dropConflicts(timeline, itemId, laneId, start) {
   const moving = timeline.items.find((item) => item.id === itemId);
   if (!moving || laneId === NO_STATION) return [];
+  // Eine Station, die es nicht mehr gibt, nimmt nichts mehr an.
+  if (timeline.lanes.find((lane) => lane.id === laneId)?.missing) return [{ key: "gelöscht", missing: true }];
   const end = start + moving.minutes * MINUTE;
   return timeline.items.filter((item) => item.id !== itemId && item.laneId === laneId && item.state !== "done"
     && item.start < end && start < item.end);

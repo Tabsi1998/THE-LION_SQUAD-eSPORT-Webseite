@@ -3,25 +3,28 @@
 //
 // Linien kommen aus den echten Quellen der Plätze („W:A:1“ im Ziel, `advancement` in der Quelle), nicht aus der
 // Reihenfolge der Spiele - so stimmen sie auch zwischen Winner und Loser Bracket, ins Grand Final und in den Reset.
+import { FINAL_SECTIONS, LOSER_SECTIONS, sectionKey, sectionKind } from "@/lib/bracketSections";
+import { matchName } from "@/lib/bracketNames";
 import { absoluteRank, finderFor, normalizeSource } from "@/lib/slotSource";
 
 const DONE = new Set(["completed", "finished", "reported", "confirmed", "forfeit"]);
 const LIVE = new Set(["running", "in_progress"]);
-// Dieselben Namen wie der Server (services/round_labels.LOSER_SECTIONS) - bracketGraph.test.js hält beide gleich.
-export const LOSER_SECTIONS = new Set(["lb", "loser", "losers", "lower", "lower_bracket", "loser bracket", "looser"]);
-const FINAL_SECTIONS = new Set(["gf", "grand_final"]);
+// Abschnittsnamen aus einer Quelle mit dem Server (lib/bracketSections, #1591).
+export { FINAL_SECTIONS, LOSER_SECTIONS };
 
 const statusOf = (match) => String(match?.status || "").toLowerCase();
 export const isDone = (match) => DONE.has(statusOf(match));
 export const isLive = (match) => LIVE.has(statusOf(match));
 export const isCancelled = (match) => statusOf(match) === "cancelled";
 
-/** Grobe Lage eines Abschnitts: main, loser, final oder bronze. */
+/** Grobe Lage eines Abschnitts: main, loser, final oder bronze - wie `section_kind` am Server (Gruppen zählen als main).
+ * Ältere Bäume nennen das Spiel um Platz 3 auch „TP“ oder „Third Place“; das bleibt zusätzlich erkannt. */
 export function sectionGroup(section) {
-  const key = String(section || "MAIN").trim().toLowerCase();
-  if (LOSER_SECTIONS.has(key)) return "loser";
-  if (FINAL_SECTIONS.has(key)) return "final";
-  if (key === "bronze" || key === "tp" || key.includes("third") || key.includes("platz 3")) return "bronze";
+  const kind = sectionKind(section);
+  if (kind === "loser" || kind === "bronze") return kind;
+  if (kind === "grand_final") return "final";
+  const key = sectionKey(section);
+  if (key === "tp" || key.includes("third") || key.includes("platz 3")) return "bronze";
   return "main";
 }
 
@@ -230,7 +233,7 @@ export function heatExits(match, edges = [], matches = [], rails = drawRails(mat
   const keys = (flow) => [...new Set([
     ...edges.filter((edge) => edge.from === match.id && edge.flow === flow && !edge.void && !edge.rail).map((edge) => edge.to),
     ...railTargets(flow),
-  ].filter((id) => !isCancelled(byId.get(id))).map((id) => byId.get(id)?.match_key).filter(Boolean))].sort();
+  ].filter((id) => !isCancelled(byId.get(id))).map((id) => byId.get(id)).filter((row) => row?.match_key).map(matchName))].sort();
   return { advance: keys("W"), drop: keys("L"), qualifiers: Number(match?.settings?.qualifiers_per_match || 0) };
 }
 
@@ -250,7 +253,8 @@ export function heatText(match, edges, matches, finalId) {
   const field = filled === seats ? `${filled} Spieler` : filled ? `${filled} von ${seats} Spielern` : `${seats} ${seats === 1 ? "Platz" : "Plätze"}`;
   const onward = last ? "Platz 1 gewinnt" : exits.qualifiers ? count(exits.qualifiers) : "";
   return {
-    name: match.match_type === "ffa" ? `Lauf ${match.match_key || ""}`.trim() : match.match_key || "Spiel",
+    // Ein Wort als Kürzel (#1591): „Grand Final“ statt „Lauf FINAL“.
+    name: matchName(match) !== String(match.match_key || "") ? matchName(match) : match.match_type === "ffa" ? `Lauf ${match.match_key || ""}`.trim() : match.match_key || "Spiel",
     meta: [field, onward].filter(Boolean).join(" · "),
     cut: exits.qualifiers && exits.advance.length ? `${count(exits.qualifiers)} → ${exits.advance.join(", ")}` : "",
     rest: exits.drop.length ? `Die anderen → ${exits.drop.join(", ")}` : exits.advance.length ? "Die anderen scheiden aus" : "",
@@ -298,6 +302,13 @@ export function pathFor(registrationId, matches = [], edges = []) {
     }
   }
   return result;
+}
+
+/** Wurde `row` in `target` zusammengelegt? Per Kennung (Web) oder - am TV, der nur Schlüssel bekommt - per Spiel-Schlüssel. */
+function mergedInto(row, target) {
+  if (!row || !target) return false;
+  if (row.merged_into) return row.merged_into === target.id;
+  return Boolean(row.merged_into_key) && row.merged_into_key === target.match_key && (row.stage_id || "") === (target.stage_id || "");
 }
 
 /** Der Sieger eines Spiels (Platz 1 bzw. `winner_id`). */
@@ -349,7 +360,7 @@ export function diffBracket(previous, next) {
       if (!id || oldSlots.get(slot.slot)?.registration_id === id || playersOf(old).has(id)) continue;
       const source = normalizeSource(slot.source);
       const drawn = Boolean(slotDraw(slot));
-      const mergedFrom = previous.find((row) => row.id !== match.id && nextById.get(row.id)?.merged_into === match.id && wasIn.has(`${row.id}:${id}`));
+      const mergedFrom = previous.find((row) => row.id !== match.id && mergedInto(nextById.get(row.id), match) && wasIn.has(`${row.id}:${id}`));
       if (mergedFrom) {
         moves.push({ key: `merge:${match.id}:${id}`, type: "merge", matchId: match.id, registrationId: id, from: { matchId: mergedFrom.id } });
       } else if (!drawn && source?.type === "rank" && source.match_key) {

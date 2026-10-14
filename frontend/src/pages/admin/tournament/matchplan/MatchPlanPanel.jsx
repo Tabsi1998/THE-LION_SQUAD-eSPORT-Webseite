@@ -3,10 +3,12 @@ import { Wand2 } from "lucide-react";
 import { toast } from "sonner";
 import { api, formatRequestError } from "@/lib/api";
 import { useLiveRefresh } from "@/hooks/useLiveRefresh";
-import { buildTimeline, scheduleDelay } from "@/lib/matchTimeline";
+import { buildTimeline, knownStations, scheduleDelay } from "@/lib/matchTimeline";
 import { dependencyGraph } from "@/lib/matchFlow";
 import { matchDurationSource } from "@/lib/matchDuration";
-import { applySchedulePlan, moveMatch, requestSchedulePlan, updateMatchPlan } from "@/lib/schedulePlan";
+import { applySchedulePlan, moveMatch, releaseSchedule, requestSchedulePlan, updateMatchPlan } from "@/lib/schedulePlan";
+import { countOf } from "@/lib/schedulePlanText";
+import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { matchRights } from "@/lib/tournamentRights";
 import { planViewMode } from "@/lib/matchPlanMode";
 import { viennaTime } from "@/lib/vienna";
@@ -54,6 +56,7 @@ export function MatchPlanPanel({ tournament, matches = [], stages = [], stations
   const [deadlines, setDeadlines] = useState(null);
   const [matchdays, setMatchdays] = useState(null);
   const [planError, setPlanError] = useState("");
+  const confirm = useConfirm();
   const [remoteError, setRemoteError] = useState("");
   const request = useRef(0);
 
@@ -111,8 +114,10 @@ export function MatchPlanPanel({ tournament, matches = [], stages = [], stations
     if (preview) return preview;
     if (!background) return null;
     const assignments = live ? (background.assignments || []).map((row) => ({ ...row, changed: false })) : [];
-    return { assignments, warnings: background.warnings || [] };
+    return { assignments, warnings: background.warnings || [], stations: background.stations };
   }, [preview, background, live]);
+  // Eine Wahrheit für Kopf, Zeitleiste und Auswahl: die Stationen des Turniers und die, die der Planer kennt (Event).
+  const allStations = useMemo(() => knownStations(stations, background), [stations, background]);
   const timeline = useMemo(() => buildTimeline({
     matches, stations, stages, tournament, game: durationGame, registrations, plan: shownPlan, now,
   }), [matches, stations, stages, tournament, durationGame, registrations, shownPlan, now]);
@@ -177,7 +182,7 @@ export function MatchPlanPanel({ tournament, matches = [], stages = [], stations
   const editor = (item, close, { withStation = true } = {}) => {
     const match = matchById.get(item.id);
     return (
-      <MatchEditor item={item} match={match} stations={stations} stage={stages.find((stage) => stage.id === match?.stage_id) || null}
+      <MatchEditor item={item} match={match} stations={allStations} stage={stages.find((stage) => stage.id === match?.stage_id) || null}
         tournament={tournament} game={durationGame} onSave={saveMatch} onClose={close} withStation={withStation} />
     );
   };
@@ -207,10 +212,54 @@ export function MatchPlanPanel({ tournament, matches = [], stages = [], stations
     }
   };
 
+  // Feste Termine auf einmal lösen (Praxis 14.10.): die alte Planung hatte jedes Spiel von Hand gesetzt, oft auf einer
+  // Station, die es nicht mehr gibt. Gezählt wird wie am Server: von Hand gesetzt bzw. an der fehlenden Station, nicht
+  // begonnen.
+  const unstarted = (match) => !match.is_preview && !match.started_at
+    && !["completed", "forfeit", "cancelled", "archived", "bye", "no_show", "disputed", "in_progress", "running", "waiting_result"].includes(match.status);
+  const manualCount = matches.filter((match) => unstarted(match) && match.schedule_source === "manual").length;
+  const missingIds = new Set((background?.warnings || []).filter((row) => row.type === "unknown_station").flatMap((row) => row.match_ids || []));
+  const missingCount = matches.filter((match) => missingIds.has(match.id) && unstarted(match)).length;
+
+  const releaseAll = async (scope, count) => {
+    const verb = count === 1 ? "verliert seinen festen Termin und seine Station" : "verlieren ihre festen Termine und Stationen";
+    const ok = await confirm({
+      title: scope === "all" ? "Alle Termine von Hand lösen?" : "Spiele an gelöschten Stationen lösen?",
+      description: `${countOf(count, "Spiel", "Spiele")} ${verb}. Danach „Automatisch planen“: die Vorschau zeigt, wie der Planer neu `
+        + "verteilt - geschrieben wird erst mit „Übernehmen“. Laufende und gespielte Spiele bleiben.",
+      confirmLabel: "Termine lösen",
+      tone: "danger",
+    });
+    if (!ok) return;
+    setBusy(true);
+    const result = await releaseSchedule(tid, scope);
+    setBusy(false);
+    if (!result.ok) {
+      toast.error(result.message);
+      return;
+    }
+    toast.success(`${countOf(result.released, "Spiel", "Spiele")} gelöst - jetzt plant der Planer neu.`);
+    await onChanged?.();
+    await refreshPlan();
+    await startPreview();
+  };
+
   const planButton = mode === "local" && canPlan ? (
-    <button type="button" className="tls-btn tls-btn--primary mp-btn" onClick={startPreview} disabled={busy}>
-      <Wand2 className="h-4 w-4" aria-hidden="true" /> Automatisch planen
-    </button>
+    <>
+      <button type="button" className="tls-btn tls-btn--primary mp-btn" onClick={startPreview} disabled={busy}>
+        <Wand2 className="h-4 w-4" aria-hidden="true" /> Automatisch planen
+      </button>
+      {manualCount > 0 && (
+        <button type="button" className="tls-btn tls-btn--quiet mp-btn" onClick={() => releaseAll("all", manualCount)} disabled={busy}>
+          Alle Termine von Hand lösen
+        </button>
+      )}
+      {missingCount > 0 && (
+        <button type="button" className="tls-btn tls-btn--quiet mp-btn" onClick={() => releaseAll("missing_stations", missingCount)} disabled={busy}>
+          Nur Spiele an gelöschten Stationen lösen
+        </button>
+      )}
+    </>
   ) : null;
 
   // Erst nach Zeit, dahinter, was noch keine Zeit hat - so steht jedes Spiel da, auch solange der Baum Vorschau ist.
@@ -237,7 +286,7 @@ export function MatchPlanPanel({ tournament, matches = [], stages = [], stations
         tournament={tournament}
         mode={mode}
         duration={duration}
-        stations={stations}
+        stations={allStations}
         canEdit={canEditSettings}
         onSave={saveSettings}
         actions={planButton}

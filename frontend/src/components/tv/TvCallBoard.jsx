@@ -1,7 +1,8 @@
 import { describeSlot, finderFor } from "@/lib/slotSource";
 import { countdown, ringShare } from "@/lib/tvCalls";
 import { matchName } from "@/lib/tvLive";
-import { formatRoundName } from "@/lib/tournamentLabels";
+import { matchRoundLabel } from "@/lib/tournamentLabels";
+import { forecastText } from "@/lib/tvForecast";
 import { viennaTime } from "@/lib/vienna";
 import { TvFace } from "./TvParts";
 import { useTv } from "./TvScreen";
@@ -26,7 +27,7 @@ function playersOf(match, matches, nameOf) {
 function whatOf(call, tournamentOf) {
   const match = call.match;
   const tournament = tournamentOf ? tournamentOf(match) : "";
-  return [tournament, formatRoundName(match.round_name, match.round), matchName(match)].filter(Boolean).join(" · ");
+  return [tournament, matchRoundLabel(match), matchName(match)].filter(Boolean).join(" · ");
 }
 
 /** Der Countdown: Ring und Zahl. Ohne geplante Zeit nur der Ring; bei 0 „Jetzt geht es los“. */
@@ -91,14 +92,16 @@ function CallRow({ call, matches, nameOf, tournamentOf }) {
   );
 }
 
+/** „ca. 16:40“ - mit Prognose (lib/tvForecast, #1564) die voraussichtliche Zeit, sonst die geplante. */
 function plannedTime(entry) {
+  if (entry.eta !== undefined) return forecastText({ ...entry, station: "" });
   return entry.at ? `ca. ${viennaTime(entry.at, { hour: "2-digit", minute: "2-digit" })}` : "";
 }
 
 /** „Danach an PC 5“ - klein unter den Aufrufen (oder als Liste, wenn gerade niemand aufgerufen ist). */
 function NextRow({ entry, matches, nameOf, tournamentOf }) {
   const players = playersOf(entry.match, matches, nameOf).map((player) => player.name);
-  const what = [tournamentOf ? tournamentOf(entry.match) : "", formatRoundName(entry.match.round_name, entry.match.round), matchName(entry.match)].filter(Boolean).join(" · ");
+  const what = [tournamentOf ? tournamentOf(entry.match) : "", matchRoundLabel(entry.match), matchName(entry.match)].filter(Boolean).join(" · ");
   return (
     <div className="tv-call-next" data-testid={`tv-call-next-${entry.match.id}`}>
       <div className="min-w-0">
@@ -106,7 +109,10 @@ function NextRow({ entry, matches, nameOf, tournamentOf }) {
         <div className="tv-t-info tv-muted">{what}</div>
       </div>
       <div className="tv-t-name tv-call-next__who" data-tv-name="1">{players.join(" vs. ") || "Teilnehmer offen"}</div>
-      <div className="tv-t-num font-display tv-call-next__time">{plannedTime(entry)}</div>
+      <div className="tv-call-next__when">
+        <div className="tv-t-num font-display tv-call-next__time">{plannedTime(entry)}</div>
+        {entry.delayText ? <div className="tv-t-meta tv-call-next__delay">{entry.delayText}</div> : null}
+      </div>
     </div>
   );
 }

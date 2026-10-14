@@ -7,6 +7,10 @@ GET /api/tournaments/:id/bracket in der Flow-Testumgebung (In-Memory, kein Serve
 Nach einer Änderung an Generator oder Umbau neu erzeugen (mit der Backend-Umgebung, z. B. dem Venv von local_check):
 
     python scripts/make_ffa_bracket_fixture.py
+
+Mit ``--lines`` entstehen statt dessen die Fälle für die Linien-Prüfung des Baums (#1591) in
+frontend/e2e/fixtures/bracketLines.json: Läufe mit 16 im Doppel-K.-o. mit Grand Final, gemischt (wie im Betrieb
+geschrieben, vor und nach Runde 1), K.-o. mit 8 fest, Doppel-K.-o. mit 8 fest, 8 von 16 Fahrern zusammengelegt.
 """
 import asyncio
 import json
@@ -16,6 +20,7 @@ from datetime import timedelta
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 OUT = ROOT / "frontend" / "e2e" / "fixtures" / "ffaGenerated.json"
+LINES_OUT = ROOT / "frontend" / "e2e" / "fixtures" / "bracketLines.json"
 sys.path.insert(0, str(ROOT / "backend"))
 sys.path.insert(0, str(ROOT / "backend" / "tests"))
 
@@ -34,10 +39,10 @@ LONG = {16: "Der unglaublich lange Spielername Nummer Eins mit noch mehr Text da
 
 
 async def build(flow, count: int, mode: str, plan_size: int, *, shuffle: bool = False, duel: bool = False, double: bool = False,
-                advancement: str | None = None):
+                advancement: str | None = None, custom: str | None = None):
     """Ein Turnier wie im Betrieb. ``shuffle``: Gegner der nächsten Runde mischen (#1548, Auslosung nach der Runde);
     ``advancement``: einer der vier Modi (#1590, ``draw_show``/``instant``); ``duel``: K.-o. mit Duellen (Auto-Schema
-    ``single_elimination``) statt FFA-Läufen."""
+    ``single_elimination``) statt FFA-Läufen; ``custom``: eigenes Schema (#1591)."""
     advancement = advancement or ("draw_round" if shuffle else "fixed")
     shuffle = advancement != "fixed"
     tournament, _users, regs = await flow.with_participants(
@@ -57,7 +62,7 @@ async def build(flow, count: int, mode: str, plan_size: int, *, shuffle: bool = 
                  "settings": {"grand_final": "reset"} if double else {}}
     else:
         # Der Baum ist für die geplante Größe gebaut (so wie beim Öffnen des Check-ins mit allen Anmeldungen).
-        schema = _auto_ffa_custom_schema(plan_size, 4, 2)
+        schema = custom or _auto_ffa_custom_schema(plan_size, 4, 2)
         stage = {"stage_type": "ffa_custom_bracket", "match_type": "ffa", "name": "Läufe",
                  "settings": {"schema": schema, "match_size": 4, "qualifiers_per_match": 2, "min_players": 2}}
     await flow.db.tournament_stages.insert_one({
@@ -222,5 +227,79 @@ async def main():
         print(key, rows)
 
 
+# Läufe im Doppel-K.-o. mit Grand Final, so wie die Turnierleitung es im Betrieb schreibt (#1591): die Loser-Runden
+# tragen die Rundennummer ihrer Zeit („# Runde 2“ …), die Verlierer aus Runde 2 und die Weiterkommer aus der ersten
+# Loser-Runde laufen gemischt zusammen.
+FFA16_DE = """[WB]
+# Runde 1
+A=[1,2,3,4]
+B=[5,6,7,8]
+C=[9,10,11,12]
+D=[13,14,15,16]
+# Runde 2
+E=[W:A:1,W:A:2,W:B:1,W:B:2]
+F=[W:C:1,W:C:2,W:D:1,W:D:2]
+# Finale
+G=[W:E:1,W:E:2,W:F:1,W:F:2]
+
+[LB]
+# Runde 2
+LA=[L:A:1,L:A:2,L:B:1,L:B:2]
+LB=[L:C:1,L:C:2,L:D:1,L:D:2]
+# Runde 3
+LC=[W:LA:1,W:LA:2,L:E:1,L:E:2]
+LD=[W:LB:1,W:LB:2,L:F:1,L:F:2]
+# Runde 4
+LE=[W:LC:1,W:LC:2,W:LD:1,W:LD:2]
+# Runde 5
+LF=[W:LE:1,W:LE:2,L:G:1,L:G:2]
+
+[GF]
+# Grand Final
+FINAL=[W:G:1,W:G:2,W:LF:1,W:LF:2]"""
+
+LINES_INFO = ("Erzeugt von scripts/make_ffa_bracket_fixture.py --lines mit dem echten Generator (#1591): Läufe mit 16 im "
+              "Doppel-K.-o. mit Grand Final, gemischt, vor und nach Runde 1 (ffa16de_start, ffa16de_round1); K.-o. mit 8 "
+              "fest (se8_fixed); Doppel-K.-o. mit 8 fest (de8_fixed); 8 von 16 Fahrern zusammengelegt (ffa8_merged). "
+              "Nicht von Hand ändern - neu erzeugen.")
+
+
+async def main_lines():
+    data = {}
+    flow, shutdown = make_flow()
+    try:
+        tournament, staff, _schema = await build(flow, 16, "auto", 16, shuffle=True, custom=FFA16_DE)
+        data["ffa16de_start"] = await bracket(flow, tournament)
+        await flow.start(tournament)
+        await results(flow, tournament, staff, ["A", "B", "C", "D"])
+        data["ffa16de_round1"] = await bracket(flow, tournament)
+    finally:
+        await shutdown()
+    for name, double in (("se8_fixed", False), ("de8_fixed", True)):
+        flow, shutdown = make_flow()
+        try:
+            tournament, _staff, _schema = await build(flow, 8, "auto", 8, duel=True, double=double)
+            data[name] = await bracket(flow, tournament)
+        finally:
+            await shutdown()
+    flow, shutdown = make_flow()
+    try:
+        tournament, staff, _schema = await build(flow, 8, "suggest", 16)
+        flow.act_as(staff)
+        plan = (await flow.db.tournaments.find_one({"id": tournament["id"]}, {"_id": 0}))["heat_rebuild_plan"]
+        response = await flow.post(f"/api/tournaments/{tournament['id']}/heat-rebuild/confirm", json={"plan_id": plan["id"]})
+        assert response.status_code == 200, response.text
+        data["ffa8_merged"] = await bracket(flow, tournament)
+    finally:
+        await shutdown()
+    out = {"_info": LINES_INFO}
+    for key, value in data.items():
+        out[key] = {name: item for name, item in value.items() if name not in {"structure", "matches"}}
+        rows = [(m["match_key"], m.get("section"), m["round"], m.get("round_label"), m.get("status"))
+                for m in sorted(value["matches_v2"], key=lambda m: (m["round"], m.get("order") or 0))]
+        print(key, rows)
+    LINES_OUT.write_text(json.dumps(out, ensure_ascii=False, indent=1, default=str) + "\n", encoding="utf-8", newline="\n")
+
+
 if __name__ == "__main__":
-    asyncio.run(main())
+    asyncio.run(main_lines() if "--lines" in sys.argv else main())

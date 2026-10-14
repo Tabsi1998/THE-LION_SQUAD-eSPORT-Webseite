@@ -755,6 +755,11 @@ async def _safe_ops_retention():
         gone = await purge_discord_activity(get_db())
         if gone:
             logger.info(f"[scheduler] discord_activity_servers removed={gone}")
+        # Namen von Fast-Lap-Gästen ohne Konto (#1585): nach 90 Tagen nur noch „Gast <Nummer>“.
+        from services.fastlap_guests import expire_guest_names
+        renamed = await expire_guest_names(get_db())
+        if renamed:
+            logger.info(f"[scheduler] fastlap_guest_names expired={renamed}")
         # App-Sitzungen ohne Aktivität seit 30 Tagen (#942) schließen - sie stünden sonst 90 Tage in der Liste.
         from services.auth_sessions import purge_stale_app_sessions
         closed = await purge_stale_app_sessions(get_db())

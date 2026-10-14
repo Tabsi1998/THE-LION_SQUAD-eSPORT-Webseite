@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { BYE_LABEL, OPEN_SLOT_LABEL, finishedMatchText, formatBracketSection, isByeSlot, matchHeadline, slotName, stationText } from "./tournamentLabels";
+import { BYE_LABEL, OPEN_SLOT_LABEL, finishedMatchText, formatBracketSection, isByeSlot, matchHeadline, matchRoundLabel, slotName, stationText } from "./tournamentLabels";
+import TVG from "../../e2e/fixtures/tvGenerated.json";
 
 describe("formatBracketSection", () => {
   it("nutzt die eingefuehrten eSports-Begriffe statt Uebersetzungen", () => {
@@ -86,5 +87,22 @@ describe("Klartext für Plätze, Station und Ergebnis", () => {
     expect(stationText({ station_label: "B - pc" })).toBe("Station B · PC");
     expect(stationText({ station_name: "Switch 2 Station 1 - switch2" })).toBe("Switch 2 Station 1");
     expect(stationText({})).toBe("");
+  });
+});
+
+describe("matchRoundLabel (#1564)", () => {
+  it("nimmt den Rundennamen des Servers - am TV wie im Web-Baum", () => {
+    // Doppel-K.-o. aus dem echten Generator: „Winner Final“, „Grand Final Reset“ statt „Winner Runde 4“, „Runde 9“.
+    const labels = new Set(TVG.de16.matches_v2.map(matchRoundLabel));
+    expect(labels).toContain("Winner Final");
+    expect(labels).toContain("Grand Final Reset");
+    const se = new Set(TVG.se8_planned.matches_v2.map(matchRoundLabel));
+    expect(se).toEqual(new Set(["Viertelfinale", "Halbfinale", "Finale"]));
+  });
+
+  it("ohne Namen vom Server wie bisher aus round_name bzw. der Nummer", () => {
+    expect(matchRoundLabel({ round_name: "Round 2", round: 2 })).toBe("Runde 2");
+    expect(matchRoundLabel({ round: 3 })).toBe("Runde 3");
+    expect(matchRoundLabel(null)).toBe("Runde");
   });
 });
