@@ -376,12 +376,11 @@ def wire(runner, client, tree, view: dict, db) -> None:
             return
 
         async def send_now() -> str:
-            plan = draft["plan"]
-            result = await discord_distribute.send(
-                db, text=plan["text"], target=plan["target"], guild_ids=[row["guild_id"] for row in plan["servers"]], title=plan["title"],
-                author=draft["author"], origin=draft["origin"], actor_id=draft["user"]["id"], via="discord")
-            runner.last_action = f"Mitteilung verteilt ({now_utc().strftime('%H:%M')} UTC)"
-            return discord_distribute.result_text(result)
+            # Die Berechtigung zählt beim Bestätigen, nicht nur bei der Vorschau (#1045).
+            text = await discord_distribute.send_draft(db, interaction.user.id, draft)
+            if text != discord_distribute.NOT_STAFF:
+                runner.last_action = f"Mitteilung verteilt ({now_utc().strftime('%H:%M')} UTC)"
+            return text
 
         extra = {"view": confirm_view(send_now)} if draft["sendable"] else {}
         await interaction.followup.send(content=draft["content"], embed=discord.Embed.from_dict(draft["embed"]), ephemeral=True, **extra)
