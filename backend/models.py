@@ -633,6 +633,10 @@ class TournamentCreate(BaseModel):
     matchday_days: int = Field(default=7, ge=1, le=31)
     default_match_weekday: int = Field(default=6, ge=0, le=6)
     default_match_time: str = "20:00"
+    # Antwortfrist für Terminvorschläge in Stunden (#1552) - vorher fest 72.
+    match_schedule_response_hours: int = Field(default=72, ge=1, le=720)
+    # Mindestpause eines Spielers zwischen zwei Spielen, in Minuten - der Planer hält sie ein (#1552).
+    match_break_minutes: int = Field(default=5, ge=0, le=240)
     auto_start_enabled: bool = False
     # Phase 7
     season_weight: float = 2.0
@@ -702,6 +706,8 @@ class TournamentUpdate(BaseModel):
     matchday_days: Optional[int] = Field(default=None, ge=1, le=31)
     default_match_weekday: Optional[int] = Field(default=None, ge=0, le=6)
     default_match_time: Optional[str] = None
+    match_schedule_response_hours: Optional[int] = Field(default=None, ge=1, le=720)
+    match_break_minutes: Optional[int] = Field(default=None, ge=0, le=240)
     auto_start_enabled: Optional[bool] = None
     season_weight: Optional[float] = None
     visibility: Optional[Literal["public", "community", "members", "internal"]] = None

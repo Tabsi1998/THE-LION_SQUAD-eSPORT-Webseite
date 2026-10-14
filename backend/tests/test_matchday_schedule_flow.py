@@ -93,3 +93,40 @@ async def test_a_time_set_by_staff_survives_the_run(flow):
     assert (await flow.put("/api/matches/m1", json={"scheduled_at": None})).status_code == 200
     assert (await persist_all_matchday_schedules(flow.db))["written"] == 1
     assert (await flow.db.matches_v2.find_one({"id": "m1"}, {"_id": 0}))["schedule_source"] == "default"
+
+
+# ---------------------------------------------------------------- Codex-Prüfung zu #1569
+
+@pytest.mark.asyncio
+async def test_a_stale_run_does_not_overwrite_a_time_agreed_in_the_meantime(flow):
+    from services.matchday_schedule import apply_schedule_writes, schedule_writes
+
+    start = (now_utc() - timedelta(days=1)).replace(microsecond=0)
+    tournament = await league(flow, start=start)
+    await player_with_registration(flow, "heim", "reg-home")
+    await player_with_registration(flow, "gast", "reg-away")
+    match = {"id": "m1", "tournament_id": "t1", "matchday_number": 1, "round": 1, "status": "pending", "match_type": "duel",
+             "slots": [{"slot": 1, "registration_id": "reg-home"}, {"slot": 2, "registration_id": "reg-away"}], "created_at": now_utc().isoformat()}
+    await flow.db.matches_v2.insert_one(dict(match))
+    writes = schedule_writes(tournament, [match], [])
+    assert len(writes) == 1
+
+    # Zwischen Lesen und Schreiben einigen sich die Seiten.
+    agreed = (start + timedelta(days=2)).isoformat()
+    await flow.db.matches_v2.update_one({"id": "m1"}, {"$set": {"scheduled_at": agreed, "schedule_source": "accepted"}})
+
+    assert await apply_schedule_writes(flow.db, writes) == 0
+    stored = await flow.db.matches_v2.find_one({"id": "m1"}, {"_id": 0})
+    assert stored["schedule_source"] == "accepted" and stored["scheduled_at"] == agreed
+
+
+@pytest.mark.asyncio
+async def test_the_run_also_finds_a_league_phase_inside_a_tournament_of_another_format(flow):
+    start = (now_utc() - timedelta(days=1)).replace(microsecond=0)
+    await flow.db.tournaments.insert_one({"id": "t2", "slug": "cup", "title": "Cup", "format": "single_elim", "status": "live", "event_mode": "online",
+                                          "start_date": start.isoformat(), "created_at": now_utc().isoformat()})
+    await flow.db.tournament_stages.insert_one({"id": "s-league", "tournament_id": "t2", "number": 1, "stage_type": "league", "settings": {}})
+    await flow.db.matches_v2.insert_one({"id": "m2", "tournament_id": "t2", "stage_id": "s-league", "round": 1, "status": "pending", "match_type": "duel",
+                                          "slots": [{"slot": 1, "registration_id": "r1"}, {"slot": 2, "registration_id": "r2"}], "created_at": now_utc().isoformat()})
+    assert (await persist_all_matchday_schedules(flow.db)) == {"tournaments": 1, "written": 1}
+    assert (await flow.db.matches_v2.find_one({"id": "m2"}, {"_id": 0}))["schedule_source"] == "default"

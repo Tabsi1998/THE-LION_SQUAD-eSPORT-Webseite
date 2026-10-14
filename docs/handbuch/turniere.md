@@ -124,8 +124,11 @@ Zu den Besonderheiten:
 - **Gruppenphase:** Oben **Gruppen generieren**, die Zahl der Gruppen eintippen (Vorschlag 4). Im Reiter **Gruppen**
   stehen sie.
 - **Liga, Jeder gegen jeden und Gruppen:** Unter **Bearbeiten → Spielweise** erscheint der Kasten **Spielwochen**:
-  **Spieltag dauert (Tage)**, **Standardtag**, **Standarduhrzeit**. Ein Spieltag ist ein Zeitraum. Beide Seiten dürfen
-  Termine vorschlagen, was die Gegenseite annimmt, gilt, sonst greift die Standardzeit.
+  **Spieltag dauert (Tage)**, **Standardtag**, **Standarduhrzeit** (Wiener Zeit) und **Antwortfrist (Stunden)**. Ein
+  Spieltag ist ein Zeitraum. Beide Seiten dürfen Termine vorschlagen, was die Gegenseite annimmt, gilt, sonst greift
+  die Standardzeit. Ein vereinbarter Termin bleibt, auch außerhalb der Woche. Antwortet die Gegenseite nicht in der
+  Frist, bekommt die Turnierleitung eine Meldung. Spielwochen gibt es nur online: eine Gruppenphase **vor Ort** plant
+  der Spielplaner auf Stationen (siehe 3.8).
 - **Freier Turnierbaum:** Unter **Bearbeiten → Struktur** erscheint das Feld **Schema** (beim Mehrspieler-Baum dazu
   **Spielgröße** und **Qualifizierte**). Ein Beispiel-Schema steht als Vorgabe darin. Anschließend unten
   **Speichern & Struktur anwenden**, dann im Reiter **Turnierbaum** prüfen.
@@ -285,8 +288,13 @@ Der Reiter zeigt auch andere Fälle, zum Beispiel ein fehlendes Ergebnis oder ei
   „Switch“ mal 8) – nur für die Turnierleitung.
 - **Spiel zuweisen** an einer Station: **Zuweisen** reserviert, **Direkt starten** startet gleich. **Starten** und
   **Freigeben** stehen an der belegten Station.
-- **Zeitplan füllen** verteilt offene Spiele automatisch, **Freie Stationen starten** startet, was bereit ist. Im
-  Turnier macht **Werkzeuge → Stationen automatisch** dasselbe.
+- **Zeitplan füllen** plant offene Spiele mit Vorschau, **Freie Stationen starten** startet, was bereit ist. Im
+  Turnier macht **Werkzeuge → Planen** dasselbe: Der Spielplaner zeigt je Spiel Zeit und Station,
+  dazu Konflikte, und schreibt erst bei **Übernehmen** alles auf einmal. Er plant ab jetzt (Erledigtes und Laufendes
+  bleibt), hält die Reihenfolge des Turnierbaums ein (spätere Runden stehen als „voraussichtlich“), setzt keinen
+  Spieler zweimal gleichzeitig an und hält die **Mindestpause** (Bearbeiten → Erweiterte Spieloptionen, Vorgabe
+  5 Minuten) ein. Von Hand gesetzte Termine bleiben stehen; liegen sie zu früh oder doppelt, meldet die Vorschau das
+  rot. Nebenbei (Statuswechsel, An- oder Abmeldung) wird nicht mehr geplant. Online-Turniere bekommen keine Stationen.
 - **PDF Hochformat / Querformat** liefert einen Aushang der Stationen.
 - Der Status einer Station (frei, belegt, reserviert, defekt) lässt sich ändern.
 
@@ -321,7 +329,7 @@ Strafen stehen unter **Admin → eSports → Strafen**, die Jahreswertung unter 
   (Organisation, Schiedsrichter, Ergebnisdienst, Stationsleitung, Stream-Betreuung), **Bereich** (ganzes Turnier oder
   Phase, Gruppe, Station, Spiel) und eine **Notiz**, zum Beispiel „Samstag Vormittag“. Der Helfer sieht nur dieses
   Turnier. Zwei Helfer reichen oft: einer am Check-in, einer mit dem Handy bei den Spielen („Ergebnisdienst“).
-- **Stationen automatisch füllen** statt jedes Spiel einzeln zuzuweisen.
+- **Werkzeuge → Planen** statt jedes Spiel einzeln zuzuweisen; Vorschau prüfen, dann **Übernehmen**.
 - **Das Handy der Turnierleitung** (`/tournaments/<Name>/leitung`) trägt Ergebnisse ein, zeigt „Ergebnis fehlt“ und
   gibt Benachrichtigungen bei Problemen.
 - **TV** aufstellen und aufrufen lassen, damit Spieler selbst sehen, wo sie hinmüssen.

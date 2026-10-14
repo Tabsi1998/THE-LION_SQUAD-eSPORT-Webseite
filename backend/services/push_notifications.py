@@ -34,6 +34,8 @@ PUSH_CHANNELS = {
     "match_station": "lion_calls",
     "match_reminder": "lion_calls",
     "match_attention": "lion_calls",
+    # Antwortfrist eines Terminvorschlags abgelaufen (#1552): Turnierleitung legt den Termin fest.
+    "schedule_escalation": "lion_tournaments",
     # Team am Spieltag (#1192): „Bist du schon da?“ vom Kapitän - ein Ruf zum Antreten.
     "team_presence_nudge": "lion_calls",
     # Check-in, Ergebnisse, Turnier-Updates, Gewinne, Event-Hinweise, „Wie war …?“ nach Turnier oder Event.

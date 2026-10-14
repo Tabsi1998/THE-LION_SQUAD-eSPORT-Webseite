@@ -13,6 +13,7 @@ import { Plus, Trash2, Link as LinkIcon, X as XIcon, Wand2, Play } from "lucide-
 import { toast } from "sonner";
 import { ResultWindowLoader } from "@/components/tls/results/ResultWindow";
 import { ResultUndoBar, useResultUndo } from "@/components/tls/results/ResultUndoBar";
+import { planAndApplySchedule } from "@/lib/schedulePlan";
 
 const DEVICES = [
   ["switch", "Switch"], ["switch2", "Switch 2"], ["pc", "PC"],
@@ -181,15 +182,10 @@ export default function AdminStationsPage() {
       toast.error(formatRequestError(e, "Spiel konnte nicht zugewiesen werden."));
     }
   };
+  // Spielplaner (#1552): Vorschau im Dialog, geschrieben wird erst nach „Übernehmen“ - wie auf der Turnierseite.
   const autoAssign = async () => {
     if (!activeTid) return;
-    try {
-      const { data } = await api.post(`/stations/auto-assign?tournament_id=${encodeURIComponent(activeTid)}&plan=true`);
-      toast.success(`${data.assigned} Spiele geplant.`);
-      loadStations(); loadMatches();
-    } catch (e) {
-      toast.error(formatRequestError(e, "Automatische Planung konnte nicht ausgeführt werden."));
-    }
+    if (await planAndApplySchedule({ tournamentId: activeTid, confirm })) { loadStations(); loadMatches(); }
   };
   const startFreeStations = async () => {
     if (!activeTid) return;
@@ -288,7 +284,7 @@ export default function AdminStationsPage() {
         </div>
           );
         })()}
-        <button type="button" onClick={autoAssign} disabled={!list.length || !unassignedMatches.length} className="px-4 py-2 border border-[#29B6E8]/50 text-[#29B6E8] font-bold uppercase tracking-wider rounded-sm inline-flex items-center justify-center gap-2 disabled:opacity-40">
+        <button type="button" onClick={autoAssign} disabled={!list.length || !unassignedMatches.length} data-testid="stations-plan-schedule" className="px-4 py-2 border border-[#29B6E8]/50 text-[#29B6E8] font-bold uppercase tracking-wider rounded-sm inline-flex items-center justify-center gap-2 disabled:opacity-40">
           <Wand2 className="w-4 h-4" /> Zeitplan füllen
         </button>
         <button type="button" onClick={startFreeStations} disabled={!freeStations.length || !startableCount} className="px-4 py-2 bg-[#00FF88] text-black font-bold uppercase tracking-wider rounded-sm inline-flex items-center justify-center gap-2 disabled:opacity-40">
