@@ -154,6 +154,8 @@ async def _records(db, user: dict, now: str, until: datetime) -> int:
         await db.mail_jobs.delete_many({"to": email})
     # Gespeicherte Namen: am News-Beitrag, im Protokoll der Erfolge und in den Daten des Adminprotokolls.
     await db.news_posts.update_many({"author_id": user_id}, {"$set": {"author_name": GONE}})
+    # Nachricht an alle Angemeldeten (#1372): der gespeicherte Name des Absenders.
+    await db.event_messages.update_many({"actor_id": user_id}, {"$set": {"actor_name": GONE}})
     await db.achievement_events.update_many({"user_id": user_id}, {"$set": {"username": None, "user_name": GONE}})
     await db.achievement_events.update_many({"actor_id": user_id}, {"$set": {"actor_name": GONE}})
     await db.audit_logs.update_many({"$or": [{"actor_id": user_id}, {"target_id": user_id}], "data": {"$type": "object"}},

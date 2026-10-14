@@ -157,6 +157,10 @@ PERSONAL: dict[str, Entry] = {
     "gallery_photos": Entry(OVERWRITTEN, note="Foto des Vereins; „Foto: Name“ wird entfernt, die Einsendung steht unter gallery_submissions"),
     # Protokolle
     "audit_logs": Entry(OVERWRITTEN, ("audit_trail",)),
+    # Nachricht an alle Angemeldeten (#1372): Absender und Text; die Empfänger nur als Zahl. Bei der Kontolöschung wird der
+    # gespeicherte Name des Absenders überschrieben; nach der Frist des Adminprotokolls gelöscht (``ops_alerts.purge_old_logs``).
+    "event_messages": Entry(OVERWRITTEN, ("event_messages_sent",), "Nachricht der Turnierleitung an alle Angemeldeten eines "
+                            "Events; Name des Absenders überschrieben, gelöscht nach der Frist des Adminprotokolls"),
     "news_posts": Entry(OVERWRITTEN, note="Beitrag des Vereins; der gespeicherte Name der Autorin oder des Autors wird überschrieben"),
 }
 
@@ -169,7 +173,7 @@ CLUB_CONTENT = frozenset({
 
 NO_PERSON = frozenset({
     "advent_views", "badges", "cms_nav", "cms_pages", "competition_write_usage", "discord_guild_stats",
-    "discord_welcomes", "dolibarr_public", "email_templates", "feedback_entries", "games", "mastodon_apps",
+    "discord_welcomes", "dolibarr_public", "email_templates", "event_message_gates", "feedback_entries", "games", "mastodon_apps",
     "meeting_admission_counts", "mutation_locks", "ops_alert_log", "ops_alert_state", "ops_check_runs", "ops_errors",
     "ops_slow_requests", "ops_vitals", "partners", "schema_migration_lock", "schema_migrations", "site_banner_stats",
     "sponsors", "sticker_builtin_packs", "user_badges", "youtube_videos",

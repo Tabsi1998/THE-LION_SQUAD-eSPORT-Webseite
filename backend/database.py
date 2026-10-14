@@ -75,6 +75,8 @@ async def init_indexes():
     await db.event_registrations.create_index("id", unique=True)
     await db.event_registrations.create_index([("event_id", 1), ("user_id", 1)], unique=True)
     await db.event_registrations.create_index([("event_id", 1), ("status", 1)])
+    # Nachricht an alle Angemeldeten (#1372): das Protokoll je Event, neueste zuerst.
+    await db.event_messages.create_index([("event_id", 1), ("created_at", -1)])
     # F1
     await db.f1_challenges.create_index("id", unique=True)
     await db.f1_challenges.create_index("slug", unique=True)
