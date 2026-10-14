@@ -16,6 +16,7 @@ import { TvNextUp } from "@/components/tv/TvNextUp";
 import { useLowMomentTimer, useMinuteTick, useTvSound, useTvSponsors } from "@/components/tv/tvHooks";
 import { lastStageId } from "@/lib/bracketPodium";
 import { bracketChanges, isLiveMatch } from "@/lib/tvLive";
+import { slotDraw } from "@/lib/bracketGraph";
 import { advancementsOf } from "@/lib/tvTravel";
 import { championKey, championOf } from "@/lib/tvChampion";
 import { COLLECT_AFTER, createMomentQueue, momentsFromChange } from "@/lib/tvMoments";
@@ -241,7 +242,11 @@ function BracketTv() {
         for (const matchId of results) {
           const match = matches.find((row) => row.id === matchId);
           for (const move of advancementsOf(match, matches)) {
-            if (move.target && ["win", "drop"].includes(move.kind)) keys.push(`${move.target.matchId}:${move.target.slotIndex}`);
+            if (!move.target || !["win", "drop"].includes(move.kind)) continue;
+            // Gemischte Plätze (#1548) deckt die Auslosung auf, nicht das Ergebnis.
+            const target = matches.find((row) => row.id === move.target.matchId);
+            if (slotDraw(target?.slots?.[move.target.slotIndex])) continue;
+            keys.push(`${move.target.matchId}:${move.target.slotIndex}`);
           }
         }
         if (keys.length) setHidden((current) => new Set([...current, ...keys]));

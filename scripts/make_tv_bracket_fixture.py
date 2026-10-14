@@ -13,6 +13,7 @@ Zustände (Zeitpunkt der Erzeugung steht in ``_generated_at``; die Tests stellen
 * ``se8_corrected`` das Ergebnis von A ist korrigiert (umgedreht), der andere steht jetzt im Halbfinale
 * ``se8_walkover`` B kampflos (nicht erschienen)
 * ``se6``          K.-o. mit 6: zwei Freilose in Runde 1
+* ``se8_mixed`` … ``se8_mixed_drawn`` K.-o. mit 8, Gegner gemischt (#1548): vor der Auslosung, kurz davor, ausgelost
 * ``de16`` … ``de16_champion`` Doppel-K.-o. mit 16 und Reset, lange Namen: Start, nach Winner Runde 1, vor dem
   Grand Final, Reset nötig (Sieger aus dem Loser Bracket gewinnt das Grand Final), Sieger nach dem Reset
 * ``de16_before_no_reset`` / ``de16_no_reset`` derselbe Baum noch einmal, vor dem Grand Final und danach - diesmal gewinnt
@@ -168,6 +169,26 @@ async def se6(data):
         await shutdown()
 
 
+async def se8_mixed(data):
+    """K.-o. mit 8, Gegner der nächsten Runde gemischt (#1548): vor der Auslosung, kurz davor, nach der Auslosung."""
+    flow, shutdown = make_flow()
+    try:
+        staff, t = await knockout(flow, 8, "single_elim", lambda i: NAMES[i], randomize_advancement_rounds=True, title="Lions Mix-Cup")
+        await add_stations(flow, t, "Switch 1", "Switch 2")
+        await plan(flow, t)
+        await flow.start(t)
+        data["se8_mixed"] = await display(flow, t, staff)
+        matches = await by_key(flow, t)
+        first_round = sorted((m for m in matches.values() if m["round"] == 1), key=lambda m: m["match_key"])
+        for match in first_round[:-1]:
+            await decide(flow, match, players(match))
+        data["se8_mixed_before_draw"] = await display(flow, t, staff)
+        await decide(flow, first_round[-1], players(first_round[-1]))
+        data["se8_mixed_drawn"] = await display(flow, t, staff)
+    finally:
+        await shutdown()
+
+
 async def play_open(flow, t, stop):
     """Spielt alle spielbaren Spiele (beide Plätze besetzt), der obere Platz gewinnt - bis ``stop(match)`` zutrifft."""
     while True:
@@ -285,6 +306,7 @@ async def main():
     data = {}
     await se8(data)
     await se6(data)
+    await se8_mixed(data)
     await de16(data, reset=True)
     await de16(data, reset=False)
     await ffa_states(data)

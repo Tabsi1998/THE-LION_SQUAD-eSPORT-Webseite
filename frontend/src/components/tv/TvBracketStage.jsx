@@ -3,6 +3,7 @@ import { BracketTree, isTableFormat } from "@/components/tls/BracketTree";
 import { runParticles } from "@/components/achievements/ceremony/particles";
 import { resolveMediaUrl } from "@/lib/api";
 import { lastStageId } from "@/lib/bracketPodium";
+import { slotDraw } from "@/lib/bracketGraph";
 import { initials, isMatchDone } from "@/lib/slotSource";
 import { matchRoundLabel } from "@/lib/tournamentLabels";
 import { MOTION } from "@/lib/motion";
@@ -452,6 +453,8 @@ export function TvBracketStage({ data, moment = null, onMomentDone, hiddenSlots 
       if (!session.cancelled) await hideBanner();
     };
 
+    const drawnSlot = (target) => Boolean(slotDraw(byId().get(target.matchId)?.slots?.[target.slotIndex]));
+
     const travel = async (decided) => {
       const geometry = measureStage(stageRef.current);
       const stage = stageRef.current;
@@ -465,6 +468,8 @@ export function TvBracketStage({ data, moment = null, onMomentDone, hiddenSlots 
         let drops = 0;
         for (const move of moves) {
           if (!move.target || !["win", "drop"].includes(move.kind)) continue;
+          // Gemischte Runde (#1548): wohin es geht, entscheidet erst die Auslosung - die fährt eigens über die Schiene.
+          if (drawnSlot(move.target)) continue;
           const slotKey = `${move.target.matchId}:${move.target.slotIndex}`;
           const source = geometry.regs.get(`${match.id}:${move.registrationId}`);
           const slot = geometry.slots.get(slotKey);
@@ -629,10 +634,61 @@ export function TvBracketStage({ data, moment = null, onMomentDone, hiddenSlots 
       const rows = moment.rows || [];
       const keys = rows.map((row) => `${row.matchId}:${row.slotIndex}`);
       const heats = new Set(rows.map((row) => row.matchId)).size;
-      setBanner({ text: `Auslosung · ${rows.length} ${rows.length === 1 ? "Name" : "Namen"} in ${heats} ${heats === 1 ? "Lauf" : "Läufen"}`, kind: "event" });
+      const all = byId();
+      const mixed = rows.filter((row) => row.from);
+      // Gemischte Runde (#1548): „Auslosung · Halbfinale · 4 Namen auf 2 Spiele“ - sonst wie bisher für die Läufe.
+      const round = mixed.length ? matchRoundLabel(all.get(mixed[0].matchId)) : "";
+      setBanner({
+        text: mixed.length
+          ? `Auslosung · ${round} · ${rows.length} ${rows.length === 1 ? "Name" : "Namen"} auf ${heats} ${heats === 1 ? "Spiel" : "Spiele"}`
+          : `Auslosung · ${rows.length} ${rows.length === 1 ? "Name" : "Namen"} in ${heats} ${heats === 1 ? "Lauf" : "Läufen"}`,
+        kind: "event",
+      });
       if (!motionRef.current) {
         revealRef.current?.(keys);
         await sleep(MOMENT_MS.draw);
+        if (!session.cancelled) await hideBanner();
+        return;
+      }
+      if (mixed.length) {
+        // Aus dem Quellspiel über die Schiene an den gezogenen Platz - auf der echten Linie (lineRoute), nacheinander.
+        await sleep(500);
+        if (session.cancelled) return;
+        const geometry = measureStage(stageRef.current);
+        const nameOf = nameOfRegistration(dataRef.current?.registrations || []);
+        const avatarOf = avatarOfRegistration(dataRef.current?.registrations || []);
+        const avatarSize = box.avatar * TV_STAGE_UNIT_PX;
+        const list = [];
+        for (const row of mixed) {
+          const slotKey = `${row.matchId}:${row.slotIndex}`;
+          const slot = geometry.slots.get(slotKey);
+          const source = geometry.regs.get(`${row.from.matchId}:${row.registrationId}`) || geometry.cards.get(row.from.matchId);
+          const slotNumber = all.get(row.matchId)?.slots?.[row.slotIndex]?.slot;
+          const route = slot && source ? lineRoute(stageRef.current, geometry, row.from.matchId, row.matchId, slotNumber, source.y + source.h / 2) : null;
+          if (!route) {
+            revealRef.current?.([slotKey]);
+            continue;
+          }
+          const name = nameOf(row.registrationId);
+          list.push({
+            id: `draw-${row.matchId}-${row.registrationId}`,
+            slotKey,
+            kind: "win",
+            matchIndex: list.length,
+            order: 0,
+            route,
+            length: routeLength(route),
+            land: { x: slot.x + box.padX * TV_STAGE_UNIT_PX + avatarSize / 2, y: slot.y + slot.h / 2 },
+            label: initials(name),
+            avatar: avatarOf(row.registrationId),
+            source: geometry.cards.get(row.from.matchId),
+            target: geometry.cards.get(row.matchId),
+          });
+        }
+        await fly(list);
+        if (session.cancelled) return;
+        revealRef.current?.(keys);
+        await sleep(DRAW_HOLD_MS);
         if (!session.cancelled) await hideBanner();
         return;
       }

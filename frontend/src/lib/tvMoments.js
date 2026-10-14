@@ -5,6 +5,7 @@
 // Ergebnisse auf einmal werden eine Sammelkarte. Ein kleiner Speicher ohne Abhängigkeiten, den React über
 // useSyncExternalStore liest - wie die Zeremonie-Warteschlange der Erfolge.
 import { diffBracket, isDone, matchFate } from "@/lib/bracketGraph";
+import { withDrawOrigins } from "@/components/tls/bracket/bracketMotion";
 import { matchName, stationName } from "@/lib/tvLive";
 import { matchRoundLabel } from "@/lib/tournamentLabels";
 
@@ -138,7 +139,8 @@ const slotIndexOf = (match, registrationId) => (match?.slots || []).findIndex((s
  * (Schlüssel aus diffBracket) - so läuft sie genau einmal, auch wenn derselbe Stand noch einmal kommt.
  */
 export function momentsFromChange(previous, next, { seen = new Set() } = {}) {
-  const events = diffBracket(previous || null, next || null).filter((event) => !seen.has(event.key));
+  // Gemischte Runden (#1548): die Auslosung kennt die echte Herkunft je Platz - wie im Web-Baum (withDrawOrigins).
+  const events = withDrawOrigins(diffBracket(previous || null, next || null), next || []).filter((event) => !seen.has(event.key));
   for (const event of events) seen.add(event.key);
   const before = new Map((previous || []).map((match) => [match.id, match]));
   const after = new Map((next || []).map((match) => [match.id, match]));
@@ -148,7 +150,15 @@ export function momentsFromChange(previous, next, { seen = new Set() } = {}) {
 
   const draws = events.filter((event) => event.type === "draw");
   if (draws.length) {
-    moments.push({ type: "draw", rows: draws.map((event, index) => ({ matchId: event.matchId, registrationId: event.registrationId, slotIndex: slotIndexOf(after.get(event.matchId), event.registrationId), index })) });
+    const rail = draws.find((event) => event.rail)?.rail || null;
+    moments.push({
+      type: "draw",
+      rail,
+      rows: draws.map((event, index) => ({
+        matchId: event.matchId, registrationId: event.registrationId, slotIndex: slotIndexOf(after.get(event.matchId), event.registrationId), index,
+        ...(event.from ? { from: { matchId: event.from.matchId }, rail: event.rail || null } : null),
+      })),
+    });
   }
 
   const merged = events.filter((event) => event.type === "fate" && event.fate === "merged").map((event) => event.matchId);

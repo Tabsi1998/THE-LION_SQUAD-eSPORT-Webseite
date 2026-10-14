@@ -92,3 +92,22 @@ describe("Momente aus dem Vergleich alter/neuer Stand", () => {
     expect(queue.next().type).toBe("merge");
   });
 });
+
+describe("Gegner gemischt (#1548) am TV", () => {
+  it("die Auslosung einer gemischten Runde: jeder Name kommt aus seinem echten Quellspiel über die Schiene", () => {
+    const before = state("se8_mixed_before_draw");
+    const after = state("se8_mixed_drawn");
+    const { moments } = momentsFromChange(before.matches_v2, after.matches_v2);
+    const draw = moments.find((moment) => moment.type === "draw");
+    expect(draw).toBeTruthy();
+    expect(draw.rail).toBe("WB:2");
+    // Alle vier Halbfinal-Plätze, jeder mit Herkunft aus source_result (nicht aus dem Schema-Platz).
+    expect(draw.rows).toHaveLength(4);
+    for (const row of draw.rows) {
+      const match = after.matches_v2.find((entry) => entry.id === row.matchId);
+      const slot = match.slots[row.slotIndex];
+      expect(row.from.matchId).toBe(idOf(after, slot.source_result.from_match_key));
+      expect(row.rail).toBe("WB:2");
+    }
+  });
+});

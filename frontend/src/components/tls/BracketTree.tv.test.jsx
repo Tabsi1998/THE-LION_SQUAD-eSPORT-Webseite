@@ -107,3 +107,30 @@ describe("TV-Linien aus den echten Quellen (#1564)", () => {
     expect(reset).toHaveClass("tls-bracket-line--void");
   });
 });
+
+describe("Sammelschiene am TV (#1548, wie im Web-Baum)", () => {
+  it("vor der Auslosung: eine Schiene mit Ästen aus allen Quellspielen und in alle Zielspiele - keine festen Linien", () => {
+    const data = state("se8_mixed");
+    layoutRects(data);
+    render(<BracketTree data={data} viewMode="tv" nodeRenderer={TvTreeNode} tvLayout={{ columns: 4 }} />);
+    expect(document.querySelector("[data-rail-spine='WB:2']")).not.toBeNull();
+    const branchesIn = paths().filter((path) => path.getAttribute("data-to") === "rail:WB:2" && !path.hasAttribute("data-rail-spine")).map((path) => path.getAttribute("data-from"));
+    expect(new Set(branchesIn)).toEqual(new Set(["A", "B", "C", "D"].map((key) => idOf(data, key))));
+    const branchesOut = paths().filter((path) => path.getAttribute("data-from") === "rail:WB:2" && !path.hasAttribute("data-rail-spine")).map((path) => path.getAttribute("data-to"));
+    expect(new Set(branchesOut)).toEqual(new Set(["E", "F"].map((key) => idOf(data, key))));
+    expect(line(idOf(data, "A"), idOf(data, "E"))).toBeNull();
+  });
+
+  it("nach der Auslosung: die Schiene bleibt, der echte Weg über sie liegt unsichtbar darunter - die Bahn der Fahrt", () => {
+    const data = state("se8_mixed_drawn");
+    layoutRects(data);
+    render(<BracketTree data={data} viewMode="tv" nodeRenderer={TvTreeNode} tvLayout={{ columns: 4 }} />);
+    expect(document.querySelector("[data-rail-spine='WB:2']")).not.toBeNull();
+    const e = data.matches_v2.find((match) => match.match_key === "E");
+    const from = idOf(data, e.slots[1].source_result.from_match_key);
+    const real = line(from, e.id);
+    expect(real).toHaveAttribute("data-real", "1");
+    expect(real).toHaveClass("tls-bracket-line--real");
+    expect(real.getAttribute("data-points")).toBeTruthy();
+  });
+});
