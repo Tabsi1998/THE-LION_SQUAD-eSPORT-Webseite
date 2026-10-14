@@ -27,6 +27,7 @@ import { ParticipantRemovalActions } from "./tournament/ParticipantRemovalAction
 import { ActionGroup, EmptyBracketNotice, TournamentEditForm } from "./tournament/TournamentEditForm";
 import { OPERATIONAL_STATUS_VALUES, TOURNAMENT_STATUS_OPTIONS, normalizeSearch, primaryTournamentAction } from "./tournament/shared";
 import { planAndApplySchedule } from "@/lib/schedulePlan";
+import { MatchPlanPanel } from "./tournament/matchplan/MatchPlanPanel";
 
 export default function AdminTournamentEditPage() {
   // Globale Aktionen nur für die Turnierleitung mit Zwei-Faktor (#1028), Helfer sehen die ihres Einsatzes.
@@ -424,7 +425,10 @@ export default function AdminTournamentEditPage() {
   const availableTabs = [
     ["participants", "Teilnehmer"],
     ["bracket", "Turnierbaum"],
-    ["stages", "Matchplan"],
+    // Matchplan (#1557): Zeitleiste je Station, Vorschau, Ziehen, live. Die Spiele mit Ergebnissen und Phasen bleiben
+    // im Reiter „Spiele“ (Adresse ?tab=stages bleibt gleich).
+    ["matchplan", "Matchplan"],
+    ["stages", "Spiele"],
     ...(t.format === "groups" ? [["groups", "Gruppen"]] : []),
     ...(isTournamentLead ? [["staff", "Team"]] : []),
     // Rückmeldungen (#1196): erst, wenn das Turnier vorbei ist - ohne Namen.
@@ -746,6 +750,18 @@ export default function AdminTournamentEditPage() {
           rightsForMatch={rightsForMatch}
           tournament={t}
           durationGame={bracket?.duration_game || null}
+        />
+      )}
+      {activeTab === "matchplan" && (
+        <MatchPlanPanel
+          tournament={t}
+          matches={matchesV2}
+          stages={stages}
+          stations={stations}
+          registrations={regs}
+          durationGame={bracket?.duration_game || null}
+          canEditSettings={isTournamentLead}
+          onChanged={loadSafely}
         />
       )}
       {activeTab === "edit" && isTournamentLead && (

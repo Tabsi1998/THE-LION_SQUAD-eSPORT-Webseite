@@ -27,6 +27,7 @@ import hashlib
 import json
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 
 from services.advancement_draw import draw_group_of, match_mode, prerequisite_ids
 from services.match_audience import playing_ids, teams_by_id
@@ -36,6 +37,8 @@ from services.matchday_schedule import plays_in_matchdays, schedule_writes
 from services.tournament_rules import match_policy
 
 DEFAULT_BREAK_MINUTES = 5
+# Uhrzeiten in Warnungen: so, wie die Turnierleitung in der Halle sie liest (#1557).
+VIENNA = ZoneInfo("Europe/Vienna")
 SCHEDULE_SOURCES = ("planner", "live", "manual", "accepted", "home", "default")
 # Quellen, die der Planer nie anfasst: von Hand gesetzt und vereinbart.
 KEPT_SOURCES = frozenset({"manual", "accepted"})
@@ -408,8 +411,9 @@ def _plan_stations(tournament: dict, matches: list[dict], stations, stage_by_id:
             end = board.ends.get(previous["id"])
             if end is not None and end + timedelta(minutes=pause) > start:
                 warnings.append({"type": "too_early", "severity": "error", "match_id": match["id"], "other_match_id": previous["id"],
-                                 "message": f"{_label(match)} ist fest um {start.astimezone(timezone.utc).strftime('%H:%M')} UTC, "
-                                            f"aber {_label(previous)} ist erst um {end.astimezone(timezone.utc).strftime('%H:%M')} UTC vorbei."})
+                                 "earliest_at": (end + timedelta(minutes=pause)).isoformat(),
+                                 "message": f"{_label(match)} ist fest um {start.astimezone(VIENNA).strftime('%H:%M')}, "
+                                            f"aber {_label(previous)} ist erst um {end.astimezone(VIENNA).strftime('%H:%M')} vorbei."})
                 break
     return assignments, warnings
 

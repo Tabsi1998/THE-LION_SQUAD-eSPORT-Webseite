@@ -824,6 +824,10 @@ def _next_status(doc: dict, now: datetime, kind: str = "tournament") -> str | No
     if status in ("draft", "paused", "completed", "results_published", "archived", "cancelled"):
         return None
     auto_start_enabled = bool(doc.get("auto_start_enabled"))
+    if end and now >= end and kind == "f1":
+        # Eine Fast Lap beendet die Turnierleitung (#1584): erst „Beendet“ oder „Ergebnisse veröffentlicht“ von Hand
+        # legt Gewinne und Saisonpunkte an. Öffentlich zeigt sie nach dem Ende trotzdem „Beendet“ (public_phase).
+        return None
     if end and now >= end and (kind != "tournament" or auto_start_enabled):
         return "completed"
     if status == "scheduled" and reg_enabled and reg_from and now >= reg_from and (not reg_until or now <= reg_until):

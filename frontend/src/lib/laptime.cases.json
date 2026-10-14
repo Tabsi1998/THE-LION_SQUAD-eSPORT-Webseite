@@ -1,0 +1,36 @@
+{
+  "_comment": "Rundenzeiten (#1584): dieselben Fälle prüfen Website (laptime.test.js), App (mobile/src/lib/laptime.test.ts) und Server (backend/tests/test_fastlap_laptime_unit.py). Komma oder Punkt, m:ss.mmm oder ss.mmm; Sekunden mit Minuten höchstens 59; bis zu drei Nachkommastellen; eine nackte Zahl sind Sekunden.",
+  "parse": [
+    { "input": "1:24.587", "ms": 84587 },
+    { "input": "1:24,587", "ms": 84587 },
+    { "input": "84.587", "ms": 84587 },
+    { "input": "84,587", "ms": 84587 },
+    { "input": "84,5", "ms": 84500 },
+    { "input": "1:32.45", "ms": 92450 },
+    { "input": "1:24", "ms": 84000 },
+    { "input": "  0:59.9 ", "ms": 59900 },
+    { "input": "90", "ms": 90000 },
+    { "input": "125", "ms": 125000 },
+    { "input": "125.5", "ms": 125500 },
+    { "input": "12:05.003", "ms": 725003 },
+    { "input": "0:00.001", "ms": 1 }
+  ],
+  "empty": ["", "   "],
+  "invalid": ["1:75.000", "1:60.000", "schnell", "1:2:3", "-1:20.000", "1:20.1234", "1:20.", "1:20,5,0", "1.24.587", "1250", ":24.587"],
+  "format": [
+    { "ms": 84587, "text": "1:24.587" },
+    { "ms": 59900, "text": "0:59.900" },
+    { "ms": 0, "text": "0:00.000" },
+    { "ms": 725123, "text": "12:05.123" }
+  ],
+  "plausibility": [
+    { "ms": 19999, "track": {}, "warning": "too_fast" },
+    { "ms": 20000, "track": {}, "warning": null },
+    { "ms": 600000, "track": {}, "warning": null },
+    { "ms": 600001, "track": {}, "warning": "too_slow" },
+    { "ms": 25000, "track": { "min_plausible_ms": 30000 }, "warning": "too_fast" },
+    { "ms": 700000, "track": { "max_plausible_ms": 900000 }, "warning": null },
+    { "ms": 15000, "track": { "min_plausible_ms": 10000, "max_plausible_ms": null }, "warning": null },
+    { "ms": 15000, "track": null, "warning": "too_fast" }
+  ]
+}

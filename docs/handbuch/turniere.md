@@ -8,7 +8,7 @@ Der Weg eines Turniers aus Sicht der Turnierleitung: anlegen, Anmeldung, Check-i
 - **Admin → eSports → Turniere** (`/admin/tournaments`) – Liste aller Turniere mit Suche, Status-Filter und CSV-Export
 - **Admin → eSports → Turniere → Neues Turnier** (`/admin/tournaments/new`) – anlegen
 - **Admin → eSports → Turniere → Turnier öffnen** (`/admin/tournaments/<Turnier>`) – Reiter **Teilnehmer**,
-  **Turnierbaum**, **Matchplan**, **Gruppen** (nur beim Format Gruppenphase), **Team**, **Rückmeldungen** (erst nach
+  **Turnierbaum**, **Matchplan** (Zeitleiste je Station, siehe 3.8), **Spiele**, **Gruppen** (nur beim Format Gruppenphase), **Team**, **Rückmeldungen** (erst nach
   dem Ende), **Bearbeiten**
 - **Admin → eSports → Turnier-Leitfaden** (`/admin/tournament-guide`) – welches Format wofür, mit „Voreinstellung übernehmen“
 - **Admin → eSports → Stationen** (`/admin/stations`) – Geräte und Plätze in der Halle, Spiele zuweisen
@@ -142,7 +142,7 @@ Zu den Besonderheiten:
 - **Seeding** (Zufall, Manuell, Ranking) und der **Setzplatz** pro Teilnehmer stehen unter Spieloptionen bzw. beim
   Hinzufügen eines Teilnehmers.
 
-Ob der Baum Vorschau oder fix ist, siehst du im Reiter **Matchplan** (Hinweis „Vorschau / Draft“).
+Ob der Baum Vorschau oder fix ist, siehst du im Reiter **Spiele** (Hinweis „Vorschau / Draft“).
 
 ### 3.2 Online, Vor Ort, Hybrid
 
@@ -280,7 +280,7 @@ Wörtern:
 
 | Ort | Weg |
 | --- | --- |
-| **Matchplan** | Turnier öffnen → Reiter **Matchplan** → am Spiel **Ergebnis eintragen** (nur, wenn das Turnier **Live** oder **Pausiert** ist und beide Seiten feststehen) |
+| **Spiele** | Turnier öffnen → Reiter **Spiele** → am Spiel **Ergebnis eintragen** (nur, wenn das Turnier **Live** oder **Pausiert** ist und beide Seiten feststehen) |
 | **Stationen** | Admin → eSports → Stationen → an der Station **Ergebnis eintragen** |
 | **Turnierleitung am Handy** | `/tournaments/<Name>/leitung` → Reiter **Ergebnisse** → **Eintragen** |
 | **Matchseite** | öffentliche Seite des Spiels |
@@ -358,6 +358,32 @@ im Protokoll und unter ihren Strafen) und **+5 Min. verlängern**. Die Fristen s
   Spiel kommt aus der einen Dauer-Regel (3.12).
 - **PDF Hochformat / Querformat** liefert einen Aushang der Stationen.
 - Der Status einer Station (frei, belegt, reserviert, defekt) lässt sich ändern.
+- **Belegung je Station** zeigt dieselbe Zeitleiste wie der Matchplan (unten), live; **Im Matchplan öffnen** springt
+  in den Reiter des Turniers. Ein Lauf zeigt alle seine Spieler.
+
+**Matchplan** (Turnier öffnen → Reiter **Matchplan**) ist das Werkzeug der Turnierleitung am Turniertag:
+
+- **Oben die Planung:** Turnierstart, **Mindestpause** zwischen zwei Spielen, **Puffer je Spiel** (Luft, die auf jede
+  Spieldauer kommt – nicht auf eine Dauer, die am Spiel selbst steht), die Spieldauer mit Herkunft („vom Spiel:
+  12 Min. (Grand Prix) + 8 Min. Puffer“) und die Stationen des Turniers. Ändern darf das die Turnierleitung über alle
+  Turniere; alle anderen sehen die Werte.
+- **Automatisch planen** zeigt die Vorschau des Spielplaners: geänderte Spiele hell umrandet, gestrichelt, wo sie
+  vorher lagen, Konflikte in Worten. Erst **Übernehmen** schreibt. Hat sich der Plan inzwischen geändert, steht das da,
+  und die Seite plant neu – geschrieben wird nie etwas anderes als gezeigt.
+- **Wer wartet auf wen:** der Ablauf von links nach rechts; antippen zeigt, was ein Spiel braucht und wer danach
+  darauf wartet. Gestrichelter Rahmen = Prognose (die Spieler stehen noch nicht fest).
+- **Zeitleiste je Station:** Balken je Spiel, Länge = Dauer. Winner Bracket blau, Loser Bracket violett, Finale gold,
+  läuft rot mit Spielzeit, erledigt grau, Konflikt orange, feste Termine mit Nadel. **Ziehen** legt ein Spiel auf eine
+  andere Zeit oder Station und macht den Termin fest; ein belegtes Feld wird schon beim Ziehen orange. Mit der
+  Tastatur: Spiel wählen, **Enter** nimmt auf, **Pfeiltasten** verschieben (5 Minuten, mit Umschalt 15, hoch und runter
+  die Station), **Enter** legt ab, **Escape** bricht ab. **Termin lösen** gibt einen festen Termin an den Planer
+  zurück.
+- **Live:** Oben steht der Verzug aus der Prognose des Planers („+11 Min. – Finale jetzt ca. 20:51“), die Zeitleiste
+  zeigt, wie der Rest nachrückt; **Nachrücken planen** öffnet die Vorschau dazu. Feste Termine bleiben.
+- **Am Handy** steht statt der breiten Zeitleiste je Station eine Liste: was läuft, was als Nächstes kommt.
+- **Online** gibt es keine Stationen: der Matchplan zeigt die Runden mit Fristen je Spiel (offen seit, „nicht
+  erschienen“ ab, Ergebnis gilt ab). **Liga:** Spielwochen mit Frist und dem geltenden Termin (vereinbart, Heimrecht,
+  Standardzeit).
 
 Ein Spiel gilt auf dem Aufruf-TV als aufgerufen, sobald es einer Station zugewiesen und noch nicht gestartet ist. Mehr
 in [TV und Beamer](tv.md).

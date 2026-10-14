@@ -763,11 +763,12 @@ async def get_public_profile(username: str, view_as: str | None = None, viewer: 
         stats.update(match_summary)
         # F1 / Fast Lap
         from routes.f1_routes import _ms_to_time_str
-        # Per track best
+        # Bestzeit je Strecke und Pole aus der einen Rangfunktion (#1584): nur gewertete Zeiten (keine ungültigen, keine
+        # Vereins-Referenz), Strafe eingerechnet, bei Gleichstand liegt die früher gefahrene Zeit vorn.
+        from services.fastlap_standings import official_query, official_times, rank_laps
         all_laps = await db.f1_lap_times.find(
-            {"user_id": user_id, "is_invalid": {"$ne": True}},
-            {"_id": 0, "track_id": 1, "challenge_id": 1, "time_ms": 1,
-             "penalty_seconds": 1, "created_at": 1}).to_list(2000)
+            official_query({"user_id": user_id}),
+            {"_id": 0, "track_id": 1, "challenge_id": 1}).to_list(2000)
         c_ids_f1_all = list({lap["challenge_id"] for lap in all_laps})
         challenges_raw = await db.f1_challenges.find(
             {"id": {"$in": c_ids_f1_all}},
@@ -776,37 +777,27 @@ async def get_public_profile(username: str, view_as: str | None = None, viewer: 
         chall_docs = {c["id"]: c for c in challenges_raw if await _is_public_challenge(c)}
         all_laps = [lap for lap in all_laps if lap.get("challenge_id") in chall_docs]
         stats["fast_laps"] = len(all_laps)
-        best_per_track = {}
-        for lap in all_laps:
-            eff = lap["time_ms"] + int(lap.get("penalty_seconds", 0) * 1000)
-            k = lap["track_id"]
-            if k not in best_per_track or eff < best_per_track[k]["time_ms"]:
-                best_per_track[k] = {"time_ms": eff, "challenge_id": lap["challenge_id"]}
+        track_challenge = {lap["track_id"]: lap["challenge_id"] for lap in all_laps if lap.get("track_id")}
         track_docs = {t["id"]: t for t in await db.f1_tracks.find(
-            {"id": {"$in": list(best_per_track.keys())}},
+            {"id": {"$in": list(track_challenge.keys())}},
             {"_id": 0, "id": 1, "name": 1, "country": 1}).to_list(200)}
-        for tid, entry in best_per_track.items():
+        for tid, cid in track_challenge.items():
             tr = track_docs.get(tid)
-            ch = chall_docs.get(entry["challenge_id"])
-            if tr:
-                # Check if this user is currently P1 on this track
-                is_p1 = True
-                other_best = await db.f1_lap_times.find(
-                    {"track_id": tid, "is_invalid": {"$ne": True}, "user_id": {"$ne": user_id}},
-                    {"_id": 0, "user_id": 1, "time_ms": 1, "penalty_seconds": 1}).to_list(5000)
-                for ol in other_best:
-                    effective_ms = ol["time_ms"] + int(ol.get("penalty_seconds", 0) * 1000)
-                    if effective_ms < entry["time_ms"]:
-                        is_p1 = False
-                        break
-                if is_p1:
-                    stats["pole_positions"] += 1
-                f1_bests.append({
-                    "track": tr, "challenge": ch,
-                    "time_ms": entry["time_ms"],
-                    "time_str": _ms_to_time_str(entry["time_ms"]),
-                    "is_leader": is_p1,
-                })
+            if not tr:
+                continue
+            ranked = rank_laps(await official_times(db, cid, tid))
+            own = next((row for row in ranked if row["user_id"] == user_id), None)
+            if not own:
+                continue
+            is_p1 = own["rank"] == 1
+            if is_p1:
+                stats["pole_positions"] += 1
+            f1_bests.append({
+                "track": tr, "challenge": chall_docs.get(cid),
+                "time_ms": own["effective_ms"],
+                "time_str": _ms_to_time_str(own["effective_ms"]),
+                "is_leader": is_p1,
+            })
         f1_bests.sort(key=lambda x: x["time_ms"])
         # Teams
         team_ids = [tm["team_id"] for tm in await db.team_members.find(
