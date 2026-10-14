@@ -12,12 +12,14 @@ import asyncio
 import json
 import pathlib
 import sys
+from datetime import timedelta
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 OUT = ROOT / "frontend" / "e2e" / "fixtures" / "ffaGenerated.json"
 sys.path.insert(0, str(ROOT / "backend"))
 sys.path.insert(0, str(ROOT / "backend" / "tests"))
 
+from services import scheduler  # noqa: E402
 from flow_harness import make_flow, new_id  # noqa: E402
 from models import now_utc  # noqa: E402
 from services.custom_bracket import _auto_ffa_custom_schema, ffa_heat_plan  # noqa: E402
@@ -50,6 +52,11 @@ async def build(flow, count: int, mode: str, plan_size: int):
     flow.act_as(staff)
     response = await flow.post(f"/api/tournaments/{tournament['id']}/status", json={"status": "check_in"})
     assert response.status_code == 200, response.text
+    # Der Baum entsteht mit dem Ende des Check-ins aus den Eingecheckten (#1551): alle sind da, der Check-in endet.
+    await flow.db.tournament_registrations.update_many({"tournament_id": tournament["id"]}, {"$set": {"status": "checked_in"}})
+    await flow.db.tournaments.update_one({"id": tournament["id"]}, {"$set": {
+        "check_in_until": (now_utc() - timedelta(minutes=1)).isoformat()}})
+    await scheduler._safe_status_transitions()
     return tournament, staff, schema
 
 
