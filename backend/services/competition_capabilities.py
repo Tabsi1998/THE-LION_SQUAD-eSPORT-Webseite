@@ -180,6 +180,11 @@ CAPABILITIES: tuple[Capability, ...] = (
     _c("lead.read", "Turnierleitung am Handy",
        ["GET /api/tournaments/{tid}/lead"], [GRAPH],
        note="#1156: offene Spiele für die Turnierleitung des Turniers - zuerst, was fehlt, dann nach Station."),
+    _c("lead.live_queue", "Live-Warteschlange je Station: ansehen, aufrufen, starten",
+       ["GET /api/tournaments/{tid}/live-queue", "GET /api/tournaments/{tid}/live-queue/me",
+        "POST /api/tournaments/{tid}/live-queue/call", "POST /api/tournaments/{tid}/live-queue/start"], [GRAPH],
+       note="#1556: je Station „läuft / als Nächstes / danach“ mit Prognose aus dem Planer; Aufrufen und Starten "
+            "unter der Turnier-Sperre, nur mit Stations-Recht; lesen öffentlich wie der Turnierbaum."),
     _c("lead.no_show", "„Nicht erschienen“ nach Frist entscheiden",
        ["POST /api/tournaments/{tid}/lead/no-show/{match_id}"], [GRAPH],
        note="#1551: nach der Frist schlägt der Server „kampflos verloren“ vor; die Turnierleitung bestätigt "
