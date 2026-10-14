@@ -11,10 +11,12 @@ let pending = "";
 /** Den Code aus „/vor-ort#…“ übernehmen und die Adresse sofort bereinigen. Gibt zurück, ob einer da war. */
 export function captureOnsiteToken(location = window.location, history = window.history) {
   if (!location || location.pathname.replace(/\/+$/, "") !== ONSITE_PATH || !location.hash) return false;
+  // Erst lesen, dann bereinigen: `window.location` ist lebendig, nach replaceState ist der Anker weg.
+  const hash = location.hash;
   history.replaceState(history.state, "", ONSITE_PATH);
   let raw = "";
   try {
-    raw = decodeURIComponent(location.hash.slice(1)).trim();
+    raw = decodeURIComponent(hash.slice(1)).trim();
   } catch {
     raw = "";
   }

@@ -1,10 +1,18 @@
 import { captureOnsiteToken, forgetOnsiteToken, peekOnsiteToken } from "@/lib/onsiteToken";
 
+// Wie im Browser: `location` ist lebendig - nach replaceState ist der Anker weg.
 function fakeWindow(pathname, hash) {
   const calls = [];
+  const location = { pathname, hash };
   return {
-    location: { pathname, hash },
-    history: { state: { idx: 1 }, replaceState: (...args) => calls.push(args) },
+    location,
+    history: {
+      state: { idx: 1 },
+      replaceState: (...args) => {
+        calls.push(args);
+        location.hash = "";
+      },
+    },
     calls,
   };
 }
