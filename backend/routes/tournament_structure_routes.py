@@ -11,6 +11,7 @@ from services.tournament_permissions import (
     require_tournament_staff_permission,
 )
 from services.custom_bracket import BracketSchemaError, build_matches_v2_from_schema
+from services.draw_records import record_build_draws
 from services.competition_engine import CLASSIC, GRAPH, EngineSwitchRequired, decide_rebuild_engine
 from services.competition_formats import find_format_capability
 from services.competition_graph_validation import validate_competition_graph
@@ -158,6 +159,8 @@ async def _build_tournament_structure_plan(
                 generator_registrations,
                 preview=body.preview,
                 rng=rng,
+                # Auch das Los (Liga, #1548) folgt dem Startwert des Plans - Vorschau und Anwenden bauen dasselbe.
+                draw_rng=rng,
             )
         except BracketSchemaError as exc:
             raise HTTPException(status_code=400, detail=str(exc))
@@ -348,6 +351,8 @@ async def apply_tournament_structure_plan(
             detail={"code": "structure_apply_rollback_failed", "message": str(exc)},
         ) from exc
 
+    if not body.preview and matches:
+        await record_build_draws(db, matches, actor_id=me.get("id"))
     return {
         **result,
         "plan_version": STRUCTURE_PLAN_VERSION,
@@ -445,6 +450,8 @@ async def rebuild_bracket_from_tournament_format(tid: str, body: TournamentBrack
             "id": {"$ne": stage["id"]},
         })
         await persist_competition_versions(db, tournament, "graph")
+        if not preview:
+            await record_build_draws(db, matches, actor_id=me.get("id"))
         await _audit_tournament_action(
             db,
             "tournament.bracket.rebuild_from_structure",

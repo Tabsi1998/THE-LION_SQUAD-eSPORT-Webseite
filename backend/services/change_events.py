@@ -58,6 +58,7 @@ STAFF_STREAM_ROLES = frozenset({"tournament_admin", "club_admin", "superadmin"})
 USER_SCOPE = "user"
 # Held only in the in-memory buffer; stripped before an event reaches a client.
 TARGETS_KEY = "_target_user_ids"
+DETAILS_KEY = "details"
 EVENT_BUFFER_SIZE = 256
 SUBSCRIBER_QUEUE_SIZE = 100
 
@@ -178,6 +179,8 @@ def _event_for_scope(event: dict, visibility_scope: str, user_id: str | None = N
 
     resource = event.get("entity_type") or ""
     public_event = dict(event)
+    # Einzelheiten eines Fachereignisses (z. B. welche Auslosung) bekommt nur der staff-Strom.
+    public_event.pop(DETAILS_KEY, None)
     public_event.update({
         "entity_id": None,
         "path": f"/api/{resource}" if resource else "/api",
@@ -256,6 +259,31 @@ async def publish_api_change(method: str, path: str, status_code: int):
         return
 
     event = _build_api_change_event(method, normalized_path, status_code)
+    _event_buffer.append(event)
+    _deliver(event)
+
+
+async def publish_draw_done(tournament_id: str, details: dict) -> None:
+    """Auslosung fertig (#1548): Typ ``draw_done`` - öffentlich nur „Turniere haben sich geändert“, der staff-Strom
+    bekommt Turnier, Phase, Gruppe und Kennung der Auslosung (``details``). Wer gelost hat, steht nur im Protokoll."""
+    event_id = str(uuid.uuid4())
+    event = {
+        "event_id": event_id,
+        "event_type": "draw_done",
+        "entity_type": "tournaments",
+        "entity_id": tournament_id,
+        "version": _next_version(),
+        "occurred_at": _utc_now(),
+        "visibility_scope": "public",
+        "dedupe_key": f"draw_done:{details.get('draw_id') or event_id}",
+        "id": event_id,
+        "method": "POST",
+        "path": f"/api/tournaments/{tournament_id}",
+        "resource": "tournaments",
+        "status": 200,
+        "ts": int(time.time() * 1000),
+        DETAILS_KEY: dict(details),
+    }
     _event_buffer.append(event)
     _deliver(event)
 

@@ -68,7 +68,7 @@ Turniere. **Ohne 2FA** erscheint stattdessen der Hinweis **2FA einrichten**, sie
    ausschließen** und, wenn das Turnier zu einem Event gehört, **Anmeldung nur mit Event-Anmeldung**. Unter dem Kasten warnt
    **Planung prüfen** bei widersprüchlichen Zeiten.
 6. Weiter unten, aufklappbar: **Darstellung und Regeln** (Slug, Plattform, Beschreibung, Banner, **Regeln**,
-   Partner), **Spieloptionen** (Best of, Seeding, Folgerunden mischen, Spiel um Platz 3), **Preise**, **Streaming und
+   Partner), **Spieloptionen** (Best of, Seeding, Gegner der nächsten Runde, Spiel um Platz 3), **Preise**, **Streaming und
    externe Links**. Schreibt die **Regeln** hinein, bevor die Anmeldung aufgeht – was ihr festlegt (Frist bis zum
    Forfeit, Streitfall-Ablauf, Beweise), steht dann für alle fest.
 7. **Turnier erstellen**. Du landest im Turnier.
@@ -199,8 +199,16 @@ verbindlichen Teilnahme: Warteliste kostet nichts. Alles Weitere steht in [Abrec
   da sind. Bis dahin wurde die Vorschau bei jeder Anmeldung neu gemischt.
 - Danach bleibt der Baum fix: Teilnehmer lassen sich nicht mehr einfach entfernen. Stattdessen **Nicht erschienen**
   setzen und über **Teilnehmer hinzufügen** mit **Ersetzt Nicht-Erschienen** einen Ersatz einsetzen.
-- Mit dem Haken **Folgerunden zufällig mischen** (Spieloptionen) bleibt Runde 1 nach dem Check-in fix, die Folgerunden
-  werden zufällig besetzt.
+- **Gegner der nächsten Runde** (Spieloptionen, auch je Phase): **Fester Baum** (Standard) oder **Zufällig mischen**.
+  Gemischt bleibt Runde 1 nach dem Check-in fix. Erst wenn **alle** Spiele einer Runde fertig sind, kommen alle
+  Weiterkommer in einen Topf und werden gleichmäßig auf die Spiele der nächsten Runde verteilt – echtes Los, auch zwei
+  aus demselben Spiel können sich wiedersehen. Im Doppel-K.-o. wird im Loser Bracket nur innerhalb derselben
+  Loser-Runde gemischt; laufen nur zwei Spiele in eines zusammen (Finale, Grand Final, Spiel um Platz 3), ändert sich
+  nichts. Bis zur Auslosung steht im Baum „Platz aus Runde 1“. Jede Auslosung steht mit Zeitpunkt, Person und Ergebnis
+  im Protokoll. **Neu auslosen** (Reiter Spiele, Kasten „Auslosung“) geht, bis eines der Spiele der Runde aufgerufen
+  oder gestartet ist. In der **Liga** werden Reihenfolge der Spieltage und Heimrecht ausgelost (jeder spielt trotzdem
+  genau einmal je Hin- und Rückrunde gegen jeden); **Spieltage neu auslosen** geht bis Spieltag 1 beginnt. Die
+  Einstellung gilt, sobald der Turnierbaum neu gebaut wird (Vorschau oder Check-in).
 - **Turnier starten** (Status **Live**) prüft vorher die Planung. Gibt es Konflikte oder Hinweise, fragt die Seite
   „Mit Hinweisen live schalten?“. Ohne ein spielbares Spiel lässt sich das Turnier nicht starten.
 

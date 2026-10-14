@@ -272,6 +272,11 @@ async def submit_v2_result(
         hold_id=hold_id,
         history=history,
     )
+    # Gemischt (#1548): hat dieses Ergebnis eine Runde fertig gemacht, ist die Folgerunde ausgelost - ins Protokoll mit
+    # der Person, die das Ergebnis eingetragen hat, und als Live-Ereignis.
+    if application.get("draws"):
+        from services.draw_records import record_draws
+        await record_draws(db, application["draws"], actor_id=actor_id, tournament_id=match.get("tournament_id"))
     dispute_resolved = match.get("status") == "disputed"
     if dispute_resolved:
         await _close_disputes(db, match, actor_id, now_iso)

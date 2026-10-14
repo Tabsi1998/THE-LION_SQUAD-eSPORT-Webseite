@@ -18,11 +18,12 @@ bzw. ``normalize_v2_results`` und schreibt über ``submit_v2_result`` (services/
 from __future__ import annotations
 
 import math
-import random
+import uuid
 from typing import Any
 from collections import defaultdict, deque
 
 from match_rules import RESULT_MAX_SCORE, RESULT_MAX_TIME_MS, match_allows_draw
+from services.advancement_draw import DRAW_RNG, assign_balanced, draw_group_of, group_sources, group_targets
 from services.match_result_errors import MatchResultError
 from services.round_labels import section_kind
 
@@ -427,35 +428,6 @@ def _find_slot(match: dict, slot_number: int) -> dict | None:
     return None
 
 
-def _randomize_advancement_enabled(match: dict) -> bool:
-    return bool((match.get("settings") or {}).get("randomize_advancement_rounds"))
-
-
-def _advancement_slot_candidates(target: dict, advancement: dict) -> list[dict]:
-    flow = advancement.get("flow")
-    candidates = []
-    for slot in target.get("slots") or []:
-        source = slot.get("source") or {}
-        if source.get("type") != "rank":
-            continue
-        if source.get("flow") != flow:
-            continue
-        if slot.get("registration_id") or slot.get("source_result"):
-            continue
-        candidates.append(slot)
-    return candidates
-
-
-def _select_advancement_slot(match: dict, target: dict, advancement: dict) -> dict | None:
-    configured = _find_slot(target, int(advancement.get("to_slot") or 0))
-    if not _randomize_advancement_enabled(match):
-        return configured
-    candidates = _advancement_slot_candidates(target, advancement)
-    if not candidates:
-        return configured
-    return random.choice(candidates)
-
-
 def _advancement_result_rank(match: dict, advancement: dict) -> int:
     rank = int(advancement.get("rank") or 0)
     if advancement.get("flow") != "L":
@@ -560,7 +532,163 @@ def _auto_bye_result(winner: dict, now_iso: str) -> dict:
     }
 
 
-def resolve_walkovers(start_ids: list[str], by_id: dict[str, dict], target_sets: dict[str, dict], now_iso: str) -> None:
+# ---------------------------------------------------------------------------------------------- Auslosung (#1548)
+
+DECIDED_OR_VOID = DECIDED_STATUSES | {"cancelled"}
+
+
+def _draw_open_targets(by_id: dict[str, dict], group: str) -> list[dict]:
+    return [target for target in group_targets(by_id.values(), group) if target.get("status") != "cancelled"]
+
+
+def _group_is_drawn(targets: list[dict]) -> bool:
+    return any(isinstance(target.get("draw"), dict) for target in targets)
+
+
+def _draw_started(target: dict) -> bool:
+    """Hat ein Spiel der Gruppe begonnen (oder ist entschieden)? Dann gilt das Los - neu auslosen geht nicht mehr."""
+    return (
+        str(target.get("status") or "") in LOCKED_DOWNSTREAM_STATUSES
+        or bool(target.get("results"))
+        or bool(target.get("started_at"))
+        or bool(target.get("called_at"))
+        or bool(target.get("reports"))
+        or isinstance(target.get("pending_result"), dict)
+    )
+
+
+def _drawn_slot(targets: list[dict], source_id: str, flow: str | None, ranks: set[int]) -> tuple[dict, dict] | None:
+    """Der ausgeloste Platz eines Weiterkommers (Quelle, Weg, Platz) - für Korrekturen nach der Auslosung."""
+    for target in targets:
+        for slot in target.get("slots") or []:
+            origin = slot.get("source_result") or {}
+            if origin.get("from_match_id") == source_id and origin.get("flow") == flow \
+                    and int(origin.get("rank") or 0) in ranks:
+                return target, slot
+    return None
+
+
+def _free_draw_slot(targets: list[dict], rng=None) -> tuple[dict, dict] | None:
+    """Nach Rückgängig oder Korrektur-Kaskade fehlt die Herkunft eines Platzes: ein freier Platz der Gruppe."""
+    free = [
+        (target, slot) for target in targets for slot in target.get("slots") or []
+        if (slot.get("source") or {}).get("type") == "rank" and slot.get("status") == "pending"
+        and not slot.get("registration_id") and not slot.get("source_result")
+    ]
+    return (rng or DRAW_RNG).choice(free) if free else None
+
+
+def _locate_target_slot(advancement: dict, target: dict, by_id: dict[str, dict], source_id: str,
+                        result_rank: int, rng=None) -> tuple[dict, dict | None, str | None]:
+    """Wohin ein Weiterkommer geht: fester Baum - der Platz aus dem Schema; gemischt - vor der Auslosung noch nirgends
+    (Rückgabe mit Gruppe), danach sein ausgeloster Platz."""
+    group = draw_group_of(target)
+    if not group or target.get("status") == "cancelled":
+        return target, _find_slot(target, int(advancement.get("to_slot") or 0)), None
+    targets = _draw_open_targets(by_id, group)
+    if not _group_is_drawn(targets):
+        return target, None, group
+    ranks = {int(result_rank), int(advancement.get("rank") or 0)}
+    found = _drawn_slot(targets, source_id, advancement.get("flow"), ranks) or _free_draw_slot(targets, rng)
+    if not found:
+        return target, None, None
+    return found[0], found[1], None
+
+
+def run_draw(group: str, by_id: dict[str, dict], target_sets: dict[str, dict], now_iso: str, *,
+             decided_results: dict[str, list[dict]] | None = None, rng=None, draws: list[dict] | None = None,
+             trigger: str = "result") -> list[str]:
+    """Die Auslosung einer Gruppe, sobald **alle** Quellspiele entschieden sind (gespielt, gewertet, kampflos oder
+    abgesagt). Der Topf: je Weiterleitung in die Gruppe der Teilnehmer auf diesem Platz - oder ein Freilos, wo es ihn
+    nicht gibt. ``assign_balanced`` verteilt gleichmäßig. ``decided_results``: Ergebnisse, die noch nicht am Spiel
+    stehen (das gerade eingetragene). Rückgabe: die Folgespiele, die jetzt besetzt sind."""
+    decided_results = decided_results or {}
+    targets = _draw_open_targets(by_id, group)
+    if not targets or _group_is_drawn(targets):
+        return []
+    sources = sorted(group_sources(by_id.values(), group), key=lambda row: (row.get("round") or 0, row.get("order") or 0))
+    if not all(row["id"] in decided_results or str(row.get("status") or "") in DECIDED_OR_VOID for row in sources):
+        return []
+    target_ids = {target["id"] for target in targets}
+    entries: list[dict] = []
+    slots_by_target: dict[str, list[int]] = defaultdict(list)
+    for source in sources:
+        if source["id"] in decided_results:
+            results = decided_results[source["id"]]
+        else:
+            results = [] if source.get("status") == "cancelled" else source.get("results") or []
+        by_rank = {int(row.get("rank") or 0): row for row in results}
+        for advancement in source.get("advancement") or []:
+            target = by_id.get(advancement.get("to_match_id"))
+            if not target or target["id"] not in target_ids:
+                continue
+            slot = _find_slot(target, int(advancement.get("to_slot") or 0))
+            if not slot or (slot.get("source") or {}).get("type") != "rank":
+                continue
+            slots_by_target[target["id"]].append(int(slot.get("slot") or 0))
+            rank = _advancement_result_rank(source, advancement)
+            result = by_rank.get(rank)
+            entries.append({
+                "registration_id": (result or {}).get("registration_id"),
+                "user_id": (result or {}).get("user_id"),
+                "rank": int(result["rank"]) if result else rank,
+                "flow": advancement.get("flow"),
+                "source": source,
+            })
+    if not entries:
+        return []
+    draw_id = str(uuid.uuid4())
+    ordered_targets = sorted(targets, key=lambda row: (row.get("order") or 0, row.get("match_key") or ""))
+    placed = assign_balanced(entries, [(target["id"], slots_by_target[target["id"]]) for target in ordered_targets
+                                       if slots_by_target.get(target["id"])], rng)
+    assignments = []
+    for target_id, slot_no, entry in placed:
+        target = by_id[target_id]
+        slot = _find_slot(target, slot_no)
+        source = entry["source"] if entry else None
+        if entry and entry.get("registration_id"):
+            slot["registration_id"] = entry["registration_id"]
+            slot["user_id"] = entry.get("user_id")
+            slot["source_result"] = {
+                "from_match_id": source["id"],
+                "from_match_key": source.get("match_key"),
+                "rank": entry["rank"],
+                "flow": entry["flow"],
+                "confirmed_at": now_iso,
+                "draw_id": draw_id,
+            }
+            slot["status"] = "filled"
+        elif entry:
+            _mark_slot_bye(slot, source, entry["rank"], entry["flow"], now_iso)
+            slot["source_result"]["draw_id"] = draw_id
+        assignments.append({
+            "match_id": target_id,
+            "match_key": target.get("match_key"),
+            "slot": slot_no,
+            "registration_id": (entry or {}).get("registration_id"),
+            "from_match_key": source.get("match_key") if source else None,
+            "rank": (entry or {}).get("rank"),
+            "flow": (entry or {}).get("flow"),
+        })
+    marker = {"id": draw_id, "group": group, "drawn_at": now_iso, "trigger": trigger}
+    for target in targets:
+        target["draw"] = dict(marker)
+        target["status"] = _status_after_slot_fill({**target, "status": _effective_status(target, target_sets)})
+        target["updated_at"] = now_iso
+        target_sets.setdefault(target["id"], {}).update({
+            "slots": target.get("slots") or [],
+            "status": target["status"],
+            "draw": dict(marker),
+            "updated_at": now_iso,
+        })
+    if draws is not None:
+        draws.append({**marker, "kind": "advancement", "stage_id": targets[0].get("stage_id"),
+                      "tournament_id": targets[0].get("tournament_id"), "assignments": assignments})
+    return [target["id"] for target in targets]
+
+
+def resolve_walkovers(start_ids: list[str], by_id: dict[str, dict], target_sets: dict[str, dict], now_iso: str,
+                      *, rng=None, draws: list[dict] | None = None) -> None:
     """Die Freilos-Kette (#1549): ein Spiel ohne offenen Zufluss und mit höchstens einem Teilnehmer ist entschieden.
 
     Genau ein Teilnehmer: er kommt kampflos weiter - nur den Sieger-Weg (``W`` Platz 1); jeder andere Weg (Verlierer
@@ -596,12 +724,20 @@ def resolve_walkovers(start_ids: list[str], by_id: dict[str, dict], target_sets:
         }
         match.update(change)
         target_sets.setdefault(match_id, {}).update(change)
+        waiting_groups: list[str] = []
         for advancement in match.get("advancement") or []:
             target = by_id.get(advancement.get("to_match_id"))
-            target_slot = _find_slot(target, int(advancement.get("to_slot") or 0)) if target else None
-            if not target or not target_slot:
+            if not target:
                 continue
             rank = int(advancement.get("rank") or 0)
+            target, target_slot, group = _locate_target_slot(advancement, target, by_id, match_id, rank, rng)
+            if group:
+                # Gemischt (#1548): ausgelost wird erst, wenn die ganze Runde entschieden ist.
+                if group not in waiting_groups:
+                    waiting_groups.append(group)
+                continue
+            if not target_slot:
+                continue
             if winner and advancement.get("flow") == "W" and rank == 1:
                 target_slot["registration_id"] = winner.get("registration_id")
                 target_slot["user_id"] = winner.get("user_id")
@@ -624,6 +760,10 @@ def resolve_walkovers(start_ids: list[str], by_id: dict[str, dict], target_sets:
                 "updated_at": now_iso,
             })
             queue.append(target["id"])
+        for group in waiting_groups:
+            for drawn_id in run_draw(group, by_id, target_sets, now_iso, rng=rng, draws=draws, trigger="walkover"):
+                seen.discard(drawn_id)
+                queue.append(drawn_id)
 
 
 def _came_from_lower_side(slot: dict | None, by_key: dict[str, dict], upper_slot: int) -> bool:
@@ -769,7 +909,10 @@ def build_v2_result_application(
     proof_url: str | None = None,
     note: str | None = None,
     force: bool = False,
+    rng=None,
 ) -> dict:
+    """Ein Ergebnis anwenden: Weiterkommer in die Folgespiele, Freilos-Kette, Reset-Regel. Gemischt (#1548) wartet die
+    Folgerunde, bis die ganze Runde entschieden ist; dann wird gelost (``draws`` in der Antwort). ``rng``: nur Tests."""
     if match.get("status") in {"cancelled"}:
         raise MatchV2ResultError("Abgebrochene Matches können kein Ergebnis erhalten")
     if match.get("status") in {"completed", "forfeit"} and not force:
@@ -782,43 +925,51 @@ def build_v2_result_application(
     target_sets: dict[str, dict] = {}
     overwritten_targets: set[str] = set()
     advanced_registration_ids: set[str] = set()
+    waiting_groups: list[str] = []
+    draws: list[dict] = []
 
     for advancement in match.get("advancement") or []:
         target = by_id.get(advancement.get("to_match_id")) or by_key.get(advancement.get("to_match_key"))
         if not target:
             raise MatchV2ResultError(f"Zielmatch {advancement.get('to_match_key')} nicht gefunden")
-        target_slot = _select_advancement_slot(match, target, advancement)
-        if not target_slot:
-            raise MatchV2ResultError(f"Zielslot {advancement.get('to_slot')} in {target.get('match_key')} nicht gefunden")
         result_rank = _advancement_result_rank(match, advancement)
         result = result_by_rank.get(result_rank)
-        if not result:
-            if _rank_can_be_missing_because_of_bye(match, result_rank):
-                target_slot["registration_id"] = None
-                target_slot["user_id"] = None
-                target_slot["source_result"] = {
-                    "from_match_id": match["id"],
-                    "from_match_key": match.get("match_key"),
-                    "rank": result_rank,
-                    "flow": advancement.get("flow"),
-                    "skipped": True,
-                    "reason": "bye",
-                    "confirmed_at": now_iso,
-                }
-                target_slot["status"] = "bye"
-                target_sets[target["id"]] = {
-                    "slots": target.get("slots") or [],
-                    "status": _status_after_slot_fill(target),
-                    "updated_at": now_iso,
-                }
-                continue
+        if not result and not _rank_can_be_missing_because_of_bye(match, result_rank):
             raise MatchV2ResultError(f"Rank {result_rank} fehlt für Advancement")
-        if result["registration_id"] in advanced_registration_ids:
-            raise MatchV2ResultError(
-                "Teilnehmer darf aus demselben Match nicht mehrfach weitergeleitet werden",
-                409,
-            )
-        advanced_registration_ids.add(result["registration_id"])
+        if result:
+            if result["registration_id"] in advanced_registration_ids:
+                raise MatchV2ResultError(
+                    "Teilnehmer darf aus demselben Match nicht mehrfach weitergeleitet werden",
+                    409,
+                )
+            advanced_registration_ids.add(result["registration_id"])
+        target, target_slot, group = _locate_target_slot(advancement, target, by_id, match["id"], result_rank, rng)
+        if group:
+            # Gemischt (#1548): noch nicht ausgelost - der Platz ergibt sich, wenn die ganze Runde fertig ist.
+            if group not in waiting_groups:
+                waiting_groups.append(group)
+            continue
+        if not target_slot:
+            raise MatchV2ResultError(f"Zielslot {advancement.get('to_slot')} in {target.get('match_key')} nicht gefunden")
+        if not result:
+            target_slot["registration_id"] = None
+            target_slot["user_id"] = None
+            target_slot["source_result"] = {
+                "from_match_id": match["id"],
+                "from_match_key": match.get("match_key"),
+                "rank": result_rank,
+                "flow": advancement.get("flow"),
+                "skipped": True,
+                "reason": "bye",
+                "confirmed_at": now_iso,
+            }
+            target_slot["status"] = "bye"
+            target_sets.setdefault(target["id"], {}).update({
+                "slots": target.get("slots") or [],
+                "status": _status_after_slot_fill(target),
+                "updated_at": now_iso,
+            })
+            continue
 
         existing_reg = target_slot.get("registration_id")
         if existing_reg and existing_reg != result["registration_id"]:
@@ -830,6 +981,7 @@ def build_v2_result_application(
             _ensure_no_pending_result(target)
             overwritten_targets.add(target["id"])
 
+        draw_id = (target_slot.get("source_result") or {}).get("draw_id")
         target_slot["registration_id"] = result["registration_id"]
         target_slot["user_id"] = result.get("user_id")
         target_slot["source_result"] = {
@@ -838,13 +990,17 @@ def build_v2_result_application(
             "rank": result["rank"],
             "flow": advancement.get("flow"),
             "confirmed_at": now_iso,
+            **({"draw_id": draw_id} if draw_id else {}),
         }
         target_slot["status"] = "filled"
-        target_sets[target["id"]] = {
+        target_sets.setdefault(target["id"], {}).update({
             "slots": target.get("slots") or [],
             "status": _status_after_slot_fill(target),
             "updated_at": now_iso,
-        }
+        })
+
+    for group in waiting_groups:
+        run_draw(group, by_id, target_sets, now_iso, decided_results={match["id"]: results}, rng=rng, draws=draws)
 
     reset_matches: list[dict] = []
     if force:
@@ -858,7 +1014,7 @@ def build_v2_result_application(
             _cascade_clear_downstream(target_id, by_id, downstream, target_sets, now_iso, reset_log=reset_matches)
 
     # Freilos-Kette und Reset-Regel erst jetzt - nach Korrektur und Kaskade steht fest, was in den Zielen gilt.
-    resolve_walkovers(list(target_sets), by_id, target_sets, now_iso)
+    resolve_walkovers(list(target_sets), by_id, target_sets, now_iso, rng=rng, draws=draws)
     _apply_bracket_reset_rule(match, results, by_id, by_key, target_sets, now_iso)
 
     match_set = {
@@ -882,4 +1038,96 @@ def build_v2_result_application(
         "advanced": len(target_sets),
         # Folgespiele, die diese Korrektur zurücksetzt - mit dem Ergebnis, das sie vorher hatten (#1035).
         "reset_matches": reset_matches,
+        # Auslosungen, die dieses Ergebnis ausgelöst hat (#1548) - für Protokoll und Live-Ereignis.
+        "draws": draws,
     }
+
+
+# ---------------------------------------------------------------------------------------------- Neu auslosen (#1548)
+
+REDRAW_STARTED_DETAIL = "{name} hat schon begonnen – neu auslosen geht nicht mehr."
+
+
+def _match_name(match: dict) -> str:
+    return str(match.get("round_name") or match.get("match_key") or "Ein Spiel dieser Runde")
+
+
+def build_redraw_application(stage_matches: list[dict], group: str, *, now_iso: str, rng=None) -> dict:
+    """„Neu auslosen“ durch die Turnierleitung: dieselben Weiterkommer, neues Los - bis eines der Spiele der Gruppe
+    beginnt (aufgerufen, gestartet, Meldung, Ergebnis oder kampflos entschieden), dann 409."""
+    by_id, _by_key = _target_lookup(stage_matches)
+    targets = _draw_open_targets(by_id, group)
+    if not targets:
+        raise MatchV2ResultError("Diese Auslosung gibt es nicht.", 404)
+    if not _group_is_drawn(targets):
+        raise MatchV2ResultError("Noch nicht ausgelost – die Runde davor ist noch nicht fertig.", 409)
+    for target in targets:
+        if _draw_started(target):
+            raise MatchV2ResultError(REDRAW_STARTED_DETAIL.format(name=_match_name(target)), 409)
+    for target in targets:
+        for slot in target.get("slots") or []:
+            if (slot.get("source") or {}).get("type") == "rank" and slot.get("source_result"):
+                _clear_slot(slot)
+        target.pop("draw", None)
+        target["status"] = _status_after_slot_fill(target, preserve_terminal=False)
+    target_sets: dict[str, dict] = {}
+    draws: list[dict] = []
+    drawn = run_draw(group, by_id, target_sets, now_iso, rng=rng, draws=draws, trigger="redraw")
+    if not drawn:
+        raise MatchV2ResultError("Neu auslosen geht gerade nicht – die Runde davor ist nicht mehr fertig.", 409)
+    resolve_walkovers(drawn, by_id, target_sets, now_iso, rng=rng, draws=draws)
+    return {"target_sets": target_sets, "draw": draws[0], "draws": draws}
+
+
+def _pair(match: dict) -> frozenset:
+    return frozenset(slot.get("registration_id") or f"slot-{slot.get('slot')}" for slot in match.get("slots") or [])
+
+
+def build_league_redraw_application(stage_matches: list[dict], *, now_iso: str, rng=None) -> dict:
+    """Liga „Neu auslosen“ vor Spieltag 1 (#1548): Reihenfolge der Spieltage und Heimrecht neu, die Paarungen bleiben
+    (Kreismethode), jede Partie behält ihre Kennung. Die Rückrunde spiegelt die Hinrunde."""
+    rng = rng or DRAW_RNG
+    matches = [match for match in stage_matches if match.get("status") != "cancelled"]
+    if not matches:
+        raise MatchV2ResultError("Diese Phase hat keine Spieltage.", 404)
+    for match in matches:
+        if _draw_started(match):
+            raise MatchV2ResultError("Die Liga hat schon begonnen – neu auslosen geht nur vor Spieltag 1.", 409)
+    days: dict[int, list[dict]] = defaultdict(list)
+    for match in matches:
+        days[int(match.get("round") or 0)].append(match)
+    numbers = sorted(days)
+    half = len(numbers) // 2
+    mirrored = len(numbers) % 2 == 0 and half > 0 and all(
+        sorted(map(sorted, map(list, (_pair(m) for m in days[numbers[i]])))) ==
+        sorted(map(sorted, map(list, (_pair(m) for m in days[numbers[i + half]]))))
+        for i in range(half)
+    )
+    legs = [numbers[:half], numbers[half:]] if mirrored else [numbers]
+    order = list(range(len(legs[0])))
+    rng.shuffle(order)
+    new_round: dict[int, int] = {}
+    for leg_index, leg in enumerate(legs):
+        for position, old_index in enumerate(order):
+            new_round[leg[old_index]] = numbers[0] + leg_index * len(leg) + position
+    swap = {pair: rng.random() < 0.5 for pair in {_pair(match) for match in matches}}
+    draw = {"id": str(uuid.uuid4()), "group": str(matches[0].get("section") or "LIGA"), "kind": "league",
+            "trigger": "redraw", "drawn_at": now_iso}
+    target_sets: dict[str, dict] = {}
+    assignments = []
+    for match in sorted(matches, key=lambda row: (row.get("round") or 0, row.get("order") or 0)):
+        slots = [dict(slot) for slot in match.get("slots") or []]
+        if swap[_pair(match)] and len(slots) == 2:
+            first, second = slots
+            slots = [{**second, "slot": first.get("slot")}, {**first, "slot": second.get("slot")}]
+        number = new_round[int(match.get("round") or 0)]
+        update = {"round": number, "round_name": f"Spieltag {number}", "slots": slots, "draw": dict(draw),
+                  "updated_at": now_iso}
+        match.update(update)
+        target_sets[match["id"]] = update
+        assignments.append({"match_id": match["id"], "match_key": match.get("match_key"), "round": number,
+                            "home": slots[0].get("registration_id") if slots else None,
+                            "away": slots[1].get("registration_id") if len(slots) > 1 else None})
+    full = {**draw, "stage_id": matches[0].get("stage_id"), "tournament_id": matches[0].get("tournament_id"),
+            "assignments": assignments}
+    return {"target_sets": target_sets, "draw": full, "draws": [full]}

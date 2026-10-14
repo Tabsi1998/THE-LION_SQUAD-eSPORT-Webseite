@@ -550,3 +550,42 @@ test("Bearbeiten: Grand Final nur beim Doppel-K.-o., gespeicherter Wert vorbeleg
   await user.click(screen.getByTestId("tr-edit-save"));
   await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/tournaments/t-1", expect.objectContaining({ grand_final_mode: "reset" })));
 });
+
+// Gegner der nächsten Runde (#1548): Auswahl statt Haken, gespeicherter Wert vorbelegt, geht als Ja/Nein mit.
+test("Bearbeiten: Gegner der nächsten Runde – fester Baum oder zufällig mischen", async () => {
+  const user = userEvent.setup();
+  renderPage();
+  await screen.findByRole("heading", { name: "Winter Cup 2026" });
+  await user.click(screen.getByTestId("admin-tr-tab-edit"));
+  const select = await screen.findByTestId("tr-edit-advancement");
+  expect(select).toHaveValue("fixed");
+  expect(screen.getByText(/alle Weiterkommer in einen Topf/)).toBeInTheDocument();
+  await user.selectOptions(select, "shuffle");
+  await user.click(screen.getByTestId("tr-edit-save"));
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/tournaments/t-1", expect.objectContaining({ randomize_advancement_rounds: true })));
+});
+
+// Neu auslosen (#1548): im Betriebs-Reiter mit Aufbau-Recht, solange die Runde nicht begonnen hat.
+test("Betrieb: Neu auslosen für eine ausgeloste Runde", async () => {
+  const user = userEvent.setup();
+  const drawn = (id) => ({
+    id, match_key: id, stage_id: "s-1", section: "WB", round: 2, round_name: "Runde 2", status: "ready",
+    settings: { draw_group: "WB:2", randomize_advancement_rounds: true },
+    draw: { id: "d-1", group: "WB:2", drawn_at: "2026-10-14T10:00:00+00:00" },
+    slots: [{ slot: 1, status: "filled", registration_id: "r1", source: { type: "rank", flow: "W", match_key: "A", rank: 1 } }],
+  });
+  apiMock.get.mockImplementation((url) => {
+    const path = String(url);
+    if (path.includes("/tournaments/t-1") && !path.includes("/t-1/")) return Promise.resolve({ data: { ...TOURNAMENT, can_manage_structure: true } });
+    if (path.includes("/stages")) return Promise.resolve({ data: [{ id: "s-1", name: "Turnierbaum", stage_type: "single_elimination", settings: {} }] });
+    if (path.includes("/matches-v2")) return Promise.resolve({ data: [drawn("E"), drawn("F")] });
+    return Promise.resolve(routeFor(path));
+  });
+  apiMock.post.mockResolvedValue({ data: { ok: true } });
+  renderPage();
+  await screen.findByRole("heading", { name: "Winter Cup 2026" });
+  await user.click(screen.getByTestId("admin-tr-tab-stages"));
+  await user.click(await screen.findByTestId("redraw-WB:2"));
+  await user.click(await screen.findByTestId("confirm-dialog-confirm"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/tournaments/t-1/stages/s-1/redraw", { group: "WB:2" }));
+});

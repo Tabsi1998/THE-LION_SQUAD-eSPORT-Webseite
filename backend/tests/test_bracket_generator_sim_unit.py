@@ -3,6 +3,10 @@
 Jeder Baum wird mit zufälligen Ergebnissen (fester Zufallsstart) bis zum Ende durchgespielt. Geprüft wird je Schritt:
 kein Teilnehmer steht in zwei spielbereiten Spielen gleichzeitig, am Ende ist jedes Spiel entschieden (gespielt,
 Freilos oder „nicht nötig“), das Finale ist erreichbar. Dazu je Format die Regeln aus dem Issue.
+
+Gemischt (#1548, „Zufällig mischen“): dieselben Bäume mit Auslosung nach jeder Runde. Die Auslosung nutzt ``secrets``
+(ohne Startwert) - die Prüfungen gelten für jedes Los. Zusätzlich je Schritt: eine Folgerunde ist erst besetzt, wenn
+alle Spiele der Runde davor entschieden sind, und jeder Weiterkommer steht genau einmal in der Folgerunde.
 """
 import math
 import pathlib
@@ -21,11 +25,13 @@ from services.custom_bracket import (  # noqa: E402
     ffa_heat_plan,
     parse_custom_bracket_schema,
 )
+from services.advancement_draw import group_sources, group_targets  # noqa: E402
 from services.match_v2_results import build_v2_result_application  # noqa: E402
 
 NOW = "2026-10-31T10:00:00+00:00"
 TERMINAL = {"completed", "forfeit", "cancelled"}
 ACTIVE = {"ready", "scheduled", "in_progress", "waiting_result"}
+SHUFFLE = {"randomize_advancement_rounds": True}
 
 
 def registrations(count: int) -> list[dict]:
@@ -62,10 +68,26 @@ def assert_nobody_twice_ready(matches: list[dict]) -> None:
             seen[reg] = match["match_key"]
 
 
+def assert_draws_wait_for_whole_round(matches: list[dict]) -> None:
+    """Gemischt: solange ein Quellspiel einer Gruppe offen ist, ist dort niemand ausgelost; danach steht jeder
+    Weiterkommer genau einmal in der Folgerunde."""
+    groups = {m["settings"]["draw_group"] for m in matches if (m.get("settings") or {}).get("draw_group")}
+    for group in groups:
+        targets = group_targets(matches, group)
+        sources = group_sources(matches, group)
+        if any(m["status"] not in TERMINAL for m in sources):
+            assert not any(t.get("draw") for t in targets), f"{group} ausgelost, obwohl die Runde noch läuft"
+            assert not any(filled_ids(t) for t in targets), f"{group} besetzt, obwohl die Runde noch läuft"
+            continue
+        seated = [reg for t in targets for reg in filled_ids(t)]
+        assert len(seated) == len(set(seated)), f"{group}: jemand sitzt doppelt"
+
+
 def play_through(matches: list[dict], rng: random.Random, *, on_result=None) -> list[tuple[dict, list[str]]]:
     """Spielt alle spielbereiten Spiele in zufälliger Reihenfolge mit zufälligem Ausgang, bis nichts mehr offen ist."""
     history: list[tuple[dict, list[str]]] = []
     assert_nobody_twice_ready(matches)
+    assert_draws_wait_for_whole_round(matches)
     for _ in range(10_000):
         ready = [match for match in matches if match["status"] == "ready"]
         if not ready:
@@ -78,6 +100,7 @@ def play_through(matches: list[dict], rng: random.Random, *, on_result=None) -> 
         if on_result:
             on_result(match, ranking)
         assert_nobody_twice_ready(matches)
+        assert_draws_wait_for_whole_round(matches)
     open_matches = [match["match_key"] for match in matches if match["status"] not in TERMINAL]
     assert not open_matches, f"nicht erreichbar: {open_matches}"
     return history
@@ -89,10 +112,12 @@ def section_of(match: dict) -> str:
 
 # ---------------------------------------------------------------------------------------------- Single Elimination
 
+@pytest.mark.parametrize("shuffle", [False, True], ids=["fest", "gemischt"])
 @pytest.mark.parametrize("count", range(2, 41))
 @pytest.mark.parametrize("bronze", [False, True])
-def test_single_elimination_plays_through_for_every_size(count: int, bronze: bool):
-    matches = build(count, "single_elimination", tournament={"bronze_match": bronze, "format": "single_elim"})
+def test_single_elimination_plays_through_for_every_size(count: int, bronze: bool, shuffle: bool):
+    matches = build(count, "single_elimination",
+                    tournament={"bronze_match": bronze, "format": "single_elim", **(SHUFFLE if shuffle else {})})
     play_through(matches, random.Random(count))
     final = max((m for m in matches if section_of(m) in {"WB", "MAIN"}), key=lambda m: m["round"])
     assert final["status"] == "completed"
@@ -134,16 +159,25 @@ def earliest_allowed_rematch_round(bracket_size: int) -> int:
     return int(math.log2(bracket_size))
 
 
+@pytest.mark.parametrize("shuffle", [False, True], ids=["fest", "gemischt"])
 @pytest.mark.parametrize("count", range(2, 41))
 @pytest.mark.parametrize("grand_final", ["reset", "single", "none"])
-def test_double_elimination_plays_through_for_every_size(count: int, grand_final: str):
-    matches = build(count, "double_elimination", tournament={"grand_final_mode": grand_final})
+def test_double_elimination_plays_through_for_every_size(count: int, grand_final: str, shuffle: bool):
+    matches = build(count, "double_elimination",
+                    tournament={"grand_final_mode": grand_final, **(SHUFFLE if shuffle else {})})
     bracket_size = 2 ** math.ceil(math.log2(max(2, count)))
     met: dict[frozenset, list[dict]] = {}
+    losses: dict[str, int] = {}
 
-    def on_result(match, _ranking):
+    def on_result(match, ranking):
         pair = frozenset(filled_ids(match))
         met.setdefault(pair, []).append(match)
+        # Doppel-K.-o.: wer zweimal verloren hat, spielt nicht mehr - fest wie gemischt.
+        if len(ranking) == 2:
+            losses[ranking[1]] = losses.get(ranking[1], 0) + 1
+        for row in matches:
+            if row["status"] in ACTIVE:
+                assert all(losses.get(reg, 0) < 2 for reg in filled_ids(row)), f"{row['match_key']}: zwei Niederlagen"
 
     play_through(matches, random.Random(count * 7 + len(grand_final)), on_result=on_result)
 
@@ -152,8 +186,16 @@ def test_double_elimination_plays_through_for_every_size(count: int, grand_final
             if section_of(again) == "GF":
                 continue
             assert section_of(again) == "LB"
-            assert loser_round_of(again) >= earliest_allowed_rematch_round(bracket_size), \
-                f"Wiedersehen {sorted(pair)} schon in {again['round_name']}"
+            # Gemischt ist ein Wiedersehen im Loser Bracket jederzeit möglich - echtes Los (#1548).
+            if not shuffle:
+                assert loser_round_of(again) >= earliest_allowed_rematch_round(bracket_size), \
+                    f"Wiedersehen {sorted(pair)} schon in {again['round_name']}"
+    for match in matches:
+        group = (match.get("settings") or {}).get("draw_group")
+        if group:
+            # Im Loser Bracket nur zwischen Spielen derselben Loser-Runde gemischt (#1548).
+            assert {section_of(m) for m in group_targets(matches, group)} == {section_of(match)}
+            assert {m["round"] for m in group_targets(matches, group)} == {match["round"]}
 
     wb_final = max((m for m in matches if section_of(m) == "WB"), key=lambda m: m["round"])
     lb_matches = [m for m in matches if section_of(m) == "LB"]
@@ -270,10 +312,12 @@ def test_double_elimination_schema_orders_loser_drops_to_avoid_rematches():
 
 # ---------------------------------------------------------------------------------------------- FFA-Läufe
 
+@pytest.mark.parametrize("shuffle", [False, True], ids=["fest", "gemischt"])
 @pytest.mark.parametrize("match_size,qualifiers", [(3, 1), (3, 2), (4, 1), (4, 2), (8, 1), (8, 2)])
 @pytest.mark.parametrize("count", range(2, 41))
-def test_ffa_bracket_plays_through_balanced_for_every_size(count: int, match_size: int, qualifiers: int):
-    matches = build(count, "ffa_custom_bracket", "ffa", settings={"match_size": match_size, "qualifiers_per_match": qualifiers})
+def test_ffa_bracket_plays_through_balanced_for_every_size(count: int, match_size: int, qualifiers: int, shuffle: bool):
+    matches = build(count, "ffa_custom_bracket", "ffa", settings={"match_size": match_size, "qualifiers_per_match": qualifiers},
+                    tournament=SHUFFLE if shuffle else None)
     by_round: dict[int, list[dict]] = {}
     for match in matches:
         by_round.setdefault(match["round"], []).append(match)
@@ -355,12 +399,9 @@ def test_correction_rebuilds_the_walkover_chain():
     play_through(matches, random.Random(5))
 
 
-def test_reset_rule_follows_origin_not_slot_number_when_rounds_are_shuffled(monkeypatch):
-    """Zufallsmischung der Folgerunden: der Sieger der Siegerrunde kann im Grand Final auf Platz 2 landen. Ob ein
-    Reset nötig ist, entscheidet seine Herkunft, nicht die Platznummer."""
-    import services.match_v2_results as results_module
-
-    monkeypatch.setattr(results_module.random, "choice", lambda candidates: candidates[-1])
+def test_reset_rule_follows_origin_not_slot_number_when_rounds_are_shuffled():
+    """Gemischt (#1548): ob ein Reset nötig ist, entscheidet die Herkunft des Finalisten, nicht die Platznummer -
+    auch wenn der Sieger der Siegerrunde im Grand Final auf Platz 2 sitzt."""
     matches = build(4, "double_elimination", tournament={"randomize_advancement_rounds": True})
     by_key = {m["match_key"]: m for m in matches}
     gf = by_key["GF"]
@@ -368,8 +409,9 @@ def test_reset_rule_follows_origin_not_slot_number_when_rounds_are_shuffled(monk
     while gf["status"] != "ready":
         match = next(m for m in matches if m["status"] == "ready")
         apply_result(matches, match, sorted(filled_ids(match), key=lambda reg: int(reg[1:])))
-    assert gf["status"] == "ready"
-    assert gf["slots"][1]["registration_id"] == "r1", "der Sieger der Siegerrunde sitzt gemischt auf Platz 2"
+    upper, lower = gf["slots"]
+    gf["slots"] = [{**lower, "slot": 1}, {**upper, "slot": 2}]
+    assert gf["slots"][1]["registration_id"] == "r1", "der Sieger der Siegerrunde sitzt auf Platz 2"
     apply_result(matches, gf, ["r1", "r2"])
     assert by_key["GFR"]["status"] == "cancelled", "Sieg der Siegerrunde: kein Reset, auch von Platz 2 aus"
     raw = [{"registration_id": "r2", "rank": 1}, {"registration_id": "r1", "rank": 2}]

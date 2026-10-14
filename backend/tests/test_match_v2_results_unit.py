@@ -389,19 +389,13 @@ def test_v2_result_application_force_clears_dependent_downstream_slots():
     assert application["target_sets"]["m-c"]["status"] == "pending"
 
 
-def test_v2_randomized_advancement_uses_any_free_target_slot(monkeypatch):
+def test_v2_old_shuffle_flag_without_draw_group_keeps_the_fixed_slots():
+    """Gemischt wird seit #1548 per Auslosung der ganzen Runde (``settings.draw_group`` am Folgespiel, beim Bau
+    gesetzt). Ältere Spiele mit nur dem Haken am Spiel und ohne Gruppe bleiben beim Platz aus dem Schema."""
     source = _source_match()
     source["settings"] = {"randomize_advancement_rounds": True}
     winner_target = _target("m-b", "B")
-    winner_target["settings"] = {"min_players": 2}
-    winner_target["slots"] = [
-        {"slot": 1, "registration_id": None, "status": "pending", "source": {"type": "rank", "flow": "W", "match_key": "A", "rank": 1}},
-        {"slot": 2, "registration_id": None, "status": "pending", "source": {"type": "rank", "flow": "W", "match_key": "A", "rank": 2}},
-        {"slot": 3, "registration_id": None, "status": "pending", "source": {"type": "rank", "flow": "W", "match_key": "B", "rank": 1}},
-        {"slot": 4, "registration_id": None, "status": "pending", "source": {"type": "rank", "flow": "W", "match_key": "B", "rank": 2}},
-    ]
     loser_target = _target("m-l", "L")
-    monkeypatch.setattr("services.match_v2_results.random.choice", lambda candidates: candidates[-1])
 
     application = build_v2_result_application(
         source,
@@ -412,8 +406,8 @@ def test_v2_randomized_advancement_uses_any_free_target_slot(monkeypatch):
     )
 
     slots = application["target_sets"]["m-b"]["slots"]
-    assert slots[3]["registration_id"] == "r2"
-    assert slots[2]["registration_id"] == "r1"
+    assert [slot["registration_id"] for slot in slots] == ["r2", "r1"]
+    assert application["draws"] == []
 
 
 # ---------------------------------------------------------------- Unentschieden

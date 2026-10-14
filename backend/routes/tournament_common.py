@@ -16,6 +16,7 @@ from services.tournament_permissions import READ_STAFF_ROLES, has_tournament_sta
 from services.tournament_rules import tournament_modes
 from services.permissions import is_confirmed_tournament_lead
 from services.custom_bracket import BracketSchemaError, build_matches_v2_from_schema
+from services.draw_records import record_build_draws
 from services.competition_engine import GRAPH, preferred_engine
 from services.competition_formats import find_format_capability
 from services.competition_versions import persist_competition_versions
@@ -656,6 +657,8 @@ async def _rebuild_checkin_bracket_after_staff_change(db, tournament: dict, acto
                 continue
             _apply_match_plan(matches, match_plan, _v2_plan_key)
             await db.matches_v2.insert_many(matches)
+            # Gemischt (#1548): schon beim Bau entschiedene Auslosungen (Liga, kampflose Runde) ins Protokoll.
+            await record_build_draws(db, matches, actor_id=actor_id)
             await db.tournament_stages.update_one(
                 {"id": stage["id"]},
                 {"$set": {"status": "ready", "updated_at": now_utc().isoformat()}},

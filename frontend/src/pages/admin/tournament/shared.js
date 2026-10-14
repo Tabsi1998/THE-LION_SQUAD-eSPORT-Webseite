@@ -78,6 +78,67 @@ export const GRAND_FINAL_OPTIONS = [
   ["none", "Kein Grand Final: Der Sieger der Siegerrunde gewinnt das Turnier"],
 ];
 export const GRAND_FINAL_HINT = "Beide Finalisten haben im Doppel-K.-o. ein zweites Leben. Ohne Reset hätte der Sieger der Siegerrunde nach nur einer Niederlage verloren.";
+
+// Gegner der nächsten Runde (#1548): fester Baum (Vorgabe) oder echtes Los nach jeder Runde. Am Server ein Ja/Nein
+// (`randomize_advancement_rounds`); an der Phase heißt leer „vom Turnier erben“.
+export const ADVANCEMENT_MODE_OPTIONS = [
+  ["fixed", "Fester Baum (Standard): Wer weiterkommt, geht in das Spiel, das der Turnierbaum vorsieht"],
+  ["shuffle", "Zufällig mischen: Nach jeder Runde werden alle Weiterkommer neu ausgelost"],
+];
+export const ADVANCEMENT_MODE_HINT = "Zufällig mischen: Erst wenn alle Spiele einer Runde fertig sind, kommen alle Weiterkommer in einen Topf und werden gleichmäßig auf die nächsten Spiele verteilt – auch zwei aus demselben Spiel können sich wiedersehen. Laufen nur zwei Spiele in eines zusammen (z. B. das Finale), ändert sich nichts. In der Liga werden die Reihenfolge der Spieltage und das Heimrecht ausgelost. Die Turnierleitung kann neu auslosen, bis die Runde beginnt.";
+export const STAGE_ADVANCEMENT_OPTIONS = [["", "Vom Turnier erben"], ...ADVANCEMENT_MODE_OPTIONS];
+export const advancementModeOf = (flag) => (flag ? "shuffle" : "fixed");
+export function stageAdvancementValue(settings) {
+  const value = settings?.randomize_advancement_rounds;
+  if (value === true) return "shuffle";
+  if (value === false) return "fixed";
+  return "";
+}
+export function stageAdvancementSetting(value) {
+  if (value === "shuffle") return true;
+  if (value === "fixed") return false;
+  return null;
+}
+
+// Neu auslosen (#1548): gleich wie am Server (`_draw_started`) - ist eines der Spiele aufgerufen, gestartet, gemeldet
+// oder entschieden, gilt das Los.
+const DRAW_LOCKED_STATUSES = new Set(["in_progress", "waiting_result", "disputed", "completed", "forfeit"]);
+export function drawStarted(match) {
+  return DRAW_LOCKED_STATUSES.has(match?.status) || (match?.results || []).length > 0 || !!match?.started_at
+    || !!match?.called_at || (match?.reports || []).length > 0 || !!match?.pending_result;
+}
+
+/** Die Auslosungs-Gruppen einer Phase: Runde, Spiele, ob schon gelost und ob neu auslosen noch geht. */
+export function drawGroupsOf(matches = []) {
+  const groups = new Map();
+  for (const match of matches || []) {
+    const group = match?.settings?.draw_group;
+    if (!group || match.status === "cancelled") continue;
+    if (!groups.has(group)) groups.set(group, []);
+    groups.get(group).push(match);
+  }
+  return [...groups.entries()].map(([group, rows]) => {
+    const sorted = [...rows].sort((a, b) => (a.order || 0) - (b.order || 0) || String(a.match_key).localeCompare(String(b.match_key)));
+    const drawn = sorted.some((row) => row.draw && typeof row.draw === "object");
+    return {
+      group,
+      label: sorted[0]?.round_name || `Runde ${sorted[0]?.round || ""}`.trim(),
+      section: sorted[0]?.section || "",
+      round: sorted[0]?.round || 0,
+      matchKeys: sorted.map((row) => row.match_key),
+      drawn,
+      canRedraw: drawn && !sorted.some(drawStarted),
+    };
+  }).sort((a, b) => a.round - b.round || a.group.localeCompare(b.group));
+}
+
+/** Liga: Spieltage neu auslosen geht nur gemischt und nur, solange kein Spiel begonnen hat. */
+export function leagueRedrawAllowed(stage, matches = []) {
+  if (stage?.stage_type !== "league") return false;
+  const rows = (matches || []).filter((match) => match.status !== "cancelled");
+  if (!rows.length || !rows.some((match) => match.settings?.randomize_advancement_rounds)) return false;
+  return !rows.some(drawStarted);
+}
 // Nur diese Formate spielen in Wochen; ein K.-o.-Baum hat Runden, keine Woche.
 // Muss zu MATCHDAY_FORMATS in services/matchday_schedule.py passen.
 

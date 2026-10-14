@@ -4,6 +4,7 @@ import hashlib
 import json
 import logging
 from fastapi import HTTPException, Depends
+from pydantic import BaseModel, Field
 from database import get_db
 from auth import get_current_user, get_optional_user
 from services.tournament_permissions import (
@@ -13,8 +14,11 @@ from services.tournament_permissions import (
 )
 from services.custom_bracket import BracketSchemaError, build_matches_v2_from_schema
 from services.competition_versions import persist_competition_versions
+from services.draw_records import record_build_draws, record_draws
 from services.match_v2_results import (
     MatchV2ResultError,
+    build_league_redraw_application,
+    build_redraw_application,
     build_v2_result_application,
     public_recalculation_error,
 )
@@ -228,6 +232,7 @@ async def recalculate_tournament_matches_v2_advancement(tid: str, stage_id: str 
             if target_id in by_id:
                 by_id[target_id].update(update)
             updated_match_ids.add(target_id)
+        await record_draws(db, application.get("draws"), actor_id=me.get("id"), tournament_id=tid)
 
     await _audit_tournament_action(
         db,
@@ -299,6 +304,8 @@ async def generate_tournament_stage_matches(tid: str, stage_id: str, force: bool
         {"$set": {"status": "pending" if preview else "ready", "updated_at": now_utc().isoformat()}},
     )
     await persist_competition_versions(db, tournament, "graph")
+    if not preview:
+        await record_build_draws(db, matches, actor_id=me.get("id"))
     await _audit_tournament_action(
         db,
         "tournament.stage.generate",
@@ -314,3 +321,49 @@ async def generate_tournament_stage_matches(tid: str, stage_id: str, force: bool
         },
     )
     return {"ok": True, "stage_id": stage_id, "match_count": len(matches), "preview": preview}
+
+
+class StageRedrawPayload(BaseModel):
+    # Die Auslosungs-Gruppe (``settings.draw_group`` der Folgespiele, z. B. „WB:2“); leer bei der Liga.
+    group: str | None = Field(default=None, max_length=80)
+
+
+@router.post("/{tid}/stages/{stage_id}/redraw")
+async def redraw_tournament_stage(tid: str, stage_id: str, body: StageRedrawPayload | None = None,
+                                  me: dict = Depends(get_current_user),
+                                  _mutation_tid: str = Depends(_serialized_tournament_write)):
+    """„Neu auslosen“ (#1548): die Turnierleitung lost eine Folgerunde neu aus - oder bei der Liga die Spieltage -,
+    solange keines der betroffenen Spiele begonnen hat (sonst 409). Unter der Turnier-Schreibsperre; Protokoll mit
+    Person, Zeitpunkt und Ergebnis, dazu das Live-Ereignis ``draw_done``."""
+    db = get_db()
+    tid = await _resolve_tid(tid)
+    await require_tournament_staff_permission(me, tid, STRUCTURE_STAFF_ROLES)
+    tournament = await _ensure_tournament_unlocked(db, tid)
+    stage = await db.tournament_stages.find_one({"id": stage_id, "tournament_id": tid}, {"_id": 0})
+    if not stage:
+        raise HTTPException(status_code=404, detail="Phase nicht gefunden")
+    stage_matches = await db.matches_v2.find({"stage_id": stage_id, "is_preview": {"$ne": True}}, {"_id": 0}).to_list(3000)
+    group = ((body.group if body else None) or "").strip()
+    now_iso = now_utc().isoformat()
+    try:
+        if group:
+            application = build_redraw_application(stage_matches, group, now_iso=now_iso)
+        elif stage.get("stage_type") == "league":
+            application = build_league_redraw_application(stage_matches, now_iso=now_iso)
+        else:
+            raise MatchV2ResultError("Bitte angeben, welche Runde neu ausgelost werden soll.", 422)
+    except MatchV2ResultError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=str(exc))
+    for target_id, update in application["target_sets"].items():
+        await db.matches_v2.update_one({"id": target_id}, {"$set": update})
+    await record_draws(db, application["draws"], actor_id=me.get("id"), tournament_id=tid)
+    if not group:
+        # Die Spieltage haben sich verschoben: Termine der Liga neu rechnen (von Hand gesetzte bleiben).
+        from services.matchday_schedule import persist_matchday_schedule
+        await persist_matchday_schedule(db, tournament)
+    draw = application["draw"]
+    return {
+        "ok": True,
+        "draw": {key: draw.get(key) for key in ("id", "group", "kind", "trigger", "drawn_at", "assignments")},
+        "updated_match_ids": sorted(application["target_sets"]),
+    }
