@@ -711,6 +711,8 @@ class TournamentCreate(BaseModel):
     bronze_match: bool = False
     # Doppel-K.-o. (#1549): kein Grand Final, eines, oder mit Reset-Spiel (Vorgabe).
     grand_final_mode: Literal["none", "single", "reset"] = "reset"
+    # FFA-Läufe zusammenlegen (#1550, Entscheidung E13): Vorschlag für die Turnierleitung (Vorgabe) oder automatisch.
+    heat_rebuild_mode: Literal["suggest", "auto"] = "suggest"
     # Leer: die Dauer kommt vom Spiel (Modus, #1554), sonst 30 Minuten - siehe services/match_duration.py.
     match_duration_minutes: Optional[int] = Field(default=None, ge=1, le=1440)
     # Spielmodus des Games (``games.match_modes[].mode``) - leer: der erste Modus.
@@ -791,6 +793,7 @@ class TournamentUpdate(BaseModel):
     best_of: Optional[int] = None
     bronze_match: Optional[bool] = None
     grand_final_mode: Optional[Literal["none", "single", "reset"]] = None
+    heat_rebuild_mode: Optional[Literal["suggest", "auto"]] = None
     match_duration_minutes: Optional[int] = Field(default=None, ge=1, le=1440)
     game_mode: Optional[str] = Field(default=None, max_length=40)
     stream_link: Optional[str] = None

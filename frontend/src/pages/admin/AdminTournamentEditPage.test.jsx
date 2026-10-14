@@ -719,3 +719,23 @@ test("Bearbeiten: Grand Final nur beim Doppel-K.-o., gespeicherter Wert vorbeleg
   await user.click(screen.getByTestId("tr-edit-save"));
   await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/tournaments/t-1", expect.objectContaining({ grand_final_mode: "reset" })));
 });
+
+// Läufe umbauen (#1550): die Einstellung nur beim FFA-Turnierbaum; der offene Vorschlag steht als Leiste über den
+// Reitern, solange die Turnierleitung Struktur-Recht hat.
+test("Bearbeiten: „Läufe umbauen“ nur beim FFA-Turnierbaum, und der Vorschlag steht als Leiste da", async () => {
+  const user = userEvent.setup();
+  const plan = { id: "plan-1", summary: "Runde 1: Läufe C und D (2 + 2) werden zusammengelegt zu C mit 4.", ops: [{ kind: "merged", text: "Runde 1: Läufe C und D (2 + 2) werden zusammengelegt zu C mit 4." }] };
+  apiMock.get.mockImplementation((url) => Promise.resolve(String(url).includes("/tournaments/t-1") && !String(url).includes("/t-1/")
+    ? { data: { ...TOURNAMENT, format: "ffa_custom_bracket", heat_rebuild_mode: "auto", heat_rebuild_plan: plan, can_manage_structure: true } }
+    : routeFor(String(url))));
+  renderPage();
+  await screen.findByRole("heading", { name: "Winter Cup 2026" });
+  expect(screen.getByTestId("admin-tr-heat-rebuild")).toHaveTextContent("zusammengelegt zu C mit 4");
+  await user.click(screen.getByTestId("admin-tr-tab-edit"));
+  const select = await screen.findByTestId("tr-edit-heat-rebuild");
+  expect(select).toHaveValue("auto");
+  expect(screen.queryByTestId("tr-edit-grand-final")).not.toBeInTheDocument();
+  await user.selectOptions(select, "suggest");
+  await user.click(screen.getByTestId("tr-edit-save"));
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/tournaments/t-1", expect.objectContaining({ heat_rebuild_mode: "suggest" })));
+});

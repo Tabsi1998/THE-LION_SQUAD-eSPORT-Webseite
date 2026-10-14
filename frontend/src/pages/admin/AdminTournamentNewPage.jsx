@@ -7,7 +7,7 @@ import { AdminFormPage, FormActions, FormGrid, FormSection } from "@/components/
 import { PartnerPicker } from "@/components/tls/PartnerPicker";
 import { EventMembershipLine } from "@/pages/admin/event/EventProgramPanel";
 import { CheckField, FieldLabel, SelectField, TextField } from "@/components/tls/FormFields";
-import { GRAND_FINAL_FORMATS, GRAND_FINAL_HINT, GRAND_FINAL_OPTIONS } from "./tournament/shared";
+import { GRAND_FINAL_FORMATS, GRAND_FINAL_HINT, GRAND_FINAL_OPTIONS, HEAT_REBUILD_FORMATS, HEAT_REBUILD_HINT, HEAT_REBUILD_OPTIONS } from "./tournament/shared";
 import { ImageUpload } from "@/components/tls/ImageUpload";
 import { MarkdownEditor } from "@/components/tls/MarkdownEditor";
 import { normalizeDateTimeFields, toDateTimeLocalInput } from "@/lib/datetime";
@@ -92,7 +92,7 @@ export default function AdminTournamentNewPage() {
     discord_skip: false,
     auto_start_enabled: false,
     event_mode: "online", result_entry_mode: "", schedule_mode: "",
-    best_of: 1, bronze_match: false, grand_final_mode: "reset", seeding_mode: "random", randomize_advancement_rounds: false,
+    best_of: 1, bronze_match: false, grand_final_mode: "reset", heat_rebuild_mode: "suggest", seeding_mode: "random", randomize_advancement_rounds: false,
     is_public: true, rules: "", prize_pool: "",
     banner_url: "",
     prize_places: [
@@ -303,6 +303,9 @@ export default function AdminTournamentNewPage() {
           )}
           {GRAND_FINAL_FORMATS.has(form.format) && (
             <SelectField label="Grand Final" value={form.grand_final_mode} onChange={(v) => set("grand_final_mode", v)} options={GRAND_FINAL_OPTIONS} hint={GRAND_FINAL_HINT} testId="new-tr-grand-final" />
+          )}
+          {HEAT_REBUILD_FORMATS.has(form.format) && (
+            <SelectField label="Läufe umbauen" value={form.heat_rebuild_mode} onChange={(v) => set("heat_rebuild_mode", v)} options={HEAT_REBUILD_OPTIONS} hint={HEAT_REBUILD_HINT} testId="new-tr-heat-rebuild" />
           )}
         </FormSection>
 
