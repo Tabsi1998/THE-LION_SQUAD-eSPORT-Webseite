@@ -64,6 +64,11 @@ test("Begleitperson: scannen, schlanke Ansicht, anmelden, mitspielen - abmelden,
   const adminContext = await browser.newContext({ viewport: DESKTOP });
   const admin = await adminContext.newPage();
   await signIn(admin, "admin");
+  // Wiederholbar: eine Anmeldung des Gasts aus einem früheren Lauf nimmt die Leitung vorher heraus.
+  const before = await (await admin.request.get(`/api/tournaments/${tid}/registrations`)).json();
+  for (const row of before.filter((reg) => reg.user?.username === state.accounts.guest.email.split("@")[0])) {
+    await admin.request.delete(`/api/tournaments/${tid}/registrations/${row.id}`, { headers: await csrfHeaders(admin) });
+  }
   const { path: qrPath } = await onsiteState(admin);
   const token = qrPath.split("#")[1];
 
@@ -72,7 +77,12 @@ test("Begleitperson: scannen, schlanke Ansicht, anmelden, mitspielen - abmelden,
   await signIn(page, "anon");
   // Ohne Zugang ist das Mitglieder-Turnier nicht sichtbar.
   expect((await page.request.get(`/api/tournaments/${slug}`)).status()).toBe(403);
-  const problems = watch(page, { allow: (response) => [401, 403].includes(response.status()) });
+  // Erwartet: 401/403 vor der Anmeldung; die Login-Seite fragt Passkeys an, die der Abnahme-Stand nicht eingerichtet hat (503).
+  const passkeys = (response) => response.status() === 503 && response.url().includes("/api/auth/passkeys/");
+  const problems = watch(page, {
+    allow: (response) => [401, 403].includes(response.status()) || passkeys(response),
+    allowConsole: (text) => text.includes("status of 503"),
+  });
 
   // QR-Code scannen: der Code verlässt die Adresse sofort und landet nie in einer URL.
   const requested = [];
@@ -105,7 +115,7 @@ test("Begleitperson: scannen, schlanke Ansicht, anmelden, mitspielen - abmelden,
 
   // Die Leitung sieht die Anmeldung als „Vor Ort“.
   await admin.goto(`/admin/tournaments/${tid}`);
-  await expect(admin.getByTestId("onsite-mark").first()).toBeVisible();
+  await expect(admin.getByTestId("onsite-mark").filter({ visible: true }).first()).toBeVisible();
 
   // Abmelden: ohne Freigabe ist das Turnier wieder verborgen.
   const regs = await (await page.request.get(`/api/tournaments/${tid}/registrations`)).json();

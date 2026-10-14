@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { QrCode } from "lucide-react";
 import { api, formatApiError } from "@/lib/api";
-import { forgetOnsiteToken, peekOnsiteToken } from "@/lib/onsiteToken";
+import { captureOnsiteToken, forgetOnsiteToken, peekOnsiteToken } from "@/lib/onsiteToken";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 
@@ -14,9 +14,20 @@ const RESCAN = "Bitte den QR-Code am Bildschirm oder am Aushang neu scannen.";
 
 export default function OnsiteAccessPage() {
   const nav = useNavigate();
-  const [token] = useState(() => peekOnsiteToken());
+  const [token, setToken] = useState(() => peekOnsiteToken());
   const [problem, setProblem] = useState(token ? "" : RESCAN);
   useDocumentTitle("Vor Ort mitspielen", "Anmeldung vor Ort über den QR-Code.", { robots: "noindex, nofollow" });
+
+  // Ein neuer Scan im selben Tab ändert nur den Anker - dann lädt die Seite nicht neu und der Start greift nicht.
+  useEffect(() => {
+    const onHash = () => {
+      if (!captureOnsiteToken()) return;
+      setProblem("");
+      setToken(peekOnsiteToken());
+    };
+    window.addEventListener("hashchange", onHash);
+    return () => window.removeEventListener("hashchange", onHash);
+  }, []);
 
   useEffect(() => {
     if (!token) return undefined;

@@ -5,7 +5,7 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 // eine Adresse zu schreiben.
 
 const apiMock = { post: vi.fn() };
-const tokenMock = { peekOnsiteToken: vi.fn(), forgetOnsiteToken: vi.fn() };
+const tokenMock = { peekOnsiteToken: vi.fn(), forgetOnsiteToken: vi.fn(), captureOnsiteToken: vi.fn(() => false) };
 vi.mock("@/lib/api", () => ({ api: apiMock, formatApiError: (detail) => detail || "" }));
 vi.mock("@/lib/onsiteToken", () => tokenMock);
 vi.mock("@/components/tls/PublicLayout", () => ({ PublicLayout: ({ children }) => <div>{children}</div> }));
@@ -27,7 +27,10 @@ const renderPage = () => render(
   </MemoryRouter>,
 );
 
-beforeEach(() => vi.clearAllMocks());
+beforeEach(() => {
+  vi.clearAllMocks();
+  tokenMock.captureOnsiteToken.mockReturnValue(false);
+});
 
 test("löst den Code im Rumpf ein und führt zum Turnier", async () => {
   tokenMock.peekOnsiteToken.mockReturnValue("code-aus-dem-qr-1234567890");
@@ -52,4 +55,17 @@ test("Code gilt nicht mehr: Hinweis vom Server, kein Weiterleiten", async () => 
   renderPage();
   expect(await screen.findByTestId("onsite-access-invalid")).toHaveTextContent("gilt nicht (mehr)");
   expect(screen.queryByTestId("target-page")).not.toBeInTheDocument();
+});
+
+test("ein neuer Scan im selben Tab (nur der Anker ändert sich) löst den neuen Code ein", async () => {
+  const { act } = await import("@testing-library/react");
+  tokenMock.peekOnsiteToken.mockReturnValue("");
+  renderPage();
+  await screen.findByTestId("onsite-access-invalid");
+  tokenMock.captureOnsiteToken.mockReturnValue(true);
+  tokenMock.peekOnsiteToken.mockReturnValue("neuer-code-1234567890");
+  apiMock.post.mockResolvedValue({ data: { tournament: { id: "t1", slug: "lan-cup" } } });
+  await act(async () => { window.dispatchEvent(new HashChangeEvent("hashchange")); });
+  expect(await screen.findByTestId("target-page")).toBeInTheDocument();
+  expect(apiMock.post).toHaveBeenCalledWith("/tournaments/onsite/redeem", { token: "neuer-code-1234567890" });
 });
