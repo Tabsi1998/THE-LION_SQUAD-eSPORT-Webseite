@@ -2,16 +2,11 @@
   "GHSA-86W9-CPQP-85RV": {
     "module": "node-forge",
     "expires": "2027-01-02",
-    "reason": "node-forge 1.4.0 is the newest release and still affected (re-checked on 2026-10-13 for the 1.6.0 release: advisory range <=1.4.0); no patched version exists. It is used only by @expo/cli through @expo/code-signing-certificates (development tooling for signing over-the-air updates, which the app does not use) and is not part of the app bundle. Re-check on expiry."
+    "reason": "node-forge 1.4.0 is the newest release and still affected (re-checked on 2026-10-14: advisory range <=1.4.0); no patched version exists, and the newest @expo/cli (57.0.29) and @expo/code-signing-certificates (0.0.7) still depend on it. It is used only inside @expo/cli: directly to read local signing certificates for `expo run:ios`, and through @expo/code-signing-certificates to sign over-the-air update manifests on the dev server (only when a client sends an expo-expect-signature header; app.json sets updates.enabled=false and the app does not use expo-updates). The only signature verification there checks a signature the CLI has just created itself, so no outside signature reaches the affected PKCS#1 v1.5 verify path. It is not part of the app bundle. Re-check on expiry."
   },
   "GHSA-VFJ7-8CJW-P6XM": {
     "module": "braces",
     "expires": "2027-01-02",
-    "reason": "braces 3.0.3 is the newest release and still affected (stack exhaustion through deeply nested brace patterns; first flagged by the audit gate on 2026-10-03, re-checked on 2026-10-13: advisory range <=3.0.3); no patched version exists. It is used only by jest 29 (@jest/core -> micromatch) to match the test file patterns of this repository; it is development tooling, never sees outside input and is not part of the app bundle. Jest 30 no longer pulls in micromatch there, but jest-expo 57 is built for jest 29, so leaving it is a separate test tooling upgrade, not part of a release. Re-check on expiry."
-  },
-  "GHSA-HP3W-G68C-FV3C": {
-    "module": "sprintf-js",
-    "expires": "2027-01-02",
-    "reason": "sprintf-js 1.1.3 is the newest release and still affected (denial of service through unbounded precision specifiers; first flagged by the audit gate on 2026-10-06, re-checked on 2026-10-13: advisory range <=1.1.3); no patched version exists. It is reached only through jest-expo -> babel-plugin-istanbul -> @istanbuljs/load-nyc-config -> js-yaml 3 -> argparse 1, i.e. the coverage configuration reader of the test runner; it is development tooling, never sees outside input and is not part of the app bundle. Re-check on expiry."
+    "reason": "braces 3.0.3 is the newest release and still affected (stack exhaustion through deeply nested brace patterns; first flagged by the audit gate on 2026-10-03, re-checked on 2026-10-14: advisory range <=3.0.3); no patched version exists, and micromatch 4.0.8 is the newest release. It is reached only through micromatch from jest 29 (@jest/core, jest-config, jest-haste-map, @jest/transform, jest-message-util) and from metro-file-map (the file watcher of the Metro bundler). braces only parses the glob patterns, which come from the jest and Metro configuration of this repository, never from outside input; file paths are only matched against them. Both are development and build tooling, not part of the app bundle. Jest 30 alone would not remove it, because Metro still uses micromatch. Re-check on expiry."
   }
 }
