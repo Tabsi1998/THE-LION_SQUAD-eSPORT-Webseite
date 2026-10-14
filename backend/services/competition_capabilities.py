@@ -130,6 +130,10 @@ CAPABILITIES: tuple[Capability, ...] = (
             "antworten mit applies=false. Rein lesend, die Termine werden berechnet."),
     _c("planning.check", "Planungsprüfung und Spielplan-Export",
        ["GET /api/tournaments/{tid}/planning-check", "GET /api/tournaments/{tid}/match-plan.csv"], [CLASSIC, GRAPH]),
+    _c("planning.schedule", "Spielplan planen (Vorschau) und übernehmen",
+       ["POST /api/tournaments/{tid}/schedule/plan", "POST /api/tournaments/{tid}/schedule/apply"], [GRAPH],
+       note="Der Spielplaner (#1552) schreibt Zeit und Station zusammen mit schedule_source; die Vorschau "
+            "schreibt nichts, Übernehmen alles auf einmal. Online nie Stationen."),
 
     # ---------- Matches lesen ----------
     _c("match.read", "Match ansehen",
@@ -171,6 +175,11 @@ CAPABILITIES: tuple[Capability, ...] = (
     _c("lead.read", "Turnierleitung am Handy",
        ["GET /api/tournaments/{tid}/lead"], [GRAPH],
        note="#1156: offene Spiele für die Turnierleitung des Turniers - zuerst, was fehlt, dann nach Station."),
+    _c("structure.heat_rebuild", "FFA-Läufe zusammenlegen, ausgleichen, abkürzen",
+       ["POST /api/tournaments/{tid}/heat-rebuild/check", "POST /api/tournaments/{tid}/heat-rebuild/confirm",
+        "POST /api/tournaments/{tid}/heat-rebuild/reject"], [GRAPH],
+       note="#1550: Prüfung läuft nach Baubau und Ergebnis von selbst; im Modus „Vorschlag“ bestätigt oder lehnt "
+            "die Turnierleitung hier ab."),
     _c("structure.redraw", "Gegner der nächsten Runde neu auslosen",
        ["POST /api/tournaments/{tid}/stages/{stage_id}/redraw"], [GRAPH],
        note="#1548: gemischt lost der Server nach jeder fertigen Runde von selbst aus; die Turnierleitung lost eine "

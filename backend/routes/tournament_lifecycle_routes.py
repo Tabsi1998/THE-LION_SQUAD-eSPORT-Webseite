@@ -15,6 +15,7 @@ from services.tournament_permissions import (
 from services.custom_bracket import BracketSchemaError, build_matches_v2_from_schema
 from services.draw_records import record_build_draws
 from services.competition_read import load_competition_read_model, observe_structure_read
+from services.heat_rebuild import evaluate_after_write
 from services.competition_standings import placement_rows_for_structure
 from services.competition_versions import persist_competition_versions
 from services.tv_display import ROUND_SPONSOR_MAX, pause_until_value, round_sponsor_rows
@@ -117,6 +118,8 @@ async def _finalize_stage_previews_for_checkin(db, tournament: dict, actor_id: s
             "participant_count": len(registrations),
         },
     )
+    # Unterbesetzte Läufe (#1550): gleich nach dem Bau prüfen - zusammenlegen, ausgleichen, abkürzen (oder vorschlagen).
+    await evaluate_after_write(db, tid, actor_id=actor_id, trigger="checkin")
     return {
         "ok": True,
         "engine": "stages",

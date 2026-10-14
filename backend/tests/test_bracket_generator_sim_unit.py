@@ -426,3 +426,68 @@ def test_walkover_chain_runs_linear_over_long_cascades():
     """Eine lange Freilos-Kette (2 Spieler in einem 64er-Baum) läuft in einem Durchgang durch."""
     matches = build(2, "single_elimination", tournament={"max_participants": 64})
     assert all(m["status"] in TERMINAL | {"ready"} for m in matches)
+
+
+# ---------------------------------------------------------------------------------------------- Ausfälle (#1550)
+
+def _rebuild(matches: list[dict], stage: dict) -> None:
+    from services.heat_rebuild import rebuild_heats, stage_heat_rules
+    rebuild_heats(matches, now_iso=NOW, **stage_heat_rules(stage, matches))
+
+
+def _withdraw(match: dict, registration_id: str) -> None:
+    """Ein Ausfall vor dem Start (#1553 ruft später dieselbe Funktion): der Platz wird frei."""
+    for slot in match["slots"]:
+        if slot.get("registration_id") == registration_id:
+            slot.update({"registration_id": None, "user_id": None, "status": "bye"})
+
+
+@pytest.mark.parametrize("match_size,qualifiers", [(3, 1), (4, 2), (8, 2)])
+@pytest.mark.parametrize("count", range(3, 41))
+def test_ffa_bracket_survives_random_dropouts_after_round_one(count: int, match_size: int, qualifiers: int):
+    """Nach Runde 1 fallen zufällig Fahrer aus (Wertung „nicht erschienen“ und Ausfall vor dem Start): der Planer legt
+    zusammen, gleicht aus und kürzt ab - das Finale ist immer erreichbar, kein gespielter Lauf hat weniger als 2,
+    das Finale nie mehr als die Laufgröße."""
+    rng = random.Random(count * 1000 + match_size * 10 + qualifiers)
+    stage = {"id": "s", "number": 1, "stage_type": "ffa_custom_bracket", "match_type": "ffa",
+             "settings": {"match_size": match_size, "qualifiers_per_match": qualifiers, "min_players": 2}}
+    base = {"id": "t", "seeding_mode": "manual", "max_participants": count}
+    matches = build_matches_v2_from_schema(base, stage, registrations(count))
+    _rebuild(matches, stage)
+    withdrawn: set[str] = set()
+    for _ in range(10_000):
+        ready = [match for match in matches if match["status"] == "ready"]
+        if not ready:
+            break
+        alive = {reg for m in matches if m["status"] not in TERMINAL for reg in filled_ids(m)}
+        later = [m for m in ready if m["round"] >= 2 and len(filled_ids(m)) >= 2]
+        if later and len(alive) > 2 and rng.random() < 0.3:
+            victim_match = rng.choice(later)
+            _withdraw(victim_match, rng.choice(filled_ids(victim_match)))
+            victim_match["status"] = "ready" if len(filled_ids(victim_match)) >= 2 else "pending"
+            _rebuild(matches, stage)
+            assert_nobody_twice_ready(matches)
+            continue
+        match = rng.choice(ready)
+        ranking = filled_ids(match)
+        rng.shuffle(ranking)
+        raw = [{"registration_id": reg, "rank": index + 1, "forfeit": index == len(ranking) - 1 and rng.random() < 0.3}
+               for index, reg in enumerate(ranking)]
+        application = build_v2_result_application(match, matches, raw, actor_id="staff", now_iso=NOW)
+        match.update(application["match_set"])
+        by_id = {row["id"]: row for row in matches}
+        for target_id, update in application["target_sets"].items():
+            by_id[target_id].update(update)
+        _rebuild(matches, stage)
+        assert_nobody_twice_ready(matches)
+        withdrawn |= {row["registration_id"] for row in match["results"] if row.get("forfeit")}
+    assert all(m["status"] in TERMINAL for m in matches), [m["match_key"] for m in matches if m["status"] not in TERMINAL]
+    finals = [m for m in matches if m["status"] == "completed" and not m.get("advancement")]
+    assert len(finals) == 1, f"genau ein Finale: {[m['match_key'] for m in finals]}"
+    assert len(finals[0]["results"]) <= match_size
+    for match in matches:
+        if match["status"] == "completed" and (match.get("result_meta") or {}).get("source") != "auto_bye":
+            assert len(match["results"]) >= 2, f"{match['match_key']} wurde mit {len(match['results'])} gespielt"
+        if match["status"] not in TERMINAL:
+            continue
+        assert len(match["slots"]) <= match_size + 2, f"{match['match_key']} hat {len(match['slots'])} Plätze"

@@ -846,7 +846,7 @@ async def decide_schedule_proposal(match_id: str, proposal_id: str, body: MatchS
     await db.match_schedule_proposals.insert_one(counter)
     await getattr(db, collection).update_one({"id": match_id}, {"$set": {
         "schedule_status": "proposed",
-        "schedule_deadline_at": _schedule_deadline(match),
+        "schedule_deadline_at": _schedule_deadline(match, tournament),
         "updated_at": now_iso,
     }})
     counter.pop("_id", None)

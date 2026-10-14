@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.6.1 - 2026-10-14
+
+- Mobile: Anmelden: Hast du die Zwei-Faktor-App nicht zur Hand, tippst du einen Wiederherstellungscode in ein eigenes Feld mit voller Tastatur ein. Die Zwei-Faktor-Abfrage brichst du mit „Abbrechen und neu anmelden“ ab, ohne die App neu zu starten. Die neue Seite „Hilfe beim Anmelden“ schickt dir bei „Passwort vergessen?“ oder fehlender Bestätigungs-Mail den Link per E-Mail (#995, #996).
+- Mobile: Einwilligungen: In „Meine Mitgliedschaft“ siehst du, wozu du zugestimmt hast, liest die Texte samt der Fassung, der du zugestimmt hast, und erteilst oder widerrufst deine Einwilligungen selbst (#1537).
+- Mobile: Einlass: Die Kamera läuft nur, solange der Einlass vorne ist, und prüft beim Zurückkommen das Kamerarecht neu. Scannen mehrere Handys, stimmen „anwesend“ und „beschlussfähig“ nach spätestens 10 Sekunden auf allen. Wechselst du die Versammlung, landet ein später Scan nicht in der falschen (#1056, #1063, #1064).
+- Mobile: Kalender: Termine stehen immer in Wiener Zeit – im Raster, in den Balken und bei „In meinen Kalender“, auch wenn du im Ausland bist (#1062).
+- Mobile: Mehr Schutz für Dateien: Bilder, Dokumente und Belege lädt die App nur mit Anmeldung und nur vom Vereinsserver. Beim Abmelden oder Kontowechsel werden heruntergeladene Dateien gelöscht (#1054, #1057, #1059, #1060).
+
 ## 1.6.0 - 2026-10-13
 
 - Mobile: Events mit ihren Turnieren: Im Tab Events und auf der Startseite ist ein Event eine Karte, seine Turniere und Fast Laps klappen darunter auf. Mit „Nur meine“ siehst du in Liste und Kalender nur das, wofür du oder dein Team angemeldet seid (#1182, #1189).

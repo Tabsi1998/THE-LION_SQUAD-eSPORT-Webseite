@@ -535,6 +535,93 @@ test("an ein Spiel gebundener Ergebnisdienst: Ergebnis-Knopf nur bei seinem Spie
   expect(screen.queryByTestId("matchplan-result-m-other")).toBeNull();
 });
 
+// Spielplaner (#1552): kein stilles Mitlaufen mehr. „Planen“ zeigt die Vorschau, „Übernehmen“ schreibt alles
+// auf einmal - und ein Statuswechsel plant nichts nebenbei.
+function renderPageWithStation() {
+  apiMock.get.mockImplementation((url) => {
+    const path = String(url);
+    if (path.includes("/stations")) return Promise.resolve({ data: [{ id: "st-1", name: "1", device_type: "switch2", status: "free" }] });
+    return Promise.resolve(routeFor(path));
+  });
+  return renderPage();
+}
+
+test("ein Statuswechsel plant keine Stationen mehr nebenbei", async () => {
+  const user = userEvent.setup();
+  apiMock.post.mockImplementation((url) => {
+    if (String(url).includes("/status")) return Promise.resolve({ data: { status: "check_in", auto_generated_bracket: { ok: true, match_count: 3 } } });
+    return Promise.resolve({ data: {} });
+  });
+  renderPageWithStation();
+  await screen.findByRole("heading", { name: "Winter Cup 2026" });
+  apiMock.post.mockClear();
+
+  await user.selectOptions(screen.getByTestId("admin-tr-status-select"), "check_in");
+
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith(expect.stringContaining("/status"), expect.anything()));
+  const urls = apiMock.post.mock.calls.map(([url]) => String(url));
+  expect(urls.some((url) => url.includes("auto-assign") || url.includes("/schedule/"))).toBe(false);
+});
+
+test("„Planen“ zeigt die Vorschau und schreibt erst nach „Übernehmen“", async () => {
+  const user = userEvent.setup();
+  apiMock.post.mockImplementation((url) => {
+    if (String(url).includes("/schedule/plan")) {
+      return Promise.resolve({ data: {
+        mode: "stations", fingerprint: "abc123", planned_at: "2026-10-31T09:58:00+00:00",
+        assignments: [
+          { match_id: "m1", label: "A1", scheduled_at: "2026-10-31T10:00:00+00:00", station_name: "1", forecast: false, changed: true },
+          { match_id: "m2", label: "F", scheduled_at: "2026-10-31T10:35:00+00:00", station_name: "1", forecast: true, changed: true },
+        ],
+        warnings: [{ type: "too_early", severity: "error", match_id: "m3", message: "B1 ist fest um 10:00 UTC, aber A1 ist erst um 10:30 UTC vorbei." }],
+      } });
+    }
+    if (String(url).includes("/schedule/apply")) return Promise.resolve({ data: { written: 2, warnings: [] } });
+    return Promise.resolve({ data: {} });
+  });
+  renderPageWithStation();
+  await screen.findByRole("heading", { name: "Winter Cup 2026" });
+  const tools = screen.getByTestId("admin-tr-tools");
+  await user.click(tools.querySelector("summary"));
+  expect(screen.queryByTestId("admin-tr-auto-stations")).not.toBeInTheDocument();
+
+  await user.click(screen.getByTestId("admin-tr-plan-schedule"));
+
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith(expect.stringContaining("/tournaments/t-1/schedule/plan")));
+  const dialog = await screen.findByRole("dialog");
+  expect(dialog).toHaveTextContent("2 Spiele");
+  expect(dialog).toHaveTextContent("1 Konflikt");
+  expect(dialog).toHaveTextContent("B1 ist fest um 10:00 UTC");
+  expect(dialog).toHaveTextContent("voraussichtlich");
+  expect(apiMock.post.mock.calls.some(([url]) => String(url).includes("/schedule/apply"))).toBe(false);
+
+  await user.click(screen.getByRole("button", { name: "Übernehmen" }));
+
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith(
+    expect.stringContaining("/tournaments/t-1/schedule/apply"),
+    expect.objectContaining({ fingerprint: "abc123", planned_at: "2026-10-31T09:58:00+00:00" })
+  ));
+});
+
+test("ein Online-Turnier bekommt beim Planen keine Stationen, nur den Hinweis", async () => {
+  const user = userEvent.setup();
+  apiMock.post.mockImplementation((url) => {
+    if (String(url).includes("/schedule/plan")) {
+      return Promise.resolve({ data: { mode: "none", reason: "Online-Turnier: Termine werden abgestimmt, Stationen gibt es nur vor Ort.", fingerprint: "x", assignments: [], warnings: [] } });
+    }
+    return Promise.resolve({ data: {} });
+  });
+  renderPageWithStation();
+  await screen.findByRole("heading", { name: "Winter Cup 2026" });
+  await user.click(screen.getByTestId("admin-tr-tools").querySelector("summary"));
+
+  await user.click(screen.getByTestId("admin-tr-plan-schedule"));
+
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith(expect.stringContaining("/schedule/plan")));
+  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  expect(apiMock.post.mock.calls.some(([url]) => String(url).includes("/schedule/apply"))).toBe(false);
+});
+
 // Grand Final (#1549): im Bearbeiten-Formular nur beim Doppel-K.-o., mit dem gespeicherten Wert.
 test("Bearbeiten: Grand Final nur beim Doppel-K.-o., gespeicherter Wert vorbelegt", async () => {
   const user = userEvent.setup();
@@ -550,6 +637,25 @@ test("Bearbeiten: Grand Final nur beim Doppel-K.-o., gespeicherter Wert vorbeleg
   await user.click(screen.getByTestId("tr-edit-save"));
   await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/tournaments/t-1", expect.objectContaining({ grand_final_mode: "reset" })));
 });
+
+// Läufe umbauen (#1550): die Einstellung nur beim FFA-Turnierbaum; der offene Vorschlag steht als Leiste über den
+// Reitern, solange die Turnierleitung Struktur-Recht hat.
+test("Bearbeiten: „Läufe umbauen“ nur beim FFA-Turnierbaum, und der Vorschlag steht als Leiste da", async () => {
+  const user = userEvent.setup();
+  const plan = { id: "plan-1", summary: "Runde 1: Läufe C und D (2 + 2) werden zusammengelegt zu C mit 4.", ops: [{ kind: "merged", text: "Runde 1: Läufe C und D (2 + 2) werden zusammengelegt zu C mit 4." }] };
+  apiMock.get.mockImplementation((url) => Promise.resolve(String(url).includes("/tournaments/t-1") && !String(url).includes("/t-1/")
+    ? { data: { ...TOURNAMENT, format: "ffa_custom_bracket", heat_rebuild_mode: "auto", heat_rebuild_plan: plan, can_manage_structure: true } }
+    : routeFor(String(url))));
+  renderPage();
+  await screen.findByRole("heading", { name: "Winter Cup 2026" });
+  expect(screen.getByTestId("admin-tr-heat-rebuild")).toHaveTextContent("zusammengelegt zu C mit 4");
+  await user.click(screen.getByTestId("admin-tr-tab-edit"));
+  const select = await screen.findByTestId("tr-edit-heat-rebuild");
+  expect(select).toHaveValue("auto");
+  expect(screen.queryByTestId("tr-edit-grand-final")).not.toBeInTheDocument();
+  await user.selectOptions(select, "suggest");
+  await user.click(screen.getByTestId("tr-edit-save"));
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/tournaments/t-1", expect.objectContaining({ heat_rebuild_mode: "suggest" })));
 
 // Gegner der nächsten Runde (#1548): Auswahl statt Haken, gespeicherter Wert vorbelegt, geht als Ja/Nein mit.
 test("Bearbeiten: Gegner der nächsten Runde – fester Baum oder zufällig mischen", async () => {

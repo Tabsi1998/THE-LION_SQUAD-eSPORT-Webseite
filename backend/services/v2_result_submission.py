@@ -282,6 +282,10 @@ async def submit_v2_result(
         await _close_disputes(db, match, actor_id, now_iso)
     updated = await db.matches_v2.find_one({"id": match["id"]}, {"_id": 0})
     await _finish_result_side_effects(db, updated, force, dispute_resolved=dispute_resolved)
+    # Unterbesetzte Läufe (#1550): jedes Ergebnis - auch Korrektur, Wertung und Freilos-Kette - ändert, was die
+    # Folgeläufe erwarten; der Aufrufer hält die Turnier-Schreibsperre.
+    from services.heat_rebuild import evaluate_after_write
+    await evaluate_after_write(db, match.get("tournament_id"), actor_id=actor_id, trigger="result")
     return {
         "ok": True,
         "match": updated,

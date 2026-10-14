@@ -107,6 +107,18 @@ async def _safe_tournament_reminders():
         _log_task_failure("tournament_reminders", exc)
 
 
+async def _safe_heat_rebuilds():
+    """Lauf-Umbau (#1550): eingereihte Auswertungen nach einem Konflikt nachholen."""
+    try:
+        from database import get_db
+        from services.heat_rebuild import process_pending_heat_rebuilds
+        processed = await process_pending_heat_rebuilds(get_db())
+        if processed:
+            logger.info(f"[scheduler] heat_rebuilds processed={processed}")
+    except Exception as exc:
+        _log_task_failure("heat_rebuilds", exc)
+
+
 async def _safe_scheduled_news():
     try:
         from services.news_publish import finalize_due_news
@@ -945,6 +957,8 @@ def start_scheduler() -> AsyncIOScheduler:
                   max_instances=1, coalesce=True)
     sched.add_job(_single_replica("tournament_reminders", _safe_tournament_reminders), IntervalTrigger(seconds=60), id="tournament_reminders",
                   max_instances=1, coalesce=True)
+    sched.add_job(_single_replica("heat_rebuilds", _safe_heat_rebuilds), IntervalTrigger(seconds=60), id="heat_rebuilds",
+                  replace_existing=True)
     sched.add_job(_single_replica("scheduled_news", _safe_scheduled_news), IntervalTrigger(seconds=60), id="scheduled_news",
                   max_instances=1, coalesce=True)
     sched.add_job(_single_replica("prize_expiry", _safe_prize_expiry), IntervalTrigger(minutes=60), id="prize_expiry",
@@ -986,7 +1000,8 @@ def start_scheduler() -> AsyncIOScheduler:
                   max_instances=1, coalesce=True)
     sched.add_job(_single_replica("billing_orders", _safe_billing_orders), IntervalTrigger(seconds=120), id="billing_orders",
                   max_instances=1, coalesce=True)
-    # Geltende Spieltag-Termine in die Partien schreiben (#235): abgelaufene Fristen, neue Partien.
+    # Liga-Modus des Spielplaners (#235, #1552): geltende Spieltag-Termine online in Wiener Zeit schreiben,
+    # abgelaufene Antwortfristen an die Turnierleitung melden. Vor Ort plant der Planer über „Planen“.
     sched.add_job(_single_replica("matchday_schedule", _safe_matchday_schedule), IntervalTrigger(minutes=15), id="matchday_schedule",
                   max_instances=1, coalesce=True)
     sched.add_job(_single_replica("billing_sync", _safe_billing_sync), IntervalTrigger(minutes=10), id="billing_sync",

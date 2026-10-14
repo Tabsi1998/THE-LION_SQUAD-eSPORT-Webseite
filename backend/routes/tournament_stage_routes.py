@@ -15,6 +15,7 @@ from services.tournament_permissions import (
 from services.custom_bracket import BracketSchemaError, build_matches_v2_from_schema
 from services.competition_versions import persist_competition_versions
 from services.draw_records import record_build_draws, record_draws
+from services.heat_rebuild import evaluate_after_write
 from services.match_v2_results import (
     MatchV2ResultError,
     build_league_redraw_application,
@@ -246,6 +247,7 @@ async def recalculate_tournament_matches_v2_advancement(tid: str, stage_id: str 
             "error_count": len(errors),
         },
     )
+    await evaluate_after_write(db, tid, actor_id=me.get("id"), trigger="recalculate")
     return {
         "ok": not errors,
         "source_match_count": len(completed),
@@ -320,6 +322,9 @@ async def generate_tournament_stage_matches(tid: str, stage_id: str, force: bool
             "match_type": stage.get("match_type"),
         },
     )
+    if not preview:
+        # Unterbesetzte Läufe (#1550): nach jedem Bau prüfen.
+        await evaluate_after_write(db, tid, actor_id=me.get("id"), trigger="generate")
     return {"ok": True, "stage_id": stage_id, "match_count": len(matches), "preview": preview}
 
 

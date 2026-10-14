@@ -139,6 +139,14 @@ export function leagueRedrawAllowed(stage, matches = []) {
   if (!rows.length || !rows.some((match) => match.settings?.randomize_advancement_rounds)) return false;
   return !rows.some(drawStarted);
 }
+// Läufe umbauen (#1550, Entscheidung E13): unterbesetzte Läufe zusammenlegen, ausgleichen, abkürzen - als Vorschlag
+// für die Turnierleitung (Vorgabe) oder automatisch. Auffüllen und Freilos laufen immer von selbst.
+export const HEAT_REBUILD_FORMATS = new Set(["ffa_custom_bracket"]);
+export const HEAT_REBUILD_OPTIONS = [
+  ["suggest", "Vorschlag (Standard): Die Turnierleitung bestätigt Zusammenlegen, Ausgleichen und Abkürzen mit einem Klick"],
+  ["auto", "Automatisch: Läufe werden ohne Rückfrage zusammengelegt, ausgeglichen und abgekürzt"],
+];
+export const HEAT_REBUILD_HINT = "Ist das Turnier nicht voll oder fallen Fahrer aus, werden unterbesetzte Läufe zusammengelegt (2 + 2 wird ein Lauf mit 4). Laufende und aufgerufene Läufe bleiben unangetastet.";
 // Nur diese Formate spielen in Wochen; ein K.-o.-Baum hat Runden, keine Woche.
 // Muss zu MATCHDAY_FORMATS in services/matchday_schedule.py passen.
 

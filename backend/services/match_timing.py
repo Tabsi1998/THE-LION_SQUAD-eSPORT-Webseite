@@ -7,12 +7,14 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 
+from services.match_duration import DEFAULT_MATCH_DURATION_MINUTES, effective_match_duration
+
 # Spiele, für die ein Ergebnis eingetragen werden kann - sobald beide Seiten feststehen.
 OPEN_STATUSES = {"pending", "ready", "scheduled", "in_progress", "running", "waiting_result", "disputed"}
 RUNNING_STATUSES = {"in_progress", "running", "waiting_result"}
 # „Ergebnis fehlt“: geplante Zeit plus Dauer plus diese Minuten vorbei (#1160).
 MISSING_AFTER_MINUTES = 5
-DEFAULT_DURATION_MINUTES = 30
+DEFAULT_DURATION_MINUTES = DEFAULT_MATCH_DURATION_MINUTES
 
 
 def _parse(value) -> datetime | None:
@@ -43,10 +45,8 @@ def registration_name(registration: dict | None) -> str:
     return (registration or {}).get("display_name") or (registration or {}).get("ingame_name") or (registration or {}).get("team_name") or "Teilnehmer"
 
 
-def duration_minutes(match: dict, tournament: dict | None) -> int:
-    value = match.get("duration_minutes") or (match.get("settings") or {}).get("duration_minutes") \
-        or (tournament or {}).get("match_duration_minutes") or DEFAULT_DURATION_MINUTES
-    return max(1, as_int(value, DEFAULT_DURATION_MINUTES))
+def duration_minutes(match: dict, tournament: dict | None, stage: dict | None = None) -> int:
+    return effective_match_duration(match, stage=stage, tournament=tournament)
 
 
 def timing(match: dict, tournament: dict | None, now: datetime) -> dict:
