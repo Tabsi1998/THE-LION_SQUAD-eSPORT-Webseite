@@ -33,6 +33,7 @@ import { formatCents, previewQuote, startFeeSummary } from "@/lib/pricing";
 import { TournamentTabs } from "@/components/tls/tournament/TournamentTabs";
 import { TournamentTimeline, countdownText, timelineSteps } from "@/components/tls/tournament/TournamentTimeline";
 import { MyStandCard } from "@/components/tls/tournament/MyStandCard";
+import { OnsiteTournamentView } from "@/components/tls/tournament/OnsiteTournamentView";
 import { FriendsAtEvent } from "@/components/tls/FriendsAtEvent";
 import { offerFriendsHint } from "@/lib/friendsHint";
 import { useCanonicalSlugRedirect } from "@/hooks/useCanonicalSlugRedirect";
@@ -80,6 +81,17 @@ function TournamentDetailView() {
   const load = useCallback(async () => {
     const accessConfig = { params: accessToken ? { access: accessToken } : undefined };
     const { data } = await api.get(`/tournaments/${slug}`, accessConfig);
+    if (data?.onsite_view) {
+      // Vor-Ort-Zugang (#1592): nur die schlanke Ansicht - Teilnehmerliste, Baum und Tabelle gibt es erst nach der
+      // Anmeldung. Die eigenen Teams braucht die Team-Anmeldung.
+      const teamsResponse = user ? await api.get("/teams/my").catch(() => ({ data: [] })) : { data: [] };
+      setT(data);
+      setRegs([]);
+      setStandings([]);
+      setMyTeams(teamsResponse.data || []);
+      setMyReg(null);
+      return;
+    }
     setT(data);
     const [{ data: r }, teamsResponse] = await Promise.all([
       api.get(`/tournaments/${data.id}/registrations`, accessConfig),
@@ -183,6 +195,24 @@ function TournamentDetailView() {
   };
 
   if (!t) return <PublicLayout><PublicLoadingState label="Lade Turnier" /></PublicLayout>;
+  if (t.onsite_view) {
+    return (
+      <PublicLayout>
+        <OnsiteTournamentView tournament={t} user={user} loading={loading} error={registerModal ? "" : actionError} onRegister={handleRegister} />
+        {registerModal && (
+          <RegistrationModal
+            tournament={t}
+            user={user}
+            myTeams={myTeams}
+            loading={loading}
+            error={actionError}
+            onClose={() => setRegisterModal(false)}
+            onSubmit={submitRegistration}
+          />
+        )}
+      </PublicLayout>
+    );
+  }
 
   const registration = getRegistrationState(t, "Anmeldung");
   const isTeamTournament = (t.team_mode || "solo") !== "solo";

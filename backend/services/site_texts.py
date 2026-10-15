@@ -325,7 +325,7 @@ def privacy_page(legal: dict, facts: dict) -> dict:
                 info([("Hosting / Betrieb", (f.get("hosting") or {}).get("provider")), ("Hosting-Region", (f.get("hosting") or {}).get("country"))])),
         section("cookies", "Cookies, Statistik und lokale Speicherung",
                 p("Die Plattform verwendet technisch notwendige Cookies und lokale Speichermechanismen für Login, Session, Refresh-Token, "
-                  "CSRF-Schutz und grundlegende Bedienfunktionen. Ohne diese Funktionen sind geschützte Bereiche nicht nutzbar. Tracking- oder "
+                  "CSRF-Schutz, den Vor-Ort-Zugang zu einem Turnier und grundlegende Bedienfunktionen. Ohne diese Funktionen sind geschützte Bereiche nicht nutzbar. Tracking- oder "
                   "Marketing-Cookies sind für den Betrieb dieser Plattform nicht erforderlich."),
                 p(analytics_text(str(f.get("analytics") or "")), "privacy-analytics")),
         section("recipients", "Empfänger und Auftragsverarbeiter",

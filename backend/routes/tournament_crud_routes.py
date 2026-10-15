@@ -2,7 +2,7 @@
 """
 import hashlib
 import json
-from fastapi import HTTPException, Depends
+from fastapi import HTTPException, Depends, Request
 from fastapi.responses import RedirectResponse
 from urllib.parse import quote, urlencode
 from pymongo.errors import DuplicateKeyError
@@ -41,13 +41,13 @@ from routes.tournament_common import (
     _create_initial_stage_bracket_preview,
     _enrich_game_identity,
     _ensure_tournament_unlocked,
-    _is_tournament_staff,
     _normalize_team_settings,
     _resolve_tid,
     _serialized_tournament_write,
-    _user_participates_in_tournament,
     _user_tournament_participation_ids,
+    tournament_hidden_reason,
 )
+from services import onsite_access
 from routes.tournament_router import router
 
 
@@ -208,26 +208,28 @@ async def list_tournaments(status: str | None = None, game_id: str | None = None
 
 
 @router.get("/{slug_or_id}")
-async def get_tournament(slug_or_id: str, include_draft: bool = False, access: str | None = None, user=Depends(get_optional_user)):
+async def get_tournament(slug_or_id: str, include_draft: bool = False, access: str | None = None,
+                         user=Depends(get_optional_user), request: Request = None):
     db = get_db()
     t, was_old_slug = await find_by_slug_or_history(db.tournaments, slug_or_id, {"_id": 0})
     if not t:
         raise HTTPException(status_code=404, detail="Turnier nicht gefunden")
     is_admin = is_confirmed_tournament_lead(user)
-    is_assigned = await _is_tournament_staff(t["id"], user)
-    is_participant = await _user_participates_in_tournament(db, t["id"], user)
     access_link = await validate_access_link(db, access, "tournament", t["id"], user, "view")
-    has_access = bool(access_link)
-    if t.get("status") == "draft" and not (is_admin or is_assigned or has_access):
+    hidden = None if access_link else await tournament_hidden_reason(db, t, user)
+    # Vor-Ort-Zugang (#1592): wer sonst nichts sieht, aber den QR-Code eingelöst hat, bekommt die schlanke Ansicht.
+    onsite_only = bool(hidden) and await onsite_access.has_pass(db, request, t)
+    if hidden == 404 and not onsite_only:
         raise HTTPException(status_code=404, detail="Turnier nicht gefunden")
-    if not (is_admin or is_assigned or is_participant or has_access) and t.get("is_public") is False:
-        raise HTTPException(status_code=404, detail="Turnier nicht gefunden")
-    if not (is_admin or is_assigned or is_participant or has_access) and not await user_can_see(user, t.get("visibility") or "public"):
+    if hidden and not onsite_only:
         raise HTTPException(status_code=403, detail="Turnier ist nicht sichtbar")
     if was_old_slug and t.get("slug"):
         suffix = f"?{urlencode({'access': access})}" if access else ""
         return RedirectResponse(url=f"/api/tournaments/{quote(str(t['slug']), safe='')}{suffix}", status_code=301)
     await _enrich_tournament(t, user)
+    if onsite_only:
+        _expose_offer(t, False)
+        return onsite_access.slim_view(t)
     # Was die Person hier darf (#1353): die Verwaltung zeigt Knöpfe nur nach diesen Feldern.
     t.update(await tournament_rights(user, t["id"]))
     if not t.get("can_manage_structure"):
@@ -261,6 +263,9 @@ async def get_tournament(slug_or_id: str, include_draft: bool = False, access: s
     # Turnier nur mit Event-Anmeldung (#875): die Seite zeigt den Weg über das Event, bevor jemand scheitert.
     from services import tournament_event_gate
     t["event_gate"] = await tournament_event_gate.viewer_state(db, t, user)
+    if not is_admin:
+        # Das Event als Klammer nur, wenn die Person es sehen darf (#1473) - auch für Teilnehmende ohne Mitgliedschaft.
+        await hide_unseen_event_links(db, user, [t])
     return t
 
 

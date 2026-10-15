@@ -28,6 +28,7 @@ _FACHMODULE = (
     "tournament_live_routes",
     "tournament_heat_routes",
     "tournament_removal_routes",
+    "tournament_onsite_routes",
 )
 for _name in _FACHMODULE:
     importlib.import_module(f"routes.{_name}")

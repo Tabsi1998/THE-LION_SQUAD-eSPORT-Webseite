@@ -204,6 +204,26 @@ verbindlichen Teilnahme: Warteliste kostet nichts. Alles Weitere steht in [Abrec
 - Oben im Turnier: Downloads **PDF Teilnehmer**, **PDF Check-in**, **PDF Anmeldung QR** (zum Aufhängen), **PDF Spiele**
   und **CSV Matchplan**.
 - Mit **Speziallinks** (Kasten oben, nur Turnierleitung) schickt ihr einzelnen Personen einen Link, der anmelden darf.
+- Anmeldungen über den Vor-Ort-Zugang tragen in der Liste das Zeichen **Vor Ort**.
+
+**Vor-Ort-Anmeldung über QR (auch für Nicht-Mitglieder):** Bei Turnieren mit **Nur Mitglieder**, **Community** oder
+**Intern** können vor Ort trotzdem Begleitpersonen oder Gäste mitspielen – über den QR-Code am TV oder am Aushang.
+
+- Der Kasten **Vor-Ort-Anmeldung über QR** oben im Turnier (nur Turnierleitung) zeigt, ob der Zugang an ist und für
+  welches Zeitfenster er gilt. Vorgabe: **an** bei Turnieren **Vor Ort** und **Hybrid**, **aus** bei **Online**.
+  **Abschalten** bzw. **Einschalten** ändert das.
+- Gültig ist der Zugang ab **Anmeldung öffnet** bzw. **Check-in ab** (das Frühere) bis zum Turnierende, nur solange
+  das Turnier zwischen **Anmeldung offen** und **Pausiert** steht. Davor und danach gilt wieder die normale
+  Sichtbarkeit – auch für einen weitergeleiteten Link.
+- **Aushang drucken** öffnet ein A4-Blatt mit Turnier, Termin, Spiel und großem QR-Code. Der TV zeigt im
+  Anmelde-Bildschirm denselben QR-Code, solange der Zugang gilt.
+- **Neuer Code** macht den alten QR-Code und alle damit schon geöffneten Zugänge sofort ungültig – etwa, wenn ein Foto
+  des Aushangs herumgeht. Danach den Aushang neu drucken; der TV zeigt den neuen Code von selbst.
+- Wer scannt, sieht eine schlanke Turnierseite (Titel, Termin, Spiel, freie Plätze, **Mitspielen**). Ohne Konto geht es
+  über Anmelden oder Registrieren und danach zurück zum Turnier. Regeln, Datenschutz, Fristen, Plätze und Warteliste
+  gelten wie immer.
+- Nach der Anmeldung sieht die Person das ganze Turnier – Baum, Spielplan, eigene Spiele, Ergebnis melden –, aber
+  nichts anderes aus dem Mitgliederbereich. Meldet sie sich ab, ist das Turnier wieder verborgen.
 
 ### 3.4 Check-in und der Wechsel zum festen Baum
 
@@ -548,6 +568,8 @@ Im Turnier dann **Matchdauer** leer lassen: dort steht „vom Spiel: 15 Min. (Gr
 | „Nur eine Seite kann ‚Nicht erschienen‘ oder ‚Aufgegeben‘ haben.“ | Beide Schalter gesetzt | Einen davon aus |
 | Turnier ist gesperrt, nichts lässt sich ändern | **Sperren** nach dem Ende | **Entsperren** in den Werkzeugen |
 | „Turnierleitung darf nur operative Status setzen“ | Ein Helfer wollte einen anderen Status | Statuswechsel macht die Turnierleitung |
+| „Dieser Vor-Ort-Code gilt nicht (mehr)“ nach dem Scannen | Zugang abgeschaltet, erneuert oder außerhalb des Zeitfensters | Kasten **Vor-Ort-Anmeldung über QR** prüfen; nach **Neuer Code** den Aushang neu drucken |
+| Gast hat sich registriert, sieht das Turnier aber nicht („nicht sichtbar“) | Die Bestätigungs-Mail wurde in einem anderen Browser geöffnet (etwa in der Mail-App) – dort fehlt der Vor-Ort-Zugang | Im Browser angemeldet bleiben und den QR-Code dort **neu scannen** |
 | Dashboard zeigt „Turnier-Anmeldungen: warten auf Freigabe“ | Von Hand eingetragene Anmeldungen mit Status **Ausstehend** | Im Reiter Teilnehmer auf **Bestätigt** setzen |
 
 ---

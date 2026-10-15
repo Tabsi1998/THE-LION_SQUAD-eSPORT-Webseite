@@ -2,7 +2,7 @@
 """
 import logging
 
-from fastapi import HTTPException, Depends
+from fastapi import HTTPException, Depends, Request
 from datetime import datetime, timezone
 from pymongo.errors import DuplicateKeyError
 from database import get_db
@@ -33,7 +33,7 @@ from services.competition_versions import persist_competition_versions
 from services.heat_rebuild import evaluate_after_write
 from services.mutation_lock import MutationLockBusy, mutation_lock, tournament_write_resource
 from models import RegistrationCreate, RegistrationUpdate, RegistrationAdminCreate, now_utc, new_id
-from services import tournament_event_gate, tournament_fees
+from services import onsite_access, tournament_event_gate, tournament_fees
 from services.query_filters import safe_regex
 from services.private_fields import private_projection
 from routes.tournament_common import (
@@ -604,7 +604,8 @@ async def _create_self_registration(db, tid: str, tournament: dict, body: Regist
 @router.post("/{tid}/register")
 async def register_for_tournament(tid: str, body: RegistrationCreate,
                                    access: str | None = None,
-                                   me: dict = Depends(get_current_user)):
+                                   me: dict = Depends(get_current_user),
+                                   request: Request = None):
     db = get_db()
     tid = await _resolve_tid(tid)
     t = await db.tournaments.find_one({"id": tid}, {"_id": 0})
@@ -613,11 +614,13 @@ async def register_for_tournament(tid: str, body: RegistrationCreate,
     view_access = await validate_access_link(db, access, "tournament", tid, me, "view")
     register_access = await validate_access_link(db, access, "tournament", tid, me, "register")
     has_access = bool(view_access or register_access)
-    if not has_access:
+    # Vor-Ort-Zugang (#1592): öffnet die Anmeldung auch ohne Sichtbarkeit; die Leitung sieht „vor Ort“.
+    onsite = await onsite_access.has_pass(db, request, t)
+    if not has_access and not onsite:
         t = await _get_visible_tournament(tid, me)
     elif t.get("status") == "draft" and not register_access:
         raise HTTPException(status_code=404, detail="Turnier nicht gefunden")
-    return await self_register(db, t, body, me, register_access, via="web")
+    return await self_register(db, t, body, me, register_access, via="onsite" if onsite else "web")
 
 
 async def self_register(db, t: dict, body: RegistrationCreate, me: dict, register_access: dict | None, *, via: str = "web") -> dict:

@@ -19,6 +19,12 @@
   es unter Privatsphäre selbst ab („Freunde sehen, wo ich angemeldet bin“); mit Geburtsdatum unter 14 Jahren ist es von
   Anfang an aus. Nach der ersten Anmeldung kommt einmal ein Hinweis mit „Ausschalten“. Die Antworten tragen
   `Cache-Control: private, no-store`, die App speichert sie nicht zwischen (`backend/services/event_friends.py`).
+- Vor-Ort-Zugang zu Turnieren (#1592): Der QR-Code auf TV und Aushang trägt einen Code hinter dem `#` – er erreicht
+  keinen Server-Log, keinen Referrer und keine Statistik; die Seite entfernt ihn sofort aus der Adresse. Gespeichert wird
+  nur ein Prüfwert in `tournament_onsite_access` (mit der Kennung der Leitung, die ihn zuletzt erneuert hat). Eingelöst
+  setzt der Server ein technisch notwendiges, HttpOnly-Cookie `tls_onsite` nur unter `/api`: Turnier-Kennung, Ablauf und
+  Signatur, ohne Angaben zur Person, höchstens 12 Stunden und nie über das Turnierende hinaus. Eine Anmeldung darüber
+  trägt `registered_via: "onsite"`.
 
 ## Konto löschen: was mit welchen Daten passiert
 
