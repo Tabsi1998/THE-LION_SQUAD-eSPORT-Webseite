@@ -1,0 +1,59 @@
+/* Live vor Ort (#1556): Warteschlange je Station, Spielzeit-Uhr, Aufruf-Hervorhebung.
+   Bewegt werden nur Verschieben und Deckkraft; Dauern und Kurven aus den Bewegungs-Regeln (--tls-motion-*, --tls-ease).
+   Mit „Bewegung reduzieren“ stehen die Dauern auf fast 0 und --tls-motion-on auf 0 - es bleibt das Ergebnis, nichts fährt. */
+
+/* Stationen kommen gestaffelt: je Karte ein Viertel von „fast“ später, nur beim ersten Erscheinen. */
+.tls-live-station {
+  animation: tls-live-arrive var(--tls-motion-mid) var(--tls-ease) both;
+  animation-delay: calc(var(--tls-live-i, 0) * var(--tls-motion-fast) / 4);
+}
+@keyframes tls-live-arrive {
+  from { opacity: 0; transform: translateY(calc(6px * var(--tls-motion-on))); }
+  to { opacity: 1; transform: none; }
+}
+
+/* Aufgerufen: der Block hebt sich einmal leicht an, der Rahmen leuchtet auf und bleibt ruhig sichtbar. */
+.tls-live-next { position: relative; }
+.tls-live-next[data-state="called"] {
+  animation: tls-live-lift var(--tls-motion-mid) var(--tls-ease) both;
+}
+.tls-live-next[data-state="called"]::after {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  border: 1px solid var(--tls-brand);
+  box-shadow: 0 6px 24px -10px rgb(var(--tls-brand-rgb) / 0.6);
+  pointer-events: none;
+  animation: tls-live-glow calc(var(--tls-motion-slow) * 3) var(--tls-ease) both;
+}
+@keyframes tls-live-lift {
+  from { transform: translateY(calc(4px * var(--tls-motion-on))); }
+  to { transform: none; }
+}
+@keyframes tls-live-glow {
+  0% { opacity: 0; }
+  30% { opacity: 1; }
+  100% { opacity: 0.55; }
+}
+
+/* Spielzeit-Uhr (#1167): ein Balken, der über transform wächst. Er tickt sekündlich um Bruchteile eines Pixels -
+   ohne Übergang; nur die Farbe gleitet, wenn sie bei 80 % und 100 % wechselt. */
+.tls-live-clock-track {
+  height: 4px;
+  border-radius: 9999px;
+  background: rgb(255 255 255 / 0.08);
+  overflow: hidden;
+}
+.tls-live-clock-bar {
+  height: 100%;
+  border-radius: inherit;
+  transform-origin: left center;
+  background: var(--tls-brand);
+  transition: background-color var(--tls-motion-mid) var(--tls-ease);
+}
+.tls-live-clock[data-tone="warn"] .tls-live-clock-bar { background: var(--tls-warn); }
+.tls-live-clock[data-tone="over"] .tls-live-clock-bar { background: var(--tls-live); }
+.tls-live-clock-time { transition: color var(--tls-motion-mid) var(--tls-ease); }
+.tls-live-clock[data-tone="warn"] .tls-live-clock-time { color: var(--tls-warn); }
+.tls-live-clock[data-tone="over"] .tls-live-clock-time { color: var(--tls-live); }

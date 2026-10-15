@@ -121,7 +121,7 @@ export function PlanSettings({ tournament, mode, duration, stations, canEdit, on
 }
 
 /** „Automatisch planen“ ergibt eine Vorschau: was sich ändert, was nicht passt - erst „Übernehmen“ schreibt. */
-export function PlanPreview({ plan, stale, busy, onApply, onDiscard }) {
+export function PlanPreview({ plan, stale, busy, onApply, onDiscard, forecastOnly = false }) {
   const reduce = useReducedMotion();
   const changed = (plan?.assignments || []).filter((item) => item.changed);
   const warnings = plan?.warnings || [];
@@ -143,21 +143,25 @@ export function PlanPreview({ plan, stale, busy, onApply, onDiscard }) {
           transition={motionTransition("mid")}
         >
           <div className="mp-preview__text">
-            <span className="mp-preview__eyebrow"><Wand2 className="h-3.5 w-3.5" aria-hidden="true" /> Vorschau</span>
+            <span className="mp-preview__eyebrow"><Wand2 className="h-3.5 w-3.5" aria-hidden="true" /> {forecastOnly ? "Nur Prognose" : "Vorschau"}</span>
             <p className="mp-preview__summary">
               {changed.length
                 ? `${countOf(changed.length, "Spiel", "Spiele")} ${verb} Zeit${stations ? " und Station" : ""}`
                 : "Nichts zu ändern: alle Spiele stehen schon so im Plan"}
               {`, ${countOf(errors.length, "Konflikt", "Konflikte")}, ${countOf(hints.length, "Hinweis", "Hinweise")}.`}
             </p>
-            <p className="mp-preview__sub">Geänderte Spiele sind hell umrandet, gestrichelt steht, wo sie vorher lagen. Geschrieben wird erst mit „Übernehmen“.</p>
+            <p className="mp-preview__sub">{forecastOnly
+              ? "Nur Prognose: „Automatisch planen“ zeigt im laufenden Turnier vor Ort nur, wie der Rest nachrückt – es entscheidet die Warteschlange je Station, geplante Zeiten bleiben als Vergleich; einzelne Spiele kannst du weiter umlegen (ändern, ziehen, Termin lösen)."
+              : "Geänderte Spiele sind hell umrandet, gestrichelt steht, wo sie vorher lagen. Geschrieben wird erst mit „Übernehmen“."}</p>
             {stale && <p className="mp-preview__stale" role="alert" data-testid="mp-preview-stale">{stale} Ich habe neu geplant - bitte prüfe die Vorschau noch einmal.</p>}
           </div>
           <div className="mp-preview__actions">
-            <button type="button" className="tls-btn tls-btn--primary mp-btn" disabled={busy || !changed.length} onClick={onApply}>
-              {busy ? "Übernimmt …" : "Übernehmen"}
-            </button>
-            <button type="button" className="tls-btn tls-btn--quiet mp-btn" disabled={busy} onClick={onDiscard}>Verwerfen</button>
+            {!forecastOnly && (
+              <button type="button" className="tls-btn tls-btn--primary mp-btn" disabled={busy || !changed.length} onClick={onApply}>
+                {busy ? "Übernimmt …" : "Übernehmen"}
+              </button>
+            )}
+            <button type="button" className="tls-btn tls-btn--quiet mp-btn" disabled={busy} onClick={onDiscard}>{forecastOnly ? "Schließen" : "Verwerfen"}</button>
           </div>
         </motion.section>
       )}
@@ -166,7 +170,7 @@ export function PlanPreview({ plan, stale, busy, onApply, onDiscard }) {
 }
 
 /** Live: wie weit der Tag hinter dem gespeicherten Plan liegt - aus der Prognose des Planers. */
-export function DelayBanner({ delay, onReplan, canPlan }) {
+export function DelayBanner({ delay, onReplan, canPlan, forecastOnly = false }) {
   if (!delay) return null;
   const late = delay.minutes > 0;
   return (
@@ -174,9 +178,11 @@ export function DelayBanner({ delay, onReplan, canPlan }) {
       <strong className="mp-delay__value">{late ? `+${delay.minutes}` : `−${Math.abs(delay.minutes)}`} Min.</strong>
       <span>
         {late ? "Verzug" : "Vorsprung"} - {delay.label} jetzt ca. {hm(delay.at)}
-        <span className="mp-delay__sub"> statt {hm(delay.at - delay.minutes * 60_000)}.{canPlan ? " „Automatisch planen“ rückt die offenen Spiele nach; feste Termine bleiben." : ""}</span>
+        <span className="mp-delay__sub"> statt {hm(delay.at - delay.minutes * 60_000)}.{forecastOnly
+          ? " Live rückt die Warteschlange von selbst nach – „Automatisch planen“ zeigt nur die Prognose; einzelne Spiele kannst du weiter umlegen."
+          : canPlan ? " „Automatisch planen“ rückt die offenen Spiele nach; feste Termine bleiben." : ""}</span>
       </span>
-      {canPlan && <button type="button" className="tls-btn tls-btn--secondary mp-btn" onClick={onReplan}>Nachrücken planen</button>}
+      {canPlan && <button type="button" className="tls-btn tls-btn--secondary mp-btn" onClick={onReplan}>{forecastOnly ? "Prognose ansehen" : "Nachrücken planen"}</button>}
     </div>
   );
 }
@@ -262,7 +268,7 @@ export function OrderList({ items, laneNames, canEdit, onRelease, editor }) {
 }
 
 /** Handy: je Station die Spiele untereinander - was jetzt läuft, was als Nächstes kommt. */
-export function StationAgenda({ timeline, canEdit = false, onRelease, editor }) {
+export function StationAgenda({ timeline, canEdit = false, onRelease, editor, nextIds = null }) {
   const [open, setOpen] = useState(null);
   const editable = (item) => typeof canEdit === "function" ? canEdit(item) : Boolean(canEdit);
   const unscheduled = timeline.unscheduled || [];
@@ -270,7 +276,8 @@ export function StationAgenda({ timeline, canEdit = false, onRelease, editor }) 
     <div className="mp-agenda" data-testid="mp-agenda">
       {timeline.lanes.map((lane) => {
         const items = timeline.items.filter((item) => item.laneId === lane.id);
-        const next = items.find((item) => item.state === "planned");
+        // Live (#1556) sagt die Warteschlange, was als Nächstes kommt; sonst das erste geplante Spiel der Station.
+        const next = nextIds ? items.find((item) => nextIds.has(item.id)) : items.find((item) => item.state === "planned");
         return (
           <section key={lane.id} className="mp-agenda__lane" aria-label={lane.name}>
             <h4 className="mp-agenda__title">
@@ -279,7 +286,7 @@ export function StationAgenda({ timeline, canEdit = false, onRelease, editor }) 
             </h4>
             <ul className="mp-agenda__list">
               {items.map((item) => (
-                <li key={item.id} className="mp-agenda__item" data-state={item.state} data-next={next?.id === item.id ? "true" : undefined}
+                <li key={item.id} className="mp-agenda__item" data-match={item.id} data-state={item.state} data-next={next?.id === item.id ? "true" : undefined}
                   data-conflict={item.conflicts.length ? "true" : undefined}>
                   <span className="mp-agenda__time mp-mono">{hm(item.start)}</span>
                   <span className="mp-agenda__body">
