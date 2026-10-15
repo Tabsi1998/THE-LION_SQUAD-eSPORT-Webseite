@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
-import { AlertTriangle, ClipboardCheck, Clock, Radio, Shuffle } from "lucide-react";
+import { AlertTriangle, ClipboardCheck, Clock, MonitorPlay, Radio, Shuffle } from "lucide-react";
 import { toast } from "sonner";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
@@ -13,6 +13,7 @@ import { leadFilter, leadLine, leadNames } from "@/lib/tournamentLead";
 import { ResultWindow } from "@/components/tls/results/ResultWindow";
 import { ResultUndoBar, useResultUndo } from "@/components/tls/results/ResultUndoBar";
 import { DisputeCard } from "@/components/tls/results/DisputeCard";
+import { StationQueueBoard } from "@/components/tls/live/StationQueueBoard";
 
 // Turnierleitung am Handy (#1156): /tournaments/<slug>/leitung - nur für die Turnierleitung dieses Turniers. Erster
 // Reiter „Braucht Aufmerksamkeit“ (#1160): was hängt, mit dem passenden Knopf - Erledigtes verschwindet von selbst; jeder
@@ -20,6 +21,8 @@ import { DisputeCard } from "@/components/tls/results/DisputeCard";
 // Station; Filter „Läuft“ und „Ergebnis fehlt“.
 // „Eintragen“ öffnet das Ergebnis-Fenster (#1370), danach 10 Sekunden „Rückgängig“. Die Verwaltung bleibt zum
 // Vorbereiten - die Live-Werkzeuge stehen hier.
+// Reiter „Stationen“ (#1556, nur vor Ort): die Warteschlange je Station - läuft mit Spielzeit-Uhr, als Nächstes mit
+// „Aufrufen“ und „Gestartet“, danach. Die Reihenfolge und den Verzug rechnet der Server (GET …/live-queue).
 
 const FILTERS = [
   ["all", "Alle offenen", "open"],
@@ -38,6 +41,9 @@ export default function TournamentLeadPage() {
   const [deciding, setDeciding] = useState(false);
   const [tab, setTab] = useState(null);
   const [movingId, setMovingId] = useState("");
+  const [queue, setQueue] = useState(null);
+  const [queueLoaded, setQueueLoaded] = useState(false);
+  const [busyStation, setBusyStation] = useState("");
   // Eigene Adresse je Fall (#1158, #1160): ?fall=<id> springt zum Fall.
   const fall = searchParams.get("fall") || "";
   const scrolledTo = useRef("");
@@ -52,8 +58,23 @@ export default function TournamentLeadPage() {
     }
   }, [slug]);
 
+  // Die Warteschlange vor Ort (#1556) - online gibt es sie nicht (`applies: false`), dann fehlt der Reiter.
+  const loadQueue = useCallback(async () => {
+    try {
+      const { data: view } = await api.get(`/tournaments/${encodeURIComponent(slug)}/live-queue`);
+      setQueue(view?.applies ? view : null);
+    } catch {
+      setQueue(null);
+    } finally {
+      setQueueLoaded(true);
+    }
+  }, [slug]);
+
   useEffect(() => { load(); }, [load]);
+  useEffect(() => { loadQueue(); }, [loadQueue]);
   useLiveRefresh(load, ["matches", "matches-v2", "tournaments", "stations"], { fallbackMs: 15000 });
+  // Die Prognose wandert auch ohne Ereignis mit der Zeit - einmal je Minute nachfragen.
+  useLiveRefresh(loadQueue, ["matches", "matches-v2", "tournaments", "stations"], { fallbackMs: 15000, pollMs: 60000 });
   const undo = useResultUndo({ onDone: load });
   useDocumentTitle(data?.tournament?.title ? `Turnierleitung · ${data.tournament.title}` : "Turnierleitung", "Turnierleitung: Ergebnisse eintragen und offene Spiele im Blick.", { robots: "noindex, nofollow" });
 
@@ -66,7 +87,8 @@ export default function TournamentLeadPage() {
   const draws = useMemo(() => data?.draws || [], [data]);
   const byId = useMemo(() => Object.fromEntries(matches.map((item) => [item.id, item])), [matches]);
   const cases = attention.length + draws.length;
-  const activeTab = tab || (fall || cases ? "attention" : "results");
+  // Erst entscheiden, wenn klar ist, ob es vor Ort eine Warteschlange gibt - sonst springt der Reiter nach dem Laden.
+  const activeTab = tab || (fall || cases ? "attention" : queue ? "stations" : queueLoaded ? "results" : "");
   const freeStations = (data?.stations || []).filter((station) => station.status !== "broken" && !station.busy);
 
   const drawNow = async (card) => {
@@ -105,6 +127,22 @@ export default function TournamentLeadPage() {
       target.scrollIntoView?.({ block: "center" });
     }
   }, [fall, data]);
+
+  // Aufrufen und Gestartet (#1556): zwei Helfer zugleich - der Server nimmt genau einen, der andere sieht den neuen Stand.
+  const operateStation = async (kind, station, entry) => {
+    setBusyStation(station.id);
+    try {
+      const { data: done } = await api.post(`/tournaments/${encodeURIComponent(slug)}/live-queue/${kind}`, { station_id: station.id, match_id: entry.match_id });
+      const where = station.station_text || station.name;
+      if (kind === "call") toast.success(done?.idempotent_replay ? `War schon an ${where} aufgerufen.` : `Aufgerufen an ${where} – die Spieler bekommen Bescheid.`);
+      else toast.success(done?.idempotent_replay ? "Läuft bereits." : `Gestartet an ${where} – die Uhr läuft.`);
+    } catch (err) {
+      toast.error(formatApiError(err.response?.data?.detail) || "Das hat nicht geklappt. Bitte neu laden.");
+    } finally {
+      setBusyStation("");
+      await Promise.all([loadQueue(), load()]);
+    }
+  };
 
   // Streitfall entscheiden (#1158): „Ergebnis bleibt“ mit einem Tipp - beide Seiten bekommen die Entscheidung.
   const keepResult = async (item, note) => {
@@ -167,13 +205,22 @@ export default function TournamentLeadPage() {
         <div className="text-[11px] uppercase tracking-[0.3em] text-[#FFD700] font-bold">Turnierleitung</div>
         <h1 className="mt-1 font-heading text-2xl md:text-4xl font-black uppercase [overflow-wrap:anywhere]">{data?.tournament?.title || "…"}</h1>
 
-        <div className="mt-6 flex items-center gap-1 border-b border-white/10" role="tablist" aria-label="Turnierleitung">
-          {[["attention", `Braucht Aufmerksamkeit (${cases})`, AlertTriangle], ["results", "Ergebnisse", ClipboardCheck]].map(([key, label, Icon]) => (
-            <button key={key} type="button" role="tab" aria-selected={activeTab === key} onClick={() => setTab(key)} className={`inline-flex min-h-[44px] items-center gap-2 border-b-2 px-3 text-xs sm:text-sm font-bold uppercase tracking-wider ${activeTab === key ? "border-[#29B6E8] text-white" : "border-transparent text-white/50"}`} data-testid={`lead-tab-${key}`}>
-              <Icon className={`w-4 h-4 ${key === "attention" && cases ? "text-[#FFD700]" : "text-[#29B6E8]"}`} /> {label}
+        <div className="mt-6 flex items-center gap-1 overflow-x-auto border-b border-white/10" role="tablist" aria-label="Turnierleitung">
+          {[["attention", <><span className={queue ? "hidden sm:inline" : ""}>Braucht </span>Aufmerksamkeit ({cases})</>, AlertTriangle], ...(queue ? [["stations", "Stationen", MonitorPlay]] : []), ["results", "Ergebnisse", ClipboardCheck]].map(([key, label, Icon]) => (
+            <button key={key} type="button" role="tab" aria-selected={activeTab === key} onClick={() => setTab(key)} className={`inline-flex min-h-[44px] shrink-0 items-center gap-1.5 sm:gap-2 whitespace-nowrap border-b-2 px-2 sm:px-3 text-xs sm:text-sm font-bold uppercase tracking-wider ${activeTab === key ? "border-[#29B6E8] text-white" : "border-transparent text-white/50"}`} data-testid={`lead-tab-${key}`}>
+              <Icon className={`${queue ? "hidden sm:block" : ""} w-4 h-4 shrink-0 ${key === "attention" && cases ? "text-[#FFD700]" : "text-[#29B6E8]"}`} /> {label}
             </button>
           ))}
         </div>
+
+        {activeTab === "stations" && queue ? (
+          <div className="mt-5" data-testid="lead-stations">
+            <StationQueueBoard queue={queue} busyKey={busyStation} onCall={(station, entry) => operateStation("call", station, entry)} onStart={(station, entry) => operateStation("start", station, entry)} />
+            <p className="mt-4 text-xs text-white/40">Die Reihenfolge rechnet der Server aus Plan, Linien und Stationen – wird eine Station frei, rückt das nächste bereite Spiel nach. „Aufrufen“ schickt den Spielern „Du bist dran“; „nicht erschienen“ greift nach der Frist ab dem Aufruf.</p>
+          </div>
+        ) : null}
+
+        {!activeTab ? <div className="py-10 text-center text-white/40">Wird geladen …</div> : null}
 
         {activeTab === "attention" ? (
           <div className="mt-5 space-y-3" data-testid="lead-attention">

@@ -23,6 +23,7 @@ import { finishedMatchText, formatMatchKind, formatMatchStatus, isByeSlot, isMat
 import { matchIsOver } from "@/lib/afterEnd";
 import { rankingMode } from "@/lib/matchReport";
 import { MatchReportForm } from "@/components/tls/tournament/MatchReportForm";
+import { LiveQueueStatus } from "@/components/tls/live/LiveQueueStatus";
 import { MatchCallBox } from "@/components/tls/tournament/MatchCallBox";
 import { ProblemReportForm } from "@/components/tls/results/ProblemReportForm";
 import { ResultWindow } from "@/components/tls/results/ResultWindow";
@@ -330,6 +331,10 @@ function MatchPageView() {
         </div>
 
         {data.call && <MatchCallBox call={data.call} />}
+        {/* Vor Ort (#1556): wo und wann das Spiel laut Warteschlange dran ist - den Aufruf selbst zeigt die Karte darüber. */}
+        {!finished && isV2 && data.tournament?.id && data.event_mode && data.event_mode !== "online" ? (
+          <LiveQueueStatus tournamentId={data.tournament.id} matchId={id} hideCalled className="mt-6" />
+        ) : null}
 
         {actionError && <div className="mt-5"><AuthFormAlert id="match-action-error">{actionError}</AuthFormAlert></div>}
 

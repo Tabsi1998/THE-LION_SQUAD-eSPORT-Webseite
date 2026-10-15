@@ -25,6 +25,7 @@ _FACHMODULE = (
     "tournament_schedule_routes",
     "tournament_format_routes",
     "tournament_lead_routes",
+    "tournament_live_routes",
     "tournament_heat_routes",
     "tournament_removal_routes",
     "tournament_onsite_routes",

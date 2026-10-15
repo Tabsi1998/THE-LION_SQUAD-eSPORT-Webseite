@@ -183,7 +183,8 @@ def test_the_result_timer_knows_stage_and_game():
     from services.match_timing import timing
 
     start = datetime(2026, 10, 31, 10, 0, tzinfo=timezone.utc)
-    match = {"scheduled_at": start.isoformat(), "status": "scheduled", "station_id": "s1"}
+    # Gezählt ab dem echten Start (#1556) - an der Station gestartet.
+    match = {"scheduled_at": start.isoformat(), "started_at": start.isoformat(), "status": "in_progress", "station_id": "s1"}
     now = start + timedelta(minutes=14)
     assert timing(match, {}, now, game=MK8)["overdue_minutes"] == 2
     assert timing(match, {}, now, stage={"settings": {"duration_minutes": 10}})["overdue_minutes"] == 4

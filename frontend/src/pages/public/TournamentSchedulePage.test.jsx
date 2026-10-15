@@ -170,3 +170,37 @@ test("ohne eigene Anmeldung und ohne Stationen gibt es weder Filter noch Station
   // Gruppen: jede Karte nennt ihre Gruppe.
   expect(screen.getAllByText(/Gruppe A · /).length).toBeGreaterThan(0);
 });
+
+test("Live-Warteschlange (#1556): je Station „Jetzt“ und „Als Nächstes“ aus dem Server, oben der Verzug und dein nächstes Spiel", async () => {
+  const user = (await import("@testing-library/user-event")).default.setup();
+  const set = generated.onsite;
+  const live = set.bracket.matches_v2.find((match) => match.status === "in_progress");
+  const queue = {
+    applies: true,
+    summary: { delay_minutes: 11, last: { label: "Finale", forecast_at: "2026-10-31T19:51:00Z" } },
+    stations: [{
+      id: live.station_id, name: "PC 1", station_text: "PC 1", status: "busy", waiting: 1,
+      running: { match_id: live.id, state: "running", names: ["NeonFalke", "PixelPaula"], label: "Viertelfinale", started_at: "2026-10-31T16:00:00Z", duration_minutes: 30 },
+      next: { match_id: "x2", state: "called", names: ["LuckyLion", "Jo"], label: "Halbfinale", called_at: "2026-10-31T16:28:00Z", report_by: "2026-10-31T16:30:00Z" },
+      after: null,
+    }],
+    matches: {},
+  };
+  apiMock.get.mockImplementation((path) => {
+    if (path === "/tournaments/cup") return Promise.resolve({ data: { ...set.tournament, slug: "cup" } });
+    if (path === `/tournaments/${set.tournament.id}/bracket`) return Promise.resolve({ data: set.bracket });
+    if (path === `/tournaments/${set.tournament.id}/matchdays`) return Promise.resolve({ data: { applies: false, matchdays: [] } });
+    if (path === `/tournaments/${set.tournament.id}/live-queue`) return Promise.resolve({ data: queue });
+    if (path === `/tournaments/${set.tournament.id}/live-queue/me`) return Promise.resolve({ data: { applies: true, entries: [{ match_id: "x9", state: "queued", position: 1, station_text: "PC 2", forecast_at: "2026-10-31T17:40:00Z" }] } });
+    return Promise.reject(new Error(path));
+  });
+  renderSchedule();
+  expect(await screen.findByTestId("live-queue-status")).toHaveTextContent("Du bist als Nächstes an PC 2");
+  await user.click(await screen.findByTestId("schedule-view-stations"));
+  expect(await screen.findByTestId("schedule-live-summary")).toHaveTextContent("+11 Min. · Finale jetzt ca. 20:51");
+  const now = screen.getByTestId(`schedule-now-${live.station_id}`);
+  expect(now).toHaveTextContent("Jetzt");
+  expect(now).toHaveTextContent("NeonFalke gegen PixelPaula");
+  expect(now).toHaveTextContent("Als Nächstes");
+  expect(now).toHaveTextContent("Aufgerufen · antreten bis 17:30");
+});
