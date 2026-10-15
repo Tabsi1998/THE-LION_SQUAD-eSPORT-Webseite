@@ -48,11 +48,11 @@ export function OnsiteTournamentView({ tournament: t, user, loading = false, err
 
         {seats.text ? (
           <div className="mt-6">
-            <div className={`font-heading text-2xl font-bold ${seats.free === 0 ? "text-[#FFD700]" : "text-[#00FF88]"}`} data-testid="onsite-seats">{seats.text}</div>
+            <div className={`font-heading text-2xl font-bold ${seats.free === 0 ? "text-warn" : "text-ok"}`} data-testid="onsite-seats">{seats.text}</div>
             {boxes.length ? (
               <div className="mt-3 grid gap-1" style={{ gridTemplateColumns: `repeat(${Math.min(16, boxes.length)}, minmax(0, 1fr))` }} aria-hidden="true">
                 {boxes.map((taken, index) => (
-                  <i key={index} className={`block h-2.5 rounded-[1px] ${taken ? "bg-white/20" : "bg-[#00FF88]"}`} />
+                  <i key={index} className={`block h-2.5 rounded-[1px] ${taken ? "bg-white/20" : "bg-ok"}`} />
                 ))}
               </div>
             ) : null}

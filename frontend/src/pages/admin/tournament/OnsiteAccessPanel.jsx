@@ -79,7 +79,7 @@ export function OnsiteAccessPanel({ tournamentId }) {
             dieses Turnier – sonst nichts aus dem Mitgliederbereich.
           </p>
         </div>
-        <span className={`shrink-0 text-xs font-bold uppercase tracking-wider ${state.enabled ? "text-[#00FF88]" : "text-white/50"}`} data-testid="onsite-access-state">{stateText}</span>
+        <span className={`shrink-0 text-xs font-bold uppercase tracking-wider ${state.enabled ? "text-ok" : "text-white/50"}`} data-testid="onsite-access-state">{stateText}</span>
       </div>
       <p className="mt-3 text-xs text-white/60" data-testid="onsite-access-window">
         Zeitfenster: {windowText(state.window)}{state.explicit === null || state.explicit === undefined ? ` · Vorgabe (${state.default ? "an bei Turnieren vor Ort" : "aus bei Online-Turnieren"})` : ""}
