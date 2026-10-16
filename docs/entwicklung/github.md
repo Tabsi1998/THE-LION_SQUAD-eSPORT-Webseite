@@ -61,7 +61,7 @@ Die erste Version ist **1.0.0** und umfasst alles ab dem Stand vom 15.10.2026. D
 Ablauf mit Tags `mobile-v*` ([App-Releases](../../mobile/RELEASES.md)). Der Server holt App-Updates nur aus
 Releases mit genau diesem Tag-Muster (`backend/services/github_releases.py`), Website-Releases stören ihn
 nicht. Die Markierung „Latest“ auf GitHub trägt immer das zuletzt veröffentlichte Release, egal ob Website
-oder App; das README-Badge „App“ filtert deshalb auf `mobile-v*`.
+oder App; die README-Badges filtern deshalb nach dem Release-Namen: „Website“ auf `v*`, „App“ auf `LionsAPP*`.
 
 **Pflicht-Prüfungen im Release-PR.** PRs, die ein Workflow mit dem eingebauten `GITHUB_TOKEN` öffnet, starten
 keine weiteren Workflows – CI und CodeQL laufen dort also nicht von selbst, und die Regel für `main` lässt den
