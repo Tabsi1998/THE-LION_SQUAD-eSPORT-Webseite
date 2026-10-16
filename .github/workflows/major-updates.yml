@@ -1,0 +1,46 @@
+name: Größere Updates
+
+# Dependabot schlägt nur Minor- und Patch-Updates vor, Expo-Pakete gar nicht
+# (.github/dependabot.yml). Das schützt vor Brüchen - aber neue Hauptversionen und ein neues
+# Expo-SDK bemerkt so niemand. Einmal im Monat listet scripts/major-updates-report.py sie in
+# einem Issue auf (#1739). Nichts davon wird automatisch eingespielt.
+# Ein offenes Issue mit demselben Titel wird aktualisiert statt ein zweites anzulegen.
+on:
+  schedule:
+    - cron: "41 4 5 * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  report:
+    name: Bericht über größere Updates
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+      - name: Neue Hauptversionen suchen
+        id: report
+        run: python3 scripts/major-updates-report.py --out report.md >> "$GITHUB_OUTPUT"
+      - name: Issue anlegen oder aktualisieren
+        if: steps.report.outputs.count != '0'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          title="Größere Updates verfügbar"
+          { cat report.md; echo; echo "<sub>Stand $(date -u +%d.%m.%Y), [Lauf]($RUN_URL)</sub>"; } > body.md
+          existing=$(gh issue list --state open --search "in:title \"$title\"" --json number,title --jq ".[] | select(.title == \"$title\") | .number" | head -1)
+          if [ -n "$existing" ]; then
+            gh issue edit "$existing" --body-file body.md
+          else
+            gh issue create --title "$title" --label dependencies --body-file body.md
+          fi

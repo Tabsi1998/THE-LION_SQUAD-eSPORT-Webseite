@@ -18,7 +18,7 @@ jobs:
     name: Labels nach Bereich
     # PRs aus Forks bekommen keinen Schreibzugriff; dort setzt der Betreiber die Labels.
     if: github.event.pull_request.head.repo.full_name == github.repository
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
       - uses: actions/labeler@v7

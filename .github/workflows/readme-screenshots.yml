@@ -29,7 +29,7 @@ jobs:
   shots:
     name: README-Bilder aufnehmen
     if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 40
     steps:
       - uses: actions/checkout@v7
@@ -102,7 +102,7 @@ jobs:
     name: Bilder als PR vorschlagen
     needs: shots
     if: github.event_name != 'pull_request'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
       contents: write
