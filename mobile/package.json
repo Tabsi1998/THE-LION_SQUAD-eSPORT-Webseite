@@ -27,7 +27,7 @@
     "@react-navigation/native-stack": "^7.20.0",
     "@shopify/react-native-skia": "2.6.2",
     "axios": "^1.20.0",
-    "expo": "~57.0.29",
+    "expo": "~57.0.30",
     "expo-application": "~57.0.3",
     "expo-asset": "~57.0.20",
     "expo-audio": "~57.0.5",
