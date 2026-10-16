@@ -10,7 +10,9 @@
 [![CI](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/actions/workflows/ci.yml/badge.svg?branch=main&event=push)](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/actions/workflows/ci.yml?query=branch%3Amain)
 [![CodeQL](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/actions/workflows/codeql.yml/badge.svg?branch=main)](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/actions/workflows/codeql.yml)
 [![lionsquad.at](https://img.shields.io/website?url=https%3A%2F%2Flionsquad.at&label=lionsquad.at&up_message=online&down_message=offline)](https://lionsquad.at)
-[![LionsAPP](https://img.shields.io/github/v/release/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite?filter=mobile-v*&sort=date&display_name=release&label=App&logo=android&logoColor=white&color=29B6E8)](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/releases)
+[![Website](https://img.shields.io/github/v/release/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite?filter=v*&sort=date&display_name=release&label=Website&color=29B6E8)](CHANGELOG.md)
+[![LionsAPP](https://img.shields.io/github/v/release/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite?filter=LionsAPP*&sort=date&display_name=release&label=App%20%E2%80%93%20neuester%20Build&logo=android&logoColor=white&color=29B6E8)](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/releases)
+[![Google Play](https://img.shields.io/badge/Google_Play-LionsAPP-414141?logo=googleplay&logoColor=white)](https://play.google.com/store/apps/details?id=at.lionsquad.app)
 
 [![Letzter Commit](https://img.shields.io/github/last-commit/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/main?label=letzter%20Commit)](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commits/main)
 [![Offene Issues](https://img.shields.io/github/issues/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite?label=offene%20Issues)](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues)
@@ -77,7 +79,7 @@ Passkey, Zwei-Faktor für die Verwaltung.
 ### 📱 LionsAPP und unterwegs
 
 Die Website ist fürs Handy gebaut. Dazu kommt die native Android-App mit Benachrichtigungen, Turnieren und dem
-Mitgliederbereich ([App-Anleitung](mobile/README.md), [Releases](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/releases)).
+Mitgliederbereich – [bei Google Play](https://play.google.com/store/apps/details?id=at.lionsquad.app) ([App-Anleitung](mobile/README.md), [Releases](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/releases)).
 
 <table>
   <tr>

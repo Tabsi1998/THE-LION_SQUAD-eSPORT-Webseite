@@ -15,12 +15,18 @@ müssen (#1734). Die Prüfregeln selbst stehen in [`CLAUDE.md`](../../CLAUDE.md)
 | [Website-Release](../../.github/workflows/release-please.yml) | Merge auf `main`, von Hand | pflegt den Release-PR, nach dessen Merge Tag, Release, `CHANGELOG.md` |
 | [README-Bilder](../../.github/workflows/readme-screenshots.yml) | am Monatsersten, von Hand | nimmt die README-Bilder im Abnahme-Stand auf und schlägt sie als PR vor |
 | [Externe Links](../../.github/workflows/links.yml) | montags, von Hand | ruft alle http(s)-Links der Markdown-Dateien ab, tote Links landen in einem Issue |
+| [Expo-Patches](../../.github/workflows/expo-updates.yml) | am 3. jedes Monats, von Hand | `npx expo install --fix` im installierten SDK, PR mit Auto-Merge nach grünen Pflicht-Prüfungen |
+| [Größere Updates](../../.github/workflows/major-updates.yml) | am 5. jedes Monats, von Hand | Issue mit neuen Hauptversionen und neuem Expo-SDK – nichts wird eingespielt |
 | [Mobile APK Release](../../.github/workflows/mobile-release.yml) | nur von Hand | Notweg für eine signierte APK, siehe [App-Releases](../../mobile/RELEASES.md) |
 
 Von Hand starten: Reiter **Actions** → Workflow links wählen → **Run workflow**.
 
 Das Repository ist öffentlich, Actions-Minuten auf den Standard-Runnern kosten deshalb nichts. Die CI läuft
 trotzdem nur für die Bereiche, die eine Änderung berührt – das spart Wartezeit, nicht Geld.
+
+Alle Workflows laufen fest auf `ubuntu-24.04`, nicht auf `ubuntu-latest` (#1739): GitHub stellt `ubuntu-latest`
+am 19.10.2026 auf Ubuntu 26 um. Der Umstieg kommt bewusst in einem eigenen PR, wenn Browser-Installation,
+Docker und Playwright dort geprüft sind.
 
 ## PR-Titel und Commits
 
@@ -55,7 +61,7 @@ Die erste Version ist **1.0.0** und umfasst alles ab dem Stand vom 15.10.2026. D
 Ablauf mit Tags `mobile-v*` ([App-Releases](../../mobile/RELEASES.md)). Der Server holt App-Updates nur aus
 Releases mit genau diesem Tag-Muster (`backend/services/github_releases.py`), Website-Releases stören ihn
 nicht. Die Markierung „Latest“ auf GitHub trägt immer das zuletzt veröffentlichte Release, egal ob Website
-oder App; das README-Badge „App“ filtert deshalb auf `mobile-v*`.
+oder App; die README-Badges filtern deshalb nach dem Release-Namen: „Website“ auf `v*`, „App“ auf `LionsAPP*`.
 
 **Pflicht-Prüfungen im Release-PR.** PRs, die ein Workflow mit dem eingebauten `GITHUB_TOKEN` öffnet, starten
 keine weiteren Workflows – CI und CodeQL laufen dort also nicht von selbst, und die Regel für `main` lässt den
@@ -66,8 +72,33 @@ Merge nicht zu. Zwei Wege:
 - **Ohne Token:** den Release-PR einmal **schließen und wieder öffnen**. Dann starten CI und CodeQL wie bei jedem
   anderen PR.
 
-Dasselbe gilt für Merges durch Dependabot Auto-Merge: Sie lösen auf `main` keinen neuen CI- und Release-Lauf
-aus. Das holt der nächste eigene Merge nach.
+Auto-Merges (Dependabot, Expo-Patches) schaltet der Workflow mit `RELEASE_PLEASE_TOKEN` ein; der Merge zählt dann
+als Merge des Betreibers und löst auf `main` CI und release-please aus. Für Dependabot muss der Token zusätzlich
+als **Dependabot-Secret** liegen (Tabelle unten), weil Workflows, die Dependabot startet, nur diese Secrets sehen.
+
+## Updates: was automatisch kommt und was nicht
+
+| Art | Weg | Automatisch gemergt? |
+| --- | --- | --- |
+| Patch (x.y.**Z**) von npm, pip, Actions | Dependabot, montags | ja, nach grünen Pflicht-Prüfungen |
+| Minor (x.**Y**.0) | Dependabot, montags | nein – du prüfst und mergst |
+| Expo-Patches im installierten SDK | Workflow „Expo-Patches“, monatlich | ja, nach grünen Pflicht-Prüfungen |
+| Major (**X**.0.0), neues Expo-SDK | nur der Bericht „Größere Updates“ als Issue | nie |
+
+## Größere Updates
+
+Der Bericht ([`scripts/major-updates-report.py`](../../scripts/major-updates-report.py)) listet einmal im Monat in
+einem Issue, wo es eine neue Hauptversion gibt. Unter 1.0 zählt schon eine neue Minor-Version, so wie SemVer es
+vorsieht. Pakete, die das Expo-SDK vorgibt (`expo-*`, React, React Native …), stehen nicht einzeln darin;
+stattdessen meldet er ein neues SDK.
+
+So gehst du ein größeres Update an:
+
+1. Ein Issue, ein Paket (oder ein Expo-SDK). Den Changelog des Pakets lesen, vor allem „Breaking Changes“.
+2. Zweig `chore/<nr>-<paket>-<version>`, Update einspielen, lokal prüfen (`python scripts/local_check.py`).
+3. Expo-SDK: `npx expo install expo@latest --fix` in `mobile/`, dann `npx expo-doctor` und die
+   [Geräteabnahme](../../mobile/RELEASE_SMOKE_TEST.md), bevor eine App-Version veröffentlicht wird.
+4. PR mit `chore:` (oder `feat!:`, wenn sich für Nutzer etwas sichtbar ändert), CI grün, mergen.
 
 ## README-Bilder
 
@@ -99,7 +130,8 @@ Was nicht in Dateien steht, sondern in den Einstellungen des Repositorys gesetzt
 | Settings → General → Social preview | Bild hochladen: `frontend/public/assets/brand/og-default.png` | Vorschau beim Teilen des Repo-Links |
 | Startseite → Zahnrad bei „About“ | Beschreibung, Website `https://lionsquad.at`, Topics | Kurzprofil des Repos |
 | Settings → Secrets and variables → Actions | Secret `RELEASE_PLEASE_TOKEN` (optional, siehe unten) | Pflicht-Prüfungen in Release- und Bilder-PRs |
-| Settings → Rules → „main schützen“ | „CI-Ergebnis“ und CodeQL als Pflicht (schon gesetzt) | Merge nur mit grünen Prüfungen, auch für Auto-Merge |
+| Settings → Secrets and variables → Dependabot | dasselbe Secret `RELEASE_PLEASE_TOKEN` | Dependabot-Auto-Merge löst CI und Release aus |
+| Settings → Rules → „main schützen“ | „CI-Ergebnis“ und CodeQL als Pflicht (schon gesetzt), dazu „PR-Titel prüfen“ | Merge nur mit grünen Prüfungen und gültigem Titel, auch für Auto-Merge |
 
 **Token für `RELEASE_PLEASE_TOKEN`:** GitHub → Profilbild → Settings → Developer settings → Personal access
 tokens → Fine-grained tokens → Generate new token. Repository access: nur dieses Repository. Permissions:

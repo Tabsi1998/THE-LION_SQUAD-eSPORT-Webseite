@@ -8,6 +8,9 @@ name: CI
 # - Nach dem Merge läuft die CI ein zweites Mal auf main (#1734): Das Repo ist
 #   öffentlich, Actions-Minuten auf den Standard-Runnern kosten nichts, und das
 #   CI-Badge in der README zeigt so den echten Stand von main.
+# - Runner fest auf ubuntu-24.04 (#1739): ubuntu-latest wechselt am 19.10.2026 auf
+#   Ubuntu 26. Umstieg bewusst in einem eigenen PR, wenn Browser- und Docker-Schritte
+#   dort geprüft sind.
 on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
@@ -31,7 +34,7 @@ jobs:
   changes:
     name: Bereiche und Geheimnis-Scan
     if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     outputs:
       backend: ${{ steps.areas.outputs.backend }}
@@ -62,7 +65,7 @@ jobs:
     name: Backend
     needs: changes
     if: needs.changes.outputs.backend == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     env:
       APP_ENV: test
@@ -116,7 +119,7 @@ jobs:
     name: Frontend
     needs: changes
     if: needs.changes.outputs.frontend == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     # Prüfen, Bauen und Unit-Tests; die Browser-Tests laufen parallel im Job darunter.
     timeout-minutes: 20
     steps:
@@ -178,7 +181,7 @@ jobs:
     name: Browser-Tests (${{ matrix.shard }}/4)
     needs: changes
     if: needs.changes.outputs.frontend == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     # Platz für einen wiederholten Browser-Download plus die Tests (gut 11 Minuten je Teil).
     timeout-minutes: 35
     strategy:
@@ -229,7 +232,7 @@ jobs:
     name: Mobile App
     needs: changes
     if: needs.changes.outputs.mobile == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
@@ -277,7 +280,7 @@ jobs:
     name: Production container smoke
     needs: changes
     if: needs.changes.outputs.container == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 25
     env:
       APP_ENV: production
@@ -327,7 +330,7 @@ jobs:
     name: CI-Ergebnis
     needs: [changes, backend, frontend, frontend-e2e, mobile, container-smoke]
     if: always()
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
       - name: Ergebnis der Prüfungen

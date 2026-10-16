@@ -5,6 +5,13 @@ name: Dependabot Auto-Merge
 # und CodeQL; schlägt eine Prüfung fehl, bleibt der PR offen. Minor- und Major-Updates
 # prüft der Betreiber weiter von Hand. Eine Gruppe, die auch nur ein Minor-Update
 # enthält, gilt als Minor und mergt sich nicht selbst.
+#
+# Token (#1739): Ein Merge mit dem eingebauten GITHUB_TOKEN löst auf main keine
+# Workflows aus (CI, Website-Release). Darum schaltet RELEASE_PLEASE_TOKEN den
+# Auto-Merge ein; der Merge zählt dann als Merge des Betreibers. Workflows, die
+# Dependabot auslöst, sehen nur Dependabot-Secrets - der Token muss deshalb auch
+# unter Settings -> Secrets and variables -> Dependabot liegen. Fehlt er dort,
+# geht es mit dem GITHUB_TOKEN weiter wie bisher.
 on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
@@ -20,7 +27,7 @@ jobs:
   auto-merge:
     name: Patch-Update automatisch mergen
     if: github.event.pull_request.user.login == 'dependabot[bot]' && github.repository == 'Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
       - name: Art des Updates lesen
@@ -31,6 +38,6 @@ jobs:
       - name: Auto-Merge einschalten
         if: steps.meta.outputs.update-type == 'version-update:semver-patch'
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN || github.token }}
           PR_URL: ${{ github.event.pull_request.html_url }}
         run: gh pr merge --auto --squash "$PR_URL"

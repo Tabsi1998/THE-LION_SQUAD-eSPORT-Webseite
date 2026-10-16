@@ -31,7 +31,7 @@ concurrency:
 jobs:
   release-please:
     name: Release-PR pflegen
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
       - uses: googleapis/release-please-action@v5

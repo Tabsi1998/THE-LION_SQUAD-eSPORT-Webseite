@@ -1,0 +1,94 @@
+name: Expo-Patches
+
+# Expo veröffentlicht laufend Patch-Versionen innerhalb eines SDK. Die CI prüft mit
+# `npx expo install --check`, ob die App auf den empfohlenen Versionen steht, und wird rot,
+# sobald ein neuer Patch erscheint (#1736). Dependabot lässt Expo-Pakete bewusst aus.
+# Darum einmal im Monat (#1739):
+# - `npx expo install --fix` bleibt im installierten SDK (z. B. 57.x) - ein SDK-Wechsel
+#   passiert hier nie, den meldet der Bericht „Größere Updates“ als Issue.
+# - Gibt es etwas zu heben, kommt ein PR „chore(app): …“; er mergt sich selbst, sobald die
+#   Pflicht-Prüfungen der Regel für main grün sind (Typecheck, Tests, expo-doctor).
+#   Schlägt etwas fehl, bleibt er offen.
+on:
+  schedule:
+    - cron: "23 4 3 * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+concurrency:
+  group: expo-updates
+  cancel-in-progress: false
+
+jobs:
+  expo:
+    name: Expo-Patches im SDK heben
+    runs-on: ubuntu-24.04
+    # Schreibrechte nur für den Notweg ohne RELEASE_PLEASE_TOKEN (PR mit dem eingebauten Token).
+    permissions:
+      contents: write
+      pull-requests: write
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+      - name: Pakete installieren
+        working-directory: mobile
+        run: npm ci
+      - name: Empfohlene Versionen prüfen und heben
+        id: fix
+        working-directory: mobile
+        run: |
+          if npx expo install --check; then
+            echo "Alle Expo-Pakete stehen auf den empfohlenen Versionen."
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          npx expo install --fix
+          npx expo install --check
+          npx tsc --noEmit
+          {
+            echo "summary<<EOF"
+            git diff --unified=0 package.json | grep '^[-+] ' || true
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+      - name: PR anlegen
+        id: pr
+        if: steps.fix.outputs.changed == 'true'
+        uses: peter-evans/create-pull-request@v8
+        with:
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN || github.token }}
+          branch: chore/expo-patches
+          delete-branch: true
+          add-paths: |
+            mobile/package.json
+            mobile/package-lock.json
+          commit-message: "chore(app): Expo-Pakete auf die empfohlenen Versionen des SDK heben"
+          title: "chore(app): Expo-Pakete auf die empfohlenen Versionen des SDK heben"
+          labels: |
+            app
+            dependencies
+          body: |
+            `npx expo install --fix` hat diese Versionen gehoben (innerhalb des installierten SDK, kein SDK-Wechsel):
+
+            ```diff
+            ${{ steps.fix.outputs.summary }}
+            ```
+
+            Typecheck lief im Workflow grün. Der PR mergt sich selbst, sobald die Pflicht-Prüfungen grün sind.
+            Erzeugt von [Expo-Patches](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) (#1739).
+      - name: Auto-Merge einschalten
+        if: steps.pr.outputs.pull-request-number != ''
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN || github.token }}
+          PR_URL: ${{ steps.pr.outputs.pull-request-url }}
+        run: gh pr merge --auto --squash "$PR_URL"
