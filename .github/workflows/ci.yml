@@ -1,15 +1,18 @@
 name: CI
 
 # Lokal zuerst, GitHub bestätigt: Die Prüfungen laufen vor dem Push auf dem
-# Entwicklungsrechner (lokaler CI-Spiegel liest genau diese Datei). GitHub
-# rechnet jede Minute ab, deshalb hier nur das Nötige:
+# Entwicklungsrechner (lokaler CI-Spiegel liest genau diese Datei).
 # - Entwurfs-PRs lösen nichts aus; "Ready for review" startet den Lauf.
-# - Nur die Jobs laufen, deren Bereich der PR berührt (scripts/ci-changed-areas.py).
+# - Nur die Jobs laufen, deren Bereich die Änderung berührt (scripts/ci-changed-areas.py).
 # - Der Geheimnis-Scan läuft bei jeder Änderung.
-# - Kein zweiter Lauf nach dem Merge auf main; bei Bedarf manuell starten.
+# - Nach dem Merge läuft die CI ein zweites Mal auf main (#1734): Das Repo ist
+#   öffentlich, Actions-Minuten auf den Standard-Runnern kosten nichts, und das
+#   CI-Badge in der README zeigt so den echten Stand von main.
 on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
+  push:
+    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -18,14 +21,16 @@ permissions:
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
+# Bei PRs löst ein neuer Push den laufenden Lauf ab. Auf main läuft jeder Merge zu
+# Ende, sonst stünde im Badge „abgebrochen“ statt eines Ergebnisses.
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   changes:
     name: Bereiche und Geheimnis-Scan
-    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.draft == false
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
@@ -43,10 +48,11 @@ jobs:
         id: areas
         env:
           EVENT_NAME: ${{ github.event_name }}
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.event.after }}
         run: |
-          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+          # Manueller Lauf oder Push ohne Vorgänger (neuer Zweig): alles prüfen.
+          if [ "$EVENT_NAME" = "workflow_dispatch" ] || [ -z "$BASE_SHA" ] || [ "$BASE_SHA" = "0000000000000000000000000000000000000000" ]; then
             python3 scripts/ci-changed-areas.py --all >> "$GITHUB_OUTPUT"
           else
             python3 scripts/ci-changed-areas.py --base "$BASE_SHA" --head "$HEAD_SHA" >> "$GITHUB_OUTPUT"

@@ -1,0 +1,129 @@
+name: README-Bilder
+
+# Bilder für die README (#1734): Abnahme-Stand starten (docs/entwicklung/abnahme-lokal.md), mit den Testdaten aus
+# scripts/seed_abnahme.py befüllen (keine echten Mitglieder) und mit Playwright aufnehmen
+# (frontend/e2e/abnahme/readme-screenshots.spec.js).
+# - Von Hand und am Monatsersten: neue Bilder kommen als Pull Request „docs: README-Bilder aktualisieren“.
+# - In PRs, die Aufnahme oder Workflow ändern: nur als Artefakt zum Ansehen, kein PR.
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "37 4 1 * *"
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - ".github/workflows/readme-screenshots.yml"
+      - "frontend/e2e/abnahme/readme-screenshots.spec.js"
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+concurrency:
+  group: readme-screenshots-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  shots:
+    name: README-Bilder aufnehmen
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+          cache: yarn
+          cache-dependency-path: frontend/yarn.lock
+      - name: Abnahme-Stand bauen und starten
+        run: |
+          docker compose -p lsw-abnahme --env-file .env.abnahme.example \
+            -f docker-compose.yml -f docker-compose.abnahme.yml up -d --build
+          for attempt in $(seq 1 60); do
+            if curl --fail --silent http://127.0.0.1:23000/health >/dev/null && \
+               curl --fail --silent http://127.0.0.1:28001/api/health/ready >/dev/null; then
+              exit 0
+            fi
+            sleep 3
+          done
+          docker compose -p lsw-abnahme logs --no-color --tail=200
+          exit 1
+      - name: Testdaten anlegen
+        run: python3 scripts/seed_abnahme.py
+      - name: Website-Pakete installieren
+        working-directory: frontend
+        run: yarn install --frozen-lockfile
+      - name: Browser installieren
+        working-directory: frontend
+        timeout-minutes: 15
+        run: |
+          for attempt in 1 2 3; do
+            if timeout --kill-after=15 300 npx playwright install --with-deps chromium; then exit 0; fi
+            sudo pkill -9 -f '/usr/lib/apt/methods|apt-get' || true
+            sleep 10
+          done
+          exit 1
+      - name: Bilder aufnehmen
+        working-directory: frontend
+        env:
+          ABNAHME: "1"
+          E2E_BASE_URL: http://127.0.0.1:23000
+          README_SHOTS: ${{ github.workspace }}/docs/assets/readme
+        run: npx playwright test e2e/abnahme/readme-screenshots.spec.js --project=chromium --workers=1 --retries=0 --reporter=github,line
+      - name: Bilder als Artefakt
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: readme-bilder
+          path: docs/assets/readme/*.jpg
+          if-no-files-found: warn
+          retention-days: 14
+      - name: Testberichte bei Fehlern
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: readme-bilder-fehler
+          path: |
+            frontend/test-results/
+            frontend/playwright-report/
+          if-no-files-found: ignore
+          retention-days: 7
+      - name: Abnahme-Stand stoppen
+        if: always()
+        run: docker compose -p lsw-abnahme --env-file .env.abnahme.example -f docker-compose.yml -f docker-compose.abnahme.yml down --volumes --remove-orphans
+
+  pull-request:
+    name: Bilder als PR vorschlagen
+    needs: shots
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
+        with:
+          name: readme-bilder
+          path: docs/assets/readme
+      # Mit RELEASE_PLEASE_TOKEN starten CI und CodeQL im PR von selbst; ohne ihn den PR einmal schließen und
+      # wieder öffnen (docs/entwicklung/github.md).
+      - uses: peter-evans/create-pull-request@v8
+        with:
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN || github.token }}
+          branch: docs/readme-bilder
+          delete-branch: true
+          add-paths: docs/assets/readme/*.jpg
+          commit-message: "docs: README-Bilder aktualisieren"
+          title: "docs: README-Bilder aktualisieren"
+          labels: documentation
+          body: |
+            Neue Bilder für die README, aufgenommen im Abnahme-Stand mit Testdaten (keine echten Mitglieder).
+            Erzeugt von [README-Bilder](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}).

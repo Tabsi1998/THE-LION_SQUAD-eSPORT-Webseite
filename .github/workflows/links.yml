@@ -1,0 +1,55 @@
+name: Externe Links
+
+# Interne Doku-Links prüft scripts/check-doc-links.py in jedem PR. Externe Links (Anbieter-
+# Doku, Stores, Werkzeuge) brechen aber ohne Änderung bei uns. Darum einmal die Woche
+# alle http(s)-Links der Markdown-Dateien abrufen (#1734). Tote Links landen in einem
+# Issue; ein bestehendes offenes Issue wird ergänzt statt ein zweites anzulegen.
+on:
+  schedule:
+    - cron: "17 5 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  links:
+    name: Externe Links prüfen
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - name: Links abrufen
+        id: lychee
+        uses: lycheeverse/lychee-action@v2
+        with:
+          fail: false
+          output: lychee-report.md
+          args: >-
+            --no-progress
+            --scheme https --scheme http
+            --max-concurrency 8
+            --accept 200..=299,403,429
+            --exclude '^https?://(127\.0\.0\.1|localhost|[^/]*\.test)([:/]|$)'
+            --exclude '^https?://example\.(com|org|test)'
+            --exclude-path 'node_modules'
+            --exclude-path 'test_reports'
+            './**/*.md'
+      - name: Issue anlegen oder ergänzen
+        if: steps.lychee.outputs.exit_code != '0'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          title="Externe Doku-Links nicht erreichbar"
+          { echo "Die wöchentliche Prüfung hat tote Links gefunden ([Lauf]($RUN_URL))."; echo; cat lychee-report.md; } > body.md
+          existing=$(gh issue list --state open --search "in:title \"$title\"" --json number --jq '.[0].number // empty')
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --body-file body.md
+          else
+            gh issue create --title "$title" --label documentation --body-file body.md
+          fi

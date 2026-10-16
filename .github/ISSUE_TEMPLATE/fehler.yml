@@ -1,0 +1,61 @@
+name: Fehler melden
+description: Etwas auf der Website oder in der LionsAPP funktioniert nicht wie erwartet.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Danke fürs Melden! **Dieses Repository ist öffentlich.** Bitte keine Namen, E-Mail-Adressen, Fotos von
+        Mitgliedern, Zugangsdaten oder Screenshots mit persönlichen Daten eintragen. Sicherheitslücken bitte
+        [privat melden](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/security/advisories/new).
+  - type: dropdown
+    id: bereich
+    attributes:
+      label: Wo tritt der Fehler auf?
+      multiple: true
+      options:
+        - Website (öffentlich)
+        - Website (Mitgliederbereich)
+        - Website (Verwaltung)
+        - LionsAPP (Android)
+        - TV-Ansicht / Halle
+        - Server / Betrieb
+    validations:
+      required: true
+  - type: textarea
+    id: was
+    attributes:
+      label: Was ist passiert?
+      description: Kurz und konkret – was hast du gesehen?
+    validations:
+      required: true
+  - type: textarea
+    id: erwartet
+    attributes:
+      label: Was hättest du erwartet?
+    validations:
+      required: true
+  - type: textarea
+    id: schritte
+    attributes:
+      label: So lässt es sich nachstellen
+      placeholder: |
+        1. Seite … öffnen
+        2. Auf … tippen
+        3. …
+    validations:
+      required: false
+  - type: input
+    id: geraet
+    attributes:
+      label: Gerät und Browser bzw. App-Version
+      placeholder: z. B. Pixel 8, Chrome 141 – oder LionsAPP 1.7.0 (Build 94)
+    validations:
+      required: false
+  - type: checkboxes
+    id: datenschutz
+    attributes:
+      label: Datenschutz
+      options:
+        - label: Mein Text und meine Anhänge enthalten keine persönlichen Daten von Mitgliedern und keine Zugänge.
+          required: true

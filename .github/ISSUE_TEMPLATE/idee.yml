@@ -1,0 +1,43 @@
+name: Idee vorschlagen
+description: Eine neue Funktion oder Verbesserung für Website oder LionsAPP.
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Super, dass du eine Idee hast! **Dieses Repository ist öffentlich** – bitte keine persönlichen Daten
+        von Mitgliedern eintragen.
+  - type: dropdown
+    id: bereich
+    attributes:
+      label: Wofür ist die Idee?
+      multiple: true
+      options:
+        - Turniere / Fast Lap / Jahreswertung
+        - Events / Turniertag vor Ort
+        - Mitgliederbereich / Profile / Community
+        - Startseite / News / Galerie
+        - Verwaltung
+        - LionsAPP
+        - Sonstiges
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: Welches Problem löst sie?
+      description: Wer hat den Nutzen, und was ist heute umständlich oder fehlt?
+    validations:
+      required: true
+  - type: textarea
+    id: vorschlag
+    attributes:
+      label: Wie stellst du dir das vor?
+    validations:
+      required: true
+  - type: textarea
+    id: alternativen
+    attributes:
+      label: Andere Wege, an die du gedacht hast
+    validations:
+      required: false
