@@ -66,11 +66,11 @@ Passkey, Zwei-Faktor für die Verwaltung.
 <table>
   <tr>
     <td width="50%"><img src="docs/assets/readme/mein-bereich.jpg" alt="Mein Bereich eines Spielers" width="100%"></td>
-    <td width="50%"><img src="docs/assets/readme/podest.jpg" alt="Podest einer beendeten Liga" width="100%"></td>
+    <td width="50%"><img src="docs/assets/readme/sieger-moment.jpg" alt="Sieger-Moment nach einer beendeten Liga" width="100%"></td>
   </tr>
   <tr>
     <td align="center"><sub>Mein Bereich</sub></td>
-    <td align="center"><sub>Podest einer beendeten Liga</sub></td>
+    <td align="center"><sub>Sieger-Moment nach der Liga</sub></td>
   </tr>
 </table>
 
