@@ -67,10 +67,12 @@ test.describe("README-Bilder aus dem Abnahme-Stand", () => {
     // Beendete Liga mit geteiltem Platz 1: Spieler 1 sieht seinen Sieger-Moment (nur beim ersten Besuch).
     await page.goto(`/tournaments/${state.slugs.league_published}`);
     const moment = page.getByTestId("placement-moment");
-    if (await moment.isVisible({ timeout: 5_000 }).catch(() => false)) {
+    const appeared = await moment.waitFor({ state: "visible", timeout: 12_000 }).then(() => true, () => false);
+    if (appeared) {
       await page.waitForTimeout(1_000);
       await shot(page, "sieger-moment");
       await page.getByTestId("placement-moment-close").click();
+      await expect(moment).toHaveCount(0);
     }
     const podium = page.getByTestId("podium");
     await podium.scrollIntoViewIfNeeded();
