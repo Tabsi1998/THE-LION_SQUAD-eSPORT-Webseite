@@ -75,7 +75,7 @@ jobs:
           ABNAHME: "1"
           E2E_BASE_URL: http://127.0.0.1:23000
           README_SHOTS: ${{ github.workspace }}/docs/assets/readme
-        run: npx playwright test e2e/abnahme/readme-screenshots.spec.js --project=chromium --workers=1
+        run: npx playwright test e2e/abnahme/readme-screenshots.spec.js --project=chromium --workers=1 --retries=0 --reporter=github,line
       - name: Bilder als Artefakt
         if: always()
         uses: actions/upload-artifact@v7
@@ -84,6 +84,16 @@ jobs:
           path: docs/assets/readme/*.jpg
           if-no-files-found: warn
           retention-days: 14
+      - name: Testberichte bei Fehlern
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: readme-bilder-fehler
+          path: |
+            frontend/test-results/
+            frontend/playwright-report/
+          if-no-files-found: ignore
+          retention-days: 7
       - name: Abnahme-Stand stoppen
         if: always()
         run: docker compose -p lsw-abnahme --env-file .env.abnahme.example -f docker-compose.yml -f docker-compose.abnahme.yml down --volumes --remove-orphans
