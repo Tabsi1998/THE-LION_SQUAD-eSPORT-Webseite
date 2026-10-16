@@ -40,14 +40,17 @@ Was die Funktionen können und was ihr dafür einrichtet – zum Durchlesen, ohn
 | [PUBLIC_ROUTE_INVENTORY](PUBLIC_ROUTE_INVENTORY.md) | Öffentliche Seiten und Routen |
 | [Frontend](frontend/README.md) | Lokale Entwicklung und Build |
 | [Abnahme lokal](docs/entwicklung/abnahme-lokal.md) | Echter Server in Docker mit Testdaten, Browser-Abnahme ohne Nachstellen |
+| [GitHub-Automatik](docs/entwicklung/github.md) | Workflows, PR-Titel, Website-Releases, README-Bilder, Vorlagen und Einstellungen |
+| [CHANGELOG](CHANGELOG.md) | Versionen der Website |
 | [PERFORMANCE_BUDGETS](frontend/PERFORMANCE_BUDGETS.md) | Frontend-Leistungsziele |
 
 Prüfungen: [CI](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/actions/workflows/ci.yml),
 [CodeQL](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/actions/workflows/codeql.yml),
 [alle Workflows](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/actions).
 Lokale Markdown-Linkziele werden mit `python scripts/check-doc-links.py` geprüft; dasselbe Skript hält
-die Obergrenze von `CLAUDE.md` (60 KB).
-Das ersetzt keine manuelle Prüfung externer Links oder der fachlichen Abnahme.
+die Obergrenze von `CLAUDE.md` (60 KB). Externe Links prüft der Workflow
+[Externe Links](.github/workflows/links.yml) einmal die Woche.
+Das ersetzt nicht die fachliche Abnahme.
 
 ## Arbeit mit Claude Code
 

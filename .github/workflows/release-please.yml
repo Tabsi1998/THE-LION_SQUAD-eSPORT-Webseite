@@ -1,0 +1,41 @@
+name: Website-Release
+
+# Versionen und Changelog der Website (#1734). Nach jedem Merge auf main sammelt
+# release-please die PR-Titel (feat:, fix: ...) in einem Release-PR. Wer ihn mergt,
+# bekommt Tag vX.Y.Z, GitHub-Release und den Eintrag in CHANGELOG.md.
+# Die App behält ihren eigenen, lokalen Ablauf (mobile/RELEASES.md, Tags mobile-v*);
+# Änderungen unter mobile/ zählen hier nicht mit (release-please-config.json).
+#
+# Token: Mit dem Secret RELEASE_PLEASE_TOKEN (fein granulierter Token, nur dieses Repo,
+# Contents und Pull requests: Lesen und Schreiben) starten CI und CodeQL im Release-PR
+# von selbst. Ohne das Secret nimmt der Workflow den GITHUB_TOKEN; dann den Release-PR
+# einmal schließen und wieder öffnen, damit die Pflicht-Prüfungen laufen
+# (docs/entwicklung/github.md).
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+concurrency:
+  group: release-please
+  cancel-in-progress: false
+
+jobs:
+  release-please:
+    name: Release-PR pflegen
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: googleapis/release-please-action@v5
+        with:
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN || github.token }}
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json

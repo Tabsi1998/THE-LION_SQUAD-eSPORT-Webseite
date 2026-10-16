@@ -82,5 +82,7 @@ their reason and expiry date; none of them is part of the shipped app bundle.
 
 ## Reporting
 
-Report suspected vulnerabilities privately to the repository owner. Do not open a public
-issue containing exploit details, personal data, or credentials.
+Report suspected vulnerabilities privately to the repository owner via
+[GitHub private vulnerability reporting](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/security/advisories/new)
+("Security" tab → "Report a vulnerability"). Do not open a public issue containing exploit
+details, personal data, or credentials.

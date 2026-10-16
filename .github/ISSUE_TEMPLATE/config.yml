@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Sicherheitslücke melden (privat)
+    url: https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/security/advisories/new
+    about: Schwachstellen bitte nie öffentlich als Issue, sondern privat über GitHub melden.
+  - name: Frage oder Anliegen an den Verein
+    url: https://lionsquad.at/contact
+    about: Mitgliedschaft, Turnieranmeldung oder Daten zu deinem Konto – dafür ist das Kontaktformular da.

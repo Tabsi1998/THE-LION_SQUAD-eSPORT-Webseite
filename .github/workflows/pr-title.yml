@@ -1,0 +1,50 @@
+name: PR-Titel
+
+# Gemergt wird mit „Squash and merge“, der PR-Titel wird damit zur Commit-Nachricht auf
+# main. Daraus schreibt release-please Version und Changelog (#1734). Deshalb beginnt
+# jeder PR-Titel mit einem Typ nach Conventional Commits, der Rest bleibt Deutsch:
+#   feat: Turnierbaum zeigt Sieger-Moment      -> neue Minor-Version, Abschnitt „Neu“
+#   fix: Anmeldung vergisst die Begleitperson  -> neue Patch-Version, „Fehlerbehebungen“
+#   feat!: ...                                 -> neue Major-Version (bricht etwas)
+# Ein Bereich in Klammern ist erlaubt, aber nicht nötig: fix(app): ...
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened, ready_for_review]
+
+permissions:
+  pull-requests: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+concurrency:
+  group: pr-title-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  title:
+    name: PR-Titel prüfen
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: amannn/action-semantic-pull-request@v6
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        with:
+          types: |
+            feat
+            fix
+            perf
+            revert
+            docs
+            deps
+            refactor
+            test
+            ci
+            build
+            style
+            chore
+          subjectPattern: ^\S.*$
+          subjectPatternError: |
+            Nach dem Typ fehlt die Beschreibung: „{title}“.
+            Beispiel: „feat: Turnierbaum zeigt Sieger-Moment“ oder „fix: Anmeldung vergisst die Begleitperson“.

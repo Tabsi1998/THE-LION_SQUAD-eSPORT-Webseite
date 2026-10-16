@@ -1,0 +1,26 @@
+name: PR-Labels
+
+# Setzt Labels nach den geänderten Ordnern (Regeln in .github/labeler.yml, #1734).
+# Von Hand gesetzte Labels bleiben stehen.
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  label:
+    name: Labels nach Bereich
+    # PRs aus Forks bekommen keinen Schreibzugriff; dort setzt der Betreiber die Labels.
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/labeler@v7
+        with:
+          sync-labels: false

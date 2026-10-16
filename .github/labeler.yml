@@ -1,0 +1,29 @@
+# Labels nach Bereich für Pull Requests (#1734), gesetzt von .github/workflows/labeler.yml.
+# Nur vorhandene Labels; ein PR kann mehrere bekommen.
+backend:
+  - changed-files:
+      - any-glob-to-any-file: ["backend/**"]
+
+web:
+  - changed-files:
+      - any-glob-to-any-file: ["frontend/**"]
+
+app:
+  - changed-files:
+      - any-glob-to-any-file: ["mobile/**"]
+
+documentation:
+  - changed-files:
+      - any-glob-to-any-file: ["**/*.md", "docs/**"]
+
+github_actions:
+  - changed-files:
+      - any-glob-to-any-file: [".github/**"]
+
+operations:
+  - changed-files:
+      - any-glob-to-any-file: ["scripts/**", "deploy/**", "docker-compose*.yml", "install.sh", "update.sh", ".env*.example"]
+
+dependencies:
+  - changed-files:
+      - any-glob-to-any-file: ["**/requirements*.txt", "**/package.json", "**/yarn.lock", "**/package-lock.json"]

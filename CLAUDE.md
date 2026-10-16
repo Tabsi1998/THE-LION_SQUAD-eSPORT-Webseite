@@ -95,6 +95,9 @@ npx jest src/pfad/Datei.test.tsx && npx tsc --noEmit
   `fix/<nr>-<stichwort>`, `docs/…`.
 - Commit- und PR-Texte auf Deutsch, mit dem Warum. Im PR-Text je Issue `Closes #N` (englisch – deutsches
   „Schließt“ schließt nichts).
+- PR-Titel beginnt mit einem Typ nach Conventional Commits (`feat:`, `fix:`, `perf:`, `docs:`, `chore:` …),
+  der Rest auf Deutsch – daraus entstehen Version und Changelog der Website
+  ([GitHub-Automatik](docs/entwicklung/github.md)). Der Workflow „PR-Titel“ prüft das.
 - PR als Entwurf öffnen, lokal prüfen, dann bereit melden. Gemergt wird mit „Squash and merge“.
 - `CLAUDE.md` nur in eigenen Doku-PRs ändern; Themen-Doku (`docs/…`, `mobile/CHANGELOG.md`) gehört in den
   Feature-PR.
@@ -104,5 +107,7 @@ npx jest src/pfad/Datei.test.tsx && npx tsc --noEmit
 - **App:** lokal gebaut und veröffentlicht, Ablauf in [`mobile/RELEASES.md`](mobile/RELEASES.md),
   Geräteabnahme in [`mobile/RELEASE_SMOKE_TEST.md`](mobile/RELEASE_SMOKE_TEST.md). Signierschlüssel liegen
   nur auf dem Rechner des Betreibers.
+- **Website:** release-please pflegt einen Release-PR; sein Merge erzeugt Tag `vX.Y.Z`, Release und
+  `CHANGELOG.md` ([GitHub-Automatik](docs/entwicklung/github.md)).
 - **Server:** der Betreiber spielt Updates von Hand mit `update.sh` ein – kein automatisches Deployment.
   Anleitung: [`UPDATE.md`](UPDATE.md), Betrieb: [`docs/BETRIEB.md`](docs/BETRIEB.md).

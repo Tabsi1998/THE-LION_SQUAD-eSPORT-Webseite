@@ -1,0 +1,36 @@
+name: Dependabot Auto-Merge
+
+# Patch-Updates (x.y.Z) von Dependabot mergen sich selbst, sobald die Pflicht-Prüfungen
+# der Regel für main grün sind (#1734). GitHub wartet dafür von selbst auf „CI-Ergebnis“
+# und CodeQL; schlägt eine Prüfung fehl, bleibt der PR offen. Minor- und Major-Updates
+# prüft der Betreiber weiter von Hand. Eine Gruppe, die auch nur ein Minor-Update
+# enthält, gilt als Minor und mergt sich nicht selbst.
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  auto-merge:
+    name: Patch-Update automatisch mergen
+    if: github.event.pull_request.user.login == 'dependabot[bot]' && github.repository == 'Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Art des Updates lesen
+        id: meta
+        uses: dependabot/fetch-metadata@v3
+        with:
+          github-token: ${{ github.token }}
+      - name: Auto-Merge einschalten
+        if: steps.meta.outputs.update-type == 'version-update:semver-patch'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+        run: gh pr merge --auto --squash "$PR_URL"
