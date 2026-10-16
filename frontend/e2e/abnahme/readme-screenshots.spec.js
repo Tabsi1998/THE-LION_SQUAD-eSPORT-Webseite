@@ -13,9 +13,11 @@ const DESKTOP = { width: 1440, height: 900 };
 const PHONE = { width: 390, height: 844 };
 
 async function settle(page) {
-  await page.waitForLoadState("networkidle").catch(() => {});
-  // Einblendungen und Zähler zu Ende laufen lassen, damit das Bild ruhig ist.
-  await page.waitForTimeout(1_200);
+  // Kein "networkidle": Live-Seiten fragen laufend nach und würden nie ruhig. Stattdessen laden lassen, warten, bis
+  // keine Lade-Platzhalter mehr stehen, und Einblendungen zu Ende laufen lassen.
+  await page.waitForLoadState("load");
+  await expect(page.locator("[aria-busy='true']")).toHaveCount(0, { timeout: 15_000 }).catch(() => {});
+  await page.waitForTimeout(2_500);
 }
 
 async function shot(page, name) {
