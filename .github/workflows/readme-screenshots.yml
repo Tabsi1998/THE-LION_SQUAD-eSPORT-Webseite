@@ -16,7 +16,7 @@ on:
       - "frontend/e2e/abnahme/readme-screenshots.spec.js"
 
 permissions:
-  contents: read
+  contents: write
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -94,6 +94,14 @@ jobs:
             frontend/playwright-report/
           if-no-files-found: ignore
           retention-days: 7
+      - name: TEMP Vorschau-Zweig
+        if: github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git config user.name github-actions; git config user.email github-actions@users.noreply.github.com
+          git checkout --orphan tmp-shots && git rm -rfq --cached . && git add -f docs/assets/readme/*.jpg
+          git commit -qm "temp shots" && git push -f origin HEAD:refs/heads/tmp/readme-bilder-1735
       - name: Abnahme-Stand stoppen
         if: always()
         run: docker compose -p lsw-abnahme --env-file .env.abnahme.example -f docker-compose.yml -f docker-compose.abnahme.yml down --volumes --remove-orphans
