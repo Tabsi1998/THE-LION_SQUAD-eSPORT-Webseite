@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.2](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/compare/v1.0.1...v1.0.2) (2026-10-18)
+
+
+### Fehlerbehebungen
+
+* Planer löst alten Termin, wenn ein Spiel nach Austritt nur noch einen Spieler hat ([#1608](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1608)) ([#1765](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1765)) ([b30bc62](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/b30bc620625df24757088076671836640782603c))
+
 ## [1.0.1](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/compare/v1.0.0...v1.0.1) (2026-10-18)
 
 
