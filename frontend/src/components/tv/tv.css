@@ -1111,7 +1111,7 @@
 .tv-lanes__lane[data-state="called"] .tv-lanes__name { color: var(--tv-gold); }
 .tv-lanes__cell { display: grid; grid-template-rows: auto 1fr; gap: calc(var(--tv-u) * 0.35); min-width: 0; }
 .tv-lanes__kicker { display: inline-flex; align-items: center; gap: 0.5em; color: var(--tv-muted); }
-.tv-lanes__cell--now .tv-lanes__kicker { color: var(--tv-live); }
+.tv-lanes__lane[data-state="live"] .tv-lanes__cell--now .tv-lanes__kicker { color: var(--tv-live); }
 .tv-lanes__cell--next .tv-lanes__kicker { color: var(--tv-gold); }
 .tv-lanes__stack { display: grid; min-width: 0; }
 .tv-lanes__swap { grid-area: 1 / 1; min-width: 0; }
