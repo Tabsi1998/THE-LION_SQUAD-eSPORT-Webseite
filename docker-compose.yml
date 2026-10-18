@@ -50,6 +50,9 @@ services:
       # Signierte Webhooks des Vereinsmoduls (#1540): Schlüssel-Kennung:Geheimnis, mehrere mit Komma.
       DOLIBARR_WEBHOOK_SECRETS: "${DOLIBARR_WEBHOOK_SECRETS:-}"
       DISABLE_SCHEDULER: "${DISABLE_SCHEDULER:-false}"
+      # Nur ausgewählte Hintergrund-Jobs (#1609), leer: alle. Versandsperre nur für lokale Abnahme-Stände.
+      SCHEDULER_JOBS: "${SCHEDULER_JOBS:-}"
+      OUTBOUND_DISABLED: "${OUTBOUND_DISABLED:-false}"
       UPLOAD_DIR: "${UPLOAD_DIR:-/app/backend/uploads}"
       MAX_IMAGE_UPLOAD_MB: "${MAX_IMAGE_UPLOAD_MB:-50}"
       MAX_VIDEO_UPLOAD_MB: "${MAX_VIDEO_UPLOAD_MB:-1536}"
