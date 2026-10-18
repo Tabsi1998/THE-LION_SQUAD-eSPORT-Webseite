@@ -418,3 +418,22 @@ def test_the_tv_learns_about_mixed_groups_and_where_each_player_really_came_from
     assert slot["source"]["draw"] == {"group": "WB:2", "label": "Runde 1"}
     assert slot["source_result"] == {"from_match_id": "c", "from_match_key": "C", "rank": 1, "flow": "W", "draw_id": "d1"}
     assert "user-1" not in json.dumps(match) and "user-9" not in json.dumps(match)
+
+
+def test_the_tv_learns_the_advancement_mode_and_when_a_show_draw_is_ready():
+    """Show-Auslosung und „sofort zufällig“ am TV (#1634): der Modus am Spiel und der Marker „bereit“ mit Gruppe, Zeit und
+    Zahl der Namen - nicht, wann und wem die Erinnerung ging."""
+    payload = {"tournament": {"id": "t1"}, "registrations": [], "stages": [], "matches_v2": [
+        {"id": "e", "match_key": "E", "section": "WB", "round": 2, "status": "pending", "results": [], "slots": [],
+         "settings": {"draw_group": "WB:2", "advancement_mode": "draw_show", "draw_show_minutes": 7},
+         "draw_ready": {"group": "WB:2", "since": "2026-10-31T15:00:00Z", "pot_size": 8,
+                        "reminded_at": "2026-10-31T15:07:00Z", "reminded_by": "user-7"}},
+        {"id": "f", "match_key": "F", "section": "WB", "round": 2, "status": "pending", "results": [], "slots": [],
+         "settings": {"draw_group": "WB:2", "randomize_advancement_rounds": True}},
+    ]}
+    matches = {match["id"]: match for match in tv_display.display_bracket_payload(payload)["matches_v2"]}
+    assert matches["e"]["settings"] == {"draw_group": "WB:2", "advancement_mode": "draw_show"}
+    assert matches["e"]["draw_ready"] == {"group": "WB:2", "since": "2026-10-31T15:00:00Z", "pot_size": 8}
+    assert matches["f"]["settings"]["randomize_advancement_rounds"] is True
+    assert "draw_ready" not in matches["f"]
+    assert "user-7" not in json.dumps(matches)
