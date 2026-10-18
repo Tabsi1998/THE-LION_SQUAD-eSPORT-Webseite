@@ -75,7 +75,7 @@ test("ein Ergebnis: der Ergebnis-Moment kommt - der Sieger fährt danach entlang
   expect(main()).not.toHaveAttribute("data-moment");
   await change("se8_after_a");
   await waitFor(() => expect(main()).toHaveAttribute("data-moment", "result"));
-  expect(screen.getByTestId("tv-result-card")).toHaveTextContent("entschieden");
+  expect(await screen.findByTestId("tv-result-card")).toHaveTextContent("entschieden");
 });
 
 test("korrigiert: das geänderte Ergebnis eines entschiedenen Spiels sagt „korrigiert“", async () => {
@@ -123,7 +123,8 @@ test("Läufe zusammengelegt: eigener Moment, die frei gewordenen Stationen leuch
   await screen.findByTestId("tv-tree");
   await change("ffa8_after_merge");
   await waitFor(() => expect(main()).toHaveAttribute("data-moment", "merge"));
-  const banner = screen.getByTestId("tv-live-banner");
+  // Den Banner setzt die Bühne im Effekt nach dem Moment (TvBracketStage) - einen Takt später als `data-moment` (#1614).
+  const banner = await screen.findByTestId("tv-live-banner");
   expect(banner).toHaveTextContent("Läufe zusammengelegt");
   expect(screen.getByTestId("tv-freed")).toHaveTextContent("Switch 3 und Switch 4 sind frei");
 });
@@ -153,7 +154,8 @@ test("Auslosung: ein Moment, die Namen kommen nacheinander in die Läufe", async
     emitApiInvalidation({ resource: "matches" });
   });
   await waitFor(() => expect(main()).toHaveAttribute("data-moment", "draw"));
-  expect(screen.getByTestId("tv-live-banner")).toHaveTextContent("Auslosung");
+  // Wackelte unter Last (#1614): `data-moment` setzt die Seite sofort, den Banner die Bühne erst im Effekt danach.
+  expect(await screen.findByTestId("tv-live-banner")).toHaveTextContent("Auslosung");
   await waitFor(() => expect(document.querySelectorAll(".tv-row--draw").length).toBe(16));
 });
 
@@ -343,7 +345,7 @@ test("Nachhol-Abfrage aussteht, eine neue Meldung kommt, die Nachhol-Antwort zue
   // Neu gemeldet: das Ergebnis von A wurde korrigiert - dieser Moment kommt.
   await act(async () => { pending[1]({ data: state("se8_corrected") }); });
   await waitFor(() => expect(main()).toHaveAttribute("data-moment", "result"));
-  expect(screen.getByTestId("tv-result-card")).toHaveTextContent("Korrigiert");
+  expect(await screen.findByTestId("tv-result-card")).toHaveTextContent("Korrigiert");
 });
 
 test("kurzes Neuverbinden des Stroms (wenige 100 ms, z. B. Server oder Proxy) ist keine Unterbrechung - der Moment kommt", async () => {
@@ -386,5 +388,5 @@ test("Nachhol-Antwort und Meldungs-Antwort im selben Render-Durchgang: nur der n
   });
   await waitFor(() => expect(main()).toHaveAttribute("data-moment", "result"));
   // Der Moment ist die Korrektur - nicht das verpasste „entschieden“.
-  expect(screen.getByTestId("tv-result-card")).toHaveTextContent("Korrigiert");
+  expect(await screen.findByTestId("tv-result-card")).toHaveTextContent("Korrigiert");
 });
