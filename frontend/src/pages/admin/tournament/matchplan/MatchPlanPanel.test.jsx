@@ -304,6 +304,24 @@ describe("Automatisch planen: Vorschau und Übernehmen", () => {
     await waitFor(() => expect(screen.queryByTestId("mp-preview")).toBeNull());
     expect(apiMock.post.mock.calls.some(([url]) => url.includes("/schedule/apply"))).toBe(false);
   });
+
+  // #1608: Nach einem Austritt hat ein Spiel nur noch einen Spieler - der Planer löst seinen alten Termin. Auch wenn sonst
+  // nichts zu ändern ist, sagt die Vorschau das und „Übernehmen“ geht.
+  it("nennt gelöste Termine (nur noch ein Spieler) und lässt sie übernehmen", async () => {
+    const user = userEvent.setup();
+    const state = fixture.local.preview;
+    const plan = {
+      ...state.plan,
+      assignments: state.plan.assignments.map((item) => ({ ...item, changed: false })),
+      releases: [{ match_id: "m-e", label: "E", previous: { scheduled_at: state.plan.planned_at, station_id: "st-1", schedule_source: "planner" } }],
+    };
+    setup(state, { plan });
+    await user.click(screen.getByRole("button", { name: "Automatisch planen" }));
+    const preview = await screen.findByTestId("mp-preview");
+    expect(preview).toHaveTextContent("1 Termin wird gelöst (nur noch ein Spieler)");
+    expect(preview).not.toHaveTextContent("Nichts zu ändern");
+    expect(within(preview).getByRole("button", { name: "Übernehmen" })).toBeEnabled();
+  });
 });
 
 describe("Konflikte und feste Termine", () => {

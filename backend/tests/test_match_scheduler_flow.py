@@ -461,3 +461,58 @@ async def test_an_online_phase_is_not_replanned_after_a_rebuild(flow):
     stage = await flow.db.tournament_stages.find_one({"tournament_id": tournament["id"]}, {"_id": 0})
     assert await replan_after_heat_rebuild(flow.db, stored, stage) == {"applies": False, "written": 0, "warnings": []}
     assert all(not match.get("station_id") and not match.get("scheduled_at") for match in await flow.matches(tournament))
+
+
+async def final_left_with_a_bye(flow, tournament):
+    """Wie nach dem Austritt des Siegers aus Runde 1: sein Platz im Finale wird ein Freilos."""
+    final = next(row for row in await flow.matches(tournament) if row["round"] == 2)
+    slots = [dict(slot) for slot in final["slots"]]
+    slots[0] = {**slots[0], "source": {"type": "bye"}, "registration_id": None, "user_id": None, "status": "bye"}
+    await flow.db.matches_v2.update_one({"id": final["id"]}, {"$set": {"slots": slots}})
+    return final
+
+
+@pytest.mark.asyncio
+async def test_a_planner_time_on_a_match_left_with_a_bye_is_released_on_apply(flow):
+    """#1608: Nach einem Austritt hat ein späteres Spiel nur noch einen Spieler (Freilos). Der Planer plant es nicht mehr,
+    und „Übernehmen“ löst seinen alten Termin samt Station, statt ihn als Überschneidung stehen zu lassen."""
+    from services.match_scheduler import apply_plan, plan_for_tournament
+
+    _staff, tournament, _users, _registrations = await built(flow, **on_site_fields())
+    await stations(flow, tournament, "1", "2")
+    stored = await flow.db.tournaments.find_one({"id": tournament["id"]}, {"_id": 0})
+    await apply_plan(flow.db, stored, await plan_for_tournament(flow.db, stored))
+    planned = next(row for row in await flow.matches(tournament) if row["round"] == 2)
+    assert planned["schedule_source"] == "planner" and planned["scheduled_at"] and planned["station_id"]
+
+    final = await final_left_with_a_bye(flow, tournament)
+    plan = await plan_for_tournament(flow.db, stored)
+    assert [item["match_id"] for item in plan["releases"]] == [final["id"]]
+    result = await apply_plan(flow.db, stored, plan)
+    assert result["written"] >= 1
+    released = await flow.reload(final)
+    assert released["scheduled_at"] is None and released["station_id"] is None and released["schedule_source"] is None
+    assert released["schedule_forecast"] is False
+    # Nichts mehr zu lösen: der nächste Plan ist ruhig.
+    assert (await plan_for_tournament(flow.db, stored))["releases"] == []
+
+
+@pytest.mark.asyncio
+async def test_a_release_does_not_touch_a_match_set_by_hand_after_the_preview(flow):
+    from services.match_scheduler import apply_plan, plan_for_tournament
+
+    _staff, tournament, _users, _registrations = await built(flow, **on_site_fields())
+    station, _other = await stations(flow, tournament, "1", "2")
+    stored = await flow.db.tournaments.find_one({"id": tournament["id"]}, {"_id": 0})
+    await apply_plan(flow.db, stored, await plan_for_tournament(flow.db, stored))
+    final = await final_left_with_a_bye(flow, tournament)
+    plan = await plan_for_tournament(flow.db, stored)
+    assert plan["releases"]
+
+    # Zwischen Vorschau und Übernehmen setzt die Leitung das Finale von Hand.
+    fixed = (now_utc() + timedelta(hours=4)).replace(microsecond=0).isoformat()
+    await flow.db.matches_v2.update_one({"id": final["id"]},
+                                        {"$set": {"scheduled_at": fixed, "station_id": station["id"], "schedule_source": "manual"}})
+    await apply_plan(flow.db, stored, plan)
+    kept = await flow.reload(final)
+    assert kept["schedule_source"] == "manual" and kept["scheduled_at"] == fixed and kept["station_id"] == station["id"]
