@@ -30,8 +30,8 @@ function DurationSource({ own, inherited, testId }) {
 // Je Spiel (nach Codex-Prüfung): ein Einsatz für einzelne Spiele, Phasen, Gruppen oder Stationen zeigt seine Knöpfe nur dort.
 const NO_MATCH_RIGHTS = () => ({ plan: false, results: false });
 
-// Rechte je Turnier (#1353), wie sie der Server schickt: Einstellungen der Phasen nur für die Turnierleitung über alle
-// Turniere, Erzeugen mit dem Aufbau-Recht, Termin und Station mit dem Check-in-Recht, Ergebnisse mit dem Ergebnis-Recht.
+// Rechte je Turnier (#1353), wie sie der Server schickt: Regeln der Phasen (#1636) und Erzeugen mit dem Aufbau-Recht,
+// Termin und Station mit dem Check-in-Recht, Ergebnisse mit dem Ergebnis-Recht.
 export function TournamentStagesPanel({ tournamentId, stages, matches, registrations, stations = [], canEditSettings = false, canManageStructure = false, rightsForMatch = NO_MATCH_RIGHTS, onChanged, onOpenMatchplan = null, mode = "operations", tournament = null, durationGame = null }) {
   const showSettings = canEditSettings && mode === "settings";
   const showMatchList = mode !== "settings";
@@ -199,6 +199,27 @@ export function TournamentStagesPanel({ tournamentId, stages, matches, registrat
   );
 }
 
+function stageFormOf(stage) {
+  const settings = stage.settings || {};
+  return {
+    name: stage.name || "",
+    match_type: stage.match_type || "ffa",
+    stage_type: stage.stage_type || "ffa_custom_bracket",
+    status: stage.status || "pending",
+    match_size: settings.match_size || 4,
+    min_players: settings.min_players || 2,
+    qualifiers_per_match: settings.qualifiers_per_match || 2,
+    duration_minutes: ownDurationInput(settings.duration_minutes),
+    event_mode: settings.event_mode || "",
+    result_entry_mode: settings.result_entry_mode || "",
+    schedule_mode: settings.schedule_mode || "",
+    grand_final: settings.grand_final || "",
+    advancement: stageAdvancementValue(settings),
+    draw_show_minutes: settings.draw_show_minutes ?? "",
+    schema: settings.schema || "",
+  };
+}
+
 // Regel-Felder einer Phase (#1636), die die Turnierleitung im Betrieb ändern darf. Die Weiterkommen-Felder kommen aus
 // stageAdvancementSettings (Modus + alter Schalter).
 const RULE_SETTING_KEYS = [
@@ -208,9 +229,9 @@ const RULE_SETTING_KEYS = [
 
 const EVENT_MODE_HINTS = {
   "": "Die Phase spielt so, wie es beim Turnier eingestellt ist.",
-  local: "Vor Ort: Spiele laufen an Stationen, mit Warteschlange und Aufruf.",
-  online: "Online: Runden mit Fristen, die Spieler melden ihre Ergebnisse selbst.",
-  hybrid: "Hybrid: grundsätzlich online, ein Spiel mit Station läuft vor Ort.",
+  local: "Vor Ort: Der Matchplan verteilt die Spiele auf Stationen, mit Warteschlange und Aufruf. Ergebnisse trägt ohne eigene Einstellung die Turnierleitung ein.",
+  online: "Online: Runden mit Fristen. Ohne eigene Einstellung melden die Spieler ihre Ergebnisse selbst und stimmen Termine ab.",
+  hybrid: "Hybrid: Es gelten die Online-Regeln (Fristen, Spieler melden). Stationen plant der Matchplan nur bei „Vor Ort“.",
 };
 
 // „Regeln dieser Phase“ (#1636): aufklappbar unter dem Kopf der Phase, nur für die Turnierleitung. Aufbau, Schema und
@@ -286,23 +307,13 @@ function StageCard({ tournamentId, stage, matches, regById, stations = [], canMa
   const settings = stage.settings || {};
   const durationContext = useContext(DurationContext);
   const [activeSection, setActiveSection] = useState("all");
-  const [form, setForm] = useState({
-    name: stage.name || "",
-    match_type: stage.match_type || "ffa",
-    stage_type: stage.stage_type || "ffa_custom_bracket",
-    status: stage.status || "pending",
-    match_size: settings.match_size || 4,
-    min_players: settings.min_players || 2,
-    qualifiers_per_match: settings.qualifiers_per_match || 2,
-    duration_minutes: ownDurationInput(settings.duration_minutes),
-    event_mode: settings.event_mode || "",
-    result_entry_mode: settings.result_entry_mode || "",
-    schedule_mode: settings.schedule_mode || "",
-    grand_final: settings.grand_final || "",
-    advancement: stageAdvancementValue(settings),
-    draw_show_minutes: settings.draw_show_minutes ?? "",
-    schema: settings.schema || "",
-  });
+  const [form, setForm] = useState(() => stageFormOf(stage));
+  // Neuer Stand der Phase vom Server (#1636, Codex): das Formular folgt, damit Speichern keine alten Werte zurückschreibt.
+  const version = `${stage.updated_at || ""}|${JSON.stringify(settings)}`;
+  useEffect(() => {
+    setForm(stageFormOf(stage));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [version]);
   const confirm = useConfirm();
   const config = stageConfigFor(form);
   const set = (k, v) => setForm((x) => ({ ...x, [k]: v }));
