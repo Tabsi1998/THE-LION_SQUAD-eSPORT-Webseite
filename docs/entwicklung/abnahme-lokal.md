@@ -27,8 +27,10 @@ ABNAHME_SOURCE=../lsw-pr docker compose -p lsw-abnahme --env-file .env.abnahme.e
 Der Ordner für `ABNAHME_SOURCE` sollte kein `frontend/node_modules` haben (frisch mit `git worktree add` angelegt):
 Docker nimmt sonst den ganzen Ordner mit ins Bild.
 
-Fertig, wenn `http://127.0.0.1:23000/health` antwortet. Zeitgesteuerte Läufe (Mails, Erinnerungen, Statuswechsel)
-sind aus; was die Testdaten brauchen, stößt der Seed selbst an.
+Fertig, wenn `http://127.0.0.1:23000/health` antwortet. Zeitgesteuerte Läufe (Mails, Erinnerungen, Statuswechsel,
+Discord) sind aus; was die Testdaten brauchen, stößt der Seed selbst an. Zwei Jobs laufen bewusst mit
+(`SCHEDULER_JOBS=result_holds,draw_show`, #1609): gehaltene Ergebnisse werden sicher veröffentlicht, und die
+Show-Auslosung erinnert und lost nach ihrer Frist selbst - wie am Turnierabend.
 
 ## 2. Befüllen
 

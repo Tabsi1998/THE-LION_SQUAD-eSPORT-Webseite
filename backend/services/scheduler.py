@@ -15,6 +15,7 @@ Designed to be safe-by-default: every job catches its own exceptions so the
 scheduler never crashes the app, and every tick runs on one API replica only.
 """
 import logging
+import os
 from contextlib import suppress
 from datetime import datetime, timedelta, timezone
 
@@ -1009,6 +1010,15 @@ async def _safe_status_transitions():
         _log_task_failure("status_transitions", exc)
 
 
+def allowed_jobs() -> set[str] | None:
+    """Nur ausgewählte Jobs (#1609): ``SCHEDULER_JOBS=result_holds,draw_show`` legt nur diese an - etwa im Abnahme-Stand,
+    wo Mails, Discord und Erinnerungen aus bleiben, gehaltene Ergebnisse und die Show-Auslosung aber laufen sollen.
+    Leer oder nicht gesetzt: alle Jobs. ``DISABLE_SCHEDULER=true`` schaltet weiter alles ab."""
+    raw = os.environ.get("SCHEDULER_JOBS", "")
+    names = {part.strip() for part in raw.split(",") if part.strip()}
+    return names or None
+
+
 def start_scheduler() -> AsyncIOScheduler:
     global _scheduler
     if _scheduler:
@@ -1139,6 +1149,14 @@ def start_scheduler() -> AsyncIOScheduler:
                   id="helper_reminders", max_instances=1, coalesce=True)
     sched.add_job(_single_replica("year_review_notices", _safe_year_review_notices, lease_seconds=900.0), CronTrigger(hour=10, minute=15, timezone="Europe/Vienna"),
                   id="year_review_notices", max_instances=1, coalesce=True)
+    allowed = allowed_jobs()
+    if allowed is not None:
+        known = {job.id for job in sched.get_jobs()}
+        for job_id in known - allowed:
+            sched.remove_job(job_id)
+        if allowed - known:
+            logger.warning("[scheduler] SCHEDULER_JOBS nennt unbekannte Jobs: %s", ", ".join(sorted(allowed - known)))
+        logger.info("[scheduler] nur ausgewählte Jobs (SCHEDULER_JOBS): %s", ", ".join(sorted(known & allowed)) or "keiner")
     sched.start()
     _scheduler = sched
     scheduler_state.set_running(sched)
