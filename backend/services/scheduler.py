@@ -1155,11 +1155,13 @@ def start_scheduler() -> AsyncIOScheduler:
             sched.remove_job(job_id)
         if allowed - known:
             logger.warning("[scheduler] SCHEDULER_JOBS nennt unbekannte Jobs: %s", ", ".join(sorted(allowed - known)))
-        logger.info("[scheduler] nur ausgewählte Jobs (SCHEDULER_JOBS): %s", ", ".join(sorted(known & allowed)) or "keiner")
     sched.start()
     _scheduler = sched
     scheduler_state.set_running(sched)
-    logger.info("[scheduler] started (mail_queue 30s · match_reminders 5m · tournament_reminders 60s · scheduled_news 60s · prize_expiry 60m · f1_prize_reminders 5m · birthday 6h · twitch 90s · game_server_sync 60s · mobile_push_receipts 5m)")
+    if allowed is None:
+        logger.info("[scheduler] started (mail_queue 30s · match_reminders 5m · tournament_reminders 60s · scheduled_news 60s · prize_expiry 60m · f1_prize_reminders 5m · birthday 6h · twitch 90s · game_server_sync 60s · mobile_push_receipts 5m)")
+    else:
+        logger.info("[scheduler] started (nur Auswahl: %s)", ", ".join(sorted(job.id for job in sched.get_jobs())))
     return sched
 
 
