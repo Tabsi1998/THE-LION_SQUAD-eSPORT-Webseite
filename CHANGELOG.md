@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.3](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/compare/v1.0.2...v1.0.3) (2026-10-18)
+
+
+### Fehlerbehebungen
+
+* Abnahme-Stand mit ausgewählten Hintergrund-Jobs statt ganz ohne ([#1609](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1609)) ([#1768](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1768)) ([e883a73](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/e883a738f236aa20f810a3282239fd6e3bd4f8b5))
+
 ## [1.0.2](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/compare/v1.0.1...v1.0.2) (2026-10-18)
 
 
