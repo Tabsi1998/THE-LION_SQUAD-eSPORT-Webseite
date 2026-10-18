@@ -132,13 +132,18 @@ Turnier, wechselt er durch die **Wiedergabeliste**:
 | --- | --- | --- |
 | **Turnierbaum** | 12 s | der Baum, mit Fahrten über die Linien, wenn jemand weiterkommt |
 | **Live-Spiele** | 8 s | was gerade läuft |
-| **Aufrufe** | 8 s | wer an welche Station soll |
+| **Aufrufe** | 8 s | wer an welche Station soll; vor Ort mit Stationen die Live-Warteschlange je Station (3.3) |
 | **Sponsor** | 6 s | Sponsor-Moment |
 | **Zahlen** | 8 s | Zahlen zum Turnier |
 
 - In der Liste ändert ihr mit den Pfeilen die **Reihenfolge**, bei jeder Folie die **Sekunden** (3 bis 120).
 - Folien **ohne Inhalt** werden übersprungen (keine Aufrufe, kein laufendes Spiel).
 - Kommt ein **Ergebnis**, hält die Liste an, der Baum zeigt es groß, danach läuft die Folie zu Ende.
+- **Show-Auslosung:** Ist die Runde fertig und der Topf steht, zeigt der Baum oben „**Auslosung bereit · 8 Namen**“,
+  die Spiele der nächsten Runde leuchten ruhig in Gold. Der Hinweis bleibt stehen, bis ihr lost – dann kommen die
+  Namen als Auslosung in die Spiele.
+- **Sofort zufällig:** Mit jedem Ergebnis landet der Weiterkommer auf seinem gezogenen Platz – kurz oben „Zufällig
+  gezogen · Name → Spiel“, der Platz leuchtet auf.
 - Ist das Turnier noch nicht gestartet, zeigt der TV von selbst **Anmeldung offen** oder **Check-in**. Beim Status
   **Pausiert** zeigt er die Pause.
 - Ist das Turnier entschieden, bleibt die Siegerkarte stehen.
@@ -157,6 +162,12 @@ zuweisen** einer Station zugewiesen habt, es aber noch nicht gestartet ist.
 
 **Countdown:** Hat das Spiel eine geplante Uhrzeit, läuft der Countdown bis dahin. Hat es keine, läuft er ab dem
 Aufruf so lange, wie bei **Zeit zum Antreten** steht (Standard 2 Minuten, 1 bis 30).
+
+**Live-Warteschlange (vor Ort mit Stationen):** Hat das Turnier vor Ort Stationen, zeigt die Folie **Aufrufe** am
+Turnierbaum-TV jede Station als eigene Zeile: **Jetzt** mit Spiel, Namen und Spielzeit (gelb ab 80 % der Dauer, rot
+darüber) und **Als Nächstes** – aufgerufen mit „antreten bis …“ und Countdown, sonst mit der voraussichtlichen Zeit und
+dem Verzug. Ruft die Turnierleitung auf oder startet ein Spiel, zieht die Tafel ohne Neuladen nach. Online-Turniere
+und Turniere ohne Stationen zeigen die Aufruf-Tafel wie oben.
 
 Eine Tafel für das **ganze Event** (alle Turniere) ist die Ansicht **Aufrufe**. Für ein einzelnes Turnier nehmt ihr den
 Turnierbaum mit der Wiedergabeliste „Nur hier: nur Aufrufe“ (siehe 3.8).

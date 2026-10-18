@@ -142,12 +142,12 @@ export function TvCollectiveCard({ matches: shown, allMatches, registrations, is
 /**
  * „Jetzt live: Spiel B an PC 5“ - oben mittig über dem Baum, solange der Moment läuft. Seit #1564 auch für die anderen
  * Ereignisse (`kind` „event“: Auslosung, zusammengelegt, entfällt) - ohne Live-Punkt; `note` leuchtet kurz (die Station,
- * die frei wird).
+ * die frei wird). `kind` „ready“ (#1634): „Auslosung bereit · 8 Namen“ in Gold - steht, bis gelost ist.
  */
 export function TvLiveBanner({ text, kind = "live", note = "", leaving = false }) {
   const live = kind === "live";
   return (
-    <div className={`tv-live-banner tv-t-info ${live ? "" : "tv-live-banner--event"}`} role="status" data-testid="tv-live-banner" data-kind={kind} data-leaving={leaving ? "1" : undefined}>
+    <div className={`tv-live-banner tv-t-info ${live ? "" : "tv-live-banner--event"} ${kind === "ready" ? "tv-live-banner--ready" : ""}`} role="status" data-testid="tv-live-banner" data-kind={kind} data-leaving={leaving ? "1" : undefined}>
       {live ? <span className="tv-live-dot-tv tv-live-dot" aria-hidden="true" /> : <span className="tv-live-banner__mark" aria-hidden="true" />}
       <span>{live ? `Jetzt live: ${text}` : text}</span>
       {note ? <span className="tv-live-banner__note" data-testid="tv-freed">{note}</span> : null}
