@@ -146,10 +146,15 @@ export function readyDraws(matches = []) {
   });
 }
 
-/** „Auslosung bereit · 8 Namen“ - wie die Karte der Turnierleitung; mehrere Gruppen zählen zusammen. */
+/**
+ * „Auslosung bereit · 8 Namen“ - wie die Karte der Turnierleitung. Warten mehrere Runden zugleich (Winner und Loser
+ * Bracket), sagt es die Zahl dazu: „Auslosung bereit · 2 Runden · 16 Namen“.
+ */
 export function drawReadyText(draws = []) {
-  const names = (draws || []).reduce((sum, draw) => sum + (Number(draw.names) || 0), 0);
-  return names ? `Auslosung bereit · ${names} ${names === 1 ? "Name" : "Namen"}` : "Auslosung bereit";
+  const list = draws || [];
+  const names = list.reduce((sum, draw) => sum + (Number(draw.names) || 0), 0);
+  const parts = ["Auslosung bereit", list.length > 1 ? `${list.length} Runden` : "", names ? `${names} ${names === 1 ? "Name" : "Namen"}` : ""];
+  return parts.filter(Boolean).join(" · ");
 }
 
 const slotIndexOf = (match, registrationId) => (match?.slots || []).findIndex((slot) => slot?.registration_id === registrationId);

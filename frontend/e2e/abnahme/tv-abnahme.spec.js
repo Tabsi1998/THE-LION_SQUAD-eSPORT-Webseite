@@ -72,10 +72,16 @@ async function openScreens(browser, url) {
     const page = await context.newPage();
     await signIn(page, "anon");
     await page.addInitScript(() => {
+      // Jeder Wechsel zählt, auch das Ende eines Moments („-“) - so zählen zwei Auslosungen nacheinander zweimal.
       window.__tvMoments = [];
+      window.__tvBanners = [];
+      let last = "-";
       window.setInterval(() => {
-        const moment = document.querySelector("[data-testid='tv-main']")?.getAttribute("data-moment") || "";
-        if (moment && window.__tvMoments[window.__tvMoments.length - 1] !== moment) window.__tvMoments.push(moment);
+        const moment = document.querySelector("[data-testid='tv-main']")?.getAttribute("data-moment") || "-";
+        if (moment !== last) window.__tvMoments.push(moment);
+        last = moment;
+        const banner = document.querySelector("[data-testid='tv-live-banner']")?.textContent || "";
+        if (banner && window.__tvBanners[window.__tvBanners.length - 1] !== banner) window.__tvBanners.push(banner);
       }, 40);
     });
     const problems = watch(page, { allow: allowTv, allowConsole: allowTvConsole });
@@ -98,6 +104,24 @@ async function closeScreens(screens) {
 }
 
 const moments = (page) => page.evaluate(() => window.__tvMoments);
+const banners = (page) => page.evaluate(() => window.__tvBanners);
+const countOf = async (page, type) => (await moments(page)).filter((entry) => entry === type).length;
+
+/** Die Show-Runden, die auf das Los warten - je Gruppe Phase und Zahl der Namen (wie die Karte der Leitung). */
+async function readyGroups(page, tid) {
+  const groups = new Map();
+  for (const row of Object.values(await matchesOf(page, tid))) {
+    if (!row.draw_ready || typeof row.draw_ready !== "object" || row.draw) continue;
+    groups.set(row.draw_ready.group, { group: row.draw_ready.group, stageId: row.stage_id, names: row.draw_ready.pot_size });
+  }
+  return [...groups.values()].sort((a, b) => a.group.localeCompare(b.group));
+}
+
+/** „Auslosung bereit · 8 Namen“, bei mehreren Runden „Auslosung bereit · 2 Runden · 16 Namen“ (lib/tvMoments). */
+function readyText(groups) {
+  const names = groups.reduce((sum, group) => sum + group.names, 0);
+  return ["Auslosung bereit", groups.length > 1 ? `${groups.length} Runden` : "", `${names} Namen`].filter(Boolean).join(" · ");
+}
 
 test.describe("Abnahme: Turnierbaum-TV mit Auslosung und Live-Warteschlange (#1634)", () => {
   test.skip(!ENABLED || !state, "nur mit ABNAHME=1 und einem befüllten Abnahme-Stand");
@@ -129,10 +153,13 @@ test.describe("Abnahme: Turnierbaum-TV mit Auslosung und Live-Warteschlange (#16
       expect(open, "ein Lauf der Runde 1 ist noch offen").toBeTruthy();
       await enterResult(page, open);
 
+      // Was der Server als bereit führt (Winner Bracket, bei FFA mit Loser Bracket auch dessen erste Runde).
+      let groups = [];
+      await expect.poll(async () => (groups = await readyGroups(page, tid)).length, { timeout: 30_000 }).toBeGreaterThan(0);
       for (const screen of screens) {
         const banner = screen.page.locator("[data-testid='tv-live-banner'][data-kind='ready']");
         await expect(banner).toBeVisible({ timeout: TV_WAIT });
-        await expect(banner).toContainText("Auslosung bereit · 8 Namen");
+        await expect(banner).toHaveText(readyText(groups));
         await expect(screen.page.locator("[data-ready='1']").first()).toBeVisible();
         await expect.poll(() => moments(screen.page), { timeout: TV_WAIT }).toContain("draw_ready");
       }
@@ -143,17 +170,30 @@ test.describe("Abnahme: Turnierbaum-TV mit Auslosung und Live-Warteschlange (#16
         await shot(screen.page, `tv-show-bereit-${screen.name}.png`);
       }
 
-      const targets = Object.values(await matchesOf(page, tid)).filter((row) => row.draw_ready && typeof row.draw_ready === "object");
-      expect(targets.length).toBeGreaterThan(0);
-      const drawn = await post(page, `/api/tournaments/${tid}/stages/${targets[0].stage_id}/draw`, { group: targets[0].draw_ready.group });
-      expect(drawn.status(), await drawn.text()).toBe(200);
-      for (const screen of screens) {
-        await expect.poll(() => moments(screen.page), { timeout: TV_WAIT }).toContain("draw");
-        await expect(screen.page.locator("[data-testid='tv-live-banner']")).toContainText("Auslosung ·", { timeout: TV_WAIT });
-        await shot(screen.page, `tv-show-gelost-${screen.name}.png`);
-        await expect(screen.page.locator("[data-testid='tv-live-banner'][data-kind='ready']")).toHaveCount(0);
-        await expect(screen.page.locator("[data-ready='1']")).toHaveCount(0);
+      // Die Leitung lost Runde für Runde („Jetzt auslosen“): je Los ein Auslosungs-Moment, der Hinweis nennt, was noch
+      // wartet - nach dem letzten Los ist er weg und nichts leuchtet mehr.
+      for (const [index, group] of groups.entries()) {
+        const drawsBefore = await Promise.all(screens.map((screen) => countOf(screen.page, "draw")));
+        const drawn = await post(page, `/api/tournaments/${tid}/stages/${group.stageId}/draw`, { group: group.group });
+        expect(drawn.status(), await drawn.text()).toBe(200);
+        const left = groups.slice(index + 1);
+        // Das Bild mitten im Moment - beide Bildschirme zugleich, damit keiner ihn verpasst.
+        if (index === 0) {
+          await Promise.all(screens.map(async (screen) => {
+            await expect(screen.page.locator("[data-testid='tv-live-banner'][data-kind='event']", { hasText: "Auslosung · " })).toBeVisible({ timeout: TV_WAIT });
+            await screen.page.waitForTimeout(900);
+            await shot(screen.page, `tv-show-gelost-${screen.name}.png`);
+          }));
+        }
+        for (const [position, screen] of screens.entries()) {
+          await expect.poll(() => countOf(screen.page, "draw"), { timeout: TV_WAIT }).toBeGreaterThan(drawsBefore[position]);
+          expect((await banners(screen.page)).some((text) => text.startsWith("Auslosung · "))).toBe(true);
+          const standing = screen.page.locator("[data-testid='tv-live-banner'][data-kind='ready']");
+          if (left.length) await expect(standing).toHaveText(readyText(left), { timeout: TV_WAIT });
+          else await expect(standing).toHaveCount(0, { timeout: TV_WAIT });
+        }
       }
+      for (const screen of screens) await expect(screen.page.locator("[data-ready='1']")).toHaveCount(0);
     } finally {
       await closeScreens(screens);
     }
@@ -176,12 +216,16 @@ test.describe("Abnahme: Turnierbaum-TV mit Auslosung und Live-Warteschlange (#16
       const landed = Object.values(rows).find((row) => row.round === 2 && seated(row).includes(winner));
       expect(landed, "der Sieger sitzt sofort in Runde 2").toBeTruthy();
 
+      await Promise.all(screens.map(async (screen) => {
+        await expect(screen.page.locator("[data-testid='tv-live-banner']", { hasText: "Zufällig gezogen · " })).toBeVisible({ timeout: TV_WAIT });
+        await screen.page.waitForTimeout(700);
+        await shot(screen.page, `tv-sofort-gezogen-${screen.name}.png`);
+      }));
       for (const screen of screens) {
         await expect.poll(() => moments(screen.page), { timeout: TV_WAIT }).toContain("draw_assigned");
-        const banner = screen.page.getByTestId("tv-live-banner");
-        await expect(banner).toContainText("Zufällig gezogen ·", { timeout: TV_WAIT });
+        await expect.poll(async () => (await banners(screen.page)).some((text) => text.startsWith("Zufällig gezogen · ")), { timeout: TV_WAIT }).toBe(true);
         await expect(screen.page.getByTestId(`tv-match-${landed.id}`).locator(`[data-tv-reg='${winner}']`)).toBeVisible({ timeout: TV_WAIT });
-        await shot(screen.page, `tv-sofort-gezogen-${screen.name}.png`);
+        await shot(screen.page, `tv-sofort-danach-${screen.name}.png`);
         // Kein Auslosungs-Moment der ganzen Runde - nur der eine Platz.
         expect(await moments(screen.page)).not.toContain("draw");
       }

@@ -1116,7 +1116,10 @@
 .tv-queue__stack { display: grid; min-width: 0; }
 .tv-queue__swap { grid-area: 1 / 1; min-width: 0; }
 .tv-queue__swap--in { animation: tv-queue-in var(--tls-motion-slow) var(--tls-ease) both; animation-delay: var(--tv-delay, 0ms); }
-.tv-queue__swap--out { pointer-events: none; animation: tv-queue-out var(--tls-motion-slow) var(--tls-ease) both; }
+/* Gehen geht schneller als Kommen - der neue Inhalt ist das, worauf man schaut. */
+.tv-queue__swap--out { pointer-events: none; animation: tv-queue-out var(--tls-motion-mid) var(--tls-ease) both; }
+/* Beim ersten Bild gleitet schon die ganze Folie herein - die Stationen blenden darin nur versetzt auf. */
+.tv-queue__swap--first { animation-name: tv-fade-in; }
 @keyframes tv-queue-in { from { opacity: 0; transform: translateY(calc(var(--tv-u) * 1.4)); } }
 @keyframes tv-queue-out { to { opacity: 0; transform: translateY(calc(var(--tv-u) * -1)); } }
 .tv-queue__body { display: grid; gap: calc(var(--tv-u) * 0.25); align-content: start; min-width: 0; }

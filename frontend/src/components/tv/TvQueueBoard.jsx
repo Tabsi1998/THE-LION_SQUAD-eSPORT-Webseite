@@ -133,6 +133,9 @@ function QueueCell({ kind, lane, swapKey, order, matchOf, motionOn }) {
   const frozen = useRef(null);
   if (frozen.current?.key !== swapKey) frozen.current = { key: swapKey, delay: `${order * LANE_STAGGER_MS + (kind === "next" ? LANE_STAGGER_MS / 2 : 0)}ms` };
   const { delay } = frozen.current;
+  // Der erste Inhalt kommt mit der Folie - nur Aufblenden; erst ein Wechsel gleitet.
+  const firstKey = useRef(swapKey);
+  const first = firstKey.current === swapKey;
   return (
     <div className={`tv-queue__cell tv-queue__cell--${kind}`} data-testid={`tv-queue-${kind}-${lane.id}`} data-match={entryOf(lane)?.match_id || undefined} data-state={entryOf(lane)?.state || undefined}>
       <span className="tv-kicker tv-t-meta tv-queue__kicker">
@@ -145,7 +148,7 @@ function QueueCell({ kind, lane, swapKey, order, matchOf, motionOn }) {
             <Body lane={leaving.value} match={matchOf(entryOf(leaving.value)?.match_id)} ghost />
           </div>
         ) : null}
-        <div key={swapKey} className="tv-queue__swap tv-queue__swap--in" style={{ "--tv-delay": delay }}>
+        <div key={swapKey} className={`tv-queue__swap tv-queue__swap--in ${first ? "tv-queue__swap--first" : ""}`} style={{ "--tv-delay": delay }}>
           <Body lane={lane} match={matchOf(entryOf(lane)?.match_id)} />
         </div>
       </div>

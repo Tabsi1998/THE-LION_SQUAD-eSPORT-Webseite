@@ -68,6 +68,7 @@ describe("Show-Auslosung bereit (draw_ready)", () => {
     const round = withMode(state("se8_mixed_before_draw"), "draw_round", { ready: true });
     expect(readyDraws(round.matches_v2)).toEqual([]);
     expect(drawReadyText([])).toBe("Auslosung bereit");
+    expect(drawReadyText([{ names: 8 }, { names: 8 }])).toBe("Auslosung bereit · 2 Runden · 16 Namen");
   });
 });
 
