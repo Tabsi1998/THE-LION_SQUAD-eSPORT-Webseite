@@ -334,6 +334,12 @@ def _rebuild_group(graph: _Graph, heats: list[dict], buckets: list[list[tuple]],
     """Verteilt die Einträge der Gruppe auf die ersten ``len(buckets)`` Läufe (nach ``order``); der Rest entfällt."""
     survivors = heats[: len(buckets)]
     dormant = [copy.deepcopy(slot) for heat in heats for slot in heat.get("slots") or [] if _dormant(graph, slot)]
+    # Leere Plätze aus einem Ausscheiden ohne Nachrücker (#1596), auf die noch eine Weiterleitung zeigt: sie ziehen mit
+    # in den Sammellauf, samt Weiterleitung - sonst bekäme ein anderer Lauf denselben Platz (zwei Quellen auf einem
+    # Platz). Ein Ausfall vor dem Start (ohne `removed_registration_id`) braucht keinen zusätzlichen Freilos-Platz.
+    linked_byes = [(copy.deepcopy(slot), entry) for heat in heats for slot in heat.get("slots") or []
+                   if slot.get("status") == "bye" and (slot.get("source_result") or {}).get("removed_registration_id")
+                   and (entry := _feeding_entry(graph, slot, heat["id"])) is not None]
     merged: dict[str, dict] = {}
     scheduled = sorted(str(heat.get("scheduled_at")) for heat in heats if heat.get("scheduled_at"))
     received: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))
@@ -354,6 +360,10 @@ def _rebuild_group(graph: _Graph, heats: list[dict], buckets: list[list[tuple]],
             for slot in dormant:
                 slot["slot"] = len(new_slots) + 1
                 new_slots.append(slot)
+            for slot, entry in linked_byes:
+                slot["slot"] = len(new_slots) + 1
+                new_slots.append(slot)
+                entry.update({"to_match_id": survivor["id"], "to_match_key": survivor.get("match_key"), "to_slot": slot["slot"]})
         while len(new_slots) < 2:
             new_slots.append(_bye_slot(len(new_slots) + 1))
         survivor["slots"] = new_slots

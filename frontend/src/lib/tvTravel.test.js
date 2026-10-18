@@ -162,3 +162,25 @@ describe("Flug am Beamer (#1564): weich an, weich ab, leicht angehoben, weich ge
     expect(landFrame(from, to, 1).scale).toBeCloseTo(0.9, 5);
   });
 });
+
+// #1596: Nach einem Austritt ohne Nachrücker bleibt der Platz im Folgelauf ein Freilos, die Verbindung aber stehen. Wer
+// dort säße, ist raus (keine Fahrt, kein „weiter“) - und der gefahrene Lauf wird dadurch nicht zum Finale.
+test("advancementsOf: Freilos-Platz nach Austritt - raus statt weiter, aber kein Finale", () => {
+  const heat = {
+    id: "q", match_key: "Q", stage_id: "s", settings: { qualifiers_per_match: 1 },
+    results: [{ registration_id: "r7", rank: 1 }, { registration_id: "r8", rank: 2 }, { registration_id: "r9", rank: 3 }],
+  };
+  const next = {
+    id: "r", match_key: "R", stage_id: "s", section: "MAIN",
+    slots: [
+      { slot: 1, source: { type: "rank", flow: "W", match_key: "P", rank: 1 }, status: "filled", registration_id: "r1" },
+      { slot: 2, source: { type: "rank", flow: "W", match_key: "Q", rank: 1 }, status: "bye", registration_id: null,
+        source_result: { removed_registration_id: "r7", reason: "eliminated" } },
+    ],
+  };
+  const rows = advancementsOf(heat, [heat, next]);
+  expect(rows.map((row) => [row.registrationId, row.kind, row.target])).toEqual([
+    ["r7", "out", null], ["r8", "out", null], ["r9", "out", null],
+  ]);
+  expect(rows.some((row) => row.kind === "place")).toBe(false);
+});
