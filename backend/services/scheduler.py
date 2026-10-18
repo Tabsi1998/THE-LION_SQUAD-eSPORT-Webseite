@@ -1009,6 +1009,15 @@ async def _safe_status_transitions():
         _log_task_failure("status_transitions", exc)
 
 
+def allowed_jobs() -> set[str] | None:
+    """Nur ausgewählte Jobs (#1609): ``SCHEDULER_JOBS=result_holds,draw_show`` legt nur diese an - etwa im Abnahme-Stand,
+    wo Mails, Discord und Erinnerungen aus bleiben, gehaltene Ergebnisse und die Show-Auslosung aber laufen sollen.
+    Leer oder nicht gesetzt: alle Jobs. ``DISABLE_SCHEDULER=true`` schaltet weiter alles ab."""
+    from services.outbound_guard import scheduler_job_selection
+
+    return scheduler_job_selection()
+
+
 def start_scheduler() -> AsyncIOScheduler:
     global _scheduler
     if _scheduler:
@@ -1139,10 +1148,20 @@ def start_scheduler() -> AsyncIOScheduler:
                   id="helper_reminders", max_instances=1, coalesce=True)
     sched.add_job(_single_replica("year_review_notices", _safe_year_review_notices, lease_seconds=900.0), CronTrigger(hour=10, minute=15, timezone="Europe/Vienna"),
                   id="year_review_notices", max_instances=1, coalesce=True)
+    allowed = allowed_jobs()
+    if allowed is not None:
+        known = {job.id for job in sched.get_jobs()}
+        for job_id in known - allowed:
+            sched.remove_job(job_id)
+        if allowed - known:
+            logger.warning("[scheduler] SCHEDULER_JOBS nennt unbekannte Jobs: %s", ", ".join(sorted(allowed - known)))
     sched.start()
     _scheduler = sched
     scheduler_state.set_running(sched)
-    logger.info("[scheduler] started (mail_queue 30s · match_reminders 5m · tournament_reminders 60s · scheduled_news 60s · prize_expiry 60m · f1_prize_reminders 5m · birthday 6h · twitch 90s · game_server_sync 60s · mobile_push_receipts 5m)")
+    if allowed is None:
+        logger.info("[scheduler] started (mail_queue 30s · match_reminders 5m · tournament_reminders 60s · scheduled_news 60s · prize_expiry 60m · f1_prize_reminders 5m · birthday 6h · twitch 90s · game_server_sync 60s · mobile_push_receipts 5m)")
+    else:
+        logger.info("[scheduler] started (nur Auswahl: %s)", ", ".join(sorted(job.id for job in sched.get_jobs())))
     return sched
 
 

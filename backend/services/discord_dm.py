@@ -106,6 +106,10 @@ async def send_discord_dm_for_notification(notification: dict, category: str | N
     kind = str(notification.get("kind") or "")
     if not user_id or kind in EXCLUDED_KINDS:
         return 0
+    from services.outbound_guard import outbound_disabled
+
+    if outbound_disabled():
+        return 0  # Abnahme-Stand (#1609): keine Direktnachricht nach außen
     db = get_db()
     discord_id = await discord_link_id(db, user_id)
     if not discord_id:
