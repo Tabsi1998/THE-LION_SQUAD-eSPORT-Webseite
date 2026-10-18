@@ -19,6 +19,9 @@ services:
       # Show-Auslosung (draw_show: Erinnerung und Los nach der Frist). Alles andere stößt der Seed selbst an.
       DISABLE_SCHEDULER: "false"
       SCHEDULER_JOBS: "result_holds,draw_show"
+      # Was die zwei Jobs an Benachrichtigungen anstoßen, bleibt in der App: kein Push an Expo, keine Discord-DM,
+      # kein Discord-Bot (#1609, Codex).
+      OUTBOUND_DISABLED: "true"
 
   frontend:
     container_name: ${ABNAHME_PROJECT:-lsw-abnahme}-frontend

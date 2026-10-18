@@ -166,6 +166,11 @@ async def send_mobile_push_for_notification(notification: dict[str, Any]) -> int
     user_id = notification.get("user_id")
     if not user_id:
         return 0
+    from services.outbound_guard import outbound_disabled
+
+    if outbound_disabled():
+        # Abnahme-Stand (#1609): die Benachrichtigung bleibt in der App, nichts geht an Expo.
+        return 0
 
     db = get_db()
     tokens = await db.mobile_push_tokens.find(

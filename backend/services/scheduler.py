@@ -15,7 +15,6 @@ Designed to be safe-by-default: every job catches its own exceptions so the
 scheduler never crashes the app, and every tick runs on one API replica only.
 """
 import logging
-import os
 from contextlib import suppress
 from datetime import datetime, timedelta, timezone
 
@@ -1014,9 +1013,9 @@ def allowed_jobs() -> set[str] | None:
     """Nur ausgewählte Jobs (#1609): ``SCHEDULER_JOBS=result_holds,draw_show`` legt nur diese an - etwa im Abnahme-Stand,
     wo Mails, Discord und Erinnerungen aus bleiben, gehaltene Ergebnisse und die Show-Auslosung aber laufen sollen.
     Leer oder nicht gesetzt: alle Jobs. ``DISABLE_SCHEDULER=true`` schaltet weiter alles ab."""
-    raw = os.environ.get("SCHEDULER_JOBS", "")
-    names = {part.strip() for part in raw.split(",") if part.strip()}
-    return names or None
+    from services.outbound_guard import scheduler_job_selection
+
+    return scheduler_job_selection()
 
 
 def start_scheduler() -> AsyncIOScheduler:

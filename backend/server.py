@@ -164,10 +164,9 @@ async def lifespan(app: FastAPI):
             start_scheduler()
         except Exception as exc:
             logger.warning(f"[scheduler] failed to start: {exc}")
-    # Discord-Bot (#302): läuft im Backend, sobald Token und Schalter im Admin gesetzt sind. Mit einer Job-Auswahl
-    # (SCHEDULER_JOBS, #1609) nur, wenn „discord_bot“ dabei ist.
-    jobs = {part.strip() for part in os.environ.get("SCHEDULER_JOBS", "").split(",") if part.strip()}
-    if os.environ.get("DISABLE_SCHEDULER", "").lower() != "true" and (not jobs or "discord_bot" in jobs):
+    # Discord-Bot (#302): läuft im Backend, sobald Token und Schalter im Admin gesetzt sind. Job-Auswahl und
+    # Versandsperre (#1609) prüft start_if_enabled selbst.
+    if os.environ.get("DISABLE_SCHEDULER", "").lower() != "true":
         try:
             from services.discord_bot import bot as discord_bot
             await discord_bot.start_if_enabled()

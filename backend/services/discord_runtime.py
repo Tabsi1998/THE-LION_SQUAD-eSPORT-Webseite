@@ -414,6 +414,13 @@ class BotRunner:
 
     async def start_if_enabled(self) -> bool:
         _wiring_safety_net.ensure()  # Anmeldungen beim Import (#1420), siehe services/bootstrap.py
+        from services.outbound_guard import discord_bot_allowed
+
+        # Abnahme-Stand (#1609): Versand gesperrt oder der Bot nicht in der Job-Auswahl - auch nicht nach einer Änderung
+        # der Einstellungen im Admin (apply_settings) oder vom Wächter (restart_if_down).
+        if not discord_bot_allowed():
+            await self.stop()
+            return False
         db = get_db()
         settings = await db.settings.find_one({"id": "discord"}, {"_id": 0}) or {}
         view = bot_settings(settings)
