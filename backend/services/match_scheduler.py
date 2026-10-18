@@ -279,6 +279,17 @@ def _plan_stations(tournament: dict, matches: list[dict], stations, stage_by_id:
     # Spiele, die der Planer nicht mehr plant, aber früher selbst geplant hat (#1608): ihr Termin wird gelöst.
     releases: list[dict] = []
 
+    def release(match: dict) -> None:
+        releases.append({
+            "match_id": match["id"], "match_key": match.get("match_key"), "label": _label(match),
+            "stage_id": match.get("stage_id"),
+            "previous": {"scheduled_at": match.get("scheduled_at"), "station_id": match.get("station_id"),
+                         "schedule_source": match.get("schedule_source"), "status": match.get("status")},
+        })
+
+    def planner_time(match: dict) -> bool:
+        return match.get("schedule_source") == "planner" and bool(match.get("scheduled_at") or match.get("station_id"))
+
     def players_of(match: dict) -> set[str]:
         return participants_of(match, participant_keys)
     usable = _usable_stations(tournament, stations, game)
@@ -316,6 +327,11 @@ def _plan_stations(tournament: dict, matches: list[dict], stations, stage_by_id:
     for match in matches:
         status = str(match.get("status") or "")
         if status in DONE_STATUSES:
+            # Kampflos entschieden (Freilos nach Austritt, `resolve_walkovers`, Codex zu #1608): nie gespielt - ein alter
+            # Termin des Planers samt Station gehört nicht mehr dazu.
+            if ((match.get("result_meta") or {}).get("source") == "auto_bye" and planner_time(match)
+                    and not match.get("started_at") and not match.get("called_at")):
+                release(match)
             continue
         running = status in RUNNING_STATUSES or bool(match.get("started_at"))
         kept = match.get("schedule_source") in KEPT_SOURCES and _parse(match.get("scheduled_at")) is not None
@@ -346,13 +362,8 @@ def _plan_stations(tournament: dict, matches: list[dict], stations, stage_by_id:
             # Nach einem Austritt kann ein späteres Spiel nur noch einen Spieler haben (Freilos, #1608): kein Zeitfenster,
             # keine Station. Ein alter Termin des Planers bleibt sonst stehen und meldet falsche Überschneidungen.
             # Von Hand gesetzte und vereinbarte Termine (KEPT_SOURCES) sind oben schon gehalten.
-            if match.get("schedule_source") == "planner" and (match.get("scheduled_at") or match.get("station_id")):
-                releases.append({
-                    "match_id": match["id"], "match_key": match.get("match_key"), "label": _label(match),
-                    "stage_id": match.get("stage_id"),
-                    "previous": {"scheduled_at": match.get("scheduled_at"), "station_id": match.get("station_id"),
-                                 "schedule_source": match.get("schedule_source"), "status": match.get("status")},
-                })
+            if planner_time(match):
+                release(match)
             continue
         candidates.append(match)
 

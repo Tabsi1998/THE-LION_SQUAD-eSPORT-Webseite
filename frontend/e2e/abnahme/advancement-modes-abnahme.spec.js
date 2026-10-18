@@ -271,9 +271,8 @@ test.describe("Abnahme: Weiterkommen in vier Modi gegen den echten Server", () =
     const group = adminPage.getByTestId("draw-group-WB:2");
     await expect(group).toContainText("2 von 4 Plätzen gezogen");
     await shot(adminPage, "sofort-admin-auslosung-1440.png");
-    // Matchplan: die Zielspiele sind nur Prognose, das Los füllt sie einzeln. Geprüft vor dem Austritt unten - danach
-    // hat E nur noch einen möglichen Spieler (Freilos), der Planer lässt es aus und der alte Planer-Termin bleibt
-    // am Spiel stehen; die Liste meldet dann eine Überschneidung statt der Prognose (Altbefund, nicht #1590).
+    // Matchplan: die Zielspiele sind nur Prognose, das Los füllt sie einzeln. Nach dem Austritt unten hat ein Spiel der
+    // Runde 2 nur noch einen möglichen Spieler (Freilos) - der Planer löst dann seinen alten Termin (#1608).
     await adminPage.goto(`/admin/tournaments/${tid}?tab=matchplan`);
     await expect(adminPage.getByTestId("mp-settings")).toBeVisible();
     await expect(adminPage.getByTestId("mp-order")).toContainText("das Los entscheidet");
@@ -308,6 +307,14 @@ test.describe("Abnahme: Weiterkommen in vier Modi gegen den echten Server", () =
     const freedMatch = roundTwo.find((row) => row.slots.some((slot) => slot.source_result?.removed_registration_id === winnerA));
     const freed = freedMatch?.slots.find((slot) => slot.source_result?.removed_registration_id === winnerA);
     expect(freed?.status).toBe("bye");
+    // #1608: Das Spiel mit dem Freilos hat keinen Planer-Termin und keine Station mehr, und kein anderes Spiel meldet
+    // im Matchplan eine Überschneidung damit.
+    expect(freedMatch.scheduled_at ?? null).toBeNull();
+    expect(freedMatch.station_id ?? null).toBeNull();
+    await adminPage.goto(`/admin/tournaments/${tid}?tab=matchplan`);
+    await expect(adminPage.getByTestId("mp-order")).toBeVisible();
+    await expect(adminPage.getByTestId("mp-order")).not.toContainText(new RegExp(`Überschneidet sich an .* mit ${freedMatch.match_key}\\.`));
+    await shot(adminPage, "matchplan-sofort-nach-austritt-1440.png");
     // Der Spieler sieht den frei gewordenen Platz als Freilos und den Namen nur noch in Runde 1 - erst dann das Bild
     // („Sieger aus Viertelfinale“ zählt vorher wie nachher zwei, das reicht nicht als Warten auf das Nachladen).
     const freedCard = playerPage.getByTestId(`bracket-match-v2-${freedMatch.id}`);

@@ -516,3 +516,37 @@ async def test_a_release_does_not_touch_a_match_set_by_hand_after_the_preview(fl
     await apply_plan(flow.db, stored, plan)
     kept = await flow.reload(final)
     assert kept["schedule_source"] == "manual" and kept["scheduled_at"] == fixed and kept["station_id"] == station["id"]
+
+
+@pytest.mark.asyncio
+async def test_a_real_withdrawal_from_a_planned_final_releases_its_time_after_the_walkover(flow):
+    """#1608 über den echten Weg (Codex): Das Finale ist mit beiden Siegern besetzt und vom Planer terminiert. Ein Finalist
+    tritt aus, das Finale wird kampflos entschieden - und verliert dabei Termin und Station des Planers."""
+    from services.match_scheduler import apply_plan, plan_for_tournament
+
+    _staff, tournament, _users, _registrations = await built(flow, status="live", **on_site_fields())
+    await stations(flow, tournament, "1", "2")
+    for match in sorted(await flow.matches(tournament), key=lambda row: row["match_key"]):
+        if match["round"] != 1:
+            continue
+        seated = [slot["registration_id"] for slot in match["slots"] if slot.get("registration_id")]
+        response = await flow.post(f"/api/matches/{match['id']}/result", json={
+            "results": [{"registration_id": reg, "rank": index + 1} for index, reg in enumerate(seated)]})
+        assert response.status_code == 200, response.text
+    stored = await flow.db.tournaments.find_one({"id": tournament["id"]}, {"_id": 0})
+    await apply_plan(flow.db, stored, await plan_for_tournament(flow.db, stored))
+    final = next(row for row in await flow.matches(tournament) if row["round"] == 2)
+    finalists = [slot["registration_id"] for slot in final["slots"] if slot.get("registration_id")]
+    assert len(finalists) == 2
+    assert final["schedule_source"] == "planner" and final["scheduled_at"] and final["station_id"]
+
+    url = f"/api/tournaments/{tournament['id']}/registrations/{finalists[0]}/removal"
+    preview = await flow.post(url, json={"kind": "withdrawn"})
+    assert preview.status_code == 200, preview.text
+    done = await flow.post(url, json={"kind": "withdrawn", "plan_id": preview.json()["plan"]["id"]})
+    assert done.status_code == 200, done.text
+
+    after = await flow.reload(final)
+    assert after["status"] in {"completed", "cancelled"}
+    assert (after.get("result_meta") or {}).get("source") == "auto_bye"
+    assert after["scheduled_at"] is None and after["station_id"] is None and after["schedule_source"] is None
