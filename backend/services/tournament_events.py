@@ -331,16 +331,13 @@ def _readvance(heat: dict, by_id: dict[str, dict], registration_id: str, now_iso
             # ein ausgeloster Platz gehört nicht zu der Weiterleitung, die im Schema auf ihn zeigt. (Sofort zufällig,
             # #1590: dort folgt das Schema dem Los - der Eintrag gehört zum Platz und wird wie im festen Baum gestrichen.)
             continue
-        # Niemand rückt nach: der Platz ist „Quelle unerfüllbar“ wie beim Lauf-Umbau - der Lauf schickt für diesen
-        # Rang niemanden mehr, damit ein Platz genau dann eine Lauf-Quelle hat, wenn ein Eintrag auf ihn zeigt.
-        source = slot.get("source") or {}
-        slot["source"] = {"type": "bye", "raw": source.get("raw"),
-                          "was": {key: source.get(key) for key in ("flow", "match_key", "rank")},
-                          **({"draw": source["draw"]} if source.get("draw") else {})}
+        # Niemand rückt nach: der Platz bleibt ein Freilos, Quelle und Weiterleitung des gefahrenen Laufs bleiben aber
+        # stehen (#1596). Strich der Austritt die Weiterleitung, war der Lauf ohne Weg weiter - und neben dem echten
+        # Finale, das der Umbau später abkürzt, blieb ein zweites „Finale“. Seine Weiterleitung verliert ein Lauf nur
+        # über das Abkürzen zum Finale (heat_rebuild._shorten).
         if current:
             slot["source_result"] = {**(slot.get("source_result") or {}),
                                      "reason": "eliminated" if current == registration_id else "bye"}
-        heat["advancement"] = [row for row in heat.get("advancement") or [] if row is not entry]
         heat["updated_at"] = now_iso
     for target in touched.values():
         target["status"] = _status_after_slot_fill(target, preserve_terminal=False)

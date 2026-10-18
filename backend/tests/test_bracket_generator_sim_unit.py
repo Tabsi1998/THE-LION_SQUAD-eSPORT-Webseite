@@ -582,13 +582,15 @@ def _play_with_random_removals(matches: list[dict], rng: random.Random, *, stage
     return removed
 
 
-# Ausscheiden fest und sofort zufällig (#1590). „Auslosung nach der Runde“ fehlt hier bewusst, und die FFA-Läufe laufen
-# nur fest: beim Ausscheiden nach einem Los kann der Lauf-Umbau in seltenen Fällen zwei „Finals“ hinterlassen - ein
-# Altfehler, der mit anderen Startwerten auch im festen Baum auftritt (#1596).
+# Ausscheiden fest und sofort zufällig (#1590). „Auslosung nach der Runde“ fehlt bei K.-o. und Doppel-K.-o. bewusst.
+# FFA-Läufe fest und sofort (#1596): ein Austritt streicht die Weiterleitung eines gefahrenen Laufs nicht mehr (keine
+# zwei „Finals“), leere Plätze aus einem Ausscheiden ziehen beim Zusammenlegen mit (keine doppelte Quelle). „Gemischt“
+# bleibt hier noch draußen: mit echtem Los tritt die doppelte Quelle sehr selten noch auf (gemessen 1 von 1.200 Läufen,
+# vorher 24 von 800) - der Rest steht in #1596.
 REMOVAL_MODES = [None, INSTANT]
 REMOVAL_MODE_IDS = ["fest", "sofort"]
-FFA_REMOVAL_MODES = [None]
-FFA_REMOVAL_MODE_IDS = ["fest"]
+FFA_REMOVAL_MODES = [None, INSTANT]
+FFA_REMOVAL_MODE_IDS = ["fest", "sofort"]
 
 
 @pytest.mark.parametrize("mode", REMOVAL_MODES, ids=REMOVAL_MODE_IDS)
@@ -644,3 +646,18 @@ def test_ffa_bracket_survives_random_disqualifications(count: int, match_size: i
         seated = [slot.get("registration_id") for slot in match["slots"] if slot.get("status") == "filled"]
         if match["status"] not in TERMINAL:
             assert not (set(seated) & removed)
+
+
+def test_a_withdrawal_without_replacement_keeps_the_way_of_a_driven_heat():
+    """#1596, fester Baum: 31 Fahrer, Laufgröße 3, Quote 1, Ausfälle mit Startwert 11. Der Austritt aus einem schon
+    gefahrenen Lauf ohne Nachrücker strich dessen Weiterleitung - am Ende standen zwei gefahrene Läufe ohne Weg weiter
+    („Finals“ P und Q). Jetzt verliert ein Lauf seine Weiterleitung nur, wenn er zum Finale abgekürzt wird."""
+    stage = {"id": "s", "number": 1, "stage_type": "ffa_custom_bracket", "match_type": "ffa",
+             "settings": {"match_size": 3, "qualifiers_per_match": 1, "min_players": 2}}
+    base = {"id": "t", "seeding_mode": "manual", "max_participants": 31}
+    matches = build_matches_v2_from_schema(base, stage, registrations(31))
+    _rebuild(matches, stage)
+    _play_with_random_removals(matches, random.Random(11), stage=stage)
+    last_round = max(m["round"] for m in matches if m["status"] == "completed")
+    finals = [m["match_key"] for m in matches if m["status"] == "completed" and not m.get("advancement") and m["round"] == last_round]
+    assert len(finals) == 1, f"genau ein Finale: {finals}"
