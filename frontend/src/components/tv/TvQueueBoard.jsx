@@ -12,9 +12,10 @@ import { useSecondTick } from "./TvTreeNode";
 // gelb ab 80 %, rot ab 100 %), daneben „Als Nächstes“: aufgerufen mit Frist und Countdown oder geplant mit Prognose und
 // Verzug. Die Aufrufe stecken darin (das nächste Spiel einer Station, gold). Wechselt etwas an einer Station, gleitet der
 // alte Inhalt nach oben weg und der neue von unten herein - Station für Station versetzt, nur Verschieben und Deckkraft.
-// „Bewegung reduzieren“: sofort der neue Stand, kein Gleiten. Mehr als acht Stationen blättern ruhig („Seite 1/2“).
+// „Bewegung reduzieren“: sofort der neue Stand, kein Gleiten. Ab drei Stationen in zwei Spalten, mehr als sechs blättern
+// ruhig („Seite 1/2“) - so passt jede Bahn ohne Abschneiden auf 1920×1080.
 
-const PER_PAGE = 8;
+const PER_PAGE = 6;
 const PAGE_MS = 10000;
 // Versatz je Station beim Wechsel - nur die Stationen, die sich geändert haben, zählen mit.
 const LANE_STAGGER_MS = 80;
@@ -60,14 +61,14 @@ export function TvQueueClock({ entry, testId }) {
   const { motionOn } = useTv();
   const second = useSecondTick();
   const info = matchClock(entry?.started_at, entry?.duration_minutes, second * 1000, { stepped: !motionOn });
-  if (!info) return <span className="tv-queue__clock tv-t-info" data-testid={testId} data-tone="none">läuft</span>;
+  if (!info) return <span className="tv-lanes__clock tv-t-info" data-testid={testId} data-tone="none">läuft</span>;
   return (
-    <span className="tv-queue__clock" data-testid={testId} data-tone={info.tone} role="timer" aria-label={info.limit ? `Spielzeit ${info.text} von ${info.limit}` : `Spielzeit ${info.text}`}>
-      <span className="tv-queue__time font-display">{info.text}</span>
-      {info.limit ? <span className="tv-queue__limit tv-t-meta">/ {info.limit}</span> : null}
-      {info.tone === "over" && info.overMinutes ? <span className="tv-queue__over tv-t-meta">+{info.overMinutes} Min.</span> : null}
+    <span className="tv-lanes__clock" data-testid={testId} data-tone={info.tone} role="timer" aria-label={info.limit ? `Spielzeit ${info.text} von ${info.limit}` : `Spielzeit ${info.text}`}>
+      <span className="tv-lanes__time font-display">{info.text}</span>
+      {info.limit ? <span className="tv-lanes__limit tv-t-meta">/ {info.limit}</span> : null}
+      {info.tone === "over" && info.overMinutes ? <span className="tv-lanes__over tv-t-meta">+{info.overMinutes} Min.</span> : null}
       {info.ratio !== null ? (
-        <span className="tv-queue__track" aria-hidden="true"><i style={{ transform: `scaleX(${info.ratio.toFixed(4)})` }} /></span>
+        <span className="tv-lanes__track" aria-hidden="true"><i style={{ transform: `scaleX(${info.ratio.toFixed(4)})` }} /></span>
       ) : null}
     </span>
   );
@@ -78,7 +79,7 @@ function CallLeft({ entry, ghost }) {
   const second = useSecondTick();
   if (!entry?.report_by) return null;
   const left = countdown(asInstant(entry.report_by).getTime(), second * 1000);
-  return <span className="tv-queue__left font-display" data-testid={ghost ? undefined : `tv-queue-left-${entry.match_id}`}>{left.done ? "jetzt" : `noch ${left.text}`}</span>;
+  return <span className="tv-lanes__left font-display" data-testid={ghost ? undefined : `tv-queue-left-${entry.match_id}`}>{left.done ? "jetzt" : `noch ${left.text}`}</span>;
 }
 
 // `ghost`: der weggleitende alte Inhalt - ohne Test-Kennungen, damit jede nur einmal dasteht.
@@ -86,15 +87,15 @@ function NowCell({ lane, match, ghost = false }) {
   const entry = lane.now;
   if (!entry) {
     return (
-      <div className="tv-queue__body tv-queue__body--quiet">
+      <div className="tv-lanes__body tv-lanes__body--quiet">
         <span className="tv-t-info tv-faint">{lane.status === "broken" ? "Bitte nicht benutzen" : "Gerade frei"}</span>
       </div>
     );
   }
   return (
-    <div className="tv-queue__body">
-      <span className="tv-queue__what tv-t-info">{queueWhat(entry, match)}</span>
-      <b className="tv-queue__who tv-t-name" data-tv-name="1">{queueWho(entry)}</b>
+    <div className="tv-lanes__body">
+      <span className="tv-lanes__what tv-t-info">{queueWhat(entry, match)}</span>
+      <b className="tv-lanes__who tv-t-name" data-tv-name="1">{queueWho(entry)}</b>
       <TvQueueClock entry={entry} testId={ghost ? undefined : `tv-queue-clock-${lane.id}`} />
     </div>
   );
@@ -104,19 +105,19 @@ function NextCell({ lane, match, ghost = false }) {
   const entry = lane.next;
   if (!entry) {
     return (
-      <div className="tv-queue__body tv-queue__body--quiet">
+      <div className="tv-lanes__body tv-lanes__body--quiet">
         <span className="tv-t-info tv-faint">{lane.status === "broken" ? "" : "Noch nichts geplant"}</span>
       </div>
     );
   }
   const line = queueNextLine(entry);
   return (
-    <div className="tv-queue__body" data-tone={line.tone}>
-      <span className="tv-queue__what tv-t-info">{queueWhat(entry, match)}</span>
-      <b className="tv-queue__who tv-t-name" data-tv-name="1">{queueWho(entry)}</b>
-      <span className="tv-queue__when tv-t-info" data-testid={ghost ? undefined : `tv-queue-when-${lane.id}`}>
+    <div className="tv-lanes__body" data-tone={line.tone}>
+      <span className="tv-lanes__what tv-t-info">{queueWhat(entry, match)}</span>
+      <b className="tv-lanes__who tv-t-name" data-tv-name="1">{queueWho(entry)}</b>
+      <span className="tv-lanes__when tv-t-info" data-testid={ghost ? undefined : `tv-queue-when-${lane.id}`}>
         {line.text}
-        {line.delay ? <span className="tv-queue__delay"> · {line.delay}</span> : null}
+        {line.delay ? <span className="tv-lanes__delay"> · {line.delay}</span> : null}
         {line.tone === "call" ? <CallLeft entry={entry} ghost={ghost} /> : null}
       </span>
     </div>
@@ -137,18 +138,18 @@ function QueueCell({ kind, lane, swapKey, order, matchOf, motionOn }) {
   const firstKey = useRef(swapKey);
   const first = firstKey.current === swapKey;
   return (
-    <div className={`tv-queue__cell tv-queue__cell--${kind}`} data-testid={`tv-queue-${kind}-${lane.id}`} data-match={entryOf(lane)?.match_id || undefined} data-state={entryOf(lane)?.state || undefined}>
-      <span className="tv-kicker tv-t-meta tv-queue__kicker">
+    <div className={`tv-lanes__cell tv-lanes__cell--${kind}`} data-testid={`tv-queue-${kind}-${lane.id}`} data-match={entryOf(lane)?.match_id || undefined} data-state={entryOf(lane)?.state || undefined}>
+      <span className="tv-kicker tv-t-meta tv-lanes__kicker">
         {kind === "now" && lane.now ? <span className="tv-live-dot-tv tv-live-dot" aria-hidden="true" /> : null}
         {kind === "now" ? "Jetzt" : "Als Nächstes"}
       </span>
-      <div className="tv-queue__stack">
+      <div className="tv-lanes__stack">
         {leaving ? (
-          <div key={`out-${leaving.key}`} className="tv-queue__swap tv-queue__swap--out" aria-hidden="true" data-testid={`tv-queue-${kind}-out-${lane.id}`}>
+          <div key={`out-${leaving.key}`} className="tv-lanes__swap tv-lanes__swap--out" aria-hidden="true" data-testid={`tv-queue-${kind}-out-${lane.id}`}>
             <Body lane={leaving.value} match={matchOf(entryOf(leaving.value)?.match_id)} ghost />
           </div>
         ) : null}
-        <div key={swapKey} className={`tv-queue__swap tv-queue__swap--in ${first ? "tv-queue__swap--first" : ""}`} style={{ "--tv-delay": delay }}>
+        <div key={swapKey} className={`tv-lanes__swap tv-lanes__swap--in ${first ? "tv-lanes__swap--first" : ""}`} style={{ "--tv-delay": delay }}>
           <Body lane={lane} match={matchOf(entryOf(lane)?.match_id)} />
         </div>
       </div>
@@ -190,28 +191,28 @@ export function TvQueueBoard({ queue, matches = [] }) {
 
   if (!lanes.length) return null;
   const summary = queueSummaryLine(queue?.summary);
-  const columns = shown.length > 4 ? 2 : 1;
+  const columns = shown.length > 2 ? 2 : 1;
   return (
-    <section className="tv-queue" data-testid="tv-queue-board" data-count={lanes.length} data-pages={pages}>
-      <div className="tv-queue__head">
+    <section className="tv-lanes" data-testid="tv-queue-board" data-count={lanes.length} data-pages={pages}>
+      <div className="tv-lanes__head">
         <div className="tv-kicker tv-t-meta">Stationen · Live-Warteschlange</div>
         <div className="tv-t-info tv-muted text-right" data-testid="tv-queue-summary">
           {summary}
           {pages > 1 ? <span data-testid="tv-queue-page">{summary ? " · " : ""}Seite {(page % pages) + 1}/{pages}</span> : null}
         </div>
       </div>
-      <div className="tv-queue__lanes" style={{ "--cols": columns }} key={motionOn && pages > 1 ? `page-${page}` : undefined}>
+      <div className="tv-lanes__lanes" style={{ "--cols": columns }} key={motionOn && pages > 1 ? `page-${page}` : undefined}>
         {shown.map((lane) => {
           const state = laneState(lane);
           const look = STATE[state];
           const index = order.get(lane.id) ?? 0;
           return (
-            <article key={lane.id} className="tv-queue__lane" data-testid={`tv-queue-lane-${lane.id}`} data-state={state}>
-              <header className="tv-queue__station">
-                <b className="tv-queue__name font-heading" data-tv-name="1">{lane.name}</b>
+            <article key={lane.id} className="tv-lanes__lane" data-testid={`tv-queue-lane-${lane.id}`} data-state={state}>
+              <header className="tv-lanes__station">
+                <b className="tv-lanes__name font-heading" data-tv-name="1">{lane.name}</b>
                 <span className={`tv-pill tv-t-meta tv-pill--${look.tone}`}>{look.label}</span>
               </header>
-              <QueueCell kind="now" lane={lane} swapKey={lane.now?.match_id || `none-${lane.status}`} order={index} matchOf={matchOf} motionOn={motionOn} />
+              <QueueCell kind="now" lane={lane} swapKey={lane.now?.match_id || (lane.status === "broken" ? "none-broken" : "none")} order={index} matchOf={matchOf} motionOn={motionOn} />
               <QueueCell kind="next" lane={lane} swapKey={`${lane.next?.match_id || "none"}:${lane.next?.state || ""}`} order={index} matchOf={matchOf} motionOn={motionOn} />
             </article>
           );

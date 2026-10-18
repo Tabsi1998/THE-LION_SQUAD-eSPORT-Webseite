@@ -1087,10 +1087,10 @@
    Jede Station eine Bahn: Name groß, „Jetzt“ mit Spielzeit, „Als Nächstes“ mit Frist oder Prognose. Wechselt etwas,
    gleitet der alte Inhalt nach oben weg und der neue von unten herein - Station für Station versetzt (--tv-delay), nur
    Verschieben und Deckkraft. Beide liegen dafür in derselben Rasterzelle übereinander. Lange Namen brechen um, nie „…“. */
-.tv-queue { display: flex; flex-direction: column; gap: calc(var(--tv-u) * 1.4); height: 100%; min-height: 0; padding-top: calc(var(--tv-u) * 1.2); }
-.tv-queue__head { display: flex; align-items: baseline; justify-content: space-between; gap: calc(var(--tv-u) * 2); }
-.tv-queue__lanes { flex: 1 1 auto; min-height: 0; display: grid; grid-template-columns: repeat(var(--cols, 1), minmax(0, 1fr)); grid-auto-rows: min-content; align-content: start; gap: calc(var(--tv-u) * 1.2) calc(var(--tv-u) * 2); }
-.tv-queue__lane {
+.tv-lanes { display: flex; flex-direction: column; gap: calc(var(--tv-u) * 1.4); height: 100%; min-height: 0; padding-top: calc(var(--tv-u) * 1.2); }
+.tv-lanes__head { display: flex; align-items: baseline; justify-content: space-between; gap: calc(var(--tv-u) * 2); }
+.tv-lanes__lanes { flex: 1 1 auto; min-height: 0; display: grid; grid-template-columns: repeat(var(--cols, 1), minmax(0, 1fr)); grid-auto-rows: min-content; align-content: start; gap: calc(var(--tv-u) * 1.2) calc(var(--tv-u) * 2); }
+.tv-lanes__lane {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: calc(var(--tv-u) * 0.6) calc(var(--tv-u) * 2.4);
@@ -1100,47 +1100,47 @@
   border-radius: 4px;
   background: var(--tv-card);
 }
-.tv-queue__lane[data-state="live"] { border-left-color: var(--tv-live); }
-.tv-queue__lane[data-state="called"] { border-color: color-mix(in srgb, var(--tv-gold) 55%, transparent); border-left-color: var(--tv-gold); }
-.tv-queue__lane[data-state="free"] { border-left-color: var(--tv-green); }
-.tv-queue__lane[data-state="broken"] { border-style: dashed; opacity: 0.7; }
-.tv-screen[data-tv-contrast="1"] .tv-queue__lane[data-state="called"] { border-color: var(--tv-gold); }
-.tv-screen[data-tv-contrast="1"] .tv-queue__lane[data-state="broken"] { opacity: 1; }
-.tv-queue__station { grid-column: 1 / -1; display: flex; align-items: center; justify-content: space-between; gap: calc(var(--tv-u) * 1.2); min-width: 0; }
-.tv-queue__name { font-size: calc(var(--tv-fs-head) * 1.15); line-height: 1.05; font-weight: 900; text-transform: uppercase; overflow-wrap: anywhere; min-width: 0; }
-.tv-queue__lane[data-state="called"] .tv-queue__name { color: var(--tv-gold); }
-.tv-queue__cell { display: grid; grid-template-rows: auto 1fr; gap: calc(var(--tv-u) * 0.35); min-width: 0; }
-.tv-queue__kicker { display: inline-flex; align-items: center; gap: 0.5em; color: var(--tv-muted); }
-.tv-queue__cell--now .tv-queue__kicker { color: var(--tv-live); }
-.tv-queue__cell--next .tv-queue__kicker { color: var(--tv-gold); }
-.tv-queue__stack { display: grid; min-width: 0; }
-.tv-queue__swap { grid-area: 1 / 1; min-width: 0; }
-.tv-queue__swap--in { animation: tv-queue-in var(--tls-motion-slow) var(--tls-ease) both; animation-delay: var(--tv-delay, 0ms); }
+.tv-lanes__lane[data-state="live"] { border-left-color: var(--tv-live); }
+.tv-lanes__lane[data-state="called"] { border-color: color-mix(in srgb, var(--tv-gold) 55%, transparent); border-left-color: var(--tv-gold); }
+.tv-lanes__lane[data-state="free"] { border-left-color: var(--tv-green); }
+.tv-lanes__lane[data-state="broken"] { border-style: dashed; opacity: 0.7; }
+.tv-screen[data-tv-contrast="1"] .tv-lanes__lane[data-state="called"] { border-color: var(--tv-gold); }
+.tv-screen[data-tv-contrast="1"] .tv-lanes__lane[data-state="broken"] { opacity: 1; }
+.tv-lanes__station { grid-column: 1 / -1; display: flex; align-items: center; justify-content: space-between; gap: calc(var(--tv-u) * 1.2); min-width: 0; }
+.tv-lanes__name { font-size: calc(var(--tv-fs-head) * 1.15); line-height: 1.05; font-weight: 900; text-transform: uppercase; overflow-wrap: anywhere; min-width: 0; }
+.tv-lanes__lane[data-state="called"] .tv-lanes__name { color: var(--tv-gold); }
+.tv-lanes__cell { display: grid; grid-template-rows: auto 1fr; gap: calc(var(--tv-u) * 0.35); min-width: 0; }
+.tv-lanes__kicker { display: inline-flex; align-items: center; gap: 0.5em; color: var(--tv-muted); }
+.tv-lanes__cell--now .tv-lanes__kicker { color: var(--tv-live); }
+.tv-lanes__cell--next .tv-lanes__kicker { color: var(--tv-gold); }
+.tv-lanes__stack { display: grid; min-width: 0; }
+.tv-lanes__swap { grid-area: 1 / 1; min-width: 0; }
+.tv-lanes__swap--in { animation: tv-lanes-in var(--tls-motion-slow) var(--tls-ease) both; animation-delay: var(--tv-delay, 0ms); }
 /* Gehen geht schneller als Kommen - der neue Inhalt ist das, worauf man schaut. */
-.tv-queue__swap--out { pointer-events: none; animation: tv-queue-out var(--tls-motion-mid) var(--tls-ease) both; }
+.tv-lanes__swap--out { pointer-events: none; animation: tv-lanes-out var(--tls-motion-mid) var(--tls-ease) both; }
 /* Beim ersten Bild gleitet schon die ganze Folie herein - die Stationen blenden darin nur versetzt auf. */
-.tv-queue__swap--first { animation-name: tv-fade-in; }
-@keyframes tv-queue-in { from { opacity: 0; transform: translateY(calc(var(--tv-u) * 1.4)); } }
-@keyframes tv-queue-out { to { opacity: 0; transform: translateY(calc(var(--tv-u) * -1)); } }
-.tv-queue__body { display: grid; gap: calc(var(--tv-u) * 0.25); align-content: start; min-width: 0; }
-.tv-queue__body--quiet { align-content: center; }
-.tv-queue__what { color: var(--tv-muted); }
-.tv-queue__who { font-weight: 700; overflow-wrap: anywhere; }
-.tv-queue__when { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.15em 0.6em; font-weight: 700; color: var(--tv-text); }
-.tv-queue__body[data-tone="call"] .tv-queue__when { color: var(--tv-gold); }
-.tv-queue__delay { color: var(--tls-warn); }
-.tv-queue__left { font-size: var(--tv-fs-num); line-height: var(--tv-lh-num); font-variant-numeric: tabular-nums; color: var(--tv-gold); }
+.tv-lanes__swap--first { animation-name: tv-fade-in; }
+@keyframes tv-lanes-in { from { opacity: 0; transform: translateY(calc(var(--tv-u) * 1.4)); } }
+@keyframes tv-lanes-out { to { opacity: 0; transform: translateY(calc(var(--tv-u) * -1)); } }
+.tv-lanes__body { display: grid; gap: calc(var(--tv-u) * 0.25); align-content: start; min-width: 0; }
+.tv-lanes__body--quiet { align-content: center; }
+.tv-lanes__what { color: var(--tv-muted); }
+.tv-lanes__who { font-weight: 700; overflow-wrap: anywhere; }
+.tv-lanes__when { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.15em 0.6em; font-weight: 700; color: var(--tv-text); }
+.tv-lanes__body[data-tone="call"] .tv-lanes__when { color: var(--tv-gold); }
+.tv-lanes__delay { color: var(--tls-warn); }
+.tv-lanes__left { font-size: var(--tv-fs-num); line-height: var(--tv-lh-num); font-variant-numeric: tabular-nums; color: var(--tv-gold); }
 /* Die Spielzeit: groß und ruhig, der Balken skaliert (gelb ab 80 %, rot ab 100 %, wie lib/liveQueue.matchClock). */
-.tv-queue__clock { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.2em 0.5em; color: var(--tv-text); }
-.tv-queue__time { font-size: var(--tv-fs-num); line-height: var(--tv-lh-num); font-weight: 800; font-variant-numeric: tabular-nums; }
-.tv-queue__limit { color: var(--tv-muted); }
-.tv-queue__over { font-weight: 700; color: var(--tv-live); }
-.tv-queue__clock[data-tone="warn"] .tv-queue__time { color: var(--tls-warn); }
-.tv-queue__clock[data-tone="over"] .tv-queue__time { color: var(--tv-live); }
-.tv-queue__track { flex-basis: 100%; height: max(3px, calc(var(--tv-u) * 0.4)); border-radius: 999px; background: var(--tv-line); overflow: hidden; }
-.tv-queue__track i { display: block; height: 100%; background: var(--tv-accent); transform-origin: left center; transition: transform 1s linear; }
-.tv-queue__clock[data-tone="warn"] .tv-queue__track i { background: var(--tls-warn); }
-.tv-queue__clock[data-tone="over"] .tv-queue__track i { background: var(--tv-live); }
+.tv-lanes__clock { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.2em 0.5em; color: var(--tv-text); }
+.tv-lanes__time { font-size: var(--tv-fs-num); line-height: var(--tv-lh-num); font-weight: 800; font-variant-numeric: tabular-nums; }
+.tv-lanes__limit { color: var(--tv-muted); }
+.tv-lanes__over { font-weight: 700; color: var(--tv-live); }
+.tv-lanes__clock[data-tone="warn"] .tv-lanes__time { color: var(--tls-warn); }
+.tv-lanes__clock[data-tone="over"] .tv-lanes__time { color: var(--tv-live); }
+.tv-lanes__track { flex-basis: 100%; height: max(3px, calc(var(--tv-u) * 0.4)); border-radius: 999px; background: var(--tv-line); overflow: hidden; }
+.tv-lanes__track i { display: block; height: 100%; background: var(--tv-accent); transform-origin: left center; transition: transform 1s linear; }
+.tv-lanes__clock[data-tone="warn"] .tv-lanes__track i { background: var(--tls-warn); }
+.tv-lanes__clock[data-tone="over"] .tv-lanes__track i { background: var(--tv-live); }
 
 /* ------------------------------------------ Live-Spiele (#1121) */
 .tv-slide-live { height: 100%; min-height: 0; display: grid; gap: calc(var(--tv-u) * 2); padding-top: calc(var(--tv-u) * 1.2); }

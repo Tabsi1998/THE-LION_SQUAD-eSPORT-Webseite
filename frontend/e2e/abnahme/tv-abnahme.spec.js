@@ -245,8 +245,8 @@ test.describe("Abnahme: Turnierbaum-TV mit Auslosung und Live-Warteschlange (#16
         // Eine laufende Station zeigt die Spielzeit, die ohne Neuladen weiterläuft.
         const clock = screen.page.locator("[data-testid^='tv-queue-clock-']").first();
         await expect(clock).toBeVisible();
-        const before = await clock.locator(".tv-queue__time").textContent();
-        await expect.poll(() => clock.locator(".tv-queue__time").textContent(), { timeout: 5_000 }).not.toBe(before);
+        const before = await clock.locator(".tv-lanes__time").textContent();
+        await expect.poll(() => clock.locator(".tv-lanes__time").textContent(), { timeout: 5_000 }).not.toBe(before);
         await shot(screen.page, `tv-warteschlange-vorher-${screen.name}.png`);
       }
 
@@ -264,6 +264,7 @@ test.describe("Abnahme: Turnierbaum-TV mit Auslosung und Live-Warteschlange (#16
         await expect(screen.page.getByTestId(`tv-queue-next-${free.id}`)).toHaveAttribute("data-state", "called", { timeout: TV_WAIT });
         await expect(screen.page.getByTestId(`tv-queue-lane-${free.id}`)).toHaveAttribute("data-state", "called");
         await expect(screen.page.getByTestId(`tv-queue-when-${free.id}`)).toContainText("Aufgerufen");
+        await screen.page.waitForTimeout(700); // das Gleiten ist durch
         await shot(screen.page, `tv-warteschlange-aufgerufen-${screen.name}.png`);
       }
 
@@ -273,6 +274,7 @@ test.describe("Abnahme: Turnierbaum-TV mit Auslosung und Live-Warteschlange (#16
         await expect(screen.page.getByTestId(`tv-queue-now-${free.id}`)).toHaveAttribute("data-match", free.next.match_id, { timeout: TV_WAIT });
         await expect(screen.page.getByTestId(`tv-queue-lane-${free.id}`)).toHaveAttribute("data-state", "live");
         await expect(screen.page.getByTestId(`tv-queue-clock-${free.id}`)).toBeVisible();
+        await screen.page.waitForTimeout(700); // das Gleiten ist durch
         await shot(screen.page, `tv-warteschlange-gestartet-${screen.name}.png`);
       }
     } finally {

@@ -40,7 +40,7 @@ test("Wechsel: das alte Spiel gleitet weg, das neue herein - nur an der Station,
   const { rerender } = render(board(before));
   await screen.findByTestId("tv-queue-board");
   // Beim ersten Bild kommen die Stationen nacheinander herein (Versatz je Station).
-  const delays = ["s1", "s2"].map((id) => screen.getByTestId(`tv-queue-now-${id}`).querySelector(".tv-queue__swap--in").style.getPropertyValue("--tv-delay"));
+  const delays = ["s1", "s2"].map((id) => screen.getByTestId(`tv-queue-now-${id}`).querySelector(".tv-lanes__swap--in").style.getPropertyValue("--tv-delay"));
   expect(delays).toEqual(["0ms", "80ms"]);
 
   // An s2 startet das nächste Spiel: m6 läuft jetzt, als Nächstes nichts mehr.
@@ -49,7 +49,7 @@ test("Wechsel: das alte Spiel gleitet weg, das neue herein - nur an der Station,
   expect(now).toHaveAttribute("data-match", "m6");
   expect(screen.getByTestId("tv-queue-now-out-s2")).toBeInTheDocument();
   // Die einzige geänderte Station gleitet ohne Wartezeit - s1 bleibt ruhig stehen, ohne Abschied.
-  expect(now.querySelector(".tv-queue__swap--in").style.getPropertyValue("--tv-delay")).toBe("0ms");
+  expect(now.querySelector(".tv-lanes__swap--in").style.getPropertyValue("--tv-delay")).toBe("0ms");
   expect(screen.queryByTestId("tv-queue-now-out-s1")).not.toBeInTheDocument();
   // Der alte Inhalt geht nach dem Gleiten ganz.
   await waitFor(() => expect(screen.queryByTestId("tv-queue-now-out-s2")).not.toBeInTheDocument());
