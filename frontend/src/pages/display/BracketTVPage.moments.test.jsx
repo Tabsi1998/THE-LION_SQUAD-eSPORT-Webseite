@@ -75,7 +75,7 @@ test("ein Ergebnis: der Ergebnis-Moment kommt - der Sieger fährt danach entlang
   expect(main()).not.toHaveAttribute("data-moment");
   await change("se8_after_a");
   await waitFor(() => expect(main()).toHaveAttribute("data-moment", "result"));
-  expect(screen.getByTestId("tv-result-card")).toHaveTextContent("entschieden");
+  expect(await screen.findByTestId("tv-result-card")).toHaveTextContent("entschieden");
 });
 
 test("korrigiert: das geänderte Ergebnis eines entschiedenen Spiels sagt „korrigiert“", async () => {
@@ -345,7 +345,7 @@ test("Nachhol-Abfrage aussteht, eine neue Meldung kommt, die Nachhol-Antwort zue
   // Neu gemeldet: das Ergebnis von A wurde korrigiert - dieser Moment kommt.
   await act(async () => { pending[1]({ data: state("se8_corrected") }); });
   await waitFor(() => expect(main()).toHaveAttribute("data-moment", "result"));
-  expect(screen.getByTestId("tv-result-card")).toHaveTextContent("Korrigiert");
+  expect(await screen.findByTestId("tv-result-card")).toHaveTextContent("Korrigiert");
 });
 
 test("kurzes Neuverbinden des Stroms (wenige 100 ms, z. B. Server oder Proxy) ist keine Unterbrechung - der Moment kommt", async () => {
@@ -388,5 +388,5 @@ test("Nachhol-Antwort und Meldungs-Antwort im selben Render-Durchgang: nur der n
   });
   await waitFor(() => expect(main()).toHaveAttribute("data-moment", "result"));
   // Der Moment ist die Korrektur - nicht das verpasste „entschieden“.
-  expect(screen.getByTestId("tv-result-card")).toHaveTextContent("Korrigiert");
+  expect(await screen.findByTestId("tv-result-card")).toHaveTextContent("Korrigiert");
 });
