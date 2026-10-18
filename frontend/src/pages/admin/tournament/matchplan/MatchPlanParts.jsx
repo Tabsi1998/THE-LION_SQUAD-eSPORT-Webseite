@@ -124,11 +124,17 @@ export function PlanSettings({ tournament, mode, duration, stations, canEdit, on
 export function PlanPreview({ plan, stale, busy, onApply, onDiscard, forecastOnly = false }) {
   const reduce = useReducedMotion();
   const changed = (plan?.assignments || []).filter((item) => item.changed);
+  // Termine, die der Planer löst (#1608): das Spiel hat nur noch einen Spieler (Freilos nach Austritt).
+  const releases = plan?.releases || [];
   const warnings = plan?.warnings || [];
   const errors = warnings.filter((item) => item.severity === "error");
   const hints = warnings.filter((item) => item.severity !== "error");
   const stations = plan?.mode === "stations" || plan?.mode === "mixed";
   const verb = changed.length === 1 ? "bekommt" : "bekommen";
+  const parts = [
+    changed.length ? `${countOf(changed.length, "Spiel", "Spiele")} ${verb} Zeit${stations ? " und Station" : ""}` : null,
+    releases.length ? `${countOf(releases.length, "Termin", "Termine")} ${releases.length === 1 ? "wird" : "werden"} gelöst (nur noch ein Spieler)` : null,
+  ].filter(Boolean);
   return (
     <AnimatePresence initial={!reduce}>
       {plan && (
@@ -145,9 +151,7 @@ export function PlanPreview({ plan, stale, busy, onApply, onDiscard, forecastOnl
           <div className="mp-preview__text">
             <span className="mp-preview__eyebrow"><Wand2 className="h-3.5 w-3.5" aria-hidden="true" /> {forecastOnly ? "Nur Prognose" : "Vorschau"}</span>
             <p className="mp-preview__summary">
-              {changed.length
-                ? `${countOf(changed.length, "Spiel", "Spiele")} ${verb} Zeit${stations ? " und Station" : ""}`
-                : "Nichts zu ändern: alle Spiele stehen schon so im Plan"}
+              {parts.length ? parts.join(", ") : "Nichts zu ändern: alle Spiele stehen schon so im Plan"}
               {`, ${countOf(errors.length, "Konflikt", "Konflikte")}, ${countOf(hints.length, "Hinweis", "Hinweise")}.`}
             </p>
             <p className="mp-preview__sub">{forecastOnly
@@ -157,7 +161,7 @@ export function PlanPreview({ plan, stale, busy, onApply, onDiscard, forecastOnl
           </div>
           <div className="mp-preview__actions">
             {!forecastOnly && (
-              <button type="button" className="tls-btn tls-btn--primary mp-btn" disabled={busy || !changed.length} onClick={onApply}>
+              <button type="button" className="tls-btn tls-btn--primary mp-btn" disabled={busy || !(changed.length || releases.length)} onClick={onApply}>
                 {busy ? "Übernimmt …" : "Übernehmen"}
               </button>
             )}

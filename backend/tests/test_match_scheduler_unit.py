@@ -276,3 +276,32 @@ def test_a_too_early_time_is_told_in_vienna_time_with_the_earliest_possible_star
     assert "UTC" not in warning["message"] and f"um {vienna}" in warning["message"]
     earliest = datetime.fromisoformat(warning["earliest_at"])
     assert earliest >= T0 + timedelta(minutes=30 + DEFAULT_BREAK_MINUTES)
+
+
+# ---------------------------------------------------------------- Freilos nach Austritt (#1608)
+
+def bye_slot(index):
+    return {"slot": index, "source": {"type": "bye"}, "registration_id": None, "user_id": None, "status": "bye"}
+
+
+def test_a_planner_time_on_a_match_that_is_left_with_a_bye_is_released():
+    matches = single_elim_four()
+    matches[2].update({"status": "scheduled", "scheduled_at": (T0 + timedelta(minutes=40)).isoformat(), "station_id": "s-a",
+                       "schedule_source": "planner"})
+    matches[2]["slots"][0] = bye_slot(1)
+    plan = plan_schedule(tournament(), matches, [station("s-a"), station("s-b")], now=T0)
+    assert "id-F" not in by_match(plan)
+    assert [item["match_id"] for item in plan["releases"]] == ["id-F"]
+    assert plan["releases"][0]["previous"]["station_id"] == "s-a"
+    # Der Fingerabdruck kennt das Lösen: ohne alten Termin ist es ein anderer Plan.
+    matches[2].update({"scheduled_at": None, "station_id": None, "schedule_source": None})
+    assert plan_schedule(tournament(), matches, [station("s-a"), station("s-b")], now=T0)["fingerprint"] != plan["fingerprint"]
+
+
+def test_a_manual_time_on_a_match_with_a_bye_is_not_released():
+    matches = single_elim_four()
+    matches[2].update({"status": "scheduled", "scheduled_at": (T0 + timedelta(minutes=40)).isoformat(), "station_id": "s-a",
+                       "schedule_source": "manual"})
+    matches[2]["slots"][0] = bye_slot(1)
+    plan = plan_schedule(tournament(), matches, [station("s-a"), station("s-b")], now=T0)
+    assert plan["releases"] == []

@@ -274,8 +274,21 @@ def _usable_stations(tournament: dict, stations, game: dict | None = None) -> li
 
 
 def _plan_stations(tournament: dict, matches: list[dict], stations, stage_by_id: dict, now: datetime, busy_elsewhere,
-                   participant_keys: dict[str, set[str]] | None = None, game: dict | None = None) -> tuple[list[dict], list[dict], list[dict]]:
+                   participant_keys: dict[str, set[str]] | None = None, game: dict | None = None) -> tuple[list[dict], list[dict], list[dict], list[dict]]:
     warnings: list[dict] = []
+    # Spiele, die der Planer nicht mehr plant, aber früher selbst geplant hat (#1608): ihr Termin wird gelöst.
+    releases: list[dict] = []
+
+    def release(match: dict) -> None:
+        releases.append({
+            "match_id": match["id"], "match_key": match.get("match_key"), "label": _label(match),
+            "stage_id": match.get("stage_id"),
+            "previous": {"scheduled_at": match.get("scheduled_at"), "station_id": match.get("station_id"),
+                         "schedule_source": match.get("schedule_source"), "status": match.get("status")},
+        })
+
+    def planner_time(match: dict) -> bool:
+        return match.get("schedule_source") == "planner" and bool(match.get("scheduled_at") or match.get("station_id"))
 
     def players_of(match: dict) -> set[str]:
         return participants_of(match, participant_keys)
@@ -314,6 +327,11 @@ def _plan_stations(tournament: dict, matches: list[dict], stations, stage_by_id:
     for match in matches:
         status = str(match.get("status") or "")
         if status in DONE_STATUSES:
+            # Kampflos entschieden (Freilos nach Austritt, `resolve_walkovers`, Codex zu #1608): nie gespielt - ein alter
+            # Termin des Planers samt Station gehört nicht mehr dazu.
+            if ((match.get("result_meta") or {}).get("source") == "auto_bye" and planner_time(match)
+                    and not match.get("started_at") and not match.get("called_at")):
+                release(match)
             continue
         running = status in RUNNING_STATUSES or bool(match.get("started_at"))
         kept = match.get("schedule_source") in KEPT_SOURCES and _parse(match.get("scheduled_at")) is not None
@@ -341,6 +359,11 @@ def _plan_stations(tournament: dict, matches: list[dict], stations, stage_by_id:
         if status not in PLANNABLE_STATUSES:
             continue
         if _possible_players(match) < _min_players(match):
+            # Nach einem Austritt kann ein späteres Spiel nur noch einen Spieler haben (Freilos, #1608): kein Zeitfenster,
+            # keine Station. Ein alter Termin des Planers bleibt sonst stehen und meldet falsche Überschneidungen.
+            # Von Hand gesetzte und vereinbarte Termine (KEPT_SOURCES) sind oben schon gehalten.
+            if planner_time(match):
+                release(match)
             continue
         candidates.append(match)
 
@@ -454,11 +477,14 @@ def _plan_stations(tournament: dict, matches: list[dict], stations, stage_by_id:
                                  "message": f"{_label(match)} ist fest um {start.astimezone(VIENNA).strftime('%H:%M')}, "
                                             f"aber {_label(previous)} ist erst um {end.astimezone(VIENNA).strftime('%H:%M')} vorbei."})
                 break
-    return assignments, warnings, held
+    return assignments, warnings, held, releases
 
 
-def _fingerprint(assignments: list[dict]) -> str:
+def _fingerprint(assignments: list[dict], releases: list[dict] = ()) -> str:
     rows = sorted((item["match_id"], item.get("scheduled_at"), item.get("station_id"), item.get("schedule_source")) for item in assignments)
+    if releases:
+        rows += sorted(("release", item["match_id"], (item.get("previous") or {}).get("scheduled_at"),
+                        (item.get("previous") or {}).get("station_id")) for item in releases)
     return hashlib.sha256(json.dumps(rows, sort_keys=True).encode("utf-8")).hexdigest()[:16]
 
 
@@ -487,8 +513,10 @@ def plan_schedule(tournament: dict, matches, stations=(), *, stages=(), proposal
     assignments: list[dict] = []
     warnings: list[dict] = []
     held: list[dict] = []
+    releases: list[dict] = []
     if local:
-        planned, found, held = _plan_stations(tournament, local, stations, stage_by_id, now, busy_elsewhere, participant_keys, game)
+        planned, found, held, releases = _plan_stations(tournament, local, stations, stage_by_id, now, busy_elsewhere,
+                                                        participant_keys, game)
         assignments.extend(planned)
         warnings.extend(found)
     if weekly:
@@ -533,7 +561,8 @@ def plan_schedule(tournament: dict, matches, stations=(), *, stages=(), proposal
         "assignments": assignments,
         "warnings": warnings,
         "held": held,
-        "fingerprint": _fingerprint(assignments),
+        "releases": releases,
+        "fingerprint": _fingerprint(assignments, releases),
         "stations": known_stations,
     }
 
@@ -668,6 +697,19 @@ async def apply_plan(db, tournament: dict, plan: dict) -> dict:
             written += 1
             if update.get("station_id"):
                 on_station.append((before, update))
+    for item in plan.get("releases") or []:
+        # Termin des Planers lösen (#1608): Compare-and-Set wie oben - nur, wenn das Spiel noch so dasteht wie in der
+        # Vorschau, nicht aufgerufen und nicht begonnen. Was inzwischen von Hand gesetzt wurde, bleibt.
+        previous = item.get("previous") or {}
+        if previous.get("schedule_source") != "planner":
+            continue
+        guard = {"id": item["match_id"], "scheduled_at": previous.get("scheduled_at"), "station_id": previous.get("station_id"),
+                 "schedule_source": "planner", "status": previous.get("status"), "started_at": None, "called_at": None}
+        result = await db.matches_v2.update_one(guard, {"$set": {
+            "scheduled_at": None, "station_id": None, "schedule_source": None, "schedule_forecast": False,
+            "schedule_written_at": now_iso, "updated_at": now_iso,
+        }})
+        written += result.modified_count
     warnings = list(plan.get("warnings") or [])
     # Nachprüfen (Codex zu #1611): eine Station, die zwischen Vorschau und Schreiben gelöscht wurde, bekommt nichts.
     for station_id in {update["station_id"] for _item, update in on_station}:
@@ -685,7 +727,7 @@ async def apply_plan(db, tournament: dict, plan: dict) -> dict:
                                before["id"], station_id)
         warnings.append({"type": "station_gone", "severity": "error", "station_id": station_id,
                          "message": "Eine Station wurde beim Übernehmen gelöscht - ihre Spiele sind nicht geplant. Bitte neu planen."})
-    if plan.get("assignments"):
+    if plan.get("assignments") or plan.get("releases"):
         # Neu geplant: der Hinweis vom Check-in-Ende („Baum hat sich geändert - neu planen“) ist erledigt.
         await db.tournament_stages.update_many({"tournament_id": tournament["id"], "schedule_hint": {"$exists": True}},
                                                {"$unset": {"schedule_hint": ""}})
@@ -703,6 +745,7 @@ async def replan_after_heat_rebuild(db, tournament: dict, stage: dict | None) ->
     if stage is None or match_policy({}, tournament, stage)["event_mode"] != "local" or plays_in_matchdays(tournament, stage):
         return {"applies": False, "written": 0, "warnings": []}
     plan = await plan_for_tournament(db, tournament)
-    stage_plan = {**plan, "assignments": [item for item in plan["assignments"] if item.get("stage_id") == stage.get("id")]}
+    stage_plan = {**plan, "assignments": [item for item in plan["assignments"] if item.get("stage_id") == stage.get("id")],
+                  "releases": [item for item in plan.get("releases") or [] if item.get("stage_id") == stage.get("id")]}
     result = await apply_plan(db, tournament, stage_plan)
     return {"applies": True, "written": result["written"], "warnings": plan.get("warnings") or []}
