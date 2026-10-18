@@ -32,6 +32,9 @@ export function advancementsOf(match, matches = [], { lastStage = true, table = 
   }
   const stage = match.stage_id || "";
   const targets = new Map();
+  // Ein Weg weiter, auch wenn sein Platz leer bleibt (Freilos nach einem Austritt, #1596): das Spiel ist dann kein
+  // Finale - wer auf diesem Platz säße, ist aber raus und fährt nirgends hin.
+  let ways = 0;
   for (const other of matches || []) {
     if (!other || other.id === match.id || (other.stage_id || "") !== stage) continue;
     (other.slots || []).forEach((slot, slotIndex) => {
@@ -40,6 +43,8 @@ export function advancementsOf(match, matches = [], { lastStage = true, table = 
       const rank = absoluteRank(source, match);
       const row = ranking.find((entry) => Number(entry.rank) === rank);
       if (!row || targets.has(row.registration_id)) return;
+      ways += 1;
+      if (slot?.status === "bye") return;
       targets.set(row.registration_id, {
         matchId: other.id,
         matchKey: other.match_key,
@@ -51,7 +56,7 @@ export function advancementsOf(match, matches = [], { lastStage = true, table = 
       });
     });
   }
-  const terminal = targets.size === 0;
+  const terminal = ways === 0;
   const qualifiers = Number(match?.settings?.qualifiers_per_match || 0);
   const bronze = isBronzeMatch(match);
   return ranking.map((row) => {
