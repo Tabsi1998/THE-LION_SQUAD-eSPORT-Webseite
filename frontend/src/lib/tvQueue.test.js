@@ -26,6 +26,8 @@ describe("Bahnen je Station", () => {
     expect(queueLanes("<html>")).toEqual([]);
     expect(hasQueue(queue([{ id: "s1", name: "PC 1", status: "free", running: null, next: null }]))).toBe(false);
     expect(hasQueue(queue([{ id: "s1", name: "PC 1", status: "free", running: null, next: queued }]))).toBe(true);
+    // Nur eine defekte Station: die Tafel zeigt „Bitte nicht benutzen“ statt der alten Aufruf-Tafel.
+    expect(hasQueue(queue([{ id: "s1", name: "PC 1", status: "broken", running: null, next: null }]))).toBe(true);
   });
 });
 

@@ -360,3 +360,25 @@ test("#1634: scheitert die Warteschlange (alter Server), zeigt der TV den Baum w
   await waitFor(() => expect(screen.getByTestId("tv-status")).toHaveTextContent("aktuell"));
   expect(screen.getByTestId("tv-status")).not.toHaveClass("tv-status--error");
 });
+
+test("#1634 (Codex): ein Server ohne Warteschlange (404) wird in dieser Sitzung nicht noch einmal gefragt", async () => {
+  let asked = 0;
+  apiMock.get.mockImplementation(async (url) => {
+    if (url === "/tv/settings") return { data: { settings: {} } };
+    if (url.startsWith("/tournaments/t1/bracket/display")) return { data: BRACKET };
+    if (url.endsWith("/live-queue")) {
+      asked += 1;
+      throw Object.assign(new Error("nicht gefunden"), { response: { status: 404 } });
+    }
+    return { data: [] };
+  });
+  renderTv("/display/bracket/t1?key=k");
+  expect(await screen.findByTestId("tv-tree")).toBeInTheDocument();
+  await waitFor(() => expect(asked).toBe(1));
+  const { emitApiInvalidation } = await import("@/lib/apiInvalidation");
+  await act(async () => {
+    emitApiInvalidation({ resource: "tournaments" });
+  });
+  await waitFor(() => expect(apiMock.get.mock.calls.filter(([url]) => String(url).startsWith("/tournaments/t1/bracket/display")).length).toBeGreaterThan(1));
+  expect(asked).toBe(1);
+});

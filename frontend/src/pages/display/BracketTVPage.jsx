@@ -134,6 +134,9 @@ function BracketTv() {
   const [stations, setStations] = useState([]);
   // Live-Warteschlange je Station (#1634) - `null`, solange es keine gibt (online, keine Stationen, alter Server).
   const [liveQueue, setLiveQueue] = useState(null);
+  // Ein Server ohne Warteschlange (404/405, ältere Stände): für diese Sitzung nicht mehr fragen - sonst fragt jeder TV
+  // in der Halle alle 15 s vergeblich nach (Codex zu #1634).
+  const queueOffRef = useRef(false);
   const [loadError, setLoadError] = useState(null);
   const [keyRefused, setKeyRefused] = useState(false);
   const [lastUpdated, setLastUpdated] = useState(null);
@@ -194,13 +197,18 @@ function BracketTv() {
       const tournamentId = br?.tournament?.id || id;
       const [list, live] = await Promise.allSettled([
         api.get(`/stations?tournament_id=${encodeURIComponent(tournamentId)}`),
-        api.get(`/tournaments/${encodeURIComponent(tournamentId)}/live-queue`, displayKey ? { params: { key: displayKey } } : undefined),
+        queueOffRef.current
+          ? Promise.resolve(null)
+          : api.get(`/tournaments/${encodeURIComponent(tournamentId)}/live-queue`, displayKey ? { params: { key: displayKey } } : undefined),
       ]);
       if (seq < appliedRef.current) return;
       if (list.status === "fulfilled") setStations(Array.isArray(list.value?.data) ? list.value.data : []);
-      if (live.status === "fulfilled") {
+      if (live.status === "fulfilled" && live.value) {
         const view = live.value?.data;
         setLiveQueue(view && typeof view === "object" && !Array.isArray(view) && view.applies === true ? view : null);
+      } else if (live.status === "rejected" && [404, 405].includes(live.reason?.response?.status)) {
+        queueOffRef.current = true;
+        setLiveQueue(null);
       }
     } catch (error) {
       const status = error?.response?.status;

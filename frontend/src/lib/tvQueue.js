@@ -27,7 +27,8 @@ export function queueLanes(queue) {
 
 /** Gibt es etwas zu zeigen - ein laufendes oder ein nächstes Spiel an irgendeiner Station? */
 export function hasQueue(queue) {
-  return queueLanes(queue).some((lane) => lane.now || lane.next);
+  // Auch eine defekte Station allein zählt (Codex): die Halle soll „Bitte nicht benutzen“ sehen.
+  return queueLanes(queue).some((lane) => lane.now || lane.next || lane.status === "broken");
 }
 
 /** „Viertelfinale · Spiel B“ - mit dem Spiel aus dem Baum wie überall am TV, sonst der Text des Servers. */
