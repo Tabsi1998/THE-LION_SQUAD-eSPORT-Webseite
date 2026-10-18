@@ -93,3 +93,57 @@ test("Phase: leere Spieldauer erbt und geht als null an den Server", async () =>
   await waitFor(() => expect(apiMock.patch).toHaveBeenCalledTimes(2));
   expect(apiMock.patch.mock.calls[1][1].settings.duration_minutes).toBe(25);
 });
+
+// Regeln dieser Phase (#1636): im Betrieb nur für die Turnierleitung, aufklappbar; Speichern schickt nur die Regel-Felder,
+// damit Name, Status und Aufbau nicht mit einem alten Stand überschrieben werden.
+test("Regeln dieser Phase: nur mit Leitungsrecht sichtbar", () => {
+  panel({ tournament: {}, durationGame: GAME });
+  expect(screen.queryByTestId("stage-rules-toggle-s1")).toBeNull();
+});
+
+test("Regeln dieser Phase: Austragung mit Erklärung, Speichern nur mit Regel-Feldern", async () => {
+  const stage = { ...STAGE, status: "running", settings: { match_size: 4, schema: "x", advancement_mode: "draw_round" } };
+  panel({ canEditSettings: true, tournament: {}, durationGame: GAME, stages: [stage] });
+  const toggle = screen.getByTestId("stage-rules-toggle-s1");
+  expect(toggle).toHaveAttribute("aria-expanded", "false");
+  expect(screen.queryByTestId("stage-rules-save-s1")).toBeNull();
+  fireEvent.click(toggle);
+  expect(toggle).toHaveAttribute("aria-expanded", "true");
+  expect(screen.getByTestId("stage-rules-event-mode-hint-s1")).toHaveTextContent("wie es beim Turnier eingestellt ist");
+  fireEvent.change(screen.getByTestId("stage-rules-event-mode-s1"), { target: { value: "local" } });
+  expect(screen.getByTestId("stage-rules-event-mode-hint-s1")).toHaveTextContent("Stationen");
+  fireEvent.click(screen.getByTestId("stage-rules-save-s1"));
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledTimes(1));
+  const [url, body] = apiMock.patch.mock.calls[0];
+  expect(url).toBe("/tournaments/t1/stages/s1");
+  expect(Object.keys(body)).toEqual(["settings"]);
+  expect(body.settings).toMatchObject({ event_mode: "local", match_size: 4, schema: "x", advancement_mode: "draw_round", duration_minutes: null });
+  // Die Spielliste bleibt darunter.
+  expect(screen.getByTestId("stages-matchplan-hint")).toBeInTheDocument();
+});
+
+// Codex zu #1636: Nach dem Neuladen derselben Phase folgt das Formular dem neuen Stand - Speichern schreibt keine alten
+// Werte zurück; Show-Auslosung mit Minuten und ein gespeichertes Grand Final bleiben erhalten.
+test("Regeln dieser Phase: neuer Stand der Phase ersetzt das Formular, nichts geht verloren", async () => {
+  const first = { ...STAGE, updated_at: "1", settings: { match_size: 4, event_mode: "online" } };
+  const props = { canEditSettings: true, tournament: {}, durationGame: GAME };
+  const view = panel({ ...props, stages: [first] });
+  fireEvent.click(screen.getByTestId("stage-rules-toggle-s1"));
+  const toggle = screen.getByTestId("stage-rules-toggle-s1");
+  expect(document.getElementById(toggle.getAttribute("aria-controls"))).not.toBeNull();
+  expect(screen.getByTestId("stage-rules-event-mode-s1")).toHaveValue("online");
+
+  const reloaded = {
+    ...first, updated_at: "2",
+    settings: { match_size: 4, event_mode: "local", advancement_mode: "draw_show", randomize_advancement_rounds: true, draw_show_minutes: 7, grand_final: "single" },
+  };
+  view.rerender(
+    <TournamentStagesPanel tournamentId="t1" stages={[reloaded]} matches={[MATCH]} registrations={[]} rightsForMatch={PLAN_RIGHTS} onChanged={() => {}} {...props} />,
+  );
+  await waitFor(() => expect(screen.getByTestId("stage-rules-event-mode-s1")).toHaveValue("local"));
+  fireEvent.click(screen.getByTestId("stage-rules-save-s1"));
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledTimes(1));
+  expect(apiMock.patch.mock.calls[0][1].settings).toMatchObject({
+    event_mode: "local", advancement_mode: "draw_show", randomize_advancement_rounds: true, draw_show_minutes: 7, grand_final: "single",
+  });
+});
