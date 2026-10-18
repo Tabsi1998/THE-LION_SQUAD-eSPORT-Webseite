@@ -182,6 +182,7 @@ export function TournamentStagesPanel({ tournamentId, stages, matches, registrat
             canManageStructure={canManageStructure}
             rightsForMatch={rightsForMatch}
             showSettings={showSettings}
+            canEditRules={canEditSettings && mode !== "settings"}
             showMatchList={showMatchList}
             onChanged={onChanged}
             onDelete={() => removeStage(stage)}
@@ -195,6 +196,62 @@ export function TournamentStagesPanel({ tournamentId, stages, matches, registrat
       </div>
     </div>
     </DurationContext.Provider>
+  );
+}
+
+// Regel-Felder einer Phase (#1636), die die Turnierleitung im Betrieb ändern darf. Die Weiterkommen-Felder kommen aus
+// stageAdvancementSettings (Modus + alter Schalter).
+const RULE_SETTING_KEYS = [
+  "duration_minutes", "event_mode", "result_entry_mode", "schedule_mode", "grand_final",
+  "advancement_mode", "randomize_advancement_rounds", "draw_show_minutes",
+];
+
+const EVENT_MODE_HINTS = {
+  "": "Die Phase spielt so, wie es beim Turnier eingestellt ist.",
+  local: "Vor Ort: Spiele laufen an Stationen, mit Warteschlange und Aufruf.",
+  online: "Online: Runden mit Fristen, die Spieler melden ihre Ergebnisse selbst.",
+  hybrid: "Hybrid: grundsätzlich online, ein Spiel mit Station läuft vor Ort.",
+};
+
+// „Regeln dieser Phase“ (#1636): aufklappbar unter dem Kopf der Phase, nur für die Turnierleitung. Aufbau, Schema und
+// Löschen bleiben bei der Format-Vorschau.
+function StageRules({ stage, form, set, durationContext, onSave }) {
+  const [open, setOpen] = useState(false);
+  const panelId = `stage-rules-${stage.id}`;
+  return (
+    <div className="border-b border-white/10">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        aria-controls={panelId}
+        className="w-full flex items-center justify-between gap-3 px-5 py-3 text-left"
+        data-testid={`stage-rules-toggle-${stage.id}`}
+      >
+        <span className="font-bold uppercase tracking-wider text-xs text-white/80">Regeln dieser Phase</span>
+        <span className="text-white/50 text-lg leading-none" aria-hidden="true">{open ? "−" : "+"}</span>
+      </button>
+      {open && (
+        <div id={panelId} className="px-5 pb-5 space-y-3">
+          <div className="grid md:grid-cols-3 gap-3">
+            <div className="block md:col-span-3">
+              <SelectField label="Austragung" value={form.event_mode} onChange={(v)=>set("event_mode", v)} options={[["", "Vom Turnier erben"], ...EVENT_MODE_OPTIONS]} testId={`stage-rules-event-mode-${stage.id}`} />
+              <div className="text-[11px] text-white/40 mt-1.5" data-testid={`stage-rules-event-mode-hint-${stage.id}`}>{EVENT_MODE_HINTS[form.event_mode] || EVENT_MODE_HINTS[""]}</div>
+            </div>
+            <SelectField label="Ergebniserfassung" value={form.result_entry_mode} onChange={(v)=>set("result_entry_mode", v)} options={[["", "Vom Turnier erben"], ...RESULT_ENTRY_MODE_OPTIONS.filter(([value]) => value)]} />
+            <SelectField label="Terminplanung" value={form.schedule_mode} onChange={(v)=>set("schedule_mode", v)} options={[["", "Vom Turnier erben"], ...SCHEDULE_MODE_OPTIONS.filter(([value]) => value)]} />
+            <div>
+              <Fld label="Spieldauer Min." type="number" min="1" value={form.duration_minutes} onChange={(v)=>set("duration_minutes", v)} placeholder={String(inheritedDuration(durationContext).minutes)} testId={`stage-rules-duration-${stage.id}`} />
+              <DurationSource own={form.duration_minutes} inherited={inheritedDuration(durationContext)} testId={`stage-rules-duration-source-${stage.id}`} />
+            </div>
+            {form.stage_type === "double_elimination" && <GrandFinalField value={form.grand_final} onChange={(v)=>set("grand_final", v)} testId={`stage-rules-grand-final-${stage.id}`} />}
+            <AdvancementField value={form.advancement} minutes={form.draw_show_minutes} onChange={(v)=>set("advancement", v)} onMinutes={(v)=>set("draw_show_minutes", v)} testId={`stage-rules-advancement-${stage.id}`} />
+          </div>
+          <div className="text-xs text-white/45">Leer heißt: wie beim Turnier. Gilt für neue und noch offene Spiele dieser Phase.</div>
+          <button type="button" onClick={onSave} className="tls-btn tls-btn--secondary px-3 py-2 rounded-sm text-xs font-bold uppercase tracking-wider" data-testid={`stage-rules-save-${stage.id}`}>Regeln speichern</button>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -225,7 +282,7 @@ function GrandFinalField({ value, onChange, testId }) {
   );
 }
 
-function StageCard({ tournamentId, stage, matches, regById, stations = [], canManageStructure = false, rightsForMatch = NO_MATCH_RIGHTS, showSettings = false, showMatchList = true, onChanged, onDelete }) {
+function StageCard({ tournamentId, stage, matches, regById, stations = [], canManageStructure = false, rightsForMatch = NO_MATCH_RIGHTS, showSettings = false, canEditRules = false, showMatchList = true, onChanged, onDelete }) {
   const settings = stage.settings || {};
   const durationContext = useContext(DurationContext);
   const [activeSection, setActiveSection] = useState("all");
@@ -272,6 +329,21 @@ function StageCard({ tournamentId, stage, matches, regById, stations = [], canMa
       calculation: settings.calculation || "points",
     },
   });
+  // Regeln dieser Phase (#1636): nur die Regel-Felder; Name, Status und Aufbau bleiben, wie der Server sie gerade hat.
+  const rulesPayload = () => {
+    const { settings: next } = stagePayload();
+    const picked = Object.fromEntries(RULE_SETTING_KEYS.map((key) => [key, next[key] ?? null]));
+    return { settings: { ...settings, ...picked } };
+  };
+  const saveRules = async () => {
+    try {
+      await api.patch(`/tournaments/${tournamentId}/stages/${stage.id}`, rulesPayload());
+      toast.success("Regeln der Phase gespeichert.");
+      onChanged();
+    } catch (err) {
+      toast.error(formatRequestError(err, "Regeln der Phase konnten nicht gespeichert werden."));
+    }
+  };
   const save = async () => {
     try {
       await api.patch(`/tournaments/${tournamentId}/stages/${stage.id}`, stagePayload());
@@ -372,6 +444,9 @@ function StageCard({ tournamentId, stage, matches, regById, stations = [], canMa
           </div>
         )}
       </div>
+      {canEditRules && !showSettings && (
+        <StageRules stage={stage} form={form} set={set} durationContext={durationContext} onSave={saveRules} />
+      )}
       <div className={`${showSettings && showMatchList ? "grid lg:grid-cols-2 gap-5" : "space-y-3"} p-5`}>
         {showSettings && (
           <div className="space-y-3">

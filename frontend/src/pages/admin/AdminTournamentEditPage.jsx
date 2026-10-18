@@ -722,7 +722,7 @@ export default function AdminTournamentEditPage() {
           matches={matchesV2}
           registrations={regs}
           stations={stations}
-          canEditSettings={false}
+          canEditSettings={isTournamentLead}
           canManageStructure={Boolean(t.can_manage_structure)}
           onChanged={load}
           onOpenMatchplan={() => selectTab("matchplan")}
