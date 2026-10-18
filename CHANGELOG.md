@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.4](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/compare/v1.0.3...v1.0.4) (2026-10-18)
+
+
+### Fehlerbehebungen
+
+* FFA-Läufe - Austritt ohne Nachrücker hinterlässt kein zweites Finale ([#1596](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1596)) ([#1770](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1770)) ([88236c6](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/88236c686d1111c09565fe27a97a5d4c2729f038))
+
 ## [1.0.3](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/compare/v1.0.2...v1.0.3) (2026-10-18)
 
 
