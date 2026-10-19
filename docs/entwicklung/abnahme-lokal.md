@@ -94,6 +94,35 @@ cd frontend && ABNAHME=1 E2E_BASE_URL=http://127.0.0.1:24000 npx playwright test
 Den ganzen Event-Abend einmal mit der Turnierleitung durchspielen (Generalprobe vor einem Event): Drehbuch
 [Probelauf](probelauf.md), die übrigen Rollen spielt `scripts/probelauf_mitspieler.py`.
 
+## App gegen den Abnahme-Server im Emulator
+
+Die Release-App spricht fest mit lionsquad.at - **nie gegen Produktion testen**. Ein Debug-Build im Android-Emulator
+liest die Adressen aus `EXPO_PUBLIC_API_BASE_URL` und `EXPO_PUBLIC_WEBSITE_BASE_URL` (`mobile/src/config.ts`; ohne sie
+`10.0.2.2:8001` bzw. `:3000`, nie Produktion). `10.0.2.2` ist im Emulator der eigene Rechner. So entstanden die
+App-Bilder der [Helfer-Anleitung](../handbuch/helfer.md) (#1686):
+
+```bash
+# Stand wie oben (eigener Projektname), dazu den Emulator als Host zulassen
+export TRUSTED_HOSTS=127.0.0.1,localhost,10.0.2.2   # sonst 400 „Invalid host header“
+# App: mobile/node_modules vorhanden (Skia-Bibliotheken fehlen? npx install-skia)
+cd mobile
+# Platzhalter-google-services.json mit Paket at.lionsquad.app anlegen (Fantasiewerte, nie die echte Datei -
+# so landet aus dem Test nichts in Firebase), dann:
+npx expo prebuild --platform android --no-install
+(cd android && ./gradlew app:assembleDebug -PreactNativeArchitectures=x86_64)
+emulator -avd <avd> -read-only -no-snapshot          # -read-only: das AVD bleibt unverändert
+adb install -r android/app/build/outputs/apk/debug/app-debug.apk
+adb reverse tcp:8081 tcp:8081
+EXPO_PUBLIC_API_BASE_URL=http://10.0.2.2:25000 EXPO_PUBLIC_WEBSITE_BASE_URL=http://10.0.2.2:25000 npx expo start --clear
+```
+
+Vor dem Anmelden prüfen, dass die App wirklich am Stand ankommt: `docker logs <projekt>-frontend` zeigt Anfragen mit
+`okhttp`. Angemeldet wird mit den Testzugängen aus der Stand-Datei (Zwei-Faktor wie oben aus dem Test-Geheimnis).
+Bildschirmfotos: `adb exec-out screencap -p > bild.png`; eine saubere Statusleiste gibt der Demo-Modus
+(`adb shell settings put global sysui_demo_allowed 1`, dann `am broadcast -a com.android.systemui.demo -e command
+clock -e hhmm 1200` usw.). Die gelbe Warnleiste des Debug-Builds unten mit dem X schließen. Danach: Emulator zu,
+`mobile/android/` und die Platzhalter-Datei löschen (beide nicht im Repo).
+
 ## 4. Stoppen
 
 ```bash
