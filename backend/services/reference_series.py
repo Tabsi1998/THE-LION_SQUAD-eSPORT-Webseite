@@ -14,6 +14,7 @@ oder Saisonpunkte, und keine Sammlung wird mit dem Turnierbereich geteilt.
 from __future__ import annotations
 
 from models import new_id, now_utc
+from services.scoring_rules import normalize_rules
 from services.series_standings import compute_standings
 
 POINTS_SCHEMES_ID = "points_schemes"
@@ -54,6 +55,19 @@ async def points_schemes(db) -> list[dict]:
     """Die Vorlagen aus den Einstellungen, in gespeicherter Reihenfolge."""
     doc = await db.settings.find_one({"id": POINTS_SCHEMES_ID}, {"_id": 0}) or {}
     return [scheme for scheme in doc.get("schemes") or [] if isinstance(scheme, dict) and scheme.get("id")]
+
+
+async def complete_schemes(db) -> list[dict]:
+    """Die Vorlagen mit vollständigen Regeln (Standards ergänzt) - so muss das Formular keine eigenen Standards kennen.
+    Eine Vorlage, deren Regeln nicht (mehr) gelten, kommt unverändert, statt die Seite scheitern zu lassen."""
+    out = []
+    for scheme in await points_schemes(db):
+        try:
+            rules = normalize_rules(scheme.get("rules") or {})
+        except ValueError:
+            rules = scheme.get("rules") or {}
+        out.append({**scheme, "rules": rules})
+    return out
 
 
 async def add_missing_templates(db) -> int:

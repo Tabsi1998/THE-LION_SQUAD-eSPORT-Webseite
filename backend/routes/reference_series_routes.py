@@ -85,7 +85,8 @@ def _stamp(me: dict) -> dict:
 # ---------------------------------------------------------------- Übersicht und Vorlagen
 @router.get("/admin")
 async def admin_overview(me: dict = Depends(require_area("content"))):
-    """Alle Spuren mit ihren Serien (auch archivierte) und die Punkteschema-Vorlagen - eine Abfrage für die Seite."""
+    """Alle Spuren mit ihren Serien (auch archivierte), die Punkteschema-Vorlagen und die Standard-Regeln - eine Abfrage
+    für die Seite."""
     db = get_db()
     lineages = await db.reference_lineages.find({}, {"_id": 0}).to_list(None)
     series = await db.reference_series.find({}, {"_id": 0}).to_list(None)
@@ -96,12 +97,13 @@ async def admin_overview(me: dict = Depends(require_area("content"))):
         lineage["series"] = sorted(by_lineage.get(lineage["id"], []), key=lambda row: row.get("status") == "archived")
     lineages.sort(key=lambda row: (bool(row.get("is_archived")), row.get("order_index") or 0,
                                    str(row.get("title") or "").casefold()))
-    return {"lineages": lineages, "points_schemes": await reference_series.points_schemes(db)}
+    return {"lineages": lineages, "points_schemes": await reference_series.complete_schemes(db),
+            "default_rules": normalize_rules({})}
 
 
 @router.get("/admin/points-schemes")
 async def admin_points_schemes(me: dict = Depends(require_area("content"))):
-    return {"schemes": await reference_series.points_schemes(get_db())}
+    return {"schemes": await reference_series.complete_schemes(get_db())}
 
 
 # ---------------------------------------------------------------- Spur

@@ -53,6 +53,9 @@ async def test_the_board_creates_all_three_kinds_with_rules_copied_from_a_templa
     schemes = (await flow.get(f"{ADMIN}/points-schemes")).json()["schemes"]
     by_id = {scheme["id"]: scheme for scheme in schemes}
     assert {"organizer", "formula_1", "team_league_3_1_0"} <= set(by_id)
+    # Vollständig, damit das Formular keine eigenen Standards kennen muss.
+    assert by_id["organizer"]["rules"]["tiebreakers"] == ["countback", "latest_result"]
+    assert by_id["team_league_3_1_0"]["rules"]["count_mode"] == "all"
 
     racing = await _lineage(flow)
     tour = await _lineage(flow, title="Probe Monatscup", kind="series", label="4vs4")
@@ -81,6 +84,8 @@ async def test_the_board_creates_all_three_kinds_with_rules_copied_from_a_templa
     overview = (await flow.get(ADMIN)).json()
     assert [(item["title"], [series["season_slug"] for series in item["series"]]) for item in overview["lineages"]] == [
         ("Probe Monatscup", ["2026"]), ("Probe Racing F1", ["2026-division-1"]), ("Probe Team-Liga", ["saison-3"])]
+    assert overview["default_rules"]["count_mode"] == "all" and overview["default_rules"]["dnf_points"] == 0
+    assert overview["points_schemes"][0]["rules"]["bonuses"]["fastest_lap"] == {"points": 0, "max_place": None}
 
 
 @pytest.mark.asyncio
