@@ -442,11 +442,20 @@ async def delete_tournament(tid: str, me: dict = Depends(require_admin()),
 
 
 @router.get("/{slug_or_id}/streams")
-async def tournament_live_streams(slug_or_id: str):
-    """„Turnier live“ (#579): die laufenden Streams der Teilnehmer - nur öffentliche Turniere, nur Personen mit öffentlichem Profil."""
+async def tournament_live_streams(slug_or_id: str, user=Depends(get_optional_user), request: Request = None):
+    """„Turnier live“ (#579): die laufenden Streams der Teilnehmer, nur Personen mit öffentlichem Profil.
+
+    Wer das Turnier sieht (dieselbe Regel wie die Turnierseite, auch „Nur Mitglieder“), bekommt die Streams (#1831).
+    Wer die Turnierseite öffnen kann, das Turnier aber nicht sieht (403, Vor-Ort-Zugang), bekommt eine leere Liste statt
+    eines Fehlers - die Seite sagt selbst, was sie zeigt. Was die Turnierseite mit 404 beantwortet, bleibt 404."""
     from services import tournament_streams
     db = get_db()
     t, _ = await find_by_slug_or_history(db.tournaments, slug_or_id, {"_id": 0})
-    if not tournament_streams.public_tournament(t):
+    if not t:
         raise HTTPException(status_code=404, detail="Turnier nicht gefunden")
-    return await tournament_streams.live_streams_for_tournament(db, t)
+    hidden = await tournament_hidden_reason(db, t, user)
+    if hidden == 404 and not await onsite_access.has_pass(db, request, t):
+        raise HTTPException(status_code=404, detail="Turnier nicht gefunden")
+    if hidden:
+        return []
+    return await tournament_streams.participant_streams(db, t)

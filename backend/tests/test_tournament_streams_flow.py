@@ -156,3 +156,43 @@ async def test_withdrawn_and_disqualified_participants_are_not_promoted(flow):
     tournament = await flow.db.tournaments.find_one({"id": "t1"}, {"_id": 0})
     discord_rows = await tournament_streams.live_streams_for_tournament(flow.db, tournament, for_discord=True)
     assert [row["username"] for row in discord_rows] == ["paula"]
+
+
+@pytest.mark.asyncio
+async def test_members_tournament_shows_streams_to_those_who_see_it_and_an_empty_list_instead_of_404_to_others(flow):
+    """#1831: Ein Turnier „Nur Mitglieder“ zeigt die Streams allen, die das Turnier sehen (Mitglieder, Turnierleitung,
+    Teilnehmende) - wer es nicht sehen darf, bekommt eine leere Liste statt 404 (die Seite selbst sagt schon, dass es
+    nicht sichtbar ist). Entwürfe und unbekannte Turniere bleiben 404; die Sichtbarkeit wird nicht weicher."""
+    paula = await streamer(flow, "paula")
+    companion = await streamer(flow, "begleitung")
+    await flow.db.tournaments.insert_many([
+        {"id": "t4", "slug": "mitglieder-cup", "title": "Mitglieder-Cup", "status": "live", "is_public": True, "visibility": "members"},
+        {"id": "t5", "slug": "entwurf", "title": "Entwurf", "status": "draft", "visibility": "members"},
+    ])
+    await flow.db.tournament_registrations.insert_many([
+        {"id": "r1", "tournament_id": "t4", "user_id": paula["id"], "status": "checked_in"},
+        {"id": "r2", "tournament_id": "t4", "user_id": companion["id"], "status": "approved"},
+        {"id": "r3", "tournament_id": "t5", "user_id": paula["id"], "status": "approved"},
+    ])
+    await live(flow, paula, "s-paula")
+
+    flow.act_as(None)
+    anonymous = await flow.get("/api/tournaments/mitglieder-cup/streams")
+    assert anonymous.status_code == 200 and anonymous.json() == [], "nicht sichtbar: leer statt Fehler, ohne Namen"
+    stranger = await flow.add_user(role="player", name="Fremd")
+    flow.act_as(stranger)
+    assert (await flow.get("/api/tournaments/mitglieder-cup/streams")).json() == []
+
+    member = await flow.add_user(role="player", name="Mitglied")
+    flow.act_as({**member, "is_club_member": True})
+    assert [row["username"] for row in (await flow.get("/api/tournaments/mitglieder-cup/streams")).json()] == ["paula"]
+    # Begleitpersonen ohne Mitgliedschaft sehen ihr Turnier als Teilnehmende (#1592) - und damit auch die Streams.
+    flow.act_as(companion)
+    assert [row["username"] for row in (await flow.get("/api/tournaments/mitglieder-cup/streams")).json()] == ["paula"]
+    flow.act_as(await flow.add_user(role="tournament_admin", name="Turnierleitung"))
+    assert [row["username"] for row in (await flow.get("/api/tournaments/t4/streams")).json()] == ["paula"]
+
+    flow.act_as(None)
+    assert (await flow.get("/api/tournaments/entwurf/streams")).status_code == 404, "Entwürfe verrät die Liste nicht"
+    flow.act_as({**member, "is_club_member": True})
+    assert (await flow.get("/api/tournaments/entwurf/streams")).status_code == 404
