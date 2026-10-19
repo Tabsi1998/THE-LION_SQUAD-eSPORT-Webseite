@@ -5,6 +5,10 @@ oder im Profil seinen Weg liest, will wissen, wie weit er kam: die letzte Runde 
 Halbfinale, Viertelfinale und Achtelfinale. Beim Doppel-K.-o. bleiben Winner und Loser Bracket englisch (wie überall
 auf der Seite), das letzte Spiel ist das Grand Final. Eigene Namen aus dem Baum-Text („Spiel um Platz 3“, „Finale
 Nord“) bleiben, wie sie sind.
+
+Die Nummer, die man liest, zählt je Phase und Baumteil fortlaufend ab 1 (#1792) - wie der Web-Baum
+(``frontend/src/lib/bracketNames.js``). Das Loser Bracket beginnt zur Zeit der zweiten Runde (``round`` 2), heißt aber
+„Loser Runde 1“. Gemeinsame Fälle für Server und Web: ``frontend/src/lib/roundLabelCases.json``.
 """
 from __future__ import annotations
 
@@ -58,17 +62,18 @@ def stage_kind(stage_type: str | None, tournament_format: str | None = None, mat
     return "knockout"
 
 
-def rounds_by_section(matches: list[dict]) -> dict[tuple, int]:
-    """Die höchste Runde je Stufe und Baumteil - daraus folgt, welche Runde das Finale ist."""
-    out: dict[tuple, int] = {}
+def rounds_by_section(matches: list[dict]) -> dict[tuple, list[int]]:
+    """Die Runden je Stufe und Baumteil, aufsteigend - daraus folgen die Nummer, die man liest (fortlaufend ab 1), und
+    welche Runde das Finale ist."""
+    seen: dict[tuple, set[int]] = {}
     for match in matches or []:
         key = (match.get("stage_id"), section_kind(match.get("section")))
-        out[key] = max(out.get(key, 0), _int(match.get("round")))
-    return out
+        seen.setdefault(key, set()).add(_int(match.get("round")))
+    return {key: sorted(values) for key, values in seen.items()}
 
 
-def round_label(match: dict, *, max_rounds: dict[tuple, int] | None = None, kind: str = "knockout") -> str:
-    """Die Runde eines Spiels in Alltagsworten."""
+def round_label(match: dict, *, rounds: dict[tuple, list[int]] | None = None, kind: str = "knockout") -> str:
+    """Die Runde eines Spiels in Alltagsworten. ``rounds`` aus ``rounds_by_section`` (alle Spiele des Turniers)."""
     name = str(match.get("round_name") or "").strip()
     number = _int(match.get("round"))
     section = section_kind(match.get("section"))
@@ -82,34 +87,37 @@ def round_label(match: dict, *, max_rounds: dict[tuple, int] | None = None, kind
         if match.get("matchday_label"):
             return str(match["matchday_label"])
         return f"Spieltag {number}" if number else "Spieltag"
-    last = (max_rounds or {}).get((match.get("stage_id"), section), 0)
+    order = (rounds or {}).get((match.get("stage_id"), section)) or []
+    last = order[-1] if order else 0
+    # Die Nummer im Abschnitt (#1792): die wievielte Runde dieses Baumteils - nicht ``round`` des Spiels.
+    shown = order.index(number) + 1 if number in order else number
     side = SIDE_ROUND.match(name)
     if side:
         label = "Winner" if side.group(1).lower() == "winner" else "Loser"
         if last and _int(side.group(2)) == last:
             return f"{label} Final"
-        return f"{label} Runde {side.group(2)}"
+        return f"{label} Runde {shown if number in order else side.group(2)}"
     if name and not GENERIC_ROUND.match(name):
         return name.replace("Round ", "Runde ").replace("Bronze Match", "Spiel um Platz 3")
     if section == "loser":
-        return f"Loser Runde {number}" if number else "Loser Bracket"
-    if last and number:
-        from_end = last - number
+        return f"Loser Runde {shown}" if shown else "Loser Bracket"
+    if order and shown:
+        from_end = len(order) - shown
         if kind == "heats":
-            return "Finale" if from_end == 0 else f"Runde {number}"
+            return "Finale" if from_end == 0 else f"Runde {shown}"
         if from_end in KO_FROM_END:
             return KO_FROM_END[from_end]
-    return f"Runde {number}" if number else "Runde"
+    return f"Runde {shown}" if shown else "Runde"
 
 
 def attach_round_labels(matches: list[dict], stages: list[dict] | None = None, tournament: dict | None = None) -> list[dict]:
     """Schreibt je Spiel ``round_label`` (#1259, #1561) - für die Baum-Antwort, damit Website, App und TV gleich heißen."""
     stage_types = {stage.get("id"): stage.get("stage_type") for stage in stages or [] if isinstance(stage, dict)}
-    max_rounds = rounds_by_section(matches)
+    rounds = rounds_by_section(matches)
     tournament_format = (tournament or {}).get("format")
     for match in matches or []:
         if not isinstance(match, dict):
             continue
         kind = stage_kind(stage_types.get(match.get("stage_id")) or match.get("stage_type"), tournament_format, match.get("match_type"))
-        match["round_label"] = round_label(match, max_rounds=max_rounds, kind=kind)
+        match["round_label"] = round_label(match, rounds=rounds, kind=kind)
     return matches

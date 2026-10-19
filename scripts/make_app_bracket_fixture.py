@@ -89,11 +89,11 @@ def labels_for(payload: dict, tournament_format: str) -> dict:
     """Die Rundennamen wie die Baum-Antwort nach #1581 (attach_round_labels) - je Spiel-Kennung."""
     matches = payload.get("matches_v2") or []
     stage_types = {stage.get("id"): stage.get("stage_type") for stage in payload.get("stages") or []}
-    max_rounds = rounds_by_section(matches)
+    rounds = rounds_by_section(matches)
     out = {}
     for match in matches:
         kind = stage_kind(stage_types.get(match.get("stage_id")) or match.get("stage_type"), tournament_format, match.get("match_type"))
-        out[match["id"]] = round_label(match, max_rounds=max_rounds, kind=kind)
+        out[match["id"]] = round_label(match, rounds=rounds, kind=kind)
     return out
 
 

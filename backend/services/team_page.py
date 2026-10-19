@@ -205,12 +205,12 @@ async def team_overview(db, team: dict, viewer: dict | None, *, insider: bool, r
         model = await load_competition_read_model(db, tid)
         snapshot = model.structure_snapshot()
         stage_types = {stage.get("id"): stage.get("stage_type") for stage in snapshot.get("stages") or []}
-        max_rounds = rounds_by_section(snapshot.get("matches") or [])
+        rounds = rounds_by_section(snapshot.get("matches") or [])
         for match in chosen:
             if match.get("tournament_id") != tid:
                 continue
             kind = stage_kind(stage_types.get(match.get("stage_id")), (visible.get(tid) or {}).get("format"), match.get("match_type"))
-            labels[match["id"]] = round_label(match, max_rounds=max_rounds, kind=kind)
+            labels[match["id"]] = round_label(match, rounds=rounds, kind=kind)
     recent = []
     for match in chosen:
         line = _match_line(match, own_ids, names)

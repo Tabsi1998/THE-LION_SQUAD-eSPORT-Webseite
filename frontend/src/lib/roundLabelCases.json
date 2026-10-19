@@ -1,0 +1,74 @@
+{
+  "_info": "Gemeinsame Fälle für Rundennamen (#1792): der Server (backend/services/round_labels.py, Test backend/tests/test_round_label_cases_unit.py) rechnet aus round/round_name/section je Spiel den Namen `expected`; der Web-Baum (frontend/src/lib/bracketNames.js, Test roundLabelCases.test.js) zeigt genau diesen Namen, ohne ihn umzunummerieren. Damit nennen Baum, TV, Warteschlange und App dieselbe Runde.",
+  "cases": [
+    {
+      "name": "Läufe im Doppel-K.-o.: das Loser Bracket beginnt zur Zeit der zweiten Runde",
+      "format": "ffa_custom_bracket",
+      "stages": [{ "id": "s", "stage_type": "ffa_custom_bracket" }],
+      "matches": [
+        { "id": "A", "stage_id": "s", "section": "WB", "round": 1, "round_name": "Runde 1", "match_type": "ffa", "expected": "Runde 1" },
+        { "id": "E", "stage_id": "s", "section": "WB", "round": 2, "round_name": "Runde 2", "match_type": "ffa", "expected": "Runde 2" },
+        { "id": "G", "stage_id": "s", "section": "WB", "round": 3, "round_name": "Finale", "match_type": "ffa", "expected": "Finale" },
+        { "id": "LA", "stage_id": "s", "section": "LB", "round": 2, "round_name": "Runde 2", "match_type": "ffa", "expected": "Loser Runde 1" },
+        { "id": "LB", "stage_id": "s", "section": "LB", "round": 2, "round_name": "Runde 2", "match_type": "ffa", "expected": "Loser Runde 1" },
+        { "id": "LC", "stage_id": "s", "section": "LB", "round": 3, "round_name": "Runde 3", "match_type": "ffa", "expected": "Loser Runde 2" },
+        { "id": "LE", "stage_id": "s", "section": "LB", "round": 4, "round_name": "Runde 4", "match_type": "ffa", "expected": "Loser Runde 3" },
+        { "id": "LF", "stage_id": "s", "section": "LB", "round": 5, "round_name": "Runde 5", "match_type": "ffa", "expected": "Loser Runde 4" },
+        { "id": "FINAL", "stage_id": "s", "section": "GF", "round": 6, "round_name": "Grand Final", "match_type": "ffa", "expected": "Grand Final" }
+      ]
+    },
+    {
+      "name": "Duelle im Doppel-K.-o. (Auto-Schema): Namen aus dem Schema, Loser-Runden ab 1",
+      "format": "double_elim",
+      "stages": [{ "id": "s", "stage_type": "double_elimination" }],
+      "matches": [
+        { "id": "A", "stage_id": "s", "section": "WB", "round": 1, "round_name": "Winner Runde 1", "expected": "Winner Runde 1" },
+        { "id": "E", "stage_id": "s", "section": "WB", "round": 2, "round_name": "Winner Runde 2", "expected": "Winner Runde 2" },
+        { "id": "G", "stage_id": "s", "section": "WB", "round": 3, "round_name": "Winner Runde 3", "expected": "Winner Final" },
+        { "id": "LA", "stage_id": "s", "section": "LB", "round": 2, "round_name": "Loser Runde 1", "expected": "Loser Runde 1" },
+        { "id": "LC", "stage_id": "s", "section": "LB", "round": 3, "round_name": "Loser Runde 2", "expected": "Loser Runde 2" },
+        { "id": "LE", "stage_id": "s", "section": "LB", "round": 4, "round_name": "Loser Runde 3", "expected": "Loser Runde 3" },
+        { "id": "LF", "stage_id": "s", "section": "LB", "round": 5, "round_name": "Loser Runde 4", "expected": "Loser Runde 4" },
+        { "id": "GF", "stage_id": "s", "section": "GF", "round": 6, "round_name": "Grand Final", "expected": "Grand Final" },
+        { "id": "GFR", "stage_id": "s", "section": "GF", "round": 7, "round_name": "Grand Final Reset", "expected": "Grand Final Reset" }
+      ]
+    },
+    {
+      "name": "Eigenes Schema, Loser-Runden nach der Uhr benannt („Loser Runde 2“ zuerst)",
+      "format": "custom_bracket",
+      "stages": [{ "id": "s", "stage_type": "custom_bracket" }],
+      "matches": [
+        { "id": "A", "stage_id": "s", "section": "WB", "round": 1, "round_name": "Winner Runde 1", "expected": "Winner Runde 1" },
+        { "id": "C", "stage_id": "s", "section": "WB", "round": 2, "round_name": "Winner Runde 2", "expected": "Winner Final" },
+        { "id": "LA", "stage_id": "s", "section": "LB", "round": 2, "round_name": "Loser Runde 2", "expected": "Loser Runde 1" },
+        { "id": "LB", "stage_id": "s", "section": "LB", "round": 3, "round_name": "Loser Runde 3", "expected": "Loser Final" },
+        { "id": "GF", "stage_id": "s", "section": "GF", "round": 4, "round_name": "Grand Final", "expected": "Grand Final" }
+      ]
+    },
+    {
+      "name": "Gemischte Abschnitte: Gruppen, dann K.-o. mit Spiel um Platz 3 und Runden, die weiterzählen",
+      "format": "groups",
+      "stages": [{ "id": "g", "stage_type": "round_robin_groups" }, { "id": "k", "stage_type": "single_elimination" }],
+      "matches": [
+        { "id": "G1", "stage_id": "g", "section": "group_A", "round": 1, "round_name": "Runde 1", "expected": "Spieltag 1" },
+        { "id": "G2", "stage_id": "g", "section": "group_B", "round": 2, "round_name": "Runde 2", "expected": "Spieltag 2" },
+        { "id": "K1", "stage_id": "k", "section": "MAIN", "round": 4, "round_name": "Runde 4", "expected": "Viertelfinale" },
+        { "id": "K2", "stage_id": "k", "section": "MAIN", "round": 5, "round_name": "Runde 5", "expected": "Halbfinale" },
+        { "id": "K3", "stage_id": "k", "section": "MAIN", "round": 6, "round_name": "Runde 6", "expected": "Finale" },
+        { "id": "B", "stage_id": "k", "section": "BRONZE", "round": 6, "round_name": "Spiel um Platz 3", "expected": "Spiel um Platz 3" }
+      ]
+    },
+    {
+      "name": "Läufe in zwei Phasen: die zweite zählt wieder ab 1",
+      "format": "ffa_custom_bracket",
+      "stages": [{ "id": "v", "stage_type": "ffa_single_elimination" }, { "id": "f", "stage_type": "ffa_single_elimination" }],
+      "matches": [
+        { "id": "V1", "stage_id": "v", "section": "MAIN", "round": 1, "round_name": "Runde 1", "match_type": "ffa", "expected": "Runde 1" },
+        { "id": "V2", "stage_id": "v", "section": "MAIN", "round": 2, "round_name": "Runde 2", "match_type": "ffa", "expected": "Finale" },
+        { "id": "F1", "stage_id": "f", "section": "MAIN", "round": 3, "round_name": "Runde 3", "match_type": "ffa", "expected": "Runde 1" },
+        { "id": "F2", "stage_id": "f", "section": "MAIN", "round": 4, "round_name": "Runde 4", "match_type": "ffa", "expected": "Runde 2" },
+        { "id": "F3", "stage_id": "f", "section": "MAIN", "round": 5, "round_name": "Runde 5", "match_type": "ffa", "expected": "Finale" }
+      ]
+    }
+  ]
+}

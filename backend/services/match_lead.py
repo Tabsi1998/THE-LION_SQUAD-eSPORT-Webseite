@@ -59,7 +59,7 @@ def advance_texts(match: dict, stage_matches: list[dict], stage: dict | None, to
     """Je Platz, wohin es weitergeht: {"1": {"text": "ins Halbfinale", "flow": "W"}}."""
     by_id = {row.get("id"): row for row in stage_matches if row.get("id")}
     by_key = {row.get("match_key"): row for row in stage_matches if row.get("match_key")}
-    max_rounds = rounds_by_section(stage_matches)
+    rounds = rounds_by_section(stage_matches)
     out: dict = {}
     for advancement in match.get("advancement") or []:
         target = by_id.get(advancement.get("to_match_id")) or by_key.get(advancement.get("to_match_key"))
@@ -69,7 +69,7 @@ def advance_texts(match: dict, stage_matches: list[dict], stage: dict | None, to
         rank = _advancement_result_rank(match, advancement)
         if rank < 1:
             continue
-        out[str(rank)] = {"text": into(round_label(target, max_rounds=max_rounds, kind=kind)), "flow": advancement.get("flow") or "W"}
+        out[str(rank)] = {"text": into(round_label(target, rounds=rounds, kind=kind)), "flow": advancement.get("flow") or "W"}
     return out
 
 
