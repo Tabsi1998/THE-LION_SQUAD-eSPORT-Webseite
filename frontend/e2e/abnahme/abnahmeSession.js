@@ -74,8 +74,11 @@ async function signIn(page, role) {
   const saved = readSession(role);
   if (saved.cookies?.length) {
     await page.context().addCookies(saved.cookies);
+    // /api/auth/me antwortet auch Gästen mit 200 (Inhalt null) - gültig ist die Sitzung nur, wenn sie dieses Konto
+    // zeigt. Sonst gälte eine Sitzung aus einem längst gelöschten Stand als angemeldet (#1656).
     const me = await page.request.get("/api/auth/me");
-    if (me.status() === 200) return;
+    const user = me.status() === 200 ? await me.json().catch(() => null) : null;
+    if (user?.email === account.email) return;
     await page.context().clearCookies();
   }
   for (let attempt = 0; attempt < 3; attempt += 1) {
