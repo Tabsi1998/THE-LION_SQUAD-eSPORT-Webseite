@@ -1,8 +1,10 @@
 // Pause-, Check-in- und Anmelde-Bildschirm (#1123): Der Turnierbaum-TV hat auch dann eine Aufgabe, wenn gerade nichts
-// gespielt wird. Er wählt selbst: „Pausiert“ → Pause, Check-in läuft → Check-in, Anmeldung offen → Anmeldung, sonst die
-// Wiedergabeliste (#1121). Gerechnet wird wie am Server: die Anmeldung ist offen, wenn sie es für Spieler wirklich ist
-// (Status „Anmeldung offen“, eingeschaltet, im Zeitraum), der Check-in nach Status oder Zeitraum. Die Uhr läuft mit -
+// gespielt wird. Er wählt selbst: „Pausiert“ → Pause, Anmeldung offen mit freiem Platz → Anmeldung (#1827), Check-in
+// läuft → Check-in, sonst die Wiedergabeliste (#1121). Gerechnet wird wie auf der Anmeldeseite: die Anmeldung ist offen,
+// wenn sie es für Spieler wirklich ist (Status „Anmeldung offen“, eingeschaltet, im Zeitraum), der Check-in nach Status
+// oder Zeitraum. Die Uhr läuft mit -
 // der TV wechselt von selbst, auch ohne neue Daten.
+import { getRegistrationState } from "@/lib/datetime";
 import { formatBracketSection, matchRoundLabel } from "@/lib/tournamentLabels";
 import { isMatchDone } from "@/lib/slotSource";
 import { isLiveMatch, matchName, stationName } from "@/lib/tvLive";
@@ -21,13 +23,9 @@ function statusOf(tournament) {
   return status === "checkin_open" ? "check_in" : status;
 }
 
-/** Kann man sich gerade anmelden? Dieselbe Regel wie beim Anmelden am Server. */
+/** Kann man sich gerade anmelden? Dieselbe Regel wie die Anmeldeseite (#1827) - und wie beim Anmelden am Server. */
 export function registrationOpen(tournament, now = Date.now()) {
-  if (!tournament || tournament.registration_enabled === false || tournament.is_invite_only) return false;
-  if (statusOf(tournament) !== "registration_open") return false;
-  const from = timeOf(tournament.registration_open_from);
-  const until = timeOf(tournament.registration_open_until);
-  return (from === null || now >= from) && (until === null || now <= until);
+  return getRegistrationState(tournament, "Anmeldung", now).canRegister;
 }
 
 /** Läuft der Check-in? Nach Status - oder im Check-in-Zeitraum, solange das Turnier noch nicht begonnen hat. */
@@ -43,14 +41,22 @@ export function checkInRunning(tournament, now = Date.now()) {
   return from !== null && now >= from && (until === null || now <= until);
 }
 
-/** Welcher Bildschirm: „pause“, „checkin“, „registration“ oder „playlist“ (Wiedergabeliste). */
-export function tvScreenFor(tournament, { now = Date.now() } = {}) {
+/**
+ * Welcher Bildschirm: „pause“, „checkin“, „registration“ oder „playlist“ (Wiedergabeliste). Kann man sich anmelden und
+ * ist ein Platz frei, bleibt der Anmelde-Bildschirm mit dem QR-Code (Vor-Ort-Zugang) - auch wenn der Check-in-Zeitraum
+ * schon läuft (#1827, vor Ort: Einlass mit Anmeldung und Check-in zugleich). Den Check-in zeigt der TV, sobald die
+ * Turnierleitung ihn startet (Status „Check-in“), die Anmeldung zu ist oder alle Plätze vergeben sind. `seats`
+ * (belegt/Plätze vom Server) und `registrations` zählen wie der Anmelde-Bildschirm.
+ */
+export function tvScreenFor(tournament, { now = Date.now(), seats = null, registrations = [] } = {}) {
   if (!tournament) return "playlist";
   const status = statusOf(tournament);
   if (status === "paused") return "pause";
   if (TERMINAL.has(status) || status === "live") return "playlist";
+  const canRegister = registrationOpen(tournament, now);
+  if (canRegister && registrationView(tournament, seats, registrations, now).free !== 0) return "registration";
   if (checkInRunning(tournament, now)) return "checkin";
-  if (registrationOpen(tournament, now)) return "registration";
+  if (canRegister) return "registration";
   return "playlist";
 }
 

@@ -257,7 +257,8 @@ function BracketTv() {
   const nameOf = useMemo(() => nameOfRegistration(registrations), [registrations]);
   const avatarOf = useMemo(() => avatarOfRegistration(registrations), [registrations]);
   const hasMatches = matches.length > 0;
-  const screen = tvScreenFor(t, { now: minute * 60000 + 30000 });
+  // Anmeldung vor Check-in, solange ein Platz frei ist (#1827) - gezählt wie auf dem Anmelde-Bildschirm.
+  const screen = tvScreenFor(t, { now: minute * 60000 + 30000, seats: data?.seats, registrations });
   const playlist = settings.playlist;
   const treeInList = playlist.some((entry) => entry.slide === "tree");
   const showMoments = screen === "playlist" && treeInList && hasMatches;

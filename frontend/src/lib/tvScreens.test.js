@@ -2,7 +2,8 @@
 // Minuszeit, wer beim Check-in da ist, freie Plätze.
 import { singleElimination } from "../../e2e/fixtures/tvBrackets.mjs";
 import { call } from "../../e2e/fixtures/tvHall.mjs";
-import { checkInView, dayAndTime, nextUp, pauseClock, pauseView, registrationView, tvScreenFor } from "./tvScreens";
+import { getRegistrationState } from "./datetime";
+import { checkInView, dayAndTime, nextUp, pauseClock, pauseView, registrationOpen, registrationView, tvScreenFor } from "./tvScreens";
 
 const NOW = Date.parse("2026-10-10T14:32:00+02:00");
 const at = (minutes) => new Date(NOW + minutes * 60000).toISOString();
@@ -26,14 +27,52 @@ test("Anmeldung nur, wenn man sich wirklich anmelden kann - wie am Server", () =
   expect(tvScreenFor({ status: "registration_open", registration_open_until: at(60) }, { now: NOW })).toBe("registration");
 });
 
-test("Check-in auch im Check-in-Zeitraum - aber nicht mehr nach dem Start; der Check-in geht vor der Anmeldung", () => {
+test("Check-in auch im Check-in-Zeitraum - aber nicht mehr nach dem Start", () => {
   const window = { check_in_from: at(-10), check_in_until: at(10) };
   expect(tvScreenFor({ status: "registration_closed", ...window }, { now: NOW })).toBe("checkin");
-  expect(tvScreenFor({ status: "registration_open", ...window }, { now: NOW })).toBe("checkin");
   expect(tvScreenFor({ status: "registration_closed", ...window, start_date: at(-1) }, { now: NOW })).toBe("playlist");
   expect(tvScreenFor({ status: "registration_closed", check_in_from: at(5) }, { now: NOW })).toBe("playlist");
   // Die Uhr läuft weiter: zehn Minuten später ist der Check-in zu.
   expect(tvScreenFor({ status: "registration_closed", ...window }, { now: NOW + 11 * 60000 })).toBe("playlist");
+});
+
+test("#1827: Anmeldung offen im Check-in-Zeitraum - solange Plätze frei sind, bleibt der Anmelde-QR", () => {
+  const open = { status: "registration_open", max_participants: 16, check_in_from: at(-10), check_in_until: at(60) };
+  // Vor Ort üblich: Einlass mit Anmeldung und Check-in zugleich - der TV bietet weiter die Anmeldung an.
+  expect(tvScreenFor(open, { now: NOW, seats: { taken: 0, capacity: 16 } })).toBe("registration");
+  expect(tvScreenFor(open, { now: NOW, seats: { taken: 15, capacity: 16 } })).toBe("registration");
+  // Ohne Platzzahl vom Server zählen die Anmeldungen, die einen Platz belegen.
+  const people = Array.from({ length: 3 }, (_, index) => ({ id: `r${index}`, status: "approved" }));
+  expect(tvScreenFor(open, { now: NOW, registrations: people })).toBe("registration");
+  // Ohne Obergrenze ist immer ein Platz frei.
+  expect(tvScreenFor({ ...open, max_participants: null }, { now: NOW })).toBe("registration");
+  // Voll: dann der Check-in (die Warteliste wartet, bis der Check-in vorbei ist).
+  expect(tvScreenFor(open, { now: NOW, seats: { taken: 16, capacity: 16 } })).toBe("checkin");
+  // Die Turnierleitung startet den Check-in („Check-in starten“): ab dann der Check-in, wie bisher.
+  expect(tvScreenFor({ ...open, status: "check_in" }, { now: NOW, seats: { taken: 3, capacity: 16 } })).toBe("checkin");
+  // Anmeldezeitraum vorbei, Check-in läuft: der Check-in.
+  expect(tvScreenFor({ ...open, registration_open_until: at(-1) }, { now: NOW, seats: { taken: 3, capacity: 16 } })).toBe("checkin");
+});
+
+test("#1827: Anmeldung am TV nach derselben Regel wie die Anmeldeseite (getRegistrationState)", () => {
+  const cases = [
+    { status: "registration_open" },
+    { status: "registration_open", registration_enabled: false },
+    { status: "registration_open", is_invite_only: true },
+    { status: "registration_open", registration_open_from: at(10) },
+    { status: "registration_open", registration_open_until: at(-1) },
+    { status: "registration_open", registration_open_from: at(-10), registration_open_until: at(10) },
+    { status: "scheduled" },
+    { status: "draft" },
+  ];
+  for (const tournament of cases) {
+    expect(registrationOpen(tournament, NOW), JSON.stringify(tournament)).toBe(getRegistrationState(tournament, "Anmeldung", NOW).canRegister);
+  }
+  // Die Uhr des TVs zählt, nicht die des Geräts: zehn Minuten später ist die Anmeldung zu.
+  const until = { status: "registration_open", registration_open_until: at(5) };
+  expect(registrationOpen(until, NOW)).toBe(true);
+  expect(registrationOpen(until, NOW + 10 * 60000)).toBe(false);
+  expect(getRegistrationState(until, "Anmeldung", NOW + 10 * 60000).canRegister).toBe(false);
 });
 
 test("Pause: Weiter um 14:30 mit Countdown, ohne Uhrzeit nur „Kurze Pause“, danach „Gleich geht es weiter“", () => {

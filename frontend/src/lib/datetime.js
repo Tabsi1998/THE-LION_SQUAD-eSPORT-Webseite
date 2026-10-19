@@ -132,8 +132,9 @@ export function hasOnlineRegistration(item) {
   return item?.online_registration_enabled === true && item?.registration_enabled === true && !!(item.registration_open_from || item.registration_open_until);
 }
 
-export function getRegistrationState(item, noun = "Anmeldung") {
-  const now = Date.now();
+// Die eine Regel, ob man sich anmelden kann - Anmeldeseite und Anmelde-QR am TV (#1827) fragen hier. `now`: der TV gibt
+// seine Uhr herein (sie läuft jede Minute weiter, auch ohne neue Daten).
+export function getRegistrationState(item, noun = "Anmeldung", now = Date.now()) {
   const openFrom = item?.registration_open_from ? new Date(item.registration_open_from) : null;
   const openUntil = item?.registration_open_until ? new Date(item.registration_open_until) : null;
   const openFromMs = openFrom && !Number.isNaN(openFrom.getTime()) ? openFrom.getTime() : null;
