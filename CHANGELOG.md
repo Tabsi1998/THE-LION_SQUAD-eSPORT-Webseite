@@ -1,5 +1,26 @@
 # Changelog
 
+## 1.3.0 (19.10.2026)
+
+### Neu
+
+* Abo-Hinweis einmal nach der Anmeldung zu Event oder Turnier (#1788)
+* Anmelde- und Registrierungsgrenze je Netz in der Verwaltung einstellbar, mit Event-Zeitraum (#1802)
+* Anmeldeliste des Events druckt mit Begleitpersonen, Warteliste, Druckzeit und QR-Code (#1283)
+* Ansicht „Mein Kalender“ mit den eigenen Terminen und ihrem Stand, auch ohne Abo (#1788)
+* Druckansicht für Turnierbaum, Spielplan, Check-in-Liste und Tagesplan (#1283)
+* Eintrag „Mein Kalender-Abo“ in den Einstellungen (#1788)
+* Kasten „Automatisch in deinen Kalender“ mit Anleitung, Status und Rückfrage beim Abschalten (#1788)
+* Knopf „Drucken“ auf Baum, Spielplan, Teilnehmern und Event (#1283)
+* Referenzen „Jahr für Jahr“ nach Jahr statt Freitext-Saison gruppieren (#1748)
+* Referenzen filtern nach Jahr statt nach Freitext-Saison (#1748)
+* Referenzen zeigen Spiel-Logo, ohne Logo das Spiel-Kürzel in der Spiel-Kachel (#1748)
+* verständliche Meldung „Zu viele Anmeldungen aus diesem Netz“ statt allgemeinem Hinweis (#1802)
+
+### Dokumentation
+
+* Betrieb und Handbuch – Grenze je Netz für Events einstellen (#1802)
+
 ## 1.2.4 (19.10.2026)
 
 ### Fehlerbehebungen
