@@ -191,3 +191,17 @@ def test_cross_series_lookups_have_indexes():
     finally:
         database.get_db = original
     assert {"name_normalized_1_link_status_1", "alias_id_1"} <= names
+
+
+# ---------------------------------------------------------------- Clan-Tags ohne Regex (CodeQL)
+def test_clan_tags_stripped_linear_even_for_long_whitespace():
+    import time
+    assert strip_clan_tags(" [TLS]  Probe Fahrer  (LS) ") == "Probe Fahrer"
+    assert strip_clan_tags("[A][B] Probe {C}") == "Probe"
+    assert strip_clan_tags("Probe [mehr als zwoelf Zeichen]") == "Probe [mehr als zwoelf Zeichen]"
+    assert not is_usable_name("[TLS]") and not is_usable_name("(Probe)")
+    started = time.perf_counter()
+    for text in ("a" + " " * 100_000 + "b", "x" + " " * 100_000 + "(a", "[" + " " * 100_000):
+        strip_clan_tags(text)
+        is_usable_name(text)
+    assert time.perf_counter() - started < 1.0

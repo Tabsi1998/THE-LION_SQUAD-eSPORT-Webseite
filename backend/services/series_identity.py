@@ -16,16 +16,39 @@ gespeicherten **Alias** (``reference_aliases``, mit Quelle und wer wann bestäti
 """
 from __future__ import annotations
 
-import re
 import unicodedata
 from dataclasses import dataclass, field
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
 VIENNA = ZoneInfo("Europe/Vienna")
-# Clan-Tags am Anfang oder Ende eines Namens: [TLS], (TLS), {TLS}, <TLS> - auch mehrere hintereinander.
-_LEADING_TAGS = re.compile(r"^\s*(?:[\[({<][^\])}>]{1,12}[\])}>]\s*)+")
-_TRAILING_TAGS = re.compile(r"(?:\s*[\[({<][^\])}>]{1,12}[\])}>])+\s*$")
+# Clan-Tags am Anfang oder Ende eines Namens: [TLS], (TLS), {TLS}, <TLS> - auch mehrere hintereinander, je 1-12 Zeichen.
+# Bewusst ohne regulären Ausdruck: die Schleife bleibt bei jeder Eingabe linear (CodeQL: Regex mit vielen Leerzeichen).
+_TAG_OPEN = "[({<"
+_TAG_CLOSE = "])}>"
+_TAG_MAX = 12
+
+
+def _without_clan_tags(value) -> str:
+    """Der Text ohne Clan-Tags am Anfang und Ende und ohne Leerraum außen."""
+    text = str(value or "").strip()
+    while text and text[0] in _TAG_OPEN:
+        end = next((i for i in range(1, min(len(text), _TAG_MAX + 2)) if text[i] in _TAG_CLOSE), -1)
+        if end < 2:
+            break
+        text = text[end + 1:].lstrip()
+    while text and text[-1] in _TAG_CLOSE:
+        start = -1
+        for i in range(len(text) - 2, max(-1, len(text) - _TAG_MAX - 3), -1):
+            if text[i] in _TAG_CLOSE:
+                break
+            if text[i] in _TAG_OPEN:
+                start = i
+                break
+        if start < 0 or start > len(text) - 3:
+            break
+        text = text[:start].rstrip()
+    return text
 # Plattform-Kennungen im Konto (Reiter „Gaming“), die für jedes Spiel gelten.
 PLATFORM_IDS = (
     ("ea_id", "EA-ID"), ("psn_id", "PSN"), ("xbox_id", "Xbox"), ("steam_id", "Steam"), ("epic_id", "Epic"),
@@ -45,7 +68,7 @@ def normalize_name(value) -> str:
 def strip_clan_tags(value) -> str:
     """Der Name ohne Clan-Tags am Anfang und Ende. Bliebe nichts übrig, kommt der Name unverändert zurück."""
     text = str(value or "")
-    stripped = _TRAILING_TAGS.sub("", _LEADING_TAGS.sub("", text)).strip()
+    stripped = _without_clan_tags(text)
     return stripped if normalize_name(stripped) else text
 
 
@@ -53,7 +76,7 @@ def is_usable_name(value) -> bool:
     """Taugt der Name zum Wiedererkennen? Ohne Clan-Tags muss mindestens ein Buchstabe oder eine Ziffer bleiben -
     „!!!“, nur Emoji oder nur „[TLS]“ werden abgelehnt und nie als Alias gespeichert oder abgeglichen."""
     text = str(value or "")
-    return bool(normalize_name(_TRAILING_TAGS.sub("", _LEADING_TAGS.sub("", text))))
+    return bool(normalize_name(_without_clan_tags(text)))
 
 
 def name_keys(value) -> tuple[str, ...]:
