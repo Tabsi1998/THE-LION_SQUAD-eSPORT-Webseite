@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.4.0](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/compare/v1.3.0...v1.4.0) (2026-10-19)
+
+
+### Neu
+
+* Referenz kann zu einer Serie gehören ([#1741](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1741)) ([da6af27](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/da6af27e584177e1056bcb2763290d418a0836e9))
+* Regeln je Saison aus Punkteschema-Vorlagen, Regeländerung rechnet neu ([#1741](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1741)) ([da6af27](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/da6af27e584177e1056bcb2763290d418a0836e9))
+* Seite einer Saison in der Verwaltung ([#1741](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1741)) ([da6af27](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/da6af27e584177e1056bcb2763290d418a0836e9))
+* Verwaltung „Serien“ – Spuren und Saisons anlegen, bearbeiten, archivieren ([#1741](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1741)) ([da6af27](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/da6af27e584177e1056bcb2763290d418a0836e9))
+
 ## 1.3.0 (19.10.2026)
 
 ### Neu
