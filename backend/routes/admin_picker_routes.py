@@ -29,6 +29,7 @@ PURPOSES = {
     "access_links": "Speziallinks",
     "board": "Vorstandsposten",
     "invite": "Einladungen zum Mitgliedsantrag",
+    "reference_series": "Captains externer Serien",
 }
 MISSING_RIGHT = "Dafür fehlt dir das Recht: {what}."
 
@@ -57,6 +58,9 @@ async def _allowed(purpose: str, me: dict, context_id: str | None) -> bool:
         return await user_has_area(me, "club", "system") and not needs_mfa(me)
     if purpose == "invite":
         return await user_has_area(me, "club") and not needs_mfa(me)
+    if purpose == "reference_series":
+        # Captains trägt der Vorstand ein (#1749): Bereich Redaktion mit Zwei-Faktor.
+        return await user_has_area(me, "content") and not needs_mfa(me)
     return False
 
 
