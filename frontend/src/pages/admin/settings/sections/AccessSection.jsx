@@ -43,7 +43,7 @@ function AccessLimitsCard({ authConfig, savingAuth, saveAuth }) {
             <p className="text-xs text-white/50 mt-1">In diesem Zeitraum (höchstens drei Tage) gelten die Event-Werte, danach von selbst wieder die normalen.</p>
           </div>
           {authConfig.event_limits_active && (
-            <span className="text-[10px] font-bold uppercase tracking-wider text-[#00FF88]" data-testid="access-event-active">Läuft gerade</span>
+            <span className="shrink-0 whitespace-nowrap text-[10px] font-bold uppercase tracking-wider text-[#00FF88]" data-testid="access-event-active">Läuft gerade</span>
           )}
         </div>
         <div className="grid sm:grid-cols-2 gap-3">
