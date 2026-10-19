@@ -37,16 +37,20 @@ export function queueWhat(entry, match = null) {
   return entry?.label || "Spiel";
 }
 
-/** Wer spielt: „A vs. B“, im Lauf „4 Spieler“, offene Plätze in Worten - nie eine leere Zeile. */
-const together = (names) => names.join(names.length > 2 ? " · " : " vs. ");
+const together = (names, compact) => (compact && names.length > 2 ? `${names.length} Spieler` : names.join(names.length > 2 ? " · " : " vs. "));
 
-export function queueWho(entry) {
+/**
+ * Wer spielt: „A vs. B“, im Lauf bis vier Namen zweizeilig (ab fünf „5 Spieler“), offene Plätze in Worten - nie eine
+ * leere Zeile. `compact` (fünf oder sechs Stationen auf einer Seite): im Lauf nur die Zahl.
+ */
+export function queueWho(entry, { compact = false } = {}) {
   const names = (entry?.names || []).filter(Boolean);
   const open = Number(entry?.open_slots) || 0;
-  if (open && names.length) return `${together(names)} · ${open === 1 ? "1 Platz" : `${open} Plätze`} offen`;
+  if (open && names.length) return `${together(names, compact)} · ${open === 1 ? "1 Platz" : `${open} Plätze`} offen`;
   if (open) return `${open === 1 ? "1 Platz" : `${open} Plätze`} offen`;
   // Im Lauf (Fabian 19.10.): bis vier Namen, je zwei in einer Zeile - die Halle sieht, wer gerade fährt.
-  if (names.length > 4) return `${names.length} Spieler`;
+  // Viele Stationen auf einer Seite (drei Reihen, Codex): kurz bleiben, sonst sprengen lange Namen die Karte.
+  if (names.length > 4 || (compact && names.length > 2)) return `${names.length} Spieler`;
   if (names.length > 2) return [names.slice(0, 2), names.slice(2)].map((row) => row.join(" · ")).join("\n");
   return names.join(" vs. ") || "Teilnehmer offen";
 }
