@@ -250,11 +250,11 @@ Teilnehmer und Ergebnisse kommen dort in den nächsten Schritten dazu, ebenso di
 `/references/series/<spur>/<saison>`. Die bestehenden Referenzen bleiben, wie sie sind.
 
 **Captains:** Auf der Seite der Saison steht unten **Captains**. Dort tragt ihr Mitglieder ein, die für genau diese
-Saison Ergebnisse hochladen dürfen: Namen tippen, **Gilt bis** wählen (Pflicht, meist das Saisonende) und – wenn der
+Saison Ergebnisse hochladen dürfen – nur aktive Vereinsmitglieder, die Suche findet nur sie. Namen tippen, **Gilt bis** wählen (Pflicht, meist das Saisonende) und – wenn der
 Captain ohne Freigabe veröffentlichen darf – **Darf veröffentlichen** anhaken; dann **Captain hinzufügen**. In der Liste
 lassen sich der Ablauf verlängern (**Ablauf speichern**), das Recht umschalten und der Captain entfernen. Abgelaufene
-Captains stehen blass am Ende. Fehlt einem Captain noch die Zwei-Faktor-Anmeldung, steht es dabei – ohne sie kommt er
-nicht in die Saison. Steht die Saison unter **Einträge eines Captains** auf „Captain veröffentlicht direkt“, gilt das für
+Captains stehen blass am Ende. Fehlt einem Captain noch die Zwei-Faktor-Anmeldung oder ist er kein aktives Mitglied mehr,
+steht es dabei – so lange kommt er nicht in die Saison. Steht die Saison unter **Einträge eines Captains** auf „Captain veröffentlicht direkt“, gilt das für
 alle ihre Captains.
 
 <img src="../assets/serien/serien-captains.png" alt="Abschnitt Captains einer Saison mit einem Captain, Ablauf, Recht zum Veröffentlichen und dem Formular zum Hinzufügen" width="560">

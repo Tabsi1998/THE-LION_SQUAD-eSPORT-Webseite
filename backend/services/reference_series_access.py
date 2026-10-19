@@ -5,8 +5,8 @@ Zwei Wege, sonst keiner:
 - **Vorstand:** der Bereich Redaktion („content“) darf jede Serie - mit bestätigter Zwei-Faktor-Anmeldung, wie jeder
   Verwaltungsbereich (``can_use_area``).
 - **Captain:** ein Eintrag in ``reference_series_staff`` für genau diese Serie. Er gilt nur mit bestätigter
-  Zwei-Faktor-Anmeldung (Entscheidung 7), bis einschließlich ``valid_until`` (Wiener Tag, ``club_today``) und nicht in
-  einer archivierten Serie. Geprüft wird bei **jedem** Aufruf aus der Datenbank - nichts wird am Konto zwischengespeichert.
+  Zwei-Faktor-Anmeldung (Entscheidung 7), nur für aktive Vereinsmitglieder, bis einschließlich ``valid_until`` (Wiener
+  Tag, ``club_today``) und nicht in einer archivierten Serie. Geprüft wird bei **jedem** Aufruf aus der Datenbank - nichts wird am Konto zwischengespeichert.
 
 Für Routen, die eine Serie im Pfad haben (``/…/series/{series_id}/…``)::
 
@@ -43,6 +43,7 @@ CAPTAIN = "captain"
 NO_RIGHT = "Für diese Serie fehlt dir das Recht. Captains trägt der Vorstand in der Saison ein."
 EXPIRED = "Dein Captain-Recht für diese Serie ist abgelaufen. Verlängern kann es der Vorstand."
 ARCHIVED = "Diese Serie ist archiviert. Ändern kann sie nur noch der Vorstand."
+NOT_MEMBER = "Captain-Rechte gelten nur für aktive Vereinsmitglieder. Bei Fragen zur Mitgliedschaft hilft der Vorstand."
 BOARD_ONLY = "Das darf nur der Vorstand (Bereich Redaktion)."
 PUBLISH_ONLY_BOARD = "Veröffentlichen gibt in dieser Serie der Vorstand frei. Speichere den Eintrag als Entwurf."
 
@@ -68,6 +69,19 @@ def staff_is_valid(staff: dict | None, today: str | None = None) -> bool:
     except ValueError:
         return False
     return (today or club_today()) <= until
+
+
+async def active_member_ids(db, user_ids) -> set[str]:
+    """Wer von diesen Konten heute aktives Vereinsmitglied ist (aktiv oder Ehrenmitglied) - Captain kann nur sein, wer
+    Mitglied ist (Entscheidung des Obmanns). Endet die Mitgliedschaft, endet damit auch das Captain-Recht."""
+    from services.membership_service import ACTIVE_STATUSES
+
+    wanted = sorted({user_id for user_id in user_ids if user_id})
+    if not wanted:
+        return set()
+    rows = db.memberships.find({"user_id": {"$in": wanted}, "member_status": {"$in": sorted(ACTIVE_STATUSES)}},
+                               {"_id": 0, "user_id": 1})
+    return {row["user_id"] async for row in rows if row.get("user_id")}
 
 
 def captain_may_publish(series: dict, staff: dict) -> bool:
@@ -163,6 +177,8 @@ async def series_access(user: dict | None, series_id: str, db=None) -> SeriesAcc
         raise HTTPException(403, NO_RIGHT)
     if not staff_is_valid(staff):
         raise HTTPException(403, EXPIRED)
+    if user["id"] not in await active_member_ids(db, [user["id"]]):
+        raise HTTPException(403, NOT_MEMBER)
     series = await db.reference_series.find_one({"id": series_id}, {"_id": 0})
     if not series:
         raise HTTPException(403, NO_RIGHT)
@@ -185,7 +201,7 @@ async def captain_series(db, user: dict | None, today: str | None = None) -> lis
     today = today or club_today()
     rows = [row async for row in db.reference_series_staff.find(
         {"user_id": user["id"], "role": CAPTAIN}, {"_id": 0}) if staff_is_valid(row, today)]
-    if not rows:
+    if not rows or user["id"] not in await active_member_ids(db, [user["id"]]):
         return []
     by_series = {row["series_id"]: row for row in rows if row.get("series_id")}
     series = await db.reference_series.find(

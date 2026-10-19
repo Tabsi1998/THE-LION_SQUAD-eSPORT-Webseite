@@ -134,6 +134,16 @@ async def _account_hits(db, q: str) -> list[dict]:
     return hits
 
 
+async def _member_account_hits(db, q: str) -> list[dict]:
+    """Captains externer Serien (#1749): nur Konten mit aktiver Mitgliedschaft - Captain kann nur ein Mitglied werden."""
+    member_ids = await db.memberships.distinct("user_id", {"member_status": {"$in": list(ACTIVE_MEMBER_STATUSES)}})
+    users = await _search_accounts(db, q, {"id": {"$in": [uid for uid in member_ids if uid]}}) if member_ids else []
+    teams = await _first_teams(db, [u["id"] for u in users])
+    return [{"id": user["id"], "name": _name(user), "avatar_url": user.get("avatar_url"),
+             "context": " · ".join(["Mitglied", *([f"Team {teams[user['id']]}"] if user["id"] in teams else [])])}
+            for user in users]
+
+
 async def _board_hits(db, q: str) -> list[dict]:
     """Nur Vereinsmitglieder (#1355): Konten mit aktiver Mitgliedschaft - und gepflegte Mitgliederprofile ohne Konto."""
     member_ids = await db.memberships.distinct("user_id", {"member_status": {"$in": list(ACTIVE_MEMBER_STATUSES)}})
@@ -199,6 +209,8 @@ async def search_people(
         return await _board_hits(db, needle)
     if purpose == "invite":
         return await _invite_hits(db, needle)
+    if purpose == "reference_series":
+        return await _member_account_hits(db, needle)
     return await _account_hits(db, needle)
 
 

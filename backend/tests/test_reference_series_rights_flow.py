@@ -34,6 +34,11 @@ def _day(offset: int) -> str:
     return (date.fromisoformat(club_today()) + timedelta(days=offset)).isoformat()
 
 
+async def _member(flow, user: dict, status: str = "active") -> None:
+    await flow.db.memberships.update_one({"user_id": user["id"]}, {"$set": {"user_id": user["id"], "member_status": status}},
+                                         upsert=True)
+
+
 async def _setup(flow):
     """Vorstand, zwei Serien (eine fremde), ein Captain für die erste."""
     await migrations.migrate_points_scheme_templates(flow.db)
@@ -45,6 +50,7 @@ async def _setup(flow):
     own = (await flow.post(f"{ADMIN}/series", json={"lineage_id": lineage["id"], "season": "2026"})).json()
     other = (await flow.post(f"{ADMIN}/series", json={"lineage_id": lineage["id"], "season": "2027"})).json()
     captain = await flow.add_user(name="captain-carla")
+    await _member(flow, captain)
     added = await flow.post(f"{ADMIN}/series/{own['id']}/staff",
                             json={"user_id": captain["id"], "valid_until": _day(30)})
     assert added.status_code == 200, added.text
@@ -85,6 +91,7 @@ async def test_the_board_adds_changes_and_removes_a_captain_and_every_step_is_lo
 async def test_a_captain_right_needs_an_end_that_is_not_in_the_past(flow):
     _, captain, own, _, staff = await _setup(flow)
     other = await flow.add_user(name="ohne-ende")
+    await _member(flow, other)
     missing = await flow.post(f"{ADMIN}/series/{own['id']}/staff", json={"user_id": other["id"]})
     assert missing.status_code == 422
     past = await flow.post(f"{ADMIN}/series/{own['id']}/staff", json={"user_id": other["id"], "valid_until": _day(-1)})
@@ -234,6 +241,37 @@ async def test_round_result_and_participant_ids_of_another_series_answer_404(flo
             assert missing.value.status_code == 404
 
 
+# ---------------------------------------------------------------- Nur Vereinsmitglieder
+@pytest.mark.asyncio
+async def test_only_an_active_club_member_becomes_captain(flow):
+    _, _, own, _, _ = await _setup(flow)
+    guest = await flow.add_user(name="gast-gerda")
+    refused = await flow.post(f"{ADMIN}/series/{own['id']}/staff", json={"user_id": guest["id"], "valid_until": _day(5)})
+    assert refused.status_code == 422 and "Vereinsmitglied" in refused.json()["detail"]
+    await _member(flow, guest, "pending")
+    pending = await flow.post(f"{ADMIN}/series/{own['id']}/staff", json={"user_id": guest["id"], "valid_until": _day(5)})
+    assert pending.status_code == 422
+    await _member(flow, guest, "honorary")
+    honorary = await flow.post(f"{ADMIN}/series/{own['id']}/staff", json={"user_id": guest["id"], "valid_until": _day(5)})
+    assert honorary.status_code == 200 and honorary.json()["is_member"] is True
+
+
+@pytest.mark.asyncio
+async def test_the_captain_right_ends_with_the_membership_on_the_next_call(flow):
+    _, captain, own, _, staff = await _setup(flow)
+    flow.act_as(captain)
+    assert (await flow.get(f"{ADMIN}/series/{own['id']}")).status_code == 200
+    await _member(flow, captain, "former")
+    ended = await flow.get(f"{ADMIN}/series/{own['id']}")
+    assert ended.status_code == 403 and "Vereinsmitglied" in ended.json()["detail"]
+    assert (await flow.get("/api/users/me/duty")).json()["series"] == []
+    assert (await flow.get("/api/auth/me")).json()["has_series_captain"] is False
+    # Der Vorstand sieht den Eintrag weiter - mit dem Hinweis, dass die Mitgliedschaft fehlt.
+    flow.act_as((await flow.db.users.find_one({"username": "vorstand-vera"}, {"_id": 0})))
+    listed = (await flow.get(f"{ADMIN}/series/{own['id']}/staff")).json()["staff"]
+    assert [(row["id"], row["is_member"]) for row in listed] == [(staff["id"], False)]
+
+
 # ---------------------------------------------------------------- Meine Serien
 @pytest.mark.asyncio
 async def test_my_series_lists_only_own_valid_series_and_flags_the_account(flow):
@@ -253,7 +291,9 @@ async def test_my_series_lists_only_own_valid_series_and_flags_the_account(flow)
 @pytest.mark.asyncio
 async def test_the_person_search_for_captains_is_for_the_board_only(flow):
     board, captain, *_ = await _setup(flow)
+    await flow.add_user(name="captain-ohne-mitgliedschaft")
     found = await flow.get("/api/admin/people/search", params={"purpose": "reference_series", "q": "captain"})
+    # Nur Vereinsmitglieder - ein Konto ohne Mitgliedschaft taucht nicht auf.
     assert found.status_code == 200 and [hit["name"] for hit in found.json()] == ["captain-carla"]
     flow.act_as(captain)
     assert (await flow.get("/api/admin/people/search",

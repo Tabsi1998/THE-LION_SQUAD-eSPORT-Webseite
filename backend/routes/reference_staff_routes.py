@@ -1,5 +1,7 @@
 """Externe Serien - Rechte (#1749): Captain je Serie mit Ablauf; der Vorstand (Bereich Redaktion) darf alles.
 
+- Captain kann nur ein aktives Vereinsmitglied werden; endet die Mitgliedschaft, ruht das Recht (geprüft bei jedem
+  Zugriff in ``services/reference_series_access.py``).
 - Captains verwaltet nur der Vorstand, in der Saison: hinzufügen (Personensuche, Zweck ``reference_series``), Ablauf
   (``valid_until``, Pflicht) und Veröffentlichen-Recht ändern, entfernen. Jede Änderung steht im Adminprotokoll
   (``audit_logs``, ``reference_series.staff_*``).
@@ -14,11 +16,13 @@ from auth import require_area
 from database import get_db
 from models import ReferenceSeriesStaffCreate, ReferenceSeriesStaffUpdate, new_id, now_utc
 from services.dolibarr_policy import club_today
-from services.reference_series_access import captain_may_publish, staff_is_valid
+from services.reference_series_access import active_member_ids, captain_may_publish, staff_is_valid
 
 router = APIRouter(prefix="/api/reference-series", tags=["reference-series"])
 
 PAST_DAY = "Der Ablauf liegt in der Vergangenheit - so hätte der Captain kein Recht."
+NOT_A_MEMBER = ("Captain kann nur ein aktives Vereinsmitglied werden. Diese Person ist gerade kein aktives Mitglied - "
+                "zuerst die Mitgliedschaft klären (Admin → Mitglieder).")
 USER_FIELDS = {"_id": 0, "id": 1, "username": 1, "display_name": 1, "avatar_url": 1, "mfa_enabled": 1,
                "is_active": 1, "is_banned": 1}
 
@@ -49,8 +53,9 @@ async def _audit(db, me: dict, action: str, series_id: str, data: dict) -> None:
     })
 
 
-def _row(staff: dict, series: dict, user: dict | None, today: str) -> dict:
-    """Ein Captain für die Verwaltung: Name und Bild, Ablauf, gilt heute, Zwei-Faktor eingerichtet - keine E-Mail."""
+def _row(staff: dict, series: dict, user: dict | None, today: str, is_member: bool) -> dict:
+    """Ein Captain für die Verwaltung: Name und Bild, Ablauf, gilt heute, Zwei-Faktor eingerichtet, aktives Mitglied -
+    keine E-Mail."""
     user = user or {}
     return {
         "id": staff["id"], "series_id": staff["series_id"], "user_id": staff["user_id"], "role": staff.get("role"),
@@ -59,6 +64,7 @@ def _row(staff: dict, series: dict, user: dict | None, today: str) -> dict:
         "name": user.get("display_name") or user.get("username") or "Unbekanntes Konto",
         "avatar_url": user.get("avatar_url"), "mfa_enabled": bool(user.get("mfa_enabled")),
         "account_active": bool(user) and user.get("is_active") is not False and not user.get("is_banned"),
+        "is_member": is_member,
         "created_at": staff.get("created_at"), "updated_at": staff.get("updated_at"),
     }
 
@@ -68,7 +74,8 @@ async def _rows(db, series: dict) -> list[dict]:
     users = {row["id"]: row async for row in db.users.find(
         {"id": {"$in": sorted({row["user_id"] for row in staff})}}, USER_FIELDS)}
     today = club_today()
-    rows = [_row(row, series, users.get(row["user_id"]), today) for row in staff]
+    members = await active_member_ids(db, users)
+    rows = [_row(row, series, users.get(row["user_id"]), today, row["user_id"] in members) for row in staff]
     rows.sort(key=lambda row: (not row["is_valid"], row["name"].casefold()))
     return rows
 
@@ -88,6 +95,8 @@ async def add_staff(series_id: str, body: ReferenceSeriesStaffCreate, me: dict =
     user = await db.users.find_one({"id": body.user_id}, USER_FIELDS)
     if not user or user.get("is_active") is False or user.get("is_banned"):
         raise HTTPException(404, "Konto nicht gefunden.")
+    if body.user_id not in await active_member_ids(db, [body.user_id]):
+        raise HTTPException(422, NOT_A_MEMBER)
     if await db.reference_series_staff.find_one(
             {"series_id": series_id, "user_id": body.user_id, "role": body.role}, {"_id": 1}):
         raise HTTPException(409, "Diese Person ist in dieser Saison schon Captain.")
@@ -98,7 +107,7 @@ async def add_staff(series_id: str, body: ReferenceSeriesStaffCreate, me: dict =
     await db.reference_series_staff.insert_one(dict(doc))
     await _audit(db, me, "staff_add", series_id, {"staff_id": doc["id"], "user_id": body.user_id, "role": body.role,
                                                   "can_publish": body.can_publish, "valid_until": body.valid_until})
-    return _row(doc, series, user, club_today())
+    return _row(doc, series, user, club_today(), True)
 
 
 @router.patch("/admin/series/{series_id}/staff/{staff_id}")
@@ -121,7 +130,8 @@ async def update_staff(series_id: str, staff_id: str, body: ReferenceSeriesStaff
             "before": {key: existing.get(key) for key in changes}, "after": changes})
     saved = await _staff(db, series_id, staff_id)
     user = await db.users.find_one({"id": saved["user_id"]}, USER_FIELDS)
-    return _row(saved, series, user, club_today())
+    is_member = saved["user_id"] in await active_member_ids(db, [saved["user_id"]])
+    return _row(saved, series, user, club_today(), is_member)
 
 
 @router.delete("/admin/series/{series_id}/staff/{staff_id}")

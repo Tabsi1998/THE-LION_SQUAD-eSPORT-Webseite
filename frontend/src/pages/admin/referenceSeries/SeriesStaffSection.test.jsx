@@ -19,8 +19,8 @@ vi.mock("@/components/tls/PersonPicker", () => ({
 const { SeriesStaffSection } = await import("./SeriesStaffSection");
 
 const SERIES = { id: "serie-1", publish_mode: "review" };
-const ACTIVE = { id: "st-1", user_id: "u-1", name: "Captain Carla", valid_until: "2026-12-31", is_valid: true, can_publish: false, publishes_directly: false, mfa_enabled: true, account_active: true };
-const EXPIRED = { id: "st-2", user_id: "u-3", name: "Alter Albert", valid_until: "2026-01-31", is_valid: false, can_publish: true, publishes_directly: true, mfa_enabled: false, account_active: true };
+const ACTIVE = { id: "st-1", user_id: "u-1", name: "Captain Carla", valid_until: "2026-12-31", is_valid: true, can_publish: false, publishes_directly: false, mfa_enabled: true, account_active: true, is_member: true };
+const EXPIRED = { id: "st-2", user_id: "u-3", name: "Alter Albert", valid_until: "2026-01-31", is_valid: false, can_publish: true, publishes_directly: true, mfa_enabled: false, account_active: true, is_member: false };
 
 beforeEach(() => {
   for (const fn of Object.values(apiMock)) fn.mockReset();
@@ -30,12 +30,14 @@ beforeEach(() => {
   apiMock.delete.mockResolvedValue({ data: { ok: true } });
 });
 
-test("Liste: Ablauf, Entwurf oder direkt, fehlende Zwei-Faktor-Anmeldung", async () => {
+test("Liste: Ablauf, Entwurf oder direkt, fehlende Zwei-Faktor-Anmeldung und Mitgliedschaft", async () => {
   render(<SeriesStaffSection series={SERIES} />);
   expect(await screen.findByTestId("series-staff-validity-st-1")).toHaveTextContent("gilt bis 31.12.2026 · Einträge sind Entwürfe, der Vorstand gibt frei");
   expect(screen.getByTestId("series-staff-validity-st-2")).toHaveTextContent("abgelaufen am 31.01.2026 · veröffentlicht direkt");
   expect(screen.getByTestId("series-staff-mfa-st-2")).toHaveTextContent("Zwei-Faktor fehlt");
   expect(screen.queryByTestId("series-staff-mfa-st-1")).toBeNull();
+  expect(screen.getByTestId("series-staff-member-st-2")).toHaveTextContent("Kein aktives Vereinsmitglied mehr");
+  expect(screen.queryByTestId("series-staff-member-st-1")).toBeNull();
   expect(screen.getByTestId("series-staff-mode")).toHaveTextContent("Entwürfe, die der Vorstand freigibt");
   expect(apiMock.get).toHaveBeenCalledWith("/reference-series/admin/series/serie-1/staff");
 });

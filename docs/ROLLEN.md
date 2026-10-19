@@ -221,7 +221,7 @@ Kontoliste mit E-Mail-Adressen bleibt bei „Alle Benutzer“ (Vereinsverwaltung
 | `access_links` | Speziallinks | Turnierleitung | aktive Konten |
 | `board` | Vorstand besetzen | Vereinsverwaltung, System | nur Vereinsmitglieder (und gepflegte Mitgliederprofile ohne Konto) |
 | `invite` | Bewerbungen: zum Antrag einladen | Vereinsverwaltung | Konten ohne aktive Mitgliedschaft, mit „ist schon eingeladen“ |
-| `reference_series` | Serien: Captain einer Saison hinzufügen (#1749) | Redaktion | aktive Konten |
+| `reference_series` | Serien: Captain einer Saison hinzufügen (#1749) | Redaktion | nur aktive Vereinsmitglieder |
 
 Teams kommen als kleine Auswahl (`GET /api/admin/choices/teams?tournament_id=…`, wie `tournament`), Event-Sponsoren
 mit dem Haken „Events“ nur mit Name und Logo (`GET /api/admin/choices/sponsors`: Turnierleitung, Redaktion, System).
@@ -242,6 +242,8 @@ je Saison Captains eintragen, die nur für diese eine Saison Ergebnisse und Scor
 
 - **Zwei-Faktor ist Pflicht** – für den Vorstand wie für Captains (Entscheidung 7 des Obmanns). Ohne bestätigte
   Zwei-Faktor-Anmeldung antwortet der Server mit dem Hinweis darauf; das Web führt zur Einrichtung.
+- **Nur Vereinsmitglieder:** Captain kann nur werden, wer aktives Vereinsmitglied ist (aktiv oder Ehrenmitglied).
+  Endet die Mitgliedschaft, endet das Captain-Recht beim nächsten Aufruf; der Vorstand sieht den Eintrag mit Hinweis.
 - **Ablauf:** jeder Captain hat einen letzten Tag (`valid_until`, Wiener Tag, einschließlich, Pflicht – ein Recht ohne
   Ende gibt es nicht). Ab dem Tag danach gilt es nicht mehr, ohne neue Anmeldung: der Server prüft bei **jedem** Aufruf.
   In einer archivierten Saison haben Captains kein Recht mehr.

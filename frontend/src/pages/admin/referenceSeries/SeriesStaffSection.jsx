@@ -9,7 +9,7 @@ import { Plus, Trash2 } from "lucide-react";
 
 // Captains der Saison (#1749): nur für den Vorstand. Hinzufügen per Personensuche mit Ablauf (Pflicht) und Recht zum
 // Veröffentlichen; je Captain Ablauf ändern, Recht umschalten, entfernen. Jede Änderung protokolliert der Server.
-// Ein Captain braucht Zwei-Faktor - fehlt sie am Konto, steht es dabei. Bekommt `series`.
+// Ein Captain muss aktives Vereinsmitglied sein und braucht Zwei-Faktor - fehlt eins davon, steht es dabei. Bekommt `series`.
 
 function StaffRow({ row, seriesId, onSaved, onRemove }) {
   const [until, setUntil] = useState(row.valid_until || "");
@@ -39,6 +39,9 @@ function StaffRow({ row, seriesId, onSaved, onRemove }) {
             <div className="text-xs text-warn" data-testid={`series-staff-mfa-${row.id}`}>Zwei-Faktor fehlt noch – bis dahin kommt dieser Captain nicht in die Saison.</div>
           )}
           {!row.account_active && <div className="text-xs text-warn">Konto ist gesperrt oder inaktiv.</div>}
+          {row.is_member === false && (
+            <div className="text-xs text-warn" data-testid={`series-staff-member-${row.id}`}>Kein aktives Vereinsmitglied mehr – das Recht ruht, bis die Mitgliedschaft wieder aktiv ist.</div>
+          )}
         </div>
       </div>
       <div className="mt-3 flex flex-wrap items-end gap-3 md:mt-0 md:shrink-0">
@@ -120,7 +123,7 @@ export function SeriesStaffSection({ series }) {
         </ul>
       )}
       <form onSubmit={add} className="mt-4 border-t border-white/10 pt-4 space-y-3" data-testid="series-staff-add">
-        <PersonPicker purpose="reference_series" value={person} onChange={setPerson} label="Captain hinzufügen" testId="series-staff-person" />
+        <PersonPicker purpose="reference_series" value={person} onChange={setPerson} label="Captain hinzufügen" hint="Nur aktive Vereinsmitglieder." emptyText="Kein Vereinsmitglied mit diesem Namen." testId="series-staff-person" />
         <div className="flex flex-wrap items-end gap-3">
           <TextField label="Gilt bis" type="date" required value={until} min={todayDay()} onChange={setUntil} hint="Meist das Saisonende." testId="series-staff-new-until" className="w-48" />
           <CheckField label="Darf veröffentlichen" checked={canPublish} onChange={setCanPublish} hint="Sonst sind die Einträge Entwürfe, die der Vorstand freigibt." testId="series-staff-new-publish" className="pb-2" />
