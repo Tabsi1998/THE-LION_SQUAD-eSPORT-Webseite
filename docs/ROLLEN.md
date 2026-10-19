@@ -249,6 +249,9 @@ je Saison Captains eintragen, die nur für diese eine Saison Ergebnisse und Scor
   In einer archivierten Saison haben Captains kein Recht mehr.
 - **Standard:** Einträge eines Captains sind Entwürfe, der Vorstand gibt frei. Direkt veröffentlichen geht nur, wenn
   der Vorstand es je Saison (`publish_mode`) oder je Captain (`can_publish`) einschaltet.
+- **Veröffentlichte Ergebnisse:** Wer nicht veröffentlichen darf, ändert ein veröffentlichtes Ergebnisblatt nie
+  direkt. Die Änderung wird ein neuer Entwurf daneben, den der Vorstand freigibt; bis dahin bleibt das veröffentlichte
+  Blatt sichtbar (`SeriesAccess.edit_target`).
 - **Kennungen:** Termine, Ergebnisblätter und Teilnehmer gehören zur Saison aus dem Pfad; eine Kennung aus einer
   anderen Saison antwortet mit 404 – auch für den Vorstand.
 - **Wo:** Captains verwaltet der Vorstand auf der Seite der Saison (Admin → Serien → Saison → „Captains“). Ein Captain

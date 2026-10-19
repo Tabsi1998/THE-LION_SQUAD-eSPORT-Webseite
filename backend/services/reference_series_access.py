@@ -14,6 +14,8 @@ Für Routen, die eine Serie im Pfad haben (``/…/series/{series_id}/…``)::
     async def save(series_id: str, round_id: str, body: …, access: SeriesAccess = Depends(require_series_editor)):
         round_doc = await access.round(round_id)             # 404, wenn der Termin nicht zu dieser Serie gehört
         status = access.result_status(body.status)            # 403, wenn „published“ ohne Recht zum Veröffentlichen
+        if access.edit_target(existing_sheet) == EDIT_PENDING_DRAFT:
+            …  # veröffentlichtes Blatt bleibt, die Änderung wird ein Entwurf daneben (Freigabe durch den Vorstand)
         …
 
 - ``require_series_editor`` liest ``series_id`` aus dem Pfad; der Parameter muss genau so heißen.
@@ -40,6 +42,9 @@ from services.permissions import MFA_MESSAGE, can_use_area, needs_mfa
 
 BOARD = "board"
 CAPTAIN = "captain"
+# Ziel einer Änderung am Ergebnisblatt (``SeriesAccess.edit_target``).
+EDIT_SHEET = "sheet"
+EDIT_PENDING_DRAFT = "pending_draft"
 NO_RIGHT = "Für diese Serie fehlt dir das Recht. Captains trägt der Vorstand in der Saison ein."
 EXPIRED = "Dein Captain-Recht für diese Serie ist abgelaufen. Verlängern kann es der Vorstand."
 ARCHIVED = "Diese Serie ist archiviert. Ändern kann sie nur noch der Vorstand."
@@ -117,6 +122,19 @@ class SeriesAccess:
         if status == "published" and not self.can_publish:
             raise HTTPException(403, PUBLISH_ONLY_BOARD)
         return status
+
+    def edit_target(self, result: dict | None) -> str:
+        """Wohin eine Änderung an einem Ergebnisblatt geht (Regel des Obmanns, für #1744):
+
+        - ``EDIT_SHEET``: auf das Blatt selbst - es gibt noch keins, es ist ein Entwurf, oder die Person darf
+          veröffentlichen (Vorstand, Captain mit Recht oder in einer Serie auf „direkt“).
+        - ``EDIT_PENDING_DRAFT``: das Blatt ist veröffentlicht und die Person darf nicht veröffentlichen. Die Änderung
+          wird ein **neuer Entwurf daneben**, den der Vorstand freigibt; das veröffentlichte Blatt bleibt unverändert
+          sichtbar, bis er es tut. Nie das veröffentlichte Blatt überschreiben oder zurück auf Entwurf setzen.
+        """
+        if result and result.get("status") == "published" and not self.can_publish:
+            return EDIT_PENDING_DRAFT
+        return EDIT_SHEET
 
     def summary(self) -> dict:
         """Für die Oberfläche: Rolle und Veröffentlichen-Recht (Knöpfe zeigen, nicht prüfen - geprüft wird hier)."""
