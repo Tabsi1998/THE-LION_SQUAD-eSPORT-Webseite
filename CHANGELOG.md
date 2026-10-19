@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.4.0 (19.10.2026)
+
+### Neu
+
+* Referenz kann zu einer Serie gehören (#1741)
+* Regeln je Saison aus Punkteschema-Vorlagen, Regeländerung rechnet neu (#1741)
+* Seite einer Saison in der Verwaltung (#1741)
+* Verwaltung „Serien“ – Spuren und Saisons anlegen, bearbeiten, archivieren (#1741)
+
 ## 1.3.0 (19.10.2026)
 
 ### Neu
