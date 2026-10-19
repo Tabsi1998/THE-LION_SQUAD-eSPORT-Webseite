@@ -110,15 +110,17 @@ cmd_run() {
     fi
     # Nie zwei Seeds in derselben Minute: Turniertitel tragen die Uhrzeit auf die Minute, und das Anlegen eines Turniers
     # mit gleichem Inhalt liefert das schon vorhandene zurück (idempotent) - der zweite Seed bekäme den Cup des ersten,
-    # der dann schon live ist (beim ersten lokalen Lauf nach zwei kurzen Specs passiert).
+    # der dann schon live ist (beim ersten lokalen Lauf nach zwei kurzen Specs passiert). Gemerkt wird die Minute am
+    # ENDE des vorigen Seeds: sein Zeitstempel kann auch in der Minute nach dem Start entstehen (erster Nachtlauf
+    # 19.10.: Start um :58, Stempel in der nächsten Minute, der folgende Seed bekam dessen Turnier).
     while [ "$(date -u +%Y%m%d%H%M)" = "$last_minute" ]; do sleep 2; done
-    last_minute="$(date -u +%Y%m%d%H%M)"
     group "$name (Seed: $seed)"
     started=$(date +%s)
     set +e
     # Die Zeile mit dem Stand (Zugänge) bleibt in der Stand-Datei und erscheint weder im Log noch im Artefakt.
     ABNAHME_STATE="$state" "$PYTHON" "$ROOT/scripts/$seed" 2>&1 | grep -v '^ABNAHME-STATE ' > "$out/seed.log"
     seed_rc=${PIPESTATUS[0]}
+    last_minute="$(date -u +%Y%m%d%H%M)"
     set -e
     seeded=$(date +%s)
     spec_rc=0
