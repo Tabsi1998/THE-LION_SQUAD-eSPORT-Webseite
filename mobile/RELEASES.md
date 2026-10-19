@@ -185,6 +185,7 @@ GitHub sortiert Releases nach Veröffentlichungsdatum, nicht nach Version. Alte 
 
 Neueste oben.
 
+- `1.7.1`: Build 95, Weiterkommen in vier Modi mit Show-Auslosung als Moment, neue Baum-Namen und „voraussichtlich“ (#1633), Fast-Lap-Versuche und Gäste wie auf der Website (#1585)
 - `1.7.0`: Build 94, neue Turnieransicht mit Turnierbaum und Linien, „Dein Weg“, Live, Tabellen und gruppiertem Spielplan, gemischten Runden und Vibration (#1563, #1548, #1168), Fast Lap mit einem Zeit-Parser, Rückfrage bei unplausiblen Zeiten und Hinweis nach der Veröffentlichung (#1584)
 - `1.6.1`: Build 93, Anmeldung mit Wiederherstellungscode, MFA abbrechen und Hilfe beim Anmelden (#995, #996), Einwilligungen in der App (#1537), Einlass mit sauberer Kamera und aktuellen Zahlen (#1056, #1063, #1064), Kalender in Wiener Zeit (#1062), Dateien und Medien nur mit Anmeldung vom eigenen Server (#1054, #1057, #1059, #1060)
 - `1.6.0`: Build 92, Events als Klammer um ihre Turniere mit „Nur meine“ (#1182, #1189), „Spielst du auch mit?“ nach der Event-Anmeldung (#1184), Kalender mit Heute, Balken, Vereinsterminen und Abo (#1271, #1190), Event-Fotos mit Hinweis und Einsenden (#1185, #1186), Rückblick nach dem Event und Freunde beim Event (#1187, #1188), Löwen-Rang-Rahmen im Profil, in Listen und auf dem Podest (#1457, #1463) mit Aufstiegs-Moment und Haptik (#1456), App-Sperre und Kontowechsel ohne Inhalte des vorigen Kontos (#1052, #1053), Team-Verwaltung nur mit Zwei-Faktor (#1479)

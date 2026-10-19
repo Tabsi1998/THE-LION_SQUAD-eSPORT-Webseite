@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.7.1 - 2026-10-19
+
+- Mobile: Weiterkommen in vier Modi: Über dem Turnierbaum steht, wie es weitergeht – fester Baum, Auslosung nach der Runde, Show-Auslosung oder sofort zufällig; ein Tipp erklärt den Modus. Spielt eine Phase anders als das Turnier, steht je Phase eine Zeile. Offene Plätze sagen „wartet auf Auslosung“, „das Los entscheidet“ oder „Sieger aus Viertelfinale“ – wie auf der Website (#1633).
+- Mobile: Show-Auslosung: Steht der Topf, erscheint ein goldener Hinweis „Auslosung bereit“ mit der Zahl der Namen, die Zielspiele heben sich nacheinander an und das Handy vibriert einmal leicht. Wird gelost, kommen die Namen gestaffelt in ihre Plätze; bei „sofort zufällig“ zeigt die App kurz, wer wohin gezogen wurde. Mit „Bewegung reduzieren“ steht alles sofort da (#1633).
+- Mobile: Neue Namen im Baum: „Loser Runde 1“, „Grand Final“ und „Spiel um Platz 3“ heißen wie auf der Website; vorgeplante Zeiten stehen als „voraussichtlich“ im Runden-Kopf, im Spielplan und bei den nächsten Spielen (#1633).
+- Mobile: Fast Lap: Die Rangliste zeigt die Versuche wie Website und TV („3 von 5 Versuchen“), Gäste ohne Konto sind als „Gast“ gekennzeichnet (#1585).
+
 ## 1.7.0 - 2026-10-14
 
 - Mobile: Turnierbaum mit Linien: Im Reiter „Baum“ siehst du den Turnierbaum wie auf der Website – mit Linien von jedem Spiel in den Platz, in den der Sieger (oder der Verlierer) kommt, Rundennamen wie „Halbfinale“ und der frühesten Uhrzeit über jeder Spalte. Bei Doppel-K.-o. liegt das Loser Bracket unter dem Hauptfeld, rechts steht der Pokal. Freilos, „kampflos“ und Spiele, die entfallen, sind klar benannt; bei Läufen steht, wie viele weiterkommen und wohin die anderen gehen (#1563).
