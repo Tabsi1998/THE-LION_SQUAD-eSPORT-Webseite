@@ -22,3 +22,13 @@ test("Duell unverändert „A gegen B“, Lauf mit vier Namen", () => {
   expect(box).toHaveTextContent("NeonFalke gegen PixelPanther");
   expect(box).toHaveTextContent("A1 · A2 · A3 · A4");
 });
+
+test("Runde und Durchgang über den Namen - wie in der Turnierleitung (#1824)", () => {
+  render(<StationNowNext stationKey="st1" station={{
+    running: entry({ match_id: "m0", match_key: "QF1", label: "Viertelfinale", heat: false, names: ["NeonFalke", "PixelPanther"], started_at: "2026-10-31T16:00:00Z" }),
+    next: entry({ match_key: "LA", label: "Loser Runde 1", heat: true, names: ["A1", "A2", "A3"] }),
+  }} />);
+  const box = screen.getByTestId("schedule-now-st1");
+  expect(box).toHaveTextContent("Viertelfinale");
+  expect(box).toHaveTextContent("Loser Runde 1 · Durchgang LA");
+});
