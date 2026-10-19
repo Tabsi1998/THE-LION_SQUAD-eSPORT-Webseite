@@ -98,6 +98,13 @@ def test_a_sheet_with_negative_penalty_points_is_not_scored():
         compute_standings(rules=_rules(), rounds=[_round("r1", 1)], sheets=sheets, participants=PARTICIPANTS)
 
 
+def test_a_sheet_naming_a_participant_twice_is_not_scored():
+    # Welche der beiden Zeilen zählt, hinge sonst an der Reihenfolge im Blatt.
+    sheets = {"r1": {"rows": _rows(("anna", 1), ("bert", 2), ("anna", 6))}}
+    with pytest.raises(ValueError, match="mehrfach"):
+        compute_standings(rules=_rules(), rounds=[_round("r1", 1)], sheets=sheets, participants=PARTICIPANTS)
+
+
 def test_rounds_that_do_not_count_are_left_out():
     rounds = [_round("r1", 1), _round("finale", 2, counts=False)]
     sheets = {"r1": {"rows": _rows(("anna", 2))}, "finale": {"rows": _rows(("anna", 1))}}

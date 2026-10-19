@@ -195,8 +195,15 @@ def _given_points(row: dict) -> float:
 
 def validate_sheet(sheet: dict, round_id: str) -> None:
     """Prüft ein Ergebnisblatt vor dem Rechnen; wirft ``ValueError`` mit der Runde und dem Grund. Strafpunkte sind nie
-    negativ."""
+    negativ, und jeder Teilnehmer steht höchstens einmal im Blatt - sonst hinge an der Reihenfolge, welche Zeile
+    zählt."""
+    seen: set[str] = set()
     for row in sheet.get("rows") or []:
+        pid = row.get("participant_id")
+        if pid in seen:
+            raise ValueError(f"Runde {round_id}: Teilnehmer {pid} steht mehrfach im Ergebnisblatt.")
+        if pid:
+            seen.add(pid)
         penalty = row.get("penalty_points")
         if penalty is not None and (_number(penalty, "penalty_points") or 0) < 0:
             raise ValueError(f"Runde {round_id}: Strafpunkte dürfen nicht negativ sein ({row.get('participant_id')}).")
