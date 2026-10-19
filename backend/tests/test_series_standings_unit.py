@@ -154,6 +154,14 @@ def test_without_guests_the_next_driver_of_the_team_counts():
     assert _table(rows, "team", "points", "driver_ids") == [("Löwen", 13, ["anna", "dora"]), ("Falken", 6, ["bert"])]
 
 
+def test_team_scoring_without_any_team_produces_no_empty_team_standing():
+    rules = _rules(team_scoring={"enabled": True})
+    loners = [{"id": "anna", "name": "Anna Probe", "link": "member"}]
+    snapshots = compute_standings(rules=rules, rounds=[_round("r1", 1)], sheets={"r1": {"rows": _rows(("anna", 1))}},
+                                  participants=loners)
+    assert {snap["scope"] for snap in snapshots} == {"drivers"}
+
+
 def test_team_scoring_off_produces_no_team_standing():
     snapshots = compute_standings(rules=_rules(), rounds=[_round("r1", 1)], sheets={"r1": TEAM_ROUND}, participants=PARTICIPANTS)
     assert {snap["scope"] for snap in snapshots} == {"drivers"}
