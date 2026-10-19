@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.7.2 - 2026-10-19
+
+- Mobile: Mein Kalender: Im Reiter Events siehst du unter „Mein Kalender“ alle deine Termine an einem Ort – Turniere, Events, Fast Laps, Versammlungen und Schichten, gruppiert nach Heute, Diese Woche und Später oder als Monat. Jeder Termin zeigt deinen Stand (angemeldet, mit Team, Warteliste), ein Filter wählt die Art. (#1788)
+- Mobile: Kalender-Abo: Unter „Automatisch in deinen Kalender“ richtest du einmal dein persönliches Abo ein – direkt in den Handy-Kalender oder Google Kalender. Danach erscheint jede Anmeldung von selbst dort. Kopieren mit leichter Vibration, „Neu erzeugen“ und „Abschalten“ mit Rückfrage. (#1788)
+- Mobile: Einstellungen: Unter Konto gibt es den festen Eintrag „Mein Kalender-Abo“. Nach einer Anmeldung zu Event oder Turnier weist die App einmal auf das Abo hin, solange du noch keins hast. (#1788)
+
 ## 1.7.1 - 2026-10-19
 
 - Mobile: Weiterkommen in vier Modi: Über dem Turnierbaum steht, wie es weitergeht – fester Baum, Auslosung nach der Runde, Show-Auslosung oder sofort zufällig; ein Tipp erklärt den Modus. Spielt eine Phase anders als das Turnier, steht je Phase eine Zeile. Offene Plätze sagen „wartet auf Auslosung“, „das Los entscheidet“ oder „Sieger aus Viertelfinale“ – wie auf der Website (#1633).

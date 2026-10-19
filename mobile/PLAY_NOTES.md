@@ -12,6 +12,13 @@ Regeln:
 - Höchstens 500 Zeichen inklusive Zeilenumbrüchen (Grenze von Google Play).
 - Kurz und für Mitglieder verständlich: was sie in der App merken, keine Issue-Nummern, keine Technik.
 
+## 1.7.2
+
+Neu in 1.7.2:
+• Mein Kalender: alle deine Termine mit deinem Stand an einem Ort
+• Kalender-Abo: Termine automatisch im Handy- oder Google-Kalender
+• Fester Eintrag „Mein Kalender-Abo“ in den Einstellungen
+
 ## 1.7.1
 
 Neu in 1.7.1:
