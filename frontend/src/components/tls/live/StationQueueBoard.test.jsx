@@ -115,3 +115,13 @@ test("Lauf (#1824): Durchgang und Namen bei „Läuft“, „Als Nächstes“ un
   expect(screen.getByTestId("live-after-st1")).toHaveTextContent("Runde 1 · Durchgang C · 4 Plätze offen");
   expect(screen.getByTestId("live-station-st1")).not.toHaveTextContent("Teilnehmer");
 });
+
+test("Lauf mit nur noch zwei Spielern (#1824): Namen mit „·“, kein „gegen“", () => {
+  const two = entry("D", { label: "Runde 1", heat: true, names: ["NeonFalke", "PixelPanther"] });
+  render(<StationQueueBoard queue={queue([{ id: "st1", name: "1", station_text: "Station 1", status: "free", waiting: 1, running: null, next: two, after: null }])}
+    onCall={vi.fn()} onStart={vi.fn()} />);
+  const next = screen.getByTestId("live-next-st1");
+  expect(next).toHaveTextContent("Runde 1 · Durchgang D");
+  expect(next).toHaveTextContent("NeonFalke · PixelPanther");
+  expect(next).not.toHaveTextContent("gegen");
+});

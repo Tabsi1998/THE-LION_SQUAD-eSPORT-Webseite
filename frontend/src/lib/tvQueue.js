@@ -83,7 +83,8 @@ export function queueWho(entry, { compact = false, versus = "vs.", rows = true, 
   const names = (entry?.names || []).filter(Boolean);
   const open = Number(entry?.open_slots) || 0;
   let who;
-  if (names.length <= 2) who = names.join(` ${versus} `);
+  // Ein Lauf bleibt ein Lauf, auch mit nur noch zwei Spielern (nach Austritten): Namen mit „·“, nie „gegen“.
+  if (names.length <= 2) who = names.join(queueIsHeat(entry) ? " · " : ` ${versus} `);
   // Viele Stationen auf einer Seite (drei Reihen, Codex): kurz bleiben, sonst sprengen lange Namen die Karte.
   else if (compact) who = `${names.length} Spieler`;
   else if (names.length > MAX_NAMES) who = overflow === "plus" ? `${names.slice(0, MAX_NAMES).join(" · ")} +${names.length - MAX_NAMES}` : `${names.length} Spieler`;

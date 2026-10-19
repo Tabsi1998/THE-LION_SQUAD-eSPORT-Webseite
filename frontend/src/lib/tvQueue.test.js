@@ -71,6 +71,15 @@ describe("Texte", () => {
     expect(stationWho({ names: [] })).toBe("Teilnehmer offen");
   });
 
+  it("ein Lauf mit nur noch zwei Spielern bleibt ein Lauf - nie „gegen“/„vs.“; Duelle unverändert (#1824)", () => {
+    const twoLeft = { names: ["Alpha", "Beta"], heat: true };
+    expect(queueWho(twoLeft)).toBe("Alpha · Beta");
+    expect(queueWho(twoLeft, { compact: true })).toBe("Alpha · Beta");
+    expect(stationWho(twoLeft)).toBe("Alpha · Beta");
+    expect(queueWho({ names: ["Alpha", "Beta"], heat: false })).toBe("Alpha vs. Beta");
+    expect(stationWho({ names: ["Alpha", "Beta"], heat: false })).toBe("Alpha gegen Beta");
+  });
+
   it("ohne Baum: der Rundenname, im Lauf mit dem Durchgang - Duelle nur die Runde", () => {
     expect(queueWhat({ label: "Runde 1", match_key: "A", heat: true, names: ["a", "b", "c", "d"] })).toBe("Runde 1 · Durchgang A");
     expect(queueWhat({ label: "Loser Runde 1", match_key: "LA", heat: true, names: ["a", "b", "c"] })).toBe("Loser Runde 1 · Durchgang LA");

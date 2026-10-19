@@ -54,3 +54,15 @@ test("ein aufgerufenes Spiel geht vor - auch wenn ein anderes früher prognostiz
   expect(next).toHaveTextContent("Durchgang LB");
   expect(next).toHaveTextContent("Aufgerufen · Station 3");
 });
+
+test("Fußzeile: ein Lauf mit nur noch zwei Spielern zeigt die Namen mit „·“, kein „vs.“ (#1824)", () => {
+  const two = {
+    applies: true,
+    stations: [{ id: "st2", name: "2", status: "free", running: null, waiting: 1,
+      next: { match_id: "m-la", match_key: "LA", label: "Loser Runde 1", heat: true, names: ["NeonFalke", "PixelPanther"], open_slots: 0, state: "queued", forecast_at: "2026-10-31T21:40:00Z" } }],
+  };
+  render(<TvNextUp matches={[heatLA]} stations={stations} queue={two} />);
+  const next = screen.getByTestId("tv-next-up");
+  expect(next).toHaveTextContent("NeonFalke · PixelPanther");
+  expect(next).not.toHaveTextContent("vs.");
+});
