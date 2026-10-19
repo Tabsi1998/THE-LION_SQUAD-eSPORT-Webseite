@@ -183,3 +183,19 @@ test("Jahr für Jahr auf der Seite (#1748): Jahresköpfe, Medaillenzähler bleib
   expect(screen.getByTestId("references-stat-bronze")).toHaveTextContent("3");
   expect(screen.getByTestId("references-stat-podiums")).toHaveTextContent("6");
 });
+
+test("Spiel-Logo (#1748): mit Logo das Bild, ohne Logo das Kürzel statt eines Pokal-Symbols", async () => {
+  const withLogo = { ...ITEMS[0], game: { ...ITEMS[0].game, logo_url: "/media/cod.png", short_name: "CoD" } };
+  const noLogo = { ...ITEMS[1], game: { ...ITEMS[1].game, short_name: "rl" } };
+  apiMock.get.mockResolvedValue({ data: { items: [withLogo, noLogo], summary: SUMMARY } });
+  render(<MemoryRouter><ReferencesPage /></MemoryRouter>);
+  const logoCard = within(await screen.findByTestId("reference-card-r1")).getByTestId("reference-game-logo");
+  expect(logoCard.querySelector("img")).toHaveAttribute("src", "/media/cod.png");
+  expect(logoCard).not.toHaveTextContent("COD");
+  const codeCard = within(screen.getByTestId("reference-card-r2")).getByTestId("reference-game-logo");
+  expect(codeCard.querySelector("img")).toBeNull();
+  expect(codeCard).toHaveTextContent("RL");
+  // Die Spiel-Kachel nimmt dasselbe: Logo oder Kürzel.
+  expect(within(screen.getByTestId("references-game-g2")).getByTestId("reference-game-logo")).toHaveTextContent("RL");
+  expect(within(screen.getByTestId("references-game-g1")).getByTestId("reference-game-logo").querySelector("img")).toHaveAttribute("src", "/media/cod.png");
+});

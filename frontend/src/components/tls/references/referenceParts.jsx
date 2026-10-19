@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import { ArrowRight, ExternalLink, Handshake, Medal, Trophy, User, Users } from "lucide-react";
 import { resolveMediaUrl } from "@/lib/api";
 import { gameLabel } from "@/lib/gameLabels";
+import { gameCode } from "@/components/tls/GamesShelf";
 import { useCountUp } from "@/hooks/useCountUp";
 import { asInstant, viennaDate } from "@/lib/vienna";
 
@@ -174,12 +175,25 @@ export function PlacementBadge({ placement, medal, size = "md" }) {
   );
 }
 
+// Das Zeichen eines Spiels (#1748): sein Logo, ohne Logo das Kürzel wie im Spiele-Regal (gameCode) - ohne Spiel
+// (freies Turnier) der Pokal. `className` setzt die Größe, `codeClass` die Schrift des Kürzels.
+export function GameMark({ game, className = "w-5 h-5", codeClass = "text-[7px]", iconClass = "w-3 h-3", padded = false }) {
+  const hasGame = Boolean(game?.short_name || game?.name);
+  return (
+    <span data-testid="reference-game-logo" className={`${className} shrink-0 rounded-sm bg-black overflow-hidden flex items-center justify-center`}>
+      {game?.logo_url
+        ? <img src={resolveMediaUrl(game.logo_url)} alt="" className={`w-full h-full object-contain ${padded ? "p-1" : ""}`} />
+        : hasGame
+          ? <span aria-hidden="true" className={`font-heading font-black tracking-wide text-white leading-none ${codeClass}`}>{gameCode(game)}</span>
+          : <Trophy className={`${iconClass} text-[#29B6E8]`} />}
+    </span>
+  );
+}
+
 export function GameChip({ item }) {
   return (
     <span className="inline-flex items-center gap-2 pl-1 pr-2.5 py-1 border border-white/10 bg-black/40 rounded-sm text-[10px] uppercase tracking-widest font-bold text-white/70">
-      <span className="w-5 h-5 rounded-sm bg-black overflow-hidden flex items-center justify-center">
-        {item.game?.logo_url ? <img src={resolveMediaUrl(item.game.logo_url)} alt="" className="w-full h-full object-contain" /> : <Trophy className="w-3 h-3 text-[#29B6E8]" />}
-      </span>
+      <GameMark game={item.game} />
       {gameTitle(item)}
     </span>
   );

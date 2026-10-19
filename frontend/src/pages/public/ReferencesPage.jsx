@@ -5,7 +5,7 @@ import { api, resolveMediaUrl } from "@/lib/api";
 import { seoTextPreview } from "@/lib/textPreview";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
-import { CountLine, EntryRow, FieldChips, GameChip, MEDAL, MEDAL_RANK, MedalStat, PlacementBadge, RefButton, ReferenceCard, SectionTitle, bestPlacement, displayTitle, entriesOf, entryTitle, formatDate, gameKey, gameTitle, hasMember, medalOf, memberEntryOf, memberName, platformLabel, referenceGameName, timeOf } from "@/components/tls/references/referenceParts";
+import { CountLine, EntryRow, FieldChips, GameChip, GameMark, MEDAL, MEDAL_RANK, MedalStat, PlacementBadge, RefButton, ReferenceCard, SectionTitle, bestPlacement, displayTitle, entriesOf, entryTitle, formatDate, gameKey, gameTitle, hasMember, medalOf, memberEntryOf, memberName, platformLabel, referenceGameName, timeOf } from "@/components/tls/references/referenceParts";
 import { Medal, Trophy, User, Users, X } from "lucide-react";
 import { TrophyShelf } from "@/components/tls/TrophyShelf";
 import { PublicLoadingState } from "@/components/tls/PublicLoadingState";
@@ -24,7 +24,7 @@ export function groupReferences(items) {
   const games = new Map();
   items.forEach((item) => {
     const key = gameKey(item);
-    if (!games.has(key)) games.set(key, { key, title: gameTitle(item), logo: item.game?.logo_url, cover: item.game?.cover_url, items: [] });
+    if (!games.has(key)) games.set(key, { key, title: gameTitle(item), game: item.game, logo: item.game?.logo_url, cover: item.game?.cover_url, items: [] });
     games.get(key).items.push(item);
   });
   return Array.from(games.values()).map((game) => ({
@@ -156,7 +156,7 @@ export default function ReferencesPage() {
           <div className="mt-6 grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3">
             <GameTile active={gameFilter === "all"} onClick={() => setGameFilter("all")} title="Alle Spiele" count={items.length} podiums={trophies.length} testId="references-game-all" />
             {games.map((game) => (
-              <GameTile key={game.key} active={gameFilter === game.key} onClick={() => setGameFilter(gameFilter === game.key ? "all" : game.key)} title={game.title} logo={game.logo} count={game.count} podiums={game.podiums} best={game.best} testId={`references-game-${game.key}`} />
+              <GameTile key={game.key} active={gameFilter === game.key} onClick={() => setGameFilter(gameFilter === game.key ? "all" : game.key)} title={game.title} game={game.game} count={game.count} podiums={game.podiums} best={game.best} testId={`references-game-${game.key}`} />
             ))}
           </div>
         </section>
@@ -293,12 +293,10 @@ export function ReferenceDetailPage() {
 
 // ---------------------------------------------------------------- Bausteine
 
-function GameTile({ active, onClick, title, logo, count, podiums, best, testId }) {
+function GameTile({ active, onClick, title, game, count, podiums, best, testId }) {
   return (
     <button type="button" onClick={onClick} data-testid={testId} className={`text-left border rounded-sm p-3 flex items-center gap-3 transition ${active ? "border-[#29B6E8] bg-[#29B6E8]/10" : "border-white/10 bg-[#111] hover:border-[#29B6E8]/40"}`}>
-      <span className="w-11 h-11 shrink-0 rounded-sm bg-black border border-white/10 overflow-hidden flex items-center justify-center">
-        {logo ? <img src={resolveMediaUrl(logo)} alt="" className="w-full h-full object-contain p-1" /> : <Trophy className="w-5 h-5 text-[#29B6E8]" />}
-      </span>
+      <GameMark game={game} className="w-11 h-11 border border-white/10" codeClass="text-xs" iconClass="w-5 h-5" padded />
       <span className="min-w-0">
         <span className="block font-heading font-black uppercase text-sm truncate">{title}</span>
         <span className="block text-[10px] uppercase tracking-widest font-bold text-white/45">
