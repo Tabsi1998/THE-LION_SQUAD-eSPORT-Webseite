@@ -30,6 +30,7 @@ from services.series_standings import ordered_rounds
 from services.reference_calendar import (
     ClockError, calendar_view, club_day_of, parse_round_lines, vienna_clock, vienna_start,
 )
+from services.reference_series_access import SeriesAccess, require_series_editor
 from services.visibility import user_can_see
 
 router = APIRouter(prefix="/api/reference-series", tags=["reference-series"])
@@ -217,12 +218,11 @@ async def _calendar(db, series_id: str) -> dict:
 
 # ---------------------------------------------------------------- Verwaltung
 @router.get("/admin/series/{series_id}/calendar")
-async def admin_calendar(series_id: str, me: dict = Depends(require_area("content"))):
+async def admin_calendar(series_id: str, access: SeriesAccess = Depends(require_series_editor)):
     """Kalender der Serie: Termine in Reihenfolge mit Status, Zähler je Status, Hinweise auf Lücken, archivierte
-    Termine extra."""
-    db = get_db()
-    await _series(db, series_id)
-    return await _calendar(db, series_id)
+    Termine extra. Lesen dürfen Vorstand und gültige Captains dieser Saison (#1749) - sie tragen zu diesen Terminen
+    Ergebnisse ein; ändern darf den Kalender nur der Vorstand (Bereich Redaktion)."""
+    return await _calendar(get_db(), series_id)
 
 
 @router.post("/admin/series/{series_id}/rounds")

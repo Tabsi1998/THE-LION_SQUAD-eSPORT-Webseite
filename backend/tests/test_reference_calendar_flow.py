@@ -425,3 +425,34 @@ async def test_the_order_is_only_set_by_ordering_never_by_create_or_edit(flow):
     edited = await flow.patch(f"{_rounds(series)}/{b['id']}", json={"order": 1})
     assert edited.status_code == 422
     assert (await flow.db.reference_rounds.find_one({"id": b["id"]}))["order"] == 2
+
+
+# ---------------------------------------------------------------- Captains (#1749)
+@pytest.mark.asyncio
+async def test_a_captain_reads_the_calendar_of_his_season_but_only_the_board_changes_it(flow):
+    from datetime import date, timedelta
+
+    from services.dolibarr_policy import club_today
+
+    _, lineage, series = await _setup(flow)
+    other = (await flow.post(f"{ADMIN}/series", json={"lineage_id": lineage["id"], "season": "2027"})).json()
+    created = (await flow.post(_rounds(series), json={"code": "R1", "day": "2026-11-12"})).json()
+    captain = await flow.add_user(name="captain-carla")
+    await flow.db.memberships.update_one({"user_id": captain["id"]},
+                                         {"$set": {"user_id": captain["id"], "member_status": "active"}}, upsert=True)
+    until = (date.fromisoformat(club_today()) + timedelta(days=30)).isoformat()
+    added = await flow.post(f"{ADMIN}/series/{series['id']}/staff", json={"user_id": captain["id"], "valid_until": until})
+    assert added.status_code == 200, added.text
+
+    flow.act_as(captain)
+    calendar = await flow.get(f"{ADMIN}/series/{series['id']}/calendar")
+    assert calendar.status_code == 200, calendar.text
+    assert [item["code"] for item in calendar.json()["rounds"]] == ["R1"]
+    assert (await flow.get(f"{ADMIN}/series/{other['id']}/calendar")).status_code == 403
+    writes = [
+        await flow.post(_rounds(series), json={"day": "2026-11-19"}),
+        await flow.patch(f"{_rounds(series)}/{created['id']}", json={"venue": "x"}),
+        await flow.post(f"{_rounds(series)}/{created['id']}/cancel", json={}),
+        await flow.post(f"{_rounds(series)}/paste", json={"text": "R2 19.11. Nord"}),
+    ]
+    assert [response.status_code for response in writes] == [403] * 4

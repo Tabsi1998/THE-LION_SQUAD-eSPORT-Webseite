@@ -157,3 +157,16 @@ test("Bearbeiten, Archivieren und Wiederansetzen senden den Stand; 409 beim Vers
   await waitFor(() => expect(apiMock.get.mock.calls.length).toBeGreaterThan(loads));
   expect(screen.getByTestId("postpone-sheet")).toBeInTheDocument();
 });
+
+test("ein Captain sieht den Kalender seiner Saison nur zum Lesen", async () => {
+  apiMock.get.mockResolvedValue({ data: CALENDAR });
+  render(<SeriesCalendarSection series={{ ...SERIES, access: { role: "captain", can_publish: false } }} onChanged={() => {}} />);
+  const items = await screen.findAllByTestId("calendar-round");
+  expect(items).toHaveLength(4);
+  expect(within(items[0]).getByTestId("round-state")).toHaveTextContent("Ergebnis fehlt");
+  expect(screen.getByTestId("calendar-hints")).toBeInTheDocument();
+  for (const id of ["calendar-new", "calendar-paste", "calendar-sort", "round-edit", "round-cancel", "round-postpone", "round-archive", "calendar-archived"]) {
+    expect(screen.queryByTestId(id)).toBeNull();
+  }
+  expect(screen.queryByRole("button", { name: /nach oben/ })).toBeNull();
+});

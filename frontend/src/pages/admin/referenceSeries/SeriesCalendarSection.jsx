@@ -30,6 +30,8 @@ export function SeriesCalendarSection({ series }) {
   const [busy, setBusy] = useState(false);
   const confirm = useConfirm();
   const lineage = series.lineage || {};
+  // Captains (#1749) lesen den Kalender ihrer Saison; ändern darf ihn nur der Vorstand.
+  const board = (series.access?.role || "board") === "board";
   const base = `/reference-series/admin/series/${series.id}/rounds`;
 
   const load = useCallback(async () => {
@@ -99,7 +101,7 @@ export function SeriesCalendarSection({ series }) {
             </div>
           )}
         </div>
-        <div className="flex items-center gap-2 flex-wrap">
+        {board && <div className="flex items-center gap-2 flex-wrap">
           {rounds.length > 1 && (
             <button type="button" onClick={() => run(() => api.post(`${base}/sort-by-date`, { expected_version: calendar?.version }), "Nach Datum geordnet.")} disabled={busy} data-testid="calendar-sort" className="tls-btn tls-btn--quiet px-3 py-2 rounded-sm text-xs font-bold uppercase tracking-wider inline-flex items-center gap-2">
               <ArrowDownUp className="w-3.5 h-3.5" /> Nach Datum ordnen
@@ -111,7 +113,7 @@ export function SeriesCalendarSection({ series }) {
           <button type="button" onClick={openNew} disabled={!calendar} data-testid="calendar-new" className="tls-btn tls-btn--secondary px-3 py-2 rounded-sm text-xs font-bold uppercase tracking-wider inline-flex items-center gap-2">
             <Plus className="w-3.5 h-3.5" /> Termin
           </button>
-        </div>
+        </div>}
       </div>
 
       {error && <p className="mt-3 text-sm text-red-300" role="alert">{error}</p>}
@@ -125,7 +127,7 @@ export function SeriesCalendarSection({ series }) {
 
       {calendar && rounds.length === 0 && (
         <p className="mt-3 text-sm text-white/55" data-testid="calendar-empty">
-          Noch keine Termine. Einzeln mit „Termin“ oder alle auf einmal mit „Liste einfügen“.
+          {board ? "Noch keine Termine. Einzeln mit „Termin“ oder alle auf einmal mit „Liste einfügen“." : "Noch keine Termine."}
         </p>
       )}
 
@@ -148,7 +150,7 @@ export function SeriesCalendarSection({ series }) {
                 </div>
               </div>
               <StateBadge state={round.state} />
-              <div className="flex items-center shrink-0">
+              {board && <div className="flex items-center shrink-0">
                 <button type="button" className={ICON_BUTTON} disabled={busy || index === 0} onClick={() => move(index, -1)} aria-label={`${roundLabel(round)} nach oben`} title="Nach oben"><ArrowUp className="w-3.5 h-3.5" /></button>
                 <button type="button" className={ICON_BUTTON} disabled={busy || index === rounds.length - 1} onClick={() => move(index, 1)} aria-label={`${roundLabel(round)} nach unten`} title="Nach unten"><ArrowDown className="w-3.5 h-3.5" /></button>
                 <button type="button" className={ICON_BUTTON} onClick={() => setSheet({ type: "round", round })} aria-label={`${roundLabel(round)} bearbeiten`} title="Bearbeiten" data-testid="round-edit"><Pencil className="w-3.5 h-3.5" /></button>
@@ -164,13 +166,13 @@ export function SeriesCalendarSection({ series }) {
                 {round.state !== "scored" && (
                   <button type="button" className={ICON_BUTTON} disabled={busy} onClick={() => archive(round)} aria-label={`${roundLabel(round)} archivieren`} title="Archivieren" data-testid="round-archive"><Archive className="w-3.5 h-3.5" /></button>
                 )}
-              </div>
+              </div>}
             </li>
           ))}
         </ol>
       )}
 
-      {archived.length > 0 && (
+      {board && archived.length > 0 && (
         <details className="mt-3 text-sm text-white/55" data-testid="calendar-archived">
           <summary className="cursor-pointer text-xs font-bold uppercase tracking-wider">Archiviert ({archived.length})</summary>
           <ul className="mt-2 space-y-1">

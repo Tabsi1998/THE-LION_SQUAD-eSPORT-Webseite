@@ -237,6 +237,8 @@ je Saison Captains eintragen, die nur für diese eine Saison Ergebnisse und Scor
 | Spur und Saison anlegen, bearbeiten, archivieren, Regeln ändern | ja | nein | nein |
 | Captains hinzufügen, Ablauf und Veröffentlichen-Recht ändern, entfernen | ja | nein | nein |
 | Saison in der Verwaltung öffnen | ja | ja | nein |
+| Kalender der Saison ansehen (#1742) | ja | ja, nur lesen | nein |
+| Termine anlegen, einfügen, verschieben, absagen, ordnen (#1742) | ja | nein | nein |
 | Ergebnisse eintragen (Entwurf) | ja | ja (Pakete #1742 ff.) | nein |
 | Ergebnisse veröffentlichen | ja | nur wenn die Saison auf „Captain veröffentlicht direkt“ steht oder der Captain das Recht „Darf veröffentlichen“ hat | nein |
 
