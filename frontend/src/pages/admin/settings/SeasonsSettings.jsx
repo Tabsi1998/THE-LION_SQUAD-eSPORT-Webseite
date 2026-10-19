@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
-import { CalendarDays, Eye, Sparkles } from "lucide-react";
+import { ArrowUpRight, CalendarDays, Eye, Sparkles } from "lucide-react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import { api, formatApiError } from "@/lib/api";
 import { useLiveRefresh } from "@/hooks/useLiveRefresh";
+import { useSeason } from "@/seasons/SeasonContext";
 import { SeasonsWeatherCard } from "./SeasonsWeatherCard";
 import { asInstant, viennaDate, viennaDateTime } from "@/lib/vienna";
 
@@ -45,6 +46,23 @@ export function runningSeasons(data) {
   return (data.seasons || []).filter((season) => season.active_now).map((season) => ({ key: season.key, effective: season.intensity || "normal" }));
 }
 
+const CALM = "darum siehst du die Vorschau ruhig: ohne Feuerwerk, Partikel und Bewegung.";
+
+/**
+ * Warum die Vorschau bei dir weniger zeigt als bei anderen (#1838): Countdown und Gruß kommen immer, Feuerwerk,
+ * Partikel und Bewegung nur ohne „Bewegung reduzieren“, ohne eigene Wahl „dezent“ und ohne Stärke „dezent“. Ohne den
+ * Kanal Website oder mit eigener Wahl „aus“ zeigt die Vorschau auf der Website gar nichts. Leer = alles zu sehen.
+ */
+export function previewLimits({ season, preference, reducedMotion }) {
+  if (!(season.channels || []).includes("web")) return ["„Website“ ist nicht angehakt – auf der Website zeigt die Vorschau nichts."];
+  if (preference === "off") return ["Deine eigene Saison-Deko steht auf „aus“ (Profil → Darstellung) – darum zeigt dir die Vorschau nichts."];
+  const out = [];
+  if (reducedMotion) out.push(`Dein Gerät wünscht weniger Bewegung („Bewegung reduzieren“) – ${CALM}`);
+  if (preference === "subtle") out.push(`Deine eigene Saison-Deko steht auf „dezent“ (Profil → Darstellung) – ${CALM}`);
+  if (season.intensity === "subtle") out.push("Stärke „dezent“: die Saison läuft für alle ruhig – ohne Feuerwerk, Partikel und Bewegung.");
+  return out;
+}
+
 // Für das Eingabefeld: in der Zeit des Geräts - so zeigt der Browser das Feld.
 export function toLocalInput(value) {
   if (!value) return "";
@@ -84,7 +102,9 @@ function ManagedSeasonCard({ season }) {
   );
 }
 
-function SeasonCard({ season, busy, onSave, onPreview }) {
+function SeasonCard({ season, busy, onSave, onPreview, previewRunning = false }) {
+  const { preference, reducedMotion } = useSeason();
+  const limits = previewLimits({ season, preference, reducedMotion });
   const [texts, setTexts] = useState(null);
   const [previewAt, setPreviewAt] = useState("");
   const draft = texts ?? season.texts;
@@ -163,6 +183,13 @@ function SeasonCard({ season, busy, onSave, onPreview }) {
           </label>
         )}
         <span className="text-[11px] text-white/40">Nur du siehst sie – sofort, in diesem Tab.</span>
+        {previewRunning && (
+          // Im selben Tab (#1838): das Token liegt nur in dieser Sitzung - ein neuer Tab kennt es nicht. Auf der Website
+          // steht auch, was die Verwaltung nicht hat (Logo, Kopfzeile, Fußzeile).
+          <Link to="/" data-testid={`season-${season.key}-preview-site`} className="inline-flex items-center gap-1 text-[11px] font-bold text-[#29B6E8] hover:underline">
+            Auf der Website ansehen <ArrowUpRight className="w-3 h-3" />
+          </Link>
+        )}
         {season.key === "advent_calendar" && (
           <Link to="/admin/advent" data-testid="season-advent_calendar-doors" className="ml-auto px-3 py-1.5 border border-[#e9c46a]/50 text-[#e9c46a] text-[10px] font-bold uppercase tracking-wider rounded-sm hover:bg-[#e9c46a]/10">Türchen pflegen</Link>
         )}
@@ -171,6 +198,11 @@ function SeasonCard({ season, busy, onSave, onPreview }) {
           <Link to="/admin/ostern" data-testid="season-easter_hunt-eggs" className="ml-auto px-3 py-1.5 border border-[#9be15d]/50 text-[#9be15d] text-[10px] font-bold uppercase tracking-wider rounded-sm hover:bg-[#9be15d]/10">Ostereier verstecken</Link>
         )}
       </div>
+      {limits.length > 0 && (
+        <ul className="text-[11px] text-[#FFC857]/85 space-y-0.5" data-testid={`season-${season.key}-preview-limits`}>
+          {limits.map((line) => <li key={line}>{line}</li>)}
+        </ul>
+      )}
     </div>
   );
 }
@@ -181,6 +213,13 @@ export function SeasonsSettings() {
   const [busy, setBusy] = useState(false);
   const [calendarYear, setCalendarYear] = useState(null);
   const [calendar, setCalendar] = useState(null);
+  // Welche Vorschau gerade läuft (Saison und Ende) - für den Weg auf die Website an ihrer Karte.
+  const [running, setRunning] = useState(null);
+  useEffect(() => {
+    if (!running) return undefined;
+    const timer = window.setTimeout(() => setRunning(null), Math.max(0, running.until - Date.now()));
+    return () => window.clearTimeout(timer);
+  }, [running]);
 
   const load = useCallback(async () => {
     try {
@@ -214,6 +253,7 @@ export function SeasonsSettings() {
     try {
       const { data: result } = await api.post(`/settings/seasons/${key}/preview`, at ? { at } : {});
       rememberPreview(result.token, result.seconds || 60);
+      setRunning({ key, until: Date.now() + (result.seconds || 60) * 1000 });
       toast.success(`Vorschau läuft ${result.seconds || 60} Sekunden – hier und auf jeder Seite in diesem Tab.`);
     } catch (err) {
       toast.error(formatApiError(err.response?.data?.detail));
@@ -279,7 +319,7 @@ export function SeasonsSettings() {
         {data.seasons.filter((season) => !season.always).map((season) => (
           MANAGED_ELSEWHERE[season.key]
             ? <ManagedSeasonCard key={season.key} season={season} />
-            : <SeasonCard key={season.key} season={season} busy={busy} onSave={(patch, message, after) => save({ seasons: { [season.key]: patch } }, message, after)} onPreview={(at) => preview(season.key, at)} />
+            : <SeasonCard key={season.key} season={season} busy={busy} onSave={(patch, message, after) => save({ seasons: { [season.key]: patch } }, message, after)} onPreview={(at) => preview(season.key, at)} previewRunning={running?.key === season.key} />
         ))}
       </div>
       <div className="border border-white/10 bg-[#121212] rounded-sm p-5 space-y-3" data-testid="seasons-calendar">
