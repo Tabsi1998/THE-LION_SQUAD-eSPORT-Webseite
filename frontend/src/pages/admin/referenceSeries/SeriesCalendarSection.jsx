@@ -70,11 +70,11 @@ export function SeriesCalendarSection({ series }) {
 
   const cancel = async (round) => {
     if (!await confirm({ title: `${roundLabel(round)} absagen?`, description: "Ein abgesagter Termin zählt nicht als „Ergebnis fehlt“ und nicht zur Rundenzahl. „Wieder ansetzen“ nimmt es zurück.", confirmLabel: "Absagen" })) return;
-    run(() => api.post(`${base}/${round.id}/cancel`, {}), "Termin abgesagt.");
+    run(() => api.post(`${base}/${round.id}/cancel`, { expected_version: calendar?.version }), "Termin abgesagt.");
   };
   const archive = async (round) => {
     if (!await confirm({ title: `${roundLabel(round)} archivieren?`, description: "Der Termin verschwindet aus dem Kalender. Gelöscht wird nichts – unter „Archiviert“ lässt er sich zurückholen.", confirmLabel: "Archivieren" })) return;
-    run(() => api.post(`${base}/${round.id}/archive`), "Termin archiviert.");
+    run(() => api.post(`${base}/${round.id}/archive`, { expected_version: calendar?.version }), "Termin archiviert.");
   };
   const move = (index, step) => {
     const ids = moveIds(rounds, index, step);
@@ -159,7 +159,7 @@ export function SeriesCalendarSection({ series }) {
                   </>
                 )}
                 {round.status === "cancelled" && (
-                  <button type="button" className={ICON_BUTTON} disabled={busy} onClick={() => run(() => api.post(`${base}/${round.id}/reinstate`), "Termin wieder angesetzt.")} aria-label={`${roundLabel(round)} wieder ansetzen`} title="Wieder ansetzen" data-testid="round-reinstate"><RotateCcw className="w-3.5 h-3.5" /></button>
+                  <button type="button" className={ICON_BUTTON} disabled={busy} onClick={() => run(() => api.post(`${base}/${round.id}/reinstate`, { expected_version: calendar?.version }), "Termin wieder angesetzt.")} aria-label={`${roundLabel(round)} wieder ansetzen`} title="Wieder ansetzen" data-testid="round-reinstate"><RotateCcw className="w-3.5 h-3.5" /></button>
                 )}
                 {round.state !== "scored" && (
                   <button type="button" className={ICON_BUTTON} disabled={busy} onClick={() => archive(round)} aria-label={`${roundLabel(round)} archivieren`} title="Archivieren" data-testid="round-archive"><Archive className="w-3.5 h-3.5" /></button>
@@ -177,7 +177,7 @@ export function SeriesCalendarSection({ series }) {
             {archived.map((round) => (
               <li key={round.id} className="flex items-center gap-3">
                 <span className="flex-1 min-w-0">{(round.code || "Termin")} · {roundWhen(round)}{round.venue ? ` · ${round.venue}` : ""}</span>
-                <button type="button" disabled={busy} onClick={() => run(() => api.post(`${base}/${round.id}/restore`), "Termin zurückgeholt.")} className="tls-btn tls-btn--quiet px-3 py-1.5 rounded-sm text-[11px] font-bold uppercase tracking-wider inline-flex items-center gap-1.5">
+                <button type="button" disabled={busy} onClick={() => run(() => api.post(`${base}/${round.id}/restore`, { expected_version: calendar?.version }), "Termin zurückgeholt.")} className="tls-btn tls-btn--quiet px-3 py-1.5 rounded-sm text-[11px] font-bold uppercase tracking-wider inline-flex items-center gap-1.5">
                   <ArchiveRestore className="w-3.5 h-3.5" /> Zurückholen
                 </button>
               </li>
@@ -187,7 +187,7 @@ export function SeriesCalendarSection({ series }) {
       )}
 
       {sheet?.type === "round" && <RoundSheet series={series} lineage={lineage} round={sheet.round} suggestion={sheet.suggestion} version={calendar?.version} onClose={() => setSheet(null)} onSaved={saved} onStale={load} />}
-      {sheet?.type === "postpone" && <PostponeSheet series={series} round={sheet.round} onClose={() => setSheet(null)} onSaved={saved} />}
+      {sheet?.type === "postpone" && <PostponeSheet series={series} round={sheet.round} version={calendar?.version} onClose={() => setSheet(null)} onSaved={saved} onStale={load} />}
       {sheet?.type === "paste" && <PasteSheet series={series} lineage={lineage} version={calendar?.version} onClose={() => setSheet(null)} onSaved={saved} onStale={load} />}
     </section>
   );

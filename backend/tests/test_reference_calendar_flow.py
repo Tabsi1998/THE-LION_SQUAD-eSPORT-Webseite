@@ -381,3 +381,35 @@ async def test_every_calendar_change_is_in_the_audit_log_with_before_and_after(f
     pasted = logs["reference_round.paste"][0]["data"]
     stored = await flow.db.reference_rounds.find_one({"code": "R3"})
     assert (pasted["count"], pasted["round_ids"], pasted["codes"]) == (1, [stored["id"]], ["R3"])
+
+
+@pytest.mark.asyncio
+async def test_a_stale_calendar_is_refused_for_every_change_of_a_round(flow):
+    _, _, series = await _setup(flow)
+    a = (await flow.post(_rounds(series), json={"code": "A", "day": "2026-11-19"})).json()
+    b = (await flow.post(_rounds(series), json={"code": "B", "day": "2026-11-26"})).json()
+    await flow.post(f"{_rounds(series)}/{b['id']}/cancel", json={})
+    seen = (await _calendar(flow, series))["version"]
+    await flow.patch(f"{_rounds(series)}/{a['id']}", json={"venue": "Nord"})  # jemand anderes
+    stale = {"expected_version": seen}
+    responses = [
+        await flow.patch(f"{_rounds(series)}/{a['id']}", json={"venue": "Süd", **stale}),
+        await flow.post(f"{_rounds(series)}/{a['id']}/postpone", json={"day": "2026-11-21", **stale}),
+        await flow.post(f"{_rounds(series)}/{a['id']}/cancel", json=stale),
+        await flow.post(f"{_rounds(series)}/{b['id']}/reinstate", json=stale),
+        await flow.post(f"{_rounds(series)}/{a['id']}/archive", json=stale),
+    ]
+    assert [response.status_code for response in responses] == [409] * 5
+    stored = await flow.db.reference_rounds.find_one({"id": a["id"]})
+    assert (stored["venue"], stored["status"], stored["archived_at"]) == ("Nord", "planned", None)
+    assert (await flow.db.reference_rounds.find_one({"id": b["id"]}))["status"] == "cancelled"
+
+    fresh = (await _calendar(flow, series))["version"]
+    archived = await flow.post(f"{_rounds(series)}/{a['id']}/archive", json={"expected_version": fresh})
+    assert archived.status_code == 200
+    stale_restore = await flow.post(f"{_rounds(series)}/{a['id']}/restore", json={"expected_version": fresh})
+    assert stale_restore.status_code == 409
+    restored = await flow.post(f"{_rounds(series)}/{a['id']}/restore", json={"expected_version": fresh + 1})
+    assert restored.status_code == 200
+    edited = await flow.patch(f"{_rounds(series)}/{a['id']}", json={"venue": "Süd", "expected_version": fresh + 2})
+    assert edited.status_code == 200 and edited.json()["venue"] == "Süd"

@@ -73,18 +73,22 @@ class RoundCreateBody(_DayTime, _Versioned, ReferenceRoundCreate):
     time: Optional[str] = None
 
 
-class RoundUpdateBody(_DayTime, ReferenceRoundUpdate):
+class RoundUpdateBody(_DayTime, _Versioned, ReferenceRoundUpdate):
     day: Optional[str] = None
     time: Optional[str] = None
 
 
-class RoundPostponeBody(_DayTime):
+class RoundPostponeBody(_DayTime, _Versioned):
     day: str
     time: Optional[str] = None
     note: Optional[str] = Field(default=None, max_length=300)
 
 
-class RoundCancelBody(BaseModel):
+class RoundActionBody(_Versioned):
+    """Wiederansetzen, Archivieren, Zurückholen: nur der Stand des Kalenders."""
+
+
+class RoundCancelBody(_Versioned):
     note: Optional[str] = Field(default=None, max_length=300)
 
 
@@ -260,7 +264,7 @@ async def update_round(series_id: str, round_id: str, body: RoundUpdateBody,
         updates.update(_when(day, clock))
     elif "starts_at" in raw:
         updates.update(_when_from_instant(raw["starts_at"]))
-    await _claim(db, series_id)
+    await _claim(db, series_id, body.expected_version)
     await db.reference_rounds.update_one({"id": round_id}, {"$set": {**updates, **_stamp(me)}})
     await _log(db, "reference_round.update", me, series_id, {
         "round_id": round_id, "before": {key: existing.get(key) for key in updates}, "after": updates})
@@ -288,7 +292,7 @@ async def postpone_round(series_id: str, round_id: str, body: RoundPostponeBody,
         "original_club_day": existing.get("original_club_day") if keep else existing.get("club_day"),
         "status_note": _text(body.note),
     }
-    await _claim(db, series_id)
+    await _claim(db, series_id, body.expected_version)
     await db.reference_rounds.update_one({"id": round_id}, {"$set": {**updates, **_stamp(me)}})
     await _log(db, "reference_round.postpone", me, series_id, {
         "round_id": round_id, "from": existing.get("club_day"), "to": body.day, "note": updates["status_note"]})
@@ -306,7 +310,7 @@ async def cancel_round(series_id: str, round_id: str, body: RoundCancelBody,
     if existing.get("status") == "scored":
         raise HTTPException(409, "Der Termin ist schon gewertet.")
     if existing.get("status") != "cancelled":
-        await _claim(db, series_id)
+        await _claim(db, series_id, body.expected_version)
         await db.reference_rounds.update_one({"id": round_id}, {"$set": {
             "status": "cancelled", "cancelled_from": existing.get("status") or "planned",
             "status_note": _text(body.note), **_stamp(me)}})
@@ -316,13 +320,14 @@ async def cancel_round(series_id: str, round_id: str, body: RoundCancelBody,
 
 
 @router.post("/admin/series/{series_id}/rounds/{round_id}/reinstate")
-async def reinstate_round(series_id: str, round_id: str, me: dict = Depends(require_area("content"))):
+async def reinstate_round(series_id: str, round_id: str, body: Optional[RoundActionBody] = None,
+                          me: dict = Depends(require_area("content"))):
     """Absage zurücknehmen: der Status davor (geplant oder verschoben) gilt wieder."""
     db = get_db()
     await _series(db, series_id)
     existing = await _round(db, series_id, round_id)
     if existing.get("status") == "cancelled":
-        await _claim(db, series_id)
+        await _claim(db, series_id, body.expected_version if body else None)
         await db.reference_rounds.update_one({"id": round_id}, {"$set": {
             "status": existing.get("cancelled_from") or "planned", "cancelled_from": None, "status_note": None,
             **_stamp(me)}})
@@ -331,13 +336,14 @@ async def reinstate_round(series_id: str, round_id: str, me: dict = Depends(requ
     return await _round(db, series_id, round_id)
 
 
-async def _set_archived(series_id: str, round_id: str, archived: bool, me: dict) -> dict:
+async def _set_archived(series_id: str, round_id: str, archived: bool, me: dict,
+                        body: Optional[RoundActionBody]) -> dict:
     db = get_db()
     await _series(db, series_id)
     existing = await _round(db, series_id, round_id)
     if archived and existing.get("status") == "scored":
         raise HTTPException(409, "Der Termin ist schon gewertet.")
-    await _claim(db, series_id)
+    await _claim(db, series_id, body.expected_version if body else None)
     await db.reference_rounds.update_one({"id": round_id}, {"$set": {
         "archived_at": now_utc().isoformat() if archived else None, **_stamp(me)}})
     await _log(db, "reference_round.archive" if archived else "reference_round.restore", me, series_id,
@@ -347,13 +353,15 @@ async def _set_archived(series_id: str, round_id: str, archived: bool, me: dict)
 
 
 @router.post("/admin/series/{series_id}/rounds/{round_id}/archive")
-async def archive_round(series_id: str, round_id: str, me: dict = Depends(require_area("content"))):
-    return await _set_archived(series_id, round_id, True, me)
+async def archive_round(series_id: str, round_id: str, body: Optional[RoundActionBody] = None,
+                        me: dict = Depends(require_area("content"))):
+    return await _set_archived(series_id, round_id, True, me, body)
 
 
 @router.post("/admin/series/{series_id}/rounds/{round_id}/restore")
-async def restore_round(series_id: str, round_id: str, me: dict = Depends(require_area("content"))):
-    return await _set_archived(series_id, round_id, False, me)
+async def restore_round(series_id: str, round_id: str, body: Optional[RoundActionBody] = None,
+                        me: dict = Depends(require_area("content"))):
+    return await _set_archived(series_id, round_id, False, me, body)
 
 
 async def _write_order(db, series_id: str, ids: list[str], me: dict) -> None:

@@ -23,9 +23,9 @@ export function RoundSheet({ series, lineage, round, suggestion, version, onClos
     setSaving(true);
     try {
       const payload = roundPayload(form);
-      // Neu: mit dem Stand des Kalenders, den die Seite kennt - war jemand schneller, kommt 409.
+      // Mit dem Stand des Kalenders, den die Seite kennt - war jemand schneller, kommt 409.
       if (isNew) await api.post(base(series), { ...payload, expected_version: version });
-      else await api.patch(`${base(series)}/${round.id}`, payload);
+      else await api.patch(`${base(series)}/${round.id}`, { ...payload, expected_version: version });
       toast.success("Gespeichert.");
       onSaved();
     } catch (err) {
@@ -54,7 +54,7 @@ export function RoundSheet({ series, lineage, round, suggestion, version, onClos
   );
 }
 
-export function PostponeSheet({ series, round, onClose, onSaved }) {
+export function PostponeSheet({ series, round, version, onClose, onSaved, onStale }) {
   const [day, setDay] = useState(round.club_day || "");
   const [time, setTime] = useState(round.time || series.default_time || "");
   const [note, setNote] = useState("");
@@ -65,11 +65,12 @@ export function PostponeSheet({ series, round, onClose, onSaved }) {
     event.preventDefault();
     setSaving(true);
     try {
-      await api.post(`${base(series)}/${round.id}/postpone`, { day, time: time || null, note: note.trim() || null });
+      await api.post(`${base(series)}/${round.id}/postpone`, { day, time: time || null, note: note.trim() || null, expected_version: version });
       toast.success("Termin verschoben.");
       onSaved();
     } catch (err) {
       toast.error(formatApiError(err.response?.data?.detail));
+      if (err.response?.status === 409) onStale?.();
     } finally {
       setSaving(false);
     }
