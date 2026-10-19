@@ -22,7 +22,7 @@ from models import (
     now_utc, new_id,
 )
 from services.rate_limit import enforce_rate_limit, get_client_ip, keyed_subject, release_rate_limit
-from services.auth_settings import load_auth_settings
+from services.auth_settings import effective_ip_limits, load_auth_settings
 from services.google_identity import GoogleIdentityError, verify_google_credential
 from services.secret_store import decrypt_secret, encrypt_secret
 from services.totp import generate_recovery_codes, generate_totp_secret, matching_totp_counter, provisioning_uri
@@ -34,7 +34,10 @@ router = APIRouter(prefix="/api/auth", tags=["auth"])
 logger = logging.getLogger("tls.auth")
 
 BRUTE_FORCE_MAX = 7
-LOGIN_PER_IP_PER_MINUTE = 30
+LOGIN_PER_IP_PER_MINUTE = 30  # Vorgabe; eingestellt wird unter Verwaltung -> System -> Zugang (#1802)
+# Für alle hinter einem gemeinsamen Anschluss (Hallen-WLAN): nicht „falsches Passwort“, sondern kurz warten.
+LOGIN_IP_LIMIT_MESSAGE = "Zu viele Anmeldungen aus diesem Netz. Bitte versuche es in {wait} erneut."
+REGISTER_IP_LIMIT_MESSAGE = "Zu viele Registrierungen aus diesem Netz. Bitte versuche es in {wait} erneut."
 BRUTE_FORCE_WINDOW_MIN = 15
 REFRESH_REPLAY_GRACE_SECONDS = 10
 # Dasselbe Gerät der App (Kennung in `X-Device-Id`, #942) darf eine gerade gedrehte Erneuerung länger wiederholen:
@@ -91,6 +94,19 @@ class MfaCancelBody(BaseModel):
 class ConsentBody(BaseModel):
     accept_privacy: bool = False
     accept_terms: bool = False
+
+
+async def _enforce_login_ip_limit(request: Request, settings: dict) -> None:
+    """Grenze je Adresse für Web und App (#1510, #1802) - Wert aus der Verwaltung, im Event-Zeitraum der Event-Wert."""
+    limit = effective_ip_limits(settings)["login_per_minute"]
+    await enforce_rate_limit(request, "auth:login:ip", limit=limit, window_seconds=60, message=LOGIN_IP_LIMIT_MESSAGE)
+
+
+async def _enforce_register_ip_limit(request: Request, settings: dict) -> None:
+    limit = effective_ip_limits(settings)["register_per_hour"]
+    await enforce_rate_limit(
+        request, "auth:register:ip", limit=limit, window_seconds=3600, message=REGISTER_IP_LIMIT_MESSAGE,
+    )
 
 
 async def _check_brute_force(db, identifier: str):
@@ -642,9 +658,10 @@ async def _revoke_refresh(db, token: str):
 
 @router.post("/register")
 async def register(body: UserRegister, request: Request, response: Response):
-    await enforce_rate_limit(request, "auth:register:ip", limit=5, window_seconds=3600)
     db = get_db()
-    if not (await load_auth_settings(db))["registration_enabled"]:
+    auth_settings = await load_auth_settings(db)
+    await _enforce_register_ip_limit(request, auth_settings)
+    if not auth_settings["registration_enabled"]:
         raise HTTPException(status_code=403, detail="Die Registrierung ist derzeit deaktiviert.")
     if not body.accept_privacy or not body.accept_terms:
         raise HTTPException(status_code=400, detail="Datenschutz und Nutzungsbedingungen müssen akzeptiert werden.")
@@ -713,11 +730,12 @@ async def register(body: UserRegister, request: Request, response: Response):
 @router.post("/login")
 async def login(body: UserLogin, request: Request, response: Response):
     db = get_db()
-    if not (await load_auth_settings(db))["password_login_enabled"]:
+    auth_settings = await load_auth_settings(db)
+    if not auth_settings["password_login_enabled"]:
         raise HTTPException(status_code=403, detail="Die Anmeldung mit E-Mail und Passwort ist derzeit deaktiviert.")
     # Je Adresse (#1510): bremst, bevor ein Passwort geprüft wird - auch über viele verschiedene E-Mails hinweg.
-    # Großzügig genug für viele Geräte hinter einem Anschluss (Vereinsabend, LAN).
-    await enforce_rate_limit(request, "auth:login:ip", limit=LOGIN_PER_IP_PER_MINUTE, window_seconds=60)
+    # Viele Geräte hinter einem Anschluss (Vereinsabend, Hallen-WLAN): Wert in der Verwaltung einstellbar (#1802).
+    await _enforce_login_ip_limit(request, auth_settings)
     email = body.email.lower().strip()
     identifier = _client_identifier(request, email)
     await _check_brute_force(db, identifier)
@@ -937,9 +955,10 @@ async def google_unlink(user: dict = Depends(get_current_user)):
 
 @router.post("/mobile/register")
 async def mobile_register(body: UserRegister, request: Request):
-    await enforce_rate_limit(request, "auth:register:ip", limit=5, window_seconds=3600)
     db = get_db()
-    if not (await load_auth_settings(db))["registration_enabled"]:
+    auth_settings = await load_auth_settings(db)
+    await _enforce_register_ip_limit(request, auth_settings)
+    if not auth_settings["registration_enabled"]:
         raise HTTPException(status_code=403, detail="Die Registrierung ist derzeit deaktiviert.")
     if not body.accept_privacy or not body.accept_terms:
         raise HTTPException(status_code=400, detail="Datenschutz und Nutzungsbedingungen müssen akzeptiert werden.")
@@ -1002,11 +1021,12 @@ async def mobile_register(body: UserRegister, request: Request):
 @router.post("/mobile/login")
 async def mobile_login(body: UserLogin, request: Request):
     db = get_db()
-    if not (await load_auth_settings(db))["password_login_enabled"]:
+    auth_settings = await load_auth_settings(db)
+    if not auth_settings["password_login_enabled"]:
         raise HTTPException(status_code=403, detail="Die Anmeldung mit E-Mail und Passwort ist derzeit deaktiviert.")
     # Je Adresse (#1510): bremst, bevor ein Passwort geprüft wird - auch über viele verschiedene E-Mails hinweg.
-    # Großzügig genug für viele Geräte hinter einem Anschluss (Vereinsabend, LAN).
-    await enforce_rate_limit(request, "auth:login:ip", limit=LOGIN_PER_IP_PER_MINUTE, window_seconds=60)
+    # Viele Geräte hinter einem Anschluss (Vereinsabend, Hallen-WLAN): Wert in der Verwaltung einstellbar (#1802).
+    await _enforce_login_ip_limit(request, auth_settings)
     email = body.email.lower().strip()
     identifier = _client_identifier(request, email)
     await _check_brute_force(db, identifier)

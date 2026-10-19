@@ -42,10 +42,12 @@ async def enforce_rate_limit(
     limit: int,
     window_seconds: int,
     subject: str | None = None,
+    message: str | None = None,
 ) -> str:
     """Raise 429 if the bucket+subject exceeds limit inside the time window.
 
     Returns the counter document id; ``release_rate_limit`` hands the counted request back (e.g. a successful try).
+    ``message`` ersetzt den allgemeinen Hinweis; ``{wait}`` darin wird durch die Wartezeit ersetzt (#1802).
     """
     db = get_db()
     identity = subject or get_client_ip(request)
@@ -76,7 +78,7 @@ async def enforce_rate_limit(
         retry_after = max(1, int((window_start + timedelta(seconds=window_seconds) - now).total_seconds()))
         raise HTTPException(
             status_code=429,
-            detail=f"Zu viele Anfragen. Bitte warte noch {_format_wait(retry_after)}.",
+            detail=(message or "Zu viele Anfragen. Bitte warte noch {wait}.").replace("{wait}", _format_wait(retry_after)),
             headers={"Retry-After": str(retry_after)},
         )
     return document_id
