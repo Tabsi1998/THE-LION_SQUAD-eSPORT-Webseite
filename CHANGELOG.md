@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.2.2 (19.10.2026)
+
+### Dokumentation
+
+* App gegen den Abnahme-Server im Android-Emulator (#1686)
+* App-Bilder in der Helfer-Anleitung, mit Hinweis wo die App etwas noch nicht kann (#1686)
+* Drehbuch für den Probelauf des Event-Abends (#1635)
+* Handbuch Turniere nennt den Knopf „Austritt eintragen“ (#1635)
+
 ## 1.2.1 (19.10.2026)
 
 ### Dokumentation
