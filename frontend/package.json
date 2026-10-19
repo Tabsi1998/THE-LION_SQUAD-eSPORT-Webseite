@@ -78,8 +78,8 @@
     "zod": "^3.24.4"
   },
   "resolutions": {
-    "@tiptap/extension-bubble-menu": "3.31.4",
-    "@tiptap/extension-floating-menu": "3.31.4",
+    "@tiptap/extension-bubble-menu": "3.32.0",
+    "@tiptap/extension-floating-menu": "3.32.0",
     "postcss-selector-parser": "7.1.6"
   },
   "scripts": {
