@@ -1,6 +1,6 @@
 import { act, render } from "@testing-library/react";
 import { emitApiInvalidation, setStreamConnected } from "@/lib/apiInvalidation";
-import { useLiveRefresh } from "./useLiveRefresh";
+import { LIVE_REFRESH_STUCK_MS, useLiveRefresh } from "./useLiveRefresh";
 
 // Der Ersatz für 25 setInterval-Aufrufe im Web (#221): Solange der
 // Änderungsstrom steht, lädt eine Ansicht nur bei passender Änderung; fällt
@@ -114,4 +114,106 @@ test("ein versteckter Tab fragt im Takt nicht nach", () => {
   });
   expect(load).toHaveBeenCalledTimes(1);
   hidden.mockRestore();
+});
+
+// Lasttest (#1683): Bei vielen Zuschauern und langsamem Server startete jede Meldung eine neue Abfrage, während die
+// alten noch liefen - die Abfragen stapelten sich. Jetzt läuft je Ansicht höchstens eine, danach genau eine nach.
+function slowLoad() {
+  const finishers = [];
+  const load = vi.fn(() => new Promise((resolve) => finishers.push(resolve)));
+  return { load, finish: () => finishers.shift()?.() };
+}
+
+const change = () => emitApiInvalidation({ resource: "tournaments", path: "/api/tournaments/t-1" });
+
+test("während eine Abfrage läuft, startet keine zweite - danach genau eine", async () => {
+  const { load, finish } = slowLoad();
+  act(() => setStreamConnected(true));
+  render(<View load={load} resources={["tournaments"]} />);
+
+  act(() => {
+    change();
+    vi.advanceTimersByTime(200);
+  });
+  expect(load).toHaveBeenCalledTimes(1);
+
+  act(() => {
+    change();
+    vi.advanceTimersByTime(200);
+    change();
+    vi.advanceTimersByTime(200);
+  });
+  expect(load).toHaveBeenCalledTimes(1);
+
+  await act(async () => finish());
+  expect(load).toHaveBeenCalledTimes(2);
+
+  // Ohne neue Meldung bleibt es dabei.
+  await act(async () => finish());
+  act(() => {
+    vi.advanceTimersByTime(1000);
+  });
+  expect(load).toHaveBeenCalledTimes(2);
+});
+
+test("auch die Abfrage im Takt wartet auf die laufende", async () => {
+  const { load, finish } = slowLoad();
+  render(<View load={load} resources={["tournaments"]} options={{ fallbackMs: 1000 }} />);
+
+  act(() => {
+    vi.advanceTimersByTime(3100);
+  });
+  expect(load).toHaveBeenCalledTimes(1);
+
+  await act(async () => finish());
+  expect(load).toHaveBeenCalledTimes(2);
+});
+
+test("eine hängende Abfrage blockiert nicht: nach 30 s darf eine neue starten", () => {
+  const { load } = slowLoad();
+  act(() => setStreamConnected(true));
+  render(<View load={load} resources={["tournaments"]} />);
+
+  act(() => {
+    change();
+    vi.advanceTimersByTime(200);
+  });
+  expect(load).toHaveBeenCalledTimes(1);
+
+  act(() => {
+    vi.advanceTimersByTime(LIVE_REFRESH_STUCK_MS);
+    change();
+    vi.advanceTimersByTime(200);
+  });
+  expect(load).toHaveBeenCalledTimes(2);
+});
+
+test("overlap: Abfragen dürfen sich überlappen (TV-Baum ordnet Antworten selbst)", () => {
+  const { load } = slowLoad();
+  act(() => setStreamConnected(true));
+  render(<View load={load} resources={["tournaments"]} options={{ overlap: true }} />);
+
+  act(() => {
+    change();
+    vi.advanceTimersByTime(200);
+    change();
+    vi.advanceTimersByTime(200);
+  });
+  expect(load).toHaveBeenCalledTimes(2);
+});
+
+test("nach dem Verlassen der Ansicht lädt die laufende Abfrage nichts mehr nach", async () => {
+  const { load, finish } = slowLoad();
+  act(() => setStreamConnected(true));
+  const view = render(<View load={load} resources={["tournaments"]} />);
+
+  act(() => {
+    change();
+    vi.advanceTimersByTime(200);
+    change();
+    vi.advanceTimersByTime(200);
+  });
+  view.unmount();
+  await act(async () => finish());
+  expect(load).toHaveBeenCalledTimes(1);
 });
