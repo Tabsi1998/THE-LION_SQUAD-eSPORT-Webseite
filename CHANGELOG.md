@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.2.1 (19.10.2026)
+
+### Dokumentation
+
+* Kurzanleitung für Helfer am Turniertag mit Bildern zu jedem Schritt, PC und Handy (#1686)
+
 ## 1.2.0 (19.10.2026)
 
 ### Neu
