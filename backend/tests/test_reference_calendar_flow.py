@@ -344,3 +344,40 @@ async def test_two_editors_at_the_same_time_one_wins_and_new_rounds_never_share_
     assert [response.status_code for response in created] == [200, 200]
     orders = [row["order"] async for row in flow.db.reference_rounds.find({}, {"order": 1})]
     assert len(orders) == len(set(orders)) == 4
+
+
+# ---------------------------------------------------------------- Protokoll
+@pytest.mark.asyncio
+async def test_every_calendar_change_is_in_the_audit_log_with_before_and_after(flow):
+    admin, _, series = await _setup(flow)
+    a = (await flow.post(_rounds(series), json={"code": "A", "venue": "Nord", "day": "2026-11-19"})).json()
+    b = (await flow.post(_rounds(series), json={"code": "B", "day": "2026-11-12"})).json()
+    await flow.patch(f"{_rounds(series)}/{a['id']}", json={"venue": "Süd", "time": "19:00"})
+    await flow.post(f"{_rounds(series)}/order", json={"ids": [b["id"], a["id"]]})
+    await flow.post(f"{_rounds(series)}/order", json={"ids": [a["id"], b["id"]]})
+    await flow.post(f"{_rounds(series)}/sort-by-date")
+    await flow.post(f"{_rounds(series)}/paste", json={"text": "R3 26.11. West", "apply": True})
+
+    logs = {}
+    async for log in flow.db.audit_logs.find({"target_id": series["id"]}).sort("created_at", 1):
+        logs.setdefault(log["action"], []).append(log)
+    assert all(log["actor_id"] == admin["id"] for entries in logs.values() for log in entries)
+
+    created = logs["reference_round.create"][0]["data"]
+    assert created["round_id"] == a["id"]
+    assert created["after"] == {"code": "A", "venue": "Nord", "club_day": "2026-11-19",
+                                "starts_at": "2026-11-19T19:30:00+00:00", "order": 1}
+
+    updated = logs["reference_round.update"][0]["data"]
+    assert updated["round_id"] == a["id"]
+    assert updated["before"] == {"venue": "Nord", "club_day": "2026-11-19", "starts_at": "2026-11-19T19:30:00+00:00"}
+    assert updated["after"] == {"venue": "Süd", "club_day": "2026-11-19", "starts_at": "2026-11-19T18:00:00+00:00"}
+
+    assert [(entry["data"]["before"], entry["data"]["after"]) for entry in logs["reference_round.order"]] == [
+        ([a["id"], b["id"]], [b["id"], a["id"]]), ([b["id"], a["id"]], [a["id"], b["id"]])]
+    sorted_log = logs["reference_round.sort"][0]["data"]
+    assert (sorted_log["before"], sorted_log["after"]) == ([a["id"], b["id"]], [b["id"], a["id"]])
+
+    pasted = logs["reference_round.paste"][0]["data"]
+    stored = await flow.db.reference_rounds.find_one({"code": "R3"})
+    assert (pasted["count"], pasted["round_ids"], pasted["codes"]) == (1, [stored["id"]], ["R3"])

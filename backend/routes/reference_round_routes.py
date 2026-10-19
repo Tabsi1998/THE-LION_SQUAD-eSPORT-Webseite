@@ -26,6 +26,7 @@ from database import get_db
 from models import ReferenceRoundCreate, ReferenceRoundUpdate, _clock, new_id, now_utc
 from services import reference_series
 from services.dolibarr_policy import club_today
+from services.series_standings import ordered_rounds
 from services.reference_calendar import (
     ClockError, calendar_view, club_day_of, parse_round_lines, vienna_clock, vienna_start,
 )
@@ -165,6 +166,22 @@ async def _log(db, action: str, me: dict, series_id: str, data: dict) -> None:
                                     "data": data, "created_at": now_utc().isoformat()})
 
 
+def _brief(doc: dict) -> dict:
+    """Knapper Stand eines neuen Termins fürs Protokoll: gesetzte Felder, Art und Wertung nur, wenn abweichend."""
+    out = {key: doc.get(key) for key in ("code", "title", "venue", "club_day", "starts_at", "order", "opponent")
+           if doc.get(key) is not None}
+    if doc.get("kind", "regular") != "regular":
+        out["kind"] = doc["kind"]
+    if doc.get("counts") is False:
+        out["counts"] = False
+    return out
+
+
+async def _active_ids(db, series_id: str) -> list[str]:
+    rounds = await db.reference_rounds.find({"series_id": series_id, "archived_at": None}, {"_id": 0}).to_list(None)
+    return [item["id"] for item in ordered_rounds(rounds)]
+
+
 async def _recompute(db, series_id: str) -> None:
     await reference_series.recompute_standings(db, await _series(db, series_id))
 
@@ -220,6 +237,7 @@ async def create_round(series_id: str, body: RoundCreateBody, me: dict = Depends
                      title=_text(body.title), venue=_text(body.venue), **when, kind=body.kind, counts=body.counts,
                      opponent=_text(body.opponent), note=_text(body.note))
     await db.reference_rounds.insert_one(doc)
+    await _log(db, "reference_round.create", me, series_id, {"round_id": doc["id"], "after": _brief(doc)})
     await _recompute(db, series_id)
     doc.pop("_id", None)
     return doc
@@ -244,6 +262,8 @@ async def update_round(series_id: str, round_id: str, body: RoundUpdateBody,
         updates.update(_when_from_instant(raw["starts_at"]))
     await _claim(db, series_id)
     await db.reference_rounds.update_one({"id": round_id}, {"$set": {**updates, **_stamp(me)}})
+    await _log(db, "reference_round.update", me, series_id, {
+        "round_id": round_id, "before": {key: existing.get(key) for key in updates}, "after": updates})
     await _recompute(db, series_id)
     return await _round(db, series_id, round_id)
 
@@ -351,8 +371,10 @@ async def order_rounds(series_id: str, body: RoundOrderBody, me: dict = Depends(
         {"series_id": series_id, "archived_at": None}, {"_id": 0, "id": 1})}
     if len(body.ids) != len(set(body.ids)) or set(body.ids) != active:
         raise HTTPException(422, "Die Reihenfolge muss jeden Termin der Serie genau einmal nennen.")
+    before = await _active_ids(db, series_id)
     await _claim(db, series_id, body.expected_version)
     await _write_order(db, series_id, body.ids, me)
+    await _log(db, "reference_round.order", me, series_id, {"before": before, "after": body.ids})
     await _recompute(db, series_id)
     return await _calendar(db, series_id)
 
@@ -366,8 +388,11 @@ async def sort_rounds_by_date(series_id: str, body: Optional[RoundSortBody] = No
     rounds = await db.reference_rounds.find({"series_id": series_id, "archived_at": None}, {"_id": 0}).to_list(None)
     rounds.sort(key=lambda item: (item.get("club_day") is None, item.get("club_day") or "",
                                   item.get("starts_at") or "", item.get("order") or 0, str(item.get("id"))))
+    before = [item["id"] for item in ordered_rounds(rounds)]
+    after = [item["id"] for item in rounds]
     await _claim(db, series_id, body.expected_version if body else None)
-    await _write_order(db, series_id, [item["id"] for item in rounds], me)
+    await _write_order(db, series_id, after, me)
+    await _log(db, "reference_round.sort", me, series_id, {"before": before, "after": after})
     await _recompute(db, series_id)
     return await _calendar(db, series_id)
 
@@ -391,7 +416,8 @@ async def paste_rounds(series_id: str, body: RoundPasteBody, me: dict = Depends(
                        club_day=row["day"], starts_at=row["starts_at"], source="paste")
             for offset, row in enumerate(parsed["rows"])]
     await db.reference_rounds.insert_many(docs)
-    await _log(db, "reference_round.paste", me, series_id, {"count": len(docs)})
+    await _log(db, "reference_round.paste", me, series_id, {"count": len(docs), "round_ids": [doc["id"] for doc in docs],
+                                                         "codes": [doc["code"] for doc in docs]})
     await _recompute(db, series_id)
     return {"created": len(docs), **await _calendar(db, series_id)}
 
