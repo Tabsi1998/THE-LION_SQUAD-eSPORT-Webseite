@@ -358,3 +358,20 @@ async def test_called_before_the_planned_time_report_and_no_show_are_the_same_ti
     deadlines = (await flow.get(f"/api/tournaments/{tournament['id']}/schedule/deadlines")).json()["matches"]
     assert _when(next(row for row in deadlines if row["match_id"] == two["id"])["no_show_due_at"]) == planned
 
+
+@pytest.mark.asyncio
+async def test_a_ready_match_goes_to_the_free_station_not_behind_an_overrunning_one(flow):
+    """#1791: Station 1 überzieht, Station 2 ist frei - das bereite Spiel steht als Nächstes an Station 2."""
+    _staff, tournament, stations, _players = await on_site(flow)
+    one, two = await first_round(flow, tournament)
+    assert (await call(flow, tournament, stations[0], one)).status_code == 200
+    assert (await start(flow, tournament, stations[0], one)).status_code == 200
+    await flow.db.matches_v2.update_one(
+        {"id": one["id"]}, {"$set": {"started_at": (now_utc() - timedelta(minutes=45)).isoformat()}}
+    )
+    view = await queue(flow, tournament)
+    by_station = {row["id"]: row for row in view["stations"]}
+    assert by_station[stations[0]["id"]]["running"]["match_id"] == one["id"]
+    assert by_station[stations[1]["id"]]["next"]["match_id"] == two["id"], "an die freie Station, nicht dahinter"
+    assert view["matches"][two["id"]]["station_id"] == stations[1]["id"]
+    assert _when(view["matches"][two["id"]]["forecast_at"]) <= now_utc() + timedelta(minutes=1)

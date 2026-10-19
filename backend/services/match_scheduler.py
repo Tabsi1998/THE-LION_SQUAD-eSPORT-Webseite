@@ -147,6 +147,11 @@ class _Board:
             self.participant_busy.setdefault(key, []).append((start, end, match_id))
         self.ends[match_id] = end
 
+    def free_since(self, station_id: str, moment: datetime) -> datetime | None:
+        """Seit wann die Station zu ``moment`` frei ist: das Ende ihrer letzten Belegung davor (``None``: nie belegt)."""
+        ends = [busy_end for _start, busy_end, _ in self.station_busy.get(station_id, []) if busy_end <= moment]
+        return max(ends) if ends else None
+
     def earliest(self, lower: datetime, minutes: int, station_id: str, participants: set[str], pause: int) -> datetime:
         """Der erste Zeitpunkt ab ``lower``, an dem Station und alle Spieler (mit Pause) frei sind."""
         duration = timedelta(minutes=minutes)
@@ -435,7 +440,10 @@ def _plan_stations(tournament: dict, matches: list[dict], stations, stage_by_id:
             best = None
             for station in usable:
                 moment = board.earliest(lower, minutes, station["id"], players, pause)
-                key = (moment, str(station.get("name") or ""), station["id"])
+                # Gleich früh an mehreren Stationen: an die, die zuerst frei war (#1791). Ein überzogenes Spiel hält seine
+                # Station „bis jetzt“ - sie ist nicht wirklich frei, eine freie Station geht vor.
+                since = board.free_since(station["id"], moment)
+                key = (moment, since is not None, since or moment, str(station.get("name") or ""), station["id"])
                 if best is None or key < best[0]:
                     best = (key, station, moment)
             _key, station, moment = best
