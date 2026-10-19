@@ -30,6 +30,11 @@ async function nothingCut(page) {
       const width = sheet.offsetWidth / mmPx;
       const height = sheet.offsetHeight / mmPx;
       if (Math.abs(width - (landscape ? 297 : 210)) > 1 || Math.abs(height - (landscape ? 210 : 297)) > 1) out.push(`Blatt ${index + 1}: ${width.toFixed(1)} x ${height.toFixed(1)} mm`);
+      // Kopf: der Name bricht um (höchstens zwei Zeilen), endet aber nie mit „…“ und sprengt den Kopf nicht.
+      const head = sheet.querySelector("header");
+      const title = sheet.querySelector("h1");
+      if (head.scrollHeight > head.clientHeight + 1) out.push(`Blatt ${index + 1}: Kopf zu hoch`);
+      if (title.scrollHeight > title.clientHeight + 1) out.push(`Blatt ${index + 1}: Name abgeschnitten`);
       const body = sheet.querySelector("[data-print-body]");
       if (body.scrollHeight > body.clientHeight + 1 || body.scrollWidth > body.clientWidth + 1) {
         out.push(`Blatt ${index + 1}: Inhalt ${body.scrollWidth}x${body.scrollHeight} > ${body.clientWidth}x${body.clientHeight}`);

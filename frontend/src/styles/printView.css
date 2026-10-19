@@ -60,12 +60,18 @@
   line-height: 1.1;
   text-transform: uppercase;
   letter-spacing: -0.01em;
-  white-space: nowrap;
+  /* Lange Namen brechen um (höchstens zwei Zeilen, dann etwas kleiner) statt mit „…“ zu enden. */
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
   overflow: hidden;
-  text-overflow: ellipsis;
+  overflow-wrap: anywhere;
   hyphens: none;
+  text-wrap: balance;
 }
-.tls-print-meta { text-align: right; font-size: 8pt; white-space: nowrap; }
+.tls-print-title--long { font-size: 10.5pt; line-height: 1.08; }
+.tls-print-meta { flex: none; max-width: 42%; text-align: right; font-size: 8pt; }
 
 .tls-print-foot {
   display: flex;

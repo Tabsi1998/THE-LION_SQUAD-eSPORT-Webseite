@@ -8,6 +8,11 @@ import "@/styles/printView.css";
 
 const mm = (value) => `${value}mm`;
 
+/** Passt der Name in groß nicht in eine Zeile, wird er kleiner und darf zwei Zeilen nehmen (quer ist mehr Platz). */
+export function isLongTitle(title, orientation) {
+  return String(title || "").length > (orientation === "landscape" ? 30 : 22);
+}
+
 /** Ein A4-Blatt mit Kopf (Verein, Titel, Teil) und Fuß (QR-Code zur Live-Seite, Druckzeit, Seitenzahl). */
 export function PrintSheet({ orientation, kicker, title, meta, stamp, qrUrl, qrLabel, page, pages, children, testId, zoom = 1 }) {
   return (
@@ -22,7 +27,7 @@ export function PrintSheet({ orientation, kicker, title, meta, stamp, qrUrl, qrL
         <header className="tls-print-head" style={{ height: mm(SHEET.header), flex: "none" }}>
           <div style={{ minWidth: 0 }}>
             <div className="tls-print-kicker">THE LION SQUAD · {kicker}</div>
-            <h1 className="tls-print-title">{title}</h1>
+            <h1 className={`tls-print-title ${isLongTitle(title, orientation) ? "tls-print-title--long" : ""}`}>{title}</h1>
           </div>
           <div className="tls-print-meta">{meta}</div>
         </header>
