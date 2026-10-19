@@ -493,6 +493,45 @@ async def inside_main() -> None:
                 await result(admin, match)
             state["tournaments"][f"mode_{mode}"] = cup["id"]
 
+        # Druckansicht (#1283): ein Event morgen mit Einlass und Anmeldeliste (Begleitung, Warteliste, einer schon da) und
+        # daran ein Doppel-K.-o. mit 16 Duellen (Winner, Loser, Grand Final), live, geplant, die ersten Spiele gespielt.
+        event_start = quarter(now_utc() + timedelta(days=1))
+        event = await admin.call("POST", "/api/events", json={
+            "name": f"Abnahme Event Druck ({stamp})", "status": "registration_open", "visibility": "public", "has_registration": True,
+            "allow_companions": True, "max_companions_per_registration": 2, "max_participants": 3,
+            "start_date": event_start.isoformat(), "end_date": (event_start + timedelta(hours=10)).isoformat(),
+            "door_time": (event_start - timedelta(minutes=30)).isoformat()})
+        for index, player in enumerate(users["players"][1:5]):
+            visitor = await Session.login(player["email"], False)
+            try:
+                await visitor.call("POST", f"/api/events/{event['id']}/registrations", json={"companion_count": 1 if index == 0 else 0})
+            finally:
+                await visitor.close()
+        lead_view = await admin.call("GET", f"/api/events/{event['id']}/lead", params={"filter": "all"})
+        first = next(row for row in lead_view["registrations"] if row["status"] == "registered")
+        await admin.call("PATCH", f"/api/events/{event['id']}/registrations/{first['id']}", json={"status": "checked_in"})
+        double = await tournament(admin, game, f"Abnahme Doppel-K.-o. ({stamp})", event_start + timedelta(hours=1),
+                                  format="double_elim", event_mode="local", schedule_mode="fixed_by_staff", result_entry_mode="staff_only",
+                                  match_duration_minutes=12, event_id=event["id"],
+                                  check_in_from=(event_start + timedelta(minutes=15)).isoformat())
+        await register(admin, double, users["players"])
+        await admin.call("POST", f"/api/tournaments/{double['id']}/bracket/from-format?preview=false")
+        await admin.call("POST", f"/api/tournaments/{double['id']}/staff", json={"user_id": users["lead"]["id"], "role": "organizer"})
+        await admin.call("POST", f"/api/tournaments/{double['id']}/staff", json={"user_id": users["helper"]["id"], "role": "stream_operator"})
+        await stations(admin, double, 4)
+        await admin.call("POST", f"/api/tournaments/{double['id']}/status", json={"status": "live", "force": True})
+        double_plan = await admin.call("POST", f"/api/tournaments/{double['id']}/schedule/plan")
+        if double_plan.get("mode") == "stations":
+            await admin.call("POST", f"/api/tournaments/{double['id']}/schedule/apply",
+                             json={"fingerprint": double_plan["fingerprint"], "planned_at": double_plan["planned_at"]})
+        opening = sorted((row for row in (await matches_of(admin, double["id"])).values()
+                          if int(row.get("round") or 0) == 1 and str(row.get("section") or "WB").upper() == "WB"),
+                         key=lambda row: row.get("match_key") or "")
+        for match in opening[:3]:
+            await result(admin, match)
+        state["tournaments"]["print_double"] = double["id"]
+        state["print_event"] = {"id": event["id"], "slug": event.get("slug")}
+
         # Fast Lap mit einer Strecke und Zeiten.
         challenge = await admin.call("POST", "/api/f1/challenges", json={"title": f"Abnahme Fast Lap ({stamp})", "game_id": game["id"],
                                                                          "status": "live", "registration_enabled": False})
