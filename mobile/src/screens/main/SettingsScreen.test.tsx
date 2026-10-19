@@ -206,6 +206,9 @@ test("Konto: Profil bearbeiten öffnet die eigene Seite, Abmelden meldet ab", as
   await renderSettings();
   await fireEvent.press(screen.getByTestId("settings-edit-profile"));
   expect(navigate).toHaveBeenCalledWith("ProfileEdit");
+  // Mein Kalender-Abo (#1788): der feste Eintrag unter Konto.
+  await fireEvent.press(screen.getByTestId("settings-calendar-subscription"));
+  expect(navigate).toHaveBeenCalledWith("CalendarSubscription");
   await fireEvent.press(screen.getByTestId("settings-logout"));
   expect(mockLogout).toHaveBeenCalledTimes(1);
 });

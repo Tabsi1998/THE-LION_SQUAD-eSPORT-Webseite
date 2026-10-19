@@ -243,6 +243,7 @@ export const DETAIL_OPTIONS: Record<DetailScreenName, NativeStackNavigationOptio
   YearReview: { title: "Dein Jahr", ...gold },
   Settings: { title: "Einstellungen" },
   ProfileEdit: { title: "Profil bearbeiten" },
+  CalendarSubscription: { title: "Mein Kalender-Abo" },
 };
 
 /**

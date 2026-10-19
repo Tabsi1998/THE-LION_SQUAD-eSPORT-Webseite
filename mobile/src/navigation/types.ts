@@ -102,6 +102,8 @@ export type DetailParamList = {
   // Einstellungen an einem Ort (#1146): Zahnrad oben im Profil.
   Settings: undefined;
   ProfileEdit: undefined;
+  // Mein Kalender-Abo (#1788): der persönliche Link - aus den Einstellungen und dem Hinweis nach einer Anmeldung.
+  CalendarSubscription: undefined;
 };
 
 export type AppStackParamList = TabRootParamList & DetailParamList;

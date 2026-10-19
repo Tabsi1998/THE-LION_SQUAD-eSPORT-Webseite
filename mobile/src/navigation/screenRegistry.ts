@@ -32,6 +32,7 @@ import { PublicProfileScreen } from "../screens/main/PublicProfileScreen";
 import { SearchScreen } from "../screens/main/SearchScreen";
 import { SeasonPassScreen } from "../screens/main/SeasonPassScreen";
 import { SettingsScreen } from "../screens/main/SettingsScreen";
+import { CalendarSubscriptionScreen } from "../screens/main/CalendarSubscriptionScreen";
 import { TeamChatScreen } from "../screens/main/TeamChatScreen";
 import { TeamDetailScreen } from "../screens/main/TeamDetailScreen";
 import { TournamentChatScreen } from "../screens/main/TournamentChatScreen";
@@ -91,4 +92,5 @@ export const DETAIL_SCREENS: Record<DetailScreenName, Screen> = {
   YearReview: YearReviewScreen,
   Settings: SettingsScreen,
   ProfileEdit: ProfileEditScreen,
+  CalendarSubscription: CalendarSubscriptionScreen,
 };
