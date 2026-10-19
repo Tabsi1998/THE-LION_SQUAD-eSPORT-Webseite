@@ -14,6 +14,7 @@ müssen (#1734). Die Prüfregeln selbst stehen in [`CLAUDE.md`](../../CLAUDE.md)
 | [Dependabot Auto-Merge](../../.github/workflows/dependabot-auto-merge.yml) | PRs von Dependabot | Patch-Updates (x.y.Z) mergen sich nach grünen Pflicht-Prüfungen selbst |
 | [Website-Release](../../.github/workflows/release-please.yml) | Merge auf `main`, von Hand | pflegt den Release-PR, nach dessen Merge Tag, Release, `CHANGELOG.md` |
 | [README-Bilder](../../.github/workflows/readme-screenshots.yml) | am Monatsersten, von Hand | nimmt die README-Bilder im Abnahme-Stand auf und schlägt sie als PR vor |
+| [Nächtliche Abnahme](../../.github/workflows/nightly-abnahme.yml) | jede Nacht, von Hand | spielt den Event-Abend im [Abnahme-Stand](abnahme-lokal.md) durch, rot → Issue „Nächtlicher Abnahme-Test rot“ |
 | [Externe Links](../../.github/workflows/links.yml) | montags, von Hand | ruft alle http(s)-Links der Markdown-Dateien ab, tote Links landen in einem Issue |
 | [Expo-Patches](../../.github/workflows/expo-updates.yml) | am 3. jedes Monats, von Hand | `npx expo install --fix` im installierten SDK, PR mit Auto-Merge nach grünen Pflicht-Prüfungen |
 | [Größere Updates](../../.github/workflows/major-updates.yml) | am 5. jedes Monats, von Hand | Issue mit neuen Hauptversionen und neuem Expo-SDK – nichts wird eingespielt |

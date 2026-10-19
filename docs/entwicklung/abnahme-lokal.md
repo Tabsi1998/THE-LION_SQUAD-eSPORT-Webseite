@@ -102,3 +102,32 @@ docker compose -p lsw-abnahme --env-file .env.abnahme.example -f docker-compose.
 ```
 
 `down --volumes` löscht nur die Volumes des Projekts `lsw-abnahme`, nie die eines anderen Stacks.
+
+## 5. Jede Nacht: der ganze Abend
+
+Der Workflow [Nächtliche Abnahme](../../.github/workflows/nightly-abnahme.yml) spielt jede Nacht um 01:23 UTC (03:23
+Wiener Sommerzeit, 02:23 Winterzeit) den Event-Abend auf GitHub durch (#1656): frischer Abnahme-Stand, dann **jede
+Abnahme-Spec der Reihe nach, vor jeder frisch geseedet**. Die Specs verbrauchen Testdaten (`advancement-modes` spielt
+die Show-Runde, die `tv-abnahme` danach noch braucht) - der Seed legt bei jedem Aufruf neue Turniere an. Specs, die
+`seed_abnahme_fastlap.py` nennen, bekommen diesen Seed und eine eigene Stand-Datei. Neue Specs in `e2e/abnahme/` laufen
+von selbst mit, `readme-screenshots.spec.js` nicht (eigener Workflow).
+
+- **Bericht:** im Lauf unter *Summary* - je Spec grün oder rot, Zahl der Tests, Dauer, bei Rot Testname und erste
+  Fehlerzeile. Bilder, Playwright-Bericht und Traces liegen sieben Tage im Artefakt `abnahme-nacht`.
+- **Meldung:** Rot legt das Issue „Nächtlicher Abnahme-Test rot“ an oder kommentiert das offene; die erste grüne
+  Nacht danach kommentiert „Wieder grün“ und schließt es (`scripts/nightly_abnahme_report.py`).
+- **Von Hand:** Actions → „Nächtliche Abnahme“ → *Run workflow*; dort lassen sich die Meldung abschalten und einzelne
+  Specs wählen. Oder `gh workflow run nightly-abnahme.yml`.
+
+Derselbe Ablauf am eigenen Rechner, mit eigenem Stand (Vorgabe `lsw-abnahme-nacht`, Ports 24500/29501; den
+gemeinsamen Stand `lsw-abnahme` fasst das Skript nicht an):
+
+```bash
+bash scripts/run_abnahme_all.sh up     # bauen, starten, auf Health warten (ABNAHME_SOURCE wie oben)
+bash scripts/run_abnahme_all.sh run    # Seed → Spec, Seed → Spec …; Bericht in .local-testing/abnahme/nacht-…/summary.md
+bash scripts/run_abnahme_all.sh down   # Stand samt Testdatenbank weg
+```
+
+`ABNAHME_SPECS="tv-abnahme matchplan-abnahme"` wählt einzelne Specs, `PYTHON` das Python (unter Windows etwa das
+eigene venv). Geplante Workflows laufen nur auf `main`; nach 60 Tagen ohne Aktivität im Repository schaltet GitHub
+sie ab - dann im Reiter Actions wieder einschalten.

@@ -1,0 +1,124 @@
+name: Nächtliche Abnahme
+
+# Der ganze Abend als automatischer Test (#1656): jede Nacht ein frischer Abnahme-Stand
+# (docs/entwicklung/abnahme-lokal.md), dann jede Abnahme-Spec aus frontend/e2e/abnahme/ der Reihe nach - vor jeder Spec
+# frisch geseedet, weil die Specs Testdaten verbrauchen. Den Ablauf macht scripts/run_abnahme_all.sh, derselbe wie am
+# eigenen Rechner. Nur Testdaten, Versandsperre an (OUTBOUND_DISABLED): nichts geht nach außen, nie Produktion.
+# Bericht im Job-Summary, Bilder, Playwright-Bericht und Traces als Artefakt. Rot: Issue „Nächtlicher Abnahme-Test rot“
+# anlegen oder kommentieren; die erste grüne Nacht danach kommentiert und schließt es (scripts/nightly_abnahme_report.py).
+on:
+  schedule:
+    # 01:23 UTC = 03:23 Wiener Sommerzeit, 02:23 Winterzeit - morgens liegt das Ergebnis da.
+    - cron: "23 1 * * *"
+  workflow_dispatch:
+    inputs:
+      melden:
+        description: "Ergebnis als Issue melden (rot: anlegen/kommentieren, grün nach rot: schließen)"
+        type: boolean
+        default: true
+      specs:
+        description: "Nur diese Specs, durch Leerzeichen getrennt (leer = alle), z. B. tv-abnahme matchplan-abnahme"
+        type: string
+        default: ""
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  ABNAHME_PROJECT: lsw-abnahme-nacht
+  FRONTEND_PORT: "24500"
+  BACKEND_PORT: "29501"
+
+concurrency:
+  group: nightly-abnahme
+  cancel-in-progress: false
+
+jobs:
+  abnahme:
+    name: Ganzer Abend gegen den Abnahme-Stand
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    env:
+      ABNAHME_RESULTS: ${{ github.workspace }}/abnahme-nacht
+      ABNAHME_STATE: ${{ github.workspace }}/.local-testing/abnahme/state-nacht.json
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+          cache: yarn
+          cache-dependency-path: frontend/yarn.lock
+      - name: Abnahme-Stand bauen und starten
+        run: bash scripts/run_abnahme_all.sh up
+      - name: Website-Pakete installieren
+        working-directory: frontend
+        run: yarn install --frozen-lockfile
+      - name: Browser installieren
+        working-directory: frontend
+        timeout-minutes: 15
+        run: |
+          for attempt in 1 2 3; do
+            if timeout --kill-after=15 300 npx playwright install --with-deps chromium; then exit 0; fi
+            sudo pkill -9 -f '/usr/lib/apt/methods|apt-get' || true
+            sleep 10
+          done
+          exit 1
+      - name: Ganzer Abend - je Spec frisch seeden, dann testen
+        env:
+          ABNAHME_SHOTS: ${{ github.workspace }}/abnahme-nacht/bilder
+          ABNAHME_SPECS: ${{ inputs.specs }}
+          PYTHON: python3
+        run: bash scripts/run_abnahme_all.sh run
+      - name: Bericht ins Job-Summary
+        if: always()
+        run: |
+          if [ ! -f "$ABNAHME_RESULTS/summary.md" ]; then
+            python3 scripts/nightly_abnahme_report.py summary --results "$ABNAHME_RESULTS" --out "$ABNAHME_RESULTS/summary.md"
+          fi
+          {
+            cat "$ABNAHME_RESULTS/summary.md"
+            echo
+            echo "Bilder, Playwright-Bericht und Traces je Spec: Artefakt **abnahme-nacht** (7 Tage)."
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Ergebnisse als Artefakt
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: abnahme-nacht
+          path: abnahme-nacht/
+          if-no-files-found: ignore
+          retention-days: 7
+      - name: Abnahme-Stand stoppen
+        if: always()
+        run: bash scripts/run_abnahme_all.sh down
+
+  # Getrennter Job, damit nur die Meldung Issues schreiben darf - nicht der Job, der Code und Browser ausführt.
+  meldung:
+    name: Meldung als Issue
+    needs: abnahme
+    if: ${{ !cancelled() && (github.event_name == 'schedule' || inputs.melden) }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+      # Fehlt das Artefakt (Aufbau schon gescheitert), meldet der Bericht „kam nicht bis zu den Tests“ - also rot.
+      - uses: actions/download-artifact@v8
+        continue-on-error: true
+        with:
+          name: abnahme-nacht
+          path: abnahme-nacht
+      - name: Issue anlegen, kommentieren oder schließen
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: python3 scripts/nightly_abnahme_report.py notify --results abnahme-nacht --run-url "$RUN_URL"
