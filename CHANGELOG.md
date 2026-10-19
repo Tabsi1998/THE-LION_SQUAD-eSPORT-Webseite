@@ -1,27 +1,25 @@
 # Changelog
 
-## [1.3.0](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/compare/v1.2.4...v1.3.0) (2026-10-19)
-
+## 1.3.0 (19.10.2026)
 
 ### Neu
 
-* Abo-Hinweis einmal nach der Anmeldung zu Event oder Turnier ([#1788](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1788)) ([c26708a](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/c26708a3e8e9426c568b2a003fb826550c011384))
-* Anmelde- und Registrierungsgrenze je Netz in der Verwaltung einstellbar, mit Event-Zeitraum ([#1802](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1802)) ([d90f7d0](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/d90f7d0d5bd380352fe0fb147e6d8d4167f70b4a))
-* Anmeldeliste des Events druckt mit Begleitpersonen, Warteliste, Druckzeit und QR-Code ([#1283](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1283)) ([41f8600](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/41f8600cce2781875d0d8ee471d2255feb3912d8))
-* Ansicht „Mein Kalender“ mit den eigenen Terminen und ihrem Stand, auch ohne Abo ([#1788](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1788)) ([c26708a](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/c26708a3e8e9426c568b2a003fb826550c011384))
-* Druckansicht für Turnierbaum, Spielplan, Check-in-Liste und Tagesplan ([#1283](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1283)) ([41f8600](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/41f8600cce2781875d0d8ee471d2255feb3912d8))
-* Eintrag „Mein Kalender-Abo“ in den Einstellungen ([#1788](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1788)) ([c26708a](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/c26708a3e8e9426c568b2a003fb826550c011384))
-* Kasten „Automatisch in deinen Kalender“ mit Anleitung, Status und Rückfrage beim Abschalten ([#1788](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1788)) ([c26708a](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/c26708a3e8e9426c568b2a003fb826550c011384))
-* Knopf „Drucken“ auf Baum, Spielplan, Teilnehmern und Event ([#1283](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1283)) ([41f8600](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/41f8600cce2781875d0d8ee471d2255feb3912d8))
-* Referenzen „Jahr für Jahr“ nach Jahr statt Freitext-Saison gruppieren ([#1748](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1748)) ([c3f8665](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/c3f8665472f7c6c3f656d5414872907080029bff))
-* Referenzen filtern nach Jahr statt nach Freitext-Saison ([#1748](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1748)) ([c3f8665](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/c3f8665472f7c6c3f656d5414872907080029bff))
-* Referenzen zeigen Spiel-Logo, ohne Logo das Spiel-Kürzel in der Spiel-Kachel ([#1748](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1748)) ([c3f8665](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/c3f8665472f7c6c3f656d5414872907080029bff))
-* verständliche Meldung „Zu viele Anmeldungen aus diesem Netz“ statt allgemeinem Hinweis ([#1802](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1802)) ([d90f7d0](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/d90f7d0d5bd380352fe0fb147e6d8d4167f70b4a))
-
+* Abo-Hinweis einmal nach der Anmeldung zu Event oder Turnier (#1788)
+* Anmelde- und Registrierungsgrenze je Netz in der Verwaltung einstellbar, mit Event-Zeitraum (#1802)
+* Anmeldeliste des Events druckt mit Begleitpersonen, Warteliste, Druckzeit und QR-Code (#1283)
+* Ansicht „Mein Kalender“ mit den eigenen Terminen und ihrem Stand, auch ohne Abo (#1788)
+* Druckansicht für Turnierbaum, Spielplan, Check-in-Liste und Tagesplan (#1283)
+* Eintrag „Mein Kalender-Abo“ in den Einstellungen (#1788)
+* Kasten „Automatisch in deinen Kalender“ mit Anleitung, Status und Rückfrage beim Abschalten (#1788)
+* Knopf „Drucken“ auf Baum, Spielplan, Teilnehmern und Event (#1283)
+* Referenzen „Jahr für Jahr“ nach Jahr statt Freitext-Saison gruppieren (#1748)
+* Referenzen filtern nach Jahr statt nach Freitext-Saison (#1748)
+* Referenzen zeigen Spiel-Logo, ohne Logo das Spiel-Kürzel in der Spiel-Kachel (#1748)
+* verständliche Meldung „Zu viele Anmeldungen aus diesem Netz“ statt allgemeinem Hinweis (#1802)
 
 ### Dokumentation
 
-* Betrieb und Handbuch – Grenze je Netz für Events einstellen ([#1802](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1802)) ([d90f7d0](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/d90f7d0d5bd380352fe0fb147e6d8d4167f70b4a))
+* Betrieb und Handbuch – Grenze je Netz für Events einstellen (#1802)
 
 ## 1.2.4 (19.10.2026)
 
