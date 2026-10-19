@@ -127,3 +127,37 @@ async def test_sieger_nur_als_winner_id_kommt_durch_die_projektionen(flow):
     assert values["upsets"] == 2, "zwei Siege gegen den besser Gesetzten"
     assert values["group_stage_firsts"] == 1
     assert values["team_match_wins"] == 2
+
+
+@pytest.mark.asyncio
+async def test_sieger_und_siegesserie_aus_reinen_platz_ergebnissen(flow):
+    """Sieger und Siegesserie (matches_won, match_streak_max) über den Turnierbaum: reine Platz-Ergebnisse zählen,
+    ein Unentschieden (zweimal Platz 1) und ein Freilos nicht - für beide Seiten."""
+    me = await flow.add_user(name="Spielerin")
+    other = await flow.add_user(name="Gegner")
+    await flow.db.tournaments.insert_one({"id": "t1", "title": "Liga", "status": "completed", "is_public": True})
+    await flow.db.tournament_registrations.insert_many([
+        {"id": "r-me", "tournament_id": "t1", "user_id": me["id"], "status": "checked_in"},
+        {"id": "r-ot", "tournament_id": "t1", "user_id": other["id"], "status": "checked_in"},
+    ])
+
+    def played(mid: str, when: str, my_rank: int, their_rank: int) -> dict:
+        return {"id": mid, "tournament_id": "t1", "status": "completed", "stage_number": 1, "round": 1, "order": 1,
+                "completed_at": when, "updated_at": when,
+                "slots": [{"slot": 1, "registration_id": "r-me"}, {"slot": 2, "registration_id": "r-ot"}],
+                "results": [{"registration_id": "r-me", "rank": my_rank}, {"registration_id": "r-ot", "rank": their_rank}]}
+    bye = {"id": "s-0", "tournament_id": "t1", "status": "completed", "stage_number": 1, "round": 1, "order": 1,
+           "completed_at": "2026-09-01T17:00:00+00:00", "updated_at": "2026-09-01T17:00:00+00:00",
+           "slots": [{"slot": 1, "registration_id": "r-ot"}, {"slot": 2, "registration_id": None, "status": "bye"}],
+           "results": [{"registration_id": "r-ot", "rank": 1, "note": "Freilos", "reported_by": "system"}]}
+    await flow.db.matches_v2.insert_many([
+        bye,
+        played("s-1", "2026-09-01T18:00:00+00:00", 1, 2),
+        played("s-2", "2026-09-02T18:00:00+00:00", 1, 2),
+        played("s-3", "2026-09-03T18:00:00+00:00", 1, 1),
+        played("s-4", "2026-09-04T18:00:00+00:00", 2, 1),
+    ])
+    mine = await counters.compute(me["id"], {"matches_won", "match_streak_max"})
+    theirs = await counters.compute(other["id"], {"matches_won", "match_streak_max"})
+    assert (mine["matches_won"], mine["match_streak_max"]) == (2, 2)
+    assert (theirs["matches_won"], theirs["match_streak_max"]) == (1, 1), "nur s-4 - Freilos und Unentschieden nicht"

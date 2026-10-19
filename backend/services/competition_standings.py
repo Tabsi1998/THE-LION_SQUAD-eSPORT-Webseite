@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from services.match_winner import won_by
 from services.round_labels import section_kind
 
 
@@ -599,12 +600,9 @@ def registration_badge_match_progress(matches: list[dict], registration_ids: set
     streak = 0
     streak_max = 0
     for match in relevant:
-        is_win = any(
-            result.get("registration_id") in registration_ids
-            and result.get("outcome") == "winner"
-            for result in match.get("results") or []
-        )
-        if is_win:
+        # Dieselbe Regel wie alle Sieg-Erfolge (#1796): ein Unentschieden (zwei Mal Platz 1) und ein Freilos sind
+        # kein Sieg - der Turnierbaum schreibt beides als „winner“.
+        if won_by(match, registration_ids):
             won += 1
             streak += 1
             streak_max = max(streak_max, streak)
