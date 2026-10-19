@@ -22,6 +22,7 @@ from database import get_db
 from models import now_utc
 from services import achievement_progress
 from services.achievement_core import SIGNAL_RULES, SIGNALS, STATS, VIENNA, evaluator  # noqa: F401 - umgezogen (#1420)
+from services.match_winner import is_duel, match_winner_id, participant_ids, won_by
 from services.private_fields import private_projection
 
 logger = logging.getLogger("tls.achievements.counters")
@@ -112,7 +113,7 @@ class Context:
             ids = list(await self.registration_ids())
             if not ids:
                 return []
-            return await self.db.matches_v2.find({"slots.registration_id": {"$in": ids}}, {"_id": 0, "id": 1, "tournament_id": 1, "status": 1, "slots": 1, "results": 1, "completed_at": 1, "updated_at": 1, "scheduled_at": 1, "best_of": 1, "map": 1, "maps": 1, "disputes": 1, "forfeit_registration_id": 1, "section": 1, "bracket": 1, "round_name": 1, "group_id": 1}).to_list(5000)
+            return await self.db.matches_v2.find({"slots.registration_id": {"$in": ids}}, {"_id": 0, "id": 1, "tournament_id": 1, "status": 1, "slots": 1, "results": 1, "winner_id": 1, "completed_at": 1, "updated_at": 1, "scheduled_at": 1, "best_of": 1, "map": 1, "maps": 1, "disputes": 1, "forfeit_registration_id": 1, "section": 1, "bracket": 1, "round_name": 1, "group_id": 1}).to_list(5000)
         return await self._memo("matches", load)
 
     async def awards(self) -> list[dict]:
@@ -185,7 +186,7 @@ class Context:
 
     async def group_matches(self, tournament_id: str, group_id: str) -> list[dict]:
         key = f"group:{tournament_id}:{group_id}"
-        return await self._memo(key, lambda: self.db.matches_v2.find({"tournament_id": tournament_id, "group_id": group_id, "status": "completed"}, {"_id": 0, "slots": 1, "results": 1}).to_list(2000))
+        return await self._memo(key, lambda: self.db.matches_v2.find({"tournament_id": tournament_id, "group_id": group_id, "status": "completed"}, {"_id": 0, "slots": 1, "results": 1, "winner_id": 1}).to_list(2000))
 
     # ---- Katalog B (#613): Fast Lap, Saison, Team
 
@@ -261,7 +262,7 @@ class Context:
     async def team_matches(self) -> list[dict]:
         async def load():
             ids = list(await self.team_registrations())
-            return await self.db.matches_v2.find({"slots.registration_id": {"$in": ids}, "status": "completed"}, {"_id": 0, "id": 1, "slots": 1, "results": 1, "completed_at": 1, "updated_at": 1}).to_list(10000) if ids else []
+            return await self.db.matches_v2.find({"slots.registration_id": {"$in": ids}, "status": "completed"}, {"_id": 0, "id": 1, "slots": 1, "results": 1, "winner_id": 1, "completed_at": 1, "updated_at": 1}).to_list(10000) if ids else []
         return await self._memo("team_matches", load)
 
 
@@ -617,7 +618,7 @@ def _completed_matches(matches: list[dict], registration_ids: set[str]) -> list[
         mine = {slot["registration_id"] for slot in slots} & registration_ids
         if not mine:
             continue
-        won = any(result.get("registration_id") in registration_ids and result.get("outcome") == "winner" for result in match.get("results") or [])
+        won = won_by(match, registration_ids)
         when = _parse(match.get("completed_at") or match.get("updated_at") or match.get("scheduled_at"))
         opponents = {slot["registration_id"] for slot in slots} - registration_ids
         out.append((match, won, when, opponents))
@@ -662,7 +663,8 @@ async def _upsets(ctx):
     count = 0
     mine = await ctx.registration_ids()
     for match, won, _when, _opponents in _completed_matches(await ctx.matches(), mine):
-        if not won:
+        # Favoritenschreck ist ein Duell-Erfolg (#1796): im FFA-Lauf schlägt Platz 1 nicht „den Gegner“.
+        if not won or not is_duel(match):
             continue
         seeds = {slot.get("registration_id"): slot.get("seed") for slot in match.get("slots") or [] if slot.get("registration_id")}
         my_seed = min((int(seeds[r]) for r in seeds if r in mine and isinstance(seeds.get(r), int)), default=None)
@@ -907,7 +909,10 @@ async def record_signal(user_id: str, name: str, count: int = 1, day: str | None
 # ------------------------------------------------------------------ Katalog A (#612): Serien, Karten, Pünktlichkeit, Dispute, Turnierläufe
 
 def _score_pair(match: dict, mine: set[str]) -> tuple[int, int] | None:
-    """(eigene Punkte, Gegnerpunkte) aus results[].score - None, wenn keine Zahlen eingetragen sind."""
+    """(eigene Punkte, Gegnerpunkte) aus results[].score - None, wenn keine Zahlen eingetragen sind oder es kein Duell
+    ist: Zu Null, volle Distanz und Entscheider gibt es nur bei genau zwei Seiten (#1796), nie in einem FFA-Lauf."""
+    if not is_duel(match):
+        return None
     own = their = None
     for entry in match.get("results") or []:
         score = entry.get("score")
@@ -980,7 +985,7 @@ async def _comebacks(ctx):
     count = 0
     for match, won, _when, _o in _completed_matches(await ctx.matches(), mine):
         maps = [m for m in (match.get("maps") or []) if isinstance(m, dict) and m.get("winner_registration_id")]
-        if won and maps and maps[0]["winner_registration_id"] not in mine:
+        if won and is_duel(match) and maps and maps[0]["winner_registration_id"] not in mine:
             count += 1
     return count
 
@@ -1111,10 +1116,9 @@ async def _group_firsts(ctx):
     for tournament_id, group_id in groups:
         wins: dict[str, int] = {}
         for match in await ctx.group_matches(tournament_id, group_id):
-            for result in match.get("results") or []:
-                reg = result.get("registration_id")
-                if reg:
-                    wins[reg] = wins.get(reg, 0) + (1 if result.get("outcome") == "winner" else 0)
+            winner = match_winner_id(match)
+            for reg in participant_ids(match):
+                wins[reg] = wins.get(reg, 0) + (1 if reg == winner else 0)
         if not wins:
             continue
         best = max(wins.values())
@@ -1290,15 +1294,13 @@ async def _team_match_wins(ctx):
     wins = 0
     for match in await ctx.team_matches():
         when = _parse(match.get("completed_at") or match.get("updated_at"))
-        for result in match.get("results") or []:
-            reg = registrations.get(result.get("registration_id"))
-            if not reg or result.get("outcome") != "winner":
-                continue
-            joined = _parse((memberships.get(reg.get("team_id")) or {}).get("joined_at"))
-            if joined and when and when < joined:
-                continue
-            wins += 1
-            break
+        reg = registrations.get(match_winner_id(match))
+        if not reg:
+            continue
+        joined = _parse((memberships.get(reg.get("team_id")) or {}).get("joined_at"))
+        if joined and when and when < joined:
+            continue
+        wins += 1
     return wins
 
 
