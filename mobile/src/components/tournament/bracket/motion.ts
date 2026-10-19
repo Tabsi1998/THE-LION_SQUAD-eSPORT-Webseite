@@ -2,7 +2,8 @@ import { css, cubicBezier } from "react-native-reanimated";
 
 // Bewegung im Turnierbaum (#1563), geplant nach animate-expo: selten (je neuem Stand), nur transform und opacity, auf
 // dem UI-Thread. Die federnden Teile (Weiterkommen, Platzziffern, Zählen) stehen in BracketMotion.tsx; hier die
-// CSS-Animationen beim Einhängen: Aufleuchten, Atmen des Live-Punkts, Pokal. „Bewegung reduzieren“: nichts davon.
+// CSS-Animationen beim Einhängen: Aufleuchten, Atmen des Live-Punkts, Pokal, das Anheben einer Karte bei der Auslosung
+// (#1633). „Bewegung reduzieren“: nichts davon.
 
 export const EASE_OUT = cubicBezier(0.23, 1, 0.32, 1);
 
@@ -23,4 +24,26 @@ export function breatheStyle(reduce: boolean) {
 
 export function crownStyle(reduce: boolean) {
   return reduce ? null : { animationName: CROWN, animationDuration: 520, animationTimingFunction: EASE_OUT };
+}
+
+// Auslosung als Moment (#1633): die Karte hebt sich sanft an und setzt wieder auf - ruhig, ohne Nachfedern. Nur
+// transform; das Aufleuchten darüber ist eine eigene Fläche (Flash, nur Deckkraft).
+const LIFT = css.keyframes({
+  "0%": { transform: [{ translateY: 0 }, { scale: 1 }] },
+  "40%": { transform: [{ translateY: -6 }, { scale: 1.02 }] },
+  "100%": { transform: [{ translateY: 0 }, { scale: 1 }] },
+});
+/** Ein Hinweis kommt von unten herein (Auslosung bereit, zufällig gezogen). */
+const RISE_IN = css.keyframes({
+  "0%": { opacity: 0, transform: [{ translateY: 8 }] },
+  "100%": { opacity: 1, transform: [{ translateY: 0 }] },
+});
+export const EASE_IN_OUT = cubicBezier(0.77, 0, 0.175, 1);
+
+export function liftStyle(delay: number, reduce: boolean) {
+  return reduce ? null : { animationName: LIFT, animationDuration: 700, animationDelay: delay, animationTimingFunction: EASE_IN_OUT, animationFillMode: "both" as const };
+}
+
+export function riseInStyle(reduce: boolean) {
+  return reduce ? null : { animationName: RISE_IN, animationDuration: 260, animationTimingFunction: EASE_OUT, animationFillMode: "both" as const };
 }

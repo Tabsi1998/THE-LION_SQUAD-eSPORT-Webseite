@@ -210,8 +210,11 @@ export function TournamentDetailScreen({ navigation, route }: Props) {
   const tables = useMemo(() => standingsTables(standings, tournament?.format, ownRegistration?.id || null, statusById), [ownRegistration?.id, standings, statusById, tournament?.format]);
   const openMatch = useCallback((id: string) => navigation.navigate("MatchDetail", { id }), [navigation]);
   // Bewegung und Sieger-Moment (#1563, #1168): aus dem Vergleich alter/neuer Stand beim Live-Nachladen - genau einmal,
-  // nur sichtbar (Seite im Vordergrund, App aktiv, Baum offen), kein Nachholen beim ersten Stand.
+  // nur sichtbar (Seite im Vordergrund, App aktiv, Baum offen), kein Nachholen beim ersten Stand. Auslosung als Moment
+  // (#1633): `seenMoments` merkt sich jede Bewegung und jeden Topf über alle Stände - kommt derselbe Wechsel noch einmal
+  // (Nachladen, Neuverbindung), läuft er nicht ein zweites Mal.
   const previousMatches = useRef<BracketMatch[] | null>(null);
+  const seenMoments = useRef(new Set<string>());
   const [plan, setPlan] = useState<MotionPlan | null>(null);
   const [crowned, setCrowned] = useState(false);
   const tabRef = useRef<TabKey>("overview");
@@ -221,7 +224,7 @@ export function TournamentDetailScreen({ navigation, route }: Props) {
     previousMatches.current = allMatches;
     if (!before) return undefined;
     const visible = focusedRef.current && AppState.currentState !== "background";
-    const next = motionPlan(before, allMatches, { active: visible });
+    const next = motionPlan(before, allMatches, { active: visible, seen: seenMoments.current });
     if (next && tabRef.current === "bracket") setPlan(next);
     if (visible && wonJustNow(before, allMatches, ownRegistration?.id, stages)) {
       setCrowned(true);
@@ -230,8 +233,15 @@ export function TournamentDetailScreen({ navigation, route }: Props) {
     // Dein Weiterkommen (Fabian, 14.10.): einmal kurz - im selben Moment, in dem dein Name in die nächste Runde gleitet.
     const mine = ownRegistration?.id;
     if (mine && next && [...next.rows.values()].some((rows) => rows.get(mine)?.type === "advance" || rows.get(mine)?.type === "draw")) return playMoment("advance");
+    // Auslosung im offenen Baum (#1633): Topf bereit, Runde ausgelost, Platz sofort gezogen - einmal leicht, im selben
+    // Moment, in dem sich die Karten heben. Nur mit sichtbarem Gegenstück (Baum offen), sonst still.
+    if (next?.draw && tabRef.current === "bracket") return playMoment("draw");
     return undefined;
   }, [allMatches, bracket.matches_v2, ownRegistration?.id, stages]);
+  // Weg vom Baum: der Moment ist vorbei - beim Zurückkommen steht der Baum ruhig da (kein zweites Mal, #1633).
+  useEffect(() => {
+    if (tab !== "bracket") setPlan(null);
+  }, [tab]);
   const matchFinder = useMemo(() => finderFor(allMatches), [allMatches]);
   const upcomingMatches = useMemo(() => {
     const open = allMatches.filter((match) => OPEN_MATCH_STATUSES.has(String(match.status || "")));
@@ -555,6 +565,7 @@ export function TournamentDetailScreen({ navigation, route }: Props) {
                   matches={allMatches}
                   stages={stages}
                   format={tournament.format}
+                  advancement={tournament}
                   nameOf={nameOf}
                   statusOf={statusOf}
                   mineId={ownRegistration?.id || null}

@@ -265,3 +265,23 @@ async def test_stage_settings_keep_mode_and_flag_in_step(flow):
     legacy = await flow.patch(f"/api/tournaments/{tournament['id']}/stages/{stage['id']}", json={"settings": {"randomize_advancement_rounds": False}})
     assert legacy.status_code == 200, legacy.text
     assert legacy.json()["settings"]["advancement_mode"] == "fixed"
+
+
+# ------------------------------------------------------------------------------------------- App (#1633)
+
+@pytest.mark.asyncio
+async def test_public_bracket_carries_mode_and_ready_pot_for_the_app(flow):
+    """Die App (#1633) liest Modus und Topf aus der öffentlichen Baum-Antwort - wie der TV-Schlüssel seit #1634."""
+    _staff, tournament, _users, _regs = await bracket(flow, advancement_mode="draw_show")
+    await play_round_one(flow, tournament)
+    flow.act_as(None)
+    response = await flow.get(f"/api/tournaments/{tournament['id']}/bracket")
+    assert response.status_code == 200, response.text
+    targets = [m for m in response.json()["matches_v2"] if (m.get("settings") or {}).get("draw_group")]
+    assert targets and all(m["settings"]["advancement_mode"] == "draw_show" for m in targets)
+    ready = [m["draw_ready"] for m in targets if m.get("round") == 2]
+    assert ready and all(marker["pot_size"] == 4 and marker["since"] for marker in ready)
+    assert all(slot["source"]["draw"]["label"] for m in targets if m.get("round") == 2 for slot in m["slots"])
+    detail = await flow.get(f"/api/tournaments/{tournament['id']}")
+    assert detail.status_code == 200, detail.text
+    assert detail.json()["advancement_mode"] == "draw_show"

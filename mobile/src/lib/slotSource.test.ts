@@ -37,3 +37,11 @@ test("Zeit: die Dauer vom Server geht vor", () => {
   expect(plannedText({ scheduled_at: "2026-10-10T14:20:00+02:00", effective_duration_minutes: 15 }, now)).toBe("geplant ca. 14:20 · 15 Minuten");
   expect(plannedText({ duration_minutes: 20, effective_duration_minutes: 20 }, now)).toBe("20 Minuten");
 });
+
+// Vorgeplant im Vorschau-Baum oder nur vom Planer vorhergesagt (#1613, App #1633): „voraussichtlich“ - wie im Web.
+test("Zeit: vorgeplant oder Prognose heißt „voraussichtlich“", () => {
+  const now = new Date("2026-10-10T08:00:00Z");
+  expect(plannedText({ scheduled_at: "2026-10-10T14:20:00+02:00", is_preview: true }, now)).toBe("voraussichtlich ca. 14:20");
+  expect(plannedText({ scheduled_at: "2026-10-10T14:20:00+02:00", schedule_forecast: true, effective_duration_minutes: 15 }, now)).toBe("voraussichtlich ca. 14:20 · 15 Minuten");
+  expect(plannedText({ scheduled_at: "2026-10-10T14:20:00+02:00", schedule_forecast: false }, now)).toBe("geplant ca. 14:20");
+});

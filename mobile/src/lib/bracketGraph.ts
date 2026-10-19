@@ -10,6 +10,8 @@
 // Gruppe (`drawRails`): alle Quellspiele mit Ast auf die Schiene, von dort je ein Ast in jedes Zielspiel - nur innerhalb
 // der Sektion. Nach der Auslosung kommt die Linie eines Platzes aus der echten Herkunft (`source_result.from_match_key`,
 // Kante mit `rail`); „Dein Weg“ folgt ihr. Fester Baum: wie bisher nur echte Quellen.
+import { matchName } from "./bracketNames";
+import { BRONZE_SECTIONS, FINAL_SECTIONS, LOSER_SECTIONS, MAIN_SECTIONS, sectionKey, sectionKind } from "./bracketSections";
 import { absoluteRank, finderFor, normalizeSource, type SlotSource } from "./slotSource";
 
 export type BracketSlot = {
@@ -17,7 +19,7 @@ export type BracketSlot = {
   registration_id?: string | null;
   status?: string | null;
   source?: SlotSource;
-  source_result?: { reason?: string | null; removed_registration_id?: string | null; from_match_key?: string | null; flow?: string | null; rank?: number | null; skipped?: boolean } | null;
+  source_result?: { reason?: string | null; removed_registration_id?: string | null; from_match_key?: string | null; flow?: string | null; rank?: number | null; skipped?: boolean; draw_id?: string | null } | null;
 };
 export type BracketResult = { registration_id?: string | null; rank?: number | null; score?: number | null; points?: number | null; forfeit?: boolean; dnf?: boolean; no_show?: boolean; disqualified?: boolean; qualified?: boolean };
 export type BracketMatch = {
@@ -48,10 +50,29 @@ export type BracketMatch = {
   settings?: Record<string, any> | null;
   result_meta?: { source?: string | null; reason?: string | null } | null;
   draw?: { id?: string; group?: string; drawn_at?: string } | null;
+  // Show-Auslosung (#1590): die Runde ist fertig, der Topf steht - bis die Turnierleitung lost.
+  draw_ready?: { group?: string; since?: string; pot_size?: number } | null;
+  // Vorschau-Baum bzw. nur vom Planer vorhergesagt (#1613): die Zeit ist „voraussichtlich“.
+  is_preview?: boolean | null;
+  schedule_forecast?: boolean | null;
   [key: string]: unknown;
 };
 export type BracketEdge = { id: string; from: string; to: string; toSlot: number; flow: "W" | "L"; rank: number; cross: boolean; void: boolean; rail?: string };
-export type DrawRail = { key: string; stageId: string | null; group: string; label: string; sources: Array<{ id: string; flow: "W" | "L" }>; targets: string[]; drawn: boolean };
+export type AdvancementMode = "fixed" | "draw_round" | "draw_show" | "instant";
+export type DrawRail = {
+  key: string;
+  stageId: string | null;
+  group: string;
+  label: string;
+  sources: Array<{ id: string; flow: "W" | "L" }>;
+  targets: string[];
+  drawn: boolean;
+  /** Vier Modi (#1590): Modus des Ziels, Show-Topf steht, Plätze mit und noch ohne Los. */
+  mode: AdvancementMode;
+  ready: boolean;
+  assigned: number;
+  open: number;
+};
 export type MatchFate = { kind: "merged"; into: string; label: string } | { kind: "reset" | "skipped"; label: string };
 export type BracketEvent = {
   key: string;
@@ -65,22 +86,23 @@ export type BracketEvent = {
 
 const DONE = new Set(["completed", "finished", "reported", "confirmed", "forfeit"]);
 const LIVE = new Set(["running", "in_progress"]);
-// Dieselben Namen wie der Server (services/round_labels.LOSER_SECTIONS).
-export const LOSER_SECTIONS = new Set(["lb", "loser", "losers", "lower", "lower_bracket", "loser bracket", "looser"]);
-const FINAL_SECTIONS = new Set(["gf", "grand_final"]);
-const MAIN_SECTIONS = new Set(["main", "wb", "winner", "final"]);
+// Abschnittsnamen aus einer Quelle mit dem Server (lib/bracketSections, wie im Web seit #1591).
+export { LOSER_SECTIONS };
+const MAIN_PODIUM = new Set([...MAIN_SECTIONS].filter(Boolean));
 
 const statusOf = (match: Pick<BracketMatch, "status"> | null | undefined) => String(match?.status || "").toLowerCase();
 export const isDone = (match: Pick<BracketMatch, "status"> | null | undefined) => DONE.has(statusOf(match));
 export const isLive = (match: Pick<BracketMatch, "status"> | null | undefined) => LIVE.has(statusOf(match));
 export const isCancelled = (match: Pick<BracketMatch, "status"> | null | undefined) => statusOf(match) === "cancelled";
 
-/** Grobe Lage eines Abschnitts: main, loser, final oder bronze. */
+/** Grobe Lage eines Abschnitts: main, loser, final oder bronze - wie `section_kind` am Server (Gruppen zählen als main).
+ * Ältere Bäume nennen das Spiel um Platz 3 auch „TP“ oder „Third Place“; das bleibt zusätzlich erkannt. Wie im Web. */
 export function sectionGroup(section?: string | null): "main" | "loser" | "final" | "bronze" {
-  const key = String(section || "MAIN").trim().toLowerCase();
-  if (LOSER_SECTIONS.has(key)) return "loser";
-  if (FINAL_SECTIONS.has(key)) return "final";
-  if (key === "bronze" || key === "tp" || key.includes("third") || key.includes("platz 3")) return "bronze";
+  const kind = sectionKind(section);
+  if (kind === "loser" || kind === "bronze") return kind;
+  if (kind === "grand_final") return "final";
+  const key = sectionKey(section);
+  if (key === "tp" || key.includes("third") || key.includes("platz 3")) return "bronze";
   return "main";
 }
 
@@ -131,6 +153,27 @@ export function slotDraw(slot: BracketSlot | null | undefined): { group?: string
 }
 
 export const drawGroupOf = (match: BracketMatch | null | undefined) => (match?.settings?.draw_group ? String(match.settings.draw_group) : null);
+
+// Weiterkommen in vier Modi (#1590): am Spiel `settings.advancement_mode`; ältere Bäume kennen nur den Schalter. Wie im Web.
+const ADVANCEMENT_MODES = new Set<AdvancementMode>(["fixed", "draw_round", "draw_show", "instant"]);
+export function advancementModeOf(match: BracketMatch | null | undefined): AdvancementMode {
+  const settings = match?.settings || {};
+  if (ADVANCEMENT_MODES.has(settings.advancement_mode)) return settings.advancement_mode;
+  return settings.randomize_advancement_rounds ? "draw_round" : "fixed";
+}
+
+/** Hat dieser Platz sein Los schon (#1590, je Platz statt je Gruppe)? Ein Freilos-Platz, dessen Quelle der Umbau
+ * gestrichen hat (`source_result.skipped` ohne Los-Kennung, #1575), zählt nicht - der wartet weiter aufs Los. */
+export function slotDrawn(slot: BracketSlot | null | undefined) {
+  if (!slotDraw(slot)) return false;
+  const origin = slot?.source_result;
+  if (!origin?.from_match_key) return false;
+  if (origin.draw_id) return true;
+  return Boolean(slot?.registration_id) && !origin.skipped;
+}
+
+/** Ein Platz der Gruppe, der noch auf sein Los wartet. */
+export const slotOpen = (slot: BracketSlot | null | undefined) => Boolean(slotDraw(slot)) && String(slot?.status || "").toLowerCase() === "pending" && !slot?.registration_id && !slot?.source_result;
 
 /**
  * Der eindeutige Schlüssel einer Sammelschiene: Phase und Gruppe - wie im Web (`railKey`, #1581). Gruppen heißen je Phase
@@ -223,10 +266,16 @@ export function drawRails(matches: BracketMatch[] = []): DrawRail[] {
       }
     }
     const label = targets.flatMap((target) => (target.slots || []).map(slotDraw)).find((draw) => draw?.label)?.label || "";
-    // Gelost ist, wenn ein Ziel `draw` trägt oder ein Platz seine Herkunft aus dem Los hat. Ein Freilos-Platz, dessen
-    // Quelle der Lauf-Umbau gestrichen hat (`source_result.skipped`, #1575), zählt nicht - der wartet weiter aufs Los.
-    const drawn = targets.some((target) => target.draw || (target.slots || []).some((slot) => slotDraw(slot) && slot.source_result?.from_match_key && !slot.source_result?.skipped));
-    return { key, stageId, group, label, sources: [...sources.values()], targets: targets.map((match) => match.id), drawn };
+    const slots = targets.flatMap((target) => target.slots || []);
+    const assigned = slots.filter(slotDrawn).length;
+    const open = slots.filter(slotOpen).length;
+    const mode = advancementModeOf(targets[0]);
+    // Gelost ist, wenn ein Ziel `draw` trägt oder ein Platz schon sein Los hat (sofort zufällig: je Platz, #1590). Ein
+    // Freilos-Platz, dessen Quelle der Lauf-Umbau gestrichen hat (#1575), zählt nicht - der wartet weiter aufs Los.
+    const drawn = targets.some((target) => target.draw) || assigned > 0;
+    // Show-Auslosung (#1590): der Topf steht, bis die Turnierleitung lost - nur im Modus Show und nur vor dem Los.
+    const ready = mode === "draw_show" && !drawn && targets.some((target) => Boolean(target.draw_ready) && typeof target.draw_ready === "object");
+    return { key, stageId, group, label, sources: [...sources.values()], targets: targets.map((match) => match.id), drawn, mode, ready, assigned, open };
   });
 }
 
@@ -256,7 +305,7 @@ export function heatExits(match: BracketMatch, edges: BracketEdge[] = [], matche
   const keys = (flow: "W" | "L") => [...new Set([
     ...edges.filter((edge) => edge.from === match.id && edge.flow === flow && !edge.void && !edge.rail).map((edge) => edge.to),
     ...railTargets(flow),
-  ].filter((id) => !isCancelled(byId.get(id))).map((id) => byId.get(id)?.match_key).filter(Boolean) as string[])].sort();
+  ].filter((id) => !isCancelled(byId.get(id))).map((id) => byId.get(id)).filter((row): row is BracketMatch => Boolean(row?.match_key)).map(matchName))].sort();
   return { advance: keys("W"), drop: keys("L"), qualifiers: Number(match?.settings?.qualifiers_per_match || 0) };
 }
 
@@ -276,7 +325,8 @@ export function heatText(match: BracketMatch, edges: BracketEdge[], matches: Bra
   const field = filled === seats ? `${filled} Spieler` : filled ? `${filled} von ${seats} Spielern` : `${seats} ${seats === 1 ? "Platz" : "Plätze"}`;
   const onward = last ? "Platz 1 gewinnt" : exits.qualifiers ? count(exits.qualifiers) : "";
   return {
-    name: match.match_type === "ffa" ? `Lauf ${match.match_key || ""}`.trim() : match.match_key || "Spiel",
+    // Ein Wort als Kürzel (#1591, wie im Web): „Grand Final“ statt „Lauf FINAL“.
+    name: matchName(match) !== String(match.match_key || "") ? matchName(match) : match.match_type === "ffa" ? `Lauf ${match.match_key || ""}`.trim() : match.match_key || "Spiel",
     meta: [field, onward].filter(Boolean).join(" · "),
     cut: exits.qualifiers && exits.advance.length ? `${count(exits.qualifiers)} → ${exits.advance.join(", ")}` : "",
     rest: exits.drop.length ? `Die anderen → ${exits.drop.join(", ")}` : exits.advance.length ? "Die anderen scheiden aus" : "",
@@ -336,6 +386,13 @@ function advancedFrom(match: BracketMatch | undefined, registrationId: string) {
   return Number(row.rank) > 0 && Number(row.rank) <= qualifiers && !isOut(row);
 }
 
+/** Wurde `row` in `target` zusammengelegt? Per Kennung oder - wie am TV, der nur Schlüssel bekommt - per Spiel-Schlüssel. */
+function mergedInto(row: BracketMatch | undefined, target: BracketMatch) {
+  if (!row || !target) return false;
+  if (row.merged_into) return row.merged_into === target.id;
+  return Boolean(row.merged_into_key) && row.merged_into_key === target.match_key && (row.stage_id || "") === (target.stage_id || "");
+}
+
 const resultSig = (match: BracketMatch | undefined) => (match?.results || []).map((row) => `${row.registration_id}:${row.rank ?? ""}:${row.score ?? row.points ?? ""}`).sort().join(",");
 
 /**
@@ -370,7 +427,7 @@ export function diffBracket(previous: BracketMatch[] | null | undefined, next: B
       if (!id || oldSlots.get(slot.slot)?.registration_id === id || playersOf(old).has(id)) continue;
       const source = normalizeSource(slot.source);
       const drawn = Boolean(slotDraw(slot));
-      const mergedFrom = previous.find((row) => row.id !== match.id && nextById.get(row.id)?.merged_into === match.id && wasIn.has(`${row.id}:${id}`));
+      const mergedFrom = previous.find((row) => row.id !== match.id && mergedInto(nextById.get(row.id), match) && wasIn.has(`${row.id}:${id}`));
       if (mergedFrom) {
         moves.push({ key: `merge:${match.id}:${id}`, type: "merge", matchId: match.id, registrationId: id, from: { matchId: mergedFrom.id } });
       } else if (!drawn && source?.type === "rank" && source.match_key) {
@@ -387,8 +444,8 @@ export function diffBracket(previous: BracketMatch[] | null | undefined, next: B
 
 /** Spiel um Platz 3 - am Abschnitt, Rundennamen oder Kürzel erkannt (wie frontend/src/lib/bracketPodium.js). */
 export function isBronzeMatch(match: BracketMatch) {
-  const haystack = [match?.section, match?.bracket, match?.round_name, match?.match_key].filter(Boolean).join(" ").toLowerCase();
-  return haystack.includes("bronze") || haystack.includes("platz 3") || haystack.includes("third");
+  const haystack = [match?.section, match?.bracket, match?.round_name, match?.match_key, match?.name].filter(Boolean).join(" ").toLowerCase();
+  return BRONZE_SECTIONS.has(sectionKey(match?.section)) || haystack.includes("bronze") || haystack.includes("platz 3") || haystack.includes("third");
 }
 
 function lastStageMatches(matches: BracketMatch[], stages: Array<{ id?: string; number?: number }> = []) {
@@ -405,8 +462,8 @@ function lastStageMatches(matches: BracketMatch[], stages: Array<{ id?: string; 
  */
 export function finalMatchOf(matches: BracketMatch[] = [], stages: Array<{ id?: string; number?: number }> = []): BracketMatch | null {
   const pool = lastStageMatches(matches, stages).filter((match) => !isBronzeMatch(match) && !isCancelled(match));
-  const grandFinals = pool.filter((match) => FINAL_SECTIONS.has(String(match.section || "").toLowerCase()));
-  const candidates = grandFinals.length ? grandFinals : pool.filter((match) => MAIN_SECTIONS.has(String(match.section || "main").toLowerCase()));
+  const grandFinals = pool.filter((match) => FINAL_SECTIONS.has(sectionKey(match.section)));
+  const candidates = grandFinals.length ? grandFinals : pool.filter((match) => MAIN_PODIUM.has(sectionKey(match.section) || "main"));
   if (!candidates.length) return null;
   const maxRound = Math.max(...candidates.map((match) => Number(match.round || 1)));
   const lastRound = candidates.filter((match) => Number(match.round || 1) === maxRound);

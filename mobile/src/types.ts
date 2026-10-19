@@ -115,6 +115,9 @@ export type Tournament = {
   show_chat?: boolean;
   banner_url?: string | null;
   format?: string;
+  // Weiterkommen in vier Modi (#1590): der Server liest auch den alten Schalter und liefert immer den Modus.
+  advancement_mode?: "fixed" | "draw_round" | "draw_show" | "instant" | null;
+  randomize_advancement_rounds?: boolean | null;
   participants?: string[];
   matches?: Match[];
   standings?: Array<{ rank: number; name: string; points?: number; result?: string }>;
