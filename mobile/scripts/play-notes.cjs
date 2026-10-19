@@ -29,9 +29,12 @@ function playNotesSection(markdown, version) {
   return body.join("\n").trim();
 }
 
-/** So zählt Google Play: jedes Zeichen, Zeilenumbrüche mit. */
+/**
+ * So zählt Google Play: Unicode-Zeichen, Zeilenumbrüche mit („500 Unicode characters“). `Array.from` zählt ein Emoji
+ * als ein Zeichen - `String.length` zählte es als zwei (UTF-16).
+ */
 function playNotesLength(text) {
-  return String(text || "").trim().length;
+  return Array.from(String(text || "").trim()).length;
 }
 
 /** Was am Hinweis für diese Version nicht stimmt - leer, wenn er so in die Play Console darf. */

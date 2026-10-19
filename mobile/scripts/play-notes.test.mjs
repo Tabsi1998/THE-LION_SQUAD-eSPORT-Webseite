@@ -70,6 +70,14 @@ test("genau 500 Zeichen gehen, 501 nicht", () => {
   assert.match(problems[0], /höchstens 500/);
 });
 
+test("ein Emoji zählt wie bei Google Play als ein Zeichen", () => {
+  assert.equal(playNotesLength("Neu in 1.0.0:\n• Pokal 🏆"), 23);
+  const head = "Neu in 1.7.1:\n• ";
+  const exact = head + "🏆".repeat(RELEASE_NOTES_LIMIT - head.length);
+  assert.equal(playNotesLength(exact), 500);
+  assert.deepEqual(playNotesProblems(exact, "1.7.1"), []);
+});
+
 test("fehlt der Abschnitt, sagt die Prüfung, wo er hingehört", () => {
   const problems = playNotesProblems(null, "1.8.0");
   assert.equal(problems.length, 1);
