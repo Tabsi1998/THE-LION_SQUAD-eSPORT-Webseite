@@ -36,9 +36,9 @@ function StaffRow({ row, seriesId, onSaved, onRemove }) {
             {validityText(row)} · {publishText(row.publishes_directly)}
           </div>
           {!row.mfa_enabled && (
-            <div className="text-xs text-[#FFD700]/80" data-testid={`series-staff-mfa-${row.id}`}>Zwei-Faktor fehlt noch – bis dahin kommt dieser Captain nicht in die Saison.</div>
+            <div className="text-xs text-warn" data-testid={`series-staff-mfa-${row.id}`}>Zwei-Faktor fehlt noch – bis dahin kommt dieser Captain nicht in die Saison.</div>
           )}
-          {!row.account_active && <div className="text-xs text-[#FFD700]/80">Konto ist gesperrt oder inaktiv.</div>}
+          {!row.account_active && <div className="text-xs text-warn">Konto ist gesperrt oder inaktiv.</div>}
         </div>
       </div>
       <div className="mt-3 flex flex-wrap items-end gap-3 md:mt-0 md:shrink-0">
