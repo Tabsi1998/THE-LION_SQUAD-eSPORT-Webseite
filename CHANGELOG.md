@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.2.4 (19.10.2026)
+
+### Fehlerbehebungen
+
+* Erfolge „Sieger“ und „Siegesserie“ werten Unentschieden und Freilos nicht mehr als Sieg (#1796)
+* Sieg-Erfolge (z. B. „Zu Null“, Clutch, Favoritenschreck, Gruppensieg, Team-Siege) zählen jetzt auch eingetragene Ergebnisse (#1796)
+
 ## 1.2.3 (19.10.2026)
 
 ### Fehlerbehebungen
