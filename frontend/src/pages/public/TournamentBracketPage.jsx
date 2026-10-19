@@ -4,6 +4,7 @@ import { api } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { TournamentTabs } from "@/components/tls/tournament/TournamentTabs";
 import { BracketTree } from "@/components/tls/BracketTree";
+import { PrintLink } from "@/components/tls/print/PrintLink";
 import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
 import { SkeletonCards, SkeletonDetailHeader } from "@/components/tls/Skeleton";
 import { PhaseBadge } from "@/components/tls/PhaseBadge";
@@ -92,11 +93,15 @@ export default function TournamentBracketPage() {
             </div>
             <TournamentTabs tournament={t} accessToken={accessToken} className="mt-4" />
           </div>
+          <div className="flex flex-wrap gap-2">
+          {/* Druckansicht (#1283): Plan B auf Papier - Baum auf A4 quer. */}
+          <PrintLink slug={t.slug || t.id} parts="baum" from="baum" accessToken={accessToken} testId="bracket-print-link" />
           {t.can_view_display && (
             <Link to={`/display/bracket/${t.id}`} target="_blank" data-testid="bracket-tv-link" className="tls-btn tls-btn--secondary inline-flex items-center gap-2 px-4 py-2.5 font-bold uppercase tracking-wider rounded-sm text-sm">
               <Tv className="w-4 h-4" /> TV-/Beamer-Ansicht
             </Link>
           )}
+          </div>
         </div>
         {(data.matches_v2?.length || 0) === 0 ? (
           <div className="border border-white/10 rounded-sm bg-surface-1 p-12 text-center">

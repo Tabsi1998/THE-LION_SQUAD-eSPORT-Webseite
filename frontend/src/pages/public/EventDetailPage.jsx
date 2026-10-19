@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams, Link, useNavigate, useSearchParams } from "react-router-dom";
 import { api, formatRequestError, resolveMediaUrl } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
+import { PrintLink } from "@/components/tls/print/PrintLink";
 import { PublicLoadingState } from "@/components/tls/PublicLoadingState";
 import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
 import { StepBar, eventStep, eventSteps } from "@/components/tls/StepBar";
@@ -398,6 +399,8 @@ function EventOverview({ e, user, over, accessToken, hasConsent, onChanged, regi
           <button type="button" onClick={onLive} className="tls-btn tls-btn--secondary inline-flex min-h-11 items-center gap-2 px-4 py-2 text-xs uppercase tracking-wider font-bold rounded-sm" data-testid="event-live-follow">
             <Radio className="w-4 h-4" /> Live verfolgen
           </button>
+          {/* Druckansicht (#1283): Tagesplan auf Papier - mit Turnier-Recht auch die Anmeldeliste. */}
+          <PrintLink scope="event" slug={e.slug || e.id} parts="tagesplan" accessToken={accessToken} testId="event-print-link" />
           {hasArea(user, "tournaments") && (
             <Link to={`/display/event/${e.id}`} data-testid="event-display-link" className="tls-btn tls-btn--quiet inline-flex items-center gap-2 px-4 py-2 text-xs uppercase tracking-wider font-bold rounded-sm">
               <ExternalLink className="w-4 h-4" /> Display

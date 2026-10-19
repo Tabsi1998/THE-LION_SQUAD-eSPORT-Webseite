@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { ChevronLeft, ChevronRight, MapPin } from "lucide-react";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { TournamentTabs } from "@/components/tls/tournament/TournamentTabs";
+import { PrintLink } from "@/components/tls/print/PrintLink";
 import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
 import { SkeletonCards, SkeletonDetailHeader } from "@/components/tls/Skeleton";
 import { LiveClock } from "@/components/tls/bracket/BracketCards";
@@ -176,8 +177,14 @@ export default function TournamentSchedulePage() {
           className="mb-3"
         />
         <Link to={tournamentUrl} className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8] hover:text-white">← Zurück zum Turnier</Link>
-        <h1 className="mt-3 font-heading text-4xl md:text-6xl font-black uppercase">Spielplan</h1>
-        <p className="mt-3 text-white/60 max-w-2xl">Alle Runden, Zeiten und Stationen. Ein Spiel antippen öffnet seine Spielseite mit Chat und Ergebnis.</p>
+        <div className="mt-3 flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <h1 className="font-heading text-4xl md:text-6xl font-black uppercase">Spielplan</h1>
+            <p className="mt-3 text-white/60 max-w-2xl">Alle Runden, Zeiten und Stationen. Ein Spiel antippen öffnet seine Spielseite mit Chat und Ergebnis.</p>
+          </div>
+          {/* Druckansicht (#1283): mit leeren Feldern für das Ergebnis zum Handschreiben. */}
+          <PrintLink slug={tournament.slug || tournament.id} parts="spielplan" from="spielplan" accessToken={accessToken} testId="schedule-print-link" />
+        </div>
         <TournamentTabs tournament={tournament} accessToken={accessToken} className="mt-5" />
 
         {/* Mein nächstes Spiel vor Ort (#1556): „Du bist als Nächstes an Station 2 · ca. 18:40“. */}
