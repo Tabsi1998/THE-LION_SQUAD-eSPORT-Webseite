@@ -1,6 +1,6 @@
 -r requirements.txt
 
-black==26.10.0
+black==26.10.1
 flake8==7.4.1
 isort==8.0.1
 mongomock-motor==0.0.36
