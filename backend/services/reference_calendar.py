@@ -31,7 +31,7 @@ _ISO_DATE = re.compile(r"(?<!\d)(\d{4})-(\d{1,2})-(\d{1,2})(?!\d)")
 _DOT_DATE = re.compile(r"(?<![\d.])(\d{1,2})\.(\d{1,2})\.(\d{4}|\d{2})?(?![\d])")
 _CLOCK = re.compile(r"(?<![\d:])(\d{1,2}):(\d{2})(?:\s*Uhr)?(?![\d:])", re.IGNORECASE)
 _CODE = re.compile(r"^\s*([A-Za-zÄÖÜäöü]{1,6}\s?\d{1,3}|\d{1,3})\.?(?=[\s·|;\t]|$)")
-_SPLIT = re.compile(r"\s*[·|;\t]\s*|\s+[–-]\s+")
+_SPLIT = re.compile(r"[·|;]| [–-] ")
 _YEAR = re.compile(r"(?<!\d)(\d{4})(?!\d)")
 
 
@@ -51,8 +51,17 @@ def vienna_start(day: str | None, clock: str | None) -> str | None:
     wall = datetime.combine(date.fromisoformat(day), datetime.strptime(clock, "%H:%M").time())
     instant = wall.replace(tzinfo=CLUB_TZ, fold=0).astimezone(timezone.utc)
     if instant.astimezone(CLUB_TZ).replace(tzinfo=None) != wall:
-        raise ClockError(f"{clock} Uhr gibt es am {wall:%d.%m.%Y} in Wien nicht (Umstellung auf Sommerzeit).")
+        raise ClockError(clock_gap_message(day, clock))
     return instant.isoformat()
+
+
+def clock_gap_message(day: str, clock: str) -> str:
+    """Die Meldung für eine Uhrzeit, die es nicht gibt - aus den Eingaben gebaut, nie aus einer Ausnahme."""
+    try:
+        shown = date.fromisoformat(day).strftime("%d.%m.%Y")
+    except ValueError:
+        shown = "diesem Tag"
+    return f"{clock} Uhr gibt es am {shown} in Wien nicht (Umstellung auf Sommerzeit)."
 
 
 def club_day_of(value) -> str | None:
@@ -127,7 +136,10 @@ def _next_weekday(after: date, weekday: int | None) -> date:
 
 
 def _clean_venue(text: str) -> str:
-    parts = [part.strip(" ,") for part in _SPLIT.split(text)]
+    # Erst Leerraum zusammenfassen (linear), dann ohne \s-Wiederholungen trennen - CodeQL: kein Regex, der bei vielen
+    # Leerzeichen hintereinander langsam wird.
+    flat = " ".join(str(text or "").replace("\t", "|").split())
+    parts = [part.strip(" ,") for part in _SPLIT.split(flat)]
     return " · ".join(" ".join(part.split()) for part in parts if part.strip(" ,"))
 
 
@@ -201,8 +213,8 @@ def parse_round_lines(text: str, *, season: str | None, today: str, default_week
         if not error:
             try:
                 starts_at = vienna_start(day.isoformat(), clock)
-            except ClockError as exc:
-                error = str(exc)
+            except ClockError:
+                error = clock_gap_message(day.isoformat(), clock)
         if error:
             errors.append({"line": number, "text": raw, "message": error})
             continue

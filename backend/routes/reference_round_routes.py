@@ -28,7 +28,7 @@ from services import reference_series
 from services.dolibarr_policy import club_today
 from services.series_standings import ordered_rounds
 from services.reference_calendar import (
-    ClockError, calendar_view, club_day_of, parse_round_lines, vienna_clock, vienna_start,
+    ClockError, calendar_view, clock_gap_message, club_day_of, parse_round_lines, vienna_clock, vienna_start,
 )
 from services.reference_series_access import SeriesAccess, require_series_editor
 from services.visibility import user_can_see
@@ -133,8 +133,8 @@ def _text(value) -> Optional[str]:
 def _when(day: Optional[str], clock: Optional[str]) -> dict:
     try:
         return {"club_day": day, "starts_at": vienna_start(day, clock)}
-    except ClockError as exc:
-        raise HTTPException(422, str(exc)) from exc
+    except ClockError:
+        raise HTTPException(422, clock_gap_message(day, clock)) from None
 
 
 def _when_from_instant(value) -> dict:
