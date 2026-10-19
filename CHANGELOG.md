@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.0](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/compare/v1.0.4...v1.1.0) (2026-10-19)
+
+
+### Neu
+
+* TV-Warteschlange nennt im Lauf die Namen ([#1634](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1634)) ([#1776](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1776)) ([5286c93](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/5286c93eba8ea38d33d18c2c518ba16885589c31))
+
 ## [1.0.4](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/compare/v1.0.3...v1.0.4) (2026-10-18)
 
 
