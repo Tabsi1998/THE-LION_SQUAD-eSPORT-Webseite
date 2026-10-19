@@ -187,7 +187,8 @@ diese eine Liste der Anmeldungen.
 - **Da** (eingecheckt) heißt: die Person war da. Das bringt ihr einen Eintrag in der Jahreswertung, XP und kann Erfolge
   freischalten (siehe [Erfolge, Level und Jahreswertung](erfolge.md)).
 - **Storniert** oder **Nicht erschienen** beendet auch offene Rechnungsaufträge.
-- **Drucken:** eine schlichte Liste der Angemeldeten mit Kästchen zum Abhaken.
+- **Drucken:** öffnet die Druckansicht – Liste der Angemeldeten mit Kästchen zum Abhaken, Begleitpersonen, Warteliste,
+  Druckzeit und QR-Code; auf Wunsch mit Tagesplan (Plan B auf Papier, siehe [Turniere 3.13](turniere.md#313-plan-b-auf-papier)).
 
 **Nachricht an alle Angemeldeten:** Knopf **Nachricht an alle**. Text schreiben oder eine Vorlage antippen („Der Parkplatz ist
 gesperrt – bitte den Hintereingang nehmen.“), höchstens 1000 Zeichen. Darunter steht, an wie viele Personen sie geht. **Weiter**
