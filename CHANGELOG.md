@@ -1,29 +1,26 @@
 # Changelog
 
-## [1.5.0](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/compare/v1.4.0...v1.5.0) (2026-10-19)
-
+## 1.5.0 (19.10.2026)
 
 ### Neu
 
-* Captain nur für aktive Vereinsmitglieder ([#1749](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1749)) ([321c570](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/321c570e9701e8bc8c6b888ee4fc03b4ceb10521))
-* Captains in der Saison verwalten ([#1749](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1749)) ([321c570](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/321c570e9701e8bc8c6b888ee4fc03b4ceb10521))
-* Captains je Saison hinzufügen, ändern und entfernen mit Protokoll ([#1749](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1749)) ([321c570](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/321c570e9701e8bc8c6b888ee4fc03b4ceb10521))
-* Captains sehen ihre Serien unter „Mein Dienst“ und öffnen ihre Saison ([#1749](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1749)) ([321c570](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/321c570e9701e8bc8c6b888ee4fc03b4ceb10521))
-* Dialog „Unbekannte Namen“ und Teilnehmerliste in der Saison-Seite ([#1743](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1743)) ([8f96350](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/8f96350e8e7813964ea7763d751d4f04fbce8fde))
-* Namen externer Serien vergleichbar machen und Vorschläge mit Begründung bilden ([#1743](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1743)) ([8f96350](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/8f96350e8e7813964ea7763d751d4f04fbce8fde))
-* Teilnehmer einer Serie als Mitglied, Gast oder Extern zuordnen ([#1743](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1743)) ([8f96350](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/8f96350e8e7813964ea7763d751d4f04fbce8fde))
-
+* Captain nur für aktive Vereinsmitglieder (#1749)
+* Captains in der Saison verwalten (#1749)
+* Captains je Saison hinzufügen, ändern und entfernen mit Protokoll (#1749)
+* Captains sehen ihre Serien unter „Mein Dienst“ und öffnen ihre Saison (#1749)
+* Dialog „Unbekannte Namen“ und Teilnehmerliste in der Saison-Seite (#1743)
+* Namen externer Serien vergleichbar machen und Vorschläge mit Begründung bilden (#1743)
+* Teilnehmer einer Serie als Mitglied, Gast oder Extern zuordnen (#1743)
 
 ### Fehlerbehebungen
 
-* Klick in die Fläche einer Mehrfachauswahl im Profil schaltet nicht mehr die erste Option um ([#1835](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1835)) ([5af0d91](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/5af0d9109eba37a6a299fbdfb86b4465b74d27a1))
-* Klick neben Avatar, Banner oder Logo öffnet nicht mehr die Dateiauswahl (Profil und Team) ([#1835](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1835)) ([5af0d91](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/5af0d9109eba37a6a299fbdfb86b4465b74d27a1))
-* Kontolöschung nimmt Teilnehmer externer Serien aus der Vereinsstatistik ([#1743](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1743)) ([8f96350](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/8f96350e8e7813964ea7763d751d4f04fbce8fde))
-
+* Klick in die Fläche einer Mehrfachauswahl im Profil schaltet nicht mehr die erste Option um (#1835)
+* Klick neben Avatar, Banner oder Logo öffnet nicht mehr die Dateiauswahl (Profil und Team) (#1835)
+* Kontolöschung nimmt Teilnehmer externer Serien aus der Vereinsstatistik (#1743)
 
 ### Dokumentation
 
-* Handbuch „Unbekannte Namen“ mit Bildern aus der Abnahme ([#1743](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1743)) ([8f96350](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/8f96350e8e7813964ea7763d751d4f04fbce8fde))
+* Handbuch „Unbekannte Namen“ mit Bildern aus der Abnahme (#1743)
 
 ## 1.4.0 (19.10.2026)
 
