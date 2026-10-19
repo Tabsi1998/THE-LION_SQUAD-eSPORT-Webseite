@@ -83,7 +83,8 @@
         { "id": "LX", "stage_id": "s", "section": "LB", "round": null, "match_type": "ffa", "expected": "Loser Bracket" },
         { "id": "LY", "stage_id": "s", "section": "LB", "round": 0, "match_type": "ffa", "expected": "Loser Bracket" },
         { "id": "LZ", "stage_id": "s", "section": "LB", "match_type": "ffa", "expected": "Loser Bracket" },
-        { "id": "LW", "stage_id": "s", "section": "LB", "round": "x", "match_type": "ffa", "expected": "Loser Bracket" }
+        { "id": "LW", "stage_id": "s", "section": "LB", "round": "x", "match_type": "ffa", "expected": "Loser Bracket" },
+        { "id": "LV", "stage_id": "s", "section": "LB", "round": 1.5, "match_type": "ffa", "expected": "Loser Bracket" }
       ]
     },
     {

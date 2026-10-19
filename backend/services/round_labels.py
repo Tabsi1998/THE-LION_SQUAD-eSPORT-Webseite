@@ -35,6 +35,15 @@ def _int(value) -> int:
         return 0
 
 
+def _round_number(value) -> int:
+    """Rundennummer: nur ganze Zahlen ab 1, sonst 0 - wie ``roundNumber`` im Web (1.5 zählt nicht, „3“ schon)."""
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return 0
+    return int(number) if number.is_integer() and number > 0 else 0
+
+
 def section_kind(section) -> str:
     """Wo im Baum ein Spiel liegt: main, loser, grand_final, bronze oder group."""
     key = str(section or "").strip().lower()
@@ -68,8 +77,8 @@ def rounds_by_section(matches: list[dict]) -> dict[tuple, list[int]]:
     seen: dict[tuple, set[int]] = {}
     for match in matches or []:
         key = (match.get("stage_id"), section_kind(match.get("section")))
-        number = _int(match.get("round"))
-        if number > 0:
+        number = _round_number(match.get("round"))
+        if number:
             seen.setdefault(key, set()).add(number)
     return {key: sorted(values) for key, values in seen.items()}
 
@@ -77,7 +86,7 @@ def rounds_by_section(matches: list[dict]) -> dict[tuple, list[int]]:
 def round_label(match: dict, *, rounds: dict[tuple, list[int]] | None = None, kind: str = "knockout") -> str:
     """Die Runde eines Spiels in Alltagsworten. ``rounds`` aus ``rounds_by_section`` (alle Spiele des Turniers)."""
     name = str(match.get("round_name") or "").strip()
-    number = max(0, _int(match.get("round")))
+    number = _round_number(match.get("round"))
     section = section_kind(match.get("section"))
     if section == "bronze":
         return "Spiel um Platz 3"
