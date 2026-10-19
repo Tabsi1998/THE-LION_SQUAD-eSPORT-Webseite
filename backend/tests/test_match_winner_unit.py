@@ -7,7 +7,7 @@ import sys
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 
-from services.match_winner import match_winner_id, won_by  # noqa: E402
+from services.match_winner import is_duel, match_winner_id, won_by  # noqa: E402
 
 
 def duel(first: dict, second: dict, **extra) -> dict:
@@ -62,6 +62,16 @@ def test_freilos_ist_kein_sieg():
     bye = {"status": "completed", "slots": [{"registration_id": "a"}, {"registration_id": None}],
            "results": [{"registration_id": "a", "rank": 1, "note": "Freilos", "reported_by": "system"}]}
     assert match_winner_id(bye) is None
+    # Auch wo ein älterer Stand oder der Turnierbaum den Freilos-Sieger ausdrücklich nennt.
+    assert match_winner_id({**bye, "results": [{**bye["results"][0], "outcome": "winner"}]}) is None
+    assert match_winner_id({"status": "completed", "winner_id": "a", "slots": [{"registration_id": "a"}], "results": []}) is None
+    assert match_winner_id({"status": "completed", "winner_id": "a", "slots": [], "results": []}) is None
+
+
+def test_duell_heisst_genau_zwei_seiten():
+    assert is_duel(duel({"rank": 1}, {"rank": 2}))
+    assert not is_duel({"slots": [{"registration_id": reg} for reg in "abc"], "results": []})
+    assert not is_duel({"slots": [{"registration_id": "a"}, {"registration_id": None}], "results": []})
 
 
 def test_ohne_ergebnis_kein_sieger():
