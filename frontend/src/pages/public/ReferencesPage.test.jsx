@@ -178,6 +178,15 @@ test("Zeitleiste nach Jahr (#1748): gleiche Season-Nummer verschiedener Spiele u
   expect(keysOf(groups)).toEqual([["2026", ["rl"]], ["2025", ["rl-old", "cod"]]]);
 });
 
+test("Zeitleiste nach Jahr (#1748): ein ungültiges Startdatum fällt aufs Enddatum zurück - für Jahr und Reihenfolge", () => {
+  const groups = timelineGroups([
+    at("early", "2025-02-01"),
+    at("broken", "kein Datum", { end_date: "2025-08-01" }),
+    at("late", "2025-11-01"),
+  ]);
+  expect(keysOf(groups)).toEqual([["2025", ["late", "broken", "early"]]]);
+});
+
 test("Zeitleiste nach Jahr (#1748): ohne Startdatum zählt das Enddatum, kaputte Daten verschwinden nicht", () => {
   const groups = timelineGroups([at("end", null, { end_date: "2023-06-30" }), at("bad", "kein Datum")]);
   expect(keysOf(groups)).toEqual([["2023", ["end"]], ["", ["bad"]]]);

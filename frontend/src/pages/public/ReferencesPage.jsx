@@ -5,7 +5,7 @@ import { api, resolveMediaUrl } from "@/lib/api";
 import { seoTextPreview } from "@/lib/textPreview";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
-import { CountLine, EntryRow, FieldChips, GameChip, GameMark, MEDAL, MEDAL_RANK, MedalStat, PlacementBadge, RefButton, ReferenceCard, SectionTitle, bestPlacement, displayTitle, entriesOf, entryTitle, formatDate, gameKey, gameTitle, hasMember, medalOf, memberEntryOf, memberName, platformLabel, referenceGameName, timeOf } from "@/components/tls/references/referenceParts";
+import { CountLine, EntryRow, FieldChips, GameChip, GameMark, MEDAL, MEDAL_RANK, MedalStat, PlacementBadge, RefButton, ReferenceCard, SectionTitle, bestPlacement, displayTitle, entriesOf, entryTitle, formatDate, gameKey, gameTitle, hasMember, medalOf, memberEntryOf, memberName, platformLabel, referenceGameName, referenceInstant, timeOf } from "@/components/tls/references/referenceParts";
 import { Medal, Trophy, User, Users, X } from "lucide-react";
 import { TrophyShelf } from "@/components/tls/TrophyShelf";
 import { PublicLoadingState } from "@/components/tls/PublicLoadingState";
@@ -40,9 +40,10 @@ export function trophyItems(items) {
   return items.filter((item) => medalOf(item)).sort((a, b) => (MEDAL_RANK[medalOf(a)] - MEDAL_RANK[medalOf(b)]) || (timeOf(b) - timeOf(a)));
 }
 
-// Das Jahr einer Teilnahme in Wiener Zeit (#1748): aus dem Start, sonst dem Ende - leer ohne gültiges Datum.
+// Das Jahr einer Teilnahme in Wiener Zeit (#1748): aus dem gültigen Start, sonst dem Ende - derselbe Zeitpunkt wie
+// für die Reihenfolge (timeOf); leer ohne gültiges Datum.
 export function referenceYear(item) {
-  return viennaDay(item.start_date || item.end_date || null).slice(0, 4);
+  return viennaDay(referenceInstant(item)).slice(0, 4);
 }
 
 // Zeitleiste nach Jahr (#1748) statt nach Freitext-Saison: Sonst landeten gleiche Season-Nummern verschiedener

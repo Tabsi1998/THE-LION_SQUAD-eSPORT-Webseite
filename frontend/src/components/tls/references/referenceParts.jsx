@@ -101,9 +101,18 @@ export function medalOf(item) {
   return medalForPlacement(bestPlacement(item));
 }
 
+/** Der Zeitpunkt einer Teilnahme: das erste gültige von Start- und Enddatum - ein kaputter Start fällt aufs Ende zurück (#1748). null ohne gültiges Datum. */
+export function referenceInstant(item) {
+  for (const value of [item.start_date, item.end_date]) {
+    if (!value) continue;
+    const date = asInstant(value);
+    if (!Number.isNaN(date.getTime())) return date;
+  }
+  return null;
+}
+
 export function timeOf(item) {
-  const date = asInstant(item.start_date || item.end_date || 0);
-  return Number.isNaN(date.getTime()) ? 0 : date.getTime();
+  return referenceInstant(item)?.getTime() || 0;
 }
 
 export function SectionTitle({ icon: Icon, accent, eyebrow, title, hint }) {
