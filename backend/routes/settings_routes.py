@@ -11,7 +11,9 @@ import httpx
 from database import get_db
 from auth import require_club_admin, require_super, get_current_user, get_optional_user, require_area
 from services.public_site_settings import PUBLIC_LEGAL_SOURCE_FIELDS
-from services.auth_settings import is_google_client_id, load_auth_settings
+from services.auth_settings import (
+    is_google_client_id, load_auth_settings, parse_window_time, public_auth_settings, validate_event_window, validate_limit_updates,
+)
 from services.rate_limit import enforce_rate_limit
 from services.secret_store import decrypt_secret, encrypt_secret, secret_is_configured
 from models import now_utc, new_id
@@ -390,6 +392,13 @@ class AuthSettings(BaseModel):
     google_registration_enabled: Optional[bool] = None
     google_linking_enabled: Optional[bool] = None
     google_client_id: Optional[str] = None
+    # Grenzen je Adresse (#1802); Schranken und Bedeutung stehen in services/auth_settings.py.
+    login_ip_limit_per_minute: Optional[int] = None
+    register_ip_limit_per_hour: Optional[int] = None
+    event_login_ip_limit_per_minute: Optional[int] = None
+    event_register_ip_limit_per_hour: Optional[int] = None
+    event_limits_from: Optional[str] = Field(default=None, max_length=64)
+    event_limits_until: Optional[str] = Field(default=None, max_length=64)
 
 
 SETTING_AUDIT_SECRET_FIELDS = {"resend_api_key", "smtp_pass", "twitch_client_secret", "discord_client_secret", "steam_api_key",
@@ -772,7 +781,7 @@ async def public_settings(response: Response):
         "social_links": await _public_social_links(db, b),
         "channels_from_dolibarr": bool(b.get("channels_from_dolibarr")),
         "disabled_platforms": sorted(disabled_platforms(b)),
-        **(await load_auth_settings(db)),
+        **public_auth_settings(await load_auth_settings(db)),
     }
 
 
@@ -1605,6 +1614,16 @@ async def update_auth_settings(body: AuthSettings, me: dict = Depends(require_su
     db = get_db()
     raw = body.model_dump(exclude_unset=True)
     updates = {k: v for k, v in raw.items() if isinstance(v, bool)}
+    limit_updates, problem = validate_limit_updates(raw)
+    if problem:
+        raise HTTPException(400, problem)
+    if limit_updates:
+        current_auth = await load_auth_settings(db)
+        window = {key: limit_updates.get(key, current_auth[key]) for key in ("event_limits_from", "event_limits_until")}
+        problem = validate_event_window(parse_window_time(window["event_limits_from"]), parse_window_time(window["event_limits_until"]))
+        if problem:
+            raise HTTPException(400, problem)
+        updates.update(limit_updates)
     if "google_client_id" in raw:
         client_id = str(raw.get("google_client_id") or "").strip()
         if client_id and not is_google_client_id(client_id):

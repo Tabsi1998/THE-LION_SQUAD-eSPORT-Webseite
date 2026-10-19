@@ -40,6 +40,41 @@ Gelb ist kein Fehler, wenn an dem Tag wirklich alle im selben Netz waren, etwa a
 Cloudflare lässt je Anfrage höchstens 100 MB durch – größere Uploads enden mit 413, egal was im Proxy
 Manager eingestellt ist (Ausweg: der Upload-Host ohne Cloudflare, siehe unten).
 
+## Anmelde-Grenze je Netz für Events (#1802)
+
+Von einer Internet-Adresse aus sind höchstens **30 Anmeldungen je Minute** und **5 Registrierungen je
+Stunde** möglich (Web und App zusammen). Im Hallen- oder Vereins-WLAN teilen sich alle Handys eine
+öffentliche Adresse; beim Einlass kommen dann auch richtige Anmeldungen nicht durch. Betroffene lesen
+„Zu viele Anmeldungen aus diesem Netz. Bitte versuche es in … erneut.“ – nach spätestens einer Minute
+(Registrierung: einer Stunde) geht es wieder.
+
+Einstellen unter **Admin → System → Zugang → Grenze je Netz** (nur Superadmin):
+
+<img src="assets/betrieb/zugang-grenze-je-netz.png" alt="Karte Grenze je Netz mit normalen Werten, Event-Zeitraum und Event-Werten" width="520">
+
+| Feld | Vorgabe | Erlaubt | Wofür |
+| --- | --- | --- | --- |
+| Anmeldungen je Minute | 30 | 10–300 | Alltag |
+| Registrierungen je Stunde | 5 | 3–100 | Alltag |
+| Event-Zeitraum Beginn/Ende | leer | höchstens drei Tage | Nur in diesem Zeitraum gelten die Event-Werte, danach von selbst wieder die normalen |
+| Event: Anmeldungen je Minute | 150 | 10–1000 | Einlass, Turnierstart |
+| Event: Registrierungen je Stunde | 50 | 3–500 | Anmeldung vor Ort |
+
+**Vor einem Event:** Beginn eine Stunde vor Einlass, Ende nach dem letzten Programmpunkt eintragen,
+**Grenzen speichern**. Solange der Zeitraum läuft, steht oben rechts „Läuft gerade“. Richtwert für
+Anmeldungen je Minute: etwa so viele, wie in den ersten zehn Minuten gleichzeitig ankommen; höher
+als nötig bringt nichts. Wer in der Minute schon einmal angemeldet ist, braucht keine weitere Anmeldung.
+
+**Wann erhöhen:** Melden am Einlass mehrere Leute die Meldung „aus diesem Netz“, oder ist die Anmeldung
+vor Ort über QR-Code geplant. Für einen Vereinsabend reicht meist die Vorgabe.
+
+**Was gleich bleibt:** Der Schutz je Konto – nach sieben falschen Passwörtern für dieselbe E-Mail sind
+15 Minuten Pause – hängt nicht an diesen Werten und lässt sich nicht lockern. Die Grenzen stehen nur
+in der Verwaltung, nicht auf der öffentlichen Seite.
+
+Zählt der Server alle Besucher als eine Adresse (Prüfung „Besucher-Adresse“ oben auf Gelb), gilt die
+Grenze für alle gemeinsam – dann zuerst den Proxy richtig einstellen, nicht die Grenze hochdrehen.
+
 ## Eindeutige Indizes und Altdubletten (#930, #1043)
 
 Einige Sammlungen dürfen je Schlüssel nur eine Zeile haben (etwa XP je Konto, Discord-Aktivität je Person und

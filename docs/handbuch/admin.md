@@ -292,6 +292,7 @@ Jedes Thema hat genau **einen** Ort:
 | Du kannst die Rolle einer Person nicht ändern | Nur der Superadmin darf das; du siehst nur Text | Superadmin fragen |
 | Eine Person lässt sich nicht sperren | Superadmin-Konto, eigenes Konto, oder ein Konto mit Adminbereich (das sperrt nur der Superadmin) | Siehe 3.6 |
 | Freigabe gespeichert, die Person sieht nichts | Sie hat noch keine bestätigte Zwei-Faktor-Anmeldung, oder sie muss sich neu anmelden | 3.5 |
+| Am Event: „Zu viele Anmeldungen aus diesem Netz. Bitte versuche es in … erneut.“ | Viele Handys im selben WLAN teilen sich eine Adresse, die Grenze je Netz ist erreicht | Eine Minute warten; für das Event unter System → Zugang → **Grenze je Netz** einen Event-Zeitraum mit höherem Wert setzen ([Betrieb](../BETRIEB.md#anmelde-grenze-je-netz-für-events-1802)) |
 | Auf der Kommandozentrale fehlt eine Kachel, die eine andere Person sieht | Jede Kachel zeigt sich nur mit dem Bereich ihrer Seite | Gewollt; Freigabe beim Superadmin erfragen (3.6) |
 
 ---

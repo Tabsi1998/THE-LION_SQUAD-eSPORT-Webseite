@@ -67,6 +67,31 @@ export const ACCESS_SWITCHES = [
   ["password_login_enabled", "E-Mail & Passwort Login", "Klassische Anmeldung mit E-Mail und Passwort."],
   ["registration_enabled", "Registrierung offen", "Neue Nutzer können selbst einen Community-Account erstellen."],
 ];
+
+// Grenze je Netz (#1802): prüft die Eingaben der Karte sofort. Die Schranken (limit_bounds, event_window_max_hours)
+// liefert der Server mit den Zugangs-Einstellungen – hier keine eigenen Zahlen; fehlen sie, prüft nur der Server.
+// Gibt je Feld eine Meldung zurück; leer heißt: speicherbar.
+export function validateAccessLimits(draft, { limit_bounds: bounds, event_window_max_hours: maxHours } = {}) {
+  const errors = {};
+  for (const [key, range] of Object.entries(bounds || {})) {
+    const value = draft[key];
+    if (!Number.isInteger(value) || value < range.min || value > range.max) {
+      errors[key] = `Bitte eine ganze Zahl von ${range.min} bis ${range.max} angeben.`;
+    }
+  }
+  const from = draft.event_limits_from ? new Date(draft.event_limits_from) : null;
+  const until = draft.event_limits_until ? new Date(draft.event_limits_until) : null;
+  if (from && Number.isNaN(from.getTime())) errors.event_limits_from = "Datum und Uhrzeit sind ungültig.";
+  else if (until && Number.isNaN(until.getTime())) errors.event_limits_until = "Datum und Uhrzeit sind ungültig.";
+  else if (from && !until) errors.event_limits_until = "Bitte auch das Ende angeben – oder den Beginn leeren.";
+  else if (until && !from) errors.event_limits_from = "Bitte auch den Beginn angeben – oder das Ende leeren.";
+  else if (from && until && until <= from) errors.event_limits_until = "Das Ende muss nach dem Beginn liegen.";
+  else if (from && until && maxHours && until - from > maxHours * 3600000) {
+    const span = maxHours % 24 === 0 ? `${maxHours / 24} Tage` : `${maxHours} Stunden`;
+    errors.event_limits_until = `Höchstens ${span} am Stück.`;
+  }
+  return errors;
+}
 // Alte Reiter-Links (?tab=…) und Lesezeichen landen auf der passenden Seite.
 
 export const LEGACY_TAB_REDIRECTS = {
