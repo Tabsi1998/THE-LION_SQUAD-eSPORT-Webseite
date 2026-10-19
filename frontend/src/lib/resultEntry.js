@@ -183,10 +183,13 @@ export function initialState(entry) {
   const byId = Object.fromEntries((entry?.result || []).map((row) => [row.registration_id, row]));
   const flags = {};
   const scores = {};
+  // Im Lauf als nicht erschienen markiert (#1823, `participants[].no_show`): ohne gespeichertes Ergebnis schon so da.
+  const marked = new Set((entry?.participants || []).filter((row) => row.no_show).map((row) => row.registration_id));
   for (const id of sides) {
     const row = byId[id];
     if (row?.forfeit) flags[id] = "no_show";
     else if (row?.dnf) flags[id] = "gave_up";
+    else if (!row && marked.has(id)) flags[id] = "no_show";
     scores[id] = row?.score ?? row?.points ?? 0;
   }
   const order = [...(entry?.result || [])].filter((row) => !row.forfeit && !row.dnf).sort((a, b) => Number(a.rank) - Number(b.rank)).map((row) => row.registration_id);
