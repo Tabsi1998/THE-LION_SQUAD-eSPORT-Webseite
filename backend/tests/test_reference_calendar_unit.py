@@ -12,7 +12,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 
 from services import dolibarr_policy  # noqa: E402
 from services.reference_calendar import (  # noqa: E402
-    calendar_view, club_day_of, parse_round_lines, round_status, vienna_start,
+    ClockError, calendar_view, club_day_of, parse_round_lines, round_status, vienna_start,
 )
 
 
@@ -170,3 +170,23 @@ def test_too_many_lines_are_refused_as_a_whole():
 def test_iso_dates_and_plain_numbers_work_too():
     result = _parse("1. 2026-11-05 Nord\n2 2026-11-12 Süd")
     assert [(row["code"], row["day"]) for row in result["rows"]] == [("1", "2026-11-05"), ("2", "2026-11-12")]
+
+
+# ---------------------------------------------------------------- Zeitumstellung
+def test_a_clock_that_does_not_exist_in_vienna_is_refused():
+    # Letzter Sonntag im März: 02:00 springt auf 03:00.
+    with pytest.raises(ClockError, match="02:30 Uhr gibt es am 29.03.2026 in Wien nicht"):
+        vienna_start("2026-03-29", "02:30")
+    assert vienna_start("2026-03-29", "03:00") == "2026-03-29T01:00:00+00:00"
+
+
+def test_a_clock_that_exists_twice_means_the_first_one_in_summer_time():
+    # Letzter Sonntag im Oktober: 02:00–02:59 gibt es zweimal - gemeint ist die erste (noch Sommerzeit, UTC+2).
+    assert vienna_start("2026-10-25", "02:30") == "2026-10-25T00:30:00+00:00"
+    assert vienna_start("2026-10-25", "03:30") == "2026-10-25T02:30:00+00:00"
+
+
+def test_a_pasted_line_with_a_missing_clock_is_named():
+    result = _parse("R1 29.03. 02:30 Nord\nR2 25.10. 02:30 Süd")
+    assert [(error["line"], error["message"]) for error in result["errors"]] == [
+        (1, "02:30 Uhr gibt es am 29.03.2026 in Wien nicht (Umstellung auf Sommerzeit).")]

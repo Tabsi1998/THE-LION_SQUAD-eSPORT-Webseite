@@ -282,3 +282,14 @@ async def test_the_public_calendar_respects_visibility_and_hides_notes(flow):
     flow.act_as(None)
     assert (await flow.get(url)).status_code == 404
     assert (await flow.get(f"{PUBLIC}/gibt-es-nicht/2026/calendar")).status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_a_clock_lost_to_summer_time_is_refused_and_a_double_one_means_the_first(flow):
+    _, _, series = await _setup(flow)
+    missing = await flow.post(_rounds(series), json={"day": "2026-03-29", "time": "02:30"})
+    assert missing.status_code == 422 and "Sommerzeit" in missing.text
+    double = await flow.post(_rounds(series), json={"day": "2026-10-25", "time": "02:30"})
+    assert double.status_code == 200 and double.json()["starts_at"] == "2026-10-25T00:30:00+00:00"
+    moved = await flow.post(f"{_rounds(series)}/{double.json()['id']}/postpone", json={"day": "2027-03-28", "time": "02:15"})
+    assert moved.status_code == 422

@@ -26,7 +26,7 @@ from models import ReferenceRoundCreate, ReferenceRoundUpdate, _clock, new_id, n
 from services import reference_series
 from services.dolibarr_policy import club_today
 from services.reference_calendar import (
-    calendar_view, club_day_of, parse_round_lines, vienna_clock, vienna_start,
+    ClockError, calendar_view, club_day_of, parse_round_lines, vienna_clock, vienna_start,
 )
 from services.visibility import user_can_see
 
@@ -114,7 +114,10 @@ def _text(value) -> Optional[str]:
 
 
 def _when(day: Optional[str], clock: Optional[str]) -> dict:
-    return {"club_day": day, "starts_at": vienna_start(day, clock)}
+    try:
+        return {"club_day": day, "starts_at": vienna_start(day, clock)}
+    except ClockError as exc:
+        raise HTTPException(422, str(exc)) from exc
 
 
 def _when_from_instant(value) -> dict:

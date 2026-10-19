@@ -3,6 +3,7 @@ und der Parser für eingefügte Terminlisten.
 
 - **Zeit:** ein Termin hat einen Wiener Tag (``club_day``, „JJJJ-MM-TT“) und, wenn eine Uhrzeit bekannt ist, einen
   Zeitpunkt in UTC (``starts_at``). Gezählt wird nur in Wiener Tagen; „heute“ liefert ``dolibarr_policy.club_today()``.
+  Zur Zeitumstellung: eine Uhrzeit, die es nicht gibt, wird abgelehnt; eine doppelte meint die erste (Sommerzeit).
   So kann der Vereinskalender (``calendar_items``, Stufe 2) Titel, Ort, Tag und Zeitpunkt später unverändert übernehmen.
 - **Status** (``round_status``): gespeichert sind nur geplant, gewertet, abgesagt und verschoben; gerechnet werden
   „heute“ und „Ergebnis fehlt“ (Tag vorbei, kein veröffentlichtes Ergebnis). Abgesagt fehlt nie.
@@ -35,12 +36,23 @@ _YEAR = re.compile(r"(?<!\d)(\d{4})(?!\d)")
 
 
 # ---------------------------------------------------------------- Zeit
+class ClockError(ValueError):
+    """Eine Wiener Uhrzeit, die es an diesem Tag nicht gibt (Umstellung auf Sommerzeit)."""
+
+
 def vienna_start(day: str | None, clock: str | None) -> str | None:
-    """Wiener Tag und Uhrzeit („HH:MM“) als Zeitpunkt in UTC (ISO); ohne Uhrzeit ``None`` - dann zählt nur der Tag."""
+    """Wiener Tag und Uhrzeit („HH:MM“) als Zeitpunkt in UTC (ISO); ohne Uhrzeit ``None`` - dann zählt nur der Tag.
+
+    Zeitumstellung: Eine Uhrzeit, die es nicht gibt (letzter Sonntag im März, 02:00–02:59), lehnt ``ClockError`` ab.
+    Eine Uhrzeit, die es zweimal gibt (letzter Sonntag im Oktober, 02:00–02:59), meint die erste - noch Sommerzeit,
+    wie ``fromViennaInput`` im Web."""
     if not day or not clock:
         return None
-    local = datetime.combine(date.fromisoformat(day), datetime.strptime(clock, "%H:%M").time(), tzinfo=CLUB_TZ)
-    return local.astimezone(timezone.utc).isoformat()
+    wall = datetime.combine(date.fromisoformat(day), datetime.strptime(clock, "%H:%M").time())
+    instant = wall.replace(tzinfo=CLUB_TZ, fold=0).astimezone(timezone.utc)
+    if instant.astimezone(CLUB_TZ).replace(tzinfo=None) != wall:
+        raise ClockError(f"{clock} Uhr gibt es am {wall:%d.%m.%Y} in Wien nicht (Umstellung auf Sommerzeit).")
+    return instant.isoformat()
 
 
 def club_day_of(value) -> str | None:
@@ -185,15 +197,21 @@ def parse_round_lines(text: str, *, season: str | None, today: str, default_week
             error = f"Ort ist zu lang (höchstens {MAX_VENUE} Zeichen)."
         if not error and code and len(code) > MAX_CODE:
             error = f"Kürzel ist zu lang (höchstens {MAX_CODE} Zeichen)."
+        clock = clock or default_time
+        starts_at = None
+        if not error:
+            try:
+                starts_at = vienna_start(day.isoformat(), clock)
+            except ClockError as exc:
+                error = str(exc)
         if error:
             errors.append({"line": number, "text": raw, "message": error})
             continue
         previous = day
-        clock = clock or default_time
         warning = None
         if default_weekday is not None and not undated and day.weekday() != default_weekday:
             warning = "Nicht am Standard-Wochentag."
         rows.append({"line": number, "text": raw, "code": code, "venue": venue, "day": day.isoformat(),
-                     "time": clock, "starts_at": vienna_start(day.isoformat(), clock), "derived_day": undated,
+                     "time": clock, "starts_at": starts_at, "derived_day": undated,
                      "warning": warning})
     return {"rows": [] if errors else rows, "errors": errors}
