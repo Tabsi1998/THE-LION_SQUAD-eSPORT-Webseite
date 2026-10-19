@@ -13,7 +13,7 @@ import "./seasons.css";
 // für alle) und Corners über dem Inhalt, nie klickbar, unter Dialogen. Toasts einmal je Tag. Nur die
 // Module aktiver Saisonen werden geladen; im Adminbereich und auf dem Display bleibt die Bühne leer.
 
-export const QUIET_PATHS = ["/admin", "/display", "/setup", "/consent"];
+export const QUIET_PATHS = ["/admin", "/display", "/print", "/setup", "/consent"];
 
 export function isQuietPath(pathname) {
   return QUIET_PATHS.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));

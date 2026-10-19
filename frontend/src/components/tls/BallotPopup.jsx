@@ -11,7 +11,7 @@ import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 // ein Band am unteren Rand, bis abgestimmt ist oder die Abstimmung schließt. Geheime Wahlen laufen auf Papier im Saal -
 // dafür gibt es nur den Hinweis. Im Admin und auf Anzeige-Seiten bleibt es still, wie bei den Zeremonien.
 
-const QUIET_PREFIXES = ["/admin", "/display", "/setup", "/consent"];
+const QUIET_PREFIXES = ["/admin", "/display", "/print", "/setup", "/consent"];
 
 const isObject = (value) => Boolean(value) && typeof value === "object" && !Array.isArray(value);
 

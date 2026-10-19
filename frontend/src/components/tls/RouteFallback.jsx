@@ -9,7 +9,7 @@ import { SkeletonPage } from "./Skeleton";
 // Seitenwechsel (#1324): Kopf und Leiste bleiben stehen, darin ein Skelett und die dünne Linie unter dem Kopf - kein
 // schwarzer Vollbild-Kreisel mehr. Verwaltung, TV-Seiten und Anmeldung haben einen eigenen Rahmen: dort nur das ruhige
 // Skelett.
-const OWN_FRAME = /^\/(admin|display|tv|login|register|forgot-password|reset-password|verify-email)(\/|$)/;
+const OWN_FRAME = /^\/(admin|display|print|tv|login|register|forgot-password|reset-password|verify-email)(\/|$)/;
 
 export function RouteFallback() {
   const { pathname } = useLocation();

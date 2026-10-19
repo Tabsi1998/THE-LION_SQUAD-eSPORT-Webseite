@@ -66,6 +66,8 @@ const TournamentDetailPage = lazy(() => import("@/pages/public/TournamentDetailP
 // Vor-Ort-Zugang (#1592): Ziel des QR-Codes auf TV und Aushang.
 const OnsiteAccessPage = lazy(() => import("@/pages/public/OnsiteAccessPage"));
 const AdminOnsitePosterPage = lazy(() => import("@/pages/admin/AdminOnsitePosterPage"));
+// Druckansicht (#1283): Plan B auf Papier - Baum, Spielplan, Check-in-Liste und Tagesplan, ohne Menü und Deko.
+const PrintPage = lazy(() => import("@/pages/print/PrintPage"));
 const TournamentBracketPage = lazy(() => import("@/pages/public/TournamentBracketPage"));
 const TournamentStandingsPage = lazy(() => import("@/pages/public/TournamentStandingsPage"));
 const TournamentSchedulePage = lazy(() => import("@/pages/public/TournamentSchedulePage"));
@@ -422,6 +424,10 @@ function App() {
           <Route path="/display/event/:id/calls" element={<EventCallsTVPage />} />
           <Route path="/display/bracket/:id" element={<BracketTvRoute />} />
           <Route path="/display/bracket/:id/station/:stationId" element={<BracketTvRoute station />} />
+
+          {/* Druckansicht (#1283): öffentlich wie Baum und Spielplan; die Check-in-Liste prüft der Server. */}
+          <Route path="/print/tournaments/:slug" element={<PrintPage scope="tournament" />} />
+          <Route path="/print/events/:slug" element={<PrintPage scope="event" />} />
 
           {/* Error pages */}
           <Route path="/403" element={<ForbiddenPage />} />
