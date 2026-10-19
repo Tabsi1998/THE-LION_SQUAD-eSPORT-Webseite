@@ -71,6 +71,7 @@ jobs:
         env:
           ABNAHME_SHOTS: ${{ github.workspace }}/abnahme-nacht/bilder
           ABNAHME_SPECS: ${{ inputs.specs }}
+          ABNAHME_TRACE: "off"
           PYTHON: python3
         run: bash scripts/run_abnahme_all.sh run
       - name: Bericht ins Job-Summary
@@ -82,14 +83,21 @@ jobs:
           {
             cat "$ABNAHME_RESULTS/summary.md"
             echo
-            echo "Bilder, Playwright-Bericht und Traces je Spec: Artefakt **abnahme-nacht** (7 Tage)."
+            echo "Bilder und Playwright-Bericht je Spec: Artefakt **abnahme-nacht** (7 Tage). Traces gibt es nachts nicht (öffentliches Artefakt).
           } >> "$GITHUB_STEP_SUMMARY"
       - name: Ergebnisse als Artefakt
         if: always()
         uses: actions/upload-artifact@v7
         with:
           name: abnahme-nacht
-          path: abnahme-nacht/
+          # Öffentliches Repo (Codex): keine Playwright-Traces - sie zeichnen Anmeldung, Zwei-Faktor-Code und
+          # Sitzungs-Cookies der Testkonten auf. Nachts läuft der Test mit ABNAHME_TRACE=off; zur Sicherheit fliegen
+          # Trace-Dateien hier noch einmal raus.
+          path: |
+            abnahme-nacht/
+            !abnahme-nacht/**/trace.zip
+            !abnahme-nacht/**/*.trace
+            !abnahme-nacht/**/state*.json
           if-no-files-found: ignore
           retention-days: 7
       - name: Abnahme-Stand stoppen

@@ -131,7 +131,7 @@ cmd_run() {
         PLAYWRIGHT_JSON_OUTPUT_FILE="$out/report.json" \
         PLAYWRIGHT_HTML_OUTPUT_DIR="$out/playwright-report" PLAYWRIGHT_HTML_OPEN=never \
         npx playwright test "e2e/abnahme/$name.spec.js" --project=chromium --workers=1 --retries=0 \
-          --trace=retain-on-failure --output="$out/test-results" --reporter=line,json,html
+          --trace="${ABNAHME_TRACE:-retain-on-failure}" --output="$out/test-results" --reporter=line,json,html
       ) 2>&1 | tee "$out/spec.log"
       spec_rc=${PIPESTATUS[0]}
       set -e
