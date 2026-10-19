@@ -306,6 +306,8 @@ async def _anonymize_user_data(db, user_id: str, actor_id: str, action: str) -> 
             "platform_verified": "",
             # Freunde beim Event (#1188): Wahl und Hinweis gehören zum Konto.
             "privacy_friends_see_registrations": "", "friends_registrations_hint_seen_at": "",
+            # Abo-Hinweis „Mein Kalender“ (#1788).
+            "calendar_subscribe_hint_seen_at": "",
         },
     })
     for collection in (db.refresh_tokens, db.auth_sessions, db.email_verification_tokens,

@@ -21,6 +21,9 @@ import secrets
 from models import now_utc
 from services import calendar_items, club_calendar
 
+# Der Hinweis „Deine Termine automatisch im Kalender?“ nach einer Anmeldung (#1788): einmal je Konto, am Konto gemerkt.
+HINT_FIELD = "calendar_subscribe_hint_seen_at"
+
 TOKEN_BYTES = 32
 PATH_PREFIX = "/api/calendar/personal/"
 # token_urlsafe(32) ergibt 43 Zeichen; alles andere ist sicher kein Token und wird gar nicht erst nachgeschlagen.
@@ -74,8 +77,8 @@ async def owner_for(db, token: str) -> dict | None:
     row = await db.calendar_feed_tokens.find_one({"token_hash": token_hash(token)}, {"_id": 0, "user_id": 1})
     if not row or not row.get("user_id"):
         return None
-    user = await db.users.find_one({"id": row["user_id"]}, _ACCOUNT_FIELDS)
-    if not user or user.get("is_active") is False or user.get("is_banned"):
+    user = await account(db, row["user_id"])
+    if not user:
         return None
     await db.calendar_feed_tokens.update_one({"user_id": user["id"]}, {"$set": {"last_used_at": now_utc()}})
     return user
@@ -92,12 +95,73 @@ def _allowed(item: dict) -> bool:
     return bool(item.get("mine")) and item.get("status") not in EXCLUDED_STATUS and item.get("visibility") not in EXCLUDED_VISIBILITY
 
 
-async def personal_items(db, user: dict) -> list[dict]:
+async def personal_items(db, user: dict, own: dict[str, dict[str, dict]] | None = None) -> list[dict]:
     """Nur die eigenen Termine: aus der Sicht der Person, davon was „angemeldet“ ist, plus ihre Vereinstermine.
 
     Vereinstermine sind gewollt (#1189: „nur die eigenen Termine“, `club_calendar.club_items` ist dafür gebaut): zugesagte
     Versammlungen und eigene Helferschichten - ohne Namen anderer, ohne Zugangslink. Abgesagtes und Internes nie.
+    Dieselbe Liste zeigt „Mein Kalender“ (#1788) - die Regel steht nur hier.
     """
-    items = [item for item in await calendar_items.collect(db, user) if _allowed(item)]
+    items = [item for item in await calendar_items.collect(db, user, own) if _allowed(item)]
     items += [item for item in await club_calendar.club_items(db, user) if _allowed(item)]
     return sorted(items, key=lambda item: (item["start"], item["kind"], item["title"]))
+
+
+# ---------------------------------------------------------------- „Mein Kalender“ (#1788)
+
+# Vereinstermine tragen keinen Anmeldestand - ihre Plakette sagt, was sie für die Person sind.
+_MEETING_STATE = {"state": "accepted", "label": "Zugesagt", "team_name": None}
+_SHIFT_LABEL = "Schicht"
+
+
+async def account(db, user_id: str) -> dict | None:
+    """Das Konto so, wie es der Feed sieht (ohne Sitzung, ohne Zwei-Faktor) - gesperrt oder abgeschaltet: keins."""
+    user = await db.users.find_one({"id": user_id}, _ACCOUNT_FIELDS)
+    if not user or user.get("is_active") is False or user.get("is_banned"):
+        return None
+    return user
+
+
+def own_state(item: dict, own: dict[str, dict[str, dict]]) -> dict | None:
+    """Der eigene Stand zu einem Termin als Plakette: angemeldet, Warteliste, eingecheckt, dabei mit dem Team, Schicht …"""
+    kind = item.get("kind")
+    if kind == "club":
+        if item.get("club_kind") == "meeting":
+            return dict(_MEETING_STATE)
+        phase = item.get("phase") or {}
+        return {"state": phase.get("state") or "shift", "label": phase.get("label") or _SHIFT_LABEL, "team_name": None}
+    if kind == "event":
+        state = own.get("events", {}).get(item.get("event_id") or item.get("id"))
+    elif kind == "tournament":
+        state = own.get("tournaments", {}).get(str(item.get("id") or "").removesuffix("-anmeldeschluss"))
+    elif kind == "fastlap":
+        state = own.get("fastlaps", {}).get(item.get("id"))
+    else:
+        state = None
+    if not state:
+        return None
+    return {"state": state.get("state"), "label": state.get("label"), "team_name": state.get("team_name")}
+
+
+async def hint_due(db, user_id: str, active: bool) -> bool:
+    """Der Hinweis nach einer Anmeldung: nur ohne aktiven Link und nur, solange er nicht schon einmal erschienen ist."""
+    if active:
+        return False
+    row = await db.users.find_one({"id": user_id}, {"_id": 0, HINT_FIELD: 1}) or {}
+    return not row.get(HINT_FIELD)
+
+
+async def mark_hint_seen(db, user_id: str) -> None:
+    await db.users.update_one({"id": user_id}, {"$set": {HINT_FIELD: now_utc().isoformat()}})
+
+
+async def my_calendar(db, user_id: str) -> dict:
+    """„Mein Kalender“ ohne Abo: genau die Termine des persönlichen Feeds (``personal_items``), je Termin mit Stand,
+    dazu der Stand des Abos und ob der Hinweis fällig ist. Das Konto wird wie beim Feed geladen - dieselbe Sicht."""
+    subscription = await status(db, user_id)
+    user = await account(db, user_id)
+    items: list[dict] = []
+    if user:
+        own = await calendar_items.own_entries(db, user)
+        items = [{**item, "own": own_state(item, own)} for item in await personal_items(db, user, own)]
+    return {"items": items, "subscription": subscription, "hint_due": await hint_due(db, user_id, subscription["active"])}

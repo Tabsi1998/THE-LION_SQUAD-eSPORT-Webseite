@@ -157,13 +157,17 @@ async def own_entries(db, user: dict | None) -> dict[str, dict[str, dict]]:
     return out
 
 
-async def collect(db, user: dict | None) -> list[dict]:
-    """Alle sichtbaren Termine, nach Beginn sortiert - Vergangenes bleibt drin (Vormonat)."""
+async def collect(db, user: dict | None, own: dict[str, dict[str, dict]] | None = None) -> list[dict]:
+    """Alle sichtbaren Termine, nach Beginn sortiert - Vergangenes bleibt drin (Vormonat).
+
+    ``own`` ist der schon geholte eigene Stand (``own_entries``) - „Mein Kalender“ (#1788) braucht ihn auch für die Plaketten.
+    """
     events = await db.events.find({"status": {"$ne": "draft"}}, _EVENT_FIELDS).to_list(2000)
     tournaments = await db.tournaments.find({"status": {"$ne": "draft"}, "is_public": {"$ne": False}}, _TOURNAMENT_FIELDS).to_list(2000)
     fastlaps = await db.f1_challenges.find({"status": {"$ne": "draft"}}, _FASTLAP_FIELDS).to_list(2000)
 
-    own = await own_entries(db, user)
+    if own is None:
+        own = await own_entries(db, user)
     my_events, my_tournaments, my_fastlaps = set(own["events"]), set(own["tournaments"]), set(own["fastlaps"])
 
     items: list[dict] = []
