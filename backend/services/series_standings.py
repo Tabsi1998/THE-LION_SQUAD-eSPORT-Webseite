@@ -21,7 +21,9 @@ from __future__ import annotations
 
 import math
 
-from services.scoring_rules import counted_results, league_table, normalize_rules, rank_with_ties, result_points
+from services.scoring_rules import (
+    counted_results, league_table, normalize_rules, rank_with_ties, result_points, validate_sheet,
+)
 
 WORST = -math.inf
 TABLE_FIELDS = ("played", "won", "drawn", "lost", "score_for", "score_against", "score_diff")
@@ -224,6 +226,8 @@ def compute_standings(*, rules: dict, rounds: list[dict], sheets: dict[str, dict
     seq_of = {item["id"]: index for index, item in enumerate(counting, start=1)}
     total_rounds = sum(1 for item in counting if item.get("status") != "cancelled")
     scored = [item for item in counting if item.get("status") == "scored" and item["id"] in sheets]
+    for item in scored:
+        validate_sheet(sheets[item["id"]], item["id"])
     people = {person["id"]: person for person in participants if person.get("id")}
     own = {str(team).strip() for team in own_teams if str(team or "").strip()}
     snapshots: list[dict] = []

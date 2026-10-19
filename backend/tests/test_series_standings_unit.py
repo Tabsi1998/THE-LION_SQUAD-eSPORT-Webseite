@@ -4,6 +4,8 @@ Wert gegen die Summe, abgesagte Runde und eine Regeländerung, die genau dasselb
 import copy
 import random
 
+import pytest
+
 from services.scoring_rules import normalize_rules
 from services.series_standings import compute_standings
 
@@ -88,6 +90,12 @@ def test_a_cancelled_round_has_no_standing_scores_nothing_and_does_not_count_as_
     # Anna nur Sechste.
     assert _table(_scope(snapshots, "drivers"), "participant_id", "rank", "points", "dropped_round_ids") == [
         ("bert", 1, 10, ["r1"]), ("anna", 2, 10, ["r3"])]
+
+
+def test_a_sheet_with_negative_penalty_points_is_not_scored():
+    sheets = {"r1": {"rows": [{"participant_id": "anna", "place": 2, "penalty_points": -4}]}}
+    with pytest.raises(ValueError, match="r1"):
+        compute_standings(rules=_rules(), rounds=[_round("r1", 1)], sheets=sheets, participants=PARTICIPANTS)
 
 
 def test_rounds_that_do_not_count_are_left_out():
