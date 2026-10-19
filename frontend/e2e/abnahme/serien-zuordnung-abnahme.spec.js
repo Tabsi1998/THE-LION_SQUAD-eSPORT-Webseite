@@ -93,7 +93,7 @@ test.describe("Abnahme #1743: externe Namen den Mitgliedern zuordnen", () => {
       await expect(list.locator("li", { hasText: `[TLS] ${gameId}` })).toContainText(`Mitglied · ${memberName}`);
       await expect(list.locator("li", { hasText: `Gast Probe ${stamp}` })).toContainText("Gast");
       await expect(list.locator("li", { hasText: `Fremd Probe ${stamp}` })).toContainText("Extern");
-      await expect(admin.getByTestId("series-participants-counts")).toContainText("1 Mitglieder · 1 Gäste · 1 Extern · 2 offen");
+      await expect(admin.getByTestId("series-participants-counts")).toContainText("1 Mitglied · 1 Gast · 1 Extern · 2 offen");
       await shot(admin, "serien-zuordnung-liste");
 
       // Nächste Saison: bestätigte Namen erkennt die Website selbst, der Externe bleibt offen.

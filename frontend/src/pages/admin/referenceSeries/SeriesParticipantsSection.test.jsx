@@ -9,7 +9,7 @@ vi.mock("@/lib/api", () => ({ api: apiMock, formatApiError: (detail) => detail |
 vi.mock("@/hooks/useApiInvalidation", () => ({ useApiInvalidation: () => {} }));
 vi.mock("sonner", () => ({ toast: toastMock }));
 
-const { SeriesParticipantsSection, splitNames } = await import("./SeriesParticipantsSection");
+const { SeriesParticipantsSection, countsText, splitNames } = await import("./SeriesParticipantsSection");
 const { preselectedProfile, profileOptions } = await import("./UnknownNamesSheet");
 
 const SERIES = { id: "serie-1", lineage: { id: "spur-1", title: "Probe Liga F1" } };
@@ -50,7 +50,7 @@ test("Liste zeigt je Name Mitglied, Gast, Extern oder offen samt Zählung", asyn
   expect(screen.getByTestId("participant-link-t2")).toHaveTextContent("Gast");
   expect(screen.getByTestId("participant-link-t3")).toHaveTextContent("Extern");
   expect(screen.getByTestId("participant-link-t4")).toHaveTextContent("Offen");
-  expect(screen.getByTestId("series-participants-counts")).toHaveTextContent("1 Mitglieder · 1 Gäste · 1 Extern · 2 offen");
+  expect(screen.getByTestId("series-participants-counts")).toHaveTextContent("1 Mitglied · 1 Gast · 1 Extern · 2 offen");
   expect(screen.getByTestId("series-unknown-open")).toHaveTextContent("Unbekannte Namen (2)");
 });
 
@@ -114,4 +114,10 @@ test("Hilfen: Zeilen trennen, Vorauswahl nur bei starkem Vorschlag, Vorschläge 
   expect(preselectedProfile([{ target: "guest", strong: true }, { target: "member", profile_id: "p2", strong: true }])).toBe("p2");
   expect(profileOptions([{ target: "member", profile_id: "p2", label: "Bert" }], [{ id: "p1", name: "Anna" }, { id: "p2", name: "Bert" }]))
     .toEqual([["", "Mitglied wählen …"], ["p2", "Bert – Vorschlag"], ["p1", "Anna"]]);
+});
+
+test("Zählung in Einzahl und Mehrzahl", () => {
+  expect(countsText({ member: 1, guest: 1, external: 1, open: 1 })).toBe("1 Mitglied · 1 Gast · 1 Extern · 1 offen");
+  expect(countsText({ member: 2, guest: 2, external: 0, open: 3 })).toBe("2 Mitglieder · 2 Gäste · 0 Extern · 3 offen");
+  expect(countsText({})).toBe("0 Mitglieder · 0 Gäste · 0 Extern · 0 offen");
 });

@@ -17,6 +17,16 @@ export function splitNames(text) {
   return String(text || "").split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
 }
 
+export function countsText(counts = {}) {
+  const count = (value, one, many) => `${value || 0} ${value === 1 ? one : many}`;
+  return [
+    count(counts.member, "Mitglied", "Mitglieder"),
+    count(counts.guest, "Gast", "Gäste"),
+    `${counts.external || 0} Extern`,
+    `${counts.open || 0} offen`,
+  ].join(" · ");
+}
+
 function linkText(row) {
   if (row.link_status === "open") return "Offen";
   if (row.link === "member") return row.profile_name ? `Mitglied · ${row.profile_name}` : LINK_LABELS.member;
@@ -82,7 +92,7 @@ export function SeriesParticipantsSection({ series }) {
         <div className="min-w-0">
           <div className="text-[11px] font-bold uppercase tracking-widest text-[#29B6E8]">Teilnehmer</div>
           <div className="mt-1 text-[10px] uppercase tracking-widest text-white/45 font-bold" data-testid="series-participants-counts">
-            {counts.member || 0} Mitglieder · {counts.guest || 0} Gäste · {counts.external || 0} Extern · {open} offen
+            {countsText(counts)}
           </div>
         </div>
         <div className="flex items-center gap-2 shrink-0 flex-wrap">
