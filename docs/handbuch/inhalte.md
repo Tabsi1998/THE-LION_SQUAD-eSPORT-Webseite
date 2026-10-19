@@ -279,7 +279,7 @@ fehlt das Ergebnis, oder der Termin wurde abgesagt.
 </table>
 
 **Öffentlich** steht der Kalender unter `/references/series/<spur>/<saison>` – mit der Sichtbarkeit von Spur und Saison
-(eine Saison „Nur Mitglieder“ sehen Gäste nicht), ohne Notizen. Die volle Serienseite mit Tabelle kommt in einem
+(eine Saison „Nur Mitglieder“ sehen Gäste nicht), ohne Notizen; statt „Ergebnis fehlt“ steht dort „Ergebnis folgt“. Die volle Serienseite mit Tabelle kommt in einem
 späteren Schritt; bis dahin ist die Seite nicht für Suchmaschinen gedacht.
 
 **Captains:** Auf der Seite der Saison steht unten **Captains**. Dort tragt ihr Mitglieder ein, die für genau diese

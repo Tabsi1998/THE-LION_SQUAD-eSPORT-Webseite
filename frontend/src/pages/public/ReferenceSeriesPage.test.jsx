@@ -22,6 +22,7 @@ const BODY = {
     { id: "r1", position: 1, code: "R1", club_day: "2026-11-05", time: "20:30", venue: "Probering", state: "today" },
     { id: "r2", position: 2, code: "R2", club_day: "2026-11-14", time: null, venue: "Teststadt", state: "postponed", original_club_day: "2026-11-12" },
     { id: "r3", position: 3, code: null, club_day: null, time: null, state: "cancelled" },
+    { id: "r4", position: 4, code: "R4", club_day: "2026-10-29", time: null, state: "missing" },
   ],
 };
 
@@ -45,7 +46,10 @@ test("der Kalender der Saison mit Status, nicht indexiert", async () => {
   expect(await screen.findByRole("heading", { level: 1 })).toHaveTextContent("Probe Racing F1 2026 · Division 1");
   expect(apiMock.get).toHaveBeenCalledWith("/reference-series/public/probe-racing-f1/2026-division-1/calendar");
   const rows = screen.getAllByTestId("series-page-round");
-  expect(rows.map((row) => row.dataset.state)).toEqual(["today", "postponed", "cancelled"]);
+  expect(rows.map((row) => row.dataset.state)).toEqual(["today", "postponed", "cancelled", "missing"]);
+  // Öffentlich „Ergebnis folgt“, nicht „fehlt“.
+  expect(rows[3]).toHaveTextContent("Ergebnis folgt");
+  expect(rows[3]).not.toHaveTextContent("Ergebnis fehlt");
   expect(rows[0]).toHaveTextContent("Do., 05.11.2026 · 20:30");
   expect(rows[0]).toHaveTextContent("Heute");
   expect(rows[1]).toHaveTextContent("ursprünglich Do., 12.11.2026");

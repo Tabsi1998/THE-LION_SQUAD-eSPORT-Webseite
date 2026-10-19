@@ -12,6 +12,9 @@ export const STATE_LABELS = {
   scored: "Gewertet",
 };
 
+// Öffentlich klingt ein fehlendes Ergebnis nach dem, was kommt: „Ergebnis folgt“ (in der Verwaltung „fehlt“).
+export const PUBLIC_STATE_LABELS = { ...STATE_LABELS, missing: "Ergebnis folgt" };
+
 // Farbe je Status: Blau für heute, Bernstein für fehlende Ergebnisse, Grün für gewertet, gedämpft für abgesagt.
 export const STATE_TONES = {
   planned: "border-white/15 text-white/60",

@@ -6,7 +6,7 @@ import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
 import { SkeletonLines } from "@/components/tls/Skeleton";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
-import { STATE_LABELS, STATE_TONES, dayLabel, roundLabel, roundWhen } from "@/lib/referenceCalendar";
+import { PUBLIC_STATE_LABELS, STATE_TONES, dayLabel, roundLabel, roundWhen } from "@/lib/referenceCalendar";
 import { NotFoundPage } from "@/pages/ErrorPages";
 
 // Seite einer Serie unter /references/series/<spur>/<saison> (Entscheidung 5 zu #1741). Bis die volle Seite mit
@@ -76,7 +76,7 @@ export default function ReferenceSeriesPage() {
                         {round.original_club_day && <span className="block text-[11px] text-white/45">ursprünglich {dayLabel(round.original_club_day)}</span>}
                       </span>
                       <span className={`inline-flex items-center px-2 py-0.5 border rounded-sm text-[10px] font-bold uppercase tracking-widest whitespace-nowrap ${STATE_TONES[round.state] || STATE_TONES.planned}`}>
-                        {STATE_LABELS[round.state] || round.state}
+                        {PUBLIC_STATE_LABELS[round.state] || round.state}
                       </span>
                     </li>
                   ))}
