@@ -4,6 +4,7 @@ const fs = require("fs");
 const path = require("path");
 const { releaseTag, versionProblems } = require("./release-version.cjs");
 const { buildWhatsNew } = require("./whats-new.cjs");
+const { loadPlayNotes } = require("./play-notes.cjs");
 
 const root = path.resolve(__dirname, "..");
 const readJson = (file) => JSON.parse(fs.readFileSync(path.join(root, file), "utf8"));
@@ -49,6 +50,9 @@ const whatsNewPath = path.join(root, "src", "whatsnew.json");
 const expectedWhatsNew = `${JSON.stringify(buildWhatsNew({ changelog, version, build: versionCode }), null, 2)}\n`;
 const actualWhatsNew = fs.existsSync(whatsNewPath) ? fs.readFileSync(whatsNewPath, "utf8").replace(/\r\n/g, "\n") : "";
 check(actualWhatsNew === expectedWhatsNew, "src/whatsnew.json is stale - run `npm run whatsnew` and commit the file");
+
+// Versionshinweis für Google Play (19.10.2026): Abschnitt in PLAY_NOTES.md, „Neu in <Version>:“, Punkte mit „•“, ≤ 500 Zeichen.
+for (const problem of loadPlayNotes(root, version).problems) failures.push(problem);
 
 if (tag) {
   const expectedTag = releaseTag(version, versionCode);

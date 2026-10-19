@@ -73,7 +73,14 @@ Den ganzen Ordner `%USERPROFILE%\.lionsapp-release` sichern, zum Beispiel auf ei
 
 ## Release bauen
 
-Vorher im PR: Version und Build-Zähler erhöhen, einen Abschnitt in `CHANGELOG.md` schreiben, `npm run whatsnew` ausführen, die Version unten in der Historie eintragen. Dann nach `main` mergen und lokal `main` holen.
+Vorher im PR: Version und Build-Zähler erhöhen, einen Abschnitt in `CHANGELOG.md` schreiben, `npm run whatsnew` ausführen, den Versionshinweis für Google Play in `PLAY_NOTES.md` eintragen (siehe unten), die Version unten in der Historie eintragen. Dann nach `main` mergen und lokal `main` holen.
+
+**Versionshinweis für Google Play:** `PLAY_NOTES.md` hat je Version einen Abschnitt `## 1.2.3` mit genau dem Text
+für die Play Console – erste Zeile `Neu in 1.2.3:`, darunter jeder Punkt in einer eigenen Zeile mit `• `, höchstens
+500 Zeichen inklusive Zeilenumbrüchen, kurz und für Mitglieder verständlich. Preflight und `--check` brechen ab, wenn
+er fehlt oder nicht passt. Das Release-Skript setzt ihn als Block „Versionshinweis für Google Play (zum Kopieren)“ in
+den GitHub-Release-Text, legt ihn als `builds/play-notes-<Version>-build<N>.txt` ab, gibt ihn am Ende im Terminal aus
+und schickt mit `--play` genau diese Fassung an Google.
 
 ```bash
 cd mobile
@@ -89,7 +96,8 @@ Das Skript geht so vor:
 2. Es führt Preflight, Typecheck und Tests aus.
 3. Es erzeugt das Android-Projekt (`expo prebuild`) und baut mit Gradle die APK.
 4. Es prüft die Signatur: kein Debug-Zertifikat, das erwartete Zertifikat. Dann berechnet es SHA-256.
-5. Es legt das GitHub-Release an, mit APK, Prüfsumme, Signaturangaben und dem Changelog-Abschnitt.
+5. Es legt das GitHub-Release an, mit APK, Prüfsumme, Signaturangaben, dem Changelog-Abschnitt und dem
+   Versionshinweis für Google Play zum Kopieren.
 6. Mit `--aab` baut es zusätzlich das App Bundle für die Play Console (`bundleRelease`), legt es mit
    Prüfsumme in `builds/` ab und hängt es ans Release. Das Bundle ist mit dem Upload-Schlüssel
    signiert; Google signiert es beim Ausliefern mit dem App-Signaturschlüssel (Play App Signing) –
@@ -98,7 +106,7 @@ Das Skript geht so vor:
    **offenen Test** der Play Console (bei Google „beta“) – dazu die R8-Zuordnung als Deobfuskation.
    Interner und geschlossener Test sind abgeschaltet (Entscheidung 05.10., #925), Produktion
    sowieso: die Freigabe an alle klickt der Betreiber. `--play` schließt `--aab` ein.
-   Versionshinweise kommen aus dem Changelog-Abschnitt – ganze Punkte bis 500 Zeichen (#924).
+   Versionshinweis ist der Abschnitt aus `PLAY_NOTES.md` (auf 500 Zeichen geprüft, wird nicht gekürzt).
    Scheitert der Upload, bleibt das GitHub-Release gültig; das Skript endet mit Code 1 und nennt das
    Bundle unter `builds/` zum Hochladen von Hand.
 
@@ -126,7 +134,7 @@ Einmalig, sobald das Entwicklerkonto freigegeben ist (etwa zehn Minuten Klickweg
 
 `npm run release:local -- --check` sagt danach, ob das Dienstkonto die App sehen darf – ein lesender Aufruf (Edit anlegen, Tracks lesen, Edit verwerfen). Ohne die Datei ist das kein Fehler; sie ist nur für `--play` nötig.
 
-Automatisch: Bundle hochladen, Versionshinweise aus dem Changelog, Track fertigstellen. Klick bleibt: Produktion, Store-Eintrag, Datensicherheits-Formular, Tester-Listen.
+Automatisch: Bundle hochladen, Versionshinweis aus `PLAY_NOTES.md`, Track fertigstellen. Klick bleibt: Produktion, Store-Eintrag, Datensicherheits-Formular, Tester-Listen.
 
 ## Update aus der App (#250)
 
