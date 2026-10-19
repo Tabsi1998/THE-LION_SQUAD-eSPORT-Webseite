@@ -325,6 +325,15 @@ def display_station(station: dict) -> dict:
     return _pick(station, HALL_STATION_FIELDS)
 
 
+# Die Stationsliste für alle, die nicht leiten (Live-Seite, Spielplan, Turnierbaum- und Stations-TV): die Felder der
+# Tafeln und dazu die Warteschlange (Spiel-Kennungen) für „Als Nächstes“ der Stations-Ansicht.
+STATION_LIST_FIELDS = (*HALL_STATION_FIELDS, "queue_match_ids")
+
+
+def listed_station(station: dict) -> dict:
+    return _pick(station, STATION_LIST_FIELDS)
+
+
 def display_event_payload(event: dict, tournaments: list[dict], challenges: list[dict], schedule: dict | None,
                           brackets: list[dict], stations: list[dict]) -> dict:
     """Die Antwort für einen Event-Schlüssel. ``tournaments``/``challenges`` sind schon nach ``shown_on_event_tv``
