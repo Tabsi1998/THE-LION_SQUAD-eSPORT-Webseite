@@ -193,6 +193,7 @@ GitHub sortiert Releases nach Veröffentlichungsdatum, nicht nach Version. Alte 
 
 Neueste oben.
 
+- `1.7.2`: Build 96, „Mein Kalender“ mit eigenen Terminen und persönlichem Kalender-Abo, Eintrag in den Einstellungen und einmaliger Hinweis nach der Anmeldung (#1788)
 - `1.7.1`: Build 95, Weiterkommen in vier Modi mit Show-Auslosung als Moment, neue Baum-Namen und „voraussichtlich“ (#1633), Fast-Lap-Versuche und Gäste wie auf der Website (#1585)
 - `1.7.0`: Build 94, neue Turnieransicht mit Turnierbaum und Linien, „Dein Weg“, Live, Tabellen und gruppiertem Spielplan, gemischten Runden und Vibration (#1563, #1548, #1168), Fast Lap mit einem Zeit-Parser, Rückfrage bei unplausiblen Zeiten und Hinweis nach der Veröffentlichung (#1584)
 - `1.6.1`: Build 93, Anmeldung mit Wiederherstellungscode, MFA abbrechen und Hilfe beim Anmelden (#995, #996), Einwilligungen in der App (#1537), Einlass mit sauberer Kamera und aktuellen Zahlen (#1056, #1063, #1064), Kalender in Wiener Zeit (#1062), Dateien und Medien nur mit Anmeldung vom eigenen Server (#1054, #1057, #1059, #1060)
