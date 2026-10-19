@@ -18,6 +18,9 @@ test.describe.configure({ mode: "serial" });
 // Die Login-Seite fragt Passkeys an, die der Abnahme-Stand nicht eingerichtet hat (503); der alte Link soll 404 geben.
 const allow = (response) => response.status() === 503 && response.url().includes("/passkey");
 
+// Text so, wie er in der ICS-Datei steht (RFC 5545): Backslash, Semikolon und Komma maskiert.
+const icsText = (value) => (value || "").trim().replace(/\\/g, "\\\\").replace(/;/g, "\\;").replace(/,/g, "\\,");
+
 async function feedText(page, url) {
   const response = await page.request.get(url);
   return { status: response.status(), text: response.status() === 200 ? await response.text() : "" };
@@ -81,7 +84,7 @@ test("anmelden → Hinweis einmal, Termin in Mein Kalender, Abo mit Termin, abme
   let feed = await feedText(page, firstUrl);
   expect(feed.status).toBe(200);
   expect(feed.text).toContain("BEGIN:VCALENDAR");
-  expect(feed.text.replace(/\r?\n[ \t]/g, "")).toContain((title || "").trim().replace(/,/g, "\\,"));
+  expect(feed.text.replace(/\r?\n[ \t]/g, "")).toContain(icsText(title));
   expect((await (await page.request.get("/api/calendar/hint")).json()).due).toBe(false);
 
   // Abmelden: weg aus „Mein Kalender“ und aus dem Feed.
@@ -93,7 +96,7 @@ test("anmelden → Hinweis einmal, Termin in Mein Kalender, Abo mit Termin, abme
   await expect(page.getByTestId(`calendar-item-tournament-${tid}`)).toHaveCount(0);
   feed = await feedText(page, firstUrl);
   expect(feed.status).toBe(200);
-  expect(feed.text).not.toContain((title || "").trim().replace(/,/g, "\\,"));
+  expect(feed.text).not.toContain(icsText(title));
 
   // Neu erzeugen: die alte Adresse gibt 404, die neue gilt.
   await page.getByTestId("calendar-personal-renew").click();
