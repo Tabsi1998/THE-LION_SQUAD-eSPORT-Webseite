@@ -21,6 +21,7 @@ from services.tv_display import (
     KEY_INVALID,
     display_bracket_payload,
     display_event_payload,
+    event_on_tv,
     key_expired,
     shown_on_event_tv,
 )
@@ -38,7 +39,8 @@ async def get_event_display(slug_or_id: str, key: str | None = None):
     db = get_db()
     event, _ = await find_by_slug_or_history(db.events, slug_or_id, {"_id": 0})
     link = await validate_access_link(db, key, "event", event["id"], None, DISPLAY_GRANT) if event and key else None
-    if not link:
+    # Wie die Event-Seite: ein Entwurf oder ein internes Event zeigt die Tafel nie - auch mit Schlüssel nicht.
+    if not link or not event_on_tv(event):
         raise HTTPException(status_code=403, detail=KEY_INVALID)
     if key_expired(event, now_utc()):
         raise HTTPException(status_code=403, detail=KEY_EXPIRED)

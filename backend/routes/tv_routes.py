@@ -16,9 +16,11 @@ from models import new_id, now_utc
 from services.access_links import hash_access_token, new_access_token
 from services.tv_display import (
     DISPLAY_GRANT,
+    EVENT_NOT_ON_TV,
     SETTINGS_ID,
     display_event_path,
     display_path,
+    event_on_tv,
     key_expires_at,
     key_label,
     public_payload,
@@ -155,7 +157,8 @@ def _key_payload(link: dict, targets: dict) -> dict:
     }
 
 
-TARGET_FIELDS = {"_id": 0, "id": 1, "title": 1, "name": 1, "slug": 1, "start_date": 1, "end_date": 1}
+TARGET_FIELDS = {"_id": 0, "id": 1, "title": 1, "name": 1, "slug": 1, "start_date": 1, "end_date": 1, "status": 1, "visibility": 1,
+                 "is_public": 1}
 
 
 async def _targets_by_id(db, rows: list[dict]) -> dict:
@@ -195,6 +198,8 @@ async def create_tv_key(body: TvKeyCreate, me: dict = Depends(require_admin())):
         target = await db.events.find_one({"id": body.event_id}, TARGET_FIELDS)
         if not target:
             raise HTTPException(status_code=404, detail="Event nicht gefunden")
+        if not event_on_tv(target):
+            raise HTTPException(status_code=400, detail=EVENT_NOT_ON_TV)
     else:
         target_type = "tournament"
         target = await db.tournaments.find_one({"id": body.tournament_id}, TARGET_FIELDS)

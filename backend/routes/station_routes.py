@@ -15,7 +15,7 @@ from services.tournament_permissions import (
     is_global_tournament_staff,
     require_tournament_staff_permission,
 )
-from services.tv_display import DISPLAY_GRANT, key_expired, listed_station, shown_on_event_tv
+from services.tv_display import DISPLAY_GRANT, event_on_tv, key_expired, listed_station, shown_on_event_tv
 from services.visibility import lead_can_see
 from services.match_calls import notify_match_called
 from services.station_runtime import notify_match_started
@@ -125,7 +125,8 @@ class _StationView:
         self.events: dict[str, bool] = {}
 
     async def _event_key_opens(self, event: dict | None) -> bool:
-        if not self.key or not event:
+        # Wie die Event-Tafel: Entwürfe und interne Events öffnet kein Schlüssel.
+        if not self.key or not event_on_tv(event):
             return False
         link = await validate_access_link(self.db, self.key, "event", event["id"], None, DISPLAY_GRANT)
         return bool(link) and not key_expired(event, now_utc())

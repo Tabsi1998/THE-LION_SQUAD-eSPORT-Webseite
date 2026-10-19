@@ -316,6 +316,15 @@ def shown_on_event_tv(item: dict | None) -> bool:
     return (item.get("visibility") or "public") in EVENT_TV_VISIBILITIES
 
 
+EVENT_NOT_ON_TV = "Für Entwürfe und interne Events gibt es keinen TV-Link."
+
+
+def event_on_tv(event: dict | None) -> bool:
+    """Darf ein Event überhaupt einen Schlüssel haben bzw. mit Schlüssel gezeigt werden? Dieselbe Regel wie für seine
+    Turniere: kein Entwurf, Sichtbarkeit höchstens „Nur Mitglieder“ - geprüft beim Anlegen und bei jedem Abruf."""
+    return shown_on_event_tv(event)
+
+
 def display_event_path(event_id: str, token: str) -> str:
     """Die Adresse der Hallen-Tafel mit Schlüssel - die Aufruf-Tafel hängt ``/calls`` an (Link-Baukasten)."""
     return f"/display/event/{event_id}?{urlencode({'key': token})}"

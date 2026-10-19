@@ -226,3 +226,32 @@ async def test_a_key_belongs_to_exactly_one_tournament_or_one_event_and_only_adm
     created = await event_key(flow, event)
     await flow.post("/api/tv/keys", json={"tournament_id": cup["id"]})
     assert [row["id"] for row in (await flow.get("/api/tv/keys", params={"event_id": event["id"]})).json()] == [created["id"]]
+
+
+@pytest.mark.asyncio
+async def test_event_keys_only_for_events_the_event_page_could_show(flow):
+    """Wie die Event-Seite höchstens „Nur Mitglieder“: für Entwürfe und interne Events gibt es keinen Schlüssel, und ein
+    Schlüssel zeigt nichts mehr, sobald sein Event Entwurf oder intern wird - auch nicht dessen Stationen."""
+    staff = await flow.add_user(role="tournament_admin", name="Turnierleitung")
+    flow.act_as(staff)
+    for fields in ({"status": "draft"}, {"visibility": "internal"}):
+        refused = await flow.post("/api/tv/keys", json={"event_id": (await event_of(flow, **fields))["id"]})
+        assert refused.status_code == 400, (fields, refused.text)
+    assert await flow.db.access_links.count_documents({}) == 0
+    assert (await flow.post("/api/tv/keys", json={"event_id": (await event_of(flow, visibility="members"))["id"]})).status_code == 200
+
+    event = await event_of(flow)
+    await cup_of(flow, event, "Probelauf-Cup", visibility="members")
+    beamer = {"id": new_id(), "name": "Beamer", "device_type": "beamer", "event_id": event["id"], "status": "free"}
+    await flow.db.stations.insert_one(dict(beamer))
+    token = (await event_key(flow, event))["token"]
+    flow.act_as(None)
+    assert (await hall(flow, event["id"], token)).status_code == 200
+    for fields in ({"status": "draft"}, {"visibility": "internal"}):
+        await flow.db.events.update_one({"id": event["id"]}, {"$set": {"status": "live", "visibility": "public", **fields}})
+        refused = await hall(flow, event["id"], token)
+        assert refused.status_code == 403 and refused.json()["detail"] == tv_display.KEY_INVALID, fields
+        stations = await flow.get("/api/stations", params={"event_id": event["id"], "key": token})
+        assert stations.json() == [], fields
+    await flow.db.events.update_one({"id": event["id"]}, {"$set": {"status": "live", "visibility": "public"}})
+    assert (await hall(flow, event["id"], token)).status_code == 200
