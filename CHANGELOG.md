@@ -1,5 +1,22 @@
 # Changelog
 
+## 1.2.3 (19.10.2026)
+
+### Fehlerbehebungen
+
+* „antreten bis“ und „nicht erschienen ab“ nennen beim Aufruf vor der Planzeit dieselbe Zeit (#1791)
+* Ein bereites Spiel rückt an die freie Station statt hinter eine überzogene (#1791)
+* Loser-Runden heißen am TV und in der Live-Warteschlange wie im Turnierbaum („Loser Runde 1“ statt „2“) (#1792)
+* Umbauplan beim Austritt mit richtiger Einzahl und Mehrzahl („1 Spiel betroffen“) (#1793)
+
+### Schneller
+
+* Live-Ansichten laden nie doppelt zugleich nach (#1683)
+
+### Dokumentation
+
+* Lasttest vor einem Event starten (#1683)
+
 ## 1.2.2 (19.10.2026)
 
 ### Dokumentation
