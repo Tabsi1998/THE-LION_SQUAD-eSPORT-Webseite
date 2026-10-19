@@ -150,8 +150,9 @@ export function PersonalFeedCard({ onStatus, style, testID = "calendar-personal"
 }
 
 /**
- * Kopieren mit kurzem Haken-Moment (#1788): leichte Vibration, das Symbol wird zum Haken und der Knopf federt einmal
- * nach - mit „Bewegung reduzieren“ nur der Wechsel ohne Bewegung. Der Vorleser hört „Abo-Adresse kopiert“.
+ * Kopieren mit kurzem Haken-Moment (#1788): leichte Vibration, das Symbol wird zum Haken, „Kopiert“ steht zwei Sekunden
+ * da und der Knopf federt einmal nach - mit „Bewegung reduzieren“ nur der Wechsel ohne Bewegung. Der Vorleser hört
+ * „Abo-Adresse kopiert“.
  */
 function CopyButton({ url, testID }: { url: string; testID: string }) {
   const reduce = useReduceMotion();
@@ -176,6 +177,8 @@ function CopyButton({ url, testID }: { url: string; testID: string }) {
     }
   };
 
+  // Feste Mindestbreite: „Kopieren“ und „Kopiert“ springen nicht, und Android bricht Symbol und Text nicht um
+  // (Geräteprobe #1788: ohne sie rutschte das Symbol über den Text).
   return (
     <Animated.View style={{ transform: [{ scale: pop }] }}>
       <Button
@@ -186,6 +189,7 @@ function CopyButton({ url, testID }: { url: string; testID: string }) {
         accessibilityLabel={copied ? "Abo-Adresse kopiert" : "Abo-Adresse kopieren"}
         onPress={copy}
         testID={testID}
+        style={styles.copy}
       />
     </Animated.View>
   );
@@ -220,6 +224,9 @@ const styles = StyleSheet.create({
   addressText: {
     fontFamily: "monospace",
     fontSize: 12,
+  },
+  copy: {
+    minWidth: 132,
   },
   buttons: {
     flexDirection: "row",
