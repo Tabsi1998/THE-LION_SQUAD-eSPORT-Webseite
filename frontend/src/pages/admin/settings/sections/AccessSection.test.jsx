@@ -42,3 +42,15 @@ test("ohne Event-Zeitraum gibt es nichts zu leeren", () => {
   expect(screen.queryByTestId("access-event-active")).toBeNull();
   expect(screen.getByTestId("access-event-clear")).toBeDisabled();
 });
+
+test("ein anderer Zugangs-Schalter lässt ungespeicherte Grenzen stehen, gespeicherte Werte kommen an", () => {
+  const props = { authSwitches: () => null, savingAuth: false, saveAuth: vi.fn() };
+  const { rerender } = render(<AccessSection {...props} authConfig={config} />);
+  fireEvent.change(screen.getByTestId("access-limit-login_ip_limit_per_minute"), { target: { value: "90" } });
+  // Schalter „Registrierung offen“ umgelegt: neue Einstellungen vom Server, Grenzen unverändert.
+  rerender(<AccessSection {...props} authConfig={{ ...config, registration_enabled: false }} />);
+  expect(screen.getByTestId("access-limit-login_ip_limit_per_minute")).toHaveValue(90);
+  // Kommen neue Grenzen vom Server (gespeichert), zeigt die Karte sie.
+  rerender(<AccessSection {...props} authConfig={{ ...config, registration_enabled: false, login_ip_limit_per_minute: 120 }} />);
+  expect(screen.getByTestId("access-limit-login_ip_limit_per_minute")).toHaveValue(120);
+});

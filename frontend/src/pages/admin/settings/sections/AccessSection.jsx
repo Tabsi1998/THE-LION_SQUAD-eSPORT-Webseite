@@ -20,7 +20,9 @@ function pickLimits(config) {
 
 function AccessLimitsCard({ authConfig, savingAuth, saveAuth }) {
   const [draft, setDraft] = useState(() => pickLimits(authConfig));
-  useEffect(() => { setDraft(pickLimits(authConfig)); }, [authConfig]);
+  // Nur wenn sich die gespeicherten Grenzen ändern, neu übernehmen - ein anderer Zugangs-Schalter lässt Eingaben stehen.
+  const savedLimits = JSON.stringify(pickLimits(authConfig));
+  useEffect(() => { setDraft(JSON.parse(savedLimits)); }, [savedLimits]);
   const set = (key) => (value) => setDraft((current) => ({ ...current, [key]: value }));
   const field = ([key, label, min, max]) => (
     <BrandNumberField key={key} label={`${label} (${min}–${max})`} value={draft[key]} onChange={set(key)} min={min} max={max} testId={`access-limit-${key}`} />
