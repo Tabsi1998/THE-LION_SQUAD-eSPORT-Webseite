@@ -209,9 +209,10 @@ test.describe("Abnahme #1585: Fast Lap vor Ort gegen den echten Server", () => {
     await page.setViewportSize({ width: 1920, height: 1080 });
     await page.goto(`/display/f1/${state.fastlap.onsite.id}`);
     await expect(page.getByTestId("tv-queue")).toBeVisible();
-    await expect(page.getByTestId("tv-queue-ontrack")).toContainText("Lena");
-    await expect(page.getByTestId("tv-queue-ontrack")).toContainText("Alle 3 Versuche gefahren");
-    await expect(page.getByTestId("tv-queue-ontrack")).toContainText(QUEUE_GUEST);
+    // Je Person am Start eine Zeile: Lena an Simulator 1, der in der Liste angelegte Gast (#1825) an Simulator 2.
+    const lena = page.getByTestId("tv-queue-ontrack").filter({ hasText: "Lena" });
+    await expect(lena).toContainText("Alle 3 Versuche gefahren");
+    await expect(page.getByTestId("tv-queue-ontrack").filter({ hasText: QUEUE_GUEST })).toContainText("Simulator 2");
     await expect(page.getByTestId("tv-queue-next").first()).toContainText("KartKönigin");
     await noSideScroll(page);
     await shot(page, "06-tv-am-start-1920");
