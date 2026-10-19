@@ -466,10 +466,11 @@ class LoadTest:
     # -- Grundlagen
     def client(self, cookies=None):
         httpx = self.httpx
-        # Wie ein Browser: höchstens sechs Verbindungen je Seite, eine davon hält der Strom.
+        # Wie ein Browser: höchstens sechs Verbindungen je Seite, eine davon hält der Strom. trust_env=False: kein
+        # Proxy aus der Umgebung (HTTP_PROXY, ALL_PROXY …) - die Anfragen gehen nur an die geprüfte lokale Adresse.
         client = httpx.AsyncClient(base_url=self.cfg.base_url, timeout=httpx.Timeout(30.0),
                                    limits=httpx.Limits(max_connections=6, max_keepalive_connections=6),
-                                   cookies=httpx.Cookies(cookies) if cookies is not None else None)
+                                   cookies=httpx.Cookies(cookies) if cookies is not None else None, trust_env=False)
         self.clients.append(client)
         return client
 

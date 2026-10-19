@@ -94,6 +94,16 @@ def test_main_never_prints_userinfo(monkeypatch, tmp_path, capsys):
     assert "geheimpw" not in captured.err + captured.out
 
 
+@pytest.mark.parametrize("variable", ["HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY"])
+def test_clients_ignore_proxies_from_the_environment(monkeypatch, tmp_path, variable):
+    # Ein Proxy aus der Umgebung würde die geprüfte lokale Adresse umgehen - der Lasttest nimmt keinen.
+    monkeypatch.setenv(variable, "http://proxy.invalid:9")
+    cfg = lasttest.Config(base_url=URL, project="lsw-abnahme-1683", state=tmp_path / "s.json", out=tmp_path)
+    client = lasttest.LoadTest(cfg, {}).client()
+    assert client.trust_env is False
+    assert not client._mounts  # keine Proxy-Weiterleitung eingehängt
+
+
 def test_published_ports_from_docker_inspect():
     ports = {"80/tcp": [{"HostIp": "127.0.0.1", "HostPort": "24800"}], "443/tcp": None, "8001/tcp": [{"HostPort": ""}]}
     assert lasttest.published_ports(ports) == {24800}
