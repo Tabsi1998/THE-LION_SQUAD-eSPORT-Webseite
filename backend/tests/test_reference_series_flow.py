@@ -188,9 +188,11 @@ async def test_archiving_keeps_everything_and_can_be_undone(flow):
     assert gone.json()["is_archived"] is True
     overview = (await flow.get(ADMIN)).json()
     assert [item["id"] for item in overview["lineages"]] == [lineage["id"]], "archiviert bleibt sichtbar in der Verwaltung"
-    assert (await flow.post(f"{ADMIN}/lineages/{lineage['id']}/restore")).json()["is_archived"] is False
+    back = await flow.post(f"{ADMIN}/lineages/{lineage['id']}/restore")
+    assert back.json()["is_archived"] is False
 
-    assert (await flow.delete(f"{ADMIN}/series/{series['id']}")).status_code == 405
+    removal = await flow.delete(f"{ADMIN}/series/{series['id']}")
+    assert removal.status_code == 405
     assert await flow.db.reference_series.count_documents({}) == 1
 
 
@@ -201,7 +203,8 @@ async def test_only_the_content_area_manages_series(flow):
     for role in ("player", "tournament_admin"):
         flow.act_as(await flow.add_user(role=role))
         assert (await flow.get(ADMIN)).status_code == 403
-        assert (await flow.post(f"{ADMIN}/lineages", json={"title": "x", "kind": "racing"})).status_code == 403
+        created = await flow.post(f"{ADMIN}/lineages", json={"title": "x", "kind": "racing"})
+        assert created.status_code == 403
     flow.act_as(None)
     assert (await flow.get(ADMIN)).status_code == 401
 
@@ -275,7 +278,8 @@ async def test_deleting_an_account_cuts_the_series_links_of_its_own_profile(flow
     export = (await flow.get("/api/dsgvo/export-my-data")).json()
     assert [row["id"] for row in export["reference_series_staff"]] == ["captain"]
 
-    assert (await flow.post("/api/dsgvo/anonymize-me")).status_code == 200
+    erased = await flow.post("/api/dsgvo/anonymize-me")
+    assert erased.status_code == 200
     own = await db.reference_participants.find_one({"id": "eigen"})
     assert (own["profile_id"], own["link"], own["name_hidden"]) == (None, "external", True)
     kept = await db.reference_participants.find_one({"id": "verein"})
