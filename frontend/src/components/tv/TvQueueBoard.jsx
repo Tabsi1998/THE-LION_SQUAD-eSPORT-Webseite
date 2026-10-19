@@ -83,7 +83,7 @@ function CallLeft({ entry, ghost }) {
 }
 
 // `ghost`: der weggleitende alte Inhalt - ohne Test-Kennungen, damit jede nur einmal dasteht.
-function NowCell({ lane, match, ghost = false }) {
+function NowCell({ lane, match, ghost = false, compact = false }) {
   const entry = lane.now;
   if (!entry) {
     return (
@@ -95,13 +95,13 @@ function NowCell({ lane, match, ghost = false }) {
   return (
     <div className="tv-lanes__body">
       <span className="tv-lanes__what tv-t-info">{queueWhat(entry, match)}</span>
-      <b className="tv-lanes__who tv-t-name" data-tv-name="1">{queueWho(entry)}</b>
+      <b className="tv-lanes__who tv-t-name" data-tv-name="1">{queueWho(entry, { compact })}</b>
       <TvQueueClock entry={entry} testId={ghost ? undefined : `tv-queue-clock-${lane.id}`} />
     </div>
   );
 }
 
-function NextCell({ lane, match, ghost = false }) {
+function NextCell({ lane, match, ghost = false, compact = false }) {
   const entry = lane.next;
   if (!entry) {
     return (
@@ -114,7 +114,7 @@ function NextCell({ lane, match, ghost = false }) {
   return (
     <div className="tv-lanes__body" data-tone={line.tone}>
       <span className="tv-lanes__what tv-t-info">{queueWhat(entry, match)}</span>
-      <b className="tv-lanes__who tv-t-name" data-tv-name="1">{queueWho(entry)}</b>
+      <b className="tv-lanes__who tv-t-name" data-tv-name="1">{queueWho(entry, { compact })}</b>
       <span className="tv-lanes__when tv-t-info" data-testid={ghost ? undefined : `tv-queue-when-${lane.id}`}>
         {line.text}
         {line.delay ? <span className="tv-lanes__delay"> · {line.delay}</span> : null}
@@ -125,7 +125,7 @@ function NextCell({ lane, match, ghost = false }) {
 }
 
 /** Eine Hälfte der Bahn (Jetzt oder Als Nächstes): wechselt das Spiel, gleitet der alte Inhalt weg, der neue herein. */
-function QueueCell({ kind, lane, swapKey, order, matchOf, motionOn }) {
+function QueueCell({ kind, lane, swapKey, order, matchOf, motionOn, compact = false }) {
   const leaving = useSwap(swapKey, lane, motionOn);
   const Body = kind === "now" ? NowCell : NextCell;
   const entryOf = (row) => (kind === "now" ? row.now : row.next);
@@ -146,11 +146,11 @@ function QueueCell({ kind, lane, swapKey, order, matchOf, motionOn }) {
       <div className="tv-lanes__stack">
         {leaving ? (
           <div key={`out-${leaving.key}`} className="tv-lanes__swap tv-lanes__swap--out" aria-hidden="true" data-testid={`tv-queue-${kind}-out-${lane.id}`}>
-            <Body lane={leaving.value} match={matchOf(entryOf(leaving.value)?.match_id)} ghost />
+            <Body lane={leaving.value} match={matchOf(entryOf(leaving.value)?.match_id)} ghost compact={compact} />
           </div>
         ) : null}
         <div key={swapKey} className={`tv-lanes__swap tv-lanes__swap--in ${first ? "tv-lanes__swap--first" : ""}`} style={{ "--tv-delay": delay }}>
-          <Body lane={lane} match={matchOf(entryOf(lane)?.match_id)} />
+          <Body lane={lane} match={matchOf(entryOf(lane)?.match_id)} compact={compact} />
         </div>
       </div>
     </div>
@@ -192,6 +192,8 @@ export function TvQueueBoard({ queue, matches = [] }) {
   if (!lanes.length) return null;
   const summary = queueSummaryLine(queue?.summary);
   const columns = shown.length > 2 ? 2 : 1;
+  // Drei Reihen auf 1080p (fünf oder sechs Stationen): im Lauf „4 Spieler“ statt der Namen.
+  const compact = shown.length > 4;
   return (
     <section className="tv-lanes" data-testid="tv-queue-board" data-count={lanes.length} data-pages={pages}>
       <div className="tv-lanes__head">
@@ -212,8 +214,8 @@ export function TvQueueBoard({ queue, matches = [] }) {
                 <b className="tv-lanes__name font-heading" data-tv-name="1">{lane.name}</b>
                 <span className={`tv-pill tv-t-meta tv-pill--${look.tone}`}>{look.label}</span>
               </header>
-              <QueueCell kind="now" lane={lane} swapKey={lane.now?.match_id || (lane.status === "broken" ? "none-broken" : "none")} order={index} matchOf={matchOf} motionOn={motionOn} />
-              <QueueCell kind="next" lane={lane} swapKey={`${lane.next?.match_id || "none"}:${lane.next?.state || ""}`} order={index} matchOf={matchOf} motionOn={motionOn} />
+              <QueueCell kind="now" lane={lane} swapKey={lane.now?.match_id || (lane.status === "broken" ? "none-broken" : "none")} order={index} matchOf={matchOf} motionOn={motionOn} compact={compact} />
+              <QueueCell kind="next" lane={lane} swapKey={`${lane.next?.match_id || "none"}:${lane.next?.state || ""}`} order={index} matchOf={matchOf} motionOn={motionOn} compact={compact} />
             </article>
           );
         })}

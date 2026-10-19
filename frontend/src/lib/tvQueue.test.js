@@ -34,7 +34,13 @@ describe("Bahnen je Station", () => {
 describe("Texte", () => {
   it("wer spielt: Duell, Lauf, offene Plätze", () => {
     expect(queueWho(running)).toBe("Alpha vs. Beta");
-    expect(queueWho(queued)).toBe("4 Spieler");
+    expect(queueWho({ names: ["Alpha", "Beta", "Gamma", "Delta"] })).toBe("Alpha · Beta\nGamma · Delta");
+    expect(queueWho({ names: ["Alpha", "Beta", "Gamma"] })).toBe("Alpha · Beta\nGamma");
+    expect(queueWho({ names: ["A", "B", "C", "D", "E"] })).toBe("5 Spieler");
+    expect(queueWho({ names: ["Alpha", "Beta", "Gamma", "Delta"] }, { compact: true })).toBe("4 Spieler");
+    expect(queueWho({ names: ["Alpha", "Beta"] }, { compact: true })).toBe("Alpha vs. Beta");
+    expect(queueWho({ names: ["Alpha", "Beta", "Gamma"], open_slots: 1 })).toBe("Alpha · Beta · Gamma · 1 Platz offen");
+    expect(queueWho({ names: ["Alpha", "Beta", "Gamma"], open_slots: 1 }, { compact: true })).toBe("3 Spieler · 1 Platz offen");
     expect(queueWho({ names: ["Alpha"], open_slots: 1 })).toBe("Alpha · 1 Platz offen");
     expect(queueWho({ names: [], open_slots: 2 })).toBe("2 Plätze offen");
     expect(queueWho({ names: [] })).toBe("Teilnehmer offen");
