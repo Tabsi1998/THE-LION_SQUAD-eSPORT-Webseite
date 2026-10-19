@@ -137,6 +137,9 @@ async def init_indexes():
     await db.reference_participants.create_index("id", unique=True)
     await db.reference_participants.create_index([("series_id", 1), ("name_normalized", 1)])
     await db.reference_participants.create_index("profile_id")
+    # Zuordnung (#1743): offene Namen über alle Serien und die Teilnehmer, die ein Alias zugeordnet hat.
+    await db.reference_participants.create_index([("name_normalized", 1), ("link_status", 1)])
+    await db.reference_participants.create_index("alias_id")
     await db.reference_round_results.create_index("id", unique=True)
     await db.reference_round_results.create_index("round_id", unique=True)
     await db.reference_round_results.create_index([("series_id", 1), ("status", 1)])

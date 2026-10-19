@@ -172,3 +172,22 @@ def test_guests_count_for_the_team_but_not_for_the_club():
     ]
     assert [counts_for_club(person) for person in people] == [True, False, False, False]
     assert [person["id"] for person in club_participants(people)] == ["a"]
+
+
+# ---------------------------------------------------------------- Indexe
+def test_cross_series_lookups_have_indexes():
+    import asyncio
+
+    from mongomock_motor import AsyncMongoMockClient
+
+    import database
+
+    db = AsyncMongoMockClient()["tls_index_test"]
+    original = database.get_db
+    database.get_db = lambda: db
+    try:
+        asyncio.run(database.init_indexes())
+        names = set(asyncio.run(db.reference_participants.index_information()))
+    finally:
+        database.get_db = original
+    assert {"name_normalized_1_link_status_1", "alias_id_1"} <= names
