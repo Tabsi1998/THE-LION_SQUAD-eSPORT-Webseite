@@ -49,18 +49,22 @@ export function runningSeasons(data) {
 const CALM = "darum siehst du die Vorschau ruhig: ohne Feuerwerk, Partikel und Bewegung.";
 
 /**
- * Warum die Vorschau bei dir weniger zeigt als bei anderen (#1838): Countdown und Gruß kommen immer, Feuerwerk,
- * Partikel und Bewegung nur ohne „Bewegung reduzieren“, ohne eigene Wahl „dezent“ und ohne Stärke „dezent“. Ohne den
- * Kanal Website oder mit eigener Wahl „aus“ zeigt die Vorschau auf der Website gar nichts. Leer = alles zu sehen.
+ * Warum die Vorschau bei dir weniger zeigt als bei anderen (#1838) - was fürs ganze Gerät oder Konto gilt, steht
+ * einmal über den Karten: Countdown und Gruß kommen immer, Feuerwerk, Partikel und Bewegung nicht bei „Bewegung
+ * reduzieren“ oder eigener Wahl „dezent“; bei eigener Wahl „aus“ zeigt die Vorschau gar nichts. Leer = alles zu sehen.
  */
-export function previewLimits({ season, preference, reducedMotion }) {
-  if (!(season.channels || []).includes("web")) return ["„Website“ ist nicht angehakt – auf der Website zeigt die Vorschau nichts."];
+export function ownViewLimits({ preference, reducedMotion }) {
   if (preference === "off") return ["Deine eigene Saison-Deko steht auf „aus“ (Profil → Darstellung) – darum zeigt dir die Vorschau nichts."];
   const out = [];
   if (reducedMotion) out.push(`Dein Gerät wünscht weniger Bewegung („Bewegung reduzieren“) – ${CALM}`);
   if (preference === "subtle") out.push(`Deine eigene Saison-Deko steht auf „dezent“ (Profil → Darstellung) – ${CALM}`);
-  if (season.intensity === "subtle") out.push("Stärke „dezent“: die Saison läuft für alle ruhig – ohne Feuerwerk, Partikel und Bewegung.");
   return out;
+}
+
+/** Was nur diese Saison betrifft und darum an ihrer Karte steht: Stärke „dezent“, Website nicht angehakt. */
+export function previewLimits({ season }) {
+  if (!(season.channels || []).includes("web")) return ["„Website“ ist nicht angehakt – auf der Website zeigt die Vorschau nichts."];
+  return season.intensity === "subtle" ? ["Stärke „dezent“: die Saison läuft für alle ruhig – ohne Feuerwerk, Partikel und Bewegung."] : [];
 }
 
 // Für das Eingabefeld: in der Zeit des Geräts - so zeigt der Browser das Feld.
@@ -103,8 +107,7 @@ function ManagedSeasonCard({ season }) {
 }
 
 function SeasonCard({ season, busy, onSave, onPreview, previewRunning = false }) {
-  const { preference, reducedMotion } = useSeason();
-  const limits = previewLimits({ season, preference, reducedMotion });
+  const limits = previewLimits({ season });
   const [texts, setTexts] = useState(null);
   const [previewAt, setPreviewAt] = useState("");
   const draft = texts ?? season.texts;
@@ -213,6 +216,8 @@ export function SeasonsSettings() {
   const [busy, setBusy] = useState(false);
   const [calendarYear, setCalendarYear] = useState(null);
   const [calendar, setCalendar] = useState(null);
+  const { preference, reducedMotion } = useSeason();
+  const ownLimits = ownViewLimits({ preference, reducedMotion });
   // Welche Vorschau gerade läuft (Saison und Ende) - für den Weg auf die Website an ihrer Karte.
   const [running, setRunning] = useState(null);
   useEffect(() => {
@@ -315,6 +320,11 @@ export function SeasonsSettings() {
         onSeasonSave={(patch, message) => save({ seasons: { weather: patch } }, message)}
         onPreview={() => preview("weather")}
       />
+      {ownLimits.length > 0 && (
+        <ul className="border border-[#FFC857]/25 bg-[#FFC857]/5 rounded-sm px-4 py-2 text-xs text-[#FFC857]/85 space-y-0.5" data-testid="seasons-preview-own-limits">
+          {ownLimits.map((line) => <li key={line}>{line}</li>)}
+        </ul>
+      )}
       <div className={`grid gap-4 ${data.enabled ? "" : "opacity-60"}`}>
         {data.seasons.filter((season) => !season.always).map((season) => (
           MANAGED_ELSEWHERE[season.key]

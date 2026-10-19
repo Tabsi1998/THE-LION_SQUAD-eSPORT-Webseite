@@ -42,6 +42,7 @@ test("Silvester-Vorschau aus der Verwaltung: Countdown, Feuerwerk, dann auf der 
   await page.goto("/admin/settings/jahreszeiten");
   await expect(page.getByTestId("season-new_year-preview")).toBeVisible();
   await expect(page.getByTestId("season-new_year-preview-limits")).toHaveCount(0);
+  await expect(page.getByTestId("seasons-preview-own-limits")).toHaveCount(0);
   const answer = page.waitForResponse((response) => response.url().includes("/api/seasonal/active?preview=new_year."));
   await page.getByTestId("season-new_year-preview").click();
   const payload = await (await answer).json();
@@ -73,12 +74,15 @@ test("Silvester-Vorschau mit „Bewegung reduzieren“: Countdown ohne Feuerwerk
   await page.setViewportSize(DESKTOP);
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto("/admin/settings/jahreszeiten");
-  const limits = page.getByTestId("season-new_year-preview-limits");
+  // Gilt fürs ganze Gerät: einmal über den Karten, nicht an jeder Karte.
+  const limits = page.getByTestId("seasons-preview-own-limits");
   await expect(limits).toContainText("Bewegung reduzieren");
+  await expect(page.getByTestId("season-new_year-preview-limits")).toHaveCount(0);
   await page.getByTestId("season-new_year-preview").click();
   await expect(page.getByTestId("new-year-countdown")).toBeVisible();
   await expect(page.getByTestId("season-sky")).toHaveCount(0);
   await limits.scrollIntoViewIfNeeded();
+  await page.mouse.wheel(0, -120);
   await page.waitForTimeout(500);
   await shot(page, "1838-silvester-vorschau-bewegung-reduziert.png");
   expect(problems).toEqual([]);

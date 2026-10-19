@@ -14,7 +14,7 @@ vi.mock("@/hooks/useLiveRefresh", () => ({ useLiveRefresh: () => {} }));
 const seasonView = { preference: "on", reducedMotion: false };
 vi.mock("@/seasons/SeasonContext", () => ({ useSeason: () => seasonView }));
 
-const { SeasonsSettings, runningSeasons, stateText, previewLimits, PREVIEW_STORAGE_KEY } = await import("./SeasonsSettings");
+const { SeasonsSettings, runningSeasons, stateText, previewLimits, ownViewLimits, PREVIEW_STORAGE_KEY } = await import("./SeasonsSettings");
 
 function season(overrides) {
   return {
@@ -175,21 +175,24 @@ test("Adventkalender und Ostereiersuche stehen nur zum Lesen da, mit dem Weg zur
   expect(screen.getByTestId("season-halloween-enabled")).toBeInTheDocument();
 });
 
-test("Vorschau ruhig (#1838): sagt, warum Feuerwerk und Bewegung bei dir fehlen", () => {
+test("Vorschau ruhig (#1838): Gründe des Geräts/Kontos einmal oben, Gründe der Saison an der Karte", () => {
+  expect(ownViewLimits({ preference: "on", reducedMotion: false })).toEqual([]);
+  expect(ownViewLimits({ preference: "on", reducedMotion: true })).toEqual([expect.stringContaining("Bewegung reduzieren")]);
+  expect(ownViewLimits({ preference: "subtle", reducedMotion: false })).toEqual([expect.stringContaining("„dezent“")]);
+  expect(ownViewLimits({ preference: "off", reducedMotion: true })).toEqual([expect.stringContaining("„aus“")]);
   const base = season({ key: "new_year", label: "Silvester" });
-  expect(previewLimits({ season: base, preference: "on", reducedMotion: false })).toEqual([]);
-  expect(previewLimits({ season: base, preference: "on", reducedMotion: true })).toEqual([expect.stringContaining("Bewegung reduzieren")]);
-  expect(previewLimits({ season: base, preference: "subtle", reducedMotion: false })).toEqual([expect.stringContaining("„dezent“")]);
-  expect(previewLimits({ season: base, preference: "off", reducedMotion: true })).toEqual([expect.stringContaining("„aus“")]);
-  expect(previewLimits({ season: { ...base, intensity: "subtle" }, preference: "on", reducedMotion: false })).toEqual([expect.stringContaining("Stärke „dezent“")]);
-  expect(previewLimits({ season: { ...base, channels: ["app"] }, preference: "on", reducedMotion: false })).toEqual([expect.stringContaining("Website")]);
+  expect(previewLimits({ season: base })).toEqual([]);
+  expect(previewLimits({ season: { ...base, intensity: "subtle" } })).toEqual([expect.stringContaining("Stärke „dezent“")]);
+  expect(previewLimits({ season: { ...base, channels: ["app"] } })).toEqual([expect.stringContaining("Website")]);
 });
 
-test("Vorschau-Karte: Hinweis bei „Bewegung reduzieren“, nach dem Start der Weg auf die Website im selben Tab", async () => {
+test("Hinweis bei „Bewegung reduzieren“ steht einmal oben, nicht an jeder Karte; nach dem Start der Weg auf die Website im selben Tab", async () => {
   const user = userEvent.setup();
   seasonView.reducedMotion = true;
   render(<MemoryRouter><SeasonsSettings /></MemoryRouter>);
-  expect(await screen.findByTestId("season-new_year-preview-limits")).toHaveTextContent("Bewegung reduzieren");
+  expect(await screen.findByTestId("seasons-preview-own-limits")).toHaveTextContent("Bewegung reduzieren");
+  expect(screen.queryByTestId("season-new_year-preview-limits")).toBeNull();
+  expect(screen.queryByTestId("season-halloween-preview-limits")).toBeNull();
   expect(screen.queryByTestId("season-new_year-preview-site")).toBeNull();
   await user.click(screen.getByTestId("season-new_year-preview"));
   const link = await screen.findByTestId("season-new_year-preview-site");
@@ -199,8 +202,17 @@ test("Vorschau-Karte: Hinweis bei „Bewegung reduzieren“, nach dem Start der 
   expect(screen.queryByTestId("season-halloween-preview-site")).toBeNull();
 });
 
-test("Vorschau-Karte ohne Einschränkung: kein Hinweis", async () => {
+test("Stärke „dezent“ sagt es nur die Karte dieser Saison", async () => {
+  apiMock.get.mockResolvedValue({ data: { ...VIEW, seasons: VIEW.seasons.map((item) => (item.key === "new_year" ? { ...item, intensity: "subtle" } : item)) } });
+  render(<MemoryRouter><SeasonsSettings /></MemoryRouter>);
+  expect(await screen.findByTestId("season-new_year-preview-limits")).toHaveTextContent("Stärke „dezent“");
+  expect(screen.queryByTestId("season-halloween-preview-limits")).toBeNull();
+  expect(screen.queryByTestId("seasons-preview-own-limits")).toBeNull();
+});
+
+test("ohne Einschränkung: kein Hinweis", async () => {
   render(<MemoryRouter><SeasonsSettings /></MemoryRouter>);
   await screen.findByTestId("season-new_year-preview");
   expect(screen.queryByTestId("season-new_year-preview-limits")).toBeNull();
+  expect(screen.queryByTestId("seasons-preview-own-limits")).toBeNull();
 });
