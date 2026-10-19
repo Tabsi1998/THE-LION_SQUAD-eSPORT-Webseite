@@ -369,6 +369,22 @@ test.describe("Abnahme: Tafeln mit Event-Schlüssel (#1822) und Anmelde-QR im Ch
       for (const name of names) await expect(call).toContainText(name);
       await expect(tv.getByTestId(`tv-call-clock-${match.id}`)).toBeVisible();
       await expect(tv.getByTestId("event-calls-tv")).toContainText("Probelauf-Cup");
+      // Der Stationsname bleibt ganz: kein Wort über zwei Zeilen, nichts ragt aus der Spalte.
+      const layout = await tv.getByTestId(`tv-call-station-${match.id}`).evaluate((element) => {
+        const node = element.firstChild;
+        const range = document.createRange();
+        const broken = [];
+        let index = 0;
+        for (const word of node.textContent.split(" ")) {
+          range.setStart(node, index);
+          range.setEnd(node, index + word.length);
+          if (range.getClientRects().length > 1) broken.push(word);
+          index += word.length + 1;
+        }
+        return { broken, overflow: element.scrollWidth - element.clientWidth };
+      });
+      expect(layout.broken, "kein Wort mitten getrennt").toEqual([]);
+      expect(layout.overflow).toBeLessThanOrEqual(1);
       await shot(tv, "tv-aufruf-tafel-mitglieder-fhd.png");
       // Eine Weile laufen lassen (länger als eine Ersatz-Abfrage): weiter keine Fehler.
       await tv.waitForTimeout(16_000);
