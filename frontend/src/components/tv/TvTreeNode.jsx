@@ -36,6 +36,7 @@ export const TvTreeContext = createContext({
   drawRows: NO_MARKS,
   drawStep: 60,
   forecast: NO_MARKS,
+  readyCards: NO_MARKS,
 });
 
 // Eine Uhr für alle laufenden Spiele: einmal je Sekunde, nur die Uhren zeichnen neu.
@@ -141,6 +142,9 @@ export function TvTreeNode({ match, regMap, podiumMap, findMatch }) {
   const goldCard = tree.goldCards.has(match.id);
   const meta = heat && !matchFate(match) ? [`${(match.slots || []).length} Spieler`, qualifiers ? `${qualifiers} ${qualifiers === 1 ? "kommt" : "kommen"} weiter` : ""].filter(Boolean).join(" · ") : "";
   const mark = tree.marks?.get(match.id) || "";
+  // Show-Auslosung bereit (#1634): die Zielspiele leuchten ruhig, bis gelost ist - nacheinander (`--tv-i`).
+  const readyIndex = tree.readyCards?.get(match.id);
+  const ready = readyIndex !== undefined && !fate;
   // Entfällt (Reset nicht nötig, zusammengelegt, gestrichen): wie im Web-Baum nur eine ruhige Zeile - der Kopf mit Grund.
   if (fate) slots = [];
   if (solo) {
@@ -151,13 +155,15 @@ export function TvTreeNode({ match, regMap, podiumMap, findMatch }) {
 
   return (
     <article
-      className={["tv-node", live ? "tv-node--live" : "", done ? "tv-node--done" : "", goldCard ? "tv-node--gold" : "", heat ? "tv-node--heat" : "", fate ? "tv-node--void" : "", solo ? "tv-node--bye" : ""].filter(Boolean).join(" ")}
+      className={["tv-node", live ? "tv-node--live" : "", done ? "tv-node--done" : "", goldCard ? "tv-node--gold" : "", heat ? "tv-node--heat" : "", fate ? "tv-node--void" : "", solo ? "tv-node--bye" : "", ready ? "tv-node--ready" : ""].filter(Boolean).join(" ")}
+      style={ready ? { "--tv-i": readyIndex } : undefined}
       data-testid={`tv-match-${match.id}`}
       data-tv-node={match.id}
       data-live={live ? "1" : undefined}
       data-walkover={walkover ? "1" : undefined}
       data-bye={solo ? "1" : undefined}
       data-mark={mark || undefined}
+      data-ready={ready ? "1" : undefined}
     >
       <header className="tv-node__head">
         <span className="tv-node__title tv-t-meta">
@@ -179,7 +185,10 @@ export function TvTreeNode({ match, regMap, podiumMap, findMatch }) {
         const shown = hidden ? { ...slot, registration_id: null, status: "pending" } : slot;
         const described = describeSlot(shown, nameOf, findMatch);
         // Gelost (#1591): „Weiter aus Runde 1“ statt „Platz aus Runde 1“ - wie im Web-Baum.
-        const info = described.kind === "pending" ? { ...described, label: treeSlotLabel(shown, findMatch) || described.label } : described;
+        // Show-Auslosung (#1590): der Topf steht - „Auslosung bereit“ statt „Weiter aus Runde 1“, wie im Web-Baum.
+        const waitsForDraw = described.kind === "pending" && Boolean(slot?.source?.draw) && match.draw_ready && typeof match.draw_ready === "object";
+        const info = waitsForDraw ? { ...described, label: "Auslosung bereit" }
+          : described.kind === "pending" ? { ...described, label: treeSlotLabel(shown, findMatch) || described.label } : described;
         const registrationId = hidden ? null : slot.registration_id || null;
         const result = registrationId ? resultOf(registrationId) : null;
         const outcome = registrationId ? byRegistration.get(registrationId) : null;

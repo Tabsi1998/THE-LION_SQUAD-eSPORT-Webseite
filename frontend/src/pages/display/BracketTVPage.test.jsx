@@ -277,3 +277,108 @@ test("#1124/#1125: ein Link nur mit Sponsor oder Zahlen, aber nichts davon da - 
   // Noch kein Spiel gespielt: keine Zahlen.
   expect(await screen.findByTestId("tv-slide-empty")).toHaveTextContent("Noch keine Zahlen zum Turnier");
 });
+
+// ---------------------------------------------------------------- #1634: Live-Warteschlange je Station
+const startedAgo = (minutes) => new Date(Date.now() - minutes * 60000).toISOString();
+
+function queueView({ called = false } = {}) {
+  return {
+    applies: true,
+    reason: null,
+    stations: [
+      { id: "st1", name: "PC 1", station_text: "Station PC 1", status: "busy", waiting: 1,
+        running: { match_id: "m1", state: "running", names: ["NeonFalke", "KartKönigin"], open_slots: 0, label: "Runde 1", started_at: startedAgo(4), duration_minutes: 30 },
+        next: { match_id: "m2", state: "queued", names: [], open_slots: 2, label: "Runde 1", forecast: true, forecast_at: inMinutes(30), delay_minutes: 8 } },
+      { id: "st2", name: "PC 2", station_text: "Station PC 2", status: called ? "reserved" : "free", waiting: 1, running: null,
+        next: { match_id: "m3", state: called ? "called" : "queued", names: [], open_slots: 2, label: "Runde 2", forecast_at: inMinutes(10), report_by: called ? inMinutes(2) : null } },
+    ],
+    matches: {},
+    unplaced: [],
+    summary: null,
+  };
+}
+
+function serveQueue({ bracket = BRACKET, queue = () => queueView() } = {}) {
+  apiMock.get.mockImplementation(async (url) => {
+    if (url === "/tv/settings") return { data: { settings: {} } };
+    if (url.startsWith("/tournaments/t1/bracket/display")) return { data: bracket };
+    if (url === "/tournaments/t1/live-queue") return { data: queue() };
+    return { data: [] };
+  });
+}
+
+test("#1634: vor Ort mit Stationen wird die Aufruf-Folie zur Warteschlange - je Station Jetzt mit Spielzeit und Als Nächstes", async () => {
+  serveQueue();
+  renderTv("/display/bracket/t1?key=k&playlist=calls");
+  const board = await screen.findByTestId("tv-queue-board");
+  expect(apiMock.get).toHaveBeenCalledWith("/tournaments/t1/live-queue", { params: { key: "k" } });
+  expect(board).toHaveAttribute("data-count", "2");
+  expect(screen.queryByTestId("tv-call-board")).not.toBeInTheDocument();
+  const now = screen.getByTestId("tv-queue-now-st1");
+  expect(now).toHaveTextContent("NeonFalke vs. KartKönigin");
+  expect(now).toHaveTextContent("Spiel A");
+  expect(screen.getByTestId("tv-queue-clock-st1")).toHaveTextContent(/^0[34]:\d{2}\s*\/ 30 Min\.$/);
+  expect(screen.getByTestId("tv-queue-when-st1")).toHaveTextContent(/^voraussichtlich ca\. \d{2}:\d{2} · \+8 Min\.$/);
+  expect(screen.getByTestId("tv-queue-now-st2")).toHaveTextContent("Gerade frei");
+  expect(screen.getByTestId("tv-queue-lane-st1")).toHaveAttribute("data-state", "live");
+  expect(screen.getByTestId("bracket-tv")).toHaveAttribute("data-slide", "calls");
+});
+
+test("#1634: ein Aufruf an der Station - die Warteschlange zieht ohne Neuladen nach (Strom), mit Frist und Countdown", async () => {
+  let called = false;
+  serveQueue({ queue: () => queueView({ called }) });
+  renderTv("/display/bracket/t1?key=k&playlist=calls");
+  await screen.findByTestId("tv-queue-board");
+  expect(screen.getByTestId("tv-queue-next-st2")).toHaveAttribute("data-state", "queued");
+  called = true;
+  const { emitApiInvalidation } = await import("@/lib/apiInvalidation");
+  await act(async () => {
+    emitApiInvalidation({ resource: "tournaments" });
+  });
+  await waitFor(() => expect(screen.getByTestId("tv-queue-next-st2")).toHaveAttribute("data-state", "called"), { timeout: 3000 });
+  expect(screen.getByTestId("tv-queue-lane-st2")).toHaveAttribute("data-state", "called");
+  expect(screen.getByTestId("tv-queue-when-st2")).toHaveTextContent(/Aufgerufen · antreten bis \d{2}:\d{2}/);
+  expect(screen.getByTestId("tv-queue-left-m3")).toHaveTextContent(/^noch [12]:\d{2}$/);
+});
+
+test("#1634: ohne Warteschlange (online, keine Stationen) bleibt die Aufruf-Tafel wie bisher", async () => {
+  serveQueue({ queue: () => ({ applies: false, reason: "online", stations: [], matches: {}, summary: null }) });
+  renderTv("/display/bracket/t1?key=k&playlist=calls");
+  expect(await screen.findByTestId("tv-calls-none")).toHaveTextContent("Gerade keine Aufrufe");
+  expect(screen.queryByTestId("tv-queue-board")).not.toBeInTheDocument();
+});
+
+test("#1634: scheitert die Warteschlange (alter Server), zeigt der TV den Baum wie bisher - ohne Fehler", async () => {
+  apiMock.get.mockImplementation(async (url) => {
+    if (url === "/tv/settings") return { data: { settings: {} } };
+    if (url.startsWith("/tournaments/t1/bracket/display")) return { data: BRACKET };
+    if (url.endsWith("/live-queue")) throw Object.assign(new Error("nicht gefunden"), { response: { status: 404 } });
+    return { data: [] };
+  });
+  renderTv("/display/bracket/t1?key=k");
+  expect(await screen.findByTestId("tv-tree")).toBeInTheDocument();
+  await waitFor(() => expect(screen.getByTestId("tv-status")).toHaveTextContent("aktuell"));
+  expect(screen.getByTestId("tv-status")).not.toHaveClass("tv-status--error");
+});
+
+test("#1634 (Codex): ein Server ohne Warteschlange (404) wird in dieser Sitzung nicht noch einmal gefragt", async () => {
+  let asked = 0;
+  apiMock.get.mockImplementation(async (url) => {
+    if (url === "/tv/settings") return { data: { settings: {} } };
+    if (url.startsWith("/tournaments/t1/bracket/display")) return { data: BRACKET };
+    if (url.endsWith("/live-queue")) {
+      asked += 1;
+      throw Object.assign(new Error("nicht gefunden"), { response: { status: 404 } });
+    }
+    return { data: [] };
+  });
+  renderTv("/display/bracket/t1?key=k");
+  expect(await screen.findByTestId("tv-tree")).toBeInTheDocument();
+  await waitFor(() => expect(asked).toBe(1));
+  const { emitApiInvalidation } = await import("@/lib/apiInvalidation");
+  await act(async () => {
+    emitApiInvalidation({ resource: "tournaments" });
+  });
+  await waitFor(() => expect(apiMock.get.mock.calls.filter(([url]) => String(url).startsWith("/tournaments/t1/bracket/display")).length).toBeGreaterThan(1));
+  expect(asked).toBe(1);
+});

@@ -11,6 +11,7 @@ import { TvFooter, TvHeader, TvPill, TvPresentedBy, toneFor } from "@/components
 import { TvBracketStage } from "@/components/tv/TvBracketStage";
 import { TvChampionCard, avatarOfRegistration, nameOfRegistration } from "@/components/tv/TvMoments";
 import { TvCallBoard } from "@/components/tv/TvCallBoard";
+import { TvQueueBoard } from "@/components/tv/TvQueueBoard";
 import { TvLiveSlide, TvSlideBar, TvSponsorMoment, TvStatsSlide } from "@/components/tv/TvSlides";
 import { TvCheckInScreen, TvPauseScreen, TvRegistrationScreen } from "@/components/tv/TvScreens";
 import { TvNextUp } from "@/components/tv/TvNextUp";
@@ -25,6 +26,7 @@ import { advance, changesAfter, firstIndex, isDue, onlyMomentSlides, serializePl
 import { callsOf, newCalls } from "@/lib/tvCalls";
 import { forecastBoard, nextUp } from "@/lib/tvForecast";
 import { statsTiles } from "@/lib/tvStats";
+import { hasQueue } from "@/lib/tvQueue";
 import { presentedBy, sponsorFor, sponsorPlan } from "@/lib/tvSponsors";
 import { tvScreenFor } from "@/lib/tvScreens";
 import { viennaTime } from "@/lib/vienna";
@@ -38,11 +40,14 @@ import { viennaTime } from "@/lib/vienna";
 // Seit #1564 hat jedes Turnier-Ereignis seinen Moment (Auslosung, zusammengelegt, kampflos, korrigiert, entfällt) - aus
 // demselben Vergleich wie der Web-Baum, genau einmal. Nach einer Neuverbindung holt der TV den Stand ruhig nach, wie
 // beim ersten Laden. Unten stehen „Läuft“ und „Als Nächstes“ mit Prognose und Verzug.
+// Seit #1634: Show-Auslosung bereit und der sofort gezogene Platz sind eigene Momente; hat das Turnier vor Ort eine
+// Live-Warteschlange (GET /live-queue mit demselben Schlüssel), zeigt die Folie „Aufrufe“ je Station Jetzt und Als
+// Nächstes - nachgeladen wie der Baum (Strom und Ersatz-Abfrage). Ohne Warteschlange bleibt alles wie vorher.
 
 const EMPTY = new Set();
 const NO_TAGS = new Map();
 // Momente, die auf dem Baum spielen (die anderen sind Folien: Sponsor, Zahlen).
-const HIGH = new Set(["champion", "result", "live", "draw", "merge", "mark"]);
+const HIGH = new Set(["champion", "result", "live", "draw", "draw_ready", "draw_assigned", "merge", "mark"]);
 // Mehr Ereignisse auf einmal sind kein Live-Geschehen mehr (Neuaufbau, Nachladen) - dann ohne Moment ans Ende.
 const MAX_EVENTS = 48;
 // Worauf der TV hört - dieselbe Liste für das Nachladen und das Zählen der Meldungen aus dem Strom.
@@ -127,6 +132,11 @@ function BracketTv() {
   const { motionOn, settings } = useTv();
   const [data, setData] = useState(null);
   const [stations, setStations] = useState([]);
+  // Live-Warteschlange je Station (#1634) - `null`, solange es keine gibt (online, keine Stationen, alter Server).
+  const [liveQueue, setLiveQueue] = useState(null);
+  // Ein Server ohne Warteschlange (404/405, ältere Stände): für diese Sitzung nicht mehr fragen - sonst fragt jeder TV
+  // in der Halle alle 15 s vergeblich nach (Codex zu #1634).
+  const queueOffRef = useRef(false);
   const [loadError, setLoadError] = useState(null);
   const [keyRefused, setKeyRefused] = useState(false);
   const [lastUpdated, setLastUpdated] = useState(null);
@@ -182,13 +192,23 @@ function BracketTv() {
       setLoadError(null);
       setKeyRefused(false);
       setLastUpdated(Date.now());
-      // Die Stationen (öffentlich, wie bisher): wer reserviert ist, steht auf der Aufruf-Tafel (#1122).
+      // Die Stationen (öffentlich, wie bisher): wer reserviert ist, steht auf der Aufruf-Tafel (#1122). Dazu die
+      // Live-Warteschlange (#1634) mit demselben Schlüssel - beide zugleich; scheitert eine, bleibt ihr letzter Stand.
       const tournamentId = br?.tournament?.id || id;
-      try {
-        const { data: list } = await api.get(`/stations?tournament_id=${encodeURIComponent(tournamentId)}`);
-        setStations(Array.isArray(list) ? list : []);
-      } catch {
-        setStations((current) => current);
+      const [list, live] = await Promise.allSettled([
+        api.get(`/stations?tournament_id=${encodeURIComponent(tournamentId)}`),
+        queueOffRef.current
+          ? Promise.resolve(null)
+          : api.get(`/tournaments/${encodeURIComponent(tournamentId)}/live-queue`, displayKey ? { params: { key: displayKey } } : undefined),
+      ]);
+      if (seq < appliedRef.current) return;
+      if (list.status === "fulfilled") setStations(Array.isArray(list.value?.data) ? list.value.data : []);
+      if (live.status === "fulfilled" && live.value) {
+        const view = live.value?.data;
+        setLiveQueue(view && typeof view === "object" && !Array.isArray(view) && view.applies === true ? view : null);
+      } else if (live.status === "rejected" && [404, 405].includes(live.reason?.response?.status)) {
+        queueOffRef.current = true;
+        setLiveQueue(null);
       }
     } catch (error) {
       const status = error?.response?.status;
@@ -324,11 +344,11 @@ function BracketTv() {
       if (results.length > COLLECT_AFTER) queue.enqueue({ type: "result", items: results });
       else results.forEach((matchId) => queue.enqueue({ type: "result", items: [matchId] }));
     }
-    // Auslosung und Zusammenlegen: bis der Moment sie zeigt, stehen die neuen Plätze noch leer.
+    // Auslosung, sofort gezogener Platz und Zusammenlegen: bis der Moment sie zeigt, stehen die neuen Plätze noch leer.
     if (motionOn) {
       const keys = [];
       for (const entry of change.moments) {
-        if (entry.type === "draw") entry.rows.forEach((row) => keys.push(`${row.matchId}:${row.slotIndex}`));
+        if (entry.type === "draw" || entry.type === "draw_assigned") entry.rows.forEach((row) => keys.push(`${row.matchId}:${row.slotIndex}`));
         if (entry.type === "merge") entry.moves.forEach((move) => keys.push(`${move.matchId}:${move.slotIndex}`));
       }
       if (keys.length) setHidden((current) => new Set([...current, ...keys]));
@@ -363,6 +383,8 @@ function BracketTv() {
   const forecast = useMemo(() => forecastBoard(matches, { stations, now: Math.max(Date.now(), minute * 60000) }), [matches, stations, minute]);
   const upcoming = useMemo(() => nextUp(matches, { board: forecast, limit: 3, exclude: new Set(calls.map((call) => call.matchId)) }), [matches, forecast, calls]);
   const tiles = useMemo(() => statsTiles(matches, nameOf), [matches, nameOf]);
+  // Vor Ort mit Stationen (#1634): die Aufruf-Folie wird zur Warteschlange je Station - die Aufrufe stecken darin.
+  const queued = hasQueue(liveQueue);
   const plan = sponsorPlan(settings, sponsors);
   const lastStage = lastStageId(matches, data?.stages || []);
   const isLastStage = useCallback((match) => !lastStage || (match.stage_id || "__default") === lastStage, [lastStage]);
@@ -376,7 +398,7 @@ function BracketTv() {
   const available = (slide) => {
     if (slide === "tree") return hasMatches;
     if (slide === "live") return live.length > 0;
-    if (slide === "calls") return calls.length > 0;
+    if (slide === "calls") return calls.length > 0 || queued;
     if (slide === "sponsor") return plan.moment && (onlyLow || isDue(lastLow.current.sponsor, settings.sponsor_every));
     if (slide === "stats") return Boolean(settings.stats) && tiles.length > 0 && (onlyLow || isDue(lastLow.current.stats, settings.stats_every));
     return false;
@@ -439,7 +461,7 @@ function BracketTv() {
     : screen === "pause" ? (t.paused_until ? `Pause bis ${viennaTime(t.paused_until, { hour: "2-digit", minute: "2-digit" })}` : "Kurze Pause")
       : screen === "checkin" ? "Check-in"
         : screen === "registration" ? "Anmeldung offen"
-          : hasMatches ? (parked ? "Turnier entschieden" : { tree: "Turnierbaum", live: "Live-Spiele", calls: "Aufrufe", sponsor: "Unser Partner", stats: "Zahlen zum Turnier" }[active] || "Turnierbaum") : null;
+          : hasMatches ? (parked ? "Turnier entschieden" : { tree: "Turnierbaum", live: "Live-Spiele", calls: queued ? "Stationen" : "Aufrufe", sponsor: "Unser Partner", stats: "Zahlen zum Turnier" }[active] || "Turnierbaum") : null;
 
   return (
     <div className="tv-page" data-testid="bracket-tv" data-screen={screen} data-slide={screen === "playlist" ? active : undefined}>
@@ -507,7 +529,7 @@ function BracketTv() {
               ) : null}
               {active === "calls" ? (
                 <div className="tv-slide" key={`calls-${playing.runId}`}>
-                  <TvCallBoard calls={calls} upcoming={upcoming} matches={matches} nameOf={nameOf} avatarOf={avatarOf} />
+                  {queued ? <TvQueueBoard queue={liveQueue} matches={matches} /> : <TvCallBoard calls={calls} upcoming={upcoming} matches={matches} nameOf={nameOf} avatarOf={avatarOf} />}
                 </div>
               ) : null}
               {active === "sponsor" && sponsorShown ? (

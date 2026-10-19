@@ -8,8 +8,8 @@ import { initials, isMatchDone } from "@/lib/slotSource";
 import { matchRoundLabel } from "@/lib/tournamentLabels";
 import { MOTION } from "@/lib/motion";
 import { CAMERA, cameraStops, centeredView, clampView, fitZoom, nearestStop, rectFits, stageTransform, unionRect, viewBetween, viewForRect } from "@/lib/tvCamera";
-import { isLiveMatch, liveZoomPlan } from "@/lib/tvLive";
-import { COLLECT_AFTER, MOMENT_MS } from "@/lib/tvMoments";
+import { isLiveMatch, liveZoomPlan, matchName } from "@/lib/tvLive";
+import { COLLECT_AFTER, MOMENT_MS, drawReadyText, readyDraws } from "@/lib/tvMoments";
 import { TRAVEL, advancementsOf, landFrame, planTravel, rideFrame, routeLength, routePath, travelRoute, travelTotal } from "@/lib/tvTravel";
 import { TV_STAGE_UNIT_PX, stageBase, treeBox, treeCssVars, treeMinZoom } from "@/lib/tvType";
 import { TvChampionCard, TvCollectiveCard, TvLiveBanner, TvResultCard, avatarOfRegistration, nameOfRegistration } from "./TvMoments";
@@ -25,6 +25,9 @@ import { useTv } from "./TvScreen";
 // entlang (dieselbe Führung wie im Web-Baum), die Auslosung lässt die Namen nacheinander in die Läufe kommen, beim
 // Zusammenlegen fliegen die Namen in den Sammellauf und die frei gewordene Station leuchtet kurz im Banner, „entfällt“
 // lässt die Karte zurücktreten. Für 5 m Abstand: große Banner, ruhiges Tempo, eine Bewegung nach der anderen.
+// Seit #1634: Show-Auslosung bereit - der Hinweis „Auslosung bereit · 8 Namen“ hebt sich herein und bleibt stehen, bis
+// gelost ist, die Zielspiele leuchten ruhig; sofort zufällig - ein Name gleitet auf seinen gezogenen Platz, der kurz
+// aufleuchtet (eine Zeile der Auslosung).
 
 const FINISHED = new Set(["completed", "results_published", "archived", "cancelled"]);
 const EMPTY = new Set();
@@ -169,6 +172,10 @@ export function TvBracketStage({ data, moment = null, onMomentDone, hiddenSlots 
   const [championCenter, setChampionCenter] = useState(false);
   const [confetti, setConfetti] = useState(false);
   const [parkSpot, setParkSpot] = useState("");
+  // Show-Auslosung bereit (#1634): aus den Daten - steht auch nach dem Neuladen da, bis gelost ist.
+  const ready = useMemo(() => readyDraws(matches), [matches]);
+  const readyText = ready.length ? drawReadyText(ready) : "";
+  const readyRef = useRef(readyText);
 
   // ------------------------------------------------------------ Kamera
   const plan = useMemo(() => {
@@ -196,6 +203,7 @@ export function TvBracketStage({ data, moment = null, onMomentDone, hiddenSlots 
     contentSizeRef.current = content;
     dataRef.current = data;
     championRef.current = champion;
+    readyRef.current = readyText;
   });
 
   const apply = useCallback((view) => {
@@ -335,6 +343,11 @@ export function TvBracketStage({ data, moment = null, onMomentDone, hiddenSlots 
   }, [champion, showGold, content, colGapPx, data]);
 
   const drawnGold = championParked ? Infinity : moment?.type === "champion" ? goldCount : 0;
+  // Die Zielspiele einer bereiten Show-Auslosung: je Spiel seine Stelle für das versetzte Aufleuchten.
+  const readyCards = useMemo(() => {
+    const ids = ready.flatMap((draw) => draw.matchIds);
+    return ids.length ? new Map(ids.map((id, index) => [id, index])) : NO_MAP;
+  }, [ready]);
   const treeValue = useMemo(() => {
     const goldCards = new Set();
     const goldRows = new Set();
@@ -358,8 +371,9 @@ export function TvBracketStage({ data, moment = null, onMomentDone, hiddenSlots 
       drawRows,
       drawStep,
       forecast,
+      readyCards,
     };
-  }, [matches, stages, hiddenSlots, landing, champion, showGold, drawnGold, data?.tournament?.status, marks, drawRows, drawStep, forecast]);
+  }, [matches, stages, hiddenSlots, landing, champion, showGold, drawnGold, data?.tournament?.status, marks, drawRows, drawStep, forecast, readyCards]);
 
   // ------------------------------------------------------------ Geparkte Siegerkarte: eine freie Ecke, sonst die Kopfleiste
   useLayoutEffect(() => {
@@ -704,6 +718,59 @@ export function TvBracketStage({ data, moment = null, onMomentDone, hiddenSlots 
       await hideBanner();
     };
 
+    // Show-Auslosung bereit (#1634): der Baum zeigt die Zielspiele, der Hinweis hebt sich herein und bleibt danach stehen
+    // (dasselbe Element, unten `standing`) - bis gelost ist. Ist schon gelost, wenn der Moment endet, geht er weich.
+    const runDrawReady = async () => {
+      const draws = moment.draws || [];
+      setBanner({ text: drawReadyText(draws), kind: "ready" });
+      await focusCards(moment.matchIds || [], 900);
+      if (session.cancelled) return;
+      await sleep(MOMENT_MS.draw_ready);
+      if (session.cancelled) return;
+      if (readyRef.current) setBanner(null);
+      else await hideBanner();
+    };
+
+    // Sofort zufällig (#1634): ein Name landet auf seinem gezogenen Platz - wie eine Zeile der Auslosung: die Zeile gleitet
+    // herein, danach leuchtet der Platz kurz auf. Der Banner sagt, wer wohin kam.
+    const runDrawAssigned = async () => {
+      const rows = moment.rows || [];
+      if (!rows.length) return;
+      const keys = rows.map((row) => `${row.matchId}:${row.slotIndex}`);
+      const all = byId();
+      const nameOf = nameOfRegistration(dataRef.current?.registrations || []);
+      const [first] = rows;
+      setBanner({
+        text: rows.length === 1
+          ? `Zufällig gezogen · ${nameOf(first.registrationId) || "Weiterkommer"} → ${matchName(all.get(first.matchId))}`
+          : `Zufällig gezogen · ${rows.length} Namen auf ihre Plätze`,
+        kind: "event",
+      });
+      if (!motionRef.current) {
+        revealRef.current?.(keys);
+        await sleep(MOMENT_MS.draw_assigned);
+        if (!session.cancelled) await hideBanner();
+        return;
+      }
+      await focusCards([...new Set(rows.map((row) => row.matchId))], 700);
+      if (session.cancelled) return;
+      setDrawStep(DRAW_STEP.max);
+      setDrawRows(new Map(rows.map((row) => [`${row.matchId}:${row.slotIndex}`, { index: row.index }])));
+      revealRef.current?.(keys);
+      await sleep(rows.length * DRAW_STEP.max + ROW_IN_MS);
+      if (session.cancelled) return;
+      setLanding((current) => new Set([...current, ...keys]));
+      session.timers.push(window.setTimeout(() => setLanding((current) => {
+        const next = new Set(current);
+        keys.forEach((key) => next.delete(key));
+        return next;
+      }), 1000));
+      await sleep(MOMENT_MS.draw_assigned);
+      if (session.cancelled) return;
+      setDrawRows(NO_MAP);
+      await hideBanner();
+    };
+
     // Läufe zusammengelegt (#1564): die alten Läufe treten zurück, die Namen fliegen in den Sammellauf, die frei
     // gewordene Station leuchtet kurz im Banner.
     const runMerge = async () => {
@@ -847,6 +914,8 @@ export function TvBracketStage({ data, moment = null, onMomentDone, hiddenSlots 
         else if (moment.type === "result") await runResult();
         else if (moment.type === "champion") await runChampion();
         else if (moment.type === "draw") await runDraw();
+        else if (moment.type === "draw_ready") await runDrawReady();
+        else if (moment.type === "draw_assigned") await runDrawAssigned();
         else if (moment.type === "merge") await runMerge();
         else if (moment.type === "mark") await runMark();
       } finally {
@@ -877,6 +946,10 @@ export function TvBracketStage({ data, moment = null, onMomentDone, hiddenSlots 
   const lastStage = lastStageId(matches, stages);
   const cardMatches = card ? card.ids.map((id) => matches.find((match) => match.id === id)).filter(Boolean) : [];
   const nameOf = nameOfRegistration(registrations);
+  // Was oben steht: der Banner des Moments, sonst der stehende Hinweis „Auslosung bereit“ - nicht über einer Ergebnis- oder
+  // Siegerkarte. Hinweis und Banner des Bereit-Moments sind dasselbe Element (Schlüssel „ready“): kein zweites Hereinkommen.
+  const standing = readyText && !card && !championCenter ? { text: readyText, kind: "ready" } : null;
+  const shownBanner = banner || standing;
 
   return (
     <div ref={viewportRef} className="tv-viewport" data-testid="tv-viewport" data-camera={moment ? "moment" : plan?.mode || "wait"} data-moment={moment?.type || undefined}>
@@ -907,7 +980,7 @@ export function TvBracketStage({ data, moment = null, onMomentDone, hiddenSlots 
         ))}
       </div>
       {plan?.mode === "tour" ? <div className="tv-vignette" aria-hidden="true" /> : null}
-      {banner ? <TvLiveBanner text={banner.text} kind={banner.kind} note={banner.note} leaving={banner.leaving} /> : null}
+      {shownBanner ? <TvLiveBanner key={shownBanner.kind === "ready" ? "ready" : "moment"} text={shownBanner.text} kind={shownBanner.kind} note={shownBanner.note} leaving={shownBanner.leaving} /> : null}
       {card && cardMatches.length ? (
         <div className="tv-moment-layer">
           {card.many ? (

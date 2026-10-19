@@ -258,6 +258,8 @@ function deferredBrackets() {
   const pending = [];
   apiMock.get.mockImplementation((url) => {
     if (url === "/tv/settings") return Promise.resolve({ data: { settings: {} } });
+    // Die Live-Warteschlange (#1634) ist keine Baum-Abfrage - hier ohne Warteschlange.
+    if (url.endsWith("/live-queue")) return Promise.resolve({ data: { applies: false } });
     if (url.startsWith("/tournaments/")) {
       if (!pending.length && current) {
         // Erste Abfrage beim Laden: sofort.
@@ -389,4 +391,111 @@ test("Nachhol-Antwort und Meldungs-Antwort im selben Render-Durchgang: nur der n
   await waitFor(() => expect(main()).toHaveAttribute("data-moment", "result"));
   // Der Moment ist die Korrektur - nicht das verpasste „entschieden“.
   expect(await screen.findByTestId("tv-result-card")).toHaveTextContent("Korrigiert");
+});
+
+// ---------------------------------------------------------------- #1634: Show-Auslosung bereit und sofort zufällig
+/** Die Zielspiele der Gruppe WB:2 im Modus `mode`, auf Wunsch „bereit“ (Marker wie am Server). */
+function withMode(bracket, mode, { ready = false } = {}) {
+  for (const match of bracket.matches_v2) {
+    if (match.settings?.draw_group !== "WB:2") continue;
+    match.settings = { ...match.settings, advancement_mode: mode };
+    if (ready) match.draw_ready = { group: "WB:2", since: "2026-10-31T15:00:00+00:00", pot_size: 4 };
+  }
+  return bracket;
+}
+
+/** Sofort zufällig: ein Platz von E ist gezogen (Los-Kennung und Herkunft aus dem echten gemischten Stand). */
+function oneAssigned() {
+  const after = withMode(state("se8_mixed_before_draw"), "instant");
+  const drawn = state("se8_mixed_drawn").matches_v2.find((match) => match.match_key === "E").slots[0];
+  const target = after.matches_v2.find((match) => match.match_key === "E");
+  target.slots[0] = { ...target.slots[0], registration_id: drawn.registration_id, status: "filled", source_result: drawn.source_result };
+  return { after, registrationId: drawn.registration_id };
+}
+
+/** Der letzte Lauf der Runde (D) ist entschieden, der Topf steht - die Zielspiele noch leer, mit Marker „bereit“. */
+function roundReady() {
+  const ready = withMode(state("se8_mixed_drawn"), "draw_show", { ready: true });
+  const empty = state("se8_mixed_before_draw");
+  ready.matches_v2 = ready.matches_v2.map((match) => (match.settings?.draw_group === "WB:2"
+    ? { ...empty.matches_v2.find((row) => row.id === match.id), settings: match.settings, draw_ready: match.draw_ready }
+    : match));
+  return ready;
+}
+
+async function push(bracket) {
+  current = bracket;
+  await act(async () => {
+    emitApiInvalidation({ resource: "tournaments" });
+  });
+}
+
+const regName = (bracket, registrationId) => {
+  const reg = bracket.registrations.find((row) => row.id === registrationId);
+  return reg?.display_name || reg?.user?.display_name || reg?.ingame_name || "";
+};
+
+test("Show-Auslosung bereit: eigener Moment, die Zielspiele leuchten, der Hinweis bleibt stehen, bis gelost ist", async () => {
+  current = withMode(state("se8_mixed_before_draw"), "draw_show");
+  renderTv();
+  await screen.findByTestId("tv-tree");
+  expect(screen.queryByTestId("tv-live-banner")).not.toBeInTheDocument();
+  // Das Ergebnis des letzten Laufs macht die Runde fertig: erst der Ergebnis-Moment, dann „Auslosung bereit“.
+  await push(roundReady());
+  await waitFor(() => expect(main()).toHaveAttribute("data-moment", "result"));
+  await waitFor(() => expect(main()).toHaveAttribute("data-moment", "draw_ready"), { timeout: 8000 });
+  // Den Banner setzt die Bühne im Effekt nach dem Moment (#1614) - darauf warten.
+  const banner = await screen.findByTestId("tv-live-banner");
+  expect(banner).toHaveAttribute("data-kind", "ready");
+  expect(banner).toHaveTextContent("Auslosung bereit · 4 Namen");
+  const target = screen.getByTestId(`tv-match-${idOf(current, "E")}`);
+  expect(target).toHaveAttribute("data-ready", "1");
+  expect(target).toHaveTextContent("Auslosung bereit");
+  // Nach dem Moment steht der Hinweis weiter da - dasselbe Element, es kommt nicht noch einmal herein.
+  await waitFor(() => expect(main()).not.toHaveAttribute("data-moment"), { timeout: 6000 });
+  expect(screen.getByTestId("tv-live-banner")).toBe(banner);
+  expect(banner).toHaveTextContent("Auslosung bereit · 4 Namen");
+  // Gelost: der Hinweis geht, die Auslosung kommt als eigener Moment, nichts leuchtet mehr.
+  await push(withMode(state("se8_mixed_drawn"), "draw_show"));
+  await waitFor(() => expect(main()).toHaveAttribute("data-moment", "draw"));
+  await waitFor(() => expect(screen.getByTestId("tv-live-banner")).toHaveTextContent(/^Auslosung · /));
+  expect(screen.getByTestId(`tv-match-${idOf(current, "E")}`)).not.toHaveAttribute("data-ready");
+}, 25000);
+
+test("beim ersten Laden ist eine bereite Show-Auslosung gleich als Hinweis da - ohne Moment", async () => {
+  current = roundReady();
+  renderTv();
+  await screen.findByTestId("tv-tree");
+  const banner = await screen.findByTestId("tv-live-banner");
+  expect(banner).toHaveAttribute("data-kind", "ready");
+  expect(main()).not.toHaveAttribute("data-moment");
+});
+
+test("sofort zufällig: ein Name landet auf seinem gezogenen Platz - kurzer eigener Moment, keine Auslosung der Runde", async () => {
+  current = withMode(state("se8_mixed_before_draw"), "instant");
+  renderTv();
+  await screen.findByTestId("tv-tree");
+  const { after, registrationId } = oneAssigned();
+  await push(after);
+  await waitFor(() => expect(main()).toHaveAttribute("data-moment", "draw_assigned"));
+  const banner = await screen.findByTestId("tv-live-banner");
+  expect(banner).toHaveTextContent(/^Zufällig gezogen · /);
+  expect(banner).toHaveTextContent(regName(after, registrationId));
+  // Der Name steht auf seinem Platz (die Zeile gleitet herein) - und der Moment ist kurz.
+  const target = screen.getByTestId(`tv-match-${idOf(after, "E")}`);
+  await waitFor(() => expect(target.querySelector(`[data-tv-reg='${registrationId}']`)).not.toBeNull());
+  await waitFor(() => expect(main()).not.toHaveAttribute("data-moment"), { timeout: 5000 });
+}, 15000);
+
+test("sofort zufällig mit „Bewegung reduzieren“: der Name steht sofort da, nichts gleitet", async () => {
+  current = withMode(state("se8_mixed_before_draw"), "instant");
+  renderTv("&reduce_motion=1");
+  await screen.findByTestId("tv-tree");
+  const { after, registrationId } = oneAssigned();
+  await push(after);
+  await waitFor(() => expect(main()).toHaveAttribute("data-moment", "draw_assigned"));
+  await screen.findByTestId("tv-live-banner");
+  const row = screen.getByTestId(`tv-match-${idOf(after, "E")}`).querySelector(`[data-tv-reg='${registrationId}']`);
+  expect(row).not.toBeNull();
+  expect(row.className).not.toContain("tv-row--draw");
 });

@@ -188,9 +188,13 @@ SLOT_FIELDS = ("slot", "registration_id", "status", "seed", "source")
 SOURCE_FIELDS = ("type", "flow", "match_key", "rank", "seed", "raw")
 # Ausgefallen (#1564): Aufgabe bzw. nicht ins Ziel - nur die Kennzeichen, nie Notiz oder Konto.
 RESULT_FIELDS = ("registration_id", "rank", "score", "points", "qualified", "dnf", "forfeit")
-MATCH_SETTING_FIELDS = ("match_size", "qualifiers_per_match", "duration_minutes", "best_of", "draw_group")
+MATCH_SETTING_FIELDS = ("match_size", "qualifiers_per_match", "duration_minutes", "best_of", "draw_group",
+                        # Weiterkommen in vier Modi (#1590): der TV unterscheidet Show-Auslosung und „sofort zufällig“ (#1634).
+                        "advancement_mode", "randomize_advancement_rounds")
 # Gegner mischen (#1548, #1561): Gruppe, Klartext des Platzes, ob gelost ist und die echte Herkunft je Platz.
 DRAW_FIELDS = ("id", "group", "drawn_at")
+# Show-Auslosung bereit (#1590, am TV #1634): Gruppe, seit wann und wie viele Namen im Topf - nie, wer erinnert wurde.
+DRAW_READY_FIELDS = ("group", "since", "pot_size")
 SOURCE_DRAW_FIELDS = ("group", "label")
 SOURCE_RESULT_FIELDS = ("from_match_id", "from_match_key", "rank", "flow", "draw_id", "skipped", "reason")
 # Grand Final Reset und entfallene Spiele (#1561): die Regel und die öffentlichen Gründe - nie Konten oder Notizen.
@@ -220,6 +224,8 @@ def _display_match(match: dict) -> dict:
     out["settings"] = _pick(settings, MATCH_SETTING_FIELDS)
     if isinstance(match.get("draw"), dict):
         out["draw"] = _pick(match["draw"], DRAW_FIELDS)
+    if isinstance(match.get("draw_ready"), dict):
+        out["draw_ready"] = _pick(match["draw_ready"], DRAW_READY_FIELDS)
     if isinstance(settings.get("bracket_reset"), dict):
         out["settings"]["bracket_reset"] = _pick(settings["bracket_reset"], RESET_RULE_FIELDS)
     if isinstance(match.get("result_meta"), dict):
