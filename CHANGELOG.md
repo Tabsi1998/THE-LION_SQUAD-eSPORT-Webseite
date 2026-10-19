@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.0](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/compare/v1.1.0...v1.2.0) (2026-10-19)
+
+
+### Neu
+
+* **app:** Turnierbaum mit vier Weiterkommen-Modi, Auslosung als Moment und neuen Namen ([#1633](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1633)) ([#1779](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1779)) ([5b30f57](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/5b30f57fa0d846e3e7b00612fc945b0dd7ded6d6))
+
 ## [1.1.0](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/compare/v1.0.4...v1.1.0) (2026-10-19)
 
 
