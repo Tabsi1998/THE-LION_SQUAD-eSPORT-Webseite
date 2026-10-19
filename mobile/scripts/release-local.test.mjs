@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import os from "node:os";
 import path from "node:path";
@@ -9,7 +9,7 @@ import test from "node:test";
 // nichts, das passiert nur beim Aufruf als Skript.
 
 const require = createRequire(import.meta.url);
-const { quote, readIfPresent } = require("./release-local.cjs");
+const { publishToPlay, quote, readIfPresent, writePlayNotes } = require("./release-local.cjs");
 
 /** Liest eine Angabe so, wie Windows-Programme ihre Befehlszeile lesen (Regeln von CommandLineToArgvW). */
 function parseWindowsArgument(commandLine) {
@@ -76,6 +76,45 @@ test("readIfPresent liest eine Datei und gibt ohne Datei einen leeren Text", asy
     assert.equal(readIfPresent(path.join(dir, "fehlt", "stempel")), "");
     await writeFile(file, "abc\n");
     assert.equal(readIfPresent(file), "abc\n");
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+// Versionshinweis für Google Play (19.10.2026): mit --play geht genau die Fassung aus PLAY_NOTES.md an Google - nicht
+// die langen „Was ist neu“-Punkte -, und jedes Release legt sie als Textdatei zum Kopieren unter builds/ ab.
+const PLAY_NOTES = "Neu in 1.7.1:\n• Weiterkommen in vier Modi\n• Fast Lap: Versuche und Gäste wie auf der Website";
+
+test("--play gibt den Versionshinweis aus PLAY_NOTES.md unverändert an publishBundle", async () => {
+  const calls = [];
+  const publish = async (args) => {
+    calls.push(args);
+    return { editId: "edit-1", track: "beta", versionCode: args.versionCode };
+  };
+  const ok = await publishToPlay({ account: { clientEmail: "x" }, aabPath: "a.aab", mappingPath: "", versionCode: 95, playNotes: PLAY_NOTES, publish });
+  assert.equal(ok, true);
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].notes, PLAY_NOTES);
+  assert.equal(calls[0].versionCode, 95);
+});
+
+test("ein gescheiterter Play-Upload lässt das Release gelten und endet mit Code 1", async () => {
+  const before = process.exitCode;
+  try {
+    const ok = await publishToPlay({ account: {}, aabPath: "a.aab", versionCode: 95, playNotes: PLAY_NOTES, publish: async () => { throw new Error("Play API: verweigert"); } });
+    assert.equal(ok, false);
+    assert.equal(process.exitCode, 1);
+  } finally {
+    process.exitCode = before;
+  }
+});
+
+test("writePlayNotes legt builds/play-notes-<Version>-build<N>.txt mit dem Text ab", async () => {
+  const dir = await mkdtemp(path.join(os.tmpdir(), "lionsapp-builds-"));
+  try {
+    const file = writePlayNotes({ buildsDir: path.join(dir, "builds"), version: "1.7.1", versionCode: 95, text: PLAY_NOTES });
+    assert.equal(file, path.join(dir, "builds", "play-notes-1.7.1-build95.txt"));
+    assert.equal(await readFile(file, "utf8"), `${PLAY_NOTES}\n`);
   } finally {
     await rm(dir, { recursive: true, force: true });
   }

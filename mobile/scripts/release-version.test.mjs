@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { readFile } from "node:fs/promises";
+import { cp, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 import releaseVersion from "./release-version.cjs";
@@ -125,6 +127,23 @@ test("die Release-Notizen nennen Build, Prüfsumme, Zertifikat und Änderungen",
   assert.doesNotMatch(notes, /undefined|null/);
 });
 
+test("die Release-Notizen bringen den Versionshinweis für Google Play zum Kopieren, vor der Installation", () => {
+  const playNotes = "Neu in 1.7.1:\n• Weiterkommen in vier Modi\n• Fast Lap: Versuche und Gäste";
+  const notes = releaseNotes({
+    version: "1.7.1",
+    versionCode: 95,
+    apk: "LionsAPP-v1.7.1-build95-abc1234.apk",
+    sha256: "f".repeat(64),
+    signatureText: CURRENT_SIGNATURE,
+    changelog: "## 1.7.1 - 2026-10-19\n\n- Turnierbaum\n",
+    playNotes,
+  });
+  const fence = "```";
+  const block = `## Versionshinweis für Google Play (zum Kopieren, ${playNotes.length} von 500 Zeichen)\n\n${fence}text\n${playNotes}\n${fence}\n\n## Installation`;
+  assert.ok(notes.includes(block), notes);
+  assert.ok(notes.indexOf("## Änderungen") < notes.indexOf("## Versionshinweis für Google Play"));
+});
+
 test("die App im Repo erfüllt das Schema und zählt über Build 56 hinaus", async () => {
   const pkg = JSON.parse(await readFile(new URL("../package.json", import.meta.url), "utf8"));
   const app = JSON.parse(await readFile(new URL("../app.json", import.meta.url), "utf8"));
@@ -169,4 +188,43 @@ test("der Preflight besteht für den Stand im Repo und lehnt einen falschen Tag 
   });
   assert.equal(wrongTag.status, 1);
   assert.match(wrongTag.stderr, /mobile-v9\.9\.9-build1/);
+});
+
+// Versionshinweis für Google Play (19.10.2026): der Preflight läuft vor jedem Build und bricht ab, wenn PLAY_NOTES.md
+// für die Version fehlt oder nicht passt. Geprüft an einer Kopie der App-Dateien, damit das Repo unberührt bleibt.
+async function preflightWithPlayNotes(playNotes) {
+  const mobile = fileURLToPath(new URL("..", import.meta.url));
+  const dir = await mkdtemp(path.join(os.tmpdir(), "lionsapp-preflight-"));
+  try {
+    await mkdir(path.join(dir, "scripts"));
+    await mkdir(path.join(dir, "src"));
+    for (const file of ["package.json", "package-lock.json", "app.json", "CHANGELOG.md", "RELEASES.md", "src/whatsnew.json"]) {
+      await cp(path.join(mobile, file), path.join(dir, file));
+    }
+    for (const file of ["release-preflight.cjs", "release-version.cjs", "whats-new.cjs", "play-notes.cjs", "play-publish.cjs"]) {
+      await cp(path.join(mobile, "scripts", file), path.join(dir, "scripts", file));
+    }
+    if (playNotes !== null) await writeFile(path.join(dir, "PLAY_NOTES.md"), playNotes);
+    return spawnSync(process.execPath, [path.join(dir, "scripts", "release-preflight.cjs")], {
+      encoding: "utf8",
+      env: { ...process.env, GITHUB_REF_TYPE: "branch", GITHUB_REF_NAME: "main" },
+    });
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+}
+
+test("der Preflight bricht ab, wenn der Versionshinweis für Google Play fehlt oder zu lang ist", async () => {
+  const pkg = JSON.parse(await readFile(new URL("../package.json", import.meta.url), "utf8"));
+  const valid = `## ${pkg.version}\n\nNeu in ${pkg.version}:\n• Etwas Neues\n`;
+  const ok = await preflightWithPlayNotes(valid);
+  assert.equal(ok.status, 0, ok.stderr);
+
+  const missing = await preflightWithPlayNotes(null);
+  assert.equal(missing.status, 1);
+  assert.ok(missing.stderr.includes(`PLAY_NOTES.md: Abschnitt „## ${pkg.version}“`), missing.stderr);
+
+  const tooLong = await preflightWithPlayNotes(`## ${pkg.version}\n\nNeu in ${pkg.version}:\n• ${"x".repeat(500)}\n`);
+  assert.equal(tooLong.status, 1);
+  assert.match(tooLong.stderr, /höchstens 500/);
 });
