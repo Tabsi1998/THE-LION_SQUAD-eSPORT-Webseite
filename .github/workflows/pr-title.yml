@@ -13,6 +13,7 @@ on:
 
 permissions:
   pull-requests: read
+  contents: read
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -48,3 +49,59 @@ jobs:
           subjectPatternError: |
             Nach dem Typ fehlt die Beschreibung: „{title}“.
             Beispiel: „feat: Turnierbaum zeigt Sieger-Moment“ oder „fix: Anmeldung vergisst die Begleitperson“.
+
+  # App-PRs (Titel mit „(app)“, Fabian 19.10.2026) zählen nicht für die Website-Version - das klappt nur, wenn sie
+  # ausschließlich unter mobile/ (und im App-Handbuch) ändern. Website-Teile wie ein Backend-Test gehören in einen
+  # eigenen PR (z. B. „test: …“), sonst landet die App-Neuheit im Changelog der Website.
+  app-only:
+    name: App-PR nur in mobile/
+    if: contains(github.event.pull_request.title, '(app)')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Geänderte Dateien prüfen
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          outside=$(gh api --paginate "repos/$REPO/pulls/$NUMBER/files" --jq '.[].filename' \
+            | grep -v -E '^(mobile/|docs/handbuch/app\.md$)' || true)
+          if [ -n "$outside" ]; then
+            echo "::error::Ein App-PR („(app)“ im Titel) ändert Website-Dateien - diese Teile bitte in einen eigenen PR (z. B. „test: …“) oder einen Website-Typ ohne „(app)“ nehmen:"
+            echo "$outside"
+            exit 1
+          fi
+          echo "Nur App-Dateien geändert."
+
+  # Mehrere Einträge je PR (Fabian 19.10.2026): Ein Block BEGIN_COMMIT_OVERRIDE … END_COMMIT_OVERRIDE im PR-Text legt
+  # die Zeilen für Release und Changelog fest - jede Neuerung, jeder Fix einzeln. Ohne Block gilt der PR-Titel.
+  # Geprüft wird nur das Format, damit keine Zeile still verloren geht.
+  changelog-block:
+    name: Changelog-Block im PR-Text
+    if: contains(github.event.pull_request.body, 'BEGIN_COMMIT_OVERRIDE')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Zeilen prüfen
+        env:
+          BODY: ${{ github.event.pull_request.body }}
+        run: |
+          text=$(printf '%s\n' "$BODY" | tr -d '\r')
+          if ! printf '%s\n' "$text" | grep -qx 'END_COMMIT_OVERRIDE'; then
+            echo "::error::END_COMMIT_OVERRIDE fehlt - der Block endet auf einer eigenen Zeile."
+            exit 1
+          fi
+          block=$(printf '%s\n' "$text" | sed -n '/^BEGIN_COMMIT_OVERRIDE$/,/^END_COMMIT_OVERRIDE$/p' | sed '1d;$d' | grep -v -E '^\s*$' || true)
+          if [ -z "$block" ]; then
+            echo "::error::Der Changelog-Block ist leer."
+            exit 1
+          fi
+          bad=$(printf '%s\n' "$block" | grep -v -E '^(feat|fix|perf|revert|docs|deps|refactor|test|ci|build|style|chore)(\([a-z0-9-]+\))?!?: \S' || true)
+          if [ -n "$bad" ]; then
+            echo "::error::Jede Zeile im Changelog-Block beginnt mit einem Typ, z. B. feat: … oder fix(app): …"
+            printf '%s\n' "$bad"
+            exit 1
+          fi
+          echo "Einträge im Block:"
+          printf '%s\n' "$block"

@@ -45,8 +45,10 @@ Commits im Zweig dürfen frei benannt sein.
 | `feat!:` / `fix!:` | bricht etwas | **2**.0.0 | mit Hinweis |
 
 Beispiele: `feat: Turnierbaum zeigt den Sieger-Moment`, `fix(app): Anmeldung vergisst die Begleitperson`.
-Ein Bereich in Klammern ist erlaubt, aber nicht nötig. Änderungen nur unter `mobile/` zählen nicht für die
-Website-Version.
+Ein Bereich in Klammern ist erlaubt, aber nicht nötig. Änderungen nur unter `mobile/` (und im App-Handbuch
+`docs/handbuch/app.md`) zählen nicht für die Website-Version. **App-PRs** tragen `(app)` im Titel und ändern nur
+dort – die Prüfung „App-PR nur in mobile/“ meldet sonst die Website-Dateien; die gehören in einen eigenen PR
+(z. B. `test: …`), damit eine App-Neuheit nicht im Changelog der Website landet.
 
 ## Releases der Website
 
@@ -56,6 +58,28 @@ Website-Version.
    Eintrag in [`CHANGELOG.md`](../../CHANGELOG.md); `frontend/package.json` bekommt dieselbe Version.
 3. Den Server spielst du danach wie gewohnt ein ([UPDATE](../../UPDATE.md)) – es gibt kein automatisches
    Deployment.
+
+**Wann veröffentlichen?** Nicht nach jedem Fix. Der Release-PR sammelt still; veröffentlicht wird bewusst – mal
+ein größerer Meilenstein mit Neuem und Fixes, mal ein paar Fixes, mal ein einzelner wichtiger Fix.
+
+**Mehrere Einträge je PR.** Beim „Squash and merge“ wird ein PR sonst zu genau einer Zeile (der Titel). Bringt
+ein PR mehrere Neuerungen oder Fixes, steht im PR-Text ein Block – jede Zeile wird ein eigener Eintrag unter
+„Neu“, „Fehlerbehebungen“ usw., und die Version richtet sich danach:
+
+```
+BEGIN_COMMIT_OVERRIDE
+feat: TV zeigt „Auslosung bereit“ mit leuchtenden Zielspielen (#1634)
+feat: Live-Warteschlange je Station am TV (#1634)
+fix: Defekte Stationen erscheinen am TV mit „Bitte nicht benutzen“ (#1634)
+END_COMMIT_OVERRIDE
+```
+
+Die Prüfung „Changelog-Block im PR-Text“ meldet Zeilen ohne Typ. Nur sichtbare Änderungen gehören hinein; Tests,
+CI und Umbau bleiben draußen (oder als `test:`/`ci:` – die erscheinen nicht).
+
+**Lesbares Changelog.** Nach jedem Lauf räumt [`scripts/tidy_changelog.py`](../../scripts/tidy_changelog.py) den
+Release-PR auf und beim Veröffentlichen den Text des GitHub-Release: je Eintrag nur die Issue-Nummer („(#1634)“,
+ohne PR-Link und Commit-Hash), Überschrift „1.2.0 (19.10.2026)“.
 
 Die erste Version ist **1.0.0** und umfasst alles ab dem Stand vom 15.10.2026. Die App behält ihren eigenen
 Ablauf mit Tags `mobile-v*` ([App-Releases](../../mobile/RELEASES.md)). Der Server holt App-Updates nur aus

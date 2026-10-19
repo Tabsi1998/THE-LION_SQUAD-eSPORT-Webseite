@@ -25,7 +25,7 @@
       "package-name": "lionsquad-website",
       "initial-version": "1.0.0",
       "changelog-path": "CHANGELOG.md",
-      "exclude-paths": ["mobile"],
+      "exclude-paths": ["mobile", "docs/handbuch/app.md"],
       "extra-files": [
         { "type": "json", "path": "frontend/package.json", "jsonpath": "$.version" }
       ]

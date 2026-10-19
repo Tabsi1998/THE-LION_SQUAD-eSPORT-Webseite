@@ -6,6 +6,10 @@ name: Website-Release
 # Die App behält ihren eigenen, lokalen Ablauf (mobile/RELEASES.md, Tags mobile-v*);
 # Änderungen unter mobile/ zählen hier nicht mit (release-please-config.json).
 #
+# Lesbar (Fabian 19.10.2026): Nach jedem Lauf räumt scripts/tidy_changelog.py das Changelog im Release-PR auf
+# (nur „(#1634)“, keine PR-Links und Commit-Hashes, Datum 19.10.2026) und beim Veröffentlichen den Text des
+# GitHub-Release. Veröffentlicht wird nur, wenn jemand den Release-PR bewusst mergt.
+#
 # Token: Mit dem Secret RELEASE_PLEASE_TOKEN (fein granulierter Token, nur dieses Repo,
 # Contents und Pull requests: Lesen und Schreiben) starten CI und CodeQL im Release-PR
 # von selbst. Ohne das Secret nimmt der Workflow den GITHUB_TOKEN; dann den Release-PR
@@ -35,7 +39,43 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: googleapis/release-please-action@v5
+        id: release
         with:
           token: ${{ secrets.RELEASE_PLEASE_TOKEN || github.token }}
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
+      # Release-PR offen oder eben aktualisiert: sein Changelog lesbar machen (gleicher Token, damit die Pflicht-
+      # Prüfungen im Release-PR weiter von selbst laufen).
+      - name: Release-PR auschecken
+        if: ${{ steps.release.outputs.pr }}
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ fromJSON(steps.release.outputs.pr).headBranchName }}
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN || github.token }}
+      - name: Changelog im Release-PR lesbar machen
+        if: ${{ steps.release.outputs.pr }}
+        run: |
+          python3 scripts/tidy_changelog.py CHANGELOG.md
+          if git diff --quiet -- CHANGELOG.md; then
+            echo "Changelog ist schon lesbar."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -q -m "chore: Changelog lesbar" -- CHANGELOG.md
+          git push -q origin HEAD
+      # Gerade veröffentlicht: den Text des GitHub-Release aus dem lesbaren Changelog nehmen.
+      - name: Main auschecken (Release-Text)
+        if: ${{ steps.release.outputs.release_created }}
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ steps.release.outputs.tag_name }}
+      - name: Text des GitHub-Release lesbar machen
+        if: ${{ steps.release.outputs.release_created }}
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN || github.token }}
+          TAG: ${{ steps.release.outputs.tag_name }}
+          VERSION: ${{ steps.release.outputs.version }}
+        run: |
+          python3 scripts/tidy_changelog.py CHANGELOG.md --section "$VERSION" > release-notes.md
+          gh release edit "$TAG" --notes-file release-notes.md
