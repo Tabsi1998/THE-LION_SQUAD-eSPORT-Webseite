@@ -218,6 +218,36 @@ test("nach dem Verlassen der Ansicht lädt die laufende Abfrage nichts mehr nach
   expect(load).toHaveBeenCalledTimes(1);
 });
 
+test("overlap gilt ab dem ersten Render: ein späterer Wechsel mischt nicht beide Arten", () => {
+  const first = slowLoad();
+  act(() => setStreamConnected(true));
+  const view = render(<View load={first.load} resources={["tournaments"]} options={{ overlap: true }} />);
+  act(() => {
+    change();
+    vi.advanceTimersByTime(200);
+  });
+  view.rerender(<View load={first.load} resources={["tournaments"]} options={{ overlap: false }} />);
+  act(() => {
+    change();
+    vi.advanceTimersByTime(200);
+    change();
+    vi.advanceTimersByTime(200);
+  });
+  expect(first.load).toHaveBeenCalledTimes(3); // weiter überlappend, keine zweite Art daneben
+  view.unmount();
+
+  const second = slowLoad();
+  const other = render(<View load={second.load} resources={["tournaments"]} />);
+  other.rerender(<View load={second.load} resources={["tournaments"]} options={{ overlap: true }} />);
+  act(() => {
+    change();
+    vi.advanceTimersByTime(200);
+    change();
+    vi.advanceTimersByTime(200);
+  });
+  expect(second.load).toHaveBeenCalledTimes(1); // weiter eine zur Zeit
+});
+
 test("hängt eine Abfrage und wartet eine Meldung, startet nach 30 s von selbst eine neue - ohne weitere Meldung", () => {
   const { load } = slowLoad();
   act(() => setStreamConnected(true));

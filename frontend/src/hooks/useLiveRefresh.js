@@ -27,7 +27,8 @@ export const LIVE_REFRESH_STUCK_MS = 30000;
  * stapeln sich bei vielen Zuschauern und langsamem Server die Abfragen - jede
  * Meldung startet eine neue, während die alten noch laufen (Lasttest).
  * `overlap: true` lässt Abfragen wie bisher überlappen - für Ansichten, die
- * Antworten selbst ordnen und jede Meldung sofort brauchen (TV-Baum).
+ * Antworten selbst ordnen und jede Meldung sofort brauchen (TV-Baum). Es gilt,
+ * was beim ersten Render übergeben wurde.
  *
  * @param {() => unknown} callback  lädt die Daten der Ansicht
  * @param {string[]} resources     Ressourcen wie bei useApiInvalidation; leer = alles
@@ -39,7 +40,8 @@ export function useLiveRefresh(callback, resources = [], options = {}) {
   const debounceMs = options.debounceMs ?? 150;
   const enabled = options.enabled ?? true;
   const onlyVisible = options.onlyVisible ?? true;
-  const overlap = options.overlap ?? false;
+  // Fest ab dem ersten Render: ein Wechsel mittendrin ließe alte überlappende Abfragen neben der einen laufen.
+  const [overlap] = useState(() => options.overlap ?? false);
   const resourceKey = useMemo(() => resources.join("|"), [resources]);
 
   const callbackRef = useRef(callback);
