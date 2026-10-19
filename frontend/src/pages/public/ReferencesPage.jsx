@@ -67,7 +67,8 @@ export default function ReferencesPage() {
   const [podiumOnly, setPodiumOnly] = useState(false);
   const [gameFilter, setGameFilter] = useState("all");
   const [platformFilter, setPlatformFilter] = useState("all");
-  const [seasonFilter, setSeasonFilter] = useState("all");
+  // Jahres-Filter (#1748): dieselben Jahre wie die Gruppen der Zeitleiste, "" = ohne Datum.
+  const [yearFilter, setYearFilter] = useState("all");
   // Aus dem Mitgliederprofil (#859): `?member=<Profil-ID>` zeigt nur die Teilnahmen dieser Person.
   const [searchParams, setSearchParams] = useSearchParams();
   const memberFilter = searchParams.get("member") || "";
@@ -101,17 +102,18 @@ export default function ReferencesPage() {
   const trophies = useMemo(() => trophyItems(items), [items]);
   const platformOptions = useMemo(() => Array.from(new Map(items.flatMap((item) => (item.platforms || []).map((key) => [key, { key, label: platformLabel(item, key) }]))).values()), [items]);
   const seasonOptions = useMemo(() => Array.from(new Set(items.map((item) => item.season).filter(Boolean))).sort((a, b) => b.localeCompare(a, "de-AT", { numeric: true })), [items]);
+  const yearOptions = useMemo(() => timelineGroups(items).map((group) => ({ key: group.key, label: group.label })), [items]);
 
   const filteredItems = items.filter((item) => {
     if (podiumOnly && !onPodium(item, memberFilter ? memberEntryOf(item, memberFilter) : null)) return false;
     if (gameFilter !== "all" && gameKey(item) !== gameFilter) return false;
     if (platformFilter !== "all" && !(item.platforms || []).includes(platformFilter)) return false;
-    if (seasonFilter !== "all" && (item.season || "") !== seasonFilter) return false;
+    if (yearFilter !== "all" && referenceYear(item) !== yearFilter) return false;
     if (memberFilter && !hasMember(item, memberFilter)) return false;
     return true;
   });
   const timeline = timelineGroups(filteredItems);
-  const filtersActive = podiumOnly || gameFilter !== "all" || platformFilter !== "all" || seasonFilter !== "all" || Boolean(memberFilter);
+  const filtersActive = podiumOnly || gameFilter !== "all" || platformFilter !== "all" || yearFilter !== "all" || Boolean(memberFilter);
   const counts = { gold: summary.gold || 0, silver: summary.silver || 0, bronze: summary.bronze || 0 };
 
   return (
@@ -172,12 +174,12 @@ export default function ReferencesPage() {
             </FilterChip>
           )}
           <FilterChip active={podiumOnly} onClick={() => setPodiumOnly((value) => !value)} tone="gold">Podest</FilterChip>
-          {seasonOptions.length > 0 && (
+          {yearOptions.length > 1 && (
             <>
               <span className="hidden sm:inline text-white/20">|</span>
-              <FilterChip active={seasonFilter === "all"} onClick={() => setSeasonFilter("all")}>Alle Saisons</FilterChip>
-              {seasonOptions.map((season) => (
-                <FilterChip key={season} active={seasonFilter === season} onClick={() => setSeasonFilter(seasonFilter === season ? "all" : season)} testId={`references-season-${season}`}>{season}</FilterChip>
+              <FilterChip active={yearFilter === "all"} onClick={() => setYearFilter("all")}>Alle Jahre</FilterChip>
+              {yearOptions.map((year) => (
+                <FilterChip key={year.key || "none"} active={yearFilter === year.key} onClick={() => setYearFilter(yearFilter === year.key ? "all" : year.key)} testId={`references-year-${year.key || "none"}`}>{year.label}</FilterChip>
               ))}
             </>
           )}
@@ -190,7 +192,7 @@ export default function ReferencesPage() {
             </>
           )}
           {filtersActive && (
-            <button type="button" onClick={() => { setPodiumOnly(false); setGameFilter("all"); setPlatformFilter("all"); setSeasonFilter("all"); if (memberFilter) clearMember(); }} data-testid="references-reset" className="ml-auto text-[11px] uppercase tracking-wider font-bold text-white/45 hover:text-white">Filter zurücksetzen</button>
+            <button type="button" onClick={() => { setPodiumOnly(false); setGameFilter("all"); setPlatformFilter("all"); setYearFilter("all"); if (memberFilter) clearMember(); }} data-testid="references-reset" className="ml-auto text-[11px] uppercase tracking-wider font-bold text-white/45 hover:text-white">Filter zurücksetzen</button>
           )}
         </div>
 

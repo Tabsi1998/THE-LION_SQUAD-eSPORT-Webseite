@@ -82,14 +82,28 @@ test("drei Zahlen, Chips aus den Feldern, Einträge mit eigener Platzierung und 
   expect(team).toHaveTextContent("Gast");
 });
 
-test("Saison-Filter und Podest-Filter wirken je Teilnahme bzw. je Eintrag", async () => {
+test("Jahres-Filter (#1748) und Podest-Filter wirken je Teilnahme bzw. je Eintrag", async () => {
+  const third = { ...ITEMS[1], id: "r3", title: "Altes Turnier", display_title: "Altes Turnier", start_date: null };
+  apiMock.get.mockResolvedValue({ data: { items: [{ ...ITEMS[0], start_date: "2026-02-01" }, { ...ITEMS[1], start_date: "2025-11-15" }, third], summary: SUMMARY } });
   render(<MemoryRouter><ReferencesPage /></MemoryRouter>);
   await screen.findByTestId("reference-card-r1");
-  fireEvent.click(screen.getByTestId("references-season-Season 2"));
-  expect(screen.queryByTestId("reference-card-r1")).toBeNull();
-  expect(screen.getByTestId("reference-card-r2")).toBeInTheDocument();
+  // Die Chips folgen der Gruppierung: Alle Jahre, neuestes Jahr zuerst, „Ohne Datum“ am Ende - keine Freitext-Saisons.
+  const filters = screen.getByTestId("references-filters");
+  expect(filters.textContent).toMatch(/Alle Jahre.*2026.*2025.*Ohne Datum/);
+  expect(screen.queryByText("Alle Saisons")).toBeNull();
+  expect(screen.queryByTestId("references-season-Season 2")).toBeNull();
+  // Die Saison bleibt als Text auf der Karte.
+  expect(screen.getByTestId("reference-chips-r1")).toHaveTextContent("Season 3");
 
-  fireEvent.click(screen.getByText("Alle Saisons"));
+  fireEvent.click(screen.getByTestId("references-year-2025"));
+  expect(screen.queryByTestId("reference-card-r1")).toBeNull();
+  expect(screen.queryByTestId("reference-card-r3")).toBeNull();
+  expect(screen.getByTestId("reference-card-r2")).toBeInTheDocument();
+  fireEvent.click(screen.getByTestId("references-year-none"));
+  expect(screen.getByTestId("reference-card-r3")).toBeInTheDocument();
+  expect(screen.queryByTestId("reference-card-r2")).toBeNull();
+
+  fireEvent.click(screen.getByText("Alle Jahre"));
   fireEvent.click(screen.getByText("Podest"));
   expect(screen.getByTestId("reference-card-r1")).toBeInTheDocument();
   expect(screen.queryByTestId("reference-card-r2")).toBeNull();
