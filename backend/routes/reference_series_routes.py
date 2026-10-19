@@ -3,7 +3,8 @@
 Eine **Spur** ist die Klammer (etwa eine Rennliga mit ihrer Bezeichnung „F1“), eine **Serie** eine Saison dieser Spur
 in einer Stufe. Gelöscht wird nichts: Spur und Serie werden archiviert und lassen sich zurückholen. Regeln kommen als
 Kopie einer Punkteschema-Vorlage (``services/reference_series.py``); ändert sich eine Regel, steigt ``rules_version``,
-das Adminprotokoll hält es fest, und die gespeicherten Stände werden neu gerechnet (Entscheidung 4).
+das Adminprotokoll hält Alt- und Neu-Stand fest, der abgelöste Stand bleibt je Version in ``rules_history``, und die
+gespeicherten Stände werden neu gerechnet (Entscheidung 4).
 
 Öffentliche Seiten (``/references/series/<spur>/<saison>``) und Termine, Teilnehmer, Ergebnisse und Captains kommen in
 eigenen Paketen dazu (#1742 ff.); sie hängen ihre Routen an diesen Router.
@@ -177,7 +178,7 @@ async def create_series(body: ReferenceSeriesCreate, me: dict = Depends(require_
     doc.update({
         "id": new_id(), "lineage_id": lineage["id"],
         "season_slug": await _season_slug(db, lineage["id"], doc["season"], doc.get("tier")), "season_slug_history": [],
-        "rules_version": 1, "rules_note": None, "rules_changed_at": None, "rules_changed_by": None,
+        "rules_version": 1, "rules_note": None, "rules_changed_at": None, "rules_changed_by": None, "rules_history": [],
         "archived_at": None, "archived_from": None,
         "created_at": now, "created_by": me["id"], **_stamp(me),
     })
@@ -209,9 +210,16 @@ async def update_series(series_id: str, body: ReferenceSeriesUpdate, me: dict = 
             updates.pop("rules")
         else:
             rules_changed = True
-            updates.update({"rules": rules, "rules_version": int(existing.get("rules_version") or 1) + 1,
-                            "rules_note": (note or "").strip() or None, "rules_changed_at": now_utc().isoformat(),
-                            "rules_changed_by": me["id"]})
+            version = int(existing.get("rules_version") or 1)
+            changed_at = now_utc().isoformat()
+            # Regel-Historie je Version: der abgelöste Stand bleibt vollständig, damit ein früher gerechneter Stand
+            # (``reference_standings.rules_version``) nachvollziehbar bleibt.
+            replaced = {"version": version, "rules": existing.get("rules"), "note": existing.get("rules_note"),
+                        "replaced_at": changed_at, "replaced_by": me["id"]}
+            updates.update({"rules": rules, "rules_version": version + 1,
+                            "rules_note": (note or "").strip() or None, "rules_changed_at": changed_at,
+                            "rules_changed_by": me["id"],
+                            "rules_history": [*(existing.get("rules_history") or []), replaced]})
     if "season" in updates or "tier" in updates:
         season = updates.get("season", existing.get("season"))
         tier = updates.get("tier", existing.get("tier"))
@@ -230,7 +238,9 @@ async def update_series(series_id: str, body: ReferenceSeriesUpdate, me: dict = 
     if rules_changed:
         await db.audit_logs.insert_one({
             "id": new_id(), "action": "reference_series.rules_change", "actor_id": me["id"], "target_id": series_id,
-            "data": {"version": saved["rules_version"], "note": saved.get("rules_note")},
+            "data": {"version": saved["rules_version"], "note": saved.get("rules_note"),
+                     "previous_version": existing.get("rules_version") or 1, "previous_rules": existing.get("rules"),
+                     "rules": saved["rules"]},
             "created_at": now_utc().isoformat(),
         })
         await reference_series.recompute_standings(db, saved)

@@ -133,6 +133,18 @@ async def test_editing_keeps_the_rules_version_until_a_rule_changes(flow):
     assert body["rules_changed_at"]
     log = await flow.db.audit_logs.find_one({"action": "reference_series.rules_change", "target_id": series["id"]})
     assert log["actor_id"] == admin["id"] and log["data"]["version"] == 2
+    # Alt- und Neu-Stand vollständig: eine frühere Berechnung bleibt nachvollziehbar.
+    assert (log["data"]["previous_version"], log["data"]["previous_rules"], log["data"]["rules"]) == (1, series["rules"], body["rules"])
+    assert series["rules_history"] == []
+    assert [(entry["version"], entry["rules"], entry["note"], entry["replaced_by"]) for entry in body["rules_history"]] == [
+        (1, series["rules"], None, admin["id"])]
+    assert body["rules_history"][0]["replaced_at"] == body["rules_changed_at"]
+
+    again = await flow.patch(f"{ADMIN}/series/{series['id']}", json={"rules": {**rules, "count_n": 2}})
+    history = again.json()["rules_history"]
+    assert [(entry["version"], entry["rules"]["count_n"], entry["note"]) for entry in history] == [
+        (1, 0, None), (2, 1, "Ein Streichergebnis")]
+    assert again.json()["rules_version"] == 3 and again.json()["rules_note"] is None
 
     lineage_edit = await flow.patch(f"{ADMIN}/lineages/{lineage['id']}", json={"title": "Probe Racing Liga"})
     assert lineage_edit.json()["slug"] == "probe-racing-liga" and lineage_edit.json()["slug_history"] == ["probe-racing-f1"]
