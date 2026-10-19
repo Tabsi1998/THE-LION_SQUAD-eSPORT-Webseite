@@ -67,7 +67,7 @@ function MatchCard({ match }) {
   return (
     <article className="tls-print-card" style={{ height: mm(cardHeight(match.slots.length)) }} data-testid="print-match">
       <div className="tls-print-card__head" style={{ height: mm(TREE.cardHead) }}>
-        <b>{match.heat ? `Lauf ${match.key}` : `Spiel ${match.key}`}</b>
+        <b>{match.heat ? `Lauf ${match.key}` : `Spiel ${match.key}`}{match.piece ? ` · Teil ${match.piece.index}/${match.piece.of}` : ""}</b>
         <span>{info}</span>
       </div>
       {match.slots.map((slot, index) => <SlotRow key={index} slot={slot} heat={match.heat} />)}
@@ -160,7 +160,7 @@ export function ScheduleBody({ page }) {
             <tr key={row.id} style={{ height: mm(scheduleRowHeight(row)) }} data-testid="print-schedule-row">
               <td className="whitespace-nowrap">{row.time ? `${row.forecast ? "ca. " : ""}${row.time}` : "–"}</td>
               <td className="tls-print-ellipsis">{row.station || "–"}</td>
-              <td><div className="tls-print-ellipsis font-bold">{row.round}</div><div className="tls-print-muted tls-print-ellipsis">{[row.group, row.heat ? `Lauf ${row.key}` : `Spiel ${row.key}`].filter(Boolean).join(" · ")}</div></td>
+              <td><div className="tls-print-ellipsis font-bold">{row.round}</div><div className="tls-print-muted tls-print-ellipsis">{[row.group, row.heat ? `Lauf ${row.key}` : `Spiel ${row.key}`, row.piece ? `Teil ${row.piece.index}/${row.piece.of}` : ""].filter(Boolean).join(" · ")}</div></td>
               <td><ScheduleSides row={row} /></td>
               <td>{row.heat ? <span className="tls-print-muted">Platz je Zeile</span> : <span className="tls-print-write">{row.done ? <span className="block text-center font-bold">{row.sides.map((side) => side.score || "–").join(" : ")}</span> : null}</span>}</td>
             </tr>

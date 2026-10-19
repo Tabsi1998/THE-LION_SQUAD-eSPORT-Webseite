@@ -130,6 +130,32 @@ test.describe("Abnahme #1283: Druckansicht gegen den echten Server", () => {
     expect(problems).toEqual([]);
   });
 
+  test("Großer Lauf (64 Plätze): Karte und Spielplan-Zeile gehen in Teilen weiter, nichts abgeschnitten", async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name !== "chromium", "PDF gibt es nur in Chromium");
+    await page.setViewportSize(DESKTOP);
+    await signIn(page, "anon");
+    // Der Seed hat 16 Spieler; der echte Baum des Läufe-Cups wird im Browser auf einen Lauf mit 64 Plätzen aufgefüllt
+    // (Namen erfunden) - so prüft die Abnahme die Darstellung eines Laufs bis players_per_run 64.
+    await page.route(/\/api\/tournaments\/[^/]+\/bracket(\?|$)/, async (route) => {
+      const response = await route.fetch();
+      const body = await response.json();
+      const heat = body.matches_v2.find((item) => (item.slots || []).length > 2);
+      const extra = Array.from({ length: 64 }, (_, index) => ({ id: `gross-${index + 1}`, display_name: `Testfahrer ${index + 1}` }));
+      body.registrations = [...body.registrations, ...extra];
+      heat.slots = extra.map((reg, index) => ({ slot: index + 1, registration_id: reg.id }));
+      heat.results = [];
+      heat.status = "pending";
+      await route.fulfill({ response, json: body });
+    });
+    const problems = watch(page, { allow: (response) => response.status() === 401 && /\/api\/auth\/(me|refresh)/.test(response.url()), allowConsole: (text) => /401/.test(text) });
+    await page.goto(`/print/tournaments/${state.slugs.local_live}?teile=baum,spielplan`);
+    await expect(page.locator("[data-testid='print-match']").filter({ hasText: "Teil 1/" }).first()).toBeVisible();
+    const sheetsText = (await page.locator("[data-orientation]").allInnerTexts()).join("\n");
+    for (const index of [1, 32, 64]) expect(sheetsText).toContain(`Testfahrer ${index}`);
+    await checkPrint(page, "grosser-lauf-64");
+    expect(problems).toEqual([]);
+  });
+
   test("Check-in-Liste ohne Recht: weder Ansicht noch Schnittstelle", async ({ page }, testInfo) => {
     test.skip(testInfo.project.name !== "chromium", "Größe stellt der Test selbst ein");
     const url = `/api/tournaments/${state.slugs.print_double}/print/checkin`;

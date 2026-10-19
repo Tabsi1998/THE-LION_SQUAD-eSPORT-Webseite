@@ -172,6 +172,40 @@ describe("Baum", () => {
   });
 });
 
+describe("Großer Lauf (64 Plätze in einem Lauf)", () => {
+  function bigHeat() {
+    const regs = Array.from({ length: 64 }, (_, index) => `P${index + 1}`);
+    return {
+      stages: [{ id: "s1", number: 1 }],
+      registrations: regs.map(reg),
+      matches_v2: [match({ round: 1, order: 0, slots: 64, regs, key: "A", label: "Runde 1", match_type: "ffa", scheduled_at: "2026-10-31T09:00:00Z" })],
+    };
+  }
+
+  test("Baum: die Karte wird in Teilkarten geteilt, alle 64 Plätze genau einmal, nichts zu hoch", () => {
+    for (const orientation of ["landscape", "portrait"]) {
+      const pages = bracketPages(bigHeat(), { orientation });
+      everyColumnFits(pages, orientation);
+      const cards = pages.flatMap((page) => page.blocks.flatMap((block) => block.columns.flatMap((column) => column.matches)));
+      expect(cards.length).toBeGreaterThan(1);
+      expect(cards.every((card) => card.piece && card.piece.of === cards.length)).toBe(true);
+      expect(cards.flatMap((card) => card.slots.map((slot) => slot.label))).toEqual(Array.from({ length: 64 }, (_, index) => `P${index + 1}`));
+      expect(pages.every((page) => page.blocks.every((block) => !block.overflow))).toBe(true);
+    }
+  });
+
+  test("Spielplan: die Zeile geht in Teilzeilen weiter, jede Seite passt", () => {
+    const pages = schedulePages(bigHeat(), { orientation: "portrait" });
+    const rows = pages.flatMap((page) => page.sections.flatMap((section) => section.rows));
+    expect(rows.length).toBeGreaterThan(1);
+    expect(rows.flatMap((row) => row.sides).length).toBe(64);
+    for (const page of pages) {
+      const used = 8 + page.sections.reduce((sum, section) => sum + 9 + section.rows.reduce((total, row) => total + scheduleRowHeight(row), 0), 0);
+      expect(used).toBeLessThanOrEqual(listCapacity("portrait"));
+    }
+  });
+});
+
 describe("Listen", () => {
   test("Abschnitt läuft auf der nächsten Seite mit Fortsetzung weiter, Kopf nie allein am Seitenende", () => {
     const rows = Array.from({ length: 30 }, (_, index) => ({ id: index }));

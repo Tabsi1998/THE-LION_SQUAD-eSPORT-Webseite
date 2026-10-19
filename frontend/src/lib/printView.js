@@ -189,6 +189,33 @@ export function bracketBlocks(bracket) {
  * Anteil ab: Band b bekommt die Karten [b·n/B, (b+1)·n/B) - so bleibt der Baum lesbar (obere Hälfte, untere Hälfte).
  * Eine einzelne Karte, die allein zu hoch ist, wird nicht geteilt (`overflow`).
  */
+/** Wie viele Plätze eine Karte höchstens haben darf, damit sie allein in eine Spalte passt. */
+export function slotsPerCard(capacity) {
+  return Math.max(1, Math.floor((capacity - TREE.cardHead - TREE.cardPad) / TREE.cardRow));
+}
+
+/**
+ * Ein Lauf mit mehr Plätzen, als eine Spalte hoch ist (z. B. 64 in einem Lauf), wird in Teilkarten geteilt - die
+ * Plätze gehen auf der nächsten Karte weiter („Teil 2/3“). Nie still abschneiden.
+ */
+export function splitTallCards(columns, capacity) {
+  const most = slotsPerCard(capacity);
+  return columns.map((column) => ({
+    ...column,
+    matches: column.matches.flatMap((match) => {
+      if (match.slots.length <= most) return [match];
+      const count = Math.ceil(match.slots.length / most);
+      const size = Math.ceil(match.slots.length / count);
+      return Array.from({ length: count }, (_, index) => ({
+        ...match,
+        id: `${match.id}#${index + 1}`,
+        piece: { index: index + 1, of: count, from: index * size + 1 },
+        slots: match.slots.slice(index * size, (index + 1) * size),
+      }));
+    }),
+  }));
+}
+
 export function splitBands(columns, capacity) {
   const most = Math.max(1, ...columns.map((column) => column.matches.length));
   const slice = (bands) => Array.from({ length: bands }, (_, band) => columns.map((column) => {
@@ -216,7 +243,7 @@ export function bracketPages(bracket, { orientation = PRINT_DEFAULTS.treeOrienta
     for (let start = 0; start < block.columns.length; start += maxColumns) chunks.push(block.columns.slice(start, start + maxColumns));
     const parts = [];
     for (const chunk of chunks) {
-      const { bands, overflow } = splitBands(chunk, capacity);
+      const { bands, overflow } = splitBands(splitTallCards(chunk, capacity), capacity);
       bands.forEach((band, bandIndex) => parts.push({
         columns: band.map((column) => ({ ...column, continued: bandIndex > 0 || bands.length > 1 ? { band: bandIndex + 1, of: bands.length } : null })),
         overflow,
@@ -332,8 +359,23 @@ export function scheduleSections(bracket, { order = PRINT_DEFAULTS.scheduleOrder
   return [...sections.values()];
 }
 
+/** Ein Lauf mit mehr Plätzen, als auf eine Seite passen, geht in Teilzeilen weiter („Teil 2/2“) - nie abgeschnitten. */
+export function splitTallRows(rows, capacity) {
+  const most = Math.max(1, Math.floor((capacity - SCHEDULE.tableHead - SCHEDULE.sectionHead - SCHEDULE.rowPad) / SCHEDULE.linePerSide));
+  return rows.flatMap((row) => {
+    if (!row.heat || row.sides.length <= most) return [row];
+    const count = Math.ceil(row.sides.length / most);
+    const size = Math.ceil(row.sides.length / count);
+    return Array.from({ length: count }, (_, index) => ({
+      ...row, id: `${row.id}#${index + 1}`, piece: { index: index + 1, of: count }, sides: row.sides.slice(index * size, (index + 1) * size),
+    }));
+  });
+}
+
 export function schedulePages(bracket, { orientation = PRINT_DEFAULTS.listOrientation, order = PRINT_DEFAULTS.scheduleOrder } = {}) {
-  return paginate(scheduleSections(bracket, { order }), {
+  const capacity = listCapacity(orientation);
+  const sections = scheduleSections(bracket, { order }).map((section) => ({ ...section, rows: splitTallRows(section.rows, capacity) }));
+  return paginate(sections, {
     capacity: listCapacity(orientation), tableHead: SCHEDULE.tableHead, sectionHead: SCHEDULE.sectionHead, rowHeight: scheduleRowHeight,
   }).map((page) => ({ ...page, kind: "spielplan", orientation }));
 }
