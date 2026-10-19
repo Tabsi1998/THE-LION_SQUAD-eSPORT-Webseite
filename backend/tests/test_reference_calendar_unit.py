@@ -190,3 +190,11 @@ def test_a_pasted_line_with_a_missing_clock_is_named():
     result = _parse("R1 29.03. 02:30 Nord\nR2 25.10. 02:30 Süd")
     assert [(error["line"], error["message"]) for error in result["errors"]] == [
         (1, "02:30 Uhr gibt es am 29.03.2026 in Wien nicht (Umstellung auf Sommerzeit).")]
+
+
+def test_the_29th_of_february_after_new_year_takes_the_leap_year():
+    result = _parse("R1 05.11. Nord\nR2 29.02. Süd", season="2023/24", today="2023-10-01")
+    assert result["errors"] == []
+    assert [row["day"] for row in result["rows"]] == ["2023-11-05", "2024-02-29"]
+    wrong = _parse("R1 05.11. Nord\nR2 29.02. Süd", season="2024/25", today="2024-10-01")
+    assert [error["message"] for error in wrong["errors"]] == ["Datum 29.02. gibt es nicht."]

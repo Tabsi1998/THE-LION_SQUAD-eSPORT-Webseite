@@ -163,12 +163,11 @@ def parse_round_lines(text: str, *, season: str | None, today: str, default_week
             rest = rest[:match.start()] + " " + rest[match.end():]
             try:
                 if y is None:
-                    y = year
-                    day = date(y, m, d)
-                    if previous and day < previous:
-                        day = date(y + 1, m, d)
-                else:
-                    day = date(y, m, d)
+                    # Erst das Jahr, dann das Datum - sonst scheitert der 29.02. am Jahr vor dem Schaltjahr.
+                    y = previous.year if previous else year
+                    if previous and (m, d) < (previous.month, previous.day):
+                        y += 1
+                day = date(y, m, d)
             except ValueError:
                 error = f"Datum {shown} gibt es nicht."
         clock = None
