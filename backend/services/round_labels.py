@@ -64,18 +64,20 @@ def stage_kind(stage_type: str | None, tournament_format: str | None = None, mat
 
 def rounds_by_section(matches: list[dict]) -> dict[tuple, list[int]]:
     """Die Runden je Stufe und Baumteil, aufsteigend - daraus folgen die Nummer, die man liest (fortlaufend ab 1), und
-    welche Runde das Finale ist."""
+    welche Runde das Finale ist. Nur gültige Rundennummern (ab 1) zählen - ein Alt-Spiel ohne Runde verschiebt nichts."""
     seen: dict[tuple, set[int]] = {}
     for match in matches or []:
         key = (match.get("stage_id"), section_kind(match.get("section")))
-        seen.setdefault(key, set()).add(_int(match.get("round")))
+        number = _int(match.get("round"))
+        if number > 0:
+            seen.setdefault(key, set()).add(number)
     return {key: sorted(values) for key, values in seen.items()}
 
 
 def round_label(match: dict, *, rounds: dict[tuple, list[int]] | None = None, kind: str = "knockout") -> str:
     """Die Runde eines Spiels in Alltagsworten. ``rounds`` aus ``rounds_by_section`` (alle Spiele des Turniers)."""
     name = str(match.get("round_name") or "").strip()
-    number = _int(match.get("round"))
+    number = max(0, _int(match.get("round")))
     section = section_kind(match.get("section"))
     if section == "bronze":
         return "Spiel um Platz 3"

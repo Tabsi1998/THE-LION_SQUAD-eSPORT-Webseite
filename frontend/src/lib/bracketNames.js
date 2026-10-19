@@ -7,20 +7,31 @@ import { describeSlot, normalizeSource } from "@/lib/slotSource";
 
 const GENERIC_ROUND = /^((?:Loser|Winner) )?Runde (\d+)$/i;
 
-/** Rundennamen je Phase und Abschnitt fortlaufend ab 1 - nur die allgemeinen („Runde 2“, „Loser Runde 3“). Neue Liste. */
+/** Die Rundennummer eines Spiels - nur ganze Zahlen ab 1, sonst 0 (Alt-Daten ohne Runde, wie `_int` am Server). */
+function roundNumber(match) {
+  const number = Number(match?.round);
+  return Number.isInteger(number) && number > 0 ? number : 0;
+}
+
+/**
+ * Rundennamen je Phase und Abschnitt fortlaufend ab 1 - nur die allgemeinen („Runde 2“, „Loser Runde 3“). Neue Liste.
+ * Dieselbe Zählung wie services/round_labels.rounds_by_section (#1792): Spiele ohne gültige Runde zählen nicht mit.
+ */
 export function displayRoundLabels(matches = []) {
   const rounds = new Map();
   for (const match of matches || []) {
+    const number = roundNumber(match);
+    if (!number) continue;
     const key = `${match?.stage_id || ""}|${match?.section || ""}`;
     if (!rounds.has(key)) rounds.set(key, new Set());
-    rounds.get(key).add(Number(match?.round || 0));
+    rounds.get(key).add(number);
   }
   const order = new Map([...rounds].map(([key, set]) => [key, [...set].sort((a, b) => a - b)]));
   return (matches || []).map((match) => {
     const label = String(match?.round_label || match?.round_name || "");
     const generic = GENERIC_ROUND.exec(label);
-    if (!generic) return match;
-    const index = order.get(`${match.stage_id || ""}|${match.section || ""}`).indexOf(Number(match.round || 0)) + 1;
+    if (!generic || !roundNumber(match)) return match;
+    const index = order.get(`${match.stage_id || ""}|${match.section || ""}`).indexOf(roundNumber(match)) + 1;
     const shown = `${generic[1] || ""}Runde ${index}`;
     return shown === label && match.round_label ? match : { ...match, round_label: shown };
   });
