@@ -11,6 +11,7 @@ from services.scoring_rules import (
     place_points,
     rank_with_ties,
     result_points,
+    validate_sheet,
 )
 
 F1 = [25, 18, 15, 12, 10, 8, 6, 4, 2, 1]
@@ -52,6 +53,17 @@ def test_no_start_and_disqualification_get_their_own_points_and_no_bonus():
 def test_penalty_points_are_subtracted_and_the_source_is_named():
     scored = result_points({"place": 2, "penalty_points": 5}, rules())
     assert (scored["points"], scored["base"], scored["penalty"], scored["source"]) == (13, 18, 5, "scheme")
+
+
+def test_negative_penalty_points_never_raise_the_score():
+    scored = result_points({"place": 2, "penalty_points": -5}, rules())
+    assert (scored["points"], scored["penalty"]) == (18, 0)
+
+
+def test_a_sheet_with_negative_penalty_points_is_refused():
+    with pytest.raises(ValueError, match="Strafpunkte"):
+        validate_sheet({"rows": [{"participant_id": "anna", "place": 1, "penalty_points": -2}]}, "r1")
+    validate_sheet({"rows": [{"participant_id": "anna", "place": 1, "penalty_points": 2}]}, "r1")
 
 
 def test_organizer_points_and_manual_points_are_taken_as_entered():

@@ -8,7 +8,8 @@ füllt fehlende Werte mit Standards und weist Unsinn ab; alle anderen Funktionen
 - **Marken:** ``dns`` (Nichtstart: ``dns_points``, gilt nicht als Teilnahme), ``dsq`` (``dsq_points``), ``dnf``
   (``dnf_points``; ``None`` heißt Punkte nach Platz), ``fastest_lap`` und ``pole`` als Bonus bis ``max_place``.
   Strafpunkte (``penalty_points``) werden abgezogen - außer bei Punkten laut Veranstalter oder von Hand, die gelten
-  wie eingetragen.
+  wie eingetragen. Strafpunkte sind nie negativ: ``validate_sheet`` lehnt solche Blätter ab, ``result_points`` zählt
+  einen negativen Wert als keine Strafe.
 - **Was zählt:** alle Runden, die besten N (``best_n``) oder alle bis auf N Streichergebnisse (``drop_n``). ``drop_n``
   heißt: von allen Runden des Kalenders (ohne abgesagte) zählen die besten ``Runden - N`` - wer weniger Ergebnisse
   hat, dem zählt alles. So fällt nie mitten in der Saison plötzlich etwas weg, und am Ende sind es genau N.
@@ -192,6 +193,15 @@ def _given_points(row: dict) -> float:
     return int(value) if value.is_integer() else value
 
 
+def validate_sheet(sheet: dict, round_id: str) -> None:
+    """Prüft ein Ergebnisblatt vor dem Rechnen; wirft ``ValueError`` mit der Runde und dem Grund. Strafpunkte sind nie
+    negativ."""
+    for row in sheet.get("rows") or []:
+        penalty = row.get("penalty_points")
+        if penalty is not None and (_number(penalty, "penalty_points") or 0) < 0:
+            raise ValueError(f"Runde {round_id}: Strafpunkte dürfen nicht negativ sein ({row.get('participant_id')}).")
+
+
 def result_points(row: dict, rules: dict) -> dict:
     """Punkte einer Zeile mit Herkunft: ``points`` = ``base`` + ``bonus`` - ``penalty``.
 
@@ -205,7 +215,8 @@ def result_points(row: dict, rules: dict) -> dict:
         return _scored(_given_points(row), 0, 0, "organizer", participated)
     if row.get("points_source") == "manual" and row.get("points") is not None:
         return _scored(_given_points(row), 0, 0, "manual", participated)
-    penalty = _number(row.get("penalty_points") or 0, "penalty_points") or 0
+    # Strafpunkte ziehen nur ab: ein negativer Wert (Tippfehler, alter Stand) zählt als keine Strafe.
+    penalty = max(_number(row.get("penalty_points") or 0, "penalty_points") or 0, 0)
     if "dsq" in marks:
         return _scored(rules["dsq_points"], 0, penalty, "scheme", participated)
     if "dnf" in marks and rules["dnf_points"] is not None:
