@@ -9,7 +9,7 @@ import {
   modeOfSettings,
   newlyReady,
   readyDraws,
-  treeModes,
+  stageModes,
 } from "./advancement";
 import type { BracketMatch } from "./bracketGraph";
 import { motionPlan } from "./bracketMotion";
@@ -37,15 +37,44 @@ describe("Modus", () => {
     expect(modeOfSettings(null)).toBe("fixed");
   });
 
-  test("im Baum: der Modus der gemischten Runden, ohne solche der des Turniers", () => {
-    expect(treeModes(state("se8_show_ready"))).toEqual(["draw_show"]);
-    expect(treeModes(state("se8_instant_1"), { advancement_mode: "fixed" })).toEqual(["instant"]);
-    expect(treeModes(state("se8_draw_before"))).toEqual(["draw_round"]);
-    expect(treeModes([], { advancement_mode: "instant" })).toEqual(["instant"]);
-    expect(treeModes([])).toEqual(["fixed"]);
+  // Je Phase wie der Server (match_mode, advancement_mode_of): am Spiel, sonst an der Phase, sonst am Turnier.
+  const modesOf = (rows: ReturnType<typeof stageModes>) => rows.map((row) => `${row.title}: ${row.mode}`);
+  const inStage = (matches: BracketMatch[], id: string, strip = false) => matches.map((match) => ({
+    ...match, id: `${id}-${match.id}`, stage_id: id,
+    settings: strip ? { ...match.settings, advancement_mode: undefined, randomize_advancement_rounds: undefined } : match.settings,
+  }));
+  const fixedPhase = () => inStage(state("se8_draw_before").map((match) => ({ ...match, settings: { qualifiers_per_match: 1 } })), "A");
+
+  test("im Baum: der Modus steht am Spiel - so wurde gebaut", () => {
+    expect(modesOf(stageModes(state("se8_show_ready")))).toEqual([": draw_show"]);
+    expect(modesOf(stageModes(state("se8_instant_1"), [], { advancement_mode: "fixed" }))).toEqual([": instant"]);
+    expect(modesOf(stageModes(state("se8_draw_before")))).toEqual([": draw_round"]);
+    expect(modesOf(stageModes([], [], { advancement_mode: "instant" }))).toEqual([]);
+  });
+
+  test("Turnier „sofort zufällig“, Phase A ausdrücklich fester Baum, Phase B Show: je Phase der eigene Modus", () => {
+    const stages = [{ id: "A", name: "Vorrunde", number: 1, settings: { advancement_mode: "fixed" } }, { id: "B", name: "Finalrunde", number: 2, settings: {} }];
+    const matches = [...fixedPhase(), ...inStage(state("se8_show_ready"), "B")];
+    expect(modesOf(stageModes(matches, stages, { advancement_mode: "instant" }))).toEqual(["Vorrunde: fixed", "Finalrunde: draw_show"]);
+    // Nur die feste Phase: fester Baum - nicht der Modus des Turniers.
+    expect(modesOf(stageModes(fixedPhase(), stages, { advancement_mode: "instant" }))).toEqual(["Vorrunde: fixed"]);
+    // Der feste Baum am Spiel (alter Schalter aus) geht vor Phase und Turnier.
+    const builtFixed = fixedPhase().map((match) => ({ ...match, settings: { randomize_advancement_rounds: false } }));
+    expect(modesOf(stageModes(builtFixed, [{ id: "A", name: "Vorrunde", settings: { advancement_mode: "draw_show" } }], { advancement_mode: "instant" }))).toEqual(["Vorrunde: fixed"]);
+  });
+
+  test("ohne Angabe am Spiel: Phase, dann Turnier - auch der alte Schalter", () => {
+    expect(modesOf(stageModes(fixedPhase(), [{ id: "A", name: "Vorrunde", settings: { randomize_advancement_rounds: true } }], null))).toEqual(["Vorrunde: draw_round"]);
+    expect(modesOf(stageModes(fixedPhase(), [{ id: "A", name: "Vorrunde", settings: {} }], { advancement_mode: "instant" }))).toEqual(["Vorrunde: instant"]);
+    expect(modesOf(stageModes(fixedPhase(), [{ id: "A", name: "Vorrunde" }], { randomize_advancement_rounds: true }))).toEqual(["Vorrunde: draw_round"]);
+    expect(modesOf(stageModes(fixedPhase(), [{ id: "A", name: "Vorrunde" }], null))).toEqual(["Vorrunde: fixed"]);
     // Gemischt, aber aus der Zeit vor den vier Modi (nur die Gruppe am Spiel): Auslosung nach der Runde.
-    const old = state("se8_draw_before").map((match) => ({ ...match, settings: { ...match.settings, advancement_mode: undefined, randomize_advancement_rounds: undefined } }));
-    expect(treeModes(old)).toEqual(["draw_round"]);
+    expect(modesOf(stageModes(inStage(state("se8_draw_before"), "A", true), [{ id: "A", name: "Vorrunde" }], null))).toEqual(["Vorrunde: draw_round"]);
+  });
+
+  test("nur die Phasen, die der Baum zeigt, in seiner Reihenfolge", () => {
+    const matches = [...fixedPhase(), ...inStage(state("se8_show_ready"), "B")];
+    expect(stageModes(matches, [], null, ["B"]).map((row) => row.mode)).toEqual(["draw_show"]);
   });
 });
 

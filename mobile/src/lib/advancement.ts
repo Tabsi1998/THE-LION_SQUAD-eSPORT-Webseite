@@ -5,6 +5,8 @@
 // Matchplan (lib/matchTimeline.drawStateOf). Reine Funktionen.
 import { advancementModeOf, drawGroupOf, drawRails, sectionGroup, slotDraw, slotDrawn, type AdvancementMode, type BracketEvent, type BracketMatch } from "./bracketGraph";
 
+type ModeSource = { advancement_mode?: unknown; randomize_advancement_rounds?: unknown } | null | undefined;
+
 const MODES: AdvancementMode[] = ["fixed", "draw_round", "draw_show", "instant"];
 
 /** Die Namen der vier Modi - wie in den Einstellungen der Website. */
@@ -19,26 +21,49 @@ export const ADVANCEMENT_MODE_LABELS: Record<AdvancementMode, string> = {
 export const ADVANCEMENT_MODE_TEXTS: Record<AdvancementMode, string> = {
   fixed: "Die Zuordnung steht im Turnierbaum: Sieger aus A trifft Sieger aus B.",
   draw_round: "Erst wenn alle Spiele einer Runde fertig sind, kommen alle Weiterkommer in einen Topf und werden gleichmäßig auf die nächsten Spiele verteilt – auch zwei aus demselben Spiel können sich wiedersehen.",
-  draw_show: "Wie die Auslosung nach der Runde, nur lost erst die Turnierleitung. Bis dahin steht im Baum „Auslosung bereit“.",
+  draw_show: "Wie die Auslosung nach der Runde, nur lost erst die Turnierleitung. Bis dahin steht im Baum „Auslosung bereit“. Nach der eingestellten Zeit erinnert der Server die Turnierleitung; nach noch einmal so viel Zeit lost er selbst.",
   instant: "Ist ein Spiel fertig, kommt jeder Weiterkommer sofort auf einen zufälligen freien Platz der nächsten Runde. Ein Spiel kann starten, sobald es voll ist – alles kann passieren.",
 };
 
-/** Der Modus eines Turniers oder einer Phase - auch aus älteren Daten, die nur den Schalter kennen (wie im Web). */
-export function modeOfSettings(source: { advancement_mode?: unknown; randomize_advancement_rounds?: unknown } | null | undefined): AdvancementMode {
+/** Der Modus eines Dokuments (Turnier, Phase, Spiel-Einstellungen): das neue Feld, sonst der alte Schalter (an →
+ * Auslosung nach der Runde, aus → fester Baum), sonst `null` (leer, erbt) - wie `_mode_of_settings` am Server. */
+export function declaredMode(source: ModeSource): AdvancementMode | null {
   const value = source?.advancement_mode;
   if (MODES.includes(value as AdvancementMode)) return value as AdvancementMode;
-  return source?.randomize_advancement_rounds === true ? "draw_round" : "fixed";
+  const legacy = source?.randomize_advancement_rounds;
+  if (typeof legacy === "boolean") return legacy ? "draw_round" : "fixed";
+  return null;
 }
 
+/** Der Modus eines Turniers oder einer Phase - auch aus älteren Daten, die nur den Schalter kennen (wie im Web). */
+export function modeOfSettings(source: ModeSource): AdvancementMode {
+  return declaredMode(source) || "fixed";
+}
+
+type StageLike = { id?: string; name?: string | null; number?: number; settings?: ModeSource } & NonNullable<ModeSource>;
+export type StageMode = { key: string; title: string; mode: AdvancementMode };
+
 /**
- * Die Modi, in denen dieser Baum gespielt wird: aus den gemischten Runden (der Modus steht am Spiel), sonst der des
- * Turniers. Mehrere Phasen können verschiedene Modi haben - dann alle, in der Reihenfolge der Modi.
+ * Der Modus je Phase, so wie der Server ihn auflöst: am Spiel (`settings.advancement_mode` bzw. der alte Schalter - so
+ * wurde der Baum gebaut), sonst an der Phase, sonst am Turnier (`advancement_mode_of`, `match_mode`). Eine gemischte
+ * Runde ohne jede Angabe stammt aus der Zeit vor den vier Modi: „Auslosung nach der Runde“. `stageIds`: nur diese
+ * Phasen (der Baum zeigt Tabellen-Phasen nicht), in ihrer Reihenfolge.
  */
-export function treeModes(matches: BracketMatch[] = [], tournament?: { advancement_mode?: unknown; randomize_advancement_rounds?: unknown } | null): AdvancementMode[] {
-  // Eine gemischte Runde ohne Modus am Spiel stammt aus der Zeit vor den vier Modi: „Auslosung nach der Runde“.
-  const fromRails = new Set<AdvancementMode>(drawRails(matches).map((rail) => (rail.mode === "fixed" ? "draw_round" : rail.mode)));
-  if (!fromRails.size) return [modeOfSettings(tournament)];
-  return MODES.filter((mode) => fromRails.has(mode));
+export function stageModes(matches: BracketMatch[] = [], stages: StageLike[] = [], tournament?: ModeSource, stageIds?: string[]): StageMode[] {
+  const byStage = new Map<string, BracketMatch[]>();
+  for (const match of matches || []) byStage.set(match.stage_id || "", [...(byStage.get(match.stage_id || "") || []), match]);
+  const stageById = new Map((stages || []).map((stage) => [stage.id || "", stage]));
+  const ids = stageIds || [...byStage.keys()].sort((a, b) => (Number(stageById.get(a)?.number) || 0) - (Number(stageById.get(b)?.number) || 0));
+  return ids.map((id) => {
+    const list = byStage.get(id) || [];
+    const stage = stageById.get(id);
+    const fromMatch = list.map((match) => declaredMode(match.settings)).find(Boolean) || null;
+    const legacyMixed = !fromMatch && list.some((match) => drawGroupOf(match)) ? "draw_round" : null;
+    const mode = fromMatch || legacyMixed || declaredMode(stage?.settings) || declaredMode(stage) || modeOfSettings(tournament);
+    // Gemischte Runden gibt es im festen Baum nicht - steht trotzdem eine da, wurde gemischt gebaut.
+    const fixed = mode === "fixed" && list.some((match) => drawGroupOf(match)) ? "draw_round" : mode;
+    return { key: id || "-", title: String(stage?.name || ""), mode: fixed };
+  });
 }
 
 export type ReadyDraw = { key: string; group: string; label: string; matchIds: string[]; names: number; since: string };

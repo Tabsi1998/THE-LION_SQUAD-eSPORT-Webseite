@@ -2,10 +2,10 @@ import React, { useCallback, useMemo, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import Svg, { G, Path } from "react-native-svg";
 import { useReduceMotion } from "../../FadeIn";
-import { drawStatusLines, readyDraws, treeModes } from "../../../lib/advancement";
+import { drawStatusLines, readyDraws, stageModes } from "../../../lib/advancement";
 import { cardModel, type CardModel } from "../../../lib/bracketCards";
 import { bracketEdges, drawRails, finalMatchOf, isLive, orderEdges, pathFor, winnerOf, type BracketEdge, type BracketMatch } from "../../../lib/bracketGraph";
-import { layoutBracket, TROPHY_ID, type BracketLayout } from "../../../lib/bracketLayout";
+import { HEADER_H, layoutBracket, TROPHY_ID, type BracketLayout } from "../../../lib/bracketLayout";
 import type { MotionPlan } from "../../../lib/bracketMotion";
 import { displayRoundLabels } from "../../../lib/bracketNames";
 import { finderFor } from "../../../lib/slotSource";
@@ -28,7 +28,7 @@ import { LiveNow } from "./LiveNow";
 
 type Props = {
   matches: BracketMatch[];
-  stages: Array<{ id?: string; stage_type?: string | null; match_type?: string | null; name?: string | null; number?: number }>;
+  stages: Array<{ id?: string; stage_type?: string | null; match_type?: string | null; name?: string | null; number?: number; settings?: Record<string, unknown> | null; advancement_mode?: unknown; randomize_advancement_rounds?: unknown }>;
   format?: string | null;
   /** Das Turnier - sein Modus gilt, solange der Baum keine gemischte Runde hat. */
   advancement?: { advancement_mode?: unknown; randomize_advancement_rounds?: unknown } | null;
@@ -68,7 +68,6 @@ export function BracketCanvas({ matches: rawMatches, stages, format, advancement
     return displayRoundLabels(rawMatches.map((match) => (match.round_label ? match : { ...match, round_label: given.get(match.id) || null })));
   }, [format, rawMatches, stages]);
   const labels = useMemo(() => roundLabels(matches, stages, format), [format, matches, stages]);
-  const modes = useMemo(() => treeModes(matches, advancement), [advancement, matches]);
   const statuses = useMemo(() => drawStatusLines(matches, labels), [labels, matches]);
   const ready = useMemo(() => readyDraws(matches), [matches]);
   const edges = useMemo(() => edgesFor(matches), [matches]);
@@ -103,6 +102,8 @@ export function BracketCanvas({ matches: rawMatches, stages, format, advancement
         return { id, title: byStage.size > 1 ? stageById.get(id)?.name || "" : "", layout, finalId };
       });
   }, [edges, final, format, matches, models, positionEdges, rails, stages]);
+  // Weiterkommen je Phase (#1633): am Spiel, sonst an der Phase, sonst am Turnier - nur die Phasen mit Baum.
+  const modes = useMemo(() => stageModes(matches, stages, advancement, groups.map((group) => group.id)), [advancement, groups, matches, stages]);
   const live = useMemo(() => matches.filter(isLive), [matches]);
   const champion = final ? winnerOf(final) : null;
   const mineMatches = mineId ? matches.some((match) => (match.slots || []).some((slot) => slot.registration_id === mineId)) : false;
@@ -226,7 +227,8 @@ function Canvas({ layout, matches, models, labels, path, selected, plan, reduce,
           // Vorgeplant im Vorschau-Baum oder nur vom Planer vorhergesagt (#1613): Orientierung, keine Zusage - wie im Web.
           const forecast = header.matchIds.some((id) => byId.get(id)?.is_preview || byId.get(id)?.schedule_forecast);
           return (
-            <Text key={header.key} style={[styles.header, { left: header.x, top: header.y, width: header.w }]} numberOfLines={1} accessibilityRole="header">
+            // Große Schrift (#1633): zwei Zeilen, die Schrift wird bei Bedarf kleiner - nie ein abgeschnittenes Wort.
+            <Text key={header.key} style={[styles.header, { left: header.x, top: header.y, width: header.w }]} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.5} accessibilityRole="header" testID={`bracket-round-${header.key}`}>
               {labels.get(first.id) || "Runde"}{time ? ` · ${forecast ? "voraussichtlich " : ""}${time}` : ""}
             </Text>
           );
@@ -300,5 +302,6 @@ const styles = StyleSheet.create({
   pathText: { color: colors.white, flexShrink: 1, fontSize: 13, fontWeight: "800" },
   pathClear: { color: roles.brand, fontSize: 12, fontWeight: "900", paddingVertical: 8, textDecorationLine: "underline" },
   band: { color: roles.honor, fontSize: 11, fontWeight: "900", left: 0, letterSpacing: 1, position: "absolute", textTransform: "uppercase" },
-  header: { color: roles.muted, fontSize: 11, fontWeight: "900", letterSpacing: 0.4, position: "absolute" },
+  // Feste Höhe über den Karten (bracketLayout.HEADER_H): zwei Zeilen haben Platz, sonst wird die Schrift kleiner.
+  header: { color: roles.muted, fontSize: 11, fontWeight: "900", height: HEADER_H - 2, letterSpacing: 0.4, lineHeight: 13, position: "absolute" },
 });

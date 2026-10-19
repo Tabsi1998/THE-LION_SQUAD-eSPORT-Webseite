@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import Animated from "react-native-reanimated";
-import { ADVANCEMENT_MODE_LABELS, ADVANCEMENT_MODE_TEXTS, drawReadyText, type DrawStatus, type ReadyDraw } from "../../../lib/advancement";
+import { ADVANCEMENT_MODE_LABELS, ADVANCEMENT_MODE_TEXTS, drawReadyText, type DrawStatus, type ReadyDraw, type StageMode } from "../../../lib/advancement";
 import { matchName } from "../../../lib/bracketNames";
 import type { AdvancementMode, BracketMatch } from "../../../lib/bracketGraph";
 import type { MotionPlan } from "../../../lib/bracketMotion";
@@ -13,13 +13,15 @@ import { riseInStyle } from "./motion";
 // gerade passiert. Steht der Topf der Show-Auslosung, steht „Auslosung bereit · 8 Namen“ in Gold - aus den Daten, auch
 // nach dem Neuladen, bis gelost ist. Wird er gerade bereit, kommt der Hinweis von unten herein und leuchtet einmal auf;
 // ein sofort gezogener Platz sagt kurz „Zufällig gezogen · NeonFalke → E“ (wie am TV) und geht nach ein paar Sekunden.
-// „Bewegung reduzieren“: alles steht sofort da.
+// „Bewegung reduzieren“: alles steht sofort da. Mehrere Phasen mit verschiedenen Modi: je Phase eine Zeile.
+// Große Schrift: kein Deckel, alles bricht um - nichts wird gekürzt.
 
 export const ASSIGNED_NOTE_MS = 4000;
-const FONT_SCALE = 1.3;
+/** Was unter „Auslosung bereit“ steht - wie die Erklärung der Show-Auslosung im Web (Erinnerung, Los nach der Frist). */
+export const READY_SUB = "Die Turnierleitung lost gleich – sonst lost der Server nach der Frist selbst.";
 
 type Props = {
-  modes: AdvancementMode[];
+  modes: StageMode[];
   statuses: DrawStatus[];
   ready: ReadyDraw[];
   plan: MotionPlan | null;
@@ -51,7 +53,11 @@ export function DrawNotice({ modes, statuses, ready, plan, matches, nameOf, redu
     return () => clearTimeout(timer);
   }, [shown]);
   const fresh = Boolean(plan?.ready.length);
-  const label = modes.map((mode) => ADVANCEMENT_MODE_LABELS[mode]).join(" / ");
+  const distinct = [...new Set(modes.map((row) => row.mode))] as AdvancementMode[];
+  const perStage = distinct.length > 1;
+  const label = perStage
+    ? modes.map((row) => `${row.title || "Phase"}: ${ADVANCEMENT_MODE_LABELS[row.mode]}`).join(", ")
+    : ADVANCEMENT_MODE_LABELS[distinct[0] || "fixed"];
   const lines = statuses.filter((status) => !(ready.length && status.tone === "ready"));
   return (
     <View style={styles.wrap}>
@@ -64,13 +70,22 @@ export function DrawNotice({ modes, statuses, ready, plan, matches, nameOf, redu
         style={styles.modeRow}
         testID="bracket-mode"
       >
-        <Text style={styles.modeLabel} maxFontSizeMultiplier={FONT_SCALE}>Weiterkommen</Text>
-        <Text style={styles.modeName} maxFontSizeMultiplier={FONT_SCALE}>{label}</Text>
-        <Text style={styles.modeMore} maxFontSizeMultiplier={FONT_SCALE}>{open ? "weniger" : "wie?"}</Text>
+        <Text style={styles.modeLabel}>Weiterkommen</Text>
+        {perStage ? (
+          <View style={styles.modeList}>
+            {modes.map((row) => (
+              <Text key={row.key} style={styles.modeName} testID="bracket-mode-stage">
+                <Text style={styles.modeStage}>{row.title || "Phase"}: </Text>
+                {ADVANCEMENT_MODE_LABELS[row.mode]}
+              </Text>
+            ))}
+          </View>
+        ) : <Text style={styles.modeName}>{label}</Text>}
+        <Text style={styles.modeMore}>{open ? "weniger" : "wie?"}</Text>
       </Pressable>
       {open ? (
-        <Text style={styles.explain} testID="bracket-mode-text" maxFontSizeMultiplier={FONT_SCALE}>
-          {modes.map((mode) => (modes.length > 1 ? `${ADVANCEMENT_MODE_LABELS[mode]}: ${ADVANCEMENT_MODE_TEXTS[mode]}` : ADVANCEMENT_MODE_TEXTS[mode])).join("\n")}
+        <Text style={styles.explain} testID="bracket-mode-text">
+          {distinct.map((mode) => (perStage ? `${ADVANCEMENT_MODE_LABELS[mode]}: ${ADVANCEMENT_MODE_TEXTS[mode]}` : ADVANCEMENT_MODE_TEXTS[mode])).join("\n")}
         </Text>
       ) : null}
       {ready.length ? (
@@ -81,18 +96,18 @@ export function DrawNotice({ modes, statuses, ready, plan, matches, nameOf, redu
           accessibilityLiveRegion="polite"
         >
           {fresh ? <Flash reduce={reduce} delay={120} color="rgba(255,215,0,0.18)" /> : null}
-          <Text style={styles.readyText} maxFontSizeMultiplier={FONT_SCALE}>{drawReadyText(ready)}</Text>
-          <Text style={styles.readySub} maxFontSizeMultiplier={FONT_SCALE}>Die Turnierleitung lost gleich.</Text>
+          <Text style={styles.readyText}>{drawReadyText(ready)}</Text>
+          <Text style={styles.readySub}>{READY_SUB}</Text>
         </Animated.View>
       ) : null}
       {lines.map((status) => (
-        <Text key={status.key} style={[styles.status, status.tone === "instant" && styles.statusInstant]} testID="bracket-draw-status" maxFontSizeMultiplier={FONT_SCALE}>
+        <Text key={status.key} style={[styles.status, status.tone === "instant" && styles.statusInstant]} testID="bracket-draw-status">
           {[status.round, status.text].filter(Boolean).join(" · ")}
         </Text>
       ))}
       {shown ? (
         <Animated.View key={shown.key} style={[styles.assigned, riseInStyle(reduce)]} testID="bracket-draw-assigned" accessibilityLiveRegion="polite">
-          <Text style={styles.assignedText} numberOfLines={2} maxFontSizeMultiplier={FONT_SCALE}>{shown.text}</Text>
+          <Text style={styles.assignedText}>{shown.text}</Text>
         </Animated.View>
       ) : null}
     </View>
@@ -101,9 +116,11 @@ export function DrawNotice({ modes, statuses, ready, plan, matches, nameOf, redu
 
 const styles = StyleSheet.create({
   wrap: { gap: 6 },
-  modeRow: { alignItems: "baseline", flexDirection: "row", flexWrap: "wrap", gap: 6, minHeight: 32, paddingVertical: 4 },
+  modeRow: { alignItems: "baseline", flexDirection: "row", flexWrap: "wrap", gap: 6, minHeight: 48, paddingVertical: 8 },
   modeLabel: { color: roles.quiet, fontSize: 10, fontWeight: "900", letterSpacing: 0.8, textTransform: "uppercase" },
   modeName: { color: roles.brand, flexShrink: 1, fontSize: 13, fontWeight: "900" },
+  modeList: { flexBasis: "100%", gap: 2 },
+  modeStage: { color: roles.muted, fontWeight: "700" },
   modeMore: { color: roles.muted, fontSize: 12, fontWeight: "700", textDecorationLine: "underline" },
   explain: { color: roles.muted, fontSize: 12, lineHeight: 17 },
   ready: {

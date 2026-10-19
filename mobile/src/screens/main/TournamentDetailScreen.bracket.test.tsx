@@ -444,5 +444,10 @@ describe("neue Namen im Baum (#1633)", () => {
     await open("Baum");
     await screen.findByTestId("bracket-canvas");
     expect(screen.getAllByText(/voraussichtlich 17:30/).length).toBeGreaterThan(0);
+    // Große Schrift (#1633, Codex): der Runden-Kopf darf zwei Zeilen haben und wird kleiner - nie „Viertelfin…“.
+    for (const head of screen.getAllByTestId(/^bracket-round-/)) {
+      expect(head.props.numberOfLines).toBe(2);
+      expect(head.props.adjustsFontSizeToFit).toBe(true);
+    }
   });
 });
