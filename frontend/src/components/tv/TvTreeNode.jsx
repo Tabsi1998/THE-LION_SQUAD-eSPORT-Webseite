@@ -1,6 +1,6 @@
 import { treeSlotLabel } from "@/lib/bracketNames";
 import { createContext, useContext, useMemo, useSyncExternalStore } from "react";
-import { isOut, isWalkover, matchFate, soloAdvance } from "@/lib/bracketGraph";
+import { isOut, isWalkover, markedNoShow, matchFate, soloAdvance } from "@/lib/bracketGraph";
 import { Trophy } from "lucide-react";
 import { resolveMediaUrl } from "@/lib/api";
 import { describeSlot, initials, isMatchDone, plannedText } from "@/lib/slotSource";
@@ -213,7 +213,8 @@ export function TvTreeNode({ match, regMap, podiumMap, findMatch }) {
         const short = info.kind === "player" ? initials(info.label) : "";
         const label = solo ? `Freilos: ${info.label} kommt weiter` : info.label;
         const fit = nameFit(label, 23, scale);
-        const gone = goneText(result);
+        // Im offenen Lauf als nicht erschienen markiert (#1823): wie nach dem Ergebnis, ohne Platz.
+        const gone = goneText(result || (markedNoShow(match, registrationId) ? { no_show: true } : null));
         const draw = tree.drawRows?.get(slotKey);
         const rowClasses = [classes, gone ? "tv-row--gone" : "", draw ? "tv-row--draw" : ""].filter(Boolean).join(" ");
         return (

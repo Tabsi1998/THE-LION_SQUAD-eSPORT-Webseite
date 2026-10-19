@@ -81,6 +81,18 @@ test("Durchgang nach dem Ergebnis: nach Platz sortiert, Weiterkommer blau, Loser
   expect(screen.getByTestId("tv-match-m-A")).toHaveTextContent("4 Spieler · 2 kommen weiter");
 });
 
+test("Durchgang mit „nicht erschienen“ vor dem Ergebnis (#1823): offen, nur die Person steht als nicht angetreten da", () => {
+  const bracket = heatDoubleElimination();
+  find(bracket, "A").no_show_registration_ids = ["r4"];
+  renderNode(bracket, "A");
+  const card = screen.getByTestId("tv-match-m-A");
+  const row = card.querySelector("[data-tv-reg='r4']");
+  expect(row.className).toContain("tv-row--gone");
+  expect(row).toHaveTextContent("nicht angetreten");
+  expect(card.querySelectorAll(".tv-row--gone")).toHaveLength(1);
+  expect(card).not.toHaveTextContent("#");
+});
+
 test("im Duell: wer ausscheidet, wird blasser; der goldene Weg leuchtet in der Zeile des Siegers", () => {
   const bracket = singleElimination(8);
   decide(bracket, "A");

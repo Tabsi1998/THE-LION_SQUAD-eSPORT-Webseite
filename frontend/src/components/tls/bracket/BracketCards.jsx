@@ -7,7 +7,7 @@ import { formatMatchStatus } from "@/lib/tournamentLabels";
 import { asInstant, viennaDateTime } from "@/lib/vienna";
 import { initials } from "@/lib/slotSource";
 import { MOTION, motionAllowed } from "@/lib/motion";
-import { heatText, isDone, isLive, isOut, isWalkover, matchFate, soloAdvance } from "@/lib/bracketGraph";
+import { heatText, isDone, isLive, isOut, isWalkover, markedNoShow, matchFate, soloAdvance } from "@/lib/bracketGraph";
 import { useBracketMotionState, useRowFlight } from "./bracketMotion";
 import {
   DurationContext, FinderContext, FinishedContext, GraphContext, MatchLinkContext, MineContext, PathContext, nodePathState, useMatchChanged,
@@ -203,7 +203,7 @@ function PlayerRow({ match, slot, regMap, findMatch, result, played, isWinner, i
   const rowMotion = regId ? state.rows.get(`${match.id}:${regId}`) || null : null;
   useRowFlight(ref, rowMotion, done, slot?.slot ?? null);
   const podium = podiumMeta(podiumRank);
-  const out = Boolean(reg) && (isOut(result) || OUT_REGISTRATION.has(String(reg?.status || "").toLowerCase()));
+  const out = Boolean(reg) && (isOut(result) || markedNoShow(match, regId) || OUT_REGISTRATION.has(String(reg?.status || "").toLowerCase()));
   const isMine = Boolean(mine) && regId === mine;
   const pop = state.pop.has(match.id);
   const blink = walkover && isWinner && state.blink.has(match.id);
