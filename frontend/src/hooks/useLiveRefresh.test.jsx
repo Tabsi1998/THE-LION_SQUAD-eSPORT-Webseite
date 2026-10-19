@@ -300,3 +300,25 @@ test("ohne wartende Meldung startet eine hängende Abfrage nichts von selbst; na
   });
   expect(load).toHaveBeenCalledTimes(2);
 });
+
+test("abgeschaltet während eine Abfrage hängt: weder der 30-s-Zeitgeber noch ihr Ende startet eine neue", async () => {
+  const { load, finish } = slowLoad();
+  act(() => setStreamConnected(true));
+  const view = render(<View load={load} resources={["tournaments"]} options={{ enabled: true }} />);
+
+  act(() => {
+    change();
+    vi.advanceTimersByTime(200);
+    change();
+    vi.advanceTimersByTime(200);
+  });
+  expect(load).toHaveBeenCalledTimes(1);
+
+  view.rerender(<View load={load} resources={["tournaments"]} options={{ enabled: false }} />);
+  act(() => {
+    vi.advanceTimersByTime(LIVE_REFRESH_STUCK_MS * 2);
+  });
+  expect(load).toHaveBeenCalledTimes(1);
+  await act(async () => finish());
+  expect(load).toHaveBeenCalledTimes(1);
+});

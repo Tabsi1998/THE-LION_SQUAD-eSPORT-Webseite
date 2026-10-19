@@ -45,6 +45,7 @@ export function useLiveRefresh(callback, resources = [], options = {}) {
   const resourceKey = useMemo(() => resources.join("|"), [resources]);
 
   const callbackRef = useRef(callback);
+  const enabledRef = useRef(enabled);
   const timerRef = useRef(null);
   const flightRef = useRef({ running: false, again: false, startedAt: 0, token: null, alive: true, stuckTimer: null });
   const [connected, setConnected] = useState(isStreamConnected);
@@ -76,7 +77,7 @@ export function useLiveRefresh(callback, resources = [], options = {}) {
     // bliebe die Ansicht bei stehendem Strom ohne weitere Meldung für immer auf dem alten Stand.
     flight.stuckTimer = setTimeout(() => {
       flight.stuckTimer = null;
-      if (flight.token === token && flight.running && flight.again && flight.alive) runOnce();
+      if (flight.token === token && flight.running && flight.again && flight.alive && enabledRef.current) runOnce();
     }, LIVE_REFRESH_STUCK_MS);
     const done = () => {
       // Eine hängende Abfrage, die schon abgelöst ist, gibt nichts mehr frei.
@@ -84,7 +85,7 @@ export function useLiveRefresh(callback, resources = [], options = {}) {
       clearTimeout(flight.stuckTimer);
       flight.stuckTimer = null;
       flight.running = false;
-      if (flight.again && flight.alive) runOnce();
+      if (flight.again && flight.alive && enabledRef.current) runOnce();
     };
     let result;
     try {
@@ -106,6 +107,16 @@ export function useLiveRefresh(callback, resources = [], options = {}) {
       flight.stuckTimer = null;
     };
   }, []);
+
+  // Abgeschaltet (z. B. Spiel beendet): keine Abfrage mehr von selbst - weder nach 30 s noch hinter der laufenden.
+  useEffect(() => {
+    enabledRef.current = enabled;
+    if (enabled) return;
+    const flight = flightRef.current;
+    clearTimeout(flight.stuckTimer);
+    flight.stuckTimer = null;
+    flight.again = false;
+  }, [enabled]);
 
   useEffect(() => subscribeStreamState(setConnected), []);
 
