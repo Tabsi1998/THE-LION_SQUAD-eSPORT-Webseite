@@ -2,12 +2,13 @@ import * as Haptics from "expo-haptics";
 
 // Vibration bei wichtigen Momenten am Turniertag (#1168): kurze, klare Muster - Aufruf dreimal kurz, Check-in geschafft
 // einmal, Ergebnis eingetragen zweimal, Turniersieg einmal lang (Erfolg plus zwei schwere Stöße); dazu (Fabian,
-// 14.10.2026, #1563) dein Weiterkommen im Baum einmal kurz. Sonst vibriert nichts extra. Ist am Handy die Vibration
+// 14.10.2026, #1563) dein Weiterkommen im Baum einmal kurz und (#1633) eine Auslosung im offenen Baum einmal leicht -
+// Topf bereit, Runde ausgelost oder ein Platz sofort gezogen. Sonst vibriert nichts extra. Ist am Handy die Vibration
 // aus, bleibt es still (expo-haptics folgt der System-Einstellung);
 // jede Vibration hat ihr sichtbares Gegenstück (Aufruf-Karte, Hinweis, Pokal) - sie ist nie das einzige Zeichen.
 // Pulsar (react-native-pulsar) ist im Projekt nicht installiert; die Muster laufen über das vorhandene expo-haptics.
 
-export type HapticMoment = "call" | "checkIn" | "result" | "advance" | "win";
+export type HapticMoment = "call" | "checkIn" | "result" | "advance" | "draw" | "win";
 type Step = { at: number; kind: "light" | "medium" | "heavy" | "success" };
 
 export const HAPTIC_MOMENTS: Record<HapticMoment, Step[]> = {
@@ -15,6 +16,7 @@ export const HAPTIC_MOMENTS: Record<HapticMoment, Step[]> = {
   checkIn: [{ at: 0, kind: "success" }],
   result: [{ at: 0, kind: "light" }, { at: 140, kind: "light" }],
   advance: [{ at: 0, kind: "medium" }],
+  draw: [{ at: 0, kind: "light" }],
   win: [{ at: 0, kind: "success" }, { at: 180, kind: "heavy" }, { at: 360, kind: "heavy" }],
 };
 

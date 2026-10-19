@@ -85,6 +85,7 @@ Fünf Tabs unten: **Home**, **Events**, **Community**, **Verein**, **Profil**. O
 | Chats (Direkt, Team, Turnier, Match) in einer Liste | Tab Community |
 | Anmeldung zu Turnieren, Check-in, Ergebnis melden und bestätigen, Problem melden | im Turnier bzw. Match |
 | „Du bist dran“-Aufruf und Spielstart-Zähler | Push, Match |
+| Turnierbaum mit Weiterkommen-Modus (fester Baum, Auslosung nach der Runde, Show-Auslosung, sofort zufällig) und was gerade passiert („wartet auf Auslosung“, „Auslosung bereit · N Namen“, „das Los entscheidet“); Auslosung als Moment mit einer leichten Vibration, Namen wie im Web („Loser Runde 1“, „Grand Final“, „voraussichtlich“) | Turnier → Baum |
 | Turnierleitung: Ergebnisse eintragen, „Braucht Aufmerksamkeit“ | Turnier → Turnierleitung (für Leitung und Helfer) |
 | Mitgliedskarte (auch ohne Netz), Versammlungen und Abstimmung, Helfen, Vereinsdokumente, Vorteile, Meine Mitgliedschaft | Tab Verein |
 | Einlass bei der Generalversammlung (Vorstand) | Tab Verein → Einlass |

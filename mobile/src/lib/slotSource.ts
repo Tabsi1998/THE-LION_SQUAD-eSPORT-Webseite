@@ -27,6 +27,9 @@ type MatchLike = {
   duration_minutes?: number | null;
   // Die Dauer, die gilt (#1554) - der Server rechnet die Kette (Spiel, Phase, Turnier, Spiel-Modus).
   effective_duration_minutes?: number | null;
+  // Vorschau-Baum bzw. nur vom Planer vorhergesagt (#1613): die Zeit ist „voraussichtlich“.
+  is_preview?: boolean | null;
+  schedule_forecast?: boolean | null;
 };
 export type SlotView = { kind: "player" | "bye" | "pending" | "empty"; label: string };
 
@@ -118,7 +121,8 @@ export function isMatchDone(match: MatchLike | null | undefined) {
   return (match?.results || []).length > 0 && ["completed", "archived"].includes(String(match?.status || ""));
 }
 
-/** „geplant ca. 14:20 · 30 Minuten“ statt „Zeit noch offen“ - an einem anderen Tag mit Datum, für fertige Spiele nichts. */
+/** „geplant ca. 14:20 · 30 Minuten“ statt „Zeit noch offen“ - an einem anderen Tag mit Datum, für fertige Spiele nichts.
+ * Vorgeplant im Vorschau-Baum oder nur vom Planer vorhergesagt (#1613): „voraussichtlich ca. 14:20“ - wie im Web. */
 export function plannedText(match: MatchLike | null | undefined, now: Date = new Date()) {
   if (!match || isMatchDone(match)) return "";
   // Ältere Server kennen effective_duration_minutes nicht - dann zählt, was am Spiel steht.
@@ -128,7 +132,8 @@ export function plannedText(match: MatchLike | null | undefined, now: Date = new
     const time = viennaTime(match.scheduled_at, { hour: "2-digit", minute: "2-digit" });
     const sameDay = viennaDay(match.scheduled_at) === viennaDay(now);
     const day = sameDay ? "" : `${viennaDate(match.scheduled_at, { day: "2-digit", month: "2-digit" })} `;
-    if (time && time !== "Invalid Date") parts.push(`geplant ca. ${day}${time}`);
+    const forecast = Boolean(match.schedule_forecast || match.is_preview);
+    if (time && time !== "Invalid Date") parts.push(`${forecast ? "voraussichtlich" : "geplant"} ca. ${day}${time}`);
   }
   if (duration > 0) parts.push(`${duration} Minuten`);
   return parts.join(" · ");

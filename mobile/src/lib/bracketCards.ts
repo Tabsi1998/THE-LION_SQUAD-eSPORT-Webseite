@@ -2,7 +2,11 @@
 // so rechnet bracketLayout die Lage und jede Linie endet genau an der Zeile des Platzes, in den der Spieler kommt.
 // Ruhig wie im Web (#1561): Duell mit zwei Zeilen, Lauf mit Plätzen und der Linie „2 kommen weiter → E“, Freilos und
 // entfallene Spiele als eine Zeile.
-import { heatText, isByeSlot, isDone, isOut, isWalkover, matchFate, slotDraw, type BracketEdge, type BracketMatch, type BracketSlot } from "./bracketGraph";
+// Namen wie im Web (#1633, #1591): die Lauf-Karte des Grand Final heißt „Grand Final“, ein geloster Platz sagt, wer kommt
+// („Weiter aus Runde 1“, „Sieger aus Viertelfinale“) - bei der Show-Auslosung, sobald der Topf steht, „Auslosung bereit“.
+import { drawStateOf, type DrawState } from "./advancement";
+import { heatText, isByeSlot, isDone, isOut, isWalkover, matchFate, type BracketEdge, type BracketMatch, type BracketSlot } from "./bracketGraph";
+import { treeSlotLabel } from "./bracketNames";
 import { describeSlot } from "./slotSource";
 import { byeLine } from "./tournamentView";
 
@@ -53,8 +57,18 @@ export type CardModel = {
   walkover: boolean;
   mine: boolean;
   empty: boolean;
+  /** Wartet das Spiel auf ein Los (#1590): bereit (Show), offen oder sofort zufällig - sonst `null`. */
+  drawState: DrawState | null;
   anchor: (slot: number) => number;
 };
+
+/** Wer in einen leeren Platz kommt - wie im Web-Baum (BracketCards.pendingLabel): Show mit stehendem Topf „Auslosung
+ * bereit“, sonst „Weiter aus Runde 1“, „Verlierer aus Runde 2“, „Sieger aus E“. */
+function pendingLabel(slot: BracketSlot, match: BracketMatch, findMatch: (key: string) => any) {
+  const source = slot.source as { draw?: unknown } | null | undefined;
+  if (source?.draw && match.draw_ready && typeof match.draw_ready === "object") return "Auslosung bereit";
+  return treeSlotLabel(slot, findMatch);
+}
 
 const scoreText = (value: unknown) => {
   const number = Number(value);
@@ -64,9 +78,9 @@ const scoreText = (value: unknown) => {
 export function cardModel(match: BracketMatch, ctx: CardContext): CardModel {
   const isHeat = match.match_type === "ffa" || (match.slots || []).length > 2;
   const key = String(match.match_key || "");
-  const title = isHeat ? `Lauf ${key}`.trim() : key || "Spiel";
   const text = heatText(match, ctx.edges, ctx.matches, ctx.finalId);
-  const base = { id: match.id, key, title, text, cutAfter: -1, rows: [] as CardRow[], rowHeight: ROW_H, walkover: false, empty: false };
+  const title = isHeat ? text.name : key || "Spiel";
+  const base = { id: match.id, key, title, text, cutAfter: -1, rows: [] as CardRow[], rowHeight: ROW_H, walkover: false, empty: false, drawState: drawStateOf(match) };
   const single = (kind: "bye" | "fate", line: CardModel["line"], mine: boolean): CardModel => ({ ...base, kind, height: SINGLE_H, line, mine, anchor: () => SINGLE_H / 2 });
 
   const fate = matchFate(match);
@@ -89,11 +103,8 @@ export function cardModel(match: BracketMatch, ctx: CardContext): CardModel {
   }
   const rows: CardRow[] = slots.map((slot, index) => {
     const id = slot.registration_id || null;
-    // Gemischt (#1548): bis zur Auslosung „Platz aus Runde 1“ - wie slotSource ab #1580, auch für ältere Stände.
-    const draw = slotDraw(slot);
-    const view = draw && !slot.registration_id && !isByeSlot(slot)
-      ? { kind: "pending" as const, label: `Platz aus ${draw.label || "der Vorrunde"}` }
-      : describeSlot(slot, ctx.nameOf, findMatch);
+    const described = describeSlot(slot, ctx.nameOf, findMatch);
+    const view = described.kind === "pending" ? { kind: "pending" as const, label: pendingLabel(slot, match, findMatch) || described.label } : described;
     const result = id ? results.get(id) : undefined;
     const rank = Number(result?.rank) || 0;
     const winner = done && Boolean(id) && (rank === 1 || match.winner_id === id);

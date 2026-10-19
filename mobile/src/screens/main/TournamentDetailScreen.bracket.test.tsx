@@ -10,6 +10,8 @@ import { TournamentDetailScreen } from "./TournamentDetailScreen";
 // Pokal, neue Zustände (entfällt, zusammengelegt, kampflos, Freilos, ausgetreten/disqualifiziert), Check-in vorbei.
 
 const TREES = JSON.parse(fs.readFileSync(path.join(__dirname, "../../../../docs/bracket-trees.json"), "utf8"));
+// Vier Modi (#1590, App #1633): Bäume aus dem echten Generator mit Show-Auslosung und „sofort zufällig“.
+const FFA = JSON.parse(fs.readFileSync(path.join(__dirname, "../../../../frontend/e2e/fixtures/ffaGenerated.json"), "utf8"));
 
 const mockGet = jest.fn();
 const mockPost = jest.fn();
@@ -40,8 +42,8 @@ const navigation = {
 } as never;
 const route = { key: "t", name: "TournamentDetail", params: { id: "cup" } } as never;
 
-function serve(state: string, tournament: Record<string, unknown> = {}, mineName?: string) {
-  const tree = TREES[state];
+function serve(state: string, tournament: Record<string, unknown> = {}, mineName?: string, source: Record<string, any> = TREES) {
+  const tree = source[state];
   const mine = mineName ? tree.registrations.find((reg: any) => reg.display_name === mineName) : null;
   const registrations = tree.registrations.map((reg: any) => (mine && reg.id === mine.id ? { ...reg, user_id: "u-1", is_mine: true } : reg));
   const data = {
@@ -190,14 +192,17 @@ test("dein Weiterkommen im offenen Baum: einmal kurz - fremdes Weiterkommen stil
 });
 
 describe("gemischte Runden (#1548)", () => {
-  test("vor der Auslosung: Sammelschiene statt Einzel-Linien, „Platz aus Runde 1“, dein Weg bis zur Schiene", async () => {
+  test("vor der Auslosung: Sammelschiene statt Einzel-Linien, „wartet auf Auslosung“, wer kommt, dein Weg bis zur Schiene", async () => {
     serve("se8_mixed_open", {}, "NeonFalke");
     await open("Baum");
     const railKey = `${TREES.se8_mixed_open.matches_v2[0].stage_id}/WB:2`;
     expect(await screen.findByTestId(`bracket-rail-${railKey}`)).toBeTruthy();
     const target = screen.getByTestId(`bracket-card-${keyId("se8_mixed_open", "E")}`);
-    expect(target).toHaveTextContent(/gemischt aus Runde 1/);
-    expect(target).toHaveTextContent(/Platz aus Runde 1/);
+    // Wie im Web-Baum (#1591, #1590): der Zustand im Kopf, der Platz sagt, wer kommt.
+    expect(target).toHaveTextContent(/wartet auf Auslosung/);
+    expect(target).toHaveTextContent(/Sieger aus Viertelfinale/);
+    expect(screen.getByTestId("bracket-mode")).toHaveTextContent(/Weiterkommen.*Auslosung nach der Runde/);
+    expect(screen.getByTestId("bracket-draw-status")).toHaveTextContent("Halbfinale · wartet auf Auslosung");
     expect(screen.queryByTestId(/^bracket-line-.*>.*E/)).toBeNull();
     await fireEvent.press(screen.getByTestId("bracket-my-path"));
     expect(screen.getByTestId(`bracket-rail-weg-${railKey}-${keyId("se8_mixed_open", "A")}`)).toBeTruthy();
@@ -309,5 +314,140 @@ describe("Check-in", () => {
     await fireEvent.press(await screen.findByTestId("tournament-checkin"));
     await waitFor(() => expect(mockPost).toHaveBeenCalledWith("/tournaments/t1/checkin"));
     expect(Haptics.notificationAsync).toHaveBeenCalledTimes(1);
+  });
+});
+
+// Vier Modi in der App (#1633): Modus und Zustand wie im Web, die Auslosung als Moment wie am TV - genau einmal, mit
+// einer leichten Vibration im offenen Baum.
+describe("Weiterkommen in vier Modi (#1633)", () => {
+  const ffaKey = (state: string, key: string) => FFA[state].matches_v2.find((match: any) => match.match_key === key).id;
+  const light = () => (Haptics.impactAsync as jest.Mock).mock.calls.filter(([style]) => style === "light").length;
+  /** Dieselbe Show-Runde kurz bevor der Topf steht. */
+  const FFA_PLUS = { ...FFA, se8_show_waiting: { ...FFA.se8_show_ready, matches_v2: FFA.se8_show_ready.matches_v2.map((match: any) => ({ ...match, draw_ready: null })) } };
+
+  test("fester Baum: der Modus steht über dem Baum, Antippen erklärt ihn", async () => {
+    serve("se6_live", { advancement_mode: "fixed" });
+    await open("Baum");
+    const mode = await screen.findByTestId("bracket-mode");
+    expect(mode).toHaveTextContent(/Fester Baum/);
+    expect(screen.queryByTestId("bracket-mode-text")).toBeNull();
+    await fireEvent.press(mode);
+    expect(screen.getByTestId("bracket-mode-text")).toHaveTextContent("Die Zuordnung steht im Turnierbaum: Sieger aus A trifft Sieger aus B.");
+    expect(screen.queryByTestId("bracket-draw-status")).toBeNull();
+  });
+
+  test("Show-Auslosung bereit: Hinweis in Gold aus den Daten, die Plätze sagen „Auslosung bereit“", async () => {
+    serve("se8_show_ready", {}, undefined, FFA);
+    await open("Baum");
+    expect(await screen.findByTestId("bracket-draw-ready")).toHaveTextContent(/Auslosung bereit · 4 Namen/);
+    expect(screen.getByTestId("bracket-mode")).toHaveTextContent(/Show-Auslosung/);
+    const target = screen.getByTestId(`bracket-card-${ffaKey("se8_show_ready", "E")}`);
+    expect(within(target).getAllByText("Auslosung bereit").length).toBe(3);
+    // Der erste Stand ist kein Moment: nichts hebt sich, nichts vibriert.
+    expect(screen.queryByTestId(/^bracket-lift-/)).toBeNull();
+    expect(Haptics.impactAsync).not.toHaveBeenCalled();
+  });
+
+  test("der Topf wird bereit: die Zielspiele heben sich, einmal leicht vibrieren - genau einmal", async () => {
+    serve("se8_show_waiting", {}, undefined, FFA_PLUS);
+    await open("Baum");
+    await screen.findByTestId("bracket-canvas");
+    expect(screen.queryByTestId("bracket-draw-ready")).toBeNull();
+    serve("se8_show_ready", {}, undefined, FFA_PLUS);
+    await act(async () => { await mockLive.reload?.(); });
+    expect(await screen.findByTestId("bracket-draw-ready")).toHaveTextContent(/Auslosung bereit · 4 Namen/);
+    expect(screen.getByTestId(`bracket-lift-${ffaKey("se8_show_ready", "E")}`)).toBeTruthy();
+    expect(screen.getByTestId(`bracket-lift-${ffaKey("se8_show_ready", "F")}`)).toBeTruthy();
+    expect(light()).toBe(1);
+    // Derselbe Wechsel noch einmal (Nachladen nach kurzem Aussetzer): kein zweiter Moment.
+    serve("se8_show_waiting", {}, undefined, FFA_PLUS);
+    await act(async () => { await mockLive.reload?.(); });
+    serve("se8_show_ready", {}, undefined, FFA_PLUS);
+    await act(async () => { await mockLive.reload?.(); });
+    await screen.findByTestId("bracket-draw-ready");
+    expect(light()).toBe(1);
+  });
+
+  test("zurück in den Baum: der Moment läuft nicht noch einmal", async () => {
+    serve("se8_show_waiting", {}, undefined, FFA_PLUS);
+    await open("Baum");
+    await screen.findByTestId("bracket-canvas");
+    serve("se8_show_ready", {}, undefined, FFA_PLUS);
+    await act(async () => { await mockLive.reload?.(); });
+    expect(await screen.findByTestId(`bracket-lift-${ffaKey("se8_show_ready", "E")}`)).toBeTruthy();
+    await fireEvent.press(screen.getAllByText("Matches")[0]);
+    await fireEvent.press(screen.getAllByText("Baum")[0]);
+    expect(await screen.findByTestId("bracket-draw-ready")).toBeTruthy();
+    expect(screen.queryByTestId(/^bracket-lift-/)).toBeNull();
+  });
+
+  test("ausgelost: die Namen kommen herein, der Hinweis geht", async () => {
+    serve("se8_show_ready", {}, undefined, FFA);
+    await open("Baum");
+    await screen.findByTestId("bracket-draw-ready");
+    serve("se8_show_drawn", {}, undefined, FFA);
+    await act(async () => { await mockLive.reload?.(); });
+    await waitFor(() => expect(screen.queryByTestId("bracket-draw-ready")).toBeNull());
+    expect(screen.getByTestId(`bracket-lift-${ffaKey("se8_show_drawn", "E")}`)).toBeTruthy();
+    expect(light()).toBe(1);
+  });
+
+  test("sofort zufällig: „das Los entscheidet“, ein gezogener Platz sagt kurz, wer wohin kam", async () => {
+    serve("se8_instant_0", {}, undefined, FFA);
+    await open("Baum");
+    expect(await screen.findByTestId("bracket-draw-status")).toHaveTextContent("Halbfinale · das Los entscheidet");
+    expect(screen.getByTestId(`bracket-card-${ffaKey("se8_instant_0", "E")}`)).toHaveTextContent(/das Los entscheidet/);
+    serve("se8_instant_1", {}, undefined, FFA);
+    await act(async () => { await mockLive.reload?.(); });
+    expect(await screen.findByTestId("bracket-draw-assigned")).toHaveTextContent(/Zufällig gezogen · .+ → [EF]/);
+    expect(screen.getByTestId("bracket-draw-status")).toHaveTextContent("Halbfinale · 1 von 4 zufällig gezogen");
+    expect(light()).toBe(1);
+  });
+
+  test("ohne offenen Baum: kein Moment, keine Vibration", async () => {
+    serve("se8_show_waiting", {}, undefined, FFA_PLUS);
+    await open("Matches");
+    serve("se8_show_ready", {}, undefined, FFA_PLUS);
+    await act(async () => { await mockLive.reload?.(); });
+    await waitFor(() => expect(mockGet.mock.calls.filter(([url]) => url === "/tournaments/cup").length).toBeGreaterThan(1));
+    expect(Haptics.impactAsync).not.toHaveBeenCalled();
+  });
+});
+
+// Namen wie im Web (#1591, App #1633): das Loser Bracket beginnt mit „Loser Runde 1“, „[FINAL]“ ist das Grand Final, vorgeplante
+// Zeiten heißen „voraussichtlich“ (#1613).
+describe("neue Namen im Baum (#1633)", () => {
+  const LINES = JSON.parse(fs.readFileSync(path.join(__dirname, "../../../../frontend/e2e/fixtures/bracketLines.json"), "utf8"));
+
+  test("Loser Runde 1 und Grand Final", async () => {
+    serve("ffa16de_start", {}, undefined, LINES);
+    await open("Baum");
+    await screen.findByTestId("bracket-canvas");
+    expect(screen.getAllByText(/^Loser Runde 1/).length).toBeGreaterThan(0);
+    expect(screen.queryByText(/^Loser Runde 5/)).toBeNull();
+    const final = LINES.ffa16de_start.matches_v2.find((match: any) => match.match_key === "FINAL");
+    expect(screen.getByTestId(`bracket-card-${final.id}`)).toHaveTextContent(/^Grand Final/);
+    expect(screen.queryByText("Lauf FINAL")).toBeNull();
+  });
+
+  test("Abschnitt „FINAL“ steht als Grand Final - mit Pokal, nicht als eigener Hauptbaum", async () => {
+    const tree = { ...TREES.de4_reset_cancelled, matches_v2: TREES.de4_reset_cancelled.matches_v2.map((match: any) => (["GF", "grand_final"].includes(String(match.section)) ? { ...match, section: "FINAL" } : match)) };
+    serve("de4_final", { status: "completed" }, undefined, { de4_final: tree });
+    await open("Baum");
+    expect(await screen.findByTestId("bracket-trophy")).toHaveTextContent(/NeonFalke/);
+    expect(screen.getAllByText(/^Grand Final/).length).toBeGreaterThan(0);
+  });
+
+  test("Vorschau-Baum vorgeplant: Runden-Kopf und Spielplan sagen „voraussichtlich“", async () => {
+    const preview = { ...TREES.se6_live, matches_v2: TREES.se6_live.matches_v2.map((match: any) => ({ ...match, is_preview: true, scheduled_at: "2026-10-31T16:30:00Z" })) };
+    serve("preview", {}, undefined, { preview });
+    await open("Baum");
+    await screen.findByTestId("bracket-canvas");
+    expect(screen.getAllByText(/voraussichtlich 17:30/).length).toBeGreaterThan(0);
+    // Große Schrift (#1633, Codex): der Runden-Kopf darf zwei Zeilen haben und wird kleiner - nie „Viertelfin…“.
+    for (const head of screen.getAllByTestId(/^bracket-round-/)) {
+      expect(head.props.numberOfLines).toBe(2);
+      expect(head.props.adjustsFontSizeToFit).toBe(true);
+    }
   });
 });

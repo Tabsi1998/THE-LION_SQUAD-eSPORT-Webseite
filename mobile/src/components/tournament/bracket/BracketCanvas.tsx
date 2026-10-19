@@ -2,16 +2,19 @@ import React, { useCallback, useMemo, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import Svg, { G, Path } from "react-native-svg";
 import { useReduceMotion } from "../../FadeIn";
+import { drawStatusLines, readyDraws, stageModes } from "../../../lib/advancement";
 import { cardModel, type CardModel } from "../../../lib/bracketCards";
 import { bracketEdges, drawRails, finalMatchOf, isLive, orderEdges, pathFor, winnerOf, type BracketEdge, type BracketMatch } from "../../../lib/bracketGraph";
-import { layoutBracket, TROPHY_ID, type BracketLayout } from "../../../lib/bracketLayout";
+import { HEADER_H, layoutBracket, TROPHY_ID, type BracketLayout } from "../../../lib/bracketLayout";
 import type { MotionPlan } from "../../../lib/bracketMotion";
+import { displayRoundLabels } from "../../../lib/bracketNames";
 import { finderFor } from "../../../lib/slotSource";
 import { matchStatusText, roundLabels, stageKind } from "../../../lib/tournamentView";
 import { viennaTime } from "../../../lib/vienna";
 import { colors, radius, roles, surfaces } from "../../../theme";
 import { Button } from "../../Button";
 import { BracketCard, TrophyCard } from "./BracketCard";
+import { DrawNotice } from "./DrawNotice";
 import { LiveNow } from "./LiveNow";
 
 // Der Turnierbaum der App (#1563): eine Leinwand je Phase mit Linien (react-native-svg - liegt schon im Projekt und
@@ -19,11 +22,16 @@ import { LiveNow } from "./LiveNow";
 // Live mit Station und Uhr (oben angepinnt), Lauf-Karten, Pokal am Ende. Die Lage rechnet bracketLayout ohne Messen.
 // Gemischte Runden (#1548): je Auslosungs-Gruppe eine Sammelschiene; dein Weg führt bis zur Schiene und nach der
 // Auslosung entlang der echten Herkunft weiter.
+// Vier Modi (#1633, wie Web #1590 und TV #1634): oben steht, wie man weiterkommt und was gerade passiert (DrawNotice);
+// Namen wie im Web (#1591): Runden je Abschnitt fortlaufend („Loser Runde 1“), „Grand Final“, „voraussichtlich“ bei
+// vorgeplanten Zeiten (#1613).
 
 type Props = {
   matches: BracketMatch[];
-  stages: Array<{ id?: string; stage_type?: string | null; match_type?: string | null; name?: string | null; number?: number }>;
+  stages: Array<{ id?: string; stage_type?: string | null; match_type?: string | null; name?: string | null; number?: number; settings?: Record<string, unknown> | null; advancement_mode?: unknown; randomize_advancement_rounds?: unknown }>;
   format?: string | null;
+  /** Das Turnier - sein Modus gilt, solange der Baum keine gemischte Runde hat. */
+  advancement?: { advancement_mode?: unknown; randomize_advancement_rounds?: unknown } | null;
   nameOf: (registrationId: string) => string;
   statusOf: (registrationId: string) => string;
   mineId: string | null;
@@ -50,11 +58,18 @@ function edgesFor(matches: BracketMatch[]): BracketEdge[] {
   return [...bySection.values()].flatMap((rounds) => orderEdges([...rounds.entries()].sort((a, b) => a[0] - b[0]).map(([, list]) => [...list].sort((a, b) => (Number(a.order) || 0) - (Number(b.order) || 0)))));
 }
 
-export function BracketCanvas({ matches, stages, format, nameOf, statusOf, mineId, plan, crowned, onOpenMatch }: Props) {
+export function BracketCanvas({ matches: rawMatches, stages, format, advancement, nameOf, statusOf, mineId, plan, crowned, onOpenMatch }: Props) {
   const reduce = useReduceMotion();
   const [selected, setSelected] = useState<string | null>(null);
   const toggle = useCallback((registrationId: string) => setSelected((current) => (current === registrationId ? null : registrationId)), []);
+  // Rundennamen wie im Web-Baum: vom Server (sonst dieselbe Regel hier), je Abschnitt fortlaufend ab 1.
+  const matches = useMemo(() => {
+    const given = roundLabels(rawMatches, stages, format);
+    return displayRoundLabels(rawMatches.map((match) => (match.round_label ? match : { ...match, round_label: given.get(match.id) || null })));
+  }, [format, rawMatches, stages]);
   const labels = useMemo(() => roundLabels(matches, stages, format), [format, matches, stages]);
+  const statuses = useMemo(() => drawStatusLines(matches, labels), [labels, matches]);
+  const ready = useMemo(() => readyDraws(matches), [matches]);
   const edges = useMemo(() => edgesFor(matches), [matches]);
   const rails = useMemo(() => drawRails(matches), [matches]);
   const positionEdges = useMemo(() => (rails.length ? bracketEdges(matches, { schema: true }) : edges), [edges, matches, rails.length]);
@@ -87,6 +102,8 @@ export function BracketCanvas({ matches, stages, format, nameOf, statusOf, mineI
         return { id, title: byStage.size > 1 ? stageById.get(id)?.name || "" : "", layout, finalId };
       });
   }, [edges, final, format, matches, models, positionEdges, rails, stages]);
+  // Weiterkommen je Phase (#1633): am Spiel, sonst an der Phase, sonst am Turnier - nur die Phasen mit Baum.
+  const modes = useMemo(() => stageModes(matches, stages, advancement, groups.map((group) => group.id)), [advancement, groups, matches, stages]);
   const live = useMemo(() => matches.filter(isLive), [matches]);
   const champion = final ? winnerOf(final) : null;
   const mineMatches = mineId ? matches.some((match) => (match.slots || []).some((slot) => slot.registration_id === mineId)) : false;
@@ -94,6 +111,7 @@ export function BracketCanvas({ matches, stages, format, nameOf, statusOf, mineI
   return (
     <View style={styles.wrap}>
       {live.length ? <LiveNow matches={live} labels={labels} nameOf={nameOf} reduce={reduce} onOpen={onOpenMatch} /> : null}
+      <DrawNotice modes={modes} statuses={statuses} ready={ready} plan={plan} matches={matches} nameOf={nameOf} reduce={reduce} />
       {mineMatches || selected ? (
         <View style={styles.pathRow}>
           {selected ? (
@@ -206,9 +224,12 @@ function Canvas({ layout, matches, models, labels, path, selected, plan, reduce,
           if (!first) return null;
           const times = header.matchIds.map((id) => byId.get(id)?.scheduled_at).filter(Boolean).sort() as string[];
           const time = times[0] ? viennaTime(times[0], { hour: "2-digit", minute: "2-digit" }) : "";
+          // Vorgeplant im Vorschau-Baum oder nur vom Planer vorhergesagt (#1613): Orientierung, keine Zusage - wie im Web.
+          const forecast = header.matchIds.some((id) => byId.get(id)?.is_preview || byId.get(id)?.schedule_forecast);
           return (
-            <Text key={header.key} style={[styles.header, { left: header.x, top: header.y, width: header.w }]} numberOfLines={1} accessibilityRole="header">
-              {labels.get(first.id) || "Runde"}{time ? ` · ${time}` : ""}
+            // Große Schrift (#1633): zwei Zeilen, die Schrift wird bei Bedarf kleiner - nie ein abgeschnittenes Wort.
+            <Text key={header.key} style={[styles.header, { left: header.x, top: header.y, width: header.w }]} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.5} accessibilityRole="header" testID={`bracket-round-${header.key}`}>
+              {labels.get(first.id) || "Runde"}{time ? ` · ${forecast ? "voraussichtlich " : ""}${time}` : ""}
             </Text>
           );
         })}
@@ -217,12 +238,14 @@ function Canvas({ layout, matches, models, labels, path, selected, plan, reduce,
           const match = byId.get(node.id) as BracketMatch;
           const live = isLive(match) ? { station: String(match.station_text || ""), startedAt: match.started_at || null } : null;
           const rows = plan?.rows.get(node.id);
-          const motion = plan && (rows || plan.results.has(node.id) || plan.walkovers.has(node.id) || plan.fates.has(node.id))
-            ? { rows, result: plan.results.has(node.id), walkover: plan.walkovers.has(node.id), fate: plan.fates.has(node.id), key: plan.key }
+          const lift = plan?.lifts.get(node.id);
+          const motion = plan && (rows || lift || plan.results.has(node.id) || plan.walkovers.has(node.id) || plan.fates.has(node.id))
+            ? { rows, lift, result: plan.results.has(node.id), walkover: plan.walkovers.has(node.id), fate: plan.fates.has(node.id), key: plan.key }
             : null;
           return (
             <BracketCard
-              key={node.id}
+              // Auslosung (#1633): mit dem Schlüssel des Moments neu eingehängt - so hebt sich die Karte genau einmal an.
+              key={lift && plan ? `${node.id}:${plan.key}` : node.id}
               model={model}
               x={node.x}
               y={node.y}
@@ -279,5 +302,6 @@ const styles = StyleSheet.create({
   pathText: { color: colors.white, flexShrink: 1, fontSize: 13, fontWeight: "800" },
   pathClear: { color: roles.brand, fontSize: 12, fontWeight: "900", paddingVertical: 8, textDecorationLine: "underline" },
   band: { color: roles.honor, fontSize: 11, fontWeight: "900", left: 0, letterSpacing: 1, position: "absolute", textTransform: "uppercase" },
-  header: { color: roles.muted, fontSize: 11, fontWeight: "900", letterSpacing: 0.4, position: "absolute" },
+  // Feste Höhe über den Karten (bracketLayout.HEADER_H): zwei Zeilen haben Platz, sonst wird die Schrift kleiner.
+  header: { color: roles.muted, fontSize: 11, fontWeight: "900", height: HEADER_H - 2, letterSpacing: 0.4, lineHeight: 13, position: "absolute" },
 });

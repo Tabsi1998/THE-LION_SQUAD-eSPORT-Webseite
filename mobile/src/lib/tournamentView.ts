@@ -1,6 +1,8 @@
 // Turnieransicht der App (#1563): Rundennamen in Alltagsworten, Baum oder Tabelle, Spielplan nach Spieltag oder Station
 // („Nur meine“), Tabellen für Gruppen, Liga und Swiss, Check-in-Ende, Live-Uhr und die Freilos-Zeile. Reine Funktionen.
-import { drawGroupOf, isByeSlot, isCancelled, isDone, isLive, isWalkover, matchFate, sectionGroup, slotDraw, soloAdvance, type BracketMatch } from "./bracketGraph";
+import { DRAW_STATE_TEXT, drawStateOf } from "./advancement";
+import { isByeSlot, isCancelled, isDone, isLive, isWalkover, matchFate, sectionGroup, soloAdvance, type BracketMatch } from "./bracketGraph";
+import { sectionKind } from "./bracketSections";
 import { formatStatus } from "./format";
 
 // ---------------------------------------------------------------------------------------------------- Rundennamen
@@ -14,20 +16,8 @@ const TABLE_FORMATS = new Set(["round_robin", "league", "swiss", "groups"]);
 const HEAT_FORMATS = new Set(["ffa", "battle_royale", "grand_prix", "time_trial", "ffa_custom_bracket"]);
 const GENERIC_ROUND = /^(?:runde|round)\s*(\d+)$/i;
 const SIDE_ROUND = /^(winner|loser)\s+(?:runde|round)\s*(\d+)$/i;
-const LOSER_KEYS = new Set(["lb", "loser", "losers", "lower", "lower_bracket", "loser bracket", "looser"]);
-const FINAL_KEYS = new Set(["gf", "grand_final", "grand final", "final"]);
-const BRONZE_KEYS = new Set(["bronze", "br", "spiel um platz 3", "platz 3"]);
 
 export type TreeKind = "table" | "heats" | "knockout";
-
-function sectionKind(section?: string | null) {
-  const key = String(section || "").trim().toLowerCase();
-  if (BRONZE_KEYS.has(key)) return "bronze";
-  if (FINAL_KEYS.has(key)) return "grand_final";
-  if (LOSER_KEYS.has(key)) return "loser";
-  if (key.startsWith("group_") || key === "round_robin") return "group";
-  return "main";
-}
 
 /** Wie man eine Phase liest: „table“ (Bilanz), „heats“ (Plätze je Runde) oder „knockout“. */
 export function stageKind(stageType?: string | null, format?: string | null, matchType?: string | null): TreeKind {
@@ -222,8 +212,9 @@ export function matchStatusText(match: BracketMatch) {
   const fate = matchFate(match);
   if (fate) return fate.label;
   if (isWalkover(match)) return "kampflos";
-  // Gemischt (#1548): bis zur Auslosung steht am Zielspiel, aus welcher Runde gemischt wird.
-  const waiting = drawGroupOf(match) && !match.draw ? (match.slots || []).find((slot) => slotDraw(slot) && !slot.registration_id && !isByeSlot(slot)) : null;
-  if (waiting) return `gemischt aus ${slotDraw(waiting)?.label || "der Vorrunde"}`;
+  // Gemischt (#1548, vier Modi #1590): bis zur Auslosung sagt das Zielspiel, was passiert - wie Baum und Matchplan im
+  // Web: „wartet auf Auslosung“, „Auslosung bereit“ (Show, der Topf steht), „das Los entscheidet“ (sofort zufällig).
+  const draw = drawStateOf(match);
+  if (draw) return DRAW_STATE_TEXT[draw];
   return formatStatus(match.status);
 }

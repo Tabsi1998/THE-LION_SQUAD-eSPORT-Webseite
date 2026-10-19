@@ -3,20 +3,25 @@ import React from "react";
 import { StyleSheet, Text, View } from "react-native";
 import Animated from "react-native-reanimated";
 import { HEAD_H, LINE_H, META_H, SINGLE_H, type CardModel, type CardRow } from "../../../lib/bracketCards";
-import type { RowMotion } from "../../../lib/bracketMotion";
+import type { CardLift, RowMotion } from "../../../lib/bracketMotion";
 import { colors, radius, roles, surfaces } from "../../../theme";
 import { LiveClock } from "./LiveClock";
 import { CountUp, Flash, PopIn, PressScale, SpringIn } from "./BracketMotion";
-import { breatheStyle, crownStyle } from "./motion";
+import { breatheStyle, crownStyle, liftStyle } from "./motion";
 
 // Eine Karte im Turnierbaum (#1563): ruhig wie im Web (#1561). Kopf mit Kürzel und Stand (läuft: roter Punkt, Station,
 // Uhr), Zeilen mit Name und Ergebnis - Sieger hell, Verlierer leise, „Du“ in Cyan, ausgefallen durchgestrichen. Ein Name
 // ist ein Knopf: Antippen zeigt seinen Weg (leichtes Eindrücken). Feste Höhen (bracketCards) - die Linien enden genau an
 // der Zeile. Neuer Stand: wer weiterkommt, federt in seine Zeile und leuchtet kurz auf; ein frisches Ergebnis zählt hoch,
 // Platzziffern poppen nacheinander (BracketMotion).
+// Auslosung (#1633): steht der Topf der Show-Auslosung, sind die Zielspiele gold umrandet, bis gelost ist. Im Moment
+// selbst hebt sich die Karte sanft an und leuchtet kurz auf (gold: Topf steht, Cyan: ein Name wurde gezogen) - die Karte
+// wird dafür mit dem Schlüssel des Moments neu eingehängt, die Zeilen kommen gestaffelt (SpringIn).
 
 const ARRIVE_GLOW = "rgba(41,182,232,0.22)";
 const RESULT_GLOW = "rgba(255,255,255,0.08)";
+const READY_GLOW = "rgba(255,215,0,0.16)";
+const DRAW_GLOW = "rgba(41,182,232,0.16)";
 
 const FONT_SCALE = 1.3;
 
@@ -29,7 +34,7 @@ type Props = {
   live: { station: string; startedAt: string | null } | null;
   dim: boolean;
   selected: string | null;
-  motion: { rows?: Map<string, RowMotion>; result?: boolean; walkover?: boolean; fate?: boolean; key: string } | null;
+  motion: { rows?: Map<string, RowMotion>; result?: boolean; walkover?: boolean; fate?: boolean; lift?: CardLift; key: string } | null;
   reduce: boolean;
   onOpen: (matchId: string) => void;
   onToggle: (registrationId: string) => void;
@@ -42,8 +47,10 @@ function BracketCardImpl({ model, x, y, w, status, live, dim, selected, motion, 
     // Dein Weg (#1177): der Rest tritt zurück - eine kurze Überblendung, bei „Bewegung reduzieren“ sofort.
     { transitionProperty: "opacity" as const, transitionDuration: reduce ? 1 : 150 },
     model.mine && styles.mine,
+    model.drawState === "ready" && styles.drawReady,
     live && styles.live,
     model.kind === "fate" && styles.fate,
+    motion?.lift ? liftStyle(motion.lift.delay, reduce) : null,
   ];
   if (model.kind === "fate" || model.kind === "bye") {
     const line = model.line;
@@ -75,6 +82,11 @@ function BracketCardImpl({ model, x, y, w, status, live, dim, selected, motion, 
   return (
     <Animated.View style={frame} testID={`bracket-card-${model.id}`}>
       {motion?.result || motion?.walkover ? <Flash key={`flash-${motion.key}`} reduce={reduce} color={RESULT_GLOW} /> : null}
+      {motion?.lift ? (
+        <View pointerEvents="none" style={StyleSheet.absoluteFill} testID={`bracket-lift-${model.id}`}>
+          <Flash key={`lift-${motion.key}`} reduce={reduce} delay={motion.lift.delay + 80} color={motion.lift.tone === "ready" ? READY_GLOW : DRAW_GLOW} />
+        </View>
+      ) : null}
       <PressScale onPress={() => onOpen(model.id)} accessibilityRole="button" accessibilityLabel={`${model.title} öffnen`} innerStyle={styles.head}>
         <Text style={styles.key} numberOfLines={1} maxFontSizeMultiplier={FONT_SCALE}>{model.title}</Text>
         {live ? (
@@ -84,7 +96,7 @@ function BracketCardImpl({ model, x, y, w, status, live, dim, selected, motion, 
             {live.startedAt ? <><Text style={styles.liveText}> · </Text><LiveClock startedAt={live.startedAt} style={styles.liveText} /></> : null}
           </View>
         ) : (
-          <Text style={[styles.status, model.walkover && styles.walkover]} numberOfLines={1} maxFontSizeMultiplier={FONT_SCALE}>{status}</Text>
+          <Text style={[styles.status, model.walkover && styles.walkover, model.drawState === "ready" && styles.statusReady]} numberOfLines={1} maxFontSizeMultiplier={FONT_SCALE}>{status}</Text>
         )}
       </PressScale>
       {model.kind === "heat" ? <Text style={styles.meta} numberOfLines={1} maxFontSizeMultiplier={FONT_SCALE}>{model.text.meta}</Text> : null}
@@ -189,6 +201,7 @@ const styles = StyleSheet.create({
     position: "absolute",
   },
   mine: { borderColor: "rgba(41,182,232,0.6)" },
+  drawReady: { borderColor: "rgba(255,215,0,0.5)" },
   live: { borderColor: "rgba(255,59,48,0.6)" },
   fate: { backgroundColor: "transparent", borderColor: "rgba(255,255,255,0.12)", borderStyle: "dashed" },
   fill: { flex: 1 },
@@ -205,6 +218,7 @@ const styles = StyleSheet.create({
   key: { color: roles.muted, flexShrink: 1, fontSize: 11, fontWeight: "900", letterSpacing: 0.6 },
   status: { color: roles.quiet, flexShrink: 1, fontSize: 11, fontWeight: "700" },
   walkover: { color: roles.warn },
+  statusReady: { color: roles.honor },
   liveHead: { alignItems: "center", flexDirection: "row", flexShrink: 1 },
   liveDot: { backgroundColor: roles.live, borderRadius: 3, height: 6, marginRight: 5, width: 6 },
   liveText: { color: roles.live, fontSize: 11, fontWeight: "900" },

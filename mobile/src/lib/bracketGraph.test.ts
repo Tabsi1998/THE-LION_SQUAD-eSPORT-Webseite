@@ -1,6 +1,7 @@
 import fs from "fs";
 import path from "path";
 import {
+  advancementModeOf,
   bracketEdges,
   diffBracket,
   drawRails,
@@ -223,4 +224,39 @@ test.each(CASES.railsPerPhase)("Schienen je Phase getrennt: $state", ({ state, r
     const rail = all.find((candidate) => entry.startsWith(`${candidate.key}:`))!;
     return `${phaseOf(rail.targets[0])} ${rail.group}:${keyOf.get(entry.slice(rail.key.length + 1))}`;
   })).toEqual(expectedPath.rails);
+});
+
+// Vier Modi (#1590, App #1633): dieselben gemeinsamen Fälle wie das Web (frontend/src/lib/bracketCases.test.js) - auf den
+// Bäumen aus frontend/e2e/fixtures/ffaGenerated.json (Los mit secrets, deshalb ohne Namen). Schiene je Platz: sofort
+// zufällig zählt gezogene und offene Plätze, die Show meldet den Topf; je Zuweisung ein eigener Moment.
+const FFA: Record<string, Tree> = JSON.parse(fs.readFileSync(path.join(__dirname, "../../../frontend/e2e/fixtures/ffaGenerated.json"), "utf8"));
+type ModeCases = {
+  railsModes: Array<{ state: string; rails: Array<Record<string, unknown>> }>;
+  diffInstant: Array<{ from: string; to: string; types: string[]; drawIndexes: number[]; railEdgesAfter: number }>;
+};
+const MODES = CASES as unknown as ModeCases;
+
+test.each(MODES.railsModes)("Schiene je Platz: $state", ({ state, rails }) => {
+  expect(drawRails(FFA[state].matches_v2).map(({ group, mode, drawn, ready, assigned, open }) => ({ group, mode, drawn, ready, assigned, open }))).toEqual(rails);
+});
+
+test.each(MODES.diffInstant)("je Zuweisung ein Moment: $from → $to", ({ from, to, types, drawIndexes, railEdgesAfter }) => {
+  const events = diffBracket(FFA[from].matches_v2, FFA[to].matches_v2);
+  expect(events.map((event) => event.type)).toEqual(types);
+  expect(events.filter((event) => event.type === "draw").map((event) => event.index)).toEqual(drawIndexes);
+  expect(bracketEdges(FFA[to].matches_v2).filter((edge) => edge.rail)).toHaveLength(railEdgesAfter);
+  expect(new Set(events.map((event) => event.key)).size).toBe(events.length);
+});
+
+test("Modus am Spiel: neues Feld vor dem alten Schalter, sonst fester Baum", () => {
+  expect(advancementModeOf({ id: "a", settings: { advancement_mode: "instant", randomize_advancement_rounds: true } })).toBe("instant");
+  expect(advancementModeOf({ id: "a", settings: { randomize_advancement_rounds: true } })).toBe("draw_round");
+  expect(advancementModeOf({ id: "a", settings: { advancement_mode: "quatsch" } })).toBe("fixed");
+  expect(advancementModeOf(null)).toBe("fixed");
+});
+
+test("Abschnitt „FINAL“ ist das Grand Final, „BR“ das Spiel um Platz 3 (#1591)", () => {
+  expect(["FINAL", "grand final", "BR"].map(sectionGroup)).toEqual(["final", "final", "bronze"]);
+  const final = (section: string) => ({ id: section, section, round: 4, status: "pending" });
+  expect(finalMatchOf([{ id: "w", section: "WB", round: 3, status: "pending" }, final("FINAL")])?.id).toBe("FINAL");
 });

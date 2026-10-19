@@ -99,9 +99,22 @@ test("„Du“ und lange Namen bekommen Platz", () => {
   expect(mine.mine).toBe(true);
 });
 
-test("gemischt vor der Auslosung: „Platz aus Runde 1“ statt „Sieger aus A“", () => {
+// Wie im Web-Baum (#1591, App #1633): wer kommt, in einer Zeile - „Sieger aus Runde 1“ statt „Platz aus Runde 1“ (mit
+// Rundennamen vom Server bzw. aus dem Baum: „Sieger aus Viertelfinale“, siehe Screen-Test).
+test("gemischt vor der Auslosung: „Sieger aus Runde 1“ statt „Sieger aus A“", () => {
   const { card } = setup("se8_mixed_open");
-  expect(card("E").rows.map((row) => [row.label, row.pending])).toEqual([["Platz aus Runde 1", true], ["Platz aus Runde 1", true]]);
+  expect(card("E").rows.map((row) => [row.label, row.pending])).toEqual([["Sieger aus Runde 1", true], ["Sieger aus Runde 1", true]]);
+  expect(card("E").drawState).toBe("waiting");
   const drawn = setup("se8_mixed_drawn").card("E");
   expect(drawn.rows.every((row) => row.registrationId && !row.pending)).toBe(true);
+});
+
+// Show-Auslosung (#1590, App #1633): steht der Topf, sagen die Plätze „Auslosung bereit“ - wie Web-Baum und TV.
+test("Show-Auslosung bereit: die offenen Plätze sagen „Auslosung bereit“", () => {
+  const FFA = JSON.parse(fs.readFileSync(path.join(__dirname, "../../../frontend/e2e/fixtures/ffaGenerated.json"), "utf8"));
+  const matches: BracketMatch[] = FFA.se8_show_ready.matches_v2;
+  const ctx = { nameOf: () => "", statusOf: () => "", finder: finderFor(matches), edges: bracketEdges(matches), matches, finalId: null, mine: null };
+  const model = cardModel(matches.find((match) => match.match_key === "E")!, ctx);
+  expect(model.rows.map((row) => row.label)).toEqual(["Auslosung bereit", "Auslosung bereit"]);
+  expect(model.drawState).toBe("ready");
 });

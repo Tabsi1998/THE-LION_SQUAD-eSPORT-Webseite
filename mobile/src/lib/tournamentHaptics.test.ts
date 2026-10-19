@@ -16,8 +16,10 @@ const calls = () => [
 ];
 
 test("die Muster der wichtigen Momente", () => {
-  expect(Object.keys(HAPTIC_MOMENTS)).toEqual(["call", "checkIn", "result", "advance", "win"]);
+  expect(Object.keys(HAPTIC_MOMENTS)).toEqual(["call", "checkIn", "result", "advance", "draw", "win"]);
   expect(HAPTIC_MOMENTS.advance.map((step) => step.kind)).toEqual(["medium"]);
+  // Auslosung im offenen Baum (#1633): einmal leicht.
+  expect(HAPTIC_MOMENTS.draw.map((step) => step.kind)).toEqual(["light"]);
   expect(HAPTIC_MOMENTS.call.map((step) => step.kind)).toEqual(["medium", "medium", "medium"]);
   expect(HAPTIC_MOMENTS.checkIn.map((step) => step.kind)).toEqual(["success"]);
   expect(HAPTIC_MOMENTS.result.map((step) => step.kind)).toEqual(["light", "light"]);

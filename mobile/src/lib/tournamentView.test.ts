@@ -155,10 +155,12 @@ test("Status eines Spiels in Worten: entfällt, zusammengelegt, kampflos, läuft
   expect(matchStatusText(byKey("se6_done").G)).toBe("Beendet");
 });
 
-test("gemischt: Zielspiele sagen, woraus gemischt wird - bis zur Auslosung", () => {
+// Vier Modi (#1590, App #1633): wie Baum und Matchplan im Web - „wartet auf Auslosung“, bei der Show „Auslosung bereit“,
+// sofort zufällig „das Los entscheidet“ (die Fälle dazu in advancement.test.ts).
+test("gemischt: Zielspiele sagen, dass sie auf das Los warten - bis zur Auslosung", () => {
   const byKey = (state: string) => Object.fromEntries(TREES[state].matches_v2.map((match) => [match.match_key, match]));
-  expect(matchStatusText(byKey("se8_mixed_open").E)).toBe("gemischt aus Runde 1");
-  expect(matchStatusText(byKey("de8_mixed_r1").LC)).toBe("gemischt aus Winner Runde 2 / Loser Runde 1");
+  expect(matchStatusText(byKey("se8_mixed_open").E)).toBe("wartet auf Auslosung");
+  expect(matchStatusText(byKey("de8_mixed_r1").LC)).toBe("wartet auf Auslosung");
   expect(matchStatusText(byKey("se8_mixed_drawn").E)).toBe("Bereit");
   expect(matchStatusText(byKey("se8_mixed_open").G)).toBe("Ausstehend");
 });
