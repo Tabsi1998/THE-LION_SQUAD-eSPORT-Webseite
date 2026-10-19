@@ -145,6 +145,59 @@ async def test_the_confirmation_is_sent_after_the_lock_is_released(flow, monkeyp
     assert seen == [(anna["id"], "approved", 0, False)], "genau eine Bestätigung, ohne gehaltene Sperre"
 
 
+@pytest.mark.asyncio
+async def test_a_late_wait_list_confirmation_is_dropped_once_the_person_moved_up(flow, monkeypatch):
+    """Warteliste → jemand meldet sich ab, die Person rückt nach („nachgerückt“) → erst dann käme die verspätete
+    Bestätigung „Warteliste“. Sie entfällt: nur die Nachricht zum jetzigen Stand geht hinaus."""
+    from routes import tournament_registration_routes as routes
+
+    tournament = await flow.create_tournament(max_participants=1)
+    ben, anna = await flow.add_user(name="Ben"), await flow.add_user(name="Anna")
+    ben_reg = await flow.register(tournament, ben)
+    sent = []
+
+    async def notify(db, tid, registration, status, *, previous=None, **kwargs):
+        sent.append((registration["user_id"], status, previous))
+
+    monkeypatch.setattr(routes, "_notify_registration", notify)
+    real_after = routes._after_self_registration
+
+    async def ben_signs_off_first(db, tid, reg, me):
+        flow.act_as(ben)
+        response = await flow.client.delete(f"/api/tournaments/{tid}/registrations/{ben_reg['id']}")
+        assert response.status_code == 200, response.text
+        await real_after(db, tid, reg, me)
+
+    monkeypatch.setattr(routes, "_after_self_registration", ben_signs_off_first)
+    body = RegistrationCreate(accept_rules=True, accept_privacy=True)
+
+    reply = await routes.self_register(flow.db, tournament, body, anna, None, via="onsite")
+
+    assert reply["status"] == "waitlist"
+    stored = await flow.db.tournament_registrations.find_one({"id": reply["id"]}, {"_id": 0})
+    assert stored["status"] == "approved"
+    assert sent == [(anna["id"], "approved", "waitlist")], "nur „nachgerückt“, keine verspätete Warteliste-Nachricht"
+
+
+@pytest.mark.asyncio
+async def test_the_confirmation_goes_out_once_per_registration(flow, monkeypatch):
+    from routes import tournament_registration_routes as routes
+
+    tournament = await flow.create_tournament(max_participants=8)
+    anna = await flow.add_user(name="Anna")
+    sent = []
+
+    async def notify(db, tid, registration, status, **kwargs):
+        sent.append(status)
+
+    monkeypatch.setattr(routes, "_notify_registration", notify)
+    reply = await routes.self_register(flow.db, tournament, RegistrationCreate(accept_rules=True, accept_privacy=True),
+                                       anna, None, via="onsite")
+    await routes._after_self_registration(flow.db, tournament["id"], reply, anna)
+
+    assert sent == ["approved"]
+
+
 def test_the_registration_wait_is_configurable_and_bounded():
     from routes.tournament_common import registration_wait_seconds
 

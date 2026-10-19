@@ -658,8 +658,16 @@ async def _after_self_registration(db, tid: str, reg: dict, me: dict) -> None:
     für Platz, Vorschau und Startgeld, und die nächste in der Schlange kommt früher dran."""
     # Bestätigung (#1133): „Du bist dabei“ oder „Du stehst auf der Warteliste“ - im Postfach und, wenn erlaubt, per Mail;
     # bei Teams auch an Teamleitung und Co-Leitung.
-    registration = {key: value for key, value in reg.items() if key not in RESPONSE_ONLY_KEYS}
-    await _notify_registration(db, tid, registration, reg["status"], actor_id=me.get("id"))
+    # Ohne Sperre kann sich der Stand inzwischen geändert haben - etwa von der Warteliste nachgerückt, mit eigener
+    # Nachricht „nachgerückt“. Die Bestätigung geht daher nur hinaus, solange die Anmeldung noch diesen Stand hat, und
+    # je Anmeldung nur einmal: Stand prüfen und als gemeldet markieren in einem Schritt.
+    claimed = await db.tournament_registrations.update_one(
+        {"id": reg["id"], "status": reg["status"], "notified_status": {"$exists": False}},
+        {"$set": {"notified_status": reg["status"]}},
+    )
+    if getattr(claimed, "modified_count", 0):
+        registration = {key: value for key, value in reg.items() if key not in RESPONSE_ONLY_KEYS}
+        await _notify_registration(db, tid, registration, reg["status"], actor_id=me.get("id"))
     try:
         from badges import on_tournament_registered
         await on_tournament_registered(me["id"], tid)
