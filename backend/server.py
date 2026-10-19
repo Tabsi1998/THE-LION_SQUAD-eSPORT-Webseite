@@ -52,6 +52,12 @@ from routes.f1_routes import router as f1_router
 from routes.event_program_routes import router as event_program_router
 from routes.station_routes import router as station_router
 from routes.news_routes import router as news_router
+from routes.reference_series_routes import router as reference_series_router
+from routes.reference_round_routes import router as reference_round_router
+from routes.reference_participant_routes import router as reference_participant_router
+from routes.reference_result_routes import router as reference_result_router
+from routes.reference_staff_routes import router as reference_staff_router
+from routes.reference_series_public_routes import router as reference_series_public_router
 from routes.mobile_routes import router as mobile_router
 from routes.admin_routes import router as admin_router
 from routes.ops_routes import router as ops_router
@@ -309,6 +315,13 @@ app.include_router(match_router)
 app.include_router(f1_router)
 app.include_router(station_router)
 app.include_router(news_router)
+app.include_router(reference_series_router)
+# Externe Serien (#1741): je Paket ein eigener Router (Kalender, Zuordnung, Eintragen, Rechte, öffentlich).
+app.include_router(reference_round_router)
+app.include_router(reference_participant_router)
+app.include_router(reference_result_router)
+app.include_router(reference_staff_router)
+app.include_router(reference_series_public_router)
 app.include_router(mobile_router)
 app.include_router(admin_router)
 app.include_router(ops_router)

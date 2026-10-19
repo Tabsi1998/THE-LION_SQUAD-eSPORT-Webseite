@@ -1452,6 +1452,12 @@ async def get_reference(rid: str, user: dict | None = Depends(get_optional_user)
     return (await _enrich_references(visible))[0]
 
 
+async def _check_reference_series(db, series_id: str | None) -> None:
+    """Externe Serien (#1741): eine Referenz darf zu einer Serie gehören - dann muss es die Serie geben."""
+    if series_id and not await db.reference_series.find_one({"id": series_id}, {"_id": 1}):
+        raise HTTPException(404, "Serie nicht gefunden.")
+
+
 @router.post("/references")
 async def create_reference(body: ReferenceCreate, me: dict = Depends(require_area("content"))):
     db = get_db()
@@ -1459,6 +1465,7 @@ async def create_reference(body: ReferenceCreate, me: dict = Depends(require_are
     doc["partner_ids"] = await partner_pages.clean_partner_ids(db, doc.get("partner_ids"))
     if doc.get("game_id") and not await db.games.find_one({"id": doc["game_id"]}, {"id": 1}):
         raise HTTPException(404, "Spiel nicht gefunden.")
+    await _check_reference_series(db, doc.get("series_id"))
     await _freeze_reference_members(db, doc)
     doc["id"] = new_id()
     doc["created_at"] = now_utc().isoformat()
@@ -1475,7 +1482,7 @@ async def update_reference(rid: str, body: ReferenceUpdate, me: dict = Depends(r
     nullable_fields = {
         "organizer", "league", "season", "format", "game_id", "game_name", "team_name", "placement",
         "placement_label", "participant_count", "team_count", "start_date", "end_date", "location",
-        "external_url", "bracket_url", "match_url", "result_url", "description", "highlights",
+        "external_url", "bracket_url", "match_url", "result_url", "description", "highlights", "series_id",
     }
     raw = body.model_dump(exclude_unset=True)
     updates = {k: v for k, v in raw.items() if v is not None or k in nullable_fields}
@@ -1483,6 +1490,7 @@ async def update_reference(rid: str, body: ReferenceUpdate, me: dict = Depends(r
         updates["partner_ids"] = await partner_pages.clean_partner_ids(db, updates["partner_ids"])
     if updates.get("game_id") and not await db.games.find_one({"id": updates["game_id"]}, {"id": 1}):
         raise HTTPException(404, "Spiel nicht gefunden.")
+    await _check_reference_series(db, updates.get("series_id"))
     if "entries" in updates or any(key in updates for key in LEGACY_ENTRY_FIELDS):
         existing = await db.references.find_one({"id": rid}, {"_id": 0})
         if not existing:

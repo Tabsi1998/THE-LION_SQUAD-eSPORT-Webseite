@@ -61,6 +61,15 @@ async def migrate_deleted_account_leftovers(db) -> str:
     return f"{accounts} deleted accounts cleaned, {images} images removed"
 
 
+async def migrate_points_scheme_templates(db) -> str:
+    """Externe Serien (#1741): die Punkteschema-Vorlagen als Daten in den Einstellungen (``points_schemes``). Angelegt
+    wird nur, was fehlt - eine bearbeitete Vorlage bleibt; Serien, Termine oder Ergebnisse legt die Migration nie an."""
+    from services import reference_series
+
+    added = await reference_series.add_missing_templates(db)
+    return f"{added} points scheme templates added"
+
+
 MIGRATIONS = (
     (1, "encrypt_legacy_integration_credentials", migrate_plaintext_secrets),
     (2, "team_leader_role_to_player", migrate_team_leader_role),
@@ -68,6 +77,7 @@ MIGRATIONS = (
     (4, "deleted_account_leftovers", migrate_deleted_account_leftovers),
     # #1029: dieselben Schritte noch einmal - die Löschung räumt seither mehr Sammlungen auf (services/personal_data.py).
     (5, "deleted_account_leftovers_1029", migrate_deleted_account_leftovers),
+    (6, "reference_points_schemes", migrate_points_scheme_templates),
 )
 
 

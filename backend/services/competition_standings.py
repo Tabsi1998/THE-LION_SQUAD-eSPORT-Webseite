@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from services.match_winner import won_by
 from services.round_labels import section_kind
+from services.scoring_rules import rank_with_ties
 
 
 TERMINAL_MATCH_STATUSES = {"completed", "forfeit"}
@@ -285,19 +286,8 @@ def swiss_standings(matches: list[dict], registrations: list[dict]) -> list[dict
     return _with_form_and_movement(_swiss_rows, matches, registrations)
 
 
-def _rank_with_ties(rows: list[dict], key) -> None:
-    """Wettbewerbsrang (#1593): wer in jedem Kriterium gleich steht, teilt den Platz - 1, 2, 2, 4.
-
-    Sonst hinge der Platz an der Reihenfolge der Anmeldungen, und Podest und Pfeile wären zufällig.
-    """
-    rows.sort(key=key, reverse=True)
-    previous = None
-    for index, row in enumerate(rows, start=1):
-        value = key(row)
-        if value != previous:
-            rank = index
-            previous = value
-        row["rank"] = rank
+# Der Wettbewerbsrang (#1593) wohnt seit #1741 im gemeinsamen Rechenkern; der alte Name bleibt als Weiterleitung.
+_rank_with_ties = rank_with_ties
 
 
 FORM_LENGTH = 5

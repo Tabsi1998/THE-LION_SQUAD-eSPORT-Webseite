@@ -1471,6 +1471,8 @@ class ReferenceCreate(BaseModel):
     status: ReferenceStatus = "completed"
     is_active: bool = True
     order_index: int = 0
+    # Externe Serien (#1741): optional gehört die Teilnahme zu einer Serie (Stufe 2: Saisonende als Referenz).
+    series_id: Optional[str] = None
 
 
 class ReferenceUpdate(BaseModel):
@@ -1506,6 +1508,267 @@ class ReferenceUpdate(BaseModel):
     status: Optional[ReferenceStatus] = None
     is_active: Optional[bool] = None
     order_index: Optional[int] = None
+    series_id: Optional[str] = None
+
+
+# ---------- Externe Serien (#1741): Spur, Serie, Termine, Teilnehmer, Ergebnisse, Stände, Aliase, Captains ----------
+# Eine Spur (``reference_lineages``) ist die Klammer, darunter je Saison und Stufe eine Serie (``reference_series``).
+# Gerechnet wird mit ``services/scoring_rules.py`` und ``services/series_standings.py``; Routen in
+# ``routes/reference_series_routes.py``. Alle Werte einer Serie sind einstellbar, nichts ist fest verdrahtet.
+ReferenceSeriesKind = Literal["series", "racing", "team_league"]  # Turnierserie, Rennliga, Team-Liga
+ReferenceSeriesStatus = Literal["planned", "active", "completed", "archived"]
+ReferenceSeriesOpenStatus = Literal["planned", "active", "completed"]
+ReferenceSeriesPublishMode = Literal["review", "direct"]  # Captain: Entwurf mit Freigabe des Vorstands oder direkt
+ReferenceRoundStatus = Literal["planned", "scored", "cancelled", "postponed"]
+ReferenceRoundKind = Literal["regular", "final"]
+ReferenceParticipantKind = Literal["person", "team"]
+ReferenceParticipantLink = Literal["member", "guest", "external"]
+ReferenceResultMark = Literal["dnf", "dns", "dsq", "fastest_lap", "pole"]
+ReferencePointsSource = Literal["scheme", "organizer", "manual"]
+ReferenceResultStatus = Literal["draft", "published"]
+ReferenceStandingScope = Literal["drivers", "teams", "table"]
+ReferenceAliasTarget = Literal["member", "guest"]
+ReferenceAliasSource = Literal["manual", "game_id", "suggestion", "import"]
+ReferenceStaffRole = Literal["captain"]
+
+_CLOCK_RE = re.compile(r"^([01]\d|2[0-3]):[0-5]\d$")
+
+
+def _series_rules(value: Optional[dict]) -> Optional[dict]:
+    """Regeln werden hier nur geprüft; vervollständigt (Vorlage + Standards) werden sie in der Route."""
+    if value is None:
+        return None
+    from services.scoring_rules import normalize_rules
+
+    normalize_rules(value)
+    return value
+
+
+def _clock(value: Optional[str]) -> Optional[str]:
+    text = (value or "").strip()
+    if not text:
+        return None
+    if not _CLOCK_RE.match(text):
+        raise ValueError("Uhrzeit als HH:MM (Wiener Zeit), etwa 20:30.")
+    return text
+
+
+class ReferenceLineageCreate(BaseModel):
+    """Spur: die Klammer über den Saisons, etwa „Lion Racing F1“ oder ein Monatscup."""
+    title: str = Field(min_length=1, max_length=160)
+    kind: ReferenceSeriesKind
+    organizer: Optional[str] = Field(default=None, max_length=160)
+    label: Optional[str] = Field(default=None, max_length=60)  # Spur-Bezeichnung: 4vs4, F1 …
+    game_id: Optional[str] = None
+    game_name: Optional[str] = Field(default=None, max_length=120)
+    partner_ids: List[str] = Field(default_factory=list)
+    external_url: Optional[str] = Field(default=None, max_length=500)
+    description: Optional[str] = Field(default=None, max_length=4000)
+    visibility: ReferenceVisibility = "public"
+    slug: Optional[str] = Field(default=None, max_length=90)
+    order_index: int = 0
+
+
+class ReferenceLineageUpdate(BaseModel):
+    title: Optional[str] = Field(default=None, min_length=1, max_length=160)
+    kind: Optional[ReferenceSeriesKind] = None
+    organizer: Optional[str] = Field(default=None, max_length=160)
+    label: Optional[str] = Field(default=None, max_length=60)
+    game_id: Optional[str] = None
+    game_name: Optional[str] = Field(default=None, max_length=120)
+    partner_ids: Optional[List[str]] = None
+    external_url: Optional[str] = Field(default=None, max_length=500)
+    description: Optional[str] = Field(default=None, max_length=4000)
+    visibility: Optional[ReferenceVisibility] = None
+    slug: Optional[str] = Field(default=None, max_length=90)
+    order_index: Optional[int] = None
+
+
+class ReferenceSeriesCreate(BaseModel):
+    """Eine Saison einer Spur in einer Stufe. ``points_scheme_id`` kopiert eine Vorlage, ``rules`` überschreibt sie."""
+    lineage_id: str
+    season: str = Field(min_length=1, max_length=60)
+    tier: Optional[str] = Field(default=None, max_length=60)  # Ligastufe, etwa „Division 1“
+    title: Optional[str] = Field(default=None, max_length=160)
+    status: ReferenceSeriesOpenStatus = "planned"
+    publish_mode: ReferenceSeriesPublishMode = "review"
+    default_weekday: Optional[int] = Field(default=None, ge=0, le=6)  # 0 = Montag
+    default_time: Optional[str] = None  # HH:MM, Wiener Zeit
+    points_scheme_id: Optional[str] = None
+    rules: Optional[Dict[str, Any]] = None
+    team_name: Optional[str] = Field(default=None, max_length=120)  # das eigene Team (Team-Liga, Teamwertung)
+    official_table_url: Optional[str] = Field(default=None, max_length=500)
+    external_url: Optional[str] = Field(default=None, max_length=500)
+    visibility: ReferenceVisibility = "public"
+    description: Optional[str] = Field(default=None, max_length=4000)
+    reference_id: Optional[str] = None  # Stufe 2: Saisonende als Referenz (#1750)
+    order_index: int = 0
+
+    @field_validator("rules")
+    @classmethod
+    def _rules(cls, value):
+        return _series_rules(value)
+
+    @field_validator("default_time")
+    @classmethod
+    def _time(cls, value):
+        return _clock(value)
+
+
+class ReferenceSeriesUpdate(BaseModel):
+    season: Optional[str] = Field(default=None, min_length=1, max_length=60)
+    tier: Optional[str] = Field(default=None, max_length=60)
+    title: Optional[str] = Field(default=None, max_length=160)
+    status: Optional[ReferenceSeriesStatus] = None
+    publish_mode: Optional[ReferenceSeriesPublishMode] = None
+    default_weekday: Optional[int] = Field(default=None, ge=0, le=6)
+    default_time: Optional[str] = None
+    rules: Optional[Dict[str, Any]] = None
+    rules_note: Optional[str] = Field(default=None, max_length=500)  # Hinweis zur Regeländerung
+    team_name: Optional[str] = Field(default=None, max_length=120)
+    official_table_url: Optional[str] = Field(default=None, max_length=500)
+    external_url: Optional[str] = Field(default=None, max_length=500)
+    visibility: Optional[ReferenceVisibility] = None
+    description: Optional[str] = Field(default=None, max_length=4000)
+    reference_id: Optional[str] = None
+    order_index: Optional[int] = None
+
+    @field_validator("rules")
+    @classmethod
+    def _rules(cls, value):
+        return _series_rules(value)
+
+    @field_validator("default_time")
+    @classmethod
+    def _time(cls, value):
+        return _clock(value)
+
+
+class ReferenceRoundCreate(BaseModel):
+    """Termin einer Serie (#1742): Zeit in UTC, der Vereinstag in Wien wird daraus gerechnet."""
+    order: int = Field(default=0, ge=0)
+    code: Optional[str] = Field(default=None, max_length=20)  # Kürzel, etwa „R3“ oder „ST5“
+    title: Optional[str] = Field(default=None, max_length=160)
+    venue: Optional[str] = Field(default=None, max_length=160)  # Strecke oder Ort
+    starts_at: Optional[datetime] = None
+    status: ReferenceRoundStatus = "planned"
+    original_starts_at: Optional[datetime] = None  # bei „verschoben“: der ursprüngliche Termin
+    kind: ReferenceRoundKind = "regular"
+    counts: bool = True  # zählt zur Wertung
+    opponent: Optional[str] = Field(default=None, max_length=120)  # Team-Liga
+    note: Optional[str] = Field(default=None, max_length=1000)
+
+
+class ReferenceRoundUpdate(BaseModel):
+    order: Optional[int] = Field(default=None, ge=0)
+    code: Optional[str] = Field(default=None, max_length=20)
+    title: Optional[str] = Field(default=None, max_length=160)
+    venue: Optional[str] = Field(default=None, max_length=160)
+    starts_at: Optional[datetime] = None
+    status: Optional[ReferenceRoundStatus] = None
+    original_starts_at: Optional[datetime] = None
+    kind: Optional[ReferenceRoundKind] = None
+    counts: Optional[bool] = None
+    opponent: Optional[str] = Field(default=None, max_length=120)
+    note: Optional[str] = Field(default=None, max_length=1000)
+
+
+class ReferenceParticipantCreate(BaseModel):
+    """Teilnehmer einer Serie (#1743): der Name wie beim Veranstalter, verknüpft mit einem Vereinsprofil, als Gast oder
+    extern. Fremde erscheinen nur in Tabellen und lassen sich ausblenden (Entscheidung 2)."""
+    name: str = Field(min_length=1, max_length=120)
+    start_number: Optional[str] = Field(default=None, max_length=10)
+    default_team: Optional[str] = Field(default=None, max_length=120)
+    kind: ReferenceParticipantKind = "person"
+    link: ReferenceParticipantLink = "external"
+    profile_id: Optional[str] = None  # Vereinsprofil (club_member_profiles), nur bei „member“
+    guest_name: Optional[str] = Field(default=None, max_length=120)
+    is_club_member: bool = False
+    name_hidden: bool = False
+
+
+class ReferenceParticipantUpdate(BaseModel):
+    name: Optional[str] = Field(default=None, min_length=1, max_length=120)
+    start_number: Optional[str] = Field(default=None, max_length=10)
+    default_team: Optional[str] = Field(default=None, max_length=120)
+    kind: Optional[ReferenceParticipantKind] = None
+    link: Optional[ReferenceParticipantLink] = None
+    profile_id: Optional[str] = None
+    guest_name: Optional[str] = Field(default=None, max_length=120)
+    is_club_member: Optional[bool] = None
+    name_hidden: Optional[bool] = None
+
+
+class ReferenceResultRow(BaseModel):
+    """Zeile eines Ergebnisblatts (#1744): Platz, Team in diesem Rennen, Punkte samt Herkunft, Marken, Strafpunkte."""
+    participant_id: str
+    place: Optional[int] = Field(default=None, ge=1, le=1000)
+    team: Optional[str] = Field(default=None, max_length=120)
+    points: Optional[float] = Field(default=None, ge=-10000, le=10000)
+    points_source: ReferencePointsSource = "scheme"
+    marks: List[ReferenceResultMark] = Field(default_factory=list)
+    penalty_points: float = Field(default=0, ge=0, le=10000)
+    note: Optional[str] = Field(default=None, max_length=300)
+
+
+class ReferenceMatchMap(BaseModel):
+    name: str = Field(min_length=1, max_length=80)
+    home_score: float = Field(ge=0, le=RESULT_MAX_SCORE)
+    away_score: float = Field(ge=0, le=RESULT_MAX_SCORE)
+
+
+class ReferenceMatch(BaseModel):
+    """Spiel einer Team-Liga (#1747): das eigene Spiel mit Maps und Aufstellung (Teilnehmer-Kennungen)."""
+    home: str = Field(min_length=1, max_length=120)
+    away: str = Field(min_length=1, max_length=120)
+    home_score: float = Field(ge=0, le=RESULT_MAX_SCORE)
+    away_score: float = Field(ge=0, le=RESULT_MAX_SCORE)
+    maps: List[ReferenceMatchMap] = Field(default_factory=list)
+    lineup: List[str] = Field(default_factory=list)
+
+
+class ReferenceOfficialTableRow(BaseModel):
+    """Zeile der Tabelle laut Veranstalter (Entscheidung 3)."""
+    team: str = Field(min_length=1, max_length=120)
+    rank: Optional[int] = Field(default=None, ge=1)
+    played: Optional[int] = Field(default=None, ge=0)
+    won: Optional[int] = Field(default=None, ge=0)
+    drawn: Optional[int] = Field(default=None, ge=0)
+    lost: Optional[int] = Field(default=None, ge=0)
+    score_for: Optional[float] = Field(default=None, ge=0)
+    score_against: Optional[float] = Field(default=None, ge=0)
+    score_diff: Optional[float] = None
+    points: Optional[float] = None
+
+
+class ReferenceRoundResultSave(BaseModel):
+    """Genau ein Blatt je Termin. ``expected_version`` schützt vor gleichzeitigem Überschreiben (409)."""
+    rows: List[ReferenceResultRow] = Field(default_factory=list)
+    matches: List[ReferenceMatch] = Field(default_factory=list)
+    official_totals: Dict[str, float] = Field(default_factory=dict)  # offizieller Stand je Teilnehmer nach der Runde
+    official_team_totals: Dict[str, float] = Field(default_factory=dict)
+    official_table: List[ReferenceOfficialTableRow] = Field(default_factory=list)
+    status: ReferenceResultStatus = "draft"
+    expected_version: Optional[int] = Field(default=None, ge=0)
+    note: Optional[str] = Field(default=None, max_length=1000)
+
+
+class ReferenceAliasCreate(BaseModel):
+    """Alias über alle Serien (#1743): ein Name (optional je Spiel) zeigt auf ein Vereinsprofil oder einen Gast."""
+    name: str = Field(min_length=1, max_length=120)
+    game_id: Optional[str] = None
+    target: ReferenceAliasTarget
+    profile_id: Optional[str] = None
+    guest_name: Optional[str] = Field(default=None, max_length=120)
+    source: ReferenceAliasSource = "manual"
+
+
+class ReferenceSeriesStaffCreate(BaseModel):
+    """Captain einer Serie (#1749), aufgebaut wie die Turnier-Leitung; mit Ablauf."""
+    user_id: str
+    role: ReferenceStaffRole = "captain"
+    can_publish: bool = False
+    expires_at: Optional[datetime] = None
 
 
 # ---------- Gallery ----------

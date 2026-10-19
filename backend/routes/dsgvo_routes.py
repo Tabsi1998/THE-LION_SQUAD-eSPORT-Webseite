@@ -108,6 +108,23 @@ def _value(make):
     return ("value", make)
 
 
+# Externe Serien (#1741): Teilnahmen und Aliase hängen an Vereinsprofilen, nicht am Konto. In die Auskunft kommt, was
+# an einem eigenen Profil hängt - ohne die Kennung, wer einen Alias bestätigt hat.
+SERIES_PARTICIPATION = ("id", "series_id", "name", "start_number", "default_team", "kind", "link", "profile_id",
+                        "is_club_member", "name_hidden", "created_at", "updated_at")
+SERIES_ALIAS = ("id", "name", "name_normalized", "game_id", "target", "profile_id", "source", "confirmed_at", "created_at")
+
+
+def _own_profile_rows(db, user_id: str, collection, fields: tuple[str, ...]):
+    async def produce():
+        own = [row["id"] async for row in _paged(db.club_member_profiles, {"user_id": user_id}) if row.get("id")]
+        if not own:
+            return
+        async for row in _paged(collection, {"profile_id": {"$in": own}}):
+            yield {key: row[key] for key in fields if key in row}
+    return ("list", produce)
+
+
 def _chat_rows(db, user_id: str):
     async def own_chat_messages():
         for name in ("team_chat_messages", "match_chat_messages", "tournament_chat_messages"):
@@ -240,6 +257,10 @@ async def _user_data_sections(db, user_id: str) -> list[tuple[str, tuple]]:
         ("schedule_proposals", _rows(db.match_schedule_proposals, {"actor_user_id": user_id}, _pick(*PROPOSAL))),
         ("match_proof_photos", _rows(db.match_proof_photos, {"owner_id": user_id}, _pick(*PROOF_PHOTO))),
         ("f1_staff", _rows(db.f1_staff_assignments, me)),
+        # Captain einer externen Serie (#1741, #1749): je Serie die Aufgabe, ob veröffentlicht werden darf, und der Ablauf.
+        ("reference_series_staff", _rows(db.reference_series_staff, me)),
+        ("reference_participations", _own_profile_rows(db, user_id, db.reference_participants, SERIES_PARTICIPATION)),
+        ("reference_aliases", _own_profile_rows(db, user_id, db.reference_aliases, SERIES_ALIAS)),
         ("season_standings", _rows(db.season_standings, me)),
         ("season_rank_history", _rows(db.season_rank_snapshots, me)),
         ("upload_events", _rows(db.upload_events, {"owner_id": user_id}, _pick(*UPLOAD_EVENT))),

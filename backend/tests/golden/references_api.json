@@ -1,0 +1,466 @@
+{
+ "by_game": {
+  "items": [
+   {
+    "best_placement": 2,
+    "display_title": "Herbst Cup Season 3",
+    "entries": [
+     {
+      "id": "ref-alt-1",
+      "kind": "team",
+      "lineup": [
+       "Max Muster"
+      ],
+      "lineup_members": [
+       {
+        "avatar_url": "/a.webp",
+        "display_name": "Anni",
+        "profile_id": "p-anna",
+        "profile_url": "/members/anni"
+       }
+      ],
+      "medal": "silver",
+      "member_profile_ids": [
+       "p-anna"
+      ],
+      "participant_count": 16,
+      "placement": 2,
+      "placement_label": null,
+      "team_count": null,
+      "team_id": null,
+      "team_name": "Löwen Probe"
+     }
+    ],
+    "format": "HC",
+    "game": {
+     "cover_url": null,
+     "display_name": "Rocket League",
+     "id": "g-rl",
+     "logo_url": "/logos/rl.webp",
+     "name": "Rocket League",
+     "short_name": "RL",
+     "slug": "rocket-league"
+    },
+    "game_id": "g-rl",
+    "game_name": "Rocket League",
+    "id": "ref-alt",
+    "is_active": true,
+    "league": "Liga X",
+    "lineup": [
+     "Max Muster"
+    ],
+    "lineup_members": [
+     {
+      "avatar_url": "/a.webp",
+      "display_name": "Anni",
+      "profile_id": "p-anna",
+      "profile_url": "/members/anni"
+     }
+    ],
+    "medal": "silver",
+    "member_profile_ids": [
+     "p-anna"
+    ],
+    "mode": "online",
+    "order_index": 0,
+    "organizer": "Probe Liga",
+    "participant_count": 16,
+    "partners": [],
+    "placement": 2,
+    "platforms": [
+     "PS"
+    ],
+    "reference_meta": {
+     "platforms": [
+      {
+       "key": "PS",
+       "label": "PlayStation"
+      }
+     ],
+     "title_segments": [
+      "HC",
+      "Herbst Cup",
+      "Liga X"
+     ]
+    },
+    "season": "Season 3",
+    "start_date": "2025-11-02",
+    "status": "completed",
+    "team_name": "Löwen Probe",
+    "title": "[PS] HC | Liga X | Herbst Cup Season 3",
+    "visibility": "public"
+   }
+  ],
+  "summary": {
+   "active": 0,
+   "bronze": 0,
+   "entries": 1,
+   "games": 1,
+   "gold": 0,
+   "planned": 0,
+   "podiums": 1,
+   "seasons": [
+    "Season 3"
+   ],
+   "silver": 1,
+   "top10": 1,
+   "total": 1
+  }
+ },
+ "detail": {
+  "best_placement": 1,
+  "display_title": "Winter Open",
+  "end_date": "2026-01-11",
+  "entries": [
+   {
+    "id": "e1",
+    "kind": "solo",
+    "lineup": [],
+    "lineup_members": [
+     {
+      "avatar_url": "/a.webp",
+      "display_name": "Anni",
+      "profile_id": "p-anna",
+      "profile_url": "/members/anni"
+     }
+    ],
+    "medal": "gold",
+    "member_profile_ids": [
+     "p-anna"
+    ],
+    "participant_count": 32,
+    "placement": 1
+   },
+   {
+    "id": "e2",
+    "kind": "team",
+    "lineup": [
+     "Gast Gustav"
+    ],
+    "lineup_members": [
+     {
+      "avatar_url": null,
+      "display_name": "Benny",
+      "profile_id": "p-ben",
+      "profile_url": "/members/benny"
+     }
+    ],
+    "medal": null,
+    "member_profile_ids": [
+     "p-ben"
+    ],
+    "placement": 5,
+    "team_count": 8,
+    "team_name": "Löwen Zwei"
+   }
+  ],
+  "external_url": "https://example.test/winter",
+  "format": "CORE",
+  "game": {
+   "cover_url": null,
+   "display_name": "Call of Duty: Black Ops",
+   "id": "g-bo",
+   "logo_url": null,
+   "name": "Black Ops",
+   "short_name": null,
+   "slug": "black-ops"
+  },
+  "game_id": "g-bo",
+  "game_name": "Call of Duty: Black Ops",
+  "id": "ref-eintraege",
+  "is_active": true,
+  "league": "Liga A",
+  "lineup_members": [],
+  "medal": "gold",
+  "mode": "hybrid",
+  "order_index": 1,
+  "organizer": "Probe Verein",
+  "partner_ids": [
+   "partner-1"
+  ],
+  "partners": [
+   {
+    "id": "partner-1",
+    "kind": "verein",
+    "logo_url": "/logos/probe.webp",
+    "name": "Probe Verein",
+    "slug": "probe-verein"
+   }
+  ],
+  "placement": 1,
+  "platforms": [
+   "PC"
+  ],
+  "reference_meta": {
+   "platforms": [
+    {
+     "key": "PC",
+     "label": "PC"
+    }
+   ],
+   "title_segments": [
+    "Winter Open"
+   ]
+  },
+  "season": "Season 5",
+  "start_date": "2026-01-10",
+  "status": "active",
+  "title": "Winter Open",
+  "visibility": "public"
+ },
+ "list": {
+  "items": [
+   {
+    "best_placement": 1,
+    "display_title": "Winter Open",
+    "end_date": "2026-01-11",
+    "entries": [
+     {
+      "id": "e1",
+      "kind": "solo",
+      "lineup": [],
+      "lineup_members": [
+       {
+        "avatar_url": "/a.webp",
+        "display_name": "Anni",
+        "profile_id": "p-anna",
+        "profile_url": "/members/anni"
+       }
+      ],
+      "medal": "gold",
+      "member_profile_ids": [
+       "p-anna"
+      ],
+      "participant_count": 32,
+      "placement": 1
+     },
+     {
+      "id": "e2",
+      "kind": "team",
+      "lineup": [
+       "Gast Gustav"
+      ],
+      "lineup_members": [
+       {
+        "avatar_url": null,
+        "display_name": "Benny",
+        "profile_id": "p-ben",
+        "profile_url": "/members/benny"
+       }
+      ],
+      "medal": null,
+      "member_profile_ids": [
+       "p-ben"
+      ],
+      "placement": 5,
+      "team_count": 8,
+      "team_name": "Löwen Zwei"
+     }
+    ],
+    "external_url": "https://example.test/winter",
+    "format": "CORE",
+    "game": {
+     "cover_url": null,
+     "display_name": "Call of Duty: Black Ops",
+     "id": "g-bo",
+     "logo_url": null,
+     "name": "Black Ops",
+     "short_name": null,
+     "slug": "black-ops"
+    },
+    "game_id": "g-bo",
+    "game_name": "Call of Duty: Black Ops",
+    "id": "ref-eintraege",
+    "is_active": true,
+    "league": "Liga A",
+    "lineup_members": [],
+    "medal": "gold",
+    "mode": "hybrid",
+    "order_index": 1,
+    "organizer": "Probe Verein",
+    "partner_ids": [
+     "partner-1"
+    ],
+    "partners": [
+     {
+      "id": "partner-1",
+      "kind": "verein",
+      "logo_url": "/logos/probe.webp",
+      "name": "Probe Verein",
+      "slug": "probe-verein"
+     }
+    ],
+    "placement": 1,
+    "platforms": [
+     "PC"
+    ],
+    "reference_meta": {
+     "platforms": [
+      {
+       "key": "PC",
+       "label": "PC"
+      }
+     ],
+     "title_segments": [
+      "Winter Open"
+     ]
+    },
+    "season": "Season 5",
+    "start_date": "2026-01-10",
+    "status": "active",
+    "title": "Winter Open",
+    "visibility": "public"
+   },
+   {
+    "best_placement": null,
+    "display_title": "Sommer Liga",
+    "entries": [
+     {
+      "id": "ref-ohne-platz-1",
+      "kind": "solo",
+      "lineup": [
+       "Lea Leer"
+      ],
+      "lineup_members": [],
+      "medal": null,
+      "member_profile_ids": [],
+      "participant_count": null,
+      "placement": null,
+      "placement_label": null,
+      "team_count": null,
+      "team_id": null,
+      "team_name": null
+     }
+    ],
+    "format": null,
+    "game_name": "Mario Kart",
+    "id": "ref-ohne-platz",
+    "is_active": true,
+    "league": null,
+    "lineup": [
+     "Lea Leer"
+    ],
+    "lineup_members": [],
+    "medal": null,
+    "partners": [],
+    "platforms": [],
+    "reference_meta": {
+     "platforms": [],
+     "title_segments": [
+      "Sommer Liga"
+     ]
+    },
+    "season": null,
+    "start_date": "2026-07-01",
+    "status": "planned",
+    "title": "Sommer Liga",
+    "visibility": "public"
+   },
+   {
+    "best_placement": 2,
+    "display_title": "Herbst Cup Season 3",
+    "entries": [
+     {
+      "id": "ref-alt-1",
+      "kind": "team",
+      "lineup": [
+       "Max Muster"
+      ],
+      "lineup_members": [
+       {
+        "avatar_url": "/a.webp",
+        "display_name": "Anni",
+        "profile_id": "p-anna",
+        "profile_url": "/members/anni"
+       }
+      ],
+      "medal": "silver",
+      "member_profile_ids": [
+       "p-anna"
+      ],
+      "participant_count": 16,
+      "placement": 2,
+      "placement_label": null,
+      "team_count": null,
+      "team_id": null,
+      "team_name": "Löwen Probe"
+     }
+    ],
+    "format": "HC",
+    "game": {
+     "cover_url": null,
+     "display_name": "Rocket League",
+     "id": "g-rl",
+     "logo_url": "/logos/rl.webp",
+     "name": "Rocket League",
+     "short_name": "RL",
+     "slug": "rocket-league"
+    },
+    "game_id": "g-rl",
+    "game_name": "Rocket League",
+    "id": "ref-alt",
+    "is_active": true,
+    "league": "Liga X",
+    "lineup": [
+     "Max Muster"
+    ],
+    "lineup_members": [
+     {
+      "avatar_url": "/a.webp",
+      "display_name": "Anni",
+      "profile_id": "p-anna",
+      "profile_url": "/members/anni"
+     }
+    ],
+    "medal": "silver",
+    "member_profile_ids": [
+     "p-anna"
+    ],
+    "mode": "online",
+    "order_index": 0,
+    "organizer": "Probe Liga",
+    "participant_count": 16,
+    "partners": [],
+    "placement": 2,
+    "platforms": [
+     "PS"
+    ],
+    "reference_meta": {
+     "platforms": [
+      {
+       "key": "PS",
+       "label": "PlayStation"
+      }
+     ],
+     "title_segments": [
+      "HC",
+      "Herbst Cup",
+      "Liga X"
+     ]
+    },
+    "season": "Season 3",
+    "start_date": "2025-11-02",
+    "status": "completed",
+    "team_name": "Löwen Probe",
+    "title": "[PS] HC | Liga X | Herbst Cup Season 3",
+    "visibility": "public"
+   }
+  ],
+  "summary": {
+   "active": 1,
+   "bronze": 0,
+   "entries": 4,
+   "games": 3,
+   "gold": 1,
+   "planned": 1,
+   "podiums": 2,
+   "seasons": [
+    "Season 3",
+    "Season 5"
+   ],
+   "silver": 1,
+   "top10": 3,
+   "total": 3
+  }
+ }
+}
