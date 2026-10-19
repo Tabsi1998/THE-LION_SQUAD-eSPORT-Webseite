@@ -167,6 +167,8 @@ ein oder aus, **Jetzt abrufen** holt den Stand sofort. Gibt es keinen frischen S
 | **Wo** | Website / App | Wo die Saison läuft. Beides aus: sie läuft nirgends |
 | Texte (nur bei Saisons mit Text, etwa Weihnachten) | Gruß, Abschied am 6. Jänner | Eigene Worte; leer heißt Vorgabe |
 | **Vorschau 60 Sekunden** | Knopf | Zeigt die Saison eine Minute lang, auch außerhalb der Zeit |
+| **Auf der Website ansehen** | Link (nur während der Vorschau) | Öffnet die Startseite im selben Tab – die Vorschau läuft dort weiter, mit Logo, Kopf- und Fußzeile |
+| Gelber Hinweis unter der Vorschau | – | Sagt, warum du weniger siehst: „Bewegung reduzieren“ am Gerät, deine Deko „dezent“/„aus“, Stärke „dezent“ oder Website nicht angehakt |
 
 Die Saisons und ihre Zeiten:
 
@@ -284,6 +286,7 @@ News und zur Mitgliedschaft.
 | Felder in den Vereinsdaten sind grau, „aus Dolibarr“ | Die Vereinsdaten kommen aus dem Vereinsmodul | Dort ändern, oder den Schalter unter Dolibarr → Funktionen ausschalten |
 | „Dolibarr-Stand nicht abrufbar“ | Die Anbindung fehlt oder hat keinen Zugriff | Verbindung unter **Admin → Mitglieder → Dolibarr** prüfen |
 | Keine Deko zu sehen | Hauptschalter **Saisonale Deko** aus, die Saison aus, nicht im Zeitraum oder das Gerät hat „Bewegung reduzieren“ | Hauptschalter, Karte der Saison und den Kalender prüfen; zum Testen **Vorschau 60 Sekunden** |
+| Silvester-Vorschau: Countdown ja, aber kein Feuerwerk | Am Gerät ist „Bewegung reduzieren“ an, die eigene Deko steht auf „dezent“ oder die Stärke auf „dezent“ – dann bleibt alles ruhig (gewollt). Der gelbe Hinweis unter der Vorschau nennt den Grund | „Bewegung reduzieren“ am Gerät ausschalten (Windows: Animationseffekte) oder Profil → Darstellung → Saison-Deko „An“ |
 | „… läuft nirgends – schalte Website oder App ein.“ | Bei **Wo** ist beides abgewählt | Website und/oder App ankreuzen |
 | „Kein frischer Stand – es gilt die Vorgabe“ beim Wetter | Der Abruf ist fehlgeschlagen | **Jetzt abrufen** erneut klicken, Breiten- und Längengrad prüfen |
 | Der Vereinsgeburtstag erscheint nie | Es gibt kein Gründungsdatum | Unter **Admin → Verein → Über uns** das Gründungsdatum eintragen |
