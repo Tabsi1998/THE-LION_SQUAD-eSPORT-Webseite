@@ -66,7 +66,11 @@ test.describe("Abnahme #1749: Captain je Serie - Vorstand verwaltet, Captain sie
       // Captain: „Mein Dienst“ im Menü, „Meine Serien“ mit genau dieser Saison
       const captain = await captainContext.newPage();
       await signIn(captain, "lead");
-      const captainProblems = watch(captain, { allow: (response) => response.status() === 403 && response.url().includes(foreignId) });
+      // Erwartet: genau ein 403 beim Öffnen der fremden Saison (Antwort und die Zeile, die der Browser dazu schreibt).
+      const captainProblems = watch(captain, {
+        allow: (response) => response.status() === 403 && response.url().includes(foreignId),
+        allowConsole: (text) => text.includes("status of 403"),
+      });
       const me = await (await captain.request.get("/api/auth/me")).json();
       expect(me.has_series_captain).toBe(true);
       await captain.goto("/admin/dienst");
@@ -74,7 +78,11 @@ test.describe("Abnahme #1749: Captain je Serie - Vorstand verwaltet, Captain sie
       const mine = captain.getByTestId(`duty-series-row-${ownId}`);
       await expect(mine).toContainText(`Probe Captain Liga ${stamp}`);
       await expect(captain.getByTestId(`duty-series-row-${foreignId}`)).toHaveCount(0);
-      await shot(captain, "serien-meine-serien");
+      // Die Turnierleitung hat im Seed viele Einsätze - fürs Handbuch nur der Abschnitt „Meine Serien“.
+      if (SHOTS) {
+        await captain.locator("section", { has: captain.getByRole("heading", { name: "Meine Serien" }) })
+          .screenshot({ path: path.join(SHOTS, "serien-meine-serien.png") });
+      }
       await captain.getByTestId(`duty-series-open-${ownId}`).click();
       await expect(captain.getByTestId("series-detail-captain")).toContainText("Du bist Captain dieser Saison");
       await expect(captain.getByTestId("series-detail-edit")).toHaveCount(0);
