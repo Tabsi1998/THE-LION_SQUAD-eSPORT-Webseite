@@ -103,6 +103,19 @@ describe("Teile und Rechte", () => {
 });
 
 describe("Baum", () => {
+  test("Lauf mit „nicht erschienen“ (#1823): kleiner Zusatz „n. e.“ beim Platz - vor und nach dem Eintragen", () => {
+    const names = ["Anna", "Ben", "Cem", "Dana"];
+    const open = match({ round: 1, order: 0, key: "A", slots: 4, regs: names, match_type: "ffa", status: "scheduled", no_show_registration_ids: ["r-Ben"] });
+    const played = match({
+      round: 1, order: 1, key: "B", slots: 4, regs: names, match_type: "ffa", status: "completed",
+      results: [{ registration_id: "r-Dana", rank: 1 }, { registration_id: "r-Anna", rank: 2 }, { registration_id: "r-Cem", rank: 3 }, { registration_id: "r-Ben", rank: 4, forfeit: true }],
+    });
+    const bracket = { stages: [{ id: "s1", number: 1, name: "Läufe" }], matches_v2: [open, played], registrations: names.map(reg) };
+    const [first, second] = bracketBlocks(bracket)[0].columns[0].matches;
+    expect(first.slots.map((slot) => [slot.score, slot.note || ""])).toEqual([["", ""], ["", "n. e."], ["", ""], ["", ""]]);
+    expect(second.slots.map((slot) => [slot.score, slot.note || ""])).toEqual([["2.", ""], ["4.", "n. e."], ["3.", ""], ["1.", ""]]);
+  });
+
   test("Rundennamen wie im Web-Baum - auch die Loser-Runden nach der Uhr heißen fortlaufend", () => {
     const bracket = doubleElim();
     const web = displayRoundLabels(bracket.matches_v2);
