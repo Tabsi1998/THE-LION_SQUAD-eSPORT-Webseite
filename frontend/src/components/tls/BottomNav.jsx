@@ -48,6 +48,7 @@ const HIDDEN_PREFIXES = [
   "/reset-password",
   "/setup",
   "/display/",
+  "/print/",
   "/admin",
 ];
 

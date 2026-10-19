@@ -11,7 +11,7 @@ import { planCeremony } from "./select";
 // Erfolge II (E8, #618): der eine Ort, an dem Zeremonien erscheinen. Liest die Warteschlange, zeigt nie
 // zwei zugleich, hält im Adminbereich und auf Anzeige-Seiten still (die Zeremonie wartet dort in der
 // Schlange) und beachtet „Zeremonien dezent“ aus dem Profil sowie die Systemeinstellung.
-const QUIET_PREFIXES = ["/admin", "/display", "/setup", "/consent"];
+const QUIET_PREFIXES = ["/admin", "/display", "/print", "/setup", "/consent"];
 
 // Die Vorschau im Admin (E10) übersteuert Bewegung und Klang: ``reducedOverride`` (an/aus statt Profil und System)
 // und ``sound`` („on“, „off“ oder „auto“ = wie im Profil).

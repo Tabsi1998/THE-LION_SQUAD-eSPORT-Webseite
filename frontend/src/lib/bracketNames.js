@@ -4,6 +4,7 @@
 // „Weiter aus Runde 1“ (Lauf), „Sieger aus Viertelfinale“ (Duell) bzw. „Verlierer aus Runde 2“ - kurz, in einer Zeile.
 import { sectionKind } from "@/lib/bracketSections";
 import { describeSlot, normalizeSource } from "@/lib/slotSource";
+import { formatRoundName } from "@/lib/tournamentLabels";
 
 const GENERIC_ROUND = /^((?:Loser|Winner) )?Runde (\d+)$/i;
 
@@ -39,6 +40,12 @@ export function displayRoundLabels(matches = []) {
     const shown = `${generic[1] || ""}Runde ${index}`;
     return shown === label && match.round_label ? match : { ...match, round_label: shown };
   });
+}
+
+/** Der Rundenname über einer Spalte - Web-Baum, Druckansicht (#1283): der Name vom Server (nach `displayRoundLabels`
+ * fortlaufend), sonst aus `round_name` bzw. der Nummer („Runde 2“). */
+export function roundName(match, number = match?.round) {
+  return match?.round_label || formatRoundName(match?.round_name, number);
 }
 
 /** Wie ein Spiel in Texten heißt: das Kürzel („A“, „LC“). Das Grand Final heißt wie seine Runde („Grand Final“,

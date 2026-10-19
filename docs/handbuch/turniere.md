@@ -493,6 +493,7 @@ Strafen stehen unter **Admin → eSports → Strafen**, die Jahreswertung unter 
   gibt Benachrichtigungen bei Problemen.
 - **TV** aufstellen und aufrufen lassen, damit Spieler selbst sehen, wo sie hinmüssen.
 - **Check-in** vorher: Online-Spieler checken selbst ein, vor Ort druckt **PDF Check-in** die Liste zum Abhaken.
+- **Plan B auf Papier** am Vorabend drucken: Baum, Spielplan und Check-in-Liste ([3.13](#313-plan-b-auf-papier)).
 - **Nicht erschienen** früh setzen, Ersatz einsetzen, und die Frist vorher in den Regeln nennen.
 
 ### 3.12 Spieldauer und Spiel-Daten
@@ -540,6 +541,32 @@ Eine Dauer am Turnier, an der Phase oder am Spiel ist immer die ganze Dauer, ohn
 | Punktetabelle | `15, 12, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1` (12er-Lobby) bzw. `4-3-2-1` (4 an einer Station) |
 
 Im Turnier dann **Matchdauer** leer lassen: dort steht „vom Spiel: 15 Min. (Grand Prix 4 Rennen)“.
+
+### 3.13 Plan B: auf Papier
+
+Fällt am Event Netz oder Server aus, läuft das Turnier auf Papier weiter. Darum am **Vorabend** drucken:
+
+- Auf **Turnierbaum**, **Spielplan**, **Teilnehmer** (nur mit Check-in-Recht) und beim Event (**Was läuft** bzw.
+  **Anmeldungen & Einlass**) steht der Knopf **Drucken**. Er öffnet die Druckansicht – hell, ohne Menü – mit dem passenden
+  Teil vorgewählt. Oben lassen sich die Teile an- und abhaken (Turnierbaum, Spielplan, Check-in-Liste bzw. Tagesplan),
+  Baum und Listen **quer** oder **hoch** stellen und der Spielplan **nach Zeit** oder **nach Station** ordnen. Erst
+  **Drucken** dort schickt es an den Drucker; am Handy öffnet es das Druck- bzw. Teilen-Menü (als PDF sichern).
+- **Baum:** A4 quer, Runde für Runde nebeneinander. Passt ein großer Baum nicht auf ein Blatt, geht er auf mehreren
+  Seiten weiter – jede Spalte trägt ihren Rundennamen (wie im Web-Baum) und „1/2“, „2/2“. Winner Bracket, Loser Bracket,
+  Grand Final, Gruppen und Läufe (FFA) haben je ihren Block; leere Kästchen rechts sind für das Ergebnis bzw. den Platz.
+- **Spielplan:** Zeit, Station, Spiel, Teilnehmer und ein leeres Feld zum Eintragen des Ergebnisses.
+- **Check-in-Liste:** Kästchen zum Abhaken, Setzplatz, beim Event die Begleitpersonen, darunter die Warteliste. Nur mit
+  Turnier-Recht – andere sehen den Teil gar nicht, und der Server gibt die Liste nur der Turnierleitung.
+- Jede Seite trägt unten die **Druckzeit** („Stand 30.10. 19:12“) und einen **QR-Code** zur Live-Seite. Was auf Papier
+  eingetragen wurde, später in der Turnierleitung nachtragen.
+
+<table>
+<tr><th>Baum auf A4 quer (Testdaten)</th><th>Spielplan mit Ergebnisfeldern (Testdaten)</th></tr>
+<tr>
+<td><img src="../assets/druckansicht/baum-quer.png" alt="Druckansicht des Winner Bracket eines Doppel-K.-o. auf A4 quer, Rundennamen über den Spalten, Druckzeit und QR-Code unten" width="420"></td>
+<td><img src="../assets/druckansicht/spielplan.png" alt="Druckansicht des Spielplans mit Zeit, Station, Spiel, Teilnehmern und leeren Ergebnisfeldern" width="300"></td>
+</tr>
+</table>
 
 ---
 

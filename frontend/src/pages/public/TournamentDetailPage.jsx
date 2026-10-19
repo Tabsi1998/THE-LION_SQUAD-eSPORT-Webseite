@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ModerationStateBadge } from "@/components/tls/ModerationStateBadge";
+import { PrintLink } from "@/components/tls/print/PrintLink";
 import { useParams, Link, useNavigate, useSearchParams } from "react-router-dom";
 import { api, formatApiError, resolveMediaUrl } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
@@ -424,7 +425,11 @@ function TournamentDetailView() {
           {/* Eigener Stand je Turnier (#1047); den Kontowechsel übernimmt die Hülle oben. */}
           {t.show_chat && <TournamentChat key={t.id} tournament={t} user={user} />}
           <section id="teilnehmer" data-testid="tournament-participants">
-            <h2 className="font-heading text-2xl font-bold uppercase mb-3">Teilnehmer ({regs.length})</h2>
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+              <h2 className="font-heading text-2xl font-bold uppercase">Teilnehmer ({regs.length})</h2>
+              {/* Druckansicht (#1283): Check-in-Liste mit Kästchen - nur mit Check-in-Recht (der Server prüft es selbst). */}
+              {t.can_check_in ? <PrintLink slug={t.slug || t.id} parts="liste" from="teilnehmer" accessToken={accessToken} testId="participants-print-link" /> : null}
+            </div>
             <div className="border border-white/10 rounded-sm divide-y divide-white/5 bg-[#121212]">
               {sortedRegs.map((r) => {
                 const mine = !!user && (r.user_id === user.id || r.is_mine);

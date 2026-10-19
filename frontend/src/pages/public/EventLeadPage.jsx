@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { Check, Megaphone, Minus, Plus, Printer, Search, Undo2, Users, X } from "lucide-react";
+import { Check, Megaphone, Minus, Plus, Search, Undo2, Users, X } from "lucide-react";
+import { PrintLink } from "@/components/tls/print/PrintLink";
 import { toast } from "sonner";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
@@ -8,7 +9,7 @@ import { api, formatApiError } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { useLiveRefresh } from "@/hooks/useLiveRefresh";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
-import { viennaDate, viennaDateTime } from "@/lib/vienna";
+import { viennaDateTime } from "@/lib/vienna";
 import {
   LEAD_FILTERS, MESSAGE_MAX, MESSAGE_TEMPLATES, STATUS_LABELS,
   changeText, companionsText, counterText, filterRows, leadCounts, messagePreview, seatsText,
@@ -125,9 +126,8 @@ export default function EventLeadPage() {
                 <Megaphone className="w-4 h-4" /> Nachricht an alle
               </button>
             ) : null}
-            <button type="button" onClick={() => window.print()} className="tls-btn tls-btn--quiet inline-flex min-h-[44px] items-center gap-2 px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold" data-testid="event-lead-print">
-              <Printer className="w-4 h-4" /> Drucken
-            </button>
+            {/* Druckansicht (#1283): Liste mit Kästchen, Begleitpersonen, Warteliste, Druckzeit und QR-Code. */}
+            <PrintLink scope="event" slug={event.slug || slug} parts="liste" testId="event-lead-print" className="!text-xs !py-2" />
           </div>
         </div>
 
@@ -188,7 +188,6 @@ export default function EventLeadPage() {
         <p className="mt-6 text-xs text-white/40">Jede Änderung steht im Protokoll (wer, wann, was). Mail-Adressen stehen hier nur gekürzt.</p>
       </section>
 
-      <PrintSheet event={event} rows={rows} counts={counts} />
       {undo ? <UndoBar undo={undo} onUndo={undoLast} /> : null}
       {messageOpen ? <MessageDialog event={event} recipients={data?.message_recipients || 0} onClose={() => setMessageOpen(false)} onSent={load} /> : null}
     </PublicLayout>
@@ -387,31 +386,6 @@ function MessageLog({ messages }) {
           </li>
         ))}
       </ul>
-    </div>
-  );
-}
-
-// Drucken: eine schlichte Liste mit Kästchen - die Angemeldeten nach Namen. Die Druckansichten aus #1283 übernehmen sie.
-function PrintSheet({ event, rows, counts }) {
-  const expected = rows.filter((row) => row.status === "registered" || row.status === "checked_in");
-  return (
-    <div className="tls-print-sheet hidden print:block bg-white p-6 text-black" data-testid="event-lead-print-sheet">
-      <h1 className="text-xl font-bold">{event.name} – Anmeldungen</h1>
-      <p className="text-sm">{event.start_date ? viennaDate(event.start_date) : ""} · {counts.expected} Anmeldungen · {counts.expected_seats} Plätze</p>
-      <table className="mt-4 w-full border-collapse text-sm">
-        <thead>
-          <tr><th className="w-10 border-b border-black py-1 text-left">Da</th><th className="border-b border-black py-1 text-left">Name</th><th className="border-b border-black py-1 text-left">Begleitpersonen</th></tr>
-        </thead>
-        <tbody>
-          {expected.map((row) => (
-            <tr key={row.id}>
-              <td className="border-b border-black/30 py-2"><span className="inline-block h-4 w-4 border border-black" aria-hidden="true" /></td>
-              <td className="border-b border-black/30 py-2">{row.display_name}</td>
-              <td className="border-b border-black/30 py-2">{row.companion_count || ""}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
     </div>
   );
 }

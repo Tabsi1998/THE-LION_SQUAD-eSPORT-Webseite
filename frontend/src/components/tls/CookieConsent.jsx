@@ -58,7 +58,7 @@ function writeStoredConsent(consent) {
 // TV und Beamer (#1110, Entscheidung vom 07.10.2026): Auf den Anzeige-Seiten erscheint kein Cookie-Hinweis - dort
 // klickt niemand. Es läuft dort nur das Nötige (keine Statistik, keine fremden Inhalte), egal was gespeichert ist.
 function isDisplayPath(pathname) {
-  return /^\/display(?:\/|$)/.test(pathname || "");
+  return /^\/(?:display|print)(?:\/|$)/.test(pathname || "");
 }
 
 function RouteWatch({ onPath }) {

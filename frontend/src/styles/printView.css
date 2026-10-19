@@ -1,0 +1,219 @@
+/* Druckansicht (#1283): Blätter in echter A4-Größe. Am Bildschirm liegen sie als Papier auf dunklem Grund (am Handy
+   verkleinert über --tls-print-zoom), beim Druck füllt jedes Blatt genau eine Seite - Baum quer, Listen nach Wahl.
+   Schwarz auf Weiß, Haarlinien statt Flächen, damit auch ein einfacher Schwarzweiß-Drucker es sauber schafft. */
+
+@page tls-print-landscape { size: A4 landscape; margin: 0; }
+@page tls-print-portrait { size: A4 portrait; margin: 0; }
+@page { margin: 0; }
+
+.tls-print-desk {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 24px;
+  padding: 8px 16px 64px;
+}
+
+.tls-print-frame {
+  zoom: var(--tls-print-zoom, 1);
+}
+
+.tls-paper-sheet {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: #fff;
+  color: #000;
+  font-family: 'Outfit', 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 9pt;
+  line-height: 1.25;
+  font-variant-numeric: tabular-nums;
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.5);
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+.tls-paper-sheet--landscape { page: tls-print-landscape; width: 297mm; height: 210mm; }
+.tls-paper-sheet--portrait { page: tls-print-portrait; width: 210mm; height: 297mm; }
+
+.tls-paper-sheet ::selection { background: #000; color: #fff; }
+
+.tls-print-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 6mm;
+  border-bottom: 0.5mm solid #000;
+  padding-bottom: 1.5mm;
+}
+.tls-print-kicker {
+  font-size: 7pt;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+.tls-print-title {
+  margin: 0.5mm 0 0;
+  font-family: 'Unbounded', 'Arial Black', sans-serif;
+  font-size: 14pt;
+  font-weight: 900;
+  line-height: 1.1;
+  text-transform: uppercase;
+  letter-spacing: -0.01em;
+  /* Lange Namen brechen um und werden stufenweise kleiner (lib/printView.titleTier) - abgeschnitten wird nichts:
+     bis 80 Zeichen passt jeder Name in den Kopf (14 pt eine Zeile, 10,5 pt zwei, 8,5 pt bis drei Zeilen). */
+  overflow-wrap: anywhere;
+  hyphens: none;
+  text-wrap: balance;
+}
+.tls-print-title--long { font-size: 10.5pt; line-height: 1.08; }
+.tls-print-title--longer { font-size: 8.5pt; line-height: 1.08; }
+.tls-print-meta { flex: none; max-width: 42%; text-align: right; font-size: 8pt; }
+
+.tls-print-foot {
+  display: flex;
+  align-items: center;
+  gap: 4mm;
+  border-top: 0.25mm solid #000;
+  padding-top: 1.5mm;
+  font-size: 7.5pt;
+}
+.tls-print-foot__qr { width: 16mm; height: 16mm; flex: none; }
+.tls-print-foot__qr svg { width: 100%; height: 100%; }
+.tls-print-foot__text { flex: 1; min-width: 0; }
+.tls-print-foot__url { font-weight: 700; word-break: break-all; }
+.tls-print-foot__stamp { text-align: right; white-space: nowrap; }
+.tls-print-foot__stamp strong { display: block; font-size: 11pt; }
+
+/* Baum */
+.tls-print-block__title {
+  display: flex;
+  align-items: baseline;
+  gap: 3mm;
+  font-weight: 800;
+  font-size: 9pt;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  overflow: hidden;
+}
+.tls-print-block__title span { font-weight: 500; letter-spacing: 0.04em; text-transform: none; }
+.tls-print-col__title {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 2mm;
+  border-bottom: 0.25mm solid #000;
+  padding-bottom: 0.8mm;
+  font-weight: 800;
+  font-size: 8.5pt;
+  white-space: nowrap;
+  overflow: hidden;
+}
+.tls-print-col__title small { font-weight: 500; font-size: 6.5pt; }
+.tls-print-card {
+  flex: none;
+  border: 0.3mm solid #000;
+  border-radius: 1mm;
+  overflow: hidden;
+  break-inside: avoid;
+}
+.tls-print-card__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 2mm;
+  padding: 0 1.5mm;
+  border-bottom: 0.2mm solid #000;
+  font-size: 6.5pt;
+  white-space: nowrap;
+  overflow: hidden;
+}
+.tls-print-card__head b { font-size: 7.5pt; }
+.tls-print-slot {
+  display: flex;
+  align-items: stretch;
+  border-top: 0.15mm solid #9a9a9a;
+}
+.tls-print-slot:first-of-type { border-top: 0; }
+.tls-print-slot__name {
+  flex: 1;
+  min-width: 0;
+  align-self: center;
+  padding: 0 1.5mm;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.tls-print-slot__name--pending { font-style: italic; color: #444; font-size: 8pt; }
+.tls-print-slot__name--winner { font-weight: 800; }
+.tls-print-slot__score {
+  flex: none;
+  width: 9mm;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-left: 0.2mm solid #000;
+  font-weight: 700;
+}
+
+/* Tabellen */
+.tls-print-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+.tls-print-table th {
+  text-align: left;
+  font-size: 7pt;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  box-shadow: inset 0 -0.4mm 0 #000;
+  padding: 0 1.5mm;
+  white-space: nowrap;
+}
+.tls-print-table td {
+  padding: 0 1.5mm;
+  /* Linien als Schatten nach innen: sie machen die Zeile nicht höher, die gerechnete Höhe stimmt also genau. */
+  box-shadow: inset 0 -0.15mm 0 #9a9a9a;
+  vertical-align: middle;
+  overflow: hidden;
+}
+.tls-print-table .tls-print-section td {
+  box-shadow: inset 0 -0.25mm 0 #000;
+  padding-top: 2mm;
+  font-weight: 800;
+  font-size: 9pt;
+  white-space: nowrap;
+}
+.tls-print-section span { font-weight: 500; font-size: 7.5pt; margin-left: 2mm; }
+.tls-print-ellipsis { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tls-print-muted { color: #444; font-size: 7.5pt; }
+.tls-print-box {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 4.5mm;
+  height: 4.5mm;
+  border: 0.35mm solid #000;
+  border-radius: 0.6mm;
+  vertical-align: middle;
+}
+.tls-print-write {
+  display: block;
+  height: 5mm;
+  border: 0.25mm solid #000;
+  border-radius: 0.6mm;
+}
+.tls-print-line { display: block; border-bottom: 0.2mm dotted #000; height: 4.5mm; }
+.tls-print-empty { padding: 4mm 1.5mm; color: #444; font-style: italic; }
+
+@media print {
+  html, body, #root { background: #fff !important; min-height: 0 !important; }
+  .tls-print-toolbar { display: none !important; }
+  /* Nichts vor dem ersten Blatt (Hinweis-Bereich u. a.): sonst beginnt der Druck mit einer leeren Seite in der
+     Vorgabegröße, weil das erste Blatt seine benannte Seite (quer/hoch) nicht an die Wurzel weitergeben kann. */
+  body > :not(#root), #root > :not(.tls-print-page) { display: none !important; }
+  .tls-print-page { background: #fff !important; min-height: 0 !important; }
+  .tls-print-desk { display: block; padding: 0; gap: 0; }
+  .tls-print-frame { zoom: 1 !important; }
+  .tls-paper-sheet { box-shadow: none; break-after: page; }
+  .tls-print-frame:last-child .tls-paper-sheet { break-after: auto; }
+}

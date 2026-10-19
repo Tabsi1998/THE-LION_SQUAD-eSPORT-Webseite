@@ -1,9 +1,9 @@
-import { displayRoundLabels } from "@/lib/bracketNames";
+import { displayRoundLabels, roundName } from "@/lib/bracketNames";
 import { useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, createContext } from "react";
 import { Link, useInRouterContext } from "react-router-dom";
 import { AnimatePresence, MotionConfig, motion } from "framer-motion";
 import { ChevronLeft, ChevronRight, Trophy } from "lucide-react";
-import { formatBracketSection, formatRoundName } from "@/lib/tournamentLabels";
+import { formatBracketSection } from "@/lib/tournamentLabels";
 import { asInstant, viennaTime } from "@/lib/vienna";
 import { finderFor, initials } from "@/lib/slotSource";
 import { buildPodiumMap, finalMatchOf, isBronzeMatch, lastStageId, normalizeSection } from "@/lib/bracketPodium";
@@ -223,9 +223,8 @@ export function nextMatchFor(matches = [], mineId) {
   return own[0] || null;
 }
 
-function roundNameOf(match, number) {
-  return match?.round_label || formatRoundName(match?.round_name, number);
-}
+// Eine Regel mit der Druckansicht (#1283): lib/bracketNames.roundName.
+const roundNameOf = roundName;
 
 function NextMatchBanner({ matches, regMap, mineId }) {
   const { onMatchClick } = useContext(MatchLinkContext);
