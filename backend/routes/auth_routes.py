@@ -395,6 +395,11 @@ async def with_areas(user: dict) -> dict:
 
     doc = dict(user)
     doc["areas"] = sorted(await areas_for(user))
+    # Captain einer externen Serie (#1749): öffnet „Mein Dienst“ und die Seite der Saison - nur zum Anzeigen, die Routen
+    # prüfen selbst (``require_series_editor``).
+    from services.reference_series_access import has_captain_series
+
+    doc["has_series_captain"] = await has_captain_series(get_db(), user)
     doc.pop("_areas", None)
     return doc
 

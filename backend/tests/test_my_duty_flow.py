@@ -90,14 +90,14 @@ async def test_moderation_gets_only_the_report_counter(flow):
         {"id": new_id(), "status": "open"}, {"id": new_id(), "status": "open"}, {"id": new_id(), "status": "resolved"},
     ])
     data = await _duty(flow, moderator)
-    assert data == {"assignments": [], "moderation": {"open_reports": 2}, "lead_today": []}
+    assert data == {"assignments": [], "series": [], "moderation": {"open_reports": 2}, "lead_today": []}
 
 
 @pytest.mark.asyncio
 async def test_player_without_duty_gets_an_empty_answer(flow):
     player = await flow.add_user(name="Spieler")
     await flow.create_tournament(title="Heute", start_date=_at(0))
-    assert await _duty(flow, player) == {"assignments": [], "moderation": None, "lead_today": []}
+    assert await _duty(flow, player) == {"assignments": [], "series": [], "moderation": None, "lead_today": []}
 
 
 @pytest.mark.asyncio
