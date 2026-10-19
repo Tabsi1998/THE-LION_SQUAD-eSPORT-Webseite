@@ -38,12 +38,16 @@ export function queueWhat(entry, match = null) {
 }
 
 /** Wer spielt: „A vs. B“, im Lauf „4 Spieler“, offene Plätze in Worten - nie eine leere Zeile. */
+const together = (names) => names.join(names.length > 2 ? " · " : " vs. ");
+
 export function queueWho(entry) {
   const names = (entry?.names || []).filter(Boolean);
   const open = Number(entry?.open_slots) || 0;
-  if (open && names.length) return `${names.join(" vs. ")} · ${open === 1 ? "1 Platz" : `${open} Plätze`} offen`;
+  if (open && names.length) return `${together(names)} · ${open === 1 ? "1 Platz" : `${open} Plätze`} offen`;
   if (open) return `${open === 1 ? "1 Platz" : `${open} Plätze`} offen`;
-  if (names.length > 2) return `${names.length} Spieler`;
+  // Im Lauf (Fabian 19.10.): bis vier Namen, je zwei in einer Zeile - die Halle sieht, wer gerade fährt.
+  if (names.length > 4) return `${names.length} Spieler`;
+  if (names.length > 2) return [names.slice(0, 2), names.slice(2)].map((row) => row.join(" · ")).join("\n");
   return names.join(" vs. ") || "Teilnehmer offen";
 }
 

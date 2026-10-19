@@ -1125,7 +1125,7 @@
 .tv-lanes__body { display: grid; gap: calc(var(--tv-u) * 0.25); align-content: start; min-width: 0; }
 .tv-lanes__body--quiet { align-content: center; }
 .tv-lanes__what { color: var(--tv-muted); }
-.tv-lanes__who { font-weight: 700; overflow-wrap: anywhere; }
+.tv-lanes__who { font-weight: 700; overflow-wrap: anywhere; white-space: pre-line; }
 .tv-lanes__when { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.15em 0.6em; font-weight: 700; color: var(--tv-text); }
 .tv-lanes__body[data-tone="call"] .tv-lanes__when { color: var(--tv-gold); }
 .tv-lanes__delay { color: var(--tls-warn); }
