@@ -130,6 +130,25 @@ async def test_a_captain_opens_only_the_own_series(flow):
 
 
 @pytest.mark.asyncio
+async def test_a_captain_sees_only_the_fields_to_work_with_the_board_sees_everything(flow):
+    board, captain, own, _, _ = await _setup(flow)
+    full = (await flow.get(f"{ADMIN}/series/{own['id']}")).json()
+    assert {"created_by", "updated_by", "rules_history", "visibility"} <= set(full)
+    assert {"created_by", "partner_ids", "visibility"} <= set(full["lineage"])
+
+    flow.act_as(captain)
+    view = (await flow.get(f"{ADMIN}/series/{own['id']}")).json()
+    assert set(view) == set(reference_series_access.CAPTAIN_SERIES_FIELDS) | {"lineage", "access"}
+    assert set(view["lineage"]) == set(reference_series_access.CAPTAIN_LINEAGE_FIELDS)
+    for hidden in ("created_by", "updated_by", "rules_history", "visibility", "partner_ids", "slug_history",
+                   "archived_from", "reference_id"):
+        assert hidden not in view and hidden not in view["lineage"]
+    assert board["id"] not in str(view)
+    assert (view["season"], view["rules"]["points_mode"], view["lineage"]["title"]) == (
+        "2026", full["rules"]["points_mode"], "Probe Racing F1")
+
+
+@pytest.mark.asyncio
 async def test_the_right_ends_after_valid_until_and_is_checked_on_every_call(flow, monkeypatch):
     _, captain, own, _, _ = await _setup(flow)
     flow.act_as(captain)

@@ -190,12 +190,10 @@ async def create_series(body: ReferenceSeriesCreate, me: dict = Depends(require_
 
 @router.get("/admin/series/{series_id}")
 async def get_series(series_id: str, access: SeriesAccess = Depends(require_series_editor)):
-    """Vorstand und gültige Captains dieser Serie (#1749); ``access`` sagt der Seite, was die Person hier darf."""
-    db = get_db()
-    series = dict(access.series)
-    series["lineage"] = await db.reference_lineages.find_one({"id": series["lineage_id"]}, {"_id": 0})
-    series["access"] = access.summary()
-    return series
+    """Vorstand und gültige Captains dieser Serie (#1749); ``access`` sagt der Seite, was die Person hier darf. Captains
+    bekommen nur die Felder zum Eintragen (``SeriesAccess.series_view``)."""
+    lineage = await get_db().reference_lineages.find_one({"id": access.series["lineage_id"]}, {"_id": 0})
+    return access.series_view(lineage)
 
 
 @router.patch("/admin/series/{series_id}")

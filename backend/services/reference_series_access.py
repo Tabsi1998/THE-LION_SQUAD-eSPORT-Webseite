@@ -46,6 +46,13 @@ ARCHIVED = "Diese Serie ist archiviert. Ändern kann sie nur noch der Vorstand."
 BOARD_ONLY = "Das darf nur der Vorstand (Bereich Redaktion)."
 PUBLISH_ONLY_BOARD = "Veröffentlichen gibt in dieser Serie der Vorstand frei. Speichere den Eintrag als Entwurf."
 
+# Was ein Captain von Saison und Spur sieht - ausdrücklich, damit neue Verwaltungsfelder nicht von selbst hinausgehen.
+CAPTAIN_SERIES_FIELDS = (
+    "id", "lineage_id", "season", "tier", "title", "season_slug", "status", "publish_mode", "default_weekday",
+    "default_time", "rules", "rules_version", "rules_note", "team_name", "official_table_url", "external_url",
+)
+CAPTAIN_LINEAGE_FIELDS = ("id", "title", "kind", "label", "organizer", "game_id", "game_name")
+
 
 def staff_is_valid(staff: dict | None, today: str | None = None) -> bool:
     """Gilt der Eintrag heute? Ohne gültiges Ablaufdatum gilt er nie - ein fehlendes Datum heißt nicht „für immer“."""
@@ -103,6 +110,19 @@ class SeriesAccess:
         if self.staff:
             out["valid_until"] = self.staff.get("valid_until")
         return out
+
+    def series_view(self, lineage: dict | None) -> dict:
+        """Die Saison für die Verwaltungsseite: der Vorstand bekommt alles, ein Captain nur, was er zum Eintragen
+        braucht (``CAPTAIN_SERIES_FIELDS``, ``CAPTAIN_LINEAGE_FIELDS``) - keine Ersteller- oder Änderer-Kennungen, keine
+        Regel-Historie, keine Sichtbarkeit oder Partner. Neue Felder erscheinen für Captains erst, wenn sie hier stehen."""
+        if self.is_board:
+            view = dict(self.series)
+            view["lineage"] = lineage
+        else:
+            view = {key: self.series.get(key) for key in CAPTAIN_SERIES_FIELDS}
+            view["lineage"] = {key: (lineage or {}).get(key) for key in CAPTAIN_LINEAGE_FIELDS} if lineage else None
+        view["access"] = self.summary()
+        return view
 
     def _scoped(self, found: dict | None, missing: str) -> dict:
         if not found:
