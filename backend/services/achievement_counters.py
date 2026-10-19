@@ -22,6 +22,7 @@ from database import get_db
 from models import now_utc
 from services import achievement_progress
 from services.achievement_core import SIGNAL_RULES, SIGNALS, STATS, VIENNA, evaluator  # noqa: F401 - umgezogen (#1420)
+from services.match_winner import match_winner_id, won_by
 from services.private_fields import private_projection
 
 logger = logging.getLogger("tls.achievements.counters")
@@ -617,7 +618,7 @@ def _completed_matches(matches: list[dict], registration_ids: set[str]) -> list[
         mine = {slot["registration_id"] for slot in slots} & registration_ids
         if not mine:
             continue
-        won = any(result.get("registration_id") in registration_ids and result.get("outcome") == "winner" for result in match.get("results") or [])
+        won = won_by(match, registration_ids)
         when = _parse(match.get("completed_at") or match.get("updated_at") or match.get("scheduled_at"))
         opponents = {slot["registration_id"] for slot in slots} - registration_ids
         out.append((match, won, when, opponents))
@@ -1111,10 +1112,11 @@ async def _group_firsts(ctx):
     for tournament_id, group_id in groups:
         wins: dict[str, int] = {}
         for match in await ctx.group_matches(tournament_id, group_id):
+            winner = match_winner_id(match)
             for result in match.get("results") or []:
                 reg = result.get("registration_id")
                 if reg:
-                    wins[reg] = wins.get(reg, 0) + (1 if result.get("outcome") == "winner" else 0)
+                    wins[reg] = wins.get(reg, 0) + (1 if reg == winner else 0)
         if not wins:
             continue
         best = max(wins.values())
@@ -1290,9 +1292,10 @@ async def _team_match_wins(ctx):
     wins = 0
     for match in await ctx.team_matches():
         when = _parse(match.get("completed_at") or match.get("updated_at"))
+        winner = match_winner_id(match)
         for result in match.get("results") or []:
             reg = registrations.get(result.get("registration_id"))
-            if not reg or result.get("outcome") != "winner":
+            if not reg or result.get("registration_id") != winner:
                 continue
             joined = _parse((memberships.get(reg.get("team_id")) or {}).get("joined_at"))
             if joined and when and when < joined:
