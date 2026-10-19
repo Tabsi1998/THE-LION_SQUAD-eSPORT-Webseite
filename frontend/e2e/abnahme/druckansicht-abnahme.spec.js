@@ -66,9 +66,17 @@ async function checkPrint(page, name) {
   const pdf = await page.pdf({ preferCSSPageSize: true, printBackground: true });
   expect(pdfPages(pdf), "eine PDF-Seite je Blatt").toBe(count);
   save(EXAMPLES, `${name}.pdf`, pdf);
+  // Bilder im Druck-Medium (ohne Werkzeugleiste): je Teil das erste Blatt.
+  if (EXAMPLES || SHOTS) {
+    for (const kind of ["baum", "spielplan", "liste", "tagesplan"]) {
+      const first = page.getByTestId(`print-sheet-${kind}`).first();
+      if (!(await first.count())) continue;
+      const image = await first.screenshot();
+      save(EXAMPLES, `${name}-${kind}.png`, image);
+      save(SHOTS, `druckansicht-${name}-${kind}.png`, image);
+    }
+  }
   await page.emulateMedia({ media: "screen" });
-  save(EXAMPLES, `${name}-seite1.png`, await sheets.first().screenshot());
-  if (SHOTS) save(SHOTS, `druckansicht-${name}.png`, await sheets.first().screenshot());
   return count;
 }
 
@@ -94,11 +102,13 @@ test.describe("Abnahme #1283: Druckansicht gegen den echten Server", () => {
     await expect(page.locator("[data-testid='print-round-title']").first()).not.toBeEmpty();
     expect(await page.getByTestId("print-sheet-baum").first().getAttribute("data-orientation")).toBe("landscape");
 
-    await page.getByTestId("print-part-spielplan").check();
-    await page.getByTestId("print-part-liste").check();
+    await page.getByTestId("print-part-spielplan").click();
+    await expect(page.getByTestId("print-part-spielplan")).toBeChecked();
+    await page.getByTestId("print-part-liste").click();
+    await expect(page.getByTestId("print-part-liste")).toBeChecked();
     await expect(page.getByTestId("print-sheet-liste").first()).toBeVisible();
     await expect(page.locator("[data-testid='print-checkin-row']").first()).toBeVisible();
-    await expect(page.getByLabel("schon da").first()).toBeAttached();
+    await expect(page.getByLabel(/^(abhaken|schon da)$/).first()).toBeAttached();
     const count = await checkPrint(page, "doppel-ko-baum-spielplan-liste");
     expect(count).toBeGreaterThanOrEqual(3);
     expect(problems).toEqual([]);
@@ -114,7 +124,7 @@ test.describe("Abnahme #1283: Druckansicht gegen den echten Server", () => {
     expect((await page.locator("[data-testid='print-match']").first().innerText())).toMatch(/Lauf/);
     await expect(page.getByTestId("print-part-liste")).toHaveCount(0);
     await checkPrint(page, "laeufe-cup-baum-spielplan");
-    await page.getByRole("radio", { name: "Hoch" }).first().check();
+    await page.getByRole("radio", { name: "Hoch" }).first().click();
     await expect(page.getByTestId("print-sheet-baum").first()).toHaveAttribute("data-orientation", "portrait");
     expect(await nothingCut(page)).toEqual([]);
     expect(problems).toEqual([]);
@@ -145,7 +155,8 @@ test.describe("Abnahme #1283: Druckansicht gegen den echten Server", () => {
     await page.goto(`/events/${slug}/leitung`);
     await page.getByTestId("event-lead-print").click();
     await expect(page).toHaveURL(/\/print\/events\/.+teile=liste/);
-    await page.getByTestId("print-part-tagesplan").check();
+    await page.getByTestId("print-part-tagesplan").click();
+    await expect(page.getByTestId("print-part-tagesplan")).toBeChecked();
     await expect(page.locator("[data-testid='print-dayplan-row']").first()).toBeVisible();
     await expect(page.getByTestId("print-sheet-liste").first()).toContainText("Begleitung");
     await expect(page.getByTestId("print-sheet-liste").first()).toContainText("Warteliste");

@@ -159,7 +159,7 @@ export default function PrintPage({ scope = "tournament" }) {
 
   return (
     <div className="tls-print-page min-h-screen bg-[#0A0A0A] text-white">
-      <div className="tls-print-toolbar sticky top-0 z-20 border-b border-white/10 bg-[#0A0A0A]/95 backdrop-blur-sm" data-testid="print-toolbar">
+      <div className="tls-print-toolbar md:sticky md:top-0 z-20 border-b border-white/10 bg-[#0A0A0A]/95 backdrop-blur-sm" data-testid="print-toolbar">
         <div className="mx-auto max-w-[1180px] px-4 py-3 flex flex-col gap-3">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex min-w-0 items-center gap-3">
@@ -229,7 +229,7 @@ export default function PrintPage({ scope = "tournament" }) {
                 {sheet.empty ? <p className="tls-print-empty">{EMPTY_TEXT[sheet.kind]}</p> : null}
                 {!sheet.empty && sheet.kind === "baum" ? <TreeBody page={sheet.page} /> : null}
                 {!sheet.empty && sheet.kind === "spielplan" ? <ScheduleBody page={sheet.page} /> : null}
-                {!sheet.empty && sheet.kind === "liste" ? <CheckinBody page={sheet.page} /> : null}
+                {!sheet.empty && sheet.kind === "liste" ? <CheckinBody page={sheet.page} extraLabel={scope === "event" ? "Begleitung" : "Station"} /> : null}
                 {!sheet.empty && sheet.kind === "tagesplan" ? <DayPlanBody page={sheet.page} /> : null}
               </PrintSheet>
           );

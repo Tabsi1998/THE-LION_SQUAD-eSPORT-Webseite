@@ -144,9 +144,9 @@ export function ScheduleBody({ page }) {
   return (
     <table className="tls-print-table">
       <colgroup>
-        <col style={{ width: "15mm" }} />
-        <col style={{ width: "26mm" }} />
-        <col style={{ width: "36mm" }} />
+        <col style={{ width: "19mm" }} />
+        <col style={{ width: "32mm" }} />
+        <col style={{ width: "34mm" }} />
         <col />
         <col style={{ width: "24mm" }} />
       </colgroup>
@@ -158,7 +158,7 @@ export function ScheduleBody({ page }) {
           <SectionRow key={`${section.key}-head`} section={section} span={5} />,
           ...section.rows.map((row) => (
             <tr key={row.id} style={{ height: mm(scheduleRowHeight(row)) }} data-testid="print-schedule-row">
-              <td>{row.time ? `${row.forecast ? "ca. " : ""}${row.time}` : "–"}</td>
+              <td className="whitespace-nowrap">{row.time ? `${row.forecast ? "ca. " : ""}${row.time}` : "–"}</td>
               <td className="tls-print-ellipsis">{row.station || "–"}</td>
               <td><div className="tls-print-ellipsis font-bold">{row.round}</div><div className="tls-print-muted tls-print-ellipsis">{[row.group, row.heat ? `Lauf ${row.key}` : `Spiel ${row.key}`].filter(Boolean).join(" · ")}</div></td>
               <td><ScheduleSides row={row} /></td>
@@ -171,8 +171,9 @@ export function ScheduleBody({ page }) {
   );
 }
 
-/** Check-in-Liste: Kästchen zum Abhaken, Nummer, Name, Setzplatz, Begleitung und eine Zeile für Notizen. */
-export function CheckinBody({ page }) {
+/** Check-in-Liste: Kästchen zum Abhaken, Nummer, Name, Setzplatz, Begleitung (Event) bzw. Station zum Eintragen (Turnier)
+ * und eine Zeile für Notizen. */
+export function CheckinBody({ page, extraLabel = "Begleitung" }) {
   return (
     <table className="tls-print-table">
       <colgroup>
@@ -184,7 +185,7 @@ export function CheckinBody({ page }) {
         <col style={{ width: "40mm" }} />
       </colgroup>
       <thead>
-        <tr style={{ height: mm(CHECKIN.tableHead) }}><th>Da</th><th>Nr.</th><th>Name</th><th>Setzpl.</th><th>Begleitung</th><th>Notiz</th></tr>
+        <tr style={{ height: mm(CHECKIN.tableHead) }}><th>Da</th><th>Nr.</th><th>Name</th><th>Setzpl.</th><th>{extraLabel}</th><th>Notiz</th></tr>
       </thead>
       <tbody>
         {page.sections.map((section) => [
@@ -196,7 +197,7 @@ export function CheckinBody({ page }) {
               <td>{row.number}</td>
               <td><div className="tls-print-ellipsis font-bold">{row.name}{row.detail ? <span className="tls-print-muted font-normal"> · {row.detail}</span> : null}</div></td>
               <td>{row.seed}</td>
-              <td>{row.extra}</td>
+              <td>{row.extra || (extraLabel === "Begleitung" ? "" : <span className="tls-print-line" />)}</td>
               <td><span className="tls-print-line" /></td>
             </tr>
           )),
