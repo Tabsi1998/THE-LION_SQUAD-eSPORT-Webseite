@@ -83,7 +83,7 @@ jobs:
           {
             cat "$ABNAHME_RESULTS/summary.md"
             echo
-            echo "Bilder und Playwright-Bericht je Spec: Artefakt **abnahme-nacht** (7 Tage). Traces gibt es nachts nicht (öffentliches Artefakt).
+            echo "Bilder und Playwright-Bericht je Spec: Artefakt **abnahme-nacht** (7 Tage). Traces gibt es nachts nicht (öffentliches Artefakt)."
           } >> "$GITHUB_STEP_SUMMARY"
       - name: Ergebnisse als Artefakt
         if: always()
