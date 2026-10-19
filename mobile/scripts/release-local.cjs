@@ -28,6 +28,7 @@ const path = require("path");
 const { spawnSync } = require("child_process");
 const release = require("./release-version.cjs");
 const play = require("./play-publish.cjs");
+const { loadPlayNotes } = require("./play-notes.cjs");
 
 const mobileDir = path.resolve(__dirname, "..");
 const repoDir = path.resolve(mobileDir, "..");
@@ -231,12 +232,11 @@ async function playCheck(config) {
 /**
  * Nach dem GitHub-Release: das Bundle in den Test-Track (#412). Scheitert es, bleibt das
  * Release gültig - das Skript sagt es laut, endet mit Code 1 und nennt das Bundle zum Hochladen von Hand.
+ * Versionshinweis ist die kurze Fassung aus PLAY_NOTES.md (19.10.2026), nicht die „Was ist neu“-Punkte.
  */
-async function publishToPlay({ account, aabPath, mappingPath, version, versionCode, changelog }) {
-  const { whatsNewEntries } = require("./whats-new.cjs");
-  const notes = whatsNewEntries(changelog, version).map((item) => `- ${item}`).join("\n");
+async function publishToPlay({ account, aabPath, mappingPath, versionCode, playNotes, publish = play.publishBundle }) {
   try {
-    const result = await play.publishBundle({ account, packageName: readJson("app.json").expo.android.package, aabPath, mappingPath, versionCode, track: playTrack, notes });
+    const result = await publish({ account, packageName: readJson("app.json").expo.android.package, aabPath, mappingPath, versionCode, track: playTrack, notes: playNotes });
     console.log(`In der Play Console: Build ${result.versionCode} im Track „${result.track}“ (Edit ${result.editId}). Tester bekommen ihn nach Googles Prüfung.`);
     return true;
   } catch (error) {
@@ -244,6 +244,14 @@ async function publishToPlay({ account, aabPath, mappingPath, version, versionCo
     process.exitCode = 1;
     return false;
   }
+}
+
+/** Der Versionshinweis für Google Play als Textdatei zum Kopieren neben APK und Bundle (19.10.2026). */
+function writePlayNotes({ buildsDir: dir, version, versionCode, text }) {
+  const file = path.join(dir, `play-notes-${version}-build${versionCode}.txt`);
+  fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(file, `${text}\n`);
+  return file;
 }
 
 function javaMajor(javaHome) {
@@ -293,6 +301,9 @@ function gatherChecks() {
 
   const problems = release.versionProblems(version);
   add(!problems.length, `Version ${version} passt zum Schema`, problems.join(" "));
+  // Versionshinweis für Google Play (19.10.2026): der Text zum Kopieren in die Play Console, je Version in PLAY_NOTES.md.
+  const playNotes = loadPlayNotes(mobileDir, version);
+  add(!playNotes.problems.length, `Versionshinweis für Google Play in PLAY_NOTES.md (${playNotes.length} von ${play.RELEASE_NOTES_LIMIT} Zeichen)`, playNotes.problems.join(" "));
 
   git(["fetch", "--quiet", "--tags", "origin"]);
   const tags = (git(["tag", "-l", "mobile-v*"]).stdout || "").split(/\r?\n/).filter(Boolean);
@@ -358,6 +369,13 @@ function printChecks(checks) {
 
 function step(title) {
   console.log(`\n=== ${title}`);
+}
+
+/** Zum Schluss: Datei und Text des Versionshinweises, fertig zum Kopieren in die Play Console. */
+function printPlayNotes(file, text) {
+  step(`Versionshinweis für Google Play (zum Kopieren, ${text.length} von ${play.RELEASE_NOTES_LIMIT} Zeichen)`);
+  console.log(`Datei: ${file}\n`);
+  console.log(text);
 }
 
 /**
@@ -512,7 +530,11 @@ async function main() {
   fs.writeFileSync(`${apkPath}.sha256`, `${sha256}  ${apk}\n`);
   const notesPath = path.join(buildsDir, `release-notes-${version}-build${versionCode}.md`);
   const changelog = fs.readFileSync(path.join(buildMobile, "CHANGELOG.md"), "utf8");
-  fs.writeFileSync(notesPath, release.releaseNotes({ version, versionCode, apk, sha256, signatureText, changelog }));
+  // Aus dem gebauten Commit wie der Changelog; der Preflight hat ihn dort schon geprüft.
+  const playNotes = loadPlayNotes(buildMobile, version);
+  if (playNotes.problems.length) fail(playNotes.problems.join(" "));
+  const playNotesPath = writePlayNotes({ buildsDir, version, versionCode, text: playNotes.text });
+  fs.writeFileSync(notesPath, release.releaseNotes({ version, versionCode, apk, sha256, signatureText, changelog, playNotes: playNotes.text }));
   console.log(`APK: ${apkPath}`);
   console.log(`SHA-256: ${sha256}`);
 
@@ -539,6 +561,7 @@ async function main() {
 
   if (mode === "dry-run") {
     if (playTrack) console.log("Play-Upload im Probelauf übersprungen - der Probelauf veröffentlicht nichts.");
+    printPlayNotes(playNotesPath, playNotes.text);
     console.log("\nProbelauf fertig. Nichts veröffentlicht.");
     return;
   }
@@ -560,12 +583,13 @@ async function main() {
   const uploaded = await uploadToServer({ config, apkPath, apk, version, versionCode, changelog });
   if (playTrack) {
     step(`App Bundle in den offenen Test der Play Console laden (Track „${play.resolveTrack(playTrack)}“)`);
-    await publishToPlay({ account: playAccount, aabPath, mappingPath, version, versionCode, changelog });
+    await publishToPlay({ account: playAccount, aabPath, mappingPath, versionCode, playNotes: playNotes.text });
   }
+  printPlayNotes(playNotesPath, playNotes.text);
   return uploaded;
 }
 
-module.exports = { quote, readIfPresent };
+module.exports = { publishToPlay, quote, readIfPresent, writePlayNotes };
 
 // Gebaut und veröffentlicht wird nur beim Aufruf als Skript - die Tests laden die Datei, um einzelne Teile zu prüfen.
 if (require.main === module) {

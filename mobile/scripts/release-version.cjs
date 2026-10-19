@@ -114,7 +114,25 @@ function changelogSection(changelog, version) {
   return body.join("\n").trim();
 }
 
-function releaseNotes({ version, versionCode, apk, sha256, signatureText, changelog }) {
+/**
+ * Der Versionshinweis aus PLAY_NOTES.md als Block zum Kopieren (19.10.2026): der Betreiber lädt das Bundle von Hand in
+ * den offenen Test und kopiert den Text von hier. Ohne Hinweis kein Block.
+ */
+function playNotesBlock(playNotes) {
+  const text = String(playNotes || "").trim();
+  if (!text) return [];
+  const { RELEASE_NOTES_LIMIT } = require("./play-publish.cjs");
+  return [
+    `## Versionshinweis für Google Play (zum Kopieren, ${text.length} von ${RELEASE_NOTES_LIMIT} Zeichen)`,
+    "",
+    "```text",
+    text,
+    "```",
+    "",
+  ];
+}
+
+function releaseNotes({ version, versionCode, apk, sha256, signatureText, changelog, playNotes }) {
   const channel = releaseChannel(version);
   const section = changelogSection(changelog, version) || "- Keine Einträge im Changelog.";
   const install = channel === "beta"
@@ -136,6 +154,7 @@ function releaseNotes({ version, versionCode, apk, sha256, signatureText, change
     "",
     section,
     "",
+    ...playNotesBlock(playNotes),
     "## Installation",
     "",
     `${install} Außerhalb von Google Play kann Android Hinweise zu unbekannten Quellen oder Play Protect zeigen. Eine LionsAPP bis Build 56 ist mit einem älteren Schlüssel signiert und muss einmal gelöscht werden, bevor sich diese Version installieren lässt.`,

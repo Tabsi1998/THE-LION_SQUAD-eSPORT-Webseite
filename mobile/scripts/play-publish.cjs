@@ -84,7 +84,7 @@ function client({ token, packageName, fetch = globalThis.fetch }) {
     const headers = { Authorization: `Bearer ${token}` };
     if (body !== undefined) headers["Content-Type"] = contentType;
     // Hier gehen das App-Bundle und die R8-Zuordnung als Datei an die Play-API - dafür ist dieses Skript da. Paketname
-    // und Build-Nummer in der Adresse stammen aus app.json, die Versionshinweise aus dem CHANGELOG (#1408).
+    // und Build-Nummer in der Adresse stammen aus app.json, die Versionshinweise aus PLAY_NOTES.md (#1408).
     const response = await fetch(url, { method, headers, body: body !== undefined && contentType === "application/json" ? JSON.stringify(body) : body });
     const data = await readJson(response);
     if (!response.ok) {
