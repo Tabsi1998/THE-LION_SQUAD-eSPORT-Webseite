@@ -16,7 +16,8 @@ steht, was das **Event** darum herum tut.
 Wer das sieht: der Bereich **Turnierleitung**. Den Newsletter zu einem Event verschickt, wer das Event bearbeiten darf; ein zweites
 Mal senden nur Redaktion und System.
 
-Öffentlich: **/events** (Liste), **/events/<name>** (das einzelne Event), **/calendar** (Kalender mit Abo).
+Öffentlich: **/events** (Liste), **/events/<name>** (das einzelne Event), **/calendar** (Kalender mit Abo), mit Konto
+**/calendar/mine** („Mein Kalender“ mit persönlichem Abo).
 
 ---
 
@@ -232,24 +233,50 @@ Events in einem Schritt anmelden.
 - Kam jemand von einem Turnier mit Event-Pflicht, geht es danach zurück zu diesem Turnier.
 - Dasselbe Fenster gibt es in der App.
 
-### 3.8 Kalender, Abo und „Nur meine“
+### 3.8 Kalender, „Mein Kalender“ und Abo
 
-**Kalender (`/calendar`):** Liste oder Monatsansicht (die letzte Wahl merkt sich das Gerät), filterbar nach **Event**, **Turnier**,
-**Fast Lap** und **Verein**. Angemeldete Termine tragen eine goldene Markierung. Für Mitglieder stehen Versammlungen und die eigenen
-Helferschichten dabei.
+**Kalender (`/calendar`):** Zwei Reiter: **Alle** und **Mein Kalender**. Liste oder Monatsansicht (die letzte Wahl merkt sich das
+Gerät), filterbar nach **Event**, **Turnier**, **Fast Lap** und **Verein**. Angemeldete Termine tragen einen blauen Rahmen. Für
+Mitglieder stehen Versammlungen und die eigenen Helferschichten dabei.
 
 - **Kalender abonnieren:** Eine Adresse für **alle öffentlichen Termine**, ohne Personendaten – die dürft ihr weitergeben.
-  **Im Kalender öffnen** oder die Adresse einfügen (Google Kalender: „Weitere Kalender“ → „Per URL“; Apple, Outlook, Thunderbird:
-  „Kalender abonnieren“). Änderungen kommen von selbst nach.
-- **Mein persönlicher Link** (nur mit Konto): Ein Abo nur mit den **eigenen** Terminen – Anmeldungen (auch mit dem Team), gefahrene
-  Fast Laps, zugesagte Versammlungen und Schichten. **Link erzeugen**; die Adresse erscheint **nur dieses eine Mal**, also gleich
-  kopieren. **Neu erzeugen** macht die alte ungültig, **Abschalten** beendet den Link. Die Adresse ist privat. Ihn erzeugt man
-  auf der Website, nicht in der App.
+  **Im Kalender öffnen** oder die Adresse einfügen. **So geht's in deinem Kalender** klappt die Kurzanleitung für Google, Apple
+  und Outlook auf. Änderungen kommen von selbst nach.
 - **In den Kalender** am einzelnen Event (im Fakten-Kasten): ein einzelner Termin, bei mehrtägigen Events auch je Tag. Nach dem Ende
   des Events fällt der Knopf weg.
-- **Nur meine:** Mit Konto gibt es in der Events-Liste und im Kalender den Knopf **Nur meine**. Er zeigt, wofür man selbst oder das
-  eigene Team angemeldet ist, bei Fast Laps, wo man eine Zeit gefahren ist. In einer Event-Karte bleiben dann nur die eigenen
-  Turniere. Leer heißt „Hier bist du nirgends dabei“. Auf Karten steht ein goldenes Kennzeichen **Dabei**, mit Teamname.
+- **Nur meine:** In der Events-Liste zeigt der Knopf **Nur meine**, wofür man selbst oder das eigene Team angemeldet ist, bei Fast
+  Laps, wo man eine Zeit gefahren ist. Auf Karten steht ein goldenes Kennzeichen **Dabei**, mit Teamname.
+
+**Mein Kalender (`/calendar/mine`, nur mit Konto):** Nur die **eigenen** Termine – auch ohne Abo. Dabei sind Anmeldungen zu Events
+und Turnieren (auch über das eigene Team), Fast Laps mit gefahrener Zeit, zugesagte Versammlungen und die eigenen Schichten.
+Abgesagtes und „Nur intern“ stehen nie darin – dieselbe Regel wie im persönlichen Abo.
+
+- **Als Nächstes** gruppiert nach **Heute**, **Diese Woche** und **Später**; **Monat** zeigt das Raster wie im Vereinskalender.
+- Je Termin steht der eigene **Stand** als Plakette: angemeldet, Warteliste, eingecheckt, „Du bist dabei · mit Team“, gefahren,
+  zugesagt oder der Stand der Schicht. Ein Tipp öffnet den Termin (Turnierseite, Event, Mitgliederbereich).
+- Leer heißt: noch nirgends angemeldet – mit Wegen zu **Turniere** und **Events**.
+- Erreichbar über den Reiter im Kalender und über **Einstellungen → Konto → Mein Kalender-Abo**.
+
+<img src="../assets/kalender/mein-kalender-liste.png" alt="Mein Kalender, Als Nächstes mit dem angemeldeten Turnier und seinem Stand" width="560">
+
+**Automatisch in deinen Kalender (persönliches Abo):** Der Kasten unter „Mein Kalender“ und in den Einstellungen. Ein Abo mit genau
+diesen Terminen – einmal einrichten, danach erscheint jede Anmeldung von selbst im Handy- oder PC-Kalender.
+
+- **Abo einrichten** erzeugt die private Adresse. Sie erscheint **nur dieses eine Mal**, also gleich **Kopieren** (kurzer Haken
+  „Kopiert“), **Im Kalender öffnen** (Apple, Outlook) oder **Google Kalender** antippen.
+- Danach steht dort nur noch der Stand: **Aktiv seit …, zuletzt abgerufen …**.
+- **Neu erzeugen** (mit Rückfrage) macht die alte Adresse sofort ungültig – Kalender damit bekommen nichts mehr. **Abschalten** (mit
+  Rückfrage) beendet das Abo.
+- Die Adresse ist privat: nicht weitergeben. Gespeichert ist sie nur verschlüsselt (als Prüfwert); sie steht in keinem Protokoll.
+
+<img src="../assets/kalender/mein-kalender-abo.png" alt="Kasten Automatisch in deinen Kalender mit der Adresse und Kopiert-Haken" width="420">
+
+**Hinweis nach der Anmeldung:** Wer sich zu einem Event oder Turnier anmeldet (auch über „Spielst du auch mit?“) und noch kein Abo
+hat, sieht unten einmal den Hinweis **Deine Termine automatisch im Kalender?** mit **Einmal abonnieren** (führt zum Kasten) und
+**Nicht jetzt**. Er kommt je Konto nur einmal – gemerkt am Konto, also auch nicht auf einem anderen Gerät. Mit aktivem Abo kommt er
+nie. Fast Laps haben keine eigene Anmeldung (die Zeit trägt die Leitung ein), dort gibt es den Hinweis nicht.
+
+<img src="../assets/kalender/mein-kalender-hinweis.png" alt="Hinweis Deine Termine automatisch im Kalender mit Einmal abonnieren" width="380">
 
 ### 3.9 Verteilen: Newsletter, Meldung, Discord
 
@@ -338,7 +365,9 @@ Name, Bild und dem Ort: Event und Turniere, bei Teams mit Teamname. Wichtig für
 | „Nochmal senden“ fehlt | Nur Redaktion und System dürfen ein zweites Mal senden | Redaktion fragen |
 | Abschnitt Kosten fehlt | Es gibt einen externen Anmeldelink, oder die Anmeldung ist aus | Link entfernen bzw. Anmeldung einschalten |
 | Kosten lassen sich nicht ändern | Dafür ist der Bereich **Finanzen** nötig | Rechte klären ([Rollen](../ROLLEN.md)) |
-| Personal-Kalender zeigt nichts | Die Adresse ist abgelaufen oder wurde neu erzeugt | Auf `/calendar` **Neu erzeugen** und im Kalender die neue Adresse eintragen |
+| Persönliches Abo zeigt nichts | Die Adresse wurde neu erzeugt oder das Abo abgeschaltet | Unter **Mein Kalender** bzw. **Einstellungen → Mein Kalender-Abo** **Neu erzeugen** und im Kalender die neue Adresse eintragen |
+| Termin fehlt in „Mein Kalender“ | Abgemeldet, abgesagt oder „Nur intern“ | Gewollt; Abgesagtes und Internes stehen nie darin |
+| Der Abo-Hinweis kommt nicht mehr | Er erscheint je Konto nur einmal und nie mit aktivem Abo | Abo über **Mein Kalender** einrichten |
 | Freunde-Abschnitt fehlt | Keine bestätigten Freunde angemeldet, oder sie teilen ihre Anmeldungen nicht | Gewollt; jede Person steuert es selbst |
 
 ---
