@@ -181,7 +181,9 @@ MATCH_FIELDS = ("id", "tournament_id", "stage_id", "stage_number", "stage_type",
                 "station_label", "winner_id", "is_preview", "called_at", "best_of", "effective_duration_minutes",
                 "merged_into_key",
                 # „Als Nächstes“ mit Prognose (#1564): ist die Zeit nur eine Prognose des Planers, und woher stammt sie.
-                "schedule_forecast", "schedule_source")
+                "schedule_forecast", "schedule_source",
+                # „Nicht erschienen“ im offenen Lauf (#1823): nur wer, nie die Begründung (``no_show_notes``).
+                "no_show_registration_ids")
 # Wer zum Check-in zählt (#1123) und wer einen Platz belegt (wie die Anmeldung: offen, bestätigt, eingecheckt).
 CHECKIN_STATUSES = ("approved", "checked_in")
 SEAT_STATUSES = ("pending", "approved", "checked_in")

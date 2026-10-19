@@ -399,6 +399,19 @@ def test_the_tv_knows_the_forecast_and_who_dropped_out_but_no_notes():
     assert "geheim" not in json.dumps(matches) and "u1" not in json.dumps(matches)
 
 
+def test_the_tv_knows_who_did_not_show_up_in_an_open_heat_but_not_why():
+    """„Nicht erschienen“ im Lauf (#1823): der Lauf ist offen, die Person markiert - der TV zeigt sie als nicht
+    angetreten. Die Begründung der Turnierleitung bleibt intern."""
+    payload = {"tournament": {"id": "t1"}, "registrations": [], "stages": [], "matches_v2": [
+        {"id": "d", "match_key": "D", "section": "WB", "round": 1, "status": "scheduled", "match_type": "ffa",
+         "slots": [{"slot": 1, "registration_id": "r1"}, {"slot": 2, "registration_id": "r2"}], "results": [],
+         "no_show_registration_ids": ["r2"], "no_show_notes": {"r2": "Kam nicht, laut Herrn X"}},
+    ]}
+    match = tv_display.display_bracket_payload(payload)["matches_v2"][0]
+    assert match["no_show_registration_ids"] == ["r2"]
+    assert "Herrn X" not in json.dumps(match)
+
+
 def test_the_tv_learns_about_mixed_groups_and_where_each_player_really_came_from():
     """Gegner mischen (#1548, #1561): der TV braucht die Gruppe, den Klartext der Plätze, ob gelost ist und die echte
     Herkunft je Platz - ohne Konten (`user_id`) und ohne Zeitstempel der Bestätigung."""
