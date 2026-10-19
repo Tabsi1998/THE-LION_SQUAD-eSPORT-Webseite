@@ -1,5 +1,6 @@
 import React from "react";
-import { AccessibilityInfo, Alert, Animated, Clipboard, Linking } from "react-native";
+import { AccessibilityInfo, Alert, Animated, Linking } from "react-native";
+import * as Clipboard from "expo-clipboard";
 import * as Haptics from "expo-haptics";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react-native";
 import { PersonalFeedCard } from "./PersonalFeedCard";
@@ -21,6 +22,7 @@ jest.mock("@expo/vector-icons", () => {
   const { Text } = jest.requireActual("react-native");
   return { Ionicons: ({ name }: { name: string }) => <Text>{`icon:${name}`}</Text> };
 });
+jest.mock("expo-clipboard", () => ({ setStringAsync: jest.fn(async () => true) }));
 jest.mock("../../lib/siteUrls", () => ({ WEB_BASE_URL: "https://lionsquad.at" }));
 
 const PATH = "/api/calendar/personal/geheim123.ics";
@@ -41,7 +43,7 @@ beforeEach(() => {
   jest.spyOn(AccessibilityInfo, "isReduceMotionEnabled").mockImplementation(async () => reduce);
   jest.spyOn(AccessibilityInfo, "announceForAccessibility").mockImplementation(() => undefined);
   alertSpy = jest.spyOn(Alert, "alert").mockImplementation(() => undefined);
-  setString = jest.spyOn(Clipboard, "setString").mockImplementation(() => undefined);
+  setString = jest.spyOn(Clipboard, "setStringAsync").mockResolvedValue(true);
   jest.spyOn(Linking, "openURL").mockResolvedValue(true);
   timing = jest.spyOn(Animated, "timing");
   mockGet.mockResolvedValue({ data: { active: false, created_at: null, last_used_at: null } });

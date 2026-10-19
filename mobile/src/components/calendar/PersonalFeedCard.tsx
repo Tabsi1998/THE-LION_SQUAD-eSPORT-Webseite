@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { AccessibilityInfo, Alert, Animated, Clipboard, Linking, Pressable, StyleSheet, View, type StyleProp, type ViewStyle } from "react-native";
+import { AccessibilityInfo, Alert, Animated, Linking, Pressable, StyleSheet, View, type StyleProp, type ViewStyle } from "react-native";
+import * as Clipboard from "expo-clipboard";
 import * as Haptics from "expo-haptics";
 import { Ionicons } from "@expo/vector-icons";
 import { Button } from "../Button";
@@ -164,7 +165,7 @@ function CopyButton({ url, testID }: { url: string; testID: string }) {
   }, []);
 
   const copy = () => {
-    Clipboard.setString(url);
+    Promise.resolve(Clipboard.setStringAsync(url)).catch(() => undefined);
     // Ohne Vibration (Gerät, Einstellung) bleibt es still - der Haken zeigt es trotzdem.
     Promise.resolve(Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)).catch(() => undefined);
     AccessibilityInfo.announceForAccessibility("Abo-Adresse kopiert");
