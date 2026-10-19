@@ -36,8 +36,8 @@ Seite von selbst weiter, ohne Maus und ohne Tastatur.
 | --- | --- | --- |
 | **Turnierbaum** | Den Turnierbaum mit einer Wiedergabeliste: Baum, Live-Spiele, Aufrufe, zwischendurch Sponsor und Zahlen. Vor dem Start von selbst Anmeldung oder Check-in, bei „Pausiert“ die Pause. | ja |
 | **Station** | Nur, was an dieser einen Station läuft oder als Nächstes kommt. Durchgänge als Startaufstellung, Duelle als „A gegen B“. | ja (derselbe wie beim Turnier) |
-| **Event** (Hallen-Tafel) | Den Tagesplan mit „jetzt“-Linie, alle Stationen, was läuft und was als Nächstes kommt. | nein |
-| **Aufrufe** (Aufruf-Tafel) | Nur die Aufrufe, über alle Turniere eines Events: wer jetzt an welche Station soll, mit Countdown. | nein |
+| **Event** (Hallen-Tafel) | Den Tagesplan mit „jetzt“-Linie, alle Stationen, was läuft und was als Nächstes kommt. | freiwillig – für Turniere „Nur Mitglieder“ ja (ein Schlüssel je Event) |
+| **Aufrufe** (Aufruf-Tafel) | Nur die Aufrufe, über alle Turniere eines Events: wer jetzt an welche Station soll, mit Countdown. | freiwillig – für Turniere „Nur Mitglieder“ ja (derselbe wie bei der Hallen-Tafel) |
 | **Fast Lap** | Podium und Rangliste einer Challenge, die Vereins-Referenz und den Bestzeit-Moment. | nein |
 
 Dazu kommen Einstellungen, die für alle Bildschirme gelten (Grundwerte) oder nur für einen:
@@ -82,11 +82,18 @@ Dazu kommen Einstellungen, die für alle Bildschirme gelten (Grundwerte) oder nu
 
 ### 2.3 Die Hallen-Tafel, die Aufruf-Tafel und Fast Lap
 
-Genau gleich, nur ohne Schlüssel – diese Ansichten sind öffentlich:
+Genau gleich, aber ohne Pflicht-Schlüssel – ohne Schlüssel zeigen diese Ansichten, was öffentlich ist:
 
 1. Ansicht **Event**, **Aufrufe** oder **Fast Lap** wählen.
 2. Bei **Event** beziehungsweise **Fast-Lap-Challenge** das Ziel auswählen.
 3. **Link kopieren**.
+
+**Turniere „Nur Mitglieder“ am Event:** Für sie braucht der Bildschirm einen TV-Zugang. Ohne Schlüssel fehlen sie auf
+Hallen- und Aufruf-Tafel (der Bildschirm ist ja nicht angemeldet). Deshalb bei **Event** oder **Aufrufe** unter
+**Anzeige-Schlüssel (freiwillig)** einen **Namen des Bildschirms** eintragen und auf **Link mit Schlüssel** klicken.
+Der Link trägt dann den Schlüssel, und die Tafel zeigt am Hallen-PC ohne Anmeldung alle Turniere des Events – auch
+„Nur Mitglieder“, nie „Nur intern“ oder Entwürfe. Ein Schlüssel gilt für **Hallen- und Aufruf-Tafel desselben
+Events**. Wie beim Turnierbaum steht er nur in diesem Moment im Link – gleich kopieren.
 
 ### 2.4 Die Stations-Ansicht
 
@@ -146,6 +153,11 @@ Turnier, wechselt er durch die **Wiedergabeliste**:
   gezogen · Name → Spiel“, der Platz leuchtet auf.
 - Ist das Turnier noch nicht gestartet, zeigt der TV von selbst **Anmeldung offen** oder **Check-in**. Beim Status
   **Pausiert** zeigt er die Pause.
+- **Anmeldung und Check-in zugleich** (vor Ort üblich: Einlass mit beidem): Solange man sich anmelden kann und ein
+  Platz frei ist, bleibt der Anmelde-Bildschirm mit QR-Code (bei Turnieren vor Ort der Vor-Ort-Zugang) und den freien
+  Plätzen – auch wenn der Check-in-Zeitraum schon begonnen hat. Den Check-in zeigt der TV, sobald ihr ihn startet
+  (Status „Check-in“), die Anmeldung zu ist oder alle Plätze vergeben sind. Ob die Anmeldung offen ist, entscheidet
+  dieselbe Regel wie auf der Turnierseite.
 - Ist das Turnier entschieden, bleibt die Siegerkarte stehen.
 
 **Pause bis:** Setzt ihr ein Turnier unter **Admin → eSports → Turniere → Turnier öffnen** auf **Pausiert**, erscheint
@@ -233,12 +245,13 @@ Einen vorhandenen Link ändern: Ihn im Feld **Vorhandenen TV-Link einfügen, um 
 
 ### 3.9 Anzeige-Schlüssel verwalten
 
-Ganz unten auf der Seite, **Aktive Anzeige-Schlüssel**: Jeder Turnierbaum-Link mit Schlüssel steht dort mit Name,
-Turnier, Erstellungszeit und „zuletzt da“. **Widerrufen** beendet den Schlüssel sofort: Der Bildschirm zeigt dann
-„Dieser TV-Link gilt nicht mehr“. Ein neuer Link geht jederzeit oben im Baukasten.
+Ganz unten auf der Seite, **Aktive Anzeige-Schlüssel**: Jeder Link mit Schlüssel steht dort mit Name, Turnier
+(beziehungsweise „Event …“), Erstellungszeit und „zuletzt da“. **Widerrufen** beendet den Schlüssel sofort: Der
+Bildschirm zeigt dann „Dieser TV-Link gilt nicht mehr“. Ein neuer Link geht jederzeit oben im Baukasten. Ein Schlüssel
+endet von selbst eine Woche nach dem Turnier beziehungsweise Event.
 
-Der Schlüssel erlaubt **nur das Anschauen dieses einen Turniers** (und seiner Stationen). Mehr kann damit niemand
-tun.
+Ein Turnier-Schlüssel erlaubt **nur das Anschauen dieses einen Turniers** (und seiner Stationen), ein Event-Schlüssel
+**nur das Anschauen der Tafeln dieses einen Events**. Mehr kann damit niemand tun.
 
 ### 3.10 Fast Lap am TV
 
@@ -262,6 +275,8 @@ QR-Code zum Mitfahren. Mehr dazu im [Fast-Lap-Kapitel](fastlap.md).
 | „Das ist kein Link einer TV-Seite“ beim Übernehmen | Der eingefügte Text ist keine Adresse einer TV-Seite | Den ganzen Link einfügen, beginnend mit der Adresse eurer Website |
 | Änderung in den Grundwerten kommt nicht an | Nicht gespeichert (Knopf **Speichern**), oder der Link hat dafür eine eigene Abweichung | Speichern. Bei der Ansicht prüfen, ob unter „Abweichungen nur für diesen Bildschirm“ der Wert steht; dann gilt der Link-Wert |
 | Der Bildschirm zeigt „Keine Aufrufe“, obwohl Spiele laufen | Ein Spiel ist erst aufgerufen, wenn es einer Station zugewiesen und noch nicht gestartet ist | Unter **Admin → eSports → Stationen** mit **Spiel zuweisen** zuweisen |
+| Hallen- oder Aufruf-Tafel zeigt ein Turnier „Nur Mitglieder“ nicht | Der Link hat keinen Anzeige-Schlüssel – der Bildschirm ist nicht angemeldet und sieht nur, was öffentlich ist | Im Baukasten bei **Event** oder **Aufrufe** **Link mit Schlüssel** erstellen und den neuen Link am TV öffnen (siehe 2.3) |
+| Der Turnierbaum-TV zeigt den Check-in statt der Anmeldung | Die Anmeldung ist zu, alle Plätze sind vergeben, oder der Check-in wurde gestartet | Gewollt. Solange man sich anmelden kann und ein Platz frei ist, zeigt er die Anmeldung mit QR-Code |
 | Aufruf-Tafel ohne Countdown | Ein Spiel ohne geplante Zeit zählt ab dem Aufruf | Bei **Zeit zum Antreten** die Minuten einstellen |
 | Kein Ton beim Ergebnis | Ton ist standardmäßig aus, oder der Browser wartet auf einen Klick | **Ton beim Ergebnis** einschalten und am TV einmal klicken („Für Ton einmal klicken“) |
 | „Gerade kein Sponsor für den TV“ | Kein Sponsor hat den Haken **TV / Anzeige** | Unter **Admin → Verein → Sponsoren** beim Sponsor den Haken setzen |
@@ -276,10 +291,12 @@ QR-Code zum Mitfahren. Mehr dazu im [Fast-Lap-Kapitel](fastlap.md).
 ## 5. Häufige Fragen
 
 **Brauche ich am Hallen-PC ein Konto?**
-Nein. Der Turnierbaum läuft mit dem Anzeige-Schlüssel im Link, die anderen Ansichten sind öffentlich.
+Nein. Der Turnierbaum läuft mit dem Anzeige-Schlüssel im Link, die anderen Ansichten sind öffentlich. Hat das Event
+Turniere „Nur Mitglieder“, bekommen Hallen- und Aufruf-Tafel einen Event-Schlüssel (siehe 2.3).
 
 **Was passiert, wenn jemand den Link fotografiert?**
-Mit einem Turnierbaum-Link kann man nur dieses Turnier ansehen. Ihr könnt den Schlüssel jederzeit widerrufen.
+Mit einem Turnierbaum-Link kann man nur dieses Turnier ansehen, mit einem Event-Link nur die Tafeln dieses Events.
+Ihr könnt den Schlüssel jederzeit widerrufen.
 
 **Kann ich mehrere Bildschirme für ein Turnier haben?**
 Ja. Erstellt je Bildschirm einen eigenen Link mit eigenem Namen. Dann seht ihr unter **Aktive Anzeige-Schlüssel**, welcher
