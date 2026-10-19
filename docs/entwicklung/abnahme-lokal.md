@@ -163,3 +163,36 @@ bash scripts/run_abnahme_all.sh down   # Stand samt Testdatenbank weg
 `ABNAHME_SPECS="tv-abnahme matchplan-abnahme"` wählt einzelne Specs, `PYTHON` das Python (unter Windows etwa das
 eigene venv). Geplante Workflows laufen nur auf `main`; nach 60 Tagen ohne Aktivität im Repository schaltet GitHub
 sie ab - dann im Reiter Actions wieder einschalten.
+
+## 6. Lasttest für den Event-Abend
+
+`scripts/lasttest_abnahme.py` (#1683) setzt einen eigenen Abnahme-Stand unter Last wie am Turnierabend, über die echten
+Routen und so, wie die Seiten im Browser abfragen: Zuschauer und Spieler auf Turnierseite, Baum, Spielplan und Fast Lap
+(jeder mit Änderungsstrom und Nachladen bei jeder Änderung, ein Teil angemeldet mit „Du bist als Nächstes“), TVs mit
+Anzeige-Schlüssel, Helfer an der Live-Warteschlange (aufrufen, starten, Ergebnis), Fast-Lap-Schnelleingabe und
+Vor-Ort-Anmeldungen über den QR-Code. Er bricht vor der ersten Anfrage ab, wenn die Adresse nicht auf diesem Rechner
+liegt, der Port nicht zum Docker-Projekt gehört oder dessen Backend nicht die Abnahme-Datenbank nutzt; den gemeinsamen
+Stand `lsw-abnahme` nimmt er nie (er trägt Ergebnisse ein). Er verbraucht Testdaten - vor jedem Lauf frisch seeden, nie
+zwei Seeds in derselben Minute.
+
+Vor einem Event, auf einem eigenen Stand (hier der des Nachtlaufs):
+
+```bash
+bash scripts/run_abnahme_all.sh up
+export ABNAHME_PROJECT=lsw-abnahme-nacht FRONTEND_PORT=24500 \
+  ABNAHME_STATE=$PWD/.local-testing/abnahme/state-lsw-abnahme-nacht.json
+python scripts/seed_abnahme.py
+python scripts/lasttest_abnahme.py --minutes 10 --viewers 150   # Bericht: .local-testing/abnahme/lasttest-…/report.md
+bash scripts/run_abnahme_all.sh down
+```
+
+Stellschrauben: `--minutes`, `--viewers` (Vorgabe 150), `--signed-in` (Anteil angemeldeter Spieler, 0.3), `--tvs` (3),
+`--helpers` (4), `--helper-pause` (20 s je Schritt - dichter als am Abend), `--fastlap-pause` (30 s), `--onsite` (20
+Anmeldungen), `--ramp` (60 s, bis alle da sind), Grenzwerte `--p95-ms` (800) und `--max-error-rate` (0.005).
+`--overlapping-reloads` lädt wie das Web vor #1683 (jede Meldung ein neues Nachladen, auch wenn das vorige noch läuft).
+
+Der Bericht (Markdown und JSON) nennt je Gruppe von Endpunkten Anfragen, Fehlerquote, p50/p95/p99, grün oder rot gegen
+die Grenzwerte, die langsamsten Anfragen und `docker stats` von Backend, Datenbank und Frontend. 409 „schon erledigt“
+zählt als abgelehnt, eine besetzte Turnier-Sperre („bitte erneut versuchen“) als Fehler. Exit 0 grün, 1 rot, 2
+abgebrochen. Die Zahlen gelten für diesen Rechner (Docker Desktop), nicht für den Server; „Verzögerung der
+Lastschleife“ zeigt, ob der Lasttest selbst bremst. Zugänge stehen nur in der Stand-Datei, nie im Bericht.

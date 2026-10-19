@@ -225,7 +225,9 @@ function BracketTv() {
     load();
   }, [load]);
   // Die TV-Anzeige läuft stundenlang: ohne Strom alle 15 s nachfragen. „tv“: ein widerrufener Schlüssel wirkt sofort.
-  useLiveRefresh(load, LIVE_RESOURCES, { fallbackMs: 15000 });
+  // Abfragen dürfen sich überlappen (#1683): `load` ordnet die Antworten selbst (seqRef), und jede Meldung braucht
+  // ihren Moment sofort - nicht erst nach einer noch laufenden Nachhol-Abfrage.
+  useLiveRefresh(load, LIVE_RESOURCES, { fallbackMs: 15000, overlap: true });
   // Welche Abfrage eine Änderung aus dem Strom trägt: jede passende Meldung zählt mit.
   useEffect(() => subscribeApiInvalidation((event) => {
     if (invalidationMatches(event, LIVE_RESOURCES)) eventSeqRef.current += 1;
