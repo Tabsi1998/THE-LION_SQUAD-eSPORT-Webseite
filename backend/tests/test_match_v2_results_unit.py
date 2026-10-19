@@ -74,6 +74,57 @@ def test_normalize_v2_results_requires_all_filled_slots():
         normalize_v2_results(_source_match(), RESULTS[:3])
 
 
+def _heat_with_no_show(registration_id="r3", note="Nicht erschienen – Frist von 10 Minuten abgelaufen"):
+    match = _source_match()
+    match["no_show_registration_ids"] = [registration_id]
+    match["no_show_notes"] = {registration_id: note}
+    return match
+
+
+def test_a_heat_without_the_missing_person_gets_them_last_as_no_show():
+    """#1823: im Lauf reicht das Ergebnis der Anwesenden - wer als nicht erschienen markiert ist, steht danach hinten."""
+    results = normalize_v2_results(_heat_with_no_show(), [
+        {"registration_id": "r4", "rank": 1}, {"registration_id": "r1", "rank": 2}, {"registration_id": "r2", "rank": 3},
+    ])
+
+    assert [(row["registration_id"], row["rank"], row["forfeit"]) for row in results] == [
+        ("r4", 1, False), ("r1", 2, False), ("r2", 3, False), ("r3", 4, True)]
+    assert results[-1]["note"] == "Nicht erschienen – Frist von 10 Minuten abgelaufen"
+
+
+def test_a_heat_with_points_puts_the_missing_person_last_too():
+    results = normalize_v2_results(_heat_with_no_show(), [
+        {"registration_id": "r1", "score": 4}, {"registration_id": "r2", "score": 9}, {"registration_id": "r4", "score": 7},
+    ])
+
+    assert [row["registration_id"] for row in results] == ["r2", "r4", "r1", "r3"]
+    assert results[-1]["forfeit"] is True
+
+
+def test_the_window_flag_keeps_the_reason_of_the_mark():
+    results = normalize_v2_results(_heat_with_no_show(), [
+        {"registration_id": "r4", "rank": 1}, {"registration_id": "r1", "rank": 2},
+        {"registration_id": "r2", "rank": 3}, {"registration_id": "r3", "rank": 4, "forfeit": True},
+    ])
+
+    assert results[-1]["note"] == "Nicht erschienen – Frist von 10 Minuten abgelaufen"
+
+
+def test_a_marked_person_who_raced_after_all_keeps_the_entered_place():
+    results = normalize_v2_results(_heat_with_no_show(), [
+        {"registration_id": "r3", "rank": 1}, {"registration_id": "r4", "rank": 2},
+        {"registration_id": "r1", "rank": 3}, {"registration_id": "r2", "rank": 4},
+    ])
+
+    assert [(row["registration_id"], row["forfeit"]) for row in results][0] == ("r3", False)
+
+
+def test_without_a_mark_a_missing_participant_is_still_an_error():
+    match = _heat_with_no_show()
+    with pytest.raises(MatchV2ResultError, match="alle belegten Teilnehmer"):
+        normalize_v2_results(match, [{"registration_id": "r4", "rank": 1}, {"registration_id": "r1", "rank": 2}])
+
+
 def test_normalize_v2_results_auto_ranks_fastest_time_when_configured():
     match = _source_match()
     match["settings"] = {"calculation": "time"}

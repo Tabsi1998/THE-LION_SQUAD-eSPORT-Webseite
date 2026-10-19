@@ -16,6 +16,7 @@ from services.v2_match_flows import (
     dispute_entry,
     is_duplicate_dispute,
     is_duplicate_report,
+    no_show_keeps_heat_open,
     report_consensus,
     report_entry,
     results_for_forfeit,
@@ -45,12 +46,30 @@ def test_the_forfeiting_participant_is_ranked_last():
     ]
 
 
-def test_the_other_participants_keep_their_order():
-    """Bei mehr als zwei Teilnehmern gibt der Forfeit nur den letzten Platz vor."""
-    results = results_for_forfeit(match_with("a", "b", "c", "d"), "b")
+def test_a_played_heat_keeps_its_ranking_not_the_seat_order():
+    """#1823: eine Wertung in einem gefahrenen Lauf nimmt die Person nach hinten - die anderen behalten ihre Plätze
+    aus dem Ergebnis, nicht die Reihenfolge ihrer Sitze."""
+    match = match_with("a", "b", "c", "d", results=[
+        {"registration_id": "d", "rank": 1}, {"registration_id": "b", "rank": 2},
+        {"registration_id": "a", "rank": 3}, {"registration_id": "c", "rank": 4},
+    ])
 
-    assert [item["registration_id"] for item in results] == ["a", "c", "d", "b"]
-    assert [item["rank"] for item in results] == [1, 2, 3, 4]
+    results = results_for_forfeit(match, "b")
+
+    assert [(item["registration_id"], item["rank"]) for item in results] == [("d", 1), ("a", 2), ("c", 3), ("b", 4)]
+    assert results[-1]["forfeit"] is True
+
+
+@pytest.mark.parametrize(("seated", "results", "expected"), [
+    (("a", "b", "c", "d"), None, True),
+    (("a", "b", "c"), None, True),
+    (("a", "b"), None, False),
+    (("a",), None, False),
+    (("a", "b", "c", "d"), [{"registration_id": "a", "rank": 1}], False),
+])
+def test_only_an_open_heat_keeps_going_without_the_missing_person(seated, results, expected):
+    """#1823: im Lauf mit mehr als zwei Spielern bleibt der Lauf offen; das Duell (zwei Seiten) wird gewertet."""
+    assert no_show_keeps_heat_open(match_with(*seated, **({"results": results} if results else {}))) is expected
 
 
 def test_empty_slots_are_ignored():

@@ -182,6 +182,17 @@ def _withdrawn_walkovers(match: dict, application: dict, reset_matches: list[dic
             "admin_decision_at": None,
         })
         withdrawn.append({"match_id": match["id"], "registration_id": previous})
+    # Im Lauf als nicht erschienen markiert (#1823), aber mit Platz eingetragen: die Person ist doch gefahren - die
+    # Markierung und ihr Eintrag „nicht erschienen“ fallen weg.
+    marked = match.get("no_show_registration_ids") or []
+    ranked = {row.get("registration_id") for row in application["results"]}
+    raced = [item for item in marked if item in ranked and item not in still_forfeit]
+    if raced:
+        application["match_set"].update({
+            "no_show_registration_ids": [item for item in marked if item not in raced],
+            "no_show_notes": {key: value for key, value in (match.get("no_show_notes") or {}).items() if key not in raced},
+        })
+        withdrawn.extend({"match_id": match["id"], "registration_id": item} for item in raced)
     withdrawn.extend(
         {"match_id": row["id"], "registration_id": row["forfeit_registration_id"]}
         for row in reset_matches if row.get("forfeit_registration_id")

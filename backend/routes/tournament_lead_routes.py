@@ -5,7 +5,9 @@ Helfer-Einsatz in genau diesem Turnier. Spieler, Moderatoren ohne Einsatz und G�
 darf je Spiel nur, wer Ergebnis-Recht hat (``can_enter``) - das prüft der Ergebnis-Weg noch einmal.
 
 „Nicht erschienen?“ (#1551): ist die Frist eines Spiels um, liegt ein Vorschlag am Spiel. Die Turnierleitung bestätigt
-ihn - die gewählte Seite verliert dieses eine Spiel kampflos, über den Forfeit-Weg - oder verlängert die Frist.
+ihn - die gewählte Seite verliert dieses eine Spiel kampflos, über den Forfeit-Weg - oder verlängert die Frist. Im
+Lauf mit mehr als zwei Spielern (#1823) wird nur die gewählte Person markiert; der Lauf bleibt offen
+(``services.match_forfeit``).
 """
 from datetime import datetime, timedelta, timezone
 from typing import Literal

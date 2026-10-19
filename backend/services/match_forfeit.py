@@ -5,23 +5,60 @@ Ergebnis-Weg (``submit_v2_result``) läuft und damit den Baum weiterschiebt. Daz
 Begründung für die betroffene Person (sie sieht sie unter ihren Strafen) und der Eintrag „nicht erschienen“.
 
 Zwei Wege nutzen das: die Turnierleitung über ``POST /matches/{id}/forfeit`` und das Ergebnis-Fenster (#1156), wenn
-im Duell eine Seite „Nicht erschienen“ hat - dort geht es erst nach den 10 Sekunden „Rückgängig“ raus.
+im Duell eine Seite „Nicht erschienen“ hat - dort geht es erst nach den 10 Sekunden „Rückgängig“ raus. Dazu der
+Vorschlag „nicht erschienen“ nach der Frist (#1551), den die Turnierleitung bestätigt.
+
+Im offenen Lauf mit mehr als zwei Spielern (#1823) ist „nicht erschienen“ keine Wertung des ganzen Laufs: die Person
+wird am Lauf markiert (``no_show_registration_ids``, die Begründung intern in ``no_show_notes``), der Lauf bleibt offen
+und wird mit den Anwesenden gefahren. Beim Eintragen steht sie als „nicht erschienen“ hinten
+(``match_v2_results._with_marked_no_shows``).
 """
 from __future__ import annotations
 
 import logging
 
-from models import now_utc
-from services.v2_match_flows import results_for_forfeit
+from models import new_id, now_utc
+from services.match_v2_results import MatchV2ResultError
+from services.v2_match_flows import no_show_keeps_heat_open, results_for_forfeit
 from services.v2_result_submission import submit_v2_result
 from services.walkover_incidents import record_walkover_incident  # noqa: F401 - umgezogen (#1420)
 
 logger = logging.getLogger("tls.match")
 
 
+async def mark_heat_no_show(db, match: dict, registration_id: str, *, note: str, actor_id: str) -> dict:
+    """Eine Person im Lauf als nicht erschienen markieren - der Lauf bleibt offen, niemand rückt weiter (#1823).
+    Ein zweites Mal für dieselbe Person ändert nichts."""
+    if str(match.get("status") or "") == "cancelled":
+        raise MatchV2ResultError("Abgebrochene Matches können kein Ergebnis erhalten")
+    marked = list(match.get("no_show_registration_ids") or [])
+    if registration_id in marked:
+        return {**match, "idempotent_replay": True}
+    now_iso = now_utc().isoformat()
+    await db.matches_v2.update_one({"id": match["id"]}, {"$set": {
+        "no_show_registration_ids": [*marked, registration_id],
+        "no_show_notes": {**(match.get("no_show_notes") or {}), registration_id: note},
+        "updated_at": now_iso,
+    }})
+    await db.audit_logs.insert_one({
+        "id": new_id(), "action": "match.no_show.marked", "target_id": match.get("tournament_id"), "actor_id": actor_id,
+        "data": {"match_id": match.get("id"), "stage_id": match.get("stage_id"), "match_key": match.get("match_key"),
+                 "registration_id": registration_id, "note": note},
+        "created_at": now_iso,
+    })
+    await record_walkover_incident(db, match, registration_id, actor_id)
+    result = await db.matches_v2.find_one({"id": match["id"]}, {"_id": 0}) or match
+    result["idempotent_replay"] = False
+    return result
+
+
 async def apply_forfeit(db, match: dict, forfeiting_registration_id: str, *, note: str, actor_id: str,
                         force: bool, reason: str | None = None, hold_id: str | None = None) -> dict:
-    """Die Wertung schreiben: Platzierung über den Ergebnis-Weg, dann Stand und Begründung am Spiel."""
+    """Die Wertung schreiben: Platzierung über den Ergebnis-Weg, dann Stand und Begründung am Spiel. Im offenen Lauf
+    mit mehr als zwei Spielern nur die Markierung (#1823)."""
+    if no_show_keeps_heat_open(match):
+        results_for_forfeit(match, forfeiting_registration_id)  # gehört die Person zum Lauf?
+        return await mark_heat_no_show(db, match, forfeiting_registration_id, note=note, actor_id=actor_id)
     results = results_for_forfeit(match, forfeiting_registration_id)
     outcome = await submit_v2_result(
         db,
