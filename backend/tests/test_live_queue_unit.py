@@ -164,6 +164,16 @@ def test_each_station_shows_running_next_and_after():
     assert view["matches"]["id-F"]["state"] == "queued"
 
 
+def test_an_entry_says_whether_it_is_a_heat():
+    """Ein Lauf (mehr als zwei Plätze) ist als solcher markiert - die Stationen nennen dann Durchgang und Namen (#1824)."""
+    heat = duel("A", "r1", "r2", match_type="ffa", settings={"min_players": 2})
+    heat["slots"] = [slot(1, "r1"), slot(2, "r2"), slot(3, "r3"), slot(4, "r4")]
+    view = queue([heat, duel("B", "r5", "r6", order=2)], [station("st1", "1"), station("st2", "2")], T0)
+    assert view["matches"]["id-A"]["heat"] is True
+    assert view["matches"]["id-A"]["names"] == ["Spieler 1", "Spieler 2", "Spieler 3", "Spieler 4"]
+    assert view["matches"]["id-B"]["heat"] is False
+
+
 def test_the_next_match_depends_only_on_its_own_lines_not_on_the_whole_round():
     """SF1 wartet auf QF1 und QF3 - nicht auf QF2/QF4. Läuft QF2 lang, verschiebt das SF1 nicht."""
     matches = eight()

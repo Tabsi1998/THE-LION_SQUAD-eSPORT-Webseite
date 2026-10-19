@@ -93,6 +93,10 @@ def _open_slots(match: dict) -> int:
     )
 
 
+def _is_heat(match: dict) -> bool:
+    return str(match.get("match_type") or "duel") != "duel" or len(match.get("slots") or []) > 2
+
+
 def _live_copy(match: dict, now: datetime) -> dict:
     """Ein von Hand gesetzter oder vereinbarter Termin, der vorbei ist, ohne dass das Spiel begann, gilt ab jetzt -
     sonst stünde die Prognose in der Vergangenheit."""
@@ -212,6 +216,8 @@ def build_live_queue(
             "station_text": _station_text(station_by_id.get(row["station_id"])) if row["station_id"] else "",
             "names": [names.get(registration_id) or "Teilnehmer" for registration_id in filled],
             "open_slots": _open_slots(match),
+            # Lauf (mehr als zwei Plätze): die Stationen nennen dann den Durchgang und die Namen (#1824).
+            "heat": _is_heat(match),
             "ready": len(filled) >= _min_players(match) and not _unresolved(match),
             "forecast": row["forecast"],
             "planned_at": _iso(planned),
