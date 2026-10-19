@@ -74,6 +74,14 @@ export default function AdminSettingsPage() {
     google_linking_enabled: false,
     google_client_id: "",
     google_configured: false,
+    // Grenzen je Netz (#1802) - Vorgaben wie im Backend, bis die Einstellungen geladen sind.
+    login_ip_limit_per_minute: 30,
+    register_ip_limit_per_hour: 5,
+    event_login_ip_limit_per_minute: 150,
+    event_register_ip_limit_per_hour: 50,
+    event_limits_from: "",
+    event_limits_until: "",
+    event_limits_active: false,
   });
   const [savingAuth, setSavingAuth] = useState(false);
   const [testingGoogle, setTestingGoogle] = useState(false);
@@ -562,7 +570,7 @@ export default function AdminSettingsPage() {
 
       {tab === "auth" && section === "google" && <GoogleLoginSection authConfig={authConfig} setAuthConfig={setAuthConfig} savingAuth={savingAuth} testingGoogle={testingGoogle} saveAuth={saveAuth} testGoogleConfig={testGoogleConfig} authSwitches={authSwitches} />}
 
-      {tab === "auth" && section === "zugang" && <AccessSection authSwitches={authSwitches} />}
+      {tab === "auth" && section === "zugang" && <AccessSection authSwitches={authSwitches} authConfig={authConfig} savingAuth={savingAuth} saveAuth={saveAuth} />}
 
       {tab === "email" && <ResendSection email={email} setEmail={setEmail} testEmail={testEmail} setTestEmail={setTestEmail} savingEmail={savingEmail} saveEmail={saveEmail} clearEmailSecret={clearEmailSecret} sendTest={sendTest} mailViaSmtp={mailViaSmtp} emailNotConfigured={emailNotConfigured} />}
 
