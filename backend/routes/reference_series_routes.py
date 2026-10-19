@@ -24,6 +24,7 @@ from models import (
     now_utc,
 )
 from services import partner_pages, reference_series
+from services.reference_series_access import SeriesAccess, require_series_editor
 from services.scoring_rules import normalize_rules
 from services.slug_utils import apply_slug_history, slug_source_for_update, slugify, unique_slug
 
@@ -188,10 +189,12 @@ async def create_series(body: ReferenceSeriesCreate, me: dict = Depends(require_
 
 
 @router.get("/admin/series/{series_id}")
-async def get_series(series_id: str, me: dict = Depends(require_area("content"))):
+async def get_series(series_id: str, access: SeriesAccess = Depends(require_series_editor)):
+    """Vorstand und gültige Captains dieser Serie (#1749); ``access`` sagt der Seite, was die Person hier darf."""
     db = get_db()
-    series = await _series(db, series_id)
+    series = dict(access.series)
     series["lineage"] = await db.reference_lineages.find_one({"id": series["lineage_id"]}, {"_id": 0})
+    series["access"] = access.summary()
     return series
 
 
