@@ -100,13 +100,12 @@ def _official(row: dict, official) -> None:
 # ---------------------------------------------------------------- Fahrer und Spieler
 def _results_by_participant(rules: dict, upto: list[dict], sheets: dict, seq_of: dict) -> dict[str, list[dict]]:
     found: dict[str, list[dict]] = {}
+    # Jeder Teilnehmer steht höchstens einmal im Blatt - das prüft validate_sheet vor dem Rechnen.
     for item in upto:
-        seen: set[str] = set()
         for row in sheets[item["id"]].get("rows") or []:
             pid = row.get("participant_id")
-            if not pid or pid in seen:
+            if not pid:
                 continue
-            seen.add(pid)
             scored = result_points(row, rules)
             found.setdefault(pid, []).append({
                 "round_id": item["id"], "seq": seq_of[item["id"]], "place": row.get("place") or None,

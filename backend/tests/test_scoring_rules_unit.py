@@ -66,6 +66,13 @@ def test_a_sheet_with_negative_penalty_points_is_refused():
     validate_sheet({"rows": [{"participant_id": "anna", "place": 1, "penalty_points": 2}]}, "r1")
 
 
+def test_a_sheet_naming_a_participant_twice_is_refused():
+    twice = {"rows": [{"participant_id": "anna", "place": 1}, {"participant_id": "bert", "place": 2},
+                      {"participant_id": "anna", "place": 3}]}
+    with pytest.raises(ValueError, match="anna.*mehrfach"):
+        validate_sheet(twice, "r1")
+
+
 def test_organizer_points_and_manual_points_are_taken_as_entered():
     organizer = rules(points_mode="organizer")
     assert result_points({"place": 1, "points": 7.5}, organizer) == {
