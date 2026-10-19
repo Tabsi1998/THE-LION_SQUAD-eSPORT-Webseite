@@ -145,6 +145,18 @@ async def test_no_show_in_a_heat_marks_only_that_person_and_the_heat_stays_open(
 
 
 @pytest.mark.asyncio
+async def test_case_and_message_say_the_heat_stays_open(flow):
+    """Im Lauf heißt der Vorschlag nicht „kampflos werten“: Karte und Nachricht sagen, dass der Lauf offen bleibt."""
+    tournament, _heat, _user_of = await heats_cup(flow)
+    assert (await sweep(flow.db))["proposed"] == 1
+    item = next(row for row in (await flow.get(f"/api/tournaments/{tournament['id']}/lead")).json()["attention"]
+                if row["kind"] == "no_show")
+    assert "Lauf bleibt offen" in item["detail"] and "kampflos" not in item["detail"]
+    note = await flow.db.notifications.find_one({"kind": "match_attention", "meta.reason": "no_show"}, {"_id": 0})
+    assert "Lauf bleibt offen" in note["body"] and "ampflos" not in note["body"]
+
+
+@pytest.mark.asyncio
 async def test_the_present_three_are_entered_and_the_best_two_advance(flow):
     tournament, heat, _user_of = await heats_cup(flow)
     first, missing, third, fourth = seats(heat)

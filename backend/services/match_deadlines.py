@@ -24,7 +24,7 @@ from services.matchday_schedule import (
     matchday_window,
     plays_in_matchdays,
 )
-from services.v2_match_flows import latest_reports
+from services.v2_match_flows import latest_reports, no_show_keeps_heat_open
 
 DEFAULTS = {
     "no_show_minutes_on_site": 10,
@@ -39,6 +39,14 @@ LIMITS = {
     "result_confirm_hours_league": 336,
 }
 NO_SHOW_RULE_TEXT = {"on_site": "ab Aufruf", "online": "ab Öffnung des Spiels"}
+# Was die Turnierleitung nach der Frist tun kann: im Duell kampflos werten, im Lauf mit mehr als zwei Spielern nur die
+# fehlende Person markieren - der Lauf bleibt offen (#1823). Für Karte und Nachricht.
+NO_SHOW_ACTION_DUEL = "kampflos werten oder verlängern"
+NO_SHOW_ACTION_HEAT = "nicht erschienen markieren (Lauf bleibt offen) oder verlängern"
+
+
+def no_show_action(match: dict) -> str:
+    return NO_SHOW_ACTION_HEAT if no_show_keeps_heat_open(match) else NO_SHOW_ACTION_DUEL
 # Liga: so lange hat der Gegner mindestens Zeit zu widersprechen, auch über das Ende der Spielwoche hinaus.
 LEAGUE_MIN_OBJECTION_HOURS = 24
 # Ein Spiel, für das „nicht erschienen“ noch gilt: beide Seiten stehen fest, es hat nicht begonnen.

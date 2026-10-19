@@ -7,8 +7,9 @@ Je Turnier eine Liste, die der Server jedes Mal frisch rechnet - Erledigtes vers
 - „Streitfall offen“ (``ds-<spiel>``): ein Dispute wartet auf Entscheidung (#1134, #1158). Knopf „Ansehen“.
 - „Meldungen weichen ab“ (``rc-<spiel>``): zwei Spieler-Meldungen passen nicht zusammen (#1132). Knopf „Eintragen“.
 - „Station defekt“ (``st-<station>``): eine defekte Station, auf die noch Spiele warten. Knopf „Umlegen“.
-- „Nicht erschienen?“ (``ns-<spiel>``): die Frist ist um, der Server schlägt „kampflos verloren“ vor (#1551). Knöpfe
-  „<Name> nicht erschienen“ und „Verlängern“; die Nachricht dazu schickt der Fristen-Job (match_deadline_sweep).
+- „Nicht erschienen?“ (``ns-<spiel>``): die Frist ist um, der Server schlägt „kampflos verloren“ vor (#1551; im Lauf
+  mit mehr als zwei Spielern: nur markieren, der Lauf bleibt offen, #1823). Knöpfe „<Name> nicht erschienen“ und
+  „Verlängern“; die Nachricht dazu schickt der Fristen-Job (match_deadline_sweep).
 
 Jeder Fall hat eine eigene Adresse: /tournaments/<slug>/leitung?fall=<id> - die Startseite der Verwaltung und die
 Benachrichtigungen verlinken genau dorthin.
@@ -25,7 +26,7 @@ import logging
 from datetime import datetime
 
 from models import now_utc
-from services.match_deadlines import NO_SHOW_RULE_TEXT
+from services.match_deadlines import NO_SHOW_RULE_TEXT, no_show_action
 from services.match_disputes import category_label, open_dispute
 from services.match_duration import load_duration_game
 from services.match_timing import OPEN_STATUSES, filled_slots, registration_name, timing
@@ -72,7 +73,7 @@ def attention_items(tournament: dict, matches: list[dict], stations: list[dict],
         if isinstance(proposal, dict) and not proposal.get("decision") and status in NO_SHOW_STATUSES and not match.get("started_at"):
             items.append({**base, "id": f"ns-{match.get('id')}", "kind": "no_show", "title": "Nicht erschienen?",
                           "detail": f"{proposal.get('minutes') or 0} Min. {NO_SHOW_RULE_TEXT.get(proposal.get('rule'), '')} um – "
-                                    "kampflos werten oder verlängern.",
+                                    f"{no_show_action(match)}.",
                           "action": "no_show", "since": proposal.get("due_at"),
                           "participants": [{"registration_id": slot["registration_id"],
                                             "name": registration_name(regs_by_id.get(slot["registration_id"]))}
