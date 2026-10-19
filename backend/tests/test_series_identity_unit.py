@@ -38,6 +38,37 @@ def test_names_without_letters_or_digits_have_no_key():
     assert suggest(index, "!!!") == [] and exact_alias(index, "!!!") is None
 
 
+def _alias(alias_id, profile_id, game_id=None, target="member", guest_name=None):
+    return {"id": alias_id, "name_normalized": "probename", "target": target, "profile_id": profile_id,
+            "guest_name": guest_name, "game_id": game_id, "confirmed_at": "2026-01-01T10:00:00+00:00"}
+
+
+def test_a_game_bound_alias_wins_over_a_global_one_in_any_order():
+    profiles = {"p-anna": "Anna Probe", "p-bert": "Bert Probe"}
+    aliases = [_alias("a-global", "p-bert"), _alias("a-game", "p-anna", game_id="spiel-1")]
+    for order in (aliases, aliases[::-1]):
+        assert exact_alias(IdentityIndex(profiles=profiles, aliases=order, game_id="spiel-1"), "Probe Name")["id"] == "a-game"
+        # Eine Spur ohne Spiel (oder mit anderem Spiel) nimmt den globalen.
+        assert exact_alias(IdentityIndex(profiles=profiles, aliases=order, game_id=None), "Probe Name")["id"] == "a-global"
+        assert exact_alias(IdentityIndex(profiles=profiles, aliases=order, game_id="spiel-2"), "Probe Name")["id"] == "a-global"
+
+
+def test_ambiguous_aliases_never_assign_by_themselves():
+    profiles = {"p-anna": "Anna Probe", "p-bert": "Bert Probe"}
+    clash = [_alias("a-1", "p-anna"), _alias("a-2", "p-bert")]
+    for order in (clash, clash[::-1]):
+        index = IdentityIndex(profiles=profiles, aliases=order, game_id=None)
+        assert exact_alias(index, "Probe Name") is None
+        assert [item["profile_id"] for item in suggest(index, "Probe Name")] == ["p-anna", "p-bert"]
+    # Zwei Einträge mit demselben Ziel sind nicht mehrdeutig - genommen wird immer derselbe.
+    same = [_alias("a-2", "p-anna"), _alias("a-1", "p-anna")]
+    for order in (same, same[::-1]):
+        assert exact_alias(IdentityIndex(profiles=profiles, aliases=order, game_id=None), "Probe Name")["id"] == "a-1"
+    # Zeigt der spielgebundene Alias auf ein Profil, das es nicht mehr gibt, gibt es nur Vorschläge.
+    stale = [_alias("a-global", "p-bert"), _alias("a-game", "p-weg", game_id="spiel-1")]
+    assert exact_alias(IdentityIndex(profiles=profiles, aliases=stale, game_id="spiel-1"), "Probe Name") is None
+
+
 def test_similar_names_have_different_keys():
     assert normalize_name("Probe Fahrer") != normalize_name("Probe Fahrer 2")
     assert normalize_name("ProbeFahrer") != normalize_name("ProbeFahrerin")

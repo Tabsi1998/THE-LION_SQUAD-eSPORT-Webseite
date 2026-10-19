@@ -215,6 +215,25 @@ async def test_names_without_letters_or_digits_are_refused(flow):
 
 
 @pytest.mark.asyncio
+async def test_a_game_bound_alias_wins_and_a_global_one_does_not_override_it(flow):
+    ctx = await _setup(flow)
+    game_series = ctx["first"]["id"]
+    waiting = await _add(flow, game_series, "Doppel Name")  # offen, bevor es Aliase gab
+    other = (await flow.post(f"{ADMIN}/lineages", json={"title": "Probe Ohne Spiel", "kind": "series"})).json()
+    free = (await flow.post(f"{ADMIN}/series", json={"lineage_id": other["id"], "season": "2026"})).json()
+    await flow.db.reference_aliases.insert_one({"id": "a-game", "name": "Doppel Name", "name_normalized": "doppelname",
+                                                "target": "member", "profile_id": "p-anna", "guest_name": None,
+                                                "game_id": "spiel-1", "confirmed_at": "2026-01-01T10:00:00+00:00"})
+    row = await _add(flow, free["id"], "Doppel Name")
+    await _assign(flow, free["id"], row["id"], link="member", profile_id="p-bert")  # globaler Alias
+    # Der globale Alias ordnet in der Spur mit eigenem Spiel-Alias nichts zu ...
+    assert (await flow.db.reference_participants.find_one({"id": waiting["id"]}, {"_id": 0}))["link_status"] == "open"
+    # ... und ein neuer Name dort folgt dem Alias seines Spiels.
+    assert (await _add(flow, game_series, "Doppel Name"))["profile_id"] == "p-anna"
+    assert (await _add(flow, free["id"], "Doppel-Name"))["profile_id"] == "p-bert"
+
+
+@pytest.mark.asyncio
 async def test_editing_a_participant_never_changes_the_link(flow):
     ctx = await _setup(flow)
     sid = ctx["first"]["id"]

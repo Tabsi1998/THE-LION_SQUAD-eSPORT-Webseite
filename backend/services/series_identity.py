@@ -125,13 +125,30 @@ def _alias_hit(keys: tuple[str, ...], alias: dict) -> str | None:
 
 def exact_alias(index: IdentityIndex, name) -> dict | None:
     """Der Alias, der einen neuen Namen von selbst zuordnet: voller Schlüssel und dasselbe Spiel (oder für alle
-    Spiele gespeichert). Ein Treffer erst ohne Clan-Tag oder aus einem anderen Spiel bleibt ein Vorschlag."""
+    Spiele gespeichert). Ein Treffer erst ohne Clan-Tag oder aus einem anderen Spiel bleibt ein Vorschlag.
+
+    Ein Alias für das Spiel der Spur hat Vorrang vor einem für alle Spiele. Zeigen die Aliase der entscheidenden Stufe
+    auf verschiedene Ziele (oder auf ein Profil, das es nicht mehr gibt), wird nichts von selbst zugeordnet - der
+    Vorstand entscheidet über die Vorschläge. Gleiche Eingaben ergeben in jeder Reihenfolge dasselbe."""
     keys = name_keys(name)
-    for alias in index.aliases:
-        if _alias_hit(keys, alias) == "full" and alias.get("game_id") in (index.game_id, None):
-            if alias.get("target") == "guest" or alias.get("profile_id") in index.profiles:
-                return alias
-    return None
+    hits = [alias for alias in index.aliases
+            if _alias_hit(keys, alias) == "full" and alias.get("game_id") in (index.game_id, None)]
+    bound = [alias for alias in hits if index.game_id and alias.get("game_id") == index.game_id]
+    tier = sorted(bound or hits, key=lambda alias: str(alias.get("id") or ""))
+    if not tier:
+        return None
+
+    def target(alias: dict) -> tuple:
+        if alias.get("target") == "guest":
+            return ("guest", normalize_name(alias.get("guest_name")))
+        return ("member", alias.get("profile_id"))
+
+    if len({target(alias) for alias in tier}) != 1:
+        return None
+    chosen = tier[0]
+    if chosen.get("target") != "guest" and chosen.get("profile_id") not in index.profiles:
+        return None
+    return chosen
 
 
 def suggest(index: IdentityIndex, name, start_number: str | None = None) -> list[dict]:

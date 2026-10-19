@@ -350,6 +350,15 @@ async def _apply_alias_elsewhere(db, alias: dict, me: dict, skip_id: str) -> lis
         lineages = [row["id"] async for row in db.reference_lineages.find({"game_id": alias["game_id"]}, {"_id": 0, "id": 1})]
         allowed = {row["id"] async for row in db.reference_series.find(
             {"id": {"$in": sorted(allowed)}, "lineage_id": {"$in": lineages}}, {"_id": 0, "id": 1})}
+    else:
+        # Ein Alias für alle Spiele tritt hinter einen spielgebundenen mit demselben Namen zurück (wie ``exact_alias``).
+        bound_games = await db.reference_aliases.distinct(
+            "game_id", {"name_normalized": alias["name_normalized"], "game_id": {"$ne": None}})
+        if bound_games:
+            lineages = [row["id"] async for row in db.reference_lineages.find(
+                {"game_id": {"$in": bound_games}}, {"_id": 0, "id": 1})]
+            allowed -= {row["id"] async for row in db.reference_series.find(
+                {"id": {"$in": sorted(allowed)}, "lineage_id": {"$in": lineages}}, {"_id": 0, "id": 1})}
     ids = [row["id"] for row in rows if row["series_id"] in allowed]
     if not ids:
         return []
