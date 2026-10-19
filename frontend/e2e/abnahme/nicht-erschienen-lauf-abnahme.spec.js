@@ -104,6 +104,8 @@ test.describe("Abnahme: nicht erschienen im Lauf (#1823)", () => {
     await page.goto(`/tournaments/${slug}/leitung?fall=ns-${heat.id}`);
     const card = page.getByTestId(`lead-case-ns-${heat.id}`);
     await expect(card).toBeVisible();
+    await expect(card).toContainText("Lauf bleibt offen");
+    await expect(card).not.toContainText("kampflos");
     await shot(page, `${testInfo.project.name}-lauf-vorschlag.png`);
     await page.getByTestId(`lead-no-show-${missing}`).click();
     await expect(page.getByText("Als nicht erschienen markiert – der Lauf bleibt offen.")).toBeVisible();
@@ -117,6 +119,13 @@ test.describe("Abnahme: nicht erschienen im Lauf (#1823)", () => {
     // Warteschlange: der Lauf ist weiter aufgerufen und wartet - nicht beendet.
     const queue = await (await page.request.get(`/api/tournaments/${tid}/live-queue`)).json();
     expect(queue.matches?.[heat.id]?.state, "Warteschlange zeigt den Lauf als aufgerufen").toBe("called");
+    expect(queue.matches[heat.id].no_show_due_at, "die Frist ist vorbei").toBeNull();
+    expect(queue.matches[heat.id].no_show_names).toHaveLength(1);
+
+    // Druck: „n. e.“ bei der Person, schon vor dem Eintragen.
+    await page.goto(`/print/tournaments/${slug}?teile=baum`);
+    const printed = page.getByTestId("print-match").filter({ hasText: "Lauf D" });
+    await expect(printed.getByTestId("print-no-show")).toHaveCount(1);
 
     // Baum: die Person durchgestrichen, die anderen nicht, keine Plätze.
     await page.goto(`/tournaments/${slug}/bracket`);
@@ -156,6 +165,9 @@ test.describe("Abnahme: nicht erschienen im Lauf (#1823)", () => {
     stored = (await matchesOf(page, tid)).find((match) => match.id === heat.id);
     expect(stored.results.map((row) => [row.registration_id, row.rank, Boolean(row.forfeit)])).toEqual([
       [fourth, 1, false], [first, 2, false], [third, 3, false], [missing, 4, true]]);
+    await page.goto(`/print/tournaments/${slug}?teile=baum`);
+    await expect(page.getByTestId("print-match").filter({ hasText: "Lauf D" }).getByTestId("print-no-show")).toHaveText("n. e.");
+    await shot(page, `${testInfo.project.name}-lauf-druck.png`);
 
     // Weiterkommen: Lauf C (läuft seit dem Seed) eintragen - die Runde ist fertig und wird gelost. Die zwei Besten aus D
     // stehen in Runde 2, die Person nicht (nur auf dem Verlierer-Weg, wie im Duell).
@@ -190,7 +202,7 @@ test.describe("Abnahme: nicht erschienen im Lauf (#1823)", () => {
     expect(deadlinePassed(duel.id).proposed).toBe(1);
 
     await page.goto(`/tournaments/${slug}/leitung?fall=ns-${duel.id}`);
-    await expect(page.getByTestId(`lead-case-ns-${duel.id}`)).toBeVisible();
+    await expect(page.getByTestId(`lead-case-ns-${duel.id}`)).toContainText("kampflos werten");
     await page.getByTestId(`lead-no-show-${loser}`).click();
     await expect(page.getByText("Kampflos gewertet – beide Seiten bekommen Bescheid.")).toBeVisible();
 
