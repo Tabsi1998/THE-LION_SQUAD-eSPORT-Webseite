@@ -44,7 +44,7 @@ export function useLiveRefresh(callback, resources = [], options = {}) {
 
   const callbackRef = useRef(callback);
   const timerRef = useRef(null);
-  const flightRef = useRef({ running: false, again: false, startedAt: 0, token: null, alive: true });
+  const flightRef = useRef({ running: false, again: false, startedAt: 0, token: null, alive: true, stuckTimer: null });
   const [connected, setConnected] = useState(isStreamConnected);
 
   useEffect(() => {
@@ -52,6 +52,11 @@ export function useLiveRefresh(callback, resources = [], options = {}) {
   }, [callback]);
 
   // Läuft schon eine Abfrage, merkt sich ein weiterer Aufruf nur „danach noch einmal“.
+  //
+  // Grenze: Eine abgelöste, hängende Abfrage kann ihr Ergebnis noch spät setzen und so einen neueren Stand
+  // überschreiben (wie vorher bei überlappenden Abfragen). Verhindern ließe sich das nur, wenn der Hook dem Ladevorgang
+  // ein Kennzeichen mitgibt - die Ladefunktionen nehmen aber eigene Parameter (z. B. MatchPage `load({ preserveDrafts })`).
+  // Ansichten, die das brauchen, ordnen Antworten selbst (TV-Baum: seqRef) und nutzen `overlap: true`.
   const run = useCallback(function runOnce() {
     if (overlap) {
       Promise.resolve(callbackRef.current?.()).catch(() => {});
@@ -63,10 +68,19 @@ export function useLiveRefresh(callback, resources = [], options = {}) {
       return;
     }
     const token = {};
+    clearTimeout(flight.stuckTimer);
     Object.assign(flight, { running: true, again: false, startedAt: Date.now(), token });
+    // Hängt die Abfrage und wartet eine Meldung, startet nach LIVE_REFRESH_STUCK_MS von selbst eine neue - sonst
+    // bliebe die Ansicht bei stehendem Strom ohne weitere Meldung für immer auf dem alten Stand.
+    flight.stuckTimer = setTimeout(() => {
+      flight.stuckTimer = null;
+      if (flight.token === token && flight.running && flight.again && flight.alive) runOnce();
+    }, LIVE_REFRESH_STUCK_MS);
     const done = () => {
       // Eine hängende Abfrage, die schon abgelöst ist, gibt nichts mehr frei.
       if (flight.token !== token) return;
+      clearTimeout(flight.stuckTimer);
+      flight.stuckTimer = null;
       flight.running = false;
       if (flight.again && flight.alive) runOnce();
     };
@@ -86,6 +100,8 @@ export function useLiveRefresh(callback, resources = [], options = {}) {
     flight.alive = true;
     return () => {
       flight.alive = false;
+      clearTimeout(flight.stuckTimer);
+      flight.stuckTimer = null;
     };
   }, []);
 

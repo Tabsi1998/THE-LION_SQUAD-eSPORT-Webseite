@@ -217,3 +217,56 @@ test("nach dem Verlassen der Ansicht lädt die laufende Abfrage nichts mehr nach
   await act(async () => finish());
   expect(load).toHaveBeenCalledTimes(1);
 });
+
+test("hängt eine Abfrage und wartet eine Meldung, startet nach 30 s von selbst eine neue - ohne weitere Meldung", () => {
+  const { load } = slowLoad();
+  act(() => setStreamConnected(true));
+  render(<View load={load} resources={["tournaments"]} />);
+
+  act(() => {
+    change();
+    vi.advanceTimersByTime(200);
+    change();
+    vi.advanceTimersByTime(200);
+  });
+  expect(load).toHaveBeenCalledTimes(1);
+
+  act(() => {
+    vi.advanceTimersByTime(LIVE_REFRESH_STUCK_MS);
+  });
+  expect(load).toHaveBeenCalledTimes(2);
+
+  // Die neue hängt ebenfalls, aber ohne wartende Meldung: kein weiterer Start.
+  act(() => {
+    vi.advanceTimersByTime(LIVE_REFRESH_STUCK_MS * 2);
+  });
+  expect(load).toHaveBeenCalledTimes(2);
+});
+
+test("ohne wartende Meldung startet eine hängende Abfrage nichts von selbst; nach dem Verlassen auch nicht", () => {
+  const { load } = slowLoad();
+  act(() => setStreamConnected(true));
+  const view = render(<View load={load} resources={["tournaments"]} />);
+
+  act(() => {
+    change();
+    vi.advanceTimersByTime(200);
+    vi.advanceTimersByTime(LIVE_REFRESH_STUCK_MS * 2);
+  });
+  expect(load).toHaveBeenCalledTimes(1);
+
+  act(() => {
+    change();
+    vi.advanceTimersByTime(200);
+  });
+  expect(load).toHaveBeenCalledTimes(2);
+  act(() => {
+    change();
+    vi.advanceTimersByTime(200);
+  });
+  view.unmount();
+  act(() => {
+    vi.advanceTimersByTime(LIVE_REFRESH_STUCK_MS);
+  });
+  expect(load).toHaveBeenCalledTimes(2);
+});
