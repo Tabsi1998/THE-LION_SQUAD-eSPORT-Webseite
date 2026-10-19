@@ -22,7 +22,7 @@ const ROUNDS = [
   { id: "r4", position: 4, code: "R4", club_day: "2026-11-12", time: null, venue: null, status: "cancelled", state: "cancelled", counts: false, kind: "final" },
 ];
 const CALENDAR = {
-  today: "2026-11-05", rounds: ROUNDS, archived: [{ id: "rx", code: "RX", club_day: "2026-12-01", time: null }],
+  today: "2026-11-05", version: 7, rounds: ROUNDS, archived: [{ id: "rx", code: "RX", club_day: "2026-12-01", time: null }],
   counts: { planned: 0, today: 0, missing: 1, cancelled: 1, postponed: 1, scored: 1 },
   hints: [{ round_id: "r1", text: "R1 hat kein Ergebnis, obwohl R2 schon gewertet ist – abgesagt?" }],
 };
@@ -76,6 +76,7 @@ test("neuer Termin: Vorgabe nächster Standard-Wochentag und Standard-Uhrzeit", 
   fireEvent.click(screen.getByTestId("round-save"));
   await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/reference-series/admin/series/serie-1/rounds", {
     code: "R5", title: null, venue: "Musterkurs", day: "2026-11-19", time: "20:30", kind: "regular", counts: true, opponent: null, note: null,
+    expected_version: 7,
   }));
 });
 
@@ -97,7 +98,7 @@ test("Liste einfügen: erst die Vorschau vom Server, dann übernehmen", async ()
   expect(screen.getByTestId("paste-submit")).toHaveTextContent("2 Termine übernehmen");
   apiMock.post.mockResolvedValueOnce({ data: { created: 2, ...CALENDAR } });
   fireEvent.click(screen.getByTestId("paste-submit"));
-  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/reference-series/admin/series/serie-1/rounds/paste", { text, apply: true }));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/reference-series/admin/series/serie-1/rounds/paste", { text, apply: true, expected_version: 7 }));
 });
 
 test("Liste einfügen: Fehler je Zeile, übernommen wird nichts", async () => {
@@ -124,6 +125,16 @@ test("Absagen, Verschieben und Reihenfolge rufen den Server", async () => {
   await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/reference-series/admin/series/serie-1/rounds/r3/postpone", { day: "2026-11-14", time: "19:00", note: null }));
 
   fireEvent.click(screen.getByRole("button", { name: "R2 nach oben" }));
-  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/reference-series/admin/series/serie-1/rounds/order", { ids: ["r2", "r1", "r3", "r4"] }));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/reference-series/admin/series/serie-1/rounds/order", { ids: ["r2", "r1", "r3", "r4"], expected_version: 7 }));
   expect(screen.getByRole("button", { name: "R1 nach oben" })).toBeDisabled();
+});
+
+test("hat jemand anderes inzwischen geändert (409), lädt der Kalender neu", async () => {
+  await renderSection();
+  await screen.findAllByTestId("calendar-round");
+  expect(apiMock.get).toHaveBeenCalledTimes(1);
+  apiMock.post.mockRejectedValueOnce({ response: { status: 409, data: { detail: "Der Kalender wurde inzwischen geändert – bitte neu laden." } } });
+  fireEvent.click(screen.getByTestId("calendar-sort"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/reference-series/admin/series/serie-1/rounds/sort-by-date", { expected_version: 7 }));
+  await waitFor(() => expect(apiMock.get).toHaveBeenCalledTimes(2));
 });

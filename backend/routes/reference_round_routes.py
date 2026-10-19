@@ -19,6 +19,7 @@ from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field, field_validator
+from pymongo import ReturnDocument
 
 from auth import get_optional_user, require_area
 from database import get_db
@@ -58,7 +59,13 @@ class _DayTime(BaseModel):
         return _clock(value)
 
 
-class RoundCreateBody(_DayTime, ReferenceRoundCreate):
+class _Versioned(BaseModel):
+    """``expected_version``: der Stand des Kalenders, den die Seite kennt (``version`` aus dem Kalender). Hat ihn
+    inzwischen jemand anderes geändert, gibt es 409 statt eines stillen Überschreibens."""
+    expected_version: Optional[int] = Field(default=None, ge=0)
+
+
+class RoundCreateBody(_DayTime, _Versioned, ReferenceRoundCreate):
     """Termin anlegen: Wiener Tag und Uhrzeit. Ohne ``time`` gilt die Standard-Uhrzeit der Serie, ``time: null`` heißt
     ausdrücklich „ohne Uhrzeit“."""
     day: Optional[str] = None
@@ -80,11 +87,15 @@ class RoundCancelBody(BaseModel):
     note: Optional[str] = Field(default=None, max_length=300)
 
 
-class RoundOrderBody(BaseModel):
+class RoundOrderBody(_Versioned):
     ids: List[str] = Field(default_factory=list, max_length=500)
 
 
-class RoundPasteBody(BaseModel):
+class RoundSortBody(_Versioned):
+    pass
+
+
+class RoundPasteBody(_Versioned):
     text: str = Field(max_length=20000)
     apply: bool = False
 
@@ -126,9 +137,27 @@ def _when_from_instant(value) -> dict:
     return {"club_day": club_day_of(value), "starts_at": value.isoformat()}
 
 
-async def _next_order(db, series_id: str) -> int:
-    rows = await db.reference_rounds.find({"series_id": series_id}, {"_id": 0, "order": 1}).to_list(None)
-    return max([int(row.get("order") or 0) for row in rows] or [0]) + 1
+STALE = "Der Kalender wurde inzwischen geändert – bitte neu laden."
+
+
+async def _claim(db, series_id: str, expected: Optional[int] = None, *, orders: int = 0) -> int:
+    """Jede Änderung am Kalender zählt ``calendar_version`` der Serie atomar hoch - mit ``expected`` nur, wenn der
+    Stand noch stimmt (sonst 409). ``orders`` vergibt so viele neue Reihenfolge-Nummern über den Zähler
+    ``round_order_seq``: auch zwei gleichzeitige Anlagen bekommen nie dieselbe. Liefert die erste neue Nummer."""
+    if orders:
+        rows = await db.reference_rounds.find({"series_id": series_id}, {"_id": 0, "order": 1}).to_list(None)
+        highest = max([int(row.get("order") or 0) for row in rows] or [0])
+        # $max ist atomar: der Zähler fängt nie unter der höchsten vorhandenen Nummer an.
+        await db.reference_series.update_one({"id": series_id}, {"$max": {"round_order_seq": highest}})
+    query: dict = {"id": series_id}
+    if expected is not None:
+        query["calendar_version"] = expected if expected else {"$in": [0, None]}
+    before = await db.reference_series.find_one_and_update(
+        query, {"$inc": {"calendar_version": 1, "round_order_seq": orders}},
+        projection={"_id": 0, "round_order_seq": 1}, return_document=ReturnDocument.BEFORE)
+    if before is None:
+        raise HTTPException(409, STALE)
+    return int(before.get("round_order_seq") or 0) + 1
 
 
 async def _log(db, action: str, me: dict, series_id: str, data: dict) -> None:
@@ -152,6 +181,7 @@ def _new_round(series_id: str, me: dict, **fields) -> dict:
 
 
 async def _calendar(db, series_id: str) -> dict:
+    series = await db.reference_series.find_one({"id": series_id}, {"_id": 0, "calendar_version": 1}) or {}
     rounds = await db.reference_rounds.find({"series_id": series_id}, {"_id": 0}).to_list(None)
     published = [row["round_id"] async for row in db.reference_round_results.find(
         {"series_id": series_id, "status": "published"}, {"_id": 0, "round_id": 1})]
@@ -161,7 +191,7 @@ async def _calendar(db, series_id: str) -> dict:
                       key=lambda item: (item.get("order") or 0, str(item.get("id"))))
     for item in [*view["rounds"], *archived]:
         item["time"] = vienna_clock(item.get("starts_at"))
-    return {"today": today, **view, "archived": archived}
+    return {"today": today, "version": int(series.get("calendar_version") or 0), **view, "archived": archived}
 
 
 # ---------------------------------------------------------------- Verwaltung
@@ -185,7 +215,8 @@ async def create_round(series_id: str, body: RoundCreateBody, me: dict = Depends
         when = _when(body.day, clock)
     else:
         when = _when_from_instant(body.starts_at)
-    doc = _new_round(series_id, me, order=body.order or await _next_order(db, series_id), code=_text(body.code),
+    first = await _claim(db, series_id, body.expected_version, orders=1)
+    doc = _new_round(series_id, me, order=body.order or first, code=_text(body.code),
                      title=_text(body.title), venue=_text(body.venue), **when, kind=body.kind, counts=body.counts,
                      opponent=_text(body.opponent), note=_text(body.note))
     await db.reference_rounds.insert_one(doc)
@@ -211,6 +242,7 @@ async def update_round(series_id: str, round_id: str, body: RoundUpdateBody,
         updates.update(_when(day, clock))
     elif "starts_at" in raw:
         updates.update(_when_from_instant(raw["starts_at"]))
+    await _claim(db, series_id)
     await db.reference_rounds.update_one({"id": round_id}, {"$set": {**updates, **_stamp(me)}})
     await _recompute(db, series_id)
     return await _round(db, series_id, round_id)
@@ -236,6 +268,7 @@ async def postpone_round(series_id: str, round_id: str, body: RoundPostponeBody,
         "original_club_day": existing.get("original_club_day") if keep else existing.get("club_day"),
         "status_note": _text(body.note),
     }
+    await _claim(db, series_id)
     await db.reference_rounds.update_one({"id": round_id}, {"$set": {**updates, **_stamp(me)}})
     await _log(db, "reference_round.postpone", me, series_id, {
         "round_id": round_id, "from": existing.get("club_day"), "to": body.day, "note": updates["status_note"]})
@@ -253,6 +286,7 @@ async def cancel_round(series_id: str, round_id: str, body: RoundCancelBody,
     if existing.get("status") == "scored":
         raise HTTPException(409, "Der Termin ist schon gewertet.")
     if existing.get("status") != "cancelled":
+        await _claim(db, series_id)
         await db.reference_rounds.update_one({"id": round_id}, {"$set": {
             "status": "cancelled", "cancelled_from": existing.get("status") or "planned",
             "status_note": _text(body.note), **_stamp(me)}})
@@ -268,6 +302,7 @@ async def reinstate_round(series_id: str, round_id: str, me: dict = Depends(requ
     await _series(db, series_id)
     existing = await _round(db, series_id, round_id)
     if existing.get("status") == "cancelled":
+        await _claim(db, series_id)
         await db.reference_rounds.update_one({"id": round_id}, {"$set": {
             "status": existing.get("cancelled_from") or "planned", "cancelled_from": None, "status_note": None,
             **_stamp(me)}})
@@ -282,6 +317,7 @@ async def _set_archived(series_id: str, round_id: str, archived: bool, me: dict)
     existing = await _round(db, series_id, round_id)
     if archived and existing.get("status") == "scored":
         raise HTTPException(409, "Der Termin ist schon gewertet.")
+    await _claim(db, series_id)
     await db.reference_rounds.update_one({"id": round_id}, {"$set": {
         "archived_at": now_utc().isoformat() if archived else None, **_stamp(me)}})
     await _log(db, "reference_round.archive" if archived else "reference_round.restore", me, series_id,
@@ -315,19 +351,22 @@ async def order_rounds(series_id: str, body: RoundOrderBody, me: dict = Depends(
         {"series_id": series_id, "archived_at": None}, {"_id": 0, "id": 1})}
     if len(body.ids) != len(set(body.ids)) or set(body.ids) != active:
         raise HTTPException(422, "Die Reihenfolge muss jeden Termin der Serie genau einmal nennen.")
+    await _claim(db, series_id, body.expected_version)
     await _write_order(db, series_id, body.ids, me)
     await _recompute(db, series_id)
     return await _calendar(db, series_id)
 
 
 @router.post("/admin/series/{series_id}/rounds/sort-by-date")
-async def sort_rounds_by_date(series_id: str, me: dict = Depends(require_area("content"))):
+async def sort_rounds_by_date(series_id: str, body: Optional[RoundSortBody] = None,
+                              me: dict = Depends(require_area("content"))):
     """Reihenfolge nach Tag und Uhrzeit; Termine ohne Tag ans Ende, sonst bleibt die bisherige Reihenfolge."""
     db = get_db()
     await _series(db, series_id)
     rounds = await db.reference_rounds.find({"series_id": series_id, "archived_at": None}, {"_id": 0}).to_list(None)
     rounds.sort(key=lambda item: (item.get("club_day") is None, item.get("club_day") or "",
                                   item.get("starts_at") or "", item.get("order") or 0, str(item.get("id"))))
+    await _claim(db, series_id, body.expected_version if body else None)
     await _write_order(db, series_id, [item["id"] for item in rounds], me)
     await _recompute(db, series_id)
     return await _calendar(db, series_id)
@@ -347,7 +386,7 @@ async def paste_rounds(series_id: str, body: RoundPasteBody, me: dict = Depends(
     if parsed["errors"] or not parsed["rows"]:
         raise HTTPException(422, {"message": "Die Liste hat Fehler." if parsed["errors"] else "Die Liste ist leer.",
                                   "errors": parsed["errors"]})
-    order = await _next_order(db, series_id)
+    order = await _claim(db, series_id, body.expected_version, orders=len(parsed["rows"]))
     docs = [_new_round(series_id, me, order=order + offset, code=row["code"], venue=row["venue"],
                        club_day=row["day"], starts_at=row["starts_at"], source="paste")
             for offset, row in enumerate(parsed["rows"])]

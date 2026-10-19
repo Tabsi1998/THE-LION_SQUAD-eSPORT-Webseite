@@ -2,6 +2,7 @@
 -Uhrzeit der Serie als Vorgabe, Bearbeiten, Verschieben (der ursprüngliche Termin bleibt), Absagen (fehlt nie),
 Reihenfolge, Archivieren statt Löschen, Rechte und die öffentliche Terminliste mit der Sichtbarkeit der Serie.
 Nur erfundene Namen und Orte."""
+import asyncio
 import pathlib
 import sys
 
@@ -10,7 +11,7 @@ import pytest_asyncio
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 
-from flow_harness import make_flow  # noqa: E402
+from flow_harness import InterleavedReads, make_flow  # noqa: E402
 from routes import reference_round_routes  # noqa: E402
 from services import migrations  # noqa: E402
 
@@ -293,3 +294,53 @@ async def test_a_clock_lost_to_summer_time_is_refused_and_a_double_one_means_the
     assert double.status_code == 200 and double.json()["starts_at"] == "2026-10-25T00:30:00+00:00"
     moved = await flow.post(f"{_rounds(series)}/{double.json()['id']}/postpone", json={"day": "2027-03-28", "time": "02:15"})
     assert moved.status_code == 422
+
+
+# ---------------------------------------------------------------- Gleichzeitig
+@pytest.mark.asyncio
+async def test_a_stale_calendar_is_refused_for_order_sort_create_and_paste(flow):
+    _, _, series = await _setup(flow)
+    assert (await _calendar(flow, series))["version"] == 0
+    a = (await flow.post(_rounds(series), json={"code": "A", "day": "2026-11-19", "expected_version": 0})).json()
+    assert a["order"] == 1
+    b = (await flow.post(_rounds(series), json={"code": "B", "day": "2026-11-12", "expected_version": 1})).json()
+    assert b["order"] == 2
+    seen = (await _calendar(flow, series))["version"]
+    # Jemand anderes ändert inzwischen den Kalender.
+    await flow.patch(f"{_rounds(series)}/{a['id']}", json={"venue": "Nord"})
+    stale = {"expected_version": seen}
+    responses = [
+        await flow.post(f"{_rounds(series)}/order", json={"ids": [b["id"], a["id"]], **stale}),
+        await flow.post(f"{_rounds(series)}/sort-by-date", json=stale),
+        await flow.post(_rounds(series), json={"code": "C", "day": "2026-11-26", **stale}),
+        await flow.post(f"{_rounds(series)}/paste", json={"text": "D 03.12. Süd", "apply": True, **stale}),
+    ]
+    assert [response.status_code for response in responses] == [409, 409, 409, 409]
+    assert "neu laden" in responses[0].text
+    assert await flow.db.reference_rounds.count_documents({}) == 2
+    fresh = (await _calendar(flow, series))["version"]
+    assert fresh > seen
+    ordered = await flow.post(f"{_rounds(series)}/order", json={"ids": [b["id"], a["id"]], "expected_version": fresh})
+    assert ordered.status_code == 200 and ordered.json()["version"] == fresh + 1
+
+
+@pytest.mark.asyncio
+async def test_two_editors_at_the_same_time_one_wins_and_new_rounds_never_share_a_number(flow, monkeypatch):
+    _, _, series = await _setup(flow)
+    a = (await flow.post(_rounds(series), json={"code": "A", "day": "2026-11-19"})).json()
+    b = (await flow.post(_rounds(series), json={"code": "B", "day": "2026-11-12"})).json()
+    version = (await _calendar(flow, series))["version"]
+
+    # Beide lesen die Serie, bevor eine weiterschreibt - wie zwei Worker auf echtem MongoDB.
+    monkeypatch.setattr(reference_round_routes, "get_db", lambda gate=InterleavedReads(flow.db, "reference_series"): gate)
+    first, second = await asyncio.gather(
+        flow.post(f"{_rounds(series)}/order", json={"ids": [b["id"], a["id"]], "expected_version": version}),
+        flow.post(f"{_rounds(series)}/order", json={"ids": [a["id"], b["id"]], "expected_version": version}))
+    assert sorted([first.status_code, second.status_code]) == [200, 409]
+
+    monkeypatch.setattr(reference_round_routes, "get_db", lambda gate=InterleavedReads(flow.db, "reference_series"): gate)
+    created = await asyncio.gather(*(flow.post(_rounds(series), json={"code": code, "day": "2026-12-03"})
+                                     for code in ("C", "D")))
+    assert [response.status_code for response in created] == [200, 200]
+    orders = [row["order"] async for row in flow.db.reference_rounds.find({}, {"order": 1})]
+    assert len(orders) == len(set(orders)) == 4

@@ -12,7 +12,7 @@ import { toast } from "sonner";
 
 const base = (series) => `/reference-series/admin/series/${series.id}/rounds`;
 
-export function RoundSheet({ series, lineage, round, suggestion, onClose, onSaved }) {
+export function RoundSheet({ series, lineage, round, suggestion, version, onClose, onSaved, onStale }) {
   const isNew = !round?.id;
   const [form, setForm] = useState(() => roundToForm(round || {}, suggestion));
   const [saving, setSaving] = useState(false);
@@ -23,12 +23,14 @@ export function RoundSheet({ series, lineage, round, suggestion, onClose, onSave
     setSaving(true);
     try {
       const payload = roundPayload(form);
-      if (isNew) await api.post(base(series), payload);
+      // Neu: mit dem Stand des Kalenders, den die Seite kennt - war jemand schneller, kommt 409.
+      if (isNew) await api.post(base(series), { ...payload, expected_version: version });
       else await api.patch(`${base(series)}/${round.id}`, payload);
       toast.success("Gespeichert.");
       onSaved();
     } catch (err) {
       toast.error(formatApiError(err.response?.data?.detail));
+      if (err.response?.status === 409) onStale?.();
     } finally {
       setSaving(false);
     }
@@ -85,7 +87,7 @@ export function PostponeSheet({ series, round, onClose, onSaved }) {
   );
 }
 
-export function PasteSheet({ series, lineage, onClose, onSaved }) {
+export function PasteSheet({ series, lineage, version, onClose, onSaved, onStale }) {
   const [text, setText] = useState("");
   const [preview, setPreview] = useState(null);
   const [saving, setSaving] = useState(false);
@@ -104,7 +106,7 @@ export function PasteSheet({ series, lineage, onClose, onSaved }) {
         const { data } = await api.post(`${base(series)}/paste`, { text });
         setPreview({ ...data, text });
       } else {
-        const { data } = await api.post(`${base(series)}/paste`, { text, apply: true });
+        const { data } = await api.post(`${base(series)}/paste`, { text, apply: true, expected_version: version });
         toast.success(`${data.created} Termine übernommen.`);
         onSaved();
       }
@@ -112,6 +114,7 @@ export function PasteSheet({ series, lineage, onClose, onSaved }) {
       const detail = err.response?.data?.detail;
       if (detail?.errors) setPreview({ rows: [], errors: detail.errors, text });
       else toast.error(formatApiError(detail));
+      if (err.response?.status === 409) onStale?.();
     } finally {
       setSaving(false);
     }

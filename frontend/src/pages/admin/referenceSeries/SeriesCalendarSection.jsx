@@ -54,6 +54,8 @@ export function SeriesCalendarSection({ series }) {
       if (message) toast.success(message);
     } catch (err) {
       toast.error(formatApiError(err.response?.data?.detail));
+      // 409: jemand anderes hat den Kalender inzwischen geändert - den aktuellen Stand zeigen.
+      if (err.response?.status === 409) load();
     } finally {
       setBusy(false);
     }
@@ -76,7 +78,7 @@ export function SeriesCalendarSection({ series }) {
   };
   const move = (index, step) => {
     const ids = moveIds(rounds, index, step);
-    if (ids) run(() => api.post(`${base}/order`, { ids }));
+    if (ids) run(() => api.post(`${base}/order`, { ids, expected_version: calendar?.version }));
   };
   const openNew = () => setSheet({
     type: "round",
@@ -99,7 +101,7 @@ export function SeriesCalendarSection({ series }) {
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           {rounds.length > 1 && (
-            <button type="button" onClick={() => run(() => api.post(`${base}/sort-by-date`), "Nach Datum geordnet.")} disabled={busy} data-testid="calendar-sort" className="tls-btn tls-btn--quiet px-3 py-2 rounded-sm text-xs font-bold uppercase tracking-wider inline-flex items-center gap-2">
+            <button type="button" onClick={() => run(() => api.post(`${base}/sort-by-date`, { expected_version: calendar?.version }), "Nach Datum geordnet.")} disabled={busy} data-testid="calendar-sort" className="tls-btn tls-btn--quiet px-3 py-2 rounded-sm text-xs font-bold uppercase tracking-wider inline-flex items-center gap-2">
               <ArrowDownUp className="w-3.5 h-3.5" /> Nach Datum ordnen
             </button>
           )}
@@ -184,9 +186,9 @@ export function SeriesCalendarSection({ series }) {
         </details>
       )}
 
-      {sheet?.type === "round" && <RoundSheet series={series} lineage={lineage} round={sheet.round} suggestion={sheet.suggestion} onClose={() => setSheet(null)} onSaved={saved} />}
+      {sheet?.type === "round" && <RoundSheet series={series} lineage={lineage} round={sheet.round} suggestion={sheet.suggestion} version={calendar?.version} onClose={() => setSheet(null)} onSaved={saved} onStale={load} />}
       {sheet?.type === "postpone" && <PostponeSheet series={series} round={sheet.round} onClose={() => setSheet(null)} onSaved={saved} />}
-      {sheet?.type === "paste" && <PasteSheet series={series} lineage={lineage} onClose={() => setSheet(null)} onSaved={saved} />}
+      {sheet?.type === "paste" && <PasteSheet series={series} lineage={lineage} version={calendar?.version} onClose={() => setSheet(null)} onSaved={saved} onStale={load} />}
     </section>
   );
 }
