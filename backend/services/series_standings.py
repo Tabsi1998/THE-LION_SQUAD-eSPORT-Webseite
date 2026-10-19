@@ -7,7 +7,8 @@ gewerteter Runde einen Stand je Wertung (``scope``):
   (``tiebreak`` nennt das Kriterium, das gegen die Zeile darüber entschieden hat) und der offizielle Wert des
   Veranstalters (``official_totals`` im Blatt der Runde) mit Abweichung zur eigenen Summe.
 - ``teams``: Teamwertung, wenn eingeschaltet - je Rennen die besten ``counting_drivers`` eines Teams (Team je Rennen
-  aus der Zeile, sonst das Standard-Team); ein Gast zählt fürs Team, wenn ``guests_count`` an ist.
+  aus der Zeile, sonst das Standard-Team); ein Gast zählt fürs Team, wenn ``guests_count`` an ist. Ohne ein einziges
+  Team gibt es keinen (leeren) Teamstand.
 - ``table``: Tabelle einer Team-Liga aus den eingetragenen Spielen; hat das Blatt die Tabelle des Veranstalters
   (``official_table``), gilt sie, abgeglichen wird das eigene Team (``own_teams``).
 
@@ -233,8 +234,9 @@ def compute_standings(*, rules: dict, rounds: list[dict], sheets: dict[str, dict
         if any(sheets[done["id"]].get("rows") for done in upto):
             drivers = _driver_rows(rules, upto, sheets, seq_of, total_rounds, people)
             scopes.append(("drivers", "participant_id", drivers))
-            if rules["team_scoring"]["enabled"]:
-                scopes.append(("teams", "team", _team_rows(rules, upto, sheets, seq_of, people)))
+            teams = _team_rows(rules, upto, sheets, seq_of, people) if rules["team_scoring"]["enabled"] else []
+            if teams:
+                scopes.append(("teams", "team", teams))
         if any(sheets[done["id"]].get("matches") or sheets[done["id"]].get("official_table") for done in upto):
             scopes.append(("table", "team", _table_rows(rules, upto, sheets, own)))
         for scope, key, rows in scopes:
