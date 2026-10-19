@@ -11,6 +11,7 @@ import { Screen } from "../../components/Screen";
 import { HeaderButton, TabHeader, useTabScrollToTop } from "../../components/TabHeader";
 import { seasonScrollProps } from "../../seasons/sky/scroll";
 import { MonthCalendar } from "../../components/MonthCalendar";
+import { MyCalendarView } from "../../components/calendar/MyCalendarView";
 import { SegmentedTabs } from "../../components/SegmentedTabs";
 import { Body, Heading, Muted } from "../../components/Text";
 import { api, errorMessage } from "../../lib/api";
@@ -38,6 +39,8 @@ type Props = NativeStackScreenProps<TournamentStackParamList, "TournamentList">;
 type Filter = GroupFilter;
 type ViewMode = "list" | "calendar";
 type Scope = "all" | "club";
+// „Mein Kalender“ (#1788): neben „Alle“ nur die eigenen Termine - wie im Web der Reiter unter /calendar/mine.
+type CalendarScope = "all" | "mine";
 // Ein Vereinstermin aus /calendar (#1190): Versammlung oder eigene Helferschicht - nur für Mitglieder, der Server entscheidet.
 type ClubCalendarItem = { id: string; kind: string; club_kind?: string; title: string; start: string; end?: string | null; mine?: boolean; path?: string | null; all_day?: boolean; day?: string | null; location?: string | null };
 type HubBase = { id: string; title: string; date?: string | null; endDate?: string | null; status?: string; phase?: string; image?: string | null; detail?: string; visibility?: string | null; own?: string | null };
@@ -57,6 +60,11 @@ const filters: Array<{ key: Filter; label: string }> = [
 ];
 
 // „Verein“ zeigt nur Interne (#342) - der Schalter erscheint erst, wenn es solche gibt.
+const calendarScopes: Array<{ key: CalendarScope; label: string }> = [
+  { key: "all", label: "Alle" },
+  { key: "mine", label: "Mein Kalender" },
+];
+
 const scopes: Array<{ key: Scope; label: string }> = [
   { key: "all", label: "Alle" },
   { key: "club", label: "Verein" },
@@ -101,6 +109,12 @@ export function TournamentsScreen({ navigation, route }: Props) {
   useEffect(() => {
     if (route?.params?.filter) setFilter(route.params.filter);
   }, [route?.params?.filter]);
+  const [calendarScope, setCalendarScope] = useState<CalendarScope>(route?.params?.scope === "mine" ? "mine" : "all");
+  useEffect(() => {
+    if (route?.params?.scope) setCalendarScope(route.params.scope);
+  }, [route?.params?.scope]);
+  // „Mein Kalender“ lädt selbst (#1788); Ziehen zum Aktualisieren und Live-Änderungen laden es mit.
+  const [mineRefresh, setMineRefresh] = useState(0);
   const scrollRef = useRef<ScrollView>(null);
   useTabScrollToTop(scrollRef);
   const [scope, setScope] = useState<Scope>("all");
@@ -189,10 +203,15 @@ export function TournamentsScreen({ navigation, route }: Props) {
   useEffect(() => {
     load();
   }, [load]);
-  useLiveRefresh(load, TOURNAMENT_LIST_LIVE_RESOURCES, { fallbackMs: 30000 });
+  const liveLoad = useCallback(() => {
+    setMineRefresh((value) => value + 1);
+    return load();
+  }, [load]);
+  useLiveRefresh(liveLoad, TOURNAMENT_LIST_LIVE_RESOURCES, { fallbackMs: 30000 });
 
   const signedIn = Boolean(user && !isGuestUser(user));
   const mineOnly = signedIn && onlyMine;
+  const myCalendar = calendarScope === "mine";
 
   // Die Liste (#1182): Events mit ihren Turnieren und Fast Laps als eine Karte, der Rest für sich.
   const entries = useMemo<Entry[]>(() => {
@@ -296,18 +315,19 @@ export function TournamentsScreen({ navigation, route }: Props) {
         ref={scrollRef}
         {...seasonScrollProps("TournamentList")}
         contentContainerStyle={styles.content}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor={colors.cyan} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); setMineRefresh((value) => value + 1); load(); }} tintColor={colors.cyan} />}
       >
         {/* Der Kalender ist ein Symbol in der Kopfzeile (#1145, #1182) - eine Reihe Umschalter weniger. */}
         <TabHeader title="Events" testID="events-header" extra={viewToggle}>
-          {error ? <Muted style={styles.error}>{error}</Muted> : <Muted>{view === "calendar" ? "Alle Termine im Monat." : "Was ansteht: Events, Turniere und Fast Laps."}</Muted>}
+          {error && !myCalendar ? <Muted style={styles.error}>{error}</Muted> : <Muted>{myCalendar ? "Nur deine Termine – mit deinem Stand, auch ohne Abo." : view === "calendar" ? "Alle Termine im Monat." : "Was ansteht: Events, Turniere und Fast Laps."}</Muted>}
         </TabHeader>
 
         {/* Die Filterzeilen rücken mit eigenem Abstand zusammen: ein negativer Rand am Inhalt der waagrechten Liste schnitt
             die Oberkante der Knöpfe ab (Geräteprobe vor 1.4.0). */}
         <View style={styles.tabRows}>
-          <SegmentedTabs items={filters} value={filter} onChange={setFilter} label="Was zeigen" />
-          {signedIn || (view === "list" && filter === "all") || hasInternal ? (
+          <SegmentedTabs items={calendarScopes} value={calendarScope} onChange={setCalendarScope} label="Welche Termine" />
+          {myCalendar ? null : <SegmentedTabs items={filters} value={filter} onChange={setFilter} label="Was zeigen" />}
+          {!myCalendar && (signedIn || (view === "list" && filter === "all") || hasInternal) ? (
             <View style={styles.chips}>
               {signedIn ? <Chip label="Nur meine" on={onlyMine} onPress={() => setOnlyMine((value) => !value)} testID="events-only-mine" /> : null}
               {view === "list" && filter === "all" ? (
@@ -320,7 +340,16 @@ export function TournamentsScreen({ navigation, route }: Props) {
           ) : null}
         </View>
 
-        {view === "calendar" ? (
+        {myCalendar ? (
+          <MyCalendarView
+            view={view}
+            signedIn={signedIn}
+            refreshKey={mineRefresh}
+            onBrowse={(next) => { setCalendarScope("all"); setFilter(next); }}
+          />
+        ) : null}
+
+        {!myCalendar && view === "calendar" ? (
           <View style={styles.section}>
             <MonthCalendar
               year={shownMonth.year}
@@ -347,7 +376,7 @@ export function TournamentsScreen({ navigation, route }: Props) {
             {/* Abonnieren (#1189): der öffentliche Vereinskalender bleibt im Handy-Kalender aktuell. */}
             <Card style={styles.subscribe} testID="calendar-subscribe">
               <Body style={styles.subscribeTitle}>Kalender abonnieren</Body>
-              <Muted>Alle öffentlichen Termine in deinem Kalender – Änderungen kommen von selbst nach. Deinen persönlichen Link mit nur deinen Terminen gibt es auf der Website unter Kalender.</Muted>
+              <Muted>Alle öffentlichen Termine in deinem Kalender – Änderungen kommen von selbst nach. Deinen persönlichen Link mit nur deinen Terminen gibt es unter „Mein Kalender“.</Muted>
               <View style={styles.subscribeButtons}>
                 <Button label="Im Kalender öffnen" variant="secondary" compact onPress={() => { Linking.openURL(feed.webcal).catch(() => undefined); }} testID="calendar-subscribe-webcal" />
                 <Button label="Google Kalender" variant="quiet" compact onPress={() => { Linking.openURL(feed.google).catch(() => undefined); }} testID="calendar-subscribe-google" />
@@ -356,7 +385,7 @@ export function TournamentsScreen({ navigation, route }: Props) {
           </View>
         ) : null}
 
-        {view === "list" && filter === "all" && openEntries.length ? (
+        {!myCalendar && view === "list" && filter === "all" && openEntries.length ? (
           <View style={styles.stats}>
             <Stat label="Events" value={String(counts.events)} color={kindColors.event} />
             <Stat label="Turniere" value={String(counts.tournaments)} color={kindColors.tournament} />
@@ -364,7 +393,7 @@ export function TournamentsScreen({ navigation, route }: Props) {
           </View>
         ) : null}
 
-        {view === "list" ? (openEntries.length ? (
+        {!myCalendar && view === "list" ? (openEntries.length ? (
           openEntries.map((entry, index) => (
             <ListItemFadeIn key={entry.card.key} entrance={entrance} id={entry.card.key} index={index}>
               <EntryCard entry={entry} onOpen={open} opened={opened.has(entry.card.key)} onToggle={() => toggleOpened(entry.card.key)} />
@@ -378,7 +407,7 @@ export function TournamentsScreen({ navigation, route }: Props) {
           />
         )) : null}
 
-        {view === "list" && pastEntries.length ? (
+        {!myCalendar && view === "list" && pastEntries.length ? (
           <View style={styles.section}>
             <Pressable
               onPress={() => setShowPast((value) => !value)}

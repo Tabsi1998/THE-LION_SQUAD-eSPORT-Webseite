@@ -24,6 +24,9 @@ jest.mock("../../live", () => ({ isGuestUser: () => mockGuest.value }));
 const mockOpenSignIn = jest.fn();
 jest.mock("../../navigation/rootNavigation", () => ({ openSignIn: (...args: unknown[]) => mockOpenSignIn(...args) }));
 jest.mock("@expo/vector-icons", () => ({ Ionicons: () => null }));
+// Der Abo-Hinweis nach der Anmeldung (#1788): ob er kommt, entscheidet der Server - hier nur, dass gefragt wird.
+const mockOfferCalendar = jest.fn();
+jest.mock("../../lib/calendarHint", () => ({ offerCalendarHint: () => mockOfferCalendar() }));
 jest.mock("../../components/MediaImage", () => ({ MediaImage: () => null }));
 // Der Kalender-Knopf als Marke: da, wenn die Seite ihm einen Termin gibt (#1221).
 jest.mock("../../components/AddToCalendarButton", () => ({
@@ -106,6 +109,7 @@ test("Kosten vor dem Absenden: Zusatz per Haken, Summe live, ohne Kostenhaken ke
   expect(screen.getByText("Verbindlich anmelden · 35,00 €")).toBeTruthy();
   await fireEvent.press(screen.getByTestId("event-register-submit"));
   await waitFor(() => expect(mockPost).toHaveBeenCalledWith("/events/e1/registrations", { companion_count: 0, note: null, selected_positions: ["shirt"] }));
+  await waitFor(() => expect(mockOfferCalendar).toHaveBeenCalledTimes(1));
 });
 
 test("eigener Betrag an der Anmeldung; die Verwaltung klappt die Teilnehmer aus und checkt ein", async () => {

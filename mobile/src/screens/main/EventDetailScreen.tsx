@@ -10,6 +10,7 @@ import { EventRecapCard } from "../../components/EventRecapCard";
 import { FormInput } from "../../components/FormInput";
 import { FriendsAtEventCard } from "../../components/FriendsAtEventCard";
 import { offerFriendsHint } from "../../lib/friendsHint";
+import { offerCalendarHint } from "../../lib/calendarHint";
 import { ErrorState, PartialLoadNotice, SkeletonList } from "../../components/ListState";
 import { MediaImage } from "../../components/MediaImage";
 import { PlayAlongSheet } from "../../components/PlayAlongSheet";
@@ -172,6 +173,8 @@ export function EventDetailScreen({ navigation, route }: Props) {
       await load();
       // Der einmalige Hinweis direkt nach der ersten Anmeldung (#1188 Teil 2).
       void offerFriendsHint();
+      // Der Abo-Hinweis (#1788): nur ohne aktives Abo und nur einmal - der Server entscheidet.
+      void offerCalendarHint();
       if (offersPlayAlong(event, Boolean(user) && !guest)) setPlayAlongFor(event.id);
       else finishPlayAlong();
     } catch (err) {

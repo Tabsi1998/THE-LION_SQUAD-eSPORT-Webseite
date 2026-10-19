@@ -215,6 +215,8 @@ export function targetFromUrl(url?: string | null): AppTarget | null {
   if (first === "members" && second === "helfen" && Number(query.get("event"))) return detail("MemberHelperShifts", { event: Number(query.get("event")) });
   if (first === "members" && second) return memberTarget(second);
   if (first === "seasons") return detail("SeasonPass");
+  // „Mein Kalender“ (#1788): /calendar/mine öffnet im Events-Tab die eigenen Termine.
+  if (first === "calendar" && second === "mine") return tab("TournamentList", { scope: "mine" });
   if (second) return null;
 
   switch (first) {

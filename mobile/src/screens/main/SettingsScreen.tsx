@@ -291,6 +291,8 @@ function AccountSettings() {
       <Group title="Konto" testID="settings-group-account">
         <Card style={styles.list}>
           <Row icon="create-outline" label="Profil bearbeiten" detail="Name, Bio, Spiele und Konten" onPress={() => navigation?.navigate("ProfileEdit" as never)} testID="settings-edit-profile" />
+          {/* Mein Kalender-Abo (#1788): der feste Weg zum persönlichen Link - wie im Web unter Einstellungen. */}
+          <Row icon="calendar-outline" label="Mein Kalender-Abo" detail="Deine Termine automatisch im Handy-Kalender" onPress={() => navigation?.navigate("CalendarSubscription" as never)} testID="settings-calendar-subscription" border />
           <Row icon="document-lock-outline" label="Meine Daten" detail="Auskunft und Export auf der Website" onPress={() => openLink(`${WEB_BASE_URL}/privacy-account`)} testID="settings-data" border />
           <Row icon="log-out-outline" label="Abmelden" detail="Dieses Gerät aus deinem Konto ausloggen." onPress={() => {
             // Ein wartender Schalter geht noch ins richtige Konto, danach wird abgemeldet (#1061).

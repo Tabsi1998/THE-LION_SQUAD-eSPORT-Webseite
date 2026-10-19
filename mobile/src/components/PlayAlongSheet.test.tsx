@@ -15,6 +15,11 @@ jest.mock("../lib/api", () => ({
 }));
 jest.mock("@expo/vector-icons", () => ({ Ionicons: () => null }));
 jest.mock("../seasons/anchors", () => ({ useSeasonOverlay: () => null }));
+// Hinweise nach der Anmeldung (#1188, #1788): ob sie kommen, entscheidet der Server - hier nur, dass gefragt wird.
+const mockOfferFriends = jest.fn();
+const mockOfferCalendar = jest.fn();
+jest.mock("../lib/friendsHint", () => ({ offerFriendsHint: () => mockOfferFriends() }));
+jest.mock("../lib/calendarHint", () => ({ offerCalendarHint: () => mockOfferCalendar() }));
 
 const SOLO: PlayAlongEntry = { kind: "tournament", id: "t1", slug: "lan-cup", title: "LAN-Cup", start_date: "2026-10-31T14:00:00+00:00", mode: "Einzel", game: "Rocket League",
   team: false, fee: { total_cents: 1000, currency: "EUR" }, spots_left: 3, full: false, selectable: true, reason: null, captain: false, my_status: null };
@@ -89,6 +94,9 @@ test("Anmelden erst mit Regeln und Kosten; danach das Ergebnis je Eintrag mit Su
   expect(screen.getByTestId("play-along-result-t2")).toHaveTextContent(/Warteliste/);
   expect(screen.getByTestId("play-along-total")).toHaveTextContent(/10,00 €/);
   expect(screen.getByText("1 angemeldet, 1 auf der Warteliste.")).toBeTruthy();
+  // Nach einer echten Turnier-Anmeldung fragt die App, ob der Abo-Hinweis fällig ist (#1788).
+  expect(mockOfferCalendar).toHaveBeenCalledTimes(1);
+  expect(mockOfferFriends).toHaveBeenCalledTimes(1);
   expect(screen.getByText("Zurück zum Turnier")).toBeTruthy();
 });
 
