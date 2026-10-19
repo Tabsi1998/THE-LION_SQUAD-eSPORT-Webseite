@@ -245,9 +245,42 @@ und im Protokoll, und alle Tabellen der Saison werden neu gerechnet.
 <img src="../assets/serien/serien-saison-seite.png" alt="Seite einer Saison mit Regeln, Version und Hinweis zur letzten Änderung" width="560">
 
 **Archivieren statt Löschen:** Spur und Saison lassen sich nur archivieren; **Archivierte zeigen** blendet sie ein,
-**Zurückholen** macht es rückgängig. Ein Klick auf die Saison öffnet ihre Seite mit Regeln und Version. Termine,
-Teilnehmer und Ergebnisse kommen dort in den nächsten Schritten dazu, ebenso die öffentliche Seite unter
-`/references/series/<spur>/<saison>`. Die bestehenden Referenzen bleiben, wie sie sind.
+**Zurückholen** macht es rückgängig. Ein Klick auf die Saison öffnet ihre Seite mit Regeln, Version und Kalender.
+Teilnehmer und Ergebnisse kommen dort in den nächsten Schritten dazu, Captains stehen weiter unten. Die bestehenden
+Referenzen bleiben, wie sie sind.
+
+**Kalender der Saison.** Auf der Seite der Saison stehen alle Termine in ihrer Reihenfolge, jeder mit Status:
+**Geplant**, **Heute**, **Ergebnis fehlt** (Tag vorbei, nichts eingetragen), **Verschoben**, **Abgesagt** und
+**Gewertet**. Gezählt wird immer nach dem Wiener Kalendertag.
+
+- **Liste einfügen:** je Zeile ein Termin, etwa `R1 · 05.11. · Strecke` – Kürzel, Datum (TT.MM. oder TT.MM.JJJJ),
+  optional Uhrzeit und Ort; trennen mit Leerzeichen, `·`, `|` oder `;`. Ohne Jahr gilt das erste Jahr der Saison, über
+  Neujahr zählt es weiter. Eine Zeile ohne Datum bekommt den nächsten **Standard-Wochentag** nach der Zeile davor,
+  ohne Uhrzeit gilt die **Standard-Uhrzeit**. **Vorschau** zeigt, was daraus wird; hat eine Zeile einen Fehler, steht
+  er mit Zeilennummer da, und übernommen wird erst eine fehlerfreie Liste.
+- **Termin:** einzeln anlegen; Tag und Uhrzeit sind mit dem nächsten Standard-Wochentag und der Standard-Uhrzeit
+  vorbefüllt. Art **Finale**, **Zählt zur Wertung** (aus: steht im Kalender, geht aber nicht in die Tabelle) und bei
+  einer Team-Liga der Gegner. Die Notiz sieht nur die Verwaltung.
+- **Verschieben** (Kalender-Symbol): neuer Tag und Uhrzeit. Der ursprüngliche Tag bleibt beim Termin stehen, auch wenn
+  ihr noch einmal verschiebt.
+- **Absagen** (Verbotszeichen): ein abgesagter Termin fehlt nie und zählt nicht zur Rundenzahl der Wertung;
+  **Wieder ansetzen** nimmt es zurück.
+- **Reihenfolge:** mit den Pfeilen oder **Nach Datum ordnen**. **Archivieren** nimmt einen Termin aus dem Kalender,
+  unter **Archiviert** lässt er sich zurückholen. Gewertete Termine lassen sich weder absagen noch archivieren.
+
+Hat ein Termin kein Ergebnis, obwohl danach schon gewertet ist, steht oben der Hinweis **Lücke im Kalender** – meist
+fehlt das Ergebnis, oder der Termin wurde abgesagt.
+
+<table>
+<tr>
+<td><img src="../assets/serien/serien-kalender-einfuegen.png" alt="Blatt Terminliste einfügen mit der Vorschau der erkannten Termine" width="420"></td>
+<td><img src="../assets/serien/serien-kalender-verwaltung.png" alt="Kalender der Saison mit verschobenem und abgesagtem Termin" width="420"></td>
+</tr>
+</table>
+
+**Öffentlich** steht der Kalender unter `/references/series/<spur>/<saison>` – mit der Sichtbarkeit von Spur und Saison
+(eine Saison „Nur Mitglieder“ sehen Gäste nicht), ohne Notizen. Die volle Serienseite mit Tabelle kommt in einem
+späteren Schritt; bis dahin ist die Seite nicht für Suchmaschinen gedacht.
 
 **Captains:** Auf der Seite der Saison steht unten **Captains**. Dort tragt ihr Mitglieder ein, die für genau diese
 Saison Ergebnisse hochladen dürfen – nur aktive Vereinsmitglieder, die Suche findet nur sie. Namen tippen, **Gilt bis** wählen (Pflicht, meist das Saisonende) und – wenn der
@@ -286,7 +319,8 @@ Einträge Entwürfe sind. Nach dem letzten Tag verschwindet die Saison aus der L
 | Sponsor-Felder lassen sich nicht ändern | Dolibarr führt sie | In Dolibarr ändern |
 | Partner zeigt „x online“ nicht | Das Widget ist im Discord des Partners aus | Partner bitten, es einzuschalten |
 | Seite „Über uns“ zeigt keine Zahl | Zähler mit null bleiben weg | Gewollt |
-| `/references/series/…` zeigt „Hier ist kein Rudel“ | Die öffentliche Seite einer Saison kommt erst in einem späteren Schritt | Gewollt; bis dahin nur in der Verwaltung |
+| `/references/series/…` zeigt „Hier ist kein Rudel“ | Saison oder Spur archiviert, Adresse falsch, oder die Sichtbarkeit ist enger (etwa „Nur Mitglieder“) | Sichtbarkeit und Status prüfen |
+| Termin steht auf **Ergebnis fehlt**, fand aber nie statt | Nicht abgesagt | **Absagen** – dann fehlt er nicht mehr |
 
 ---
 
