@@ -131,6 +131,11 @@ async def test_no_show_in_a_heat_marks_only_that_person_and_the_heat_stays_open(
     assert await flow.db.audit_logs.count_documents({"action": "match.forfeit"}) == 0
     assert await flow.db.audit_logs.count_documents({"action": "match.no_show.marked"}) == 1
     assert await incidents(flow, user_of[missing], heat) == 1, "der Eintrag „nicht erschienen“ gilt der fehlenden Person"
+    # Die Rückmeldung der Turnierleitung richtet sich nach dem Stand - auch bei einem zweiten Tipp.
+    assert confirmed.json()["status"] == stored["status"]
+    again = await flow.post(f"/api/tournaments/{tournament['id']}/lead/no-show/{heat['id']}",
+                            json={"action": "confirm", "registration_id": missing})
+    assert again.json()["idempotent_replay"] is True and again.json()["status"] == stored["status"]
 
     lead = (await flow.get(f"/api/tournaments/{tournament['id']}/lead")).json()
     assert not [row for row in lead["attention"] if row["kind"] == "no_show"]

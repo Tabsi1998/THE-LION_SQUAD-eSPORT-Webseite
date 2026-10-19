@@ -90,7 +90,8 @@ async def decide_no_show(tid: str, match_id: str, body: NoShowDecision, me: dict
     if not isinstance(proposal, dict):
         raise HTTPException(status_code=409, detail="Für dieses Spiel liegt kein Vorschlag „nicht erschienen“ vor.")
     if proposal.get("decision") == "confirmed" and body.action == "confirm":
-        return {"ok": True, "idempotent_replay": True, "match_id": match_id}
+        # Mit Stand (#1823): im Lauf bleibt er offen, im Duell ist er „forfeit“ - danach richtet sich die Rückmeldung.
+        return {"ok": True, "idempotent_replay": True, "match_id": match_id, "status": match.get("status")}
     now = now_utc()
     if body.action == "extend":
         start = max(now, _parse(proposal.get("due_at")) or now)
