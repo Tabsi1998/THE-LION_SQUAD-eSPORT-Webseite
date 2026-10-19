@@ -220,7 +220,8 @@ export function splitBands(columns, capacity) {
   const most = Math.max(1, ...columns.map((column) => column.matches.length));
   const slice = (bands) => Array.from({ length: bands }, (_, band) => columns.map((column) => {
     const n = column.matches.length;
-    return { ...column, matches: column.matches.slice(Math.floor((band * n) / bands), Math.floor(((band + 1) * n) / bands)) };
+    // Aufgerundet: eine Spalte mit wenigen Spielen (Finale) steht schon auf der ersten Seite, nicht erst auf der letzten.
+    return { ...column, matches: column.matches.slice(Math.ceil((band * n) / bands), Math.ceil(((band + 1) * n) / bands)) };
   }));
   for (let bands = 1; bands <= most; bands += 1) {
     const sliced = slice(bands);
@@ -244,10 +245,18 @@ export function bracketPages(bracket, { orientation = PRINT_DEFAULTS.treeOrienta
     const parts = [];
     for (const chunk of chunks) {
       const { bands, overflow } = splitBands(splitTallCards(chunk, capacity), capacity);
-      bands.forEach((band, bandIndex) => parts.push({
-        columns: band.map((column) => ({ ...column, continued: bandIndex > 0 || bands.length > 1 ? { band: bandIndex + 1, of: bands.length } : null })),
-        overflow,
-      }));
+      // Je Spalte: auf wie vielen Seiten sie Spiele hat. Nur dort steht ihr Kopf - mit „1/2“, „2/2“ nur, wenn es mehrere
+      // sind. Eine Seite zeigt keine leere Spalte.
+      const spread = chunk.map((_, index) => bands.filter((band) => band[index].matches.length).length);
+      const seen = chunk.map(() => 0);
+      bands.forEach((band) => {
+        const columns = band.flatMap((column, index) => {
+          if (!column.matches.length) return [];
+          seen[index] += 1;
+          return [{ ...column, continued: spread[index] > 1 ? { band: seen[index], of: spread[index] } : null }];
+        });
+        if (columns.length) parts.push({ columns, overflow });
+      });
     }
     parts.forEach((part, index) => {
       const piece = { key: `${block.key}#${index}`, title: block.title, kind: block.kind, part: parts.length > 1 ? { index: index + 1, of: parts.length } : null, columns: part.columns, overflow: part.overflow };

@@ -132,6 +132,19 @@ describe("Baum", () => {
     expect(pages[0].blocks[0].part).toEqual({ index: 1, of: pages.length });
   });
 
+  test("Spalten mit wenigen Spielen stehen auf der ersten Seite; keine Seite zeigt eine leere Spalte", () => {
+    for (const bracket of [singleElim(32), singleElim(16), doubleElim()]) {
+      const pages = bracketPages(bracket, { orientation: "landscape" });
+      for (const page of pages) for (const block of page.blocks) for (const column of block.columns) expect(column.matches.length).toBeGreaterThan(0);
+    }
+    const pages = bracketPages(singleElim(16), { orientation: "landscape" });
+    // 16er: Runde 1 in zwei Bändern - das Finale (Runde 4, ein Spiel) steht auf Seite 1, ohne „1/2“.
+    const final = pages[0].blocks[0].columns.find((column) => column.title === "Runde 4");
+    expect(final.matches).toHaveLength(1);
+    expect(final.continued).toBeNull();
+    expect(pages[1].blocks[0].columns.map((column) => column.title)).not.toContain("Runde 4");
+  });
+
   test("hochkant passen weniger Spalten - trotzdem nichts abgeschnitten", () => {
     const pages = bracketPages(singleElim(16), { orientation: "portrait" });
     everyColumnFits(pages, "portrait");
