@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.1](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/compare/v1.2.0...v1.2.1) (2026-10-19)
+
+
+### Dokumentation
+
+* Kurzanleitung für Helfer am Turniertag mit Bildern zu jedem Schritt, PC und Handy ([#1686](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1686)) ([a5e7e13](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/a5e7e133f0d7665a09333541fda33324b12d0a82))
+
 ## 1.2.0 (19.10.2026)
 
 ### Neu
