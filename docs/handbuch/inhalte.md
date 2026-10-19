@@ -265,6 +265,30 @@ Einträge Entwürfe sind. Nach dem letzten Tag verschwindet die Saison aus der L
 
 <img src="../assets/serien/serien-meine-serien.png" alt="Mein Dienst eines Captains mit der Liste Meine Serien" width="560">
 
+**Teilnehmer und unbekannte Namen:** Auf der Seite der Saison stehen unter **Teilnehmer** alle Namen so, wie der
+Veranstalter sie führt – je als **Mitglied** (mit Profil), **Gast**, **Extern** oder **offen**. **Namen** fügt mehrere auf
+einmal hinzu (einer je Zeile); schon vorhandene werden übersprungen, bekannte gleich zugeordnet.
+**Unbekannte Namen** öffnet die offenen Namen mit Vorschlägen samt Begründung:
+
+- **Spiel-ID passt** – die Kennung im Konto des Mitglieds (Reiter „Gaming“: je Spiel, EA-ID, PSN, Xbox …) ist gleich.
+  Der Vorschlag ist vorausgewählt.
+- **Alias bestätigt am …** – der Name wurde schon einmal zugeordnet.
+- **Name im Profil passt** und **Gleiche Startnummer wie in …** sind nur Hinweise und werden nicht vorausgewählt.
+
+Verglichen wird ohne Groß/Klein, Leerzeichen, Sonderzeichen und Akzente; Clan-Tags wie „[TLS]“ sind optional (der
+Vorschlag sagt dann „ohne Clan-Tag“). Bloß ähnliche Namen („Name2“) werden nie vorgeschlagen. Je Zeile entscheidet ihr
+einmal: **Bestätigen** (Mitglied), **Gast** oder **Extern**. Mitglied und Gast merkt sich die Website als **Alias** und
+erkennt den Namen danach in jeder Serie selbst; für Externe wird nichts gespeichert, und ein falscher Alias wird damit
+zurückgenommen. **Gäste** zählen fürs Team, aber nicht in der Vereinsstatistik und nicht im Profil. Aliase und
+Verknüpfungen sieht nur die Verwaltung (Bereich Redaktion).
+
+<table>
+<tr>
+<td><img src="../assets/serien/serien-zuordnung-unbekannte-namen.png" alt="Dialog Unbekannte Namen mit Vorschlag über die Spiel-ID, Bestätigen, Gast und Extern" width="420"></td>
+<td><img src="../assets/serien/serien-zuordnung-liste.png" alt="Teilnehmer einer Saison als Mitglied, Gast, Extern oder offen" width="420"></td>
+</tr>
+</table>
+
 ---
 
 ## 4. Wenn etwas nicht klappt
