@@ -25,7 +25,7 @@ siehst nur, wofür du eingeteilt bist. Jede Eingabe wird gespeichert, auch wer s
 
 <sub>In der App: Turnierleitung ja, Reiter Stationen noch nicht – bitte Website nutzen.</sub>
 
-**1.** Bei deiner Station steht **Als Nächstes**. Tippe **Aufrufen** – die Spieler bekommen „Du bist dran“.
+**1.** Bei deiner Station steht **Als Nächstes** – mit Runde, Durchgang und den Namen, wer antritt. Tippe **Aufrufen** – die Spieler bekommen „Du bist dran“.
 
 <table><tr><th>PC</th><th>Handy</th></tr><tr>
 <td><img src="../assets/helfer/a1-aufrufen-pc.png" alt="Station frei, Als Nächstes mit Knopf Aufrufen" width="420"></td>
