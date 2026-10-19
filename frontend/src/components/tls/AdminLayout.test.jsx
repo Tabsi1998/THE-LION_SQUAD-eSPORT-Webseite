@@ -197,6 +197,9 @@ test.each([
   ["Kassier (nur Finanzen)", { role: "player", areas: ["finance"], ...MFA }, ["/admin", "/admin/finance"]],
   ["Moderator", { role: "moderator" }, ["/admin/dienst", "/admin/moderation"]],
   ["Helfer", { role: "player", has_staff_assignment: true, is_tournament_staff: true }, ["/admin/dienst", "/admin/tournaments", "/admin/f1", "/admin/stations"]],
+  // Captain einer Serie (#1749): nur „Mein Dienst“ - keine Turnierseiten, keine Serien-Verwaltung.
+  ["Captain einer Serie", { role: "player", has_series_captain: true, ...MFA }, ["/admin/dienst"]],
+  ["Turnierleitung und Captain", { role: "tournament_admin", has_series_captain: true, ...MFA }, expect.arrayContaining(["/admin", "/admin/dienst", "/admin/tournaments"])],
   ["Spieler", { role: "player" }, []],
 ])("%s sieht genau seine Einträge", (_name, user, expected) => {
   expect(visible(user)).toEqual(expected);

@@ -7,6 +7,7 @@ Ein Server-Dienst für alle, die ihn brauchen: die Seite „Mein Dienst“ der W
   Turniere, die vorbei sind (abgeschlossen, Ergebnisse veröffentlicht, archiviert, abgesagt), fehlen.
 - Moderation bekommt nur den Zähler der offenen Meldungen - keine Turniere.
 - Die Turnierleitung über alle Turniere (mit bestätigter Zwei-Faktor-Anmeldung) sieht zusätzlich alle Turniere von heute.
+- Captains externer Serien (#1749) sehen ihre Serien („Meine Serien“), solange ihr Recht gilt.
 - Spieler ohne Dienst bekommen eine leere Antwort.
 """
 from __future__ import annotations
@@ -139,8 +140,12 @@ async def duty_overview(db, user: dict, now: datetime | None = None) -> dict:
     moderation = None
     if await can_use_area(user, "moderation", db=db):
         moderation = {"open_reports": await db.user_reports.count_documents({"status": "open"})}
+    from services.reference_series_access import captain_series
+
     return {
         "assignments": await helper_rows(db, user, now),
+        # Externe Serien (#1749): wo die Person heute Captain ist - „Meine Serien“.
+        "series": await captain_series(db, user),
         "moderation": moderation,
         "lead_today": await lead_today_rows(db, now) if is_confirmed_tournament_lead(user) else [],
     }

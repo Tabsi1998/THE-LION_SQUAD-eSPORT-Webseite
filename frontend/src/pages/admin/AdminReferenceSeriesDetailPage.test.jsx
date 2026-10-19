@@ -5,7 +5,7 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 // Teilnehmer, Ergebnisse und Captains hängen die nächsten Pakete als eigene Abschnitte an.
 
 const apiMock = { get: vi.fn(), post: vi.fn(), patch: vi.fn() };
-vi.mock("@/lib/api", () => ({ api: apiMock, formatApiError: (detail) => detail || "Fehler" }));
+vi.mock("@/lib/api", () => ({ api: apiMock, formatApiError: (detail) => detail || "Fehler", formatRequestError: () => "Fehler", resolveMediaUrl: (url) => url }));
 vi.mock("@/components/tls/AdminLayout", () => ({ AdminLayout: ({ children }) => <div>{children}</div> }));
 vi.mock("@/components/tls/ConfirmDialog", () => ({ useConfirm: () => async () => true }));
 vi.mock("@/hooks/useApiInvalidation", () => ({ useApiInvalidation: () => {} }));
@@ -60,6 +60,25 @@ test("Bearbeiten öffnet das Seitenblatt der Saison, Archivieren archiviert", as
   fireEvent.click(screen.getByTestId("series-sheet-cancel"));
   fireEvent.click(screen.getByTestId("series-detail-archive"));
   await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/reference-series/admin/series/serie-1/archive"));
+});
+
+// Captains (#1749) öffnen dieselbe Seite: ohne Bearbeiten, Archivieren und Captain-Verwaltung, zurück zu „Mein Dienst“.
+test("Captain: Hinweis mit Ablauf und Entwurf, keine Knöpfe des Vorstands", async () => {
+  apiMock.get.mockResolvedValue({ data: { ...SERIES, access: { role: "captain", can_publish: false, valid_until: "2026-12-31" } } });
+  renderAt();
+  expect(await screen.findByTestId("series-detail-captain")).toHaveTextContent("Du bist Captain dieser Saison bis 31.12.2026 · Einträge sind Entwürfe, der Vorstand gibt frei.");
+  expect(screen.queryByTestId("series-detail-edit")).toBeNull();
+  expect(screen.queryByTestId("series-detail-archive")).toBeNull();
+  expect(screen.queryByTestId("series-staff")).toBeNull();
+  expect(screen.getByTestId("series-detail-back")).toHaveAttribute("href", "/admin/dienst");
+  expect(apiMock.get).toHaveBeenCalledTimes(1);
+});
+
+test("Vorstand: die Captain-Verwaltung steht auf der Seite", async () => {
+  apiMock.get.mockImplementation(async (url) => ({ data: url.endsWith("/staff") ? { staff: [], publish_mode: "review" } : { ...SERIES, access: { role: "board", can_publish: true } } }));
+  renderAt();
+  expect(await screen.findByTestId("series-staff-empty")).toBeInTheDocument();
+  expect(screen.queryByTestId("series-detail-captain")).toBeNull();
 });
 
 test("eine unbekannte Saison sagt es klar", async () => {

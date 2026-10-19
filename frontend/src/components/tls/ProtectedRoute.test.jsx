@@ -164,3 +164,22 @@ test("Verwaltungsbereich ohne Zwei-Faktor und ohne Einsatz: erst die Einrichtung
   renderEntrance({ id: "r", role: "player", areas: ["content"] });
   expect(screen.getByTestId("mfa-setup")).toBeInTheDocument();
 });
+
+// Captains externer Serien (#1749): die Seite der Saison geht für sie auf - wie im Server nur mit Zwei-Faktor. Welche
+// Serie, prüft der Server; andere Seiten der Redaktion bleiben zu.
+test("ein Captain kommt mit Zwei-Faktor in die Saison, ohne zur Einrichtung, in andere Redaktionsseiten nicht", () => {
+  authState.user = { id: "c", role: "player", has_series_captain: true, ...mfa };
+  renderAt("/admin/reference-series/s1", <ProtectedRoute requireArea="content" allowSeriesCaptain><div>saison</div></ProtectedRoute>);
+  expect(screen.getByText("saison")).toBeInTheDocument();
+
+  renderAt("/admin/news", <ProtectedRoute requireArea="content"><div>news</div></ProtectedRoute>);
+  expect(screen.getByText("verboten")).toBeInTheDocument();
+
+  authState.user = { id: "c", role: "player", has_series_captain: true, mfa_enabled: false };
+  renderAt("/admin/reference-series/s2", <ProtectedRoute requireArea="content" allowSeriesCaptain><div>saison</div></ProtectedRoute>);
+  expect(screen.getByTestId("mfa-setup")).toBeInTheDocument();
+
+  authState.user = { id: "p", role: "player" };
+  renderAt("/admin/reference-series/s3", <ProtectedRoute requireArea="content" allowSeriesCaptain><div>saison</div></ProtectedRoute>);
+  expect(screen.getAllByText("verboten").length).toBeGreaterThan(0);
+});

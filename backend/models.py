@@ -1763,12 +1763,39 @@ class ReferenceAliasCreate(BaseModel):
     source: ReferenceAliasSource = "manual"
 
 
+def _staff_day(value: str) -> str:
+    """Ein Kalendertag JJJJ-MM-TT (Wiener Tag) - als Text gespeichert, damit Vergleiche mit ``club_today`` passen."""
+    text = (value or "").strip()
+    try:
+        return datetime.strptime(text, "%Y-%m-%d").date().isoformat()
+    except ValueError as exc:
+        raise ValueError("Ablauf als Tag (JJJJ-MM-TT).") from exc
+
+
 class ReferenceSeriesStaffCreate(BaseModel):
-    """Captain einer Serie (#1749), aufgebaut wie die Turnier-Leitung; mit Ablauf."""
-    user_id: str
+    """Captain einer Serie (#1749), aufgebaut wie die Turnier-Leitung. ``valid_until`` ist Pflicht (Wiener Tag,
+    einschließlich) - ein Recht ohne Ende gibt es nicht. Veröffentlichen ist aus, bis der Vorstand es einschaltet."""
+    user_id: str = Field(min_length=1, max_length=80)
     role: ReferenceStaffRole = "captain"
     can_publish: bool = False
-    expires_at: Optional[datetime] = None
+    valid_until: str
+
+    @field_validator("valid_until")
+    @classmethod
+    def _until(cls, value):
+        return _staff_day(value)
+
+
+class ReferenceSeriesStaffUpdate(BaseModel):
+    can_publish: Optional[bool] = None
+    valid_until: Optional[str] = None
+
+    @field_validator("valid_until")
+    @classmethod
+    def _until(cls, value):
+        if value is None:
+            raise ValueError("Ablauf als Tag (JJJJ-MM-TT) - ein Recht ohne Ende gibt es nicht.")
+        return _staff_day(value)
 
 
 # ---------- Gallery ----------

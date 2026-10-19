@@ -1,16 +1,22 @@
 // „Mein Dienst“ (#1352): der Eingang für Helfer und Moderation - statt „Kein Zugriff“. Oben die Moderation (nur mit dem
 // Bereich), darunter die eigenen Turniere und Fast Laps, heute zuerst, je mit der eigenen Rolle; für die Turnierleitung
 // zusätzlich alles, was heute läuft. Die Daten kommen aus dem Server-Dienst „deine Aufgaben“ (`/users/me/duty`), den
-// später auch die Startseite je Rolle (#1286) und „Dein Dienst“ auf Home (#1175) nutzen.
+// später auch die Startseite je Rolle (#1286) und „Dein Dienst“ auf Home (#1175) nutzen. Captains externer Serien
+// (#1749) sehen darunter „Meine Serien“.
 import { useCallback, useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { useLiveRefresh } from "@/hooks/useLiveRefresh";
 import { DutyList, ModerationDuty } from "@/pages/admin/duty/DutyList";
+import { SeriesDutyList } from "@/pages/admin/duty/SeriesDutyList";
+import { useAuth } from "@/context/AuthContext";
+import { mfaSetupPath, needsSecondFactor } from "@/lib/permissions";
+import { Link } from "react-router-dom";
 
 export default function AdminDutyPage() {
   const [data, setData] = useState(null);
   const [failed, setFailed] = useState(false);
+  const { user } = useAuth();
   const load = useCallback(() => {
     api.get("/users/me/duty")
       .then(({ data: next }) => { setData(next); setFailed(false); })
@@ -21,7 +27,8 @@ export default function AdminDutyPage() {
 
   const assignments = data?.assignments || [];
   const leadToday = data?.lead_today || [];
-  const nothing = data && !data.moderation && assignments.length === 0 && leadToday.length === 0;
+  const series = data?.series || [];
+  const nothing = data && !data.moderation && assignments.length === 0 && leadToday.length === 0 && series.length === 0;
 
   return (
     <AdminLayout>
@@ -44,7 +51,7 @@ export default function AdminDutyPage() {
         </section>
       )}
 
-      {data && (assignments.length > 0 || !data.moderation) && (
+      {data && (assignments.length > 0 || (!data.moderation && series.length === 0)) && (
         <section className="mb-8" aria-labelledby="duty-assignments-heading">
           <h2 id="duty-assignments-heading" className="font-heading font-bold uppercase text-lg mb-3">Deine Einsätze</h2>
           {assignments.length > 0 ? (
@@ -54,6 +61,18 @@ export default function AdminDutyPage() {
               {nothing ? "Gerade hast du keinen Einsatz. Sobald dich die Turnierleitung einträgt, steht er hier." : "Gerade hast du keinen eigenen Einsatz."}
             </p>
           )}
+        </section>
+      )}
+
+      {series.length > 0 && (
+        <section className="mb-8" aria-labelledby="duty-series-heading">
+          <h2 id="duty-series-heading" className="font-heading font-bold uppercase text-lg mb-3">Meine Serien</h2>
+          {needsSecondFactor(user) && (
+            <p className="mb-3 rounded-sm border border-warn/30 bg-warn/5 px-4 py-3 text-sm text-white/70" data-testid="duty-series-mfa">
+              Captains brauchen die Zwei-Faktor-Anmeldung. <Link to={mfaSetupPath("/admin/dienst")} className="underline hover:text-white">Jetzt einrichten</Link>
+            </p>
+          )}
+          <SeriesDutyList rows={series} />
         </section>
       )}
 

@@ -33,6 +33,15 @@ def test_authenticated_bootstrap_returns_the_user_without_refresh(monkeypatch):
         return set()
 
     monkeypatch.setattr(permissions, "areas_for", no_areas)
+    # Captain einer externen Serie (#1749) - ebenfalls aus der Datenbank, hier: keiner.
+    from services import reference_series_access
 
-    assert asyncio.run(me(SimpleNamespace(cookies={"refresh_token": "opaque"}), response, user)) == {**user, "areas": []}
+    async def no_captain(_db, _user):
+        return False
+
+    monkeypatch.setattr(reference_series_access, "has_captain_series", no_captain)
+    monkeypatch.setattr("routes.auth_routes.get_db", lambda: None)
+
+    assert asyncio.run(me(SimpleNamespace(cookies={"refresh_token": "opaque"}), response, user)) == {
+        **user, "areas": [], "has_series_captain": False}
     assert "x-session-refresh" not in response.headers

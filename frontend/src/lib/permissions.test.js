@@ -76,6 +76,8 @@ test.each([
   ["Helfer (Spieler mit Einsatz)", { role: "player", has_staff_assignment: true, is_tournament_staff: true }, "duty", true],
   ["Moderator", { role: "moderator" }, "moderation", true],
   ["Moderator mit Einsatz", { role: "moderator", has_staff_assignment: true }, "duty", true],
+  ["Captain einer Serie (#1749)", { role: "player", has_series_captain: true }, "duty", true],
+  ["Redaktion mit 2FA, auch Captain", { role: "player", areas: ["content"], has_series_captain: true, mfa_enabled: true, auth_mfa_verified: true }, "dashboard", false],
   ["Spieler ohne Dienst", { role: "player" }, "none", false],
   ["nicht angemeldet", null, "login", false],
 ])("%s → %s", (_name, user, target, dutyEntry) => {

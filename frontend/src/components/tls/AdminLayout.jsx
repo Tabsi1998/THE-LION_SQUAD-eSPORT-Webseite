@@ -1,4 +1,4 @@
-import { adminWithoutSecondFactor, canUseArea, hasArea, mfaSetupPath, roleLabel, showsDutyEntry } from "@/lib/permissions";
+import { adminWithoutSecondFactor, canUseArea, hasArea, hasSeriesCaptain, mfaSetupPath, roleLabel, showsDutyEntry } from "@/lib/permissions";
 import { INTEGRATIONS, MENU_INTEGRATIONS } from "@/lib/integrations";
 import { NavLink, useLocation, useNavigate, Link } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
@@ -234,8 +234,9 @@ function itemMatchesQuery(item, groupLabel, query) {
 export function navGroupsFor(user, query, disabledPlatforms = []) {
   const searchQuery = normalizeSearch(query);
   const helper = Boolean(user?.has_staff_assignment) || (Boolean(user?.is_tournament_staff) && !hasArea(user, "tournaments"));
-  // „Mein Dienst“ (#1352): wer einen Einsatz hat - oder nur moderiert und keine Startseite der Verwaltung bekommt.
-  const duty = helper || showsDutyEntry(user);
+  // „Mein Dienst“ (#1352): wer einen Einsatz hat, Captain einer Serie ist (#1749) - oder nur moderiert und keine
+  // Startseite der Verwaltung bekommt.
+  const duty = helper || hasSeriesCaptain(user) || showsDutyEntry(user);
   // Abgehakte Plattformen (#558) fehlen im Menü - einschalten geht unter Alle Verbindungen.
   const off = new Set(Array.isArray(disabledPlatforms) ? disabledPlatforms : []);
   return ADMIN_GROUPS.map((group) => ({

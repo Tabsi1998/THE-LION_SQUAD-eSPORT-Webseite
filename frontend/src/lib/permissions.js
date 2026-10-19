@@ -90,10 +90,18 @@ export function hasHelperAssignment(user) {
   return Boolean(user?.has_staff_assignment);
 }
 
+/** Captain einer externen Serie (#1749) - der Server setzt `has_series_captain`, solange ein Recht heute gilt. Öffnet
+ * „Mein Dienst“ mit „Meine Serien“ und die Seite der Saison; die Seiten selbst verlangen Zwei-Faktor, die Routen prüfen
+ * jede Serie einzeln. */
+export function hasSeriesCaptain(user) {
+  return Boolean(user?.has_series_captain);
+}
+
 /** Wohin /admin führt (#1352, #1353):
  * - „dashboard“: ein Verwaltungsbereich mit bestätigter Zwei-Faktor-Anmeldung (auch Finanzen, #992) - wie
  *   `require_dashboard` im Server;
- * - „duty“: „Mein Dienst“ für Helfer mit Einsatz (auch ein Admin, der die Zwei-Faktor-Anmeldung noch nicht hat);
+ * - „duty“: „Mein Dienst“ für Helfer mit Einsatz und Captains externer Serien (#1749) - auch ein Admin, der die
+ *   Zwei-Faktor-Anmeldung noch nicht hat;
  * - „mfa“: Verwaltungsbereich ohne Zwei-Faktor und ohne Einsatz - erst einrichten;
  * - „moderation“: nur Moderation - direkt zu den Meldungen;
  * - „none“: kein Dienst - „Kein Zugriff“ mit dem freundlichen Satz statt der Bereichsliste;
@@ -101,7 +109,7 @@ export function hasHelperAssignment(user) {
 export function adminHome(user) {
   if (!user) return "login";
   if (canUseArea(user, ...ADMIN_AREAS)) return "dashboard";
-  if (hasHelperAssignment(user)) return "duty";
+  if (hasHelperAssignment(user) || hasSeriesCaptain(user)) return "duty";
   if (isAnyAdmin(user)) return "mfa";
   if (canUseArea(user, "moderation")) return "moderation";
   return "none";

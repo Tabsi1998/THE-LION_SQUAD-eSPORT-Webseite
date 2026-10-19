@@ -1,6 +1,6 @@
 import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
-import { ADMIN_AREAS, MFA_AREAS, adminHome, hasArea, isAnyAdmin, leadWithoutSecondFactor, mfaSetupPath, needsSecondFactor } from "@/lib/permissions";
+import { ADMIN_AREAS, MFA_AREAS, adminHome, hasArea, hasSeriesCaptain, isAnyAdmin, leadWithoutSecondFactor, mfaSetupPath, needsSecondFactor } from "@/lib/permissions";
 import { SkeletonDetailHeader } from "@/components/tls/Skeleton";
 
 // Rechte nach Bereichen (#287): `requireArea` verlangt einen der genannten
@@ -15,8 +15,10 @@ import { SkeletonDetailHeader } from "@/components/tls/Skeleton";
 // `adminHome` ist der Eingang /admin (#1352): die Startseite für Verwaltungsbereiche, „Mein Dienst“ für Helfer, die
 // Meldungen für Moderation, sonst „Kein Zugriff“ mit dem freundlichen Satz (`adminHome` in lib/permissions).
 // `requireDuty` öffnet „Mein Dienst“ für alle mit einem Dienst - Helfer, Moderation oder Verwaltung.
+// `allowSeriesCaptain` (#1749) öffnet eine Seite mit `requireArea` zusätzlich für Captains externer Serien - wie im
+// Server nur mit bestätigter Zwei-Faktor-Anmeldung; welche Serie, prüft der Server bei jedem Aufruf.
 
-export function ProtectedRoute({ children, requireArea = null, requireAdmin = false, requireClubAdmin = false, requireMember = false, requireTournamentStaff = false, adminHome: entrance = false, requireDuty = false }) {
+export function ProtectedRoute({ children, requireArea = null, requireAdmin = false, requireClubAdmin = false, requireMember = false, requireTournamentStaff = false, adminHome: entrance = false, requireDuty = false, allowSeriesCaptain = false }) {
   const { user } = useAuth();
   const loc = useLocation();
   const wantedAreas = requireArea ? [requireArea].flat() : requireClubAdmin ? ["system"] : requireAdmin ? ADMIN_AREAS : [];
@@ -37,6 +39,10 @@ export function ProtectedRoute({ children, requireArea = null, requireAdmin = fa
     if (home === "mfa") return <Navigate to={mfaSetupPath(loc.pathname)} replace />;
     if (entrance && home === "duty") return <Navigate to="/admin/dienst" replace />;
     if (entrance && home === "moderation") return <Navigate to="/admin/moderation" replace />;
+    return children;
+  }
+  if (allowSeriesCaptain && hasSeriesCaptain(user) && !hasArea(user, ...wantedAreas)) {
+    if (needsSecondFactor(user)) return <Navigate to={mfaSetupPath(loc.pathname)} replace />;
     return children;
   }
   if (wantedAreas.length && !hasArea(user, ...wantedAreas)) {

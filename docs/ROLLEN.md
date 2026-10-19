@@ -221,10 +221,46 @@ Kontoliste mit E-Mail-Adressen bleibt bei „Alle Benutzer“ (Vereinsverwaltung
 | `access_links` | Speziallinks | Turnierleitung | aktive Konten |
 | `board` | Vorstand besetzen | Vereinsverwaltung, System | nur Vereinsmitglieder (und gepflegte Mitgliederprofile ohne Konto) |
 | `invite` | Bewerbungen: zum Antrag einladen | Vereinsverwaltung | Konten ohne aktive Mitgliedschaft, mit „ist schon eingeladen“ |
+| `reference_series` | Serien: Captain einer Saison hinzufügen (#1749) | Redaktion | nur aktive Vereinsmitglieder |
 
 Teams kommen als kleine Auswahl (`GET /api/admin/choices/teams?tournament_id=…`, wie `tournament`), Event-Sponsoren
 mit dem Haken „Events“ nur mit Name und Logo (`GET /api/admin/choices/sponsors`: Turnierleitung, Redaktion, System).
 Jede Liste lädt für sich: fehlt ein Recht, steht an der Stelle ein Satz, der Rest der Seite geht weiter.
+
+## Externe Serien: Vorstand und Captains (#1749)
+
+Ergebnisse externer Serien trägt der Vorstand ein – der Bereich Redaktion darf jede Serie. Zusätzlich kann der Vorstand
+je Saison Captains eintragen, die nur für diese eine Saison Ergebnisse und Scoreboards hochladen.
+
+| Was | Redaktion (Vorstand) | Captain dieser Saison | Captain einer anderen Saison, alle anderen |
+| --- | --- | --- | --- |
+| Spur und Saison anlegen, bearbeiten, archivieren, Regeln ändern | ja | nein | nein |
+| Captains hinzufügen, Ablauf und Veröffentlichen-Recht ändern, entfernen | ja | nein | nein |
+| Saison in der Verwaltung öffnen | ja | ja | nein |
+| Ergebnisse eintragen (Entwurf) | ja | ja (Pakete #1742 ff.) | nein |
+| Ergebnisse veröffentlichen | ja | nur wenn die Saison auf „Captain veröffentlicht direkt“ steht oder der Captain das Recht „Darf veröffentlichen“ hat | nein |
+
+- **Zwei-Faktor ist Pflicht** – für den Vorstand wie für Captains (Entscheidung 7 des Obmanns). Ohne bestätigte
+  Zwei-Faktor-Anmeldung antwortet der Server mit dem Hinweis darauf; das Web führt zur Einrichtung.
+- **Nur Vereinsmitglieder:** Captain kann nur werden, wer aktives Vereinsmitglied ist (aktiv oder Ehrenmitglied).
+  Endet die Mitgliedschaft, endet das Captain-Recht beim nächsten Aufruf; der Vorstand sieht den Eintrag mit Hinweis.
+- **Ablauf:** jeder Captain hat einen letzten Tag (`valid_until`, Wiener Tag, einschließlich, Pflicht – ein Recht ohne
+  Ende gibt es nicht). Ab dem Tag danach gilt es nicht mehr, ohne neue Anmeldung: der Server prüft bei **jedem** Aufruf.
+  In einer archivierten Saison haben Captains kein Recht mehr.
+- **Standard:** Einträge eines Captains sind Entwürfe, der Vorstand gibt frei. Direkt veröffentlichen geht nur, wenn
+  der Vorstand es je Saison (`publish_mode`) oder je Captain (`can_publish`) einschaltet.
+- **Veröffentlichte Ergebnisse:** Wer nicht veröffentlichen darf, ändert ein veröffentlichtes Ergebnisblatt nie
+  direkt. Die Änderung wird ein neuer Entwurf daneben, den der Vorstand freigibt; bis dahin bleibt das veröffentlichte
+  Blatt sichtbar (`SeriesAccess.edit_target`).
+- **Kennungen:** Termine, Ergebnisblätter und Teilnehmer gehören zur Saison aus dem Pfad; eine Kennung aus einer
+  anderen Saison antwortet mit 404 – auch für den Vorstand.
+- **Wo:** Captains verwaltet der Vorstand auf der Seite der Saison (Admin → Serien → Saison → „Captains“). Ein Captain
+  sieht seine Saisons unter „Mein Dienst“ → „Meine Serien“ (`/admin/dienst`); `/admin` führt Captains ohne
+  Verwaltungsbereich dorthin. Die Seite der Saison zeigt ihm keine Knöpfe des Vorstands.
+- **Protokoll:** Hinzufügen, Ändern und Entfernen stehen im Adminprotokoll (`reference_series.staff_add`,
+  `reference_series.staff_update`, `reference_series.staff_remove`) mit Vorher und Nachher.
+- **Code:** `services/reference_series_access.py` (`require_series_editor`, `SeriesAccess`), Verwaltung in
+  `routes/reference_staff_routes.py`.
 
 ## Zwei-Faktor und Anmeldung (#348)
 
@@ -328,7 +364,7 @@ Finanzen; die Turnierleitung Turniere, Stationen, Strafen und Gewinne; der Admin
 
 | Gruppe | Einträge | Wer |
 | --- | --- | --- |
-| Übersicht | Dashboard (Turnierleitung, Redaktion, Vereinsverwaltung, Finanzen, System) · Mein Dienst (Helfer mit Einsatz, Moderation ohne Verwaltungsbereich) | Dashboard mit einem dieser Bereiche und Zwei-Faktor (Server: `require_dashboard`, #992, #1353); „Mein Dienst“ (#1352) für Helfer und reine Moderation – im Benutzermenü statt „Admin“, `/admin` führt Helfer nach `/admin/dienst`, Moderation nach `/admin/moderation`, Konten ohne Dienst auf „Kein Zugriff“ mit dem Satz „Die Verwaltung ist für Vereinsdienste …“ |
+| Übersicht | Dashboard (Turnierleitung, Redaktion, Vereinsverwaltung, Finanzen, System) · Mein Dienst (Helfer mit Einsatz, Captains externer Serien, Moderation ohne Verwaltungsbereich) | Dashboard mit einem dieser Bereiche und Zwei-Faktor (Server: `require_dashboard`, #992, #1353); „Mein Dienst“ (#1352) für Helfer und reine Moderation – im Benutzermenü statt „Admin“, `/admin` führt Helfer nach `/admin/dienst`, Moderation nach `/admin/moderation`, Konten ohne Dienst auf „Kein Zugriff“ mit dem Satz „Die Verwaltung ist für Vereinsdienste …“ |
 | Verein | Vereinsdaten (System) · Über uns, Sponsoren, Partner, Referenzen, Serien (Redaktion) · Vorstand, Kontakt-Inbox (Vereinsverwaltung) | je Eintrag |
 | Mitglieder | Mitglieder, Mitgliederprofile, Bewerbungen, Mitgliedervorteile, Dokumente, Alle Benutzer (Vereinsverwaltung) · Dolibarr (Vereinsverwaltung und System) | Vereinsverwaltung |
 | Finanzen | Finanzübersicht | Finanzen |
