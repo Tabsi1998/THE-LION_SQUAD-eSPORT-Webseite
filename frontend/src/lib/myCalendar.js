@@ -46,7 +46,8 @@ export function agendaBuckets(items, now = new Date()) {
     if (item.all_day) {
       // Ganztägig (Versammlung ohne Uhrzeit): gilt bis zum Ende seines letzten Tags in Wien - nicht bis 00:00 des
       // Beginns. Ein Ende ist ausschließlich (00:00 des Folgetags), darum eine Millisekunde davor.
-      const lastDay = end ? viennaDay(new Date(end.getTime() - 1)) : day;
+      const lastInstant = end ? new Date(end.getTime() - 1) : null;
+      const lastDay = lastInstant ? viennaDay(lastInstant) : day;
       if ((lastDay > day ? lastDay : day) < today) continue;
     } else if ((end || start).getTime() < now.getTime()) {
       continue;
