@@ -36,6 +36,7 @@ import { MyStandCard } from "@/components/tls/tournament/MyStandCard";
 import { OnsiteTournamentView } from "@/components/tls/tournament/OnsiteTournamentView";
 import { FriendsAtEvent } from "@/components/tls/FriendsAtEvent";
 import { offerFriendsHint } from "@/lib/friendsHint";
+import { offerCalendarHint } from "@/lib/calendarHint";
 import { useCanonicalSlugRedirect } from "@/hooks/useCanonicalSlugRedirect";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
@@ -157,6 +158,8 @@ function TournamentDetailView() {
       await load();
       // Der einmalige Hinweis direkt nach der ersten Anmeldung (#1188), nicht erst auf der Event-Seite.
       void offerFriendsHint();
+      // Der Abo-Hinweis (#1788): nur ohne aktives Abo und nur einmal - der Server entscheidet.
+      void offerCalendarHint();
     }, "Anmeldung konnte nicht gespeichert werden.");
   };
 

@@ -241,6 +241,11 @@ async def ensure_accounts(db) -> dict:
     users["players"] = players
     # Begleitperson für den Vor-Ort-Zugang (#1592): Konto ohne Mitgliedschaft, nirgends angemeldet.
     users["guest"] = await upsert("gast", "gast@abnahme.lionsquad.at", "Begleitung Gast", "player", False)
+    # Mein Kalender (#1788): ein Konto ohne Abo, dem der Hinweis nach der Anmeldung noch nie erschien - bei jedem Befüllen
+    # wieder so, damit die Abnahme wiederholbar ist.
+    users["calendar"] = await upsert("kalender", "kalender@abnahme.lionsquad.at", "Kalender Abnahme", "player", False)
+    await db.users.update_one({"id": users["calendar"]["id"]}, {"$unset": {"calendar_subscribe_hint_seen_at": ""}})
+    await db.calendar_feed_tokens.delete_many({"user_id": users["calendar"]["id"]})
     return users
 
 
@@ -345,6 +350,7 @@ async def inside_main() -> None:
     # Spieler 1 (NeonFalke) spielt überall mit: eigene Spiele, „Nur meine“, „Deine Gruppe“, „Du“, Sieger-Moment.
     state["accounts"]["player"] = {"email": "spieler01@abnahme.lionsquad.at", "password": TEST_PASSWORD, "totp": None}
     state["accounts"]["guest"] = {"email": "gast@abnahme.lionsquad.at", "password": TEST_PASSWORD, "totp": None}
+    state["accounts"]["calendar"] = {"email": "kalender@abnahme.lionsquad.at", "password": TEST_PASSWORD, "totp": None}
     try:
         game = await ensure_game(admin, db)
         stamp = now_utc().strftime("%d.%m. %H:%M")
@@ -509,6 +515,11 @@ async def inside_main() -> None:
                                        end_date=(now_utc() + timedelta(hours=10)).isoformat())
         await register(admin, members_cup, users["players"][:3])
         state["tournaments"]["onsite_members"] = members_cup["id"]
+
+        # Mein Kalender (#1788): ein öffentliches Online-Turnier mit offener Anmeldung, bei dem noch niemand dabei ist.
+        calendar_cup = await tournament(admin, game, f"Abnahme Kalender-Cup ({stamp})", quarter(now_utc() + timedelta(days=5)),
+                                        format="single_elim", event_mode="online", max_participants=16)
+        state["tournaments"]["calendar_cup"] = calendar_cup["id"]
     finally:
         await admin.close()
     slugs = {}

@@ -14,6 +14,7 @@ import { ViewTransitions } from "@/components/tls/ViewTransitions";
 import { AchievementCatchUp } from "@/components/tls/AchievementCatchUp";
 import { CeremonyHost } from "@/components/achievements/ceremony/CeremonyHost";
 import { BallotPopup } from "@/components/tls/BallotPopup";
+import { CalendarHintHost } from "@/components/calendar/CalendarHintHost";
 import { CookieConsentProvider } from "@/components/tls/CookieConsent";
 import { AnalyticsHead } from "@/components/tls/AnalyticsHead";
 import { ConfirmDialogProvider } from "@/components/tls/ConfirmDialog";
@@ -233,6 +234,8 @@ function App() {
                 Deko - der Adventkalender darin hat eine eigene Grenze mit Hinweis (seasons/adventCalendar). */}
             <OptionalBoundary quiet><SeasonStage /></OptionalBoundary>
             <Toaster theme="dark" position="top-right" richColors />
+            {/* Abo-Hinweis nach einer Anmeldung (#1788): einmal je Konto, unten - die Meldungen bleiben oben rechts. */}
+            <OptionalBoundary quiet><CalendarHintHost /></OptionalBoundary>
             <StartSplashGate />
             <AppErrorBoundary>
             <BottomNav />
@@ -283,6 +286,8 @@ function App() {
           <Route path="/events/:slug/live" element={<EventLivePage />} />
           <Route path="/events/:slug/leitung" element={<EventLeadPage />} />
           <Route path="/calendar" element={<CalendarPage />} />
+          {/* „Mein Kalender“ (#1788): nur die eigenen Termine, auch ohne Abo - der Reiter neben „Alle“. */}
+          <Route path="/calendar/mine" element={<CalendarPage />} />
           <Route path="/advent" element={<AdventCalendarPage />} />
           <Route path="/ostern" element={<EasterHuntPage />} />
           <Route path="/teams" element={<TeamsPage />} />

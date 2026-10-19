@@ -15,6 +15,9 @@ für die sie eingetragen ist - ohne Namen anderer, ohne Zugangslink.
 „Nur meine“ und der persönliche Link (#1189): `GET /api/calendar/mine` sagt der angemeldeten Person, wofür sie dabei ist
 (Event, Turnier auch mit dem Team, Fast Lap gefahren). `GET|POST|DELETE /api/calendar/personal` verwaltet ihren privaten
 Abo-Link; `GET /api/calendar/personal/{token}.ics` liefert nur ihre eigenen Termine (`services/personal_calendar.py`).
+
+„Mein Kalender“ (#1788): `GET /api/calendar/me` zeigt dieselben Termine wie der persönliche Feed - auch ohne Abo - mit dem
+eigenen Stand je Termin. `GET|POST /api/calendar/hint` sagt, ob der Abo-Hinweis nach einer Anmeldung fällig ist, und merkt ihn.
 """
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import Response
@@ -167,6 +170,31 @@ async def calendar_mine(response: Response, me: dict = Depends(get_current_user)
     """Wofür die Person dabei ist - Kennung → Stand je Art; Grundlage für „Nur meine“ in Web und App."""
     response.headers["Cache-Control"] = PRIVATE_CACHE
     return await calendar_items.own_entries(get_db(), me)
+
+
+@router.get("/me")
+async def calendar_me(response: Response, me: dict = Depends(get_current_user)):
+    """„Mein Kalender“ (#1788): die Termine des persönlichen Feeds - auch ohne Abo - mit dem eigenen Stand je Termin, dazu
+    der Stand des Abos (ohne Adresse) und ob der Hinweis nach einer Anmeldung fällig ist."""
+    response.headers["Cache-Control"] = PRIVATE_CACHE
+    return await personal_calendar.my_calendar(get_db(), me["id"])
+
+
+@router.get("/hint")
+async def personal_hint(response: Response, me: dict = Depends(get_current_user)):
+    """Nach einer Anmeldung fragen Website und App, ob der Abo-Hinweis jetzt fällig ist (nur ohne Link, nur einmal)."""
+    response.headers["Cache-Control"] = PRIVATE_CACHE
+    db = get_db()
+    active = (await personal_calendar.status(db, me["id"]))["active"]
+    return {"due": await personal_calendar.hint_due(db, me["id"], active)}
+
+
+@router.post("/hint")
+async def personal_hint_seen(response: Response, me: dict = Depends(get_current_user)):
+    """Der Hinweis ist erschienen - am Konto gemerkt, damit er auf keinem Gerät wiederkommt."""
+    response.headers["Cache-Control"] = PRIVATE_CACHE
+    await personal_calendar.mark_hint_seen(get_db(), me["id"])
+    return {"due": False}
 
 
 @router.get("/personal")

@@ -3356,3 +3356,32 @@ html[data-season-still-cards] .tls-card[data-season-perch="card"]:focus-visible 
 .mp-week[data-current="true"] { border-color: rgb(var(--tls-brand-rgb) / 0.55); }
 .mp-week__deadline { margin-top: 2px; font-size: 12.5px; color: rgba(255, 255, 255, 0.55); }
 .mp-week--empty { font-size: 13px; color: rgba(255, 255, 255, 0.5); }
+
+/* Mein Kalender (#1788): der eigene Stand als Plakette - Cyan heißt „du“ (#1305), Warteliste wartet, Erledigtes ist grün,
+   Vereinstermine tragen Vereinsgold. Termine heben sich gestaffelt an, der Abo-Hinweis ebenso, beim Kopieren erscheint
+   der Haken. Mit „Bewegung reduzieren“ steht --tls-motion-on auf 0 und die Dauern auf fast null: nichts bewegt sich. */
+.tls-own-badge {
+  display: inline-flex; align-items: center; padding: 1px 6px; border-radius: 3px; font-size: 10px; font-weight: 700;
+  letter-spacing: 0.06em; text-transform: uppercase; white-space: nowrap;
+  color: var(--tls-brand); background: rgb(var(--tls-brand-rgb) / 0.12);
+}
+.tls-own-badge[data-tone="wait"] { color: var(--tls-warn); background: rgb(var(--tls-warn-rgb) / 0.14); }
+.tls-own-badge[data-tone="done"] { color: var(--tls-ok); background: rgb(var(--tls-ok-rgb) / 0.14); }
+.tls-own-badge[data-tone="club"] { color: var(--tls-honor); background: rgb(var(--tls-honor-rgb) / 0.12); }
+@keyframes tls-cal-rise {
+  from { opacity: 0; transform: translateY(calc(6px * var(--tls-motion-on))); }
+  to { opacity: 1; transform: none; }
+}
+.tls-cal-enter {
+  animation: tls-cal-rise var(--tls-motion-mid) var(--tls-ease) both;
+  animation-delay: calc(min(var(--tls-i, 0), 8) * 40ms);
+}
+.tls-cal-hint { animation: tls-cal-rise var(--tls-motion-mid) var(--tls-ease) both; }
+@keyframes tls-copy-check {
+  from { opacity: 0; transform: scale(calc(1 - 0.4 * var(--tls-motion-on))); }
+  to { opacity: 1; transform: none; }
+}
+.tls-copy-check { animation: tls-copy-check var(--tls-motion-fast) var(--tls-ease) both; }
+@media (prefers-reduced-motion: reduce) {
+  .tls-cal-enter, .tls-cal-hint, .tls-copy-check { animation: none; }
+}

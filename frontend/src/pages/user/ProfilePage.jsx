@@ -22,6 +22,7 @@ import { NotificationsTab } from "./profile/NotificationsTab";
 import { SecurityTab } from "./profile/SecurityTab";
 import { AppearanceTab } from "./profile/AppearanceTab";
 import { AboutTab } from "./profile/AboutTab";
+import { CalendarTab } from "./profile/CalendarTab";
 import { AutosaveStatus } from "./profile/SwitchRow";
 
 // Die Einstellungen (#1146): Rahmen, Formularzustand und Speichern. Jeder Reiter ist eine eigene Datei unter ./profile
@@ -315,6 +316,7 @@ export default function ProfilePage() {
             {tab === "socials" && <SocialsTab form={form} set={set} setNow={setNow} errors={autosave.fieldErrors} links={platformLinks} onLink={startPlatformLink} onUnlink={unlinkPlatform} />}
             {tab === "appearance" && <AppearanceTab />}
             {tab === "about" && <AboutTab />}
+            {tab === "calendar" && <CalendarTab />}
             {tab === "security" && <SecurityTab user={user} refresh={refresh} siteSettings={siteSettings} />}
             {tab === "privacy" && (
               <PrivacyTab

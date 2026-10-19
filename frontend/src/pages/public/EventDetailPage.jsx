@@ -14,6 +14,7 @@ import { FactsBox } from "@/components/tls/FactsBox";
 import { EventRecap } from "@/components/tls/EventRecap";
 import { FriendsAtEvent } from "@/components/tls/FriendsAtEvent";
 import { offerFriendsHint } from "@/lib/friendsHint";
+import { offerCalendarHint } from "@/lib/calendarHint";
 import { EventBanner } from "@/components/tls/EventBanner";
 import { PlayAlongSheet } from "@/components/tls/PlayAlongSheet";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
@@ -652,6 +653,8 @@ function EventRegistrationPanel({ event, user, accessToken = "", onChanged, open
       onRegistered?.();
       // Der einmalige Hinweis direkt nach der ersten Anmeldung (#1188 Teil 2).
       void offerFriendsHint();
+      // Der Abo-Hinweis (#1788): nur ohne aktives Abo und nur einmal - der Server entscheidet.
+      void offerCalendarHint();
     });
     if (attempt.started && attempt.error) {
       const message = formatRequestError(attempt.error, "Anmeldung konnte nicht gespeichert werden.");

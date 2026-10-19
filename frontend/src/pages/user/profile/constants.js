@@ -1,4 +1,4 @@
-import { Bell, Eye, Gamepad2, Globe, Info, LayoutDashboard, Settings, ShieldCheck, Sparkles, User, UserCircle } from "lucide-react";
+import { Bell, CalendarPlus, Eye, Gamepad2, Globe, Info, LayoutDashboard, Settings, ShieldCheck, Sparkles, User, UserCircle } from "lucide-react";
 
 // Das Benutzermenü (#282, #516, #1150): eine Liste für den Kopf am PC und das Handy-Menü - jedes Thema an genau einem
 // Ort. Nachrichten stehen unter Community → Chats, Benachrichtigungen hinter der Glocke, Rechnungen, Gewinne und Strafen
@@ -34,6 +34,8 @@ export const SETTINGS_GROUPS = [
     { k: "basic", label: "Grunddaten", icon: User },
     { k: "gaming", label: "Gaming", icon: Gamepad2 },
     { k: "socials", label: "Socials", icon: Globe },
+    // Mein Kalender-Abo (#1788): der feste Ort für den persönlichen Abo-Link - die App bekommt denselben Eintrag.
+    { k: "calendar", label: "Mein Kalender-Abo", icon: CalendarPlus },
   ] },
   { key: "about", label: "Über die App", tabs: [{ k: "about", label: "App und Rechtliches", icon: Info }] },
 ];

@@ -34,6 +34,8 @@ async function mockApi(page, { personal = { active: false, created_at: null, las
       return route.fulfill(json({ active: true, path: "/api/calendar/personal/beispiel-token-zum-testen.ics", created_at: "2026-12-02T10:00:00+00:00", last_used_at: null }));
     }
     if (path === "/api/calendar/personal") return route.fulfill(json(personal));
+    // „Mein Kalender“ (#1788): nur das eigene Turnier, mit Stand.
+    if (path === "/api/calendar/me") return route.fulfill(json({ items: [{ ...CUP, own: { state: "approved", label: "Du bist dabei", team_name: null } }], subscription: personal, hint_due: false }));
     if (path === "/api/settings/public") return route.fulfill(json({ club_name: "THE LION SQUAD", domain: "lionsquad.at" }));
     if (path === "/api/auth/me") return route.fulfill(json({ detail: "anonym" }, 401));
     return route.abort();
@@ -78,15 +80,17 @@ test.describe("Kalender-Ansicht", () => {
     await testInfo.attach("kalender-monat-1440.png", { body: await page.screenshot(), contentType: "image/png" });
   });
 
-  test("bei 390 px: „Nur meine“ und der persönliche Link passen ins Bild", async ({ page }, testInfo) => {
+  test("bei 390 px: „Mein Kalender“ und der persönliche Link passen ins Bild", async ({ page }, testInfo) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await mockApi(page);
     await page.goto("/calendar");
+    await expect(page.getByTestId("calendar-list").getByTestId("calendar-item-event-e-lan")).toBeVisible();
+    await page.getByTestId("calendar-scope-mine").click();
+    await expect(page).toHaveURL(/\/calendar\/mine$/);
     const list = page.getByTestId("calendar-list");
-    await expect(list.getByTestId("calendar-item-event-e-lan")).toBeVisible();
-    await page.getByTestId("calendar-only-mine").click();
     await expect(list.getByTestId("calendar-item-event-e-lan")).toHaveCount(0);
     await expect(list.getByTestId("calendar-item-tournament-t-cup")).toBeVisible();
+    await expect(page.getByTestId("calendar-badge-tournament-t-cup")).toHaveText("Du bist dabei");
 
     await page.getByTestId("calendar-personal-create").click();
     await expect(page.getByTestId("calendar-personal-feed-url")).toHaveValue(/\/api\/calendar\/personal\/beispiel-token-zum-testen\.ics$/);
