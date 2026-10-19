@@ -116,6 +116,11 @@ def no_show_deadline(match: dict, tournament: dict | None, stage: dict | None = 
         return None
     if isinstance(match.get("pending_result"), dict):
         return None
+    # Schon entschieden (#1823): im Lauf ist jemand als nicht erschienen markiert oder der Vorschlag bestätigt - der Lauf
+    # bleibt offen, die Frist ist vorbei (kein „nicht erschienen ab“ mehr in Warteschlange und Matchplan).
+    proposal = match.get("no_show_proposal")
+    if match.get("no_show_registration_ids") or (isinstance(proposal, dict) and proposal.get("decision")):
+        return None
     mode = (tournament or {}).get("event_mode") or "online"
     if match.get("called_at"):
         rule, base, key = "on_site", _parse(match.get("called_at")), "no_show_minutes_on_site"

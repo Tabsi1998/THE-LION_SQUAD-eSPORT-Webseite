@@ -157,6 +157,21 @@ async def test_case_and_message_say_the_heat_stays_open(flow):
 
 
 @pytest.mark.asyncio
+async def test_the_deadline_ends_with_the_mark(flow):
+    """Ist die Person markiert, ist die Frist vorbei - Warteschlange und Matchplan nennen kein „nicht erschienen ab“."""
+    tournament, heat, _user_of = await heats_cup(flow)
+    _first, missing, _third, _fourth = seats(heat)
+    assert (await sweep(flow.db))["proposed"] == 1
+    schedule = (await flow.get(f"/api/tournaments/{tournament['id']}/schedule/deadlines")).json()
+    assert any(row.get("no_show_due_at") for row in schedule["matches"] if row["match_id"] == heat["id"])
+    response = await flow.post(f"/api/tournaments/{tournament['id']}/lead/no-show/{heat['id']}",
+                               json={"action": "confirm", "registration_id": missing})
+    assert response.status_code == 200, response.text
+    schedule = (await flow.get(f"/api/tournaments/{tournament['id']}/schedule/deadlines")).json()
+    assert not any(row.get("no_show_due_at") for row in schedule["matches"] if row["match_id"] == heat["id"])
+
+
+@pytest.mark.asyncio
 async def test_the_present_three_are_entered_and_the_best_two_advance(flow):
     tournament, heat, _user_of = await heats_cup(flow)
     first, missing, third, fourth = seats(heat)

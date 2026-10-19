@@ -208,6 +208,22 @@ def test_a_called_match_is_next_with_its_report_time():
     assert called["no_show_due_at"] == at(11), "vor Ort 10 Minuten ab dem Aufruf (E6)"
 
 
+def test_a_marked_no_show_ends_the_deadline_and_the_queue_names_the_person():
+    """#1823: im Lauf als nicht erschienen markiert - die Frist ist vorbei, statt „nicht erschienen ab“ steht, wer fehlt."""
+    matches = eight()
+    matches[0].update(status="in_progress", started_at=at(0))
+    matches[1].update(status="scheduled", called_at=at(1), no_show_registration_ids=["r7"],
+                      no_show_proposal={"id": "p1", "decision": "confirmed"})
+    stations = [
+        station("st1", "1", status="busy", current_match_id="id-QF1"),
+        station("st2", "2", status="reserved", current_match_id="id-QF2", called_at=at(1)),
+    ]
+    called = queue(matches, stations, T0 + timedelta(minutes=12), report_minutes=2)["stations"][1]["next"]
+    assert called["match_id"] == "id-QF2" and called["state"] == "called"
+    assert called["no_show_due_at"] is None
+    assert called["no_show_names"] == ["Spieler 7"]
+
+
 # ---------------------------------------------------------------- Verzug
 
 
