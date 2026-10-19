@@ -1,6 +1,7 @@
 """Fristen im Spiel (#1551, Entscheidung E6) - die Regeln, ohne Datenbank.
 
-„Nicht erschienen“: vor Ort 10 Minuten ab dem Aufruf an die Station (``called_at``), online 15 Minuten ab der Öffnung
+„Nicht erschienen“: vor Ort 10 Minuten ab dem Aufruf an die Station (``called_at``) - vor der Planzeit aufgerufen, die
+Planzeit, wie „antreten bis“ (``appear_by``, #1791) -, online 15 Minuten ab der Öffnung
 des Spiels. Geöffnet ist ein Online-Spiel, sobald beide Seiten feststehen und die Zeit da ist: die geplante Zeit, das
 Weiterrücken aus dem Vorspiel, der Turnierstart, das Check-in-Ende - was zuletzt kam. Danach schlägt der Server der
 Turnierleitung „kampflos verloren“ vor (services/match_deadline_sweep); sie bestätigt oder verlängert.
@@ -83,8 +84,24 @@ def opened_at(match: dict, tournament: dict | None) -> datetime | None:
     return max(moments) if moments else None
 
 
+def appear_by(match: dict, called_at, minutes: int) -> datetime | None:
+    """Bis wann die Spieler nach dem Aufruf an der Station sein müssen (#1791) - eine Regel für „antreten bis“
+    (``match_calls.report_by``, Minuten: „Zeit zum Antreten“ des TV) und „nicht erschienen ab“ vor Ort
+    (``no_show_deadline``, Minuten: ``no_show_minutes_on_site``). Liegt die geplante Zeit nach dem Aufruf, gilt sie -
+    wer vor der Planzeit aufgerufen wird, hat bis zur Planzeit; sonst der Aufruf plus die Minuten. Dieselbe Rechnung wie
+    ``callsOf`` in frontend/src/lib/tvCalls.js."""
+    called = _parse(called_at)
+    scheduled = _parse(match.get("scheduled_at"))
+    if scheduled and (called is None or scheduled > called):
+        return scheduled
+    if called:
+        return called + timedelta(minutes=max(1, int(minutes or 1)))
+    return None
+
+
 def no_show_deadline(match: dict, tournament: dict | None, stage: dict | None = None) -> dict | None:
-    """Ab wann „nicht erschienen“ vorgeschlagen wird - ``None``, wenn die Frist hier nicht gilt."""
+    """Ab wann „nicht erschienen“ vorgeschlagen wird - ``None``, wenn die Frist hier nicht gilt. Vor Ort dieselbe Regel
+    wie „antreten bis“ (``appear_by``): wer vor der Planzeit aufgerufen wird, hat bis zur Planzeit."""
     if match.get("is_preview") or str(match.get("status") or "") not in NO_SHOW_OPEN_STATUSES:
         return None
     if len(_filled(match)) < 2 or match.get("started_at") or match.get("reports"):
@@ -101,7 +118,7 @@ def no_show_deadline(match: dict, tournament: dict | None, stage: dict | None = 
     if not base:
         return None
     minutes = setting(key, tournament, stage)
-    due = base + timedelta(minutes=minutes)
+    due = appear_by(match, base, minutes) if rule == "on_site" else base + timedelta(minutes=minutes)
     extended = _parse(match.get("no_show_extended_until"))
     if extended and extended > due:
         due = extended

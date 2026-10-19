@@ -334,3 +334,27 @@ async def test_missing_result_counts_from_the_real_start(flow):
     )
     lead = (await flow.get(f"/api/tournaments/{tournament['id']}/lead")).json()
     assert {item["id"]: item["timing"] for item in lead["matches"]}[one["id"]]["missing"] is True
+
+
+def _when(value: str | None):
+    from datetime import datetime
+
+    return datetime.fromisoformat(str(value).replace("Z", "+00:00")) if value else None
+
+
+@pytest.mark.asyncio
+async def test_called_before_the_planned_time_report_and_no_show_are_the_same_time(flow):
+    """#1791: vor der Planzeit aufgerufen - „antreten bis“ und „nicht erschienen ab“ nennen beide die Planzeit."""
+    _staff, tournament, stations, _players = await on_site(flow)
+    _one, two = await first_round(flow, tournament)
+    planned = (now_utc() + timedelta(minutes=15)).replace(microsecond=0)
+    await flow.db.matches_v2.update_one({"id": two["id"]}, {"$set": {"scheduled_at": planned.isoformat()}})
+    response = await call(flow, tournament, stations[1], two)
+    assert response.status_code == 200, response.text
+
+    entry = (await queue(flow, tournament))["matches"][two["id"]]
+    assert entry["state"] == "called"
+    assert _when(entry["report_by"]) == planned and _when(entry["no_show_due_at"]) == planned
+    deadlines = (await flow.get(f"/api/tournaments/{tournament['id']}/schedule/deadlines")).json()["matches"]
+    assert _when(next(row for row in deadlines if row["match_id"] == two["id"])["no_show_due_at"]) == planned
+

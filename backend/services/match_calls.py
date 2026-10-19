@@ -12,10 +12,11 @@ dieser Aufruf - mit Countdown aufs Handy und auf den TV. Eine Erinnerung 10 Minu
 """
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 
 from services.match_audience import match_player_users, registrations_for_match
+from services.match_deadlines import appear_by
 from services.station_labels import station_text
 from services.tv_display import SETTINGS_ID as TV_SETTINGS_ID, merge as merge_tv_settings
 from services.user_notifications import create_user_notification
@@ -41,14 +42,9 @@ async def report_minutes(db) -> int:
 
 
 def report_by(match: dict, called_at, minutes: int) -> datetime | None:
-    """Bis wann die Spieler an der Station sein sollen - wie ``callsOf`` der Aufruf-Tafel."""
-    called = _parse(called_at)
-    scheduled = _parse(match.get("scheduled_at"))
-    if scheduled and (called is None or scheduled > called):
-        return scheduled
-    if called:
-        return called + timedelta(minutes=max(1, int(minutes or 2)))
-    return None
+    """Bis wann die Spieler an der Station sein sollen - wie ``callsOf`` der Aufruf-Tafel. Dieselbe Regel wie die Frist
+    „nicht erschienen“ vor Ort (#1791): ``match_deadlines.appear_by``."""
+    return appear_by(match, called_at, int(minutes or 2))
 
 
 async def call_view(db, match: dict) -> dict | None:

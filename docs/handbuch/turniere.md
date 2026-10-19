@@ -353,8 +353,8 @@ auf **In Klärung**.
 Der Reiter zeigt auch andere Fälle, zum Beispiel ein fehlendes Ergebnis oder eine **defekte Station**: Dort legt
 **Umlegen** die wartenden Spiele auf eine freie Station. Erledigtes verschwindet von selbst.
 
-**Nicht erschienen?** Ist die Frist eines Spiels um – vor Ort 10 Minuten ab Aufruf an die Station, online 15 Minuten
-ab Spielbeginn –, schlägt die Seite „kampflos verloren“ vor: eine Benachrichtigung an die Turnierleitung und ein Fall in
+**Nicht erschienen?** Ist die Frist eines Spiels um – vor Ort 10 Minuten ab Aufruf an die Station (vor der geplanten
+Zeit aufgerufen: die geplante Zeit), online 15 Minuten ab Spielbeginn –, schlägt die Seite „kampflos verloren“ vor: eine Benachrichtigung an die Turnierleitung und ein Fall in
 **Braucht Aufmerksamkeit** mit den Knöpfen **<Name> nicht erschienen** (die Seite verliert nur dieses Spiel, mit Grund
 im Protokoll und unter ihren Strafen) und **+5 Min. verlängern**. Die Fristen stellt ihr im Turnier unter
 **Erweiterte Spieloptionen → Fristen** ein (leer heißt Standard); eine Phase kann sie in ihren Einstellungen
@@ -433,7 +433,8 @@ Warteschlange. In der Turnierleitung am Handy (`/tournaments/<slug>/leitung`) st
   heißt es „wartet auf die Vorspiele“ und die Zeit „voraussichtlich“.
 - **Aufrufen** reserviert die Station und schickt den Spielern „Du bist dran“ (Postfach und Push, bei Teams an die
   Aufgestellten). Danach steht dort „Aufgerufen · antreten bis … · nicht erschienen ab …“; die Frist „nicht erschienen“
-  (3.7) zählt ab dem Aufruf.
+  (3.7) zählt ab dem Aufruf. Wer vor der geplanten Zeit aufgerufen wird, hat bis zur geplanten Zeit – dann nennen
+  „antreten bis“ und „nicht erschienen ab“ dieselbe Uhrzeit.
 - **Gestartet** setzt die echte Startzeit. Ab da läuft die Uhr, und **Ergebnis fehlt** zählt erst ab diesem Start
   (Dauer plus 5 Minuten) – ein Spiel, das an seiner Station noch wartet, hat Verzug, aber kein fehlendes Ergebnis.
 - Rufen zwei Helfer gleichzeitig auf, gilt genau ein Aufruf; der andere bekommt „Die Station hält inzwischen ein anderes
