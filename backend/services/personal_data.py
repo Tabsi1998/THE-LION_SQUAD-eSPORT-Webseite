@@ -140,6 +140,15 @@ PERSONAL: dict[str, Entry] = {
     "f1_staff_assignments": Entry(DELETED, ("f1_staff",)),
     # Captain einer externen Serie (#1741, #1749): eine Aufgabe wie im Turnier-Team - geht mit dem Konto.
     "reference_series_staff": Entry(DELETED, ("reference_series_staff",)),
+    # Externe Serien (#1741): Teilnahmen und Aliase hängen an Vereinsprofilen. In der Auskunft steht, was an einem eigenen
+    # Profil hängt. Geht das selbst angelegte Profil mit dem Konto, wird die Teilnahme extern (Name ausgeblendet) und der
+    # Alias gelöscht; an einem Eintrag des Vereins (Mitgliederverwaltung, Redaktion) bleiben beide.
+    "reference_participants": Entry(DETACHED, ("reference_participations",),
+                                    "Teilnahme an einer externen Serie über ein eigenes Vereinsprofil; Ergebnis und Tabelle "
+                                    "bleiben, die Verknüpfung zum selbst angelegten Profil wird gelöst und der Name ausgeblendet"),
+    "reference_aliases": Entry(DELETED, ("reference_aliases",),
+                               "Name bei einem Veranstalter, der auf ein eigenes Vereinsprofil zeigt; mit dem selbst angelegten "
+                               "Profil gelöscht, an einem Eintrag des Vereins bleibt er"),
     "event_registrations": Entry(OVERWRITTEN, ("event_registrations",)),
     "f1_lap_times": Entry(OVERWRITTEN, ("f1_lap_times",)),
     # Fast Lap vor Ort (#1585): Gäste ohne Konto und die Liste „Am Start / Als Nächstes“.
@@ -176,11 +185,10 @@ CLUB_CONTENT = frozenset({
     "member_benefits", "references", "seasons", "settings", "site_banners", "stations", "sticker_packs", "stickers",
     "team_invite_links", "tournament_awards", "tournament_groups", "tournament_onsite_access", "tournament_stages",
     "tournaments",
-    # Externe Serien (#1741): Spur, Serie, Termine, Ergebnisblätter samt Revisionen (nur die Kennung, wer geändert hat),
-    # Stände. Teilnehmer und Aliase tragen den Namen wie beim Veranstalter und höchstens die Kennung eines Vereinsprofils;
-    # löscht ein Konto sein eigenes Profil, verlieren sie die Verknüpfung (Teilnehmer: Name ausgeblendet, Alias weg).
-    "reference_aliases", "reference_lineages", "reference_participants", "reference_round_result_revisions",
-    "reference_round_results", "reference_rounds", "reference_series", "reference_standings",
+    # Externe Serien (#1741): Spur, Serie, Termine, Ergebnisblätter samt Revisionen (nur die Kennung, wer geändert hat)
+    # und Stände. Teilnehmer und Aliase stehen bei den Daten zur Person.
+    "reference_lineages", "reference_round_result_revisions", "reference_round_results", "reference_rounds",
+    "reference_series", "reference_standings",
 })
 
 NO_PERSON = frozenset({

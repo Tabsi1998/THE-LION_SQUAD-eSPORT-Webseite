@@ -88,8 +88,8 @@ class FakeDb:
             "twitch_stream_sessions", "tournament_stream_announcements", "dolibarr_links", "dolibarr_identities",
             "dolibarr_honours", "billing_orders", "billing_customers", "match_reports_v2", "match_schedule_proposals",
             "match_proof_photos", "f1_staff_assignments", "season_standings", "season_rank_snapshots", "upload_events",
-            # Captain einer externen Serie (#1741)
-            "reference_series_staff",
+            # Externe Serien (#1741): Captain, Teilnahmen und Aliase über eigene Vereinsprofile
+            "reference_series_staff", "reference_participants", "reference_aliases",
         ):
             setattr(self, name, FakeCollection())
 

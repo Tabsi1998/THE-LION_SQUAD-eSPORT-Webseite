@@ -268,15 +268,22 @@ async def test_deleting_an_account_cuts_the_series_links_of_its_own_profile(flow
     await db.reference_participants.insert_many([
         {"id": "eigen", "series_id": "s1", "name": "PaulaRacing", "link": "member", "profile_id": "selbst", "name_hidden": False},
         {"id": "verein", "series_id": "s1", "name": "Paula P.", "link": "member", "profile_id": "akte", "name_hidden": False},
+        {"id": "fremd", "series_id": "s1", "name": "Otto O.", "link": "member", "profile_id": "profil-otto", "name_hidden": False},
     ])
     await db.reference_aliases.insert_many([
         {"id": "alias-eigen", "name_normalized": "paularacing", "target": "member", "profile_id": "selbst"},
-        {"id": "alias-verein", "name_normalized": "paula p", "target": "member", "profile_id": "akte"},
+        {"id": "alias-verein", "name_normalized": "paula p", "target": "member", "profile_id": "akte",
+         "confirmed_by": "vorstand-vera"},
+        {"id": "alias-fremd", "name_normalized": "otto o", "target": "member", "profile_id": "profil-otto"},
     ])
     await db.reference_series_staff.insert_one({"id": "captain", "series_id": "s1", "user_id": paula["id"], "role": "captain"})
     flow.act_as(paula)
     export = (await flow.get("/api/dsgvo/export-my-data")).json()
     assert [row["id"] for row in export["reference_series_staff"]] == ["captain"]
+    # Teilnahmen und Aliase über die eigenen Vereinsprofile (#1741) - fremde nicht, und nicht, wer bestätigt hat.
+    assert sorted(row["id"] for row in export["reference_participations"]) == ["eigen", "verein"]
+    assert sorted(row["id"] for row in export["reference_aliases"]) == ["alias-eigen", "alias-verein"]
+    assert "Otto" not in str(export) and "vorstand-vera" not in str(export)
 
     erased = await flow.post("/api/dsgvo/anonymize-me")
     assert erased.status_code == 200
@@ -284,7 +291,7 @@ async def test_deleting_an_account_cuts_the_series_links_of_its_own_profile(flow
     assert (own["profile_id"], own["link"], own["name_hidden"]) == (None, "external", True)
     kept = await db.reference_participants.find_one({"id": "verein"})
     assert (kept["profile_id"], kept["link"]) == ("akte", "member"), "der Eintrag aus der Mitgliederverwaltung gehört dem Verein"
-    assert {row["id"] async for row in db.reference_aliases.find({}, {"_id": 0, "id": 1})} == {"alias-verein"}
+    assert {row["id"] async for row in db.reference_aliases.find({}, {"_id": 0, "id": 1})} == {"alias-verein", "alias-fremd"}
     assert await db.reference_series_staff.count_documents({}) == 0
 
 
