@@ -87,3 +87,14 @@ export function newCalls(previousIds, calls = []) {
   if (!previousIds) return [];
   return (calls || []).filter((call) => !previousIds.has(call.matchId)).map((call) => call.matchId);
 }
+
+// Der Stationsname groß auf der Aufruf-Tafel: nie mitten im Wort getrennt („SWITC / H 1“). Die Schrift richtet sich nach
+// dem längsten Wort (tv.css, `--tv-station-chars`); ein Wort mit mehr als STATION_WORD_MAX Zeichen wird mit „…“ gekürzt.
+export const STATION_WORD_MAX = 12;
+
+/** `{ text, chars }`: der Name, zu lange Wörter gekürzt, und die Zeichen des längsten Worts (mindestens 4). */
+export function stationFit(name) {
+  const words = String(name || "").trim().split(/\s+/).filter(Boolean)
+    .map((word) => (word.length > STATION_WORD_MAX ? `${word.slice(0, STATION_WORD_MAX - 1)}…` : word));
+  return { text: words.join(" "), chars: Math.max(4, ...words.map((word) => word.length)) };
+}

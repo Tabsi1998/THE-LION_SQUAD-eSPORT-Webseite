@@ -2,10 +2,21 @@
 // bei 0, gestartete und entschiedene Spiele sind kein Aufruf mehr; was danach kommt; neue Aufrufe für den Gong.
 import { decide, find, singleElimination, start } from "../../e2e/fixtures/tvBrackets.mjs";
 import { call, plan, stationsOf } from "../../e2e/fixtures/tvHall.mjs";
-import { callsOf, countdown, newCalls, nextPlanned, ringShare } from "./tvCalls";
+import { STATION_WORD_MAX, callsOf, countdown, newCalls, nextPlanned, ringShare, stationFit } from "./tvCalls";
 
 const NOW = Date.parse("2026-10-10T14:32:00+02:00");
 const at = (minutes) => new Date(NOW + minutes * 60000).toISOString();
+
+test("#1822: der Stationsname bleibt ganz - die Schrift richtet sich nach dem längsten Wort, sehr lange Wörter mit „…“", () => {
+  expect(stationFit("Switch 1")).toEqual({ text: "Switch 1", chars: 6 });
+  expect(stationFit("PC 3")).toEqual({ text: "PC 3", chars: 4 });
+  expect(stationFit("  Rennsitz   links ")).toEqual({ text: "Rennsitz links", chars: 8 });
+  const long = stationFit("Rennsimulatorplatz 3");
+  expect(long.text).toBe("Rennsimulat… 3");
+  expect(long.chars).toBe(STATION_WORD_MAX);
+  expect(stationFit("")).toEqual({ text: "", chars: 4 });
+  expect(stationFit(null)).toEqual({ text: "", chars: 4 });
+});
 
 test("ohne geplante Zeit läuft der Countdown die „Zeit zum Antreten“ ab dem Aufruf", () => {
   const bracket = singleElimination(8);

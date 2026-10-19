@@ -77,6 +77,18 @@ test("#1822: mit Schlüssel holt die Aufruf-Tafel alles in einer Abfrage - auch 
   expect(requested().filter((url) => url !== "/tv/settings")).toEqual(["/events/event-1/display"]);
 });
 
+test("#1822: der Stationsname auf der Aufruf-Tafel bleibt ganz - Schrift nach dem längsten Wort, sehr lange Wörter mit „…“", async () => {
+  const hall = hallEvent({ now: Date.now(), stations: 12 });
+  const [first] = hall.stations.filter((station) => station.status === "reserved");
+  Object.assign(first, { name: "Rennsimulatorplatz 3", label: "Rennsimulatorplatz 3" });
+  serve(hall);
+  renderAt("/display/event/event-1/calls");
+  await screen.findByTestId("tv-call-board");
+  const shown = screen.getAllByTestId(/^tv-call-station-/).find((element) => element.textContent.startsWith("Rennsim"));
+  expect(shown).toHaveTextContent("Rennsimulat… 3");
+  expect(shown.style.getPropertyValue("--tv-station-chars")).toBe("12");
+});
+
 test("#1822: ein widerrufener Schlüssel - die Tafel zeigt nichts mehr vom Event, nur wie es weitergeht", async () => {
   apiMock.get.mockImplementation(async (url) => {
     if (url === "/tv/settings") return { data: { settings: {} } };
