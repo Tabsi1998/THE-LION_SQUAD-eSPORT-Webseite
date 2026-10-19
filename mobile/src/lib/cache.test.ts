@@ -13,6 +13,7 @@ test.each([
   // #1188 Teil 2: Freunde bei Turnier und Fast Lap, und ob der einmalige Hinweis fällig ist.
   "/tournaments/rl/friends", "/api/tournaments/t1/friends", "/f1/challenges/monza/friends", "https://lionsquad.at/api/f1/challenges/c1/friends",
   "/users/me/friends-hint",
+  "/calendar/hint", "/api/calendar/personal",
 ])(
   "nicht zwischengespeichert: %s",
   async (url) => {
@@ -24,7 +25,7 @@ test.each([
 );
 
 test.each([
-  "/events/herbst-lan", "/calendar", "/calendar/mine", "/seasonal/advent", "/friends", "/events/recap-party",
+  "/events/herbst-lan", "/calendar", "/calendar/mine", "/calendar/me", "/seasonal/advent", "/friends", "/events/recap-party",
   "/tournaments/rl", "/tournaments/friends-cup", "/f1/challenges/monza", "/f1/challenges/monza/leaderboard", "/users/me",
 ])(
   "Gegenprobe – weiter zwischengespeichert: %s",

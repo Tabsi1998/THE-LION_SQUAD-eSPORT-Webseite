@@ -57,6 +57,8 @@ const NO_CACHE_PATHS = [
   /^\/?tournaments\/[^/?#]+\/friends(?:[?#]|$)/,
   /^\/?f1\/challenges\/[^/?#]+\/friends(?:[?#]|$)/,
   /^\/?users\/me\/friends-hint(?:[?#]|$)/,
+  // Abo-Hinweis und Abo-Stand (#1788): eine alte Antwort zeigte den Hinweis ein zweites Mal oder ein abgeschaltetes Abo.
+  /^\/?calendar\/(hint|personal)(?:[?#]|$)/,
 ];
 
 export function shouldCache(url: string): boolean {
