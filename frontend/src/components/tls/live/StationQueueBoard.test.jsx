@@ -97,3 +97,21 @@ test("Spielzeit-Uhr: Farbe bei 80 % und 100 %, ohne Dauer ohne Balken", () => {
   expect(screen.getByTestId("clock")).toHaveAttribute("data-tone", "none");
   expect(screen.queryByTestId("clock-bar")).toBeNull();
 });
+
+test("Lauf (#1824): Durchgang und Namen bei „Läuft“, „Als Nächstes“ und „Danach“ - nicht nur die Zahl", () => {
+  const heat = (key, names, extra = {}) => entry(key, { label: "Runde 1", heat: true, names, ...extra });
+  render(<StationQueueBoard queue={queue([
+    { id: "st1", name: "1", station_text: "Station 1", status: "busy", waiting: 2,
+      running: heat("A", ["NeonFalke", "PixelPanther", "Kometa", "Tiramisu"], { state: "running", position: 0, started_at: "2026-10-31T16:00:00Z" }),
+      next: heat("B", ["S1", "S2", "S3", "S4", "S5", "S6", "S7", "S8"], { state: "called", called_at: "2026-10-31T16:18:00Z" }),
+      after: heat("C", [], { open_slots: 4, ready: false }) },
+  ])} onCall={vi.fn()} onStart={vi.fn()} />);
+  const running = screen.getByTestId("live-running-st1");
+  expect(running).toHaveTextContent("Runde 1 · Durchgang A");
+  expect(running).toHaveTextContent("NeonFalke · PixelPanther · Kometa · Tiramisu");
+  const next = screen.getByTestId("live-next-st1");
+  expect(next).toHaveTextContent("Runde 1 · Durchgang B");
+  expect(next).toHaveTextContent("S1 · S2 · S3 · S4 +4");
+  expect(screen.getByTestId("live-after-st1")).toHaveTextContent("Runde 1 · Durchgang C · 4 Plätze offen");
+  expect(screen.getByTestId("live-station-st1")).not.toHaveTextContent("Teilnehmer");
+});

@@ -1,5 +1,6 @@
 import { BellRing, Hourglass, Play, Timer } from "lucide-react";
 import { delayText, queueSummaryLine } from "@/lib/liveQueue";
+import { stationWho, queueWhat } from "@/lib/tvQueue";
 import { viennaTime } from "@/lib/vienna";
 import { MatchClock } from "./MatchClock";
 import "./live.css";
@@ -9,15 +10,6 @@ import "./live.css";
 // Seite zeigt nur. Knöpfe nur, wer die Station bedienen darf (`queue.operate`).
 
 const clock = (value) => (value ? viennaTime(value, { hour: "2-digit", minute: "2-digit" }) : "");
-
-function who(entry) {
-  const names = entry?.names || [];
-  if (names.length === 2) return `${names[0]} gegen ${names[1]}`;
-  if (names.length > 2) return `${names.length} Teilnehmer`;
-  if (names.length === 1 && !entry.open_slots) return names[0];
-  if (entry?.open_slots) return names.length ? `${names[0]} · ${entry.open_slots === 1 ? "1 Platz" : `${entry.open_slots} Plätze`} offen` : `${entry.open_slots} Plätze offen`;
-  return "Teilnehmer offen";
-}
 
 function when(entry) {
   const parts = [entry?.forecast_at ? `${entry.forecast ? "voraussichtlich " : ""}ca. ${clock(entry.forecast_at)}` : "", delayText(entry?.delay_minutes)];
@@ -88,8 +80,8 @@ function StationCard({ station, index, busy, canOperate, onCall, onStart }) {
 
       {running ? (
         <div className="mt-3" data-testid={`live-running-${station.id}`}>
-          <div className="text-xs text-white/50 [overflow-wrap:anywhere]">{running.label}</div>
-          <div className="text-sm font-bold text-white [overflow-wrap:anywhere]">{who(running)}</div>
+          <div className="text-xs text-white/50 [overflow-wrap:anywhere]">{queueWhat(running)}</div>
+          <div className="text-sm font-bold text-white [overflow-wrap:anywhere]">{stationWho(running)}</div>
           <MatchClock startedAt={running.started_at} durationMinutes={running.duration_minutes} testId={`live-clock-${running.match_id}`} className="mt-2" />
         </div>
       ) : null}
@@ -97,8 +89,8 @@ function StationCard({ station, index, busy, canOperate, onCall, onStart }) {
       {next ? (
         <div className={`tls-live-next mt-3 rounded-sm border p-2.5 ${next.state === "called" ? "border-brand/40 bg-brand/5" : "border-white/10 bg-white/[0.02]"}`} data-state={next.state} data-testid={`live-next-${station.id}`}>
           <div className="text-[11px] font-bold uppercase tracking-widest text-white/45">Als Nächstes</div>
-          <div className="mt-0.5 text-xs text-white/50 [overflow-wrap:anywhere]">{next.label}</div>
-          <div className="text-sm font-bold text-white [overflow-wrap:anywhere]">{who(next)}</div>
+          <div className="mt-0.5 text-xs text-white/50 [overflow-wrap:anywhere]">{queueWhat(next)}</div>
+          <div className="text-sm font-bold text-white [overflow-wrap:anywhere]">{stationWho(next)}</div>
           <div className={`mt-1 flex items-start gap-1.5 text-xs ${next.state === "called" ? "text-brand" : "text-white/60"}`}>
             {next.state === "called" ? <BellRing className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" /> : null}
             <span className="min-w-0 [overflow-wrap:anywhere]">{next.state === "called" ? calledLine(next) : when(next)}</span>
@@ -111,7 +103,7 @@ function StationCard({ station, index, busy, canOperate, onCall, onStart }) {
 
       {after ? (
         <div className="mt-2 text-xs text-white/50 [overflow-wrap:anywhere]" data-testid={`live-after-${station.id}`}>
-          <span className="font-bold uppercase tracking-wider text-white/40">Danach</span> · {after.label} · {who(after)}{when(after) ? ` · ${when(after)}` : ""}
+          <span className="font-bold uppercase tracking-wider text-white/40">Danach</span> · {queueWhat(after)} · {stationWho(after)}{when(after) ? ` · ${when(after)}` : ""}
         </div>
       ) : null}
     </section>

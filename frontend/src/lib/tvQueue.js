@@ -31,28 +31,47 @@ export function hasQueue(queue) {
   return queueLanes(queue).some((lane) => lane.now || lane.next || lane.status === "broken");
 }
 
-/** „Viertelfinale · Spiel B“ - mit dem Spiel aus dem Baum wie überall am TV, sonst der Text des Servers. */
-export function queueWhat(entry, match = null) {
-  if (match) return [matchRoundLabel(match), matchName(match)].filter(Boolean).join(" · ");
-  return entry?.label || "Spiel";
+/** Ist der Eintrag ein Lauf (mehr als zwei Plätze)? Der Server sagt es (`heat`), ältere Antworten zählen die Plätze. */
+export function queueIsHeat(entry) {
+  if (typeof entry?.heat === "boolean") return entry.heat;
+  return (entry?.names || []).length + (Number(entry?.open_slots) || 0) > 2;
 }
 
-const together = (names, compact) => (compact && names.length > 2 ? `${names.length} Spieler` : names.join(names.length > 2 ? " · " : " vs. "));
+/**
+ * „Viertelfinale · Spiel B“ - mit dem Spiel aus dem Baum wie überall am TV. Ohne Baum (Turnierleitung, Spielplan) der
+ * Rundenname des Servers, im Lauf mit dem Durchgang: „Loser Runde 1 · Durchgang LA“ (#1824).
+ */
+export function queueWhat(entry, match = null) {
+  if (match) return [matchRoundLabel(match), matchName(match)].filter(Boolean).join(" · ");
+  const label = entry?.label || "Spiel";
+  const key = String(entry?.match_key || "");
+  // Kurze Kürzel („A“, „LA“, „R1-3“) sind der Durchgang; ein Wort als Kürzel steht schon als Name da.
+  const heat = queueIsHeat(entry) && key && key !== label && (key.length <= 3 || /\d/.test(key));
+  return heat ? `${label} · Durchgang ${key}` : label;
+}
+
+const MAX_NAMES = 4;
+const openText = (open) => `${open === 1 ? "1 Platz" : `${open} Plätze`} offen`;
 
 /**
- * Wer spielt: „A vs. B“, im Lauf bis vier Namen zweizeilig (ab fünf „5 Spieler“), offene Plätze in Worten - nie eine
- * leere Zeile. `compact` (fünf oder sechs Stationen auf einer Seite): im Lauf nur die Zahl.
+ * Wer spielt - dieselbe Darstellung am TV, in der Turnierleitung und im Spielplan: Duell „A vs. B“ (`versus: "gegen"`
+ * für „A gegen B“), im Lauf bis vier Namen (`rows`: je zwei in einer Zeile), darüber „5 Spieler“ oder mit
+ * `overflow: "plus"` die ersten vier und „+N“. Offene Plätze in Worten - nie eine leere Zeile. `compact` (fünf oder
+ * sechs Stationen auf einer TV-Seite): im Lauf nur die Zahl.
  */
-export function queueWho(entry, { compact = false } = {}) {
+export function queueWho(entry, { compact = false, versus = "vs.", rows = true, overflow = "count" } = {}) {
   const names = (entry?.names || []).filter(Boolean);
   const open = Number(entry?.open_slots) || 0;
-  if (open && names.length) return `${together(names, compact)} · ${open === 1 ? "1 Platz" : `${open} Plätze`} offen`;
-  if (open) return `${open === 1 ? "1 Platz" : `${open} Plätze`} offen`;
-  // Im Lauf (Fabian 19.10.): bis vier Namen, je zwei in einer Zeile - die Halle sieht, wer gerade fährt.
+  let who;
+  if (names.length <= 2) who = names.join(` ${versus} `);
   // Viele Stationen auf einer Seite (drei Reihen, Codex): kurz bleiben, sonst sprengen lange Namen die Karte.
-  if (names.length > 4 || (compact && names.length > 2)) return `${names.length} Spieler`;
-  if (names.length > 2) return [names.slice(0, 2), names.slice(2)].map((row) => row.join(" · ")).join("\n");
-  return names.join(" vs. ") || "Teilnehmer offen";
+  else if (compact) who = `${names.length} Spieler`;
+  else if (names.length > MAX_NAMES) who = overflow === "plus" ? `${names.slice(0, MAX_NAMES).join(" · ")} +${names.length - MAX_NAMES}` : `${names.length} Spieler`;
+  // Im Lauf (Fabian 19.10.): bis vier Namen, je zwei in einer Zeile - die Halle sieht, wer gerade fährt.
+  else if (rows && !open) who = [names.slice(0, 2), names.slice(2)].map((row) => row.join(" · ")).join("\n");
+  else who = names.join(" · ");
+  if (open) return who ? `${who} · ${openText(open)}` : openText(open);
+  return who || "Teilnehmer offen";
 }
 
 /**
@@ -71,4 +90,10 @@ export function queueNextLine(entry) {
 /** Woran der TV einen Wechsel an der Station erkennt: anderes laufendes Spiel, anderes nächstes, aufgerufen. */
 export function laneSignature(lane) {
   return [lane?.now?.match_id || "-", lane?.next?.match_id || "-", lane?.next?.state || "-"].join("|");
+}
+
+/** Wer spielt, wie es die Stationen der Turnierleitung und der Spielplan zeigen: „A gegen B“, im Lauf die Namen in
+ * einer Zeile, ab fünf die ersten vier und „+N“ (#1824). */
+export function stationWho(entry) {
+  return queueWho(entry, { versus: "gegen", rows: false, overflow: "plus" });
 }
