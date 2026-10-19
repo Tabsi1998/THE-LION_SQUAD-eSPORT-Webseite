@@ -143,7 +143,7 @@ liegt, der Port nicht zum Docker-Projekt gehört oder dessen Backend nicht die A
 Stand `lsw-abnahme` nimmt er nie (er trägt Ergebnisse ein). Er verbraucht Testdaten - vor jedem Lauf frisch seeden, nie
 zwei Seeds in derselben Minute.
 
-Beim Probelauf, auf einem eigenen Stand (hier der des Nachtlaufs):
+Vor einem Event, auf einem eigenen Stand (hier der des Nachtlaufs):
 
 ```bash
 bash scripts/run_abnahme_all.sh up
