@@ -38,7 +38,8 @@ export type CommunitySection = "chats" | "teams" | "players" | "leaderboards";
 export type TabRootParamList = {
   // `feedback` (#1196): „Wie war …?“ aus der Meldung - Home öffnet dann gleich das Bewerten.
   Dashboard: { feedback?: string } | undefined;
-  TournamentList: { filter?: EventsFilter } | undefined;
+  // `scope: "mine"` (#1788): „Mein Kalender“ - nur die eigenen Termine.
+  TournamentList: { filter?: EventsFilter; scope?: "all" | "mine" } | undefined;
   CommunityHub: { section?: CommunitySection } | undefined;
   VereinHub: undefined;
   Profile: { tab?: ProfileTabKey } | undefined;

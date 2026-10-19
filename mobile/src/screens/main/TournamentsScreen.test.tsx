@@ -269,3 +269,41 @@ test("Abonnieren im Kalender öffnet den webcal-Link oder Google Kalender", asyn
   expect(openURL).toHaveBeenLastCalledWith(expect.stringMatching(/^https:\/\/calendar\.google\.com\/calendar\/render\?cid=webcal%3A%2F%2F/));
   openURL.mockRestore();
 });
+
+// „Mein Kalender“ (#1788): der Reiter neben „Alle“ - nur die eigenen Termine, ohne die Filter der Gesamtliste. Ein Link
+// auf /calendar/mine öffnet ihn gleich; der leere Zustand führt zurück zu den Turnieren.
+test("„Mein Kalender“ zeigt nur die eigenen Termine und führt im leeren Zustand zu den Turnieren", async () => {
+  mockAuth.user = { id: "u-1", username: "paula" };
+  tournaments = [cup(1)];
+  let mineItems: unknown[] = [{ id: "t1", kind: "tournament", title: "Mein Cup", start: "2099-03-02T18:00:00Z", path: "/tournaments/t1", own: { state: "approved", label: "Du bist dabei" } }];
+  mockGet.mockImplementation(async (path: string) => {
+    if (path === "/tournaments") return { data: tournaments };
+    if (path === "/calendar/me") return { data: { items: mineItems, subscription: { active: false } } };
+    if (path === "/calendar/personal") return { data: { active: false } };
+    return { data: [] };
+  });
+  await render(<TournamentsScreen navigation={navigation} route={route} />);
+  await waitFor(() => expect(screen.getByText("Cup 1")).toBeTruthy());
+  expect(mockGet).not.toHaveBeenCalledWith("/calendar/me");
+
+  await fireEvent.press(screen.getByRole("tab", { name: "Mein Kalender" }));
+  await waitFor(() => expect(screen.getByText("Mein Cup")).toBeTruthy());
+  expect(screen.queryByText("Cup 1")).toBeNull();
+  expect(screen.queryByRole("tab", { name: "Fast Laps" })).toBeNull();
+  expect(screen.getByTestId("calendar-personal")).toBeTruthy();
+
+  // Eine Live-Änderung lädt „Mein Kalender“ mit - jetzt ohne Termine.
+  mineItems = [];
+  await act(async () => {
+    await mockLive.refresh();
+  });
+  await waitFor(() => expect(screen.getByText("Noch keine Termine")).toBeTruthy());
+  await fireEvent.press(screen.getByTestId("my-calendar-browse-tournaments"));
+  expect(screen.getByText("Cup 1")).toBeTruthy();
+});
+
+test("ein Link auf /calendar/mine öffnet „Mein Kalender“; Gäste sehen die Bitte um das Login", async () => {
+  await render(<TournamentsScreen navigation={navigation} route={{ key: "tournaments", name: "TournamentList", params: { scope: "mine" } } as never} />);
+  await waitFor(() => expect(screen.getByTestId("my-calendar-login")).toBeTruthy());
+  expect(mockGet).not.toHaveBeenCalledWith("/calendar/me");
+});

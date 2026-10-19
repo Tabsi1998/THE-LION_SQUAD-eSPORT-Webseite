@@ -50,6 +50,8 @@ const ADDRESSES: Array<[string, unknown]> = [
   ["/fastlaps", tab("EventsTab", "TournamentList", { filter: "fastlaps" })],
   ["/f1", tab("EventsTab", "TournamentList", { filter: "fastlaps" })],
   ["/calendar", tab("EventsTab", "TournamentList")],
+  ["/calendar/mine", tab("EventsTab", "TournamentList", { scope: "mine" })],
+  ["/calendar/mine#abo", tab("EventsTab", "TournamentList", { scope: "mine" })],
   ["/esports", tab("EventsTab", "TournamentList")],
   ["/community", tab("CommunityTab", "CommunityHub")],
   ["/messages", tab("CommunityTab", "CommunityHub", { section: "chats" })],
