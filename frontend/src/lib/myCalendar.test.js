@@ -32,6 +32,23 @@ test("was gestern begann und noch läuft, steht unter Heute; ganztägig zählt d
   expect(buckets[1].items.map((entry) => entry.id)).toEqual(["versammlung"]);
 });
 
+test("ganztägig gilt bis zum Ende des Tags in Wien - auch am Tag der Zeitumstellung (25.10.2026)", () => {
+  // Versammlung am So 25.10.2026 ohne Uhrzeit: Beginn 00:00 Wien (Sommerzeit) = 24.10. 22:00 UTC, kein Ende.
+  const meeting = { ...item("versammlung", "2026-10-24T22:00:00+00:00", { kind: "club" }), all_day: true, day: "2026-10-25" };
+  // Mehrtägig ganztägig mit ausschließlichem Ende: Sa 24. bis Mo 26.10. (Ende 27.10. 00:00 Wien, Winterzeit = 26.10. 23:00 UTC).
+  const camp = { ...item("camp", "2026-10-23T22:00:00+00:00"), all_day: true, day: "2026-10-24", end: "2026-10-26T23:00:00+00:00" };
+
+  // So 25.10., 21:00 Wien (Winterzeit) - beide laufen noch: Heute.
+  expect(agendaBuckets([meeting, camp], new Date("2026-10-25T20:00:00Z")).map((bucket) => [bucket.key, bucket.items.map((entry) => entry.id)]))
+    .toEqual([["today", ["camp", "versammlung"]]]);
+  // So 25.10., 23:59 Wien: die Versammlung zählt noch.
+  expect(agendaBuckets([meeting], new Date("2026-10-25T22:59:00Z"))[0].items.map((entry) => entry.id)).toEqual(["versammlung"]);
+  // Mo 26.10., 00:30 Wien: die Versammlung ist vorbei, das Lager läuft bis Montagabend.
+  expect(agendaBuckets([meeting, camp], new Date("2026-10-25T23:30:00Z")).flatMap((bucket) => bucket.items.map((entry) => entry.id))).toEqual(["camp"]);
+  // Di 27.10., 00:30 Wien: beide vorbei.
+  expect(agendaBuckets([meeting, camp], new Date("2026-10-26T23:30:00Z"))).toEqual([]);
+});
+
 test("die Tage eines Events sind eine Zeile", () => {
   const days = [1, 2].map((n) => item(`e-lan-tag-${n}`, `2099-10-1${n}T10:00:00+02:00`, { end: `2099-10-1${n}T22:00:00+02:00`, marker: "event_day", event_id: "e-lan", event_name: "Herbst-LAN" }));
   const [later] = agendaBuckets(days, NOW);
