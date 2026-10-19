@@ -5,15 +5,16 @@ import { api, resolveMediaUrl } from "@/lib/api";
 import { seoTextPreview } from "@/lib/textPreview";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
-import { CountLine, EntryRow, FieldChips, GameChip, MEDAL, MEDAL_RANK, MedalStat, PlacementBadge, RefButton, ReferenceCard, SectionTitle, bestPlacement, displayTitle, entriesOf, entryTitle, formatDate, gameKey, gameTitle, hasMember, medalOf, memberEntryOf, memberName, platformLabel, referenceGameName, timeOf } from "@/components/tls/references/referenceParts";
+import { CountLine, EntryRow, FieldChips, GameChip, GameMark, MEDAL, MEDAL_RANK, MedalStat, PlacementBadge, RefButton, ReferenceCard, SectionTitle, bestPlacement, displayTitle, entriesOf, entryTitle, formatDate, gameKey, gameTitle, hasMember, medalOf, memberEntryOf, memberName, platformLabel, referenceGameName, referenceInstant, timeOf } from "@/components/tls/references/referenceParts";
 import { Medal, Trophy, User, Users, X } from "lucide-react";
 import { TrophyShelf } from "@/components/tls/TrophyShelf";
 import { PublicLoadingState } from "@/components/tls/PublicLoadingState";
+import { viennaDay } from "@/lib/vienna";
 
 // Referenzen als Erfolgswand (#409, Design-Rework nach Rückmeldung des Betreibers): oben die
 // Medaillenbilanz des Vereins, dann die Trophäenwand mit allen Podestplätzen (Spiel-Cover, große
 // Platzierung, Aufstellung), dann die Bilanz je Spiel und darunter alle Teilnahmen als Zeitleiste
-// nach Saison. Eine Referenz ist eine Turnierteilnahme mit Einträgen (Team oder Einzelstarter).
+// nach Jahr (#1748). Eine Referenz ist eine Turnierteilnahme mit Einträgen (Team oder Einzelstarter).
 // Die Karten funktionieren ohne Bilder - mit Cover werden sie besser.
 
 const modeLabels = { online: "Online", offline: "Vor Ort", hybrid: "Hybrid" };
@@ -23,7 +24,7 @@ export function groupReferences(items) {
   const games = new Map();
   items.forEach((item) => {
     const key = gameKey(item);
-    if (!games.has(key)) games.set(key, { key, title: gameTitle(item), logo: item.game?.logo_url, cover: item.game?.cover_url, items: [] });
+    if (!games.has(key)) games.set(key, { key, title: gameTitle(item), game: item.game, logo: item.game?.logo_url, cover: item.game?.cover_url, items: [] });
     games.get(key).items.push(item);
   });
   return Array.from(games.values()).map((game) => ({
@@ -39,17 +40,25 @@ export function trophyItems(items) {
   return items.filter((item) => medalOf(item)).sort((a, b) => (MEDAL_RANK[medalOf(a)] - MEDAL_RANK[medalOf(b)]) || (timeOf(b) - timeOf(a)));
 }
 
-// Zeitleiste: Saisons absteigend (numerisch), Teilnahmen ohne Saison unter „Weitere“, innerhalb neu → alt.
+// Das Jahr einer Teilnahme in Wiener Zeit (#1748): aus dem gültigen Start, sonst dem Ende - derselbe Zeitpunkt wie
+// für die Reihenfolge (timeOf); leer ohne gültiges Datum.
+export function referenceYear(item) {
+  return viennaDay(referenceInstant(item)).slice(0, 4);
+}
+
+// Zeitleiste nach Jahr (#1748) statt nach Freitext-Saison: Sonst landeten gleiche Season-Nummern verschiedener
+// Spiele und Jahre in einer Gruppe. Neuestes Jahr zuerst, Teilnahmen ohne Datum unter „Ohne Datum“ am Ende,
+// innerhalb neu → alt.
 export function timelineGroups(items) {
   const groups = new Map();
   items.forEach((item) => {
-    const key = item.season || "";
-    if (!groups.has(key)) groups.set(key, { key, label: item.season || "Weitere Turniere", items: [] });
+    const key = referenceYear(item);
+    if (!groups.has(key)) groups.set(key, { key, label: key || "Ohne Datum", items: [] });
     groups.get(key).items.push(item);
   });
   return Array.from(groups.values())
     .map((group) => ({ ...group, items: group.items.slice().sort((a, b) => timeOf(b) - timeOf(a)) }))
-    .sort((a, b) => (a.key === "" ? 1 : b.key === "" ? -1 : b.key.localeCompare(a.key, "de-AT", { numeric: true })));
+    .sort((a, b) => (a.key === "" ? 1 : b.key === "" ? -1 : b.key.localeCompare(a.key)));
 }
 
 export default function ReferencesPage() {
@@ -59,7 +68,8 @@ export default function ReferencesPage() {
   const [podiumOnly, setPodiumOnly] = useState(false);
   const [gameFilter, setGameFilter] = useState("all");
   const [platformFilter, setPlatformFilter] = useState("all");
-  const [seasonFilter, setSeasonFilter] = useState("all");
+  // Jahres-Filter (#1748): dieselben Jahre wie die Gruppen der Zeitleiste, "" = ohne Datum.
+  const [yearFilter, setYearFilter] = useState("all");
   // Aus dem Mitgliederprofil (#859): `?member=<Profil-ID>` zeigt nur die Teilnahmen dieser Person.
   const [searchParams, setSearchParams] = useSearchParams();
   const memberFilter = searchParams.get("member") || "";
@@ -93,17 +103,18 @@ export default function ReferencesPage() {
   const trophies = useMemo(() => trophyItems(items), [items]);
   const platformOptions = useMemo(() => Array.from(new Map(items.flatMap((item) => (item.platforms || []).map((key) => [key, { key, label: platformLabel(item, key) }]))).values()), [items]);
   const seasonOptions = useMemo(() => Array.from(new Set(items.map((item) => item.season).filter(Boolean))).sort((a, b) => b.localeCompare(a, "de-AT", { numeric: true })), [items]);
+  const yearOptions = useMemo(() => timelineGroups(items).map((group) => ({ key: group.key, label: group.label })), [items]);
 
   const filteredItems = items.filter((item) => {
     if (podiumOnly && !onPodium(item, memberFilter ? memberEntryOf(item, memberFilter) : null)) return false;
     if (gameFilter !== "all" && gameKey(item) !== gameFilter) return false;
     if (platformFilter !== "all" && !(item.platforms || []).includes(platformFilter)) return false;
-    if (seasonFilter !== "all" && (item.season || "") !== seasonFilter) return false;
+    if (yearFilter !== "all" && referenceYear(item) !== yearFilter) return false;
     if (memberFilter && !hasMember(item, memberFilter)) return false;
     return true;
   });
   const timeline = timelineGroups(filteredItems);
-  const filtersActive = podiumOnly || gameFilter !== "all" || platformFilter !== "all" || seasonFilter !== "all" || Boolean(memberFilter);
+  const filtersActive = podiumOnly || gameFilter !== "all" || platformFilter !== "all" || yearFilter !== "all" || Boolean(memberFilter);
   const counts = { gold: summary.gold || 0, silver: summary.silver || 0, bronze: summary.bronze || 0 };
 
   return (
@@ -148,7 +159,7 @@ export default function ReferencesPage() {
           <div className="mt-6 grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3">
             <GameTile active={gameFilter === "all"} onClick={() => setGameFilter("all")} title="Alle Spiele" count={items.length} podiums={trophies.length} testId="references-game-all" />
             {games.map((game) => (
-              <GameTile key={game.key} active={gameFilter === game.key} onClick={() => setGameFilter(gameFilter === game.key ? "all" : game.key)} title={game.title} logo={game.logo} count={game.count} podiums={game.podiums} best={game.best} testId={`references-game-${game.key}`} />
+              <GameTile key={game.key} active={gameFilter === game.key} onClick={() => setGameFilter(gameFilter === game.key ? "all" : game.key)} title={game.title} game={game.game} count={game.count} podiums={game.podiums} best={game.best} testId={`references-game-${game.key}`} />
             ))}
           </div>
         </section>
@@ -156,7 +167,7 @@ export default function ReferencesPage() {
 
       {/* Zeitleiste aller Teilnahmen mit Filtern */}
       <section ref={timelineRef} className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-16 scroll-mt-24" data-testid="references-timeline">
-        <SectionTitle icon={Users} accent="#29B6E8" eyebrow="Alle Teilnahmen" title="Saison für Saison" hint={filtersActive ? `${filteredItems.length} von ${items.length}` : `${items.length} ${items.length === 1 ? "Teilnahme" : "Teilnahmen"}`} />
+        <SectionTitle icon={Users} accent="#29B6E8" eyebrow="Alle Teilnahmen" title="Jahr für Jahr" hint={filtersActive ? `${filteredItems.length} von ${items.length}` : `${items.length} ${items.length === 1 ? "Teilnahme" : "Teilnahmen"}`} />
         <div className="mt-5 flex flex-wrap items-center gap-2" data-testid="references-filters">
           {memberFilter && (
             <FilterChip active onClick={clearMember} testId="references-member">
@@ -164,12 +175,12 @@ export default function ReferencesPage() {
             </FilterChip>
           )}
           <FilterChip active={podiumOnly} onClick={() => setPodiumOnly((value) => !value)} tone="gold">Podest</FilterChip>
-          {seasonOptions.length > 0 && (
+          {yearOptions.length > 1 && (
             <>
               <span className="hidden sm:inline text-white/20">|</span>
-              <FilterChip active={seasonFilter === "all"} onClick={() => setSeasonFilter("all")}>Alle Saisons</FilterChip>
-              {seasonOptions.map((season) => (
-                <FilterChip key={season} active={seasonFilter === season} onClick={() => setSeasonFilter(seasonFilter === season ? "all" : season)} testId={`references-season-${season}`}>{season}</FilterChip>
+              <FilterChip active={yearFilter === "all"} onClick={() => setYearFilter("all")}>Alle Jahre</FilterChip>
+              {yearOptions.map((year) => (
+                <FilterChip key={year.key || "none"} active={yearFilter === year.key} onClick={() => setYearFilter(yearFilter === year.key ? "all" : year.key)} testId={`references-year-${year.key || "none"}`}>{year.label}</FilterChip>
               ))}
             </>
           )}
@@ -182,7 +193,7 @@ export default function ReferencesPage() {
             </>
           )}
           {filtersActive && (
-            <button type="button" onClick={() => { setPodiumOnly(false); setGameFilter("all"); setPlatformFilter("all"); setSeasonFilter("all"); if (memberFilter) clearMember(); }} data-testid="references-reset" className="ml-auto text-[11px] uppercase tracking-wider font-bold text-white/45 hover:text-white">Filter zurücksetzen</button>
+            <button type="button" onClick={() => { setPodiumOnly(false); setGameFilter("all"); setPlatformFilter("all"); setYearFilter("all"); if (memberFilter) clearMember(); }} data-testid="references-reset" className="ml-auto text-[11px] uppercase tracking-wider font-bold text-white/45 hover:text-white">Filter zurücksetzen</button>
           )}
         </div>
 
@@ -285,12 +296,10 @@ export function ReferenceDetailPage() {
 
 // ---------------------------------------------------------------- Bausteine
 
-function GameTile({ active, onClick, title, logo, count, podiums, best, testId }) {
+function GameTile({ active, onClick, title, game, count, podiums, best, testId }) {
   return (
     <button type="button" onClick={onClick} data-testid={testId} className={`text-left border rounded-sm p-3 flex items-center gap-3 transition ${active ? "border-[#29B6E8] bg-[#29B6E8]/10" : "border-white/10 bg-[#111] hover:border-[#29B6E8]/40"}`}>
-      <span className="w-11 h-11 shrink-0 rounded-sm bg-black border border-white/10 overflow-hidden flex items-center justify-center">
-        {logo ? <img src={resolveMediaUrl(logo)} alt="" className="w-full h-full object-contain p-1" /> : <Trophy className="w-5 h-5 text-[#29B6E8]" />}
-      </span>
+      <GameMark game={game} code className="w-11 h-11 border border-white/10" codeClass="text-xs" iconClass="w-5 h-5" padded />
       <span className="min-w-0">
         <span className="block font-heading font-black uppercase text-sm truncate">{title}</span>
         <span className="block text-[10px] uppercase tracking-widest font-bold text-white/45">

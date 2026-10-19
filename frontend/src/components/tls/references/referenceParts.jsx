@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import { ArrowRight, ExternalLink, Handshake, Medal, Trophy, User, Users } from "lucide-react";
 import { resolveMediaUrl } from "@/lib/api";
 import { gameLabel } from "@/lib/gameLabels";
+import { gameCode } from "@/components/tls/GamesShelf";
 import { useCountUp } from "@/hooks/useCountUp";
 import { asInstant, viennaDate } from "@/lib/vienna";
 
@@ -100,9 +101,18 @@ export function medalOf(item) {
   return medalForPlacement(bestPlacement(item));
 }
 
+/** Der Zeitpunkt einer Teilnahme: das erste gültige von Start- und Enddatum - ein kaputter Start fällt aufs Ende zurück (#1748). null ohne gültiges Datum. */
+export function referenceInstant(item) {
+  for (const value of [item.start_date, item.end_date]) {
+    if (!value) continue;
+    const date = asInstant(value);
+    if (!Number.isNaN(date.getTime())) return date;
+  }
+  return null;
+}
+
 export function timeOf(item) {
-  const date = asInstant(item.start_date || item.end_date || 0);
-  return Number.isNaN(date.getTime()) ? 0 : date.getTime();
+  return referenceInstant(item)?.getTime() || 0;
 }
 
 export function SectionTitle({ icon: Icon, accent, eyebrow, title, hint }) {
@@ -174,12 +184,26 @@ export function PlacementBadge({ placement, medal, size = "md" }) {
   );
 }
 
+// Das Zeichen eines Spiels (#1748): sein Logo. Ohne Logo zeigen nur große Zeichen (`code`, etwa die Spiel-Kachel)
+// das Kürzel wie im Spiele-Regal (gameCode); im kleinen Chip wäre es unlesbar und doppelt - der volle Name steht
+// daneben -, dort und ohne Spiel steht der Pokal. `className` setzt die Größe, `codeClass` die Schrift des Kürzels.
+export function GameMark({ game, code = false, className = "w-5 h-5", codeClass = "text-xs", iconClass = "w-3 h-3", padded = false }) {
+  const hasGame = code && Boolean(game?.short_name || game?.name);
+  return (
+    <span data-testid="reference-game-logo" className={`${className} shrink-0 rounded-sm bg-black overflow-hidden flex items-center justify-center`}>
+      {game?.logo_url
+        ? <img src={resolveMediaUrl(game.logo_url)} alt="" className={`w-full h-full object-contain ${padded ? "p-1" : ""}`} />
+        : hasGame
+          ? <span aria-hidden="true" className={`font-heading font-black tracking-wide text-white leading-none ${codeClass}`}>{gameCode(game)}</span>
+          : <Trophy className={`${iconClass} text-[#29B6E8]`} />}
+    </span>
+  );
+}
+
 export function GameChip({ item }) {
   return (
     <span className="inline-flex items-center gap-2 pl-1 pr-2.5 py-1 border border-white/10 bg-black/40 rounded-sm text-[10px] uppercase tracking-widest font-bold text-white/70">
-      <span className="w-5 h-5 rounded-sm bg-black overflow-hidden flex items-center justify-center">
-        {item.game?.logo_url ? <img src={resolveMediaUrl(item.game.logo_url)} alt="" className="w-full h-full object-contain" /> : <Trophy className="w-3 h-3 text-[#29B6E8]" />}
-      </span>
+      <GameMark game={item.game} />
       {gameTitle(item)}
     </span>
   );
