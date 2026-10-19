@@ -100,3 +100,30 @@ async def test_gespeicherte_gruppenspiele_nur_mit_plaetzen_zaehlen_fuer_den_grup
     theirs = await counters.compute(other["id"], {"group_stage_firsts"})
     assert mine["group_stage_firsts"] == 1, "zwei Siege gegen einen"
     assert theirs["group_stage_firsts"] == 0
+
+
+@pytest.mark.asyncio
+async def test_sieger_nur_als_winner_id_kommt_durch_die_projektionen(flow):
+    """Ältere Spiele der alten Engine nennen den Sieger nur als ``winner_id``. Die Zähler laden ihn aus ``matches_v2``
+    mit - Spiele, Gruppenspiele und Teamspiele haben je eine eigene Projektion."""
+    me = await flow.add_user(name="Spielerin")
+    other = await flow.add_user(name="Gegner")
+    await flow.db.tournaments.insert_one({"id": "t1", "title": "Alt", "status": "completed", "is_public": True})
+    await flow.db.teams.insert_one({"id": "T1", "name": "Lions", "member_ids": [me["id"]], "leader_id": me["id"], "created_by": me["id"],
+                                    "created_at": "2026-01-01T00:00:00+00:00"})
+    await flow.db.team_members.insert_one({"team_id": "T1", "user_id": me["id"], "role": "leader", "joined_at": "2026-01-02T00:00:00+00:00"})
+    await flow.db.tournament_registrations.insert_many([
+        {"id": "r-me", "tournament_id": "t1", "user_id": me["id"], "team_id": "T1", "seed": 4, "status": "checked_in"},
+        {"id": "r-ot", "tournament_id": "t1", "user_id": other["id"], "seed": 1, "status": "checked_in"},
+    ])
+
+    def legacy(mid: str, winner: str) -> dict:
+        return {"id": mid, "tournament_id": "t1", "group_id": "g1", "status": "completed", "winner_id": winner,
+                "completed_at": "2026-09-01T18:00:00+00:00",
+                "slots": [{"slot": 1, "registration_id": "r-me", "seed": 4}, {"slot": 2, "registration_id": "r-ot", "seed": 1}],
+                "results": []}
+    await flow.db.matches_v2.insert_many([legacy("w-1", "r-me"), legacy("w-2", "r-me"), legacy("w-3", "r-ot")])
+    values = await counters.compute(me["id"], {"upsets", "group_stage_firsts", "team_match_wins"})
+    assert values["upsets"] == 2, "zwei Siege gegen den besser Gesetzten"
+    assert values["group_stage_firsts"] == 1
+    assert values["team_match_wins"] == 2
