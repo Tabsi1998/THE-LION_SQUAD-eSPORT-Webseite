@@ -25,6 +25,26 @@ export function queueLanes(queue) {
   }));
 }
 
+const stamp = (value) => {
+  const time = value ? new Date(value).getTime() : NaN;
+  return Number.isNaN(time) ? Number.MAX_SAFE_INTEGER : time;
+};
+
+/**
+ * Das nächste Spiel der ganzen Halle für die Fußzeile „Als Nächstes“ (#1828): aus derselben Live-Warteschlange wie die
+ * Stationen - ein aufgerufenes zuerst, sonst das mit der frühesten Prognose. `{ lane, entry }` oder `null`. So nennt die
+ * Fußzeile nach einem Austritt dieselbe Station und dieselben Spieler wie die Stations-Ansicht.
+ */
+export function queueNextUp(queue) {
+  const picks = queueLanes(queue)
+    .map((lane, index) => ({ lane, entry: lane.next, index }))
+    .filter((pick) => pick.entry && pick.lane.status !== "broken");
+  picks.sort((a, b) => (a.entry.state === "called" ? 0 : 1) - (b.entry.state === "called" ? 0 : 1)
+    || stamp(a.entry.forecast_at) - stamp(b.entry.forecast_at)
+    || a.index - b.index);
+  return picks.length ? { lane: picks[0].lane, entry: picks[0].entry } : null;
+}
+
 /** Gibt es etwas zu zeigen - ein laufendes oder ein nächstes Spiel an irgendeiner Station? */
 export function hasQueue(queue) {
   // Auch eine defekte Station allein zählt (Codex): die Halle soll „Bitte nicht benutzen“ sehen.

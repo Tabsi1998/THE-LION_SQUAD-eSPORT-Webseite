@@ -551,7 +551,7 @@ function BracketTv() {
       </main>
 
       <TvFooter qrValue={screen === "registration" ? registerUrl : publicUrl} kicker={screen === "registration" ? "Jetzt anmelden" : "Jetzt mitfiebern"} text={screen === "registration" ? "QR scannen und anmelden" : "QR scannen und Turnierbaum öffnen"}>
-        {screen === "playlist" && hasMatches && !parked ? <TvNextUp matches={matches} stations={stations} nameOf={nameOf} forecast={forecast} /> : null}
+        {screen === "playlist" && hasMatches && !parked ? <TvNextUp matches={matches} stations={stations} nameOf={nameOf} forecast={forecast} queue={liveQueue} /> : null}
       </TvFooter>
       {needsClick ? <div className="tv-hint tv-t-meta" role="status" data-testid="tv-sound-hint">Für Ton einmal klicken</div> : null}
     </div>
