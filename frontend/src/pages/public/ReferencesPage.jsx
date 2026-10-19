@@ -298,7 +298,7 @@ export function ReferenceDetailPage() {
 function GameTile({ active, onClick, title, game, count, podiums, best, testId }) {
   return (
     <button type="button" onClick={onClick} data-testid={testId} className={`text-left border rounded-sm p-3 flex items-center gap-3 transition ${active ? "border-[#29B6E8] bg-[#29B6E8]/10" : "border-white/10 bg-[#111] hover:border-[#29B6E8]/40"}`}>
-      <GameMark game={game} className="w-11 h-11 border border-white/10" codeClass="text-xs" iconClass="w-5 h-5" padded />
+      <GameMark game={game} code className="w-11 h-11 border border-white/10" codeClass="text-xs" iconClass="w-5 h-5" padded />
       <span className="min-w-0">
         <span className="block font-heading font-black uppercase text-sm truncate">{title}</span>
         <span className="block text-[10px] uppercase tracking-widest font-bold text-white/45">

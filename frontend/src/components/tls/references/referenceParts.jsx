@@ -175,10 +175,11 @@ export function PlacementBadge({ placement, medal, size = "md" }) {
   );
 }
 
-// Das Zeichen eines Spiels (#1748): sein Logo, ohne Logo das Kürzel wie im Spiele-Regal (gameCode) - ohne Spiel
-// (freies Turnier) der Pokal. `className` setzt die Größe, `codeClass` die Schrift des Kürzels.
-export function GameMark({ game, className = "w-5 h-5", codeClass = "text-[7px]", iconClass = "w-3 h-3", padded = false }) {
-  const hasGame = Boolean(game?.short_name || game?.name);
+// Das Zeichen eines Spiels (#1748): sein Logo. Ohne Logo zeigen nur große Zeichen (`code`, etwa die Spiel-Kachel)
+// das Kürzel wie im Spiele-Regal (gameCode); im kleinen Chip wäre es unlesbar und doppelt - der volle Name steht
+// daneben -, dort und ohne Spiel steht der Pokal. `className` setzt die Größe, `codeClass` die Schrift des Kürzels.
+export function GameMark({ game, code = false, className = "w-5 h-5", codeClass = "text-xs", iconClass = "w-3 h-3", padded = false }) {
+  const hasGame = code && Boolean(game?.short_name || game?.name);
   return (
     <span data-testid="reference-game-logo" className={`${className} shrink-0 rounded-sm bg-black overflow-hidden flex items-center justify-center`}>
       {game?.logo_url

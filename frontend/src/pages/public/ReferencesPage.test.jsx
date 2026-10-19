@@ -198,7 +198,7 @@ test("Jahr für Jahr auf der Seite (#1748): Jahresköpfe, Medaillenzähler bleib
   expect(screen.getByTestId("references-stat-podiums")).toHaveTextContent("6");
 });
 
-test("Spiel-Logo (#1748): mit Logo das Bild, ohne Logo das Kürzel statt eines Pokal-Symbols", async () => {
+test("Spiel-Logo (#1748): mit Logo das Bild; ohne Logo im kleinen Chip der Pokal, das Kürzel erst in der Spiel-Kachel", async () => {
   const withLogo = { ...ITEMS[0], game: { ...ITEMS[0].game, logo_url: "/media/cod.png", short_name: "CoD" } };
   const noLogo = { ...ITEMS[1], game: { ...ITEMS[1].game, short_name: "rl" } };
   apiMock.get.mockResolvedValue({ data: { items: [withLogo, noLogo], summary: SUMMARY } });
@@ -208,8 +208,10 @@ test("Spiel-Logo (#1748): mit Logo das Bild, ohne Logo das Kürzel statt eines P
   expect(logoCard).not.toHaveTextContent("COD");
   const codeCard = within(screen.getByTestId("reference-card-r2")).getByTestId("reference-game-logo");
   expect(codeCard.querySelector("img")).toBeNull();
-  expect(codeCard).toHaveTextContent("RL");
-  // Die Spiel-Kachel nimmt dasselbe: Logo oder Kürzel.
+  // Im 20-px-Chip wäre das Kürzel nicht lesbar - und der volle Name steht ohnehin daneben.
+  expect(codeCard.textContent).toBe("");
+  expect(codeCard.querySelector("svg")).toBeInTheDocument();
+  // Die Spiel-Kachel ist groß genug für das Kürzel; mit Logo nimmt sie das Logo.
   expect(within(screen.getByTestId("references-game-g2")).getByTestId("reference-game-logo")).toHaveTextContent("RL");
   expect(within(screen.getByTestId("references-game-g1")).getByTestId("reference-game-logo").querySelector("img")).toHaveAttribute("src", "/media/cod.png");
 });
