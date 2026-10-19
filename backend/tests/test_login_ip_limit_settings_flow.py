@@ -192,6 +192,9 @@ async def test_admin_saves_limits_inside_bounds_and_rejects_the_rest(flow):
     response = await flow.put("/api/settings/auth", json={"login_ip_limit_per_minute": 120})
     assert response.status_code == 200, response.text
     assert response.json()["login_ip_limit_per_minute"] == 120
+    # Die Verwaltung bekommt die Schranken mit, damit die Karte dieselben prüft wie der Server.
+    assert response.json()["limit_bounds"]["login_ip_limit_per_minute"] == {"min": 10, "max": 300}
+    assert response.json()["event_window_max_hours"] == 72
 
     for body in ({"login_ip_limit_per_minute": 5}, {"login_ip_limit_per_minute": 5000},
                  {"event_limits_from": "2026-10-31T16:00:00+00:00"},
@@ -217,4 +220,4 @@ async def test_public_settings_do_not_name_the_limits(flow):
     await store(flow, login_ip_limit_per_minute=200)
     data = (await flow.get("/api/settings/public")).json()
     assert "password_login_enabled" in data
-    assert not [key for key in data if "limit" in key]
+    assert not [key for key in data if "limit" in key or "event_window" in key]

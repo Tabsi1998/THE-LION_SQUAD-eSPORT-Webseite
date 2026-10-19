@@ -133,6 +133,9 @@ async def load_auth_settings(db=None) -> dict:
         parsed = parse_window_time(doc.get(key))
         result[key] = parsed.isoformat() if parsed else ""
     result["event_limits_active"] = event_window_active(result)
+    # Schranken für die Prüfung in der Verwaltung - eine Quelle, die Karte rechnet nicht mit eigenen Zahlen.
+    result["limit_bounds"] = {key: {"min": low, "max": high} for key, (_d, low, high, _l) in AUTH_LIMIT_FIELDS.items()}
+    result["event_window_max_hours"] = int(EVENT_WINDOW_MAX.total_seconds() // 3600)
     configured = is_google_client_id(result["google_client_id"])
     result["google_configured"] = configured
     if not configured:

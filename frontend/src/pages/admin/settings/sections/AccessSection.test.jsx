@@ -8,6 +8,12 @@ const config = {
   login_ip_limit_per_minute: 30, register_ip_limit_per_hour: 5,
   event_login_ip_limit_per_minute: 150, event_register_ip_limit_per_hour: 50,
   event_limits_from: "", event_limits_until: "", event_limits_active: false,
+  // So liefert sie der Server (services/auth_settings.py).
+  limit_bounds: {
+    login_ip_limit_per_minute: { min: 10, max: 300 }, register_ip_limit_per_hour: { min: 3, max: 100 },
+    event_login_ip_limit_per_minute: { min: 10, max: 1000 }, event_register_ip_limit_per_hour: { min: 3, max: 500 },
+  },
+  event_window_max_hours: 72,
 };
 
 function renderSection(overrides = {}, saveAuth = vi.fn()) {
@@ -53,4 +59,48 @@ test("ein anderer Zugangs-Schalter lässt ungespeicherte Grenzen stehen, gespeic
   // Kommen neue Grenzen vom Server (gespeichert), zeigt die Karte sie.
   rerender(<AccessSection {...props} authConfig={{ ...config, registration_enabled: false, login_ip_limit_per_minute: 120 }} />);
   expect(screen.getByTestId("access-limit-login_ip_limit_per_minute")).toHaveValue(120);
+});
+
+test("ungültige Zahlen zeigen sofort eine Meldung am Feld und sperren das Speichern", () => {
+  const saveAuth = renderSection();
+  const login = screen.getByTestId("access-limit-login_ip_limit_per_minute");
+  for (const value of ["5", "301", "12.5", ""]) {
+    fireEvent.change(login, { target: { value } });
+    expect(screen.getByTestId("access-limit-login_ip_limit_per_minute-error")).toHaveTextContent("Bitte eine ganze Zahl von 10 bis 300 angeben.");
+    expect(screen.getByTestId("access-limits-save")).toBeDisabled();
+  }
+  fireEvent.change(screen.getByTestId("access-limit-event_register_ip_limit_per_hour"), { target: { value: "501" } });
+  expect(screen.getByTestId("access-limit-event_register_ip_limit_per_hour-error")).toHaveTextContent("von 3 bis 500");
+  fireEvent.change(screen.getByTestId("access-limit-event_register_ip_limit_per_hour"), { target: { value: "60" } });
+  fireEvent.change(login, { target: { value: "300" } });
+  expect(screen.queryByRole("alert")).toBeNull();
+  fireEvent.click(screen.getByTestId("access-limits-save"));
+  expect(saveAuth).toHaveBeenCalledTimes(1);
+});
+
+test("Event-Zeitraum: unvollständig, Ende vor Beginn oder zu lang wird sofort gemeldet", () => {
+  renderSection();
+  const from = screen.getByTestId("access-event-from");
+  const until = screen.getByTestId("access-event-until");
+  const save = screen.getByTestId("access-limits-save");
+
+  fireEvent.change(from, { target: { value: "2026-10-31T16:00" } });
+  expect(screen.getByTestId("access-event-until-error")).toHaveTextContent("Bitte auch das Ende angeben");
+  expect(save).toBeDisabled();
+
+  fireEvent.change(until, { target: { value: "2026-10-31T15:00" } });
+  expect(screen.getByTestId("access-event-until-error")).toHaveTextContent("Das Ende muss nach dem Beginn liegen.");
+  expect(save).toBeDisabled();
+
+  fireEvent.change(until, { target: { value: "2026-11-03T16:01" } });
+  expect(screen.getByTestId("access-event-until-error")).toHaveTextContent("Höchstens 3 Tage am Stück.");
+  expect(save).toBeDisabled();
+
+  fireEvent.change(until, { target: { value: "2026-11-03T16:00" } });
+  expect(screen.queryByRole("alert")).toBeNull();
+  expect(save).toBeEnabled();
+
+  fireEvent.change(from, { target: { value: "" } });
+  expect(screen.getByTestId("access-event-from-error")).toHaveTextContent("Bitte auch den Beginn angeben");
+  expect(save).toBeDisabled();
 });

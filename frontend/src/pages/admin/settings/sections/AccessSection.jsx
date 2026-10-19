@@ -1,17 +1,22 @@
 // Einstellungen (#223): Abschnitt „Zugang (Passwort-Login, Registrierung)“ – nur Darstellung; Zustand und Handler bleiben in AdminSettingsPage.
 import { useEffect, useState } from "react";
-import { ACCESS_SWITCHES } from "../shared";
+import { ACCESS_SWITCHES, validateAccessLimits } from "../shared";
 import { BrandDateTimeField, BrandNumberField } from "./parts";
 
-// Grenzen je Netz (#1802): Schranken wie im Backend (services/auth_settings.py) – der Server prüft sie ohnehin.
+// Grenzen je Netz (#1802): die Schranken kommen vom Server (limit_bounds in den Zugangs-Einstellungen).
 const ACCESS_LIMIT_FIELDS = [
-  ["login_ip_limit_per_minute", "Anmeldungen je Minute", 10, 300],
-  ["register_ip_limit_per_hour", "Registrierungen je Stunde", 3, 100],
+  ["login_ip_limit_per_minute", "Anmeldungen je Minute"],
+  ["register_ip_limit_per_hour", "Registrierungen je Stunde"],
 ];
 const ACCESS_EVENT_LIMIT_FIELDS = [
-  ["event_login_ip_limit_per_minute", "Anmeldungen je Minute", 10, 1000],
-  ["event_register_ip_limit_per_hour", "Registrierungen je Stunde", 3, 500],
+  ["event_login_ip_limit_per_minute", "Anmeldungen je Minute"],
+  ["event_register_ip_limit_per_hour", "Registrierungen je Stunde"],
 ];
+
+function FieldError({ message, testId }) {
+  if (!message) return null;
+  return <p role="alert" className="mt-1 text-xs text-[#FF6B6B]" data-testid={testId}>{message}</p>;
+}
 const LIMIT_KEYS = [...ACCESS_LIMIT_FIELDS, ...ACCESS_EVENT_LIMIT_FIELDS].map(([key]) => key).concat(["event_limits_from", "event_limits_until"]);
 
 function pickLimits(config) {
@@ -24,9 +29,18 @@ function AccessLimitsCard({ authConfig, savingAuth, saveAuth }) {
   const savedLimits = JSON.stringify(pickLimits(authConfig));
   useEffect(() => { setDraft(JSON.parse(savedLimits)); }, [savedLimits]);
   const set = (key) => (value) => setDraft((current) => ({ ...current, [key]: value }));
-  const field = ([key, label, min, max]) => (
-    <BrandNumberField key={key} label={`${label} (${min}–${max})`} value={draft[key]} onChange={set(key)} min={min} max={max} testId={`access-limit-${key}`} />
-  );
+  const errors = validateAccessLimits(draft, authConfig);
+  const invalid = Object.keys(errors).length > 0;
+  const numbersInvalid = Object.keys(errors).some((key) => !key.startsWith("event_limits_"));
+  const field = ([key, label]) => {
+    const range = authConfig.limit_bounds?.[key];
+    return (
+      <div key={key}>
+        <BrandNumberField label={range ? `${label} (${range.min}–${range.max})` : label} value={draft[key]} onChange={set(key)} min={range?.min} max={range?.max} testId={`access-limit-${key}`} />
+        <FieldError message={errors[key]} testId={`access-limit-${key}-error`} />
+      </div>
+    );
+  };
 
   return (
     <div className="border border-white/10 bg-[#121212] rounded-sm p-5 space-y-4" data-testid="access-limits">
@@ -49,16 +63,22 @@ function AccessLimitsCard({ authConfig, savingAuth, saveAuth }) {
           )}
         </div>
         <div className="grid sm:grid-cols-2 gap-3">
-          <BrandDateTimeField label="Beginn" value={draft.event_limits_from} onChange={set("event_limits_from")} testId="access-event-from" />
-          <BrandDateTimeField label="Ende" value={draft.event_limits_until} onChange={set("event_limits_until")} testId="access-event-until" />
+          <div>
+            <BrandDateTimeField label="Beginn" value={draft.event_limits_from} onChange={set("event_limits_from")} testId="access-event-from" />
+            <FieldError message={errors.event_limits_from} testId="access-event-from-error" />
+          </div>
+          <div>
+            <BrandDateTimeField label="Ende" value={draft.event_limits_until} onChange={set("event_limits_until")} testId="access-event-until" />
+            <FieldError message={errors.event_limits_until} testId="access-event-until-error" />
+          </div>
           {ACCESS_EVENT_LIMIT_FIELDS.map(field)}
         </div>
       </div>
       <div className="flex flex-wrap gap-2">
-        <button type="button" disabled={savingAuth} onClick={() => saveAuth({ ...authConfig, ...draft })} className="px-4 py-2 bg-[#29B6E8] text-black text-xs font-bold uppercase rounded-sm disabled:opacity-50" data-testid="access-limits-save">
+        <button type="button" disabled={savingAuth || invalid} onClick={() => saveAuth({ ...authConfig, ...draft })} className="px-4 py-2 bg-[#29B6E8] text-black text-xs font-bold uppercase rounded-sm disabled:opacity-50" data-testid="access-limits-save">
           Grenzen speichern
         </button>
-        <button type="button" disabled={savingAuth || (!draft.event_limits_from && !draft.event_limits_until)} onClick={() => saveAuth({ ...authConfig, ...draft, event_limits_from: "", event_limits_until: "" })} className="px-4 py-2 border border-white/15 text-xs font-bold uppercase rounded-sm disabled:opacity-40" data-testid="access-event-clear">
+        <button type="button" disabled={savingAuth || numbersInvalid || (!draft.event_limits_from && !draft.event_limits_until)} onClick={() => saveAuth({ ...authConfig, ...draft, event_limits_from: "", event_limits_until: "" })} className="px-4 py-2 border border-white/15 text-xs font-bold uppercase rounded-sm disabled:opacity-40" data-testid="access-event-clear">
           Event-Zeitraum leeren
         </button>
       </div>
