@@ -77,6 +77,45 @@ test("Baukasten: Event-Link mit Abweichung, ohne Schlüssel", async () => {
   expect(screen.getByTestId("tv-link-result")).toHaveTextContent("Jahreszeiten in der TV-Kopfleiste Aus");
 });
 
+test("#1822: Hallen- und Aufruf-Tafel - der Schlüssel ist freiwillig, gilt für das Event und kommt in beide Links", async () => {
+  const user = userEvent.setup();
+  apiMock.post.mockResolvedValueOnce({ data: { id: "k3", label: "Beamer Halle", target_type: "event", target_title: "Lions LAN Herbst", event_id: "e1",
+    tournament_id: null, token: "event-schluessel", path: "/display/event/e1?key=event-schluessel" } });
+  render(<AdminTvPage />);
+  await user.click(screen.getByTestId("tv-view-calls"));
+  await waitFor(() => expect(within(screen.getByTestId("tv-target")).getByText("Lions LAN Herbst")).toBeInTheDocument());
+  await user.selectOptions(screen.getByTestId("tv-target"), "e1");
+  // Ohne Schlüssel gibt es den Link schon - mit Hinweis, wofür der Schlüssel da ist.
+  expect(screen.getByTestId("tv-link").textContent).toBe(`${window.location.origin}/display/event/e1/calls`);
+  expect(screen.getByTestId("tv-key-hint")).toHaveTextContent("Für Turniere „Nur Mitglieder“ braucht der Bildschirm einen TV-Zugang");
+  await user.type(screen.getByTestId("tv-key-label"), "Beamer Halle");
+  await user.click(screen.getByTestId("tv-key-create"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/tv/keys", { event_id: "e1", label: "Beamer Halle" }));
+  await waitFor(() => expect(screen.getByTestId("tv-link").textContent).toBe(`${window.location.origin}/display/event/e1/calls?key=event-schluessel`));
+  // Die Hallen-Tafel desselben Events teilt sich den Schlüssel; ein anderes Ziel braucht einen neuen.
+  await user.click(screen.getByTestId("tv-view-event"));
+  await user.selectOptions(screen.getByTestId("tv-target"), "e1");
+  expect(screen.getByTestId("tv-link").textContent).toBe(`${window.location.origin}/display/event/e1?key=event-schluessel`);
+  await user.click(screen.getByTestId("tv-view-bracket"));
+  await user.selectOptions(screen.getByTestId("tv-target"), "t1");
+  expect(screen.getByTestId("tv-link-missing")).toHaveTextContent("Link erstellen");
+});
+
+test("#1822: ein Event-Link mit Schlüssel übernehmen - der Schlüssel bleibt im Link", async () => {
+  const user = userEvent.setup();
+  render(<AdminTvPage />);
+  await user.type(screen.getByTestId("tv-link-paste"), "https://club.example/display/event/e1/calls?key=alt&contrast=1");
+  await user.click(screen.getByTestId("tv-link-takeover"));
+  expect(screen.getByTestId("tv-link").textContent).toBe(`${window.location.origin}/display/event/e1/calls?key=alt&contrast=1`);
+});
+
+test("#1822: Schlüssel-Liste nennt bei Event-Schlüsseln das Event", async () => {
+  keys = [{ id: "k4", label: "Beamer Halle", target_type: "event", target_title: "Lions LAN Herbst", tournament_title: null, event_id: "e1",
+    created_at: "2026-10-07T10:00:00+00:00", last_used_at: null, expires_at: null, expired: false }];
+  render(<AdminTvPage />);
+  expect(await screen.findByTestId("tv-key-k4")).toHaveTextContent("Event Lions LAN Herbst");
+});
+
 test("Baukasten: der Turnierbaum braucht erst einen Schlüssel, dann trägt der Link ihn", async () => {
   const user = userEvent.setup();
   render(<AdminTvPage />);

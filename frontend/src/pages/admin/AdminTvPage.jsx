@@ -7,7 +7,7 @@ import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { api, formatRequestError } from "@/lib/api";
 import { PLAYLIST_SECONDS, PLAYLIST_SLIDES, SLIDE_LABELS, playlistLabel } from "@/lib/tvPlaylist";
-import { TV_DEFAULTS, TV_FIELDS, TV_GROUPS, TV_VIEWS, buildTvLink, fieldsForView, linkOverrides, parseTvPath, resolveTvSettings, sameTvValue, tvValueLabel } from "@/lib/tvSettings";
+import { TV_DEFAULTS, TV_FIELDS, TV_GROUPS, TV_VIEWS, buildTvLink, fieldsForView, linkOverrides, parseTvPath, resolveTvSettings, sameTvValue, takesTvKey, tvValueLabel } from "@/lib/tvSettings";
 import { viennaDateTime } from "@/lib/vienna";
 
 // TV & Beamer (#1110): eine Stelle für alle Bildschirme. Oben die Grundwerte - sie gelten auf jedem TV und kommen
@@ -342,9 +342,9 @@ function LinkBuilder({ defaults }) {
     };
   }, [view, targetId]);
 
-  // Der Schlüssel gehört zu genau einem Turnier: wechselt das Turnier, braucht der Link einen neuen. Turnierbaum und
-  // Stationen desselben Turniers teilen sich einen Schlüssel.
-  const key = meta.needsKey && created?.tournament_id === targetId ? created.token : "";
+  // Der Schlüssel gehört zu genau einem Turnier oder Event: wechselt das Ziel, braucht der Link einen neuen. Turnierbaum
+  // und Stationen desselben Turniers teilen sich einen Schlüssel, Hallen- und Aufruf-Tafel desselben Events (#1822).
+  const key = takesTvKey(meta) && created?.target_type === meta.keyFor && created?.target_id === targetId ? created.token : "";
   // Nur Abweichungen, die diese Ansicht nutzt, kommen in den Link.
   const usedOverrides = Object.fromEntries(Object.entries(overrides).filter(([fieldKey]) => fields.some((field) => field.key === fieldKey)));
   const link = buildTvLink({ origin: window.location.origin, view, targetId, stationId, displayKey: key, overrides: usedOverrides });
@@ -354,8 +354,9 @@ function LinkBuilder({ defaults }) {
     if (!targetId || busy) return;
     setBusy(true);
     try {
-      const { data } = await api.post("/tv/keys", { tournament_id: targetId, label: label || "Bildschirm" });
-      setCreated(data);
+      const target = meta.keyFor === "event" ? { event_id: targetId } : { tournament_id: targetId };
+      const { data } = await api.post("/tv/keys", { ...target, label: label || "Bildschirm" });
+      setCreated({ token: data.token, target_type: meta.keyFor, target_id: data.event_id || data.tournament_id || targetId });
       toast.success("Link mit Anzeige-Schlüssel erstellt. Den Schlüssel zeigt nur diese Seite – Link jetzt kopieren oder am TV öffnen.");
     } catch (error) {
       toast.error(formatRequestError(error, "Der Link konnte nicht erstellt werden."));
@@ -375,8 +376,8 @@ function LinkBuilder({ defaults }) {
       setStationId(found.stationId);
       setOverrides(linkOverrides(url.searchParams));
       const pastedKey = url.searchParams.get("key");
-      const needsKey = TV_VIEWS.find((entry) => entry.key === found.view)?.needsKey;
-      setCreated(needsKey && pastedKey ? { token: pastedKey, tournament_id: found.targetId, label: "" } : null);
+      const foundMeta = TV_VIEWS.find((entry) => entry.key === found.view);
+      setCreated(takesTvKey(foundMeta) && pastedKey ? { token: pastedKey, target_type: foundMeta.keyFor, target_id: found.targetId } : null);
       setPasted("");
       toast.success("Link übernommen – Abweichungen ändern, dann den neuen Link am TV öffnen.");
     } catch {
@@ -448,15 +449,19 @@ function LinkBuilder({ defaults }) {
                 })} />
             ))}
           </div>
-          {meta.needsKey ? (
-            <div className={FIELD_BOX}>
-              <div className="text-sm font-bold text-white/90 inline-flex items-center gap-2"><KeyRound className="w-4 h-4 text-[#FFD700]" /> Anzeige-Schlüssel</div>
-              <p className="mt-1 text-xs text-white/50">Damit läuft der Turnierbaum (und jede Station dieses Turniers) am Hallen-PC ohne Anmeldung. Der Schlüssel erlaubt nur das Anschauen dieses einen Turniers und lässt sich unten widerrufen.</p>
+          {takesTvKey(meta) ? (
+            <div className={FIELD_BOX} data-testid="tv-key-box">
+              <div className="text-sm font-bold text-white/90 inline-flex items-center gap-2"><KeyRound className="w-4 h-4 text-[#FFD700]" /> Anzeige-Schlüssel{meta.needsKey ? "" : " (freiwillig)"}</div>
+              {meta.keyFor === "event" ? (
+                <p className="mt-1 text-xs text-white/50" data-testid="tv-key-hint">Für Turniere „Nur Mitglieder“ braucht der Bildschirm einen TV-Zugang: Mit Schlüssel zeigen Hallen- und Aufruf-Tafel am Hallen-PC ohne Anmeldung alle Turniere dieses Events, ohne Schlüssel nur die öffentlichen. Der Schlüssel erlaubt nur das Anschauen dieses einen Events und lässt sich unten widerrufen.</p>
+              ) : (
+                <p className="mt-1 text-xs text-white/50" data-testid="tv-key-hint">Damit läuft der Turnierbaum (und jede Station dieses Turniers) am Hallen-PC ohne Anmeldung. Der Schlüssel erlaubt nur das Anschauen dieses einen Turniers und lässt sich unten widerrufen.</p>
+              )}
               <div className="mt-3 flex flex-wrap gap-2">
                 <input value={label} onChange={(event) => setLabel(event.target.value)} maxLength={80} placeholder="Name des Bildschirms, z. B. Beamer Halle"
                   className={`flex-1 min-w-[12rem] ${INPUT}`} data-testid="tv-key-label" />
                 <button type="button" onClick={createKey} disabled={!targetId || busy} className="inline-flex items-center gap-2 px-4 py-2 bg-[#FFD700] text-black rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-40" data-testid="tv-key-create">
-                  <KeyRound className="w-3.5 h-3.5" /> {key ? "Neuen Schlüssel" : "Link erstellen"}
+                  <KeyRound className="w-3.5 h-3.5" /> {key ? "Neuen Schlüssel" : meta.needsKey ? "Link erstellen" : "Link mit Schlüssel"}
                 </button>
               </div>
             </div>
@@ -518,9 +523,10 @@ function TvKeyList() {
   useApiInvalidation(load, ["tv"]);
 
   const revoke = async (row) => {
+    const isEvent = row.target_type === "event";
     const approved = await confirm({
       title: `„${row.label}“ widerrufen?`,
-      description: `Der Bildschirm mit diesem Link zeigt den Turnierbaum von „${row.tournament_title}“ ab sofort nicht mehr. Ein neuer Link geht jederzeit oben im Baukasten.`,
+      description: `Der Bildschirm mit diesem Link zeigt ${isEvent ? "die Tafeln" : "den Turnierbaum"} von „${row.target_title || row.tournament_title}“ ab sofort nicht mehr. Ein neuer Link geht jederzeit oben im Baukasten.`,
       confirmLabel: "Widerrufen",
     });
     if (!approved) return;
@@ -536,15 +542,15 @@ function TvKeyList() {
   return (
     <section className="mt-6 border border-white/10 bg-[#121212] rounded-sm p-5" data-testid="tv-keys">
       <h2 className="font-heading text-lg font-black uppercase inline-flex items-center gap-2"><KeyRound className="w-5 h-5 text-[#FFD700]" /> Aktive Anzeige-Schlüssel</h2>
-      <p className="mt-1 text-xs text-white/50 max-w-3xl">Jeder Turnierbaum-Link mit Schlüssel steht hier – mit Bildschirm, Turnier und wann er zuletzt da war. Widerrufen beendet ihn sofort.</p>
+      <p className="mt-1 text-xs text-white/50 max-w-3xl">Jeder Link mit Schlüssel steht hier – mit Bildschirm, Turnier oder Event und wann er zuletzt da war. Widerrufen beendet ihn sofort.</p>
       {error && <div className="mt-3 text-xs text-[#FF6B6B]">Die Schlüssel konnten nicht geladen werden.</div>}
-      {!keys.length && !error ? <div className="mt-4 border border-dashed border-white/15 rounded-sm p-5 text-sm text-white/45" data-testid="tv-keys-empty">Noch keine Turnierbaum-Links mit Schlüssel.</div> : null}
+      {!keys.length && !error ? <div className="mt-4 border border-dashed border-white/15 rounded-sm p-5 text-sm text-white/45" data-testid="tv-keys-empty">Noch keine Links mit Schlüssel.</div> : null}
       <div className="mt-4 space-y-2">
         {keys.map((row) => (
           <div key={row.id} className="flex flex-wrap items-center justify-between gap-3 border border-white/10 bg-[#0F0F0F] rounded-sm px-4 py-3" data-testid={`tv-key-${row.id}`}>
             <div className="min-w-0">
               <div className="text-sm font-bold text-white/90">{row.label}</div>
-              <div className="text-xs text-white/50">{row.tournament_title} · erstellt {row.created_at ? viennaDateTime(row.created_at, { dateStyle: "short", timeStyle: "short" }) : "–"} · {row.last_used_at ? `zuletzt da ${viennaDateTime(row.last_used_at, { dateStyle: "short", timeStyle: "short" })}` : "noch nie geöffnet"} · <span data-testid={`tv-key-until-${row.id}`} className={row.expired ? "text-[#FF6B6B]" : undefined}>{row.expired ? "abgelaufen (eine Woche nach dem Turnier)" : row.expires_at ? `gilt bis ${viennaDateTime(row.expires_at, { dateStyle: "short" })}` : "gilt bis zum Widerruf"}</span></div>
+              <div className="text-xs text-white/50">{row.target_type === "event" ? `Event ${row.target_title}` : row.target_title || row.tournament_title} · erstellt {row.created_at ? viennaDateTime(row.created_at, { dateStyle: "short", timeStyle: "short" }) : "–"} · {row.last_used_at ? `zuletzt da ${viennaDateTime(row.last_used_at, { dateStyle: "short", timeStyle: "short" })}` : "noch nie geöffnet"} · <span data-testid={`tv-key-until-${row.id}`} className={row.expired ? "text-[#FF6B6B]" : undefined}>{row.expired ? `abgelaufen (eine Woche nach dem ${row.target_type === "event" ? "Event" : "Turnier"})` : row.expires_at ? `gilt bis ${viennaDateTime(row.expires_at, { dateStyle: "short" })}` : "gilt bis zum Widerruf"}</span></div>
             </div>
             <button type="button" onClick={() => revoke(row)} className="inline-flex items-center gap-2 px-3 py-2 border border-[#FF3B30]/40 text-[#FF6B6B] rounded-sm text-xs uppercase tracking-wider font-bold hover:bg-[#FF3B30]/10" data-testid={`tv-key-revoke-${row.id}`}>
               <Trash2 className="w-3.5 h-3.5" /> Widerrufen
