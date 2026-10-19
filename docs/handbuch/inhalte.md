@@ -2,7 +2,7 @@
 
 Was auf der Website steht und wer es pflegt: News schreiben und verteilen, Galerie und Alben (mit den Fotos, die
 Mitglieder von Events einsenden), die Medien-Bibliothek, „Über uns“ mit Zeitstrahl, Werten und Vereinsfoto, Sponsoren
-und Partner, die Seite „Sponsor werden“ und die Referenzen.
+und Partner, die Seite „Sponsor werden“, die Referenzen und die Serien (externe Wettbewerbe über eine Saison).
 
 **Wo im Admin:**
 
@@ -13,6 +13,7 @@ und Partner, die Seite „Sponsor werden“ und die Referenzen.
 - **Admin → Verein → Sponsoren** (`/admin/sponsors`) – Sponsoren und die Seite „Sponsor werden“
 - **Admin → Verein → Partner** (`/admin/partners`) – befreundete Vereine, Veranstalter, Communitys
 - **Admin → Verein → Referenzen** (`/admin/references`) – Turnierteilnahmen des Vereins
+- **Admin → Verein → Serien** (`/admin/reference-series`) – Turnierserien, Rennligen und Team-Ligen über eine Saison
 
 Öffentlich: **/news**, **/gallery**, **/about**, **/sponsors**, **/partners**, **/references**.
 
@@ -45,6 +46,7 @@ Turnierleitung. Die Turnierleitung allein darf keine News, Galerie, Sponsoren od
 | **Sponsor werden** | Zahlen, Leistungen je Stufe, Mappe als PDF | Verein → Sponsoren, Kasten unten |
 | **Partner** | Eigene Seite je Partner mit Kanälen, Tools und gemeinsamen News | Verein → Partner |
 | **Referenzen** | Turnierteilnahmen mit Platzierung, für den Auftritt des Vereins | Verein → Referenzen |
+| **Serien** | Externe Wettbewerbe über eine Saison: Spur, Saisons und ihre Regeln | Verein → Serien |
 
 ---
 
@@ -212,6 +214,41 @@ Neben jeder Teilnahme steht das **Logo des Spiels** (Admin → Spiele); hat das 
 **Wo wir antreten** sein **Kürzel** und die Karte einen Pokal neben dem Namen.
 Die Medaillenzahlen oben zählen wie bisher je Eintrag.
 
+### 3.9 Serien
+
+**Admin → Verein → Serien** (`/admin/reference-series`). Für externe Wettbewerbe, die über eine ganze Saison laufen:
+monatliche **Turnierserien**, **Rennligen** mit Fahrer- und Teamwertung und **Team-Ligen**. Der Aufbau hat zwei Stufen:
+
+- Eine **Spur** ist die Klammer, etwa „Lion Racing F1“: Titel, Art, Bezeichnung (F1, 4vs4 …), Veranstalter, Spiel und
+  Sichtbarkeit. **Neue Spur** öffnet das Blatt.
+- Darunter je **Saison und Stufe** eine Serie: an der Spur **Saison**. Saison und Stufe (etwa „2026“ und „Division 1“)
+  ergeben die Adresse. Dazu Status, Standard-Wochentag und -Uhrzeit (Wiener Zeit), das eigene Team, Links und wie
+  Einträge eines Captains erscheinen – Standard: als Entwurf, den der Vorstand freigibt.
+
+<table>
+<tr>
+<td><img src="../assets/serien/serien-liste.png" alt="Serien: eine Spur mit ihrer Saison, Status, Freigabe und Regel-Version" width="420"></td>
+<td><img src="../assets/serien/serien-saison-anlegen.png" alt="Blatt Neue Saison mit Vorlage, Saison, Stufe und den Regeln" width="420"></td>
+</tr>
+</table>
+
+**Regeln:** Die **Punkteschema-Vorlage** füllt alle Regeln vor. Sie werden kopiert – eine spätere Änderung der Vorlage
+ändert die Saison nicht. Einstellbar ist alles: Punkte je Platz oder **laut Veranstalter**, Boni für schnellste Runde und
+Pole (bis Platz X), Punkte bei Ausfall, Nichtstart und Disqualifikation, **alle Runden**, **beste N** oder **N
+Streichergebnisse** (es zählen die besten „Runden im Kalender minus N“), Aktivitätspunkte ab Runde X, die Finalgrenze,
+der Vorrang bei Gleichstand (der Reihe nach, sonst teilen sich beide den Platz) und die Teamwertung (wie viele Fahrer je
+Rennen zählen, ob Gäste zählen). Eine Team-Liga hat stattdessen Punkte für Sieg, Unentschieden und Niederlage.
+
+Ändert ihr eine Regel mitten in der Saison, steigt die **Version**, der **Hinweis zur Regeländerung** steht bei der Saison
+und im Protokoll, und alle Tabellen der Saison werden neu gerechnet.
+
+<img src="../assets/serien/serien-saison-seite.png" alt="Seite einer Saison mit Regeln, Version und Hinweis zur letzten Änderung" width="560">
+
+**Archivieren statt Löschen:** Spur und Saison lassen sich nur archivieren; **Archivierte zeigen** blendet sie ein,
+**Zurückholen** macht es rückgängig. Ein Klick auf die Saison öffnet ihre Seite mit Regeln und Version. Termine,
+Teilnehmer, Ergebnisse und Captains kommen dort in den nächsten Schritten dazu, ebenso die öffentliche Seite unter
+`/references/series/<spur>/<saison>`. Die bestehenden Referenzen bleiben, wie sie sind.
+
 ---
 
 ## 4. Wenn etwas nicht klappt
@@ -233,6 +270,7 @@ Die Medaillenzahlen oben zählen wie bisher je Eintrag.
 | Sponsor-Felder lassen sich nicht ändern | Dolibarr führt sie | In Dolibarr ändern |
 | Partner zeigt „x online“ nicht | Das Widget ist im Discord des Partners aus | Partner bitten, es einzuschalten |
 | Seite „Über uns“ zeigt keine Zahl | Zähler mit null bleiben weg | Gewollt |
+| `/references/series/…` zeigt „Hier ist kein Rudel“ | Die öffentliche Seite einer Saison kommt erst in einem späteren Schritt | Gewollt; bis dahin nur in der Verwaltung |
 
 ---
 
@@ -240,6 +278,9 @@ Die Medaillenzahlen oben zählen wie bisher je Eintrag.
 
 **Kann die Turnierleitung News schreiben?**
 Nein, das ist die Redaktion.
+
+**Kann ich eine Serie löschen?**
+Nein – Spur und Saison werden archiviert und lassen sich zurückholen. So gehen Termine, Ergebnisse und Tabellen nie verloren.
 
 **Wo stelle ich ein, dass eine News nur Mitglieder sehen?**
 Im Beitrag unter **Sichtbarkeit**: **Nur Vereinsmitglieder**.

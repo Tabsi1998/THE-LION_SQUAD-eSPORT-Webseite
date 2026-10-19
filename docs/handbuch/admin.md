@@ -79,7 +79,7 @@ einem Vorstandsposten.
 | Bereich | Gehört dazu |
 | --- | --- |
 | **Turnierleitung** | Turniere, Events, Stationen, Fast Lap, Jahreswertung, Spiele, TV & Beamer, Gewinne, Strafen |
-| **Redaktion** | News, Galerie, Medien, Sponsoren, Partner, Referenzen, Navigation, Erfolge, Sticker, Adventkalender, Ostereiersuche |
+| **Redaktion** | News, Galerie, Medien, Sponsoren, Partner, Referenzen, Serien, Navigation, Erfolge, Sticker, Adventkalender, Ostereiersuche |
 | **Vereinsverwaltung** | Mitglieder, Bewerbungen, Dokumente, Vorteile, Vorstand, Kontakt-Inbox, Benutzer, Dolibarr |
 | **Finanzen** | Finanzübersicht, Kosten und Startgelder |
 | **System** | Verbindungen, E-Mail, Auftritt, Betrieb & Logs, Status, Zugang, App-Versionen, Game-Server |
@@ -107,7 +107,7 @@ die Zwei-Faktor-Anmeldung bestätigt ist (Moderation ausgenommen).
 | Gruppe | Einträge (Bereich) |
 | --- | --- |
 | **Übersicht** | Dashboard (Turnierleitung, Redaktion, Vereinsverwaltung, Finanzen, System) · Mein Dienst (Helfer mit Einsatz, Moderation ohne Verwaltungsbereich) |
-| **Verein** | Vereinsdaten (System) · Über uns, Sponsoren, Partner, Referenzen (Redaktion) · Vorstand, Kontakt-Inbox (Vereinsverwaltung) |
+| **Verein** | Vereinsdaten (System) · Über uns, Sponsoren, Partner, Referenzen, Serien (Redaktion) · Vorstand, Kontakt-Inbox (Vereinsverwaltung) |
 | **Mitglieder** | Mitglieder, Mitgliederprofile, Bewerbungen, Mitgliedervorteile, Dokumente, Einlass (Versammlung), Alle Benutzer (Vereinsverwaltung) · Dolibarr (Vereinsverwaltung, System) |
 | **Finanzen** | Finanzübersicht (Finanzen) |
 | **eSports** | Turniere, Fast Lap, Stationen (Turnierleitung und Helfer mit Einsatz) · Turnier-Leitfaden, Jahreswertung, Spiele, TV & Beamer, Gewinne, Strafen (Turnierleitung) · Game-Server (System) |
