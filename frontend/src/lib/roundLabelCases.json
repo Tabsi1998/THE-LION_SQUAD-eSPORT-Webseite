@@ -85,6 +85,19 @@
         { "id": "LZ", "stage_id": "s", "section": "LB", "match_type": "ffa", "expected": "Loser Bracket" },
         { "id": "LW", "stage_id": "s", "section": "LB", "round": "x", "match_type": "ffa", "expected": "Loser Bracket" }
       ]
+    },
+    {
+      "name": "Gemischte Schreibweisen eines Baumteils (LB, loser, Loser) zählen zusammen",
+      "format": "double_elim",
+      "stages": [{ "id": "s", "stage_type": "double_elimination" }],
+      "matches": [
+        { "id": "A", "stage_id": "s", "section": "WB", "round": 1, "round_name": "Winner Runde 1", "expected": "Winner Runde 1" },
+        { "id": "C", "stage_id": "s", "section": "winner", "round": 2, "round_name": "Winner Runde 2", "expected": "Winner Final" },
+        { "id": "LA", "stage_id": "s", "section": "LB", "round": 2, "round_name": "Runde 2", "expected": "Loser Runde 1" },
+        { "id": "LC", "stage_id": "s", "section": "loser", "round": 3, "round_name": "Runde 3", "expected": "Loser Runde 2" },
+        { "id": "LE", "stage_id": "s", "section": " Loser ", "round": 4, "round_name": "Runde 4", "expected": "Loser Runde 3" },
+        { "id": "GF", "stage_id": "s", "section": "GF", "round": 5, "round_name": "Grand Final", "expected": "Grand Final" }
+      ]
     }
   ]
 }

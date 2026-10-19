@@ -13,16 +13,20 @@ function roundNumber(match) {
   return Number.isInteger(number) && number > 0 ? number : 0;
 }
 
+/** Phase und Baumteil wie am Server (`stage_id`, `section_kind`). */
+const sectionKey = (match) => `${match?.stage_id || ""}|${sectionKind(match?.section)}`;
+
 /**
  * Rundennamen je Phase und Abschnitt fortlaufend ab 1 - nur die allgemeinen („Runde 2“, „Loser Runde 3“). Neue Liste.
- * Dieselbe Zählung wie services/round_labels.rounds_by_section (#1792): Spiele ohne gültige Runde zählen nicht mit.
+ * Dieselbe Zählung wie services/round_labels.rounds_by_section (#1792): Spiele ohne gültige Runde zählen nicht mit, und
+ * ein Baumteil zählt zusammen, wie der Server ihn liest (sectionKind: „LB“, „loser“ und „Loser“ sind ein Loser Bracket).
  */
 export function displayRoundLabels(matches = []) {
   const rounds = new Map();
   for (const match of matches || []) {
     const number = roundNumber(match);
     if (!number) continue;
-    const key = `${match?.stage_id || ""}|${match?.section || ""}`;
+    const key = sectionKey(match);
     if (!rounds.has(key)) rounds.set(key, new Set());
     rounds.get(key).add(number);
   }
@@ -31,7 +35,7 @@ export function displayRoundLabels(matches = []) {
     const label = String(match?.round_label || match?.round_name || "");
     const generic = GENERIC_ROUND.exec(label);
     if (!generic || !roundNumber(match)) return match;
-    const index = order.get(`${match.stage_id || ""}|${match.section || ""}`).indexOf(roundNumber(match)) + 1;
+    const index = order.get(sectionKey(match)).indexOf(roundNumber(match)) + 1;
     const shown = `${generic[1] || ""}Runde ${index}`;
     return shown === label && match.round_label ? match : { ...match, round_label: shown };
   });
