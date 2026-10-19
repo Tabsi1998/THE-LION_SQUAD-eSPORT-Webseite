@@ -30,6 +30,7 @@ import { basisLabel, formatCents, ownPriceLine, quoteTotal, startFeeSummary } fr
 import { isGuestUser } from "../../live";
 import { FriendsAtEventCard } from "../../components/FriendsAtEventCard";
 import { offerFriendsHint } from "../../lib/friendsHint";
+import { offerCalendarHint } from "../../lib/calendarHint";
 import { openSignIn } from "../../navigation/rootNavigation";
 import { useLiveRefresh } from "../../realtime/LiveChangesProvider";
 import type { TournamentStackParamList } from "../../navigation/types";
@@ -281,6 +282,8 @@ export function TournamentDetailScreen({ navigation, route }: Props) {
       await load();
       // Der einmalige Hinweis direkt nach der ersten Anmeldung (#1188 Teil 2), nicht erst auf der Event-Seite.
       void offerFriendsHint();
+      // Der Abo-Hinweis (#1788): nur ohne aktives Abo und nur einmal - der Server entscheidet.
+      void offerCalendarHint();
     } catch (err) {
       setError(errorMessage(err, "Turnier-Anmeldung konnte nicht gespeichert werden."));
     } finally {

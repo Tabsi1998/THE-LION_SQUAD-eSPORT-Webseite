@@ -22,7 +22,7 @@ jest.mock("./screenRegistry", () => {
     DETAIL_SCREENS: names(["TournamentDetail", "EventDetail", "FastLapDetail", "MatchDetail", "TournamentChat", "TeamDetail", "TeamChat", "PublicProfile",
       "DirectThread", "NewsList", "NewsDetail", "Gallery", "GalleryAlbum", "GalleryViewer", "Notifications", "Search", "SeasonPass", "AchievementShowcase",
       "AdventCalendar", "EasterHunt", "MyInvoices", "MyPrizes", "MyMembership", "MemberDocuments", "MemberMeetings", "MemberHelperShifts", "MemberCard",
-      "Admission", "InfoCenter", "ClubAbout", "YearReview", "Settings", "ProfileEdit"]),
+      "Admission", "InfoCenter", "ClubAbout", "YearReview", "Settings", "ProfileEdit", "CalendarSubscription"]),
   };
 });
 const mockAuth = { user: { id: "u-1", username: "neonfalke", display_name: "NeonFalke", role: "player" } as Record<string, unknown> | null, loading: false };
@@ -35,6 +35,7 @@ jest.mock("../seasons/SeasonStage", () => ({ SeasonStage: () => null, useSeasonT
 jest.mock("../components/SiteBannerTicker", () => ({ SiteBannerTicker: () => null }));
 jest.mock("../components/AchievementCatchUpOverlay", () => ({ AchievementCatchUpOverlay: () => null }));
 jest.mock("../components/BallotPopupOverlay", () => ({ BallotPopupOverlay: () => null }));
+jest.mock("../components/calendar/CalendarHintHost", () => ({ CalendarHintHost: () => null }));
 jest.mock("../components/PasskeyInvite", () => ({ PasskeyInvite: () => null }));
 jest.mock("../components/SignInNudge", () => ({ SignInNudge: () => null, markSignInNudgeSeen: jest.fn(async () => undefined) }));
 jest.mock("../components/TabHeader", () => ({ HeaderBell: () => null }));

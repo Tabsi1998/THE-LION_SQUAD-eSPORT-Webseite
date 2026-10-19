@@ -13,6 +13,7 @@ import {
 } from "../lib/playAlong";
 import { formatCents } from "../lib/startFee";
 import { offerFriendsHint } from "../lib/friendsHint";
+import { offerCalendarHint } from "../lib/calendarHint";
 import { useSeasonOverlay } from "../seasons/anchors";
 import { colors, radius } from "../theme";
 import { Button } from "./Button";
@@ -107,7 +108,11 @@ export function PlayAlongSheet({ eventId, multiDay = false, from = null, onClose
       });
       setResult(data);
       // Erste Turnier-Anmeldung über „Spielst du auch mit?“: der einmalige Hinweis (#1188 Teil 2).
-      if ((data?.results || []).some((entry) => entry.state === "registered")) void offerFriendsHint();
+      if ((data?.results || []).some((entry) => entry.state === "registered")) {
+        void offerFriendsHint();
+        // Der Abo-Hinweis (#1788): nur ohne aktives Abo und nur einmal - der Server entscheidet.
+        void offerCalendarHint();
+      }
     } catch (err) {
       setError(errorMessage(err, "Die Anmeldung hat nicht geklappt."));
     } finally {

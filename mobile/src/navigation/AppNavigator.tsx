@@ -11,6 +11,7 @@ import { BootScreen } from "../screens/BootScreen";
 import { LockScreen } from "../screens/LockScreen";
 import { AchievementCatchUpOverlay } from "../components/AchievementCatchUpOverlay";
 import { BallotPopupOverlay } from "../components/BallotPopupOverlay";
+import { CalendarHintHost } from "../components/calendar/CalendarHintHost";
 import { PasskeyInvite } from "../components/PasskeyInvite";
 import { markSignInNudgeSeen, SignInNudge } from "../components/SignInNudge";
 import { LoginScreen } from "../screens/auth/LoginScreen";
@@ -81,6 +82,8 @@ export function AppNavigator() {
       {signedIn && !user?.consent_required ? <BallotPopupOverlay /> : null}
       {/* Passkey (#919): direkt nach einer Anmeldung mit Passwort einmal die Einladung zum Fingerabdruck. */}
       {signedIn && !user?.consent_required ? <PasskeyInvite /> : null}
+      {/* Abo-Hinweis (#1788): einmal nach einer Anmeldung zu Event oder Turnier, nur ohne aktives Abo. */}
+      {signedIn && !user?.consent_required ? <CalendarHintHost /> : null}
       {/* Gast zuerst (#918): beim ersten Start nach ein paar Sekunden einmal „Konto erstellen oder anmelden“. */}
       {!signedIn ? <SignInNudge /> : null}
     </NavigationContainer>
