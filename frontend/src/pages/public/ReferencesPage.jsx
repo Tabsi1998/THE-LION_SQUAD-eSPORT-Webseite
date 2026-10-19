@@ -9,11 +9,12 @@ import { CountLine, EntryRow, FieldChips, GameChip, MEDAL, MEDAL_RANK, MedalStat
 import { Medal, Trophy, User, Users, X } from "lucide-react";
 import { TrophyShelf } from "@/components/tls/TrophyShelf";
 import { PublicLoadingState } from "@/components/tls/PublicLoadingState";
+import { viennaDay } from "@/lib/vienna";
 
 // Referenzen als Erfolgswand (#409, Design-Rework nach Rückmeldung des Betreibers): oben die
 // Medaillenbilanz des Vereins, dann die Trophäenwand mit allen Podestplätzen (Spiel-Cover, große
 // Platzierung, Aufstellung), dann die Bilanz je Spiel und darunter alle Teilnahmen als Zeitleiste
-// nach Saison. Eine Referenz ist eine Turnierteilnahme mit Einträgen (Team oder Einzelstarter).
+// nach Jahr (#1748). Eine Referenz ist eine Turnierteilnahme mit Einträgen (Team oder Einzelstarter).
 // Die Karten funktionieren ohne Bilder - mit Cover werden sie besser.
 
 const modeLabels = { online: "Online", offline: "Vor Ort", hybrid: "Hybrid" };
@@ -39,17 +40,24 @@ export function trophyItems(items) {
   return items.filter((item) => medalOf(item)).sort((a, b) => (MEDAL_RANK[medalOf(a)] - MEDAL_RANK[medalOf(b)]) || (timeOf(b) - timeOf(a)));
 }
 
-// Zeitleiste: Saisons absteigend (numerisch), Teilnahmen ohne Saison unter „Weitere“, innerhalb neu → alt.
+// Das Jahr einer Teilnahme in Wiener Zeit (#1748): aus dem Start, sonst dem Ende - leer ohne gültiges Datum.
+export function referenceYear(item) {
+  return viennaDay(item.start_date || item.end_date || null).slice(0, 4);
+}
+
+// Zeitleiste nach Jahr (#1748) statt nach Freitext-Saison: Sonst landeten gleiche Season-Nummern verschiedener
+// Spiele und Jahre in einer Gruppe. Neuestes Jahr zuerst, Teilnahmen ohne Datum unter „Ohne Datum“ am Ende,
+// innerhalb neu → alt.
 export function timelineGroups(items) {
   const groups = new Map();
   items.forEach((item) => {
-    const key = item.season || "";
-    if (!groups.has(key)) groups.set(key, { key, label: item.season || "Weitere Turniere", items: [] });
+    const key = referenceYear(item);
+    if (!groups.has(key)) groups.set(key, { key, label: key || "Ohne Datum", items: [] });
     groups.get(key).items.push(item);
   });
   return Array.from(groups.values())
     .map((group) => ({ ...group, items: group.items.slice().sort((a, b) => timeOf(b) - timeOf(a)) }))
-    .sort((a, b) => (a.key === "" ? 1 : b.key === "" ? -1 : b.key.localeCompare(a.key, "de-AT", { numeric: true })));
+    .sort((a, b) => (a.key === "" ? 1 : b.key === "" ? -1 : b.key.localeCompare(a.key)));
 }
 
 export default function ReferencesPage() {
@@ -156,7 +164,7 @@ export default function ReferencesPage() {
 
       {/* Zeitleiste aller Teilnahmen mit Filtern */}
       <section ref={timelineRef} className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-16 scroll-mt-24" data-testid="references-timeline">
-        <SectionTitle icon={Users} accent="#29B6E8" eyebrow="Alle Teilnahmen" title="Saison für Saison" hint={filtersActive ? `${filteredItems.length} von ${items.length}` : `${items.length} ${items.length === 1 ? "Teilnahme" : "Teilnahmen"}`} />
+        <SectionTitle icon={Users} accent="#29B6E8" eyebrow="Alle Teilnahmen" title="Jahr für Jahr" hint={filtersActive ? `${filteredItems.length} von ${items.length}` : `${items.length} ${items.length === 1 ? "Teilnahme" : "Teilnahmen"}`} />
         <div className="mt-5 flex flex-wrap items-center gap-2" data-testid="references-filters">
           {memberFilter && (
             <FilterChip active onClick={clearMember} testId="references-member">
