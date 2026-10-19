@@ -161,3 +161,26 @@ async def test_sieger_und_siegesserie_aus_reinen_platz_ergebnissen(flow):
     theirs = await counters.compute(other["id"], {"matches_won", "match_streak_max"})
     assert (mine["matches_won"], mine["match_streak_max"]) == (2, 2)
     assert (theirs["matches_won"], theirs["match_streak_max"]) == (1, 1), "nur s-4 - Freilos und Unentschieden nicht"
+
+
+@pytest.mark.asyncio
+async def test_ffa_lauf_zaehlt_als_sieg_aber_fuer_keinen_duell_erfolg(flow):
+    """Platz 1 im FFA-Lauf ist ein Sieg - Zu Null, volle Distanz, Entscheider, Comeback und Favoritenschreck gibt es
+    aber nur im Duell. Sonst wäre jeder Lauf mit 0 Punkten bei den anderen ein „Zu Null“."""
+    me = await flow.add_user(name="Spielerin")
+    await flow.db.tournaments.insert_one({"id": "t1", "title": "Cup", "status": "completed", "is_public": True})
+    regs = ["r-me", "r-2", "r-3", "r-4"]
+    await flow.db.tournament_registrations.insert_many(
+        [{"id": "r-me", "tournament_id": "t1", "user_id": me["id"], "status": "checked_in"}]
+        + [{"id": reg, "tournament_id": "t1", "user_id": f"u-{reg}", "status": "checked_in"} for reg in regs[1:]])
+    heat = {"id": "h-1", "tournament_id": "t1", "status": "completed", "best_of": 3, "stage_number": 1, "round": 1, "order": 1,
+            "completed_at": "2026-09-01T18:00:00+00:00", "updated_at": "2026-09-01T18:00:00+00:00",
+            "slots": [{"slot": index + 1, "registration_id": reg, "seed": 4 - index} for index, reg in enumerate(regs)],
+            "maps": [{"winner_registration_id": "r-2"}, {"winner_registration_id": "r-me"}, {"winner_registration_id": "r-me"}],
+            "results": [{"registration_id": "r-me", "rank": 1, "score": 2}, {"registration_id": "r-2", "rank": 2, "score": 1},
+                        {"registration_id": "r-3", "rank": 3, "score": 0}, {"registration_id": "r-4", "rank": 4, "score": 0}]}
+    await flow.db.matches_v2.insert_one(heat)
+    values = await counters.compute(me["id"], {"matches_won", "clean_sheets", "full_distance_series", "deciders_won", "comebacks", "upsets"})
+    assert values["matches_won"] == 1, "Platz 1 im Lauf ist ein Sieg"
+    assert {key: values[key] for key in ("clean_sheets", "full_distance_series", "deciders_won", "comebacks", "upsets")} == \
+        {"clean_sheets": 0, "full_distance_series": 0, "deciders_won": 0, "comebacks": 0, "upsets": 0}

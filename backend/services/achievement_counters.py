@@ -22,7 +22,7 @@ from database import get_db
 from models import now_utc
 from services import achievement_progress
 from services.achievement_core import SIGNAL_RULES, SIGNALS, STATS, VIENNA, evaluator  # noqa: F401 - umgezogen (#1420)
-from services.match_winner import match_winner_id, participant_ids, won_by
+from services.match_winner import is_duel, match_winner_id, participant_ids, won_by
 from services.private_fields import private_projection
 
 logger = logging.getLogger("tls.achievements.counters")
@@ -663,7 +663,8 @@ async def _upsets(ctx):
     count = 0
     mine = await ctx.registration_ids()
     for match, won, _when, _opponents in _completed_matches(await ctx.matches(), mine):
-        if not won:
+        # Favoritenschreck ist ein Duell-Erfolg (#1796): im FFA-Lauf schlägt Platz 1 nicht „den Gegner“.
+        if not won or not is_duel(match):
             continue
         seeds = {slot.get("registration_id"): slot.get("seed") for slot in match.get("slots") or [] if slot.get("registration_id")}
         my_seed = min((int(seeds[r]) for r in seeds if r in mine and isinstance(seeds.get(r), int)), default=None)
@@ -908,7 +909,10 @@ async def record_signal(user_id: str, name: str, count: int = 1, day: str | None
 # ------------------------------------------------------------------ Katalog A (#612): Serien, Karten, Pünktlichkeit, Dispute, Turnierläufe
 
 def _score_pair(match: dict, mine: set[str]) -> tuple[int, int] | None:
-    """(eigene Punkte, Gegnerpunkte) aus results[].score - None, wenn keine Zahlen eingetragen sind."""
+    """(eigene Punkte, Gegnerpunkte) aus results[].score - None, wenn keine Zahlen eingetragen sind oder es kein Duell
+    ist: Zu Null, volle Distanz und Entscheider gibt es nur bei genau zwei Seiten (#1796), nie in einem FFA-Lauf."""
+    if not is_duel(match):
+        return None
     own = their = None
     for entry in match.get("results") or []:
         score = entry.get("score")
@@ -981,7 +985,7 @@ async def _comebacks(ctx):
     count = 0
     for match, won, _when, _o in _completed_matches(await ctx.matches(), mine):
         maps = [m for m in (match.get("maps") or []) if isinstance(m, dict) and m.get("winner_registration_id")]
-        if won and maps and maps[0]["winner_registration_id"] not in mine:
+        if won and is_duel(match) and maps and maps[0]["winner_registration_id"] not in mine:
             count += 1
     return count
 
