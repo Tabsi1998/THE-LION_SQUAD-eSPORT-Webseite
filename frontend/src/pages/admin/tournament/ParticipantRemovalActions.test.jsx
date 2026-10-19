@@ -17,7 +17,7 @@ const PLAN = {
   id: "plan-1",
   kind: "disqualified",
   mode: "bracket",
-  summary: "Disqualifikation: 2 Spiele betroffen, 1 werden kampflos gewertet. E: Lena kommt kampflos weiter. G: der Platz wird frei.",
+  summary: "Disqualifikation: 2 Spiele betroffen, 1 wird kampflos gewertet. E: Lena kommt kampflos weiter. G: der Platz wird frei.",
   ops: [
     { kind: "slot_cleared", match_key: "G", text: "G: der Platz wird frei, das Spiel wartet auf den Gegner." },
     { kind: "walkover", match_key: "E", text: "E: Lena kommt kampflos weiter." },

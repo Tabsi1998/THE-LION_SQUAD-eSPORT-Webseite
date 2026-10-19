@@ -545,3 +545,25 @@ def test_lineups_are_closed_for_withdrawn_and_disqualified_teams():
     tournament = {"status": "check_in"}
     assert lineup_open(tournament, {"status": "approved"}) is True
     assert lineup_open(tournament, {"status": "disqualified"}) is False
+
+
+@pytest.mark.parametrize("ops, expected", [
+    ([{"kind": "walkover", "text": "E: A kommt kampflos weiter."}],
+     "Disqualifikation: 1 Spiel betroffen, 1 wird kampflos gewertet. E: A kommt kampflos weiter."),
+    ([{"kind": "walkover", "text": "E: A kommt kampflos weiter."}, {"kind": "slot_freed", "text": "G: der Platz wird frei."}],
+     "Disqualifikation: 2 Spiele betroffen, 1 wird kampflos gewertet. E: A kommt kampflos weiter. G: der Platz wird frei."),
+    ([{"kind": "slot_freed", "text": "G: der Platz wird frei."}, {"kind": "slot_freed", "text": "H: der Platz wird frei."}],
+     "Disqualifikation: 2 Spiele betroffen, keines wird kampflos gewertet. G: der Platz wird frei. H: der Platz wird frei."),
+    ([{"kind": "walkover", "text": "E."}, {"kind": "forfeit", "text": "F."}],
+     "Disqualifikation: 2 Spiele betroffen, 2 werden kampflos gewertet. E. F."),
+])
+def test_removal_summary_counts_in_singular_and_plural(ops, expected):
+    """#1793: „1 Spiel betroffen“, „2 Spiele betroffen“ - nicht „1 Spiele“."""
+    assert describe_removal({"kind": "disqualified", "mode": "tree", "ops": ops}) == expected
+
+
+@pytest.mark.parametrize("rest, text", [(1, "1 offenes wird kampflos verloren gewertet"), (2, "2 offene werden kampflos verloren gewertet")])
+def test_league_forfeit_summary_counts_in_singular_and_plural(rest, text):
+    ops = [{"kind": "forfeit", "text": "x."} for _ in range(rest)]
+    summary = describe_removal({"kind": "withdrawn", "mode": "forfeit", "played": 3, "total": 5, "ops": ops})
+    assert text in summary

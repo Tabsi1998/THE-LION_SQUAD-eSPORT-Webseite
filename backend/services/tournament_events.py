@@ -509,15 +509,20 @@ def describe_removal(plan: dict, names: dict[str, str] | None = None) -> str:
                 f"alle Spiele werden annulliert und die Person aus der Tabelle genommen.")
     elif mode == "forfeit":
         rest = len([op for op in ops if op.get("kind") == "forfeit"])
+        # Einzahl und Mehrzahl (#1793): „1 offenes wird“, „2 offene werden“.
+        open_text = {0: "keines wird", 1: "1 offenes wird"}.get(rest, f"{rest} offene werden")
         head = (f"{label}: {plan.get('played')} von {plan.get('total')} Spielen gespielt - "
-                f"{rest} offene werden kampflos verloren gewertet, die Person bleibt in der Tabelle.")
+                f"{open_text} kampflos verloren gewertet, die Person bleibt in der Tabelle.")
     elif mode == "swiss":
         head = f"{label}: die Ergebnisse bleiben, die Person wird nicht mehr gepaart."
     elif not ops:
         head = f"{label}: kein offenes Spiel betroffen."
     else:
         walkovers = len([op for op in ops if op.get("kind") in {"walkover", "forfeit"}])
-        head = f"{label}: {len(ops)} Spiele betroffen, {walkovers} werden kampflos gewertet."
+        # Einzahl und Mehrzahl (#1793): „1 Spiel betroffen“, „2 Spiele betroffen“; „1 wird“, „2 werden“.
+        games = "1 Spiel" if len(ops) == 1 else f"{len(ops)} Spiele"
+        scored = {0: "keines wird", 1: "1 wird"}.get(walkovers, f"{walkovers} werden")
+        head = f"{label}: {games} betroffen, {scored} kampflos gewertet."
     return " ".join([head, *(op.get("text") or describe_op(op, names) for op in ops)]).strip()
 
 
