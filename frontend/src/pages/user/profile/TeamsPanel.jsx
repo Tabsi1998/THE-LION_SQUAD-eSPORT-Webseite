@@ -278,7 +278,7 @@ export function TeamsPanel() {
                   </select>
                 </Field>
               </Row>
-              <Field label="Lineup / Mitspieler">
+              <Field label="Lineup / Mitspieler" group>
                 <div className="grid sm:grid-cols-2 gap-2">
                   {(activeTeam.members || []).map((m) => (
                     <label key={m.id} className="flex items-center gap-2 border border-white/10 bg-[#0A0A0A] rounded-sm p-2 text-sm">

@@ -48,8 +48,8 @@ export function BasicTab({ form, set, setNow = set, errors = {} }) {
         <Field label="Stadt"><Input value={form.city} onChange={(v) => set("city", v)} /></Field>
       </Row>
       <Row>
-        <Field label="Avatar"><ImageUpload value={form.avatar_url} onChange={(v) => setNow("avatar_url", v)} testId="profile-avatar" variant="square" crop="round" allowLibrary /></Field>
-        <Field label="Banner"><ImageUpload value={form.banner_url} onChange={(v) => setNow("banner_url", v)} testId="profile-banner" variant="wide" crop="banner" allowLibrary /></Field>
+        <Field label="Avatar" group><ImageUpload value={form.avatar_url} onChange={(v) => setNow("avatar_url", v)} testId="profile-avatar" variant="square" crop="round" allowLibrary /></Field>
+        <Field label="Banner" group><ImageUpload value={form.banner_url} onChange={(v) => setNow("banner_url", v)} testId="profile-banner" variant="wide" crop="banner" allowLibrary /></Field>
       </Row>
     </Section>
   );
