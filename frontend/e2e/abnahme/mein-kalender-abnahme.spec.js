@@ -76,7 +76,8 @@ test("anmelden → Hinweis einmal, Termin in Mein Kalender, Abo mit Termin, abme
   await page.getByTestId("calendar-personal-feed-copy").click();
   await expect(page.getByTestId("calendar-personal-feed-copy")).toContainText("Kopiert");
   await bild(page, "mein-kalender-abo", card);
-  const title = await row.locator("span.font-bold").first().textContent();
+  const title = ((await (await page.request.get("/api/calendar/me")).json()).items.find((item) => item.id === tid) || {}).title || "";
+  expect(title).toContain("Kalender-Cup");
   let feed = await feedText(page, firstUrl);
   expect(feed.status).toBe(200);
   expect(feed.text).toContain("BEGIN:VCALENDAR");
