@@ -1,0 +1,66 @@
+import { formToRules, parsePointsList, rulesToForm, seriesAddress, seriesPayload, seriesToForm, visibleLineages } from "@/lib/referenceSeries";
+
+// Serien (#1741): die Regeln einer Serie kommen vollständig vom Server (Vorlage oder Standard) und gehen vollständig
+// zurück - das Formular rechnet nichts selbst, es wandelt nur zwischen Feldern und Werten.
+
+const RULES = {
+  points_mode: "scheme",
+  points_by_place: [25, 18, 15],
+  bonuses: { fastest_lap: { points: 1, max_place: 10 }, pole: { points: 0, max_place: null } },
+  dnf_points: null,
+  dns_points: 0,
+  dsq_points: 0,
+  count_mode: "drop_n",
+  count_n: 2,
+  activity_points: { points: 1, from_round: 3 },
+  final_top_n: 8,
+  tiebreakers: ["countback", "latest_result"],
+  team_scoring: { enabled: true, counting_drivers: 2, guests_count: true },
+  match_points: { win: 3, draw: 1, loss: 0 },
+  table_tiebreakers: ["score_diff"],
+};
+
+test("Punkte je Platz lassen sich in jeder üblichen Schreibweise eingeben", () => {
+  expect(parsePointsList("25, 18, 15")).toEqual([25, 18, 15]);
+  expect(parsePointsList("35-30-26 23")).toEqual([35, 30, 26, 23]);
+  expect(parsePointsList("10; 7.5\n5")).toEqual([10, 7.5, 5]);
+  expect(parsePointsList("")).toEqual([]);
+});
+
+test("Regeln gehen unverändert durch das Formular", () => {
+  expect(formToRules(rulesToForm(RULES))).toEqual(RULES);
+});
+
+test("leere Felder: Ausfall nach Platz, keine Grenze, keine Finalgrenze, Vorrang ohne Lücken", () => {
+  const form = { ...rulesToForm(RULES), dnf_points: "", fastest_lap_max_place: "", final_top_n: "", tiebreakers: ["", "wins", ""] };
+  const rules = formToRules(form);
+  expect(rules.dnf_points).toBeNull();
+  expect(rules.bonuses.fastest_lap.max_place).toBeNull();
+  expect(rules.final_top_n).toBeNull();
+  expect(rules.tiebreakers).toEqual(["wins"]);
+  expect(rulesToForm({ ...RULES, dnf_points: 2 }).dnf_points).toBe("2");
+});
+
+test("eine neue Serie nennt Spur und Vorlage, eine bestehende nicht", () => {
+  const form = { ...seriesToForm({ season: "2026", tier: "", default_weekday: 2, default_time: "20:30", rules: RULES }), lineage_id: "spur-1", points_scheme_id: "formula_1" };
+  const created = seriesPayload(form, { isNew: true });
+  expect(created).toMatchObject({ lineage_id: "spur-1", points_scheme_id: "formula_1", season: "2026", tier: null, default_weekday: 2, default_time: "20:30" });
+  expect(created.rules.points_by_place).toEqual([25, 18, 15]);
+  const edited = seriesPayload({ ...form, default_weekday: "", default_time: "" }, { isNew: false });
+  expect(edited).not.toHaveProperty("lineage_id");
+  expect(edited).not.toHaveProperty("points_scheme_id");
+  expect(edited).toMatchObject({ default_weekday: null, default_time: null });
+});
+
+test("Adresse der Serie: /references/series/<spur>/<saison>", () => {
+  expect(seriesAddress({ slug: "probe-racing-f1" }, { season_slug: "2026-division-1" })).toBe("/references/series/probe-racing-f1/2026-division-1");
+});
+
+test("Archiviertes erscheint nur auf Wunsch", () => {
+  const lineages = [
+    { id: "a", is_archived: false, series: [{ id: "s1", status: "active" }, { id: "s2", status: "archived" }] },
+    { id: "b", is_archived: true, series: [{ id: "s3", status: "completed" }] },
+  ];
+  expect(visibleLineages(lineages, false).map((item) => [item.id, item.series.map((series) => series.id)])).toEqual([["a", ["s1"]]]);
+  expect(visibleLineages(lineages, true).map((item) => [item.id, item.series.map((series) => series.id)])).toEqual([["a", ["s1", "s2"]], ["b", ["s3"]]]);
+});

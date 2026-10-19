@@ -3,7 +3,7 @@ import { INTEGRATIONS, MENU_INTEGRATIONS } from "@/lib/integrations";
 import { NavLink, useLocation, useNavigate, Link } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { Logo } from "@/components/tls/Logo";
-import { LayoutDashboard, Trophy, Gamepad2, Users as UsersIcon, CalendarDays, Flag, Building2, Newspaper, LogOut, ExternalLink, Menu, X, Code2, Star, Crown, Gift, Image as ImageIcon, Award, Inbox, UserCheck, Medal, FolderOpen, FileText, AlertTriangle, Handshake, BellRing, Search, Server, QrCode, Activity, MessagesSquare, ChevronDown, Sticker, Smartphone, Link2, Wallet, BookOpen, Mail, Palette, Share2, LogIn, Sparkles, CalendarHeart, Egg, ScanLine, Tv, ShieldCheck, ClipboardList } from "lucide-react";
+import { LayoutDashboard, Trophy, Gamepad2, Users as UsersIcon, CalendarDays, Flag, Building2, Newspaper, LogOut, ExternalLink, Menu, X, Code2, Star, Crown, Gift, Image as ImageIcon, Award, Inbox, UserCheck, Medal, FolderOpen, FileText, AlertTriangle, Handshake, BellRing, Search, Server, QrCode, Activity, ListOrdered, MessagesSquare, ChevronDown, Sticker, Smartphone, Link2, Wallet, BookOpen, Mail, Palette, Share2, LogIn, Sparkles, CalendarHeart, Egg, ScanLine, Tv, ShieldCheck, ClipboardList } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePublicSiteSettings } from "@/hooks/usePublicSiteSettings";
 import { OfflineBar } from "@/components/tls/OfflineBar";
@@ -33,6 +33,8 @@ export const ADMIN_GROUPS = [
       { to: "/admin/sponsors", label: "Sponsoren", icon: Star, areas: ["content"] },
       { to: "/admin/partners", label: "Partner", icon: Handshake, areas: ["content"] },
       { to: "/admin/references", label: "Referenzen", icon: Medal, areas: ["content"] },
+      // Serien (#1741): externe Wettbewerbe über eine Saison - Spur, Saison, Regeln; Termine und Tabellen folgen.
+      { to: "/admin/reference-series", label: "Serien", icon: ListOrdered, areas: ["content"] },
       { to: "/admin/contact", label: "Kontakt-Inbox", icon: Inbox, areas: ["club"] },
     ],
   },
@@ -176,6 +178,7 @@ const ADMIN_SEARCH_TERMS = {
   "/admin/sponsors": ["unterstuetzer", "partner", "dolibarr", "kategorie", "stufe", "laufzeit", "ehemalige"],
   "/admin/partners": ["kooperationen", "netzwerk", "dolibarr", "kategorie"],
   "/admin/references": ["erfolge", "platzierungen", "results"],
+  "/admin/reference-series": ["serien", "ligen", "liga", "rennliga", "turnierserie", "team-liga", "saison", "spur", "punkteschema", "streichergebnisse", "tabelle"],
   "/admin/contact": ["kontakt", "inbox", "nachrichten"],
   "/admin/downloads": ["downloads", "qr", "pdf", "stationen", "turnier qr", "fastlap qr", "embed", "anzeigen"],
   "/admin/mobile-push": ["push", "notifications", "app", "push-monitoring", "testnachricht"],

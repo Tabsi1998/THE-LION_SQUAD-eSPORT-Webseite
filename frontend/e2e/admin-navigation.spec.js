@@ -99,8 +99,8 @@ test.describe("Adminmenü", () => {
     // 79 mit den acht Plattformen aus Welle 2 und Mastodon/Bluesky aus Welle 3 (#547).
     // 80 mit „Jahreszeiten“ unter Auftritt (#633), 81 mit „Adventkalender“ unter Content (#641),
     // 82 mit „Ostereiersuche“ unter Content (#646), 83 mit „Einlass (Versammlung)“ unter Mitglieder (#845),
-    // 84 mit „TV & Beamer“ unter eSports (#1110).
-    expect((await navMetrics(page)).entries).toBe(84);
+    // 84 mit „TV & Beamer“ unter eSports (#1110), 85 mit „Serien“ unter Verein (#1741).
+    expect((await navMetrics(page)).entries).toBe(85);
   });
 
   test("eine Gruppe lässt sich zuklappen und bleibt es nach dem Neuladen", async ({ page }) => {
