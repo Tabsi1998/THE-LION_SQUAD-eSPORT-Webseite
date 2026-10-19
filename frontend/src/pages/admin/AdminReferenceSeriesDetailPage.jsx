@@ -115,7 +115,8 @@ export default function AdminReferenceSeriesDetailPage() {
           <div className="space-y-4">
             <RulesSummary series={series} />
             <SeriesCalendarSection series={series} onChanged={load} />
-            <SeriesParticipantsSection series={series} onChanged={load} />
+            {/* Zuordnung der Namen (Aliase, Verknüpfungen) bleibt beim Vorstand (#1743) - Captains sehen sie nicht. */}
+            {board && <SeriesParticipantsSection series={series} onChanged={load} />}
             <SeriesResultsSection series={series} onChanged={load} />
             {board && <SeriesStaffSection series={series} />}
           </div>
