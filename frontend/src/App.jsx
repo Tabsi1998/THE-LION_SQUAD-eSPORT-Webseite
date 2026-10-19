@@ -201,6 +201,7 @@ const AdminContactPage = lazy(() => import("@/pages/admin/AdminContactPage"));
 const AdminBoardPage = lazy(() => import("@/pages/admin/AdminBoardPage"));
 const AdminReferencesPage = lazy(() => import("@/pages/admin/AdminReferencesPage"));
 const AdminReferenceSeriesPage = lazy(() => import("@/pages/admin/AdminReferenceSeriesPage"));
+const AdminReferenceSeriesDetailPage = lazy(() => import("@/pages/admin/AdminReferenceSeriesDetailPage"));
 const AdminAboutPage = lazy(() => import("@/pages/admin/AdminAboutPage"));
 const AdminGameServersPage = lazy(() => import("@/pages/admin/AdminGameServersPage"));
 const SetupWizardPage = lazy(() => import("@/pages/SetupWizardPage"));
@@ -400,6 +401,7 @@ function App() {
           <Route path="/admin/partners" element={<ProtectedRoute requireArea="content"><AdminPartnersPage /></ProtectedRoute>} />
           <Route path="/admin/references" element={<ProtectedRoute requireArea="content"><AdminReferencesPage /></ProtectedRoute>} />
           <Route path="/admin/reference-series" element={<ProtectedRoute requireArea="content"><AdminReferenceSeriesPage /></ProtectedRoute>} />
+          <Route path="/admin/reference-series/:seriesId" element={<ProtectedRoute requireArea="content"><AdminReferenceSeriesDetailPage /></ProtectedRoute>} />
           <Route path="/admin/about" element={<ProtectedRoute requireArea="content"><AdminAboutPage /></ProtectedRoute>} />
           <Route path="/admin/game-servers" element={<ProtectedRoute requireArea="system"><AdminGameServersPage /></ProtectedRoute>} />
           <Route path="/admin/achievements" element={<ProtectedRoute requireArea="content"><AdminAchievementsPage /></ProtectedRoute>} />
