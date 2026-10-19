@@ -140,6 +140,24 @@ test.describe("Abnahme: Turnierbaum-TV mit Auslosung und Live-Warteschlange (#16
     await context.close();
   });
 
+  test("Loser Bracket: Baum, TV und Warteschlange nennen dieselbe Runde (#1792)", async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name !== "chromium", "ein Lauf genügt");
+    const tid = state.tournaments.mode_draw_show;
+    await signIn(page, "lead");
+    // Der Baum des Cups schreibt die Loser-Runden mit „# Runde 1“ … (Spalten ab der zweiten Runde): Server-Name, den TV
+    // (Momente, Aufruf-Tafel) und Warteschlange lesen, ist der Name der Baum-Spalte - „Loser Runde 1“, nicht „2“.
+    const tree = await page.request.get(`/api/tournaments/${tid}/bracket`);
+    expect(tree.status(), await tree.text()).toBe(200);
+    const labels = Object.fromEntries((await tree.json()).matches_v2.map((row) => [row.match_key, row.round_label]));
+    expect(["LA", "LB", "LC", "LD", "LE", "LF"].map((key) => labels[key])).toEqual([
+      "Loser Runde 1", "Loser Runde 1", "Loser Runde 2", "Loser Runde 2", "Loser Runde 3", "Loser Runde 4"]);
+    const queue = await page.request.get(`/api/tournaments/${tid}/live-queue`);
+    expect(queue.status(), await queue.text()).toBe(200);
+    const entries = Object.values((await queue.json()).matches || {}).filter((entry) => /^L[A-F]$/.test(entry.match_key || ""));
+    expect(entries.length).toBeGreaterThan(0);
+    for (const entry of entries) expect(entry.label, entry.match_key).toBe(labels[entry.match_key]);
+  });
+
   test("Show-Auslosung: Runde fertig → „Auslosung bereit“ steht, Zielspiele leuchten; Los → Auslosungs-Moment", async ({ browser, page }, testInfo) => {
     test.skip(testInfo.project.name !== "chromium", "ein Lauf genügt");
     const tid = state.tournaments.mode_draw_show;

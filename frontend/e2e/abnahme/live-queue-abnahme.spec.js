@@ -66,6 +66,20 @@ test.describe("Abnahme: Live-Warteschlange vor Ort", () => {
     await expect(next).toContainText("nicht erschienen ab");
     await shot(page, "leitung-1440-aufgerufen.png");
 
+    // Eine Regel für beide Fristen (#1791): „nicht erschienen ab“ liegt nie vor „antreten bis“; vor der Planzeit
+    // aufgerufen, nennen beide die Planzeit.
+    const view = await (await page.request.get(`/api/tournaments/${tid}/live-queue`)).json();
+    const entry = view.stations.find((row) => row.id === stationId)?.next;
+    expect(entry?.state).toBe("called");
+    expect(Date.parse(entry.no_show_due_at)).toBeGreaterThanOrEqual(Date.parse(entry.report_by));
+    if (entry.planned_at && Date.parse(entry.planned_at) > Date.parse(entry.called_at)) {
+      expect(Date.parse(entry.no_show_due_at)).toBe(Date.parse(entry.report_by));
+    }
+    // Ein bereites Spiel wartet nie hinter einer belegten Station, solange eine andere ganz frei ist (#1791).
+    const idle = view.stations.filter((row) => !row.running && !row.next);
+    const waiting = view.stations.filter((row) => row.running && row.next?.ready && row.next.state === "queued");
+    expect(idle.length && waiting.length ? waiting.map((row) => row.next.match_key) : []).toEqual([]);
+
     // … und starten: die Uhr dieser Station beginnt bei null.
     await page.getByTestId(`live-start-${stationId}`).click();
     const fresh = page.getByTestId(`live-running-${stationId}`).locator("[role='timer']");

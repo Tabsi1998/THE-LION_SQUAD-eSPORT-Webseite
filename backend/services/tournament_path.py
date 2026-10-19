@@ -103,7 +103,7 @@ async def tournament_path(db, tournament: dict, registration_ids: set[str] | lis
     snapshot = model.structure_snapshot()
     matches = snapshot.get("matches") or []
     stages = {stage.get("id"): stage for stage in snapshot.get("stages") or []}
-    max_rounds = rounds_by_section(matches)
+    rounds = rounds_by_section(matches)
     mine = [m for m in matches if m.get("status") in DONE and m.get("results") and own & set(_slots(m))]
     names = await visible_names(db, [rid for m in mine for rid in _slots(m) if rid not in own], public=public)
     steps: list[dict] = []
@@ -128,7 +128,7 @@ async def tournament_path(db, tournament: dict, registration_ids: set[str] | lis
         if kind == "heats" or len(participants) > 2 or match.get("match_type") == "ffa":
             rank = mine_result.get("rank")
             steps.append({
-                "kind": "heat", "label": round_label(match, max_rounds=max_rounds, kind="heats"), "rank": rank, "field": len(participants),
+                "kind": "heat", "label": round_label(match, rounds=rounds, kind="heats"), "rank": rank, "field": len(participants),
                 "result": f"Platz {rank} von {len(participants)}" if rank else "gewertet", "outcome": "win" if rank == 1 else "placed",
                 "opponent": None,
             })
@@ -139,7 +139,7 @@ async def tournament_path(db, tournament: dict, registration_ids: set[str] | lis
         forfeit = bool(match.get("status") == "forfeit" or mine_result.get("forfeit") or theirs.get("forfeit"))
         score = f"{own_score}:{other_score}" if own_score is not None and other_score is not None else ("kampflos" if forfeit else "")
         steps.append({
-            "kind": "duel", "label": round_label(match, max_rounds=max_rounds, kind=kind), "result": score,
+            "kind": "duel", "label": round_label(match, rounds=rounds, kind=kind), "result": score,
             "outcome": _outcome(mine_result, theirs), "opponent": names.get(opponent) if opponent else "Freilos",
             "forfeit": forfeit,
         })

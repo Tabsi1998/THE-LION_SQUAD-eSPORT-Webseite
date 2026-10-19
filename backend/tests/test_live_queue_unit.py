@@ -231,6 +231,23 @@ def test_a_running_match_over_its_time_pushes_the_queue_to_now():
     assert view["stations"][0]["next"]["forecast_at"] >= now.isoformat()
 
 
+def test_a_ready_match_goes_to_the_free_station_not_behind_a_busy_one():
+    """#1791: Station 1 überzieht (läuft noch), Station 2 ist frei - das bereite Spiel kommt an Station 2, nicht dahinter.
+
+    Für den Planer ist die überzogene Station „ab jetzt“ frei, genau wie die freie - bei Gleichstand gewinnt die Station,
+    die zuerst frei war (Handbuch: „an die Station, die zuerst frei ist“), nicht die mit dem kleineren Namen."""
+    matches = [
+        duel("A", "r1", "r2", order=1, status="in_progress", started_at=at(0), station_id="st1"),
+        duel("B", "r3", "r4", order=2, scheduled_at=at(0), station_id="st1", schedule_source="planner"),
+    ]
+    stations = [station("st1", "1", status="busy", current_match_id="id-A"), station("st2", "2")]
+    now = T0 + timedelta(minutes=45)
+    view = queue(matches, stations, now)
+    first, second = view["stations"]
+    assert first["running"]["match_id"] == "id-A" and first["next"] is None
+    assert second["next"]["match_id"] == "id-B" and second["next"]["forecast_at"] == now.isoformat()
+
+
 def test_a_time_set_by_hand_in_the_past_is_forecast_from_now():
     """Ein von Hand gesetzter Termin, der vorbei ist, ohne dass das Spiel begann.
 
