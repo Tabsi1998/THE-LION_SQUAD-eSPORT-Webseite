@@ -361,8 +361,9 @@ im Protokoll und unter ihren Strafen) und **+5 Min. verlängern**. Die Fristen s
 überschreiben.
 
 Im **Lauf mit mehr als zwei Spielern** wertet **<Name> nicht erschienen** nicht den ganzen Lauf: Nur diese Person wird
-markiert, der Lauf bleibt offen und wird mit den Anwesenden gefahren. Im Baum steht sie durchgestrichen, am TV als
-„nicht angetreten“. Im Ergebnis-Fenster ist **Nicht erschienen** bei ihr schon gesetzt – ihr tippt nur die Anwesenden
+markiert, der Lauf bleibt offen und wird mit den Anwesenden gefahren (Karte und Nachricht sagen „Lauf bleibt offen“).
+Im Baum steht sie durchgestrichen, am TV als „nicht angetreten“, im Druck mit „n. e.“; die Warteschlange zeigt statt
+der Frist „<Name> nicht erschienen“. Im Ergebnis-Fenster ist **Nicht erschienen** bei ihr schon gesetzt – ihr tippt nur die Anwesenden
 in Zielreihenfolge. Danach steht sie auf dem letzten Platz und kommt auf dem Sieger-Weg nicht weiter. Ist sie doch
 noch gekommen und mitgefahren, nehmt ihr den Schalter im Ergebnis-Fenster zurück – dann fällt auch der Eintrag unter
 ihren Strafen weg.
