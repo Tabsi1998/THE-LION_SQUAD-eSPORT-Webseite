@@ -50,8 +50,10 @@ from routes.tournament_common import (
     _is_tournament_staff,
     _public_registration,
     _resolve_tid,
+    _serialized_registration_write,
     _serialized_tournament_write,
     _v2_plan_key,
+    registration_wait_seconds,
 )
 from routes.tournament_router import router
 
@@ -637,7 +639,8 @@ async def self_register(db, t: dict, body: RegistrationCreate, me: dict, registe
     if t.get("block_club_member_registration") and await _is_active_club_member(db, me):
         raise HTTPException(status_code=403, detail="Dieses Turnier ist für externe Teilnehmer vorgesehen. Vereinsmitglieder können sich hier nicht selbst anmelden.")
     try:
-        async with mutation_lock(db, tournament_write_resource(tid)):
+        # Gleichzeitige Anmeldungen (#1826, Vor-Ort-QR am Einlass) stellen sich an der Sperre an statt abzubrechen.
+        async with mutation_lock(db, tournament_write_resource(tid), wait_seconds=registration_wait_seconds()):
             current = await db.tournaments.find_one({"id": tid}, {"_id": 0})
             if not current:
                 raise HTTPException(status_code=404, detail="Turnier nicht gefunden")
@@ -891,7 +894,7 @@ async def staff_set_registration_checkin(tid: str, reg_id: str, body: dict,
 
 @router.delete("/{tid}/registrations/{reg_id}")
 async def delete_registration(tid: str, reg_id: str, me: dict = Depends(get_current_user),
-                              _mutation_tid: str = Depends(_serialized_tournament_write)):
+                              _mutation_tid: str = Depends(_serialized_registration_write)):
     db = get_db()
     tid = await _resolve_tid(tid)
     await _ensure_tournament_unlocked(db, tid)
