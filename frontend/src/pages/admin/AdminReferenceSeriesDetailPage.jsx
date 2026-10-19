@@ -11,12 +11,15 @@ import { SeriesParticipantsSection } from "./referenceSeries/SeriesParticipantsS
 import { SeriesResultsSection } from "./referenceSeries/SeriesResultsSection";
 import { SeriesStaffSection } from "./referenceSeries/SeriesStaffSection";
 import { seasonLabel } from "./AdminReferenceSeriesPage";
+import { dayLabel, publishText } from "@/lib/referenceSeriesStaff";
 import { toast } from "sonner";
 import { Archive, ArchiveRestore, ArrowLeft, Pencil } from "lucide-react";
 
 // Seite einer Saison (#1741): Kopf mit Spur, Saison, Status und Regeln; Bearbeiten im Seitenblatt, Archivieren statt
 // Löschen. Kalender (#1742), Teilnehmer (#1743), Ergebnisse (#1744) und Captains (#1749) sind eigene Abschnitte, die
 // ihre Pakete füllen.
+// Captains (#1749) öffnen dieselbe Seite über „Mein Dienst“: der Server sagt in `access`, was die Person hier darf -
+// Bearbeiten, Archivieren und die Captain-Verwaltung bleiben beim Vorstand.
 
 const KIND_LABELS = Object.fromEntries(KIND_OPTIONS);
 const COUNT_LABELS = Object.fromEntries(COUNT_MODE_OPTIONS);
@@ -76,10 +79,12 @@ export default function AdminReferenceSeriesDetailPage() {
   };
 
   const lineage = series?.lineage || {};
+  const access = series?.access || { role: "board", can_publish: true };
+  const board = access.role === "board";
   return (
     <AdminLayout>
-      <Link to="/admin/reference-series" data-testid="series-detail-back" className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-white/50 hover:text-[#29B6E8]">
-        <ArrowLeft className="w-3.5 h-3.5" /> Serien
+      <Link to={board ? "/admin/reference-series" : "/admin/dienst"} data-testid="series-detail-back" className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-white/50 hover:text-[#29B6E8]">
+        <ArrowLeft className="w-3.5 h-3.5" /> {board ? "Serien" : "Mein Dienst"}
       </Link>
       {missing && <div className="mt-6 text-white/60" data-testid="series-detail-missing">{missing}</div>}
       {series && (
@@ -93,23 +98,28 @@ export default function AdminReferenceSeriesDetailPage() {
               <h1 className="font-heading text-3xl md:text-4xl font-black uppercase mt-1">{seasonLabel(series)}</h1>
               <div className="mt-1 text-[10px] uppercase tracking-widest font-bold text-white/45">{STATUS_LABELS[series.status] || series.status}</div>
             </div>
-            <div className="flex items-center gap-2 shrink-0">
+            {board && <div className="flex items-center gap-2 shrink-0">
               <button type="button" onClick={() => setEditing(true)} data-testid="series-detail-edit" className="tls-btn tls-btn--secondary px-4 py-2 rounded-sm text-xs font-bold uppercase tracking-wider inline-flex items-center gap-2">
                 <Pencil className="w-3.5 h-3.5" /> Bearbeiten
               </button>
               <button type="button" onClick={toggleArchive} data-testid="series-detail-archive" className="tls-btn tls-btn--quiet px-4 py-2 rounded-sm text-xs font-bold uppercase tracking-wider inline-flex items-center gap-2">
                 {archived ? <ArchiveRestore className="w-3.5 h-3.5" /> : <Archive className="w-3.5 h-3.5" />} {archived ? "Zurückholen" : "Archivieren"}
               </button>
-            </div>
+            </div>}
           </div>
+          {!board && (
+            <p className="mb-4 border border-[#29B6E8]/30 bg-[#29B6E8]/5 rounded-sm px-4 py-3 text-sm text-white/75" data-testid="series-detail-captain">
+              Du bist Captain dieser Saison{dayLabel(access.valid_until) ? ` bis ${dayLabel(access.valid_until)}` : ""} · {publishText(access.can_publish)}.
+            </p>
+          )}
           <div className="space-y-4">
             <RulesSummary series={series} />
             <SeriesCalendarSection series={series} onChanged={load} />
             <SeriesParticipantsSection series={series} onChanged={load} />
             <SeriesResultsSection series={series} onChanged={load} />
-            <SeriesStaffSection series={series} onChanged={load} />
+            {board && <SeriesStaffSection series={series} />}
           </div>
-          {editing && <SeriesForm series={series} lineage={lineage} onClose={() => setEditing(false)} onSaved={() => { setEditing(false); load(); }} />}
+          {board && editing && <SeriesForm series={series} lineage={lineage} onClose={() => setEditing(false)} onSaved={() => { setEditing(false); load(); }} />}
         </>
       )}
     </AdminLayout>

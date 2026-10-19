@@ -8,6 +8,8 @@ const apiMock = { get: vi.fn() };
 vi.mock("@/lib/api", () => ({ api: apiMock }));
 vi.mock("@/hooks/useLiveRefresh", () => ({ useLiveRefresh: () => {} }));
 vi.mock("@/components/tls/AdminLayout", () => ({ AdminLayout: ({ children }) => <div>{children}</div> }));
+const authState = { user: { id: "u", role: "player", mfa_enabled: true, auth_mfa_verified: true } };
+vi.mock("@/context/AuthContext", () => ({ useAuth: () => authState }));
 
 const { default: AdminDutyPage } = await import("./AdminDutyPage");
 
@@ -53,4 +55,28 @@ test("Moderation: die Meldungen mit Zähler, keine Turnierliste", async () => {
 test("ohne Einsatz ein Satz statt einer leeren Seite", async () => {
   renderWith({ assignments: [], moderation: null, lead_today: [] });
   expect(await screen.findByTestId("duty-empty")).toHaveTextContent("Gerade hast du keinen Einsatz.");
+});
+
+// „Meine Serien“ (#1749): Captains sehen ihre Serien mit Ablauf und Knopf zur Saison - ohne Zwei-Faktor mit Hinweis.
+const SERIES_ROW = {
+  id: "s-1", season: "2026", tier: "Division 1", status: "active", lineage_title: "Probe Racing F1", lineage_kind: "racing",
+  valid_until: "2026-12-31", can_publish: false, url: "/admin/reference-series/s-1",
+};
+
+test("Captain: Meine Serien mit Ablauf, Entwurfs-Hinweis und Knopf zur Saison - kein leerer Einsatz-Satz", async () => {
+  renderWith({ assignments: [], series: [SERIES_ROW], moderation: null, lead_today: [] });
+  expect(await screen.findByTestId("duty-series")).toBeInTheDocument();
+  expect(screen.getByTestId("duty-series-row-s-1")).toHaveTextContent("Probe Racing F1");
+  expect(screen.getByTestId("duty-series-row-s-1")).toHaveTextContent("Entwürfe");
+  expect(screen.getByTestId("duty-series-until-s-1")).toHaveTextContent("bis 31.12.2026");
+  expect(screen.getByTestId("duty-series-open-s-1")).toHaveAttribute("href", "/admin/reference-series/s-1");
+  expect(screen.queryByTestId("duty-empty")).toBeNull();
+  expect(screen.queryByTestId("duty-series-mfa")).toBeNull();
+});
+
+test("Captain ohne Zwei-Faktor: Hinweis mit Weg zur Einrichtung", async () => {
+  authState.user = { id: "u", role: "player" };
+  renderWith({ assignments: [], series: [SERIES_ROW], moderation: null, lead_today: [] });
+  expect(await screen.findByTestId("duty-series-mfa")).toHaveTextContent("Zwei-Faktor");
+  authState.user = { id: "u", role: "player", mfa_enabled: true, auth_mfa_verified: true };
 });
