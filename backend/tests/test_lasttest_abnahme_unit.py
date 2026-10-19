@@ -60,6 +60,40 @@ def test_port_must_belong_to_the_project():
     assert any("Port 23000" in problem for problem in problems)
 
 
+@pytest.mark.parametrize("url, expected", [
+    ("http://lasttest:geheimpw@127.0.0.1:24800", "Zugangsdaten"),
+    ("http://lasttest@127.0.0.1:24800", "Zugangsdaten"),
+    ("http://127.0.0.1:24800/?key=geheimpw", "Abfrage oder Fragment"),
+    ("http://127.0.0.1:24800/#geheimpw", "Abfrage oder Fragment"),
+    ("http://127.0.0.1:24800?", "Abfrage oder Fragment"),
+    ("ftp://127.0.0.1:24800", "http://"),
+    ("http://127.0.0.1:99999", "Port"),
+])
+def test_base_url_only_scheme_host_port_path(url, expected):
+    problems = lasttest.target_problems(url, "lsw-abnahme-1683", LOCAL_ENV, {24800})
+    assert any(expected in problem for problem in problems)
+    # Die Meldungen nennen die Adresse nie im Wortlaut.
+    assert not any("geheimpw" in problem or "lasttest:" in problem for problem in problems)
+
+
+@pytest.mark.parametrize("url, clean", [
+    ("http://127.0.0.1:24800/", "http://127.0.0.1:24800"),
+    ("http://localhost:24800/basis/", "http://localhost:24800/basis"),
+    ("http://[::1]:24800", "http://[::1]:24800"),
+])
+def test_clean_base_url_for_output(url, clean):
+    assert lasttest.base_url_problems(url) == []
+    assert lasttest.clean_base_url(url) == clean
+
+
+def test_main_never_prints_userinfo(monkeypatch, tmp_path, capsys):
+    monkeypatch.setattr(lasttest, "_inspect", lambda container, template: None)
+    url = "http://lasttest:geheimpw@127.0.0.1:24800/?key=geheimpw"
+    assert lasttest.main(["--project", "lsw-abnahme-1683", "--base-url", url, "--state", str(tmp_path / "s.json")]) == 2
+    captured = capsys.readouterr()
+    assert "geheimpw" not in captured.err + captured.out
+
+
 def test_published_ports_from_docker_inspect():
     ports = {"80/tcp": [{"HostIp": "127.0.0.1", "HostPort": "24800"}], "443/tcp": None, "8001/tcp": [{"HostPort": ""}]}
     assert lasttest.published_ports(ports) == {24800}

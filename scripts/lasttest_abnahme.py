@@ -95,12 +95,41 @@ def published_ports(ports: dict | None) -> set[int]:
     return found
 
 
+def base_url_problems(base_url: str) -> list[str]:
+    """Nur scheme://host:port[/pfad] - keine Zugangsdaten, keine Abfrage, kein Fragment. Die Meldungen nennen die
+    Adresse nie im Wortlaut (sie könnte Zugangsdaten enthalten)."""
+    parts = urlsplit(base_url)
+    problems = []
+    if parts.scheme not in {"http", "https"}:
+        problems.append("Adresse braucht http:// oder https://")
+    if parts.username is not None or parts.password is not None or "@" in parts.netloc:
+        problems.append("Adresse enthält Zugangsdaten (user@) - nur scheme://host:port[/pfad]")
+    if parts.query or parts.fragment or base_url.rstrip().endswith(("?", "#")):
+        problems.append("Adresse enthält Abfrage oder Fragment (? oder #) - nur scheme://host:port[/pfad]")
+    try:
+        parts.port
+    except ValueError:
+        problems.append("Adresse hat keinen gültigen Port")
+    return problems
+
+
+def clean_base_url(base_url: str) -> str:
+    """Die Adresse, wie sie in Ausgabe und Bericht steht: scheme://host[:port][/pfad], ohne alles andere."""
+    parts = urlsplit(base_url.strip())
+    host = f"[{parts.hostname}]" if parts.hostname and ":" in parts.hostname else (parts.hostname or "")
+    try:
+        port = f":{parts.port}" if parts.port else ""
+    except ValueError:
+        port = ""
+    return f"{parts.scheme}://{host}{port}{parts.path}".rstrip("/")
+
+
 def target_problems(base_url: str, project: str, backend_env: dict | None, ports: set[int]) -> list[str]:
     """Was dagegen spricht, diesen Stand unter Last zu setzen - leer heißt: ein eigener, lokaler Abnahme-Stand."""
-    problems = []
+    problems = base_url_problems(base_url)
     parts = urlsplit(base_url)
-    if parts.scheme not in {"http", "https"} or parts.hostname not in seed.LOCAL_HOSTS:
-        problems.append(f"Adresse {parts.hostname or base_url!r} liegt nicht auf diesem Rechner")
+    if parts.hostname not in seed.LOCAL_HOSTS:
+        problems.append(f"Adresse {parts.hostname or '(ohne Host)'!r} liegt nicht auf diesem Rechner")
     if project == SHARED_PROJECT:
         problems.append(f"{SHARED_PROJECT} ist der gemeinsame Stand - der Lasttest trägt Ergebnisse ein, bitte einen "
                         "eigenen Stand (ABNAHME_PROJECT) nehmen")
@@ -108,8 +137,11 @@ def target_problems(base_url: str, project: str, backend_env: dict | None, ports
         problems.append(f"Container {project}-backend läuft nicht")
     else:
         problems.extend(seed.abnahme_target_problems(backend_env))
-    port = parts.port or (443 if parts.scheme == "https" else 80)
-    if port not in ports:
+    try:
+        port = parts.port or (443 if parts.scheme == "https" else 80)
+    except ValueError:
+        port = None
+    if port is not None and port not in ports:
         problems.append(f"Port {port} gehört nicht zum Stand {project} (veröffentlicht: {sorted(ports) or 'keine'})")
     return problems
 
@@ -915,7 +947,7 @@ def parse_args(argv: list[str] | None = None) -> Config:
     state = args.state or Path(os.environ.get("ABNAHME_STATE") or default_state)
     stamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M")
     out = args.out or ROOT / ".local-testing" / "abnahme" / f"lasttest-{args.project}-{stamp}"
-    return Config(base_url=args.base_url.rstrip("/"), project=args.project, state=state, out=out, minutes=args.minutes,
+    return Config(base_url=args.base_url.strip(), project=args.project, state=state, out=out, minutes=args.minutes,
                   viewers=args.viewers, signed_in=args.signed_in, tvs=min(args.tvs, 6), helpers=args.helpers,
                   helper_pause=args.helper_pause, fastlap_pause=args.fastlap_pause, onsite=args.onsite, ramp=args.ramp,
                   p95_ms=args.p95_ms, error_rate=args.max_error_rate, seed=args.seed,
@@ -931,6 +963,7 @@ def main(argv: list[str] | None = None) -> int:
     except SystemExit as stop:
         print(stop, file=sys.stderr)
         return 2
+    cfg.base_url = clean_base_url(cfg.base_url)
     if not cfg.state.is_file():
         print(f"Stand-Datei fehlt: {cfg.state} - erst python scripts/seed_abnahme.py", file=sys.stderr)
         return 2
