@@ -290,11 +290,15 @@ async def update_participant(series_id: str, participant_id: str, body: Referenc
 
 
 # ---------------------------------------------------------------- Zuordnen
-async def _save_alias(db, *, name: str, game_id: str | None, link: dict, source: str, me: dict) -> tuple[dict, dict | None]:
-    """Ein Alias je Schlüssel und Spiel. Eine Korrektur überschreibt den alten Stand (das Protokoll hält ihn fest)."""
+async def _save_alias(db, *, name: str, game_id: str | None, link: dict, source: str, me: dict,
+                      existing: dict | None = None) -> tuple[dict, dict | None]:
+    """Ein Alias je Schlüssel und Spiel. Eine Korrektur überschreibt den alten Stand (das Protokoll hält ihn fest);
+    ``existing`` ist der Alias, über den der Teilnehmer zugeordnet war - er wird korrigiert, statt einen zweiten
+    (etwa spielgebundenen) daneben anzulegen."""
     now = now_utc().isoformat()
-    key = {"name_normalized": series_identity.normalize_name(name), "game_id": game_id}
-    previous = await db.reference_aliases.find_one(key, {"_id": 0})
+    key = ({"id": existing["id"]} if existing
+           else {"name_normalized": series_identity.normalize_name(name), "game_id": game_id})
+    previous = existing or await db.reference_aliases.find_one(key, {"_id": 0})
     await db.reference_aliases.update_one(key, {
         "$set": {"name": name, "target": "member" if link["link"] == "member" else "guest",
                  "profile_id": link["profile_id"], "guest_name": link["guest_name"], "source": source,
@@ -302,6 +306,24 @@ async def _save_alias(db, *, name: str, game_id: str | None, link: dict, source:
         "$setOnInsert": {"id": new_id(), "created_at": now},
     }, upsert=True)
     return await db.reference_aliases.find_one(key, {"_id": 0}), previous
+
+
+async def _move_followers(db, alias_id: str, link: dict, me: dict, skip_id: str) -> tuple[list[str], list[str]]:
+    """Wer über diesen Alias von selbst zugeordnet wurde (``link_source`` „alias“), folgt seiner Korrektur; einzeln
+    bestätigte Zuordnungen bleiben. Bei „Extern“ ist der Alias weg - die Teilnehmer werden extern und behalten die
+    Spur, dass ein Alias zurückgenommen wurde. Liefert Teilnehmer und Serien."""
+    rows = await db.reference_participants.find(
+        {"alias_id": alias_id, "link_source": "alias", "id": {"$ne": skip_id}}, {"_id": 0, "id": 1, "series_id": 1},
+    ).to_list(None)
+    if not rows:
+        return [], []
+    now = now_utc().isoformat()
+    withdrawn = link["link"] == "external"
+    await db.reference_participants.update_many({"id": {"$in": [row["id"] for row in rows]}}, {"$set": {
+        **link, "link_status": "decided", "link_source": "alias_withdrawn" if withdrawn else "alias",
+        "alias_id": None if withdrawn else alias_id, "decided_at": now, "decided_by": me["id"],
+        "updated_at": now, "updated_by": me["id"]}})
+    return sorted(row["id"] for row in rows), sorted({row["series_id"] for row in rows})
 
 
 async def _apply_alias_elsewhere(db, alias: dict, me: dict, skip_id: str) -> list[str]:
@@ -349,13 +371,18 @@ async def assign_participant(series_id: str, participant_id: str, body: Particip
     game_id = await _game_id(db, series)
     link = await _link_for(db, body, participant)
 
-    alias_id, previous_alias, others = None, None, []
+    alias_id, previous_alias, others, followers = None, None, [], []
+    # Kam die Zuordnung über einen Alias, wird genau dieser korrigiert (Quelle gemerkt in ``alias_id``).
+    via = (await db.reference_aliases.find_one({"id": participant["alias_id"]}, {"_id": 0})
+           if participant.get("link_source") == "alias" and participant.get("alias_id") else None)
     if body.link == "external":
-        # Über Fremde wird kein Alias gespeichert; ein falscher Alias für genau diesen Namen wird zurückgenommen.
+        # Über Fremde wird kein Alias gespeichert; ein falscher Alias für diesen Namen wird zurückgenommen.
         key = {"name_normalized": series_identity.normalize_name(participant["name"]), "game_id": game_id}
-        previous_alias = await db.reference_aliases.find_one(key, {"_id": 0})
+        previous_alias = via or await db.reference_aliases.find_one(key, {"_id": 0})
         if previous_alias:
             await db.reference_aliases.delete_one({"id": previous_alias["id"]})
+            followers, moved = await _move_followers(db, previous_alias["id"], link, me, participant_id)
+            others = [sid for sid in moved if sid != series_id]
         source = "manual"
     else:
         index = await build_index(db, series, [participant["name"]])
@@ -365,9 +392,11 @@ async def assign_participant(series_id: str, participant_id: str, body: Particip
         source = "suggestion" if (("member", link["profile_id"]) if link["link"] == "member"
                                   else ("guest", None)) in suggested else "manual"
         alias, previous_alias = await _save_alias(db, name=participant["name"], game_id=game_id, link=link,
-                                                  source=source, me=me)
+                                                  source=source, me=me, existing=via)
         alias_id = alias["id"]
-        others = await _apply_alias_elsewhere(db, alias, me, participant_id)
+        followers, moved = await _move_followers(db, alias_id, link, me, participant_id)
+        opened = await _apply_alias_elsewhere(db, alias, me, participant_id)
+        others = [sid for sid in dict.fromkeys([*moved, *opened]) if sid != series_id]
 
     now = now_utc().isoformat()
     await db.reference_participants.update_one({"id": participant_id}, {"$set": {
@@ -381,7 +410,8 @@ async def assign_participant(series_id: str, participant_id: str, body: Particip
         "data": {"series_id": series_id, "link": link["link"], "profile_id": link["profile_id"],
                  "previous_link": participant.get("link"), "previous_status": participant.get("link_status"),
                  "previous_profile_id": participant.get("profile_id"), "alias_id": alias_id,
-                 "replaced_alias": replaced, "also_assigned_in": others},
+                 "replaced_alias": replaced, "also_assigned_in": others,
+                 "followers": followers},
         "created_at": now,
     })
     for sid in dict.fromkeys([series_id, *others]):

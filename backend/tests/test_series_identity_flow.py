@@ -275,3 +275,38 @@ async def test_deleting_the_account_after_a_confirmed_assignment(flow):
     # Der Name wird danach nicht mehr von selbst zugeordnet.
     flow.act_as(ctx["admin"])
     assert (await _add(flow, ctx["second"]["id"], "Anni Rennt"))["link_status"] == "open"
+
+
+# ---------------------------------------------------------------- Korrektur eines Alias
+@pytest.mark.asyncio
+async def test_correcting_an_alias_moves_everyone_it_assigned_but_not_single_decisions(flow):
+    ctx = await _setup(flow)
+    first, second = ctx["first"]["id"], ctx["second"]["id"]
+    original = await _add(flow, first, "Wechsel Name")
+    await _assign(flow, first, original["id"], link="member", profile_id="p-bert")
+    auto = await _add(flow, second, "Wechsel Name")  # von selbst über den Alias zugeordnet
+    assert (auto["profile_id"], auto["link_source"]) == ("p-bert", "alias")
+    single = await _add(flow, second, "Wechsel-Name")
+    await flow.db.reference_participants.update_one({"id": single["id"]}, {"$set": {"link_source": "manual"}})
+
+    # Korrektur am automatisch zugeordneten Teilnehmer: der Alias zieht um und alle, die er zugeordnet hat, mit.
+    later = await _add(flow, first, "WECHSEL NAME")
+    fixed = (await _assign(flow, second, auto["id"], link="member", profile_id="p-anna")).json()
+    assert fixed["profile_id"] == "p-anna"
+    assert (await flow.db.reference_participants.find_one({"id": later["id"]}, {"_id": 0}))["profile_id"] == "p-anna"
+    assert await flow.db.reference_aliases.count_documents({}) == 1
+    assert (await flow.db.reference_aliases.find_one({}, {"_id": 0}))["profile_id"] == "p-anna"
+    # Einzeln bestätigte Zuordnungen bleiben.
+    assert (await flow.db.reference_participants.find_one({"id": original["id"]}, {"_id": 0}))["profile_id"] == "p-bert"
+    assert (await flow.db.reference_participants.find_one({"id": single["id"]}, {"_id": 0}))["profile_id"] == "p-bert"
+    assert (await _add(flow, second, "Wechsel  Name!"))["profile_id"] == "p-anna"
+
+    # „Extern“ nimmt den Alias zurück: wer über ihn zugeordnet war, wird ebenfalls extern.
+    await _assign(flow, second, fixed["id"], link="external")
+    assert await flow.db.reference_aliases.count_documents({}) == 0
+    follower = await flow.db.reference_participants.find_one({"id": later["id"]}, {"_id": 0})
+    assert (follower["link"], follower["profile_id"], follower["alias_id"], follower["is_club_member"]) == (
+        "external", None, None, False)
+    assert (await flow.db.reference_participants.find_one({"id": single["id"]}, {"_id": 0}))["profile_id"] == "p-bert"
+    audit = await flow.db.audit_logs.find({"action": "reference_series.participant_assign"}, {"_id": 0}).to_list(None)
+    assert later["id"] in audit[-1]["data"]["followers"]
