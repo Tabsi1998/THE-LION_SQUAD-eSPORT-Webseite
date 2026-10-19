@@ -205,6 +205,11 @@ Platzierung, beides in derselben Teilnahme möglich. Spieler wählt ihr aus den 
 Mit **Vorschläge speichern** pflegt ihr die Auswahllisten für Formate und Platzierungen. Einen Partner als Veranstalter oder per Haken
 zu nennen, zeigt die Referenz auch auf seiner Seite.
 
+Öffentlich ordnet **/references** unter **Jahr für Jahr** jede Teilnahme nach dem Jahr ihres **Startdatums** ein (Wiener Zeit;
+ohne Start zählt das Enddatum). Teilnahmen ganz ohne Datum stehen am Ende unter **Ohne Datum** – tragt also ein Datum ein.
+Neben jeder Teilnahme steht das **Logo des Spiels** (Admin → Spiele); hat das Spiel keins, steht dort sein **Kürzel**.
+Die Medaillenzahlen oben zählen wie bisher je Eintrag.
+
 ---
 
 ## 4. Wenn etwas nicht klappt
