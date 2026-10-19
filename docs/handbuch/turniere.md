@@ -360,6 +360,13 @@ im Protokoll und unter ihren Strafen) und **+5 Min. verlängern**. Die Fristen s
 **Erweiterte Spieloptionen → Fristen** ein (leer heißt Standard); eine Phase kann sie in ihren Einstellungen
 überschreiben.
 
+Im **Lauf mit mehr als zwei Spielern** wertet **<Name> nicht erschienen** nicht den ganzen Lauf: Nur diese Person wird
+markiert, der Lauf bleibt offen und wird mit den Anwesenden gefahren. Im Baum steht sie durchgestrichen, am TV als
+„nicht angetreten“. Im Ergebnis-Fenster ist **Nicht erschienen** bei ihr schon gesetzt – ihr tippt nur die Anwesenden
+in Zielreihenfolge. Danach steht sie auf dem letzten Platz und kommt auf dem Sieger-Weg nicht weiter. Ist sie doch
+noch gekommen und mitgefahren, nehmt ihr den Schalter im Ergebnis-Fenster zurück – dann fällt auch der Eintrag unter
+ihren Strafen weg.
+
 ### 3.8 Stationen
 
 **Admin → eSports → Stationen** (Seite „Stationen & Spiel-Zuweisung“). Oben das **Aktive Turnier** wählen.

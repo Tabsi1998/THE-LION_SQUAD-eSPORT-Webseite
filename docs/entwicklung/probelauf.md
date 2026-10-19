@@ -234,7 +234,7 @@ Ist Runde 1 fertig und noch ein Lauf offen: `$PM spielen` (ruft auf, startet, tr
 | Turnierleitung | Reiter **Teilnehmer**: bei einem Spieler aus einem noch wartenden Lauf **Austritt** | Umbauplan in Worten („… der Platz wird frei, 3 bleiben.“), Grund optional |
 | Turnierleitung | **Austritt eintragen** | Status „Ausgetreten“; der Lauf spielt mit 3 weiter, Baum und TV zeigen es |
 | Claude (nach 3 Minuten) | `$PM fristen` | „1 neuer Vorschlag ‚nicht erschienen‘“ |
-| Turnierleitung (Handy) | **Braucht Aufmerksamkeit**: Fall mit „<Name> nicht erschienen“ und „+5 Min. verlängern“ | ein Tipp auf einen Namen: der Lauf ist gewertet, die Person hat nur dieses Spiel verloren (Strafe im Protokoll) |
+| Turnierleitung (Handy) | **Braucht Aufmerksamkeit**: Fall mit „<Name> nicht erschienen“ und „+5 Min. verlängern“ | ein Tipp auf einen Namen: der Lauf bleibt offen, die Person ist markiert (Baum durchgestrichen, TV „nicht angetreten“, Strafe im Protokoll); im Ergebnis-Fenster ist **Nicht erschienen** schon gesetzt – nach dem Eintragen der Anwesenden steht sie hinten, die zwei Besten kommen weiter (#1823) |
 
 ---
 
