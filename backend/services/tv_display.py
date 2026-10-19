@@ -8,9 +8,10 @@ dieselben Namen als Parameter). Was fehlt oder nicht passt, ist der Standard: Fa
 eingeschaltet ist. Meilenstein 60 bringt die Wiedergabeliste des Turnierbaum-TVs (#1121), die Aufrufe (#1122), die Zahlen
 zwischendurch (#1124), die Sponsoren am TV (#1125) und den Streckenwechsel bei Meisterschaften (#1127).
 
-Anzeige-Schlüssel: ein Speziallink (``access_links``) mit der einzigen Freigabe ``display`` für genau ein Turnier.
-Gespeichert wird wie bei allen Speziallinks nur der Hash; den Schlüssel selbst sieht der Admin einmal beim Anlegen.
-Er öffnet nur die TV-Daten dieses Turniers - keine Turnierseite, keine Anmeldung, kein Ergebnis - und ist im Admin
+Anzeige-Schlüssel: ein Speziallink (``access_links``) mit der einzigen Freigabe ``display`` für genau ein Turnier
+oder - für Hallen- und Aufruf-Tafel (#1822) - genau ein Event. Gespeichert wird wie bei allen Speziallinks nur der
+Hash; den Schlüssel selbst sieht der Admin einmal beim Anlegen. Er öffnet nur die TV-Daten dieses Turniers bzw. der
+Turniere dieses Events - keine Turnier- oder Event-Seite, keine Anmeldung, kein Ergebnis - und ist im Admin
 widerrufbar. Die Antwort für den Schlüssel ist schmaler als die für die Turnierleitung: nur, was der TV zeigt.
 """
 from __future__ import annotations
@@ -286,6 +287,54 @@ def display_bracket_payload(payload: dict) -> dict:
         "seats": seat_summary(tournament, all_registrations),
         "display_key": True,
     }
+
+
+# ------------------------------------------------------------------ Schlüssel je Event (#1822)
+# Hallen-Tafel (#1126) und Aufruf-Tafel (#1122) laufen am Hallen-TV ohne Anmeldung. Ein Schlüssel je Event öffnet die
+# TV-Daten aller Turniere des Events, die eine Tafel zeigen darf - auch „Nur Mitglieder“, nie „Nur intern“, „nicht
+# öffentlich“ oder Entwürfe. Je Turnier dieselbe Antwort wie beim Turnierbaum-Schlüssel, dazu das Event mit Tagesplan
+# und die Stationen - jeweils nur die Felder, die die Tafeln zeigen. Ohne Schlüssel bleibt alles, wie es ist.
+
+EVENT_TV_VISIBILITIES = frozenset({"public", "community", "members"})
+EVENT_FIELDS = ("id", "slug", "name", "status", "start_date", "end_date", "door_time", "location", "city", "banner_url",
+                "cover_url")
+EVENT_DAY_FIELDS = ("date", "start_at", "end_at", "door_at", "title")
+# Tagesplan (lib/tvDayPlan.js): Zeiten, Stand, Check-in und Pause je Turnier bzw. Fast Lap.
+EVENT_TOURNAMENT_FIELDS = ("id", "slug", "title", "status", "public_phase", "start_date", "end_date", "check_in_from",
+                           "check_in_until", "check_in_closed_at", "paused_until", "event_day")
+EVENT_FASTLAP_FIELDS = ("id", "slug", "title", "status", "start_date", "end_date", "event_day")
+# Stationen-Raster und Aufrufe (lib/tvStationGrid.js, lib/tvCalls.js) - keine Notizen, keine Warteschlange.
+HALL_STATION_FIELDS = ("id", "name", "label", "device_type", "status", "current_match_id", "current_match_type", "called_at",
+                       "tournament_id", "event_id")
+
+
+def shown_on_event_tv(item: dict | None) -> bool:
+    """Zeigt die Tafel mit Event-Schlüssel dieses Turnier (bzw. diese Fast Lap)? Kein Entwurf, nicht „nicht öffentlich“,
+    Sichtbarkeit höchstens „Nur Mitglieder“. Was fehlt oder unbekannt ist, zeigt sie nicht."""
+    if not isinstance(item, dict) or item.get("status") == "draft" or item.get("is_public") is False:
+        return False
+    return (item.get("visibility") or "public") in EVENT_TV_VISIBILITIES
+
+
+def display_event_path(event_id: str, token: str) -> str:
+    """Die Adresse der Hallen-Tafel mit Schlüssel - die Aufruf-Tafel hängt ``/calls`` an (Link-Baukasten)."""
+    return f"/display/event/{event_id}?{urlencode({'key': token})}"
+
+
+def display_station(station: dict) -> dict:
+    return _pick(station, HALL_STATION_FIELDS)
+
+
+def display_event_payload(event: dict, tournaments: list[dict], challenges: list[dict], schedule: dict | None,
+                          brackets: list[dict], stations: list[dict]) -> dict:
+    """Die Antwort für einen Event-Schlüssel. ``tournaments``/``challenges`` sind schon nach ``shown_on_event_tv``
+    gefiltert, ``brackets`` je Turnier die Antwort aus ``display_bracket_payload``."""
+    view = _pick(event, EVENT_FIELDS)
+    if isinstance(schedule, dict) and isinstance(schedule.get("days"), list):
+        view["schedule"] = {"days": [_pick(day, EVENT_DAY_FIELDS) for day in schedule["days"] if isinstance(day, dict)]}
+    view["tournaments"] = [_pick(row, EVENT_TOURNAMENT_FIELDS) for row in tournaments]
+    view["f1_challenges"] = [_pick(row, EVENT_FASTLAP_FIELDS) for row in challenges]
+    return {"event": view, "brackets": brackets, "stations": [display_station(row) for row in stations], "display_key": True}
 
 
 # ------------------------------------------------------------------ Was nur ein Turnier betrifft
