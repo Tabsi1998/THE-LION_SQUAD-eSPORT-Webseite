@@ -7,7 +7,9 @@ const { ENABLED, STATE_FILE, state, signIn, watch } = require("./abnahmeSession"
 // (Admin) trägt die Turnierleitung als Captain einer Saison ein - ein Konto mit Zwei-Faktor, aber ohne den Bereich
 // Redaktion. Der Captain findet die Saison unter „Mein Dienst → Meine Serien“, öffnet sie ohne die Knöpfe des
 // Vorstands und kommt weder an eine fremde Saison noch an Einstellungen der eigenen. Nach dem Entfernen ist das Recht
-// sofort weg. Nur erfundene Namen. Läuft nur mit ABNAHME=1.
+// sofort weg. Captain kann nur ein aktives Vereinsmitglied sein: die Turnierleitung wird dafür Mitglied, ohne
+// Mitgliedschaft ruht das Recht, am Ende steht ihre Mitgliedschaft wieder auf „keine“. Nur erfundene Namen. Läuft nur
+// mit ABNAHME=1.
 
 const SHOTS = process.env.ABNAHME_SHOTS || "";
 
@@ -36,10 +38,19 @@ test.describe("Abnahme #1749: Captain je Serie - Vorstand verwaltet, Captain sie
     const until = `${new Date().getFullYear() + 1}-12-31`;
     const adminContext = await browser.newContext({ viewport: { width: 1440, height: 900 } });
     const captainContext = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+    let admin = null;
+    let leadId = null;
     try {
-      const admin = await adminContext.newPage();
+      admin = await adminContext.newPage();
       await signIn(admin, "admin");
       const adminProblems = watch(admin);
+      const captain = await captainContext.newPage();
+      await signIn(captain, "lead");
+      leadId = (await (await captain.request.get("/api/auth/me")).json()).id;
+      const setMembership = async (status) => {
+        const answer = await send(admin, "PUT", `/api/membership/user/${leadId}`, { member_status: status });
+        expect(answer.status(), await answer.text()).toBe(200);
+      };
 
       // Spur mit zwei Saisons über die echten Routen: eine bekommt den Captain, die andere bleibt fremd.
       const lineage = await send(admin, "POST", "/api/reference-series/admin/lineages", { title: `Probe Captain Liga ${stamp}`, kind: "racing", label: "F1" });
@@ -52,9 +63,18 @@ test.describe("Abnahme #1749: Captain je Serie - Vorstand verwaltet, Captain sie
       expect(foreign.status(), await foreign.text()).toBe(200);
       const foreignId = (await foreign.json()).id;
 
-      // Vorstand: Captain auf der Seite der Saison hinzufügen
+      // Ohne Mitgliedschaft findet die Suche die Turnierleitung nicht, und der Server lehnt sie ab.
+      await setMembership("none");
+      const refused = await send(admin, "POST", `/api/reference-series/admin/series/${ownId}/staff`, { user_id: leadId, valid_until: until });
+      expect(refused.status()).toBe(422);
       await admin.goto(`/admin/reference-series/${ownId}`);
       await expect(admin.getByTestId("series-staff-empty")).toBeVisible();
+      await admin.getByTestId("series-staff-person-search").fill("Turnierleitung");
+      await expect(admin.getByTestId("series-staff-person-empty")).toContainText("Kein Vereinsmitglied");
+      await admin.getByTestId("series-staff-person-search").fill("");
+
+      // Vorstand: Captain (jetzt Mitglied) auf der Seite der Saison hinzufügen
+      await setMembership("active");
       await admin.getByTestId("series-staff-person-search").fill("Turnierleitung");
       await admin.getByRole("option", { name: /Abnahme Turnierleitung/ }).click();
       await admin.getByTestId("series-staff-new-until").fill(until);
@@ -64,8 +84,6 @@ test.describe("Abnahme #1749: Captain je Serie - Vorstand verwaltet, Captain sie
       await shot(admin, "serien-captains");
 
       // Captain: „Mein Dienst“ im Menü, „Meine Serien“ mit genau dieser Saison
-      const captain = await captainContext.newPage();
-      await signIn(captain, "lead");
       // Erwartet: genau ein 403 beim Öffnen der fremden Saison (Antwort und die Zeile, die der Browser dazu schreibt).
       const captainProblems = watch(captain, {
         allow: (response) => response.status() === 403 && response.url().includes(foreignId),
@@ -96,6 +114,17 @@ test.describe("Abnahme #1749: Captain je Serie - Vorstand verwaltet, Captain sie
       await captain.goto(`/admin/reference-series/${foreignId}`);
       await expect(captain.getByTestId("series-detail-missing")).toBeVisible();
 
+      // Captains sehen nur die Felder zum Eintragen - keine Verwaltungsdaten.
+      const view = await (await captain.request.get(`/api/reference-series/admin/series/${ownId}`)).json();
+      expect(view.created_by).toBeUndefined();
+      expect(view.lineage.created_by).toBeUndefined();
+
+      // Endet die Mitgliedschaft, ruht das Recht sofort - mit neuer Mitgliedschaft ist es wieder da.
+      await setMembership("inactive");
+      expect((await captain.request.get(`/api/reference-series/admin/series/${ownId}`)).status()).toBe(403);
+      await setMembership("active");
+      expect((await captain.request.get(`/api/reference-series/admin/series/${ownId}`)).status()).toBe(200);
+
       // Vorstand entfernt den Captain - das Recht ist sofort weg.
       await row.getByRole("button", { name: /als Captain entfernen/ }).click();
       await admin.getByTestId("confirm-dialog-confirm").click();
@@ -106,6 +135,8 @@ test.describe("Abnahme #1749: Captain je Serie - Vorstand verwaltet, Captain sie
       expect(adminProblems).toEqual([]);
       expect(captainProblems).toEqual([]);
     } finally {
+      // Die Turnierleitung des Seeds ist sonst kein Mitglied - so bleibt es für die anderen Abnahmen.
+      if (admin && leadId) await send(admin, "PUT", `/api/membership/user/${leadId}`, { member_status: "none" });
       await adminContext.close();
       await captainContext.close();
     }
