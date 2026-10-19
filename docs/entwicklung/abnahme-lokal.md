@@ -91,6 +91,9 @@ python scripts/seed_abnahme.py
 cd frontend && ABNAHME=1 E2E_BASE_URL=http://127.0.0.1:24000 npx playwright test e2e/abnahme --project=chromium --workers=1
 ```
 
+Den ganzen Event-Abend einmal mit der Turnierleitung durchspielen (Generalprobe vor einem Event): Drehbuch
+[Probelauf](probelauf.md), die übrigen Rollen spielt `scripts/probelauf_mitspieler.py`.
+
 ## 4. Stoppen
 
 ```bash
