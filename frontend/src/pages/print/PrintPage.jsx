@@ -56,7 +56,15 @@ function Choice({ legend, name, value, options, onChange }) {
   );
 }
 
+/** Neuer Gegenstand (anderes Turnier/Event, anderer Zugangslink) = neue Ansicht: nichts vom vorigen bleibt stehen - sonst
+ * stünde nach einem Seitenwechsel die Liste von A unter dem Kopf von B. */
 export default function PrintPage({ scope = "tournament" }) {
+  const { slug } = useParams();
+  const [params] = useSearchParams();
+  return <PrintView key={`${scope}|${slug}|${params.get("access") || ""}`} scope={scope} />;
+}
+
+function PrintView({ scope }) {
   const { slug } = useParams();
   const [params, setParams] = useSearchParams();
   const accessToken = params.get("access") || "";

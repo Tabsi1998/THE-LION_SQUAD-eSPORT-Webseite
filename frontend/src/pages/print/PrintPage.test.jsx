@@ -1,6 +1,6 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { Link, MemoryRouter, Route, Routes } from "react-router-dom";
 
 // Druckansicht (#1283): Blätter je Teil mit Druckzeit und QR-Code, kein Druck beim Laden (erst der Knopf), und die
 // Check-in-Liste nur mit Turnier-Recht - ohne Recht fragt die Seite den Server gar nicht erst.
@@ -78,4 +78,21 @@ test("mit Turnier-Recht: Check-in-Liste mit Kästchen und Live-Link zur Turnierl
   expect(screen.getByLabelText("schon da")).toBeInTheDocument();
   expect(screen.getByTestId("branded-qr-code").dataset.value).toBe(`${window.location.origin}/tournaments/herbst-cup/leitung`);
   await waitFor(() => expect(screen.queryByTestId("print-sheet-baum")).not.toBeInTheDocument());
+});
+
+test("Wechsel zu einem anderen Turnier: nichts vom vorigen bleibt stehen (keine Liste von A unter dem Kopf von B)", async () => {
+  serve({ canCheckIn: true });
+  const fallback = apiMock.get.getMockImplementation();
+  // B lädt langsam: solange darf weder Kopf noch Liste von A zu sehen sein.
+  apiMock.get.mockImplementation((url) => (url.startsWith("/tournaments/winter-cup") ? new Promise(() => {}) : fallback(url)));
+  render(
+    <MemoryRouter initialEntries={["/print/tournaments/herbst-cup?teile=liste"]}>
+      <Routes><Route path="/print/tournaments/:slug" element={<><Link to="/print/tournaments/winter-cup?teile=liste">weiter</Link><PrintPage scope="tournament" /></>} /></Routes>
+    </MemoryRouter>,
+  );
+  expect(await screen.findByTestId("print-checkin-row")).toHaveTextContent("Anna");
+  await userEvent.click(screen.getByText("weiter"));
+  await waitFor(() => expect(screen.queryByTestId("print-checkin-row")).not.toBeInTheDocument());
+  expect(screen.queryByText("Herbst-Cup")).not.toBeInTheDocument();
+  expect(screen.getByTestId("print-loading")).toBeInTheDocument();
 });
