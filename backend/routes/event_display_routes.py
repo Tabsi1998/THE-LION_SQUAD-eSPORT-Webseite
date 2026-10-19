@@ -54,7 +54,12 @@ async def get_event_display(slug_or_id: str, key: str | None = None):
         tournament["public_phase"] = derive_public_phase(tournament, "tournament")
     for row in (*tournaments, *challenges):
         row["event_day"] = event_days.day_of(event, row.get("start_date"))
-    # Die Stationen des Events und seiner Turniere - eine Station, die an beidem hängt, nur einmal.
-    station_query = {"$or": [{"event_id": event["id"]}, {"tournament_id": {"$in": [row["id"] for row in tournaments]}}]}
-    stations = {row["id"]: row for row in await db.stations.find(station_query, {"_id": 0}).to_list(500) if row.get("id")}
+    # Die Stationen der gezeigten Turniere und die nur am Event - eine Station, die an beidem hängt, nur einmal. Hängt
+    # eine Station an einem Turnier, entscheidet das Turnier: eines, das die Tafel nicht zeigt, nimmt sie mit hinaus.
+    shown_ids = {row["id"] for row in tournaments}
+    station_query = {"$or": [{"event_id": event["id"]}, {"tournament_id": {"$in": sorted(shown_ids)}}]}
+    stations = {
+        row["id"]: row for row in await db.stations.find(station_query, {"_id": 0}).to_list(500)
+        if row.get("id") and (row["tournament_id"] in shown_ids if row.get("tournament_id") else True)
+    }
     return display_event_payload(event, tournaments, challenges, event_days.schedule_view(event), brackets, list(stations.values()))

@@ -255,3 +255,30 @@ async def test_event_keys_only_for_events_the_event_page_could_show(flow):
         assert stations.json() == [], fields
     await flow.db.events.update_one({"id": event["id"]}, {"$set": {"status": "live", "visibility": "public"}})
     assert (await hall(flow, event["id"], token)).status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_stations_of_tournaments_the_hall_does_not_show_stay_off_it(flow):
+    """Eine Station, die am Event und an einem Turnier hängt, das die Tafel nicht zeigt (intern, Entwurf, nicht
+    öffentlich), steht nicht auf der Tafel - auch nicht über das Event. Stationen nur am Event bleiben."""
+    staff = await flow.add_user(role="tournament_admin", name="Turnierleitung")
+    flow.act_as(staff)
+    event = await event_of(flow)
+    shown_cup, _ = await cup_of(flow, event, "Probelauf-Cup", visibility="members")
+    internal_cup, _ = await cup_of(flow, event, "Intern-Test", visibility="internal")
+    draft = await flow.create_tournament(title="Entwurf", event_id=event["id"], status="draft")
+    hidden_cup, _ = await cup_of(flow, event, "Nicht öffentlich", is_public=False)
+    rows = [
+        {"id": new_id(), "name": "Switch 1", "device_type": "switch2", "status": "free", "event_id": event["id"], "tournament_id": shown_cup["id"]},
+        {"id": new_id(), "name": "PC intern", "device_type": "pc", "status": "busy", "event_id": event["id"], "tournament_id": internal_cup["id"]},
+        {"id": new_id(), "name": "PC Entwurf", "device_type": "pc", "status": "free", "event_id": event["id"], "tournament_id": draft["id"]},
+        {"id": new_id(), "name": "PC versteckt", "device_type": "pc", "status": "free", "event_id": event["id"], "tournament_id": hidden_cup["id"]},
+        {"id": new_id(), "name": "Beamer", "device_type": "beamer", "status": "free", "event_id": event["id"]},
+    ]
+    await flow.db.stations.insert_many([dict(row) for row in rows])
+    token = (await event_key(flow, event))["token"]
+    flow.act_as(None)
+    body = (await hall(flow, event["id"], token)).json()
+    assert sorted(row["name"] for row in body["stations"]) == ["Beamer", "Switch 1"]
+    for hidden in (internal_cup, draft, hidden_cup):
+        assert hidden["id"] not in json.dumps(body)
