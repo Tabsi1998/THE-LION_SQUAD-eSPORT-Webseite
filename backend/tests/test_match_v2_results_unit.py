@@ -7,6 +7,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 
 from services.match_v2_results import (
     MatchV2ResultError,
+    _pot_ranks,
     build_v2_result_application,
     is_v2_result_replay,
     normalize_v2_results,
@@ -123,6 +124,42 @@ def test_without_a_mark_a_missing_participant_is_still_an_error():
     match = _heat_with_no_show()
     with pytest.raises(MatchV2ResultError, match="alle belegten Teilnehmer"):
         normalize_v2_results(match, [{"registration_id": "r4", "rank": 1}, {"registration_id": "r1", "rank": 2}])
+
+
+@pytest.mark.parametrize(("ranking", "winners", "losers"), [
+    # Ausgetreten unter den Weiterkommern: der Dritte rückt ins Sieger-Ziel, ins Loser Bracket nur noch der Vierte.
+    (["r1", "r2", "r3", "r4"], ["r2", "r3"], ["r4", None]),
+    # Ausgetreten unter den Verlierern: auf dem Verlierer-Weg rückt der Nächste auf.
+    (["r2", "r3", "r1", "r4"], ["r2", "r3"], ["r4", None]),
+])
+def test_a_withdrawn_heat_player_moves_the_others_up_on_both_paths(ranking, winners, losers):
+    """#1823 (Austritt während des Laufs, Läufe-Cup mit Loser Bracket): steht eine ausgetretene Person im Ergebnis,
+    rücken die anderen auf dem Sieger- und dem Verlierer-Weg auf - niemand wird zweimal weitergeleitet."""
+    source = {**_source_match(), "match_type": "ffa"}
+
+    application = build_v2_result_application(
+        source,
+        [source, _target("m-b", "B"), _target("m-l", "L")],
+        [{"registration_id": registration_id, "rank": rank} for rank, registration_id in enumerate(ranking, start=1)],
+        actor_id="admin",
+        now_iso="2026-05-08T12:00:00+00:00",
+        eliminated={"r1"},
+    )
+
+    assert [slot["registration_id"] for slot in application["target_sets"]["m-b"]["slots"]] == winners
+    assert [slot["registration_id"] for slot in application["target_sets"]["m-l"]["slots"]] == losers
+
+
+def test_the_draw_pot_moves_the_others_up_on_both_paths_too():
+    """Gemischte Runden (#1548) losen aus demselben Stand: wer im Lauf auf den Sieger-Weg aufrückt, kommt nicht
+    zugleich in den Topf des Loser Bracket (#1823)."""
+    source = {**_source_match(), "match_type": "ffa"}
+    results = [{"registration_id": f"r{rank}", "rank": rank} for rank in range(1, 5)]
+
+    loser_path, winner_path = _pot_ranks(source, results, {"r1"})
+
+    assert [winner_path[rank]["registration_id"] for rank in (1, 2)] == ["r2", "r3"]
+    assert loser_path[3]["registration_id"] == "r4" and 4 not in loser_path
 
 
 def test_normalize_v2_results_auto_ranks_fastest_time_when_configured():

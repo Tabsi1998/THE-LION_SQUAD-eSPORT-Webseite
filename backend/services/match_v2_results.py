@@ -742,14 +742,16 @@ def _note_instant_assignment(target: dict, slot: dict, source: dict, now_iso: st
 
 
 def _pot_ranks(source: dict, results: list[dict], gone: set[str]) -> tuple[dict[int, dict], dict[int, dict]]:
-    """Wer auf welchem Platz steht - für den Verlierer-Weg wie gewertet, für den Sieger-Weg ohne Ausgeschiedene
-    (#1553: im Lauf rücken die Nächsten auf, wie in ``build_v2_result_application``)."""
+    """Wer auf welchem Platz steht - für Verlierer- und Sieger-Weg; im Lauf ohne Ausgeschiedene (#1553: die Nächsten
+    rücken auf, wie in ``build_v2_result_application``; wer auf dem Sieger-Weg aufrückt, kommt nicht zugleich in den
+    Topf des Loser Bracket, #1823)."""
     by_rank = {int(row.get("rank") or 0): row for row in results}
     if not gone or source.get("match_type") != "ffa":
         return by_rank, by_rank
     staying = [row for row in sorted(results, key=lambda row: int(row.get("rank") or 0))
                if row.get("registration_id") not in gone]
-    return by_rank, {index: row for index, row in enumerate(staying, start=1)}
+    moved_up = {index: row for index, row in enumerate(staying, start=1)}
+    return moved_up, moved_up
 
 
 def _group_is_ready(targets: list[dict]) -> bool:
@@ -1178,11 +1180,11 @@ def build_v2_result_application(
 
     results = normalize_v2_results(match, raw_results)
     eliminated = set(eliminated or ())
-    result_by_rank = {entry["rank"]: entry for entry in results}
-    winner_path_by_rank = result_by_rank
+    path_by_rank = {entry["rank"]: entry for entry in results}
     if eliminated and match.get("match_type") == "ffa":
-        # Plätze rücken auf: der Sieger-Weg zählt nur, wer noch im Turnier ist.
-        winner_path_by_rank = {index: entry for index, entry in enumerate(
+        # Plätze rücken auf: Sieger- und Verlierer-Weg zählen nur, wer noch im Turnier ist - wer auf dem Sieger-Weg
+        # aufrückt, steht nicht zugleich im Loser Bracket (#1823).
+        path_by_rank = {index: entry for index, entry in enumerate(
             (entry for entry in results if entry["registration_id"] not in eliminated), start=1)}
     by_id, by_key = _target_lookup(stage_matches)
     downstream = _downstream_links(stage_matches)
@@ -1198,7 +1200,7 @@ def build_v2_result_application(
             raise MatchV2ResultError(f"Zielmatch {advancement.get('to_match_key')} nicht gefunden")
         result_rank = _advancement_result_rank(match, advancement)
         flow = advancement.get("flow")
-        result = (winner_path_by_rank if flow == "W" else result_by_rank).get(result_rank)
+        result = path_by_rank.get(result_rank)
         skip_reason = None
         if result and result["registration_id"] in eliminated:
             skip_reason = "eliminated"

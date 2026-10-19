@@ -216,3 +216,30 @@ async def test_undo_after_the_result_reopens_the_heat_with_the_mark(flow):
     assert stored["no_show_registration_ids"] == [missing], "die Markierung bleibt für das neue Eintragen"
     after = await by_key(flow, tournament)
     assert from_heat(after["F"], heat) == {} and from_heat(after["LA"], heat) == {}
+
+
+
+@pytest.mark.asyncio
+async def test_a_withdrawal_during_the_heat_keeps_it_open_for_the_others(flow):
+    tournament, heat, _user_of = await heats_cup(flow)
+    gone, missing, third, fourth = seats(heat)
+    plan = (await flow.post(f"/api/tournaments/{tournament['id']}/registrations/{gone}/removal",
+                            json={"kind": "withdrawn"})).json()["plan"]
+    applied = await flow.post(f"/api/tournaments/{tournament['id']}/registrations/{gone}/removal",
+                              json={"kind": "withdrawn", "plan_id": plan["id"]})
+    assert applied.status_code == 200, applied.text
+    assert (await flow.reload(heat))["status"] in {"ready", "scheduled"}, "der aufgerufene Lauf bleibt, wie er ist"
+    # Mit einer ausgetretenen Person im Lauf schlägt die Frist nichts vor (match_deadline_sweep) - die Leitung markiert.
+    marked = await flow.post(f"/api/matches/{heat['id']}/forfeit",
+                             json={"forfeit_registration_id": missing, "note": "Nicht am Platz"})
+    assert marked.status_code == 200, marked.text
+    assert (await flow.reload(heat))["status"] in {"ready", "scheduled"}
+
+    response = await flow.post(f"/api/matches/{heat['id']}/result", json={"results": [
+        {"registration_id": fourth, "rank": 1}, {"registration_id": gone, "rank": 2}, {"registration_id": third, "rank": 3}]})
+    assert response.status_code == 200, response.text
+    after = await by_key(flow, tournament)
+    # Wer ausgetreten ist, rückt nirgends ein - die anderen rücken auf; wer aufrückt, steht nicht zugleich im Loser
+    # Bracket. Wer nicht erschienen ist, kommt nur auf dem Verlierer-Weg weiter (wie im Duell).
+    assert set(from_heat(after["F"], heat).values()) == {fourth, third}
+    assert set(from_heat(after["LA"], heat).values()) == {missing}
