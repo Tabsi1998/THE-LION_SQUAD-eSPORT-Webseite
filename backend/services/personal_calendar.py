@@ -147,7 +147,7 @@ async def hint_due(db, user_id: str, active: bool) -> bool:
     """Der Hinweis nach einer Anmeldung: nur ohne aktiven Link und nur, solange er nicht schon einmal erschienen ist."""
     if active:
         return False
-    row = await db.users.find_one({"id": user_id}, {"_id": 0, HINT_FIELD: 1}) or {}
+    row = await db.users.find_one({"id": user_id}, {"_id": 0, "calendar_subscribe_hint_seen_at": 1}) or {}
     return not row.get(HINT_FIELD)
 
 
