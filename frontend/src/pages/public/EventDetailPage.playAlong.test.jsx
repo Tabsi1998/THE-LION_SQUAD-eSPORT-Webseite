@@ -68,7 +68,7 @@ test("nach der Event-Anmeldung kommt „Spielst du auch mit?“ - „Nein danke�
 test("ohne Turniere und Fast Laps bleibt es ein Schritt", async () => {
   renderPage({ ...EVENT, tournaments: [] });
   await registerForEvent();
-  await waitFor(() => expect(apiMock.get.mock.calls.filter(([url]) => !url.includes("friends"))).toHaveLength(2));
+  await waitFor(() => expect(apiMock.get.mock.calls.filter(([url]) => !url.includes("friends") && url !== "/calendar/hint")).toHaveLength(2));
   expect(screen.queryByTestId("play-along-sheet")).toBeNull();
   expect(apiMock.get.mock.calls.some(([url]) => url.endsWith("/play-along"))).toBe(false);
 });
