@@ -283,6 +283,8 @@ function App() {
           <Route path="/events/:slug/live" element={<EventLivePage />} />
           <Route path="/events/:slug/leitung" element={<EventLeadPage />} />
           <Route path="/calendar" element={<CalendarPage />} />
+          {/* „Mein Kalender“ (#1788): nur die eigenen Termine, auch ohne Abo - der Reiter neben „Alle“. */}
+          <Route path="/calendar/mine" element={<CalendarPage />} />
           <Route path="/advent" element={<AdventCalendarPage />} />
           <Route path="/ostern" element={<EasterHuntPage />} />
           <Route path="/teams" element={<TeamsPage />} />

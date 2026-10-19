@@ -168,38 +168,99 @@ test("Mitglieder sehen Versammlungen und eigene Schichten in Vereinsgold (#1305)
   expect(shift).toHaveTextContent("Helferschicht");
 });
 
-// „Nur meine“ und der persönliche Link (#1189).
-function respondSignedIn(items, personal = { active: false, created_at: null, last_used_at: null }) {
+
+// „Mein Kalender“ (#1788) und der persönliche Link (#1189).
+function respondSignedIn(items, personal = { active: false, created_at: null, last_used_at: null }, mine = []) {
   apiMock.get.mockImplementation(async (url) => {
     if (url === "/calendar/personal") return { data: personal };
+    if (url === "/calendar/me") return { data: { items: mine, subscription: personal, hint_due: false } };
     return { data: { items, signed_in: true, feed_path: "/api/calendar/feed.ics" } };
   });
 }
 
-test("ohne Login weder „Nur meine“ noch persönlicher Link", async () => {
+// Wie der Server sie liefert: nur eigene Termine, je Termin mit Stand.
+const MINE = [
+  { ...ITEMS[2], own: { state: "approved", label: "Du bist dabei", team_name: "Lions Rocket" } },
+  { id: "e-lan", kind: "event", slug: "lan", title: "Herbst-LAN", start: "2099-10-01T16:00:00+02:00", end: "2099-10-01T23:00:00+02:00", status: "scheduled", phase: null, location: "Vereinsheim", path: "/events/lan", visibility: "public", mine: true, marker: null, own: { state: "waitlist", label: "Warteliste" } },
+  { ...CLUB[1], start: "2099-10-03T20:00:00+00:00", end: "2099-10-03T23:00:00+00:00", day: "2099-10-03", own: { state: "requested", label: "Angefragt" } },
+  { id: "f-old", kind: "fastlap", slug: "monza", title: "Fast Lap Monza", start: "2099-09-01T10:00:00+02:00", end: "2099-09-03T10:00:00+02:00", status: "completed", phase: null, path: "/fastlap/monza", visibility: "public", mine: true, marker: null, own: { state: "driven", label: "Du bist gefahren" } },
+];
+
+function renderMine() {
+  render(<MemoryRouter initialEntries={["/calendar/mine"]}><CalendarPage /></MemoryRouter>);
+}
+
+test("ohne Login kein persönlicher Link; „Mein Kalender“ bittet ums Login", async () => {
   respond([...ITEMS, ...CLUB]);
   await renderPage("Oktober 2099");
-  expect(screen.queryByTestId("calendar-only-mine")).toBeNull();
   expect(screen.queryByTestId("calendar-personal")).toBeNull();
   expect(apiMock.get).not.toHaveBeenCalledWith("/calendar/personal");
+  expect(screen.getByTestId("calendar-scope-mine")).toHaveAttribute("href", "/calendar/mine");
+  expect(screen.getByTestId("calendar-scope-all")).toHaveAttribute("aria-current", "page");
+
+  apiMock.get.mockReset();
+  apiMock.get.mockRejectedValue({ response: { status: 401 } });
+  renderMine();
+  expect(await screen.findByTestId("calendar-mine-login")).toHaveTextContent("Melde dich an");
+  expect(screen.queryByTestId("calendar-personal")).toBeNull();
 });
 
-test("„Nur meine“ zeigt nur, wofür man angemeldet ist - auch bei den Vereinsterminen", async () => {
-  respondSignedIn([...ITEMS, ...CLUB]);
+test("Mein Kalender: Heute, Diese Woche, Später - mit Stand je Termin, Vergangenes fehlt", async () => {
   window.localStorage.setItem("tls_calendar_view", "list");
-  render(<MemoryRouter><CalendarPage /></MemoryRouter>);
-  await screen.findByTestId("calendar-only-mine");
-  const list = screen.getByTestId("calendar-list");
-  expect(within(list).getByTestId("calendar-item-event-e-fest")).toBeInTheDocument();
-  await userEvent.click(screen.getByTestId("calendar-only-mine"));
-  expect(screen.getByTestId("calendar-only-mine")).toHaveAttribute("aria-pressed", "true");
-  expect(within(list).queryByTestId("calendar-item-event-e-fest")).toBeNull();
-  expect(within(list).getByTestId("calendar-item-tournament-t-cup")).toBeInTheDocument();
-  expect(within(list).getByTestId("calendar-item-club-shift-5-52")).toBeInTheDocument();
-  expect(within(list).queryByTestId("calendar-item-club-meeting-7")).toBeNull();
+  respondSignedIn(ITEMS, undefined, MINE);
+  renderMine();
+  const list = await screen.findByTestId("calendar-list");
+  expect(apiMock.get).toHaveBeenCalledWith("/calendar/me");
+  expect(apiMock.get).not.toHaveBeenCalledWith("/calendar");
+  expect(screen.getByTestId("calendar-scope-mine")).toHaveAttribute("aria-current", "page");
+  expect(screen.getByTestId("calendar-view-list")).toHaveTextContent("Als Nächstes");
+
+  // 1. Oktober 2099 ist ein Donnerstag: die LAN heute, die Schicht am Samstag diese Woche, das Turnier später.
+  expect(within(screen.getByTestId("calendar-bucket-today")).getByTestId("calendar-item-event-e-lan")).toBeInTheDocument();
+  expect(within(screen.getByTestId("calendar-bucket-week")).getByTestId("calendar-item-club-shift-5-52")).toBeInTheDocument();
+  expect(within(screen.getByTestId("calendar-bucket-later")).getByTestId("calendar-item-tournament-t-cup")).toBeInTheDocument();
+  expect(within(list).queryByTestId("calendar-item-fastlap-f-old")).toBeNull();
+
+  expect(screen.getByTestId("calendar-badge-tournament-t-cup")).toHaveTextContent("Du bist dabei · mit Lions Rocket");
+  expect(screen.getByTestId("calendar-badge-event-e-lan")).toHaveAttribute("data-tone", "wait");
+  expect(screen.getByTestId("calendar-badge-club-shift-5-52")).toHaveAttribute("data-tone", "club");
+  expect(screen.getByTestId("calendar-item-tournament-t-cup")).toHaveAttribute("href", "/tournaments/autumn-cup");
+
+  // Gestaffelt eingeblendet: jede Zeile trägt ihre Stelle.
+  const rows = list.querySelectorAll("li.tls-cal-enter");
+  expect(rows).toHaveLength(3);
+  expect(rows[0].style.getPropertyValue("--tls-i")).toBe("0");
+
+  // Art ausblenden wie im Vereinskalender; es stehen nur Arten da, die vorkommen.
+  expect(screen.getByTestId("calendar-kind-club")).toBeInTheDocument();
+  await userEvent.click(screen.getByTestId("calendar-kind-club"));
+  expect(screen.queryByTestId("calendar-item-club-shift-5-52")).toBeNull();
+
+  // Darunter der Kasten fürs Abo.
+  expect(await screen.findByTestId("calendar-personal")).toHaveTextContent("Automatisch in deinen Kalender");
+  expect(screen.queryByTestId("calendar-subscribe")).toBeNull();
 });
 
-test("Persönlicher Link: erzeugen zeigt die Adresse einmal, neu erzeugen fragt nach, abschalten", async () => {
+test("Mein Kalender als Monat zeigt die eigenen Termine im Raster", async () => {
+  respondSignedIn(ITEMS, undefined, MINE);
+  renderMine();
+  await waitFor(() => expect(screen.getByTestId("calendar-title")).toHaveTextContent("Oktober 2099"));
+  expect(screen.getByTestId("calendar-dot-2099-10-12-tournament")).toBeInTheDocument();
+  expect(screen.getByTestId("calendar-day-2099-10-12").className).toContain("border-brand");
+  expect(screen.queryByTestId("calendar-dot-2099-10-05-event")).toBeNull();
+});
+
+test("Mein Kalender leer: freundlich, mit Weg zu Turnieren und Events und dem Abo-Kasten", async () => {
+  respondSignedIn(ITEMS, undefined, []);
+  renderMine();
+  const empty = await screen.findByTestId("calendar-mine-empty");
+  expect(within(empty).getByRole("link", { name: "Turniere ansehen" })).toHaveAttribute("href", "/tournaments");
+  expect(within(empty).getByRole("link", { name: "Events ansehen" })).toHaveAttribute("href", "/events");
+  expect(screen.queryByTestId("calendar-view")).toBeNull();
+  expect(await screen.findByTestId("calendar-personal")).toBeInTheDocument();
+});
+
+test("Persönlicher Link: erzeugen zeigt die Adresse einmal, neu erzeugen und abschalten fragen nach", async () => {
   respondSignedIn(ITEMS);
   apiMock.post.mockResolvedValue({ data: { active: true, path: "/api/calendar/personal/geheim-123.ics", created_at: "2099-10-01T10:00:00+00:00", last_used_at: null } });
   apiMock.delete.mockResolvedValue({ data: { active: false } });
@@ -209,6 +270,9 @@ test("Persönlicher Link: erzeugen zeigt die Adresse einmal, neu erzeugen fragt 
   expect(apiMock.post).toHaveBeenCalledWith("/calendar/personal");
   expect(screen.getByTestId("calendar-personal-feed-url")).toHaveValue(`${window.location.origin}/api/calendar/personal/geheim-123.ics`);
   expect(screen.getByTestId("calendar-personal-webcal").getAttribute("href")).toMatch(/^webcal:\/\/.*\/api\/calendar\/personal\/geheim-123\.ics$/);
+  expect(screen.getByTestId("calendar-personal-google").getAttribute("href")).toBe(
+    `https://calendar.google.com/calendar/r?cid=${encodeURIComponent(screen.getByTestId("calendar-personal-webcal").getAttribute("href"))}`,
+  );
   expect(screen.getByTestId("calendar-personal-once")).toBeInTheDocument();
   // Der öffentliche Feed bleibt daneben unverändert.
   expect(screen.getByTestId("calendar-feed-url")).toHaveValue(`${window.location.origin}/api/calendar/feed.ics`);
@@ -219,6 +283,9 @@ test("Persönlicher Link: erzeugen zeigt die Adresse einmal, neu erzeugen fragt 
   expect(apiMock.post).toHaveBeenCalledTimes(2);
 
   await userEvent.click(screen.getByTestId("calendar-personal-revoke"));
+  expect(apiMock.delete).not.toHaveBeenCalled();
+  expect(screen.getByTestId("calendar-personal-confirm-text")).toHaveTextContent("Dein Abo endet");
+  await userEvent.click(screen.getByTestId("calendar-personal-revoke-confirm"));
   expect(apiMock.delete).toHaveBeenCalledWith("/calendar/personal");
   expect(screen.queryByTestId("calendar-personal-feed-url")).toBeNull();
   expect(screen.getByTestId("calendar-personal-create")).toBeInTheDocument();
@@ -228,6 +295,19 @@ test("Persönlicher Link schon aktiv: keine Adresse, nur der Stand", async () =>
   respondSignedIn(ITEMS, { active: true, created_at: "2099-09-01T10:00:00+00:00", last_used_at: "2099-09-30T08:00:00+00:00" });
   render(<MemoryRouter><CalendarPage /></MemoryRouter>);
   const active = await screen.findByTestId("calendar-personal-active");
-  expect(active).toHaveTextContent("Dein Link ist aktiv");
+  expect(active).toHaveTextContent("Aktiv seit");
+  expect(active).toHaveTextContent("zuletzt abgerufen");
   expect(screen.queryByTestId("calendar-personal-feed-url")).toBeNull();
+});
+
+test("Kopieren bestätigt mit Haken", async () => {
+  respond(ITEMS);
+  const writeText = vi.fn().mockResolvedValue();
+  Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
+  await renderPage("Oktober 2099");
+  await userEvent.click(screen.getByTestId("calendar-feed-copy"));
+  expect(writeText).toHaveBeenCalledWith(`${window.location.origin}/api/calendar/feed.ics`);
+  expect(screen.getByTestId("calendar-feed-copy")).toHaveAttribute("data-copied", "true");
+  expect(screen.getByTestId("calendar-feed-copy").querySelector(".tls-copy-check")).not.toBeNull();
+  expect(screen.getByText("Abo-Adresse kopiert")).toBeInTheDocument();
 });
