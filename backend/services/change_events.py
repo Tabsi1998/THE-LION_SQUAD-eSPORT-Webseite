@@ -37,6 +37,8 @@ PUBLIC_RESOURCES = frozenset({
     "news",
     "partners",
     "references",
+    # Externe Serien (#1741): Tabellen und Kalender der Serienseiten laden nach jeder Änderung neu.
+    "reference-series",
     "seasons",
     "sponsors",
     "stations",

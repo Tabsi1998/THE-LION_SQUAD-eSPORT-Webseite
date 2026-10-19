@@ -6,15 +6,17 @@ und für den Betreiber in ``DATA_PROTECTION.md``:
 
 - **Gelöscht**, weil ohne Konto ohne Zweck: XP und ihre Ereignisse, Erfolge, Einladungen zur Mitgliedschaft und in
   Teams, die Tokens der Mitgliedskarte, der persönliche Kalender-Link (#1189), Discord-Aktivität und -Zugehörigkeit,
-  die Warteschlangen der Erfolge, Stream-Zustände, Aufgaben im Turnier- und F1-Team, Lesestände, Sticker, die
-  Verbindung zur Mitgliederakte, der selbst angelegte Eintrag im Mitgliederverzeichnis und die eigenen Bilder.
+  die Warteschlangen der Erfolge, Stream-Zustände, Aufgaben im Turnier- und F1-Team und als Captain einer externen
+  Serie, Lesestände, Sticker, die Verbindung zur Mitgliederakte, der selbst angelegte Eintrag im Mitgliederverzeichnis
+  (samt Aliasen externer Serien darauf) und die eigenen Bilder.
 - **Überschrieben**, weil die Zeile als Zählung oder Nachweis bleibt: Anmeldungen zu Events und Turnieren,
   Mitgliedsanträge, Rundenzeiten, Gewinne, die Textauszüge der Moderation, Zugangslinks, Kontaktanfragen und
   gespeicherte Namen (News-Beitrag, Protokoll der Erfolge, Daten im Adminprotokoll).
 - **Gelöst**, nicht gelöscht: Vorstandsposten sowie redaktionelle und aus der Mitgliederverwaltung stammende
   Einträge im Verzeichnis verlieren nur die Verknüpfung zum Konto - sie gehören dem Verein. Ebenso der Einlass bei
   einer Generalversammlung (``meeting_admissions``, #845): die Anwesenheit ist Sache des Vereins; wer als Vorstand
-  selbst eingelassen hat, steht dort danach ohne Namen.
+  selbst eingelassen hat, steht dort danach ohne Namen. Teilnehmer externer Serien, die auf den selbst angelegten
+  Eintrag zeigten (#1741), werden extern und ihr Name ausgeblendet - Ergebnis und Tabelle bleiben.
 """
 from __future__ import annotations
 
@@ -48,6 +50,8 @@ PURGED = (
     "dolibarr_honours",
     # Seit #1585: der Platz in der Liste „Am Start / Als Nächstes“ einer Fast Lap.
     "f1_queue",
+    # Seit #1741: Captain einer externen Serie.
+    "reference_series_staff",
 )
 # Angaben zur Person, die in den Daten des Adminprotokolls stehen können (#1029). Der Vorgang bleibt, die Angaben nicht.
 AUDIT_PERSONAL_KEYS = ("display_name", "username", "real_name", "first_name", "last_name", "nickname", "email", "phone", "address",
@@ -73,8 +77,18 @@ async def _directory(db, user_id: str, now: str) -> list[str]:
     ).to_list(50)
     if own:
         await db.club_member_profiles.delete_many({"id": {"$in": [row["id"] for row in own]}})
+        await _series_links(db, [row["id"] for row in own], now)
     await db.club_member_profiles.update_many({"user_id": user_id}, {"$set": {"user_id": None, "updated_at": now}})
     return [row[field] for row in own for field in ("photo_url", "cover_url") if row.get(field)]
+
+
+async def _series_links(db, profile_ids: list[str], now: str) -> None:
+    """Externe Serien (#1741) zeigen auf Vereinsprofile, nie auf Konten. Geht das eigene Profil mit dem Konto, wird
+    der Teilnehmer extern und sein Name (wie beim Veranstalter) ausgeblendet - Ergebnis und Tabelle bleiben; ein Alias
+    auf das Profil hat keinen Zweck mehr. Einträge des Vereins im Verzeichnis bleiben und mit ihnen die Verknüpfung."""
+    await db.reference_participants.update_many({"profile_id": {"$in": profile_ids}}, {"$set": {
+        "profile_id": None, "link": "external", "name_hidden": True, "updated_at": now}})
+    await db.reference_aliases.delete_many({"profile_id": {"$in": profile_ids}})
 
 
 async def _applications(db, user_id: str, now: str) -> None:

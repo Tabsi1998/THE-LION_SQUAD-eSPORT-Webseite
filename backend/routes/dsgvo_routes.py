@@ -240,6 +240,8 @@ async def _user_data_sections(db, user_id: str) -> list[tuple[str, tuple]]:
         ("schedule_proposals", _rows(db.match_schedule_proposals, {"actor_user_id": user_id}, _pick(*PROPOSAL))),
         ("match_proof_photos", _rows(db.match_proof_photos, {"owner_id": user_id}, _pick(*PROOF_PHOTO))),
         ("f1_staff", _rows(db.f1_staff_assignments, me)),
+        # Captain einer externen Serie (#1741, #1749): je Serie die Aufgabe, ob veröffentlicht werden darf, und der Ablauf.
+        ("reference_series_staff", _rows(db.reference_series_staff, me)),
         ("season_standings", _rows(db.season_standings, me)),
         ("season_rank_history", _rows(db.season_rank_snapshots, me)),
         ("upload_events", _rows(db.upload_events, {"owner_id": user_id}, _pick(*UPLOAD_EVENT))),

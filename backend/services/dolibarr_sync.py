@@ -375,7 +375,8 @@ async def _find_directory_profile(db, member_id: int, user_id: str | None, name:
 async def _merge_duplicate_profile(db, primary: dict, dup: dict) -> None:
     """Ein vom Abgleich angelegtes Doppel geht im gepflegten Profil auf (#504): Einwilligung, Mitgliedsnummer
     und Dolibarr-Stand ziehen um, Foto/Kurztext/Spiele nur, wo das gepflegte Profil leer ist; Verweise
-    (Vorstand, Referenzen) hängen um. Nie von Hand bearbeitet → weg, sonst offline mit Grund `duplicate`."""
+    (Vorstand, Referenzen, Teilnehmer und Aliase externer Serien) hängen um. Nie von Hand bearbeitet → weg, sonst
+    offline mit Grund `duplicate`."""
     now = now_utc().isoformat()
     update: dict = {}
     for key in ("consent", "dolibarr_member_id", "dolibarr_name", "dolibarr_profile_at", "dolibarr_photo_sha", "user_id",
@@ -390,6 +391,9 @@ async def _merge_duplicate_profile(db, primary: dict, dup: dict) -> None:
     async for ref in db.references.find({"member_profile_ids": dup["id"]}, {"_id": 0, "id": 1, "member_profile_ids": 1}):
         ids = [primary["id"] if v == dup["id"] else v for v in ref.get("member_profile_ids") or []]
         await db.references.update_one({"id": ref["id"]}, {"$set": {"member_profile_ids": list(dict.fromkeys(ids))}})
+    # Externe Serien (#1741): Teilnehmer und Aliase zeigen danach auf das gepflegte Profil.
+    for collection in (db.reference_participants, db.reference_aliases):
+        await collection.update_many({"profile_id": dup["id"]}, {"$set": {"profile_id": primary["id"]}})
     untouched = dup.get("created_by") == ACTOR and dup.get("updated_by") == ACTOR
     if untouched:
         await db.club_member_profiles.delete_one({"id": dup["id"]})
