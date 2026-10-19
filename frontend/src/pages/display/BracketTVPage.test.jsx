@@ -59,6 +59,8 @@ test("mit Schlüssel im Link fragt der TV mit Schlüssel - und zeigt leere Plät
   renderTv("/display/bracket/t1?key=nur-anschauen&text_size=large");
   expect(await screen.findByText("Sieger aus A")).toBeInTheDocument();
   expect(apiMock.get).toHaveBeenCalledWith("/tournaments/t1/bracket/display", { params: { key: "nur-anschauen" } });
+  // Die Stationen mit demselben Schlüssel - auch bei Turnieren „Nur Mitglieder“ (#1822).
+  await waitFor(() => expect(apiMock.get).toHaveBeenCalledWith("/stations?tournament_id=t1", { params: { key: "nur-anschauen" } }));
   const tv = screen.getByTestId("bracket-tv");
   expect(tv).toHaveTextContent("Sieger aus B");
   expect(tv).toHaveTextContent("NeonFalke");
