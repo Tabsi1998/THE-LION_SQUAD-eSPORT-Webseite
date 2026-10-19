@@ -413,3 +413,15 @@ async def test_a_stale_calendar_is_refused_for_every_change_of_a_round(flow):
     assert restored.status_code == 200
     edited = await flow.patch(f"{_rounds(series)}/{a['id']}", json={"venue": "Süd", "expected_version": fresh + 2})
     assert edited.status_code == 200 and edited.json()["venue"] == "Süd"
+
+
+@pytest.mark.asyncio
+async def test_the_order_is_only_set_by_ordering_never_by_create_or_edit(flow):
+    _, _, series = await _setup(flow)
+    a = (await flow.post(_rounds(series), json={"code": "A", "day": "2026-11-19"})).json()
+    # Eine mitgeschickte Nummer zählt nicht - die Folge vergibt sie, doppelt geht es nicht.
+    b = (await flow.post(_rounds(series), json={"code": "B", "day": "2026-11-26", "order": 1})).json()
+    assert (a["order"], b["order"]) == (1, 2)
+    edited = await flow.patch(f"{_rounds(series)}/{b['id']}", json={"order": 1})
+    assert edited.status_code == 422
+    assert (await flow.db.reference_rounds.find_one({"id": b["id"]}))["order"] == 2

@@ -237,7 +237,8 @@ async def create_round(series_id: str, body: RoundCreateBody, me: dict = Depends
     else:
         when = _when_from_instant(body.starts_at)
     first = await _claim(db, series_id, body.expected_version, orders=1)
-    doc = _new_round(series_id, me, order=body.order or first, code=_text(body.code),
+    # Die Nummer vergibt immer die Folge - ein mitgeschicktes ``order`` zählt nicht (Reihenfolge nur über Ordnen).
+    doc = _new_round(series_id, me, order=first, code=_text(body.code),
                      title=_text(body.title), venue=_text(body.venue), **when, kind=body.kind, counts=body.counts,
                      opponent=_text(body.opponent), note=_text(body.note))
     await db.reference_rounds.insert_one(doc)
@@ -254,10 +255,12 @@ async def update_round(series_id: str, round_id: str, body: RoundUpdateBody,
     await _series(db, series_id)
     existing = await _round(db, series_id, round_id)
     raw = body.model_dump(exclude_unset=True)
+    if "order" in raw:
+        raise HTTPException(422, "Die Reihenfolge ändern „Ordnen“ und „Nach Datum ordnen“.")
     if "status" in raw or "original_starts_at" in raw:
         raise HTTPException(422, "Den Status ändern Verschieben, Absagen und das Ergebnis.")
     updates: dict = {key: _text(raw[key]) for key in ("code", "title", "venue", "opponent", "note") if key in raw}
-    updates.update({key: raw[key] for key in ("kind", "counts", "order") if raw.get(key) is not None})
+    updates.update({key: raw[key] for key in ("kind", "counts") if raw.get(key) is not None})
     if "day" in raw or "time" in raw:
         day = raw["day"] if "day" in raw else existing.get("club_day")
         clock = raw["time"] if "time" in raw else vienna_clock(existing.get("starts_at"))
