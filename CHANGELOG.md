@@ -1,12 +1,11 @@
 # Changelog
 
-## [1.2.4](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/compare/v1.2.3...v1.2.4) (2026-10-19)
-
+## 1.2.4 (19.10.2026)
 
 ### Fehlerbehebungen
 
-* Erfolge „Sieger“ und „Siegesserie“ werten Unentschieden und Freilos nicht mehr als Sieg ([#1796](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1796)) ([a0e1bb2](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/a0e1bb21e29584ed792316e72bfebb6ca2ce4a38))
-* Sieg-Erfolge (z. B. „Zu Null“, Clutch, Favoritenschreck, Gruppensieg, Team-Siege) zählen jetzt auch eingetragene Ergebnisse ([#1796](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1796)) ([a0e1bb2](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/a0e1bb21e29584ed792316e72bfebb6ca2ce4a38))
+* Erfolge „Sieger“ und „Siegesserie“ werten Unentschieden und Freilos nicht mehr als Sieg (#1796)
+* Sieg-Erfolge (z. B. „Zu Null“, Clutch, Favoritenschreck, Gruppensieg, Team-Siege) zählen jetzt auch eingetragene Ergebnisse (#1796)
 
 ## 1.2.3 (19.10.2026)
 
