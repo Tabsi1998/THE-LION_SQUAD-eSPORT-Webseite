@@ -51,6 +51,19 @@ def test_section_is_the_release_text_of_one_version():
     assert tidy_changelog.section(RAW, "9.9.9") == ""
 
 
+def test_versions_with_a_pre_release_or_build_suffix_are_found():
+    raw = f"""# Changelog
+
+## [1.3.0-rc.1]({REPO}/compare/v1.2.0...v1.3.0-rc.1) (2026-10-20)
+
+### Neu
+
+* Vorabversion ([#1800]({REPO}/issues/1800)) ([abc1234]({REPO}/commit/abc1234def))
+"""
+    assert "## 1.3.0-rc.1 (20.10.2026)" in tidy_changelog.tidy(raw)
+    assert tidy_changelog.section(raw, "1.3.0-rc.1").startswith("### Neu")
+
+
 def test_cli_rewrites_the_file_and_prints_a_section(tmp_path, capsys):
     path = tmp_path / "CHANGELOG.md"
     path.write_text(RAW, encoding="utf-8")

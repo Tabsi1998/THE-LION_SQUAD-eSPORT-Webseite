@@ -25,8 +25,9 @@ import re
 import sys
 from pathlib import Path
 
-HEADER = re.compile(r"^##\s+\[?(?P<version>\d+\.\d+\.\d+)\]?(?:\([^)]*\))?\s*\((?P<date>\d{4}-\d{2}-\d{2})\)\s*$")
-TIDY_HEADER = re.compile(r"^##\s+(?P<version>\d+\.\d+\.\d+)\s+\((?P<date>\d{2}\.\d{2}\.\d{4})\)\s*$")
+VERSION = r"\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?"
+HEADER = re.compile(r"^##\s+\[?(?P<version>" + VERSION + r")\]?(?:\([^)]*\))?\s*\((?P<date>\d{4}-\d{2}-\d{2})\)\s*$")
+TIDY_HEADER = re.compile(r"^##\s+(?P<version>" + VERSION + r")\s+\((?P<date>\d{2}\.\d{2}\.\d{4})\)\s*$")
 COMMIT_LINK = re.compile(r"\s*\(\[[0-9a-f]{7,40}\]\([^)]*/commit/[0-9a-f]+\)\)")
 REF_LINK = re.compile(r"\(\[#(\d+)\]\([^)]*\)\)")
 PLAIN_REF = re.compile(r"\s*\(#(\d+)\)")
