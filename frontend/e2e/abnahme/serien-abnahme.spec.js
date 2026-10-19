@@ -13,6 +13,8 @@ const SHOTS = process.env.ABNAHME_SHOTS || "";
 async function shot(page, name) {
   if (!SHOTS) return;
   fs.mkdirSync(SHOTS, { recursive: true });
+  // Bilder fürs Handbuch: erst, wenn die Meldung „Gespeichert.“ wieder weg ist.
+  await expect(page.locator("[data-sonner-toast]")).toHaveCount(0, { timeout: 10_000 });
   await page.screenshot({ path: path.join(SHOTS, `${name}.png`), fullPage: true });
 }
 
