@@ -2,7 +2,8 @@
 Vorschläge mit Begründung bilden. Getroffen wird nur bei gleichem Schlüssel, nie bei bloß ähnlichen Namen; die
 Startnummer ist nur ein Hinweis. Nur erfundene Namen."""
 from services.series_identity import (
-    IdentityIndex, counts_for_club, club_participants, name_keys, normalize_name, strip_clan_tags, suggest,
+    IdentityIndex, club_participants, counts_for_club, exact_alias, is_usable_name, name_keys, normalize_name,
+    strip_clan_tags, suggest,
 )
 
 
@@ -25,6 +26,16 @@ def test_clan_tags_are_optional():
     assert strip_clan_tags("[TLS]") == "[TLS]"
     assert name_keys("[TLS] Probe Fahrer") == ("tlsprobefahrer", "probefahrer")
     assert name_keys("Probe Fahrer") == ("probefahrer",)
+
+
+def test_names_without_letters_or_digits_have_no_key():
+    for name in ("!!!", "🙂🙂", "[TLS]", "(TLS) [ABC]", "  ", "---"):
+        assert name_keys(name) == () and not is_usable_name(name), name
+    assert is_usable_name("[TLS] P") and is_usable_name("7")
+    # Ein leerer Schlüssel trifft nie - auch nicht einen (alten) Alias mit leerem Schlüssel.
+    index = IdentityIndex(profiles={"p-anna": "Anna Probe"}, game_id=None, aliases=[
+        {"name_normalized": "", "target": "member", "profile_id": "p-anna", "game_id": None}])
+    assert suggest(index, "!!!") == [] and exact_alias(index, "!!!") is None
 
 
 def test_similar_names_have_different_keys():

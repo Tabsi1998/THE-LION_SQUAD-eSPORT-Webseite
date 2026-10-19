@@ -196,6 +196,25 @@ async def test_batch_adds_new_names_and_skips_known_ones(flow):
 
 
 @pytest.mark.asyncio
+async def test_names_without_letters_or_digits_are_refused(flow):
+    ctx = await _setup(flow)
+    sid = ctx["first"]["id"]
+    for name in ("!!!", "🙂", "[TLS]"):
+        response = await flow.post(f"{ADMIN}/series/{sid}/participants", json={"name": name})
+        assert response.status_code == 422, name
+    response = await flow.post(f"{ADMIN}/series/{sid}/participants/batch", json={"names": ["!!!", "[TLS]", "Gut Probe", " "]})
+    assert [row["name"] for row in response.json()["created"]] == ["Gut Probe"]
+    assert response.json()["rejected"] == ["!!!", "[TLS]"] and response.json()["skipped"] == 3
+    row = response.json()["created"][0]
+    assert (await flow.patch(f"{ADMIN}/series/{sid}/participants/{row['id']}", json={"name": "🙂🙂"})).status_code == 422
+    # Ein alter Teilnehmer ohne Schlüssel bekommt nie einen Alias.
+    await flow.db.reference_participants.update_one({"id": row["id"]}, {"$set": {"name": "???", "name_normalized": ""}})
+    assert (await _assign(flow, sid, row["id"], link="member", profile_id="p-anna")).status_code == 422
+    assert (await _assign(flow, sid, row["id"], link="external")).status_code == 200
+    assert await flow.db.reference_aliases.count_documents({}) == 0
+
+
+@pytest.mark.asyncio
 async def test_editing_a_participant_never_changes_the_link(flow):
     ctx = await _setup(flow)
     sid = ctx["first"]["id"]

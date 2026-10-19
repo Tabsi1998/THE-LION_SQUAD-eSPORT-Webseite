@@ -49,8 +49,17 @@ def strip_clan_tags(value) -> str:
     return stripped if normalize_name(stripped) else text
 
 
+def is_usable_name(value) -> bool:
+    """Taugt der Name zum Wiedererkennen? Ohne Clan-Tags muss mindestens ein Buchstabe oder eine Ziffer bleiben -
+    „!!!“, nur Emoji oder nur „[TLS]“ werden abgelehnt und nie als Alias gespeichert oder abgeglichen."""
+    text = str(value or "")
+    return bool(normalize_name(_TRAILING_TAGS.sub("", _LEADING_TAGS.sub("", text))))
+
+
 def name_keys(value) -> tuple[str, ...]:
-    """Voller Schlüssel und - wenn anders - der ohne Clan-Tag."""
+    """Voller Schlüssel und - wenn anders - der ohne Clan-Tag. Leer, wenn der Name nicht taugt."""
+    if not is_usable_name(value):
+        return ()
     keys = [normalize_name(value), normalize_name(strip_clan_tags(value))]
     return tuple(key for key in dict.fromkeys(keys) if key)
 

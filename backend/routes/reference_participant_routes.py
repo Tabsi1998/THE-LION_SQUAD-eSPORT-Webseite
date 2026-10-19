@@ -47,6 +47,18 @@ def _clean(value) -> str:
     return " ".join(str(value or "").split())
 
 
+UNUSABLE_NAME = "Der Name braucht mindestens einen Buchstaben oder eine Ziffer (ohne Clan-Tag)."
+
+
+def _usable(name: str) -> str:
+    """Leer oder ohne Buchstaben und Ziffern („!!!“, nur Emoji, nur „[TLS]“) lässt sich nie wiedererkennen."""
+    if not name:
+        raise HTTPException(422, "Name fehlt.")
+    if not series_identity.is_usable_name(name):
+        raise HTTPException(422, UNUSABLE_NAME)
+    return name
+
+
 async def _series(db, series_id: str) -> dict:
     found = await db.reference_series.find_one({"id": series_id}, {"_id": 0})
     if not found:
@@ -237,8 +249,7 @@ async def create_participant(series_id: str, body: ReferenceParticipantCreate,
     db = get_db()
     series = await _series(db, series_id)
     fields = body.model_dump()
-    if not _clean(fields["name"]):
-        raise HTTPException(422, "Name fehlt.")
+    _usable(_clean(fields["name"]))
     index = await build_index(db, series, [fields["name"]], with_ids=False)
     doc = await _new_participant(db, series, index, fields, me)
     if doc["link_status"] == "decided":
@@ -253,9 +264,12 @@ async def create_participants(series_id: str, body: ParticipantBatch, me: dict =
     series = await _series(db, series_id)
     present = {row.get("name_normalized") async for row in db.reference_participants.find(
         {"series_id": series_id}, {"_id": 0, "name_normalized": 1})}
-    names = []
+    names, rejected = [], []
     for raw in body.names:
         name = _clean(raw)[:120]
+        if name and not series_identity.is_usable_name(name):
+            rejected.append(name)
+            continue
         key = series_identity.normalize_name(name)
         if key and key not in present:
             present.add(key)
@@ -264,7 +278,7 @@ async def create_participants(series_id: str, body: ParticipantBatch, me: dict =
     created = [await _new_participant(db, series, index, {"name": name}, me) for name in names]
     if any(row["link_status"] == "decided" for row in created):
         await reference_series.recompute_standings(db, series)
-    return {"created": created, "skipped": len(body.names) - len(created)}
+    return {"created": created, "skipped": len(body.names) - len(created), "rejected": rejected}
 
 
 @router.patch("/admin/series/{series_id}/participants/{participant_id}")
@@ -278,9 +292,7 @@ async def update_participant(series_id: str, participant_id: str, body: Referenc
     updates = {key: value for key, value in raw.items()
                if key not in LINK_FIELDS and (value is not None or key in PARTICIPANT_NULLABLE)}
     if "name" in updates:
-        updates["name"] = _clean(updates["name"])
-        if not updates["name"]:
-            raise HTTPException(422, "Name fehlt.")
+        updates["name"] = _usable(_clean(updates["name"]))
         updates["name_normalized"] = series_identity.normalize_name(updates["name"])
     for key in PARTICIPANT_NULLABLE & set(updates):
         updates[key] = _clean(updates[key]) or None
@@ -385,6 +397,8 @@ async def assign_participant(series_id: str, participant_id: str, body: Particip
             others = [sid for sid in moved if sid != series_id]
         source = "manual"
     else:
+        if not series_identity.is_usable_name(participant["name"]):
+            raise HTTPException(422, UNUSABLE_NAME + " Bitte erst den Namen korrigieren.")
         index = await build_index(db, series, [participant["name"]])
         suggested = {(item["target"], item["profile_id"]) for item in
                      series_identity.suggest(index, participant["name"], participant.get("start_number"))
