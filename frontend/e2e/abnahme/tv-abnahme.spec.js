@@ -300,3 +300,122 @@ test.describe("Abnahme: Turnierbaum-TV mit Auslosung und Live-Warteschlange (#16
     }
   });
 });
+
+/** Ändern wie die Website: PATCH mit dem CSRF-Kopf aus dem Cookie der Sitzung. */
+async function patch(page, url, data) {
+  const cookies = await page.context().cookies();
+  const csrf = decodeURIComponent(cookies.find((cookie) => cookie.name === "csrf_token")?.value || "");
+  return page.request.patch(url, { data, headers: csrf ? { "X-CSRF-Token": csrf } : {} });
+}
+
+/** Ein Link mit Schlüssel, angelegt vom Admin in eigener Sitzung über die echte Route (wie „TV & Beamer“). */
+async function keyPath(browser, target) {
+  const context = await browser.newContext();
+  try {
+    const admin = await context.newPage();
+    await signIn(admin, "admin");
+    const created = await post(admin, "/api/tv/keys", { ...target, label: "Abnahme-TV #1822" });
+    expect(created.status(), await created.text()).toBe(200);
+    return (await created.json()).path;
+  } finally {
+    await context.close();
+  }
+}
+
+/** Der Hallen-TV: nicht angemeldet, 1920×1080, jede Antwort 4xx/5xx und jeder Konsolenfehler zählt - ohne Ausnahme. */
+async function hallTv(browser) {
+  const context = await browser.newContext({ viewport: SCREENS.fhd });
+  const page = await context.newPage();
+  await signIn(page, "anon");
+  return { context, page, problems: watch(page) };
+}
+
+test.describe("Abnahme: Tafeln mit Event-Schlüssel (#1822) und Anmelde-QR im Check-in-Zeitraum (#1827)", () => {
+  test.skip(!ENABLED || !state, "nur mit ABNAHME=1 und einem befüllten Abnahme-Stand");
+  test.skip(({ isMobile }) => Boolean(isMobile), "Größen stellt der Test selbst ein");
+  test.skip(ENABLED && !state?.hall_event, "Stand ohne Vereinsabend - scripts/seed_abnahme.py neu laufen lassen");
+  test.describe.configure({ mode: "serial", timeout: 180_000 });
+
+  test("Aufruf im Cup „Nur Mitglieder“: mit Event-Schlüssel am TV ohne Anmeldung, ohne Schlüssel nicht - keine Fehler", async ({ browser, page }, testInfo) => {
+    test.skip(testInfo.project.name !== "chromium", "ein Lauf genügt");
+    const event = state.hall_event;
+    const tid = state.tournaments.hall_members;
+    const hallPath = await keyPath(browser, { event_id: event.id });
+    expect(hallPath).toMatch(/^\/display\/event\/[^/?]+\?key=[^&]+$/);
+    const callsPath = hallPath.replace("?", "/calls?");
+
+    // Die Turnierleitung ruft ein Spiel des Mitglieder-Cups an eine freie Station auf („Spiel zuweisen“).
+    await signIn(page, "lead");
+    const open = Object.values(await matchesOf(page, tid))
+      .filter((row) => Number(row.round) === 1 && seated(row).length === 2 && !["completed", "forfeit"].includes(row.status));
+    const match = open.find((row) => !row.station_id) || open[0];
+    expect(match, "ein spielbereites Spiel der ersten Runde").toBeTruthy();
+    const stationRows = await (await page.request.get(`/api/stations?tournament_id=${tid}`)).json();
+    const free = stationRows.find((row) => row.status === "free");
+    expect(free, "eine freie Station").toBeTruthy();
+    const assigned = await post(page, `/api/stations/${free.id}/assign/${match.id}`, {});
+    expect(assigned.status(), await assigned.text()).toBe(200);
+    const tree = await (await page.request.get(`/api/tournaments/${tid}/bracket`)).json();
+    const names = seated(match).map((id) => tree.registrations.find((reg) => reg.id === id)?.display_name).filter(Boolean);
+    expect(names).toHaveLength(2);
+
+    const { context, page: tv, problems } = await hallTv(browser);
+    try {
+      // Mit Schlüssel: der Aufruf mit Station, Namen und Countdown.
+      await tv.goto(callsPath);
+      const call = tv.getByTestId(`tv-call-${match.id}`);
+      await expect(call).toBeVisible({ timeout: TV_WAIT });
+      await expect(tv.getByTestId(`tv-call-station-${match.id}`)).toHaveText(free.name);
+      for (const name of names) await expect(call).toContainText(name);
+      await expect(tv.getByTestId(`tv-call-clock-${match.id}`)).toBeVisible();
+      await expect(tv.getByTestId("event-calls-tv")).toContainText("Probelauf-Cup");
+      await shot(tv, "tv-aufruf-tafel-mitglieder-fhd.png");
+      // Eine Weile laufen lassen (länger als eine Ersatz-Abfrage): weiter keine Fehler.
+      await tv.waitForTimeout(16_000);
+      await expect(call).toBeVisible();
+
+      // Die Hallen-Tafel desselben Events mit demselben Schlüssel: die Station steht als aufgerufen da.
+      await tv.goto(hallPath);
+      await expect(tv.getByTestId("tv-hall")).toContainText("Aufgerufen", { timeout: TV_WAIT });
+      await shot(tv, "tv-hallen-tafel-mitglieder-fhd.png");
+
+      // Ohne Schlüssel bleibt der Cup „Nur Mitglieder“ draußen - und die Tafel fragt nichts an, was abgelehnt wird.
+      await tv.goto(`/display/event/${event.id}/calls`);
+      await expect(tv.getByTestId("tv-call-board")).toBeVisible({ timeout: TV_WAIT });
+      await expect(tv.getByTestId(`tv-call-${match.id}`)).toHaveCount(0);
+      await expect(tv.getByTestId("event-calls-tv")).not.toContainText("Probelauf-Cup");
+      await tv.waitForTimeout(16_000);
+      expect(problems).toEqual([]);
+    } finally {
+      await context.close();
+    }
+  });
+
+  test("Turnierbaum-TV: Anmeldung offen, Check-in läuft schon - der TV zeigt weiter die Anmeldung mit freien Plätzen", async ({ browser, page }, testInfo) => {
+    test.skip(testInfo.project.name !== "chromium", "ein Lauf genügt");
+    const tid = state.tournaments.onsite_members;
+    // Vor Ort üblich: Einlass mit Anmeldung und Check-in zugleich - der Check-in-Zeitraum hat gerade begonnen.
+    await signIn(page, "admin");
+    const now = Date.now();
+    const changed = await patch(page, `/api/tournaments/${tid}`, {
+      check_in_from: new Date(now - 60_000).toISOString(), check_in_until: new Date(now + 60 * 60_000).toISOString(),
+    });
+    expect(changed.status(), await changed.text()).toBe(200);
+    const path = await keyPath(browser, { tournament_id: tid });
+    const shown = await (await page.request.get(`/api/tournaments/${tid}/bracket/display`, { params: { key: new URL(path, "http://x").searchParams.get("key") } })).json();
+    expect(shown.onsite_path, "der QR-Code trägt den Vor-Ort-Zugang").toMatch(/^\/vor-ort/);
+
+    const { context, page: tv, problems } = await hallTv(browser);
+    try {
+      await tv.goto(path);
+      await expect(tv.getByTestId("bracket-tv")).toHaveAttribute("data-screen", "registration", { timeout: TV_WAIT });
+      await expect(tv.getByTestId("tv-registration-seats")).toHaveText(/Noch \d+ von 8 Plätzen frei/);
+      await expect(tv.getByTestId("bracket-tv")).toContainText("QR scannen und anmelden");
+      await expect(tv.getByTestId("tv-checkin-screen")).toHaveCount(0);
+      await shot(tv, "tv-anmeldung-im-checkin-fhd.png");
+      expect(problems).toEqual([]);
+    } finally {
+      await context.close();
+    }
+  });
+});

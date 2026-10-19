@@ -559,6 +559,26 @@ async def inside_main() -> None:
         calendar_cup = await tournament(admin, game, f"Abnahme Kalender-Cup ({stamp})", quarter(now_utc() + timedelta(days=5)),
                                         format="single_elim", event_mode="online", max_participants=16)
         state["tournaments"]["calendar_cup"] = calendar_cup["id"]
+
+        # Hallen- und Aufruf-Tafel mit Event-Schlüssel (#1822): ein öffentliches Event, das gerade läuft, mit einem
+        # öffentlichen Sofort-Cup und einem Cup „Nur Mitglieder“ - beide vor Ort, K.-o. 8, live, zwei Stationen,
+        # Turnierleitung eingeteilt. Den Aufruf und den TV-Schlüssel legt die Abnahme selbst an (tv-abnahme.spec.js).
+        hall_start = quarter(now_utc() - timedelta(hours=1))
+        hall_event = await admin.call("POST", "/api/events", json={
+            "name": f"Abnahme Vereinsabend ({stamp})", "status": "live", "visibility": "public",
+            "start_date": hall_start.isoformat(), "end_date": (hall_start + timedelta(hours=8)).isoformat()})
+        for key, label, visibility in (("hall_public", "Sofort-Cup", "public"), ("hall_members", "Probelauf-Cup", "members")):
+            cup = await tournament(admin, game, f"Abnahme {label} am Vereinsabend ({stamp})", quarter(now_utc() - timedelta(minutes=30)),
+                                   format="single_elim", event_mode="local", schedule_mode="fixed_by_staff",
+                                   result_entry_mode="staff_only", match_duration_minutes=12, max_participants=8,
+                                   visibility=visibility, event_id=hall_event["id"])
+            await register(admin, cup, users["players"][:8])
+            await admin.call("POST", f"/api/tournaments/{cup['id']}/bracket/from-format?preview=false")
+            await admin.call("POST", f"/api/tournaments/{cup['id']}/staff", json={"user_id": users["lead"]["id"], "role": "organizer"})
+            await stations(admin, cup, 2)
+            await admin.call("POST", f"/api/tournaments/{cup['id']}/status", json={"status": "live", "force": True})
+            state["tournaments"][key] = cup["id"]
+        state["hall_event"] = {"id": hall_event["id"], "slug": hall_event.get("slug")}
     finally:
         await admin.close()
     slugs = {}

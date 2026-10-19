@@ -47,7 +47,9 @@ Vor-Ort-Turnier (live, zwei Stationen, geplant, Turnierleitung eingeteilt) für 
 (#1590): fester Baum und Auslosung nach der Runde (K.-o. 8), Show-Auslosung (FFA 16, drei von vier Läufen fertig,
 Erinnerung nach 3 Min.) und sofort zufällig (K.-o. 8, noch ohne Ergebnis).
 Dazu ein Mitglieder-Turnier vor Ort mit offener Anmeldung für den Vor-Ort-Zugang (#1592) und ein Gast-Konto ohne
-Mitgliedschaft (`vor-ort-abnahme.spec.js`).
+Mitgliedschaft (`vor-ort-abnahme.spec.js`). Für Hallen- und Aufruf-Tafel mit Event-Schlüssel (#1822) ein laufendes
+Event „Vereinsabend“ mit einem öffentlichen Cup und einem Cup „Nur Mitglieder“ (beide K.-o. 8, live, zwei Stationen;
+`tv-abnahme.spec.js`).
 Spieler 1 spielt überall mit und ist der Spieler-Zugang der Tests. Es lässt sich mehrfach aufrufen: Konten
 bleiben, Turniere kommen dazu.
 
