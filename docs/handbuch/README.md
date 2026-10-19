@@ -12,6 +12,7 @@ Technische Hintergründe für die Entwicklung stehen in den Dateien unter [`docs
 | Kapitel | Worum es geht |
 | --- | --- |
 | [Erste Schritte im Admin](admin.md) | Menü je Rolle, Suche, Kommandozentrale, Zwei-Faktor, Freigaben vergeben, Helfer und Moderation, wo welches Thema steht |
+| [Helfer am Turniertag](helfer.md) | Kurzanleitung zum Ausdrucken: Stationen und Warteschlange, Aufrufen und Starten, Ergebnis eintragen, Fast-Lap-Schnelleingabe, Vor-Ort-QR, was tun bei Problemen |
 | [Turniere](turniere.md) | Anlegen, Formate, Anmeldung und Startgeld, Check-in, Aufstellung, Ergebnis-Fenster, Dispute, Stationen, Abschluss, Turniertag mit wenig Helfern |
 | [Events](events.md) | Event anlegen (auch mehrtägig, mit mehreren Orten), Turniere und Fast Laps als Teil des Events, Anmeldung und Warteliste, „Spielst du auch mit?“, Kalender-Abo und „Nur meine“, Rückblick, Fotos, Freunde beim Event, Newsletter |
 | [Verein und Mitglieder](verein.md) | Mitglied werden, Anträge und Einladungen, Mitgliederbereich, Mitgliedskarte, Vorstand und Stellvertretungen, Statuten, Versammlungen, Helferdienste, persönliche Unterlagen |
