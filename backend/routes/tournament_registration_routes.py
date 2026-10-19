@@ -589,17 +589,9 @@ async def _create_self_registration(db, tid: str, tournament: dict, body: Regist
             reg["price_snapshot"], reg["billing_status"] = snapshot, "pending"
     reg.pop("_id", None)
     reg.pop("identity_key", None)
-    # Bestätigung (#1133): „Du bist dabei“ oder „Du stehst auf der Warteliste“ - im Postfach und, wenn erlaubt, per Mail;
-    # bei Teams auch an Teamleitung und Co-Leitung.
-    await _notify_registration(db, tid, reg, reg["status"], actor_id=me.get("id"))
+    # Bestätigung und Erfolge folgen nach der Sperre (``_after_self_registration``).
     reg["auto_bracket_update"] = auto_bracket_update
     reg["idempotent_replay"] = False
-    # Badge trigger
-    try:
-        from badges import on_tournament_registered
-        await on_tournament_registered(me["id"], tid)
-    except Exception:
-        logger.warning("[achievements] Anmeldung zu %s nicht ausgewertet", _log_safe(tid), exc_info=True)
     return reg
 
 
@@ -649,9 +641,30 @@ async def self_register(db, t: dict, body: RegistrationCreate, me: dict, registe
             current_error = _registration_error(current)
             if current_error and not register_access:
                 raise HTTPException(status_code=400, detail=current_error)
-            return await _create_self_registration(db, tid, current, body, me, register_access, via=via)
+            reg = await _create_self_registration(db, tid, current, body, me, register_access, via=via)
     except MutationLockBusy:
         raise HTTPException(status_code=409, detail="Eine Turnieraktion wird bereits verarbeitet. Bitte erneut versuchen.")
+    if not reg.get("idempotent_replay"):
+        await _after_self_registration(db, tid, reg, me)
+    return reg
+
+
+# Felder der Antwort, die nicht zur Anmeldung selbst gehören.
+RESPONSE_ONLY_KEYS = {"auto_bracket_update", "idempotent_replay"}
+
+
+async def _after_self_registration(db, tid: str, reg: dict, me: dict) -> None:
+    """Nach der Sperre (#1826): Bestätigung und Erfolge brauchen sie nicht - so hält eine Anmeldung die Sperre nur
+    für Platz, Vorschau und Startgeld, und die nächste in der Schlange kommt früher dran."""
+    # Bestätigung (#1133): „Du bist dabei“ oder „Du stehst auf der Warteliste“ - im Postfach und, wenn erlaubt, per Mail;
+    # bei Teams auch an Teamleitung und Co-Leitung.
+    registration = {key: value for key, value in reg.items() if key not in RESPONSE_ONLY_KEYS}
+    await _notify_registration(db, tid, registration, reg["status"], actor_id=me.get("id"))
+    try:
+        from badges import on_tournament_registered
+        await on_tournament_registered(me["id"], tid)
+    except Exception:
+        logger.warning("[achievements] Anmeldung zu %s nicht ausgewertet", _log_safe(tid), exc_info=True)
 
 
 @router.post("/{tid}/registrations")

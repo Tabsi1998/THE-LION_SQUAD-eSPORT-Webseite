@@ -121,6 +121,30 @@ async def test_many_signing_off_at_once_all_get_out_and_the_wait_list_moves_up(f
     assert await statuses(flow, tournament) == ["approved"] * 2
 
 
+@pytest.mark.asyncio
+async def test_the_confirmation_is_sent_after_the_lock_is_released(flow, monkeypatch):
+    """Bestätigung (Postfach, Mail) und Erfolge halten die Sperre nicht - die nächste Anmeldung kommt früher dran."""
+    from routes import tournament_registration_routes as routes
+    from services.mutation_lock import tournament_write_resource
+
+    tournament = await flow.create_tournament(max_participants=8)
+    anna = await flow.add_user(name="Anna")
+    seen = []
+
+    async def notify(db, tid, registration, status, **kwargs):
+        held = await flow.db.mutation_locks.count_documents({"resource": tournament_write_resource(tid)})
+        seen.append((registration["user_id"], status, held, "auto_bracket_update" in registration))
+
+    monkeypatch.setattr(routes, "_notify_registration", notify)
+    body = RegistrationCreate(accept_rules=True, accept_privacy=True)
+
+    first = await routes.self_register(flow.db, tournament, body, anna, None, via="onsite")
+    again = await routes.self_register(flow.db, tournament, body, anna, None, via="onsite")
+
+    assert first["idempotent_replay"] is False and again["idempotent_replay"] is True
+    assert seen == [(anna["id"], "approved", 0, False)], "genau eine Bestätigung, ohne gehaltene Sperre"
+
+
 def test_the_registration_wait_is_configurable_and_bounded():
     from routes.tournament_common import registration_wait_seconds
 
