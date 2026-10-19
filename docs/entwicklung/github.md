@@ -77,6 +77,19 @@ END_COMMIT_OVERRIDE
 Die Prüfung „Changelog-Block im PR-Text“ meldet Zeilen ohne Typ. Nur sichtbare Änderungen gehören hinein; Tests,
 CI und Umbau bleiben draußen (oder als `test:`/`ci:` – die erscheinen nicht).
 
+**Netto für Nutzer, nichts doppelt.** Ein Release beschreibt, was sich für Nutzer seit der letzten Version geändert
+hat – kein Git-Log (Grundsatz nach „Keep a Changelog“):
+
+| Fall | Im Release |
+| --- | --- |
+| neue Funktion | eine Zeile unter „Neu“, egal wie viele Commits |
+| Nachbesserung im selben PR (Prüfungs-Befund, eigener Fehler) | keine eigene Zeile |
+| Fix an Gemergtem, das noch **nicht** veröffentlicht ist | keine eigene Fehlerbehebung; bei Bedarf den Block des ursprünglichen PRs anpassen (release-please liest ihn auch nach dem Merge) |
+| Fix an schon **Veröffentlichtem** | eigene Zeile unter „Fehlerbehebungen“ |
+
+Vor jedem Release wird die fertige Liste im Release-PR durchgesehen (Doppeltes, Unverständliches) und erst dann
+gemergt.
+
 **Lesbares Changelog.** Nach jedem Lauf räumt [`scripts/tidy_changelog.py`](../../scripts/tidy_changelog.py) den
 Release-PR auf und beim Veröffentlichen den Text des GitHub-Release: je Eintrag nur die Issue-Nummer („(#1634)“,
 ohne PR-Link und Commit-Hash), Überschrift „1.2.0 (19.10.2026)“.
