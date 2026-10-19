@@ -34,6 +34,9 @@ async function nothingCut(page) {
       const head = sheet.querySelector("header");
       const title = sheet.querySelector("h1");
       if (head.scrollHeight > head.clientHeight + 1) out.push(`Blatt ${index + 1}: Kopf zu hoch`);
+      // Der Kopf richtet sich nach unten aus - was zu hoch ist, liefe nach oben hinaus; das zählt scrollHeight nicht.
+      const headBox = head.getBoundingClientRect();
+      if ([...head.querySelectorAll("*")].some((node) => node.getBoundingClientRect().top < headBox.top - 1)) out.push(`Blatt ${index + 1}: Kopf läuft oben hinaus`);
       if (title.scrollHeight > title.clientHeight + 1) out.push(`Blatt ${index + 1}: Name abgeschnitten`);
       const body = sheet.querySelector("[data-print-body]");
       if (body.scrollHeight > body.clientHeight + 1 || body.scrollWidth > body.clientWidth + 1) {
@@ -158,6 +161,32 @@ test.describe("Abnahme #1283: Druckansicht gegen den echten Server", () => {
     const sheetsText = (await page.locator("[data-orientation]").allInnerTexts()).join("\n");
     for (const index of [1, 32, 64]) expect(sheetsText).toContain(`Testfahrer ${index}`);
     await checkPrint(page, "grosser-lauf-64");
+    expect(problems).toEqual([]);
+  });
+
+  test("Name mit 80 Zeichen: Kopf hoch und quer vollständig, nichts versteckt", async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name !== "chromium", "PDF gibt es nur in Chromium");
+    await page.setViewportSize(DESKTOP);
+    await signIn(page, "anon");
+    // Der längste zulässige Name (80 Zeichen, erfunden) - im Browser in die echte Antwort gesetzt.
+    const long = "Abnahme Großes Herbstturnier der Löwen mit Doppel-K.-o. und Läufen Vorrunde 2026 Ü".slice(0, 80).padEnd(80, "X");
+    expect(long).toHaveLength(80);
+    await page.route(/\/api\/tournaments\/[^/?]+(\?|$)/, async (route) => {
+      const response = await route.fetch();
+      const body = await response.json();
+      await route.fulfill({ response, json: { ...body, title: long } });
+    });
+    const problems = watch(page, { allow: (response) => response.status() === 401 && /\/api\/auth\/(me|refresh)/.test(response.url()), allowConsole: (text) => /401/.test(text) });
+    for (const baum of ["quer", "hoch"]) {
+      await page.goto(`/print/tournaments/${state.slugs.print_double}?teile=baum,spielplan&baum=${baum}`);
+      await expect(page.locator("[data-orientation] h1").first()).toHaveText(long, { ignoreCase: true });
+      for (const orientation of ["landscape", "portrait"]) {
+        const heads = page.locator(`[data-orientation='${orientation}'] h1`);
+        if (await heads.count()) await expect(heads.first()).toHaveText(long);
+      }
+      expect(await nothingCut(page)).toEqual([]);
+      await checkPrint(page, `langer-name-baum-${baum}`);
+    }
     expect(problems).toEqual([]);
   });
 

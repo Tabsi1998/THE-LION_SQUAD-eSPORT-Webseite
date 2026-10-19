@@ -60,17 +60,14 @@
   line-height: 1.1;
   text-transform: uppercase;
   letter-spacing: -0.01em;
-  /* Lange Namen brechen um (höchstens zwei Zeilen, dann etwas kleiner) statt mit „…“ zu enden. */
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-  line-clamp: 2;
-  overflow: hidden;
+  /* Lange Namen brechen um und werden stufenweise kleiner (lib/printView.titleTier) - abgeschnitten wird nichts:
+     bis 80 Zeichen passt jeder Name in den Kopf (14 pt eine Zeile, 10,5 pt zwei, 8,5 pt bis drei Zeilen). */
   overflow-wrap: anywhere;
   hyphens: none;
   text-wrap: balance;
 }
 .tls-print-title--long { font-size: 10.5pt; line-height: 1.08; }
+.tls-print-title--longer { font-size: 8.5pt; line-height: 1.08; }
 .tls-print-meta { flex: none; max-width: 42%; text-align: right; font-size: 8pt; }
 
 .tls-print-foot {

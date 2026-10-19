@@ -1,17 +1,14 @@
 import { Check } from "lucide-react";
 import { BrandedQRCode } from "@/components/tls/BrandedQRCode";
-import { CHECKIN, DAYPLAN, SCHEDULE, SHEET, TREE, cardHeight, scheduleRowHeight, sheetBody, treeColumnCapacity, treeColumns } from "@/lib/printView";
+import { CHECKIN, DAYPLAN, SCHEDULE, SHEET, TREE, cardHeight, scheduleRowHeight, sheetBody, titleTier, treeColumnCapacity, treeColumns } from "@/lib/printView";
 import "@/styles/printView.css";
 
 // Druckansicht (#1283): die Blätter. Jede Höhe kommt aus lib/printView (Millimeter) - Karten und Zeilen sind genau so
 // hoch, wie die Aufteilung gerechnet hat; Namen bleiben einzeilig und enden mit „…“, statt das Blatt zu sprengen.
 
 const mm = (value) => `${value}mm`;
+const TITLE_CLASS = { normal: "", long: "tls-print-title--long", longer: "tls-print-title--longer" };
 
-/** Passt der Name in groß nicht in eine Zeile, wird er kleiner und darf zwei Zeilen nehmen (quer ist mehr Platz). */
-export function isLongTitle(title, orientation) {
-  return String(title || "").length > (orientation === "landscape" ? 30 : 22);
-}
 
 /** Ein A4-Blatt mit Kopf (Verein, Titel, Teil) und Fuß (QR-Code zur Live-Seite, Druckzeit, Seitenzahl). */
 export function PrintSheet({ orientation, kicker, title, meta, stamp, qrUrl, qrLabel, page, pages, children, testId, zoom = 1 }) {
@@ -27,7 +24,7 @@ export function PrintSheet({ orientation, kicker, title, meta, stamp, qrUrl, qrL
         <header className="tls-print-head" style={{ height: mm(SHEET.header), flex: "none" }}>
           <div style={{ minWidth: 0 }}>
             <div className="tls-print-kicker">THE LION SQUAD · {kicker}</div>
-            <h1 className={`tls-print-title ${isLongTitle(title, orientation) ? "tls-print-title--long" : ""}`}>{title}</h1>
+            <h1 className={`tls-print-title ${TITLE_CLASS[titleTier(title, orientation)]}`} data-title-tier={titleTier(title, orientation)}>{title}</h1>
           </div>
           <div className="tls-print-meta">{meta}</div>
         </header>

@@ -3,7 +3,7 @@ import { describe, expect, test } from "vitest";
 import { displayRoundLabels, roundName } from "@/lib/bracketNames";
 import {
   CHECKIN, PRINT_DEFAULTS, bracketBlocks, bracketPages, cardHeight, checkinPages, columnHeight, dayPlanPages, eventCheckinSections, listCapacity,
-  paginate, parseParts, scheduleRowHeight, schedulePages, sheetBody, splitBands, stampText, tournamentCheckinSections, treeColumnCapacity, treeColumns,
+  TITLE_MAX, paginate, parseParts, scheduleRowHeight, schedulePages, sheetBody, splitBands, stampText, titleTier, tournamentCheckinSections, treeColumnCapacity, treeColumns,
 } from "@/lib/printView";
 
 let next = 0;
@@ -70,6 +70,15 @@ describe("Blatt", () => {
     expect(sheetBody("portrait")).toEqual({ width: 190, height: 235 });
     expect(treeColumns("landscape")).toBe(4);
     expect(treeColumns("portrait")).toBe(3);
+  });
+
+  test("Name im Kopf: stufenweise kleiner statt abgeschnitten - bis 80 Zeichen hoch und quer", () => {
+    expect(TITLE_MAX).toBe(80);
+    expect(titleTier("Herbst-Cup", "portrait")).toBe("normal");
+    expect(titleTier("Abnahme Doppel-K.-o. (19.10. 19:01)", "portrait")).toBe("long");
+    expect(titleTier("Abnahme Doppel-K.-o. (19.10. 19:01)", "landscape")).toBe("long");
+    expect(titleTier("x".repeat(80), "portrait")).toBe("longer");
+    expect(titleTier("x".repeat(80), "landscape")).toBe("longer");
   });
 
   test("Druckzeit mit Datum und Uhrzeit in Wiener Zeit", () => {

@@ -43,6 +43,21 @@ export function sheetBody(orientation = "portrait") {
   };
 }
 
+/** Längster Name, für den der Kopf ausgelegt ist (Turnier- und Event-Namen). */
+export const TITLE_MAX = 80;
+
+/**
+ * Wie groß der Name im Kopf steht: „normal“ (14 pt, eine Zeile), „long“ (10,5 pt, bis zwei Zeilen) oder „longer“
+ * (8,5 pt, bis drei Zeilen). Quer ist mehr Platz. Bis TITLE_MAX Zeichen fehlt so nie etwas (Abnahme prüft es).
+ */
+export function titleTier(title, orientation = "portrait") {
+  const length = String(title || "").length;
+  const [normal, long] = orientation === "landscape" ? [30, 60] : [22, 40];
+  if (length <= normal) return "normal";
+  if (length <= long) return "long";
+  return "longer";
+}
+
 /** Welche Teile die Adresse wählt (`?teile=baum,liste`) - nur bekannte, in Papier-Reihenfolge, ohne Dopplung. */
 export function parseParts(value, scope = "tournament", { staff = false } = {}) {
   const allowed = PRINT_PARTS.filter((part) => (part.scope === scope || part.scope === "both") && (!part.staff || staff));
