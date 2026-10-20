@@ -17,6 +17,14 @@ const SHOTS = process.env.ABNAHME_SHOTS || "";
 async function shot(locator, name, options = {}) {
   if (!SHOTS) return;
   fs.mkdirSync(SHOTS, { recursive: true });
+  // Die feste Leiste unten (Handy) läge sonst über dem Ausschnitt.
+  await locator.page().evaluate(() => {
+    for (const element of document.querySelectorAll("body *")) {
+      const style = getComputedStyle(element);
+      const rect = element.getBoundingClientRect();
+      if (style.position === "fixed" && rect.bottom >= window.innerHeight - 2 && rect.height < 140) element.style.visibility = "hidden";
+    }
+  });
   await locator.screenshot({ path: path.join(SHOTS, `${name}.png`), ...options });
 }
 
@@ -175,7 +183,7 @@ test.describe("Abnahme #1878: Referenzen - Übersicht neu", () => {
         await page.emulateMedia({ reducedMotion: "no-preference" });
 
         // Ganze Seite als Bild, danach der Link der Hauptkarte.
-        if (SHOTS) await page.screenshot({ path: path.join(SHOTS, `referenzen-ganz-${name}.png`), fullPage: true });
+        await shot(page.locator("body"), `referenzen-ganz-${name}`);
         await page.getByTestId("references-showcase").click();
         await expect(page).toHaveURL(new RegExp(`/references/series/${racing.slug}/`));
         expect(problems).toEqual([]);
