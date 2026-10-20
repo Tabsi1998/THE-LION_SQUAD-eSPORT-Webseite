@@ -16,6 +16,7 @@ from services.match_v2_results import (
 )
 from services.station_runtime import release_station_for_match
 from services.competition_usage import GRAPH, record_write
+from services.heat_no_show import result_marks
 
 
 logger = logging.getLogger("tls.match_results")
@@ -168,7 +169,8 @@ async def _finish_result_side_effects(db, match: dict, force: bool, dispute_reso
         )
 
 
-def _withdrawn_walkovers(match: dict, application: dict, reset_matches: list[dict]) -> list[dict]:
+def _withdrawn_walkovers(match: dict, application: dict, reset_matches: list[dict], *,
+                         from_players: bool = False) -> tuple[list[dict], list[str]]:
     """Welche Wertungen „nicht erschienen“ mit diesem Ergebnis wegfallen. Am Spiel selbst werden die Felder der Wertung
     gleich mit dem Ergebnis geleert; ``apply_forfeit`` setzt sie danach neu, wenn die Korrektur wieder eine Wertung ist."""
     withdrawn = []
@@ -182,22 +184,18 @@ def _withdrawn_walkovers(match: dict, application: dict, reset_matches: list[dic
             "admin_decision_at": None,
         })
         withdrawn.append({"match_id": match["id"], "registration_id": previous})
-    # Im Lauf als nicht erschienen markiert (#1823), aber mit Platz eingetragen: die Person ist doch gefahren - die
-    # Markierung und ihr Eintrag „nicht erschienen“ fallen weg.
-    marked = match.get("no_show_registration_ids") or []
-    ranked = {row.get("registration_id") for row in application["results"]}
-    raced = [item for item in marked if item in ranked and item not in still_forfeit]
-    if raced:
-        application["match_set"].update({
-            "no_show_registration_ids": [item for item in marked if item not in raced],
-            "no_show_notes": {key: value for key, value in (match.get("no_show_notes") or {}).items() if key not in raced},
-        })
-        withdrawn.extend({"match_id": match["id"], "registration_id": item} for item in raced)
+    # „Nicht erschienen“ im Lauf (#1823, services.heat_no_show): wer markiert war und mit Platz eingetragen ist, ist doch
+    # gefahren - Markierung und Eintrag fallen weg. Wen die Leitung erst hier als „nicht erschienen“ setzt, wird markiert
+    # wie über die Turnierleitung (der Eintrag folgt nach dem Schreiben).
+    fields, marked_now, raced = result_marks(match, application["results"], from_players=from_players)
+    if fields:
+        application["match_set"].update(fields)
+    withdrawn.extend({"match_id": match["id"], "registration_id": item} for item in raced)
     withdrawn.extend(
         {"match_id": row["id"], "registration_id": row["forfeit_registration_id"]}
         for row in reset_matches if row.get("forfeit_registration_id")
     )
-    return withdrawn
+    return withdrawn, marked_now
 
 
 async def submit_v2_result(
@@ -272,7 +270,8 @@ async def submit_v2_result(
     reset_docs = [{**row, "slots": seats_before.get(row["id"]) or []} for row in stage_matches if row.get("id") in reset_ids]
     # Eine Wertung „nicht erschienen“, die nicht mehr gilt (#1035): die Korrektur nimmt Wertung, Begründung und den
     # Eintrag bei der Person zurück - am Spiel selbst und in zurückgesetzten Folgespielen.
-    withdrawn = _withdrawn_walkovers(match, application, reset_matches)
+    withdrawn, marked_now = _withdrawn_walkovers(match, application, reset_matches,
+                                                 from_players=audit_action in PLAYER_RESULT_ACTIONS)
     previous_report_id = (match.get("result_meta") or {}).get("report_id")
     history = {
         **({"replaces_report_id": previous_report_id} if previous_report_id else {}),
@@ -316,6 +315,9 @@ async def submit_v2_result(
     for target_id, update in application["target_sets"].items():
         await db.matches_v2.update_one({"id": target_id}, {"$set": update})
     await db.matches_v2.update_one({"id": match["id"]}, {"$set": application["match_set"]})
+    if marked_now:
+        from services.heat_no_show import record_marks
+        await record_marks(db, {**match, **application["match_set"]}, marked_now, actor_id=actor_id, source="result")
     if withdrawn:
         from services.walkover_incidents import revoke_walkover_incident
         for row in withdrawn:

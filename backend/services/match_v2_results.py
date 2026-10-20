@@ -293,20 +293,24 @@ def _stated_rank(entry: dict) -> float:
         return math.inf
 
 
+# Begründung einer Zeile „nicht erschienen“ im Lauf ohne eigene (#1823) - wie im Ergebnis-Fenster (result_hold).
+HEAT_NO_SHOW_NOTE = "Nicht erschienen"
+
+
 def _with_marked_no_shows(match: dict, raw_results: list[dict], participants: dict[str, dict]) -> list[dict]:
     """„Nicht erschienen“ im Lauf (#1823): wer markiert ist und im Ergebnis fehlt, kommt als nicht erschienen dazu - die
-    Rangfolge stellt ihn nach hinten. Eine Zeile „nicht erschienen“ ohne Begründung bekommt die der Markierung. Wer
-    markiert ist und doch mit Platz im Ergebnis steht, ist gefahren: seine Zeile gilt, wie sie eingetragen ist."""
+    Rangfolge stellt ihn nach hinten. Eine Zeile „nicht erschienen“ ohne Begründung bekommt die der Markierung (sonst
+    „Nicht erschienen“ - die Person sieht sie unter ihren Strafen). Wer markiert ist und doch mit Platz im Ergebnis
+    steht, ist gefahren: seine Zeile gilt, wie sie eingetragen ist."""
     marked = [item for item in match.get("no_show_registration_ids") or [] if item in participants]
-    if not marked:
+    if not marked and len(participants) <= 2:
         return raw_results
     notes = match.get("no_show_notes") or {}
     rows = []
     for entry in raw_results:
         registration_id = str(entry.get("registration_id") or "").strip()
-        reason = notes.get(registration_id) if registration_id in marked else None
-        if entry.get("forfeit") and reason and not (entry.get("note") or "").strip():
-            entry = {**entry, "note": reason}
+        if entry.get("forfeit") and not (entry.get("note") or "").strip():
+            entry = {**entry, "note": (notes.get(registration_id) if registration_id in marked else None) or HEAT_NO_SHOW_NOTE}
         rows.append(entry)
     listed = {str(entry.get("registration_id") or "").strip() for entry in raw_results}
     missing = [item for item in marked if item not in listed]

@@ -190,6 +190,43 @@ async def test_two_missing_are_marked_one_after_the_other_after_the_deadline(flo
 
 
 @pytest.mark.asyncio
+async def test_the_result_window_marks_no_shows_and_records_their_entries(flow):
+    """Ohne Vorschlag, nur im Ergebnis-Fenster „Nicht erschienen“ gesetzt: dieselbe Markierung und derselbe Eintrag
+    „nicht erschienen“ je Person wie über die Turnierleitung."""
+    tournament, heat, user_of = await heats_cup(flow)
+    first, second, third, fourth = seats(heat)
+    response = await flow.post(f"/api/matches/{heat['id']}/result", json={"results": [
+        {"registration_id": third, "rank": 1}, {"registration_id": first, "rank": 2},
+        {"registration_id": second, "rank": 3, "forfeit": True}, {"registration_id": fourth, "rank": 4, "forfeit": True}]})
+    assert response.status_code == 200, response.text
+
+    stored = await flow.reload(heat)
+    assert set(stored["no_show_registration_ids"]) == {second, fourth}
+    assert all("Nicht erschienen" in (row.get("note") or "") for row in stored["results"] if row["forfeit"])
+    assert await flow.db.audit_logs.count_documents({"action": "match.no_show.marked"}) == 2
+    assert await incidents(flow, user_of[second], heat) == 1 and await incidents(flow, user_of[fourth], heat) == 1
+
+
+@pytest.mark.asyncio
+async def test_deadline_and_result_window_mixed_mark_each_person_once(flow):
+    """Gemischt: eine Person nach der Frist bestätigt, die zweite erst im Ergebnis-Fenster - beide markiert, jeder
+    Eintrag einmal."""
+    tournament, heat, user_of = await heats_cup(flow)
+    first, second, third, fourth = seats(heat)
+    assert (await confirm_no_show(flow, tournament, heat, fourth)).status_code == 200
+    response = await flow.post(f"/api/matches/{heat['id']}/result", json={"results": [
+        {"registration_id": first, "rank": 1}, {"registration_id": third, "rank": 2},
+        {"registration_id": second, "rank": 3, "forfeit": True}]})
+    assert response.status_code == 200, response.text
+
+    stored = await flow.reload(heat)
+    assert set(stored["no_show_registration_ids"]) == {second, fourth}
+    assert {row["registration_id"] for row in stored["results"] if row["forfeit"]} == {second, fourth}
+    assert await flow.db.audit_logs.count_documents({"action": "match.no_show.marked"}) == 2
+    assert await incidents(flow, user_of[second], heat) == 1 and await incidents(flow, user_of[fourth], heat) == 1
+
+
+@pytest.mark.asyncio
 async def test_the_present_three_are_entered_and_the_best_two_advance(flow):
     tournament, heat, _user_of = await heats_cup(flow)
     first, missing, third, fourth = seats(heat)
