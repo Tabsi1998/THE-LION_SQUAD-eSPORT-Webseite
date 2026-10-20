@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
+import { useCountdownDays } from "@/hooks/useCountdownDays";
+import { whenPhrase, whenText, whenTickMs } from "@/lib/countdownRule";
 
 // Phasen nach Farb-Rolle (#1305) - wie StatusBadge: Rot nur „läuft gerade“, Grün offen, Cyan angekündigt, Grau vorbei.
 const PHASE_STYLES = {
@@ -34,27 +36,16 @@ const FALLBACK_LABELS = {
   paused: "Pausiert",
 };
 
-const COUNTDOWN_PREFIX = {
-  registration_opens: "in",
-  registration_closes: "endet in",
-  check_in_opens: "Check-in in",
-  check_in_closes: "Check-in endet in",
-  starts: "startet in",
-  ends: "endet in",
+// Das Verb vor der Zeitangabe (#1264): „startet in 3 Tagen“, „startet am Sa 14. November“, „startet im März“. Wann ein
+// Countdown kommt und wann Datum oder Monat, sagt die eine Regel in lib/countdownRule.js - keine „154T 16h“ mehr.
+const COUNTDOWN_VERB = {
+  registration_opens: "",
+  registration_closes: "endet",
+  check_in_opens: "Check-in",
+  check_in_closes: "Check-in endet",
+  starts: "startet",
+  ends: "endet",
 };
-
-function formatRemaining(ms) {
-  if (ms <= 0) return "";
-  const totalSeconds = Math.floor(ms / 1000);
-  const days = Math.floor(totalSeconds / 86400);
-  const hours = Math.floor((totalSeconds % 86400) / 3600);
-  const minutes = Math.floor((totalSeconds % 3600) / 60);
-  const seconds = totalSeconds % 60;
-  if (days > 0) return `${days}T ${hours}h`;
-  if (hours > 0) return `${hours}h ${minutes}m`;
-  if (minutes > 0) return `${minutes}m ${seconds}s`;
-  return `${seconds}s`;
-}
 
 function fallbackPhase(status) {
   const state = status === "scheduled" ? "announced" : (status === "checkin_open" ? "check_in" : status);
@@ -75,17 +66,27 @@ export function PhaseBadge({ phase, status, size = "sm", className = "" }) {
     return Number.isNaN(date.getTime()) ? null : date.getTime();
   }, [normalized?.target_at]);
 
+  const days = useCountdownDays();
+
+  // Die Angabe hat Minuten als kleinste Einheit: in der letzten Stunde alle 15 Sekunden nachsehen, sonst jede Minute.
   useEffect(() => {
-    if (!targetMs || targetMs <= Date.now()) return undefined;
-    const interval = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(interval);
+    if (!targetMs) return undefined;
+    let timer = null;
+    const tick = () => {
+      setNow(Date.now());
+      const next = whenTickMs(targetMs);
+      if (next) timer = setTimeout(tick, next);
+    };
+    const first = whenTickMs(targetMs);
+    if (first) timer = setTimeout(tick, first);
+    return () => { if (timer) clearTimeout(timer); };
   }, [targetMs]);
 
   if (!normalized) return null;
   const state = normalized.state || status || "announced";
-  const remaining = targetMs ? formatRemaining(targetMs - now) : "";
-  const prefix = remaining ? COUNTDOWN_PREFIX[normalized.countdown_kind] || "in" : "";
-  const label = [normalized.label || fallbackPhase(status).label, prefix && `${prefix} ${remaining}`].filter(Boolean).join(" · ");
+  const when = targetMs && targetMs > now ? whenText(targetMs, { now, days }) : null;
+  const remaining = when ? whenPhrase(COUNTDOWN_VERB[normalized.countdown_kind] || "", when) : "";
+  const label = [normalized.label || fallbackPhase(status).label, remaining].filter(Boolean).join(" · ");
   const sz = size === "lg" ? "text-sm px-3 py-1" : size === "md" ? "text-[11px] px-2.5 py-1" : "text-[10px] px-2 py-[3px]";
 
   return (
