@@ -8,6 +8,8 @@ import { nameOf } from "@/lib/referenceSeriesTable";
 import {
   OUTCOMES, mapShare, matchPointsLabel, matchdayProgress, pathRankLabel, rankTrend, tableRows, tableTiebreakLabel,
 } from "@/lib/teamLeague";
+import { leaguePath } from "@/lib/referencesOverview";
+import { SEASON_NOTE_TONES } from "@/lib/seriesTiers";
 import "./referenceSeries.css";
 import "./teamLeague.css";
 
@@ -256,8 +258,11 @@ function Lineup({ lineup, rounds }) {
   );
 }
 
-function LeaguePath({ path, lineageSlug }) {
+// Vermerk je Saison wie auf der Übersicht (#1898): zuerst das „Ergebnis der Saison“, sonst aus den Stufen abgeleitet;
+// „läuft“ steht hier schon als eigenes Zeichen.
+function LeaguePath({ path, lineageSlug, tierOrder }) {
   if (!path?.length) return null;
+  const notes = leaguePath(path, tierOrder).steps.map((step) => (step.note === "läuft" ? "" : step.note));
   return (
     <section className="mt-12" aria-labelledby="team-league-path" data-testid="team-league-path">
       <SectionTitle id="team-league-path">Liga-Weg</SectionTitle>
@@ -272,6 +277,7 @@ function LeaguePath({ path, lineageSlug }) {
                 <span className={metal ? metal.text : undefined}>{pathRankLabel(season)}</span>
                 {season.points != null && <span> · {formatNumber(season.points)} Pkt</span>}
                 {season.status === "active" && <span className="ml-2 text-[10px] font-bold uppercase tracking-widest text-[#29B6E8]">läuft</span>}
+                {notes[index] && <span className={`ml-2 text-[10px] font-bold uppercase tracking-widest ${SEASON_NOTE_TONES[notes[index]] || "text-zinc-400"}`} data-testid="team-league-season-note">{notes[index]}</span>}
               </span>
             </>
           );
@@ -302,7 +308,7 @@ export function TeamLeagueSections({ data }) {
       <LeagueTable league={league} rounds={rounds} />
       <Schedule matchdays={matchdays} />
       <Lineup lineup={league.lineup} rounds={rounds} />
-      <LeaguePath path={league.path} lineageSlug={data.lineage?.slug} />
+      <LeaguePath path={league.path} lineageSlug={data.lineage?.slug} tierOrder={data.lineage?.tier_order} />
     </div>
   );
 }

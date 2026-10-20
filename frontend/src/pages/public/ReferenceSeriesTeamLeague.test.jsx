@@ -130,6 +130,27 @@ test("Liga-Weg: frühere Saisons verlinkt, die aktuelle markiert", async () => {
   expect(seasons[1]).toHaveTextContent("läuft");
 });
 
+test("Liga-Weg (#1898): Vermerk der Saison wie auf der Übersicht, sonst aus den Stufen abgeleitet", async () => {
+  // Ohne Vermerk: Division 2 → Division 1 ist ein Aufstieg; die laufende Saison trägt nur „läuft“.
+  const { unmount } = renderPage();
+  let notes = await screen.findAllByTestId("team-league-season-note");
+  expect(notes.map((note) => note.textContent)).toEqual(["Aufstieg"]);
+  unmount();
+
+  // Vermerk ohne Zahl im Namen; die Reihenfolge der Spur ordnet die übrigen Stufen.
+  const path = [
+    { season: "2023", tier: "Bronze", season_slug: "2023-bronze", status: "completed", current: false, rank: 3, teams: 6, points: 9 },
+    { season: "2024", tier: "Silber", season_slug: "2024-silber", status: "completed", current: false, rank: 1, teams: 6, points: 14, season_result: "champion" },
+    { season: "2025", tier: "Gold", season_slug: "2025-gold", status: "completed", current: false, rank: 5, teams: 6, points: 4, season_result: "relegated" },
+    { season: "2026", tier: "Silber", season_slug: "2026-silber", status: "active", current: true, rank: 2, teams: 3, points: 2 },
+  ];
+  renderPage({ ...BODY, lineage: { ...BODY.lineage, tier_order: ["Gold", "Silber", "Bronze"] }, team_league: { ...BODY.team_league, path } });
+  notes = await screen.findAllByTestId("team-league-season-note");
+  expect(notes.map((note) => note.textContent)).toEqual(["Aufstieg", "Meister", "Abstieg"]);
+  expect(notes[0].className).toContain("text-ok");
+  expect(notes[1].className).toContain("text-honor");
+});
+
 test("Eine leere Saison zeigt Hinweise statt leerer Tabellen", async () => {
   renderPage({ ...BODY, team_league: { ...BODY.team_league, table: null, rank_history: [], matchdays: [], lineup: { round_ids: [], players: [] }, path: [] } });
   expect(await screen.findByText("Die Tabelle steht hier nach dem ersten Spieltag.")).toBeInTheDocument();

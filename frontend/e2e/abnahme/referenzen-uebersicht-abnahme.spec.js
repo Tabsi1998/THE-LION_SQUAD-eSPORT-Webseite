@@ -200,6 +200,43 @@ test.describe("Abnahme #1878: Referenzen - Übersicht neu", () => {
     }
   });
 
+  test("Vermerk der Saison (#1898): „Aufstieg“ ohne Zahl im Namen - auf der Übersicht und im Liga-Weg der Team-Liga", async ({ browser }, testInfo) => {
+    test.skip(testInfo.project.name !== "chromium", "ein Durchgang genügt");
+    const stamp = Date.now().toString(36).slice(-4);
+    const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+    let admin = null;
+    let lineage = null;
+    try {
+      admin = await context.newPage();
+      await signIn(admin, "admin");
+      lineage = await ok(await send(admin, "POST", "/api/reference-series/admin/lineages", {
+        title: `Probe Medaillenliga ${stamp}`, kind: "team_league", label: "5vs5", organizer: "Probe Verband", tier_order: ["Gold", "Silber", "Bronze"] }));
+      const seasons = [];
+      for (const [season, tier, status, result] of [["2024", "Bronze", "completed", null], ["2025", "Silber", "completed", "promoted"], ["2026", "Gold", "active", null]]) {
+        seasons.push(await ok(await send(admin, "POST", "/api/reference-series/admin/series", {
+          lineage_id: lineage.id, season, tier, status, team_name: `Probe Löwen ${stamp}`, season_result: result })));
+      }
+      const page = await context.newPage();
+      await signIn(page, "anon");
+      await page.goto("/references");
+      const card = page.getByTestId(`references-lineage-${lineage.slug}`);
+      // 2024 Bronze → 2025 Silber leitet die Reihenfolge der Spur ab, 2025 trägt den Vermerk.
+      await expect(card.locator('[data-note="Aufstieg"]')).toHaveCount(2);
+      await expect(card.locator('[data-note="Aufstieg"]').nth(1)).toContainText("Silber");
+      await expect(card).toContainText("3 Saisons · 2 Aufstiege");
+      await shot(card, "referenzen-liga-weg-vermerk");
+
+      await page.goto(`/references/series/${lineage.slug}/${seasons[2].season_slug}`);
+      const notes = page.getByTestId("team-league-season-note");
+      await expect(notes).toHaveText(["Aufstieg", "Aufstieg"]);
+      await shot(page.getByTestId("team-league-path"), "serien-team-liga-weg-vermerk");
+      await page.close();
+    } finally {
+      if (admin && lineage) await send(admin, "POST", `/api/reference-series/admin/lineages/${lineage.id}/archive`).catch(() => {});
+      await context.close();
+    }
+  });
+
   test("ohne gewählte Hauptkarte wählt die Seite selbst - die Einstellung lässt sich lesen", async ({ browser }, testInfo) => {
     test.skip(testInfo.project.name !== "chromium", "ein Durchgang genügt");
     const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
