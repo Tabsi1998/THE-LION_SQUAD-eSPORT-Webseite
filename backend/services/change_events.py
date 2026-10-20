@@ -60,6 +60,14 @@ STAFF_STREAM_ROLES = frozenset({"tournament_admin", "club_admin", "superadmin"})
 USER_SCOPE = "user"
 # Held only in the in-memory buffer; stripped before an event reaches a client.
 TARGETS_KEY = "_target_user_ids"
+# Live-Nachladen je Turnier (#1801): Eine Änderung nennt ihr Turnier und dessen Event, damit nur die Seiten dieses
+# Turniers nachladen (bzw. die des Events, wo sich Turniere Stationen teilen). Öffentlich nur, wenn Turnier und Event
+# öffentlich sind - ob, merkt sich die Meldung im Puffer unter SCOPE_PUBLIC_KEY; ohne Kennung laden alle nach.
+SCOPE_KEYS = ("tournament_id", "parent_event_id")
+SCOPE_PUBLIC_KEY = "_scope_public"
+# Unter /api/tournaments/<…>, aber kein Turnier.
+NON_TOURNAMENT_SEGMENTS = frozenset({"onsite"})
+_SCOPE_FIELDS = {"_id": 0, "id": 1, "event_id": 1, "status": 1, "is_public": 1, "visibility": 1}
 EVENT_BUFFER_SIZE = 256
 SUBSCRIBER_QUEUE_SIZE = 100
 
@@ -152,6 +160,64 @@ def _build_api_change_event(method: str, path: str, status_code: int) -> dict:
     }
 
 
+def _scope_target(path: str) -> tuple[str, str] | None:
+    """Worauf eine Änderung zeigt (#1801): ``("tournament", Kennung oder Slug)``, ``("match", Kennung)`` oder None.
+
+    Ohne Turnier bleiben Stationen (die Turniere eines Events teilen sie sich), das Turnier selbst (Einstellungen, Event,
+    Sichtbarkeit - danach sollen alle Seiten nachladen), neue Turniere und was zu keinem Turnier gehört (Vor-Ort-Zugang).
+    """
+    parts = [part for part in _normalized_path(path).split("/") if part]
+    if parts and parts[0] == "api":
+        parts = parts[1:]
+    if len(parts) < 2:
+        return None
+    resource, ref = parts[0], parts[1]
+    if resource == "matches":
+        return "match", ref
+    if resource == "matches-v2":
+        return "tournament", ref
+    if resource == "tournaments" and len(parts) > 2 and ref not in NON_TOURNAMENT_SEGMENTS:
+        return "tournament", ref
+    return None
+
+
+async def _lookup_scope(db, kind: str, ref: str) -> dict | None:
+    """Turnier und Event einer Änderung - und ob beide öffentlich sind (dieselbe Regel wie ``public_tournament`` und
+    die Event-Seite: kein Entwurf, Sichtbarkeit öffentlich). Ein Turnier in einem nicht öffentlichen Event bleibt
+    öffentlich ohne Kennung: Seiten mit geteilten Stationen könnten sonst nicht erkennen, dass es sie betrifft."""
+    from services.slug_utils import find_by_slug_or_history
+    from services.tournament_visibility import public_tournament
+
+    if kind == "match":
+        match = await db.matches_v2.find_one({"id": ref}, {"_id": 0, "tournament_id": 1})
+        if not match or not match.get("tournament_id"):
+            return None
+        tournament = await db.tournaments.find_one({"id": match["tournament_id"]}, _SCOPE_FIELDS)
+    else:
+        tournament, _ = await find_by_slug_or_history(db.tournaments, ref, _SCOPE_FIELDS)
+    if not tournament or not tournament.get("id"):
+        return None
+    event_id = tournament.get("event_id") or None
+    visible = public_tournament(tournament)
+    if visible and event_id:
+        event = await db.events.find_one({"id": event_id}, {"_id": 0, "status": 1, "visibility": 1})
+        visible = bool(event) and event.get("status") != "draft" and (event.get("visibility") or "public") == "public"
+    return {"tournament_id": tournament["id"], "parent_event_id": event_id, SCOPE_PUBLIC_KEY: visible}
+
+
+async def _change_scope(path: str) -> dict:
+    target = _scope_target(path)
+    if not target:
+        return {}
+    try:
+        from database import get_db
+
+        return await _lookup_scope(get_db(), *target) or {}
+    except Exception:
+        # Die Meldung geht auch ohne Kennung hinaus - dann laden alle Seiten nach, wie vor #1801.
+        return {}
+
+
 def _build_user_change_event(resource: str, user_ids: frozenset[str]) -> dict:
     event_id = str(uuid.uuid4())
     return {
@@ -181,10 +247,13 @@ def _event_for_scope(event: dict, visibility_scope: str, user_id: str | None = N
     if event.get("visibility_scope") != "public" and visibility_scope != "staff":
         return None
     if visibility_scope == "staff":
-        return dict(event)
+        return {key: value for key, value in event.items() if key != SCOPE_PUBLIC_KEY}
 
     resource = event.get("entity_type") or ""
-    public_event = dict(event)
+    public_event = {key: value for key, value in event.items() if key != SCOPE_PUBLIC_KEY}
+    if not event.get(SCOPE_PUBLIC_KEY):
+        for key in SCOPE_KEYS:
+            public_event.pop(key, None)
     public_event.update({
         "entity_id": None,
         "path": f"/api/{resource}" if resource else "/api",
@@ -264,7 +333,10 @@ async def publish_api_change(method: str, path: str, status_code: int):
     if normalized_path.startswith("/api/auth/refresh") or normalized_path.startswith("/api/changes/stream"):
         return
 
+    # Erst das Turnier nachschlagen, dann die Nummer vergeben - so bleiben die Nummern im Puffer aufsteigend.
+    scope = await _change_scope(normalized_path)
     event = _build_api_change_event(method, normalized_path, status_code)
+    event.update(scope)
     _event_buffer.append(event)
     _deliver(event)
 

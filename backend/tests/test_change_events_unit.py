@@ -3,7 +3,9 @@ import asyncio
 import json
 
 import pytest
+from mongomock_motor import AsyncMongoMockClient
 
+import database
 from services import change_events
 
 
@@ -15,6 +17,14 @@ def reset_change_event_state():
     yield
     change_events._subscribers.clear()
     change_events._event_buffer.clear()
+
+
+@pytest.fixture(autouse=True)
+def scope_db(monkeypatch):
+    """Turniere, Spiele und Events für die Turnier-Kennung der Meldungen (#1801) - eine Datenbank im Speicher."""
+    db = AsyncMongoMockClient()["change_events_unit"]
+    monkeypatch.setattr(database, "_db", db)
+    return db
 
 
 def test_public_event_redacts_raw_path_and_identifiers():
@@ -295,3 +305,139 @@ def test_signed_in_stream_replays_own_private_change_only():
     assert '"resource":"notifications"' in own[1]
     assert '"replayed":0' in other[0]
     assert len(other) == 1
+
+
+# Live-Nachladen je Turnier (#1801): Jede Änderung war eine öffentliche Meldung „tournaments“ ohne Turnier - alle offenen
+# Turnierseiten, auch die anderer Turniere, luden nach. Die Meldung nennt jetzt das Turnier (und sein Event, weil sich
+# die Turniere eines Events Stationen teilen) - aber nur, wenn beides öffentlich ist. Sonst bleibt sie ohne Kennung und
+# lädt wie bisher überall.
+
+async def add_tournament(db, tid="t-1", **fields):
+    doc = {"id": tid, "slug": f"cup-{tid}", "status": "live", "visibility": "public", "event_id": None, **fields}
+    await db.tournaments.insert_one(dict(doc))
+    return doc
+
+
+def publish(method, path):
+    asyncio.run(change_events.publish_api_change(method, path, 200))
+    return change_events._event_buffer[-1]
+
+
+def public_view(event):
+    return change_events._event_for_scope(event, "public")
+
+
+def test_public_tournament_change_names_its_tournament(scope_db):
+    asyncio.run(add_tournament(scope_db, "t-1"))
+
+    by_id = public_view(publish("POST", "/api/tournaments/t-1/live-queue/call"))
+    by_slug = public_view(publish("POST", "/api/tournaments/cup-t-1/register"))
+
+    for event in (by_id, by_slug):
+        assert event["tournament_id"] == "t-1"
+        assert event["parent_event_id"] is None
+        assert event["path"] == "/api/tournaments"
+        assert "cup-t-1" not in json.dumps(event)
+
+
+def test_match_changes_name_the_tournament_of_the_match(scope_db):
+    async def seed():
+        await add_tournament(scope_db, "t-1")
+        await scope_db.matches_v2.insert_one({"id": "m-1", "tournament_id": "t-1"})
+
+    asyncio.run(seed())
+
+    result = public_view(publish("POST", "/api/matches/m-1/result"))
+    removal = public_view(publish("POST", "/api/matches-v2/t-1/removal"))
+
+    assert result["tournament_id"] == "t-1" and result["resource"] == "matches"
+    assert removal["tournament_id"] == "t-1" and removal["resource"] == "matches-v2"
+    assert "m-1" not in json.dumps(result)
+
+
+@pytest.mark.parametrize("fields", [
+    {"status": "draft"},
+    {"is_public": False},
+    {"visibility": "members"},
+    {"visibility": "internal"},
+    {"visibility": "community"},
+])
+def test_hidden_tournament_change_stays_without_identifiers(scope_db, fields):
+    asyncio.run(add_tournament(scope_db, "t-hidden", **fields))
+
+    event = publish("POST", "/api/tournaments/t-hidden/register")
+    public = public_view(event)
+    staff = change_events._event_for_scope(event, "staff")
+
+    assert public.get("tournament_id") is None
+    assert public.get("parent_event_id") is None
+    assert "t-hidden" not in json.dumps(public)
+    # Die Verwaltung sieht den rohen Pfad ohnehin - dort darf die Kennung stehen.
+    assert staff["tournament_id"] == "t-hidden"
+    assert not [key for key in (*public, *staff) if key.startswith("_")]
+
+
+def test_tournament_of_a_public_event_also_names_the_event(scope_db):
+    async def seed():
+        await scope_db.events.insert_one({"id": "e-1", "status": "live", "visibility": "public"})
+        await add_tournament(scope_db, "t-1", event_id="e-1")
+
+    asyncio.run(seed())
+
+    event = public_view(publish("POST", "/api/tournaments/t-1/live-queue/start"))
+
+    assert event["tournament_id"] == "t-1"
+    assert event["parent_event_id"] == "e-1"
+
+
+@pytest.mark.parametrize("event_fields", [{"visibility": "members"}, {"status": "draft"}, None])
+def test_public_tournament_of_a_hidden_event_stays_without_identifiers(scope_db, event_fields):
+    # Ohne die Kennung des Events wüssten Seiten mit geteilten Stationen nicht, ob die Änderung sie betrifft - und die
+    # Kennung eines internen Events gehört nicht in eine öffentliche Meldung. Also gar keine Kennung: alle laden nach.
+    async def seed():
+        if event_fields is not None:
+            await scope_db.events.insert_one({"id": "e-1", "status": "live", "visibility": "public", **event_fields})
+        await add_tournament(scope_db, "t-1", event_id="e-1")
+
+    asyncio.run(seed())
+
+    event = publish("POST", "/api/tournaments/t-1/live-queue/start")
+    public = public_view(event)
+
+    assert public.get("tournament_id") is None
+    assert public.get("parent_event_id") is None
+    assert "e-1" not in json.dumps(public)
+    assert change_events._event_for_scope(event, "staff")["parent_event_id"] == "e-1"
+
+
+@pytest.mark.parametrize("method, path", [
+    ("POST", "/api/stations/s-1/assign/m-1"),  # Stationen teilen sich die Turniere eines Events
+    ("POST", "/api/tournaments/onsite/redeem"),  # gehört zu keinem Turnier
+    ("POST", "/api/tournaments"),  # neues Turnier: die Übersichten laden ohnehin
+    ("PATCH", "/api/tournaments/t-1"),  # das Turnier selbst (Event, Sichtbarkeit): alle laden nach
+    ("POST", "/api/tournaments/unknown/register"),
+    ("POST", "/api/matches/unknown/result"),
+    ("PATCH", "/api/events/e-1"),
+])
+def test_changes_without_a_single_tournament_stay_without_identifiers(scope_db, method, path):
+    async def seed():
+        await add_tournament(scope_db, "t-1")
+        await scope_db.matches_v2.insert_one({"id": "m-1", "tournament_id": "t-1"})
+
+    asyncio.run(seed())
+
+    public = public_view(publish(method, path))
+
+    assert public.get("tournament_id") is None
+
+
+def test_change_is_published_even_if_the_tournament_lookup_fails(monkeypatch):
+    def broken():
+        raise RuntimeError("Datenbank weg")
+
+    monkeypatch.setattr(database, "get_db", broken)
+
+    event = public_view(publish("POST", "/api/tournaments/t-1/register"))
+
+    assert event["resource"] == "tournaments"
+    assert event.get("tournament_id") is None
