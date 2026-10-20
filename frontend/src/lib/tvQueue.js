@@ -32,14 +32,17 @@ const stamp = (value) => {
 
 /**
  * Das nächste Spiel der ganzen Halle für die Fußzeile „Als Nächstes“ (#1828): aus derselben Live-Warteschlange wie die
- * Stationen - ein aufgerufenes zuerst, sonst das mit der frühesten Prognose. `{ lane, entry }` oder `null`. So nennt die
- * Fußzeile nach einem Austritt dieselbe Station und dieselben Spieler wie die Stations-Ansicht.
+ * Stationen - ein aufgerufenes zuerst, dann ein bereites vor einem, das noch auf Auslosung oder Vorspiele wartet (#1858),
+ * sonst das mit der frühesten Prognose. `{ lane, entry }` oder `null`. So nennt die Fußzeile nach einem Austritt dieselbe
+ * Station und dieselben Spieler wie die Stations-Ansicht.
  */
 export function queueNextUp(queue) {
   const picks = queueLanes(queue)
     .map((lane, index) => ({ lane, entry: lane.next, index }))
     .filter((pick) => pick.entry && pick.lane.status !== "broken");
+  const waits = (entry) => (entry.ready === false ? 1 : 0);
   picks.sort((a, b) => (a.entry.state === "called" ? 0 : 1) - (b.entry.state === "called" ? 0 : 1)
+    || waits(a.entry) - waits(b.entry)
     || stamp(a.entry.forecast_at) - stamp(b.entry.forecast_at)
     || a.index - b.index);
   return picks.length ? { lane: picks[0].lane, entry: picks[0].entry } : null;

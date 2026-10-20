@@ -114,7 +114,9 @@ function StationCard({ station, index, busy, canOperate, onCall, onStart }) {
 
 function NextAction({ station, next, running, broken, busy, canOperate, onCall, onStart }) {
   if (!next.ready) {
-    return <p className="mt-2 flex items-center gap-1.5 text-xs text-white/45"><Hourglass className="h-3.5 w-3.5" aria-hidden="true" /> wartet auf die Vorspiele</p>;
+    // Worauf es wartet, sagt der Server (#1858): das Los je Runde (Show-Auslosung) oder ein offenes Vorspiel.
+    const waiting = next.waiting_for === "draw" ? "wartet auf die Auslosung" : "wartet auf die Vorspiele";
+    return <p className="mt-2 flex items-center gap-1.5 text-xs text-white/45"><Hourglass className="h-3.5 w-3.5" aria-hidden="true" /> {waiting}</p>;
   }
   if (next.state === "called") {
     return canOperate ? (

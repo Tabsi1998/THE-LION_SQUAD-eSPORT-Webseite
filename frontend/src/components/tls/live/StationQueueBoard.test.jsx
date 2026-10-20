@@ -85,6 +85,20 @@ test("ohne Stations-Recht keine Knöpfe; Helfer nur an der eigenen Station; Vors
   expect(screen.getByTestId("live-next-st2")).toHaveTextContent("wartet auf die Vorspiele");
 });
 
+test("ein Lauf, der auf die Show-Auslosung wartet, sagt das - nicht „wartet auf die Vorspiele“ (#1858)", () => {
+  render(<StationQueueBoard queue={queue([
+    { id: "st3", name: "3", station_text: "Station 3", status: "free", waiting: 1, running: null,
+      next: entry("LA", { label: "Loser Runde 1", ready: false, forecast: true, names: [], open_slots: 4, heat: true, waiting_for: "draw" }) },
+    { id: "st4", name: "4", station_text: "Station 4", status: "free", waiting: 1, running: null,
+      next: entry("LC", { label: "Loser Runde 2", ready: false, forecast: true, names: [], open_slots: 4, heat: true, waiting_for: "previous" }) },
+  ])} onCall={vi.fn()} onStart={vi.fn()} />);
+  const draw = screen.getByTestId("live-next-st3");
+  expect(draw).toHaveTextContent("wartet auf die Auslosung");
+  expect(draw).not.toHaveTextContent("Vorspiele");
+  expect(screen.queryByTestId("live-call-st3")).toBeNull();
+  expect(screen.getByTestId("live-next-st4")).toHaveTextContent("wartet auf die Vorspiele");
+});
+
 test("defekte Station und leere Warteschlange sagen es im Klartext", () => {
   render(<StationQueueBoard queue={queue([
     { id: "st1", name: "1", station_text: "Station 1", status: "broken", waiting: 0, running: null, next: null, after: null },

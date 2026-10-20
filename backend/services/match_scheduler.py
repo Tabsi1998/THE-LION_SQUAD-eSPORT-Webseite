@@ -124,6 +124,16 @@ def _unresolved(match: dict) -> bool:
                for slot in match.get("slots") or [])
 
 
+def playable(match: dict) -> bool:
+    """Aufrufbar (#1858): jeder Platz steht fest (ein Freilos zählt nicht) und genug Spieler sitzen - dieselbe Regel wie
+    „Aufrufen“ (``tournament_live_routes._check_open``). Nur so ein Spiel kommt an einer Station vor die anderen."""
+    slots = match.get("slots") or []
+    if not slots:
+        return bool(match.get("participant_a_id")) and bool(match.get("participant_b_id"))
+    filled = sum(1 for slot in slots if slot.get("registration_id"))
+    return filled >= _min_players(match) and not _unresolved(match)
+
+
 def _label(match: dict) -> str:
     return match.get("match_key") or match.get("round_name") or match.get("id") or "Spiel"
 
@@ -151,6 +161,10 @@ class _Board:
         """Seit wann die Station zu ``moment`` frei ist: das Ende ihrer letzten Belegung davor (``None``: nie belegt)."""
         ends = [busy_end for _start, busy_end, _ in self.station_busy.get(station_id, []) if busy_end <= moment]
         return max(ends) if ends else None
+
+    def booked_later(self, station_id: str, moment: datetime) -> bool:
+        """Steht an der Station ab ``moment`` schon etwas? Dann käme ein Spiel ab ``moment`` davor in die Lücke (#1858)."""
+        return any(busy_start >= moment for busy_start, _end, _ in self.station_busy.get(station_id, []))
 
     def earliest(self, lower: datetime, minutes: int, station_id: str, participants: set[str], pause: int) -> datetime:
         """Der erste Zeitpunkt ab ``lower``, an dem Station und alle Spieler (mit Pause) frei sind."""
@@ -238,6 +252,16 @@ def _draw_state(match: dict, matches: list[dict]) -> dict:
     return {"waiting_for_draw": waiting, "draw_ready": waiting and isinstance(match.get("draw_ready"), dict)}
 
 
+def _waiting_for(match: dict, previous: list[dict], draw_state: dict) -> str | None:
+    """Worauf ein noch nicht aufrufbares Spiel wartet (#1858): ``previous`` - ein Vorspiel ist offen; ``draw`` - die
+    Vorspiele sind fertig, das Los je Runde fehlt (Show-Auslosung, Auslosung nach der Runde). Aufrufbar: ``None``."""
+    if playable(match):
+        return None
+    if any(str(row.get("status") or "") not in DONE_STATUSES for row in previous):
+        return "previous"
+    return "draw" if draw_state.get("waiting_for_draw") else "previous"
+
+
 def _chain_lengths(matches: list[dict], predecessors: dict[str, list[dict]]) -> dict[str, int]:
     """Wie viele Spiele hängen noch an diesem - die längste Kette bis zum Finale geht zuerst."""
     successors: dict[str, list[str]] = {}
@@ -309,6 +333,14 @@ def _plan_stations(tournament: dict, matches: list[dict], stations, stage_by_id:
     by_id = {match["id"]: match for match in matches}
     by_key = {(match.get("stage_id"), match.get("match_key")): match for match in matches if match.get("match_key")}
     board = _Board()
+    predecessors = _predecessor_map(matches, by_key)
+    # Bis wann an jeder Station aufrufbare Spiele stehen (#1858): ein Spiel, das noch auf die Auslosung oder Vorspiele
+    # wartet, kommt dort erst danach - es nimmt einem bereiten nie den Platz „Als Nächstes“.
+    ready_until: dict[str, datetime] = {}
+
+    def hold_ready(station_id: str | None, end: datetime) -> None:
+        if station_id:
+            ready_until[station_id] = max(ready_until.get(station_id, end), end)
 
     def duration(match: dict) -> int:
         return effective_match_duration(match, stage=stage_by_id.get(match.get("stage_id")), tournament=tournament, game=game)
@@ -357,9 +389,14 @@ def _plan_stations(tournament: dict, matches: list[dict], stations, stage_by_id:
             # Planer davor noch etwas auf die schon reservierte Station (Codex zu #1595).
             board.block(match["id"], match.get("station_id"), players_of(match), now if called else start, end)
             fixed.append((match, start, end))
+            waiting = None
+            if not running and not called:
+                waiting = _waiting_for(match, predecessors.get(match["id"], []), _draw_state(match, matches))
+            if waiting is None:
+                hold_ready(match.get("station_id"), end)
             held.append({"match_id": match["id"], "station_id": match.get("station_id"), "start": start.isoformat(),
                          "end": end.isoformat(), "minutes": duration(match),
-                         "kind": "running" if running else "called" if called else "kept"})
+                         "kind": "running" if running else "called" if called else "kept", "waiting_for": waiting})
             continue
         if status not in PLANNABLE_STATUSES:
             continue
@@ -407,8 +444,8 @@ def _plan_stations(tournament: dict, matches: list[dict], stations, stage_by_id:
                 warnings.append({"type": "player_overlap", "severity": "error", "match_id": match["id"], "other_match_id": other["id"],
                                  "message": f"{_label(match)} und {_label(other)}: ein Spieler ist zur selben Zeit in beiden Spielen."})
 
-    predecessors = _predecessor_map(matches, by_key)
     chains = _chain_lengths(matches, predecessors)
+    callable_ids = {match["id"] for match in candidates if playable(match)}
     assignments: list[dict] = []
     stage_floor = horizon
     stage_numbers = sorted({int(match.get("stage_number") or 0) for match in candidates}) if usable else []
@@ -423,9 +460,14 @@ def _plan_stations(tournament: dict, matches: list[dict], stations, stage_by_id:
                     warnings.append({"type": "unplaced", "severity": "error", "match_id": match["id"],
                                      "message": f"{_label(match)}: die Vorspiele lassen sich nicht auflösen."})
                 break
-            match = min(ready, key=lambda item: (-chains.get(item["id"], 0), int(item.get("round") or 0),
-                                                 int(item.get("order") or item.get("position") or 0), str(item.get("match_key") or item["id"])))
+            # Aufrufbare zuerst (#1858): ein Lauf, der noch auf die Auslosung oder Vorspiele wartet, nimmt einem bereiten
+            # keine Station - danach wie gehabt die längste Kette, Runde, Reihenfolge.
+            match = min(ready, key=lambda item: (item["id"] not in callable_ids, -chains.get(item["id"], 0),
+                                                 int(item.get("round") or 0), int(item.get("order") or item.get("position") or 0),
+                                                 str(item.get("match_key") or item["id"])))
             del remaining[match["id"]]
+            draw_state = _draw_state(match, matches)
+            waiting = _waiting_for(match, predecessors.get(match["id"], []), draw_state)
             lower = stage_floor
             # Vorschau: wer gegen wen spielt, kann sich bis zum Check-in-Ende noch ändern - nur voraussichtlich.
             forecast = _unresolved(match) or bool(match.get("is_preview"))
@@ -439,16 +481,23 @@ def _plan_stations(tournament: dict, matches: list[dict], stations, stage_by_id:
             players = players_of(match)
             best = None
             for station in usable:
-                moment = board.earliest(lower, minutes, station["id"], players, pause)
-                # Gleich früh an mehreren Stationen: an die, die zuerst frei war (#1791). Ein überzogenes Spiel hält seine
-                # Station „bis jetzt“ - sie ist nicht wirklich frei, eine freie Station geht vor.
+                # Wartet das Spiel noch (#1858), kommt es an dieser Station erst nach den aufrufbaren - nie in eine Lücke
+                # davor, sonst stünde es „Als Nächstes“ und der bereite Lauf hätte kein „Aufrufen“.
+                floor = lower if waiting is None else max(lower, ready_until.get(station["id"], lower))
+                moment = board.earliest(floor, minutes, station["id"], players, pause)
+                # Gleich früh an mehreren Stationen: lieber eine, an der danach nichts steht, als die Lücke vor einem
+                # anderen Spiel (#1858: sonst laufen vier bereite Läufe auf zwei Stationen, zwei bleiben frei). Dann die,
+                # die zuerst frei war (#1791) - ein überzogenes Spiel hält seine Station „bis jetzt“, eine freie geht vor.
                 since = board.free_since(station["id"], moment)
-                key = (moment, since is not None, since or moment, str(station.get("name") or ""), station["id"])
+                key = (moment, board.booked_later(station["id"], moment), since is not None, since or moment,
+                       str(station.get("name") or ""), station["id"])
                 if best is None or key < best[0]:
                     best = (key, station, moment)
             _key, station, moment = best
             end = moment + timedelta(minutes=minutes)
             board.block(match["id"], station["id"], players, moment, end)
+            if waiting is None:
+                hold_ready(station["id"], end)
             stage_ends.append(end)
             previous_at = _parse(match.get("scheduled_at"))
             assignments.append({
@@ -462,7 +511,9 @@ def _plan_stations(tournament: dict, matches: list[dict], stations, stage_by_id:
                 "station_name": station.get("name"),
                 "duration_minutes": minutes,
                 "forecast": forecast,
-                **_draw_state(match, matches),
+                **draw_state,
+                # Worauf es wartet (#1858): ``draw``, ``previous`` - oder ``None``, dann ist es aufrufbar.
+                "waiting_for": waiting,
                 "schedule_source": "planner",
                 "changed": (previous_at != moment or match.get("station_id") != station["id"]
                             or match.get("schedule_source") != "planner" or bool(match.get("schedule_forecast")) != forecast),
