@@ -77,3 +77,40 @@ test("ohne Phase färbt weiter der Status", async () => {
   await render(<StatusBadge status="live" />);
   expect(screen.getByTestId("status-badge-text")).toHaveStyle({ color: colors.live });
 });
+
+// Countdown nur, wenn es bald so weit ist (#1897): dieselbe Regel wie PhaseBadge im Web (lib/countdownRule).
+describe("Countdown im Chip", () => {
+  const NOW = Date.parse("2026-10-07T10:00:00+02:00");
+  const phase = (target: string, kind = "starts") => ({ state: "announced", label: "Angekündigt", target_at: target, countdown_kind: kind });
+
+  beforeEach(() => {
+    jest.useFakeTimers({ now: NOW });
+  });
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  test("weit weg: Monat statt „154T 16h“, nah: Tage, morgen, heute, Minuten", async () => {
+    const { rerender } = await render(<StatusBadge phase={phase("2027-03-10T14:00:00+01:00")} />);
+    expect(screen.getByLabelText("Angekündigt · startet im März")).toBeTruthy();
+    await rerender(<StatusBadge phase={phase("2026-11-14T18:00:00+01:00")} />);
+    expect(screen.getByLabelText("Angekündigt · startet am Sa 14. November")).toBeTruthy();
+    await rerender(<StatusBadge phase={phase("2026-10-10T09:00:00+02:00")} />);
+    expect(screen.getByLabelText("Angekündigt · startet in 3 Tagen")).toBeTruthy();
+    await rerender(<StatusBadge phase={phase("2026-10-08T14:00:00+02:00", "check_in_opens")} />);
+    expect(screen.getByLabelText("Angekündigt · Check-in morgen 14:00")).toBeTruthy();
+    await rerender(<StatusBadge phase={phase("2026-10-07T14:00:00+02:00", "registration_closes")} />);
+    expect(screen.getByLabelText("Angekündigt · endet heute 14:00")).toBeTruthy();
+    await rerender(<StatusBadge phase={phase("2026-10-07T10:45:00+02:00", "check_in_closes")} />);
+    expect(screen.getByLabelText("Angekündigt · Check-in endet in 45 Minuten")).toBeTruthy();
+    await rerender(<StatusBadge phase={phase("2026-10-10T09:00:00+02:00", "registration_opens")} />);
+    expect(screen.getByLabelText("Angekündigt · in 3 Tagen")).toBeTruthy();
+  });
+
+  test("ohne Termin oder in der Vergangenheit steht kein Countdown da", async () => {
+    const { rerender } = await render(<StatusBadge phase={{ state: "announced", label: "Angekündigt" }} />);
+    expect(screen.getByLabelText("Angekündigt")).toBeTruthy();
+    await rerender(<StatusBadge phase={phase("2026-10-07T09:00:00+02:00")} />);
+    expect(screen.getByLabelText("Angekündigt")).toBeTruthy();
+  });
+});

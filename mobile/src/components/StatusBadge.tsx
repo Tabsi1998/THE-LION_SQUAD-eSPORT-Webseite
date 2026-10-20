@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Animated, StyleSheet, View, type StyleProp, type ViewStyle } from "react-native";
+import { useBranding } from "../branding/BrandingProvider";
 import { useReduceMotion } from "./FadeIn";
+import { whenPhrase, whenText, whenTickMs } from "../lib/countdownRule";
 import { formatStatus, upperDe } from "../lib/format";
 import { phaseTone, type PhaseTone } from "../lib/phaseTone";
 import { colors, radius, roles } from "../theme";
@@ -26,18 +28,29 @@ export function StatusBadge({
   style?: StyleProp<ViewStyle>;
 }) {
   const [now, setNow] = useState(() => Date.now());
+  const { countdownDays } = useBranding();
   const targetMs = useMemo(() => targetTime(phase), [phase]);
 
+  // Countdown nur, wenn es bald so weit ist (#1897). Die Angabe hat Minuten als kleinste Einheit: in der letzten Stunde
+  // alle 15 Sekunden nachsehen, sonst jede Minute.
   useEffect(() => {
-    if (!targetMs || targetMs <= Date.now()) return undefined;
-    const timer = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(timer);
+    if (!targetMs) return undefined;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const tick = () => {
+      setNow(Date.now());
+      const next = whenTickMs(targetMs);
+      if (next) timer = setTimeout(tick, next);
+    };
+    const first = whenTickMs(targetMs);
+    if (first) timer = setTimeout(tick, first);
+    return () => {
+      if (timer) clearTimeout(timer);
+    };
   }, [targetMs]);
 
-  const remaining = targetMs ? formatRemaining(targetMs - now) : "";
-  const prefix = remaining ? countdownPrefix(phaseCountdownKind(phase)) : "";
+  const remaining = targetMs && targetMs > now ? formatRemaining(targetMs, now, phaseCountdownKind(phase), countdownDays) : "";
   const statusLabel = statusText({ label, phase, status });
-  const text = [statusLabel, prefix && `${prefix} ${remaining}`].filter(Boolean).join(" · ");
+  const text = [statusLabel, remaining].filter(Boolean).join(" · ");
   // Text und Tönung aus derselben Regel (#1869): steht eine Phase da, färbt nur sie - mit der Tabelle von PhaseBadge im
   // Web (lib/phaseTone). Der Rohstatus („live“) färbte sonst eine noch angekündigte Fast Lap rot.
   const state = phaseState(phase);
@@ -114,29 +127,19 @@ function targetTime(phase?: PhaseLike | string | null) {
   return Number.isNaN(date.getTime()) ? null : date.getTime();
 }
 
-function countdownPrefix(kind?: string | null) {
-  const prefixes: Record<string, string> = {
-    check_in_closes: "Check-in endet in",
-    check_in_opens: "Check-in in",
-    ends: "endet in",
-    registration_closes: "endet in",
-    registration_opens: "in",
-    starts: "startet in",
-  };
-  return prefixes[String(kind || "")] || "in";
-}
+// Das Verb vor der Zeitangabe wie im Web (PhaseBadge): „startet in 3 Tagen“, „startet am Sa 14. November“, „startet im März“.
+const COUNTDOWN_VERB: Record<string, string> = {
+  check_in_closes: "Check-in endet",
+  check_in_opens: "Check-in",
+  ends: "endet",
+  registration_closes: "endet",
+  registration_opens: "",
+  starts: "startet",
+};
 
-function formatRemaining(ms: number) {
-  if (ms <= 0) return "";
-  const totalSeconds = Math.floor(ms / 1000);
-  const days = Math.floor(totalSeconds / 86400);
-  const hours = Math.floor((totalSeconds % 86400) / 3600);
-  const minutes = Math.floor((totalSeconds % 3600) / 60);
-  const seconds = totalSeconds % 60;
-  if (days > 0) return `${days}T ${hours}h`;
-  if (hours > 0) return `${hours}h ${minutes}m`;
-  if (minutes > 0) return `${minutes}m ${seconds}s`;
-  return `${seconds}s`;
+/** Wann der Termin ist, nach der einen Regel (lib/countdownRule): Monat, Datum, „in 3 Tagen“, „morgen 14:00“, Minuten. */
+export function formatRemaining(targetMs: number, now: number, kind?: string | null, days?: unknown): string {
+  return whenPhrase(COUNTDOWN_VERB[String(kind || "")] || "", whenText(targetMs, { now, days }));
 }
 
 function toneForStatus(value: string): StatusTone {
