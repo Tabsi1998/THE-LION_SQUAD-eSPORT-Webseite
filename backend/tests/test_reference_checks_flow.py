@@ -10,6 +10,7 @@ import pytest_asyncio
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 
 from flow_harness import make_flow  # noqa: E402
+from routes import news_routes  # noqa: E402
 from services import dolibarr_policy  # noqa: E402
 
 CHECKS = "/api/references/admin/checks"
@@ -98,3 +99,39 @@ async def test_only_the_content_area_sees_the_checks(flow):
     flow.act_as(member)
     assert (await flow.get(CHECKS)).status_code == 403
     assert (await flow.post(f"{CHECKS}/preview", json={})).status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_a_change_of_the_limits_lands_in_the_admin_log(flow):
+    admin = await _board(flow)
+    await flow.patch(CHECKS, json={"max_duration_days": 90})
+    # Gleicher Wert noch einmal: keine zweite Zeile.
+    await flow.patch(CHECKS, json={"max_duration_days": 90})
+    await flow.patch(CHECKS, json={"warn_future_end": False})
+    logs = await flow.db.audit_logs.find({"action": "references.checks_change"}, {"_id": 0}).sort(
+        "created_at", 1).to_list(None)
+    assert [(log["actor_id"], log["target_id"], log["data"]) for log in logs] == [
+        (admin["id"], "reference_checks", {"previous": {"max_duration_days": 365, "warn_future_end": True},
+                                           "settings": {"max_duration_days": 90, "warn_future_end": True}}),
+        (admin["id"], "reference_checks", {"previous": {"max_duration_days": 90, "warn_future_end": True},
+                                           "settings": {"max_duration_days": 90, "warn_future_end": False}}),
+    ]
+
+
+@pytest.mark.asyncio
+async def test_the_list_reads_every_reference_in_blocks(flow, monkeypatch):
+    await _board(flow)
+    docs = [{"id": f"ref-{index:04d}", "title": f"Cup {index:04d}", "status": "completed", "placement": 1,
+             "participant_count": 8, "description": "x" * 50} for index in range(1003)]
+    # Drei auffällige - eine davon ganz am Ende, hinter der alten Grenze von 1000.
+    for index in (0, 600, 1002):
+        docs[index].update({"placement": 20, "participant_count": 16})
+    await flow.db.references.insert_many(docs)
+    listing = (await flow.get(CHECKS)).json()
+    assert listing["checked"] == 1003
+    assert sorted(item["id"] for item in listing["items"]) == ["ref-0000", "ref-0600", "ref-1002"]
+    # Kleinere Blöcke ergeben dasselbe; die Liste trägt nur, was sie zeigt.
+    monkeypatch.setattr(news_routes, "REFERENCE_CHECK_BLOCK", 7)
+    again = (await flow.get(CHECKS)).json()
+    assert again["checked"] == 1003 and again["items"] == listing["items"]
+    assert set(listing["items"][0]) == {"id", "title", "start_date", "warnings"}

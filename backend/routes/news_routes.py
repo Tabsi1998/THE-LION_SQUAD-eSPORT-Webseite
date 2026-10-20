@@ -1495,20 +1495,42 @@ async def _reference_warnings(db, doc: dict) -> list[dict]:
     return reference_checks.check_reference(doc, dolibarr_policy.club_today(), await _reference_check_settings(db))
 
 
+# Die Liste der Auffälligkeiten liest wirklich alle Referenzen - in Blöcken und nur mit den Feldern, die Prüfung und
+# Sortierung brauchen; ohne Obergrenze.
+REFERENCE_CHECK_BLOCK = 500
+REFERENCE_CHECK_FIELDS = (
+    "id", "title", "status", "order_index", "start_date", "end_date", "placement", "participant_count", "team_count",
+    "team_name", "entries.kind", "entries.placement", "entries.participant_count", "entries.team_count",
+)
+
+
 @router.get("/references/admin/checks")
 async def admin_reference_checks(me: dict = Depends(require_area("content"))):
     """Auffälligkeiten in allen gespeicherten Referenzen (auch den alten) - je Referenz ihre Warnungen."""
     db = get_db()
     settings = await _reference_check_settings(db)
     today = dolibarr_policy.club_today()
-    refs = _sort_references(await db.references.find({}, {"_id": 0}).to_list(1000))
-    items = []
-    for ref in refs:
-        warnings = reference_checks.check_reference(ref, today, settings)
-        if warnings:
-            items.append({"id": ref["id"], "title": ref.get("title"), "start_date": ref.get("start_date"),
-                          "warnings": warnings})
-    return {"settings": settings, "checked": len(refs), "items": items}
+    projection = {field: 1 for field in REFERENCE_CHECK_FIELDS}
+    checked, found, last = 0, [], None
+    while True:
+        block = await db.references.find({"_id": {"$gt": last}} if last is not None else {}, projection).sort(
+            "_id", 1).limit(REFERENCE_CHECK_BLOCK).to_list(REFERENCE_CHECK_BLOCK)
+        if not block:
+            break
+        last = block[-1]["_id"]
+        checked += len(block)
+        for ref in block:
+            warnings = reference_checks.check_reference(ref, today, settings)
+            if warnings:
+                ref.pop("_id", None)
+                found.append((ref, warnings))
+        if len(block) < REFERENCE_CHECK_BLOCK:
+            break
+    order = {id(ref): index for index, ref in enumerate(_sort_references([ref for ref, _ in found]))}
+    found.sort(key=lambda pair: order[id(pair[0])])
+    items = [{"id": ref.get("id"), "title": ref.get("title"), "start_date": ref.get("start_date"),
+              "warnings": warnings} for ref, warnings in found]
+    return {"settings": settings, "checked": checked, "items": items}
 
 
 @router.patch("/references/admin/checks")
@@ -1519,6 +1541,13 @@ async def admin_update_reference_checks(body: ReferenceCheckSettings, me: dict =
     saved = reference_checks.normalize_settings({**current, **updates})
     await db.settings.update_one({"id": reference_checks.SETTINGS_ID}, {"$set": {
         "id": reference_checks.SETTINGS_ID, **saved, "updated_at": now_utc().isoformat()}}, upsert=True)
+    # Adminprotokoll: wer die Grenzen der Prüfung wann von welchem auf welchen Wert gestellt hat - nur bei einer Änderung.
+    if saved != current:
+        await db.audit_logs.insert_one({
+            "id": new_id(), "action": "references.checks_change", "actor_id": me["id"],
+            "target_id": reference_checks.SETTINGS_ID, "data": {"previous": current, "settings": saved},
+            "created_at": now_utc().isoformat(),
+        })
     return saved
 
 
