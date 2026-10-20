@@ -3397,3 +3397,17 @@ html[data-season-still-cards] .tls-card[data-season-perch="card"]:focus-visible 
   .tls-run-card { transition: none; }
   .tls-run-card:hover { transform: none; }
 }
+
+/* Bestätigungs-Blatt der Anmeldung (#1261): am Handy fährt das Blatt von unten herein, ab 640 px blendet das Fenster
+   leicht vergrößert ein; der Hintergrund blendet nur. Mit „Bewegung reduzieren“ nur die Deckkraft, ohne Weg. */
+@keyframes tls-register-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes tls-register-rise { from { transform: translateY(100%); } to { transform: none; } }
+@keyframes tls-register-pop { from { opacity: 0; transform: translateY(8px) scale(0.97); } to { opacity: 1; transform: none; } }
+.tls-register-backdrop { animation: tls-register-fade var(--tls-motion-fast) ease-out both; }
+.tls-register-sheet { animation: tls-register-rise 0.32s cubic-bezier(0.32, 0.72, 0, 1) both; }
+@media (min-width: 640px) {
+  .tls-register-sheet { animation: tls-register-pop var(--tls-motion-mid) var(--tls-ease) both; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tls-register-sheet { animation: tls-register-fade var(--tls-motion-fast) ease-out both; }
+}

@@ -9,14 +9,13 @@ import { PublicLayout } from "@/components/tls/PublicLayout";
 import { PublicLoadingState } from "@/components/tls/PublicLoadingState";
 import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
 import { StatusBadge } from "@/components/tls/StatusBadge";
-import { StepBar, tournamentSteps } from "@/components/tls/StepBar";
 import { PhaseBadge } from "@/components/tls/PhaseBadge";
 import { AuthFormAlert } from "@/components/tls/AuthFormFields";
 import { useLiveRefresh } from "@/hooks/useLiveRefresh";
 import { useChatRead } from "@/hooks/useChats";
 import { useSubmissionGuard } from "@/hooks/useSubmissionGuard";
 import { toast } from "sonner";
-import { Calendar, Users, Trophy, MapPin, Gamepad2, Radio, Zap, X, Flag, MessageSquare, Send, Handshake, ExternalLink } from "lucide-react";
+import { Calendar, Users, Trophy, MapPin, Gamepad2, Radio, Zap, Flag, MessageSquare, Send, Handshake, ExternalLink } from "lucide-react";
 import { PrizeList } from "@/components/tls/PrizeList";
 import { StreamEmbed } from "@/components/tls/StreamEmbed";
 import { TournamentLiveStreams } from "@/components/tls/tournament/TournamentLiveStreams";
@@ -30,11 +29,12 @@ import { renderMarkdownLite } from "@/lib/markdownLite";
 import { seoTextPreview } from "@/lib/textPreview";
 import { formatTeamMode, formatTournamentDisplay } from "@/lib/tournamentLabels";
 import { gameLabel } from "@/lib/gameLabels";
-import { formatCents, previewQuote, startFeeSummary } from "@/lib/pricing";
+import { formatCents, startFeeSummary } from "@/lib/pricing";
 import { TournamentTabs } from "@/components/tls/tournament/TournamentTabs";
 import { TournamentTimeline, countdownText, timelineSteps } from "@/components/tls/tournament/TournamentTimeline";
 import { MyStandCard } from "@/components/tls/tournament/MyStandCard";
 import { OnsiteTournamentView } from "@/components/tls/tournament/OnsiteTournamentView";
+import { RegistrationSheet } from "@/components/tls/tournament/RegistrationSheet";
 import { FriendsAtEvent } from "@/components/tls/FriendsAtEvent";
 import { offerFriendsHint } from "@/lib/friendsHint";
 import { offerCalendarHint } from "@/lib/calendarHint";
@@ -165,14 +165,12 @@ function TournamentDetailView() {
     }, "Anmeldung konnte nicht gespeichert werden.");
   };
 
-  const handleRegister = async () => {
+  // Bestätigungs-Blatt (#1261): jede Anmeldung öffnet zuerst das Blatt - auch Einzel ohne Startgeld und Kennungen. Erst
+  // „Verbindlich anmelden“ darin meldet an; ein versehentlicher Tipp ist keine Anmeldung mehr.
+  const handleRegister = () => {
     if (!user) { nav(`/login?next=${encodeURIComponent(`/tournaments/${slug}${accessToken ? `?access=${accessToken}` : ""}`)}`); return; }
-    const needsTeam = (t.team_mode || "solo") !== "solo";
-    if (needsTeam || t.offer || (t.game?.effective_player_id_fields || t.game?.player_id_fields || []).length) {
-      setRegisterModal(true);
-      return;
-    }
-    await submitRegistration({});
+    setActionError("");
+    setRegisterModal(true);
   };
 
   const handleCheckin = async () => {
@@ -205,7 +203,7 @@ function TournamentDetailView() {
       <PublicLayout>
         <OnsiteTournamentView tournament={t} user={user} loading={loading} error={registerModal ? "" : actionError} onRegister={handleRegister} />
         {registerModal && (
-          <RegistrationModal
+          <RegistrationSheet
             tournament={t}
             user={user}
             myTeams={myTeams}
@@ -464,7 +462,7 @@ function TournamentDetailView() {
         </aside>
       </div>
       {registerModal && (
-        <RegistrationModal
+        <RegistrationSheet
           tournament={t}
           user={user}
           myTeams={myTeams}
@@ -607,114 +605,6 @@ function TournamentChat({ tournament, user }) {
         )}
       </div>
     </section>
-  );
-}
-
-function RegistrationModal({ tournament, user, myTeams = [], loading, error, onClose, onSubmit }) {
-  const game = tournament.game || {};
-  const fields = game.effective_player_id_fields || game.player_id_fields || [];
-  const sourceSlug = game.identity_game_slug || game.slug;
-  const needsTeam = (tournament.team_mode || "solo") !== "solo";
-  const manageableTeams = myTeams.filter((team) => team.can_manage || ["leader", "co_leader"].includes(team.my_role));
-  const initial = {
-    ...((user?.game_ids || {})[sourceSlug] || {}),
-    ...((user?.game_ids || {})[game.slug] || {}),
-  };
-  const [playerIds, setPlayerIds] = useState(initial);
-  const [teamId, setTeamId] = useState(manageableTeams[0]?.id || "");
-  // Startgeld (#319): Summe vor dem Absenden, wählbare Positionen als Haken, Kostenübernahme als Pflicht.
-  const offer = tournament.offer || null;
-  const [acceptCosts, setAcceptCosts] = useState(false);
-  const [selectedPositions, setSelectedPositions] = useState([]);
-  const seats = needsTeam ? Math.max(1, Number(tournament.team_size) || 1) : 1;
-  const quote = offer ? previewQuote(offer, { seats, selected: selectedPositions }) : null;
-  const set = (key, value) => setPlayerIds((cur) => ({ ...cur, [key]: value }));
-  const submit = (e) => {
-    e.preventDefault();
-    onSubmit({ playerIds, teamId: needsTeam ? teamId : null, acceptCosts, selectedPositions });
-  };
-  return (
-    <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4" onClick={onClose}>
-      <form onSubmit={submit} className="w-full max-w-lg bg-[#121212] border border-white/10 rounded-sm p-5 space-y-4" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <h3 className="font-heading text-xl font-black uppercase">Turnier-Anmeldung</h3>
-            <StepBar steps={tournamentSteps(tournament)} current={0} className="mt-3" testId="tournament-register-steps" />
-            <p className="text-xs text-white/50 mt-1">
-              {needsTeam
-                ? "Wähle das Team aus, das du als Leader oder Co-Leader anmelden möchtest."
-                : fields.length
-                  ? `${gameLabel(game)} benötigt Spieler-IDs${sourceSlug !== game.slug ? ` aus ${game.identity_game_name || "dem Hauptspiel"}` : ""}.`
-                  : "Bitte bestätige das Startgeld, dann bist du dabei."}
-            </p>
-          </div>
-          <button type="button" onClick={onClose} className="text-white/45 hover:text-white"><X className="w-5 h-5" /></button>
-        </div>
-        {needsTeam && (
-          <label className="block">
-            <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Team *</div>
-            <select
-              value={teamId}
-              onChange={(e) => setTeamId(e.target.value)}
-              required
-              className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm"
-            >
-              {manageableTeams.map((team) => <option key={team.id} value={team.id}>[{team.tag}] {team.name}</option>)}
-            </select>
-            {manageableTeams.length === 0 && (
-              <div className="mt-2 text-xs text-[#FF3B30]">Du bist aktuell bei keinem Team als Leader oder Co-Leader eingetragen.</div>
-            )}
-          </label>
-        )}
-        {fields.map((field) => (
-          <label key={field.key} className="block">
-            <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">{field.label}{field.required !== false ? " *" : ""}</div>
-            <input
-              value={playerIds[field.key] || ""}
-              onChange={(e) => set(field.key, e.target.value)}
-              required={field.required !== false}
-              placeholder={field.help_text || field.label}
-              className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm"
-            />
-          </label>
-        ))}
-        {offer && (
-          <div className="border border-[#FFD700]/40 rounded-sm p-3 space-y-2" data-testid="tournament-register-costs">
-            <div className="text-[11px] uppercase tracking-widest font-bold text-[#FFD700]">Startgeld</div>
-            {offer.positions.some((position) => position.optional) && (
-              <div className="space-y-1">
-                {offer.positions.filter((position) => position.optional).map((position) => (
-                  <label key={position.key} className="flex items-center gap-2 text-sm">
-                    <input type="checkbox" checked={selectedPositions.includes(position.key)} onChange={(e) => setSelectedPositions((current) => (e.target.checked ? [...current, position.key] : current.filter((key) => key !== position.key)))} data-testid={`tournament-offer-option-${position.key}`} />
-                    <span>{position.label} <span className="text-white/50">{formatCents(position.amount_cents, offer.currency)} {position.basis === "per_person" ? "je Spieler" : position.basis === "per_team" ? "je Team" : "je Anmeldung"}</span></span>
-                  </label>
-                ))}
-              </div>
-            )}
-            {quote && !quote.free && (
-              <div className="flex items-baseline justify-between gap-3 text-sm" data-testid="tournament-quote">
-                <span className="text-white/65">{needsTeam ? `Summe für ein Team mit ${seats} Spielern` : "Summe"}</span>
-                <strong className="font-heading text-xl text-white">{formatCents(quote.total_cents, quote.currency)}</strong>
-              </div>
-            )}
-            {needsTeam && offer.positions.some((position) => position.basis === "per_person") && (
-              <div className="text-xs text-white/45">Gezählt wird der Roster bei der Freigabe – fehlen noch Spieler, gilt die Teamgröße.</div>
-            )}
-            <label className="flex items-start gap-2 text-sm">
-              <input type="checkbox" checked={acceptCosts} onChange={(e) => setAcceptCosts(e.target.checked)} className="mt-1" data-testid="tournament-accept-costs" />
-              <span>{needsTeam ? "Ich übernehme das Startgeld für das Team (Rechnung an mich)." : "Ich übernehme das Startgeld (Rechnung an mich)."}<br /><span className="text-xs text-white/45">Bezahlt wird erst mit der verbindlichen Teilnahme; die Rechnung kommt in dein Konto unter „Meine Rechnungen“.</span></span>
-            </label>
-          </div>
-        )}
-        {error && <AuthFormAlert id="tournament-registration-error">{error}</AuthFormAlert>}
-        <div className="flex justify-end gap-2 pt-2">
-          <button type="button" onClick={onClose} className="tls-btn tls-btn--quiet px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold">Abbrechen</button>
-          <button disabled={loading || (needsTeam && !teamId) || (offer && !acceptCosts)} data-testid="tournament-register-submit" className="tls-btn tls-btn--primary px-5 py-2 rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-50">
-            {loading ? "Sendet…" : quote && !quote.free ? `Verbindlich anmelden · ${formatCents(quote.total_cents, quote.currency)}` : "Anmelden"}
-          </button>
-        </div>
-      </form>
-    </div>
   );
 }
 
