@@ -7,8 +7,8 @@ Die Zahlen zu Bildgroessen haengen stark vom Inhalt ab - ein Gruppenfoto
 komprimiert anders als ein Bildschirmfoto. Deshalb misst dieses Skript die
 echten Dateien dieser Installation, statt mit erfundenen Beispielen zu rechnen.
 
-    python3 scripts/media-report.py
-    python3 scripts/media-report.py --dir /pfad/zu/uploads --limit 200
+    docker compose exec backend python3 scripts/media-report.py
+    docker compose exec backend python3 scripts/media-report.py --dir /pfad/zu/uploads --limit 200
 """
 from __future__ import annotations
 

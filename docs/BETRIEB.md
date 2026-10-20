@@ -239,6 +239,32 @@ docker compose build
 docker compose exec backend ls scripts static
 ```
 
+## Betriebsskripte im Backend-Container (#1583)
+
+Skripte, die im laufenden Container gebraucht werden, liegen in `backend/scripts/` (nur das kommt ins
+Backend-Image, die Skripte im Repo-Ordner `scripts/` nicht). Aufruf immer aus dem Container:
+
+```bash
+docker compose exec backend python3 scripts/media-report.py
+docker compose exec backend python3 scripts/uploads-inventory.py > /tmp/upload-inventar.md
+docker compose exec backend python scripts/unique_index_duplicates.py
+```
+
+Alle drei lesen nur (Dubletten-Skript: ohne `--anwenden`).
+
+## Betriebsskripte im Backend-Container (#1583)
+
+Skripte, die im laufenden Container gebraucht werden, liegen in `backend/scripts/` (nur das kommt ins
+Backend-Image, die Skripte im Repo-Ordner `scripts/` nicht). Aufruf immer aus dem Container:
+
+```bash
+docker compose exec backend python3 scripts/media-report.py
+docker compose exec backend python3 scripts/uploads-inventory.py > /tmp/upload-inventar.md
+docker compose exec backend python scripts/unique_index_duplicates.py
+```
+
+Alle drei lesen nur (das Dubletten-Skript ohne `--anwenden`).
+
 ## Externe Überwachung
 
 Ein Uptime-Dienst prüft mindestens jede Minute `https://lionsquad.at/api/health/live`,
