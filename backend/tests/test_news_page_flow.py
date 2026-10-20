@@ -80,3 +80,48 @@ async def test_news_meta_keeps_the_fixed_order_and_names_unknown_categories(flow
     assert [(row["k"], row["l"], row["count"]) for row in rows] == [
         ("club", "Verein", 1), ("tournaments", "Turniere", 1), ("video", "Video", 1),
     ]
+
+
+# ---------------------------------------------------------------- #1343 Sieger für die Text-Karte
+
+async def finished_tournament(flow, winner_name, **fields):
+    tournament = await flow.create_tournament(**{"status": "results_published", "title": "Kart-Cup", **fields})
+    winner = await flow.add_user(name=winner_name)
+    second = await flow.add_user(name="Zweiter")
+    reg_winner = await flow.register(tournament, winner)
+    reg_second = await flow.register(tournament, second)
+    await flow.db.tournament_awards.insert_many([
+        {"id": "a1-" + tournament["id"], "tournament_id": tournament["id"], "registration_id": reg_winner["id"], "user_id": winner["id"], "rank": 1},
+        {"id": "a2-" + tournament["id"], "tournament_id": tournament["id"], "registration_id": reg_second["id"], "user_id": second["id"], "rank": 2},
+    ])
+    return tournament
+
+
+@pytest.mark.asyncio
+async def test_result_news_carry_the_winner_in_list_and_on_home(flow):
+    cup = await finished_tournament(flow, "NeonFalke")
+    await news(flow, "ergebnis", category="recap", linked_tournament_ids=[cup["id"]])
+    await news(flow, "ankuendigung", category="tournaments", days_ago=2)
+
+    flow.act_as(None)
+    listed = {row["slug"]: row for row in (await flow.get("/api/news?compact=true")).json()}
+    assert listed["ergebnis"]["result"] == {"winner": "NeonFalke", "tournament": "Kart-Cup"}
+    assert listed["ankuendigung"].get("result") is None
+    assert "linked_tournament_ids" not in listed["ergebnis"], "die kompakte Liste bleibt schlank"
+
+    home = {row["slug"]: row for row in (await flow.get("/api/home/state")).json()["news"]}
+    assert home["ergebnis"]["result"]["winner"] == "NeonFalke"
+
+
+@pytest.mark.asyncio
+async def test_no_winner_before_results_or_for_hidden_tournaments(flow):
+    running = await finished_tournament(flow, "Frueh", status="live")
+    hidden = await finished_tournament(flow, "Versteckt", is_public=False)
+    members = await finished_tournament(flow, "Intern", visibility="members")
+    await news(flow, "laeuft", linked_tournament_ids=[running["id"]])
+    await news(flow, "versteckt", linked_tournament_ids=[hidden["id"]])
+    await news(flow, "mitglieder", linked_tournament_ids=[members["id"]])
+
+    flow.act_as(None)
+    listed = {row["slug"]: row for row in (await flow.get("/api/news?compact=true")).json()}
+    assert all(row.get("result") is None for row in listed.values())

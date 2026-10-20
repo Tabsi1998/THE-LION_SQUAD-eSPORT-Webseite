@@ -26,6 +26,8 @@ import { SkeletonCards, SkeletonDetailHeader } from "@/components/tls/Skeleton";
 import { ArrowRight, Flag, Trophy, Calendar, Newspaper, Pin, Radio, Timer, Users } from "lucide-react";
 import { formatAgo, formatWhen } from "@/lib/datetime";
 import { KIND_COLORS } from "@/lib/categoryColors";
+import { withoutRepeatedBanners } from "@/lib/newsCards";
+import { NewsTextCard } from "@/components/tls/NewsTextCard";
 import { eventSortTime, scheduleLine } from "@/lib/eventDays";
 import { childSummary, nestUnderEvents } from "@/lib/eventGroups";
 import { LoadState, LoadStaleNotice } from "@/components/tls/LoadState";
@@ -63,8 +65,9 @@ export default function HomePage() {
   // Ein Stand, eine Liste: sonst sähe der Änderungsvergleich in NextUp bei jedem Tick neue Objekte.
   // Ein Event mit seinen Turnieren und Fast Laps ist eine Zeile (#1182) - aus drei Karten wird eine.
   const timeline = useMemo(() => (state ? nestUnderEvents(buildHomeTimeline(state)).slice(0, 5) : []), [state]);
-  const primaryNews = state?.featured_news?.[0] || state?.news?.[0] || null;
-  const newsItems = homeNews(state, primaryNews?.id).slice(0, 3);
+  const leadNews = state?.featured_news?.[0] || state?.news?.[0] || null;
+  // Dasselbe Bild nie zweimal nebeneinander (#1343): die Wiederholung bekommt die Text-Karte.
+  const [primaryNews = null, ...newsItems] = withoutRepeatedBanners(leadNews ? [leadNews, ...homeNews(state, leadNews.id).slice(0, 3)] : []);
   const isEmptyHome = state && !state.has_live && !timeline.length && !primaryNews && !newsItems.length;
 
   return (
@@ -385,7 +388,7 @@ function FeaturedNews({ news }) {
         {news.banner_url ? (
           <LazyImg src={news.banner_url} alt="" sizes="(min-width: 1024px) 45vw, 100vw" className="w-full h-full object-cover object-center opacity-90 tls-card__media" />
         ) : (
-          <div className="w-full h-full bg-gradient-to-br from-[#29B6E8]/20 via-[#101010] to-black" />
+          <NewsTextCard news={news} size="lg" />
         )}
       </div>
       <div className="p-5 md:p-7 lg:p-8 flex flex-col justify-center min-w-0">
@@ -535,7 +538,7 @@ function NewsCard({ news, featured = false, index = 0, count = 1 }) {
             className={`relative w-full h-full ${tall ? "object-cover lg:object-contain" : "object-cover"} tls-card__media`} />
         </div>
       ) : (
-        <div className={`${media} bg-gradient-to-br from-[#29B6E8]/20 via-[#0A0A0A] to-[#0A0A0A]`} />
+        <div className={`${media} relative bg-[#0A0A0A] overflow-hidden`}><NewsTextCard news={news} size={featured ? "lg" : "md"} /></div>
       )}
       <div className={`p-4 ${tall ? "" : "flex-1"}`}>
         <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-widest font-bold text-[#29B6E8]">

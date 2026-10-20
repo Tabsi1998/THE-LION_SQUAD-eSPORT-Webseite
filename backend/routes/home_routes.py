@@ -19,6 +19,7 @@ from auth import get_optional_user, require_area
 from models import now_utc
 from services import founding
 from services.visibility import user_can_see
+from services.news_cards import attach_result_winners
 from services import event_days
 from services.public_phase import derive_public_phase
 
@@ -289,6 +290,8 @@ async def home_state(user: dict | None = Depends(get_optional_user)):
         reverse=True,
     )
     visible_news = visible_news[:8]
+    # Ergebnis-News tragen den Sieger (#1343) - die Text-Karte ohne Bild zeigt ihn mit Pokal.
+    await attach_result_winners(db, visible_news, user)
 
     stats = {
         "news": len([n for n in news if (n.get("visibility") in (None, "public")) and not ((_parse_dt(n.get("published_at") or n.get("created_at")) or now) > now)]),

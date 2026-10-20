@@ -9,8 +9,10 @@ import { PublicLoadingState } from "@/components/tls/PublicLoadingState";
 import { LazyImg } from "@/components/tls/LazyImg";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
-import { ArrowRight, Pin, Newspaper, Crown, Lock } from "lucide-react";
+import { ArrowRight, Pin, Crown, Lock } from "lucide-react";
 import { NewsFilterRow } from "@/components/tls/NewsFilterRow";
+import { NewsTextCard } from "@/components/tls/NewsTextCard";
+import { withoutRepeatedBanners } from "@/lib/newsCards";
 import { formatAgo } from "@/lib/datetime";
 import { newsCategoryColor } from "@/lib/categoryColors";
 
@@ -65,8 +67,10 @@ export default function NewsPage() {
 
   const hasSearch = Boolean(searchQuery.trim());
 
-  const pinned = list.filter((n) => n.pinned);
-  const rest = list.filter((n) => !n.pinned);
+  // Dasselbe Bild nie zweimal (#1343): die Wiederholung bekommt die Text-Karte.
+  const shown = withoutRepeatedBanners(list);
+  const pinned = shown.filter((n) => n.pinned);
+  const rest = shown.filter((n) => !n.pinned);
 
   return (
     <PublicLayout>
@@ -138,9 +142,7 @@ function NewsCard({ n, featured = false }) {
         {n.banner_url ? (
           <LazyImg src={n.banner_url} alt="" sizes="(min-width: 1024px) 33vw, (min-width: 768px) 50vw, 100vw" className="w-full h-full object-cover tls-card__media" />
         ) : (
-          <div className="w-full h-full flex items-center justify-center" style={{ background: `linear-gradient(135deg, ${c}33, #0A0A0A 48%, #121212)` }}>
-            <Newspaper className="w-10 h-10 text-white/20" />
-          </div>
+          <NewsTextCard news={n} />
         )}
         </div>
       <div className="p-5 flex-1 flex flex-col">

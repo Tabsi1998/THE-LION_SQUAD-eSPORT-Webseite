@@ -9,6 +9,7 @@ from auth import get_optional_user, require_area
 from services.permissions import is_confirmed_admin_role
 from services.visibility import user_can_see, filter_visible
 from services.content_embed_service import resolve_content_embeds
+from services.news_cards import attach_result_winners
 from services.sponsor_utils import dedupe_public_sponsors, public_sponsor_view
 from services import partner_pages, sponsor_images
 from services.notification_preferences import enqueue_newsletter_for_item
@@ -116,6 +117,8 @@ def _compact_news(post: dict) -> dict:
         "pinned": bool(post.get("pinned")),
         "published_at": post.get("published_at"),
         "created_at": post.get("created_at"),
+        # Sieger eines verknüpften Turniers (#1343) - nur bei Ergebnis-News, sonst leer.
+        "result": post.get("result"),
     }
 
 
@@ -432,7 +435,7 @@ async def list_news(
         projection = {
             "_id": 0, "id": 1, "title": 1, "slug": 1, "excerpt": 1, "banner_url": 1,
             "category": 1, "visibility": 1, "pinned": 1, "published": 1,
-            "published_at": 1, "created_at": 1,
+            "published_at": 1, "created_at": 1, "linked_tournament_ids": 1,
         }
     fetch_limit = max(200, min(max(int(limit or 48), 1) + max(int(offset or 0), 0) + 80, 500))
     posts = await db.news_posts.find(q, projection).sort([("published_at", -1), ("created_at", -1)]).to_list(fetch_limit)
@@ -450,8 +453,12 @@ async def list_news(
             reverse=True,
         )
     if compact:
-        posts = [_compact_news(p) for p in posts]
-        return _page_items(posts, limit, offset, paged)
+        page = _page_items(posts, limit, offset, paged)
+        rows = page["items"] if paged else page
+        await attach_result_winners(db, rows, user)
+        compacted = [_compact_news(p) for p in rows]
+        return {**page, "items": compacted} if paged else compacted
+    await attach_result_winners(db, posts, user)
     return posts
 
 

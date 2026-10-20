@@ -693,6 +693,14 @@ button.tls-bracket-row:active, .tls-bracket-head:active { transform: scale(calc(
   .tls-news-search { opacity: 0; transform: translateX(calc(8px * var(--tls-motion-on))); }
 }
 
+/* Text-Karte ohne Bild (#1343): beim Drüberfahren schiebt sich der angeschnittene Löwe ein Stück herein und wird
+   etwas heller - dieselbe Geste wie das Bild einer Karte, nur ruhiger. Ohne Maus und mit „Bewegung reduzieren“ still. */
+.tls-news-textcard__lion { transition: transform var(--tls-motion-mid) var(--tls-ease), opacity var(--tls-motion-mid) ease; opacity: 0.85; }
+@media (hover: hover) and (pointer: fine) {
+  .tls-card:hover .tls-news-textcard__lion { transform: translate(calc(-6px * var(--tls-motion-on)), calc(-4px * var(--tls-motion-on))); opacity: 1; }
+}
+.tls-card:focus-visible .tls-news-textcard__lion { opacity: 1; }
+
 /* ===== Premium rarity frames (animated conic-gradient borders) ===== */
 @property --tls-angle { syntax: "<angle>"; initial-value: 0deg; inherits: false; }
 @keyframes tls-rotate { to { --tls-angle: 360deg; } }

@@ -11,6 +11,7 @@ import { PublicLoadingState } from "@/components/tls/PublicLoadingState";
 import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
 import { RichContent } from "@/components/tls/RichContent";
 import { VideoEmbed } from "@/components/tls/VideoEmbed";
+import { NewsTextCard } from "@/components/tls/NewsTextCard";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useCanonicalSlugRedirect } from "@/hooks/useCanonicalSlugRedirect";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
@@ -225,7 +226,7 @@ export default function NewsDetailPage() {
                   {others.map((item) => (
                     <Link key={item.id || item.slug} to={`/news/${item.slug}`} data-testid={`news-more-${item.slug}`} className="flex items-center gap-3 border border-white/10 hover:border-[#29B6E8]/50 rounded-sm p-2 transition group">
                       <span className="w-16 h-12 shrink-0 rounded-sm overflow-hidden bg-[#0A0A0A] border border-white/10 flex items-center justify-center">
-                        {item.banner_url ? <SizedImage src={item.banner_url} width={64} height={48} alt="" className="w-full h-full" /> : <Newspaper className="w-4 h-4 text-white/30" />}
+                        {item.banner_url ? <SizedImage src={item.banner_url} width={64} height={48} alt="" className="w-full h-full" /> : <NewsTextCard news={item} size="thumb" />}
                       </span>
                       <span className="min-w-0">
                         <span className="block text-sm font-bold leading-snug line-clamp-2 group-hover:text-[#29B6E8] transition">{item.title}</span>
