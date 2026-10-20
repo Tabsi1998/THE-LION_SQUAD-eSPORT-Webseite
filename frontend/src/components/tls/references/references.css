@@ -1,0 +1,86 @@
+/* Referenzen-Übersicht (#1878). Farben nur aus den Rollen (styles/system.css): Cyan für Links und Fortschritt, Gold nur
+   für Podest und „Heute“, Silber und Bronze nur für Platz 2 und 3 - als Ring und Schrift, nie als Fläche. Flächen
+   surface-1 mit 1-px-Linien, keine Verläufe als Flächen.
+
+   Bewegung ruhig und einmalig: die Abschnitte steigen gestaffelt auf (je 70 ms), Karten heben sich nur unter der Maus
+   an, die Balken füllen sich einmal von links (je Segment 40 ms später), „Heute“ pulsiert. Nur transform und opacity.
+   Mit „Bewegung reduzieren“ bleibt das Einblenden - ohne Weg, ohne Füllen, ohne Puls, ohne Anheben. */
+
+@keyframes tls-ref-rise {
+  from { opacity: 0; transform: translateY(calc(12px * var(--tls-motion-on))); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes tls-ref-fill { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+
+/* Einblenden: feste Dauer statt --tls-motion-*, damit es auch mit „Bewegung reduzieren“ sanft bleibt (dort steht
+   --tls-motion-on auf 0, der Weg fällt weg). */
+.tls-ref-rise {
+  animation: tls-ref-rise 480ms var(--tls-ease) both;
+  animation-delay: calc(var(--tls-ref-i, 0) * 70ms);
+}
+
+/* Kopf: am Handy Einleitung, Ehrentafel, Sprungmarken untereinander; breit links Einleitung und Sprungmarken, rechts
+   die Tafel (unten bündig). */
+.tls-ref-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas: "intro" "board" "nav";
+  row-gap: 1rem;
+}
+.tls-ref-hero__intro { grid-area: intro; }
+.tls-ref-hero__board { grid-area: board; }
+.tls-ref-hero__nav { grid-area: nav; }
+@media (min-width: 1024px) {
+  .tls-ref-hero {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-areas: "intro board" "nav board";
+    column-gap: 3rem;
+    row-gap: 1.375rem;
+    align-items: end;
+  }
+}
+
+/* Karten: Anheben und Rahmen nur mit Maus. */
+.tls-ref-lift {
+  transition: transform var(--tls-motion-mid) var(--tls-ease), border-color var(--tls-motion-mid) var(--tls-ease);
+}
+@media (hover: hover) and (pointer: fine) {
+  .tls-ref-lift:hover {
+    transform: translateY(calc(-3px * var(--tls-motion-on)));
+    border-color: rgb(var(--tls-brand-rgb) / 0.5);
+  }
+}
+.tls-ref-lift:focus-visible, .tls-ref-row:focus-visible {
+  outline: 2px solid var(--tls-brand);
+  outline-offset: 2px;
+}
+
+/* Zeile der Chronik: leise Fläche unter der Maus. */
+.tls-ref-row { transition: background-color var(--tls-motion-fast) var(--tls-ease); }
+@media (hover: hover) and (pointer: fine) {
+  .tls-ref-row:hover { background-color: rgb(255 255 255 / 0.035); }
+}
+
+/* Fortschritt in Segmenten: die gewerteten füllen sich einmal von links, gestaffelt. */
+.tls-ref-fill {
+  transform-origin: left center;
+  animation: tls-ref-fill 700ms var(--tls-ease) both;
+  animation-delay: calc(200ms + var(--tls-ref-seg, 0) * 40ms);
+}
+
+/* Waagrecht wischen (Läuft gerade, Filter am Handy): ohne Balken, mit Einrasten. */
+.tls-ref-scroll { scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+.tls-ref-scroll::-webkit-scrollbar { display: none; }
+.tls-ref-snap { scroll-snap-type: x mandatory; scroll-padding-inline: 1rem; }
+.tls-ref-snap > * { scroll-snap-align: start; }
+@media (min-width: 768px) {
+  .tls-ref-snap { scroll-snap-type: none; }
+}
+
+/* Sprungmarken unter dem Kopf: Abstand zur festen Kopfleiste. */
+.tls-ref-anchor { scroll-margin-top: 6rem; }
+
+@media (prefers-reduced-motion: reduce) {
+  .tls-ref-fill, .tls-run-pulse { animation: none; }
+  .tls-ref-lift, .tls-ref-row { transition: none; }
+}

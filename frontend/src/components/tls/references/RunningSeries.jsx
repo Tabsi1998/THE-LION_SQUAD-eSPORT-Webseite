@@ -1,125 +1,105 @@
-import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { CalendarDays, Radio } from "lucide-react";
-import { api } from "@/lib/api";
 import { seriesAddress } from "@/lib/referenceSeries";
-import { dayNoon, viennaDate } from "@/lib/vienna";
-import { GameMark, SectionTitle } from "@/components/tls/references/referenceParts";
+import { KIND_LABELS, nextTitle, nextValue, placeTitle, progressText } from "@/lib/referencesOverview";
+import { GameMark } from "@/components/tls/references/referenceParts";
+import { SectionHead } from "@/components/tls/references/overviewParts";
 
-// „Heute im Einsatz“ und „Läuft gerade“ (#1748): laufende Serien-Saisons mit Fortschritt, nächstem Termin und dem
-// aktuellen Platz des Vereins. Die Daten kommen aus einem eigenen schlanken Endpunkt (nur sichtbare, aktive Saisons,
-// keine fremden Namen). Ist nichts laufend (oder der Abruf scheitert), erscheint der Bereich gar nicht - die Seite
-// sieht dann aus wie bisher.
+// „Läuft gerade“ (#1748, neu gestaltet #1878): laufende Serien-Saisons mit Spur, Art, Saison/Stufe, Fortschritt in
+// Segmenten, nächstem Termin und unserem Platz als große Zahl. Was heute ansteht, kommt zuerst (Server) und trägt den
+// goldenen Chip „Heute“ mit dezentem Puls. Am Handy wischt man waagrecht von Karte zu Karte. Die Daten lädt die Seite
+// (schlanker Endpunkt, nur sichtbare aktive Saisons, keine Namen); ohne laufende Saison erscheint der Bereich nicht.
 
-const KIND_LABELS = { series: "Turnierserie", racing: "Rennliga", team_league: "Team-Liga" };
-
-export function nextLabel(next) {
-  if (!next) return "";
-  const clock = next.time ? `${next.time} Uhr` : "";
-  if (next.state === "today") return ["Heute", clock].filter(Boolean).join(", ");
-  const day = next.club_day ? viennaDate(dayNoon(next.club_day), { weekday: "short", day: "2-digit", month: "2-digit" }) : "";
-  return [day, clock].filter(Boolean).join(", ");
-}
+// Bis zu so vielen Terminen zeigt der Balken Segmente, darüber einen durchgehenden Balken.
+const MAX_SEGMENTS = 30;
 
 export function seasonLabel(item) {
   const { series } = item;
   return [series?.title, series?.season, series?.tier].filter(Boolean).join(" · ");
 }
 
-export function RunningSeries() {
-  const [items, setItems] = useState([]);
-  useEffect(() => {
-    let alive = true;
-    api.get("/reference-series/public/running").then(({ data }) => {
-      const list = Array.isArray(data?.items) ? data.items.filter((item) => item?.lineage && item?.series) : [];
-      if (alive) setItems(list);
-    }).catch(() => { if (alive) setItems([]); });
-    return () => { alive = false; };
-  }, []);
-  if (!items.length) return null;
-  const today = items.filter((item) => item.today);
-  const rest = items.filter((item) => !item.today);
+export function RunningSeries({ items, index = 2 }) {
+  if (!items?.length) return null;
+  const today = items.some((item) => item.today);
+  const count = `${items.length} ${items.length === 1 ? "laufende Saison" : "laufende Saisons"}`;
   return (
-    <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-12 space-y-10" data-testid="references-running">
-      {today.length > 0 && (
-        <div data-testid="references-today">
-          <SectionTitle icon={Radio} accent="rgb(var(--tls-honor-rgb))" eyebrow="Heute im Einsatz" title="Wir treten heute an" />
-          <RunningGrid items={today} />
-        </div>
-      )}
-      {rest.length > 0 && (
-        <div data-testid="references-running-list">
-          <SectionTitle icon={CalendarDays} accent="#29B6E8" eyebrow="Läuft gerade" title="Laufende Saisons" />
-          <RunningGrid items={rest} />
-        </div>
-      )}
+    <section id="einsatz" aria-labelledby="references-running-title" className="tls-ref-anchor tls-ref-rise max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-10 md:pt-[72px]" style={{ "--tls-ref-i": index }} data-testid="references-running">
+      <SectionHead id="references-running-title" eyebrow="Gerade im Einsatz" tone={today ? "honor" : "brand"} pulse={today} title="Läuft gerade" hint={`${count} · Stand nach dem letzten gewerteten Termin`} />
+      <div className="tls-ref-scroll tls-ref-snap -mx-4 px-4 pb-1 flex gap-3 overflow-x-auto sm:-mx-6 sm:px-6 md:mx-0 md:px-0 md:pb-0 md:overflow-visible md:grid md:gap-5 md:grid-cols-[repeat(auto-fit,minmax(min(100%,330px),1fr))]" data-testid="references-running-list">
+        {items.map((item) => <RunningCard key={`${item.lineage.slug}/${item.series.season_slug}`} item={item} />)}
+      </div>
+      {items.length > 1 && <div className="md:hidden mt-2.5 text-[13px] text-quiet">Wischen für weitere Saisons →</div>}
     </section>
   );
 }
 
-function RunningGrid({ items }) {
-  return (
-    <div className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-      {items.map((item, index) => <RunningCard key={`${item.lineage.slug}/${item.series.season_slug}`} item={item} index={index} />)}
-    </div>
-  );
-}
-
-function RunningCard({ item, index }) {
+function RunningCard({ item }) {
   const { lineage, series, progress, next, club } = item;
+  const kind = lineage.kind;
   const total = progress?.total || 0;
   const scored = Math.min(progress?.scored || 0, total);
-  const percent = total ? Math.round((scored / total) * 100) : 0;
-  const detail = seasonLabel(item);
   return (
     <Link
       to={seriesAddress(lineage, series)}
       data-testid={`running-card-${lineage.slug}-${series.season_slug}`}
       data-today={item.today ? "true" : undefined}
-      style={{ "--tls-run-i": Math.min(index, 8) }}
-      className={`tls-run-card block min-w-0 border rounded-sm p-4 bg-[#111] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#29B6E8] ${item.today ? "border-honor/50" : "border-white/10"}`}
+      className={`tls-ref-lift shrink-0 w-[min(300px,calc(100vw-3rem))] md:w-auto min-w-0 flex flex-col gap-3.5 md:gap-[18px] p-[18px] md:p-[22px] bg-surface-1 border rounded-[10px] text-white no-underline ${item.today ? "border-honor/40" : "border-white/[0.08]"}`}
     >
-      <div className="flex items-start gap-3">
-        <GameMark game={item.game} code className="w-10 h-10 border border-white/10" codeClass="text-xs" iconClass="w-5 h-5" padded />
-        <div className="min-w-0 flex-1">
-          <div className="font-heading font-black uppercase leading-tight break-words" data-testid="running-title">{lineage.title}</div>
-          <div className="mt-1 text-[10px] uppercase tracking-widest font-bold text-white/45 break-words">
-            {[KIND_LABELS[lineage.kind], detail].filter(Boolean).join(" · ")}
-          </div>
+      <div className="flex items-start gap-3 md:gap-3.5">
+        <GameMark game={item.game || (lineage.game_name ? { name: lineage.game_name } : null)} code className="w-10 h-10 md:w-11 md:h-11 !rounded-lg !bg-surface-3 border border-white/10" codeClass="font-display text-[15px] md:text-base !text-brand" iconClass="w-5 h-5" padded />
+        <div className="flex-1 min-w-0 flex flex-col gap-0.5">
+          <div className="text-[11px] md:text-xs font-bold uppercase tracking-[0.14em] md:tracking-[0.16em] text-quiet">{KIND_LABELS[kind] || "Serie"}</div>
+          <div className="font-semibold text-[15px] md:text-base text-zinc-200 break-words [overflow-wrap:anywhere]" data-testid="running-title">{lineage.title}</div>
         </div>
         {item.today && (
-          <span className="shrink-0 inline-flex items-center gap-1.5 px-2 py-1 rounded-sm bg-honor/15 text-honor text-[10px] uppercase tracking-widest font-bold" data-testid="running-today-badge">
+          <span className="shrink-0 inline-flex items-center gap-1.5 md:gap-[7px] px-2 md:px-2.5 py-1 rounded-full bg-honor/[0.12] border border-honor/45 text-honor text-[11px] md:text-xs font-bold uppercase tracking-[0.1em] md:tracking-[0.12em]" data-testid="running-today-badge">
             <span className="tls-run-pulse" aria-hidden="true" /> Heute
           </span>
         )}
       </div>
-
+      <div className="font-heading font-extrabold uppercase leading-[1.15] text-[19px] md:text-[22px] break-words [overflow-wrap:anywhere]" data-testid="running-season">{seasonLabel(item)}</div>
       {total > 0 && (
-        <div className="mt-4">
-          <div className="flex items-baseline justify-between gap-3 text-xs">
-            <span className="text-white/60" data-testid="running-progress-text">{scored} von {total} {total === 1 ? "Termin" : "Terminen"}</span>
-            <span className="text-white/35 tabular-nums">{percent}%</span>
-          </div>
-          <div className="mt-1.5 h-1.5 rounded-full bg-white/10 overflow-hidden" role="progressbar" aria-label="Fortschritt der Saison" aria-valuemin={0} aria-valuemax={total} aria-valuenow={scored}>
-            <div className="tls-run-fill h-full rounded-full bg-[#29B6E8]" style={{ width: `${percent}%` }} />
-          </div>
+        <div className="flex flex-col gap-1.5 md:gap-2">
+          <Segments scored={scored} total={total} />
+          <div className="text-[13px] md:text-sm text-zinc-400" data-testid="running-progress-text">{progressText(kind, scored, total)}</div>
         </div>
       )}
-
-      <dl className="mt-4 grid grid-cols-2 gap-3 text-sm">
-        <div className="min-w-0">
-          <dt className="text-[10px] uppercase tracking-widest font-bold text-white/40">Nächster Termin</dt>
-          <dd className="mt-0.5 text-white/85 break-words" data-testid="running-next">
-            {next ? [nextLabel(next), next.code || next.title].filter(Boolean).join(" · ") : "Kein Termin offen"}
-          </dd>
+      <div className="mt-auto grid grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)] gap-3 md:gap-4 pt-3 md:pt-4 border-t border-white/[0.08]">
+        <div className="min-w-0 flex flex-col gap-1">
+          <div className="text-[11px] md:text-xs font-bold uppercase tracking-[0.14em] md:tracking-[0.16em] text-quiet">{nextTitle(kind, next)}</div>
+          <div className="font-semibold text-sm md:text-base text-white break-words [overflow-wrap:anywhere]" data-testid="running-next">{nextValue(next)}</div>
         </div>
-        <div className="min-w-0">
-          <dt className="text-[10px] uppercase tracking-widest font-bold text-white/40">Unser Platz</dt>
-          <dd className="mt-0.5 text-white/85" data-testid="running-place">
-            {club ? <><span className="font-heading font-black text-lg text-honor">{club.rank}.</span>{club.of ? <span className="text-white/45"> von {club.of}</span> : null}</> : <span className="text-white/45">Noch offen</span>}
-          </dd>
+        <div className="min-w-0 flex flex-col items-end gap-0.5 text-right" data-testid="running-place">
+          <div className="text-[11px] md:text-xs font-bold uppercase tracking-[0.14em] md:tracking-[0.16em] text-quiet">{placeTitle(kind)}</div>
+          {club ? (
+            <div className="flex items-baseline gap-1.5">
+              <span className="font-display font-bold leading-[0.9] tabular-nums text-[34px] md:text-[40px] text-brand">{club.rank}.</span>
+              {club.of ? <span className="text-[13px] md:text-sm text-zinc-400">von {club.of}</span> : null}
+            </div>
+          ) : (
+            <div className="text-sm text-zinc-400 pt-1">Noch offen</div>
+          )}
         </div>
-      </dl>
+      </div>
     </Link>
+  );
+}
+
+function Segments({ scored, total }) {
+  const bar = { role: "progressbar", "aria-label": "Fortschritt der Saison", "aria-valuemin": 0, "aria-valuemax": total, "aria-valuenow": scored };
+  if (total > MAX_SEGMENTS) {
+    return (
+      <div {...bar} className="h-1.5 rounded-sm bg-white/[0.12] overflow-hidden">
+        <div className="tls-ref-fill h-full bg-brand" style={{ width: `${Math.round((scored / total) * 100)}%` }} />
+      </div>
+    );
+  }
+  return (
+    <div {...bar} className="flex gap-[3px] md:gap-1">
+      {Array.from({ length: total }, (_, index) => (
+        <span key={index} className="flex-1 h-1.5 rounded-sm bg-white/[0.12] overflow-hidden">
+          {index < scored && <span className="tls-ref-fill block h-full bg-brand" style={{ "--tls-ref-seg": index }} />}
+        </span>
+      ))}
+    </div>
   );
 }
