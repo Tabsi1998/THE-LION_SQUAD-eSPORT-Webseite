@@ -426,3 +426,28 @@ def test_registration_match_summary_still_counts_sole_winner():
     assert registration_match_summary(stage, {"r1"}) == {"matches_played": 1, "matches_won": 1}
     assert registration_match_summary(stage, {"r2"}) == {"matches_played": 1, "matches_won": 0}
 
+
+def test_badge_streak_orders_matches_by_completion_not_by_later_correction():
+    """#1806 (zweiter Punkt): eine spätere Korrektur (updated_at) schiebt ein altes Spiel nicht ans Ende der Serie."""
+    def duel(match_id, winner, completed_at, updated_at):
+        loser = "r2" if winner == "r1" else "r1"
+        return {
+            **_shared_first_stage_match(match_id),
+            "results": [{"registration_id": winner, "rank": 1}, {"registration_id": loser, "rank": 2}],
+            "completed_at": completed_at,
+            "updated_at": updated_at,
+        }
+
+    stage = adapt_stage_matches([
+        # Nach Abschluss: Sieg, Niederlage, Sieg, Sieg -> längste Serie 2.
+        duel("a", "r1", "2026-10-01T10:00:00+00:00", "2026-10-09T10:00:00+00:00"),  # später korrigiert
+        duel("b", "r2", "2026-10-02T10:00:00+00:00", "2026-10-02T10:00:00+00:00"),
+        duel("c", "r1", "2026-10-03T10:00:00+00:00", "2026-10-03T10:00:00+00:00"),
+        duel("d", "r1", "2026-10-04T10:00:00+00:00", "2026-10-04T10:00:00+00:00"),
+    ])
+    assert all(match.get("completed_at") for match in stage)
+    assert registration_badge_match_progress(stage, {"r1"}) == {
+        "matches_played": 4,
+        "matches_won": 3,
+        "match_streak_max": 2,
+    }
