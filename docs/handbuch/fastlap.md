@@ -219,15 +219,18 @@ veröffentlicht** und fehlen Einträge, gibt es den Knopf **Gewinne erzeugen**.
 ### 3.8 Bestenliste und Auswertung
 
 Auf der öffentlichen Seite der Challenge: eine **Strecken-Rangliste** je Strecke und, bei Championship, die
-**Gesamtwertung** mit Punkten. Bei einer Championship gibt es, sobald die Challenge **Beendet**, **Ergebnisse veröffentlicht** oder **Archiviert** ist,
-**Gesamtwertung-PDF** und **Gesamtwertungs-Urkunden**. Die **Turnierleitung** sieht **Urkunden jetzt drucken** und in
-der Tabelle **Drucken** für die ersten vier schon, während die Challenge läuft – für Gäste genauso. Im Admin stehen oben auf der Challenge-Seite **CSV** (die Bestzeit je Fahrer und Strecke) und **PDF**
+**Gesamtwertung** mit Punkten. Sobald die Challenge **Beendet**, **Ergebnisse veröffentlicht** oder **Archiviert** ist,
+steht unter der Tabelle **Downloads** (am Handy eine aufklappbare Zeile): **Ergebnis-PDF**, bei Championship
+**Gesamtwertung-PDF**, und wer angemeldet unter den ersten vier steht, **Meine Urkunde**. **TV / Beamer Modus**, alle
+**Urkunden** und die Spalte **Urkunde** in der Tabelle sehen nur die Leitung der Challenge und Konten mit dem Bereich
+Turniere. Die **Turnierleitung** sieht **Urkunden jetzt drucken** und in der Tabelle **Drucken** für die ersten vier
+schon, während die Challenge läuft – für Gäste genauso. Im Admin stehen oben auf der Challenge-Seite **CSV** (die Bestzeit je Fahrer und Strecke) und **PDF**
 (Rangliste, für die gewählte Strecke). Die Liste aller Challenges exportiert ihr mit **CSV**.
 
 ### 3.9 Bestzeit-Moment
 
-- **Auf dem TV:** Ansicht **Fast Lap** im Baukasten unter **Admin → eSports → TV & Beamer**, oder in der Challenge der Knopf
-  **TV Modus**. Kommt eine neue Bestzeit, liegt etwa drei Sekunden ein Moment „Neue Bestzeit!“ über der Liste mit Bild,
+- **Auf dem TV:** Ansicht **Fast Lap** im Baukasten unter **Admin → eSports → TV & Beamer**, oder für die Leitung in der Challenge der Knopf
+  **TV / Beamer Modus**. Kommt eine neue Bestzeit, liegt etwa drei Sekunden ein Moment „Neue Bestzeit!“ über der Liste mit Bild,
   Name, Zeit, Abstand und dem bisherigen Halter, ein Glanz läuft einmal darüber. Danach rutscht die Zeile an ihren
   Platz. Ein Sponsor-Moment läuft dazwischen mit, wenn er eingeschaltet ist. Steht jemand in der Liste „Am Start / Als
   Nächstes“ (3.12), zeigt das TV über der Rangliste, wer gerade fährt (mit Station und „Versuch 2 von 3“) und wer als
