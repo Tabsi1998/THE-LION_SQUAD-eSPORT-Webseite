@@ -198,6 +198,75 @@ async def test_the_confirmation_goes_out_once_per_registration(flow, monkeypatch
     assert sent == ["approved"]
 
 
+
+def count_preview_refreshes(monkeypatch, routes, seen: list) -> None:
+    """Den Vorschau-Baum künstlich langsam machen (wie auf dem echten Server) und mitschreiben, wie viele Anmeldungen
+    er bei jedem Neubau sieht."""
+    real = routes._refresh_tournament_previews_after_registration
+
+    async def slow(db, tournament, actor_id):
+        count = await db.tournament_registrations.count_documents(
+            {"tournament_id": tournament["id"], "status": {"$in": ["approved", "checked_in"]}})
+        seen.append(count)
+        await asyncio.sleep(SLOW_SECONDS)
+        return await real(db, tournament, actor_id)
+
+    monkeypatch.setattr(routes, "_refresh_tournament_previews_after_registration", slow)
+
+
+@pytest.mark.asyncio
+async def test_sixteen_at_once_do_not_wait_for_sixteen_bracket_rebuilds(flow, monkeypatch):
+    """#1859: Früher baute jede Anmeldung den Vorschau-Baum in der Sperre neu - 16 gleichzeitige warteten 16 Neubauten
+    ab (im Probelauf bis 20 s). Jetzt vergibt die Sperre nur den Platz; der Baum wird danach einmal für alle gebaut und
+    enthält am Ende alle 16."""
+    from routes import tournament_registration_routes as routes
+
+    seen: list[int] = []
+    count_preview_refreshes(monkeypatch, routes, seen)
+    tournament = await flow.create_tournament(max_participants=32)
+    people = [await flow.add_user(name=f"Gast {index}") for index in range(16)]
+    body = RegistrationCreate(accept_rules=True, accept_privacy=True)
+    loop = asyncio.get_running_loop()
+
+    started = loop.time()
+    results = await asyncio.gather(*(outcome(routes.self_register(flow.db, tournament, body, who, None, via="onsite"))
+                                     for who in people))
+    elapsed = loop.time() - started
+
+    assert [status for status, _ in results] == [200] * 16, [detail for status, detail in results if status != 200]
+    assert await statuses(flow, tournament) == ["approved"] * 16
+    assert seen and seen[-1] == 16, f"der letzte Neubau muss alle 16 enthalten: {seen}"
+    assert len(seen) <= 3, f"ein Neubau für alle statt einer je Anmeldung: {seen}"
+    assert elapsed < 12 * SLOW_SECONDS, f"16 Anmeldungen brauchten {elapsed:.2f} s"
+
+
+@pytest.mark.asyncio
+async def test_a_failing_bracket_rebuild_does_not_cost_the_place(flow, monkeypatch):
+    """#1859: Der Baum folgt nach der Platzvergabe. Scheitert er, bleibt die Anmeldung bestätigt, und die Bestätigung
+    geht trotzdem genau einmal hinaus."""
+    from routes import tournament_registration_routes as routes
+
+    async def broken(db, tournament, actor_id):
+        raise RuntimeError("Baum kaputt")
+
+    sent = []
+
+    async def notify(db, tid, registration, status, **kwargs):
+        sent.append(status)
+
+    monkeypatch.setattr(routes, "_refresh_tournament_previews_after_registration", broken)
+    monkeypatch.setattr(routes, "_notify_registration", notify)
+    tournament = await flow.create_tournament(max_participants=8)
+    anna = await flow.add_user(name="Anna")
+
+    reply = await routes.self_register(flow.db, tournament, RegistrationCreate(accept_rules=True, accept_privacy=True),
+                                       anna, None, via="onsite")
+
+    assert reply["status"] == "approved"
+    assert await statuses(flow, tournament) == ["approved"]
+    assert sent == ["approved"]
+
+
 def test_the_registration_wait_is_configurable_and_bounded():
     from routes.tournament_common import registration_wait_seconds
 
