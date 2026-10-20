@@ -20,6 +20,7 @@ from fastapi import APIRouter, Depends, Request
 from auth import get_optional_user
 from database import get_db
 from routes.reference_round_routes import PUBLIC_FIELDS, _calendar, visible_series
+from services import reference_running_cache
 from services.dolibarr_policy import club_today
 from services.rate_limit import enforce_rate_limit
 from services.reference_calendar import calendar_view, vienna_clock
@@ -171,8 +172,23 @@ async def public_running(request: Request, user: dict | None = Depends(get_optio
     in gesammelten Abfragen (je Sammlung eine), nie je Saison; je Adresse begrenzt. Steht heute (Wiener Tag) ein Termin an, kommt die
     Saison zuerst und trägt ``today``."""
     await enforce_rate_limit(request, "reference-running", 60, 60)
-    db = get_db()
     today = club_today()
+    # Startseiten-Last (#1753): die Antwort hängt nur am Tag und an den Stufen, die ``user`` sieht - gemerkt wird sie
+    # je Tag und Stufe kurz (services/reference_running_cache.py), die Verwaltung leert sie bei jedem Schreiben.
+    key = (today, *[await user_can_see(user, level) for level in VISIBILITY_LEVELS])
+    cached = reference_running_cache.get(key)
+    if cached is not None:
+        return cached
+    body = await _running(user, today)
+    reference_running_cache.put(key, body)
+    return body
+
+
+VISIBILITY_LEVELS = ("community", "members", "internal")
+
+
+async def _running(user: dict | None, today: str) -> dict:
+    db = get_db()
     seen: dict = {}
 
     async def visible(value) -> bool:

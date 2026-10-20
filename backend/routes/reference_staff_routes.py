@@ -15,10 +15,13 @@ from fastapi import APIRouter, Depends, HTTPException
 from auth import require_area
 from database import get_db
 from models import ReferenceSeriesStaffCreate, ReferenceSeriesStaffUpdate, new_id, now_utc
+from services import reference_running_cache
 from services.dolibarr_policy import club_today
 from services.reference_series_access import active_member_ids, captain_may_publish, staff_is_valid
 
-router = APIRouter(prefix="/api/reference-series", tags=["reference-series"])
+# Jeder schreibende Aufruf leert den Cache der laufenden Saisons (#1753, Startseite).
+router = APIRouter(prefix="/api/reference-series", tags=["reference-series"],
+                   dependencies=[Depends(reference_running_cache.reset_after_write)])
 
 PAST_DAY = "Der Ablauf liegt in der Vergangenheit - so hätte der Captain kein Recht."
 NOT_A_MEMBER = ("Captain kann nur ein aktives Vereinsmitglied werden. Diese Person ist gerade kein aktives Mitglied - "

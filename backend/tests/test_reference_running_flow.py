@@ -11,7 +11,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 
 from flow_harness import make_flow  # noqa: E402
 from routes import reference_round_routes, reference_series_public_routes  # noqa: E402
-from services import migrations  # noqa: E402
+from services import migrations, reference_running_cache  # noqa: E402
 
 ADMIN = "/api/reference-series/admin"
 RUNNING = "/api/reference-series/public/running"
@@ -20,6 +20,7 @@ OWN = "Probe Löwen"
 
 @pytest_asyncio.fixture
 async def flow(monkeypatch):
+    reference_running_cache.reset()
     instance, shutdown = make_flow()
     monkeypatch.setattr(reference_round_routes, "club_today", lambda: "2026-11-09")
     monkeypatch.setattr(reference_series_public_routes, "club_today", lambda: "2026-11-09")
@@ -119,6 +120,7 @@ async def test_running_hides_planned_completed_archived_and_hidden_series_and_fo
     assert "Fremd Beta" not in response.text and "Probe Alpha" not in response.text
     flow.act_as(admin)
     await flow.db.reference_lineages.update_one({"id": cup["id"]}, {"$set": {"is_archived": True}})
+    reference_running_cache.reset()  # direkt in der Datenbank, an der Verwaltung vorbei
     flow.act_as(None)
     titles = [item["lineage"]["title"] for item in (await flow.get(RUNNING)).json()["items"]]
     assert titles == ["Probe Liga 4vs4"]
@@ -149,6 +151,7 @@ async def test_running_counts_only_active_visible_members_for_the_club_place(flo
     assert next(item for item in items if item["lineage"]["kind"] == "series")["club"] is None
     # Wieder sichtbar und aktiv: Alpha zählt.
     await flow.db.reference_participants.update_one({"id": "p-alpha"}, {"$set": {"name_hidden": False}})
+    reference_running_cache.reset()  # direkt in der Datenbank, an der Verwaltung vorbei
     items = (await flow.get(RUNNING)).json()["items"]
     assert next(item for item in items if item["lineage"]["kind"] == "series")["club"] == {"rank": 2, "of": 3}
 
@@ -208,3 +211,60 @@ async def test_running_counts_the_club_members_of_a_season_without_names(flow):
     assert by_kind["series"]["club_count"] == 2
     assert by_kind["team_league"]["club_count"] == 0
     assert "Probe Gamma" not in response.text
+
+
+def _count_loads(monkeypatch):
+    loaded = []
+    original = reference_series_public_routes.calendar_view
+
+    def counting(rounds, published, today):
+        loaded.append(1)
+        return original(rounds, published, today)
+
+    monkeypatch.setattr(reference_series_public_routes, "calendar_view", counting)
+    return loaded
+
+
+@pytest.mark.asyncio
+async def test_running_is_cached_per_visibility_and_a_write_clears_it(flow, monkeypatch):
+    """Startseiten-Last (#1753): der zweite Aufruf kommt aus dem Cache, eine Schreibstelle der Verwaltung leert ihn, und
+    der Cache gilt je Sichtbarkeitsstufe - Mitglieder-Saisons kommen nie bei Anonymen an."""
+    admin, _, cup_series, *_ = await _setup(flow)
+    await _season(flow, "Nur Mitglieder", "series", "2026", [("A1", "2026-12-03")], visibility="members")
+    loaded = _count_loads(monkeypatch)
+    flow.act_as(None)
+    first = (await flow.get(RUNNING)).json()
+    assert len(loaded) == 2
+    assert (await flow.get(RUNNING)).json() == first
+    assert len(loaded) == 2  # aus dem Cache, keine neue Abfrage
+
+    flow.act_as(admin)
+    titles = [item["lineage"]["title"] for item in (await flow.get(RUNNING)).json()["items"]]
+    assert "Nur Mitglieder" in titles and len(loaded) == 5
+    flow.act_as(None)
+    titles = [item["lineage"]["title"] for item in (await flow.get(RUNNING)).json()["items"]]
+    assert "Nur Mitglieder" not in titles and len(loaded) == 5
+
+    # Eine Saison über die Verwaltung archivieren leert den Cache: sie ist sofort weg.
+    flow.act_as(admin)
+    archived = await flow.post(f"{ADMIN}/series/{cup_series['id']}/archive")
+    assert archived.status_code == 200, archived.text
+    flow.act_as(None)
+    titles = [item["lineage"]["title"] for item in (await flow.get(RUNNING)).json()["items"]]
+    assert "Probe Monatscup" not in titles and len(loaded) == 6
+
+
+@pytest.mark.asyncio
+async def test_running_cache_expires_after_the_ttl(flow, monkeypatch):
+    await _setup(flow)
+    loaded = _count_loads(monkeypatch)
+    clock = [1000.0]
+    monkeypatch.setattr(reference_running_cache, "_now", lambda: clock[0])
+    flow.act_as(None)
+    await flow.get(RUNNING)
+    clock[0] += reference_running_cache.TTL_SECONDS - 1
+    await flow.get(RUNNING)
+    assert len(loaded) == 2
+    clock[0] += 2
+    await flow.get(RUNNING)
+    assert len(loaded) == 4

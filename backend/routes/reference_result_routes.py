@@ -94,14 +94,16 @@ from pymongo.errors import DuplicateKeyError
 from database import get_db
 from match_rules import RESULT_MAX_SCORE
 from models import ReferencePointsSource, ReferenceResultMark, ReferenceResultStatus, new_id, now_utc
-from services import reference_series, series_identity, series_results
+from services import reference_running_cache, reference_series, series_identity, series_results
 from services.dolibarr_policy import club_today
 from services.reference_series_access import EDIT_PENDING_DRAFT, SeriesAccess, require_series_editor
 from services.scoring_rules import normalize_rules, result_points, validate_sheet
 from services.series_participants import build_index, new_participant, remove_unused_new
 from services.series_standings import compute_standings
 
-router = APIRouter(prefix="/api/reference-series", tags=["reference-series"])
+# Jeder schreibende Aufruf leert den Cache der laufenden Saisons (#1753, Startseite).
+router = APIRouter(prefix="/api/reference-series", tags=["reference-series"],
+                   dependencies=[Depends(reference_running_cache.reset_after_write)])
 
 BASE = "/admin/series/{series_id}/rounds/{round_id}/results"
 MAX_ROWS = 500
