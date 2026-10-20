@@ -5,7 +5,7 @@ import { MemoryRouter } from "react-router-dom";
 // eigener Platzierung; alte Referenzen kommen mit den vom Server abgeleiteten Feldern ins Formular.
 
 const apiMock = { get: vi.fn(), post: vi.fn(), patch: vi.fn(), delete: vi.fn() };
-const toastMock = { success: vi.fn(), error: vi.fn() };
+const toastMock = { success: vi.fn(), error: vi.fn(), warning: vi.fn() };
 vi.mock("@/lib/api", () => ({ api: apiMock, formatApiError: (detail) => detail || "Fehler" }));
 vi.mock("@/components/tls/AdminLayout", () => ({ AdminLayout: ({ children }) => <div>{children}</div> }));
 vi.mock("@/components/tls/ConfirmDialog", () => ({ useConfirm: () => async () => true }));
@@ -31,6 +31,9 @@ const LEGACY_ITEM = {
   entries: [{ id: "e1", kind: "team", team_name: "THE LION SQUAD", member_profile_ids: ["p1"], lineup: ["Gast"], lineup_members: [{ profile_id: "p1", display_name: "Anni" }], placement: 2, medal: "silver" }],
 };
 
+// Das Formular prüft nebenbei (#1755) - gespeichert ist, was an „/references“ geht.
+const saveCalls = () => apiMock.post.mock.calls.filter(([url]) => url === "/references");
+
 function mockApi(items) {
   apiMock.get.mockImplementation(async (url) => {
     if (url === "/references/admin") return { data: { items, summary: { total: items.length } } };
@@ -47,6 +50,8 @@ beforeEach(() => {
   apiMock.post.mockResolvedValue({ data: { id: "new" } });
   apiMock.patch.mockResolvedValue({ data: LEGACY_ITEM });
   toastMock.error.mockReset();
+  toastMock.warning.mockReset();
+  toastMock.success.mockReset();
 });
 
 test("Neue Referenz: Felder statt Titel, zwei Einzelstarter mit je eigener Platzierung", async () => {
@@ -69,8 +74,8 @@ test("Neue Referenz: Felder statt Titel, zwei Einzelstarter mit je eigener Platz
   fireEvent.change(screen.getByTestId("reference-entry-1-participants"), { target: { value: "32" } });
 
   fireEvent.submit(screen.getByTestId("reference-sheet"));
-  await waitFor(() => expect(apiMock.post).toHaveBeenCalledTimes(1));
-  const [url, payload] = apiMock.post.mock.calls[0];
+  await waitFor(() => expect(saveCalls()).toHaveLength(1));
+  const [url, payload] = saveCalls()[0];
   expect(url).toBe("/references");
   expect(payload).toEqual(expect.objectContaining({ title: "Winter Cup", league: "Liga X", season: "Season 3", platforms: ["PS"] }));
   expect(payload.entries).toEqual([
@@ -87,7 +92,55 @@ test("ohne Eintrag wird nicht gespeichert", async () => {
   expect(screen.getByTestId("reference-entries-empty")).toBeInTheDocument();
   fireEvent.submit(screen.getByTestId("reference-sheet"));
   await waitFor(() => expect(toastMock.error).toHaveBeenCalled());
-  expect(apiMock.post).not.toHaveBeenCalled();
+  expect(saveCalls()).toHaveLength(0);
+});
+
+// Prüfung beim Speichern (#1755): Warnungen am Feld, Speichern bleibt möglich, Auffälligkeiten der Altdaten.
+test("Prüfung: Hinweise erscheinen am Feld, gespeichert wird trotzdem mit Hinweis-Meldung", async () => {
+  mockApi([LEGACY_ITEM]);
+  apiMock.post.mockImplementation(async (url, body) => {
+    if (url !== "/references/admin/checks/preview") return { data: {} };
+    const warnings = [];
+    if (body.end_date === "2028-03-01") warnings.push({ field: "end_date", code: "too_long", message: "Das Ende liegt 731 Tage nach dem Start." });
+    if (body.entries?.[0]?.placement === 12) warnings.push({ field: "entries.0.placement", code: "placement_above_count", message: "Platz 12 ist größer als die Zahl der Teilnehmer (8)." });
+    return { data: { warnings } };
+  });
+  apiMock.patch.mockResolvedValue({ data: { ...LEGACY_ITEM, check_warnings: [{ field: "end_date" }, { field: "entries.0.placement" }] } });
+  render(<MemoryRouter><AdminReferencesPage /></MemoryRouter>);
+  fireEvent.click(await screen.findByTestId("reference-edit-r1"));
+  fireEvent.change(screen.getByTestId("reference-start-date"), { target: { value: "2026-03-01" } });
+  fireEvent.change(screen.getByTestId("reference-end-date"), { target: { value: "2028-03-01" } });
+  fireEvent.change(screen.getByTestId("reference-entry-0-placement"), { target: { value: "12" } });
+  fireEvent.change(screen.getByTestId("reference-entry-0-teams"), { target: { value: "8" } });
+
+  expect(await screen.findByTestId("reference-end-date-warnings")).toHaveTextContent("731 Tage");
+  expect(await screen.findByTestId("reference-entry-0-warnings")).toHaveTextContent("Platz 12");
+
+  fireEvent.submit(screen.getByTestId("reference-sheet"));
+  await waitFor(() => expect(toastMock.warning).toHaveBeenCalledWith("Gespeichert – 2 Hinweise zur Prüfung."));
+  expect(apiMock.patch).toHaveBeenCalledWith("/references/r1", expect.objectContaining({ end_date: "2028-03-01" }));
+  expect(toastMock.success).not.toHaveBeenCalled();
+});
+
+test("Prüfung: Auffälligkeiten der Altdaten mit Bearbeiten und einstellbarer Grenze", async () => {
+  mockApi([LEGACY_ITEM]);
+  const base = apiMock.get.getMockImplementation();
+  apiMock.get.mockImplementation(async (url) => (url === "/references/admin/checks" ? { data: {
+    settings: { max_duration_days: 365, warn_future_end: true }, checked: 1,
+    items: [{ id: "r1", title: "Herbst Cup", warnings: [{ field: "placement", code: "placement_above_count", message: "Platz 20 ist größer als die Zahl der Teilnehmer (16)." }] }],
+  } } : base(url)));
+  apiMock.patch.mockResolvedValue({ data: { max_duration_days: 30, warn_future_end: false } });
+  render(<MemoryRouter><AdminReferencesPage /></MemoryRouter>);
+  expect(await screen.findByTestId("reference-checks-count")).toHaveTextContent("(1)");
+  expect(screen.getByTestId("reference-check-r1")).toHaveTextContent("Platz 20");
+
+  fireEvent.change(screen.getByTestId("reference-checks-days"), { target: { value: "30" } });
+  fireEvent.click(screen.getByTestId("reference-checks-future"));
+  fireEvent.click(screen.getByTestId("reference-checks-save"));
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/references/admin/checks", { max_duration_days: 30, warn_future_end: false }));
+
+  fireEvent.click(screen.getByTestId("reference-check-edit-r1"));
+  expect(screen.getByRole("dialog", { name: "Referenz bearbeiten" })).toBeInTheDocument();
 });
 
 test("Bearbeiten übernimmt die abgeleiteten Felder und den Eintrag der alten Referenz", async () => {

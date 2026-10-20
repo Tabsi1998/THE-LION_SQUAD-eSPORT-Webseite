@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, formatApiError } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { AdminSheet } from "@/components/tls/AdminSheet";
@@ -9,6 +9,8 @@ import { GermanDateField } from "@/components/tls/GermanDateField";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { gameOptionLabel } from "@/lib/gameLabels";
+import { checkKey, warningSummary, warningsByField } from "@/lib/referenceChecks";
+import { AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import { ExternalLink, Medal, Pencil, Plus, Save, Trash2, User, Users } from "lucide-react";
 import { viennaDate } from "@/lib/vienna";
@@ -257,6 +259,7 @@ export default function AdminReferencesPage() {
 
       <ShowcaseAdmin items={items} />
       <ReferenceHelperAdmin helpers={helperSettings} onSaved={(helpers) => { setHelperSettings(helpers); load(); }} />
+      <ReferenceCheckAdmin items={items} onEdit={(id) => setEditing(items.find((item) => item.id === id) || null)} />
 
       <div className="space-y-3">
         {items.map((item) => (
@@ -473,9 +476,146 @@ function HelperTextArea({ label, value, onChange, rows = 5 }) {
   );
 }
 
+// Prüfung (#1755): Auffälligkeiten in allen gespeicherten Referenzen, auch den alten, und die Grenzen der Prüfung.
+function ReferenceCheckAdmin({ items, onEdit }) {
+  const [data, setData] = useState(null);
+  const [form, setForm] = useState({ max_duration_days: "", warn_future_end: true });
+  const [saving, setSaving] = useState(false);
+
+  const load = useCallback(async () => {
+    try {
+      const { data: result } = await api.get("/references/admin/checks");
+      setData(result || null);
+      setForm({ max_duration_days: String(result?.settings?.max_duration_days ?? ""), warn_future_end: result?.settings?.warn_future_end !== false });
+    } catch {
+      setData(null);
+    }
+  }, []);
+
+  useEffect(() => { load(); }, [load, items]);
+
+  if (!data) return null;
+  const findings = data.items || [];
+
+  const save = async () => {
+    setSaving(true);
+    try {
+      await api.patch("/references/admin/checks", {
+        max_duration_days: Number(form.max_duration_days) || null,
+        warn_future_end: Boolean(form.warn_future_end),
+      });
+      toast.success("Prüfung gespeichert.");
+      load();
+    } catch (err) {
+      toast.error(formatApiError(err.response?.data?.detail));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <details className="mb-6 border border-white/10 bg-[#121212] rounded-sm" data-testid="reference-checks">
+      <summary className="cursor-pointer px-4 py-3 text-sm font-bold uppercase tracking-wider text-white/75 hover:text-[#29B6E8]">
+        Auffälligkeiten <span className={findings.length ? "text-warn" : "text-white/40"} data-testid="reference-checks-count">({findings.length})</span>
+      </summary>
+      <div className="border-t border-white/10 p-4 space-y-4">
+        <p className="text-sm text-white/55 max-w-3xl">
+          Beim Speichern wird geprüft, ob Datum und Platzierung zusammenpassen. Gespeichert wird trotzdem – hier stehen alle Referenzen mit Hinweis, auch alte. Geprüft: {data.checked ?? 0}.
+        </p>
+        {findings.length === 0 && <div className="text-sm text-white/45" data-testid="reference-checks-empty">Keine Auffälligkeiten.</div>}
+        <ul className="space-y-2">
+          {findings.map((item) => (
+            <li key={item.id} className="border border-white/10 bg-[#0A0A0A] rounded-sm p-3 flex items-start justify-between gap-3" data-testid={`reference-check-${item.id}`}>
+              <div className="min-w-0">
+                <div className="font-semibold text-sm">{item.title || "Ohne Titel"}{item.start_date && <span className="ml-2 text-xs text-white/45">{formatDate(item.start_date)}</span>}</div>
+                <FieldWarnings messages={(item.warnings || []).map((warning) => warning.message)} />
+              </div>
+              <button type="button" onClick={() => onEdit(item.id)} data-testid={`reference-check-edit-${item.id}`} className="p-1.5 text-white/40 hover:text-[#29B6E8] shrink-0" aria-label="Referenz bearbeiten"><Pencil className="w-4 h-4" /></button>
+            </li>
+          ))}
+        </ul>
+        <FormGrid cols={3}>
+          <TextField label="Längste Dauer (Tage)" type="number" min="1" max="3650" value={form.max_duration_days} onChange={(v) => setForm((current) => ({ ...current, max_duration_days: v }))} hint="Liegt das Ende weiter nach dem Start, kommt ein Hinweis." testId="reference-checks-days" />
+          <CheckField label="Abgeschlossen, aber Ende in der Zukunft melden" checked={form.warn_future_end} onChange={(v) => setForm((current) => ({ ...current, warn_future_end: v }))} testId="reference-checks-future" className="self-center md:col-span-2" />
+        </FormGrid>
+        <button type="button" onClick={save} disabled={saving} data-testid="reference-checks-save" className="inline-flex items-center gap-2 px-4 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm disabled:opacity-50">
+          <Save className="w-4 h-4" /> {saving ? "Speichere..." : "Prüfung speichern"}
+        </button>
+      </div>
+    </details>
+  );
+}
+
 function RefLink({ href, label }) {
   if (!href) return null;
   return <a href={href} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-[10px] uppercase tracking-widest text-[#29B6E8] hover:underline">{label}<ExternalLink className="w-3 h-3" /></a>;
+}
+
+function formToPayload(form) {
+  return {
+    title: form.title.trim(),
+    organizer: form.organizer.trim() || null,
+    partner_ids: form.partner_ids || [],
+    league: form.league.trim() || null,
+    season: form.season.trim() || null,
+    format: form.format.trim() || null,
+    platforms: form.platforms,
+    game_id: form.game_id || null,
+    game_name: form.game_name.trim() || null,
+    entries: form.entries.map(entryPayload),
+    start_date: form.start_date || null,
+    end_date: form.end_date || null,
+    location: form.location.trim() || null,
+    mode: form.mode,
+    external_url: form.external_url.trim() || null,
+    bracket_url: form.bracket_url.trim() || null,
+    match_url: form.match_url.trim() || null,
+    result_url: form.result_url.trim() || null,
+    description: form.description.trim() || null,
+    highlights: form.highlights.trim() || null,
+    visibility: form.visibility,
+    status: form.status,
+    is_active: form.is_active !== false,
+    order_index: Number(form.order_index) || 0,
+  };
+}
+
+// Prüfung (#1755): die Formularwerte gehen kurz nach jeder Änderung an Datum, Status, Platz oder Teilnehmerzahl an
+// den Server; die Warnungen erscheinen am Feld. Speichern bleibt immer möglich.
+const CHECK_DELAY_MS = 400;
+
+function useReferenceWarnings(payload) {
+  const [warnings, setWarnings] = useState({});
+  const key = checkKey(payload);
+  const latest = useRef(payload);
+  latest.current = payload;
+  useEffect(() => {
+    let alive = true;
+    const timer = setTimeout(async () => {
+      try {
+        const { data } = await api.post("/references/admin/checks/preview", latest.current);
+        if (alive) setWarnings(warningsByField(data?.warnings));
+      } catch {
+        if (alive) setWarnings({});
+      }
+    }, CHECK_DELAY_MS);
+    return () => { alive = false; clearTimeout(timer); };
+  }, [key]);
+  return warnings;
+}
+
+function FieldWarnings({ messages, testId }) {
+  if (!messages?.length) return null;
+  return (
+    <div className="mt-1 space-y-0.5" role="status" data-testid={testId}>
+      {messages.map((message) => (
+        <div key={message} className="flex items-start gap-1.5 text-xs text-warn">
+          <AlertTriangle className="w-3.5 h-3.5 mt-px shrink-0" aria-hidden="true" />
+          <span>{message}</span>
+        </div>
+      ))}
+    </div>
+  );
 }
 
 function ReferenceForm({ reference, games, memberProfiles, partners = [], suggestions, onClose, onSaved }) {
@@ -501,6 +641,10 @@ function ReferenceForm({ reference, games, memberProfiles, partners = [], sugges
     setPlatformInput("");
   };
 
+  const payload = useMemo(() => formToPayload(form), [form]);
+  const warnings = useReferenceWarnings(payload);
+  const warningsAt = (field) => warnings[field] || [];
+
   const save = async (e) => {
     e.preventDefault();
     if (form.entries.length === 0) {
@@ -508,36 +652,12 @@ function ReferenceForm({ reference, games, memberProfiles, partners = [], sugges
       return;
     }
     setSaving(true);
-    const payload = {
-      title: form.title.trim(),
-      organizer: form.organizer.trim() || null,
-      partner_ids: form.partner_ids || [],
-      league: form.league.trim() || null,
-      season: form.season.trim() || null,
-      format: form.format.trim() || null,
-      platforms: form.platforms,
-      game_id: form.game_id || null,
-      game_name: form.game_name.trim() || null,
-      entries: form.entries.map(entryPayload),
-      start_date: form.start_date || null,
-      end_date: form.end_date || null,
-      location: form.location.trim() || null,
-      mode: form.mode,
-      external_url: form.external_url.trim() || null,
-      bracket_url: form.bracket_url.trim() || null,
-      match_url: form.match_url.trim() || null,
-      result_url: form.result_url.trim() || null,
-      description: form.description.trim() || null,
-      highlights: form.highlights.trim() || null,
-      visibility: form.visibility,
-      status: form.status,
-      is_active: form.is_active !== false,
-      order_index: Number(form.order_index) || 0,
-    };
     try {
-      if (isNew) await api.post("/references", payload);
-      else await api.patch(`/references/${reference.id}`, payload);
-      toast.success("Referenz gespeichert.");
+      const { data } = isNew ? await api.post("/references", payload) : await api.patch(`/references/${reference.id}`, payload);
+      // Prüfung (#1755): gespeichert ist trotzdem - die Hinweise stehen danach unter „Auffälligkeiten“.
+      const summary = warningSummary(data?.check_warnings);
+      if (summary) toast.warning(summary);
+      else toast.success("Referenz gespeichert.");
       onSaved();
     } catch (err) {
       toast.error(formatApiError(err.response?.data?.detail));
@@ -608,6 +728,7 @@ function ReferenceForm({ reference, games, memberProfiles, partners = [], sugges
             suggestions={suggestions}
             onChange={(patch) => setEntry(entry.key, patch)}
             onRemove={() => removeEntry(entry.key)}
+            warnings={warningsAt(`entries.${index}.placement`)}
           />
         ))}
         <div className="flex flex-wrap gap-2">
@@ -623,6 +744,7 @@ function ReferenceForm({ reference, games, memberProfiles, partners = [], sugges
           <TextField label="Ort" value={form.location} onChange={(v) => set("location", v)} suggestions={suggestions.locations} testId="reference-location" />
           <SelectField label="Modus" value={form.mode} onChange={(v) => set("mode", v)} options={MODE_OPTIONS} testId="reference-mode" />
         </FormGrid>
+        <FieldWarnings messages={warningsAt("end_date")} testId="reference-end-date-warnings" />
         <FormGrid>
           <TextField label="Turnier-Webseite" value={form.external_url} onChange={(v) => set("external_url", v)} placeholder="https://..." />
           <TextField label="Bracket / Tabelle" value={form.bracket_url} onChange={(v) => set("bracket_url", v)} placeholder="https://..." />
@@ -645,7 +767,7 @@ function ReferenceForm({ reference, games, memberProfiles, partners = [], sugges
   );
 }
 
-function EntryEditor({ entry, index, profiles, suggestions, onChange, onRemove }) {
+function EntryEditor({ entry, index, profiles, suggestions, onChange, onRemove, warnings = [] }) {
   const isSolo = entry.kind === "solo";
   const toggleMember = (profileId) => onChange((current) => {
     const ids = current.member_profile_ids || [];
@@ -685,6 +807,7 @@ function EntryEditor({ entry, index, profiles, suggestions, onChange, onRemove }
         <TextField label="Teilnehmer" type="number" min="1" value={entry.participant_count} onChange={(v) => onChange({ participant_count: v })} testId={`reference-entry-${index}-participants`} />
         <TextField label="Teams" type="number" min="1" value={entry.team_count} onChange={(v) => onChange({ team_count: v })} testId={`reference-entry-${index}-teams`} />
       </FormGrid>
+      <FieldWarnings messages={warnings} testId={`reference-entry-${index}-warnings`} />
     </div>
   );
 }
