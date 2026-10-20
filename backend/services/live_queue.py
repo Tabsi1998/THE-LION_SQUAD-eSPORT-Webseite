@@ -131,6 +131,7 @@ def _rows(plan: dict) -> list[dict]:
                 "minutes": int(item["minutes"]),
                 "state": "queued" if item["kind"] == "kept" else item["kind"],
                 "forecast": False,
+                "waiting_for": item.get("waiting_for"),
             }
         )
     for item in plan.get("assignments") or []:
@@ -142,6 +143,7 @@ def _rows(plan: dict) -> list[dict]:
                 "minutes": int(item.get("duration_minutes") or 0),
                 "state": "queued",
                 "forecast": bool(item.get("forecast")),
+                "waiting_for": item.get("waiting_for"),
             }
         )
     return rows
@@ -218,8 +220,10 @@ def build_live_queue(
             "open_slots": _open_slots(match),
             # Lauf (mehr als zwei Plätze): die Stationen nennen dann den Durchgang und die Namen (#1824).
             "heat": _is_heat(match),
-            # Aufrufbar - dieselbe Regel wie im Planer und bei „Aufrufen“ (#1858).
+            # Aufrufbar - dieselbe Regel wie im Planer und bei „Aufrufen“ (#1858). Sonst, worauf es wartet: ``draw`` (das
+            # Los je Runde, etwa die Show-Auslosung) oder ``previous`` (ein Vorspiel ist offen).
             "ready": ready,
+            "waiting_for": None if ready else row.get("waiting_for") or "previous",
             "forecast": row["forecast"],
             "planned_at": _iso(planned),
             "forecast_at": _iso(row["start"]),

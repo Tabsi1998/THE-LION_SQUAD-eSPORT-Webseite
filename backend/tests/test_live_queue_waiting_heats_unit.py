@@ -184,10 +184,16 @@ def test_heats_waiting_for_the_show_draw_leave_free_stations_to_the_ready_heats(
     assert shown["E"]["ready"] and shown["F"]["ready"], "E und F sind bereit - sie stehen als Nächstes, nicht danach"
     assert len(callable_stations(view)) == 2, "zwei freie Stationen haben „Aufrufen“ für E und F"
     for key in ("LA", "LB"):
-        assert shown[key]["ready"] is False, "LA/LB warten auf die Auslosung"
+        assert shown[key]["ready"] is False and shown[key]["waiting_for"] == "draw", "LA/LB warten auf die Auslosung"
     assert_ready_first(view)
 
 
+def test_a_heat_waiting_for_its_previous_heats_says_so():
+    """LC/LD warten auf LA/LB und E/F - nicht auf ein Los, das noch nicht dran ist."""
+    view = queue(cup(), 4)
+    entries = {entry["match_key"]: entry for entry in view["matches"].values()}
+    assert entries["LC"]["waiting_for"] == "previous" and entries["LD"]["waiting_for"] == "previous"
+    assert entries["E"]["waiting_for"] is None, "ein bereiter Lauf wartet auf nichts"
 
 
 def test_four_ready_heats_get_all_four_free_stations():
@@ -241,7 +247,7 @@ def test_duels_waiting_for_the_draw_leave_free_stations_to_the_ready_duels():
     shown = nexts(view)
     assert set(shown) == {"E", "F", "LA", "LB"}
     assert shown["E"]["ready"] and shown["F"]["ready"]
-    assert shown["LA"]["ready"] is False and shown["LB"]["ready"] is False
+    assert shown["LA"]["waiting_for"] == "draw" and shown["LB"]["waiting_for"] == "draw"
     assert len(callable_stations(view)) == 2
     assert_ready_first(view)
 
