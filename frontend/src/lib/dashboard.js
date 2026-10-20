@@ -20,8 +20,10 @@ export function isStillRelevant(item, now = new Date()) {
 }
 
 export function isLiveOrToday(item, now = new Date()) {
-  if (LIVE_PHASES.has(String(item?.phaseState || "").toLowerCase())) return true;
-  if (LIVE_STATUSES.has(String(item?.status || "").toLowerCase())) return true;
+  const phase = String(item?.phaseState || "").toLowerCase();
+  if (LIVE_PHASES.has(phase)) return true;
+  // Die öffentliche Phase geht vor dem Rohstatus: ein stehen gebliebenes „live“ nach dem Ende zählt nicht (#1881).
+  if ((!phase || phase === "paused") && LIVE_STATUSES.has(String(item?.status || "").toLowerCase())) return true;
   const day = viennaDay(item?.date);
   return Boolean(day) && day === viennaDay(now);
 }

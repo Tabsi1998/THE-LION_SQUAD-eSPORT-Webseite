@@ -72,3 +72,52 @@ def test_f1_with_online_registration_keeps_registration_open():
     assert phase["state"] == "registration_open"
     assert phase["label"] == "Anmeldung offen"
     assert phase["countdown_kind"] == "registration_closes"
+
+
+NOW = datetime(2030, 6, 10, 12, 0, tzinfo=timezone.utc)
+
+
+def test_manual_live_without_dates_shows_running():
+    phase = derive_public_phase({"status": "live"}, "f1", now=NOW)
+
+    assert phase["state"] == "live"
+    assert phase["label"] == "Läuft"
+    assert phase["countdown_kind"] == "ends"
+
+
+def test_manual_live_with_future_start_shows_running():
+    phase = derive_public_phase({"status": "live", "start_date": "2030-06-20T10:00:00+00:00"}, "tournament", now=NOW)
+
+    assert phase["state"] == "live"
+    assert phase["label"] == "Läuft"
+
+
+def test_manual_live_with_past_end_is_completed():
+    phase = derive_public_phase(
+        {"status": "live", "start_date": "2030-06-01T10:00:00+00:00", "end_date": "2030-06-02T10:00:00+00:00"},
+        "event",
+        now=NOW,
+    )
+
+    assert phase["state"] == "completed"
+
+
+def test_paused_and_cancelled_are_not_overridden_by_live_logic():
+    assert derive_public_phase({"status": "paused"}, "f1", now=NOW)["state"] == "paused"
+    cancelled = derive_public_phase({"status": "cancelled", "start_date": "2030-06-01T10:00:00+00:00"}, "f1", now=NOW)
+    assert cancelled["state"] == "cancelled"
+
+
+def test_manual_live_event_keeps_day_break_between_days():
+    event = {
+        "status": "live",
+        "start_date": "2030-06-09T08:00:00+00:00",
+        "end_date": "2030-06-12T20:00:00+00:00",
+        "days": [
+            {"date": "2030-06-09", "start_at": "2030-06-09T08:00:00+00:00", "end_at": "2030-06-09T18:00:00+00:00"},
+            {"date": "2030-06-11", "start_at": "2030-06-11T08:00:00+00:00", "end_at": "2030-06-11T18:00:00+00:00"},
+        ],
+    }
+    phase = derive_public_phase(event, "event", now=NOW)
+
+    assert phase["state"] == "day_break"

@@ -64,16 +64,23 @@ export function dayIndexOf(days, instant) {
   return same ? same.index : -1;
 }
 
+// Die öffentliche Phase vom Server (public_phase) geht vor dem Rohstatus: Ein stehen gebliebenes „live“ nach dem Ende
+// ist dort schon „completed“ (#1881). Ohne Phase gilt dieselbe Reihenfolge wie dort: manuelle Status, Ende, live.
+function statusOf(item) {
+  return String(item.phase || item.status || "").toLowerCase();
+}
+
 function tournamentState(item, now) {
-  const status = String(item.status || "").toLowerCase();
+  const status = statusOf(item);
   if (DONE_TOURNAMENT.has(status)) return "past";
-  if (LIVE_TOURNAMENT.has(status)) return "live";
+  if (status === "paused") return "live";
   if (item.to !== null && now >= item.to) return "past";
+  if (LIVE_TOURNAMENT.has(status)) return "live";
   return "upcoming";
 }
 
 function fastLapState(item, now) {
-  const status = String(item.status || "").toLowerCase();
+  const status = statusOf(item);
   if (DONE_FASTLAP.has(status)) return "past";
   if (item.to !== null && now >= item.to) return "past";
   if (LIVE_FASTLAP.has(status) || (item.from !== null && now >= item.from && (item.to === null || now < item.to))) return "live";
@@ -86,12 +93,12 @@ export function planItems(event) {
   for (const tournament of event?.tournaments || []) {
     const from = timeOf(tournament.start_date);
     if (from === null) continue;
-    items.push({ id: `t-${tournament.id}`, kind: "tournament", source: tournament, title: tournament.title || tournament.name || "Turnier", status: tournament.status, from, to: timeOf(tournament.end_date) });
+    items.push({ id: `t-${tournament.id}`, kind: "tournament", source: tournament, title: tournament.title || tournament.name || "Turnier", status: tournament.status, phase: tournament.public_phase?.state || null, from, to: timeOf(tournament.end_date) });
   }
   for (const challenge of event?.f1_challenges || []) {
     const from = timeOf(challenge.start_date);
     if (from === null) continue;
-    items.push({ id: `f-${challenge.id}`, kind: "fastlap", source: challenge, title: challenge.title || challenge.name || "Fast Lap", status: challenge.status, from, to: timeOf(challenge.end_date) });
+    items.push({ id: `f-${challenge.id}`, kind: "fastlap", source: challenge, title: challenge.title || challenge.name || "Fast Lap", status: challenge.status, phase: challenge.public_phase?.state || null, from, to: timeOf(challenge.end_date) });
   }
   return items.sort((a, b) => a.from - b.from || a.title.localeCompare(b.title, "de"));
 }
