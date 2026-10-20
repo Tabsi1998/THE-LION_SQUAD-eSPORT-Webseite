@@ -1,6 +1,6 @@
 const { chromium } = require("@playwright/test");
 
-const { resolveAuditBaseUrl, assertNotProduction } = require("./audit-base-url");
+const { resolveAuditBaseUrl, assertNotProduction, fetchChecked } = require("./audit-base-url");
 
 let baseUrl;
 try {
@@ -56,6 +56,7 @@ async function checkResourceLink(link) {
 
     let response;
     try {
+      assertNotProduction(current, process.env);
       response = await fetch(current, {
         redirect: "manual",
         headers: { "user-agent": "Lionsquad-Public-Audit/1.0" },
@@ -201,8 +202,7 @@ async function auditPage(context, path) {
 }
 
 async function main() {
-  const sitemap = await fetch(`${baseUrl}/sitemap.xml`).then((response) => {
-    assertNotProduction(response.url, process.env);
+  const sitemap = await fetchChecked(`${baseUrl}/sitemap.xml`, {}, process.env).then((response) => {
     if (!response.ok) throw new Error(`Sitemap returned ${response.status}`);
     return response.text();
   });
@@ -219,7 +219,7 @@ async function main() {
   const linkSources = new Map();
   const resourceLinks = new Map();
   const browser = await chromium.launch({ headless: true });
-  const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
+  const context = await browser.newContext({ viewport: { width: 1440, height: 1000 }, serviceWorkers: "block" });
   // Jede Anfrage des Browsers (auch nach Weiterleitungen) prüfen: nie ohne Freigabe zur echten Seite.
   await context.route("**/*", async (route) => {
     try {

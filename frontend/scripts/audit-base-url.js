@@ -38,6 +38,22 @@ function assertNotProduction(value, env = {}) {
   }
 }
 
+// Lädt eine Adresse und folgt Weiterleitungen selbst: Jedes Ziel wird vor dem Aufruf geprüft, damit die
+// echte Seite nie ohne Freigabe kontaktiert wird. Höchstens maxRedirects Schritte.
+async function fetchChecked(url, options = {}, env = {}, fetchImpl = globalThis.fetch, maxRedirects = 5) {
+  let current = new URL(url).toString();
+  for (let hop = 0; hop <= maxRedirects; hop += 1) {
+    assertNotProduction(current, env);
+    const response = await fetchImpl(current, { ...options, redirect: "manual" });
+    if (response.status < 300 || response.status >= 400) return response;
+    const location = response.headers.get("location");
+    await response.body?.cancel?.();
+    if (!location) return response;
+    current = new URL(location, current).toString();
+  }
+  throw new Error(`Zu viele Weiterleitungen (mehr als ${maxRedirects}).`);
+}
+
 function resolveAuditBaseUrl(env = {}) {
   const raw = String(env.PUBLIC_AUDIT_BASE_URL || "").trim();
   if (!raw) {
@@ -69,4 +85,4 @@ function resolveAuditBaseUrl(env = {}) {
   return url.origin + url.pathname.replace(/\/+$/, "");
 }
 
-module.exports = { resolveAuditBaseUrl, isProductionHost, isProductionUrl, assertNotProduction };
+module.exports = { resolveAuditBaseUrl, isProductionHost, isProductionUrl, assertNotProduction, fetchChecked };

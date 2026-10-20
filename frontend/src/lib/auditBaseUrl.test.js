@@ -1,8 +1,8 @@
 import { createRequire } from "node:module";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 const require = createRequire(import.meta.url);
-const { resolveAuditBaseUrl, isProductionHost, assertNotProduction } = require("../../scripts/audit-base-url.js");
+const { resolveAuditBaseUrl, isProductionHost, assertNotProduction, fetchChecked } = require("../../scripts/audit-base-url.js");
 
 describe("Content-Audit: Basis-Adresse (#1007)", () => {
   it("bricht ohne ausdrücklich gesetzte Adresse ab", () => {
@@ -47,5 +47,38 @@ describe("Content-Audit: Schutz vor der echten Seite (#1007)", () => {
     expect(() => assertNotProduction("https://lionsquad.at./news", {})).toThrow(/Abbruch/);
     expect(() => assertNotProduction("https://cdn.lionsquad.at/a.png", { PUBLIC_AUDIT_ALLOW_PRODUCTION: "0" })).toThrow(/Abbruch/);
     expect(() => assertNotProduction("https://lionsquad.at/", { PUBLIC_AUDIT_ALLOW_PRODUCTION: "1" })).not.toThrow();
+  });
+});
+
+describe("Content-Audit: Weiterleitungen beim Laden (#1007)", () => {
+  const redirect = (location) => ({ status: 302, headers: new Headers({ location }), body: null });
+  const ok = { status: 200, headers: new Headers(), body: null };
+
+  it("folgt erlaubten Weiterleitungen selbst und mit manual", async () => {
+    const fetchImpl = vi.fn()
+      .mockResolvedValueOnce(redirect("/neu"))
+      .mockResolvedValueOnce(ok);
+    const response = await fetchChecked("http://127.0.0.1:3000/sitemap.xml", {}, {}, fetchImpl);
+    expect(response.status).toBe(200);
+    expect(fetchImpl.mock.calls.map((call) => call[0])).toEqual(["http://127.0.0.1:3000/sitemap.xml", "http://127.0.0.1:3000/neu"]);
+    expect(fetchImpl.mock.calls.every((call) => call[1].redirect === "manual")).toBe(true);
+  });
+
+  it("ruft die echte Seite bei einer Weiterleitung dorthin gar nicht erst auf", async () => {
+    const fetchImpl = vi.fn().mockResolvedValueOnce(redirect("https://lionsquad.at./sitemap.xml"));
+    await expect(fetchChecked("http://127.0.0.1:3000/sitemap.xml", {}, {}, fetchImpl)).rejects.toThrow(/Abbruch/);
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
+  it("erlaubt die echte Seite nur mit Freigabe", async () => {
+    const fetchImpl = vi.fn().mockResolvedValueOnce(redirect("https://lionsquad.at/")).mockResolvedValueOnce(ok);
+    const env = { PUBLIC_AUDIT_ALLOW_PRODUCTION: "1" };
+    await expect(fetchChecked("http://127.0.0.1:3000/", {}, env, fetchImpl)).resolves.toBe(ok);
+  });
+
+  it("bricht nach höchstens fünf Weiterleitungen ab", async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(redirect("/weiter"));
+    await expect(fetchChecked("http://127.0.0.1:3000/", {}, {}, fetchImpl)).rejects.toThrow(/Zu viele Weiterleitungen/);
+    expect(fetchImpl).toHaveBeenCalledTimes(6);
   });
 });
