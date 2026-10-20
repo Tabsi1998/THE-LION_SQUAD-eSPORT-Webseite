@@ -82,3 +82,17 @@ test("der Kopf zählt zonenlose Werte als Wiener Uhr, auch wenn das Gerät in ei
     else process.env.TZ = before;
   }
 });
+
+test("Sortieren und neu hinten vergleichen Zeitpunkte, nicht Text - auch bei gemischter Schreibweise (#1049)", () => {
+  // Als Zeitpunkte: a 08:00Z, b 08:30Z, c 08:45Z, d 09:00Z (zonenlos = 11:00 Wien).
+  const a = msg("a", "bob", "2026-07-01T10:00:00+02:00");
+  const b = msg("b", "bob", "2026-07-01T08:30:00Z");
+  const c = msg("c", "bob", "2026-07-01T08:45:00+00:00");
+  const d = msg("d", "bob", "2026-07-01T11:00:00");
+  expect(mergeMessages([d, b], [c, a]).messages.map((row) => row.id)).toEqual(["a", "b", "c", "d"]);
+  // Hinten dazu zählt nur, was nach der letzten bekannten Nachricht (b, 08:30Z) liegt.
+  expect(mergeMessages([a, b], [c]).appended).toBe(1);
+  expect(mergeMessages([a, b], [msg("x", "bob", "2026-07-01T09:00:00+02:00")]).appended).toBe(0);
+  // Zonenlos zählt als Wiener Uhr: 10:20 zonenlos (08:20Z) liegt vor 08:30Z.
+  expect(mergeMessages([b], [msg("y", "bob", "2026-07-01T10:20:00")]).appended).toBe(0);
+});
