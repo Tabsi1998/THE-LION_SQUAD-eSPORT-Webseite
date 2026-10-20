@@ -231,6 +231,16 @@ test("Freilos statt „Offen“", async () => {
   expect(screen.queryByText("Offen")).toBeNull();
 });
 
+// Teilnehmerliste (#1870): kein Rohwert wie „Filled“ - ein eingecheckter Platz sagt es auf Deutsch.
+test("Teilnehmerliste zeigt keinen Rohwert, bekannte Zustände deutsch", async () => {
+  answer({ ...PAGE, participants: [NEON, { ...LUNA, status: "checked_in" }] });
+  await render(<MatchDetailScreen navigation={navigation} route={route} />);
+  await waitFor(() => expect(screen.getByTestId("match-headline")).toHaveTextContent("NeonFalke gegen LunaByte"));
+  expect(screen.queryByText(/filled/i)).toBeNull();
+  expect(screen.queryByText(/checked/i)).toBeNull();
+  expect(screen.getByText("Eingecheckt")).toBeTruthy();
+});
+
 // Terminvorschlag zum Antippen (#1139) in Wiener Zeit (#960): Tag wählen, Uhrzeit in Viertelstunden.
 test("Terminvorschlag: Tag und Uhrzeit antippen - an den Server geht die Wiener Uhrzeit", async () => {
   jest.useFakeTimers({ now: new Date("2026-05-19T08:00:00Z"), doNotFake: ["nextTick", "setImmediate"] });
