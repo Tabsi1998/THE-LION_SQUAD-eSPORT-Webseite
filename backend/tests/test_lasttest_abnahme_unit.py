@@ -150,6 +150,36 @@ def test_reload_follows_the_web_rules(kind, resource, watched, expected):
     assert lasttest.wants_reload(kind, {"resource": resource}, watched) is expected
 
 
+# Live-Nachladen je Turnier (#1801), wie lib/apiInvalidation.js: eine Seite lädt nur bei Änderungen ihres Turniers -
+# Seiten mit Stationen auch bei den anderen Turnieren ihres Events; ohne Kennung oder ohne eigenes Turnier wie bisher.
+SPIELPLAN = {"tournaments", "matches", "matches-v2", "stations"}
+
+
+@pytest.mark.parametrize("event, watched, tournament_id, event_id, expected", [
+    ({"resource": "tournaments", "tournament_id": "t1"}, {"tournaments"}, "t1", None, True),
+    ({"resource": "tournaments", "tournament_id": "t2"}, {"tournaments"}, "t1", None, False),
+    ({"resource": "matches", "tournament_id": "t2"}, {"tournaments", "matches"}, "t1", None, False),
+    ({"resource": "tournaments"}, {"tournaments"}, "t1", None, True),  # Meldung ohne Turnier
+    ({"resource": "tournaments", "tournament_id": "t2"}, {"tournaments"}, None, None, True),  # Seite ohne Turnier
+    ({"resource": "matches", "tournament_id": "t2", "parent_event_id": "e1"}, SPIELPLAN, "t1", "e1", True),
+    ({"resource": "matches", "tournament_id": "t2", "parent_event_id": "e2"}, SPIELPLAN, "t1", "e1", False),
+    ({"resource": "matches", "tournament_id": "t2", "parent_event_id": None}, SPIELPLAN, "t1", None, False),
+    ({"resource": "matches", "tournament_id": "t2", "parent_event_id": "e2"}, SPIELPLAN, "t1", None, True),  # TV mit Schlüssel
+    ({"resource": "tournaments", "tournament_id": "t2", "parent_event_id": "e1"}, {"tournaments"}, "t1", "e1", False),
+    ({"resource": "f1", "tournament_id": "t1"}, {"tournaments"}, "t1", None, False),
+])
+def test_reload_only_for_the_own_tournament_like_the_web(event, watched, tournament_id, event_id, expected):
+    assert lasttest.wants_reload("change", event, watched, tournament_id, event_id) is expected
+
+
+def test_reload_every_tournament_compares_with_the_web_before_1801():
+    other = {"resource": "tournaments", "tournament_id": "t2"}
+    assert lasttest.wants_reload("change", other, {"tournaments"}, "t1", None, every_tournament=True) is True
+    assert lasttest.wants_reload("reset", {}, {"tournaments"}, "t1", None) is True
+    assert lasttest.parse_args(["--reload-every-tournament"]).reload_every_tournament is True
+    assert lasttest.parse_args([]).reload_every_tournament is False
+
+
 def station(sid, running=None, upcoming=None, status="free"):
     return {"id": sid, "status": status, "running": running, "next": upcoming}
 
@@ -269,3 +299,6 @@ def test_markdown_report_names_verdict_and_limits():
     assert "| Baum | 1 | 0 | 0,00 % |" in text
     assert "95,5 %" in text
     assert "geheim" not in text
+    assert "nur bei Änderungen des eigenen Turniers (Web ab #1801)" in text
+    report["config"]["reload_every_tournament"] = True
+    assert "bei jeder Änderung jedes Turniers (Web vor #1801)" in lasttest.render_markdown(report)

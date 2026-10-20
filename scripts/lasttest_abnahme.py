@@ -10,7 +10,8 @@ Simuliert wird ein Abend mit den Daten aus dem Seed (Stand-Datei `ABNAHME_STATE`
 die Seiten im Browser abfragen (mit Playwright mitgeschnitten):
 
   * Zuschauer und Spieler: Turnierseite, Baum, Spielplan, Fast Lap - jeder mit dem Änderungsstrom
-    (`/api/changes/stream`) und Nachladen bei jeder passenden Änderung, wie `useLiveRefresh` (150 ms entprellt).
+    (`/api/changes/stream`) und Nachladen bei jeder passenden Änderung seines Turniers (#1801), wie `useLiveRefresh`
+    (150 ms entprellt).
     Ein Teil ist als Spieler angemeldet: dazu „Du bist als Nächstes“ (`live-queue/me`) im 60-s-Takt.
   * TVs mit Anzeige-Schlüssel: Baum (`bracket/display?key=`), Stationen und Live-Warteschlange (`live-queue?key=`).
   * Helfer (Turnierleitung): Live-Warteschlange lesen, aufrufen, starten, Ergebnis eintragen - je Helfer ein Turnier.
@@ -193,11 +194,28 @@ def event_keys(event: dict) -> set[str]:
     return ({resource} | RESOURCE_ALIASES.get(resource, set())) - {""}
 
 
-def wants_reload(kind: str, event: dict, watched: set[str]) -> bool:
-    """Lädt eine Seite mit diesen Ressourcen bei dieser Meldung neu? Ein Reset des Stroms lädt alles."""
+def concerns_page(event: dict, tournament_id: str | None, event_id: str | None, shared_stations: bool) -> bool:
+    """Betrifft die Meldung das Turnier der Seite (#1801, wie lib/apiInvalidation.js)? Ohne Turnier in der Meldung oder
+    an der Seite: ja. Seiten mit Stationen auch bei jedem anderen Turnier desselben Events (sie teilen sich Stationen) -
+    kennt die Seite ihr Event nicht, bei jedem Turnier mit Event."""
+    changed = event.get("tournament_id")
+    if not changed or not tournament_id or changed == tournament_id:
+        return True
+    if not shared_stations:
+        return False
+    changed_event = event.get("parent_event_id")
+    return bool(changed_event) and (not event_id or changed_event == event_id)
+
+
+def wants_reload(kind: str, event: dict, watched: set[str], tournament_id: str | None = None,
+                 event_id: str | None = None, *, every_tournament: bool = False) -> bool:
+    """Lädt eine Seite mit diesen Ressourcen (und diesem Turnier) bei dieser Meldung neu? Ein Reset des Stroms lädt
+    alles. ``every_tournament``: wie das Web vor #1801 - jede passende Meldung, egal welches Turnier."""
     if kind == "reset":
         return True
-    return kind == "change" and bool(event_keys(event) & watched)
+    if kind != "change" or not event_keys(event) & watched:
+        return False
+    return every_tournament or concerns_page(event, tournament_id, event_id, "stations" in watched)
 
 
 def next_action(view: dict, turn: int = 0) -> tuple[str, str, str] | None:
@@ -387,7 +405,9 @@ def render_markdown(report: dict) -> str:
         "", "## Ablauf", "",
         f"- Meldungen aus dem Änderungsstrom: {_de(run['events'])}, daraus Nachladen: {_de(run['reloads'])}, "
         f"Resets des Stroms: {run['resets']}, abgebrochene Ströme: {run['stream_drops']}; Nachladen "
-        + ("überlappend (Web vor #1683)" if cfg.get("overlapping_reloads") else "nie doppelt je Seite (Web ab #1683)"),
+        + ("überlappend (Web vor #1683)" if cfg.get("overlapping_reloads") else "nie doppelt je Seite (Web ab #1683)")
+        + ", " + ("bei jeder Änderung jedes Turniers (Web vor #1801)" if cfg.get("reload_every_tournament")
+                  else "nur bei Änderungen des eigenen Turniers (Web ab #1801)"),
         f"- Helfer: {run['actions'].get('call', 0)} aufgerufen, {run['actions'].get('start', 0)} gestartet, "
         f"{run['actions'].get('result', 0)} Ergebnisse; Fast Lap: {run['actions'].get('lap', 0)} Zeiten; "
         f"Vor Ort: {run['onsite_signups']} angemeldet, {run['actions'].get('onsite_off', 0)} wieder abgemeldet",
@@ -419,6 +439,7 @@ class Config:
     error_rate: float = ERROR_LIMIT
     seed: int = 1683
     overlapping_reloads: bool = False
+    reload_every_tournament: bool = False
 
 
 class SetupError(RuntimeError):
@@ -566,8 +587,10 @@ class LoadTest:
             response = await admin.get(f"/api/tournaments/{tid}?include_draft=true")
             if response.status_code != 200:
                 raise SetupError(f"Turnier {key} fehlt im Stand (HTTP {response.status_code}) - Stand-Datei passt nicht")
-            self.tournaments[key] = {"id": tid, "slug": response.json().get("slug") or tid}
-        csrf = {"x-csrf-token": admin.cookies.get("csrf_token") or ""}
+            body = response.json()
+            # Das Event braucht der Spielplan (geteilte Stationen, #1801).
+            self.tournaments[key] = {"id": tid, "slug": body.get("slug") or tid, "event_id": body.get("event_id")}
+        csrf ={"x-csrf-token": admin.cookies.get("csrf_token") or ""}
         for index in range(self.cfg.tvs):
             key = EVENT_TOURNAMENTS[index % 2][0]
             response = await admin.post("/api/tv/keys", json={"tournament_id": self.tournaments[key]["id"],
@@ -602,10 +625,13 @@ class LoadTest:
                 await self.admin.delete(f"/api/tv/keys/{key['id']}", headers=csrf)
 
     # -- Strom und Seiten
-    async def stream(self, client, watched: Callable[[], set[str]], reload, overlap: bool = False) -> None:
+    async def stream(self, client, watched: Callable[[], set[str]], reload, overlap: bool = False,
+                     scope: Callable[[], tuple[str | None, str | None]] = lambda: (None, None)) -> None:
         """Der Änderungsstrom einer Seite: Verbindungszeit messen, bei passender Meldung entprellt nachladen.
 
-        `watched` sagt beim Eintreffen einer Meldung, worauf die Seite gerade hört (sie kann inzwischen gewechselt haben).
+        `watched` sagt beim Eintreffen einer Meldung, worauf die Seite gerade hört (sie kann inzwischen gewechselt haben),
+        `scope` ihr Turnier und Event (#1801): nachgeladen wird nur bei Änderungen dieses Turniers - mit
+        `--reload-every-tournament` wie das Web vor #1801 bei jeder.
         Wie `useLiveRefresh`: 150 ms entprellt, nach dem Verbinden einmal nachladen, und nie zwei Nachladen derselben
         Seite zugleich - kommt währenddessen eine Meldung, folgt genau eines danach. Mit `--overlapping-reloads` wie
         das Web vor #1683: jede Meldung startet ein eigenes Nachladen, auch wenn das vorige noch läuft. Der TV-Baum
@@ -667,7 +693,8 @@ class LoadTest:
                                 self.counters.events += 1
                                 self.counters.resets += name == "reset"
                                 event = json.loads(data or "{}")
-                                if wants_reload(name, event, watched()):
+                                if wants_reload(name, event, watched(), *scope(),
+                                                every_tournament=self.cfg.reload_every_tournament):
                                     schedule()
                             name, data = None, None
             except asyncio.CancelledError:
@@ -732,8 +759,11 @@ class LoadTest:
             async def reload(client=client, state=state):
                 await self.load(client, self.page_requests(state["page"], state["tournament"], signed_in, False))
 
-            # Die Seite wechselt, der Strom bleibt: welche Ressourcen zählen, entscheidet die Seite beim Eintreffen.
-            watcher = self.spawn(self.stream(client, lambda state=state: WATCH[state["page"]], reload))
+            # Die Seite wechselt, der Strom bleibt: welche Ressourcen und welches Turnier zählen, entscheidet die Seite
+            # beim Eintreffen.
+            watcher = self.spawn(self.stream(
+                client, lambda state=state: WATCH[state["page"]], reload,
+                scope=lambda state=state: (state["tournament"]["id"], state["tournament"].get("event_id"))))
             poller = self.spawn(self._poll_me(client, state, signed_in))
             for _ in range(self.rng.randint(1, 4)):
                 if not await self.pause(self.rng.uniform(30, 120)):
@@ -767,7 +797,8 @@ class LoadTest:
 
         await self.load(client, [("Seitenrahmen", url) for url in SHELL])
         await reload()
-        self.spawn(self.stream(client, lambda: WATCH["tv"], reload, overlap=True))
+        # Mit Anzeige-Schlüssel kennt der TV sein Event nicht (#1801): dann zählt jedes Turnier mit Event.
+        self.spawn(self.stream(client, lambda: WATCH["tv"], reload, overlap=True, scope=lambda: (tournament["id"], None)))
 
     async def helper(self, index: int) -> None:
         key = EVENT_TOURNAMENTS[index % len(EVENT_TOURNAMENTS)][0]
@@ -781,7 +812,8 @@ class LoadTest:
         async def reload():
             await look()
 
-        self.spawn(self.stream(client, lambda: WATCH["helfer"], reload))
+        # Die Turnierleitung kennt das Event ihres Turniers nicht (Ansicht ohne Event, #1801).
+        self.spawn(self.stream(client, lambda: WATCH["helfer"], reload, scope=lambda: (tid, None)))
         turn = index
         while await self.pause(self.cfg.helper_pause * self.rng.uniform(0.6, 1.4)):
             action = next_action(await look(), turn)
@@ -943,6 +975,8 @@ def parse_args(argv: list[str] | None = None) -> Config:
     parser.add_argument("--seed", type=int, default=1683, help="Zufallsstart, damit Läufe vergleichbar bleiben")
     parser.add_argument("--overlapping-reloads", action="store_true",
                         help="Nachladen wie das Web vor #1683: jede Meldung lädt neu, auch wenn das vorige noch läuft")
+    parser.add_argument("--reload-every-tournament", action="store_true",
+                        help="Nachladen wie das Web vor #1801: bei jeder Änderung jedes Turniers, nicht nur des eigenen")
     args = parser.parse_args(argv)
     default_state = ROOT / ".local-testing" / "abnahme" / f"state-{args.project}.json"
     state = args.state or Path(os.environ.get("ABNAHME_STATE") or default_state)
@@ -952,7 +986,7 @@ def parse_args(argv: list[str] | None = None) -> Config:
                   viewers=args.viewers, signed_in=args.signed_in, tvs=min(args.tvs, 6), helpers=args.helpers,
                   helper_pause=args.helper_pause, fastlap_pause=args.fastlap_pause, onsite=args.onsite, ramp=args.ramp,
                   p95_ms=args.p95_ms, error_rate=args.max_error_rate, seed=args.seed,
-                  overlapping_reloads=args.overlapping_reloads)
+                  overlapping_reloads=args.overlapping_reloads, reload_every_tournament=args.reload_every_tournament)
 
 
 def main(argv: list[str] | None = None) -> int:
