@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.12.1](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/compare/v1.12.0...v1.12.1) (2026-10-20)
+
+
+### Fehlerbehebungen
+
+* Bereiter Lauf an freier Station hat die Prognose „jetzt“, auch wenn ein Spieler im Turnier daneben noch ein geplantes Spiel hat ([#1872](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1872)) ([d49670c](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/d49670c6d5bb8db43347928b58ece8d8dd8bf5ed))
+* Manuell auf „live“ gesetzte Fast Laps, Turniere und Events zeigen öffentlich „Läuft“ statt „Angekündigt“, auch ohne oder vor dem Startdatum ([#1881](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1881)) ([4bb8064](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/4bb80646d1018f88c27d06bc756601b2c20a4430))
+* TV-Tagesplan und Dashboard zeigen ein Turnier nach seinem Ende nicht mehr als „live“, auch wenn der Status auf „live“ stehen geblieben ist ([#1881](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1881)) ([4bb8064](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/4bb80646d1018f88c27d06bc756601b2c20a4430))
+
+
+### Dokumentation
+
+* Handbuch nennt die Prognose „jetzt“ neben einem zweiten Turnier ([#1872](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1872)) ([d49670c](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/d49670c6d5bb8db43347928b58ece8d8dd8bf5ed))
+
 ## 1.12.0 (20.10.2026)
 
 ### Neu
