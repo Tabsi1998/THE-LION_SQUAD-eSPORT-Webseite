@@ -205,6 +205,10 @@ test.describe("Abnahme #1744: Ergebnisse eintragen - Vorschau, Version, Entwurf 
       await sheet.getByTestId("result-submit").click();
       await expect(sheet.getByTestId("result-preview")).toBeVisible();
       await expect(sheet.getByTestId("preview-standing-row")).toHaveCount(4);
+      // Punkte laut Veranstalter werden nur verglichen: 7 statt 15 auf Platz 3 ist ein Hinweis an der Zeile, es zählt der
+      // Schlüssel.
+      await expect(sheet.getByTestId("result-row").nth(2).getByTestId("result-row-problems")).toContainText("passen nicht zum Schlüssel");
+      await expect(sheet.getByTestId("result-row").nth(2).getByTestId("result-row-scored")).toContainText("15 Pkt");
       await shot(admin, sheet, "ergebnis-vorschau-1440");
       await admin.setViewportSize({ width: 390, height: 844 });
       await shot(admin, sheet, "ergebnis-vorschau-390");
@@ -229,11 +233,9 @@ test.describe("Abnahme #1744: Ergebnisse eintragen - Vorschau, Version, Entwurf 
       await expect(sheet).toHaveCount(0);
       stored = await ok(await admin.request.get(results));
       expect(stored.version).toBe(3);
-      expect(stored.sheet.rows.map((row) => [row.place, row.points, row.marks])).toEqual([
-        [1, 25, ["fastest_lap"]], [2, 18, []], [3, 7, []], [4, null, ["dnf"]],
+      expect(stored.sheet.rows.map((row) => [row.place, row.points, row.points_source, row.marks])).toEqual([
+        [1, 25, "organizer", ["fastest_lap"]], [2, 18, "organizer", []], [3, 7, "organizer", []], [4, null, "scheme", ["dnf"]],
       ]);
-      // Eingetragene Punkte zählen; wie der Server die Herkunft ablegt („manual“/„organizer“), prüft die API-Abnahme.
-      expect(stored.sheet.rows[3].points_source).toBe("scheme");
       if (await admin.getByTestId("unknown-names").isVisible()) await admin.getByTestId("unknown-names-close").click();
 
       // 4. Captain (Turnierleitung, dafür Mitglied): Änderung am veröffentlichten Blatt wird Entwurf daneben.
@@ -243,6 +245,9 @@ test.describe("Abnahme #1744: Ergebnisse eintragen - Vorschau, Version, Entwurf 
       sheet = await openRound(captain);
       await expect(sheet.getByTestId("result-pending-note")).toBeVisible();
       await sheet.getByTestId("result-row-points").nth(2).fill("8");
+      // „Punkte zählen statt Schlüssel“: nur so überschreibt der Wert den Schlüssel (manual).
+      await sheet.getByTestId("result-row-more").nth(2).click();
+      await sheet.getByTestId("result-row-override").check();
       await sheet.getByTestId("result-submit").click();
       await expect(sheet.getByTestId("result-preview")).toBeVisible();
       await expect(sheet.getByTestId("result-row-known").first()).toHaveText("bekannt");
@@ -255,6 +260,7 @@ test.describe("Abnahme #1744: Ergebnisse eintragen - Vorschau, Version, Entwurf 
       stored = await ok(await admin.request.get(results));
       expect(stored.sheet.rows[2].points).toBe(7);
       expect(stored.sheet.pending_draft.rows[2].points).toBe(8);
+      expect(stored.sheet.pending_draft.rows[2].points_source).toBe("manual");
 
       // 5. Vorstand sieht den Entwurf daneben und gibt ihn frei.
       await admin.goto(page);
@@ -266,6 +272,8 @@ test.describe("Abnahme #1744: Ergebnisse eintragen - Vorschau, Version, Entwurf 
       stored = await ok(await admin.request.get(results));
       expect(stored.sheet.pending_draft).toBeNull();
       expect(stored.sheet.rows[2].points).toBe(8);
+      expect(stored.sheet.rows[2].points_source).toBe("manual");
+      expect(stored.sheet.rows[1].points_source).toBe("organizer");
       expect(problems).toEqual([]);
 
       await ok(await send(admin, "POST", `${SERIES}/series/${series.id}/archive`));
