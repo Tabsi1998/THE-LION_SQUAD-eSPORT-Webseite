@@ -338,18 +338,3 @@ async def download_document(doc_id: str, request: Request, user: dict | None = D
     await db.documents.update_one({"id": doc_id}, {"$inc": {"download_count": 1}})
     await note_document_open(db, user, doc_id)
     return _file_response(doc, path, "attachment")
-
-
-@router.post("/{doc_id}/track-download")
-async def track_download(doc_id: str, user: dict | None = Depends(get_optional_user)):
-    """Increment download counter only when downloads are enabled."""
-    db = get_db()
-    doc = await db.documents.find_one({"id": doc_id}, {"_id": 0})
-    if not doc:
-        raise HTTPException(404, "Dokument nicht gefunden.")
-    if not await _user_can_see(user, doc.get("visibility") or "members"):
-        raise HTTPException(403, "Kein Zugriff.")
-    if not doc.get("allow_download") and not _is_admin(user):
-        _refuse_locked_download(user)
-    await db.documents.update_one({"id": doc_id}, {"$inc": {"download_count": 1}})
-    return {"ok": True, "url": _document_url(doc_id)}

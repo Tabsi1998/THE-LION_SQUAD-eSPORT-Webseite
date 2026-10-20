@@ -334,53 +334,6 @@ class TestDocumentsCRUDVisibility:
         assert did not in [x["id"] for x in items]
 
 
-# ---------------- track-download ----------------
-class TestTrackDownload:
-    def test_member_track_download(self, admin, member_client, admin_uploaded_url):
-        # create dedicated members-only doc
-        r = admin.post(f"{BASE_URL}/api/documents", json={
-            "title": "TEST Phase4 Track DL",
-            "category": "download",
-            "visibility": "members",
-            "file_url": admin_uploaded_url["url"],
-        })
-        assert r.status_code == 200
-        did = r.json()["id"]
-        try:
-            tr = member_client.post(f"{BASE_URL}/api/documents/{did}/track-download")
-            assert tr.status_code == 200, tr.text
-            body = tr.json()
-            assert body["ok"] is True
-            assert body["url"] == admin_uploaded_url["url"]
-
-            # second track increments
-            member_client.post(f"{BASE_URL}/api/documents/{did}/track-download")
-            # Verify in DB via admin listing
-            items = admin.get(f"{BASE_URL}/api/documents/admin").json()
-            d = next(x for x in items if x["id"] == did)
-            assert d["download_count"] >= 2
-        finally:
-            admin.delete(f"{BASE_URL}/api/documents/{did}")
-
-    def test_anonymous_track_members_only_403(self, admin, anon, admin_uploaded_url):
-        r = admin.post(f"{BASE_URL}/api/documents", json={
-            "title": "TEST Phase4 Anon Track",
-            "category": "download",
-            "visibility": "members",
-            "file_url": admin_uploaded_url["url"],
-        })
-        did = r.json()["id"]
-        try:
-            tr = anon.post(f"{BASE_URL}/api/documents/{did}/track-download")
-            assert tr.status_code == 403
-        finally:
-            admin.delete(f"{BASE_URL}/api/documents/{did}")
-
-    def test_track_404(self, admin):
-        r = admin.post(f"{BASE_URL}/api/documents/missing-id-zzz/track-download")
-        assert r.status_code == 404
-
-
 # ---------------- authorisation ----------------
 class TestAuthorisation:
     def test_create_cu_403(self, community_user, admin_uploaded_url):
