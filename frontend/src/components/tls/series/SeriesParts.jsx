@@ -9,8 +9,14 @@ import "./referenceSeries.css";
 // Bausteine der Serienseite (#1745): Rundenfortschritt mit nächstem Termin, Regeln, Finalrechner (ausdrücklich ein
 // Richtwert) und das Finale als eigene Runde mit Endplatzierung (Podest in den Farben der Pokale).
 
+// Wörter des Fortschritts je Art der Serie: eine Rennliga (#1746) zählt Rennen statt Runden.
+export const PROGRESS_WORDS = {
+  series: { rounds: "Runden", next: "Nächstes Turnier: " },
+  racing: { rounds: "Rennen", next: "Nächstes Rennen: " },
+};
+
 /** Ein Feld je Wertungsrunde (gewertet in Cyan), das Finale in Gold am Ende; darunter der nächste Termin. */
-export function SeriesProgress({ progress, rounds }) {
+export function SeriesProgress({ progress, rounds, words = PROGRESS_WORDS.series }) {
   const steps = roundColumns(rounds);
   const final = (rounds || []).find((round) => round.kind === "final");
   const next = progress?.next;
@@ -20,7 +26,7 @@ export function SeriesProgress({ progress, rounds }) {
         <h2 id="series-progress" className="text-[11px] font-bold uppercase tracking-[0.3em] text-white/55">Fortschritt</h2>
         <p className="text-sm text-white/80 tabular-nums">
           <span className="font-display text-xl font-bold text-white">{progress?.scored || 0}</span>
-          <span className="text-white/50"> von {progress?.total || 0} Runden gewertet</span>
+          <span className="text-white/50"> von {progress?.total || 0} {words.rounds} gewertet</span>
           {progress?.cancelled > 0 && <span className="text-white/40"> · {progress.cancelled} abgesagt</span>}
         </p>
       </div>
@@ -32,7 +38,7 @@ export function SeriesProgress({ progress, rounds }) {
       )}
       {next && (
         <p className="mt-3 text-sm text-white/70" data-testid="series-next">
-          <span className="text-white/45">{next.kind === "final" ? "Als Nächstes das Finale: " : "Nächstes Turnier: "}</span>
+          <span className="text-white/45">{next.kind === "final" ? "Als Nächstes das Finale: " : words.next}</span>
           <span className="text-white font-semibold">{roundLabel(next)}</span>
           <span className="tabular-nums"> · {roundWhen(next)}</span>
           {next.venue && <span> · {next.venue}</span>}

@@ -12,6 +12,8 @@ import "./referenceSeries.css";
 // Zahlen, Klassen tls-standings / tls-standing-*): Ergebnis je Runde, gestrichene Ergebnisse durchgestrichen und blass,
 // Linie „Finalgrenze“, Filter „Nur Vereinsspieler“. Am Handy Karten (Top 10 und Vereinsspieler, alles aufklappbar)
 // statt der breiten Tabelle. Fremde Namen sind reiner Text, nur Vereinsmitglieder verlinken auf ihr Profil.
+// Die Rennliga (#1746) nutzt dieselbe Tabelle für Fahrer- und Teamwertung: Name, Ergebniszelle und Punkte lassen sich
+// über `render…` ersetzen, eine Spalte (etwa „Abstand“) kommt über `extraColumn` dazu.
 
 function places(by) {
   return `${by} ${by === 1 ? "Platz" : "Plätze"}`;
@@ -45,7 +47,7 @@ function Name({ row }) {
   );
 }
 
-function Points({ row }) {
+export function Points({ row }) {
   const hint = tiebreakHint(row.tiebreak);
   return (
     <span title={hint || undefined} className={hint ? "underline decoration-dotted decoration-white/30 underline-offset-4" : undefined}>
@@ -73,11 +75,19 @@ function Cutline({ topN, span }) {
   );
 }
 
-function DesktopTable({ rows, columns, topN, cutAfter }) {
-  const span = columns.length + 3;
+const DEFAULT_VIEW = {
+  renderName: (row) => <Name row={row} />,
+  renderResult: (result, name) => <ResultValue result={result} name={name} />,
+  renderPoints: (row) => <Points row={row} />,
+  extraColumn: null,
+};
+
+function DesktopTable({ rows, columns, topN, cutAfter, label, view }) {
+  const { extraColumn } = view;
+  const span = columns.length + 3 + (extraColumn ? 1 : 0);
   return (
     // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- eine scrollbare Fläche muss per Tastatur erreichbar sein (axe: scrollable-region-focusable)
-    <div role="region" aria-label="Gesamtwertung" tabIndex={0} className="tls-standings hidden md:block border border-white/10 rounded-md bg-[var(--tls-surface-1)] overflow-x-auto overscroll-x-contain focus:outline-none focus-visible:ring-2 focus-visible:ring-[#29B6E8]" data-testid="series-table">
+    <div role="region" aria-label={label} tabIndex={0} className="tls-standings hidden md:block border border-white/10 rounded-md bg-[var(--tls-surface-1)] overflow-x-auto overscroll-x-contain focus:outline-none focus-visible:ring-2 focus-visible:ring-[#29B6E8]" data-testid="series-table">
       <table className="w-full text-sm tabular-nums">
         <thead className="text-[11px] uppercase tracking-[0.12em] text-white/50">
           <tr className="border-b border-white/10">
@@ -88,7 +98,8 @@ function DesktopTable({ rows, columns, topN, cutAfter }) {
                 {roundLabel({ ...round, position: round.position || index + 1 })}
               </th>
             ))}
-            <th scope="col" title="Punkte der Gesamtwertung" className="text-right pr-4 pl-2 py-2.5 font-semibold">Pkt</th>
+            <th scope="col" title={`Punkte der ${label}`} className={`text-right ${extraColumn ? "px-2" : "pr-4 pl-2"} py-2.5 font-semibold`}>Pkt</th>
+            {extraColumn && <th scope="col" title={extraColumn.title} className="text-right pr-4 pl-2 py-2.5 font-semibold whitespace-nowrap">{extraColumn.header}</th>}
           </tr>
         </thead>
         <tbody>
@@ -101,13 +112,14 @@ function DesktopTable({ rows, columns, topN, cutAfter }) {
                     <Move row={row} />
                   </span>
                 </td>
-                <th scope="row" className="px-2 py-2.5 align-middle min-w-[10rem] text-left font-normal"><Name row={row} /></th>
+                <th scope="row" className="px-2 py-2.5 align-middle min-w-[10rem] text-left font-normal">{view.renderName(row, index)}</th>
                 {columns.map((round, roundIndex) => (
                   <td key={round.id} className="px-2 py-2.5 text-right align-middle text-white/70">
-                    <ResultValue result={resultIn(row, round.id)} name={roundLabel({ ...round, position: round.position || roundIndex + 1 })} />
+                    {view.renderResult(resultIn(row, round.id), roundLabel({ ...round, position: round.position || roundIndex + 1 }), row)}
                   </td>
                 ))}
-                <td className="pr-4 pl-2 py-2.5 text-right align-middle font-display text-base font-bold text-white"><Points row={row} /></td>
+                <td className={`${extraColumn ? "px-2" : "pr-4 pl-2"} py-2.5 text-right align-middle font-display text-base font-bold text-white`}>{view.renderPoints(row)}</td>
+                {extraColumn && <td className="pr-4 pl-2 py-2.5 text-right align-middle tabular-nums text-white/60">{extraColumn.cell(row)}</td>}
               </tr>
               {cutAfter === row.key && <Cutline topN={topN} span={span} />}
             </Fragment>
@@ -118,7 +130,8 @@ function DesktopTable({ rows, columns, topN, cutAfter }) {
   );
 }
 
-function MobileCards({ rows, allCount, columns, topN, expanded, onExpand }) {
+function MobileCards({ rows, allCount, columns, topN, expanded, onExpand, view }) {
+  const { extraColumn } = view;
   const shown = mobileRows(rows, { expanded });
   const cutAfter = cutlineAfter(shown, topN);
   return (
@@ -132,8 +145,11 @@ function MobileCards({ rows, allCount, columns, topN, expanded, onExpand }) {
                   <span className="font-display text-lg font-bold text-white tabular-nums">{row.rank}</span>
                   <Move row={row} />
                 </span>
-                <span className="min-w-0 flex-1"><Name row={row} /></span>
-                <span className="font-display text-lg font-bold text-white tabular-nums"><Points row={row} /></span>
+                <span className="min-w-0 flex-1">{view.renderName(row, index)}</span>
+                <span className="flex flex-col items-end shrink-0">
+                  <span className="font-display text-lg font-bold text-white tabular-nums">{view.renderPoints(row)}</span>
+                  {extraColumn && <span className="text-[11px] tabular-nums text-white/50">{extraColumn.cell(row)}</span>}
+                </span>
               </div>
               {columns.length > 0 && (
                 <div className="mt-1.5 pl-[3.75rem] flex flex-wrap gap-x-3 gap-y-0.5 text-[12px] tabular-nums text-white/60">
@@ -144,7 +160,7 @@ function MobileCards({ rows, allCount, columns, topN, expanded, onExpand }) {
                     return (
                       <span key={round.id} className="whitespace-nowrap">
                         <span className="text-white/35" aria-hidden="true">{name} </span>
-                        <ResultValue result={result} name={name} />
+                        {view.renderResult(result, name, row)}
                       </span>
                     );
                   })}
@@ -168,15 +184,26 @@ function MobileCards({ rows, allCount, columns, topN, expanded, onExpand }) {
   );
 }
 
-/** `standings`: gespeicherter Stand vom Server; `rounds`: Kalender der Saison; `rules`: Regeln der Serie. */
-export function SeriesStandings({ standings, rounds, rules }) {
+/** `standings`: gespeicherter Stand vom Server; `rounds`: Kalender der Saison; `rules`: Regeln der Serie. `label` nennt
+ * die Wertung, `filterLabel` den Filter (ohne: kein Filter); `renderName(row, index)`, `renderResult(result, name, row)`,
+ * `renderPoints(row)` und `extraColumn` ({ header, title, cell(row) }) ersetzen die Teile der Zeile. */
+export function SeriesStandings({
+  standings, rounds, rules, label = "Gesamtwertung", filterLabel = "Nur Vereinsspieler",
+  renderName, renderResult, renderPoints, extraColumn = null,
+}) {
   const [clubOnly, setClubOnly] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const all = useMemo(() => standings?.rows || [], [standings]);
   const rows = visibleRows(all, { clubOnly });
   const columns = useMemo(() => roundColumns(rounds), [rounds]);
   const topN = rules?.final_top_n || null;
-  const hasClub = all.some((row) => row.club_member);
+  const hasClub = Boolean(filterLabel) && all.some((row) => row.club_member);
+  const view = {
+    renderName: renderName || DEFAULT_VIEW.renderName,
+    renderResult: renderResult || DEFAULT_VIEW.renderResult,
+    renderPoints: renderPoints || DEFAULT_VIEW.renderPoints,
+    extraColumn,
+  };
 
   if (!all.length) return <p className="mt-3 text-sm text-white/55" data-testid="series-no-table">Noch keine Ergebnisse – die Tabelle erscheint nach der ersten gewerteten Runde.</p>;
   return (
@@ -190,12 +217,12 @@ export function SeriesStandings({ standings, rounds, rules }) {
             className={`min-h-[36px] px-3 rounded-md border text-[12px] font-bold uppercase tracking-[0.12em] transition-colors ${clubOnly ? "border-[#29B6E8]/70 bg-[#29B6E8]/10 text-[#29B6E8]" : "border-white/15 text-white/65 hover:text-white hover:border-white/30"}`}
             data-testid="series-filter-club"
           >
-            Nur Vereinsspieler
+            {filterLabel}
           </button>
         </div>
       )}
-      <DesktopTable rows={rows} columns={columns} topN={topN} cutAfter={cutlineAfter(rows, topN)} />
-      <MobileCards rows={rows} allCount={rows.length} columns={columns} topN={topN} expanded={expanded || clubOnly} onExpand={() => setExpanded(true)} />
+      <DesktopTable rows={rows} columns={columns} topN={topN} cutAfter={cutlineAfter(rows, topN)} label={label} view={view} />
+      <MobileCards rows={rows} allCount={rows.length} columns={columns} topN={topN} expanded={expanded || clubOnly} onExpand={() => setExpanded(true)} view={view} />
     </div>
   );
 }
