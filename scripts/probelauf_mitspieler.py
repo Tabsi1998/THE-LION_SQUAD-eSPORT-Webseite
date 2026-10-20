@@ -8,7 +8,8 @@ was passiert:
                 Show-Auslosung, 4 Stationen), Sofort-Cup (K.-o. 8, sofort zufällig, schon live) und Fast Lap (zwei
                 Simulatoren); Turnierleitung und Helfer eingeteilt
   anmelden      15 Spieler scannen den Vor-Ort-QR-Code und melden sich an (Platz 16 ist für die Begleitperson am Handy
-                der Turnierleitung); ``--warteliste``: danach kommt Spieler 16 - der Cup ist voll, Warteliste
+                der Turnierleitung); ``--gleichzeitig``: alle im selben Moment, mit Antwortzeit je Person;
+                ``--warteliste``: danach kommt Spieler 16 - der Cup ist voll, Warteliste
   gast          die Begleitperson über den QR-Code - nur, falls das Handy nicht mitspielt
   checkin       der Helfer am Einlass checkt die ersten 8 ein (``--alle``: alle Bestätigten außer dem, der nicht kommt)
   checkin-ende  Check-in-Ende wie am Abend: die Zeit „Check-in endet“ ist um, der Server macht den Baum fest
@@ -136,6 +137,8 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("--alle", action="store_true", help="checkin: alle Bestätigten außer dem, der nicht kommt")
     parser.add_argument("--nur-aufrufen", action="store_true", help="station: nur aufrufen, nicht starten")
     parser.add_argument("--warteliste", action="store_true", help="anmelden: nur Spieler 16 (landet auf der Warteliste)")
+    parser.add_argument("--gleichzeitig", action="store_true",
+                        help="anmelden: alle im selben Moment wie eine Gruppe am Einlass, mit Antwortzeiten")
     return parser.parse_args(argv)
 
 
@@ -453,17 +456,33 @@ async def scan_and_register(ctx: Context, email: str, tid: str, token: str) -> d
                               json={"accept_rules": True, "accept_privacy": True})
 
 
+async def timed_scan_and_register(ctx: Context, email: str, tid: str, token: str) -> tuple[dict, float]:
+    import time
+
+    started = time.perf_counter()
+    reg = await scan_and_register(ctx, email, tid, token)
+    return reg, time.perf_counter() - started
+
+
 async def phase_anmelden(ctx: Context) -> None:
     tid = ctx.tid()
     token = await onsite_token(ctx, tid)
     # Spieler 1 bis 15 (oder die ersten --anzahl); mit --warteliste nur Spieler 16 - nach der Begleitperson ist der Cup
     # voll, er landet auf der Warteliste.
     numbers = [WAITLIST] if ctx.args.get("warteliste") else list(range(1, NO_SHOW + 1))[: ctx.limit(NO_SHOW)]
-    for number in numbers:
-        player = await ctx.user(PLAYER.format(number))
-        reg = await scan_and_register(ctx, player["email"], tid, token)
+    players = [await ctx.user(PLAYER.format(number)) for number in numbers]
+    if ctx.args.get("gleichzeitig"):
+        # Eine Gruppe am Einlass (#1859): alle scannen und tippen im selben Moment auf „Mitspielen“.
+        for player in players:
+            await ctx.as_(player["email"])
+        results = await asyncio.gather(*(timed_scan_and_register(ctx, player["email"], tid, token) for player in players))
+    else:
+        results = [await timed_scan_and_register(ctx, player["email"], tid, token) for player in players]
+    for player, (reg, seconds) in zip(players, results):
         status = (reg or {}).get("status") or (reg or {}).get("detail") or "?"
-        say(f"  {player['display_name']:<16} {STATUS_TEXT.get(status, status)}")
+        say(f"  {player['display_name']:<16} {STATUS_TEXT.get(status, status):<12} {seconds:4.1f} s")
+    if ctx.args.get("gleichzeitig") and results:
+        say(f"Gleichzeitig: längste Antwort {max(seconds for _, seconds in results):.1f} s")
     say(f"Anmeldungen: {await registration_counts(ctx, tid)}")
     taken = await ctx.db.tournament_registrations.count_documents({"tournament_id": tid, "status": {"$in": ["approved", "checked_in"]}})
     if taken < 16:
