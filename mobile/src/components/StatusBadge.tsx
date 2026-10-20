@@ -42,7 +42,18 @@ export function StatusBadge({
     <View style={[styles.badge, toneStyles[tone].badge, style]} accessible accessibilityLabel={text}>
       {phaseState(phase) === "live" ? <LiveDot color={toneStyles[tone].text.color} /> : null}
       {/* Großbuchstaben im Text selbst (#1296): so misst Android die Zeile richtig - kein Abschneiden auf dem Tablet. */}
-      <Muted style={[styles.text, toneStyles[tone].text]} textBreakStrategy="simple">{upperDe(text)}</Muted>
+      {/* Immer eine Zeile (#1797): Android rundet die gemessene Breite ab und brach „ANGEKÜNDIGT“ vor dem letzten Buchstaben
+          um. Passt der Text wirklich nicht, wird die Schrift etwas kleiner statt umzubrechen. */}
+      <Muted
+        style={[styles.text, toneStyles[tone].text]}
+        textBreakStrategy="simple"
+        numberOfLines={1}
+        adjustsFontSizeToFit
+        minimumFontScale={0.8}
+        testID="status-badge-text"
+      >
+        {upperDe(text)}
+      </Muted>
     </View>
   );
 }

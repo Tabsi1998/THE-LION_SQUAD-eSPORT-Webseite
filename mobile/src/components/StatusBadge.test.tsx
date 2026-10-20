@@ -27,3 +27,14 @@ test("mit Bewegung reduzieren bleibt der Punkt, der Ring entfaellt", async () =>
   await waitFor(() => expect(dot.children.length).toBe(1));
   spy.mockRestore();
 });
+
+// Fast-Lap-Abzeichen (#1797): „ANGEKÜNDIGT“ brach in der App vor dem letzten Buchstaben um. Der Chip bleibt einzeilig,
+// zu Langes wird etwas kleiner statt umzubrechen.
+test("der Chip bleibt einzeilig und wird bei Platzmangel kleiner statt umzubrechen", async () => {
+  await render(<StatusBadge phase={{ state: "announced", label: "Angekündigt" }} status="upcoming" />);
+  const text = screen.getByTestId("status-badge-text");
+  expect(text).toHaveTextContent("ANGEKÜNDIGT");
+  expect(text.props.numberOfLines).toBe(1);
+  expect(text.props.adjustsFontSizeToFit).toBe(true);
+  expect(text.props.minimumFontScale).toBeGreaterThanOrEqual(0.75);
+});
