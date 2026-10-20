@@ -1,15 +1,14 @@
 # Changelog
 
-## [1.7.0](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/compare/v1.6.2...v1.7.0) (2026-10-20)
-
+## 1.7.0 (20.10.2026)
 
 ### Neu
 
-* Filter „Nur Vereinsspieler“ und Handy-Karten auf der Serienseite ([#1745](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1745)) ([3818e89](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/3818e891caec5b31ad338560cff1008046bf0be0))
-* Finale als eigene Runde mit Endplatzierung auf der Serienseite ([#1745](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1745)) ([3818e89](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/3818e891caec5b31ad338560cff1008046bf0be0))
-* Finalrechner „Was braucht es fürs Finale?“ als Richtwert ([#1745](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1745)) ([3818e89](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/3818e891caec5b31ad338560cff1008046bf0be0))
-* Seite Turnierserie mit Gesamtwertung, Streichergebnissen und Finalgrenze ([#1745](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1745)) ([3818e89](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/3818e891caec5b31ad338560cff1008046bf0be0))
-* Serienseite nicht indexiert, fremde Namen nur in Tabellen ([#1745](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1745)) ([3818e89](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/3818e891caec5b31ad338560cff1008046bf0be0))
+* Filter „Nur Vereinsspieler“ und Handy-Karten auf der Serienseite (#1745)
+* Finale als eigene Runde mit Endplatzierung auf der Serienseite (#1745)
+* Finalrechner „Was braucht es fürs Finale?“ als Richtwert (#1745)
+* Seite Turnierserie mit Gesamtwertung, Streichergebnissen und Finalgrenze (#1745)
+* Serienseite nicht indexiert, fremde Namen nur in Tabellen (#1745)
 
 ## 1.6.2 (20.10.2026)
 
