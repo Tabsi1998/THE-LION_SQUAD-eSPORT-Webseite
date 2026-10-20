@@ -84,9 +84,10 @@ async def test_news_meta_keeps_the_fixed_order_and_names_unknown_categories(flow
 
 # ---------------------------------------------------------------- #1343 Sieger für die Text-Karte
 
-async def finished_tournament(flow, winner_name, **fields):
+async def finished_tournament(flow, winner_name, *, public_profile=True, **fields):
     tournament = await flow.create_tournament(**{"status": "results_published", "title": "Kart-Cup", **fields})
     winner = await flow.add_user(name=winner_name)
+    await flow.db.users.update_one({"id": winner["id"]}, {"$set": {"privacy_public_profile": public_profile}})
     second = await flow.add_user(name="Zweiter")
     reg_winner = await flow.register(tournament, winner)
     reg_second = await flow.register(tournament, second)
@@ -111,6 +112,33 @@ async def test_result_news_carry_the_winner_in_list_and_on_home(flow):
 
     home = {row["slug"]: row for row in (await flow.get("/api/home/state")).json()["news"]}
     assert home["ergebnis"]["result"]["winner"] == "NeonFalke"
+
+
+@pytest.mark.asyncio
+async def test_winner_name_follows_the_profile_settings(flow):
+    privat = await finished_tournament(flow, "Privat", public_profile=False)
+    team_cup = await flow.create_tournament(status="results_published", title="Team-Cup", team_mode="team")
+    await flow.db.teams.insert_many([{"id": "team-offen", "name": "Lions"}, {"id": "team-zu", "name": "Geheim", "is_public": False}])
+    await flow.db.tournament_registrations.insert_many([
+        {"id": "r-offen", "tournament_id": team_cup["id"], "team_id": "team-offen", "display_name": "Lions", "status": "approved"},
+    ])
+    closed_cup = await flow.create_tournament(status="results_published", title="Zu-Cup", team_mode="team")
+    await flow.db.tournament_registrations.insert_one({"id": "r-zu", "tournament_id": closed_cup["id"], "team_id": "team-zu", "display_name": "Geheim", "status": "approved"})
+    await flow.db.tournament_awards.insert_many([
+        {"id": "a-offen", "tournament_id": team_cup["id"], "registration_id": "r-offen", "team_id": "team-offen", "rank": 1},
+        {"id": "a-zu", "tournament_id": closed_cup["id"], "registration_id": "r-zu", "team_id": "team-zu", "rank": 1},
+    ])
+    await news(flow, "privat", linked_tournament_ids=[privat["id"]])
+    await news(flow, "team", linked_tournament_ids=[team_cup["id"]])
+    await news(flow, "team-zu", linked_tournament_ids=[closed_cup["id"]])
+
+    flow.act_as(None)
+    listed = {row["slug"]: row for row in (await flow.get("/api/news?compact=true")).json()}
+    assert listed["privat"].get("result") is None, "ohne öffentliches Profil keine Sieger-Karte"
+    assert listed["team"]["result"]["winner"] == "Lions"
+    assert listed["team-zu"].get("result") is None
+    home = {row["slug"]: row for row in (await flow.get("/api/home/state")).json()["news"]}
+    assert home["privat"].get("result") is None
 
 
 @pytest.mark.asyncio

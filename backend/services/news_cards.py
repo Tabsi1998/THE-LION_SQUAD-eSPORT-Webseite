@@ -6,24 +6,25 @@
 from __future__ import annotations
 
 from services import event_registration
-from services.event_recap import load_users, registration_name
 from services.public_phase import derive_public_phase, parse_dt
-from services.visibility import user_can_see
+from services.tournament_path import visible_names
+from services.visibility import filter_visible
 
 RESULT_STATUSES = {"results_published", "archived"}
 COUNTED_TOURNAMENT_REGISTRATIONS = ["approved", "checked_in"]
 LIVE_STATES = {"live", "paused", "day_break", "check_in"}
 
 
-async def _visible_tournament(tournament: dict, user: dict | None) -> bool:
-    if tournament.get("is_public") is False:
-        return False
-    return await user_can_see(user, tournament.get("visibility") or "public")
+async def visible_tournaments(tournaments: list[dict], user: dict | None) -> list[dict]:
+    """Turniere, die der Besucher sehen darf - je Sichtbarkeit einmal entschieden, nicht je Turnier."""
+    return await filter_visible([t for t in tournaments if t.get("is_public") is not False], user)
 
 
 async def attach_result_winners(db, posts: list[dict], user: dict | None) -> None:
-    """Setzt ``result = {"winner", "tournament"}`` je Beitrag mit verknüpftem, abgeschlossenem Turnier - mit wenigen
-    Abfragen für die ganze Liste. Nur Turniere, die der Besucher sehen darf."""
+    """Setzt ``result = {"winner", "tournament"}`` je Beitrag mit verknüpftem, abgeschlossenem Turnier - mit einer
+    festen Zahl Abfragen für die ganze Liste. Nur Turniere, die der Besucher sehen darf. Der Name folgt derselben Regel
+    wie öffentliche Ergebnisse (``tournament_path.visible_names``): Einzelne nur mit öffentlichem Profil, Teams nur,
+    wenn das Team öffentlich ist - sonst keine Sieger-Karte."""
     ids = {tid for post in posts for tid in (post.get("linked_tournament_ids") or []) if tid}
     if not ids:
         return
@@ -31,7 +32,7 @@ async def attach_result_winners(db, posts: list[dict], user: dict | None) -> Non
         {"id": {"$in": list(ids)}, "status": {"$in": list(RESULT_STATUSES)}},
         {"_id": 0, "id": 1, "title": 1, "visibility": 1, "is_public": 1},
     ).to_list(len(ids))
-    visible = {t["id"]: t for t in tournaments if await _visible_tournament(t, user)}
+    visible = {t["id"]: t for t in await visible_tournaments(tournaments, user)}
     if not visible:
         return
     awards = await db.tournament_awards.find(
@@ -39,18 +40,13 @@ async def attach_result_winners(db, posts: list[dict], user: dict | None) -> Non
     ).to_list(len(visible) * 4)
     first_award = {}
     for award in awards:
-        first_award.setdefault(award["tournament_id"], award.get("registration_id"))
-    regs = {
-        reg["id"]: reg for reg in await db.tournament_registrations.find(
-            {"id": {"$in": [rid for rid in first_award.values() if rid]}}, {"_id": 0},
-        ).to_list(len(first_award) or 1)
+        if award.get("registration_id"):
+            first_award.setdefault(award["tournament_id"], award["registration_id"])
+    names = await visible_names(db, list(first_award.values()), public=True)
+    winners = {
+        tid: {"winner": names[rid], "tournament": visible[tid].get("title") or "Turnier"}
+        for tid, rid in first_award.items() if names.get(rid)
     }
-    users = await load_users(db, [reg.get("user_id") for reg in regs.values()])
-    winners = {}
-    for tid, rid in first_award.items():
-        reg = regs.get(rid)
-        if reg:
-            winners[tid] = {"winner": registration_name(reg, users), "tournament": visible[tid].get("title") or "Turnier"}
     for post in posts:
         for tid in post.get("linked_tournament_ids") or []:
             if tid in winners:
