@@ -5,10 +5,11 @@ const { test, expect } = require("@playwright/test");
 const { ENABLED, state, signIn, watch } = require("./abnahmeSession");
 
 // Abnahme #1823 gegen den echten Server (docs/entwicklung/abnahme-lokal.md): „nicht erschienen“ im Lauf mit vier
-// Spielern (Läufe-Cup live aus dem Seed). Die Frist läuft ab, die Turnierleitung tippt „<Name> nicht erschienen“ - der
-// Lauf bleibt offen, nur die Person ist markiert (Leitung, Warteschlange, Baum, TV). Im Ergebnis-Fenster ist sie schon
-// als nicht erschienen gesetzt; die drei Anwesenden werden in Zielreihenfolge eingetragen, die zwei Besten kommen
-// weiter, die Person steht hinten. Im Duell (Online-Abend) bleibt es „kampflos“ für den Gegner.
+// Spielern (Läufe-Cup live aus dem Seed), zwei fehlen. Die Frist läuft ab, die Turnierleitung tippt nacheinander
+// „<Name> nicht erschienen“ - der Fall bleibt für die anderen offen (je Person), der Lauf bleibt offen, nur die zwei
+// sind markiert (Leitung, Warteschlange, Baum, TV, Druck). Im Ergebnis-Fenster sind sie schon als nicht erschienen
+// gesetzt; die zwei Anwesenden werden in Zielreihenfolge eingetragen und kommen weiter, die zwei Fehlenden teilen sich
+// den letzten Platz und gehen ins Loser Bracket. Im Duell (Online-Abend) bleibt es „kampflos“ für den Gegner.
 //
 // Die Frist („nicht erschienen“ 10 Minuten nach dem Aufruf) prüft am Abend der Job match_deadlines jede Minute; der
 // Abnahme-Stand lässt ihn aus. Hier ruft der Test das Spiel deshalb rückdatiert auf und prüft die Frist einmal im
@@ -86,7 +87,7 @@ test.describe("Abnahme: nicht erschienen im Lauf (#1823)", () => {
   test.skip(({ isMobile }) => Boolean(isMobile), "Breite wird hier selbst gesetzt");
   test.describe.configure({ mode: "serial" });
 
-  test("Lauf zu viert: nur die Person ist markiert, der Lauf bleibt offen, die drei Anwesenden werden eingetragen", async ({ browser, page }, testInfo) => {
+  test("Lauf zu viert, zwei fehlen: je Person markiert, der Lauf bleibt offen, die zwei Anwesenden werden eingetragen", async ({ browser, page }, testInfo) => {
     test.setTimeout(240_000);
     const tid = state.tournaments.local_live;
     const slug = state.slugs?.local_live || tid;
@@ -97,7 +98,7 @@ test.describe("Abnahme: nicht erschienen im Lauf (#1823)", () => {
     const heat = byKey(await matchesOf(page, tid)).D;
     expect(heat, "Lauf D aus dem Seed").toBeTruthy();
     expect(seated(heat)).toHaveLength(4);
-    const [first, missing, third, fourth] = seated(heat);
+    const [first, missing, third, absent] = seated(heat);
     expect(deadlinePassed(heat.id).proposed, "die Frist ist um - genau ein Vorschlag").toBe(1);
 
     // Turnierleitung: „Braucht Aufmerksamkeit“ - ein Tipp auf den Namen.
@@ -109,30 +110,33 @@ test.describe("Abnahme: nicht erschienen im Lauf (#1823)", () => {
     await shot(page, `${testInfo.project.name}-lauf-vorschlag.png`);
     await page.getByTestId(`lead-no-show-${missing}`).click();
     await expect(page.getByText("Als nicht erschienen markiert – der Lauf bleibt offen.")).toBeVisible();
-    await expect(card).toHaveCount(0);
+    // Je Person: der Fall bleibt für alle anderen offen - die zweite Fehlende wird genauso markiert.
+    await expect(page.getByTestId(`lead-no-show-${missing}`)).toHaveCount(0);
+    await page.getByTestId(`lead-no-show-${absent}`).click();
+    await expect(page.getByTestId(`lead-no-show-${absent}`)).toHaveCount(0);
+    for (const id of [first, third]) await expect(page.getByTestId(`lead-no-show-${id}`)).toBeVisible();
 
     let stored = (await matchesOf(page, tid)).find((match) => match.id === heat.id);
     expect(stored.status, "der Lauf ist nicht beendet").toMatch(/^(ready|scheduled)$/);
     expect(stored.results || []).toEqual([]);
-    expect(stored.no_show_registration_ids).toEqual([missing]);
+    expect([...stored.no_show_registration_ids].sort()).toEqual([missing, absent].sort());
 
     // Warteschlange: der Lauf ist weiter aufgerufen und wartet - nicht beendet.
     const queue = await (await page.request.get(`/api/tournaments/${tid}/live-queue`)).json();
     expect(queue.matches?.[heat.id]?.state, "Warteschlange zeigt den Lauf als aufgerufen").toBe("called");
-    expect(queue.matches[heat.id].no_show_due_at, "die Frist ist vorbei").toBeNull();
-    expect(queue.matches[heat.id].no_show_names).toHaveLength(1);
+    expect(queue.matches[heat.id].no_show_names, "wer fehlt, steht in der Warteschlange").toHaveLength(2);
 
-    // Druck: „n. e.“ bei der Person, schon vor dem Eintragen.
+    // Druck: „n. e.“ bei beiden, schon vor dem Eintragen.
     await page.goto(`/print/tournaments/${slug}?teile=baum`);
     const printed = page.getByTestId("print-match").filter({ hasText: "Lauf D" });
-    await expect(printed.getByTestId("print-no-show")).toHaveCount(1);
+    await expect(printed.getByTestId("print-no-show")).toHaveCount(2);
 
     // Baum: die Person durchgestrichen, die anderen nicht, keine Plätze.
     await page.goto(`/tournaments/${slug}/bracket`);
     const tree = page.getByTestId(`bracket-heat-${heat.id}`);
     await expect(tree).toBeVisible();
-    await expect(tree.locator(`[data-row='${heat.id}:${missing}']`)).toHaveAttribute("data-out", "1");
-    for (const other of [first, third, fourth]) await expect(tree.locator(`[data-row='${heat.id}:${other}']`)).not.toHaveAttribute("data-out", "1");
+    for (const gone of [missing, absent]) await expect(tree.locator(`[data-row='${heat.id}:${gone}']`)).toHaveAttribute("data-out", "1");
+    for (const other of [first, third]) await expect(tree.locator(`[data-row='${heat.id}:${other}']`)).not.toHaveAttribute("data-out", "1");
     await tree.scrollIntoViewIfNeeded();
     await shot(page, `${testInfo.project.name}-lauf-baum.png`);
 
@@ -148,7 +152,7 @@ test.describe("Abnahme: nicht erschienen im Lauf (#1823)", () => {
     await tv.goto((await created.json()).path);
     const tvCard = tv.getByTestId(`tv-match-${heat.id}`);
     await expect(tvCard.locator(`[data-tv-reg='${missing}']`)).toContainText("nicht angetreten", { timeout: TV_WAIT });
-    await expect(tvCard.locator(".tv-row--gone")).toHaveCount(1);
+    await expect(tvCard.locator(".tv-row--gone")).toHaveCount(2);
     await shot(tv, `${testInfo.project.name}-lauf-tv.png`);
     await tvContext.close();
     await adminContext.close();
@@ -156,21 +160,23 @@ test.describe("Abnahme: nicht erschienen im Lauf (#1823)", () => {
     // Ergebnis-Fenster: „Nicht erschienen“ schon gesetzt - die drei Anwesenden in Zielreihenfolge.
     await page.goto(`/tournaments/${slug}/leitung?spiel=${heat.id}`);
     await expect(page.getByTestId("result-window")).toBeVisible();
-    await expect(page.getByTestId(`result-flag-${missing}-no_show`)).toHaveAttribute("aria-pressed", "true");
-    for (const id of [fourth, first, third]) await page.getByTestId(`result-order-${id}`).click();
+    for (const gone of [missing, absent]) await expect(page.getByTestId(`result-flag-${gone}-no_show`)).toHaveAttribute("aria-pressed", "true");
+    for (const id of [third, first]) await page.getByTestId(`result-order-${id}`).click();
     await shot(page, `${testInfo.project.name}-lauf-fenster.png`);
     await page.getByTestId("result-save").click();
     await published(page, tid, heat.id);
 
     stored = (await matchesOf(page, tid)).find((match) => match.id === heat.id);
-    expect(stored.results.map((row) => [row.registration_id, row.rank, Boolean(row.forfeit)])).toEqual([
-      [fourth, 1, false], [first, 2, false], [third, 3, false], [missing, 4, true]]);
+    // Die zwei Fehlenden teilen sich den letzten Platz (Reihenfolge nach Setzplatz).
+    expect(stored.results.slice(0, 2).map((row) => [row.registration_id, row.rank, Boolean(row.forfeit)])).toEqual([[third, 1, false], [first, 2, false]]);
+    expect(stored.results.slice(2).map((row) => [row.rank, Boolean(row.forfeit)])).toEqual([[3, true], [3, true]]);
+    expect(stored.results.slice(2).map((row) => row.registration_id).sort()).toEqual([missing, absent].sort());
     await page.goto(`/print/tournaments/${slug}?teile=baum`);
-    await expect(page.getByTestId("print-match").filter({ hasText: "Lauf D" }).getByTestId("print-no-show")).toHaveText("n. e.");
+    await expect(page.getByTestId("print-match").filter({ hasText: "Lauf D" }).getByTestId("print-no-show")).toHaveCount(2);
     await shot(page, `${testInfo.project.name}-lauf-druck.png`);
 
     // Weiterkommen: Lauf C (läuft seit dem Seed) eintragen - die Runde ist fertig und wird gelost. Die zwei Besten aus D
-    // stehen in Runde 2, die Person nicht (nur auf dem Verlierer-Weg, wie im Duell).
+    // stehen in Runde 2, die zwei Fehlenden nicht (nur auf dem Verlierer-Weg, wie im Duell).
     const running = byKey(await matchesOf(page, tid)).C;
     const saved = await post(page, `/api/matches/${running.id}/result`, {
       results: seated(running).map((registration, index) => ({ registration_id: registration, rank: index + 1 })) });
@@ -181,8 +187,11 @@ test.describe("Abnahme: nicht erschienen im Lauf (#1823)", () => {
       // Läufe-Cup (seed_abnahme.CUP_SCHEMA): Runde 2 im Winner Bracket E und F, Runde 1 im Loser Bracket LA und LB.
       const winners = ["E", "F"].flatMap((key) => seated(rows[key] || {}));
       const losers = ["LA", "LB"].flatMap((key) => seated(rows[key] || {}));
-      return { fourth: winners.includes(fourth), first: winners.includes(first), missingUp: winners.includes(missing), missingDown: losers.includes(missing) };
-    }, { message: "Weiterkommen aus Lauf D", timeout: HOLD_WAIT }).toEqual({ fourth: true, first: true, missingUp: false, missingDown: true });
+      return {
+        third: winners.includes(third), first: winners.includes(first),
+        missingUp: winners.includes(missing) || winners.includes(absent), missingDown: losers.includes(missing) && losers.includes(absent),
+      };
+    }, { message: "Weiterkommen aus Lauf D", timeout: HOLD_WAIT }).toEqual({ third: true, first: true, missingUp: false, missingDown: true });
     expect(problems).toEqual([]);
   });
 
