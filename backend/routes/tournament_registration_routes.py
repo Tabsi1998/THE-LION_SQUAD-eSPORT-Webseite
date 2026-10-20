@@ -597,10 +597,10 @@ async def _create_self_registration(db, tid: str, tournament: dict, body: Regist
 
 @router.post("/{tid}/register")
 async def register_for_tournament(tid: str, body: RegistrationCreate,
-                                   background: BackgroundTasks,
                                    access: str | None = None,
                                    me: dict = Depends(get_current_user),
-                                   request: Request = None):
+                                   request: Request = None,
+                                   background: BackgroundTasks = None):
     db = get_db()
     tid = await _resolve_tid(tid)
     t = await db.tournaments.find_one({"id": tid}, {"_id": 0})
