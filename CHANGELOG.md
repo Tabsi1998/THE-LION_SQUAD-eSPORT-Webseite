@@ -1,5 +1,24 @@
 # Changelog
 
+## 1.10.0 (20.10.2026)
+
+### Neu
+
+* Referenzen – Seite Team-Liga mit Tabelle, Spielplan, Aufstellung und Liga-Weg (#1747)
+
+### Fehlerbehebungen
+
+* Bereite Läufe verteilen sich auf alle freien Stationen (#1858)
+* Fall „Nicht erschienen?“ nennt Baumteil, Runde und Durchgang (#1860)
+* Kasten „Auslosung“ im Reiter Spiele nennt Baumteil und Runde wie der Baum (#1860)
+* Läufe, die auf Auslosung oder Vorspiele warten, nehmen bereiten keine Station mehr weg (#1858)
+* Stationen sagen „wartet auf die Auslosung“ bei der Show-Auslosung (#1858)
+* TV nennt als Nächstes einen bereiten Lauf statt eines wartenden (#1858)
+
+### Schneller
+
+* Vor-Ort-Anmeldungen im selben Moment sind in unter einer Sekunde bestätigt (#1859)
+
 ## 1.9.0 (20.10.2026)
 
 ### Neu
