@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.12.1 (20.10.2026)
+
+### Fehlerbehebungen
+
+* Bereiter Lauf an freier Station hat die Prognose „jetzt“, auch wenn ein Spieler im Turnier daneben noch ein geplantes Spiel hat (#1872)
+* Manuell auf „live“ gesetzte Fast Laps, Turniere und Events zeigen öffentlich „Läuft“ statt „Angekündigt“, auch ohne oder vor dem Startdatum (#1881)
+* TV-Tagesplan und Dashboard zeigen ein Turnier nach seinem Ende nicht mehr als „live“, auch wenn der Status auf „live“ stehen geblieben ist (#1881)
+
+### Dokumentation
+
+* Handbuch nennt die Prognose „jetzt“ neben einem zweiten Turnier (#1872)
+
 ## 1.12.0 (20.10.2026)
 
 ### Neu
