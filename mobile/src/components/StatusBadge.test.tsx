@@ -2,6 +2,7 @@ import React from "react";
 import { AccessibilityInfo } from "react-native";
 import { render, screen, waitFor } from "@testing-library/react-native";
 import { StatusBadge } from "./StatusBadge";
+import { colors } from "../theme";
 
 // Zustands-Chip (#1085): wie im Web steht der Chip ruhig, bei LIVE pulsiert nur der Punkt mit einem Ring. Mit
 // "Bewegung reduzieren" bleibt der Punkt ohne Ring; andere Zustaende haben keinen Punkt.
@@ -37,4 +38,29 @@ test("der Chip bleibt einzeilig und wird bei Platzmangel kleiner statt umzubrech
   expect(text.props.numberOfLines).toBe(1);
   expect(text.props.adjustsFontSizeToFit).toBe(true);
   expect(text.props.minimumFontScale).toBeGreaterThanOrEqual(0.75);
+});
+
+// Text und Tönung aus derselben Regel (#1869): steht eine Phase da, bestimmt sie beides - wie PhaseBadge im Web. Eine
+// Fast Lap mit Status „live“, die laut Phase noch angekündigt ist, stand sonst als „ANGEKÜNDIGT“ in Live-Rot da.
+test("eine Phase bestimmt Text und Tönung, der Rohstatus färbt nicht mit", async () => {
+  await render(<StatusBadge phase={{ state: "announced", label: "Angekündigt" }} status="live" />);
+  const text = screen.getByTestId("status-badge-text");
+  expect(text).toHaveTextContent("ANGEKÜNDIGT");
+  expect(text).toHaveStyle({ color: colors.cyan });
+  expect(screen.queryByTestId("status-live-dot")).toBeNull();
+});
+
+test("laufend und beendet: Text und Tönung passen zusammen", async () => {
+  const live = await render(<StatusBadge phase={{ state: "live", label: "Läuft" }} status="registration_open" />);
+  expect(screen.getByTestId("status-badge-text")).toHaveTextContent("LÄUFT");
+  expect(screen.getByTestId("status-badge-text")).toHaveStyle({ color: colors.live });
+  await live.unmount();
+  await render(<StatusBadge phase={{ state: "completed", label: "Beendet" }} status="live" />);
+  expect(screen.getByTestId("status-badge-text")).toHaveTextContent("BEENDET");
+  expect(screen.getByTestId("status-badge-text")).toHaveStyle({ color: colors.muted });
+});
+
+test("ohne Phase färbt weiter der Status", async () => {
+  await render(<StatusBadge status="live" />);
+  expect(screen.getByTestId("status-badge-text")).toHaveStyle({ color: colors.live });
 });

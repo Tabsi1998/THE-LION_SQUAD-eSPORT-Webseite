@@ -37,7 +37,9 @@ export function StatusBadge({
   const prefix = remaining ? countdownPrefix(phaseCountdownKind(phase)) : "";
   const statusLabel = statusText({ label, phase, status });
   const text = [statusLabel, prefix && `${prefix} ${remaining}`].filter(Boolean).join(" · ");
-  const tone = toneForStatus(`${text} ${status || ""} ${phaseState(phase)}`);
+  // Text und Tönung aus derselben Regel (#1869): steht eine Phase da, färbt nur sie - wie PhaseBadge im Web. Der
+  // Rohstatus („live“) färbte sonst eine noch angekündigte Fast Lap rot.
+  const tone = toneForStatus(phaseLabel(phase) ? `${text} ${phaseState(phase)}` : `${text} ${status || ""}`);
   return (
     <View style={[styles.badge, toneStyles[tone].badge, style]} accessible accessibilityLabel={text}>
       {phaseState(phase) === "live" ? <LiveDot color={toneStyles[tone].text.color} /> : null}
