@@ -82,11 +82,11 @@ from pymongo.errors import DuplicateKeyError
 from database import get_db
 from match_rules import RESULT_MAX_SCORE
 from models import ReferencePointsSource, ReferenceResultMark, ReferenceResultStatus, new_id, now_utc
-from routes.reference_participant_routes import _new_participant, build_index
 from services import reference_series, series_identity, series_results
 from services.dolibarr_policy import club_today
 from services.reference_series_access import EDIT_PENDING_DRAFT, SeriesAccess, require_series_editor
 from services.scoring_rules import normalize_rules, result_points, validate_sheet
+from services.series_participants import build_index, new_participant
 from services.series_standings import compute_standings
 
 router = APIRouter(prefix="/api/reference-series", tags=["reference-series"])
@@ -494,7 +494,7 @@ async def _create_people(db, access: SeriesAccess, resolution) -> dict[str, dict
     index = await build_index(db, access.series, [person["name"] for person in people], with_ids=False)
     created = {}
     for person in people:
-        created[person["key"]] = await _new_participant(db, access.series, index, {
+        created[person["key"]] = await new_participant(db, access.series, index, {
             "name": person["name"], "start_number": person["start_number"], "default_team": person["team"]},
             access.user)
     return created
