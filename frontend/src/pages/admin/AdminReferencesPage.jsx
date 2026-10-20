@@ -12,6 +12,8 @@ import { gameOptionLabel } from "@/lib/gameLabels";
 import { toast } from "sonner";
 import { ExternalLink, Medal, Pencil, Plus, Save, Trash2, User, Users } from "lucide-react";
 import { viennaDate } from "@/lib/vienna";
+import { podiumItems, yearOf } from "@/lib/referencesOverview";
+import { bestPlacement } from "@/components/tls/references/referenceParts";
 
 // Referenzen (#409): eine Referenz ist eine Turnierteilnahme des Vereins mit Einträgen - entweder
 // ein Team (Spieler treten gemeinsam an, eine Platzierung) oder mehrere Einzelstarter mit je
@@ -253,6 +255,7 @@ export default function AdminReferencesPage() {
         <Stat label="Bronze" value={summary.bronze || 0} tone="bronze" />
       </div>
 
+      <ShowcaseAdmin items={items} />
       <ReferenceHelperAdmin helpers={helperSettings} onSaved={(helpers) => { setHelperSettings(helpers); load(); }} />
 
       <div className="space-y-3">
@@ -412,6 +415,52 @@ function ReferenceHelperAdmin({ helpers, onSaved }) {
         </button>
       </div>
     </details>
+  );
+}
+
+// Vitrine der Übersicht (#1878): welcher Erfolg die Hauptkarte bekommt. Vorgabe automatisch - höchster Platz in der
+// höchsten Stufe, bei Gleichstand der neueste -, sonst eine der Podest-Referenzen.
+const SHOWCASE_AUTO_LABEL = "Automatisch: höchster Platz in der höchsten Stufe, bei Gleichstand der neueste";
+
+function ShowcaseAdmin({ items }) {
+  const [choice, setChoice] = useState("auto");
+  const [saving, setSaving] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    api.get("/references/admin/showcase").then(({ data }) => {
+      if (alive) setChoice(data?.mode === "pinned" && data.reference_id ? data.reference_id : "auto");
+    }).catch(() => {});
+    return () => { alive = false; };
+  }, []);
+  const podium = podiumItems(items);
+  const options = [
+    ["auto", SHOWCASE_AUTO_LABEL],
+    ...podium.map((item) => [item.id, [`${bestPlacement(item)}. Platz`, item.display_title || item.title, yearOf(item)].filter(Boolean).join(" · ")]),
+  ];
+  // Eine gewählte Referenz, die nicht mehr auf dem Podest steht, bleibt sichtbar, bis jemand neu wählt.
+  if (choice !== "auto" && !podium.some((item) => item.id === choice)) options.push([choice, "Gewählte Referenz (nicht mehr auf dem Podest)"]);
+  const save = async () => {
+    setSaving(true);
+    try {
+      const payload = choice === "auto" ? { mode: "auto", reference_id: null } : { mode: "pinned", reference_id: choice };
+      const { data } = await api.patch("/references/admin/showcase", payload);
+      setChoice(data?.mode === "pinned" && data.reference_id ? data.reference_id : "auto");
+      toast.success("Hauptkarte der Vitrine gespeichert.");
+    } catch (err) {
+      toast.error(formatApiError(err.response?.data?.detail));
+    } finally {
+      setSaving(false);
+    }
+  };
+  return (
+    <div className="mb-4 border border-white/10 bg-surface-1 rounded-sm p-4 flex flex-wrap items-end gap-3" data-testid="reference-showcase">
+      <div className="flex-1 min-w-[16rem]">
+        <SelectField label="Vitrine: Hauptkarte" value={choice} onChange={setChoice} options={options} testId="reference-showcase-select" hint="Welcher Erfolg auf der Übersicht groß erscheint. Die übrigen Podestplätze stehen daneben." />
+      </div>
+      <button type="button" onClick={save} disabled={saving} data-testid="reference-showcase-save" className="inline-flex items-center gap-2 px-4 py-2 bg-brand text-black font-bold uppercase tracking-wider rounded-sm disabled:opacity-50">
+        <Save className="w-4 h-4" /> {saving ? "Speichere..." : "Speichern"}
+      </button>
+    </div>
   );
 }
 
