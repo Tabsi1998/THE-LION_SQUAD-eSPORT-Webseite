@@ -246,14 +246,6 @@ async def _recent_audit_logs(db, full: bool) -> list[dict]:
     return await db.audit_logs.find({}, projection).sort("created_at", -1).to_list(20)
 
 
-@router.get("/audit-logs")
-async def audit_logs(limit: int = 100, me: dict = Depends(require_club_admin())):
-    db = get_db()
-    safe_limit = max(1, min(int(limit or 100), 500))
-    logs = await db.audit_logs.find({}, {"_id": 0}).sort("created_at", -1).to_list(safe_limit)
-    return logs
-
-
 @router.get("/mobile-logs")
 async def mobile_client_logs(
     limit: int = Query(default=100, ge=1, le=500),
