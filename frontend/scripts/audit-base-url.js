@@ -4,9 +4,38 @@
 
 const PRODUCTION_HOSTS = ["lionsquad.at"];
 
+// Hostname vereinheitlichen: Kleinbuchstaben, ohne DNS-Punkt am Ende.
+function normalizeHostname(hostname) {
+  return String(hostname || "").trim().toLowerCase().replace(/\.+$/, "");
+}
+
+// new URL() wandelt IDN in Punycode und vereinheitlicht Punkt-Schreibweisen; so wird auch geprüft.
 function isProductionHost(hostname) {
-  const host = String(hostname || "").toLowerCase().replace(/^www\./, "");
-  return PRODUCTION_HOSTS.includes(host);
+  let host = normalizeHostname(hostname);
+  try {
+    host = normalizeHostname(new URL(`http://${host}`).hostname);
+  } catch {
+    // unverändert prüfen
+  }
+  return PRODUCTION_HOSTS.some((production) => host === production || host.endsWith(`.${production}`));
+}
+
+function isProductionUrl(value) {
+  try {
+    return isProductionHost(new URL(value).hostname);
+  } catch {
+    return false;
+  }
+}
+
+// Ohne ausdrückliche Freigabe darf der Audit nie bei der echten Seite landen (auch nicht per Weiterleitung).
+function assertNotProduction(value, env = {}) {
+  if (env.PUBLIC_AUDIT_ALLOW_PRODUCTION !== "1" && isProductionUrl(value)) {
+    throw new Error(
+      `Abbruch: der Audit würde die echte Seite erreichen (${new URL(value).origin}). `
+      + "Nur mit ausdrücklich gesetztem PUBLIC_AUDIT_ALLOW_PRODUCTION=1 erlaubt.",
+    );
+  }
 }
 
 function resolveAuditBaseUrl(env = {}) {
@@ -30,7 +59,7 @@ function resolveAuditBaseUrl(env = {}) {
   if (url.username || url.password) {
     throw new Error("PUBLIC_AUDIT_BASE_URL darf keine Zugangsdaten enthalten.");
   }
-  if (isProductionHost(url.hostname) && env.PUBLIC_AUDIT_ALLOW_PRODUCTION !== "1") {
+  if (isProductionUrl(url.href) && env.PUBLIC_AUDIT_ALLOW_PRODUCTION !== "1") {
     throw new Error(
       "PUBLIC_AUDIT_BASE_URL zeigt auf die echte Seite. Das ist nur mit ausdrücklich gesetztem "
       + "PUBLIC_AUDIT_ALLOW_PRODUCTION=1 erlaubt (nur lesender Audit, nach Absprache).",
@@ -40,4 +69,4 @@ function resolveAuditBaseUrl(env = {}) {
   return url.origin + url.pathname.replace(/\/+$/, "");
 }
 
-module.exports = { resolveAuditBaseUrl, isProductionHost };
+module.exports = { resolveAuditBaseUrl, isProductionHost, isProductionUrl, assertNotProduction };

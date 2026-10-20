@@ -1,6 +1,6 @@
 const { chromium } = require("@playwright/test");
 
-const { resolveAuditBaseUrl } = require("./audit-base-url");
+const { resolveAuditBaseUrl, assertNotProduction } = require("./audit-base-url");
 
 let baseUrl;
 try {
@@ -202,6 +202,7 @@ async function auditPage(context, path) {
 
 async function main() {
   const sitemap = await fetch(`${baseUrl}/sitemap.xml`).then((response) => {
+    assertNotProduction(response.url, process.env);
     if (!response.ok) throw new Error(`Sitemap returned ${response.status}`);
     return response.text();
   });
@@ -219,6 +220,16 @@ async function main() {
   const resourceLinks = new Map();
   const browser = await chromium.launch({ headless: true });
   const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
+  // Jede Anfrage des Browsers (auch nach Weiterleitungen) prüfen: nie ohne Freigabe zur echten Seite.
+  await context.route("**/*", async (route) => {
+    try {
+      assertNotProduction(route.request().url(), process.env);
+    } catch (error) {
+      console.error(error.message);
+      process.exit(2);
+    }
+    await route.continue();
+  });
   const findings = [];
   let cursor = 0;
 
