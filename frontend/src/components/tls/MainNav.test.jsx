@@ -176,6 +176,7 @@ test("kompakte Kopfzeile: Menüpunkte zwischen 1024 und 1439 px enger", async ()
   for (const key of ["home", "verein", "community"]) {
     const link = screen.getByTestId(`nav-${key}`);
     expect(link.className).toMatch(/(^|\s)px-4(\s|$)/);
-    expect(link.className).toMatch(/(^|\s)lg:max-\[1439\.98px\]:px-1\.5(\s|$)/);
+    expect(link.className).toMatch(/(^|\s)lg:px-1\.5(\s|$)/);
+    expect(link.className).toMatch(/(^|\s)min-\[1440px\]:px-4(\s|$)/);
   }
 });

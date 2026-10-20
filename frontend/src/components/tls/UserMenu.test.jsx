@@ -132,5 +132,5 @@ test("kompakte Kopfzeile: der Name steht zwischen 1024 und 1439 px nicht neben d
   const button = screen.getByTestId("nav-user");
   expect(button).toHaveAccessibleName("Benutzermenü Lion Fan");
   const name = [...button.querySelectorAll("span")].find((span) => span.textContent === "Lion Fan");
-  expect(name.className).toMatch(/(^|\s)lg:max-\[1439\.98px\]:hidden(\s|$)/);
+  expect(name.className).toMatch(/(^|\s)lg:hidden(\s|$)/);
 });

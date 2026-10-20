@@ -127,6 +127,7 @@ async function headerFacts(page) {
     const tall = buttons.filter((el) => el.getBoundingClientRect().height > 44).map((el) => el.dataset.testid || el.textContent.trim());
     return {
       overflow: row.scrollWidth - row.clientWidth,
+      visibleLogos: [...row.querySelectorAll("[data-testid=tls-logo]")].filter((img) => img.getBoundingClientRect().width > 0).length,
       logoWidth: box ? Math.round(box.width) : 0,
       // Vollständig: das Bild wird nicht gestaucht - Breite zu Höhe wie im Original.
       logoSquashed: box ? Math.abs(box.width / box.height - logo.naturalWidth / logo.naturalHeight) > 0.05 : true,
@@ -150,6 +151,7 @@ test.describe("Kopfzeile 1024-1439 px (#1234)", () => {
         await expect.poll(() => page.evaluate(() => [...document.querySelectorAll("[data-testid=site-header-row] [data-testid=tls-logo]")].some((img) => img.complete && img.naturalWidth > 0))).toBe(true);
         const facts = await headerFacts(page);
         expect(facts.overflow).toBeLessThanOrEqual(1);
+        expect(facts.visibleLogos).toBe(1);
         expect(facts.logoWidth).toBeGreaterThanOrEqual(32);
         expect(facts.logoSquashed).toBe(false);
         expect(facts.tall).toEqual([]);

@@ -256,7 +256,7 @@ function NavDropdown({ item, isClubMember, signedIn, badge = 0 }) {
     onPointerDown: onTriggerPointerDown,
     onClick: onTriggerClick,
     onKeyDown: onTriggerKeyDown,
-    className: `tls-nav-link px-4 lg:max-[1439.98px]:px-1.5 py-2 text-sm font-semibold uppercase tracking-wider lg:max-[1439.98px]:tracking-wide transition rounded-sm inline-flex items-center gap-1.5 lg:max-[1439.98px]:gap-1 ${
+    className: `tls-nav-link px-4 lg:px-1.5 min-[1440px]:px-4 py-2 text-sm font-semibold uppercase tracking-wider lg:tracking-wide min-[1440px]:tracking-wider transition rounded-sm inline-flex items-center gap-1.5 lg:gap-1 min-[1440px]:gap-1.5 ${
       isActive ? "text-[#29B6E8]" : "text-white/70 hover:text-white"
     }`,
   };
@@ -400,7 +400,7 @@ export function MainNav({ isClubMember = false, signedIn = false, badges = {} })
             end={item.end}
             data-testid={`nav-${item.label.toLowerCase()}`}
             className={({ isActive }) =>
-              `tls-nav-link px-4 lg:max-[1439.98px]:px-1.5 py-2 text-sm font-semibold uppercase tracking-wider lg:max-[1439.98px]:tracking-wide transition rounded-sm ${
+              `tls-nav-link px-4 lg:px-1.5 min-[1440px]:px-4 py-2 text-sm font-semibold uppercase tracking-wider lg:tracking-wide min-[1440px]:tracking-wider transition rounded-sm ${
                 isActive ? "text-[#29B6E8]" : "text-white/70 hover:text-white"
               }`
             }

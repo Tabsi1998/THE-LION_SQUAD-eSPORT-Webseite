@@ -80,7 +80,7 @@ export function UserMenu() {
         className={`inline-flex items-center gap-2 pl-1.5 pr-2.5 py-1.5 text-xs font-bold uppercase tracking-wider border rounded-sm transition ${open ? "border-[#29B6E8]/50 text-[#29B6E8] bg-[#29B6E8]/10" : "border-white/10 text-white/80 hover:border-[#29B6E8]/40 hover:text-[#29B6E8]"}`}
       >
         <Avatar user={user} />
-        <span className="max-w-[10rem] truncate lg:max-[1439.98px]:hidden">{name}</span>
+        <span className="max-w-[10rem] truncate lg:hidden min-[1440px]:inline">{name}</span>
         <ChevronDown className={`w-3.5 h-3.5 transition ${open ? "rotate-180" : ""}`} />
       </button>
       {open ? (

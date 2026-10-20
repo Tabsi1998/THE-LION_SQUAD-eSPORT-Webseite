@@ -103,13 +103,14 @@ export function PublicLayout({ children }) {
       <header className="tls-header sticky top-0 z-50" data-compact={headerCompact && !mobileOpen ? "1" : "0"} data-testid="site-header">
         <div className="relative">
         <div aria-hidden="true" className="tls-header__bg absolute inset-0 backdrop-blur-xl bg-[#0A0A0A]/80 border-b border-white/10" data-testid="site-header-bg" />
-        <div className="tls-header__row relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 lg:max-[1439.98px]:px-5 h-16 md:h-20 flex items-center justify-between gap-4 lg:max-[1439.98px]:gap-3" data-testid="site-header-row">
+        <div className="tls-header__row relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-5 min-[1440px]:px-8 h-16 md:h-20 flex items-center justify-between gap-4 lg:gap-3 min-[1440px]:gap-4" data-testid="site-header-row">
           {/* Kompakte Kopfzeile (#1234): zwischen 1024 und 1439 px steht das ganze Menü in der Zeile - dort nur der Löwenkopf
               statt des Schriftzugs, Login als Personen-Symbol, „Beitreten“ statt „Mitglied werden“ und engere Menüpunkte
-              (MainNav). Der Logo-Rahmen schrumpft nie; darunter und ab 1440 px bleibt alles wie bisher. */}
-          <div className="flex items-center min-w-0 lg:max-[1439.98px]:shrink-0" data-testid="site-header-brand">
+              (MainNav). Der Logo-Rahmen schrumpft nie; darunter und ab 1440 px bleibt alles wie bisher. Alles hängt an EINER Grenze:
+              ab `lg` kompakt, ab `min-[1440px]` zurück - so ist bei Zoom/hoher DPI nie beides aus. */}
+          <div className="flex items-center min-w-0 lg:shrink-0 min-[1440px]:shrink" data-testid="site-header-brand">
             <span className="inline-flex lg:hidden min-[1440px]:inline-flex" data-header-logo="wordmark"><span className="tls-header__logo"><Logo size="lg" /></span></span>
-            <span className="hidden lg:max-[1439.98px]:inline-flex" data-header-logo="mascot"><span className="tls-header__logo"><Logo variant="mascot" size="lg" /></span></span>
+            <span className="hidden lg:inline-flex min-[1440px]:hidden" data-header-logo="mascot"><span className="tls-header__logo"><Logo variant="mascot" size="lg" /></span></span>
             <SeasonWidgetSlot />
           </div>
           <MainNav isClubMember={isClubMember} signedIn={Boolean(user)} badges={{ community: unreadChats }} />
@@ -128,18 +129,18 @@ export function PublicLayout({ children }) {
                   to="/login"
                   data-testid="nav-login"
                   title="Login"
-                  className="tls-hit hidden md:inline-flex items-center px-3 py-2 lg:max-[1439.98px]:h-10 lg:max-[1439.98px]:w-10 lg:max-[1439.98px]:justify-center lg:max-[1439.98px]:p-0 lg:max-[1439.98px]:border lg:max-[1439.98px]:border-white/10 lg:max-[1439.98px]:rounded-sm text-xs font-bold uppercase tracking-wider whitespace-nowrap text-white/80 hover:text-[#29B6E8] lg:max-[1439.98px]:hover:border-[#29B6E8]/50 lg:max-[1439.98px]:hover:bg-[#29B6E8]/10 transition"
+                  className="tls-hit hidden md:inline-flex items-center px-3 py-2 lg:h-10 lg:w-10 lg:justify-center lg:p-0 lg:border lg:border-white/10 lg:rounded-sm min-[1440px]:h-auto min-[1440px]:w-auto min-[1440px]:justify-start min-[1440px]:px-3 min-[1440px]:py-2 min-[1440px]:border-0 min-[1440px]:rounded-none text-xs font-bold uppercase tracking-wider whitespace-nowrap text-white/80 hover:text-[#29B6E8] lg:hover:border-[#29B6E8]/50 lg:hover:bg-[#29B6E8]/10 min-[1440px]:hover:bg-transparent transition"
                 >
-                  <UserRound aria-hidden="true" className="hidden lg:max-[1439.98px]:block w-4 h-4" />
-                  <span className="lg:max-[1439.98px]:sr-only">Login</span>
+                  <UserRound aria-hidden="true" className="hidden lg:block min-[1440px]:hidden w-4 h-4" />
+                  <span className="lg:sr-only min-[1440px]:not-sr-only">Login</span>
                 </Link>
                 <Link
                   to="/register"
                   data-testid="nav-register"
-                  className="tls-btn tls-btn--primary inline-flex px-4 py-2 lg:max-[1439.98px]:px-3 text-xs font-bold uppercase tracking-wider lg:max-[1439.98px]:whitespace-nowrap rounded-sm"
+                  className="tls-btn tls-btn--primary inline-flex px-4 py-2 lg:px-3 min-[1440px]:px-4 text-xs font-bold uppercase tracking-wider lg:whitespace-nowrap min-[1440px]:whitespace-normal rounded-sm"
                 >
-                  <span className="lg:max-[1439.98px]:hidden">Mitglied werden</span>
-                  <span className="hidden lg:max-[1439.98px]:inline">Beitreten</span>
+                  <span className="lg:hidden min-[1440px]:inline">Mitglied werden</span>
+                  <span className="hidden lg:inline min-[1440px]:hidden">Beitreten</span>
                 </Link>
               </>
             )}

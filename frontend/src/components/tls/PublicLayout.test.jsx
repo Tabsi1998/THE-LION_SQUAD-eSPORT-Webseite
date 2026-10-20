@@ -54,8 +54,9 @@ test("Logo: Schriftzug bis 1023 und ab 1440 px, dazwischen der Löwenkopf - der 
   expect(wordmark.className).toMatch(/(^|\s)lg:hidden(\s|$)/);
   expect(wordmark.className).toMatch(/(^|\s)min-\[1440px\]:inline-flex(\s|$)/);
   expect(mascot.className).toMatch(/(^|\s)hidden(\s|$)/);
-  expect(mascot.className).toMatch(/(^|\s)lg:max-\[1439\.98px\]:inline-flex(\s|$)/);
-  expect(screen.getByTestId("site-header-brand").className).toMatch(/(^|\s)lg:max-\[1439\.98px\]:shrink-0(\s|$)/);
+  expect(mascot.className).toMatch(/(^|\s)lg:inline-flex(\s|$)/);
+  expect(mascot.className).toMatch(/(^|\s)min-\[1440px\]:hidden(\s|$)/);
+  expect(screen.getByTestId("site-header-brand").className).toMatch(/(^|\s)lg:shrink-0(\s|$)/);
 });
 
 test("Gast: Login als Personen-Symbol mit Namen, der Knopf kurz „Beitreten“ - beide einzeilig", () => {
@@ -63,11 +64,11 @@ test("Gast: Login als Personen-Symbol mit Namen, der Knopf kurz „Beitreten“ 
   const login = screen.getByTestId("nav-login");
   expect(login).toHaveAccessibleName("Login");
   expect(login.querySelector("svg")).not.toBeNull();
-  expect(within(login).getByText("Login").className).toMatch(/lg:max-\[1439\.98px\]:sr-only/);
+  expect(within(login).getByText("Login").className).toMatch(/lg:sr-only/);
   const register = screen.getByTestId("nav-register");
   expect(register.className).toMatch(/whitespace-nowrap/);
-  expect(within(register).getByText("Mitglied werden").className).toMatch(/lg:max-\[1439\.98px\]:hidden/);
-  expect(within(register).getByText("Beitreten").className).toMatch(/(^|\s)hidden(\s|$).*lg:max-\[1439\.98px\]:inline/);
+  expect(within(register).getByText("Mitglied werden").className).toMatch(/lg:hidden/);
+  expect(within(register).getByText("Beitreten").className).toMatch(/(^|\s)hidden(\s|$).*lg:inline.*min-\[1440px\]:hidden/);
 });
 
 // Saison-Deko-Schalter (#1239): Gäste finden ihn am Handy unten im Menü (bis 1023 px gilt das Handy-Menü), am PC in der
@@ -107,4 +108,32 @@ test("ohne laufende Saison kein Schalter", () => {
   const menu = openMobileMenu();
   expect(within(menu).queryByTestId("menu-deco-switch")).toBeNull();
   expect(screen.queryByTestId("season-deco-switch")).toBeNull();
+});
+
+// Eine Grenze für beide Logos (#1234): Löwenkopf und Schriftzug schalten an derselben Stelle um - ab `lg` und ab
+// `min-[1440px]`, nie mit einer max-Grenze. Sonst wären bei Zoom oder hoher DPI (Breite zwischen 1439,98 und 1440 px)
+// beide aus. Die Breakpoints werden hier aus den Klassen nachgerechnet, wie Tailwind sie anwendet.
+const BREAKPOINTS = [["", 0], ["sm:", 640], ["md:", 768], ["lg:", 1024], ["xl:", 1280], ["min-[1440px]:", 1440]];
+function shownAt(className, width) {
+  let shown = true;
+  for (const [prefix, from] of BREAKPOINTS) {
+    if (width < from) continue;
+    for (const cls of className.split(/\s+/)) {
+      if (!cls.startsWith(prefix) || cls.slice(prefix.length).includes(":")) continue;
+      const value = cls.slice(prefix.length);
+      if (value === "hidden") shown = false;
+      else if (["inline-flex", "flex", "block", "inline", "inline-block"].includes(value)) shown = true;
+    }
+  }
+  return shown;
+}
+
+test("an jeder Breite genau ein Logo - auch zwischen 1439,98 und 1440 px", () => {
+  renderLayout();
+  const boxes = [...screen.getByTestId("site-header-row").querySelectorAll("[data-header-logo]")];
+  for (const box of boxes) expect(box.className).not.toMatch(/max-/);
+  for (const width of [390, 1023, 1024, 1279, 1280, 1439, 1439.98, 1439.99, 1440, 1920]) {
+    const shown = boxes.filter((box) => shownAt(box.className, width)).map((box) => box.dataset.headerLogo);
+    expect([width, shown]).toEqual([width, [width >= 1024 && width < 1440 ? "mascot" : "wordmark"]]);
+  }
 });
