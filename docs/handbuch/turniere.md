@@ -200,7 +200,9 @@ verbindlichen Teilnahme: Warteliste kostet nichts. Alles Weitere steht in [Abrec
   gespielt → alle Spiele annulliert und raus aus der Tabelle, sonst Rest kampflos verloren. Im Schweizer System
   bleiben die Ergebnisse, die Person wird nicht mehr gepaart. In Läufen rückt der Nächstplatzierte nach – mit Loser
   Bracket auf beiden Wegen: wer auf den Sieger-Weg nachrückt, verlässt dafür das Loser Bracket, dort rückt der Nächste
-  auf, der letzte Platz wird ein Freilos. Wer im nächsten Lauf schon aufgerufen oder gefahren ist, bleibt dort. Danach steht
+  auf, der letzte Platz wird ein Freilos. Wer im nächsten Lauf schon aufgerufen oder gefahren ist, bleibt dort. Wird
+  die nächste Runde ausgelost (auch **Jetzt auslosen** je Weg und **Neu auslosen**), gilt dieselbe Reihe: wer
+  ausgetreten ist, kommt in keinen Topf, die Nächsten rücken auf. Danach steht
   die Anmeldung auf **Ausgetreten** bzw. **Disqualifiziert**; die Statusauswahl kennt diese Werte nicht.
 - Bei Team-Turnieren steht unter jedem Team die Aufstellung (3.5).
 - Oben im Turnier: Downloads **PDF Teilnehmer**, **PDF Check-in**, **PDF Anmeldung QR** (zum Aufhängen), **PDF Spiele**
