@@ -350,3 +350,81 @@ def test_the_registration_wait_is_configurable_and_bounded():
     assert registration_wait_seconds({"REGISTRATION_LOCK_WAIT_SECONDS": "999"}) == 60.0
     assert registration_wait_seconds({"REGISTRATION_LOCK_WAIT_SECONDS": "viel"}) == 20.0
     assert registration_wait_seconds({"REGISTRATION_LOCK_WAIT_SECONDS": "nan"}) == 20.0
+
+
+async def sign_off(flow, tournament: dict, reg: dict, who: dict):
+    flow.act_as(who)
+    return await flow.client.delete(f"/api/tournaments/{tournament['id']}/registrations/{reg['id']}")
+
+
+@pytest.mark.asyncio
+async def test_eight_signing_off_at_once_do_not_wait_for_eight_bracket_rebuilds(flow, monkeypatch):
+    """#1871: Abmelden baute den Vorschau-Baum noch in der Turnier-Sperre - jede Abmeldung und die nächste Anmeldung am
+    Einlass warteten so lange. Jetzt wie beim Anmelden (#1859): in der Sperre nur Abmeldung und Nachrücken, der Baum
+    danach, einmal für alle bis dahin."""
+    from routes import tournament_registration_routes as routes
+
+    _, _, get_current_user, _ = load_application()
+    import server
+
+    seen: list[int] = []
+    count_preview_refreshes(monkeypatch, routes, seen)
+    tournament = await flow.create_tournament(max_participants=8)
+    people = [await flow.add_user(name=f"Gast {index}") for index in range(8)]
+    by_id = {who["id"]: who for who in people}
+    registrations = [await flow.register(tournament, who) for who in people]
+
+    async def header_user(request: Request) -> dict:
+        return by_id[request.headers["x-test-user"]]
+
+    server.app.dependency_overrides[get_current_user] = header_user
+    loop = asyncio.get_running_loop()
+
+    started = loop.time()
+    responses = await asyncio.gather(*(
+        flow.client.delete(f"/api/tournaments/{tournament['id']}/registrations/{reg['id']}",
+                           headers={"x-test-user": reg["user_id"]})
+        for reg in registrations
+    ))
+    elapsed = loop.time() - started
+
+    assert [response.status_code for response in responses] == [200] * 8, [r.text for r in responses if r.status_code != 200]
+    assert await statuses(flow, tournament) == []
+    assert seen and seen[-1] == 0, f"der letzte Neubau kennt alle Abmeldungen: {seen}"
+    assert len(seen) <= 3, f"ein Neubau für alle statt einer je Abmeldung: {seen}"
+    assert elapsed < 6 * SLOW_SECONDS, f"8 Abmeldungen brauchten {elapsed:.2f} s"
+
+
+@pytest.mark.asyncio
+async def test_a_failed_rebuild_after_signing_off_is_tried_once_more_and_never_costs_the_sign_off(flow, monkeypatch, caplog):
+    """#1871: wie bei der Anmeldung - scheitert der Neubau, gleich noch einmal; scheitert auch der, steht es im Log,
+    die Abmeldung gilt trotzdem, die Warteliste ist exakt nachgerückt und bekommt genau eine Nachricht."""
+    import logging
+
+    from routes import tournament_registration_routes as routes
+
+    calls, sent = [], []
+
+    async def broken(db, tournament, actor_id):
+        calls.append(tournament["id"])
+        raise RuntimeError("Baum kaputt")
+
+    async def notify(db, tid, registration, status, *, previous=None, **kwargs):
+        sent.append((registration["user_id"], status, previous))
+
+    monkeypatch.setattr(routes, "_refresh_tournament_previews_after_registration", broken)
+    monkeypatch.setattr(routes, "_notify_registration", notify)
+    tournament = await flow.create_tournament(max_participants=1)
+    anna, ben = await flow.add_user(name="Anna"), await flow.add_user(name="Ben")
+    anna_reg = await flow.register(tournament, anna)
+    await flow.register(tournament, ben, status="waitlist")
+
+    with caplog.at_level(logging.ERROR, logger="tls.tournament_registration"):
+        response = await sign_off(flow, tournament, anna_reg, anna)
+
+    assert response.status_code == 200, response.text
+    assert response.json()["auto_bracket_update"] is None
+    assert calls == [tournament["id"], tournament["id"]], "ein zweiter Versuch"
+    assert any(record.exc_info for record in caplog.records), "der gescheiterte Neubau steht samt Fehler im Log"
+    assert await statuses(flow, tournament) == ["approved"], "die Warteliste ist nachgerückt"
+    assert sent == [(ben["id"], "approved", "waitlist")], f"genau eine Nachricht nachgerückt: {sent}"

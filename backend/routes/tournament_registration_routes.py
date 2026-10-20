@@ -39,6 +39,7 @@ from services import onsite_access, tournament_event_gate, tournament_fees
 from services.query_filters import safe_regex
 from services.private_fields import private_projection
 from routes.tournament_common import (
+    TOURNAMENT_BUSY_DETAIL,
     TOURNAMENT_MUTATION_LOCKED_DETAIL,
     _apply_match_plan,
     _audit_tournament_action,
@@ -52,7 +53,6 @@ from routes.tournament_common import (
     _is_tournament_staff,
     _public_registration,
     _resolve_tid,
-    _serialized_registration_write,
     _serialized_tournament_write,
     _v2_plan_key,
     registration_wait_seconds,
@@ -719,6 +719,7 @@ PREVIEW_REFRESH_ATTEMPTS = 2
 
 async def _refresh_previews_after_self_registration(db, tid: str, number: int, actor_id: str | None) -> dict | None:
     """Den Vorschau-Baum nach der Anmeldung Nummer ``number`` auffrischen - ohne die Platzvergabe aufzuhalten (#1859).
+    Abmeldungen stellen sich genauso an (#1871).
 
     Früher baute jede Anmeldung den Baum in der Turnier-Sperre neu, die nächste wartete so lange. Jetzt stellt sich das
     Auffrischen hinten an die Schlange: Wer am Einlass gleichzeitig kam, ist bis dahin gespeichert, ein Neubau nimmt
@@ -1027,10 +1028,27 @@ async def staff_set_registration_checkin(tid: str, reg_id: str, body: dict,
 
 
 @router.delete("/{tid}/registrations/{reg_id}")
-async def delete_registration(tid: str, reg_id: str, me: dict = Depends(get_current_user),
-                              _mutation_tid: str = Depends(_serialized_registration_write)):
+async def delete_registration(tid: str, reg_id: str, me: dict = Depends(get_current_user)):
+    """Abmelden (#1871): wie die Anmeldung (#1859) hält die Sperre nur Abmeldung und Nachrücken; den Vorschau-Baum baut
+    die Abmeldung danach, hinten in der Schlange der Anmeldungen - einmal für alle bis dahin."""
     db = get_db()
     tid = await _resolve_tid(tid)
+    queue = _registration_queue(tid)
+    try:
+        async with queue.turn(registration_wait_seconds()) as wait:
+            async with mutation_lock(db, tournament_write_resource(tid), wait_seconds=wait):
+                tournament = await _delete_registration_locked(db, tid, reg_id, me)
+    except MutationLockBusy:
+        raise HTTPException(status_code=409, detail=TOURNAMENT_BUSY_DETAIL)
+    auto_bracket_update = None
+    if tournament:
+        queue.requested += 1
+        auto_bracket_update = await _refresh_previews_after_self_registration(db, tid, queue.requested, me.get("id"))
+    return {"ok": True, "auto_bracket_update": auto_bracket_update}
+
+
+async def _delete_registration_locked(db, tid: str, reg_id: str, me: dict) -> dict | None:
+    """Prüfen, abmelden, Warteliste nachrücken - alles in der Turnier-Sperre, damit die Plätze exakt bleiben."""
     await _ensure_tournament_unlocked(db, tid)
     reg = await db.tournament_registrations.find_one({"id": reg_id, "tournament_id": tid})
     if not reg:
@@ -1069,9 +1087,6 @@ async def delete_registration(tid: str, reg_id: str, me: dict = Depends(get_curr
     await tournament_fees.close_price(db, reg, "Abmeldung")
     await db.tournament_registrations.delete_one({"id": reg_id})
     await _move_up_from_waitlist(db, tid, me.get("id"))
-    auto_bracket_update = None
-    if tournament:
-        auto_bracket_update = await _refresh_tournament_previews_after_registration(db, tournament, me.get("id"))
     await _audit_tournament_action(
         db,
         "tournament.registration.delete",
@@ -1079,7 +1094,7 @@ async def delete_registration(tid: str, reg_id: str, me: dict = Depends(get_curr
         tid,
         {"registration_id": reg_id, "user_id": reg.get("user_id"), "self_unregister": (is_own_registration or is_team_manager) and not is_staff},
     )
-    return {"ok": True, "auto_bracket_update": auto_bracket_update}
+    return tournament
 
 
 async def _find_self_registration(db, tid: str, user_id: str) -> dict | None:
