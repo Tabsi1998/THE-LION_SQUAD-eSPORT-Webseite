@@ -8,7 +8,8 @@ import { EmptyState, ErrorState, PartialLoadNotice, SkeletonList, loadProblem, t
 import { MediaImage } from "../../components/MediaImage";
 import { Screen } from "../../components/Screen";
 import { StatusBadge } from "../../components/StatusBadge";
-import { Body, Heading, Muted, Title } from "../../components/Text";
+import { FitTitle } from "../../components/FitTitle";
+import { Body, Heading, Muted } from "../../components/Text";
 import { useAuth } from "../../auth/AuthContext";
 import { api, errorMessage } from "../../lib/api";
 import { formatDate, formatDateTime } from "../../lib/format";
@@ -217,7 +218,15 @@ export function FastLapDetailScreen({ navigation, route }: Props) {
             </View>
             <View style={styles.heroText}>
               <StatusBadge phase={challenge.public_phase} status={challenge.status} />
-              <Title>{challenge.title}</Title>
+              {/* Umbruch nur zwischen Wörtern (#1867): ohne Silbentrennung; zerreißt Android doch ein Wort, wird die
+                  Schrift etwas kleiner, höchstens bis 80 %. */}
+              <FitTitle
+                text={challenge.title || ""}
+                minScale={0.8}
+                textBreakStrategy="simple"
+                android_hyphenationFrequency="none"
+                testID="fastlap-hero-title"
+              />
               <Muted>{formatDate(challenge.start_date)}</Muted>
             </View>
           </View>

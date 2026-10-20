@@ -3,8 +3,9 @@ import { openLink } from "../../lib/openLink";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { useFocusEffect, useIsFocused } from "@react-navigation/native";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Pressable, RefreshControl, ScrollView, StyleSheet, View, type LayoutChangeEvent, type NativeSyntheticEvent, type TextLayoutEventData } from "react-native";
+import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
 import { Card } from "../../components/Card";
+import { FitTitle } from "../../components/FitTitle";
 import { ContentCard } from "../../components/ContentCard";
 import { ListItemFadeIn, useListEntrance } from "../../components/FadeIn";
 import { EmptyState, SkeletonList } from "../../components/ListState";
@@ -13,7 +14,7 @@ import { TabHeader, useTabScrollToTop } from "../../components/TabHeader";
 import { seasonScrollProps } from "../../seasons/sky/scroll";
 import { SeasonEdgeSlot, SeasonWidgetSlot } from "../../seasons/SeasonStage";
 import { AdventHint } from "../../advent/entry";
-import { Body, Heading, Muted, Title } from "../../components/Text";
+import { Body, Heading, Muted } from "../../components/Text";
 import { useAuth } from "../../auth/AuthContext";
 import { useBranding } from "../../branding/BrandingProvider";
 import { api, errorMessage } from "../../lib/api";
@@ -484,45 +485,16 @@ function Section({ title, actionLabel, onAction, children }: { title: string; ac
   );
 }
 
-/** Ein Wort, das über zwei Zeilen zerrissen wurde: die Zeile endet mit einem Buchstaben, die nächste beginnt mit einem. */
-export function breaksInsideWord(lines: ReadonlyArray<{ text: string }>): boolean {
-  const letter = /[0-9A-Za-zÀ-ÖØ-öø-ÿ]/;
-  return lines.some((line, index) => index < lines.length - 1 && letter.test(line.text.slice(-1)) && letter.test(lines[index + 1].text.charAt(0)));
-}
-
-const HERO_TITLE_SIZE = 30;
-const HERO_TITLE_MIN_SCALE = 0.55;
+export { breaksInsideWord } from "../../components/FitTitle";
 
 /**
  * Der Titel der Begrüßungskarte. Neben Pill und Saison-Widget (Adventkranz, Partyhüte …) bleibt nur eine schmale
- * Spalte; Android bricht ein zu langes Wort dann mitten im Wort um („Willkomm|en“, Geräteprobe vor 1.4.0). Dann wird
- * die Schrift in Schritten kleiner, bis kein Wort mehr zerrissen ist - Umbrüche an Leerzeichen bleiben erlaubt. Neuer
- * Text oder mehr Platz (das Widget verschwindet) beginnen wieder bei voller Größe. Wird die Spalte schmaler (das Widget
- * kommt nach dem Laden der Saisons dazu), setzt nichts zurück: Android meldet die Zeilen dann nur einmal, ein
- * Zurücksetzen im selben Durchgang hätte das Verkleinern wieder aufgehoben.
+ * Spalte; Android bricht ein zu langes Wort dann mitten im Wort um („Willkomm|en“, Geräteprobe vor 1.4.0). FitTitle
+ * macht die Schrift dann kleiner, hier bis 55 %.
  */
 export function HeroTitle({ text }: { text: string }) {
-  const [scale, setScale] = useState(1);
-  const width = useRef(0);
-  const shownText = useRef(text);
-  useEffect(() => {
-    if (shownText.current === text) return;
-    shownText.current = text;
-    setScale(1);
-  }, [text]);
-  const onLayout = useCallback((event: LayoutChangeEvent) => {
-    const next = Math.round(event.nativeEvent.layout.width);
-    if (width.current && next > width.current + 1) setScale(1);
-    width.current = next;
-  }, []);
-  const onTextLayout = useCallback((event: NativeSyntheticEvent<TextLayoutEventData>) => {
-    if (!breaksInsideWord(event.nativeEvent.lines)) return;
-    setScale((current) => (current > HERO_TITLE_MIN_SCALE ? Math.max(HERO_TITLE_MIN_SCALE, Math.round((current - 0.05) * 100) / 100) : current));
-  }, []);
   return (
-    <Title onLayout={onLayout} onTextLayout={onTextLayout} style={scale < 1 ? { fontSize: Math.round(HERO_TITLE_SIZE * scale) } : null} testID="dashboard-hero-title">
-      {text}
-    </Title>
+    <FitTitle text={text} minScale={0.55} testID="dashboard-hero-title" />
   );
 }
 
