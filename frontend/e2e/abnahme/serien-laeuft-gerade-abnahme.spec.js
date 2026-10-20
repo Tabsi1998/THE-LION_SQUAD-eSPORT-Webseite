@@ -99,7 +99,7 @@ test.describe("Abnahme #1748: Referenzen - Heute im Einsatz und Läuft gerade", 
         await expect(card.getByTestId("running-place")).toContainText("2. von 3");
         await expect(card.getByTestId("running-today-badge")).toBeVisible();
         const leagueCard = page.getByTestId("references-running-list").getByTestId(`running-card-${league.slug}-${leagueSeason.season_slug}`);
-        await expect(leagueCard).toContainText("0 von 1 Terminen");
+        await expect(leagueCard).toContainText("0 von 1 Termin");
         await expect(leagueCard.getByTestId("running-place")).toContainText("Noch offen");
         // Fremde Namen kommen nirgends vor.
         const text = await running.innerText();
