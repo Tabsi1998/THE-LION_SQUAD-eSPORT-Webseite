@@ -179,3 +179,18 @@ test("Schlimmster Fall: viele Läufe, lange Rundennamen, fehlender Zeitpunkt", a
   await user.click(screen.getByTestId("redraw-LB:7"));
   expect(await screen.findByTestId("confirm-dialog")).toHaveTextContent("die 10 Spiele dieser Runde");
 });
+
+test("Show-Auslosung im Doppel-K.-o.: die Runden heißen wie im Baum, Winner vor Loser (#1860)", () => {
+  const ready = { draw: null, status: "pending", draw_ready: { since: "2026-10-20T18:00:00+00:00" } };
+  const show = (group) => ({ draw_group: group, advancement_mode: "draw_show" });
+  const matches = [
+    target("LA", { ...ready, section: "LB", round_label: "Loser Runde 1", settings: show("LB:2") }),
+    target("E", { ...ready, round_label: "Runde 2", settings: show("WB:2") }),
+  ];
+
+  expect(drawGroupsOf(matches).map((row) => row.label)).toEqual(["Winner Runde 2", "Loser Runde 1"]);
+  renderControls({ matches });
+  expect(screen.getByTestId("draw-group-WB:2")).toHaveTextContent("Winner Runde 2 – Auslosung bereit");
+  expect(screen.getByTestId("draw-group-LB:2")).toHaveTextContent("Loser Runde 1 – Auslosung bereit");
+  cleanup();
+});
