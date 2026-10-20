@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.7.1](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/compare/v1.7.0...v1.7.1) (2026-10-20)
+
+
+### Fehlerbehebungen
+
+* Live-Meldungen nennen nur sichtbare Turniere ([#1801](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1801)) ([60e4609](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/60e460996d9559497e4c65cfb47304f01cfa7647))
+
+
+### Schneller
+
+* Live-Meldungen nennen Turnier und Event öffentlicher Turniere ([#1801](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1801)) ([60e4609](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/60e460996d9559497e4c65cfb47304f01cfa7647))
+* Turnierseiten laden nur bei Änderungen ihres Turniers nach ([#1801](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1801)) ([60e4609](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/60e460996d9559497e4c65cfb47304f01cfa7647))
+
 ## 1.7.0 (20.10.2026)
 
 ### Neu
