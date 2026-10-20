@@ -1,9 +1,10 @@
 """Anmeldungen, Teilnehmerverwaltung und Check-in.
 """
 import asyncio
+import contextlib
 import logging
 
-from fastapi import HTTPException, Depends, Request
+from fastapi import BackgroundTasks, HTTPException, Depends, Request
 from datetime import datetime, timezone
 from pymongo.errors import DuplicateKeyError
 from database import get_db
@@ -596,6 +597,7 @@ async def _create_self_registration(db, tid: str, tournament: dict, body: Regist
 
 @router.post("/{tid}/register")
 async def register_for_tournament(tid: str, body: RegistrationCreate,
+                                   background: BackgroundTasks,
                                    access: str | None = None,
                                    me: dict = Depends(get_current_user),
                                    request: Request = None):
@@ -613,12 +615,16 @@ async def register_for_tournament(tid: str, body: RegistrationCreate,
         t = await _get_visible_tournament(tid, me)
     elif t.get("status") == "draft" and not register_access:
         raise HTTPException(status_code=404, detail="Turnier nicht gefunden")
-    return await self_register(db, t, body, me, register_access, via="onsite" if onsite else "web")
+    # Bestätigung und Erfolge erst nach der Antwort (#1859): am Einlass wartet niemand auf Postfach, Mail und Abzeichen.
+    return await self_register(db, t, body, me, register_access, via="onsite" if onsite else "web", followups=background)
 
 
-async def self_register(db, t: dict, body: RegistrationCreate, me: dict, register_access: dict | None, *, via: str = "web") -> dict:
+async def self_register(db, t: dict, body: RegistrationCreate, me: dict, register_access: dict | None, *, via: str = "web",
+                        followups: BackgroundTasks | None = None) -> dict:
     """Die Selbstanmeldung hinter der Route - das Website-Formular und der Discord-Knopf (#885) laufen hier durch
-    dieselben Prüfungen (Sperre, Regeln und Datenschutz, Frist, Vereinsmitglieder, Event-Pflicht, Startgeld)."""
+    dieselben Prüfungen (Sperre, Regeln und Datenschutz, Frist, Vereinsmitglieder, Event-Pflicht, Startgeld).
+
+    ``followups``: Bestätigung und Erfolge laufen dann nach der Antwort (Route); ohne gleich hier (Discord, Event)."""
     tid = t["id"]
     if _is_tournament_locked(t):
         raise HTTPException(status_code=423, detail=TOURNAMENT_MUTATION_LOCKED_DETAIL)
@@ -629,90 +635,103 @@ async def self_register(db, t: dict, body: RegistrationCreate, me: dict, registe
         raise HTTPException(status_code=400, detail=registration_error)
     if t.get("block_club_member_registration") and await _is_active_club_member(db, me):
         raise HTTPException(status_code=403, detail="Dieses Turnier ist für externe Teilnehmer vorgesehen. Vereinsmitglieder können sich hier nicht selbst anmelden.")
-    queue = _preview_queue(tid)
-    queue.pending += 1
+    queue = _registration_queue(tid)
     try:
-        # Gleichzeitige Anmeldungen (#1826, Vor-Ort-QR am Einlass) stellen sich an der Sperre an statt abzubrechen.
-        # In der Sperre nur Platz und Startgeld (#1859) - der Vorschau-Baum folgt danach, gesammelt für alle.
-        async with mutation_lock(db, tournament_write_resource(tid), wait_seconds=registration_wait_seconds()):
-            current = await db.tournaments.find_one({"id": tid}, {"_id": 0})
-            if not current:
-                raise HTTPException(status_code=404, detail="Turnier nicht gefunden")
-            if _is_tournament_locked(current):
-                raise HTTPException(status_code=423, detail=TOURNAMENT_MUTATION_LOCKED_DETAIL)
-            current_error = _registration_error(current)
-            if current_error and not register_access:
-                raise HTTPException(status_code=400, detail=current_error)
-            reg = await _create_self_registration(db, tid, current, body, me, register_access, via=via)
+        # Gleichzeitige Anmeldungen (#1826, Vor-Ort-QR am Einlass) stellen sich an der Sperre an statt abzubrechen -
+        # im selben Prozess der Reihe nach (#1859), ohne Lücken durch das Nachfragen an der Sperre. In der Sperre nur
+        # Platz und Startgeld; der Vorschau-Baum folgt danach, einmal für alle bis dahin Angemeldeten.
+        async with queue.turn(registration_wait_seconds()) as wait:
+            async with mutation_lock(db, tournament_write_resource(tid), wait_seconds=wait):
+                current = await db.tournaments.find_one({"id": tid}, {"_id": 0})
+                if not current:
+                    raise HTTPException(status_code=404, detail="Turnier nicht gefunden")
+                if _is_tournament_locked(current):
+                    raise HTTPException(status_code=423, detail=TOURNAMENT_MUTATION_LOCKED_DETAIL)
+                current_error = _registration_error(current)
+                if current_error and not register_access:
+                    raise HTTPException(status_code=400, detail=current_error)
+                reg = await _create_self_registration(db, tid, current, body, me, register_access, via=via)
     except MutationLockBusy:
         raise HTTPException(status_code=409, detail="Eine Turnieraktion wird bereits verarbeitet. Bitte erneut versuchen.")
-    finally:
-        queue.pending -= 1
     if not reg.get("idempotent_replay"):
         if reg["status"] in {"approved", "checked_in"}:
             queue.requested += 1
             reg["auto_bracket_update"] = await _refresh_previews_after_self_registration(db, tid, queue.requested,
                                                                                          me.get("id"))
-        await _after_self_registration(db, tid, reg, me)
+        if followups is not None:
+            followups.add_task(_after_self_registration, db, tid, reg, me)
+        else:
+            await _after_self_registration(db, tid, reg, me)
     return reg
 
 
-class _PreviewQueue:
-    """Vorschau-Baum nach Selbstanmeldungen, je Turnier gesammelt (#1859).
+class _RegistrationQueue:
+    """Die Schlange der Selbstanmeldungen eines Turniers in diesem Prozess (#1859).
 
-    ``requested`` zählt die bestätigten Anmeldungen dieses Prozesses (erhöht erst nach dem Speichern), ``refreshed`` bis
-    zu welcher Nummer ein Auffrischen sie schon enthält, ``pending`` wie viele Anmeldungen gerade an der Sperre stehen
-    oder in ihr sind."""
+    Die Turnier-Sperre liegt in MongoDB, damit sie über Prozesse hinweg gilt; wer wartet, fragt sie im Takt neu an. Bei
+    16 Anmeldungen im selben Moment entstanden so zwischen zwei Anmeldungen Lücken bis zum nächsten Nachfragen. Hier
+    stellen sich die Anmeldungen eines Prozesses vorher der Reihe nach an (``asyncio.Lock`` ist fair): die nächste fragt
+    die Sperre erst, wenn die vorige sie freigibt, und bekommt sie sofort.
 
-    __slots__ = ("requested", "refreshed", "pending")
+    ``requested`` zählt die bestätigten Anmeldungen (erhöht erst nach dem Speichern), ``refreshed`` bis zu welcher Nummer
+    der Vorschau-Baum sie schon enthält."""
+
+    __slots__ = ("lock", "requested", "refreshed")
 
     def __init__(self):
+        self.lock = asyncio.Lock()
         self.requested = 0
         self.refreshed = 0
-        self.pending = 0
+
+    @contextlib.asynccontextmanager
+    async def turn(self, wait_seconds: float):
+        """In der Schlange warten, höchstens ``wait_seconds``; liefert die verbleibende Wartezeit für die Sperre."""
+        loop = asyncio.get_running_loop()
+        started = loop.time()
+        try:
+            async with asyncio.timeout(wait_seconds):
+                await self.lock.acquire()
+        except TimeoutError:
+            raise MutationLockBusy("registration queue") from None
+        try:
+            yield max(0.5, wait_seconds - (loop.time() - started))
+        finally:
+            self.lock.release()
 
 
-_PREVIEW_QUEUES: dict[str, _PreviewQueue] = {}
-# Takt, in dem ein wartendes Auffrischen nachsieht, ob die Schlange an der Sperre leer ist.
-PREVIEW_SETTLE_POLL_SECONDS = 0.05
+_REGISTRATION_QUEUES: dict[tuple[int, str], _RegistrationQueue] = {}
 
 
-def _preview_queue(tid: str) -> _PreviewQueue:
-    queue = _PREVIEW_QUEUES.get(tid)
+def _registration_queue(tid: str) -> _RegistrationQueue:
+    key = (id(asyncio.get_running_loop()), tid)
+    queue = _REGISTRATION_QUEUES.get(key)
     if queue is None:
-        queue = _PREVIEW_QUEUES[tid] = _PreviewQueue()
+        queue = _REGISTRATION_QUEUES[key] = _RegistrationQueue()
     return queue
 
 
 async def _refresh_previews_after_self_registration(db, tid: str, number: int, actor_id: str | None) -> dict | None:
     """Den Vorschau-Baum nach der Anmeldung Nummer ``number`` auffrischen - ohne die Platzvergabe aufzuhalten (#1859).
 
-    Am Einlass melden sich 16 bis 30 Leute im selben Moment an. Früher baute jede Anmeldung den Baum in der
-    Turnier-Sperre neu, die nächste wartete so lange. Jetzt hält eine Anmeldung die Sperre nur für Platz und Startgeld;
-    den Baum baut danach einer für alle: Wer wartet, bis die Schlange an der Sperre leer ist, und dann neu baut, nimmt
-    alle bis dahin gespeicherten Anmeldungen mit - die übrigen sehen „schon erledigt“ und antworten sofort. Ein Fehler
-    oder eine besetzte Sperre beim Baum kostet niemanden seinen Platz (er ist schon gespeichert); der Baum wächst dann
-    mit der nächsten Anmeldung oder spätestens beim Check-in-Ende.
+    Früher baute jede Anmeldung den Baum in der Turnier-Sperre neu, die nächste wartete so lange. Jetzt stellt sich das
+    Auffrischen hinten an die Schlange: Wer am Einlass gleichzeitig kam, ist bis dahin gespeichert, ein Neubau nimmt
+    alle mit, die übrigen sehen „schon erledigt“. Ein Fehler oder eine besetzte Sperre beim Baum kostet niemanden seinen
+    Platz (er ist schon gespeichert); der Baum wächst dann mit der nächsten Anmeldung oder beim Check-in-Ende.
 
     Mehrere Prozesse: jeder zählt nur seine eigenen Anmeldungen und baut im Zweifel einmal mehr - nie zu selten."""
-    queue = _preview_queue(tid)
-    wait = registration_wait_seconds()
-    loop = asyncio.get_running_loop()
-    settle_until = loop.time() + wait
-    # Erst die Schlange an der Sperre durchlassen (Platzvergabe zuerst), höchstens so lange wie eine Anmeldung wartet.
-    while queue.refreshed < number and queue.pending > 0 and loop.time() < settle_until:
-        await asyncio.sleep(PREVIEW_SETTLE_POLL_SECONDS)
+    queue = _registration_queue(tid)
     if queue.refreshed >= number:
         return None
     try:
-        async with mutation_lock(db, tournament_write_resource(tid), wait_seconds=wait):
+        async with queue.turn(registration_wait_seconds()) as wait:
             if queue.refreshed >= number:
                 return None
-            covered = queue.requested
-            tournament = await db.tournaments.find_one({"id": tid}, {"_id": 0})
-            update = await _refresh_tournament_previews_after_registration(db, tournament, actor_id) if tournament else None
-            queue.refreshed = max(queue.refreshed, covered)
-            return update
+            async with mutation_lock(db, tournament_write_resource(tid), wait_seconds=wait):
+                covered = queue.requested
+                tournament = await db.tournaments.find_one({"id": tid}, {"_id": 0})
+                update = await _refresh_tournament_previews_after_registration(db, tournament, actor_id) if tournament else None
+                queue.refreshed = max(queue.refreshed, covered)
+                return update
     except MutationLockBusy:
         logger.warning("Vorschau nach Anmeldung zu %s nicht aufgefrischt: Sperre besetzt", _log_safe(tid))
     except Exception as exc:  # noqa: BLE001
