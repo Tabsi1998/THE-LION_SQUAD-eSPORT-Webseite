@@ -277,7 +277,8 @@ News und zur Mitgliedschaft.
 
 | Fehlerbild | Ursache | Lösung |
 | --- | --- | --- |
-| „Nur PNG, JPG oder WebP erlaubt.“ beim Hochladen | Die Datei ist ein SVG oder ein anderes Format | Das Logo als PNG exportieren (zum Beispiel 512 × 512 oder größer) |
+| „Nur PNG, JPG oder WebP erlaubt.“ beim Hochladen | Die Datei hat ein anderes Format | Das Logo als PNG exportieren (zum Beispiel 512 × 512 oder größer) |
+| „SVG-Dateien gehen hier nicht.“ beim Hochladen | SVG bleibt aus Sicherheitsgründen gesperrt | Als PNG mit durchsichtigem Hintergrund (zum Beispiel 2000 px breit) oder als WebP exportieren; die Website macht daraus alle Größen |
 | Das Logo ist unscharf oder abgeschnitten | Zu kleine Datei oder falsches Seitenverhältnis | Quadratisches PNG in höherer Auflösung hochladen |
 | Das Favicon ist im Browser nicht zu sehen | Browser-Cache, oder nur die Fassung für dunklen Modus hinterlegt | Seite hart neu laden. Besser **Aus Logo und Akzentfarbe erzeugen** nutzen |
 | Änderungen am Branding sieht man nicht | Browser-Cache | Mit `Strg + F5` neu laden |
