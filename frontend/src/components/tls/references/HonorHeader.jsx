@@ -13,7 +13,7 @@ export function HonorHeader({ stats, links }) {
       <div className="tls-ref-hero max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-9 pb-7 md:pt-20 md:pb-16">
         <div className="tls-ref-hero__intro tls-ref-rise flex flex-col gap-4 md:gap-[22px] min-w-0" style={{ "--tls-ref-i": 0 }}>
           <div className="text-[11px] md:text-xs font-bold uppercase tracking-[0.28em] text-honor">Verein · Erfolgswand</div>
-          <h1 className="m-0 font-heading font-extrabold uppercase leading-[0.95] tracking-[-0.01em] text-[38px] md:text-[clamp(44px,6vw,80px)] break-words [text-wrap:balance]">Erfolge &amp; Referenzen</h1>
+          <h1 className="m-0 font-heading font-extrabold uppercase leading-[0.95] tracking-[-0.01em] text-[38px] md:text-[clamp(44px,6vw,64px)] lg:text-[clamp(44px,5.2vw,76px)] break-words [text-wrap:balance]">Erfolge &amp; Referenzen</h1>
           <p className="m-0 max-w-[52ch] text-muted-text text-base md:text-lg">
             Wo THE LION SQUAD im Namen des Vereins angetreten ist – in Turnieren, Rennligen und Team-Ligen. Mit allem, was dabei herausgekommen ist.
           </p>
