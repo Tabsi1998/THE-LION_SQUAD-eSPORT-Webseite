@@ -12,6 +12,7 @@ import { Reveal } from "@/components/tls/Reveal";
 import { MascotBadge } from "@/components/tls/Logo";
 import { LazyImg } from "@/components/tls/LazyImg";
 import { SeasonPassWidget } from "@/components/tls/SeasonPassWidget";
+import { HomeTodayStrip } from "@/components/tls/HomeTodayStrip";
 import { SponsorTicker } from "@/components/tls/SponsorTicker";
 import { LiveStreamSlider } from "@/components/tls/LiveStreamSlider";
 import { TwitchClips } from "@/components/tls/TwitchClips";
@@ -108,6 +109,8 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* Heute im Einsatz (#1753): nur an Renn- und Spieltagen der Serien, sonst fehlt der Streifen ganz. */}
+      <HomeTodayStrip />
       <ClubNumbers numbers={state?.club_numbers} shown={state?.club_numbers_shown} />
       {/* Discord (#581): online und im Voice - nur Zahlen, nur bei eingeschaltetem Server-Widget. */}
       <LiveStreamSlider />
