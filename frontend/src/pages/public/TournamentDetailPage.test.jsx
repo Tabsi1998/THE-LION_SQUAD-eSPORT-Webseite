@@ -424,3 +424,14 @@ test("die Seite hört nach dem Laden nur noch auf das eigene Turnier", async () 
   await screen.findAllByText("Herbst-Cup");
   await waitFor(() => expect(page().at(-1).options.tournamentId).toBe("t1"));
 });
+
+test("#1888: die Livestream-Karte folgt der öffentlichen Phase - nach dem Ende keine, solange es läuft schon", async () => {
+  mockApi({ ...base, status: "live", public_phase: { state: "completed", label: "Beendet" } });
+  const { unmount } = renderPage();
+  expect(await screen.findByTestId("tournament-title")).toBeInTheDocument();
+  expect(screen.queryByTestId("tournament-live-streams-stub")).toBeNull();
+  unmount();
+  mockApi({ ...base, status: "live", public_phase: { state: "live", label: "Läuft" } });
+  renderPage();
+  expect(await screen.findByTestId("tournament-live-streams-stub")).toBeInTheDocument();
+});

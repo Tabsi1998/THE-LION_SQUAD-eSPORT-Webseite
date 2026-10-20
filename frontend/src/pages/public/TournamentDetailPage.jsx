@@ -34,6 +34,7 @@ import { formatCents, previewQuote, startFeeSummary } from "@/lib/pricing";
 import { TournamentTabs } from "@/components/tls/tournament/TournamentTabs";
 import { TournamentTimeline, countdownText, timelineSteps } from "@/components/tls/tournament/TournamentTimeline";
 import { MyStandCard } from "@/components/tls/tournament/MyStandCard";
+import { isPublicLive } from "@/lib/publicPhase";
 import { OnsiteTournamentView } from "@/components/tls/tournament/OnsiteTournamentView";
 import { FriendsAtEvent } from "@/components/tls/FriendsAtEvent";
 import { offerFriendsHint } from "@/lib/friendsHint";
@@ -405,7 +406,8 @@ function TournamentDetailView() {
               <Podium rows={podiumRows} registrations={regs} />
             </section>
           )}
-          {t.status === "live" && <TournamentLiveStreams tournament={t} />}
+          {/* Die Livestream-Karte folgt der öffentlichen Phase (#1888): nach dem Ende keine, auch wenn der Status noch „live“ ist. */}
+          {isPublicLive(t) && <TournamentLiveStreams tournament={t} />}
           {(t.has_live_stream || (t.twitch_enabled && t.twitch_channel)) && (
             <section data-testid="tournament-stream"><StreamEmbed source={t} /></section>
           )}
