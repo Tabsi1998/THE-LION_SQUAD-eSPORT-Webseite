@@ -19,8 +19,31 @@ export type ImageShape = "round" | "square" | "banner";
 /** Zuschnitt je Stelle - dieselben Formate wie im Web (ImageUpload `crop`). */
 export const IMAGE_ASPECT: Record<ImageShape, [number, number]> = { round: [1, 1], square: [1, 1], banner: [3, 1] };
 
+// Erlaubte Typen wie am Server und im Web (#1419): PNG, JPG, WebP. SVG wird schon vor dem Hochladen abgelehnt - mit
+// demselben Wortlaut wie am Server (backend/services/image_upload.py `SVG_REFUSED_MESSAGE`). Ohne Angabe zum Typ
+// entscheidet der Server.
+export const SVG_REFUSED_MESSAGE = "SVG-Dateien gehen hier nicht. Bitte als PNG mit durchsichtigem Hintergrund (z. B. 2000 px breit) oder als WebP exportieren – die Website macht daraus alle Größen.";
+export const UNSUPPORTED_IMAGE_MESSAGE = "Nur PNG, JPG oder WebP erlaubt.";
+const ALLOWED_IMAGE_TYPES = new Set(["image/png", "image/jpeg", "image/jpg", "image/webp"]);
+const ALLOWED_IMAGE_EXTS = new Set(["png", "jpg", "jpeg", "webp"]);
+
+/** Warum dieses Bild nicht hochgeht - oder null, wenn der Typ passt (oder unbekannt ist). */
+export function unsupportedImageText(asset: Pick<ImagePicker.ImagePickerAsset, "mimeType" | "fileName" | "uri">): string | null {
+  const type = (asset.mimeType || "").trim().toLowerCase();
+  const name = (asset.fileName || asset.uri || "").split(/[?#]/)[0];
+  const slash = name.lastIndexOf("/");
+  const dot = name.lastIndexOf(".");
+  const ext = dot > slash ? name.slice(dot + 1).toLowerCase() : "";
+  if (type === "image/svg+xml" || ext === "svg") return SVG_REFUSED_MESSAGE;
+  if (type) return ALLOWED_IMAGE_TYPES.has(type) ? null : UNSUPPORTED_IMAGE_MESSAGE;
+  if (ext && !ALLOWED_IMAGE_EXTS.has(ext)) return UNSUPPORTED_IMAGE_MESSAGE;
+  return null;
+}
+
 /** Hochladen wie im Web: dieselbe Adresse, dieselbe Prüfung. Liefert die Adresse des Bildes. */
 export async function uploadPickedImage(asset: ImagePicker.ImagePickerAsset): Promise<string> {
+  const refused = unsupportedImageText(asset);
+  if (refused) throw new PickProblem(refused);
   const type = asset.mimeType || "image/jpeg";
   const ext = (type.split("/")[1] || "jpg").replace("jpeg", "jpg");
   const form = new FormData();
@@ -80,6 +103,9 @@ export function ImagePickField({
     try {
       const asset = await pickImage(source, shape);
       if (!asset) return;
+      // Ein falscher Typ (etwa SVG) braucht kein Netz: gleich der Satz, ohne „Wird hochgeladen“.
+      const refused = unsupportedImageText(asset);
+      if (refused) throw new PickProblem(refused);
       setBusy(true);
       const url = await uploadPickedImage(asset);
       await onUploaded(url);
