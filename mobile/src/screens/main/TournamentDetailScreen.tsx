@@ -1,11 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Alert, AppState, Modal, Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { Alert, AppState, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { AddToCalendarButton } from "../../components/AddToCalendarButton";
 import { tournamentIsOver } from "../../lib/afterEnd";
 import { Button } from "../../components/Button";
 import { Card } from "../../components/Card";
-import { FormInput } from "../../components/FormInput";
 import { ErrorState, PartialLoadNotice, SkeletonList, loadProblem, type LoadProblem } from "../../components/ListState";
 import { Screen } from "../../components/Screen";
 import { SegmentedTabs } from "../../components/SegmentedTabs";
@@ -21,12 +20,13 @@ import { motionPlan, wonJustNow, type MotionPlan } from "../../lib/bracketMotion
 import { playMoment } from "../../lib/tournamentHaptics";
 import { checkInState, matchStatusText, standingsTables, treeKind } from "../../lib/tournamentView";
 import { BracketCanvas } from "../../components/tournament/bracket/BracketCanvas";
+import { RegistrationSheet, type RegistrationPayload } from "../../components/tournament/RegistrationSheet";
 import { ScheduleList } from "../../components/tournament/ScheduleList";
 import { StandingsTables } from "../../components/tournament/StandingsTables";
 import { getRegistrationState } from "../../lib/registration";
 import { TeamDayCard } from "../../components/tournament/TeamDayCard";
 import { ResultShareCard } from "../../components/ResultShareCard";
-import { basisLabel, formatCents, ownPriceLine, quoteTotal, startFeeSummary } from "../../lib/startFee";
+import { ownPriceLine, startFeeSummary } from "../../lib/startFee";
 import { isGuestUser } from "../../live";
 import { FriendsAtEventCard } from "../../components/FriendsAtEventCard";
 import { offerFriendsHint } from "../../lib/friendsHint";
@@ -36,7 +36,6 @@ import { useLiveRefresh } from "../../realtime/LiveChangesProvider";
 import type { TournamentStackParamList } from "../../navigation/types";
 import { colors, radius } from "../../theme";
 import type { Team, Tournament, User } from "../../types";
-import { useSeasonOverlay } from "../../seasons/anchors";
 import { useShareHeader } from "../../components/HeaderActions";
 import { sharePage } from "../../lib/share";
 import { idSegment } from "../../lib/apiIds";
@@ -52,13 +51,6 @@ type BracketPayload = {
   stages?: any[];
   registrations?: any[];
   engine?: string;
-};
-type RegistrationPayload = {
-  player_ids?: Record<string, string>;
-  team_id?: string | null;
-  // Startgeld (#319): wer anmeldet, übernimmt es - der Server verlangt die Bestätigung.
-  accept_costs?: boolean;
-  selected_positions?: string[];
 };
 
 const tabs: Array<{ key: TabKey; label: string }> = [
@@ -291,14 +283,13 @@ export function TournamentDetailScreen({ navigation, route }: Props) {
     }
   }, [busy, load, tournament, user?.discord_name, user?.display_name, user?.username]);
 
+  // Jede Anmeldung geht über das Bestätigungs-Blatt (#1904): auch ein Einzelturnier ohne Startgeld und ohne Kennungen -
+  // ein versehentlicher Tipp ist keine Anmeldung mehr.
   const startRegistration = useCallback(() => {
     if (!tournament || busy) return;
-    if (isTeamTournament || gameFields.length || tournament.offer) {
-      setRegisterModal(true);
-      return;
-    }
-    register();
-  }, [busy, gameFields.length, isTeamTournament, register, tournament]);
+    setError("");
+    setRegisterModal(true);
+  }, [busy, tournament]);
 
   const checkIn = useCallback(async () => {
     if (!tournament || busy) return;
@@ -629,8 +620,9 @@ export function TournamentDetailScreen({ navigation, route }: Props) {
           </Card>
         ) : null}
       </ScrollView>
-      <RegistrationModal
+      <RegistrationSheet
         busy={busy}
+        error={registerModal ? error : ""}
         fields={gameFields}
         teams={manageableTeams}
         tournament={tournament}
@@ -658,162 +650,6 @@ function prizeGroupLabel(group?: string | null) {
   if (group === "loser") return "Loser-Bracket";
   if (group === "special") return "Sonderpreis";
   return group;
-}
-
-function RegistrationModal({
-  busy,
-  fields,
-  teams,
-  tournament,
-  user,
-  visible,
-  onClose,
-  onSubmit,
-}: {
-  busy: boolean;
-  fields: NonNullable<NonNullable<Tournament["game"]>["effective_player_id_fields"]>;
-  teams: Team[];
-  tournament: Tournament;
-  user?: User | null;
-  visible: boolean;
-  onClose: () => void;
-  onSubmit: (payload: RegistrationPayload) => void;
-}) {
-  useSeasonOverlay("registration-modal", visible);
-  const isTeamTournament = (tournament.team_mode || "solo") !== "solo";
-  const sourceSlug = tournament.game?.identity_game_slug || tournament.game?.slug || "";
-  const gameSlug = tournament.game?.slug || "";
-  const initialIds = useMemo(() => ({
-    ...((sourceSlug && user?.game_ids?.[sourceSlug]) || {}),
-    ...((gameSlug && user?.game_ids?.[gameSlug]) || {}),
-  }), [gameSlug, sourceSlug, user?.game_ids]);
-  const [playerIds, setPlayerIds] = useState<Record<string, string>>(initialIds);
-  const [teamId, setTeamId] = useState(teams[0]?.id || "");
-  // Startgeld (#319): Summe vor dem Absenden, wählbare Positionen, Kostenübernahme als Pflicht.
-  const offer = tournament.offer || null;
-  const [acceptCosts, setAcceptCosts] = useState(false);
-  const [selectedPositions, setSelectedPositions] = useState<string[]>([]);
-  const seats = isTeamTournament ? Math.max(1, Number(tournament.team_size) || 1) : 1;
-  const total = offer ? quoteTotal(offer, seats, selectedPositions) : 0;
-  const currency = offer?.currency || "EUR";
-
-  useEffect(() => {
-    if (!visible) return;
-    setPlayerIds(initialIds);
-    setTeamId(teams[0]?.id || "");
-    setAcceptCosts(false);
-    setSelectedPositions([]);
-  }, [initialIds, teams, visible]);
-
-  const missingRequired = fields.some((field) => field.required !== false && !String(playerIds[field.key] || "").trim());
-  const canSubmit = !busy && (!isTeamTournament || Boolean(teamId)) && !missingRequired && (!offer || acceptCosts);
-
-  return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <View style={styles.modalBackdrop}>
-        <View style={styles.modalCard}>
-          <ScrollView contentContainerStyle={styles.modalContent} keyboardShouldPersistTaps="handled">
-            <View style={styles.modalHead}>
-              <View style={styles.flex}>
-                <Heading>Turnier-Anmeldung</Heading>
-                <Muted>{isTeamTournament ? "Wähle dein verwaltbares Team aus." : fields.length ? `${tournament.game?.display_name || tournament.game?.name || "Dieses Spiel"} benötigt diese Angaben.` : "Bitte bestätige das Startgeld, dann bist du dabei."}</Muted>
-              </View>
-              <Pressable onPress={onClose} style={({ pressed }) => [styles.closeButton, pressed && styles.pressed]}>
-                <Body style={styles.closeText}>x</Body>
-              </Pressable>
-            </View>
-
-            {isTeamTournament ? (
-              <View style={styles.formGroup}>
-                <Muted style={styles.formLabel}>Team</Muted>
-                {teams.length ? teams.map((team) => (
-                  <Pressable key={team.id} onPress={() => setTeamId(team.id)} style={[styles.teamChoice, teamId === team.id && styles.teamChoiceActive]}>
-                    <View style={styles.flex}>
-                      <Body style={styles.strong}>{team.tag ? `[${team.tag}] ${team.name}` : team.name}</Body>
-                      <Muted>{team.my_role === "co_leader" ? "Co-Leader" : team.my_role === "leader" ? "Leader" : team.can_manage ? "Verwaltbar" : "Team"}</Muted>
-                    </View>
-                    <View style={[styles.radio, teamId === team.id && styles.radioActive]} />
-                  </Pressable>
-                )) : (
-                  <Muted style={styles.errorText}>Du hast aktuell kein Team, das du für dieses Turnier anmelden darfst.</Muted>
-                )}
-              </View>
-            ) : null}
-
-            {fields.length ? (
-              <View style={styles.formGroup}>
-                <Muted style={styles.formLabel}>Spieler-IDs</Muted>
-                {fields.map((field) => (
-                  <FormInput
-                    key={field.key}
-                    label={`${field.label || field.key}${field.required === false ? "" : " *"}`}
-                    value={playerIds[field.key] || ""}
-                    placeholder={field.help_text || field.label || field.key}
-                    onChangeText={(value) => setPlayerIds((current) => ({ ...current, [field.key]: value }))}
-                  />
-                ))}
-              </View>
-            ) : null}
-
-            {offer ? (
-              <View style={[styles.formGroup, styles.feeBox]} testID="tournament-register-costs">
-                <Muted style={styles.feeLabel}>Startgeld</Muted>
-                {offer.positions.filter((position) => position.optional).map((position) => {
-                  const chosen = selectedPositions.includes(position.key);
-                  return (
-                    <Pressable
-                      key={position.key}
-                      onPress={() => setSelectedPositions((current) => (chosen ? current.filter((key) => key !== position.key) : [...current, position.key]))}
-                      style={styles.checkRow}
-                      accessibilityRole="checkbox"
-                      accessibilityState={{ checked: chosen }}
-                      testID={`tournament-offer-option-${position.key}`}
-                    >
-                      <View style={[styles.checkbox, chosen && styles.checkboxActive]} />
-                      <Body style={styles.flex}>{position.label} <Muted>{formatCents(position.amount_cents, currency)} {basisLabel(position.basis)}</Muted></Body>
-                    </Pressable>
-                  );
-                })}
-                <View style={styles.feeTotalRow}>
-                  <Muted>{isTeamTournament ? `Summe für ein Team mit ${seats} Spielern` : "Summe"}</Muted>
-                  <Body style={styles.strong} testID="tournament-quote">{formatCents(total, currency)}</Body>
-                </View>
-                {isTeamTournament && offer.positions.some((position) => position.basis === "per_person") ? (
-                  <Muted>Gezählt wird der Roster bei der Freigabe – fehlen noch Spieler, gilt die Teamgröße.</Muted>
-                ) : null}
-                <Pressable
-                  onPress={() => setAcceptCosts((current) => !current)}
-                  style={styles.checkRow}
-                  accessibilityRole="checkbox"
-                  accessibilityState={{ checked: acceptCosts }}
-                  testID="tournament-accept-costs"
-                >
-                  <View style={[styles.checkbox, acceptCosts && styles.checkboxActive]} />
-                  <View style={styles.flex}>
-                    <Body>{isTeamTournament ? "Ich übernehme das Startgeld für das Team (Rechnung an mich)." : "Ich übernehme das Startgeld (Rechnung an mich)."}</Body>
-                    <Muted>Bezahlt wird erst mit der verbindlichen Teilnahme; die Rechnung kommt in dein Konto.</Muted>
-                  </View>
-                </Pressable>
-              </View>
-            ) : null}
-
-            <Muted>Mit der Anmeldung akzeptierst du die Turnierregeln und die Datenschutzhinweise.</Muted>
-            {missingRequired ? <Muted style={styles.errorText}>Bitte alle Pflicht-IDs ausfüllen.</Muted> : null}
-
-            <View style={styles.formActions}>
-              <Button label="Abbrechen" variant="secondary" onPress={onClose} disabled={busy} />
-              <Button
-                label={busy ? "Sendet ..." : offer && total > 0 ? `Verbindlich anmelden · ${formatCents(total, currency)}` : "Anmelden"}
-                onPress={() => onSubmit({ team_id: isTeamTournament ? teamId : null, player_ids: playerIds, accept_costs: acceptCosts, selected_positions: selectedPositions })}
-                disabled={!canSubmit}
-                testID="tournament-register-submit"
-              />
-            </View>
-          </ScrollView>
-        </View>
-      </View>
-    </Modal>
-  );
 }
 
 function CompletedTournamentSummary({
@@ -1060,10 +896,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 8,
-  },
-  flex: {
-    flex: 1,
-    minWidth: 0,
   },
   pressed: {
     opacity: 0.72,
@@ -1362,32 +1194,6 @@ const styles = StyleSheet.create({
   error: {
     color: colors.live,
   },
-  closeButton: {
-    alignItems: "center",
-    backgroundColor: "rgba(255,255,255,0.06)",
-    borderColor: colors.border,
-    borderRadius: 18,
-    borderWidth: 1,
-    height: 36,
-    justifyContent: "center",
-    width: 36,
-  },
-  closeText: {
-    fontSize: 22,
-    fontWeight: "900",
-    lineHeight: 24,
-  },
-  formActions: {
-    gap: 10,
-  },
-  formGroup: {
-    gap: 10,
-  },
-  formLabel: {
-    color: colors.cyan,
-    fontWeight: "900",
-    textTransform: "uppercase",
-  },
   feeBox: {
     backgroundColor: "rgba(255,215,0,0.06)",
     borderColor: "rgba(255,215,0,0.35)",
@@ -1402,76 +1208,5 @@ const styles = StyleSheet.create({
     fontWeight: "900",
     letterSpacing: 1,
     textTransform: "uppercase",
-  },
-  feeTotalRow: {
-    alignItems: "baseline",
-    flexDirection: "row",
-    gap: 10,
-    justifyContent: "space-between",
-  },
-  checkRow: {
-    alignItems: "flex-start",
-    flexDirection: "row",
-    gap: 10,
-  },
-  checkbox: {
-    borderColor: colors.border,
-    borderRadius: radius.lg,
-    borderWidth: 2,
-    height: 18,
-    marginTop: 2,
-    width: 18,
-  },
-  checkboxActive: {
-    backgroundColor: colors.gold,
-    borderColor: colors.gold,
-  },
-  modalBackdrop: {
-    backgroundColor: "rgba(0,0,0,0.78)",
-    flex: 1,
-    justifyContent: "center",
-    padding: 18,
-  },
-  modalCard: {
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    maxHeight: "88%",
-    overflow: "hidden",
-  },
-  modalContent: {
-    gap: 14,
-    padding: 16,
-  },
-  modalHead: {
-    alignItems: "flex-start",
-    flexDirection: "row",
-    gap: 12,
-  },
-  radio: {
-    borderColor: colors.border,
-    borderRadius: 8,
-    borderWidth: 2,
-    height: 16,
-    width: 16,
-  },
-  radioActive: {
-    backgroundColor: colors.cyan,
-    borderColor: colors.cyan,
-  },
-  teamChoice: {
-    alignItems: "center",
-    backgroundColor: "rgba(255,255,255,0.04)",
-    borderColor: colors.border,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    flexDirection: "row",
-    gap: 10,
-    padding: 11,
-  },
-  teamChoiceActive: {
-    backgroundColor: "rgba(41,182,232,0.13)",
-    borderColor: "rgba(41,182,232,0.5)",
   },
 });
