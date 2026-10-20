@@ -1,0 +1,513 @@
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { api, formatApiError } from "@/lib/api";
+import { AdminSheet } from "@/components/tls/AdminSheet";
+import { INPUT_CLASS, TextAreaField } from "@/components/tls/FormFields";
+import { roundLabel, roundWhen } from "@/lib/referenceCalendar";
+import { parseResultPaste, parseTablePaste } from "@/lib/resultPaste";
+import {
+  MARK_OPTIONS, autoPlaces, emptyMap, emptyMatch, emptyRow, formStamp, formToPayload, formatPoints, matchParticipant,
+  pastedToRows, problemsByRow, scoredText, sheetToForm,
+} from "@/lib/referenceResults";
+import { ResultPreview } from "./ResultPreview";
+import { toast } from "sonner";
+import { ClipboardList, Plus, RefreshCw, SlidersHorizontal, Trash2, X } from "lucide-react";
+
+// Ergebnis eintragen (#1744): ein Termin, eine dynamische Liste. Zeilen hinzufügen und entfernen, Platz aus der
+// Reihenfolge (überschreibbar), Name mit Vorschlag aus den Teilnehmern, Team je Rennen, Punkte leer = nach Schlüssel,
+// Marken und Strafpunkte unter „Mehr“. Team-Liga: Spiel mit Ergebnis, Maps und Aufstellung, dazu die Tabelle laut
+// Veranstalter zum Einfügen. Erst prüft der Server (Vorschau), dann wird übernommen – als Entwurf, veröffentlicht oder,
+// wenn das Blatt schon veröffentlicht ist und die Person nicht veröffentlichen darf, als Entwurf daneben.
+
+const SMALL_INPUT = `${INPUT_CLASS} !py-1.5 text-sm`;
+const LABEL = "text-[10px] font-bold uppercase tracking-widest text-white/45";
+const ICON_BUTTON = "p-1.5 rounded-sm text-white/45 hover:text-white hover:bg-white/5 transition active:scale-[0.97]";
+
+function PasteBox({ onApply, label, placeholder, hint, testId }) {
+  const [text, setText] = useState("");
+  const [errors, setErrors] = useState([]);
+  const apply = () => {
+    const result = onApply(text);
+    setErrors(result.errors);
+    if (result.rows.length) setText("");
+  };
+  return (
+    <div className="border border-white/10 rounded-sm bg-[#0A0A0A] p-3 space-y-2" data-testid={testId}>
+      <TextAreaField label={label} value={text} onChange={(value) => { setText(value); setErrors([]); }} rows={5} placeholder={placeholder} hint={hint} testId={`${testId}-text`} />
+      <div className="flex items-center gap-2">
+        <button type="button" onClick={apply} disabled={!text.trim()} data-testid={`${testId}-apply`} className="tls-btn tls-btn--secondary px-3 py-2 rounded-sm text-xs font-bold uppercase tracking-wider disabled:opacity-50">
+          Liste übernehmen
+        </button>
+      </div>
+      {errors.length > 0 && (
+        <ul className="text-xs text-red-200 space-y-0.5" data-testid={`${testId}-errors`} role="alert">
+          {errors.map((error, index) => (
+            <li key={index}>{error.line ? `Zeile ${error.line}: ` : ""}{error.message}{error.text ? <span className="text-red-200/60"> – „{error.text}“</span> : null}</li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+function RowProblems({ items }) {
+  if (!items?.length) return null;
+  return (
+    <ul className="mt-1 space-y-0.5 text-xs" data-testid="result-row-problems">
+      {items.map((item, index) => (
+        <li key={index} className={item.level === "error" ? "text-red-300" : "text-amber-300"}>{item.message}</li>
+      ))}
+    </ul>
+  );
+}
+
+function ResultRow({ row, index, autoPlace, organizerMode, problems, scored, onChange, onRemove }) {
+  const [open, setOpen] = useState(() => Boolean(row.penalty_points || row.start_number || row.official_total || row.override));
+  const level = problems?.some((item) => item.level === "error") ? "error" : problems?.length ? "warning" : null;
+  const toggleMark = (mark) => onChange({ marks: row.marks.includes(mark) ? row.marks.filter((item) => item !== mark) : [...row.marks, mark] });
+  const number = index + 1;
+  return (
+    <li data-testid="result-row" data-level={level || undefined}
+      className={`py-2.5 pl-2 border-l-2 ${level === "error" ? "border-red-400/70" : level === "warning" ? "border-amber-400/60" : "border-transparent"}`}>
+      <div className="flex flex-wrap items-center gap-2">
+        <input aria-label={`Platz Zeile ${number}`} inputMode="numeric" value={row.place} placeholder={autoPlace ? String(autoPlace) : "–"}
+          onChange={(event) => onChange({ place: event.target.value })} data-testid="result-row-place" className={`${SMALL_INPUT} !w-14 text-center tabular-nums`} />
+        <input aria-label={`Name Zeile ${number}`} value={row.name} list="result-participants" placeholder="Name wie beim Veranstalter" maxLength={120}
+          onChange={(event) => onChange({ name: event.target.value, participant_id: "" })} data-testid="result-row-name" className={`${SMALL_INPUT} !w-auto flex-1 min-w-[9rem]`} />
+        <input aria-label={`Team Zeile ${number}`} value={row.team} list="result-teams" placeholder="Team" maxLength={120}
+          onChange={(event) => onChange({ team: event.target.value })} data-testid="result-row-team" className={`${SMALL_INPUT} !w-full sm:!w-36 order-last sm:order-none`} />
+        <input aria-label={`Punkte Zeile ${number}`} inputMode="decimal" value={row.points} placeholder={organizerMode ? "Pkt" : "Schlüssel"}
+          title={organizerMode ? "Punkte laut Veranstalter" : "Leer: nach Schlüssel. Eingetragen: laut Veranstalter (wird geprüft)."}
+          onChange={(event) => onChange({ points: event.target.value })} data-testid="result-row-points" className={`${SMALL_INPUT} !w-20 text-right tabular-nums`} />
+        <button type="button" className={`${ICON_BUTTON} ${open ? "text-[#29B6E8]" : ""}`} onClick={() => setOpen((value) => !value)} aria-expanded={open} aria-label={`Mehr zu Zeile ${number}`} title="Marken, Strafpunkte, Startnummer" data-testid="result-row-more">
+          <SlidersHorizontal className="w-4 h-4" />
+        </button>
+        <button type="button" className={ICON_BUTTON} onClick={onRemove} aria-label={`Zeile ${number} entfernen`} title="Entfernen" data-testid="result-row-remove">
+          <X className="w-4 h-4" />
+        </button>
+      </div>
+      {(open || row.marks.length > 0) && (
+        <div className="mt-2 flex flex-wrap gap-1.5" role="group" aria-label={`Marken Zeile ${number}`}>
+          {MARK_OPTIONS.map(([mark, label]) => {
+            const active = row.marks.includes(mark);
+            if (!open && !active) return null;
+            return (
+              <button key={mark} type="button" aria-pressed={active} onClick={() => toggleMark(mark)} data-testid={`result-row-mark-${mark}`}
+                className={`px-2 py-1 rounded-sm border text-[10px] font-bold uppercase tracking-wider transition-colors active:scale-[0.97] ${active ? "border-[#29B6E8] bg-[#29B6E8]/15 text-[#29B6E8]" : "border-white/10 text-white/50 hover:text-white"}`}>
+                {label}
+              </button>
+            );
+          })}
+        </div>
+      )}
+      {open && (
+        <div className="mt-2 grid grid-cols-2 sm:grid-cols-4 gap-2" data-testid="result-row-details">
+          <label className="block"><span className={LABEL}>Strafpunkte</span>
+            <input inputMode="decimal" value={row.penalty_points} onChange={(event) => onChange({ penalty_points: event.target.value })} data-testid="result-row-penalty" className={SMALL_INPUT} /></label>
+          <label className="block"><span className={LABEL}>Startnummer</span>
+            <input value={row.start_number} maxLength={10} onChange={(event) => onChange({ start_number: event.target.value })} data-testid="result-row-start" className={SMALL_INPUT} /></label>
+          <label className="block"><span className={LABEL}>Gesamt laut Veranst.</span>
+            <input inputMode="decimal" value={row.official_total} onChange={(event) => onChange({ official_total: event.target.value })} data-testid="result-row-total" className={SMALL_INPUT} /></label>
+          {!organizerMode && (
+            <label className="flex items-end gap-2 pb-2 text-xs text-white/70">
+              <input type="checkbox" checked={row.override} onChange={(event) => onChange({ override: event.target.checked })} data-testid="result-row-override" className="accent-[#29B6E8]" />
+              Punkte zählen statt Schlüssel
+            </label>
+          )}
+        </div>
+      )}
+      {scored && <div className="mt-1 text-[11px] text-white/45 tabular-nums" data-testid="result-row-scored">= {scoredText(scored)}</div>}
+      <RowProblems items={problems} />
+    </li>
+  );
+}
+
+function MatchEditor({ match, index, participants, onChange, onRemove }) {
+  const [person, setPerson] = useState("");
+  const setMap = (key, values) => onChange({ maps: match.maps.map((item) => (item.key === key ? { ...item, ...values } : item)) });
+  const addPerson = () => {
+    const name = person.trim();
+    if (!name) return;
+    const known = matchParticipant(name, participants);
+    const entry = known ? { participant_id: known.id, name: known.name } : { participant_id: "", name };
+    if (!match.lineup.some((item) => (entry.participant_id ? item.participant_id === entry.participant_id : item.name === name))) {
+      onChange({ lineup: [...match.lineup, entry] });
+    }
+    setPerson("");
+  };
+  return (
+    <div className="border border-white/10 rounded-sm bg-[#0A0A0A] p-3 space-y-3" data-testid="result-match">
+      <div className="flex items-center justify-between">
+        <span className={LABEL}>Spiel {index + 1}</span>
+        <button type="button" className={ICON_BUTTON} onClick={onRemove} aria-label={`Spiel ${index + 1} entfernen`} data-testid="result-match-remove"><Trash2 className="w-4 h-4" /></button>
+      </div>
+      <div className="grid grid-cols-[1fr_auto_1fr] gap-2 items-end">
+        <label className="block min-w-0"><span className={LABEL}>Heim</span>
+          <input value={match.home} maxLength={120} onChange={(event) => onChange({ home: event.target.value })} data-testid="result-match-home" className={SMALL_INPUT} /></label>
+        <div className="flex items-center gap-1 pb-0.5">
+          <input aria-label="Ergebnis Heim" inputMode="numeric" value={match.home_score} onChange={(event) => onChange({ home_score: event.target.value })} data-testid="result-match-home-score" className={`${SMALL_INPUT} !w-12 text-center tabular-nums`} />
+          <span className="text-white/40">:</span>
+          <input aria-label="Ergebnis Gast" inputMode="numeric" value={match.away_score} onChange={(event) => onChange({ away_score: event.target.value })} data-testid="result-match-away-score" className={`${SMALL_INPUT} !w-12 text-center tabular-nums`} />
+        </div>
+        <label className="block min-w-0"><span className={LABEL}>Gegner</span>
+          <input value={match.away} maxLength={120} onChange={(event) => onChange({ away: event.target.value })} data-testid="result-match-away" className={SMALL_INPUT} /></label>
+      </div>
+      <div className="space-y-1.5">
+        <span className={LABEL}>Maps</span>
+        {match.maps.map((item, mapIndex) => (
+          <div key={item.key} className="flex items-center gap-2" data-testid="result-map">
+            <input aria-label={`Map ${mapIndex + 1}`} value={item.name} maxLength={80} placeholder="Map" onChange={(event) => setMap(item.key, { name: event.target.value })} className={`${SMALL_INPUT} !w-auto flex-1 min-w-0`} data-testid="result-map-name" />
+            <input aria-label={`Map ${mapIndex + 1} Heim`} inputMode="numeric" value={item.home_score} onChange={(event) => setMap(item.key, { home_score: event.target.value })} className={`${SMALL_INPUT} !w-12 text-center tabular-nums`} data-testid="result-map-home" />
+            <span className="text-white/40">:</span>
+            <input aria-label={`Map ${mapIndex + 1} Gast`} inputMode="numeric" value={item.away_score} onChange={(event) => setMap(item.key, { away_score: event.target.value })} className={`${SMALL_INPUT} !w-12 text-center tabular-nums`} data-testid="result-map-away" />
+            <button type="button" className={ICON_BUTTON} onClick={() => onChange({ maps: match.maps.filter((entry) => entry.key !== item.key) })} aria-label={`Map ${mapIndex + 1} entfernen`}><X className="w-4 h-4" /></button>
+          </div>
+        ))}
+        <button type="button" onClick={() => onChange({ maps: [...match.maps, emptyMap()] })} data-testid="result-map-add" className="tls-btn tls-btn--quiet px-2.5 py-1.5 rounded-sm text-[10px] font-bold uppercase tracking-wider inline-flex items-center gap-1.5">
+          <Plus className="w-3.5 h-3.5" /> Map
+        </button>
+      </div>
+      <div className="space-y-1.5">
+        <span className={LABEL}>Aufstellung</span>
+        {match.lineup.length > 0 && (
+          <ul className="flex flex-wrap gap-1.5" data-testid="result-lineup">
+            {match.lineup.map((item, personIndex) => (
+              <li key={item.participant_id || item.name} className="inline-flex items-center gap-1 pl-2 pr-1 py-0.5 border border-white/10 rounded-sm text-xs text-white/80">
+                {item.name || "Teilnehmer"}
+                <button type="button" onClick={() => onChange({ lineup: match.lineup.filter((_, position) => position !== personIndex) })} aria-label={`${item.name} aus der Aufstellung nehmen`} className="p-0.5 text-white/40 hover:text-white"><X className="w-3 h-3" /></button>
+              </li>
+            ))}
+          </ul>
+        )}
+        <div className="flex items-center gap-2">
+          <input aria-label="Spieler zur Aufstellung" value={person} list="result-participants" maxLength={120} placeholder="Name"
+            onChange={(event) => setPerson(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); addPerson(); } }}
+            data-testid="result-lineup-input" className={`${SMALL_INPUT} !w-auto flex-1 min-w-0`} />
+          <button type="button" onClick={addPerson} disabled={!person.trim()} data-testid="result-lineup-add" className="tls-btn tls-btn--quiet px-2.5 py-1.5 rounded-sm text-[10px] font-bold uppercase tracking-wider inline-flex items-center gap-1.5 disabled:opacity-50">
+            <Plus className="w-3.5 h-3.5" /> Hinzufügen
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function OfficialTable({ rows, onPaste, onClear }) {
+  return (
+    <section className="space-y-2" data-testid="result-table">
+      <div className="flex items-center justify-between gap-2">
+        <h3 className="text-[11px] font-bold uppercase tracking-widest text-[#29B6E8]">Tabelle laut Veranstalter</h3>
+        {rows.length > 0 && <button type="button" onClick={onClear} data-testid="result-table-clear" className="tls-btn tls-btn--quiet px-2.5 py-1.5 rounded-sm text-[10px] font-bold uppercase tracking-wider">Leeren</button>}
+      </div>
+      {rows.length > 0 ? (
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm tabular-nums">
+            <thead>
+              <tr className="text-left text-[10px] uppercase tracking-widest text-white/45">
+                <th className="py-1 pr-2 font-bold">#</th><th className="py-1 pr-2 font-bold">Team</th><th className="py-1 pr-2 font-bold">Sp</th>
+                <th className="py-1 pr-2 font-bold">S-U-N</th><th className="py-1 pr-2 font-bold">Maps</th><th className="py-1 font-bold text-right">Pkt</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row, index) => (
+                <tr key={`${row.team}-${index}`} className="border-t border-white/5" data-testid="result-table-row">
+                  <td className="py-1 pr-2">{row.rank ?? "–"}</td>
+                  <td className="py-1 pr-2 font-bold break-words">{row.team}</td>
+                  <td className="py-1 pr-2">{row.played ?? "–"}</td>
+                  <td className="py-1 pr-2 whitespace-nowrap">{[row.won, row.drawn, row.lost].map((value) => value ?? "–").join("-")}</td>
+                  <td className="py-1 pr-2 whitespace-nowrap">{row.score_for !== null && row.score_for !== undefined ? `${row.score_for}:${row.score_against}` : "–"}</td>
+                  <td className="py-1 text-right font-bold">{row.points !== null && row.points !== undefined ? formatPoints(row.points) : "–"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <PasteBox onApply={onPaste} label="Tabelle einfügen" testId="result-table-paste" placeholder={"1. Team A 10 7 1 2 22\n2. Team B 10 6 0 4 18"}
+          hint="Von der Seite des Veranstalters kopieren – mit Tab, „|“ oder „;“ getrennt, gern mit Kopfzeile (Pl, Team, Sp, S, U, N, Maps, Pkt)." />
+      )}
+    </section>
+  );
+}
+
+function PendingDraft({ draft, participants, busy, onApprove, onDiscard }) {
+  const names = Object.fromEntries((participants || []).map((person) => [person.id, person.name]));
+  const rows = draft.rows || [];
+  return (
+    <div className="border border-[#29B6E8]/40 bg-[#29B6E8]/5 rounded-sm p-3 space-y-2" data-testid="result-pending">
+      <div className="text-[11px] font-bold uppercase tracking-widest text-[#29B6E8]">Entwurf daneben wartet auf Freigabe</div>
+      <p className="text-xs text-white/60">Das veröffentlichte Ergebnis bleibt sichtbar, bis du den Entwurf freigibst.</p>
+      {rows.length > 0 && (
+        <ol className="text-sm text-white/80 space-y-0.5" data-testid="result-pending-rows">
+          {rows.slice(0, 30).map((row, index) => (
+            <li key={`${row.participant_id}-${index}`} className="tabular-nums">
+              {row.place ?? "–"}. {names[row.participant_id] || "Neuer Name"}{row.points !== null && row.points !== undefined && row.points_source !== "scheme" ? ` · ${formatPoints(row.points)} Pkt` : ""}{row.marks?.length ? ` · ${row.marks.join(", ").toUpperCase()}` : ""}
+            </li>
+          ))}
+        </ol>
+      )}
+      {(draft.matches || []).map((match, index) => (
+        <div key={index} className="text-sm text-white/80">{match.home} {match.home_score}:{match.away_score} {match.away}</div>
+      ))}
+      <div className="flex flex-wrap gap-2">
+        <button type="button" disabled={busy} onClick={onApprove} data-testid="result-pending-approve" className="tls-btn tls-btn--primary px-3 py-2 rounded-sm text-xs font-bold uppercase tracking-wider disabled:opacity-50">Freigeben</button>
+        <button type="button" disabled={busy} onClick={onDiscard} data-testid="result-pending-discard" className="tls-btn tls-btn--quiet px-3 py-2 rounded-sm text-xs font-bold uppercase tracking-wider disabled:opacity-50">Verwerfen</button>
+      </div>
+    </div>
+  );
+}
+
+export function ResultEntrySheet({ series, round, onClose, onSaved }) {
+  const base = `/reference-series/admin/series/${series.id}/rounds/${round.id}/results`;
+  const [data, setData] = useState(null);
+  const [form, setForm] = useState(null);
+  const [preview, setPreview] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const [stale, setStale] = useState(false);
+  const [pasting, setPasting] = useState(false);
+
+  const load = useCallback(async ({ keepForm = false } = {}) => {
+    try {
+      const { data: result } = await api.get(base);
+      setData(result);
+      setStale(false);
+      if (!keepForm) {
+        const sheet = result.sheet;
+        const source = result.target === "pending_draft" && sheet?.pending_draft ? sheet.pending_draft : sheet;
+        setForm(sheetToForm(source, result.participants, { kind: result.series?.kind, teamName: result.series?.team_name, opponent: result.round?.opponent }));
+      }
+    } catch (err) {
+      toast.error(formatApiError(err.response?.data?.detail) || "Ergebnis nicht geladen.");
+      onClose();
+    }
+  }, [base, onClose]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const rules = useMemo(() => data?.series?.rules || {}, [data]);
+  const kind = data?.series?.kind;
+  const teamLeague = kind === "team_league";
+  const organizerMode = rules.points_mode === "organizer";
+  const access = data?.access || {};
+  const board = access.role === "board";
+  const participants = useMemo(() => data?.participants || [], [data]);
+  const teams = useMemo(() => [...new Set(participants.map((person) => person.default_team).filter(Boolean))], [participants]);
+
+  const built = useMemo(() => (form ? formToPayload(form, rules) : null), [form, rules]);
+  const stamp = built ? formStamp(built.payload) : "";
+  const fresh = Boolean(preview && preview.stamp === stamp);
+  const problems = useMemo(() => problemsByRow(fresh ? preview : null, built?.rowKeys), [fresh, preview, built]);
+  const scoredByKey = useMemo(() => {
+    if (!fresh || !built) return {};
+    return Object.fromEntries((preview.rows || []).map((row) => [built.rowKeys[row.index], row.scored]));
+  }, [fresh, preview, built]);
+  const auto = useMemo(() => (form ? autoPlaces(form.rows) : {}), [form]);
+
+  const update = (changes) => setForm((current) => ({ ...current, ...changes }));
+  const updateRow = (key, values) => setForm((current) => ({
+    ...current,
+    rows: current.rows.map((row) => {
+      if (row.key !== key) return row;
+      const next = { ...row, ...values };
+      if ("name" in values) {
+        // Bekannter Name: gleich mit Kennung und – wenn das Feld leer ist – dem Standard-Team.
+        const known = matchParticipant(values.name, participants);
+        if (known) {
+          next.participant_id = known.id;
+          if (!next.team && known.default_team) next.team = known.default_team;
+        }
+      }
+      return next;
+    }),
+  }));
+  const removeRow = (key) => setForm((current) => ({ ...current, rows: current.rows.filter((row) => row.key !== key) }));
+  const addRow = () => setForm((current) => ({ ...current, rows: [...current.rows, emptyRow()] }));
+  const updateMatch = (key, values) => setForm((current) => ({ ...current, matches: current.matches.map((match) => (match.key === key ? { ...match, ...values } : match)) }));
+
+  const runPreview = async (payload, currentStamp) => {
+    const { data: result } = await api.post(`${base}/preview`, payload);
+    setPreview({ ...result, stamp: currentStamp });
+    return result;
+  };
+
+  const pasteRows = (text) => {
+    const result = parseResultPaste(text);
+    if (result.rows.length) {
+      const rows = pastedToRows(result.rows, participants);
+      const next = { ...form, rows };
+      setForm(next);
+      setPasting(result.errors.length > 0);
+      // Danach gleich prüfen lassen – so stehen Fehler und Punkte sofort an den Zeilen.
+      const pasted = formToPayload(next, rules);
+      runPreview(pasted.payload, formStamp(pasted.payload)).catch((err) => toast.error(formatApiError(err.response?.data?.detail)));
+    }
+    return result;
+  };
+  const pasteTable = (text) => {
+    const result = parseTablePaste(text);
+    if (result.rows.length) update({ table: result.rows.map(({ line, ...row }) => row) });
+    return result;
+  };
+
+  const stalePrompt = () => {
+    setStale(true);
+    toast.error("Das Ergebnis wurde inzwischen geändert – bitte neu laden.");
+  };
+
+  const save = async (status) => {
+    setSaving(true);
+    try {
+      const { data: result } = await api.put(base, { ...built.payload, status, expected_version: data.version });
+      const created = result.created_participants || [];
+      toast.success(result.target === "pending_draft" ? "Als Entwurf zur Freigabe gespeichert." : status === "published" ? "Ergebnis veröffentlicht." : "Als Entwurf gespeichert.");
+      onSaved({ openUnknown: board && created.some((person) => person.link_status === "open") });
+    } catch (err) {
+      const detail = err.response?.data?.detail;
+      if (err.response?.status === 409) stalePrompt();
+      else if (detail?.errors) setPreview({ ...(preview || {}), errors: detail.errors, warnings: detail.warnings || [], can_save: false, stamp });
+      else toast.error(formatApiError(detail));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const decide = async (action) => {
+    setSaving(true);
+    try {
+      await api.post(`${base}/${action}`, { expected_version: data.version });
+      toast.success(action === "approve" ? "Entwurf freigegeben." : "Entwurf verworfen.");
+      onSaved({});
+    } catch (err) {
+      const detail = err.response?.data?.detail;
+      if (err.response?.status === 409) stalePrompt();
+      else toast.error(detail?.message || formatApiError(detail));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const target = preview?.target || data?.target;
+  const toPendingDraft = target === "pending_draft";
+  const canPublish = Boolean(access.can_publish) && !toPendingDraft;
+  const ready = fresh && preview.can_save && !stale;
+
+  const submit = async (event) => {
+    event.preventDefault();
+    if (stale) return;
+    if (ready) {
+      save(canPublish ? "published" : "draft");
+      return;
+    }
+    setSaving(true);
+    try {
+      await runPreview(built.payload, stamp);
+    } catch (err) {
+      if (err.response?.status === 409) stalePrompt();
+      else toast.error(formatApiError(err.response?.data?.detail));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const submitLabel = !ready ? (fresh ? "Erneut prüfen" : "Vorschau") : toPendingDraft ? "Entwurf zur Freigabe" : canPublish ? "Veröffentlichen" : "Als Entwurf speichern";
+  const sheetStatus = data?.sheet?.status;
+  const pending = board ? data?.sheet?.pending_draft : null;
+  const filledRows = built?.payload.rows.length || 0;
+
+  return (
+    <AdminSheet title={`Ergebnis ${round ? roundLabel(round) : ""}`} eyebrow={series.lineage?.title} size="xl" onClose={onClose} onSubmit={submit} saving={saving}
+      submitLabel={submitLabel} savingLabel={ready ? "Übernehme …" : "Prüfe …"} submitTestId="result-submit" testId="result-sheet" noValidate
+      footer={ready && canPublish ? (
+        <button type="button" disabled={saving} onClick={() => save("draft")} data-testid="result-save-draft" className="tls-btn tls-btn--secondary px-4 py-2.5 rounded-sm text-xs font-bold uppercase tracking-wider disabled:opacity-50">
+          Nur als Entwurf
+        </button>
+      ) : null}>
+      {!data || !form ? <div className="text-sm text-white/40">Lädt …</div> : (
+        <>
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-white/60" data-testid="result-round">
+            <span className="tabular-nums">{roundWhen(data.round)}</span>
+            {data.round.venue && <span>· {data.round.venue}</span>}
+            {sheetStatus && <span className="text-[10px] font-bold uppercase tracking-widest text-white/45">{sheetStatus === "published" ? "veröffentlicht" : "Entwurf"} · Stand {data.version}</span>}
+            <span className="text-[10px] font-bold uppercase tracking-widest text-white/45">{organizerMode ? "Punkte laut Veranstalter" : "Punkte nach Schlüssel"}</span>
+          </div>
+
+          {stale && (
+            <div className="border border-amber-400/40 bg-amber-400/10 rounded-sm p-3 text-sm text-amber-100 flex flex-wrap items-center gap-3" role="alert" data-testid="result-stale">
+              <span className="flex-1 min-w-[12rem]">Inzwischen hat jemand anderes das Ergebnis geändert. Neu laden holt den aktuellen Stand – deine Eingaben bleiben stehen, die Vorschau prüft danach neu.</span>
+              <button type="button" onClick={() => { setPreview(null); load({ keepForm: true }); }} data-testid="result-reload" className="tls-btn tls-btn--secondary px-3 py-2 rounded-sm text-xs font-bold uppercase tracking-wider inline-flex items-center gap-1.5">
+                <RefreshCw className="w-3.5 h-3.5" /> Neu laden
+              </button>
+            </div>
+          )}
+
+          {toPendingDraft && (
+            <p className="border border-[#29B6E8]/30 bg-[#29B6E8]/5 rounded-sm px-3 py-2 text-sm text-white/75" data-testid="result-pending-note">
+              Das Ergebnis ist schon veröffentlicht. Deine Änderung wird ein Entwurf daneben – sichtbar wird sie, wenn der Vorstand sie freigibt.
+            </p>
+          )}
+
+          {pending && <PendingDraft draft={pending} participants={participants} busy={saving || stale} onApprove={() => decide("approve")} onDiscard={() => decide("discard")} />}
+          {board && !pending && sheetStatus === "draft" && (
+            <div className="flex flex-wrap items-center gap-3 text-sm text-white/60" data-testid="result-draft-note">
+              <span>Gespeichert als Entwurf – noch nicht öffentlich.</span>
+              <button type="button" disabled={saving || stale} onClick={() => decide("approve")} data-testid="result-draft-approve" className="tls-btn tls-btn--quiet px-3 py-1.5 rounded-sm text-[11px] font-bold uppercase tracking-wider disabled:opacity-50">Gespeicherten Entwurf veröffentlichen</button>
+            </div>
+          )}
+
+          <datalist id="result-participants">
+            {participants.map((person) => <option key={person.id} value={person.name}>{person.start_number ? `Nr. ${person.start_number}` : undefined}</option>)}
+          </datalist>
+          <datalist id="result-teams">{teams.map((team) => <option key={team} value={team} />)}</datalist>
+
+          {teamLeague && (
+            <section className="space-y-3" data-testid="result-matches">
+              <h3 className="text-[11px] font-bold uppercase tracking-widest text-[#29B6E8]">Spiel</h3>
+              {form.matches.map((match, index) => (
+                <MatchEditor key={match.key} match={match} index={index} participants={participants}
+                  onChange={(values) => updateMatch(match.key, values)} onRemove={() => update({ matches: form.matches.filter((item) => item.key !== match.key) })} />
+              ))}
+              <button type="button" onClick={() => update({ matches: [...form.matches, emptyMatch({ home: data.series?.team_name || "" })] })} data-testid="result-match-add" className="tls-btn tls-btn--quiet px-3 py-2 rounded-sm text-xs font-bold uppercase tracking-wider inline-flex items-center gap-2">
+                <Plus className="w-3.5 h-3.5" /> Spiel
+              </button>
+              <OfficialTable rows={form.table} onPaste={pasteTable} onClear={() => update({ table: [] })} />
+            </section>
+          )}
+
+          {(!teamLeague || form.rows.length > 0) && (
+            <section className="space-y-2" data-testid="result-rows-section">
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <h3 className="text-[11px] font-bold uppercase tracking-widest text-[#29B6E8]">Ergebnisliste{filledRows ? ` · ${filledRows}` : ""}</h3>
+                <button type="button" onClick={() => setPasting((value) => !value)} aria-expanded={pasting} data-testid="result-paste-toggle" className="tls-btn tls-btn--quiet px-3 py-1.5 rounded-sm text-[11px] font-bold uppercase tracking-wider inline-flex items-center gap-1.5">
+                  <ClipboardList className="w-3.5 h-3.5" /> Liste einfügen
+                </button>
+              </div>
+              {pasting && (
+                <PasteBox onApply={pasteRows} label="Ergebnisliste einfügen" testId="result-paste" placeholder={"1. Name 25\n2. Name 18\n3. Name DNF"}
+                  hint="Je Zeile ein Teilnehmer: „1. Name 25“, nur Namen in Reihenfolge oder eine Tabelle aus Excel oder einer Website (Tab, „|“, „;“). Ersetzt die Liste unten." />
+              )}
+              <ol className="divide-y divide-white/5" data-testid="result-rows">
+                {form.rows.map((row, index) => (
+                  <ResultRow key={row.key} row={row} index={index} autoPlace={auto[row.key]} organizerMode={organizerMode}
+                    problems={problems.byRow[row.key]} scored={scoredByKey[row.key]}
+                    onChange={(values) => updateRow(row.key, values)} onRemove={() => removeRow(row.key)} />
+                ))}
+              </ol>
+              <button type="button" onClick={addRow} data-testid="result-row-add" className="tls-btn tls-btn--secondary px-3 py-2 rounded-sm text-xs font-bold uppercase tracking-wider inline-flex items-center gap-2">
+                <Plus className="w-3.5 h-3.5" /> Teilnehmer
+              </button>
+            </section>
+          )}
+          {teamLeague && form.rows.length === 0 && (
+            <button type="button" onClick={addRow} data-testid="result-row-add" className="tls-btn tls-btn--quiet px-3 py-2 rounded-sm text-xs font-bold uppercase tracking-wider inline-flex items-center gap-2">
+              <Plus className="w-3.5 h-3.5" /> Einzelwertung (optional)
+            </button>
+          )}
+
+          <TextAreaField label="Notiz" value={form.note} onChange={(value) => update({ note: value })} rows={2} hint="Optional, etwa „Wertung laut Veranstalter vorläufig“." testId="result-note" />
+
+          {fresh && <ResultPreview preview={preview} general={problems.general} board={board} />}
+          {!fresh && preview && <p className="text-xs text-white/45" data-testid="result-preview-outdated">Geändert – „Vorschau“ prüft neu.</p>}
+        </>
+      )}
+    </AdminSheet>
+  );
+}
