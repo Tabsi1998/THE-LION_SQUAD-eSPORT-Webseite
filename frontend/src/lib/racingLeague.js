@@ -1,8 +1,10 @@
 // Rennliga (#1746): was die Seite einer Rennliga aus /api/reference-series/public/<spur>/<saison> liest. Der Server
 // rechnet und speichert alles (Punkte, Rang, Teamwertung, Team je Rennen); hier wird nur beschriftet und gezählt, was
 // im Stand schon steht: Zellen des Rennrasters, Abstand zur Spitze, Sieger und bester Vereinsfahrer je Rennen,
-// Fahrer-Detail, Teamduell und Vereins-Garage. Fremde Namen bleiben reiner Text; nur Vereinsmitglieder bekommen ein
-// Fahrer-Detail.
+// Fahrer-Detail, Teamduell und Vereins-Garage. Wer ein Fahrer-Detail bekommt und außerhalb der Tabellen mit Namen
+// steht, sagt der Server (`racing.club_drivers`: öffentlich sichtbare Vereinsmitglieder); alle anderen heißen außerhalb
+// der Tabellen „Gastfahrer“ - fremde Namen stehen nur in den Tabellen. Punkte fürs Team kommen aus der gespeicherten
+// Teamwertung (`driver_points`), nie aus einer eigenen Rechnung.
 import { formatDiff, formatNumber } from "@/lib/standingsTable";
 import { resultIn, roundColumns } from "@/lib/referenceSeriesTable";
 
@@ -60,16 +62,20 @@ function classified(cell) {
   return cell && cell.status === "finished" && cell.place;
 }
 
-/** Ein Rennen auf einen Blick: Sieger, schnellste Runde und bester Vereinsfahrer (ein Ausfall nur, wenn kein
- * Vereinsfahrer ins Ziel kam; ein Nichtstart nie). */
-export function raceSummary(rows, roundId) {
-  const entries = (rows || []).map((row) => ({ row, cell: raceCell(resultIn(row, roundId)) })).filter((item) => item.cell);
+export const GUEST_DRIVER = "Gastfahrer";
+
+/** Ein Rennen auf einen Blick, nur mit öffentlichen Vereinsfahrern (`publicKeys` vom Server): der Sieger, wenn er
+ * einer von ihnen ist, und der beste von ihnen mit Platz (ein Ausfall nur, wenn keiner ins Ziel kam; ein Nichtstart
+ * nie). Ein fremder Sieger bleibt außerhalb der Tabelle ohne Namen. */
+export function raceSummary(rows, roundId, publicKeys = []) {
+  const allowed = new Set(publicKeys || []);
+  const entries = (rows || []).filter((row) => allowed.has(row.key))
+    .map((row) => ({ row, cell: raceCell(resultIn(row, roundId)) })).filter((item) => item.cell);
   const winner = entries.find((item) => classified(item.cell) && item.cell.place === 1)?.row || null;
-  const fastest = entries.find((item) => item.cell.fastest)?.row || null;
-  const club = entries.filter((item) => item.row.club_member && item.cell.status !== "dns");
+  const club = entries.filter((item) => item.cell.status !== "dns");
   club.sort((a, b) => Number(!classified(a.cell)) - Number(!classified(b.cell))
     || (a.cell.place ?? Infinity) - (b.cell.place ?? Infinity));
-  return { winner, fastest, bestClub: club[0] || null };
+  return { winner, bestClub: club[0] || null };
 }
 
 /** Die Saison eines Fahrers: Rennen (ohne Nichtstart), Siege, Podien, schnellste Runden, Pole, Ausfälle, bester Platz
@@ -100,8 +106,10 @@ function forTeam(row, team, drivers) {
 }
 
 /** Teamduell zweier Fahrer eines Teams: in wie vielen gemeinsamen Rennen fürs Team wer vor dem anderen ins Ziel kam
- * (ein Ausfall verliert gegen jeden im Ziel; ohne Nichtstart, beide ausgefallen zählt nicht) und ihre Punkte fürs Team. */
-export function teamDuel(a, b, team, drivers) {
+ * (ein Ausfall verliert gegen jeden im Ziel; ohne Nichtstart, beide ausgefallen zählt nicht). Die Punkte fürs Team
+ * kommen aus der gespeicherten Teamwertung (`standing.driver_points`, mit gezählten Fahrern und Gast-Regel) - ohne
+ * Teamwertung (oder ohne diese Angabe) `null`. */
+export function teamDuel(a, b, team, drivers, standing) {
   const mine = forTeam(a, team, drivers);
   const theirs = new Map(forTeam(b, team, drivers).map((item) => [item.round_id, raceCell(item)]));
   let races = 0;
@@ -118,8 +126,12 @@ export function teamDuel(a, b, team, drivers) {
     if (ownIn && (!otherIn || own.place < other.place)) aheadA += 1;
     else aheadB += 1;
   }
-  const sum = (row) => forTeam(row, team, drivers).reduce((total, item) => total + points(item.points), 0);
-  return { races, a: { key: a.key, ahead: aheadA, points: sum(a) }, b: { key: b.key, ahead: aheadB, points: sum(b) } };
+  const forTeamPoints = (row) => (standing?.driver_points ? points(standing.driver_points[row.key]) : null);
+  return {
+    races,
+    a: { key: a.key, ahead: aheadA, points: forTeamPoints(a) },
+    b: { key: b.key, ahead: aheadB, points: forTeamPoints(b) },
+  };
 }
 
 /** Vereins-Garage: je Vereinsteam die Fahrer (aktuelles Team) in Tabellen-Reihenfolge, der Platz in der Teamwertung
@@ -131,18 +143,30 @@ export function garageTeams(clubTeams, rows, drivers, teamRows) {
     const pair = members.map((row, index) => ({ row, index, races: started(row) }))
       .sort((x, y) => y.races - x.races || x.index - y.index)
       .slice(0, 2);
+    const standing = (teamRows || []).find((row) => row.team === team) || null;
     return {
       team,
-      standing: (teamRows || []).find((row) => row.team === team) || null,
+      standing,
       drivers: members,
-      duel: pair.length === 2 ? teamDuel(pair[0].row, pair[1].row, team, drivers) : null,
+      duel: pair.length === 2 ? teamDuel(pair[0].row, pair[1].row, team, drivers, standing) : null,
     };
   });
 }
 
-/** Wer ein Fahrer-Detail bekommt: Vereinsmitglieder mit Namen, in Tabellen-Reihenfolge. */
-export function clubDrivers(rows) {
-  return (rows || []).filter((row) => row.club_member && !row.name_hidden && row.name);
+/** Wer ein Fahrer-Detail bekommt: nur die Kennungen, die der Server nennt (`club_drivers`: öffentlich sichtbare
+ * Vereinsmitglieder), und davon nur Vereinsmitglieder mit Namen - in Tabellen-Reihenfolge. */
+export function clubDrivers(rows, publicKeys = []) {
+  const allowed = new Set(publicKeys || []);
+  return (rows || []).filter((row) => allowed.has(row.key) && row.club_member && !row.name_hidden && row.name);
+}
+
+/** Name in Garage und Teamduell (keine Tabelle): öffentliche Vereinsfahrer mit Namen, Mitglieder ohne öffentliches
+ * Profil als „Vereinsfahrer“, alle anderen (Gäste, Fremde) als „Gastfahrer“ - ohne Namen. */
+export function garageName(row, publicKeys = []) {
+  if (row?.name && !row.name_hidden && row.club_member && (publicKeys || []).includes(row.key)) {
+    return { name: row.name, named: true };
+  }
+  return { name: row?.club_member ? "Vereinsfahrer" : GUEST_DRIVER, named: false };
 }
 
 /** Die Teamwertung in der Form der Tabelle: Teamname als Name, Vereinsteams wie Vereinsspieler markiert. */

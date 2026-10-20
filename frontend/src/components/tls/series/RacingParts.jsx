@@ -39,10 +39,11 @@ export function SeasonSwitcher({ seasons, lineageSlug }) {
   );
 }
 
-/** Name eines Fahrers: ein Vereinsmitglied öffnet sein Detail, alle anderen sind reiner Text. */
-export function DriverName({ row, onSelect, className = "" }) {
+/** Name eines Fahrers: ein öffentlicher Vereinsfahrer (`canOpen`, vom Server) öffnet sein Detail, alle anderen sind
+ * reiner Text. */
+export function DriverName({ row, onSelect, canOpen = false, className = "" }) {
   const name = nameOf(row);
-  if (row.club_member && !row.name_hidden && row.name && onSelect) {
+  if (canOpen && row.club_member && !row.name_hidden && row.name && onSelect) {
     return <button type="button" onClick={() => onSelect(row.key)} className={`tls-racing-name ${className}`}>{name}</button>;
   }
   return <span className={`tls-standing-name ${row.name_hidden ? "text-white/40 italic" : "text-white font-medium"} ${className}`}>{name}</span>;
@@ -53,11 +54,11 @@ export function GuestBadge() {
 }
 
 /** Name in der Fahrerwertung: Name, „Verein“ oder „Gast“, darunter das aktuelle Team. */
-export function DriverCell({ row, driver, onSelect }) {
+export function DriverCell({ row, driver, onSelect, canOpen = false }) {
   return (
     <span className="block min-w-0">
       <span className="flex items-center gap-2 min-w-0">
-        <DriverName row={row} onSelect={onSelect} />
+        <DriverName row={row} onSelect={onSelect} canOpen={canOpen} />
         {row.club_member && <span className="tls-standing-me">Verein</span>}
         {driver?.guest && <GuestBadge />}
       </span>
@@ -121,7 +122,7 @@ function WhoLine({ label, tone, row, cell, onSelect, testId, showClub = false })
       <span className={`shrink-0 sm:w-[10rem] text-[10px] font-bold uppercase tracking-[0.14em] ${tone}`}>{label}</span>
       {" "}
       <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5 min-w-0">
-        <DriverName row={row} onSelect={onSelect} />
+        <DriverName row={row} onSelect={onSelect} canOpen />
         {cell && <span className="text-white/50 tabular-nums whitespace-nowrap">{` · ${cell.place ? `P${cell.place}` : cell.text}`}</span>}
         {showClub && row.club_member && <span className="tls-standing-me">Verein</span>}
       </span>
@@ -129,8 +130,9 @@ function WhoLine({ label, tone, row, cell, onSelect, testId, showClub = false })
   );
 }
 
-/** Rennkalender: alle Termine mit Status, bei gewerteten Rennen Sieger und bester Vereinsfahrer. */
-export function RacingCalendar({ rounds, rows, onSelect }) {
+/** Rennkalender: alle Termine mit Status, bei gewerteten Rennen der Sieger (nur ein öffentlicher Vereinsfahrer - ein
+ * fremder Name steht nur in der Tabelle), sonst der beste öffentliche Vereinsfahrer mit Platz. */
+export function RacingCalendar({ rounds, rows, onSelect, publicKeys }) {
   return (
     <section className="mt-12" aria-labelledby="racing-calendar-title" data-testid="racing-calendar">
       <h2 id="racing-calendar-title" className="font-heading text-2xl font-black uppercase">Rennkalender</h2>
@@ -139,7 +141,7 @@ export function RacingCalendar({ rounds, rows, onSelect }) {
       ) : (
         <ol className="mt-4 divide-y divide-white/5 border-y border-white/10">
           {rounds.map((round) => {
-            const summary = round.state === "scored" ? raceSummary(rows, round.id) : null;
+            const summary = round.state === "scored" ? raceSummary(rows, round.id, publicKeys) : null;
             const best = summary?.bestClub && summary.bestClub.row !== summary.winner ? summary.bestClub : null;
             return (
               <li key={round.id} className="py-3 flex items-start gap-3" data-testid="racing-round" data-state={round.state}>

@@ -8,8 +8,10 @@ const { ENABLED, STATE_FILE, state, signIn, watch } = require("./abnahmeSession"
 // Runde, Ausfall, Nichtstart, offizieller Gesamtstand mit Abweichung), sagt ein Rennen ab, ordnet Mitglieder, einen Gast
 // und Fremde zu und blendet einen fremden Namen aus. Ohne Anmeldung zeigt die Seite dann Umschalter, Rennraster,
 // Teamwertung, Vereins-Garage mit Teamduell, Fahrer-Detail (auch per Adresse) und Rennkalender - bei 1440 und 360 px,
-// ohne Konsolenfehler und ohne seitliches Scrollen. Fremde Namen nur in den Tabellen, ausgeblendete gar nicht, die
-// Seite ist noindex. `ABNAHME_SHOTS` legt Bilder ab (optional). Nur erfundene Namen. Läuft nur mit ABNAHME=1.
+// ohne Konsolenfehler und ohne seitliches Scrollen. Fremde Namen nur in den Tabellen (Garage und Duell sagen
+// „Gastfahrer“, der Kalender nennt nur Vereinsfahrer), ausgeblendete gar nicht, die Seite ist noindex. Ein Mitglied, dessen
+// Profil nicht mehr aktiv ist, bekommt kein Detail mehr - auch nicht über ?fahrer=. `ABNAHME_SHOTS` legt Bilder ab
+// (optional). Nur erfundene Namen. Läuft nur mit ABNAHME=1.
 
 const SERIES = "/api/reference-series/admin";
 const SHOTS = process.env.ABNAHME_SHOTS || "";
@@ -129,6 +131,11 @@ test.describe("Abnahme #1746: Seite Rennliga - Rennraster, Teamwertung, Garage, 
       expect(JSON.stringify(body)).not.toContain(gamma);
       expect(body.racing.club_teams).toEqual([lions, juniors]);
       expect(Object.values(body.racing.drivers).every((item) => Object.keys(item).sort().join() === "guest,round_teams,team")).toBe(true);
+      // Detail nur für öffentliche Vereinsfahrer (Tabellen-Reihenfolge), Teampunkte je Fahrer vom Server.
+      expect(body.racing.club_drivers).toEqual([ids[lena], ids[toni], ids[max]]);
+      for (const row of body.racing.teams.rows) {
+        expect(Object.values(row.driver_points).reduce((total, value) => total + value, 0)).toBe(row.computed_points);
+      }
 
       await anon.goto(url);
       await expect(anon.getByRole("heading", { level: 1 })).toContainText(`${year} · F1`);
@@ -161,14 +168,22 @@ test.describe("Abnahme #1746: Seite Rennliga - Rennraster, Teamwertung, Garage, 
       await expect(teams.filter({ hasText: juniors }).getByText("Gast", { exact: true })).toBeVisible();
       const garage = anon.getByTestId("racing-garage");
       await expect(garage.getByTestId("racing-garage-team")).toHaveCount(2);
-      await expect(garage.getByTestId("racing-garage-team").filter({ hasText: juniors }).getByTestId("racing-duel")).toContainText("1:1");
+      const juniorsCard = garage.getByTestId("racing-garage-team").filter({ hasText: juniors });
+      await expect(juniorsCard.getByTestId("racing-duel")).toContainText("1:1");
+      await expect(juniorsCard.getByTestId("racing-duel")).toContainText("24 Pkt fürs Team");
+      // Garage und Duell sind keine Tabelle: der Gast heißt dort „Gastfahrer“, Marke und Punkte bleiben.
+      await expect(garage).not.toContainText(guest);
+      await expect(juniorsCard.getByText("Gastfahrer")).toHaveCount(2);
+      await expect(juniorsCard.getByText("Gast", { exact: true })).toBeVisible();
       const detail = anon.getByTestId("racing-driver");
       await expect(detail.getByRole("heading", { level: 3 })).toHaveText(lena);
       await expect(detail.getByTestId("racing-driver-stats")).toHaveText("1 Sieg · 2 Podien · 0 schnellste Runden · 0 Ausfälle · 1 Pole");
 
       // Rennkalender: Sieger und bester Vereinsfahrer, abgesagtes Rennen ohne Sieger.
       const calendar = anon.getByTestId("racing-calendar").getByTestId("racing-round");
-      await expect(calendar.nth(0).getByTestId("racing-round-winner")).toContainText(alpha);
+      // Ein fremder Sieger steht nur in der Tabelle - im Kalender dann nur der beste Vereinsfahrer mit Platz.
+      await expect(calendar.nth(0).getByTestId("racing-round-winner")).toHaveCount(0);
+      await expect(calendar.nth(0)).not.toContainText(alpha);
       await expect(calendar.nth(0).getByTestId("racing-round-club")).toContainText(`${lena} · P2`);
       await expect(calendar.nth(1).getByTestId("racing-round-winner")).toContainText(lena);
       await expect(calendar.nth(2)).toHaveAttribute("data-state", "cancelled");
@@ -202,6 +217,18 @@ test.describe("Abnahme #1746: Seite Rennliga - Rennraster, Teamwertung, Garage, 
         return { x: 0, y: Math.max(0, top), width: window.innerWidth, height: bottom - Math.max(0, top) };
       });
       await shot(anon, "rennliga-handy-360", { fullPage: true, clip });
+      await shot(anon.getByTestId("racing-calendar"), "rennliga-kalender-360");
+
+      // Profil nicht mehr aktiv: kein Detail, kein Knopf - auch eine Adresse mit ?fahrer= öffnet nichts.
+      await ok(await send(admin, "PATCH", `/api/membership/profiles/admin/${profiles[1]}`, { is_active: false }));
+      const after = await ok(await anon.request.get(`/api/reference-series/public/${lineage.slug}/${series.season_slug}`));
+      expect(after.racing.club_drivers).toEqual([ids[lena], ids[toni]]);
+      await anon.goto(`${url}?fahrer=${ids[max]}`);
+      await expect(anon.getByTestId("racing-driver").getByRole("heading", { level: 3 })).toHaveText(lena);
+      await expect(anon.getByTestId("racing-driver")).not.toContainText(max);
+      const maxCard = anon.getByTestId("racing-drivers").getByTestId("series-card").filter({ hasText: max });
+      await expect(maxCard.getByRole("button")).toHaveCount(0);
+      await expect(anon.getByTestId("racing-garage")).not.toContainText(max);
 
       // Die Vorsaison ist über den Umschalter erreichbar.
       await anon.getByRole("navigation", { name: "Saisons und Ligen" }).getByRole("link", { name: new RegExp(`^${year - 1}`) }).click();

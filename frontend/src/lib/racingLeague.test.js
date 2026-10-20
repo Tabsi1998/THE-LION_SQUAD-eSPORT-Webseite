@@ -1,6 +1,6 @@
 import {
-  barShare, bonusLabel, clubDrivers, driverSeason, garageTeams, gapLabel, raceCell, raceCellLabel, raceSummary, teamDuel,
-  teamRuleLabel, teamTableRows,
+  GUEST_DRIVER, barShare, bonusLabel, clubDrivers, driverSeason, garageName, garageTeams, gapLabel, raceCell, raceCellLabel,
+  raceSummary, teamDuel, teamRuleLabel, teamTableRows,
 } from "./racingLeague";
 
 // Rennliga (#1746): Zellen des Rennrasters, Abstand, Sieger und bester Vereinsfahrer je Rennen, Fahrer-Detail,
@@ -31,6 +31,9 @@ const ROWS = [
   { key: "hidden", rank: 6, points: 6, name: null, name_hidden: true, club_member: false,
     results: [result("r1", 7, 6), result("r2", 6, 0, ["dnf"])] },
 ];
+
+// Wer ein Detail bekommt, sagt der Server (club_drivers): öffentlich sichtbare Vereinsmitglieder.
+const PUBLIC = ["lion1", "lion3", "lion2"];
 
 const DRIVERS = {
   ext1: { team: "Fremd Rot", guest: false, round_teams: { r1: "Fremd Rot", r2: "Fremd Rot" } },
@@ -72,18 +75,22 @@ test("Abstand zur Spitze mit echtem Minus; die Spitze selbst hat keinen", () => 
   expect(gapLabel(ROWS[0], [])).toBe("");
 });
 
-test("Rennen: Sieger, schnellste Runde und bester Vereinsfahrer", () => {
-  const first = raceSummary(ROWS, "r1");
-  expect(first.winner.key).toBe("ext1");
-  expect(first.fastest.key).toBe("ext1");
+test("Rennen: Sieger nur als öffentlicher Vereinsfahrer, sonst der beste Vereinsfahrer mit Platz", () => {
+  // Ein fremder Sieger bleibt ohne Namen - Fremde stehen nur in den Tabellen.
+  const first = raceSummary(ROWS, "r1", PUBLIC);
+  expect(first.winner).toBeNull();
   expect(first.bestClub.row.key).toBe("lion1");
   expect(first.bestClub.cell.text).toBe("2");
-  const second = raceSummary(ROWS, "r2");
+  const second = raceSummary(ROWS, "r2", PUBLIC);
   expect(second.winner.key).toBe("lion1");
   expect(second.bestClub.row.key).toBe("lion1");
-  expect(second.fastest.key).toBe("lion3");
-  // Ohne Ergebnis keiner.
-  expect(raceSummary(ROWS, "r4")).toEqual({ winner: null, fastest: null, bestClub: null });
+  // Ein Vereinsmitglied ohne öffentliches Profil gewinnt: kein Name, und als bester Vereinsfahrer zählt es nicht.
+  const hiddenWinner = raceSummary(ROWS, "r2", ["lion3", "lion2"]);
+  expect(hiddenWinner.winner).toBeNull();
+  expect(hiddenWinner.bestClub.row.key).toBe("lion3");
+  // Ohne Ergebnis keiner, ohne Liste vom Server auch keiner.
+  expect(raceSummary(ROWS, "r4", PUBLIC)).toEqual({ winner: null, bestClub: null });
+  expect(raceSummary(ROWS, "r1")).toEqual({ winner: null, bestClub: null });
 });
 
 test("bester Vereinsfahrer: ein Ausfall nur, wenn keiner ins Ziel kam; ein Nichtstart nie", () => {
@@ -92,10 +99,10 @@ test("bester Vereinsfahrer: ein Ausfall nur, wenn keiner ins Ziel kam; ein Nicht
     { key: "b", club_member: true, results: [result("r1", null, 0, ["dns"])] },
     { key: "c", club_member: false, results: [result("r1", 1, 25)] },
   ];
-  expect(raceSummary(rows, "r1").bestClub.row.key).toBe("a");
-  expect(raceSummary([rows[1], rows[2]], "r1").bestClub).toBeNull();
+  expect(raceSummary(rows, "r1", ["a", "b"]).bestClub.row.key).toBe("a");
+  expect(raceSummary([rows[1], rows[2]], "r1", ["a", "b"]).bestClub).toBeNull();
   // Ein disqualifizierter Erster ist kein Sieger.
-  expect(raceSummary([{ key: "d", results: [result("r1", 1, 0, ["dsq"])] }], "r1").winner).toBeNull();
+  expect(raceSummary([{ key: "d", club_member: true, results: [result("r1", 1, 0, ["dsq"])] }], "r1", ["d"]).winner).toBeNull();
 });
 
 test("Fahrer-Detail: Rennen, Siege, Podien, schnellste Runden, Ausfälle und Punkte je Rennen", () => {
@@ -111,31 +118,37 @@ test("Fahrer-Detail: Rennen, Siege, Podien, schnellste Runden, Ausfälle und Pun
   expect(driverSeason(ROWS[1], ROUNDS)).toMatchObject({ wins: 1, podiums: 2, poles: 1, bestPlace: 1 });
 });
 
-test("Teamduell: wer im selben Team vor dem anderen ins Ziel kam, und die Punkte fürs Team", () => {
-  const duel = teamDuel(ROWS[2], ROWS[3], "Probe Löwen B", DRIVERS);
-  expect(duel).toEqual({ races: 2, a: { key: "lion3", ahead: 1, points: 24 }, b: { key: "guest", ahead: 1, points: 22 } });
-  // Ein Nichtstart zählt nicht als Duell, die Punkte fürs Team schon.
-  const lions = teamDuel(ROWS[1], ROWS[4], "Probe Löwen", DRIVERS);
+test("Teamduell: wer im selben Team vor dem anderen ins Ziel kam; Punkte fürs Team aus der gespeicherten Teamwertung", () => {
+  // Der Server sagt, was jeder fürs Team gezählt hat (hier zählt der Gast nicht) - das Web rechnet nicht nach.
+  const juniors = { team: "Probe Löwen B", driver_points: { lion3: 24 } };
+  const duel = teamDuel(ROWS[2], ROWS[3], "Probe Löwen B", DRIVERS, juniors);
+  expect(duel).toEqual({ races: 2, a: { key: "lion3", ahead: 1, points: 24 }, b: { key: "guest", ahead: 1, points: 0 } });
+  // Ein Nichtstart zählt nicht als Duell.
+  const lions = teamDuel(ROWS[1], ROWS[4], "Probe Löwen", DRIVERS, { driver_points: { lion1: 43, lion2: 12 } });
   expect(lions).toEqual({ races: 1, a: { key: "lion1", ahead: 1, points: 43 }, b: { key: "lion2", ahead: 0, points: 12 } });
+  // Ohne Teamwertung keine Punkte fürs Team.
+  expect(teamDuel(ROWS[1], ROWS[4], "Probe Löwen", DRIVERS, null).a.points).toBeNull();
   // Ein Ausfall verliert gegen jeden, der ins Ziel kommt.
   const rows = [
     { key: "a", results: [result("r1", 2, 0, ["dnf"]), result("r2", 9, 2)] },
     { key: "b", results: [result("r1", 8, 4), result("r2", 3, 0, ["dnf"])] },
   ];
   const drivers = { a: { round_teams: { r1: "T", r2: "T" } }, b: { round_teams: { r1: "T", r2: "Anderes Team" } } };
-  expect(teamDuel(rows[0], rows[1], "T", drivers)).toEqual({ races: 1, a: { key: "a", ahead: 0, points: 2 }, b: { key: "b", ahead: 1, points: 4 } });
+  expect(teamDuel(rows[0], rows[1], "T", drivers, null)).toMatchObject({ races: 1, a: { ahead: 0 }, b: { ahead: 1 } });
 });
 
 test("Garage: je Vereinsteam die Fahrer in Tabellen-Reihenfolge, Platz in der Teamwertung und das Duell", () => {
   const teamRows = [
     { key: "Fremd Rot", team: "Fremd Rot", rank: 1, points: 59 },
     { key: "Probe Löwen", team: "Probe Löwen", rank: 2, points: 55 },
-    { key: "Probe Löwen B", team: "Probe Löwen B", rank: 3, points: 46 },
+    { key: "Probe Löwen B", team: "Probe Löwen B", rank: 3, points: 46, driver_points: { lion3: 24, guest: 22 } },
   ];
   const garage = garageTeams(["Probe Löwen", "Probe Löwen B", "Probe Leer"], ROWS, DRIVERS, teamRows);
+  expect(garage[0].duel.a.points).toBeNull();
   expect(garage.map((item) => [item.team, item.standing?.rank ?? null, item.drivers.map((row) => row.key)])).toEqual([
     ["Probe Löwen", 2, ["lion1", "lion2"]], ["Probe Löwen B", 3, ["lion3", "guest"]], ["Probe Leer", null, []]]);
   expect(garage[0].duel).toMatchObject({ a: { key: "lion1" }, b: { key: "lion2" } });
+  expect(garage[1].duel).toMatchObject({ a: { key: "lion3", points: 24 }, b: { key: "guest", points: 22 } });
   expect(garage[2].duel).toBeNull();
   // Ohne Teamwertung gibt es keinen Platz, die Fahrer bleiben.
   expect(garageTeams(["Probe Löwen"], ROWS, DRIVERS, null)[0].standing).toBeNull();
@@ -157,9 +170,23 @@ test("Garage: im Duell die zwei Fahrer mit den meisten Rennen fürs Team", () =>
   expect([garage.duel.a.key, garage.duel.b.key]).toEqual(["a", "b"]);
 });
 
-test("Vereinsfahrer für das Detail: nur Mitglieder mit Namen, in Tabellen-Reihenfolge", () => {
-  expect(clubDrivers(ROWS).map((row) => row.key)).toEqual(["lion1", "lion3", "lion2"]);
-  expect(clubDrivers([{ key: "x", club_member: true, name_hidden: true }])).toEqual([]);
+test("Vereinsfahrer für das Detail: nur die, die der Server nennt, in Tabellen-Reihenfolge", () => {
+  expect(clubDrivers(ROWS, ["lion2", "lion1", "lion3"]).map((row) => row.key)).toEqual(["lion1", "lion3", "lion2"]);
+  // Ein Mitglied ohne öffentliches Profil fehlt in der Liste - und bekommt kein Detail, auch nicht über die Adresse.
+  expect(clubDrivers(ROWS, ["lion1"]).map((row) => row.key)).toEqual(["lion1"]);
+  // Ein fremder Name in der Liste (manipuliert) ändert nichts, ohne Liste gibt es keinen.
+  expect(clubDrivers(ROWS, ["ext1"]).map((row) => row.key)).toEqual([]);
+  expect(clubDrivers(ROWS)).toEqual([]);
+});
+
+test("Garage und Teamduell: Namen nur für öffentliche Vereinsfahrer, sonst Gastfahrer", () => {
+  expect(garageName(ROWS[1], PUBLIC)).toEqual({ name: "Probe Lion Eins", named: true });
+  expect(garageName(ROWS[3], PUBLIC)).toEqual({ name: GUEST_DRIVER, named: false });
+  expect(garageName(ROWS[0], PUBLIC)).toEqual({ name: GUEST_DRIVER, named: false });
+  expect(garageName(ROWS[5], PUBLIC)).toEqual({ name: GUEST_DRIVER, named: false });
+  // Ein Mitglied ohne öffentliches Profil bleibt Vereinsfahrer, aber ohne Namen.
+  expect(garageName(ROWS[4], ["lion1"])).toEqual({ name: "Vereinsfahrer", named: false });
+  expect(GUEST_DRIVER).toBe("Gastfahrer");
 });
 
 test("Teamwertung als Tabellenzeilen: Teamname als Name, Vereinsteams markiert", () => {

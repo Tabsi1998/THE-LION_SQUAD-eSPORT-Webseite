@@ -3,7 +3,9 @@ import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 
 // Seite Rennliga (#1746): Umschalter zwischen den Saisons der Spur, Rennraster mit Podium, schnellster Runde, Ausfall,
 // Abstand und Abweichung zum offiziellen Wert, Teamwertung mit Balken, Vereins-Garage mit Teamduell, Fahrer-Detail nur
-// für Vereinsmitglieder (auch per Adresse) und der Rennkalender mit Sieger und bestem Vereinsfahrer. Nur erfundene Namen.
+// für öffentliche Vereinsfahrer (die der Server in club_drivers nennt, auch per Adresse), Gäste und Fremde außerhalb der
+// Tabellen nur als „Gastfahrer“, Punkte fürs Team aus der gespeicherten Teamwertung und der Rennkalender mit Sieger
+// (nur aus dem Verein) und bestem Vereinsfahrer. Nur erfundene Namen.
 
 const apiMock = { get: vi.fn() };
 vi.mock("@/lib/api", () => ({ api: apiMock, formatApiError: (detail) => detail || "Fehler" }));
@@ -75,13 +77,14 @@ const BODY = {
     teams: {
       round_id: "r2",
       rows: [
-        teamRow("Fremd Rot", 1, 59, ["ext1", "hidden"], [{ round_id: "r1", points: 32, drivers: ["ext1", "hidden"] }, { round_id: "r2", points: 18, drivers: ["ext1", "hidden"] }]),
-        teamRow("Probe Löwen", 2, 55, ["lion1", "lion2"], [{ round_id: "r1", points: 30, drivers: ["lion1", "lion2"] }, { round_id: "r2", points: 25, drivers: ["lion1", "lion2"] }], { official_points: 52, deviation: -3, points: 52 }),
-        teamRow("Probe Löwen B", 3, 46, ["lion3", "guest"], [{ round_id: "r1", points: 18, drivers: ["guest", "lion3"] }, { round_id: "r2", points: 28, drivers: ["lion3", "guest"] }]),
+        teamRow("Fremd Rot", 1, 59, ["ext1", "hidden"], [{ round_id: "r1", points: 32, drivers: ["ext1", "hidden"] }, { round_id: "r2", points: 18, drivers: ["ext1", "hidden"] }], { driver_points: { ext1: 44, hidden: 6 } }),
+        teamRow("Probe Löwen", 2, 55, ["lion1", "lion2"], [{ round_id: "r1", points: 30, drivers: ["lion1", "lion2"] }, { round_id: "r2", points: 25, drivers: ["lion1", "lion2"] }], { official_points: 52, deviation: -3, points: 52, driver_points: { lion1: 43, lion2: 12 } }),
+        teamRow("Probe Löwen B", 3, 46, ["lion3", "guest"], [{ round_id: "r1", points: 18, drivers: ["guest", "lion3"] }, { round_id: "r2", points: 28, drivers: ["lion3", "guest"] }], { driver_points: { lion3: 24, guest: 22 } }),
       ],
     },
     drivers: DRIVERS,
     club_teams: ["Probe Löwen", "Probe Löwen B"],
+    club_drivers: ["lion1", "lion3", "lion2"],
   },
 };
 
@@ -160,16 +163,36 @@ test("Teamwertung: Balken und Raster, Vereinsteams hervorgehoben, Gäste markier
   expect(within(rows[0]).getAllByTestId("racing-team-cell").map((cell) => cell.textContent)).toEqual(["32", "18"]);
 });
 
+// Wie BODY, nur zählen Gäste nicht fürs Team: der Server meldet für den Gast keinen Beitrag (driver_points).
+const GUESTS_NOT_COUNTING = {
+  ...BODY,
+  racing: {
+    ...BODY.racing,
+    team_scoring: { enabled: true, counting_drivers: 2, guests_count: false },
+    teams: { ...BODY.racing.teams, rows: BODY.racing.teams.rows.map((item) => (item.team === "Probe Löwen B"
+      ? { ...item, points: 24, computed_points: 24, drivers: ["lion3"], driver_points: { lion3: 24 } } : item)) },
+  },
+};
+
 test("Garage: Vereinsteams mit Fahrern und Teamduell, das Detail zeigt den ersten Vereinsfahrer", async () => {
-  renderAt("/references/series/probe-racing/2026-f1");
+  renderAt("/references/series/probe-racing/2026-f1", GUESTS_NOT_COUNTING);
   const garage = await screen.findByTestId("racing-garage");
   const teams = within(garage).getAllByTestId("racing-garage-team");
   expect(teams.map((team) => within(team).getByRole("heading", { level: 3 }).textContent)).toEqual(["Probe Löwen", "Probe Löwen B"]);
   expect(teams[0]).toHaveTextContent("P2 · 52 Pkt");
-  expect(within(teams[1]).getByTestId("racing-duel")).toHaveTextContent("1:1");
+  // Fremde Namen nur in Tabellen: der Gast heißt in Garage und Duell „Gastfahrer“, Marke und Punkte bleiben.
+  expect(garage).not.toHaveTextContent("Gast Probe");
+  expect(within(teams[1]).getAllByText("Gastfahrer")).toHaveLength(2);
   expect(within(teams[1]).getByText("Gast")).toBeInTheDocument();
-  // Ein Gast ist im Team, aber ohne Detail.
-  expect(within(teams[1]).queryByRole("button", { name: /Gast Probe/ })).toBeNull();
+  expect(teams[1]).toHaveTextContent("P4 · 22 Pkt");
+  expect(within(teams[1]).queryByRole("button", { name: /Gast/ })).toBeNull();
+  // Teamduell: Platz-Vergleich aus den Rennen, Punkte fürs Team aus der gespeicherten Teamwertung (Gast zählt nicht).
+  const duel = within(teams[1]).getByTestId("racing-duel");
+  expect(duel).toHaveTextContent("Probe Lion Drei");
+  expect(duel).toHaveTextContent("1:1");
+  expect(duel).toHaveTextContent("24 Pkt fürs Team");
+  expect(within(duel).getByTestId("racing-duel-points-b")).toHaveTextContent("0 Pkt");
+  expect(within(teams[0]).getByTestId("racing-duel")).toHaveTextContent("43 Pkt fürs Team");
 
   const detail = screen.getByTestId("racing-driver");
   expect(within(detail).getByRole("heading", { level: 3 })).toHaveTextContent("Probe Lion Eins");
@@ -199,6 +222,20 @@ test("Fahrer-Detail aus der Tabelle und per Adresse; ein fremder Fahrer bekommt 
   expect(within(detail).getByRole("heading", { level: 3 })).toHaveTextContent("Probe Lion Drei");
 });
 
+test("ein Vereinsmitglied ohne öffentliches Profil: kein Detail, kein Knopf, in der Garage ohne Namen", async () => {
+  // Der Server nennt Lion Zwei nicht in club_drivers (etwa Profil nicht aktiv) - auch ?fahrer= öffnet nichts.
+  renderAt("/references/series/probe-racing/2026-f1?fahrer=lion2", { ...BODY, racing: { ...BODY.racing, club_drivers: ["lion1", "lion3"] } });
+  const detail = await screen.findByTestId("racing-driver");
+  expect(within(detail).getByRole("heading", { level: 3 })).toHaveTextContent("Probe Lion Eins");
+  expect(detail).not.toHaveTextContent("Probe Lion Zwei");
+  const table = within(screen.getByTestId("racing-drivers")).getByTestId("series-table");
+  const row = within(table).getAllByTestId("series-row").find((item) => item.textContent.includes("Probe Lion Zwei"));
+  expect(within(row).queryByRole("button")).toBeNull();
+  const lions = within(screen.getByTestId("racing-garage")).getAllByTestId("racing-garage-team")[0];
+  expect(lions).not.toHaveTextContent("Probe Lion Zwei");
+  expect(within(lions).getAllByText("Vereinsfahrer").length).toBeGreaterThan(0);
+});
+
 test("eine fremde Kennung in der Adresse öffnet kein Detail für Fremde", async () => {
   renderAt("/references/series/probe-racing/2026-f1?fahrer=ext1");
   const detail = await screen.findByTestId("racing-driver");
@@ -212,7 +249,9 @@ test("Rennkalender: Status, Sieger und bester Vereinsfahrer je Rennen", async ()
   const items = within(calendar).getAllByTestId("racing-round");
   expect(items.map((item) => item.dataset.state)).toEqual(["scored", "scored", "cancelled", "planned"]);
   expect(items[0]).toHaveTextContent("Probering");
-  expect(within(items[0]).getByTestId("racing-round-winner")).toHaveTextContent("Sieg Fremd Eins");
+  // Ein fremder Sieger steht nur in der Tabelle - hier dann nur der beste Vereinsfahrer mit Platz.
+  expect(within(items[0]).queryByTestId("racing-round-winner")).toBeNull();
+  expect(items[0]).not.toHaveTextContent("Fremd Eins");
   expect(within(items[0]).getByTestId("racing-round-club")).toHaveTextContent("Bester Vereinsfahrer Probe Lion Eins · P2");
   // Gewinnt ein Vereinsfahrer, steht er einmal - als Sieger mit Vereinsmarke.
   expect(within(items[1]).getByTestId("racing-round-winner")).toHaveTextContent("Sieg Probe Lion Eins");

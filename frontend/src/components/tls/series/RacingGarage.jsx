@@ -3,22 +3,23 @@ import { Link } from "react-router-dom";
 import { METALS } from "@/components/tls/TrophyShelf";
 import { formatNumber } from "@/lib/standingsTable";
 import { roundLabel } from "@/lib/referenceCalendar";
-import { nameOf } from "@/lib/referenceSeriesTable";
-import { barShare, driverSeason, raceCellLabel } from "@/lib/racingLeague";
+import { barShare, driverSeason, garageName, raceCellLabel } from "@/lib/racingLeague";
 import { GuestBadge } from "@/components/tls/series/RacingParts";
 import "./racingLeague.css";
 
 // Vereins-Garage der Rennliga (#1746): je Vereinsteam die Fahrer und das Teamduell, darunter das Detail eines
-// Vereinsfahrers (Punkte je Rennen, Siege, Podien, schnellste Runden, Ausfälle). Nur Vereinsmitglieder bekommen ein
-// Detail; Gäste und fremde Teamkollegen stehen als Text dabei.
+// Vereinsfahrers (Punkte je Rennen, Siege, Podien, schnellste Runden, Ausfälle). Detail und Namen nur für öffentliche
+// Vereinsfahrer (`publicKeys` vom Server); Gäste und fremde Teamkollegen heißen hier „Gastfahrer“ - Garage und Duell
+// sind keine Tabelle, fremde Namen stehen nur dort. Marke „Gast“, Platz und Punkte bleiben.
 
 function count(value, one, many) {
   return `${value} ${value === 1 ? one : many}`;
 }
 
-function DriverPick({ row, driver, selected, onSelect }) {
+function DriverPick({ row, driver, selected, onSelect, publicKeys }) {
   const line = `P${row.rank} · ${formatNumber(row.points)} Pkt`;
-  if (row.club_member && row.name && !row.name_hidden) {
+  const label = garageName(row, publicKeys);
+  if (label.named) {
     return (
       <button type="button" className="tls-racing-pick" aria-pressed={selected} onClick={() => onSelect(row.key)}>
         <span className="min-w-0 flex-1 flex flex-wrap items-center gap-x-2 gap-y-0.5">
@@ -32,7 +33,7 @@ function DriverPick({ row, driver, selected, onSelect }) {
   return (
     <div className="flex items-center gap-3 min-h-[44px] px-3 py-1.5">
       <span className="min-w-0 flex-1 flex flex-wrap items-center gap-x-2 gap-y-0.5">
-        <span className={`leading-snug [overflow-wrap:anywhere] ${row.name_hidden ? "text-white/40 italic" : "text-white/80"}`}>{nameOf(row)}</span>
+        <span className="leading-snug text-white/70">{label.name}</span>
         {driver?.guest && <GuestBadge />}
       </span>
       <span className="text-[12px] tabular-nums text-white/45 whitespace-nowrap">{line}</span>
@@ -40,10 +41,10 @@ function DriverPick({ row, driver, selected, onSelect }) {
   );
 }
 
-function Duel({ duel, rows }) {
-  const byKey = (key) => rows.find((row) => row.key === key);
-  const a = byKey(duel.a.key);
-  const b = byKey(duel.b.key);
+function Duel({ duel, rows, publicKeys }) {
+  const nameOf = (key) => garageName(rows.find((row) => row.key === key), publicKeys);
+  const a = nameOf(duel.a.key);
+  const b = nameOf(duel.b.key);
   return (
     <div className="mt-3 border-t border-white/10 px-3 pt-3 pb-1" data-testid="racing-duel">
       <p className="flex items-baseline justify-between gap-2 text-[11px] font-bold uppercase tracking-[0.16em] text-white/45">
@@ -55,7 +56,7 @@ function Duel({ duel, rows }) {
       ) : (
         <>
           <div className="mt-2 grid grid-cols-[1fr_auto_1fr] items-center gap-3">
-            <span className="min-w-0 text-sm leading-snug text-white [overflow-wrap:anywhere]">{nameOf(a)}</span>
+            <span className={`min-w-0 text-sm leading-snug [overflow-wrap:anywhere] ${a.named ? "text-white" : "text-white/70"}`}>{a.name}</span>
             <span className="font-display text-2xl font-bold tabular-nums text-white">
               <span aria-hidden="true">
                 <span className="text-[#29B6E8]">{duel.a.ahead}</span>
@@ -64,16 +65,18 @@ function Duel({ duel, rows }) {
               </span>
               <span className="sr-only">{`${duel.a.ahead} zu ${duel.b.ahead}`}</span>
             </span>
-            <span className="min-w-0 text-sm leading-snug text-white text-right [overflow-wrap:anywhere]">{nameOf(b)}</span>
+            <span className={`min-w-0 text-sm leading-snug text-right [overflow-wrap:anywhere] ${b.named ? "text-white" : "text-white/70"}`}>{b.name}</span>
           </div>
           <div className="tls-racing-duel mt-2" style={{ "--a": duel.a.ahead || 0.04, "--b": duel.b.ahead || 0.04 }} aria-hidden="true">
             <span />
             <span />
           </div>
-          <p className="mt-1.5 flex justify-between text-[12px] tabular-nums text-white/50">
-            <span>{formatNumber(duel.a.points)} Pkt fürs Team</span>
-            <span>{formatNumber(duel.b.points)} Pkt</span>
-          </p>
+          {duel.a.points != null && (
+            <p className="mt-1.5 flex justify-between text-[12px] tabular-nums text-white/50">
+              <span>{formatNumber(duel.a.points)} Pkt fürs Team</span>
+              <span data-testid="racing-duel-points-b">{formatNumber(duel.b.points)} Pkt</span>
+            </p>
+          )}
         </>
       )}
     </div>
@@ -81,7 +84,7 @@ function Duel({ duel, rows }) {
 }
 
 /** Ein Feld je Vereinsteam: Platz in der Teamwertung, Fahrer (Vereinsfahrer öffnen ihr Detail), Teamduell. */
-export function RacingGarageTeams({ garage, rows, drivers, selectedKey, onSelect }) {
+export function RacingGarageTeams({ garage, rows, drivers, selectedKey, onSelect, publicKeys }) {
   if (!garage.length) return null;
   return (
     <ul className="mt-4 grid gap-3 sm:grid-cols-2">
@@ -99,12 +102,12 @@ export function RacingGarageTeams({ garage, rows, drivers, selectedKey, onSelect
             <ul className="mt-2 space-y-0.5 px-0.5">
               {item.drivers.map((row) => (
                 <li key={row.key}>
-                  <DriverPick row={row} driver={drivers[row.key]} selected={row.key === selectedKey} onSelect={onSelect} />
+                  <DriverPick row={row} driver={drivers[row.key]} selected={row.key === selectedKey} onSelect={onSelect} publicKeys={publicKeys} />
                 </li>
               ))}
             </ul>
           )}
-          {item.duel && <Duel duel={item.duel} rows={rows} />}
+          {item.duel && <Duel duel={item.duel} rows={rows} publicKeys={publicKeys} />}
         </li>
       ))}
     </ul>

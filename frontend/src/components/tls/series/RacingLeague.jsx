@@ -18,7 +18,8 @@ import "./racingLeague.css";
 // Rennen, Vereins-Garage mit Teamduell und Fahrer-Detail, Fahrerwertung als Rennraster (Podium, schnellste Runde,
 // Ausfall, Abstand, Abweichung zum offiziellen Wert), Teamwertung mit Balken und der Rennkalender. Die Tabellen sind
 // die der Turnierserie (SeriesStandings) mit eigenen Zellen. Das Detail eines Vereinsfahrers steht in der Adresse
-// (?fahrer=…), damit es sich teilen lässt; Fremde bekommen keins.
+// (?fahrer=…), damit es sich teilen lässt; es gibt es nur für Kennungen, die der Server in `club_drivers` nennt
+// (öffentlich sichtbare Vereinsmitglieder) - eine andere Kennung in der Adresse öffnet nichts.
 
 const FAHRER = "fahrer";
 
@@ -69,7 +70,9 @@ export function RacingLeague({ data }) {
   const [flash, setFlash] = useState(0);
   const detailRef = useRef(null);
 
-  const club = useMemo(() => clubDrivers(rows), [rows]);
+  // Wer ein Detail bekommt und außerhalb der Tabellen mit Namen steht, sagt der Server (öffentliche Vereinsfahrer).
+  const publicKeys = useMemo(() => racing.club_drivers || [], [racing.club_drivers]);
+  const club = useMemo(() => clubDrivers(rows, publicKeys), [rows, publicKeys]);
   const teamRows = useMemo(() => teamTableRows(racing.teams?.rows, racing.club_teams), [racing.teams, racing.club_teams]);
   const garage = useMemo(() => garageTeams(racing.club_teams, rows, drivers, racing.teams?.rows), [racing.club_teams, rows, drivers, racing.teams]);
   const selected = club.find((row) => row.key === params.get(FAHRER)) || club[0] || null;
@@ -104,7 +107,7 @@ export function RacingLeague({ data }) {
       {selected && (
         <section className="mt-10" aria-labelledby="racing-garage-title" data-testid="racing-garage">
           <h2 id="racing-garage-title" className="font-heading text-2xl font-black uppercase">Vereins-Garage</h2>
-          <RacingGarageTeams garage={garage} rows={rows} drivers={drivers} selectedKey={selected.key} onSelect={select} />
+          <RacingGarageTeams garage={garage} rows={rows} drivers={drivers} selectedKey={selected.key} onSelect={select} publicKeys={publicKeys} />
           <RacingDriverDetail ref={detailRef} row={selected} driver={drivers[selected.key]} rounds={rounds} flash={flash} />
         </section>
       )}
@@ -119,7 +122,7 @@ export function RacingLeague({ data }) {
           rules={data.rules}
           label="Fahrerwertung"
           filterLabel="Nur Vereinsfahrer"
-          renderName={(row) => <DriverCell row={row} driver={drivers[row.key]} onSelect={jumpTo} />}
+          renderName={(row) => <DriverCell row={row} driver={drivers[row.key]} onSelect={jumpTo} canOpen={publicKeys.includes(row.key)} />}
           renderResult={(result, name) => <RaceCell result={result} name={name} />}
           renderPoints={(row) => <RacingPoints row={row} />}
           extraColumn={{ header: "Abstand", title: "Abstand zur Spitze in Punkten", cell: (row) => <span data-testid="racing-gap">{gapLabel(row, rows)}</span> }}
@@ -145,7 +148,7 @@ export function RacingLeague({ data }) {
       )}
 
       <SeriesFinal final={data.final} />
-      <RacingCalendar rounds={rounds} rows={rows} onSelect={jumpTo} />
+      <RacingCalendar rounds={rounds} rows={rows} onSelect={jumpTo} publicKeys={publicKeys} />
     </>
   );
 }
