@@ -2,10 +2,11 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Animated, StyleSheet, View, type StyleProp, type ViewStyle } from "react-native";
 import { useReduceMotion } from "./FadeIn";
 import { formatStatus, upperDe } from "../lib/format";
-import { colors, radius } from "../theme";
+import { phaseTone, type PhaseTone } from "../lib/phaseTone";
+import { colors, radius, roles } from "../theme";
 import { Muted } from "./Text";
 
-type StatusTone = "default" | "danger" | "gold" | "success" | "cyan";
+type StatusTone = PhaseTone;
 type PhaseLike = {
   countdown_kind?: string | null;
   label?: string | null;
@@ -37,9 +38,10 @@ export function StatusBadge({
   const prefix = remaining ? countdownPrefix(phaseCountdownKind(phase)) : "";
   const statusLabel = statusText({ label, phase, status });
   const text = [statusLabel, prefix && `${prefix} ${remaining}`].filter(Boolean).join(" · ");
-  // Text und Tönung aus derselben Regel (#1869): steht eine Phase da, färbt nur sie - wie PhaseBadge im Web. Der
-  // Rohstatus („live“) färbte sonst eine noch angekündigte Fast Lap rot.
-  const tone = toneForStatus(phaseLabel(phase) ? `${text} ${phaseState(phase)}` : `${text} ${status || ""}`);
+  // Text und Tönung aus derselben Regel (#1869): steht eine Phase da, färbt nur sie - mit der Tabelle von PhaseBadge im
+  // Web (lib/phaseTone). Der Rohstatus („live“) färbte sonst eine noch angekündigte Fast Lap rot.
+  const state = phaseState(phase);
+  const tone = state ? phaseTone(state) : toneForStatus(phaseLabel(phase) ? text : `${text} ${status || ""}`);
   return (
     <View style={[styles.badge, toneStyles[tone].badge, style]} accessible accessibilityLabel={text}>
       {phaseState(phase) === "live" ? <LiveDot color={toneStyles[tone].text.color} /> : null}
@@ -166,6 +168,11 @@ const toneStyles: Record<StatusTone, { badge: ViewStyle; text: { color: string }
   default: {
     badge: { backgroundColor: "rgba(255, 255, 255, 0.07)", borderColor: colors.border },
     text: { color: colors.muted },
+  },
+  // Pause zwischen zwei Tagen (#884) - Violett der Events wie im Web.
+  event: {
+    badge: { backgroundColor: "rgba(159, 122, 234, 0.15)", borderColor: "rgba(159, 122, 234, 0.5)" },
+    text: { color: roles.event },
   },
   gold: {
     badge: { backgroundColor: "rgba(255, 215, 0, 0.12)", borderColor: "rgba(255, 215, 0, 0.32)" },

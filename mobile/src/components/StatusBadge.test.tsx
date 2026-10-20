@@ -2,7 +2,7 @@ import React from "react";
 import { AccessibilityInfo } from "react-native";
 import { render, screen, waitFor } from "@testing-library/react-native";
 import { StatusBadge } from "./StatusBadge";
-import { colors } from "../theme";
+import { colors, roles } from "../theme";
 
 // Zustands-Chip (#1085): wie im Web steht der Chip ruhig, bei LIVE pulsiert nur der Punkt mit einem Ring. Mit
 // "Bewegung reduzieren" bleibt der Punkt ohne Ring; andere Zustaende haben keinen Punkt.
@@ -58,6 +58,19 @@ test("laufend und beendet: Text und Tönung passen zusammen", async () => {
   await render(<StatusBadge phase={{ state: "completed", label: "Beendet" }} status="live" />);
   expect(screen.getByTestId("status-badge-text")).toHaveTextContent("BEENDET");
   expect(screen.getByTestId("status-badge-text")).toHaveStyle({ color: colors.muted });
+});
+
+// Phase → Ton wie PhaseBadge im Web (lib/phaseTone): abgesagt und Entwurf grau, „Anmeldung öffnet“ cyan, Pause
+// zwischen zwei Tagen violett.
+test.each([
+  [{ state: "cancelled", label: "Abgesagt" }, colors.muted],
+  [{ state: "draft", label: "Entwurf" }, colors.muted],
+  [{ state: "registration_pending", label: "Anmeldung öffnet" }, colors.cyan],
+  [{ state: "registration_closed", label: "Anmeldung geschlossen" }, colors.muted],
+  [{ state: "day_break", label: "Pause bis zum nächsten Tag" }, roles.event],
+])("Phase %p färbt wie im Web", async (phase, color) => {
+  await render(<StatusBadge phase={phase} />);
+  expect(screen.getByTestId("status-badge-text")).toHaveStyle({ color });
 });
 
 test("ohne Phase färbt weiter der Status", async () => {
