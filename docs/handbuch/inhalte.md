@@ -287,7 +287,9 @@ und im Protokoll, und alle Tabellen der Saison werden neu gerechnet.
 Meister oder leer). Steht dort etwas, gilt es – auch wenn die Stufen keine Zahl im Namen tragen. Ist es leer, wird
 Auf- und Abstieg aus den Stufen abgeleitet. Die **Reihenfolge der Stufen** (höchste zuerst) steht an der Spur: Vorgabe
 ist die Zahl im Namen („Liga 1“ vor „Liga 2“); mit den Pfeilen legt ihr eine eigene Reihenfolge fest, etwa für
-„Gold“ und „Silber“, **Vorgabe aus den Namen** nimmt sie zurück.
+„Gold“ und „Silber“, **Vorgabe aus den Namen** nimmt sie zurück. Der Vermerk steht klein im Liga-Weg – unter
+**Serien & Ligen** auf der Übersicht und auf der Seite der Team-Liga gleich (Aufstieg grün, Meister gold, Abstieg und
+Klassenerhalt grau); die Ehrentafel zählt die Aufstiege mit, die Vitrine wählt mit der Reihenfolge der Spur.
 
 <table>
 <tr>
@@ -295,6 +297,10 @@ ist die Zahl im Namen („Liga 1“ vor „Liga 2“); mit den Pfeilen legt ihr 
 <td><img src="../assets/serien/serien-ergebnis-der-saison.png" alt="Saison bearbeiten am Handy: Feld Ergebnis der Saison mit Aufstieg" width="200"></td>
 </tr>
 </table>
+
+<img src="../assets/serien/serien-liga-weg-vermerk.png" alt="Serien und Ligen: Liga-Weg Bronze, Silber, Gold mit dem Vermerk Aufstieg ohne Zahl im Stufennamen" width="560">
+
+<img src="../assets/serien/serien-team-liga-weg-vermerk.png" alt="Liga-Weg auf der Seite der Team-Liga mit denselben Vermerken" width="480">
 
 **Archivieren statt Löschen:** Spur und Saison lassen sich nur archivieren; **Archivierte zeigen** blendet sie ein,
 **Zurückholen** macht es rückgängig. Ein Klick auf die Saison öffnet ihre Seite mit Regeln, Version und Kalender.

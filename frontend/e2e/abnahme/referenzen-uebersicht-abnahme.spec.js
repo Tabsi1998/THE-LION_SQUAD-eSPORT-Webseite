@@ -224,11 +224,14 @@ test.describe("Abnahme #1878: Referenzen - Übersicht neu", () => {
       await expect(card.locator('[data-note="Aufstieg"]')).toHaveCount(2);
       await expect(card.locator('[data-note="Aufstieg"]').nth(1)).toContainText("Silber");
       await expect(card).toContainText("3 Saisons · 2 Aufstiege");
+      await page.waitForTimeout(1200); // Einblenden fertig
       await shot(card, "referenzen-liga-weg-vermerk");
 
       await page.goto(`/references/series/${lineage.slug}/${seasons[2].season_slug}`);
       const notes = page.getByTestId("team-league-season-note");
       await expect(notes).toHaveText(["Aufstieg", "Aufstieg"]);
+      await page.getByTestId("team-league-path").scrollIntoViewIfNeeded();
+      await page.waitForTimeout(1200); // Einblenden fertig
       await shot(page.getByTestId("team-league-path"), "serien-team-liga-weg-vermerk");
       await page.close();
     } finally {
