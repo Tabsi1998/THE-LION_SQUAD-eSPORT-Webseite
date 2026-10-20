@@ -170,7 +170,8 @@ sie ab - dann im Reiter Actions wieder einschalten.
 
 `scripts/lasttest_abnahme.py` (#1683) setzt einen eigenen Abnahme-Stand unter Last wie am Turnierabend, über die echten
 Routen und so, wie die Seiten im Browser abfragen: Zuschauer und Spieler auf Turnierseite, Baum, Spielplan und Fast Lap
-(jeder mit Änderungsstrom und Nachladen bei jeder Änderung, ein Teil angemeldet mit „Du bist als Nächstes“), TVs mit
+(jeder mit Änderungsstrom und Nachladen bei jeder Änderung seines Turniers wie im Web, #1801; ein Teil angemeldet mit
+„Du bist als Nächstes“), TVs mit
 Anzeige-Schlüssel, Helfer an der Live-Warteschlange (aufrufen, starten, Ergebnis), Fast-Lap-Schnelleingabe und
 Vor-Ort-Anmeldungen über den QR-Code. Er bricht vor der ersten Anfrage ab, wenn die Adresse nicht auf diesem Rechner
 liegt, der Port nicht zum Docker-Projekt gehört oder dessen Backend nicht die Abnahme-Datenbank nutzt; den gemeinsamen
@@ -192,6 +193,8 @@ Stellschrauben: `--minutes`, `--viewers` (Vorgabe 150), `--signed-in` (Anteil an
 `--helpers` (4), `--helper-pause` (20 s je Schritt - dichter als am Abend), `--fastlap-pause` (30 s), `--onsite` (20
 Anmeldungen), `--ramp` (60 s, bis alle da sind), Grenzwerte `--p95-ms` (800) und `--max-error-rate` (0.005).
 `--overlapping-reloads` lädt wie das Web vor #1683 (jede Meldung ein neues Nachladen, auch wenn das vorige noch läuft).
+`--reload-every-tournament` lädt wie das Web vor #1801 bei jeder Änderung jedes Turniers nach statt nur bei denen des
+eigenen - für den Vergleich vorher/nachher auf demselben Stand (vor jedem Lauf frisch seeden).
 
 Der Bericht (Markdown und JSON) nennt je Gruppe von Endpunkten Anfragen, Fehlerquote, p50/p95/p99, grün oder rot gegen
 die Grenzwerte, die langsamsten Anfragen und `docker stats` von Backend, Datenbank und Frontend. 409 „schon erledigt“
