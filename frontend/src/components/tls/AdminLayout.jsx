@@ -394,10 +394,11 @@ export function AdminLayout({ children }) {
     <div className="min-h-screen bg-[#0A0A0A] text-white flex">
       <a href="#main-content" className="tls-skip-link">Zum Inhalt springen</a>
       {/* Sidebar */}
-      <aside className={`fixed md:sticky top-0 left-0 h-screen w-64 bg-[#0A0A0A] border-r border-white/10 z-40 transform transition-transform flex flex-col ${openMobile ? "translate-x-0" : "-translate-x-full md:translate-x-0"}`}>
+      {/* Bis 1023 px (Handy, Tablet hochkant) klappt das Menü aus, erst ab lg steht es fest links (#1289). */}
+      <aside className={`fixed lg:sticky top-0 left-0 h-screen w-64 bg-[#0A0A0A] border-r border-white/10 z-40 transform transition-transform flex flex-col ${openMobile ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}`}>
         <div className="p-5 border-b border-white/10 flex items-center justify-between shrink-0">
           <Logo size="sm" />
-          <button className="md:hidden p-1" onClick={() => setOpenMobile(false)} aria-label="Admin-Menü schließen">
+          <button className="lg:hidden p-1" onClick={() => setOpenMobile(false)} aria-label="Admin-Menü schließen">
             <X className="w-4 h-4" />
           </button>
         </div>
@@ -534,14 +535,15 @@ export function AdminLayout({ children }) {
       {/* Mobile overlay */}
       {openMobile && (
         <div
-          className="md:hidden fixed inset-0 bg-black/60 z-30"
+          data-testid="admin-menu-overlay"
+          className="lg:hidden fixed inset-0 bg-black/60 z-30"
           onClick={() => setOpenMobile(false)}
         />
       )}
 
       {/* Main */}
       <div className="flex-1 min-w-0">
-        <div className="md:hidden sticky top-0 z-30 bg-[#0A0A0A] border-b border-white/10 p-3 flex items-center justify-between">
+        <div className="lg:hidden sticky top-0 z-30 bg-[#0A0A0A] border-b border-white/10 p-3 flex items-center justify-between">
           <button onClick={() => setOpenMobile(true)} className="p-2" data-testid="admin-menu-open" aria-label="Admin-Menü öffnen" aria-expanded={openMobile}>
             <Menu className="w-5 h-5" />
           </button>

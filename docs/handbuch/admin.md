@@ -123,6 +123,9 @@ Gut zu wissen:
   Wechsel auf eine Seite geht ihre Gruppe von selbst wieder auf.
 - Zugeklappt zeigt die Gruppe die Zahl ihrer Einträge, ein blauer Punkt markiert die Gruppe der aktuellen Seite.
 - Wer **abgehakte Plattformen** unter „Alle Verbindungen“ hat, sieht diese nicht mehr als Menüpunkt.
+- Am **Handy und am Tablet hochkant** (bis 1023 px Breite) ist das Menü eingeklappt: oben links der **Menü-Knopf**
+  (drei Striche) klappt die Leiste aus, ein Tipp daneben schließt sie wieder. So hat die Seite die volle Breite. Ab
+  1024 px (Tablet quer, PC) steht das Menü fest links.
 - Wer **keinen** Bereich und keinen Einsatz hat, sieht kein Menü.
 - Redaktion, Vereinsverwaltung und Finanzen sehen **keine** Turnierseiten – weder im Menü noch über die Adresse. Die
   gibt es nur mit dem Bereich Turnierleitung oder einem Helfer-Einsatz.

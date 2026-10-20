@@ -73,6 +73,12 @@ function navMetrics(page) {
   });
 }
 
+// Die Leiste ist eingeklappt nur verschoben (translate), nicht versteckt - sichtbar heißt: sie ragt in den Bildschirm.
+async function menuOnScreen(page) {
+  const box = await page.locator("aside").boundingBox();
+  return box.x + box.width > 1;
+}
+
 test.describe("Adminmenü", () => {
   test.beforeEach(async ({ page }) => {
     await mockAdminSession(page);
@@ -153,6 +159,32 @@ test.describe("Adminmenü", () => {
 
     await expect(page.getByTestId("admin-nav-sponsors")).toBeVisible();
     await expect(page.getByTestId("admin-nav-group-Verein")).toHaveAttribute("aria-expanded", "true");
+  });
+
+  // Tablet hochkant (#1289): bis 1023 px Menü-Knopf und volle Breite für den Inhalt, ab 1024 px fest links.
+  for (const width of [768, 820]) {
+    test(`bei ${width} px steht kein festes Menü links, der Inhalt hat die volle Breite`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 1180 });
+      await page.goto("/admin");
+      await expect(page.getByTestId("admin-menu-open")).toBeVisible();
+      expect(await menuOnScreen(page)).toBe(false);
+      const main = await page.locator("#main-content").boundingBox();
+      expect(main.x).toBeLessThanOrEqual(1);
+      await page.getByTestId("admin-menu-open").click();
+      await expect.poll(() => menuOnScreen(page)).toBe(true);
+      await page.getByTestId("admin-menu-overlay").click({ position: { x: width - 20, y: 400 } });
+      await expect.poll(() => menuOnScreen(page)).toBe(false);
+    });
+  }
+
+  test("ab 1024 px steht das Menü fest links wie bisher", async ({ page }) => {
+    await page.setViewportSize({ width: 1024, height: 768 });
+    await page.goto("/admin");
+    await expect(page.getByTestId("admin-nav-search")).toBeVisible();
+    await expect(page.getByTestId("admin-menu-open")).toBeHidden();
+    const main = await page.locator("#main-content").boundingBox();
+    expect(main.x).toBeGreaterThanOrEqual(255);
+    expect((await navMetrics(page)).entries).toBe(84);
   });
 
   test("am Telefon bleibt das Menü im Schubfach bedienbar", async ({ page }) => {
