@@ -246,7 +246,7 @@ und im Protokoll, und alle Tabellen der Saison werden neu gerechnet.
 
 **Archivieren statt Löschen:** Spur und Saison lassen sich nur archivieren; **Archivierte zeigen** blendet sie ein,
 **Zurückholen** macht es rückgängig. Ein Klick auf die Saison öffnet ihre Seite mit Regeln, Version und Kalender.
-Teilnehmer und Ergebnisse kommen dort in den nächsten Schritten dazu, Captains stehen weiter unten. Die bestehenden
+Teilnehmer, Ergebnisse und Captains stehen weiter unten. Die bestehenden
 Referenzen bleiben, wie sie sind.
 
 **Kalender der Saison.** Auf der Seite der Saison stehen alle Termine in ihrer Reihenfolge, jeder mit Status:
@@ -340,6 +340,53 @@ Verknüpfungen sieht nur die Verwaltung (Bereich Redaktion).
 </tr>
 </table>
 
+#### Ergebnisse eintragen
+
+Auf der Seite der Saison steht unter **Ergebnisse** jeder Termin (außer abgesagten) mit **Ergebnis eintragen** – bei
+einem gewerteten Termin **Ergebnis ändern**. Das öffnet das Blatt des Termins. Vorstand und Captains der Saison sehen es.
+
+- **Ergebnisliste:** je Zeile ein Teilnehmer. **+ Teilnehmer** fügt eine Zeile an, das **×** nimmt sie wieder weg.
+  Der **Platz** ergibt sich aus der Reihenfolge (grau vorgeschlagen) und lässt sich überschreiben; ein Nichtstart (DNS)
+  bekommt keinen Platz. Der **Name** schlägt die Teilnehmer der Saison vor – ein bekannter Name bringt sein Team mit.
+  **Team** gilt für dieses Rennen. **Punkte** leer heißt: nach dem Schlüssel der Saison. Eingetragene Punkte gelten als
+  **laut Veranstalter** und werden gegen den Schlüssel geprüft; bei einer Saison „Punkte laut Veranstalter“ zählen sie
+  direkt.
+- **Mehr** (Regler-Symbol) zeigt die Marken **DNF**, **DNS**, **DSQ**, **Schnellste Runde** und **Pole**, dazu
+  **Strafpunkte**, **Startnummer**, den **Gesamtstand laut Veranstalter** (wird mit der eigenen Rechnung verglichen) und
+  **Punkte zählen statt Schlüssel**, wenn ein Wert bewusst vom Schlüssel abweicht.
+- **Liste einfügen:** die Ergebnisliste von der Seite des Veranstalters kopieren und einfügen – etwa `1. Name 25 Pkt`,
+  `3 Name DNF`, nur Namen in Reihenfolge, `Name;Platz` oder eine Tabelle aus Excel oder einer Website (Tab, `|` oder
+  `;`, gern mit Kopfzeile wie „Pos | Fahrer | Team | Punkte“). **Liste übernehmen** ersetzt die Zeilen und prüft gleich.
+  Was sich nicht lesen lässt, steht mit Zeilennummer darunter. Eine Zahl, die nur mit einem Leerzeichen am Namen hängt
+  („Max Muster 33“), bleibt beim Namen; die Zeile fragt dann **Letzte Zahl = Punkte** oder **Gehört zum Namen** (bei
+  mehreren Zeilen auch **Bei allen: letzte Zahl = Punkte**). Klar sind Punkte mit zwei Leerzeichen davor, mit „Pkt“
+  dahinter oder in einer eigenen Spalte.
+- **Team-Liga:** statt der Liste das **Spiel** – eigenes Team und Gegner (aus dem Termin vorbefüllt), Ergebnis, die
+  **Maps** und die **Aufstellung** (wer gespielt hat). Darunter die **Tabelle laut Veranstalter**: einfügen, etwa
+  `1. Team 10 7 1 2 22` oder mit Kopfzeile (Pl, Team, Sp, S, U, N, Maps, Pkt).
+
+**Vorschau** lässt den Server prüfen und rechnen, gespeichert wird dabei nichts. Fehler (rot) und Hinweise (gelb)
+stehen direkt an der Zeile, dazu die Punkte je Zeile, die erkannten **Vereinsleute**, **unbekannte Namen** und der
+**Stand nach diesem Termin** mit Bewegung (Pfeile) und der Linie der **Finalgrenze**; wer neu im Finale ist oder
+herausfällt, steht darunter. Fehler halten das Übernehmen auf, Hinweise nicht. Sobald ihr etwas ändert, muss die
+Vorschau neu prüfen.
+
+<table>
+<tr>
+<td><img src="../assets/serien/serien-ergebnis-eintragen.png" alt="Blatt Ergebnis eintragen mit drei Zeilen, Marken, einem Hinweis an der Zeile und unbekanntem Namen" width="420"></td>
+<td><img src="../assets/serien/serien-ergebnis-vorschau.png" alt="Vorschau mit dem Stand nach dem Termin und der Linie der Finalgrenze" width="420"></td>
+</tr>
+</table>
+
+**Übernehmen:** Der Vorstand (und ein Captain mit Recht zum Veröffentlichen) sieht **Veröffentlichen** und **Nur als
+Entwurf**; sonst heißt der Knopf **Als Entwurf speichern**. Ist das Ergebnis schon veröffentlicht und darf der Captain
+nicht veröffentlichen, wird seine Änderung ein **Entwurf daneben** – das veröffentlichte Ergebnis bleibt sichtbar. Der
+Vorstand sieht ihn oben im Blatt und kann ihn **Freigeben** oder **Verwerfen**; einen gespeicherten Entwurf
+veröffentlicht er mit **Gespeicherten Entwurf veröffentlichen**. Unbekannte Namen werden beim Übernehmen als offene
+Teilnehmer angelegt; beim Vorstand öffnet sich danach gleich **Unbekannte Namen** zum Zuordnen (Vorschläge sieht nur
+er, Captains sehen nur „neu“). Hat inzwischen jemand anderes gespeichert, sagt das Blatt es: **Neu laden** holt den
+aktuellen Stand, eure Eingaben bleiben stehen, und die Vorschau prüft neu. Jede Änderung steht im Adminprotokoll.
+
 ---
 
 ## 4. Wenn etwas nicht klappt
@@ -363,6 +410,8 @@ Verknüpfungen sieht nur die Verwaltung (Bereich Redaktion).
 | Seite „Über uns“ zeigt keine Zahl | Zähler mit null bleiben weg | Gewollt |
 | `/references/series/…` zeigt „Hier ist kein Rudel“ | Saison oder Spur archiviert, Adresse falsch, oder die Sichtbarkeit ist enger (etwa „Nur Mitglieder“) | Sichtbarkeit und Status prüfen |
 | Termin steht auf **Ergebnis fehlt**, fand aber nie statt | Nicht abgesagt | **Absagen** – dann fehlt er nicht mehr |
+| Ergebnis-Blatt meldet „inzwischen geändert“ | Jemand anderes hat das Ergebnis gespeichert | **Neu laden**, Vorschau prüfen, dann übernehmen |
+| Captain-Änderung ist nicht öffentlich | Das Ergebnis war veröffentlicht – die Änderung ist ein Entwurf daneben | Vorstand: im Blatt **Freigeben** |
 
 ---
 

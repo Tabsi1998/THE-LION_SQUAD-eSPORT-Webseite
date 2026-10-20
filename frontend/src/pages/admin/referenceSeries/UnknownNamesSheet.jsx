@@ -72,6 +72,7 @@ function UnknownNameRow({ item, profiles, busy, onAssign }) {
 export function UnknownNamesSheet({ series, onClose, onChanged }) {
   const [data, setData] = useState(null);
   const [busy, setBusy] = useState(false);
+  const [notice, setNotice] = useState("");
 
   const load = useCallback(async () => {
     try {
@@ -88,7 +89,9 @@ export function UnknownNamesSheet({ series, onClose, onChanged }) {
   const assign = async (participant, body) => {
     setBusy(true);
     try {
-      await api.post(`/reference-series/admin/series/${series.id}/participants/${participant.id}/assign`, body);
+      const { data: result } = await api.post(`/reference-series/admin/series/${series.id}/participants/${participant.id}/assign`, body);
+      // Wartet eine andere Saison gerade (Sperre je Saison), zieht der Server den Alias dort später nach - kurz sagen.
+      setNotice(result?.notice || "");
       toast.success(body.link === "member" ? "Zugeordnet." : body.link === "guest" ? "Als Gast markiert." : "Als extern markiert.");
       await load();
       onChanged?.();
@@ -106,6 +109,7 @@ export function UnknownNamesSheet({ series, onClose, onChanged }) {
         Einmal bestätigen genügt: Mitglied und Gast merkt sich die Website als Alias und erkennt den Namen danach in jeder Serie selbst.
         Gäste zählen fürs Team, aber nicht in der Vereinsstatistik. Für Externe wird nichts gespeichert.
       </p>
+      {notice && <p className="text-xs text-white/55 border-l-2 border-[#29B6E8]/50 pl-3" role="status" data-testid="unknown-names-notice">{notice}</p>}
       {!data && <div className="text-sm text-white/40">Lädt …</div>}
       {data && items.length === 0 && <div className="text-sm text-white/50" data-testid="unknown-names-empty">Alle Namen sind zugeordnet.</div>}
       {items.length > 0 && (

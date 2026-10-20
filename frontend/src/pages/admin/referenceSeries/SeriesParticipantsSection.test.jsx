@@ -121,3 +121,16 @@ test("Zählung in Einzahl und Mehrzahl", () => {
   expect(countsText({ member: 2, guest: 2, external: 0, open: 3 })).toBe("2 Mitglieder · 2 Gäste · 0 Extern · 3 offen");
   expect(countsText({})).toBe("0 Mitglieder · 0 Gäste · 0 Extern · 0 offen");
 });
+
+test("Dialog: wartet eine andere Saison, steht der Hinweis des Servers dezent im Dialog", async () => {
+  render(<SeriesParticipantsSection series={SERIES} />);
+  fireEvent.click(await screen.findByTestId("series-unknown-open"));
+  apiMock.post.mockResolvedValueOnce({ data: { other_series: { updated: [], pending: ["serie-2"] }, notice: "1 weitere Saison wird gerade bearbeitet und beim nächsten Speichern dort nachgezogen." } });
+  fireEvent.click(await screen.findByTestId("unknown-t4-confirm"));
+  expect(await screen.findByTestId("unknown-names-notice")).toHaveTextContent("1 weitere Saison wird gerade bearbeitet");
+  // Ohne wartende Saison kommt kein Hinweis - der alte verschwindet.
+  apiMock.post.mockResolvedValueOnce({ data: { other_series: { updated: ["serie-3"], pending: [] } } });
+  await waitFor(() => expect(screen.getByTestId("unknown-t4-external")).not.toBeDisabled());
+  fireEvent.click(screen.getByTestId("unknown-t4-external"));
+  await waitFor(() => expect(screen.queryByTestId("unknown-names-notice")).toBeNull());
+});

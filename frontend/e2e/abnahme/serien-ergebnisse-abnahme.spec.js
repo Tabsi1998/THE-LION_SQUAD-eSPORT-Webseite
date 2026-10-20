@@ -1,15 +1,26 @@
+const fs = require("fs");
+const path = require("path");
 const { test, expect } = require("@playwright/test");
-const { ENABLED, STATE_FILE, state, signIn } = require("./abnahmeSession");
+const { ENABLED, STATE_FILE, state, signIn, watch } = require("./abnahmeSession");
 
 // Abnahme gegen den echten Server (docs/entwicklung/abnahme-lokal.md): Ergebnisse externer Serien eintragen (#1744),
-// über die API (die Oberfläche kommt mit P5b). Der Vorstand (Admin) prüft ein Blatt in der Vorschau - es ändert nichts -,
+// erst über die API, dann über die Oberfläche (P5b). Der Vorstand (Admin) prüft ein Blatt in der Vorschau - es ändert nichts -,
 // übernimmt es mit Version (ein zweites Übernehmen auf denselben Stand bekommt 409) und sieht unbekannte Namen als
 // offene Teilnehmer. Die Turnierleitung als Captain der Saison ändert das veröffentlichte Blatt nur als Entwurf
 // daneben; der Vorstand gibt ihn frei. Ein Termin einer anderen Saison antwortet 404. Captain kann nur ein aktives
 // Vereinsmitglied sein: die Turnierleitung wird dafür Mitglied, am Ende steht ihre Mitgliedschaft wieder auf „keine“.
+// Die Oberfläche: Liste, Einfügen, Vorschau, Speichern, 409 mit „deinen nicht gespeicherten Änderungen“, Captain-Entwurf
+// und Freigabe, bei 1440 und 390 px. `ABNAHME_SHOTS` legt Bilder des Blatts ab (optional).
 // Nur erfundene Namen. Läuft nur mit ABNAHME=1.
 
 const SERIES = "/api/reference-series/admin";
+const SHOTS = process.env.ABNAHME_SHOTS || "";
+
+async function shot(page, locator, name) {
+  if (!SHOTS) return;
+  fs.mkdirSync(SHOTS, { recursive: true });
+  await locator.screenshot({ path: path.join(SHOTS, `${name}.png`) });
+}
 
 /** Anfrage wie die Website: mit dem CSRF-Kopf aus dem Cookie der Sitzung. */
 async function send(page, method, url, data) {
@@ -116,6 +127,158 @@ test.describe("Abnahme #1744: Ergebnisse eintragen - Vorschau, Version, Entwurf 
       await ok(await send(admin, "POST", `${SERIES}/lineages/${lineage.id}/archive`));
     } finally {
       // Die Turnierleitung des Seeds ist sonst kein Mitglied - so bleibt es für die anderen Abnahmen.
+      if (admin && leadId) await send(admin, "PUT", `/api/membership/user/${leadId}`, { member_status: "none" });
+      await adminContext.close();
+      await captainContext.close();
+    }
+  });
+
+  test("Oberfläche: Liste und Einfügen, Vorschau, Speichern, 409 mit eigenen Eingaben, Captain-Entwurf und Freigabe", async ({ browser }, testInfo) => {
+    test.skip(testInfo.project.name !== "chromium", "ein Durchgang genügt");
+    const stamp = Date.now().toString(36).slice(-5);
+    const until = `${new Date().getFullYear() + 1}-12-31`;
+    const [anna, bert, carl] = [`Probe Anna ${stamp}`, `Probe Bert ${stamp}`, `Probe Carl ${stamp}`];
+    const adminContext = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+    const captainContext = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+    let admin = null;
+    let leadId = null;
+    try {
+      admin = await adminContext.newPage();
+      await signIn(admin, "admin");
+      // 409 beim Speichern gehört hier zum Ablauf.
+      const problems = watch(admin, {
+        allow: (response) => response.status() === 409 && response.url().endsWith("/results"),
+        allowConsole: (text) => text.includes("status of 409"),
+      });
+      const captain = await captainContext.newPage();
+      await signIn(captain, "lead");
+      leadId = (await (await captain.request.get("/api/auth/me")).json()).id;
+
+      const lineage = await ok(await send(admin, "POST", `${SERIES}/lineages`, { title: `Probe Oberfläche ${stamp}`, kind: "racing", label: "F1" }));
+      const series = await ok(await send(admin, "POST", `${SERIES}/series`, {
+        lineage_id: lineage.id, season: "2026", status: "active", points_scheme_id: "formula_1", rules: { final_top_n: 2 },
+      }));
+      const first = await ok(await send(admin, "POST", `${SERIES}/series/${series.id}/rounds`, { day: "2026-01-08", code: "R1", venue: "Probering" }));
+      await ok(await send(admin, "POST", `${SERIES}/series/${series.id}/rounds`, { day: "2026-01-15", code: "R2" }));
+      const results = `${SERIES}/series/${series.id}/rounds/${first.id}/results`;
+      const page = `/admin/reference-series/${series.id}`;
+      const openRound = async (target) => {
+        await target.getByTestId("results-round").filter({ hasText: "R1" }).getByTestId("results-open").click();
+        const sheet = target.getByTestId("result-sheet");
+        await expect(sheet.getByTestId("result-rows-section")).toBeVisible();
+        return sheet;
+      };
+      const names = async (sheet) => sheet.getByTestId("result-row-name").evaluateAll((inputs) => inputs.map((input) => input.value));
+
+      // 1. Vorstand trägt per Liste ein: zwei Zeilen, Platz aus der Reihenfolge, Vorschau, Veröffentlichen.
+      await admin.goto(page);
+      let sheet = await openRound(admin);
+      await sheet.getByTestId("result-row-name").first().fill(anna);
+      await sheet.getByTestId("result-row-add").click();
+      await sheet.getByTestId("result-row-name").nth(1).fill(bert);
+      await expect(sheet.getByTestId("result-row-place").nth(1)).toHaveAttribute("placeholder", "2");
+      await sheet.getByTestId("result-submit").click();
+      await expect(sheet.getByTestId("result-preview")).toBeVisible();
+      await expect(sheet.getByTestId("result-row-scored").first()).toContainText("25 Pkt");
+      await expect(sheet.getByTestId("preview-unknown-name")).toHaveCount(2);
+      await expect(sheet.getByTestId("result-submit")).toHaveText("Veröffentlichen");
+      await sheet.getByTestId("result-submit").click();
+      // Neue offene Namen: danach öffnet sich „Unbekannte Namen“.
+      await expect(admin.getByTestId("unknown-names")).toBeVisible();
+      await admin.getByTestId("unknown-names-close").click();
+      let stored = await ok(await admin.request.get(results));
+      expect(stored.version).toBe(1);
+      expect(stored.sheet.status).toBe("published");
+      expect(stored.sheet.rows.map((row) => row.place)).toEqual([1, 2]);
+
+      // 2. Einfügen: Liste aus der Zwischenablage, eine Zahl am Namen bleibt beim Namen, Vorschau kommt gleich.
+      await expect(admin.getByTestId("results-round").filter({ hasText: "R1" }).getByTestId("results-open")).toHaveText(/ändern/);
+      sheet = await openRound(admin);
+      expect(await names(sheet)).toEqual([anna, bert]);
+      await sheet.getByTestId("result-paste-toggle").click();
+      await sheet.getByTestId("result-paste-text").fill(`1. ${bert}  25 FL\n2. ${anna} 18 Pkt\n3. ${carl} 7\n4. Probe Dora ${stamp} DNF`);
+      await sheet.getByTestId("result-paste-apply").click();
+      await expect(sheet.getByTestId("result-preview")).toBeVisible();
+      await expect(sheet.getByTestId("result-row-hint")).toHaveCount(1);
+      await sheet.getByTestId("result-row-hint-points").click();
+      expect(await names(sheet)).toEqual([bert, anna, carl, `Probe Dora ${stamp}`]);
+      await sheet.getByTestId("result-submit").click();
+      await expect(sheet.getByTestId("result-preview")).toBeVisible();
+      await expect(sheet.getByTestId("preview-standing-row")).toHaveCount(4);
+      // Punkte laut Veranstalter werden nur verglichen: 7 statt 15 auf Platz 3 ist ein Hinweis an der Zeile, es zählt der
+      // Schlüssel.
+      await expect(sheet.getByTestId("result-row").nth(2).getByTestId("result-row-problems")).toContainText("passen nicht zum Schlüssel");
+      await expect(sheet.getByTestId("result-row").nth(2).getByTestId("result-row-scored")).toContainText("15 Pkt");
+      await shot(admin, sheet, "ergebnis-vorschau-1440");
+      await admin.setViewportSize({ width: 390, height: 844 });
+      await shot(admin, sheet, "ergebnis-vorschau-390");
+      const overflow = await admin.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+      expect(overflow).toBeLessThanOrEqual(0);
+      await admin.setViewportSize({ width: 1440, height: 900 });
+
+      // 3. 409: jemand anderes speichert dazwischen. Neu laden zeigt seinen Stand, die eigenen Eingaben bleiben daneben.
+      const theirs = await ok(await send(admin, "PUT", results, { rows: [{ name: carl, place: 1 }, { name: anna, place: 2 }, { name: bert, place: 3 }], status: "published", expected_version: 1 }));
+      expect(theirs.version).toBe(2);
+      await sheet.getByTestId("result-submit").click();
+      await expect(sheet.getByTestId("result-stale")).toBeVisible();
+      await sheet.getByTestId("result-reload").click();
+      await expect(sheet.getByTestId("result-mine")).toBeVisible();
+      await expect.poll(() => names(sheet)).toEqual([carl, anna, bert]);
+      await shot(admin, sheet, "ergebnis-409-1440");
+      await sheet.getByTestId("result-mine-apply").click();
+      expect(await names(sheet)).toEqual([bert, anna, carl, `Probe Dora ${stamp}`]);
+      await sheet.getByTestId("result-submit").click();
+      await expect(sheet.getByTestId("result-preview")).toBeVisible();
+      await sheet.getByTestId("result-submit").click();
+      await expect(sheet).toHaveCount(0);
+      stored = await ok(await admin.request.get(results));
+      expect(stored.version).toBe(3);
+      expect(stored.sheet.rows.map((row) => [row.place, row.points, row.points_source, row.marks])).toEqual([
+        [1, 25, "organizer", ["fastest_lap"]], [2, 18, "organizer", []], [3, 7, "organizer", []], [4, null, "scheme", ["dnf"]],
+      ]);
+      if (await admin.getByTestId("unknown-names").isVisible()) await admin.getByTestId("unknown-names-close").click();
+
+      // 4. Captain (Turnierleitung, dafür Mitglied): Änderung am veröffentlichten Blatt wird Entwurf daneben.
+      await ok(await send(admin, "PUT", `/api/membership/user/${leadId}`, { member_status: "active" }));
+      await ok(await send(admin, "POST", `${SERIES}/series/${series.id}/staff`, { user_id: leadId, valid_until: until }));
+      await captain.goto(page);
+      sheet = await openRound(captain);
+      await expect(sheet.getByTestId("result-pending-note")).toBeVisible();
+      await sheet.getByTestId("result-row-points").nth(2).fill("8");
+      // „Punkte zählen statt Schlüssel“: nur so überschreibt der Wert den Schlüssel (manual).
+      await sheet.getByTestId("result-row-more").nth(2).click();
+      await sheet.getByTestId("result-row-override").check();
+      await sheet.getByTestId("result-submit").click();
+      await expect(sheet.getByTestId("result-preview")).toBeVisible();
+      await expect(sheet.getByTestId("result-row-known").first()).toHaveText("bekannt");
+      await expect(sheet.getByTestId("preview-unknown-suggestions")).toHaveCount(0);
+      await expect(sheet.getByTestId("result-submit")).toHaveText("Entwurf zur Freigabe");
+      await captain.setViewportSize({ width: 390, height: 844 });
+      await shot(captain, sheet, "ergebnis-captain-390");
+      await sheet.getByTestId("result-submit").click();
+      await expect(sheet).toHaveCount(0);
+      stored = await ok(await admin.request.get(results));
+      expect(stored.sheet.rows[2].points).toBe(7);
+      expect(stored.sheet.pending_draft.rows[2].points).toBe(8);
+      expect(stored.sheet.pending_draft.rows[2].points_source).toBe("manual");
+
+      // 5. Vorstand sieht den Entwurf daneben und gibt ihn frei.
+      await admin.goto(page);
+      sheet = await openRound(admin);
+      await expect(sheet.getByTestId("result-pending")).toBeVisible();
+      await shot(admin, sheet, "ergebnis-freigabe-1440");
+      await sheet.getByTestId("result-pending-approve").click();
+      await expect(sheet).toHaveCount(0);
+      stored = await ok(await admin.request.get(results));
+      expect(stored.sheet.pending_draft).toBeNull();
+      expect(stored.sheet.rows[2].points).toBe(8);
+      expect(stored.sheet.rows[2].points_source).toBe("manual");
+      expect(stored.sheet.rows[1].points_source).toBe("organizer");
+      expect(problems).toEqual([]);
+
+      await ok(await send(admin, "POST", `${SERIES}/series/${series.id}/archive`));
+      await ok(await send(admin, "POST", `${SERIES}/lineages/${lineage.id}/archive`));
+    } finally {
       if (admin && leadId) await send(admin, "PUT", `/api/membership/user/${leadId}`, { member_status: "none" });
       await adminContext.close();
       await captainContext.close();
