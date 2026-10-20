@@ -100,9 +100,9 @@ export function useFlipRows(items, keyOf, { durationMs = 450 } = {}) {
   return register;
 }
 
-/** „in 3 Tagen, 14 Stunden“ - tickt jede Minute, unter einer Stunde alle 15 Sekunden. */
-export function useCountdown(targetMs) {
-  const [text, setText] = useState(() => (targetMs ? formatCountdown(targetMs) : ""));
+/** „in 3 Tagen“, „morgen 14:00“, „in 45 Minuten“ (#1264) - tickt jede Minute, unter einer Stunde alle 15 Sekunden. */
+export function useCountdown(targetMs, days) {
+  const [text, setText] = useState(() => (targetMs ? formatCountdown(targetMs, Date.now(), days) : ""));
   useEffect(() => {
     if (!targetMs) {
       setText("");
@@ -110,12 +110,12 @@ export function useCountdown(targetMs) {
     }
     let timer = null;
     const tick = () => {
-      setText(formatCountdown(targetMs));
+      setText(formatCountdown(targetMs, Date.now(), days));
       const next = countdownTickMs(targetMs);
       if (next) timer = setTimeout(tick, next);
     };
     tick();
     return () => { if (timer) clearTimeout(timer); };
-  }, [targetMs]);
+  }, [targetMs, days]);
   return text;
 }

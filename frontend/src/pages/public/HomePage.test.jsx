@@ -51,7 +51,7 @@ test("Countdown, Live-Zahlen - und „Neu“ erst nach einer echten Änderung", 
   apiMock.get.mockResolvedValue({ data: stateWith(12) });
   render(<MemoryRouter><HomePage /></MemoryRouter>);
   const card = await screen.findByTestId("home-next-tournament-cup");
-  expect(screen.getByTestId("home-countdown")).toHaveTextContent("in 3 Tagen, 8 Stunden");
+  expect(screen.getByTestId("home-countdown")).toHaveTextContent("in 3 Tagen");
   expect(screen.getByTestId("home-live-counts")).toHaveTextContent("12 von 16 angemeldet");
   expect(card).not.toHaveAttribute("data-changed");
   expect(screen.queryByTestId("home-next-new")).not.toBeInTheDocument();
@@ -70,6 +70,40 @@ test("Countdown, Live-Zahlen - und „Neu“ erst nach einer echten Änderung", 
   // Nur der Startseiten-Stand zählt - der Vorstand (#407) wird einmal daneben geladen.
   await waitFor(() => expect(apiMock.get.mock.calls.filter(([url]) => url === "/home/state")).toHaveLength(3));
   expect(screen.queryByTestId("home-next-new")).not.toBeInTheDocument();
+});
+
+// #1264: das große „Nächste Termine“-Countdown nur, wenn es in den nächsten 14 Tagen (einstellbar) etwas gibt -
+// die Liste der Termine bleibt, das Schild in der Karte sagt dann Datum oder Monat.
+function farState(startDate) {
+  const state = stateWith(4);
+  const [cup] = state.soon.tournaments;
+  state.soon.tournaments = [{ ...cup, start_date: startDate, public_phase: { ...cup.public_phase, state: "announced", label: "Angekündigt", target_at: startDate } }];
+  return state;
+}
+
+test("#1264: in 154 Tagen kein großer Countdown, das Schild sagt den Monat", async () => {
+  apiMock.get.mockResolvedValue({ data: farState("2027-02-23T18:00:00Z") });
+  render(<MemoryRouter><HomePage /></MemoryRouter>);
+  const card = await screen.findByTestId("home-next-tournament-cup");
+  expect(screen.queryByTestId("home-countdown")).not.toBeInTheDocument();
+  expect(card).toHaveTextContent("startet im Februar");
+  expect(card).not.toHaveTextContent(/\d+T \d+h/);
+});
+
+test("#1264: in 20 Tagen kein großer Countdown - mit Schwelle 30 Tage schon", async () => {
+  const { setCachedBranding } = await import("@/lib/brandingEvents");
+  apiMock.get.mockResolvedValue({ data: farState("2026-10-12T16:00:00Z") });
+  const first = render(<MemoryRouter><HomePage /></MemoryRouter>);
+  await screen.findByTestId("home-next-tournament-cup");
+  expect(screen.queryByTestId("home-countdown")).not.toBeInTheDocument();
+  first.unmount();
+  setCachedBranding({ countdown_days: 30 });
+  try {
+    render(<MemoryRouter><HomePage /></MemoryRouter>);
+    expect(await screen.findByTestId("home-countdown")).toHaveTextContent("in 20 Tagen");
+  } finally {
+    setCachedBranding({});
+  }
 });
 
 // Startseite II und III (#407, #425, #431): Community zuerst im Hero, der Verein in Zahlen nur mit

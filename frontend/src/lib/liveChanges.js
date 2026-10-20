@@ -1,6 +1,7 @@
 // Dynamik-Block (#224, #225): Der Änderungsstrom lädt Seiten still neu. Diese Helfer sagen,
 // *was* sich dabei geändert hat, damit die Seite es kurz zeigen kann - ohne React, damit es
 // sich testen lässt.
+import { COUNTDOWN_DAYS_DEFAULT, whenText } from "./countdownRule";
 
 /** Welche Einträge sich zwischen zwei Ständen geändert haben - nach einer Signatur je Eintrag. */
 export function changedKeys(previous, next, keyOf, signatureOf) {
@@ -55,20 +56,13 @@ export function liveCountLine(item) {
 
 // ---------------------------------------------------------------- Countdown (#224)
 
-/** „in 3 Tagen, 14 Stunden“ - grob genug, dass es nicht jede Sekunde springt. */
-export function formatCountdown(targetMs, now = Date.now()) {
+/**
+ * „in 3 Tagen“, „morgen 14:00“, „heute 14:00“, „in 45 Minuten“ - die eine Regel aus lib/countdownRule.js (#1264).
+ * `days`: die Countdown-Schwelle; weiter weg kommt Datum oder Monat.
+ */
+export function formatCountdown(targetMs, now = Date.now(), days = COUNTDOWN_DAYS_DEFAULT) {
   if (!Number.isFinite(targetMs)) return "";
-  const diff = targetMs - now;
-  if (diff <= 0) return "jetzt";
-  const minutes = Math.floor(diff / 60000);
-  const days = Math.floor(minutes / 1440);
-  const hours = Math.floor((minutes % 1440) / 60);
-  const mins = minutes % 60;
-  const unit = (n, one, many) => `${n} ${n === 1 ? one : many}`;
-  if (days > 0) return hours > 0 ? `in ${unit(days, "Tag", "Tagen")}, ${unit(hours, "Stunde", "Stunden")}` : `in ${unit(days, "Tag", "Tagen")}`;
-  if (hours > 0) return mins > 0 ? `in ${unit(hours, "Stunde", "Stunden")}, ${unit(mins, "Minute", "Minuten")}` : `in ${unit(hours, "Stunde", "Stunden")}`;
-  if (minutes >= 1) return `in ${unit(minutes, "Minute", "Minuten")}`;
-  return "in unter einer Minute";
+  return whenText(targetMs, { now, days })?.text || "";
 }
 
 /** Wie oft der Countdown nachsieht: unter einer Stunde jede Sekunde reicht nicht, jede Minute schon. */
