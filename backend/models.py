@@ -1540,6 +1540,28 @@ ReferenceSeriesStatus = Literal["planned", "active", "completed", "archived"]
 ReferenceSeriesOpenStatus = Literal["planned", "active", "completed"]
 ReferenceSeriesPublishMode = Literal["review", "direct"]  # Captain: Entwurf mit Freigabe des Vorstands oder direkt
 ReferenceRoundStatus = Literal["planned", "scored", "cancelled", "postponed"]
+# Ergebnis der Saison (#1898): Aufstieg, Abstieg, Klassenerhalt, Meister - leer heißt: aus dem Stufennamen ableiten.
+ReferenceSeasonResult = Literal["promoted", "relegated", "stayed", "champion"]
+TIER_ORDER_MAX = 30
+
+
+def _tier_order(value):
+    """Reihenfolge der Stufen einer Spur (#1898), höchste zuerst: getrimmt, ohne Leere und Doppelte (Groß/klein egal).
+    Leer heißt ``None`` - dann gilt die Vorgabe aus der Zahl im Stufennamen."""
+    if value is None:
+        return None
+    out, seen = [], set()
+    for item in value:
+        name = " ".join(str(item or "").split())
+        if not name or name.casefold() in seen:
+            continue
+        if len(name) > 60:
+            raise ValueError("Eine Stufe hat höchstens 60 Zeichen.")
+        seen.add(name.casefold())
+        out.append(name)
+    if len(out) > TIER_ORDER_MAX:
+        raise ValueError(f"Höchstens {TIER_ORDER_MAX} Stufen.")
+    return out or None
 ReferenceRoundKind = Literal["regular", "final"]
 ReferenceParticipantKind = Literal["person", "team"]
 ReferenceParticipantLink = Literal["member", "guest", "external"]
@@ -1587,6 +1609,12 @@ class ReferenceLineageCreate(BaseModel):
     visibility: ReferenceVisibility = "public"
     slug: Optional[str] = Field(default=None, max_length=90)
     order_index: int = 0
+    tier_order: Optional[List[str]] = None  # #1898: eigene Reihenfolge der Stufen, höchste zuerst
+
+    @field_validator("tier_order")
+    @classmethod
+    def _tiers(cls, value):
+        return _tier_order(value)
 
 
 class ReferenceLineageUpdate(BaseModel):
@@ -1602,6 +1630,12 @@ class ReferenceLineageUpdate(BaseModel):
     visibility: Optional[ReferenceVisibility] = None
     slug: Optional[str] = Field(default=None, max_length=90)
     order_index: Optional[int] = None
+    tier_order: Optional[List[str]] = None
+
+    @field_validator("tier_order")
+    @classmethod
+    def _tiers(cls, value):
+        return _tier_order(value)
 
 
 class ReferenceSeriesCreate(BaseModel):
@@ -1623,6 +1657,7 @@ class ReferenceSeriesCreate(BaseModel):
     description: Optional[str] = Field(default=None, max_length=4000)
     reference_id: Optional[str] = None  # Stufe 2: Saisonende als Referenz (#1750)
     order_index: int = 0
+    season_result: Optional[ReferenceSeasonResult] = None  # #1898: Vermerk statt Ableitung aus dem Stufennamen
 
     @field_validator("rules")
     @classmethod
@@ -1652,6 +1687,7 @@ class ReferenceSeriesUpdate(BaseModel):
     description: Optional[str] = Field(default=None, max_length=4000)
     reference_id: Optional[str] = None
     order_index: Optional[int] = None
+    season_result: Optional[ReferenceSeasonResult] = None
 
     @field_validator("rules")
     @classmethod

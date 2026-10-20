@@ -20,7 +20,7 @@ from services.scoring_rules import match_points, normalize_rules
 from services.visibility import user_can_see
 
 TABLE_FIELDS = ("rank", "played", "won", "drawn", "lost", "score_for", "score_against", "score_diff", "points")
-PATH_FIELDS = ("season", "tier", "title", "season_slug", "status")
+PATH_FIELDS = ("season", "tier", "title", "season_slug", "status", "season_result")  # Vermerk der Saison (#1898)
 OUTCOME_LETTERS = {"win": "W", "draw": "D", "loss": "L"}
 FORM_LENGTH = 5
 

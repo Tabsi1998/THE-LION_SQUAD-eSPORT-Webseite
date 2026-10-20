@@ -222,7 +222,7 @@ async def test_the_switcher_lists_the_visible_seasons_of_the_lineage(flow):
     assert [(item["season"], item["tier"], item["season_slug"], item["status"], item["current"])
             for item in seasons] == [
         ("2026", "F1", series["season_slug"], "active", True), ("2025", "F1", "2025-f1", "completed", False)]
-    assert set(seasons[0]) == {"season", "tier", "title", "season_slug", "status", "current"}
+    assert set(seasons[0]) == {"season", "tier", "title", "season_slug", "status", "season_result", "current"}
 
     # Wer Mitglieder-Inhalte sieht, sieht auch die Saison „Nur Mitglieder“ - neueste Saison zuerst, darin nach Stufe.
     flow.act_as(admin)
