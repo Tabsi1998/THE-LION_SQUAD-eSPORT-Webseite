@@ -11,7 +11,9 @@ Regeln, wie der Betreiber sie gesetzt hat:
 * **Abhängigkeiten aus dem Graph.** Ein Spiel kommt erst nach allen Spielen, aus denen seine Plätze stammen,
   plus Mindestpause. Stehen die Plätze noch nicht fest, ist die Zeit eine Prognose (``forecast``).
 * **Kein Spieler zweimal gleichzeitig**, mit Mindestpause dazwischen - auch über die Turniere desselben Events,
-  soweit deren Spiele schon Zeiten haben (``busy_elsewhere``).
+  soweit deren Spiele schon Zeiten haben (``busy_elsewhere``). Läuft das andere Spiel oder ist es aufgerufen, ist der
+  Spieler gebunden; ist es bloß geplant, plant der Planer darum herum - ein bereites Spiel an einer freien Station
+  beginnt aber trotzdem jetzt (#1872).
 * **Feste Termine bleiben.** Von Hand gesetzt oder vereinbart wird nie verschoben; ist es zu früh oder doppelt
   belegt, steht das rot in den Warnungen.
 * **Reihenfolge:** von Hand → längste Kette bis zum Finale → längste Wartezeit (Runde, Reihenfolge).
@@ -148,7 +150,14 @@ class _Board:
 
     station_busy: dict[str, list[Interval]] = field(default_factory=dict)
     participant_busy: dict[str, list[Interval]] = field(default_factory=dict)
+    # Bloß geplante Spiele anderer Turniere (#1872): Der Planer plant um sie herum, aber sie nehmen einem bereiten Spiel
+    # an einer freien Station nicht den Platz „jetzt“ - der Spieler ist ja noch da.
+    planned_elsewhere: dict[str, list[Interval]] = field(default_factory=dict)
     ends: dict[str, datetime] = field(default_factory=dict)
+
+    def plan_elsewhere(self, match_id: str, participants: set[str], start: datetime, end: datetime) -> None:
+        for key in participants:
+            self.planned_elsewhere.setdefault(key, []).append((start, end, match_id))
 
     def block(self, match_id: str, station_id: str | None, participants: set[str], start: datetime, end: datetime) -> None:
         if station_id:
@@ -166,10 +175,15 @@ class _Board:
         """Steht an der Station ab ``moment`` schon etwas? Dann käme ein Spiel ab ``moment`` davor in die Lücke (#1858)."""
         return any(busy_start >= moment for busy_start, _end, _ in self.station_busy.get(station_id, []))
 
-    def earliest(self, lower: datetime, minutes: int, station_id: str, participants: set[str], pause: int) -> datetime:
-        """Der erste Zeitpunkt ab ``lower``, an dem Station und alle Spieler (mit Pause) frei sind."""
+    def earliest(self, lower: datetime, minutes: int, station_id: str, participants: set[str], pause: int,
+                 *, planned: bool = True) -> datetime:
+        """Der erste Zeitpunkt ab ``lower``, an dem Station und alle Spieler (mit Pause) frei sind. ``planned=False``
+        übersieht die bloß geplanten Spiele anderer Turniere (#1872)."""
         duration = timedelta(minutes=minutes)
         gap = timedelta(minutes=pause)
+        busy = self.participant_busy
+        if planned and self.planned_elsewhere:
+            busy = {key: [*self.participant_busy.get(key, []), *self.planned_elsewhere.get(key, [])] for key in participants}
         moment = lower
         for _ in range(10_000):
             end = moment + duration
@@ -178,7 +192,7 @@ class _Board:
             if clash is not None:
                 moment = clash
                 continue
-            clash = next((busy_end + gap for key in participants for busy_start, busy_end, _ in self.participant_busy.get(key, [])
+            clash = next((busy_end + gap for key in participants for busy_start, busy_end, _ in busy.get(key, [])
                           if _overlaps(moment, end + gap, busy_start, busy_end + gap)), None)
             if clash is not None:
                 moment = clash
@@ -347,8 +361,19 @@ def _plan_stations(tournament: dict, matches: list[dict], stations, stage_by_id:
 
     for entry in busy_elsewhere or []:
         start, end = _parse(entry.get("start")), _parse(entry.get("end"))
-        if start and end:
-            board.block(entry.get("match_id") or entry.get("label") or "anderes Turnier", None, set(entry.get("participants") or ()), start, end)
+        if not (start and end):
+            continue
+        label = entry.get("match_id") or entry.get("label") or "anderes Turnier"
+        players = set(entry.get("participants") or ())
+        # Was den Spieler bindet, blockt; ohne Angabe vorsichtig wie bisher (#1872). Aufgerufen: ab jetzt unterwegs.
+        # Läuft es länger als gedacht: mindestens bis jetzt - wie bei den eigenen Spielen.
+        state = entry.get("state") or "running"
+        if state == "planned":
+            board.plan_elsewhere(label, players, start, end)
+        elif state == "called":
+            board.block(label, None, players, min(start, now), max(start, now) + (end - start))
+        else:
+            board.block(label, None, players, start, max(end, now))
 
     station_by_id = {station["id"]: station for station in stations or [] if station.get("id")}
     for station in usable:
@@ -484,7 +509,11 @@ def _plan_stations(tournament: dict, matches: list[dict], stations, stage_by_id:
                 # Wartet das Spiel noch (#1858), kommt es an dieser Station erst nach den aufrufbaren - nie in eine Lücke
                 # davor, sonst stünde es „Als Nächstes“ und der bereite Lauf hätte kein „Aufrufen“.
                 floor = lower if waiting is None else max(lower, ready_until.get(station["id"], lower))
-                moment = board.earliest(floor, minutes, station["id"], players, pause)
+                # Bereit und die Station jetzt frei (#1872): jetzt - ein bloß geplantes Spiel im anderen Turnier hält den
+                # Spieler nicht fest. Alles Spätere plant um diese Termine herum, damit niemand doppelt im Plan steht.
+                moment = board.earliest(floor, minutes, station["id"], players, pause, planned=False)
+                if not (waiting is None and match["id"] in callable_ids and moment <= now):
+                    moment = board.earliest(floor, minutes, station["id"], players, pause)
                 # Gleich früh an mehreren Stationen: lieber eine, an der danach nichts steht, als die Lücke vor einem
                 # anderen Spiel (#1858: sonst laufen vier bereite Läufe auf zwei Stationen, zwei bleiben frei). Dann die,
                 # die zuerst frei war (#1791) - ein überzogenes Spiel hält seine Station „bis jetzt“, eine freie geht vor.
@@ -674,10 +703,12 @@ async def load_plan_inputs(db, tournament: dict) -> dict:
         # Gesammelt laden: ein Zugriff für die Spiele aller anderen Turniere, einmal Anmeldungen und Teams auflösen.
         title_by_id = {other["id"]: other.get("title") or "Turnier" for other in others}
         other_matches = await db.matches_v2.find(
-            {"tournament_id": {"$in": sorted(title_by_id)}, "is_preview": {"$ne": True}, "scheduled_at": {"$nin": [None, ""]},
+            # Auch ohne geplante Zeit, wenn es schon läuft oder aufgerufen ist (#1872): genau das bindet den Spieler.
+            {"tournament_id": {"$in": sorted(title_by_id)}, "is_preview": {"$ne": True},
+             "$or": [{field: {"$nin": [None, ""]}} for field in ("scheduled_at", "started_at", "called_at")],
              "status": {"$nin": list(DONE_STATUSES)}},
-            {"_id": 0, "id": 1, "tournament_id": 1, "slots": 1, "scheduled_at": 1, "started_at": 1, "duration_minutes": 1,
-             "settings": 1, "match_key": 1, "stage_id": 1, "best_of": 1},
+            {"_id": 0, "id": 1, "tournament_id": 1, "slots": 1, "scheduled_at": 1, "started_at": 1, "called_at": 1, "status": 1,
+             "station_id": 1, "duration_minutes": 1, "settings": 1, "match_key": 1, "stage_id": 1, "best_of": 1},
         ).to_list(None) if title_by_id else []  # vollständig: ein stilles Kappen ließe Konflikte unbemerkt
         other_keys = await resolve_participant_keys(db, other_matches) if other_matches else {}
         # Die Dauer der fremden Spiele aus ihrer eigenen Kette (Phase, Turnier, Game) - nichts ist mehr eingefroren.
@@ -687,12 +718,19 @@ async def load_plan_inputs(db, tournament: dict) -> dict:
             {"id": {"$in": stage_ids}}, {"_id": 0, "id": 1, "settings": 1}).to_list(len(stage_ids) + 5)} if stage_ids else {}
         other_games = await load_duration_games(db, others) if other_matches else {}
         for match in other_matches:
-            start = _parse(match.get("started_at")) or _parse(match.get("scheduled_at"))
+            start = _parse(match.get("started_at")) or _parse(match.get("scheduled_at")) or _parse(match.get("called_at"))
             if not start:
                 continue
             participants = {key for key in participants_of(match, other_keys) if key.startswith("user:")}
+            # Läuft, aufgerufen oder bloß geplant (#1872) - nur die ersten beiden halten den Spieler jetzt fest.
+            if match.get("started_at") or str(match.get("status") or "") in RUNNING_STATUSES:
+                state = "running"
+            elif match.get("called_at") and match.get("station_id"):
+                state = "called"
+            else:
+                state = "planned"
             busy_elsewhere.append({
-                "match_id": match["id"], "participants": participants, "start": start,
+                "match_id": match["id"], "participants": participants, "start": start, "state": state,
                 "end": start + timedelta(minutes=effective_match_duration(
                     match, stage=other_stages.get(match.get("stage_id") or ""), tournament=other_by_id.get(match.get("tournament_id")),
                     game=other_games.get((other_by_id.get(match.get("tournament_id")) or {}).get("game_id") or ""))),

@@ -130,15 +130,15 @@ def participant_keys(matches: list[dict]) -> dict[str, set[str]]:
     return {match["id"]: {f"user:u{reg[1:]}" for reg in seated(match)} for match in matches}
 
 
-def sofort_cup(matches: list[dict], *keys: str) -> list[dict]:
-    """Der Sofort-Cup daneben: je ein Spieler aus diesen Läufen hat dort ein Spiel in 10 Minuten (geplant, nicht
-    gestartet) - die Prognose dieser Läufe rückt nach hinten, bereit sind sie trotzdem."""
+def sofort_cup(matches: list[dict], *keys: str, state: str = "planned", offset: int = 10) -> list[dict]:
+    """Der Sofort-Cup daneben: je ein Spieler aus diesen Läufen hat dort ein Spiel in ``offset`` Minuten - standardmäßig
+    nur geplant (``state``: ``planned``; ``called`` aufgerufen, ``running`` läuft). Bereit sind die Läufe trotzdem."""
     rows = by_key(matches)
     busy = []
     for index, key in enumerate(keys):
         player = seated(rows[key])[0]
         busy.append({"match_id": f"sofort-{index}", "label": "Sofort-Cup Viertelfinale", "participants": {f"user:u{player[1:]}"},
-                     "start": T0 + timedelta(minutes=10), "end": T0 + timedelta(minutes=10 + MINUTES)})
+                     "start": T0 + timedelta(minutes=offset), "end": T0 + timedelta(minutes=offset + MINUTES), "state": state})
     return busy
 
 
