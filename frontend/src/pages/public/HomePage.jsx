@@ -28,6 +28,7 @@ import { formatAgo, formatWhen } from "@/lib/datetime";
 import { KIND_COLORS } from "@/lib/categoryColors";
 import { withoutRepeatedBanners } from "@/lib/newsCards";
 import { NewsTextCard } from "@/components/tls/NewsTextCard";
+import { NewsLead } from "@/components/tls/NewsLead";
 import { eventSortTime, scheduleLine } from "@/lib/eventDays";
 import { childSummary, nestUnderEvents } from "@/lib/eventGroups";
 import { LoadState, LoadStaleNotice } from "@/components/tls/LoadState";
@@ -146,7 +147,8 @@ export default function HomePage() {
       {state && (primaryNews || timeline.length > 0) && (
         <Reveal as="section" className="border-b border-white/10 bg-[#080808]/35" data-testid="home-current">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 md:py-12 min-w-0">
-            {primaryNews && <FeaturedNews news={primaryNews} />}
+            {/* Derselbe Aufmacher wie auf der News-Seite (#1342): die angepinnte News, sonst die neueste. */}
+            {primaryNews && <NewsLead news={primaryNews} testId={`home-featured-news-${primaryNews.slug}`} />}
             <div className={`${primaryNews ? "mt-8 md:mt-10 border-t border-white/10 pt-8 md:pt-10" : ""}`}>
               <NextUp items={timeline} />
             </div>
@@ -377,31 +379,6 @@ function BoardTeaser({ contacts }) {
         ))}
       </div>
     </div>
-  );
-}
-
-function FeaturedNews({ news }) {
-  return (
-    <Link to={`/news/${news.slug}`} data-testid={`home-featured-news-${news.slug}`} data-season-anchor="card"
-      className="tls-card group tls-reveal-item border border-white/10 rounded-sm bg-[#111] overflow-hidden grid lg:grid-cols-[minmax(0,1fr)_minmax(22rem,0.9fr)] min-w-0">
-      <div className="aspect-[16/9] lg:aspect-auto bg-[#070707] overflow-hidden">
-        {news.banner_url ? (
-          <LazyImg src={news.banner_url} alt="" sizes="(min-width: 1024px) 45vw, 100vw" className="w-full h-full object-cover object-center opacity-90 tls-card__media" />
-        ) : (
-          <NewsTextCard news={news} size="lg" />
-        )}
-      </div>
-      <div className="p-5 md:p-7 lg:p-8 flex flex-col justify-center min-w-0">
-        <div className="inline-flex items-center gap-2 text-[10px] uppercase tracking-widest font-bold text-[#29B6E8]">
-          <Newspaper className="w-3 h-3" /> Neueste News {news.pinned && <Pin className="w-3 h-3 text-white" aria-label="Angepinnt" />}
-        </div>
-        <h2 className="mt-3 max-w-2xl font-heading text-2xl md:text-3xl xl:text-[2.2rem] font-black uppercase leading-[1.03] tls-card__title break-words line-clamp-4">{news.title}</h2>
-        {news.excerpt && <p className="mt-4 max-w-2xl text-white/65 text-sm md:text-base leading-relaxed line-clamp-3">{news.excerpt}</p>}
-        <span className="mt-5 inline-flex items-center gap-2 text-xs uppercase tracking-wider font-bold text-white/55 group-hover:text-[#29B6E8]">
-          Lesen <ArrowRight className="tls-card__arrow w-3.5 h-3.5" />
-        </span>
-      </div>
-    </Link>
   );
 }
 

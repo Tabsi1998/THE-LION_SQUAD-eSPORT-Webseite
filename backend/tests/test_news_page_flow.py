@@ -125,3 +125,27 @@ async def test_no_winner_before_results_or_for_hidden_tournaments(flow):
     flow.act_as(None)
     listed = {row["slug"]: row for row in (await flow.get("/api/news?compact=true")).json()}
     assert all(row.get("result") is None for row in listed.values())
+
+
+# ---------------------------------------------------------------- #1342 derselbe Aufmacher
+
+@pytest.mark.asyncio
+async def test_home_lead_is_the_pinned_news_like_on_the_news_page(flow):
+    await news(flow, "alt-angepinnt", pinned=True, days_ago=30)
+    for day in range(1, 10):
+        await news(flow, f"neu-{day}", days_ago=day)
+
+    flow.act_as(None)
+    state = (await flow.get("/api/home/state")).json()
+    assert [n["slug"] for n in state["featured_news"]] == ["alt-angepinnt"], "auch wenn neun neuere News folgen"
+    assert "alt-angepinnt" in [n["slug"] for n in state["news"]]
+    listed = (await flow.get("/api/news?compact=true")).json()
+    assert listed[0]["slug"] == "alt-angepinnt", "die News-Seite stellt dieselbe News nach vorne"
+
+
+@pytest.mark.asyncio
+async def test_home_lead_without_pinned_news_is_the_newest(flow):
+    await news(flow, "gestern", days_ago=1)
+    await news(flow, "vorgestern", days_ago=2)
+    flow.act_as(None)
+    assert [n["slug"] for n in (await flow.get("/api/home/state")).json()["featured_news"]] == ["gestern"]
