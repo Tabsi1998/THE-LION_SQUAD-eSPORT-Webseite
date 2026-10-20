@@ -51,8 +51,8 @@ async def test_my_calendar_shows_exactly_the_feed_items_with_own_state(flow):
     body = response.json()
     assert body["subscription"] == {"active": False, "created_at": None, "last_used_at": None}, "auch ohne Abo"
     by_id = {item["id"]: item for item in body["items"]}
-    assert {"e-lan", "t-team", "f-monza"} <= set(by_id)
-    for foreign in ("e-fest", "t-otto", "t-gone", "f-spa", "e-members"):
+    assert {"e-lan", "t-team", "f-monza", "e-members"} <= set(by_id), "eigene Anmeldung zählt auch ohne Mitgliedschaft (#1830)"
+    for foreign in ("e-fest", "t-otto", "t-gone", "f-spa", "e-members-only"):
         assert foreign not in by_id, f"{foreign} gehört nicht in Paulas Kalender"
     assert by_id["e-lan"]["own"]["label"] == "Angemeldet"
     assert by_id["t-team"]["own"] == {"state": "approved", "label": "Du bist dabei", "team_name": "Lions Rocket"}
@@ -91,9 +91,11 @@ async def test_cancelled_internal_and_lead_exception_follow_the_feed(flow):
         {"id": "e-intern", "slug": "klausur", "name": "Vorstandsklausur", "status": "scheduled", "visibility": "internal", "start_date": _at(11)},
         {"id": "e-abgesagt", "slug": "grillabend", "name": "Grillabend", "status": "cancelled", "visibility": "public", "start_date": _at(12)},
         {"id": "e-members", "slug": "vereinsabend", "name": "Vereinsabend", "status": "scheduled", "visibility": "members", "start_date": _at(13)},
+        {"id": "e-members-only", "slug": "mitgliederabend", "name": "Mitgliederabend", "status": "scheduled", "visibility": "members", "start_date": _at(14)},
     ])
     await flow.db.event_registrations.insert_many(
         [{"id": f"er-{event_id}", "event_id": event_id, "user_id": admin["id"], "status": "registered"} for event_id in ("e-ok", "e-intern", "e-abgesagt")]
+        + [{"id": "er-lead-intern", "event_id": "e-intern", "user_id": lead["id"], "status": "registered"}]
         + [{"id": "er-lead", "event_id": "e-members", "user_id": lead["id"], "status": "registered"}]
     )
 
@@ -102,8 +104,10 @@ async def test_cancelled_internal_and_lead_exception_follow_the_feed(flow):
     assert titles == {"Herbst-LAN"}, "Abgesagtes und „Nur intern“ nie - wie im Feed"
 
     flow.act_as(lead)
-    assert any(item["id"] == "e-members" for item in (await flow.get("/api/calendar")).json()["items"]), "Gegenprobe: im Vereinskalender sichtbar"
-    assert (await flow.get("/api/calendar/me")).json()["items"] == [], "wie der Feed: ohne die Ausnahme der Turnierleitung"
+    seen = {item["id"] for item in (await flow.get("/api/calendar")).json()["items"]}
+    assert {"e-members", "e-members-only"} <= seen, "Gegenprobe: im Vereinskalender sichtbar"
+    mine = {item["id"] for item in (await flow.get("/api/calendar/me")).json()["items"]}
+    assert mine == {"e-members"}, "wie der Feed: nur die eigene Anmeldung, nichts über die Ausnahme, „Nur intern“ nie (#1830)"
 
 
 @pytest.mark.asyncio
@@ -166,3 +170,44 @@ async def test_hint_only_without_link_and_only_once(flow):
     assert (await flow.get("/api/calendar/me")).json()["hint_due"] is False
     await flow.delete("/api/calendar/personal")
     assert (await flow.get("/api/calendar/hint")).json() == {"due": True}, "Gegenprobe: abgeschaltet und nie gesehen"
+
+
+@pytest.mark.asyncio
+async def test_own_registration_shows_members_tournament_in_feed_and_view(flow):
+    """#1830: wer bei „Nur Mitglieder“ angemeldet ist, hat das Turnier in „Mein Kalender“ und im Feed - auch ohne
+    Mitgliedschaft und egal wie (Vor-Ort-QR, normal, über das Team). Ohne eigene Anmeldung, „Nur intern“ und nach der
+    Abmeldung nicht; der allgemeine Kalender bleibt unverändert."""
+    guest = await flow.add_user(name="gast")
+    await flow.db.teams.insert_one({"id": "team-gast", "name": "Gast-Team", "member_ids": [guest["id"], "mate"]})
+    cup = {"status": "registration_open", "visibility": "members", "is_public": True}
+    await flow.db.tournaments.insert_many([
+        {"id": "t-qr", "slug": "qr-cup", "title": "QR-Cup", "start_date": _at(3), **cup},
+        {"id": "t-web", "slug": "web-cup", "title": "Web-Cup", "start_date": _at(4), **cup},
+        {"id": "t-team-m", "slug": "team-cup", "title": "Team-Cup", "start_date": _at(5), **cup},
+        {"id": "t-other", "slug": "fremd-cup", "title": "Fremd-Cup", "start_date": _at(6), **cup},
+        {"id": "t-intern", "slug": "intern-cup", "title": "Intern-Cup", "start_date": _at(7), **{**cup, "visibility": "internal"}},
+    ])
+    await flow.db.tournament_registrations.insert_many([
+        {"id": "tr-qr", "tournament_id": "t-qr", "user_id": guest["id"], "status": "approved", "registered_via": "onsite"},
+        {"id": "tr-web", "tournament_id": "t-web", "user_id": guest["id"], "status": "pending", "registered_via": "web"},
+        {"id": "tr-team", "tournament_id": "t-team-m", "user_id": "mate", "team_id": "team-gast", "status": "approved"},
+        {"id": "tr-other", "tournament_id": "t-other", "user_id": "someone", "status": "approved"},
+        {"id": "tr-int", "tournament_id": "t-intern", "user_id": guest["id"], "status": "approved", "registered_via": "onsite"},
+    ])
+    flow.act_as(guest)
+    by_id = {item["id"]: item for item in (await flow.get("/api/calendar/me")).json()["items"]}
+    assert {"t-qr", "t-web", "t-team-m"} <= set(by_id), "jede eigene aktive Anmeldung zählt"
+    assert by_id["t-qr"]["own"]["label"] == "Du bist dabei"
+    assert by_id["t-team-m"]["own"]["team_name"] == "Gast-Team"
+    assert "t-other" not in by_id and "t-intern" not in by_id
+    path = (await flow.post("/api/calendar/personal")).json()["path"]
+    general = {item["id"] for item in (await flow.get("/api/calendar")).json()["items"]}
+    assert not general & {"t-qr", "t-web", "t-team-m"}, "der allgemeine Kalender bleibt, wie er ist"
+    flow.act_as(None)
+    feed = (await flow.get(path)).text
+    assert all(title in feed for title in ("QR-Cup", "Web-Cup", "Team-Cup"))
+    assert "Fremd-Cup" not in feed and "Intern-Cup" not in feed
+    assert "QR-Cup" not in (await flow.get("/api/calendar/feed.ics")).text
+
+    await flow.db.tournament_registrations.update_one({"id": "tr-qr"}, {"$set": {"status": "withdrawn"}})
+    assert "QR-Cup" not in (await flow.get(path)).text, "abgemeldet heißt weg"

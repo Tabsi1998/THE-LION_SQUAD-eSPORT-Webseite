@@ -204,3 +204,22 @@ def auto_confirm_due(match: dict, tournament: dict | None, stage: dict | None = 
             due = week_end
         return max(due, reported + timedelta(hours=LEAGUE_MIN_OBJECTION_HOURS))
     return reported + timedelta(minutes=setting("result_confirm_minutes_online", tournament, stage))
+
+
+def no_show_due_text(match: dict, info: dict) -> str:
+    """Welche Frist „nicht erschienen“ abgelaufen ist (#1832) - für Karte und Nachricht, aus derselben Regel wie die Frist
+    (``appear_by``). ``info`` ist der Vorschlag oder ``no_show_deadline``: ``rule``, ``minutes``, ``due_at``.
+    „Frist 23:28 (Planzeit) abgelaufen“, „3 Min. ab Aufruf (23:15) abgelaufen“, „Verlängerung bis 23:40 abgelaufen“."""
+    from zoneinfo import ZoneInfo
+
+    due = _parse(info.get("due_at"))
+    clock = due.astimezone(ZoneInfo("Europe/Vienna")).strftime("%H:%M") if due else ""
+    minutes = int(info.get("minutes") or 0)
+    rule = info.get("rule")
+    extended = _parse(match.get("no_show_extended_until"))
+    if due and extended and extended == due:
+        return f"Verlängerung bis {clock} abgelaufen"
+    if rule == "on_site" and due and appear_by(match, match.get("called_at"), minutes) == due == _parse(match.get("scheduled_at")):
+        return f"Frist {clock} (Planzeit) abgelaufen"
+    return f"{minutes} Min. {NO_SHOW_RULE_TEXT.get(rule, '')} ({clock}) abgelaufen" if clock else \
+        f"{minutes} Min. {NO_SHOW_RULE_TEXT.get(rule, '')} abgelaufen"

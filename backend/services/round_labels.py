@@ -121,6 +121,19 @@ def round_label(match: dict, *, rounds: dict[tuple, list[int]] | None = None, ki
     return f"Runde {shown}" if shown else "Runde"
 
 
+def side_round_label(match: dict, matches: list[dict], *, rounds: dict[tuple, list[int]] | None = None,
+                     kind: str = "knockout") -> str:
+    """Der Rundenname mit Baumteil (#1829): im Winner Bracket eines Doppel-K.-o. heißt „Runde 2“ „Winner Runde 2“ - wie
+    der Baum es unter „Winner Bracket“ zeigt. Ohne Loser Bracket in der Phase bleibt der Name. Gleiche Regel wie
+    ``sideRoundLabel`` im Web (frontend/src/lib/bracketNames.js)."""
+    label = round_label(match, rounds=rounds, kind=kind)
+    if section_kind(match.get("section")) != "main" or not re.fullmatch(r"Runde \d+", label):
+        return label
+    loser = any(row.get("stage_id") == match.get("stage_id") and section_kind(row.get("section")) == "loser"
+                for row in matches or [] if isinstance(row, dict))
+    return f"Winner {label}" if loser else label
+
+
 def attach_round_labels(matches: list[dict], stages: list[dict] | None = None, tournament: dict | None = None) -> list[dict]:
     """Schreibt je Spiel ``round_label`` (#1259, #1561) - für die Baum-Antwort, damit Website, App und TV gleich heißen."""
     stage_types = {stage.get("id"): stage.get("stage_type") for stage in stages or [] if isinstance(stage, dict)}

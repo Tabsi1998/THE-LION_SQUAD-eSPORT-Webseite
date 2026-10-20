@@ -16,10 +16,10 @@ from datetime import datetime
 from models import new_id, now_utc
 from services.match_deadlines import (
     NO_SHOW_OPEN_STATUSES,
-    NO_SHOW_RULE_TEXT,
     auto_confirm_due,
     no_show_action,
     no_show_deadline,
+    no_show_due_text,
     single_report,
 )
 from services.match_timing import registration_name
@@ -91,8 +91,8 @@ async def _propose_no_show(db, tournament: dict, match: dict, info: dict, now: d
     label = match.get("round_name") or match.get("matchday_label") or match.get("match_key") or "Spiel"
     key = tournament.get("slug") or tournament["id"]
     action = no_show_action(match)
-    body = (f"{tournament.get('title') or 'Turnier'} · {label}: {names} – {info['minutes']} Minuten "
-            f"{NO_SHOW_RULE_TEXT[info['rule']]} sind um. {action[:1].upper()}{action[1:]}?")
+    body = (f"{tournament.get('title') or 'Turnier'} · {label}: {names} – "
+            f"{no_show_due_text(match, info)}. {action[:1].upper()}{action[1:]}?")
     for user_id in sorted(await result_staff_user_ids(db, match)):
         await create_user_notification(
             user_id, "Nicht erschienen?", body, url=f"/tournaments/{key}/leitung?fall=ns-{match['id']}",

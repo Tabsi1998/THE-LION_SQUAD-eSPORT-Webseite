@@ -84,6 +84,27 @@ async def test_on_site_ten_minutes_after_the_call_one_proposal(flow):
     item = next(row for row in (await lead(flow, tournament))["attention"] if row["kind"] == "no_show")
     assert item["id"] == f"ns-{match['id']}" and item["action"] == "no_show"
     assert {row["registration_id"] for row in item["participants"]} == {first, second}
+    # Ohne Planzeit zählt der Aufruf: Karte und Nachricht nennen „10 Min. ab Aufruf (hh:mm)“ (#1832).
+    assert item["detail"].startswith("10 Min. ab Aufruf (") and "abgelaufen – kampflos werten" in item["detail"]
+    assert "10 Min. ab Aufruf (" in notes[0]["body"]
+
+
+@pytest.mark.asyncio
+async def test_called_before_the_planned_time_the_text_names_the_planned_time(flow):
+    """#1832: vor der Planzeit aufgerufen, die Planzeit ist um - Karte und Nachricht nennen die Planzeit."""
+    from zoneinfo import ZoneInfo
+
+    _staff, tournament, match, _first, _second, _player = await bracket(flow, event_mode="local")
+    planned = now_utc() - timedelta(minutes=1)
+    await flow.db.matches_v2.update_one({"id": match["id"]}, {"$set": {
+        "station_id": "station-1", "called_at": ago(5), "scheduled_at": planned.isoformat()}})
+    assert (await sweep(flow.db))["proposed"] == 1
+    clock = planned.astimezone(ZoneInfo("Europe/Vienna")).strftime("%H:%M")
+    item = next(row for row in (await lead(flow, tournament))["attention"] if row["kind"] == "no_show")
+    assert item["detail"].startswith(f"Frist {clock} (Planzeit) abgelaufen – "), item["detail"]
+    note = await flow.db.notifications.find_one({"kind": "match_attention", "meta.reason": "no_show"}, {"_id": 0})
+    text = note["body"]
+    assert f"Frist {clock} (Planzeit) abgelaufen" in text and "ab Aufruf" not in text, text
 
 
 @pytest.mark.asyncio

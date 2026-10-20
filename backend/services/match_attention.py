@@ -26,7 +26,7 @@ import logging
 from datetime import datetime
 
 from models import now_utc
-from services.match_deadlines import NO_SHOW_RULE_TEXT, no_show_action, no_show_candidates
+from services.match_deadlines import no_show_action, no_show_candidates, no_show_due_text
 from services.match_disputes import category_label, open_dispute
 from services.match_duration import load_duration_game
 from services.match_timing import OPEN_STATUSES, filled_slots, registration_name, timing
@@ -75,7 +75,7 @@ def attention_items(tournament: dict, matches: list[dict], stations: list[dict],
         open_proposal = isinstance(proposal, dict) and not proposal.get("decision")
         if open_proposal and status in NO_SHOW_STATUSES and not match.get("started_at") and candidates:
             items.append({**base, "id": f"ns-{match.get('id')}", "kind": "no_show", "title": "Nicht erschienen?",
-                          "detail": f"{proposal.get('minutes') or 0} Min. {NO_SHOW_RULE_TEXT.get(proposal.get('rule'), '')} um – "
+                          "detail": f"{no_show_due_text(match, proposal)} – "
                                     f"{no_show_action(match)}.",
                           "action": "no_show", "since": proposal.get("due_at"),
                           "participants": [{"registration_id": registration_id,

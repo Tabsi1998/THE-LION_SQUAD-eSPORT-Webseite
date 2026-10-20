@@ -306,6 +306,12 @@ export function drawCountdown(card, serverNow, clientNow = Date.now()) {
   return `automatisch in ${left} Min.`;
 }
 
+/** Wohin gelost wird (#1829): „nach Runde 1 → Loser Runde 1 (LA, LB)“ - die Zielrunde heißt wie im Baum. */
+export function drawTargetText(card) {
+  const keys = (card?.match_keys || []).join(", ");
+  return `nach ${card?.label} → ${card?.round_label ? `${card.round_label} (${keys})` : keys}`;
+}
+
 /** Show-Auslosung (#1590): der Topf steht - die Leitung lost mit einem Tipp, sonst der Server nach der Frist. */
 function DrawCard({ card, now, highlighted, busy, onDraw }) {
   const [tick, setTick] = useState(() => Date.now());
@@ -322,7 +328,7 @@ function DrawCard({ card, now, highlighted, busy, onDraw }) {
         </div>
         <div className="min-w-0 flex-1">
           <div className="text-sm font-bold text-white">Auslosung bereit · {card.pot_size} {card.pot_size === 1 ? "Name" : "Namen"}</div>
-          <div className="text-xs text-white/55 [overflow-wrap:anywhere]">{card.stage_name ? `${card.stage_name} · ` : ""}nach {card.label} → {(card.match_keys || []).join(", ")}</div>
+          <div className="text-xs text-white/55 [overflow-wrap:anywhere]">{card.stage_name ? `${card.stage_name} · ` : ""}{drawTargetText(card)}</div>
           <div className="text-[11px] text-brand" data-testid={`lead-draw-countdown-${card.group}`}>{drawCountdown(card, now, tick)}</div>
         </div>
         {card.can_draw ? (

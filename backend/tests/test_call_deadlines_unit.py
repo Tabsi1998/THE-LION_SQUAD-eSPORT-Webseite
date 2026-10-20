@@ -62,3 +62,17 @@ def test_one_rule_for_both():
     assert appear_by(match, match["called_at"], 2) == appear_by(match, match["called_at"], 10) == T0 + timedelta(minutes=15)
     assert appear_by({"scheduled_at": None}, None, 2) is None
     assert appear_by({"scheduled_at": at(15)}, None, 2) == T0 + timedelta(minutes=15), "ohne Aufruf: die Planzeit"
+
+
+def test_no_show_text_names_the_deadline_that_really_ran_out():
+    """#1832: vor der Planzeit aufgerufen - der Text nennt die Planzeit, nicht „N Min. ab Aufruf“. T0 = 11:00 in Wien."""
+    from services.match_deadlines import no_show_due_text
+
+    early = called_match(0, scheduled=16)
+    assert no_show_due_text(early, no_show_deadline(early, LOCAL)) == "Frist 11:16 (Planzeit) abgelaufen"
+    late = called_match(20, scheduled=16)
+    assert no_show_due_text(late, no_show_deadline(late, LOCAL)) == "10 Min. ab Aufruf (11:30) abgelaufen"
+    unplanned = called_match(0)
+    assert no_show_due_text(unplanned, {"rule": "on_site", "minutes": 3, "due_at": at(3)}) == "3 Min. ab Aufruf (11:03) abgelaufen"
+    extended = called_match(0, no_show_extended_until=at(25))
+    assert no_show_due_text(extended, no_show_deadline(extended, LOCAL)) == "Verlängerung bis 11:25 abgelaufen"
