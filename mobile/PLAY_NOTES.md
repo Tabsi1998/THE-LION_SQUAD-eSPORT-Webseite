@@ -12,6 +12,15 @@ Regeln:
 - Höchstens 500 Zeichen inklusive Zeilenumbrüchen (Grenze von Google Play).
 - Kurz und für Mitglieder verständlich: was sie in der App merken, keine Issue-Nummern, keine Technik.
 
+## 1.7.3
+
+Neu in 1.7.3:
+• Ergebnis eintragen: „nicht erschienen“ im Lauf ist schon vorbelegt
+• Turnierbaum: vorgemerkte „nicht erschienen“ sind durchgestrichen
+• Abzeichen bleiben in einer Zeile und haben die richtige Farbe
+• Fast Lap: lange Titel ohne Wortbruch, Symbol verdeckt nichts mehr
+• Match: Teilnehmerliste ohne englische Begriffe
+
 ## 1.7.2
 
 Neu in 1.7.2:

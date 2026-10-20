@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.7.3 - 2026-10-20
+
+- Mobile: Ergebnis eintragen: Wer im Lauf als „nicht erschienen“ vorgemerkt ist, steht im Ergebnis-Fenster schon so da – wie auf der Website. Im Turnierbaum sind Vorgemerkte durchgestrichen, solange es noch kein Ergebnis gibt. (#1840)
+- Mobile: Abzeichen wie „ANGEKÜNDIGT“ bleiben in einer Zeile und färben sich nach dem Zustand wie auf der Website. (#1797, #1869)
+- Mobile: Fast Lap: Lange Titel brechen nur zwischen Wörtern um, das Tacho-Symbol verdeckt das Abzeichen nicht mehr. (#1867, #1868)
+- Mobile: Match: Die Teilnehmerliste zeigt keine englischen Rohwerte wie „Filled“ mehr. (#1870)
+
 ## 1.7.2 - 2026-10-19
 
 - Mobile: Mein Kalender: Im Reiter Events siehst du unter „Mein Kalender“ alle deine Termine an einem Ort – Turniere, Events, Fast Laps, Versammlungen und Schichten, gruppiert nach Heute, Diese Woche und Später oder als Monat. Jeder Termin zeigt deinen Stand (angemeldet, mit Team, Warteliste), ein Filter wählt die Art. (#1788)
