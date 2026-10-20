@@ -1,21 +1,14 @@
 import { BellRing, Radio } from "lucide-react";
 import { delayText } from "@/lib/liveQueue";
+import { queueWhat, stationWho } from "@/lib/tvQueue";
 import { viennaTime } from "@/lib/vienna";
 import { MatchClock } from "./MatchClock";
 
 // Öffentlicher Spielplan, Sicht je Station (#1556): oben „Jetzt“ mit Spielzeit-Uhr und „Als Nächstes“ aus der
 // Warteschlange des Servers (`stations[]` von GET /tournaments/<id>/live-queue). Die Liste darunter bleibt der Plan.
-// Ohne Eintrag für die Station: nichts.
+// Über den Namen Runde und Durchgang wie in der Turnierleitung (#1824). Ohne Eintrag für die Station: nichts.
 
 const clock = (value) => (value ? viennaTime(value, { hour: "2-digit", minute: "2-digit" }) : "");
-
-function who(entry) {
-  const names = entry?.names || [];
-  if (names.length === 2) return `${names[0]} gegen ${names[1]}`;
-  if (names.length > 2) return `${names.length} Teilnehmer`;
-  if (names.length === 1) return names[0];
-  return entry?.open_slots ? `${entry.open_slots} Plätze offen` : "Teilnehmer offen";
-}
 
 function nextLine(entry) {
   if (entry.state === "called") return ["Aufgerufen", entry.report_by ? `antreten bis ${clock(entry.report_by)}` : ""].filter(Boolean).join(" · ");
@@ -30,7 +23,8 @@ export function StationNowNext({ station, stationKey }) {
       {running ? (
         <div className="min-w-0">
           <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-widest text-live"><Radio className="h-3.5 w-3.5" aria-hidden="true" /> Jetzt</div>
-          <div className="mt-0.5 text-sm font-bold text-white [overflow-wrap:anywhere]">{who(running)}</div>
+          <div className="mt-0.5 text-xs text-white/50 [overflow-wrap:anywhere]">{queueWhat(running)}</div>
+          <div className="text-sm font-bold text-white [overflow-wrap:anywhere]">{stationWho(running)}</div>
           <MatchClock startedAt={running.started_at} durationMinutes={running.duration_minutes} testId={`schedule-clock-${running.match_id}`} className="mt-1" />
         </div>
       ) : null}
@@ -39,7 +33,8 @@ export function StationNowNext({ station, stationKey }) {
           <div className={`flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-widest ${next.state === "called" ? "text-brand" : "text-white/50"}`}>
             {next.state === "called" ? <BellRing className="h-3.5 w-3.5" aria-hidden="true" /> : null} Als Nächstes
           </div>
-          <div className="mt-0.5 text-sm font-bold text-white [overflow-wrap:anywhere]">{who(next)}</div>
+          <div className="mt-0.5 text-xs text-white/50 [overflow-wrap:anywhere]">{queueWhat(next)}</div>
+          <div className="text-sm font-bold text-white [overflow-wrap:anywhere]">{stationWho(next)}</div>
           <div className={`text-xs ${next.state === "called" ? "text-brand" : "text-white/60"}`}>{nextLine(next)}</div>
         </div>
       ) : null}

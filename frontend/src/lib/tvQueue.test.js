@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { hasQueue, laneSignature, queueLanes, queueNextLine, queueWhat, queueWho } from "./tvQueue";
+import { hasQueue, laneSignature, queueLanes, queueNextLine, queueWhat, queueWho, stationWho } from "./tvQueue";
 
 // Live-Warteschlange am TV (#1634): was der TV aus GET /live-queue zeigt - ohne Warteschlange nichts.
 
@@ -60,6 +60,33 @@ describe("Texte", () => {
   it("das Spiel aus dem Baum wie überall am TV, sonst der Text des Servers", () => {
     expect(queueWhat(queued)).toBe("Lauf C");
     expect(queueWhat(running, { id: "m1", match_key: "B", round: 1, slots: [{}, {}] })).toContain("B");
+  });
+
+  it("Stationen der Turnierleitung (#1824): Duell „A gegen B“, Lauf mit Namen, ab fünf „+N“, ohne Namen in Worten", () => {
+    expect(stationWho({ names: ["Alpha", "Beta"] })).toBe("Alpha gegen Beta");
+    expect(stationWho({ names: ["Alpha", "Beta", "Gamma", "Delta"] })).toBe("Alpha · Beta · Gamma · Delta");
+    expect(stationWho({ names: ["A1", "A2", "A3", "A4", "A5", "A6", "A7", "A8"] })).toBe("A1 · A2 · A3 · A4 +4");
+    expect(stationWho({ names: ["Alpha", "Beta", "Gamma"], open_slots: 1 })).toBe("Alpha · Beta · Gamma · 1 Platz offen");
+    expect(stationWho({ names: [], open_slots: 4 })).toBe("4 Plätze offen");
+    expect(stationWho({ names: [] })).toBe("Teilnehmer offen");
+  });
+
+  it("ein Lauf mit nur noch zwei Spielern bleibt ein Lauf - nie „gegen“/„vs.“; Duelle unverändert (#1824)", () => {
+    const twoLeft = { names: ["Alpha", "Beta"], heat: true };
+    expect(queueWho(twoLeft)).toBe("Alpha · Beta");
+    expect(queueWho(twoLeft, { compact: true })).toBe("Alpha · Beta");
+    expect(stationWho(twoLeft)).toBe("Alpha · Beta");
+    expect(queueWho({ names: ["Alpha", "Beta"], heat: false })).toBe("Alpha vs. Beta");
+    expect(stationWho({ names: ["Alpha", "Beta"], heat: false })).toBe("Alpha gegen Beta");
+  });
+
+  it("ohne Baum: der Rundenname, im Lauf mit dem Durchgang - Duelle nur die Runde", () => {
+    expect(queueWhat({ label: "Runde 1", match_key: "A", heat: true, names: ["a", "b", "c", "d"] })).toBe("Runde 1 · Durchgang A");
+    expect(queueWhat({ label: "Loser Runde 1", match_key: "LA", heat: true, names: ["a", "b", "c"] })).toBe("Loser Runde 1 · Durchgang LA");
+    // Ältere Antwort ohne `heat`: die Plätze zählen.
+    expect(queueWhat({ label: "Runde 1", match_key: "B", names: ["a", "b"], open_slots: 2 })).toBe("Runde 1 · Durchgang B");
+    expect(queueWhat({ label: "Viertelfinale", match_key: "QF1", heat: false, names: ["a", "b"] })).toBe("Viertelfinale");
+    expect(queueWhat({ label: "FINAL", match_key: "FINAL", heat: true, names: [] })).toBe("FINAL");
   });
 
   it("ein Wechsel an der Station ändert die Kennung der Bahn - ein gleicher Stand nicht", () => {
