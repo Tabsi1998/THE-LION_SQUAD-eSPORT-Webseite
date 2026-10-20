@@ -344,3 +344,22 @@ async def test_a_generous_limit_per_address_and_per_key(flow, monkeypatch):
     assert limited.status_code == 429 and limited.headers.get("retry-after")
     # Auch falsche Schlüssel zählen für die Adresse.
     assert (await hall(flow, event["id"], "erfunden")).status_code == 429
+
+
+@pytest.mark.asyncio
+async def test_the_hall_gets_the_public_phase_of_event_and_fast_laps(flow):
+    """#1888: die Statuspille der Hallen-Tafel folgt der öffentlichen Phase - ein stehen gebliebenes „live“ nach dem
+    Ende ist dort schon „completed“. Dasselbe für die Fast Laps im Tagesplan."""
+    flow.act_as(await flow.add_user(role="tournament_admin", name="Turnierleitung"))
+    event = await event_of(flow, status="live", start_date=soon(-6), end_date=soon(-1))
+    lap = {"id": new_id(), "slug": "fast-lap", "title": "Fast Lap", "status": "live", "visibility": "public",
+           "event_id": event["id"], "start_date": soon(-5), "end_date": soon(-2)}
+    await flow.db.f1_challenges.insert_one(dict(lap))
+    token = (await event_key(flow, event))["token"]
+    flow.act_as(None)
+
+    body = (await hall(flow, event["id"], token)).json()
+    assert body["event"]["status"] == "live"
+    assert body["event"]["public_phase"]["state"] == "completed"
+    [shown_lap] = body["event"]["f1_challenges"]
+    assert shown_lap["public_phase"]["state"] == "completed"

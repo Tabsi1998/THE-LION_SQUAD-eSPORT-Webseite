@@ -298,13 +298,13 @@ def display_bracket_payload(payload: dict) -> dict:
 # und die Stationen - jeweils nur die Felder, die die Tafeln zeigen. Ohne Schlüssel bleibt alles, wie es ist.
 
 EVENT_TV_VISIBILITIES = frozenset({"public", "community", "members"})
-EVENT_FIELDS = ("id", "slug", "name", "status", "start_date", "end_date", "door_time", "location", "city", "banner_url",
-                "cover_url")
+EVENT_FIELDS = ("id", "slug", "name", "status", "public_phase", "start_date", "end_date", "door_time", "location", "city",
+                "banner_url", "cover_url")
 EVENT_DAY_FIELDS = ("date", "start_at", "end_at", "door_at", "title")
 # Tagesplan (lib/tvDayPlan.js): Zeiten, Stand, Check-in und Pause je Turnier bzw. Fast Lap.
 EVENT_TOURNAMENT_FIELDS = ("id", "slug", "title", "status", "public_phase", "start_date", "end_date", "check_in_from",
                            "check_in_until", "check_in_closed_at", "paused_until", "event_day")
-EVENT_FASTLAP_FIELDS = ("id", "slug", "title", "status", "start_date", "end_date", "event_day")
+EVENT_FASTLAP_FIELDS = ("id", "slug", "title", "status", "public_phase", "start_date", "end_date", "event_day")
 # Stationen-Raster und Aufrufe (lib/tvStationGrid.js, lib/tvCalls.js) - keine Notizen, keine Warteschlange.
 HALL_STATION_FIELDS = ("id", "name", "label", "device_type", "status", "current_match_id", "current_match_type", "called_at",
                        "tournament_id", "event_id")
