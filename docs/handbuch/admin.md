@@ -122,6 +122,9 @@ Gut zu wissen:
 - Die **Gruppen** lassen sich mit einem Klick auf den Gruppennamen **zuklappen**. Das merkt sich der Browser. Beim
   Wechsel auf eine Seite geht ihre Gruppe von selbst wieder auf.
 - Zugeklappt zeigt die Gruppe die Zahl ihrer Einträge, ein blauer Punkt markiert die Gruppe der aktuellen Seite.
+- Ganz oben steht **Zuletzt**: die bis zu fünf Verwaltungsseiten, die du zuletzt geöffnet hast (neueste zuerst, ohne
+  die Seite, auf der du gerade bist). Das merkt sich der Browser je Konto; es erscheinen nur Seiten, die du sehen
+  darfst. Während einer Suche ist „Zuletzt“ ausgeblendet.
 - Wer **abgehakte Plattformen** unter „Alle Verbindungen“ hat, sieht diese nicht mehr als Menüpunkt.
 - Am **Handy und am Tablet hochkant** (bis 1023 px Breite) ist das Menü eingeklappt: oben links der **Menü-Knopf**
   (drei Striche) klappt die Leiste aus, ein Tipp daneben schließt sie wieder. So hat die Seite die volle Breite. Ab

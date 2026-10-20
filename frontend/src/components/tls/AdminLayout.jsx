@@ -7,6 +7,7 @@ import { LayoutDashboard, Trophy, Gamepad2, Users as UsersIcon, CalendarDays, Fl
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePublicSiteSettings } from "@/hooks/usePublicSiteSettings";
 import { OfflineBar } from "@/components/tls/OfflineBar";
+import { ADMIN_RECENT_MAX, readRecentAdminPages, rememberRecentAdminPage } from "@/lib/adminRecent";
 
 // Sidebar-Gruppen (#408, #512): Verein (Vereinsdaten, Vorstand, Sponsoren, Partner, Referenzen,
 // Kontakt-Inbox), Mitglieder (mit Dolibarr - die Seite nennt sich Mitgliederverwaltung), Finanzen,
@@ -273,6 +274,21 @@ export function linkAreas(to) {
   return best ? best.areas : null;
 }
 
+// „Zuletzt“ (#1291): aus den gemerkten Wegen die Menüeinträge, die die Person gerade sehen darf - neueste zuerst,
+// jede Seite einmal, ohne die gerade offene Seite, höchstens fünf. Wegweiser (searchOnly) kommen nicht hinein.
+export function recentNavItems(user, recentTos, currentTo, disabledPlatforms = []) {
+  const visible = new Map(navGroupsFor(user, "", disabledPlatforms).flatMap((group) => group.items).map((item) => [item.to, item]));
+  const seen = new Set();
+  const items = [];
+  for (const to of Array.isArray(recentTos) ? recentTos : []) {
+    if (to === currentTo || seen.has(to) || !visible.has(to)) continue;
+    seen.add(to);
+    items.push(visible.get(to));
+    if (items.length === ADMIN_RECENT_MAX) break;
+  }
+  return items;
+}
+
 export function canOpenAdminLink(user, to) {
   if (!String(to || "").startsWith("/admin") && !String(to || "").startsWith("/setup")) return true;
   const areas = linkAreas(to);
@@ -305,18 +321,21 @@ function writeCollapsedGroups(labels) {
 
 // Der längste passende Eintrag gewinnt, damit "/admin" nicht jede Unterseite
 // für sich beansprucht.
-function groupLabelForPath(pathname) {
+function menuEntryForPath(pathname) {
   let best = null;
   for (const group of ADMIN_GROUPS) {
     for (const item of group.items) {
+      if (item.searchOnly) continue;
       const hit = pathname === item.to || (!item.end && pathname.startsWith(`${item.to}/`));
       if (hit && (!best || item.to.length > best.route.length)) {
         best = { route: item.to, label: group.label };
       }
     }
   }
-  return best ? best.label : null;
+  return best;
 }
+
+const RECENT_GROUP = "Zuletzt";
 
 export function AdminLayout({ children }) {
   const { user, logout } = useAuth();
@@ -347,7 +366,21 @@ export function AdminLayout({ children }) {
   // zur Einrichtung - danach zurück auf diese Seite.
   const mfaHint = adminWithoutSecondFactor(user);
 
-  const activeGroup = groupLabelForPath(location.pathname);
+  const activeEntry = menuEntryForPath(location.pathname);
+  const activeGroup = activeEntry ? activeEntry.label : null;
+  const activeRoute = activeEntry ? activeEntry.route : null;
+
+  // „Zuletzt“ (#1291): jede geöffnete Verwaltungsseite merkt sich ihren Menüpunkt (Unterseiten zählen zum Eintrag).
+  const userId = user?.id;
+  const [recentTos, setRecentTos] = useState(() => readRecentAdminPages(userId));
+  useEffect(() => {
+    const stored = readRecentAdminPages(userId);
+    setRecentTos(activeRoute ? rememberRecentAdminPage(userId, activeRoute, stored) : stored);
+  }, [activeRoute, userId]);
+  const recentItems = useMemo(
+    () => (searchQuery ? [] : recentNavItems(user, recentTos, activeRoute, disabledPlatforms)),
+    [activeRoute, disabledPlatforms, recentTos, searchQuery, user],
+  );
   const [collapsedGroups, setCollapsedGroups] = useState(() => {
     const stored = readCollapsedGroups();
     // Voreinstellung: alles offen. Eine Voreinstellung, die etwas wegräumt,
@@ -446,6 +479,41 @@ export function AdminLayout({ children }) {
                 <span className="block text-[11px] font-normal text-white/60">Die Verwaltung öffnet sich erst mit bestätigter Zwei-Faktor-Anmeldung.</span>
               </span>
             </Link>
+          )}
+          {recentItems.length > 0 && (
+            <div className="mb-3" data-testid="admin-nav-recent">
+              <button
+                type="button"
+                onClick={() => toggleGroup(RECENT_GROUP)}
+                aria-expanded={groupIsOpen(RECENT_GROUP)}
+                data-testid={`admin-nav-group-${RECENT_GROUP}`}
+                className="w-full flex items-center justify-between gap-2 px-3 py-1.5 text-[9px] font-black uppercase tracking-[0.25em] text-white/25 hover:text-white/60 transition-colors"
+              >
+                <span className="truncate">{RECENT_GROUP}</span>
+                <span className="flex items-center gap-1.5 shrink-0">
+                  {!groupIsOpen(RECENT_GROUP) && <span className="tabular-nums tracking-normal text-white/20">{recentItems.length}</span>}
+                  <ChevronDown className={`w-3 h-3 transition-transform ${groupIsOpen(RECENT_GROUP) ? "" : "-rotate-90"}`} />
+                </span>
+              </button>
+              {groupIsOpen(RECENT_GROUP) && (
+                <div className="space-y-0.5">
+                  {/* Kein NavLink: die offene Seite steht nicht in „Zuletzt“, und die festen Einträge behalten ihre Kennung. */}
+                  {recentItems.map((it) => (
+                    <Link
+                      key={it.to}
+                      to={it.to}
+                      onClick={() => setOpenMobile(false)}
+                      data-recent="true"
+                      data-testid={`admin-nav-recent-${it.to.split("/").pop() || "dashboard"}`}
+                      className="flex items-center gap-3 px-3 py-2 rounded-sm text-sm font-semibold text-white/70 hover:text-white hover:bg-white/5 transition-all"
+                    >
+                      <it.icon className="w-4 h-4 shrink-0" />
+                      <span className="truncate">{it.label}</span>
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </div>
           )}
           {visibleGroups.map((group) => {
             const open = groupIsOpen(group.label);

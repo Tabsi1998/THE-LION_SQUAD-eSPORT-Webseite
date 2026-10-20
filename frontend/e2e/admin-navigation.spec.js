@@ -57,7 +57,8 @@ function navMetrics(page) {
   return page.evaluate(() => {
     const nav = document.querySelector("nav.admin-scroll");
     const navBox = nav.getBoundingClientRect();
-    const links = [...nav.querySelectorAll("a")];
+    // „Zuletzt“ (#1291) ist kein fester Eintrag und zählt nicht mit.
+    const links = [...nav.querySelectorAll("a:not([data-recent])")];
     const active = nav.querySelector("[aria-current='page']");
     const inView = (el) => {
       const r = el.getBoundingClientRect();
@@ -159,6 +160,18 @@ test.describe("Adminmenü", () => {
 
     await expect(page.getByTestId("admin-nav-sponsors")).toBeVisible();
     await expect(page.getByTestId("admin-nav-group-Verein")).toHaveAttribute("aria-expanded", "true");
+  });
+
+  test("„Zuletzt“ steht ganz oben, zählt nicht als fester Eintrag und führt zurück", async ({ page }) => {
+    await page.goto("/admin/mobile-push");
+    await expect(page.getByTestId("admin-nav-search")).toBeVisible();
+    await page.getByTestId("admin-nav-admin").click();
+    await expect(page.getByTestId("admin-nav-recent")).toBeVisible();
+    const first = await page.evaluate(() => document.querySelector("nav.admin-scroll [data-testid^='admin-nav-group-']").dataset.testid);
+    expect(first).toBe("admin-nav-group-Zuletzt");
+    expect((await navMetrics(page)).entries).toBe(84);
+    await page.getByTestId("admin-nav-recent-mobile-push").click();
+    await expect(page).toHaveURL(/\/admin\/mobile-push$/);
   });
 
   // Tablet hochkant (#1289): bis 1023 px Menü-Knopf und volle Breite für den Inhalt, ab 1024 px fest links.
