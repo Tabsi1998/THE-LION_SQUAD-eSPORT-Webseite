@@ -68,16 +68,17 @@ function ResultRow({ row, index, autoPlace, organizerMode, problems, scored, onC
   return (
     <li data-testid="result-row" data-level={level || undefined}
       className={`py-2.5 pl-2 border-l-2 ${level === "error" ? "border-red-400/70" : level === "warning" ? "border-amber-400/60" : "border-transparent"}`}>
-      <div className="flex flex-wrap items-center gap-2">
+      {/* Handy: Platz, Name, Punkte und Knöpfe in einer Zeile, das Team darunter; ab sm alles in einer Zeile. */}
+      <div className="grid grid-cols-[3.5rem_minmax(0,1fr)_4.5rem_auto_auto] sm:grid-cols-[3.5rem_minmax(0,1fr)_9rem_5rem_auto_auto] items-center gap-2">
         <input aria-label={`Platz Zeile ${number}`} inputMode="numeric" value={row.place} placeholder={autoPlace ? String(autoPlace) : "–"}
-          onChange={(event) => onChange({ place: event.target.value })} data-testid="result-row-place" className={`${SMALL_INPUT} !w-14 text-center tabular-nums`} />
+          onChange={(event) => onChange({ place: event.target.value })} data-testid="result-row-place" className={`${SMALL_INPUT} text-center tabular-nums`} />
         <input aria-label={`Name Zeile ${number}`} value={row.name} list="result-participants" placeholder="Name wie beim Veranstalter" maxLength={120}
-          onChange={(event) => onChange({ name: event.target.value, participant_id: "" })} data-testid="result-row-name" className={`${SMALL_INPUT} !w-auto flex-1 min-w-[9rem]`} />
+          onChange={(event) => onChange({ name: event.target.value, participant_id: "" })} data-testid="result-row-name" className={SMALL_INPUT} />
         <input aria-label={`Team Zeile ${number}`} value={row.team} list="result-teams" placeholder="Team" maxLength={120}
-          onChange={(event) => onChange({ team: event.target.value })} data-testid="result-row-team" className={`${SMALL_INPUT} !w-full sm:!w-36 order-last sm:order-none`} />
-        <input aria-label={`Punkte Zeile ${number}`} inputMode="decimal" value={row.points} placeholder={organizerMode ? "Pkt" : "Schlüssel"}
+          onChange={(event) => onChange({ team: event.target.value })} data-testid="result-row-team" className={`${SMALL_INPUT} order-last col-start-2 col-end-6 sm:order-none sm:col-start-auto sm:col-end-auto`} />
+        <input aria-label={`Punkte Zeile ${number}`} inputMode="decimal" value={row.points} placeholder="Pkt"
           title={organizerMode ? "Punkte laut Veranstalter" : "Leer: nach Schlüssel. Eingetragen: laut Veranstalter (wird geprüft)."}
-          onChange={(event) => onChange({ points: event.target.value })} data-testid="result-row-points" className={`${SMALL_INPUT} !w-20 text-right tabular-nums`} />
+          onChange={(event) => onChange({ points: event.target.value })} data-testid="result-row-points" className={`${SMALL_INPUT} text-right tabular-nums`} />
         <button type="button" className={`${ICON_BUTTON} ${open ? "text-[#29B6E8]" : ""}`} onClick={() => setOpen((value) => !value)} aria-expanded={open} aria-label={`Mehr zu Zeile ${number}`} title="Marken, Strafpunkte, Startnummer" data-testid="result-row-more">
           <SlidersHorizontal className="w-4 h-4" />
         </button>
