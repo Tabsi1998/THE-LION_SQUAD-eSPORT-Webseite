@@ -112,6 +112,7 @@ test.describe("Abnahme #1747: Seite Team-Liga - Tabelle, Spielplan, Aufstellung,
       const url = `/references/series/${lineage.slug}/${current.season_slug}`;
       for (const [context, name] of [[wideContext, "breit"], [phoneContext, "handy"]]) {
         const page = await context.newPage();
+        await signIn(page, "anon"); // ohne Anmeldung, Cookie-Hinweis schon beantwortet
         const problems = watch(page);
         await page.goto(url);
         const league = page.getByTestId("team-league");
