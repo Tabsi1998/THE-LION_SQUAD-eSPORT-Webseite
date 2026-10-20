@@ -1,10 +1,8 @@
 """Live-Meldungen je Turnier (#1801), durch die echte Anwendung geschickt.
 
-Die Meldung nennt das Turnier, damit nur seine Seiten nachladen. Das Nachschlagen darf die schreibende Anfrage nicht
-aufhalten (Codex-Prüfung): Die Middleware veröffentlicht nach der Antwort.
+Die Meldung nennt das Turnier, damit nur seine Seiten nachladen. Sie geht wie bisher hinaus, bevor die Antwort die
+Middleware verlässt; das Nachschlagen kommt meist aus dem Zwischenspeicher.
 """
-import asyncio
-import contextlib
 import pathlib
 import sys
 from types import SimpleNamespace
@@ -38,9 +36,8 @@ def last_event() -> dict | None:
 
 
 @pytest.mark.asyncio
-async def test_the_change_is_published_after_the_response(flow):
+async def test_the_change_is_published_before_the_response_leaves(flow):
     _database, server, *_rest = load_application()
-    before = last_event()
     request = SimpleNamespace(method="POST", url=SimpleNamespace(path="/api/tournaments/irgendwas/register"))
 
     async def call_next(_request):
@@ -48,53 +45,8 @@ async def test_the_change_is_published_after_the_response(flow):
 
     response = await server.api_change_notifications(request, call_next)
 
-    # Die Antwort ist fertig, die Meldung noch nicht: sie läuft als Hintergrund-Aufgabe nach dem Senden.
-    assert last_event() is before
-    assert response.background is not None
-    await response.background()
-    assert last_event() is not before
     assert last_event()["path"] == "/api/tournaments/irgendwas/register"
-
-
-@pytest.mark.asyncio
-async def test_the_change_goes_out_even_if_the_client_is_gone(flow):
-    # Bricht die Verbindung nach der Antwort ab, endet auch das Warten auf die Meldung - die Meldung selbst nicht.
-    _database, server, *_rest = load_application()
-    request = SimpleNamespace(method="POST", url=SimpleNamespace(path="/api/tournaments/weg/register"))
-
-    async def call_next(_request):
-        return Response(status_code=200)
-
-    response = await server.api_change_notifications(request, call_next)
-    waiter = asyncio.ensure_future(response.background())
-    await asyncio.sleep(0)
-    waiter.cancel()
-    with contextlib.suppress(asyncio.CancelledError):
-        await waiter
-    await asyncio.gather(*change_events._pending_publishes)
-
-    assert last_event()["path"] == "/api/tournaments/weg/register"
-
-
-@pytest.mark.asyncio
-async def test_a_background_task_of_the_route_still_runs(flow):
-    _database, server, *_rest = load_application()
-    ran = []
-
-    async def route_task():
-        ran.append("route")
-
-    async def call_next(_request):
-        from starlette.background import BackgroundTask
-
-        return Response(status_code=200, background=BackgroundTask(route_task))
-
-    request = SimpleNamespace(method="PATCH", url=SimpleNamespace(path="/api/news/n-1"))
-    response = await server.api_change_notifications(request, call_next)
-    await response.background()
-
-    assert ran == ["route"]
-    assert last_event()["path"] == "/api/news/n-1"
+    assert response.background is None
 
 
 @pytest.mark.asyncio

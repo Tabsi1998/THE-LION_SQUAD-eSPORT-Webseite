@@ -13,7 +13,6 @@ from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, FileResponse, Response, StreamingResponse
-from starlette.background import BackgroundTask, BackgroundTasks
 from starlette.middleware.cors import CORSMiddleware
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 from contextlib import asynccontextmanager
@@ -118,7 +117,7 @@ from services.image_variants import resolve_variant as resolve_image_variant
 from services import ops_monitor, share_image_cache
 from services.change_events import (
     change_event_stream,
-    publish_api_change_detached,
+    publish_api_change,
     visibility_scope_for_user,
 )
 from auth import get_optional_user
@@ -537,11 +536,8 @@ async def api_change_notifications(request, call_next):
         and request.url.path.startswith("/api/")
         and response.status_code < 400
     ):
-        # Neben der Antwort (#1801): Die Meldung schlägt das Turnier nach - darauf wartet die Anfrage nicht. Erst nach dem
-        # Senden wartet der Anfrage-Zyklus auf sie; eine Hintergrund-Aufgabe der Route läuft wie bisher, davor.
-        wait_for_publish = publish_api_change_detached(request.method, request.url.path, response.status_code)
-        publish = BackgroundTask(wait_for_publish)
-        response.background = BackgroundTasks([response.background, publish]) if response.background else publish
+        # Die Meldung nennt das Turnier (#1801) - nachgeschlagen meist aus dem Zwischenspeicher in change_events.
+        await publish_api_change(request.method, request.url.path, response.status_code)
         # Live-Einbettungen (#569): Events, Turniere und Saisons ändern „Nächste Events“ und die Rangliste.
         path = request.url.path
         if path.startswith(("/api/events", "/api/tournaments", "/api/admin/events", "/api/admin/tournaments", "/api/f1")):

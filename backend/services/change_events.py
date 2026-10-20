@@ -16,7 +16,7 @@ import json
 import time
 import uuid
 from collections import deque
-from collections.abc import Awaitable, Callable, Iterable
+from collections.abc import Iterable
 from contextlib import suppress
 from datetime import datetime, timezone
 
@@ -82,8 +82,6 @@ _subscribers: set[tuple[asyncio.Queue, str, str | None]] = set()
 _event_buffer: deque[dict] = deque(maxlen=EVENT_BUFFER_SIZE)
 _scope_cache: dict[tuple[str, str], tuple[float, dict | None]] = {}
 _scope_generation = 0
-# Laufende Meldungen neben der Antwort - gehalten, damit keine vorzeitig aufgeräumt wird.
-_pending_publishes: set[asyncio.Task] = set()
 _stream_epoch = str(uuid.uuid4())
 _version = 0
 
@@ -402,21 +400,6 @@ async def publish_api_change(method: str, path: str, status_code: int):
     event.update(scope)
     _event_buffer.append(event)
     _deliver(event)
-
-
-def publish_api_change_detached(method: str, path: str, status_code: int) -> Callable[[], Awaitable[None]]:
-    """Die Meldung einer schreibenden Anfrage neben der Antwort (#1801, Codex-Prüfung): Sie startet sofort als eigene
-    Aufgabe, die Antwort wartet nicht auf das Nachschlagen des Turniers. Zurück kommt, worauf die Middleware nach dem
-    Senden der Antwort wartet (so laufen Tests und Reihenfolge wie bisher). Bricht die Verbindung ab und damit dieses
-    Warten, geht die Meldung trotzdem hinaus (``shield``)."""
-    task = asyncio.create_task(publish_api_change(method, path, status_code))
-    _pending_publishes.add(task)
-    task.add_done_callback(_pending_publishes.discard)
-
-    async def wait() -> None:
-        await asyncio.shield(task)
-
-    return wait
 
 
 # Anzeige-Ereignisse (#1553) für Web und TV: was sich im Baum getan hat, als Typ - damit eine Animation weiß, ob ein
