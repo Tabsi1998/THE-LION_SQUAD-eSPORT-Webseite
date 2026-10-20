@@ -216,6 +216,8 @@ export function PublicLayout({ children }) {
                   </>
                 )}
               </div>
+              {/* Saison-Deko für Gäste (#1239): am Handy unten im Menü statt ganz unten in der Fußzeile. */}
+              <div className="mt-3 empty:hidden"><GuestDecoSwitch variant="menu" /></div>
               <div className="mt-8">
                 <SponsorTicker compact placement="footer" />
               </div>
@@ -341,8 +343,9 @@ export function PublicLayout({ children }) {
               <Link to="/terms" className="hover:text-[#29B6E8] transition">Nutzungsbedingungen</Link>
               <button type="button" onClick={openCookieSettings} className="hover:text-[#29B6E8] transition">Cookies</button>
               {/* Der Deko-Schalter (#634) steht hier nur für Gäste; Angemeldete stellen ihn unter Einstellungen →
-                  Darstellung ein (#1146) - die Wahl gilt fürs Konto, auch in der App. */}
-              <GuestDecoSwitch />
+                  Darstellung ein (#1146) - die Wahl gilt fürs Konto, auch in der App. Bis 1023 px steht er im Handy-Menü
+                  (#1239), hier erst ab 1024 px. */}
+              <GuestDecoSwitch className="hidden lg:inline-flex" />
             </div>
           </div>
         </div>

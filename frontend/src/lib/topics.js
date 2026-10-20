@@ -12,7 +12,7 @@ export const WEB_TOPICS = [
   { topic: "Öffentliches Profil", place: "Mein Profil → Schalter „So sehen dich andere“", path: null, menu: null },
   { topic: "Erfolge", place: "deine im Profil, die Bestenliste unter Community", path: "/achievements", menu: "Community" },
   { topic: "Galerie", place: "Verein", path: "/galerie", menu: "Verein" },
-  { topic: "Saison-Deko und Einstellungen", place: "Einstellungen → Darstellung (Gäste: Footer)", path: "/profile", menu: null },
+  { topic: "Saison-Deko und Einstellungen", place: "Einstellungen → Darstellung (Gäste: am Handy im Menü, am PC in der Fußzeile)", path: "/profile", menu: null },
   { topic: "Fast Laps", place: "eSports → Fast Lap", path: "/fastlap", menu: "eSports" },
   { topic: "Mitgliedervorteile", place: "Mitgliederbereich", path: "/members/benefits", menu: null },
   { topic: "Interne Termine", place: "Events, gold markiert", path: null, menu: null },

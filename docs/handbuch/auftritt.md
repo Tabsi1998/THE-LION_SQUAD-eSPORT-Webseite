@@ -192,6 +192,12 @@ blättert ihr. Ostern und die Adventsonntage werden berechnet. **Jede Person kan
 aus stellen**, und mit „Bewegung reduzieren“ am Gerät bleibt alles ruhig. Mehr zur Technik dahinter:
 [Jahreszeiten](../SEASONS.md).
 
+Wo der Schalter steht (nur solange eine Saison läuft): Angemeldete stellen die Deko unter **Einstellungen →
+Darstellung** ein, die Wahl gilt fürs Konto. Gäste finden ihn am Handy und am Tablet hochkant (bis 1023 px) **unten im
+Menü**, am PC und am Tablet quer **ganz unten in der Fußzeile** – je Gerät an genau einem Platz.
+
+<img src="../assets/jahreszeiten/deko-schalter-handy-menue.png" alt="Handy-Menü als Gast, unten die Zeile Saison-Deko mit an, dezent und aus" width="240">
+
 ### 3.6 Adventkalender
 
 **Admin → Content → Adventkalender.** Das Jahr wählt ihr oben rechts bei **Jahr**. Rechts daneben ist der Schalter

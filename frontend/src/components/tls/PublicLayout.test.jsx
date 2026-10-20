@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 
 // Der Kopf der Website (#1234): zwischen 1024 und 1279 px eine kompakte Kopfzeile - Löwenkopf statt Schriftzug, Login
@@ -41,6 +41,7 @@ function renderLayout() {
 beforeEach(() => {
   authState.user = null;
   seasonState.seasons = [{ key: "snow", effective: "normal" }];
+  seasonState.setPreference.mockClear();
 });
 
 test("Logo: Schriftzug bis 1023 und ab 1280 px, dazwischen der Löwenkopf - der Rahmen schrumpft nie", () => {
@@ -67,4 +68,43 @@ test("Gast: Login als Personen-Symbol mit Namen, der Knopf kurz „Beitreten“ 
   expect(register.className).toMatch(/whitespace-nowrap/);
   expect(within(register).getByText("Mitglied werden").className).toMatch(/lg:max-xl:hidden/);
   expect(within(register).getByText("Beitreten").className).toMatch(/(^|\s)hidden(\s|$).*lg:max-xl:inline/);
+});
+
+// Saison-Deko-Schalter (#1239): Gäste finden ihn am Handy unten im Menü (bis 1023 px gilt das Handy-Menü), am PC in der
+// Fußzeile - je Gerät genau ein Platz. Angemeldete stellen die Deko unter Einstellungen → Darstellung ein (#1146).
+function openMobileMenu() {
+  fireEvent.click(screen.getByTestId("nav-mobile-toggle"));
+  return document.getElementById("mobile-navigation");
+}
+
+test("Gast mit laufender Saison: Schalter unten im Handy-Menü, in der Fußzeile erst ab 1024 px", () => {
+  renderLayout();
+  const menu = openMobileMenu();
+  const inMenu = within(menu).getByTestId("menu-deco-switch");
+  expect(inMenu).toHaveAccessibleName("Saisonale Deko");
+  expect(within(inMenu).getByTestId("menu-deco-on")).toHaveAttribute("aria-pressed", "true");
+  fireEvent.click(within(inMenu).getByTestId("menu-deco-subtle"));
+  expect(seasonState.setPreference).toHaveBeenCalledWith("subtle");
+  // Unten: nach Login und Registrieren.
+  const register = within(menu).getByText("Registrieren");
+  expect(register.compareDocumentPosition(inMenu) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  const footer = within(document.querySelector("footer")).getByTestId("season-deco-switch");
+  expect(footer.className).toMatch(/(^|\s)hidden(\s|$)/);
+  expect(footer.className).toMatch(/(^|\s)lg:inline-flex(\s|$)/);
+});
+
+test("angemeldet: kein Schalter im Menü und keiner in der Fußzeile", () => {
+  authState.user = { id: "u-1", username: "neonfalke" };
+  renderLayout();
+  const menu = openMobileMenu();
+  expect(within(menu).queryByTestId("menu-deco-switch")).toBeNull();
+  expect(screen.queryByTestId("season-deco-switch")).toBeNull();
+});
+
+test("ohne laufende Saison kein Schalter", () => {
+  seasonState.seasons = [];
+  renderLayout();
+  const menu = openMobileMenu();
+  expect(within(menu).queryByTestId("menu-deco-switch")).toBeNull();
+  expect(screen.queryByTestId("season-deco-switch")).toBeNull();
 });

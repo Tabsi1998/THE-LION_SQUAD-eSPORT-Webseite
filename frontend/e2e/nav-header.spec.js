@@ -1,6 +1,7 @@
 const { test, expect } = require("@playwright/test");
 
-// Web-Navigation II: Untermenüs per Antippen und Tastatur (#1233), die Kopfzeile zwischen 1024 und 1279 px (#1234). Der Server ist nachgestellt - das Menü wie
+// Web-Navigation II: Untermenüs per Antippen und Tastatur (#1233), die Kopfzeile zwischen 1024 und 1279 px (#1234) und
+// der Saison-Deko-Schalter am Handy im Menü (#1239). Der Server ist nachgestellt - das Menü wie
 // DEFAULT_NAV in backend/routes/phase_fg_routes.py („Verein“ und „eSports“ mit eigener Seite, „Community“ ohne).
 
 const kids = (rows) => rows.map(([to, label, auth_only]) => ({ to, label, auth_only }));
@@ -14,7 +15,7 @@ const NAV = [
   { to: "/contact", label: "Kontakt", order: 6 },
 ];
 
-async function mockServer(page, { user = null } = {}) {
+async function mockServer(page, { user = null, season = null, now = null } = {}) {
   await page.addInitScript(() => {
     window.localStorage.setItem("tls_cookie_consent_v1", JSON.stringify({ essential: true, external_media: false, analytics: false, meta: false, tiktok: false, saved_at: Date.now(), expires_at: Date.now() + 30 * 24 * 60 * 60 * 1000 }));
   });
@@ -27,7 +28,7 @@ async function mockServer(page, { user = null } = {}) {
     if (path === "/chats/unread") return json({ unread_total: 3 });
     if (path === "/notifications/unread-count") return json({ count: 0 });
     if (path === "/settings/public") return json({ club_name: "THE LION SQUAD", tagline: "eSports" });
-    if (path === "/seasonal/active") return json({ now: new Date().toISOString(), enabled: false, preview: false, weather: null, seasons: [] });
+    if (path === "/seasonal/active") return json({ now: now || new Date().toISOString(), enabled: Boolean(season), preview: false, weather: null, seasons: season ? [season] : [] });
     if (path === "/home/state") return json({ has_live: false, live: {}, today: {}, soon: {}, upcoming: {}, stats: {}, featured_news: [], news: [] });
     return json([]);
   });
@@ -164,5 +165,41 @@ test.describe("Kopfzeile 1024-1279 px (#1234)", () => {
         }
       });
     }
+  }
+});
+
+// Saison-Deko-Schalter (#1239): mit laufender Saison (Uhr gestellt) als Gast am Handy im Menü, am PC in der Fußzeile.
+const SNOW = { key: "snow", label: "Schnee", phase: "schnee", intensity: "full", channels: ["web", "app"], texts: {}, starts_at: "2026-11-29T00:00:00+01:00", ends_at: "2027-01-06T23:59:59+01:00", forced: false, data: { night: false, snowcap_stage: 2 } };
+
+test.describe("Saison-Deko-Schalter (#1239)", () => {
+  test.skip(({ isMobile }) => isMobile, "Breiten werden einzeln gestellt.");
+
+  for (const [who, width] of [["Gast", 390], ["angemeldet", 390], ["Gast", 1440]]) {
+    test(`${who} bei ${width} px mit laufender Saison`, async ({ page }) => {
+      await page.clock.setFixedTime(new Date("2026-12-10T12:00:00+01:00"));
+      await page.setViewportSize({ width, height: 844 });
+      await mockServer(page, { user: who === "Gast" ? null : ME, season: SNOW, now: "2026-12-10T12:00:00+01:00" });
+      await page.goto("/");
+      const footerSwitch = page.locator("footer").getByTestId("season-deco-switch");
+      if (width >= 1024) {
+        await expect(footerSwitch).toBeVisible();
+        await expect(page.getByTestId("menu-deco-switch")).toHaveCount(0);
+        return;
+      }
+      await page.getByTestId("nav-mobile-toggle").click();
+      const menu = page.locator("#mobile-navigation");
+      await expect(menu).toBeVisible();
+      if (who === "Gast") {
+        const inMenu = menu.getByTestId("menu-deco-switch");
+        await expect(inMenu).toBeVisible();
+        await inMenu.getByTestId("menu-deco-off").click();
+        await expect(inMenu.getByTestId("menu-deco-off")).toHaveAttribute("aria-pressed", "true");
+        await expect(footerSwitch).toBeHidden();
+      } else {
+        await expect(page.getByTestId("nav-user")).toHaveCount(1);
+        await expect(menu.getByTestId("menu-deco-switch")).toHaveCount(0);
+        await expect(page.getByTestId("season-deco-switch")).toHaveCount(0);
+      }
+    });
   }
 });
