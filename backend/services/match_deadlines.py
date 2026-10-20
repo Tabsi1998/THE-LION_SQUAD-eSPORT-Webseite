@@ -47,6 +47,12 @@ NO_SHOW_ACTION_HEAT = "nicht erschienen markieren (Lauf bleibt offen) oder verl�
 
 def no_show_action(match: dict) -> str:
     return NO_SHOW_ACTION_HEAT if no_show_keeps_heat_open(match) else NO_SHOW_ACTION_DUEL
+
+
+def no_show_candidates(match: dict) -> list[str]:
+    """Für wen „nicht erschienen“ noch gilt (#1823): alle im Spiel, die noch nicht als nicht erschienen markiert sind."""
+    marked = set(match.get("no_show_registration_ids") or [])
+    return [registration_id for registration_id in _filled(match) if registration_id not in marked]
 # Liga: so lange hat der Gegner mindestens Zeit zu widersprechen, auch über das Ende der Spielwoche hinaus.
 LEAGUE_MIN_OBJECTION_HOURS = 24
 # Ein Spiel, für das „nicht erschienen“ noch gilt: beide Seiten stehen fest, es hat nicht begonnen.
@@ -116,10 +122,10 @@ def no_show_deadline(match: dict, tournament: dict | None, stage: dict | None = 
         return None
     if isinstance(match.get("pending_result"), dict):
         return None
-    # Schon entschieden (#1823): im Lauf ist jemand als nicht erschienen markiert oder der Vorschlag bestätigt - der Lauf
-    # bleibt offen, die Frist ist vorbei (kein „nicht erschienen ab“ mehr in Warteschlange und Matchplan).
+    # Die Frist gilt je Person (#1823): im Lauf läuft sie für alle, die noch nicht als nicht erschienen markiert sind;
+    # sind alle markiert oder ist der Vorschlag (im Duell) bestätigt, ist sie vorbei.
     proposal = match.get("no_show_proposal")
-    if match.get("no_show_registration_ids") or (isinstance(proposal, dict) and proposal.get("decision")):
+    if not no_show_candidates(match) or (isinstance(proposal, dict) and proposal.get("decision")):
         return None
     mode = (tournament or {}).get("event_mode") or "online"
     if match.get("called_at"):

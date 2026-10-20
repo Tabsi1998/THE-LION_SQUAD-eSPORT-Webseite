@@ -26,7 +26,7 @@ import logging
 from datetime import datetime
 
 from models import now_utc
-from services.match_deadlines import NO_SHOW_RULE_TEXT, no_show_action
+from services.match_deadlines import NO_SHOW_RULE_TEXT, no_show_action, no_show_candidates
 from services.match_disputes import category_label, open_dispute
 from services.match_duration import load_duration_game
 from services.match_timing import OPEN_STATUSES, filled_slots, registration_name, timing
@@ -70,14 +70,17 @@ def attention_items(tournament: dict, matches: list[dict], stations: list[dict],
         if isinstance(match.get("pending_result"), dict):
             continue
         proposal = match.get("no_show_proposal")
-        if isinstance(proposal, dict) and not proposal.get("decision") and status in NO_SHOW_STATUSES and not match.get("started_at"):
+        # Je Person (#1823): im Lauf bleibt der Fall offen für alle, die noch nicht als nicht erschienen markiert sind.
+        candidates = no_show_candidates(match)
+        open_proposal = isinstance(proposal, dict) and not proposal.get("decision")
+        if open_proposal and status in NO_SHOW_STATUSES and not match.get("started_at") and candidates:
             items.append({**base, "id": f"ns-{match.get('id')}", "kind": "no_show", "title": "Nicht erschienen?",
                           "detail": f"{proposal.get('minutes') or 0} Min. {NO_SHOW_RULE_TEXT.get(proposal.get('rule'), '')} um – "
                                     f"{no_show_action(match)}.",
                           "action": "no_show", "since": proposal.get("due_at"),
-                          "participants": [{"registration_id": slot["registration_id"],
-                                            "name": registration_name(regs_by_id.get(slot["registration_id"]))}
-                                           for slot in filled_slots(match)]})
+                          "participants": [{"registration_id": registration_id,
+                                            "name": registration_name(regs_by_id.get(registration_id))}
+                                           for registration_id in candidates]})
             continue
         if reports_conflict(match.get("reports") or []):
             items.append({**base, "id": f"rc-{match.get('id')}", "kind": "report_conflict", "title": "Meldungen weichen ab",

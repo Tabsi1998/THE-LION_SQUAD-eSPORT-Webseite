@@ -125,7 +125,7 @@ async def test_no_show_in_a_heat_marks_only_that_person_and_the_heat_stays_open(
     assert stored.get("results") in (None, []), "keine Wertung nach Sitzreihenfolge"
     assert stored["no_show_registration_ids"] == [missing]
     assert stored.get("forfeit_registration_id") is None
-    assert stored["no_show_proposal"]["decision"] == "confirmed"
+    assert not stored["no_show_proposal"].get("decision"), "im Lauf gilt der Vorschlag je Person - er bleibt offen"
     after = await by_key(flow, tournament)
     assert from_heat(after["F"], heat) == {} and from_heat(after["LA"], heat) == {}, "niemand rückt ohne Lauf weiter"
     assert await flow.db.audit_logs.count_documents({"action": "match.forfeit"}) == 0
@@ -138,7 +138,8 @@ async def test_no_show_in_a_heat_marks_only_that_person_and_the_heat_stays_open(
     assert again.json()["idempotent_replay"] is True and again.json()["status"] == stored["status"]
 
     lead = (await flow.get(f"/api/tournaments/{tournament['id']}/lead")).json()
-    assert not [row for row in lead["attention"] if row["kind"] == "no_show"]
+    case = next(row for row in lead["attention"] if row["kind"] == "no_show")
+    assert {row["registration_id"] for row in case["participants"]} == {first, third, fourth}, "nur noch, wer nicht markiert ist"
     entry = next(row for row in lead["matches"] if row["id"] == heat["id"])
     assert {row["registration_id"]: bool(row.get("no_show")) for row in entry["participants"]} == {
         first: False, missing: True, third: False, fourth: False}, "das Ergebnis-Fenster zeigt die Person als nicht erschienen"
@@ -157,18 +158,35 @@ async def test_case_and_message_say_the_heat_stays_open(flow):
 
 
 @pytest.mark.asyncio
-async def test_the_deadline_ends_with_the_mark(flow):
-    """Ist die Person markiert, ist die Frist vorbei - Warteschlange und Matchplan nennen kein „nicht erschienen ab“."""
-    tournament, heat, _user_of = await heats_cup(flow)
-    _first, missing, _third, _fourth = seats(heat)
+async def test_two_missing_are_marked_one_after_the_other_after_the_deadline(flow):
+    """Die Frist gilt je Person: nach der ersten Bestätigung bleibt der Vorschlag für alle anderen offen, die zweite
+    markiert die zweite Person. Idempotent ist nur dieselbe Person noch einmal."""
+    tournament, heat, user_of = await heats_cup(flow)
+    first, second, third, fourth = seats(heat)
+    url = f"/api/tournaments/{tournament['id']}/lead/no-show/{heat['id']}"
+    schedule_url = f"/api/tournaments/{tournament['id']}/schedule/deadlines"
+
+    def due(schedule: dict) -> str | None:
+        return next(row.get("no_show_due_at") for row in schedule["matches"] if row["match_id"] == heat["id"])
+
     assert (await sweep(flow.db))["proposed"] == 1
-    schedule = (await flow.get(f"/api/tournaments/{tournament['id']}/schedule/deadlines")).json()
-    assert any(row.get("no_show_due_at") for row in schedule["matches"] if row["match_id"] == heat["id"])
-    response = await flow.post(f"/api/tournaments/{tournament['id']}/lead/no-show/{heat['id']}",
-                               json={"action": "confirm", "registration_id": missing})
-    assert response.status_code == 200, response.text
-    schedule = (await flow.get(f"/api/tournaments/{tournament['id']}/schedule/deadlines")).json()
-    assert not any(row.get("no_show_due_at") for row in schedule["matches"] if row["match_id"] == heat["id"])
+    one = await flow.post(url, json={"action": "confirm", "registration_id": fourth})
+    assert one.status_code == 200 and one.json()["idempotent_replay"] is False, one.text
+    assert due((await flow.get(schedule_url)).json()), "für die anderen läuft die Frist weiter"
+    assert (await sweep(flow.db))["proposed"] == 0, "der offene Vorschlag reicht - keine zweite Nachricht"
+    two = await flow.post(url, json={"action": "confirm", "registration_id": second})
+    assert two.status_code == 200 and two.json()["idempotent_replay"] is False, two.text
+    again = await flow.post(url, json={"action": "confirm", "registration_id": fourth})
+    assert again.status_code == 200 and again.json()["idempotent_replay"] is True
+
+    stored = await flow.reload(heat)
+    assert stored["status"] in {"ready", "scheduled"} and stored.get("results") in (None, [])
+    assert set(stored["no_show_registration_ids"]) == {second, fourth}
+    assert await flow.db.audit_logs.count_documents({"action": "match.no_show.marked"}) == 2
+    assert await incidents(flow, user_of[second], heat) == 1 and await incidents(flow, user_of[fourth], heat) == 1
+    case = next(row for row in (await flow.get(f"/api/tournaments/{tournament['id']}/lead")).json()["attention"]
+                if row["kind"] == "no_show")
+    assert {row["registration_id"] for row in case["participants"]} == {first, third}
 
 
 @pytest.mark.asyncio
