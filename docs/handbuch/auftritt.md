@@ -257,6 +257,7 @@ Die Startseite hat keinen eigenen Editor. Sie setzt sich aus Inhalten zusammen, 
 | Was auf der Startseite steht | Wo ihr es pflegt |
 | --- | --- |
 | Live-Banner, wenn gerade ein Turnier, Event oder Stream läuft | entsteht von selbst |
+| **Heute im Einsatz** über dem Kopf, nur an Tagen mit einem Termin einer laufenden Serie (Runde, Uhrzeit, gemeldete Vereinsfahrer/-spieler, Link zur Serienseite) | Admin → Verein → Serien: Saison auf **Läuft**, Termine und Teilnehmer der Saison |
 | Der große Kopf mit „Ein Rudel. Eine Familie.“ | fester Text, nicht im Admin änderbar |
 | **Angeheftete oder neueste News** und die **nächsten Termine** mit Countdown | Admin → Content → News (Haken **Anpinnen**), Admin → Content → Events |
 | **Jahreswertung** | Admin → eSports → Jahreswertung (die aktive Saison) |
@@ -270,6 +271,14 @@ Die Startseite hat keinen eigenen Editor. Sie setzt sich aus Inhalten zusammen, 
 
 Gibt es weder Live-Inhalte noch Termine noch News, zeigt die Startseite „Aktuell ruht das Rudel“ mit Knöpfen zu den
 News und zur Mitgliedschaft.
+
+**Heute im Einsatz:** Steht heute (Wiener Tag) ein Termin einer laufenden, sichtbaren Serie an, zeigt die Startseite
+über dem Kopf einen schmalen Streifen – je Saison eine Karte mit Serie, Saison, Runde, Uhrzeit und wie viele
+Vereinsmitglieder in der Saison gemeldet sind (nur die Zahl, keine Namen). Ein Klick führt zur Serienseite mit der
+Tabelle. Mehrere Termine stehen nacheinander, am Handy untereinander. Der Punkt bei „Heute“ pulsiert leise, mit
+„Bewegung reduzieren“ nicht. Ohne Termin heute fehlt der Streifen ganz.
+
+<img src="../assets/startseite/heute-im-einsatz-handy.png" alt="Startseite am Handy mit dem Streifen Heute im Einsatz über dem Kopf: zwei Karten mit Serie, Runde, Uhrzeit und Vereinsfahrern" width="300">
 
 ---
 

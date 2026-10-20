@@ -165,9 +165,15 @@ gedacht. Für Vor-Ort-Turniere ausgeschaltet lassen, dort startet ihr selbst.
 
 ### 3.3 Anmeldung, Startgeld und Teilnehmer
 
-**So melden sich Spieler an:** Auf der öffentlichen Turnierseite mit **Anmelden**, nach Regeln und Datenschutz
-bestätigen. Bei Team-Turnieren meldet der Kapitän oder Co-Kapitän das Team an. Fehlt dem Spiel eine Pflicht-ID
-(zum Beispiel Spielername), verlangt die Anmeldung sie.
+**So melden sich Spieler an:** Auf der öffentlichen Turnierseite mit **Jetzt anmelden** (in der Vor-Ort-Ansicht
+**Mitspielen**). Das öffnet immer zuerst ein kurzes Blatt – am Handy von unten, am PC als Fenster – mit **Start**,
+**Check-in**-Fenster, **Ort** (online oder vor Ort mit Adresse), **Startgeld** (falls eingestellt) und den **Regeln in
+drei Sätzen**; **Alle Regeln** klappt den ganzen Text auf. Erst **Verbindlich anmelden** meldet an, **Abbrechen**,
+das Kreuz oder die Escape-Taste nicht. Bei Team-Turnieren wählt der Kapitän oder Co-Kapitän im selben Blatt das Team;
+fehlt dem Spiel eine Pflicht-ID (zum Beispiel Spielername), fragt das Blatt sie ab. Die drei Sätze kommen vom Anfang
+eurer **Regeln** – schreibt das Wichtigste also nach oben.
+
+<img src="../assets/turniere/anmelde-blatt-handy.png" alt="Anmelde-Blatt am Handy mit Start, Check-in, Ort, Regeln kurz und dem Knopf Verbindlich anmelden" width="300">
 
 - Die Anmeldung gilt **sofort als Bestätigt**, solange Platz ist. Ist das Turnier voll, kommt die Person auf die
   **Warteliste**. Beides bekommt sie als Nachricht.
