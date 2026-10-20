@@ -356,6 +356,17 @@ stehen Karten statt der Tabellen.
 
 <img src="../assets/serien/serien-seite-rennliga-teams.png" alt="Teamwertung mit Balken, Punkten je Rennen, Vereinsteams und einem Gast" width="560">
 
+**Läuft gerade:** Sobald eine Saison den Status **Läuft** hat (und sichtbar, nicht archiviert ist), erscheint sie oben
+auf der Seite **Erfolge & Referenzen** (`/references`), noch vor der Vitrine. Jede Karte zeigt, wie viele Termine
+gewertet sind („1 von 4 Terminen“), den **nächsten Termin** und **Unser Platz** – bei der Team-Liga der Platz des
+eigenen Teams in der Tabelle, sonst der beste Platz eines Vereinsmitglieds in der Gesamtwertung („Noch offen“ bis zur
+ersten Wertung). Ein Klick führt zur Seite der Saison. Steht **heute** (Wiener Tag) ein Termin an, steht die Saison
+extra unter **Heute im Einsatz**, mit einem leise pulsierenden Punkt (bei „Bewegung reduzieren“ ohne Puls). Fremde Namen
+erscheinen dort nie. Läuft nichts, fehlt der Bereich ganz – die Seite sieht aus wie sonst. Zum Ändern genügt der Status
+der Saison.
+
+<img src="../assets/serien/serien-laeuft-gerade.png" alt="Referenzen-Übersicht mit den Bereichen Heute im Einsatz und Läuft gerade: Karten mit Fortschritt, nächstem Termin und Platz des Vereins" width="560">
+
 **Captains:** Auf der Seite der Saison steht unten **Captains**. Dort tragt ihr Mitglieder ein, die für genau diese
 Saison Ergebnisse hochladen dürfen – nur aktive Vereinsmitglieder, die Suche findet nur sie. Namen tippen, **Gilt bis** wählen (Pflicht, meist das Saisonende) und – wenn der
 Captain ohne Freigabe veröffentlichen darf – **Darf veröffentlichen** anhaken; dann **Captain hinzufügen**. In der Liste
