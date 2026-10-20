@@ -1,12 +1,11 @@
 # Changelog
 
-## [1.12.2](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/compare/v1.12.1...v1.12.2) (2026-10-20)
-
+## 1.12.2 (20.10.2026)
 
 ### Schneller
 
-* Abmelden baut den Vorschau-Baum erst nach der Turnier-Sperre ([#1871](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1871)) ([eb136c3](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/eb136c3ceaecc4bc75667c3bb4af2848847a81fc))
-* Abzeichen nach der Anmeldung nur für die Anmelde-Zähler auswerten ([#1871](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1871)) ([eb136c3](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/eb136c3ceaecc4bc75667c3bb4af2848847a81fc))
+* Abmelden baut den Vorschau-Baum erst nach der Turnier-Sperre (#1871)
+* Abzeichen nach der Anmeldung nur für die Anmelde-Zähler auswerten (#1871)
 
 ## 1.12.1 (20.10.2026)
 
