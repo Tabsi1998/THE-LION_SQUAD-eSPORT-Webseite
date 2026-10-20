@@ -41,8 +41,8 @@ test("anmelden → Hinweis einmal, Termin in Mein Kalender, Abo mit Termin, abme
   // Anmelden auf der Turnierseite.
   await page.goto(`/tournaments/${slug}`);
   await page.getByTestId("tournament-register-btn").click();
-  const submit = page.getByTestId("tournament-register-submit");
-  if (await submit.isVisible().catch(() => false)) await submit.click();
+  // Bestätigungs-Blatt (#1261): erst „Verbindlich anmelden“ meldet an.
+  await page.getByTestId("tournament-register-submit").click();
   await expect(page.getByTestId("tournament-my-stand")).toBeVisible();
 
   // Der Hinweis erscheint - einmal, am Konto gemerkt.
