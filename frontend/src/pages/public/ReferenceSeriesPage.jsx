@@ -59,12 +59,16 @@ export default function ReferenceSeriesPage() {
   const { lineageSlug, seasonSlug } = useParams();
   const navigate = useNavigate();
   const [data, setData] = useState(null);
+  // Für welche Adresse die Antwort kam: beim Wechsel der Saison (Umschalter, #1746) steht kurz noch die alte da - sie
+  // darf nicht als „alte Adresse“ zurückführen.
+  const [loadedFor, setLoadedFor] = useState(null);
   const [missing, setMissing] = useState(false);
 
   const load = useCallback(async () => {
     try {
       const { data: body } = await api.get(`/reference-series/public/${encodeURIComponent(lineageSlug)}/${encodeURIComponent(seasonSlug)}`);
       setData(body);
+      setLoadedFor(`${lineageSlug}/${seasonSlug}`);
       setMissing(false);
     } catch (err) {
       if (err.response?.status === 404) setMissing(true);
@@ -77,10 +81,11 @@ export default function ReferenceSeriesPage() {
   useEffect(() => {
     const lineage = data?.lineage?.slug;
     const season = data?.series?.season_slug;
+    if (loadedFor !== `${lineageSlug}/${seasonSlug}`) return;
     if (lineage && season && (lineage !== lineageSlug || season !== seasonSlug)) {
       navigate(`/references/series/${lineage}/${season}`, { replace: true });
     }
-  }, [data, lineageSlug, seasonSlug, navigate]);
+  }, [data, loadedFor, lineageSlug, seasonSlug, navigate]);
 
   const title = seriesTitle(data);
   useDocumentTitle(title || "Serie", undefined, { robots: "noindex, follow" });

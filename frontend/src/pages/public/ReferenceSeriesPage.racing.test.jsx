@@ -234,6 +234,26 @@ test("ohne Vereinsfahrer und ohne Teamwertung keine Garage und keine Teamtabelle
   expect(screen.queryByRole("navigation", { name: "Saisons und Ligen" })).toBeNull();
 });
 
+test("Umschalter: die andere Saison lädt und bleibt, auch solange noch die alte Antwort da ist", async () => {
+  let answer;
+  const older = new Promise((resolve) => { answer = resolve; });
+  apiMock.get.mockImplementation((url) => (url.endsWith("/2025-f1") ? older : Promise.resolve({ data: BODY })));
+  render(
+    <MemoryRouter initialEntries={["/references/series/probe-racing/2026-f1"]}>
+      <Routes><Route path="/references/series/:lineageSlug/:seasonSlug" element={<><ReferenceSeriesPage /><Where /></>} /></Routes>
+    </MemoryRouter>,
+  );
+  const switcher = await screen.findByRole("navigation", { name: "Saisons und Ligen" });
+  fireEvent.click(within(switcher).getByRole("link", { name: /^2025/ }));
+  expect(apiMock.get).toHaveBeenLastCalledWith("/reference-series/public/probe-racing/2025-f1");
+  // Die Antwort der alten Saison darf nicht zurück zur alten Adresse führen.
+  await new Promise((resolve) => { setTimeout(resolve, 0); });
+  expect(screen.getByTestId("where")).toHaveTextContent("/references/series/probe-racing/2025-f1");
+  answer({ data: { ...BODY, series: { ...BODY.series, season: "2025", season_slug: "2025-f1", status: "completed" }, standings: null } });
+  expect(await screen.findByRole("heading", { level: 1 })).toHaveTextContent("2025 · F1");
+  expect(screen.getByTestId("where")).toHaveTextContent("/references/series/probe-racing/2025-f1");
+});
+
 test("noch ohne Ergebnis: Hinweis statt Tabellen", async () => {
   renderAt("/references/series/probe-racing/2026-f1", {
     ...BODY, standings: null, racing: { ...BODY.racing, teams: null, drivers: {}, club_teams: [] },
