@@ -320,6 +320,38 @@ Aufstellung, dazu bei Bedarf die Tabelle laut Veranstalter.
 </tr>
 </table>
 
+**Seite Rennliga:** Eine Spur der Art **Rennliga** zeigt unter derselben Adresse ihre eigene Seite:
+
+- Oben der **Umschalter** zwischen den Saisons und Ligen der Spur (etwa 2026 · F1, 2026 · F2, die Vorsaison) –
+  laufende Saisons tragen „läuft“. Der Fortschritt zählt Rennen.
+- **Vereins-Garage:** je Vereinsteam die Fahrer mit Platz und Punkten, Gäste mit **Gast**, und das **Teamduell** – wer
+  in gemeinsamen Rennen fürs Team öfter vor dem anderen ins Ziel kam, dazu die Punkte fürs Team. Vereinsteams sind das
+  **eigene Team** der Saison und jedes Team, für das ein Vereinsmitglied zuletzt gefahren ist.
+- **Fahrer-Detail:** Ein Klick auf einen Vereinsfahrer (Garage, Tabelle oder Kalender) zeigt Platz, Punkte, Rennen,
+  Siege, Podien, schnellste Runden, Ausfälle und je Rennen einen Balken mit Punkten und Platz. Die Adresse merkt sich den
+  Fahrer (`?fahrer=…`), so lässt sich das Detail teilen. Fremde Fahrer bekommen kein Detail.
+- **Fahrerwertung** als Rennraster: je Rennen der Platz, das Podium in Gold, Silber und Bronze, eine Stoppuhr für die
+  schnellste Runde, **DNF**, **DNS** und **DSQ**, dazu Punkte und **Abstand** zur Spitze. Weicht der **Gesamtstand laut
+  Veranstalter** von der eigenen Summe ab (meist Strafen), steht die Abweichung klein in Gold neben den Punkten.
+- **Teamwertung** (wenn die Regeln sie einschalten): ein Balken je Team, die Punkte je Rennen, Vereinsteams in Cyan,
+  Gäste markiert; darüber, wie viele Fahrer je Rennen zählen und ob Gäste mitzählen.
+- **Rennkalender:** alle Termine mit Status, bei gewerteten Rennen der Sieger und der beste Vereinsfahrer.
+
+Das Team je Rennen kommt aus der Spalte **Team** im Ergebnisblatt, sonst gilt das Standard-Team des Teilnehmers. Am Handy
+stehen Karten statt der Tabellen.
+
+<table>
+<tr>
+<td><img src="../assets/serien/serien-seite-rennliga-garage.png" alt="Vereins-Garage einer Rennliga mit zwei Vereinsteams, Teamduell und dem Detail einer Fahrerin mit Punkten je Rennen" width="560"></td>
+<td rowspan="2"><img src="../assets/serien/serien-seite-rennliga-handy.png" alt="Dieselbe Seite am Handy mit Umschalter, Garage und Karten statt Tabelle" width="220"></td>
+</tr>
+<tr>
+<td><img src="../assets/serien/serien-seite-rennliga.png" alt="Fahrerwertung als Rennraster mit Podium-Ringen, schnellster Runde, Ausfällen, Abstand und Abweichung zum offiziellen Wert" width="560"></td>
+</tr>
+</table>
+
+<img src="../assets/serien/serien-seite-rennliga-teams.png" alt="Teamwertung mit Balken, Punkten je Rennen, Vereinsteams und einem Gast" width="560">
+
 **Captains:** Auf der Seite der Saison steht unten **Captains**. Dort tragt ihr Mitglieder ein, die für genau diese
 Saison Ergebnisse hochladen dürfen – nur aktive Vereinsmitglieder, die Suche findet nur sie. Namen tippen, **Gilt bis** wählen (Pflicht, meist das Saisonende) und – wenn der
 Captain ohne Freigabe veröffentlichen darf – **Darf veröffentlichen** anhaken; dann **Captain hinzufügen**. In der Liste
@@ -432,6 +464,8 @@ aktuellen Stand, eure Eingaben bleiben stehen, und die Vorschau prüft neu. Jede
 | Termin steht auf **Ergebnis fehlt**, fand aber nie statt | Nicht abgesagt | **Absagen** – dann fehlt er nicht mehr |
 | Ergebnis-Blatt meldet „inzwischen geändert“ | Jemand anderes hat das Ergebnis gespeichert | **Neu laden**, Vorschau prüfen, dann übernehmen |
 | Captain-Änderung ist nicht öffentlich | Das Ergebnis war veröffentlicht – die Änderung ist ein Entwurf daneben | Vorstand: im Blatt **Freigeben** |
+| Rennliga ohne Vereins-Garage | Kein Teilnehmer ist als Mitglied zugeordnet, und die Saison hat kein eigenes Team | **Unbekannte Namen** → **Bestätigen**, oder das eigene Team der Saison eintragen |
+| Rennliga ohne Teamwertung | Teamwertung in den Regeln der Saison aus | Saison bearbeiten → Teamwertung einschalten |
 
 ---
 
