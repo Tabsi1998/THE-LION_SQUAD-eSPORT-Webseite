@@ -1,25 +1,23 @@
 # Changelog
 
-## [1.6.1](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/compare/v1.6.0...v1.6.1) (2026-10-20)
-
+## 1.6.1 (20.10.2026)
 
 ### Fehlerbehebungen
 
-* Aufruf-Tafel trennt Stationsnamen nicht mehr mitten im Wort ([#1822](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1822)) ([b007fc2](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/b007fc29566c677f79884b82d0cd18551d92afb7))
-* Aufruf-Tafel und Hallen-Tafel ohne Anmeldung ohne Fehlerflut in der Konsole ([#1822](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1822)) ([b007fc2](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/b007fc29566c677f79884b82d0cd18551d92afb7))
-* Aufruf-Tafel und Hallen-Tafel zeigen mit Event-Schlüssel auch Turniere „Nur Mitglieder“ am TV ohne Anmeldung ([#1822](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1822)) ([b007fc2](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/b007fc29566c677f79884b82d0cd18551d92afb7))
-* Gast anlegen in „Am Start / Als Nächstes“ funktioniert ([#1825](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1825)) ([860af73](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/860af73a402f904a0aeb2f28190702e5cda6b553))
-* gleichzeitige Vor-Ort-Anmeldungen warten statt abzubrechen ([#1826](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1826)) ([860af73](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/860af73a402f904a0aeb2f28190702e5cda6b553))
-* Stationen liefern öffentlich nur Anzeige-Felder ([#1822](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1822)) ([b007fc2](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/b007fc29566c677f79884b82d0cd18551d92afb7))
-* Turnierbaum- und Stations-TV zeigen Stationen und Aufrufe auch bei Turnieren „Nur Mitglieder“ ([#1822](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1822)) ([b007fc2](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/b007fc29566c677f79884b82d0cd18551d92afb7))
-* Turnierbaum-TV zeigt den Anmelde-QR auch im Check-in-Zeitraum, solange Plätze frei sind ([#1827](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1827)) ([b007fc2](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/b007fc29566c677f79884b82d0cd18551d92afb7))
-* Turnierseiten „Nur Mitglieder“ zeigen die Streams ohne Fehler ([#1831](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1831)) ([b007fc2](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/b007fc29566c677f79884b82d0cd18551d92afb7))
-* TV & Beamer erstellt Links mit Event-Schlüssel für Hallen- und Aufruf-Tafel ([#1822](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1822)) ([b007fc2](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/b007fc29566c677f79884b82d0cd18551d92afb7))
-
+* Aufruf-Tafel trennt Stationsnamen nicht mehr mitten im Wort (#1822)
+* Aufruf-Tafel und Hallen-Tafel ohne Anmeldung ohne Fehlerflut in der Konsole (#1822)
+* Aufruf-Tafel und Hallen-Tafel zeigen mit Event-Schlüssel auch Turniere „Nur Mitglieder“ am TV ohne Anmeldung (#1822)
+* Gast anlegen in „Am Start / Als Nächstes“ funktioniert (#1825)
+* gleichzeitige Vor-Ort-Anmeldungen warten statt abzubrechen (#1826)
+* Stationen liefern öffentlich nur Anzeige-Felder (#1822)
+* Turnierbaum- und Stations-TV zeigen Stationen und Aufrufe auch bei Turnieren „Nur Mitglieder“ (#1822)
+* Turnierbaum-TV zeigt den Anmelde-QR auch im Check-in-Zeitraum, solange Plätze frei sind (#1827)
+* Turnierseiten „Nur Mitglieder“ zeigen die Streams ohne Fehler (#1831)
+* TV & Beamer erstellt Links mit Event-Schlüssel für Hallen- und Aufruf-Tafel (#1822)
 
 ### Schneller
 
-* Anmeldebestätigung erst nach der Turnier-Sperre ([#1826](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1826)) ([860af73](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/860af73a402f904a0aeb2f28190702e5cda6b553))
+* Anmeldebestätigung erst nach der Turnier-Sperre (#1826)
 
 ## 1.6.0 (20.10.2026)
 
