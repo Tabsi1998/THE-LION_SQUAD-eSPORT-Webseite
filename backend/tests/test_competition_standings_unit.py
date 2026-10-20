@@ -367,3 +367,62 @@ def test_decided_places_only_look_at_the_last_stage():
     rows = stage_standings([stage_one_loser, stage_two_final], REGISTRATIONS)
 
     assert [row["registration_id"] for row in rows] == ["r2", "r1", "r3"]
+
+
+def _shared_first_stage_match(match_id="stage-draw", **extra):
+    return {
+        "id": match_id,
+        "tournament_id": "t1",
+        "stage_id": "s1",
+        "round": 1,
+        "slots": [
+            {"slot": 1, "registration_id": "r1", "status": "filled"},
+            {"slot": 2, "registration_id": "r2", "status": "filled"},
+        ],
+        "results": [
+            {"registration_id": "r1", "rank": 1},
+            {"registration_id": "r2", "rank": 1},
+        ],
+        "advancement": [],
+        "status": "completed",
+        **extra,
+    }
+
+
+def test_shared_first_place_is_a_draw_in_the_snapshot():
+    """#1806: zwei Mal Platz 1 ist ein Unentschieden, nicht zwei Sieger."""
+    [match] = adapt_stage_matches([_shared_first_stage_match()])
+    assert {row["registration_id"]: row["outcome"] for row in match["results"]} == {"r1": "draw", "r2": "draw"}
+
+
+def test_sole_first_place_stays_the_winner_in_the_snapshot():
+    [match] = adapt_stage_matches([{
+        **_shared_first_stage_match(),
+        "results": [{"registration_id": "r1", "rank": 1}, {"registration_id": "r2", "rank": 2}],
+    }])
+    assert {row["registration_id"]: row["outcome"] for row in match["results"]} == {"r1": "winner", "r2": "placed"}
+
+
+def test_registration_match_summary_does_not_count_shared_first_place_as_win():
+    """#1806: matches_won (Profil, Awards) folgt derselben Regel wie die Sieg-Erfolge (match_winner)."""
+    stage = adapt_stage_matches([_shared_first_stage_match()])
+    for registration in ("r1", "r2"):
+        assert registration_match_summary(stage, {registration}) == {"matches_played": 1, "matches_won": 0}
+
+
+def test_registration_match_summary_ignores_raw_winner_outcome_for_shared_first():
+    """Auch ein älterer Stand mit zwei „winner“ ist ein Unentschieden."""
+    [match] = adapt_stage_matches([_shared_first_stage_match()])
+    for row in match["results"]:
+        row["outcome"] = "winner"
+    assert registration_match_summary([match], {"r1"}) == {"matches_played": 1, "matches_won": 0}
+
+
+def test_registration_match_summary_still_counts_sole_winner():
+    stage = adapt_stage_matches([{
+        **_shared_first_stage_match(),
+        "results": [{"registration_id": "r1", "rank": 1}, {"registration_id": "r2", "rank": 2}],
+    }])
+    assert registration_match_summary(stage, {"r1"}) == {"matches_played": 1, "matches_won": 1}
+    assert registration_match_summary(stage, {"r2"}) == {"matches_played": 1, "matches_won": 0}
+

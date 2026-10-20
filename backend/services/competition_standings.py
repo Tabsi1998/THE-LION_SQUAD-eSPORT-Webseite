@@ -653,10 +653,7 @@ def registration_match_summary(matches: list[dict], registration_ids: set[str]) 
         if not participants.intersection(registration_ids):
             continue
         played += 1
-        if any(
-            result.get("registration_id") in registration_ids
-            and result.get("outcome") == "winner"
-            for result in match.get("results") or []
-        ):
+        # Dieselbe Regel wie die Sieg-Erfolge (#1796, #1806): ein geteilter Platz 1 ist kein Sieg.
+        if won_by(match, registration_ids):
             won += 1
     return {"matches_played": played, "matches_won": won}
