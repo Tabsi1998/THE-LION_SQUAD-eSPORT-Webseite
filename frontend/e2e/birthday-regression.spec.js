@@ -74,7 +74,8 @@ test.describe("Vereinsgeburtstag: die Mütze", () => {
     const hat = page.getByTestId("birthday-hat");
     await expect(hat).toBeVisible({ timeout: 15000 });
     await expect(hat.getByTestId("birthday-hat-number")).toHaveText("8");
-    const logo = await page.getByTestId("tls-logo").first().boundingBox();
+    // Das Logo, das zu sehen ist: bis 1439 px der Löwenkopf der kompakten Kopfzeile (#1234), sonst der Schriftzug.
+    const logo = await page.locator("header [data-testid=tls-logo]:visible").first().boundingBox();
     const box = await hat.boundingBox();
     expect(box.y + box.height).toBeGreaterThan(logo.y - 2);
     expect(box.x + box.width / 2).toBeGreaterThan(logo.x);

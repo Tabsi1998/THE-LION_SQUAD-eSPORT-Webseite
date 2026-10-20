@@ -111,3 +111,37 @@ test("ohne Bewegung nur ein Bild - auf dem großen Löwen gehört es zur Seite",
   expect(hero.closest(".tls-mascot-hat-page")).not.toBeNull();
   expect(document.querySelectorAll("button")).toHaveLength(0);
 });
+
+// Kompakte Kopfzeile (#1234): zwischen 1024 und 1439 px ist der Schriftzug ausgeblendet und der Löwenkopf zu sehen - das
+// Stück sitzt dann auf dem Löwenkopf (Mitte des Kopfes wie beim großen Löwen), nicht auf dem unsichtbaren Schriftzug.
+test("im Kopf auf dem sichtbaren Logo: in der kompakten Kopfzeile auf dem Löwenkopf", () => {
+  const header = document.createElement("header");
+  const wordmark = document.createElement("img");
+  wordmark.dataset.testid = "tls-logo";
+  const wordmarkBox = document.createElement("span");
+  wordmarkBox.dataset.headerLogo = "wordmark";
+  wordmarkBox.append(wordmark);
+  const mascot = document.createElement("img");
+  mascot.dataset.testid = "tls-logo";
+  const mascotBox = document.createElement("span");
+  mascotBox.dataset.headerLogo = "mascot";
+  mascotBox.append(mascot);
+  header.append(wordmarkBox, mascotBox);
+  document.body.append(header);
+  const loaded = (img, rect) => {
+    Object.defineProperty(img, "complete", { value: true });
+    Object.defineProperty(img, "naturalWidth", { value: 320 });
+    Object.defineProperty(img, "naturalHeight", { value: 320 });
+    img.getBoundingClientRect = () => ({ ...rect, right: rect.left + rect.width, bottom: rect.top + rect.height });
+  };
+  loaded(wordmark, { left: 0, top: 0, width: 0, height: 0 });
+  loaded(mascot, { left: 20, top: 12, width: 56, height: 56 });
+  header.getBoundingClientRect = () => ({ left: 0, top: 0, width: 1180, height: 80, right: 1180, bottom: 80 });
+  render(<MemoryRouter><HeaderMascotHat Art={Art} moving={false} label="Hut" title="Hut" testId="hat" /></MemoryRouter>);
+  const hat = screen.getByTestId("hat");
+  expect(header.contains(hat)).toBe(true);
+  // Mitte des Löwenkopfs (HEAD_FALLBACK.mascot: 47 % der Breite) minus halbe Hutgröße.
+  const size = Math.max(14, Math.round(56 * 0.46));
+  expect(parseFloat(hat.style.left)).toBe(Math.round(20 + 0.47 * 56 - size / 2));
+  header.remove();
+});
