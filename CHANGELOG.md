@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.12.0 (20.10.2026)
+
+### Neu
+
+* Referenzen – Bereiche „Heute im Einsatz“ und „Läuft gerade“ auf der Übersicht (#1748)
+* Referenzen – schlanker öffentlicher Endpunkt für laufende Serien-Saisons (#1748)
+
 ## 1.11.0 (20.10.2026)
 
 ### Neu
