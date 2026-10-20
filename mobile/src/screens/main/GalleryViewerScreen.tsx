@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Alert, FlatList, Image, Linking, Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from "react-native";
+import { Alert, FlatList, Image, Linking, Pressable, StyleSheet, View, useWindowDimensions } from "react-native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { Ionicons } from "@expo/vector-icons";
 import * as FileSystem from "expo-file-system/legacy";
@@ -7,6 +7,7 @@ import * as Sharing from "expo-sharing";
 import { useVideoPlayer, VideoView } from "expo-video";
 import { ErrorState, SkeletonList } from "../../components/ListState";
 import { Screen } from "../../components/Screen";
+import { ZoomableImage } from "../../components/ZoomableImage";
 import { Body, Muted } from "../../components/Text";
 import { api, errorMessage, resolveMediaUrl } from "../../lib/api";
 import { groupBySection, mediaType, mediaUrl, photoCredit, posterUrl, sizedUpload, type GalleryAlbum, type GalleryItem } from "../../lib/gallery";
@@ -14,7 +15,7 @@ import type { MoreStackParamList } from "../../navigation/types";
 import { colors, radius } from "../../theme";
 
 // Großansicht (#236): Wischen zwischen Bildern (1600 px), Zoomen mit zwei Fingern, Videos mit
-// dem Player aus dem Chat, Einbettungen öffnen sich draußen. Teilen und Speichern gehen über das
+// dem Player aus dem Chat (Zoom auf Android und iOS gleich, #999: Wischen blättert nur ohne Zoom), Einbettungen öffnen sich draußen. Teilen und Speichern gehen über das
 // System-Teilen mit der heruntergeladenen Datei.
 
 type Props = NativeStackScreenProps<MoreStackParamList, "GalleryViewer">;
@@ -27,6 +28,7 @@ export function GalleryViewerScreen({ navigation, route }: Props) {
   const [index, setIndex] = useState(startIndex);
   const [chrome, setChrome] = useState(true);
   const [sharing, setSharing] = useState(false);
+  const [zoomed, setZoomed] = useState(false);
   const list = useRef<FlatList<GalleryItem>>(null);
 
   useEffect(() => {
@@ -73,13 +75,26 @@ export function GalleryViewerScreen({ navigation, route }: Props) {
         data={items}
         horizontal
         pagingEnabled
+        scrollEnabled={!zoomed}
         initialScrollIndex={Math.min(startIndex, Math.max(0, items.length - 1))}
         getItemLayout={(_, i) => ({ length: width, offset: width * i, index: i })}
         keyExtractor={(item) => item.id}
-        onMomentumScrollEnd={(event) => setIndex(Math.round(event.nativeEvent.contentOffset.x / width))}
+        onMomentumScrollEnd={(event) => {
+          setIndex(Math.round(event.nativeEvent.contentOffset.x / width));
+          setZoomed(false);
+        }}
         showsHorizontalScrollIndicator={false}
         renderItem={({ item, index: itemIndex }) => (
-          <Slide item={item} width={width} height={height} active={itemIndex === index} onTap={() => setChrome((value) => !value)} />
+          <Slide
+            item={item}
+            width={width}
+            height={height}
+            active={itemIndex === index}
+            onTap={() => setChrome((value) => !value)}
+            onZoomChange={(value) => {
+              if (itemIndex === index) setZoomed(value);
+            }}
+          />
         )}
       />
       {chrome ? (
@@ -99,7 +114,9 @@ export function GalleryViewerScreen({ navigation, route }: Props) {
   );
 }
 
-function Slide({ item, width, height, active, onTap }: { item: GalleryItem; width: number; height: number; active: boolean; onTap: () => void }) {
+type SlideProps = { item: GalleryItem; width: number; height: number; active: boolean; onTap: () => void; onZoomChange: (zoomed: boolean) => void };
+
+function Slide({ item, width, height, active, onTap, onZoomChange }: SlideProps) {
   const type = mediaType(item);
   if (type === "video") return <VideoSlide item={item} width={width} height={height} active={active} />;
   if (type === "embed") {
@@ -114,20 +131,18 @@ function Slide({ item, width, height, active, onTap }: { item: GalleryItem; widt
     );
   }
   return (
-    <ScrollView
-      style={{ width, height }}
-      contentContainerStyle={styles.zoomContent}
-      maximumZoomScale={4}
-      minimumZoomScale={1}
-      bouncesZoom
-      centerContent
-      showsVerticalScrollIndicator={false}
-      showsHorizontalScrollIndicator={false}
-    >
-      <Pressable onPress={onTap} style={[styles.slide, { width, height }]}>
-        <Image source={{ uri: resolveMediaUrl(sizedUpload(mediaUrl(item), 1600)) }} style={{ width, height }} resizeMode="contain" accessibilityLabel={item.caption || "Bild"} />
-      </Pressable>
-    </ScrollView>
+    <View style={[styles.slide, { width, height }]}>
+      <ZoomableImage
+        uri={resolveMediaUrl(sizedUpload(mediaUrl(item), 1600))}
+        width={width}
+        height={height}
+        active={active}
+        label={item.caption || "Bild"}
+        onTap={onTap}
+        onZoomChange={onZoomChange}
+        testID={`gallery-zoom-${item.id}`}
+      />
+    </View>
   );
 }
 
@@ -146,7 +161,6 @@ function VideoSlide({ item, width, height, active }: { item: GalleryItem; width:
 const styles = StyleSheet.create({
   root: { backgroundColor: colors.black, flex: 1 },
   slide: { alignItems: "center", backgroundColor: colors.black, justifyContent: "center" },
-  zoomContent: { flexGrow: 1 },
   chrome: {
     bottom: 0,
     gap: 8,
