@@ -60,7 +60,8 @@ function RowProblems({ items }) {
   );
 }
 
-function ResultRow({ row, index, autoPlace, organizerMode, problems, scored, onChange, onRemove }) {
+function ResultRow({ row, index, autoPlace, organizerMode, problems, info, onChange, onRemove }) {
+  const scored = info?.scored;
   const [open, setOpen] = useState(() => Boolean(row.penalty_points || row.start_number || row.official_total || row.override));
   const level = problems?.some((item) => item.level === "error") ? "error" : problems?.length ? "warning" : null;
   const toggleMark = (mark) => onChange({ marks: row.marks.includes(mark) ? row.marks.filter((item) => item !== mark) : [...row.marks, mark] });
@@ -116,7 +117,13 @@ function ResultRow({ row, index, autoPlace, organizerMode, problems, scored, onC
           )}
         </div>
       )}
-      {scored && <div className="mt-1 text-[11px] text-white/45 tabular-nums" data-testid="result-row-scored">= {scoredText(scored)}</div>}
+      {info && (
+        <div className="mt-1 flex flex-wrap items-center gap-x-2 text-[11px] text-white/45 tabular-nums">
+          {/* Bekannt oder neu sagt die Vorschau jedem; ob jemand Vereinsmitglied ist, nur dem Vorstand. */}
+          <span data-testid="result-row-known" className={info.is_new ? "font-bold uppercase tracking-widest text-amber-300" : undefined}>{info.is_new ? "neu" : "bekannt"}</span>
+          {scored && <span data-testid="result-row-scored">= {scoredText(scored)}</span>}
+        </div>
+      )}
       <RowProblems items={problems} />
     </li>
   );
@@ -297,9 +304,9 @@ export function ResultEntrySheet({ series, round, onClose, onSaved }) {
   const stamp = built ? formStamp(built.payload) : "";
   const fresh = Boolean(preview && preview.stamp === stamp);
   const problems = useMemo(() => problemsByRow(fresh ? preview : null, built?.rowKeys), [fresh, preview, built]);
-  const scoredByKey = useMemo(() => {
+  const infoByKey = useMemo(() => {
     if (!fresh || !built) return {};
-    return Object.fromEntries((preview.rows || []).map((row) => [built.rowKeys[row.index], row.scored]));
+    return Object.fromEntries((preview.rows || []).map((row) => [built.rowKeys[row.index], row]));
   }, [fresh, preview, built]);
   const auto = useMemo(() => (form ? autoPlaces(form.rows) : {}), [form]);
 
@@ -374,8 +381,11 @@ export function ResultEntrySheet({ series, round, onClose, onSaved }) {
   const decide = async (action) => {
     setSaving(true);
     try {
-      await api.post(`${base}/${action}`, { expected_version: data.version });
-      toast.success(action === "approve" ? "Entwurf freigegeben." : "Entwurf verworfen.");
+      const { data: result } = await api.post(`${base}/${action}`, { expected_version: data.version });
+      // Offene Namen, die nur der Entwurf angelegt hatte, nimmt der Server wieder mit - kurz sagen, wie viele.
+      const removed = (result?.removed_participants || []).length;
+      const done = action === "approve" ? "Entwurf freigegeben." : "Entwurf verworfen.";
+      toast.success(removed ? `${done} ${removed === 1 ? "1 offener Name" : `${removed} offene Namen`} entfernt.` : done);
       onSaved({});
     } catch (err) {
       const detail = err.response?.data?.detail;
@@ -488,7 +498,7 @@ export function ResultEntrySheet({ series, round, onClose, onSaved }) {
               <ol className="divide-y divide-white/5" data-testid="result-rows">
                 {form.rows.map((row, index) => (
                   <ResultRow key={row.key} row={row} index={index} autoPlace={auto[row.key]} organizerMode={organizerMode}
-                    problems={problems.byRow[row.key]} scored={scoredByKey[row.key]}
+                    problems={problems.byRow[row.key]} info={infoByKey[row.key]}
                     onChange={(values) => updateRow(row.key, values)} onRemove={() => removeRow(row.key)} />
                 ))}
               </ol>

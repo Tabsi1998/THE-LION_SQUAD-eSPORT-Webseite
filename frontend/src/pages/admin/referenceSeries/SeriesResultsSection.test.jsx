@@ -291,3 +291,43 @@ test("422 beim Übernehmen: Fehler des Servers an den Zeilen statt Speichern", a
   await waitFor(() => expect(screen.getAllByTestId("result-row")[0].dataset.level).toBe("error"));
   expect(screen.getByTestId("result-submit")).toHaveTextContent("Erneut prüfen");
 });
+
+test("Captain bekommt keine Mitglieds- und Zuordnungsfelder: nur bekannt/neu je Zeile, nichts bricht", async () => {
+  const people = PARTICIPANTS.map(({ id, name, start_number, default_team }) => ({ id, name, start_number, default_team }));
+  setup({ series: CAPTAIN, data: resultData({ access: { role: "captain", can_publish: false }, participants: people }) });
+  await openRound();
+  fireEvent.change(screen.getAllByTestId("result-row-name")[0], { target: { value: "Alpha" } });
+  fireEvent.click(screen.getByTestId("result-row-add"));
+  fireEvent.change(screen.getAllByTestId("result-row-name")[1], { target: { value: "Gamma" } });
+  const { club_members: _club, ...rest } = PREVIEW;
+  apiMock.post.mockResolvedValue({ data: {
+    ...rest,
+    rows: [
+      { index: 0, participant_id: "p1", match: "name", is_new: false, scored: { points: 25, base: 25, bonus: 0, penalty: 0 } },
+      { index: 1, participant_id: "neu:gamma", match: "new", is_new: true, scored: { points: 18, base: 18, bonus: 0, penalty: 0 } },
+    ],
+    unknown_names: [{ participant_id: "neu:gamma", name: "Gamma", start_number: null, team: null, rows: [1], matches: [] }],
+    standings: { round_seq: 1, scopes: { drivers: [{ participant_id: "p1", name: "Alpha", rank: 1, rank_change: null, points: 25 }, { participant_id: "neu:gamma", name: "Gamma", rank: 2, rank_change: null, points: 18, is_new: true }] } },
+  } });
+  fireEvent.click(screen.getByTestId("result-submit"));
+  await screen.findByTestId("result-preview");
+  expect(screen.getAllByTestId("result-row-known").map((item) => item.textContent)).toEqual(["bekannt", "neu"]);
+  expect(screen.queryByTestId("preview-club")).toBeNull();
+  expect(screen.getAllByTestId("preview-standing-row")).toHaveLength(2);
+  expect(screen.getByTestId("preview-unknown-name")).toHaveTextContent("Gamma");
+  apiMock.put.mockResolvedValue({ data: { target: "sheet", version: 1, created_participants: [{ id: "x1", name: "Gamma" }] } });
+  expect(screen.getByTestId("result-submit")).toHaveTextContent("Als Entwurf speichern");
+  fireEvent.click(screen.getByTestId("result-submit"));
+  await waitFor(() => expect(screen.queryByTestId("result-sheet")).toBeNull());
+  expect(apiMock.put.mock.calls[0][1]).toMatchObject({ status: "draft" });
+  expect(screen.queryByTestId("unknown-names")).toBeNull();
+});
+
+test("Verwerfen nennt die offenen Namen, die der Server wieder mitnimmt", async () => {
+  const sheet = { status: "published", version: 5, rows: [], matches: [], official_table: [], official_totals: {}, pending_draft: { rows: [], matches: [] } };
+  setup({ data: resultData({ version: 5, sheet }) });
+  await openRound();
+  apiMock.post.mockResolvedValue({ data: { version: 6, removed_participants: ["x1", "x2"] } });
+  fireEvent.click(screen.getByTestId("result-pending-discard"));
+  await waitFor(() => expect(toastMock.success).toHaveBeenCalledWith("Entwurf verworfen. 2 offene Namen entfernt."));
+});
