@@ -337,6 +337,43 @@ async def test_the_board_discards_a_draft_beside_and_approves_a_captains_draft_s
 
 
 @pytest.mark.asyncio
+async def test_discarding_a_draft_removes_the_people_only_this_draft_created(flow):
+    ctx = await _setup(flow)
+    await flow.db.club_member_profiles.insert_one({"id": "p-dora", "display_name": "Dora Probe", "is_active": True})
+    await flow.db.reference_aliases.insert_one({"id": "alias-dora", "name_normalized": "dorad", "target": "member",
+                                                "profile_id": "p-dora", "game_id": None,
+                                                "confirmed_at": "2026-01-02T10:00:00+00:00"})
+    await _save(flow, ctx, 0, _rows("Anna Probe", "Bert Bolzt"))
+    await _save(flow, ctx, 1, _rows("Anna Probe", "Schon Da"))
+    flow.act_as(ctx["captain"])
+    await _save(flow, ctx, 0, _rows("Neu Nora", "Neu Otto", "Neu Paul", "Schon Da"), version=1, status="draft")
+    # Der zweite Entwurf ersetzt den ersten: Nora steht schon in der Saison, Otto fällt weg, Quinn und Dora kommen dazu.
+    await _save(flow, ctx, 0, _rows("Neu Nora", "Neu Quinn", "Neu Paul", "Dora D"), version=2, status="draft")
+    people = {row["name"]: row async for row in flow.db.reference_participants.find({}, {"_id": 0})}
+    assert people["Dora D"]["link_status"] == "decided"
+
+    flow.act_as(ctx["board"])
+    # Paul steht inzwischen auch in einem anderen Blatt, Quinn hat der Vorstand zugeordnet - beide bleiben.
+    await _save(flow, ctx, 2, _rows("Neu Paul"), status="draft")
+    assigned = await flow.post(f"{ADMIN}/series/{ctx['own']['id']}/participants/{people['Neu Quinn']['id']}/assign",
+                               json={"link": "guest"})
+    assert assigned.status_code == 200, assigned.text
+    discarded = await flow.post(_url(ctx, 0, "/discard"), json={"expected_version": 3})
+    assert discarded.status_code == 200, discarded.text
+
+    left = {row["name"] async for row in flow.db.reference_participants.find({}, {"_id": 0})}
+    assert left == {"Anna Probe", "Bert Bolzt", "Carl Kurve", "Schon Da", "Neu Paul", "Neu Quinn", "Dora D"}
+    log = await flow.db.audit_logs.find_one({"action": "reference_result.discard"})
+    assert sorted(item["name"] for item in log["data"]["removed_participants"]) == ["Neu Nora", "Neu Otto"]
+    # Ein Entwurf, der niemanden neu angelegt hat, entfernt beim Verwerfen auch niemanden.
+    flow.act_as(ctx["captain"])
+    await _save(flow, ctx, 0, _rows("Bert Bolzt", "Anna Probe"), version=4, status="draft")
+    flow.act_as(ctx["board"])
+    assert (await flow.post(_url(ctx, 0, "/discard"), json={"expected_version": 5})).status_code == 200
+    assert await flow.db.reference_participants.count_documents({}) == len(left)
+
+
+@pytest.mark.asyncio
 async def test_a_captain_of_a_direct_series_publishes_and_sees_no_alias_details(flow):
     ctx = await _setup(flow)
     await flow.patch(f"{ADMIN}/series/{ctx['own']['id']}", json={"publish_mode": "direct"})

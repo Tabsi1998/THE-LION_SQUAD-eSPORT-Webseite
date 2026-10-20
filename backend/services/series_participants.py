@@ -5,6 +5,8 @@
   Startnummern der Spur. ``with_ids=False`` reicht fürs bloße Wiedererkennen.
 - ``new_participant`` legt einen Teilnehmer „offen“ an - außer ein bestätigter Alias (gleicher Name, gleiches Spiel)
   ordnet ihn sofort zu.
+- ``remove_unused_new`` nimmt Teilnehmer zurück, die nur ein verworfener Entwurf angelegt hat: nur, wenn sie noch
+  offen sind (keine Zuordnung, kein Alias) und in keinem Ergebnisblatt der Saison vorkommen.
 """
 from __future__ import annotations
 
@@ -140,3 +142,36 @@ async def new_participant(db, series: dict, index: series_identity.IdentityIndex
                     "decided_at": now, "decided_by": me["id"]})
     await db.reference_participants.insert_one(dict(doc))
     return doc
+
+
+# ---------------------------------------------------------------- Zurücknehmen
+def sheet_participant_ids(sheet: dict) -> set[str]:
+    """Alle Teilnehmer, die ein Ergebnisblatt nennt - im Blatt und im Entwurf daneben: Zeilen, Aufstellungen und
+    offizielle Werte."""
+    found: set[str] = set()
+    for source in (sheet, sheet.get("pending_draft") or {}):
+        found |= {row.get("participant_id") for row in source.get("rows") or []}
+        found |= {pid for match in source.get("matches") or [] for pid in match.get("lineup") or []}
+        found |= set(source.get("official_totals") or {})
+    found.discard(None)
+    return found
+
+
+async def remove_unused_new(db, series_id: str, candidate_ids) -> list[dict]:
+    """Teilnehmer aus ``candidate_ids`` wieder entfernen, wenn sie noch offen sind (keine Zuordnung, kein Alias) und in
+    keinem Ergebnisblatt der Saison vorkommen - auch nicht in einem Entwurf daneben. Liefert die entfernten
+    (Kennung und Name, fürs Protokoll)."""
+    wanted = sorted({pid for pid in candidate_ids or [] if pid})
+    if not wanted:
+        return []
+    query = {"series_id": series_id, "id": {"$in": wanted}, "link_status": "open", "alias_id": None}
+    rows = await db.reference_participants.find(query, {"_id": 0, "id": 1, "name": 1}).to_list(None)
+    if not rows:
+        return []
+    used: set[str] = set()
+    async for sheet in db.reference_round_results.find({"series_id": series_id}, {"_id": 0}):
+        used |= sheet_participant_ids(sheet)
+    gone = [row for row in rows if row["id"] not in used]
+    if gone:
+        await db.reference_participants.delete_many({**query, "id": {"$in": [row["id"] for row in gone]}})
+    return gone

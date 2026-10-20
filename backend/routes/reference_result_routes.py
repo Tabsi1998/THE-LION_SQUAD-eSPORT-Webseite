@@ -67,7 +67,9 @@ Aliase und Verknüpfungen liest nur die Verwaltung (#1743).
 **POST …/results/approve** und **POST …/results/discard** (nur Vorstand), Body ``{expected_version}``: Freigeben
 veröffentlicht den Entwurf daneben (ohne einen solchen das Blatt im Entwurf) samt Revision, Protokoll
 (``reference_result.approve``) und Neurechnen; Verwerfen entfernt den Entwurf daneben (``reference_result.discard``),
-das veröffentlichte Blatt bleibt. Ohne etwas freizugeben oder zu verwerfen: 409.
+das veröffentlichte Blatt bleibt. Teilnehmer, die nur Entwürfe dieses Blatts neu angelegt haben
+(``pending_draft.created_participant_ids``) und die noch offen und in keinem Blatt der Saison stehen, gehen mit
+(``removed_participants``). Ohne etwas freizugeben oder zu verwerfen: 409.
 """
 from __future__ import annotations
 
@@ -86,7 +88,7 @@ from services import reference_series, series_identity, series_results
 from services.dolibarr_policy import club_today
 from services.reference_series_access import EDIT_PENDING_DRAFT, SeriesAccess, require_series_editor
 from services.scoring_rules import normalize_rules, result_points, validate_sheet
-from services.series_participants import build_index, new_participant
+from services.series_participants import build_index, new_participant, remove_unused_new
 from services.series_standings import compute_standings
 
 router = APIRouter(prefix="/api/reference-series", tags=["reference-series"])
@@ -524,9 +526,13 @@ async def _write_sheet(db, access: SeriesAccess, round_doc: dict, existing: dict
     return await _update_if_current(db, existing["id"], expected, {"$set": fields})
 
 
-async def _write_pending(db, access: SeriesAccess, existing: dict, content: dict, expected: int) -> dict | None:
+async def _write_pending(db, access: SeriesAccess, existing: dict, content: dict, expected: int,
+                         created_ids: list[str]) -> dict | None:
+    """Entwurf daneben. ``created_participant_ids`` merkt, wen Entwürfe dieses Blatts neu angelegt haben - auch über
+    ersetzte Entwürfe hinweg -, damit Verwerfen sie wieder entfernen kann."""
+    earlier = (existing.get("pending_draft") or {}).get("created_participant_ids") or []
     draft = {**content, "created_at": now_utc().isoformat(), "created_by": access.user["id"],
-             "based_on_version": expected}
+             "based_on_version": expected, "created_participant_ids": list(dict.fromkeys([*earlier, *created_ids]))}
     return await _update_if_current(db, existing["id"], expected, {"$set": {"pending_draft": draft}})
 
 
@@ -546,7 +552,8 @@ async def save_results(series_id: str, round_id: str, body: ResultSave,
     created = await _create_people(db, access, resolution)
     content = series_results.replace_new_ids(resolution.content(), {key: doc["id"] for key, doc in created.items()})
     if target == EDIT_PENDING_DRAFT:
-        saved = await _write_pending(db, access, existing, content, body.expected_version)
+        saved = await _write_pending(db, access, existing, content, body.expected_version,
+                                     [doc["id"] for doc in created.values()])
     else:
         saved = await _write_sheet(db, access, round_doc, existing, content, status, body.expected_version)
     if saved is None:
@@ -642,7 +649,8 @@ async def approve_results(series_id: str, round_id: str, body: ResultDecision,
 @router.post(BASE + "/discard")
 async def discard_pending_draft(series_id: str, round_id: str, body: ResultDecision,
                                 access: SeriesAccess = Depends(require_series_editor)):
-    """Vorstand: den Entwurf neben dem veröffentlichten Blatt verwerfen; das Blatt bleibt, wie es ist."""
+    """Vorstand: den Entwurf neben dem veröffentlichten Blatt verwerfen; das Blatt bleibt, wie es ist. Teilnehmer, die
+    nur Entwürfe dieses Blatts neu angelegt haben und die noch offen und sonst nirgends verwendet sind, gehen mit."""
     access.require_board()
     db = get_db()
     await access.round(round_id)
@@ -654,7 +662,10 @@ async def discard_pending_draft(series_id: str, round_id: str, body: ResultDecis
     if saved is None:
         raise HTTPException(409, STALE)
     revision_id = await _revision(db, existing, kind="pending_draft", reason="discard", access=access)
+    removed = await remove_unused_new(db, series_id, existing["pending_draft"].get("created_participant_ids"))
     await _log(db, "reference_result.discard", access, saved, {
         "version": saved["version"], "previous_version": _version(existing),
-        "drafted_by": existing["pending_draft"].get("created_by"), "revision_id": revision_id})
-    return {"version": saved["version"], "sheet": _sheet_view(saved, access)}
+        "drafted_by": existing["pending_draft"].get("created_by"), "revision_id": revision_id,
+        "removed_participants": [{"id": row["id"], "name": row.get("name")} for row in removed]})
+    return {"version": saved["version"], "sheet": _sheet_view(saved, access),
+            "removed_participants": [row["id"] for row in removed]}
