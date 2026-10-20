@@ -374,6 +374,30 @@ async def test_discarding_a_draft_removes_the_people_only_this_draft_created(flo
 
 
 @pytest.mark.asyncio
+async def test_approving_removes_people_left_over_from_replaced_drafts(flow):
+    ctx = await _setup(flow)
+    await _save(flow, ctx, 0, _rows("Anna Probe", "Bert Bolzt"))
+    await _save(flow, ctx, 1, _rows("Anna Probe"), status="draft")
+    flow.act_as(ctx["captain"])
+    await _save(flow, ctx, 0, _rows("Neu Otto", "Neu Paul", "Neu Nora"), version=1, status="draft")
+    # Der zweite Entwurf ersetzt den ersten: Otto und Paul fallen weg, Nora bleibt, Quinn kommt dazu.
+    await _save(flow, ctx, 0, _rows("Neu Nora", "Neu Quinn", "Anna Probe"), version=2, status="draft")
+    flow.act_as(ctx["board"])
+    # Paul steht inzwischen in einem anderen Blatt und bleibt deshalb.
+    paul = await flow.db.reference_participants.find_one({"name": "Neu Paul"})
+    await _save(flow, ctx, 1, [{"participant_id": paul["id"], "place": 1}], version=1, status="draft")
+
+    approved = await flow.post(_url(ctx, 0, "/approve"), json={"expected_version": 3})
+    assert approved.status_code == 200, approved.text
+    left = {row["name"] async for row in flow.db.reference_participants.find({}, {"_id": 0})}
+    assert left == {"Anna Probe", "Bert Bolzt", "Carl Kurve", "Neu Nora", "Neu Quinn", "Neu Paul"}
+    log = await flow.db.audit_logs.find_one({"action": "reference_result.approve"})
+    assert [item["name"] for item in log["data"]["removed_participants"]] == ["Neu Otto"]
+    assert approved.json()["removed_participants"] == [item["id"] for item in log["data"]["removed_participants"]]
+    assert "created_participant_ids" not in approved.json()["sheet"]
+
+
+@pytest.mark.asyncio
 async def test_a_captain_of_a_direct_series_publishes_and_sees_no_alias_details(flow):
     ctx = await _setup(flow)
     await flow.patch(f"{ADMIN}/series/{ctx['own']['id']}", json={"publish_mode": "direct"})

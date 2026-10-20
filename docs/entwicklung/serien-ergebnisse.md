@@ -28,7 +28,8 @@ nach der Runde). Team-Liga: `matches` mit `home`, `away`, Ergebnis, `maps` und `
   Startnummer. Unbekannte Namen heißen in der Vorschau `neu:<Schlüssel>` und werden beim Übernehmen als offene
   Teilnehmer angelegt (Dialog „Unbekannte Namen“); ein bestätigter Alias ordnet sie sofort zu. Verwirft der Vorstand
   einen Entwurf daneben, gehen die Teilnehmer wieder, die nur dieser Entwurf angelegt hat – solange sie offen sind
-  (keine Zuordnung, kein Alias) und in keinem anderen Blatt der Saison stehen.
+  (keine Zuordnung, kein Alias) und in keinem anderen Blatt der Saison stehen. Beim Freigeben gilt dieselbe Regel für
+  Teilnehmer, die nur ein ersetzter Entwurf angelegt hat.
 - **Fehler** (halten das Übernehmen auf): Teilnehmer doppelt, unbekannte Kennung oder Startnummer, Name fehlt,
   unbrauchbar oder mehrdeutig, leeres Blatt, abgesagter oder archivierter Termin.
 - **Warnungen:** Platz doppelt, Lücke oder fehlend, Nichtstart mit Platz, Punkte passen nicht zum Schlüssel oder

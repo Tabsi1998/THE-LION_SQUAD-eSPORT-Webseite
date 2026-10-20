@@ -69,7 +69,8 @@ veröffentlicht den Entwurf daneben (ohne einen solchen das Blatt im Entwurf) sa
 (``reference_result.approve``) und Neurechnen; Verwerfen entfernt den Entwurf daneben (``reference_result.discard``),
 das veröffentlichte Blatt bleibt. Teilnehmer, die nur Entwürfe dieses Blatts neu angelegt haben
 (``pending_draft.created_participant_ids``) und die noch offen und in keinem Blatt der Saison stehen, gehen mit
-(``removed_participants``). Ohne etwas freizugeben oder zu verwerfen: 409.
+(``removed_participants``) - beim Verwerfen und ebenso beim Freigeben (dann nur, wer aus ersetzten Entwürfen übrig
+ist). Ohne etwas freizugeben oder zu verwerfen: 409.
 """
 from __future__ import annotations
 
@@ -637,13 +638,17 @@ async def approve_results(series_id: str, round_id: str, body: ResultDecision,
     if saved is None:
         raise HTTPException(409, STALE)
     revision_id = await _revision(db, existing, kind="sheet", reason="approve", access=access)
+    # Wen nur ersetzte Entwürfe angelegt haben, geht wie beim Verwerfen - wer im freigegebenen Blatt steht, bleibt.
+    removed = await remove_unused_new(db, series_id, (pending or {}).get("created_participant_ids"))
     await _log(db, "reference_result.approve", access, saved, {
         "version": saved["version"], "previous_version": _version(existing),
         "previous_status": existing.get("status"), "from": "pending_draft" if pending else "draft",
-        "drafted_by": drafted_by, "revision_id": revision_id, **_counts(content)})
+        "drafted_by": drafted_by, "revision_id": revision_id, **_counts(content),
+        "removed_participants": [{"id": row["id"], "name": row.get("name")} for row in removed]})
     await _sync_round(db, access, round_doc, True)
     await reference_series.recompute_standings(db, access.series)
-    return {"version": saved["version"], "sheet": _sheet_view(saved, access), "recomputed": True}
+    return {"version": saved["version"], "sheet": _sheet_view(saved, access), "recomputed": True,
+            "removed_participants": [row["id"] for row in removed]}
 
 
 @router.post(BASE + "/discard")
