@@ -32,8 +32,50 @@ const ITEMS = [
 ];
 const SUMMARY = { total: 2, entries: 3, podiums: 1, gold: 1, silver: 0, bronze: 0, games: 2, seasons: ["Season 2", "Season 3"] };
 
+let running = { today: "2026-11-09", items: [] };
 beforeEach(() => {
-  apiMock.get.mockResolvedValue({ data: { items: ITEMS, summary: SUMMARY } });
+  running = { today: "2026-11-09", items: [] };
+  apiMock.get.mockImplementation((url) => Promise.resolve({ data: url === "/reference-series/public/running" ? running : { items: ITEMS, summary: SUMMARY } }));
+});
+
+const CUP = { lineage: { title: "Probe Monatscup mit einem sehr langen Namen ohne Leerzeichen-Pause", slug: "probe-cup", kind: "series", label: null, game_name: "Probespiel" }, game: null, series: { season: "2026", tier: null, title: null, season_slug: "2026" }, progress: { total: 4, scored: 1 }, next: { code: "Q2", title: null, club_day: "2026-11-09", time: "20:00", state: "today" }, today: true, club: { rank: 2, of: 12 } };
+const LEAGUE = { lineage: { title: "Probe Liga", slug: "probe-liga", kind: "team_league", label: "4vs4", game_name: null }, game: null, series: { season: "2026", tier: "Division 1", title: null, season_slug: "2026" }, progress: { total: 8, scored: 0 }, next: { code: "ST1", title: null, club_day: "2026-11-23", time: null, state: "planned" }, today: false, club: null };
+
+test("Läuft gerade: ohne laufende Serie kein Bereich, die Seite bleibt wie sie ist", async () => {
+  render(<MemoryRouter><ReferencesPage /></MemoryRouter>);
+  expect(await screen.findByTestId("reference-card-r1")).toBeInTheDocument();
+  expect(screen.queryByTestId("references-running")).toBeNull();
+  expect(screen.getByTestId("references-trophies")).toBeInTheDocument();
+});
+
+test("Läuft gerade: Heute im Einsatz mit Fortschritt, Termin, Platz und Link; die anderen darunter", async () => {
+  running = { today: "2026-11-09", items: [CUP, LEAGUE] };
+  render(<MemoryRouter><ReferencesPage /></MemoryRouter>);
+  const today = await screen.findByTestId("references-today");
+  const card = within(today).getByTestId("running-card-probe-cup-2026");
+  expect(card).toHaveAttribute("href", "/references/series/probe-cup/2026");
+  expect(card).toHaveTextContent("1 von 4 Terminen");
+  expect(within(card).getByTestId("running-next")).toHaveTextContent("Heute, 20:00 Uhr · Q2");
+  expect(within(card).getByTestId("running-place")).toHaveTextContent("2. von 12");
+  expect(within(card).getByTestId("running-today-badge")).toBeInTheDocument();
+  expect(within(card).getByRole("progressbar")).toHaveAttribute("aria-valuenow", "1");
+
+  const list = screen.getByTestId("references-running-list");
+  const league = within(list).getByTestId("running-card-probe-liga-2026");
+  expect(league).toHaveTextContent("0 von 8 Terminen");
+  expect(within(league).getByTestId("running-next")).toHaveTextContent("23.11. · ST1");
+  expect(within(league).getByTestId("running-place")).toHaveTextContent("Noch offen");
+  expect(within(league).queryByTestId("running-today-badge")).toBeNull();
+  expect(within(today).queryByTestId("running-card-probe-liga-2026")).toBeNull();
+  // Reihenfolge: Bereich steht vor der Vitrine.
+  expect(screen.getByTestId("references-running").compareDocumentPosition(screen.getByTestId("references-trophies")) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+});
+
+test("Läuft gerade: ein fehlgeschlagener Abruf blendet den Bereich aus", async () => {
+  apiMock.get.mockImplementation((url) => (url === "/reference-series/public/running" ? Promise.reject(new Error("x")) : Promise.resolve({ data: { items: ITEMS, summary: SUMMARY } })));
+  render(<MemoryRouter><ReferencesPage /></MemoryRouter>);
+  expect(await screen.findByTestId("reference-card-r1")).toBeInTheDocument();
+  expect(screen.queryByTestId("references-running")).toBeNull();
 });
 
 test("drei Zahlen, Chips aus den Feldern, Einträge mit eigener Platzierung und Profil-Link", async () => {
