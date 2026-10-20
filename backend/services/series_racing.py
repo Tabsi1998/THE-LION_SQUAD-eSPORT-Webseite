@@ -4,8 +4,8 @@ Gerechnet wird nichts - alles kommt aus dem gespeicherten Stand der letzten gewe
 (``reference_standings``, ``services/series_standings.py``):
 
 - **Saisons der Spur** für den Umschalter (F1 aktuell, F2, Vorsaison): sichtbar und nicht archiviert, neueste Saison
-  zuerst, darin nach Stufe. Die Sichtbarkeit jeder Saison gilt wie für ihre Seite; geladen wird gesammelt - eine
-  Abfrage für alle Saisons, eine Prüfung je Sichtbarkeitsstufe statt je Saison.
+  zuerst, darin nach Stufe. Die Sichtbarkeit jeder Saison gilt wie für ihre Seite; geladen wird gesammelt über die
+  Saisonliste der Team-Liga (``team_league_page.visible_seasons``: eine Abfrage, eine Prüfung je Sichtbarkeitsstufe).
 - **Teamwertung** (``scope = teams``), wenn die Regeln sie einschalten: je Team Rang, Punkte, offizieller Wert mit
   Abweichung, je Rennen die gezählten Fahrer und über die Saison alle Fahrer des Teams nach Punkten.
 - **Fahrer:** je Fahrer das Team je Rennen (Team der Zeile, sonst das Standard-Team - wie die Teamwertung zählt), das
@@ -17,9 +17,8 @@ Gerechnet wird nichts - alles kommt aus dem gespeicherten Stand der letzten gewe
 from __future__ import annotations
 
 from services.scoring_rules import normalize_rules
-from services.visibility import user_can_see
+from services.team_league_page import PATH_FIELDS as SEASON_FIELDS, visible_seasons
 
-SEASON_FIELDS = ("season", "tier", "title", "season_slug", "status")
 TEAM_ROW_FIELDS = ("rank", "tiebreak", "points", "computed_points", "official_points", "deviation")
 
 
@@ -29,11 +28,7 @@ def _text(value) -> str:
 
 async def lineage_seasons(db, user: dict | None, lineage: dict, current_id: str) -> list[dict]:
     """Sichtbare, nicht archivierte Saisons der Spur: neueste Saison zuerst, darin nach Stufe."""
-    found = await db.reference_series.find(
-        {"lineage_id": lineage["id"], "status": {"$ne": "archived"}},
-        {"_id": 0, "id": 1, "visibility": 1, **{field: 1 for field in SEASON_FIELDS}}).to_list(None)
-    allowed = {level: await user_can_see(user, level) for level in {item.get("visibility") for item in found}}
-    visible = [item for item in found if allowed[item.get("visibility")]]
+    visible = await visible_seasons(db, user, lineage["id"])
     visible.sort(key=lambda item: (_text(item.get("tier")).casefold(), str(item.get("id"))))
     visible.sort(key=lambda item: _text(item.get("season")).casefold(), reverse=True)
     return [{**{field: item.get(field) for field in SEASON_FIELDS}, "current": item["id"] == current_id}

@@ -70,7 +70,9 @@ def _match_view(match: dict, rules: dict) -> dict:
     }
 
 
-async def _visible_seasons(db, user, lineage_id: str) -> list[dict]:
+async def visible_seasons(db, user, lineage_id: str) -> list[dict]:
+    """Sichtbare, nicht archivierte Saisons einer Spur - eine Abfrage, eine Prüfung je Sichtbarkeitsstufe.
+    Auch für den Umschalter der Rennliga (#1746)."""
     found = await db.reference_series.find(
         {"lineage_id": lineage_id, "status": {"$ne": "archived"}},
         {"_id": 0, "id": 1, "visibility": 1, "team_name": 1, **{key: 1 for key in PATH_FIELDS}}).to_list(None)
@@ -201,7 +203,7 @@ async def team_league_view(db, user, lineage: dict, series: dict, rounds: list[d
         return None
     sid, team_name = series["id"], series.get("team_name")
     rules = _rules(series)
-    seasons = await _visible_seasons(db, user, lineage["id"])
+    seasons = await visible_seasons(db, user, lineage["id"])
     if not any(item["id"] == sid for item in seasons):
         seasons.append(series)
     sheets = await _published(db, [item["id"] for item in seasons])

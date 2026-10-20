@@ -15,7 +15,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 
 from flow_harness import make_flow  # noqa: E402
 from routes import reference_round_routes  # noqa: E402
-from services import migrations, reference_series, series_racing  # noqa: E402
+from services import migrations, reference_series, team_league_page  # noqa: E402
 
 ADMIN = "/api/reference-series/admin"
 PUBLIC = "/api/reference-series/public"
@@ -203,13 +203,13 @@ async def test_the_switcher_checks_each_visibility_once_not_each_season(flow, mo
         await _series(flow, lineage["id"], season, tier="F1")
     await _series(flow, lineage["id"], "2022", tier="F1", visibility="members")
     calls = []
-    original = series_racing.user_can_see
+    original = team_league_page.user_can_see
 
     async def counting(user, visibility, **kwargs):
         calls.append(visibility)
         return await original(user, visibility, **kwargs)
 
-    monkeypatch.setattr(series_racing, "user_can_see", counting)
+    monkeypatch.setattr(team_league_page, "user_can_see", counting)
     flow.act_as(None)
     seasons = (await flow.get(_url(lineage, series))).json()["racing"]["seasons"]
     assert [item["season"] for item in seasons] == ["2026", "2025", "2024", "2023"]
