@@ -192,11 +192,12 @@ function BracketTv() {
       setLoadError(null);
       setKeyRefused(false);
       setLastUpdated(Date.now());
-      // Die Stationen (öffentlich, wie bisher): wer reserviert ist, steht auf der Aufruf-Tafel (#1122). Dazu die
-      // Live-Warteschlange (#1634) mit demselben Schlüssel - beide zugleich; scheitert eine, bleibt ihr letzter Stand.
+      // Die Stationen: wer reserviert ist, steht auf der Aufruf-Tafel (#1122) - mit dem Schlüssel auch bei Turnieren „Nur
+      // Mitglieder“ (#1822). Dazu die Live-Warteschlange (#1634) mit demselben Schlüssel - beide zugleich; scheitert
+      // eine, bleibt ihr letzter Stand.
       const tournamentId = br?.tournament?.id || id;
       const [list, live] = await Promise.allSettled([
-        api.get(`/stations?tournament_id=${encodeURIComponent(tournamentId)}`),
+        api.get(`/stations?tournament_id=${encodeURIComponent(tournamentId)}`, displayKey ? { params: { key: displayKey } } : undefined),
         queueOffRef.current
           ? Promise.resolve(null)
           : api.get(`/tournaments/${encodeURIComponent(tournamentId)}/live-queue`, displayKey ? { params: { key: displayKey } } : undefined),
@@ -257,7 +258,8 @@ function BracketTv() {
   const nameOf = useMemo(() => nameOfRegistration(registrations), [registrations]);
   const avatarOf = useMemo(() => avatarOfRegistration(registrations), [registrations]);
   const hasMatches = matches.length > 0;
-  const screen = tvScreenFor(t, { now: minute * 60000 + 30000 });
+  // Anmeldung vor Check-in, solange ein Platz frei ist (#1827) - gezählt wie auf dem Anmelde-Bildschirm.
+  const screen = tvScreenFor(t, { now: minute * 60000 + 30000, seats: data?.seats, registrations });
   const playlist = settings.playlist;
   const treeInList = playlist.some((entry) => entry.slide === "tree");
   const showMoments = screen === "playlist" && treeInList && hasMatches;

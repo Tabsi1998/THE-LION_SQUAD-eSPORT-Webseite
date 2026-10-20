@@ -48,7 +48,8 @@ function StationTv() {
     try {
       const { data: br } = await api.get(`/tournaments/${id}/bracket/display`, displayKey ? { params: { key: displayKey } } : undefined);
       const tournamentId = br?.tournament?.id || id;
-      const { data: list } = await api.get(`/stations?tournament_id=${encodeURIComponent(tournamentId)}`);
+      // Mit dem Schlüssel auch bei Turnieren „Nur Mitglieder“ (#1822).
+      const { data: list } = await api.get(`/stations?tournament_id=${encodeURIComponent(tournamentId)}`, displayKey ? { params: { key: displayKey } } : undefined);
       setData(br);
       setStations(Array.isArray(list) ? list : []);
       setLoadError(null);

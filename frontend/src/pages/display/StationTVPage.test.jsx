@@ -43,6 +43,8 @@ test("ein laufender Durchgang an der Station: Startaufstellung, Station und Spie
   renderStation("/display/bracket/t1/station/st-pc-3?key=nur-anschauen");
   expect(await screen.findByTestId("tv-start-grid")).toHaveAttribute("data-decided", "0");
   expect(apiMock.get).toHaveBeenCalledWith("/tournaments/t1/bracket/display", { params: { key: "nur-anschauen" } });
+  // Die Stationen mit demselben Schlüssel - auch bei Turnieren „Nur Mitglieder“ (#1822).
+  expect(apiMock.get).toHaveBeenCalledWith(expect.stringMatching(/^\/stations\?tournament_id=/), { params: { key: "nur-anschauen" } });
   expect(screen.getByTestId("station-tv")).toHaveTextContent("PC 3");
   expect(screen.getByTestId("station-tv-match")).toHaveAttribute("data-mode", "live");
   expect(screen.getByTestId("station-tv-match")).toHaveTextContent("Durchgang B");

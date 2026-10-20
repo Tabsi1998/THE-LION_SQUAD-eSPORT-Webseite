@@ -297,19 +297,27 @@ export function fieldsForView(view) {
 
 // Ansichten für den Link-Baukasten. Die Stations-Ansicht (#1120) gehört zum Turnierbaum: dasselbe Turnier, derselbe
 // Anzeige-Schlüssel, dazu eine Station. Die Aufruf-Tafel (#1122) gibt es für ein ganzes Event (alle Turniere); für ein
-// einzelnes Turnier ist es der Turnierbaum mit der Wiedergabeliste „nur Aufrufe“.
+// einzelnes Turnier ist es der Turnierbaum mit der Wiedergabeliste „nur Aufrufe“. `keyFor`: wofür der Schlüssel gilt -
+// Turnierbaum und Station teilen sich den Schlüssel des Turniers, Hallen- und Aufruf-Tafel den des Events (#1822). Dort
+// ist er freiwillig (`keyOptional`): ohne zeigen sie, was öffentlich ist, mit auch Turniere „Nur Mitglieder“.
 export const TV_VIEWS = Object.freeze([
-  { key: "bracket", label: "Turnierbaum", path: "/display/bracket/", target: "Turnier", needsKey: true },
-  { key: "station", label: "Station", path: "/display/bracket/", target: "Turnier", needsKey: true, needsStation: true },
-  { key: "event", label: "Event", path: "/display/event/", target: "Event", needsKey: false },
-  { key: "calls", label: "Aufrufe", path: "/display/event/", suffix: "/calls", target: "Event", needsKey: false },
+  { key: "bracket", label: "Turnierbaum", path: "/display/bracket/", target: "Turnier", needsKey: true, keyFor: "tournament" },
+  { key: "station", label: "Station", path: "/display/bracket/", target: "Turnier", needsKey: true, needsStation: true, keyFor: "tournament" },
+  { key: "event", label: "Event", path: "/display/event/", target: "Event", needsKey: false, keyOptional: true, keyFor: "event" },
+  { key: "calls", label: "Aufrufe", path: "/display/event/", suffix: "/calls", target: "Event", needsKey: false, keyOptional: true, keyFor: "event" },
   { key: "fastlap", label: "Fast Lap", path: "/display/f1/", target: "Fast-Lap-Challenge", needsKey: false },
 ]);
+
+/** Trägt diese Ansicht einen Anzeige-Schlüssel im Link - Pflicht (Turnierbaum, Station) oder freiwillig (Event, Aufrufe)? */
+export function takesTvKey(meta) {
+  return Boolean(meta?.needsKey || meta?.keyOptional);
+}
 
 const SAFE_ID = /^[A-Za-z0-9_-]+$/;
 
 /**
- * Der Link für einen Bildschirm: Ansicht, Ziel, beim Turnierbaum der Anzeige-Schlüssel und nur die Abweichungen, die
+ * Der Link für einen Bildschirm: Ansicht, Ziel, beim Turnierbaum (und, wenn erstellt, bei Hallen- und Aufruf-Tafel) der
+ * Anzeige-Schlüssel und nur die Abweichungen, die
  * der Admin für diesen Bildschirm gewählt hat - alles andere kommt aus den Grundwerten und folgt ihnen live. Die
  * Stations-Ansicht braucht dazu die Station: /display/bracket/<Turnier>/station/<Station>.
  */
@@ -318,7 +326,7 @@ export function buildTvLink({ origin = "", view, targetId, stationId = "", displ
   if (!meta || !targetId || !SAFE_ID.test(String(targetId))) return "";
   if (meta.needsStation && (!stationId || !SAFE_ID.test(String(stationId)))) return "";
   const params = new URLSearchParams();
-  if (meta.needsKey && displayKey) params.set("key", displayKey);
+  if (takesTvKey(meta) && displayKey) params.set("key", displayKey);
   for (const key of TV_KEYS) {
     if (validTvValue(key, overrides?.[key])) params.set(key, serializeTvParam(key, overrides[key]));
   }

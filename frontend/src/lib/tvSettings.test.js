@@ -1,6 +1,6 @@
 // TV & Beamer (#1110): Link-Werte schlagen Grundwerte, Grundwerte schlagen den Standard, der Baukasten baut gültige Links.
 // Meilenstein 60: Wiedergabeliste, Aufrufe, Zahlen, Sponsoren und Streckenwechsel als Einstellungen mit Fabians Wahl.
-import { TV_DEFAULTS, TV_FIELDS, TV_GROUPS, TV_KEYS, buildTvLink, fieldsForView, linkOverrides, parseTvParam, parseTvPath, resolveTvSettings, sameTvValue, tvValueLabel, validTvValue } from "./tvSettings";
+import { TV_DEFAULTS, TV_FIELDS, TV_GROUPS, TV_KEYS, TV_VIEWS, buildTvLink, fieldsForView, linkOverrides, parseTvParam, parseTvPath, resolveTvSettings, sameTvValue, takesTvKey, tvValueLabel, validTvValue } from "./tvSettings";
 
 test("der Standard ist Fabians Auswahl aus der TV-Vorschau - Ton aus, Sponsoren nach Wahl C", () => {
   expect(TV_DEFAULTS).toEqual({
@@ -88,8 +88,12 @@ test("der Baukasten baut gültige Links - und liest sie wieder genauso zurück",
   expect(url.searchParams.get("key")).toBe("Schl_ssel-1");
   expect(linkOverrides(url.searchParams)).toEqual(overrides);
 
-  const event = buildTvLink({ origin: "https://club.example", view: "event", targetId: "e1", displayKey: "nicht-hier", overrides: { season_header: false } });
+  const event = buildTvLink({ origin: "https://club.example", view: "event", targetId: "e1", overrides: { season_header: false } });
   expect(event).toBe("https://club.example/display/event/e1?season_header=0");
+  // Hallen-Tafel mit dem freiwilligen Schlüssel des Events (#1822).
+  expect(buildTvLink({ view: "event", targetId: "e1", displayKey: "event-1" })).toBe("/display/event/e1?key=event-1");
+  // Fast Lap trägt nie einen Schlüssel.
+  expect(buildTvLink({ view: "fastlap", targetId: "f1", displayKey: "nicht-hier" })).toBe("/display/f1/f1");
   expect(buildTvLink({ view: "fastlap", targetId: "f1" })).toBe("/display/f1/f1");
   expect(buildTvLink({ view: "fastlap", targetId: "f1", overrides: { track_seconds: 60 } })).toBe("/display/f1/f1?track_seconds=60");
   // Kein Ziel, unbekannte Ansicht oder ein Ziel mit Sonderzeichen: kein Link.
@@ -102,9 +106,13 @@ test("der Baukasten baut gültige Links - und liest sie wieder genauso zurück",
   expect(buildTvLink({ view: "bracket", targetId: "t1", displayKey: "k", overrides: { result_sound: true } })).toBe("/display/bracket/t1?key=k&result_sound=1");
 });
 
-test("Aufruf-Tafel für ein ganzes Event (#1122): eigene Ansicht, ohne Schlüssel - und zurückgelesen", () => {
-  const link = buildTvLink({ origin: "https://club.example", view: "calls", targetId: "e1", displayKey: "nicht-hier", overrides: { call_sound: true } });
+test("Aufruf-Tafel für ein ganzes Event (#1122): eigene Ansicht, Schlüssel freiwillig (#1822) - und zurückgelesen", () => {
+  const link = buildTvLink({ origin: "https://club.example", view: "calls", targetId: "e1", overrides: { call_sound: true } });
   expect(link).toBe("https://club.example/display/event/e1/calls?call_sound=1");
+  const keyed = buildTvLink({ origin: "https://club.example", view: "calls", targetId: "e1", displayKey: "event-1", overrides: { call_sound: true } });
+  expect(keyed).toBe("https://club.example/display/event/e1/calls?key=event-1&call_sound=1");
+  expect(takesTvKey(TV_VIEWS.find((entry) => entry.key === "calls"))).toBe(true);
+  expect(takesTvKey(TV_VIEWS.find((entry) => entry.key === "fastlap"))).toBe(false);
   expect(parseTvPath("/display/event/e1/calls")).toEqual({ view: "calls", targetId: "e1", stationId: "" });
   expect(parseTvPath("/display/event/e1")).toEqual({ view: "event", targetId: "e1", stationId: "" });
 });

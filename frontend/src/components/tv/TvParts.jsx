@@ -128,3 +128,15 @@ export function TvPill({ tone = "muted", children, live = false, testId }) {
 export function toneFor(status) {
   return TONES[String(status || "").toLowerCase()] || "muted";
 }
+
+/** Ein Anzeige-Schlüssel gilt nicht (mehr): der Bildschirm zeigt nichts vom Inhalt, nur wie es weitergeht (wie beim Turnierbaum-TV). */
+export function TvKeyRefused() {
+  return (
+    <div className="tv-page" data-testid="tv-key-refused">
+      <div className="flex-1 flex flex-col items-center justify-center gap-[calc(var(--tv-u)*1.5)] px-[var(--tv-edge)] text-center">
+        <div className="tv-t-head font-heading font-black uppercase">Dieser TV-Link gilt nicht mehr</div>
+        <div className="tv-t-info tv-muted">Im Admin unter eSports → TV &amp; Beamer einen neuen Link erstellen und hier öffnen.</div>
+      </div>
+    </div>
+  );
+}

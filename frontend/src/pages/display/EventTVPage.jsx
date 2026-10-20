@@ -1,10 +1,10 @@
 import { useCallback, useMemo, useSyncExternalStore } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useSearchParams } from "react-router-dom";
 import { CalendarDays, MapPin } from "lucide-react";
 import { resolveMediaUrl } from "@/lib/api";
 import { DisplayStatusBanner } from "@/components/tls/DisplayStatusBanner";
 import { TvScreen, useTv } from "@/components/tv/TvScreen";
-import { TvFooter, TvHeader, TvPill } from "@/components/tv/TvParts";
+import { TvFooter, TvHeader, TvKeyRefused, TvPill } from "@/components/tv/TvParts";
 import { TvDayPlan, TvNowNext, TvStationBoard } from "@/components/tv/TvHall";
 import { TvSponsorMoment } from "@/components/tv/TvSlides";
 import { useEventHall } from "@/components/tv/useEventHall";
@@ -54,8 +54,10 @@ function statusLabel(status) {
 
 function EventTv() {
   const { id } = useParams();
+  const [params] = useSearchParams();
   const { settings } = useTv();
-  const { event, stations, matches, lookup, tournamentOfMatch, loadError, lastUpdated, load } = useEventHall(id);
+  // Mit Anzeige-Schlüssel (#1822) auch die Turniere „Nur Mitglieder“ - am Hallen-TV ohne Anmeldung.
+  const { event, stations, matches, lookup, tournamentOfMatch, loadError, keyRefused, lastUpdated, load } = useEventHall(id, { displayKey: params.get("key") || "" });
   const sponsors = useTvSponsors();
   const minute = useMinuteTick();
   const now = minute * 60000 + 30000;
@@ -103,6 +105,7 @@ function EventTv() {
   const low = useLowMomentTimer(queue, queue.getCurrent());
   const sponsorShown = low?.moment.type === "sponsor" ? sponsorFor(sponsors, low.moment.sponsorIndex || 0) : null;
 
+  if (keyRefused) return <TvKeyRefused />;
   if (!event) {
     return (
       <div className="tv-page">

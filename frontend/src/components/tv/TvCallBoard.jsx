@@ -1,5 +1,5 @@
 import { describeSlot, finderFor } from "@/lib/slotSource";
-import { countdown, ringShare } from "@/lib/tvCalls";
+import { countdown, ringShare, stationFit } from "@/lib/tvCalls";
 import { matchName } from "@/lib/tvLive";
 import { matchRoundLabel } from "@/lib/tournamentLabels";
 import { forecastText } from "@/lib/tvForecast";
@@ -57,11 +57,13 @@ function CallCard({ call, matches, nameOf, avatarOf, tournamentOf, layout }) {
   const second = useSecondTick();
   const done = countdown(call.dueAt, second * 1000).done;
   const players = playersOf(call.match, matches, nameOf);
+  // Nie mitten im Wort trennen: die Schrift passt sich dem längsten Wort an (#1822).
+  const station = stationFit(call.station);
   return (
     <article className={`tv-call tv-call--${layout}`} data-done={done ? "1" : undefined} data-testid={`tv-call-${call.matchId}`}>
       <div className="tv-call__left">
         <div className="tv-call__kicker tv-t-info">Als Nächstes an</div>
-        <div className="tv-call__station font-heading" data-testid={`tv-call-station-${call.matchId}`}>{call.station}</div>
+        <div className="tv-call__station font-heading" style={{ "--tv-station-chars": station.chars }} data-testid={`tv-call-station-${call.matchId}`}>{station.text}</div>
         <div className="tv-call__what tv-t-info">{whatOf(call, tournamentOf)}</div>
         <div className="tv-call__go tv-t-info">{done ? "Jetzt geht es los" : "Bitte jetzt zur Station"}</div>
       </div>
@@ -82,7 +84,7 @@ function CallRow({ call, matches, nameOf, tournamentOf }) {
   const players = playersOf(call.match, matches, nameOf).map((player) => player.name);
   return (
     <div className="tv-call-row" data-testid={`tv-call-${call.matchId}`}>
-      <div className="tv-call-row__station font-heading">{call.station}</div>
+      <div className="tv-call-row__station font-heading">{stationFit(call.station).text}</div>
       <div className="tv-call-row__body">
         <div className="tv-t-meta tv-muted">{whatOf(call, tournamentOf)}</div>
         <div className="tv-t-name" data-tv-name="1">{players.join(" · ")}</div>

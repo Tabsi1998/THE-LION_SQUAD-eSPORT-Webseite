@@ -1004,8 +1004,29 @@
 .tv-call--few { display: flex; flex-direction: column; gap: calc(var(--tv-u) * 1.6); padding: calc(var(--tv-u) * 2.4) calc(var(--tv-u) * 2.6); }
 .tv-call__left { display: grid; gap: calc(var(--tv-u) * 0.7); align-content: center; justify-items: start; min-width: 0; }
 .tv-call__kicker { color: var(--tv-gold); font-weight: 700; letter-spacing: 0.26em; text-transform: uppercase; }
-.tv-call__station { font-size: calc(var(--tv-u) * 12.5); line-height: 1; font-weight: 900; text-transform: uppercase; overflow-wrap: anywhere; }
-.tv-call--few .tv-call__station { font-size: calc(var(--tv-u) * 7.5); }
+/* Der Stationsname nie mitten im Wort getrennt (#1822): die Schrift richtet sich nach dem längsten Wort
+   (`--tv-station-chars`, lib/tvCalls stationFit) - so groß wie bisher, wenn es passt, sonst kleiner bis zur Untergrenze.
+   `--tv-station-room`: wie viele Zeichen-Einheiten die Spalte etwa fasst. Höchstens zwei Zeilen, dann „…“. */
+.tv-call__station {
+  --tv-station-room: 58;
+  font-size: clamp(calc(var(--tv-u) * 5), calc(var(--tv-u) * var(--tv-station-room) / var(--tv-station-chars, 5)), calc(var(--tv-u) * 12.5));
+  line-height: 1;
+  font-weight: 900;
+  text-transform: uppercase;
+  overflow-wrap: normal;
+  word-break: keep-all;
+  hyphens: none;
+  max-width: 100%;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+}
+.tv-call--few .tv-call__station {
+  --tv-station-room: 36;
+  font-size: clamp(calc(var(--tv-u) * 3.5), calc(var(--tv-u) * var(--tv-station-room) / var(--tv-station-chars, 5)), calc(var(--tv-u) * 7.5));
+}
 .tv-call__what { color: var(--tv-muted); }
 .tv-call__go {
   margin-top: calc(var(--tv-u) * 1.2);
@@ -1062,7 +1083,7 @@
   background: var(--tv-card);
 }
 .tv-screen[data-tv-contrast="1"] .tv-call-row { border-color: var(--tv-gold); }
-.tv-call-row__station { font-size: calc(var(--tv-fs-head) * 1.35); line-height: 1.05; font-weight: 900; text-transform: uppercase; color: var(--tv-gold); overflow-wrap: anywhere; }
+.tv-call-row__station { font-size: calc(var(--tv-fs-head) * 1.35); line-height: 1.05; font-weight: 900; text-transform: uppercase; color: var(--tv-gold); overflow-wrap: normal; word-break: keep-all; hyphens: none; }
 .tv-call-row__body { display: grid; gap: calc(var(--tv-u) * 0.3); min-width: 0; }
 .tv-call-next {
   flex-shrink: 0;

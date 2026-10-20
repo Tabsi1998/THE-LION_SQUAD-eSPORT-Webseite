@@ -7,8 +7,9 @@ Die Live-Erkennung (``twitch_service``) weiß, welche verknüpften Konten gerade
 - meldet der Bot es **einmal je Stream-Start** im Thread des Turniers (#572) im Kanal „Events und Turniere“
   („🔴 Paula streamt den Sommer-Cup – zuschauen“) - festgehalten je Turnier und Stream-ID.
 
-Nur öffentliche Turniere, nur Teilnehmer mit öffentlichem Profil (und Twitch nicht auf „privat“). Ein Turnier nur für
-Mitglieder (#910) bekommt die Meldung in seinem Thread im Mitglieder-Kanal; die Turnierseite bleibt wie bisher.
+Nur Teilnehmer mit öffentlichem Profil (und Twitch nicht auf „privat“). Die Turnierseite zeigt die Streams allen, die
+das Turnier sehen (#1831, auch „Nur Mitglieder“); der Bot meldet öffentliche Turniere im Kanal, ein Turnier nur für
+Mitglieder (#910) im Thread im Mitglieder-Kanal.
 """
 from __future__ import annotations
 
@@ -42,10 +43,16 @@ def discord_tournament(tournament: dict | None) -> bool:
 async def live_streams_for_tournament(db, tournament: dict, *, for_discord: bool = False) -> list[dict]:
     """Die laufenden Streams der Teilnehmer - nur Personen mit öffentlichem Profil. ``for_discord``: auch Turniere nur
     für Mitglieder (die Meldung geht dann in den Mitglieder-Kanal)."""
-    from services.match_notifications import _participant_user_ids
-
     if not (discord_tournament(tournament) if for_discord else public_tournament(tournament)):
         return []
+    return await participant_streams(db, tournament)
+
+
+async def participant_streams(db, tournament: dict) -> list[dict]:
+    """Die laufenden Streams der Teilnehmer, ohne Blick auf die Sichtbarkeit des Turniers - nur für eine Person, die das
+    Turnier sehen darf (die Turnierseite prüft das vorher, #1831). Personen nur mit öffentlichem Profil."""
+    from services.match_notifications import _participant_user_ids
+
     registrations = await db.tournament_registrations.find(
         {"tournament_id": tournament["id"], "status": {"$nin": ["cancelled", "rejected", "withdrawn", "disqualified", "no_show"]}},
         {"_id": 0, "user_id": 1, "team_id": 1},

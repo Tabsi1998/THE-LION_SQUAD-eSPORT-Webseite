@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useSearchParams } from "react-router-dom";
 import { DisplayStatusBanner } from "@/components/tls/DisplayStatusBanner";
 import { TvScreen, useTv } from "@/components/tv/TvScreen";
-import { TvFooter, TvHeader, TvPill } from "@/components/tv/TvParts";
+import { TvFooter, TvHeader, TvKeyRefused, TvPill } from "@/components/tv/TvParts";
 import { TvCallBoard } from "@/components/tv/TvCallBoard";
 import { avatarOfRegistration, nameOfRegistration } from "@/components/tv/TvMoments";
 import { useEventHall } from "@/components/tv/useEventHall";
@@ -12,7 +12,8 @@ import { nextUp } from "@/lib/tvForecast";
 
 // Aufruf-Tafel für ein ganzes Event (#1122): ein Bildschirm nur für Aufrufe, über alle Turniere des Events - wer jetzt an
 // welche Station soll, mit Countdown. Ohne Aufrufe „Gerade keine Aufrufe“ und die nächsten geplanten Spiele. Der Gong
-// beim Aufruf ist eine Einstellung (Standard aus). Läuft ohne Anmeldung wie der Event-TV.
+// beim Aufruf ist eine Einstellung (Standard aus). Läuft ohne Anmeldung wie der Event-TV; Turniere „Nur Mitglieder“
+// zeigt sie mit dem Anzeige-Schlüssel des Events im Link (#1822).
 
 export default function EventCallsTVPage() {
   return (
@@ -24,8 +25,10 @@ export default function EventCallsTVPage() {
 
 function EventCallsTv() {
   const { id } = useParams();
+  const [params] = useSearchParams();
   const { settings } = useTv();
-  const { event, stations, matches, registrations, tournamentOfMatch, loadError, lastUpdated, load } = useEventHall(id);
+  // Mit Anzeige-Schlüssel (#1822) auch die Aufrufe der Turniere „Nur Mitglieder“ - am Hallen-TV ohne Anmeldung.
+  const { event, stations, matches, registrations, tournamentOfMatch, loadError, keyRefused, lastUpdated, load } = useEventHall(id, { displayKey: params.get("key") || "" });
   const calls = useMemo(() => callsOf(matches, stations, { reportMinutes: settings.report_minutes }), [matches, stations, settings.report_minutes]);
   // Was danach kommt (#1564): mit Prognose und Verzug - jede Minute neu gerechnet.
   const minute = useMinuteTick();
@@ -43,6 +46,7 @@ function EventCallsTv() {
     if (fresh.length && gong) gong.play();
   }, [event, calls, gong]);
 
+  if (keyRefused) return <TvKeyRefused />;
   if (!event) {
     return (
       <div className="tv-page">

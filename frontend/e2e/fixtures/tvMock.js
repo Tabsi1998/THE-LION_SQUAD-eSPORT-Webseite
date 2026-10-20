@@ -27,7 +27,8 @@ async function mockTvApi(page, state) {
     state.calls.bracket += 1;
     return route.fulfill({ contentType: "application/json", body: JSON.stringify(state.bracket) });
   });
-  await page.route("**/api/stations?tournament_id=t1", (route) => route.fulfill({ contentType: "application/json", body: JSON.stringify(state.stations || []) }));
+  // Mit Anzeige-Schlüssel fragt der TV die Stationen mit `&key=…` (#1822) - beide Formen.
+  await page.route(/\/api\/stations\?tournament_id=t1(&.*)?$/, (route) => route.fulfill({ contentType: "application/json", body: JSON.stringify(state.stations || []) }));
   let counter = 0;
   state.push = () => {
     counter += 1;

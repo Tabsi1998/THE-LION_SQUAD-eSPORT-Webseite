@@ -3,14 +3,20 @@ from datetime import datetime, timezone
 
 from fastapi import APIRouter, HTTPException, Depends
 from database import get_db
-from auth import get_current_user, require_admin
+from auth import get_current_user, get_optional_user, require_admin
 from models import StationCreate, StationUpdate, now_utc, new_id
+from routes.tournament_common import tournament_hidden_reason
+from services.access_links import validate_access_link
 from services.tournament_permissions import (
+    READ_STAFF_ROLES,
     STATION_ASSIGN_ROLES,
     has_tournament_staff_permission,
     is_global_tournament_admin,
+    is_global_tournament_staff,
     require_tournament_staff_permission,
 )
+from services.tv_display import DISPLAY_GRANT, event_on_tv, key_expired, listed_station, shown_on_event_tv
+from services.visibility import lead_can_see
 from services.match_calls import notify_match_called
 from services.station_runtime import notify_match_started
 from services.competition_read import find_match_source, load_competition_read_model, load_matches_by_query
@@ -101,8 +107,83 @@ def _match_has_minimum_participants(match: dict) -> bool:
     return _match_participant_count(match) >= minimum
 
 
+class _StationView:
+    """Wer welche Stationen wie sieht (#1822): ``"full"`` (vollständig, wie bisher), ``"listed"`` (die Anzeige-Felder aus
+    ``tv_display.STATION_LIST_FIELDS``) oder ``None`` (gar nicht). Je Turnier und Event einmal entschieden.
+
+    - Admins mit dem Bereich Turniere: alles vollständig.
+    - Turnier- und Stationsleitung eines Turniers: dessen Stationen vollständig.
+    - Sonst die Anzeige-Felder, wenn die Person das Turnier sieht (dieselbe Regel wie die Turnierseite) bzw. das Event
+      (kein Entwurf, Sichtbarkeit) - oder wenn ``key`` ein gültiger Anzeige-Schlüssel dieses Turniers oder seines Events
+      ist (wie Turnierbaum- und Event-TV). Stationen ohne Turnier und Event sieht nur die Leitung.
+    """
+
+    def __init__(self, db, user: dict | None, key: str | None):
+        self.db, self.user, self.key = db, user, (key or "").strip() or None
+        self.lead = is_global_tournament_staff(user)
+        self.tournaments: dict[str, str | None] = {}
+        self.events: dict[str, bool] = {}
+
+    async def _event_key_opens(self, event: dict | None) -> bool:
+        # Wie die Event-Tafel: Entwürfe und interne Events öffnet kein Schlüssel.
+        if not self.key or not event_on_tv(event):
+            return False
+        link = await validate_access_link(self.db, self.key, "event", event["id"], None, DISPLAY_GRANT)
+        return bool(link) and not key_expired(event, now_utc())
+
+    async def for_event(self, event_id: str) -> bool:
+        if event_id not in self.events:
+            event = await self.db.events.find_one({"id": event_id}, {"_id": 0})
+            seen = bool(event) and event.get("status") != "draft" and await lead_can_see(self.user, event.get("visibility") or "public")
+            self.events[event_id] = seen or await self._event_key_opens(event)
+        return self.events[event_id]
+
+    async def for_tournament(self, tournament_id: str) -> str | None:
+        if tournament_id not in self.tournaments:
+            self.tournaments[tournament_id] = await self._tournament(tournament_id)
+        return self.tournaments[tournament_id]
+
+    async def _tournament(self, tournament_id: str) -> str | None:
+        tournament = await self.db.tournaments.find_one({"id": tournament_id}, {"_id": 0})
+        if not tournament:
+            return None
+        if await has_tournament_staff_permission(self.user, tournament_id, READ_STAFF_ROLES):
+            return "full"
+        if await tournament_hidden_reason(self.db, tournament, self.user) is None:
+            return "listed"
+        if self.key:
+            link = await validate_access_link(self.db, self.key, "tournament", tournament_id, None, DISPLAY_GRANT)
+            if link and not key_expired(tournament, now_utc()):
+                return "listed"
+            if tournament.get("event_id") and shown_on_event_tv(tournament):
+                event = await self.db.events.find_one({"id": tournament["event_id"]}, {"_id": 0})
+                if await self._event_key_opens(event):
+                    return "listed"
+        return None
+
+    async def rows(self, stations: list[dict]) -> list[dict]:
+        if self.lead:
+            return stations
+        shown = []
+        for station in stations:
+            if station.get("tournament_id"):
+                view = await self.for_tournament(station["tournament_id"])
+            elif station.get("event_id"):
+                view = "listed" if await self.for_event(station["event_id"]) else None
+            else:
+                view = None
+            if view == "full":
+                shown.append(station)
+            elif view == "listed":
+                shown.append(listed_station(station))
+        return shown
+
+
 @router.get("")
-async def list_stations(tournament_id: str | None = None, event_id: str | None = None):
+async def list_stations(tournament_id: str | None = None, event_id: str | None = None, key: str | None = None,
+                        user: dict | None = Depends(get_optional_user)):
+    """Die Stationen - für die Leitung vollständig, sonst die Anzeige-Felder dessen, was die Person sehen darf
+    (``_StationView``). ``key``: Anzeige-Schlüssel eines Turniers oder Events, wie bei Turnierbaum- und Event-TV."""
     db = get_db()
     q = {}
     if tournament_id:
@@ -110,7 +191,7 @@ async def list_stations(tournament_id: str | None = None, event_id: str | None =
     if event_id:
         q["event_id"] = event_id
     stations = await db.stations.find(q, {"_id": 0}).to_list(500)
-    return stations
+    return await _StationView(db, user, key).rows(stations)
 
 
 @router.post("")

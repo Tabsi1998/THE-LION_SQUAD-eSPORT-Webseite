@@ -59,6 +59,8 @@ test("mit Schlüssel im Link fragt der TV mit Schlüssel - und zeigt leere Plät
   renderTv("/display/bracket/t1?key=nur-anschauen&text_size=large");
   expect(await screen.findByText("Sieger aus A")).toBeInTheDocument();
   expect(apiMock.get).toHaveBeenCalledWith("/tournaments/t1/bracket/display", { params: { key: "nur-anschauen" } });
+  // Die Stationen mit demselben Schlüssel - auch bei Turnieren „Nur Mitglieder“ (#1822).
+  await waitFor(() => expect(apiMock.get).toHaveBeenCalledWith("/stations?tournament_id=t1", { params: { key: "nur-anschauen" } }));
   const tv = screen.getByTestId("bracket-tv");
   expect(tv).toHaveTextContent("Sieger aus B");
   expect(tv).toHaveTextContent("NeonFalke");
@@ -181,6 +183,30 @@ test("#1123: Anmeldung offen - großer QR-Code zur Anmeldung und freie Plätze",
   const codes = screen.getAllByTestId("branded-qr-code").map((element) => element.getAttribute("data-value"));
   expect(codes).toContain(`${window.location.origin}/tournaments/cup`);
   expect(codes.join(" ")).not.toContain("key");
+});
+
+test("#1827: Anmeldung offen und Check-in läuft schon - der TV zeigt weiter den Anmelde-QR (Vor-Ort-Zugang) und die freien Plätze", async () => {
+  const tournament = { ...BRACKET.tournament, status: "registration_open", registration_enabled: true, start_date: inMinutes(120),
+    max_participants: 16, check_in_from: inMinutes(-5), check_in_until: inMinutes(60) };
+  serveAll({ bracket: { ...BRACKET, matches_v2: [], seats: { taken: 3, capacity: 16 }, onsite_path: "/vor-ort#token-1", tournament } });
+  renderTv("/display/bracket/t1?key=k");
+  expect(await screen.findByTestId("tv-registration-screen")).toBeInTheDocument();
+  expect(screen.queryByTestId("tv-checkin-screen")).not.toBeInTheDocument();
+  expect(screen.getByTestId("tv-registration-seats")).toHaveTextContent("Noch 13 von 16 Plätzen frei");
+  const codes = screen.getAllByTestId("branded-qr-code").map((element) => element.getAttribute("data-value"));
+  expect(codes).toContain(`${window.location.origin}/vor-ort#token-1`);
+  // Kopf und Bildschirm sagen dasselbe.
+  expect(screen.getByTestId("bracket-tv")).toHaveAttribute("data-screen", "registration");
+});
+
+test("#1827: ist das Turnier voll, zeigt der TV im Check-in-Zeitraum den Check-in", async () => {
+  const tournament = { ...BRACKET.tournament, status: "registration_open", registration_enabled: true, start_date: inMinutes(120),
+    max_participants: 2, check_in_from: inMinutes(-5), check_in_until: inMinutes(60) };
+  const registrations = [{ id: "r1", display_name: "NeonFalke", status: "checked_in" }, { id: "r2", display_name: "KartKönigin", status: "approved" }];
+  serveAll({ bracket: { ...BRACKET, matches_v2: [], registrations, seats: { taken: 2, capacity: 2 }, onsite_path: "/vor-ort#token-1", tournament } });
+  renderTv("/display/bracket/t1?key=k");
+  expect(await screen.findByTestId("tv-checkin-screen")).toBeInTheDocument();
+  expect(screen.getByTestId("tv-checkin-count")).toHaveTextContent("1von 2 da");
 });
 
 test("#1121/#1122: ein Link mit nur einer Folie - die Aufruf-Tafel, ohne Balken", async () => {

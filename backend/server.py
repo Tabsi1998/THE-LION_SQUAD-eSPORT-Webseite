@@ -47,6 +47,8 @@ from routes.event_routes import router as event_router
 from routes.event_lead_routes import router as event_lead_router
 from routes.event_recap_routes import is_private_path as is_private_friends_path, router as event_recap_router
 from routes.tournament_routes import router as tournament_router
+# Hallen- und Aufruf-Tafel mit Event-Schlüssel (#1822) - nutzt den Turnierbaum aus den Turnier-Routen.
+from routes.event_display_routes import router as event_display_router
 from routes.match_routes import router as match_router
 from routes.f1_routes import router as f1_router
 from routes.event_program_routes import router as event_program_router
@@ -308,6 +310,7 @@ app.include_router(admin_picker_router)
 app.include_router(tv_router)
 app.include_router(event_router)
 app.include_router(event_lead_router)
+app.include_router(event_display_router)
 app.include_router(event_recap_router)
 app.include_router(tournament_router)
 app.include_router(event_program_router)

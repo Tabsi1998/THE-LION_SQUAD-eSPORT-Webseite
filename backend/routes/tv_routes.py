@@ -1,4 +1,5 @@
-"""TV & Beamer (#1110): Grundwerte für alle Bildschirme und die Anzeige-Schlüssel des Turnierbaum-TVs.
+"""TV & Beamer (#1110): Grundwerte für alle Bildschirme und die Anzeige-Schlüssel des Turnierbaum-TVs und - für Hallen-
+und Aufruf-Tafel (#1822) - der Events.
 
 Lesen der Grundwerte geht ohne Anmeldung (die TV-Seiten laufen ohne); speichern, Schlüssel anlegen und widerrufen
 dürfen nur Admins mit dem Bereich Turniere. Jede Änderung unter /api/tv meldet der Änderungsstrom öffentlich als
@@ -7,13 +8,23 @@ dürfen nur Admins mit dem Bereich Turniere. Jede Änderung unter /api/tv meldet
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel, ConfigDict, Field, StrictBool, StrictInt, field_validator
+from pydantic import BaseModel, ConfigDict, Field, StrictBool, StrictInt, field_validator, model_validator
 
 from auth import require_admin
 from database import get_db
 from models import new_id, now_utc
 from services.access_links import hash_access_token, new_access_token
-from services.tv_display import DISPLAY_GRANT, SETTINGS_ID, display_path, key_expires_at, key_label, public_payload
+from services.tv_display import (
+    DISPLAY_GRANT,
+    EVENT_NOT_ON_TV,
+    SETTINGS_ID,
+    display_event_path,
+    display_path,
+    event_on_tv,
+    key_expires_at,
+    key_label,
+    public_payload,
+)
 
 router = APIRouter(prefix="/api/tv", tags=["tv"])
 
@@ -58,10 +69,19 @@ class TvSettingsUpdate(BaseModel):
 
 
 class TvKeyCreate(BaseModel):
+    """Ein Schlüssel gehört zu genau einem Turnier (Turnierbaum, Stationen) oder genau einem Event (Hallen- und
+    Aufruf-Tafel, #1822) - beides oder keins ist ein Fehler."""
     model_config = ConfigDict(extra="forbid")
 
-    tournament_id: str = Field(min_length=1, max_length=120)
+    tournament_id: str | None = Field(default=None, min_length=1, max_length=120)
+    event_id: str | None = Field(default=None, min_length=1, max_length=120)
     label: str = Field(default="", max_length=200)
+
+    @model_validator(mode="after")
+    def _exactly_one_target(self):
+        if (self.tournament_id is None) == (self.event_id is None):
+            raise ValueError("Ein TV-Link gehört zu genau einem Turnier oder genau einem Event.")
+        return self
 
 
 async def _stored(db) -> dict:
@@ -110,55 +130,87 @@ async def reset_tv_settings(me: dict = Depends(require_admin())):
     return public_payload({})
 
 
-def _key_payload(link: dict, tournaments: dict) -> dict:
-    tournament = tournaments.get(link.get("target_id")) or {}
-    until = key_expires_at(tournament)
+def _key_payload(link: dict, targets: dict) -> dict:
+    """Eine Zeile der Liste. ``targets``: Turniere und Events nach Kennung (die Kennungen sind eindeutig)."""
+    is_event = link.get("target_type") == "event"
+    target = targets.get(link.get("target_id")) or {}
+    title = (target.get("name") if is_event else target.get("title")) or ("Event" if is_event else "Turnier")
+    until = key_expires_at(target)
     return {
         "id": link.get("id"),
         "label": link.get("note") or "Bildschirm",
-        "tournament_id": link.get("target_id"),
-        "tournament_title": tournament.get("title") or "Turnier",
-        "tournament_slug": tournament.get("slug"),
+        # Wofür der Schlüssel gilt (#1822): ein Turnier (Turnierbaum, Stationen) oder ein Event (Hallen- und Aufruf-Tafel).
+        "target_type": "event" if is_event else "tournament",
+        "target_title": title,
+        "tournament_id": None if is_event else link.get("target_id"),
+        "tournament_title": None if is_event else title,
+        "tournament_slug": None if is_event else target.get("slug"),
+        "event_id": link.get("target_id") if is_event else None,
+        "event_slug": target.get("slug") if is_event else None,
         "created_at": link.get("created_at"),
         "created_by": link.get("created_by"),
         "last_used_at": link.get("last_used_at"),
         "is_active": link.get("is_active") is not False,
-        # Eine Woche nach dem Turnier endet der Schlüssel von selbst (aus den Turnierdaten gerechnet, nicht gespeichert).
+        # Eine Woche nach dem Turnier bzw. Event endet der Schlüssel von selbst (aus dessen Daten gerechnet, nicht gespeichert).
         "expires_at": until.isoformat() if until else None,
         "expired": bool(until and now_utc() > until),
     }
 
 
-async def _tournaments_by_id(db, ids: list[str]) -> dict:
-    rows = await db.tournaments.find({"id": {"$in": ids}}, {"_id": 0, "id": 1, "title": 1, "slug": 1, "start_date": 1, "end_date": 1}).to_list(len(ids) or 1)
-    return {row["id"]: row for row in rows}
+TARGET_FIELDS = {"_id": 0, "id": 1, "title": 1, "name": 1, "slug": 1, "start_date": 1, "end_date": 1, "status": 1, "visibility": 1,
+                 "is_public": 1}
+
+
+async def _targets_by_id(db, rows: list[dict]) -> dict:
+    """Die Turniere und Events der Schlüssel - je Art eine Abfrage."""
+    wanted = {"tournament": set(), "event": set()}
+    for row in rows:
+        if row.get("target_id") and row.get("target_type") in wanted:
+            wanted[row["target_type"]].add(row["target_id"])
+    found: dict = {}
+    for kind, collection in (("tournament", db.tournaments), ("event", db.events)):
+        ids = sorted(wanted[kind])
+        if ids:
+            found.update({doc["id"]: doc for doc in await collection.find({"id": {"$in": ids}}, TARGET_FIELDS).to_list(len(ids))})
+    return found
 
 
 @router.get("/keys")
-async def list_tv_keys(tournament_id: str | None = None, me: dict = Depends(require_admin())):
-    """Die aktiven Anzeige-Schlüssel - Name des Bildschirms, Turnier, zuletzt gesehen. Nie der Schlüssel selbst."""
+async def list_tv_keys(tournament_id: str | None = None, event_id: str | None = None, me: dict = Depends(require_admin())):
+    """Die aktiven Anzeige-Schlüssel - Name des Bildschirms, Turnier oder Event, zuletzt gesehen. Nie der Schlüssel selbst."""
     db = get_db()
-    query: dict = {"grants": DISPLAY_GRANT, "target_type": "tournament", "is_active": {"$ne": False}}
+    query: dict = {"grants": DISPLAY_GRANT, "target_type": {"$in": ["tournament", "event"]}, "is_active": {"$ne": False}}
     if tournament_id:
-        query["target_id"] = tournament_id
+        query.update({"target_type": "tournament", "target_id": tournament_id})
+    elif event_id:
+        query.update({"target_type": "event", "target_id": event_id})
     rows = await db.access_links.find(query, {"_id": 0, "token_hash": 0}).sort("created_at", -1).to_list(200)
-    tournaments = await _tournaments_by_id(db, sorted({row.get("target_id") for row in rows if row.get("target_id")}))
-    return [_key_payload(row, tournaments) for row in rows]
+    targets = await _targets_by_id(db, rows)
+    return [_key_payload(row, targets) for row in rows]
 
 
 @router.post("/keys")
 async def create_tv_key(body: TvKeyCreate, me: dict = Depends(require_admin())):
     """Ein neuer Schlüssel für einen Bildschirm. Den Schlüssel gibt es nur in dieser Antwort - gespeichert wird der Hash."""
     db = get_db()
-    tournament = await db.tournaments.find_one({"id": body.tournament_id}, {"_id": 0, "id": 1, "title": 1, "slug": 1, "start_date": 1, "end_date": 1})
-    if not tournament:
-        raise HTTPException(status_code=404, detail="Turnier nicht gefunden")
+    if body.event_id:
+        target_type = "event"
+        target = await db.events.find_one({"id": body.event_id}, TARGET_FIELDS)
+        if not target:
+            raise HTTPException(status_code=404, detail="Event nicht gefunden")
+        if not event_on_tv(target):
+            raise HTTPException(status_code=400, detail=EVENT_NOT_ON_TV)
+    else:
+        target_type = "tournament"
+        target = await db.tournaments.find_one({"id": body.tournament_id}, TARGET_FIELDS)
+        if not target:
+            raise HTTPException(status_code=404, detail="Turnier nicht gefunden")
     token = new_access_token()
     now = now_utc().isoformat()
     doc = {
         "id": new_id(),
-        "target_type": "tournament",
-        "target_id": tournament["id"],
+        "target_type": target_type,
+        "target_id": target["id"],
         "grants": [DISPLAY_GRANT],
         "token_hash": hash_access_token(token),
         "expires_at": None,
@@ -173,8 +225,10 @@ async def create_tv_key(body: TvKeyCreate, me: dict = Depends(require_admin())):
         "updated_at": now,
     }
     await db.access_links.insert_one(dict(doc))
-    await _audit(db, "tv_key.create", tournament["id"], me.get("id"), {"access_link_id": doc["id"], "label": doc["note"]})
-    return {**_key_payload(doc, {tournament["id"]: tournament}), "token": token, "path": display_path(tournament["id"], token)}
+    await _audit(db, "tv_key.create", target["id"], me.get("id"),
+                 {"access_link_id": doc["id"], "label": doc["note"], "target_type": target_type})
+    path = display_event_path(target["id"], token) if target_type == "event" else display_path(target["id"], token)
+    return {**_key_payload(doc, {target["id"]: target}), "token": token, "path": path}
 
 
 @router.delete("/keys/{key_id}")
