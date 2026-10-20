@@ -231,6 +231,12 @@ async def public_running(request: Request, user: dict | None = Depends(get_optio
     active = {item["id"] async for item in db.club_member_profiles.find(
         {"id": {"$in": profile_ids}, "is_active": {"$ne": False}}, {"_id": 0, "id": 1})} if profile_ids else set()
     club_ids = {item["id"] for item in candidates if item.get("profile_id") in active}
+    # Wie viele Vereinsmitglieder je Saison gemeldet sind (#1753, „Heute im Einsatz“ auf der Startseite): nur die Zahl.
+    club_count: dict = {}
+    if club_ids:
+        async for item in db.reference_participants.find(
+                {"id": {"$in": list(club_ids)}, "series_id": {"$in": ids}}, {"_id": 0, "series_id": 1}):
+            club_count[item["series_id"]] = club_count.get(item["series_id"], 0) + 1
     game_ids = list({lineage["game_id"] for lineage, _ in shown if lineage.get("game_id")})
     games = {item["id"]: item async for item in db.games.find(
         {"id": {"$in": game_ids}}, {"_id": 0, "id": 1, "name": 1, "short_name": 1, "logo_url": 1})} if game_ids else {}
@@ -248,6 +254,7 @@ async def public_running(request: Request, user: dict | None = Depends(get_optio
             "next": _running_next(rounds),
             "today": any(item["state"] == "today" for item in rounds),
             "club": _club_place(lineage, series, snapshots, club_ids),
+            "club_count": club_count.get(series["id"], 0),
             "_order": (series.get("order_index") or 0),
         })
     items.sort(key=lambda item: (not item["today"], (item["next"] or {}).get("club_day") or "9999", item["_order"],

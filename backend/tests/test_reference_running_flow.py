@@ -187,3 +187,24 @@ async def test_running_loads_details_for_at_most_twelve_series(flow, monkeypatch
     assert "l13" not in slugs and "l12" not in slugs
     days = [item["next"]["club_day"] for item in items]
     assert days == sorted(days)
+
+
+@pytest.mark.asyncio
+async def test_running_counts_the_club_members_of_a_season_without_names(flow):
+    """Heute im Einsatz auf der Startseite (#1753): je Saison, wie viele Vereinsmitglieder gemeldet sind - nur die Zahl,
+    gezählt wie beim Platz (sichtbar, verknüpft, aktives Profil)."""
+    _, _, cup_series, *_ = await _setup(flow)
+    await flow.db.club_member_profiles.insert_one(
+        {"id": "profil-c", "slug": "probe-c", "display_name": "Probe Gamma", "is_active": True})
+    await flow.db.reference_participants.insert_many([
+        {"id": "p-gamma", "series_id": cup_series["id"], "name": "Probe Gamma", "link": "member",
+         "profile_id": "profil-c", "is_club_member": True, "name_hidden": False},
+        {"id": "p-versteckt", "series_id": cup_series["id"], "name": "Probe Delta", "link": "member",
+         "profile_id": "profil-c", "is_club_member": True, "name_hidden": True},
+    ])
+    flow.act_as(None)
+    response = await flow.get(RUNNING)
+    by_kind = {item["lineage"]["kind"]: item for item in response.json()["items"]}
+    assert by_kind["series"]["club_count"] == 2
+    assert by_kind["team_league"]["club_count"] == 0
+    assert "Probe Gamma" not in response.text
