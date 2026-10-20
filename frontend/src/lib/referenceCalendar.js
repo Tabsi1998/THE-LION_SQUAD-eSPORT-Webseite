@@ -1,0 +1,114 @@
+// Kalender externer Serien (#1742): Beschriftungen und kleine Rechnungen für die Termine einer Saison. Der Status
+// („heute“, „Ergebnis fehlt“ …) und „heute“ selbst kommen vom Server (Wiener Tag über club_today()) - hier wird
+// nur beschriftet und ein Vorschlag für den nächsten Termin gerechnet, in Kalendertagen, nie mit der Uhr des Geräts.
+import { dayNoon, viennaDate } from "@/lib/vienna";
+
+export const STATE_LABELS = {
+  planned: "Geplant",
+  today: "Heute",
+  missing: "Ergebnis fehlt",
+  cancelled: "Abgesagt",
+  postponed: "Verschoben",
+  scored: "Gewertet",
+};
+
+// Öffentlich klingt ein fehlendes Ergebnis nach dem, was kommt: „Ergebnis folgt“ (in der Verwaltung „fehlt“).
+export const PUBLIC_STATE_LABELS = { ...STATE_LABELS, missing: "Ergebnis folgt" };
+
+// Farbe je Status: Blau für heute, Bernstein für fehlende Ergebnisse, Grün für gewertet, gedämpft für abgesagt.
+export const STATE_TONES = {
+  planned: "border-white/15 text-white/60",
+  today: "border-[#29B6E8]/60 text-[#29B6E8] bg-[#29B6E8]/10",
+  missing: "border-amber-400/50 text-amber-300 bg-amber-400/10",
+  cancelled: "border-white/10 text-white/40 line-through",
+  postponed: "border-violet-400/40 text-violet-300",
+  scored: "border-emerald-400/40 text-emerald-300",
+};
+
+export const ROUND_KIND_OPTIONS = [["regular", "Regulär"], ["final", "Finale"]];
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+const DAY_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+/** Tag „JJJJ-MM-TT“ plus n Kalendertage. */
+export function addDays(day, count) {
+  return new Date(dayNoon(day).getTime() + count * DAY_MS).toISOString().slice(0, 10);
+}
+
+/** Wochentag eines Kalendertags, 0 = Montag (wie in Python). */
+export function weekdayOf(day) {
+  return (dayNoon(day).getUTCDay() + 6) % 7;
+}
+
+/**
+ * Vorschlag für den nächsten Termin: der nächste Standard-Wochentag nach dem letzten Termin (ohne Wochentag eine
+ * Woche später); ohne Termine der nächste Standard-Wochentag ab heute (oder heute).
+ */
+export function suggestNextDay(rounds, weekday, today) {
+  const days = (rounds || []).map((round) => round.club_day).filter((day) => DAY_RE.test(day || "")).sort();
+  const last = days[days.length - 1];
+  const hasWeekday = weekday !== null && weekday !== undefined && weekday !== "";
+  if (!last) {
+    if (!DAY_RE.test(today || "")) return "";
+    return hasWeekday ? addDays(today, (Number(weekday) - weekdayOf(today) + 7) % 7) : today;
+  }
+  if (!hasWeekday) return addDays(last, 7);
+  return addDays(last, ((Number(weekday) - weekdayOf(last) + 6) % 7) + 1);
+}
+
+/** „Do., 05.11.2026“ - leer ohne Tag. */
+export function dayLabel(day) {
+  if (!DAY_RE.test(day || "")) return "";
+  return viennaDate(dayNoon(day), { weekday: "short", day: "2-digit", month: "2-digit", year: "numeric" });
+}
+
+/** Tag und Uhrzeit eines Termins: „Do., 05.11.2026 · 20:30“, ohne Uhrzeit nur der Tag, ohne Tag „Termin offen“. */
+export function roundWhen(round) {
+  const day = dayLabel(round?.club_day);
+  if (!day) return "Termin offen";
+  return round.time ? `${day} · ${round.time}` : day;
+}
+
+/** Kurzname eines Termins: Kürzel, sonst „Termin 3“. */
+export function roundLabel(round) {
+  return (round?.code || "").trim() || `Termin ${round?.position || ""}`.trim();
+}
+
+/** Ids in neuer Reihenfolge, wenn der Termin an `index` um `step` (−1 / +1) wandert; null am Rand. */
+export function moveIds(rounds, index, step) {
+  const target = index + step;
+  if (target < 0 || target >= rounds.length) return null;
+  const ids = rounds.map((round) => round.id);
+  [ids[index], ids[target]] = [ids[target], ids[index]];
+  return ids;
+}
+
+/** Formularwerte eines Termins. */
+export function roundToForm(round = {}, { day = "", time = "" } = {}) {
+  return {
+    code: round.code || "",
+    title: round.title || "",
+    venue: round.venue || "",
+    day: round.id ? round.club_day || "" : day,
+    time: round.id ? round.time || "" : time,
+    kind: round.kind || "regular",
+    counts: round.counts !== false,
+    opponent: round.opponent || "",
+    note: round.note || "",
+  };
+}
+
+/** Formular → Body für POST/PATCH; leere Uhrzeit heißt „ohne Uhrzeit“. */
+export function roundPayload(form) {
+  return {
+    code: form.code.trim() || null,
+    title: form.title.trim() || null,
+    venue: form.venue.trim() || null,
+    day: form.day || null,
+    time: form.time || null,
+    kind: form.kind,
+    counts: Boolean(form.counts),
+    opponent: form.opponent.trim() || null,
+    note: form.note.trim() || null,
+  };
+}

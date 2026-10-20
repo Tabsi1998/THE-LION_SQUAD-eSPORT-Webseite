@@ -71,7 +71,10 @@ test("Captain: Hinweis mit Ablauf und Entwurf, keine Knöpfe des Vorstands", asy
   expect(screen.queryByTestId("series-detail-archive")).toBeNull();
   expect(screen.queryByTestId("series-staff")).toBeNull();
   expect(screen.getByTestId("series-detail-back")).toHaveAttribute("href", "/admin/dienst");
-  expect(apiMock.get).toHaveBeenCalledTimes(1);
+  // Die Saison und ihr Kalender (#1742, nur lesen) - die Captain-Liste lädt die Seite für Captains nicht.
+  await waitFor(() => expect(apiMock.get).toHaveBeenCalledWith("/reference-series/admin/series/serie-1/calendar"));
+  expect(apiMock.get.mock.calls.map(([url]) => url).filter((url) => url.includes("/staff"))).toEqual([]);
+  expect(screen.queryByTestId("calendar-new")).toBeNull();
 });
 
 test("Vorstand: die Captain-Verwaltung steht auf der Seite", async () => {
