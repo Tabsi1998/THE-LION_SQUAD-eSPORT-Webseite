@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.7.1 (20.10.2026)
+
+### Fehlerbehebungen
+
+* Live-Meldungen nennen nur sichtbare Turniere (#1801)
+
+### Schneller
+
+* Live-Meldungen nennen Turnier und Event öffentlicher Turniere (#1801)
+* Turnierseiten laden nur bei Änderungen ihres Turniers nach (#1801)
+
 ## 1.7.0 (20.10.2026)
 
 ### Neu
