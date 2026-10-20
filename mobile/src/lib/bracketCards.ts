@@ -5,7 +5,7 @@
 // Namen wie im Web (#1633, #1591): die Lauf-Karte des Grand Final heißt „Grand Final“, ein geloster Platz sagt, wer kommt
 // („Weiter aus Runde 1“, „Sieger aus Viertelfinale“) - bei der Show-Auslosung, sobald der Topf steht, „Auslosung bereit“.
 import { drawStateOf, type DrawState } from "./advancement";
-import { heatText, isByeSlot, isDone, isOut, isWalkover, matchFate, type BracketEdge, type BracketMatch, type BracketSlot } from "./bracketGraph";
+import { heatText, isByeSlot, isDone, isOut, isWalkover, markedNoShow, matchFate, type BracketEdge, type BracketMatch, type BracketSlot } from "./bracketGraph";
 import { treeSlotLabel } from "./bracketNames";
 import { describeSlot } from "./slotSource";
 import { byeLine } from "./tournamentView";
@@ -120,7 +120,7 @@ export function cardModel(match: BracketMatch, ctx: CardContext): CardModel {
       winner: isHeat ? qualified || (done && rank === 1) : winner,
       loser: done && Boolean(id) && (isHeat ? !qualified && rank !== 1 : !winner),
       qualified,
-      out: Boolean(id) && (isOut(result) || OUT_STATUSES.has(ctx.statusOf(id as string))),
+      out: Boolean(id) && (isOut(result) || markedNoShow(match, id) || OUT_STATUSES.has(ctx.statusOf(id as string))),
       mine: Boolean(ctx.mine) && id === ctx.mine,
     };
   });

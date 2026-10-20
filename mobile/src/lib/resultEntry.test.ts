@@ -2,10 +2,12 @@ import fs from "fs";
 import path from "path";
 import {
   bestOfResults,
+  initialState,
   inputKind,
   orderResults,
   pointsResults,
   resultSentence,
+  resultsFor,
   scoreResults,
   tapGame,
   winnerResults,
@@ -35,6 +37,22 @@ test.each(CASES.tap)("Best-of antippen: $name", ({ input, games }) => {
   expect(tapGame(input.games, input.index, input.winner, { sides: input.sides, bestOf: input.bestOf })).toEqual(games);
 });
 test.each(CASES.sentence)("Satz: $name", ({ entry, results, sentence }) => expect(resultSentence(entry, results)).toBe(sentence));
+
+test("Lauf (#1840, wie Web #1823): wer als nicht erschienen markiert ist, steht im Fenster schon so da", () => {
+  const entry: ResultEntry = {
+    id: "h1", kind: "heat", ranking_mode: "higher_score", result: [],
+    participants: [{ registration_id: "a" }, { registration_id: "b", no_show: true }, { registration_id: "c" }, { registration_id: "d" }],
+  };
+  const state = initialState(entry);
+  expect(state.flags).toEqual({ b: "no_show" });
+  expect(resultsFor(entry, "order", { ...state, order: ["d", "a", "c"] })).toEqual({ results: [
+    { registration_id: "d", rank: 1 }, { registration_id: "a", rank: 2 }, { registration_id: "c", rank: 3 },
+    { registration_id: "b", rank: 4, forfeit: true },
+  ] });
+  // Ein gespeichertes Ergebnis geht vor: wer doch gefahren ist, bleibt ohne Markierung.
+  const played = { ...entry, result: [{ registration_id: "b", rank: 1 }, { registration_id: "a", rank: 2 }, { registration_id: "c", rank: 3 }, { registration_id: "d", rank: 4 }] };
+  expect(initialState(played).flags).toEqual({});
+});
 
 test("die Eingabe passt zum Format", () => {
   expect(inputKind({ kind: "duel", best_of: 1 })).toBe("score");

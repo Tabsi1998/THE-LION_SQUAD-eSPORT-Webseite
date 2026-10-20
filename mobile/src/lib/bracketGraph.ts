@@ -46,6 +46,8 @@ export type BracketMatch = {
   merged_into_key?: string | null;
   slots?: BracketSlot[] | null;
   results?: BracketResult[] | null;
+  /** Im offenen Lauf als nicht erschienen markiert (#1823). */
+  no_show_registration_ids?: string[] | null;
   advancement?: Array<{ to_match_id?: string | null; to_slot?: number | null; flow?: string | null; rank?: number | null }> | null;
   settings?: Record<string, any> | null;
   result_meta?: { source?: string | null; reason?: string | null } | null;
@@ -144,6 +146,12 @@ export function isWalkover(match: BracketMatch) {
 /** Wer ausgefallen ist (Aufgabe, nicht erschienen, nicht ins Ziel). */
 export function isOut(result: BracketResult | null | undefined) {
   return Boolean(result?.forfeit || result?.dnf || result?.no_show || result?.disqualified);
+}
+
+/** Im offenen Lauf als nicht erschienen markiert (#1840, wie Web #1823) - bis ein Ergebnis da ist; danach zählt die Ergebniszeile. */
+export function markedNoShow(match: Pick<BracketMatch, "no_show_registration_ids" | "results"> | null | undefined, registrationId: string | null | undefined) {
+  if (!registrationId || !(match?.no_show_registration_ids || []).includes(registrationId)) return false;
+  return !(match?.results || []).some((row) => row?.registration_id === registrationId);
 }
 
 /** Die Auslosung eines Platzes (`source.draw`, #1548) - oder `null` im festen Baum. */
