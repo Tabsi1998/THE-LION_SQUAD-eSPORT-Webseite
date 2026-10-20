@@ -93,6 +93,8 @@ def test_partner_badge_for_events_carries_white_version_and_transparency(uploads
     from services.partner_pages import partner_badge
 
     clear = uploads("badge-clear.png", "RGBA", (0, 0, 0, 0), inner=(10, 200, 90, 255))
-    badge = partner_badge({"id": "p1", "slug": "gamma", "name": "Gamma", "logo_url": clear, "logo_mono_url": "/api/static/uploads/w.png"})
+    doc = {"id": "p1", "slug": "gamma", "name": "Gamma", "logo_url": clear, "logo_mono_url": "/api/static/uploads/w.png"}
+    assert "logo_mono_url" not in partner_badge(doc), "Referenzen und Turniere bleiben, wie sie waren"
+    badge = partner_badge(doc, tone=True)
     assert badge["logo_transparent"] is True
     assert badge["logo_mono_url"] == "/api/static/uploads/w.png"

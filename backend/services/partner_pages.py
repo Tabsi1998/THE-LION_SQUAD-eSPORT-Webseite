@@ -347,15 +347,15 @@ async def discord_widget(guild_id) -> dict | None:
 _BADGE_FIELDS = {"_id": 0, "id": 1, "slug": 1, "name": 1, "logo_url": 1, "logo_mono_url": 1, "dolibarr_images": 1, "kind": 1}
 
 
-def partner_badge(doc: dict) -> dict:
-    from services import sponsor_images
-
-    from services import logo_tone
+def partner_badge(doc: dict, *, tone: bool = False) -> dict:
+    from services import logo_tone, sponsor_images
 
     logo = sponsor_images.pick(doc, "logo")[0]
-    # Einfarbig (#1321): die weiße Fassung und ob das Logo durchsichtig ist - die Event-Seite zeigt Partner weiß.
-    return {"id": doc.get("id"), "slug": doc.get("slug"), "name": doc.get("name"), "logo_url": logo, "kind": doc.get("kind"),
-            "logo_mono_url": doc.get("logo_mono_url"), "logo_transparent": logo_tone.logo_transparent(logo)}
+    badge = {"id": doc.get("id"), "slug": doc.get("slug"), "name": doc.get("name"), "logo_url": logo, "kind": doc.get("kind")}
+    if tone:
+        # Einfarbig (#1321): die Event-Seite zeigt Partner weiß - dafür die weiße Fassung und ob das Logo durchsichtig ist.
+        badge.update(logo_mono_url=doc.get("logo_mono_url"), logo_transparent=logo_tone.logo_transparent(logo))
+    return badge
 
 
 async def clean_partner_ids(db, ids) -> list[str]:
@@ -367,15 +367,15 @@ async def clean_partner_ids(db, ids) -> list[str]:
     return [item for item in wanted if item in found]
 
 
-async def attach_partners(db, item: dict) -> None:
-    """`partners` (Kurzform) an ein Event oder Turnier hängen - nur aktive Partner."""
+async def attach_partners(db, item: dict, *, tone: bool = False) -> None:
+    """`partners` (Kurzform) an ein Event oder Turnier hängen - nur aktive Partner. ``tone``: mit weißer Fassung (#1321)."""
     ids = [item_id for item_id in (item.get("partner_ids") or []) if item_id]
     if not ids:
         item["partners"] = []
         return
     rows = await db.partners.find({"id": {"$in": ids}, "is_active": {"$ne": False}},
                                   _BADGE_FIELDS).to_list(len(ids))
-    by_id = {row["id"]: partner_badge(row) for row in rows}
+    by_id = {row["id"]: partner_badge(row, tone=tone) for row in rows}
     item["partners"] = [by_id[item_id] for item_id in ids if item_id in by_id]
 
 
