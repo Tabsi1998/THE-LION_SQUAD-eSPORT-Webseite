@@ -36,6 +36,7 @@ Diese Routen bleiben erreichbar, damit Menschen sie verwenden und Crawler `noind
 - `/players` und `/u/<username>`
 - `/membership/apply`
 - `/matches/<id>`
+- `/references/series/<spur>/<saison>` (Serienseite mit Tabellen, #1745: fremde Namen nur in Tabellen, nie in der Sitemap)
 - Login-, Registrierungs- und Passwort-Routen
 - Fehleransichten `/403`, `/500` und der SPA-404-Fallback; sie setzen `noindex, nofollow`
 
