@@ -1,4 +1,5 @@
 import { fetch as expoFetch } from "expo/fetch";
+import { NavigationContext } from "@react-navigation/native";
 import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { AppState } from "react-native";
 import { useAuth } from "../auth/AuthContext";
@@ -13,7 +14,7 @@ type LiveChangesValue = {
 
 // Ohne Provider (etwa in Tests einzelner Screens) gilt der Strom als getrennt:
 // useLiveRefresh fragt dann wie bisher im Intervall ab.
-const LiveChangesContext = createContext<LiveChangesValue>({
+export const LiveChangesContext = createContext<LiveChangesValue>({
   connected: false,
   subscribe: () => () => {},
 });
@@ -75,8 +76,43 @@ export function useLiveConnected() {
 }
 
 /**
+ * Ist die Ansicht gerade zu sehen (#1015)? Die App ist nicht im Hintergrund und - innerhalb eines Screens - der Screen hat
+ * den Fokus. Außerhalb der Navigation (Provider wie Chats, Benachrichtigungen, Branding) zählt nur die App: bewusste
+ * Ausnahme, weil sie für alle Reiter gelten.
+ */
+function useVisible() {
+  const navigation = useContext(NavigationContext);
+  const [appActive, setAppActive] = useState(() => AppState.currentState !== "background");
+  const [focused, setFocused] = useState(() => (navigation ? navigation.isFocused() : true));
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener("change", (state) => {
+      if (state === "background") setAppActive(false);
+      else if (state === "active") setAppActive(true);
+    });
+    return () => subscription.remove();
+  }, []);
+
+  useEffect(() => {
+    if (!navigation) return undefined;
+    setFocused(navigation.isFocused());
+    const offFocus = navigation.addListener("focus", () => setFocused(true));
+    const offBlur = navigation.addListener("blur", () => setFocused(false));
+    return () => {
+      offFocus();
+      offBlur();
+    };
+  }, [navigation]);
+
+  return appActive && focused;
+}
+
+/**
  * Lädt eine Ansicht neu, sobald der Server eine passende Änderung meldet.
- * Solange keine Live-Verbindung besteht, wird wie bisher im Intervall abgefragt.
+ * Solange keine Live-Verbindung besteht, wird im Intervall abgefragt - aber nur, solange die Ansicht zu sehen ist
+ * (#1015): Ein Reiter im Hintergrund und die App im Hintergrund pollen nicht. Meldungen für eine verdeckte Ansicht
+ * merken sich nur, dass sie veraltet ist; kommt sie wieder nach vorn (oder ist dabei ein Takt verpasst), lädt sie
+ * genau einmal neu. Alle Wege laufen über dieselbe Entprellung, damit die Rückkehr keinen Schwall an Anfragen auslöst.
  */
 export function useLiveRefresh(
   callback: () => unknown,
@@ -84,27 +120,43 @@ export function useLiveRefresh(
   options: { fallbackMs?: number; debounceMs?: number; enabled?: boolean } = {},
 ) {
   const { connected, subscribe } = useContext(LiveChangesContext);
+  const visible = useVisible();
   const callbackRef = useRef(callback);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const visibleRef = useRef(visible);
+  const staleRef = useRef(false);
+  const lastRunRef = useRef(Date.now());
   const enabled = options.enabled ?? true;
   const debounceMs = options.debounceMs ?? 250;
   const fallbackMs = options.fallbackMs ?? 0;
   const resourceKey = resources.join("|");
+  const scheduleRef = useRef(() => {});
+  visibleRef.current = visible;
 
   useEffect(() => {
     callbackRef.current = callback;
   }, [callback]);
+
+  scheduleRef.current = () => {
+    if (timerRef.current) clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(() => {
+      timerRef.current = null;
+      staleRef.current = false;
+      lastRunRef.current = Date.now();
+      runSafely(callbackRef.current);
+    }, debounceMs);
+  };
 
   useEffect(() => {
     if (!enabled) return undefined;
     const selected = resourceKey ? resourceKey.split("|") : [];
     const unsubscribe = subscribe((event) => {
       if (!liveChangeMatches(event, selected)) return;
-      if (timerRef.current) clearTimeout(timerRef.current);
-      timerRef.current = setTimeout(() => {
-        timerRef.current = null;
-        runSafely(callbackRef.current);
-      }, debounceMs);
+      if (!visibleRef.current) {
+        staleRef.current = true;
+        return;
+      }
+      scheduleRef.current();
     });
     return () => {
       unsubscribe();
@@ -113,13 +165,25 @@ export function useLiveRefresh(
         timerRef.current = null;
       }
     };
-  }, [debounceMs, enabled, resourceKey, subscribe]);
+  }, [enabled, resourceKey, subscribe]);
+
+  // Wieder zu sehen: einmal nachladen, wenn inzwischen etwas gemeldet wurde oder ein Takt ausgefallen ist.
+  useEffect(() => {
+    if (!enabled || !visible) return;
+    const missedTick = !connected && fallbackMs > 0 && Date.now() - lastRunRef.current >= fallbackMs;
+    if (staleRef.current || missedTick) scheduleRef.current();
+    // Nur beim Wechsel der Sichtbarkeit prüfen, nicht bei jedem Wechsel der Verbindung.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [enabled, visible]);
 
   useEffect(() => {
-    if (!enabled || connected || !fallbackMs) return undefined;
-    const timer = setInterval(() => runSafely(callbackRef.current), fallbackMs);
+    if (!enabled || connected || !fallbackMs || !visible) return undefined;
+    const timer = setInterval(() => {
+      lastRunRef.current = Date.now();
+      runSafely(callbackRef.current);
+    }, fallbackMs);
     return () => clearInterval(timer);
-  }, [connected, enabled, fallbackMs]);
+  }, [connected, enabled, fallbackMs, visible]);
 }
 
 function runSafely(callback: () => unknown) {
