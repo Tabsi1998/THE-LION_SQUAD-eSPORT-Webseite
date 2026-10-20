@@ -162,6 +162,10 @@ class _Board:
         ends = [busy_end for _start, busy_end, _ in self.station_busy.get(station_id, []) if busy_end <= moment]
         return max(ends) if ends else None
 
+    def booked_later(self, station_id: str, moment: datetime) -> bool:
+        """Steht an der Station ab ``moment`` schon etwas? Dann käme ein Spiel ab ``moment`` davor in die Lücke (#1858)."""
+        return any(busy_start >= moment for busy_start, _end, _ in self.station_busy.get(station_id, []))
+
     def earliest(self, lower: datetime, minutes: int, station_id: str, participants: set[str], pause: int) -> datetime:
         """Der erste Zeitpunkt ab ``lower``, an dem Station und alle Spieler (mit Pause) frei sind."""
         duration = timedelta(minutes=minutes)
@@ -481,10 +485,12 @@ def _plan_stations(tournament: dict, matches: list[dict], stations, stage_by_id:
                 # davor, sonst stünde es „Als Nächstes“ und der bereite Lauf hätte kein „Aufrufen“.
                 floor = lower if waiting is None else max(lower, ready_until.get(station["id"], lower))
                 moment = board.earliest(floor, minutes, station["id"], players, pause)
-                # Gleich früh an mehreren Stationen: an die, die zuerst frei war (#1791). Ein überzogenes Spiel hält seine
-                # Station „bis jetzt“ - sie ist nicht wirklich frei, eine freie Station geht vor.
+                # Gleich früh an mehreren Stationen: lieber eine, an der danach nichts steht, als die Lücke vor einem
+                # anderen Spiel (#1858: sonst laufen vier bereite Läufe auf zwei Stationen, zwei bleiben frei). Dann die,
+                # die zuerst frei war (#1791) - ein überzogenes Spiel hält seine Station „bis jetzt“, eine freie geht vor.
                 since = board.free_since(station["id"], moment)
-                key = (moment, since is not None, since or moment, str(station.get("name") or ""), station["id"])
+                key = (moment, board.booked_later(station["id"], moment), since is not None, since or moment,
+                       str(station.get("name") or ""), station["id"])
                 if best is None or key < best[0]:
                     best = (key, station, moment)
             _key, station, moment = best

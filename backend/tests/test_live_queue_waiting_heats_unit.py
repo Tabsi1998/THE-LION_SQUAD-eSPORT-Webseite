@@ -190,6 +190,17 @@ def test_heats_waiting_for_the_show_draw_leave_free_stations_to_the_ready_heats(
 
 
 
+def test_four_ready_heats_get_all_four_free_stations():
+    """Nach dem zweiten Los sind E, F, LA und LB bereit: vier freie Stationen, viermal „Aufrufen“ - nicht zwei Läufe
+    nacheinander auf Station 1 und 2, während Station 3 und 4 frei bleiben."""
+    matches = cup()
+    draw(matches, "LB:2")
+    view = queue(matches, 4, busy=sofort_cup(matches, "E", "F"))
+    shown = nexts(view)
+    assert set(shown) == {"E", "F", "LA", "LB"}
+    assert all(entry["ready"] for entry in shown.values())
+    assert len(callable_stations(view)) == 4
+    assert_ready_first(view)
 
 
 def test_with_one_station_the_waiting_heats_queue_behind_the_ready_ones():
@@ -234,3 +245,10 @@ def test_duels_waiting_for_the_draw_leave_free_stations_to_the_ready_duels():
     assert len(callable_stations(view)) == 2
     assert_ready_first(view)
 
+
+def test_four_ready_duels_get_all_four_free_stations():
+    matches = cup("duel")
+    draw(matches, "LB:2")
+    view = queue(matches, 4, busy=sofort_cup(matches, "E", "F"), match_type="duel")
+    assert set(nexts(view)) == {"E", "F", "LA", "LB"}
+    assert len(callable_stations(view)) == 4
