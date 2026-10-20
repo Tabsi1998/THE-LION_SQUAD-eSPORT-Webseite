@@ -713,6 +713,10 @@ def _registration_queue(tid: str) -> _RegistrationQueue:
     return queue
 
 
+# Scheitert der Neubau der Vorschau, gleich noch einmal - erst dann bleibt sie bis zur nächsten Änderung stehen.
+PREVIEW_REFRESH_ATTEMPTS = 2
+
+
 async def _refresh_previews_after_self_registration(db, tid: str, number: int, actor_id: str | None) -> dict | None:
     """Den Vorschau-Baum nach der Anmeldung Nummer ``number`` auffrischen - ohne die Platzvergabe aufzuhalten (#1859).
 
@@ -731,14 +735,20 @@ async def _refresh_previews_after_self_registration(db, tid: str, number: int, a
                 return None
             async with mutation_lock(db, tournament_write_resource(tid), wait_seconds=wait):
                 covered = queue.requested
-                tournament = await db.tournaments.find_one({"id": tid}, {"_id": 0})
-                update = await _refresh_tournament_previews_after_registration(db, tournament, actor_id) if tournament else None
-                queue.refreshed = max(queue.refreshed, covered)
-                return update
+                for attempt in range(1, PREVIEW_REFRESH_ATTEMPTS + 1):
+                    try:
+                        tournament = await db.tournaments.find_one({"id": tid}, {"_id": 0})
+                        update = await _refresh_tournament_previews_after_registration(db, tournament, actor_id) if tournament else None
+                    except Exception:  # noqa: BLE001
+                        if attempt < PREVIEW_REFRESH_ATTEMPTS:
+                            logger.warning("Vorschau nach Anmeldung zu %s gescheitert - neuer Versuch", _log_safe(tid))
+                            continue
+                        logger.exception("Vorschau nach Anmeldung zu %s nicht aufgefrischt", _log_safe(tid))
+                        return None
+                    queue.refreshed = max(queue.refreshed, covered)
+                    return update
     except MutationLockBusy:
         logger.warning("Vorschau nach Anmeldung zu %s nicht aufgefrischt: Sperre besetzt", _log_safe(tid))
-    except Exception as exc:  # noqa: BLE001
-        logger.warning("Vorschau nach Anmeldung zu %s nicht aufgefrischt (%s)", _log_safe(tid), type(exc).__name__)
     return None
 
 
