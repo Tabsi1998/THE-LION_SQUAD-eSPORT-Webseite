@@ -1,15 +1,14 @@
 # Changelog
 
-## [1.11.0](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/compare/v1.10.0...v1.11.0) (2026-10-20)
-
+## 1.11.0 (20.10.2026)
 
 ### Neu
 
-* Rennliga-Seite – Fahrerwertung als Rennraster mit Podium, schnellster Runde, Ausfall, Abstand und Abweichung zum offiziellen Wert ([#1746](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1746)) ([9b4f211](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/9b4f211a78e5f5b817a511d418f20384d4c621b0))
-* Rennliga-Seite – Rennkalender mit Sieger aus dem Verein, sonst bestem Vereinsfahrer mit Platz ([#1746](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1746)) ([9b4f211](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/9b4f211a78e5f5b817a511d418f20384d4c621b0))
-* Rennliga-Seite – Teamwertung mit Balken und Punkten je Rennen, Vereinsteams hervorgehoben, Gäste markiert ([#1746](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1746)) ([9b4f211](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/9b4f211a78e5f5b817a511d418f20384d4c621b0))
-* Rennliga-Seite – Umschalter zwischen den Saisons und Ligen einer Spur ([#1746](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1746)) ([9b4f211](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/9b4f211a78e5f5b817a511d418f20384d4c621b0))
-* Rennliga-Seite – Vereins-Garage mit Teamduell und Fahrer-Detail für öffentliche Vereinsfahrer ([#1746](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1746)) ([9b4f211](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/9b4f211a78e5f5b817a511d418f20384d4c621b0))
+* Rennliga-Seite – Fahrerwertung als Rennraster mit Podium, schnellster Runde, Ausfall, Abstand und Abweichung zum offiziellen Wert (#1746)
+* Rennliga-Seite – Rennkalender mit Sieger aus dem Verein, sonst bestem Vereinsfahrer mit Platz (#1746)
+* Rennliga-Seite – Teamwertung mit Balken und Punkten je Rennen, Vereinsteams hervorgehoben, Gäste markiert (#1746)
+* Rennliga-Seite – Umschalter zwischen den Saisons und Ligen einer Spur (#1746)
+* Rennliga-Seite – Vereins-Garage mit Teamduell und Fahrer-Detail für öffentliche Vereinsfahrer (#1746)
 
 ## 1.10.0 (20.10.2026)
 
