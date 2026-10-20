@@ -416,7 +416,10 @@ async def redraw_tournament_stage(tid: str, stage_id: str, body: StageRedrawPayl
     now_iso = now_utc().isoformat()
     try:
         if group:
-            application = build_redraw_application(stage_matches, group, now_iso=now_iso)
+            # Wer ausgetreten oder disqualifiziert ist, kommt auch beim neuen Los nicht zurück (#1839).
+            from services.v2_result_submission import eliminated_registration_ids
+            application = build_redraw_application(stage_matches, group, now_iso=now_iso,
+                                                   eliminated=await eliminated_registration_ids(db, tid))
         elif stage.get("stage_type") == "league":
             application = build_league_redraw_application(stage_matches, now_iso=now_iso)
         else:

@@ -21,6 +21,8 @@ Regeln (Entscheidungen E12, E14, Regeltabelle in der Turnier-Dynamik-Notiz):
   nicht mehr (Anmeldungsstatus).
 - **FFA-Läufe**: aus allen noch nicht aufgerufenen Läufen raus; hat die Person einen Lauf gefahren und ist weiter,
   rückt der Nächstplatzierte in den Folgelauf nach („Plätze rücken auf“), solange der Folgelauf nicht aufgerufen ist.
+  Mit Loser Bracket rücken beide Wege gemeinsam auf (#1839): wer in den Sieger-Weg nachrückt, verlässt das Loser
+  Bracket, dort rückt der Nächste auf - niemand steht in zwei Läufen derselben Runde.
   Die Freilos-Kette läuft nicht in Läufe hinein - ein Lauf mit einem Fahrer wird vom Lauf-Planer zusammengelegt.
 - Danach gilt überall: die Person rückt nie mehr ein (``eliminated`` im Ergebnis-Anwender).
 
@@ -44,12 +46,14 @@ from services.competition_usage import GRAPH, record_write
 from services.competition_versions import persist_competition_versions
 from services.heat_rebuild import STALE_DETAIL, _doc_fields, _replan_schedule, _unchanged_filter, evaluate_after_write
 from services.match_notifications import notify_match_result_confirmed
-from services.advancement_draw import draw_group_of, group_targets, match_mode
+from services.advancement_draw import draw_group_of, match_mode
 from services.match_v2_results import (
+    _advancement_result_rank,
     _status_after_slot_fill,
     build_v2_result_application,
     group_awaits_draw,
     has_result,
+    moved_up_seating,
     resolve_walkovers,
 )
 from services.station_runtime import release_station_for_match
@@ -251,55 +255,20 @@ def _exclude_from_draw(match: dict, registration_id: str, now_iso: str, ops: lis
                 "round_name": match.get("round_name"), "registration_id": registration_id})
 
 
-def _drawn_seats(by_id: dict[str, dict], group: str, stage_id: str | None, heat_id: str) -> list[tuple[dict, dict]]:
-    """Die ausgelosten Plätze, die dieser Lauf in der Gruppe (seiner Phase) belegt - auch frei gewordene, nach Rang."""
-    seats = [
-        (target, slot)
-        for target in group_targets(by_id.values(), group, stage_id) if target.get("status") != "cancelled"
-        for slot in target.get("slots") or []
-        if (slot.get("source_result") or {}).get("from_match_id") == heat_id
-        and (slot.get("source_result") or {}).get("flow") == "W"
-    ]
-    return sorted(seats, key=lambda seat: int((seat[1].get("source_result") or {}).get("rank") or 0))
-
-
 def _readvance(heat: dict, by_id: dict[str, dict], registration_id: str, now_iso: str, ops: list[dict],
                eliminated: set[str]) -> None:
-    """Plätze rücken auf: der Sieger-Weg eines gefahrenen Laufs zählt nur noch, wer im Turnier bleibt - auch wer
-    früher schon ausgeschieden ist, kommt nicht zurück. Erst werden alle Plätze dieses Laufs im Folgelauf frei, dann
-    neu besetzt (wer von Platz 2 auf Platz 1 rückt, wechselt den Sitz)."""
+    """Plätze rücken auf: die Wege eines gefahrenen Laufs zählen nur noch, wer im Turnier bleibt - auch wer früher
+    schon ausgeschieden ist, kommt nicht zurück. Erst werden alle Plätze dieses Laufs in den Folgeläufen frei, dann
+    neu besetzt (wer von Platz 2 auf Platz 1 rückt, wechselt den Sitz).
+
+    Sieger- und Verlierer-Weg rücken gemeinsam auf (#1839), nach derselben Regel wie beim Eintragen und im Topf
+    (``moved_up_seating`` auf ``_advancement_paths``): wer ins Finale nachrückt, verlässt dafür seinen Platz im Loser
+    Bracket; dort rückt der Nächste auf, der letzte Platz wird ein Freilos. Ein Platz in einem Folgelauf, der nicht mehr
+    umbaubar ist, bleibt, wie er ist, und zählt mit; wer dort schon sitzt, rückt nicht nach. Wartet ein Weg noch aufs
+    Los (Show-Auslosung je Gruppe), schreibt das hier nichts - der Topf rechnet später dieselbe Regel (``run_draw``)."""
     gone = eliminated | {registration_id}
-    # Wer über seinen Platz aus diesem Lauf schon weitergespielt hat (der Folgelauf ist nicht mehr umbaubar: gefahren,
-    # aufgerufen oder gestartet), bleibt dort - sonst säße er in zwei Läufen zugleich. Nachrücken kann nur, wer noch
-    # keinen festen Sitz hat.
-    settled = {
-        slot.get("registration_id")
-        for target in by_id.values() if not _rebuildable(target) and int(target.get("round") or 0) > int(heat.get("round") or 0)
-        for slot in target.get("slots") or [] if slot.get("registration_id")
-    }
-    survivors = [row for row in sorted(heat.get("results") or [], key=lambda row: int(row.get("rank") or 0))
-                 if row.get("registration_id") and row["registration_id"] not in gone and not row.get("forfeit")
-                 and row["registration_id"] not in settled]
-    entries = []
-    drawn_seats: dict[tuple, list[tuple[dict, dict]]] = {}
-    for entry in sorted((e for e in heat.get("advancement") or [] if e.get("flow") == "W"), key=lambda e: int(e.get("rank") or 0)):
-        target = by_id.get(entry.get("to_match_id"))
-        group = draw_group_of(target)
-        if group and match_mode(target) != "instant":
-            # Gemischt (#1548): ausgelost sitzt der Weiterkommer nicht auf dem Platz aus dem Schema, sondern auf seinem
-            # ausgelosten Platz - der k-te Weiterkommer dieses Laufs auf dem k-ten Platz, den der Lauf in der Gruppe hat.
-            # (Sofort zufällig, #1590: das Schema folgt dem Los - der Platz aus dem Eintrag ist der gezogene Platz.)
-            scope = (target.get("stage_id"), group)
-            seats = drawn_seats.setdefault(scope, _drawn_seats(by_id, group, target.get("stage_id"), heat["id"]))
-            if not seats:
-                continue
-            target, slot = seats.pop(0)
-        else:
-            slot = next((s for s in (target or {}).get("slots") or [] if int(s.get("slot") or 0) == int(entry.get("to_slot") or 0)), None)
-        if target and slot and _rebuildable(target):
-            rank = int(entry.get("rank") or 0)
-            wanted = survivors[rank - 1] if 0 < rank <= len(survivors) else None
-            entries.append((entry, target, slot, wanted))
+    entries = [(row["entry"], row["target"], row["slot"], row["wanted"])
+               for row in moved_up_seating(heat, by_id, gone) if not row["fixed"] and not row["awaiting"]]
     if all(slot.get("registration_id") == (wanted or {}).get("registration_id") for _e, _t, slot, wanted in entries):
         return
     touched: dict[str, dict] = {}
@@ -312,12 +281,13 @@ def _readvance(heat: dict, by_id: dict[str, dict], registration_id: str, now_iso
         if wanted and any(s.get("registration_id") == wanted["registration_id"] for s in target.get("slots") or []):
             wanted = None  # sitzt dort schon auf einem anderen Weg
         if wanted:
+            position = _advancement_result_rank(heat, entry)
             slot.update({
                 "registration_id": wanted["registration_id"],
                 "user_id": wanted.get("user_id"),
                 "source_result": {"from_match_id": heat["id"], "from_match_key": heat.get("match_key"),
-                                  "rank": int(wanted.get("rank") or entry.get("rank") or 0), "flow": "W",
-                                  "confirmed_at": now_iso, "moved_up": int(wanted.get("rank") or 0) != int(entry.get("rank") or 0)},
+                                  "rank": int(wanted.get("rank") or position or 0), "flow": entry["flow"],
+                                  "confirmed_at": now_iso, "moved_up": int(wanted.get("rank") or 0) != int(position or 0)},
                 "status": "filled",
             })
             if current != wanted["registration_id"]:
@@ -356,7 +326,9 @@ def _plan_bracket(stage_matches: list[dict], matches: list[dict], by_id: dict[st
         if _feeds_undrawn_draw(heat, by_id):
             # Gemischt (#1548): die Folgerunde ist noch nicht ausgelost - die Auslosung lässt die Person aus.
             _exclude_from_draw(heat, registration_id, now_iso, ops)
-        elif heat.get("match_type") == "ffa":
+        if heat.get("match_type") == "ffa":
+            # Show-Auslosung je Gruppe (#1839): ist ein Weg schon gelost, der andere noch nicht, rückt der geloste auf;
+            # der andere folgt mit dem Los derselben Reihe.
             _readvance(heat, by_id, registration_id, now_iso, ops, eliminated)
     chain: list[str] = []
     for match in sorted(stage_matches, key=_sort_key):

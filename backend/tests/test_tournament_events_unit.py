@@ -19,7 +19,13 @@ from services.competition_standings import stage_standings  # noqa: E402
 from services.competition_snapshot import build_structure_snapshot  # noqa: E402
 from services.custom_bracket import build_matches_v2_from_schema  # noqa: E402
 from services.graph_swiss import swiss_round_documents  # noqa: E402
-from services.match_v2_results import MatchV2ResultError, build_v2_result_application  # noqa: E402
+from services.advancement_draw import draw_group_of  # noqa: E402
+from services.match_v2_results import (  # noqa: E402
+    MatchV2ResultError,
+    build_redraw_application,
+    build_show_draw_application,
+    build_v2_result_application,
+)
 from services.tournament_events import REMOVAL_KINDS, describe_removal, plan_removal, removal_hash  # noqa: E402
 from services.v2_match_flows import results_for_forfeit  # noqa: E402
 
@@ -481,6 +487,323 @@ def test_ffa_dq_does_not_touch_a_heat_that_has_been_called_or_started():
     plan = plan_removal(matches, first, kind="disqualified", now_iso=NOW)
     assert "readvanced" not in [op["kind"] for op in plan["ops"]]
     assert first in filled_ids(semi), "ein aufgerufener Lauf wird nicht umgebaut - die Wertung kommt mit dem Ergebnis"
+
+
+# ---------------------------------------------------------------------------------------------- Läufe mit Loser Bracket
+
+# Zwei Läufe zu viert: die zwei Besten ins Finale F, Platz 3 und 4 ins Loser Bracket LA (wie der Läufe-Cup im Seed).
+HEATS_WITH_LOSERS = """[WB]
+A=[1,2,3,4]
+B=[5,6,7,8]
+F=[W:A:1,W:A:2,W:B:1,W:B:2]
+
+[LB]
+LA=[L:A:1,L:A:2,L:B:1,L:B:2]
+"""
+# Der Läufe-Cup aus dem Abnahme-Seed: 16 Fahrer, je Runde zwei Läufe in Sieger- und Verlierer-Weg (gemischt: Gruppen).
+CUP_WITH_LOSERS = """[WB]
+A=[1,2,3,4]
+B=[5,6,7,8]
+C=[9,10,11,12]
+D=[13,14,15,16]
+E=[W:A:1,W:A:2,W:B:1,W:B:2]
+F=[W:C:1,W:C:2,W:D:1,W:D:2]
+G=[W:E:1,W:E:2,W:F:1,W:F:2]
+
+[LB]
+LA=[L:A:1,L:A:2,L:B:1,L:B:2]
+LB=[L:C:1,L:C:2,L:D:1,L:D:2]
+LC=[W:LA:1,W:LA:2,L:E:1,L:E:2]
+LD=[W:LB:1,W:LB:2,L:F:1,L:F:2]
+LE=[W:LC:1,W:LC:2,W:LD:1,W:LD:2]
+LF=[W:LE:1,W:LE:2,L:G:1,L:G:2]
+"""
+
+
+def heats_with_losers(scheme: str = HEATS_WITH_LOSERS, count: int = 8, mode: str | None = None) -> list[dict]:
+    stage = {"id": "s", "number": 1, "stage_type": "ffa_custom_bracket", "match_type": "ffa",
+             "settings": {"schema": scheme, "match_size": 4, "qualifiers_per_match": 2, "min_players": 2}}
+    base = {"id": "t", "seeding_mode": "manual", "max_participants": count, **({"advancement_mode": mode} if mode else {})}
+    return build_matches_v2_from_schema(base, stage, registrations(count))
+
+
+def from_heat(target: dict, heat: dict) -> dict[int, str]:
+    """Wer aus diesem Lauf in ``target`` sitzt - je Platz im Lauf."""
+    return {int(slot["source_result"]["rank"]): slot["registration_id"] for slot in target["slots"]
+            if (slot.get("source_result") or {}).get("from_match_id") == heat["id"] and slot.get("registration_id")}
+
+
+def assert_once_per_round(matches: list[dict]) -> None:
+    """Der Baum zeigt jede Person höchstens einmal je Runde - Sieger- und Verlierer-Weg zusammen (#1839)."""
+    seen: dict[tuple[int, str], str] = {}
+    for match in matches:
+        if match["status"] == "cancelled":
+            continue
+        for reg in filled_ids(match):
+            key = (int(match["round"]), reg)
+            assert key not in seen, f"{reg} steht in Runde {key[0]} in {seen[key]} und {match['match_key']}"
+            seen[key] = match["match_key"]
+
+
+def play_ready(matches: list[dict]) -> None:
+    """Alle spielbereiten Läufe nach Sitzplatz eintragen, bis keiner mehr bereit ist - bricht ein Eintragen ab, schlägt
+    der Test fehl (z. B. „nicht mehrfach weitergeleitet“)."""
+    for _ in range(40):
+        ready = [m for m in matches if m["status"] == "ready"]
+        if not ready:
+            return
+        apply_result(matches, ready[0], filled_ids(ready[0]))
+        assert_once_per_round(matches)
+
+
+def test_heat_withdrawal_moves_the_next_place_from_the_loser_bracket_into_the_final():
+    """#1839: Lauf A ist gefahren (r1 bis r4), r1 tritt aus. r3 rückt ins Finale nach und verlässt dafür das Loser
+    Bracket; dort rückt r4 auf, der letzte Platz aus A wird ein Freilos. Beide Wege rücken gleich auf - wie beim
+    Eintragen mit Ausgeschiedenen (#1823)."""
+    matches = heats_with_losers()
+    by_key = by_key_of(matches)
+    apply_result(matches, by_key["A"], ["r1", "r2", "r3", "r4"])
+    assert from_heat(by_key["LA"], by_key["A"]) == {3: "r3", 4: "r4"}
+
+    plan = plan_removal(matches, "r1", kind="withdrawn", now_iso=NOW)
+    assert from_heat(by_key["F"], by_key["A"]) == {2: "r2", 3: "r3"}
+    assert from_heat(by_key["LA"], by_key["A"]) == {4: "r4"}, "r3 sitzt nicht zugleich im Loser Bracket"
+    freed = [slot for slot in by_key["LA"]["slots"] if (slot.get("source") or {}).get("match_key") == "A"
+             and not slot.get("registration_id")]
+    assert len(freed) == 1 and freed[0]["status"] == "bye", "der letzte Platz aus A im Loser Bracket wird ein Freilos"
+    moved = {(op["match_key"], op["registration_id"]) for op in plan["ops"] if op["kind"] == "readvanced"}
+    assert moved == {("F", "r2"), ("F", "r3"), ("LA", "r4")}
+    assert by_key["A"]["results"][0]["registration_id"] == "r1", "das gefahrene Ergebnis bleibt"
+    assert_once_per_round(matches)
+    assert_graph_valid(matches)
+
+    again = plan_removal(matches, "r1", kind="withdrawn", now_iso=NOW, eliminated={"r1"})
+    assert again["ops"] == [] and again["changed_ids"] == [], "ein zweiter Lauf ändert nichts"
+    play_ready(matches)
+    assert by_key["F"]["status"] == "completed" and by_key["LA"]["status"] == "completed"
+    assert all("r1" not in filled_ids(by_key[key]) for key in ("F", "LA")), "wer ausgetreten ist, rückt nirgends ein"
+
+
+@pytest.mark.parametrize("state", ["called", "completed"])
+def test_heat_withdrawal_after_the_loser_round_was_called_or_entered_moves_nobody_out_of_it(state):
+    """Variante: das Loser Bracket ist schon aufgerufen oder eingetragen. Wer dort gefahren ist (oder gleich fährt),
+    bleibt dort - er rückt nicht ins Finale nach; der Platz im Finale wird ein Freilos."""
+    matches = heats_with_losers()
+    by_key = by_key_of(matches)
+    apply_result(matches, by_key["A"], ["r1", "r2", "r3", "r4"])
+    apply_result(matches, by_key["B"], ["r5", "r6", "r7", "r8"])
+    if state == "called":
+        by_key["LA"]["called_at"] = NOW
+    else:
+        apply_result(matches, by_key["LA"], ["r7", "r3", "r8", "r4"])
+    loser_round = copy.deepcopy(by_key["LA"])
+
+    plan = plan_removal(matches, "r1", kind="withdrawn", now_iso=NOW)
+    assert by_key["LA"] == loser_round, "das Loser Bracket bleibt, wie es ist"
+    assert from_heat(by_key["F"], by_key["A"]) == {2: "r2"}
+    assert [op["registration_id"] for op in plan["ops"] if op["kind"] == "readvanced"] == ["r2"]
+    assert_once_per_round(matches)
+    assert_graph_valid(matches)
+
+
+def test_heat_withdrawal_with_the_final_called_leaves_the_loser_bracket_alone():
+    """Variante: das Finale ist schon aufgerufen - dort wird nicht umgebaut (die Wertung kommt mit dem Ergebnis), also
+    rückt auch im Loser Bracket niemand auf."""
+    matches = heats_with_losers()
+    by_key = by_key_of(matches)
+    apply_result(matches, by_key["A"], ["r1", "r2", "r3", "r4"])
+    apply_result(matches, by_key["B"], ["r5", "r6", "r7", "r8"])
+    by_key["F"]["called_at"] = NOW
+    loser_round = copy.deepcopy(by_key["LA"])
+
+    plan = plan_removal(matches, "r1", kind="withdrawn", now_iso=NOW)
+    assert "readvanced" not in [op["kind"] for op in plan["ops"]]
+    assert "r1" in filled_ids(by_key["F"]) and by_key["LA"] == loser_round
+    assert_once_per_round(matches)
+
+
+@pytest.mark.parametrize("mode", [None, "instant", "draw_round"], ids=["fest", "sofort", "topf"])
+def test_heat_withdrawal_in_the_cup_moves_up_on_both_paths_in_every_mode(mode):
+    """Der Läufe-Cup mit Loser Bracket, Runde 1 gefahren: fester Baum, sofort zufällig (#1590) und Auslosung nach der
+    Runde (#1548, ausgeloste Plätze). Der Erste aus A tritt aus: der Dritte rückt in den Sieger-Weg, der Vierte bleibt
+    allein aus A im Loser Bracket. Danach lässt sich alles bis zum Ende eintragen."""
+    matches = heats_with_losers(CUP_WITH_LOSERS, 16, mode)
+    by_key = by_key_of(matches)
+    for key in "ABCD":
+        apply_result(matches, by_key[key], filled_ids(by_key[key]))
+    first, second, third, fourth = [row["registration_id"] for row in by_key["A"]["results"]]
+    winners = [m for m in matches if section_of(m) != "LB" and m["round"] == 2]
+    losers = [m for m in matches if section_of(m) == "LB" and m["round"] == 2]
+
+    plan_removal(matches, first, kind="withdrawn", now_iso=NOW)
+    seated_winners = {reg for m in winners for reg in filled_ids(m)}
+    seated_losers = {reg for m in losers for reg in filled_ids(m)}
+    assert {second, third} <= seated_winners and first not in seated_winners
+    assert fourth in seated_losers and third not in seated_losers
+    assert_once_per_round(matches)
+    assert_graph_valid(matches)
+    again = plan_removal(matches, first, kind="withdrawn", now_iso=NOW, eliminated={first})
+    assert again["ops"] == [] and again["changed_ids"] == [], "ein zweiter Lauf ändert nichts"
+    # Korrektur von A danach (gleiches Ergebnis): jeder bleibt auf seinem Platz - auch auf ausgelosten Plätzen, an denen
+    # jetzt der Rang des Nachrückers steht.
+    before = seating_of(matches, 2)
+    apply_result(matches, by_key["A"], [first, second, third, fourth], eliminated={first}, force=True)
+    assert seating_of(matches, 2) == before
+    play_ready(matches)
+    assert all(m["status"] in TERMINAL for m in matches), [m["match_key"] for m in matches if m["status"] not in TERMINAL]
+
+
+def seating_of(matches: list[dict], round_no: int) -> dict[tuple[str, int], str | None]:
+    return {(m["match_key"], int(slot["slot"])): slot.get("registration_id")
+            for m in matches if m["round"] == round_no for slot in m["slots"]}
+
+
+def show_draw(matches: list[dict], group: str, eliminated: set[str]) -> None:
+    application = build_show_draw_application(matches, group, now_iso=NOW, eliminated=eliminated)
+    by_id = {row["id"]: row for row in matches}
+    for target_id, update in application["target_sets"].items():
+        by_id[target_id].update(update)
+
+
+def play_show(matches: list[dict], eliminated: set[str]) -> None:
+    """Bis zum Ende: bereite Läufe eintragen, bereite Show-Runden auslosen (wie die Turnierleitung)."""
+    for _ in range(60):
+        ready = [m for m in matches if m["status"] == "ready"]
+        if ready:
+            apply_result(matches, ready[0], filled_ids(ready[0]), eliminated=eliminated)
+        else:
+            waiting = sorted({draw_group_of(m) for m in matches if isinstance(m.get("draw_ready"), dict) and not m.get("draw")})
+            if not waiting:
+                return
+            show_draw(matches, waiting[0], eliminated)
+        assert_once_per_round(matches)
+
+
+SHOW_CASES = ["vor-dem-ende-der-runde", "runde-fertig-nicht-gelost", "sieger-weg-gelost", "loser-weg-gelost", "beide-gelost"]
+
+
+@pytest.mark.parametrize("case", SHOW_CASES)
+def test_heat_withdrawal_with_the_show_draw_moves_up_on_both_paths(case):
+    """Show-Auslosung (#1590), je Gruppe von der Turnierleitung gelost: der Erste aus A tritt aus - vor dem Ende der
+    Runde, vor dem Los, nachdem nur der Sieger- oder nur der Verlierer-Weg gelost ist, oder nach beiden Losen. Immer
+    dasselbe: der Zweite und der Dritte sind im Sieger-Weg, der Vierte allein aus A im Loser Bracket, sein letzter
+    Platz ist ein Freilos - nie doppelt, niemand fällt heraus. Eine Korrektur von A danach ändert nichts, und alles
+    lässt sich bis zum Ende eintragen und auslosen."""
+    matches = heats_with_losers(CUP_WITH_LOSERS, 16, "draw_show")
+    by_key = by_key_of(matches)
+    winner_group, loser_group = draw_group_of(by_key["E"]), draw_group_of(by_key["LA"])
+    first, second, third, fourth = filled_ids(by_key["A"])
+    apply_result(matches, by_key["A"], [first, second, third, fourth])
+    gone = {first}
+    if case == "vor-dem-ende-der-runde":
+        plan_removal(matches, first, kind="withdrawn", now_iso=NOW)
+    for key in "BCD":
+        apply_result(matches, by_key[key], filled_ids(by_key[key]), eliminated=gone if case == "vor-dem-ende-der-runde" else None)
+    before_removal = {"sieger-weg-gelost": [winner_group], "loser-weg-gelost": [loser_group],
+                      "beide-gelost": [winner_group, loser_group]}.get(case, [])
+    for group in before_removal:
+        show_draw(matches, group, set())
+    if case != "vor-dem-ende-der-runde":
+        plan_removal(matches, first, kind="withdrawn", now_iso=NOW)
+    for group in (winner_group, loser_group):
+        if group not in before_removal:
+            show_draw(matches, group, gone)
+
+    winners = {reg for m in matches if m["round"] == 2 and section_of(m) != "LB" for reg in filled_ids(m)}
+    losers = {reg for m in matches if m["round"] == 2 and section_of(m) == "LB" for reg in filled_ids(m)}
+    assert {second, third} <= winners and fourth in losers
+    assert third not in losers and first not in winners | losers
+    assert len(winners) + len(losers) == 15, "alle außer dem Ausgetretenen sitzen in Runde 2 - einer hat ein Freilos"
+    assert_once_per_round(matches)
+    assert_graph_valid(matches)
+    before = seating_of(matches, 2)
+    apply_result(matches, by_key["A"], [first, second, third, fourth], eliminated=gone, force=True)
+    assert seating_of(matches, 2) == before, "die Korrektur findet jeden auf seinem Platz"
+    play_show(matches, gone)
+    assert all(m["status"] in TERMINAL for m in matches), [m["match_key"] for m in matches if m["status"] not in TERMINAL]
+
+
+@pytest.mark.parametrize("called", ["sieger-weg", "loser-weg"])
+def test_heat_withdrawal_with_the_show_draw_keeps_a_called_heat_as_it_is(called):
+    """Show-Auslosung, nur ein Weg gelost und dort ist ein Lauf schon aufgerufen: wer darin sitzt, bleibt; sein Platz
+    zählt mit - das spätere Los des anderen Wegs rechnet dieselbe Reihe. Niemand steht doppelt, niemand fällt heraus."""
+    matches = heats_with_losers(CUP_WITH_LOSERS, 16, "draw_show")
+    by_key = by_key_of(matches)
+    winner_group, loser_group = draw_group_of(by_key["E"]), draw_group_of(by_key["LA"])
+    for key in "ABCD":
+        apply_result(matches, by_key[key], filled_ids(by_key[key]))
+    first, second, third, fourth = [row["registration_id"] for row in by_key["A"]["results"]]
+    drawn, other = (winner_group, loser_group) if called == "sieger-weg" else (loser_group, winner_group)
+    show_draw(matches, drawn, set())
+    sitting = first if called == "sieger-weg" else third
+    heat = next(m for m in matches if m["round"] == 2 and sitting in filled_ids(m))
+    heat["called_at"] = NOW
+    kept = filled_ids(heat)
+
+    plan_removal(matches, first, kind="withdrawn", now_iso=NOW)
+    show_draw(matches, other, {first})
+    assert filled_ids(heat) == kept, "der aufgerufene Lauf bleibt, wie er ist"
+    seated = [reg for m in matches if m["round"] == 2 for reg in filled_ids(m)]
+    assert second in seated and third in seated and fourth in seated
+    if called == "loser-weg":
+        assert first not in seated
+    assert_once_per_round(matches)
+    assert_graph_valid(matches)
+
+
+def test_redraw_after_a_heat_withdrawal_keeps_the_withdrawn_out():
+    """„Neu auslosen“ nach dem Austritt (Auslosung nach der Runde): wer ausgetreten ist, kommt mit dem neuen Los nicht
+    zurück; der Zweite und der Dritte bleiben im Sieger-Weg, der Vierte im Loser Bracket."""
+    matches = heats_with_losers(CUP_WITH_LOSERS, 16, "draw_round")
+    by_key = by_key_of(matches)
+    for key in "ABCD":
+        apply_result(matches, by_key[key], filled_ids(by_key[key]))
+    first, second, third, fourth = [row["registration_id"] for row in by_key["A"]["results"]]
+    plan_removal(matches, first, kind="withdrawn", now_iso=NOW)
+    for group in (draw_group_of(by_key["E"]), draw_group_of(by_key["LA"])):
+        application = build_redraw_application(matches, group, now_iso=NOW, eliminated={first})
+        by_id = {row["id"]: row for row in matches}
+        for target_id, update in application["target_sets"].items():
+            by_id[target_id].update(update)
+    winners = {reg for m in matches if m["round"] == 2 and section_of(m) != "LB" for reg in filled_ids(m)}
+    losers = {reg for m in matches if m["round"] == 2 and section_of(m) == "LB" for reg in filled_ids(m)}
+    assert {second, third} <= winners and fourth in losers and third not in losers
+    assert first not in winners | losers
+    assert_once_per_round(matches)
+
+
+def test_heat_withdrawal_with_the_first_seat_called_keeps_the_second_in_place():
+    """12 Fahrer (B:1 → E, B:2 → D): der Lauf des Ersten ist schon aufgerufen, er bleibt dort (die Wertung kommt mit
+    dem Ergebnis). Sein Platz zählt in der Reihe mit - der Zweite behält seinen Platz in D, niemand fällt heraus."""
+    matches, _stage = ffa(12)
+    by_key = by_key_of(matches)
+    first, second, third, fourth = filled_ids(by_key["B"])
+    apply_result(matches, by_key["B"], [first, second, third, fourth])
+    seat_of_first = next(m for m in matches if m["round"] == 2 and first in filled_ids(m))
+    seat_of_second = next(m for m in matches if m["round"] == 2 and second in filled_ids(m))
+    assert seat_of_first["id"] != seat_of_second["id"]
+    seat_of_first["called_at"] = NOW
+
+    plan = plan_removal(matches, first, kind="withdrawn", now_iso=NOW)
+    assert "readvanced" not in [op["kind"] for op in plan["ops"]]
+    assert first in filled_ids(seat_of_first) and second in filled_ids(seat_of_second)
+    assert third not in {reg for m in matches if m["round"] == 2 for reg in filled_ids(m)}
+    assert_once_per_round(matches)
+
+
+def test_duel_withdrawal_in_double_elimination_does_not_move_the_loser_up():
+    """Duelle bleiben, wie sie sind: im Doppel-K.-o. rückt nach einem gespielten Spiel niemand aus dem Loser Bracket
+    nach - der Gegner im Folgespiel kommt kampflos weiter, der Verlierer bleibt im Loser Bracket."""
+    matches = build(8, "double_elimination")
+    by_key = by_key_of(matches)
+    apply_result(matches, by_key["A"], ["r1", "r8"])
+    lower = [m["match_key"] for m in matches if "r8" in filled_ids(m) and m["status"] not in TERMINAL]
+    plan = plan_removal(matches, "r1", kind="withdrawn", now_iso=NOW)
+    assert "readvanced" not in [op["kind"] for op in plan["ops"]]
+    assert [m["match_key"] for m in matches if "r8" in filled_ids(m) and m["status"] not in TERMINAL] == lower
+    assert all(section_of(by_key[key]) == "LB" for key in lower)
+    assert_once_per_round(matches)
+    assert_graph_valid(matches)
 
 
 # ---------------------------------------------------------------------------------------------- Ergebnis-Vertrag

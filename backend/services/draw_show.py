@@ -65,12 +65,13 @@ def draw_pot(group: str, stage_id, matches: list[dict], eliminated: set[str] | N
     rows = [row for row in matches if row.get("stage_id") == stage_id]
     target_ids = {target.get("id") for target in group_targets(rows, group, stage_id) if target.get("status") != "cancelled"}
     pot: list[str] = []
+    by_id = {row["id"]: row for row in rows if row.get("id")}
     for source in sorted(group_sources(rows, group, stage_id), key=lambda row: (row.get("round") or 0, row.get("order") or 0)):
         if str(source.get("status") or "") not in DECIDED_OR_VOID:
             continue
         results = [] if source.get("status") == "cancelled" else source.get("results") or []
         gone = set(eliminated or ()) | {row.get("registration_id") for row in results if row.get("eliminated")}
-        by_rank, winner_path = _pot_ranks(source, results, gone)
+        by_rank, winner_path = _pot_ranks(source, results, gone, by_id)
         for advancement in source.get("advancement") or []:
             if advancement.get("to_match_id") not in target_ids:
                 continue
@@ -169,11 +170,14 @@ async def perform_show_draw(db, tournament: dict, stage_id: str, group: str, *, 
     schreibt alles oder nichts, protokolliert, meldet das Ereignis und stößt den Lauf-Umbau an."""
     from services.draw_records import record_draws
     from services.heat_rebuild import evaluate_after_write
+    from services.v2_result_submission import eliminated_registration_ids
 
     tid = tournament["id"]
     stage_matches = await db.matches_v2.find({"stage_id": stage_id, "is_preview": {"$ne": True}}, {"_id": 0}).to_list(3000)
     originals = {match["id"]: copy.deepcopy(match) for match in stage_matches}
-    application = build_show_draw_application(stage_matches, group, now_iso=now_utc().isoformat(), trigger=trigger)
+    # Wer ausgetreten oder disqualifiziert ist, kommt nicht in den Topf (#1839) - wie beim Eintragen.
+    application = build_show_draw_application(stage_matches, group, now_iso=now_utc().isoformat(), trigger=trigger,
+                                              eliminated=await eliminated_registration_ids(db, tid))
     await write_draw_sets(db, originals, application["target_sets"])
     await record_draws(db, application["draws"], actor_id=actor_id, tournament_id=tid)
     # Erst auslosen, dann umbauen (#1550): die neue Belegung kann Läufe zusammenlegen oder ausgleichen.
