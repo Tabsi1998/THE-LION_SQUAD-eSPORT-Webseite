@@ -260,7 +260,7 @@ def _event_for_scope(event: dict, visibility_scope: str, user_id: str | None = N
         "resource": resource,
     })
     if isinstance(event.get("tournament_event"), dict):
-        public_event["tournament_event"] = _public_tournament_event(event["tournament_event"])
+        public_event["tournament_event"] = _public_tournament_event(event["tournament_event"], bool(event.get(SCOPE_PUBLIC_KEY)))
     return public_event
 
 
@@ -356,14 +356,15 @@ TOURNAMENT_EVENT_TYPES = frozenset({
 PUBLIC_TOURNAMENT_EVENT_TYPES = {"player_withdrawn": "slot_cleared", "player_disqualified": "slot_cleared"}
 
 
-def _public_tournament_event(payload: dict) -> dict:
+def _public_tournament_event(payload: dict, visible: bool) -> dict:
     """Die öffentliche Sicht eines Anzeige-Ereignisses: Typ, Turnier und Spiel-Kennungen - keine Anmeldung, keine Art
-    des Ausscheidens (über die Teilnehmerliste wäre sie einer Person zuzuordnen)."""
+    des Ausscheidens (über die Teilnehmerliste wäre sie einer Person zuzuordnen). Turnier und Spiele nur, wenn das
+    Turnier öffentlich ist (``visible``, dieselbe Regel wie ``tournament_id`` an der Meldung)."""
     event_type = str(payload.get("type") or "")
     return {
         "type": PUBLIC_TOURNAMENT_EVENT_TYPES.get(event_type, event_type),
-        "tournament_id": payload.get("tournament_id"),
-        "match_ids": list(payload.get("match_ids") or []),
+        "tournament_id": payload.get("tournament_id") if visible else None,
+        "match_ids": list(payload.get("match_ids") or []) if visible else [],
     }
 
 
@@ -374,7 +375,10 @@ async def publish_tournament_event(tournament_id: str, event_type: str, *, match
     bekommt nur der Staff-Strom (``_public_tournament_event``)."""
     if event_type not in TOURNAMENT_EVENT_TYPES or not tournament_id:
         return
-    event = _build_api_change_event("POST", f"/api/tournaments/{tournament_id}/events", 200)
+    path = f"/api/tournaments/{tournament_id}/events"
+    scope = await _change_scope(path)
+    event = _build_api_change_event("POST", path, 200)
+    event.update(scope)
     event.update({
         "event_type": "tournament.event",
         "dedupe_key": f"tournament.event:{event['event_id']}",

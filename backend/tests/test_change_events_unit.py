@@ -431,6 +431,30 @@ def test_changes_without_a_single_tournament_stay_without_identifiers(scope_db, 
     assert public.get("tournament_id") is None
 
 
+def test_display_event_names_only_a_visible_tournament(scope_db):
+    # Anzeige-Ereignisse (#1553) folgen derselben Regel: Turnier und Spiele nur, wenn das Turnier öffentlich ist.
+    async def scenario():
+        await add_tournament(scope_db, "t-open")
+        await add_tournament(scope_db, "t-closed", visibility="members")
+        await change_events.publish_tournament_event("t-open", "walkover", match_ids=["m-open"])
+        await change_events.publish_tournament_event("t-closed", "walkover", match_ids=["m-closed"])
+
+    asyncio.run(scenario())
+    shown, hidden = change_events._event_buffer
+
+    public_shown = public_view(shown)
+    assert public_shown["tournament_id"] == "t-open"
+    assert public_shown["tournament_event"] == {"type": "walkover", "tournament_id": "t-open", "match_ids": ["m-open"]}
+
+    public_hidden = public_view(hidden)
+    assert public_hidden["tournament_event"] == {"type": "walkover", "tournament_id": None, "match_ids": []}
+    assert "t-closed" not in json.dumps(public_hidden)
+    assert "m-closed" not in json.dumps(public_hidden)
+    staff_hidden = change_events._event_for_scope(hidden, "staff")
+    assert staff_hidden["tournament_event"]["tournament_id"] == "t-closed"
+    assert staff_hidden["tournament_event"]["match_ids"] == ["m-closed"]
+
+
 def test_change_is_published_even_if_the_tournament_lookup_fails(monkeypatch):
     def broken():
         raise RuntimeError("Datenbank weg")
