@@ -2,10 +2,12 @@ const crypto = require("node:crypto");
 const fs = require("node:fs");
 const path = require("node:path");
 const { test, expect } = require("@playwright/test");
+const { bilder } = require("./anleitungBilder");
 
 // Abnahme gegen den echten, lokal laufenden Server (docs/entwicklung/abnahme-lokal.md): Weiterkommen in vier Modi
 // (#1590). Admin stellt den Modus ein (Turnier und Phase, Erklärtexte, Minutenfeld nur bei der Show); Turnierleitung
 // macht bei der Show-Auslosung die Runde fertig, sieht die Karte „Auslosung bereit · N Namen“ mit Restzeit und lost;
+// an den Stationen bekommen die bereiten Läufe „Aufrufen“, wer noch auf das Los wartet, sagt das (#1858);
 // bei „sofort zufällig“ besetzt jedes Ergebnis sofort einen Platz in Runde 2 (der Baum des Spielers bewegt sich),
 // Neu auslosen trifft nur nicht begonnene Spiele, ein Austritt danach räumt den richtigen Platz; der Matchplan sagt
 // „wartet auf Auslosung“ bzw. „Prognose“. Desktop 1440 und Handy 375, keine Konsolenfehler, keine Antwort 4xx/5xx.
@@ -94,6 +96,20 @@ async function tournamentOf(page, tid) {
 
 function seated(match) {
   return (match.slots || []).filter((slot) => slot.registration_id).map((slot) => slot.registration_id);
+}
+
+/** Schreiben wie die Website: mit dem CSRF-Kopf aus dem Cookie der Sitzung. */
+async function post(page, url, data) {
+  const cookies = await page.context().cookies();
+  const csrf = decodeURIComponent(cookies.find((cookie) => cookie.name === "csrf_token")?.value || "");
+  return page.request.post(url, { data, headers: csrf ? { "X-CSRF-Token": csrf } : {} });
+}
+
+/** Je Station, was „Als Nächstes“ steht - aus der Live-Warteschlange des Servers. */
+async function nextUp(page, tid) {
+  const response = await page.request.get(`/api/tournaments/${tid}/live-queue`);
+  expect(response.status(), await response.text()).toBe(200);
+  return (await response.json()).stations.map((station) => station.next).filter(Boolean);
 }
 
 /** Ein Ergebnis über das Ergebnis-Fenster der Turnierleitung: Duell nach Stand, Lauf nach Reihenfolge der Tipps. */
@@ -216,6 +232,75 @@ test.describe("Abnahme: Weiterkommen in vier Modi gegen den echten Server", () =
     expect(problems).toEqual([]);
     expect(playerProblems).toEqual([]);
     await playerContext.close();
+  });
+
+  // #1858 (Generalprobe 2): Ein Lauf, der noch auf das Los wartet, stand „Als Nächstes“ an einer freien Station vor
+  // einem bereiten Lauf - kein „Aufrufen“. Läuft direkt nach dem Test oben: Winner Runde 2 ist ausgelost, Loser Runde 1
+  // wartet noch (der Server lost erst nach der Frist von 6 Minuten).
+  test("Show-Auslosung an den Stationen: bereite Läufe bekommen „Aufrufen“, wartende sagen „wartet auf die Auslosung“", async ({ browser, page }, testInfo) => {
+    test.skip(testInfo.project.name !== "chromium", "Größe stellt der Test selbst ein");
+    const tid = state.tournaments.mode_draw_show;
+    const slug = state.slugs.mode_draw_show;
+    // Wie am Abend vier Stationen (der Seed legt zwei an) - Stationen anlegen darf nur der Admin.
+    const adminContext = await browser.newContext({ viewport: SIZES.desktop });
+    const adminPage = await adminContext.newPage();
+    await login(adminPage, state.accounts.admin);
+    for (const name of ["Switch 3", "Switch 4"]) {
+      const created = await post(adminPage, "/api/stations", { name, device_type: "switch2", tournament_id: tid });
+      expect(created.status(), await created.text()).toBe(200);
+    }
+    await adminContext.close();
+
+    await page.setViewportSize(SIZES.handy);
+    await login(page, state.accounts.lead);
+    const problems = watch(page);
+    const rows = Object.values(await matchesOf(page, tid));
+    const ready = rows.filter((row) => row.round === 2 && row.section === "WB");
+    const waiting = rows.filter((row) => row.section === "LB" && row.draw_ready && !seated(row).length);
+    expect(ready.length === 2 && ready.every((row) => seated(row).length === 4), "Winner Runde 2 ist ausgelost").toBe(true);
+    expect(waiting.length, "Loser Runde 1 wartet noch auf die Show-Auslosung").toBe(2);
+    const group = waiting[0].settings.draw_group;
+    const readyKeys = ready.map((row) => row.match_key).sort();
+    const waitingKeys = waiting.map((row) => row.match_key).sort();
+
+    await page.goto(`/tournaments/${slug}/leitung`);
+    await page.getByTestId("lead-tab-stations").click();
+    const board = page.getByTestId("live-board");
+    const nexts = board.locator("[data-testid^='live-next-']");
+    await expect(board.locator("[data-testid^='live-station-']")).toHaveCount(4);
+    // Zwei freie Stationen mit „Aufrufen“ für die bereiten Läufe; die beiden anderen sagen, worauf ihr Lauf wartet.
+    await expect(board.locator("[data-testid^='live-call-']")).toHaveCount(2);
+    for (const key of readyKeys) await expect(nexts.filter({ hasText: `Durchgang ${key}` })).toHaveCount(1);
+    for (const key of waitingKeys) await expect(nexts.filter({ hasText: `Durchgang ${key}` })).toContainText("wartet auf die Auslosung");
+    await expect(board).not.toContainText("wartet auf die Vorspiele");
+    let shown = await nextUp(page, tid);
+    expect(shown.filter((entry) => entry.ready).map((entry) => entry.match_key).sort()).toEqual(readyKeys);
+    expect(shown.filter((entry) => !entry.ready).map((entry) => [entry.match_key, entry.waiting_for]).sort())
+      .toEqual(waitingKeys.map((key) => [key, "draw"]));
+    await shot(page, "show-stationen-waehrend-auslosung-375.png");
+    expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(0);
+    // Für das Handbuch (docs/handbuch/turniere.md, Live vor Ort): die Stationen am PC und am Handy.
+    await bilder(page, "stationen-auslosung", board);
+    await page.setViewportSize(SIZES.desktop);
+    await expect(board.locator("[data-testid^='live-call-']")).toHaveCount(2);
+    await shot(page, "show-stationen-waehrend-auslosung-1440.png");
+
+    // Nach dem zweiten Los: vier bereite Läufe, vier Stationen, viermal „Aufrufen“ - keiner wartet hinter einem anderen.
+    await page.setViewportSize(SIZES.handy);
+    await page.getByTestId("lead-tab-attention").click();
+    await page.getByTestId(`lead-draw-now-${group}`).click();
+    await expect(page.getByTestId(`lead-draw-${group}`)).toHaveCount(0);
+    await page.reload();
+    await page.getByTestId("lead-tab-stations").click();
+    await expect(board.locator("[data-testid^='live-call-']")).toHaveCount(4);
+    shown = await nextUp(page, tid);
+    expect(shown.map((entry) => entry.match_key).sort()).toEqual([...readyKeys, ...waitingKeys].sort());
+    expect(shown.every((entry) => entry.ready)).toBe(true);
+    await shot(page, "show-stationen-nach-auslosung-375.png");
+    await page.setViewportSize(SIZES.desktop);
+    await expect(board.locator("[data-testid^='live-call-']")).toHaveCount(4);
+    await shot(page, "show-stationen-nach-auslosung-1440.png");
+    expect(problems).toEqual([]);
   });
 
   test("Sofort zufällig: Ergebnis besetzt sofort einen Platz (Baum bewegt sich), zweites Ergebnis, Neu auslosen, Austritt danach", async ({ browser, page }, testInfo) => {
