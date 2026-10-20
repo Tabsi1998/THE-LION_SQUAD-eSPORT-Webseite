@@ -28,11 +28,10 @@ from services.match_duration import effective_match_duration
 from services.match_scheduler import (
     KEPT_SOURCES,
     RUNNING_STATUSES,
-    _min_players,
-    _unresolved,
     _usable_stations,
     load_plan_inputs,
     plan_schedule,
+    playable,
 )
 from services.round_labels import attach_round_labels
 from services.station_labels import station_text
@@ -204,6 +203,7 @@ def build_live_queue(
         due = report_by(match, match.get("called_at"), report_minutes) if called else None
         no_show = no_show_deadline(match, tournament, stage) if called else None
         filled = _filled(match)
+        ready = playable(match)
         entries[match["id"]] = {
             "match_id": match["id"],
             "match_key": match.get("match_key"),
@@ -218,7 +218,8 @@ def build_live_queue(
             "open_slots": _open_slots(match),
             # Lauf (mehr als zwei Plätze): die Stationen nennen dann den Durchgang und die Namen (#1824).
             "heat": _is_heat(match),
-            "ready": len(filled) >= _min_players(match) and not _unresolved(match),
+            # Aufrufbar - dieselbe Regel wie im Planer und bei „Aufrufen“ (#1858).
+            "ready": ready,
             "forecast": row["forecast"],
             "planned_at": _iso(planned),
             "forecast_at": _iso(row["start"]),
@@ -242,7 +243,10 @@ def build_live_queue(
         else:
             unplaced.append(entry["match_id"])
     for lane in lanes.values():
-        lane.sort(key=lambda entry: (_STATE_ORDER[entry["state"]], entry["forecast_at"], str(entry["match_key"] or "")))
+        # Bereite vor wartenden (#1858): „Als Nächstes“ ist ein aufrufbares Spiel, solange an der Station eines ansteht -
+        # auch wenn ein fester Termin eines wartenden früher läge.
+        lane.sort(key=lambda entry: (_STATE_ORDER[entry["state"]], not entry["ready"], entry["forecast_at"],
+                                     str(entry["match_key"] or "")))
         position = 0
         for entry in lane:
             if entry["state"] == "running":
