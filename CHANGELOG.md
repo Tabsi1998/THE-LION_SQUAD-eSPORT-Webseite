@@ -1,12 +1,11 @@
 # Changelog
 
-## [1.12.0](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/compare/v1.11.0...v1.12.0) (2026-10-20)
-
+## 1.12.0 (20.10.2026)
 
 ### Neu
 
-* Referenzen – Bereiche „Heute im Einsatz“ und „Läuft gerade“ auf der Übersicht ([#1748](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1748)) ([9e39ded](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/9e39ded033aecec5ae7015cd3d72a3a4762bb5f8))
-* Referenzen – schlanker öffentlicher Endpunkt für laufende Serien-Saisons ([#1748](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1748)) ([9e39ded](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/9e39ded033aecec5ae7015cd3d72a3a4762bb5f8))
+* Referenzen – Bereiche „Heute im Einsatz“ und „Läuft gerade“ auf der Übersicht (#1748)
+* Referenzen – schlanker öffentlicher Endpunkt für laufende Serien-Saisons (#1748)
 
 ## 1.11.0 (20.10.2026)
 
