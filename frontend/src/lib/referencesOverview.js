@@ -8,14 +8,54 @@ export const KIND_LABELS = { series: "Turnierserie", racing: "Rennliga", team_le
 
 // ---------------------------------------------------------------- Stufe
 
+// Wörter, nach denen die Nummer einer Stufe steht („Division 2“, „Liga 1“, „Div. 3“). Groß- und Kleinschreibung egal.
+const TIER_WORDS = new Set(["liga", "division", "div", "stufe", "tier", "league"]);
+
+/** Der Name in Wörter und Zahlen zerlegt - linear, Zeichen für Zeichen; Punkte bleiben als eigenes Stück stehen. */
+function tierTokens(text) {
+  const tokens = [];
+  let current = "";
+  for (const char of String(text || "")) {
+    if (/[\p{L}\p{N}]/u.test(char)) {
+      current += char;
+      continue;
+    }
+    if (current) tokens.push(current);
+    current = "";
+    if (char === ".") tokens.push(".");
+  }
+  if (current) tokens.push(current);
+  return tokens;
+}
+
+/** Eine Stufennummer: nur Ziffern, 1 bis 999 - eine vierstellige Jahreszahl ist keine Stufe, „4v4“ auch nicht. */
+function tierNumber(token) {
+  if (!token || token.length > 3 || ![...token].every((char) => char >= "0" && char <= "9")) return null;
+  const value = Number(token);
+  return value > 0 ? value : null;
+}
+
 /**
- * Rang einer Stufe aus ihrem Namen: die erste Zahl („Division 1“, „1. Liga“, „Liga 2“), kleiner ist höher. Ohne Zahl -
- * oder mit einer Jahreszahl - ist die Stufe nicht vergleichbar und steht ganz unten (Infinity).
+ * Rang einer Stufe aus ihrem Namen, kleiner ist höher: die Zahl direkt nach einem Stufenwort („4v4 Division 2“ → 2,
+ * „Saison 2026 – Liga 1“ → 1), sonst eine Ordnungszahl direkt davor („1. Liga“ → 1). Spielformate (4v4, 2x2) und
+ * Jahreszahlen zählen nicht. Ohne Treffer ist die Stufe nicht vergleichbar und steht ganz unten (Infinity) - dann gibt
+ * es weder Auf- noch Abstieg.
  */
 export function tierRank(text) {
-  const match = String(text || "").match(/\d+/);
-  const value = match ? Number(match[0]) : NaN;
-  return Number.isFinite(value) && value > 0 && value < 100 ? value : Infinity;
+  const tokens = tierTokens(text);
+  const words = tokens.map((token) => token.toLowerCase());
+  for (let index = 0; index < tokens.length; index += 1) {
+    if (!TIER_WORDS.has(words[index])) continue;
+    const next = tokens[index + 1] === "." ? tokens[index + 2] : tokens[index + 1];
+    const after = tierNumber(next);
+    if (after) return after;
+  }
+  for (let index = 2; index < tokens.length; index += 1) {
+    if (!TIER_WORDS.has(words[index]) || tokens[index - 1] !== ".") continue;
+    const before = tierNumber(tokens[index - 2]);
+    if (before) return before;
+  }
+  return Infinity;
 }
 
 /** Je Referenz die Saison und Spur, zu der sie gehört (aus dem Endpunkt „Serien und Ligen“). */

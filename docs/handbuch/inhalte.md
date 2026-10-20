@@ -225,8 +225,8 @@ Teilnahmen ganz ohne Datum stehen am Ende unter **Ohne Datum** – tragt also ei
 
 **Welche Teilnahme die Hauptkarte bekommt,** stellt ihr oben auf der Seite unter **Vitrine: Hauptkarte** ein:
 **Automatisch** (Vorgabe) nimmt den höchsten Platz in der höchsten Stufe, bei Gleichstand den neuesten. Die Stufe kommt aus
-der Saison, zu der die Referenz gehört, sonst aus dem Feld **Liga**; es zählt die Zahl darin („Liga 1“ vor „Liga 2“, ohne
-Zahl ganz unten). Oder ihr wählt eine der Podest-Referenzen fest – dann steht auf der Karte „Ausgewählt vom Verein“.
+der Saison, zu der die Referenz gehört, sonst aus dem Feld **Liga**; es zählt die Zahl nach Liga, Division, Div, Stufe,
+Tier oder League („Liga 1“ vor „Liga 2“, ohne solche Zahl ganz unten). Oder ihr wählt eine der Podest-Referenzen fest – dann steht auf der Karte „Ausgewählt vom Verein“.
 Gehört die Hauptkarte zu einer Saison, führt sie zur Seite der Saison, sonst zur Referenz.
 
 <table>
@@ -393,9 +393,10 @@ nie. Läuft nichts, fehlt der Bereich ganz. Zum Ändern genügt der Status der S
 
 **Serien & Ligen:** Darunter steht je Spur eine Karte mit ihrem **Liga-Weg** – jede sichtbare Saison mit Stufe, unserem
 Platz und einem Vermerk: **läuft** für die laufende Saison (hervorgehoben), **Aufstieg** oder **Abstieg**, wenn die
-nächste Saison eine höhere oder tiefere Stufe hat. Verglichen wird die Zahl im Namen der Stufe („Division 2“ → „Division
-1“ ist ein Aufstieg) – benennt Stufen also mit Zahl; ohne Zahl bleibt der Vermerk leer. Die Karte führt zur laufenden,
-sonst zur neuesten Saison.
+nächste Saison eine höhere oder tiefere Stufe hat. Verglichen wird die Zahl direkt nach **Liga**, **Division**, **Div**,
+**Stufe**, **Tier** oder **League** („Division 3“ → „Division 2“ ist ein Aufstieg, auch als „4v4 Division 3“; „1. Liga“
+geht ebenso). Spielformate wie 4v4 und Jahreszahlen zählen nicht – ohne solche Zahl bleibt der Vermerk leer. Die Karte
+führt zur laufenden, sonst zur neuesten Saison.
 
 <img src="../assets/referenzen/referenzen-serien-breit.png" alt="Serien und Ligen: je Spur der Liga-Weg mit Saison, Stufe, Platz, Aufstieg und laufender Saison" width="560">
 

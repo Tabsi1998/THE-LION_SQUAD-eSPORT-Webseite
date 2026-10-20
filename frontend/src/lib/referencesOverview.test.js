@@ -35,6 +35,51 @@ test("tierRank: die Zahl der Stufe zählt, kleiner ist höher; ohne Zahl ganz un
   expect(tierRank(null)).toBe(Infinity);
 });
 
+test("tierRank: die Zahl direkt nach dem Stufenwort zählt - nicht die erste Zahl im Namen", () => {
+  // Spielformat vorne: 4v4 ist keine Stufe.
+  expect(tierRank("4v4 Division 2")).toBe(2);
+  expect(tierRank("2x2 Liga 3")).toBe(3);
+  // Jahreszahl vorne: die Stufe dahinter zählt.
+  expect(tierRank("Saison 2026 – Liga 1")).toBe(1);
+  // Alle Stufenwörter, Groß- und Kleinschreibung egal, Satzzeichen dazwischen.
+  expect(tierRank("liga 3")).toBe(3);
+  expect(tierRank("DIV. 4")).toBe(4);
+  expect(tierRank("Div-2")).toBe(2);
+  expect(tierRank("Stufe 5")).toBe(5);
+  expect(tierRank("Tier 2")).toBe(2);
+  expect(tierRank("Pro League 1")).toBe(1);
+  // Ohne Stufenwort, nur Format, nur Jahr oder Jahr nach dem Stufenwort: nicht vergleichbar.
+  expect(tierRank("Season 3")).toBe(Infinity);
+  expect(tierRank("4v4")).toBe(Infinity);
+  expect(tierRank("4vs4 Cup 2")).toBe(Infinity);
+  expect(tierRank("Liga 2026")).toBe(Infinity);
+  expect(tierRank("Division A")).toBe(Infinity);
+});
+
+test("Liga-Weg: Division 3 → Division 2 ist ein Aufstieg, auch mit Format oder Jahr im Namen", () => {
+  const plain = leaguePath([
+    { season: "2025", tier: "Division 3", status: "completed" },
+    { season: "2026", tier: "Division 2", status: "completed" },
+  ]);
+  expect(plain.steps.map((step) => step.note)).toEqual(["Aufstieg", ""]);
+  const format = leaguePath([
+    { season: "2025", tier: "4v4 Division 3", status: "completed" },
+    { season: "2026", tier: "4v4 Division 2", status: "completed" },
+  ]);
+  expect(format.steps.map((step) => step.note)).toEqual(["Aufstieg", ""]);
+  const year = leaguePath([
+    { season: "2025", tier: "Saison 2025 – Liga 2", status: "completed" },
+    { season: "2026", tier: "Saison 2026 – Liga 1", status: "completed" },
+  ]);
+  expect(year.steps.map((step) => step.note)).toEqual(["Aufstieg", ""]);
+  // Nicht vergleichbar: weder Auf- noch Abstieg - auch wenn die erste Zahl im Namen sich ändert.
+  const unknown = leaguePath([
+    { season: "2025", tier: "2v2 Cup", status: "completed" },
+    { season: "2026", tier: "4v4 Cup", status: "completed" },
+  ]);
+  expect(unknown.steps.map((step) => step.note)).toEqual(["", ""]);
+});
+
 // ---------------------------------------------------------------- Hauptkarte
 
 test("Hauptkarte automatisch: höchste Stufe vor höchstem Platz, bei Gleichstand die neueste", () => {
