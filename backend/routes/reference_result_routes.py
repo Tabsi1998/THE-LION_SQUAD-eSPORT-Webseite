@@ -130,8 +130,10 @@ class ResultParticipantRef(BaseModel):
 
 
 class ResultEntryRow(ResultParticipantRef):
-    """Eine Zeile: Platz, Team in diesem Rennen, Punkte (zählen bei „Punkte nach Schlüssel“ nur mit ``points_source``
-    „manual“ oder „organizer“), Marken, Strafpunkte und der offizielle Gesamtstand nach der Runde (optional)."""
+    """Eine Zeile: Platz, Team in diesem Rennen, Punkte, Marken, Strafpunkte und der offizielle Gesamtstand nach der
+    Runde (optional). Punkte bei „Punkte nach Schlüssel“: nur ``points_source`` „manual“ überschreibt den Schlüssel;
+    „organizer“ wird als Wert des Veranstalters gespeichert und nur verglichen (Warnung ``points_differ``). Bei
+    „Punkte laut Veranstalter“ zählt der eingetragene Wert."""
     place: Optional[int] = Field(default=None, ge=1, le=1000)
     team: Optional[str] = Field(default=None, max_length=120)
     points: Optional[float] = Field(default=None, ge=-10000, le=10000, allow_inf_nan=False)

@@ -29,6 +29,11 @@ Eine Zeile nennt den Teilnehmer über `participant_id`, `name` (wie beim Veranst
 nach der Runde). Team-Liga: `matches` mit `home`, `away`, Ergebnis, `maps` und `lineup` (Teilnehmer wie oben), dazu
 `official_table` (Tabelle laut Veranstalter nach dem Spieltag) und `official_team_totals`.
 
+- **Punkte:** In einer Serie mit Punkteschlüssel zählt der Schlüssel. Nur `points_source: "manual"` (Haken „Punkte
+  zählen statt Schlüssel“) überschreibt ihn mit dem eingetragenen Wert. `organizer` speichert den Wert des
+  Veranstalters und vergleicht ihn nur – weicht er ab, kommt die Warnung `points_differ`, gezählt wird weiter der
+  Schlüssel. In einer Serie „Punkte laut Veranstalter“ zählt der eingetragene Wert.
+
 - **Zuordnen:** Name vor Startnummer – erst der volle Name, dann ohne Clan-Tag; bei mehreren Treffern entscheidet die
   Startnummer. Unbekannte Namen heißen in der Vorschau `neu:<Schlüssel>` und werden beim Übernehmen als offene
   Teilnehmer angelegt (Dialog „Unbekannte Namen“); ein bestätigter Alias ordnet sie sofort zu. Verwirft der Vorstand

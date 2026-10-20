@@ -6,7 +6,7 @@ import sys
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 
 from services import series_results  # noqa: E402
-from services.scoring_rules import normalize_rules  # noqa: E402
+from services.scoring_rules import normalize_rules, result_points  # noqa: E402
 from services.series_results import check, final_line, official_warnings, replace_new_ids, resolve  # noqa: E402
 
 PEOPLE = [
@@ -113,12 +113,29 @@ def test_points_against_the_scheme():
     out = _resolved([
         {"participant_id": "p-anna", "place": 1, "points": 11, "marks": ["fastest_lap"]},  # passt: 10 + 1
         {"participant_id": "p-bert", "place": 2, "points": 8},                               # Schlüssel sagt 6
-        {"participant_id": "p-carl", "place": 3, "points": 5, "points_source": "manual"},
-        {"participant_id": "p-carl2", "place": 4, "points": 2, "points_source": "organizer"},
     ])
     check(out, SCHEME, ROUND, TODAY)
-    assert _codes(out.warnings) == ["points_differ", "points_manual", "points_manual"]
-    assert [row["points_source"] for row in out.rows] == ["scheme", "scheme", "manual", "manual"]
+    assert _codes(out.warnings) == ["points_differ"]
+    assert [row["points_source"] for row in out.rows] == ["scheme", "scheme"]
+
+
+def test_with_a_scheme_organizer_points_are_only_compared_and_the_scheme_counts():
+    out = _resolved([{"participant_id": "p-carl", "place": 3, "points": 7, "points_source": "organizer"}])
+    check(out, SCHEME, ROUND, TODAY)
+    row = out.rows[0]
+    # Gespeichert als Wert des Veranstalters, gezählt wird der Schlüssel (Platz 3: 4 Punkte) - mit Warnung.
+    assert (row["points_source"], row["points"]) == ("organizer", 7)
+    assert result_points(row, SCHEME)["points"] == 4
+    points = [item for item in out.warnings if item["code"].startswith("points")]
+    assert _codes(points) == ["points_differ"] and "gezählt wird der Schlüssel" in points[0]["message"]
+
+
+def test_with_a_scheme_only_manual_points_override_it():
+    out = _resolved([{"participant_id": "p-carl", "place": 3, "points": 5, "points_source": "manual"}])
+    check(out, SCHEME, ROUND, TODAY)
+    row = out.rows[0]
+    assert (row["points_source"], result_points(row, SCHEME)["points"]) == ("manual", 5)
+    assert [code for code in _codes(out.warnings) if code.startswith("points")] == ["points_manual"]
 
 
 def test_points_by_the_organizer_are_kept_and_missing_ones_are_flagged():
@@ -127,6 +144,8 @@ def test_points_by_the_organizer_are_kept_and_missing_ones_are_flagged():
                      {"participant_id": "p-carl", "marks": ["dns"]}], rules=ORGANIZER)
     check(out, ORGANIZER, ROUND, TODAY)
     assert [row["points_source"] for row in out.rows] == ["organizer", "organizer", "organizer"]
+    # In der Serie „laut Veranstalter“ zählt der eingetragene Wert.
+    assert result_points(out.rows[0], ORGANIZER)["points"] == 30
     assert _codes(out.warnings) == ["points_missing"] and out.warnings[0]["rows"] == [1]
 
 

@@ -12,9 +12,10 @@ Finalgrenze. Laden, Speichern und das Neurechnen der Stände machen die Routen (
   Platz fehlt, Nichtstart mit Platz, Punkte passen nicht zum Schlüssel oder fehlen bei „laut Veranstalter“, Maps passen
   nicht zum Ergebnis, eigenes Team fehlt im Spiel, Team doppelt in der Tabelle, Termin liegt in der Zukunft oder zählt
   nicht zur Wertung. Die Abweichung zum offiziellen Gesamtstand kommt aus dem gerechneten Stand (``official_warnings``).
-- **Punkte:** Bei „Punkte nach Schlüssel“ zählen eingetragene Punkte nur mit ``points_source`` „manual“ oder
-  „organizer“ (gespeichert als „manual“ - so rechnet ``scoring_rules.result_points``); bei „Punkte laut Veranstalter“
-  ist jede Zeile „organizer“.
+- **Punkte:** Bei „Punkte nach Schlüssel“ überschreiben eingetragene Punkte den Schlüssel nur mit ``points_source``
+  „manual“ (Haken „Punkte zählen statt Schlüssel“). „organizer“ speichert den Wert des Veranstalters und vergleicht
+  ihn nur (Warnung ``points_differ``), gezählt wird der Schlüssel - so rechnet ``scoring_rules.result_points``. Bei
+  „Punkte laut Veranstalter“ zählt jede Zeile wie eingetragen („organizer“).
 - **Finalgrenze** (``final_line``): wer nach dieser Runde unter den besten ``final_top_n`` steht, wer neu drin ist und
   wer herausgefallen ist.
 
@@ -171,12 +172,16 @@ def _remember_new(resolution: Resolution, located: Located, ref: dict, *, row: i
 
 
 def _points_source(raw: dict, rules: dict) -> tuple[str, object]:
+    """Herkunft der eingetragenen Punkte. Serie „laut Veranstalter“: jede Zeile zählt wie eingetragen („organizer“,
+    „manual“ bleibt „manual“). Serie mit Schlüssel: nur „manual“ überschreibt den Schlüssel; „organizer“ bleibt der
+    Wert des Veranstalters - gespeichert und verglichen (Warnung ``points_differ``), gezählt wird der Schlüssel."""
     points = raw.get("points")
     points = None if points is None else number(float(points))
+    source = raw.get("points_source")
     if rules["points_mode"] == "organizer":
-        return ("manual" if raw.get("points_source") == "manual" and points is not None else "organizer"), points
-    if raw.get("points_source") in ("manual", "organizer") and points is not None:
-        return "manual", points
+        return ("manual" if source == "manual" and points is not None else "organizer"), points
+    if source in ("manual", "organizer") and points is not None:
+        return source, points
     return "scheme", points
 
 
