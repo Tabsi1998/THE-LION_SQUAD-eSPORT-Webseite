@@ -50,17 +50,30 @@ const TABLE_HEADERS = {
   points: ["pkt", "punkte", "pts", "points"],
 };
 
+// Jede Art Leerraum zählt gleich: Leerzeichen, Tab, geschütztes und schmales geschütztes Leerzeichen (U+00A0, U+202F),
+// Ziffern- und Viertelgeviert-Leerzeichen, Zeilentrenner. Unsichtbare Zeichen ohne Breite (U+200B, U+2060, BOM) fallen
+// weg. Der Ausdruck prüft genau ein Zeichen und ist damit linear.
+const SPACE = /\s/u;
+const INVISIBLE = new Set(["\u200b", "\u2060", "\ufeff"]);
+
 function isSpace(char) {
-  return char === " " || char === "\t" || char === " " || char === "\r" || char === "\f" || char === "\v";
+  return SPACE.test(char);
 }
 
-/** Leerraum zusammenfassen – ohne regulären Ausdruck. */
-export function cleanText(value) {
+/** Text vor dem Erkennen: Unicode in NFC (ein „é“ ist dann immer dasselbe Zeichen). */
+export function normalizeText(value) {
   const text = String(value ?? "");
+  return typeof text.normalize === "function" ? text.normalize("NFC") : text;
+}
+
+/** Leerraum zusammenfassen – ohne regulären Ausdruck über die ganze Eingabe. */
+export function cleanText(value) {
+  const text = normalizeText(value);
   let out = "";
   let pending = false;
   for (const char of text) {
-    if (isSpace(char) || char === "\n") {
+    if (INVISIBLE.has(char)) continue;
+    if (isSpace(char)) {
       pending = out.length > 0;
       continue;
     }
@@ -128,7 +141,7 @@ function short(text) {
 
 /** Zeilen samt Nummer; ab `maxRows` gefüllten Zeilen ist Schluss (mit Fehler). */
 function readLines(text, maxRows, errors) {
-  let source = String(text ?? "");
+  let source = normalizeText(text);
   if (source.length > MAX_PASTE_CHARS) {
     errors.push({ line: null, text: "", message: `Der Text ist zu lang – höchstens ${MAX_PASTE_CHARS.toLocaleString("de-AT")} Zeichen.` });
     source = source.slice(0, MAX_PASTE_CHARS);
@@ -186,8 +199,9 @@ function tokenize(text) {
   let current = "";
   let gap = 0;
   let spaces = 0;
-  for (const char of String(text ?? "")) {
-    if (isSpace(char) || char === "\n") {
+  for (const char of normalizeText(text)) {
+    if (INVISIBLE.has(char)) continue;
+    if (isSpace(char)) {
       if (current) {
         items.push({ text: current, gap });
         current = "";

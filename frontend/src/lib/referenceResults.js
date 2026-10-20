@@ -2,7 +2,7 @@
 // wandeln. Gerechnet und geprüft wird im Server (Vorschau) – hier wird nur übersetzt. Text aus der Zwischenablage liest
 // ausschließlich `lib/resultPaste.js`.
 
-import { parseNumber, parsePlace } from "@/lib/resultPaste";
+import { cleanText, parseNumber, parsePlace } from "@/lib/resultPaste";
 
 export const MARK_OPTIONS = [
   ["dnf", "DNF"], ["dns", "DNS"], ["dsq", "DSQ"], ["fastest_lap", "Schnellste Runde"], ["pole", "Pole"],
@@ -100,9 +100,9 @@ export function hintToPoints(row, participants = []) {
 
 /** Genau ein Teilnehmer mit diesem Namen (ohne Groß/klein) – sonst entscheidet der Server. */
 export function matchParticipant(name, participants = []) {
-  const wanted = text(name).trim().toLowerCase();
+  const wanted = cleanText(name).toLowerCase();
   if (!wanted) return null;
-  const found = participants.filter((person) => text(person.name).trim().toLowerCase() === wanted);
+  const found = participants.filter((person) => cleanText(person.name).toLowerCase() === wanted);
   return found.length === 1 ? found[0] : null;
 }
 
@@ -158,7 +158,7 @@ export function countFieldErrors(errors) {
 
 function reference(item) {
   if (item.participant_id) return { participant_id: item.participant_id };
-  const out = { name: text(item.name).trim() };
+  const out = { name: cleanText(item.name) };
   if (text(item.start_number).trim()) out.start_number = text(item.start_number).trim();
   return out;
 }

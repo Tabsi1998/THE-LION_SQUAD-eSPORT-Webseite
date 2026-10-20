@@ -5,7 +5,7 @@ import { cleanText, parseMark, parseNumber, parsePlace, parseResultPaste, parseT
 const pick = (rows, ...keys) => rows.map((row) => Object.fromEntries(keys.map((key) => [key, row[key]])));
 
 test("Bausteine: Leerraum, Zahlen, Plätze und Marken", () => {
-  expect(cleanText("  Probe  Fahrer\t ")).toBe("Probe Fahrer");
+  expect(cleanText("  Probe\u00a0 Fahrer\t ")).toBe("Probe Fahrer");
   expect(parseNumber("25")).toBe(25);
   expect(parseNumber("12,5")).toBe(12.5);
   expect(parseNumber("-3")).toBe(-3);
@@ -158,4 +158,19 @@ test("Tabelle laut Veranstalter: Zeilen, Kopfzeile, Maps-Stand und kaputte Zeile
   ]);
   expect(header.errors).toEqual([{ line: 3, text: "x", message: "Kein Team erkannt." }]);
   expect(parseTablePaste("1\n2").errors[0].message).toContain("Format nicht erkannt");
+});
+
+test("Unicode: jede Art Leerraum zählt gleich, unsichtbare Zeichen fallen weg, Namen in NFC", () => {
+  // Geschütztes (U+00A0) und schmales geschütztes Leerzeichen (U+202F), Viertelgeviert (U+2005), Tab, BOM, U+200B.
+  const text = "\ufeff1.\u00a0Alpha\u202fFahrer\u00a0\u00a025\n2.\u2005Be\u200bta \u00a018 Pkt\n3. Jose\u0301 Probe";
+  const result = parseResultPaste(text);
+  expect(result.errors).toEqual([]);
+  expect(pick(result.rows, "place", "name", "points")).toEqual([
+    { place: 1, name: "Alpha Fahrer", points: 25 },
+    { place: 2, name: "Beta", points: 18 },
+    { place: 3, name: "Jos\u00e9 Probe", points: null },
+  ]);
+  expect(parseResultPaste("1\t\u00a0Alpha\u202f\t25").rows[0]).toMatchObject({ name: "Alpha", points: 25 });
+  expect(cleanText("\u2003Probe\u3000Name\u2028")).toBe("Probe Name");
+  expect(cleanText("Cafe\u0301")).toBe("Caf\u00e9");
 });
