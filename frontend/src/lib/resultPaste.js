@@ -3,7 +3,8 @@
 // Marken – danach prüft und rechnet die Vorschau des Servers.
 //
 // Erkannt werden:
-// - Zeilen wie „1. Name 25“, „1) Name“, „Name“ (nur Namen in Reihenfolge), „3 Name DNF“, „1. Name 25 Pkt“.
+// - Zeilen wie „1. Name  25“ (Punkte mit zwei Leerzeichen abgesetzt), „1. Name 25 Pkt“, „1) Name“, „Name“ (nur Namen in
+//   Reihenfolge), „3 Name DNF“. Eine Zahl, die nur mit einem Leerzeichen am Namen hängt, bleibt beim Namen (`points_hint`).
 // - Tabellen mit Tab (aus Excel oder einer Website kopiert), „|“ oder „;“ als Trenner – mit oder ohne Kopfzeile
 //   („Platz | Fahrer | Team | Punkte“). Ohne Kopfzeile: erste Zahl Platz, erster Text Name, zweiter Text Team, letzte
 //   Zahl Punkte, eine Zahl vor dem Namen Startnummer; „Name;Platz“ geht auch.
@@ -26,7 +27,7 @@ const MARK_WORDS = {
   pole: "pole",
 };
 
-const POINT_UNITS = new Set(["pkt", "pkt.", "punkte", "pts", "pts.", "points", "p"]);
+const POINT_UNITS = new Set(["pkt", "pkt.", "punkte", "pts", "pts.", "points", "p", "p."]);
 
 const RESULT_HEADERS = {
   place: ["platz", "pl", "pos", "position", "rang", "rank", "#"],
@@ -179,49 +180,82 @@ function readHeader(cells, headers, required) {
 }
 
 // ---------------------------------------------------------------- Ergebnisliste
+/** Wörter einer Zeile samt Zahl der Leerzeichen davor (`gap`) – zeichenweise, ohne regulären Ausdruck. */
+function tokenize(text) {
+  const items = [];
+  let current = "";
+  let gap = 0;
+  let spaces = 0;
+  for (const char of String(text ?? "")) {
+    if (isSpace(char) || char === "\n") {
+      if (current) {
+        items.push({ text: current, gap });
+        current = "";
+      }
+      spaces += 1;
+      continue;
+    }
+    if (!current) {
+      gap = items.length ? spaces : 0;
+      spaces = 0;
+    }
+    current += char;
+  }
+  if (current) items.push({ text: current, gap });
+  return items;
+}
+
+// Zeilenformat: eine Zahl am Ende ist nur dann Punkte, wenn sie klar abgesetzt ist – mindestens zwei Leerzeichen davor
+// oder eine Einheit dahinter („25 Pkt“, „25 P.“). Sonst gehört sie zum Namen („Max Muster 33“), und die Zeile bekommt
+// `points_hint`: die Oberfläche fragt, ob die letzte Zahl Punkte sind.
 function lineRow(text) {
-  const tokens = cleanText(text).split(" ");
+  const items = tokenize(text);
   let place = null;
-  const first = tokens[0];
+  const first = items[0].text;
   let digits = 0;
   while (digits < first.length && isDigit(first[digits])) digits += 1;
   if (digits > 0 && digits === first.length) {
     place = parsePlace(first);
-    if (place !== null) tokens.shift();
+    if (place !== null) items.shift();
   } else if (digits > 0 && (first[digits] === "." || first[digits] === ")")) {
     place = parsePlace(first.slice(0, digits + 1));
     if (place !== null) {
       const rest = first.slice(digits + 1);
-      tokens.shift();
-      if (rest) tokens.unshift(rest);
+      items.shift();
+      if (rest) items.unshift({ text: rest, gap: 1 });
     }
   }
-  while (tokens.length && (tokens[0] === "-" || tokens[0] === "–" || tokens[0] === "|")) tokens.shift();
+  while (items.length && (items[0].text === "-" || items[0].text === "–" || items[0].text === "|")) items.shift();
 
   let points = null;
+  let hint = null;
+  let unit = false;
   const marks = [];
-  while (tokens.length > 1) {
-    const last = tokens[tokens.length - 1];
-    const lower = last.toLowerCase();
-    const mark = parseMark(last);
+  while (items.length > 1) {
+    const last = items[items.length - 1];
+    const mark = parseMark(last.text);
     if (mark) {
       if (!marks.includes(mark)) marks.unshift(mark);
-      tokens.pop();
+      items.pop();
       continue;
     }
-    if (POINT_UNITS.has(lower) && tokens.length > 2 && parseNumber(tokens[tokens.length - 2]) !== null && points === null) {
-      tokens.pop();
+    if (POINT_UNITS.has(last.text.toLowerCase()) && items.length > 2 && parseNumber(items[items.length - 2].text) !== null && points === null) {
+      items.pop();
+      unit = true;
       continue;
     }
-    const number = parseNumber(last);
-    if (number !== null && points === null && !last.startsWith("+")) {
-      points = number;
-      tokens.pop();
-      continue;
+    const number = parseNumber(last.text);
+    if (number !== null && points === null && !last.text.startsWith("+")) {
+      if (unit || last.gap >= 2) {
+        points = number;
+        items.pop();
+      } else {
+        hint = { points: number, text: last.text };
+      }
     }
     break;
   }
-  return { place, name: tokens.join(" "), team: "", points, start_number: "", marks };
+  return { place, name: items.map((item) => item.text).join(" "), team: "", points, start_number: "", marks, points_hint: hint };
 }
 
 function cellRow(cells) {
@@ -256,11 +290,11 @@ function cellRow(cells) {
     place = numbers.shift();
   }
   const points = numbers.length ? numbers[numbers.length - 1] : null;
-  return { place, name, team, points, start_number: startNumber, marks };
+  return { place, name, team, points, start_number: startNumber, marks, points_hint: null };
 }
 
 function headerRow(cells, keys) {
-  const row = { place: null, name: "", team: "", points: null, start_number: "", marks: [] };
+  const row = { place: null, name: "", team: "", points: null, start_number: "", marks: [], points_hint: null };
   keys.forEach((key, index) => {
     const cell = cells[index] || "";
     if (!cell) return;
@@ -282,7 +316,8 @@ function headerRow(cells, keys) {
 
 /**
  * Ergebnisliste aus der Zwischenablage.
- * Liefert `{format, header, rows: [{line, place, name, team, points, start_number, marks}], errors: [{line, text, message}]}`.
+ * Liefert `{format, header, rows: [{line, place, name, team, points, start_number, marks, points_hint}], errors: [{line, text, message}]}`.
+ * `points_hint` (`{points, text}` oder `null`): Zeilenformat mit einer Zahl am Ende, die auch zum Namen gehören kann.
  * `place` und `points` sind `null`, wenn die Liste sie nicht nennt – dann zählt die Reihenfolge bzw. der Schlüssel.
  */
 export function parseResultPaste(text, { maxRows = MAX_PASTE_ROWS } = {}) {
@@ -318,7 +353,7 @@ export function parseResultPaste(text, { maxRows = MAX_PASTE_ROWS } = {}) {
     rows.push({ line: line.number, ...row, team: row.team.slice(0, MAX_NAME) });
   });
   if (!rows.length && lines.length && errors.every((error) => error.message === NO_NAME)) {
-    errors.unshift({ line: null, text: "", message: "Format nicht erkannt. Je Zeile ein Teilnehmer, etwa „1. Name 25“ oder eine Tabelle mit Tab, „|“ oder „;“." });
+    errors.unshift({ line: null, text: "", message: "Format nicht erkannt. Je Zeile ein Teilnehmer, etwa „1. Name  25“ oder eine Tabelle mit Tab, „|“ oder „;“." });
   }
   return { format: lines.length ? separator.format : null, header: Boolean(keys), rows, errors };
 }

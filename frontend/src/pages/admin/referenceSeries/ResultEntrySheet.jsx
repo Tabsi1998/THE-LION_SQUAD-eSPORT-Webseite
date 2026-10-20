@@ -5,7 +5,7 @@ import { INPUT_CLASS, TextAreaField } from "@/components/tls/FormFields";
 import { roundLabel, roundWhen } from "@/lib/referenceCalendar";
 import { parseResultPaste, parseTablePaste } from "@/lib/resultPaste";
 import {
-  MARK_OPTIONS, autoPlaces, emptyMap, emptyMatch, emptyRow, formStamp, formToPayload, formatPoints, matchParticipant,
+  MARK_OPTIONS, autoPlaces, hintToPoints, emptyMap, emptyMatch, emptyRow, formStamp, formToPayload, formatPoints, matchParticipant,
   pastedToRows, problemsByRow, scoredText, sheetToForm,
 } from "@/lib/referenceResults";
 import { ResultPreview } from "./ResultPreview";
@@ -60,7 +60,7 @@ function RowProblems({ items }) {
   );
 }
 
-function ResultRow({ row, index, autoPlace, organizerMode, problems, info, onChange, onRemove }) {
+function ResultRow({ row, index, autoPlace, organizerMode, problems, info, onChange, onHint, onRemove }) {
   const scored = info?.scored;
   const [open, setOpen] = useState(() => Boolean(row.penalty_points || row.start_number || row.official_total || row.override));
   const level = problems?.some((item) => item.level === "error") ? "error" : problems?.length ? "warning" : null;
@@ -122,6 +122,13 @@ function ResultRow({ row, index, autoPlace, organizerMode, problems, info, onCha
           {/* Bekannt oder neu sagt die Vorschau jedem; ob jemand Vereinsmitglied ist, nur dem Vorstand. */}
           <span data-testid="result-row-known" className={info.is_new ? "font-bold uppercase tracking-widest text-amber-300" : undefined}>{info.is_new ? "neu" : "bekannt"}</span>
           {scored && <span data-testid="result-row-scored">= {scoredText(scored)}</span>}
+        </div>
+      )}
+      {row.points_hint && (
+        <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-amber-300" data-testid="result-row-hint">
+          <span>„{row.points_hint.text}“ am Ende: Teil des Namens oder Punkte?</span>
+          <button type="button" onClick={onHint} data-testid="result-row-hint-points" className="underline underline-offset-2 hover:text-amber-100">Letzte Zahl = Punkte</button>
+          <button type="button" onClick={() => onChange({ points_hint: null })} data-testid="result-row-hint-name" className="underline underline-offset-2 text-amber-300/70 hover:text-amber-100">Gehört zum Namen</button>
         </div>
       )}
       <RowProblems items={problems} />
@@ -326,7 +333,8 @@ export function ResultEntrySheet({ series, round, onClose, onSaved }) {
     rows: current.rows.map((row) => {
       if (row.key !== key) return row;
       const next = { ...row, ...values };
-      if ("name" in values) {
+      if ("name" in values && !("points_hint" in values) && next.points_hint && !next.name.endsWith(` ${next.points_hint.text}`)) next.points_hint = null;
+      if ("name" in values && !("participant_id" in values && values.participant_id)) {
         // Bekannter Name: gleich mit Kennung und – wenn das Feld leer ist – dem Standard-Team.
         const known = matchParticipant(values.name, participants);
         if (known) {
@@ -336,6 +344,11 @@ export function ResultEntrySheet({ series, round, onClose, onSaved }) {
       }
       return next;
     }),
+  }));
+  const hinted = form ? form.rows.filter((row) => row.points_hint).length : 0;
+  const allHintsToPoints = () => setForm((current) => ({
+    ...current,
+    rows: current.rows.map((row) => (row.points_hint ? { ...row, ...hintToPoints(row, participants) } : row)),
   }));
   const removeRow = (key) => setForm((current) => ({ ...current, rows: current.rows.filter((row) => row.key !== key) }));
   const addRow = () => setForm((current) => ({ ...current, rows: [...current.rows, emptyRow()] }));
@@ -525,15 +538,21 @@ export function ResultEntrySheet({ series, round, onClose, onSaved }) {
                   <ClipboardList className="w-3.5 h-3.5" /> Liste einfügen
                 </button>
               </div>
+              {hinted > 1 && (
+                <div className="flex flex-wrap items-center gap-2 border border-amber-400/40 bg-amber-400/10 rounded-sm px-3 py-2 text-xs text-amber-100" data-testid="result-hints">
+                  <span className="flex-1 min-w-[12rem]">{hinted} Zeilen enden auf eine Zahl – Teil des Namens oder Punkte?</span>
+                  <button type="button" onClick={allHintsToPoints} data-testid="result-hints-points" className="tls-btn tls-btn--quiet px-2.5 py-1.5 rounded-sm text-[10px] font-bold uppercase tracking-wider">Bei allen: letzte Zahl = Punkte</button>
+                </div>
+              )}
               {pasting && (
-                <PasteBox onApply={pasteRows} label="Ergebnisliste einfügen" testId="result-paste" placeholder={"1. Name 25\n2. Name 18\n3. Name DNF"}
-                  hint="Je Zeile ein Teilnehmer: „1. Name 25“, nur Namen in Reihenfolge oder eine Tabelle aus Excel oder einer Website (Tab, „|“, „;“). Ersetzt die Liste unten." />
+                <PasteBox onApply={pasteRows} label="Ergebnisliste einfügen" testId="result-paste" placeholder={"1. Name  25\n2. Name 18 Pkt\n3. Name DNF"}
+                  hint="Je Zeile ein Teilnehmer: „1. Name  25“ (Punkte mit zwei Leerzeichen oder „Pkt“ abgesetzt), nur Namen in Reihenfolge oder eine Tabelle aus Excel oder einer Website (Tab, „|“, „;“). Ersetzt die Liste unten." />
               )}
               <ol className="divide-y divide-white/5" data-testid="result-rows">
                 {form.rows.map((row, index) => (
                   <ResultRow key={row.key} row={row} index={index} autoPlace={auto[row.key]} organizerMode={organizerMode}
                     problems={problems.byRow[row.key]} info={infoByKey[row.key]}
-                    onChange={(values) => updateRow(row.key, values)} onRemove={() => removeRow(row.key)} />
+                    onChange={(values) => updateRow(row.key, values)} onHint={() => updateRow(row.key, hintToPoints(row, participants))} onRemove={() => removeRow(row.key)} />
                 ))}
               </ol>
               <button type="button" onClick={addRow} data-testid="result-row-add" className="tls-btn tls-btn--secondary px-3 py-2 rounded-sm text-xs font-bold uppercase tracking-wider inline-flex items-center gap-2">

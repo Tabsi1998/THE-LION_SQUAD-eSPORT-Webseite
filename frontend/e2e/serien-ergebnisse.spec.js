@@ -81,7 +81,7 @@ for (const [width, height] of [[390, 844], [1440, 900]]) {
     await expect(sheet).toBeVisible();
 
     await sheet.getByTestId("result-paste-toggle").click();
-    await sheet.getByTestId("result-paste-text").fill("1. Alpha Probe 25 FL\n2. Beta Test 20\n3. Gamma Muster DNF");
+    await sheet.getByTestId("result-paste-text").fill("1. Alpha Probe  25 FL\n2. Beta Test 20 Pkt\n3. Gamma Muster DNF");
     await sheet.getByTestId("result-paste-apply").click();
     await expect(sheet.getByTestId("result-preview")).toBeVisible();
     await expect(sheet.getByTestId("result-row")).toHaveCount(3);

@@ -354,10 +354,13 @@ einem gewerteten Termin **Ergebnis ändern**. Das öffnet das Blatt des Termins.
 - **Mehr** (Regler-Symbol) zeigt die Marken **DNF**, **DNS**, **DSQ**, **Schnellste Runde** und **Pole**, dazu
   **Strafpunkte**, **Startnummer**, den **Gesamtstand laut Veranstalter** (wird mit der eigenen Rechnung verglichen) und
   **Punkte zählen statt Schlüssel**, wenn ein Wert bewusst vom Schlüssel abweicht.
-- **Liste einfügen:** die Ergebnisliste von der Seite des Veranstalters kopieren und einfügen – etwa `1. Name 25`,
+- **Liste einfügen:** die Ergebnisliste von der Seite des Veranstalters kopieren und einfügen – etwa `1. Name 25 Pkt`,
   `3 Name DNF`, nur Namen in Reihenfolge, `Name;Platz` oder eine Tabelle aus Excel oder einer Website (Tab, `|` oder
   `;`, gern mit Kopfzeile wie „Pos | Fahrer | Team | Punkte“). **Liste übernehmen** ersetzt die Zeilen und prüft gleich.
-  Was sich nicht lesen lässt, steht mit Zeilennummer darunter.
+  Was sich nicht lesen lässt, steht mit Zeilennummer darunter. Eine Zahl, die nur mit einem Leerzeichen am Namen hängt
+  („Max Muster 33“), bleibt beim Namen; die Zeile fragt dann **Letzte Zahl = Punkte** oder **Gehört zum Namen** (bei
+  mehreren Zeilen auch **Bei allen: letzte Zahl = Punkte**). Klar sind Punkte mit zwei Leerzeichen davor, mit „Pkt“
+  dahinter oder in einer eigenen Spalte.
 - **Team-Liga:** statt der Liste das **Spiel** – eigenes Team und Gegner (aus dem Termin vorbefüllt), Ergebnis, die
   **Maps** und die **Aufstellung** (wer gespielt hat). Darunter die **Tabelle laut Veranstalter**: einfügen, etwa
   `1. Team 10 7 1 2 22` oder mit Kopfzeile (Pl, Team, Sp, S, U, N, Maps, Pkt).

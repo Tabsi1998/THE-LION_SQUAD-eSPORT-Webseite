@@ -55,10 +55,12 @@ test("Team-Liga: Spiel mit Maps und Aufstellung, Tabelle ohne leere Werte", () =
 });
 
 test("eingefügte Liste: bekannte Namen gleich mit Kennung", () => {
-  const rows = pastedToRows(parseResultPaste("1. alpha 25\n2. Unbekannt DNF").rows, PEOPLE);
+  const rows = pastedToRows(parseResultPaste("1. alpha  25\n2. Unbekannt DNF\n3. Probe 7").rows, PEOPLE);
+  expect(rows[2].points_hint).toEqual({ points: 7, text: "7" });
   expect(rows.map((row) => [row.participant_id, row.name, row.place, row.points, row.marks])).toEqual([
     ["p1", "alpha", "1", "25", []],
     ["", "Unbekannt", "2", "", ["dnf"]],
+    ["", "Probe 7", "3", "", []],
   ]);
 });
 

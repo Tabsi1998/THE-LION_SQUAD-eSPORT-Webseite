@@ -23,17 +23,31 @@ test("Bausteine: Leerraum, Zahlen, Plätze und Marken", () => {
   expect(parseMark("Probe")).toBeNull();
 });
 
-test("Zeilen „1. Name 25“ mit Punkten, Einheit, Marken und ohne Leerzeichen nach dem Punkt", () => {
-  const result = parseResultPaste("1. Alpha Fahrer 25\n2) Beta 18 Pkt\n3 Gamma DNF\n4.Delta 12,5\n5 - Epsilon");
+test("Zeilen „1. Name  25“: Punkte nur klar abgesetzt (zwei Leerzeichen oder Einheit), Marken, ohne Leerzeichen nach dem Punkt", () => {
+  const result = parseResultPaste("1. Alpha Fahrer  25\n2) Beta 18 Pkt\n3 Gamma DNF\n4.Delta   12,5\n5 - Epsilon\n6. Zeta 7 P.");
   expect(result.format).toBe("lines");
   expect(result.errors).toEqual([]);
-  expect(pick(result.rows, "line", "place", "name", "points", "marks")).toEqual([
-    { line: 1, place: 1, name: "Alpha Fahrer", points: 25, marks: [] },
-    { line: 2, place: 2, name: "Beta", points: 18, marks: [] },
-    { line: 3, place: 3, name: "Gamma", points: null, marks: ["dnf"] },
-    { line: 4, place: 4, name: "Delta", points: 12.5, marks: [] },
-    { line: 5, place: 5, name: "Epsilon", points: null, marks: [] },
+  expect(pick(result.rows, "line", "place", "name", "points", "marks", "points_hint")).toEqual([
+    { line: 1, place: 1, name: "Alpha Fahrer", points: 25, marks: [], points_hint: null },
+    { line: 2, place: 2, name: "Beta", points: 18, marks: [], points_hint: null },
+    { line: 3, place: 3, name: "Gamma", points: null, marks: ["dnf"], points_hint: null },
+    { line: 4, place: 4, name: "Delta", points: 12.5, marks: [], points_hint: null },
+    { line: 5, place: 5, name: "Epsilon", points: null, marks: [], points_hint: null },
+    { line: 6, place: 6, name: "Zeta", points: 7, marks: [], points_hint: null },
   ]);
+});
+
+test("eine Zahl am Namen bleibt beim Namen – mit Hinweis, dass sie Punkte sein könnten", () => {
+  const result = parseResultPaste("1. Max Muster 33\n2. Lion77\n3 Probe Fahrer 18 DNF\nTest Name 5");
+  expect(result.errors).toEqual([]);
+  expect(pick(result.rows, "place", "name", "points", "marks", "points_hint")).toEqual([
+    { place: 1, name: "Max Muster 33", points: null, marks: [], points_hint: { points: 33, text: "33" } },
+    { place: 2, name: "Lion77", points: null, marks: [], points_hint: null },
+    { place: 3, name: "Probe Fahrer 18", points: null, marks: ["dnf"], points_hint: { points: 18, text: "18" } },
+    { place: null, name: "Test Name 5", points: null, marks: [], points_hint: { points: 5, text: "5" } },
+  ]);
+  // In Tabellen ist die Spalte klar getrennt – dort gibt es keinen Zweifel.
+  expect(parseResultPaste("1\tMax Muster\t33").rows[0]).toMatchObject({ name: "Max Muster", points: 33, points_hint: null });
 });
 
 test("nur Namen in Reihenfolge: kein Platz, die Reihenfolge zählt", () => {
@@ -92,7 +106,7 @@ test("„Name;Platz“ und „Name;Platz;Punkte“", () => {
 });
 
 test("kaputte Zeilen: Fehler mit Zeilennummer, der Rest wird gelesen", () => {
-  const result = parseResultPaste("1. Alpha 25\n2.\n3 18\n4. Delta");
+  const result = parseResultPaste("1. Alpha  25\n2.\n3 18\n4. Delta");
   expect(pick(result.rows, "line", "name")).toEqual([{ line: 1, name: "Alpha" }, { line: 4, name: "Delta" }]);
   expect(result.errors).toEqual([
     { line: 2, text: "2.", message: "Kein Name erkannt." },

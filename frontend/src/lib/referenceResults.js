@@ -18,7 +18,7 @@ const text = (value) => (value === null || value === undefined ? "" : String(val
 export function emptyRow(values = {}) {
   return {
     key: nextKey("row"), participant_id: "", name: "", team: "", place: "", points: "", override: false, marks: [],
-    penalty_points: "", start_number: "", official_total: "", note: "", source: "", ...values,
+    penalty_points: "", start_number: "", official_total: "", note: "", source: "", points_hint: null, ...values,
   };
 }
 
@@ -81,8 +81,19 @@ export function pastedToRows(parsed, participants = []) {
       points: text(row.points),
       marks: [...row.marks],
       start_number: row.start_number || "",
+      points_hint: row.points_hint || null,
     });
   });
+}
+
+/** „Letzte Zahl = Punkte“: die Zahl am Ende des Namens wird zu Punkten (nur, wenn der Name noch auf sie endet). */
+export function hintToPoints(row, participants = []) {
+  const hint = row.points_hint;
+  const suffix = hint ? ` ${hint.text}` : "";
+  if (!hint || !row.name.endsWith(suffix)) return { points_hint: null };
+  const name = row.name.slice(0, -suffix.length);
+  const known = matchParticipant(name, participants);
+  return { name, points: hint.text, points_hint: null, participant_id: known?.id || "", ...(known && !row.team && known.default_team ? { team: known.default_team } : {}) };
 }
 
 /** Genau ein Teilnehmer mit diesem Namen (ohne Groß/klein) – sonst entscheidet der Server. */

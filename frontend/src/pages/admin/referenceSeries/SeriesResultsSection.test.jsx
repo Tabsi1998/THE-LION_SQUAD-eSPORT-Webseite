@@ -165,7 +165,7 @@ test("Liste einfügen ersetzt die Zeilen und prüft gleich – Fehler mit Zeilen
   setup();
   await openRound();
   fireEvent.click(screen.getByTestId("result-paste-toggle"));
-  fireEvent.change(screen.getByTestId("result-paste-text"), { target: { value: "1. Alpha 25\n2.\n3. Gamma DNF" } });
+  fireEvent.change(screen.getByTestId("result-paste-text"), { target: { value: "1. Alpha  25\n2.\n3. Gamma DNF" } });
   fireEvent.click(screen.getByTestId("result-paste-apply"));
   await waitFor(() => expect(apiMock.post).toHaveBeenCalled());
   expect(screen.getAllByTestId("result-row-name").map((input) => input.value)).toEqual(["Alpha", "Gamma"]);
@@ -175,6 +175,46 @@ test("Liste einfügen ersetzt die Zeilen und prüft gleich – Fehler mit Zeilen
   ]);
   expect(screen.getByTestId("result-paste-errors")).toHaveTextContent("Zeile 2: Kein Name erkannt.");
   await screen.findByTestId("result-preview");
+});
+
+test("Zahl am Namensende: bleibt beim Namen, bis jemand „letzte Zahl = Punkte“ wählt", async () => {
+  setup();
+  await openRound();
+  fireEvent.click(screen.getByTestId("result-paste-toggle"));
+  fireEvent.change(screen.getByTestId("result-paste-text"), { target: { value: "1. Alpha 25\n2. Beta 18\n3. Probe 77" } });
+  fireEvent.click(screen.getByTestId("result-paste-apply"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalled());
+  expect(apiMock.post.mock.calls[0][1].rows[0]).toMatchObject({ name: "Alpha 25", points: null });
+  expect(screen.getAllByTestId("result-row-hint")).toHaveLength(3);
+  expect(screen.getByTestId("result-hints")).toHaveTextContent("3 Zeilen enden auf eine Zahl");
+  // Einzeln: Punkte; einzeln: gehört zum Namen; die übrigen auf einmal.
+  fireEvent.click(screen.getAllByTestId("result-row-hint-points")[0]);
+  fireEvent.click(screen.getAllByTestId("result-row-hint-name")[0]);
+  expect(screen.getAllByTestId("result-row-name").map((input) => input.value)).toEqual(["Alpha", "Beta 18", "Probe 77"]);
+  expect(screen.getAllByTestId("result-row-points")[0]).toHaveValue("25");
+  expect(screen.getAllByTestId("result-row-team")[0]).toHaveValue("Probe Racing");
+  expect(screen.queryByTestId("result-hints")).toBeNull();
+  fireEvent.click(screen.getByTestId("result-row-hint-points"));
+  expect(screen.getAllByTestId("result-row-name").map((input) => input.value)).toEqual(["Alpha", "Beta 18", "Probe"]);
+  fireEvent.click(screen.getByTestId("result-submit"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledTimes(2));
+  expect(apiMock.post.mock.calls[1][1].rows).toEqual([
+    expect.objectContaining({ participant_id: "p1", points: 25, points_source: "organizer" }),
+    expect.objectContaining({ name: "Beta 18", points: null }),
+    expect.objectContaining({ name: "Probe", points: 77 }),
+  ]);
+});
+
+test("mehrere Zahlen am Namensende: auf einmal als Punkte lesen", async () => {
+  setup();
+  await openRound();
+  fireEvent.click(screen.getByTestId("result-paste-toggle"));
+  fireEvent.change(screen.getByTestId("result-paste-text"), { target: { value: "1. Alpha 25\n2. Beta 18" } });
+  fireEvent.click(screen.getByTestId("result-paste-apply"));
+  fireEvent.click(await screen.findByTestId("result-hints-points"));
+  expect(screen.getAllByTestId("result-row-name").map((input) => input.value)).toEqual(["Alpha", "Beta"]);
+  expect(screen.getAllByTestId("result-row-points").map((input) => input.value)).toEqual(["25", "18"]);
+  expect(screen.queryByTestId("result-row-hint")).toBeNull();
 });
 
 test("409 beim Übernehmen: Neu laden zeigt den aktuellen Stand, eigene Eingaben nur bewusst wieder anwenden", async () => {
