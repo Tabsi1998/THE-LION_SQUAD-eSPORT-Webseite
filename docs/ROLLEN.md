@@ -239,8 +239,9 @@ je Saison Captains eintragen, die nur für diese eine Saison Ergebnisse und Scor
 | Saison in der Verwaltung öffnen | ja | ja | nein |
 | Kalender der Saison ansehen (#1742) | ja | ja, nur lesen | nein |
 | Termine anlegen, einfügen, verschieben, absagen, ordnen (#1742) | ja | nein | nein |
-| Ergebnisse eintragen (Entwurf) | ja | ja (Pakete #1742 ff.) | nein |
+| Ergebnisse eintragen (Entwurf, #1744) | ja | ja | nein |
 | Ergebnisse veröffentlichen | ja | nur wenn die Saison auf „Captain veröffentlicht direkt“ steht oder der Captain das Recht „Darf veröffentlichen“ hat | nein |
+| Entwurf eines Captains freigeben oder verwerfen (#1744) | ja | nein | nein |
 
 - **Zwei-Faktor ist Pflicht** – für den Vorstand wie für Captains (Entscheidung 7 des Obmanns). Ohne bestätigte
   Zwei-Faktor-Anmeldung antwortet der Server mit dem Hinweis darauf; das Web führt zur Einrichtung.
@@ -260,7 +261,9 @@ je Saison Captains eintragen, die nur für diese eine Saison Ergebnisse und Scor
   sieht seine Saisons unter „Mein Dienst“ → „Meine Serien“ (`/admin/dienst`); `/admin` führt Captains ohne
   Verwaltungsbereich dorthin. Die Seite der Saison zeigt ihm keine Knöpfe des Vorstands.
 - **Protokoll:** Hinzufügen, Ändern und Entfernen stehen im Adminprotokoll (`reference_series.staff_add`,
-  `reference_series.staff_update`, `reference_series.staff_remove`) mit Vorher und Nachher.
+  `reference_series.staff_update`, `reference_series.staff_remove`) mit Vorher und Nachher; Ergebnisse mit
+  `reference_result.save`, `.pending_draft`, `.approve` und `.discard`, der alte Stand als Revision
+  ([API zum Eintragen](entwicklung/serien-ergebnisse.md)).
 - **Code:** `services/reference_series_access.py` (`require_series_editor`, `SeriesAccess`), Verwaltung in
   `routes/reference_staff_routes.py`.
 

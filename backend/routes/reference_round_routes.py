@@ -6,7 +6,8 @@ abgesagt und verschoben - „heute“ und „Ergebnis fehlt“ rechnet ``service
 Wiener Tag (``club_today()``). Verschieben hält den ursprünglichen Termin fest (``original_starts_at`` und
 ``original_club_day``, beim ersten Verschieben gesetzt und danach behalten), Absagen merkt sich den Status davor.
 Gelöscht wird nichts: Termine werden archiviert. Nach jeder Änderung rechnet der Server die Stände der Serie neu
-(abgesagte Runden zählen nicht zur Rundenzahl, ``counts`` nimmt eine Runde aus der Wertung).
+(abgesagte Runden zählen nicht zur Rundenzahl, ``counts`` nimmt eine Runde aus der Wertung). Jede Änderung läuft unter
+der Sperre der Saison, wie das Eintragen der Ergebnisse (``reference_series.series_locked``, #1744).
 
 Öffentlich: ``/api/reference-series/public/<spur>/<saison>/calendar`` - nur, wenn Spur und Serie sichtbar und nicht
 archiviert sind, ohne Notizen. Die Felder (Titel, Ort, Tag, Zeitpunkt, Status) sind so gewählt, dass der Vereinskalender
@@ -226,6 +227,7 @@ async def admin_calendar(series_id: str, access: SeriesAccess = Depends(require_
 
 
 @router.post("/admin/series/{series_id}/rounds")
+@reference_series.series_locked
 async def create_round(series_id: str, body: RoundCreateBody, me: dict = Depends(require_area("content"))):
     db = get_db()
     series = await _series(db, series_id)
@@ -249,6 +251,7 @@ async def create_round(series_id: str, body: RoundCreateBody, me: dict = Depends
 
 
 @router.patch("/admin/series/{series_id}/rounds/{round_id}")
+@reference_series.series_locked
 async def update_round(series_id: str, round_id: str, body: RoundUpdateBody,
                        me: dict = Depends(require_area("content"))):
     db = get_db()
@@ -276,6 +279,7 @@ async def update_round(series_id: str, round_id: str, body: RoundUpdateBody,
 
 
 @router.post("/admin/series/{series_id}/rounds/{round_id}/postpone")
+@reference_series.series_locked
 async def postpone_round(series_id: str, round_id: str, body: RoundPostponeBody,
                          me: dict = Depends(require_area("content"))):
     """Neuer Tag (und Uhrzeit); der ursprüngliche Termin bleibt vom ersten Verschieben an stehen."""
@@ -304,6 +308,7 @@ async def postpone_round(series_id: str, round_id: str, body: RoundPostponeBody,
 
 
 @router.post("/admin/series/{series_id}/rounds/{round_id}/cancel")
+@reference_series.series_locked
 async def cancel_round(series_id: str, round_id: str, body: RoundCancelBody,
                        me: dict = Depends(require_area("content"))):
     """Abgesagt: zählt nie als „Ergebnis fehlt“ und nicht zur Rundenzahl der Wertung."""
@@ -323,6 +328,7 @@ async def cancel_round(series_id: str, round_id: str, body: RoundCancelBody,
 
 
 @router.post("/admin/series/{series_id}/rounds/{round_id}/reinstate")
+@reference_series.series_locked
 async def reinstate_round(series_id: str, round_id: str, body: Optional[RoundActionBody] = None,
                           me: dict = Depends(require_area("content"))):
     """Absage zurücknehmen: der Status davor (geplant oder verschoben) gilt wieder."""
@@ -356,12 +362,14 @@ async def _set_archived(series_id: str, round_id: str, archived: bool, me: dict,
 
 
 @router.post("/admin/series/{series_id}/rounds/{round_id}/archive")
+@reference_series.series_locked
 async def archive_round(series_id: str, round_id: str, body: Optional[RoundActionBody] = None,
                         me: dict = Depends(require_area("content"))):
     return await _set_archived(series_id, round_id, True, me, body)
 
 
 @router.post("/admin/series/{series_id}/rounds/{round_id}/restore")
+@reference_series.series_locked
 async def restore_round(series_id: str, round_id: str, body: Optional[RoundActionBody] = None,
                         me: dict = Depends(require_area("content"))):
     return await _set_archived(series_id, round_id, False, me, body)
@@ -374,6 +382,7 @@ async def _write_order(db, series_id: str, ids: list[str], me: dict) -> None:
 
 
 @router.post("/admin/series/{series_id}/rounds/order")
+@reference_series.series_locked
 async def order_rounds(series_id: str, body: RoundOrderBody, me: dict = Depends(require_area("content"))):
     """Neue Reihenfolge: genau die nicht archivierten Termine der Serie, jeder einmal."""
     db = get_db()
@@ -391,6 +400,7 @@ async def order_rounds(series_id: str, body: RoundOrderBody, me: dict = Depends(
 
 
 @router.post("/admin/series/{series_id}/rounds/sort-by-date")
+@reference_series.series_locked
 async def sort_rounds_by_date(series_id: str, body: Optional[RoundSortBody] = None,
                               me: dict = Depends(require_area("content"))):
     """Reihenfolge nach Tag und Uhrzeit; Termine ohne Tag ans Ende, sonst bleibt die bisherige Reihenfolge."""
@@ -409,6 +419,7 @@ async def sort_rounds_by_date(series_id: str, body: Optional[RoundSortBody] = No
 
 
 @router.post("/admin/series/{series_id}/rounds/paste")
+@reference_series.series_locked
 async def paste_rounds(series_id: str, body: RoundPasteBody, me: dict = Depends(require_area("content"))):
     """Eingefügte Terminliste: ohne ``apply`` nur die Vorschau, mit ``apply`` werden die Termine angehängt - nur, wenn
     keine Zeile einen Fehler hat (sonst 422 mit den Fehlern je Zeile)."""

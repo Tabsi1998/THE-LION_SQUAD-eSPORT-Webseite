@@ -42,6 +42,7 @@ Was die Funktionen können und was ihr dafür einrichtet – zum Durchlesen, ohn
 | [Abnahme lokal](docs/entwicklung/abnahme-lokal.md) | Echter Server in Docker mit Testdaten, Browser-Abnahme ohne Nachstellen |
 | [Probelauf](docs/entwicklung/probelauf.md) | Drehbuch für die Generalprobe eines Event-Abends auf dem Abnahme-Stand |
 | [GitHub-Automatik](docs/entwicklung/github.md) | Workflows, PR-Titel, Website-Releases, README-Bilder, Vorlagen und Einstellungen |
+| [Serien: Ergebnisse eintragen](docs/entwicklung/serien-ergebnisse.md) | API zum Eintragen: Vorschau, Übernehmen mit Version, Entwurf daneben, Freigabe |
 | [CHANGELOG](CHANGELOG.md) | Versionen der Website |
 | [PERFORMANCE_BUDGETS](frontend/PERFORMANCE_BUDGETS.md) | Frontend-Leistungsziele |
 
