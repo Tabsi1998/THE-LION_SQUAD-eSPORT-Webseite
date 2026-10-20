@@ -1,5 +1,27 @@
 # Changelog
 
+## [1.10.0](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/compare/v1.9.0...v1.10.0) (2026-10-20)
+
+
+### Neu
+
+* Referenzen – Seite Team-Liga mit Tabelle, Spielplan, Aufstellung und Liga-Weg ([#1747](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1747)) ([2c865a5](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/2c865a51c824109612ebec14aff2f99065715c19))
+
+
+### Fehlerbehebungen
+
+* Bereite Läufe verteilen sich auf alle freien Stationen ([#1858](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1858)) ([1abe6b4](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/1abe6b46a491a3dc2b9a12bd457cf53c70260bb4))
+* Fall „Nicht erschienen?“ nennt Baumteil, Runde und Durchgang ([#1860](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1860)) ([c92cdf3](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/c92cdf387ecd5b50d8553e8a75b7d926fbf9fb6c))
+* Kasten „Auslosung“ im Reiter Spiele nennt Baumteil und Runde wie der Baum ([#1860](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1860)) ([c92cdf3](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/c92cdf387ecd5b50d8553e8a75b7d926fbf9fb6c))
+* Läufe, die auf Auslosung oder Vorspiele warten, nehmen bereiten keine Station mehr weg ([#1858](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1858)) ([1abe6b4](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/1abe6b46a491a3dc2b9a12bd457cf53c70260bb4))
+* Stationen sagen „wartet auf die Auslosung“ bei der Show-Auslosung ([#1858](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1858)) ([1abe6b4](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/1abe6b46a491a3dc2b9a12bd457cf53c70260bb4))
+* TV nennt als Nächstes einen bereiten Lauf statt eines wartenden ([#1858](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1858)) ([1abe6b4](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/1abe6b46a491a3dc2b9a12bd457cf53c70260bb4))
+
+
+### Schneller
+
+* Vor-Ort-Anmeldungen im selben Moment sind in unter einer Sekunde bestätigt ([#1859](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1859)) ([c92cdf3](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/c92cdf387ecd5b50d8553e8a75b7d926fbf9fb6c))
+
 ## 1.9.0 (20.10.2026)
 
 ### Neu
