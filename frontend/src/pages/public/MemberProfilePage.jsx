@@ -56,12 +56,9 @@ export default function MemberProfilePage() {
             <MemberHero profile={profile} />
 
             <div className="mt-8 grid xl:grid-cols-[minmax(0,1fr)_21rem] gap-8 items-start">
-              <div className="min-w-0">
-                {profile.bio ? (
-                  <RichContent text={profile.bio} />
-                ) : (
-                  <div className="text-white/45 text-sm">Noch keine Biografie hinterlegt.</div>
-                )}
+              {/* Ohne Biografie fehlt der Absatz einfach (#1268) - kein Platzhaltertext. */}
+              <div className="min-w-0" data-testid="member-bio">
+                {profile.bio && <RichContent text={profile.bio} />}
               </div>
               <aside className="space-y-4">
                 <InfoPanel title="Profil">
