@@ -24,7 +24,7 @@ export function Showcase({ items, showcase, linked, index = 3 }) {
   return (
     <section id="vitrine" aria-labelledby="references-trophies-title" className="tls-ref-anchor tls-ref-rise max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-12 md:pt-[88px]" style={{ "--tls-ref-i": index }} data-testid="references-trophies">
       <SectionHead id="references-trophies-title" eyebrow="Vitrine" tone="honor" title="Unsere Podestplätze" hint={hint} />
-      <div className="flex flex-wrap gap-3.5 md:gap-5 items-stretch">
+      <div className="flex flex-wrap gap-3.5 md:gap-5 items-start">
         <MainCard item={main} link={linked?.get(main.id)} pinned={showcase?.mode === "pinned" && showcase.reference_id === main.id} />
         {rest.length > 0 && (
           <div className="flex-[2_1_560px] min-w-0 grid grid-cols-2 md:grid-cols-[repeat(auto-fill,minmax(min(100%,200px),1fr))] gap-2.5 md:gap-3 content-start">
