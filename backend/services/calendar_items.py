@@ -157,10 +157,13 @@ async def own_entries(db, user: dict | None) -> dict[str, dict[str, dict]]:
     return out
 
 
-async def collect(db, user: dict | None, own: dict[str, dict[str, dict]] | None = None) -> list[dict]:
+async def collect(db, user: dict | None, own: dict[str, dict[str, dict]] | None = None, *,
+                  onsite_tournaments: set[str] | frozenset[str] = frozenset()) -> list[dict]:
     """Alle sichtbaren Termine, nach Beginn sortiert - Vergangenes bleibt drin (Vormonat).
 
     ``own`` ist der schon geholte eigene Stand (``own_entries``) - „Mein Kalender“ (#1788) braucht ihn auch für die Plaketten.
+    ``onsite_tournaments`` (#1830, nur der persönliche Kalender): Turniere, bei denen die Person über den Vor-Ort-QR
+    angemeldet ist - die stehen auch ohne Sichtbarkeit darin (etwa die Begleitperson bei „Nur Mitglieder“).
     """
     events = await db.events.find({"status": {"$ne": "draft"}}, _EVENT_FIELDS).to_list(2000)
     tournaments = await db.tournaments.find({"status": {"$ne": "draft"}, "is_public": {"$ne": False}}, _TOURNAMENT_FIELDS).to_list(2000)
@@ -176,7 +179,8 @@ async def collect(db, user: dict | None, own: dict[str, dict[str, dict]] | None 
             continue
         items.extend(event_items(ev, mine=ev.get("id") in my_events))
     for t in tournaments:
-        if not await lead_can_see(user, t.get("visibility")):
+        onsite = t.get("id") in onsite_tournaments and t.get("id") in my_tournaments
+        if not onsite and not await lead_can_see(user, t.get("visibility")):
             continue
         path = f"/tournaments/{t.get('slug') or t.get('id')}"
         item = tournament_item(t, mine=t.get("id") in my_tournaments)

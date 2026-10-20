@@ -20,6 +20,7 @@ import secrets
 
 from models import now_utc
 from services import calendar_items, club_calendar
+from services.event_facts import ACTIVE_TOURNAMENT_STATES
 
 # Der Hinweis „Deine Termine automatisch im Kalender?“ nach einer Anmeldung (#1788): einmal je Konto, am Konto gemerkt.
 HINT_FIELD = "calendar_subscribe_hint_seen_at"
@@ -95,6 +96,16 @@ def _allowed(item: dict) -> bool:
     return bool(item.get("mine")) and item.get("status") not in EXCLUDED_STATUS and item.get("visibility") not in EXCLUDED_VISIBILITY
 
 
+async def onsite_tournament_ids(db, user: dict) -> set[str]:
+    """Die Turniere mit einer aktiven eigenen Anmeldung über den Vor-Ort-QR (``registered_via`` „onsite“, #1592)."""
+    if not user or not user.get("id"):
+        return set()
+    rows = db.tournament_registrations.find(
+        {"user_id": user["id"], "registered_via": "onsite", "status": {"$in": list(ACTIVE_TOURNAMENT_STATES)}},
+        {"_id": 0, "tournament_id": 1})
+    return {row["tournament_id"] async for row in rows if row.get("tournament_id")}
+
+
 async def personal_items(db, user: dict, own: dict[str, dict[str, dict]] | None = None) -> list[dict]:
     """Nur die eigenen Termine: aus der Sicht der Person, davon was „angemeldet“ ist, plus ihre Vereinstermine.
 
@@ -102,7 +113,10 @@ async def personal_items(db, user: dict, own: dict[str, dict[str, dict]] | None 
     Versammlungen und eigene Helferschichten - ohne Namen anderer, ohne Zugangslink. Abgesagtes und Internes nie.
     Dieselbe Liste zeigt „Mein Kalender“ (#1788) - die Regel steht nur hier.
     """
-    items = [item for item in await calendar_items.collect(db, user, own) if _allowed(item)]
+    # Über den Vor-Ort-QR angemeldet (#1830): das Turnier zählt auch ohne Sichtbarkeit - „Nur intern“ und Abgesagtes
+    # bleiben trotzdem draußen (_allowed).
+    onsite = await onsite_tournament_ids(db, user)
+    items = [item for item in await calendar_items.collect(db, user, own, onsite_tournaments=onsite) if _allowed(item)]
     items += [item for item in await club_calendar.club_items(db, user) if _allowed(item)]
     return sorted(items, key=lambda item: (item["start"], item["kind"], item["title"]))
 

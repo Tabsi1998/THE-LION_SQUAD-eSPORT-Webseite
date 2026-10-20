@@ -166,3 +166,39 @@ async def test_hint_only_without_link_and_only_once(flow):
     assert (await flow.get("/api/calendar/me")).json()["hint_due"] is False
     await flow.delete("/api/calendar/personal")
     assert (await flow.get("/api/calendar/hint")).json() == {"due": True}, "Gegenprobe: abgeschaltet und nie gesehen"
+
+
+@pytest.mark.asyncio
+async def test_onsite_qr_registration_shows_members_tournament_in_feed_and_view(flow):
+    """#1830: wer sich vor Ort über den QR-Code bei „Nur Mitglieder“ anmeldet (Begleitperson ohne Mitgliedschaft), hat
+    das Turnier in „Mein Kalender“ und im Feed. Ohne QR-Anmeldung, „Nur intern“ und nach der Abmeldung nicht; der
+    allgemeine Kalender bleibt unverändert."""
+    guest = await flow.add_user(name="gast")
+    await flow.db.tournaments.insert_many([
+        {"id": "t-members", "slug": "mitglieder-cup", "title": "Mitglieder-Cup", "status": "registration_open",
+         "visibility": "members", "is_public": True, "start_date": _at(3)},
+        {"id": "t-web", "slug": "web-cup", "title": "Web-Cup", "status": "registration_open",
+         "visibility": "members", "is_public": True, "start_date": _at(4)},
+        {"id": "t-intern", "slug": "intern-cup", "title": "Intern-Cup", "status": "registration_open",
+         "visibility": "internal", "is_public": True, "start_date": _at(5)},
+    ])
+    await flow.db.tournament_registrations.insert_many([
+        {"id": "tr-qr", "tournament_id": "t-members", "user_id": guest["id"], "status": "approved", "registered_via": "onsite"},
+        {"id": "tr-web", "tournament_id": "t-web", "user_id": guest["id"], "status": "approved", "registered_via": "web"},
+        {"id": "tr-int", "tournament_id": "t-intern", "user_id": guest["id"], "status": "approved", "registered_via": "onsite"},
+    ])
+    flow.act_as(guest)
+    by_id = {item["id"]: item for item in (await flow.get("/api/calendar/me")).json()["items"]}
+    assert "t-members" in by_id, "über den Vor-Ort-QR angemeldet: steht in Mein Kalender"
+    assert by_id["t-members"]["own"]["label"] == "Du bist dabei"
+    assert "t-web" not in by_id and "t-intern" not in by_id
+    path = (await flow.post("/api/calendar/personal")).json()["path"]
+    assert not any(item["id"] == "t-members" for item in (await flow.get("/api/calendar")).json()["items"]), \
+        "der allgemeine Kalender bleibt, wie er ist"
+    flow.act_as(None)
+    feed = (await flow.get(path)).text
+    assert "Mitglieder-Cup" in feed and "Web-Cup" not in feed and "Intern-Cup" not in feed
+    assert "Mitglieder-Cup" not in (await flow.get("/api/calendar/feed.ics")).text
+
+    await flow.db.tournament_registrations.update_one({"id": "tr-qr"}, {"$set": {"status": "withdrawn"}})
+    assert "Mitglieder-Cup" not in (await flow.get(path)).text, "abgemeldet heißt weg"
