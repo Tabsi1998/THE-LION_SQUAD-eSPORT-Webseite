@@ -145,3 +145,9 @@ test("Aufstellung verlinkt nur öffentlich sichtbare Profile: kein Link bei ausg
   expect(lineup).toHaveTextContent("Name ausgeblendet");
   expect(within(lineup).queryByRole("link")).not.toBeInTheDocument();
 });
+
+test("Die Tabelle der Team-Liga bricht Namen um statt zu kürzen (eigener Rahmen)", async () => {
+  renderPage();
+  const wrap = await screen.findByTestId("team-league-table-wrap");
+  expect(wrap).toHaveClass("tls-tl-table");
+});

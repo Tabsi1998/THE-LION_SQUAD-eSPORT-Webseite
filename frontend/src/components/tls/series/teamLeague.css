@@ -80,3 +80,8 @@
   .tls-tl-path__card { transition: box-shadow 160ms ease; }
   .tls-tl-path__card--link:hover { transform: none; }
 }
+
+/* Tabelle der Team-Liga: Teamnamen ganz lesbar - umbrechen statt kürzen; ist es zu schmal, rutscht die Marke
+   „Verein“ unter den Namen. Gilt nur hier, die Rangliste der Turniere bleibt wie sie ist. */
+.tls-tl-table .tls-standing-row td:nth-child(2) > span { flex-wrap: wrap; row-gap: 2px; }
+.tls-tl-table .tls-standing-name { display: block; -webkit-line-clamp: none; overflow: visible; overflow-wrap: break-word; }

@@ -46,7 +46,7 @@ test.describe("Abnahme #1747: Seite Team-Liga - Tabelle, Spielplan, Aufstellung,
   test("Vorstand trägt ein, die Seite zeigt die Team-Liga", async ({ browser }, testInfo) => {
     test.skip(testInfo.project.name !== "chromium", "ein Durchgang genügt");
     const stamp = Date.now().toString(36).slice(-5);
-    const own = `Probe Löwen ${stamp}`;
+    const own = `Lions Esports Akademie ${stamp}`; // langer Name: muss auch bei 360 px ganz lesbar sein
     const memberName = `Probe Kapitän ${stamp}`;
     const guestName = `Gast Probe ${stamp}`;
     const rules = { points_mode: "organizer", match_points: { win: 2, draw: 1, loss: 0 }, table_tiebreakers: ["score_diff", "wins"] };
@@ -124,6 +124,9 @@ test.describe("Abnahme #1747: Seite Team-Liga - Tabelle, Spielplan, Aufstellung,
         const ownRow = page.getByTestId(`standing-row-${own}`);
         await expect(ownRow).toHaveAttribute("data-mine", "true");
         await expect(ownRow).toContainText("Verein");
+        // Der eigene Name wird umbrochen, nicht gekürzt.
+        const clipped = await ownRow.locator(".tls-standing-name").evaluate((node) => node.scrollHeight > node.clientHeight + 1 || node.scrollWidth > node.clientWidth + 1);
+        expect(clipped).toBe(false);
         const days = page.getByTestId("team-league-matchday");
         await expect(days).toHaveCount(3);
         await expect(days.nth(0)).toHaveAttribute("data-outcome", "win");

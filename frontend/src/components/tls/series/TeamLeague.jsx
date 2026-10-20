@@ -102,7 +102,7 @@ function LeagueTable({ league, rounds }) {
           <dd className="text-white/80 min-w-0">{tableTiebreakLabel(league.rules)}</dd>
         </div>
       </dl>
-      <div className="mt-4">
+      <div className="tls-tl-table mt-4" data-testid="team-league-table-wrap">
         {rows.length ? (
           <StandingsTable rows={rows} kind="team_league" label="Tabelle" mineLabel="Verein" />
         ) : (
