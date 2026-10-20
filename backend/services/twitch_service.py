@@ -318,4 +318,4 @@ async def twitch_poll_loop(interval_seconds: int = 60):
             try:
                 await record_poll("error", detail=type(e).__name__)
             except Exception:  # noqa: BLE001 - die Datenbank selbst ist weg
-                pass
+                logger.debug("[twitch] Abrufstand nicht gespeichert", exc_info=True)

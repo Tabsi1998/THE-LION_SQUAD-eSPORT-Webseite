@@ -682,7 +682,7 @@ async def _apply(db, tournament: dict, registration: dict, fresh: dict, matches:
         from services.discord_bracket import request_refresh
         request_refresh(tid)
     except Exception:  # noqa: BLE001
-        pass
+        logger.debug("Discord-Baum für Turnier %s nicht vorgemerkt", tid, exc_info=True)
     await publish_tournament_event(tid, DISPLAY_EVENTS[kind], match_ids=[m["id"] for m in changed],
                                    registration_id=registration["id"])
     for op in fresh["ops"]:

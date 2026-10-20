@@ -933,8 +933,8 @@ async def post_match_chat(match_id: str, body: MatchChatCreate, request: Request
         try:
             from services import xp
             await xp.grant(me["id"], "community_chat", doc["id"])
-        except Exception:  # noqa: BLE001
-            pass
+        except Exception as exc:  # noqa: BLE001 - XP hält keine Nachricht auf
+            logger.warning("[xp] community_chat für Nachricht %s nicht gutgeschrieben type=%s", doc["id"], type(exc).__name__)
         try:
             await _notify_match_chat_message(db, match, collection, me, doc)
         except Exception:

@@ -37,8 +37,8 @@ def _log_task_failure(task: str, exc: Exception) -> None:
         from database import get_db
         from services.ops_alerts import schedule_notify
         schedule_notify(get_db(), "job_failed", f"Hintergrundjob abgebrochen: {task}", f"Fehlerart: {type(exc).__name__}", key=f"job:{task}")
-    except Exception:  # noqa: BLE001
-        pass
+    except Exception as alert_exc:  # noqa: BLE001
+        logger.warning("[scheduler] Alarm für %s nicht vorgemerkt type=%s", task, type(alert_exc).__name__)
 
 
 def scheduler_lock_resource(job_id: str) -> str:

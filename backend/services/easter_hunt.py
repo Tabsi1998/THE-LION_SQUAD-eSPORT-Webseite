@@ -322,8 +322,8 @@ async def _count_for_achievements(user_id: str) -> int:
             from services.achievement_queue import request_evaluation
 
             await request_evaluation([user_id], "easter_egg", sources={"signal"})
-        except Exception:  # noqa: BLE001
-            pass
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("[easter] Erfolge auch nicht vorgemerkt type=%s", type(exc).__name__)
         return 0
 
 

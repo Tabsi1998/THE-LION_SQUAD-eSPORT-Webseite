@@ -1072,6 +1072,7 @@ async def _passkey_enroll_ticket(db, user_id: str) -> str | None:
     try:
         return await issue_enroll_ticket(db, user_id)
     except Exception:  # noqa: BLE001 - ohne Ticket fragt die App beim Anlegen nach dem Passwort
+        logger.debug("Passkey-Ticket nicht ausgestellt", exc_info=True)
         return None
 
 

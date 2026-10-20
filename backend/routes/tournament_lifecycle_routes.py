@@ -462,8 +462,9 @@ async def set_status(tid: str, body: dict, me: dict = Depends(get_current_user),
         try:
             from services.registration_notifications import notify_tournament_finished
             await notify_tournament_finished(db, {**t, "id": tid})
-        except Exception:  # noqa: BLE001 - eine Nachricht hält keinen Statuswechsel auf
-            pass
+        except Exception as exc:  # noqa: BLE001 - eine Nachricht hält keinen Statuswechsel auf
+            import logging
+            logging.getLogger("tls.tournament").warning("„Turnier beendet“ für %s nicht verschickt type=%s", log_safe(tid), type(exc).__name__)
 
     # Turnierabschluss: alle Angemeldeten neu auswerten (#301) - nicht erst beim Profilbesuch.
     if prev != status and status in ("completed", "results_published"):
@@ -482,8 +483,9 @@ async def set_status(tid: str, body: dict, me: dict = Depends(get_current_user),
         try:
             from services.discord_threads import status_changed
             await status_changed(db, {**t, "id": tid}, prev, status)
-        except Exception:  # noqa: BLE001 - Discord hält keinen Statuswechsel auf
-            pass
+        except Exception as exc:  # noqa: BLE001 - Discord hält keinen Statuswechsel auf
+            import logging
+            logging.getLogger("tls.tournament").warning("Discord-Status für %s nicht gemeldet type=%s", log_safe(tid), type(exc).__name__)
     return {
         "ok": True,
         "auto_generated_bracket": auto_generated_bracket,

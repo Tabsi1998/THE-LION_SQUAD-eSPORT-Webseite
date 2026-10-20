@@ -310,8 +310,8 @@ async def send_direct_message(user_id: str, body: DirectMessageCreate, request: 
         try:
             from services import xp
             await xp.grant(me["id"], "community_chat", doc["id"])
-        except Exception:  # noqa: BLE001
-            pass
+        except Exception as exc:  # noqa: BLE001 - XP hält keine Nachricht auf
+            logger.warning("[xp] community_chat für Nachricht %s nicht gutgeschrieben type=%s", doc["id"], type(exc).__name__)
     from services.change_events import publish_user_change
     if verdict == "hold":
         await publish_user_change([me["id"]], "messages")
