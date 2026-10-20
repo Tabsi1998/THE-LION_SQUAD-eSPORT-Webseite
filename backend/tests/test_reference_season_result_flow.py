@@ -1,6 +1,7 @@
 """Auf- und Abstieg je Saison als Vermerk (#1898): je Saison ein optionales „Ergebnis der Saison“ (Aufstieg, Abstieg,
 Klassenerhalt, Meister oder leer) und je Spur eine optionale Reihenfolge der Stufen. Der Server speichert und prüft,
-die Seiten (Liga-Weg, Vitrine) nutzen zuerst diese Angaben und erst dann die Zahl im Stufennamen. Nur erfundene Namen."""
+die Seiten (Liga-Weg, Vitrine) nutzen zuerst diese Angaben und erst dann die Zahl im Stufennamen.
+Nur erfundene Namen."""
 import pathlib
 import sys
 
@@ -58,7 +59,8 @@ async def test_a_season_carries_its_result_and_can_clear_it(flow):
         assert response.json()["season_result"] == value
     cleared = await flow.patch(f"{ADMIN}/series/{series['id']}", json={"season_result": None})
     assert cleared.json()["season_result"] is None
-    assert (await flow.patch(f"{ADMIN}/series/{series['id']}", json={"season_result": "abgestiegen"})).status_code == 422
+    wrong = await flow.patch(f"{ADMIN}/series/{series['id']}", json={"season_result": "abgestiegen"})
+    assert wrong.status_code == 422
     # Ohne Angabe bleibt das Feld leer.
     plain = await _series(flow, lineage["id"], season="2026")
     assert plain.get("season_result") is None

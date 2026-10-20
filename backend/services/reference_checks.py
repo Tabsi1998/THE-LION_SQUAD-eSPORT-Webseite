@@ -67,7 +67,8 @@ def _date_warnings(doc: dict, today: date | None, settings: dict) -> list[dict]:
     finished = (doc.get("status") or "completed") == "completed"
     if finished and settings["warn_future_end"] and end and today and end > today:
         out.append({"field": "end_date", "code": "end_in_future",
-                    "message": f"Die Teilnahme ist abgeschlossen, das Ende ({_german(end)}) liegt aber in der Zukunft."})
+                    "message": f"Die Teilnahme ist abgeschlossen, das Ende ({_german(end)}) liegt aber in der "
+                               "Zukunft."})
     return out
 
 
