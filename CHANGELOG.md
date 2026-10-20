@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.8.0 (20.10.2026)
+
+### Neu
+
+* Ergebnisse externer Serien eintragen – Vorschau, Übernehmen mit Version und Freigabe (#1744)
+* Ergebnisse externer Serien zuordnen und auf Plausibilität prüfen (#1744)
+
+### Fehlerbehebungen
+
+* Änderungen an einer Saison laufen nacheinander, nie rechnet ein älterer Stand über einen neueren (#1744)
+
 ## 1.7.1 (20.10.2026)
 
 ### Fehlerbehebungen
