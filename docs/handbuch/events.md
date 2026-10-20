@@ -250,7 +250,8 @@ Mitglieder stehen Versammlungen und die eigenen Helferschichten dabei.
 
 **Mein Kalender (`/calendar/mine`, nur mit Konto):** Nur die **eigenen** Termine – auch ohne Abo. Dabei sind Anmeldungen zu Events
 und Turnieren (auch über das eigene Team), Fast Laps mit gefahrener Zeit, zugesagte Versammlungen und die eigenen Schichten.
-Abgesagtes und „Nur intern“ stehen nie darin – dieselbe Regel wie im persönlichen Abo.
+Wer angemeldet ist, sieht den Termin auch bei „Nur Mitglieder“ ohne Mitgliedschaft (etwa nach der Anmeldung über den
+Vor-Ort-QR-Code oder einen Zugangslink). Abgesagtes und „Nur intern“ stehen nie darin – dieselbe Regel wie im persönlichen Abo.
 
 - **Als Nächstes** gruppiert nach **Heute**, **Diese Woche** und **Später**; **Monat** zeigt das Raster wie im Vereinskalender.
 - Je Termin steht der eigene **Stand** als Plakette: angemeldet, Warteliste, eingecheckt, „Du bist dabei · mit Team“, gefahren,

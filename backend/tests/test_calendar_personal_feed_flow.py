@@ -42,6 +42,7 @@ async def seed(flow, paula: dict, otto: dict) -> None:
         {"id": "e-lan", "slug": "herbst-lan", "name": "Herbst-LAN", "status": "registration_open", "visibility": "public", "start_date": _at(10)},
         {"id": "e-fest", "slug": "sommerfest", "name": "Sommerfest", "status": "scheduled", "visibility": "public", "start_date": _at(11)},
         {"id": "e-members", "slug": "vereinsabend", "name": "Vereinsabend", "status": "scheduled", "visibility": "members", "start_date": _at(12)},
+        {"id": "e-members-only", "slug": "mitgliederabend", "name": "Mitgliederabend", "status": "scheduled", "visibility": "members", "start_date": _at(12, 20)},
     ])
     await flow.db.tournaments.insert_many([
         {"id": "t-team", "slug": "rocket-cup", "title": "Rocket Cup", "status": "registration_open", "visibility": "public", "is_public": True,
@@ -124,16 +125,19 @@ async def test_personal_link_is_stored_as_hash_and_shows_only_own_items(flow):
     assert "Herbst-LAN" in text and "Rocket Cup" in text and "Fast Lap Monza" in text
     for foreign in ("Sommerfest", "Ottos Cup", "Zurückgezogen", "Fast Lap Spa"):
         assert foreign not in text, f"{foreign} gehört nicht Paula"
-    assert "Vereinsabend" not in text, "ohne Mitgliedschaft sieht Paula den Mitglieder-Termin nicht - auch nicht über den Link"
+    # #1830: ihre eigene Anmeldung zählt auch ohne Mitgliedschaft; ein Mitglieder-Termin ohne Anmeldung nie.
+    assert "Vereinsabend" in text, "eigene Anmeldung bei „Nur Mitglieder“: steht im Link, auch ohne Mitgliedschaft"
+    assert "Mitgliederabend" not in text, "ohne eigene Anmeldung kein Mitglieder-Termin - auch nicht über den Link"
     assert (await flow.db.calendar_feed_tokens.find_one({"user_id": paula["id"]}))["last_used_at"]
 
-    # Gegenprobe: mit aktiver Mitgliedschaft steht der Mitglieder-Termin darin.
+    # Gegenprobe: auch mit aktiver Mitgliedschaft kommt nur dazu, wofür sie angemeldet ist.
     await flow.db.memberships.insert_one({"id": "m-1", "user_id": paula["id"], "member_status": "active"})
-    assert "Vereinsabend" in (await flow.get(path)).text
+    member_text = (await flow.get(path)).text
+    assert "Vereinsabend" in member_text and "Mitgliederabend" not in member_text
 
     # Der öffentliche Feed bleibt anonym: keine Mitglieder-Termine, kein Bezug zu Paula.
     public = (await flow.get("/api/calendar/feed.ics")).text
-    assert "Vereinsabend" not in public and "Sommerfest" in public
+    assert "Vereinsabend" not in public and "Mitgliederabend" not in public and "Sommerfest" in public
 
 
 @pytest.mark.asyncio
@@ -241,14 +245,20 @@ def test_nginx_writes_no_access_log_for_the_personal_feed():
 async def test_without_a_session_the_lead_exception_does_not_apply(flow):
     """Die Turnierleitung sieht „Nur Mitglieder“ nur mit bestätigter Zwei-Faktor-Anmeldung - der Link hat keine."""
     lead = await flow.add_user(role="tournament_admin", name="leitung")
-    await flow.db.events.insert_one({"id": "e-members", "slug": "vereinsabend", "name": "Vereinsabend", "status": "scheduled",
-                                     "visibility": "members", "start_date": _at(12)})
+    await flow.db.events.insert_many([
+        {"id": "e-members", "slug": "vereinsabend", "name": "Vereinsabend", "status": "scheduled", "visibility": "members", "start_date": _at(12)},
+        {"id": "e-members-only", "slug": "mitgliederabend", "name": "Mitgliederabend", "status": "scheduled", "visibility": "members", "start_date": _at(13)},
+    ])
     await flow.db.event_registrations.insert_one({"id": "er-1", "event_id": "e-members", "user_id": lead["id"], "status": "registered"})
     flow.act_as(lead)
-    assert any(item["id"] == "e-members" for item in (await flow.get("/api/calendar")).json()["items"]), "mit Sitzung und 2FA sichtbar"
+    seen = {item["id"] for item in (await flow.get("/api/calendar")).json()["items"]}
+    assert {"e-members", "e-members-only"} <= seen, "mit Sitzung und 2FA sichtbar"
     path = (await flow.post("/api/calendar/personal")).json()["path"]
     flow.act_as(None)
-    assert "Vereinsabend" not in (await flow.get(path)).text
+    text = (await flow.get(path)).text
+    # Die Ausnahme der Turnierleitung bringt nichts in den Link - nur die eigene Anmeldung zählt (#1830).
+    assert "Mitgliederabend" not in text, "nur über die Ausnahme sichtbar: nicht im Link"
+    assert "Vereinsabend" in text, "eigene Anmeldung: im Link"
 
 
 @pytest.mark.asyncio

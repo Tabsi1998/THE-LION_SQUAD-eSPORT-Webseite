@@ -4,11 +4,12 @@
   liest, baut daraus keine Adresse. Darum zeigt die Website die Adresse nur einmal, direkt nach dem Erzeugen.
 - Je Konto höchstens ein Link. „Neu erzeugen“ ersetzt ihn - die alte Adresse gilt sofort nicht mehr -, „Abschalten“
   löscht ihn. Beim Löschen des Kontos fällt er mit weg (``account_erasure.PURGED``).
-- Der Feed enthält nur, was die Person selbst sehen darf und wofür sie (oder ihr Team) dabei ist: dieselbe Liste wie
-  ``GET /api/calendar`` mit ihrem Konto, davon nur „angemeldet“ - dazu ihre Vereinstermine (zugesagte Versammlungen,
-  eigene Schichten). Abgesagtes und „Nur intern“ stehen nie darin, auch nicht für die Vereinsverwaltung. Ein gesperrtes oder
-  abgeschaltetes Konto bekommt nichts. Ohne Sitzung gilt keine bestätigte
-  Zwei-Faktor-Anmeldung: die Ausnahme der Turnierleitung für „Nur Mitglieder“ greift hier nicht (eher weniger als mehr).
+- Der Feed enthält nur, wofür die Person (oder ihr Team) dabei ist: dieselbe Liste wie ``GET /api/calendar`` mit ihrem
+  Konto, davon nur „angemeldet“ - dazu ihre Vereinstermine (zugesagte Versammlungen, eigene Schichten). Die eigene
+  Anmeldung zählt auch ohne Sichtbarkeit (#1830: Vor-Ort-QR, Zugangslink, „Nur Mitglieder“ ohne Mitgliedschaft); ohne
+  eigene Anmeldung kommt nichts dazu. Abgesagtes und „Nur intern“ stehen nie darin, auch nicht für die Vereinsverwaltung
+  und nicht mit eigener Anmeldung. Ein gesperrtes oder abgeschaltetes Konto bekommt nichts. Ohne Sitzung gilt keine
+  bestätigte Zwei-Faktor-Anmeldung: die Ausnahme der Turnierleitung für „Nur Mitglieder“ greift hier nicht.
 - Das Token steht nie im Protokoll: ``log_safe.SecretPathFilter`` kürzt es im Zugriffsprotokoll von Uvicorn, nginx
   schreibt für diese Adressen keines (``frontend/nginx.conf``).
 """
@@ -20,7 +21,6 @@ import secrets
 
 from models import now_utc
 from services import calendar_items, club_calendar
-from services.event_facts import ACTIVE_TOURNAMENT_STATES
 
 # Der Hinweis „Deine Termine automatisch im Kalender?“ nach einer Anmeldung (#1788): einmal je Konto, am Konto gemerkt.
 HINT_FIELD = "calendar_subscribe_hint_seen_at"
@@ -96,16 +96,6 @@ def _allowed(item: dict) -> bool:
     return bool(item.get("mine")) and item.get("status") not in EXCLUDED_STATUS and item.get("visibility") not in EXCLUDED_VISIBILITY
 
 
-async def onsite_tournament_ids(db, user: dict) -> set[str]:
-    """Die Turniere mit einer aktiven eigenen Anmeldung über den Vor-Ort-QR (``registered_via`` „onsite“, #1592)."""
-    if not user or not user.get("id"):
-        return set()
-    rows = db.tournament_registrations.find(
-        {"user_id": user["id"], "registered_via": "onsite", "status": {"$in": list(ACTIVE_TOURNAMENT_STATES)}},
-        {"_id": 0, "tournament_id": 1})
-    return {row["tournament_id"] async for row in rows if row.get("tournament_id")}
-
-
 async def personal_items(db, user: dict, own: dict[str, dict[str, dict]] | None = None) -> list[dict]:
     """Nur die eigenen Termine: aus der Sicht der Person, davon was „angemeldet“ ist, plus ihre Vereinstermine.
 
@@ -113,10 +103,8 @@ async def personal_items(db, user: dict, own: dict[str, dict[str, dict]] | None 
     Versammlungen und eigene Helferschichten - ohne Namen anderer, ohne Zugangslink. Abgesagtes und Internes nie.
     Dieselbe Liste zeigt „Mein Kalender“ (#1788) - die Regel steht nur hier.
     """
-    # Über den Vor-Ort-QR angemeldet (#1830): das Turnier zählt auch ohne Sichtbarkeit - „Nur intern“ und Abgesagtes
-    # bleiben trotzdem draußen (_allowed).
-    onsite = await onsite_tournament_ids(db, user)
-    items = [item for item in await calendar_items.collect(db, user, own, onsite_tournaments=onsite) if _allowed(item)]
+    # Die eigene Anmeldung zählt auch ohne Sichtbarkeit (#1830) - „Nur intern“ und Abgesagtes bleiben draußen (_allowed).
+    items = [item for item in await calendar_items.collect(db, user, own, include_own=True) if _allowed(item)]
     items += [item for item in await club_calendar.club_items(db, user) if _allowed(item)]
     return sorted(items, key=lambda item: (item["start"], item["kind"], item["title"]))
 

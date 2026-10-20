@@ -158,12 +158,13 @@ async def own_entries(db, user: dict | None) -> dict[str, dict[str, dict]]:
 
 
 async def collect(db, user: dict | None, own: dict[str, dict[str, dict]] | None = None, *,
-                  onsite_tournaments: set[str] | frozenset[str] = frozenset()) -> list[dict]:
+                  include_own: bool = False) -> list[dict]:
     """Alle sichtbaren Termine, nach Beginn sortiert - Vergangenes bleibt drin (Vormonat).
 
     ``own`` ist der schon geholte eigene Stand (``own_entries``) - „Mein Kalender“ (#1788) braucht ihn auch für die Plaketten.
-    ``onsite_tournaments`` (#1830, nur der persönliche Kalender): Turniere, bei denen die Person über den Vor-Ort-QR
-    angemeldet ist - die stehen auch ohne Sichtbarkeit darin (etwa die Begleitperson bei „Nur Mitglieder“).
+    ``include_own`` (#1830, nur der persönliche Kalender): wofür die Person selbst dabei ist (``own``: eigene oder
+    Team-Anmeldung, egal ob über Vor-Ort-QR, Zugangslink oder normal; gefahrene Fast Lap), steht auch ohne Sichtbarkeit
+    darin - etwa „Nur Mitglieder“ ohne Mitgliedschaft. Ohne eigene Anmeldung gilt die Sichtbarkeit wie bisher.
     """
     events = await db.events.find({"status": {"$ne": "draft"}}, _EVENT_FIELDS).to_list(2000)
     tournaments = await db.tournaments.find({"status": {"$ne": "draft"}, "is_public": {"$ne": False}}, _TOURNAMENT_FIELDS).to_list(2000)
@@ -173,14 +174,16 @@ async def collect(db, user: dict | None, own: dict[str, dict[str, dict]] | None 
         own = await own_entries(db, user)
     my_events, my_tournaments, my_fastlaps = set(own["events"]), set(own["tournaments"]), set(own["fastlaps"])
 
+    async def visible(doc: dict, mine: set[str]) -> bool:
+        return (include_own and doc.get("id") in mine) or await lead_can_see(user, doc.get("visibility"))
+
     items: list[dict] = []
     for ev in events:
-        if not await lead_can_see(user, ev.get("visibility")):
+        if not await visible(ev, my_events):
             continue
         items.extend(event_items(ev, mine=ev.get("id") in my_events))
     for t in tournaments:
-        onsite = t.get("id") in onsite_tournaments and t.get("id") in my_tournaments
-        if not onsite and not await lead_can_see(user, t.get("visibility")):
+        if not await visible(t, my_tournaments):
             continue
         path = f"/tournaments/{t.get('slug') or t.get('id')}"
         item = tournament_item(t, mine=t.get("id") in my_tournaments)
@@ -195,7 +198,7 @@ async def collect(db, user: dict | None, own: dict[str, dict[str, dict]] | None 
             if deadline:
                 items.append(deadline)
     for c in fastlaps:
-        if not await lead_can_see(user, c.get("visibility")):
+        if not await visible(c, my_fastlaps):
             continue
         item = fastlap_item(c, mine=c.get("id") in my_fastlaps)
         if item:
