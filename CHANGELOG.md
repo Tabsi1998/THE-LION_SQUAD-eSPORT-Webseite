@@ -1,5 +1,27 @@
 # Changelog
 
+## 1.5.0 (19.10.2026)
+
+### Neu
+
+* Captain nur für aktive Vereinsmitglieder (#1749)
+* Captains in der Saison verwalten (#1749)
+* Captains je Saison hinzufügen, ändern und entfernen mit Protokoll (#1749)
+* Captains sehen ihre Serien unter „Mein Dienst“ und öffnen ihre Saison (#1749)
+* Dialog „Unbekannte Namen“ und Teilnehmerliste in der Saison-Seite (#1743)
+* Namen externer Serien vergleichbar machen und Vorschläge mit Begründung bilden (#1743)
+* Teilnehmer einer Serie als Mitglied, Gast oder Extern zuordnen (#1743)
+
+### Fehlerbehebungen
+
+* Klick in die Fläche einer Mehrfachauswahl im Profil schaltet nicht mehr die erste Option um (#1835)
+* Klick neben Avatar, Banner oder Logo öffnet nicht mehr die Dateiauswahl (Profil und Team) (#1835)
+* Kontolöschung nimmt Teilnehmer externer Serien aus der Vereinsstatistik (#1743)
+
+### Dokumentation
+
+* Handbuch „Unbekannte Namen“ mit Bildern aus der Abnahme (#1743)
+
 ## 1.4.0 (19.10.2026)
 
 ### Neu
