@@ -177,7 +177,7 @@ test("Liste einfügen ersetzt die Zeilen und prüft gleich – Fehler mit Zeilen
   await screen.findByTestId("result-preview");
 });
 
-test("409 beim Übernehmen: Hinweis, Neu laden holt den Stand und behält die Eingaben", async () => {
+test("409 beim Übernehmen: Neu laden zeigt den aktuellen Stand, eigene Eingaben nur bewusst wieder anwenden", async () => {
   setup();
   await openRound();
   fireEvent.change(screen.getAllByTestId("result-row-name")[0], { target: { value: "Alpha" } });
@@ -187,17 +187,38 @@ test("409 beim Übernehmen: Hinweis, Neu laden holt den Stand und behält die Ei
   fireEvent.click(screen.getByTestId("result-submit"));
   await screen.findByTestId("result-stale");
   expect(toastMock.error).toHaveBeenCalled();
-  const calls = apiMock.get.mock.calls.length;
-  apiMock.get.mockImplementation(async (url) => (url.endsWith("/calendar") ? { data: CALENDAR } : { data: resultData({ version: 4 }) }));
+  // Inzwischen hat jemand anderes Beta auf Platz 1 gespeichert.
+  const current = { status: "draft", version: 4, pending_draft: null, rows: [{ participant_id: "p2", place: 1, points_source: "scheme", marks: [] }], matches: [], official_table: [], official_totals: {} };
+  apiMock.get.mockImplementation(async (url) => (url.endsWith("/calendar") ? { data: CALENDAR } : { data: resultData({ version: 4, sheet: current }) }));
   fireEvent.click(screen.getByTestId("result-reload"));
   await waitFor(() => expect(screen.queryByTestId("result-stale")).toBeNull());
-  expect(apiMock.get.mock.calls.length).toBe(calls + 1);
-  expect(screen.getAllByTestId("result-row-name")[0]).toHaveValue("Alpha");
+  // Der aktuelle Stand steht im Blatt, die eigenen Eingaben daneben - nichts wird still überschrieben.
+  await waitFor(() => expect(screen.getAllByTestId("result-row-name").map((input) => input.value)).toEqual(["Beta"]));
+  expect(screen.getByTestId("result-mine-summary")).toHaveTextContent("1 Zeile: Alpha");
+  apiMock.put.mockResolvedValue({ data: { target: "sheet", version: 5, created_participants: [] } });
+  fireEvent.click(screen.getByTestId("result-mine-apply"));
+  expect(screen.queryByTestId("result-mine")).toBeNull();
+  expect(screen.getAllByTestId("result-row-name").map((input) => input.value)).toEqual(["Alpha"]);
+  // Danach erst wieder prüfen, dann mit der neuen Version speichern.
+  expect(screen.getByTestId("result-submit")).toHaveTextContent("Vorschau");
   fireEvent.click(screen.getByTestId("result-submit"));
   await screen.findByTestId("result-preview");
-  apiMock.put.mockResolvedValue({ data: { target: "sheet", version: 5, created_participants: [] } });
   fireEvent.click(screen.getByTestId("result-submit"));
   await waitFor(() => expect(apiMock.put).toHaveBeenLastCalledWith(expect.any(String), expect.objectContaining({ expected_version: 4 })));
+});
+
+test("409: eigene Eingaben verwerfen lässt den aktuellen Stand stehen", async () => {
+  setup();
+  await openRound();
+  fireEvent.change(screen.getAllByTestId("result-row-name")[0], { target: { value: "Alpha" } });
+  apiMock.post.mockRejectedValue({ response: { status: 409, data: { detail: "Das Ergebnis wurde inzwischen geändert – bitte neu laden." } } });
+  fireEvent.click(screen.getByTestId("result-submit"));
+  await screen.findByTestId("result-stale");
+  fireEvent.click(screen.getByTestId("result-reload"));
+  await screen.findByTestId("result-mine");
+  fireEvent.click(screen.getByTestId("result-mine-discard"));
+  expect(screen.queryByTestId("result-mine")).toBeNull();
+  expect(screen.getAllByTestId("result-row-name").map((input) => input.value)).toEqual([""]);
 });
 
 test("Captain ohne Recht: veröffentlichtes Blatt wird Entwurf daneben, unbekannte Namen nur „neu“", async () => {

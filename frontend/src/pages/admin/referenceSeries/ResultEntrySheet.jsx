@@ -264,6 +264,16 @@ function PendingDraft({ draft, participants, busy, onApprove, onDiscard }) {
   );
 }
 
+function mineSummary(form) {
+  const names = form.rows.map((row) => String(row.name || "").trim()).filter(Boolean);
+  const parts = [];
+  if (names.length) parts.push(`${names.length} ${names.length === 1 ? "Zeile" : "Zeilen"}: ${names.slice(0, 8).join(", ")}${names.length > 8 ? " …" : ""}`);
+  const matches = form.matches.filter((match) => String(match.home || "").trim() || String(match.away || "").trim());
+  if (matches.length) parts.push(matches.map((match) => `${match.home} ${match.home_score || 0}:${match.away_score || 0} ${match.away}`).join(" · "));
+  if (form.table.length) parts.push(`Tabelle mit ${form.table.length} Teams`);
+  return parts.join(" · ") || "Keine Einträge.";
+}
+
 export function ResultEntrySheet({ series, round, onClose, onSaved }) {
   const base = `/reference-series/admin/series/${series.id}/rounds/${round.id}/results`;
   const [data, setData] = useState(null);
@@ -271,18 +281,18 @@ export function ResultEntrySheet({ series, round, onClose, onSaved }) {
   const [preview, setPreview] = useState(null);
   const [saving, setSaving] = useState(false);
   const [stale, setStale] = useState(false);
+  // Eigene Eingaben, die beim Neuladen nach einem 409 nicht still im neuen Stand landen dürfen.
+  const [mine, setMine] = useState(null);
   const [pasting, setPasting] = useState(false);
 
-  const load = useCallback(async ({ keepForm = false } = {}) => {
+  const load = useCallback(async () => {
     try {
       const { data: result } = await api.get(base);
       setData(result);
       setStale(false);
-      if (!keepForm) {
-        const sheet = result.sheet;
-        const source = result.target === "pending_draft" && sheet?.pending_draft ? sheet.pending_draft : sheet;
-        setForm(sheetToForm(source, result.participants, { kind: result.series?.kind, teamName: result.series?.team_name, opponent: result.round?.opponent }));
-      }
+      const sheet = result.sheet;
+      const source = result.target === "pending_draft" && sheet?.pending_draft ? sheet.pending_draft : sheet;
+      setForm(sheetToForm(source, result.participants, { kind: result.series?.kind, teamName: result.series?.team_name, opponent: result.round?.opponent }));
     } catch (err) {
       toast.error(formatApiError(err.response?.data?.detail) || "Ergebnis nicht geladen.");
       onClose();
@@ -354,6 +364,18 @@ export function ResultEntrySheet({ series, round, onClose, onSaved }) {
     const result = parseTablePaste(text);
     if (result.rows.length) update({ table: result.rows.map(({ line, ...row }) => row) });
     return result;
+  };
+
+  const reloadCurrent = () => {
+    setMine(form);
+    setPreview(null);
+    load();
+  };
+  const applyMine = () => {
+    // Bewusst übernehmen: die eigenen Eingaben auf den neuen Stand (die Version kommt vom Neuladen), danach neu prüfen.
+    setForm(mine);
+    setMine(null);
+    setPreview(null);
   };
 
   const stalePrompt = () => {
@@ -443,10 +465,22 @@ export function ResultEntrySheet({ series, round, onClose, onSaved }) {
 
           {stale && (
             <div className="border border-amber-400/40 bg-amber-400/10 rounded-sm p-3 text-sm text-amber-100 flex flex-wrap items-center gap-3" role="alert" data-testid="result-stale">
-              <span className="flex-1 min-w-[12rem]">Inzwischen hat jemand anderes das Ergebnis geändert. Neu laden holt den aktuellen Stand – deine Eingaben bleiben stehen, die Vorschau prüft danach neu.</span>
-              <button type="button" onClick={() => { setPreview(null); load({ keepForm: true }); }} data-testid="result-reload" className="tls-btn tls-btn--secondary px-3 py-2 rounded-sm text-xs font-bold uppercase tracking-wider inline-flex items-center gap-1.5">
+              <span className="flex-1 min-w-[12rem]">Inzwischen hat jemand anderes das Ergebnis geändert. Neu laden zeigt den aktuellen Stand; deine Eingaben bleiben daneben aufgehoben.</span>
+              <button type="button" onClick={reloadCurrent} data-testid="result-reload" className="tls-btn tls-btn--secondary px-3 py-2 rounded-sm text-xs font-bold uppercase tracking-wider inline-flex items-center gap-1.5">
                 <RefreshCw className="w-3.5 h-3.5" /> Neu laden
               </button>
+            </div>
+          )}
+
+          {mine && (
+            <div className="border border-[#29B6E8]/40 bg-[#29B6E8]/5 rounded-sm p-3 text-sm text-white/80 space-y-2" data-testid="result-mine">
+              <div className="text-[11px] font-bold uppercase tracking-widest text-[#29B6E8]">Deine nicht gespeicherten Änderungen</div>
+              <p className="text-xs text-white/60">Das Blatt zeigt jetzt den aktuellen Stand. Deine Eingaben sind nicht gespeichert – übernimm sie bewusst oder verwirf sie.</p>
+              <div className="text-xs text-white/70" data-testid="result-mine-summary">{mineSummary(mine)}</div>
+              <div className="flex flex-wrap gap-2">
+                <button type="button" onClick={applyMine} data-testid="result-mine-apply" className="tls-btn tls-btn--secondary px-3 py-2 rounded-sm text-xs font-bold uppercase tracking-wider">Meine Eingaben erneut anwenden</button>
+                <button type="button" onClick={() => setMine(null)} data-testid="result-mine-discard" className="tls-btn tls-btn--quiet px-3 py-2 rounded-sm text-xs font-bold uppercase tracking-wider">Verwerfen</button>
+              </div>
             </div>
           )}
 
