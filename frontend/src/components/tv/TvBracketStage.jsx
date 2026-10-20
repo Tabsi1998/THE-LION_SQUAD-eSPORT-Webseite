@@ -4,6 +4,7 @@ import { runParticles } from "@/components/achievements/ceremony/particles";
 import { resolveMediaUrl } from "@/lib/api";
 import { lastStageId } from "@/lib/bracketPodium";
 import { slotDraw } from "@/lib/bracketGraph";
+import { roundsText } from "@/lib/bracketNames";
 import { initials, isMatchDone } from "@/lib/slotSource";
 import { matchRoundLabel } from "@/lib/tournamentLabels";
 import { MOTION } from "@/lib/motion";
@@ -651,7 +652,9 @@ export function TvBracketStage({ data, moment = null, onMomentDone, hiddenSlots 
       const all = byId();
       const mixed = rows.filter((row) => row.from);
       // Gemischte Runde (#1548): „Auslosung · Halbfinale · 4 Namen auf 2 Spiele“ - sonst wie bisher für die Läufe.
-      const round = mixed.length ? matchRoundLabel(all.get(mixed[0].matchId)) : "";
+      // Mehrere Runden in einem Moment (#1829): jede mit ihrem Namen aus dem Baum („Winner Runde 2 und Loser Runde 1“).
+      const drawnIds = [...new Set(mixed.map((row) => row.matchId))];
+      const round = mixed.length ? roundsText(drawnIds.map((id) => all.get(id)), [...all.values()]) : "";
       setBanner({
         text: mixed.length
           ? `Auslosung · ${round} · ${rows.length} ${rows.length === 1 ? "Name" : "Namen"} auf ${heats} ${heats === 1 ? "Spiel" : "Spiele"}`

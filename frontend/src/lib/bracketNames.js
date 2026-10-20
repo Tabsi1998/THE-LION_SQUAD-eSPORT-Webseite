@@ -4,7 +4,7 @@
 // „Weiter aus Runde 1“ (Lauf), „Sieger aus Viertelfinale“ (Duell) bzw. „Verlierer aus Runde 2“ - kurz, in einer Zeile.
 import { sectionKind } from "@/lib/bracketSections";
 import { describeSlot, normalizeSource } from "@/lib/slotSource";
-import { formatRoundName } from "@/lib/tournamentLabels";
+import { formatRoundName, matchRoundLabel } from "@/lib/tournamentLabels";
 
 const GENERIC_ROUND = /^((?:Loser|Winner) )?Runde (\d+)$/i;
 
@@ -69,4 +69,26 @@ export function treeSlotLabel(slot, findMatch = () => undefined) {
   // Aus einem Duell kommt der Sieger, aus einem Lauf kommen die Weiterkommer.
   const duel = (from.slots || []).length <= 2 && String(from.match_type || "duel") === "duel";
   return `${source.flow === "W" ? (duel ? "Sieger" : "Weiter") : "Verlierer"} aus ${round}`;
+}
+
+const SIDE_ORDER = { main: 0, loser: 1 };
+
+/** Der Rundenname mit Baumteil (#1829): im Winner Bracket eines Doppel-K.-o. heißt „Runde 2“ „Winner Runde 2“ - so,
+ * wie der Baum es unter „Winner Bracket“ zeigt. Ohne Loser Bracket in der Phase bleibt der Name, wie er ist. Gleiche
+ * Regel wie `side_round_label` am Server (services/round_labels.py). */
+export function sideRoundLabel(match, matches = []) {
+  const label = matchRoundLabel(match);
+  if (sectionKind(match?.section) !== "main" || !/^Runde \d+$/.test(label)) return label;
+  const loser = (matches || []).some((row) => row?.stage_id === match?.stage_id && sectionKind(row?.section) === "loser");
+  return loser ? `Winner ${label}` : label;
+}
+
+/** Die Runden eines Moments in Worten (#1829): „Winner Runde 2 und Loser Runde 1“ - je Baumteil ein eigener Name,
+ * Winner vor Loser, dann nach Runde. */
+export function roundsText(drawn = [], matches = []) {
+  const sorted = [...(drawn || [])].filter(Boolean).sort((a, b) =>
+    (SIDE_ORDER[sectionKind(a.section)] ?? 2) - (SIDE_ORDER[sectionKind(b.section)] ?? 2) || (Number(a.round) || 0) - (Number(b.round) || 0));
+  const names = [...new Set(sorted.map((match) => sideRoundLabel(match, matches)).filter(Boolean))];
+  if (names.length < 2) return names[0] || "";
+  return `${names.slice(0, -1).join(", ")} und ${names[names.length - 1]}`;
 }

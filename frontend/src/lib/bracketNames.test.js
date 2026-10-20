@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import LINES from "../../e2e/fixtures/bracketLines.json";
 import { bracketEdges, heatText } from "./bracketGraph";
-import { displayRoundLabels, matchName, treeSlotLabel } from "./bracketNames";
+import { displayRoundLabels, matchName, roundsText, sideRoundLabel, treeSlotLabel } from "./bracketNames";
 import { finderFor } from "./slotSource";
 
 // Namen im Turnierbaum (#1591): fortlaufende Runden je Abschnitt, „Grand Final“ statt „Lauf FINAL“, klare Plätze.
@@ -67,5 +67,24 @@ describe("treeSlotLabel", () => {
 
   it("fester Baum bleibt bei „Sieger aus E“", () => {
     expect(labels("G")).toEqual(["Sieger aus E", "Platz 2 aus E", "Sieger aus F", "Platz 2 aus F"]);
+  });
+});
+
+describe("roundsText (#1829)", () => {
+  it("Winner Runde 2 und Loser Runde 1 im selben Moment heißen getrennt, wie im Baum", () => {
+    const matches = ffa();
+    const keys = byKey(matches);
+    const drawn = ["LA", "E", "LB", "F"].map((key) => keys.get(key));
+    expect(roundsText(drawn, matches)).toBe("Winner Runde 2 und Loser Runde 1");
+  });
+
+  it("eine Runde allein: Winner Runde im Doppel-K.-o., sonst der Name wie bisher", () => {
+    const matches = ffa();
+    const keys = byKey(matches);
+    expect(roundsText([keys.get("LA")], matches)).toBe("Loser Runde 1");
+    expect(sideRoundLabel(keys.get("E"), matches)).toBe("Winner Runde 2");
+    const single = matches.filter((match) => match.section !== "LB");
+    expect(sideRoundLabel(keys.get("E"), single)).toBe("Runde 2");
+    expect(sideRoundLabel(keys.get("G"), matches)).toBe("Finale");
   });
 });
