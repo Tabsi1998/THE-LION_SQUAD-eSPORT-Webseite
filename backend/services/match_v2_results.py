@@ -1413,9 +1413,11 @@ SHOW_ALREADY_DRAWN_DETAIL = "Diese Runde ist schon ausgelost."
 
 
 def build_show_draw_application(stage_matches: list[dict], group: str, *, now_iso: str, rng=None,
-                                trigger: str = "show") -> dict:
+                                trigger: str = "show", eliminated: set[str] | None = None) -> dict:
     """„Jetzt auslosen“ (Show-Auslosung, #1590): die Runde ist bereit (``draw_ready``), die Turnierleitung - oder
-    nach der Frist der Server (``trigger="timeout"``) - legt das Los. Vorher 409, zweimal 409, unbekannt 404."""
+    nach der Frist der Server (``trigger="timeout"``) - legt das Los. Vorher 409, zweimal 409, unbekannt 404.
+    ``eliminated``: wer ausgetreten oder disqualifiziert ist (#1553) - kommt nicht in den Topf, die Plätze rücken auf
+    wie beim Eintragen (#1839)."""
     by_id, _by_key = _target_lookup(stage_matches)
     targets = _draw_open_targets(by_id, group)
     if not targets:
@@ -1427,7 +1429,7 @@ def build_show_draw_application(stage_matches: list[dict], group: str, *, now_is
     target_sets: dict[str, dict] = {}
     draws: list[dict] = []
     drawn = run_draw(group, by_id, target_sets, now_iso, stage_id=targets[0].get("stage_id"), rng=rng, draws=draws,
-                     trigger=trigger, force=True)
+                     trigger=trigger, force=True, eliminated=eliminated)
     if not drawn:
         raise MatchV2ResultError("Auslosen geht gerade nicht – die Runde davor ist nicht mehr fertig.", 409)
     resolve_walkovers(drawn, by_id, target_sets, now_iso, rng=rng, draws=draws)
@@ -1511,10 +1513,12 @@ def _instant_redraw(targets: list[dict], by_id: dict[str, dict], group: str, now
     return {"target_sets": target_sets, "draw": draw, "draws": [draw]}
 
 
-def build_redraw_application(stage_matches: list[dict], group: str, *, now_iso: str, rng=None) -> dict:
+def build_redraw_application(stage_matches: list[dict], group: str, *, now_iso: str, rng=None,
+                             eliminated: set[str] | None = None) -> dict:
     """„Neu auslosen“ durch die Turnierleitung: dieselben Weiterkommer, neues Los - bis eines der Spiele der Gruppe
     beginnt (aufgerufen, gestartet, Meldung, Ergebnis oder kampflos entschieden), dann 409. Sofort zufällig (#1590):
-    nur die Zielspiele, die noch nicht begonnen haben (``_instant_redraw``)."""
+    nur die Zielspiele, die noch nicht begonnen haben (``_instant_redraw``). ``eliminated`` wie beim ersten Los: wer
+    ausgetreten ist, kommt auch beim neuen Los nicht zurück (#1839)."""
     by_id, _by_key = _target_lookup(stage_matches)
     targets = _draw_open_targets(by_id, group)
     if not targets:
@@ -1535,7 +1539,7 @@ def build_redraw_application(stage_matches: list[dict], group: str, *, now_iso: 
     target_sets: dict[str, dict] = {}
     draws: list[dict] = []
     drawn = run_draw(group, by_id, target_sets, now_iso, stage_id=targets[0].get("stage_id"), rng=rng, draws=draws,
-                     trigger="redraw")
+                     trigger="redraw", eliminated=eliminated)
     if not drawn:
         raise MatchV2ResultError("Neu auslosen geht gerade nicht – die Runde davor ist nicht mehr fertig.", 409)
     resolve_walkovers(drawn, by_id, target_sets, now_iso, rng=rng, draws=draws)

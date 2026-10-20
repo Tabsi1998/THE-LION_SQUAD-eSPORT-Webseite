@@ -40,17 +40,17 @@ async def flow():
         await shutdown()
 
 
-async def heats_cup(flow) -> dict:
-    """Ein Läufe-Cup vor Ort mit acht Spielern und zwei Stationen, live."""
+async def heats_cup(flow, scheme: str = SCHEME, count: int = 8, **fields) -> dict:
+    """Ein Läufe-Cup vor Ort mit zwei Stationen, live."""
     tournament, _users, _registrations = await flow.with_participants(
-        8, format="ffa_custom_bracket", event_mode="local", status="registration_open")
+        count, format="ffa_custom_bracket", event_mode="local", status="registration_open", **fields)
     for name in ("1", "2"):
         await flow.db.stations.insert_one({"id": new_id(), "name": name, "tournament_id": tournament["id"],
                                            "status": "free", "current_match_id": None})
     await flow.db.tournament_stages.insert_one({
         "id": new_id(), "tournament_id": tournament["id"], "number": 1, "name": "Läufe",
         "stage_type": "ffa_custom_bracket", "match_type": "ffa", "status": "pending",
-        "settings": {"schema": SCHEME, "match_size": 4, "qualifiers_per_match": 2, "min_players": 2},
+        "settings": {"schema": scheme, "match_size": 4, "qualifiers_per_match": 2, "min_players": 2},
         "created_at": now_utc().isoformat(), "updated_at": now_utc().isoformat(),
     })
     flow.act_as(await flow.add_staff())
@@ -177,3 +177,82 @@ async def test_withdrawal_after_the_loser_round_was_entered_leaves_it_and_frees_
     await assert_queue_once(flow, tournament)
     await enter(flow, after["F"], seats(after["F"]))
     assert (await flow.reload(after["F"]))["status"] == "completed"
+
+
+# ---------------------------------------------------------------------------------------------- Show-Auslosung und Topf
+
+# Der Läufe-Cup aus dem Abnahme-Seed: 16 Fahrer, je Runde zwei Läufe in Sieger- und Verlierer-Weg (gemischt: Gruppen).
+CUP = """[WB]
+A=[1,2,3,4]
+B=[5,6,7,8]
+C=[9,10,11,12]
+D=[13,14,15,16]
+E=[W:A:1,W:A:2,W:B:1,W:B:2]
+F=[W:C:1,W:C:2,W:D:1,W:D:2]
+G=[W:E:1,W:E:2,W:F:1,W:F:2]
+
+[LB]
+LA=[L:A:1,L:A:2,L:B:1,L:B:2]
+LB=[L:C:1,L:C:2,L:D:1,L:D:2]
+LC=[W:LA:1,W:LA:2,L:E:1,L:E:2]
+LD=[W:LB:1,W:LB:2,L:F:1,L:F:2]
+LE=[W:LC:1,W:LC:2,W:LD:1,W:LD:2]
+LF=[W:LE:1,W:LE:2,L:G:1,L:G:2]
+"""
+
+
+async def round_two(flow, tournament: dict) -> tuple[set[str], set[str]]:
+    """Wer in Runde 2 sitzt: (Sieger-Weg, Loser Bracket)."""
+    rows = [m for m in await flow.matches(tournament) if m.get("round") == 2]
+    winners = {reg for m in rows if str(m.get("section") or "").upper() != "LB" for reg in seats(m)}
+    losers = {reg for m in rows if str(m.get("section") or "").upper() == "LB" for reg in seats(m)}
+    return winners, losers
+
+
+async def draw(flow, tournament: dict, key: str, path: str = "draw") -> dict:
+    """„Jetzt auslosen“ bzw. „Neu auslosen“ der Gruppe, in der das Spiel ``key`` liegt."""
+    match = (await by_key(flow, tournament))[key]
+    response = await flow.post(f"/api/tournaments/{tournament['id']}/stages/{match['stage_id']}/{path}",
+                               json={"group": match["settings"]["draw_group"]})
+    assert response.status_code == 200, response.text
+    return response.json()
+
+
+@pytest.mark.asyncio
+async def test_show_draw_leaves_out_who_withdrew_during_the_heat(flow):
+    """Austritt, während der Lauf schon aufgerufen ist: die Person bleibt im Ergebnis (zuletzt gewertet), kommt aber
+    beim späteren Los in keinen Topf - der Nächste rückt auf, auf beiden Wegen."""
+    tournament = await heats_cup(flow, CUP, 16, advancement_mode="draw_show")
+    matches = await by_key(flow, tournament)
+    heat = matches["A"]
+    await flow.db.matches_v2.update_one({"id": heat["id"]}, {"$set": {"station_id": "station-1", "called_at": now_utc().isoformat()}})
+    gone, second, third, fourth = seats(heat)
+    await withdraw(flow, tournament, gone)
+    assert gone in seats(await flow.reload(heat)), "der aufgerufene Lauf bleibt, wie er ist"
+    await enter(flow, heat, [gone, second, third, fourth])
+    for key in "BCD":
+        await enter(flow, matches[key], seats(matches[key]))
+    await draw(flow, tournament, "E")
+    await draw(flow, tournament, "LA")
+    winners, losers = await round_two(flow, tournament)
+    assert gone not in winners | losers
+    assert {second, third} <= winners and fourth in losers and third not in losers
+    await assert_tree_once_per_round(flow, tournament)
+
+
+@pytest.mark.asyncio
+async def test_redraw_after_a_withdrawal_keeps_the_withdrawn_out(flow):
+    """Auslosung nach der Runde, danach tritt der Erste aus A aus und die Leitung lost beide Wege neu: er kommt nicht
+    zurück, der Dritte bleibt im Sieger-Weg und nicht im Loser Bracket."""
+    tournament = await heats_cup(flow, CUP, 16, advancement_mode="draw_round")
+    matches = await by_key(flow, tournament)
+    for key in "ABCD":
+        await enter(flow, matches[key], seats(matches[key]))
+    first, second, third, fourth = [row["registration_id"] for row in (await flow.reload(matches["A"]))["results"]]
+    await withdraw(flow, tournament, first)
+    await draw(flow, tournament, "E", "redraw")
+    await draw(flow, tournament, "LA", "redraw")
+    winners, losers = await round_two(flow, tournament)
+    assert first not in winners | losers
+    assert {second, third} <= winners and fourth in losers and third not in losers
+    await assert_tree_once_per_round(flow, tournament)

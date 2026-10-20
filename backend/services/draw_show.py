@@ -169,11 +169,14 @@ async def perform_show_draw(db, tournament: dict, stage_id: str, group: str, *, 
     schreibt alles oder nichts, protokolliert, meldet das Ereignis und stößt den Lauf-Umbau an."""
     from services.draw_records import record_draws
     from services.heat_rebuild import evaluate_after_write
+    from services.v2_result_submission import eliminated_registration_ids
 
     tid = tournament["id"]
     stage_matches = await db.matches_v2.find({"stage_id": stage_id, "is_preview": {"$ne": True}}, {"_id": 0}).to_list(3000)
     originals = {match["id"]: copy.deepcopy(match) for match in stage_matches}
-    application = build_show_draw_application(stage_matches, group, now_iso=now_utc().isoformat(), trigger=trigger)
+    # Wer ausgetreten oder disqualifiziert ist, kommt nicht in den Topf (#1839) - wie beim Eintragen.
+    application = build_show_draw_application(stage_matches, group, now_iso=now_utc().isoformat(), trigger=trigger,
+                                              eliminated=await eliminated_registration_ids(db, tid))
     await write_draw_sets(db, originals, application["target_sets"])
     await record_draws(db, application["draws"], actor_id=actor_id, tournament_id=tid)
     # Erst auslosen, dann umbauen (#1550): die neue Belegung kann Läufe zusammenlegen oder ausgleichen.
