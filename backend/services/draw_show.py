@@ -96,7 +96,9 @@ def lead_cards(matches: list[dict], tournament: dict | None, stages: dict[str, d
                *, can_draw: bool, eliminated: set[str] | None = None) -> list[dict]:
     """Die Karten „Auslosung bereit · N Namen“ für die Turnierleitung (Web und App)."""
     from services.match_timing import registration_name
+    from services.round_labels import rounds_by_section, side_round_label, stage_kind
 
+    rounds = rounds_by_section(matches)
     cards = []
     for entry in ready_groups(matches):
         stage = stages.get(entry.get("stage_id") or "")
@@ -113,6 +115,10 @@ def lead_cards(matches: list[dict], tournament: dict | None, stages: dict[str, d
             "group": entry["group"],
             "label": label or "Vorrunde",
             "round_name": targets[0].get("round_name") if targets else None,
+            # Die Zielrunde wie im Baum (#1829): „Winner Runde 2“, „Loser Runde 1“.
+            "round_label": side_round_label(targets[0], matches, rounds=rounds, kind=stage_kind(
+                (stage or {}).get("stage_type"), (tournament or {}).get("format"), targets[0].get("match_type")))
+            if targets else None,
             "match_ids": [target["id"] for target in targets],
             "match_keys": [target.get("match_key") for target in targets],
             "pot": [registration_name(regs_by_id.get(registration_id)) for registration_id in pot_ids],

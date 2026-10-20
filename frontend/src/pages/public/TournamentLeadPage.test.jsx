@@ -135,6 +135,13 @@ test("Auslosung bereit: Topf mit Namen, Restzeit, „Jetzt auslosen“ nur mit A
   vi.useRealTimers();
 });
 
+test("Auslosung bereit: die Zielrunde heißt wie im Baum (#1829)", async () => {
+  const { drawTargetText } = await import("./TournamentLeadPage");
+  expect(drawTargetText({ label: "Runde 1", round_label: "Loser Runde 1", match_keys: ["LA", "LB"] })).toBe("nach Runde 1 → Loser Runde 1 (LA, LB)");
+  expect(drawTargetText({ label: "Runde 1", round_label: "Winner Runde 2", match_keys: ["C", "D"] })).toBe("nach Runde 1 → Winner Runde 2 (C, D)");
+  expect(drawTargetText({ label: "Runde 1", match_keys: ["E", "F"] })).toBe("nach Runde 1 → E, F");
+});
+
 test("Auslosung bereit ohne Aufbau-Recht: Karte ohne Knopf; nach der Frist steht „jeden Moment“", async () => {
   const { drawCountdown } = await import("./TournamentLeadPage");
   const card = { id: "draw-LB:3", stage_id: "s1", group: "LB:3", label: "Loser Runde 2", match_keys: ["LC"], pot: ["Jo"], pot_size: 1, due_at: "2026-10-14T10:20:00+00:00", can_draw: false };
