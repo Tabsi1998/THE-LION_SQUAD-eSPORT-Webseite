@@ -6,9 +6,9 @@ const { ENABLED, STATE_FILE, state, signIn, watch } = require("./abnahmeSession"
 // Abnahme gegen den echten Server (docs/entwicklung/abnahme-lokal.md): „Heute im Einsatz“ und „Läuft gerade“ auf der
 // Referenzen-Übersicht (#1748). Der Vorstand legt über die echten Routen eine Turnierserie (ein gewerteter Termin, einer
 // heute, einer in einer Woche) und eine Team-Liga (nächster Termin später) an, beide laufend. Ohne Anmeldung zeigt die
-// Übersicht dann „Heute im Einsatz“ mit der Turnierserie (Fortschritt, nächster Termin, Platz des Vereins, Link) und
-// „Läuft gerade“ mit der Liga - ohne fremde Namen, bei 1440 und 360 px ohne Überlauf, bei „Bewegung reduzieren“ ohne
-// Puls. `ABNAHME_SHOTS` legt Bilder ab (optional). Nur erfundene Namen. Läuft nur mit ABNAHME=1.
+// Übersicht dann „Läuft gerade“ (seit #1878 eine Kartenreihe): zuerst die Turnierserie mit dem Chip „Heute“
+// (Fortschritt, nächster Termin, Platz des Vereins, Link), dann die Liga - ohne fremde Namen, bei 1440 und 360 px ohne
+// Überlauf, bei „Bewegung reduzieren“ ohne Puls. `ABNAHME_SHOTS` legt Bilder ab (optional). Nur erfundene Namen. Läuft nur mit ABNAHME=1.
 
 const SERIES = "/api/reference-series/admin";
 const SHOTS = process.env.ABNAHME_SHOTS || "";
@@ -93,13 +93,14 @@ test.describe("Abnahme #1748: Referenzen - Heute im Einsatz und Läuft gerade", 
         const running = page.getByTestId("references-running");
         await expect(running).toBeVisible();
         const card = page.getByTestId(`running-card-${cup.slug}-${cupSeason.season_slug}`);
-        await expect(page.getByTestId("references-today").getByTestId(`running-card-${cup.slug}-${cupSeason.season_slug}`)).toBeVisible();
-        await expect(card).toContainText("1 von 3 Terminen");
-        await expect(card.getByTestId("running-next")).toContainText("Heute");
-        await expect(card.getByTestId("running-place")).toContainText("2. von 3");
+        await expect(card).toHaveAttribute("data-today", "true");
+        await expect(card).toContainText("1 von 3 Turnieren gewertet");
+        await expect(card).toContainText("Heute");
+        await expect(card.getByTestId("running-place")).toContainText("2.");
+        await expect(card.getByTestId("running-place")).toContainText("von 3");
         await expect(card.getByTestId("running-today-badge")).toBeVisible();
         const leagueCard = page.getByTestId("references-running-list").getByTestId(`running-card-${league.slug}-${leagueSeason.season_slug}`);
-        await expect(leagueCard).toContainText("0 von 1 Termin");
+        await expect(leagueCard).toContainText("0 von 1 Spieltag gespielt");
         await expect(leagueCard.getByTestId("running-place")).toContainText("Noch offen");
         // Fremde Namen kommen nirgends vor.
         const text = await running.innerText();
