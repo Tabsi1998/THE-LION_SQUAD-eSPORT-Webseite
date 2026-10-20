@@ -352,6 +352,33 @@ async def test_the_other_tournaments_of_the_event_are_loaded_together(flow):
     assert {f"user:{users[index]['id']}" for index in range(3)} <= set().union(*(row["participants"] for row in inputs["busy_elsewhere"]))
     for collection in ("matches_v2", "tournament_registrations", "teams", "team_members"):
         assert calls.get((collection, "find"), 0) <= 2, (collection, calls)
+    assert {row["state"] for row in inputs["busy_elsewhere"]} == {"planned"}, "geplant, nicht gestartet"
+
+
+@pytest.mark.asyncio
+async def test_foreign_matches_say_whether_they_run_are_called_or_only_planned(flow):
+    """#1872: nur Laufendes und Aufgerufenes bindet den Spieler jetzt - auch ein gestartetes Spiel ohne geplante Zeit."""
+    from services.match_scheduler import load_plan_inputs
+
+    _staff, tournament, _users, _registrations = await built(flow, **begun_fields(event_id="ev-1872"))
+    start = (await flow.db.tournaments.find_one({"id": tournament["id"]}, {"_id": 0}))["start_date"]
+    await flow.db.tournaments.insert_one({"id": "t-sofort", "slug": "sofort", "title": "Sofort-Cup", "format": "single_elim", "status": "live",
+                                          "event_mode": "local", "event_id": "ev-1872", "start_date": start, "created_at": now_utc().isoformat()})
+    rows = {
+        "m-planned": {"status": "scheduled", "scheduled_at": start},
+        "m-called": {"status": "scheduled", "scheduled_at": start, "called_at": now_utc().isoformat(), "station_id": "st-x"},
+        "m-running": {"status": "in_progress", "started_at": now_utc().isoformat()},
+        "m-open": {"status": "pending"},
+    }
+    await flow.db.matches_v2.insert_many([
+        {"id": match_id, "tournament_id": "t-sofort", "round": 1, "match_type": "duel", **fields,
+         "slots": [{"slot": 1, "registration_id": None, "user_id": f"u-{match_id}"}, {"slot": 2, "registration_id": None}]}
+        for match_id, fields in rows.items()
+    ])
+    stored = await flow.db.tournaments.find_one({"id": tournament["id"]}, {"_id": 0})
+    inputs = await load_plan_inputs(flow.db, stored)
+    states = {row["match_id"]: row["state"] for row in inputs["busy_elsewhere"]}
+    assert states == {"m-planned": "planned", "m-called": "called", "m-running": "running"}
 
 
 @pytest.mark.asyncio
