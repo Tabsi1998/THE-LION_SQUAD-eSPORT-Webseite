@@ -224,3 +224,14 @@ test("Spiel-Logo (#1748): mit Logo das Bild; ohne Logo im kleinen Chip der Pokal
   expect(within(screen.getByTestId("references-game-g2")).getByTestId("reference-game-logo")).toHaveTextContent("RL");
   expect(within(screen.getByTestId("references-game-g1")).getByTestId("reference-game-logo").querySelector("img")).toHaveAttribute("src", "/media/cod.png");
 });
+
+test("Spiel-Kacheln brechen lange Namen um statt sie abzuschneiden (#1812)", async () => {
+  render(<MemoryRouter><ReferencesPage /></MemoryRouter>);
+  await screen.findByTestId("reference-card-r1");
+  for (const id of ["references-game-all", "references-game-g1"]) {
+    const name = within(screen.getByTestId(id)).getByTestId("references-game-name");
+    expect(name.className).not.toMatch(/line-clamp/);
+    expect(name.className).toContain("break-words");
+    expect(name.className).not.toMatch(/(^|\s)truncate(\s|$)/);
+  }
+});

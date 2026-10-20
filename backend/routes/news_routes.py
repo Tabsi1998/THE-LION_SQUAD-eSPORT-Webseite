@@ -1115,7 +1115,7 @@ async def _enrich_references(items: list[dict]) -> list[dict]:
     parent_ids = list({g.get("parent_game_id") for g in games.values() if g.get("parent_game_id")})
     parents = {}
     if parent_ids:
-        parents = {g["id"]: g for g in await db.games.find({"id": {"$in": parent_ids}}, {"_id": 0, "id": 1, "name": 1, "slug": 1, "short_name": 1}).to_list(200)}
+        parents = {g["id"]: g for g in await db.games.find({"id": {"$in": parent_ids}}, {"_id": 0, "id": 1, "name": 1, "slug": 1, "short_name": 1, "logo_url": 1, "cover_url": 1}).to_list(200)}
     lineup_profile_ids = list({
         member.get("profile_id")
         for item in items
@@ -1148,8 +1148,9 @@ async def _enrich_references(items: list[dict]) -> list[dict]:
                 "display_name": display_name,
                 "slug": game.get("slug"),
                 "short_name": game.get("short_name"),
-                "logo_url": game.get("logo_url"),
-                "cover_url": game.get("cover_url"),
+                # Ausgabe ohne eigenes Logo/Cover zeigt das des Hauptspiels (#1811).
+                "logo_url": game.get("logo_url") or (parent or {}).get("logo_url"),
+                "cover_url": game.get("cover_url") or (parent or {}).get("cover_url"),
             }
             item["game_name"] = item.get("game_name") or display_name
         # Felder statt Titel-Muster (#409): explizite Felder gewinnen, alte Titel werden zerlegt.

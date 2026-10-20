@@ -144,3 +144,22 @@ async def test_old_clients_with_one_placement_still_save(flow):
     assert body["entries"][0]["kind"] == "solo" and body["entries"][0]["placement"] == 3
     assert body["entries"][0]["lineup_members"][0]["display_name"] == "Benny"
     assert body["platforms"] == ["PC"] and body["display_title"] == "Community Cup"
+
+
+@pytest.mark.asyncio
+async def test_edition_without_own_logo_shows_logo_and_cover_of_the_main_game(flow):
+    await flow.db.games.insert_many([
+        {"id": "g-main", "name": "Rocket League", "slug": "rocket-league", "logo_url": "/uploads/rl-logo.png", "cover_url": "/uploads/rl-cover.png"},
+        {"id": "g-ed-bare", "name": "Sideswipe", "slug": "sideswipe", "kind": "edition", "parent_game_id": "g-main"},
+        {"id": "g-ed-own", "name": "Season Pass", "slug": "season-pass", "kind": "edition", "parent_game_id": "g-main", "logo_url": "/uploads/own-logo.png"},
+    ])
+    admin = await flow.add_user(role="superadmin", name="admin")
+    flow.act_as(admin)
+    bare = await flow.post("/api/references", json={"title": "Cup A", "game_id": "g-ed-bare", "placement": 1})
+    own = await flow.post("/api/references", json={"title": "Cup B", "game_id": "g-ed-own", "placement": 1})
+    assert bare.status_code == 200 and own.status_code == 200
+    assert bare.json()["game"]["logo_url"] == "/uploads/rl-logo.png"
+    assert bare.json()["game"]["cover_url"] == "/uploads/rl-cover.png"
+    assert own.json()["game"]["logo_url"] == "/uploads/own-logo.png"
+    assert own.json()["game"]["cover_url"] == "/uploads/rl-cover.png"
+    flow.act_as(None)
