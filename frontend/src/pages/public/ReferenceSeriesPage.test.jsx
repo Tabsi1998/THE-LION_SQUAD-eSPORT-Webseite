@@ -83,6 +83,9 @@ test("Tabelle: gestrichene Ergebnisse, Bewegung, Finalgrenze; fremde Namen ohne 
   const table = await screen.findByTestId("series-table");
   const rows = within(table).getAllByTestId("series-row");
   expect(rows).toHaveLength(4);
+  // Der Name ist der Zeilenkopf - Screenreader lesen ihn zu jeder Zelle der Zeile.
+  expect(within(table).getAllByRole("rowheader").map((cell) => cell.textContent)).toEqual(["Probe a", "Probe bVerein", "Probe c", "Name ausgeblendet"]);
+  expect(within(rows[0]).getByRole("rowheader")).toHaveAttribute("scope", "row");
   // Spalten: Wertungsrunden ohne Finale, die abgesagte durchgestrichen.
   expect(within(table).getAllByRole("columnheader").map((cell) => cell.textContent)).toEqual(["#", "Name", "Q1", "Q2", "QX", "Q3", "Pkt"]);
   // Gestrichen: blass und für Screenreader benannt.

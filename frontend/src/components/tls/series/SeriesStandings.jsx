@@ -101,7 +101,7 @@ function DesktopTable({ rows, columns, topN, cutAfter }) {
                     <Move row={row} />
                   </span>
                 </td>
-                <td className="px-2 py-2.5 align-middle min-w-[10rem]"><Name row={row} /></td>
+                <th scope="row" className="px-2 py-2.5 align-middle min-w-[10rem] text-left font-normal"><Name row={row} /></th>
                 {columns.map((round, roundIndex) => (
                   <td key={round.id} className="px-2 py-2.5 text-right align-middle text-white/70">
                     <ResultValue result={resultIn(row, round.id)} name={roundLabel({ ...round, position: round.position || roundIndex + 1 })} />
