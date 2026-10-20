@@ -394,20 +394,22 @@ def test_tournament_of_a_public_event_also_names_the_event(scope_db):
 def test_public_tournament_of_a_hidden_event_stays_without_identifiers(scope_db, event_fields):
     # Ohne die Kennung des Events wüssten Seiten mit geteilten Stationen nicht, ob die Änderung sie betrifft - und die
     # Kennung eines internen Events gehört nicht in eine öffentliche Meldung. Also gar keine Kennung: alle laden nach.
+    # Kennungen mit Buchstaben, die in keiner UUID vorkommen - sonst fände „not in“ sie zufällig in der event_id.
     async def seed():
         if event_fields is not None:
-            await scope_db.events.insert_one({"id": "e-1", "status": "live", "visibility": "public", **event_fields})
-        await add_tournament(scope_db, "t-1", event_id="e-1")
+            await scope_db.events.insert_one({"id": "event-intern", "status": "live", "visibility": "public", **event_fields})
+        await add_tournament(scope_db, "turnier-im-event", event_id="event-intern")
 
     asyncio.run(seed())
 
-    event = publish("POST", "/api/tournaments/t-1/live-queue/start")
+    event = publish("POST", "/api/tournaments/turnier-im-event/live-queue/start")
     public = public_view(event)
 
     assert public.get("tournament_id") is None
     assert public.get("parent_event_id") is None
-    assert "e-1" not in json.dumps(public)
-    assert change_events._event_for_scope(event, "staff")["parent_event_id"] == "e-1"
+    assert "event-intern" not in json.dumps(public)
+    assert "turnier-im-event" not in json.dumps(public)
+    assert change_events._event_for_scope(event, "staff")["parent_event_id"] == "event-intern"
 
 
 @pytest.mark.parametrize("method, path", [
