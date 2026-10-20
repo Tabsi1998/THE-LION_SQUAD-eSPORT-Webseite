@@ -64,6 +64,15 @@ function fileLooksSupported(file) {
   return SUPPORTED_IMAGE_TYPES.has(type) || SUPPORTED_IMAGE_EXT_RE.test(file.name || "");
 }
 
+// SVG bleibt gesperrt (#1419); die Meldung sagt, was stattdessen geht - derselbe Wortlaut wie am Server.
+export const SVG_REFUSED_MESSAGE = "SVG-Dateien gehen hier nicht. Bitte als PNG mit durchsichtigem Hintergrund (z. B. 2000 px breit) oder als WebP exportieren – die Website macht daraus alle Größen.";
+
+export function unsupportedImageMessage(file) {
+  const type = (file?.type || "").toLowerCase();
+  if (type === "image/svg+xml" || /\.svg$/i.test(file?.name || "")) return SVG_REFUSED_MESSAGE;
+  return "Nur PNG, JPG oder WebP erlaubt.";
+}
+
 function ImagePreviewBox({ value, previewClass, onClear, testId }) {
   const [state, setState] = useState(value ? "loading" : "empty");
   const src = value ? resolveMediaUrl(value) : "";
@@ -259,7 +268,7 @@ async function loadImage(file) {
 export async function prepareImageForUpload(file, maxSizeMb = DEFAULT_IMAGE_UPLOAD_MB, editOptions = null) {
   if (!file) return file;
   if (!fileLooksSupported(file)) {
-    throw new Error("Nur PNG, JPG oder WebP erlaubt.");
+    throw new Error(unsupportedImageMessage(file));
   }
   if (!browserCanOptimizeImages()) return file;
 
@@ -420,7 +429,7 @@ export function ImageUpload({ value, onChange, label, testId = "image-upload", v
   const handleFile = async (file) => {
     if (!file) return;
     if (!fileLooksSupported(file)) {
-      toast.error("Nur PNG, JPG oder WebP erlaubt.");
+      toast.error(unsupportedImageMessage(file));
       if (fileRef.current) fileRef.current.value = "";
       return;
     }
@@ -604,7 +613,7 @@ export function ImageUpload({ value, onChange, label, testId = "image-upload", v
               </button>
             </div>
           )}
-          <p className="text-[10px] text-white/40">PNG/JPG/WebP bis {maxSizeMb} MB.</p>
+          <p className="text-[10px] text-white/40">PNG/JPG/WebP bis {maxSizeMb} MB. SVG geht nicht.</p>
         </div>
       </div>
       {libraryOpen && (
