@@ -324,18 +324,22 @@ Aufstellung, dazu bei Bedarf die Tabelle laut Veranstalter.
 
 - Oben der **Umschalter** zwischen den Saisons und Ligen der Spur (etwa 2026 · F1, 2026 · F2, die Vorsaison) –
   laufende Saisons tragen „läuft“. Der Fortschritt zählt Rennen.
-- **Vereins-Garage:** je Vereinsteam die Fahrer mit Platz und Punkten, Gäste mit **Gast**, und das **Teamduell** – wer
-  in gemeinsamen Rennen fürs Team öfter vor dem anderen ins Ziel kam, dazu die Punkte fürs Team. Vereinsteams sind das
-  **eigene Team** der Saison und jedes Team, für das ein Vereinsmitglied zuletzt gefahren ist.
+- **Vereins-Garage:** je Vereinsteam die Fahrer mit Platz und Punkten und das **Teamduell** – wer in gemeinsamen
+  Rennen fürs Team öfter vor dem anderen ins Ziel kam, dazu die Punkte, die jeder laut Teamwertung fürs Team geholt hat
+  (nur gezählte Rennen, Gäste nur, wenn sie mitzählen). Garage und Duell sind keine Tabelle: Gäste und Fremde stehen dort
+  als **Gastfahrer** ohne Namen (Gäste mit **Gast**), ihre Namen nur in den Tabellen. Vereinsteams sind das **eigene
+  Team** der Saison und jedes Team, für das ein Vereinsmitglied zuletzt gefahren ist.
 - **Fahrer-Detail:** Ein Klick auf einen Vereinsfahrer (Garage, Tabelle oder Kalender) zeigt Platz, Punkte, Rennen,
   Siege, Podien, schnellste Runden, Ausfälle und je Rennen einen Balken mit Punkten und Platz. Die Adresse merkt sich den
-  Fahrer (`?fahrer=…`), so lässt sich das Detail teilen. Fremde Fahrer bekommen kein Detail.
+  Fahrer (`?fahrer=…`), so lässt sich das Detail teilen. Ein Detail gibt es nur für Vereinsmitglieder mit aktivem Profil
+  und sichtbarem Namen – wie beim Profil-Link; für alle anderen öffnet auch die Adresse keins.
 - **Fahrerwertung** als Rennraster: je Rennen der Platz, das Podium in Gold, Silber und Bronze, eine Stoppuhr für die
   schnellste Runde, **DNF**, **DNS** und **DSQ**, dazu Punkte und **Abstand** zur Spitze. Weicht der **Gesamtstand laut
   Veranstalter** von der eigenen Summe ab (meist Strafen), steht die Abweichung klein in Gold neben den Punkten.
 - **Teamwertung** (wenn die Regeln sie einschalten): ein Balken je Team, die Punkte je Rennen, Vereinsteams in Cyan,
   Gäste markiert; darüber, wie viele Fahrer je Rennen zählen und ob Gäste mitzählen.
-- **Rennkalender:** alle Termine mit Status, bei gewerteten Rennen der Sieger und der beste Vereinsfahrer.
+- **Rennkalender:** alle Termine mit Status; bei gewerteten Rennen der Sieger, wenn er aus dem Verein ist, sonst der
+  beste Vereinsfahrer mit Platz.
 
 Das Team je Rennen kommt aus der Spalte **Team** im Ergebnisblatt, sonst gilt das Standard-Team des Teilnehmers. Am Handy
 stehen Karten statt der Tabellen.
