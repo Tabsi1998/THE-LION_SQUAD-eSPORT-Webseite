@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { api, formatMemberSince, formatRequestError } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { AdminSheet } from "@/components/tls/AdminSheet";
@@ -61,7 +62,15 @@ export default function AdminMembersPage() {
   const [q, setQ] = useState("");
   const [filter, setFilter] = useState("all"); // all | community | members | pending
   const [editing, setEditing] = useState(null); // {user, membership}
-  const [tab, setTab] = useState("status");
+  // Reiter in der Adresse (#1365): `/admin/members?tab=profiles` öffnet die öffentlichen Profile direkt.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tab = searchParams.get("tab") === "profiles" ? "profiles" : "status";
+  const setTab = (next) => setSearchParams((current) => {
+    const params = new URLSearchParams(current);
+    if (next === "profiles") params.set("tab", "profiles");
+    else params.delete("tab");
+    return params;
+  }, { replace: true });
 
   const load = useCallback(async () => {
     const { data } = await api.get(`/users${q ? `?q=${encodeURIComponent(q)}` : ""}`);
@@ -97,21 +106,24 @@ export default function AdminMembersPage() {
         <div>
           <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#FFD700]">VEREIN</span>
           <h1 className="font-heading text-3xl md:text-4xl font-black uppercase mt-1">Mitglieder</h1>
-          <p className="text-sm text-white/60 mt-1">Mitgliedschaften, Mitgliedsnummern und die öffentliche Vereinsmitgliederseite an einem Ort pflegen.</p>
+          <p className="text-sm text-white/60 mt-1">Mitgliedschaften, Mitgliedsnummern und die öffentlichen Profile an einem Ort pflegen.</p>
         </div>
       </div>
 
-      <div className="flex flex-wrap gap-2 mb-6 border-b border-white/10">
+      {/* Am Handy wischbar statt umbrechend (#1365). */}
+      <div role="tablist" aria-label="Mitglieder" className="flex gap-2 mb-6 border-b border-white/10 overflow-x-auto">
         {[
           { k: "status", l: "Mitgliedschaften" },
-          { k: "profiles", l: "Öffentliche Mitgliederseite" },
+          { k: "profiles", l: "Öffentliche Profile" },
         ].map((item) => (
           <button
             key={item.k}
             type="button"
+            role="tab"
+            aria-selected={tab === item.k}
             onClick={() => setTab(item.k)}
             data-testid={`members-main-tab-${item.k}`}
-            className={`px-4 py-3 text-xs font-black uppercase tracking-wider border-b-2 transition ${
+            className={`shrink-0 whitespace-nowrap px-4 py-3 text-xs font-black uppercase tracking-wider border-b-2 transition ${
               tab === item.k
                 ? "border-[#FFD700] text-[#FFD700]"
                 : "border-transparent text-white/45 hover:text-white"

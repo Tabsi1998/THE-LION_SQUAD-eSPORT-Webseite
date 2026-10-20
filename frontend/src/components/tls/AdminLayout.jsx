@@ -42,7 +42,9 @@ export const ADMIN_GROUPS = [
     label: "Mitglieder",
     items: [
       { to: "/admin/members", label: "Mitglieder", icon: Crown, areas: ["club"] },
-      { to: "/admin/member-profiles", label: "Mitgliederprofile", icon: UserCheck, areas: ["club"] },
+      // Die öffentlichen Profile sind seit #1365 nur noch der Reiter „Öffentliche Profile“ unter Mitglieder - ein
+      // Wegweiser für die Suche, kein eigener Menüpunkt; die alte Adresse leitet dorthin.
+      { to: "/admin/members?tab=profiles", label: "Mitglieder: Öffentliche Profile", icon: UserCheck, areas: ["club"], searchOnly: true },
       { to: "/admin/membership-applications", label: "Bewerbungen", icon: Inbox, areas: ["club"] },
       { to: "/admin/benefits", label: "Mitgliedervorteile", icon: Gift, areas: ["club"] },
       { to: "/admin/documents", label: "Dokumente", icon: FileText, areas: ["club"] },
@@ -147,7 +149,7 @@ const ADMIN_SEARCH_TERMS = {
   "/admin/app-releases": ["app", "apk", "release", "version", "update", "build", "lionsapp"],
   "/admin/members": ["verein", "mitgliedschaft", "beitrag", "verzeichnis", "einwilligung", "dolibarr", "mitgliedsnummer"],
   "/admin/moderation": ["moderation", "wortfilter", "sperre", "gesperrt", "meldungen", "gemeldet", "blockiert", "strikes", "chat"],
-  "/admin/member-profiles": ["profile", "spielerprofile", "vereinsspieler"],
+  "/admin/members?tab=profiles": ["profile", "mitgliederprofile", "spielerprofile", "vereinsspieler", "vereinsmitglieder", "mitgliederverzeichnis", "öffentliche seite"],
   "/admin/membership-applications": ["antraege", "beitritt", "join"],
   "/admin/benefits": ["vorteile", "rabatte"],
   "/admin/documents": ["dateien", "downloads"],

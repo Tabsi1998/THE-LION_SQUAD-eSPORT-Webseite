@@ -137,7 +137,6 @@ const AdminMobilePushPage = lazy(() => import("@/pages/admin/AdminMobilePushPage
 const AdminAppReleasesPage = lazy(() => import("@/pages/admin/AdminAppReleasesPage"));
 const AdminWidgetsPage = lazy(() => import("@/pages/admin/AdminWidgetsPage"));
 const AdminMembersPage = lazy(() => import("@/pages/admin/AdminMembersPage"));
-const AdminClubMemberProfilesPage = lazy(() => import("@/pages/admin/AdminClubMemberProfilesPage"));
 const AdminBenefitsPage = lazy(() => import("@/pages/admin/AdminBenefitsPage"));
 const AdminAdmissionPage = lazy(() => import("@/pages/admin/AdminAdmissionPage"));
 const AdminGalleryPage = lazy(() => import("@/pages/admin/AdminGalleryPage"));
@@ -342,7 +341,8 @@ function App() {
           <Route path="/admin" element={<ProtectedRoute adminHome><AdminDashboardPage /></ProtectedRoute>} />
           <Route path="/admin/dienst" element={<ProtectedRoute requireDuty><AdminDutyPage /></ProtectedRoute>} />
           <Route path="/admin/members" element={<ProtectedRoute requireArea="club"><AdminMembersPage /></ProtectedRoute>} />
-          <Route path="/admin/member-profiles" element={<ProtectedRoute requireArea="club"><AdminClubMemberProfilesPage /></ProtectedRoute>} />
+          {/* Öffentliche Profile (#1365): nur noch ein Reiter unter Mitglieder - die alte Adresse öffnet ihn. */}
+          <Route path="/admin/member-profiles" element={<Navigate to="/admin/members?tab=profiles" replace />} />
           <Route path="/admin/benefits" element={<ProtectedRoute requireArea="club"><AdminBenefitsPage /></ProtectedRoute>} />
           <Route path="/admin/einlass" element={<ProtectedRoute requireArea="club"><AdminAdmissionPage /></ProtectedRoute>} />
           <Route path="/admin/tournaments" element={<ProtectedRoute requireTournamentStaff><AdminTournamentsPage /></ProtectedRoute>} />
