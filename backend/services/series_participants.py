@@ -5,8 +5,12 @@
   Startnummern der Spur. ``with_ids=False`` reicht fürs bloße Wiedererkennen.
 - ``new_participant`` legt einen Teilnehmer „offen“ an - außer ein bestätigter Alias (gleicher Name, gleiches Spiel)
   ordnet ihn sofort zu.
-- ``remove_unused_new`` nimmt Teilnehmer zurück, die nur ein verworfener Entwurf angelegt hat: nur, wenn sie noch
-  offen sind (keine Zuordnung, kein Alias) und in keinem Ergebnisblatt der Saison vorkommen.
+- ``remove_unused_new`` nimmt Teilnehmer zurück, die nur ein verworfener Entwurf (oder ein gescheitertes Speichern)
+  angelegt hat: nur, wenn sie noch offen sind (keine Zuordnung, kein Alias), noch die Markierung
+  ``created_by_sheet`` tragen und in keinem Ergebnisblatt der Saison vorkommen. Bedingung und Löschen stehen im selben
+  Filter - was jemand dazwischen zuordnet oder verwendet, bleibt.
+- ``claim_participants`` nimmt diese Markierung weg, sobald ein Blatt einen Teilnehmer verwendet - **vor** dem
+  Schreiben des Blatts. Fehlt danach einer, war das Aufräumen schneller, und das Blatt wird nicht gespeichert.
 """
 from __future__ import annotations
 
@@ -123,7 +127,9 @@ def link_fields(alias: dict) -> dict:
             "guest_name": None if member else alias.get("guest_name"), "is_club_member": member}
 
 
-async def new_participant(db, series: dict, index: series_identity.IdentityIndex, fields: dict, me: dict) -> dict:
+async def new_participant(db, series: dict, index: series_identity.IdentityIndex, fields: dict, me: dict, *,
+                          created_by_sheet: str | None = None) -> dict:
+    """``created_by_sheet`` markiert einen Teilnehmer, den ein Ergebnisblatt angelegt hat (``remove_unused_new``)."""
     now = now_utc().isoformat()
     name = clean(fields["name"])
     doc = {
@@ -136,6 +142,8 @@ async def new_participant(db, series: dict, index: series_identity.IdentityIndex
         "link_status": "open", "link_source": None, "alias_id": None, "decided_at": None, "decided_by": None,
         "created_at": now, "created_by": me["id"], "updated_at": now, "updated_by": me["id"],
     }
+    if created_by_sheet:
+        doc["created_by_sheet"] = created_by_sheet
     alias = series_identity.exact_alias(index, name)
     if alias:
         doc.update({**link_fields(alias), "link_status": "decided", "link_source": "alias", "alias_id": alias.get("id"),
@@ -157,14 +165,30 @@ def sheet_participant_ids(sheet: dict) -> set[str]:
     return found
 
 
+async def claim_participants(db, series_id: str, ids) -> bool:
+    """Diese Teilnehmer verwendet jetzt ein Blatt: die Markierung ``created_by_sheet`` fällt weg, kein Aufräumen
+    entfernt sie mehr. Aufrufen **bevor** das Blatt geschrieben wird. ``False``, wenn einer schon fehlt - dann war das
+    Aufräumen schneller, und das Blatt darf so nicht gespeichert werden."""
+    wanted = sorted({pid for pid in ids or [] if pid})
+    if not wanted:
+        return True
+    scope = {"series_id": series_id, "id": {"$in": wanted}}
+    await db.reference_participants.update_many({**scope, "created_by_sheet": {"$ne": None}},
+                                                {"$set": {"created_by_sheet": None}})
+    return await db.reference_participants.count_documents(scope) == len(wanted)
+
+
 async def remove_unused_new(db, series_id: str, candidate_ids) -> list[dict]:
-    """Teilnehmer aus ``candidate_ids`` wieder entfernen, wenn sie noch offen sind (keine Zuordnung, kein Alias) und in
-    keinem Ergebnisblatt der Saison vorkommen - auch nicht in einem Entwurf daneben. Liefert die entfernten
+    """Teilnehmer aus ``candidate_ids`` wieder entfernen, wenn sie noch offen sind (keine Zuordnung, kein Alias), noch
+    als neu angelegt markiert sind (``created_by_sheet``, kein Blatt hat sie seither übernommen) und in keinem
+    Ergebnisblatt der Saison vorkommen - auch nicht in einem Entwurf daneben. Die Bedingungen stehen im Löschfilter
+    selbst: wer dazwischen zugeordnet oder von einem Blatt übernommen wird, bleibt. Liefert die tatsächlich entfernten
     (Kennung und Name, fürs Protokoll)."""
     wanted = sorted({pid for pid in candidate_ids or [] if pid})
     if not wanted:
         return []
-    query = {"series_id": series_id, "id": {"$in": wanted}, "link_status": "open", "alias_id": None}
+    query = {"series_id": series_id, "id": {"$in": wanted}, "link_status": "open", "alias_id": None,
+             "created_by_sheet": {"$ne": None}}
     rows = await db.reference_participants.find(query, {"_id": 0, "id": 1, "name": 1}).to_list(None)
     if not rows:
         return []
@@ -172,6 +196,10 @@ async def remove_unused_new(db, series_id: str, candidate_ids) -> list[dict]:
     async for sheet in db.reference_round_results.find({"series_id": series_id}, {"_id": 0}):
         used |= sheet_participant_ids(sheet)
     gone = [row for row in rows if row["id"] not in used]
-    if gone:
-        await db.reference_participants.delete_many({**query, "id": {"$in": [row["id"] for row in gone]}})
-    return gone
+    if not gone:
+        return []
+    ids = [row["id"] for row in gone]
+    await db.reference_participants.delete_many({**query, "id": {"$in": ids}})
+    kept = {row["id"] async for row in db.reference_participants.find(
+        {"series_id": series_id, "id": {"$in": ids}}, {"_id": 0, "id": 1})}
+    return [row for row in gone if row["id"] not in kept]

@@ -99,6 +99,44 @@ async def _counts(flow) -> dict:
         "audit_logs", "reference_aliases")}
 
 
+class _Hooked:
+    """Datenbank, bei der ``hook`` einmal läuft, unmittelbar bevor ``collection.method`` zum ersten Mal aufgerufen
+    wird (``after=False``) oder gleich danach (``after=True``) - so kommt eine andere Anfrage genau zwischen zwei
+    Schritte. ``db`` darf selbst ein Wrapper sein (etwa ``InterleavedReads``)."""
+
+    def __init__(self, db, collection: str, method: str, hook, *, after: bool = False):
+        self._db, self._collection, self._method, self._hook, self._after = db, collection, method, hook, after
+        self.fired = False
+
+    def __getattr__(self, name):
+        target = getattr(self._db, name)
+        return _HookedCollection(target, self) if name == self._collection else target
+
+    def __getitem__(self, name):
+        return self.__getattr__(name)
+
+
+class _HookedCollection:
+    def __init__(self, collection, owner: _Hooked):
+        self._collection, self._owner = collection, owner
+
+    def __getattr__(self, name):
+        original = getattr(self._collection, name)
+        if name != self._owner._method:
+            return original
+
+        async def hooked(*args, **kwargs):
+            first = not self._owner.fired
+            self._owner.fired = True
+            if first and not self._owner._after:
+                await self._owner._hook()
+            result = await original(*args, **kwargs)
+            if first and self._owner._after:
+                await self._owner._hook()
+            return result
+        return hooked
+
+
 # ---------------------------------------------------------------- Vorschau
 @pytest.mark.asyncio
 async def test_the_preview_changes_nothing_and_shows_table_movement_final_line_and_unknown_names(flow):
@@ -213,6 +251,53 @@ async def test_two_simultaneous_saves_one_wins_the_other_gets_409(flow, monkeypa
     assert sorted(answer.status_code for answer in answers) == [200, 409]
     assert (await flow.db.reference_round_results.find_one({}))["version"] == 2
     assert await flow.db.reference_round_result_revisions.count_documents({}) == 1
+
+
+@pytest.mark.asyncio
+async def test_the_loser_keeps_a_new_participant_that_was_assigned_before_it_cleans_up(flow, monkeypatch):
+    ctx = await _setup(flow)
+
+    async def assign_meanwhile():
+        # Der Vorstand ordnet die neuen Namen zu, während der Verlierer gerade aufräumen will.
+        await flow.db.reference_participants.update_many({"name": {"$in": ["Neu Nora", "Neu Otto"]}}, {"$set": {
+            "link": "guest", "link_status": "decided"}})
+
+    gate = _Hooked(InterleavedReads(flow.db, "reference_round_results"), "reference_participants", "delete_many",
+                   assign_meanwhile)
+    monkeypatch.setattr(reference_result_routes, "get_db", lambda: gate)
+    # Jede Seite bringt einen eigenen neuen Namen mit - der Verlierer muss also aufräumen.
+    answers = await asyncio.gather(*(flow.put(_url(ctx, 0), json={
+        "rows": _rows(*order), "status": "published", "expected_version": 0})
+        for order in (("Anna Probe", "Neu Nora"), ("Neu Otto", "Bert Bolzt"))))
+    assert sorted(answer.status_code for answer in answers) == [200, 409]
+    assert gate.fired
+    assert await flow.db.reference_participants.count_documents({"name": {"$in": ["Neu Nora", "Neu Otto"]}}) == 2
+
+
+@pytest.mark.asyncio
+async def test_discarding_keeps_a_new_participant_another_sheet_took_between_check_and_delete(flow, monkeypatch):
+    ctx = await _setup(flow)
+    await _save(flow, ctx, 0, _rows("Anna Probe", "Bert Bolzt"))
+    flow.act_as(ctx["captain"])
+    await _save(flow, ctx, 0, _rows("Neu Nora", "Anna Probe"), version=1, status="draft")
+    nora = await flow.db.reference_participants.find_one({"name": "Neu Nora"})
+    flow.act_as(ctx["board"])
+    taken = {}
+
+    async def save_elsewhere():
+        # Zwischen Prüfen und Löschen trägt jemand Nora in ein anderes Blatt ein.
+        taken["answer"] = await flow.put(_url(ctx, 1), json={
+            "rows": [{"participant_id": nora["id"], "place": 1}], "status": "draft", "expected_version": 0})
+
+    gate = _Hooked(flow.db, "reference_participants", "delete_many", save_elsewhere)
+    monkeypatch.setattr(reference_result_routes, "get_db", lambda: gate)
+    discarded = await flow.post(_url(ctx, 0, "/discard"), json={"expected_version": 2})
+    assert discarded.status_code == 200, discarded.text
+    assert taken["answer"].status_code == 200, taken["answer"].text
+    assert discarded.json()["removed_participants"] == []
+    assert await flow.db.reference_participants.find_one({"id": nora["id"]}) is not None
+    other = await flow.db.reference_round_results.find_one({"round_id": ctx["rounds"][1]})
+    assert other["rows"][0]["participant_id"] == nora["id"]
 
 
 @pytest.mark.asyncio

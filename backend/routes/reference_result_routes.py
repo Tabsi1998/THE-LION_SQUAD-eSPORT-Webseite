@@ -65,7 +65,9 @@ gewertet sind.
   = ``EDIT_PENDING_DRAFT``), wird die Änderung als ``pending_draft`` neben dem Blatt gespeichert
   (``reference_result.pending_draft``) - das veröffentlichte Blatt bleibt sichtbar und zählt weiter.
 - Unbekannte Namen werden als offene Teilnehmer angelegt (Dialog „Unbekannte Namen“, #1743); ein bestätigter Alias
-  ordnet sie gleich zu. Scheitert das Speichern danach an der Version, werden sie wieder entfernt.
+  ordnet sie gleich zu. Scheitert das Speichern danach an der Version, werden sie wieder entfernt - nur, solange sie
+  offen, ungenutzt und noch als neu markiert sind (``created_by_sheet``; ein Blatt, das einen Teilnehmer verwendet,
+  nimmt die Markierung vor dem Schreiben weg, ``series_participants.claim_participants``).
 
 **POST …/results/approve** und **POST …/results/discard** (nur Vorstand), Body ``{expected_version}``: Freigeben
 veröffentlicht den Entwurf daneben (ohne einen solchen das Blatt im Entwurf) samt Revision, Protokoll
@@ -92,7 +94,9 @@ from services import reference_series, series_identity, series_results
 from services.dolibarr_policy import club_today
 from services.reference_series_access import EDIT_PENDING_DRAFT, SeriesAccess, require_series_editor
 from services.scoring_rules import normalize_rules, result_points, validate_sheet
-from services.series_participants import build_index, new_participant, remove_unused_new
+from services.series_participants import (
+    build_index, claim_participants, new_participant, remove_unused_new, sheet_participant_ids,
+)
 from services.series_standings import compute_standings
 
 router = APIRouter(prefix="/api/reference-series", tags=["reference-series"])
@@ -504,17 +508,19 @@ async def _sync_round(db, access: SeriesAccess, round_doc: dict, published: bool
     await db.reference_series.update_one({"id": access.series_id}, {"$inc": {"calendar_version": 1}})
 
 
-async def _create_people(db, access: SeriesAccess, resolution) -> dict[str, dict]:
-    """Neue Namen als offene Teilnehmer (mit bestätigtem Alias gleich zugeordnet). Schlüssel → Teilnehmer."""
+async def _create_people(db, access: SeriesAccess, resolution, round_id: str) -> dict[str, dict]:
+    """Neue Namen als offene Teilnehmer (mit bestätigtem Alias gleich zugeordnet), markiert als von diesem Speichern
+    angelegt (``created_by_sheet``). Schlüssel → Teilnehmer."""
     people = list(resolution.new_people.values())
     if not people:
         return {}
     index = await build_index(db, access.series, [person["name"] for person in people], with_ids=False)
+    marker = f"{round_id}:{new_id()}"
     created = {}
     for person in people:
         created[person["key"]] = await new_participant(db, access.series, index, {
             "name": person["name"], "start_number": person["start_number"], "default_team": person["team"]},
-            access.user)
+            access.user, created_by_sheet=marker)
     return created
 
 
@@ -565,18 +571,27 @@ async def save_results(series_id: str, round_id: str, body: ResultSave,
     _, _, resolution = await _prepare(db, access, round_doc, body)
     _refuse(resolution)
 
-    created = await _create_people(db, access, resolution)
+    created = await _create_people(db, access, resolution, round_doc["id"])
+    own = [doc["id"] for doc in created.values()]
     content = series_results.replace_new_ids(resolution.content(), {key: doc["id"] for key, doc in created.items()})
-    if target == EDIT_PENDING_DRAFT:
-        saved = await _write_pending(db, access, existing, content, body.expected_version,
-                                     [doc["id"] for doc in created.values()])
-    else:
-        saved = await _write_sheet(db, access, round_doc, existing, content, status, body.expected_version)
+    # Wer schon in der Saison stand, gilt ab jetzt als verwendet - außer die Entwürfe dieses Blatts haben ihn selbst
+    # neu angelegt (dann darf Verwerfen ihn weiter mitnehmen). Fehlt einer, hat ihn das Aufräumen gerade entfernt.
+    chain = set(((existing or {}).get("pending_draft") or {}).get("created_participant_ids") or []) \
+        if target == EDIT_PENDING_DRAFT else set()
+    used = sheet_participant_ids(content) - set(own) - chain
+    saved = None
+    if await claim_participants(db, series_id, used):
+        if target == EDIT_PENDING_DRAFT:
+            saved = await _write_pending(db, access, existing, content, body.expected_version, own)
+        else:
+            saved = await _write_sheet(db, access, round_doc, existing, content, status, body.expected_version)
     if saved is None:
-        # Jemand war schneller: die eben angelegten (noch nirgends verwendeten) Teilnehmer gehen wieder.
-        if created:
-            await db.reference_participants.delete_many({"id": {"$in": [doc["id"] for doc in created.values()]}})
+        # Jemand war schneller: die eben angelegten Teilnehmer gehen wieder - nur, wenn sie noch offen, unverwendet und
+        # von niemandem übernommen sind (Bedingung im Löschfilter, ``remove_unused_new``).
+        await remove_unused_new(db, series_id, own)
         raise HTTPException(409, STALE)
+    if target != EDIT_PENDING_DRAFT:
+        await claim_participants(db, series_id, own)
 
     revision_id = None
     if target == EDIT_PENDING_DRAFT:
@@ -644,6 +659,9 @@ async def approve_results(series_id: str, round_id: str, body: ResultDecision,
     errors = await _approval_errors(db, access, round_doc, content)
     if errors:
         raise HTTPException(422, {"message": "Der Entwurf hat Fehler.", "errors": errors, "warnings": []})
+    # Wer im freigegebenen Blatt steht, gilt ab jetzt als verwendet; fehlt einer, war das Aufräumen schneller.
+    if not await claim_participants(db, series_id, sheet_participant_ids(content)):
+        raise HTTPException(409, STALE)
     stamp = _stamp(access)
     drafted_by = source.get("created_by") if pending else source.get("updated_by")
     saved = await _update_if_current(db, existing["id"], body.expected_version, {"$set": {
