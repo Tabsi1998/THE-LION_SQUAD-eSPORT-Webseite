@@ -220,13 +220,7 @@ export function FastLapDetailScreen({ navigation, route }: Props) {
               <StatusBadge phase={challenge.public_phase} status={challenge.status} />
               {/* Umbruch nur zwischen Wörtern (#1867): ohne Silbentrennung; zerreißt Android doch ein Wort, wird die
                   Schrift etwas kleiner, höchstens bis 80 %. */}
-              <FitTitle
-                text={challenge.title || ""}
-                minScale={0.8}
-                textBreakStrategy="simple"
-                android_hyphenationFrequency="none"
-                testID="fastlap-hero-title"
-              />
+              <FitTitle text={challenge.title || ""} minScale={0.8} testID="fastlap-hero-title" />
               <Muted>{formatDate(challenge.start_date)}</Muted>
             </View>
           </View>

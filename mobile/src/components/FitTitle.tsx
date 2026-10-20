@@ -36,7 +36,8 @@ export function FitTitle({ text, minScale, ...props }: Omit<TextProps, "children
     setScale((current) => (current > minScale ? Math.max(minScale, Math.round((current - 0.05) * 100) / 100) : current));
   }, [minScale]);
   return (
-    <Title {...props} onLayout={onLayout} onTextLayout={onTextLayout} style={scale < 1 ? { fontSize: Math.round(TITLE_SIZE * scale) } : null}>
+    // Vorgabe (#1867): einfache Umbruch-Strategie, keine Silbentrennung - Android trennt sonst auch ohne Not im Wort.
+    <Title textBreakStrategy="simple" android_hyphenationFrequency="none" {...props} onLayout={onLayout} onTextLayout={onTextLayout} style={scale < 1 ? { fontSize: Math.round(TITLE_SIZE * scale) } : null}>
       {text}
     </Title>
   );
