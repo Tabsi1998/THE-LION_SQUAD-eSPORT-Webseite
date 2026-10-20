@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams, Link, useNavigate, useSearchParams } from "react-router-dom";
 import { api, formatRequestError, resolveMediaUrl } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
+import { SponsorLogo } from "@/components/tls/SponsorLogo";
 import { PrintLink } from "@/components/tls/print/PrintLink";
 import { PublicLoadingState } from "@/components/tls/PublicLoadingState";
 import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
@@ -541,7 +542,7 @@ function EventOverview({ e, user, over, accessToken, hasConsent, onChanged, regi
               <div className="flex flex-wrap gap-3">
                 {e.partners.map((p) => (
                   <Link key={p.id} to={`/partners/${p.slug || p.id}`} data-testid={`event-partner-${p.slug || p.id}`} className="inline-flex items-center gap-3 border border-white/10 bg-[#101010] rounded-sm px-3 py-2 hover:border-[#29B6E8]/60 transition">
-                    {p.logo_url ? <img src={resolveMediaUrl(p.logo_url)} alt="" className="h-8 w-8 object-contain" /> : <Handshake className="h-5 w-5 text-[#29B6E8]" />}
+                    {p.logo_url ? <span className="h-8 w-8 flex items-center justify-center"><SponsorLogo logo={p} fill={0.7} /></span> : <Handshake className="h-5 w-5 text-[#29B6E8]" />}
                     <span className="font-heading font-bold uppercase text-sm">{p.name}</span>
                   </Link>
                 ))}
@@ -553,8 +554,8 @@ function EventOverview({ e, user, over, accessToken, hasConsent, onChanged, regi
               <SectionTitle>Unterstützt von</SectionTitle>
               <div className="flex flex-wrap items-center gap-8 border-y border-white/10 py-6 min-w-0">
                 {eventSponsors.map((s) => (
-                  <a key={sponsorKey(s)} href={s.link || "#"} target={s.link ? "_blank" : undefined} rel="noreferrer" aria-label={s.name} className="group inline-flex items-center justify-center min-w-32">
-                    <img src={resolveMediaUrl(s.logo_url)} alt="" className="max-h-14 max-w-44 object-contain opacity-80 group-hover:opacity-100 transition" />
+                  <a key={sponsorKey(s)} href={s.link || "#"} target={s.link ? "_blank" : undefined} rel="noreferrer" aria-label={s.name} className="group inline-flex items-center justify-center h-14 w-44" data-testid={`event-sponsor-${s.id || sponsorKey(s)}`}>
+                    <SponsorLogo logo={s} />
                   </a>
                 ))}
               </div>

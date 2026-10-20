@@ -87,3 +87,12 @@ async def test_sponsor_and_partner_carry_transparency_and_white_version(flow, up
     assert updated.json()["logo_mono_url"] == mono
     public_sponsor = next(s for s in (await flow.get("/api/sponsors")).json() if s["name"] == "Alpha")
     assert public_sponsor["logo_mono_url"] == mono
+
+
+def test_partner_badge_for_events_carries_white_version_and_transparency(uploads):
+    from services.partner_pages import partner_badge
+
+    clear = uploads("badge-clear.png", "RGBA", (0, 0, 0, 0), inner=(10, 200, 90, 255))
+    badge = partner_badge({"id": "p1", "slug": "gamma", "name": "Gamma", "logo_url": clear, "logo_mono_url": "/api/static/uploads/w.png"})
+    assert badge["logo_transparent"] is True
+    assert badge["logo_mono_url"] == "/api/static/uploads/w.png"

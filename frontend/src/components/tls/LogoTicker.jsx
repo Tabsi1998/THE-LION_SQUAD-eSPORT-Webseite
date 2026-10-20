@@ -4,8 +4,7 @@
  * Logos, darunter stehen sie zentriert. Hover hält an, „Bewegung reduzieren“ auch (index.css).
  */
 import { Link } from "react-router-dom";
-import { resolveMediaUrl } from "@/lib/api";
-import { SmartLogo } from "@/components/tls/SmartLogo";
+import { SponsorLogo } from "@/components/tls/SponsorLogo";
 
 export function repeatForLoop(items, minItems) {
   if (!items.length) return [];
@@ -33,6 +32,8 @@ export function LogoTicker({
   groupPaddingClass = "pr-16",
   verticalClass = "py-5",
   reverse = false,
+  // Einfarbig (#1321): weiß, beim Drüberfahren in Farbe - im Fußzeilen-Band immer weiß (`hoverColor={false}`).
+  hoverColor = true,
   testId = "logo-ticker",
   className = "",
 }) {
@@ -44,7 +45,7 @@ export function LogoTicker({
     const linkClass = `inline-flex items-center justify-center shrink-0 opacity-80 hover:opacity-100 transition ${boxClassFor(item)}`;
     // Jedes Logo füllt seinen Kasten (object-contain): eine kleine Vorlage wächst mit, eine große schrumpft. So stehen
     // alle Logos eines Bandes gleich hoch, egal wie groß die Datei ist, und folgen jeder Kastengröße.
-    const logo = <SmartLogo src={resolveMediaUrl(item.logo_url)} alt={item.name} className="w-full h-full object-contain" />;
+    const logo = <SponsorLogo logo={item} alt={item.name} hoverColor={hoverColor} />;
     if (item.to) {
       return <Link key={key} to={item.to} tabIndex={duplicate ? -1 : undefined} className={linkClass} title={item.name}>{logo}</Link>;
     }
