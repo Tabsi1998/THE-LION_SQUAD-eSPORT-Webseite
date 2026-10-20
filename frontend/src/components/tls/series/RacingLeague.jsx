@@ -104,11 +104,12 @@ export function RacingLeague({ data }) {
       <SeasonSwitcher seasons={racing.seasons} lineageSlug={data.lineage?.slug} />
       <SeriesProgress progress={data.progress} rounds={rounds} words={PROGRESS_WORDS.racing} />
 
-      {selected && (
+      {/* Die Garage steht, sobald es Vereinsteams gibt; nur das Detail braucht einen öffentlichen Vereinsfahrer. */}
+      {(garage.length > 0 || selected) && (
         <section className="mt-10" aria-labelledby="racing-garage-title" data-testid="racing-garage">
           <h2 id="racing-garage-title" className="font-heading text-2xl font-black uppercase">Vereins-Garage</h2>
-          <RacingGarageTeams garage={garage} rows={rows} drivers={drivers} selectedKey={selected.key} onSelect={select} publicKeys={publicKeys} />
-          <RacingDriverDetail ref={detailRef} row={selected} driver={drivers[selected.key]} rounds={rounds} flash={flash} />
+          <RacingGarageTeams garage={garage} rows={rows} drivers={drivers} selectedKey={selected?.key} onSelect={select} publicKeys={publicKeys} />
+          {selected && <RacingDriverDetail ref={detailRef} row={selected} driver={drivers[selected.key]} rounds={rounds} flash={flash} />}
         </section>
       )}
 

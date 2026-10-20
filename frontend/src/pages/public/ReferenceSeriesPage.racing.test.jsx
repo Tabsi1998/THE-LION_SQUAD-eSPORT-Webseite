@@ -236,6 +236,18 @@ test("ein Vereinsmitglied ohne öffentliches Profil: kein Detail, kein Knopf, in
   expect(within(lions).getAllByText("Vereinsfahrer").length).toBeGreaterThan(0);
 });
 
+test("kein öffentlicher Vereinsfahrer: die Garage bleibt mit ihren Teams, nur das Fahrer-Detail entfällt", async () => {
+  renderAt("/references/series/probe-racing/2026-f1?fahrer=lion1", { ...BODY, racing: { ...BODY.racing, club_drivers: [] } });
+  const garage = await screen.findByTestId("racing-garage");
+  const teams = within(garage).getAllByTestId("racing-garage-team");
+  expect(teams.map((team) => within(team).getByRole("heading", { level: 3 }).textContent)).toEqual(["Probe Löwen", "Probe Löwen B"]);
+  expect(within(teams[0]).getAllByText("Vereinsfahrer").length).toBeGreaterThan(0);
+  expect(within(teams[1]).getAllByText("Gastfahrer").length).toBeGreaterThan(0);
+  expect(within(garage).queryByRole("button")).toBeNull();
+  expect(screen.queryByTestId("racing-driver")).toBeNull();
+  expect(garage).not.toHaveTextContent("Probe Lion Eins");
+});
+
 test("eine fremde Kennung in der Adresse öffnet kein Detail für Fremde", async () => {
   renderAt("/references/series/probe-racing/2026-f1?fahrer=ext1");
   const detail = await screen.findByTestId("racing-driver");
