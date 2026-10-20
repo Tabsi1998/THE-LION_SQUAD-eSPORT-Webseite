@@ -28,7 +28,7 @@ import {
   formatStatus,
   formatWhen,
 } from "../../lib/format";
-import { finishedMatchText, formatMatchKind, isMatchFinished, matchHeadline, slotName, stationText } from "../../lib/matchText";
+import { finishedMatchText, formatMatchKind, isMatchFinished, matchHeadline, slotName, slotStatusText, stationText } from "../../lib/matchText";
 import { viennaWall, wallToIso } from "../../lib/dateChoice";
 import { DateTimeChooser } from "../../components/DateTimeChooser";
 import type { TournamentStackParamList } from "../../navigation/types";
@@ -460,7 +460,7 @@ export function MatchDetailScreen({ navigation, route }: Props) {
               <View style={styles.flex}>
                 <Body style={styles.strong}>{slotName(participant.display_name, participant, match)}</Body>
                 {participant.team ? <Muted>{participant.team.tag ? `[${participant.team.tag}] ` : ""}{participant.team.name}</Muted> : null}
-                {participant.status ? <Muted>{formatStatus(participant.status)}</Muted> : null}
+                {slotStatusText(participant.status) ? <Muted>{slotStatusText(participant.status)}</Muted> : null}
               </View>
             </View>
           )) : <Muted>Noch keine Teilnehmer zugewiesen.</Muted>}

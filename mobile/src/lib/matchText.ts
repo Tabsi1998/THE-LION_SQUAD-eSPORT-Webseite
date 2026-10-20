@@ -57,6 +57,20 @@ export function slotName(name: string | null | undefined, slot: Slot | null | un
   return isByeSlot(slot, match) ? BYE_LABEL : OPEN_SLOT_LABEL;
 }
 
+// Zustand eines Platzes in der Teilnehmerliste (#1870): nie als Rohwert. Belegt, offen und Freilos sagt schon der Name
+// des Platzes (wie auf der Website, die dafür keine eigene Zeile zeigt); Unbekanntes bleibt weg statt englisch.
+const SLOT_STATUS_LABELS: Record<string, string> = {
+  checked_in: "Eingecheckt",
+  no_show: "Nicht erschienen",
+  withdrawn: "Zurückgezogen",
+  disqualified: "Disqualifiziert",
+};
+
+/** Zusatzzeile zum Zustand eines Platzes - leer, wenn der Name schon alles sagt oder der Wert unbekannt ist. */
+export function slotStatusText(status?: string | null) {
+  return SLOT_STATUS_LABELS[String(status || "").trim().toLowerCase()] || "";
+}
+
 /** Ist das Spiel entschieden (beendet, gewertet, Freilos)? */
 export function isMatchFinished(match: MatchLike | null | undefined) {
   return FINISHED_MATCH_STATUSES.has(String(match?.status || ""));

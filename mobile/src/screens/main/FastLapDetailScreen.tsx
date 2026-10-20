@@ -8,7 +8,8 @@ import { EmptyState, ErrorState, PartialLoadNotice, SkeletonList, loadProblem, t
 import { MediaImage } from "../../components/MediaImage";
 import { Screen } from "../../components/Screen";
 import { StatusBadge } from "../../components/StatusBadge";
-import { Body, Heading, Muted, Title } from "../../components/Text";
+import { FitTitle } from "../../components/FitTitle";
+import { Body, Heading, Muted } from "../../components/Text";
 import { useAuth } from "../../auth/AuthContext";
 import { api, errorMessage } from "../../lib/api";
 import { formatDate, formatDateTime } from "../../lib/format";
@@ -208,16 +209,18 @@ export function FastLapDetailScreen({ navigation, route }: Props) {
           <MediaImage
             uri={activeTrack?.image_url || challenge.banner_url}
             style={styles.hero}
-            fallback={<Ionicons name="speedometer-outline" color={colors.gold} size={42} />}
+            fallback={<Ionicons name="speedometer-outline" color={colors.gold} size={HERO_ICON_SIZE} />}
           />
           <View style={styles.heroShade} />
-          <View style={styles.heroContent}>
+          <View style={styles.heroContent} testID="fastlap-hero-content">
             <View style={styles.heroMark}>
               <Ionicons name="speedometer-outline" color={colors.black} size={22} />
             </View>
             <View style={styles.heroText}>
               <StatusBadge phase={challenge.public_phase} status={challenge.status} />
-              <Title>{challenge.title}</Title>
+              {/* Umbruch nur zwischen Wörtern (#1867): ohne Silbentrennung; zerreißt Android doch ein Wort, wird die
+                  Schrift etwas kleiner, höchstens bis 80 %. */}
+              <FitTitle text={challenge.title || ""} minScale={0.8} testID="fastlap-hero-title" />
               <Muted>{formatDate(challenge.start_date)}</Muted>
             </View>
           </View>
@@ -509,18 +512,30 @@ function stripText(value: string) {
   return value.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
 }
 
+const HERO_PAD = 18;
+const HERO_ICON_SIZE = 42;
+
 const styles = StyleSheet.create({
   content: {
     gap: 16,
     paddingBottom: 28,
   },
+  // Kopf (#1868): Bild und Schatten füllen ihn, der Inhalt steht im Fluss am unteren Rand. Darüber bleibt ein freier
+  // Streifen, in dem ohne Banner das Tacho-Symbol sitzt - ein langer Titel lässt den Kopf wachsen, statt das Symbol
+  // über das Abzeichen zu legen.
   heroWrap: {
+    justifyContent: "flex-end",
     minHeight: 250,
   },
   hero: {
+    bottom: 0,
+    left: 0,
+    position: "absolute",
+    right: 0,
+    top: 0,
     borderWidth: 0,
-    height: 250,
-    width: "100%",
+    justifyContent: "flex-start",
+    paddingTop: HERO_PAD,
   },
   heroShade: {
     backgroundColor: "rgba(0,0,0,0.45)",
@@ -532,12 +547,10 @@ const styles = StyleSheet.create({
   },
   heroContent: {
     alignItems: "flex-end",
-    bottom: 18,
     flexDirection: "row",
     gap: 12,
-    left: 18,
-    position: "absolute",
-    right: 18,
+    padding: HERO_PAD,
+    paddingTop: HERO_PAD + HERO_ICON_SIZE + 12,
   },
   heroMark: {
     alignItems: "center",

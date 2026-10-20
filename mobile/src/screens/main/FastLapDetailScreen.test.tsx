@@ -141,3 +141,34 @@ test("nach der Veröffentlichung keine Eingabe in der App - ein Satz sagt, wo es
   await waitFor(() => expect(screen.getByTestId("fastlap-locked")).toBeTruthy());
   expect(screen.queryByTestId("fastlap-driver-search")).toBeNull();
 });
+
+// Langer Titel (#1867): bei 360 dp brach Android „Regenbogen-Boulevard“ mitten im Wort um. Umbrochen wird nur
+// zwischen Wörtern; zerreißt Android doch ein Wort, wird die Schrift schrittweise kleiner, höchstens bis 80 %.
+test("der Titel im Kopf bricht nicht im Wort um und wird höchstens bis 80 % kleiner", async () => {
+  answer({ ...CHALLENGE, title: "Fast Lap Regenbogen-Boulevard" });
+  await render(<FastLapDetailScreen route={route} />);
+  const title = () => screen.getByTestId("fastlap-hero-title");
+  await waitFor(() => expect(title()).toHaveTextContent("Fast Lap Regenbogen-Boulevard"));
+  expect(title().props.textBreakStrategy).toBe("simple");
+  expect(title().props.android_hyphenationFrequency).toBe("none");
+  expect(title()).toHaveStyle({ fontSize: 30 });
+  const layout = (lines: string[]) => fireEvent(title(), "textLayout", { nativeEvent: { lines: lines.map((text) => ({ text })) } });
+  await layout(["Fast Lap Regenbog", "en-Boulevard"]);
+  expect(title()).toHaveStyle({ fontSize: 29 });
+  // Umbruch nach dem Bindestrich oder an Leerzeichen ist in Ordnung.
+  await layout(["Fast Lap ", "Regenbogen-", "Boulevard"]);
+  expect(title()).toHaveStyle({ fontSize: 29 });
+  for (let step = 0; step < 20; step += 1) await layout(["Fast Lap Regenbog", "en-Boulevard"]);
+  expect(title()).toHaveStyle({ fontSize: 24 });
+});
+
+// Tacho im Kopf (#1868): das große Symbol ohne Banner lag über dem Abzeichen. Der Inhalt steht im Fluss unter einem
+// freien Streifen für das Symbol - wird der Titel länger, wächst der Kopf, statt sich zu überlagern.
+test("der Kopfinhalt liegt im Fluss unter dem Platz für das Tacho-Symbol", async () => {
+  answer(CHALLENGE);
+  await render(<FastLapDetailScreen route={route} />);
+  await waitFor(() => expect(screen.getByTestId("fastlap-hero-content")).toBeTruthy());
+  const content = screen.getByTestId("fastlap-hero-content");
+  expect(content).not.toHaveStyle({ position: "absolute" });
+  expect(content).toHaveStyle({ paddingTop: 72 });
+});
