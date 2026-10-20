@@ -1,5 +1,6 @@
 """Anmeldungen, Teilnehmerverwaltung und Check-in.
 """
+import asyncio
 import logging
 
 from fastapi import HTTPException, Depends, Request
@@ -580,17 +581,15 @@ async def _create_self_registration(db, tid: str, tournament: dict, body: Regist
             existing.pop("identity_key", None)
             return {**existing, "auto_bracket_update": None, "idempotent_replay": True}
         raise
-    auto_bracket_update = None
     if reg["status"] in {"approved", "checked_in"}:
-        auto_bracket_update = await _refresh_tournament_previews_after_registration(db, tournament, me.get("id"))
         # Verbindlich dabei: Preis einfrieren, Auftrag anlegen (#319). Warteliste zahlt beim Nachrücken.
         snapshot = await tournament_fees.freeze_price(db, reg, tournament, payer=me)
         if snapshot:
             reg["price_snapshot"], reg["billing_status"] = snapshot, "pending"
     reg.pop("_id", None)
     reg.pop("identity_key", None)
-    # Bestätigung und Erfolge folgen nach der Sperre (``_after_self_registration``).
-    reg["auto_bracket_update"] = auto_bracket_update
+    # Vorschau-Baum, Bestätigung und Erfolge folgen nach der Sperre (#1859, ``self_register``).
+    reg["auto_bracket_update"] = None
     reg["idempotent_replay"] = False
     return reg
 
@@ -630,8 +629,11 @@ async def self_register(db, t: dict, body: RegistrationCreate, me: dict, registe
         raise HTTPException(status_code=400, detail=registration_error)
     if t.get("block_club_member_registration") and await _is_active_club_member(db, me):
         raise HTTPException(status_code=403, detail="Dieses Turnier ist für externe Teilnehmer vorgesehen. Vereinsmitglieder können sich hier nicht selbst anmelden.")
+    queue = _preview_queue(tid)
+    queue.pending += 1
     try:
         # Gleichzeitige Anmeldungen (#1826, Vor-Ort-QR am Einlass) stellen sich an der Sperre an statt abzubrechen.
+        # In der Sperre nur Platz und Startgeld (#1859) - der Vorschau-Baum folgt danach, gesammelt für alle.
         async with mutation_lock(db, tournament_write_resource(tid), wait_seconds=registration_wait_seconds()):
             current = await db.tournaments.find_one({"id": tid}, {"_id": 0})
             if not current:
@@ -644,9 +646,78 @@ async def self_register(db, t: dict, body: RegistrationCreate, me: dict, registe
             reg = await _create_self_registration(db, tid, current, body, me, register_access, via=via)
     except MutationLockBusy:
         raise HTTPException(status_code=409, detail="Eine Turnieraktion wird bereits verarbeitet. Bitte erneut versuchen.")
+    finally:
+        queue.pending -= 1
     if not reg.get("idempotent_replay"):
+        if reg["status"] in {"approved", "checked_in"}:
+            queue.requested += 1
+            reg["auto_bracket_update"] = await _refresh_previews_after_self_registration(db, tid, queue.requested,
+                                                                                         me.get("id"))
         await _after_self_registration(db, tid, reg, me)
     return reg
+
+
+class _PreviewQueue:
+    """Vorschau-Baum nach Selbstanmeldungen, je Turnier gesammelt (#1859).
+
+    ``requested`` zählt die bestätigten Anmeldungen dieses Prozesses (erhöht erst nach dem Speichern), ``refreshed`` bis
+    zu welcher Nummer ein Auffrischen sie schon enthält, ``pending`` wie viele Anmeldungen gerade an der Sperre stehen
+    oder in ihr sind."""
+
+    __slots__ = ("requested", "refreshed", "pending")
+
+    def __init__(self):
+        self.requested = 0
+        self.refreshed = 0
+        self.pending = 0
+
+
+_PREVIEW_QUEUES: dict[str, _PreviewQueue] = {}
+# Takt, in dem ein wartendes Auffrischen nachsieht, ob die Schlange an der Sperre leer ist.
+PREVIEW_SETTLE_POLL_SECONDS = 0.05
+
+
+def _preview_queue(tid: str) -> _PreviewQueue:
+    queue = _PREVIEW_QUEUES.get(tid)
+    if queue is None:
+        queue = _PREVIEW_QUEUES[tid] = _PreviewQueue()
+    return queue
+
+
+async def _refresh_previews_after_self_registration(db, tid: str, number: int, actor_id: str | None) -> dict | None:
+    """Den Vorschau-Baum nach der Anmeldung Nummer ``number`` auffrischen - ohne die Platzvergabe aufzuhalten (#1859).
+
+    Am Einlass melden sich 16 bis 30 Leute im selben Moment an. Früher baute jede Anmeldung den Baum in der
+    Turnier-Sperre neu, die nächste wartete so lange. Jetzt hält eine Anmeldung die Sperre nur für Platz und Startgeld;
+    den Baum baut danach einer für alle: Wer wartet, bis die Schlange an der Sperre leer ist, und dann neu baut, nimmt
+    alle bis dahin gespeicherten Anmeldungen mit - die übrigen sehen „schon erledigt“ und antworten sofort. Ein Fehler
+    oder eine besetzte Sperre beim Baum kostet niemanden seinen Platz (er ist schon gespeichert); der Baum wächst dann
+    mit der nächsten Anmeldung oder spätestens beim Check-in-Ende.
+
+    Mehrere Prozesse: jeder zählt nur seine eigenen Anmeldungen und baut im Zweifel einmal mehr - nie zu selten."""
+    queue = _preview_queue(tid)
+    wait = registration_wait_seconds()
+    loop = asyncio.get_running_loop()
+    settle_until = loop.time() + wait
+    # Erst die Schlange an der Sperre durchlassen (Platzvergabe zuerst), höchstens so lange wie eine Anmeldung wartet.
+    while queue.refreshed < number and queue.pending > 0 and loop.time() < settle_until:
+        await asyncio.sleep(PREVIEW_SETTLE_POLL_SECONDS)
+    if queue.refreshed >= number:
+        return None
+    try:
+        async with mutation_lock(db, tournament_write_resource(tid), wait_seconds=wait):
+            if queue.refreshed >= number:
+                return None
+            covered = queue.requested
+            tournament = await db.tournaments.find_one({"id": tid}, {"_id": 0})
+            update = await _refresh_tournament_previews_after_registration(db, tournament, actor_id) if tournament else None
+            queue.refreshed = max(queue.refreshed, covered)
+            return update
+    except MutationLockBusy:
+        logger.warning("Vorschau nach Anmeldung zu %s nicht aufgefrischt: Sperre besetzt", _log_safe(tid))
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Vorschau nach Anmeldung zu %s nicht aufgefrischt (%s)", _log_safe(tid), type(exc).__name__)
+    return None
 
 
 # Felder der Antwort, die nicht zur Anmeldung selbst gehören.
