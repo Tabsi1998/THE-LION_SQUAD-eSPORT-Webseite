@@ -254,6 +254,34 @@ async def test_two_simultaneous_saves_one_wins_the_other_gets_409(flow, monkeypa
 
 
 @pytest.mark.asyncio
+async def test_two_quick_writes_in_a_row_leave_round_status_and_standings_consistent(flow, monkeypatch):
+    ctx = await _setup(flow)
+    await _save(flow, ctx, 0, _rows("Anna Probe", "Bert Bolzt"))
+    later = {}
+
+    async def publish_again():
+        # A hat eben zurückgenommen (Version 2) und ist noch nicht fertig - da veröffentlicht B schon wieder (3).
+        later["answer"] = await flow.put(_url(ctx, 0), json={
+            "rows": _rows("Bert Bolzt", "Anna Probe"), "status": "published", "expected_version": 2})
+
+    gate = _Hooked(flow.db, "reference_round_results", "find_one_and_update", publish_again, after=True)
+    monkeypatch.setattr(reference_result_routes, "get_db", lambda: gate)
+    first = await flow.put(_url(ctx, 0), json={"rows": _rows("Anna Probe", "Bert Bolzt"), "status": "draft",
+                                               "expected_version": 1})
+    assert first.status_code == 200, first.text
+    assert later["answer"].status_code == 200, later["answer"].text
+    # A meldet, was A geschrieben hat - nicht den Stand von B.
+    assert (first.json()["version"], first.json()["sheet"]["status"]) == (2, "draft")
+    sheet = await flow.db.reference_round_results.find_one({"round_id": ctx["rounds"][0]})
+    assert (sheet["version"], sheet["status"]) == (3, "published")
+    # Termin und Stand folgen dem letzten Schreiben (B), nicht dem, der zuletzt fertig wurde (A).
+    round_doc = await flow.db.reference_rounds.find_one({"id": ctx["rounds"][0]})
+    assert (round_doc["status"], round_doc["result_version"]) == ("scored", 3)
+    standing = await _standing(flow, ctx, 0)
+    assert standing and standing[0]["participant_id"] == ctx["people"]["Bert Bolzt"]
+
+
+@pytest.mark.asyncio
 async def test_the_loser_keeps_a_new_participant_that_was_assigned_before_it_cleans_up(flow, monkeypatch):
     ctx = await _setup(flow)
 

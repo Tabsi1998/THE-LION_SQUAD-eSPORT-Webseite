@@ -52,3 +52,6 @@ nach der Runde). Team-Liga: `matches` mit `home`, `away`, Ergebnis, `maps` und `
 - Jede Änderung legt den alten Stand in `reference_round_result_revisions` ab und steht im Adminprotokoll
   (`reference_result.save`, `.pending_draft`, `.approve`, `.discard`). Veröffentlichen oder Zurücknehmen rechnet die
   Stände der Serie neu und setzt den Termin auf „gewertet“ bzw. zurück.
+- Zwei Schreibvorgänge kurz hintereinander: Antwort und Termin-Status kommen aus dem Blatt, das das eigene Update
+  geschrieben hat; der Termin merkt sich die Blatt-Version (`result_version`) und folgt immer dem späteren Schreiben;
+  die Stände werden aus der Datenbank nachgerechnet, bis sich währenddessen nichts mehr geändert hat.

@@ -60,7 +60,10 @@ gewertet sind.
 - Jede Änderung legt den alten Stand als Revision ab (``reference_round_result_revisions``), schreibt ins
   Adminprotokoll (``reference_result.save``) und rechnet die Stände neu, wenn das Blatt veröffentlicht ist oder war.
   Veröffentlichen setzt den Termin auf „gewertet“ (der Status davor bleibt in ``scored_from``), Zurücknehmen stellt ihn
-  wieder her.
+  wieder her. Folgen zwei Schreibvorgänge schnell aufeinander, zählt das spätere: Antwort und Termin-Status kommen aus
+  dem Blatt, das das eigene atomare Update geschrieben hat, der Termin merkt sich die Blatt-Version
+  (``result_version``) und wird nur bedingt gesetzt, und die Stände werden aus der Datenbank nachgerechnet, bis sich
+  währenddessen nichts mehr geändert hat.
 - **Entwurf daneben:** Ist das Blatt veröffentlicht und die Person darf nicht veröffentlichen (``access.edit_target``
   = ``EDIT_PENDING_DRAFT``), wird die Änderung als ``pending_draft`` neben dem Blatt gespeichert
   (``reference_result.pending_draft``) - das veröffentlichte Blatt bleibt sichtbar und zählt weiter.
@@ -227,15 +230,15 @@ def _version_query(expected: int):
 
 
 async def _update_if_current(db, sheet_id: str, expected: int, update: dict) -> dict | None:
-    """Ändert das Blatt nur, wenn es noch die erwartete Version hat - atomar, und zählt die Version hoch. Liefert das
-    geänderte Blatt oder ``None``, wenn jemand schneller war."""
-    update = {**update, "$inc": {"version": 1}}
+    """Ändert das Blatt nur, wenn es noch die erwartete Version hat - atomar, und zählt die Version hoch. Liefert genau
+    das Blatt, das dieses Update geschrieben hat (Stand davor plus Änderung, nicht neu gelesen: ein schnelles zweites
+    Schreiben dazwischen würde sonst als das eigene gelten), oder ``None``, wenn jemand schneller war."""
     before = await db.reference_round_results.find_one_and_update(
-        {"id": sheet_id, "version": _version_query(expected)}, update, projection={"_id": 0, "id": 1},
-        return_document=ReturnDocument.BEFORE)
+        {"id": sheet_id, "version": _version_query(expected)}, {**update, "$inc": {"version": 1}},
+        projection={"_id": 0}, return_document=ReturnDocument.BEFORE)
     if before is None:
         return None
-    return await db.reference_round_results.find_one({"id": sheet_id}, {"_id": 0})
+    return {**before, **update.get("$set", {}), "version": _version(before) + 1}
 
 
 def _round_view(round_doc: dict) -> dict:
@@ -493,19 +496,56 @@ def _counts(content: dict) -> dict:
             "official_table": len(content.get("official_table") or [])}
 
 
-async def _sync_round(db, access: SeriesAccess, round_doc: dict, published: bool) -> None:
-    """Veröffentlicht heißt „gewertet“ - der Status davor bleibt in ``scored_from``; Zurücknehmen stellt ihn wieder
-    her. Der Kalender bekommt einen neuen Stand (``calendar_version``), damit offene Seiten neu laden."""
-    status = round_doc.get("status")
-    if published and status != "scored":
-        update = {"status": "scored", "scored_from": status or "planned"}
-    elif not published and status == "scored":
-        update = {"status": round_doc.get("scored_from") or "planned", "scored_from": None}
-    else:
-        return
-    await db.reference_rounds.update_one({"id": round_doc["id"], "series_id": access.series_id},
-                                         {"$set": {**update, **_stamp(access)}})
-    await db.reference_series.update_one({"id": access.series_id}, {"$inc": {"calendar_version": 1}})
+async def _sync_round(db, access: SeriesAccess, round_id: str, version: int, published: bool) -> None:
+    """Termin-Status aus dem Blatt, das *dieses* Schreiben erzeugt hat (``version``, ``published``): veröffentlicht
+    heißt „gewertet“ - der Status davor bleibt in ``scored_from``; Zurücknehmen stellt ihn wieder her.
+
+    Bedingt geschrieben: der Termin merkt sich die Blatt-Version, nach der er zuletzt gesetzt wurde
+    (``result_version``). Hat ein späteres Schreiben ihn schon gesetzt, bleibt er; und gesetzt wird nur, wenn Status und
+    ``result_version`` noch so sind wie eben gelesen (sonst neu lesen). Ändert sich der Status, bekommt der Kalender
+    einen neuen Stand (``calendar_version``), damit offene Seiten neu laden."""
+    for _ in range(5):
+        current = await db.reference_rounds.find_one({"id": round_id, "series_id": access.series_id}, {"_id": 0})
+        if not current or int(current.get("result_version") or 0) >= version:
+            return
+        status = current.get("status")
+        update: dict = {"result_version": version}
+        if published and status != "scored":
+            update.update({"status": "scored", "scored_from": status or "planned"})
+        elif not published and status == "scored":
+            update.update({"status": current.get("scored_from") or "planned", "scored_from": None})
+        if "status" in update:
+            update.update(_stamp(access))
+        done = await db.reference_rounds.update_one(
+            {"id": round_id, "series_id": access.series_id, "status": status,
+             "result_version": current.get("result_version")}, {"$set": update})
+        if done.matched_count:
+            if "status" in update:
+                await db.reference_series.update_one({"id": access.series_id}, {"$inc": {"calendar_version": 1}})
+            return
+
+
+async def _results_state(db, series_id: str) -> tuple:
+    """Was die Stände bestimmt: Version und Status jedes Blatts, Status und Archiv jedes Termins."""
+    sheets = [(row.get("round_id"), row.get("version"), row.get("status")) async for row in
+              db.reference_round_results.find({"series_id": series_id},
+                                              {"_id": 0, "round_id": 1, "version": 1, "status": 1})]
+    rounds = [(row.get("id"), row.get("status"), row.get("archived_at"), row.get("counts"), row.get("result_version"))
+              async for row in db.reference_rounds.find(
+                  {"series_id": series_id},
+                  {"_id": 0, "id": 1, "status": 1, "archived_at": 1, "counts": 1, "result_version": 1})]
+    return (sorted(sheets, key=lambda item: str(item[0])), sorted(rounds, key=lambda item: str(item[0])))
+
+
+async def _recompute(db, access: SeriesAccess) -> None:
+    """Stände immer aus dem Stand der Datenbank. Ändert sich währenddessen ein Blatt oder Termin (ein zweites
+    Schreiben), wird nachgerechnet - so gewinnt nie ein Ergebnis, das auf einem älteren Stand gerechnet wurde."""
+    for _ in range(3):
+        before = await _results_state(db, access.series_id)
+        series = await db.reference_series.find_one({"id": access.series_id}, {"_id": 0}) or access.series
+        await reference_series.recompute_standings(db, series)
+        if await _results_state(db, access.series_id) == before:
+            return
 
 
 async def _create_people(db, access: SeriesAccess, resolution, round_id: str) -> dict[str, dict]:
@@ -608,9 +648,10 @@ async def save_results(series_id: str, round_id: str, body: ResultSave,
                    "created_participants": [doc["id"] for doc in created.values()]})
     recomputed = False
     if target != EDIT_PENDING_DRAFT:
-        await _sync_round(db, access, round_doc, status == "published")
-        if was_published or status == "published":
-            await reference_series.recompute_standings(db, access.series)
+        now_published = saved.get("status") == "published"
+        await _sync_round(db, access, round_doc["id"], saved["version"], now_published)
+        if was_published or now_published:
+            await _recompute(db, access)
             recomputed = True
     return {
         "target": target, "version": saved["version"], "sheet": _sheet_view(saved, access), "recomputed": recomputed,
@@ -678,8 +719,8 @@ async def approve_results(series_id: str, round_id: str, body: ResultDecision,
         "previous_status": existing.get("status"), "from": "pending_draft" if pending else "draft",
         "drafted_by": drafted_by, "revision_id": revision_id, **_counts(content),
         "removed_participants": [{"id": row["id"], "name": row.get("name")} for row in removed]})
-    await _sync_round(db, access, round_doc, True)
-    await reference_series.recompute_standings(db, access.series)
+    await _sync_round(db, access, round_id, saved["version"], True)
+    await _recompute(db, access)
     return {"version": saved["version"], "sheet": _sheet_view(saved, access), "recomputed": True,
             "removed_participants": [row["id"] for row in removed]}
 
