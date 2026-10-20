@@ -8,6 +8,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePublicSiteSettings } from "@/hooks/usePublicSiteSettings";
 import { OfflineBar } from "@/components/tls/OfflineBar";
 import { ADMIN_RECENT_MAX, readRecentAdminPages, rememberRecentAdminPage } from "@/lib/adminRecent";
+import { useModalBehavior } from "@/hooks/useModalBehavior";
 
 // Sidebar-Gruppen (#408, #512): Verein (Vereinsdaten, Vorstand, Sponsoren, Partner, Referenzen,
 // Kontakt-Inbox), Mitglieder (mit Dolibarr - die Seite nennt sich Mitgliederverwaltung), Finanzen,
@@ -354,11 +355,38 @@ export function scrollMenuToActive(nav) {
   if (box.top < top && box.bottom > top) nav.scrollTop += box.bottom - top;
 }
 
+// Ab lg (1024 px) steht das Menü fest links (#1289); darunter ist es eine ausklappende Leiste.
+const WIDE_QUERY = "(min-width: 1024px)";
+
+function useWideLayout() {
+  const [wide, setWide] = useState(() => typeof window !== "undefined" && typeof window.matchMedia === "function" && window.matchMedia(WIDE_QUERY).matches);
+  useEffect(() => {
+    if (typeof window.matchMedia !== "function") return undefined;
+    const query = window.matchMedia(WIDE_QUERY);
+    const onChange = () => setWide(query.matches);
+    onChange();
+    query.addEventListener?.("change", onChange);
+    return () => query.removeEventListener?.("change", onChange);
+  }, []);
+  return wide;
+}
+
 export function AdminLayout({ children }) {
   const { user, logout } = useAuth();
   const nav = useNavigate();
   const location = useLocation();
   const [openMobile, setOpenMobile] = useState(false);
+  // Barrierefreiheit: die eingeklappte Leiste ist nur verschoben - ohne `inert` erreichte die Tastatur unsichtbare
+  // Einträge. Offen verhält sie sich wie ein Dialog (Fokus hinein, Tab bleibt drin, Escape schließt).
+  const wide = useWideLayout();
+  const drawerOpen = openMobile && !wide;
+  const drawerHidden = !openMobile && !wide;
+  const menuButtonRef = useRef(null);
+  const closeDrawer = useCallback(() => {
+    setOpenMobile(false);
+    menuButtonRef.current?.focus();
+  }, []);
+  const asideRef = useModalBehavior(drawerOpen, closeDrawer);
   const [navQuery, setNavQuery] = useState("");
   const site = usePublicSiteSettings();
   const disabledPlatforms = site?.disabled_platforms;
@@ -440,12 +468,30 @@ export function AdminLayout({ children }) {
     scrollMenuToActive(navRef.current);
   }, [location.pathname, collapsedGroups, searchQuery, recentItems.length]);
 
+  // Beim Öffnen der Leiste: Fokus auf „Zuletzt“, sonst auf den ersten Eintrag (nach useModalBehavior, das sich den
+  // Menü-Knopf als Rückweg merkt).
+  useEffect(() => {
+    if (!drawerOpen) return undefined;
+    // Einen Takt später: so gewinnt dieser Fokus sicher gegen den ersten Fokus von useModalBehavior (das Logo).
+    const timer = window.setTimeout(() => {
+      const nav = navRef.current;
+      const target = nav?.querySelector(`[data-testid='admin-nav-group-${RECENT_GROUP}']`) || nav?.querySelector("a[href]");
+      target?.focus({ preventScroll: true });
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [drawerOpen]);
+
   return (
     <div className="min-h-screen bg-[#0A0A0A] text-white flex">
       <a href="#main-content" className="tls-skip-link">Zum Inhalt springen</a>
       {/* Sidebar */}
       {/* Bis 1023 px (Handy, Tablet hochkant) klappt das Menü aus, erst ab lg steht es fest links (#1289). */}
-      <aside className={`fixed lg:sticky top-0 left-0 h-screen w-64 bg-[#0A0A0A] border-r border-white/10 z-40 transform transition-transform flex flex-col ${openMobile ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}`}>
+      <aside
+        ref={asideRef}
+        inert={drawerHidden}
+        aria-hidden={drawerHidden ? "true" : undefined}
+        className={`fixed lg:sticky top-0 left-0 h-screen w-64 bg-[#0A0A0A] border-r border-white/10 z-40 transform transition-transform flex flex-col ${openMobile ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}`}
+      >
         <div className="p-5 border-b border-white/10 flex items-center justify-between shrink-0">
           <Logo size="sm" />
           <button className="lg:hidden p-1" onClick={() => setOpenMobile(false)} aria-label="Admin-Menü schließen">
@@ -629,7 +675,7 @@ export function AdminLayout({ children }) {
       {/* Main */}
       <div className="flex-1 min-w-0">
         <div className="lg:hidden sticky top-0 z-30 bg-[#0A0A0A] border-b border-white/10 p-3 flex items-center justify-between">
-          <button onClick={() => setOpenMobile(true)} className="p-2" data-testid="admin-menu-open" aria-label="Admin-Menü öffnen" aria-expanded={openMobile}>
+          <button ref={menuButtonRef} onClick={() => setOpenMobile(true)} className="p-2" data-testid="admin-menu-open" aria-label="Admin-Menü öffnen" aria-expanded={openMobile}>
             <Menu className="w-5 h-5" />
           </button>
           <Logo size="sm" />

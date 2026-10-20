@@ -190,6 +190,32 @@ test.describe("Adminmenü", () => {
     });
   }
 
+  // Barrierefreiheit (Codex-Prüfung): eingeklappt erreicht die Tastatur das Menü nicht; offen springt der Fokus hinein,
+  // Escape schließt und gibt den Fokus an den Menü-Knopf zurück.
+  test("bei 820 px: eingeklapptes Menü ist nicht per Tab erreichbar, Öffnen und Escape führen den Fokus", async ({ page }) => {
+    await page.setViewportSize({ width: 820, height: 1180 });
+    await page.goto("/admin");
+    const button = page.getByTestId("admin-menu-open");
+    await expect(button).toBeVisible();
+    await button.focus();
+    const inMenu = () => page.evaluate(() => Boolean(document.activeElement?.closest("aside")));
+    for (let step = 0; step < 6; step += 1) {
+      await page.keyboard.press("Shift+Tab");
+      expect(await inMenu()).toBe(false);
+    }
+
+    await button.focus();
+    await page.keyboard.press("Enter");
+    await expect.poll(inMenu).toBe(true);
+    await expect.poll(() => page.evaluate(() => Boolean(document.activeElement?.closest("nav.admin-scroll")))).toBe(true);
+
+    await page.keyboard.press("Escape");
+    await expect(button).toBeFocused();
+    await expect.poll(() => menuOnScreen(page)).toBe(false);
+    await page.keyboard.press("Shift+Tab");
+    expect(await inMenu()).toBe(false);
+  });
+
   test("ab 1024 px steht das Menü fest links wie bisher", async ({ page }) => {
     await page.setViewportSize({ width: 1024, height: 768 });
     await page.goto("/admin");

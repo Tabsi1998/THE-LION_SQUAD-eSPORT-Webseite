@@ -18,7 +18,11 @@ const CLUB = { id: "club-1", role: "player", areas: ["club"], ...MFA };
 beforeAll(() => {
   window.Element.prototype.scrollIntoView = () => {};
 });
-beforeEach(() => window.localStorage.clear());
+beforeEach(() => {
+  window.localStorage.clear();
+  // PC-Breite: das Menü steht fest links (ab lg).
+  window.matchMedia = vi.fn((query) => ({ matches: query.includes("1024"), media: query, addEventListener: () => {}, removeEventListener: () => {} }));
+});
 afterEach(() => {
   authState.user = null;
   vi.restoreAllMocks();
