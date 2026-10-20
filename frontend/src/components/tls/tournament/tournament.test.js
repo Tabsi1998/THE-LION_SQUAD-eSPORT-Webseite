@@ -1,4 +1,4 @@
-import { countdownText, timelineSteps } from "./TournamentTimeline";
+import { countdownText, stepCountdown, timelineSteps } from "./TournamentTimeline";
 import { paymentLine } from "./MyStandCard";
 import { tournamentTabs } from "./TournamentTabs";
 
@@ -14,11 +14,20 @@ test("timelineSteps sortiert die Termine, markiert vergangene und genau den näc
   expect(timelineSteps({}, NOW)).toEqual([]);
 });
 
-test("countdownText spricht in Minuten, Stunden oder Tagen", () => {
+test("countdownText folgt der einen Regel (#1264): ohne Abkürzungen, weit weg Datum oder Monat", () => {
   expect(countdownText(NOW - 1, NOW)).toBe("jetzt");
-  expect(countdownText(NOW + 5 * 60000, NOW)).toBe("in 5 Min.");
-  expect(countdownText(NOW + 3 * 3600000, NOW)).toBe("in 3 Std.");
+  expect(countdownText(NOW + 5 * 60000, NOW)).toBe("in 5 Minuten");
+  expect(countdownText(NOW + 3 * 3600000, NOW)).toBe("heute 17:00");
   expect(countdownText(NOW + 7 * 86400000, NOW)).toBe("in 7 Tagen");
+  expect(countdownText(Date.parse("2026-10-30T12:00:00+00:00"), NOW)).toBe("Fr 30. Oktober");
+  expect(countdownText(Date.parse("2026-10-30T12:00:00+00:00"), NOW, 40)).toBe("in 36 Tagen");
+});
+
+test("stepCountdown: der Schritt mit seiner Zeitangabe - „Start im März“, „Anmeldung endet am Fr 30. Oktober“", () => {
+  expect(stepCountdown({ label: "Start", ms: Date.parse("2027-03-01T12:00:00+00:00") }, NOW)).toBe("Start im März");
+  expect(stepCountdown({ label: "Anmeldung endet", ms: Date.parse("2026-10-30T12:00:00+00:00") }, NOW)).toBe("Anmeldung endet am Fr 30. Oktober");
+  expect(stepCountdown({ label: "Check-in öffnet", ms: Date.parse("2026-09-25T15:00:00+00:00") }, NOW)).toBe("Check-in öffnet morgen 17:00");
+  expect(stepCountdown(null, NOW)).toBe("");
 });
 
 test("paymentLine nennt Betrag und Zahlungsstand", () => {

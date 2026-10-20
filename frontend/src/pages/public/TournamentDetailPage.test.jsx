@@ -154,7 +154,8 @@ test("Anmeldung offen: Anmelden ist die eine Hauptaktion, die anderen Wege sind 
   expect(screen.getByTestId("tournament-tabs")).toHaveTextContent("Übersicht");
   expect(screen.getByTestId("tournament-tab-participants")).toHaveTextContent("Teilnehmer (0)");
   expect(screen.getByTestId("tournament-timeline-registration_close")).toHaveTextContent("Anmeldung endet");
-  expect(screen.getByTestId("tournament-timeline-next")).toHaveTextContent("Anmeldung endet in");
+  // Weit weg kein Countdown, sondern der Monat (#1264).
+  expect(screen.getByTestId("tournament-timeline-next")).toHaveTextContent("Anmeldung endet im Oktober 2099");
   expect(screen.getAllByText(/Anmeldung endet/).length).toBe(3); // Statuskasten, Zeitleiste, „nächster Schritt“ - nicht mehr in der Seitenleiste
   expect(screen.queryByText("Anmeldung öffnet", { selector: "span" })).toBeInTheDocument();
   expect(screen.getAllByText(/Anmeldung öffnet/).length).toBe(1); // nur in der Zeitleiste
