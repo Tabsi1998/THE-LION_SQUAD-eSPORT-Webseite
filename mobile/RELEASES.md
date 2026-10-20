@@ -193,6 +193,7 @@ GitHub sortiert Releases nach Veröffentlichungsdatum, nicht nach Version. Alte 
 
 Neueste oben.
 
+- `1.7.3`: Build 97, „nicht erschienen“ im Lauf vorbelegt und im Baum durchgestrichen (#1840), Abzeichen einzeilig und mit Farbe wie im Web (#1797, #1869), Fast-Lap-Titel ohne Wortbruch und Symbol ohne Überlappung (#1867, #1868), Teilnehmerliste ohne Rohwerte (#1870)
 - `1.7.2`: Build 96, „Mein Kalender“ mit eigenen Terminen und persönlichem Kalender-Abo, Eintrag in den Einstellungen und einmaliger Hinweis nach der Anmeldung (#1788)
 - `1.7.1`: Build 95, Weiterkommen in vier Modi mit Show-Auslosung als Moment, neue Baum-Namen und „voraussichtlich“ (#1633), Fast-Lap-Versuche und Gäste wie auf der Website (#1585)
 - `1.7.0`: Build 94, neue Turnieransicht mit Turnierbaum und Linien, „Dein Weg“, Live, Tabellen und gruppiertem Spielplan, gemischten Runden und Vibration (#1563, #1548, #1168), Fast Lap mit einem Zeit-Parser, Rückfrage bei unplausiblen Zeiten und Hinweis nach der Veröffentlichung (#1584)

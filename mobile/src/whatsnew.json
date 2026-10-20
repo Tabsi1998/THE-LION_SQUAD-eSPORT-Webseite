@@ -1,10 +1,11 @@
 {
-  "version": "1.7.2",
-  "build": 96,
-  "date": "2026-10-19",
+  "version": "1.7.3",
+  "build": 97,
+  "date": "2026-10-20",
   "items": [
-    "Mein Kalender: Im Reiter Events siehst du unter „Mein Kalender“ alle deine Termine an einem Ort – Turniere, Events, Fast Laps, Versammlungen und Schichten, gruppiert nach Heute, Diese Woche und Später oder als Monat. Jeder Termin zeigt deinen Stand (angemeldet, mit Team, Warteliste), ein Filter wählt die Art.",
-    "Kalender-Abo: Unter „Automatisch in deinen Kalender“ richtest du einmal dein persönliches Abo ein – direkt in den Handy-Kalender oder Google Kalender. Danach erscheint jede Anmeldung von selbst dort. Kopieren mit leichter Vibration, „Neu erzeugen“ und „Abschalten“ mit Rückfrage.",
-    "Einstellungen: Unter Konto gibt es den festen Eintrag „Mein Kalender-Abo“. Nach einer Anmeldung zu Event oder Turnier weist die App einmal auf das Abo hin, solange du noch keins hast."
+    "Ergebnis eintragen: Wer im Lauf als „nicht erschienen“ vorgemerkt ist, steht im Ergebnis-Fenster schon so da – wie auf der Website. Im Turnierbaum sind Vorgemerkte durchgestrichen, solange es noch kein Ergebnis gibt.",
+    "Abzeichen wie „ANGEKÜNDIGT“ bleiben in einer Zeile und färben sich nach dem Zustand wie auf der Website.",
+    "Fast Lap: Lange Titel brechen nur zwischen Wörtern um, das Tacho-Symbol verdeckt das Abzeichen nicht mehr.",
+    "Match: Die Teilnehmerliste zeigt keine englischen Rohwerte wie „Filled“ mehr."
   ]
 }
