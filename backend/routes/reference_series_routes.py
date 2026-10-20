@@ -197,6 +197,7 @@ async def get_series(series_id: str, access: SeriesAccess = Depends(require_seri
 
 
 @router.patch("/admin/series/{series_id}")
+@reference_series.series_locked
 async def update_series(series_id: str, body: ReferenceSeriesUpdate, me: dict = Depends(require_area("content"))):
     db = get_db()
     existing = await _series(db, series_id)

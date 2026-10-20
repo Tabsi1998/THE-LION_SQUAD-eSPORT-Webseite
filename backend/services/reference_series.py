@@ -10,16 +10,22 @@ oder Saisonpunkte, und keine Sammlung wird mit dem Turnierbereich geteilt.
 - **Neu gerechnet** wird beim Schreiben: nach einer Regeländerung (und später nach jedem veröffentlichten Ergebnis)
   rechnet ``recompute_standings`` alle Stände der Serie aus Kalender, veröffentlichten Blättern und Teilnehmern -
   öffentliche Seiten lesen nur den gespeicherten Stand.
-- **Nacheinander** (``series_write``): Ergebnisse speichern, freigeben, verwerfen und alle Kalender-Änderungen einer
-  Saison laufen unter einer Sperre je Saison (``services/mutation_lock.py``) - samt Versionsprüfung, Termin-Status,
-  Aufräumen und Neurechnen. So rechnet nie ein älterer Stand über einen neueren.
+- **Nacheinander** (``series_write``, ``series_locked``): alles, was Stände einer Saison neu rechnet - Ergebnisse
+  speichern, freigeben, verwerfen, alle Kalender-Änderungen, Teilnehmer anlegen und zuordnen, Regeln ändern - läuft
+  unter einer Sperre je Saison (``services/mutation_lock.py``), samt Versionsprüfung, Termin-Status, Aufräumen und
+  Neurechnen. So rechnet nie ein älterer Stand über einen neueren. Zieht ein Vorgang andere Saisons mit (ein Alias
+  ordnet dort zu), werden deren Stände danach je Saison unter ihrer eigenen Sperre neu gerechnet
+  (``recompute_locked``) - nie zwei Sperren ineinander, also keine gegenseitige Blockade.
 """
 from __future__ import annotations
 
+import functools
+import inspect
 from contextlib import asynccontextmanager
 
 from fastapi import HTTPException
 
+from database import get_db
 from models import new_id, now_utc
 from services.mutation_lock import MutationLockBusy, mutation_lock, series_write_resource
 from services.scoring_rules import normalize_rules
@@ -37,6 +43,29 @@ async def series_write(db, series_id: str):
             yield
     except MutationLockBusy:
         raise HTTPException(409, SERIES_BUSY) from None
+
+
+def series_locked(handler):
+    """Decorator für Routen mit ``series_id`` im Pfad: der ganze Vorgang läuft unter ``series_write``. Die Signatur
+    wird mit ausgewerteten Typen weitergegeben, damit FastAPI Körper und Abhängigkeiten der Route erkennt."""
+    signature = inspect.signature(handler, eval_str=True)
+
+    @functools.wraps(handler)
+    async def locked(*args, **kwargs):
+        series_id = kwargs["series_id"] if "series_id" in kwargs else args[0]
+        async with series_write(get_db(), series_id):
+            return await handler(*args, **kwargs)
+
+    locked.__signature__ = signature
+    return locked
+
+
+async def recompute_locked(db, series_id: str) -> int:
+    """Stände einer (anderen) Saison neu - unter ihrer eigenen Sperre und mit ihren aktuellen Regeln. Nie aufrufen,
+    während schon eine Sperre gehalten wird."""
+    async with series_write(db, series_id):
+        series = await db.reference_series.find_one({"id": series_id}, {"_id": 0})
+        return await recompute_standings(db, series) if series else 0
 
 
 POINTS_SCHEMES_ID = "points_schemes"

@@ -48,7 +48,10 @@ nach der Runde). Team-Liga: `matches` mit `home`, `away`, Ergebnis, `maps` und `
   (anlegen, ändern, verschieben, absagen, wieder ansetzen, archivieren, zurückholen, ordnen, einfügen) laufen unter der
   Sperre `series:<id>` (`services/mutation_lock.py`, `reference_series.series_write`, Wartezeit wie bei Turnieren).
   Darin: Versionsprüfung, Schreiben, Termin-Status, Teilnehmer aufräumen und einmal Neurechnen. Ist die Sperre zu
-  lange besetzt: 409 „In dieser Saison wird gerade schon etwas gespeichert …“.
+  lange besetzt: 409 „In dieser Saison wird gerade schon etwas gespeichert …“. Ebenso unter der Sperre: Teilnehmer
+  anlegen, bearbeiten und zuordnen (#1743) und Regeln der Saison ändern - alles, was Stände rechnet, rechnet also
+  nacheinander. Zieht eine Zuordnung über den Alias andere Saisons mit, rechnen diese danach je unter ihrer eigenen
+  Sperre neu (`reference_series.recompute_locked`), nie zwei Sperren ineinander.
 - `expected_version` ist Pflicht (0 ohne Blatt); ein veralteter Stand der Seite bekommt 409. Zwei gleichzeitige
   Übernahmen auf denselben Stand: eine gewinnt, die andere bekommt 409.
 - Ist das Blatt veröffentlicht und die Person darf nicht veröffentlichen (`target: "pending_draft"`), landet die

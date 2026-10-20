@@ -16,7 +16,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 
 from flow_harness import make_flow  # noqa: E402
-from routes import reference_result_routes  # noqa: E402
+from routes import reference_participant_routes, reference_result_routes  # noqa: E402
 from services import migrations, reference_series  # noqa: E402
 from services.dolibarr_policy import club_today  # noqa: E402
 
@@ -423,6 +423,60 @@ async def test_parallel_results_and_calendar_changes_end_consistent(flow, monkey
     fresh = {(row["round_id"], row["scope"]): row["rows"]
              async for row in flow.db.reference_standings.find({"series_id": sid}, {"_id": 0})}
     assert stored == fresh and stored
+
+
+async def _standings_match_a_fresh_recompute(flow, series_id: str) -> dict:
+    stored = {(row["round_id"], row["scope"]): row["rows"]
+              async for row in flow.db.reference_standings.find({"series_id": series_id}, {"_id": 0})}
+    series = await flow.db.reference_series.find_one({"id": series_id}, {"_id": 0})
+    await reference_series.recompute_standings(flow.db, series)
+    fresh = {(row["round_id"], row["scope"]): row["rows"]
+             async for row in flow.db.reference_standings.find({"series_id": series_id}, {"_id": 0})}
+    assert stored == fresh and stored, series_id
+    return stored
+
+
+@pytest.mark.asyncio
+async def test_assigning_in_parallel_to_saving_results_ends_with_consistent_standings(flow, monkeypatch):
+    # Teamwertung ohne Gäste: wird Bert zum Gast, ändert das die Stände.
+    rules = {**RULES, "team_scoring": {"enabled": True, "counting_drivers": None, "guests_count": False}}
+    ctx = await _setup(flow, rules=rules)
+    sid, other = ctx["own"]["id"], ctx["other"]["id"]
+
+    def team_rows(*names):
+        return [{"name": name, "place": index, "team": "Probe Team"} for index, name in enumerate(names, start=1)]
+
+    await _save(flow, ctx, 0, team_rows("Anna Probe", "Bert Bolzt"))
+    # In der anderen Saison steht Bert noch offen - der Alias zieht ihn dort mit (Neurechnen unter ihrer Sperre).
+    other_results = f"{ADMIN}/series/{other}/rounds/{ctx['foreign_round']}/results"
+    published = await flow.put(other_results, json={
+        "rows": team_rows("Bert Bolzt", "Anna Probe"), "status": "published", "expected_version": 0})
+    assert published.status_code == 200, published.text
+    written = asyncio.Event()
+
+    async def pause():
+        # Die Zuordnung hat den ersten Stand geschrieben, ist aber noch nicht fertig.
+        written.set()
+        await asyncio.sleep(0.3)
+
+    gate = _Hooked(flow.db, "reference_standings", "update_one", pause, after=True)
+    monkeypatch.setattr(reference_participant_routes, "get_db", lambda: gate)
+    assigning = asyncio.create_task(flow.post(
+        f"{ADMIN}/series/{sid}/participants/{ctx['people']['Bert Bolzt']}/assign", json={"link": "guest"}))
+    await written.wait()
+    saved = await flow.put(_url(ctx, 1), json={"rows": team_rows("Bert Bolzt", "Anna Probe"), "status": "published",
+                                               "expected_version": 0})
+    assigned = await assigning
+    assert (assigned.status_code, saved.status_code) == (200, 200), (assigned.text, saved.text)
+
+    own = await _standings_match_a_fresh_recompute(flow, sid)
+    assert (ctx["rounds"][1], "drivers") in own
+    elsewhere = await _standings_match_a_fresh_recompute(flow, other)
+    bert_there = await flow.db.reference_participants.find_one({"series_id": other, "name": "Bert Bolzt"})
+    assert bert_there["link"] == "guest"
+    # Als Gast zählt Bert nicht mehr fürs Team - auch in der mitgezogenen Saison.
+    assert all(bert_there["id"] not in row["driver_ids"]
+               for (_, scope), rows in elsewhere.items() if scope == "teams" for row in rows)
 
 
 @pytest.mark.asyncio

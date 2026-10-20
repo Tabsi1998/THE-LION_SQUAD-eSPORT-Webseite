@@ -9,6 +9,8 @@ Alles hier ist Verwaltung im Bereich Redaktion („content“): Aliase und Verkn
   bestätigt von, am), damit derselbe Name in jeder Serie von selbst erkannt wird - offene Teilnehmer mit diesem Namen
   werden gleich mit zugeordnet. „Extern“ speichert keinen Alias über Fremde und nimmt einen falschen Alias zurück.
 - Gäste zählen fürs Team, nie für den Verein (``is_club_member`` nur bei Mitgliedern); danach wird neu gerechnet.
+- Anlegen, Bearbeiten und Zuordnen laufen unter der Sperre der Saison (``reference_series.series_locked``, #1744);
+  mitgezogene andere Saisons rechnen danach je unter ihrer eigenen Sperre neu (``recompute_locked``).
 
 Modelle, Indexe und Datenschutz-Einordnung liegen seit dem Datenmodell (#1741) in ``models.py``, ``database.py`` und
 ``services/personal_data.py``; Kontolöschung und Auskunft in ``account_erasure`` und ``dsgvo_routes``."""
@@ -117,6 +119,7 @@ async def unknown_names(series_id: str, me: dict = Depends(require_area("content
 
 # ---------------------------------------------------------------- Anlegen und Bearbeiten
 @router.post("/admin/series/{series_id}/participants")
+@reference_series.series_locked
 async def create_participant(series_id: str, body: ReferenceParticipantCreate,
                              me: dict = Depends(require_area("content"))):
     db = get_db()
@@ -131,6 +134,7 @@ async def create_participant(series_id: str, body: ReferenceParticipantCreate,
 
 
 @router.post("/admin/series/{series_id}/participants/batch")
+@reference_series.series_locked
 async def create_participants(series_id: str, body: ParticipantBatch, me: dict = Depends(require_area("content"))):
     """Mehrere Namen auf einmal. Wer in der Serie schon steht (gleicher Schlüssel), wird übersprungen."""
     db = get_db()
@@ -155,6 +159,7 @@ async def create_participants(series_id: str, body: ParticipantBatch, me: dict =
 
 
 @router.patch("/admin/series/{series_id}/participants/{participant_id}")
+@reference_series.series_locked
 async def update_participant(series_id: str, participant_id: str, body: ReferenceParticipantUpdate,
                              me: dict = Depends(require_area("content"))):
     """Name, Startnummer, Team, Art und Ausblenden. Die Verknüpfung ändert nur das Zuordnen."""
@@ -258,8 +263,20 @@ async def _link_for(db, body: ParticipantAssign, participant: dict) -> dict:
 @router.post("/admin/series/{series_id}/participants/{participant_id}/assign")
 async def assign_participant(series_id: str, participant_id: str, body: ParticipantAssign,
                              me: dict = Depends(require_area("content"))):
-    """Einmal bestätigen: Mitglied (mit Profil), Gast oder Extern. Mitglied und Gast speichern den Alias."""
+    """Einmal bestätigen: Mitglied (mit Profil), Gast oder Extern. Mitglied und Gast speichern den Alias.
+
+    Läuft unter der Sperre dieser Saison (#1744). Zieht der Alias andere Saisons mit, werden deren Stände danach je
+    Saison unter ihrer eigenen Sperre neu gerechnet - nie zwei Sperren ineinander, also keine gegenseitige Blockade."""
     db = get_db()
+    async with reference_series.series_write(db, series_id):
+        others = await _assign(db, series_id, participant_id, body, me)
+    for sid in others:
+        await reference_series.recompute_locked(db, sid)
+    return await _participant(db, series_id, participant_id)
+
+
+async def _assign(db, series_id: str, participant_id: str, body: ParticipantAssign, me: dict) -> list[str]:
+    """Das Zuordnen selbst, samt Neurechnen dieser Saison. Liefert die anderen Saisons, die der Alias mitgezogen hat."""
     series = await _series(db, series_id)
     participant = await _participant(db, series_id, participant_id)
     game_id = await series_game_id(db, series)
@@ -310,6 +327,5 @@ async def assign_participant(series_id: str, participant_id: str, body: Particip
                  "followers": followers},
         "created_at": now,
     })
-    for sid in dict.fromkeys([series_id, *others]):
-        await reference_series.recompute_standings(db, series if sid == series_id else await _series(db, sid))
-    return await _participant(db, series_id, participant_id)
+    await reference_series.recompute_standings(db, series)
+    return list(dict.fromkeys(others))
