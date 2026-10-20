@@ -18,7 +18,7 @@ const text = (value) => (value === null || value === undefined ? "" : String(val
 export function emptyRow(values = {}) {
   return {
     key: nextKey("row"), participant_id: "", name: "", team: "", place: "", points: "", override: false, marks: [],
-    penalty_points: "", start_number: "", official_total: "", ...values,
+    penalty_points: "", start_number: "", official_total: "", note: "", source: "", ...values,
   };
 }
 
@@ -42,11 +42,15 @@ export function sheetToForm(content, participants = [], { kind, teamName, oppone
     name: participantName(participants, row.participant_id),
     team: text(row.team),
     place: text(row.place),
+    // Ohne Platz gespeichert (etwa Ausfall ohne Wertung): bleibt ohne Platz, bis jemand einen einträgt.
+    no_place: row.place === null || row.place === undefined,
     points: row.points_source === "scheme" ? "" : text(row.points),
     override: row.points_source === "manual",
     marks: [...(row.marks || [])],
     penalty_points: row.penalty_points ? text(row.penalty_points) : "",
     official_total: text(totals[row.participant_id]),
+    note: text(row.note),
+    source: row.points_source || "",
   }));
   const matches = (content?.matches || []).map((match) => ({
     ...emptyMatch({ home: match.home, away: match.away }),
@@ -59,6 +63,8 @@ export function sheetToForm(content, participants = [], { kind, teamName, oppone
     rows: rows.length || kind === "team_league" ? rows : [emptyRow()],
     matches,
     table: (content?.official_table || []).map((row) => ({ ...row })),
+    // Teamwerte laut Veranstalter haben (noch) kein eigenes Feld im Blatt – sie gehen unverändert wieder mit.
+    teamTotals: { ...(content?.official_team_totals || {}) },
     note: text(content?.note),
   };
 }
@@ -112,7 +118,7 @@ export function autoPlaces(rows) {
   for (const row of rows) {
     if (!filled(row)) continue;
     seen += 1;
-    out[row.key] = row.marks.includes("dns") ? null : seen;
+    out[row.key] = row.marks.includes("dns") || row.no_place ? null : seen;
   }
   return out;
 }
@@ -122,8 +128,7 @@ export function autoPlaces(rows) {
  * Reihenfolge (Nichtstart ohne Platz). Punkte: leer = nach Schlüssel; eingetragen = laut Veranstalter (geprüft gegen den
  * Schlüssel) oder – mit „überschreiben“ – als Wert, der zählt. `rowKeys[i]` ist die Formularzeile zu Zeile `i` im Body.
  */
-export function formToPayload(form, rules = {}) {
-  const organizerMode = rules.points_mode === "organizer";
+export function formToPayload(form) {
   const rowKeys = [];
   const rows = [];
   const auto = autoPlaces(form.rows);
@@ -136,10 +141,12 @@ export function formToPayload(form, rules = {}) {
       place: explicitPlace !== null ? Math.trunc(explicitPlace) : auto[row.key],
       team: text(row.team).trim() || null,
       points,
-      points_source: points === null ? "scheme" : (organizerMode || !row.override ? "organizer" : "manual"),
+      // Ohne Punkte bleibt die gespeicherte Herkunft (etwa „laut Veranstalter“ ohne Wert) erhalten.
+      points_source: points === null ? (row.source === "organizer" ? "organizer" : "scheme") : (row.override ? "manual" : "organizer"),
       marks: [...row.marks],
       penalty_points: number(row.penalty_points) || 0,
       official_total: number(row.official_total),
+      note: text(row.note).trim() || null,
     };
     rowKeys.push(row.key);
     rows.push(out);
@@ -162,7 +169,7 @@ export function formToPayload(form, rules = {}) {
     return out;
   });
   const note = text(form.note).trim();
-  return { payload: { rows, matches, official_table, note: note || null }, rowKeys };
+  return { payload: { rows, matches, official_team_totals: { ...(form.teamTotals || {}) }, official_table, note: note || null }, rowKeys };
 }
 
 /** Fehler und Warnungen der Vorschau je Formularzeile (`{key: [{level, message}]}`) und die ohne Zeile. */

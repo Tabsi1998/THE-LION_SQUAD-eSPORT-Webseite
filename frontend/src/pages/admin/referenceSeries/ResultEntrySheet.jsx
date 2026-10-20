@@ -300,7 +300,7 @@ export function ResultEntrySheet({ series, round, onClose, onSaved }) {
   const participants = useMemo(() => data?.participants || [], [data]);
   const teams = useMemo(() => [...new Set(participants.map((person) => person.default_team).filter(Boolean))], [participants]);
 
-  const built = useMemo(() => (form ? formToPayload(form, rules) : null), [form, rules]);
+  const built = useMemo(() => (form ? formToPayload(form) : null), [form]);
   const stamp = built ? formStamp(built.payload) : "";
   const fresh = Boolean(preview && preview.stamp === stamp);
   const problems = useMemo(() => problemsByRow(fresh ? preview : null, built?.rowKeys), [fresh, preview, built]);
@@ -345,7 +345,7 @@ export function ResultEntrySheet({ series, round, onClose, onSaved }) {
       setForm(next);
       setPasting(result.errors.length > 0);
       // Danach gleich prüfen lassen – so stehen Fehler und Punkte sofort an den Zeilen.
-      const pasted = formToPayload(next, rules);
+      const pasted = formToPayload(next);
       runPreview(pasted.payload, formStamp(pasted.payload)).catch((err) => toast.error(formatApiError(err.response?.data?.detail)));
     }
     return result;

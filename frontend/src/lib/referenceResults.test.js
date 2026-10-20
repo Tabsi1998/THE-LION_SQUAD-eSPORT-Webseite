@@ -29,7 +29,7 @@ test("Punkte: leer nach Schlüssel, eingetragen laut Veranstalter, „überschre
   expect(scheme[1]).toMatchObject({ name: "Beta", start_number: "7", points: 12.5, points_source: "manual", penalty_points: 5 });
   expect(scheme[2]).toMatchObject({ points: null, points_source: "scheme" });
   const organizer = formToPayload({ rows, matches: [], table: [], note: "" }, { points_mode: "organizer" }).payload.rows;
-  expect(organizer[1].points_source).toBe("organizer");
+  expect(organizer.map((row) => row.points_source)).toEqual(["organizer", "manual", "scheme"]);
 });
 
 test("gespeichertes Blatt zurück ins Formular – Namen aus den Teilnehmern, offizieller Gesamtstand", () => {
@@ -71,4 +71,44 @@ test("Meldungen der Vorschau landen an der richtigen Formularzeile, Spiele und A
   expect(general).toEqual([{ level: "error", message: "Leer.", match: undefined }, { level: "warning", message: "Aufstellung fehlt.", match: 0 }]);
   expect(scoredText({ points: 25.5, base: 25, bonus: 1, penalty: 0.5 })).toBe("25,5 Pkt (25 + 1 Bonus − 0,5 Strafe)");
   expect(scoredText({ points: 18, base: 18, bonus: 0, penalty: 0 })).toBe("18 Pkt");
+});
+
+// Was der Server aus einem Body speichert (series_results.Resolution.content) – so lässt sich prüfen, dass Öffnen und
+// Speichern ohne Änderung genau das gespeicherte Blatt ergibt.
+function storedFrom(payload) {
+  const totals = {};
+  const rows = payload.rows.map(({ official_total, participant_id, place, team, points, points_source, marks, penalty_points, note }) => {
+    if (official_total !== null && official_total !== undefined) totals[participant_id] = official_total;
+    return { participant_id, place, team, points, points_source, marks, penalty_points, note };
+  });
+  return {
+    rows,
+    matches: payload.matches.map((match) => ({ ...match, lineup: match.lineup.map((ref) => ref.participant_id) })),
+    official_totals: totals,
+    official_team_totals: payload.official_team_totals,
+    official_table: payload.official_table,
+    note: payload.note,
+  };
+}
+
+test("Öffnen und Speichern ohne Änderung ergibt dasselbe Blatt – jedes Feld des Vertrags bleibt", () => {
+  const sheet = {
+    rows: [
+      { participant_id: "p1", place: 1, team: "Probe Racing", points: 26, points_source: "manual", marks: ["fastest_lap", "pole"], penalty_points: 0, note: "Zeitstrafe zurückgenommen" },
+      { participant_id: "p2", place: 2, team: null, points: 18, points_source: "organizer", marks: [], penalty_points: 5, note: null },
+      { participant_id: "p3", place: null, team: "Test GP", points: null, points_source: "scheme", marks: ["dnf"], penalty_points: 0, note: null },
+      { participant_id: "p4", place: null, team: null, points: null, points_source: "organizer", marks: ["dns"], penalty_points: 0, note: null },
+      { participant_id: "p5", place: 3, team: null, points: null, points_source: "scheme", marks: [], penalty_points: 0, note: null },
+    ],
+    matches: [{ home: "Probe Lions", away: "Test Eagles", home_score: 2, away_score: 1, maps: [{ name: "Probe Map", home_score: 13, away_score: 9 }], lineup: ["p1", "p2"] }],
+    official_totals: { p1: 51, p2: 30.5 },
+    official_team_totals: { "Probe Racing": 77, "Test GP": 40 },
+    official_table: [{ team: "Probe Lions", rank: 1, played: 3, won: 2, drawn: 0, lost: 1, score_for: 5, score_against: 3, score_diff: 2, points: 6 }],
+    note: "vorläufig",
+  };
+  const people = [...PEOPLE, { id: "p3", name: "Gamma" }, { id: "p4", name: "Delta" }, { id: "p5", name: "Epsilon" }];
+  for (const mode of ["scheme", "organizer"]) {
+    const { payload } = formToPayload(sheetToForm(sheet, people), { points_mode: mode });
+    expect(storedFrom(payload)).toEqual(sheet);
+  }
 });
