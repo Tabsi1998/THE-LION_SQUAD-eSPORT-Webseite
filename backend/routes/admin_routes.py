@@ -781,7 +781,7 @@ def _upload_status() -> dict:
             probe = path / ".tls-write-test"
             probe.write_text("ok", encoding="utf-8")
             probe.unlink(missing_ok=True)
-        except Exception as exc:
+        except Exception:
             logger.warning("upload directory write check failed for %s", label, exc_info=True)
             error = "Schreibtest fehlgeschlagen."
             try:
@@ -853,19 +853,19 @@ async def system_status(me: dict = Depends(require_any_admin())):
     try:
         from services.scheduler_state import get_scheduler_status
         scheduler = get_scheduler_status()
-    except Exception as exc:
+    except Exception:
         logger.warning("scheduler status failed", exc_info=True)
         scheduler = {"running": False, "jobs": [], "error": "Scheduler-Status konnte nicht geladen werden."}
     try:
         from services.push_notifications import mobile_push_health_summary
         mobile_push = await mobile_push_health_summary()
-    except Exception as exc:
+    except Exception:
         logger.warning("mobile push health failed", exc_info=True)
         mobile_push = {"active_tokens": 0, "users_with_tokens": 0, "ticket_errors": 0, "receipt_errors": 0, "error": "Push-Status konnte nicht geladen werden."}
     try:
         await db.command("ping")
         database = {"ok": True}
-    except Exception as exc:
+    except Exception:
         logger.warning("database health check failed", exc_info=True)
         database = {"ok": False, "error": "Datenbankprüfung fehlgeschlagen."}
     uploads = _upload_status()

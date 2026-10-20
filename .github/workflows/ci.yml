@@ -95,8 +95,8 @@ jobs:
       - name: Validate shell scripts
         # Jede *.sh, die Git kennt, einzeln (#980): `bash -n a.sh b.sh` prüfte nur a.sh. Fehler nennen die Datei.
         run: bash scripts/check-shell-syntax.sh
-      - name: Lint backend for undefined names and syntax hazards
-        run: flake8 backend --select=E9,F63,F7,F82 --exclude=backend/tests
+      - name: Lint backend for undefined names, syntax hazards and unused imports/variables
+        run: flake8 backend --select=E9,F63,F7,F82,F401,F841 --exclude=backend/tests
       - name: Audit backend dependencies
         run: pip-audit -r backend/requirements.txt
       - name: Run backend unit tests
