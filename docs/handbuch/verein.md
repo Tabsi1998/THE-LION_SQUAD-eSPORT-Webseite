@@ -153,7 +153,7 @@ erklären** (mit Wunschdatum, der letzte Tag wird in der Mitgliederverwaltung ge
 ### 3.6 Vereinsdokumente, Vorteile und Persönliches
 
 - **Dokumente:** Admin → Mitglieder → Dokumente → **Neues Dokument**: Datei, Titel, Kategorie (Statuten, Protokolle, Formular,
-  Regelwerk, Leitlinie, Download, Media Kit, Präsentation, Vorlage, Sonstiges), **Sichtbarkeit**, Tags und der Haken **Download
+  Regelwerk, Leitlinie, Download, Media Kit, Präsentation, Vorlage, Sonstiges), **Sichtbarkeit** (**Mitglieder** oder **Vorstand**), Tags und der Haken **Download
   erlauben** (Standard ist nur die Ansicht im Browser). Mitglieder finden sie unter **Vereinsdokumente**.
   Die Liste sagt es in Worten: die Plakette **Alle**, **Mitglieder** oder **Vorstand** zeigt, wer ein Dokument sehen darf;
   darunter steht, wie oft es angesehen und heruntergeladen wurde („1-mal angesehen · 3-mal heruntergeladen“) und ob
