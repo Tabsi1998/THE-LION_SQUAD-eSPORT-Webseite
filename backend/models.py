@@ -1511,6 +1511,19 @@ class ReferenceUpdate(BaseModel):
     series_id: Optional[str] = None
 
 
+class ReferenceShowcaseSettings(BaseModel):
+    """Hauptkarte der Vitrine (#1878): „auto“ (höchster Platz in der höchsten Stufe, bei Gleichstand der neueste)
+    oder eine fest gewählte Referenz."""
+    mode: Literal["auto", "pinned"] = "auto"
+    reference_id: Optional[str] = Field(default=None, max_length=80)
+
+    @model_validator(mode="after")
+    def _pinned_needs_reference(self):
+        if self.mode == "pinned" and not (self.reference_id or "").strip():
+            raise ValueError("Für eine fest gewählte Hauptkarte bitte eine Referenz wählen.")
+        return self
+
+
 # ---------- Externe Serien (#1741): Spur, Serie, Termine, Teilnehmer, Ergebnisse, Stände, Aliase, Captains ----------
 # Eine Spur (``reference_lineages``) ist die Klammer, darunter je Saison und Stufe eine Serie (``reference_series``).
 # Gerechnet wird mit ``services/scoring_rules.py`` und ``services/series_standings.py``; Routen in
