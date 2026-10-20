@@ -362,11 +362,15 @@ im Protokoll und unter ihren Strafen) und **+5 Min. verlängern**. Die Fristen s
 
 Im **Lauf mit mehr als zwei Spielern** wertet **<Name> nicht erschienen** nicht den ganzen Lauf: Nur diese Person wird
 markiert, der Lauf bleibt offen und wird mit den Anwesenden gefahren (Karte und Nachricht sagen „Lauf bleibt offen“).
-Im Baum steht sie durchgestrichen, am TV als „nicht angetreten“, im Druck mit „n. e.“; die Warteschlange zeigt statt
-der Frist „<Name> nicht erschienen“. Im Ergebnis-Fenster ist **Nicht erschienen** bei ihr schon gesetzt – ihr tippt nur die Anwesenden
-in Zielreihenfolge. Danach steht sie auf dem letzten Platz und kommt auf dem Sieger-Weg nicht weiter. Ist sie doch
-noch gekommen und mitgefahren, nehmt ihr den Schalter im Ergebnis-Fenster zurück – dann fällt auch der Eintrag unter
-ihren Strafen weg.
+Im Baum steht sie durchgestrichen, am TV als „nicht angetreten“, im Druck mit „n. e.“; die Warteschlange zeigt
+zusätzlich „<Name> nicht erschienen“. Die Frist gilt je Person: Fehlen mehrere, tippt ihr jeden Namen einzeln an – der
+Fall bleibt für alle offen, die noch nicht markiert sind. Im Ergebnis-Fenster ist **Nicht erschienen** bei ihr schon
+gesetzt – ihr tippt nur die Anwesenden in Zielreihenfolge. Setzt ihr dort jemanden erst beim Eintragen auf **Nicht
+erschienen**, wird er genauso markiert (mit Eintrag unter den Strafen). Danach steht sie auf dem letzten Platz und
+kommt auf dem Sieger-Weg nicht weiter. Fehlen mehrere, teilen sie sich den letzten Platz; wer von ihnen wohin
+weiterkommt (Freilos auf dem Sieger-Weg oder Loser Bracket), entscheidet der Setzplatz, ohne Setzplatz der Sitzplatz im
+Lauf. Ist sie doch noch gekommen und mitgefahren, nehmt ihr den Schalter im Ergebnis-Fenster zurück – dann fällt auch
+der Eintrag unter ihren Strafen weg.
 
 ### 3.8 Stationen
 
