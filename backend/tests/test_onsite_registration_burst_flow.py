@@ -160,7 +160,7 @@ async def test_a_late_wait_list_confirmation_is_dropped_once_the_person_moved_up
         sent.append((registration["user_id"], status, previous))
 
     monkeypatch.setattr(routes, "_notify_registration", notify)
-    real_after = routes._after_self_registration
+    real_after = routes._confirm_self_registration
 
     async def ben_signs_off_first(db, tid, reg, me):
         flow.act_as(ben)
@@ -168,7 +168,7 @@ async def test_a_late_wait_list_confirmation_is_dropped_once_the_person_moved_up
         assert response.status_code == 200, response.text
         await real_after(db, tid, reg, me)
 
-    monkeypatch.setattr(routes, "_after_self_registration", ben_signs_off_first)
+    monkeypatch.setattr(routes, "_confirm_self_registration", ben_signs_off_first)
     body = RegistrationCreate(accept_rules=True, accept_privacy=True)
 
     reply = await routes.self_register(flow.db, tournament, body, anna, None, via="onsite")
@@ -269,18 +269,23 @@ async def test_a_failing_bracket_rebuild_does_not_cost_the_place(flow, monkeypat
 
 
 @pytest.mark.asyncio
-async def test_the_route_answers_before_confirmation_and_achievements(flow, monkeypatch):
-    """#1859: Postfach, Mail und Abzeichen brauchen bei 16 gleichzeitigen Anmeldungen am meisten Zeit - die Route
-    antwortet daher schon mit dem Platz und erledigt sie danach (Hintergrund der Antwort), die Bestätigung genau einmal."""
+async def test_the_confirmation_is_out_before_the_answer_only_achievements_follow(flow, monkeypatch):
+    """#1859: Die Abzeichen-Auswertung kostet bei 16 gleichzeitigen Anmeldungen am meisten - sie läuft nach der Antwort.
+    Die Bestätigung nicht: ein Hintergrund-Auftrag überlebt keinen Neustart, und eine Wiederholung der Anmeldung
+    schickt sie nicht nach (#1846, genau eine Bestätigung). Sie ist also erstellt, wenn die Antwort zurückkommt."""
     from fastapi import BackgroundTasks
     from routes import tournament_registration_routes as routes
 
-    sent = []
+    sent, awarded = [], []
 
     async def notify(db, tid, registration, status, **kwargs):
         sent.append(status)
 
+    async def badges(user_id, tid):
+        awarded.append(user_id)
+
     monkeypatch.setattr(routes, "_notify_registration", notify)
+    monkeypatch.setattr(routes, "_award_registration_badges", badges)
     tournament = await flow.create_tournament(max_participants=8)
     anna = await flow.add_user(name="Anna")
     later = BackgroundTasks()
@@ -288,15 +293,52 @@ async def test_the_route_answers_before_confirmation_and_achievements(flow, monk
     reply = await routes.self_register(flow.db, tournament, RegistrationCreate(accept_rules=True, accept_privacy=True),
                                        anna, None, via="onsite", followups=later)
 
-    assert reply["status"] == "approved" and sent == []
+    assert reply["status"] == "approved"
+    assert sent == ["approved"], "die Bestätigung ist vor der Antwort draußen"
+    stored = await flow.db.tournament_registrations.find_one({"id": reply["id"]}, {"_id": 0})
+    assert stored["notified_status"] == "approved"
+    assert awarded == [], "die Abzeichen folgen erst nach der Antwort"
     await later()
-    assert sent == ["approved"]
+    assert awarded == [anna["id"]]
+
+    # Neustart nach der Antwort, die Abzeichen gingen verloren - die Wiederholung schickt keine zweite Bestätigung.
+    again = await routes.self_register(flow.db, tournament, RegistrationCreate(accept_rules=True, accept_privacy=True),
+                                       anna, None, via="onsite", followups=BackgroundTasks())
+    assert again["idempotent_replay"] is True and sent == ["approved"]
 
     flow.act_as(await flow.add_user(name="Ben"))
     response = await flow.client.post(f"/api/tournaments/{tournament['id']}/register",
                                       json={"accept_rules": True, "accept_privacy": True})
     assert response.status_code == 200, response.text
     assert sent == ["approved", "approved"]
+
+
+@pytest.mark.asyncio
+async def test_a_failed_bracket_rebuild_is_tried_once_more(flow, monkeypatch):
+    """#1859: Scheitert der Neubau der Vorschau nach einer Anmeldung, versucht der Server es sofort noch einmal - sonst
+    stünde der Baum bis zur nächsten Anmeldung oder zum Check-in-Ende ohne die Person da."""
+    from routes import tournament_registration_routes as routes
+
+    real = routes._refresh_tournament_previews_after_registration
+    calls = []
+
+    async def flaky(db, tournament, actor_id):
+        calls.append(tournament["id"])
+        if len(calls) == 1:
+            raise RuntimeError("kurz weg")
+        return await real(db, tournament, actor_id)
+
+    monkeypatch.setattr(routes, "_refresh_tournament_previews_after_registration", flaky)
+    tournament = await flow.create_tournament(max_participants=8)
+    anna = await flow.add_user(name="Anna")
+
+    reply = await routes.self_register(flow.db, tournament, RegistrationCreate(accept_rules=True, accept_privacy=True),
+                                       anna, None, via="onsite")
+
+    assert reply["status"] == "approved"
+    assert calls == [tournament["id"], tournament["id"]]
+    queue = routes._registration_queue(tournament["id"])
+    assert queue.refreshed == queue.requested == 1, "der zweite Versuch zählt als aufgefrischt"
 
 
 def test_the_registration_wait_is_configurable_and_bounded():
