@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { hasQueue, laneSignature, queueLanes, queueNextLine, queueWhat, queueWho, stationWho } from "./tvQueue";
+import { hasQueue, laneSignature, queueLanes, queueNextLine, queueNextUp, queueWhat, queueWho, stationWho } from "./tvQueue";
 
 // Live-Warteschlange am TV (#1634): was der TV aus GET /live-queue zeigt - ohne Warteschlange nichts.
 
@@ -28,6 +28,19 @@ describe("Bahnen je Station", () => {
     expect(hasQueue(queue([{ id: "s1", name: "PC 1", status: "free", running: null, next: queued }]))).toBe(true);
     // Nur eine defekte Station: die Tafel zeigt „Bitte nicht benutzen“ statt der alten Aufruf-Tafel.
     expect(hasQueue(queue([{ id: "s1", name: "PC 1", status: "broken", running: null, next: null }]))).toBe(true);
+  });
+
+  it("„Als Nächstes“ der Halle: ein Aufruf zuerst, dann ein bereites Spiel vor einem, das noch auf das Los wartet (#1858)", () => {
+    const waiting = { ...queued, match_id: "m4", names: [], open_slots: 4, ready: false, waiting_for: "draw", forecast_at: "2026-10-31T14:20:00Z" };
+    const ready = { ...queued, ready: true };
+    const lanes = [
+      { id: "s3", name: "PC 3", status: "free", running: null, next: waiting },
+      { id: "s1", name: "PC 1", status: "free", running: null, next: ready },
+    ];
+    expect(queueNextUp(queue(lanes)).entry.match_id).toBe("m3");
+    expect(queueNextUp(queue([...lanes, { id: "s2", name: "PC 2", status: "free", running: null, next: called }])).entry.match_id).toBe("m2");
+    // Ohne bereites Spiel bleibt das wartende - die Halle sieht trotzdem, was kommt.
+    expect(queueNextUp(queue([lanes[0]])).entry.match_id).toBe("m4");
   });
 });
 
