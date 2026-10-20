@@ -783,17 +783,34 @@ def _note_instant_assignment(target: dict, slot: dict, source: dict, now_iso: st
         })
 
 
-def _pot_ranks(source: dict, results: list[dict], gone: set[str]) -> tuple[dict[int, dict], dict[int, dict]]:
-    """Wer auf welchem Platz steht - für Verlierer- und Sieger-Weg; im Lauf ohne Ausgeschiedene (#1553: die Nächsten
-    rücken auf, wie in ``build_v2_result_application``; wer auf dem Sieger-Weg aufrückt, kommt nicht zugleich in den
-    Topf des Loser Bracket, #1823)."""
+def _advancement_paths(match: dict, results: list[dict], gone: set[str]) -> tuple[dict[int, dict], dict[int, dict]]:
+    """Wer über welchen Platz weiterkommt: ``(Verlierer-Weg, Sieger-Weg)``, je Platz die Zeile - für den
+    Ergebnis-Anwender und den Topf gemischter Runden gleich.
+
+    - Der Platz, wie gewertet; teilen sich mehrere Fehlende den letzten Platz, zählt ihre Reihenfolge (Setzplatz).
+    - Im Lauf ohne Ausgeschiedene (#1553): die Nächsten rücken auf - auf beiden Wegen, wer auf dem Sieger-Weg aufrückt,
+      steht nicht zugleich im Loser Bracket.
+    - Wer nicht erschienen ist, bekommt nie einen Sieger-Platz: der wird ein Freilos (``forfeit``). Auf dem
+      Verlierer-Weg stehen erst die Anwesenden, die nicht weiterkommen, dann alle Nicht-Erschienenen nach Setzplatz -
+      so weit Plätze da sind; ohne Verlierer-Weg scheiden sie aus (#1823)."""
     by_rank = _placement_positions(results)
-    if not gone or source.get("match_type") != "ffa":
+    if gone and match.get("match_type") == "ffa":
+        staying = [row for row in sorted(results, key=lambda row: int(row.get("rank") or 0))
+                   if row.get("registration_id") not in gone]
+        by_rank = {index: row for index, row in enumerate(staying, start=1)}
+    loser_ranks = sorted(_advancement_result_rank(match, entry) for entry in match.get("advancement") or []
+                         if entry.get("flow") == "L")
+    ordered = [by_rank[key] for key in sorted(by_rank)]
+    if not loser_ranks or not any(row.get("forfeit") for row in ordered):
         return by_rank, by_rank
-    staying = [row for row in sorted(results, key=lambda row: int(row.get("rank") or 0))
-               if row.get("registration_id") not in gone]
-    moved_up = {index: row for index, row in enumerate(staying, start=1)}
-    return moved_up, moved_up
+    qualifiers = loser_ranks[0] - 1
+    losers = [row for row in ordered[qualifiers:] if not row.get("forfeit")] + [row for row in ordered if row.get("forfeit")]
+    return {qualifiers + index: row for index, row in enumerate(losers, start=1)}, by_rank
+
+
+def _pot_ranks(source: dict, results: list[dict], gone: set[str]) -> tuple[dict[int, dict], dict[int, dict]]:
+    """Wer auf welchem Platz in den Topf kommt - dieselbe Regel wie beim Eintragen (``_advancement_paths``)."""
+    return _advancement_paths(source, results, gone)
 
 
 def _group_is_ready(targets: list[dict]) -> bool:
@@ -1222,12 +1239,8 @@ def build_v2_result_application(
 
     results = normalize_v2_results(match, raw_results)
     eliminated = set(eliminated or ())
-    path_by_rank = _placement_positions(results)
-    if eliminated and match.get("match_type") == "ffa":
-        # Plätze rücken auf: Sieger- und Verlierer-Weg zählen nur, wer noch im Turnier ist - wer auf dem Sieger-Weg
-        # aufrückt, steht nicht zugleich im Loser Bracket (#1823).
-        path_by_rank = {index: entry for index, entry in enumerate(
-            (entry for entry in results if entry["registration_id"] not in eliminated), start=1)}
+    # Plätze rücken auf, wer nicht erschienen ist, nur auf den Verlierer-Weg (#1553, #1823): ``_advancement_paths``.
+    loser_path, winner_path = _advancement_paths(match, results, eliminated)
     by_id, by_key = _target_lookup(stage_matches)
     downstream = _downstream_links(stage_matches)
     target_sets: dict[str, dict] = {}
@@ -1242,7 +1255,7 @@ def build_v2_result_application(
             raise MatchV2ResultError(f"Zielmatch {advancement.get('to_match_key')} nicht gefunden")
         result_rank = _advancement_result_rank(match, advancement)
         flow = advancement.get("flow")
-        result = path_by_rank.get(result_rank)
+        result = (winner_path if flow == "W" else loser_path).get(result_rank)
         skip_reason = None
         if result and result["registration_id"] in eliminated:
             skip_reason = "eliminated"

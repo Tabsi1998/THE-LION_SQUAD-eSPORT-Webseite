@@ -259,6 +259,25 @@ async def test_two_missing_share_the_last_place_and_advance_by_seed_not_by_marki
 
 
 @pytest.mark.asyncio
+async def test_three_missing_never_take_a_winner_place(flow):
+    """3 von 4 fehlen, Quote 2: der eine Anwesende kommt weiter, der zweite Sieger-Platz wird ein Freilos. Die
+    Nicht-Erschienenen gehen ins Loser Bracket, so weit Plätze da sind - nach Setzplatz."""
+    tournament, heat, _user_of = await heats_cup(flow)
+    first, second, third, fourth = seats(heat)
+    response = await flow.post(f"/api/matches/{heat['id']}/result", json={"results": [
+        {"registration_id": third, "rank": 1}, {"registration_id": first, "rank": 2, "forfeit": True},
+        {"registration_id": second, "rank": 3, "forfeit": True}, {"registration_id": fourth, "rank": 4, "forfeit": True}]})
+    assert response.status_code == 200, response.text
+
+    seed = {reg["id"]: reg["seed"] for reg in await flow.db.tournament_registrations.find(
+        {"tournament_id": tournament["id"]}, {"_id": 0, "id": 1, "seed": 1}).to_list(20)}
+    by_seed = sorted((first, second, fourth), key=lambda item: seed[item])
+    after = await by_key(flow, tournament)
+    assert in_target(after["F"], heat) == [third], "kein Nicht-Erschienener auf dem Sieger-Weg"
+    assert in_target(after["LA"], heat) == by_seed[:2], "ins Loser Bracket nach Setzplatz, so weit Plätze da sind"
+
+
+@pytest.mark.asyncio
 async def test_the_present_three_are_entered_and_the_best_two_advance(flow):
     tournament, heat, _user_of = await heats_cup(flow)
     first, missing, third, fourth = seats(heat)

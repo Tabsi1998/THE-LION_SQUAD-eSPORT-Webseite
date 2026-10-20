@@ -200,6 +200,49 @@ def test_the_draw_pot_takes_no_shows_sharing_a_place_in_order():
     assert [winner_path[rank]["registration_id"] for rank in (1, 2)] == ["r3", "r1"]
 
 
+THREE_MISSING = [  # nur r3 ist da; Setzplätze r1=4, r2=2, r4=3
+    {"registration_id": "r3", "rank": 1},
+    {"registration_id": "r1", "rank": 2, "forfeit": True}, {"registration_id": "r2", "rank": 3, "forfeit": True},
+    {"registration_id": "r4", "rank": 4, "forfeit": True},
+]
+
+
+def test_no_show_never_takes_a_winner_place_and_all_go_the_loser_path_by_seed():
+    """#1823 (3 von 4 fehlen, Quote 2): der zweite Sieger-Platz wird ein Freilos; die Nicht-Erschienenen gehen auf den
+    Verlierer-Weg, so weit Plätze da sind - nach Setzplatz (r2, dann r4); r1 (Setzplatz 4) bleibt draußen."""
+    source = _seeded_heat()
+
+    application = build_v2_result_application(
+        source, [source, _target("m-b", "B"), _target("m-l", "L")], THREE_MISSING,
+        actor_id="admin", now_iso="2026-05-08T12:00:00+00:00",
+    )
+
+    winners = application["target_sets"]["m-b"]["slots"]
+    assert [slot["registration_id"] for slot in winners] == ["r3", None]
+    assert winners[1]["status"] == "bye" and winners[1]["source_result"]["reason"] == "forfeit"
+    assert [slot["registration_id"] for slot in application["target_sets"]["m-l"]["slots"]] == ["r2", "r4"]
+
+
+def test_without_a_loser_path_the_no_shows_are_out():
+    source = {**_seeded_heat(), "advancement": [entry for entry in _seeded_heat()["advancement"] if entry["flow"] == "W"]}
+
+    application = build_v2_result_application(
+        source, [source, _target("m-b", "B")], THREE_MISSING, actor_id="admin", now_iso="2026-05-08T12:00:00+00:00",
+    )
+
+    assert [slot["registration_id"] for slot in application["target_sets"]["m-b"]["slots"]] == ["r3", None]
+
+
+def test_the_draw_pot_sends_every_no_show_to_the_loser_path_too():
+    source = _seeded_heat()
+    results = normalize_v2_results(source, THREE_MISSING)
+
+    loser_path, winner_path = _pot_ranks(source, results, set())
+
+    assert winner_path[1]["registration_id"] == "r3" and winner_path[2]["forfeit"] is True
+    assert [loser_path[rank]["registration_id"] for rank in (3, 4)] == ["r2", "r4"]
+
+
 def test_the_draw_pot_moves_the_others_up_on_both_paths_too():
     """Gemischte Runden (#1548) losen aus demselben Stand: wer im Lauf auf den Sieger-Weg aufrückt, kommt nicht
     zugleich in den Topf des Loser Bracket (#1823)."""

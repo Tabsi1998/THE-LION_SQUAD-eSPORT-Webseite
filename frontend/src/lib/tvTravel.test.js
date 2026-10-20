@@ -53,6 +53,21 @@ test("Durchgang mit zwei Fehlenden (#1823): beide auf dem letzten Platz, ins Los
   ]);
 });
 
+test("Durchgang, 3 von 4 fehlen (#1823): kein Nicht-Erschienener auf dem Sieger-Weg, alle auf den Verlierer-Weg wie am Server", () => {
+  const bracket = heatDoubleElimination();
+  decide(bracket, "A", ["r4", "r1", "r5", "r8"]);
+  const heat = find(bracket, "A");
+  // Wie der Server: r1, r5 und r8 fehlen und teilen sich Platz 2 (Reihenfolge nach Setzplatz); der zweite Sieger-Platz
+  // ist ein Freilos, ins Loser Bracket kommen r1 und r5.
+  heat.results = heat.results.map((row) => (row.registration_id === "r4" ? row : { ...row, rank: 2, forfeit: true, score: null }));
+  find(bracket, "C").slots[1] = { ...find(bracket, "C").slots[1], registration_id: null, status: "bye" };
+  find(bracket, "D").slots[0] = { ...find(bracket, "D").slots[0], registration_id: "r1", status: "filled" };
+  find(bracket, "D").slots[1] = { ...find(bracket, "D").slots[1], registration_id: "r5", status: "filled" };
+  const moves = advancementsOf(heat, bracket.matches_v2);
+  const where = Object.fromEntries(moves.map((move) => [move.registrationId, move.target ? `${move.target.matchKey}:${move.target.slot}` : move.kind]));
+  expect(where).toEqual({ r4: "C:1", r1: "D:1", r5: "D:2", r8: "out" });
+});
+
 test("Doppel-K.-o.: der Verlierer rutscht ins Loser Bracket, aus dem Loser Bracket geht es ins Grand Final", () => {
   const bracket = doubleElimination(8);
   decide(bracket, "A");
