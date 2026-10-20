@@ -1,4 +1,4 @@
-import { dashboardActions, registrationLabel, seasonLine, splitHomeTimeline, timelineItems } from "./dashboard";
+import { dashboardActions, isLiveOrToday,registrationLabel, seasonLine, splitHomeTimeline, timelineItems } from "./dashboard";
 
 // Das Dashboard als persoenliche Startseite (#256): nur Termine von heute an,
 // heute und live zuerst, Aktionen mit Ziel, eine Zeile Jahreswertung.
@@ -71,4 +71,12 @@ test("die Jahreswertung ist eine Zeile: eigener Platz, sonst die Spitze", () => 
   expect(seasonLine({ leader: { display_name: "Anna", points: 99 } })).toBe("Vorn: Anna · 99 Punkte");
   expect(seasonLine({})).toBe("Noch keine Punkte vergeben.");
   expect(seasonLine(null)).toBe("");
+});
+
+test("ein stehen gebliebenes live nach dem Ende zählt nicht als live (#1881)", () => {
+  const later = new Date("2026-09-20T10:00:00+02:00");
+  expect(isLiveOrToday({ status: "live", phaseState: "completed", date: "2026-09-10" }, later)).toBe(false);
+  expect(isLiveOrToday({ status: "live", phaseState: "live", date: "2026-09-10" }, later)).toBe(true);
+  expect(isLiveOrToday({ status: "paused", phaseState: "paused", date: "2026-09-10" }, later)).toBe(true);
+  expect(isLiveOrToday({ status: "live", date: "2026-09-10" }, later)).toBe(true);
 });

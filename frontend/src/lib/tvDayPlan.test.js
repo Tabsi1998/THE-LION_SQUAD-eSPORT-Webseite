@@ -103,3 +103,30 @@ test("nach dem Check-in-Ende (#1551) heißt der Hinweis nicht mehr „Check-in l
   evening.check_in_closed_at = new Date(NOW).toISOString();
   expect(hintOf()).not.toMatch(/Check-in/);
 });
+
+// #1881: Die Phase vom Server geht vor dem Rohstatus - ein stehen gebliebenes live nach dem Ende ist beendet.
+function plannedState(tournament, now) {
+  const event = { start_date: "2026-10-10T10:00:00+02:00", end_date: "2026-10-10T20:00:00+02:00", tournaments: [tournament] };
+  return dayPlan(event, now).lanes[0].blocks[0].state;
+}
+
+const CUP = { id: "c", title: "Cup", start_date: "2026-10-10T12:00:00+02:00", end_date: "2026-10-10T16:00:00+02:00" };
+
+test("Rohstatus live nach dem Ende bleibt am TV nicht live", () => {
+  const after = at("2026-10-10T17:00:00+02:00");
+  expect(plannedState({ ...CUP, status: "live" }, after)).toBe("past");
+  expect(plannedState({ ...CUP, status: "live", public_phase: { state: "completed" } }, after)).toBe("past");
+  expect(plannedState({ ...CUP, status: "check_in" }, after)).toBe("past");
+});
+
+test("Rohstatus live im Zeitfenster und pausiert zeigen live, abgesagt ist vorbei", () => {
+  const during = at("2026-10-10T14:00:00+02:00");
+  expect(plannedState({ ...CUP, status: "live" }, during)).toBe("live");
+  expect(plannedState({ ...CUP, status: "paused" }, at("2026-10-10T17:00:00+02:00"))).toBe("live");
+  expect(plannedState({ ...CUP, status: "cancelled" }, during)).toBe("past");
+});
+
+test("die öffentliche Phase vom Server geht vor dem Rohstatus", () => {
+  const during = at("2026-10-10T14:00:00+02:00");
+  expect(plannedState({ ...CUP, status: "live", public_phase: { state: "cancelled" } }, during)).toBe("past");
+});
