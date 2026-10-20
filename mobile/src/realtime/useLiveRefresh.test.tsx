@@ -191,3 +191,17 @@ test("nach dem Abbauen läuft auch der Ersatz-Takt nicht weiter", async () => {
   await advance(60000);
   expect(refresh).not.toHaveBeenCalled();
 });
+
+test("verdeckt, während ein Neuladen noch entprellt wird: es lädt nicht verdeckt, sondern einmal beim Zurückkommen", async () => {
+  const refresh = jest.fn();
+  const bus = liveBus(true);
+  const nav = fakeNavigation();
+  await mount(<Probe onRefresh={refresh} />, bus, nav);
+  await act(() => bus.emit({ path: "/tournaments/t-1", event_type: "tournament.updated" }));
+  await act(() => nav.blur());
+  await advance(500);
+  expect(refresh).not.toHaveBeenCalled();
+  await act(() => nav.focus());
+  await advance(100);
+  expect(refresh).toHaveBeenCalledTimes(1);
+});

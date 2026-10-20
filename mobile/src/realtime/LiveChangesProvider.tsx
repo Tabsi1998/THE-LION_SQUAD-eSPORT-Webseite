@@ -141,6 +141,12 @@ export function useLiveRefresh(
     if (timerRef.current) clearTimeout(timerRef.current);
     timerRef.current = setTimeout(() => {
       timerRef.current = null;
+      // Inzwischen verdeckt: nicht laden, nur merken - die Rückkehr lädt einmal nach.
+      if (!visibleRef.current) {
+        staleRef.current = true;
+        return;
+      }
+      // Erst jetzt, beim echten Start, gilt die Ansicht als frisch; was danach kommt, markiert sie wieder als veraltet.
       staleRef.current = false;
       lastRunRef.current = Date.now();
       runSafely(callbackRef.current);
