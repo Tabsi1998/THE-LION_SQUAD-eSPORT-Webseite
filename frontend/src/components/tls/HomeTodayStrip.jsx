@@ -6,7 +6,7 @@ import { todayFacts, todayItems } from "@/lib/homeToday";
 import { seriesAddress } from "@/lib/referenceSeries";
 import { GameMark } from "@/components/tls/references/referenceParts";
 
-// „Heute im Einsatz“ (#1753): an Renn- und Spieltagen ein schmaler Streifen unter dem Kopf der Startseite - je Saison
+// „Heute im Einsatz“ (#1753): an Renn- und Spieltagen ein schmaler Streifen über dem Kopf der Startseite - je Saison
 // mit heutigem Termin eine Karte (Serie, Saison, Runde, Uhrzeit, gemeldete Vereinsleute), die zur Serienseite mit der
 // Tabelle führt. Gestaltet wie die Karten „Läuft gerade“ der Referenzen-Übersicht: goldener Chip „Heute“ mit dezentem
 // Puls, Karten blenden gestaffelt ein. Mit „Bewegung reduzieren“ stehen Puls und Einblenden still (index.css,

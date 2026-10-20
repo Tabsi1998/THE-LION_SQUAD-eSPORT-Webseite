@@ -69,6 +69,9 @@ export default function HomePage() {
     <PublicLayout>
       {/* Live Banner — only when something is actually live */}
       {state?.has_live && <LiveBanner state={state} />}
+      {/* Heute im Einsatz (#1753): nur an Renn- und Spieltagen der Serien, sonst fehlt der Streifen ganz. Wie das
+          Live-Banner über dem Kopf, damit man ihn auch am Handy ohne Scrollen sieht. */}
+      <HomeTodayStrip />
 
       {/* Hero */}
       <section ref={heroRef} className="relative overflow-hidden border-b border-white/10 bg-grid-dense">
@@ -109,8 +112,6 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Heute im Einsatz (#1753): nur an Renn- und Spieltagen der Serien, sonst fehlt der Streifen ganz. */}
-      <HomeTodayStrip />
       <ClubNumbers numbers={state?.club_numbers} shown={state?.club_numbers_shown} />
       {/* Discord (#581): online und im Voice - nur Zahlen, nur bei eingeschaltetem Server-Widget. */}
       <LiveStreamSlider />
