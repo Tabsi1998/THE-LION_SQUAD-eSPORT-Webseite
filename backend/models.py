@@ -1421,6 +1421,13 @@ ReferenceStatus = Literal["planned", "active", "completed", "archived"]
 ReferenceEntryKind = Literal["team", "solo"]
 
 
+class ReferenceCheckSettings(BaseModel):
+    """Grenzen der Prüfung beim Speichern einer Referenz (#1755): ab wie vielen Tagen zwischen Start und Ende gewarnt
+    wird, und ob eine abgeschlossene Teilnahme mit Ende in der Zukunft auffällt."""
+    max_duration_days: Optional[int] = Field(default=None, ge=1, le=3650)
+    warn_future_end: Optional[bool] = None
+
+
 class ReferenceEntry(BaseModel):
     """Ein Eintrag einer Turnierteilnahme (#409): entweder ein Team (Spieler treten gemeinsam an,
     eine Platzierung) oder ein Einzelstarter mit eigener Platzierung."""

@@ -14,6 +14,7 @@ from services import partner_pages, sponsor_images
 from services.notification_preferences import enqueue_newsletter_for_item
 from services.user_notifications import create_user_notification
 from services.slug_utils import apply_slug_history, find_by_slug_or_history, slug_source_for_update, unique_slug
+from services import dolibarr_policy, reference_checks
 from models import (
     NewsCreate, NewsUpdate, SponsorCreate, SponsorUpdate,
     PartnerCreate, PartnerUpdate, ReferenceCreate, ReferenceShowcaseSettings, ReferenceUpdate,
@@ -22,6 +23,7 @@ from models import (
     GalleryPhotoCreate, GalleryPhotoUpdate,
     now_utc, new_id,
 )
+from models import ReferenceCheckSettings
 
 router = APIRouter(prefix="/api", tags=["news"])
 # Entwürfe und unveröffentlichte Beiträge sehen diese Rollen; Moderatoren moderieren.
@@ -1483,6 +1485,51 @@ async def admin_update_reference_helpers(body: dict, me: dict = Depends(require_
     return _normalize_reference_helpers(helpers)
 
 
+# Prüfung beim Speichern (#1755): nur Warnungen je Feld, gespeichert wird trotzdem. Grenzen als Einstellung mit Vorgabe.
+async def _reference_check_settings(db) -> dict:
+    doc = await db.settings.find_one({"id": reference_checks.SETTINGS_ID}, {"_id": 0})
+    return reference_checks.normalize_settings(doc)
+
+
+async def _reference_warnings(db, doc: dict) -> list[dict]:
+    return reference_checks.check_reference(doc, dolibarr_policy.club_today(), await _reference_check_settings(db))
+
+
+@router.get("/references/admin/checks")
+async def admin_reference_checks(me: dict = Depends(require_area("content"))):
+    """Auffälligkeiten in allen gespeicherten Referenzen (auch den alten) - je Referenz ihre Warnungen."""
+    db = get_db()
+    settings = await _reference_check_settings(db)
+    today = dolibarr_policy.club_today()
+    refs = _sort_references(await db.references.find({}, {"_id": 0}).to_list(1000))
+    items = []
+    for ref in refs:
+        warnings = reference_checks.check_reference(ref, today, settings)
+        if warnings:
+            items.append({"id": ref["id"], "title": ref.get("title"), "start_date": ref.get("start_date"),
+                          "warnings": warnings})
+    return {"settings": settings, "checked": len(refs), "items": items}
+
+
+@router.patch("/references/admin/checks")
+async def admin_update_reference_checks(body: ReferenceCheckSettings, me: dict = Depends(require_area("content"))):
+    db = get_db()
+    current = await _reference_check_settings(db)
+    updates = {key: value for key, value in body.model_dump(exclude_unset=True).items() if value is not None}
+    saved = reference_checks.normalize_settings({**current, **updates})
+    await db.settings.update_one({"id": reference_checks.SETTINGS_ID}, {"$set": {
+        "id": reference_checks.SETTINGS_ID, **saved, "updated_at": now_utc().isoformat()}}, upsert=True)
+    return saved
+
+
+@router.post("/references/admin/checks/preview")
+async def admin_preview_reference_checks(body: ReferenceUpdate, me: dict = Depends(require_area("content"))):
+    """Prüft die Formularwerte, ohne zu speichern - das Formular zeigt die Warnungen vor dem Speichern am Feld."""
+    doc = body.model_dump(exclude_unset=True)
+    doc["entries"] = [entry for entry in doc.get("entries") or [] if isinstance(entry, dict)]
+    return {"warnings": await _reference_warnings(get_db(), doc)}
+
+
 @router.get("/references/{rid}")
 async def get_reference(rid: str, user: dict | None = Depends(get_optional_user)):
     db = get_db()
@@ -1515,7 +1562,7 @@ async def create_reference(body: ReferenceCreate, me: dict = Depends(require_are
     doc["updated_at"] = now_utc().isoformat()
     await db.references.insert_one(doc)
     doc.pop("_id", None)
-    return (await _enrich_references([doc]))[0]
+    return {**(await _enrich_references([doc]))[0], "check_warnings": await _reference_warnings(db, doc)}
 
 
 @router.put("/references/{rid}")
@@ -1546,7 +1593,7 @@ async def update_reference(rid: str, body: ReferenceUpdate, me: dict = Depends(r
     if res.matched_count == 0:
         raise HTTPException(404, "Referenz nicht gefunden.")
     saved = await db.references.find_one({"id": rid}, {"_id": 0})
-    return (await _enrich_references([saved]))[0]
+    return {**(await _enrich_references([saved]))[0], "check_warnings": await _reference_warnings(db, saved)}
 
 
 @router.delete("/references/{rid}")
