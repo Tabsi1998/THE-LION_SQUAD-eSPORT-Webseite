@@ -74,7 +74,12 @@ async def _visible_seasons(db, user, lineage_id: str) -> list[dict]:
     found = await db.reference_series.find(
         {"lineage_id": lineage_id, "status": {"$ne": "archived"}},
         {"_id": 0, "id": 1, "visibility": 1, "team_name": 1, **{key: 1 for key in PATH_FIELDS}}).to_list(None)
-    seen = [item for item in found if await user_can_see(user, item.get("visibility"))]
+    allowed: dict = {}  # je Sichtbarkeitsstufe einmal prüfen, nicht je Saison
+    for item in found:
+        level = item.get("visibility")
+        if level not in allowed:
+            allowed[level] = await user_can_see(user, level)
+    seen = [item for item in found if allowed[item.get("visibility")]]
     return sorted(seen, key=lambda item: (str(item.get("season") or ""), str(item.get("tier") or ""), item["id"]))
 
 
@@ -163,11 +168,22 @@ async def _lineup(db, series: dict, seasons: list[dict], sheets: dict, own_days:
     return {"round_ids": [round_id for round_id, match in own_days if match.get("lineup")], "players": players}
 
 
-async def _path(db, series: dict, seasons: list[dict]) -> list[dict]:
+async def _table_snapshots(db, series_ids: list[str]) -> dict[str, list[dict]]:
+    """Alle gespeicherten Tabellenstände der Saisons in einer Abfrage, je Saison nach Spieltag geordnet."""
+    out: dict[str, list[dict]] = {sid: [] for sid in series_ids}
+    async for snapshot in db.reference_standings.find(
+            {"series_id": {"$in": series_ids}, "scope": "table"},
+            {"_id": 0, "series_id": 1, "round_id": 1, "round_seq": 1, "rows": 1}):
+        out.setdefault(snapshot["series_id"], []).append(snapshot)
+    for items in out.values():
+        items.sort(key=lambda item: item.get("round_seq") or 0)
+    return out
+
+
+def _path(series: dict, seasons: list[dict], snapshots: dict[str, list[dict]]) -> list[dict]:
     path = []
     for season in seasons:
-        latest = await db.reference_standings.find_one(
-            {"series_id": season["id"], "scope": "table"}, {"_id": 0, "rows": 1}, sort=[("round_seq", -1)])
+        latest = (snapshots.get(season["id"]) or [None])[-1]
         rows = (latest or {}).get("rows") or []
         own = _own_row(rows, season.get("team_name")) or {}
         path.append({
@@ -201,9 +217,8 @@ async def team_league_view(db, user, lineage: dict, series: dict, rounds: list[d
             own_days.append((item["id"], match))
             form.append(OUTCOME_LETTERS[view["outcome"]])
 
-    snapshots = await db.reference_standings.find(
-        {"series_id": sid, "scope": "table"},
-        {"_id": 0, "round_id": 1, "round_seq": 1, "rows": 1}).sort("round_seq", 1).to_list(None)
+    by_season = await _table_snapshots(db, [item["id"] for item in seasons])
+    snapshots = by_season.get(sid) or []
     history = []
     for snapshot in snapshots:
         own = _own_row(snapshot.get("rows") or [], team_name)
@@ -218,5 +233,5 @@ async def team_league_view(db, user, lineage: dict, series: dict, rounds: list[d
         "rank_history": history,
         "matchdays": matchdays,
         "lineup": await _lineup(db, series, seasons, sheets, own_days),
-        "path": await _path(db, series, seasons),
+        "path": _path(series, seasons, by_season),
     }
