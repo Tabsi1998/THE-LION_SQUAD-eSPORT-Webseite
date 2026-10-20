@@ -179,3 +179,38 @@ test("einen Gast anlegen und gleich wählen", async () => {
   expect(await screen.findByTestId("fl-quick-driver-selected")).toHaveTextContent("Lena 🏎️");
   expect(created).toHaveBeenCalledWith({ id: "g-9", display_name: "Lena 🏎️" });
 });
+
+// #1825: Der Fahrer-Wähler steht in „Am Start / Als Nächstes“ innerhalb des Formulars der Liste. „Anlegen“ (Klick oder
+// Enter im Namensfeld) legt den Gast an und wählt ihn - ohne dabei die Liste abzuschicken.
+test("in der Liste einen Gast anlegen: Klick auf Anlegen wählt ihn, die Liste wird nicht abgeschickt", async () => {
+  apiMock.post.mockResolvedValue({ data: { id: "g-9", display_name: "Lena" } });
+  const created = vi.fn();
+  render(<FastLapQueuePanel challenge={CHALLENGE} track={TRACK} queue={QUEUE} guests={[ANNA]} onGuestCreated={created} onChanged={vi.fn()} />);
+  fireEvent.click(screen.getByTestId("fl-queue-driver-tab-guest"));
+  fireEvent.change(screen.getByTestId("fl-queue-driver-guest-name"), { target: { value: "Lena" } });
+  fireEvent.click(screen.getByTestId("fl-queue-driver-guest-create"));
+  expect(await screen.findByTestId("fl-queue-driver-selected")).toHaveTextContent("Lena");
+  expect(apiMock.post).toHaveBeenCalledTimes(1);
+  expect(apiMock.post).toHaveBeenCalledWith("/f1/challenges/c-1/guests", { display_name: "Lena" });
+  expect(created).toHaveBeenCalledWith({ id: "g-9", display_name: "Lena" });
+  expect(toastMock.error).not.toHaveBeenCalled();
+  expect(screen.getByTestId("fl-queue-add")).toBeEnabled();
+});
+
+test("in der Liste einen Gast anlegen: Enter im Namensfeld legt an statt die Liste abzuschicken", async () => {
+  apiMock.post.mockResolvedValue({ data: { id: "g-9", display_name: "Lena" } });
+  render(<FastLapQueuePanel challenge={CHALLENGE} track={TRACK} queue={QUEUE} guests={[ANNA]} onChanged={vi.fn()} />);
+  fireEvent.click(screen.getByTestId("fl-queue-driver-tab-guest"));
+  const input = screen.getByTestId("fl-queue-driver-guest-name");
+  fireEvent.change(input, { target: { value: "Lena" } });
+  fireEvent.keyDown(input, { key: "Enter" });
+  expect(await screen.findByTestId("fl-queue-driver-selected")).toHaveTextContent("Lena");
+  expect(apiMock.post).toHaveBeenCalledTimes(1);
+  expect(toastMock.error).not.toHaveBeenCalled();
+});
+
+test("der Fahrer-Wähler enthält kein eigenes Formular (keine verschachtelten Formulare)", () => {
+  const { container } = render(<FastLapQueuePanel challenge={CHALLENGE} track={TRACK} queue={QUEUE} guests={[ANNA]} onChanged={vi.fn()} />);
+  fireEvent.click(screen.getByTestId("fl-queue-driver-tab-guest"));
+  expect(container.querySelectorAll("form form")).toHaveLength(0);
+});

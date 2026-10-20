@@ -31,10 +31,11 @@ export function FastLapDriverChooser({ challengeId, guests, onGuestCreated, valu
   // Verknüpfte Gäste (#1585) fahren als Konto weiter - sie stehen hier nicht mehr zur Wahl.
   const open = (guests || []).filter((guest) => !guest.linked_user_id);
 
-  const createGuest = async (event) => {
-    event?.preventDefault();
+  // Kein eigenes <form> (#1825): der Wähler steht in „Am Start / Als Nächstes“ innerhalb des Formulars der Liste, ein
+  // verschachteltes Formular schickte dort die Liste statt des Gastes ab. Klick und Enter legen den Gast hier direkt an.
+  const createGuest = async () => {
     const text = name.trim();
-    if (!text) return;
+    if (!text || saving) return;
     setSaving(true);
     try {
       const { data } = await api.post(`/f1/challenges/${challengeId}/guests`, { display_name: text });
@@ -78,12 +79,12 @@ export function FastLapDriverChooser({ challengeId, guests, onGuestCreated, valu
         <PersonPicker purpose="fastlap" contextId={challengeId} value={null} onChange={(person) => onChange(driverFromPerson(person))} label="" placeholder="Fahrer suchen …" testId={`${testId}-person`} />
       ) : (
         <div className="space-y-2">
-          <form onSubmit={createGuest} className="flex gap-2">
-            <input value={name} onChange={(event) => setName(event.target.value)} maxLength={40} placeholder="Name des Gastes, z. B. Anna K." aria-label="Name des Gastes" data-testid={`${testId}-guest-name`} className={`${INPUT_CLASS} min-w-0`} />
-            <button disabled={saving || !name.trim()} data-testid={`${testId}-guest-create`} className="tls-btn tls-btn--secondary shrink-0 inline-flex items-center gap-1.5 px-3 rounded-sm text-xs font-bold uppercase tracking-wider disabled:opacity-40">
+          <div className="flex gap-2">
+            <input value={name} onChange={(event) => setName(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); createGuest(); } }} maxLength={40} placeholder="Name des Gastes, z. B. Anna K." aria-label="Name des Gastes" data-testid={`${testId}-guest-name`} className={`${INPUT_CLASS} min-w-0`} />
+            <button type="button" onClick={createGuest} disabled={saving || !name.trim()} data-testid={`${testId}-guest-create`} className="tls-btn tls-btn--secondary shrink-0 inline-flex items-center gap-1.5 px-3 rounded-sm text-xs font-bold uppercase tracking-wider disabled:opacity-40">
               <UserPlus className="w-3.5 h-3.5" /> Anlegen
             </button>
-          </form>
+          </div>
           {open.length > 0 && (
             <div className="flex flex-wrap gap-1.5 max-h-28 overflow-y-auto" data-testid={`${testId}-guests`}>
               {open.map((guest) => (

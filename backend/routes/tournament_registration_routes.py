@@ -50,8 +50,10 @@ from routes.tournament_common import (
     _is_tournament_staff,
     _public_registration,
     _resolve_tid,
+    _serialized_registration_write,
     _serialized_tournament_write,
     _v2_plan_key,
+    registration_wait_seconds,
 )
 from routes.tournament_router import router
 
@@ -587,17 +589,9 @@ async def _create_self_registration(db, tid: str, tournament: dict, body: Regist
             reg["price_snapshot"], reg["billing_status"] = snapshot, "pending"
     reg.pop("_id", None)
     reg.pop("identity_key", None)
-    # Bestätigung (#1133): „Du bist dabei“ oder „Du stehst auf der Warteliste“ - im Postfach und, wenn erlaubt, per Mail;
-    # bei Teams auch an Teamleitung und Co-Leitung.
-    await _notify_registration(db, tid, reg, reg["status"], actor_id=me.get("id"))
+    # Bestätigung und Erfolge folgen nach der Sperre (``_after_self_registration``).
     reg["auto_bracket_update"] = auto_bracket_update
     reg["idempotent_replay"] = False
-    # Badge trigger
-    try:
-        from badges import on_tournament_registered
-        await on_tournament_registered(me["id"], tid)
-    except Exception:
-        logger.warning("[achievements] Anmeldung zu %s nicht ausgewertet", _log_safe(tid), exc_info=True)
     return reg
 
 
@@ -637,7 +631,8 @@ async def self_register(db, t: dict, body: RegistrationCreate, me: dict, registe
     if t.get("block_club_member_registration") and await _is_active_club_member(db, me):
         raise HTTPException(status_code=403, detail="Dieses Turnier ist für externe Teilnehmer vorgesehen. Vereinsmitglieder können sich hier nicht selbst anmelden.")
     try:
-        async with mutation_lock(db, tournament_write_resource(tid)):
+        # Gleichzeitige Anmeldungen (#1826, Vor-Ort-QR am Einlass) stellen sich an der Sperre an statt abzubrechen.
+        async with mutation_lock(db, tournament_write_resource(tid), wait_seconds=registration_wait_seconds()):
             current = await db.tournaments.find_one({"id": tid}, {"_id": 0})
             if not current:
                 raise HTTPException(status_code=404, detail="Turnier nicht gefunden")
@@ -646,9 +641,38 @@ async def self_register(db, t: dict, body: RegistrationCreate, me: dict, registe
             current_error = _registration_error(current)
             if current_error and not register_access:
                 raise HTTPException(status_code=400, detail=current_error)
-            return await _create_self_registration(db, tid, current, body, me, register_access, via=via)
+            reg = await _create_self_registration(db, tid, current, body, me, register_access, via=via)
     except MutationLockBusy:
         raise HTTPException(status_code=409, detail="Eine Turnieraktion wird bereits verarbeitet. Bitte erneut versuchen.")
+    if not reg.get("idempotent_replay"):
+        await _after_self_registration(db, tid, reg, me)
+    return reg
+
+
+# Felder der Antwort, die nicht zur Anmeldung selbst gehören.
+RESPONSE_ONLY_KEYS = {"auto_bracket_update", "idempotent_replay"}
+
+
+async def _after_self_registration(db, tid: str, reg: dict, me: dict) -> None:
+    """Nach der Sperre (#1826): Bestätigung und Erfolge brauchen sie nicht - so hält eine Anmeldung die Sperre nur
+    für Platz, Vorschau und Startgeld, und die nächste in der Schlange kommt früher dran."""
+    # Bestätigung (#1133): „Du bist dabei“ oder „Du stehst auf der Warteliste“ - im Postfach und, wenn erlaubt, per Mail;
+    # bei Teams auch an Teamleitung und Co-Leitung.
+    # Ohne Sperre kann sich der Stand inzwischen geändert haben - etwa von der Warteliste nachgerückt, mit eigener
+    # Nachricht „nachgerückt“. Die Bestätigung geht daher nur hinaus, solange die Anmeldung noch diesen Stand hat, und
+    # je Anmeldung nur einmal: Stand prüfen und als gemeldet markieren in einem Schritt.
+    claimed = await db.tournament_registrations.update_one(
+        {"id": reg["id"], "status": reg["status"], "notified_status": {"$exists": False}},
+        {"$set": {"notified_status": reg["status"]}},
+    )
+    if getattr(claimed, "modified_count", 0):
+        registration = {key: value for key, value in reg.items() if key not in RESPONSE_ONLY_KEYS}
+        await _notify_registration(db, tid, registration, reg["status"], actor_id=me.get("id"))
+    try:
+        from badges import on_tournament_registered
+        await on_tournament_registered(me["id"], tid)
+    except Exception:
+        logger.warning("[achievements] Anmeldung zu %s nicht ausgewertet", _log_safe(tid), exc_info=True)
 
 
 @router.post("/{tid}/registrations")
@@ -891,7 +915,7 @@ async def staff_set_registration_checkin(tid: str, reg_id: str, body: dict,
 
 @router.delete("/{tid}/registrations/{reg_id}")
 async def delete_registration(tid: str, reg_id: str, me: dict = Depends(get_current_user),
-                              _mutation_tid: str = Depends(_serialized_tournament_write)):
+                              _mutation_tid: str = Depends(_serialized_registration_write)):
     db = get_db()
     tid = await _resolve_tid(tid)
     await _ensure_tournament_unlocked(db, tid)

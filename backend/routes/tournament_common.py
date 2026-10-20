@@ -8,6 +8,7 @@ from fastapi import HTTPException
 from typing import Optional
 from datetime import datetime, timedelta, timezone
 import math
+import os
 from pydantic import BaseModel, Field
 from database import get_db
 from services.visibility import user_can_see
@@ -737,6 +738,28 @@ async def _resolve_tid(slug_or_id: str) -> str:
     return t["id"]
 
 
+TOURNAMENT_BUSY_DETAIL = "Eine Turnieraktion wird bereits verarbeitet. Bitte erneut versuchen."
+REGISTRATION_WAIT_DEFAULT_SECONDS = 20.0
+REGISTRATION_WAIT_MIN_SECONDS = 2.0
+REGISTRATION_WAIT_MAX_SECONDS = 60.0
+
+
+def registration_wait_seconds(environ=None) -> float:
+    """Wie lange An- und Abmeldungen auf die Turnier-Sperre warten (#1826).
+
+    Am Einlass scannen Gruppen den Vor-Ort-QR-Code im selben Moment; jede Anmeldung hält die Sperre kurz (Platz zählen,
+    Vorschau, Startgeld). Die Anfragen stellen sich daher an, statt nach zwei Sekunden mit „bitte erneut versuchen“
+    abzubrechen. Einstellbar über ``REGISTRATION_LOCK_WAIT_SECONDS`` (2 bis 60 Sekunden, Standard 20)."""
+    raw = str((environ if environ is not None else os.environ).get("REGISTRATION_LOCK_WAIT_SECONDS", "")).strip()
+    try:
+        value = float(raw) if raw else REGISTRATION_WAIT_DEFAULT_SECONDS
+    except ValueError:
+        value = REGISTRATION_WAIT_DEFAULT_SECONDS
+    if not math.isfinite(value):
+        value = REGISTRATION_WAIT_DEFAULT_SECONDS
+    return min(REGISTRATION_WAIT_MAX_SECONDS, max(REGISTRATION_WAIT_MIN_SECONDS, value))
+
+
 async def _serialized_tournament_write(tid: str):
     """Serialize critical writes for one canonical tournament across workers."""
     db = get_db()
@@ -745,7 +768,18 @@ async def _serialized_tournament_write(tid: str):
         async with mutation_lock(db, tournament_write_resource(resolved_tid)):
             yield resolved_tid
     except MutationLockBusy:
-        raise HTTPException(status_code=409, detail="Eine Turnieraktion wird bereits verarbeitet. Bitte erneut versuchen.")
+        raise HTTPException(status_code=409, detail=TOURNAMENT_BUSY_DETAIL)
+
+
+async def _serialized_registration_write(tid: str):
+    """Wie ``_serialized_tournament_write``, aber mit der Wartezeit für An- und Abmeldungen (#1826)."""
+    db = get_db()
+    resolved_tid = await _resolve_tid(tid)
+    try:
+        async with mutation_lock(db, tournament_write_resource(resolved_tid), wait_seconds=registration_wait_seconds()):
+            yield resolved_tid
+    except MutationLockBusy:
+        raise HTTPException(status_code=409, detail=TOURNAMENT_BUSY_DETAIL)
 
 
 # ---------- Swiss / Groups specific ----------

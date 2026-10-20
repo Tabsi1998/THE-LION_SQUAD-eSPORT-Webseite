@@ -16,6 +16,10 @@ const state = ENABLED && fs.existsSync(STATE_FILE) ? JSON.parse(fs.readFileSync(
 const DESKTOP = { width: 1440, height: 900 };
 const HANDY = { width: 375, height: 812 };
 const REASON = "Abnahme: Gast hat ein Konto angelegt";
+// #1825: Gäste, die direkt in „Am Start / Als Nächstes“ angelegt werden (je Lauf eindeutig).
+const RUN = String(Date.now() % 100000);
+const QUEUE_GUEST = `Listengast ${RUN}`;
+const QUEUE_GUEST_DESKTOP = `Listengast PC ${RUN}`;
 
 function base32(secret) {
   const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
@@ -165,6 +169,36 @@ test.describe("Abnahme #1585: Fast Lap vor Ort gegen den echten Server", () => {
     await shot(page, "04-helfer-schnelleingabe-375");
     await page.getByTestId("fl-queue").scrollIntoViewIfNeeded();
     await shot(page, "05-am-start-375");
+    // #1825: In „Am Start / Als Nächstes“ einen Gast anlegen (der Wähler steht im Formular der Liste), in die Liste,
+    // starten - das TV zeigt ihn danach am Start.
+    await page.getByTestId("fl-queue-driver-tab-guest").click();
+    await page.getByTestId("fl-queue-driver-guest-name").fill(QUEUE_GUEST);
+    await page.getByTestId("fl-queue-driver-guest-create").click();
+    await expect(page.getByTestId("fl-queue-driver-selected")).toContainText(QUEUE_GUEST);
+    await page.getByTestId("fl-queue-station").fill("Simulator 2");
+    await page.getByTestId("fl-queue-add").click();
+    await expect(page.getByTestId("fl-queue-next")).toContainText(QUEUE_GUEST);
+    await page.getByRole("button", { name: `${QUEUE_GUEST} starten` }).click();
+    await expect(page.getByTestId("fl-queue-ontrack")).toContainText(QUEUE_GUEST);
+    await noSideScroll(page);
+    await shot(page, "05b-gast-in-der-liste-375");
+    expect(problems).toEqual([]);
+  });
+
+  test("Helfer 1440: Gast in der Liste anlegen - Enter im Namensfeld", async ({ page }, info) => {
+    test.skip(info.project.name !== "chromium", "Größe stellt der Test selbst ein");
+    const problems = watch(page, "helper");
+    await prepare(page, "helper");
+    await page.setViewportSize(DESKTOP);
+    await page.goto(`/admin/f1/${state.fastlap.onsite.id}`);
+    await expect(page.getByTestId("fl-queue")).toBeVisible();
+    await page.getByTestId("fl-queue-driver-tab-guest").click();
+    await page.getByTestId("fl-queue-driver-guest-name").fill(QUEUE_GUEST_DESKTOP);
+    await page.getByTestId("fl-queue-driver-guest-name").press("Enter");
+    await expect(page.getByTestId("fl-queue-driver-selected")).toContainText(QUEUE_GUEST_DESKTOP);
+    await page.getByTestId("fl-queue-add").click();
+    await expect(page.getByTestId("fl-queue-next")).toContainText(QUEUE_GUEST_DESKTOP);
+    await shot(page, "05c-gast-in-der-liste-1440");
     expect(problems).toEqual([]);
   });
 
@@ -175,8 +209,10 @@ test.describe("Abnahme #1585: Fast Lap vor Ort gegen den echten Server", () => {
     await page.setViewportSize({ width: 1920, height: 1080 });
     await page.goto(`/display/f1/${state.fastlap.onsite.id}`);
     await expect(page.getByTestId("tv-queue")).toBeVisible();
-    await expect(page.getByTestId("tv-queue-ontrack")).toContainText("Lena");
-    await expect(page.getByTestId("tv-queue-ontrack")).toContainText("Alle 3 Versuche gefahren");
+    // Je Person am Start eine Zeile: Lena an Simulator 1, der in der Liste angelegte Gast (#1825) an Simulator 2.
+    const lena = page.getByTestId("tv-queue-ontrack").filter({ hasText: "Lena" });
+    await expect(lena).toContainText("Alle 3 Versuche gefahren");
+    await expect(page.getByTestId("tv-queue-ontrack").filter({ hasText: QUEUE_GUEST })).toContainText("Simulator 2");
     await expect(page.getByTestId("tv-queue-next").first()).toContainText("KartKönigin");
     await noSideScroll(page);
     await shot(page, "06-tv-am-start-1920");

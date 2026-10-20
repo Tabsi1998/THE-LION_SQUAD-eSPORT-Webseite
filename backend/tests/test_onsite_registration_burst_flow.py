@@ -1,0 +1,209 @@
+"""Vor-Ort-Anmeldung im Schwall (#1826): Am Einlass scannen Gruppen den QR-Code am TV im selben Moment.
+
+Alle Anmeldungen eines Turniers laufen unter derselben Turnier-Sperre. Wartet eine Anmeldung zu kurz auf sie, bekommt
+die Person „Eine Turnieraktion wird bereits verarbeitet“ - obwohl nur andere Anmeldungen vor ihr dran sind. Diese
+Tests machen jede Anmeldung künstlich langsam (wie Mails, Vorschau und Rechnung auf dem echten Server), schicken viele
+gleichzeitig ab und verlangen: alle kommen an, die Platzgrenze bleibt exakt, der Rest steht auf der Warteliste. Dasselbe
+für gleichzeitige Abmeldungen samt Nachrücken.
+"""
+import asyncio
+import pathlib
+import sys
+
+import pytest
+import pytest_asyncio
+from fastapi import HTTPException, Request
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+
+from flow_harness import load_application, make_flow  # noqa: E402
+from models import RegistrationCreate  # noqa: E402
+
+# So lange hält eine Anmeldung die Sperre in diesen Tests. 16 davon brauchen zusammen deutlich mehr als die frühere
+# Wartezeit von 2 Sekunden.
+SLOW_SECONDS = 0.3
+
+
+@pytest_asyncio.fixture
+async def flow():
+    instance, shutdown = make_flow()
+    # Wie auf echtem MongoDB: eine Sperre je Ressource (sonst serialisiert mongomock nichts).
+    await instance.db.mutation_locks.create_index("resource", unique=True)
+    try:
+        yield instance
+    finally:
+        await shutdown()
+
+
+def slow_inside_the_lock(monkeypatch, module, name: str) -> None:
+    real = getattr(module, name)
+
+    async def slow(*args, **kwargs):
+        await asyncio.sleep(SLOW_SECONDS)
+        return await real(*args, **kwargs)
+
+    monkeypatch.setattr(module, name, slow)
+
+
+async def outcome(call):
+    try:
+        return 200, await call
+    except HTTPException as exc:
+        return exc.status_code, exc.detail
+
+
+async def statuses(flow, tournament: dict) -> list[str]:
+    rows = await flow.db.tournament_registrations.find({"tournament_id": tournament["id"]}, {"_id": 0}).to_list(100)
+    return sorted(row["status"] for row in rows)
+
+
+@pytest.mark.asyncio
+async def test_sixteen_people_scanning_at_once_all_get_in(flow, monkeypatch):
+    from routes import tournament_registration_routes as routes
+
+    slow_inside_the_lock(monkeypatch, routes, "_create_self_registration")
+    tournament = await flow.create_tournament(max_participants=32)
+    people = [await flow.add_user(name=f"Gast {index}") for index in range(16)]
+    body = RegistrationCreate(accept_rules=True, accept_privacy=True)
+
+    results = await asyncio.gather(*(outcome(routes.self_register(flow.db, tournament, body, who, None, via="onsite"))
+                                     for who in people))
+
+    assert [status for status, _ in results] == [200] * 16, [detail for status, detail in results if status != 200]
+    assert await statuses(flow, tournament) == ["approved"] * 16
+
+
+@pytest.mark.asyncio
+async def test_ten_at_once_for_eight_places_fill_exactly_eight_and_wait_list_two(flow, monkeypatch):
+    from routes import tournament_registration_routes as routes
+
+    slow_inside_the_lock(monkeypatch, routes, "_create_self_registration")
+    tournament = await flow.create_tournament(max_participants=8)
+    people = [await flow.add_user(name=f"Gast {index}") for index in range(10)]
+    body = RegistrationCreate(accept_rules=True, accept_privacy=True)
+
+    results = await asyncio.gather(*(outcome(routes.self_register(flow.db, tournament, body, who, None, via="onsite"))
+                                     for who in people))
+
+    assert [status for status, _ in results] == [200] * 10, [detail for status, detail in results if status != 200]
+    assert await statuses(flow, tournament) == ["approved"] * 8 + ["waitlist"] * 2
+    replies = sorted(reply["status"] for _, reply in results)
+    assert replies == ["approved"] * 8 + ["waitlist"] * 2
+
+
+@pytest.mark.asyncio
+async def test_many_signing_off_at_once_all_get_out_and_the_wait_list_moves_up(flow, monkeypatch):
+    from routes import tournament_registration_routes as routes
+
+    _, _, get_current_user, _ = load_application()
+    import server
+
+    tournament = await flow.create_tournament(max_participants=8)
+    people = [await flow.add_user(name=f"Gast {index}") for index in range(10)]
+    by_id = {who["id"]: who for who in people}
+    registrations = [await flow.register(tournament, who, status="approved" if index < 8 else "waitlist")
+                     for index, who in enumerate(people)]
+
+    async def header_user(request: Request) -> dict:
+        return by_id[request.headers["x-test-user"]]
+
+    server.app.dependency_overrides[get_current_user] = header_user
+    slow_inside_the_lock(monkeypatch, routes, "_move_up_from_waitlist")
+    leaving = registrations[:8]
+
+    responses = await asyncio.gather(*(
+        flow.client.delete(f"/api/tournaments/{tournament['id']}/registrations/{reg['id']}",
+                           headers={"x-test-user": reg["user_id"]})
+        for reg in leaving
+    ))
+
+    assert [response.status_code for response in responses] == [200] * 8, [r.text for r in responses if r.status_code != 200]
+    assert await statuses(flow, tournament) == ["approved"] * 2
+
+
+@pytest.mark.asyncio
+async def test_the_confirmation_is_sent_after_the_lock_is_released(flow, monkeypatch):
+    """Bestätigung (Postfach, Mail) und Erfolge halten die Sperre nicht - die nächste Anmeldung kommt früher dran."""
+    from routes import tournament_registration_routes as routes
+    from services.mutation_lock import tournament_write_resource
+
+    tournament = await flow.create_tournament(max_participants=8)
+    anna = await flow.add_user(name="Anna")
+    seen = []
+
+    async def notify(db, tid, registration, status, **kwargs):
+        held = await flow.db.mutation_locks.count_documents({"resource": tournament_write_resource(tid)})
+        seen.append((registration["user_id"], status, held, "auto_bracket_update" in registration))
+
+    monkeypatch.setattr(routes, "_notify_registration", notify)
+    body = RegistrationCreate(accept_rules=True, accept_privacy=True)
+
+    first = await routes.self_register(flow.db, tournament, body, anna, None, via="onsite")
+    again = await routes.self_register(flow.db, tournament, body, anna, None, via="onsite")
+
+    assert first["idempotent_replay"] is False and again["idempotent_replay"] is True
+    assert seen == [(anna["id"], "approved", 0, False)], "genau eine Bestätigung, ohne gehaltene Sperre"
+
+
+@pytest.mark.asyncio
+async def test_a_late_wait_list_confirmation_is_dropped_once_the_person_moved_up(flow, monkeypatch):
+    """Warteliste → jemand meldet sich ab, die Person rückt nach („nachgerückt“) → erst dann käme die verspätete
+    Bestätigung „Warteliste“. Sie entfällt: nur die Nachricht zum jetzigen Stand geht hinaus."""
+    from routes import tournament_registration_routes as routes
+
+    tournament = await flow.create_tournament(max_participants=1)
+    ben, anna = await flow.add_user(name="Ben"), await flow.add_user(name="Anna")
+    ben_reg = await flow.register(tournament, ben)
+    sent = []
+
+    async def notify(db, tid, registration, status, *, previous=None, **kwargs):
+        sent.append((registration["user_id"], status, previous))
+
+    monkeypatch.setattr(routes, "_notify_registration", notify)
+    real_after = routes._after_self_registration
+
+    async def ben_signs_off_first(db, tid, reg, me):
+        flow.act_as(ben)
+        response = await flow.client.delete(f"/api/tournaments/{tid}/registrations/{ben_reg['id']}")
+        assert response.status_code == 200, response.text
+        await real_after(db, tid, reg, me)
+
+    monkeypatch.setattr(routes, "_after_self_registration", ben_signs_off_first)
+    body = RegistrationCreate(accept_rules=True, accept_privacy=True)
+
+    reply = await routes.self_register(flow.db, tournament, body, anna, None, via="onsite")
+
+    assert reply["status"] == "waitlist"
+    stored = await flow.db.tournament_registrations.find_one({"id": reply["id"]}, {"_id": 0})
+    assert stored["status"] == "approved"
+    assert sent == [(anna["id"], "approved", "waitlist")], "nur „nachgerückt“, keine verspätete Warteliste-Nachricht"
+
+
+@pytest.mark.asyncio
+async def test_the_confirmation_goes_out_once_per_registration(flow, monkeypatch):
+    from routes import tournament_registration_routes as routes
+
+    tournament = await flow.create_tournament(max_participants=8)
+    anna = await flow.add_user(name="Anna")
+    sent = []
+
+    async def notify(db, tid, registration, status, **kwargs):
+        sent.append(status)
+
+    monkeypatch.setattr(routes, "_notify_registration", notify)
+    reply = await routes.self_register(flow.db, tournament, RegistrationCreate(accept_rules=True, accept_privacy=True),
+                                       anna, None, via="onsite")
+    await routes._after_self_registration(flow.db, tournament["id"], reply, anna)
+
+    assert sent == ["approved"]
+
+
+def test_the_registration_wait_is_configurable_and_bounded():
+    from routes.tournament_common import registration_wait_seconds
+
+    assert registration_wait_seconds({}) == 20.0
+    assert registration_wait_seconds({"REGISTRATION_LOCK_WAIT_SECONDS": "30"}) == 30.0
+    assert registration_wait_seconds({"REGISTRATION_LOCK_WAIT_SECONDS": "0"}) == 2.0
+    assert registration_wait_seconds({"REGISTRATION_LOCK_WAIT_SECONDS": "999"}) == 60.0
+    assert registration_wait_seconds({"REGISTRATION_LOCK_WAIT_SECONDS": "viel"}) == 20.0
+    assert registration_wait_seconds({"REGISTRATION_LOCK_WAIT_SECONDS": "nan"}) == 20.0
