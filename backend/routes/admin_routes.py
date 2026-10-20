@@ -11,6 +11,7 @@ from database import get_db
 from auth import require_club_admin, get_current_user, get_optional_user, require_any_admin, require_area, require_dashboard
 from models import new_id, now_utc
 from services.competition_read import count_matches_by_status
+from services.membership_service import ACTIVE_STATUSES as ACTIVE_MEMBER_STATUSES
 from services.user_notifications import create_user_notification
 
 from services.ops_monitor import errors_overview, ops_summary, set_error_resolved, slow_overview
@@ -112,7 +113,11 @@ def _source_summary(key: str, label: str, href: str, *, total: int, problem_coun
 
 @router.get("/growth-stats")
 async def growth_stats(days: int = 30, me: dict = Depends(require_area("club", "system"))):
-    """Login + member growth for the dashboard mini chart (last N days)."""
+    """Logins, neue Konten und neue Vereinsmitglieder für den Kasten „Wachstum“ (letzte N Tage).
+
+    `new_users`/`total_users` zählen Website-Konten. `new_members` (#1378) zählt Mitgliedschaften (aktiv oder
+    Ehrenmitglied), die im Zeitraum begonnen haben - mit Beginn auf den Tag genau; ein nur als Jahr oder Monat
+    bekannter Beginn wäre sonst ein Zufallstreffer."""
     days = max(7, min(int(days or 30), 90))
     db = get_db()
     now = datetime.now(timezone.utc)
@@ -127,6 +132,11 @@ async def growth_stats(days: int = 30, me: dict = Depends(require_area("club", "
         {"$group": {"_id": {"$substrBytes": ["$created_at", 0, 10]}, "count": {"$sum": 1}}},
     ]).to_list(200)
     base_users = await db.users.count_documents({"created_at": {"$lt": start_iso}})
+    new_members = await db.memberships.count_documents({
+        "member_status": {"$in": sorted(ACTIVE_MEMBER_STATUSES)},
+        "member_since": {"$gte": start.strftime("%Y-%m-%d")},
+        "member_since_precision": {"$nin": ["year", "month"]},
+    })
     logins_by_day = {row["_id"]: row["count"] for row in login_rows}
     users_by_day = {row["_id"]: row["count"] for row in user_rows}
     out = []
@@ -141,7 +151,7 @@ async def growth_stats(days: int = 30, me: dict = Depends(require_area("club", "
             "new_users": new_users,
             "total_users": total,
         })
-    return {"days": out, "window_days": days}
+    return {"days": out, "window_days": days, "new_members": new_members}
 
 
 # Welcher Bereich welche Aufgabe der Tageszentrale sieht (#1353): dieselben Bereiche wie die Seiten dahinter.

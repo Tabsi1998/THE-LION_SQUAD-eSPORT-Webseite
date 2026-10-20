@@ -1,3 +1,4 @@
+import { countWord } from "@/lib/adminWords";
 import { viennaDateTime } from "@/lib/vienna";
 // Betrieb (#233, #265): Ampeln, Farben und Sätze für die Tageszentrale und
 // Admin → Betrieb, damit Seite und Kachel dieselbe Sprache sprechen.
@@ -29,7 +30,7 @@ export function opsTone(ops) {
 /** Was in der Kachel „Betrieb“ steht. */
 export function opsDetail(ops) {
   if (!ops) return "Server-Fehler, langsame Anfragen und Auto-Checks";
-  const parts = [`${ops.open_error_groups ?? 0} Fehlergruppen offen`, `${ops.slow_requests_24h ?? 0} langsame Anfragen in 24 h`];
+  const parts = [`${countWord(ops.open_error_groups, "Fehlergruppe", "Fehlergruppen")} offen`, countWord(ops.slow_requests_24h, "langsame Anfrage in 24 h", "langsame Anfragen in 24 h")];
   const checks = checksLabel(ops.checks);
   if (checks) parts.push(checks);
   return parts.join(", ");
