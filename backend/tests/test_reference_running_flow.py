@@ -56,9 +56,11 @@ async def _setup(flow):
     cup, cup_series, cup_rounds = await _season(
         flow, "Probe Monatscup", "series", "2026",
         [("Q1", "2026-11-02"), ("Q2", "2026-11-09"), ("Q3", "2026-11-16")])
+    await flow.db.club_member_profiles.insert_one(
+        {"id": "profil-a", "slug": "probe-a", "display_name": "Probe Alpha", "is_active": True})
     await flow.db.reference_participants.insert_many([
         {"id": "p-alpha", "series_id": cup_series["id"], "name": "Probe Alpha", "link": "member",
-         "is_club_member": True, "name_hidden": False},
+         "profile_id": "profil-a", "is_club_member": True, "name_hidden": False},
         {"id": "p-beta", "series_id": cup_series["id"], "name": "Fremd Beta", "link": "external",
          "is_club_member": False, "name_hidden": False},
     ])
@@ -127,3 +129,54 @@ async def test_running_is_empty_without_active_series(flow):
     flow.act_as(None)
     body = (await flow.get(RUNNING)).json()
     assert body["items"] == []
+
+
+@pytest.mark.asyncio
+async def test_running_counts_only_active_visible_members_for_the_club_place(flow):
+    _, _, cup_series, *_ = await _setup(flow)
+    await flow.db.club_member_profiles.insert_one(
+        {"id": "profil-b", "slug": "probe-b", "display_name": "Probe Beta", "is_active": False})
+    # Alpha (Platz 2) ist ausgeblendet, das Mitglied auf Platz 1 hat ein inaktives Profil: beide zählen nicht.
+    await flow.db.reference_participants.update_one({"id": "p-alpha"}, {"$set": {"name_hidden": True}})
+    await flow.db.reference_participants.insert_one({
+        "id": "p-beta-member", "series_id": cup_series["id"], "name": "Probe Beta", "link": "member",
+        "profile_id": "profil-b", "is_club_member": True, "name_hidden": False})
+    await flow.db.reference_standings.update_one({"series_id": cup_series["id"]}, {"$set": {"rows": [
+        {"participant_id": "p-beta-member", "rank": 1}, {"participant_id": "p-alpha", "rank": 2},
+        {"participant_id": "p-beta", "rank": 3}]}})
+    flow.act_as(None)
+    items = (await flow.get(RUNNING)).json()["items"]
+    assert next(item for item in items if item["lineage"]["kind"] == "series")["club"] is None
+    # Wieder sichtbar und aktiv: Alpha zählt.
+    await flow.db.reference_participants.update_one({"id": "p-alpha"}, {"$set": {"name_hidden": False}})
+    items = (await flow.get(RUNNING)).json()["items"]
+    assert next(item for item in items if item["lineage"]["kind"] == "series")["club"] == {"rank": 2, "of": 3}
+
+
+@pytest.mark.asyncio
+async def test_running_loads_details_for_at_most_twelve_series(flow, monkeypatch):
+    await _setup(flow)
+    lineages, series_docs = [], []
+    for number in range(15):
+        lineages.append({"id": f"l{number}", "slug": f"l{number}", "title": f"Probe Spur {number:02d}",
+                         "kind": "series", "visibility": "public", "is_archived": False})
+        series_docs.append({"id": f"s{number}", "lineage_id": f"l{number}", "season": "2026", "season_slug": "2026",
+                            "status": "active", "visibility": "public", "order_index": 5})
+    await flow.db.reference_lineages.insert_many(lineages)
+    await flow.db.reference_series.insert_many(series_docs)
+    # Ein Termin heute in der letzten Serie: sie muss trotz hinterer Reihenfolge unter den zwölf sein.
+    await flow.db.reference_rounds.insert_one({
+        "id": "r-heute", "series_id": "s14", "order": 1, "club_day": "2026-11-09", "status": "planned"})
+    loaded = []
+    original = reference_series_public_routes.calendar_view
+
+    def counting(rounds, published, today):
+        loaded.append(1)
+        return original(rounds, published, today)
+
+    monkeypatch.setattr(reference_series_public_routes, "calendar_view", counting)
+    flow.act_as(None)
+    items = (await flow.get(RUNNING)).json()["items"]
+    assert len(items) == 12 and len(loaded) == 12
+    today = [item["lineage"]["slug"] for item in items if item["today"]]
+    assert sorted(today) == ["l14", "probe-monatscup"]
