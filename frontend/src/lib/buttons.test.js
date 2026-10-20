@@ -43,7 +43,7 @@ const EXCEPTIONS = {
   "components/tls/BallotPopup.jsx": 1, // schwebender Hinweis „Abstimmung offen“
   "components/tls/GlobalSearch.jsx": 1, // Kacheln der Suche
   "components/tls/MentionText.jsx": 1, // @-Erwähnung im Text
-  "components/tls/PublicLayout.jsx": 1, // offizieller Discord-Knopf
+  "components/tls/PublicLayout.jsx": 2, // offizieller Discord-Knopf; Login als Personen-Symbol wie Lupe und Glocke (#1234)
   "pages/public/CalendarPage.jsx": 1, // Terminzeile
   "pages/public/EventDetailPage.jsx": 1, // Zeile eines Turniers am Event
   "pages/public/NewsDetailPage.jsx": 1, // verwandter Beitrag

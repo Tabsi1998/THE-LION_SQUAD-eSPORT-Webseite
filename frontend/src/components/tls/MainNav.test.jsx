@@ -169,3 +169,13 @@ test("aria: aria-expanded und aria-controls zeigen auf das Untermenü", async ()
     expect(document.getElementById(id)).toBe(menu(key));
   }
 });
+
+// Kompakte Kopfzeile (#1234): zwischen 1024 und 1279 px rücken die Menüpunkte zusammen, ab 1280 px wie bisher.
+test("kompakte Kopfzeile: Menüpunkte zwischen 1024 und 1279 px enger", async () => {
+  await renderNav();
+  for (const key of ["home", "verein", "community"]) {
+    const link = screen.getByTestId(`nav-${key}`);
+    expect(link.className).toMatch(/(^|\s)px-4(\s|$)/);
+    expect(link.className).toMatch(/(^|\s)lg:max-xl:px-1\.5(\s|$)/);
+  }
+});
