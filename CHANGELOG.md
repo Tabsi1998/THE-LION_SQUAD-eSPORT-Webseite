@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.9.0 (20.10.2026)
+
+### Neu
+
+* Ergebnisliste aus der Zwischenablage lesen – Zeilen, Tab-, |- und ;-Tabellen (#1744)
+* Ergebnisse je Termin in der Saison eintragen – dynamische Liste mit Vorschau (#1744)
+
+### Fehlerbehebungen
+
+* Referenzen zeigen bei Ausgaben ohne eigenes Logo oder Cover das des Hauptspiels (#1811)
+* Spiel-Kacheln unter „Wo wir antreten“ brechen lange Spielnamen am Handy um statt sie abzuschneiden (#1812)
+
+### Dokumentation
+
+* Handbuch „Ergebnisse eintragen“ mit Liste, Einfügen, Vorschau und Freigabe (#1744)
+
 ## 1.8.0 (20.10.2026)
 
 ### Neu
