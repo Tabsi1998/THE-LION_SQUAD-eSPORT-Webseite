@@ -7,12 +7,17 @@ Gerechnet wird nichts - alles kommt aus dem gespeicherten Stand der letzten gewe
   zuerst, darin nach Stufe. Die Sichtbarkeit jeder Saison gilt wie für ihre Seite; geladen wird gesammelt über die
   Saisonliste der Team-Liga (``team_league_page.visible_seasons``: eine Abfrage, eine Prüfung je Sichtbarkeitsstufe).
 - **Teamwertung** (``scope = teams``), wenn die Regeln sie einschalten: je Team Rang, Punkte, offizieller Wert mit
-  Abweichung, je Rennen die gezählten Fahrer und über die Saison alle Fahrer des Teams nach Punkten.
+  Abweichung, je Rennen die gezählten Fahrer und über die Saison alle Fahrer des Teams nach Punkten. Dazu der Beitrag
+  je Fahrer (``driver_points``): seine Punkte in den Rennen, in denen er fürs Team gezählt hat - so, wie der Rechenkern
+  sie gezählt hat (``counting_drivers``, ``guests_count``), aus dem gespeicherten Stand und nicht im Web nachgebaut.
 - **Fahrer:** je Fahrer das Team je Rennen (Team der Zeile, sonst das Standard-Team - wie die Teamwertung zählt), das
   aktuelle Team (das des letzten Rennens) und die Marke „Gast“. Mehr nicht: Namen kommen wie auf der Serienseite nur
   über die Tabelle, ohne Startnummer, Profil oder Verknüpfung.
 - **Vereinsteams:** das eigene Team der Saison (``team_name``) und jedes Team, für das ein Vereinsmitglied zuletzt
   gefahren ist - in der Reihenfolge der Teamwertung, ohne sie nach Namen.
+- **Fahrer-Detail** (``club_drivers``): nur öffentlich sichtbare Vereinsmitglieder - Mitglied, Profil aktiv, Name nicht
+  ausgeblendet; dieselbe Regel wie der Profil-Link der Tabelle und der Team-Liga. Die Seite zeigt ein Detail und
+  Vereinsnamen außerhalb der Tabellen nur für diese Kennungen.
 """
 from __future__ import annotations
 
@@ -48,19 +53,51 @@ def driver_teams(rows: list[dict], participants: dict) -> dict:
     return out
 
 
-def team_rows(rows: list[dict]) -> list[dict]:
-    """Die gespeicherte Teamwertung, wie die Seite sie zeigt."""
+def _number(value):
+    return int(value) if isinstance(value, float) and value.is_integer() else value
+
+
+def driver_results(rows: list[dict]) -> dict:
+    """Punkte je Fahrer und Rennen aus dem gespeicherten Fahrerstand (``result_points`` des Rechenkerns)."""
+    out = {}
+    for row in rows:
+        results = row.get("results") or []
+        out[row.get("participant_id")] = {item.get("round_id"): item.get("points") or 0 for item in results}
+    return out
+
+
+def team_rows(rows: list[dict], results: dict | None = None) -> list[dict]:
+    """Die gespeicherte Teamwertung, wie die Seite sie zeigt. ``results`` (aus ``driver_results``) ergibt je Fahrer
+    seinen Beitrag: die Punkte der Rennen, in denen er laut gespeichertem Stand fürs Team gezählt hat."""
+    results = results or {}
     out = []
     for row in rows:
         change, rank = row.get("rank_change"), row.get("rank")
+        contribution: dict[str, float] = {}
+        for item in row.get("round_points") or []:
+            for pid in item.get("driver_ids") or []:
+                points = (results.get(pid) or {}).get(item.get("round_id"), 0)
+                contribution[pid] = contribution.get(pid, 0) + points
         out.append({
             "key": row.get("team"), "team": row.get("team"),
             **{field: row.get(field) for field in TEAM_ROW_FIELDS},
             "previous_rank": None if change is None or rank is None else rank + change,
             "drivers": list(row.get("driver_ids") or []),
+            "driver_points": {pid: _number(points) for pid, points in contribution.items()},
             "results": [{"round_id": item.get("round_id"), "points": item.get("points"),
                          "drivers": list(item.get("driver_ids") or [])} for item in row.get("round_points") or []],
         })
+    return out
+
+
+def public_club_drivers(rows: list[dict], people: dict) -> list[str]:
+    """Wer ein Fahrer-Detail bekommt: öffentlich sichtbare Vereinsmitglieder (Mitglied, Profil aktiv, Name nicht
+    ausgeblendet - ``people`` setzt ``profile_slug`` nur dann), in der Reihenfolge der Fahrerwertung."""
+    out = []
+    for row in rows:
+        person = people.get(row.get("participant_id")) or {}
+        if person.get("club_member") and person.get("profile_slug") and not person.get("name_hidden"):
+            out.append(row.get("participant_id"))
     return out
 
 
@@ -86,13 +123,15 @@ async def racing_block(db, user: dict | None, lineage: dict, series: dict, peopl
         scoring = normalize_rules({})["team_scoring"]
     participants = {item["id"]: item async for item in db.reference_participants.find(
         {"series_id": sid}, {"_id": 0, "id": 1, "default_team": 1, "link": 1})}
-    drivers = driver_teams((latest or {}).get("rows") or [], participants)
+    driver_rows = (latest or {}).get("rows") or []
+    drivers = driver_teams(driver_rows, participants)
     stored = await db.reference_standings.find_one(
         {"series_id": sid, "scope": "teams"}, {"_id": 0, "round_id": 1, "round_seq": 1, "rows": 1, "computed_at": 1},
         sort=[("round_seq", -1)]) if scoring["enabled"] else None
     teams = None if not stored else {
         "round_id": stored.get("round_id"), "round_seq": stored.get("round_seq"),
-        "computed_at": stored.get("computed_at"), "rows": team_rows(stored.get("rows") or []),
+        "computed_at": stored.get("computed_at"),
+        "rows": team_rows(stored.get("rows") or [], driver_results(driver_rows)),
     }
     order = [row["team"] for row in (teams or {}).get("rows") or []]
     return {
@@ -101,4 +140,5 @@ async def racing_block(db, user: dict | None, lineage: dict, series: dict, peopl
         "teams": teams,
         "drivers": drivers,
         "club_teams": club_teams(drivers, people, order, _text(series.get("team_name")) or None),
+        "club_drivers": public_club_drivers(driver_rows, people),
     }

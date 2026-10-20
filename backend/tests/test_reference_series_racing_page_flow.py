@@ -125,9 +125,44 @@ async def test_racing_page_has_the_stored_team_standings_with_drivers_per_race(f
     assert lions["drivers"] == ["p-lion1", "p-lion2"]
     assert teams["rows"][0]["drivers"] == ["p-ext1", "p-ext2", "p-hidden"]
     assert (lions["computed_points"], lions["official_points"], lions["deviation"]) == (55, None, None)
+    # Beitrag je Fahrer zur gespeicherten Teamwertung (nur gezählte Rennen) - für „Pkt fürs Team“ im Teamduell.
+    assert lions["driver_points"] == {"p-lion1": 43, "p-lion2": 12}
+    assert teams["rows"][2]["driver_points"] == {"p-lion3": 24, "p-guest": 22}
+    assert teams["rows"][0]["driver_points"] == {"p-ext1": 44, "p-ext2": 15, "p-hidden": 0}
+    for row in teams["rows"]:
+        assert sum(row["driver_points"].values()) == row["computed_points"]
 
     # Vereinsteams: wo ein Vereinsmitglied zuletzt gefahren ist - in der Reihenfolge der Teamwertung.
     assert racing["club_teams"] == ["Probe Löwen", "Probe Löwen B"]
+    # Ein Fahrer-Detail bekommen nur öffentlich sichtbare Vereinsmitglieder, in Tabellen-Reihenfolge.
+    assert racing["club_drivers"] == ["p-lion1", "p-lion3", "p-lion2"]
+
+
+@pytest.mark.asyncio
+async def test_only_public_club_members_get_a_driver_detail(flow):
+    _, lineage, series, _ = await _setup(flow)
+    # Ein Mitglied ohne aktives Profil und eines mit ausgeblendetem Namen: kein Detail, kein Link.
+    await flow.db.club_member_profiles.update_one({"id": "profil-lion2"}, {"$set": {"is_active": False}})
+    await flow.db.reference_participants.update_one({"id": "p-lion3"}, {"$set": {"name_hidden": True}})
+    flow.act_as(None)
+    body = (await flow.get(_url(lineage, series))).json()
+    assert body["racing"]["club_drivers"] == ["p-lion1"]
+    rows = {row["key"]: row for row in body["standings"]["rows"]}
+    assert rows["p-lion2"]["profile_slug"] is None and rows["p-lion3"]["profile_slug"] is None
+
+
+@pytest.mark.asyncio
+async def test_team_points_per_driver_follow_counting_drivers_and_guests(flow):
+    rules = {**RULES, "team_scoring": {"enabled": True, "counting_drivers": 1, "guests_count": False}}
+    _, lineage, series, _ = await _setup(flow, rules=rules)
+    flow.act_as(None)
+    teams = {row["team"]: row for row in (await flow.get(_url(lineage, series))).json()["racing"]["teams"]["rows"]}
+    # Je Rennen zählt nur der beste Fahrer, ein Gast nie - so steht es im gespeicherten Stand, und so zählt das Duell.
+    assert teams["Probe Löwen"]["driver_points"] == {"p-lion1": 43}
+    assert teams["Probe Löwen B"]["driver_points"] == {"p-lion3": 24}
+    assert teams["Fremd Rot"]["driver_points"] == {"p-ext1": 44}
+    assert [(name, row["points"]) for name, row in teams.items()] == [
+        ("Fremd Rot", 44), ("Probe Löwen", 43), ("Probe Löwen B", 24), ("Fremd Blau", 10)]
 
 
 @pytest.mark.asyncio
