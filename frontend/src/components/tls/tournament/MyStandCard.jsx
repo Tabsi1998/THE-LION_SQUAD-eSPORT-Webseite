@@ -7,6 +7,7 @@ import { formatCents } from "@/lib/pricing";
 import { TeamDayPanel } from "@/components/tls/tournament/TeamDayPanel";
 import { ResultShareButton } from "@/components/tls/ResultShareButton";
 import { LiveQueueStatus } from "@/components/tls/live/LiveQueueStatus";
+import { isPublicLive } from "@/lib/publicPhase";
 
 const FINISHED = new Set(["completed", "results_published", "archived"]);
 
@@ -52,7 +53,7 @@ export function MyStandCard({ tournament: t, registration: myReg, team = null, i
         ) : null}
       </dl>
       {/* Vor Ort im laufenden Turnier (#1556): wo und wann dein nächstes Spiel ist - aus der Warteschlange je Station. */}
-      {t.status === "live" && t.event_mode && t.event_mode !== "online" ? <LiveQueueStatus tournamentId={t.id} eventId={t.event_id} className="mt-3" /> : null}
+      {isPublicLive(t) && t.event_mode && t.event_mode !== "online" ? <LiveQueueStatus tournamentId={t.id} eventId={t.event_id} className="mt-3" /> : null}
       {/* Team am Spieltag (#1192): Aufstellung und „Wer ist da“ - nur bei Team-Turnieren. */}
       {isTeamTournament ? <TeamDayPanel tournament={t} /> : null}
       {/* Ergebnis teilen (#1194): nach dem Turnier ein Bild für Status und Story. */}
