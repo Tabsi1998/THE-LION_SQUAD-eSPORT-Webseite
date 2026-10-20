@@ -216,3 +216,53 @@ async def test_moving_a_station_to_another_event_is_seen_at_once(flow):
     assert response.status_code == 200
     await change_events.publish_api_change("POST", f"/api/stations/{station['id']}/clear", 200)
     assert change_events._event_for_scope(last_event(), "public")["parent_event_id"] == second
+
+
+# Statuswechsel ohne eigene Route (Codex-Prüfung, 3. Runde): Das erste Spiel an einer Station startet das Turnier, und
+# der Planer schaltet Turniere und Events nach der Uhr weiter - auch danach wird neu nachgeschlagen.
+
+def counting_lookups(monkeypatch) -> list:
+    calls = []
+    original = change_events._lookup_scope
+
+    async def counting(db, kind, ref):
+        calls.append((kind, ref))
+        return await original(db, kind, ref)
+
+    monkeypatch.setattr(change_events, "_lookup_scope", counting)
+    return calls
+
+
+@pytest.mark.asyncio
+async def test_starting_the_first_match_at_a_station_looks_the_tournament_up_again(flow, monkeypatch):
+    from routes.station_routes import _assign_match_to_station
+
+    tournament = await plain_tournament(flow)
+    match = {"id": new_id(), "tournament_id": tournament["id"], "match_key": "A", "status": "ready",
+             "slots": [{"slot": 1, "registration_id": new_id()}, {"slot": 2, "registration_id": new_id()}]}
+    station = {"id": new_id(), "name": "Switch 1", "status": "free", "tournament_id": tournament["id"], "current_match_id": None}
+    await flow.db.matches_v2.insert_one(dict(match))
+    await flow.db.stations.insert_one(dict(station))
+    await scope_after(tournament["id"])
+    calls = counting_lookups(monkeypatch)
+
+    await _assign_match_to_station(flow.db, station, match, "matches_v2", start_now=True)
+
+    assert (await flow.db.tournaments.find_one({"id": tournament["id"]}))["status"] == "live"
+    await scope_after(tournament["id"])
+    assert calls == [("tournament", tournament["id"])]
+
+
+@pytest.mark.asyncio
+async def test_a_status_change_by_the_scheduler_looks_the_tournament_up_again(flow, monkeypatch):
+    from services import scheduler
+
+    tournament = await plain_tournament(flow)
+    await scope_after(tournament["id"])
+    calls = counting_lookups(monkeypatch)
+    doc = await flow.db.tournaments.find_one({"id": tournament["id"]}, {"_id": 0})
+
+    assert await scheduler._write_transition(flow.db, "tournaments", "tournament", doc, "registration_closed", "2026-10-20T16:00:00+00:00")
+
+    await scope_after(tournament["id"])
+    assert calls == [("tournament", tournament["id"])]

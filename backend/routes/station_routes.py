@@ -328,6 +328,7 @@ async def _assign_match_to_station(db, station: dict, match: dict, collection_na
             {"$set": {"status": "live", "updated_at": now_iso}},
         )
         if went_live.modified_count:
+            reset_scope_cache()  # Live-Meldungen (#1801): Turnier und Event neu nachschlagen
             # Das erste Match an einer Station startet das Turnier - im Discord wie über den Knopf (#572).
             from services.discord_threads import status_written
             await status_written(db, match["tournament_id"], before.get("status"))
