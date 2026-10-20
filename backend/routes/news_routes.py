@@ -1441,10 +1441,19 @@ async def admin_update_reference_showcase(body: ReferenceShowcaseSettings, me: d
     reference_id = body.reference_id.strip() if body.mode == "pinned" and body.reference_id else None
     if reference_id and not await db.references.find_one({"id": reference_id}, {"_id": 1}):
         raise HTTPException(404, "Referenz nicht gefunden.")
+    previous = await _get_reference_showcase(db)
     await db.settings.update_one({"id": "reference_showcase"}, {"$set": {
         "id": "reference_showcase", "mode": body.mode if reference_id else "auto", "reference_id": reference_id,
         "updated_at": now_utc().isoformat()}}, upsert=True)
-    return await _get_reference_showcase(db)
+    saved = await _get_reference_showcase(db)
+    # Adminprotokoll: wer die Hauptkarte wann von welcher auf welche Auswahl gestellt hat - nur bei einer Änderung.
+    if saved != previous:
+        await db.audit_logs.insert_one({
+            "id": new_id(), "action": "references.showcase_change", "actor_id": me["id"],
+            "target_id": "reference_showcase", "data": {"previous": previous, "showcase": saved},
+            "created_at": now_utc().isoformat(),
+        })
+    return saved
 
 
 @router.get("/references/admin")

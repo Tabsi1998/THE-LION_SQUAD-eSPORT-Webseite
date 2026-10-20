@@ -89,6 +89,30 @@ async def test_a_hidden_pinned_reference_reads_as_automatic_for_visitors(flow):
 
 
 @pytest.mark.asyncio
+async def test_every_change_of_the_showcase_lands_in_the_admin_log(flow):
+    admin = await flow.add_user(role="club_admin", name="vorstand")
+    flow.act_as(admin)
+    first = await _reference(flow, "Probe Cup", 1)
+    second = await _reference(flow, "Probe Liga", 2)
+    assert (await flow.patch(SHOWCASE, json={"mode": "pinned", "reference_id": first["id"]})).status_code == 200
+    assert (await flow.patch(SHOWCASE, json={"mode": "pinned", "reference_id": second["id"]})).status_code == 200
+    # Dieselbe Auswahl noch einmal gespeichert ist keine Änderung.
+    assert (await flow.patch(SHOWCASE, json={"mode": "pinned", "reference_id": second["id"]})).status_code == 200
+    assert (await flow.patch(SHOWCASE, json={"mode": "auto"})).status_code == 200
+    logs = await flow.db.audit_logs.find(
+        {"action": "references.showcase_change"}, {"_id": 0}).sort("created_at", 1).to_list(None)
+    auto = {"mode": "auto", "reference_id": None}
+    pinned_first = {"mode": "pinned", "reference_id": first["id"]}
+    pinned_second = {"mode": "pinned", "reference_id": second["id"]}
+    assert [(log["actor_id"], log["data"]["previous"], log["data"]["showcase"]) for log in logs] == [
+        (admin["id"], auto, pinned_first),
+        (admin["id"], pinned_first, pinned_second),
+        (admin["id"], pinned_second, auto),
+    ]
+    assert all(log.get("id") and log.get("created_at") for log in logs)
+
+
+@pytest.mark.asyncio
 async def test_only_the_content_area_changes_the_showcase(flow):
     player = await flow.add_user(role="user", name="spieler")
     flow.act_as(player)
