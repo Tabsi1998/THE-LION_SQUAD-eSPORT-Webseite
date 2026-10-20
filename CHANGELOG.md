@@ -1,5 +1,24 @@
 # Changelog
 
+## 1.6.1 (20.10.2026)
+
+### Fehlerbehebungen
+
+* Aufruf-Tafel trennt Stationsnamen nicht mehr mitten im Wort (#1822)
+* Aufruf-Tafel und Hallen-Tafel ohne Anmeldung ohne Fehlerflut in der Konsole (#1822)
+* Aufruf-Tafel und Hallen-Tafel zeigen mit Event-Schlüssel auch Turniere „Nur Mitglieder“ am TV ohne Anmeldung (#1822)
+* Gast anlegen in „Am Start / Als Nächstes“ funktioniert (#1825)
+* gleichzeitige Vor-Ort-Anmeldungen warten statt abzubrechen (#1826)
+* Stationen liefern öffentlich nur Anzeige-Felder (#1822)
+* Turnierbaum- und Stations-TV zeigen Stationen und Aufrufe auch bei Turnieren „Nur Mitglieder“ (#1822)
+* Turnierbaum-TV zeigt den Anmelde-QR auch im Check-in-Zeitraum, solange Plätze frei sind (#1827)
+* Turnierseiten „Nur Mitglieder“ zeigen die Streams ohne Fehler (#1831)
+* TV & Beamer erstellt Links mit Event-Schlüssel für Hallen- und Aufruf-Tafel (#1822)
+
+### Schneller
+
+* Anmeldebestätigung erst nach der Turnier-Sperre (#1826)
+
 ## 1.6.0 (20.10.2026)
 
 ### Neu
