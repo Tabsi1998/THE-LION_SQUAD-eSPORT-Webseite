@@ -814,8 +814,9 @@ class LoadTest:
         async def reload():
             await look()
 
-        # Die Turnierleitung kennt das Event ihres Turniers nicht (Ansicht ohne Event, #1801).
-        self.spawn(self.stream(client, lambda: WATCH["helfer"], reload, scope=lambda: (tid, None)))
+        # Die Turnierleitung kennt ihr Turnier und dessen Event (#1801).
+        event_id = self.tournaments[key].get("event_id")
+        self.spawn(self.stream(client, lambda: WATCH["helfer"], reload, scope=lambda: (tid, event_id)))
         turn = index
         while await self.pause(self.cfg.helper_pause * self.rng.uniform(0.6, 1.4)):
             action = next_action(await look(), turn)

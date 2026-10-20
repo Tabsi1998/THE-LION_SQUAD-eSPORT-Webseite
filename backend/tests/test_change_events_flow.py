@@ -130,3 +130,40 @@ async def test_a_station_change_names_the_event_of_the_station(flow):
     assert public["resource"] == "stations"
     assert public["parent_event_id"] == event_id and public["tournament_id"] is None
     assert station["id"] not in str(public)
+
+
+# Turnierleitung (Codex-Prüfung): Sie zeigt Stationen, die sich die Turniere eines Events teilen. Kennt sie ihr Event,
+# lädt sie nur bei Änderungen dieses Events nach - die Kennung nur, wenn die Person das Event sehen darf (#1473).
+
+async def tournament_in_event(flow, visibility: str) -> tuple[dict, str]:
+    event_id = new_id()
+    await flow.db.events.insert_one({"id": event_id, "slug": f"abend-{new_id()[:8]}", "status": "live", "visibility": visibility})
+    tournament = {"id": new_id(), "slug": f"cup-{new_id()[:8]}", "title": "Herbst-Cup", "status": "live",
+                  "visibility": "public", "event_id": event_id}
+    await flow.db.tournaments.insert_one(dict(tournament))
+    return tournament, event_id
+
+
+@pytest.mark.asyncio
+async def test_the_lead_view_names_the_event_of_its_tournament(flow):
+    tournament, event_id = await tournament_in_event(flow, "public")
+    flow.act_as(await flow.add_staff())
+
+    response = await flow.get(f"/api/tournaments/{tournament['id']}/lead")
+
+    assert response.status_code == 200
+    assert response.json()["tournament"]["event_id"] == event_id
+
+
+@pytest.mark.asyncio
+async def test_the_lead_view_keeps_an_unseen_event_to_itself(flow):
+    tournament, _event_id = await tournament_in_event(flow, "internal")
+    helper = await flow.add_user(name="Ergebnisdienst")
+    await flow.db.tournament_staff_assignments.insert_one({"id": new_id(), "tournament_id": tournament["id"], "user_id": helper["id"],
+                                                           "role": "scorekeeper", "scope": "tournament", "is_active": True})
+    flow.act_as(helper)
+
+    response = await flow.get(f"/api/tournaments/{tournament['id']}/lead")
+
+    assert response.status_code == 200
+    assert response.json()["tournament"]["event_id"] is None

@@ -157,11 +157,11 @@ test("Auslosung bereit ohne Aufbau-Recht: Karte ohne Knopf; nach der Frist steht
   vi.useRealTimers();
 });
 
-// #1801: Die Turnierleitung lädt nur bei Änderungen ihres Turniers nach (und, wegen der geteilten Stationen, der
-// Turniere mit Event) - bis das Turnier geladen ist, bei jeder. Beide Abfragen: Ansicht und Warteschlange.
-test("hört nach dem Laden nur noch auf das eigene Turnier", async () => {
+// #1801: Die Turnierleitung lädt nur bei Änderungen ihres Turniers nach (und, wegen der geteilten Stationen, der anderen
+// Turniere seines Events) - bis das Turnier geladen ist, bei jeder. Beide Abfragen: Ansicht und Warteschlange.
+test("hört nach dem Laden nur noch auf das eigene Turnier und sein Event", async () => {
   liveCalls.length = 0;
-  renderLead({ tournament: { id: "t1", slug: "fc-cup", title: "FC 26 Herbst-Cup" }, matches: [], recent: [], counts: { open: 0 }, attention: [], stations: [] });
+  renderLead({ tournament: { id: "t1", slug: "fc-cup", title: "FC 26 Herbst-Cup", event_id: "e1" }, matches: [], recent: [], counts: { open: 0 }, attention: [], stations: [] });
   expect(liveCalls.slice(0, 2).map((options) => options.tournamentId)).toEqual([undefined, undefined]);
-  await waitFor(() => expect(liveCalls.slice(-2).map((options) => options.tournamentId)).toEqual(["t1", "t1"]));
+  await waitFor(() => expect(liveCalls.slice(-2).map((options) => [options.tournamentId, options.eventId])).toEqual([["t1", "e1"], ["t1", "e1"]]));
 });
