@@ -153,8 +153,11 @@ test("tournament registration accepts only one simultaneous request", async ({ p
   await page.goto("/tournaments/test-cup");
   await acceptCookies(page);
   await expect(page.getByTestId("tournament-register-btn")).toBeVisible();
+  // Bestätigungs-Blatt (#1261): der Knopf öffnet das Blatt, „Verbindlich anmelden“ darin meldet an.
+  await page.getByTestId("tournament-register-btn").click();
+  await expect(page.getByTestId("tournament-register-submit")).toBeVisible();
   await page.evaluate(() => {
-    const button = document.querySelector('[data-testid="tournament-register-btn"]');
+    const button = document.querySelector('[data-testid="tournament-register-submit"]');
     button.click();
     button.click();
   });
