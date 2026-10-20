@@ -77,6 +77,30 @@ test("Lauf nach dem Ergebnis: nach Platz sortiert, Trennlinie nach den Weiterkom
   expect(model.text.cut).toBe("2 kommen weiter → E");
 });
 
+test("Lauf mit „nicht erschienen“ vor dem Ergebnis (#1840, wie Web #1823): nur die markierte Person durchgestrichen", () => {
+  const tree = TREES.ffa16;
+  const heat = tree.matches_v2.find((match) => match.match_key === "A")!;
+  const ids = (heat.slots || []).map((slot) => slot.registration_id).filter(Boolean) as string[];
+  const regs = new Map(tree.registrations.map((reg) => [reg.id, reg]));
+  const model = (match: BracketMatch) => cardModel(match, {
+    nameOf: (id: string) => regs.get(id)?.display_name || "",
+    statusOf: (id: string) => regs.get(id)?.status || "",
+    finder: finderFor(tree.matches_v2),
+    edges: bracketEdges(tree.matches_v2),
+    matches: tree.matches_v2,
+    finalId: null,
+    mine: null,
+  });
+  const marked = { ...heat, no_show_registration_ids: [ids[1]] } as BracketMatch;
+  expect(ids).toHaveLength(4);
+  expect(model(heat).rows.map((row) => row.out)).toEqual([false, false, false, false]);
+  expect(model(marked).rows.map((row) => [row.registrationId, row.out])).toEqual(ids.map((id, index) => [id, index === 1]));
+  expect(model(marked).rows.map((row) => row.result)).toEqual(["", "", "", ""]);
+  // Steht ein Ergebnis, zählt die Ergebniszeile - wer doch gefahren ist, ist nicht mehr durchgestrichen.
+  const played = { ...marked, status: "completed", results: ids.map((id, index) => ({ registration_id: id, rank: index + 1 })) };
+  expect(model(played).rows.some((row) => row.out)).toBe(false);
+});
+
 test("Linien enden an der Zeile des Platzes, auch im Lauf", () => {
   const { card } = setup("ffa16_round1");
   const model = card("E");
