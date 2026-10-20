@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.11.0 (20.10.2026)
+
+### Neu
+
+* Rennliga-Seite – Fahrerwertung als Rennraster mit Podium, schnellster Runde, Ausfall, Abstand und Abweichung zum offiziellen Wert (#1746)
+* Rennliga-Seite – Rennkalender mit Sieger aus dem Verein, sonst bestem Vereinsfahrer mit Platz (#1746)
+* Rennliga-Seite – Teamwertung mit Balken und Punkten je Rennen, Vereinsteams hervorgehoben, Gäste markiert (#1746)
+* Rennliga-Seite – Umschalter zwischen den Saisons und Ligen einer Spur (#1746)
+* Rennliga-Seite – Vereins-Garage mit Teamduell und Fahrer-Detail für öffentliche Vereinsfahrer (#1746)
+
 ## 1.10.0 (20.10.2026)
 
 ### Neu
