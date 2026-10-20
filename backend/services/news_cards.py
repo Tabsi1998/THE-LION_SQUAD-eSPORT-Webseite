@@ -73,13 +73,10 @@ def _window_open(doc: dict, open_from_key: str, open_until_key: str, now) -> boo
     return not (opens and now < opens) and not (closes and now > closes)
 
 
-async def tournament_signup(db, tournament: dict, now=None) -> dict:
+def tournament_signup(tournament: dict, taken: int, now=None) -> dict:
     status = tournament.get("status") or "draft"
     phase = derive_public_phase(tournament, "tournament", now)
     now = parse_dt(phase["now"])
-    taken = await db.tournament_registrations.count_documents(
-        {"tournament_id": tournament.get("id"), "status": {"$in": COUNTED_TOURNAMENT_REGISTRATIONS}},
-    )
     args = {"taken": taken, "maximum": tournament.get("max_participants")}
     start = tournament.get("start_date")
     if status in RESULT_STATUSES:
@@ -102,7 +99,20 @@ async def tournament_signup(db, tournament: dict, now=None) -> dict:
     return _signup("closed", start, **args)
 
 
-async def event_signup(db, event: dict, now=None) -> dict:
+async def tournament_signups(db, tournaments: list[dict], now=None) -> dict[str, dict]:
+    """Stand je Turnier, die Anmeldungen aller Turniere mit einer Abfrage gezählt."""
+    ids = [t["id"] for t in tournaments if t.get("id")]
+    if not ids:
+        return {}
+    rows = await db.tournament_registrations.aggregate([
+        {"$match": {"tournament_id": {"$in": ids}, "status": {"$in": COUNTED_TOURNAMENT_REGISTRATIONS}}},
+        {"$group": {"_id": "$tournament_id", "count": {"$sum": 1}}},
+    ]).to_list(None)
+    taken = {row["_id"]: int(row.get("count") or 0) for row in rows}
+    return {t["id"]: tournament_signup(t, taken.get(t["id"], 0), now) for t in tournaments if t.get("id")}
+
+
+def event_signup(event: dict, summary: dict | None, now=None) -> dict:
     phase = derive_public_phase(event, "event", now)
     state = phase["state"]
     start = event.get("start_date")
@@ -114,7 +124,7 @@ async def event_signup(db, event: dict, now=None) -> dict:
         return _signup("live", start)
     if not event.get("has_registration"):
         return _signup("none", start)
-    summary = await event_registration.summary(db, event)
+    summary = summary or {}
     args = {"taken": summary.get("reserved_seats") or 0, "maximum": event.get("max_participants")}
     if state == "registration_open":
         full = summary.get("spots_left") is not None and summary["spots_left"] <= 0
@@ -122,3 +132,9 @@ async def event_signup(db, event: dict, now=None) -> dict:
     if state in {"announced", "registration_pending", "draft"}:
         return _signup("soon", start, opens_at=event.get("registration_opens_at"), **args)
     return _signup("closed", start, **args)
+
+
+async def event_signups(db, events: list[dict], now=None) -> dict[str, dict]:
+    """Stand je Event, die Plätze aller Events mit Anmeldung in einer Abfrage (``event_registration.summaries``)."""
+    summaries = await event_registration.summaries(db, [e for e in events if e.get("has_registration")])
+    return {e["id"]: event_signup(e, summaries.get(e["id"]), now) for e in events if e.get("id")}

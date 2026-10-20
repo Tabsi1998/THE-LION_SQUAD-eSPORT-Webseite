@@ -236,3 +236,82 @@ async def test_linked_events_carry_their_signup_state(flow):
     assert (signups["lan"]["taken"], signups["lan"]["max"], signups["lan"]["spots_left"]) == (1, 3, 2)
     assert signups["voll"]["state"] == "full"
     assert signups["ohne"]["state"] == "none"
+
+
+# ---------------------------------------------------------------- Abfragen wachsen nicht mit der Liste
+
+QUERY_METHODS = {"find", "find_one", "aggregate", "count_documents", "distinct"}
+
+
+class CountingCollection:
+    def __init__(self, collection, counter):
+        self._collection = collection
+        self._counter = counter
+
+    def __getattr__(self, name):
+        attr = getattr(self._collection, name)
+        if name in QUERY_METHODS:
+            def counted(*args, **kwargs):
+                self._counter[self._collection.name] = self._counter.get(self._collection.name, 0) + 1
+                return attr(*args, **kwargs)
+            return counted
+        return attr
+
+
+class CountingDb:
+    def __init__(self, db):
+        self._db = db
+        self.counter: dict[str, int] = {}
+
+    def __getattr__(self, name):
+        return CountingCollection(getattr(self._db, name), self.counter)
+
+    def __getitem__(self, name):
+        return CountingCollection(self._db[name], self.counter)
+
+
+async def queries_for(flow, url):
+    import database
+    counting = CountingDb(flow.db)
+    previous = database._db
+    database._db = counting
+    try:
+        response = await flow.get(url)
+        assert response.status_code == 200
+    finally:
+        database._db = previous
+    return counting.counter
+
+
+async def news_with_links(flow, slug, count):
+    tournaments = [await flow.create_tournament(slug=f"{slug}-t{i}", start_date=soon(7)) for i in range(count)]
+    for tournament in tournaments:
+        await flow.register(tournament, await flow.add_user(name=f"{tournament['slug']}-spieler"))
+    events = [{"id": f"{slug}-e{i}", "slug": f"{slug}-e{i}", "name": f"Event {i}", "status": "registration_open", "visibility": "public",
+               "start_date": soon(14), "has_registration": True, "max_participants": 10} for i in range(count)]
+    await flow.db.events.insert_many([dict(e) for e in events])
+    await flow.db.event_registrations.insert_many([{"id": f"r-{e['id']}", "event_id": e["id"], "user_id": "u", "status": "registered"} for e in events])
+    await news(flow, slug, linked_tournament_ids=[t["id"] for t in tournaments], linked_event_ids=[e["id"] for e in events])
+
+
+@pytest.mark.asyncio
+async def test_linked_signups_cost_the_same_queries_for_two_or_eight_links(flow):
+    await news_with_links(flow, "wenig", 2)
+    await news_with_links(flow, "viel", 8)
+    flow.act_as(await member(flow, "leserin"))
+    few = await queries_for(flow, "/api/news/wenig")
+    many = await queries_for(flow, "/api/news/viel")
+    assert many == few, f"Abfragen je Sammlung dürfen nicht mit den Verknüpfungen wachsen: {few} gegen {many}"
+    assert many.get("tournament_registrations") == 1 and many.get("event_registrations") == 1
+
+
+@pytest.mark.asyncio
+async def test_result_winners_cost_the_same_queries_for_two_or_eight_news(flow):
+    for index in range(8):
+        cup = await finished_tournament(flow, f"Sieger{index}", visibility="members" if index % 2 else "public")
+        await news(flow, f"ergebnis-{index}", linked_tournament_ids=[cup["id"]], category="recap" if index < 2 else "club")
+    # Ohne Mitgliedschaft schlägt die Sichtbarkeit „Nur Mitglieder“ in der Datenbank nach - einmal, nicht je Turnier.
+    flow.act_as(await flow.add_user(name="leser"))
+    few = await queries_for(flow, "/api/news?compact=true&category=recap")
+    many = await queries_for(flow, "/api/news?compact=true")
+    assert many == few, f"Abfragen je Sammlung dürfen nicht mit der Liste wachsen: {few} gegen {many}"
