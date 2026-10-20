@@ -24,7 +24,7 @@ def test_event_sponsors_use_same_logo_dedupe_rule():
         {"id": "event-b", "name": "Sponsor A Duplicate", "logo_url": "/uploads/a.png"},
     ]
 
-    assert dedupe_public_sponsors(sponsors) == [{**sponsors[0], "since_year": None, "until_year": None}]
+    assert dedupe_public_sponsors(sponsors) == [{**sponsors[0], "since_year": None, "until_year": None, "logo_transparent": None}]
 
 
 def test_public_view_strips_contacts_notes_and_dolibarr_references_but_keeps_the_years():
@@ -33,4 +33,5 @@ def test_public_view_strips_contacts_notes_and_dolibarr_references_but_keeps_the
         "id": "a", "name": "Sponsor A", "logo_url": "/uploads/a.png", "contact_name": "P. Beispiel", "contact_email": "p@example.test",
         "internal_notes": "geheim", "dolibarr_id": 12, "contract_start": "2024-03-01", "contract_end": "2026-12-31", "show_on_home": True,
     }])[0]
-    assert view == {"id": "a", "name": "Sponsor A", "logo_url": "/uploads/a.png", "show_on_home": True, "since_year": 2024, "until_year": 2026}
+    assert view == {"id": "a", "name": "Sponsor A", "logo_url": "/uploads/a.png", "show_on_home": True, "since_year": 2024, "until_year": 2026,
+                    "logo_transparent": None}
