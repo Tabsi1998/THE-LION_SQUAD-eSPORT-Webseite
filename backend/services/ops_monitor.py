@@ -78,7 +78,7 @@ def route_template(app: Any, scope: dict) -> str:
 
 def error_fingerprint(error_type: str, route: str, method: str, frame: str = "") -> str:
     raw = "|".join([error_type or "", route or "", (method or "").upper(), frame or ""])
-    return hashlib.sha1(raw.encode("utf-8")).hexdigest()[:16]
+    return hashlib.sha1(raw.encode("utf-8"), usedforsecurity=False).hexdigest()[:16]
 
 
 def top_frame(exc: BaseException) -> str:

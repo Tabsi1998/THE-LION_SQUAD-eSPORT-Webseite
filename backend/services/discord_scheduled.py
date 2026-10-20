@@ -96,7 +96,7 @@ def scheduled_payload(kind: str, doc: dict, origin: str, now: datetime | None = 
 
 
 def payload_hash(payload: dict) -> str:
-    return hashlib.sha1(json.dumps(payload, sort_keys=True, ensure_ascii=False).encode("utf-8")).hexdigest()
+    return hashlib.sha1(json.dumps(payload, sort_keys=True, ensure_ascii=False).encode("utf-8"), usedforsecurity=False).hexdigest()
 
 
 def wants_event(kind: str, doc: dict, cfg: dict, now: datetime | None = None) -> tuple[bool, str | None]:
