@@ -7,6 +7,7 @@ from auth import get_current_user, get_optional_user, require_admin
 from models import StationCreate, StationUpdate, now_utc, new_id
 from routes.tournament_common import tournament_hidden_reason
 from services.access_links import validate_access_link
+from services.change_events import reset_scope_cache
 from services.tournament_permissions import (
     READ_STAFF_ROLES,
     STATION_ASSIGN_ROLES,
@@ -209,6 +210,7 @@ async def create_station(body: StationCreate, me: dict = Depends(require_admin()
     doc["created_at"] = now_utc().isoformat()
     doc["updated_at"] = now_utc().isoformat()
     await db.stations.insert_one(doc)
+    reset_scope_cache()  # Live-Meldungen (#1801): Turnier und Event neu nachschlagen
     doc.pop("_id", None)
     return doc
 
@@ -240,6 +242,7 @@ async def update_station(sid: str, body: StationUpdate, me: dict = Depends(requi
         if previous_match and (current or {}).get("called_at"):
             await _forget_call(db, previous_match)
     await db.stations.update_one({"id": sid}, change)
+    reset_scope_cache()  # Live-Meldungen (#1801): Turnier und Event neu nachschlagen
     s = await db.stations.find_one({"id": sid}, {"_id": 0})
     return s
 
@@ -372,6 +375,7 @@ async def bulk_create_stations(body: dict, me: dict = Depends(require_admin())):
             "updated_at": now,
         })
     await db.stations.insert_many(docs)
+    reset_scope_cache()  # Live-Meldungen (#1801): Turnier und Event neu nachschlagen
     for doc in docs:
         doc.pop("_id", None)
     return {"created": len(docs), "stations": docs}
@@ -525,6 +529,7 @@ async def delete_station(sid: str, me: dict = Depends(require_admin())):
         if holding:
             raise HTTPException(status_code=409, detail=station_in_use_message(station.get("name"), holding))
         deleted = bool((await db.stations.delete_one({"id": sid, "deleting": True})).deleted_count)
+        reset_scope_cache()  # Live-Meldungen (#1801): Turnier und Event neu nachschlagen
     finally:
         # Was nicht gelöscht wurde (Spiele gefunden, Fehler), bleibt benutzbar - sonst wäre es für immer gesperrt.
         if not deleted:

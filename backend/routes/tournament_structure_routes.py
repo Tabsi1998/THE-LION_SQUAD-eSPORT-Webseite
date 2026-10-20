@@ -17,6 +17,7 @@ from services.competition_engine import CLASSIC, GRAPH, EngineSwitchRequired, de
 from services.competition_formats import find_format_capability
 from services.competition_graph_validation import validate_competition_graph
 from services.competition_read import load_competition_read_model
+from services.change_events import reset_scope_cache
 from services.competition_snapshot import build_structure_snapshot
 from services.competition_structure_plan import (
     STRUCTURE_PLAN_VERSION,
@@ -506,6 +507,7 @@ async def reset_bracket(tid: str, force: bool = False, me: dict = Depends(get_cu
     if v2_match_ids:
         await db.match_reports_v2.delete_many({"match_id": {"$in": v2_match_ids}})
     await db.tournaments.update_one({"id": tid}, {"$set": {"status": "draft", "updated_at": now_utc().isoformat()}})
+    reset_scope_cache()  # Live-Meldungen (#1801): Turnier und Event neu nachschlagen
     await _audit_tournament_action(
         db,
         "tournament.bracket.reset",

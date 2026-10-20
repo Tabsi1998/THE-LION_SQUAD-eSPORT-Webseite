@@ -162,8 +162,9 @@ Web- und TV-Ansichten bekommen Aktualisierungen über `/api/changes/stream` (Ser
   Änderungen nach, Seiten mit Stationen auch bei denen der anderen Turniere desselben Events.
   Eine Station nennt ihr Turnier oder - hängt sie nur am Event - ihr Event. Meldungen ohne Kennung
   (Turniere nur für Mitglieder, neue oder geänderte Stationen) laden überall nach - wie vorher.
-  Turnier und Event werden je Turnier, Spiel und Station 45 Sekunden zwischengespeichert; Änderungen
-  an Turnier, Event oder Station selbst leeren den Speicher sofort.
+  Turnier und Event werden je Turnier, Spiel und Station 45 Sekunden zwischengespeichert; jede
+  Änderung an Event-Zuordnung (auch im Programm des Events), Sichtbarkeit oder Status leert den
+  Speicher sofort.
 
 ## Uploads und der Upload-Host ohne Cloudflare
 

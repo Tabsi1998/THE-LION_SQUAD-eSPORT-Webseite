@@ -69,12 +69,11 @@ SCOPE_PUBLIC_KEY = "_scope_public"
 NON_TOURNAMENT_SEGMENTS = frozenset({"onsite"})
 _SCOPE_FIELDS = {"_id": 0, "id": 1, "event_id": 1, "status": 1, "is_public": 1, "visibility": 1}
 # Nachschlagen nur einmal je Turnier, Spiel oder Station (Codex-Prüfung #1801): Am Turnierabend schreiben Helfer und
-# Anmeldungen dauernd in dieselben Turniere. Die Frist begrenzt, wie lange eine Änderung auf anderem Weg (etwa direkt
-# in der Datenbank) unbemerkt bleibt; was Turnier, Event oder Station selbst ändert, leert den Speicher sofort.
+# Anmeldungen dauernd in dieselben Turniere. Jede Route, die Event-Zuordnung, Sichtbarkeit oder Status eines Turniers,
+# Events oder einer Station schreibt, ruft danach ``reset_scope_cache()``. Die Frist begrenzt, wie lange eine Änderung
+# auf anderem Weg (etwa direkt in der Datenbank) unbemerkt bleibt.
 SCOPE_CACHE_SECONDS = 45.0
 SCOPE_CACHE_SIZE = 1024
-# Unter /api/tournaments/<id>/…: Aktionen, die Status oder Sichtbarkeit des Turniers ändern (Entwurf zurück).
-SCOPE_RESET_ACTIONS = frozenset({"status", "reset-bracket"})
 EVENT_BUFFER_SIZE = 256
 SUBSCRIBER_QUEUE_SIZE = 100
 
@@ -196,15 +195,8 @@ def _scope_target(path: str) -> tuple[str, str] | None:
     return None
 
 
-def _invalidates_scope(path: str) -> bool:
-    """Ändert die Anfrage Turnier, Event oder Station selbst (Sichtbarkeit, Event, Status, Zuordnung)?"""
-    parts = _api_parts(path)
-    if len(parts) < 2 or parts[0] not in {"tournaments", "events", "stations"}:
-        return False
-    return len(parts) == 2 or (parts[0] == "tournaments" and len(parts) == 3 and parts[2] in SCOPE_RESET_ACTIONS)
-
-
 def reset_scope_cache() -> None:
+    """Nach jeder Änderung an Event-Zuordnung, Sichtbarkeit oder Status: Turnier und Event neu nachschlagen."""
     global _scope_generation
     _scope_generation += 1
     _scope_cache.clear()
@@ -254,8 +246,6 @@ async def _lookup_scope(db, kind: str, ref: str) -> dict | None:
 
 async def _change_scope(path: str) -> dict:
     """Turnier und Event einer Änderung, aus dem Zwischenspeicher oder frisch nachgeschlagen."""
-    if _invalidates_scope(path):
-        reset_scope_cache()
     target = _scope_target(path)
     if not target:
         return {}

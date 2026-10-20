@@ -503,21 +503,15 @@ def test_repeated_changes_look_the_tournament_up_once(scope_db, monkeypatch):
     assert [public_view(event)["tournament_id"] for event in change_events._event_buffer] == ["t-1"] * 6
 
 
-@pytest.mark.parametrize("method, path", [
-    ("PATCH", "/api/tournaments/t-1"),
-    ("POST", "/api/tournaments/t-1/status"),
-    ("POST", "/api/tournaments/t-1/reset-bracket"),
-    ("PATCH", "/api/events/e-anderes"),
-    ("PATCH", "/api/stations/s-1"),
-])
-def test_a_change_to_tournament_event_or_station_itself_drops_the_cache(scope_db, monkeypatch, method, path):
+def test_a_reset_after_a_change_looks_the_tournament_up_again(scope_db, monkeypatch):
+    # Die Routen, die Event-Zuordnung, Sichtbarkeit oder Status schreiben, leeren den Speicher (test_change_events_flow).
     asyncio.run(add_tournament(scope_db, "t-1"))
     calls = counting_lookups(monkeypatch)
     assert public_view(publish("POST", "/api/tournaments/t-1/register"))["tournament_id"] == "t-1"
 
     # Das Turnier ist jetzt nur für Mitglieder - die nächste Meldung darf es nicht mehr nennen.
     asyncio.run(scope_db.tournaments.update_one({"id": "t-1"}, {"$set": {"visibility": "members"}}))
-    publish(method, path)
+    change_events.reset_scope_cache()
 
     assert public_view(publish("POST", "/api/tournaments/t-1/register")).get("tournament_id") is None
     assert calls.count(("tournament", "t-1")) == 2

@@ -48,6 +48,7 @@ from routes.tournament_common import (
     tournament_hidden_reason,
 )
 from services import onsite_access
+from services.change_events import reset_scope_cache
 from routes.tournament_router import router
 
 
@@ -324,6 +325,7 @@ async def create_tournament_doc(body: TournamentCreate, me: dict) -> dict:
             doc["created_by"] = me["id"]
             try:
                 await db.tournaments.insert_one(doc)
+                reset_scope_cache()  # Live-Meldungen (#1801): Turnier und Event neu nachschlagen
             except DuplicateKeyError:
                 existing = await db.tournaments.find_one({"creation_key": creation_key}, {"_id": 0})
                 if not existing:
@@ -411,6 +413,7 @@ async def update_tournament(tid: str, body: TournamentUpdate, me: dict = Depends
             updates[k] = _iso(updates[k])
     updates["updated_at"] = now_utc().isoformat()
     await db.tournaments.update_one({"id": tid}, {"$set": updates})
+    reset_scope_cache()  # Live-Meldungen (#1801): Turnier und Event neu nachschlagen
     if updates.get("status") and updates["status"] != existing.get("status"):
         # Status im Formular geändert: im Discord wie über den Knopf der Turnierleitung (#572).
         from services.discord_threads import status_written
@@ -429,6 +432,7 @@ async def delete_tournament(tid: str, me: dict = Depends(require_admin()),
     tid = await _resolve_tid(tid)
     v2_match_ids = await db.matches_v2.distinct("id", {"tournament_id": tid})
     await db.tournaments.delete_one({"id": tid})
+    reset_scope_cache()  # Live-Meldungen (#1801): Turnier und Event neu nachschlagen
     await db.tournament_registrations.delete_many({"tournament_id": tid})
     await db.tournament_staff_assignments.delete_many({"tournament_id": tid})
     await db.tournament_stages.delete_many({"tournament_id": tid})

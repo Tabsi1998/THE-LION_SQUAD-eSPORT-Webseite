@@ -119,3 +119,100 @@ async def test_the_lead_view_keeps_an_unseen_event_to_itself(flow):
 
     assert response.status_code == 200
     assert response.json()["tournament"]["event_id"] is None
+
+
+# Zwischenspeicher (Codex-Prüfung, 2. Runde): Jede Route, die Event-Zuordnung oder Status eines Turniers ändert, leert
+# ihn - die nächste Meldung folgt sofort dem neuen Stand, nicht erst nach Ablauf der Frist.
+
+async def scope_after(tournament_id: str) -> dict:
+    await change_events.publish_api_change("POST", f"/api/tournaments/{tournament_id}/register", 200)
+    return change_events._event_for_scope(last_event(), "public")
+
+
+async def plain_tournament(flow, **fields) -> dict:
+    tournament = {"id": new_id(), "slug": f"cup-{new_id()[:8]}", "title": "Herbst-Cup", "status": "registration_open",
+                  "visibility": "public", "event_id": None, **fields}
+    await flow.db.tournaments.insert_one(dict(tournament))
+    return tournament
+
+
+@pytest.mark.asyncio
+async def test_adding_to_the_program_of_a_members_event_is_seen_at_once(flow):
+    tournament = await plain_tournament(flow)
+    event_id = new_id()
+    await flow.db.events.insert_one({"id": event_id, "slug": f"abend-{new_id()[:8]}", "name": "Vereinsabend", "status": "live",
+                                     "visibility": "members"})
+    flow.act_as(await flow.add_staff())
+    assert (await scope_after(tournament["id"]))["tournament_id"] == tournament["id"]
+
+    response = await flow.post(f"/api/events/{event_id}/program", json={"kind": "tournament", "item_id": tournament["id"]})
+
+    assert response.status_code == 200
+    public = await scope_after(tournament["id"])
+    assert public.get("tournament_id") is None and public.get("parent_event_id") is None
+
+
+@pytest.mark.asyncio
+async def test_removing_from_the_program_is_seen_at_once(flow):
+    event_id = new_id()
+    await flow.db.events.insert_one({"id": event_id, "slug": f"abend-{new_id()[:8]}", "name": "Vereinsabend", "status": "live",
+                                     "visibility": "public"})
+    tournament = await plain_tournament(flow, event_id=event_id)
+    flow.act_as(await flow.add_staff())
+    assert (await scope_after(tournament["id"]))["parent_event_id"] == event_id
+
+    response = await flow.delete(f"/api/events/{event_id}/program/tournament/{tournament['id']}")
+
+    assert response.status_code == 200
+    public = await scope_after(tournament["id"])
+    assert public["tournament_id"] == tournament["id"] and public["parent_event_id"] is None
+
+
+@pytest.mark.asyncio
+async def test_a_status_change_back_to_draft_is_seen_at_once(flow):
+    tournament = await plain_tournament(flow)
+    flow.act_as(await flow.add_staff())
+    assert (await scope_after(tournament["id"]))["tournament_id"] == tournament["id"]
+
+    response = await flow.post(f"/api/tournaments/{tournament['id']}/status", json={"status": "draft"})
+
+    assert response.status_code == 200
+    assert (await scope_after(tournament["id"])).get("tournament_id") is None
+
+
+@pytest.mark.asyncio
+async def test_changing_the_visibility_of_tournament_or_event_is_seen_at_once(flow):
+    event_id = new_id()
+    await flow.db.events.insert_one({"id": event_id, "slug": f"abend-{new_id()[:8]}", "name": "Vereinsabend", "status": "live",
+                                     "visibility": "public"})
+    in_event = await plain_tournament(flow, event_id=event_id)
+    alone = await plain_tournament(flow)
+    flow.act_as(await flow.add_staff())
+    assert (await scope_after(in_event["id"]))["parent_event_id"] == event_id
+    assert (await scope_after(alone["id"]))["tournament_id"] == alone["id"]
+
+    event_change = await flow.patch(f"/api/events/{event_id}", json={"visibility": "members"})
+    tournament_change = await flow.patch(f"/api/tournaments/{alone['id']}", json={"visibility": "members"})
+
+    assert event_change.status_code == 200 and tournament_change.status_code == 200
+    assert (await scope_after(in_event["id"])).get("tournament_id") is None
+    assert (await scope_after(alone["id"])).get("tournament_id") is None
+
+
+@pytest.mark.asyncio
+async def test_moving_a_station_to_another_event_is_seen_at_once(flow):
+    first, second = new_id(), new_id()
+    for event_id in (first, second):
+        await flow.db.events.insert_one({"id": event_id, "slug": f"abend-{new_id()[:8]}", "name": "Vereinsabend",
+                                         "status": "live", "visibility": "public"})
+    station = {"id": new_id(), "name": "Switch 1", "status": "free", "event_id": first, "tournament_id": None}
+    await flow.db.stations.insert_one(dict(station))
+    flow.act_as(await flow.add_staff())
+    await change_events.publish_api_change("POST", f"/api/stations/{station['id']}/clear", 200)
+    assert change_events._event_for_scope(last_event(), "public")["parent_event_id"] == first
+
+    response = await flow.patch(f"/api/stations/{station['id']}", json={"event_id": second})
+
+    assert response.status_code == 200
+    await change_events.publish_api_change("POST", f"/api/stations/{station['id']}/clear", 200)
+    assert change_events._event_for_scope(last_event(), "public")["parent_event_id"] == second

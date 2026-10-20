@@ -19,6 +19,7 @@ from auth import require_admin
 from database import get_db
 from models import F1ChallengeCreate, TournamentCreate, now_utc
 from services import event_program
+from services.change_events import reset_scope_cache
 from services.slug_utils import find_by_slug_or_history
 
 router = APIRouter(prefix="/api/events", tags=["events"])
@@ -115,6 +116,7 @@ async def add_to_event_program(event_id: str, body: ProgramLink, me: dict = Depe
     )
     if not result.matched_count:
         raise HTTPException(409, "Inzwischen gehört es schon zu einem Event – lade das Programm neu.")
+    reset_scope_cache()  # Live-Meldungen (#1801): Turnier und Event neu nachschlagen
     return {"ok": True, "item": _row(item)}
 
 
@@ -132,6 +134,7 @@ async def remove_from_event_program(event_id: str, kind: Literal["tournament", "
     )
     if not result.matched_count:
         raise HTTPException(404, "Gehört nicht zu diesem Event.")
+    reset_scope_cache()  # Live-Meldungen (#1801): Turnier und Event neu nachschlagen
     return {"ok": True}
 
 
