@@ -35,25 +35,39 @@ export function advancementsOf(match, matches = [], { lastStage = true, table = 
   // Ein Weg weiter, auch wenn sein Platz leer bleibt (Freilos nach einem Austritt, #1596): das Spiel ist dann kein
   // Finale - wer auf diesem Platz säße, ist aber raus und fährt nirgends hin.
   let ways = 0;
+  const seats = [];
   for (const other of matches || []) {
     if (!other || other.id === match.id || (other.stage_id || "") !== stage) continue;
     (other.slots || []).forEach((slot, slotIndex) => {
       const source = normalizeSource(slot?.source);
       if (source?.type !== "rank" || source.match_key !== match.match_key) return;
-      const rank = absoluteRank(source, match);
-      const row = ranking.find((entry) => Number(entry.rank) === rank);
-      if (!row || targets.has(row.registration_id)) return;
-      ways += 1;
-      if (slot?.status === "bye") return;
-      targets.set(row.registration_id, {
-        matchId: other.id,
-        matchKey: other.match_key,
-        slot: slot?.slot ?? slotIndex + 1,
-        slotIndex,
-        section: other.section,
-        bronze: isBronzeMatch(other),
-        flow: source.flow,
-      });
+      seats.push({ other, slot, slotIndex, source, rank: absoluteRank(source, match) });
+    });
+  }
+  // Wie am Server (#1823, match_v2_results._advancement_paths): Fehlende teilen sich den letzten Platz in der
+  // Reihenfolge ihrer Zeilen (Setzplatz). Wer nicht erschienen ist, bekommt nie einen Sieger-Platz (dort steht ein
+  // Freilos); auf dem Verlierer-Weg kommen erst die Anwesenden, die nicht weiterkommen, dann alle Nicht-Erschienenen.
+  const loserRanks = seats.filter((seat) => seat.source.flow === "L").map((seat) => seat.rank);
+  const firstLoser = loserRanks.length && ranking.some((row) => row.forfeit) ? Math.min(...loserRanks) : 0;
+  const losers = firstLoser ? [...ranking.slice(firstLoser - 1).filter((row) => !row.forfeit), ...ranking.filter((row) => row.forfeit)] : null;
+  const rowAt = (flow, rank) => {
+    if (losers && flow === "L") return losers[rank - firstLoser];
+    return ranking.find((entry) => Number(entry.rank) === rank)
+      || (ranking[rank - 1]?.forfeit && Number(ranking[rank - 1].rank) < rank ? ranking[rank - 1] : undefined);
+  };
+  for (const { other, slot, slotIndex, source, rank } of seats) {
+    const row = rowAt(source.flow, rank);
+    if (!row || targets.has(row.registration_id)) continue;
+    ways += 1;
+    if (slot?.status === "bye") continue;
+    targets.set(row.registration_id, {
+      matchId: other.id,
+      matchKey: other.match_key,
+      slot: slot?.slot ?? slotIndex + 1,
+      slotIndex,
+      section: other.section,
+      bronze: isBronzeMatch(other),
+      flow: source.flow,
     });
   }
   const terminal = ways === 0;

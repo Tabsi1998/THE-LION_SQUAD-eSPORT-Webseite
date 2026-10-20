@@ -63,6 +63,15 @@ test("aufgerufen: Zeiten zum Antreten und „nicht erschienen“, Knopf „Gesta
   expect(onStart).toHaveBeenCalledWith(expect.objectContaining({ id: "st2" }), expect.objectContaining({ match_id: "QF2" }));
 });
 
+test("Lauf mit „nicht erschienen“ (#1823): statt der Frist steht, wer fehlt", () => {
+  const called = entry("A", { state: "called", called_at: "2026-10-31T16:18:00Z", report_by: "2026-10-31T16:20:00Z", no_show_due_at: null, no_show_names: ["PistenPaul"] });
+  render(<StationQueueBoard queue={queue([{ id: "st2", name: "2", station_text: "Station 2", status: "reserved", waiting: 1, running: null, next: called, after: null }])}
+    onCall={vi.fn()} onStart={vi.fn()} />);
+  const block = screen.getByTestId("live-next-st2");
+  expect(block).toHaveTextContent("PistenPaul nicht erschienen");
+  expect(block).not.toHaveTextContent("nicht erschienen ab");
+});
+
 test("ohne Stations-Recht keine Knöpfe; Helfer nur an der eigenen Station; Vorspiele offen heißt warten", () => {
   const stations = [
     { id: "st1", name: "1", station_text: "Station 1", status: "free", waiting: 1, running: null, next: entry("QF1") },

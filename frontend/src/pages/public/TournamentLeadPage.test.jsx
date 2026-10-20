@@ -71,6 +71,22 @@ test("„Nicht erschienen?“ (#1551): die Turnierleitung wählt die fehlende Se
   await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/tournaments/fc-cup/lead/no-show/m8", { action: "extend", minutes: 5 }));
 });
 
+test("„Nicht erschienen“ im Lauf (#1823): die Rückmeldung sagt, dass der Lauf offen bleibt - im Duell „kampflos“", async () => {
+  const { toast } = await import("sonner");
+  const heat = {
+    id: "ns-h1", kind: "no_show", title: "Nicht erschienen?", action: "no_show", match_id: "h1", station_text: "Switch 1",
+    label: "Lauf A", names: "4 Teilnehmer", detail: "10 Min. ab Aufruf um.",
+    participants: ["r1", "r2", "r3", "r4"].map((id) => ({ registration_id: id, name: `Spieler ${id}` })),
+  };
+  apiMock.post.mockResolvedValueOnce({ data: { ok: true, status: "scheduled" } });
+  renderLead({ tournament: { id: "t1", slug: "fc-cup", title: "Läufe-Cup" }, matches: [], recent: [], counts: {}, stations: [], attention: [heat] });
+  fireEvent.click(await screen.findByTestId("lead-no-show-r2"));
+  await waitFor(() => expect(toast.success).toHaveBeenLastCalledWith("Als nicht erschienen markiert – der Lauf bleibt offen."));
+  apiMock.post.mockResolvedValueOnce({ data: { ok: true, status: "forfeit" } });
+  fireEvent.click(await screen.findByTestId("lead-no-show-r3"));
+  await waitFor(() => expect(toast.success).toHaveBeenLastCalledWith("Kampflos gewertet – beide Seiten bekommen Bescheid."));
+});
+
 test("Stationen (#1556): vor Ort die Warteschlange je Station - „Aufrufen“ und „Gestartet“ gehen über den Server", async () => {
   apiMock.post.mockResolvedValue({ data: { ok: true } });
   const next = { match_id: "QF2", label: "Viertelfinale", names: ["NeonFalke", "Jo"], ready: true, state: "queued", position: 1, forecast_at: "2026-10-31T16:40:00Z" };

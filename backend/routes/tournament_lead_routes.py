@@ -5,7 +5,9 @@ Helfer-Einsatz in genau diesem Turnier. Spieler, Moderatoren ohne Einsatz und G�
 darf je Spiel nur, wer Ergebnis-Recht hat (``can_enter``) - das prüft der Ergebnis-Weg noch einmal.
 
 „Nicht erschienen?“ (#1551): ist die Frist eines Spiels um, liegt ein Vorschlag am Spiel. Die Turnierleitung bestätigt
-ihn - die gewählte Seite verliert dieses eine Spiel kampflos, über den Forfeit-Weg - oder verlängert die Frist.
+ihn - die gewählte Seite verliert dieses eine Spiel kampflos, über den Forfeit-Weg - oder verlängert die Frist. Im
+Lauf mit mehr als zwei Spielern (#1823) wird nur die gewählte Person markiert; der Lauf bleibt offen
+(``services.match_forfeit``) und der Vorschlag gilt weiter für alle, die noch nicht markiert sind - je Person.
 """
 from datetime import datetime, timedelta, timezone
 from typing import Literal
@@ -24,6 +26,7 @@ from services.match_lead import lead_view
 from services.match_planning import ensure_tournament_accepts_results
 from services.match_v2_results import MatchV2ResultError
 from services.result_hold import ensure_no_hold
+from services.v2_match_flows import no_show_keeps_heat_open
 from services.tournament_permissions import (
     READ_STAFF_ROLES,
     RESULT_STAFF_ROLES,
@@ -87,8 +90,11 @@ async def decide_no_show(tid: str, match_id: str, body: NoShowDecision, me: dict
     proposal = match.get("no_show_proposal")
     if not isinstance(proposal, dict):
         raise HTTPException(status_code=409, detail="Für dieses Spiel liegt kein Vorschlag „nicht erschienen“ vor.")
-    if proposal.get("decision") == "confirmed" and body.action == "confirm":
-        return {"ok": True, "idempotent_replay": True, "match_id": match_id}
+    # Schon bestätigt: im Duell der ganze Vorschlag, im Lauf diese eine Person (#1823: je Person). Mit Stand - im Lauf
+    # bleibt er offen, im Duell ist er „forfeit“; danach richtet sich die Rückmeldung.
+    already = proposal.get("decision") == "confirmed" or body.registration_id in (match.get("no_show_registration_ids") or [])
+    if already and body.action == "confirm":
+        return {"ok": True, "idempotent_replay": True, "match_id": match_id, "status": match.get("status")}
     now = now_utc()
     if body.action == "extend":
         start = max(now, _parse(proposal.get("due_at")) or now)
@@ -114,15 +120,20 @@ async def decide_no_show(tid: str, match_id: str, body: NoShowDecision, me: dict
         raise HTTPException(status_code=409, detail=STALE_PROPOSAL_DETAIL)
     minutes = int(proposal.get("minutes") or 0)
     note = f"Nicht erschienen – Frist von {minutes} Minuten abgelaufen"
+    per_person = no_show_keeps_heat_open(match)
     try:
         ensure_no_hold(match)
         decided = await apply_forfeit(db, match, body.registration_id, note=note, actor_id=me["id"], force=False)
     except MatchV2ResultError as exc:
         raise HTTPException(status_code=exc.status_code, detail=str(exc)) from None
-    await db.matches_v2.update_one({"id": match_id}, {"$set": {
-        "no_show_proposal.decision": "confirmed", "no_show_proposal.decided_by": me["id"],
-        "no_show_proposal.decided_at": now.isoformat(),
-    }})
+    if per_person:
+        # Im Lauf (#1823): der Vorschlag bleibt für die anderen offen - bestätigt ist nur diese Person.
+        await db.matches_v2.update_one({"id": match_id}, {"$addToSet": {"no_show_proposal.confirmed_ids": body.registration_id}})
+    else:
+        await db.matches_v2.update_one({"id": match_id}, {"$set": {
+            "no_show_proposal.decision": "confirmed", "no_show_proposal.decided_by": me["id"],
+            "no_show_proposal.decided_at": now.isoformat(),
+        }})
     await _audit(db, "match.no_show.confirmed", match, me["id"],
                  {"proposal_id": proposal.get("id"), "registration_id": body.registration_id})
     return {"ok": True, "match_id": match_id, "status": decided.get("status"), "idempotent_replay": False}

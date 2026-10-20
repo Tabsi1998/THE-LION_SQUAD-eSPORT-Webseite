@@ -69,6 +69,12 @@ export function isOut(result) {
   return Boolean(result?.forfeit || result?.dnf || result?.no_show || result?.disqualified);
 }
 
+/** Im offenen Lauf als nicht erschienen markiert (#1823) - bis ein Ergebnis da ist; danach zählt die Ergebniszeile. */
+export function markedNoShow(match, registrationId) {
+  if (!registrationId || !(match?.no_show_registration_ids || []).includes(registrationId)) return false;
+  return !(match?.results || []).some((row) => row?.registration_id === registrationId);
+}
+
 /** Die Auslosung eines Platzes (`source.draw`, #1548) - oder `null` im festen Baum. */
 export function slotDraw(slot) {
   const draw = slot?.source?.draw;

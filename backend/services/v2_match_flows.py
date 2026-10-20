@@ -30,12 +30,28 @@ def participant_ids(match: dict) -> list[str]:
     return [slot["registration_id"] for slot in filled_slots(match)]
 
 
+def no_show_keeps_heat_open(match: dict) -> bool:
+    """„Nicht erschienen“ in einem offenen Lauf mit mehr als zwei Spielern (#1823): keine Wertung des ganzen Laufs -
+    die Person wird markiert, die anderen fahren ihn und werden normal eingetragen. Im Duell (zwei Seiten) und in einem
+    Spiel mit Ergebnis bleibt es die Wertung (``results_for_forfeit``)."""
+    return len(participant_ids(match)) > 2 and not match.get("results")
+
+
+def marked_no_shows(match: dict) -> list[str]:
+    """Wer in diesem Lauf als nicht erschienen markiert ist (#1823) - nur, wer noch einen Platz darin hat."""
+    seated = set(participant_ids(match))
+    return [item for item in match.get("no_show_registration_ids") or [] if item in seated]
+
+
 def results_for_forfeit(match: dict, forfeiting_registration_id: str) -> list[dict]:
     """Rank a walkover: whoever gave up comes last, the rest keep their order.
 
     Expressing a forfeit as an ordinary ranking means the advancement cascade,
     the standings and the exports need no special case for it - a forfeited
     match looks like any other decided match, just with a note attached.
+
+    Hat das Spiel schon ein Ergebnis (Korrektur), behalten die anderen ihre Plätze daraus - nie die Reihenfolge der
+    Sitze (#1823).
     """
     participants = participant_ids(match)
     if not participants:
@@ -46,6 +62,9 @@ def results_for_forfeit(match: dict, forfeiting_registration_id: str) -> list[di
     # Ein einziger belegter Platz (#1553: der Gegner ist noch offen oder ein Freilos): die Wertung geht trotzdem -
     # wer nicht erschienen ist, verliert kampflos und kommt auf dem Sieger-Weg nicht weiter (match_v2_results).
     remaining = [item for item in participants if item != forfeiting_registration_id]
+    placed = {row.get("registration_id"): int(row.get("rank") or 0) for row in match.get("results") or []}
+    if placed:
+        remaining.sort(key=lambda item: (item not in placed, placed.get(item, 0)))
     results = [{"registration_id": item, "rank": index + 1} for index, item in enumerate(remaining)]
     # Ausdrücklich als Aufgabe gekennzeichnet: sonst sähe die Platzierung aus wie
     # ein normales Ergebnis ohne Punktstand - und wäre dort, wo Unentschieden

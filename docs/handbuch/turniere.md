@@ -360,6 +360,19 @@ im Protokoll und unter ihren Strafen) und **+5 Min. verlängern**. Die Fristen s
 **Erweiterte Spieloptionen → Fristen** ein (leer heißt Standard); eine Phase kann sie in ihren Einstellungen
 überschreiben.
 
+Im **Lauf mit mehr als zwei Spielern** wertet **<Name> nicht erschienen** nicht den ganzen Lauf: Nur diese Person wird
+markiert, der Lauf bleibt offen und wird mit den Anwesenden gefahren (Karte und Nachricht sagen „Lauf bleibt offen“).
+Im Baum steht sie durchgestrichen, am TV als „nicht angetreten“, im Druck mit „n. e.“; die Warteschlange zeigt
+zusätzlich „<Name> nicht erschienen“. Die Frist gilt je Person: Fehlen mehrere, tippt ihr jeden Namen einzeln an – der
+Fall bleibt für alle offen, die noch nicht markiert sind. Im Ergebnis-Fenster ist **Nicht erschienen** bei ihr schon
+gesetzt – ihr tippt nur die Anwesenden in Zielreihenfolge. Setzt ihr dort jemanden erst beim Eintragen auf **Nicht
+erschienen**, wird er genauso markiert (mit Eintrag unter den Strafen). Danach steht sie auf dem letzten Platz. Wer
+nicht erschienen ist, bekommt nie einen Sieger-Platz – was die Anwesenden nicht füllen, wird ein Freilos; mit Loser
+Bracket gehen alle Nicht-Erschienenen auf den Verlierer-Weg (nach den Anwesenden, die nicht weiterkommen), ohne Loser
+Bracket scheiden sie aus. Fehlen mehrere, teilen sie sich den letzten Platz; untereinander entscheidet der Setzplatz,
+ohne Setzplatz der Sitzplatz im Lauf, wer einen der Plätze im Loser Bracket bekommt. Ist sie doch noch gekommen und
+mitgefahren, nehmt ihr den Schalter im Ergebnis-Fenster zurück – dann fällt auch der Eintrag unter ihren Strafen weg.
+
 ### 3.8 Stationen
 
 **Admin → eSports → Stationen** (Seite „Stationen & Spiel-Zuweisung“). Oben das **Aktive Turnier** wählen.

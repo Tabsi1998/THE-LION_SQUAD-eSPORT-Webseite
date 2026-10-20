@@ -16,7 +16,9 @@ from __future__ import annotations
 # Zeit auf der Matchseite und am TV; ebenso der Grund einer Korrektur.
 INTERNAL_KEYS = frozenset({"admin_note", "admin_decision_note", "admin_decision_at", "pending_result",
                            # Der Sperr-Schlüssel des Lauf-Umbaus (#1550) - Technik, kein Inhalt.
-                           "rebuild_token"})
+                           "rebuild_token",
+                           # „Nicht erschienen“ im Lauf (#1823): wer markiert ist, ist öffentlich - die Begründung nicht.
+                           "no_show_notes"})
 INTERNAL_META_KEYS = frozenset({"note", "correction_reason", "hold_id"})
 INTERNAL_RESULT_KEYS = frozenset({"user_id", "note"})
 

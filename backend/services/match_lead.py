@@ -92,9 +92,11 @@ def entry_info(match: dict, *, tournament: dict | None, stage: dict | None, stag
     """Alles, was das Ergebnis-Fenster für ein Spiel braucht - gleich für Turnierleitung, Matchplan, Stationen und
     Matchseite (#1370)."""
     slots = filled_slots(match)
+    # Im Lauf als nicht erschienen markiert (#1823): das Fenster zeigt die Person so an, die anderen werden eingetragen.
+    marked = set(match.get("no_show_registration_ids") or [])
     participants = [
         {"registration_id": slot["registration_id"], "name": registration_name(regs_by_id.get(slot["registration_id"])),
-         "slot": slot.get("slot")}
+         "slot": slot.get("slot"), **({"no_show": True} if slot["registration_id"] in marked else {})}
         for slot in slots
     ]
     kind = "duel" if len(participants) == 2 else "heat"

@@ -21,6 +21,8 @@ function calledLine(entry) {
     entry.called_at ? `Aufgerufen ${clock(entry.called_at)}` : "Aufgerufen",
     entry.report_by ? `antreten bis ${clock(entry.report_by)}` : "",
     entry.no_show_due_at ? `nicht erschienen ab ${clock(entry.no_show_due_at)}` : "",
+    // Im Lauf markiert (#1823): die Frist ist vorbei, es steht, wer fehlt.
+    entry.no_show_names?.length ? `${entry.no_show_names.join(", ")} nicht erschienen` : "",
   ].filter(Boolean).join(" · ");
 }
 

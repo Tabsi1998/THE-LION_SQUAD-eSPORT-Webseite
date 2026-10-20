@@ -59,6 +59,7 @@ function SlotRow({ slot, heat }) {
       <span className={`tls-print-slot__name ${pending ? "tls-print-slot__name--pending" : ""} ${slot.winner ? "tls-print-slot__name--winner" : ""}`}>
         {slot.label || (heat ? "" : "noch offen")}
       </span>
+      {slot.note ? <span className="tls-print-slot__note" title="nicht erschienen" data-testid="print-no-show">{slot.note}</span> : null}
       <span className="tls-print-slot__score" aria-label={heat ? "Platz" : "Ergebnis"}>{slot.score}</span>
     </div>
   );

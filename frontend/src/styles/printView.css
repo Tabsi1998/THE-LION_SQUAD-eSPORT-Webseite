@@ -147,6 +147,14 @@
 }
 .tls-print-slot__name--pending { font-style: italic; color: #444; font-size: 8pt; }
 .tls-print-slot__name--winner { font-weight: 800; }
+/* Nicht erschienen (#1823): kurz vor dem Platz, schlicht - der Name kürzt sich davor. */
+.tls-print-slot__note {
+  flex: none;
+  align-self: center;
+  padding: 0 1mm;
+  font-size: 7pt;
+  font-style: italic;
+}
 .tls-print-slot__score {
   flex: none;
   width: 9mm;

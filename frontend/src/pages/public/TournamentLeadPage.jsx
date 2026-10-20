@@ -159,11 +159,14 @@ export default function TournamentLeadPage() {
   };
 
   // „Nicht erschienen?“ (#1551): Frist um - die fehlende Seite verliert dieses Spiel kampflos, oder die Frist läuft weiter.
+  // Im Lauf mit mehr als zwei Spielern (#1823) wird nur die Person markiert - der Lauf bleibt offen (Stand nicht „forfeit“).
   const decideNoShow = async (item, body) => {
     setDeciding(true);
     try {
-      await api.post(`/tournaments/${encodeURIComponent(slug)}/lead/no-show/${item.match_id}`, body);
-      toast.success(body.action === "extend" ? `Frist um ${body.minutes} Minuten verlängert.` : "Kampflos gewertet – beide Seiten bekommen Bescheid.");
+      const { data } = await api.post(`/tournaments/${encodeURIComponent(slug)}/lead/no-show/${item.match_id}`, body);
+      const heatOpen = Boolean(data?.status) && data.status !== "forfeit";
+      toast.success(body.action === "extend" ? `Frist um ${body.minutes} Minuten verlängert.`
+        : heatOpen ? "Als nicht erschienen markiert – der Lauf bleibt offen." : "Kampflos gewertet – beide Seiten bekommen Bescheid.");
       await load();
     } catch (err) {
       toast.error(formatApiError(err.response?.data?.detail) || "Das hat nicht geklappt.");

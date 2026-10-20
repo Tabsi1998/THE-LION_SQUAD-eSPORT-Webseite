@@ -163,6 +163,21 @@ describe("BracketTree", () => {
     expect(played.indexOf("Ben")).toBeLessThan(played.indexOf("Anna"));
     expect(screen.getByTestId("bracket-heat-h2").querySelector("[data-rank='1']")).toHaveTextContent("1");
   });
+
+  it("Lauf mit „nicht erschienen“ (#1823): offen, die Person steht ausgefallen da, die anderen nicht", () => {
+    const reg = (id, name) => ({ id, display_name: name, user: {} });
+    const data = {
+      registrations: [reg("a", "Anna"), reg("b", "Ben"), reg("c", "Cem"), reg("d", "Dana")],
+      matches_v2: [
+        { id: "h1", section: "MAIN", round: 1, order: 0, match_key: "A", match_type: "ffa", status: "scheduled", settings: { qualifiers_per_match: 2 }, slots: [{ slot: 1, registration_id: "a" }, { slot: 2, registration_id: "b" }, { slot: 3, registration_id: "c" }, { slot: 4, registration_id: "d" }], results: [], no_show_registration_ids: ["b"] },
+      ],
+    };
+    render(<BracketTree data={data} />);
+    const card = screen.getByTestId("bracket-heat-h1");
+    expect(card.querySelector("[data-row='h1:b']")).toHaveAttribute("data-out", "1");
+    expect(["a", "c", "d"].map((id) => card.querySelector(`[data-row='h1:${id}']`).getAttribute("data-out"))).toEqual([null, null, null]);
+    expect(card).not.toHaveTextContent("#");
+  });
 });
 
 // Turniere I (#833): Kürzel statt leerer Quadrate, der Weg eines Spielers, „nicht gespielt“ nach dem Ende,

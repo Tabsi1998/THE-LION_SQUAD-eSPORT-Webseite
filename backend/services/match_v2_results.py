@@ -269,7 +269,7 @@ def _auto_rank_results(match: dict, raw_results: list[dict]) -> list[dict]:
         key = _placement_key(mode, entry)
         stated = _stated_rank(entry)
         if previous_key is not None and key == previous_key and not allow_draw \
-                and (math.isinf(stated) or stated == previous_stated):
+                and (math.isinf(stated) or stated == previous_stated) and not entry.get("forfeit"):
             # Im K.-o. muss jemand weiterkommen - bei gleichem Stand sagt das nur ein angegebener Platz, nie die
             # Reihenfolge der Liste.
             raise MatchV2ResultError(
@@ -293,6 +293,70 @@ def _stated_rank(entry: dict) -> float:
         return math.inf
 
 
+# Begründung einer Zeile „nicht erschienen“ im Lauf ohne eigene (#1823) - wie im Ergebnis-Fenster (result_hold).
+HEAT_NO_SHOW_NOTE = "Nicht erschienen"
+
+
+def _with_marked_no_shows(match: dict, raw_results: list[dict], participants: dict[str, dict]) -> list[dict]:
+    """„Nicht erschienen“ im Lauf (#1823): wer markiert ist und im Ergebnis fehlt, kommt als nicht erschienen dazu - die
+    Rangfolge stellt ihn nach hinten. Eine Zeile „nicht erschienen“ ohne Begründung bekommt die der Markierung (sonst
+    „Nicht erschienen“ - die Person sieht sie unter ihren Strafen). Wer markiert ist und doch mit Platz im Ergebnis
+    steht, ist gefahren: seine Zeile gilt, wie sie eingetragen ist."""
+    marked = [item for item in match.get("no_show_registration_ids") or [] if item in participants]
+    if not marked and len(participants) <= 2:
+        return raw_results
+    notes = match.get("no_show_notes") or {}
+    rows = []
+    for entry in raw_results:
+        registration_id = str(entry.get("registration_id") or "").strip()
+        if entry.get("forfeit") and not (entry.get("note") or "").strip():
+            entry = {**entry, "note": (notes.get(registration_id) if registration_id in marked else None) or HEAT_NO_SHOW_NOTE}
+        rows.append(entry)
+    listed = {str(entry.get("registration_id") or "").strip() for entry in raw_results}
+    missing = [item for item in marked if item not in listed]
+    rows.extend({"registration_id": item, "rank": len(raw_results) + index, "forfeit": True, "note": notes.get(item)}
+                for index, item in enumerate(missing, start=1))
+    return rows
+
+
+def _no_show_order(slot: dict) -> tuple:
+    """Die Reihenfolge unter mehreren Fehlenden: der Setzplatz, ohne ihn der Sitzplatz im Lauf."""
+    source = slot.get("source") or {}
+    seed = slot.get("seed") if slot.get("seed") is not None else (source.get("seed") if source.get("type") == "seed" else None)
+    try:
+        seed = int(seed)
+    except (TypeError, ValueError):
+        seed = None
+    return (seed is None, seed or 0, int(slot.get("slot") or 0))
+
+
+def _share_last_place(results: list[dict], participants: dict[str, dict]) -> list[dict]:
+    """Fehlen mehrere (#1823), teilen sie sich gleichrangig den letzten Platz - nicht nach der Reihenfolge, in der sie
+    markiert oder eingetragen wurden. Für das Weiterkommen (Sieger-Weg bzw. Freilos oder Loser Bracket) stehen sie nach
+    Setzplatz, sonst nach Sitzplatz (``_placement_positions``)."""
+    missing = [row for row in results if row["forfeit"]]
+    if len(missing) < 2:
+        return results
+    shared = len(results) - len(missing) + 1
+    for row in missing:
+        row["rank"] = shared
+    present = [row for row in results if not row["forfeit"]]
+    return present + sorted(missing, key=lambda row: _no_show_order(participants.get(row["registration_id"]) or {}))
+
+
+def _placement_positions(results: list[dict]) -> dict[int, dict]:
+    """Platz → Zeile fürs Weiterkommen. Teilen sich mehrere Fehlende den letzten Platz (#1823), zählt ihre Reihenfolge
+    im Ergebnis (Setzplatz, sonst Sitzplatz); ein echter Gleichstand (Gruppe, Liga) bleibt beim Platz."""
+    by_rank = {int(row.get("rank") or 0): row for row in results}
+    if len(by_rank) == len(results):
+        return by_rank
+    present = [int(row.get("rank") or 0) for row in results if not row.get("forfeit")]
+    if len(set(present)) < len(present):
+        return by_rank
+    ordered = sorted(results, key=lambda row: int(row.get("rank") or 0))
+    return {index: row for index, row in enumerate(ordered, start=1)}
+
+
 def normalize_v2_results(match: dict, raw_results: list[dict], *, best_of: int | None = None) -> list[dict]:
     """Ein Ergebnis nach dem Vertrag prüfen und in die gespeicherte Form bringen (siehe Modulbeschreibung).
 
@@ -301,6 +365,7 @@ def normalize_v2_results(match: dict, raw_results: list[dict], *, best_of: int |
     participants = _slot_participant_map(match)
     if not participants:
         raise MatchV2ResultError("Match hat keine belegten Slots")
+    raw_results = _with_marked_no_shows(match, raw_results, participants)
     if len(raw_results) != len(participants):
         raise MatchV2ResultError("Ergebnisliste muss alle belegten Teilnehmer enthalten")
     raw_results = _auto_rank_results(match, raw_results)
@@ -342,7 +407,7 @@ def normalize_v2_results(match: dict, raw_results: list[dict], *, best_of: int |
         })
 
     _validate_placements(seen_ranks, len(participants), allow_draw)
-    normalized = sorted(normalized, key=lambda item: item["rank"])
+    normalized = _share_last_place(sorted(normalized, key=lambda item: item["rank"]), participants)
     if _ranking_mode(match) == "higher_score":
         _check_best_of(normalized, best_of)
     return normalized
@@ -718,15 +783,34 @@ def _note_instant_assignment(target: dict, slot: dict, source: dict, now_iso: st
         })
 
 
-def _pot_ranks(source: dict, results: list[dict], gone: set[str]) -> tuple[dict[int, dict], dict[int, dict]]:
-    """Wer auf welchem Platz steht - für den Verlierer-Weg wie gewertet, für den Sieger-Weg ohne Ausgeschiedene
-    (#1553: im Lauf rücken die Nächsten auf, wie in ``build_v2_result_application``)."""
-    by_rank = {int(row.get("rank") or 0): row for row in results}
-    if not gone or source.get("match_type") != "ffa":
+def _advancement_paths(match: dict, results: list[dict], gone: set[str]) -> tuple[dict[int, dict], dict[int, dict]]:
+    """Wer über welchen Platz weiterkommt: ``(Verlierer-Weg, Sieger-Weg)``, je Platz die Zeile - für den
+    Ergebnis-Anwender und den Topf gemischter Runden gleich.
+
+    - Der Platz, wie gewertet; teilen sich mehrere Fehlende den letzten Platz, zählt ihre Reihenfolge (Setzplatz).
+    - Im Lauf ohne Ausgeschiedene (#1553): die Nächsten rücken auf - auf beiden Wegen, wer auf dem Sieger-Weg aufrückt,
+      steht nicht zugleich im Loser Bracket.
+    - Wer nicht erschienen ist, bekommt nie einen Sieger-Platz: der wird ein Freilos (``forfeit``). Auf dem
+      Verlierer-Weg stehen erst die Anwesenden, die nicht weiterkommen, dann alle Nicht-Erschienenen nach Setzplatz -
+      so weit Plätze da sind; ohne Verlierer-Weg scheiden sie aus (#1823)."""
+    by_rank = _placement_positions(results)
+    if gone and match.get("match_type") == "ffa":
+        staying = [row for row in sorted(results, key=lambda row: int(row.get("rank") or 0))
+                   if row.get("registration_id") not in gone]
+        by_rank = {index: row for index, row in enumerate(staying, start=1)}
+    loser_ranks = sorted(_advancement_result_rank(match, entry) for entry in match.get("advancement") or []
+                         if entry.get("flow") == "L")
+    ordered = [by_rank[key] for key in sorted(by_rank)]
+    if not loser_ranks or not any(row.get("forfeit") for row in ordered):
         return by_rank, by_rank
-    staying = [row for row in sorted(results, key=lambda row: int(row.get("rank") or 0))
-               if row.get("registration_id") not in gone]
-    return by_rank, {index: row for index, row in enumerate(staying, start=1)}
+    qualifiers = loser_ranks[0] - 1
+    losers = [row for row in ordered[qualifiers:] if not row.get("forfeit")] + [row for row in ordered if row.get("forfeit")]
+    return {qualifiers + index: row for index, row in enumerate(losers, start=1)}, by_rank
+
+
+def _pot_ranks(source: dict, results: list[dict], gone: set[str]) -> tuple[dict[int, dict], dict[int, dict]]:
+    """Wer auf welchem Platz in den Topf kommt - dieselbe Regel wie beim Eintragen (``_advancement_paths``)."""
+    return _advancement_paths(source, results, gone)
 
 
 def _group_is_ready(targets: list[dict]) -> bool:
@@ -1155,12 +1239,8 @@ def build_v2_result_application(
 
     results = normalize_v2_results(match, raw_results)
     eliminated = set(eliminated or ())
-    result_by_rank = {entry["rank"]: entry for entry in results}
-    winner_path_by_rank = result_by_rank
-    if eliminated and match.get("match_type") == "ffa":
-        # Plätze rücken auf: der Sieger-Weg zählt nur, wer noch im Turnier ist.
-        winner_path_by_rank = {index: entry for index, entry in enumerate(
-            (entry for entry in results if entry["registration_id"] not in eliminated), start=1)}
+    # Plätze rücken auf, wer nicht erschienen ist, nur auf den Verlierer-Weg (#1553, #1823): ``_advancement_paths``.
+    loser_path, winner_path = _advancement_paths(match, results, eliminated)
     by_id, by_key = _target_lookup(stage_matches)
     downstream = _downstream_links(stage_matches)
     target_sets: dict[str, dict] = {}
@@ -1175,7 +1255,7 @@ def build_v2_result_application(
             raise MatchV2ResultError(f"Zielmatch {advancement.get('to_match_key')} nicht gefunden")
         result_rank = _advancement_result_rank(match, advancement)
         flow = advancement.get("flow")
-        result = (winner_path_by_rank if flow == "W" else result_by_rank).get(result_rank)
+        result = (winner_path if flow == "W" else loser_path).get(result_rank)
         skip_reason = None
         if result and result["registration_id"] in eliminated:
             skip_reason = "eliminated"

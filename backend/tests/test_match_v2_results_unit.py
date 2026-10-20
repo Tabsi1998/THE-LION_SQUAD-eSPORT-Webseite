@@ -7,6 +7,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 
 from services.match_v2_results import (
     MatchV2ResultError,
+    _pot_ranks,
     build_v2_result_application,
     is_v2_result_replay,
     normalize_v2_results,
@@ -72,6 +73,186 @@ def test_public_recalculation_error_does_not_expose_internal_detail():
 def test_normalize_v2_results_requires_all_filled_slots():
     with pytest.raises(MatchV2ResultError, match="alle belegten Teilnehmer"):
         normalize_v2_results(_source_match(), RESULTS[:3])
+
+
+def _heat_with_no_show(registration_id="r3", note="Nicht erschienen – Frist von 10 Minuten abgelaufen"):
+    match = _source_match()
+    match["no_show_registration_ids"] = [registration_id]
+    match["no_show_notes"] = {registration_id: note}
+    return match
+
+
+def test_a_heat_without_the_missing_person_gets_them_last_as_no_show():
+    """#1823: im Lauf reicht das Ergebnis der Anwesenden - wer als nicht erschienen markiert ist, steht danach hinten."""
+    results = normalize_v2_results(_heat_with_no_show(), [
+        {"registration_id": "r4", "rank": 1}, {"registration_id": "r1", "rank": 2}, {"registration_id": "r2", "rank": 3},
+    ])
+
+    assert [(row["registration_id"], row["rank"], row["forfeit"]) for row in results] == [
+        ("r4", 1, False), ("r1", 2, False), ("r2", 3, False), ("r3", 4, True)]
+    assert results[-1]["note"] == "Nicht erschienen – Frist von 10 Minuten abgelaufen"
+
+
+def test_a_heat_with_points_puts_the_missing_person_last_too():
+    results = normalize_v2_results(_heat_with_no_show(), [
+        {"registration_id": "r1", "score": 4}, {"registration_id": "r2", "score": 9}, {"registration_id": "r4", "score": 7},
+    ])
+
+    assert [row["registration_id"] for row in results] == ["r2", "r4", "r1", "r3"]
+    assert results[-1]["forfeit"] is True
+
+
+def test_the_window_flag_keeps_the_reason_of_the_mark():
+    results = normalize_v2_results(_heat_with_no_show(), [
+        {"registration_id": "r4", "rank": 1}, {"registration_id": "r1", "rank": 2},
+        {"registration_id": "r2", "rank": 3}, {"registration_id": "r3", "rank": 4, "forfeit": True},
+    ])
+
+    assert results[-1]["note"] == "Nicht erschienen – Frist von 10 Minuten abgelaufen"
+
+
+def test_a_marked_person_who_raced_after_all_keeps_the_entered_place():
+    results = normalize_v2_results(_heat_with_no_show(), [
+        {"registration_id": "r3", "rank": 1}, {"registration_id": "r4", "rank": 2},
+        {"registration_id": "r1", "rank": 3}, {"registration_id": "r2", "rank": 4},
+    ])
+
+    assert [(row["registration_id"], row["forfeit"]) for row in results][0] == ("r3", False)
+
+
+def test_without_a_mark_a_missing_participant_is_still_an_error():
+    match = _heat_with_no_show()
+    with pytest.raises(MatchV2ResultError, match="alle belegten Teilnehmer"):
+        normalize_v2_results(match, [{"registration_id": "r4", "rank": 1}, {"registration_id": "r1", "rank": 2}])
+
+
+@pytest.mark.parametrize(("ranking", "winners", "losers"), [
+    # Ausgetreten unter den Weiterkommern: der Dritte rückt ins Sieger-Ziel, ins Loser Bracket nur noch der Vierte.
+    (["r1", "r2", "r3", "r4"], ["r2", "r3"], ["r4", None]),
+    # Ausgetreten unter den Verlierern: auf dem Verlierer-Weg rückt der Nächste auf.
+    (["r2", "r3", "r1", "r4"], ["r2", "r3"], ["r4", None]),
+])
+def test_a_withdrawn_heat_player_moves_the_others_up_on_both_paths(ranking, winners, losers):
+    """#1823 (Austritt während des Laufs, Läufe-Cup mit Loser Bracket): steht eine ausgetretene Person im Ergebnis,
+    rücken die anderen auf dem Sieger- und dem Verlierer-Weg auf - niemand wird zweimal weitergeleitet."""
+    source = {**_source_match(), "match_type": "ffa"}
+
+    application = build_v2_result_application(
+        source,
+        [source, _target("m-b", "B"), _target("m-l", "L")],
+        [{"registration_id": registration_id, "rank": rank} for rank, registration_id in enumerate(ranking, start=1)],
+        actor_id="admin",
+        now_iso="2026-05-08T12:00:00+00:00",
+        eliminated={"r1"},
+    )
+
+    assert [slot["registration_id"] for slot in application["target_sets"]["m-b"]["slots"]] == winners
+    assert [slot["registration_id"] for slot in application["target_sets"]["m-l"]["slots"]] == losers
+
+
+def _seeded_heat():
+    """Lauf A mit Setzplätzen, die nicht der Sitzreihenfolge folgen: r1=4, r2=2, r3=1, r4=3."""
+    source = {**_source_match(), "match_type": "ffa"}
+    source["slots"] = [{**slot, "seed": seed} for slot, seed in zip(source["slots"], (4, 2, 1, 3))]
+    return source
+
+
+NO_SHOWS = [  # r4 vor r2 eingetragen - die Reihenfolge der Eingabe zählt nicht
+    {"registration_id": "r3", "rank": 1}, {"registration_id": "r1", "rank": 2},
+    {"registration_id": "r4", "rank": 3, "forfeit": True}, {"registration_id": "r2", "rank": 4, "forfeit": True},
+]
+
+
+def test_two_no_shows_share_the_last_place_ordered_by_seed():
+    """#1823: fehlen mehrere, teilen sie sich den letzten Platz - in der Reihenfolge ihrer Setzplätze."""
+    results = normalize_v2_results(_seeded_heat(), NO_SHOWS)
+
+    assert [(row["registration_id"], row["rank"], row["forfeit"]) for row in results] == [
+        ("r3", 1, False), ("r1", 2, False), ("r2", 3, True), ("r4", 3, True)]
+
+
+def test_without_seeds_the_seat_decides():
+    results = normalize_v2_results({**_source_match(), "match_type": "ffa"}, NO_SHOWS)
+
+    assert [row["registration_id"] for row in results if row["forfeit"]] == ["r2", "r4"]
+
+
+def test_no_shows_sharing_the_last_place_advance_in_seed_order():
+    """Weiterkommen nach Position: zwei Beste weiter, die Fehlenden nach Setzplatz ins Loser Bracket."""
+    source = _seeded_heat()
+
+    application = build_v2_result_application(
+        source, [source, _target("m-b", "B"), _target("m-l", "L")], NO_SHOWS,
+        actor_id="admin", now_iso="2026-05-08T12:00:00+00:00",
+    )
+
+    assert [slot["registration_id"] for slot in application["target_sets"]["m-b"]["slots"]] == ["r3", "r1"]
+    assert [slot["registration_id"] for slot in application["target_sets"]["m-l"]["slots"]] == ["r2", "r4"]
+
+
+def test_the_draw_pot_takes_no_shows_sharing_a_place_in_order():
+    source = _seeded_heat()
+    results = normalize_v2_results(source, NO_SHOWS)
+
+    loser_path, winner_path = _pot_ranks(source, results, set())
+
+    assert [loser_path[rank]["registration_id"] for rank in (3, 4)] == ["r2", "r4"]
+    assert [winner_path[rank]["registration_id"] for rank in (1, 2)] == ["r3", "r1"]
+
+
+THREE_MISSING = [  # nur r3 ist da; Setzplätze r1=4, r2=2, r4=3
+    {"registration_id": "r3", "rank": 1},
+    {"registration_id": "r1", "rank": 2, "forfeit": True}, {"registration_id": "r2", "rank": 3, "forfeit": True},
+    {"registration_id": "r4", "rank": 4, "forfeit": True},
+]
+
+
+def test_no_show_never_takes_a_winner_place_and_all_go_the_loser_path_by_seed():
+    """#1823 (3 von 4 fehlen, Quote 2): der zweite Sieger-Platz wird ein Freilos; die Nicht-Erschienenen gehen auf den
+    Verlierer-Weg, so weit Plätze da sind - nach Setzplatz (r2, dann r4); r1 (Setzplatz 4) bleibt draußen."""
+    source = _seeded_heat()
+
+    application = build_v2_result_application(
+        source, [source, _target("m-b", "B"), _target("m-l", "L")], THREE_MISSING,
+        actor_id="admin", now_iso="2026-05-08T12:00:00+00:00",
+    )
+
+    winners = application["target_sets"]["m-b"]["slots"]
+    assert [slot["registration_id"] for slot in winners] == ["r3", None]
+    assert winners[1]["status"] == "bye" and winners[1]["source_result"]["reason"] == "forfeit"
+    assert [slot["registration_id"] for slot in application["target_sets"]["m-l"]["slots"]] == ["r2", "r4"]
+
+
+def test_without_a_loser_path_the_no_shows_are_out():
+    source = {**_seeded_heat(), "advancement": [entry for entry in _seeded_heat()["advancement"] if entry["flow"] == "W"]}
+
+    application = build_v2_result_application(
+        source, [source, _target("m-b", "B")], THREE_MISSING, actor_id="admin", now_iso="2026-05-08T12:00:00+00:00",
+    )
+
+    assert [slot["registration_id"] for slot in application["target_sets"]["m-b"]["slots"]] == ["r3", None]
+
+
+def test_the_draw_pot_sends_every_no_show_to_the_loser_path_too():
+    source = _seeded_heat()
+    results = normalize_v2_results(source, THREE_MISSING)
+
+    loser_path, winner_path = _pot_ranks(source, results, set())
+
+    assert winner_path[1]["registration_id"] == "r3" and winner_path[2]["forfeit"] is True
+    assert [loser_path[rank]["registration_id"] for rank in (3, 4)] == ["r2", "r4"]
+
+
+def test_the_draw_pot_moves_the_others_up_on_both_paths_too():
+    """Gemischte Runden (#1548) losen aus demselben Stand: wer im Lauf auf den Sieger-Weg aufrückt, kommt nicht
+    zugleich in den Topf des Loser Bracket (#1823)."""
+    source = {**_source_match(), "match_type": "ffa"}
+    results = [{"registration_id": f"r{rank}", "rank": rank} for rank in range(1, 5)]
+
+    loser_path, winner_path = _pot_ranks(source, results, {"r1"})
+
+    assert [winner_path[rank]["registration_id"] for rank in (1, 2)] == ["r2", "r3"]
+    assert loser_path[3]["registration_id"] == "r4" and 4 not in loser_path
 
 
 def test_normalize_v2_results_auto_ranks_fastest_time_when_configured():

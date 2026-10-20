@@ -228,6 +228,9 @@ def build_live_queue(
             "called_at": match.get("called_at") if called else None,
             "report_by": _iso(due),
             "no_show_due_at": _iso(no_show["due_at"]) if no_show else None,
+            # Im Lauf als nicht erschienen markiert (#1823): wer fehlt - statt der Frist.
+            "no_show_names": [names.get(registration_id) or "Teilnehmer"
+                              for registration_id in match.get("no_show_registration_ids") or [] if registration_id in filled],
             "started_at": match.get("started_at") if row["state"] == "running" else None,
         }
 

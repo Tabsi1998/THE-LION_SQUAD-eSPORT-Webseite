@@ -24,7 +24,7 @@ from services.matchday_schedule import (
     matchday_window,
     plays_in_matchdays,
 )
-from services.v2_match_flows import latest_reports
+from services.v2_match_flows import latest_reports, no_show_keeps_heat_open
 
 DEFAULTS = {
     "no_show_minutes_on_site": 10,
@@ -39,6 +39,20 @@ LIMITS = {
     "result_confirm_hours_league": 336,
 }
 NO_SHOW_RULE_TEXT = {"on_site": "ab Aufruf", "online": "ab Öffnung des Spiels"}
+# Was die Turnierleitung nach der Frist tun kann: im Duell kampflos werten, im Lauf mit mehr als zwei Spielern nur die
+# fehlende Person markieren - der Lauf bleibt offen (#1823). Für Karte und Nachricht.
+NO_SHOW_ACTION_DUEL = "kampflos werten oder verlängern"
+NO_SHOW_ACTION_HEAT = "nicht erschienen markieren (Lauf bleibt offen) oder verlängern"
+
+
+def no_show_action(match: dict) -> str:
+    return NO_SHOW_ACTION_HEAT if no_show_keeps_heat_open(match) else NO_SHOW_ACTION_DUEL
+
+
+def no_show_candidates(match: dict) -> list[str]:
+    """Für wen „nicht erschienen“ noch gilt (#1823): alle im Spiel, die noch nicht als nicht erschienen markiert sind."""
+    marked = set(match.get("no_show_registration_ids") or [])
+    return [registration_id for registration_id in _filled(match) if registration_id not in marked]
 # Liga: so lange hat der Gegner mindestens Zeit zu widersprechen, auch über das Ende der Spielwoche hinaus.
 LEAGUE_MIN_OBJECTION_HOURS = 24
 # Ein Spiel, für das „nicht erschienen“ noch gilt: beide Seiten stehen fest, es hat nicht begonnen.
@@ -107,6 +121,11 @@ def no_show_deadline(match: dict, tournament: dict | None, stage: dict | None = 
     if len(_filled(match)) < 2 or match.get("started_at") or match.get("reports"):
         return None
     if isinstance(match.get("pending_result"), dict):
+        return None
+    # Die Frist gilt je Person (#1823): im Lauf läuft sie für alle, die noch nicht als nicht erschienen markiert sind;
+    # sind alle markiert oder ist der Vorschlag (im Duell) bestätigt, ist sie vorbei.
+    proposal = match.get("no_show_proposal")
+    if not no_show_candidates(match) or (isinstance(proposal, dict) and proposal.get("decision")):
         return None
     mode = (tournament or {}).get("event_mode") or "online"
     if match.get("called_at"):

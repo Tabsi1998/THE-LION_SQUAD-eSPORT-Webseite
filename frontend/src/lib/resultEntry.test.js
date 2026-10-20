@@ -38,6 +38,22 @@ test("die Eingabe passt zum Format", () => {
   expect(winsNeeded(5)).toBe(3);
 });
 
+test("Lauf (#1823): wer als nicht erschienen markiert ist, steht im Fenster schon so da - die anderen werden angetippt", () => {
+  const entry = {
+    kind: "heat", ranking_mode: "higher_score", result: [],
+    participants: [{ registration_id: "a" }, { registration_id: "b", no_show: true }, { registration_id: "c" }, { registration_id: "d" }],
+  };
+  const state = initialState(entry);
+  expect(state.flags).toEqual({ b: "no_show" });
+  expect(resultsFor(entry, "order", { ...state, order: ["d", "a", "c"] })).toEqual({ results: [
+    { registration_id: "d", rank: 1 }, { registration_id: "a", rank: 2 }, { registration_id: "c", rank: 3 },
+    { registration_id: "b", rank: 4, forfeit: true },
+  ] });
+  // Ein gespeichertes Ergebnis geht vor: wer doch gefahren ist, bleibt ohne Markierung.
+  const played = { ...entry, result: [{ registration_id: "b", rank: 1 }, { registration_id: "a", rank: 2 }, { registration_id: "c", rank: 3 }, { registration_id: "d", rank: 4 }] };
+  expect(initialState(played).flags).toEqual({});
+});
+
 test("ein gespeichertes Ergebnis wird zum Anfangszustand fürs Korrigieren", () => {
   const entry = {
     kind: "duel", best_of: 1, ranking_mode: "higher_score",

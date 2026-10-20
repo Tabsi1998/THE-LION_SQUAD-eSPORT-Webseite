@@ -6,7 +6,7 @@
 // deshalb kann nichts über den Rand laufen. Rundennamen kommen aus derselben Regel wie im Web-Baum (lib/bracketNames).
 import { displayRoundLabels, roundName, treeSlotLabel } from "@/lib/bracketNames";
 import { sectionKind } from "@/lib/bracketSections";
-import { isCancelled, isDone } from "@/lib/bracketGraph";
+import { isCancelled, isDone, markedNoShow } from "@/lib/bracketGraph";
 import { describeSlot, finderFor } from "@/lib/slotSource";
 import { formatBracketSection, stationText } from "@/lib/tournamentLabels";
 import { groupByStation, scheduleEntries } from "@/lib/scheduleView";
@@ -111,6 +111,13 @@ function scoreOf(match, registrationId) {
   return "";
 }
 
+/** Nicht erschienen (#1823): als Wertung im Ergebnis - oder im offenen Lauf markiert. Auf Papier kurz „n. e.“. */
+function noShowNote(match, registrationId) {
+  if (!registrationId) return "";
+  const row = (match.results || []).find((result) => result?.registration_id === registrationId);
+  return row?.forfeit || markedNoShow(match, registrationId) ? "n. e." : "";
+}
+
 function winnerIdOf(match) {
   if (match.winner_id) return match.winner_id;
   const first = (match.results || []).filter((row) => Number(row?.rank) === 1);
@@ -142,6 +149,7 @@ export function printMatch(match, regMap, findMatch) {
         label: info.kind === "player" ? info.label : pending || info.label,
         kind: info.kind,
         score: done && slot.registration_id ? scoreOf(match, slot.registration_id) : "",
+        note: noShowNote(match, slot.registration_id),
         winner: Boolean(winnerId && slot.registration_id === winnerId),
       };
     }),
