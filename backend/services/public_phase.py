@@ -122,7 +122,9 @@ def derive_public_phase(doc: dict, kind: str = "content", now: datetime | None =
             "day_count": where["count"],
         }
 
-    if start and now >= start:
+    # Ausdrücklich gesetzter Status „live“ (#1881): zeigt „Läuft“, auch ohne oder vor dem Startzeitpunkt.
+    # Ende, manuelle Status und die Tagespause mehrtägiger Events (oben) gehen vor.
+    if normalized_status == "live" or (start and now >= start):
         return {
             "state": "live",
             "label": _label("live"),
