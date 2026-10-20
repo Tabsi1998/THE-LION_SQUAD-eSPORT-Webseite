@@ -20,6 +20,7 @@ import { openCookieSettings } from "@/components/tls/CookieConsent";
 import { SeasonFooterSlot, SeasonMenuSlot, SeasonWidgetSlot } from "@/seasons/SeasonSlots";
 import { DiscordLiveLine, useDiscordNow } from "@/components/tls/DiscordNow";
 import { GuestDecoSwitch } from "@/seasons/DecoSwitch";
+import { WhatsNewLink } from "@/components/tls/WhatsNewLink";
 import { api } from "@/lib/api";
 import { getCachedBranding, onBrandingUpdated, setCachedBranding } from "@/lib/brandingEvents";
 import { contactLines, footerButtons, footerColumns } from "@/lib/siteFooter";
@@ -326,6 +327,7 @@ export function PublicLayout({ children }) {
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 flex flex-col md:flex-row items-center justify-between gap-3 text-xs text-white/40 min-w-0">
             <span>© {new Date().getFullYear()} {clubName} — {tagline}. Alle Rechte vorbehalten.</span>
             <div className="flex flex-wrap items-center justify-center md:justify-end gap-4">
+              <WhatsNewLink className="hover:text-[#29B6E8] transition" />
               <Link to="/imprint" className="hover:text-[#29B6E8] transition" data-testid="footer-imprint">Impressum</Link>
               <Link to="/privacy" className="hover:text-[#29B6E8] transition" data-testid="footer-privacy">Datenschutz</Link>
               <Link to="/terms" className="hover:text-[#29B6E8] transition">Nutzungsbedingungen</Link>

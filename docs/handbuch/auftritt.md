@@ -281,6 +281,16 @@ Tabelle. Mehrere Termine stehen nacheinander, am Handy untereinander. Der Punkt 
 
 <img src="../assets/startseite/heute-im-einsatz-handy.png" alt="Startseite am Handy mit dem Streifen Heute im Einsatz über dem Kopf: zwei Karten mit Serie, Runde, Uhrzeit und Vereinsfahrern" width="300">
 
+### 3.9 Neu auf der Website
+
+Die Seite **/neu** zeigt die letzten Neuerungen der Website, je eine in einem Satz mit Datum, die neuesten oben
+(höchstens 30). In der Fußzeile steht unten der Link **Neu**; ein kleiner blauer Punkt daneben zeigt, dass seit dem
+letzten Besuch etwas dazugekommen ist. Beim Öffnen von /neu verschwindet er. Gemerkt wird das nur im Browser.
+
+Gepflegt wird die Liste nicht im Admin, sondern in der Datei `frontend/src/whatsnew.json` (Datum, Satz, optional ein
+Link auf eine Seite der Website) – im Doku-Stand-PR nach einem Merge, wie die Texte der App. Was Website und App
+betrifft, steht in beiden. Ein Satz je Neuerung, ohne Ticketnummern und Planungskürzel; ein Test prüft das.
+
 ---
 
 ## 4. Wenn etwas nicht klappt
