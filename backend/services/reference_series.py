@@ -10,12 +10,34 @@ oder Saisonpunkte, und keine Sammlung wird mit dem Turnierbereich geteilt.
 - **Neu gerechnet** wird beim Schreiben: nach einer Regeländerung (und später nach jedem veröffentlichten Ergebnis)
   rechnet ``recompute_standings`` alle Stände der Serie aus Kalender, veröffentlichten Blättern und Teilnehmern -
   öffentliche Seiten lesen nur den gespeicherten Stand.
+- **Nacheinander** (``series_write``): Ergebnisse speichern, freigeben, verwerfen und alle Kalender-Änderungen einer
+  Saison laufen unter einer Sperre je Saison (``services/mutation_lock.py``) - samt Versionsprüfung, Termin-Status,
+  Aufräumen und Neurechnen. So rechnet nie ein älterer Stand über einen neueren.
 """
 from __future__ import annotations
 
+from contextlib import asynccontextmanager
+
+from fastapi import HTTPException
+
 from models import new_id, now_utc
+from services.mutation_lock import MutationLockBusy, mutation_lock, series_write_resource
 from services.scoring_rules import normalize_rules
 from services.series_standings import compute_standings
+
+SERIES_BUSY = "In dieser Saison wird gerade schon etwas gespeichert. Bitte gleich noch einmal versuchen."
+
+
+@asynccontextmanager
+async def series_write(db, series_id: str):
+    """Sperre je Saison für einen schreibenden Vorgang (Wartezeit wie bei Turnieren). Ist sie zu lange besetzt oder
+    geht sie verloren: 409 mit klarer Meldung - nichts halb Geschriebenes."""
+    try:
+        async with mutation_lock(db, series_write_resource(series_id)):
+            yield
+    except MutationLockBusy:
+        raise HTTPException(409, SERIES_BUSY) from None
+
 
 POINTS_SCHEMES_ID = "points_schemes"
 SERIES_KINDS = ("series", "racing", "team_league")

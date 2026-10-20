@@ -54,23 +54,24 @@ gewertet sind.
 
     {target, version, sheet, created_participants: [{id, name, link*, link_status*}], recomputed, warnings}
 
-- **409**, wenn ``expected_version`` nicht mehr stimmt - auch bei zwei gleichzeitigen Übernahmen (atomar bedingt
-  geschrieben, nie Lesen-dann-Schreiben). **422** mit ``{message, errors, warnings}``, wenn die Prüfung Fehler hat.
-  **403**, wenn ``status: "published"`` ohne Recht zum Veröffentlichen (``access.result_status``).
+- **Nacheinander:** Speichern, Freigeben und Verwerfen laufen - wie alle Kalender-Änderungen der Saison - unter der
+  Sperre je Saison (``reference_series.series_write``, ``services/mutation_lock.py``): Versionsprüfung, Schreiben,
+  Termin-Status, Aufräumen und Neurechnen ohne fremdes Schreiben dazwischen. Ist die Sperre zu lange besetzt: 409 mit
+  der Bitte, es gleich noch einmal zu versuchen.
+- **409**, wenn ``expected_version`` nicht mehr stimmt (veralteter Stand der Seite; geschrieben wird zusätzlich atomar
+  bedingt). **422** mit ``{message, errors, warnings}``, wenn die Prüfung Fehler hat. **403**, wenn
+  ``status: "published"`` ohne Recht zum Veröffentlichen (``access.result_status``).
 - Jede Änderung legt den alten Stand als Revision ab (``reference_round_result_revisions``), schreibt ins
   Adminprotokoll (``reference_result.save``) und rechnet die Stände neu, wenn das Blatt veröffentlicht ist oder war.
   Veröffentlichen setzt den Termin auf „gewertet“ (der Status davor bleibt in ``scored_from``), Zurücknehmen stellt ihn
-  wieder her. Folgen zwei Schreibvorgänge schnell aufeinander, zählt das spätere: Antwort und Termin-Status kommen aus
-  dem Blatt, das das eigene atomare Update geschrieben hat, der Termin merkt sich die Blatt-Version
-  (``result_version``) und wird nur bedingt gesetzt, und die Stände werden aus der Datenbank nachgerechnet, bis sich
-  währenddessen nichts mehr geändert hat.
+  wieder her.
 - **Entwurf daneben:** Ist das Blatt veröffentlicht und die Person darf nicht veröffentlichen (``access.edit_target``
   = ``EDIT_PENDING_DRAFT``), wird die Änderung als ``pending_draft`` neben dem Blatt gespeichert
   (``reference_result.pending_draft``) - das veröffentlichte Blatt bleibt sichtbar und zählt weiter.
 - Unbekannte Namen werden als offene Teilnehmer angelegt (Dialog „Unbekannte Namen“, #1743); ein bestätigter Alias
-  ordnet sie gleich zu. Scheitert das Speichern danach an der Version, werden sie wieder entfernt - nur, solange sie
-  offen, ungenutzt und noch als neu markiert sind (``created_by_sheet``; ein Blatt, das einen Teilnehmer verwendet,
-  nimmt die Markierung vor dem Schreiben weg, ``series_participants.claim_participants``).
+  ordnet sie gleich zu. Entfernt werden sie nur unter der Sperre und nur, solange sie offen sind (keine Zuordnung,
+  kein Alias - beides steht im Löschfilter, falls der Vorstand dazwischen zuordnet) und in keinem Blatt der Saison
+  stehen (``series_participants.remove_unused_new``).
 
 **POST …/results/approve** und **POST …/results/discard** (nur Vorstand), Body ``{expected_version}``: Freigeben
 veröffentlicht den Entwurf daneben (ohne einen solchen das Blatt im Entwurf) samt Revision, Protokoll
@@ -97,9 +98,7 @@ from services import reference_series, series_identity, series_results
 from services.dolibarr_policy import club_today
 from services.reference_series_access import EDIT_PENDING_DRAFT, SeriesAccess, require_series_editor
 from services.scoring_rules import normalize_rules, result_points, validate_sheet
-from services.series_participants import (
-    build_index, claim_participants, new_participant, remove_unused_new, sheet_participant_ids,
-)
+from services.series_participants import build_index, new_participant, remove_unused_new
 from services.series_standings import compute_standings
 
 router = APIRouter(prefix="/api/reference-series", tags=["reference-series"])
@@ -496,78 +495,51 @@ def _counts(content: dict) -> dict:
             "official_table": len(content.get("official_table") or [])}
 
 
-async def _sync_round(db, access: SeriesAccess, round_id: str, version: int, published: bool) -> None:
-    """Termin-Status aus dem Blatt, das *dieses* Schreiben erzeugt hat (``version``, ``published``): veröffentlicht
-    heißt „gewertet“ - der Status davor bleibt in ``scored_from``; Zurücknehmen stellt ihn wieder her.
-
-    Bedingt geschrieben: der Termin merkt sich die Blatt-Version, nach der er zuletzt gesetzt wurde
-    (``result_version``). Hat ein späteres Schreiben ihn schon gesetzt, bleibt er; und gesetzt wird nur, wenn Status und
-    ``result_version`` noch so sind wie eben gelesen (sonst neu lesen). Ändert sich der Status, bekommt der Kalender
-    einen neuen Stand (``calendar_version``), damit offene Seiten neu laden."""
-    for _ in range(5):
-        current = await db.reference_rounds.find_one({"id": round_id, "series_id": access.series_id}, {"_id": 0})
-        if not current or int(current.get("result_version") or 0) >= version:
-            return
-        status = current.get("status")
-        update: dict = {"result_version": version}
-        if published and status != "scored":
-            update.update({"status": "scored", "scored_from": status or "planned"})
-        elif not published and status == "scored":
-            update.update({"status": current.get("scored_from") or "planned", "scored_from": None})
-        if "status" in update:
-            update.update(_stamp(access))
-        done = await db.reference_rounds.update_one(
-            {"id": round_id, "series_id": access.series_id, "status": status,
-             "result_version": current.get("result_version")}, {"$set": update})
-        if done.matched_count:
-            if "status" in update:
-                await db.reference_series.update_one({"id": access.series_id}, {"$inc": {"calendar_version": 1}})
-            return
-
-
-async def _results_state(db, series_id: str) -> tuple:
-    """Was die Stände bestimmt: Version und Status jedes Blatts, Status und Archiv jedes Termins."""
-    sheets = [(row.get("round_id"), row.get("version"), row.get("status")) async for row in
-              db.reference_round_results.find({"series_id": series_id},
-                                              {"_id": 0, "round_id": 1, "version": 1, "status": 1})]
-    rounds = [(row.get("id"), row.get("status"), row.get("archived_at"), row.get("counts"), row.get("result_version"))
-              async for row in db.reference_rounds.find(
-                  {"series_id": series_id},
-                  {"_id": 0, "id": 1, "status": 1, "archived_at": 1, "counts": 1, "result_version": 1})]
-    return (sorted(sheets, key=lambda item: str(item[0])), sorted(rounds, key=lambda item: str(item[0])))
+async def _sync_round(db, access: SeriesAccess, round_id: str, published: bool) -> None:
+    """Termin-Status nach dem Blatt: veröffentlicht heißt „gewertet“ - der Status davor bleibt in ``scored_from``;
+    Zurücknehmen stellt ihn wieder her. Läuft unter der Sperre der Saison (``series_write``) wie Absagen, Verschieben
+    und Archivieren - gelesen und gesetzt wird also ohne Schreiben dazwischen. Ändert sich der Status, bekommt der
+    Kalender einen neuen Stand (``calendar_version``), damit offene Seiten neu laden."""
+    current = await db.reference_rounds.find_one({"id": round_id, "series_id": access.series_id}, {"_id": 0})
+    if not current:
+        return
+    status = current.get("status")
+    if published and status != "scored":
+        update = {"status": "scored", "scored_from": status or "planned"}
+    elif not published and status == "scored":
+        update = {"status": current.get("scored_from") or "planned", "scored_from": None}
+    else:
+        return
+    await db.reference_rounds.update_one({"id": round_id, "series_id": access.series_id},
+                                         {"$set": {**update, **_stamp(access)}})
+    await db.reference_series.update_one({"id": access.series_id}, {"$inc": {"calendar_version": 1}})
 
 
 async def _recompute(db, access: SeriesAccess) -> None:
-    """Stände immer aus dem Stand der Datenbank. Ändert sich währenddessen ein Blatt oder Termin (ein zweites
-    Schreiben), wird nachgerechnet - so gewinnt nie ein Ergebnis, das auf einem älteren Stand gerechnet wurde."""
-    for _ in range(3):
-        before = await _results_state(db, access.series_id)
-        series = await db.reference_series.find_one({"id": access.series_id}, {"_id": 0}) or access.series
-        await reference_series.recompute_standings(db, series)
-        if await _results_state(db, access.series_id) == before:
-            return
+    """Stände aus dem Stand der Datenbank (mit den aktuellen Regeln der Saison) - unter der Sperre einmal: währenddessen
+    schreibt niemand ein Blatt oder einen Termin dieser Saison."""
+    series = await db.reference_series.find_one({"id": access.series_id}, {"_id": 0}) or access.series
+    await reference_series.recompute_standings(db, series)
 
 
-async def _create_people(db, access: SeriesAccess, resolution, round_id: str) -> dict[str, dict]:
-    """Neue Namen als offene Teilnehmer (mit bestätigtem Alias gleich zugeordnet), markiert als von diesem Speichern
-    angelegt (``created_by_sheet``). Schlüssel → Teilnehmer."""
+async def _create_people(db, access: SeriesAccess, resolution) -> dict[str, dict]:
+    """Neue Namen als offene Teilnehmer (mit bestätigtem Alias gleich zugeordnet). Schlüssel → Teilnehmer."""
     people = list(resolution.new_people.values())
     if not people:
         return {}
     index = await build_index(db, access.series, [person["name"] for person in people], with_ids=False)
-    marker = f"{round_id}:{new_id()}"
     created = {}
     for person in people:
         created[person["key"]] = await new_participant(db, access.series, index, {
             "name": person["name"], "start_number": person["start_number"], "default_team": person["team"]},
-            access.user, created_by_sheet=marker)
+            access.user)
     return created
 
 
 async def _write_sheet(db, access: SeriesAccess, round_doc: dict, existing: dict | None, content: dict, status: str,
                        expected: int) -> dict | None:
     """Das Blatt selbst schreiben - atomar bedingt: neu nur, wenn es noch keins gibt, sonst nur mit der erwarteten
-    Version. ``None`` heißt: jemand war schneller."""
+    Version. ``None`` heißt: jemand war schneller (unter der Sperre nur, wenn jemand ohne sie schreibt)."""
     stamp = _stamp(access)
     fields = {**content, "status": status, **stamp}
     if status == "published" and (existing or {}).get("status") != "published":
@@ -591,7 +563,7 @@ async def _write_sheet(db, access: SeriesAccess, round_doc: dict, existing: dict
 async def _write_pending(db, access: SeriesAccess, existing: dict, content: dict, expected: int,
                          created_ids: list[str]) -> dict | None:
     """Entwurf daneben. ``created_participant_ids`` merkt, wen Entwürfe dieses Blatts neu angelegt haben - auch über
-    ersetzte Entwürfe hinweg -, damit Verwerfen sie wieder entfernen kann."""
+    ersetzte Entwürfe hinweg -, damit Verwerfen und Freigeben sie wieder entfernen können."""
     earlier = (existing.get("pending_draft") or {}).get("created_participant_ids") or []
     draft = {**content, "created_at": now_utc().isoformat(), "created_by": access.user["id"],
              "based_on_version": expected, "created_participant_ids": list(dict.fromkeys([*earlier, *created_ids]))}
@@ -601,58 +573,52 @@ async def _write_pending(db, access: SeriesAccess, existing: dict, content: dict
 @router.put(BASE)
 async def save_results(series_id: str, round_id: str, body: ResultSave,
                        access: SeriesAccess = Depends(require_series_editor)):
-    """Übernehmen: aufs Blatt oder - veröffentlichtes Blatt, ohne Recht zum Veröffentlichen - als Entwurf daneben."""
+    """Übernehmen: aufs Blatt oder - veröffentlichtes Blatt, ohne Recht zum Veröffentlichen - als Entwurf daneben.
+    Alles ab der Versionsprüfung läuft unter der Sperre der Saison (``reference_series.series_write``)."""
     db = get_db()
-    round_doc = await access.round(round_id)
+    await access.round(round_id)
     status = access.result_status(body.status)
-    existing = await _sheet(db, series_id, round_id)
-    _require_version(existing, body.expected_version)
-    target = access.edit_target(existing)
-    _, _, resolution = await _prepare(db, access, round_doc, body)
-    _refuse(resolution)
+    async with reference_series.series_write(db, series_id):
+        round_doc = await access.round(round_id)  # neu gelesen: inzwischen abgesagt oder archiviert?
+        existing = await _sheet(db, series_id, round_id)
+        _require_version(existing, body.expected_version)
+        target = access.edit_target(existing)
+        _, _, resolution = await _prepare(db, access, round_doc, body)
+        _refuse(resolution)
 
-    created = await _create_people(db, access, resolution, round_doc["id"])
-    own = [doc["id"] for doc in created.values()]
-    content = series_results.replace_new_ids(resolution.content(), {key: doc["id"] for key, doc in created.items()})
-    # Wer schon in der Saison stand, gilt ab jetzt als verwendet - außer die Entwürfe dieses Blatts haben ihn selbst
-    # neu angelegt (dann darf Verwerfen ihn weiter mitnehmen). Fehlt einer, hat ihn das Aufräumen gerade entfernt.
-    chain = set(((existing or {}).get("pending_draft") or {}).get("created_participant_ids") or []) \
-        if target == EDIT_PENDING_DRAFT else set()
-    used = sheet_participant_ids(content) - set(own) - chain
-    saved = None
-    if await claim_participants(db, series_id, used):
+        created = await _create_people(db, access, resolution)
+        own = [doc["id"] for doc in created.values()]
+        content = series_results.replace_new_ids(resolution.content(),
+                                                 {key: doc["id"] for key, doc in created.items()})
         if target == EDIT_PENDING_DRAFT:
             saved = await _write_pending(db, access, existing, content, body.expected_version, own)
         else:
             saved = await _write_sheet(db, access, round_doc, existing, content, status, body.expected_version)
-    if saved is None:
-        # Jemand war schneller: die eben angelegten Teilnehmer gehen wieder - nur, wenn sie noch offen, unverwendet und
-        # von niemandem übernommen sind (Bedingung im Löschfilter, ``remove_unused_new``).
-        await remove_unused_new(db, series_id, own)
-        raise HTTPException(409, STALE)
-    if target != EDIT_PENDING_DRAFT:
-        await claim_participants(db, series_id, own)
+        if saved is None:
+            # Jemand ohne Sperre war schneller: die eben angelegten, noch offenen und unverwendeten Teilnehmer gehen.
+            await remove_unused_new(db, series_id, own)
+            raise HTTPException(409, STALE)
 
-    revision_id = None
-    if target == EDIT_PENDING_DRAFT:
-        if existing.get("pending_draft"):
-            revision_id = await _revision(db, existing, kind="pending_draft", reason="replace", access=access)
-    elif existing:
-        revision_id = await _revision(db, existing, kind="sheet", reason="save", access=access)
-    was_published = (existing or {}).get("status") == "published"
-    await _log(db, "reference_result.pending_draft" if target == EDIT_PENDING_DRAFT else "reference_result.save",
-               access, saved, {
-                   "version": saved["version"], "previous_version": _version(existing),
-                   "status": "draft" if target == EDIT_PENDING_DRAFT else status,
-                   "previous_status": (existing or {}).get("status"), "revision_id": revision_id, **_counts(content),
-                   "created_participants": [doc["id"] for doc in created.values()]})
-    recomputed = False
-    if target != EDIT_PENDING_DRAFT:
-        now_published = saved.get("status") == "published"
-        await _sync_round(db, access, round_doc["id"], saved["version"], now_published)
-        if was_published or now_published:
-            await _recompute(db, access)
-            recomputed = True
+        revision_id = None
+        if target == EDIT_PENDING_DRAFT:
+            if existing.get("pending_draft"):
+                revision_id = await _revision(db, existing, kind="pending_draft", reason="replace", access=access)
+        elif existing:
+            revision_id = await _revision(db, existing, kind="sheet", reason="save", access=access)
+        was_published = (existing or {}).get("status") == "published"
+        await _log(db, "reference_result.pending_draft" if target == EDIT_PENDING_DRAFT else "reference_result.save",
+                   access, saved, {
+                       "version": saved["version"], "previous_version": _version(existing),
+                       "status": "draft" if target == EDIT_PENDING_DRAFT else status,
+                       "previous_status": (existing or {}).get("status"), "revision_id": revision_id,
+                       **_counts(content), "created_participants": own})
+        recomputed = False
+        if target != EDIT_PENDING_DRAFT:
+            now_published = saved.get("status") == "published"
+            await _sync_round(db, access, round_id, now_published)
+            if was_published or now_published:
+                await _recompute(db, access)
+                recomputed = True
     return {
         "target": target, "version": saved["version"], "sheet": _sheet_view(saved, access), "recomputed": recomputed,
         "created_participants": [{key: doc.get(key) for key in (
@@ -684,43 +650,43 @@ async def _approval_errors(db, access: SeriesAccess, round_doc: dict, content: d
 @router.post(BASE + "/approve")
 async def approve_results(series_id: str, round_id: str, body: ResultDecision,
                           access: SeriesAccess = Depends(require_series_editor)):
-    """Vorstand: den Entwurf daneben veröffentlichen - ohne einen solchen das Blatt im Entwurf."""
+    """Vorstand: den Entwurf daneben veröffentlichen - ohne einen solchen das Blatt im Entwurf. Unter der Sperre der
+    Saison."""
     access.require_board()
     db = get_db()
-    round_doc = await access.round(round_id)
-    existing = await _sheet(db, series_id, round_id)
-    if existing is None:
-        raise HTTPException(409, "Für diesen Termin gibt es noch kein Ergebnis.")
-    _require_version(existing, body.expected_version)
-    pending = existing.get("pending_draft")
-    if not pending and existing.get("status") == "published":
-        raise HTTPException(409, "Es gibt keinen Entwurf zur Freigabe.")
-    source = pending or existing
-    content = _content(source)
-    errors = await _approval_errors(db, access, round_doc, content)
-    if errors:
-        raise HTTPException(422, {"message": "Der Entwurf hat Fehler.", "errors": errors, "warnings": []})
-    # Wer im freigegebenen Blatt steht, gilt ab jetzt als verwendet; fehlt einer, war das Aufräumen schneller.
-    if not await claim_participants(db, series_id, sheet_participant_ids(content)):
-        raise HTTPException(409, STALE)
-    stamp = _stamp(access)
-    drafted_by = source.get("created_by") if pending else source.get("updated_by")
-    saved = await _update_if_current(db, existing["id"], body.expected_version, {"$set": {
-        **content, "status": "published", "pending_draft": None, **stamp, "published_at": stamp["updated_at"],
-        "published_by": access.user["id"], "approved_at": stamp["updated_at"], "approved_by": access.user["id"],
-        "drafted_by": drafted_by}})
-    if saved is None:
-        raise HTTPException(409, STALE)
-    revision_id = await _revision(db, existing, kind="sheet", reason="approve", access=access)
-    # Wen nur ersetzte Entwürfe angelegt haben, geht wie beim Verwerfen - wer im freigegebenen Blatt steht, bleibt.
-    removed = await remove_unused_new(db, series_id, (pending or {}).get("created_participant_ids"))
-    await _log(db, "reference_result.approve", access, saved, {
-        "version": saved["version"], "previous_version": _version(existing),
-        "previous_status": existing.get("status"), "from": "pending_draft" if pending else "draft",
-        "drafted_by": drafted_by, "revision_id": revision_id, **_counts(content),
-        "removed_participants": [{"id": row["id"], "name": row.get("name")} for row in removed]})
-    await _sync_round(db, access, round_id, saved["version"], True)
-    await _recompute(db, access)
+    await access.round(round_id)
+    async with reference_series.series_write(db, series_id):
+        round_doc = await access.round(round_id)
+        existing = await _sheet(db, series_id, round_id)
+        if existing is None:
+            raise HTTPException(409, "Für diesen Termin gibt es noch kein Ergebnis.")
+        _require_version(existing, body.expected_version)
+        pending = existing.get("pending_draft")
+        if not pending and existing.get("status") == "published":
+            raise HTTPException(409, "Es gibt keinen Entwurf zur Freigabe.")
+        source = pending or existing
+        content = _content(source)
+        errors = await _approval_errors(db, access, round_doc, content)
+        if errors:
+            raise HTTPException(422, {"message": "Der Entwurf hat Fehler.", "errors": errors, "warnings": []})
+        stamp = _stamp(access)
+        drafted_by = source.get("created_by") if pending else source.get("updated_by")
+        saved = await _update_if_current(db, existing["id"], body.expected_version, {"$set": {
+            **content, "status": "published", "pending_draft": None, **stamp, "published_at": stamp["updated_at"],
+            "published_by": access.user["id"], "approved_at": stamp["updated_at"], "approved_by": access.user["id"],
+            "drafted_by": drafted_by}})
+        if saved is None:
+            raise HTTPException(409, STALE)
+        revision_id = await _revision(db, existing, kind="sheet", reason="approve", access=access)
+        # Wen nur ersetzte Entwürfe angelegt haben, geht wie beim Verwerfen - wer im freigegebenen Blatt steht, bleibt.
+        removed = await remove_unused_new(db, series_id, (pending or {}).get("created_participant_ids"))
+        await _log(db, "reference_result.approve", access, saved, {
+            "version": saved["version"], "previous_version": _version(existing),
+            "previous_status": existing.get("status"), "from": "pending_draft" if pending else "draft",
+            "drafted_by": drafted_by, "revision_id": revision_id, **_counts(content),
+            "removed_participants": [{"id": row["id"], "name": row.get("name")} for row in removed]})
+        await _sync_round(db, access, round_id, True)
+        await _recompute(db, access)
     return {"version": saved["version"], "sheet": _sheet_view(saved, access), "recomputed": True,
             "removed_participants": [row["id"] for row in removed]}
 
@@ -729,22 +695,25 @@ async def approve_results(series_id: str, round_id: str, body: ResultDecision,
 async def discard_pending_draft(series_id: str, round_id: str, body: ResultDecision,
                                 access: SeriesAccess = Depends(require_series_editor)):
     """Vorstand: den Entwurf neben dem veröffentlichten Blatt verwerfen; das Blatt bleibt, wie es ist. Teilnehmer, die
-    nur Entwürfe dieses Blatts neu angelegt haben und die noch offen und sonst nirgends verwendet sind, gehen mit."""
+    nur Entwürfe dieses Blatts neu angelegt haben und die noch offen und sonst nirgends verwendet sind, gehen mit. Unter
+    der Sperre der Saison."""
     access.require_board()
     db = get_db()
     await access.round(round_id)
-    existing = await _sheet(db, series_id, round_id)
-    if not (existing or {}).get("pending_draft"):
-        raise HTTPException(409, "Es gibt keinen Entwurf zum Verwerfen.")
-    _require_version(existing, body.expected_version)
-    saved = await _update_if_current(db, existing["id"], body.expected_version, {"$set": {"pending_draft": None}})
-    if saved is None:
-        raise HTTPException(409, STALE)
-    revision_id = await _revision(db, existing, kind="pending_draft", reason="discard", access=access)
-    removed = await remove_unused_new(db, series_id, existing["pending_draft"].get("created_participant_ids"))
-    await _log(db, "reference_result.discard", access, saved, {
-        "version": saved["version"], "previous_version": _version(existing),
-        "drafted_by": existing["pending_draft"].get("created_by"), "revision_id": revision_id,
-        "removed_participants": [{"id": row["id"], "name": row.get("name")} for row in removed]})
+    async with reference_series.series_write(db, series_id):
+        existing = await _sheet(db, series_id, round_id)
+        if not (existing or {}).get("pending_draft"):
+            raise HTTPException(409, "Es gibt keinen Entwurf zum Verwerfen.")
+        _require_version(existing, body.expected_version)
+        saved = await _update_if_current(db, existing["id"], body.expected_version,
+                                         {"$set": {"pending_draft": None}})
+        if saved is None:
+            raise HTTPException(409, STALE)
+        revision_id = await _revision(db, existing, kind="pending_draft", reason="discard", access=access)
+        removed = await remove_unused_new(db, series_id, existing["pending_draft"].get("created_participant_ids"))
+        await _log(db, "reference_result.discard", access, saved, {
+            "version": saved["version"], "previous_version": _version(existing),
+            "drafted_by": existing["pending_draft"].get("created_by"), "revision_id": revision_id,
+            "removed_participants": [{"id": row["id"], "name": row.get("name")} for row in removed]})
     return {"version": saved["version"], "sheet": _sheet_view(saved, access),
             "removed_participants": [row["id"] for row in removed]}

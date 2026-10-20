@@ -58,6 +58,11 @@ def tournament_write_resource(tournament_id: str) -> str:
     return f"tournament:{tournament_id}:write"
 
 
+def series_write_resource(series_id: str) -> str:
+    """Externe Serien (#1744): alle schreibenden Vorgänge einer Saison (Ergebnisse, Kalender) nacheinander."""
+    return f"series:{series_id}"
+
+
 class _MutationLease:
     def __init__(self, db, resource: str, wait_seconds: float, lease_seconds: float, retry_seconds: float):
         self._db = db

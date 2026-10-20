@@ -1,7 +1,9 @@
 """Ergebnisse externer Serien eintragen (#1744) über die echten Routen: Vorschau ändert nichts, Übernehmen mit Version
-(409, auch bei zwei gleichzeitigen), Revision und Protokoll, Neurechnen mit Streichergebnissen, Entwurf eines Captains
-neben dem veröffentlichten Blatt mit Freigabe oder Verwerfen durch den Vorstand, unbekannte Namen als offene
-Teilnehmer, Team-Liga mit Tabelle laut Veranstalter. Kennungen fremder Serien antworten 404. Nur erfundene Namen."""
+(409, auch bei zwei gleichzeitigen), alle schreibenden Vorgänge einer Saison nacheinander unter einer Sperre (Ergebnis
+und Kalender; parallele Vorgänge enden stimmig), Revision und Protokoll, Neurechnen mit Streichergebnissen, Entwurf
+eines Captains neben dem veröffentlichten Blatt mit Freigabe oder Verwerfen durch den Vorstand, unbekannte Namen als
+offene Teilnehmer, Team-Liga mit Tabelle laut Veranstalter. Kennungen fremder Serien antworten 404. Nur erfundene
+Namen."""
 import asyncio
 import pathlib
 import sys
@@ -13,9 +15,9 @@ import pytest_asyncio
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 
-from flow_harness import InterleavedReads, make_flow  # noqa: E402
+from flow_harness import make_flow  # noqa: E402
 from routes import reference_result_routes  # noqa: E402
-from services import migrations  # noqa: E402
+from services import migrations, reference_series  # noqa: E402
 from services.dolibarr_policy import club_today  # noqa: E402
 
 ADMIN = "/api/reference-series/admin"
@@ -26,6 +28,8 @@ RULES = {"points_by_place": [10, 6, 4], "count_mode": "drop_n", "count_n": 1, "f
 @pytest_asyncio.fixture
 async def flow():
     instance, shutdown = make_flow()
+    # Die Sperre je Saison braucht wie in der Datenbank (database.py) einen eindeutigen Schlüssel.
+    await instance.db.mutation_locks.create_index("resource", unique=True)
     try:
         yield instance
     finally:
@@ -226,25 +230,19 @@ async def test_saving_writes_revisions_and_the_log_and_recomputes_with_dropped_r
 
 
 @pytest.mark.asyncio
-async def test_two_simultaneous_saves_one_wins_the_other_gets_409(flow, monkeypatch):
+async def test_two_simultaneous_saves_one_wins_the_other_gets_409(flow):
     ctx = await _setup(flow)
-    gate = InterleavedReads(flow.db, "reference_round_results")
-    monkeypatch.setattr(reference_result_routes, "get_db", lambda: gate)
-    answers = await asyncio.gather(
-        flow.put(_url(ctx, 0), json={"rows": _rows("Anna Probe", "Neu Nora"), "status": "published",
-                                     "expected_version": 0}),
-        flow.put(_url(ctx, 0), json={"rows": _rows("Neu Nora", "Bert Bolzt"), "status": "published",
-                                     "expected_version": 0}))
+    answers = await asyncio.gather(*(flow.put(_url(ctx, 0), json={
+        "rows": _rows(*order), "status": "published", "expected_version": 0})
+        for order in (("Anna Probe", "Neu Nora"), ("Neu Otto", "Bert Bolzt"))))
     assert sorted(answer.status_code for answer in answers) == [200, 409]
     assert await flow.db.reference_round_results.count_documents({}) == 1
-    # Der Verlierer räumt den eben angelegten Teilnehmer wieder weg - es bleibt genau einer, und das Blatt kennt ihn.
-    nora = await flow.db.reference_participants.find({"name": "Neu Nora"}, {"_id": 0}).to_list(None)
+    # Der Verlierer prüft die Version unter der Sperre, bevor er etwas anlegt: nur der neue Name des Gewinners bleibt.
     sheet = await flow.db.reference_round_results.find_one({})
-    assert len(nora) == 1 and nora[0]["id"] in [row["participant_id"] for row in sheet["rows"]]
+    new = await flow.db.reference_participants.find({"name": {"$in": ["Neu Nora", "Neu Otto"]}}).to_list(None)
+    assert len(new) == 1 and new[0]["id"] in [row["participant_id"] for row in sheet["rows"]]
 
     # Auch zwei Korrekturen auf denselben Stand: eine gewinnt.
-    gate = InterleavedReads(flow.db, "reference_round_results")
-    monkeypatch.setattr(reference_result_routes, "get_db", lambda: gate)
     answers = await asyncio.gather(*(flow.put(_url(ctx, 0), json={
         "rows": _rows(*order), "status": "published", "expected_version": 1})
         for order in (("Anna Probe", "Bert Bolzt"), ("Bert Bolzt", "Anna Probe"))))
@@ -254,78 +252,177 @@ async def test_two_simultaneous_saves_one_wins_the_other_gets_409(flow, monkeypa
 
 
 @pytest.mark.asyncio
-async def test_two_quick_writes_in_a_row_leave_round_status_and_standings_consistent(flow, monkeypatch):
+async def test_a_second_write_waits_for_the_first_and_round_and_standings_follow_the_last(flow, monkeypatch):
     ctx = await _setup(flow)
     await _save(flow, ctx, 0, _rows("Anna Probe", "Bert Bolzt"))
-    later = {}
+    written = asyncio.Event()
 
-    async def publish_again():
-        # A hat eben zurückgenommen (Version 2) und ist noch nicht fertig - da veröffentlicht B schon wieder (3).
-        later["answer"] = await flow.put(_url(ctx, 0), json={
-            "rows": _rows("Bert Bolzt", "Anna Probe"), "status": "published", "expected_version": 2})
+    async def pause():
+        written.set()
+        await asyncio.sleep(0.3)
 
-    gate = _Hooked(flow.db, "reference_round_results", "find_one_and_update", publish_again, after=True)
+    gate = _Hooked(flow.db, "reference_round_results", "find_one_and_update", pause, after=True)
     monkeypatch.setattr(reference_result_routes, "get_db", lambda: gate)
-    first = await flow.put(_url(ctx, 0), json={"rows": _rows("Anna Probe", "Bert Bolzt"), "status": "draft",
-                                               "expected_version": 1})
-    assert first.status_code == 200, first.text
-    assert later["answer"].status_code == 200, later["answer"].text
-    # A meldet, was A geschrieben hat - nicht den Stand von B.
+    first = asyncio.create_task(flow.put(_url(ctx, 0), json={
+        "rows": _rows("Anna Probe", "Bert Bolzt"), "status": "draft", "expected_version": 1}))
+    await written.wait()
+    second = await flow.put(_url(ctx, 0), json={"rows": _rows("Bert Bolzt", "Anna Probe"), "status": "published",
+                                                "expected_version": 2})
+    first = await first
+    assert (first.status_code, second.status_code) == (200, 200), (first.text, second.text)
     assert (first.json()["version"], first.json()["sheet"]["status"]) == (2, "draft")
+    # B wartet, bis A ganz fertig ist - erst A, dann B im Protokoll; Termin und Stand folgen B.
+    versions = [row["data"]["version"] async for row in flow.db.audit_logs.find({"action": "reference_result.save"})]
+    assert versions == [1, 2, 3]
     sheet = await flow.db.reference_round_results.find_one({"round_id": ctx["rounds"][0]})
     assert (sheet["version"], sheet["status"]) == (3, "published")
-    # Termin und Stand folgen dem letzten Schreiben (B), nicht dem, der zuletzt fertig wurde (A).
-    round_doc = await flow.db.reference_rounds.find_one({"id": ctx["rounds"][0]})
-    assert (round_doc["status"], round_doc["result_version"]) == ("scored", 3)
+    assert (await flow.db.reference_rounds.find_one({"id": ctx["rounds"][0]}))["status"] == "scored"
     standing = await _standing(flow, ctx, 0)
     assert standing and standing[0]["participant_id"] == ctx["people"]["Bert Bolzt"]
 
 
 @pytest.mark.asyncio
-async def test_the_loser_keeps_a_new_participant_that_was_assigned_before_it_cleans_up(flow, monkeypatch):
+@pytest.mark.parametrize("action", ["cancel", "archive"])
+async def test_cancelling_or_archiving_waits_for_a_result_being_written(flow, monkeypatch, action):
     ctx = await _setup(flow)
+    written = asyncio.Event()
 
-    async def assign_meanwhile():
-        # Der Vorstand ordnet die neuen Namen zu, während der Verlierer gerade aufräumen will.
-        await flow.db.reference_participants.update_many({"name": {"$in": ["Neu Nora", "Neu Otto"]}}, {"$set": {
-            "link": "guest", "link_status": "decided"}})
+    async def pause():
+        written.set()
+        await asyncio.sleep(0.3)
 
-    gate = _Hooked(InterleavedReads(flow.db, "reference_round_results"), "reference_participants", "delete_many",
-                   assign_meanwhile)
+    gate = _Hooked(flow.db, "reference_round_results", "update_one", pause, after=True)
     monkeypatch.setattr(reference_result_routes, "get_db", lambda: gate)
-    # Jede Seite bringt einen eigenen neuen Namen mit - der Verlierer muss also aufräumen.
-    answers = await asyncio.gather(*(flow.put(_url(ctx, 0), json={
-        "rows": _rows(*order), "status": "published", "expected_version": 0})
-        for order in (("Anna Probe", "Neu Nora"), ("Neu Otto", "Bert Bolzt"))))
-    assert sorted(answer.status_code for answer in answers) == [200, 409]
-    assert gate.fired
-    assert await flow.db.reference_participants.count_documents({"name": {"$in": ["Neu Nora", "Neu Otto"]}}) == 2
+    saving = asyncio.create_task(flow.put(_url(ctx, 0), json={
+        "rows": _rows("Anna Probe", "Bert Bolzt"), "status": "published", "expected_version": 0}))
+    await written.wait()
+    # Das Ergebnis ist geschrieben, der Termin noch nicht gewertet - Absagen bzw. Archivieren muss warten.
+    closing = await flow.post(f"{ADMIN}/series/{ctx['own']['id']}/rounds/{ctx['rounds'][0]}/{action}", json={})
+    saved = await saving
+    assert saved.status_code == 200, saved.text
+    assert closing.status_code == 409 and "gewertet" in closing.json()["detail"]
+    round_doc = await flow.db.reference_rounds.find_one({"id": ctx["rounds"][0]})
+    assert (round_doc["status"], round_doc.get("archived_at")) == ("scored", None)
+    assert (await flow.db.reference_round_results.find_one({}))["status"] == "published"
+    assert await _standing(flow, ctx, 0)
 
 
 @pytest.mark.asyncio
-async def test_discarding_keeps_a_new_participant_another_sheet_took_between_check_and_delete(flow, monkeypatch):
+async def test_a_lost_approval_claims_nothing_and_discarding_still_cleans_up(flow, monkeypatch):
     ctx = await _setup(flow)
     await _save(flow, ctx, 0, _rows("Anna Probe", "Bert Bolzt"))
     flow.act_as(ctx["captain"])
     await _save(flow, ctx, 0, _rows("Neu Nora", "Anna Probe"), version=1, status="draft")
     nora = await flow.db.reference_participants.find_one({"name": "Neu Nora"})
     flow.act_as(ctx["board"])
-    taken = {}
 
-    async def save_elsewhere():
-        # Zwischen Prüfen und Löschen trägt jemand Nora in ein anderes Blatt ein.
-        taken["answer"] = await flow.put(_url(ctx, 1), json={
-            "rows": [{"participant_id": nora["id"], "place": 1}], "status": "draft", "expected_version": 0})
+    async def someone_else_writes():
+        # Genau vor dem Schreiben der Freigabe ändert sich das Blatt - die Freigabe verliert.
+        await flow.db.reference_round_results.update_one({"round_id": ctx["rounds"][0]}, {"$inc": {"version": 1}})
 
-    gate = _Hooked(flow.db, "reference_participants", "delete_many", save_elsewhere)
+    gate = _Hooked(flow.db, "reference_round_results", "find_one_and_update", someone_else_writes)
+    monkeypatch.setattr(reference_result_routes, "get_db", lambda: gate)
+    lost = await flow.post(_url(ctx, 0, "/approve"), json={"expected_version": 2})
+    assert lost.status_code == 409
+    sheet = await flow.db.reference_round_results.find_one({})
+    assert (sheet["status"], bool(sheet["pending_draft"]), sheet["version"]) == ("published", True, 3)
+    # Nichts ist hängen geblieben: Verwerfen nimmt Nora weiter mit.
+    discarded = await flow.post(_url(ctx, 0, "/discard"), json={"expected_version": 3})
+    assert discarded.status_code == 200, discarded.text
+    assert discarded.json()["removed_participants"] == [nora["id"]]
+    assert await flow.db.reference_participants.find_one({"id": nora["id"]}) is None
+
+
+@pytest.mark.asyncio
+async def test_discarding_keeps_a_new_participant_the_board_assigns_between_check_and_delete(flow, monkeypatch):
+    ctx = await _setup(flow)
+    await _save(flow, ctx, 0, _rows("Anna Probe", "Bert Bolzt"))
+    flow.act_as(ctx["captain"])
+    await _save(flow, ctx, 0, _rows("Neu Nora", "Anna Probe"), version=1, status="draft")
+    nora = await flow.db.reference_participants.find_one({"name": "Neu Nora"})
+    flow.act_as(ctx["board"])
+
+    async def assign_meanwhile():
+        # Die Zuordnung (#1743) läuft ohne die Sperre der Saison - genau zwischen Prüfen und Löschen.
+        await flow.db.reference_participants.update_one({"id": nora["id"]}, {"$set": {
+            "link": "guest", "link_status": "decided"}})
+
+    gate = _Hooked(flow.db, "reference_participants", "delete_many", assign_meanwhile)
     monkeypatch.setattr(reference_result_routes, "get_db", lambda: gate)
     discarded = await flow.post(_url(ctx, 0, "/discard"), json={"expected_version": 2})
     assert discarded.status_code == 200, discarded.text
-    assert taken["answer"].status_code == 200, taken["answer"].text
-    assert discarded.json()["removed_participants"] == []
+    assert gate.fired and discarded.json()["removed_participants"] == []
     assert await flow.db.reference_participants.find_one({"id": nora["id"]}) is not None
-    other = await flow.db.reference_round_results.find_one({"round_id": ctx["rounds"][1]})
-    assert other["rows"][0]["participant_id"] == nora["id"]
+
+
+class _SlowWrites:
+    """Jedes Schreiben auf ``collection`` wartet danach kurz - so laufen gleichzeitige Anfragen wirklich ineinander
+    (mongomock antwortet sonst ohne Pause)."""
+
+    def __init__(self, db, collection: str, seconds: float = 0.02):
+        self._db, self._collection, self._seconds = db, collection, seconds
+
+    def __getattr__(self, name):
+        target = getattr(self._db, name)
+        return _SlowCollection(target, self._seconds) if name == self._collection else target
+
+    def __getitem__(self, name):
+        return self.__getattr__(name)
+
+
+class _SlowCollection:
+    WRITES = {"update_one", "update_many", "insert_one", "find_one_and_update", "delete_many"}
+
+    def __init__(self, collection, seconds: float):
+        self._collection, self._seconds = collection, seconds
+
+    def __getattr__(self, name):
+        original = getattr(self._collection, name)
+        if name not in self.WRITES:
+            return original
+
+        async def slow(*args, **kwargs):
+            result = await original(*args, **kwargs)
+            await asyncio.sleep(self._seconds)
+            return result
+        return slow
+
+
+@pytest.mark.asyncio
+async def test_parallel_results_and_calendar_changes_end_consistent(flow, monkeypatch):
+    ctx = await _setup(flow, rounds=4)
+    gate = _SlowWrites(flow.db, "reference_round_results")
+    monkeypatch.setattr(reference_result_routes, "get_db", lambda: gate)
+    sid, rounds = ctx["own"]["id"], ctx["rounds"]
+    answers = await asyncio.gather(
+        flow.put(_url(ctx, 0), json={"rows": _rows("Anna Probe", "Bert Bolzt"), "status": "published",
+                                     "expected_version": 0}),
+        flow.put(_url(ctx, 1), json={"rows": _rows("Bert Bolzt", "Carl Kurve"), "status": "published",
+                                     "expected_version": 0}),
+        flow.post(f"{ADMIN}/series/{sid}/rounds/{rounds[1]}/cancel", json={}),
+        flow.put(_url(ctx, 2), json={"rows": _rows("Carl Kurve", "Anna Probe"), "status": "published",
+                                     "expected_version": 0}),
+        flow.post(f"{ADMIN}/series/{sid}/rounds/{rounds[2]}/postpone", json={"day": _day(-1)}),
+        flow.post(f"{ADMIN}/series/{sid}/rounds/{rounds[3]}/archive", json={}),
+        flow.put(_url(ctx, 0), json={"rows": _rows("Bert Bolzt", "Anna Probe"), "status": "published",
+                                     "expected_version": 1}),
+    )
+    # Erlaubt sind Erfolg, veralteter Stand, „schon gewertet“ und ein abgesagter Termin (422) - nie ein Serverfehler.
+    assert all(answer.status_code in (200, 409, 422) for answer in answers), [a.text for a in answers]
+    sheets = {row["round_id"]: row async for row in flow.db.reference_round_results.find({}, {"_id": 0})}
+    for round_doc in await flow.db.reference_rounds.find({"series_id": sid}, {"_id": 0}).to_list(None):
+        published = (sheets.get(round_doc["id"]) or {}).get("status") == "published"
+        # Gewertet genau dann, wenn das Blatt veröffentlicht ist; kein archivierter Termin mit Ergebnis.
+        assert (round_doc["status"] == "scored") == published, round_doc
+        assert not (published and round_doc.get("archived_at")), round_doc
+    # Die gespeicherten Stände sind genau die, die ein frisches Neurechnen ergibt.
+    stored = {(row["round_id"], row["scope"]): row["rows"]
+              async for row in flow.db.reference_standings.find({"series_id": sid}, {"_id": 0})}
+    series = await flow.db.reference_series.find_one({"id": sid}, {"_id": 0})
+    await reference_series.recompute_standings(flow.db, series)
+    fresh = {(row["round_id"], row["scope"]): row["rows"]
+             async for row in flow.db.reference_standings.find({"series_id": sid}, {"_id": 0})}
+    assert stored == fresh and stored
 
 
 @pytest.mark.asyncio
