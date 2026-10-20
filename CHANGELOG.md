@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.6.2 (20.10.2026)
+
+### Fehlerbehebungen
+
+* „Nicht erschienen“ im Lauf wertet nicht mehr den ganzen Lauf – der Lauf bleibt offen, die Person steht nach dem Eintragen hinten (#1823)
+* Austritt bei Show-Auslosung je Weg rückt beide Wege nach einer Regel auf, Korrektur findet jeden Platz ([#1848](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1848), [#1849](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1849))
+* Baum und TV zeigen „nicht erschienen“ im offenen Lauf (#1823)
+* Ergebnis-Fenster belegt „nicht erschienen“ im Lauf vor (#1823)
+* Ist nur der Lauf des Ersten schon aufgerufen, behält der Zweite nach dessen Austritt seinen Platz (#1839)
+* Lauf mit Loser Bracket nach Austritt wieder eintragbar (#1823)
+* Nachrücker nach Austritt sitzt im Läufe-Cup mit Loser Bracket nur in einem Lauf (#1839)
+* Show-Auslosung und „Neu auslosen“ lassen Ausgetretene aus dem Topf (#1839)
+* Turnierleitung meldet „Lauf bleibt offen“ statt „kampflos“ (#1823)
+
 ## 1.6.1 (20.10.2026)
 
 ### Fehlerbehebungen
