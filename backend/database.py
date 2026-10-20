@@ -134,6 +134,8 @@ async def init_indexes():
     await db.reference_rounds.create_index("id", unique=True)
     await db.reference_rounds.create_index([("series_id", 1), ("order", 1)])
     await db.reference_rounds.create_index([("club_day", 1), ("status", 1)])
+    # „Läuft gerade“ (#1748): nächster offener Termin je Serie (series_id in …, club_day >= heute).
+    await db.reference_rounds.create_index([("series_id", 1), ("club_day", 1)])
     await db.reference_participants.create_index("id", unique=True)
     await db.reference_participants.create_index([("series_id", 1), ("name_normalized", 1)])
     await db.reference_participants.create_index("profile_id")

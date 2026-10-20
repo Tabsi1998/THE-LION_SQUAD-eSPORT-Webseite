@@ -3378,3 +3378,22 @@ html[data-season-still-cards] .tls-card[data-season-perch="card"]:focus-visible 
 @media (prefers-reduced-motion: reduce) {
   .tls-cal-enter, .tls-cal-hint, .tls-copy-check { animation: none; }
 }
+
+/* Referenzen: „Läuft gerade“ / „Heute im Einsatz“ (#1748). Karten steigen leise auf (gestaffelt), der Balken füllt sich
+   einmal, der Puls läuft nur bei „heute“. Bei „Bewegung reduzieren“ steht alles sofort im Endzustand, ohne Puls. */
+@keyframes tls-run-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@keyframes tls-run-fill { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+@keyframes tls-run-pulse { 0% { box-shadow: 0 0 0 0 rgb(var(--tls-honor-rgb) / 0.55); } 70%, 100% { box-shadow: 0 0 0 7px rgb(var(--tls-honor-rgb) / 0); } }
+.tls-run-card {
+  animation: tls-run-in 0.36s var(--tls-ease) both;
+  animation-delay: calc(var(--tls-run-i, 0) * 60ms);
+  transition: border-color var(--tls-motion-fast) var(--tls-ease), transform var(--tls-motion-fast) var(--tls-ease);
+}
+@media (hover: hover) { .tls-run-card:hover { border-color: rgb(41 182 232 / 0.55); transform: translateY(-2px); } }
+.tls-run-fill { transform-origin: left; animation: tls-run-fill 0.7s var(--tls-ease) 0.2s both; }
+.tls-run-pulse { width: 6px; height: 6px; border-radius: 9999px; background: var(--tls-honor); animation: tls-run-pulse 2s ease-out infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .tls-run-card, .tls-run-fill, .tls-run-pulse { animation: none; }
+  .tls-run-card { transition: none; }
+  .tls-run-card:hover { transform: none; }
+}

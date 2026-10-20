@@ -15,14 +15,18 @@ gar nicht erst mit. Nur Vereinsmitglieder tragen den Link zu ihrem Vereinsprofil
 """
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 
 from auth import get_optional_user
 from database import get_db
 from routes.reference_round_routes import PUBLIC_FIELDS, _calendar, visible_series
+from services.dolibarr_policy import club_today
+from services.rate_limit import enforce_rate_limit
+from services.reference_calendar import calendar_view, vienna_clock
 from services.scoring_rules import normalize_rules
 from services.series_racing import racing_block
 from services.team_league_page import team_league_view
+from services.visibility import user_can_see
 
 router = APIRouter(prefix="/api/reference-series", tags=["reference-series"])
 
@@ -126,6 +130,131 @@ async def _final(db, series_id: str, rounds: list[dict], people: dict) -> dict |
                   "place": row.get("place"), "points": row.get("points"), "marks": row.get("marks") or []}
                  for row in rows],
     }
+
+
+RUNNING_LIMIT = 12
+
+
+def _running_progress(rounds: list[dict]) -> dict:
+    """Wertungsrunden wie ``_progress``: ohne Finale, ohne Runden außerhalb der Wertung, ohne abgesagte."""
+    live = [item for item in rounds if item.get("kind") != "final" and item.get("counts", True) is not False
+            and item["state"] != "cancelled"]
+    return {"total": len(live), "scored": sum(1 for item in live if item["state"] == "scored")}
+
+
+def _running_next(rounds: list[dict]) -> dict | None:
+    item = next((item for item in rounds if item["state"] in UPCOMING_STATES), None)
+    if not item:
+        return None
+    return {**{key: item.get(key) for key in ("code", "title", "club_day", "state")},
+            "time": vienna_clock(item.get("starts_at"))}
+
+
+def _club_place(lineage: dict, series: dict, snapshots: dict, club_ids: set) -> dict | None:
+    """Platz des Vereins im letzten gespeicherten Stand: bei der Team-Liga das eigene Team in der Tabelle, sonst der
+    beste Platz eines Vereinsmitglieds in der Gesamtwertung. Ohne Stand oder ohne Eintrag ``None``."""
+    if lineage.get("kind") == "team_league":
+        rows = (snapshots.get((series["id"], "table")) or {}).get("rows") or []
+        own = (series.get("team_name") or "").strip()
+        mine = next((row for row in rows if own and row.get("team") == own and row.get("rank")), None)
+        return {"rank": mine["rank"], "of": len(rows)} if mine else None
+    rows = (snapshots.get((series["id"], "drivers")) or {}).get("rows") or []
+    ranks = [row["rank"] for row in rows if row.get("rank") and row.get("participant_id") in club_ids]
+    return {"rank": min(ranks), "of": len(rows)} if ranks else None
+
+
+@router.get("/public/running")
+async def public_running(request: Request, user: dict | None = Depends(get_optional_user)):
+    """Für die Übersicht „Erfolge und Referenzen“: laufende Saisons (Status „aktiv“, Spur und Serie nicht archiviert,
+    für ``user`` sichtbar) mit Fortschritt, nächstem Termin und dem Platz des Vereins - wenige Felder, kein Name.
+    Höchstens ``RUNNING_LIMIT`` Saisons (heute zuerst), Runden, Stände und Teilnehmer nur für diese,
+    in gesammelten Abfragen (je Sammlung eine), nie je Saison; je Adresse begrenzt. Steht heute (Wiener Tag) ein Termin an, kommt die
+    Saison zuerst und trägt ``today``."""
+    await enforce_rate_limit(request, "reference-running", 60, 60)
+    db = get_db()
+    today = club_today()
+    seen: dict = {}
+
+    async def visible(value) -> bool:
+        if value not in seen:
+            seen[value] = await user_can_see(user, value)
+        return seen[value]
+
+    # Erst nur die schlanken Serien- und Spur-Daten, sichtbar filtern und auf RUNNING_LIMIT kürzen - Runden, Stände
+    # und Teilnehmer werden danach nur für diese Serien geladen, damit die Last mit der Zahl der Serien nicht wächst.
+    all_series = await db.reference_series.find({"status": "active"}, {
+        "_id": 0, "id": 1, "lineage_id": 1, "visibility": 1, "season": 1, "tier": 1, "title": 1, "season_slug": 1,
+        "team_name": 1, "order_index": 1}).to_list(None)
+    lineages = {item["id"]: item async for item in db.reference_lineages.find(
+        {"id": {"$in": list({s["lineage_id"] for s in all_series})}},
+        {"_id": 0, "id": 1, "slug": 1, "title": 1, "kind": 1, "label": 1, "game_id": 1, "game_name": 1,
+         "visibility": 1, "is_archived": 1})}
+    visible_pairs = []
+    for series in all_series:
+        lineage = lineages.get(series.get("lineage_id"))
+        if (lineage and not lineage.get("is_archived") and await visible(lineage.get("visibility"))
+                and await visible(series.get("visibility"))):
+            visible_pairs.append((lineage, series))
+    if not visible_pairs:
+        return {"today": today, "items": []}
+    # Der nächste offene Termin je Serie in EINER Abfrage: nicht abgesagt, nicht gewertet, nicht archiviert, ab heute.
+    next_day = {item["_id"]: item["day"] async for item in db.reference_rounds.aggregate([
+        {"$match": {"series_id": {"$in": [series["id"] for _, series in visible_pairs]},
+                    "club_day": {"$gte": today}, "status": {"$nin": ["cancelled", "scored"]},
+                    "archived_at": None}},
+        {"$group": {"_id": "$series_id", "day": {"$min": "$club_day"}}}])}
+    # Heute zuerst (der nächste Termin ist dann heute), dann nach nächstem Termin, ohne Termin ans Ende.
+    visible_pairs.sort(key=lambda pair: (next_day.get(pair[1]["id"]) or "9999", pair[1].get("order_index") or 0,
+                                         str(pair[0].get("title") or "")))
+    shown = visible_pairs[:RUNNING_LIMIT]
+    ids = [series["id"] for _, series in shown]
+    rounds_by: dict = {sid: [] for sid in ids}
+    async for item in db.reference_rounds.find({"series_id": {"$in": ids}}, {"_id": 0}):
+        rounds_by[item["series_id"]].append(item)
+    published: dict = {sid: [] for sid in ids}
+    async for item in db.reference_round_results.find(
+            {"series_id": {"$in": ids}, "status": "published"}, {"_id": 0, "series_id": 1, "round_id": 1}):
+        published[item["series_id"]].append(item["round_id"])
+    snapshots: dict = {}
+    async for snap in db.reference_standings.find(
+            {"series_id": {"$in": ids}, "scope": {"$in": ["drivers", "table"]}},
+            {"_id": 0, "series_id": 1, "scope": 1, "round_seq": 1, "rows.rank": 1, "rows.participant_id": 1,
+             "rows.team": 1}):
+        key = (snap["series_id"], snap["scope"])
+        if key not in snapshots or (snap.get("round_seq") or 0) > (snapshots[key].get("round_seq") or 0):
+            snapshots[key] = snap
+    # Nur, wer die Serienseite als Vereinsmitglied zeigt: Verknüpfung „member“, Name nicht ausgeblendet, Profil aktiv.
+    candidates = [item async for item in db.reference_participants.find(
+        {"series_id": {"$in": ids}, "is_club_member": True, "link": "member", "name_hidden": {"$ne": True}},
+        {"_id": 0, "id": 1, "profile_id": 1})]
+    profile_ids = list({item["profile_id"] for item in candidates if item.get("profile_id")})
+    active = {item["id"] async for item in db.club_member_profiles.find(
+        {"id": {"$in": profile_ids}, "is_active": {"$ne": False}}, {"_id": 0, "id": 1})} if profile_ids else set()
+    club_ids = {item["id"] for item in candidates if item.get("profile_id") in active}
+    game_ids = list({lineage["game_id"] for lineage, _ in shown if lineage.get("game_id")})
+    games = {item["id"]: item async for item in db.games.find(
+        {"id": {"$in": game_ids}}, {"_id": 0, "id": 1, "name": 1, "short_name": 1, "logo_url": 1})} if game_ids else {}
+
+    items = []
+    for lineage, series in shown:
+        rounds = calendar_view(rounds_by[series["id"]], published[series["id"]], today)["rounds"]
+        game = games.get(lineage.get("game_id")) or {}
+        items.append({
+            "lineage": {"title": lineage.get("title"), "slug": lineage.get("slug"), "kind": lineage.get("kind"),
+                        "label": lineage.get("label"), "game_name": lineage.get("game_name") or game.get("name")},
+            "game": {key: game.get(key) for key in ("name", "short_name", "logo_url")} if game else None,
+            "series": {key: series.get(key) for key in ("season", "tier", "title", "season_slug")},
+            "progress": _running_progress(rounds),
+            "next": _running_next(rounds),
+            "today": any(item["state"] == "today" for item in rounds),
+            "club": _club_place(lineage, series, snapshots, club_ids),
+            "_order": (series.get("order_index") or 0),
+        })
+    items.sort(key=lambda item: (not item["today"], (item["next"] or {}).get("club_day") or "9999", item["_order"],
+                                 str(item["lineage"]["title"] or "")))
+    for item in items:
+        item.pop("_order")
+    return {"today": today, "items": items[:RUNNING_LIMIT]}
 
 
 @router.get("/public/{lineage_slug}/{season_slug}")

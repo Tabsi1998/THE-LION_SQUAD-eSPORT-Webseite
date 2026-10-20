@@ -7,6 +7,7 @@ import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { CountLine, EntryRow, FieldChips, GameChip, GameMark, MEDAL, MEDAL_RANK, MedalStat, PlacementBadge, RefButton, ReferenceCard, SectionTitle, bestPlacement, displayTitle, entriesOf, entryTitle, formatDate, gameKey, gameTitle, hasMember, medalOf, memberEntryOf, memberName, platformLabel, referenceGameName, referenceInstant, timeOf } from "@/components/tls/references/referenceParts";
 import { Medal, Trophy, User, Users, X } from "lucide-react";
+import { RunningSeries } from "@/components/tls/references/RunningSeries";
 import { TrophyShelf } from "@/components/tls/TrophyShelf";
 import { PublicLoadingState } from "@/components/tls/PublicLoadingState";
 import { viennaDay } from "@/lib/vienna";
@@ -141,6 +142,9 @@ export default function ReferencesPage() {
           </div>
         </div>
       </section>
+
+      {/* Heute im Einsatz / Läuft gerade (#1748): erscheint nur, wenn eine Serie läuft */}
+      <RunningSeries />
 
       {/* Vitrine (#1334): jeder Podestplatz ein Pokal in seinem Metall auf einem Regalbrett - ohne Cover-Schriftzug dahinter */}
       {trophies.length > 0 && (
