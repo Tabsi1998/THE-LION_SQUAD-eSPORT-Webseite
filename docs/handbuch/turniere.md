@@ -451,6 +451,9 @@ Warteschlange. In der Turnierleitung am Handy (`/tournaments/<slug>/leitung`) st
 - Bereite Spiele (alle Plätze besetzt) stehen an jeder Station vor denen, die noch warten: Ein Lauf, der auf die
   Auslosung oder auf Vorspiele wartet, nimmt keiner Station das **Aufrufen**. Gibt es mehrere bereite Spiele, bekommt
   jede freie Station eines – vier bereite Läufe laufen auf vier Stationen, nicht nacheinander auf zweien.
+- Ein bereites Spiel an einer freien Station hat die Prognose **jetzt**. Spielt jemand am selben Event in einem
+  zweiten Turnier, verschiebt das die Prognose nur, wenn sein Spiel dort schon **läuft** oder **aufgerufen** ist – ein
+  dort bloß geplantes Spiel nicht. Spätere Spiele plant der Planer weiter um diese Termine herum.
 - **Aufrufen** reserviert die Station und schickt den Spielern „Du bist dran“ (Postfach und Push, bei Teams an die
   Aufgestellten). Danach steht dort „Aufgerufen · antreten bis … · nicht erschienen ab …“; die Frist „nicht erschienen“
   (3.7) zählt ab dem Aufruf. Wer vor der geplanten Zeit aufgerufen wird, hat bis zur geplanten Zeit – dann nennen
