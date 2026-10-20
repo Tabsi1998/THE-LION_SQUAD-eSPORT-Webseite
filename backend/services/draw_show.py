@@ -65,12 +65,13 @@ def draw_pot(group: str, stage_id, matches: list[dict], eliminated: set[str] | N
     rows = [row for row in matches if row.get("stage_id") == stage_id]
     target_ids = {target.get("id") for target in group_targets(rows, group, stage_id) if target.get("status") != "cancelled"}
     pot: list[str] = []
+    by_id = {row["id"]: row for row in rows if row.get("id")}
     for source in sorted(group_sources(rows, group, stage_id), key=lambda row: (row.get("round") or 0, row.get("order") or 0)):
         if str(source.get("status") or "") not in DECIDED_OR_VOID:
             continue
         results = [] if source.get("status") == "cancelled" else source.get("results") or []
         gone = set(eliminated or ()) | {row.get("registration_id") for row in results if row.get("eliminated")}
-        by_rank, winner_path = _pot_ranks(source, results, gone)
+        by_rank, winner_path = _pot_ranks(source, results, gone, by_id)
         for advancement in source.get("advancement") or []:
             if advancement.get("to_match_id") not in target_ids:
                 continue

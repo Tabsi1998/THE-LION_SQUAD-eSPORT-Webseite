@@ -19,7 +19,13 @@ from services.competition_standings import stage_standings  # noqa: E402
 from services.competition_snapshot import build_structure_snapshot  # noqa: E402
 from services.custom_bracket import build_matches_v2_from_schema  # noqa: E402
 from services.graph_swiss import swiss_round_documents  # noqa: E402
-from services.match_v2_results import MatchV2ResultError, build_v2_result_application  # noqa: E402
+from services.advancement_draw import draw_group_of  # noqa: E402
+from services.match_v2_results import (  # noqa: E402
+    MatchV2ResultError,
+    build_redraw_application,
+    build_show_draw_application,
+    build_v2_result_application,
+)
 from services.tournament_events import REMOVAL_KINDS, describe_removal, plan_removal, removal_hash  # noqa: E402
 from services.v2_match_flows import results_for_forfeit  # noqa: E402
 
@@ -638,8 +644,132 @@ def test_heat_withdrawal_in_the_cup_moves_up_on_both_paths_in_every_mode(mode):
     assert_graph_valid(matches)
     again = plan_removal(matches, first, kind="withdrawn", now_iso=NOW, eliminated={first})
     assert again["ops"] == [] and again["changed_ids"] == [], "ein zweiter Lauf ändert nichts"
+    # Korrektur von A danach (gleiches Ergebnis): jeder bleibt auf seinem Platz - auch auf ausgelosten Plätzen, an denen
+    # jetzt der Rang des Nachrückers steht.
+    before = seating_of(matches, 2)
+    apply_result(matches, by_key["A"], [first, second, third, fourth], eliminated={first}, force=True)
+    assert seating_of(matches, 2) == before
     play_ready(matches)
     assert all(m["status"] in TERMINAL for m in matches), [m["match_key"] for m in matches if m["status"] not in TERMINAL]
+
+
+def seating_of(matches: list[dict], round_no: int) -> dict[tuple[str, int], str | None]:
+    return {(m["match_key"], int(slot["slot"])): slot.get("registration_id")
+            for m in matches if m["round"] == round_no for slot in m["slots"]}
+
+
+def show_draw(matches: list[dict], group: str, eliminated: set[str]) -> None:
+    application = build_show_draw_application(matches, group, now_iso=NOW, eliminated=eliminated)
+    by_id = {row["id"]: row for row in matches}
+    for target_id, update in application["target_sets"].items():
+        by_id[target_id].update(update)
+
+
+def play_show(matches: list[dict], eliminated: set[str]) -> None:
+    """Bis zum Ende: bereite Läufe eintragen, bereite Show-Runden auslosen (wie die Turnierleitung)."""
+    for _ in range(60):
+        ready = [m for m in matches if m["status"] == "ready"]
+        if ready:
+            apply_result(matches, ready[0], filled_ids(ready[0]), eliminated=eliminated)
+        else:
+            waiting = sorted({draw_group_of(m) for m in matches if isinstance(m.get("draw_ready"), dict) and not m.get("draw")})
+            if not waiting:
+                return
+            show_draw(matches, waiting[0], eliminated)
+        assert_once_per_round(matches)
+
+
+SHOW_CASES = ["vor-dem-ende-der-runde", "runde-fertig-nicht-gelost", "sieger-weg-gelost", "loser-weg-gelost", "beide-gelost"]
+
+
+@pytest.mark.parametrize("case", SHOW_CASES)
+def test_heat_withdrawal_with_the_show_draw_moves_up_on_both_paths(case):
+    """Show-Auslosung (#1590), je Gruppe von der Turnierleitung gelost: der Erste aus A tritt aus - vor dem Ende der
+    Runde, vor dem Los, nachdem nur der Sieger- oder nur der Verlierer-Weg gelost ist, oder nach beiden Losen. Immer
+    dasselbe: der Zweite und der Dritte sind im Sieger-Weg, der Vierte allein aus A im Loser Bracket, sein letzter
+    Platz ist ein Freilos - nie doppelt, niemand fällt heraus. Eine Korrektur von A danach ändert nichts, und alles
+    lässt sich bis zum Ende eintragen und auslosen."""
+    matches = heats_with_losers(CUP_WITH_LOSERS, 16, "draw_show")
+    by_key = by_key_of(matches)
+    winner_group, loser_group = draw_group_of(by_key["E"]), draw_group_of(by_key["LA"])
+    first, second, third, fourth = filled_ids(by_key["A"])
+    apply_result(matches, by_key["A"], [first, second, third, fourth])
+    gone = {first}
+    if case == "vor-dem-ende-der-runde":
+        plan_removal(matches, first, kind="withdrawn", now_iso=NOW)
+    for key in "BCD":
+        apply_result(matches, by_key[key], filled_ids(by_key[key]), eliminated=gone if case == "vor-dem-ende-der-runde" else None)
+    before_removal = {"sieger-weg-gelost": [winner_group], "loser-weg-gelost": [loser_group],
+                      "beide-gelost": [winner_group, loser_group]}.get(case, [])
+    for group in before_removal:
+        show_draw(matches, group, set())
+    if case != "vor-dem-ende-der-runde":
+        plan_removal(matches, first, kind="withdrawn", now_iso=NOW)
+    for group in (winner_group, loser_group):
+        if group not in before_removal:
+            show_draw(matches, group, gone)
+
+    winners = {reg for m in matches if m["round"] == 2 and section_of(m) != "LB" for reg in filled_ids(m)}
+    losers = {reg for m in matches if m["round"] == 2 and section_of(m) == "LB" for reg in filled_ids(m)}
+    assert {second, third} <= winners and fourth in losers
+    assert third not in losers and first not in winners | losers
+    assert len(winners) + len(losers) == 15, "alle außer dem Ausgetretenen sitzen in Runde 2 - einer hat ein Freilos"
+    assert_once_per_round(matches)
+    assert_graph_valid(matches)
+    before = seating_of(matches, 2)
+    apply_result(matches, by_key["A"], [first, second, third, fourth], eliminated=gone, force=True)
+    assert seating_of(matches, 2) == before, "die Korrektur findet jeden auf seinem Platz"
+    play_show(matches, gone)
+    assert all(m["status"] in TERMINAL for m in matches), [m["match_key"] for m in matches if m["status"] not in TERMINAL]
+
+
+@pytest.mark.parametrize("called", ["sieger-weg", "loser-weg"])
+def test_heat_withdrawal_with_the_show_draw_keeps_a_called_heat_as_it_is(called):
+    """Show-Auslosung, nur ein Weg gelost und dort ist ein Lauf schon aufgerufen: wer darin sitzt, bleibt; sein Platz
+    zählt mit - das spätere Los des anderen Wegs rechnet dieselbe Reihe. Niemand steht doppelt, niemand fällt heraus."""
+    matches = heats_with_losers(CUP_WITH_LOSERS, 16, "draw_show")
+    by_key = by_key_of(matches)
+    winner_group, loser_group = draw_group_of(by_key["E"]), draw_group_of(by_key["LA"])
+    for key in "ABCD":
+        apply_result(matches, by_key[key], filled_ids(by_key[key]))
+    first, second, third, fourth = [row["registration_id"] for row in by_key["A"]["results"]]
+    drawn, other = (winner_group, loser_group) if called == "sieger-weg" else (loser_group, winner_group)
+    show_draw(matches, drawn, set())
+    sitting = first if called == "sieger-weg" else third
+    heat = next(m for m in matches if m["round"] == 2 and sitting in filled_ids(m))
+    heat["called_at"] = NOW
+    kept = filled_ids(heat)
+
+    plan_removal(matches, first, kind="withdrawn", now_iso=NOW)
+    show_draw(matches, other, {first})
+    assert filled_ids(heat) == kept, "der aufgerufene Lauf bleibt, wie er ist"
+    seated = [reg for m in matches if m["round"] == 2 for reg in filled_ids(m)]
+    assert second in seated and third in seated and fourth in seated
+    if called == "loser-weg":
+        assert first not in seated
+    assert_once_per_round(matches)
+    assert_graph_valid(matches)
+
+
+def test_redraw_after_a_heat_withdrawal_keeps_the_withdrawn_out():
+    """„Neu auslosen“ nach dem Austritt (Auslosung nach der Runde): wer ausgetreten ist, kommt mit dem neuen Los nicht
+    zurück; der Zweite und der Dritte bleiben im Sieger-Weg, der Vierte im Loser Bracket."""
+    matches = heats_with_losers(CUP_WITH_LOSERS, 16, "draw_round")
+    by_key = by_key_of(matches)
+    for key in "ABCD":
+        apply_result(matches, by_key[key], filled_ids(by_key[key]))
+    first, second, third, fourth = [row["registration_id"] for row in by_key["A"]["results"]]
+    plan_removal(matches, first, kind="withdrawn", now_iso=NOW)
+    for group in (draw_group_of(by_key["E"]), draw_group_of(by_key["LA"])):
+        application = build_redraw_application(matches, group, now_iso=NOW, eliminated={first})
+        by_id = {row["id"]: row for row in matches}
+        for target_id, update in application["target_sets"].items():
+            by_id[target_id].update(update)
+    winners = {reg for m in matches if m["round"] == 2 and section_of(m) != "LB" for reg in filled_ids(m)}
+    losers = {reg for m in matches if m["round"] == 2 and section_of(m) == "LB" for reg in filled_ids(m)}
+    assert {second, third} <= winners and fourth in losers and third not in losers
+    assert first not in winners | losers
+    assert_once_per_round(matches)
 
 
 def test_heat_withdrawal_with_the_first_seat_called_keeps_the_second_in_place():

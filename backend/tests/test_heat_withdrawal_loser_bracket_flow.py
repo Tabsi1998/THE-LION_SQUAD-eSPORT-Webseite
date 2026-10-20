@@ -218,6 +218,37 @@ async def draw(flow, tournament: dict, key: str, path: str = "draw") -> dict:
     return response.json()
 
 
+def seating(rows: list[dict]) -> dict:
+    return {(m["match_key"], slot["slot"]): slot.get("registration_id") for m in rows if m.get("round") == 2
+            for slot in m["slots"]}
+
+
+@pytest.mark.asyncio
+async def test_show_draw_after_a_withdrawal_keeps_both_paths_in_line_and_a_correction_keeps_the_seats(flow):
+    """Show-Auslosung je Gruppe: der Sieger-Weg ist gelost, dann tritt der Erste aus A aus, dann lost die Leitung das
+    Loser Bracket. Der Dritte ist im Sieger-Weg und nicht im Loser Bracket, der Vierte dort; eine Korrektur von A mit
+    demselben Ergebnis lässt jeden auf seinem Platz."""
+    tournament = await heats_cup(flow, CUP, 16, advancement_mode="draw_show")
+    matches = await by_key(flow, tournament)
+    for key in "ABCD":
+        await enter(flow, matches[key], seats(matches[key]))
+    first, second, third, fourth = [row["registration_id"] for row in (await flow.reload(matches["A"]))["results"]]
+    await draw(flow, tournament, "E")
+
+    await withdraw(flow, tournament, first)
+    await draw(flow, tournament, "LA")
+    winners, losers = await round_two(flow, tournament)
+    assert {second, third} <= winners and fourth in losers
+    assert third not in losers and first not in winners | losers
+    await assert_tree_once_per_round(flow, tournament)
+    before = seating(await flow.matches(tournament))
+    corrected = await flow.post(f"/api/matches/{matches['A']['id']}/result?force=true", json={
+        "results": [{"registration_id": reg, "rank": index + 1} for index, reg in enumerate([first, second, third, fourth])],
+        "reason": "Nachkontrolle"})
+    assert corrected.status_code == 200, corrected.text
+    assert seating(await flow.matches(tournament)) == before, "die Korrektur findet jeden auf seinem Platz"
+
+
 @pytest.mark.asyncio
 async def test_show_draw_leaves_out_who_withdrew_during_the_heat(flow):
     """Austritt, während der Lauf schon aufgerufen ist: die Person bleibt im Ergebnis (zuletzt gewertet), kommt aber

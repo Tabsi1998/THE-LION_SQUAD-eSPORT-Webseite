@@ -670,6 +670,122 @@ def _is_instant(target: dict | None) -> bool:
     return match_mode(target) == "instant"
 
 
+def _drawn_seats_of(targets: list[dict], source_id: str | None, flow: str | None) -> list[tuple[dict, dict]]:
+    """Die ausgelosten Plätze einer Quelle auf einem Weg in der Gruppe - auch frei gewordene - nach Rang. Ein frei
+    gewordener Platz behält den Rang dessen, der dort saß; bei gleichem Rang kommt der besetzte zuerst (#1839)."""
+    seats = [
+        (target, slot) for target in targets for slot in target.get("slots") or []
+        if (slot.get("source_result") or {}).get("from_match_id") == source_id
+        and (slot.get("source_result") or {}).get("flow") == flow
+    ]
+    return sorted(seats, key=lambda seat: (int((seat[1].get("source_result") or {}).get("rank") or 0),
+                                           not seat[1].get("registration_id")))
+
+
+def _entry_seat(advancement: dict, source: dict, targets: list[dict]) -> tuple[dict, dict] | None:
+    """Der ausgeloste Platz genau dieser Weiterleitung: der k-te Eintrag eines Wegs in die Gruppe (nach Rang) sitzt auf
+    dem k-ten ausgelosten Platz dieser Quelle auf diesem Weg. So bleibt die Zuordnung, auch wenn nach einem Austritt
+    die Plätze aufgerückt sind und am Platz der Rang des Nachrückers steht (#1839). Passt die Zahl nicht (eine
+    Herkunft fehlt nach Rückgängig oder Kaskade), ``None`` - dann sucht der Aufrufer wie bisher."""
+    flow = advancement.get("flow")
+    ids = {target.get("id") for target in targets}
+    ranks = sorted(int(entry.get("rank") or 0) for entry in source.get("advancement") or []
+                   if entry.get("flow") == flow and entry.get("to_match_id") in ids)
+    seats = _drawn_seats_of(targets, source.get("id"), flow)
+    rank = int(advancement.get("rank") or 0)
+    if len(ranks) != len(seats) or len(set(ranks)) != len(ranks) or rank not in ranks:
+        return None
+    return seats[ranks.index(rank)]
+
+
+def _own_drawn_seat(advancement: dict, target: dict, source_id: str) -> tuple[dict, dict] | None:
+    """Sofort zufällig (#1590): das Schema folgt dem Los - der Platz aus dem Eintrag ist der gezogene, solange er noch
+    von dieser Quelle auf diesem Weg stammt. Nach einem Aufrücken (#1839) steht dort der Rang des Nachrückers."""
+    slot = _find_slot(target, int(advancement.get("to_slot") or 0))
+    origin = (slot or {}).get("source_result") or {}
+    if slot and origin.get("from_match_id") == source_id and origin.get("flow") == advancement.get("flow"):
+        return target, slot
+    return None
+
+
+def _seat_is_fixed(match: dict) -> bool:
+    """Ein Folgespiel, das nicht mehr umgebaut wird: aufgerufen, gestartet, gemeldet oder entschieden."""
+    return (str(match.get("status") or "pending") not in {"pending", "ready", "scheduled"}
+            or bool(match.get("called_at")) or bool(match.get("started_at")))
+
+
+def _seat_of(source: dict, entry: dict, by_id: dict[str, dict]) -> tuple[dict | None, dict | None, bool]:
+    """Wo eine Weiterleitung sitzt: (Zielspiel, Platz, wartet aufs Los). Fester Baum und sofort zufällig (#1590, das
+    Schema folgt dem Los): der Platz aus dem Eintrag; gemischt und ausgelost: der ausgeloste Platz; noch nicht
+    ausgelost: noch keiner."""
+    target = by_id.get(entry.get("to_match_id"))
+    if not target:
+        return None, None, False
+    group = draw_group_of(target)
+    if group and not _is_instant(target):
+        targets = _draw_open_targets(by_id, group, target.get("stage_id"))
+        if not _group_is_drawn(targets):
+            return target, None, True
+        found = _entry_seat(entry, source, targets)
+        return (found[0], found[1], False) if found else (target, None, False)
+    return target, _find_slot(target, int(entry.get("to_slot") or 0)), False
+
+
+def _seating_rows(source: dict, by_id: dict[str, dict]) -> list[dict]:
+    """Die Weiterleitungen eines Laufs der Reihe nach (verlangter Rang im Ergebnis, erst Sieger-, dann Verlierer-Weg)
+    mit ihrem Platz: ``entry``, ``position``, ``target``, ``slot`` (``None``, solange die Gruppe aufs Los wartet -
+    ``awaiting``) und ``fixed`` (das Folgespiel wird nicht mehr umgebaut)."""
+    paths = [entry for entry in source.get("advancement") or [] if entry.get("flow") in {"W", "L"}]
+    rows: list[dict] = []
+    for entry in sorted(paths, key=lambda e: (_advancement_result_rank(source, e), e.get("flow") != "W")):
+        target, slot, awaiting = _seat_of(source, entry, by_id)
+        if not awaiting and not slot:
+            continue
+        rows.append({"entry": entry, "position": _advancement_result_rank(source, entry), "target": target, "slot": slot,
+                     "awaiting": awaiting, "fixed": not awaiting and _seat_is_fixed(target), "wanted": None})
+    return rows
+
+
+def _fixed_seats(source: dict, by_id: dict[str, dict],
+                 rows: list[dict] | None = None) -> tuple[dict[tuple[str, int], str | None], set[str]]:
+    """Was beim Aufrücken bleibt (#1839): die festen Plätze dieses Laufs ``{(Weg, Platz): Anmeldung}`` und wer sonst
+    schon in einem festen Spiel einer späteren Runde der Phase sitzt - der rückt nirgends nach."""
+    rows = _seating_rows(source, by_id) if rows is None else rows
+    fixed = {(row["entry"].get("flow"), row["position"]): row["slot"].get("registration_id") for row in rows if row["fixed"]}
+    round_no = int(source.get("round") or 0)
+    settled = {
+        slot.get("registration_id")
+        for match in by_id.values() if match.get("stage_id") == source.get("stage_id") and _seat_is_fixed(match)
+        and int(match.get("round") or 0) > round_no
+        for slot in match.get("slots") or [] if slot.get("registration_id")
+    }
+    return fixed, settled - set(fixed.values())
+
+
+def moved_up_seating(source: dict, by_id: dict[str, dict], gone: set[str], results: list[dict] | None = None) -> list[dict]:
+    """Plätze rücken auf nach einem Austritt (#1839) - nach derselben Regel wie beim Eintragen und im Topf
+    (``_advancement_paths``): beide Wege rücken gemeinsam auf, wer ins Finale nachrückt, steht nicht mehr im Loser
+    Bracket; dort rückt der Nächste auf, der letzte Platz wird ein Freilos. Wer nicht erschienen ist, bekommt nie einen
+    Sieger-Platz. Ein Platz in einem Folgespiel, das nicht mehr umgebaut wird, bleibt und zählt mit
+    (``_fixed_seats``).
+
+    Rückgabe je Weiterleitung (``_seating_rows``) dazu ``wanted``: die Ergebniszeile oder ``None`` (Freilos). Feste
+    Plätze und Wege, die noch aufs Los warten, schreibt der Aufrufer nicht - der Topf rechnet später dieselbe Regel."""
+    results = (source.get("results") or []) if results is None else results
+    rows = _seating_rows(source, by_id)
+    fixed, settled = _fixed_seats(source, by_id, rows)
+    loser_path, winner_path = _advancement_paths(source, results, gone | settled, fixed)
+    for row in rows:
+        if row["fixed"]:
+            continue
+        flow = row["entry"].get("flow")
+        wanted = (winner_path if flow == "W" else loser_path).get(row["position"])
+        if wanted and flow == "W" and wanted.get("forfeit"):
+            wanted = None  # nie ein Sieger-Platz: der Platz wird ein Freilos (#1823)
+        row["wanted"] = wanted
+    return rows
+
+
 def _locate_target_slot(advancement: dict, target: dict, by_id: dict[str, dict], source_id: str,
                         result_rank: int, rng=None, rewired: list[dict] | None = None) -> tuple[dict, dict | None, tuple | None]:
     """Wohin ein Weiterkommer geht: fester Baum - der Platz aus dem Schema; gemischt - vor der Auslosung noch nirgends
@@ -681,18 +797,22 @@ def _locate_target_slot(advancement: dict, target: dict, by_id: dict[str, dict],
         return target, _find_slot(target, int(advancement.get("to_slot") or 0)), None
     targets = _draw_open_targets(by_id, group, target.get("stage_id"))
     ranks = {int(result_rank), int(advancement.get("rank") or 0)}
+    source = by_id.get(source_id) or {}
+    # Korrektur nach der Auslosung: zuerst der Platz genau dieser Weiterleitung (nach einem Aufrücken steht dort der
+    # Rang des Nachrückers, #1839), dann wie bisher nach Rang, sonst ein freier Platz.
     if _is_instant(target):
-        found = _drawn_slot(targets, source_id, advancement.get("flow"), ranks) or _free_draw_slot(targets, rng)
+        found = (_own_drawn_seat(advancement, target, source_id) or _drawn_slot(targets, source_id, advancement.get("flow"), ranks)
+                 or _free_draw_slot(targets, rng))
         if not found:
             return target, None, None
-        source = by_id.get(source_id) or {}
         for row in _rewire_instant(source, advancement, found[0], found[1], by_id):
             if rewired is not None:
                 rewired.append(row)
         return found[0], found[1], None
     if not _group_is_drawn(targets):
         return target, None, (target.get("stage_id"), group)
-    found = _drawn_slot(targets, source_id, advancement.get("flow"), ranks) or _free_draw_slot(targets, rng)
+    found = (_entry_seat(advancement, source, targets) or _drawn_slot(targets, source_id, advancement.get("flow"), ranks)
+             or _free_draw_slot(targets, rng))
     if not found:
         return target, None, None
     return found[0], found[1], None
@@ -783,16 +903,19 @@ def _note_instant_assignment(target: dict, slot: dict, source: dict, now_iso: st
         })
 
 
-def _advancement_paths(match: dict, results: list[dict], gone: set[str]) -> tuple[dict[int, dict], dict[int, dict]]:
+def _advancement_paths(match: dict, results: list[dict], gone: set[str],
+                       fixed: dict[tuple[str, int], str | None] | None = None) -> tuple[dict[int, dict], dict[int, dict]]:
     """Wer über welchen Platz weiterkommt: ``(Verlierer-Weg, Sieger-Weg)``, je Platz die Zeile - für den
-    Ergebnis-Anwender und den Topf gemischter Runden gleich.
+    Ergebnis-Anwender, den Topf gemischter Runden und das Aufrücken nach einem Austritt gleich.
 
     - Der Platz, wie gewertet; teilen sich mehrere Fehlende den letzten Platz, zählt ihre Reihenfolge (Setzplatz).
     - Im Lauf ohne Ausgeschiedene (#1553): die Nächsten rücken auf - auf beiden Wegen, wer auf dem Sieger-Weg aufrückt,
       steht nicht zugleich im Loser Bracket.
     - Wer nicht erschienen ist, bekommt nie einen Sieger-Platz: der wird ein Freilos (``forfeit``). Auf dem
       Verlierer-Weg stehen erst die Anwesenden, die nicht weiterkommen, dann alle Nicht-Erschienenen nach Setzplatz -
-      so weit Plätze da sind; ohne Verlierer-Weg scheiden sie aus (#1823)."""
+      so weit Plätze da sind; ohne Verlierer-Weg scheiden sie aus (#1823).
+    - ``fixed`` (#1839): Plätze in Folgespielen, die nicht mehr umgebaut werden, ``{(Weg, Platz): Anmeldung}``. Wer
+      dort sitzt, bleibt, und der Platz zählt mit; die übrigen Plätze bekommen die Übrigen nach derselben Regel."""
     by_rank = _placement_positions(results)
     if gone and match.get("match_type") == "ffa":
         staying = [row for row in sorted(results, key=lambda row: int(row.get("rank") or 0))
@@ -800,6 +923,15 @@ def _advancement_paths(match: dict, results: list[dict], gone: set[str]) -> tupl
         by_rank = {index: row for index, row in enumerate(staying, start=1)}
     loser_ranks = sorted(_advancement_result_rank(match, entry) for entry in match.get("advancement") or []
                          if entry.get("flow") == "L")
+    if fixed:
+        placed = {registration_id for registration_id in fixed.values() if registration_id}
+        ordered = [by_rank[key] for key in sorted(by_rank) if by_rank[key].get("registration_id") not in placed]
+        winner_ranks = sorted(rank for rank in (_advancement_result_rank(match, entry) for entry in match.get("advancement") or []
+                                                if entry.get("flow") == "W") if ("W", rank) not in fixed)
+        losers = ([row for row in ordered[len(winner_ranks):] if not row.get("forfeit")]
+                  + [row for row in ordered if row.get("forfeit")])
+        free_losers = [rank for rank in loser_ranks if ("L", rank) not in fixed]
+        return dict(zip(free_losers, losers)), dict(zip(winner_ranks, ordered))
     ordered = [by_rank[key] for key in sorted(by_rank)]
     if not loser_ranks or not any(row.get("forfeit") for row in ordered):
         return by_rank, by_rank
@@ -808,8 +940,14 @@ def _advancement_paths(match: dict, results: list[dict], gone: set[str]) -> tupl
     return {qualifiers + index: row for index, row in enumerate(losers, start=1)}, by_rank
 
 
-def _pot_ranks(source: dict, results: list[dict], gone: set[str]) -> tuple[dict[int, dict], dict[int, dict]]:
-    """Wer auf welchem Platz in den Topf kommt - dieselbe Regel wie beim Eintragen (``_advancement_paths``)."""
+def _pot_ranks(source: dict, results: list[dict], gone: set[str],
+               by_id: dict[str, dict] | None = None) -> tuple[dict[int, dict], dict[int, dict]]:
+    """Wer auf welchem Platz in den Topf kommt - dieselbe Regel wie beim Eintragen (``_advancement_paths``). Fehlt im
+    Lauf jemand (#1839), zählen mit ``by_id`` die festen Plätze in schon gelosten oder festen Folgespielen mit - so
+    passt der Topf zu dem, was vor dem Los schon aufgerückt ist (Show-Auslosung je Gruppe)."""
+    if by_id is not None and gone and source.get("match_type") == "ffa":
+        fixed, settled = _fixed_seats(source, by_id)
+        return _advancement_paths(source, results, gone | settled, fixed)
     return _advancement_paths(source, results, gone)
 
 
@@ -864,7 +1002,7 @@ def run_draw(group: str, by_id: dict[str, dict], target_sets: dict[str, dict], n
         else:
             results = [] if source.get("status") == "cancelled" else source.get("results") or []
         gone = set(eliminated or ()) | {row.get("registration_id") for row in results if row.get("eliminated")}
-        by_rank, winner_path = _pot_ranks(source, results, gone)
+        by_rank, winner_path = _pot_ranks(source, results, gone, by_id)
         for advancement in source.get("advancement") or []:
             target = by_id.get(advancement.get("to_match_id"))
             if not target or target["id"] not in target_ids:
