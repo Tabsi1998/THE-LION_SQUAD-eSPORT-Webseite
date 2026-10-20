@@ -77,6 +77,22 @@ MAX_DOCUMENT_UPLOAD_MB = _upload_mb_from_env("MAX_DOCUMENT_UPLOAD_MB", 50)
 MAX_VIDEO_UPLOAD_MB = _upload_mb_from_env("MAX_VIDEO_UPLOAD_MB", 1536)
 MAX_ORIGINAL_UPLOAD_MB = _upload_mb_from_env("MAX_ORIGINAL_UPLOAD_MB", MAX_VIDEO_UPLOAD_MB)
 MAX_BYTES = MAX_IMAGE_UPLOAD_MB * 1024 * 1024  # images before re-encoding
+
+# SVG bleibt gesperrt (Sicherheit); die Meldung sagt nur, was stattdessen geht (#1419). Feste Wörter, nie aus einer Ausnahme gebaut.
+SVG_REFUSED_MESSAGE = (
+    "SVG-Dateien gehen hier nicht. Bitte als PNG mit durchsichtigem Hintergrund (z. B. 2000 px breit) "
+    "oder als WebP exportieren – die Website macht daraus alle Größen."
+)
+
+
+def looks_like_svg(suffix: str = "", content_type: str = "", head: bytes = b"") -> bool:
+    """SVG nach Endung, Typ oder Anfang des Inhalts (``<svg`` oder ``<?xml``)."""
+    if (suffix or "").strip().lower() == ".svg":
+        return True
+    if (content_type or "").split(";")[0].strip().lower() == "image/svg+xml":
+        return True
+    start = (head or b"")[:512].lstrip(b"\xef\xbb\xbf \t\r\n").lower()
+    return start.startswith((b"<svg", b"<?xml"))
 MAX_VIDEO_BYTES = MAX_VIDEO_UPLOAD_MB * 1024 * 1024
 MAX_DOC_BYTES = MAX_DOCUMENT_UPLOAD_MB * 1024 * 1024  # docs
 MAX_ORIGINAL_BYTES = MAX_ORIGINAL_UPLOAD_MB * 1024 * 1024
@@ -252,6 +268,8 @@ def _encode_image_bytes(
             img.save(out, format=output_format, **save_kwargs)
             data = out.getvalue()
     except UnidentifiedImageError:
+        if looks_like_svg(suffix, declared_content_type, data):
+            raise HTTPException(status_code=400, detail=SVG_REFUSED_MESSAGE)
         raise HTTPException(status_code=400, detail="Ungültige Bilddatei")
     except HTTPException:
         raise
