@@ -382,6 +382,38 @@ async def test_foreign_matches_say_whether_they_run_are_called_or_only_planned(f
 
 
 @pytest.mark.asyncio
+async def test_an_open_foreign_match_without_any_time_is_not_even_loaded(flow, monkeypatch):
+    """#1872: Ein offenes fremdes Spiel ohne geplante Zeit, Start und Aufruf kommt gar nicht erst aus der Datenbank -
+    sonst lösten große Events für jedes davon Teilnehmer, Teams und Phasen auf."""
+    import services.match_scheduler as scheduler
+
+    _staff, tournament, _users, _registrations = await built(flow, **begun_fields(event_id="ev-1872b"))
+    start = (await flow.db.tournaments.find_one({"id": tournament["id"]}, {"_id": 0}))["start_date"]
+    await flow.db.tournaments.insert_one({"id": "t-sofort-b", "slug": "sofort-b", "title": "Sofort-Cup", "format": "single_elim",
+                                          "status": "live", "event_mode": "local", "event_id": "ev-1872b", "start_date": start,
+                                          "created_at": now_utc().isoformat()})
+    slots = [{"slot": 1, "registration_id": None, "user_id": "u-x"}, {"slot": 2, "registration_id": None}]
+    await flow.db.matches_v2.insert_many([
+        {"id": "m-open", "tournament_id": "t-sofort-b", "round": 1, "match_type": "duel", "status": "pending", "slots": slots},
+        {"id": "m-empty", "tournament_id": "t-sofort-b", "round": 1, "match_type": "duel", "status": "pending", "slots": slots,
+         "scheduled_at": None, "started_at": "", "called_at": None},
+        {"id": "m-running", "tournament_id": "t-sofort-b", "round": 1, "match_type": "duel", "status": "in_progress", "slots": slots,
+         "started_at": now_utc().isoformat()},
+    ])
+    loaded: list[str] = []
+    resolve = scheduler.resolve_participant_keys
+
+    async def spy(db, matches):
+        loaded.extend(match["id"] for match in matches if match.get("tournament_id") == "t-sofort-b")
+        return await resolve(db, matches)
+
+    monkeypatch.setattr(scheduler, "resolve_participant_keys", spy)
+    stored = await flow.db.tournaments.find_one({"id": tournament["id"]}, {"_id": 0})
+    await scheduler.load_plan_inputs(flow.db, stored)
+    assert loaded == ["m-running"]
+
+
+@pytest.mark.asyncio
 async def test_station_moves_wait_for_a_running_tournament_action(flow):
     from services.mutation_lock import mutation_lock, tournament_write_resource
 
