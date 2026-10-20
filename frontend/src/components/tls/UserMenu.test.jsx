@@ -126,11 +126,11 @@ test.each([
   if (expected === "nav-duty") expect(screen.getByTestId("nav-duty")).toHaveTextContent("Mein Dienst");
 });
 
-// Kompakte Kopfzeile (#1234): zwischen 1024 und 1279 px nur das Bild - der Name bleibt für Vorleseprogramme im Knopf.
-test("kompakte Kopfzeile: der Name steht zwischen 1024 und 1279 px nicht neben dem Bild, der Knopf nennt ihn weiter", () => {
+// Kompakte Kopfzeile (#1234): zwischen 1024 und 1439 px nur das Bild - der Name bleibt für Vorleseprogramme im Knopf.
+test("kompakte Kopfzeile: der Name steht zwischen 1024 und 1439 px nicht neben dem Bild, der Knopf nennt ihn weiter", () => {
   renderMenu();
   const button = screen.getByTestId("nav-user");
   expect(button).toHaveAccessibleName("Benutzermenü Lion Fan");
   const name = [...button.querySelectorAll("span")].find((span) => span.textContent === "Lion Fan");
-  expect(name.className).toMatch(/(^|\s)lg:max-xl:hidden(\s|$)/);
+  expect(name.className).toMatch(/(^|\s)lg:max-\[1439\.98px\]:hidden(\s|$)/);
 });

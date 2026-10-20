@@ -1,6 +1,6 @@
 const { test, expect } = require("@playwright/test");
 
-// Web-Navigation II: Untermenüs per Antippen und Tastatur (#1233), die Kopfzeile zwischen 1024 und 1279 px (#1234) und
+// Web-Navigation II: Untermenüs per Antippen und Tastatur (#1233), die Kopfzeile zwischen 1024 und 1439 px (#1234) und
 // der Saison-Deko-Schalter am Handy im Menü (#1239). Der Server ist nachgestellt - das Menü wie
 // DEFAULT_NAV in backend/routes/phase_fg_routes.py („Verein“ und „eSports“ mit eigener Seite, „Community“ ohne).
 
@@ -136,11 +136,11 @@ async function headerFacts(page) {
   });
 }
 
-test.describe("Kopfzeile 1024-1279 px (#1234)", () => {
+test.describe("Kopfzeile 1024-1439 px (#1234)", () => {
   test.skip(({ isMobile }) => isMobile, "Breiten werden einzeln gestellt.");
 
   for (const who of ["Gast", "angemeldet"]) {
-    for (const width of [1024, 1180, 1279, 1280, 1440]) {
+    for (const width of [1024, 1180, 1279, 1280, 1366, 1439, 1440]) {
       test(`${who} bei ${width} px: Logo ganz zu sehen, Knöpfe einzeilig, kein Überlauf`, async ({ page }) => {
         await page.setViewportSize({ width, height: 800 });
         await mockServer(page, { user: who === "Gast" ? null : ME });
@@ -151,10 +151,10 @@ test.describe("Kopfzeile 1024-1279 px (#1234)", () => {
         const facts = await headerFacts(page);
         expect(facts.overflow).toBeLessThanOrEqual(1);
         expect(facts.logoWidth).toBeGreaterThanOrEqual(32);
-        if (width < 1280) {
+        expect(facts.logoSquashed).toBe(false);
+        expect(facts.tall).toEqual([]);
+        if (width < 1440) {
           expect(facts.logoVariant).toBe("mascot");
-          expect(facts.logoSquashed).toBe(false);
-          expect(facts.tall).toEqual([]);
           if (who === "Gast") {
             expect(await page.getByTestId("nav-register").innerText()).toBe("BEITRETEN");
             await expect(page.getByTestId("nav-login")).toHaveAccessibleName("Login");
