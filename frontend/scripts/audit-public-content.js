@@ -1,6 +1,14 @@
 const { chromium } = require("@playwright/test");
 
-const baseUrl = (process.env.PUBLIC_AUDIT_BASE_URL || "https://lionsquad.at").replace(/\/+$/, "");
+const { resolveAuditBaseUrl } = require("./audit-base-url");
+
+let baseUrl;
+try {
+  baseUrl = resolveAuditBaseUrl(process.env);
+} catch (error) {
+  console.error(error.message);
+  process.exit(2);
+}
 const limit = Math.max(1, Number(process.env.PUBLIC_AUDIT_LIMIT || 250));
 const concurrency = Math.max(1, Math.min(8, Number(process.env.PUBLIC_AUDIT_CONCURRENCY || 5)));
 const resourceConcurrency = Math.max(1, Math.min(2, Number(process.env.PUBLIC_AUDIT_RESOURCE_CONCURRENCY || 1)));

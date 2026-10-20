@@ -215,12 +215,17 @@ Danach in der Google Search Console die betroffenen Adressen prüfen („Fehlerb
 Sichtbare Suchergebnisse ziehen oft erst nach Tagen nach.
 
 Öffentlichen Inhalt im echten Browser prüfen (Sitemap-Crawl, meldet Platzhalter, kaputte Bilder,
-Browser- und HTTP-Fehler) – manuell nach Deployments, nie als CI-Schritt gegen die Live-Seite:
+Browser- und HTTP-Fehler). Der Audit startet nur mit ausdrücklich gewählter Adresse eines lokalen oder
+Staging-Stands (#1007); ohne `PUBLIC_AUDIT_BASE_URL` bricht er vor jedem Netzzugriff mit einer Meldung ab.
+Nie als CI-Schritt gegen die Live-Seite:
 
 ```bash
 cd frontend
-yarn audit:public
+PUBLIC_AUDIT_BASE_URL=http://127.0.0.1:3000 yarn audit:public
 ```
+
+Die echte Seite lehnt der Audit ab, außer `PUBLIC_AUDIT_ALLOW_PRODUCTION=1` ist zusätzlich gesetzt
+(nur lesend, nur nach Absprache).
 
 Das interne Nginx setzt je HTML-Antwort eine CSP-Nonce; JSON-LD, SEO-Vorschauen und Cloudflares
 JavaScript-Erkennung nutzen dieselbe Nonce, `script-src` braucht kein `unsafe-inline`.
