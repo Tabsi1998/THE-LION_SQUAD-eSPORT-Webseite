@@ -267,6 +267,38 @@ async def test_a_failing_bracket_rebuild_does_not_cost_the_place(flow, monkeypat
     assert sent == ["approved"]
 
 
+
+@pytest.mark.asyncio
+async def test_the_route_answers_before_confirmation_and_achievements(flow, monkeypatch):
+    """#1859: Postfach, Mail und Abzeichen brauchen bei 16 gleichzeitigen Anmeldungen am meisten Zeit - die Route
+    antwortet daher schon mit dem Platz und erledigt sie danach (Hintergrund der Antwort), die Bestätigung genau einmal."""
+    from fastapi import BackgroundTasks
+    from routes import tournament_registration_routes as routes
+
+    sent = []
+
+    async def notify(db, tid, registration, status, **kwargs):
+        sent.append(status)
+
+    monkeypatch.setattr(routes, "_notify_registration", notify)
+    tournament = await flow.create_tournament(max_participants=8)
+    anna = await flow.add_user(name="Anna")
+    later = BackgroundTasks()
+
+    reply = await routes.self_register(flow.db, tournament, RegistrationCreate(accept_rules=True, accept_privacy=True),
+                                       anna, None, via="onsite", followups=later)
+
+    assert reply["status"] == "approved" and sent == []
+    await later()
+    assert sent == ["approved"]
+
+    flow.act_as(await flow.add_user(name="Ben"))
+    response = await flow.client.post(f"/api/tournaments/{tournament['id']}/register",
+                                      json={"accept_rules": True, "accept_privacy": True})
+    assert response.status_code == 200, response.text
+    assert sent == ["approved", "approved"]
+
+
 def test_the_registration_wait_is_configurable_and_bounded():
     from routes.tournament_common import registration_wait_seconds
 
