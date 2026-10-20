@@ -34,9 +34,8 @@ nach der Runde). Team-Liga: `matches` mit `home`, `away`, Ergebnis, `maps` und `
   Teilnehmer angelegt (Dialog „Unbekannte Namen“); ein bestätigter Alias ordnet sie sofort zu. Verwirft der Vorstand
   einen Entwurf daneben, gehen die Teilnehmer wieder, die nur dieser Entwurf angelegt hat – solange sie offen sind
   (keine Zuordnung, kein Alias) und in keinem anderen Blatt der Saison stehen. Beim Freigeben gilt dieselbe Regel für
-  Teilnehmer, die nur ein ersetzter Entwurf angelegt hat. Gegen Gleichzeitigkeit: neu angelegte Teilnehmer tragen
-  `created_by_sheet`, bis ein Blatt sie verwendet (die Markierung fällt vor dem Schreiben des Blatts weg); gelöscht
-  wird nur, was im selben Filter noch markiert, offen und ohne Alias ist.
+  Teilnehmer, die nur ein ersetzter Entwurf angelegt hat. Gelöscht wird unter der Sperre der Saison (siehe unten);
+  „offen und ohne Alias“ steht im Löschfilter selbst, weil die Zuordnung (#1743) ohne diese Sperre läuft.
 - **Fehler** (halten das Übernehmen auf): Teilnehmer doppelt, unbekannte Kennung oder Startnummer, Name fehlt,
   unbrauchbar oder mehrdeutig, leeres Blatt, abgesagter oder archivierter Termin.
 - **Warnungen:** Platz doppelt, Lücke oder fehlend, Nichtstart mit Platz, Punkte passen nicht zum Schlüssel oder
@@ -45,13 +44,15 @@ nach der Runde). Team-Liga: `matches` mit `home`, `away`, Ergebnis, `maps` und `
 
 ## Version, Entwurf daneben und Protokoll
 
-- `expected_version` ist Pflicht (0 ohne Blatt). Geschrieben wird atomar bedingt – zwei gleichzeitige Übernahmen auf
-  denselben Stand: eine gewinnt, die andere bekommt 409.
+- **Nacheinander je Saison:** Ergebnis speichern, freigeben, verwerfen und zurücknehmen sowie alle Kalender-Änderungen
+  (anlegen, ändern, verschieben, absagen, wieder ansetzen, archivieren, zurückholen, ordnen, einfügen) laufen unter der
+  Sperre `series:<id>` (`services/mutation_lock.py`, `reference_series.series_write`, Wartezeit wie bei Turnieren).
+  Darin: Versionsprüfung, Schreiben, Termin-Status, Teilnehmer aufräumen und einmal Neurechnen. Ist die Sperre zu
+  lange besetzt: 409 „In dieser Saison wird gerade schon etwas gespeichert …“.
+- `expected_version` ist Pflicht (0 ohne Blatt); ein veralteter Stand der Seite bekommt 409. Zwei gleichzeitige
+  Übernahmen auf denselben Stand: eine gewinnt, die andere bekommt 409.
 - Ist das Blatt veröffentlicht und die Person darf nicht veröffentlichen (`target: "pending_draft"`), landet die
   Änderung als `pending_draft` neben dem Blatt; das veröffentlichte bleibt sichtbar, bis der Vorstand freigibt.
 - Jede Änderung legt den alten Stand in `reference_round_result_revisions` ab und steht im Adminprotokoll
   (`reference_result.save`, `.pending_draft`, `.approve`, `.discard`). Veröffentlichen oder Zurücknehmen rechnet die
   Stände der Serie neu und setzt den Termin auf „gewertet“ bzw. zurück.
-- Zwei Schreibvorgänge kurz hintereinander: Antwort und Termin-Status kommen aus dem Blatt, das das eigene Update
-  geschrieben hat; der Termin merkt sich die Blatt-Version (`result_version`) und folgt immer dem späteren Schreiben;
-  die Stände werden aus der Datenbank nachgerechnet, bis sich währenddessen nichts mehr geändert hat.
