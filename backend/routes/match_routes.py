@@ -33,7 +33,7 @@ from models import (
     new_id,
 )
 from services.competition_read import canonical_match_for_source, find_match_source
-from services.match_overview import operational_match_overviews, own_match_overviews
+from services.match_overview import own_match_overviews
 from services.match_duration import load_duration_game, with_effective_durations
 from services.match_public_view import public_match_view, public_tournament_view
 from services.match_planning import (
@@ -687,11 +687,6 @@ async def _match_page_payload(match: dict, collection: str, user: dict | None = 
 async def my_upcoming(me: dict = Depends(get_current_user)):
     matches, _registrations = await own_match_overviews(get_db(), me)
     return matches
-
-
-@router.get("/operations")
-async def operational_matches(me: dict = Depends(get_current_user)):
-    return await operational_match_overviews(get_db(), me)
 
 
 @router.get("/{match_id}/page")

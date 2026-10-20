@@ -149,7 +149,9 @@ CAPABILITIES: tuple[Capability, ...] = (
     # ---------- Matches lesen ----------
     _c("match.read", "Match ansehen",
        ["GET /api/matches/{match_id}", "GET /api/matches/{match_id}/page",
-        "GET /api/matches/upcoming", "GET /api/matches/operations"], [CLASSIC, GRAPH]),
+        "GET /api/matches/upcoming"], [CLASSIC, GRAPH],
+       note="#933: „GET /api/matches/operations“ entfallen - ohne Aufrufer seit dem Web-Dashboard (#256); die App "
+            "liest die Spiele zum Betreuen aus /api/mobile/dashboard."),
     _c("match.chat", "Match-Chat",
        ["GET /api/matches/{match_id}/chat", "POST /api/matches/{match_id}/chat"], [CLASSIC, GRAPH]),
     _c("match.schedule", "Termin vorschlagen und entscheiden",
