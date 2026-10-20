@@ -27,16 +27,16 @@ function TeamCell({ row, index, rows, drivers, lead }) {
   return (
     <span className="block min-w-0">
       <span className="flex items-center gap-2 min-w-0">
-        <span className="tls-standing-name font-semibold text-white">{row.team}</span>
+        <span className="font-semibold text-white leading-snug [overflow-wrap:anywhere]">{row.team}</span>
         {row.club_member && <span className="tls-standing-me">Verein</span>}
       </span>
       {names.length > 0 && (
-        <span className="mt-0.5 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[12px] leading-tight text-white/50">
+        <span className="mt-0.5 block text-[12px] leading-snug text-white/50">
           {names.map((item, position) => (
-            <span key={item.key} className="inline-flex items-center gap-1.5">
-              {position > 0 && <span aria-hidden="true">·</span>}
+            <span key={item.key}>
+              {position > 0 && ", "}
               <span className={item.row?.club_member ? "text-white/80" : undefined}>{nameOf(item.row)}</span>
-              {item.guest && <GuestBadge />}
+              {item.guest && <>{" "}<GuestBadge /></>}
             </span>
           ))}
         </span>

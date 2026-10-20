@@ -43,7 +43,7 @@ export function SeasonSwitcher({ seasons, lineageSlug }) {
 export function DriverName({ row, onSelect, className = "" }) {
   const name = nameOf(row);
   if (row.club_member && !row.name_hidden && row.name && onSelect) {
-    return <button type="button" onClick={() => onSelect(row.key)} className={`tls-racing-name tls-standing-name ${className}`}>{name}</button>;
+    return <button type="button" onClick={() => onSelect(row.key)} className={`tls-racing-name ${className}`}>{name}</button>;
   }
   return <span className={`tls-standing-name ${row.name_hidden ? "text-white/40 italic" : "text-white font-medium"} ${className}`}>{name}</span>;
 }
@@ -61,7 +61,7 @@ export function DriverCell({ row, driver, onSelect }) {
         {row.club_member && <span className="tls-standing-me">Verein</span>}
         {driver?.guest && <GuestBadge />}
       </span>
-      {driver?.team && <span className="mt-0.5 block text-[12px] leading-tight text-white/45 truncate">{driver.team}</span>}
+      {driver?.team && <span className="mt-0.5 block text-[12px] leading-tight text-white/45 [overflow-wrap:anywhere]">{driver.team}</span>}
     </span>
   );
 }
@@ -120,8 +120,8 @@ function WhoLine({ label, tone, row, cell, onSelect, testId, showClub = false })
     <p className="flex flex-wrap items-center gap-x-2 gap-y-0.5 min-w-0 text-sm" data-testid={testId}>
       <span className={`shrink-0 sm:w-[10rem] text-[10px] font-bold uppercase tracking-[0.14em] ${tone}`}>{label}</span>
       {" "}
-      <span className="flex items-center gap-2 min-w-0">
-        <DriverName row={row} onSelect={onSelect} className="truncate" />
+      <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5 min-w-0">
+        <DriverName row={row} onSelect={onSelect} />
         {cell && <span className="text-white/50 tabular-nums whitespace-nowrap">{` · ${cell.place ? `P${cell.place}` : cell.text}`}</span>}
         {showClub && row.club_member && <span className="tls-standing-me">Verein</span>}
       </span>

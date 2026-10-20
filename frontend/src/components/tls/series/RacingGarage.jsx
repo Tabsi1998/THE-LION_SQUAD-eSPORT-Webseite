@@ -21,8 +21,8 @@ function DriverPick({ row, driver, selected, onSelect }) {
   if (row.club_member && row.name && !row.name_hidden) {
     return (
       <button type="button" className="tls-racing-pick" aria-pressed={selected} onClick={() => onSelect(row.key)}>
-        <span className="min-w-0 flex-1 flex items-center gap-2">
-          <span className="tls-standing-name font-semibold text-white">{row.name}</span>
+        <span className="min-w-0 flex-1 flex flex-wrap items-center gap-x-2 gap-y-0.5">
+          <span className="font-semibold text-white leading-snug [overflow-wrap:anywhere]">{row.name}</span>
           <span className="tls-standing-me">Verein</span>
         </span>
         <span className="text-[12px] tabular-nums text-white/55 whitespace-nowrap">{line}</span>
@@ -31,8 +31,8 @@ function DriverPick({ row, driver, selected, onSelect }) {
   }
   return (
     <div className="flex items-center gap-3 min-h-[44px] px-3 py-1.5">
-      <span className="min-w-0 flex-1 flex items-center gap-2">
-        <span className={`tls-standing-name ${row.name_hidden ? "text-white/40 italic" : "text-white/80"}`}>{nameOf(row)}</span>
+      <span className="min-w-0 flex-1 flex flex-wrap items-center gap-x-2 gap-y-0.5">
+        <span className={`leading-snug [overflow-wrap:anywhere] ${row.name_hidden ? "text-white/40 italic" : "text-white/80"}`}>{nameOf(row)}</span>
         {driver?.guest && <GuestBadge />}
       </span>
       <span className="text-[12px] tabular-nums text-white/45 whitespace-nowrap">{line}</span>
@@ -55,7 +55,7 @@ function Duel({ duel, rows }) {
       ) : (
         <>
           <div className="mt-2 grid grid-cols-[1fr_auto_1fr] items-center gap-3">
-            <span className="min-w-0 truncate text-sm text-white">{nameOf(a)}</span>
+            <span className="min-w-0 text-sm leading-snug text-white [overflow-wrap:anywhere]">{nameOf(a)}</span>
             <span className="font-display text-2xl font-bold tabular-nums text-white">
               <span aria-hidden="true">
                 <span className="text-[#29B6E8]">{duel.a.ahead}</span>
@@ -64,7 +64,7 @@ function Duel({ duel, rows }) {
               </span>
               <span className="sr-only">{`${duel.a.ahead} zu ${duel.b.ahead}`}</span>
             </span>
-            <span className="min-w-0 truncate text-sm text-white text-right">{nameOf(b)}</span>
+            <span className="min-w-0 text-sm leading-snug text-white text-right [overflow-wrap:anywhere]">{nameOf(b)}</span>
           </div>
           <div className="tls-racing-duel mt-2" style={{ "--a": duel.a.ahead || 0.04, "--b": duel.b.ahead || 0.04 }} aria-hidden="true">
             <span />
@@ -170,6 +170,7 @@ export const RacingDriverDetail = forwardRef(function RacingDriverDetail({ row, 
                   title={title}
                   data-testid="racing-driver-race"
                 >
+                  <span className="tls-racing-race__points" aria-hidden="true">{item.cell ? formatNumber(item.points) : ""}</span>
                   <span className="tls-racing-race__track" aria-hidden="true">
                     {item.cell && (
                       <span
