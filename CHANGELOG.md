@@ -1,5 +1,24 @@
 # Changelog
 
+## [1.9.0](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/compare/v1.8.0...v1.9.0) (2026-10-20)
+
+
+### Neu
+
+* Ergebnisliste aus der Zwischenablage lesen – Zeilen, Tab-, |- und ;-Tabellen ([#1744](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1744)) ([f3b95be](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/f3b95be4a685e759aede93a3b8d59608827febc6))
+* Ergebnisse je Termin in der Saison eintragen – dynamische Liste mit Vorschau ([#1744](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1744)) ([f3b95be](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/f3b95be4a685e759aede93a3b8d59608827febc6))
+
+
+### Fehlerbehebungen
+
+* Referenzen zeigen bei Ausgaben ohne eigenes Logo oder Cover das des Hauptspiels ([#1811](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1811)) ([84f2f69](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/84f2f69c8f22b7054c7b209c9782d15d79c47009))
+* Spiel-Kacheln unter „Wo wir antreten“ brechen lange Spielnamen am Handy um statt sie abzuschneiden ([#1812](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1812)) ([84f2f69](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/84f2f69c8f22b7054c7b209c9782d15d79c47009))
+
+
+### Dokumentation
+
+* Handbuch „Ergebnisse eintragen“ mit Liste, Einfügen, Vorschau und Freigabe ([#1744](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1744)) ([f3b95be](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/f3b95be4a685e759aede93a3b8d59608827febc6))
+
 ## 1.8.0 (20.10.2026)
 
 ### Neu
