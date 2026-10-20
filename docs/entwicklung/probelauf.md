@@ -37,14 +37,14 @@ Event nur noch Fixes, keine neuen Funktionen.
 | 7 | [Ergebnisse und Rückgängig](#7-ergebnisse-und-rückgängig) | 10 Min. | 15:10 |
 | 8 | [Weiterkommen: Show-Auslosung und sofort zufällig](#8-weiterkommen-show-auslosung-und-sofort-zufällig) | 15 Min. | 15:20 |
 | 9 | [Austritt und nicht erschienen](#9-austritt-und-nicht-erschienen) | 10 Min. | 15:35 |
-| 10 | [Lasttest-Fenster](#10-lasttest-fenster) (läuft neben 11 und 12) | 15 Min. | 15:45 |
-| 11 | [TV durchsehen](#11-tv-durchsehen) | 10 Min. | 15:45 |
-| 12 | [Fast Lap am Simulator](#12-fast-lap-am-simulator) | 15 Min. | 15:55 |
-| 13 | [Cup zu Ende, Sieger-Moment](#13-cup-zu-ende-sieger-moment) | 15 Min. | 16:10 |
-| 14 | [Abschluss und Befunde](#14-abschluss-und-befunde) | 15 Min. | 16:25 |
+| 10 | [Lasttest-Fenster](#10-lasttest-fenster) (isoliert, in der Pause) | 15 Min. | 15:45 |
+| 11 | [TV durchsehen](#11-tv-durchsehen) | 10 Min. | 16:00 |
+| 12 | [Fast Lap am Simulator](#12-fast-lap-am-simulator) | 15 Min. | 16:10 |
+| 13 | [Cup zu Ende, Sieger-Moment](#13-cup-zu-ende-sieger-moment) | 15 Min. | 16:25 |
+| 14 | [Abschluss und Befunde](#14-abschluss-und-befunde) | 15 Min. | 16:40 |
 
-**Gesamt rund 2 Stunden 40 Minuten** ab Phase 1 (dazu die Vorbereitung am Vorabend), mit Luft für eine Pause bei
-Phase 10. Der Cup selbst läuft schneller als am Abend: das Skript trägt Ergebnisse sofort ein, statt 12 Minuten zu
+**Gesamt rund 2 Stunden 55 Minuten** ab Phase 1 (dazu die Vorbereitung am Vorabend); Phase 10 ist zugleich die
+Pause. Der Cup selbst läuft schneller als am Abend: das Skript trägt Ergebnisse sofort ein, statt 12 Minuten zu
 spielen.
 
 **Was anders ist als am Abend** (gewollt, sonst dauert die Probe Stunden):
@@ -97,12 +97,15 @@ ebenfalls aus dem Skript. Für die Begleitperson das Konto `gast@abnahme.lionsqu
 | Claude | `$PM aufbau` | Event „Probelauf (…)“, Probelauf-Cup, Sofort-Cup, Fast Lap; die Adressen stehen in der Ausgabe |
 | Turnierleitung | Am PC `http://127.0.0.1:23000` als Turnierleitung anmelden (Zwei-Faktor aus der App), am Handy dasselbe | Admin-Menü sichtbar, kein „2FA einrichten“ |
 | Turnierleitung | **Admin → eSports → TV & Beamer**: Link **Turnierbaum** für den Probelauf-Cup mit Anzeige-Schlüssel („Beamer Probelauf“), dazu **Aufrufe** (Event „Probelauf“) und **Fast Lap** | drei Links; der Schlüssel steht nur jetzt im Link – gleich kopieren |
+| Turnierleitung | Bei **Aufrufe** einen **Namen des Bildschirms** eintragen („Aufruf-Tafel Probelauf“) und **Link mit Schlüssel** – ein Event-Schlüssel (#1822), weil der Cup „Nur Mitglieder“ ist | Link mit Schlüssel; unten unter **Aktive Anzeige-Schlüssel** steht er mit Event „Probelauf“. Ohne Schlüssel zeigt die Aufruf-Tafel den Cup nicht ([TV-Handbuch](../handbuch/tv.md), 2.3) |
 | Turnierleitung | Zweiter Bildschirm: zwei Browserfenster im Vollbild (`F11`), links Turnierbaum, rechts Aufruf-Tafel; Fast Lap später | TV zeigt den Cup mit „Anmeldung“ und QR-Code |
 
 **Was angelegt wird** (`aufbau`): ein Event „Probelauf“ (live, öffentlich) mit
 **Probelauf-Cup** – vor Ort, nur Mitglieder, 16 Plätze, FFA zu viert mit Winner und Loser Bracket (Schema wie im
-Seed), **Show-Auslosung**, vier Stationen „Station 1–4“, Anmeldung offen, Check-in ab jetzt, Start in rund 45 Minuten,
-„nicht erschienen“ nach 3 Minuten; Turnierleitung als Organisation und der Helfer als Schiedsrichter eingeteilt –
+Seed), **Show-Auslosung**, vier Stationen „Station 1–4“, Anmeldung offen, Check-in ab in 20 Minuten (gestartet wird
+er in Phase 3 von Hand), Start in rund 45 Minuten, „nicht erschienen“ nach 3 Minuten, 5 Minuten Mindestpause, Gewinne
+für Platz 1–3 (Testwerte „Pokal“, „Medaille“, „Urkunde“); Turnierleitung als Organisation und der Helfer als
+Schiedsrichter eingeteilt –
 **Sofort-Cup** – K.-o. 8, **sofort zufällig**, schon live und geplant, zwei Stationen – und **Probelauf Fast Lap** mit
 Strecke Spielberg, 3 Versuchen, Simulator 1 und 2, Helfer und Turnierleitung im Fast-Lap-Team.
 
@@ -125,7 +128,7 @@ hier `http://127.0.0.1:23000/vor-ort#…`. Den kann nur ein Handy mit `adb rever
 | Wer | Was | Erwartung |
 | --- | --- | --- |
 | Turnierleitung | Probelauf-Cup öffnen (`/admin/tournaments/<Cup>`), Kasten **Vor-Ort-Anmeldung über QR** | „An – gilt gerade“ |
-| Claude | `$PM anmelden` | 15 Spieler scannen den QR-Code und melden sich an: je „Bestätigt“; „Frei: 1“ |
+| Claude | `$PM anmelden --gleichzeitig` | 15 Spieler scannen den QR-Code und tippen **im selben Moment** auf **Mitspielen** (eine Gruppe am Einlass): je „Bestätigt“, jede Antwort unter 3 Sekunden (#1859), keine doppelten Plätze; „Frei: 1“ |
 | Turnierleitung | Reiter **Teilnehmer** neu laden | 15 Zeilen, jede mit dem Zeichen **Vor Ort** |
 | Turnierleitung | **Aushang drucken** öffnen | A4-Blatt mit Turnier, Termin, Spiel, großem QR-Code; der Code steht nirgends lesbar im Text |
 | Turnierleitung (Handy als Begleitperson) | Privates Fenster in Chrome, QR-Code vom Aushang am PC-Bildschirm scannen | schlanke Turnierseite: Titel, Termin, Spiel, „1 von 16 Plätzen frei“, **Mitspielen** |
@@ -142,7 +145,7 @@ prüft nur die schlanke Ansicht in der Geräteansicht des PCs.
 
 | Wer | Was | Erwartung |
 | --- | --- | --- |
-| Turnierleitung | Oben im Cup **Check-in starten** | Status „Check-in offen“, der Baum ist noch Vorschau |
+| Turnierleitung | Oben im Cup **Check-in starten** (laut Aufbau öffnet er erst in 20 Minuten – wie am Abend, wenn die Gruppe früher da ist) | Status „Check-in offen“, der Baum ist noch Vorschau |
 | Claude (Helfer am Einlass) | `$PM checkin` | die ersten 8 eingecheckt; beim Helfer kein Fehler (Rolle Schiedsrichter darf einchecken) |
 | Turnierleitung | Reiter **Teilnehmer**: PistenPaul **Nicht erschienen** | ZickZackZoe rückt von der Warteliste nach (Status „Bestätigt“), Hinweis bzw. Nachricht an sie |
 | Turnierleitung | Den Rest per **Check-in** einchecken (auch Begleitung Gast und ZickZackZoe), einen davon am Handy (Teilnehmer-Karte) | 16 eingecheckt, 1 nicht erschienen |
@@ -178,6 +181,10 @@ Am Abend schließt der Server den Check-in zur eingestellten Zeit von selbst. Is
 Warteschlange die geplanten Zeiten ein: ein bereites Spiel wartet hinter einer belegten Station, obwohl eine andere frei
 ist, und beim Aufruf steht „antreten bis <Planzeit>“, aber „nicht erschienen ab <Aufruf + 3 Min.>“. Darum vor dem Planen
 den Turnierstart auf den echten Start stellen.
+
+**Hinweis Pause:** Der Aufbau stellt **5 Minuten Mindestpause** zwischen zwei Spielen eines Spielers ein (Kasten
+„Mindestpause zwischen zwei Spielen“). Die Vorschau setzt die Läufe von Runde 2 darum frühestens 5 Minuten nach dem
+Ende ihrer Vorläufe an, auch wenn eine Station früher frei ist – das ist gewollt, kein Planungsfehler.
 
 ---
 
@@ -218,8 +225,10 @@ Ist Runde 1 fertig und noch ein Lauf offen: `$PM spielen` (ruft auf, startet, tr
 | --- | --- | --- |
 | Claude | `$PM spielen` (falls Runde 1 noch nicht fertig) | endet mit „Nichts mehr bereit: wartet auf die Show-Auslosung …“ |
 | Turnierleitung (Handy) | Reiter **Braucht Aufmerksamkeit** | zwei Karten „Auslosung bereit · 8 Namen“ (Winner Runde 2, Loser Runde 1) mit Topf und „automatisch in 6 Min.“ |
-| Turnierleitung (Handy) | **Jetzt auslosen**, TV dabei ansehen | TV-Moment „Auslosung · … · 8 Namen auf 2 Spiele“, die Namen fahren in ihre Läufe; im Reiter Spiele (Kasten „Auslosung“) das Protokoll |
-| Turnierleitung | Die zweite Karte 6 Minuten liegen lassen (optional, wenn Zeit ist) | nach 3 Min. Erinnerung, nach 6 Min. lost der Server selbst |
+| Turnierleitung (PC) | Verwaltung des Cups → Reiter **Spiele** → Kasten **Auslosung** | zwei Zeilen „Winner Runde 2 – Auslosung bereit“ und „Loser Runde 1 – Auslosung bereit“, je mit **Jetzt auslosen** (#1860) |
+| Turnierleitung (Handy) | **Jetzt auslosen**, TV dabei ansehen | TV-Moment „Auslosung · … · 8 Namen auf 2 Spiele“, die Namen fahren in ihre Läufe; im Kasten „Auslosung“ „Winner Runde 2 – ausgelost am …“ |
+| Turnierleitung (Handy) | **Die zweite Karte sofort auslosen** – solange #1858 offen ist | beide Runden gelost; im Reiter **Stationen** haben die freien Stationen **Aufrufen** für E, F, LA und LB |
+| Turnierleitung | Erst wenn #1858 behoben ist: die zweite Karte 6 Minuten liegen lassen (optional, wenn Zeit ist) | nach 3 Min. Erinnerung, nach 6 Min. lost der Server selbst; die bereiten Läufe der anderen Runde lassen sich derweil aufrufen |
 | Claude | `$PM spielen --turnier sofort --anzahl 2` | zwei Viertelfinale im Sofort-Cup gewertet |
 | Turnierleitung | Sofort-Cup: Baum am PC (oder TV-Link dafür) | jeder Sieger steht **sofort** auf einem zufälligen freien Platz im Halbfinale, die anderen Plätze zeigen „Sieger aus Viertelfinale“ |
 | Turnierleitung | Im Sofort-Cup selbst ein Viertelfinale eintragen | nach 10 Sekunden fährt der Name in Runde 2 |
@@ -234,15 +243,19 @@ Ist Runde 1 fertig und noch ein Lauf offen: `$PM spielen` (ruft auf, startet, tr
 | Turnierleitung | Reiter **Teilnehmer**: bei einem Spieler aus einem noch wartenden Lauf **Austritt** | Umbauplan in Worten („… der Platz wird frei, 3 bleiben.“), Grund optional |
 | Turnierleitung | **Austritt eintragen** | Status „Ausgetreten“; der Lauf spielt mit 3 weiter, Baum und TV zeigen es |
 | Claude (nach 3 Minuten) | `$PM fristen` | „1 neuer Vorschlag ‚nicht erschienen‘“ |
-| Turnierleitung (Handy) | **Braucht Aufmerksamkeit**: Fall mit „<Name> nicht erschienen“ und „+5 Min. verlängern“ | ein Tipp auf einen Namen: der Lauf bleibt offen, die Person ist markiert (Baum durchgestrichen, TV „nicht angetreten“, Strafe im Protokoll); im Ergebnis-Fenster ist **Nicht erschienen** schon gesetzt – nach dem Eintragen der Anwesenden steht sie hinten, die zwei Besten kommen weiter (#1823) |
+| Turnierleitung (Handy) | **Braucht Aufmerksamkeit**: Fall „Nicht erschienen?“ – er nennt den Lauf wie Baum und Stationen („Loser Runde 1 · Durchgang LA“, #1860) –, mit „<Name> nicht erschienen“ und „+5 Min. verlängern“ | ein Tipp auf einen Namen: der Lauf bleibt offen, die Person ist markiert (Baum durchgestrichen, TV „nicht angetreten“, Strafe im Protokoll); im Ergebnis-Fenster ist **Nicht erschienen** schon gesetzt – nach dem Eintragen der Anwesenden steht sie hinten, die zwei Besten kommen weiter (#1823) |
 
 ---
 
 ## 10. Lasttest-Fenster
 
 Der Lasttest aus #1683 (`scripts/lasttest_abnahme.py`: Zuschauer mit Änderungsstrom, TVs, Helfer, Fast-Lap-Eingaben,
-Vor-Ort-Anmeldungen zugleich) läuft **neben** den Phasen 11 und 12, rund 10 Minuten. Er trägt selbst Ergebnisse ein und
-fasst darum den gemeinsamen Stand `lsw-abnahme` nicht an – er bekommt einen eigenen Stand auf demselben PC:
+Vor-Ort-Anmeldungen zugleich) läuft **isoliert**, rund 10 Minuten: allein auf dem PC, während die Turnierleitung Pause
+macht. Seine Zahlen gelten nur so – laufen daneben ein zweiter Stand, Testläufe oder der Probelauf selbst, teilen sie
+sich Rechner und Datenbank, und die Antwortzeiten wirken mehrfach so lang (Durchlauf 2, 20.10.). Darum vorher prüfen
+(`docker ps`): außer `lsw-abnahme` (der ruht in der Pause) und dem Lasttest-Stand läuft kein Stand, kein Test, kein
+Build. Er trägt selbst Ergebnisse ein und fasst darum den gemeinsamen Stand `lsw-abnahme` nicht an – er bekommt einen
+eigenen Stand auf demselben PC:
 
 ```bash
 export ABNAHME_PROJECT=lsw-abnahme-last FRONTEND_PORT=24600 BACKEND_PORT=29601 \
@@ -257,8 +270,10 @@ im Kopf des Skripts (#1683); der Bericht nennt Antwortzeiten und Engpässe.
 
 | Wer | Was | Erwartung |
 | --- | --- | --- |
+| Claude | Vorher `docker ps`: nur `lsw-abnahme` und der Lasttest-Stand, keine Tests oder Builds daneben | nichts anderes läuft |
 | Claude | Lasttest starten, Ausgabe beobachten | läuft ohne Abbruch, Bericht in `.local-testing/abnahme/lasttest-…` |
-| Turnierleitung | Während des Laufs Phasen 11 und 12 normal weiter | Seiten, TV und Schnelleingabe reagieren wie vorher; wird etwas spürbar zäh, notieren mit Uhrzeit (gleicher PC: die Last teilt sich die Maschine) |
+| Claude | Danach `python scripts/lasttest_abnahme.py --minutes 3 --viewers 25 --onsite 20` (Einlass: 20 Vor-Ort-Anmeldungen in einer Sekunde) | Gruppe „Vor-Ort-Anmeldung“ ohne Fehler, p95 unter 3 Sekunden (#1859) |
+| Turnierleitung | Pause – am Probelauf nichts bedienen, bis Claude fertig meldet | – |
 | Claude | Danach: `lsw-abnahme-last` mit `bash scripts/run_abnahme_all.sh down` entfernen | nur das Lasttest-Projekt weg, `lsw-abnahme` unberührt |
 
 ---
@@ -296,7 +311,7 @@ im Kopf des Skripts (#1683); der Bericht nennt Antwortzeiten und Engpässe.
 | --- | --- | --- |
 | Claude | `$PM spielen`, bei „wartet auf die Show-Auslosung“ lost die Turnierleitung, dann wieder `$PM spielen` | bis „Offen: 0“ (14 Spiele, Grand Final zuletzt) |
 | Turnierleitung | Status **Beendet** | Podest mit „Stand vorläufig“; TV „Turnier entschieden“ mit Champion |
-| Turnierleitung | Status **Ergebnisse veröffentlicht** | Punkte, Gewinne, Auszeichnungen angelegt (Admin → eSports → Gewinne) |
+| Turnierleitung | Status **Ergebnisse veröffentlicht** | Punkte und Auszeichnungen angelegt; unter **Admin → eSports → Gewinne** drei Gewinne des Cups für Platz 1–3 („Pokal“, „Medaille“, „Urkunde“ – Testwerte aus dem Aufbau), Status offen |
 | Turnierleitung (Handy, privates Fenster) | Als Platz-1-Spieler anmelden (Name aus dem TV, Konto `spielerNN@abnahme.lionsquad.at` laut Seed) und die Turnierseite öffnen | einmal die Karte „Champion“ mit **Teilen** und **Turnierbaum**; beim zweiten Öffnen nicht mehr |
 
 ---
@@ -330,3 +345,16 @@ aufgefallen (in diesem Drehbuch schon berücksichtigt):
 - Der Umbauplan beim Austritt sagt „1 Spiele betroffen“.
 - Stationen mit Namen „Switch 1“ und Gerät „Switch 2“ heißen in der Warteschlange „Switch 1 · Switch 2“ – der Aufbau
   nennt sie darum „Station 1–4“.
+
+## Bekannt aus Durchlauf 2 (20.10.)
+
+Die Generalprobe lief ein zweites Mal mit allen Fixes. Ins Drehbuch übernommen:
+
+- Phase 1: Die Aufruf-Tafel braucht einen Event-Schlüssel, weil der Cup „Nur Mitglieder“ ist.
+- Phase 2: 15 Anmeldungen im selben Moment (`anmelden --gleichzeitig`) – vorher warteten sie bis zu 12 Sekunden (#1859).
+- Phase 3: Der Check-in öffnet laut Aufbau erst nach 20 Minuten; die Turnierleitung startet ihn selbst.
+- Phase 5: Die Mindestpause von 5 Minuten verschiebt Runde 2 nach hinten – gewollt.
+- Phase 8: Beide Show-Auslosungen sofort losen, bis #1858 behoben ist (sonst blockiert ein wartender Loser-Lauf die
+  freien Stationen). Kasten „Auslosung“ und Fall „Nicht erschienen?“ nennen den Baumteil (#1860).
+- Phase 10: Der Lasttest misst nur allein auf dem PC Verlässliches.
+- Phase 13: Der Aufbau setzt Gewinne für Platz 1–3, sonst legt das Veröffentlichen keine an.

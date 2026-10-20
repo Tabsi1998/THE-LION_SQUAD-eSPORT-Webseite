@@ -160,7 +160,7 @@ async def test_a_late_wait_list_confirmation_is_dropped_once_the_person_moved_up
         sent.append((registration["user_id"], status, previous))
 
     monkeypatch.setattr(routes, "_notify_registration", notify)
-    real_after = routes._after_self_registration
+    real_after = routes._confirm_self_registration
 
     async def ben_signs_off_first(db, tid, reg, me):
         flow.act_as(ben)
@@ -168,7 +168,7 @@ async def test_a_late_wait_list_confirmation_is_dropped_once_the_person_moved_up
         assert response.status_code == 200, response.text
         await real_after(db, tid, reg, me)
 
-    monkeypatch.setattr(routes, "_after_self_registration", ben_signs_off_first)
+    monkeypatch.setattr(routes, "_confirm_self_registration", ben_signs_off_first)
     body = RegistrationCreate(accept_rules=True, accept_privacy=True)
 
     reply = await routes.self_register(flow.db, tournament, body, anna, None, via="onsite")
@@ -196,6 +196,149 @@ async def test_the_confirmation_goes_out_once_per_registration(flow, monkeypatch
     await routes._after_self_registration(flow.db, tournament["id"], reply, anna)
 
     assert sent == ["approved"]
+
+
+
+def count_preview_refreshes(monkeypatch, routes, seen: list) -> None:
+    """Den Vorschau-Baum künstlich langsam machen (wie auf dem echten Server) und mitschreiben, wie viele Anmeldungen
+    er bei jedem Neubau sieht."""
+    real = routes._refresh_tournament_previews_after_registration
+
+    async def slow(db, tournament, actor_id):
+        count = await db.tournament_registrations.count_documents(
+            {"tournament_id": tournament["id"], "status": {"$in": ["approved", "checked_in"]}})
+        seen.append(count)
+        await asyncio.sleep(SLOW_SECONDS)
+        return await real(db, tournament, actor_id)
+
+    monkeypatch.setattr(routes, "_refresh_tournament_previews_after_registration", slow)
+
+
+@pytest.mark.asyncio
+async def test_sixteen_at_once_do_not_wait_for_sixteen_bracket_rebuilds(flow, monkeypatch):
+    """#1859: Früher baute jede Anmeldung den Vorschau-Baum in der Sperre neu - 16 gleichzeitige warteten 16 Neubauten
+    ab (im Probelauf bis 20 s). Jetzt vergibt die Sperre nur den Platz; der Baum wird danach einmal für alle gebaut und
+    enthält am Ende alle 16."""
+    from routes import tournament_registration_routes as routes
+
+    seen: list[int] = []
+    count_preview_refreshes(monkeypatch, routes, seen)
+    tournament = await flow.create_tournament(max_participants=32)
+    people = [await flow.add_user(name=f"Gast {index}") for index in range(16)]
+    body = RegistrationCreate(accept_rules=True, accept_privacy=True)
+    loop = asyncio.get_running_loop()
+
+    started = loop.time()
+    results = await asyncio.gather(*(outcome(routes.self_register(flow.db, tournament, body, who, None, via="onsite"))
+                                     for who in people))
+    elapsed = loop.time() - started
+
+    assert [status for status, _ in results] == [200] * 16, [detail for status, detail in results if status != 200]
+    assert await statuses(flow, tournament) == ["approved"] * 16
+    assert seen and seen[-1] == 16, f"der letzte Neubau muss alle 16 enthalten: {seen}"
+    assert len(seen) <= 3, f"ein Neubau für alle statt einer je Anmeldung: {seen}"
+    assert elapsed < 12 * SLOW_SECONDS, f"16 Anmeldungen brauchten {elapsed:.2f} s"
+
+
+@pytest.mark.asyncio
+async def test_a_failing_bracket_rebuild_does_not_cost_the_place(flow, monkeypatch):
+    """#1859: Der Baum folgt nach der Platzvergabe. Scheitert er, bleibt die Anmeldung bestätigt, und die Bestätigung
+    geht trotzdem genau einmal hinaus."""
+    from routes import tournament_registration_routes as routes
+
+    async def broken(db, tournament, actor_id):
+        raise RuntimeError("Baum kaputt")
+
+    sent = []
+
+    async def notify(db, tid, registration, status, **kwargs):
+        sent.append(status)
+
+    monkeypatch.setattr(routes, "_refresh_tournament_previews_after_registration", broken)
+    monkeypatch.setattr(routes, "_notify_registration", notify)
+    tournament = await flow.create_tournament(max_participants=8)
+    anna = await flow.add_user(name="Anna")
+
+    reply = await routes.self_register(flow.db, tournament, RegistrationCreate(accept_rules=True, accept_privacy=True),
+                                       anna, None, via="onsite")
+
+    assert reply["status"] == "approved"
+    assert await statuses(flow, tournament) == ["approved"]
+    assert sent == ["approved"]
+
+
+
+@pytest.mark.asyncio
+async def test_the_confirmation_is_out_before_the_answer_only_achievements_follow(flow, monkeypatch):
+    """#1859: Die Abzeichen-Auswertung kostet bei 16 gleichzeitigen Anmeldungen am meisten - sie läuft nach der Antwort.
+    Die Bestätigung nicht: ein Hintergrund-Auftrag überlebt keinen Neustart, und eine Wiederholung der Anmeldung
+    schickt sie nicht nach (#1846, genau eine Bestätigung). Sie ist also erstellt, wenn die Antwort zurückkommt."""
+    from fastapi import BackgroundTasks
+    from routes import tournament_registration_routes as routes
+
+    sent, awarded = [], []
+
+    async def notify(db, tid, registration, status, **kwargs):
+        sent.append(status)
+
+    async def badges(user_id, tid):
+        awarded.append(user_id)
+
+    monkeypatch.setattr(routes, "_notify_registration", notify)
+    monkeypatch.setattr(routes, "_award_registration_badges", badges)
+    tournament = await flow.create_tournament(max_participants=8)
+    anna = await flow.add_user(name="Anna")
+    later = BackgroundTasks()
+
+    reply = await routes.self_register(flow.db, tournament, RegistrationCreate(accept_rules=True, accept_privacy=True),
+                                       anna, None, via="onsite", followups=later)
+
+    assert reply["status"] == "approved"
+    assert sent == ["approved"], "die Bestätigung ist vor der Antwort draußen"
+    stored = await flow.db.tournament_registrations.find_one({"id": reply["id"]}, {"_id": 0})
+    assert stored["notified_status"] == "approved"
+    assert awarded == [], "die Abzeichen folgen erst nach der Antwort"
+    await later()
+    assert awarded == [anna["id"]]
+
+    # Neustart nach der Antwort, die Abzeichen gingen verloren - die Wiederholung schickt keine zweite Bestätigung.
+    again = await routes.self_register(flow.db, tournament, RegistrationCreate(accept_rules=True, accept_privacy=True),
+                                       anna, None, via="onsite", followups=BackgroundTasks())
+    assert again["idempotent_replay"] is True and sent == ["approved"]
+
+    flow.act_as(await flow.add_user(name="Ben"))
+    response = await flow.client.post(f"/api/tournaments/{tournament['id']}/register",
+                                      json={"accept_rules": True, "accept_privacy": True})
+    assert response.status_code == 200, response.text
+    assert sent == ["approved", "approved"]
+
+
+@pytest.mark.asyncio
+async def test_a_failed_bracket_rebuild_is_tried_once_more(flow, monkeypatch):
+    """#1859: Scheitert der Neubau der Vorschau nach einer Anmeldung, versucht der Server es sofort noch einmal - sonst
+    stünde der Baum bis zur nächsten Anmeldung oder zum Check-in-Ende ohne die Person da."""
+    from routes import tournament_registration_routes as routes
+
+    real = routes._refresh_tournament_previews_after_registration
+    calls = []
+
+    async def flaky(db, tournament, actor_id):
+        calls.append(tournament["id"])
+        if len(calls) == 1:
+            raise RuntimeError("kurz weg")
+        return await real(db, tournament, actor_id)
+
+    monkeypatch.setattr(routes, "_refresh_tournament_previews_after_registration", flaky)
+    tournament = await flow.create_tournament(max_participants=8)
+    anna = await flow.add_user(name="Anna")
+
+    reply = await routes.self_register(flow.db, tournament, RegistrationCreate(accept_rules=True, accept_privacy=True),
+                                       anna, None, via="onsite")
+
+    assert reply["status"] == "approved"
+    assert calls == [tournament["id"], tournament["id"]]
+    queue = routes._registration_queue(tournament["id"])
+    assert queue.refreshed == queue.requested == 1, "der zweite Versuch zählt als aufgefrischt"
 
 
 def test_the_registration_wait_is_configurable_and_bounded():

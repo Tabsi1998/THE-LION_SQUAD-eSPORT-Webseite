@@ -90,3 +90,18 @@ def test_every_phase_has_a_function():
     assert helper.parse_args(["spielen", "--turnier", "sofort", "--anzahl", "2"]).anzahl == 2
     with pytest.raises(SystemExit):
         helper.parse_args(["unbekannt"])
+
+
+def test_the_cup_opens_check_in_later_and_has_prizes():
+    """Durchlauf 2 (20.10.): Check-in erst in 20 Minuten - die Turnierleitung startet ihn in Phase 3 selbst - und
+    Gewinne für Platz 1 bis 3, damit Phase 13 das Anlegen der Gewinne beim Veröffentlichen prüfen kann."""
+    from datetime import datetime, timedelta, timezone
+
+    now = datetime(2026, 10, 24, 12, 0, tzinfo=timezone.utc)
+    cup = helper.cup_settings(now, "spiel-1", "24.10. 14:00")
+
+    assert datetime.fromisoformat(cup["check_in_from"]) == now + timedelta(minutes=20)
+    assert datetime.fromisoformat(cup["registration_open_from"]) < now < datetime.fromisoformat(cup["start_date"])
+    assert [(prize["group"], prize["place"]) for prize in cup["prize_places"]] == [("overall", 1), ("overall", 2), ("overall", 3)]
+    assert all(prize["value"] for prize in cup["prize_places"])
+    assert cup["advancement_mode"] == "draw_show" and cup["max_participants"] == 16

@@ -30,6 +30,7 @@ from services.match_deadlines import no_show_action, no_show_candidates, no_show
 from services.match_disputes import category_label, open_dispute
 from services.match_duration import load_duration_game
 from services.match_timing import OPEN_STATUSES, filled_slots, registration_name, timing
+from services.round_labels import rounds_by_section, side_round_label, stage_kind
 from services.station_labels import attach_station_info, station_text
 from services.tournament_permissions import result_staff_user_ids
 from services.user_notifications import create_user_notification
@@ -47,14 +48,32 @@ def _names(match: dict, regs_by_id: dict[str, dict]) -> str:
     return " gegen ".join(names) if len(names) == 2 else f"{len(names)} Teilnehmer"
 
 
-def _label(match: dict) -> str:
-    return match.get("round_name") or match.get("matchday_label") or match.get("match_key") or "Spiel"
+def _labeler(tournament: dict, matches: list[dict], stages: dict[str, dict] | None):
+    """Wie ein Fall sein Spiel nennt - wie Baum, Stationen und Karten (#1860): „Loser Runde 1 · Durchgang LA“,
+    „Winner Runde 2“, „Viertelfinale“. ``matches``: alle Spiele des Turniers (daraus die Zählung je Baumteil)."""
+    rounds = rounds_by_section(matches)
+
+    def label(match: dict) -> str:
+        key = str(match.get("match_key") or "")
+        if not (rounds_by_section([match]) or match.get("round_name") or match.get("matchday_label")):
+            return key or "Spiel"
+        stage = (stages or {}).get(match.get("stage_id") or "") or {}
+        kind = stage_kind(stage.get("stage_type"), (tournament or {}).get("format"), match.get("match_type"))
+        name = side_round_label(match, matches, rounds=rounds, kind=kind)
+        heat = str(match.get("match_type") or "duel") != "duel" or len(match.get("slots") or []) > 2
+        # Kurze Kürzel („A“, „LA“, „R1-3“) sind der Durchgang - wie die Stationen (queueWhat im Web).
+        if heat and key and key != name and (len(key) <= 3 or any(char.isdigit() for char in key)):
+            return f"{name} · Durchgang {key}"
+        return name or key or "Spiel"
+
+    return label
 
 
 def attention_items(tournament: dict, matches: list[dict], stations: list[dict], regs_by_id: dict[str, dict],
                     now: datetime, *, stages: dict[str, dict] | None = None, game: dict | None = None) -> list[dict]:
-    """Die Fälle eines Turniers - ``matches`` mit Stationstext (attach_station_info)."""
+    """Die Fälle eines Turniers - ``matches``: alle Spiele des Turniers, mit Stationstext (attach_station_info)."""
     items: list[dict] = []
+    _label = _labeler(tournament, matches, stages)
     for match in matches:
         status = str(match.get("status") or "pending")
         if status not in OPEN_STATUSES or len(filled_slots(match)) < 2 or match.get("is_preview"):
@@ -115,14 +134,15 @@ def attention_items(tournament: dict, matches: list[dict], stations: list[dict],
 async def tournament_attention(db, tournament: dict, *, now: datetime | None = None) -> tuple[list[dict], dict[str, dict]]:
     """Die Fälle eines Turniers aus der Datenbank - und die Spiele dazu (für die Empfänger)."""
     now = now or now_utc()
-    matches = await db.matches_v2.find({"tournament_id": tournament["id"], "status": {"$in": sorted(OPEN_STATUSES)}}, {"_id": 0}).to_list(3000)
+    # Alle Spiele, nicht nur offene: die Runden je Baumteil zählen wie im Baum (#1860).
+    matches = await db.matches_v2.find({"tournament_id": tournament["id"]}, {"_id": 0}).to_list(3000)
     await attach_station_info(db, matches)
     stations = await db.stations.find({"tournament_id": tournament["id"]}, {"_id": 0}).to_list(500)
     registrations = await db.tournament_registrations.find(
         {"tournament_id": tournament["id"]}, {"_id": 0, "id": 1, "display_name": 1, "ingame_name": 1, "team_name": 1}).to_list(2000)
     regs_by_id = {row["id"]: row for row in registrations if row.get("id")}
     stages = {row["id"]: row for row in await db.tournament_stages.find(
-        {"tournament_id": tournament["id"]}, {"_id": 0, "id": 1, "settings": 1}).to_list(200) if row.get("id")}
+        {"tournament_id": tournament["id"]}, {"_id": 0, "id": 1, "settings": 1, "stage_type": 1}).to_list(200) if row.get("id")}
     items = attention_items(tournament, matches, stations, regs_by_id, now, stages=stages, game=await load_duration_game(db, tournament))
     return items, {match["id"]: match for match in matches if match.get("id")}
 
