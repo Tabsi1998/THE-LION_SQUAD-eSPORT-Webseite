@@ -1,4 +1,6 @@
 // Turnier-Bearbeitung (#223): Optionen und reine Helfer, die mehrere Teile der Seite teilen.
+import { sideRoundLabel } from "@/lib/bracketNames";
+import { sectionKind } from "@/lib/bracketSections";
 
 export const TOURNAMENT_STATUS_OPTIONS = [
   ["draft", "Entwurf"],
@@ -144,8 +146,11 @@ const slotOpen = (slot) => Boolean(slot?.source?.draw) && slot?.status === "pend
 /**
  * Die Auslosungs-Gruppen einer Phase: Runde, Spiele, Modus, ob schon gelost und ob neu auslosen noch geht. Show
  * (#1590): `ready`, sobald der Topf steht und die Leitung losen darf. Sofort zufällig: `assigned`/`open` je Platz,
- * neu auslosen nur für die Spiele, die noch nicht begonnen haben (`redrawKeys`).
+ * neu auslosen nur für die Spiele, die noch nicht begonnen haben (`redrawKeys`). Die Runde heißt wie im Baum (#1860):
+ * „Winner Runde 2“, „Loser Runde 1“ - bei gleicher Runde Winner vor Loser.
  */
+const DRAW_SIDE_ORDER = { main: 0, loser: 1 };
+
 export function drawGroupsOf(matches = []) {
   const groups = new Map();
   for (const match of matches || []) {
@@ -168,7 +173,7 @@ export function drawGroupsOf(matches = []) {
     return {
       group,
       mode,
-      label: sorted[0]?.round_name || `Runde ${sorted[0]?.round || ""}`.trim(),
+      label: sideRoundLabel(sorted[0], matches) || `Runde ${sorted[0]?.round || ""}`.trim(),
       section: sorted[0]?.section || "",
       round: sorted[0]?.round || 0,
       matchKeys: sorted.map((row) => row.match_key),
@@ -179,7 +184,9 @@ export function drawGroupsOf(matches = []) {
       open,
       canRedraw,
     };
-  }).sort((a, b) => a.round - b.round || a.group.localeCompare(b.group));
+  }).sort((a, b) => a.round - b.round
+    || (DRAW_SIDE_ORDER[sectionKind(a.section)] ?? 2) - (DRAW_SIDE_ORDER[sectionKind(b.section)] ?? 2)
+    || a.group.localeCompare(b.group));
 }
 
 /** Liga: Spieltage neu auslosen geht nur gemischt und nur, solange kein Spiel begonnen hat. */

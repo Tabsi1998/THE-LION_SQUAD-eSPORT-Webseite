@@ -34,6 +34,7 @@ from services.match_v2_results import (
 )
 from models import TournamentStageCreate, TournamentStageUpdate, now_utc, new_id
 from services.match_public_view import public_match_view, public_stage_view
+from services.round_labels import attach_round_labels
 from routes.tournament_common import (
     _apply_match_plan,
     _audit_tournament_action,
@@ -200,11 +201,14 @@ async def list_tournament_matches_v2(tid: str, stage_id: str | None = None,
                                      user=Depends(get_optional_user)):
     db = get_db()
     tid = await _resolve_tid(tid)
-    await _get_visible_tournament(tid, user)
+    tournament = await _get_visible_tournament(tid, user)
     q = {"tournament_id": tid}
     if stage_id:
         q["stage_id"] = stage_id
     matches = await db.matches_v2.find(q, {"_id": 0}).sort([("round", 1), ("match_key", 1)]).to_list(2000)
+    # Runden wie im Baum (#1860): „Winner Runde 2“, „Loser Runde 1“ - etwa für den Kasten „Auslosung“ der Verwaltung.
+    stages = await db.tournament_stages.find({"tournament_id": tid}, {"_id": 0, "id": 1, "stage_type": 1}).to_list(200)
+    attach_round_labels(matches, stages, tournament)
     if _is_staff(user) or await _is_tournament_staff(tid, user):
         return matches
     # Ohne Turnier-Recht dieselbe Sicht wie auf der Spielseite und im Turnierbaum.
