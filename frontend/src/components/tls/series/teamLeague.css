@@ -1,0 +1,82 @@
+/* Seite Team-Liga (#1747). Farben nur aus der Website: Sieg Cyan, Unentschieden Weiß, Niederlage grau (Rot bleibt Live),
+   Gold/Silber/Bronze dem Podest im Liga-Weg. Bewegung ruhig und einmalig beim Laden: die Map-Balken füllen sich kurz
+   nach ihrer Zeile (Aufleuchten), der Liga-Weg zeichnet seine Linie nach und die Saisons erscheinen gestaffelt
+   (je 35 ms, höchstens zwölf Stufen), der Verlauf folgt ebenso. Nur transform und opacity. Mit „Bewegung reduzieren“
+   bleibt ein kurzes Einblenden ohne Weg und ohne Staffel. */
+
+/* Spieltage: gespielte Felder nach Ausgang, eine Niederlage gedämpft. */
+.tls-series-step[data-outcome="draw"] { background: rgb(255 255 255 / 0.55); }
+.tls-series-step[data-outcome="loss"] { background: rgb(255 255 255 / 0.22); }
+
+/* Ergebnis rechts in der Zeile: Kürzel S/U/N und Map-Stand. */
+.tls-tl-score { display: inline-flex; align-items: center; gap: 0.5rem; flex-shrink: 0; color: rgb(255 255 255 / 0.85); }
+.tls-tl-score__badge {
+  display: inline-flex; align-items: center; justify-content: center; width: 1.25rem; height: 1.25rem; border-radius: 3px;
+  font-size: 10px; font-weight: 800; box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.2); color: rgb(255 255 255 / 0.7);
+}
+.tls-tl-score[data-outcome="win"] { color: #fff; }
+.tls-tl-score[data-outcome="win"] .tls-tl-score__badge { background: var(--tls-brand); color: #04121a; box-shadow: none; }
+.tls-tl-score[data-outcome="loss"] { color: rgb(255 255 255 / 0.5); }
+.tls-tl-score[data-outcome="loss"] .tls-tl-score__badge { color: rgb(255 255 255 / 0.45); box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.12); }
+
+/* Eine Map: Name, Stand, schmaler Balken mit dem eigenen Anteil. */
+.tls-tl-map { display: inline-flex; align-items: center; gap: 0.5rem; font-size: 12px; min-width: 0; }
+.tls-tl-map__bar {
+  position: relative; width: 2.5rem; height: 3px; border-radius: 2px; overflow: hidden; flex-shrink: 0;
+  background: rgb(255 255 255 / 0.1);
+}
+.tls-tl-map__fill {
+  position: absolute; inset: 0; transform-origin: left center; transform: scaleX(var(--share, 0.5));
+  background: rgb(255 255 255 / 0.4);
+  animation: tls-tl-fill 420ms var(--tls-ease) both;
+  animation-delay: calc(var(--i, 0) * 35ms + 180ms); /* --i erbt die Staffel der Zeile */
+}
+.tls-tl-map[data-outcome="win"] .tls-tl-map__fill { background: var(--tls-brand); }
+@keyframes tls-tl-fill { from { transform: scaleX(0); } to { transform: scaleX(var(--share, 0.5)); } }
+
+/* Platzierungsverlauf: kleine Marken je Spieltag. */
+.tls-tl-trend {
+  display: inline-flex; align-items: center; gap: 0.35rem; padding: 2px 8px; border-radius: 3px; font-size: 12px;
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.1); color: rgb(255 255 255 / 0.5);
+  animation: tls-series-in 240ms var(--tls-ease) both; animation-delay: calc(var(--i, 0) * 35ms);
+}
+.tls-tl-trend[data-dir="up"] { color: var(--tls-brand); }
+.tls-tl-trend:last-child { box-shadow: inset 0 0 0 1px rgb(var(--tls-brand-rgb) / 0.45); }
+
+/* Liga-Weg: senkrechte Linie, die sich beim Laden nachzeichnet; ein Punkt je Saison. */
+.tls-tl-path { position: relative; list-style: none; margin: 0; padding: 0 0 0 1.5rem; display: grid; gap: 0.75rem; }
+.tls-tl-path::before {
+  content: ""; position: absolute; left: 0.4375rem; top: 0.5rem; bottom: 0.5rem; width: 1px;
+  background: rgb(255 255 255 / 0.14); transform-origin: top center;
+  animation: tls-tl-draw 520ms var(--tls-ease) both;
+}
+@keyframes tls-tl-draw { from { transform: scaleY(0); } to { transform: none; } }
+.tls-tl-path__item {
+  position: relative;
+  animation: tls-series-in 240ms var(--tls-ease) both; animation-delay: calc(var(--i, 0) * 35ms + 120ms);
+}
+.tls-tl-path__dot {
+  position: absolute; left: -1.5rem; top: 0.875rem; width: 0.9375rem; height: 0.9375rem; border-radius: 999px;
+  background: var(--tls-surface-1, #0b0f14); box-shadow: inset 0 0 0 2px rgb(255 255 255 / 0.25);
+}
+.tls-tl-path__item[data-medal="1"] .tls-tl-path__dot { box-shadow: inset 0 0 0 2px #FFD700; }
+.tls-tl-path__item[data-medal="2"] .tls-tl-path__dot { box-shadow: inset 0 0 0 2px #C9CED6; }
+.tls-tl-path__item[data-medal="3"] .tls-tl-path__dot { box-shadow: inset 0 0 0 2px #D08A4E; }
+.tls-tl-path__item[data-current="true"] .tls-tl-path__dot { background: var(--tls-brand); box-shadow: 0 0 0 4px rgb(var(--tls-brand-rgb) / 0.18); }
+.tls-tl-path__card {
+  display: block; padding: 0.625rem 0.875rem; border-radius: 6px; background: var(--tls-surface-1);
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.08);
+  transition: transform 160ms var(--tls-ease), box-shadow 160ms ease;
+}
+.tls-tl-path__item[data-current="true"] .tls-tl-path__card { box-shadow: inset 0 0 0 1px rgb(var(--tls-brand-rgb) / 0.4); }
+.tls-tl-path__card--link:focus-visible { outline: 2px solid var(--tls-brand); outline-offset: 2px; }
+@media (hover: hover) and (pointer: fine) {
+  .tls-tl-path__card--link:hover { transform: translateY(-1px); box-shadow: inset 0 0 0 1px rgb(var(--tls-brand-rgb) / 0.45); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tls-tl-trend, .tls-tl-path__item, .tls-tl-path::before { animation: tls-series-fade 150ms ease both; animation-delay: 0ms; }
+  .tls-tl-map__fill { animation: none; }
+  .tls-tl-path__card { transition: box-shadow 160ms ease; }
+  .tls-tl-path__card--link:hover { transform: none; }
+}
