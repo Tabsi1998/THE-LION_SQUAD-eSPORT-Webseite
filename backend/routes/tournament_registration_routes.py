@@ -615,7 +615,7 @@ async def register_for_tournament(tid: str, body: RegistrationCreate,
         t = await _get_visible_tournament(tid, me)
     elif t.get("status") == "draft" and not register_access:
         raise HTTPException(status_code=404, detail="Turnier nicht gefunden")
-    # Bestätigung und Erfolge erst nach der Antwort (#1859): am Einlass wartet niemand auf Postfach, Mail und Abzeichen.
+    # Abzeichen erst nach der Antwort (#1859): am Einlass wartet niemand auf die Auswertung der Erfolge.
     return await self_register(db, t, body, me, register_access, via="onsite" if onsite else "web", followups=background)
 
 
@@ -624,7 +624,9 @@ async def self_register(db, t: dict, body: RegistrationCreate, me: dict, registe
     """Die Selbstanmeldung hinter der Route - das Website-Formular und der Discord-Knopf (#885) laufen hier durch
     dieselben Prüfungen (Sperre, Regeln und Datenschutz, Frist, Vereinsmitglieder, Event-Pflicht, Startgeld).
 
-    ``followups``: Bestätigung und Erfolge laufen dann nach der Antwort (Route); ohne gleich hier (Discord, Event)."""
+    ``followups``: die Abzeichen laufen dann nach der Antwort (Route); ohne gleich hier (Discord, Event). Die Bestätigung
+    geht immer vor der Antwort hinaus (außerhalb der Sperre): ein Hintergrund-Auftrag überlebt keinen Neustart, und eine
+    Wiederholung der Anmeldung schickt sie nicht nach."""
     tid = t["id"]
     if _is_tournament_locked(t):
         raise HTTPException(status_code=423, detail=TOURNAMENT_MUTATION_LOCKED_DETAIL)
@@ -658,10 +660,11 @@ async def self_register(db, t: dict, body: RegistrationCreate, me: dict, registe
             queue.requested += 1
             reg["auto_bracket_update"] = await _refresh_previews_after_self_registration(db, tid, queue.requested,
                                                                                          me.get("id"))
+        await _confirm_self_registration(db, tid, reg, me)
         if followups is not None:
-            followups.add_task(_after_self_registration, db, tid, reg, me)
+            followups.add_task(_award_registration_badges, me["id"], tid)
         else:
-            await _after_self_registration(db, tid, reg, me)
+            await _award_registration_badges(me["id"], tid)
     return reg
 
 
@@ -745,12 +748,18 @@ RESPONSE_ONLY_KEYS = {"auto_bracket_update", "idempotent_replay"}
 
 async def _after_self_registration(db, tid: str, reg: dict, me: dict) -> None:
     """Nach der Sperre (#1826): Bestätigung und Erfolge brauchen sie nicht - so hält eine Anmeldung die Sperre nur
-    für Platz, Vorschau und Startgeld, und die nächste in der Schlange kommt früher dran."""
-    # Bestätigung (#1133): „Du bist dabei“ oder „Du stehst auf der Warteliste“ - im Postfach und, wenn erlaubt, per Mail;
-    # bei Teams auch an Teamleitung und Co-Leitung.
-    # Ohne Sperre kann sich der Stand inzwischen geändert haben - etwa von der Warteliste nachgerückt, mit eigener
-    # Nachricht „nachgerückt“. Die Bestätigung geht daher nur hinaus, solange die Anmeldung noch diesen Stand hat, und
-    # je Anmeldung nur einmal: Stand prüfen und als gemeldet markieren in einem Schritt.
+    für Platz und Startgeld, und die nächste in der Schlange kommt früher dran."""
+    await _confirm_self_registration(db, tid, reg, me)
+    await _award_registration_badges(me["id"], tid)
+
+
+async def _confirm_self_registration(db, tid: str, reg: dict, me: dict) -> None:
+    """Bestätigung (#1133): „Du bist dabei“ oder „Du stehst auf der Warteliste“ - im Postfach und, wenn erlaubt, per
+    Mail; bei Teams auch an Teamleitung und Co-Leitung.
+
+    Ohne Sperre kann sich der Stand inzwischen geändert haben - etwa von der Warteliste nachgerückt, mit eigener
+    Nachricht „nachgerückt“. Die Bestätigung geht daher nur hinaus, solange die Anmeldung noch diesen Stand hat, und
+    je Anmeldung nur einmal: Stand prüfen und als gemeldet markieren in einem Schritt."""
     claimed = await db.tournament_registrations.update_one(
         {"id": reg["id"], "status": reg["status"], "notified_status": {"$exists": False}},
         {"$set": {"notified_status": reg["status"]}},
@@ -758,9 +767,13 @@ async def _after_self_registration(db, tid: str, reg: dict, me: dict) -> None:
     if getattr(claimed, "modified_count", 0):
         registration = {key: value for key, value in reg.items() if key not in RESPONSE_ONLY_KEYS}
         await _notify_registration(db, tid, registration, reg["status"], actor_id=me.get("id"))
+
+
+async def _award_registration_badges(user_id: str, tid: str) -> None:
+    """Erfolge der Anmeldung - die Auswertung ist der größte Teil einer Anmeldung (#1859) und darf sie nicht aufhalten."""
     try:
         from badges import on_tournament_registered
-        await on_tournament_registered(me["id"], tid)
+        await on_tournament_registered(user_id, tid)
     except Exception:
         logger.warning("[achievements] Anmeldung zu %s nicht ausgewertet", _log_safe(tid), exc_info=True)
 
