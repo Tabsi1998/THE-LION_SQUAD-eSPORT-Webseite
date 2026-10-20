@@ -1,0 +1,33 @@
+# Build-Kontext des Backend-Images (docker-compose.yml: build: ./backend).
+# Nur was das Image zur Laufzeit braucht, geht an Docker. Bleibt bewusst im Image:
+# scripts/ (Betriebsskripte), static/, docker-entrypoint.py, requirements.txt.
+# Braucht das Image zur Laufzeit eine Datei, die hier steht, den Eintrag entfernen
+# (siehe docs/BETRIEB.md, Abschnitt "Docker-Build-Kontext").
+
+# Python-Müll
+__pycache__
+*.pyc
+.pytest_cache
+
+# Tests und Entwicklungsabhängigkeiten
+tests
+requirements-dev.txt
+
+# Lokale Umgebungen und Laufzeitdaten
+venv
+.venv
+uploads
+
+# Konfiguration, Schlüssel und Zugangsdaten gehören nie ins Image
+.env
+.env.*
+*.env
+*.pem
+*.key
+*credentials*
+*token.json*
+*.token.json
+
+# Docker-Dateien selbst
+Dockerfile
+.dockerignore

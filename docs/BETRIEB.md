@@ -225,6 +225,20 @@ yarn audit:public
 Das interne Nginx setzt je HTML-Antwort eine CSP-Nonce; JSON-LD, SEO-Vorschauen und Cloudflares
 JavaScript-Erkennung nutzen dieselbe Nonce, `script-src` braucht kein `unsafe-inline`.
 
+## Docker-Build-Kontext (#1050)
+
+`backend/.dockerignore` und `frontend/.dockerignore` begrenzen, was `docker compose build` an Docker
+schickt. Raus bleiben Tests, `node_modules`, `venv`, `uploads`, `.env*`, Schlüssel- und Zugangsdateien,
+Build- und Testausgaben. Im Backend-Image bleiben `scripts/`, `static/` und `docker-entrypoint.py`.
+
+Wer zur Laufzeit (Backend) oder im Build (Frontend) eine neue Datei im Image braucht, muss sie aus der
+jeweiligen `.dockerignore` herausnehmen, sonst fehlt sie im Image. Prüfen:
+
+```bash
+docker compose build
+docker compose exec backend ls scripts static
+```
+
 ## Externe Überwachung
 
 Ein Uptime-Dienst prüft mindestens jede Minute `https://lionsquad.at/api/health/live`,
