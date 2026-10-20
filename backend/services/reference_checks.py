@@ -8,7 +8,8 @@ Klartext:
 - ``end_before_start``: Ende liegt vor dem Start.
 - ``too_long``: Ende liegt mehr als ``max_duration_days`` (Vorgabe 365) nach dem Start.
 - ``end_in_future``: eine abgeschlossene Teilnahme endet erst nach dem heutigen Wiener Tag (abschaltbar).
-- ``placement_above_count``: Platz größer als die Zahl der Teilnehmer bzw. Teams des Eintrags.
+- ``placement_above_count``: Platz größer als das Feld des Eintrags - bei einem Team die Zahl der Teams, bei einem
+  Einzelstarter die Zahl der Teilnehmer; ist nur eine der beiden bekannt, gilt diese.
 
 Die Grenzen liegen in ``settings`` (``id: reference_checks``) und kommen über ``normalize_settings`` mit Vorgabe.
 """
@@ -72,13 +73,23 @@ def _date_warnings(doc: dict, today: date | None, settings: dict) -> list[dict]:
     return out
 
 
+def _field_size(entry: dict) -> tuple[int, str] | None:
+    """Das Feld, gegen das der Platz zählt: bei einem Team die Teams, sonst die Teilnehmer; fehlt die passende Zahl,
+    gilt die andere. Alte Referenzen ohne Art zählen wie die Anzeige zuerst die Teilnehmer."""
+    people = _number(entry.get("participant_count"))
+    teams = _number(entry.get("team_count"))
+    first, second = ((teams, "Teams"), (people, "Teilnehmer")) if entry.get("kind") == "team" else (
+        (people, "Teilnehmer"), (teams, "Teams"))
+    return first if first[0] else (second if second[0] else None)
+
+
 def _placement_warning(entry: dict, field: str) -> dict | None:
     place = _number(entry.get("placement"))
-    counts = [count for count in (_number(entry.get("participant_count")), _number(entry.get("team_count"))) if count]
-    if not place or not counts or place <= max(counts):
+    size = _field_size(entry)
+    if not place or not size or place <= size[0]:
         return None
     return {"field": field, "code": "placement_above_count",
-            "message": f"Platz {place} ist größer als die Zahl der Teilnehmer ({max(counts)})."}
+            "message": f"Platz {place} ist größer als die Zahl der {size[1]} ({size[0]})."}
 
 
 def check_reference(doc: dict, today: str | None, settings: dict | None = None) -> list[dict]:

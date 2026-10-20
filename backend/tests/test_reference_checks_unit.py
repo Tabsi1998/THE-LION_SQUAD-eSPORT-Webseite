@@ -56,6 +56,23 @@ def test_a_placement_above_the_field_size_is_named_at_its_entry():
     assert _fields({"entries": [{"placement": 40}]}) == []
 
 
+def test_a_team_counts_against_the_teams_a_solo_starter_against_the_participants():
+    # Platz 12 bei 8 Teams ist ein Fehler, auch wenn 20 Personen mitgespielt haben.
+    team = {"entries": [{"kind": "team", "placement": 12, "team_count": 8, "participant_count": 20}]}
+    warnings = check_reference(team, TODAY)
+    assert [(item["field"], item["code"]) for item in warnings] == [("entries.0.placement", "placement_above_count")]
+    assert "Teams (8)" in warnings[0]["message"]
+    # Ein Einzelstarter zählt gegen die Teilnehmer - die Zahl der Teams spielt dann keine Rolle.
+    assert _fields({"entries": [{"kind": "solo", "placement": 10, "participant_count": 32, "team_count": 4}]}) == []
+    solo = check_reference({"entries": [{"kind": "solo", "placement": 40, "participant_count": 32, "team_count": 64}]},
+                           TODAY)
+    assert "Teilnehmer (32)" in solo[0]["message"]
+    # Ist nur eine der beiden Zahlen bekannt, gilt diese.
+    assert _fields({"entries": [{"kind": "team", "placement": 12, "participant_count": 20}]}) == []
+    assert _fields({"entries": [{"kind": "solo", "placement": 9, "team_count": 8}]}) == [
+        ("entries.0.placement", "placement_above_count")]
+
+
 def test_an_old_reference_without_entries_is_checked_on_its_own_fields():
     doc = {"placement": 20, "participant_count": 16}
     assert _fields(doc) == [("placement", "placement_above_count")]
