@@ -4,7 +4,8 @@ Gerechnet wird nichts - alles kommt aus dem gespeicherten Stand der letzten gewe
 (``reference_standings``, ``services/series_standings.py``):
 
 - **Saisons der Spur** für den Umschalter (F1 aktuell, F2, Vorsaison): sichtbar und nicht archiviert, neueste Saison
-  zuerst, darin nach Stufe. Die Sichtbarkeit jeder Saison gilt wie für ihre Seite.
+  zuerst, darin nach Stufe. Die Sichtbarkeit jeder Saison gilt wie für ihre Seite; geladen wird gesammelt - eine
+  Abfrage für alle Saisons, eine Prüfung je Sichtbarkeitsstufe statt je Saison.
 - **Teamwertung** (``scope = teams``), wenn die Regeln sie einschalten: je Team Rang, Punkte, offizieller Wert mit
   Abweichung, je Rennen die gezählten Fahrer und über die Saison alle Fahrer des Teams nach Punkten.
 - **Fahrer:** je Fahrer das Team je Rennen (Team der Zeile, sonst das Standard-Team - wie die Teamwertung zählt), das
@@ -31,7 +32,8 @@ async def lineage_seasons(db, user: dict | None, lineage: dict, current_id: str)
     found = await db.reference_series.find(
         {"lineage_id": lineage["id"], "status": {"$ne": "archived"}},
         {"_id": 0, "id": 1, "visibility": 1, **{field: 1 for field in SEASON_FIELDS}}).to_list(None)
-    visible = [item for item in found if await user_can_see(user, item.get("visibility"))]
+    allowed = {level: await user_can_see(user, level) for level in {item.get("visibility") for item in found}}
+    visible = [item for item in found if allowed[item.get("visibility")]]
     visible.sort(key=lambda item: (_text(item.get("tier")).casefold(), str(item.get("id"))))
     visible.sort(key=lambda item: _text(item.get("season")).casefold(), reverse=True)
     return [{**{field: item.get(field) for field in SEASON_FIELDS}, "current": item["id"] == current_id}
@@ -76,9 +78,12 @@ def club_teams(drivers: dict, people: dict, team_order: list[str], own_team: str
     return sorted(teams, key=lambda team: (position.get(team, len(position)), team.casefold(), team))
 
 
-async def racing_block(db, user: dict | None, lineage: dict, series: dict, people: dict, latest: dict | None) -> dict:
-    """Der Rennliga-Teil der Serienseite. ``people``: öffentliche Personen der Saison (wie die Tabelle sie zeigt),
-    ``latest``: der gespeicherte Fahrerstand der letzten gewerteten Runde (oder ``None``)."""
+async def racing_block(db, user: dict | None, lineage: dict, series: dict, people: dict,
+                       latest: dict | None) -> dict | None:
+    """Der Rennliga-Teil der Serienseite - bei anderen Arten ``None``. ``people``: öffentliche Personen der Saison (wie
+    die Tabelle sie zeigt), ``latest``: der gespeicherte Fahrerstand der letzten gewerteten Runde (oder ``None``)."""
+    if lineage.get("kind") != "racing":
+        return None
     sid = series["id"]
     try:
         scoring = normalize_rules(series.get("rules") or {})["team_scoring"]

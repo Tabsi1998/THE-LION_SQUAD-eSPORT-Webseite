@@ -15,7 +15,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 
 from flow_harness import make_flow  # noqa: E402
 from routes import reference_round_routes  # noqa: E402
-from services import migrations, reference_series  # noqa: E402
+from services import migrations, reference_series, series_racing  # noqa: E402
 
 ADMIN = "/api/reference-series/admin"
 PUBLIC = "/api/reference-series/public"
@@ -196,6 +196,27 @@ async def test_the_switcher_lists_the_visible_seasons_of_the_lineage(flow):
 
 
 @pytest.mark.asyncio
+async def test_the_switcher_checks_each_visibility_once_not_each_season(flow, monkeypatch):
+    admin, lineage, series, _ = await _setup(flow)
+    flow.act_as(admin)
+    for season in ("2025", "2024", "2023"):
+        await _series(flow, lineage["id"], season, tier="F1")
+    await _series(flow, lineage["id"], "2022", tier="F1", visibility="members")
+    calls = []
+    original = series_racing.user_can_see
+
+    async def counting(user, visibility, **kwargs):
+        calls.append(visibility)
+        return await original(user, visibility, **kwargs)
+
+    monkeypatch.setattr(series_racing, "user_can_see", counting)
+    flow.act_as(None)
+    seasons = (await flow.get(_url(lineage, series))).json()["racing"]["seasons"]
+    assert [item["season"] for item in seasons] == ["2026", "2025", "2024", "2023"]
+    assert sorted(calls) == ["members", "public"]
+
+
+@pytest.mark.asyncio
 async def test_other_kinds_carry_no_racing_block(flow):
     await migrations.migrate_points_scheme_templates(flow.db)
     admin = await flow.add_user(role="club_admin", name="vorstand")
@@ -204,7 +225,7 @@ async def test_other_kinds_carry_no_racing_block(flow):
     series = await _series(flow, lineage["id"], "2026")
     flow.act_as(None)
     body = (await flow.get(_url(lineage, series))).json()
-    assert "racing" not in body
+    assert body["racing"] is None
 
 
 @pytest.mark.asyncio
