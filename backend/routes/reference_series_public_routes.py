@@ -34,8 +34,8 @@ ROW_FIELDS = ("rank", "points", "computed_points", "official_points", "deviation
 # Noch offen: geplant, heute, verschoben - und „Ergebnis folgt“ (vorbei, aber noch nicht gewertet).
 OPEN_STATES = ("planned", "today", "postponed", "missing")
 UPCOMING_STATES = ("planned", "today", "postponed")
-HIDDEN_PERSON = {"name": None, "name_hidden": True, "club_member": False, "profile_slug": None,
-                 "start_number": None, "team": None}
+# Von einer Person geht nur das hinaus, was die Tabelle zeigt - keine Startnummer, kein Team, keine Kennungen.
+HIDDEN_PERSON = {"name": None, "name_hidden": True, "club_member": False, "profile_slug": None}
 
 
 def _rules(series: dict) -> dict:
@@ -51,8 +51,7 @@ async def _people(db, series_id: str) -> dict:
     und nur bei Mitgliedern der Link zum Vereinsprofil."""
     participants = await db.reference_participants.find(
         {"series_id": series_id},
-        {"_id": 0, "id": 1, "name": 1, "name_hidden": 1, "is_club_member": 1, "link": 1, "profile_id": 1,
-         "start_number": 1, "default_team": 1},
+        {"_id": 0, "id": 1, "name": 1, "name_hidden": 1, "is_club_member": 1, "link": 1, "profile_id": 1},
     ).to_list(None)
     member_profiles = [item["profile_id"] for item in participants
                        if item.get("is_club_member") and item.get("link") == "member" and item.get("profile_id")]
@@ -71,7 +70,6 @@ async def _people(db, series_id: str) -> dict:
         out[item["id"]] = {
             "name": item.get("name"), "name_hidden": False, "club_member": member,
             "profile_slug": slugs.get(item.get("profile_id")) if member else None,
-            "start_number": item.get("start_number"), "team": item.get("default_team"),
         }
     return out
 

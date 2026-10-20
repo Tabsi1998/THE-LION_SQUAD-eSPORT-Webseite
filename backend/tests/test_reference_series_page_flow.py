@@ -51,9 +51,10 @@ async def _setup(flow):
     people = [
         {"id": "p-alpha", "name": "Probe Alpha", "link": "member", "profile_id": "profil-alpha",
          "is_club_member": True},
-        {"id": "p-beta", "name": "Fremd Beta", "link": "external"},
+        {"id": "p-beta", "name": "Fremd Beta", "link": "external", "start_number": "17", "default_team": "Fremd Team"},
         {"id": "p-gamma", "name": "Fremd Gamma", "link": "external", "name_hidden": True},
-        {"id": "p-delta", "name": "Gast Delta", "link": "guest", "profile_id": "profil-alpha"},
+        {"id": "p-delta", "name": "Gast Delta", "link": "guest", "profile_id": "profil-alpha", "start_number": "9",
+         "default_team": "Gast Team"},
     ]
     await flow.db.reference_participants.insert_many([
         {"series_id": series["id"], "is_club_member": False, "name_hidden": False, **person} for person in people])
@@ -142,6 +143,12 @@ async def test_foreign_names_are_text_only_and_a_hidden_name_never_leaves(flow):
     assert (rows["p-alpha"]["name"], rows["p-alpha"]["club_member"], rows["p-alpha"]["profile_slug"]) == (
         "Probe Alpha", True, "probe-alpha")
     # Fremde und Gäste: nur der Name, kein Link, keine Profil-Kennung.
+    # Von einer Person gehen nur Name, Ausblendung, Vereinsmitglied und Profil-Link hinaus - keine Startnummer, kein
+    # Team, keine Kennungen.
+    person_fields = {"name", "name_hidden", "club_member", "profile_slug"}
+    for row in rows.values():
+        assert person_fields <= set(row) and not {"start_number", "team", "default_team"} & set(row)
+    assert "Fremd Team" not in response.text and "Gast Team" not in response.text
     for key in ("p-beta", "p-delta"):
         assert rows[key]["club_member"] is False and rows[key]["profile_slug"] is None
         assert "profile_id" not in rows[key] and "link" not in rows[key]
