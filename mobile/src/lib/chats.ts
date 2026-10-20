@@ -1,6 +1,6 @@
 import { api } from "./api";
 import { idSegment, isValidId } from "./apiIds";
-import { dayBefore, viennaDate, viennaDay, viennaTime } from "./vienna";
+import { asInstant, dayBefore, viennaDate, viennaDay, viennaTime } from "./vienna";
 
 // Alle Chats an einem Ort (#1148): Direktnachrichten, Team-, Turnier- und Match-Chats aus `/api/chats`, das Neueste oben.
 // Der Server kennt je Unterhaltung „gelesen bis“ - Web und App setzen die Marke beim Öffnen, die Zahl ist überall gleich.
@@ -74,7 +74,8 @@ export function badgeText(count: number) {
 /** Uhrzeit für heute, „gestern“, sonst der Tag - wie in der Vorschau der Chat-Liste. Tage zählen in Wien. */
 export function chatTime(value?: string | null, now: Date = new Date()) {
   if (!value) return "";
-  const date = new Date(value);
+  // Ohne Zone ist es Wiener Uhr (#1049), wie überall in App und Web.
+  const date = asInstant(value);
   if (Number.isNaN(date.getTime())) return "";
   const today = viennaDay(now);
   if (viennaDay(date) === today) return viennaTime(date, { hour: "2-digit", minute: "2-digit" });

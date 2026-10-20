@@ -187,8 +187,9 @@ export function continuesMessageGroup(previous: GroupableMessage | null | undefi
   const previousAuthor = previous.user_id || previous.sender_id;
   const author = message.user_id || message.sender_id;
   if (!previousAuthor || previousAuthor !== author) return false;
-  const before = Date.parse(previous.created_at || "");
-  const after = Date.parse(message.created_at || "");
+  // Serverzeiten ohne Zone sind Wiener Uhr (asInstant, #1049) - nie die Uhr des Geräts.
+  const before = previous.created_at ? asInstant(previous.created_at).getTime() : Number.NaN;
+  const after = message.created_at ? asInstant(message.created_at).getTime() : Number.NaN;
   if (Number.isNaN(before) || Number.isNaN(after)) return false;
   return after >= before && after - before <= maxGapMs;
 }

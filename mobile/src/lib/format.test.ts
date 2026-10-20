@@ -120,6 +120,20 @@ describe("Nachrichten gruppieren", () => {
     expect(continuesMessageGroup({ user_id: "u-1" }, { user_id: "u-1", created_at: at(1) })).toBe(false);
     expect(continuesMessageGroup(null, { user_id: "u-1", created_at: at(1) })).toBe(false);
   });
+
+  // #1049: Zeiten ohne Zone sind Wiener Uhr (asInstant), mit Zone gilt die Zone - auch gemischt und über Zonen hinweg.
+  // Der CI-Rechner läuft in UTC; lokal zusätzlich mit $env:TZ="UTC" bzw. "America/Los_Angeles" (PowerShell) prüfen.
+  test("ohne Zone gilt Wiener Uhr: gemischte Werte und mehrere Zonen", () => {
+    const pair = (before: string, after: string) => continuesMessageGroup({ user_id: "u-1", created_at: before }, { user_id: "u-1", created_at: after });
+    expect(pair("2026-10-07T14:00:00", "2026-10-07T14:04:00")).toBe(true);
+    expect(pair("2026-10-07T14:00:00", "2026-10-07T12:03:00Z")).toBe(true);
+    expect(pair("2026-10-07T12:00:00Z", "2026-10-07T14:04:00")).toBe(true);
+    expect(pair("2026-10-07T14:00:00+02:00", "2026-10-07T07:03:00-05:00")).toBe(true);
+    expect(pair("2026-01-15T14:00:00", "2026-01-15T13:04:00Z")).toBe(true);
+    expect(pair("2026-10-07T14:00:00", "2026-10-07T14:00:00Z")).toBe(false);
+    expect(pair("2026-10-07T12:03:00Z", "2026-10-07T14:00:00")).toBe(false);
+    expect(pair("kein datum", "2026-10-07T14:00:00")).toBe(false);
+  });
 });
 
 // Wann etwas ist (#1139): dieselbe Schreibweise wie die Website (frontend/src/lib/datetime.test.js → formatWhen).
