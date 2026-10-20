@@ -89,7 +89,10 @@ export default function TournamentSchedulePage() {
   useEffect(() => {
     load();
   }, [load]);
-  useLiveRefresh(load, ["tournaments", "matches", "matches-v2", "stations"], { fallbackMs: 7000 });
+  // Nur Änderungen dieses Turniers und - wegen der geteilten Stationen - der anderen Turniere seines Events (#1801).
+  useLiveRefresh(load, ["tournaments", "matches", "matches-v2", "stations"], {
+    fallbackMs: 7000, tournamentId: data?.tournament?.id, eventId: data?.tournament?.event_id,
+  });
 
   // Frisch eingetragene Ergebnisse tragen kurz „gerade eingetragen“, und unten steht ein
   // Hinweis mit dem Ergebnis - auch für Zuschauer (#225). Beim ersten Laden nichts davon.
@@ -188,7 +191,7 @@ export default function TournamentSchedulePage() {
         <TournamentTabs tournament={tournament} accessToken={accessToken} className="mt-5" />
 
         {/* Mein nächstes Spiel vor Ort (#1556): „Du bist als Nächstes an Station 2 · ca. 18:40“. */}
-        {hasMine && queue ? <LiveQueueStatus tournamentId={tournament.id} className="mt-6" /> : null}
+        {hasMine && queue ? <LiveQueueStatus tournamentId={tournament.id} eventId={tournament.event_id} className="mt-6" /> : null}
 
         {(hasMine || showViews) && (
           <div className="mt-8 flex flex-wrap items-center gap-2" data-testid="schedule-toolbar">

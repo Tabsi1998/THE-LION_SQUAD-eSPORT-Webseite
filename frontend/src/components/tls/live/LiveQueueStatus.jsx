@@ -17,7 +17,9 @@ const TONE = {
   later: ["border-white/10 bg-white/[0.03]", Clock, "text-white/50"],
 };
 
-export function LiveQueueStatus({ tournamentId, matchId = null, hideCalled = false, className = "" }) {
+// `eventId` (#1801): Die Turniere eines Events teilen sich Stationen - die Warteschlange lädt bei Änderungen dieses
+// Turniers und der anderen Turniere desselben Events nach. Ohne `eventId` bei jedem Turnier mit Event.
+export function LiveQueueStatus({ tournamentId, eventId = null, matchId = null, hideCalled = false, className = "" }) {
   // Auf der Matchseite (`matchId`) schauen auch Zuschauer - dort ohne „du“.
   const personal = !matchId;
   const [entry, setEntry] = useState(null);
@@ -33,7 +35,7 @@ export function LiveQueueStatus({ tournamentId, matchId = null, hideCalled = fal
     }
   }, [tournamentId, matchId]);
   useEffect(() => { load(); }, [load]);
-  useLiveRefresh(load, ["tournaments", "matches-v2", "stations"], { fallbackMs: 30000, pollMs: 60000 });
+  useLiveRefresh(load, ["tournaments", "matches-v2", "stations"], { fallbackMs: 30000, pollMs: 60000, tournamentId, eventId });
 
   if (!entry || (hideCalled && entry.state === "called")) return null;
   const line = myQueueLine(entry, { personal });

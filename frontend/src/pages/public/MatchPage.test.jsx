@@ -12,7 +12,8 @@ vi.mock("@/components/tls/PublicLayout", () => ({ PublicLayout: ({ children }) =
 vi.mock("@/components/tls/Breadcrumbs", () => ({ Breadcrumbs: () => null }));
 vi.mock("@/components/tls/MentionTextarea", () => ({ MentionTextarea: () => <textarea /> }));
 vi.mock("@/components/tls/CommendButton", () => ({ CommendButton: () => null }));
-vi.mock("@/hooks/useLiveRefresh", () => ({ useLiveRefresh: () => {} }));
+let liveOptions = null;
+vi.mock("@/hooks/useLiveRefresh", () => ({ useLiveRefresh: (load, resources, options) => { liveOptions = options; } }));
 vi.mock("@/hooks/useChats", () => ({ useChatRead: () => {} }));
 vi.mock("@/hooks/useDocumentTitle", () => ({ useDocumentTitle: () => {} }));
 
@@ -261,4 +262,16 @@ test("vor Ort (#1556): die Matchseite sagt, wann und wo das Spiel aus der Wartes
   expect(status).toHaveTextContent("Als Nächstes an Station 2 · Switch 2");
   expect(status).not.toHaveTextContent("Du bist");
   expect(status).toHaveTextContent("ca. 12:41 · +11 Min.");
+});
+
+// #1801: Die Matchseite lädt nur bei Änderungen ihres Turniers nach - bis das Spiel geladen ist, bei jeder.
+test("hört nach dem Laden nur noch auf das eigene Turnier", async () => {
+  renderMatch({
+    ...BASE,
+    match: { id: "m1", match_key: "A", status: "scheduled", round_name: "Achtelfinale", slots: [NEON, LUNA], results: [] },
+    participants: [NEON, LUNA],
+  });
+  expect(liveOptions.tournamentId).toBeFalsy();
+  await screen.findByTestId("match-headline");
+  await waitFor(() => expect(liveOptions.tournamentId).toBe("t1"));
 });

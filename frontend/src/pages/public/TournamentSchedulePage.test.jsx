@@ -9,7 +9,8 @@ const toastMock = vi.fn();
 let refresh = null;
 vi.mock("@/lib/api", () => ({ api: apiMock }));
 vi.mock("sonner", () => ({ toast: (...args) => toastMock(...args) }));
-vi.mock("@/hooks/useLiveRefresh", () => ({ useLiveRefresh: (callback) => { refresh = callback; } }));
+let liveOptions = null;
+vi.mock("@/hooks/useLiveRefresh", () => ({ useLiveRefresh: (callback, resources, options) => { refresh = callback; liveOptions = options; } }));
 vi.mock("@/hooks/useCanonicalSlugRedirect", () => ({ useCanonicalSlugRedirect: () => {} }));
 vi.mock("@/hooks/useDocumentTitle", () => ({ useDocumentTitle: () => {} }));
 vi.mock("@/components/tls/PublicLayout", () => ({ PublicLayout: ({ children }) => <div>{children}</div> }));
@@ -203,4 +204,14 @@ test("Live-Warteschlange (#1556): je Station „Jetzt“ und „Als Nächstes“
   expect(now).toHaveTextContent("NeonFalke gegen PixelPaula");
   expect(now).toHaveTextContent("Als Nächstes");
   expect(now).toHaveTextContent("Aufgerufen · antreten bis 17:30");
+});
+
+// #1801: Der Spielplan lädt nur bei Änderungen seines Turniers nach - und, weil sich die Turniere eines Events Stationen
+// teilen, bei denen der anderen Turniere desselben Events. Bis das Turnier geladen ist, bei jeder.
+test("hört nach dem Laden auf das eigene Turnier und sein Event", async () => {
+  mockApi({ ...bracket({ status: "scheduled", results: [] }), tournament: { ...tournament, event_id: "e1" } });
+  renderSchedule();
+  expect(liveOptions.tournamentId).toBeFalsy();
+  await screen.findByTestId("schedule-match-m1");
+  await waitFor(() => expect(liveOptions).toMatchObject({ tournamentId: "t1", eventId: "e1" }));
 });

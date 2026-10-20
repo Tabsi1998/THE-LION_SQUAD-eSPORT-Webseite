@@ -85,3 +85,66 @@ describe("API invalidation stream", () => {
     expect(received[0].clientVersion).toEqual(expect.any(Number));
   });
 });
+
+// Live-Nachladen je Turnier (#1801): Die Meldung nennt das Turnier (und sein Event), wenn beides öffentlich ist. Eine
+// Seite eines Turniers lädt dann nur bei Änderungen dieses Turniers nach - Meldungen ohne Kennung laden wie bisher.
+describe("Nachladen nur für das betroffene Turnier", () => {
+  const change = (fields = {}) => ({ event_type: "api.changed", resource: "tournaments", path: "/api/tournaments", ...fields });
+
+  test("eigenes Turnier lädt, fremdes nicht", () => {
+    expect(invalidationMatches(change({ tournament_id: "t1" }), ["tournaments"], { tournamentId: "t1" })).toBe(true);
+    expect(invalidationMatches(change({ tournament_id: "t2" }), ["tournaments"], { tournamentId: "t1" })).toBe(false);
+  });
+
+  test("eine Meldung ohne Turnier lädt wie bisher", () => {
+    expect(invalidationMatches(change(), ["tournaments"], { tournamentId: "t1" })).toBe(true);
+    expect(invalidationMatches(change({ tournament_id: null }), ["tournaments"], { tournamentId: "t1" })).toBe(true);
+  });
+
+  test("solange die Seite ihr Turnier noch nicht kennt, lädt jede passende Meldung", () => {
+    expect(invalidationMatches(change({ tournament_id: "t2" }), ["tournaments"], { tournamentId: null })).toBe(true);
+    expect(invalidationMatches(change({ tournament_id: "t2" }), ["tournaments"], {})).toBe(true);
+    expect(invalidationMatches(change({ tournament_id: "t2" }), ["tournaments"])).toBe(true);
+  });
+
+  test("ein Reset lädt immer, eine fremde Ressource nie - auch mit eigenem Turnier", () => {
+    expect(invalidationMatches({ event_type: "stream.reset" }, ["tournaments"], { tournamentId: "t1" })).toBe(true);
+    expect(invalidationMatches(change({ tournament_id: "t1", resource: "news", path: "/api/news" }), ["tournaments"], { tournamentId: "t1" })).toBe(false);
+  });
+
+  test("Spiele eines Turniers zählen wie das Turnier", () => {
+    const result = { resource: "matches", path: "/api/matches", tournament_id: "t1" };
+    expect(invalidationMatches(result, ["tournaments", "matches"], { tournamentId: "t1" })).toBe(true);
+    expect(invalidationMatches({ ...result, tournament_id: "t2" }, ["tournaments", "matches"], { tournamentId: "t1" })).toBe(false);
+  });
+
+  // Die Turniere eines Events teilen sich Stationen: Wer Stationen zeigt (Spielplan, Live-Warteschlange, TV), lädt auch
+  // bei Änderungen der anderen Turniere desselben Events nach.
+  describe("Seiten mit Stationen", () => {
+    const stations = ["tournaments", "matches-v2", "stations"];
+
+    test("ein anderes Turnier desselben Events lädt, eines eines anderen Events nicht", () => {
+      const scope = { tournamentId: "t1", eventId: "e1" };
+      expect(invalidationMatches(change({ tournament_id: "t2", parent_event_id: "e1" }), stations, scope)).toBe(true);
+      expect(invalidationMatches(change({ tournament_id: "t3", parent_event_id: "e2" }), stations, scope)).toBe(false);
+    });
+
+    test("ein anderes Turnier ohne Event teilt keine Station - es lädt nicht", () => {
+      expect(invalidationMatches(change({ tournament_id: "t2", parent_event_id: null }), stations, { tournamentId: "t1", eventId: "e1" })).toBe(false);
+      expect(invalidationMatches(change({ tournament_id: "t2" }), stations, { tournamentId: "t1" })).toBe(false);
+    });
+
+    test("kennt die Seite ihr Event nicht (TV mit Schlüssel), lädt jedes Turnier mit Event", () => {
+      expect(invalidationMatches(change({ tournament_id: "t2", parent_event_id: "e9" }), stations, { tournamentId: "t1" })).toBe(true);
+      expect(invalidationMatches(change({ tournament_id: "t2", parent_event_id: "e9" }), stations, { tournamentId: "t1", eventId: null })).toBe(true);
+    });
+
+    test("Stationen-Meldungen haben kein Turnier und laden immer", () => {
+      expect(invalidationMatches({ resource: "stations", path: "/api/stations" }, stations, { tournamentId: "t1", eventId: "e1" })).toBe(true);
+    });
+
+    test("Seiten ohne Stationen bleiben beim eigenen Turnier, auch im selben Event", () => {
+      expect(invalidationMatches(change({ tournament_id: "t2", parent_event_id: "e1" }), ["tournaments"], { tournamentId: "t1", eventId: "e1" })).toBe(false);
+    });
+  });
+});

@@ -130,13 +130,35 @@ export function subscribeStreamState(listener) {
   return () => streamListeners.delete(listener);
 }
 
-export function invalidationMatches(event, resources = []) {
+// Live-Nachladen je Turnier (#1801): Der Server nennt in der Meldung das Turnier (`tournament_id`) und dessen Event
+// (`parent_event_id`), wenn beides öffentlich ist. Eine Seite eines Turniers lädt dann nur bei Änderungen dieses
+// Turniers nach. Ohne Kennung in der Meldung - oder solange die Seite ihr Turnier noch nicht kennt - gilt wie bisher alles.
+// Die Turniere eines Events teilen sich Stationen: Hört die Seite auf „stations“, zählt auch jedes andere Turnier
+// desselben Events. Kennt sie ihr Event nicht (TV mit Schlüssel), jedes Turnier mit Event - eines ohne Event teilt keine.
+function concernsScope(event, { tournamentId, eventId } = {}, sharedStations = false) {
+  const changed = event?.tournament_id;
+  if (!changed || !tournamentId || changed === tournamentId) return true;
+  if (!sharedStations) return false;
+  const changedEvent = event.parent_event_id;
+  return Boolean(changedEvent) && (!eventId || changedEvent === eventId);
+}
+
+/**
+ * @param {object} event       die Meldung aus dem Änderungsstrom
+ * @param {string[]} resources Ressourcen der Ansicht; leer = alles
+ * @param {{ tournamentId?: string|null, eventId?: string|null }} scope  Turnier (und Event) der Ansicht (#1801)
+ */
+export function invalidationMatches(event, resources = [], scope = {}) {
   if (event?.reset || event?.event_type === "stream.reset") return true;
-  if (!resources.length) return true;
-  const keys = eventKeys(event);
-  return resources.some((candidate) => {
-    const normalized = normalizeApiPath(candidate);
-    if (!normalized) return true;
-    return keys.some((key) => key === normalized || key.startsWith(`${normalized}/`));
-  });
+  if (resources.length) {
+    const keys = eventKeys(event);
+    const matched = resources.some((candidate) => {
+      const normalized = normalizeApiPath(candidate);
+      if (!normalized) return true;
+      return keys.some((key) => key === normalized || key.startsWith(`${normalized}/`));
+    });
+    if (!matched) return false;
+  }
+  const sharedStations = resources.some((candidate) => normalizeApiPath(candidate) === "stations");
+  return concernsScope(event, scope || {}, sharedStations);
 }

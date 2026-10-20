@@ -19,7 +19,7 @@ export function useTeamLineups(tournament) {
     }
   }, [id, teamMode]);
   useEffect(() => { load(); }, [load]);
-  useApiInvalidation(load, ["tournaments"]);
+  useApiInvalidation(load, ["tournaments"], { tournamentId: id });
   return lineups;
 }
 

@@ -228,10 +228,18 @@ function BracketTv() {
   // Die TV-Anzeige läuft stundenlang: ohne Strom alle 15 s nachfragen. „tv“: ein widerrufener Schlüssel wirkt sofort.
   // Abfragen dürfen sich überlappen (#1683): `load` ordnet die Antworten selbst (seqRef), und jede Meldung braucht
   // ihren Moment sofort - nicht erst nach einer noch laufenden Nachhol-Abfrage.
-  useLiveRefresh(load, LIVE_RESOURCES, { fallbackMs: 15000, overlap: true });
-  // Welche Abfrage eine Änderung aus dem Strom trägt: jede passende Meldung zählt mit.
+  // Nur Änderungen dieses Turniers und - wegen der geteilten Stationen - der anderen Turniere seines Events (#1801). Mit
+  // Anzeige-Schlüssel kennt der TV sein Event nicht: dann jedes Turnier mit Event.
+  const scopeTournamentId = data?.tournament?.id || null;
+  const scopeEventId = data?.tournament?.event_id || null;
+  useLiveRefresh(load, LIVE_RESOURCES, { fallbackMs: 15000, overlap: true, tournamentId: scopeTournamentId, eventId: scopeEventId });
+  // Welche Abfrage eine Änderung aus dem Strom trägt: jede passende Meldung zählt mit - nach derselben Regel.
+  const scopeRef = useRef({ tournamentId: scopeTournamentId, eventId: scopeEventId });
+  useEffect(() => {
+    scopeRef.current = { tournamentId: scopeTournamentId, eventId: scopeEventId };
+  }, [scopeTournamentId, scopeEventId]);
   useEffect(() => subscribeApiInvalidation((event) => {
-    if (invalidationMatches(event, LIVE_RESOURCES)) eventSeqRef.current += 1;
+    if (invalidationMatches(event, LIVE_RESOURCES, scopeRef.current)) eventSeqRef.current += 1;
   }), []);
   // Der Zustand des Stroms direkt aus der Brücke, nicht über einen React-Effekt: so steht er fest, bevor die nächste
   // Abfrage startet - auch wenn das Neuzeichnen auf einem langsamen Rechner länger dauert.

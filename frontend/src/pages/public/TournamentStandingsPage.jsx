@@ -42,7 +42,8 @@ export default function TournamentStandingsPage() {
     load();
   }, [load]);
 
-  useLiveRefresh(load, ["tournaments", "matches"], { fallbackMs: 7000 });
+  // Nur Änderungen dieses Turniers (#1801) - bis es geladen ist, jede.
+  useLiveRefresh(load, ["tournaments", "matches"], { fallbackMs: 7000, tournamentId: t?.id });
   // Gruppen kommen als [{group, standings}] (#1562): je Gruppe eine Tabelle. Live-Rahmen und Gleiten über alle Zeilen.
   const sections = useMemo(() => standingSections(rows), [rows]);
   const flatRows = useMemo(() => sections.flatMap((section) => section.rows), [sections]);

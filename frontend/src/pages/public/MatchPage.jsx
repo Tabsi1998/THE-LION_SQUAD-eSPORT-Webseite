@@ -138,7 +138,10 @@ function MatchPageView() {
     };
   }, [load]);
   // Ein fertiges Match ändert sich nicht mehr - die Live-Aktualisierung hört dann auf (#1221).
-  useLiveRefresh(load, ["matches", "matches-v2", "tournaments"], { fallbackMs: 10000, enabled: !matchIsOver(data?.match) });
+  // Nur Änderungen des eigenen Turniers (#1801) - bis das Spiel geladen ist, jede.
+  useLiveRefresh(load, ["matches", "matches-v2", "tournaments"], {
+    fallbackMs: 10000, enabled: !matchIsOver(data?.match), tournamentId: data?.tournament?.id || data?.match?.tournament_id,
+  });
   // Match-Chat gelesen (#1148) - nur für die, die mitschreiben dürfen.
   useChatRead("match", id, chat, Boolean(user && data?.can_act));
 
@@ -333,7 +336,7 @@ function MatchPageView() {
         {data.call && <MatchCallBox call={data.call} />}
         {/* Vor Ort (#1556): wo und wann das Spiel laut Warteschlange dran ist - den Aufruf selbst zeigt die Karte darüber. */}
         {!finished && isV2 && data.tournament?.id && data.event_mode && data.event_mode !== "online" ? (
-          <LiveQueueStatus tournamentId={data.tournament.id} matchId={id} hideCalled className="mt-6" />
+          <LiveQueueStatus tournamentId={data.tournament.id} eventId={data.tournament.event_id} matchId={id} hideCalled className="mt-6" />
         ) : null}
 
         {actionError && <div className="mt-5"><AuthFormAlert id="match-action-error">{actionError}</AuthFormAlert></div>}

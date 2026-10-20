@@ -57,6 +57,76 @@ test("eine passende Änderung lädt einmal, eine fremde gar nicht", () => {
   expect(load).toHaveBeenCalledTimes(1);
 });
 
+// Live-Nachladen je Turnier (#1801): Seiten eines Turniers laden nur bei Änderungen dieses Turniers nach.
+const tournamentChange = (tournamentId) => emitApiInvalidation({
+  resource: "tournaments", path: "/api/tournaments", ...(tournamentId ? { tournament_id: tournamentId } : {}),
+});
+
+test("mit tournamentId lädt nur das eigene Turnier - und eine Meldung ohne Turnier", () => {
+  const load = vi.fn();
+  act(() => setStreamConnected(true));
+  render(<View load={load} resources={["tournaments"]} options={{ tournamentId: "t1" }} />);
+
+  act(() => {
+    tournamentChange("t2");
+    vi.advanceTimersByTime(300);
+  });
+  expect(load).not.toHaveBeenCalled();
+
+  act(() => {
+    tournamentChange("t1");
+    vi.advanceTimersByTime(300);
+  });
+  expect(load).toHaveBeenCalledTimes(1);
+
+  act(() => {
+    tournamentChange(null);
+    vi.advanceTimersByTime(300);
+  });
+  expect(load).toHaveBeenCalledTimes(2);
+});
+
+test("bevor die Seite ihr Turnier kennt, lädt jede Änderung - danach nur die eigene, ohne die wartende zu verlieren", () => {
+  const load = vi.fn();
+  act(() => setStreamConnected(true));
+  const view = render(<View load={load} resources={["tournaments"]} options={{ tournamentId: null }} />);
+
+  act(() => {
+    tournamentChange("t2");
+    vi.advanceTimersByTime(100);
+  });
+  // Die Seite hat ihr Turnier geladen, während die Änderung noch entprellt wird.
+  view.rerender(<View load={load} resources={["tournaments"]} options={{ tournamentId: "t1" }} />);
+  act(() => {
+    vi.advanceTimersByTime(200);
+  });
+  expect(load).toHaveBeenCalledTimes(1);
+
+  act(() => {
+    tournamentChange("t2");
+    vi.advanceTimersByTime(300);
+  });
+  expect(load).toHaveBeenCalledTimes(1);
+});
+
+test("mit Stationen lädt auch ein anderes Turnier desselben Events", () => {
+  const load = vi.fn();
+  act(() => setStreamConnected(true));
+  render(<View load={load} resources={["tournaments", "stations"]} options={{ tournamentId: "t1", eventId: "e1" }} />);
+
+  act(() => {
+    emitApiInvalidation({ resource: "tournaments", path: "/api/tournaments", tournament_id: "t9", parent_event_id: "e9" });
+    vi.advanceTimersByTime(300);
+  });
+  expect(load).not.toHaveBeenCalled();
+
+  act(() => {
+    emitApiInvalidation({ resource: "tournaments", path: "/api/tournaments", tournament_id: "t2", parent_event_id: "e1" });
+    vi.advanceTimersByTime(300);
+  });
+  expect(load).toHaveBeenCalledTimes(1);
+});
+
 test("nach einer Unterbrechung lädt die Ansicht einmal nach", () => {
   const load = vi.fn();
   act(() => setStreamConnected(true));

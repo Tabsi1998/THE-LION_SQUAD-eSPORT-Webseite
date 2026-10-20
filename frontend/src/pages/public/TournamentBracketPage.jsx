@@ -49,7 +49,8 @@ export default function TournamentBracketPage() {
     load();
   }, [load]);
 
-  const connected = useLiveRefresh(load, ["tournaments", "matches"], { fallbackMs: 7000 });
+  // Nur Änderungen dieses Turniers (#1801) - bis es geladen ist, jede.
+  const connected = useLiveRefresh(load, ["tournaments", "matches"], { fallbackMs: 7000, tournamentId: tournament?.id });
   const wasConnected = useRef(connected);
   useEffect(() => {
     if (connected && !wasConnected.current) catchUp.current = true;

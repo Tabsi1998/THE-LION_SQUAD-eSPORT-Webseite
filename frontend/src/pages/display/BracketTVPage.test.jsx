@@ -408,3 +408,30 @@ test("#1634 (Codex): ein Server ohne Warteschlange (404) wird in dieser Sitzung 
   await waitFor(() => expect(apiMock.get.mock.calls.filter(([url]) => String(url).startsWith("/tournaments/t1/bracket/display")).length).toBeGreaterThan(1));
   expect(asked).toBe(1);
 });
+
+// #1801: Der TV lädt nur bei Änderungen seines Turniers nach - und, weil sich die Turniere eines Events Stationen
+// teilen, bei denen der anderen Turniere desselben Events. Ein Turnier ohne Event teilt keine Station.
+test("#1801: eine Änderung eines fremden Turniers lädt den TV nicht nach, eine aus seinem Event schon", async () => {
+  serve(async () => ({ data: { ...BRACKET, tournament: { ...BRACKET.tournament, event_id: "e1" } } }));
+  renderTv("/display/bracket/t1?key=k");
+  expect(await screen.findByTestId("tv-tree")).toBeInTheDocument();
+  const displayCalls = () => apiMock.get.mock.calls.filter(([url]) => String(url).startsWith("/tournaments/t1/bracket/display")).length;
+  await waitFor(() => expect(screen.getByTestId("tv-status")).toHaveTextContent("aktuell"));
+  const before = displayCalls();
+  const { emitApiInvalidation } = await import("@/lib/apiInvalidation");
+  await act(async () => {
+    emitApiInvalidation({ resource: "tournaments", path: "/api/tournaments", tournament_id: "t2", parent_event_id: null });
+    emitApiInvalidation({ resource: "matches", path: "/api/matches", tournament_id: "t3", parent_event_id: "e9" });
+    await new Promise((resolve) => setTimeout(resolve, 400));
+  });
+  expect(displayCalls()).toBe(before);
+
+  await act(async () => {
+    emitApiInvalidation({ resource: "matches", path: "/api/matches", tournament_id: "t4", parent_event_id: "e1" });
+  });
+  await waitFor(() => expect(displayCalls()).toBe(before + 1));
+  await act(async () => {
+    emitApiInvalidation({ resource: "tournaments", path: "/api/tournaments", tournament_id: "t1", parent_event_id: "e1" });
+  });
+  await waitFor(() => expect(displayCalls()).toBe(before + 2));
+});
