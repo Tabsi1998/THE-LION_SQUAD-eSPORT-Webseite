@@ -1,5 +1,6 @@
 """Externe Serien - öffentliche Seiten (#1745 bis #1748): Serienseite, Rennliga, Team-Liga und der schlanke Endpunkt
-für „Heute im Einsatz“ und „Läuft gerade“. Öffentliche Pfade unter ``/api/reference-series/public/…``, damit
+für „Heute im Einsatz“ und „Läuft gerade“, dazu „Serien und Ligen“ der Übersicht (#1878). Öffentliche Pfade unter
+``/api/reference-series/public/…``, damit
 eine Spur-Adresse nie mit ``/admin`` zusammenfällt; Sichtbarkeit der Serie gilt auch für Termine und Tabellen.
 
 Die Datei samt Anmeldung in ``server.py`` steht schon seit dem Datenmodell (#1741), damit die Pakete einander nicht in
@@ -14,6 +15,8 @@ Runde. Gerechnet wird hier nichts: die Tabelle ist der gespeicherte Stand nach d
 gar nicht erst mit. Nur Vereinsmitglieder tragen den Link zu ihrem Vereinsprofil. Die Seite ist ``noindex``.
 """
 from __future__ import annotations
+
+import re
 
 from fastapi import APIRouter, Depends, Request
 
@@ -164,6 +167,18 @@ def _club_place(lineage: dict, series: dict, snapshots: dict, club_ids: set) -> 
     return {"rank": min(ranks), "of": len(rows)} if ranks else None
 
 
+async def _club_participant_ids(db, series_ids: list[str]) -> set:
+    """Teilnehmer, die die Serienseite als Vereinsmitglied zeigt: Verknüpfung „member“, Name nicht ausgeblendet,
+    Profil aktiv - zwei Abfragen für alle Serien zusammen."""
+    candidates = [item async for item in db.reference_participants.find(
+        {"series_id": {"$in": series_ids}, "is_club_member": True, "link": "member", "name_hidden": {"$ne": True}},
+        {"_id": 0, "id": 1, "profile_id": 1})]
+    profile_ids = list({item["profile_id"] for item in candidates if item.get("profile_id")})
+    active = {item["id"] async for item in db.club_member_profiles.find(
+        {"id": {"$in": profile_ids}, "is_active": {"$ne": False}}, {"_id": 0, "id": 1})} if profile_ids else set()
+    return {item["id"] for item in candidates if item.get("profile_id") in active}
+
+
 @router.get("/public/running")
 async def public_running(request: Request, user: dict | None = Depends(get_optional_user)):
     """Für die Übersicht „Erfolge und Referenzen“: laufende Saisons (Status „aktiv“, Spur und Serie nicht archiviert,
@@ -239,14 +254,7 @@ async def _running(user: dict | None, today: str) -> dict:
         key = (snap["series_id"], snap["scope"])
         if key not in snapshots or (snap.get("round_seq") or 0) > (snapshots[key].get("round_seq") or 0):
             snapshots[key] = snap
-    # Nur, wer die Serienseite als Vereinsmitglied zeigt: Verknüpfung „member“, Name nicht ausgeblendet, Profil aktiv.
-    candidates = [item async for item in db.reference_participants.find(
-        {"series_id": {"$in": ids}, "is_club_member": True, "link": "member", "name_hidden": {"$ne": True}},
-        {"_id": 0, "id": 1, "profile_id": 1})]
-    profile_ids = list({item["profile_id"] for item in candidates if item.get("profile_id")})
-    active = {item["id"] async for item in db.club_member_profiles.find(
-        {"id": {"$in": profile_ids}, "is_active": {"$ne": False}}, {"_id": 0, "id": 1})} if profile_ids else set()
-    club_ids = {item["id"] for item in candidates if item.get("profile_id") in active}
+    club_ids = await _club_participant_ids(db, ids)
     # Wie viele Vereinsmitglieder je Saison gemeldet sind (#1753, „Heute im Einsatz“ auf der Startseite): nur die Zahl.
     club_count: dict = {}
     if club_ids:
@@ -278,6 +286,93 @@ async def _running(user: dict | None, today: str) -> dict:
     for item in items:
         item.pop("_order")
     return {"today": today, "items": items[:RUNNING_LIMIT]}
+
+
+LINEAGE_LIST_FIELDS = ("title", "slug", "kind", "label", "organizer", "game_name")
+PATH_SEASON_FIELDS = ("season", "tier", "title", "season_slug", "status")
+
+
+def _natural(value) -> tuple:
+    """Sortierschlüssel, der Zahlen als Zahlen liest: „Saison 2“ vor „Saison 10“."""
+    return tuple((0, int(part), "") if part.isdigit() else (1, 0, part.casefold())
+                 for part in re.split(r"(\d+)", str(value or "")) if part)
+
+
+async def _latest_snapshots(db, series_ids: list[str]) -> dict:
+    """Je Serie und Wertung (Fahrer/Gesamt bzw. Tabelle) der jüngste gespeicherte Stand - eine Abfrage für alle."""
+    out: dict = {}
+    async for snap in db.reference_standings.aggregate([
+            {"$match": {"series_id": {"$in": series_ids}, "scope": {"$in": ["drivers", "table"]}}},
+            {"$sort": {"round_seq": -1}},
+            {"$group": {"_id": {"series_id": "$series_id", "scope": "$scope"}, "rows": {"$first": "$rows"}}}]):
+        rows = [{key: row.get(key) for key in ("rank", "participant_id", "team")} for row in snap.get("rows") or []]
+        out[(snap["_id"]["series_id"], snap["_id"]["scope"])] = {"rows": rows}
+    return out
+
+
+@router.get("/public/lineages")
+async def public_lineages(request: Request, user: dict | None = Depends(get_optional_user)):
+    """Für „Serien und Ligen“ auf der Übersicht (#1878): je Spur ihre Saisons als Liga-Weg - Saison, Stufe, Status,
+    unser Platz (wie bei „Läuft gerade“) und die Referenzen, die zu der Saison gehören. Nur sichtbare, nicht
+    archivierte Spuren und Saisons (wie ``visible_seasons``), aber für alle Spuren zusammen: jede Sammlung wird einmal
+    gelesen, nie je Spur oder Saison. Kein Name kommt mit, auch nicht der des eigenen Teams."""
+    await enforce_rate_limit(request, "reference-lineages", 60, 60)
+    db = get_db()
+    seen: dict = {}
+
+    async def visible(value) -> bool:
+        if value not in seen:
+            seen[value] = await user_can_see(user, value)
+        return seen[value]
+
+    lineages = [item async for item in db.reference_lineages.find(
+        {"is_archived": {"$ne": True}},
+        {"_id": 0, "id": 1, "game_id": 1, "visibility": 1, "order_index": 1,
+         **{key: 1 for key in LINEAGE_LIST_FIELDS}})]
+    lineages = [item for item in lineages if await visible(item.get("visibility"))]
+    seasons_by: dict = {item["id"]: [] for item in lineages}
+    if seasons_by:
+        async for series in db.reference_series.find(
+                {"lineage_id": {"$in": list(seasons_by)}, "status": {"$ne": "archived"}},
+                {"_id": 0, "id": 1, "lineage_id": 1, "visibility": 1, "team_name": 1, "reference_id": 1,
+                 "order_index": 1, **{key: 1 for key in PATH_SEASON_FIELDS}}):
+            if await visible(series.get("visibility")):
+                seasons_by[series["lineage_id"]].append(series)
+    shown = [(lineage, seasons_by[lineage["id"]]) for lineage in lineages if seasons_by[lineage["id"]]]
+    if not shown:
+        return {"items": []}
+    ids = [series["id"] for _, seasons in shown for series in seasons]
+    snapshots = await _latest_snapshots(db, ids)
+    club_ids = await _club_participant_ids(db, ids)
+    # Referenzen der Saisons: an der Referenz (``series_id``) oder an der Serie (``reference_id``) - nur sichtbare.
+    owner_of = {series["reference_id"]: series["id"] for _, seasons in shown for series in seasons
+                if series.get("reference_id")}
+    references_by: dict = {sid: [] for sid in ids}
+    async for item in db.references.find(
+            {"is_active": {"$ne": False}, "$or": [{"series_id": {"$in": ids}}, {"id": {"$in": list(owner_of)}}]},
+            {"_id": 0, "id": 1, "series_id": 1, "visibility": 1}):
+        owner = item.get("series_id") if item.get("series_id") in references_by else owner_of.get(item["id"])
+        if owner and await visible(item.get("visibility")) and item["id"] not in references_by[owner]:
+            references_by[owner].append(item["id"])
+    game_ids = list({lineage["game_id"] for lineage, _ in shown if lineage.get("game_id")})
+    games = {item["id"]: item async for item in db.games.find(
+        {"id": {"$in": game_ids}}, {"_id": 0, "id": 1, "name": 1, "short_name": 1, "logo_url": 1})} if game_ids else {}
+
+    shown.sort(key=lambda pair: (pair[0].get("order_index") or 0, str(pair[0].get("title") or "").casefold()))
+    items = []
+    for lineage, seasons in shown:
+        seasons.sort(key=lambda item: (_natural(item.get("season")), item.get("order_index") or 0,
+                                       _natural(item.get("tier"))))
+        game = games.get(lineage.get("game_id")) or {}
+        items.append({
+            "lineage": {**{key: lineage.get(key) for key in LINEAGE_LIST_FIELDS},
+                        "game_name": lineage.get("game_name") or game.get("name")},
+            "game": {key: game.get(key) for key in ("name", "short_name", "logo_url")} if game else None,
+            "seasons": [{**{key: series.get(key) for key in PATH_SEASON_FIELDS},
+                         "club": _club_place(lineage, series, snapshots, club_ids),
+                         "reference_ids": references_by[series["id"]]} for series in seasons],
+        })
+    return {"items": items}
 
 
 @router.get("/public/{lineage_slug}/{season_slug}")
