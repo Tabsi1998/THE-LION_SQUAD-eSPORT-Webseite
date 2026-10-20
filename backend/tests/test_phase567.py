@@ -1,10 +1,11 @@
-"""Phase 5 (Status/Stream/Home) + Phase 6 (Badge Audiences) + Phase 7 (Season v2)
+"""Phase 5 (Status/Stream/Home) + Phase 6 (Badge Audiences).
+
+Die Season-v2-Routen sind entfallen (#933); die Formel prüft test_season_service_unit.
 
 Runs against the live backend via REACT_APP_BACKEND_URL. Admin creds taken from
-conftest. All tournaments/season_points created here are cleaned up at teardown.
+conftest. All tournaments created here are cleaned up at teardown.
 """
 import os
-import time
 import uuid
 import pytest
 import requests
@@ -104,23 +105,7 @@ def any_game(admin):
     return r.json()
 
 
-@pytest.fixture(scope="module")
-def active_season(admin):
-    r = admin.get(f"{BASE}/api/seasons")
-    for s in (r.json() or []):
-        if s.get("status") == "active":
-            return s
-    # Create + activate
-    slug = f"test-season-{uuid.uuid4().hex[:4]}"
-    cr = admin.post(f"{BASE}/api/seasons", json={"name": "TEST Season", "slug": slug})
-    assert cr.status_code == 200, cr.text
-    sid = cr.json()["id"]
-    admin.patch(f"{BASE}/api/seasons/{sid}", json={"status": "active"})
-    return admin.get(f"{BASE}/api/seasons/{sid}").json()
-
-
 _created_tournaments: list[str] = []
-_created_entries: list[str] = []
 
 
 @pytest.fixture(scope="module", autouse=True)
@@ -131,11 +116,6 @@ def cleanup(admin):
             admin.delete(f"{BASE}/api/tournaments/{tid}")
         except requests.RequestException:
             pass  # Aufräumen nach dem Lauf: antwortet der Server nicht, bleibt der Testrest liegen
-    for eid in _created_entries:
-        try:
-            admin.delete(f"{BASE}/api/seasons/v2/entry/{eid}")
-        except requests.RequestException:
-            pass  # wie oben
 
 
 def _mk_tournament(admin, game_id, extra=None):
@@ -322,232 +302,3 @@ class TestBadgesAudience:
         self_r = member_user.get(f"{BASE}/api/badges/user/{uid}")
         codes_self = [b["code"] for b in self_r.json()]
         assert "holzmedaille" in codes_self
-
-
-# ================= Phase 7: Season v2 points =================
-class TestSeasonV2Formula:
-    def test_major_rank1_32p_weight3_bonus25_eq_415(self, admin, active_season):
-        uid = admin.user["id"]
-        r = admin.post(f"{BASE}/api/seasons/v2/award", json={
-            "user_id": uid, "source_type": "major", "rank": 1,
-            "num_participants": 32, "weight": 3.0, "bonus": 25,
-            "source_name": "TEST major"
-        })
-        assert r.status_code == 200, r.text
-        d = r.json()
-        _created_entries.append(d["id"])
-        assert d["base_points"] == 100
-        assert d["weight"] == 3.0
-        assert d["participant_factor"] == 1.3
-        assert d["bonus_points"] == 25
-        assert d["total_points"] == 415.0
-
-    def test_tournament_rank2_10p_eq_160(self, admin):
-        uid = admin.user["id"]
-        r = admin.post(f"{BASE}/api/seasons/v2/award", json={
-            "user_id": uid, "source_type": "tournament", "rank": 2,
-            "num_participants": 10, "source_name": "TEST t2"
-        })
-        assert r.status_code == 200
-        d = r.json(); _created_entries.append(d["id"])
-        assert d["total_points"] == 160.0
-
-    def test_fastlap_farming_cap(self, admin, community_user):
-        """5th farmable award in same month triggers 50 % cap."""
-        uid = community_user.user["id"]
-        # Ensure isolation: create a fresh user id for farming so count is 0
-        totals = []
-        for i in range(5):
-            r = admin.post(f"{BASE}/api/seasons/v2/award", json={
-                "user_id": uid, "source_type": "fastlap", "rank": 1,
-                "num_participants": 12, "source_name": f"TEST farm {i}"
-            })
-            assert r.status_code == 200
-            d = r.json(); _created_entries.append(d["id"])
-            totals.append((d["total_points"], d["farming_capped"]))
-        assert totals[0][0] == 100.0 and not totals[0][1]
-        assert totals[3][0] == 100.0 and not totals[3][1]
-        assert totals[4][1] is True, "5th should be farming_capped"
-        assert totals[4][0] == 50.0, f"5th should be 50, got {totals[4][0]}"
-
-    def test_fastlap_farming_exempt_always_full(self, admin, community_user):
-        uid = community_user.user["id"]
-        for _ in range(3):
-            r = admin.post(f"{BASE}/api/seasons/v2/award", json={
-                "user_id": uid, "source_type": "fastlap", "rank": 1,
-                "num_participants": 12, "farming_exempt": True,
-                "source_name": "TEST exempt"
-            })
-            assert r.status_code == 200
-            d = r.json(); _created_entries.append(d["id"])
-            assert d["total_points"] == 100.0
-            assert d["farming_capped"] is False
-            assert d["farming_exempt"] is True
-
-    def test_major_never_farming_capped(self, admin, community_user):
-        uid = community_user.user["id"]
-        for _ in range(6):
-            r = admin.post(f"{BASE}/api/seasons/v2/award", json={
-                "user_id": uid, "source_type": "major", "rank": 1,
-                "num_participants": 32, "weight": 3.0,
-                "source_name": "TEST major multi"
-            })
-            assert r.status_code == 200
-            d = r.json(); _created_entries.append(d["id"])
-            assert d["farming_capped"] is False
-            assert d["total_points"] == 390.0  # 100*3*1.3
-
-
-class TestSeasonV2Leaderboard:
-    def test_leaderboard_sorted_and_ranked(self, anon):
-        r = anon.get(f"{BASE}/api/seasons/v2/leaderboard")
-        assert r.status_code == 200
-        d = r.json()
-        st = d["standings"]
-        if len(st) >= 2:
-            for i in range(len(st) - 1):
-                assert st[i]["total_points"] >= st[i+1]["total_points"]
-        for i, row in enumerate(st):
-            assert row["rank"] == i + 1
-            assert "events" in row
-
-    def test_leaderboard_only_members(self, anon):
-        r = anon.get(f"{BASE}/api/seasons/v2/leaderboard?only_members=true")
-        assert r.status_code == 200
-        for row in r.json()["standings"]:
-            assert row.get("is_club_member") is True
-
-    def test_leaderboard_only_community(self, anon):
-        r = anon.get(f"{BASE}/api/seasons/v2/leaderboard?only_community=true")
-        assert r.status_code == 200
-        for row in r.json()["standings"]:
-            assert not row.get("is_club_member")
-
-    def test_leaderboard_teams(self, anon):
-        r = anon.get(f"{BASE}/api/seasons/v2/leaderboard?teams=true")
-        assert r.status_code == 200
-        assert "standings" in r.json()
-
-    def test_v2_me(self, admin):
-        r = admin.get(f"{BASE}/api/seasons/v2/me")
-        assert r.status_code == 200
-        d = r.json()
-        assert "season" in d and "total" in d and "entries" in d
-        assert isinstance(d["entries"], list)
-
-    def test_v2_me_requires_auth(self, anon):
-        r = anon.get(f"{BASE}/api/seasons/v2/me")
-        assert r.status_code in (401, 403)
-
-    def test_v2_award_requires_admin(self, community_user):
-        r = community_user.post(f"{BASE}/api/seasons/v2/award", json={
-            "user_id": community_user.user["id"], "source_type": "fastlap", "rank": 1
-        })
-        assert r.status_code == 403
-
-    def test_v2_delete_missing_404(self, admin):
-        r = admin.delete(f"{BASE}/api/seasons/v2/entry/missing-id-xyz")
-        assert r.status_code == 404
-
-    def test_v2_delete_success(self, admin):
-        # Create an entry, then delete
-        r = admin.post(f"{BASE}/api/seasons/v2/award", json={
-            "user_id": admin.user["id"], "source_type": "custom",
-            "rank": 1, "num_participants": 10, "source_name": "TEST delete"
-        })
-        eid = r.json()["id"]
-        dr = admin.delete(f"{BASE}/api/seasons/v2/entry/{eid}")
-        assert dr.status_code == 200
-
-    def test_drop_worst_is_applied_to_v2_leaderboard(self, admin, active_season, community_user):
-        sid = active_season["id"]
-        previous_drop = active_season.get("drop_worst", 0)
-        source_type = f"drop_test_{uuid.uuid4().hex[:6]}"
-        uid = community_user.user["id"]
-        try:
-            pr = admin.patch(f"{BASE}/api/seasons/{sid}", json={"drop_worst": 1})
-            assert pr.status_code == 200, pr.text
-            high = admin.post(f"{BASE}/api/seasons/v2/award", json={
-                "user_id": uid, "source_type": source_type,
-                "rank": 1, "num_participants": 8, "weight": 1.0,
-                "source_name": "TEST drop high",
-            })
-            low = admin.post(f"{BASE}/api/seasons/v2/award", json={
-                "user_id": uid, "source_type": source_type,
-                "rank": 20, "num_participants": 8, "weight": 1.0,
-                "source_name": "TEST drop low",
-            })
-            assert high.status_code == 200, high.text
-            assert low.status_code == 200, low.text
-            _created_entries.extend([high.json()["id"], low.json()["id"]])
-
-            lb = admin.get(f"{BASE}/api/seasons/v2/leaderboard?season_id={sid}&source_type={source_type}&limit=10")
-            assert lb.status_code == 200, lb.text
-            row = next((item for item in lb.json()["standings"] if item["id"] == uid), None)
-            assert row, lb.text
-            assert row["events"] == 2
-            assert row["total_points"] == 100.0
-        finally:
-            admin.patch(f"{BASE}/api/seasons/{sid}", json={"drop_worst": previous_drop})
-
-
-class TestParticipantFactor:
-    """Edge cases via live awards."""
-    @pytest.mark.parametrize("n,expected", [(1, 0.75), (8, 1.0), (16, 1.15), (32, 1.3), (64, 1.5)])
-    def test_factor_n(self, admin, n, expected):
-        r = admin.post(f"{BASE}/api/seasons/v2/award", json={
-            "user_id": admin.user["id"], "source_type": "custom",
-            "rank": 1, "num_participants": n, "weight": 1.0,
-            "source_name": f"TEST factor {n}"
-        })
-        assert r.status_code == 200
-        d = r.json(); _created_entries.append(d["id"])
-        assert d["participant_factor"] == expected
-
-
-class TestPlacementPoints:
-    @pytest.mark.parametrize("rank,base", [(1, 100), (4, 50), (7, 35), (12, 20), (20, 10)])
-    def test_rank_base(self, admin, rank, base):
-        r = admin.post(f"{BASE}/api/seasons/v2/award", json={
-            "user_id": admin.user["id"], "source_type": "custom",
-            "rank": rank, "num_participants": 8, "weight": 1.0,
-            "source_name": f"TEST rank {rank}"
-        })
-        assert r.status_code == 200
-        d = r.json(); _created_entries.append(d["id"])
-        assert d["base_points"] == base
-
-    def test_rank_none_participation(self, admin):
-        r = admin.post(f"{BASE}/api/seasons/v2/award", json={
-            "user_id": admin.user["id"], "source_type": "custom",
-            "num_participants": 8, "weight": 1.0, "source_name": "TEST part"
-        })
-        assert r.status_code == 200
-        d = r.json(); _created_entries.append(d["id"])
-        assert d["base_points"] == 10
-
-
-# ================= Phase 5: results_published hook =================
-class TestResultsPublishedHook:
-    def test_results_published_creates_season_points(self, admin, any_game):
-        """Verify results_published triggers season_service.award_points."""
-        # Create tournament
-        t = _mk_tournament(admin, any_game["id"])
-        # Register admin as participant (need at least one user)
-        reg = admin.post(f"{BASE}/api/tournaments/{t['id']}/register", json={"platform_id": "admin"})
-        # admin might not be registerable on draft, try setting status first
-        if reg.status_code != 200:
-            admin.post(f"{BASE}/api/tournaments/{t['id']}/status", json={"status": "registration_open"})
-            admin.post(f"{BASE}/api/tournaments/{t['id']}/register", json={"platform_id": "admin"})
-        # Get points BEFORE
-        before = admin.get(f"{BASE}/api/seasons/v2/me").json()
-        before_count = len(before.get("entries", []))
-        # Publish results
-        r = admin.post(f"{BASE}/api/tournaments/{t['id']}/status", json={"status": "results_published"})
-        assert r.status_code == 200
-        # Give hook a moment
-        time.sleep(0.5)
-        after = admin.get(f"{BASE}/api/seasons/v2/me").json()
-        after_count = len(after.get("entries", []))
-        # Admin may or may not be registered — at minimum the call should not 500
-        assert after_count >= before_count
