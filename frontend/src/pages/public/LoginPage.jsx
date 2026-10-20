@@ -93,7 +93,7 @@ export default function LoginPage() {
         remember: () => rememberRef.current,
         exclusive: submitOnce,
         onSignedIn: finishPasskeySignIn,
-        onError: (error) => setErr(passkeyError(error)),
+        // Kein onError: der stille Vorschlag zeigt nie eine Meldung (#1242) - Fehler gibt es nur nach dem Klick auf den Knopf.
         onEnd: () => {
           stopAutofillRef.current = null;
           setAutofill("ended");

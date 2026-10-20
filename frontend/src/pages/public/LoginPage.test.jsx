@@ -249,17 +249,19 @@ test("endet der Vorschlag von selbst, verschwindet der Hinweis am Feld; der Knop
   expect(screen.getByTestId("login-passkey")).toBeInTheDocument();
 });
 
-test("nach einer Server-Ablehnung startet der Vorschlag erst wieder beim Fokus aufs Feld – höchstens einmal", async () => {
+test("nach einer Server-Ablehnung des stillen Vorschlags steht keine Meldung; er startet erst beim Fokus wieder – höchstens einmal (#1242)", async () => {
   autofillStarted();
   const user = userEvent.setup();
   renderPage();
   await waitFor(() => expect(passkeys.startPasskeyAutofill).toHaveBeenCalledTimes(1));
   act(() => {
-    autofillArgs().onError(new Error("Diesen Passkey kennt der Server nicht."));
+    autofillArgs().onError?.(new Error("Diesen Passkey kennt der Server nicht."));
     autofillArgs().onEnd();
   });
   expect(await screen.findByTestId("login-passkey")).toBeInTheDocument();
-  expect(screen.getByText("Diesen Passkey kennt der Server nicht.")).toBeInTheDocument();
+  // Der stille Vorschlag zeigt nie eine Meldung (#1242); Fehler gibt es nur nach einem Klick auf den Knopf.
+  expect(screen.queryByText("Diesen Passkey kennt der Server nicht.")).not.toBeInTheDocument();
+  expect(screen.queryByTestId("login-error")).not.toBeInTheDocument();
   expect(passkeys.startPasskeyAutofill).toHaveBeenCalledTimes(1);
 
   await user.click(screen.getByTestId("login-email"));
