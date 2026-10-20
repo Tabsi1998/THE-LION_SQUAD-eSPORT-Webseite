@@ -37,7 +37,7 @@ def _log_safe(value, limit: int = 120) -> str:
 
 # Quellen: wer ein Ereignis auslöst, nennt sie - danach richtet sich, welche Zähler neu gerechnet werden.
 SOURCES = ("match", "tournament", "fastlap", "season", "team", "event", "community", "discord", "chat", "profile",
-           "club", "achievement", "xp", "signal", "stream", "friend")
+           "club", "achievement", "xp", "signal", "stream", "friend", "registration")
 # Was der alte Block (badges.compute_user_progress) liefert - bei jeder Auffrischung mitgerechnet.
 LEGACY_KEYS = frozenset({
     "tournaments_registered", "distinct_games_registered", "distinct_formats", "matches_played", "matches_won",
@@ -543,6 +543,23 @@ async def _categories(ctx):
 
 # ------------------------------------------------------------------ Turnier
 
+# Anmeldung (#1871): was eine Turnier-Anmeldung ändert, auch ohne den alten Block - dieselbe Rechnung wie dort
+# (achievement_progress.compute_user_progress), damit Anmeldung und voller Lauf dieselben Werte schreiben.
+@counter("tournaments_registered", "registration")
+async def _tournaments_registered(ctx):
+    return len(await ctx.registrations())
+
+
+@counter("distinct_games_registered", "registration")
+async def _distinct_games_registered(ctx):
+    return len({t.get("game_id") for t in (await ctx.tournaments()).values() if t.get("game_id")})
+
+
+@counter("distinct_formats", "registration")
+async def _distinct_formats(ctx):
+    return len({t.get("format") for t in (await ctx.tournaments()).values() if t.get("format")})
+
+
 @counter("prizes_received", "tournament")
 async def _prizes(ctx):
     return await ctx.db.prize_pickups.count_documents({"user_id": ctx.user_id})
@@ -569,7 +586,7 @@ async def _tournaments_completed(ctx):
     return len({r.get("tournament_id") for r in await ctx.registrations() if r.get("tournament_id") in done})
 
 
-@counter("fast_registrations", "tournament")
+@counter("fast_registrations", "tournament", "registration")
 async def _fast_registrations(ctx):
     tournaments = await ctx.tournaments()
     count = 0
@@ -1228,7 +1245,7 @@ async def _championship_top3(ctx):
     return count
 
 
-@counter("grand_prix_entries", "fastlap", "tournament")
+@counter("grand_prix_entries", "fastlap", "tournament", "registration")
 async def _grand_prix(ctx):
     """Anmeldungen zu Turnieren im Format Grand Prix (zurückgezogene zählen nicht)."""
     tournaments = await ctx.tournaments()

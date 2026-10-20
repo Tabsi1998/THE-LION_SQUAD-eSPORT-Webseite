@@ -54,6 +54,8 @@ COUNTER_KEYS_V2 = (
     "meetings_attended", "member_votes_cast", "helper_shifts_completed", "helper_hours", "discord_servers_stage",
     # Katalog E (#678): Saison-Fundstücke
     "halloween_bats_scared", "season_collectibles_total",
+    # Anmeldung (#1871): auch im alten Block, hier zusätzlich leicht für die Auswertung gleich nach der Anmeldung
+    "tournaments_registered", "distinct_games_registered", "distinct_formats",
 )
 CONDITION_KEY_STATUS.update({key: "live" for key in COUNTER_KEYS_V2})
 

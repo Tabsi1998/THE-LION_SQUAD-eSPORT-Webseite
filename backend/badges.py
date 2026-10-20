@@ -407,8 +407,10 @@ async def _xp(user_id: str | None, source: str, ref: str, **kwargs) -> None:
 
 
 async def on_tournament_registered(user_id: str, tournament_id: str):
+    """Nur die Zähler der Anmeldung, ohne den alten Block (#1871): am Einlass melden sich viele zugleich an. Alles
+    andere (Spiele, Plätze, Profil, Mitgliedschaft) holt der volle Lauf nach - nächtlich oder ohne Quelle."""
     await _xp(user_id, "tournament_registered", tournament_id)
-    await evaluate_user_progress(user_id, {"tournament"})
+    await evaluate_user_progress(user_id, {"registration"}, legacy=False)
 
 
 async def on_checked_in(user_id: str, tournament_id: str):
