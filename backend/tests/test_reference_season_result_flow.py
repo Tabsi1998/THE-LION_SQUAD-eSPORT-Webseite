@@ -95,3 +95,18 @@ async def test_the_public_page_and_the_league_path_carry_result_and_order(flow):
     path = page["team_league"]["path"]
     assert [(item["season_slug"], item["season_result"]) for item in path] == [
         (first["season_slug"], "promoted"), (second["season_slug"], None)]
+
+
+@pytest.mark.asyncio
+async def test_the_overview_lineages_carry_result_and_order(flow):
+    await _board(flow)
+    lineage = await _lineage(flow, tier_order=["Gold", "Silber"])
+    first = await _series(flow, lineage["id"], tier="Silber", status="completed", season_result="promoted")
+    await _series(flow, lineage["id"], season="2026", tier="Gold", status="active")
+    flow.act_as(None)
+    response = await flow.get(f"{PUBLIC}/lineages")
+    assert response.status_code == 200, response.text
+    item = response.json()["items"][0]
+    assert item["lineage"]["tier_order"] == ["Gold", "Silber"]
+    assert [(season["season_slug"], season["season_result"]) for season in item["seasons"]] == [
+        (first["season_slug"], "promoted"), ("2026-gold", None)]

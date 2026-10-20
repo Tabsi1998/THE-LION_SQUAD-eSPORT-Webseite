@@ -288,8 +288,9 @@ async def _running(user: dict | None, today: str) -> dict:
     return {"today": today, "items": items[:RUNNING_LIMIT]}
 
 
-LINEAGE_LIST_FIELDS = ("title", "slug", "kind", "label", "organizer", "game_name")
-PATH_SEASON_FIELDS = ("season", "tier", "title", "season_slug", "status")
+# Reihenfolge der Stufen der Spur und Ergebnis der Saison (#1898): Liga-Weg und Vitrine nutzen sie vor der Ableitung.
+LINEAGE_LIST_FIELDS = ("title", "slug", "kind", "label", "organizer", "game_name", "tier_order")
+PATH_SEASON_FIELDS = ("season", "tier", "title", "season_slug", "status", "season_result")
 
 
 def _natural(value) -> tuple:

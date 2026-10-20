@@ -4,6 +4,8 @@
 
 export const SEASON_RESULT_OPTIONS = [["", "—"], ["promoted", "Aufstieg"], ["relegated", "Abstieg"], ["stayed", "Klassenerhalt"], ["champion", "Meister"]];
 export const SEASON_RESULT_LABELS = Object.fromEntries(SEASON_RESULT_OPTIONS.filter(([value]) => value));
+// Farbe des Vermerks im Liga-Weg - auf der Übersicht und auf der Team-Liga-Seite gleich. Ohne Eintrag: leise (grau).
+export const SEASON_NOTE_TONES = { Aufstieg: "text-ok", Meister: "text-honor", läuft: "text-brand" };
 
 // Wörter, nach denen die Nummer einer Stufe steht („Division 2“, „Liga 1“, „Div. 3“). Groß- und Kleinschreibung egal.
 const TIER_WORDS = new Set(["liga", "division", "div", "stufe", "tier", "league"]);

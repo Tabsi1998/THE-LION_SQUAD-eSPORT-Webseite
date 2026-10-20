@@ -2,12 +2,13 @@ import { Link } from "react-router-dom";
 import { seriesAddress } from "@/lib/referenceSeries";
 import { KIND_LABELS, leaguePath } from "@/lib/referencesOverview";
 import { SectionHead } from "@/components/tls/references/overviewParts";
+import { SEASON_NOTE_TONES } from "@/lib/seriesTiers";
 
 // Serien & Ligen (#1878): je Spur eine Karte mit ihrem Liga-Weg - jede sichtbare Saison mit Stufe, unserem Platz und dem
-// Vermerk (Aufstieg, Abstieg, läuft). Die laufende Saison ist hervorgehoben, die Karte führt zur Serienseite (laufende,
+// Vermerk (Aufstieg, Abstieg, Meister, Klassenerhalt, läuft - zuerst das „Ergebnis der Saison“, #1898). Die laufende Saison ist hervorgehoben, die Karte führt zur Serienseite (laufende,
 // sonst neueste Saison). Die Daten kommen gesammelt aus /api/reference-series/public/lineages, ohne Namen.
 
-const NOTE_TONES = { Aufstieg: "text-ok", läuft: "text-brand" };
+const NOTE_TONES = SEASON_NOTE_TONES;
 
 export function SeriesPaths({ lineages, index = 4 }) {
   if (!lineages?.length) return null;
@@ -23,7 +24,7 @@ export function SeriesPaths({ lineages, index = 4 }) {
 
 function LineageCard({ item }) {
   const { lineage } = item;
-  const path = leaguePath(item.seasons);
+  const path = leaguePath(item.seasons, lineage.tier_order);
   const kind = [KIND_LABELS[lineage.kind], lineage.organizer].filter(Boolean).join(" · ");
   const card = (
     <>

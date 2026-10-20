@@ -1,5 +1,6 @@
 import { bestPlacement, entriesOf, entryPeople, gameKey, gameTitle, hasMember, memberEntryOf, referenceInstant, timeOf } from "@/components/tls/references/referenceParts";
 import { dayNoon, viennaDate, viennaDay } from "@/lib/vienna";
+import { seasonNote, tierRank } from "@/lib/seriesTiers";
 
 // Referenzen-Übersicht (#1878): die Logik hinter Ehrentafel, Vitrine, Liga-Weg und Chronik - ohne Oberfläche, damit
 // sie für sich getestet ist. Gerechnet wird nur Anzeige: Platzierungen, Medaillen und Stände kommen vom Server.
@@ -8,55 +9,9 @@ export const KIND_LABELS = { series: "Turnierserie", racing: "Rennliga", team_le
 
 // ---------------------------------------------------------------- Stufe
 
-// Wörter, nach denen die Nummer einer Stufe steht („Division 2“, „Liga 1“, „Div. 3“). Groß- und Kleinschreibung egal.
-const TIER_WORDS = new Set(["liga", "division", "div", "stufe", "tier", "league"]);
-
-/** Der Name in Wörter und Zahlen zerlegt - linear, Zeichen für Zeichen; Punkte bleiben als eigenes Stück stehen. */
-function tierTokens(text) {
-  const tokens = [];
-  let current = "";
-  for (const char of String(text || "")) {
-    if (/[\p{L}\p{N}]/u.test(char)) {
-      current += char;
-      continue;
-    }
-    if (current) tokens.push(current);
-    current = "";
-    if (char === ".") tokens.push(".");
-  }
-  if (current) tokens.push(current);
-  return tokens;
-}
-
-/** Eine Stufennummer: nur Ziffern, 1 bis 999 - eine vierstellige Jahreszahl ist keine Stufe, „4v4“ auch nicht. */
-function tierNumber(token) {
-  if (!token || token.length > 3 || ![...token].every((char) => char >= "0" && char <= "9")) return null;
-  const value = Number(token);
-  return value > 0 ? value : null;
-}
-
-/**
- * Rang einer Stufe aus ihrem Namen, kleiner ist höher: die Zahl direkt nach einem Stufenwort („4v4 Division 2“ → 2,
- * „Saison 2026 – Liga 1“ → 1), sonst eine Ordnungszahl direkt davor („1. Liga“ → 1). Spielformate (4v4, 2x2) und
- * Jahreszahlen zählen nicht. Ohne Treffer ist die Stufe nicht vergleichbar und steht ganz unten (Infinity) - dann gibt
- * es weder Auf- noch Abstieg.
- */
-export function tierRank(text) {
-  const tokens = tierTokens(text);
-  const words = tokens.map((token) => token.toLowerCase());
-  for (let index = 0; index < tokens.length; index += 1) {
-    if (!TIER_WORDS.has(words[index])) continue;
-    const next = tokens[index + 1] === "." ? tokens[index + 2] : tokens[index + 1];
-    const after = tierNumber(next);
-    if (after) return after;
-  }
-  for (let index = 2; index < tokens.length; index += 1) {
-    if (!TIER_WORDS.has(words[index]) || tokens[index - 1] !== ".") continue;
-    const before = tierNumber(tokens[index - 2]);
-    if (before) return before;
-  }
-  return Infinity;
-}
+// Rang einer Stufe (kleiner ist höher) und Vermerk einer Saison kommen aus lib/seriesTiers (#1898): zuerst das „Ergebnis
+// der Saison“ und die Reihenfolge der Stufen der Spur, erst dann die Zahl im Stufennamen.
+export { tierRank };
 
 /** Je Referenz die Saison und Spur, zu der sie gehört (aus dem Endpunkt „Serien und Ligen“). */
 export function linkedSeasons(lineages) {
@@ -92,7 +47,7 @@ export function pickShowcase(items, showcase, linked = null) {
     const pinned = list.find((item) => item.id === showcase.reference_id);
     if (pinned) return pinned;
   }
-  const rank = (item) => [tierRank(tierOf(item, linked)), bestPlacement(item) || 99, -timeOf(item)];
+  const rank = (item) => [tierRank(tierOf(item, linked), linked?.get(item.id)?.lineage?.tier_order), bestPlacement(item) || 99, -timeOf(item)];
   return list.slice().sort((a, b) => {
     const left = rank(a);
     const right = rank(b);
@@ -216,21 +171,23 @@ export function chronicleCount(shown, total) {
 
 /**
  * Der Liga-Weg einer Spur aus ihren Saisons (in Reihenfolge): je Saison der Vermerk - „läuft“ für die laufende, sonst
- * „Aufstieg“ oder „Abstieg“, wenn die nächste Saison eine vergleichbare höhere bzw. tiefere Stufe hat. Gibt es in einer
- * Saison mehrere Stufen, bleibt der Übergang ohne Vermerk. Dazu die Zusammenfassung und die Saison für den Link.
+ * das „Ergebnis der Saison“ aus der Verwaltung (Aufstieg, Abstieg, Klassenerhalt, Meister; #1898). Ohne Vermerk
+ * „Aufstieg“ oder „Abstieg“, wenn die nächste Saison eine vergleichbare höhere bzw. tiefere Stufe hat - nach der
+ * Reihenfolge der Stufen der Spur (`tierOrder`), sonst nach der Zahl im Namen. Gibt es in einer Saison mehrere Stufen,
+ * bleibt dieser abgeleitete Übergang ohne Vermerk. Dazu die Zusammenfassung und die Saison für den Link.
  */
-export function leaguePath(seasons) {
+export function leaguePath(seasons, tierOrder = null) {
   const list = seasons || [];
   const perSeason = new Map();
   for (const item of list) perSeason.set(item.season, (perSeason.get(item.season) || 0) + 1);
   const steps = list.map((item, index) => {
     const current = item.status === "active";
-    let note = current ? "läuft" : "";
     const next = list[index + 1];
-    if (!note && next && next.season !== item.season && perSeason.get(item.season) === 1 && perSeason.get(next.season) === 1) {
-      const from = tierRank(item.tier);
-      const to = tierRank(next.tier);
-      if (Number.isFinite(from) && Number.isFinite(to) && from !== to) note = to < from ? "Aufstieg" : "Abstieg";
+    let note = "";
+    if (current) note = "läuft";
+    else if (item.season_result) note = seasonNote(item, next, tierOrder);
+    else if (next && next.season !== item.season && perSeason.get(item.season) === 1 && perSeason.get(next.season) === 1) {
+      note = seasonNote(item, next, tierOrder);
     }
     return { ...item, note, current };
   });
@@ -260,7 +217,7 @@ export function honorStats({ summary = {}, items = [], lineages = [] }) {
     total: summary.total || 0,
     games: summary.games || 0,
     running: seasons.filter((item) => item.status === "active").length,
-    promotions: lineages.reduce((sum, item) => sum + leaguePath(item.seasons).promotions, 0),
+    promotions: lineages.reduce((sum, item) => sum + leaguePath(item.seasons, item.lineage?.tier_order).promotions, 0),
     since: years[0] || "",
   };
 }
