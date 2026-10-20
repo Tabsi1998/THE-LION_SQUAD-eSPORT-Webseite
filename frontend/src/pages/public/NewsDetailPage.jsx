@@ -12,6 +12,7 @@ import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
 import { RichContent } from "@/components/tls/RichContent";
 import { VideoEmbed } from "@/components/tls/VideoEmbed";
 import { NewsTextCard } from "@/components/tls/NewsTextCard";
+import { NewsSignupCards, signupItems } from "@/components/tls/NewsSignupCard";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useCanonicalSlugRedirect } from "@/hooks/useCanonicalSlugRedirect";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
@@ -26,6 +27,7 @@ import { asInstant, viennaDate } from "@/lib/vienna";
 // dem Text. Eine Überschrift, die im Text den Titel wiederholt, fällt weg.
 
 const WORDS_PER_MINUTE = 200;
+const PROSE = "prose prose-invert prose-lg xl:prose-xl max-w-none text-white/85 prose-headings:font-heading prose-headings:uppercase prose-a:text-[#29B6E8]";
 
 // Tags weg, bis keine mehr übrig sind (#1408) - der Wert wird nur verglichen, nie angezeigt.
 function withoutTags(value) {
@@ -51,6 +53,24 @@ export function stripLeadingTitle(text, title) {
   if (!match) return source;
   const heading = normalizeTitle(match[1] ?? match[2]);
   return heading === wanted ? source.slice(match[0].length).replace(/^\s+/, "") : source;
+}
+
+// Wo die Anmelde-Karte hinkommt (#1266): nach dem ersten Absatz - bei HTML nach dem ersten </p>, sonst an der ersten
+// Leerzeile (nicht mitten in einem Code-Block). Ohne zweiten Absatz steht alles vorne, die Karte danach.
+export function splitAfterFirstParagraph(text) {
+  const source = String(text || "");
+  const html = source.search(/<\/p>/i);
+  if (html >= 0) {
+    const end = html + "</p>".length;
+    return [source.slice(0, end), source.slice(end).replace(/^\s+/, "")];
+  }
+  for (const match of source.matchAll(/\r?\n[ \t]*\r?\n/g)) {
+    const head = source.slice(0, match.index);
+    if (!head.trim()) continue;
+    if ((head.match(/```/g) || []).length % 2 === 1) continue;
+    return [head, source.slice(match.index + match[0].length).replace(/^\s+/, "")];
+  }
+  return [source, ""];
 }
 
 export function readingMinutes(text) {
@@ -108,6 +128,10 @@ export default function NewsDetailPage() {
   if (!post) return <PublicLayout><PublicLoadingState label="Lade News" /></PublicLayout>;
 
   const content = stripLeadingTitle(post.content, post.title);
+  const mentionNames = (post.mentioned_users || []).map((user) => user.username);
+  // Verknüpfte Turniere und Events mit Anmelde-Stand (#1266): die Karte steht nach dem ersten Absatz.
+  const signups = signupItems(post);
+  const [firstParagraph, restContent] = signups.length ? splitAfterFirstParagraph(content) : [content, ""];
   const others = more.filter((item) => item.slug !== post.slug && item.id !== post.id).slice(0, 4);
   const linked = [
     ...(post.linked_events || []).map((e) => ({ key: `e-${e.id}`, to: `/events/${e.slug}`, icon: Calendar, color: "#9F7AEA", title: e.name, sub: e.start_date ? formatDate(e.start_date, "medium") : "" })),
@@ -156,12 +180,15 @@ export default function NewsDetailPage() {
                 <LazyImg src={post.banner_url} alt="" priority sizes="(min-width: 1024px) 70vw, 100vw" className="w-full h-auto max-h-[38rem] object-cover" />
               </div>
             )}
-            <RichContent
-              text={content}
-              embeds={post.content_embeds || []}
-              validProfileUsernames={(post.mentioned_users || []).map((user) => user.username)}
-              className="mt-8 prose prose-invert prose-lg xl:prose-xl max-w-none text-white/85 prose-headings:font-heading prose-headings:uppercase prose-a:text-[#29B6E8]"
-            />
+            {signups.length > 0 ? (
+              <>
+                <RichContent text={firstParagraph} embeds={post.content_embeds || []} validProfileUsernames={mentionNames} className={`mt-8 ${PROSE}`} />
+                <NewsSignupCards post={post} className="my-8" />
+                {restContent && <RichContent text={restContent} embeds={post.content_embeds || []} validProfileUsernames={mentionNames} className={PROSE} />}
+              </>
+            ) : (
+              <RichContent text={content} embeds={post.content_embeds || []} validProfileUsernames={mentionNames} className={`mt-8 ${PROSE}`} />
+            )}
           </article>
 
           <aside className="space-y-4 lg:sticky lg:top-24" data-testid="news-sidebar">

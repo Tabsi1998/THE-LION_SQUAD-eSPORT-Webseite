@@ -19,6 +19,7 @@ import { offerCalendarHint } from "@/lib/calendarHint";
 import { EventBanner } from "@/components/tls/EventBanner";
 import { PlayAlongSheet } from "@/components/tls/PlayAlongSheet";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
+import { prefersReducedMotion } from "@/hooks/useLiveChanges";
 import { useCanonicalSlugRedirect } from "@/hooks/useCanonicalSlugRedirect";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { useSubmissionGuard } from "@/hooks/useSubmissionGuard";
@@ -186,6 +187,17 @@ export default function EventDetailPage() {
   }, [load]);
 
   useApiInvalidation(load, ["events", "tournaments", "f1", "gallery", "news"]);
+
+  // Aus der News (#1266): ?anmelden=1 öffnet das Anmeldeformular unter „Dein Event“ und springt dorthin - wie der
+  // Knopf im Fakten-Kasten. Gäste sehen dort den Weg zur Anmeldung mit Rückweg. Nur einmal je Aufruf.
+  const wantsSignup = searchParams.get("anmelden") === "1";
+  const signupHandled = useRef(false);
+  useEffect(() => {
+    if (!wantsSignup || signupHandled.current || !e) return;
+    signupHandled.current = true;
+    setRegisterOpen(true);
+    window.requestAnimationFrame?.(() => yoursRef.current?.scrollIntoView?.({ behavior: prefersReducedMotion() ? "auto" : "smooth", block: "start" }));
+  }, [wantsSignup, e]);
 
   if (error) return (
     <PublicLayout>

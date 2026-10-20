@@ -701,6 +701,13 @@ button.tls-bracket-row:active, .tls-bracket-head:active { transform: scale(calc(
 }
 .tls-card:focus-visible .tls-news-textcard__lion { opacity: 1; }
 
+/* Anmelde-Karte in der News (#1266): der Pfeil zeigt beim Drüberfahren ein Stück weiter - wohin es geht. */
+.tls-news-signup__arrow { transition: transform var(--tls-motion-fast) var(--tls-ease); }
+@media (hover: hover) and (pointer: fine) {
+  .tls-news-signup__go:hover .tls-news-signup__arrow { transform: translateX(calc(3px * var(--tls-motion-on))); }
+}
+.tls-news-signup__go:focus-visible .tls-news-signup__arrow { transform: translateX(calc(3px * var(--tls-motion-on))); }
+
 /* ===== Premium rarity frames (animated conic-gradient borders) ===== */
 @property --tls-angle { syntax: "<angle>"; initial-value: 0deg; inherits: false; }
 @keyframes tls-rotate { to { --tls-angle: 360deg; } }

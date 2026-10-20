@@ -81,6 +81,20 @@ test("Anmeldung mit Kosten: Leiste Anmeldung, Bezahlen, Dabei mit dem echten Sta
   expect(await screen.findByTestId("event-register-steps")).toHaveAttribute("aria-label", "Schritt 3 von 3: Dabei");
 });
 
+// Aus der News (#1266): „Anmelden“ führt mit ?anmelden=1 hierher und öffnet das Formular.
+test("?anmelden=1: das Anmeldeformular bekommt den Fokus, ohne den Knopf zu suchen", async () => {
+  authState.user = { id: "u1", username: "paula" };
+  const event = { ...base, status: "registration_open", has_registration: true, public_phase: { state: "registration_open", label: "Anmeldung offen" } };
+  apiMock.get.mockResolvedValue({ data: event });
+  render(
+    <MemoryRouter initialEntries={["/events/ausflug?anmelden=1"]}>
+      <Routes><Route path="/events/:slug" element={<EventDetailPage />} /></Routes>
+    </MemoryRouter>,
+  );
+  const form = await screen.findByTestId("event-register-form");
+  await waitFor(() => expect(form.contains(document.activeElement)).toBe(true));
+});
+
 test("Anmeldung ohne Kosten: keine Leiste", async () => {
   renderPage({ ...base, has_registration: true, own_registration: { id: "r1", status: "registered", seat_count: 1 } });
   expect(await screen.findByTestId("event-own-status")).toHaveTextContent("Du bist dabei");

@@ -149,3 +149,62 @@ async def test_home_lead_without_pinned_news_is_the_newest(flow):
     await news(flow, "vorgestern", days_ago=2)
     flow.act_as(None)
     assert [n["slug"] for n in (await flow.get("/api/home/state")).json()["featured_news"]] == ["gestern"]
+
+
+# ---------------------------------------------------------------- #1266 Weg zur Anmeldung
+
+def soon(days):
+    return (now_utc() + timedelta(days=days)).isoformat()
+
+
+async def linked_signups(flow, post_slug):
+    body = (await flow.get(f"/api/news/{post_slug}")).json()
+    return {t["slug"]: t["signup"] for t in body.get("linked_tournaments") or []} | {e["slug"]: e["signup"] for e in body.get("linked_events") or []}
+
+
+@pytest.mark.asyncio
+async def test_linked_tournaments_carry_their_signup_state(flow):
+    offen = await flow.create_tournament(slug="offen", start_date=soon(7), max_participants=8)
+    voll = await flow.create_tournament(slug="voll", start_date=soon(7), max_participants=2)
+    laeuft = await flow.create_tournament(slug="laeuft", status="live", start_date=soon(-1))
+    fertig = await flow.create_tournament(slug="fertig", status="results_published", start_date=soon(-5))
+    bald = await flow.create_tournament(slug="bald", status="scheduled", start_date=soon(20), registration_open_from=soon(3))
+    for tournament, count in ((offen, 3), (voll, 2)):
+        for index in range(count):
+            await flow.register(tournament, await flow.add_user(name=f"{tournament['slug']}-{index}"))
+    await flow.register(offen, await flow.add_user(name="wartet"), status="pending")
+    await news(flow, "ankuendigung", linked_tournament_ids=[t["id"] for t in (offen, voll, laeuft, fertig, bald)])
+
+    flow.act_as(None)
+    signups = await linked_signups(flow, "ankuendigung")
+    assert signups["offen"]["state"] == "open"
+    assert (signups["offen"]["taken"], signups["offen"]["max"], signups["offen"]["spots_left"]) == (3, 8, 5)
+    assert signups["offen"]["start_date"] == offen["start_date"]
+    assert signups["voll"]["state"] == "full"
+    assert signups["voll"]["spots_left"] == 0
+    assert signups["laeuft"]["state"] == "live"
+    assert signups["fertig"]["state"] == "results"
+    assert signups["bald"]["state"] == "soon"
+    assert signups["bald"]["opens_at"] == bald["registration_open_from"]
+
+
+@pytest.mark.asyncio
+async def test_linked_events_carry_their_signup_state(flow):
+    start = soon(14)
+    await flow.db.events.insert_many([
+        {"id": "e-offen", "slug": "lan", "name": "LAN", "status": "registration_open", "visibility": "public", "start_date": start, "has_registration": True, "max_participants": 3},
+        {"id": "e-voll", "slug": "voll", "name": "Voll", "status": "registration_open", "visibility": "public", "start_date": start, "has_registration": True, "max_participants": 1},
+        {"id": "e-ohne", "slug": "ohne", "name": "Ohne Anmeldung", "status": "scheduled", "visibility": "public", "start_date": start},
+    ])
+    await flow.db.event_registrations.insert_many([
+        {"id": "r1", "event_id": "e-offen", "user_id": "u1", "status": "registered"},
+        {"id": "r2", "event_id": "e-voll", "user_id": "u2", "status": "registered"},
+    ])
+    await news(flow, "lan-news", linked_event_ids=["e-offen", "e-voll", "e-ohne"])
+
+    flow.act_as(None)
+    signups = await linked_signups(flow, "lan-news")
+    assert signups["lan"]["state"] == "open"
+    assert (signups["lan"]["taken"], signups["lan"]["max"], signups["lan"]["spots_left"]) == (1, 3, 2)
+    assert signups["voll"]["state"] == "full"
+    assert signups["ohne"]["state"] == "none"

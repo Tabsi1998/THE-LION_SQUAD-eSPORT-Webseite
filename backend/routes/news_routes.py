@@ -9,7 +9,7 @@ from auth import get_optional_user, require_area
 from services.permissions import is_confirmed_admin_role
 from services.visibility import user_can_see, filter_visible
 from services.content_embed_service import resolve_content_embeds
-from services.news_cards import attach_result_winners
+from services.news_cards import attach_result_winners, event_signup, tournament_signup
 from services.sponsor_utils import dedupe_public_sponsors, public_sponsor_view
 from services import partner_pages, sponsor_images
 from services.notification_preferences import enqueue_newsletter_for_item
@@ -34,6 +34,10 @@ def _is_staff(user: dict | None) -> bool:
     Zwei-Faktor-Anmeldung (#1469). Für Empfänger einer Meldung (Konten aus der Datenbank) gilt die Rolle allein."""
     return is_confirmed_admin_role(user, STAFF_ROLES)
 
+
+# Kurzform verknüpfter Turniere und Events im Beitrag - wie bisher, dazu `signup` (#1266).
+LINKED_EVENT_FIELDS = ("id", "name", "slug", "start_date", "status", "visibility")
+LINKED_TOURNAMENT_FIELDS = ("id", "title", "slug", "start_date", "status", "visibility", "is_public")
 
 MENTION_RE = re.compile(r"@([A-Za-z0-9_.-]{2,32})")
 PROFILE_LINK_RE = re.compile(r"/u/([A-Za-z0-9_.-]{2,32})")
@@ -480,15 +484,18 @@ async def get_news(slug_or_id: str, user: dict | None = Depends(get_optional_use
     # Resolve linked entities
     db = get_db()
     if p.get("linked_event_ids"):
-        items = await db.events.find(
-            {"id": {"$in": p["linked_event_ids"]}}, {"_id": 0, "id": 1, "name": 1, "slug": 1, "start_date": 1, "status": 1, "visibility": 1},
-        ).to_list(50)
-        p["linked_events"] = await _filter_linked_items(items, user, is_staff, "event")
+        # Ganze Dokumente für den Anmelde-Stand (#1266), nach außen nur die Kurzform mit `signup`.
+        items = await db.events.find({"id": {"$in": p["linked_event_ids"]}}, {"_id": 0}).to_list(50)
+        p["linked_events"] = [
+            {**{k: item.get(k) for k in LINKED_EVENT_FIELDS}, "signup": await event_signup(db, item)}
+            for item in await _filter_linked_items(items, user, is_staff, "event")
+        ]
     if p.get("linked_tournament_ids"):
-        items = await db.tournaments.find(
-            {"id": {"$in": p["linked_tournament_ids"]}}, {"_id": 0, "id": 1, "title": 1, "slug": 1, "start_date": 1, "status": 1, "visibility": 1, "is_public": 1},
-        ).to_list(50)
-        p["linked_tournaments"] = await _filter_linked_items(items, user, is_staff, "tournament")
+        items = await db.tournaments.find({"id": {"$in": p["linked_tournament_ids"]}}, {"_id": 0}).to_list(50)
+        p["linked_tournaments"] = [
+            {**{k: item.get(k) for k in LINKED_TOURNAMENT_FIELDS}, "signup": await tournament_signup(db, item)}
+            for item in await _filter_linked_items(items, user, is_staff, "tournament")
+        ]
     if p.get("linked_f1_challenge_ids"):
         items = await db.f1_challenges.find(
             {"id": {"$in": p["linked_f1_challenge_ids"]}}, {"_id": 0, "id": 1, "title": 1, "slug": 1, "start_date": 1, "status": 1, "visibility": 1, "registration_enabled": 1, "online_registration_enabled": 1, "registration_open_from": 1, "registration_open_until": 1},
