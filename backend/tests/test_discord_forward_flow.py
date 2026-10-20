@@ -158,6 +158,21 @@ async def test_messages_count_per_server_and_the_achievement_counter_is_one_acro
 
 
 @pytest.mark.asyncio
+async def test_the_total_of_active_accounts_only_counts_servers_the_overview_shows(flow, bot):
+    await setup(flow, bot)
+    paula = await flow.add_user(role="player", name="paula")
+    nur_f1 = await flow.add_user(role="player", name="nur_f1")
+    for guild_id, user in ((MAIN, paula), (RL, paula), (F1, paula), (F1, nur_f1)):
+        await discord_stats.note_message(flow.db, guild_id, user["id"], moment=NOON)
+    # F1 wird verlassen: die Übersicht zeigt den Server nicht mehr, die Gesamtzahl darf ihn nicht mitzählen (#981).
+    await discord_guilds.reconcile(flow.db, [seen(MAIN, "LION", 120), seen(RL, "Rocket League", 40)], configured_main=MAIN)
+    data = await discord_stats.overview(flow.db, now=NOON)
+    assert sorted(row["name"] for row in data["servers"]) == ["LION", "Rocket League"]
+    assert data["total"]["active"] == {"7": 1, "30": 1}, "Paula zählt einmal, das Konto nur auf dem verlassenen Server gar nicht"
+    assert data["total"]["messages"]["7"] == 2
+
+
+@pytest.mark.asyncio
 async def test_the_windows_count_days_and_old_activity_rows_are_removed(flow, bot):
     await setup(flow, bot)
     paula = await flow.add_user(role="player", name="paula")

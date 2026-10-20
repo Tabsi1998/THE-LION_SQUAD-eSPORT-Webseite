@@ -61,14 +61,16 @@ async def purge_old(db, *, now=None) -> int:
     return int(getattr(result, "deleted_count", 0) or 0)
 
 
-async def _active_counts(db, since: str) -> tuple[dict[str, int], int]:
-    """Verschiedene verknüpfte Konten seit ``since``: je Server und über alle Server zusammen (jedes Konto einmal)."""
+async def _active_counts(db, since: str, guild_ids: set[str]) -> tuple[dict[str, int], int]:
+    """Verschiedene verknüpfte Konten seit ``since``: je Server und über alle Server zusammen (jedes Konto einmal).
+    Gezählt wird nur auf den Servern ``guild_ids`` - denselben, die die Übersicht zeigt (#981)."""
     per_guild: dict[str, int] = {}
-    pipeline = [{"$match": {"day": {"$gte": since}}}, {"$group": {"_id": {"guild": "$guild_id", "user": "$user_id"}}},
+    match = {"day": {"$gte": since}, "guild_id": {"$in": sorted(guild_ids)}}
+    pipeline = [{"$match": match}, {"$group": {"_id": {"guild": "$guild_id", "user": "$user_id"}}},
                 {"$group": {"_id": "$_id.guild", "count": {"$sum": 1}}}]
     async for row in db[ACTIVE].aggregate(pipeline):
         per_guild[str(row["_id"])] = int(row["count"])
-    everyone = [{"$match": {"day": {"$gte": since}}}, {"$group": {"_id": "$user_id"}}, {"$count": "count"}]
+    everyone = [{"$match": match}, {"$group": {"_id": "$user_id"}}, {"$count": "count"}]
     total = 0
     async for row in db[ACTIVE].aggregate(everyone):
         total = int(row["count"])
@@ -92,13 +94,13 @@ async def overview(db, *, now=None) -> dict:
     by_guild: dict[str, dict[str, dict]] = {}
     for row in rows:
         by_guild.setdefault(str(row.get("guild_id")), {})[str(row.get("day"))] = row
-    active = {window: await _active_counts(db, since[window]) for window in WINDOWS}
+    # Dieselbe Servermenge für die Liste und die Gesamtzahlen: verlassene Server zählen nirgends (#981).
+    shown = [guild for guild in await discord_guilds.list_guilds(db) if not guild.get("left_at")]
+    active = {window: await _active_counts(db, since[window], {str(guild["guild_id"]) for guild in shown}) for window in WINDOWS}
 
     servers = []
     total = {"messages": _empty(), "joins": _empty(), "leaves": _empty(), "active": {str(window): active[window][1] for window in WINDOWS}}
-    for guild in await discord_guilds.list_guilds(db):
-        if guild.get("left_at"):
-            continue
+    for guild in shown:
         guild_id = str(guild["guild_id"])
         own = by_guild.get(guild_id, {})
         entry = {"guild_id": guild_id, "name": guild.get("name") or "Server", "role": guild.get("role"), "enabled": bool(guild.get("enabled")),
