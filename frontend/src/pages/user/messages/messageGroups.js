@@ -37,7 +37,7 @@ export function buildTimeline(messages, meId, now = new Date()) {
       lastDay = day;
       previous = null;
     }
-    const previousStamp = previous ? new Date(previous.created_at || 0).getTime() : null;
+    const previousStamp = previous ? asInstant(previous.created_at || 0).getTime() : null;
     const sameSender = previous && previous.sender_id === message.sender_id;
     const closeInTime = previousStamp !== null && stamp - previousStamp <= GROUP_WINDOW_MS;
     items.push({
