@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.6.2](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/compare/v1.6.1...v1.6.2) (2026-10-20)
+
+
+### Fehlerbehebungen
+
+* „Nicht erschienen“ im Lauf wertet nicht mehr den ganzen Lauf – der Lauf bleibt offen, die Person steht nach dem Eintragen hinten ([#1823](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1823)) ([2b75892](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/2b75892022caf39008603f3f14b15dbf2012a714))
+* Austritt bei Show-Auslosung je Weg rückt beide Wege nach einer Regel auf, Korrektur findet jeden Platz ([#1848](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1848), [#1849](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1849)) ([5d9803c](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/5d9803c25397c353f939f02ce2d51a6bb098e81f))
+* Baum und TV zeigen „nicht erschienen“ im offenen Lauf ([#1823](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1823)) ([2b75892](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/2b75892022caf39008603f3f14b15dbf2012a714))
+* Ergebnis-Fenster belegt „nicht erschienen“ im Lauf vor ([#1823](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1823)) ([2b75892](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/2b75892022caf39008603f3f14b15dbf2012a714))
+* Ist nur der Lauf des Ersten schon aufgerufen, behält der Zweite nach dessen Austritt seinen Platz ([#1839](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1839)) ([5d9803c](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/5d9803c25397c353f939f02ce2d51a6bb098e81f))
+* Lauf mit Loser Bracket nach Austritt wieder eintragbar ([#1823](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1823)) ([2b75892](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/2b75892022caf39008603f3f14b15dbf2012a714))
+* Nachrücker nach Austritt sitzt im Läufe-Cup mit Loser Bracket nur in einem Lauf ([#1839](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1839)) ([5d9803c](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/5d9803c25397c353f939f02ce2d51a6bb098e81f))
+* Show-Auslosung und „Neu auslosen“ lassen Ausgetretene aus dem Topf ([#1839](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1839)) ([5d9803c](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/5d9803c25397c353f939f02ce2d51a6bb098e81f))
+* Turnierleitung meldet „Lauf bleibt offen“ statt „kampflos“ ([#1823](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1823)) ([2b75892](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/2b75892022caf39008603f3f14b15dbf2012a714))
+
 ## 1.6.1 (20.10.2026)
 
 ### Fehlerbehebungen
