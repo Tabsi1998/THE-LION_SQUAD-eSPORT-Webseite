@@ -527,6 +527,25 @@ async def test_a_busy_other_season_keeps_its_data_whole_and_catches_up_on_its_ne
 
 
 @pytest.mark.asyncio
+async def test_archiving_and_restoring_a_season_wait_for_its_lock(flow, monkeypatch):
+    monkeypatch.setattr(reference_series, "SERIES_WAIT_SECONDS", 0.05)
+    ctx = await _setup(flow)
+    sid = ctx["own"]["id"]
+    await _hold_lock(flow, sid)
+    busy = await flow.post(f"{ADMIN}/series/{sid}/archive")
+    assert busy.status_code == 409 and busy.json()["detail"] == reference_series.SERIES_BUSY
+    assert (await flow.db.reference_series.find_one({"id": sid}))["status"] != "archived"
+
+    await flow.db.mutation_locks.delete_many({"owner": "anderer-worker"})
+    assert (await flow.post(f"{ADMIN}/series/{sid}/archive")).json()["status"] == "archived"
+    await _hold_lock(flow, sid)
+    assert (await flow.post(f"{ADMIN}/series/{sid}/restore")).status_code == 409
+    assert (await flow.db.reference_series.find_one({"id": sid}))["status"] == "archived"
+    await flow.db.mutation_locks.delete_many({"owner": "anderer-worker"})
+    assert (await flow.post(f"{ADMIN}/series/{sid}/restore")).json()["status"] != "archived"
+
+
+@pytest.mark.asyncio
 async def test_unknown_names_become_open_participants_and_a_confirmed_alias_assigns_at_once(flow):
     ctx = await _setup(flow)
     await flow.db.club_member_profiles.insert_one({"id": "p-dora", "display_name": "Dora Probe", "is_active": True})

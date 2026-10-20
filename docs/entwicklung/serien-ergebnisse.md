@@ -54,8 +54,8 @@ nach der Runde). Team-Liga: `matches` mit `home`, `away`, Ergebnis, `maps` und `
   Sperre `series:<id>` (`services/mutation_lock.py`, `reference_series.series_write`, Wartezeit wie bei Turnieren).
   Darin: Versionsprüfung, Schreiben, Termin-Status, Teilnehmer aufräumen und einmal Neurechnen. Ist die Sperre zu
   lange besetzt: 409 „In dieser Saison wird gerade schon etwas gespeichert …“. Ebenso unter der Sperre: Teilnehmer
-  anlegen, bearbeiten und zuordnen (#1743) und Regeln der Saison ändern - alles, was Stände rechnet, rechnet also
-  nacheinander.
+  anlegen, bearbeiten und zuordnen (#1743), Regeln der Saison ändern und die Saison archivieren oder zurückholen -
+  alles, was Stände rechnet oder die Saison schließt, läuft also nacheinander.
 - **Zuordnung in anderen Saisons:** Zieht ein Alias andere Saisons mit, ändert die Zuordnung dort erst nach Freigabe
   der eigenen Sperre etwas – je Saison unter deren Sperre, Teilnehmer folgen und Neurechnen zusammen
   (`reference_series.follow_alias_elsewhere`), nie zwei Sperren ineinander. Ist eine Saison gerade besetzt, bleibt die
