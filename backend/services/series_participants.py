@@ -9,6 +9,10 @@
   angelegt hat: nur, wenn sie noch offen sind (keine Zuordnung, kein Alias) und in keinem Ergebnisblatt der Saison
   vorkommen. Aufrufen nur unter der Sperre der Saison (``reference_series.series_write``) - dann schreibt kein Blatt
   dazwischen; was der Vorstand dazwischen zuordnet, schützt der Löschfilter selbst.
+- **Einem Alias folgen** (``move_followers``, ``apply_alias``, ``follow_alias``): wer über einen Alias zugeordnet
+  war, folgt seiner Korrektur; offene Teilnehmer mit demselben Namen werden zugeordnet. Immer nur in den genannten
+  Saisons und unter deren Sperre - die eigene Saison beim Zuordnen, jede andere danach unter ihrer eigenen
+  (``follow_alias``; ist sie besetzt, merkt sich die Saison den Nachtrag in ``alias_followups``).
 """
 from __future__ import annotations
 
@@ -182,3 +186,88 @@ async def remove_unused_new(db, series_id: str, candidate_ids) -> list[dict]:
     kept = {row["id"] async for row in db.reference_participants.find(
         {"series_id": series_id, "id": {"$in": ids}}, {"_id": 0, "id": 1})}
     return [row for row in gone if row["id"] not in kept]
+
+
+# ---------------------------------------------------------------- Einem Alias folgen
+EXTERNAL_LINK = {"link": "external", "profile_id": None, "guest_name": None, "is_club_member": False}
+
+
+async def move_followers(db, alias_id: str, link: dict, me: dict, skip_id: str, series_ids: list[str]) -> list[str]:
+    """Wer in ``series_ids`` über diesen Alias von selbst zugeordnet wurde (``link_source`` „alias“), folgt seiner
+    Korrektur; einzeln bestätigte Zuordnungen bleiben. Bei „Extern“ ist der Alias weg - die Teilnehmer werden extern
+    und behalten die Spur, dass ein Alias zurückgenommen wurde. Liefert die Teilnehmer."""
+    rows = await db.reference_participants.find(
+        {"alias_id": alias_id, "link_source": "alias", "id": {"$ne": skip_id}, "series_id": {"$in": series_ids}},
+        {"_id": 0, "id": 1}).to_list(None)
+    if not rows:
+        return []
+    now = now_utc().isoformat()
+    withdrawn = link["link"] == "external"
+    await db.reference_participants.update_many({"id": {"$in": [row["id"] for row in rows]}}, {"$set": {
+        **link, "link_status": "decided", "link_source": "alias_withdrawn" if withdrawn else "alias",
+        "alias_id": None if withdrawn else alias_id, "decided_at": now, "decided_by": me["id"],
+        "updated_at": now, "updated_by": me["id"]}})
+    return sorted(row["id"] for row in rows)
+
+
+async def follower_series(db, alias_id: str, skip_id: str) -> set[str]:
+    """Saisons mit Teilnehmern, die über diesen Alias zugeordnet sind."""
+    return set(await db.reference_participants.distinct(
+        "series_id", {"alias_id": alias_id, "link_source": "alias", "id": {"$ne": skip_id}}))
+
+
+async def _open_targets(db, alias: dict, skip_id: str, series_ids: list[str] | None = None) -> list[dict]:
+    """Offene Teilnehmer mit dem Namen des Alias in Serien desselben Spiels (ein Alias für alle Spiele tritt hinter
+    einen spielgebundenen mit demselben Namen zurück, wie ``exact_alias``)."""
+    query = {"name_normalized": alias["name_normalized"], "link_status": "open", "id": {"$ne": skip_id}}
+    if series_ids is not None:
+        query["series_id"] = {"$in": series_ids}
+    rows = await db.reference_participants.find(query, {"_id": 0, "id": 1, "series_id": 1}).to_list(None)
+    if not rows:
+        return []
+    allowed = {row["series_id"] for row in rows}
+    if alias.get("game_id"):
+        lineages = [row["id"] async for row in db.reference_lineages.find({"game_id": alias["game_id"]},
+                                                                          {"_id": 0, "id": 1})]
+        allowed = {row["id"] async for row in db.reference_series.find(
+            {"id": {"$in": sorted(allowed)}, "lineage_id": {"$in": lineages}}, {"_id": 0, "id": 1})}
+    else:
+        bound_games = await db.reference_aliases.distinct(
+            "game_id", {"name_normalized": alias["name_normalized"], "game_id": {"$ne": None}})
+        if bound_games:
+            lineages = [row["id"] async for row in db.reference_lineages.find(
+                {"game_id": {"$in": bound_games}}, {"_id": 0, "id": 1})]
+            allowed -= {row["id"] async for row in db.reference_series.find(
+                {"id": {"$in": sorted(allowed)}, "lineage_id": {"$in": lineages}}, {"_id": 0, "id": 1})}
+    return [row for row in rows if row["series_id"] in allowed]
+
+
+async def open_series(db, alias: dict, skip_id: str) -> set[str]:
+    """Saisons mit offenen Teilnehmern, die dieser Alias zuordnen würde."""
+    return {row["series_id"] for row in await _open_targets(db, alias, skip_id)}
+
+
+async def apply_alias(db, alias: dict, me: dict, skip_id: str, series_ids: list[str]) -> list[str]:
+    """Offene Teilnehmer mit demselben Namen in ``series_ids`` gleich zuordnen. Liefert die Teilnehmer."""
+    ids = [row["id"] for row in await _open_targets(db, alias, skip_id, series_ids)]
+    if not ids:
+        return []
+    now = now_utc().isoformat()
+    await db.reference_participants.update_many({"id": {"$in": ids}}, {"$set": {
+        **link_fields(alias), "link_status": "decided", "link_source": "alias", "alias_id": alias["id"],
+        "decided_at": now, "decided_by": me["id"], "updated_at": now, "updated_by": me["id"]}})
+    return sorted(ids)
+
+
+async def follow_alias(db, series_id: str, followup: dict) -> list[str]:
+    """Eine Zuordnung in einer anderen Saison nachziehen - unter deren Sperre aufrufen. Gilt der Alias noch, folgen ihm
+    die über ihn zugeordneten Teilnehmer, und offene mit dem Namen werden zugeordnet; ist er zurückgenommen, werden
+    seine Teilnehmer extern. ``followup``: ``alias_id``, ``skip_id`` (der eben zugeordnete Teilnehmer),
+    ``requested_by``. Liefert die geänderten Teilnehmer."""
+    me = {"id": followup.get("requested_by")}
+    skip_id = followup.get("skip_id") or ""
+    alias = await db.reference_aliases.find_one({"id": followup.get("alias_id")}, {"_id": 0})
+    if alias is None:
+        return await move_followers(db, followup.get("alias_id"), EXTERNAL_LINK, me, skip_id, [series_id])
+    moved = await move_followers(db, alias["id"], link_fields(alias), me, skip_id, [series_id])
+    return moved + await apply_alias(db, alias, me, skip_id, [series_id])

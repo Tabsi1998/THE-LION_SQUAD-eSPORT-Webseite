@@ -11,35 +11,64 @@ oder Saisonpunkte, und keine Sammlung wird mit dem Turnierbereich geteilt.
   rechnet ``recompute_standings`` alle Stände der Serie aus Kalender, veröffentlichten Blättern und Teilnehmern -
   öffentliche Seiten lesen nur den gespeicherten Stand.
 - **Nacheinander** (``series_write``, ``series_locked``): alles, was Stände einer Saison neu rechnet - Ergebnisse
-  speichern, freigeben, verwerfen, alle Kalender-Änderungen, Teilnehmer anlegen und zuordnen, Regeln ändern - läuft
-  unter einer Sperre je Saison (``services/mutation_lock.py``), samt Versionsprüfung, Termin-Status, Aufräumen und
-  Neurechnen. So rechnet nie ein älterer Stand über einen neueren. Zieht ein Vorgang andere Saisons mit (ein Alias
-  ordnet dort zu), werden deren Stände danach je Saison unter ihrer eigenen Sperre neu gerechnet
-  (``recompute_locked``) - nie zwei Sperren ineinander, also keine gegenseitige Blockade.
+  speichern, freigeben, verwerfen, alle Kalender-Änderungen, Teilnehmer anlegen und zuordnen, Regeln ändern,
+  archivieren und zurückholen - läuft unter einer Sperre je Saison (``services/mutation_lock.py``), samt
+  Versionsprüfung, Termin-Status, Aufräumen und Neurechnen. So rechnet nie ein älterer Stand über einen neueren.
+- **Andere Saisons** (``follow_alias_elsewhere``): Zieht eine Zuordnung über den Alias andere Saisons mit, ändert sie
+  dort erst nach Freigabe der eigenen Sperre etwas - je Saison unter deren Sperre, Änderung und Neurechnen zusammen,
+  nie zwei Sperren ineinander. Ist eine Saison gerade besetzt, merkt sie sich den Nachtrag (``alias_followups``), und
+  der nächste Vorgang unter ihrer Sperre zieht ihn nach (``series_write``) - nie halbe Daten in einer Saison.
 """
 from __future__ import annotations
 
 import functools
 import inspect
+import logging
 from contextlib import asynccontextmanager
 
 from fastapi import HTTPException
 
 from database import get_db
 from models import new_id, now_utc
+from services import series_participants
 from services.mutation_lock import MutationLockBusy, mutation_lock, series_write_resource
 from services.scoring_rules import normalize_rules
 from services.series_standings import compute_standings
 
+logger = logging.getLogger("tls.reference_series")
 SERIES_BUSY = "In dieser Saison wird gerade schon etwas gespeichert. Bitte gleich noch einmal versuchen."
+# So lange wartet ein Vorgang auf die Sperre seiner Saison - wie bei Turnieren (mutation_lock-Standard).
+SERIES_WAIT_SECONDS = 2.0
+
+
+async def _catch_up(db, series_id: str) -> None:
+    """Unter der Sperre: Nachträge aus Zuordnungen in anderen Saisons, die hier gerade nicht durchkamen
+    (``alias_followups``), anwenden und - wenn sich etwas geändert hat - neu rechnen. Ein Fehler darin hält den
+    eigentlichen Vorgang nicht auf; der Nachtrag bleibt dann für den nächsten stehen."""
+    series = await db.reference_series.find_one({"id": series_id}, {"_id": 0})
+    pending = (series or {}).get("alias_followups") or []
+    if not pending:
+        return
+    try:
+        changed = []
+        for followup in pending:
+            changed += await series_participants.follow_alias(db, series_id, followup)
+        await db.reference_series.update_one(
+            {"id": series_id}, {"$pull": {"alias_followups": {"id": {"$in": [item.get("id") for item in pending]}}}})
+        if changed:
+            await recompute_standings(db, series)
+    except Exception:
+        logger.exception("Nachträge aus Zuordnungen anderer Saisons ließen sich nicht anwenden")
 
 
 @asynccontextmanager
 async def series_write(db, series_id: str):
     """Sperre je Saison für einen schreibenden Vorgang (Wartezeit wie bei Turnieren). Ist sie zu lange besetzt oder
-    geht sie verloren: 409 mit klarer Meldung - nichts halb Geschriebenes."""
+    geht sie verloren: 409 mit klarer Meldung - nichts halb Geschriebenes. Gleich nach dem Holen zieht sie offene
+    Nachträge aus Zuordnungen anderer Saisons nach (``_catch_up``)."""
     try:
-        async with mutation_lock(db, series_write_resource(series_id)):
+        async with mutation_lock(db, series_write_resource(series_id), wait_seconds=SERIES_WAIT_SECONDS):
+            await _catch_up(db, series_id)
             yield
     except MutationLockBusy:
         raise HTTPException(409, SERIES_BUSY) from None
@@ -60,12 +89,29 @@ def series_locked(handler):
     return locked
 
 
-async def recompute_locked(db, series_id: str) -> int:
-    """Stände einer (anderen) Saison neu - unter ihrer eigenen Sperre und mit ihren aktuellen Regeln. Nie aufrufen,
-    während schon eine Sperre gehalten wird."""
-    async with series_write(db, series_id):
-        series = await db.reference_series.find_one({"id": series_id}, {"_id": 0})
-        return await recompute_standings(db, series) if series else 0
+async def follow_alias_elsewhere(db, series_ids, followup: dict) -> tuple[list[str], list[str], list[str]]:
+    """Eine Zuordnung in anderen Saisons nachziehen - erst nach Freigabe der eigenen Sperre aufrufen. Je Saison unter
+    ihrer Sperre: Teilnehmer folgen dem Alias, dann neu rechnen. Ist eine Saison besetzt, merkt sie sich den Nachtrag
+    (``alias_followups``) für ihren nächsten Vorgang. Liefert (aktualisierte Saisons, wartende Saisons, geänderte
+    Teilnehmer)."""
+    updated, pending, changed = [], [], []
+    for series_id in series_ids:
+        try:
+            async with series_write(db, series_id):
+                moved = await series_participants.follow_alias(db, series_id, followup)
+                series = await db.reference_series.find_one({"id": series_id}, {"_id": 0})
+                if moved and series:
+                    await recompute_standings(db, series)
+        except HTTPException as exc:
+            if exc.status_code != 409:
+                raise
+            await db.reference_series.update_one({"id": series_id}, {"$push": {"alias_followups": {
+                **followup, "id": new_id(), "requested_at": now_utc().isoformat()}}})
+            pending.append(series_id)
+            continue
+        updated.append(series_id)
+        changed += moved
+    return updated, pending, changed
 
 
 POINTS_SCHEMES_ID = "points_schemes"

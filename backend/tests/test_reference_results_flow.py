@@ -17,6 +17,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 
 from flow_harness import make_flow  # noqa: E402
 from routes import reference_participant_routes, reference_result_routes  # noqa: E402
+from models import now_utc  # noqa: E402
 from services import migrations, reference_series  # noqa: E402
 from services.dolibarr_policy import club_today  # noqa: E402
 
@@ -477,6 +478,52 @@ async def test_assigning_in_parallel_to_saving_results_ends_with_consistent_stan
     # Als Gast zählt Bert nicht mehr fürs Team - auch in der mitgezogenen Saison.
     assert all(bert_there["id"] not in row["driver_ids"]
                for (_, scope), rows in elsewhere.items() if scope == "teams" for row in rows)
+
+
+async def _hold_lock(flow, series_id: str) -> None:
+    """Ein anderer Vorgang hält die Sperre dieser Saison gerade fest."""
+    await flow.db.mutation_locks.insert_one({"resource": f"series:{series_id}", "owner": "anderer-worker",
+                                             "expires_at": now_utc() + timedelta(minutes=1)})
+
+
+@pytest.mark.asyncio
+async def test_a_busy_other_season_keeps_its_data_whole_and_catches_up_on_its_next_write(flow, monkeypatch):
+    monkeypatch.setattr(reference_series, "SERIES_WAIT_SECONDS", 0.05)
+    rules = {**RULES, "team_scoring": {"enabled": True, "counting_drivers": None, "guests_count": False}}
+    ctx = await _setup(flow, rules=rules)
+    sid, other = ctx["own"]["id"], ctx["other"]["id"]
+    rows = [{"name": "Bert Bolzt", "place": 1, "team": "Probe Team"},
+            {"name": "Anna Probe", "place": 2, "team": "Probe Team"}]
+    other_results = f"{ADMIN}/series/{other}/rounds/{ctx['foreign_round']}/results"
+    assert (await flow.put(other_results, json={"rows": rows, "status": "published",
+                                                "expected_version": 0})).status_code == 200
+    bert_there = await flow.db.reference_participants.find_one({"series_id": other, "name": "Bert Bolzt"})
+    standings_before = await flow.db.reference_standings.find({"series_id": other}, {"_id": 0}).to_list(None)
+
+    await _hold_lock(flow, other)
+    assigned = await flow.post(f"{ADMIN}/series/{sid}/participants/{ctx['people']['Bert Bolzt']}/assign",
+                               json={"link": "guest"})
+    assert assigned.status_code == 200, assigned.text
+    body = assigned.json()
+    # Hier gilt die Zuordnung; die andere Saison ist besetzt und bleibt ganz, wie sie war - mit Hinweis und Protokoll.
+    assert (body["link"], body["other_series"]) == ("guest", {"updated": [], "pending": [other]})
+    assert body["notice"].startswith("1 weitere Saison wird gerade bearbeitet")
+    assert (await flow.db.reference_participants.find_one({"id": bert_there["id"]}))["link_status"] == "open"
+    assert await flow.db.reference_standings.find({"series_id": other}, {"_id": 0}).to_list(None) == standings_before
+    log = await flow.db.audit_logs.find_one({"action": "reference_series.participant_assign"})
+    assert (log["data"]["pending_series"], log["data"]["also_assigned_in"]) == ([other], [])
+    assert len((await flow.db.reference_series.find_one({"id": other}))["alias_followups"]) == 1
+
+    # Der nächste Vorgang in der anderen Saison zieht den Nachtrag nach - samt Neurechnen.
+    await flow.db.mutation_locks.delete_many({"owner": "anderer-worker"})
+    created = await flow.post(f"{ADMIN}/series/{other}/rounds", json={"day": _day(-3), "code": "R9"})
+    assert created.status_code == 200, created.text
+    caught_up = await flow.db.reference_participants.find_one({"id": bert_there["id"]})
+    assert (caught_up["link"], caught_up["link_status"], caught_up["link_source"]) == ("guest", "decided", "alias")
+    assert (await flow.db.reference_series.find_one({"id": other})).get("alias_followups") == []
+    elsewhere = await _standings_match_a_fresh_recompute(flow, other)
+    assert all(bert_there["id"] not in row["driver_ids"]
+               for (_, scope), team_rows in elsewhere.items() if scope == "teams" for row in team_rows)
 
 
 @pytest.mark.asyncio

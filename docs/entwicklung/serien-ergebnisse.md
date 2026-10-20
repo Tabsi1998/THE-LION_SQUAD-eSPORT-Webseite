@@ -55,8 +55,13 @@ nach der Runde). Team-Liga: `matches` mit `home`, `away`, Ergebnis, `maps` und `
   Darin: Versionsprüfung, Schreiben, Termin-Status, Teilnehmer aufräumen und einmal Neurechnen. Ist die Sperre zu
   lange besetzt: 409 „In dieser Saison wird gerade schon etwas gespeichert …“. Ebenso unter der Sperre: Teilnehmer
   anlegen, bearbeiten und zuordnen (#1743) und Regeln der Saison ändern - alles, was Stände rechnet, rechnet also
-  nacheinander. Zieht eine Zuordnung über den Alias andere Saisons mit, rechnen diese danach je unter ihrer eigenen
-  Sperre neu (`reference_series.recompute_locked`), nie zwei Sperren ineinander.
+  nacheinander.
+- **Zuordnung in anderen Saisons:** Zieht ein Alias andere Saisons mit, ändert die Zuordnung dort erst nach Freigabe
+  der eigenen Sperre etwas – je Saison unter deren Sperre, Teilnehmer folgen und Neurechnen zusammen
+  (`reference_series.follow_alias_elsewhere`), nie zwei Sperren ineinander. Ist eine Saison gerade besetzt, bleibt die
+  eigene Zuordnung gültig, die andere Saison bleibt ganz unverändert und merkt sich den Nachtrag (`alias_followups`);
+  der nächste Vorgang unter ihrer Sperre zieht ihn nach. Die Antwort nennt das (`other_series: {updated, pending}`,
+  `notice`), das Protokoll ebenso (`also_assigned_in`, `pending_series`).
 - `expected_version` ist Pflicht (0 ohne Blatt); ein veralteter Stand der Seite bekommt 409. Zwei gleichzeitige
   Übernahmen auf denselben Stand: eine gewinnt, die andere bekommt 409.
 - Ist das Blatt veröffentlicht und die Person darf nicht veröffentlichen (`target: "pending_draft"`), landet die
