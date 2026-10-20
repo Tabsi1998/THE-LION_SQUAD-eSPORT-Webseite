@@ -24,6 +24,17 @@ const COLUMNS = {
     { key: "form", label: "Form", title: "Die letzten fünf Spiele" },
     { key: "points", label: "Pkt", title: "Punkte", strong: true },
   ],
+  // Team-Liga externer Serien (#1747): wie die Liga, dazu die Maps (gewonnen:verloren).
+  team_league: [
+    { key: "played", label: "Sp", title: "Spiele" },
+    { key: "won", label: "S", title: "Siege", wide: true },
+    { key: "drawn", label: "U", title: "Unentschieden", wide: true },
+    { key: "lost", label: "N", title: "Niederlagen", wide: true },
+    { key: "maps", label: "Maps", title: "Maps gewonnen : verloren", wide: true, read: (row) => `${formatNumber(row.score_for ?? 0)}:${formatNumber(row.score_against ?? 0)}` },
+    { key: "score_diff", label: "Diff", title: "Differenz", format: formatDiff },
+    { key: "form", label: "Form", title: "Die letzten fünf Spiele" },
+    { key: "points", label: "Pkt", title: "Punkte", strong: true },
+  ],
   knockout: [
     { key: "won", label: "S", title: "Siege", read: (row) => row.won ?? row.wins ?? 0 },
     { key: "lost", label: "N", title: "Niederlagen", read: (row) => row.lost ?? row.losses ?? 0 },
@@ -74,9 +85,9 @@ function cellValue(column, row) {
 /**
  * `rows`: Zeilen einer Tabelle; `kind`: league, swiss oder knockout (lib/standingsTable.tableKind); `changed`: Schlüssel
  * frisch geänderter Zeilen; `registerRow`: useFlipRows - Zeilen gleiten an ihren neuen Platz; `certificateHref`: Link
- * zur Urkunde (nur nach dem Ende).
+ * zur Urkunde (nur nach dem Ende); `mineLabel`: Marke an der eigenen Zeile.
  */
-export function StandingsTable({ rows, kind = "league", changed, registerRow, certificateHref = null, label = "Rangliste" }) {
+export function StandingsTable({ rows, kind = "league", changed, registerRow, certificateHref = null, label = "Rangliste", mineLabel = "Du" }) {
   const columns = COLUMNS[kind] || COLUMNS.league;
   const span = columns.length + 2 + (certificateHref ? 1 : 0);
   return (
@@ -118,7 +129,7 @@ export function StandingsTable({ rows, kind = "league", changed, registerRow, ce
                 <td className="px-2 py-2.5 align-middle min-w-0">
                   <span className="flex items-center gap-2 min-w-0">
                     <span className="tls-standing-name text-white font-medium">{row.display_name || "Teilnehmer"}</span>
-                    {row.is_mine && <span className="tls-standing-me">Du</span>}
+                    {row.is_mine && <span className="tls-standing-me">{mineLabel}</span>}
                   </span>
                 </td>
                 {columns.map((column) => (

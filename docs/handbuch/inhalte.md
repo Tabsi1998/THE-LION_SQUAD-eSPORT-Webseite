@@ -300,6 +300,26 @@ gespeicherten Stand und ist nicht für Suchmaschinen gedacht (`noindex`).
 </tr>
 </table>
 
+**Seite Team-Liga:** Bei einer Spur vom Typ Team-Liga zeigt dieselbe Adresse statt der Gesamtwertung die Liga aus
+Sicht des eigenen Teams (Feld **Eigenes Team** der Saison). Oben die **Spieltage** (ein Feld je Spieltag – Sieg cyan,
+Niederlage grau) und der nächste Spieltag mit Gegner. Die **Tabelle** ist die Tabelle laut Veranstalter vom letzten
+eingetragenen Spieltag, sonst aus den eigenen Spielen gerechnet; Punkte für Sieg, Unentschieden und Niederlage und der
+Vorrang bei Gleichstand stehen darüber und kommen aus den Regeln der Saison. Das eigene Team ist als „Verein“ markiert,
+mit Form (die letzten fünf eigenen Spiele) und darunter dem **Platzierungsverlauf** nach jedem Spieltag. Der
+**Spielplan** zeigt je Spieltag Gegner, Heim oder Auswärts, das Ergebnis und die Maps. Die **Aufstellung** zählt, wer an
+welchem Spieltag gespielt hat: Vereinsmitglieder verlinken auf ihr Profil und haben unter **Gesamt** ihre Einsätze über
+alle Saisons der Spur; Gäste stehen getrennt und zählen nicht in die Vereinsstatistik. Der **Liga-Weg** listet alle
+Saisons der Spur mit Stufe, Platz von N und Punkten – Platz 1 bis 3 in den Farben der Pokale, die aktuelle Saison
+markiert, die anderen verlinkt. Eingetragen wird alles im Blatt **Ergebnis eintragen** des Spieltags: Spiel mit Maps und
+Aufstellung, dazu bei Bedarf die Tabelle laut Veranstalter.
+
+<table>
+<tr>
+<td><img src="../assets/serien/serien-seite-teamliga-breit.png" alt="Seite einer Team-Liga mit Spieltagen, Tabelle, Platzierungsverlauf, Spielplan, Aufstellung und Liga-Weg" width="560"></td>
+<td><img src="../assets/serien/serien-seite-teamliga-handy.png" alt="Dieselbe Seite am Handy" width="220"></td>
+</tr>
+</table>
+
 **Captains:** Auf der Seite der Saison steht unten **Captains**. Dort tragt ihr Mitglieder ein, die für genau diese
 Saison Ergebnisse hochladen dürfen – nur aktive Vereinsmitglieder, die Suche findet nur sie. Namen tippen, **Gilt bis** wählen (Pflicht, meist das Saisonende) und – wenn der
 Captain ohne Freigabe veröffentlichen darf – **Darf veröffentlichen** anhaken; dann **Captain hinzufügen**. In der Liste

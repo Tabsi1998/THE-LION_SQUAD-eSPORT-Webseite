@@ -21,6 +21,7 @@ from auth import get_optional_user
 from database import get_db
 from routes.reference_round_routes import PUBLIC_FIELDS, _calendar, visible_series
 from services.scoring_rules import normalize_rules
+from services.team_league_page import team_league_view
 
 router = APIRouter(prefix="/api/reference-series", tags=["reference-series"])
 
@@ -155,4 +156,6 @@ async def public_series(lineage_slug: str, season_slug: str, user: dict | None =
             "rows": [_standing_row(row, people) for row in latest.get("rows") or []],
         },
         "final": await _final(db, sid, rounds, people),
+        # Team-Liga (#1747): Tabelle, Spielplan, Aufstellung und Liga-Weg - bei anderen Arten ``None``.
+        "team_league": await team_league_view(db, user, lineage, series, [_public_round(item) for item in rounds]),
     }

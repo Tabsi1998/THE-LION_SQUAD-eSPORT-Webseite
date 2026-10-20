@@ -9,6 +9,7 @@ import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { PUBLIC_STATE_LABELS, STATE_TONES, dayLabel, roundLabel, roundWhen } from "@/lib/referenceCalendar";
 import { SeriesStandings } from "@/components/tls/series/SeriesStandings";
 import { FinalCalculator, SeriesFinal, SeriesProgress, SeriesRules } from "@/components/tls/series/SeriesParts";
+import { TeamLeagueSections } from "@/components/tls/series/TeamLeague";
 import { NotFoundPage } from "@/pages/ErrorPages";
 
 // Seite einer Serie unter /references/series/<spur>/<saison> (Entscheidung 5 zu #1741), Turnierserie (#1745): Kopf,
@@ -16,6 +17,7 @@ import { NotFoundPage } from "@/pages/ErrorPages";
 // Finale als eigene Runde und die Termine (#1742). Alles kommt gespeichert vom Server - hier wird nichts gerechnet.
 // Fremde Namen stehen nur in den Tabellen; die Seite ist nicht indexiert. Eine unbekannte, archivierte oder nicht
 // sichtbare Serie ist wie jede unbekannte Adresse 404. Eine alte Adresse führt zur aktuellen.
+// Team-Liga (#1747): statt Gesamtwertung, Finale und Terminen Tabelle, Spielplan, Aufstellung und Liga-Weg.
 
 function seriesTitle(data) {
   const series = data?.series || {};
@@ -92,6 +94,8 @@ export default function ReferenceSeriesPage() {
           <>
             <p className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">{eyebrow || "Serie"}</p>
             <h1 className="font-heading text-4xl md:text-5xl font-black uppercase mt-2">{title}</h1>
+            {data.lineage?.kind === "team_league" && <TeamLeagueSections data={data} />}
+            {data.lineage?.kind !== "team_league" && (<>
             <SeriesProgress progress={data.progress} rounds={rounds} />
             <section className="mt-10" aria-labelledby="series-page-table">
               <h2 id="series-page-table" className="font-heading text-2xl font-black uppercase">Gesamtwertung</h2>
@@ -101,6 +105,7 @@ export default function ReferenceSeriesPage() {
             </section>
             <SeriesFinal final={data.final} />
             <Calendar rounds={rounds} />
+            </>)}
           </>
         )}
       </article>
