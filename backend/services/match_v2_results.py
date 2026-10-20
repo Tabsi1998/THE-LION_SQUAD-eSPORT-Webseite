@@ -269,7 +269,7 @@ def _auto_rank_results(match: dict, raw_results: list[dict]) -> list[dict]:
         key = _placement_key(mode, entry)
         stated = _stated_rank(entry)
         if previous_key is not None and key == previous_key and not allow_draw \
-                and (math.isinf(stated) or stated == previous_stated):
+                and (math.isinf(stated) or stated == previous_stated) and not entry.get("forfeit"):
             # Im K.-o. muss jemand weiterkommen - bei gleichem Stand sagt das nur ein angegebener Platz, nie die
             # Reihenfolge der Liste.
             raise MatchV2ResultError(
@@ -317,6 +317,44 @@ def _with_marked_no_shows(match: dict, raw_results: list[dict], participants: di
     rows.extend({"registration_id": item, "rank": len(raw_results) + index, "forfeit": True, "note": notes.get(item)}
                 for index, item in enumerate(missing, start=1))
     return rows
+
+
+def _no_show_order(slot: dict) -> tuple:
+    """Die Reihenfolge unter mehreren Fehlenden: der Setzplatz, ohne ihn der Sitzplatz im Lauf."""
+    source = slot.get("source") or {}
+    seed = slot.get("seed") if slot.get("seed") is not None else (source.get("seed") if source.get("type") == "seed" else None)
+    try:
+        seed = int(seed)
+    except (TypeError, ValueError):
+        seed = None
+    return (seed is None, seed or 0, int(slot.get("slot") or 0))
+
+
+def _share_last_place(results: list[dict], participants: dict[str, dict]) -> list[dict]:
+    """Fehlen mehrere (#1823), teilen sie sich gleichrangig den letzten Platz - nicht nach der Reihenfolge, in der sie
+    markiert oder eingetragen wurden. Für das Weiterkommen (Sieger-Weg bzw. Freilos oder Loser Bracket) stehen sie nach
+    Setzplatz, sonst nach Sitzplatz (``_placement_positions``)."""
+    missing = [row for row in results if row["forfeit"]]
+    if len(missing) < 2:
+        return results
+    shared = len(results) - len(missing) + 1
+    for row in missing:
+        row["rank"] = shared
+    present = [row for row in results if not row["forfeit"]]
+    return present + sorted(missing, key=lambda row: _no_show_order(participants.get(row["registration_id"]) or {}))
+
+
+def _placement_positions(results: list[dict]) -> dict[int, dict]:
+    """Platz → Zeile fürs Weiterkommen. Teilen sich mehrere Fehlende den letzten Platz (#1823), zählt ihre Reihenfolge
+    im Ergebnis (Setzplatz, sonst Sitzplatz); ein echter Gleichstand (Gruppe, Liga) bleibt beim Platz."""
+    by_rank = {int(row.get("rank") or 0): row for row in results}
+    if len(by_rank) == len(results):
+        return by_rank
+    present = [int(row.get("rank") or 0) for row in results if not row.get("forfeit")]
+    if len(set(present)) < len(present):
+        return by_rank
+    ordered = sorted(results, key=lambda row: int(row.get("rank") or 0))
+    return {index: row for index, row in enumerate(ordered, start=1)}
 
 
 def normalize_v2_results(match: dict, raw_results: list[dict], *, best_of: int | None = None) -> list[dict]:
@@ -369,7 +407,7 @@ def normalize_v2_results(match: dict, raw_results: list[dict], *, best_of: int |
         })
 
     _validate_placements(seen_ranks, len(participants), allow_draw)
-    normalized = sorted(normalized, key=lambda item: item["rank"])
+    normalized = _share_last_place(sorted(normalized, key=lambda item: item["rank"]), participants)
     if _ranking_mode(match) == "higher_score":
         _check_best_of(normalized, best_of)
     return normalized
@@ -749,7 +787,7 @@ def _pot_ranks(source: dict, results: list[dict], gone: set[str]) -> tuple[dict[
     """Wer auf welchem Platz steht - für Verlierer- und Sieger-Weg; im Lauf ohne Ausgeschiedene (#1553: die Nächsten
     rücken auf, wie in ``build_v2_result_application``; wer auf dem Sieger-Weg aufrückt, kommt nicht zugleich in den
     Topf des Loser Bracket, #1823)."""
-    by_rank = {int(row.get("rank") or 0): row for row in results}
+    by_rank = _placement_positions(results)
     if not gone or source.get("match_type") != "ffa":
         return by_rank, by_rank
     staying = [row for row in sorted(results, key=lambda row: int(row.get("rank") or 0))
@@ -1184,7 +1222,7 @@ def build_v2_result_application(
 
     results = normalize_v2_results(match, raw_results)
     eliminated = set(eliminated or ())
-    path_by_rank = {entry["rank"]: entry for entry in results}
+    path_by_rank = _placement_positions(results)
     if eliminated and match.get("match_type") == "ffa":
         # Plätze rücken auf: Sieger- und Verlierer-Weg zählen nur, wer noch im Turnier ist - wer auf dem Sieger-Weg
         # aufrückt, steht nicht zugleich im Loser Bracket (#1823).

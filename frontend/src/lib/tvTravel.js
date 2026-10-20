@@ -41,7 +41,9 @@ export function advancementsOf(match, matches = [], { lastStage = true, table = 
       const source = normalizeSource(slot?.source);
       if (source?.type !== "rank" || source.match_key !== match.match_key) return;
       const rank = absoluteRank(source, match);
-      const row = ranking.find((entry) => Number(entry.rank) === rank);
+      // Teilen sich mehrere Fehlende den letzten Platz (#1823), zählt ihre Reihenfolge wie am Server (Setzplatz).
+      const row = ranking.find((entry) => Number(entry.rank) === rank)
+        || (ranking[rank - 1]?.forfeit && Number(ranking[rank - 1].rank) < rank ? ranking[rank - 1] : undefined);
       if (!row || targets.has(row.registration_id)) return;
       ways += 1;
       if (slot?.status === "bye") return;

@@ -226,6 +226,38 @@ async def test_deadline_and_result_window_mixed_mark_each_person_once(flow):
     assert await incidents(flow, user_of[second], heat) == 1 and await incidents(flow, user_of[fourth], heat) == 1
 
 
+def in_target(target: dict, heat: dict) -> list[str]:
+    """Wer aus diesem Lauf in ``target`` sitzt - nach Platz im Ziel."""
+    return [slot["registration_id"] for slot in sorted(target["slots"], key=lambda slot: slot["slot"])
+            if (slot.get("source_result") or {}).get("from_match_id") == heat["id"] and slot.get("registration_id")]
+
+
+@pytest.mark.asyncio
+async def test_two_missing_share_the_last_place_and_advance_by_seed_not_by_marking(flow):
+    """Zwei Fehlende teilen sich den letzten Platz. Wer von ihnen auf welchen Platz im Loser Bracket kommt, entscheidet
+    der Setzplatz - nicht, wer zuerst als nicht erschienen markiert wurde."""
+    tournament, heat, _user_of = await heats_cup(flow)
+    first, second, third, fourth = seats(heat)
+    url = f"/api/tournaments/{tournament['id']}/lead/no-show/{heat['id']}"
+    assert (await sweep(flow.db))["proposed"] == 1
+    for registration_id in (fourth, second):  # erst der schlechter Gesetzte
+        assert (await flow.post(url, json={"action": "confirm", "registration_id": registration_id})).status_code == 200
+
+    response = await flow.post(f"/api/matches/{heat['id']}/result", json={"results": [
+        {"registration_id": third, "rank": 1}, {"registration_id": first, "rank": 2}]})
+    assert response.status_code == 200, response.text
+
+    stored = await flow.reload(heat)
+    seed = {reg["id"]: reg["seed"] for reg in await flow.db.tournament_registrations.find(
+        {"tournament_id": tournament["id"]}, {"_id": 0, "id": 1, "seed": 1}).to_list(20)}
+    by_seed = sorted((second, fourth), key=lambda item: seed[item])
+    assert [(row["registration_id"], row["rank"], row["forfeit"]) for row in stored["results"]] == [
+        (third, 1, False), (first, 2, False), (by_seed[0], 3, True), (by_seed[1], 3, True)]
+    after = await by_key(flow, tournament)
+    assert in_target(after["F"], heat) == [third, first]
+    assert in_target(after["LA"], heat) == by_seed, "ins Loser Bracket nach Setzplatz"
+
+
 @pytest.mark.asyncio
 async def test_the_present_three_are_entered_and_the_best_two_advance(flow):
     tournament, heat, _user_of = await heats_cup(flow)

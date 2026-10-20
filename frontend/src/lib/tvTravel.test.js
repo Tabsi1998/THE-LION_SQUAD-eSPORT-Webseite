@@ -41,6 +41,18 @@ test("Durchgang mit 4 Spielern, 2 kommen weiter: Platz 1 und 2 weiter, Platz 3 u
   }
 });
 
+test("Durchgang mit zwei Fehlenden (#1823): beide auf dem letzten Platz, ins Loser Bracket in der Reihenfolge des Servers", () => {
+  const bracket = heatDoubleElimination();
+  decide(bracket, "A", ["r4", "r1", "r5", "r8"]);
+  // Wie der Server: die zwei Fehlenden teilen sich Platz 3, die Reihenfolge der Zeilen (Setzplatz) entscheidet den Platz.
+  const heat = find(bracket, "A");
+  heat.results = heat.results.map((row) => (["r5", "r8"].includes(row.registration_id) ? { ...row, rank: 3, forfeit: true, score: null } : row));
+  const moves = advancementsOf(heat, bracket.matches_v2);
+  expect(moves.filter((move) => move.kind === "drop").map((move) => [move.registrationId, move.target.matchKey, move.target.slot])).toEqual([
+    ["r5", "D", 1], ["r8", "D", 2],
+  ]);
+});
+
 test("Doppel-K.-o.: der Verlierer rutscht ins Loser Bracket, aus dem Loser Bracket geht es ins Grand Final", () => {
   const bracket = doubleElimination(8);
   decide(bracket, "A");

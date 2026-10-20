@@ -150,6 +150,56 @@ def test_a_withdrawn_heat_player_moves_the_others_up_on_both_paths(ranking, winn
     assert [slot["registration_id"] for slot in application["target_sets"]["m-l"]["slots"]] == losers
 
 
+def _seeded_heat():
+    """Lauf A mit Setzplätzen, die nicht der Sitzreihenfolge folgen: r1=4, r2=2, r3=1, r4=3."""
+    source = {**_source_match(), "match_type": "ffa"}
+    source["slots"] = [{**slot, "seed": seed} for slot, seed in zip(source["slots"], (4, 2, 1, 3))]
+    return source
+
+
+NO_SHOWS = [  # r4 vor r2 eingetragen - die Reihenfolge der Eingabe zählt nicht
+    {"registration_id": "r3", "rank": 1}, {"registration_id": "r1", "rank": 2},
+    {"registration_id": "r4", "rank": 3, "forfeit": True}, {"registration_id": "r2", "rank": 4, "forfeit": True},
+]
+
+
+def test_two_no_shows_share_the_last_place_ordered_by_seed():
+    """#1823: fehlen mehrere, teilen sie sich den letzten Platz - in der Reihenfolge ihrer Setzplätze."""
+    results = normalize_v2_results(_seeded_heat(), NO_SHOWS)
+
+    assert [(row["registration_id"], row["rank"], row["forfeit"]) for row in results] == [
+        ("r3", 1, False), ("r1", 2, False), ("r2", 3, True), ("r4", 3, True)]
+
+
+def test_without_seeds_the_seat_decides():
+    results = normalize_v2_results({**_source_match(), "match_type": "ffa"}, NO_SHOWS)
+
+    assert [row["registration_id"] for row in results if row["forfeit"]] == ["r2", "r4"]
+
+
+def test_no_shows_sharing_the_last_place_advance_in_seed_order():
+    """Weiterkommen nach Position: zwei Beste weiter, die Fehlenden nach Setzplatz ins Loser Bracket."""
+    source = _seeded_heat()
+
+    application = build_v2_result_application(
+        source, [source, _target("m-b", "B"), _target("m-l", "L")], NO_SHOWS,
+        actor_id="admin", now_iso="2026-05-08T12:00:00+00:00",
+    )
+
+    assert [slot["registration_id"] for slot in application["target_sets"]["m-b"]["slots"]] == ["r3", "r1"]
+    assert [slot["registration_id"] for slot in application["target_sets"]["m-l"]["slots"]] == ["r2", "r4"]
+
+
+def test_the_draw_pot_takes_no_shows_sharing_a_place_in_order():
+    source = _seeded_heat()
+    results = normalize_v2_results(source, NO_SHOWS)
+
+    loser_path, winner_path = _pot_ranks(source, results, set())
+
+    assert [loser_path[rank]["registration_id"] for rank in (3, 4)] == ["r2", "r4"]
+    assert [winner_path[rank]["registration_id"] for rank in (1, 2)] == ["r3", "r1"]
+
+
 def test_the_draw_pot_moves_the_others_up_on_both_paths_too():
     """Gemischte Runden (#1548) losen aus demselben Stand: wer im Lauf auf den Sieger-Weg aufrückt, kommt nicht
     zugleich in den Topf des Loser Bracket (#1823)."""
