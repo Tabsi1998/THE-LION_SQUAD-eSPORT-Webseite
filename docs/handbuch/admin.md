@@ -125,10 +125,14 @@ Gut zu wissen:
 - Ganz oben steht **Zuletzt**: die bis zu fünf Verwaltungsseiten, die du zuletzt geöffnet hast (neueste zuerst, ohne
   die Seite, auf der du gerade bist). Das merkt sich der Browser je Konto; es erscheinen nur Seiten, die du sehen
   darfst. Während einer Suche ist „Zuletzt“ ausgeblendet.
+
+  <img src="../assets/verwaltung/menue-zuletzt.png" alt="Admin-Menü mit der Gruppe Zuletzt ganz oben" width="720">
 - Wer **abgehakte Plattformen** unter „Alle Verbindungen“ hat, sieht diese nicht mehr als Menüpunkt.
 - Am **Handy und am Tablet hochkant** (bis 1023 px Breite) ist das Menü eingeklappt: oben links der **Menü-Knopf**
   (drei Striche) klappt die Leiste aus, ein Tipp daneben schließt sie wieder. So hat die Seite die volle Breite. Ab
   1024 px (Tablet quer, PC) steht das Menü fest links.
+
+  <img src="../assets/verwaltung/tablet-menue-offen.png" alt="Verwaltung am Tablet hochkant mit ausgeklapptem Menü" width="360">
 - Wer **keinen** Bereich und keinen Einsatz hat, sieht kein Menü.
 - Redaktion, Vereinsverwaltung und Finanzen sehen **keine** Turnierseiten – weder im Menü noch über die Adresse. Die
   gibt es nur mit dem Bereich Turnierleitung oder einem Helfer-Einsatz.
@@ -165,7 +169,7 @@ Von oben nach unten:
 | **Weitere Werkzeuge** | Aufklappbar: Links zu Seiten, bei denen gerade nichts ansteht |
 | **Schnellzugriff** | Nur mit Turnierleitung: **+ Turnier**, **+ Fast-Lap-Challenge**, **Events**, **Stationen** |
 | **Zahlen im Überblick** | Spieler, Teams, Aktive Turniere, Anmeldung offen, Spiele heute, Fast Lap Live, Events Gesamt |
-| **Wachstum** | Logins und neue Mitglieder der letzten 30 Tage |
+| **Wachstum** | Logins, neue Konten, Konten gesamt und neue Vereinsmitglieder (aus der Mitgliedschaft) der letzten 30 Tage – nur Vereinsverwaltung und System |
 | **Einstellungen-Zentrale** | Kacheln zu Login, Konten verknüpfen, Branding, E-Mail, Discord, Twitch, Socials und mehr – je Kachel nur mit dem passenden Bereich (fast alles System) |
 | **Letzte Adminaktionen** | Die letzten acht Einträge; **Alle Logs** öffnet Betrieb & Logs |
 
