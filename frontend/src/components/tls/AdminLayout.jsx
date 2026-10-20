@@ -337,6 +337,23 @@ function menuEntryForPath(pathname) {
 
 const RECENT_GROUP = "Zuletzt";
 
+// Menü zum aktiven Eintrag führen, ohne „Zuletzt“ anzuschneiden (#1291): steht die Gruppe da, beginnt die Liste oben
+// bei ihr; nur wenn der aktive Eintrag dann nicht zu sehen ist, rückt sie nach (die Einträge halten mit scroll-margin
+// Abstand zum Rand). Ragt „Zuletzt“ danach nur noch halb ins Bild, rückt die Liste die Gruppe ganz hinaus - eine
+// Überschrift wird nie abgeschnitten.
+export function scrollMenuToActive(nav) {
+  if (!nav) return;
+  const recent = nav.querySelector("[data-testid='admin-nav-recent']");
+  if (recent) nav.scrollTop = 0;
+  const active = nav.querySelector("[aria-current='page']");
+  if (!active) return;
+  active.scrollIntoView({ block: "nearest" });
+  if (!recent) return;
+  const top = nav.getBoundingClientRect().top;
+  const box = recent.getBoundingClientRect();
+  if (box.top < top && box.bottom > top) nav.scrollTop += box.bottom - top;
+}
+
 export function AdminLayout({ children }) {
   const { user, logout } = useAuth();
   const nav = useNavigate();
@@ -420,8 +437,8 @@ export function AdminLayout({ children }) {
   // "Push-Tests" und sah im Menü nur die Gruppe "Übersicht".
   const navRef = useRef(null);
   useEffect(() => {
-    navRef.current?.querySelector("[aria-current='page']")?.scrollIntoView({ block: "nearest" });
-  }, [location.pathname, collapsedGroups, searchQuery]);
+    scrollMenuToActive(navRef.current);
+  }, [location.pathname, collapsedGroups, searchQuery, recentItems.length]);
 
   return (
     <div className="min-h-screen bg-[#0A0A0A] text-white flex">
@@ -543,7 +560,7 @@ export function AdminLayout({ children }) {
                         onClick={() => setOpenMobile(false)}
                         data-testid={`admin-nav-${it.to.split("/").pop() || "dashboard"}`}
                         className={({ isActive }) =>
-                          `flex items-center gap-3 px-3 py-2.5 rounded-sm text-sm font-semibold transition-all ${
+                          `flex items-center gap-3 px-3 py-2.5 scroll-my-3 rounded-sm text-sm font-semibold transition-all ${
                             isActive
                               ? "bg-[#29B6E8]/15 text-[#29B6E8] border-l-2 border-[#29B6E8]"
                               : "text-white/70 hover:text-white hover:bg-white/5"

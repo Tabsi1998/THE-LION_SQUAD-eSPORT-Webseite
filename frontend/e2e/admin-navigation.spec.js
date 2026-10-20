@@ -200,6 +200,32 @@ test.describe("Adminmenü", () => {
     expect((await navMetrics(page)).entries).toBe(84);
   });
 
+  test("am Telefon wird „Zuletzt“ beim Nachführen zum aktiven Eintrag nie angeschnitten", async ({ page }) => {
+    await page.addInitScript(() => {
+      window.localStorage.setItem("tls_admin_recent_v1:admin-1", JSON.stringify(["/admin/documents", "/admin"]));
+    });
+    await page.route("**/api/users**", (route) => route.fulfill({ contentType: "application/json", body: "[]" }));
+    await page.route("**/api/membership/**", (route) => route.fulfill({ contentType: "application/json", body: route.request().url().includes("/meta") ? "{\"statuses\":[],\"types\":[]}" : "[]" }));
+    await page.setViewportSize({ width: 390, height: 844 });
+    // Mitglieder steht so tief, dass das Nachführen „Zuletzt“ ohne Vorkehrung halb aus dem Bild schob.
+    await page.goto("/admin/members");
+    await page.getByTestId("admin-menu-open").click();
+    await expect(page.getByTestId("admin-nav-recent")).toBeAttached();
+    await page.waitForTimeout(300);
+    const state = await page.evaluate(() => {
+      const nav = document.querySelector("nav.admin-scroll").getBoundingClientRect();
+      const heading = document.querySelector("[data-testid='admin-nav-group-Zuletzt']").getBoundingClientRect();
+      const recent = document.querySelector("[data-testid='admin-nav-recent']").getBoundingClientRect();
+      const active = document.querySelector("nav.admin-scroll [aria-current='page']").getBoundingClientRect();
+      return {
+        recentCut: recent.top < nav.top - 1 && recent.bottom > nav.top + 1,
+        headingCut: heading.top < nav.top - 1 && heading.bottom > nav.top - 1,
+        activeInView: active.top >= nav.top - 1 && active.bottom <= nav.bottom + 1,
+      };
+    });
+    expect(state).toEqual({ recentCut: false, headingCut: false, activeInView: true });
+  });
+
   test("am Telefon bleibt das Menü im Schubfach bedienbar", async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto("/admin");

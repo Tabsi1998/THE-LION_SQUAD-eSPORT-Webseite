@@ -9,7 +9,7 @@ const authState = { user: null, logout: () => {} };
 vi.mock("@/context/AuthContext", () => ({ useAuth: () => authState }));
 vi.mock("@/hooks/usePublicSiteSettings", () => ({ usePublicSiteSettings: () => ({}) }));
 
-const { AdminLayout, ADMIN_GROUPS, recentNavItems } = await import("./AdminLayout");
+const { AdminLayout, ADMIN_GROUPS, recentNavItems, scrollMenuToActive } = await import("./AdminLayout");
 
 const MFA = { mfa_enabled: true, auth_mfa_verified: true };
 const SYSTEM = { id: "sys-1", role: "superadmin", ...MFA };
@@ -86,4 +86,39 @@ test("ohne zuletzt geöffnete Seiten gibt es keine leere Gruppe", () => {
   renderLayout("/admin");
   expect(screen.queryByTestId("admin-nav-group-Zuletzt")).toBeNull();
   expect(ADMIN_GROUPS.some((group) => group.label === "Zuletzt")).toBe(false);
+});
+
+// Handy-Menü (#1291 nach Abnahme): beim Führen zum aktiven Eintrag wird „Zuletzt“ nie angeschnitten.
+function fakeMenu({ navTop = 0, recentBox, withRecent = true }) {
+  const nav = document.createElement("nav");
+  nav.innerHTML = `${withRecent ? '<div data-testid="admin-nav-recent"></div>' : ""}<a aria-current="page">Mitglieder</a>`;
+  nav.scrollTop = 40;
+  nav.getBoundingClientRect = () => ({ top: navTop, bottom: navTop + 600 });
+  const recent = nav.querySelector("[data-testid='admin-nav-recent']");
+  const active = nav.querySelector("a");
+  active.scrollIntoView = vi.fn(() => { nav.scrollTop = 300; });
+  if (recent) recent.getBoundingClientRect = () => recentBox(nav.scrollTop);
+  return { nav, active };
+}
+
+test("steht „Zuletzt“ da, beginnt die Liste bei ihr und bleibt dort, wenn der aktive Eintrag sichtbar ist", () => {
+  const { nav, active } = fakeMenu({ recentBox: () => ({ top: 12, bottom: 150 }) });
+  active.scrollIntoView = vi.fn();
+  scrollMenuToActive(nav);
+  expect(nav.scrollTop).toBe(0);
+  expect(active.scrollIntoView).toHaveBeenCalledWith({ block: "nearest" });
+});
+
+test("ragt „Zuletzt“ nach dem Nachführen nur halb ins Bild, rückt die Liste die Gruppe ganz hinaus", () => {
+  // Nach dem Nachführen (scrollTop 300) stünde „Zuletzt“ von -80 bis 70 - die Überschrift wäre abgeschnitten.
+  const { nav } = fakeMenu({ recentBox: (scrollTop) => ({ top: 220 - scrollTop, bottom: 370 - scrollTop }) });
+  scrollMenuToActive(nav);
+  expect(nav.scrollTop).toBe(370);
+});
+
+test("ohne „Zuletzt“ nur das Nachführen wie bisher", () => {
+  const { nav, active } = fakeMenu({ withRecent: false });
+  scrollMenuToActive(nav);
+  expect(active.scrollIntoView).toHaveBeenCalledWith({ block: "nearest" });
+  expect(nav.scrollTop).toBe(300);
 });
