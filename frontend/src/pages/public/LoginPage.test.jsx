@@ -341,3 +341,10 @@ test("„Zurück zur Website“ führt zur Seite, von der man kam", async () => 
   await userEvent.setup().click(screen.getByTestId("login-back"));
   expect(await screen.findByText("newsseite")).toBeInTheDocument();
 });
+
+// Überall „Anmelden“ (#1242): Überschrift, Knopf und der Weg über Google.
+test("Überschrift, Knopf und Google-Weg heißen Anmelden", async () => {
+  renderPage();
+  expect(await screen.findByRole("heading", { level: 1, name: "Anmelden" })).toBeInTheDocument();
+  expect(screen.getByTestId("login-submit")).toHaveTextContent("Anmelden");
+});
