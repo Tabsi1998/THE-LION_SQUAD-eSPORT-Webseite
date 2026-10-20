@@ -197,13 +197,15 @@ def event_keys(event: dict) -> set[str]:
 def concerns_page(event: dict, tournament_id: str | None, event_id: str | None, shared_stations: bool) -> bool:
     """Betrifft die Meldung das Turnier der Seite (#1801, wie lib/apiInvalidation.js)? Ohne Turnier in der Meldung oder
     an der Seite: ja. Seiten mit Stationen auch bei jedem anderen Turnier desselben Events (sie teilen sich Stationen) -
-    kennt die Seite ihr Event nicht, bei jedem Turnier mit Event."""
+    kennt die Seite ihr Event nicht, bei jedem Turnier mit Event. Eine Station nur am Event nennt das Event allein."""
     changed = event.get("tournament_id")
-    if not changed or not tournament_id or changed == tournament_id:
+    changed_event = event.get("parent_event_id")
+    if not changed and not changed_event:
+        return True
+    if not tournament_id or changed == tournament_id:
         return True
     if not shared_stations:
         return False
-    changed_event = event.get("parent_event_id")
     return bool(changed_event) and (not event_id or changed_event == event_id)
 
 

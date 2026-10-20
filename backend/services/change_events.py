@@ -177,10 +177,11 @@ def _api_parts(path: str) -> list[str]:
 
 
 def _scope_target(path: str) -> tuple[str, str] | None:
-    """Worauf eine Änderung zeigt (#1801): ``("tournament", Kennung oder Slug)``, ``("match", Kennung)`` oder None.
+    """Worauf eine Änderung zeigt (#1801): ``("tournament", Kennung oder Slug)``, ``("match", Kennung)``,
+    ``("station", Kennung)`` oder None.
 
-    Ohne Turnier bleiben Stationen (die Turniere eines Events teilen sie sich), das Turnier selbst (Einstellungen, Event,
-    Sichtbarkeit - danach sollen alle Seiten nachladen), neue Turniere und was zu keinem Turnier gehört (Vor-Ort-Zugang).
+    Ohne Kennung bleiben das Turnier und die Station selbst (Einstellungen, Event, Sichtbarkeit - danach sollen alle
+    Seiten nachladen), neue Turniere und Stationen, Sammel-Aktionen und was zu keinem Turnier gehört (Vor-Ort-Zugang).
     """
     parts = _api_parts(path)
     if len(parts) < 2:
@@ -192,13 +193,15 @@ def _scope_target(path: str) -> tuple[str, str] | None:
         return "tournament", ref
     if resource == "tournaments" and len(parts) > 2 and ref not in NON_TOURNAMENT_SEGMENTS:
         return "tournament", ref
+    if resource == "stations" and len(parts) > 2:
+        return "station", ref
     return None
 
 
 def _invalidates_scope(path: str) -> bool:
-    """Ändert die Anfrage Turnier oder Event selbst (Sichtbarkeit, Event, Status)?"""
+    """Ändert die Anfrage Turnier, Event oder Station selbst (Sichtbarkeit, Event, Status, Zuordnung)?"""
     parts = _api_parts(path)
-    if len(parts) < 2 or parts[0] not in {"tournaments", "events"}:
+    if len(parts) < 2 or parts[0] not in {"tournaments", "events", "stations"}:
         return False
     return len(parts) == 2 or (parts[0] == "tournaments" and len(parts) == 3 and parts[2] in SCOPE_RESET_ACTIONS)
 
@@ -222,11 +225,20 @@ async def _public_event(db, event_id: str) -> bool:
 async def _lookup_scope(db, kind: str, ref: str) -> dict | None:
     """Turnier und Event einer Änderung - und ob beide öffentlich sind (dieselbe Regel wie ``public_tournament`` und
     die Event-Seite: kein Entwurf, Sichtbarkeit öffentlich). Ein Turnier in einem nicht öffentlichen Event bleibt
-    öffentlich ohne Kennung: Seiten mit geteilten Stationen könnten sonst nicht erkennen, dass es sie betrifft."""
+    öffentlich ohne Kennung: Seiten mit geteilten Stationen könnten sonst nicht erkennen, dass es sie betrifft.
+    Eine Station nennt ihr Turnier - oder, wenn sie nur am Event hängt, das Event allein."""
     from services.slug_utils import find_by_slug_or_history
     from services.tournament_visibility import public_tournament
 
-    if kind == "match":
+    if kind == "station":
+        station = await db.stations.find_one({"id": ref}, {"_id": 0, "tournament_id": 1, "event_id": 1})
+        if not station or not (station.get("tournament_id") or station.get("event_id")):
+            return None
+        if not station.get("tournament_id"):
+            event_id = station["event_id"]
+            return {"tournament_id": None, "parent_event_id": event_id, SCOPE_PUBLIC_KEY: await _public_event(db, event_id)}
+        tournament = await db.tournaments.find_one({"id": station["tournament_id"]}, _SCOPE_FIELDS)
+    elif kind == "match":
         match = await db.matches_v2.find_one({"id": ref}, {"_id": 0, "tournament_id": 1})
         if not match or not match.get("tournament_id"):
             return None

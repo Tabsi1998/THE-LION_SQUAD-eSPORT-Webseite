@@ -139,8 +139,23 @@ describe("Nachladen nur für das betroffene Turnier", () => {
       expect(invalidationMatches(change({ tournament_id: "t2", parent_event_id: "e9" }), stations, { tournamentId: "t1", eventId: null })).toBe(true);
     });
 
-    test("Stationen-Meldungen haben kein Turnier und laden immer", () => {
+    test("Stationen-Meldungen ohne Turnier und Event laden immer", () => {
       expect(invalidationMatches({ resource: "stations", path: "/api/stations" }, stations, { tournamentId: "t1", eventId: "e1" })).toBe(true);
+    });
+
+    // Eine Station, die nur am Event hängt (Codex-Prüfung): ihre Meldung nennt das Event allein.
+    test("eine Station am Event lädt die Seiten dieses Events, nicht die anderer Events", () => {
+      const station = { resource: "stations", path: "/api/stations", tournament_id: null, parent_event_id: "e1" };
+      expect(invalidationMatches(station, stations, { tournamentId: "t1", eventId: "e1" })).toBe(true);
+      expect(invalidationMatches(station, stations, { tournamentId: "t1", eventId: "e2" })).toBe(false);
+      expect(invalidationMatches(station, stations, { tournamentId: "t1" })).toBe(true);
+      expect(invalidationMatches(station, stations, {})).toBe(true);
+    });
+
+    test("eine Station eines anderen Turniers ohne Event lädt nicht", () => {
+      const station = { resource: "stations", path: "/api/stations", tournament_id: "t2", parent_event_id: null };
+      expect(invalidationMatches(station, stations, { tournamentId: "t1", eventId: "e1" })).toBe(false);
+      expect(invalidationMatches(station, stations, { tournamentId: "t2" })).toBe(true);
     });
 
     test("Seiten ohne Stationen bleiben beim eigenen Turnier, auch im selben Event", () => {

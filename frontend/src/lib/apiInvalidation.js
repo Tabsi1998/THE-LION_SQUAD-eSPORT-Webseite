@@ -135,11 +135,13 @@ export function subscribeStreamState(listener) {
 // Turniers nach. Ohne Kennung in der Meldung - oder solange die Seite ihr Turnier noch nicht kennt - gilt wie bisher alles.
 // Die Turniere eines Events teilen sich Stationen: Hört die Seite auf „stations“, zählt auch jedes andere Turnier
 // desselben Events. Kennt sie ihr Event nicht (TV mit Schlüssel), jedes Turnier mit Event - eines ohne Event teilt keine.
+// Eine Station, die nur am Event hängt, nennt das Event allein (ohne Turnier).
 function concernsScope(event, { tournamentId, eventId } = {}, sharedStations = false) {
   const changed = event?.tournament_id;
-  if (!changed || !tournamentId || changed === tournamentId) return true;
+  const changedEvent = event?.parent_event_id;
+  if (!changed && !changedEvent) return true;
+  if (!tournamentId || changed === tournamentId) return true;
   if (!sharedStations) return false;
-  const changedEvent = event.parent_event_id;
   return Boolean(changedEvent) && (!eventId || changedEvent === eventId);
 }
 

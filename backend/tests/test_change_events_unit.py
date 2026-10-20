@@ -415,7 +415,7 @@ def test_public_tournament_of_a_hidden_event_stays_without_identifiers(scope_db,
 
 
 @pytest.mark.parametrize("method, path", [
-    ("POST", "/api/stations/s-1/assign/m-1"),  # Stationen teilen sich die Turniere eines Events
+    ("POST", "/api/stations/s-1/assign/m-1"),  # unbekannte Station
     ("POST", "/api/tournaments/onsite/redeem"),  # gehört zu keinem Turnier
     ("POST", "/api/tournaments"),  # neues Turnier: die Übersichten laden ohnehin
     ("PATCH", "/api/tournaments/t-1"),  # das Turnier selbst (Event, Sichtbarkeit): alle laden nach
@@ -508,8 +508,9 @@ def test_repeated_changes_look_the_tournament_up_once(scope_db, monkeypatch):
     ("POST", "/api/tournaments/t-1/status"),
     ("POST", "/api/tournaments/t-1/reset-bracket"),
     ("PATCH", "/api/events/e-anderes"),
+    ("PATCH", "/api/stations/s-1"),
 ])
-def test_a_change_to_tournament_or_event_itself_drops_the_cache(scope_db, monkeypatch, method, path):
+def test_a_change_to_tournament_event_or_station_itself_drops_the_cache(scope_db, monkeypatch, method, path):
     asyncio.run(add_tournament(scope_db, "t-1"))
     calls = counting_lookups(monkeypatch)
     assert public_view(publish("POST", "/api/tournaments/t-1/register"))["tournament_id"] == "t-1"
@@ -553,3 +554,37 @@ def test_the_cache_expires_after_a_short_while(scope_db, monkeypatch):
     now[0] += 2
     publish("POST", "/api/tournaments/t-1/register")
     assert len(calls) == 2
+
+
+# Stationen (#1801, Codex-Prüfung): Eine Station gehört einem Turnier oder einem Event. Ihre Meldungen nennen es - nach
+# derselben Regel -, damit Seiten anderer Turniere und Events nicht nachladen.
+
+def test_station_changes_name_their_tournament_or_event(scope_db):
+    async def seed():
+        await scope_db.events.insert_one({"id": "event-offen", "status": "live", "visibility": "public"})
+        await scope_db.events.insert_one({"id": "event-intern", "status": "live", "visibility": "members"})
+        await add_tournament(scope_db, "turnier-offen", event_id="event-offen")
+        await scope_db.stations.insert_many([
+            {"id": "station-turnier", "tournament_id": "turnier-offen", "event_id": None},
+            {"id": "station-event", "tournament_id": None, "event_id": "event-offen"},
+            {"id": "station-intern", "tournament_id": None, "event_id": "event-intern"},
+            {"id": "station-lose", "tournament_id": None, "event_id": None},
+        ])
+
+    asyncio.run(seed())
+
+    own = public_view(publish("POST", "/api/stations/station-turnier/assign/m-1"))
+    assert (own["tournament_id"], own["parent_event_id"]) == ("turnier-offen", "event-offen")
+    shared_event = public_view(publish("POST", "/api/stations/station-event/clear"))
+    assert (shared_event["tournament_id"], shared_event["parent_event_id"]) == (None, "event-offen")
+    assert shared_event["resource"] == "stations" and shared_event["path"] == "/api/stations"
+
+    hidden_event = publish("POST", "/api/stations/station-intern/clear")
+    assert "event-intern" not in json.dumps(public_view(hidden_event))
+    assert change_events._event_for_scope(hidden_event, "staff")["parent_event_id"] == "event-intern"
+    for path in ("/api/stations/station-lose/clear", "/api/stations/unbekannt/clear"):
+        loose = public_view(publish("POST", path))
+        assert loose.get("tournament_id") is None and loose.get("parent_event_id") is None
+    # Die Station selbst (Name, Status, Event): alle laden nach - wie beim Turnier selbst.
+    root = public_view(publish("PATCH", "/api/stations/station-event"))
+    assert root.get("tournament_id") is None and root.get("parent_event_id") is None

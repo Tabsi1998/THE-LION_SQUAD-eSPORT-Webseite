@@ -112,3 +112,21 @@ async def test_a_write_through_the_app_names_the_public_tournament(flow):
     public = change_events._event_for_scope(event, "public")
     assert public["tournament_id"] == tournament["id"]
     assert tournament["slug"] not in str(public)
+
+
+@pytest.mark.asyncio
+async def test_a_station_change_names_the_event_of_the_station(flow):
+    # Codex-Prüfung: Eine Station am Event nennt das Event - Seiten anderer Events laden nicht nach.
+    event_id = new_id()
+    await flow.db.events.insert_one({"id": event_id, "slug": f"abend-{new_id()[:8]}", "status": "live", "visibility": "public"})
+    station = {"id": new_id(), "name": "Switch 1", "status": "free", "event_id": event_id, "tournament_id": None}
+    await flow.db.stations.insert_one(dict(station))
+    flow.act_as(await flow.add_staff())
+
+    response = await flow.post(f"/api/stations/{station['id']}/clear")
+
+    assert response.status_code == 200
+    public = change_events._event_for_scope(last_event(), "public")
+    assert public["resource"] == "stations"
+    assert public["parent_event_id"] == event_id and public["tournament_id"] is None
+    assert station["id"] not in str(public)

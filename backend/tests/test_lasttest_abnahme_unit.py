@@ -167,6 +167,11 @@ SPIELPLAN = {"tournaments", "matches", "matches-v2", "stations"}
     ({"resource": "matches", "tournament_id": "t2", "parent_event_id": "e2"}, SPIELPLAN, "t1", None, True),  # TV mit Schlüssel
     ({"resource": "tournaments", "tournament_id": "t2", "parent_event_id": "e1"}, {"tournaments"}, "t1", "e1", False),
     ({"resource": "f1", "tournament_id": "t1"}, {"tournaments"}, "t1", None, False),
+    # Station nur am Event (Codex-Prüfung): nennt das Event allein.
+    ({"resource": "stations", "tournament_id": None, "parent_event_id": "e1"}, SPIELPLAN, "t1", "e1", True),
+    ({"resource": "stations", "tournament_id": None, "parent_event_id": "e2"}, SPIELPLAN, "t1", "e1", False),
+    ({"resource": "stations", "tournament_id": None, "parent_event_id": "e2"}, SPIELPLAN, "t1", None, True),
+    ({"resource": "stations"}, SPIELPLAN, "t1", "e1", True),
 ])
 def test_reload_only_for_the_own_tournament_like_the_web(event, watched, tournament_id, event_id, expected):
     assert lasttest.wants_reload("change", event, watched, tournament_id, event_id) is expected
