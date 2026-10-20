@@ -1,5 +1,28 @@
 # Changelog
 
+## [1.6.0](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/compare/v1.5.0...v1.6.0) (2026-10-20)
+
+
+### Neu
+
+* Jahreszeiten-Vorschau mit Link „Auf der Website ansehen“ im selben Tab ([#1838](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1838)) ([071681e](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/071681ec80d91a5f452befefd6c494da7f403475))
+* Kalender je Serie – Termine einzeln oder als Liste einfügen, verschieben, absagen, ordnen ([#1742](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1742)) ([e733544](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/e73354475571330839913a1b41368e07e8430eb9))
+* Status je Termin im Wiener Tag mit Hinweis auf fehlende Ergebnisse ([#1742](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1742)) ([e733544](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/e73354475571330839913a1b41368e07e8430eb9))
+* Termine der Saison auf der Serienseite ([#1742](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1742)) ([e733544](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/e73354475571330839913a1b41368e07e8430eb9))
+
+
+### Fehlerbehebungen
+
+* Jahreszeiten-Vorschau sagt, warum Feuerwerk fehlt (Bewegung reduzieren, dezent, Website aus) ([#1838](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1838)) ([071681e](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/071681ec80d91a5f452befefd6c494da7f403475))
+* Spielplan nach Stationen nennt bei „Jetzt“ und „Als Nächstes“ Runde und Durchgang ([#1824](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1824)) ([fe97c64](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/fe97c648829854bbebf8d474bf762ae077bf685b))
+* Stationen der Turnierleitung und Spielplan nennen bei Läufen Durchgang und Namen statt „4 Teilnehmer“ ([#1824](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1824)) ([fe97c64](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/fe97c648829854bbebf8d474bf762ae077bf685b))
+* TV-Fußzeile „Als Nächstes“ nennt nach einem Austritt dieselbe Station und Spielerzahl wie die Live-Warteschlange ([#1828](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1828)) ([fe97c64](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/fe97c648829854bbebf8d474bf762ae077bf685b))
+
+
+### Dokumentation
+
+* Handbuch „Serien“ – Kalender der Saison ([#1742](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1742)) ([e733544](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/e73354475571330839913a1b41368e07e8430eb9))
+
 ## 1.5.0 (19.10.2026)
 
 ### Neu
