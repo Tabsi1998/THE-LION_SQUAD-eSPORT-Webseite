@@ -9,7 +9,8 @@ import { PublicLoadingState } from "@/components/tls/PublicLoadingState";
 import { LazyImg } from "@/components/tls/LazyImg";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
-import { ArrowRight, Pin, Newspaper, Crown, Lock, Search, X } from "lucide-react";
+import { ArrowRight, Pin, Newspaper, Crown, Lock } from "lucide-react";
+import { NewsFilterRow } from "@/components/tls/NewsFilterRow";
 import { formatAgo } from "@/lib/datetime";
 import { newsCategoryColor } from "@/lib/categoryColors";
 
@@ -19,7 +20,7 @@ export default function NewsPage() {
   useDocumentTitle("News", "Aktuelle News, Ergebnisse, Ankündigungen, Events und Turnier-Updates von THE LION SQUAD eSports aus Tirol.");
   const [searchParams, setSearchParams] = useSearchParams();
   const [list, setList] = useState([]);
-  const [meta, setMeta] = useState({ categories: [], visibilities: [] });
+  const [meta, setMeta] = useState({ categories: [], in_use: [], visibilities: [] });
   const [activeCat, setActiveCat] = useState(searchParams.get("category") || "");
   const [searchQuery, setSearchQuery] = useState(searchParams.get("q") || "");
   const [loading, setLoading] = useState(true);
@@ -76,43 +77,14 @@ export default function NewsPage() {
           Alles was im Rudel passiert — von Turnier-Recaps über Eventankündigungen bis zu Vereinsthemen.
         </p>
 
-        <div className="mt-8 space-y-4">
-          <div className="relative max-w-xl">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/35" />
-            <input
-              type="search"
-              value={searchQuery}
-              onChange={(e) => updateNewsFilters({ q: e.target.value })}
-              placeholder="News suchen"
-              data-testid="news-search"
-              className="w-full rounded-sm border border-white/10 bg-[#0A0A0A] py-3 pl-10 pr-11 text-sm text-white outline-none transition placeholder:text-white/30 focus:border-[#29B6E8]/60"
-            />
-            {hasSearch && (
-              <button
-                type="button"
-                onClick={() => updateNewsFilters({ q: "" })}
-                aria-label="Suche leeren"
-                className="absolute right-2 top-1/2 inline-flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-sm text-white/45 transition hover:bg-white/10 hover:text-white"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            )}
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <button
-              onClick={() => updateNewsFilters({ category: "" })}
-              data-testid="news-filter-all"
-              className={`px-4 py-2 text-xs uppercase tracking-wider font-bold rounded-sm transition ${!activeCat ? "bg-[#29B6E8] text-black" : "border border-white/10 text-white/60 hover:text-white"}`}
-            >Alle</button>
-            {meta.categories.map((c) => (
-              <button
-                key={c.k}
-                onClick={() => updateNewsFilters({ category: c.k })}
-                data-testid={`news-filter-${c.k}`}
-                className={`px-4 py-2 text-xs uppercase tracking-wider font-bold rounded-sm transition ${activeCat === c.k ? "bg-[#29B6E8] text-black" : "border border-white/10 text-white/60 hover:text-white"}`}
-              >{c.l}</button>
-            ))}
-          </div>
+        <div className="mt-8">
+          <NewsFilterRow
+            categories={meta.in_use || []}
+            active={activeCat}
+            onSelect={(category) => updateNewsFilters({ category })}
+            query={searchQuery}
+            onQuery={(q) => updateNewsFilters({ q })}
+          />
         </div>
 
         {loading ? (

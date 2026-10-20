@@ -614,22 +614,52 @@ async def delete_news(nid: str, me: dict = Depends(require_area("content"))):
     return {"ok": True}
 
 
+NEWS_CATEGORIES = [
+    {"k": "club", "l": "Verein"},
+    {"k": "tournaments", "l": "Turniere"},
+    {"k": "events", "l": "Events"},
+    {"k": "community", "l": "Community"},
+    {"k": "sponsors", "l": "Sponsoren"},
+    {"k": "members", "l": "Mitglieder"},
+    {"k": "teams", "l": "Teams"},
+    {"k": "announcement", "l": "Ankündigung"},
+    {"k": "recap", "l": "Rückblick"},
+    {"k": "maintenance", "l": "Wartung"},
+]
+# Ältere Beiträge tragen auch Kategorien außerhalb der Auswahl - dieselben Begriffe wie lib/newsCategories.js.
+EXTRA_CATEGORY_LABELS = {"video": "Video"}
+
+
+async def _categories_in_use(user: dict | None) -> list[dict]:
+    """Kategorien mit mindestens einem Beitrag, den dieser Besucher in der Liste sieht (#1249) - mit Anzahl. Dieselben
+    Regeln wie ``GET /news``: veröffentlicht, schon fällig und sichtbar; das Admin-Team zählt Entwürfe mit."""
+    db = get_db()
+    is_admin = _is_staff(user)
+    q: dict = {} if is_admin else {"published": True}
+    posts = await db.news_posts.find(q, {"_id": 0, "category": 1, "visibility": 1, "published_at": 1}).to_list(5000)
+    if not is_admin:
+        posts = [p for p in posts if _published_now(p)]
+    posts = await _filter_visible(posts, user)
+    counts: dict[str, int] = {}
+    for post in posts:
+        key = str(post.get("category") or "").strip().lower()
+        if key:
+            counts[key] = counts.get(key, 0) + 1
+    known = [{**row, "count": counts.pop(row["k"])} for row in NEWS_CATEGORIES if counts.get(row["k"])]
+    extra = [
+        {"k": key, "l": EXTRA_CATEGORY_LABELS.get(key) or key.replace("_", " ").capitalize(), "count": count}
+        for key, count in sorted(counts.items())
+    ]
+    return known + extra
+
+
 @router.get("/news-meta")
-async def news_meta():
-    """Public: list of valid categories and visibility options."""
+async def news_meta(user: dict | None = Depends(get_optional_user)):
+    """Public: list of valid categories and visibility options. ``in_use``: nur Kategorien mit Beiträgen, die dieser
+    Besucher sieht, samt Anzahl (#1249) - die Filterzeile der News-Seite."""
     return {
-        "categories": [
-            {"k": "club", "l": "Verein"},
-            {"k": "tournaments", "l": "Turniere"},
-            {"k": "events", "l": "Events"},
-            {"k": "community", "l": "Community"},
-            {"k": "sponsors", "l": "Sponsoren"},
-            {"k": "members", "l": "Mitglieder"},
-            {"k": "teams", "l": "Teams"},
-            {"k": "announcement", "l": "Ankündigung"},
-            {"k": "recap", "l": "Rückblick"},
-            {"k": "maintenance", "l": "Wartung"},
-        ],
+        "categories": NEWS_CATEGORIES,
+        "in_use": await _categories_in_use(user),
         "visibilities": [
             {"k": "public", "l": "Öffentlich"},
             {"k": "community", "l": "Nur registrierte Community"},
