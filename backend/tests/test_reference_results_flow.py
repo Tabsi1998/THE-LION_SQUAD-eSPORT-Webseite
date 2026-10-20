@@ -822,3 +822,31 @@ async def test_team_league_own_match_and_the_official_table_with_deviation(flow)
     stored = await _standing(flow, ctx, 0, "table")
     assert [(row["team"], row["points"], row["deviation"]) for row in stored] == [
         ("Probe Löwen", 4, 1), ("Probe Gegner", 0, None)]
+
+
+@pytest.mark.asyncio
+async def test_followups_stay_until_the_recompute_succeeded(flow, monkeypatch):
+    # Codex (4. Runde): scheitert das Neurechnen beim Nachziehen, darf der Nachtrag nicht verloren gehen.
+    await flow.db.reference_series.insert_one({"id": "s-folge", "alias_followups": [{"id": "f1", "alias_id": "a1"}]})
+    calls = []
+
+    async def no_change(db, series_id, followup):
+        return []
+
+    async def failing_recompute(db, series):
+        calls.append(series["id"])
+        raise RuntimeError("Neurechnen gescheitert")
+
+    monkeypatch.setattr(reference_series.series_participants, "follow_alias", no_change)
+    monkeypatch.setattr(reference_series, "recompute_standings", failing_recompute)
+    await reference_series._catch_up(flow.db, "s-folge")
+    assert len((await flow.db.reference_series.find_one({"id": "s-folge"}))["alias_followups"]) == 1
+
+    async def working_recompute(db, series):
+        calls.append(series["id"])
+
+    monkeypatch.setattr(reference_series, "recompute_standings", working_recompute)
+    await reference_series._catch_up(flow.db, "s-folge")
+    # Auch ohne neue Änderung wird neu gerechnet - der frühere Versuch hatte schon nachgezogen.
+    assert calls == ["s-folge", "s-folge"]
+    assert (await flow.db.reference_series.find_one({"id": "s-folge"})).get("alias_followups") == []

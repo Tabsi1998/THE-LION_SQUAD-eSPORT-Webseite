@@ -53,10 +53,13 @@ async def _catch_up(db, series_id: str) -> None:
         changed = []
         for followup in pending:
             changed += await series_participants.follow_alias(db, series_id, followup)
+        # Immer neu rechnen, auch wenn diesmal nichts mehr zu ändern war: ein früherer Versuch kann die Teilnehmer schon
+        # nachgezogen haben und erst beim Neurechnen gescheitert sein.
+        await recompute_standings(db, series)
+        # Erst nach dem erfolgreichen Neurechnen austragen: scheitert es, bleibt der Nachtrag für den nächsten Vorgang
+        # stehen (das Nachziehen selbst ist wiederholbar).
         await db.reference_series.update_one(
             {"id": series_id}, {"$pull": {"alias_followups": {"id": {"$in": [item.get("id") for item in pending]}}}})
-        if changed:
-            await recompute_standings(db, series)
     except Exception:
         logger.exception("Nachträge aus Zuordnungen anderer Saisons ließen sich nicht anwenden")
 
