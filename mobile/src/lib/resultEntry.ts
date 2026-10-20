@@ -13,7 +13,8 @@ export type ResultRow = { registration_id: string; rank: number; score?: number;
 export type Outcome = { results: ResultRow[]; error?: undefined } | { error: string; results?: undefined };
 export type Flags = Record<string, SideFlag | null | undefined>;
 
-export type EntryParticipant = { registration_id: string; name?: string | null; slot?: number | null };
+// `no_show` (#1823/#1840): im offenen Lauf als nicht erschienen markiert - der Server schickt es mit.
+export type EntryParticipant = { registration_id: string; name?: string | null; slot?: number | null; no_show?: boolean };
 export type ResultEntry = {
   id: string;
   match_key?: string | null;
@@ -226,10 +227,13 @@ export function initialState(entry: ResultEntry | null | undefined): EntryState 
   const byId = Object.fromEntries((entry?.result || []).map((row) => [row.registration_id, row]));
   const flags: Flags = {};
   const scores: Record<string, number> = {};
+  // Im Lauf als nicht erschienen markiert (#1840, wie Web #1823): ohne gespeichertes Ergebnis schon so da.
+  const marked = new Set((entry?.participants || []).filter((row) => row.no_show).map((row) => row.registration_id));
   for (const id of sides) {
     const row = byId[id];
     if (row?.forfeit) flags[id] = "no_show";
     else if (row?.dnf) flags[id] = "gave_up";
+    else if (!row && marked.has(id)) flags[id] = "no_show";
     scores[id] = Number(row?.score ?? row?.points ?? 0);
   }
   const order = [...(entry?.result || [])].filter((row) => !row.forfeit && !row.dnf).sort((a, b) => Number(a.rank) - Number(b.rank)).map((row) => row.registration_id);
