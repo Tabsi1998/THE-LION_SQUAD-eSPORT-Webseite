@@ -164,9 +164,13 @@ async def test_running_loads_details_for_at_most_twelve_series(flow, monkeypatch
                             "status": "active", "visibility": "public", "order_index": 5})
     await flow.db.reference_lineages.insert_many(lineages)
     await flow.db.reference_series.insert_many(series_docs)
-    # Ein Termin heute in der letzten Serie: sie muss trotz hinterer Reihenfolge unter den zwölf sein.
-    await flow.db.reference_rounds.insert_one({
-        "id": "r-heute", "series_id": "s14", "order": 1, "club_day": "2026-11-09", "status": "planned"})
+    # Die ersten 13 haben einen späten Termin, die letzte einen frühen (nach der Reihenfolge käme sie zuletzt),
+    # eine ohne Termin: Die zwölf sind die mit den frühesten nächsten Terminen.
+    await flow.db.reference_rounds.insert_many(
+        [{"id": f"r{number}", "series_id": f"s{number}", "order": 1, "club_day": "2026-12-01", "status": "planned"}
+         for number in range(13)]
+        + [{"id": "r-frueh", "series_id": "s14", "order": 1, "club_day": "2026-11-12", "status": "planned"},
+           {"id": "r-weg", "series_id": "s13", "order": 1, "club_day": "2026-11-10", "status": "cancelled"}])
     loaded = []
     original = reference_series_public_routes.calendar_view
 
@@ -178,5 +182,8 @@ async def test_running_loads_details_for_at_most_twelve_series(flow, monkeypatch
     flow.act_as(None)
     items = (await flow.get(RUNNING)).json()["items"]
     assert len(items) == 12 and len(loaded) == 12
-    today = [item["lineage"]["slug"] for item in items if item["today"]]
-    assert sorted(today) == ["l14", "probe-monatscup"]
+    slugs = [item["lineage"]["slug"] for item in items]
+    assert slugs[:3] == ["probe-monatscup", "l14", "probe-liga-4vs4"]
+    assert "l13" not in slugs and "l12" not in slugs
+    days = [item["next"]["club_day"] for item in items]
+    assert days == sorted(days)

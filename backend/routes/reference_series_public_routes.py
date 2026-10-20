@@ -197,10 +197,14 @@ async def public_running(request: Request, user: dict | None = Depends(get_optio
             visible_pairs.append((lineage, series))
     if not visible_pairs:
         return {"today": today, "items": []}
-    on_today = {item["series_id"] async for item in db.reference_rounds.find(
-        {"series_id": {"$in": [series["id"] for _, series in visible_pairs]}, "club_day": today,
-         "status": {"$nin": ["cancelled", "scored"]}, "archived_at": None}, {"_id": 0, "series_id": 1})}
-    visible_pairs.sort(key=lambda pair: (pair[1]["id"] not in on_today, pair[1].get("order_index") or 0,
+    # Der nächste offene Termin je Serie in EINER Abfrage: nicht abgesagt, nicht gewertet, nicht archiviert, ab heute.
+    next_day = {item["_id"]: item["day"] async for item in db.reference_rounds.aggregate([
+        {"$match": {"series_id": {"$in": [series["id"] for _, series in visible_pairs]},
+                    "club_day": {"$gte": today}, "status": {"$nin": ["cancelled", "scored"]},
+                    "archived_at": None}},
+        {"$group": {"_id": "$series_id", "day": {"$min": "$club_day"}}}])}
+    # Heute zuerst (der nächste Termin ist dann heute), dann nach nächstem Termin, ohne Termin ans Ende.
+    visible_pairs.sort(key=lambda pair: (next_day.get(pair[1]["id"]) or "9999", pair[1].get("order_index") or 0,
                                          str(pair[0].get("title") or "")))
     shown = visible_pairs[:RUNNING_LIMIT]
     ids = [series["id"] for _, series in shown]
