@@ -17,7 +17,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 
 from flow_harness import make_flow, new_id  # noqa: E402
-from services import tv_display  # noqa: E402
+from services import change_events, tv_display  # noqa: E402
 from services.access_links import hash_access_token  # noqa: E402
 
 
@@ -282,3 +282,65 @@ async def test_stations_of_tournaments_the_hall_does_not_show_stay_off_it(flow):
     assert sorted(row["name"] for row in body["stations"]) == ["Beamer", "Switch 1"]
     for hidden in (internal_cup, draft, hidden_cup):
         assert hidden["id"] not in json.dumps(body)
+
+
+@pytest.mark.asyncio
+async def test_screens_share_a_short_cached_answer_that_ends_with_each_change(flow, monkeypatch):
+    """Mehrere Bildschirme laden nach einer Änderung zugleich: Die Antwort je Event wird kurz zwischengespeichert und
+    verfällt mit jeder Änderungsmeldung und nach CACHE_SECONDS. Der Schlüssel zählt bei jedem Abruf."""
+    from routes import event_display_routes
+
+    staff = await flow.add_user(role="tournament_admin", name="Turnierleitung")
+    flow.act_as(staff)
+    event = await event_of(flow)
+    await cup_of(flow, event, "Probelauf-Cup", visibility="members")
+    created = await event_key(flow, event)
+    built = []
+    original = event_display_routes._build
+
+    async def counting(db, shown_event):
+        built.append(shown_event["id"])
+        return await original(db, shown_event)
+
+    monkeypatch.setattr(event_display_routes, "_build", counting)
+    flow.act_as(None)
+    first = await hall(flow, event["id"], created["token"])
+    second = await hall(flow, event["slug"], created["token"])
+    assert first.status_code == second.status_code == 200
+    assert first.json() == second.json() and built == [event["id"]], "der zweite Bildschirm bekommt dieselbe Antwort"
+
+    await change_events.publish_api_change("POST", "/api/matches/m-1/result", 200)
+    assert (await hall(flow, event["id"], created["token"])).status_code == 200
+    assert len(built) == 2, "eine Änderungsmeldung macht den Zwischenspeicher ungültig"
+
+    later = event_display_routes._clock() + event_display_routes.CACHE_SECONDS + 1
+    monkeypatch.setattr(event_display_routes, "_clock", lambda: later)
+    assert (await hall(flow, event["id"], created["token"])).status_code == 200
+    assert len(built) == 3, "nach CACHE_SECONDS wird neu gebaut"
+
+    assert (await hall(flow, event["id"], "erfunden")).status_code == 403, "aus dem Zwischenspeicher nur mit gültigem Schlüssel"
+    flow.act_as(staff)
+    revoked = await flow.delete(f"/api/tv/keys/{created['id']}")
+    assert revoked.status_code == 200
+    flow.act_as(None)
+    assert (await hall(flow, event["id"], created["token"])).status_code == 403
+    assert len(built) == 3
+
+
+@pytest.mark.asyncio
+async def test_a_generous_limit_per_address_and_per_key(flow, monkeypatch):
+    from routes import event_display_routes
+
+    assert event_display_routes.RATE_LIMIT >= 300 and event_display_routes.CACHE_SECONDS <= 10, "großzügig und kurz"
+    monkeypatch.setattr(event_display_routes, "RATE_LIMIT", 3)
+    monkeypatch.setattr(event_display_routes, "RATE_WINDOW_SECONDS", 86400)
+    flow.act_as(await flow.add_user(role="tournament_admin", name="Turnierleitung"))
+    event = await event_of(flow)
+    token = (await event_key(flow, event))["token"]
+    flow.act_as(None)
+    for _ in range(3):
+        assert (await hall(flow, event["id"], token)).status_code == 200
+    limited = await hall(flow, event["id"], token)
+    assert limited.status_code == 429 and limited.headers.get("retry-after")
+    # Auch falsche Schlüssel zählen für die Adresse.
+    assert (await hall(flow, event["id"], "erfunden")).status_code == 429

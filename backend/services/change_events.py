@@ -119,6 +119,11 @@ def _next_version() -> int:
     return _version
 
 
+def current_version() -> int:
+    """Die Nummer der letzten Meldung in diesem Prozess - ein kurzer Zwischenspeicher verfällt, sobald sie sich ändert."""
+    return _version
+
+
 def _utc_now() -> str:
     return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
 
