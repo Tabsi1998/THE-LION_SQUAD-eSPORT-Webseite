@@ -85,14 +85,54 @@ SVG_REFUSED_MESSAGE = (
 )
 
 
+SVG_SNIFF_BYTES = 8192
+_RASTER_MAGIC = (b"\x89PNG", b"\xff\xd8\xff", b"RIFF", b"GIF8")
+_XML_SKIPPED = ((b"<?", b"?>"), (b"<!--", b"-->"), (b"<!", b">"))
+_WHITESPACE = b" \t\r\n\x0b\x0c"
+
+
+def _first_element_name(start: bytes) -> bytes:
+    """Name des ersten Elements nach BOM, Leerraum, XML-Deklaration, Kommentaren, DOCTYPE und Anweisungen.
+    Lineares Durchgehen mit ``find`` statt Regex; ohne Element oder bei abgeschnittenem Vorspiel leer."""
+    pos = 0
+    size = len(start)
+    if start.startswith(b"\xef\xbb\xbf"):
+        pos = 3
+    while pos < size:
+        while pos < size and start[pos] in _WHITESPACE:
+            pos += 1
+        if pos >= size or start[pos:pos + 1] != b"<":
+            return b""
+        for opener, closer in _XML_SKIPPED:
+            if start.startswith(opener, pos):
+                end = start.find(closer, pos + len(opener))
+                if end < 0:
+                    return b""
+                pos = end + len(closer)
+                break
+        else:
+            end = pos + 1
+            while end < size and start[end] not in _WHITESPACE + b"/>":
+                end += 1
+            return start[pos + 1:end]
+    return b""
+
+
 def looks_like_svg(suffix: str = "", content_type: str = "", head: bytes = b"") -> bool:
-    """SVG nach Endung, Typ oder Anfang des Inhalts (``<svg`` oder ``<?xml``)."""
+    """SVG nach Endung, Typ oder Inhalt: erstes Element heißt ``svg`` (auch ``svg:svg``, Groß-/Kleinschreibung egal),
+    oder der Anfang ist Text mit ``<``, kein bekanntes Rasterformat und enthält irgendwo ``<svg``."""
     if (suffix or "").strip().lower() == ".svg":
         return True
     if (content_type or "").split(";")[0].strip().lower() == "image/svg+xml":
         return True
-    start = (head or b"")[:512].lstrip(b"\xef\xbb\xbf \t\r\n").lower()
-    return start.startswith((b"<svg", b"<?xml"))
+    start = (head or b"")[:SVG_SNIFF_BYTES]
+    if start.startswith(_RASTER_MAGIC):
+        return False
+    name = _first_element_name(start).lower()
+    if name == b"svg" or name.endswith(b":svg"):
+        return True
+    text = start[3:] if start.startswith(b"\xef\xbb\xbf") else start
+    return text.lstrip(_WHITESPACE).startswith(b"<") and b"<svg" in start.lower()
 MAX_VIDEO_BYTES = MAX_VIDEO_UPLOAD_MB * 1024 * 1024
 MAX_DOC_BYTES = MAX_DOCUMENT_UPLOAD_MB * 1024 * 1024  # docs
 MAX_ORIGINAL_BYTES = MAX_ORIGINAL_UPLOAD_MB * 1024 * 1024

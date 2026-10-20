@@ -196,3 +196,26 @@ def test_other_broken_images_keep_their_old_message_and_real_images_still_pass()
         Image.new("RGB", (8, 8), "#29B6E8").save(source, format=fmt)
         encoded = image_upload._encode_image_bytes(source.getvalue(), "", ext, "bild" + ext)
         assert encoded["data"]
+
+
+def test_disguised_svg_is_found_after_comment_doctype_long_prelude_prefix_and_bom():
+    body = b'<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"><rect width="10" height="10"/></svg>'
+    disguised = {
+        "Kommentar": b"<!-- von Hand gemacht -->" + body,
+        "XML und Kommentar": b'<?xml version="1.0"?>\n<!-- c -->\n' + body,
+        "DOCTYPE": b'<?xml version="1.0"?><!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">' + body,
+        "langes Vorspiel": b"<!-- " + b"x" * 3000 + b" -->" + body,
+        "Namensraum-Praefix": b'<svg:svg xmlns:svg="http://www.w3.org/2000/svg" width="10"></svg:svg>',
+        "Grossbuchstaben": b"<SVG width=\"10\"></SVG>",
+        "BOM": b"\xef\xbb\xbf" + body,
+        "BOM und Kommentar": b"\xef\xbb\xbf  <!-- c -->" + body,
+        "Text vor dem Element": b"<html><body>" + body + b"</body></html>",
+    }
+    for name, data in disguised.items():
+        assert _refusal(FakeUpload("logo.png", "image/png", data)) == image_upload.SVG_REFUSED_MESSAGE, name
+    # Kein SVG: Rasterformate und anderer Text bleiben bei der alten Meldung.
+    assert image_upload.looks_like_svg(".png", "image/png", b"\x89PNG\r\n\x1a\n<svg") is False
+    assert image_upload.looks_like_svg(".jpg", "image/jpeg", b"\xff\xd8\xff\xe0<svg") is False
+    assert image_upload.looks_like_svg(".png", "image/png", b"<html><body>hallo</body></html>") is False
+    assert image_upload.looks_like_svg(".png", "image/png", b"<!-- offen") is False
+    assert _refusal(FakeUpload("kaputt.png", "image/png", b"<html></html>")) == "Ungültige Bilddatei"
