@@ -16,7 +16,7 @@ import json
 import time
 import uuid
 from collections import deque
-from collections.abc import Iterable
+from collections.abc import Awaitable, Callable, Iterable
 from contextlib import suppress
 from datetime import datetime, timezone
 
@@ -68,11 +68,22 @@ SCOPE_PUBLIC_KEY = "_scope_public"
 # Unter /api/tournaments/<…>, aber kein Turnier.
 NON_TOURNAMENT_SEGMENTS = frozenset({"onsite"})
 _SCOPE_FIELDS = {"_id": 0, "id": 1, "event_id": 1, "status": 1, "is_public": 1, "visibility": 1}
+# Nachschlagen nur einmal je Turnier, Spiel oder Station (Codex-Prüfung #1801): Am Turnierabend schreiben Helfer und
+# Anmeldungen dauernd in dieselben Turniere. Die Frist begrenzt, wie lange eine Änderung auf anderem Weg (etwa direkt
+# in der Datenbank) unbemerkt bleibt; was Turnier, Event oder Station selbst ändert, leert den Speicher sofort.
+SCOPE_CACHE_SECONDS = 45.0
+SCOPE_CACHE_SIZE = 1024
+# Unter /api/tournaments/<id>/…: Aktionen, die Status oder Sichtbarkeit des Turniers ändern (Entwurf zurück).
+SCOPE_RESET_ACTIONS = frozenset({"status", "reset-bracket"})
 EVENT_BUFFER_SIZE = 256
 SUBSCRIBER_QUEUE_SIZE = 100
 
 _subscribers: set[tuple[asyncio.Queue, str, str | None]] = set()
 _event_buffer: deque[dict] = deque(maxlen=EVENT_BUFFER_SIZE)
+_scope_cache: dict[tuple[str, str], tuple[float, dict | None]] = {}
+_scope_generation = 0
+# Laufende Meldungen neben der Antwort - gehalten, damit keine vorzeitig aufgeräumt wird.
+_pending_publishes: set[asyncio.Task] = set()
 _stream_epoch = str(uuid.uuid4())
 _version = 0
 
@@ -160,15 +171,18 @@ def _build_api_change_event(method: str, path: str, status_code: int) -> dict:
     }
 
 
+def _api_parts(path: str) -> list[str]:
+    parts = [part for part in _normalized_path(path).split("/") if part]
+    return parts[1:] if parts and parts[0] == "api" else parts
+
+
 def _scope_target(path: str) -> tuple[str, str] | None:
     """Worauf eine Änderung zeigt (#1801): ``("tournament", Kennung oder Slug)``, ``("match", Kennung)`` oder None.
 
     Ohne Turnier bleiben Stationen (die Turniere eines Events teilen sie sich), das Turnier selbst (Einstellungen, Event,
     Sichtbarkeit - danach sollen alle Seiten nachladen), neue Turniere und was zu keinem Turnier gehört (Vor-Ort-Zugang).
     """
-    parts = [part for part in _normalized_path(path).split("/") if part]
-    if parts and parts[0] == "api":
-        parts = parts[1:]
+    parts = _api_parts(path)
     if len(parts) < 2:
         return None
     resource, ref = parts[0], parts[1]
@@ -179,6 +193,30 @@ def _scope_target(path: str) -> tuple[str, str] | None:
     if resource == "tournaments" and len(parts) > 2 and ref not in NON_TOURNAMENT_SEGMENTS:
         return "tournament", ref
     return None
+
+
+def _invalidates_scope(path: str) -> bool:
+    """Ändert die Anfrage Turnier oder Event selbst (Sichtbarkeit, Event, Status)?"""
+    parts = _api_parts(path)
+    if len(parts) < 2 or parts[0] not in {"tournaments", "events"}:
+        return False
+    return len(parts) == 2 or (parts[0] == "tournaments" and len(parts) == 3 and parts[2] in SCOPE_RESET_ACTIONS)
+
+
+def reset_scope_cache() -> None:
+    global _scope_generation
+    _scope_generation += 1
+    _scope_cache.clear()
+
+
+def _clock() -> float:
+    return time.monotonic()
+
+
+async def _public_event(db, event_id: str) -> bool:
+    """Wie die Event-Seite für Gäste: kein Entwurf, Sichtbarkeit öffentlich."""
+    event = await db.events.find_one({"id": event_id}, {"_id": 0, "status": 1, "visibility": 1})
+    return bool(event) and event.get("status") != "draft" and (event.get("visibility") or "public") == "public"
 
 
 async def _lookup_scope(db, kind: str, ref: str) -> dict | None:
@@ -200,22 +238,35 @@ async def _lookup_scope(db, kind: str, ref: str) -> dict | None:
     event_id = tournament.get("event_id") or None
     visible = public_tournament(tournament)
     if visible and event_id:
-        event = await db.events.find_one({"id": event_id}, {"_id": 0, "status": 1, "visibility": 1})
-        visible = bool(event) and event.get("status") != "draft" and (event.get("visibility") or "public") == "public"
+        visible = await _public_event(db, event_id)
     return {"tournament_id": tournament["id"], "parent_event_id": event_id, SCOPE_PUBLIC_KEY: visible}
 
 
 async def _change_scope(path: str) -> dict:
+    """Turnier und Event einer Änderung, aus dem Zwischenspeicher oder frisch nachgeschlagen."""
+    if _invalidates_scope(path):
+        reset_scope_cache()
     target = _scope_target(path)
     if not target:
         return {}
+    now = _clock()
+    cached = _scope_cache.get(target)
+    if cached and cached[0] > now:
+        return cached[1] or {}
+    generation = _scope_generation
     try:
         from database import get_db
 
-        return await _lookup_scope(get_db(), *target) or {}
+        scope = await _lookup_scope(get_db(), *target)
     except Exception:
         # Die Meldung geht auch ohne Kennung hinaus - dann laden alle Seiten nach, wie vor #1801.
         return {}
+    # Wurde der Speicher während des Nachschlagens geleert, ist das Ergebnis vielleicht schon alt: nicht merken.
+    if generation == _scope_generation:
+        if len(_scope_cache) >= SCOPE_CACHE_SIZE:
+            _scope_cache.pop(next(iter(_scope_cache)))
+        _scope_cache[target] = (now + SCOPE_CACHE_SECONDS, scope)
+    return scope or {}
 
 
 def _build_user_change_event(resource: str, user_ids: frozenset[str]) -> dict:
@@ -339,6 +390,21 @@ async def publish_api_change(method: str, path: str, status_code: int):
     event.update(scope)
     _event_buffer.append(event)
     _deliver(event)
+
+
+def publish_api_change_detached(method: str, path: str, status_code: int) -> Callable[[], Awaitable[None]]:
+    """Die Meldung einer schreibenden Anfrage neben der Antwort (#1801, Codex-Prüfung): Sie startet sofort als eigene
+    Aufgabe, die Antwort wartet nicht auf das Nachschlagen des Turniers. Zurück kommt, worauf die Middleware nach dem
+    Senden der Antwort wartet (so laufen Tests und Reihenfolge wie bisher). Bricht die Verbindung ab und damit dieses
+    Warten, geht die Meldung trotzdem hinaus (``shield``)."""
+    task = asyncio.create_task(publish_api_change(method, path, status_code))
+    _pending_publishes.add(task)
+    task.add_done_callback(_pending_publishes.discard)
+
+    async def wait() -> None:
+        await asyncio.shield(task)
+
+    return wait
 
 
 # Anzeige-Ereignisse (#1553) für Web und TV: was sich im Baum getan hat, als Typ - damit eine Animation weiß, ob ein

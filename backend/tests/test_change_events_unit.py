@@ -14,9 +14,11 @@ def reset_change_event_state():
     change_events._subscribers.clear()
     change_events._event_buffer.clear()
     change_events._version = 0
+    change_events.reset_scope_cache()
     yield
     change_events._subscribers.clear()
     change_events._event_buffer.clear()
+    change_events.reset_scope_cache()
 
 
 @pytest.fixture(autouse=True)
@@ -467,3 +469,87 @@ def test_change_is_published_even_if_the_tournament_lookup_fails(monkeypatch):
 
     assert event["resource"] == "tournaments"
     assert event.get("tournament_id") is None
+
+
+# Zwischenspeicher (#1801, Codex-Prüfung): Jede schreibende Anfrage schlug Turnier, Event und Sichtbarkeit nach. Am
+# Turnierabend schreiben Helfer und Anmeldungen dauernd in dieselben Turniere - einmal je Turnier genügt, bis es selbst
+# (Einstellungen, Status, Event, Station) sich ändert oder die kurze Frist abläuft.
+
+def counting_lookups(monkeypatch):
+    calls = []
+    original = change_events._lookup_scope
+
+    async def counting(db, kind, ref):
+        calls.append((kind, ref))
+        return await original(db, kind, ref)
+
+    monkeypatch.setattr(change_events, "_lookup_scope", counting)
+    return calls
+
+
+def test_repeated_changes_look_the_tournament_up_once(scope_db, monkeypatch):
+    async def seed():
+        await add_tournament(scope_db, "t-1")
+        await scope_db.matches_v2.insert_one({"id": "m-1", "tournament_id": "t-1"})
+
+    asyncio.run(seed())
+    calls = counting_lookups(monkeypatch)
+
+    for _ in range(3):
+        publish("POST", "/api/tournaments/t-1/live-queue/call")
+        publish("POST", "/api/matches/m-1/result")
+
+    assert calls == [("tournament", "t-1"), ("match", "m-1")]
+    assert [public_view(event)["tournament_id"] for event in change_events._event_buffer] == ["t-1"] * 6
+
+
+@pytest.mark.parametrize("method, path", [
+    ("PATCH", "/api/tournaments/t-1"),
+    ("POST", "/api/tournaments/t-1/status"),
+    ("POST", "/api/tournaments/t-1/reset-bracket"),
+    ("PATCH", "/api/events/e-anderes"),
+])
+def test_a_change_to_tournament_or_event_itself_drops_the_cache(scope_db, monkeypatch, method, path):
+    asyncio.run(add_tournament(scope_db, "t-1"))
+    calls = counting_lookups(monkeypatch)
+    assert public_view(publish("POST", "/api/tournaments/t-1/register"))["tournament_id"] == "t-1"
+
+    # Das Turnier ist jetzt nur für Mitglieder - die nächste Meldung darf es nicht mehr nennen.
+    asyncio.run(scope_db.tournaments.update_one({"id": "t-1"}, {"$set": {"visibility": "members"}}))
+    publish(method, path)
+
+    assert public_view(publish("POST", "/api/tournaments/t-1/register")).get("tournament_id") is None
+    assert calls.count(("tournament", "t-1")) == 2
+
+
+def test_a_lookup_overtaken_by_a_change_is_not_remembered(scope_db, monkeypatch):
+    asyncio.run(add_tournament(scope_db, "t-1"))
+    calls = []
+    original = change_events._lookup_scope
+
+    async def overtaken(db, kind, ref):
+        calls.append(ref)
+        result = await original(db, kind, ref)
+        change_events.reset_scope_cache()  # währenddessen ändert jemand das Turnier selbst
+        return result
+
+    monkeypatch.setattr(change_events, "_lookup_scope", overtaken)
+    publish("POST", "/api/tournaments/t-1/register")
+    publish("POST", "/api/tournaments/t-1/register")
+
+    assert calls == ["t-1", "t-1"]
+
+
+def test_the_cache_expires_after_a_short_while(scope_db, monkeypatch):
+    asyncio.run(add_tournament(scope_db, "t-1"))
+    calls = counting_lookups(monkeypatch)
+    now = [1000.0]
+    monkeypatch.setattr(change_events, "_clock", lambda: now[0])
+
+    publish("POST", "/api/tournaments/t-1/register")
+    now[0] += change_events.SCOPE_CACHE_SECONDS - 1
+    publish("POST", "/api/tournaments/t-1/register")
+    assert len(calls) == 1
+    now[0] += 2
+    publish("POST", "/api/tournaments/t-1/register")
+    assert len(calls) == 2
