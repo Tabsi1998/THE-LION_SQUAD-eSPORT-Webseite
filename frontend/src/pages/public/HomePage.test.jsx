@@ -202,6 +202,10 @@ test("Heute im Einsatz: Streifen über dem Kopf nur mit heutigem Termin", async 
   const view = render(<MemoryRouter><HomePage /></MemoryRouter>);
   const strip = await screen.findByTestId("home-today");
   expect(strip).toHaveTextContent("Probe Monatscup");
+  // Einmal je Seitenaufruf, kein Polling: auch ein Neuladen der Startseite über den Strom fragt nicht nochmal.
+  await act(async () => { await invalidate({ resource: "tournaments" }); });
+  await act(async () => { await new Promise((done) => setTimeout(done, 50)); });
+  expect(apiMock.get.mock.calls.filter(([path]) => path === "/reference-series/public/running")).toHaveLength(1);
   expect(strip.compareDocumentPosition(screen.getByTestId("home-hero-grain")) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   view.unmount();
 
