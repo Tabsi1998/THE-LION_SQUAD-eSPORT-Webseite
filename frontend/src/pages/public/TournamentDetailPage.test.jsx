@@ -10,7 +10,8 @@ let authUser = null;
 vi.mock("@/lib/api", () => ({ api: apiMock, formatApiError: (e, f) => f || String(e), resolveMediaUrl: (u) => u }));
 vi.mock("@/context/AuthContext", () => ({ useAuth: () => ({ user: authUser }) }));
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
-vi.mock("@/hooks/useLiveRefresh", () => ({ useLiveRefresh: () => {} }));
+const liveCalls = [];
+vi.mock("@/hooks/useLiveRefresh", () => ({ useLiveRefresh: (load, resources, options) => { liveCalls.push({ resources, options }); } }));
 vi.mock("@/hooks/useCanonicalSlugRedirect", () => ({ useCanonicalSlugRedirect: () => {} }));
 vi.mock("@/hooks/useDocumentTitle", () => ({ useDocumentTitle: () => {} }));
 vi.mock("@/components/tls/ConfirmDialog", () => ({ useConfirm: () => async () => true }));
@@ -411,4 +412,15 @@ test("beendet, aber noch nicht veröffentlicht: Podest als „vorläufig“, noc
   await screen.findByTestId("podium");
   expect(screen.getByTestId("podium-provisional")).toHaveTextContent("vorläufig");
   expect(ceremonyQueue.getCurrent()).toBeNull();
+});
+
+// #1801: Die Turnierseite lädt nur bei Änderungen ihres Turniers nach - bis es geladen ist, bei jeder.
+test("die Seite hört nach dem Laden nur noch auf das eigene Turnier", async () => {
+  mockApi(base);
+  liveCalls.length = 0;
+  renderPage();
+  const page = () => liveCalls.filter((call) => call.options?.fallbackMs === 10000);
+  expect(page()[0].options.tournamentId).toBeFalsy();
+  await screen.findAllByText("Herbst-Cup");
+  await waitFor(() => expect(page().at(-1).options.tournamentId).toBe("t1"));
 });

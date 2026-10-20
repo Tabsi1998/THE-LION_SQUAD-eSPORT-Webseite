@@ -7,7 +7,8 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 const apiMock = { get: vi.fn() };
 let refresh = null;
 vi.mock("@/lib/api", () => ({ api: apiMock, API: "/api" }));
-vi.mock("@/hooks/useLiveRefresh", () => ({ useLiveRefresh: (callback) => { refresh = callback; } }));
+let liveOptions = null;
+vi.mock("@/hooks/useLiveRefresh", () => ({ useLiveRefresh: (callback, resources, options) => { refresh = callback; liveOptions = options; } }));
 vi.mock("@/hooks/useCanonicalSlugRedirect", () => ({ useCanonicalSlugRedirect: () => {} }));
 vi.mock("@/hooks/useDocumentTitle", () => ({ useDocumentTitle: () => {} }));
 vi.mock("@/components/tls/PublicLayout", () => ({ PublicLayout: ({ children }) => <div>{children}</div> }));
@@ -101,4 +102,13 @@ test("Liga: Spiele, Differenz, Form und Pfeile seit dem vorigen Spieltag", async
     else expect(tr).not.toHaveAttribute("data-mine");
   }
   expect(screen.getAllByText("Du")).toHaveLength(1);
+});
+
+// #1801: Die Rangliste lädt nur bei Änderungen ihres Turniers nach - bis es geladen ist, bei jeder.
+test("hört nach dem Laden nur noch auf das eigene Turnier", async () => {
+  mockApi(rows(["Anna"]));
+  renderPage();
+  expect(liveOptions.tournamentId).toBeFalsy();
+  await screen.findByTestId("standing-row-r-Anna");
+  await waitFor(() => expect(liveOptions.tournamentId).toBe("t1"));
 });

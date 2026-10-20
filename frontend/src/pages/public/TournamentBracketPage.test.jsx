@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
-import { act, render, screen } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 
 // Turnierbaum-Seite (#1561): nach einer Neuverbindung holt der nächste Stand Verpasstes nach - ohne Bewegung.
-const live = { connected: true, load: null };
+const live = { connected: true, load: null, options: null };
 
 vi.mock("@/lib/api", () => ({
   resolveMediaUrl: (value) => value,
@@ -12,7 +12,7 @@ vi.mock("@/lib/api", () => ({
     : { data: { id: "t1", slug: "cup", title: "Cup" } })) },
 }));
 vi.mock("@/hooks/useLiveRefresh", () => ({
-  useLiveRefresh: (load) => { live.load = load; return live.connected; },
+  useLiveRefresh: (load, resources, options) => { live.load = load; live.options = options; return live.connected; },
 }));
 vi.mock("@/components/tls/PublicLayout", () => ({ PublicLayout: ({ children }) => <div>{children}</div> }));
 vi.mock("@/components/tls/BracketTree", () => ({
@@ -49,5 +49,13 @@ describe("TournamentBracketPage", () => {
     expect(screen.getByTestId("tree")).toHaveAttribute("data-quiet", "1");
     await act(async () => { await live.load(); });
     expect(screen.getByTestId("tree")).toHaveAttribute("data-quiet", "0");
+  });
+
+  // #1801: nur Änderungen dieses Turniers laden nach - bis es geladen ist, jede.
+  it("hört nach dem Laden nur noch auf das eigene Turnier", async () => {
+    renderPage();
+    expect(live.options?.tournamentId).toBeFalsy();
+    await screen.findByTestId("tree");
+    await waitFor(() => expect(live.options?.tournamentId).toBe("t1"));
   });
 });

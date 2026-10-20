@@ -21,6 +21,7 @@ from services.competition_versions import persist_competition_versions
 from services.tv_display import ROUND_SPONSOR_MAX, pause_until_value, round_sponsor_rows
 from models import now_utc
 from services.log_safe import log_safe
+from services.change_events import reset_scope_cache
 from routes.tournament_common import (
     _apply_match_plan,
     _audit_tournament_action,
@@ -375,6 +376,7 @@ async def set_status(tid: str, body: dict, me: dict = Depends(get_current_user),
         if pause_unset:
             change["$unset"] = pause_unset
         await db.tournaments.update_one({"id": tid}, change)
+        reset_scope_cache()  # Live-Meldungen (#1801): Turnier und Event neu nachschlagen
         await _audit_tournament_action(
             db,
             "tournament.status.change",

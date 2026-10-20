@@ -72,9 +72,13 @@ export default function TournamentLeadPage() {
 
   useEffect(() => { load(); }, [load]);
   useEffect(() => { loadQueue(); }, [loadQueue]);
-  useLiveRefresh(load, ["matches", "matches-v2", "tournaments", "stations"], { fallbackMs: 15000 });
+  // Nur Änderungen dieses Turniers und - wegen der geteilten Stationen - der anderen Turniere seines Events (#1801). Bis
+  // das Turnier geladen ist, jede; ohne sichtbares Event jede eines Turniers mit Event.
+  const tournamentId = data?.tournament?.id;
+  const eventId = data?.tournament?.event_id;
+  useLiveRefresh(load, ["matches", "matches-v2", "tournaments", "stations"], { fallbackMs: 15000, tournamentId, eventId });
   // Die Prognose wandert auch ohne Ereignis mit der Zeit - einmal je Minute nachfragen.
-  useLiveRefresh(loadQueue, ["matches", "matches-v2", "tournaments", "stations"], { fallbackMs: 15000, pollMs: 60000 });
+  useLiveRefresh(loadQueue, ["matches", "matches-v2", "tournaments", "stations"], { fallbackMs: 15000, pollMs: 60000, tournamentId, eventId });
   const undo = useResultUndo({ onDone: load });
   useDocumentTitle(data?.tournament?.title ? `Turnierleitung · ${data.tournament.title}` : "Turnierleitung", "Turnierleitung: Ergebnisse eintragen und offene Spiele im Blick.", { robots: "noindex, nofollow" });
 

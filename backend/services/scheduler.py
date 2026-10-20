@@ -934,6 +934,10 @@ async def _write_transition(db, collection_name: str, kind: str, doc: dict, nxt:
     if getattr(result, "matched_count", 0) != 1:
         logger.info("[scheduler] status %s %s skipped, changed in parallel", kind, doc.get("id"))
         return False
+    # Live-Meldungen (#1801): Turnier und Event nach jedem Statuswechsel neu nachschlagen.
+    from services.change_events import reset_scope_cache
+
+    reset_scope_cache()
     return True
 
 

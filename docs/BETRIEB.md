@@ -157,6 +157,14 @@ Web- und TV-Ansichten bekommen Aktualisierungen über `/api/changes/stream` (Ser
   gemeinsamen Event-Bus.
 - Gäste bekommen nur geschwärzte Signale, rohe Admin-Pfade nur angemeldetes Personal. Nach einem
   Neustart fordert ein `reset`-Event einen vollständigen Neuabruf an.
+- Eine Änderung an einem öffentlichen Turnier (in einem öffentlichen Event oder ohne Event) nennt
+  `tournament_id` und `parent_event_id` (#1801): Seiten eines Turniers laden dann nur bei seinen
+  Änderungen nach, Seiten mit Stationen auch bei denen der anderen Turniere desselben Events.
+  Eine Station nennt ihr Turnier oder - hängt sie nur am Event - ihr Event. Meldungen ohne Kennung
+  (Turniere nur für Mitglieder, neue oder geänderte Stationen) laden überall nach - wie vorher.
+  Turnier und Event werden je Turnier, Spiel und Station 45 Sekunden zwischengespeichert; jede
+  Änderung an Event-Zuordnung (auch im Programm des Events), Sichtbarkeit oder Status leert den
+  Speicher sofort.
 
 ## Uploads und der Upload-Host ohne Cloudflare
 

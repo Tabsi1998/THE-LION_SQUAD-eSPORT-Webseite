@@ -6,7 +6,8 @@ import { lineupLabel, presenceLine, starterLabel } from "@/lib/teamDay";
 
 const apiMock = { get: vi.fn(), put: vi.fn(), post: vi.fn(), delete: vi.fn() };
 vi.mock("@/lib/api", () => ({ api: apiMock, formatRequestError: (_e, fallback) => fallback }));
-vi.mock("@/hooks/useApiInvalidation", () => ({ useApiInvalidation: () => {} }));
+let invalidationOptions = null;
+vi.mock("@/hooks/useApiInvalidation", () => ({ useApiInvalidation: (load, resources, options) => { invalidationOptions = options; } }));
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
 const { TeamDayPanel } = await import("./TeamDayPanel");
@@ -99,4 +100,12 @@ test("bei Einzel-Turnieren taucht nichts auf", async () => {
   const { container } = render(<TeamDayPanel tournament={{ id: "t-1" }} />);
   await waitFor(() => expect(apiMock.get).toHaveBeenCalledWith("/team-day/t-1"));
   expect(container).toBeEmptyDOMElement();
+});
+
+// #1801: Das Team-Feld lädt nur bei Änderungen seines Turniers nach.
+test("hört nur auf das eigene Turnier", async () => {
+  apiMock.get.mockResolvedValue({ data: view() });
+  render(<TeamDayPanel tournament={{ id: "t-1" }} />);
+  await waitFor(() => expect(apiMock.get).toHaveBeenCalled());
+  expect(invalidationOptions).toMatchObject({ tournamentId: "t-1" });
 });

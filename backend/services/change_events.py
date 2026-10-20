@@ -60,11 +60,27 @@ STAFF_STREAM_ROLES = frozenset({"tournament_admin", "club_admin", "superadmin"})
 USER_SCOPE = "user"
 # Held only in the in-memory buffer; stripped before an event reaches a client.
 TARGETS_KEY = "_target_user_ids"
+# Live-Nachladen je Turnier (#1801): Eine Änderung nennt ihr Turnier und dessen Event, damit nur die Seiten dieses
+# Turniers nachladen (bzw. die des Events, wo sich Turniere Stationen teilen). Öffentlich nur, wenn Turnier und Event
+# öffentlich sind - ob, merkt sich die Meldung im Puffer unter SCOPE_PUBLIC_KEY; ohne Kennung laden alle nach.
+SCOPE_KEYS = ("tournament_id", "parent_event_id")
+SCOPE_PUBLIC_KEY = "_scope_public"
+# Unter /api/tournaments/<…>, aber kein Turnier.
+NON_TOURNAMENT_SEGMENTS = frozenset({"onsite"})
+_SCOPE_FIELDS = {"_id": 0, "id": 1, "event_id": 1, "status": 1, "is_public": 1, "visibility": 1}
+# Nachschlagen nur einmal je Turnier, Spiel oder Station (Codex-Prüfung #1801): Am Turnierabend schreiben Helfer und
+# Anmeldungen dauernd in dieselben Turniere. Jede Route, die Event-Zuordnung, Sichtbarkeit oder Status eines Turniers,
+# Events oder einer Station schreibt, ruft danach ``reset_scope_cache()``. Die Frist begrenzt, wie lange eine Änderung
+# auf anderem Weg (etwa direkt in der Datenbank) unbemerkt bleibt.
+SCOPE_CACHE_SECONDS = 45.0
+SCOPE_CACHE_SIZE = 1024
 EVENT_BUFFER_SIZE = 256
 SUBSCRIBER_QUEUE_SIZE = 100
 
 _subscribers: set[tuple[asyncio.Queue, str, str | None]] = set()
 _event_buffer: deque[dict] = deque(maxlen=EVENT_BUFFER_SIZE)
+_scope_cache: dict[tuple[str, str], tuple[float, dict | None]] = {}
+_scope_generation = 0
 _stream_epoch = str(uuid.uuid4())
 _version = 0
 
@@ -152,6 +168,107 @@ def _build_api_change_event(method: str, path: str, status_code: int) -> dict:
     }
 
 
+def _api_parts(path: str) -> list[str]:
+    parts = [part for part in _normalized_path(path).split("/") if part]
+    return parts[1:] if parts and parts[0] == "api" else parts
+
+
+def _scope_target(path: str) -> tuple[str, str] | None:
+    """Worauf eine Änderung zeigt (#1801): ``("tournament", Kennung oder Slug)``, ``("match", Kennung)``,
+    ``("station", Kennung)`` oder None.
+
+    Ohne Kennung bleiben das Turnier und die Station selbst (Einstellungen, Event, Sichtbarkeit - danach sollen alle
+    Seiten nachladen), neue Turniere und Stationen, Sammel-Aktionen und was zu keinem Turnier gehört (Vor-Ort-Zugang).
+    """
+    parts = _api_parts(path)
+    if len(parts) < 2:
+        return None
+    resource, ref = parts[0], parts[1]
+    if resource == "matches":
+        return "match", ref
+    if resource == "matches-v2":
+        return "tournament", ref
+    if resource == "tournaments" and len(parts) > 2 and ref not in NON_TOURNAMENT_SEGMENTS:
+        return "tournament", ref
+    if resource == "stations" and len(parts) > 2:
+        return "station", ref
+    return None
+
+
+def reset_scope_cache() -> None:
+    """Nach jeder Änderung an Event-Zuordnung, Sichtbarkeit oder Status: Turnier und Event neu nachschlagen."""
+    global _scope_generation
+    _scope_generation += 1
+    _scope_cache.clear()
+
+
+def _clock() -> float:
+    return time.monotonic()
+
+
+async def _public_event(db, event_id: str) -> bool:
+    """Wie die Event-Seite für Gäste: kein Entwurf, Sichtbarkeit öffentlich."""
+    event = await db.events.find_one({"id": event_id}, {"_id": 0, "status": 1, "visibility": 1})
+    return bool(event) and event.get("status") != "draft" and (event.get("visibility") or "public") == "public"
+
+
+async def _lookup_scope(db, kind: str, ref: str) -> dict | None:
+    """Turnier und Event einer Änderung - und ob beide öffentlich sind (dieselbe Regel wie ``public_tournament`` und
+    die Event-Seite: kein Entwurf, Sichtbarkeit öffentlich). Ein Turnier in einem nicht öffentlichen Event bleibt
+    öffentlich ohne Kennung: Seiten mit geteilten Stationen könnten sonst nicht erkennen, dass es sie betrifft.
+    Eine Station nennt ihr Turnier - oder, wenn sie nur am Event hängt, das Event allein."""
+    from services.slug_utils import find_by_slug_or_history
+    from services.tournament_visibility import public_tournament
+
+    if kind == "station":
+        station = await db.stations.find_one({"id": ref}, {"_id": 0, "tournament_id": 1, "event_id": 1})
+        if not station or not (station.get("tournament_id") or station.get("event_id")):
+            return None
+        if not station.get("tournament_id"):
+            event_id = station["event_id"]
+            return {"tournament_id": None, "parent_event_id": event_id, SCOPE_PUBLIC_KEY: await _public_event(db, event_id)}
+        tournament = await db.tournaments.find_one({"id": station["tournament_id"]}, _SCOPE_FIELDS)
+    elif kind == "match":
+        match = await db.matches_v2.find_one({"id": ref}, {"_id": 0, "tournament_id": 1})
+        if not match or not match.get("tournament_id"):
+            return None
+        tournament = await db.tournaments.find_one({"id": match["tournament_id"]}, _SCOPE_FIELDS)
+    else:
+        tournament, _ = await find_by_slug_or_history(db.tournaments, ref, _SCOPE_FIELDS)
+    if not tournament or not tournament.get("id"):
+        return None
+    event_id = tournament.get("event_id") or None
+    visible = public_tournament(tournament)
+    if visible and event_id:
+        visible = await _public_event(db, event_id)
+    return {"tournament_id": tournament["id"], "parent_event_id": event_id, SCOPE_PUBLIC_KEY: visible}
+
+
+async def _change_scope(path: str) -> dict:
+    """Turnier und Event einer Änderung, aus dem Zwischenspeicher oder frisch nachgeschlagen."""
+    target = _scope_target(path)
+    if not target:
+        return {}
+    now = _clock()
+    cached = _scope_cache.get(target)
+    if cached and cached[0] > now:
+        return cached[1] or {}
+    generation = _scope_generation
+    try:
+        from database import get_db
+
+        scope = await _lookup_scope(get_db(), *target)
+    except Exception:
+        # Die Meldung geht auch ohne Kennung hinaus - dann laden alle Seiten nach, wie vor #1801.
+        return {}
+    # Wurde der Speicher während des Nachschlagens geleert, ist das Ergebnis vielleicht schon alt: nicht merken.
+    if generation == _scope_generation:
+        if len(_scope_cache) >= SCOPE_CACHE_SIZE:
+            _scope_cache.pop(next(iter(_scope_cache)))
+        _scope_cache[target] = (now + SCOPE_CACHE_SECONDS, scope)
+    return scope or {}
+
+
 def _build_user_change_event(resource: str, user_ids: frozenset[str]) -> dict:
     event_id = str(uuid.uuid4())
     return {
@@ -181,17 +298,20 @@ def _event_for_scope(event: dict, visibility_scope: str, user_id: str | None = N
     if event.get("visibility_scope") != "public" and visibility_scope != "staff":
         return None
     if visibility_scope == "staff":
-        return dict(event)
+        return {key: value for key, value in event.items() if key != SCOPE_PUBLIC_KEY}
 
     resource = event.get("entity_type") or ""
-    public_event = dict(event)
+    public_event = {key: value for key, value in event.items() if key != SCOPE_PUBLIC_KEY}
+    if not event.get(SCOPE_PUBLIC_KEY):
+        for key in SCOPE_KEYS:
+            public_event.pop(key, None)
     public_event.update({
         "entity_id": None,
         "path": f"/api/{resource}" if resource else "/api",
         "resource": resource,
     })
     if isinstance(event.get("tournament_event"), dict):
-        public_event["tournament_event"] = _public_tournament_event(event["tournament_event"])
+        public_event["tournament_event"] = _public_tournament_event(event["tournament_event"], bool(event.get(SCOPE_PUBLIC_KEY)))
     return public_event
 
 
@@ -264,7 +384,10 @@ async def publish_api_change(method: str, path: str, status_code: int):
     if normalized_path.startswith("/api/auth/refresh") or normalized_path.startswith("/api/changes/stream"):
         return
 
+    # Erst das Turnier nachschlagen, dann die Nummer vergeben - so bleiben die Nummern im Puffer aufsteigend.
+    scope = await _change_scope(normalized_path)
     event = _build_api_change_event(method, normalized_path, status_code)
+    event.update(scope)
     _event_buffer.append(event)
     _deliver(event)
 
@@ -284,14 +407,15 @@ TOURNAMENT_EVENT_TYPES = frozenset({
 PUBLIC_TOURNAMENT_EVENT_TYPES = {"player_withdrawn": "slot_cleared", "player_disqualified": "slot_cleared"}
 
 
-def _public_tournament_event(payload: dict) -> dict:
+def _public_tournament_event(payload: dict, visible: bool) -> dict:
     """Die öffentliche Sicht eines Anzeige-Ereignisses: Typ, Turnier und Spiel-Kennungen - keine Anmeldung, keine Art
-    des Ausscheidens (über die Teilnehmerliste wäre sie einer Person zuzuordnen)."""
+    des Ausscheidens (über die Teilnehmerliste wäre sie einer Person zuzuordnen). Turnier und Spiele nur, wenn das
+    Turnier öffentlich ist (``visible``, dieselbe Regel wie ``tournament_id`` an der Meldung)."""
     event_type = str(payload.get("type") or "")
     return {
         "type": PUBLIC_TOURNAMENT_EVENT_TYPES.get(event_type, event_type),
-        "tournament_id": payload.get("tournament_id"),
-        "match_ids": list(payload.get("match_ids") or []),
+        "tournament_id": payload.get("tournament_id") if visible else None,
+        "match_ids": list(payload.get("match_ids") or []) if visible else [],
     }
 
 
@@ -302,7 +426,10 @@ async def publish_tournament_event(tournament_id: str, event_type: str, *, match
     bekommt nur der Staff-Strom (``_public_tournament_event``)."""
     if event_type not in TOURNAMENT_EVENT_TYPES or not tournament_id:
         return
-    event = _build_api_change_event("POST", f"/api/tournaments/{tournament_id}/events", 200)
+    path = f"/api/tournaments/{tournament_id}/events"
+    scope = await _change_scope(path)
+    event = _build_api_change_event("POST", path, 200)
+    event.update(scope)
     event.update({
         "event_type": "tournament.event",
         "dedupe_key": f"tournament.event:{event['event_id']}",

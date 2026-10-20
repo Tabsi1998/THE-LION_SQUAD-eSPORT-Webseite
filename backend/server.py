@@ -536,6 +536,7 @@ async def api_change_notifications(request, call_next):
         and request.url.path.startswith("/api/")
         and response.status_code < 400
     ):
+        # Die Meldung nennt das Turnier (#1801) - nachgeschlagen meist aus dem Zwischenspeicher in change_events.
         await publish_api_change(request.method, request.url.path, response.status_code)
         # Live-Einbettungen (#569): Events, Turniere und Saisons ändern „Nächste Events“ und die Rangliste.
         path = request.url.path

@@ -20,6 +20,7 @@ from services.slug_utils import apply_slug_history, find_by_slug_or_history, slu
 from services import billing_orders, event_days, event_facts, event_locations, event_play_along, event_registration, pricing
 from services.event_registration import RegistrationError
 from services.mutation_lock import MutationLockBusy, mutation_lock
+from services.change_events import reset_scope_cache
 from services.permissions import areas_for, can_use_area, needs_mfa, user_has_area
 from services.permissions import is_confirmed_tournament_lead
 from models import EventCreate, EventUpdate, EventPlayAlongCreate, EventRegistrationCreate, EventRegistrationUpdate, now_utc, new_id
@@ -1035,6 +1036,7 @@ async def update_event(event_id: str, body: EventUpdate, me: dict = Depends(requ
             updates[k] = updates[k].isoformat()
     updates["updated_at"] = now_utc().isoformat()
     await db.events.update_one({"id": event_id}, {"$set": updates})
+    reset_scope_cache()  # Live-Meldungen (#1801): Turnier und Event neu nachschlagen
     event = await db.events.find_one({"id": event_id}, {"_id": 0})
     if event and event.get("status") not in {"draft", "archived", "cancelled"} and not event.get("newsletter_sent_at"):
         result = await enqueue_newsletter_for_item("event", event)
@@ -1058,6 +1060,7 @@ async def delete_event(event_id: str, me: dict = Depends(require_admin())):
     await db.events.delete_one({"id": event_id})
     await db.event_registrations.delete_many({"event_id": event_id})
     await db.tournaments.update_many({"event_id": event_id}, {"$set": {"event_id": None, "updated_at": now_utc().isoformat()}})
+    reset_scope_cache()  # Live-Meldungen (#1801): Turnier und Event neu nachschlagen
     await db.f1_challenges.update_many({"event_id": event_id}, {"$set": {"event_id": None, "updated_at": now_utc().isoformat()}})
     await db.gallery_albums.update_many({"event_id": event_id}, {"$set": {"event_id": None, "updated_at": now_utc().isoformat()}})
     return {"ok": True}

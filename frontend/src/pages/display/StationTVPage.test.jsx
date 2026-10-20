@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { decide, heatDoubleElimination, play, singleElimination, start } from "../../../e2e/fixtures/tvBrackets.mjs";
 
@@ -115,4 +115,33 @@ test("#1122: ist das nächste Spiel hier aufgerufen, steht es mit Countdown da",
   expect(await screen.findByTestId("station-tv-call")).toHaveTextContent("Aufgerufen");
   expect(screen.getByTestId("station-tv-state")).toHaveTextContent("Aufgerufen");
   expect(screen.getByTestId("tv-call-clock-m-C")).toHaveTextContent(/^1:[23]\d$/);
+});
+
+// #1801: Die Station lädt nur bei Änderungen ihres Turniers nach - und, weil sich die Turniere eines Events Stationen
+// teilen, bei denen der anderen Turniere desselben Events. Mit Schlüssel kennt sie ihr Event nicht: dann bei jedem
+// Turnier mit Event, nie bei einem ohne (das teilt keine Station).
+test("#1801: ein fremdes Turnier ohne Event lädt die Station nicht nach, eines mit Event und das eigene schon", async () => {
+  const bracket = singleElimination(8);
+  bracket.matches_v2.find((match) => match.match_key === "C").station_id = "st-pc-4";
+  serve(bracket, [{ id: "st-pc-4", name: "PC 4" }]);
+  renderStation("/display/bracket/t1/station/st-pc-4?key=k");
+  expect(await screen.findByTestId("tv-duel")).toBeInTheDocument();
+  const stationCalls = () => apiMock.get.mock.calls.filter(([url]) => url === "/stations?tournament_id=t1").length;
+  await waitFor(() => expect(stationCalls()).toBeGreaterThan(0));
+  const before = stationCalls();
+  const { emitApiInvalidation } = await import("@/lib/apiInvalidation");
+  await act(async () => {
+    emitApiInvalidation({ resource: "matches", path: "/api/matches", tournament_id: "t2", parent_event_id: null });
+    await new Promise((resolve) => setTimeout(resolve, 400));
+  });
+  expect(stationCalls()).toBe(before);
+
+  await act(async () => {
+    emitApiInvalidation({ resource: "matches", path: "/api/matches", tournament_id: "t3", parent_event_id: "e1" });
+  });
+  await waitFor(() => expect(stationCalls()).toBe(before + 1));
+  await act(async () => {
+    emitApiInvalidation({ resource: "tournaments", path: "/api/tournaments", tournament_id: "t1" });
+  });
+  await waitFor(() => expect(stationCalls()).toBe(before + 2));
 });

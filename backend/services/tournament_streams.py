@@ -16,6 +16,7 @@ from __future__ import annotations
 import logging
 
 from models import new_id, now_utc
+from services.tournament_visibility import public_tournament
 
 logger = logging.getLogger("tls.tournament.streams")
 
@@ -26,11 +27,6 @@ STREAM_FIELDS = ("user_id", "username", "display_name", "avatar_url", "twitch_lo
 
 def _twitch_visible(user: dict) -> bool:
     return bool(user.get("privacy_public_profile")) and (user.get("profile_visibility") or {}).get("twitch", "public") == "public"
-
-
-def public_tournament(tournament: dict | None) -> bool:
-    return bool(tournament) and tournament.get("status") != "draft" and tournament.get("is_public") is not False \
-        and (tournament.get("visibility") or "public") == "public"
 
 
 def discord_tournament(tournament: dict | None) -> bool:

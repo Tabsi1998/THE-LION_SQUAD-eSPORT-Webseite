@@ -9,7 +9,8 @@ vi.mock("@/lib/api", () => ({ api: apiMock, API_BASE: "", formatApiError: (value
 vi.mock("@/context/AuthContext", () => ({ useAuth: () => ({ user: { id: "s1" } }) }));
 vi.mock("@/components/tls/PublicLayout", () => ({ PublicLayout: ({ children }) => <div>{children}</div> }));
 vi.mock("@/components/tls/Breadcrumbs", () => ({ Breadcrumbs: () => null }));
-vi.mock("@/hooks/useLiveRefresh", () => ({ useLiveRefresh: () => {} }));
+const liveCalls = [];
+vi.mock("@/hooks/useLiveRefresh", () => ({ useLiveRefresh: (load, resources, options) => { liveCalls.push(options); } }));
 vi.mock("@/hooks/useDocumentTitle", () => ({ useDocumentTitle: () => {} }));
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 const TournamentLeadPage = (await import("./TournamentLeadPage")).default;
@@ -154,4 +155,13 @@ test("Auslosung bereit ohne Aufbau-Recht: Karte ohne Knopf; nach der Frist steht
   expect(drawCountdown(card, "2026-10-14T10:09:30+00:00", new Date("2026-10-14T10:09:30+00:00").getTime())).toBe("automatisch in 11 Min.");
   expect(drawCountdown({ due_at: null }, "2026-10-14T10:09:30+00:00")).toBe("");
   vi.useRealTimers();
+});
+
+// #1801: Die Turnierleitung lädt nur bei Änderungen ihres Turniers nach (und, wegen der geteilten Stationen, der anderen
+// Turniere seines Events) - bis das Turnier geladen ist, bei jeder. Beide Abfragen: Ansicht und Warteschlange.
+test("hört nach dem Laden nur noch auf das eigene Turnier und sein Event", async () => {
+  liveCalls.length = 0;
+  renderLead({ tournament: { id: "t1", slug: "fc-cup", title: "FC 26 Herbst-Cup", event_id: "e1" }, matches: [], recent: [], counts: { open: 0 }, attention: [], stations: [] });
+  expect(liveCalls.slice(0, 2).map((options) => options.tournamentId)).toEqual([undefined, undefined]);
+  await waitFor(() => expect(liveCalls.slice(-2).map((options) => [options.tournamentId, options.eventId])).toEqual([["t1", "e1"], ["t1", "e1"]]));
 });

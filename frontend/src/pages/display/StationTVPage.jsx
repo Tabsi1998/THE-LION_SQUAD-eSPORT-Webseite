@@ -68,7 +68,10 @@ function StationTv() {
   useEffect(() => {
     load();
   }, [load]);
-  useLiveRefresh(load, ["tournaments", "matches", "stations", "tv"], { fallbackMs: 15000 });
+  // Nur Änderungen dieses Turniers und - wegen der geteilten Stationen - der anderen Turniere seines Events (#1801).
+  useLiveRefresh(load, ["tournaments", "matches", "stations", "tv"], {
+    fallbackMs: 15000, tournamentId: data?.tournament?.id, eventId: data?.tournament?.event_id,
+  });
 
   const matches = useMemo(() => data?.matches_v2 || [], [data?.matches_v2]);
   const station = (stations || []).find((entry) => entry.id === stationId) || null;

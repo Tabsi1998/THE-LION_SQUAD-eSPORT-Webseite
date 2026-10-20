@@ -27,7 +27,7 @@ export function TeamDayPanel({ tournament }) {
   }, [tournament.id]);
 
   useEffect(() => { load(); }, [load]);
-  useApiInvalidation(load, ["tournaments"]);
+  useApiInvalidation(load, ["tournaments"], { tournamentId: tournament.id });
 
   const chosen = useMemo(() => draft ?? data?.lineup ?? [], [draft, data]);
   if (!data?.applicable) return null;

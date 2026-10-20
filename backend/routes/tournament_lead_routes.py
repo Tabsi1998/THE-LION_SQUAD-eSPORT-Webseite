@@ -33,6 +33,7 @@ from services.tournament_permissions import (
     has_match_result_permission,
     has_tournament_staff_permission,
 )
+from services.visibility import hide_unseen_event_links
 
 
 @router.get("/{tid}/lead")
@@ -44,7 +45,12 @@ async def tournament_lead(tid: str, me: dict = Depends(get_current_user)):
     tournament = await db.tournaments.find_one({"id": tournament_id}, {"_id": 0, "creation_key": 0, "billing": 0})
     if not tournament:
         raise HTTPException(status_code=404, detail="Turnier nicht gefunden")
-    return await lead_view(db, tournament, me)
+    view = await lead_view(db, tournament, me)
+    # Das Event (#1801): Die Ansicht zeigt Stationen, die sich die Turniere eines Events teilen, und lädt bei dessen
+    # Änderungen nach. Die Kennung nur, wenn die Person das Event sehen darf (#1473).
+    view["tournament"]["event_id"] = tournament.get("event_id")
+    await hide_unseen_event_links(db, me, [view["tournament"]])
+    return view
 
 
 STALE_PROPOSAL_DETAIL = ("Der Vorschlag gilt nicht mehr: Das Spiel hat begonnen, eine Seite hat gemeldet "

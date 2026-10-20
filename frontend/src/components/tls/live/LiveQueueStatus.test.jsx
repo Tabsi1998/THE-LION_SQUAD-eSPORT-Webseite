@@ -5,7 +5,8 @@ import { render, screen } from "@testing-library/react";
 
 const apiMock = { get: vi.fn() };
 vi.mock("@/lib/api", () => ({ api: apiMock }));
-vi.mock("@/hooks/useLiveRefresh", () => ({ useLiveRefresh: () => {} }));
+const live = { resources: null, options: null };
+vi.mock("@/hooks/useLiveRefresh", () => ({ useLiveRefresh: (load, resources, options) => { Object.assign(live, { resources, options }); } }));
 const { LiveQueueStatus } = await import("./LiveQueueStatus");
 
 const NEXT = { match_id: "m1", state: "queued", position: 1, station_text: "Station 2 · Switch 2", forecast_at: "2026-10-31T17:40:00Z", delay_minutes: 11 };
@@ -44,4 +45,14 @@ test("online, ohne Spiel oder bei einem Fehler: nichts", async () => {
   const second = render(<LiveQueueStatus tournamentId="t1" />);
   await new Promise((resolve) => setTimeout(resolve, 0));
   expect(second.container).toBeEmptyDOMElement();
+});
+
+// #1801: Die Warteschlange lädt nur bei Änderungen ihres Turniers nach - und, weil sich die Turniere eines Events
+// Stationen teilen, bei denen der anderen Turniere desselben Events.
+test("hört auf das eigene Turnier und sein Event", async () => {
+  apiMock.get.mockResolvedValue({ data: { applies: true, entries: [NEXT] } });
+  render(<LiveQueueStatus tournamentId="t1" eventId="e1" />);
+  await screen.findByTestId("live-queue-status");
+  expect(live.resources).toContain("stations");
+  expect(live.options).toMatchObject({ tournamentId: "t1", eventId: "e1" });
 });

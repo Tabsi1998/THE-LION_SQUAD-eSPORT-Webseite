@@ -120,7 +120,8 @@ function TournamentDetailView() {
     load();
   }, [load]);
 
-  useLiveRefresh(load, ["tournaments"], { fallbackMs: 10000 });
+  // Nur Änderungen dieses Turniers (#1801) - bis es geladen ist, jede.
+  useLiveRefresh(load, ["tournaments"], { fallbackMs: 10000, tournamentId: t?.id });
 
   // Sieger-Moment (#1180): wer Platz 1 bis 3 belegt hat, bekommt nach dem Ende einmal je Browser seine Karte - über die
   // Zeremonie-Warteschlange, also nie zugleich mit einem Erfolg.
@@ -499,7 +500,7 @@ function TournamentChat({ tournament, user }) {
   }, [tournament.id, user]);
 
   useEffect(() => { load(); }, [load]);
-  useLiveRefresh(load, ["tournaments"], { fallbackMs: 6000, enabled: Boolean(user) });
+  useLiveRefresh(load, ["tournaments"], { fallbackMs: 6000, enabled: Boolean(user), tournamentId: tournament.id });
   // Gelesen (#1148): beim Öffnen und bei jeder neuen Nachricht.
   useChatRead("tournament", tournament.id, messages, Boolean(user) && !blocked);
 

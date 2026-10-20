@@ -14,6 +14,7 @@ from services.graph_swiss import (
     swiss_round_documents,
 )
 from services.competition_versions import persist_competition_versions
+from services.change_events import reset_scope_cache
 from models import now_utc, new_id
 from routes.tournament_common import (
     _audit_tournament_action,
@@ -92,6 +93,7 @@ async def _swiss_next_round_graph(db, tournament: dict, actor_id: str | None) ->
     await persist_competition_versions(db, tournament, "graph")
     if tournament.get("status") == "draft":
         await db.tournaments.update_one({"id": tid}, {"$set": {"status": "live"}})
+        reset_scope_cache()  # Live-Meldungen (#1801): Turnier und Event neu nachschlagen
         from services.discord_threads import status_written
         await status_written(db, tid, tournament.get("status"))
     await _audit_tournament_action(
@@ -159,6 +161,7 @@ async def _groups_generate_graph(db, tournament: dict, group_count: int, actor_i
     )
     await persist_competition_versions(db, tournament, "graph")
     await db.tournaments.update_one({"id": tid}, {"$set": {"status": "live"}})
+    reset_scope_cache()  # Live-Meldungen (#1801): Turnier und Event neu nachschlagen
     from services.discord_threads import status_written
     await status_written(db, tid, tournament.get("status"))
     await _audit_tournament_action(
