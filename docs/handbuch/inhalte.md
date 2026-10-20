@@ -207,12 +207,36 @@ Platzierung, beides in derselben Teilnahme möglich. Spieler wählt ihr aus den 
 Mit **Vorschläge speichern** pflegt ihr die Auswahllisten für Formate und Platzierungen. Einen Partner als Veranstalter oder per Haken
 zu nennen, zeigt die Referenz auch auf seiner Seite.
 
-Öffentlich ordnet **/references** unter **Jahr für Jahr** jede Teilnahme nach dem Jahr ihres **Startdatums** ein (Wiener Zeit;
-ohne Start zählt das Enddatum). Teilnahmen ganz ohne Datum stehen am Ende unter **Ohne Datum** – tragt also ein Datum ein.
-Die Filter darüber wählen dieselben Jahre („Alle Jahre“, „2026“ …); die **Saison** steht weiter als Text auf der Karte.
-Neben jeder Teilnahme steht das **Logo des Spiels** (Admin → Spiele); hat das Spiel keins, zeigt die Kachel unter
-**Wo wir antreten** sein **Kürzel** und die Karte einen Pokal neben dem Namen.
-Die Medaillenzahlen oben zählen wie bisher je Eintrag.
+**Die Übersicht /references** („Erfolge & Referenzen“) zeigt von oben nach unten:
+
+- **Ehrentafel:** Siege, Zweite und Dritte (je Eintrag gezählt), darunter Teilnahmen, Spiele, laufende Saisons, Aufstiege
+  und „seit“ dem ersten Jahr. Die Sprungmarken daneben führen zu den Abschnitten.
+- **Läuft gerade:** die laufenden Saisons der Serien (3.9).
+- **Vitrine:** der größte Erfolg als **Hauptkarte**, daneben die übrigen Podestplätze, die neuesten zuerst. Gold, Silber
+  und Bronze stehen nur als Ring und Schrift.
+- **Serien & Ligen:** je Spur der Liga-Weg (3.9).
+- **Chronik:** alle Teilnahmen als Liste je Jahr, mit Platz, Veranstalter, Spiel, Format, unseren Startern (jeder Name nur
+  einmal) und Datum. Darüber filtern **Spiel-Chips** und **Nur Podest**; rechts steht „x von y Teilnahmen“. Kommt man über
+  „Alle Referenzen“ aus einem Mitgliederprofil, steht vorne der Chip „Nur …“ – ein Klick hebt ihn auf.
+- **Mitmachen:** „Mitglied werden“ und – wenn unter Einstellungen eine Discord-Einladung steht – „Discord beitreten“.
+
+Die Chronik ordnet jede Teilnahme nach dem Jahr ihres **Startdatums** ein (Wiener Zeit; ohne Start zählt das Enddatum).
+Teilnahmen ganz ohne Datum stehen am Ende unter **Ohne Datum** – tragt also ein Datum ein.
+
+**Welche Teilnahme die Hauptkarte bekommt,** stellt ihr oben auf der Seite unter **Vitrine: Hauptkarte** ein:
+**Automatisch** (Vorgabe) nimmt den höchsten Platz in der höchsten Stufe, bei Gleichstand den neuesten. Die Stufe kommt aus
+der Saison, zu der die Referenz gehört, sonst aus dem Feld **Liga**; es zählt die Zahl darin („Liga 1“ vor „Liga 2“, ohne
+Zahl ganz unten). Oder ihr wählt eine der Podest-Referenzen fest – dann steht auf der Karte „Ausgewählt vom Verein“.
+Gehört die Hauptkarte zu einer Saison, führt sie zur Seite der Saison, sonst zur Referenz.
+
+<table>
+<tr>
+<td><img src="../assets/referenzen/referenzen-uebersicht-breit.png" alt="Referenzen-Übersicht am PC: Ehrentafel, Läuft gerade, Vitrine mit Hauptkarte, Serien und Ligen, Chronik" width="560"></td>
+<td><img src="../assets/referenzen/referenzen-uebersicht-handy.png" alt="Dieselbe Übersicht am Handy" width="220"></td>
+</tr>
+</table>
+
+<img src="../assets/referenzen/referenzen-hauptkarte-verwaltung.png" alt="Admin Referenzen: Auswahl Vitrine Hauptkarte mit Automatisch und den Podest-Referenzen" width="560">
 
 ### 3.9 Serien
 
@@ -357,15 +381,23 @@ stehen Karten statt der Tabellen.
 <img src="../assets/serien/serien-seite-rennliga-teams.png" alt="Teamwertung mit Balken, Punkten je Rennen, Vereinsteams und einem Gast" width="560">
 
 **Läuft gerade:** Sobald eine Saison den Status **Läuft** hat (und sichtbar, nicht archiviert ist), erscheint sie oben
-auf der Seite **Erfolge & Referenzen** (`/references`), noch vor der Vitrine. Jede Karte zeigt, wie viele Termine
-gewertet sind („1 von 4 Terminen“), den **nächsten Termin** und **Unser Platz** – bei der Team-Liga der Platz des
-eigenen Teams in der Tabelle, sonst der beste Platz eines Vereinsmitglieds in der Gesamtwertung („Noch offen“ bis zur
-ersten Wertung). Ein Klick führt zur Seite der Saison. Steht **heute** (Wiener Tag) ein Termin an, steht die Saison
-extra unter **Heute im Einsatz**, mit einem leise pulsierenden Punkt (bei „Bewegung reduzieren“ ohne Puls). Fremde Namen
-erscheinen dort nie. Läuft nichts, fehlt der Bereich ganz – die Seite sieht aus wie sonst. Zum Ändern genügt der Status
-der Saison.
+auf der Seite **Erfolge & Referenzen** (`/references`), noch vor der Vitrine. Jede Karte zeigt den Fortschritt in
+Segmenten („6 von 10 Rennen gewertet“, „3 von 7 Spieltagen gespielt“, „2 von 5 Turnieren gewertet“), den **nächsten
+Termin** und unseren Platz als große Zahl – bei der Team-Liga den Platz des eigenen Teams in der Tabelle, sonst den
+besten Platz eines Vereinsmitglieds („Noch offen“ bis zur ersten Wertung). Ein Klick führt zur Seite der Saison. Steht
+**heute** (Wiener Tag) ein Termin an, kommt die Saison zuerst und trägt den goldenen Chip **Heute** mit einem leisen Puls
+(bei „Bewegung reduzieren“ ohne Puls). Am Handy wischt man waagrecht von Karte zu Karte. Fremde Namen erscheinen dort
+nie. Läuft nichts, fehlt der Bereich ganz. Zum Ändern genügt der Status der Saison.
 
-<img src="../assets/serien/serien-laeuft-gerade.png" alt="Referenzen-Übersicht mit den Bereichen Heute im Einsatz und Läuft gerade: Karten mit Fortschritt, nächstem Termin und Platz des Vereins" width="560">
+<img src="../assets/serien/serien-laeuft-gerade.png" alt="Bereich Läuft gerade: Karten mit Chip Heute, Fortschritt in Segmenten, nächstem Termin und unserem Platz" width="560">
+
+**Serien & Ligen:** Darunter steht je Spur eine Karte mit ihrem **Liga-Weg** – jede sichtbare Saison mit Stufe, unserem
+Platz und einem Vermerk: **läuft** für die laufende Saison (hervorgehoben), **Aufstieg** oder **Abstieg**, wenn die
+nächste Saison eine höhere oder tiefere Stufe hat. Verglichen wird die Zahl im Namen der Stufe („Division 2“ → „Division
+1“ ist ein Aufstieg) – benennt Stufen also mit Zahl; ohne Zahl bleibt der Vermerk leer. Die Karte führt zur laufenden,
+sonst zur neuesten Saison.
+
+<img src="../assets/referenzen/referenzen-serien-breit.png" alt="Serien und Ligen: je Spur der Liga-Weg mit Saison, Stufe, Platz, Aufstieg und laufender Saison" width="560">
 
 **Captains:** Auf der Seite der Saison steht unten **Captains**. Dort tragt ihr Mitglieder ein, die für genau diese
 Saison Ergebnisse hochladen dürfen – nur aktive Vereinsmitglieder, die Suche findet nur sie. Namen tippen, **Gilt bis** wählen (Pflicht, meist das Saisonende) und – wenn der
