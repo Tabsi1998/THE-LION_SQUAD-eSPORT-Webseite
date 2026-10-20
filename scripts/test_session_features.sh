@@ -104,7 +104,7 @@ ftyp = b'\x00\x00\x00\x18ftypmp42\x00\x00\x00\x00mp42isom'
 open('/tmp/tls_test.mp4','wb').write(ftyp + b'\x00'*2048)
 "
 fi
-UP=$(curl -s -b /tmp/j1a.txt -X POST "$API/api/uploads/video" -H "X-CSRF-Token: $(grep csrf_token /tmp/j1a.txt | awk '{print $7}')" -H "Origin: $API" -F "file=@/tmp/tls_test.mp4;type=video/mp4")
+UP=$(curl -s -b /tmp/j1a.txt -X POST "$API/api/uploads/media?media_scope=gallery" -H "X-CSRF-Token: $(grep csrf_token /tmp/j1a.txt | awk '{print $7}')" -H "Origin: $API" -F "file=@/tmp/tls_test.mp4;type=video/mp4")
 echo "$UP"
 URL=$(echo "$UP" | python3 -c "import sys,json; print(json.load(sys.stdin).get('url',''))")
 if [ -n "$URL" ]; then
