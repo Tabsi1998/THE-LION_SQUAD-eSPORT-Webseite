@@ -1,4 +1,4 @@
-import { autoPlaces, emptyRow, formToPayload, pastedToRows, problemsByRow, scoredText, sheetToForm } from "@/lib/referenceResults";
+import { autoPlaces, countFieldErrors, emptyMap, emptyMatch, emptyRow, fieldErrors, formToPayload, pastedToRows, problemsByRow, scoredText, sheetToForm } from "@/lib/referenceResults";
 import { parseResultPaste } from "@/lib/resultPaste";
 
 // Ergebnisse eintragen (#1744): Formular ↔ Vertrag des Servers. Nur erfundene Namen.
@@ -113,4 +113,25 @@ test("Öffnen und Speichern ohne Änderung ergibt dasselbe Blatt – jedes Feld 
     const { payload } = formToPayload(sheetToForm(sheet, people), { points_mode: mode });
     expect(storedFrom(payload)).toEqual(sheet);
   }
+});
+
+test("ungültige Zahlen werden nie still umgedeutet: Feldfehler je Zeile, Spiel und Map", () => {
+  const rows = [
+    emptyRow({ name: "Alpha", place: "1,5", points: "12,5" }),
+    emptyRow({ name: "Beta", place: "0", points: "zwölf", penalty_points: "-1", official_total: "1.2.3" }),
+    emptyRow({ name: "Gamma", place: "3.", points: "-2", penalty_points: "2,5", official_total: "40" }),
+  ];
+  const match = { ...emptyMatch({ home: "Probe Lions", away: "Test Eagles" }), home_score: "2", away_score: "",
+    maps: [{ ...emptyMap(), name: "Probe Map", home_score: "13", away_score: "x" }, { ...emptyMap(), name: "", home_score: "5", away_score: "" }] };
+  const errors = fieldErrors({ rows, matches: [match], table: [], note: "" });
+  expect(errors[rows[0].key]).toEqual({ place: "Platz als ganze Zahl von 1 bis 1000." });
+  expect(Object.keys(errors[rows[1].key])).toEqual(["place", "points", "penalty_points", "official_total"]);
+  expect(errors[rows[2].key]).toBeUndefined();
+  expect(errors[match.key]).toEqual({ away_score: "Ergebnis fehlt." });
+  expect(errors[match.maps[0].key]).toEqual({ away_score: "Stand als Zahl ab 0." });
+  expect(errors[match.maps[1].key]).toEqual({ name: "Name der Map fehlt." });
+  expect(countFieldErrors(errors)).toBe(8);
+  // Gültig: Dezimalkomma bei Punkten, Platz mit Punkt dahinter.
+  const { payload } = formToPayload({ rows: [rows[2]], matches: [], table: [], note: "" });
+  expect(payload.rows[0]).toMatchObject({ place: 3, points: -2, penalty_points: 2.5, official_total: 40 });
 });

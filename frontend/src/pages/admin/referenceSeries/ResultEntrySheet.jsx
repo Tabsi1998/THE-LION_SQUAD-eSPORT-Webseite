@@ -5,7 +5,7 @@ import { INPUT_CLASS, TextAreaField } from "@/components/tls/FormFields";
 import { roundLabel, roundWhen } from "@/lib/referenceCalendar";
 import { parseResultPaste, parseTablePaste } from "@/lib/resultPaste";
 import {
-  MARK_OPTIONS, autoPlaces, hintToPoints, emptyMap, emptyMatch, emptyRow, formStamp, formToPayload, formatPoints, matchParticipant,
+  MARK_OPTIONS, autoPlaces, countFieldErrors, fieldErrors, hintToPoints, emptyMap, emptyMatch, emptyRow, formStamp, formToPayload, formatPoints, matchParticipant,
   pastedToRows, problemsByRow, scoredText, sheetToForm,
 } from "@/lib/referenceResults";
 import { ResultPreview } from "./ResultPreview";
@@ -60,10 +60,26 @@ function RowProblems({ items }) {
   );
 }
 
-function ResultRow({ row, index, autoPlace, organizerMode, problems, info, onChange, onHint, onRemove }) {
+// Ungültige Eingabe: roter Rahmen und `aria-invalid` – die Meldung steht unter der Zeile.
+function invalidProps(fields, field) {
+  return fields?.[field] ? { "aria-invalid": true, "data-invalid": field } : {};
+}
+const INVALID = "!border-red-400/80";
+
+function FieldErrors({ fields, testId }) {
+  const messages = Object.values(fields || {});
+  if (!messages.length) return null;
+  return (
+    <ul className="mt-1 space-y-0.5 text-xs text-red-300" data-testid={testId} role="alert">
+      {[...new Set(messages)].map((message) => <li key={message}>{message}</li>)}
+    </ul>
+  );
+}
+
+function ResultRow({ row, index, autoPlace, organizerMode, problems, info, invalid, onChange, onHint, onRemove }) {
   const scored = info?.scored;
   const [open, setOpen] = useState(() => Boolean(row.penalty_points || row.start_number || row.official_total || row.override));
-  const level = problems?.some((item) => item.level === "error") ? "error" : problems?.length ? "warning" : null;
+  const level = invalid || problems?.some((item) => item.level === "error") ? "error" : problems?.length ? "warning" : null;
   const toggleMark = (mark) => onChange({ marks: row.marks.includes(mark) ? row.marks.filter((item) => item !== mark) : [...row.marks, mark] });
   const number = index + 1;
   return (
@@ -72,14 +88,14 @@ function ResultRow({ row, index, autoPlace, organizerMode, problems, info, onCha
       {/* Handy: Platz, Name, Punkte und Knöpfe in einer Zeile, das Team darunter; ab sm alles in einer Zeile. */}
       <div className="grid grid-cols-[3.5rem_minmax(0,1fr)_4.5rem_auto_auto] sm:grid-cols-[3.5rem_minmax(0,1fr)_9rem_5rem_auto_auto] items-center gap-2">
         <input aria-label={`Platz Zeile ${number}`} inputMode="numeric" value={row.place} placeholder={autoPlace ? String(autoPlace) : "–"}
-          onChange={(event) => onChange({ place: event.target.value })} data-testid="result-row-place" className={`${SMALL_INPUT} text-center tabular-nums`} />
+          onChange={(event) => onChange({ place: event.target.value })} data-testid="result-row-place" {...invalidProps(invalid, "place")} className={`${SMALL_INPUT} text-center tabular-nums ${invalid?.place ? INVALID : ""}`} />
         <input aria-label={`Name Zeile ${number}`} value={row.name} list="result-participants" placeholder="Name wie beim Veranstalter" maxLength={120}
           onChange={(event) => onChange({ name: event.target.value, participant_id: "" })} data-testid="result-row-name" className={SMALL_INPUT} />
         <input aria-label={`Team Zeile ${number}`} value={row.team} list="result-teams" placeholder="Team" maxLength={120}
           onChange={(event) => onChange({ team: event.target.value })} data-testid="result-row-team" className={`${SMALL_INPUT} order-last col-start-2 col-end-6 sm:order-none sm:col-start-auto sm:col-end-auto`} />
         <input aria-label={`Punkte Zeile ${number}`} inputMode="decimal" value={row.points} placeholder="Pkt"
           title={organizerMode ? "Punkte laut Veranstalter" : "Leer: nach Schlüssel. Eingetragen: laut Veranstalter (wird geprüft)."}
-          onChange={(event) => onChange({ points: event.target.value })} data-testid="result-row-points" className={`${SMALL_INPUT} text-right tabular-nums`} />
+          onChange={(event) => onChange({ points: event.target.value })} data-testid="result-row-points" {...invalidProps(invalid, "points")} className={`${SMALL_INPUT} text-right tabular-nums ${invalid?.points ? INVALID : ""}`} />
         <button type="button" className={`${ICON_BUTTON} ${open ? "text-[#29B6E8]" : ""}`} onClick={() => setOpen((value) => !value)} aria-expanded={open} aria-label={`Mehr zu Zeile ${number}`} title="Marken, Strafpunkte, Startnummer" data-testid="result-row-more">
           <SlidersHorizontal className="w-4 h-4" />
         </button>
@@ -104,11 +120,11 @@ function ResultRow({ row, index, autoPlace, organizerMode, problems, info, onCha
       {open && (
         <div className="mt-2 grid grid-cols-2 sm:grid-cols-4 gap-2" data-testid="result-row-details">
           <label className="block"><span className={LABEL}>Strafpunkte</span>
-            <input inputMode="decimal" value={row.penalty_points} onChange={(event) => onChange({ penalty_points: event.target.value })} data-testid="result-row-penalty" className={SMALL_INPUT} /></label>
+            <input inputMode="decimal" value={row.penalty_points} onChange={(event) => onChange({ penalty_points: event.target.value })} data-testid="result-row-penalty" {...invalidProps(invalid, "penalty_points")} className={`${SMALL_INPUT} ${invalid?.penalty_points ? INVALID : ""}`} /></label>
           <label className="block"><span className={LABEL}>Startnummer</span>
             <input value={row.start_number} maxLength={10} onChange={(event) => onChange({ start_number: event.target.value })} data-testid="result-row-start" className={SMALL_INPUT} /></label>
           <label className="block"><span className={LABEL}>Gesamt laut Veranst.</span>
-            <input inputMode="decimal" value={row.official_total} onChange={(event) => onChange({ official_total: event.target.value })} data-testid="result-row-total" className={SMALL_INPUT} /></label>
+            <input inputMode="decimal" value={row.official_total} onChange={(event) => onChange({ official_total: event.target.value })} data-testid="result-row-total" {...invalidProps(invalid, "official_total")} className={`${SMALL_INPUT} ${invalid?.official_total ? INVALID : ""}`} /></label>
           {!organizerMode && (
             <label className="flex items-end gap-2 pb-2 text-xs text-white/70">
               <input type="checkbox" checked={row.override} onChange={(event) => onChange({ override: event.target.checked })} data-testid="result-row-override" className="accent-[#29B6E8]" />
@@ -131,12 +147,14 @@ function ResultRow({ row, index, autoPlace, organizerMode, problems, info, onCha
           <button type="button" onClick={() => onChange({ points_hint: null })} data-testid="result-row-hint-name" className="underline underline-offset-2 text-amber-300/70 hover:text-amber-100">Gehört zum Namen</button>
         </div>
       )}
+      <FieldErrors fields={invalid} testId="result-row-invalid" />
       <RowProblems items={problems} />
     </li>
   );
 }
 
-function MatchEditor({ match, index, participants, onChange, onRemove }) {
+function MatchEditor({ match, index, participants, errors, onChange, onRemove }) {
+  const invalid = errors?.[match.key];
   const [person, setPerson] = useState("");
   const setMap = (key, values) => onChange({ maps: match.maps.map((item) => (item.key === key ? { ...item, ...values } : item)) });
   const addPerson = () => {
@@ -159,21 +177,22 @@ function MatchEditor({ match, index, participants, onChange, onRemove }) {
         <label className="block min-w-0"><span className={LABEL}>Heim</span>
           <input value={match.home} maxLength={120} onChange={(event) => onChange({ home: event.target.value })} data-testid="result-match-home" className={SMALL_INPUT} /></label>
         <div className="flex items-center gap-1 pb-0.5">
-          <input aria-label="Ergebnis Heim" inputMode="numeric" value={match.home_score} onChange={(event) => onChange({ home_score: event.target.value })} data-testid="result-match-home-score" className={`${SMALL_INPUT} !w-12 text-center tabular-nums`} />
+          <input aria-label="Ergebnis Heim" inputMode="numeric" value={match.home_score} onChange={(event) => onChange({ home_score: event.target.value })} data-testid="result-match-home-score" {...invalidProps(invalid, "home_score")} className={`${SMALL_INPUT} !w-12 text-center tabular-nums ${invalid?.home_score ? INVALID : ""}`} />
           <span className="text-white/40">:</span>
-          <input aria-label="Ergebnis Gast" inputMode="numeric" value={match.away_score} onChange={(event) => onChange({ away_score: event.target.value })} data-testid="result-match-away-score" className={`${SMALL_INPUT} !w-12 text-center tabular-nums`} />
+          <input aria-label="Ergebnis Gast" inputMode="numeric" value={match.away_score} onChange={(event) => onChange({ away_score: event.target.value })} data-testid="result-match-away-score" {...invalidProps(invalid, "away_score")} className={`${SMALL_INPUT} !w-12 text-center tabular-nums ${invalid?.away_score ? INVALID : ""}`} />
         </div>
         <label className="block min-w-0"><span className={LABEL}>Gegner</span>
           <input value={match.away} maxLength={120} onChange={(event) => onChange({ away: event.target.value })} data-testid="result-match-away" className={SMALL_INPUT} /></label>
       </div>
+      <FieldErrors fields={invalid} testId="result-match-invalid" />
       <div className="space-y-1.5">
         <span className={LABEL}>Maps</span>
         {match.maps.map((item, mapIndex) => (
           <div key={item.key} className="flex items-center gap-2" data-testid="result-map">
-            <input aria-label={`Map ${mapIndex + 1}`} value={item.name} maxLength={80} placeholder="Map" onChange={(event) => setMap(item.key, { name: event.target.value })} className={`${SMALL_INPUT} !w-auto flex-1 min-w-0`} data-testid="result-map-name" />
-            <input aria-label={`Map ${mapIndex + 1} Heim`} inputMode="numeric" value={item.home_score} onChange={(event) => setMap(item.key, { home_score: event.target.value })} className={`${SMALL_INPUT} !w-12 text-center tabular-nums`} data-testid="result-map-home" />
+            <input aria-label={`Map ${mapIndex + 1}`} value={item.name} maxLength={80} placeholder="Map" onChange={(event) => setMap(item.key, { name: event.target.value })} {...invalidProps(errors?.[item.key], "name")} className={`${SMALL_INPUT} !w-auto flex-1 min-w-0 ${errors?.[item.key]?.name ? INVALID : ""}`} data-testid="result-map-name" />
+            <input aria-label={`Map ${mapIndex + 1} Heim`} inputMode="numeric" value={item.home_score} onChange={(event) => setMap(item.key, { home_score: event.target.value })} {...invalidProps(errors?.[item.key], "home_score")} className={`${SMALL_INPUT} !w-12 text-center tabular-nums ${errors?.[item.key]?.home_score ? INVALID : ""}`} data-testid="result-map-home" />
             <span className="text-white/40">:</span>
-            <input aria-label={`Map ${mapIndex + 1} Gast`} inputMode="numeric" value={item.away_score} onChange={(event) => setMap(item.key, { away_score: event.target.value })} className={`${SMALL_INPUT} !w-12 text-center tabular-nums`} data-testid="result-map-away" />
+            <input aria-label={`Map ${mapIndex + 1} Gast`} inputMode="numeric" value={item.away_score} onChange={(event) => setMap(item.key, { away_score: event.target.value })} {...invalidProps(errors?.[item.key], "away_score")} className={`${SMALL_INPUT} !w-12 text-center tabular-nums ${errors?.[item.key]?.away_score ? INVALID : ""}`} data-testid="result-map-away" />
             <button type="button" className={ICON_BUTTON} onClick={() => onChange({ maps: match.maps.filter((entry) => entry.key !== item.key) })} aria-label={`Map ${mapIndex + 1} entfernen`}><X className="w-4 h-4" /></button>
           </div>
         ))}
@@ -181,6 +200,7 @@ function MatchEditor({ match, index, participants, onChange, onRemove }) {
           <Plus className="w-3.5 h-3.5" /> Map
         </button>
       </div>
+      <FieldErrors fields={Object.assign({}, ...match.maps.map((item) => errors?.[item.key] || {}))} testId="result-map-invalid" />
       <div className="space-y-1.5">
         <span className={LABEL}>Aufstellung</span>
         {match.lineup.length > 0 && (
@@ -434,11 +454,17 @@ export function ResultEntrySheet({ series, round, onClose, onSaved }) {
   const target = preview?.target || data?.target;
   const toPendingDraft = target === "pending_draft";
   const canPublish = Boolean(access.can_publish) && !toPendingDraft;
-  const ready = fresh && preview.can_save && !stale;
+  const invalid = useMemo(() => (form ? fieldErrors(form) : {}), [form]);
+  const invalidCount = countFieldErrors(invalid);
+  const ready = fresh && preview.can_save && !stale && invalidCount === 0;
 
   const submit = async (event) => {
     event.preventDefault();
     if (stale) return;
+    if (invalidCount) {
+      toast.error("Bitte zuerst die rot markierten Eingaben korrigieren.");
+      return;
+    }
     if (ready) {
       save(canPublish ? "published" : "draft");
       return;
@@ -520,7 +546,7 @@ export function ResultEntrySheet({ series, round, onClose, onSaved }) {
             <section className="space-y-3" data-testid="result-matches">
               <h3 className="text-[11px] font-bold uppercase tracking-widest text-[#29B6E8]">Spiel</h3>
               {form.matches.map((match, index) => (
-                <MatchEditor key={match.key} match={match} index={index} participants={participants}
+                <MatchEditor key={match.key} match={match} index={index} participants={participants} errors={invalid}
                   onChange={(values) => updateMatch(match.key, values)} onRemove={() => update({ matches: form.matches.filter((item) => item.key !== match.key) })} />
               ))}
               <button type="button" onClick={() => update({ matches: [...form.matches, emptyMatch({ home: data.series?.team_name || "" })] })} data-testid="result-match-add" className="tls-btn tls-btn--quiet px-3 py-2 rounded-sm text-xs font-bold uppercase tracking-wider inline-flex items-center gap-2">
@@ -550,7 +576,7 @@ export function ResultEntrySheet({ series, round, onClose, onSaved }) {
               )}
               <ol className="divide-y divide-white/5" data-testid="result-rows">
                 {form.rows.map((row, index) => (
-                  <ResultRow key={row.key} row={row} index={index} autoPlace={auto[row.key]} organizerMode={organizerMode}
+                  <ResultRow key={row.key} row={row} index={index} autoPlace={auto[row.key]} organizerMode={organizerMode} invalid={invalid[row.key]}
                     problems={problems.byRow[row.key]} info={infoByKey[row.key]}
                     onChange={(values) => updateRow(row.key, values)} onHint={() => updateRow(row.key, hintToPoints(row, participants))} onRemove={() => removeRow(row.key)} />
                 ))}
@@ -568,6 +594,11 @@ export function ResultEntrySheet({ series, round, onClose, onSaved }) {
 
           <TextAreaField label="Notiz" value={form.note} onChange={(value) => update({ note: value })} rows={2} hint="Optional, etwa „Wertung laut Veranstalter vorläufig“." testId="result-note" />
 
+          {invalidCount > 0 && (
+            <p className="border border-red-400/40 bg-red-400/10 rounded-sm px-3 py-2 text-sm text-red-100" role="alert" data-testid="result-invalid">
+              {invalidCount === 1 ? "Eine Eingabe ist ungültig" : `${invalidCount} Eingaben sind ungültig`} – rot markiert. Geprüft und gespeichert wird erst, wenn alles stimmt.
+            </p>
+          )}
           {fresh && <ResultPreview preview={preview} general={problems.general} board={board} />}
           {!fresh && preview && <p className="text-xs text-white/45" data-testid="result-preview-outdated">Geändert – „Vorschau“ prüft neu.</p>}
         </>

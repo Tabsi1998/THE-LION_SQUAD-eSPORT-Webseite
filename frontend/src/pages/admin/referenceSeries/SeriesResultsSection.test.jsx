@@ -392,3 +392,34 @@ test("Verwerfen nennt die offenen Namen, die der Server wieder mitnimmt", async 
   fireEvent.click(screen.getByTestId("result-pending-discard"));
   await waitFor(() => expect(toastMock.success).toHaveBeenCalledWith("Entwurf verworfen. 2 offene Namen entfernt."));
 });
+
+test("ungültiger Platz oder ungültige Punkte: rot markiert, weder Vorschau noch Speichern, bis korrigiert", async () => {
+  setup();
+  await openRound();
+  fireEvent.change(screen.getAllByTestId("result-row-name")[0], { target: { value: "Alpha" } });
+  fireEvent.change(screen.getAllByTestId("result-row-place")[0], { target: { value: "1,5" } });
+  fireEvent.change(screen.getAllByTestId("result-row-points")[0], { target: { value: "25x" } });
+  expect(screen.getAllByTestId("result-row-place")[0]).toHaveAttribute("aria-invalid", "true");
+  expect(screen.getByTestId("result-row-invalid")).toHaveTextContent("Platz als ganze Zahl von 1 bis 1000.");
+  expect(screen.getByTestId("result-invalid")).toHaveTextContent("2 Eingaben sind ungültig");
+  fireEvent.click(screen.getByTestId("result-submit"));
+  expect(apiMock.post).not.toHaveBeenCalled();
+  expect(toastMock.error).toHaveBeenCalledWith("Bitte zuerst die rot markierten Eingaben korrigieren.");
+  fireEvent.change(screen.getAllByTestId("result-row-place")[0], { target: { value: "1" } });
+  fireEvent.change(screen.getAllByTestId("result-row-points")[0], { target: { value: "25,5" } });
+  expect(screen.queryByTestId("result-invalid")).toBeNull();
+  fireEvent.click(screen.getByTestId("result-submit"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalled());
+  expect(apiMock.post.mock.calls[0][1].rows[0]).toMatchObject({ place: 1, points: 25.5 });
+});
+
+test("Team-Liga: fehlender Spielstand hält das Prüfen auf", async () => {
+  setup({ data: resultData({ series: { id: "serie-1", kind: "team_league", team_name: "Probe Lions", rules: { points_mode: "scheme" } }, round: { id: "r1", code: "R1", opponent: "Test Eagles" } }) });
+  await openRound();
+  fireEvent.change(screen.getByTestId("result-match-home-score"), { target: { value: "2" } });
+  expect(screen.getByTestId("result-match-invalid")).toHaveTextContent("Ergebnis fehlt.");
+  fireEvent.click(screen.getByTestId("result-submit"));
+  expect(apiMock.post).not.toHaveBeenCalled();
+  fireEvent.change(screen.getByTestId("result-match-away-score"), { target: { value: "-1" } });
+  expect(screen.getByTestId("result-match-invalid")).toHaveTextContent("Ergebnis als Zahl ab 0.");
+});

@@ -2,6 +2,8 @@
 // wandeln. Gerechnet und geprüft wird im Server (Vorschau) – hier wird nur übersetzt. Text aus der Zwischenablage liest
 // ausschließlich `lib/resultPaste.js`.
 
+import { parseNumber, parsePlace } from "@/lib/resultPaste";
+
 export const MARK_OPTIONS = [
   ["dnf", "DNF"], ["dns", "DNS"], ["dsq", "DSQ"], ["fastest_lap", "Schnellste Runde"], ["pole", "Pole"],
 ];
@@ -104,11 +106,54 @@ export function matchParticipant(name, participants = []) {
   return found.length === 1 ? found[0] : null;
 }
 
+// Zahlen aus den Feldern: leer heißt „keine Angabe“; alles andere muss eine gültige Zahl sein, sonst meldet
+// `fieldErrors` einen Feldfehler und das Blatt lässt sich nicht prüfen oder speichern – nie still umdeuten.
 function number(value) {
-  const cleaned = text(value).trim().replace(",", ".");
-  if (!cleaned) return null;
-  const parsed = Number(cleaned);
-  return Number.isFinite(parsed) ? parsed : null;
+  return parseNumber(value);
+}
+
+const LIMITS = { points: 10000, penalty: 10000, total: 100000, score: 1_000_000_000 };
+
+function checkNumber(value, { min, max, message }) {
+  if (!text(value).trim()) return null;
+  const parsed = parseNumber(value);
+  return parsed === null || parsed < min || parsed > max ? message : null;
+}
+
+/**
+ * Feldfehler des Formulars: `{[Zeilen-, Spiel- oder Map-Schlüssel]: {Feld: Meldung}}`. Ein ungültiger Platz („1,5“,
+ * „0“), ungültige Punkte, Strafpunkte, Gesamtstände oder Spielstände halten Vorschau und Speichern auf.
+ */
+export function fieldErrors(form) {
+  const out = {};
+  const add = (key, field, message) => { if (message) (out[key] ||= {})[field] = message; };
+  for (const row of form.rows) {
+    if (text(row.place).trim() && parsePlace(row.place) === null) add(row.key, "place", "Platz als ganze Zahl von 1 bis 1000.");
+    add(row.key, "points", checkNumber(row.points, { min: -LIMITS.points, max: LIMITS.points, message: "Punkte als Zahl, etwa 25 oder 12,5." }));
+    add(row.key, "penalty_points", checkNumber(row.penalty_points, { min: 0, max: LIMITS.penalty, message: "Strafpunkte als Zahl ab 0." }));
+    add(row.key, "official_total", checkNumber(row.official_total, { min: -LIMITS.total, max: LIMITS.total, message: "Gesamtstand als Zahl." }));
+  }
+  for (const match of form.matches) {
+    const used = text(match.home).trim() || text(match.away).trim();
+    for (const side of ["home_score", "away_score"]) {
+      if (used && !text(match[side]).trim()) add(match.key, side, "Ergebnis fehlt.");
+      else add(match.key, side, checkNumber(match[side], { min: 0, max: LIMITS.score, message: "Ergebnis als Zahl ab 0." }));
+    }
+    for (const item of match.maps) {
+      const named = text(item.name).trim();
+      const scored = text(item.home_score).trim() || text(item.away_score).trim();
+      if (!named && scored) add(item.key, "name", "Name der Map fehlt.");
+      for (const side of ["home_score", "away_score"]) {
+        if (named && !text(item[side]).trim()) add(item.key, side, "Stand fehlt.");
+        else add(item.key, side, checkNumber(item[side], { min: 0, max: LIMITS.score, message: "Stand als Zahl ab 0." }));
+      }
+    }
+  }
+  return out;
+}
+
+export function countFieldErrors(errors) {
+  return Object.values(errors).reduce((sum, fields) => sum + Object.keys(fields).length, 0);
 }
 
 function reference(item) {
@@ -146,7 +191,7 @@ export function formToPayload(form) {
   form.rows.forEach((row) => {
     if (!filled(row)) return;
     const points = number(row.points);
-    const explicitPlace = number(row.place);
+    const explicitPlace = parsePlace(row.place);
     const out = {
       ...reference(row),
       place: explicitPlace !== null ? Math.trunc(explicitPlace) : auto[row.key],
