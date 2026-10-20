@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.7.0 (20.10.2026)
+
+### Neu
+
+* Filter „Nur Vereinsspieler“ und Handy-Karten auf der Serienseite (#1745)
+* Finale als eigene Runde mit Endplatzierung auf der Serienseite (#1745)
+* Finalrechner „Was braucht es fürs Finale?“ als Richtwert (#1745)
+* Seite Turnierserie mit Gesamtwertung, Streichergebnissen und Finalgrenze (#1745)
+* Serienseite nicht indexiert, fremde Namen nur in Tabellen (#1745)
+
 ## 1.6.2 (20.10.2026)
 
 ### Fehlerbehebungen
