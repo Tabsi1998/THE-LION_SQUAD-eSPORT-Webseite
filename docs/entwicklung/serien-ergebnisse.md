@@ -16,6 +16,11 @@ Redaktion) und gültige Captains dieser Saison ([Rollen](../ROLLEN.md)); ein Ter
 | `POST …/results/approve` | Vorstand: Entwurf daneben (oder Blatt im Entwurf) veröffentlichen | 200; 409 ohne Entwurf oder bei veraltetem Stand |
 | `POST …/results/discard` | Vorstand: Entwurf daneben verwerfen | 200; 409 ohne Entwurf oder bei veraltetem Stand |
 
+**Captains** sehen nur, wer in der Saison bekannt ist und wer neu (`rows[].match`, `is_new`) – keine Zuordnung, keinen
+Alias, keine Vereinsmitgliedschaft. Diese Felder bekommt nur der Vorstand: `participants[].is_club_member` und
+`.link_status` (GET), `rows[].is_club_member`, `unknown_names[].auto_assigned`, `.alias`, `.suggestions`,
+`club_members` und `is_club_member` in den Ständen (Vorschau), `created_participants[].link` und `.link_status` (PUT).
+
 ## Zeilen
 
 Eine Zeile nennt den Teilnehmer über `participant_id`, `name` (wie beim Veranstalter) oder `start_number`; dazu

@@ -401,12 +401,37 @@ async def test_approving_removes_people_left_over_from_replaced_drafts(flow):
 async def test_a_captain_of_a_direct_series_publishes_and_sees_no_alias_details(flow):
     ctx = await _setup(flow)
     await flow.patch(f"{ADMIN}/series/{ctx['own']['id']}", json={"publish_mode": "direct"})
+    # Anna ist als Mitglied zugeordnet, „Dora D“ erkennt ein bestätigter Alias - beides sieht nur die Verwaltung.
+    await flow.db.club_member_profiles.insert_many([
+        {"id": "p-anna", "display_name": "Anna Profil", "is_active": True},
+        {"id": "p-dora", "display_name": "Dora Profil", "is_active": True}])
+    await flow.db.reference_aliases.insert_one({"id": "alias-dora", "name_normalized": "dorad", "target": "member",
+                                                "profile_id": "p-dora", "game_id": None,
+                                                "confirmed_at": "2026-01-02T10:00:00+00:00"})
+    assigned = await flow.post(f"{ADMIN}/series/{ctx['own']['id']}/participants/{ctx['people']['Anna Probe']}/assign",
+                               json={"link": "member", "profile_id": "p-anna"})
+    assert assigned.status_code == 200, assigned.text
+    rows = _rows("Anna Probe", "Neu Nora", "Dora D")
+    board_view = (await flow.post(_url(ctx, 0, "/preview"), json={"rows": rows})).json()
+    assert [item["name"] for item in board_view["club_members"]] == ["Anna Probe", "Dora D"]
+
     flow.act_as(ctx["captain"])
-    preview = (await flow.post(_url(ctx, 0, "/preview"), json={"rows": _rows("Anna Probe", "Neu Nora")})).json()
+    preview = (await flow.post(_url(ctx, 0, "/preview"), json={"rows": rows})).json()
     assert preview["access"]["can_publish"] is True
-    assert set(preview["unknown_names"][0]) == {"participant_id", "name", "start_number", "team", "rows", "matches",
-                                                "auto_assigned"}
+    # Nur bekannt oder unbekannt: keine Zuordnung, kein Alias, keine Vereinsmitglieder.
+    assert [set(item) for item in preview["unknown_names"]] == [
+        {"participant_id", "name", "start_number", "team", "rows", "matches"}] * 2
+    assert [row["match"] for row in preview["rows"]] == ["name", "new", "new"]
+    assert "club_members" not in preview
+    assert not [row for row in preview["rows"] if "is_club_member" in row]
+    assert not [row for row in preview["standings"]["scopes"]["drivers"] if "is_club_member" in row]
+    for secret in ("p-anna", "p-dora", "Anna Profil", "Dora Profil", "alias-dora"):
+        assert secret not in str(preview)
+    loaded = (await flow.get(_url(ctx))).json()
+    assert {key for row in loaded["participants"] for key in row} == {"id", "name", "start_number", "default_team",
+                                                                      "kind"}
     saved = await _save(flow, ctx, 0, _rows("Anna Probe", "Neu Nora"))
+    assert [set(item) for item in saved["created_participants"]] == [{"id", "name"}]
     assert (saved["target"], saved["sheet"]["status"]) == ("sheet", "published")
     assert "created_by" not in saved["sheet"] and "updated_by" not in saved["sheet"]
 

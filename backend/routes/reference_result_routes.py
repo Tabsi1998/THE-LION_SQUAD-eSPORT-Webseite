@@ -10,12 +10,15 @@ Server nimmt nur strukturierte Zeilen. Kurzfassung des Vertrags: ``docs/entwickl
 
     {round, series: {id, kind, team_name, rules, publish_mode}, access: {role, can_publish, valid_until?},
      version, sheet | null, target: "sheet" | "pending_draft",
-     participants: [{id, name, start_number, default_team, kind, is_club_member, link_status}]}
+     participants: [{id, name, start_number, default_team, kind, is_club_member*, link_status*}]}
 
 ``version`` ist 0, solange es kein Blatt gibt. ``sheet`` enthält ``rows``, ``matches``, ``official_totals``,
 ``official_team_totals``, ``official_table``, ``note``, ``status`` („draft“/„published“), ``version`` und
 ``pending_draft`` (Entwurf neben dem veröffentlichten Blatt oder ``null``). ``target`` sagt, wohin Übernehmen schreibt.
 Captains bekommen keine ``*_by``-Kennungen.
+
+**Captains** sehen nur, wer bekannt ist und wer neu - keine Zuordnung, keinen Alias, keine Vereinsmitgliedschaft
+(Aliase und Verknüpfungen liest nur die Verwaltung, #1743). Mit ``*`` markierte Felder bekommt nur der Vorstand.
 
 **POST …/results/preview** - ändert nichts. Body (``ResultSheetInput``)::
 
@@ -30,26 +33,26 @@ Captains bekommen keine ``*_by``-Kennungen.
 Antwort::
 
     {round, access, version, sheet_status, has_pending_draft, target, can_save, errors: [Problem], warnings: [Problem],
-     rows: [{index, participant_id, match, name, is_new, is_club_member, place, team, marks, points, points_source,
+     rows: [{index, participant_id, match, name, is_new, is_club_member*, place, team, marks, points, points_source,
              scored: {points, base, bonus, penalty, source, participated}}],
-     matches, unknown_names: [{participant_id, name, start_number, team, rows, matches, auto_assigned,
-                               alias?, suggestions?}],
-     club_members: [{participant_id, name, profile_name?}],
+     matches, unknown_names: [{participant_id, name, start_number, team, rows, matches, auto_assigned*, alias*,
+                               suggestions*}],
+     club_members*: [{participant_id, name, profile_name}],
      standings: {round_seq, scopes: {drivers|teams|table: [Zeile mit rank, rank_change, points, computed_points,
-                                                          official_points, deviation, … und name]}} | null,
+                                                          official_points, deviation, … name, is_new,
+                                                          is_club_member*]}} | null,
      final: {top_n, participant_ids, entered, left} | null, latest: {round_id, round_seq, scopes} | null}
 
 ``Problem`` ist ``{code, message, rows: [Index der Zeile], match?, places?, scope?}``. ``match`` sagt, wie eine Zeile
 gefunden wurde: ``id``, ``name``, ``name_untagged``, ``start_number`` oder ``new``. Neue Namen haben in der Vorschau
 die Kennung ``neu:<Schlüssel>``. ``standings`` ist der Zwischenstand nach diesem Termin, als wäre das Blatt
 veröffentlicht; ``rank_change`` vergleicht mit dem Termin davor. ``latest`` kommt nur, wenn danach schon Termine
-gewertet sind. Vorschläge und Alias-Ziel (``suggestions``, ``alias``, ``profile_name``) sieht nur der Vorstand -
-Aliase und Verknüpfungen liest nur die Verwaltung (#1743).
+gewertet sind.
 
 **PUT …/results** - übernehmen. Body: wie die Vorschau plus ``status`` („draft“ | „published“) und
 ``expected_version`` (Pflicht; 0 für ein neues Blatt). Antwort::
 
-    {target, version, sheet, created_participants: [{id, name, link, link_status}], recomputed, warnings}
+    {target, version, sheet, created_participants: [{id, name, link*, link_status*}], recomputed, warnings}
 
 - **409**, wenn ``expected_version`` nicht mehr stimmt - auch bei zwei gleichzeitigen Übernahmen (atomar bedingt
   geschrieben, nie Lesen-dann-Schreiben). **422** mit ``{message, errors, warnings}``, wenn die Prüfung Fehler hat.
@@ -107,6 +110,8 @@ BROKEN_SHEETS = "Die Ergebnisse der Serie lassen sich so nicht werten – bitte 
 ROUND_FIELDS = ("id", "order", "code", "title", "venue", "club_day", "starts_at", "status", "kind", "counts",
                 "opponent")
 PARTICIPANT_FIELDS = ("id", "name", "start_number", "default_team", "kind", "is_club_member", "link_status")
+# Captains: nur, wer in der Saison steht - Zuordnung, Alias und Vereinsmitgliedschaft liest nur die Verwaltung (#1743).
+CAPTAIN_PARTICIPANT_FIELDS = ("id", "name", "start_number", "default_team", "kind")
 
 
 # ---------------------------------------------------------------- Vertrag
@@ -302,21 +307,23 @@ async def _snapshots(db, series: dict, rules: dict, round_doc: dict, content: di
         raise HTTPException(422, BROKEN_SHEETS) from None
 
 
-def _scopes(snapshots: list[dict], names: dict[str, str], club: set[str]) -> dict:
+def _scopes(snapshots: list[dict], names: dict[str, str], club: set[str] | None) -> dict:
+    """Stände mit Namen; ``is_club_member`` nur, wenn ``club`` gesetzt ist (Vorstand)."""
     out = {}
     for snapshot in snapshots:
         rows = []
         for row in snapshot["rows"]:
             pid = row.get("participant_id")
-            extra = {"name": names.get(pid, ""), "is_new": series_results.is_new(pid),
-                     "is_club_member": pid in club} if pid else {}
+            extra = {"name": names.get(pid, ""), "is_new": series_results.is_new(pid)} if pid else {}
+            if pid and club is not None:
+                extra["is_club_member"] = pid in club
             rows.append({**row, **extra})
         out[snapshot["scope"]] = rows
     return out
 
 
 async def _standings(db, series: dict, rules: dict, round_doc: dict, resolution, participants: list[dict],
-                     club: set[str]) -> tuple[dict | None, dict | None, dict | None, list[dict]]:
+                     club: set[str] | None) -> tuple[dict | None, dict | None, dict | None, list[dict]]:
     """Zwischenstand nach diesem Termin, Finalgrenze, neuester Stand (wenn danach schon gewertet) und Abweichungen
     zum offiziellen Wert."""
     people = participants + [{"id": person["participant_id"], "name": person["name"], "default_team": person["team"],
@@ -352,27 +359,28 @@ async def _profile_names(db, profile_ids) -> dict[str, str]:
 
 
 async def _unknown_names(db, access: SeriesAccess, resolution) -> tuple[list[dict], list[dict]]:
-    """Neue Namen mit Vorschlägen (nur Vorstand) und die, die ein bestätigter Alias gleich zuordnet."""
+    """Neue Namen. Der Vorstand bekommt Vorschläge, das Alias-Ziel und ``auto_assigned`` dazu, dazu die Namen, die ein
+    bestätigter Alias gleich einem Mitglied zuordnet. Captains nur die Namen - Aliase liest nur die Verwaltung."""
     people = list(resolution.new_people.values())
+    fields = ("participant_id", "name", "start_number", "team", "rows", "matches")
+    if not access.is_board:
+        return [{key: person[key] for key in fields} for person in people], []
     if not people:
         return [], []
-    index = await build_index(db, access.series, [person["name"] for person in people], with_ids=access.is_board)
+    index = await build_index(db, access.series, [person["name"] for person in people])
     out, members = [], []
     for person in people:
         alias = series_identity.exact_alias(index, person["name"])
-        item = {key: person[key] for key in ("participant_id", "name", "start_number", "team", "rows", "matches")}
-        item["auto_assigned"] = bool(alias)
-        if access.is_board:
-            item["alias"] = ({"target": alias.get("target"), "profile_id": alias.get("profile_id"),
-                              "label": index.profiles.get(alias.get("profile_id")) or alias.get("guest_name")}
-                             if alias else None)
-            item["suggestions"] = series_identity.suggest(index, person["name"], person["start_number"])
-        out.append(item)
+        out.append({
+            **{key: person[key] for key in fields}, "auto_assigned": bool(alias),
+            "alias": ({"target": alias.get("target"), "profile_id": alias.get("profile_id"),
+                       "label": index.profiles.get(alias.get("profile_id")) or alias.get("guest_name")}
+                      if alias else None),
+            "suggestions": series_identity.suggest(index, person["name"], person["start_number"]),
+        })
         if alias and alias.get("target") == "member":
-            member = {"participant_id": person["participant_id"], "name": person["name"]}
-            if access.is_board:
-                member["profile_name"] = index.profiles.get(alias.get("profile_id"))
-            members.append(member)
+            members.append({"participant_id": person["participant_id"], "name": person["name"],
+                            "profile_name": index.profiles.get(alias.get("profile_id"))})
     return out, members
 
 
@@ -384,19 +392,22 @@ async def preview_results(series_id: str, round_id: str, body: ResultSheetInput,
     round_doc = await access.round(round_id)
     existing = await _sheet(db, series_id, round_id)
     rules, participants, resolution = await _prepare(db, access, round_doc, body)
-    by_id = {person["id"]: person for person in participants}
-    club_ids = {row["participant_id"] for row in resolution.rows
-                if row["participant_id"] in by_id and series_identity.counts_for_club(by_id[row["participant_id"]])}
-    for match in resolution.matches:
-        club_ids.update(pid for pid in match["lineup"]
-                        if pid in by_id and series_identity.counts_for_club(by_id[pid]))
     unknown, auto_members = await _unknown_names(db, access, resolution)
-    profiles = await _profile_names(db, [by_id[pid].get("profile_id") for pid in club_ids]) if access.is_board else {}
-    club_members = [{"participant_id": pid, "name": by_id[pid].get("name"),
-                     **({"profile_name": profiles.get(by_id[pid].get("profile_id"))} if access.is_board else {})}
-                    for pid in sorted(club_ids, key=lambda pid: str(by_id[pid].get("name") or "").casefold())]
-    club_members.extend(auto_members)
-    club = club_ids | {member["participant_id"] for member in auto_members}
+    club = club_members = None
+    if access.is_board:
+        # Erkannte Vereinsmitglieder - Verknüpfungen und Aliase liest nur die Verwaltung (#1743).
+        by_id = {person["id"]: person for person in participants}
+        club_ids = {row["participant_id"] for row in resolution.rows if row["participant_id"] in by_id
+                    and series_identity.counts_for_club(by_id[row["participant_id"]])}
+        for match in resolution.matches:
+            club_ids.update(pid for pid in match["lineup"]
+                            if pid in by_id and series_identity.counts_for_club(by_id[pid]))
+        profiles = await _profile_names(db, [by_id[pid].get("profile_id") for pid in club_ids])
+        club_members = [{"participant_id": pid, "name": by_id[pid].get("name"),
+                         "profile_name": profiles.get(by_id[pid].get("profile_id"))}
+                        for pid in sorted(club_ids, key=lambda pid: str(by_id[pid].get("name") or "").casefold())]
+        club_members.extend(auto_members)
+        club = club_ids | {member["participant_id"] for member in auto_members}
 
     standings = final = latest = None
     if not resolution.errors:
@@ -408,18 +419,21 @@ async def preview_results(series_id: str, round_id: str, body: ResultSheetInput,
         rows.append({
             **{key: row[key] for key in ("index", "participant_id", "match", "name", "place", "team", "marks",
                                          "points", "points_source")},
-            "is_new": series_results.is_new(row["participant_id"]), "is_club_member": row["participant_id"] in club,
+            "is_new": series_results.is_new(row["participant_id"]),
+            **({"is_club_member": row["participant_id"] in club} if club is not None else {}),
             "scored": result_points(row, rules) if row["participant_id"] else None,
         })
-    return {
+    out = {
         "round": _round_view(round_doc), "access": access.summary(), "version": _version(existing),
         "sheet_status": (existing or {}).get("status"),
         "has_pending_draft": bool((existing or {}).get("pending_draft")),
         "target": access.edit_target(existing), "can_save": not resolution.errors,
         "errors": resolution.errors, "warnings": resolution.warnings, "rows": rows, "matches": resolution.matches,
-        "unknown_names": unknown, "club_members": club_members, "standings": standings, "final": final,
-        "latest": latest,
+        "unknown_names": unknown, "standings": standings, "final": final, "latest": latest,
     }
+    if club_members is not None:
+        out["club_members"] = club_members
+    return out
 
 
 # ---------------------------------------------------------------- Lesen
@@ -438,7 +452,8 @@ async def get_results(series_id: str, round_id: str, access: SeriesAccess = Depe
                    "publish_mode": access.series.get("publish_mode")},
         "access": access.summary(), "version": _version(existing), "sheet": _sheet_view(existing, access),
         "target": access.edit_target(existing),
-        "participants": [{key: row.get(key) for key in PARTICIPANT_FIELDS} for row in participants],
+        "participants": [{key: row.get(key) for key in (
+            PARTICIPANT_FIELDS if access.is_board else CAPTAIN_PARTICIPANT_FIELDS)} for row in participants],
     }
 
 
@@ -584,8 +599,8 @@ async def save_results(series_id: str, round_id: str, body: ResultSave,
             recomputed = True
     return {
         "target": target, "version": saved["version"], "sheet": _sheet_view(saved, access), "recomputed": recomputed,
-        "created_participants": [{key: doc.get(key) for key in ("id", "name", "link", "link_status")}
-                                 for doc in created.values()],
+        "created_participants": [{key: doc.get(key) for key in (
+            ("id", "name", "link", "link_status") if access.is_board else ("id", "name"))} for doc in created.values()],
         "warnings": resolution.warnings,
     }
 
