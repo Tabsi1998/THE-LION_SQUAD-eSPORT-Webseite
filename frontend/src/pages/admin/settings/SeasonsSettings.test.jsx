@@ -10,8 +10,11 @@ const toastMock = { success: vi.fn(), error: vi.fn() };
 vi.mock("@/lib/api", () => ({ api: apiMock, formatApiError: (detail) => String(detail || "Fehler") }));
 vi.mock("sonner", () => ({ toast: toastMock }));
 vi.mock("@/hooks/useLiveRefresh", () => ({ useLiveRefresh: () => {} }));
+// Die eigene Sicht der Person (#1838): Deko-Wahl im Profil und „Bewegung reduzieren“ des Geräts.
+const seasonView = { preference: "on", reducedMotion: false };
+vi.mock("@/seasons/SeasonContext", () => ({ useSeason: () => seasonView }));
 
-const { SeasonsSettings, runningSeasons, stateText, PREVIEW_STORAGE_KEY } = await import("./SeasonsSettings");
+const { SeasonsSettings, runningSeasons, stateText, previewLimits, ownViewLimits, PREVIEW_STORAGE_KEY } = await import("./SeasonsSettings");
 
 function season(overrides) {
   return {
@@ -33,6 +36,8 @@ const VIEW = {
 beforeEach(() => {
   vi.clearAllMocks();
   sessionStorage.clear();
+  seasonView.preference = "on";
+  seasonView.reducedMotion = false;
   apiMock.get.mockResolvedValue({ data: VIEW });
   apiMock.put.mockImplementation(async (_url, patch) => ({ data: { ...VIEW, enabled: patch.enabled ?? VIEW.enabled } }));
   apiMock.post.mockResolvedValue({ data: { token: "halloween.123.456.abc", seconds: 60, key: "halloween" } });
@@ -75,7 +80,7 @@ test("Vorschau merkt sich das Token nur in dieser Sitzung und sagt der Bühne so
   const user = userEvent.setup();
   let previewEvents = 0;
   window.addEventListener("tls:season-preview", () => { previewEvents += 1; });
-  render(<SeasonsSettings />);
+  render(<MemoryRouter><SeasonsSettings /></MemoryRouter>);
   await user.click(await screen.findByTestId("season-halloween-preview"));
   await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/settings/seasons/halloween/preview", {}));
   expect(JSON.parse(sessionStorage.getItem(PREVIEW_STORAGE_KEY)).token).toBe("halloween.123.456.abc");
@@ -168,4 +173,46 @@ test("Adventkalender und Ostereiersuche stehen nur zum Lesen da, mit dem Weg zur
   expect(screen.queryByTestId("season-advent_calendar-enabled")).toBeNull();
   expect(screen.queryByTestId("season-easter_hunt-mode")).toBeNull();
   expect(screen.getByTestId("season-halloween-enabled")).toBeInTheDocument();
+});
+
+test("Vorschau ruhig (#1838): Gründe des Geräts/Kontos einmal oben, Gründe der Saison an der Karte", () => {
+  expect(ownViewLimits({ preference: "on", reducedMotion: false })).toEqual([]);
+  expect(ownViewLimits({ preference: "on", reducedMotion: true })).toEqual([expect.stringContaining("Bewegung reduzieren")]);
+  expect(ownViewLimits({ preference: "subtle", reducedMotion: false })).toEqual([expect.stringContaining("„dezent“")]);
+  expect(ownViewLimits({ preference: "off", reducedMotion: true })).toEqual([expect.stringContaining("„aus“")]);
+  const base = season({ key: "new_year", label: "Silvester" });
+  expect(previewLimits({ season: base })).toEqual([]);
+  expect(previewLimits({ season: { ...base, intensity: "subtle" } })).toEqual([expect.stringContaining("Stärke „dezent“")]);
+  expect(previewLimits({ season: { ...base, channels: ["app"] } })).toEqual([expect.stringContaining("Website")]);
+});
+
+test("Hinweis bei „Bewegung reduzieren“ steht einmal oben, nicht an jeder Karte; nach dem Start der Weg auf die Website im selben Tab", async () => {
+  const user = userEvent.setup();
+  seasonView.reducedMotion = true;
+  render(<MemoryRouter><SeasonsSettings /></MemoryRouter>);
+  expect(await screen.findByTestId("seasons-preview-own-limits")).toHaveTextContent("Bewegung reduzieren");
+  expect(screen.queryByTestId("season-new_year-preview-limits")).toBeNull();
+  expect(screen.queryByTestId("season-halloween-preview-limits")).toBeNull();
+  expect(screen.queryByTestId("season-new_year-preview-site")).toBeNull();
+  await user.click(screen.getByTestId("season-new_year-preview"));
+  const link = await screen.findByTestId("season-new_year-preview-site");
+  expect(link.getAttribute("href")).toBe("/");
+  expect(link.getAttribute("target")).toBeNull();
+  // Nur die Karte, deren Vorschau läuft, zeigt den Weg.
+  expect(screen.queryByTestId("season-halloween-preview-site")).toBeNull();
+});
+
+test("Stärke „dezent“ sagt es nur die Karte dieser Saison", async () => {
+  apiMock.get.mockResolvedValue({ data: { ...VIEW, seasons: VIEW.seasons.map((item) => (item.key === "new_year" ? { ...item, intensity: "subtle" } : item)) } });
+  render(<MemoryRouter><SeasonsSettings /></MemoryRouter>);
+  expect(await screen.findByTestId("season-new_year-preview-limits")).toHaveTextContent("Stärke „dezent“");
+  expect(screen.queryByTestId("season-halloween-preview-limits")).toBeNull();
+  expect(screen.queryByTestId("seasons-preview-own-limits")).toBeNull();
+});
+
+test("ohne Einschränkung: kein Hinweis", async () => {
+  render(<MemoryRouter><SeasonsSettings /></MemoryRouter>);
+  await screen.findByTestId("season-new_year-preview");
+  expect(screen.queryByTestId("season-new_year-preview-limits")).toBeNull();
+  expect(screen.queryByTestId("seasons-preview-own-limits")).toBeNull();
 });
