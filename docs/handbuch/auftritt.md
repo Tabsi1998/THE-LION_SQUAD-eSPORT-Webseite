@@ -71,6 +71,7 @@ Für eine neue Website in dieser Reihenfolge:
 | **SEO Beschreibung** | Der Text unter dem Treffer in Suchmaschinen |
 | **Akzentfarbe (HEX)** | siehe 3.2 |
 | **Domain**, **Zeitzone**, **Kontakt E-Mail** | Grunddaten der Website |
+| **Countdown ab … Tagen vorher** | Ab wann die Website bei Terminen zählt („in 13 Tagen“, am Vortag „morgen 14:00“, am Tag selbst „heute 14:00“ bzw. „in 45 Minuten“). Davor steht bis 60 Tage das Datum („Sa 14. November“), noch weiter weg nur der Monat („im März“). Der große Countdown auf der Startseite erscheint nur innerhalb dieser Tage. Leer = 14 Tage, erlaubt 1 bis 60 |
 | **Standard-Logo** | Das Logo, wenn nichts Spezielleres hinterlegt ist |
 | **Logo auf dunklem Hintergrund** / **auf hellem Hintergrund** | Zwei Fassungen für dunkle und helle Flächen |
 | **Standard SEO-/Teilen-Banner** | Das Bild, das beim Teilen eines Links erscheint, wenn die Seite kein eigenes Bild hat |
@@ -258,7 +259,7 @@ Die Startseite hat keinen eigenen Editor. Sie setzt sich aus Inhalten zusammen, 
 | --- | --- |
 | Live-Banner, wenn gerade ein Turnier, Event oder Stream läuft | entsteht von selbst |
 | Der große Kopf mit „Ein Rudel. Eine Familie.“ | fester Text, nicht im Admin änderbar |
-| **Angeheftete oder neueste News** und die **nächsten Termine** mit Countdown | Admin → Content → News (Haken **Anpinnen**), Admin → Content → Events |
+| **Angeheftete oder neueste News** und die **nächsten Termine** mit Countdown (der große Countdown nur, wenn ein Termin in den nächsten 14 Tagen liegt) | Admin → Content → News (Haken **Anpinnen**), Admin → Content → Events; ab wann gezählt wird: Admin → Auftritt → Branding, **Countdown ab … Tagen vorher** |
 | **Jahreswertung** | Admin → eSports → Jahreswertung (die aktive Saison) |
 | **Aktuelle News** | Admin → Content → News |
 | **Zahlen** (Mitglieder, Spiele …) | Admin → Verein → Über uns: Häkchen bei den Kacheln |
