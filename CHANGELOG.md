@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.8.0](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/compare/v1.7.1...v1.8.0) (2026-10-20)
+
+
+### Neu
+
+* Ergebnisse externer Serien eintragen – Vorschau, Übernehmen mit Version und Freigabe ([#1744](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1744)) ([08fee56](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/08fee563a7aed2fe16d6670efe7d0805ad643408))
+* Ergebnisse externer Serien zuordnen und auf Plausibilität prüfen ([#1744](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1744)) ([08fee56](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/08fee563a7aed2fe16d6670efe7d0805ad643408))
+
+
+### Fehlerbehebungen
+
+* Änderungen an einer Saison laufen nacheinander, nie rechnet ein älterer Stand über einen neueren ([#1744](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1744)) ([08fee56](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/08fee563a7aed2fe16d6670efe7d0805ad643408))
+
 ## 1.7.1 (20.10.2026)
 
 ### Fehlerbehebungen
