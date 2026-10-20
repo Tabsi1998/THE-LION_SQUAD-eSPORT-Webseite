@@ -447,7 +447,10 @@ Warteschlange. In der Turnierleitung am Handy (`/tournaments/<slug>/leitung`) st
   Nächstes** kommt und was **danach**. Oben steht der Verzug, zum Beispiel „+11 Min. · Finale jetzt ca. 20:51“.
 - Wird eine Station frei, rückt das nächste bereite Spiel nach – an die Station, die zuerst frei ist. Ein Spiel wartet
   nur auf seine eigenen Vorspiele (die Linien im Baum), nicht auf die ganze Runde. Steht ein Platz noch nicht fest,
-  heißt es „wartet auf die Vorspiele“ und die Zeit „voraussichtlich“.
+  heißt es „wartet auf die Vorspiele“, bei der Show-Auslosung „wartet auf die Auslosung“, und die Zeit „voraussichtlich“.
+- Bereite Spiele (alle Plätze besetzt) stehen an jeder Station vor denen, die noch warten: Ein Lauf, der auf die
+  Auslosung oder auf Vorspiele wartet, nimmt keiner Station das **Aufrufen**. Gibt es mehrere bereite Spiele, bekommt
+  jede freie Station eines – vier bereite Läufe laufen auf vier Stationen, nicht nacheinander auf zweien.
 - **Aufrufen** reserviert die Station und schickt den Spielern „Du bist dran“ (Postfach und Push, bei Teams an die
   Aufgestellten). Danach steht dort „Aufgerufen · antreten bis … · nicht erschienen ab …“; die Frist „nicht erschienen“
   (3.7) zählt ab dem Aufruf. Wer vor der geplanten Zeit aufgerufen wird, hat bis zur geplanten Zeit – dann nennen
@@ -460,6 +463,11 @@ Warteschlange. In der Turnierleitung am Handy (`/tournaments/<slug>/leitung`) st
   dort).
 - **Planen/Übernehmen** verschiebt ein aufgerufenes Spiel nicht; im laufenden Turnier vor Ort zeigt der Matchplan nur
   noch die Prognose. Die geplanten Zeiten bleiben stehen; der Verzug ist der Abstand der Prognose zu ihnen.
+
+<table><tr><th>PC</th><th>Handy</th></tr><tr>
+<td><img src="../assets/live/stationen-auslosung-pc.png" alt="Reiter Stationen bei der Show-Auslosung: zwei Stationen mit bereitem Lauf und Knopf Aufrufen, zwei mit einem Lauf, der auf die Auslosung wartet" width="420"></td>
+<td><img src="../assets/live/stationen-auslosung-handy.png" alt="Dasselbe am Handy" width="240"></td>
+</tr></table>
 
 Spieler sehen auf der Turnierseite unter **Dein Stand** und oben im **Spielplan** „Du bist als Nächstes an Station 2 ·
 ca. 18:40“ (oder „Läuft“, „Du bist dran“), auf der Matchseite steht dasselbe für das Spiel. Im Spielplan **Nach
