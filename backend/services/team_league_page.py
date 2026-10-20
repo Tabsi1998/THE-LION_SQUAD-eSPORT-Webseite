@@ -153,7 +153,8 @@ async def _lineup(db, series: dict, seasons: list[dict], sheets: dict, own_days:
         players.append({
             "key": pid, "name": None if hidden else item.get("name"), "name_hidden": hidden,
             "club_member": is_member, "guest": not is_member,
-            "profile_slug": slugs.get(item.get("profile_id")) if is_member else None,
+            # Link nur zu öffentlich sichtbaren Profilen: aktiv (wie die Profilseite) und Name nicht ausgeblendet.
+            "profile_slug": slugs.get(item.get("profile_id")) if is_member and not hidden else None,
             "round_ids": round_ids, "appearances": len(round_ids),
             "all_seasons": career.get(item.get("profile_id")) if is_member and item.get("profile_id") else None,
         })

@@ -184,7 +184,7 @@ function PlayerName({ player }) {
   const name = nameOf(player);
   return (
     <span className="flex items-center gap-2 min-w-0">
-      {player.club_member && player.profile_slug ? (
+      {player.club_member && player.profile_slug && !player.name_hidden ? (
         <Link to={`/members/${player.profile_slug}`} className="tls-standing-name text-white font-semibold hover:text-[#29B6E8] focus-visible:text-[#29B6E8]">{name}</Link>
       ) : (
         <span className={`tls-standing-name ${player.name_hidden ? "text-white/40 italic" : "text-white font-medium"}`}>{name}</span>

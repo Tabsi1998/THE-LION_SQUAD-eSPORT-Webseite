@@ -137,3 +137,11 @@ test("Eine leere Saison zeigt Hinweise statt leerer Tabellen", async () => {
   expect(screen.getByText("Noch keine Aufstellung eingetragen.")).toBeInTheDocument();
   expect(screen.queryByTestId("team-league-path")).not.toBeInTheDocument();
 });
+
+test("Aufstellung verlinkt nur öffentlich sichtbare Profile: kein Link bei ausgeblendetem Namen", async () => {
+  const players = [{ key: "p-h", name: null, name_hidden: true, club_member: true, guest: false, profile_slug: "probe-versteckt", round_ids: ["r1"], appearances: 1, all_seasons: 1 }];
+  renderPage({ ...BODY, team_league: { ...BODY.team_league, lineup: { round_ids: ["r1"], players } } });
+  const lineup = await screen.findByTestId("team-league-lineup");
+  expect(lineup).toHaveTextContent("Name ausgeblendet");
+  expect(within(lineup).queryByRole("link")).not.toBeInTheDocument();
+});

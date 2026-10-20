@@ -208,3 +208,23 @@ async def test_other_kinds_and_empty_seasons(flow):
     assert body["table"] is None and body["matchdays"] == [] and body["rank_history"] == []
     assert body["lineup"] == {"round_ids": [], "players": []}
     assert [(item["season"], item["rank"], item["current"]) for item in body["path"]] == [("2027", None, True)]
+
+
+@pytest.mark.asyncio
+async def test_lineup_links_only_publicly_visible_profiles(flow):
+    _, lineage, _, series, _ = await _setup(flow)
+    # Name ausgeblendet: weder Name noch Profil-Link.
+    await flow.db.reference_participants.update_one({"id": "p-alpha"}, {"$set": {"name_hidden": True}})
+    flow.act_as(None)
+    response = await flow.get(_url(lineage, series))
+    first = response.json()["team_league"]["lineup"]["players"][0]
+    assert (first["club_member"], first["name"], first["profile_slug"]) == (True, None, None)
+    assert "probe-alpha" not in response.text
+
+    # Profil nicht mehr aktiv (wie auf der Profilseite): kein Link.
+    await flow.db.reference_participants.update_one({"id": "p-alpha"}, {"$set": {"name_hidden": False}})
+    await flow.db.club_member_profiles.update_one({"id": "profil-alpha"}, {"$set": {"is_active": False}})
+    response = await flow.get(_url(lineage, series))
+    first = response.json()["team_league"]["lineup"]["players"][0]
+    assert (first["name"], first["profile_slug"]) == ("Probe Alpha", None)
+    assert "probe-alpha" not in response.text
