@@ -279,8 +279,26 @@ fehlt das Ergebnis, oder der Termin wurde abgesagt.
 </table>
 
 **Öffentlich** steht der Kalender unter `/references/series/<spur>/<saison>` – mit der Sichtbarkeit von Spur und Saison
-(eine Saison „Nur Mitglieder“ sehen Gäste nicht), ohne Notizen; statt „Ergebnis fehlt“ steht dort „Ergebnis folgt“. Die volle Serienseite mit Tabelle kommt in einem
-späteren Schritt; bis dahin ist die Seite nicht für Suchmaschinen gedacht.
+(eine Saison „Nur Mitglieder“ sehen Gäste nicht), ohne Notizen; statt „Ergebnis fehlt“ steht dort „Ergebnis folgt“.
+
+**Seite Turnierserie:** Dieselbe Adresse zeigt die ganze Saison – oben Spur, Veranstalter und Spiel, dann der
+**Fortschritt** (ein Feld je Wertungsrunde, das Finale in Gold, darunter das nächste Turnier mit Datum) und die **Regeln**
+(Punkteschlüssel, Streichergebnisse oder „beste N“, Vorrang bei Gleichstand, Finalgrenze). Die **Gesamtwertung** zeigt das
+Ergebnis je Runde; gestrichene Ergebnisse sind durchgestrichen und blass, Pfeile zeigen den Weg seit der Runde davor, eine
+goldene Linie die **Finalgrenze** (Top N aus den Regeln der Saison). Vereinsmitglieder sind cyan markiert und verlinken auf
+ihr Profil; fremde Namen stehen nur als Text in der Tabelle, ein ausgeblendeter Name als „Name ausgeblendet“. **Nur
+Vereinsspieler** blendet alle anderen aus. Am Handy stehen Karten statt der breiten Tabelle: die ersten zehn und alle
+Vereinsspieler, **Ganze Tabelle zeigen** klappt den Rest auf. **Was braucht es fürs Finale?** rechnet für einen gewählten
+Spieler den Abstand zur Finalgrenze und den nötigen Schnitt je offener Runde – ausdrücklich ein Richtwert. Das **Finale**
+(Termin mit Art „Finale“) steht als eigene Runde mit eigener Endplatzierung darunter. Die Seite liest nur den
+gespeicherten Stand und ist nicht für Suchmaschinen gedacht (`noindex`).
+
+<table>
+<tr>
+<td><img src="../assets/serien/serien-seite-turnierserie.png" alt="Seite einer Turnierserie mit Fortschritt, Regeln, Gesamtwertung, gestrichenen Ergebnissen und Finalgrenze" width="560"></td>
+<td><img src="../assets/serien/serien-seite-turnierserie-handy.png" alt="Dieselbe Seite am Handy mit Karten statt Tabelle" width="220"></td>
+</tr>
+</table>
 
 **Captains:** Auf der Seite der Saison steht unten **Captains**. Dort tragt ihr Mitglieder ein, die für genau diese
 Saison Ergebnisse hochladen dürfen – nur aktive Vereinsmitglieder, die Suche findet nur sie. Namen tippen, **Gilt bis** wählen (Pflicht, meist das Saisonende) und – wenn der

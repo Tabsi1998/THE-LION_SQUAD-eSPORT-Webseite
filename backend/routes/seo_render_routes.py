@@ -247,6 +247,8 @@ async def resolve_meta(raw_path: str, request: Request) -> dict:
         return await member_profile_meta(db, slug, meta, origin)
     if first in {"u", "players"} and slug:
         return await user_profile_meta(db, slug, meta, origin)
+    if first == "references" and slug == "series" and len(parts) > 3:
+        return await reference_series_meta(db, unquote(parts[2]), unquote(parts[3]), meta, origin)
     if first == "references" and slug:
         return await reference_meta(db, slug, meta, origin)
     if first == "achievements" and slug == "a" and len(parts) > 2:
@@ -714,6 +716,34 @@ async def reference_meta(db, rid: str, base: dict, origin: str) -> dict:
         "publisher": {"@type": "Organization", "name": base["site_name"], "url": origin},
         "about": game,
     }
+    return add_breadcrumbs(meta, origin, [("Referenzen", "/references")], title)
+
+
+async def reference_series_meta(db, lineage_slug: str, season_slug: str, base: dict, origin: str) -> dict:
+    """Serienseite (#1745): Titel und Veranstalter, nie Namen aus der Tabelle; nicht indexiert (Entscheidung 2)."""
+    from routes.reference_round_routes import visible_series
+    try:
+        lineage, series = await visible_series(db, None, lineage_slug, season_slug)
+    except HTTPException:
+        raise HTTPException(404, "SEO-Vorschau nicht gefunden.") from None
+    season = " · ".join(str(part) for part in (series.get("season"), series.get("tier")) if part)
+    title = series.get("title") or " ".join(part for part in (lineage.get("title"), season) if part)
+    path = f"/references/series/{lineage.get('slug') or lineage_slug}/{series.get('season_slug') or season_slug}"
+    canonical = f"{origin}{path}"
+    meta = {
+        **base,
+        "title": f"{title} · Serie · {base['site_name']}",
+        "description": seo_description(
+            series.get("description") or lineage.get("description") or title,
+            prefix="Serie",
+            details=[lineage.get("organizer"), lineage.get("game_name")],
+        ),
+        "url": canonical,
+        "canonical": canonical,
+        "robots": "noindex, follow",
+        "type": "website",
+    }
+    meta["json_ld"] = webpage_json_ld(meta)
     return add_breadcrumbs(meta, origin, [("Referenzen", "/references")], title)
 
 

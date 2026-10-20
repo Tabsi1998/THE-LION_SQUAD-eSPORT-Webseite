@@ -1,0 +1,61 @@
+/* Serienseite (#1745): Gesamtwertung, Finalgrenze, Rundenfortschritt. Farben nur aus der Website: Cyan für den Verein
+   und gewertete Runden, Gold für Finale und Finalgrenze, sonst Weiß in Abstufungen. Gestrichene Ergebnisse sind
+   durchgestrichen und blass. Bewegung ruhig: Zeilen blenden gestaffelt ein (je 35 ms, höchstens zwölf Stufen), die
+   Pfeile kommen kurz danach; mit „Bewegung reduzieren“ nur ein kurzes Einblenden ohne Weg und ohne Staffel. */
+
+.tls-series-row {
+  animation: tls-series-in 240ms var(--tls-ease) both;
+  animation-delay: calc(var(--i, 0) * 35ms);
+}
+.tls-series-row .tls-standing-move {
+  animation: tls-series-move-in 200ms var(--tls-ease) both;
+  animation-delay: calc(var(--i, 0) * 35ms + 160ms);
+}
+.tls-series-row .tls-standing-move[data-dir="down"] { --tls-series-move-from: -3px; }
+@keyframes tls-series-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes tls-series-move-in {
+  from { opacity: 0; transform: translateY(var(--tls-series-move-from, 3px)); }
+  to { opacity: 1; transform: none; }
+}
+
+.tls-series-dropped { text-decoration: line-through; text-decoration-thickness: 1px; opacity: 0.42; }
+
+/* Linie „Finalgrenze“: gestrichelt in Gold, die Beschriftung sitzt auf der Linie. */
+.tls-series-cutline > td {
+  padding: 0; height: 0;
+  border-top: 1px dashed rgb(var(--tls-honor-rgb) / 0.7);
+}
+.tls-series-cutline__label {
+  display: inline-block; transform: translateY(-50%); margin-left: 0.75rem; padding: 0 0.5rem;
+  background: var(--tls-surface-1); color: var(--tls-honor);
+  font-size: 10px; font-weight: 800; letter-spacing: 0.16em; text-transform: uppercase; line-height: 1.4;
+}
+/* Am Handy zwischen den Karten: Beschriftung links, die Linie läuft daneben weiter (nichts überdeckt sie). */
+.tls-series-cutline--card { list-style: none; display: flex; align-items: center; gap: 0.5rem; padding: 0.25rem 0; }
+.tls-series-cutline--card::after { content: ""; flex: 1 1 auto; border-top: 1px dashed rgb(var(--tls-honor-rgb) / 0.7); }
+.tls-series-cutline--card .tls-series-cutline__label { transform: none; margin: 0; padding: 0; background: none; }
+
+/* Rundenfortschritt: ein Feld je Wertungsrunde, das Finale in Gold am Ende. */
+.tls-series-step {
+  height: 6px; flex: 1 1 0; min-width: 6px; border-radius: 2px;
+  background: rgb(255 255 255 / 0.08); box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.12);
+}
+.tls-series-step[data-state="scored"] { background: var(--tls-brand); box-shadow: none; }
+.tls-series-step[data-state="today"] { box-shadow: inset 0 0 0 1px var(--tls-brand); }
+.tls-series-step[data-state="cancelled"] { background: transparent; box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.06); }
+.tls-series-step[data-kind="final"] { flex-grow: 1.6; box-shadow: inset 0 0 0 1px rgb(var(--tls-honor-rgb) / 0.6); }
+.tls-series-step[data-kind="final"][data-state="scored"] { background: var(--tls-honor); box-shadow: none; }
+
+.tls-series-badge {
+  display: inline-flex; align-items: center; padding: 1px 6px; border-radius: 3px;
+  font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
+}
+.tls-series-badge--guess { color: var(--tls-honor); box-shadow: inset 0 0 0 1px rgb(var(--tls-honor-rgb) / 0.5); }
+
+@media (prefers-reduced-motion: reduce) {
+  .tls-series-row, .tls-series-row .tls-standing-move { animation: tls-series-fade 150ms ease both; animation-delay: 0ms; }
+}
+@keyframes tls-series-fade { from { opacity: 0; } to { opacity: 1; } }

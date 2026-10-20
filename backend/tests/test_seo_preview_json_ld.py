@@ -258,3 +258,28 @@ def test_seo_preview_legal_and_players_are_noindex(monkeypatch):
     assert privacy["robots"] == "noindex, follow"
     assert players["robots"] == "noindex, follow"
     assert membership_apply["robots"] == "noindex, follow"
+
+
+def test_seo_preview_reference_series_is_noindex_without_table_names(monkeypatch):
+    """Serienseite (#1745): öffentlich erreichbar, aber nicht indexiert; nur Titel und Veranstalter, keine Namen."""
+    request = SimpleNamespace(headers={}, url=SimpleNamespace(scheme="https", netloc="lionsquad.at"))
+    db = _DbWithPublicDocs(
+        reference_lineages={"id": "spur-1", "slug": "probe-cup", "title": "Probe Cup", "organizer": "Probe Liga",
+                            "visibility": "public"},
+        reference_series={"id": "serie-1", "lineage_id": "spur-1", "season": "2026", "season_slug": "2026",
+                          "status": "active", "visibility": "public"},
+    )
+    monkeypatch.setattr(seo_render_routes, "get_db", lambda: db)
+    meta = asyncio.run(resolve_meta("/references/series/probe-cup/2026", request))
+    assert meta["robots"] == "noindex, follow"
+    assert meta["canonical"] == "https://lionsquad.at/references/series/probe-cup/2026"
+    assert meta["title"].startswith("Probe Cup 2026 · Serie")
+
+    hidden = _DbWithPublicDocs(
+        reference_lineages={"id": "spur-1", "slug": "probe-cup", "title": "Probe Cup", "visibility": "members"},
+        reference_series={"id": "serie-1", "lineage_id": "spur-1", "season_slug": "2026", "status": "active"},
+    )
+    monkeypatch.setattr(seo_render_routes, "get_db", lambda: hidden)
+    with pytest.raises(HTTPException) as exc:
+        asyncio.run(resolve_meta("/references/series/probe-cup/2026", request))
+    assert exc.value.status_code == 404
