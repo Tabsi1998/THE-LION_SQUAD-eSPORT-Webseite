@@ -10,6 +10,7 @@ import { PUBLIC_STATE_LABELS, STATE_TONES, dayLabel, roundLabel, roundWhen } fro
 import { SeriesStandings } from "@/components/tls/series/SeriesStandings";
 import { FinalCalculator, SeriesFinal, SeriesProgress, SeriesRules } from "@/components/tls/series/SeriesParts";
 import { TeamLeagueSections } from "@/components/tls/series/TeamLeague";
+import { RacingLeague } from "@/components/tls/series/RacingLeague";
 import { NotFoundPage } from "@/pages/ErrorPages";
 
 // Seite einer Serie unter /references/series/<spur>/<saison> (Entscheidung 5 zu #1741), Turnierserie (#1745): Kopf,
@@ -18,6 +19,7 @@ import { NotFoundPage } from "@/pages/ErrorPages";
 // Fremde Namen stehen nur in den Tabellen; die Seite ist nicht indexiert. Eine unbekannte, archivierte oder nicht
 // sichtbare Serie ist wie jede unbekannte Adresse 404. Eine alte Adresse führt zur aktuellen.
 // Team-Liga (#1747): statt Gesamtwertung, Finale und Terminen Tabelle, Spielplan, Aufstellung und Liga-Weg.
+// Eine Rennliga (#1746, Block `racing` vom Server) zeigt unter demselben Kopf ihre eigene Ansicht (RacingLeague).
 
 function seriesTitle(data) {
   const series = data?.series || {};
@@ -57,12 +59,16 @@ export default function ReferenceSeriesPage() {
   const { lineageSlug, seasonSlug } = useParams();
   const navigate = useNavigate();
   const [data, setData] = useState(null);
+  // Für welche Adresse die Antwort kam: beim Wechsel der Saison (Umschalter, #1746) steht kurz noch die alte da - sie
+  // darf nicht als „alte Adresse“ zurückführen.
+  const [loadedFor, setLoadedFor] = useState(null);
   const [missing, setMissing] = useState(false);
 
   const load = useCallback(async () => {
     try {
       const { data: body } = await api.get(`/reference-series/public/${encodeURIComponent(lineageSlug)}/${encodeURIComponent(seasonSlug)}`);
       setData(body);
+      setLoadedFor(`${lineageSlug}/${seasonSlug}`);
       setMissing(false);
     } catch (err) {
       if (err.response?.status === 404) setMissing(true);
@@ -75,10 +81,11 @@ export default function ReferenceSeriesPage() {
   useEffect(() => {
     const lineage = data?.lineage?.slug;
     const season = data?.series?.season_slug;
+    if (loadedFor !== `${lineageSlug}/${seasonSlug}`) return;
     if (lineage && season && (lineage !== lineageSlug || season !== seasonSlug)) {
       navigate(`/references/series/${lineage}/${season}`, { replace: true });
     }
-  }, [data, lineageSlug, seasonSlug, navigate]);
+  }, [data, loadedFor, lineageSlug, seasonSlug, navigate]);
 
   const title = seriesTitle(data);
   useDocumentTitle(title || "Serie", undefined, { robots: "noindex, follow" });
@@ -95,7 +102,8 @@ export default function ReferenceSeriesPage() {
             <p className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">{eyebrow || "Serie"}</p>
             <h1 className="font-heading text-4xl md:text-5xl font-black uppercase mt-2">{title}</h1>
             {data.lineage?.kind === "team_league" && <TeamLeagueSections data={data} />}
-            {data.lineage?.kind !== "team_league" && (<>
+            {data.racing && <RacingLeague data={data} />}
+            {data.lineage?.kind !== "team_league" && !data.racing && (<>
             <SeriesProgress progress={data.progress} rounds={rounds} />
             <section className="mt-10" aria-labelledby="series-page-table">
               <h2 id="series-page-table" className="font-heading text-2xl font-black uppercase">Gesamtwertung</h2>
