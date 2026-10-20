@@ -313,3 +313,31 @@ test("ein fremdes Ziel führt nach dem Anmelden zum Dashboard", async () => {
   await fillAndSubmit(user);
   await waitFor(() => expect(screen.getByText("dashboard")).toBeInTheDocument());
 });
+
+// „← Zurück zur Website“ (#1242): zur Seite, von der man kam, sonst zur Startseite.
+test("„Zurück zur Website“ führt ohne Vorseite zur Startseite", async () => {
+  render(
+    <MemoryRouter initialEntries={["/login"]}>
+      <Routes>
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/" element={<div>startseite</div>} />
+      </Routes>
+    </MemoryRouter>
+  );
+  await userEvent.setup().click(screen.getByTestId("login-back"));
+  expect(await screen.findByText("startseite")).toBeInTheDocument();
+});
+
+test("„Zurück zur Website“ führt zur Seite, von der man kam", async () => {
+  render(
+    <MemoryRouter initialEntries={["/news", "/login"]} initialIndex={1}>
+      <Routes>
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/news" element={<div>newsseite</div>} />
+        <Route path="/" element={<div>startseite</div>} />
+      </Routes>
+    </MemoryRouter>
+  );
+  await userEvent.setup().click(screen.getByTestId("login-back"));
+  expect(await screen.findByText("newsseite")).toBeInTheDocument();
+});

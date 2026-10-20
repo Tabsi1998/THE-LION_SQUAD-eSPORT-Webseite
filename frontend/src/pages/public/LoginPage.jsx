@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { useNavigate, useSearchParams, Link } from "react-router-dom";
+import { useLocation, useNavigate, useSearchParams, Link } from "react-router-dom";
+import { ArrowLeft } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { Logo } from "@/components/tls/Logo";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
@@ -26,6 +27,13 @@ export default function LoginPage() {
   const next = safeNextPath(params.get("next"));
   const purpose = useReturnPurpose(next, "login");
   const nav = useNavigate();
+  // „Zurück zur Website“ (#1242): zur Seite, von der man kam; ohne Vorseite (direkt geöffnet) zur Startseite.
+  const hasPreviousPage = useLocation().key !== "default";
+  const backToSite = (event) => {
+    if (!hasPreviousPage) return;
+    event.preventDefault();
+    nav(-1);
+  };
   const [email, setEmail] = useState("");
   const [pw, setPw] = useState("");
   const [mfaCode, setMfaCode] = useState("");
@@ -265,6 +273,9 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen bg-[#0A0A0A] text-white flex items-center justify-center p-6 bg-grid">
       <div className="w-full max-w-md border border-white/10 rounded-sm bg-[#121212] p-8 md:p-10">
+        <Link to="/" onClick={backToSite} data-testid="login-back" className="inline-flex min-h-11 items-center gap-2 -mt-3 mb-3 text-sm text-white/60 hover:text-white">
+          <ArrowLeft className="w-4 h-4" aria-hidden="true" /> Zurück zur Website
+        </Link>
         <div className="flex justify-center mb-8"><Logo size="xl" /></div>
         <h1 className="font-heading text-2xl font-black uppercase text-center">Login</h1>
         <p className="text-sm text-white/60 text-center mt-1">{mfaTicket ? "Gib den Code aus deiner Authenticator-App ein." : "Willkommen bei THE LION SQUAD."}</p>
