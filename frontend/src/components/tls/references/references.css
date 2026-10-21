@@ -80,7 +80,21 @@
 /* Sprungmarken unter dem Kopf: Abstand zur festen Kopfleiste. */
 .tls-ref-anchor { scroll-margin-top: 6rem; }
 
+/* Aufklappen im Mitgliederprofil (#1944): die Details blenden ruhig ein und rücken 4 px nach, Format, Aufstellung und
+   Links je 40 ms später; der Pfeil dreht sich. Zu geht sofort. Feste Dauer wie beim Aufsteigen, damit das Einblenden
+   auch mit „Bewegung reduzieren“ bleibt - dort fällt der Weg weg und der Pfeil springt. */
+@keyframes tls-ref-open {
+  from { opacity: 0; transform: translateY(calc(-4px * var(--tls-motion-on))); }
+  to { opacity: 1; transform: none; }
+}
+.tls-ref-open > * {
+  animation: tls-ref-open 220ms var(--tls-ease) both;
+  animation-delay: calc(var(--tls-ref-i, 0) * 40ms * var(--tls-motion-on));
+}
+.tls-ref-chev { transition: transform var(--tls-motion-mid) var(--tls-ease); }
+[aria-expanded="true"] > .tls-ref-chev { transform: rotate(180deg); }
+
 @media (prefers-reduced-motion: reduce) {
   .tls-ref-fill, .tls-run-pulse { animation: none; }
-  .tls-ref-lift, .tls-ref-row { transition: none; }
+  .tls-ref-lift, .tls-ref-row, .tls-ref-chev { transition: none; }
 }

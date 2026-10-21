@@ -30,7 +30,7 @@ export function SectionHead({ id, eyebrow, tone = "brand", title, hint, pulse = 
 /** Die Platzierung im Ring: Ring und Zahl in der Medaillenfarbe, sonst neutral; ohne Platz „–“. */
 export function PlaceRing({ placement, size = "md", className = "" }) {
   const tone = medalTone(placement);
-  const dims = size === "sm" ? "w-[38px] h-[38px] text-lg" : size === "xs" ? "w-[34px] h-[34px] text-[17px]" : "w-10 h-10 sm:w-11 sm:h-11 text-lg sm:text-xl";
+  const dims = size === "lg" ? "w-14 h-14 text-[26px]" : size === "sm" ? "w-[38px] h-[38px] text-lg" : size === "xs" ? "w-[34px] h-[34px] text-[17px]" : "w-10 h-10 sm:w-11 sm:h-11 text-lg sm:text-xl";
   return (
     <span
       data-testid="placement-badge"
@@ -71,11 +71,11 @@ export function Mark({ children }) {
   return <span className="inline-flex items-center px-2.5 py-1 rounded bg-surface-2 border border-white/10 text-[13px] leading-tight text-zinc-300 break-words max-w-full">{children}</span>;
 }
 
-/** Der Pfeil am Zeilenende. */
-export function Chevron({ className = "" }) {
+/** Der Pfeil am Zeilenende - nach rechts (Link) oder nach unten (Aufklappen, #1944). */
+export function Chevron({ className = "", down = false }) {
   return (
     <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true" className={`shrink-0 text-brand ${className}`}>
-      <path d="M7 4l5 5-5 5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      <path d={down ? "M5 7l4 4 4-4" : "M7 4l5 5-5 5"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }

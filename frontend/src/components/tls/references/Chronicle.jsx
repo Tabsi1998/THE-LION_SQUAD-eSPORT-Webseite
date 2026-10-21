@@ -1,12 +1,12 @@
 import { forwardRef, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { chronicleCount, filterChronicle, formatLabel, gameOptions, medalCounts, medalLine, startersOf, timelineGroups } from "@/lib/referencesOverview";
-import { bestPlacement, displayTitle, formatDate, gameTitle, memberEntryOf, referenceInstant } from "@/components/tls/references/referenceParts";
+import { bestPlacement, displayTitle, formatDate, gameTitle, memberEntryOf, referenceInstant, shortTitle } from "@/components/tls/references/referenceParts";
 import { Chevron, Mark, PlaceRing, SectionHead } from "@/components/tls/references/overviewParts";
 import { viennaDate } from "@/lib/vienna";
 
 // Chronik (#1878, ersetzt „Jahr für Jahr“): alle Teilnahmen als Liste je Jahr mit Medaillen-Zusammenfassung. Jede Zeile
-// zeigt Platz-Ring, Titel und Veranstalter, Spiel- und Format-Marke, unsere Starter (jeder Name nur einmal) und das
+// zeigt Platz-Ring, Titel (kurz wie im Mitgliederprofil, #1944) und Veranstalter, Spiel- und Format-Marke, unsere Starter (jeder Name nur einmal) und das
 // Datum und führt zur Detailseite. Filter: Spiel-Chips und „Nur Podest“, dazu die Person aus dem Profil (#859); die
 // Anzahl steht als „x von y Teilnahmen“. Am Handy werden die Zeilen kompakt, die Filter lassen sich wischen.
 
@@ -88,13 +88,17 @@ function ChronicleRow({ item, link, memberId }) {
   const format = formatLabel(item, link);
   const instant = referenceInstant(item);
   const shortDate = instant ? viennaDate(instant, { day: "2-digit", month: "2-digit" }) : "";
+  // Kurzer Titel wie im Mitgliederprofil (#1944), der lange im Tooltip; steht der Veranstalter schon darin, nicht doppelt.
+  const title = shortTitle(item, link);
+  const full = displayTitle(item);
+  const composed = title !== full;
   return (
     <li className="border-b border-white/[0.07]">
       <Link to={`/references/${item.id}`} data-testid={`reference-card-${item.id}`} className="tls-ref-row flex items-start sm:items-center sm:flex-wrap gap-3 sm:gap-x-5 sm:gap-y-2.5 py-3.5 sm:py-4 sm:px-2 text-white no-underline">
         <PlaceRing placement={placement} />
         <span className="flex-1 sm:flex-[1_1_280px] min-w-0 flex flex-col gap-1 sm:gap-0.5">
-          <span className="font-bold text-base sm:text-[17px] leading-[1.3] break-words [overflow-wrap:anywhere]" data-testid="reference-row-title">{displayTitle(item)}</span>
-          {item.organizer && <span className="hidden sm:block text-sm text-zinc-400 break-words">{item.organizer}</span>}
+          <span className="font-bold text-base sm:text-[17px] leading-[1.3] break-words [overflow-wrap:anywhere]" title={composed ? full : undefined} data-testid="reference-row-title">{title}</span>
+          {item.organizer && !composed && <span className="hidden sm:block text-sm text-zinc-400 break-words" data-testid="reference-row-organizer">{item.organizer}</span>}
           <span className="sm:hidden text-[13px] text-zinc-400 break-words">{[game, format, shortDate].filter(Boolean).join(" · ")}</span>
           {starters && <span className="sm:hidden text-[13px] text-zinc-300 break-words [overflow-wrap:anywhere]" data-testid="reference-row-starters-phone">{starters}</span>}
         </span>
