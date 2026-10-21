@@ -1,0 +1,159 @@
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+
+// Ergebnis-Bild auslesen (#1756) im Ergebnis-Blatt: Knopf und Strg+V, Übersicht, gelbe Felder, „Passt so“, übernommen
+// wird erst ohne gelbe Zeilen. Der Server liest - hier nachgestellt. Nur erfundene Namen.
+
+const apiMock = { get: vi.fn(), post: vi.fn(), put: vi.fn() };
+vi.mock("@/lib/api", () => ({ api: apiMock, formatApiError: (detail) => (typeof detail === "string" ? detail : "Fehler") }));
+const toastMock = { success: vi.fn(), error: vi.fn() };
+vi.mock("sonner", () => ({ toast: toastMock }));
+
+const { ResultEntrySheet } = await import("./ResultEntrySheet");
+
+const BASE = "/reference-series/admin/series/serie-1/rounds/r1/results";
+const PARTICIPANTS = [
+  { id: "p1", name: "Anna Probe", start_number: "7", default_team: "Rotor Racing" },
+  { id: "p2", name: "Bert Bolzt", start_number: "12", default_team: "Blaupfeil GP" },
+];
+const DATA = {
+  round: { id: "r1", code: "R1", club_day: "2026-10-15", venue: "Probering Nord" },
+  series: { id: "serie-1", kind: "racing", rules: { points_mode: "scheme", points_by_place: [25, 18, 15] } },
+  access: { role: "board", can_publish: true }, version: 0, sheet: null, target: "sheet", participants: PARTICIPANTS,
+};
+const INFO = { template: { id: "rennliga-dunkel", name: "Rennliga-Ergebnis (dunkel)" }, available: true, max_mb: 50, formats: ["image/png"] };
+const READ = {
+  template: { id: "rennliga-dunkel", name: "Rennliga-Ergebnis (dunkel)" },
+  rows: [
+    { index: 0, place: 1, dnf: false, marks: [], start_number: "7", name: "Anna Probe", participant_id: "p1", team: "Rotor Racing", grid: 2, time: "1:32:15.123", gap: null, uncertain: [], read: {} },
+    { index: 1, place: 2, dnf: false, marks: [], start_number: "12", name: "Bert Bolzt", participant_id: "p2", team: "Blaupfeil GP", grid: 1, time: "1:32:17.456", gap: "+2.333", uncertain: ["team"], read: { team: "Blaupted GP" } },
+    { index: 2, place: null, dnf: true, marks: ["dnf"], start_number: "31", name: "Dora Nev", participant_id: null, team: "Kometen Team", grid: 3, time: null, gap: null, uncertain: ["name"], read: {} },
+  ],
+  track: { name: "Probering Nord", uncertain: [] },
+  fastest_lap: { name: "Bert Bolzt", participant_id: "p2", time: "1:31.207", uncertain: [] },
+  driver_of_the_day: { name: "Anna Probe", participant_id: "p1", uncertain: [] },
+  uncertain_rows: 2,
+  warnings: [{ code: "blurry", message: "Das Bild ist unscharf oder sehr klein - bitte die gelben Felder genau prüfen." }],
+};
+// Unter Last (ganze Suite parallel) braucht der Ablauf länger als die Vorgabe von 1 s.
+const WAIT = { timeout: 5000 };
+const PREVIEW = { version: 0, target: "sheet", can_save: true, errors: [], warnings: [], rows: [], unknown_names: [], standings: null, final: null, latest: null };
+
+function setup({ info = INFO } = {}) {
+  apiMock.get.mockImplementation(async (url) => ({ data: url.endsWith("/image") ? info : DATA }));
+  apiMock.post.mockImplementation(async (url) => ({ data: url.endsWith("/image") ? READ : PREVIEW }));
+  apiMock.put.mockResolvedValue({ data: { target: "sheet", version: 1, created_participants: [] } });
+  render(<ResultEntrySheet series={{ id: "serie-1", lineage: { title: "Probe Racing" } }} round={{ id: "r1", code: "R1" }} onClose={vi.fn()} onSaved={vi.fn()} />);
+}
+
+function png(name = "ergebnis.png") {
+  return new File([new Uint8Array([137, 80, 78, 71])], name, { type: "image/png" });
+}
+
+function pasteImage(file, target = window) {
+  const event = new Event("paste", { bubbles: true, cancelable: true });
+  Object.defineProperty(event, "clipboardData", { value: { files: [file], items: [], getData: () => "" } });
+  act(() => { target.dispatchEvent(event); });
+  return event;
+}
+
+beforeEach(() => {
+  for (const fn of Object.values(apiMock)) fn.mockReset();
+  toastMock.success.mockReset();
+  toastMock.error.mockReset();
+});
+
+test("Knopf „Bild auslesen“: gelesen wird im Server, die Zeilen ersetzen die Liste, die Vorschau prüft gleich", async () => {
+  setup();
+  const pick = await screen.findByTestId("result-image-pick");
+  expect(pick).toHaveTextContent("Bild auslesen");
+  expect(screen.getByTestId("result-image-paste-hint")).toHaveTextContent("Strg+V");
+  const file = png();
+  fireEvent.change(screen.getByTestId("result-image-file"), { target: { files: [file] } });
+  await waitFor(() => expect(screen.getAllByTestId("result-row")).toHaveLength(3), WAIT);
+  expect(apiMock.post).toHaveBeenCalledWith(`${BASE}/image`, file, { headers: { "Content-Type": "image/png" } });
+  expect(screen.getAllByTestId("result-row-name").map((input) => input.value)).toEqual(["Anna Probe", "Bert Bolzt", "Dora Nev"]);
+  // Gleich danach die Vorschau – mit Ausfall ohne Platz und der schnellsten Runde als Marke.
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith(`${BASE}/preview`, expect.anything()));
+  const body = apiMock.post.mock.calls.find(([url]) => url.endsWith("/preview"))[1];
+  expect(body.rows.map((row) => [row.participant_id || row.name, row.place, row.marks])).toEqual([
+    ["p1", 1, []], ["p2", 2, ["fastest_lap"]], ["Dora Nev", null, ["dnf"]],
+  ]);
+  // Übersicht: Vorlage, Kopf, Hinweis, wie viele Zeilen gelb sind.
+  const summary = screen.getByTestId("result-image-summary");
+  expect(within(summary).getByTestId("result-image-counts")).toHaveTextContent("3 Zeilen in die Liste übernommen · Vorlage Rennliga-Ergebnis (dunkel)");
+  expect(within(summary).getByTestId("result-image-header")).toHaveTextContent("Schnellste RennrundeBert Bolzt · 1:31.207");
+  expect(within(summary).getByTestId("result-image-status")).toHaveTextContent("2 Zeilen sind gelb");
+  expect(within(summary).getByTestId("result-image-warnings")).toHaveTextContent("unscharf");
+  // Gelb: genau die unsicheren Felder, darunter was im Bild stand.
+  const rows = screen.getAllByTestId("result-row");
+  expect(within(rows[1]).getByTestId("result-row-team")).toHaveAttribute("data-ocr-uncertain", "team");
+  expect(within(rows[1]).getByTestId("result-row-name")).not.toHaveAttribute("data-ocr-uncertain");
+  expect(within(rows[1]).getByTestId("result-row-ocr")).toHaveTextContent("Team (gelesen „Blaupted GP“)");
+  expect(within(rows[2]).getByTestId("result-row-name")).toHaveAttribute("data-ocr-uncertain", "name");
+  expect(within(rows[0]).queryByTestId("result-row-ocr")).toBeNull();
+});
+
+test("übernommen wird erst ohne gelbe Zeilen: ändern oder „Passt so“", async () => {
+  setup();
+  await screen.findByTestId("result-image-pick");
+  pasteImage(png());
+  await waitFor(() => expect(screen.getAllByTestId("result-row")).toHaveLength(3), WAIT);
+  await waitFor(() => expect(screen.getByTestId("result-submit")).toHaveTextContent("Gelbe Zeilen prüfen"), WAIT);
+  expect(screen.queryByTestId("result-save-draft")).toBeNull();
+  expect(screen.getByTestId("result-image-open")).toHaveTextContent("2 Zeilen aus dem Bild sind noch gelb");
+  fireEvent.click(screen.getByTestId("result-submit"));
+  expect(toastMock.error).toHaveBeenCalledWith(expect.stringContaining("noch gelb"));
+  expect(apiMock.put).not.toHaveBeenCalled();
+
+  // Team korrigiert: die Markierung fällt; der Name der dritten Zeile wird bestätigt.
+  const rows = screen.getAllByTestId("result-row");
+  fireEvent.change(within(rows[1]).getByTestId("result-row-team"), { target: { value: "Rotor Racing" } });
+  expect(within(rows[1]).getByTestId("result-row-team")).not.toHaveAttribute("data-ocr-uncertain");
+  fireEvent.click(within(rows[2]).getByTestId("result-row-ocr-confirm"));
+  expect(screen.queryByTestId("result-image-open")).toBeNull();
+  expect(screen.getByTestId("result-image-status")).toHaveTextContent("Alles sicher gelesen");
+  // Nach der Änderung prüft die Vorschau neu, dann wird übernommen.
+  fireEvent.click(screen.getByTestId("result-submit"));
+  await waitFor(() => expect(screen.getByTestId("result-submit")).toHaveTextContent("Veröffentlichen"), WAIT);
+  fireEvent.click(screen.getByTestId("result-submit"));
+  await waitFor(() => expect(apiMock.put).toHaveBeenCalled(), WAIT);
+  const body = apiMock.put.mock.calls[0][1];
+  expect(body.status).toBe("published");
+  expect(body.rows[1].team).toBe("Rotor Racing");
+});
+
+test("Strg+V: Text in einem Feld bleibt Text, ohne Vorlage gibt es kein Auslesen", async () => {
+  setup();
+  await screen.findByTestId("result-image-pick");
+  fireEvent.click(screen.getByTestId("result-paste-toggle"));
+  const area = screen.getByTestId("result-paste-text");
+  const event = new Event("paste", { bubbles: true, cancelable: true });
+  Object.defineProperty(event, "clipboardData", { value: { files: [png()], items: [], getData: () => "1. Anna Probe" } });
+  act(() => { area.dispatchEvent(event); });
+  expect(event.defaultPrevented).toBe(false);
+  expect(apiMock.post).not.toHaveBeenCalled();
+});
+
+test("ohne Vorlage oder Tesseract: kein Knopf, Strg+V tut nichts", async () => {
+  setup({ info: { template: null, available: false, max_mb: 50, formats: [] } });
+  await screen.findByTestId("result-rows-section");
+  await waitFor(() => expect(apiMock.get).toHaveBeenCalledWith(`${BASE}/image`));
+  expect(screen.queryByTestId("result-image-pick")).toBeNull();
+  const event = pasteImage(png());
+  expect(event.defaultPrevented).toBe(false);
+  expect(apiMock.post).not.toHaveBeenCalled();
+});
+
+test("Fehler des Servers: feste Meldung, die Liste bleibt", async () => {
+  setup();
+  await screen.findByTestId("result-image-pick");
+  apiMock.post.mockRejectedValueOnce({ response: { status: 422, data: { detail: "Im Bild wurde keine Ergebnistabelle gefunden." } } });
+  fireEvent.change(screen.getByTestId("result-image-file"), { target: { files: [png()] } });
+  await waitFor(() => expect(toastMock.error).toHaveBeenCalledWith("Im Bild wurde keine Ergebnistabelle gefunden."));
+  expect(screen.getAllByTestId("result-row")).toHaveLength(1);
+  expect(screen.queryByTestId("result-image-summary")).toBeNull();
+  // Falsches Format prüft schon der Browser.
+  fireEvent.change(screen.getByTestId("result-image-file"), { target: { files: [new File(["x"], "a.heic", { type: "image/heic" })] } });
+  expect(toastMock.error).toHaveBeenLastCalledWith(expect.stringContaining("Nur PNG, JPG oder WebP"));
+  expect(apiMock.post).toHaveBeenCalledTimes(1);
+});

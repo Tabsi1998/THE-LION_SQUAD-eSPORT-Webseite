@@ -1988,6 +1988,24 @@ input.no-spin::-webkit-outer-spin-button, input.no-spin::-webkit-inner-spin-butt
    Bewegungs-Regeln oben und multiplizieren Wege mit --tls-motion-on.
    ------------------------------------------------------------------ */
 
+/* Ergebnis-Bild auslesen (#1756): beim Lesen gleitet ein Lichtband gleichmäßig über das Bild; unsichere Felder
+   leuchten beim Ankommen einmal gelb auf, Zeile für Zeile etwas später. Ohne Bewegung steht das Band still. */
+.tls-ocr-scan::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(to bottom, transparent 42%, rgb(var(--tls-brand-rgb) / 0.55) 50%, transparent 58%);
+  animation: tls-ocr-scan 1.6s linear infinite;
+}
+@keyframes tls-ocr-scan {
+  from { transform: translateY(calc(-55% * var(--tls-motion-on))); }
+  to { transform: translateY(calc(55% * var(--tls-motion-on))); }
+}
+[data-ocr-uncertain] { animation: tls-ocr-flag calc(var(--tls-motion-slow) * 3) var(--tls-ease) var(--tls-ocr-delay, 0ms) both; }
+@keyframes tls-ocr-flag {
+  0% { box-shadow: 0 0 0 0 rgb(251 191 36 / 0); }
+  30% { box-shadow: 0 0 0 4px rgb(251 191 36 / 0.32); }
+  100% { box-shadow: 0 0 0 0 rgb(251 191 36 / 0); }
+}
+
 /* Bewegungs-Regeln: Bewegung reduzieren */
 @media (prefers-reduced-motion: reduce) {
   :root {

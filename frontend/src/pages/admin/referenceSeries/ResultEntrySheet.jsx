@@ -10,6 +10,8 @@ import {
 } from "@/lib/referenceResults";
 import { ResultPreview } from "./ResultPreview";
 import { VenueWithFlag } from "@/components/tls/CountryFlag";
+import { ResultImageButton, ResultImageRowNote, ResultImageSummary, ocrMark, useResultImage } from "./ResultImageImport";
+import { afterEdit, confirmRow, imageToRows, isUncertain, openImageRows } from "@/lib/resultImage";
 import { toast } from "sonner";
 import { ClipboardList, Plus, RefreshCw, SlidersHorizontal, Trash2, X } from "lucide-react";
 
@@ -79,15 +81,17 @@ function FieldErrors({ fields, testId }) {
   );
 }
 
-function ResultRow({ row, index, autoPlace, organizerMode, problems, info, invalid, onChange, onHint, onRemove }) {
+function ResultRow({ row, index, autoPlace, organizerMode, problems, info, invalid, onChange, onHint, onRemove, onConfirmImage }) {
   const scored = info?.scored;
   // Offen von selbst nur, wo etwas Ungewöhnliches steht (Strafe, Gesamtstand, „zählen statt Schlüssel“) oder eine Eingabe
   // ungültig ist. Startnummer, Startplatz, Zeit und Abstand (#1927) stehen zugeklappt kurz unter der Zeile - so bleibt
-  // eine eingefügte Liste mit 20 Fahrern überschaubar.
-  const [opened, setOpen] = useState(() => Boolean(row.penalty_points || row.official_total || row.override));
+  // eine eingefügte Liste mit 20 Fahrern überschaubar. Aus dem Bild (#1756) auch, wenn ein Feld darunter gelb ist - offen
+  // ab dem Anlegen, damit es beim Korrigieren nicht zuklappt.
+  const [opened, setOpen] = useState(() => Boolean(row.penalty_points || row.official_total || row.override || isUncertain(row, "start_number")));
   const open = opened || Boolean(invalid?.grid || invalid?.penalty_points || invalid?.official_total);
   const raceLine = [row.start_number && `Nr. ${row.start_number}`, row.grid && `Startplatz ${row.grid}`, row.time, row.gap].filter(Boolean).join(" · ");
-  const level = invalid || problems?.some((item) => item.level === "error") ? "error" : problems?.length ? "warning" : null;
+  const mark = (field) => ocrMark(row, field, index);
+  const level = invalid || problems?.some((item) => item.level === "error") ? "error" : problems?.length || row.ocr ? "warning" : null;
   const toggleMark = (mark) => onChange({ marks: row.marks.includes(mark) ? row.marks.filter((item) => item !== mark) : [...row.marks, mark] });
   const number = index + 1;
   return (
@@ -96,11 +100,11 @@ function ResultRow({ row, index, autoPlace, organizerMode, problems, info, inval
       {/* Handy: Platz, Name, Punkte und Knöpfe in einer Zeile, das Team darunter; ab sm alles in einer Zeile. */}
       <div className="grid grid-cols-[3.5rem_minmax(0,1fr)_4.5rem_auto_auto] sm:grid-cols-[3.5rem_minmax(0,1fr)_9rem_5rem_auto_auto] items-center gap-2">
         <input aria-label={`Platz Zeile ${number}`} inputMode="numeric" value={row.place} placeholder={autoPlace ? String(autoPlace) : "–"}
-          onChange={(event) => onChange({ place: event.target.value })} data-testid="result-row-place" {...invalidProps(invalid, "place")} className={`${SMALL_INPUT} text-center tabular-nums ${invalid?.place ? INVALID : ""}`} />
+          onChange={(event) => onChange({ place: event.target.value })} data-testid="result-row-place" {...invalidProps(invalid, "place")} {...mark("place").props} className={`${SMALL_INPUT} text-center tabular-nums ${mark("place").className} ${invalid?.place ? INVALID : ""}`} />
         <input aria-label={`Name Zeile ${number}`} value={row.name} list="result-participants" placeholder="Name wie beim Veranstalter" maxLength={120}
-          onChange={(event) => onChange({ name: event.target.value, participant_id: "" })} data-testid="result-row-name" className={SMALL_INPUT} />
+          onChange={(event) => onChange({ name: event.target.value, participant_id: "" })} data-testid="result-row-name" {...mark("name").props} className={`${SMALL_INPUT} ${mark("name").className}`} />
         <input aria-label={`Team Zeile ${number}`} value={row.team} list="result-teams" placeholder="Team" maxLength={120}
-          onChange={(event) => onChange({ team: event.target.value })} data-testid="result-row-team" className={`${SMALL_INPUT} order-last col-start-2 col-end-6 sm:order-none sm:col-start-auto sm:col-end-auto`} />
+          onChange={(event) => onChange({ team: event.target.value })} data-testid="result-row-team" {...mark("team").props} className={`${SMALL_INPUT} ${mark("team").className} order-last col-start-2 col-end-6 sm:order-none sm:col-start-auto sm:col-end-auto`} />
         <input aria-label={`Punkte Zeile ${number}`} inputMode="decimal" value={row.points} placeholder="Pkt"
           title={organizerMode ? "Punkte laut Veranstalter" : "Leer: nach Schlüssel. Eingetragen: laut Veranstalter (wird geprüft)."}
           onChange={(event) => onChange({ points: event.target.value })} data-testid="result-row-points" {...invalidProps(invalid, "points")} className={`${SMALL_INPUT} text-right tabular-nums ${invalid?.points ? INVALID : ""}`} />
@@ -112,7 +116,7 @@ function ResultRow({ row, index, autoPlace, organizerMode, problems, info, inval
         </button>
       </div>
       {(open || row.marks.length > 0) && (
-        <div className="mt-2 flex flex-wrap gap-1.5" role="group" aria-label={`Marken Zeile ${number}`}>
+        <div className={`mt-2 flex flex-wrap gap-1.5 ${isUncertain(row, "marks") ? "rounded-sm ring-1 ring-amber-400/60 p-1" : ""}`} role="group" aria-label={`Marken Zeile ${number}`}>
           {MARK_OPTIONS.map(([mark, label]) => {
             const active = row.marks.includes(mark);
             if (!open && !active) return null;
@@ -130,7 +134,7 @@ function ResultRow({ row, index, autoPlace, organizerMode, problems, info, inval
           <label className="block"><span className={LABEL}>Strafpunkte</span>
             <input inputMode="decimal" value={row.penalty_points} onChange={(event) => onChange({ penalty_points: event.target.value })} data-testid="result-row-penalty" {...invalidProps(invalid, "penalty_points")} className={`${SMALL_INPUT} ${invalid?.penalty_points ? INVALID : ""}`} /></label>
           <label className="block"><span className={LABEL}>Startnummer</span>
-            <input value={row.start_number} maxLength={10} onChange={(event) => onChange({ start_number: event.target.value })} data-testid="result-row-start" className={SMALL_INPUT} /></label>
+            <input value={row.start_number} maxLength={10} onChange={(event) => onChange({ start_number: event.target.value })} data-testid="result-row-start" {...mark("start_number").props} className={`${SMALL_INPUT} ${mark("start_number").className}`} /></label>
           <label className="block"><span className={LABEL}>Startplatz</span>
             <input inputMode="numeric" value={row.grid} onChange={(event) => onChange({ grid: event.target.value })} data-testid="result-row-grid" {...invalidProps(invalid, "grid")} className={`${SMALL_INPUT} tabular-nums ${invalid?.grid ? INVALID : ""}`} /></label>
           <label className="block"><span className={LABEL}>Zeit</span>
@@ -163,6 +167,7 @@ function ResultRow({ row, index, autoPlace, organizerMode, problems, info, inval
         </div>
       )}
       <FieldErrors fields={invalid} testId="result-row-invalid" />
+      <ResultImageRowNote row={row} onConfirm={onConfirmImage} />
       <RowProblems items={problems} />
     </li>
   );
@@ -386,6 +391,16 @@ export function ResultEntrySheet({ series, round, onClose, onSaved }) {
   const participants = useMemo(() => data?.participants || [], [data]);
   // Vorschläge fürs Team: zuerst die eigenen Teams der Saison (#1926), dann die Standard-Teams der Teilnehmer.
   const teams = useMemo(() => [...new Set([...(data?.series?.own_teams || []), ...participants.map((person) => person.default_team)].filter(Boolean))], [data, participants]);
+  // Ergebnis-Bild (#1756): die gelesenen Zeilen ersetzen die Liste wie „Liste einfügen“, danach prüft die Vorschau.
+  const [checkImage, setCheckImage] = useState(false);
+  const image = useResultImage({
+    base,
+    onRead: (result) => {
+      setForm((current) => ({ ...current, rows: imageToRows(result, participants) }));
+      setPasting(false);
+      setCheckImage(true);
+    },
+  });
 
   const built = useMemo(() => (form ? formToPayload(form) : null), [form]);
   const stamp = built ? formStamp(built.payload) : "";
@@ -412,9 +427,12 @@ export function ResultEntrySheet({ series, round, onClose, onSaved }) {
           if (!next.team && known.default_team) next.team = known.default_team;
         }
       }
-      return next;
+      // Was jemand ändert, ist geprüft: die gelbe Markierung aus dem Bild fällt für diese Felder weg.
+      return afterEdit(next, Object.keys(values));
     }),
   }));
+  const confirmImageRow = (key) => setForm((current) => ({ ...current, rows: current.rows.map((row) => (row.key === key ? confirmRow(row) : row)) }));
+  const imageOpen = form ? openImageRows(form.rows) : 0;
   const hinted = form ? form.rows.filter((row) => row.points_hint).length : 0;
   const allHintsToPoints = () => setForm((current) => ({
     ...current,
@@ -429,6 +447,14 @@ export function ResultEntrySheet({ series, round, onClose, onSaved }) {
     setPreview({ ...result, stamp: currentStamp });
     return result;
   };
+
+  useEffect(() => {
+    if (!checkImage || !built) return;
+    setCheckImage(false);
+    runPreview(built.payload, stamp).catch((err) => toast.error(formatApiError(err.response?.data?.detail)));
+    // runPreview ist je Darstellung neu, ändert aber nichts am Ablauf - entscheidend ist der Stand des Formulars.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [checkImage, built, stamp]);
 
   const pasteRows = (text) => {
     const result = parseResultPaste(text);
@@ -471,7 +497,19 @@ export function ResultEntrySheet({ series, round, onClose, onSaved }) {
     toast.error("Das Ergebnis wurde inzwischen geändert – bitte neu laden.");
   };
 
+  // Gelbe Zeilen aus dem Bild: erst prüfen, dann übernehmen – „Gelbe Zeilen prüfen“ springt zur ersten.
+  const showImageOpen = () => {
+    toast.error(`${imageOpen === 1 ? "Eine Zeile aus dem Bild ist" : `${imageOpen} Zeilen aus dem Bild sind`} noch gelb – bitte prüfen oder mit „Passt so“ bestätigen.`);
+    const first = document.querySelector('[data-testid="result-sheet"] [data-ocr-uncertain], [data-testid="result-sheet"] [data-testid="result-row-ocr-confirm"]');
+    first?.scrollIntoView?.({ block: "center" });
+    first?.focus?.();
+  };
+
   const save = async (status) => {
+    if (imageOpen) {
+      showImageOpen();
+      return;
+    }
     setSaving(true);
     try {
       const { data: result } = await api.put(base, { ...built.payload, status, expected_version: data.version });
@@ -524,6 +562,7 @@ export function ResultEntrySheet({ series, round, onClose, onSaved }) {
       save(canPublish ? "published" : "draft");
       return;
     }
+    // Die Vorschau prüft auch mit gelben Zeilen - übernommen wird erst danach (siehe save).
     setSaving(true);
     try {
       await runPreview(built.payload, stamp);
@@ -535,7 +574,7 @@ export function ResultEntrySheet({ series, round, onClose, onSaved }) {
     }
   };
 
-  const submitLabel = !ready ? (fresh ? "Erneut prüfen" : "Vorschau") : toPendingDraft ? "Entwurf zur Freigabe" : canPublish ? "Veröffentlichen" : "Als Entwurf speichern";
+  const submitLabel = !ready ? (fresh ? "Erneut prüfen" : "Vorschau") : imageOpen ? "Gelbe Zeilen prüfen" : toPendingDraft ? "Entwurf zur Freigabe" : canPublish ? "Veröffentlichen" : "Als Entwurf speichern";
   const sheetStatus = data?.sheet?.status;
   const pending = board ? data?.sheet?.pending_draft : null;
   const filledRows = built?.payload.rows.length || 0;
@@ -543,7 +582,7 @@ export function ResultEntrySheet({ series, round, onClose, onSaved }) {
   return (
     <AdminSheet title={`Ergebnis ${round ? roundLabel(round) : ""}`} eyebrow={series.lineage?.title} size="xl" onClose={onClose} onSubmit={submit} saving={saving}
       submitLabel={submitLabel} savingLabel={ready ? "Übernehme …" : "Prüfe …"} submitTestId="result-submit" testId="result-sheet" noValidate
-      footer={ready && canPublish ? (
+      footer={ready && canPublish && !imageOpen ? (
         <button type="button" disabled={saving} onClick={() => save("draft")} data-testid="result-save-draft" className="tls-btn tls-btn--secondary px-4 py-2.5 rounded-sm text-xs font-bold uppercase tracking-wider disabled:opacity-50">
           Nur als Entwurf
         </button>
@@ -616,10 +655,14 @@ export function ResultEntrySheet({ series, round, onClose, onSaved }) {
             <section className="space-y-2" data-testid="result-rows-section">
               <div className="flex items-center justify-between gap-2 flex-wrap">
                 <h3 className="text-[11px] font-bold uppercase tracking-widest text-[#29B6E8]">Ergebnisliste{filledRows ? ` · ${filledRows}` : ""}</h3>
-                <button type="button" onClick={() => setPasting((value) => !value)} aria-expanded={pasting} data-testid="result-paste-toggle" className="tls-btn tls-btn--quiet px-3 py-1.5 rounded-sm text-[11px] font-bold uppercase tracking-wider inline-flex items-center gap-1.5">
-                  <ClipboardList className="w-3.5 h-3.5" /> Liste einfügen
-                </button>
+                <div className="flex flex-wrap items-center gap-2">
+                  <button type="button" onClick={() => setPasting((value) => !value)} aria-expanded={pasting} data-testid="result-paste-toggle" className="tls-btn tls-btn--quiet px-3 py-1.5 rounded-sm text-[11px] font-bold uppercase tracking-wider inline-flex items-center gap-1.5">
+                    <ClipboardList className="w-3.5 h-3.5" /> Liste einfügen
+                  </button>
+                  <ResultImageButton image={image} />
+                </div>
               </div>
+              <ResultImageSummary image={image} rows={form.rows} />
               {hinted > 1 && (
                 <div className="flex flex-wrap items-center gap-2 border border-amber-400/40 bg-amber-400/10 rounded-sm px-3 py-2 text-xs text-amber-100" data-testid="result-hints">
                   <span className="flex-1 min-w-[12rem]">{hinted} Zeilen enden auf eine Zahl – Teil des Namens oder Punkte?</span>
@@ -634,7 +677,8 @@ export function ResultEntrySheet({ series, round, onClose, onSaved }) {
                 {form.rows.map((row, index) => (
                   <ResultRow key={row.key} row={row} index={index} autoPlace={auto[row.key]} organizerMode={organizerMode} invalid={invalid[row.key]}
                     problems={problems.byRow[row.key]} info={infoByKey[row.key]}
-                    onChange={(values) => updateRow(row.key, values)} onHint={() => updateRow(row.key, hintToPoints(row, participants))} onRemove={() => removeRow(row.key)} />
+                    onChange={(values) => updateRow(row.key, values)} onHint={() => updateRow(row.key, hintToPoints(row, participants))} onRemove={() => removeRow(row.key)}
+                    onConfirmImage={() => confirmImageRow(row.key)} />
                 ))}
               </ol>
               <button type="button" onClick={addRow} data-testid="result-row-add" className="tls-btn tls-btn--secondary px-3 py-2 rounded-sm text-xs font-bold uppercase tracking-wider inline-flex items-center gap-2">
@@ -655,6 +699,11 @@ export function ResultEntrySheet({ series, round, onClose, onSaved }) {
           {invalidCount > 0 && (
             <p className="border border-red-400/40 bg-red-400/10 rounded-sm px-3 py-2 text-sm text-red-100" role="alert" data-testid="result-invalid">
               {invalidCount === 1 ? "Eine Eingabe ist ungültig" : `${invalidCount} Eingaben sind ungültig`} – rot markiert. Geprüft und gespeichert wird erst, wenn alles stimmt.
+            </p>
+          )}
+          {imageOpen > 0 && (
+            <p className="border border-amber-400/40 bg-amber-400/10 rounded-sm px-3 py-2 text-sm text-amber-100" role="status" data-testid="result-image-open">
+              {imageOpen === 1 ? "Eine Zeile aus dem Bild ist" : `${imageOpen} Zeilen aus dem Bild sind`} noch gelb – prüfen, korrigieren oder mit „Passt so“ bestätigen. Übernommen wird erst danach.
             </p>
           )}
           {fresh && <ResultPreview preview={preview} general={problems.general} board={board} />}
