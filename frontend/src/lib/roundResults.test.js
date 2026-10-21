@@ -78,6 +78,15 @@ describe("Zeilen", () => {
     expect(mobileSub(row({ gap: "+0,261", points: 12.5 }), { points: true })).toBe("12,5 P");
   });
 
+  it("gespeichert mit Punkt, angezeigt mit Komma wie beim Veranstalter (#1981); Platzhalter beim Ersten ist kein Abstand", () => {
+    expect(timeText(row({ time: "1:20.361" }))).toBe("1:20,361");
+    expect(gapText(row({ gap: "+0.046" }))).toBe("+0,046");
+    expect(gapText(row({ gap: "+1:34.878" }))).toBe("+1:34,878");
+    expect(gapText(row({ gap: "+--:--,---" }))).toBe("");
+    expect(mobileMain(row({ time: "31:55.056" }))).toBe("31:55,056");
+    expect(mobileSub(row({ time: "1:40.474", gap: "+0.261" }))).toBe("+0,261");
+  });
+
   it("Spalten ohne Zeiten: nur Pos, Name, Team und Punkte", () => {
     const race = { kind: "race", columns: ["points"], rows: [row({ team: "Fremd Rot" })] };
     expect(visibleColumns(race)).toEqual(["pos", "name", "team", "points"]);
