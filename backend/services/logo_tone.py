@@ -16,6 +16,7 @@ from pathlib import Path
 
 from PIL import Image, UnidentifiedImageError
 
+from services.image_upload import MAX_IMAGE_DIMENSION, MAX_IMAGE_PIXELS
 from storage import PUBLIC_UPLOAD_DIR, UPLOAD_DIR
 
 LOCAL_PREFIX = "/api/static/uploads/"
@@ -54,18 +55,26 @@ def logo_transparent(url: str | None) -> bool | None:
     return _transparent_cached(str(path), stat.st_mtime_ns, stat.st_size)
 
 
+def header_too_large(width: int, height: int) -> bool:
+    """Größer als ein Upload sein darf (``image_upload``): solche Bilder werden gar nicht erst dekodiert."""
+    return width > MAX_IMAGE_DIMENSION or height > MAX_IMAGE_DIMENSION or width * height > MAX_IMAGE_PIXELS
+
+
 @lru_cache(maxsize=1024)
 def _transparent_cached(path: str, _mtime_ns: int, _size: int) -> bool | None:
     try:
         with Image.open(path) as image:
-            image.draft("RGBA", (SAMPLE_SIDE, SAMPLE_SIDE))
+            # Erst nur der Kopf: ein klein gepacktes Riesenbild gilt als nicht prüfbar und steht auf der ruhigen Fläche.
+            width, height = image.size
+            if header_too_large(width, height):
+                return None
             has_alpha = "A" in image.getbands() or "transparency" in image.info
             if not has_alpha:
                 return False
-            frame = image.convert("RGBA")
-            frame.thumbnail((SAMPLE_SIDE, SAMPLE_SIDE))
-            return edge_is_transparent(frame)
-    except (OSError, UnidentifiedImageError, ValueError):
+            image.draft("RGBA", (SAMPLE_SIDE, SAMPLE_SIDE))
+            image.thumbnail((SAMPLE_SIDE, SAMPLE_SIDE))
+            return edge_is_transparent(image.convert("RGBA"))
+    except (OSError, UnidentifiedImageError, ValueError, Image.DecompressionBombError):
         return None
 
 

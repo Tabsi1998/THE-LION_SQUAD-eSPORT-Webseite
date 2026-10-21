@@ -98,3 +98,42 @@ def test_partner_badge_for_events_carries_white_version_and_transparency(uploads
     badge = partner_badge(doc, tone=True)
     assert badge["logo_transparent"] is True
     assert badge["logo_mono_url"] == "/api/static/uploads/w.png"
+
+
+def _png_huge_in_header(width=30000, height=30000) -> bytes:
+    """Ein kleines PNG, dessen Kopf ein Riesenbild ankündigt - so kostet es beim Dekodieren viel Speicher."""
+    import struct
+    import zlib
+    from io import BytesIO
+
+    buffer = BytesIO()
+    Image.new("RGBA", (4, 4), (0, 0, 0, 0)).save(buffer, format="PNG")
+    data = bytearray(buffer.getvalue())
+    ihdr = data[12:29]  # Typ "IHDR" und 13 Bytes Inhalt
+    ihdr[4:12] = struct.pack(">II", width, height)
+    data[12:29] = ihdr
+    data[29:33] = struct.pack(">I", zlib.crc32(bytes(ihdr)) & 0xFFFFFFFF)
+    return bytes(data)
+
+
+def test_huge_image_is_not_decoded_but_counts_as_unknown(uploads, monkeypatch, tmp_path):
+    (tmp_path / "riesig.png").write_bytes(_png_huge_in_header())
+
+    def no_decode(*_args, **_kwargs):
+        raise AssertionError("Riesenbild darf nicht dekodiert werden")
+
+    monkeypatch.setattr(Image.Image, "load", no_decode)
+    assert logo_tone.logo_transparent("/api/static/uploads/riesig.png") is None
+
+
+def test_dolibarr_image_that_is_huge_in_header_is_rejected():
+    from io import BytesIO
+
+    from services import sponsor_images
+
+    assert sponsor_images.oversized(_png_huge_in_header()) is True
+    assert sponsor_images.oversized(_png_huge_in_header(4096, 2)) is False
+    small = BytesIO()
+    Image.new("RGBA", (40, 20)).save(small, format="PNG")
+    assert sponsor_images.oversized(small.getvalue()) is False
+    assert sponsor_images.oversized(b"\x89PNG-kein-echtes-bild") is False
