@@ -12,6 +12,15 @@ Regeln:
 - Höchstens 500 Zeichen inklusive Zeilenumbrüchen (Grenze von Google Play).
 - Kurz und für Mitglieder verständlich: was sie in der App merken, keine Issue-Nummern, keine Technik.
 
+## 1.7.4
+
+Neu in 1.7.4:
+• Galerie: Großansicht bleibt über Bildtext und Reiterleiste
+• News ohne Bild als Text-Karte, Ergebnis-News nennen den Sieger
+• News: Anmelde-Karte direkt unter dem ersten Absatz
+• Profile ohne Nullen und ohne leere Reiter
+• Private Profile zeigen keine Referenzen und Teams
+
 ## 1.7.3
 
 Neu in 1.7.3:

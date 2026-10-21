@@ -193,6 +193,7 @@ GitHub sortiert Releases nach Veröffentlichungsdatum, nicht nach Version. Alte 
 
 Neueste oben.
 
+- `1.7.4`: Build 98, Galerie-Großansicht über Bildtext und Reiterleiste (#1910), News als Text-Karte mit Sieger und Anmelde-Karte nach dem ersten Absatz (#1912), Profile ohne Nullen und leere Reiter, privates Profil ohne Referenzen und Teams (#1916)
 - `1.7.3`: Build 97, „nicht erschienen“ im Lauf vorbelegt und im Baum durchgestrichen (#1840), Abzeichen einzeilig und mit Farbe wie im Web (#1797, #1869), Fast-Lap-Titel ohne Wortbruch und Symbol ohne Überlappung (#1867, #1868), Teilnehmerliste ohne Rohwerte (#1870)
 - `1.7.2`: Build 96, „Mein Kalender“ mit eigenen Terminen und persönlichem Kalender-Abo, Eintrag in den Einstellungen und einmaliger Hinweis nach der Anmeldung (#1788)
 - `1.7.1`: Build 95, Weiterkommen in vier Modi mit Show-Auslosung als Moment, neue Baum-Namen und „voraussichtlich“ (#1633), Fast-Lap-Versuche und Gäste wie auf der Website (#1585)
