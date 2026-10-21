@@ -8,6 +8,7 @@ import { platformColor, platformIcon } from "../../components/LinkedAccounts";
 import { PlatformIcon } from "../../components/PlatformIcon";
 import { API_BASE_URL } from "../../config";
 import { ContentCard } from "../../components/ContentCard";
+import { ClubSuccess } from "../../components/references/ClubSuccess";
 import { EmptyState, ErrorState, PartialLoadNotice, SkeletonList, loadProblem, type LoadProblem } from "../../components/ListState";
 import { LoewenRangFrame } from "../../components/LoewenRangFrame";
 import { frameLabel } from "../../lib/loewenRang";
@@ -21,7 +22,7 @@ import { formatDate, formatMembershipStatus, formatMembershipType, formatRole, p
 import { groupSponsorsByTier } from "../../lib/sponsors";
 import type { MoreStackParamList } from "../../navigation/types";
 import { colors, radius } from "../../theme";
-import type { Reference, ReferenceSummary } from "../../types";
+import type { ClubReference, ReferenceSummaryData, Showcase } from "../../lib/references";
 
 // Partnerseiten (#469) liegen im Web; die App zeigt je Partner die Kanäle und den Weg dorthin.
 const WEB_BASE_URL = API_BASE_URL.replace(/\/api\/?$/, "");
@@ -61,13 +62,6 @@ const SECTION_GROUP: Record<SectionKey, string> = {
   profiles: "Gaming",
 };
 
-const REFERENCE_STATUS: Record<string, string> = {
-  active: "Laufend",
-  planned: "Geplant",
-  completed: "Abgeschlossen",
-  archived: "Archiviert",
-};
-
 export function InfoCenterScreen({ navigation, route }: Props) {
   const { user } = useAuth();
   const [section, setSection] = useState<SectionKey>(route.params?.section || "sponsors");
@@ -76,8 +70,10 @@ export function InfoCenterScreen({ navigation, route }: Props) {
   const [events, setEvents] = useState<any[]>([]);
   const [profiles, setProfiles] = useState<any[]>([]);
   const [benefits, setBenefits] = useState<any[]>([]);
-  const [references, setReferences] = useState<Reference[]>([]);
-  const [referenceSummary, setReferenceSummary] = useState<ReferenceSummary | null>(null);
+  const [references, setReferences] = useState<ClubReference[]>([]);
+  const [referenceSummary, setReferenceSummary] = useState<ReferenceSummaryData>(null);
+  // Hauptkarte der Vitrine (#1945): wie im Web aus /references - fest gewählt oder automatisch.
+  const [showcase, setShowcase] = useState<Showcase>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   // Was beim letzten Laden nicht kam (#1001, #1152): der Bereich behält seinen letzten Stand; ohne Stand zeigt er den
@@ -98,7 +94,7 @@ export function InfoCenterScreen({ navigation, route }: Props) {
         api.get<any[]>("/events"),
         api.get<any[]>("/users/public-list"),
         api.get<any[]>("/membership/benefits"),
-        api.get<Reference[] | { items?: Reference[]; summary?: ReferenceSummary }>("/references"),
+        api.get<ClubReference[] | { items?: ClubReference[]; summary?: ReferenceSummaryData; showcase?: Showcase }>("/references"),
       ]);
       const problems: Partial<Record<SectionKey, LoadProblem>> = {};
       const list = <T,>(key: SectionKey, result: PromiseSettledResult<{ data: T[] }>, set: (items: T[]) => void) => {
@@ -116,6 +112,7 @@ export function InfoCenterScreen({ navigation, route }: Props) {
         const referenceData = liveReferences.value.data;
         setReferences(Array.isArray(referenceData) ? referenceData : referenceData?.items ?? []);
         setReferenceSummary(Array.isArray(referenceData) ? null : referenceData?.summary ?? null);
+        setShowcase(Array.isArray(referenceData) ? null : referenceData?.showcase ?? null);
       } else {
         problems.references = loadProblem(liveReferences.reason);
       }
@@ -140,11 +137,14 @@ export function InfoCenterScreen({ navigation, route }: Props) {
         contentContainerStyle={styles.content}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); loadLive(); }} tintColor={colors.cyan} />}
       >
-        <View style={styles.header}>
-          <Muted style={styles.eyebrow}>{SECTION_GROUP[active.key]}</Muted>
-          <Title>{active.label}</Title>
-          <Muted>{SECTION_INTRO[active.key]}</Muted>
-        </View>
+        {/* Erfolge (#1945) bringen ihren eigenen Kopf mit („Erfolgswand“, „Erfolge & Referenzen“). */}
+        {active.key === "references" ? null : (
+          <View style={styles.header}>
+            <Muted style={styles.eyebrow}>{SECTION_GROUP[active.key]}</Muted>
+            <Title>{active.label}</Title>
+            <Muted>{SECTION_INTRO[active.key]}</Muted>
+          </View>
+        )}
 
         {fixedSection ? null : <SegmentedTabs items={sections} value={section} onChange={setSection} />}
 
@@ -160,7 +160,9 @@ export function InfoCenterScreen({ navigation, route }: Props) {
             {section === "partners" ? <Partners items={partners} /> : null}
             {section === "events" ? <Events items={events} onOpen={(event) => navigation.navigate("EventDetail", { id: event.slug || event.id })} /> : null}
             {section === "benefits" ? <Benefits isMember={Boolean(user?.is_club_member)} membership={user?.membership || null} items={benefits} /> : null}
-            {section === "references" ? <References items={references} summary={referenceSummary} /> : null}
+            {section === "references" ? (
+              <ClubSuccess items={references} summary={referenceSummary} showcase={showcase} onOpenSeason={(target) => navigation.navigate("ReferenceSeason", target)} />
+            ) : null}
             {section === "profiles" ? <Profiles items={profiles} onOpen={(profile) => profile.username ? navigation.navigate("PublicProfile", { username: profile.username }) : undefined} /> : null}
           </>
         )}
@@ -322,75 +324,6 @@ function Benefits({ isMember, membership, items }: { isMember: boolean; membersh
   );
 }
 
-function References({ items, summary }: { items: Reference[]; summary: ReferenceSummary | null }) {
-  if (!items.length) return <EmptyState title="Keine Referenzen" detail="Externe Turniere und Ligen, bei denen der Verein angetreten ist, erscheinen hier." />;
-  return (
-    <>
-      {summary ? (
-        <View style={styles.summaryRow} testID="reference-summary">
-          <SummaryTile label="Teilnahmen" value={summary.total} />
-          <SummaryTile label="Podeste" value={summary.podiums} tone="gold" />
-          <SummaryTile label="Gold" value={summary.gold} tone="gold" />
-          <SummaryTile label="Spiele" value={summary.games} />
-        </View>
-      ) : null}
-      {items.map((reference) => <ReferenceCard key={reference.id} item={reference} />)}
-    </>
-  );
-}
-
-function SummaryTile({ label, value, tone = "cyan" }: { label: string; value: number; tone?: "cyan" | "gold" }) {
-  return (
-    <View style={styles.summaryTile}>
-      <Body style={[styles.summaryValue, tone === "gold" && styles.summaryValueGold]}>{value}</Body>
-      <Muted style={styles.summaryLabel} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>{label}</Muted>
-    </View>
-  );
-}
-
-// Wie die Karte auf lionsquad.at/references: Platzierung groß, Titel, Spiel,
-// Datum, Lineup, Link zum Turnier.
-function ReferenceCard({ item }: { item: Reference }) {
-  const placement = Number(item.placement);
-  const placed = Number.isFinite(placement) && placement > 0;
-  const placementText = item.placement_label || (placed ? `${placement}.` : "Teilnahme");
-  const game = item.game?.display_name || item.game?.name || item.game_name || "";
-  const lineup = (item.lineup_members || []).map((member) => member.display_name).filter(Boolean);
-  const meta = [item.organizer, item.team_name, item.start_date ? formatDate(item.start_date) : "", item.location].filter(Boolean).join(" · ");
-  const tags = [
-    ...(item.reference_meta?.platforms || []).map((platform) => platform.label),
-    ...(item.reference_meta?.title_segments || []),
-  ].filter(Boolean);
-  const link = item.tournament_url || item.source_url || null;
-  const status = REFERENCE_STATUS[String(item.status || "completed")] || REFERENCE_STATUS.completed;
-  return (
-    <LinkedCard url={link}>
-      <Card style={styles.card}>
-        <View style={styles.refTop}>
-          <View style={[styles.refRank, placement === 1 && styles.refRankGold, placement === 2 && styles.refRankSilver, placement === 3 && styles.refRankBronze]}>
-            <Body style={[styles.refRankText, !placed && styles.refRankTextSmall]} numberOfLines={1} adjustsFontSizeToFit>{placementText}</Body>
-            <Muted style={styles.refRankLabel} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
-              {item.teams_count ? `${item.teams_count} Teams` : item.participants_count ? `${item.participants_count} Teilnehmer` : "Platz"}
-            </Muted>
-          </View>
-          <View style={styles.refText}>
-            <View style={styles.wrap}>
-              <Badge label={status} />
-              {game ? <Badge label={game} /> : null}
-            </View>
-            <Body style={styles.strong}>{item.title || "Referenz"}</Body>
-            {meta ? <Muted>{meta}</Muted> : null}
-          </View>
-        </View>
-        {item.description ? <Muted numberOfLines={3}>{item.description}</Muted> : null}
-        {tags.length ? <View style={styles.wrap}>{tags.map((tag) => <Badge key={tag} label={tag} />)}</View> : null}
-        {lineup.length ? <Muted>Lineup: {lineup.join(", ")}</Muted> : null}
-        {link ? <Muted style={styles.link}>Turnier öffnen</Muted> : null}
-      </Card>
-    </LinkedCard>
-  );
-}
-
 function Profiles({ items, onOpen }: { items: any[]; onOpen: (profile: any) => void }) {
   if (!items.length) return <EmptyState title="Keine Profile" detail="Öffentliche Profile werden hier angezeigt, sobald sie sichtbar freigegeben sind." />;
   return (
@@ -471,72 +404,6 @@ function Badge({ label }: { label: string }) {
 }
 
 const styles = StyleSheet.create({
-  summaryRow: {
-    flexDirection: "row",
-    gap: 8,
-  },
-  summaryTile: {
-    alignItems: "center",
-    backgroundColor: "rgba(255,255,255,0.04)",
-    borderColor: colors.border,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    flex: 1,
-    gap: 2,
-    paddingHorizontal: 6,
-    paddingVertical: 10,
-  },
-  summaryValue: {
-    color: colors.cyan,
-    fontSize: 20,
-    fontWeight: "900",
-  },
-  summaryValueGold: {
-    color: colors.gold,
-  },
-  summaryLabel: {
-    fontSize: 11,
-  },
-  refTop: {
-    flexDirection: "row",
-    gap: 12,
-  },
-  refRank: {
-    alignItems: "center",
-    borderColor: colors.border,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    justifyContent: "center",
-    minHeight: 64,
-    paddingHorizontal: 6,
-    paddingVertical: 8,
-    width: 78,
-  },
-  refRankGold: {
-    borderColor: "rgba(255,215,0,0.55)",
-  },
-  refRankSilver: {
-    borderColor: "rgba(192,192,192,0.55)",
-  },
-  refRankBronze: {
-    borderColor: "rgba(205,127,50,0.55)",
-  },
-  refRankText: {
-    color: colors.white,
-    fontSize: 22,
-    fontWeight: "900",
-  },
-  refRankTextSmall: {
-    fontSize: 13,
-  },
-  refRankLabel: {
-    fontSize: 11,
-  },
-  refText: {
-    flex: 1,
-    gap: 6,
-    minWidth: 0,
-  },
   content: {
     gap: 14,
     padding: 18,
