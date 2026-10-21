@@ -84,7 +84,8 @@ test("Mitglied: oben Karte, Gruß und Beitrag, dann sechs Kacheln mit Zahlen und
   expect(screen.getByLabelText("Dokumente, 2 neu")).toBeTruthy();
   expect(screen.getByLabelText("Mitgliedschaft")).toBeTruthy();
   expect(mockGet).not.toHaveBeenCalledWith("/documents");
-  for (const label of ["Galerie", "Vorteile", "News", "Referenzen", "Sponsoren", "Partner"]) expect(screen.getAllByText(label)).toHaveLength(1);
+  // „Erfolge“ statt „Referenzen“ (Entscheidung zu #1945): Kachel und Kopfzeile heißen wie der Bereich.
+  for (const label of ["Galerie", "Vorteile", "News", "Erfolge", "Sponsoren", "Partner"]) expect(screen.getAllByText(label)).toHaveLength(1);
   // Rechnungen (Profil) und interne Termine (Events-Tab) stehen nicht im Verein-Tab.
   expect(screen.queryByText(/Rechnung/)).toBeNull();
   expect(screen.queryByText("Interne Events")).toBeNull();
@@ -166,8 +167,8 @@ test("Vorstand: der Einlass steht oben - sonst nicht", async () => {
 
 test("Adventkalender: die Zeile steht nur da, solange der Kalender läuft - als erste unter „Vom Verein“", () => {
   // Über uns, Vorstand, Kontakt (#1024) steht als erste Zeile - für Gäste, Eltern und Neue.
-  expect(clubRows(false).map((row) => row.title)).toEqual(["Über uns, Vorstand, Kontakt", "News", "Galerie", "Referenzen", "Sponsoren", "Partner"]);
-  expect(clubRows(true).map((row) => row.title)).toEqual(["Adventkalender", "Über uns, Vorstand, Kontakt", "News", "Galerie", "Referenzen", "Sponsoren", "Partner"]);
+  expect(clubRows(false).map((row) => row.title)).toEqual(["Über uns, Vorstand, Kontakt", "News", "Galerie", "Erfolge", "Sponsoren", "Partner"]);
+  expect(clubRows(true).map((row) => row.title)).toEqual(["Adventkalender", "Über uns, Vorstand, Kontakt", "News", "Galerie", "Erfolge", "Sponsoren", "Partner"]);
 });
 
 test("Symbole je Kanal, Unbekanntes als Link; Discord-Server-Zeile", () => {

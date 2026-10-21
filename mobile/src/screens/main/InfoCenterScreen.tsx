@@ -36,7 +36,8 @@ const sections: Array<{ key: SectionKey; label: string }> = [
   { key: "partners", label: "Partner" },
   { key: "events", label: "Events" },
   { key: "benefits", label: "Vorteile" },
-  { key: "references", label: "Referenzen" },
+  // Kopfzeile „Erfolge“ (Entscheidung zu #1945); der Seitenkopf darunter heißt „Erfolge & Referenzen“.
+  { key: "references", label: "Erfolge" },
   { key: "profiles", label: "Profile" },
 ];
 

@@ -70,6 +70,8 @@ test("Verein › Erfolge: Ehrentafel ohne Nullen, Vitrine und Chronik statt der 
   await render(<InfoCenterScreen navigation={navigation} route={routeFor("references")} />);
 
   await waitFor(() => expect(screen.getByTestId("club-success")).toBeTruthy());
+  // Kopfzeile „Erfolge“ (Entscheidung zu #1945), der Seitenkopf bleibt „Erfolge & Referenzen“.
+  expect(setOptions).toHaveBeenCalledWith({ title: "Erfolge" });
   expect(screen.getByText("Erfolge & Referenzen")).toBeTruthy();
   expect(screen.getByText("Siege")).toBeTruthy();
   expect(screen.getByText("Zweite")).toBeTruthy();
