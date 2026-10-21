@@ -297,6 +297,21 @@ Gepflegt wird die Liste nicht im Admin, sondern in der Datei `frontend/src/whats
 Link auf eine Seite der Website) – im Doku-Stand-PR nach einem Merge, wie die Texte der App. Was Website und App
 betrifft, steht in beiden. Ein Satz je Neuerung, ohne Ticketnummern und Planungskürzel; ein Test prüft das.
 
+### 3.10 Bewegung und Wischleisten
+
+Die Website bewegt sich ruhig und überall gleich:
+
+- **Zahlen und Zeiten zählen hoch**, wenn sie zum ersten Mal ins Bild kommen: Ehrentafel, Vitrine, Tabellen-Punkte,
+  Saison-Statistik, Kennzahlen im Profil, Fast-Lap-Zeiten und die Zahlen auf Startseite und „Über uns“.
+- **Listen erscheinen gestaffelt** (Chronik je Jahr, Vitrine, Statistik-Karten), nur die ersten zwölf Einträge.
+- **Beim Nachladen** (Live-Tabellen) zählt nichts neu: ein geänderter Wert leuchtet nur einmal kurz auf.
+- **Wischleisten**: Wo sich etwas seitlich wischen lässt (breite Tabellen, Reiter, Chips), steht darunter eine dünne
+  blaue Leiste und der rechte Rand läuft weich aus. So sieht jeder, dass es weitergeht.
+
+Wer am Gerät **„Bewegung reduzieren“** eingestellt hat, sieht alles sofort im Endzustand – ohne Zählen, Aufsteigen
+und Aufleuchten. Einstellen muss im Admin dafür nichts werden. Wie die Bausteine gebaut sind, steht für
+Entwickler in [docs/entwicklung/design-system.md](../entwicklung/design-system.md).
+
 ---
 
 ## 4. Wenn etwas nicht klappt

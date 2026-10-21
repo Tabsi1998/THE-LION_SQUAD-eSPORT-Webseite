@@ -48,7 +48,8 @@ Weitere Doku: [`DOCS.md`](DOCS.md).
   `page.route` nachgestellt).
 - Wächter-Tests: Knöpfe nur über `tls-btn--…` (`lib/buttons.test.js`), jedes Bild sagt seine Breite
   (`lib/imageSizes.test.jsx`), Daten nur über die Wien-Helfer (`lib/vienna.test.js`), Bewegung über
-  `--tls-motion-*` (`lib/motion.test.js`).
+  `--tls-motion-*` (`lib/motion.test.js`), Hochzählen nur über `components/tls/motion/CountUp`, Wischflächen nur
+  mit `tls-swipe` (`styles/swipe.test.js`) – siehe `docs/entwicklung/design-system.md`.
 - `e2e/admin-navigation.spec.js` zählt die Einträge des Adminmenüs; die Härtungs-Tests zählen Blöcke in
   `frontend/nginx.conf` – bei neuen Einträgen die Zahl anpassen.
 - Webadressen nie umbenennen, sondern weiterleiten – die App öffnet Links aus Benachrichtigungen.
