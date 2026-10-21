@@ -432,4 +432,8 @@ async def shared_for_partner(db, partner_id: str, *, user: dict | None, enrich_r
     ref_rows = await db.references.find(ref_query, {"_id": 0}).to_list(200)
     ref_rows = await enrich_references(await filter_visible(ref_rows, user))
     references = sorted((_reference_summary_for_partner(ref, partner_id) for ref in ref_rows), key=lambda r: str(r.get("start_date") or ""), reverse=True)
-    return {"events": events, "tournaments": tournaments, "references": references}
+    # #1934: Ligen und Serien mit dem Partner (Spuren und Saisons).
+    from services import partner_series_view
+
+    series = await partner_series_view.for_partner(db, partner_id, user)
+    return {"events": events, "tournaments": tournaments, "references": references, "series": series}

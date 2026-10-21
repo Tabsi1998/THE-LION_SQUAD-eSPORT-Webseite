@@ -23,7 +23,7 @@ from models import (
     new_id,
     now_utc,
 )
-from services import partner_pages, reference_running_cache, reference_series
+from services import reference_running_cache, reference_series, series_partners
 from services.own_teams import clean_teams, own_teams, team_conflicts
 from services.series_identity import normalize_name
 from services.reference_series_access import SeriesAccess, require_series_editor
@@ -120,7 +120,7 @@ async def create_lineage(body: ReferenceLineageCreate, me: dict = Depends(requir
     db = get_db()
     doc = body.model_dump()
     await _check_game(db, doc.get("game_id"))
-    doc["partner_ids"] = await partner_pages.clean_partner_ids(db, doc.get("partner_ids"))
+    await series_partners.clean(db, doc)  # #1934: Partner mit Rolle
     doc["slug"] = await unique_slug(db.reference_lineages, doc.get("slug") or doc["title"], fallback=SLUG_FALLBACK)
     now = now_utc().isoformat()
     doc.update({"id": new_id(), "slug_history": [], "is_archived": False, "archived_at": None,
@@ -137,8 +137,7 @@ async def update_lineage(lineage_id: str, body: ReferenceLineageUpdate, me: dict
     raw = body.model_dump(exclude_unset=True)
     updates = {key: value for key, value in raw.items() if value is not None or key in LINEAGE_NULLABLE}
     await _check_game(db, updates.get("game_id"))
-    if "partner_ids" in updates:
-        updates["partner_ids"] = await partner_pages.clean_partner_ids(db, updates["partner_ids"])
+    await series_partners.clean(db, updates, existing)
     updates.pop("slug", None)
     source = slug_source_for_update(raw, existing, "title", fallback=SLUG_FALLBACK)
     if source is not None:
@@ -181,6 +180,7 @@ async def create_series(body: ReferenceSeriesCreate, me: dict = Depends(require_
             raise HTTPException(404, "Punkteschema-Vorlage nicht gefunden.")
     doc["rules"] = _rules({**(template.get("rules") or {}), **(doc.get("rules") or {})})
     doc.update(_teams(doc.get("own_teams"), doc.get("team_name")))
+    await series_partners.clean(db, doc)  # #1934: eigene Partner der Saison
     await _check_reference(db, doc.get("reference_id"))
     now = now_utc().isoformat()
     doc.update({
@@ -226,6 +226,7 @@ async def update_series(series_id: str, body: ReferenceSeriesUpdate, me: dict = 
     note = raw.pop("rules_note", None)
     updates = {key: value for key, value in raw.items() if value is not None or key in SERIES_NULLABLE}
     await _check_reference(db, updates.get("reference_id"))
+    await series_partners.clean(db, updates, existing)
     teams_changed = False
     if "own_teams" in updates or "team_name" in updates:
         updates.update(_teams(updates.get("own_teams"), updates.get("team_name"), existing))

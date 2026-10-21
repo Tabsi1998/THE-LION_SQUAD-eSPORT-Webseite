@@ -27,7 +27,7 @@ from fastapi import APIRouter, Depends, Request
 from auth import get_optional_user
 from database import get_db
 from routes.reference_round_routes import PUBLIC_FIELDS, _calendar, visible_series
-from services import race_weekend, reference_running_cache
+from services import race_weekend, reference_running_cache, series_partners
 from services.dolibarr_policy import club_today
 from services.own_teams import Matcher, own_teams
 from services.rate_limit import enforce_rate_limit
@@ -253,11 +253,12 @@ async def _running(user: dict | None, today: str) -> dict:
     # und Teilnehmer werden danach nur für diese Serien geladen, damit die Last mit der Zahl der Serien nicht wächst.
     all_series = await db.reference_series.find({"status": "active"}, {
         "_id": 0, "id": 1, "lineage_id": 1, "visibility": 1, "season": 1, "tier": 1, "title": 1, "season_slug": 1,
-        "team_name": 1, "own_teams": 1, "order_index": 1, "weekend": 1}).to_list(None)
+        "team_name": 1, "own_teams": 1, "order_index": 1, "weekend": 1, "partner_ids": 1, "partner_roles": 1}
+    ).to_list(None)
     lineages = {item["id"]: item async for item in db.reference_lineages.find(
         {"id": {"$in": list({s["lineage_id"] for s in all_series})}},
         {"_id": 0, "id": 1, "slug": 1, "title": 1, "kind": 1, "label": 1, "game_id": 1, "game_name": 1,
-         "visibility": 1, "is_archived": 1})}
+         "visibility": 1, "is_archived": 1, "partner_ids": 1, "partner_roles": 1})}
     visible_pairs = []
     for series in all_series:
         lineage = lineages.get(series.get("lineage_id"))
@@ -303,8 +304,10 @@ async def _running(user: dict | None, today: str) -> dict:
     games = {item["id"]: item async for item in db.games.find(
         {"id": {"$in": game_ids}}, {"_id": 0, "id": 1, "name": 1, "short_name": 1, "logo_url": 1})} if game_ids else {}
 
+    # #1934: veranstaltende Partner (nur aktive) für das kleine Abzeichen - eine Abfrage für alle.
+    organizers = await series_partners.organizers_many(db, shown)
     items = []
-    for lineage, series in shown:
+    for (lineage, series), hosts in zip(shown, organizers):
         rounds = race_weekend.annotate(calendar_view(rounds_by[series["id"]], published[series["id"]], today)["rounds"],
                                        series.get("weekend"))
         racing = lineage.get("kind") == "racing"
@@ -319,6 +322,7 @@ async def _running(user: dict | None, today: str) -> dict:
             "today": any(item["state"] == "today" for item in rounds),
             "club": _club_place(lineage, series, snapshots, club_ids),
             "club_count": club_count.get(series["id"], 0),
+            "organizers": hosts,
             "_order": (series.get("order_index") or 0),
         })
     items.sort(key=lambda item: (not item["today"], (item["next"] or {}).get("club_day") or "9999", item["_order"],
@@ -368,7 +372,7 @@ async def public_lineages(request: Request, user: dict | None = Depends(get_opti
 
     lineages = [item async for item in db.reference_lineages.find(
         {"is_archived": {"$ne": True}},
-        {"_id": 0, "id": 1, "game_id": 1, "visibility": 1, "order_index": 1,
+        {"_id": 0, "id": 1, "game_id": 1, "visibility": 1, "order_index": 1, "partner_ids": 1, "partner_roles": 1,
          **{key: 1 for key in LINEAGE_LIST_FIELDS}})]
     lineages = [item for item in lineages if await visible(item.get("visibility"))]
     seasons_by: dict = {item["id"]: [] for item in lineages}
@@ -376,7 +380,7 @@ async def public_lineages(request: Request, user: dict | None = Depends(get_opti
         async for series in db.reference_series.find(
                 {"lineage_id": {"$in": list(seasons_by)}, "status": {"$ne": "archived"}},
                 {"_id": 0, "id": 1, "lineage_id": 1, "visibility": 1, "team_name": 1, "own_teams": 1,
-                 "reference_id": 1,
+                 "reference_id": 1, "partner_ids": 1, "partner_roles": 1,
                  "order_index": 1, **{key: 1 for key in PATH_SEASON_FIELDS}}):
             if await visible(series.get("visibility")):
                 seasons_by[series["lineage_id"]].append(series)
@@ -401,6 +405,10 @@ async def public_lineages(request: Request, user: dict | None = Depends(get_opti
         {"id": {"$in": game_ids}}, {"_id": 0, "id": 1, "name": 1, "short_name": 1, "logo_url": 1})} if game_ids else {}
 
     shown.sort(key=lambda pair: (pair[0].get("order_index") or 0, str(pair[0].get("title") or "").casefold()))
+    # #1934: veranstaltende Partner je Spur und je Saison (geerbt und eigene) - eine Abfrage für alle.
+    pairs = [(lineage, None) for lineage, _ in shown] + [(lineage, s) for lineage, seasons in shown for s in seasons]
+    hosts = dict(zip([(lineage["id"], (s or {}).get("id")) for lineage, s in pairs],
+                     await series_partners.organizers_many(db, pairs)))
     items = []
     for lineage, seasons in shown:
         seasons.sort(key=lambda item: (_natural(item.get("season")), item.get("order_index") or 0,
@@ -408,9 +416,11 @@ async def public_lineages(request: Request, user: dict | None = Depends(get_opti
         game = games.get(lineage.get("game_id")) or {}
         items.append({
             "lineage": {**{key: lineage.get(key) for key in LINEAGE_LIST_FIELDS},
-                        "game_name": lineage.get("game_name") or game.get("name")},
+                        "game_name": lineage.get("game_name") or game.get("name"),
+                        "organizers": hosts[(lineage["id"], None)]},
             "game": {key: game.get(key) for key in ("name", "short_name", "logo_url")} if game else None,
             "seasons": [{**{key: series.get(key) for key in PATH_SEASON_FIELDS},
+                         "organizers": hosts[(lineage["id"], series["id"])],
                          "club": _club_place(lineage, series, snapshots, club_ids),
                          "reference_ids": references_by[series["id"]]} for series in seasons],
         })
@@ -436,6 +446,8 @@ async def public_series(lineage_slug: str, season_slug: str, user: dict | None =
     return {
         "lineage": lineage_out,
         "series": {key: series.get(key) for key in SERIES_FIELDS},
+        # #1934: „Veranstaltet von“ und Mitwirkende - nur aktive Partner.
+        "partners": await series_partners.for_series_page(db, lineage, series),
         "rules": _rules(series),
         "today": calendar["today"],
         "progress": _progress(rounds, by_weekend=lineage.get("kind") == "racing"),
