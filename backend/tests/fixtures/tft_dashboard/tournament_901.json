@@ -1,0 +1,47 @@
+{
+  "id": 901, "name": "Turnier 1 - Probe Masters - Online", "description": "", "date": "2026-09-24T22:00:00.000Z",
+  "status": "completed", "created_at": "2026-09-13T07:46:13.316Z", "type": "normal", "series_id": 7,
+  "rounds": [
+    {"id": 1, "tournament_id": 901, "round_number": 1, "status": "completed", "created_at": "2026-09-25T18:00:00.000Z", "lobbies": [
+      {"lobby_id": 11, "lobby_number": 1, "players": [
+        {"id": 101, "puuid": "puuid-ada", "team_id": null, "placement": 1, "is_filler": false, "points": 8, "game_name": "Ada Ausgedacht", "tag_line": "AAA", "avatar_url": "https://example.invalid/avatar/ada.png", "profile_icon_id": 11, "team_name": null},
+        {"id": 102, "puuid": "puuid-bruno", "team_id": null, "placement": 2, "is_filler": false, "points": 7, "game_name": "Bruno Beispiel", "tag_line": "EUW", "avatar_url": null, "profile_icon_id": 12, "team_name": null},
+        {"id": 103, "puuid": "puuid-cleo", "team_id": null, "placement": 3, "is_filler": false, "points": 6, "game_name": "Cleo Muster", "tag_line": "TLS", "avatar_url": null, "profile_icon_id": 13, "team_name": null}
+      ]},
+      {"lobby_id": 12, "lobby_number": 2, "players": [
+        {"id": 104, "puuid": "puuid-dario", "team_id": null, "placement": 1, "is_filler": false, "points": 8, "game_name": "Dario Demo", "tag_line": "1234", "avatar_url": null, "profile_icon_id": 14, "team_name": null},
+        {"id": 105, "puuid": "puuid-finn", "team_id": null, "placement": 2, "is_filler": false, "points": 7, "game_name": "Finn Fiktiv", "tag_line": "EUW", "avatar_url": null, "profile_icon_id": 15, "team_name": null},
+        {"id": 106, "puuid": "guest_ellaerfunden_001", "team_id": null, "placement": 3, "is_filler": false, "points": 6, "game_name": "Ella Erfunden", "tag_line": "GUEST", "avatar_url": null, "profile_icon_id": null, "team_name": null}
+      ]}
+    ]},
+    {"id": 2, "tournament_id": 901, "round_number": 2, "status": "completed", "created_at": "2026-09-25T18:00:00.000Z", "lobbies": [
+      {"lobby_id": 13, "lobby_number": 1, "players": [
+        {"id": 107, "puuid": "puuid-ada", "team_id": null, "placement": 1, "is_filler": false, "points": 8, "game_name": "Ada Ausgedacht", "tag_line": "AAA", "avatar_url": "https://example.invalid/avatar/ada.png", "profile_icon_id": 11, "team_name": null},
+        {"id": 108, "puuid": "puuid-cleo", "team_id": null, "placement": 2, "is_filler": false, "points": 7, "game_name": "Cleo Muster", "tag_line": "TLS", "avatar_url": null, "profile_icon_id": 13, "team_name": null},
+        {"id": 109, "puuid": "puuid-bruno", "team_id": null, "placement": 3, "is_filler": false, "points": 6, "game_name": "Bruno Beispiel", "tag_line": "EUW", "avatar_url": null, "profile_icon_id": 12, "team_name": null},
+        {"id": 110, "puuid": "puuid-dario", "team_id": null, "placement": 4, "is_filler": false, "points": 5, "game_name": "Dario Demo", "tag_line": "1234", "avatar_url": null, "profile_icon_id": 14, "team_name": null},
+        {"id": 111, "puuid": "guest_ellaerfunden_001", "team_id": null, "placement": 5, "is_filler": false, "points": 4, "game_name": "Ella Erfunden", "tag_line": "GUEST", "avatar_url": null, "profile_icon_id": null, "team_name": null},
+        {"id": 112, "puuid": null, "team_id": null, "placement": 6, "is_filler": true, "points": 3, "game_name": "Bot", "tag_line": null, "avatar_url": null, "profile_icon_id": null, "team_name": null},
+        {"id": 113, "puuid": "puuid-finn", "team_id": null, "placement": 7, "is_filler": false, "points": 2, "game_name": "Finn Fiktiv", "tag_line": "EUW", "avatar_url": null, "profile_icon_id": 15, "team_name": null}
+      ]}
+    ]},
+    {"id": 3, "tournament_id": 901, "round_number": 3, "status": "completed", "created_at": "2026-09-25T18:00:00.000Z", "lobbies": [
+      {"lobby_id": 14, "lobby_number": 1, "players": [
+        {"id": 114, "puuid": "puuid-bruno", "team_id": null, "placement": 1, "is_filler": false, "points": 8, "game_name": "Bruno Beispiel", "tag_line": "EUW", "avatar_url": null, "profile_icon_id": 12, "team_name": null},
+        {"id": 115, "puuid": "puuid-ada", "team_id": null, "placement": 2, "is_filler": false, "points": 7, "game_name": "Ada Ausgedacht", "tag_line": "AAA", "avatar_url": "https://example.invalid/avatar/ada.png", "profile_icon_id": 11, "team_name": null},
+        {"id": 116, "puuid": "puuid-dario", "team_id": null, "placement": 3, "is_filler": false, "points": 6, "game_name": "Dario Demo", "tag_line": "1234", "avatar_url": null, "profile_icon_id": 14, "team_name": null},
+        {"id": 117, "puuid": "puuid-cleo", "team_id": null, "placement": 4, "is_filler": false, "points": 5, "game_name": "Cleo Muster", "tag_line": "TLS", "avatar_url": null, "profile_icon_id": 13, "team_name": null},
+        {"id": 118, "puuid": "guest_ellaerfunden_001", "team_id": null, "placement": 5, "is_filler": false, "points": 4, "game_name": "Ella Erfunden", "tag_line": "GUEST", "avatar_url": null, "profile_icon_id": null, "team_name": null}
+      ]}
+    ]}
+  ],
+  "participants": [
+    {"puuid": "puuid-ada", "dropped_out": false, "game_name": "Ada Ausgedacht", "tag_line": "AAA", "tier": "GOLD", "rank": "II", "league_points": 40, "avatar_url": "https://example.invalid/avatar/ada.png", "profile_icon_id": 11, "total_points": "23", "p1_count": "2", "p2_count": "1", "p3_count": "0", "p4_count": "0", "top4_count": "3"},
+    {"puuid": "puuid-bruno", "dropped_out": false, "game_name": "Bruno Beispiel", "tag_line": "EUW", "tier": null, "rank": null, "league_points": 0, "avatar_url": null, "profile_icon_id": 12, "total_points": "21", "p1_count": "1", "p2_count": "1", "p3_count": "1", "p4_count": "0", "top4_count": "3"},
+    {"puuid": "puuid-dario", "dropped_out": false, "game_name": "Dario Demo", "tag_line": "1234", "tier": "SILVER", "rank": "I", "league_points": 12, "avatar_url": null, "profile_icon_id": 14, "total_points": "19", "p1_count": "1", "p2_count": "0", "p3_count": "1", "p4_count": "1", "top4_count": "3"},
+    {"puuid": "puuid-cleo", "dropped_out": false, "game_name": "Cleo Muster", "tag_line": "TLS", "tier": null, "rank": null, "league_points": 0, "avatar_url": null, "profile_icon_id": 13, "total_points": "18", "p1_count": "0", "p2_count": "1", "p3_count": "1", "p4_count": "1", "top4_count": "3"},
+    {"puuid": "guest_ellaerfunden_001", "dropped_out": false, "game_name": "Ella Erfunden", "tag_line": "GUEST", "tier": null, "rank": null, "league_points": 0, "avatar_url": null, "profile_icon_id": null, "total_points": "14", "p1_count": "0", "p2_count": "0", "p3_count": "1", "p4_count": "0", "top4_count": "1"},
+    {"puuid": "puuid-finn", "dropped_out": true, "game_name": "Finn Fiktiv", "tag_line": "EUW", "tier": "BRONZE", "rank": "IV", "league_points": 3, "avatar_url": null, "profile_icon_id": 15, "total_points": "9", "p1_count": "0", "p2_count": "1", "p3_count": "0", "p4_count": "0", "top4_count": "1"}
+  ],
+  "teams": []
+}
