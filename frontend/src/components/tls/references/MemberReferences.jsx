@@ -225,14 +225,23 @@ function Details({ id, itemId, details }) {
   if (details.tags.length) {
     blocks.push(<div key="tags" className="flex flex-wrap gap-1.5">{details.tags.map((tag) => <Mark key={tag}>{tag}</Mark>)}</div>);
   }
+  // Einsätze der Person aus der Saison (#1931): „Aufstellung · 5 von 7 Spielen“, ohne Aufstellung als eigene Zeile.
   if (details.lineup.length) {
     blocks.push(
       <div key="lineup" className="flex flex-col gap-2">
-        <span className="text-xs font-bold uppercase tracking-[0.18em] text-zinc-400">Aufstellung</span>
+        <span className="text-xs font-bold uppercase tracking-[0.18em] text-zinc-400" data-testid={`member-reference-lineup-${itemId}`}>
+          Aufstellung{details.played && <span className="text-zinc-300"> · {details.played}</span>}
+        </span>
         <ul className="list-none m-0 p-0 flex flex-wrap gap-1.5" aria-label="Aufstellung">
           {details.lineup.map((person) => <li key={person.key} className="max-w-full"><Person person={person} /></li>)}
         </ul>
       </div>,
+    );
+  } else if (details.played) {
+    blocks.push(
+      <p key="played" className="m-0 text-xs font-bold uppercase tracking-[0.18em] text-zinc-400" data-testid={`member-reference-played-${itemId}`}>
+        Einsätze<span className="text-zinc-300"> · {details.played}</span>
+      </p>,
     );
   }
   // Links: Saison ansehen (nur mit Saison), Details zur Referenz (Bericht, Partner, Ort), Beim Veranstalter.

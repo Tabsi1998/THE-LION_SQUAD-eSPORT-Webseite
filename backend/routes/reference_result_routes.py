@@ -15,6 +15,12 @@ Server nimmt nur strukturierte Zeilen. Kurzfassung des Vertrags: ``docs/entwickl
 ``version`` ist 0, solange es kein Blatt gibt. ``sheet`` enthält ``rows``, ``matches``, ``official_totals``,
 ``official_team_totals``, ``official_table``, ``note``, ``status`` („draft“/„published“), ``version`` und
 ``pending_draft`` (Entwurf neben dem veröffentlichten Blatt oder ``null``). ``target`` sagt, wohin Übernehmen schreibt.
+``series.own_team_list`` nennt die eigenen Teams samt Schreibweisen (#1931) - damit erkennt die Oberfläche beim Einfügen
+der Begegnungsliste das eigene Spiel; ``series.map_names`` die Map-Namen, die in der Saison schon stehen (Vorschläge,
+häufigste zuerst). Team-Liga (#1931): ``matches`` hält das eigene Spiel und die übrigen Spiele des Spieltags; Maps in
+der Reihenfolge des Vetos mit Rolle (``banned``, ``picked``, ``decider``, ``played``), wer (``own``/``opponent``),
+optional ``map_id`` (Map-Bibliothek, #1616) und Aufstellung je Map, dazu Termin des Spiels (``day``, ``time``) - siehe
+``services/team_league_sheet.py``.
 Captains bekommen keine ``*_by``-Kennungen.
 
 **Captains** sehen nur, wer bekannt ist und wer neu - keine Zuordnung, keinen Alias, keine Vereinsmitgliedschaft
@@ -26,8 +32,9 @@ Captains bekommen keine ``*_by``-Kennungen.
              "manual", marks: ["dnf"|"dns"|"dsq"|"fastest_lap"|"pole"], penalty_points: 0, official_total?, note?,
              grid?, time?, gap?, dnf?, penalty_seconds?}],
      fastest_lap?: {participant_id? | name?, start_number?, time?}, driver_of_the_day?: "Name" | {participant_id? | name?},
-     matches: [{home, away, home_score, away_score, maps: [{name, home_score, away_score}],
-                lineup: [{participant_id? | name?, start_number?}]}],
+     matches: [{home, away, home_score, away_score, maps: [{name, map_id?, role?, by?, home_score?, away_score?,
+                                                            lineup?}],
+                lineup: [{participant_id? | name?, start_number?}], day?, time?}],
      official_team_totals: {"<Team>": Zahl}, official_table: [{team, rank?, played?, won?, drawn?, lost?,
                                                                 score_for?, score_against?, score_diff?, points?}],
      note?}
@@ -45,7 +52,8 @@ Antwort::
                                                           is_club_member*]}} | null,
      final: {top_n, participant_ids, entered, left} | null, latest: {round_id, round_seq, scopes} | null}
 
-``Problem`` ist ``{code, message, rows: [Index der Zeile], match?, places?, scope?}``. ``match`` sagt, wie eine Zeile
+``Problem`` ist ``{code, message, rows: [Index der Zeile], match?, places?, scope?, map?, map_field?}`` (``map``:
+Index der Map im Spiel ``match``, ``map_field``: das Feld, Prüfung #1931). ``match`` sagt, wie eine Zeile
 gefunden wurde: ``id``, ``name``, ``name_untagged``, ``start_number`` oder ``new``. Neue Namen haben in der Vorschau
 die Kennung ``neu:<Schlüssel>``. ``standings`` ist der Zwischenstand nach diesem Termin, als wäre das Blatt
 veröffentlicht; ``rank_change`` vergleicht mit dem Termin davor. ``latest`` kommt nur, wenn danach schon Termine
@@ -91,7 +99,8 @@ ist). Ohne etwas freizugeben oder zu verwerfen: 409.
 from __future__ import annotations
 
 import math
-from typing import Dict, List, Optional
+from datetime import date
+from typing import Dict, List, Literal, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field, field_validator
@@ -100,7 +109,7 @@ from pymongo.errors import DuplicateKeyError
 
 from database import get_db
 from match_rules import RESULT_MAX_SCORE
-from models import ReferencePointsSource, ReferenceResultMark, ReferenceResultStatus, new_id, now_utc
+from models import ReferencePointsSource, ReferenceResultMark, ReferenceResultStatus, _clock, new_id, now_utc
 from services import race_weekend, reference_running_cache, reference_series, series_identity, series_results
 from services.dolibarr_policy import club_today
 from services.own_teams import own_team_names, own_teams
@@ -123,7 +132,7 @@ STALE = "Das Ergebnis wurde inzwischen geändert – bitte neu laden."
 BROKEN_RULES = "Die Regeln der Serie lassen sich nicht anwenden – bitte in der Saison prüfen."
 BROKEN_SHEETS = "Die Ergebnisse der Serie lassen sich so nicht werten – bitte die veröffentlichten Blätter prüfen."
 ROUND_FIELDS = ("id", "order", "code", "title", "venue", "club_day", "starts_at", "status", "kind", "counts",
-                "opponent", "country_code", "session")
+                "opponent", "country_code", "session", "at_home", "club_day_end")
 PARTICIPANT_FIELDS = ("id", "name", "start_number", "default_team", "kind", "is_club_member", "link_status")
 # Captains: nur, wer in der Saison steht - Zuordnung, Alias und Vereinsmitgliedschaft liest nur die Verwaltung (#1743).
 CAPTAIN_PARTICIPANT_FIELDS = ("id", "name", "start_number", "default_team", "kind")
@@ -166,19 +175,47 @@ class ResultFastestLap(ResultParticipantRef):
 
 
 class ResultMapEntry(BaseModel):
+    """Eine Map im Veto (#1931): Name, später die Kennung aus der Map-Bibliothek (``map_id``, #1616), die Rolle
+    (``banned``, ``picked``, ``decider``, ``played`` - ohne Rolle gespielt), bei Bann und Wahl wer
+    (``own``/``opponent``), das Ergebnis (nicht bei Bann) und optional die Aufstellung dieser Map. Eine gespielte Map
+    (``played``/ohne Rolle) braucht beide Stände, Wahl und Decider beide oder keinen - sonst 422 mit ``map`` und
+    ``map_field`` im Problem (Prüfung #1931)."""
     name: str = Field(min_length=1, max_length=80)
-    home_score: float = Field(ge=0, le=RESULT_MAX_SCORE, allow_inf_nan=False)
-    away_score: float = Field(ge=0, le=RESULT_MAX_SCORE, allow_inf_nan=False)
+    map_id: Optional[str] = Field(default=None, max_length=80)
+    role: Optional[Literal["banned", "picked", "decider", "played"]] = None
+    by: Optional[Literal["own", "opponent"]] = None
+    home_score: Optional[float] = Field(default=None, ge=0, le=RESULT_MAX_SCORE, allow_inf_nan=False)
+    away_score: Optional[float] = Field(default=None, ge=0, le=RESULT_MAX_SCORE, allow_inf_nan=False)
+    lineup: List[ResultParticipantRef] = Field(default_factory=list, max_length=MAX_LINEUP)
 
 
 class ResultMatchEntry(BaseModel):
-    """Team-Liga: das eigene Spiel mit Ergebnis, Maps und Aufstellung (wer gespielt hat)."""
+    """Team-Liga: ein Spiel des Spieltags mit Ergebnis, Maps und Aufstellung (wer gespielt hat) - das eigene und, wenn
+    gewünscht, die übrigen (#1931). ``day``/``time``: Wiener Tag und Uhrzeit des Spiels."""
     home: str = Field(min_length=1, max_length=120)
     away: str = Field(min_length=1, max_length=120)
     home_score: float = Field(ge=0, le=RESULT_MAX_SCORE, allow_inf_nan=False)
     away_score: float = Field(ge=0, le=RESULT_MAX_SCORE, allow_inf_nan=False)
     maps: List[ResultMapEntry] = Field(default_factory=list, max_length=MAX_MAPS)
     lineup: List[ResultParticipantRef] = Field(default_factory=list, max_length=MAX_LINEUP)
+    day: Optional[str] = Field(default=None, max_length=10)
+    time: Optional[str] = Field(default=None, max_length=5)
+
+    @field_validator("day")
+    @classmethod
+    def _day(cls, value):
+        text = (value or "").strip()
+        if not text:
+            return None
+        try:
+            return date.fromisoformat(text).isoformat()
+        except ValueError:
+            raise ValueError("Tag des Spiels als JJJJ-MM-TT.") from None
+
+    @field_validator("time")
+    @classmethod
+    def _time(cls, value):
+        return _clock(value)
 
 
 class ResultTableEntry(BaseModel):
@@ -499,6 +536,26 @@ async def preview_results(series_id: str, round_id: str, body: ResultSheetInput,
 
 
 # ---------------------------------------------------------------- Lesen
+MAX_MAP_NAMES = 60
+
+
+async def _map_names(db, series_id: str) -> list[str]:
+    """Map-Namen, die in den Blättern der Saison schon stehen (auch im Entwurf daneben) - als Vorschläge, häufigste
+    zuerst (#1931). Gleich ist, was ohne Groß/klein gleich ist; gezeigt wird die erste Schreibweise."""
+    seen: dict[str, list] = {}
+    async for sheet in db.reference_round_results.find(
+            {"series_id": series_id}, {"_id": 0, "matches.maps.name": 1, "pending_draft.matches.maps.name": 1}):
+        for content in (sheet, sheet.get("pending_draft") or {}):
+            for match in content.get("matches") or []:
+                for item in match.get("maps") or []:
+                    name = series_results.clean(item.get("name"))
+                    if name:
+                        entry = seen.setdefault(name.casefold(), [name, 0])
+                        entry[1] += 1
+    ordered = sorted(seen.values(), key=lambda entry: (-entry[1], entry[0].casefold()))
+    return [name for name, _ in ordered[:MAX_MAP_NAMES]]
+
+
 @router.get(BASE)
 async def get_results(series_id: str, round_id: str, access: SeriesAccess = Depends(require_series_editor)):
     """Termin, Blatt (mit Entwurf daneben), Stand der Version und die Teilnehmer zur Auswahl."""
@@ -513,6 +570,8 @@ async def get_results(series_id: str, round_id: str, access: SeriesAccess = Depe
                    "team_name": access.series.get("team_name"),
                    "own_teams": own_team_names(access.series),
                    "rules": await _round_rules(db, access.series, round_doc),
+                   "own_team_list": own_teams(access.series),
+                   "map_names": await _map_names(db, series_id),
                    "publish_mode": access.series.get("publish_mode")},
         "access": access.summary(), "version": _version(existing), "sheet": _sheet_view(existing, access),
         "target": access.edit_target(existing),

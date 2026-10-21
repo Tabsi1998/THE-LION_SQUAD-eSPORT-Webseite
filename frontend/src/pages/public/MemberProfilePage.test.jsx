@@ -186,6 +186,19 @@ test("Details klappen auf: Format, Aufstellung mit der Person hervorgehoben, Bei
   expect(screen.queryByTestId("member-reference-details-r1")).toBeNull();
 });
 
+test("Einsätze aus der Saison (#1931): „Aufstellung · 5 von 7 Spielen“, im Einzel als eigene Zeile", async () => {
+  profileData = {
+    ...PODIUM_PROFILE,
+    references: [withOwn({ ...TEAM_CUP, appearances: { played: 5, of: 7, unit: "matches", team: "LION B" } }),
+      withOwn({ ...SOLO_CUP, appearances: { played: 3, of: 5, unit: "races", team: null } })],
+  };
+  renderProfile();
+  fireEvent.click(await screen.findByTestId("member-reference-row-r1"));
+  expect(screen.getByTestId("member-reference-lineup-r1")).toHaveTextContent("Aufstellung · 5 von 7 Spielen");
+  fireEvent.click(screen.getByTestId("member-reference-row-r2"));
+  expect(screen.getByTestId("member-reference-played-r2")).toHaveTextContent("Einsätze · 3 von 5 Rennen");
+});
+
 test("auch ohne weitere Angaben klappt jede Zeile auf - mindestens mit „Details“ zur Referenz", async () => {
   const bare = { ...SOLO_CUP, id: "r9", result_url: null, start_date: "2026-03-01" };
   profileData = { ...PODIUM_PROFILE, references: [withOwn(bare), ...PODIUM_PROFILE.references] };

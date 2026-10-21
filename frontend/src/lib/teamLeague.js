@@ -67,6 +67,79 @@ export function rankTrend(history) {
   });
 }
 
+// ---------------------------------------------------------------- #1931: Bilanz, Maps, Kader
+
+/** Differenz mit Vorzeichen: „+9“, „−4“ (echtes Minus), „±0“. */
+function signed(value) {
+  const number = Number(value) || 0;
+  if (number > 0) return `+${formatNumber(number)}`;
+  if (number < 0) return `−${formatNumber(-number)}`;
+  return "±0";
+}
+
+/**
+ * Bilanz eines eigenen Teams für die Anzeige: S/U/N, Maps (Ergebnis der Spiele) und Runden (Summe der Map-Ergebnisse) mit
+ * Differenz. Runden gibt es nur aus Spielen mit Maps - `roundsPartial`, wenn nicht alle Spiele Maps haben.
+ */
+export function recordSummary(item) {
+  const rounds = Number(item?.rounds_matches) > 0;
+  return {
+    team: item?.team, played: item?.played || 0, won: item?.won || 0, drawn: item?.drawn || 0, lost: item?.lost || 0,
+    points: item?.points ?? 0,
+    maps: `${formatNumber(item?.maps_for || 0)}:${formatNumber(item?.maps_against || 0)}`,
+    mapsDiff: signed((item?.maps_for || 0) - (item?.maps_against || 0)),
+    rounds: rounds ? `${formatNumber(item.rounds_for || 0)}:${formatNumber(item.rounds_against || 0)}` : "",
+    roundsDiff: rounds ? signed((item.rounds_for || 0) - (item.rounds_against || 0)) : "",
+    roundsPartial: rounds && Number(item.rounds_matches) < Number(item.played || 0),
+  };
+}
+
+/** Wer eine Map gewählt hat, aus eigener Sicht. */
+export const PICK_LABELS = { own: "Unsere Wahl", opponent: "Wahl Gegner", decider: "Decider" };
+const BAN_SIDES = { own: "wir", opponent: "Gegner" };
+
+/** Banns in einer Zeile: „Karte Ost (wir) · Karte Hafen (Gegner)“. */
+export function banText(bans) {
+  return (bans || []).map((ban) => (BAN_SIDES[ban.by] ? `${ban.name} (${BAN_SIDES[ban.by]})` : ban.name)).join(" · ");
+}
+
+/** Ein Spieler an einem Spieltag: gespielt, Ersatz (im Kader, nicht aufgestellt) oder nichts. */
+export function cellState(player, roundId) {
+  if ((player?.round_ids || []).includes(roundId)) return "played";
+  if ((player?.bench_round_ids || []).includes(roundId)) return "bench";
+  return "";
+}
+
+/** Einsätze kurz: „5 von 7“ - ohne Zahl der Spiele nur die Einsätze. */
+export function appearanceText(player) {
+  const played = Number(player?.appearances) || 0;
+  return Number(player?.of) > 0 ? `${played} von ${player.of}` : String(played);
+}
+
+/**
+ * Der Kader in Gruppen: bei mehreren eigenen Teams je Team (in der Reihenfolge der Saison), sonst eine Gruppe ohne
+ * Überschrift; Gäste immer zuletzt - sie zählen nicht in die Vereinsstatistik.
+ */
+export function squadGroups(lineup, ownTeams = []) {
+  const players = lineup?.players || [];
+  const members = players.filter((player) => !player.guest);
+  const guests = players.filter((player) => player.guest);
+  const groups = [];
+  if ((ownTeams || []).length > 1) {
+    const teams = [...ownTeams, ...new Set(members.map((player) => player.team).filter((team) => team && !ownTeams.includes(team)))];
+    for (const team of teams) {
+      const list = members.filter((player) => player.team === team);
+      if (list.length) groups.push({ key: `team-${team}`, label: team, players: list });
+    }
+    const rest = members.filter((player) => !teams.includes(player.team));
+    if (rest.length) groups.push({ key: "members", label: "Ohne Team", players: rest });
+  } else if (members.length) {
+    groups.push({ key: "members", label: null, players: members });
+  }
+  if (guests.length) groups.push({ key: "guests", label: "Gäste", players: guests });
+  return groups;
+}
+
 /** „Platz 2 von 8“ für den Liga-Weg. */
 export function pathRankLabel(season) {
   if (!season?.rank) return "Noch keine Tabelle";

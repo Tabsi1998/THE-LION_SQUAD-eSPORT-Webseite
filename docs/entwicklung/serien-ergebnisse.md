@@ -58,6 +58,37 @@ Runden, Fahrer des Tages, Ausfälle, Ø Start, Ø Ziel und gutgemachte Plätze (
 `POST …/team-colors/suggestions` (Vorstand und Captains; der Vorschlag aus dem Ergebnis-Bild,
 `team_color_suggestions`).
 
+**Team-Liga (#1931)** – alles optional, gespeichert nur, was angegeben ist:
+- `matches` hält das eigene Spiel und die übrigen Spiele des Spieltags; welches das eigene ist, sagen die eigenen Teams.
+  Die Warnung `own_team_missing` kommt nur, wenn in keinem Spiel ein eigenes Team spielt; die Tabelle rechnet aus allen
+  Spielen.
+- Je Spiel `day`/`time` (Wiener Tag und Uhrzeit, gespeichert als `club_day`, `time`, `starts_at`; Fehler `match_time`,
+  wenn es die Uhrzeit nicht gibt).
+- `maps` in der Reihenfolge des Vetos: `name`, optional `map_id` (spätere Map-Bibliothek, #1616), `role` (`banned`,
+  `picked`, `decider`, `played` – ohne Rolle gespielt), `by` (`own`/`opponent`, nur bei Bann und Wahl), bei gespielten
+  Maps `home_score`/`away_score` und optional `lineup`. Gespielt ist eine Map mit Ergebnis: `played` (oder ohne Rolle)
+  braucht beide Stände, Wahl und Decider beide oder keinen (ein Decider bei 2:0 bleibt leer), eine Aufstellung je Map
+  nur mit Ergebnis – sonst Fehler `map_score_missing` bzw. `map_lineup_unplayed` mit `match`, `map` (Index) und
+  `map_field`. Nichts wird still 0:0. Die Aufstellung des Spiels ist die Vereinigung mit denen der Maps (das Formular
+  nimmt eine im Spiel abgewählte Person auch aus allen Maps); `maps_differ` zählt nur Maps mit Ergebnis.
+- Mehrere eigene Teams am selben Spieltag: jedes Spiel eines eigenen Teams zählt (Karte, Bilanz, Form, Einsätze);
+  `matchdays[].matches` listet sie, `match` bleibt das erste.
+- Mit `official_table` gilt sie für Teams und Plätze: Teams aus den Spielen in anderer Schreibweise zählen für ihre
+  Zeile (wörtlich, gleiche Normalform oder – eindeutig – dieselben ganzen Wörter plus Zusätze wie „e.V.“, „eSports“,
+  „Gaming“ oder ein Kürzel in Klammern, in beide Richtungen; „Team A“ ist nicht „Team Alpha“, `services/team_names.py`),
+  ohne passende Zeile bekommen sie keine eigene (Warnung `table_team_unknown`); offizielle Plätze werden nie neu
+  gerechnet, Teams ohne Platz stehen dahinter nach Punkten.
+- GET liefert dazu `series.own_team_list` (eigene Teams samt Schreibweisen) und `series.map_names` (schon verwendete
+  Map-Namen der Saison, häufigste zuerst). Der Kader eines eigenen Teams sind die Teilnehmer mit diesem `default_team`
+  (`participants/batch` mit `team`).
+- Die Serienseite liefert `team_league.record` (Bilanz je eigenem Team), je Spieltag `others` und in `lineup.players`
+  `of`, `bench_round_ids`, `in_roster` und `team`; das Mitgliederprofil je verknüpfter Referenz `appearances`
+  (`{played, of, unit, team}`, `services/series_appearances.py`).
+- Je eigenem Spiel `veto`: das ganze Veto in seiner Reihenfolge (`name`, `role`, `played`, `by?`, `map_id?`, `picked?`,
+  bei gespielten Maps dazu `score_for`, `score_against`, `outcome`). Eine Wahl bzw. ein Decider ohne Ergebnis steht dort
+  mit `played: false` – die Web-Karte zeigt sie abgeschwächt mit „nicht gespielt“. `maps` bleibt bei den gespielten
+  Maps (so liest es die App), `bans` bei den gesperrten.
+
 **Eigene Teams (#1926):** Die Serie hat `own_teams` (`[{name, aliases}]`, `team_name` = das erste). Ein Team aus der
 Liste, aus `matches` oder der Tabelle zählt als eigenes, wenn Name oder Alias ohne Groß/klein, Leer- und Satzzeichen
 passt; die Stände führen es unter seinem Namen.

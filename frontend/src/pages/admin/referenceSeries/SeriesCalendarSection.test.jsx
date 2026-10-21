@@ -184,6 +184,32 @@ test("Bearbeiten, Archivieren und Wiederansetzen senden den Stand; 409 beim Vers
   expect(screen.getByTestId("postpone-sheet")).toBeInTheDocument();
 });
 
+test("Team-Liga (#1931): Gegner mit Seite und Zeitraum in Liste und Vorschau, Heim/Auswärts und Ende im Termin", async () => {
+  const league = { ...SERIES, lineage: { id: "spur-2", title: "Probe Liga", kind: "team_league" } };
+  const rounds = [{ id: "s1", position: 1, code: "ST1", club_day: "2026-05-13", club_day_end: "2026-05-17", time: "20:00", status: "planned", state: "planned", counts: true, kind: "regular", opponent: "Probe Wölfe", at_home: false }];
+  apiMock.get.mockResolvedValue({ data: { ...CALENDAR, rounds, hints: [] } });
+  render(<SeriesCalendarSection series={league} onChanged={() => {}} />);
+  const [item] = await screen.findAllByTestId("calendar-round");
+  expect(item).toHaveTextContent("Mi., 13.05. – So., 17.05.2026 · @ Probe Wölfe");
+
+  fireEvent.click(within(item).getByTestId("round-edit"));
+  expect(screen.getByTestId("round-side")).toHaveValue("away");
+  expect(screen.getByTestId("round-day-end")).toHaveValue("2026-05-17");
+  fireEvent.change(screen.getByTestId("round-side"), { target: { value: "home" } });
+  fireEvent.click(screen.getByTestId("round-save"));
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/reference-series/admin/series/serie-1/rounds/s1",
+    expect.objectContaining({ opponent: "Probe Wölfe", at_home: true, day_end: "2026-05-17" })));
+
+  apiMock.post.mockResolvedValueOnce({ data: { errors: [], rows: [
+    { line: 1, code: "ST2", day: "2026-05-20", day_end: "2026-05-24", time: "20:00", venue: null, opponent: "Probe Falken", at_home: true },
+  ] } });
+  fireEvent.click(screen.getByTestId("calendar-paste"));
+  fireEvent.change(screen.getByTestId("paste-text"), { target: { value: "ST2 · 20.05.–24.05. · vs Probe Falken" } });
+  fireEvent.click(screen.getByTestId("paste-submit"));
+  expect(await screen.findByTestId("paste-opponent")).toHaveTextContent("vs Probe Falken");
+  expect(screen.getByTestId("paste-day-end")).toHaveTextContent("bis So., 24.05.2026");
+});
+
 test("ein Captain sieht den Kalender seiner Saison nur zum Lesen", async () => {
   apiMock.get.mockResolvedValue({ data: CALENDAR });
   render(<SeriesCalendarSection series={{ ...SERIES, access: { role: "captain", can_publish: false } }} onChanged={() => {}} />);

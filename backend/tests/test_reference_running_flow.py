@@ -193,6 +193,33 @@ async def test_running_loads_details_for_at_most_twelve_series(flow, monkeypatch
 
 
 @pytest.mark.asyncio
+async def test_a_running_matchday_window_counts_before_the_cut_to_twelve(flow):
+    """Prüfung #1931, Punkt 5: ein Spieltag-Zeitraum, der vor heute begann und noch läuft, zählt beim Vorsortieren als
+    heute - die Saison fällt nicht aus den zwölf, nur weil ihr Spieltag gestern anfing."""
+    await _setup(flow)
+    lineages, series_docs = [], []
+    for number in range(14):
+        lineages.append({"id": f"l{number}", "slug": f"l{number}", "title": f"Probe Spur {number:02d}",
+                         "kind": "series", "visibility": "public", "is_archived": False})
+        series_docs.append({"id": f"s{number}", "lineage_id": f"l{number}", "season": "2026", "season_slug": "2026",
+                            "status": "active", "visibility": "public", "order_index": 5})
+    await flow.db.reference_lineages.insert_many(lineages)
+    await flow.db.reference_series.insert_many(series_docs)
+    # 13 Saisons mit einem Termin in drei Wochen; die letzte nur mit einem Spieltag vom 07. bis 11.11. (heute 09.11.).
+    await flow.db.reference_rounds.insert_many(
+        [{"id": f"r{number}", "series_id": f"s{number}", "order": 1, "club_day": "2026-12-01", "status": "planned"}
+         for number in range(13)]
+        + [{"id": "r-fenster", "series_id": "s13", "order": 1, "club_day": "2026-11-07",
+            "club_day_end": "2026-11-11", "status": "planned"}])
+    flow.act_as(None)
+    items = (await flow.get(RUNNING)).json()["items"]
+    window = next((item for item in items if item["lineage"]["slug"] == "l13"), None)
+    assert window is not None, [item["lineage"]["slug"] for item in items]
+    assert window["today"] is True
+    assert (window["next"]["club_day"], window["next"]["club_day_end"]) == ("2026-11-07", "2026-11-11")
+
+
+@pytest.mark.asyncio
 async def test_running_counts_the_club_members_of_a_season_without_names(flow):
     """Heute im Einsatz auf der Startseite (#1753): je Saison, wie viele Vereinsmitglieder gemeldet sind - nur die Zahl,
     gezählt wie beim Platz (sichtbar, verknüpft, aktives Profil)."""

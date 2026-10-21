@@ -157,6 +157,9 @@ def content_participant_ids(content: dict) -> set[str]:
     """Wen ein Inhalt nennt - das Blatt selbst oder der Entwurf daneben: Zeilen, Aufstellungen und offizielle Werte."""
     found = {row.get("participant_id") for row in content.get("rows") or []}
     found |= {pid for match in content.get("matches") or [] for pid in match.get("lineup") or []}
+    # Aufstellung je Map (#1931) - steht auch in der des Spiels, hier nur zur Sicherheit.
+    found |= {pid for match in content.get("matches") or [] for item in match.get("maps") or []
+              for pid in item.get("lineup") or []}
     found |= set(content.get("official_totals") or {})
     found.discard(None)
     return found
@@ -178,7 +181,9 @@ def swap_participant(content: dict, old: str, new: str) -> dict:
     if content.get("rows"):
         out["rows"] = [{**row, "participant_id": swap(row.get("participant_id"))} for row in content["rows"]]
     if content.get("matches"):
-        out["matches"] = [{**match, "lineup": [swap(pid) for pid in match.get("lineup") or []]}
+        out["matches"] = [{**match, "lineup": [swap(pid) for pid in match.get("lineup") or []],
+                           "maps": [{**item, "lineup": [swap(pid) for pid in item["lineup"]]} if item.get("lineup")
+                                    else item for item in match.get("maps") or []]}
                           for match in content["matches"]]
     if content.get("official_totals"):
         out["official_totals"] = {swap(pid): value for pid, value in content["official_totals"].items()}

@@ -6,21 +6,23 @@ import { roundWhen } from "@/lib/referenceCalendar";
 import { qualifyingMode, roundKind, sessionLabel } from "@/lib/raceWeekend";
 import { parseResultPaste, parseTablePaste } from "@/lib/resultPaste";
 import {
-  MARK_OPTIONS, autoPlaces, countFieldErrors, fieldErrors, hintToPoints, emptyMap, emptyMatch, emptyRow, formStamp, formToPayload, formatPoints, matchParticipant,
+  MARK_OPTIONS, autoPlaces, countFieldErrors, fieldErrors, hintToPoints, emptyRow, formStamp, formToPayload, formatPoints, matchParticipant,
   pastedToRows, problemsByRow, scoredText, sheetToForm,
 } from "@/lib/referenceResults";
 import { ResultPreview } from "./ResultPreview";
+import { TeamLeagueEntry } from "./TeamLeagueEntry";
 import { VenueWithFlag } from "@/components/tls/CountryFlag";
 import { ResultImageButton, ResultImageRowNote, ResultImageSummary, ocrMark, useResultImage } from "./ResultImageImport";
 import { RACE_FIELD_GROUPS, afterEdit, confirmRow, imageFormFields, imageToRows, isUncertain, openImageItems, replaceRaceMarks } from "@/lib/resultImage";
 import { toast } from "sonner";
-import { ClipboardList, Plus, RefreshCw, SlidersHorizontal, Trash2, X } from "lucide-react";
+import { ClipboardList, Plus, RefreshCw, SlidersHorizontal, X } from "lucide-react";
 
 // Ergebnis eintragen (#1744): ein Termin, eine dynamische Liste. Zeilen hinzufügen und entfernen, Platz aus der
 // Reihenfolge (überschreibbar), Name mit Vorschlag aus den Teilnehmern, Team je Rennen, Punkte leer = nach Schlüssel,
-// Marken und Strafpunkte unter „Mehr“. Team-Liga: Spiel mit Ergebnis, Maps und Aufstellung, dazu die Tabelle laut
-// Veranstalter zum Einfügen. Erst prüft der Server (Vorschau), dann wird übernommen – als Entwurf, veröffentlicht oder,
-// wenn das Blatt schon veröffentlicht ist und die Person nicht veröffentlichen darf, als Entwurf daneben.
+// Marken und Strafpunkte unter „Mehr“. Team-Liga: Spieltag einfügen, eigenes Spiel mit Maps im Veto und Aufstellung aus
+// dem Kader, die übrigen Spiele (#1931, `TeamLeagueEntry`), dazu die Tabelle laut Veranstalter zum Einfügen. Erst prüft
+// der Server (Vorschau), dann wird übernommen – als Entwurf, veröffentlicht oder, wenn das Blatt schon veröffentlicht
+// ist und die Person nicht veröffentlichen darf, als Entwurf daneben.
 // Rennliga (#1927): je Zeile unter „Mehr“ auch Startplatz, Zeit und Abstand, je Rennen schnellste Runde mit Zeit und
 // Fahrer des Tages – das Einfügen füllt sie aus Tabellen mit diesen Spalten. Qualifying (#1930): statt der Punkte die
 // Zeit in der Zeile, keine schnellste Runde und kein Fahrer des Tages; die Pole setzt der Server (Platz 1).
@@ -227,79 +229,6 @@ function RaceExtras({ form, onChange, invalid, problems = {} }) {
   );
 }
 
-function MatchEditor({ match, index, participants, errors, onChange, onRemove }) {
-  const invalid = errors?.[match.key];
-  const [person, setPerson] = useState("");
-  const setMap = (key, values) => onChange({ maps: match.maps.map((item) => (item.key === key ? { ...item, ...values } : item)) });
-  const addPerson = () => {
-    const name = person.trim();
-    if (!name) return;
-    const known = matchParticipant(name, participants);
-    const entry = known ? { participant_id: known.id, name: known.name } : { participant_id: "", name };
-    if (!match.lineup.some((item) => (entry.participant_id ? item.participant_id === entry.participant_id : item.name === name))) {
-      onChange({ lineup: [...match.lineup, entry] });
-    }
-    setPerson("");
-  };
-  return (
-    <div className="border border-white/10 rounded-sm bg-[#0A0A0A] p-3 space-y-3" data-testid="result-match">
-      <div className="flex items-center justify-between">
-        <span className={LABEL}>Spiel {index + 1}</span>
-        <button type="button" className={ICON_BUTTON} onClick={onRemove} aria-label={`Spiel ${index + 1} entfernen`} data-testid="result-match-remove"><Trash2 className="w-4 h-4" /></button>
-      </div>
-      <div className="grid grid-cols-[1fr_auto_1fr] gap-2 items-end">
-        <label className="block min-w-0"><span className={LABEL}>Heim</span>
-          <input value={match.home} maxLength={120} onChange={(event) => onChange({ home: event.target.value })} data-testid="result-match-home" className={SMALL_INPUT} /></label>
-        <div className="flex items-center gap-1 pb-0.5">
-          <input aria-label="Ergebnis Heim" inputMode="numeric" value={match.home_score} onChange={(event) => onChange({ home_score: event.target.value })} data-testid="result-match-home-score" {...invalidProps(invalid, "home_score")} className={`${SMALL_INPUT} !w-12 text-center tabular-nums ${invalid?.home_score ? INVALID : ""}`} />
-          <span className="text-white/40">:</span>
-          <input aria-label="Ergebnis Gast" inputMode="numeric" value={match.away_score} onChange={(event) => onChange({ away_score: event.target.value })} data-testid="result-match-away-score" {...invalidProps(invalid, "away_score")} className={`${SMALL_INPUT} !w-12 text-center tabular-nums ${invalid?.away_score ? INVALID : ""}`} />
-        </div>
-        <label className="block min-w-0"><span className={LABEL}>Gegner</span>
-          <input value={match.away} maxLength={120} onChange={(event) => onChange({ away: event.target.value })} data-testid="result-match-away" className={SMALL_INPUT} /></label>
-      </div>
-      <FieldErrors fields={invalid} testId="result-match-invalid" />
-      <div className="space-y-1.5">
-        <span className={LABEL}>Maps</span>
-        {match.maps.map((item, mapIndex) => (
-          <div key={item.key} className="flex items-center gap-2" data-testid="result-map">
-            <input aria-label={`Map ${mapIndex + 1}`} value={item.name} maxLength={80} placeholder="Map" onChange={(event) => setMap(item.key, { name: event.target.value })} {...invalidProps(errors?.[item.key], "name")} className={`${SMALL_INPUT} !w-auto flex-1 min-w-0 ${errors?.[item.key]?.name ? INVALID : ""}`} data-testid="result-map-name" />
-            <input aria-label={`Map ${mapIndex + 1} Heim`} inputMode="numeric" value={item.home_score} onChange={(event) => setMap(item.key, { home_score: event.target.value })} {...invalidProps(errors?.[item.key], "home_score")} className={`${SMALL_INPUT} !w-12 text-center tabular-nums ${errors?.[item.key]?.home_score ? INVALID : ""}`} data-testid="result-map-home" />
-            <span className="text-white/40">:</span>
-            <input aria-label={`Map ${mapIndex + 1} Gast`} inputMode="numeric" value={item.away_score} onChange={(event) => setMap(item.key, { away_score: event.target.value })} {...invalidProps(errors?.[item.key], "away_score")} className={`${SMALL_INPUT} !w-12 text-center tabular-nums ${errors?.[item.key]?.away_score ? INVALID : ""}`} data-testid="result-map-away" />
-            <button type="button" className={ICON_BUTTON} onClick={() => onChange({ maps: match.maps.filter((entry) => entry.key !== item.key) })} aria-label={`Map ${mapIndex + 1} entfernen`}><X className="w-4 h-4" /></button>
-          </div>
-        ))}
-        <button type="button" onClick={() => onChange({ maps: [...match.maps, emptyMap()] })} data-testid="result-map-add" className="tls-btn tls-btn--quiet px-2.5 py-1.5 rounded-sm text-[10px] font-bold uppercase tracking-wider inline-flex items-center gap-1.5">
-          <Plus className="w-3.5 h-3.5" /> Map
-        </button>
-      </div>
-      <FieldErrors fields={Object.assign({}, ...match.maps.map((item) => errors?.[item.key] || {}))} testId="result-map-invalid" />
-      <div className="space-y-1.5">
-        <span className={LABEL}>Aufstellung</span>
-        {match.lineup.length > 0 && (
-          <ul className="flex flex-wrap gap-1.5" data-testid="result-lineup">
-            {match.lineup.map((item, personIndex) => (
-              <li key={item.participant_id || item.name} className="inline-flex items-center gap-1 pl-2 pr-1 py-0.5 border border-white/10 rounded-sm text-xs text-white/80">
-                {item.name || "Teilnehmer"}
-                <button type="button" onClick={() => onChange({ lineup: match.lineup.filter((_, position) => position !== personIndex) })} aria-label={`${item.name} aus der Aufstellung nehmen`} className="p-0.5 text-white/40 hover:text-white"><X className="w-3 h-3" /></button>
-              </li>
-            ))}
-          </ul>
-        )}
-        <div className="flex items-center gap-2">
-          <input aria-label="Spieler zur Aufstellung" value={person} list="result-participants" maxLength={120} placeholder="Name"
-            onChange={(event) => setPerson(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); addPerson(); } }}
-            data-testid="result-lineup-input" className={`${SMALL_INPUT} !w-auto flex-1 min-w-0`} />
-          <button type="button" onClick={addPerson} disabled={!person.trim()} data-testid="result-lineup-add" className="tls-btn tls-btn--quiet px-2.5 py-1.5 rounded-sm text-[10px] font-bold uppercase tracking-wider inline-flex items-center gap-1.5 disabled:opacity-50">
-            <Plus className="w-3.5 h-3.5" /> Hinzufügen
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 function OfficialTable({ rows, onPaste, onClear }) {
   return (
     <section className="space-y-2" data-testid="result-table">
@@ -431,6 +360,13 @@ export function ResultEntrySheet({ series, round, onClose, onSaved }) {
       }
     },
   });
+  // Eigene Teams samt Schreibweisen (#1931) - daran erkennt „Spieltag einfügen“ das eigene Spiel.
+  const ownTeams = useMemo(() => {
+    const series = data?.series || {};
+    if (series.own_team_list?.length) return series.own_team_list;
+    const names = series.own_teams?.length ? series.own_teams : [series.team_name].filter(Boolean);
+    return names.map((name) => ({ name, aliases: [] }));
+  }, [data]);
 
   const built = useMemo(() => (form ? formToPayload(form) : null), [form]);
   const stamp = built ? formStamp(built.payload) : "";
@@ -470,7 +406,6 @@ export function ResultEntrySheet({ series, round, onClose, onSaved }) {
   }));
   const removeRow = (key) => setForm((current) => ({ ...current, rows: current.rows.filter((row) => row.key !== key) }));
   const addRow = () => setForm((current) => ({ ...current, rows: [...current.rows, emptyRow()] }));
-  const updateMatch = (key, values) => setForm((current) => ({ ...current, matches: current.matches.map((match) => (match.key === key ? { ...match, ...values } : match)) }));
 
   const runPreview = async (payload, currentStamp) => {
     const { data: result } = await api.post(`${base}/preview`, payload);
@@ -674,14 +609,7 @@ export function ResultEntrySheet({ series, round, onClose, onSaved }) {
 
           {teamLeague && (
             <section className="space-y-3" data-testid="result-matches">
-              <h3 className="text-[11px] font-bold uppercase tracking-widest text-[#29B6E8]">Spiel</h3>
-              {form.matches.map((match, index) => (
-                <MatchEditor key={match.key} match={match} index={index} participants={participants} errors={invalid}
-                  onChange={(values) => updateMatch(match.key, values)} onRemove={() => update({ matches: form.matches.filter((item) => item.key !== match.key) })} />
-              ))}
-              <button type="button" onClick={() => update({ matches: [...form.matches, emptyMatch({ home: data.series?.team_name || "" })] })} data-testid="result-match-add" className="tls-btn tls-btn--quiet px-3 py-2 rounded-sm text-xs font-bold uppercase tracking-wider inline-flex items-center gap-2">
-                <Plus className="w-3.5 h-3.5" /> Spiel
-              </button>
+              <TeamLeagueEntry form={form} setForm={setForm} ownTeams={ownTeams} round={data.round} participants={participants} invalid={invalid} mapNames={data.series?.map_names || []} />
               <OfficialTable rows={form.table} onPaste={pasteTable} onClear={() => update({ table: [] })} />
             </section>
           )}

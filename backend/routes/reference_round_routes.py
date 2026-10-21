@@ -17,6 +17,11 @@ Zeile ohne Lauf legt alle Läufe an, die die Saison für diese Runde vorgibt (�
 Öffentlich: ``/api/reference-series/public/<spur>/<saison>/calendar`` - nur, wenn Spur und Serie sichtbar und nicht
 archiviert sind, ohne Notizen. Die Felder (Titel, Ort, Tag, Zeitpunkt, Status) sind so gewählt, dass der Vereinskalender
 (``calendar_items``, Stufe 2, #1752) sie später übernehmen kann.
+
+Team-Liga (#1931): ein Termin nennt den Gegner (``opponent``), ob das eigene Team daheim spielt (``at_home``: wahr,
+falsch oder offen) und optional das Ende des Spieltags (``club_day_end``, Wiener Tag, nicht vor dem Tag) - die
+eingefügte Liste liest beides aus „vs Team X“, „@ Team X“ und „13.05.–17.05.“. Verschieben nimmt den Zeitraum weg:
+der neue Tag ist ein fester Termin.
 """
 from __future__ import annotations
 
@@ -46,7 +51,7 @@ router = APIRouter(prefix="/api/reference-series", tags=["reference-series"],
 
 PUBLIC_FIELDS = ("id", "position", "code", "title", "venue", "starts_at", "club_day", "time", "state", "status",
                  "original_starts_at", "original_club_day", "kind", "counts", "opponent", "country_code",
-                 "session", "session_kind", "weekend")
+                 "session", "session_kind", "weekend", "at_home", "club_day_end")
 
 
 def _day(value: Optional[str]) -> Optional[str]:
@@ -70,6 +75,11 @@ class _DayTime(BaseModel):
     def _check_time(cls, value):
         return _clock(value)
 
+    @field_validator("day_end", check_fields=False)
+    @classmethod
+    def _check_day_end(cls, value):
+        return _day(value)
+
 
 class _Versioned(BaseModel):
     """``expected_version``: der Stand des Kalenders, den die Seite kennt (``version`` aus dem Kalender). Hat ihn
@@ -82,11 +92,15 @@ class RoundCreateBody(_DayTime, _Versioned, ReferenceRoundCreate):
     ausdrücklich „ohne Uhrzeit“."""
     day: Optional[str] = None
     time: Optional[str] = None
+    at_home: Optional[bool] = None  # Team-Liga (#1931): daheim, auswärts oder offen
+    day_end: Optional[str] = None  # letzter Tag des Spieltags (#1931)
 
 
 class RoundUpdateBody(_DayTime, _Versioned, ReferenceRoundUpdate):
     day: Optional[str] = None
     time: Optional[str] = None
+    at_home: Optional[bool] = None
+    day_end: Optional[str] = None
 
 
 class RoundPostponeBody(_DayTime, _Versioned):
@@ -152,6 +166,18 @@ def _country(auto: bool, code: Optional[str], venue: Optional[str], title: Optio
     return {"country_code": detect_country(venue, title) if auto else code, "country_auto": bool(auto)}
 
 
+WINDOW_BEFORE = "Der Spieltag kann nicht vor seinem ersten Tag enden."
+
+
+def _window(day: Optional[str], end: Optional[str]) -> Optional[str]:
+    """Ende des Spieltags (#1931): nie vor dem Tag; ohne Tag oder gleich dem Tag gibt es keinen Zeitraum."""
+    if not end or not day or end == day:
+        return None
+    if end < day:
+        raise HTTPException(422, WINDOW_BEFORE)
+    return end
+
+
 def _when_from_instant(value) -> dict:
     if value is None:
         return {"club_day": None, "starts_at": None}
@@ -189,7 +215,8 @@ async def _log(db, action: str, me: dict, series_id: str, data: dict) -> None:
 def _brief(doc: dict) -> dict:
     """Knapper Stand eines neuen Termins fürs Protokoll: gesetzte Felder, Art und Wertung nur, wenn abweichend."""
     out = {key: doc.get(key) for key in ("code", "session", "title", "venue", "club_day", "starts_at", "order",
-                                         "opponent", "country_code") if doc.get(key) is not None}
+                                         "opponent", "country_code", "at_home", "club_day_end")
+           if doc.get(key) is not None}
     if doc.get("kind", "regular") != "regular":
         out["kind"] = doc["kind"]
     if doc.get("counts") is False:
@@ -216,7 +243,7 @@ def _new_round(series_id: str, me: dict, **fields) -> dict:
         "counts_manual": False,
         "opponent": None, "note": None, "country_code": None, "country_auto": True, "session": None,
         "source": "manual",
-        "archived_at": None,
+        "archived_at": None, "at_home": None, "club_day_end": None,
         "created_at": now, "created_by": me["id"], **_stamp(me), **fields,
     }
 
@@ -259,6 +286,7 @@ async def create_round(series_id: str, body: RoundCreateBody, me: dict = Depends
         when = _when(body.day, clock)
     else:
         when = _when_from_instant(body.starts_at)
+    window_end = _window(when["club_day"], body.day_end)
     first = await _claim(db, series_id, body.expected_version, orders=1)
     # Ohne ausdrückliche Angabe gilt die Vorgabe des Laufs (#1930): ein Qualifying zählt nicht - außer es hat Punkte.
     manual = "counts" in body.model_fields_set
@@ -271,7 +299,8 @@ async def create_round(series_id: str, body: RoundCreateBody, me: dict = Depends
     doc = _new_round(series_id, me, order=first, code=_text(body.code), session=body.session,
                      title=_text(body.title), venue=_text(body.venue), **when, kind=body.kind, counts=counts,
                      counts_manual=manual,
-                     opponent=_text(body.opponent), note=_text(body.note),
+                     opponent=_text(body.opponent), note=_text(body.note), at_home=body.at_home,
+                     club_day_end=window_end,
                      **_country(body.country_auto, body.country_code, _text(body.venue), _text(body.title)))
     await db.reference_rounds.insert_one(doc)
     await _log(db, "reference_round.create", me, series_id, {"round_id": doc["id"], "after": _brief(doc)})
@@ -306,6 +335,12 @@ async def update_round(series_id: str, round_id: str, body: RoundUpdateBody,
         updates.update(_when(day, clock))
     elif "starts_at" in raw:
         updates.update(_when_from_instant(raw["starts_at"]))
+    if "at_home" in raw:
+        updates["at_home"] = raw["at_home"]
+    if "day_end" in raw or ("club_day" in updates and existing.get("club_day_end")):
+        # Spieltag-Zeitraum (#1931): ein neuer Tag nach dem Ende passt nicht - erst das Ende ändern.
+        day = updates["club_day"] if "club_day" in updates else existing.get("club_day")
+        updates["club_day_end"] = _window(day, raw["day_end"] if "day_end" in raw else existing.get("club_day_end"))
     # Land (#1925): eine Wahl im Termin gilt; ohne Wahl folgt ein automatisches Land einer neuen Strecke bzw. einem neuen
     # Titel - ein von Hand gewähltes bleibt.
     venue = updates["venue"] if "venue" in updates else existing.get("venue")
@@ -349,6 +384,7 @@ async def postpone_round(series_id: str, round_id: str, body: RoundPostponeBody,
         "original_starts_at": existing.get("original_starts_at") if keep else existing.get("starts_at"),
         "original_club_day": existing.get("original_club_day") if keep else existing.get("club_day"),
         "status_note": _text(body.note),
+        "club_day_end": None,  # verschoben ist ein fester Tag, kein Zeitraum mehr (#1931)
     }
     await _claim(db, series_id, body.expected_version)
     await db.reference_rounds.update_one({"id": round_id}, {"$set": {**updates, **_stamp(me)}})
@@ -489,9 +525,13 @@ async def paste_rounds(series_id: str, body: RoundPasteBody, me: dict = Depends(
                                   "errors": parsed["errors"]})
     order = await _claim(db, series_id, body.expected_version, orders=parsed["count"])
     planned = [(row, item) for row in parsed["rows"] for item in row["sessions"]]
+    # Team-Liga (#1931): Gegner, Heim/Auswärts und Spieltag-Zeitraum aus der Zeile - der Zeitraum nur, wenn er nicht
+    # vor dem Tag des Laufs endet.
     docs = [_new_round(series_id, me, order=order + offset, code=row["code"], session=item["session"],
                        venue=row["venue"], club_day=item["day"], starts_at=item["starts_at"], counts=item["counts"],
-                       source="paste", country_code=row["country_code"], country_auto=True)
+                       source="paste", country_code=row["country_code"], country_auto=True,
+                       opponent=row.get("opponent"), at_home=row.get("at_home"),
+                       club_day_end=row["day_end"] if (row.get("day_end") or "") >= item["day"] else None)
             for offset, (row, item) in enumerate(planned)]
     await db.reference_rounds.insert_many(docs)
     await _log(db, "reference_round.paste", me, series_id, {"count": len(docs), "round_ids": [doc["id"] for doc in docs],

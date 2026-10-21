@@ -542,6 +542,18 @@ function tableHeaderRow(cells, keys) {
   return row;
 }
 
+/** Mehr Zellen als die Kopfzeile (#1931: eine Logo-Spalte, die im Kopf mit dem Team zusammengefasst ist): leere Zellen
+ * fallen von links weg, bis es passt. */
+function alignCells(cells, length) {
+  const out = [...cells];
+  while (out.length > length) {
+    const empty = out.findIndex((cell) => !cell);
+    if (empty < 0) break;
+    out.splice(empty, 1);
+  }
+  return out;
+}
+
 /**
  * Tabelle laut Veranstalter (Team-Liga) aus der Zwischenablage: „1. Team 10 7 1 2 22“, „1 | Team | 10 | 22“ oder
  * eine Tabelle mit Kopfzeile („Pl | Team | Sp | S | U | N | Maps | Pkt“). Liefert `{format, header, rows, errors}`.
@@ -564,7 +576,7 @@ export function parseTablePaste(text, { maxRows = 100 } = {}) {
           return;
         }
       }
-      row = keys ? tableHeaderRow(cells, keys) : tableFromTokens(cells, true);
+      row = keys ? tableHeaderRow(alignCells(cells, keys.length), keys) : tableFromTokens(cells, true);
     } else {
       row = tableFromTokens(cleanText(line.text).split(" "), true);
     }

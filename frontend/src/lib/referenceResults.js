@@ -26,12 +26,20 @@ export function emptyRow(values = {}) {
   };
 }
 
-export function emptyMap() {
-  return { key: nextKey("map"), name: "", home_score: "", away_score: "" };
+// Team-Liga (#1931): je Map die Rolle im Veto („banned“, „picked“, „decider“, leer = gespielt), wer gesperrt bzw.
+// gewählt hat („own“/„opponent“), später die Kennung aus der Map-Bibliothek (`map_id`, #1616) und optional ihre
+// Aufstellung; je Spiel Tag und Uhrzeit. `perMap` ist nur der Schalter „Aufstellung je Map“ im Formular.
+export function emptyMap(values = {}) {
+  return { key: nextKey("map"), name: "", map_id: "", role: "", by: "", home_score: "", away_score: "", lineup: [], ...values };
+}
+
+/** Gesperrt hat eine Map kein Ergebnis und keine Aufstellung. */
+export function isBanned(item) {
+  return item?.role === "banned";
 }
 
 export function emptyMatch({ home = "", away = "" } = {}) {
-  return { key: nextKey("match"), home, away, home_score: "", away_score: "", maps: [], lineup: [] };
+  return { key: nextKey("match"), home, away, home_score: "", away_score: "", maps: [], lineup: [], day: "", time: "", perMap: false };
 }
 
 function participantName(participants, id) {
@@ -61,11 +69,17 @@ export function sheetToForm(content, participants = [], { kind, teamName, oppone
     gap: text(row.gap),
     penalty_seconds: row.penalty_seconds ? text(row.penalty_seconds) : "",
   }));
+  const people = (ids) => (ids || []).map((id) => ({ participant_id: id, name: participantName(participants, id) }));
   const matches = (content?.matches || []).map((match) => ({
     ...emptyMatch({ home: match.home, away: match.away }),
     home_score: text(match.home_score), away_score: text(match.away_score),
-    maps: (match.maps || []).map((item) => ({ ...emptyMap(), name: item.name, home_score: text(item.home_score), away_score: text(item.away_score) })),
-    lineup: (match.lineup || []).map((id) => ({ participant_id: id, name: participantName(participants, id) })),
+    maps: (match.maps || []).map((item) => emptyMap({
+      name: item.name, map_id: text(item.map_id), role: item.role === "played" ? "" : item.role || "", by: item.by || "",
+      home_score: text(item.home_score), away_score: text(item.away_score), lineup: people(item.lineup),
+    })),
+    lineup: people(match.lineup),
+    day: text(match.club_day), time: text(match.time),
+    perMap: (match.maps || []).some((item) => (item.lineup || []).length > 0),
   }));
   if (kind === "team_league" && !matches.length) matches.push(emptyMatch({ home: teamName || "", away: opponent || "" }));
   return {
@@ -165,13 +179,19 @@ export function fieldErrors(form) {
       else add(match.key, side, checkNumber(match[side], { min: 0, max: LIMITS.score, message: "Ergebnis als Zahl ab 0." }));
     }
     for (const item of match.maps) {
+      if (isBanned(item)) continue; // gesperrt: ohne Ergebnis (#1931)
       const named = text(item.name).trim();
       const scored = text(item.home_score).trim() || text(item.away_score).trim();
       if (!named && scored) add(item.key, "name", "Name der Map fehlt.");
+      // Prüfung #1931: gespielt (ohne Rolle) braucht beide Stände; Wahl und Decider beide oder keinen (ein Decider bei
+      // 2:0 wird nicht gespielt) - nie still 0:0. Eine Aufstellung je Map nur mit Ergebnis (wie im Server).
+      const vetoed = ["picked", "decider"].includes(item.role);
+      const optional = vetoed && !scored;
       for (const side of ["home_score", "away_score"]) {
-        if (named && !text(item[side]).trim()) add(item.key, side, "Stand fehlt.");
+        if (named && !optional && !text(item[side]).trim()) add(item.key, side, vetoed ? "Beide Stände oder keiner." : "Stand fehlt.");
         else add(item.key, side, checkNumber(item[side], { min: 0, max: LIMITS.score, message: "Stand als Zahl ab 0." }));
       }
+      if (named && optional && match.perMap && (item.lineup || []).some(filled)) add(item.key, "lineup", "Aufstellung je Map nur mit dem Ergebnis der Map.");
     }
   }
   return out;
@@ -261,14 +281,35 @@ export function formToPayload(form) {
   });
   const matches = form.matches
     .filter((match) => text(match.home).trim() || text(match.away).trim())
-    .map((match) => ({
-      home: text(match.home).trim(), away: text(match.away).trim(),
-      home_score: number(match.home_score) || 0, away_score: number(match.away_score) || 0,
-      maps: match.maps.filter((item) => text(item.name).trim()).map((item) => ({
-        name: text(item.name).trim(), home_score: number(item.home_score) || 0, away_score: number(item.away_score) || 0,
-      })),
-      lineup: match.lineup.filter(filled).map(reference),
-    }));
+    .map((match) => {
+      // Team-Liga (#1931): Tag, Uhrzeit, Kennung, Rolle, wer und Aufstellung je Map nur, wenn angegeben.
+      const out = {
+        home: text(match.home).trim(), away: text(match.away).trim(),
+        home_score: number(match.home_score) || 0, away_score: number(match.away_score) || 0,
+        ...(text(match.day).trim() ? { day: text(match.day).trim() } : {}),
+        ...(text(match.time).trim() ? { time: text(match.time).trim() } : {}),
+        maps: match.maps.filter((item) => text(item.name).trim()).map((item) => {
+          const head = {
+            name: text(item.name).trim(),
+            ...(text(item.map_id).trim() ? { map_id: text(item.map_id).trim() } : {}),
+            ...(item.role ? { role: item.role } : {}),
+            ...(item.by && ["banned", "picked"].includes(item.role) ? { by: item.by } : {}),
+          };
+          if (isBanned(item)) return head;
+          // Ohne Ergebnis (Wahl oder Decider, nicht gespielt) bleibt die Map leer - nie still 0:0 (Prüfung #1931).
+          const scores = {};
+          for (const side of ["home_score", "away_score"]) {
+            if (text(item[side]).trim()) scores[side] = number(item[side]) || 0;
+          }
+          if (!Object.keys(scores).length) return head;
+          // Aufstellung je Map nur mit dem Schalter „je Map“ - ausgeschaltet zählt die des Spiels.
+          const lineup = match.perMap ? (item.lineup || []).filter(filled).map(reference) : [];
+          return { ...head, ...scores, ...(lineup.length ? { lineup } : {}) };
+        }),
+        lineup: match.lineup.filter(filled).map(reference),
+      };
+      return out;
+    });
   const official_table = form.table.map((row) => {
     const out = { team: row.team };
     for (const key of ["rank", "played", "won", "drawn", "lost", "score_for", "score_against", "score_diff", "points"]) {

@@ -138,7 +138,9 @@ test.describe("Abnahme #1747: Seite Team-Liga - Tabelle, Spielplan, Aufstellung,
         await expect(lineup.getByTestId("team-league-guests")).toContainText(guestName);
         await expect(lineup.getByRole("link", { name: guestName })).toHaveCount(0);
         const memberRow = lineup.getByTestId("team-league-player").filter({ hasText: memberName });
-        await expect(memberRow).toContainText("23");
+        // Einsätze (#1931): „2 von 2“ in dieser Saison, Gesamt über alle Saisons der Spur.
+        await expect(memberRow.getByTestId("team-league-appearances")).toContainText("2 von 2");
+        await expect(memberRow.locator("td").last()).toHaveText("3");
         const seasons = page.getByTestId("team-league-season");
         await expect(seasons).toHaveCount(2);
         await expect(seasons.nth(0)).toContainText("Platz 1 von 3");

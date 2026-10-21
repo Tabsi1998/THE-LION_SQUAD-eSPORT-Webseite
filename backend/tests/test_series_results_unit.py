@@ -178,11 +178,41 @@ def test_team_league_lineup_maps_own_team_and_official_table():
     check(out, SCHEME, ROUND, TODAY, own_teams="Probe Löwen")
     assert out.errors == []
     assert out.matches[0]["lineup"] == ["p-anna", "neu:neunora"]
-    assert _codes(out.warnings) == ["maps_differ", "own_team_missing", "table_team_twice", "table_rank_partial"]
+    # Das zweite Spiel ist ein übriges Spiel des Spieltags (#1931) - ohne eigenes Team, ohne Warnung dazu. Seine Teams
+    # stehen aber nicht in der Tabelle laut Veranstalter: keine eigene Zeile, je ein Hinweis (Prüfung #1931).
+    assert _codes(out.warnings) == ["maps_differ", "table_team_twice", "table_rank_partial", "table_team_unknown",
+                                    "table_team_unknown"]
     assert out.warnings[0]["message"] == "Spiel 1: Die Maps ergeben 1:1, eingetragen ist 2:1."
     assert out.official_table[0] == {"team": "Probe Löwen", "rank": 1, "played": None, "won": None, "drawn": None,
                                      "lost": None, "score_for": None, "score_against": None, "score_diff": None,
                                      "points": 3}
+
+
+def test_a_map_result_is_never_filled_in_as_zero_to_zero():
+    """Prüfung #1931, Punkt 3: gespielt (oder ohne Rolle) braucht beide Stände; Wahl und Decider beide oder keinen;
+    eine Aufstellung je Map nur mit Ergebnis; ein Bann nie mit Ergebnis."""
+    out = resolve({"matches": [{"home": "Probe Löwen", "away": "Probe Gegner", "home_score": 1, "away_score": 0,
+                                "maps": [
+                                    {"name": "Map A", "role": "banned", "by": "own", "home_score": 3, "away_score": 1},
+                                    {"name": "Map B", "role": "picked", "by": "own", "home_score": 6, "away_score": 2},
+                                    {"name": "Map C", "role": "picked", "by": "opponent"},
+                                    {"name": "Map D", "role": "decider"},
+                                    {"name": "Map E"},
+                                    {"name": "Map F", "role": "decider", "away_score": 4},
+                                    {"name": "Map G", "role": "picked", "lineup": [{"participant_id": "p-anna"}]},
+                                ]}]}, PEOPLE, SCHEME)
+    assert [(error["code"], error["map"], error["map_field"], error["message"]) for error in out.errors] == [
+        ("map_score_missing", 4, "home_score",
+         "Spiel 1, Map 5: Das Ergebnis fehlt - eine gespielte Map braucht beide Stände."),
+        ("map_score_missing", 5, "home_score",
+         "Spiel 1, Map 6: Beim Ergebnis fehlt ein Stand - beide eintragen oder beide leer lassen."),
+        ("map_lineup_unplayed", 6, "lineup", "Spiel 1, Map 7: Eine Aufstellung je Map braucht das Ergebnis der Map."),
+    ]
+    maps = out.matches[0]["maps"]
+    assert maps[0] == {"name": "Map A", "role": "banned", "by": "own"}
+    assert maps[2] == {"name": "Map C", "role": "picked", "by": "opponent"}
+    assert maps[3] == {"name": "Map D", "role": "decider"}
+    assert out.matches[0]["lineup"] == []
 
 
 def test_lineup_errors_point_to_the_match():

@@ -115,8 +115,100 @@ test("Aufstellung: nur Vereinsmitglieder verlinkt, Gäste getrennt, ausgeblendet
   expect(guests).toHaveTextContent("Name ausgeblendet");
   const players = within(lineup).getAllByTestId("team-league-player");
   expect(players[0]).toHaveTextContent("Probe Alpha");
-  expect(players[0]).toHaveTextContent("25");
+  expect(within(players[0]).getByTestId("team-league-appearances")).toHaveTextContent("2");
+  expect(players[0].lastElementChild).toHaveTextContent("5");
   expect(players[1].dataset.guest).toBe("true");
+});
+
+// #1931: Bilanz, Spieltage als Karten mit Wahl, Bann und den übrigen Spielen, Kader mit „von“ und Ersatz.
+const SEASON_1931 = {
+  ...BODY.team_league,
+  own_teams: ["Probe Löwen"],
+  record: [{ team: "Probe Löwen", played: 2, won: 1, drawn: 0, lost: 1, points: 2, maps_for: 4, maps_against: 4, rounds_for: 38, rounds_against: 31, rounds_matches: 2 }],
+  matchdays: [
+    { round: { ...ROUNDS[0], club_day_end: "2026-11-06", at_home: true }, others: [{ home: "Fremd Adler", away: "Fremd Eulen", home_score: 0, away_score: 2 }], match: {
+      opponent: "Fremd Füchse", home: true, score_for: 3, score_against: 1, outcome: "win", points: 2, team: "Probe Löwen", club_day: null, time: "21:15",
+      maps: [{ name: "Karte Nord", score_for: 6, score_against: 2, outcome: "win", picked: "own" }, { name: "Karte Süd", score_for: 4, score_against: 6, outcome: "loss", picked: "decider" }],
+      bans: [{ name: "Karte Ost", by: "own" }, { name: "Karte Hafen", by: "opponent" }], lineup_size: 2 } },
+    { round: ROUNDS[1], others: [], match: { ...BODY.team_league.matchdays[1].match, bans: [], club_day: null, time: null } },
+    { round: { ...ROUNDS[2], at_home: false }, others: [], match: null },
+  ],
+  lineup: {
+    round_ids: ["r1", "r2"],
+    players: [
+      { key: "p-a", name: "Probe Alpha", name_hidden: false, club_member: true, guest: false, profile_slug: "probe-alpha", round_ids: ["r1"], bench_round_ids: ["r2"], appearances: 1, of: 2, in_roster: true, team: "Probe Löwen", all_seasons: 5 },
+      { key: "p-b", name: "Probe Beta", name_hidden: false, club_member: true, guest: false, profile_slug: null, round_ids: [], bench_round_ids: ["r1", "r2"], appearances: 0, of: 2, in_roster: true, team: "Probe Löwen", all_seasons: null },
+    ],
+  },
+};
+
+test("Bilanz (#1931): S-U-N, Maps und Runden mit Differenz", async () => {
+  renderPage({ ...BODY, team_league: SEASON_1931 });
+  const record = await screen.findByTestId("team-league-record");
+  expect(record).toHaveTextContent("1–0–1");
+  expect(record).toHaveTextContent("Maps4:4 ±0");
+  expect(record).toHaveTextContent("Runden38:31 +7");
+});
+
+test("Spieltage als Karten (#1931): Uhrzeit des Spiels, Wahl je Map, Banns und die übrigen Spiele", async () => {
+  renderPage({ ...BODY, team_league: SEASON_1931 });
+  const days = await screen.findAllByTestId("team-league-matchday");
+  expect(days[0]).toHaveTextContent("Mo., 02.11. – Fr., 06.11.2026 · 21:15");
+  expect(within(days[0]).getAllByTestId("team-league-map-pick").map((item) => item.textContent)).toEqual(["Unsere Wahl", "Decider"]);
+  expect(within(days[0]).getByTestId("team-league-bans")).toHaveTextContent("Bann: Karte Ost (wir) · Karte Hafen (Gegner)");
+  const others = within(days[0]).getByTestId("team-league-others");
+  expect(others).toHaveTextContent("Weitere Spiele (1)");
+  expect(others).toHaveTextContent("Fremd Adler0:2Fremd Eulen");
+  expect(within(days[1]).queryByTestId("team-league-others")).toBeNull();
+  expect(days[2]).toHaveTextContent("gegen Fremd Adler");
+  expect(days[2]).toHaveTextContent("Auswärts");
+  expect(screen.getByTestId("team-league-next")).toHaveTextContent("@ Fremd Adler");
+});
+
+test("Ganzes Veto (#1931): nicht gespielte Wahl bzw. Decider stehen abgeschwächt mit „nicht gespielt“ in der Reihenfolge des Vetos", async () => {
+  const match = {
+    ...SEASON_1931.matchdays[0].match, score_for: 2, score_against: 0,
+    maps: [{ name: "Karte Nord", score_for: 6, score_against: 2, outcome: "win", picked: "own" }, { name: "Karte West", score_for: 6, score_against: 4, outcome: "win", picked: "opponent" }],
+    veto: [
+      { name: "Karte Ost", role: "banned", by: "own", played: false },
+      { name: "Karte Nord", role: "picked", by: "own", played: true, picked: "own", score_for: 6, score_against: 2, outcome: "win" },
+      { name: "Karte West", role: "picked", by: "opponent", played: true, picked: "opponent", score_for: 6, score_against: 4, outcome: "win" },
+      { name: "Karte Süd", role: "decider", played: false, picked: "decider" },
+    ],
+    bans: [{ name: "Karte Ost", by: "own" }],
+  };
+  renderPage({ ...BODY, team_league: { ...SEASON_1931, matchdays: [{ ...SEASON_1931.matchdays[0], match }] } });
+  const day = (await screen.findAllByTestId("team-league-matchday"))[0];
+  const rows = within(within(day).getByTestId("team-league-maps")).getAllByRole("listitem");
+  expect(rows.map((row) => row.textContent)).toEqual(["Karte NordUnsere Wahl6:2Sieg", "Karte WestWahl Gegner6:4Sieg", "Karte SüdDecidernicht gespielt"]);
+  expect(rows[2]).toHaveAttribute("data-played", "false");
+  expect(rows[0]).not.toHaveAttribute("data-played");
+  expect(within(day).getByTestId("team-league-bans")).toHaveTextContent("Bann: Karte Ost (wir)");
+});
+
+test("Zwei eigene Teams am selben Spieltag (Prüfung #1931): beide Spiele mit Team, Gegner und Ergebnis in der Karte", async () => {
+  const black = { opponent: "Fremd Bären", home: false, score_for: 2, score_against: 0, outcome: "win", points: 3, team: "Probe Löwen B", maps: [], bans: [], club_day: null, time: null, lineup_size: 1 };
+  const gold = { ...BODY.team_league.matchdays[0].match, team: "Probe Löwen", bans: [], club_day: null, time: null };
+  const matchdays = [{ round: ROUNDS[0], match: gold, matches: [gold, black], others: [] }, ...BODY.team_league.matchdays.slice(1)];
+  renderPage({ ...BODY, team_league: { ...BODY.team_league, own_teams: ["Probe Löwen", "Probe Löwen B"], matchdays } });
+  const [first] = await screen.findAllByTestId("team-league-matchday");
+  const blocks = within(first).getAllByTestId("team-league-own-match");
+  expect(blocks).toHaveLength(2);
+  expect(blocks[1]).toHaveTextContent("Probe Löwen B gegen Fremd Bären");
+  expect(within(blocks[1]).getByRole("img", { name: "Sieg 2:0, 3 Punkte" })).toBeInTheDocument();
+  expect(within(blocks[0]).getByRole("img", { name: "Sieg 3:1, 2 Punkte" })).toBeInTheDocument();
+});
+
+test("Kader (#1931): der ganze Kader mit „von“ und Ersatz je Spieltag", async () => {
+  renderPage({ ...BODY, team_league: SEASON_1931 });
+  const lineup = await screen.findByTestId("team-league-lineup");
+  expect(within(lineup).getByRole("heading", { name: "Kader" })).toBeInTheDocument();
+  const [alpha, beta] = within(lineup).getAllByTestId("team-league-player");
+  expect(within(alpha).getByTestId("team-league-appearances")).toHaveTextContent("1 von 2");
+  expect(alpha).toHaveTextContent("gespielt");
+  expect(alpha).toHaveTextContent("Ersatz");
+  expect(within(beta).getByTestId("team-league-appearances")).toHaveTextContent("0 von 2");
+  expect(within(lineup).queryByTestId("team-league-guests")).toBeNull();
 });
 
 test("Liga-Weg: frühere Saisons verlinkt, die aktuelle markiert", async () => {
@@ -155,7 +247,7 @@ test("Eine leere Saison zeigt Hinweise statt leerer Tabellen", async () => {
   renderPage({ ...BODY, team_league: { ...BODY.team_league, table: null, rank_history: [], matchdays: [], lineup: { round_ids: [], players: [] }, path: [] } });
   expect(await screen.findByText("Die Tabelle steht hier nach dem ersten Spieltag.")).toBeInTheDocument();
   expect(screen.getByText("Noch keine Spieltage.")).toBeInTheDocument();
-  expect(screen.getByText("Noch keine Aufstellung eingetragen.")).toBeInTheDocument();
+  expect(screen.getByText("Noch kein Kader und keine Aufstellung eingetragen.")).toBeInTheDocument();
   expect(screen.queryByTestId("team-league-path")).not.toBeInTheDocument();
 });
 

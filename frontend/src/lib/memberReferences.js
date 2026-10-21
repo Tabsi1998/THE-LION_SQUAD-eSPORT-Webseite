@@ -3,6 +3,7 @@ import { leaguePath, yearOf } from "@/lib/referencesOverview";
 import { safeHttpUrl } from "@/lib/safeLink";
 import { seriesAddress } from "@/lib/referenceSeries";
 import { seasonHref } from "@/lib/seasonClose";
+import { appearancesText } from "@/lib/teamLeagueEntry";
 import { viennaDate } from "@/lib/vienna";
 
 // Vereinsplatzierungen im Mitgliederprofil (#1944): die Logik hinter Kopf, Liga-Weg und Chronik der Person - ohne
@@ -109,6 +110,8 @@ export function organizerUrl(item) {
  * Was die aufgeklappte Zeile zeigt: den langen Titel (nur wenn er vom kurzen abweicht), Format-Marken, die Aufstellung
  * (nur im Team) und die Links - „Saison ansehen“ (nur mit Saison), „Details“ zur Referenz (immer: Bericht, Partner und
  * Ort stehen dort) und „Beim Veranstalter“. Die Saison kommt aus `season_link` der Referenz (#1750), sonst aus der Spur.
+ * `played`: die Einsätze der Person aus der verknüpften Saison (#1931), etwa „5 von 7 Spielen“ - der Server zählt sie
+ * (`appearances`), ohne Daten leer.
  */
 export function detailsOf(item, profileId, link = null) {
   const entry = ownEntry(item);
@@ -117,6 +120,7 @@ export function detailsOf(item, profileId, link = null) {
     fullTitle: full !== shortTitle(item, link) ? full : "",
     tags: formatTags(item),
     lineup: entry && entry.kind !== "solo" ? lineupOf(entry, profileId) : [],
+    played: appearancesText(item.appearances),
     seasonUrl: seasonHref(item, link),
     detailUrl: `/references/${item.id}`,
     organizerUrl: organizerUrl(item),

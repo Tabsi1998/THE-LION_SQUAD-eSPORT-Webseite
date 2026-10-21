@@ -15,6 +15,9 @@ Alles hier ist Verwaltung im Bereich Redaktion („content“): Aliase und Verkn
   Gast oder Extern (``bulk-assign``: eine Sperre, einmal neu rechnen, andere Saisons danach je einmal), zwei
   Schreibweisen zusammenführen (``merge``: Ergebnisse samt Entwürfen wandern mit) und Teilnehmer ohne Ergebnis
   entfernen. Alles nur für den Vorstand (Bereich Redaktion) - ein Captain ordnet nie zu (#1749).
+- **Kader** (#1931): ``batch`` mit ``team`` legt neue Namen gleich mit diesem Team an (``default_team``) und ordnet
+  schon vorhandene dem Team zu (``assigned``). Der Kader eines eigenen Teams sind die Teilnehmer mit diesem Team;
+  herausnehmen heißt Team leeren (``PATCH`` mit ``default_team: null``).
 
 Modelle, Indexe und Datenschutz-Einordnung liegen seit dem Datenmodell (#1741) in ``models.py``, ``database.py`` und
 ``services/personal_data.py``; Kontolöschung und Auskunft in ``account_erasure`` und ``dsgvo_routes``."""
@@ -45,8 +48,10 @@ PARTICIPANT_NULLABLE = {"start_number", "default_team"}
 
 
 class ParticipantBatch(BaseModel):
-    """Mehrere Namen auf einmal (einer je Eintrag), etwa aus einer Starterliste. Doppelte werden übersprungen."""
+    """Mehrere Namen auf einmal (einer je Eintrag), etwa aus einer Starterliste. Doppelte werden übersprungen - mit
+    ``team`` (Kader, #1931) aber diesem Team zugeordnet."""
     names: List[str] = Field(min_length=1, max_length=MAX_BATCH)
+    team: Optional[str] = Field(default=None, max_length=120)
 
 
 class ParticipantAssign(BaseModel):
@@ -179,12 +184,14 @@ async def create_participant(series_id: str, body: ReferenceParticipantCreate,
 @router.post("/admin/series/{series_id}/participants/batch")
 @reference_series.series_locked
 async def create_participants(series_id: str, body: ParticipantBatch, me: dict = Depends(require_area("content"))):
-    """Mehrere Namen auf einmal. Wer in der Serie schon steht (gleicher Schlüssel), wird übersprungen."""
+    """Mehrere Namen auf einmal. Wer in der Serie schon steht (gleicher Schlüssel), wird übersprungen - mit ``team``
+    (Kader, #1931) diesem Team zugeordnet; neue Namen bekommen das Team gleich mit."""
     db = get_db()
     series = await _series(db, series_id)
-    present = {row.get("name_normalized") async for row in db.reference_participants.find(
-        {"series_id": series_id}, {"_id": 0, "name_normalized": 1})}
-    names, rejected = [], []
+    team = clean(body.team)[:120] or None
+    present = {row.get("name_normalized"): row async for row in db.reference_participants.find(
+        {"series_id": series_id}, {"_id": 0, "id": 1, "name": 1, "name_normalized": 1, "default_team": 1})}
+    names, rejected, known = [], [], []
     for raw in body.names:
         name = clean(raw)[:120]
         if name and not series_identity.is_usable_name(name):
@@ -192,13 +199,23 @@ async def create_participants(series_id: str, body: ParticipantBatch, me: dict =
             continue
         key = series_identity.normalize_name(name)
         if key and key not in present:
-            present.add(key)
+            present[key] = {}
             names.append(name)
+        elif key and present[key].get("id") and present[key] not in known:
+            known.append(present[key])
     index = await build_index(db, series, names, with_ids=False)
-    created = [await new_participant(db, series, index, {"name": name}, me) for name in names]
-    if any(row["link_status"] == "decided" for row in created):
+    created = [await new_participant(db, series, index, {"name": name, "default_team": team}, me) for name in names]
+    assigned = [row for row in known if team and row.get("default_team") != team]
+    for row in assigned:
+        await db.reference_participants.update_one({"id": row["id"], "series_id": series_id}, {"$set": {
+            "default_team": team, "updated_at": now_utc().isoformat(), "updated_by": me["id"]}})
+    if assigned:
+        await _log(db, "reference_participant.roster", me, series_id, {
+            "team": team, "participant_ids": [row["id"] for row in assigned]})
+    if assigned or any(row["link_status"] == "decided" for row in created):
         await reference_series.recompute_standings(db, series)
-    return {"created": created, "skipped": len(body.names) - len(created), "rejected": rejected}
+    return {"created": created, "skipped": len(body.names) - len(created) - len(assigned), "rejected": rejected,
+            "assigned": [{"id": row["id"], "name": row.get("name"), "default_team": team} for row in assigned]}
 
 
 @router.patch("/admin/series/{series_id}/participants/{participant_id}")

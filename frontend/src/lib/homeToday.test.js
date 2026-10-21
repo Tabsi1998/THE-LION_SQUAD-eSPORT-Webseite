@@ -27,3 +27,8 @@ test("Runde mit Läufen (#1930): der heutige Lauf statt des Worts „Rennen“",
   const next = { code: "R3", session: "Qualifying", club_day: "2026-11-09", state: "today", time: "20:00" };
   expect(todayFacts(item({ lineage: { kind: "racing" }, next, club_count: 2 }))).toEqual(["R3 · Qualifying", "20:00 Uhr", "2 Vereinsfahrer"]);
 });
+
+test("Team-Liga (#1931): der Gegner mit Seite nach dem Spieltag", () => {
+  const league = item({ lineage: { kind: "team_league" }, next: { code: "ST4", state: "today", time: "20:30", opponent: "Probe Falken", at_home: false }, club_count: 0 });
+  expect(todayFacts(league)).toEqual(["Spieltag ST4", "@ Probe Falken", "20:30 Uhr"]);
+});
