@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.12.2 (20.10.2026)
+
+### Schneller
+
+* Abmelden baut den Vorschau-Baum erst nach der Turnier-Sperre (#1871)
+* Abzeichen nach der Anmeldung nur für die Anmelde-Zähler auswerten (#1871)
+
 ## 1.12.1 (20.10.2026)
 
 ### Fehlerbehebungen
