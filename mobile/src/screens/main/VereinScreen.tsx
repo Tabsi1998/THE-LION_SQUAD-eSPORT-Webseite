@@ -32,7 +32,7 @@ import type { NewsPost } from "../../types";
 // Der Tab Verein (#1147): alles vom Verein an einem Ort. Mitglieder sehen oben ihre Mitgliedskarte mit „Hallo“, „Mitglied
 // seit“ und dem Beitragsstand (#1336), darunter die Kacheln (Karte, Mitgliedschaft, Versammlungen, Helfen, Dokumente,
 // Vorteile) mit denselben Zahlen wie im Mitgliederbereich der Website (#1257) und interne News; alle anderen oben „Mitglied werden“ mit drei
-// Gründen. Darunter für alle: News, Galerie, Referenzen, Sponsoren, Partner und „Folge uns“. Der Einlass steht oben, nur
+// Gründen. Darunter für alle: News, Galerie, Erfolge, Sponsoren, Partner und „Folge uns“. Der Einlass steht oben, nur
 // für den Vorstand. Rechnungen liegen im Profil („Nur für dich“), interne Termine im Events-Tab (gold markiert) - jedes
 // Thema an genau einem Ort (#1150). Was jemand sehen darf, entscheidet der Server; hier wird nur sortiert und verwiesen.
 
@@ -115,7 +115,8 @@ export function clubRows(advent: boolean): ClubRow[] {
     { key: "about", title: "Über uns, Vorstand, Kontakt", icon: "information-circle-outline", screen: "ClubAbout" },
     { key: "news", title: "News", icon: "newspaper-outline", screen: "NewsList" },
     { key: "gallery", title: "Galerie", icon: "images-outline", screen: "Gallery" },
-    { key: "references", title: "Referenzen", icon: "medal-outline", screen: "InfoCenter", params: { section: "references" } },
+    // „Erfolge“ (Entscheidung zu #1945): die Erfolgswand des Vereins mit Ehrentafel, Vitrine und Chronik.
+    { key: "references", title: "Erfolge", icon: "medal-outline", screen: "InfoCenter", params: { section: "references" } },
     { key: "sponsors", title: "Sponsoren", icon: "ribbon-outline", screen: "InfoCenter", params: { section: "sponsors" } },
     { key: "partners", title: "Partner", icon: "link-outline", screen: "InfoCenter", params: { section: "partners" } },
   ];

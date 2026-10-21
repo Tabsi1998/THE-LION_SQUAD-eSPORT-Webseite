@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 import { Button } from "../../../components/Button";
 import { Card } from "../../../components/Card";
@@ -8,10 +8,9 @@ import { formatDate } from "../../../lib/format";
 import { shareResultImage, shareResultLink, type ResultShareOptions } from "../../../lib/resultShare";
 import { colors, radius } from "../../../theme";
 import type { PersonalReferenceItem } from "../../../types";
-import { ReferenceCard } from "./parts";
 
-// Profil (#1193) - wie im Web: „Dein Weg“ je Turnier in den Referenzen (aufklappen) und die Bilanz gegen Gegner als
-// Karte in der Übersicht. Farben wie im Turnierbaum (#1340): Siege hell mit Zahl in Cyan, Niederlagen grau - kein Grün
+// Profil (#1193) - wie im Web: „Dein Weg“ je Turnier in den Referenzen (seit #1945 in der aufgeklappten Zeile der
+// Chronik, ProfileReferences.tsx) und die Bilanz gegen Gegner als Karte in der Übersicht. Farben wie im Turnierbaum (#1340): Siege hell mit Zahl in Cyan, Niederlagen grau - kein Grün
 // und Rot. Im eigenen Profil steht alles; für andere nur Öffentliches, private Gegner ohne Namen bzw. gar nicht.
 
 export type PathStep = { kind: "duel" | "heat" | "table" | string; label: string; result: string; outcome?: string | null; opponent?: string | null };
@@ -72,61 +71,45 @@ function PathView({ path, testID }: { path: TournamentPathData; testID: string }
   );
 }
 
-/** Eine Referenz mit „Weg“ zum Aufklappen - der Weg lädt erst beim ersten Aufklappen. */
-export function ReferenceWithPath({ item, username, own = false, publicView = false, onOpen }: {
-  item: PersonalReferenceItem; username?: string | null; own?: boolean; publicView?: boolean; onOpen?: (item: PersonalReferenceItem) => void;
+/** Der Weg eines Turniers (aufgeklappte Zeile der Chronik): lädt beim ersten Zeigen, im eigenen Profil mit „Bild teilen“. */
+export function TournamentPathPanel({ item, username, own = false, publicView = false }: {
+  item: PersonalReferenceItem; username?: string | null; own?: boolean; publicView?: boolean;
 }) {
-  const [open, setOpen] = useState(false);
-  const [state, setState] = useState<"idle" | "loading" | "ready" | "error">("idle");
+  const [state, setState] = useState<"loading" | "ready" | "error">("loading");
   const [path, setPath] = useState<TournamentPathData | null>(null);
   const [message, setMessage] = useState("");
-  const alive = useRef(true);
   useEffect(() => {
-    alive.current = true;
-    return () => { alive.current = false; };
-  }, []);
-  const canExpand = (item.kind || "tournament") === "tournament" && Boolean(item.target_id) && Boolean(username);
-
-  const toggle = () => {
-    setOpen((value) => !value);
-    if (state !== "idle" || !username || !item.target_id) return;
+    let alive = true;
+    if (!username || !item.target_id) {
+      setState("error");
+      return undefined;
+    }
     setState("loading");
     api.get<TournamentPathData>(`/profile/${encodeURIComponent(username)}/tournaments/${encodeURIComponent(item.target_id)}/path`, viewParams(publicView))
-      .then(({ data }) => { if (alive.current) { setPath(data); setState("ready"); } })
-      .catch(() => { if (alive.current) setState("error"); });
-  };
+      .then(({ data }) => { if (alive) { setPath(data); setState("ready"); } })
+      .catch(() => { if (alive) setState("error"); });
+    return () => { alive = false; };
+  }, [item.target_id, publicView, username]);
   const share = async (task: () => Promise<"shared" | "failed">) => {
     setMessage("");
-    if ((await task()) === "failed" && alive.current) setMessage("Teilen ging gerade nicht – versuch es gleich noch einmal.");
+    if ((await task()) === "failed") setMessage("Teilen ging gerade nicht – versuch es gleich noch einmal.");
   };
-
   return (
-    <View>
-      <ReferenceCard item={item} onOpen={onOpen} />
-      {canExpand ? (
-        <Pressable onPress={toggle} accessibilityRole="button" accessibilityState={{ expanded: open }} style={({ pressed }) => [styles.toggle, pressed && styles.pressed]}
-          testID={`reference-path-toggle-${item.id}`}>
-          <Muted style={styles.toggleText}>{open ? "Weg ausblenden" : own ? "Dein Weg" : "Weg ansehen"}</Muted>
-        </Pressable>
-      ) : null}
-      {open ? (
-        <View style={styles.box} testID={`tournament-path-${item.id}`}>
-          {state === "loading" ? <Muted>Lade den Weg …</Muted> : null}
-          {state === "error" ? <Muted>Für dieses Turnier gibt es keinen Weg zum Anzeigen.</Muted> : null}
-          {state === "ready" && path ? (
-            <>
-              {!path.steps.length ? <Muted>Keine gewerteten Spiele – nur der Endplatz.</Muted> : null}
-              <PathView path={path} testID={`tournament-path-steps-${item.id}`} />
-              {own && path.share?.shareable ? (
-                <View style={styles.shareRow}>
-                  <View style={styles.flex}><Button label="Bild teilen" onPress={() => share(() => shareResultImage(path.share as ResultShareOptions))} testID={`reference-share-image-${item.id}`} /></View>
-                  <View style={styles.flex}><Button label="Link teilen" variant="secondary" onPress={() => share(() => shareResultLink(path.share as ResultShareOptions))} testID={`reference-share-link-${item.id}`} /></View>
-                </View>
-              ) : null}
-              {message ? <Muted style={styles.error}>{message}</Muted> : null}
-            </>
+    <View style={styles.box} testID={`tournament-path-${item.id}`}>
+      {state === "loading" ? <Muted>Lade den Weg …</Muted> : null}
+      {state === "error" ? <Muted>Für dieses Turnier gibt es keinen Weg zum Anzeigen.</Muted> : null}
+      {state === "ready" && path ? (
+        <>
+          {!path.steps?.length ? <Muted>Keine gewerteten Spiele – nur der Endplatz.</Muted> : null}
+          <PathView path={{ ...path, steps: path.steps || [] }} testID={`tournament-path-steps-${item.id}`} />
+          {own && path.share?.shareable ? (
+            <View style={styles.shareRow}>
+              <View style={styles.flex}><Button label="Bild teilen" onPress={() => share(() => shareResultImage(path.share as ResultShareOptions))} testID={`reference-share-image-${item.id}`} /></View>
+              <View style={styles.flex}><Button label="Link teilen" variant="secondary" onPress={() => share(() => shareResultLink(path.share as ResultShareOptions))} testID={`reference-share-link-${item.id}`} /></View>
+            </View>
           ) : null}
-        </View>
+          {message ? <Muted style={styles.error}>{message}</Muted> : null}
+        </>
       ) : null}
     </View>
   );
@@ -175,8 +158,6 @@ export function RecordCard({ username, publicView = false, onOpenUser, onOpenTea
 }
 
 const styles = StyleSheet.create({
-  toggle: { alignSelf: "flex-start", paddingVertical: 6, paddingHorizontal: 2 },
-  toggleText: { color: colors.cyan, fontWeight: "800", fontSize: 12, textTransform: "uppercase", letterSpacing: 1 },
   pressed: { opacity: 0.7 },
   box: { marginLeft: 6, paddingLeft: 12, borderLeftWidth: 1, borderLeftColor: colors.border, gap: 8, paddingBottom: 8 },
   path: { gap: 10 },

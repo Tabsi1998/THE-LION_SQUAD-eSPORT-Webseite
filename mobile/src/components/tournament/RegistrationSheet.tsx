@@ -7,7 +7,7 @@ import { FormInput } from "../FormInput";
 import { Body, Heading, Muted } from "../Text";
 import { WEBSITE_BASE_URL } from "../../config";
 import { formatWhen } from "../../lib/format";
-import { checkInWindow, NO_RULES_TEXT, placeLine, rulesSummary, rulesText } from "../../lib/registrationSheet";
+import { checkInWindow, NO_RULES_TEXT, placeLine, rulesSummary, rulesText, waitlistLead } from "../../lib/registrationSheet";
 import { basisLabel, formatCents, quoteTotal, startFeeSummary } from "../../lib/startFee";
 import { useSeasonOverlay } from "../../seasons/anchors";
 import { colors, radius } from "../../theme";
@@ -100,16 +100,18 @@ export function RegistrationSheet({ busy, error, fields, teams, tournament, user
   };
 
   const gameName = tournament.game?.display_name || tournament.game?.name || "Dieses Spiel";
-  const lead = isTeamTournament
+  // Voller Cup (#1941): Kopfzeile und Knopf sagen „Warteliste“ - bezahlt wird erst mit dem Nachrücken.
+  const waitlist = waitlistLead(tournament);
+  const lead = waitlist || (isTeamTournament
     ? "Wähle das Team aus, das du als Leader oder Co-Leader anmelden möchtest."
     : fields.length
       ? `${gameName} benötigt Spieler-IDs${sourceSlug && sourceSlug !== gameSlug ? ` aus ${tournament.game?.identity_game_name || "dem Hauptspiel"}` : ""}.`
-      : `Du meldest dich als ${user?.display_name || user?.username || "du"} an.`;
+      : `Du meldest dich als ${user?.display_name || user?.username || "du"} an.`);
   const checkIn = checkInWindow(tournament);
   const allRules = rulesText(tournament.rules).trim();
   const rules = rulesSummary(tournament.rules);
   const fee = offer?.enabled ? startFeeSummary(offer, tournament.team_mode || "solo", Number(tournament.team_size) || 1) : "";
-  const submitLabel = busy ? "Sendet ..." : offer && total > 0 ? `Verbindlich anmelden · ${formatCents(total, currency)}` : "Verbindlich anmelden";
+  const submitLabel = busy ? "Sendet ..." : waitlist ? "Auf die Warteliste" : offer && total > 0 ? `Verbindlich anmelden · ${formatCents(total, currency)}` : "Verbindlich anmelden";
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>

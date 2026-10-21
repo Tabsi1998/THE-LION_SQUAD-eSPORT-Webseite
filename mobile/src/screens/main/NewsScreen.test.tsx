@@ -61,7 +61,9 @@ test("die Beiträge blenden nacheinander ein - Ziehen und Suchen starten nichts 
   expect(fadeDelays()).toEqual([]);
 
   // Eine Suche blendet fast alles aus, danach ist alles wieder da - schon gezeigt, also sofort.
-  const search = screen.getByPlaceholderText("News durchsuchen ...");
+  // Die Suche ist ein Symbol in der Filterzeile (#1946) und klappt zum Feld auf.
+  await fireEvent.press(screen.getByTestId("news-search-open"));
+  const search = screen.getByPlaceholderText("News suchen");
   await fireEvent.changeText(search, "Beitrag 3");
   expect(screen.queryByText("Beitrag 5")).toBeNull();
   await fireEvent.changeText(search, "");

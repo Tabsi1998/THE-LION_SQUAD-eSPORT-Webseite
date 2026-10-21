@@ -64,25 +64,43 @@ beforeEach(() => {
   });
 });
 
-test("Referenzen aus { items, summary } erscheinen mit Platzierung, Spiel und Lineup", async () => {
+// Verein › Erfolge (#1945): die Referenzen im neuen Design (freigegebener Entwurf vom 21.10.2026) statt der alten Kacheln
+// mit Nullen - Ehrentafel nur mit Werten über null, Vitrine, Chronik; eine Saison öffnet ihre Seite in der App.
+test("Verein › Erfolge: Ehrentafel ohne Nullen, Vitrine und Chronik statt der alten Kacheln", async () => {
   await render(<InfoCenterScreen navigation={navigation} route={routeFor("references")} />);
 
-  await waitFor(() => expect(screen.getByText("Season #2 Newcomer Liga A")).toBeTruthy());
-  expect(screen.getByText("3.")).toBeTruthy();
-  expect(screen.getByText("7 Teams")).toBeTruthy();
-  expect(screen.getByText("Call of Duty: Black Ops 7")).toBeTruthy();
-  expect(screen.getByText("Lineup: HuEpfa, Munkehy")).toBeTruthy();
-  expect(screen.getByText("17")).toBeTruthy();
-  expect(screen.getByText("Teilnahmen")).toBeTruthy();
-  expect(screen.queryByText("Keine Referenzen")).toBeNull();
+  await waitFor(() => expect(screen.getByTestId("club-success")).toBeTruthy());
+  // Kopfzeile „Erfolge“ (Entscheidung zu #1945), der Seitenkopf bleibt „Erfolge & Referenzen“.
+  expect(setOptions).toHaveBeenCalledWith({ title: "Erfolge" });
+  expect(screen.getByText("Erfolge & Referenzen")).toBeTruthy();
+  expect(screen.getByText("Siege")).toBeTruthy();
+  expect(screen.getByText("Zweite")).toBeTruthy();
+  expect(screen.getByText("Dritte")).toBeTruthy();
+  expect(screen.getByText("17 Teilnahmen · 5 Spiele · seit 2026")).toBeTruthy();
+  expect(screen.getAllByText("Season #2 Newcomer Liga A").length).toBeGreaterThan(0);
+  // Die alten Kacheln und der Satz über externe Turniere sind weg.
+  expect(screen.queryByText("Lineup: HuEpfa, Munkehy")).toBeNull();
+  expect(screen.queryByText("Podeste")).toBeNull();
+  expect(screen.queryByText(/Externe Turniere und Ligen, bei denen/)).toBeNull();
   expect(screen.queryByText(/native App-Module/)).toBeNull();
+});
+
+test("eine Teilnahme mit Saison öffnet die Saison in der App", async () => {
+  const base = mockGet.getMockImplementation() as (path: string) => Promise<unknown>;
+  mockGet.mockImplementation((path: string) => (path === "/reference-series/public/lineages"
+    ? Promise.resolve({ data: { items: [{ lineage: { slug: "desbl", title: "DeSBL", kind: "team_league" }, seasons: [{ season: "S2", season_slug: "s2", status: "completed", reference_ids: ["r-1"] }] }] } })
+    : base(path)));
+  await render(<InfoCenterScreen navigation={navigation} route={routeFor("references")} />);
+  await waitFor(() => expect(screen.getByTestId("club-success-lineage-desbl")).toBeTruthy());
+  await fireEvent.press(screen.getByTestId("club-success-row-r-1"));
+  expect((navigation as unknown as { navigate: jest.Mock }).navigate).toHaveBeenCalledWith("ReferenceSeason", { lineage: "desbl", season: "s2" });
 });
 
 test("ohne Referenzen bleibt der Hinweis, auch bei einem Array vom alten Server", async () => {
   mockGet.mockImplementation((path: string) => Promise.resolve({ data: path === "/references" ? [] : [] }));
   await render(<InfoCenterScreen navigation={navigation} route={routeFor("references")} />);
 
-  await waitFor(() => expect(screen.getByText("Keine Referenzen")).toBeTruthy());
+  await waitFor(() => expect(screen.getByText("Noch keine Referenzen")).toBeTruthy());
 });
 
 test("Mitgliedschaft und Rolle stehen als Begriff", async () => {

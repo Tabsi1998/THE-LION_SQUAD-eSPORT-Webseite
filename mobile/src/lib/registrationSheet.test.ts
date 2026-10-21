@@ -1,4 +1,15 @@
-import { checkInWindow, placeLine, rulesSummary } from "./registrationSheet";
+import { checkInWindow, placeLine, rulesSummary, waitlistLead } from "./registrationSheet";
+
+// Voller Cup (#1941, App-Teil): das Blatt sagt, dass die Anmeldung auf die Warteliste geht - mit dem Platz, wenn der
+// Server die Länge der Warteliste mitschickt (`waitlist_count`); ein alter Server ohne das Feld: ohne Platz.
+test("waitlistLead: bei vollem Cup die Warteliste mit Platz, sonst leer", () => {
+  expect(waitlistLead({ max_participants: 16, participant_count: 16, waitlist_count: 2 })).toBe("Der Cup ist voll – du kommst auf die Warteliste (Platz 3).");
+  expect(waitlistLead({ max_participants: 16, participant_count: 17, waitlist_count: 0 })).toBe("Der Cup ist voll – du kommst auf die Warteliste (Platz 1).");
+  expect(waitlistLead({ max_participants: 16, participant_count: 16 })).toBe("Der Cup ist voll – du kommst auf die Warteliste.");
+  expect(waitlistLead({ max_participants: 16, participant_count: 15, waitlist_count: 0 })).toBe("");
+  expect(waitlistLead({ participant_count: 40 })).toBe("");
+  expect(waitlistLead(null)).toBe("");
+});
 
 // Bestätigungs-Blatt der Turnier-Anmeldung (#1904): dieselben Fälle wie im Web (frontend/src/lib/registrationSheet.test.js).
 

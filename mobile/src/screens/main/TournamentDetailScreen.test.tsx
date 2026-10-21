@@ -121,8 +121,9 @@ test("vor Ort: kein Check-in-Knopf, sondern „Check-in vor Ort bei der Turnierl
   answer({ ...checkIn, event_mode: "local" });
   const view = await render(<TournamentDetailScreen navigation={navigation} route={route} />);
   await waitFor(() => expect(screen.getByTestId("tournament-checkin-local")).toBeTruthy());
+  // Wirksame Zeiten (#1938): der Check-in läuft schon, die eingestellte Öffnung liegt noch vor uns - dann kein „ab …“.
   expect(screen.getByTestId("tournament-checkin-local")).toHaveTextContent(
-    "Check-in vor Ort bei der Turnierleitung · ab 14.11.2026, 18:00 bis 14.11.2026, 18:45",
+    "Check-in vor Ort bei der Turnierleitung · bis 14.11.2026, 18:45",
   );
   expect(screen.queryByText("Jetzt einchecken")).toBeNull();
   await view.unmount();
@@ -279,6 +280,21 @@ describe("Bestätigungs-Blatt", () => {
     await fireEvent.press(screen.getByTestId("tournament-register-submit"));
     await waitFor(() => expect(mockPost).toHaveBeenCalledTimes(1));
     expect(mockPost).toHaveBeenCalledWith("/tournaments/t1/register", expect.objectContaining({ accept_rules: true, accept_privacy: true }));
+  });
+
+  // Voller Cup (#1941, App-Teil): Kopfzeile und Knopf sagen „Warteliste“ - wie im Web.
+  test("voller Cup: die Kopfzeile nennt die Warteliste mit Platz, der Knopf heißt „Auf die Warteliste“", async () => {
+    await openSheet({ ...SOLO, max_participants: 16, participant_count: 16, waitlist_count: 2 });
+    expect(screen.getByTestId("register-sheet")).toHaveTextContent(/Der Cup ist voll – du kommst auf die Warteliste \(Platz 3\)\./);
+    expect(screen.getByTestId("tournament-register-submit")).toHaveTextContent("Auf die Warteliste");
+    await fireEvent.press(screen.getByTestId("tournament-register-submit"));
+    await waitFor(() => expect(mockPost).toHaveBeenCalledTimes(1));
+  });
+
+  test("voller Cup bei altem Server ohne Länge der Warteliste: ohne Platz, kein Absturz", async () => {
+    await openSheet({ ...SOLO, max_participants: 16, participant_count: 16 });
+    expect(screen.getByTestId("register-sheet")).toHaveTextContent(/Der Cup ist voll – du kommst auf die Warteliste\./);
+    expect(screen.getByTestId("tournament-register-submit")).toHaveTextContent("Auf die Warteliste");
   });
 
   test("ohne eigene Regeln sagt das Blatt, was gilt", async () => {

@@ -115,6 +115,8 @@ const ADDRESSES: Array<[string, unknown]> = [
   ["/sponsors", detail("InfoCenter", { section: "sponsors" })],
   ["/partners", detail("InfoCenter", { section: "partners" })],
   ["/references", detail("InfoCenter", { section: "references" })],
+  // Saison einer Serie (#1945): die Seite des Webs hat jetzt einen Screen in der App.
+  ["/references/series/prl/2026-liga-1", detail("ReferenceSeason", { lineage: "prl", season: "2026-liga-1" })],
 ];
 
 test("jede bekannte Adresse hat ihren Ort - Übersichten wechseln den Tab, alles andere legt sich darüber", () => {

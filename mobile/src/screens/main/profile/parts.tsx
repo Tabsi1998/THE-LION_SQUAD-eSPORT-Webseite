@@ -6,7 +6,7 @@ import { API_BASE_URL } from "../../../config";
 import { formatDate, formatStatus } from "../../../lib/format";
 import { prizeKindLabel, prizeKindMark, prizePlaceText, prizeSourceLabel, prizeTarget } from "../../../lib/prizes";
 import { colors, radius } from "../../../theme";
-import type { PersonalReferenceItem, PrizePickup } from "../../../types";
+import type { PrizePickup } from "../../../types";
 
 // Bausteine des Profils (#1149, #1146): früher alle in ProfileScreen.tsx. Das eigene Profil, die Einstellungen, „Profil
 // bearbeiten“ und „Meine Gewinne“ nutzen dieselben Zeilen, Schalter und Karten.
@@ -127,42 +127,6 @@ export function MatrixToggle({ label, value, disabled, onValueChange }: { label:
         thumbColor={value ? colors.cyan : colors.muted}
       />
     </View>
-  );
-}
-
-export function ReferenceCard({ item, onOpen }: { item: PersonalReferenceItem; onOpen?: (item: PersonalReferenceItem) => void }) {
-  const isFastlap = item.kind === "fastlap";
-  const isSeason = item.kind === "season";
-  const content = (
-    <Card style={profileStyles.referenceCard}>
-      <View style={profileStyles.referenceTop}>
-        <View style={[profileStyles.referenceIcon, isFastlap || isSeason ? profileStyles.referenceIconFastlap : profileStyles.referenceIconTournament]}>
-          <Body style={profileStyles.referenceIconText}>{isFastlap ? "FL" : isSeason ? "JW" : "T"}</Body>
-        </View>
-        <View style={profileStyles.referenceText}>
-          <Body style={profileStyles.strong}>{item.title}</Body>
-          <Muted>{item.subtitle || (isFastlap ? "Fast Lap" : isSeason ? "Jahreswertung" : "Turnier")}</Muted>
-          <Muted>{formatDate(item.date)} · {formatStatus(item.status)}</Muted>
-        </View>
-        <View style={profileStyles.referenceRank}>
-          <Body style={[profileStyles.referenceRankText, Number(item.rank || 0) <= 3 && item.rank ? profileStyles.gold : null]}>
-            {item.rank ? `#${item.rank}` : "-"}
-          </Body>
-          <Muted>{item.participant_count ? `von ${item.participant_count}` : "Rang"}</Muted>
-        </View>
-      </View>
-      <View style={profileStyles.referenceMeta}>
-        {item.time_str ? <Pill label={item.time_str} tone="cyan" /> : null}
-        {isSeason && item.points != null ? <Pill label={`${item.points} Jahrespunkte`} tone="gold" /> : null}
-        <Pill label={isFastlap ? "Fast Lap" : isSeason ? "Jahreswertung" : "Turnier"} />
-      </View>
-    </Card>
-  );
-  if (!item.target_id || !onOpen) return content;
-  return (
-    <Pressable onPress={() => onOpen(item)} style={({ pressed }) => [pressed && profileStyles.pressed]}>
-      {content}
-    </Pressable>
   );
 }
 

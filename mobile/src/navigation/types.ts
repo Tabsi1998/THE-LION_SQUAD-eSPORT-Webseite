@@ -95,6 +95,8 @@ export type DetailParamList = {
   // Einlass bei der Generalversammlung (#845): nur für den Vorstand (Bereich „Verein“).
   Admission: undefined;
   InfoCenter: { section?: "sponsors" | "partners" | "events" | "benefits" | "references" | "profiles" } | undefined;
+  // Saison einer Serie (#1945, nur lesen): Rennliga, Team-Liga oder Turnierserie - aus Verein › Erfolge und dem Profil.
+  ReferenceSeason: { lineage: string; season: string };
   // Über uns, Vorstand, Werte, Kontakt (#1024): kurz in der App, lange Seiten bleiben auf der Website.
   ClubAbout: undefined;
   // Jahresrückblick „Dein Jahr bei LION“ (#1195): ab Mitte Dezember; Vorschau für die Verwaltung.

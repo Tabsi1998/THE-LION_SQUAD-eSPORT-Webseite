@@ -288,3 +288,47 @@ test("Reiter Erfolge: ein neuer Erfolg lädt nur den Erfolge-Stand nach - keine 
   expect(order.filter((entry) => entry === "post /achievements/evaluate")).toHaveLength(1);
   expect(order.filter((entry) => entry === "get /achievements/me")).toHaveLength(2);
 });
+
+// Reiter „Referenzen“ im neuen Design (#1945): Vereinsplatzierungen aus dem Vereinsprofil stehen mit den eigenen Turnieren
+// in einer Chronik je Jahr, mit Kopf ohne Nullen; eine Saison öffnet ihre Seite in der App. Erfundene Namen.
+const CLUB_REFERENCE = {
+  id: "r-liga", display_title: "Probe-Liga · Division 2", start_date: "2025-06-18T18:00:00Z", best_placement: 3, game: { name: "Rocket League" },
+  member_profile_ids: ["mp-neon"], entries: [{ id: "e1", kind: "team", team_name: "Lions Probe", placement: 3, team_count: 8, lineup_members: [{ profile_id: "mp-neon", display_name: "NeonFalke" }, { profile_id: "mp-kai", display_name: "Kai Funke" }] }],
+};
+const CLUB_LINEAGES = { items: [{ lineage: { slug: "probe-liga", title: "Probe-Liga", kind: "team_league" }, seasons: [{ season: "2025", tier: "Division 2", status: "completed", season_slug: "2025", reference_ids: ["r-liga"] }] }] };
+
+test("eigenes Profil, Vereinsmitglied: Vereinsplatzierungen im Reiter Referenzen - Saison öffnet in der App", async () => {
+  mockGet.mockImplementation((path: string, config?: { params?: Record<string, string> }) => {
+    if (path === "/membership/me/directory") return Promise.resolve({ data: { listed: true, slug: "neonfalke" } });
+    if (path === "/membership/profiles/neonfalke") return Promise.resolve({ data: { id: "mp-neon", references: [CLUB_REFERENCE] } });
+    if (path === "/reference-series/public/lineages") return Promise.resolve({ data: CLUB_LINEAGES });
+    return answer(path, config);
+  });
+  await renderOwn();
+  await waitFor(() => expect(screen.getByTestId("profile-private-box")).toBeTruthy());
+  await fireEvent.press(screen.getByText("Referenzen"));
+  await waitFor(() => expect(screen.getByTestId("profile-reference-club:r-liga")).toBeTruthy());
+  expect(within(screen.getByTestId("profile-references-head")).getByText("Bronze")).toBeTruthy();
+  expect(screen.queryByTestId("profile-references-empty")).toBeNull();
+  await fireEvent.press(screen.getByTestId("profile-reference-club:r-liga"));
+  expect(screen.getByTestId("lineup-me").props.accessibilityLabel).toBe("NeonFalke, du");
+  await fireEvent.press(screen.getByText("Saison ansehen"));
+  expect(navigate).toHaveBeenLastCalledWith("ReferenceSeason", { lineage: "probe-liga", season: "2025" });
+});
+
+test("fremdes Profil eines Vereinsmitglieds: der Reiter Referenzen erscheint mit seinen Vereinsplatzierungen", async () => {
+  mockGet.mockImplementation((path: string, config?: { params?: Record<string, string> }) => {
+    if (path === "/users/public/kaifunke") return Promise.resolve({ data: { id: "u-kai", username: "kaifunke", display_name: "Kai Funke", is_club_member: true, privacy_public_profile: true, stats: {}, teams: [], awards: [], references: { items: [] } } });
+    if (path === "/membership/profiles") return Promise.resolve({ data: [{ id: "mp-kai", slug: "kai-funke", linked_account: { username: "KaiFunke" } }] });
+    if (path === "/membership/profiles/kai-funke") return Promise.resolve({ data: { id: "mp-kai", references: [CLUB_REFERENCE] } });
+    if (path === "/reference-series/public/lineages") return Promise.resolve({ data: CLUB_LINEAGES });
+    if (path === "/achievements/user/u-kai") return Promise.resolve({ data: { awards: [], groups: [], pinned: [] } });
+    return answer(path, config);
+  });
+  await render(<PublicProfileScreen navigation={navigation} route={{ key: "p", name: "PublicProfile", params: { username: "kaifunke" } } as never} />);
+  await waitFor(() => expect(screen.getByText("Referenzen")).toBeTruthy());
+  await fireEvent.press(screen.getByText("Referenzen"));
+  await waitFor(() => expect(screen.getByTestId("profile-reference-club:r-liga")).toBeTruthy());
+  await fireEvent.press(screen.getByTestId("profile-reference-club:r-liga"));
+  expect(screen.getByTestId("lineup-me").props.accessibilityLabel).toBe("Kai Funke, du");
+});
