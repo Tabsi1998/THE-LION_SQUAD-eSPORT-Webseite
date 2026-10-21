@@ -11,6 +11,10 @@ import {
 } from "@/lib/teamLeague";
 import { leaguePath } from "@/lib/referencesOverview";
 import { SEASON_NOTE_TONES } from "@/lib/seriesTiers";
+import { statFigures, vetoLabel } from "@/lib/teamLeagueMaps";
+import { LazyImg } from "@/components/tls/LazyImg";
+import { MapCard } from "@/components/tls/maps/MapPoolView";
+import { Map as MapIcon } from "lucide-react";
 import "./referenceSeries.css";
 import "./teamLeague.css";
 
@@ -207,6 +211,76 @@ function Maps({ match }) {
   );
 }
 
+const RESULT_WORDS = { win: "gewonnen", draw: "unentschieden", loss: "verloren" };
+
+/** Hat das Veto Maps aus der Bibliothek mit Bild (#1616)? Dann stehen die Schritte als Karten da. */
+function hasVetoImages(match) {
+  return Array.isArray(match?.veto) && match.veto.some((step) => step.image_url);
+}
+
+// Das Veto als Karten (#1616): Bild der Map wie beim Speichern, oben die Rolle aus eigener Sicht (Bann, Wahl, Decider),
+// unten Name und Ergebnis. Gesperrt grau, nicht gespielt abgeschwächt, die gewonnene Map leuchtet beim Erscheinen kurz in
+// Vereinsblau auf. Bewegung in maps.css (gestaffelt, nur transform und opacity, „Bewegung reduzieren“ ohne Weg).
+function VetoCards({ match }) {
+  return (
+    <ol className="tls-veto mt-3" aria-label="Veto" data-testid="team-league-veto">
+      {match.veto.map((step, index) => {
+        const played = step.played !== false && step.role !== "banned";
+        return (
+          // Maps können gleich heißen (Rückspiel auf derselben Karte) - der Index gehört zum Schlüssel.
+          <li key={`${step.name}-${index}`} className="tls-veto-card" style={{ "--tls-i": Math.min(index, 8) }} data-testid="team-league-veto-card"
+            data-role={step.role} data-by={step.by || undefined} data-played={played ? "true" : "false"} data-outcome={played ? step.outcome : undefined}>
+            <div className="tls-veto-card__media">
+              {step.image_url ? (
+                <LazyImg src={step.image_url} alt="" sizes="(min-width: 640px) 150px, 30vw" widths={[160, 320]} className="tls-veto-card__img" />
+              ) : (
+                <span className="tls-map-card__placeholder" aria-hidden="true"><MapIcon className="w-5 h-5" /></span>
+              )}
+              <span className="tls-veto-card__label" data-testid="team-league-veto-label">{vetoLabel(step)}</span>
+            </div>
+            <div className="tls-veto-card__body">
+              <span className="tls-veto-card__name">{step.name}</span>
+              {step.role === "banned" ? null : played ? (
+                <span className="tls-veto-card__result tabular-nums">
+                  {formatNumber(step.score_for)}:{formatNumber(step.score_against)}
+                  {RESULT_WORDS[step.outcome] ? <span className="tls-veto-card__word">{RESULT_WORDS[step.outcome]}</span> : null}
+                </span>
+              ) : <span className="tls-veto-card__result text-white/45">nicht gespielt</span>}
+            </div>
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
+
+// Statistik je Map (#1616) aus den eigenen Spielen der Saison: gespielt, Siege, Wahl und Bann - je Map nur die
+// Kennzahlen, die vorkommen. Meistgespielte zuerst (so liefert sie der Server).
+function MapStats({ stats }) {
+  if (!stats?.length) return null;
+  return (
+    <section className="mt-12" aria-labelledby="team-league-map-stats" data-testid="team-league-map-stats">
+      <SectionTitle id="team-league-map-stats">Maps</SectionTitle>
+      <p className="mt-2 text-sm text-white/55">Aus den eigenen Spielen der Saison: wie oft gespielt, gewonnen, gewählt und gebannt.</p>
+      <ul className="mt-4 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+        {stats.map((stat, index) => (
+          <li key={stat.map_id || stat.name} className="space-y-2" data-testid="team-league-map-stat">
+            <MapCard item={stat} index={index} sizes="(min-width: 1024px) 240px, (min-width: 640px) 33vw, 50vw" />
+            <dl className="tls-map-figures" data-testid="team-league-map-figures">
+              {statFigures(stat).map((figure) => (
+                <div key={figure.key} data-figure={figure.key}>
+                  <dt>{figure.label}</dt>
+                  <dd className="tabular-nums">{figure.value}</dd>
+                </div>
+              ))}
+            </dl>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
 // Die übrigen Spiele des Spieltags (#1931) - zugeklappt, nur Teams und Ergebnis.
 function OtherMatches({ others }) {
   if (!others?.length) return null;
@@ -251,8 +325,13 @@ function OwnMatch({ round, match, showTeam, withScore }) {
         ) : <p className="mt-2 text-sm text-white/45">Gegner offen</p>}
         {withScore && match && <span className="mt-2"><Score match={match} /></span>}
       </div>
-      {match && <Maps match={match} />}
-      {match?.bans?.length > 0 && <p className="mt-2 text-xs text-white/50" data-testid="team-league-bans"><span className="text-white/35">Bann: </span>{banText(match.bans)}</p>}
+      {/* Mit Bildern aus der Map-Bibliothek (#1616) das Veto als Karten, sonst die Liste wie bisher. */}
+      {match && hasVetoImages(match) ? <VetoCards match={match} /> : (
+        <>
+          {match && <Maps match={match} />}
+          {match?.bans?.length > 0 && <p className="mt-2 text-xs text-white/50" data-testid="team-league-bans"><span className="text-white/35">Bann: </span>{banText(match.bans)}</p>}
+        </>
+      )}
     </div>
   );
 }
@@ -439,6 +518,7 @@ export function TeamLeagueSections({ data }) {
       <Record record={league.record} />
       <LeagueTable league={league} rounds={rounds} />
       <Schedule matchdays={matchdays} showTeam={(league.own_teams || []).length > 1} />
+      <MapStats stats={league.map_stats} />
       <Lineup lineup={league.lineup} rounds={rounds} ownTeams={league.own_teams || []} />
       <LeaguePath path={league.path} lineageSlug={data.lineage?.slug} tierOrder={data.lineage?.tier_order} />
     </div>

@@ -634,7 +634,12 @@ Spieltag als Karte: Tag und Uhrzeit des Spiels (bei einem Zeitraum beide Tage), 
 Ergebnis (Rand und Kürzel S/U/N in Sieg- bzw. Niederlagen-Farbe), das ganze Veto in seiner Reihenfolge – die Maps mit
 **Unsere Wahl**, **Wahl Gegner** oder **Decider** (eine Wahl bzw. der Decider ohne Ergebnis, etwa beim 2:0,
 abgeschwächt mit „nicht gespielt“), darunter die gebannten Maps – und zugeklappt die **weiteren Spiele** des Spieltags.
-Spielen zwei eigene Teams am selben Spieltag, stehen beide Spiele auf der Karte. Der **Kader** zeigt alle
+Kommen die Maps aus der Map-Bibliothek, steht das Veto als **Karten mit Bild** da: oben die Rolle (**Bann · wir**,
+**Bann · Gegner**, **Unsere Wahl**, **Wahl Gegner**, **Decider**), unten Name und Ergebnis; gebannte Maps grau, die
+gewonnene Map mit blauem Rand. Spielen zwei eigene Teams am selben Spieltag, stehen beide Spiele auf der Karte. Unter
+dem Spielplan zeigt **Maps** je Map aus den eigenen Spielen der Saison, wie oft sie gespielt, gewonnen, verloren,
+gewählt (von uns, vom Gegner, als Decider) und gebannt wurde – meistgespielte zuerst, je Map nur die Zahlen, die
+vorkommen (Bilder unten mit Testdaten). Der **Kader** zeigt alle
 Spieler der eigenen Teams, auch wer noch nicht gespielt hat: je Spieltag ein Haken (gespielt) oder **E** (Ersatz – im
 Kader, aber nicht aufgestellt), unter **Einsätze** etwa „2 von 5“ (von den Spielen des Teams mit Aufstellung).
 Vereinsmitglieder verlinken auf ihr Profil und haben unter **Gesamt** ihre Einsätze über alle Saisons der Spur; Gäste
@@ -647,6 +652,13 @@ der Kader im Abschnitt **Kader** der Saison.
 <tr>
 <td><img src="../assets/serien/serien-seite-teamliga-breit.png" alt="Seite einer Team-Liga mit Spieltagen, Bilanz, Tabelle, Spieltagen als Karten mit dem ganzen Veto (nicht gespielter Decider abgeschwächt) und Bann, Kader mit Einsätzen und Liga-Weg" width="560"></td>
 <td><img src="../assets/serien/serien-seite-teamliga-handy.png" alt="Dieselbe Seite am Handy mit 390 px, die weiteren Spiele des ersten Spieltags aufgeklappt" width="220"></td>
+</tr>
+</table>
+
+<table>
+<tr>
+<td><img src="../assets/serien/serien-teamliga-veto-karten.png" alt="Spielplan der Team-Liga: das Veto als Karten mit Bild – Bann grau, Unsere Wahl, Wahl Gegner, Decider, die gewonnenen Maps mit blauem Rand" width="480"></td>
+<td><img src="../assets/serien/serien-teamliga-map-statistik.png" alt="Abschnitt Maps: je Map Bild und Zahlen – gespielt, Siege, Niederlagen, Wahl und Bann" width="400"></td>
 </tr>
 </table>
 
@@ -933,7 +945,15 @@ einem gewerteten Termin **Ergebnis ändern**. Das öffnet das Blatt des Termins.
   Spiele (`-:-`) werden nicht übernommen.
   Im eigenen Spiel stehen die **Maps in der Reihenfolge des Vetos**: je Map der Name (mit Vorschlägen aus den schon
   verwendeten Maps der Saison) und die Rolle – **Gespielt**, **Unsere Wahl**, **Wahl Gegner**, **Decider**, **Unser Bann**
-  oder **Bann Gegner**; gesperrte Maps haben kein Ergebnis. Eine **gespielte** Map braucht beide Stände; **Wahl** und
+  oder **Bann Gegner**; gesperrte Maps haben kein Ergebnis. Hat die Spur ein Spiel mit Maps, steht darüber der
+  **Map-Pool der Saison** (sonst die Maps des Spiels) je Modus mit Bild: in der Reihenfolge des Vetos antippen, jede
+  Map kommt in die nächste freie Zeile. Ein getippter oder eingefügter Name wird der Map zugeordnet, wenn er ihrem
+  Namen, ihrem Slug oder einer ihrer **weiteren Schreibweisen** entspricht (Groß/klein, Leer- und Bindestriche egal) –
+  dann steht ihr Bild davor, und beim Verlassen des Felds ihr Name. Ein **unbekannter Name** ist gelb markiert („Nicht im
+  Map-Pool“) und bleibt als Freitext; fehlt die Map, in der Bibliothek anlegen oder die Schreibweise dort eintragen.
+  Beim Speichern merkt sich das Spiel Name und Bild der Map: spätere Änderungen in der Bibliothek ändern alte Spiele
+  nicht, auch eine archivierte Map bleibt bei ihnen sichtbar. Eine Map aus einem anderen Spiel lehnt die Prüfung ab.
+  <img src="../assets/serien/serien-ergebnis-map-pool.png" alt="Ergebnisblatt der Team-Liga: Map-Pool der Saison je Modus mit Bild über den Maps, drei Maps aus dem Pool mit Bild, eine unbekannte Map gelb markiert" width="460"> Eine **gespielte** Map braucht beide Stände; **Wahl** und
   **Decider** dürfen leer bleiben, wenn sie nicht gespielt wurden (etwa der Decider bei 2:0) – sie zählen dann nicht.
   Ein leerer Stand wird nie zu 0:0. Die **Aufstellung** ist eine Ankreuzliste aus dem **Kader**
   des Teams; mit **je Map** bekommt jede gespielte Map ihre eigene (wer eine Map gespielt hat, hat das Spiel gespielt).

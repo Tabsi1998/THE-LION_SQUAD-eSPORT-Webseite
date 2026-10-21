@@ -90,9 +90,14 @@ describe("Öffentliche Anzeige", () => {
 describe("Formular einer Map", () => {
   it("rechnet zwischen Map und Formular um – leere Felder werden null", () => {
     const form = mapToForm({ name: "Hafenkante", slug: "hafenkante", image_url: "", modes: ["snd"], note: null, external_ref: "map_hafen" });
-    expect(form).toEqual({ name: "Hafenkante", slug: "hafenkante", image_url: "", modes: ["snd"], note: "", external_ref: "map_hafen" });
+    expect(form).toEqual({ name: "Hafenkante", slug: "hafenkante", image_url: "", modes: ["snd"], note: "", external_ref: "map_hafen", aliases: "" });
     expect(mapFormPayload({ ...form, name: "  Hafenkante  ", note: " ", slug: "" })).toEqual({
-      name: "Hafenkante", slug: null, image_url: null, modes: ["snd"], note: null, external_ref: "map_hafen",
+      name: "Hafenkante", slug: null, image_url: null, modes: ["snd"], note: null, external_ref: "map_hafen", aliases: [],
     });
+  });
+
+  it("weitere Schreibweisen stehen im Formular mit Komma getrennt (#1616 an #1931)", () => {
+    expect(mapToForm({ name: "Hafenkante", aliases: ["Harbour Edge", "Hafen"] }).aliases).toBe("Harbour Edge, Hafen");
+    expect(mapFormPayload({ name: "Hafenkante", aliases: " Harbour  Edge , , Hafen " }).aliases).toEqual(["Harbour Edge", "Hafen"]);
   });
 });

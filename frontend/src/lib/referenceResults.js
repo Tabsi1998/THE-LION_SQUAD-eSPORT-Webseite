@@ -34,9 +34,10 @@ export function emptyRow(values = {}) {
 
 // Team-Liga (#1931): je Map die Rolle im Veto („banned“, „picked“, „decider“, leer = gespielt), wer gesperrt bzw.
 // gewählt hat („own“/„opponent“), später die Kennung aus der Map-Bibliothek (`map_id`, #1616) und optional ihre
-// Aufstellung; je Spiel Tag und Uhrzeit. `perMap` ist nur der Schalter „Aufstellung je Map“ im Formular.
+// Aufstellung; je Spiel Tag und Uhrzeit. `perMap` ist nur der Schalter „Aufstellung je Map“ im Formular. `mode`: der
+// Modus im Map-Pool der Saison, unter dem die Map gewählt wurde (#1616).
 export function emptyMap(values = {}) {
-  return { key: nextKey("map"), name: "", map_id: "", role: "", by: "", home_score: "", away_score: "", lineup: [], ...values };
+  return { key: nextKey("map"), name: "", map_id: "", mode: "", role: "", by: "", home_score: "", away_score: "", lineup: [], ...values };
 }
 
 /** Gesperrt hat eine Map kein Ergebnis und keine Aufstellung. */
@@ -92,7 +93,7 @@ export function sheetToForm(content, participants = [], { kind, teamName, oppone
     ...emptyMatch({ home: match.home, away: match.away }),
     home_score: text(match.home_score), away_score: text(match.away_score),
     maps: (match.maps || []).map((item) => emptyMap({
-      name: item.name, map_id: text(item.map_id), role: item.role === "played" ? "" : item.role || "", by: item.by || "",
+      name: item.name, map_id: text(item.map_id), mode: text(item.mode), role: item.role === "played" ? "" : item.role || "", by: item.by || "",
       home_score: text(item.home_score), away_score: text(item.away_score), lineup: people(item.lineup),
     })),
     lineup: people(match.lineup),
@@ -324,6 +325,7 @@ export function formToPayload(form, rules = {}) {
           const head = {
             name: text(item.name).trim(),
             ...(text(item.map_id).trim() ? { map_id: text(item.map_id).trim() } : {}),
+            ...(text(item.map_id).trim() && text(item.mode).trim() ? { mode: text(item.mode).trim() } : {}),
             ...(item.role ? { role: item.role } : {}),
             ...(item.by && ["banned", "picked"].includes(item.role) ? { by: item.by } : {}),
           };

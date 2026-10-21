@@ -114,7 +114,8 @@ from database import get_db
 from match_rules import RESULT_MAX_SCORE
 from models import ReferencePointsSource, ReferenceResultMark, ReferenceResultStatus, _clock, new_id, now_utc
 from services import (
-    race_weekend, reference_running_cache, reference_series, series_identity, series_results, tournament_days,
+    race_weekend, reference_running_cache, reference_series, series_identity, series_results, team_league_maps,
+    tournament_days,
 )
 from services.dolibarr_policy import club_today
 from services.own_teams import own_team_names, own_teams
@@ -207,6 +208,8 @@ class ResultMapEntry(BaseModel):
     ``map_field`` im Problem (Prüfung #1931)."""
     name: str = Field(min_length=1, max_length=80)
     map_id: Optional[str] = Field(default=None, max_length=80)
+    # Modus im Map-Pool der Saison (#1616): mit ``map_id`` geprüft je Modus, ohne Angabe in irgendeinem Modus des Pools.
+    mode: Optional[str] = Field(default=None, max_length=40)
     role: Optional[Literal["banned", "picked", "decider", "played"]] = None
     by: Optional[Literal["own", "opponent"]] = None
     home_score: Optional[float] = Field(default=None, ge=0, le=RESULT_MAX_SCORE, allow_inf_nan=False)
@@ -387,6 +390,9 @@ async def _prepare(db, access: SeriesAccess, round_doc: dict, body: ResultSheetI
     rules = await _round_rules(db, access.series, round_doc)
     participants = await _participants(db, access.series_id)
     resolution = series_results.resolve(body.model_dump(), participants, rules)
+    # Maps aus der Bibliothek (#1616): nur aus der geltenden Auswahl, Name und Bild als Snapshot ins Blatt - Maps des
+    # schon gespeicherten Blatts behalten ihren Snapshot.
+    await team_league_maps.attach(db, access.series, resolution, await _sheet(db, access.series_id, round_doc["id"]))
     series_results.check(resolution, rules, round_doc, club_today(), own_teams(access.series))
     if race_weekend.session_kind(round_doc.get("session")) == "qualifying":
         # Qualifying (#1930): dass es nicht zur Wertung zählt, ist gewollt; die Pole setzt sich im Qualifying fürs
@@ -594,14 +600,17 @@ async def get_results(series_id: str, round_id: str, access: SeriesAccess = Depe
     existing = await _sheet(db, series_id, round_id)
     participants = sorted(await _participants(db, series_id),
                           key=lambda row: (str(row.get("name") or "").casefold(), str(row.get("id"))))
+    kind = await _kind(db, access.series)
     return {
         "round": _round_view(round_doc),
-        "series": {"id": access.series_id, "kind": await _kind(db, access.series),
+        "series": {"id": access.series_id, "kind": kind,
                    "team_name": access.series.get("team_name"),
                    "own_teams": own_team_names(access.series),
                    "rules": await _round_rules(db, access.series, round_doc),
                    "own_team_list": own_teams(access.series),
                    "map_names": await _map_names(db, series_id),
+                   # Maps zur Auswahl (#1616): Pool der Saison, sonst Vorgabe des Spiels; ohne Spiel None (Freitext).
+                   "map_choices": await team_league_maps.choices(db, access.series) if kind == "team_league" else None,
                    "publish_mode": access.series.get("publish_mode")},
         "access": access.summary(), "version": _version(existing), "sheet": _sheet_view(existing, access),
         "target": access.edit_target(existing),

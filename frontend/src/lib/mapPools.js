@@ -90,6 +90,8 @@ export function mapToForm(item) {
     modes: Array.isArray(item?.modes) ? [...item.modes] : [],
     note: text(item?.note),
     external_ref: text(item?.external_ref),
+    // Weitere Schreibweisen (#1616 an #1931) im Formular als ein Feld, mit Komma getrennt.
+    aliases: (Array.isArray(item?.aliases) ? item.aliases : []).join(", "),
   };
 }
 
@@ -101,5 +103,6 @@ export function mapFormPayload(form) {
     modes: [...(form?.modes || [])],
     note: orNull(form?.note),
     external_ref: orNull(form?.external_ref),
+    aliases: text(form?.aliases).split(",").map(orNull).filter(Boolean),
   };
 }

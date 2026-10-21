@@ -27,6 +27,7 @@ from services.own_teams import Matcher, own_team_names, own_teams
 from services.scoring_rules import match_points, normalize_rules
 from services.series_appearances import team_league_appearances
 from services.series_identity import without_game_tag
+from services.team_league_maps import map_stats
 from services.team_league_sheet import is_played, own_match, own_matches  # noqa: F401 - own_match für Leser (#1747)
 from services.visibility import user_can_see
 
@@ -78,7 +79,8 @@ def _match_view(match: dict, rules: dict) -> dict:
         # Das ganze Veto in seiner Reihenfolge (#1931): Banns, Wahlen und Decider - auch eine Wahl bzw. ein Decider
         # ohne Ergebnis (nicht gespielt, etwa beim 2:0). ``maps`` bleibt bei den gespielten (so liest es die App).
         step = {"name": item.get("name"), "role": item.get("role") or "played", "played": is_played(item)}
-        for key in ("by", "map_id"):
+        # ``image_url``: das Bild der Map, wie es beim Speichern war (Snapshot, #1616).
+        for key in ("by", "map_id", "image_url"):
             if item.get(key):
                 step[key] = item[key]
         if _picked(item):
@@ -96,8 +98,9 @@ def _match_view(match: dict, rules: dict) -> dict:
         # #1931: wer gewählt hat und die Kennung aus der späteren Map-Bibliothek (#1616) - nur, wenn angegeben.
         if _picked(item):
             entry["picked"] = _picked(item)
-        if item.get("map_id"):
-            entry["map_id"] = item["map_id"]
+        for key in ("map_id", "image_url"):
+            if item.get(key):
+                entry[key] = item[key]
         maps.append(entry)
         veto.append({**step, **entry})
     return {
@@ -316,4 +319,6 @@ async def team_league_view(db, user, lineage: dict, series: dict, rounds: list[d
                                                                     if view["team"] not in own_team_names(series)})]),
         "lineup": await _lineup(db, series, seasons, sheets, own_days),
         "path": _path(series, seasons, by_season),
+        # Statistik je Map der eigenen Spiele (#1616): gebannt, gewählt, gespielt, Siege und Niederlagen.
+        "map_stats": map_stats(views),
     }

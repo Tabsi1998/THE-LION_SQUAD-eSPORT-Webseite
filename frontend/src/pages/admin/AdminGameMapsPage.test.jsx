@@ -67,9 +67,11 @@ test("legt eine Map im Seitenblatt an – Name, Bild, Modi, ohne JSON", async ()
   fireEvent.change(within(sheet).getByTestId("game-map-name"), { target: { value: "Sturmdeck" } });
   fireEvent.change(within(sheet).getByTestId("game-map-image"), { target: { value: "/api/static/uploads/sturm.webp" } });
   fireEvent.click(within(sheet).getByRole("checkbox", { name: "Suchen & Zerstören" }));
+  // Weitere Schreibweisen (#1616 an #1931): darüber ordnet das Ergebnisblatt der Team-Liga einen Namen zu.
+  fireEvent.change(within(sheet).getByTestId("game-map-aliases"), { target: { value: "Storm Deck" } });
   fireEvent.click(within(sheet).getByTestId("game-map-save"));
   await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/games/g1/maps", {
-    name: "Sturmdeck", slug: null, image_url: "/api/static/uploads/sturm.webp", modes: ["snd"], note: null, external_ref: null,
+    name: "Sturmdeck", slug: null, image_url: "/api/static/uploads/sturm.webp", modes: ["snd"], note: null, external_ref: null, aliases: ["Storm Deck"],
   }));
 });
 

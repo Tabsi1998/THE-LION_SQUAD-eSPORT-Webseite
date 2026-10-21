@@ -627,6 +627,8 @@ sind zwei verschiedene Maps. Eingebaut ist keine Map; ihr legt alle selbst an. *
 
 - **Name** und **Slug** (eindeutig im Spiel; bleibt beim Umbenennen gleich), **Bild** im Format 16 : 9 über
   **Hochladen** oder **Medien wählen** (nur eigene Uploads), **Notiz** und **Externe Kennung** (freiwillig).
+- **Weitere Schreibweisen**, mit Komma getrennt – etwa wie ein Veranstalter die Map nennt. Darüber ordnet das
+  Ergebnisblatt einer Team-Liga einen getippten oder eingefügten Namen der Map zu (siehe [Inhalte, Serien](inhalte.md)).
 - **Modi:** dieselben Modi wie bei der Spieldauer (siehe 3.12) – kein zweites Modussystem. Eine Map kann in mehreren
   Modi freigegeben sein und in anderen nicht; nur dort lässt sie sich in einen Pool wählen. Hat das Spiel keine Modi,
   gilt die Map für jeden Pool.

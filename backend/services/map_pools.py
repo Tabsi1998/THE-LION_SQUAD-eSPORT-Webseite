@@ -141,7 +141,8 @@ async def library(db, game: dict | None) -> list[dict]:
     """Was zur Wahl steht: die aktiven Maps des Spiels in ihrer Reihenfolge."""
     if not game:
         return []
-    return [{key: row.get(key) for key in ("id", "slug", "name", "image_url", "modes", "order")}
+    return [{**{key: row.get(key) for key in ("id", "slug", "name", "image_url", "modes", "order")},
+             "aliases": row.get("aliases") or []}
             for row in await game_maps.maps_of(db, game["id"], active_only=True)]
 
 

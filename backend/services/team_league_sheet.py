@@ -86,6 +86,10 @@ def map_entry(raw: dict, lineup: list[str] | None) -> dict:
     map_id = _clean(raw.get("map_id"))[:MAX_MAP_ID]
     if map_id:
         out["map_id"] = map_id
+        # Modus im Map-Pool der Saison (#1616) - nur mit Kennung; Name und Bild setzt ``team_league_maps.attach``.
+        mode = _clean(raw.get("mode"))[:40]
+        if mode:
+            out["mode"] = mode
     role = _role(raw)
     if role:
         out["role"] = role

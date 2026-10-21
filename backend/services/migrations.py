@@ -103,6 +103,30 @@ async def migrate_series_own_teams(db) -> str:
     return f"{moved} series own teams taken over"
 
 
+async def migrate_game_map_keys(db) -> str:
+    """Map-Bibliothek (#1616): die Schlüssel von Name, Slug und weiteren Schreibweisen jeder Map in ``game_map_keys``
+    belegen - darüber prüft die Bibliothek atomar, dass jede Schreibweise je Spiel zu genau einer Map führt. Bei einem
+    Altbestand mit Doppelten gewinnt die Map, die in der Reihenfolge zuerst steht; die andere behält ihren Text."""
+    from pymongo.errors import DuplicateKeyError as Duplicate
+
+    from services.game_maps import spelling_keys
+
+    filled = skipped = 0
+    rows = await db.game_maps.find({}, {"_id": 0, "id": 1, "game_id": 1, "name": 1, "slug": 1, "aliases": 1,
+                                        "order": 1}).to_list(None)
+    for row in sorted(rows, key=lambda item: (str(item.get("game_id")), item.get("order") or 0)):
+        for key in spelling_keys(row.get("name"), row.get("slug"), row.get("aliases")):
+            if await db.game_map_keys.find_one({"game_id": row["game_id"], "key": key}, {"_id": 1}):
+                skipped += 1
+                continue
+            try:
+                await db.game_map_keys.insert_one({"game_id": row["game_id"], "key": key, "map_id": row["id"]})
+                filled += 1
+            except Duplicate:
+                skipped += 1
+    return f"{filled} map spellings reserved, {skipped} skipped"
+
+
 MIGRATIONS = (
     (1, "encrypt_legacy_integration_credentials", migrate_plaintext_secrets),
     (2, "team_leader_role_to_player", migrate_team_leader_role),
@@ -113,6 +137,7 @@ MIGRATIONS = (
     (6, "reference_points_schemes", migrate_points_scheme_templates),
     (7, "reference_round_countries", migrate_round_countries),
     (8, "reference_series_own_teams", migrate_series_own_teams),
+    (9, "game_map_spelling_keys", migrate_game_map_keys),  # #1616
 )
 
 
