@@ -437,6 +437,36 @@ bekommt keine Platzierung (der Status „abgebrochen“ kommt mit einem eigenen 
 Hat ein Termin kein Ergebnis, obwohl danach schon gewertet ist, steht oben der Hinweis **Lücke im Kalender** – meist
 fehlt das Ergebnis, oder der Termin wurde abgesagt.
 
+**Rennwochenende mit Läufen (Rennliga).** Eine Runde (gleiches Kürzel, etwa R1) kann mehrere **Läufe** haben:
+Qualifying, Sprint, Rennen, Hauptrennen, Lauf 1, Lauf 2 oder ein eigener Name. Jeder Lauf ist ein eigener Termin mit
+eigenem Ergebnisblatt, gezeigt wird aber eine Runde. Bestehende Termine ohne Lauf sind Rennen und bleiben, wie sie sind.
+
+- **Läufe je Runde** (Saison bearbeiten, nur bei einer Rennliga): **Läufe festlegen** legt den Ablauf an. Je Lauf gibt
+  es Name, **Versatz** in Minuten ab der Uhrzeit der Zeile, **Punkte** (wie die Saison, keine oder ein eigenes Schema
+  wie `12-9-7-6-5-4-3-2-1`), **Startplatz** (Eingabe, aus dem Qualifying oder in umgekehrter WM-Reihenfolge) und
+  **Zählt zur Wertung**. Ändert sich der Ablauf mitten in der Saison, kommt mit **Ab Runde … anders** ein Abschnitt
+  dazu, etwa ab Runde 5 ohne Qualifying. Ändert ihr Punkte oder Startplatz, rechnet die Seite alle Stände neu.
+- **Liste einfügen:** Eine Zeile je Runde (`R1 · 07.03.2026 · Australien`) legt alle Läufe der Vorgabe an – 8 Zeilen
+  ergeben bei Quali, Sprint und Rennen 24 Läufe. Eine Zeile mit Lauf legt nur diesen an: `R1 Sprint`, `R1S`, `R1 S`,
+  `R1-Sprint`, `R1 Q`, `R1 Quali`, `R1 Rennen`, `R1 Race` oder `R1 Feature`. Einen Lauf, den es in der Runde schon
+  gibt, weist die Vorschau ab.
+- **Termin:** Feld **Lauf**. Ein Qualifying zählt nicht zur Wertung – bringt es Punkte, setzt ihr den Haken. Jeder Lauf
+  lässt sich einzeln verschieben, absagen und archivieren.
+- **Ergebnis eines Qualifyings:** Platz, Startnummer, Name, Team, **Zeit** und Abstand, ohne Punkte. Ohne Zeit
+  (`--:--.---`) geht auch. Platz 1 bekommt die **Pole** von selbst. Das Einfügen liest die Quali-Liste mit Time und Gap.
+- **Startplatz:** Ist er im Rennen leer, kommt er aus dem Qualifying derselben Runde (oder aus der umgekehrten
+  Fahrerwertung vor der Runde). Ein eingetragener Startplatz, etwa nach einer Strafe, bleibt. Die Pole zählt am Rennen,
+  das seinen Startplatz aus dem Qualifying nimmt, samt Pole-Bonus der Saison.
+- **Ergebnisse eintragen:** je Runde eine Zeile, jeder Lauf ein Chip in der Farbe seines Status – ein Tipp öffnet sein
+  Blatt.
+
+<table>
+<tr>
+<td><img src="../assets/serien/serien-laeufe-je-runde.png" alt="Saison bearbeiten: Läufe je Runde mit Qualifying, Sprint mit eigenem Schema und Hauptrennen, ab Runde 5 anders" width="420"></td>
+<td><img src="../assets/serien/serien-laeufe-kalender.png" alt="Kalender der Verwaltung: je Runde ein Kopf, darunter Qualifying, Sprint und Hauptrennen mit eigenem Status" width="420"></td>
+</tr>
+</table>
+
 <table>
 <tr>
 <td><img src="../assets/serien/serien-kalender-einfuegen.png" alt="Blatt Terminliste einfügen mit der Vorschau der erkannten Termine" width="420"></td>
@@ -514,6 +544,19 @@ Aufstellung, dazu bei Bedarf die Tabelle laut Veranstalter.
   Gäste markiert; darüber, wie viele Fahrer je Rennen zählen und ob Gäste mitzählen.
 - **Rennkalender:** alle Termine mit Status; bei gewerteten Rennen der Sieger, wenn er aus dem Verein ist, sonst der
   beste Vereinsfahrer mit Platz.
+- **Rennwochenende:** Hat die Saison Läufe, steht im Kalender je Runde eine Zeile mit Flagge, Ort und den **Lauf-Chips**
+  „Quali · Sprint · Rennen“ (Uhrzeit und Status), der Sieger je zählendem Lauf darunter. Im Rennraster steht über Sprint
+  und Rennen ein Kopf mit Flagge und Kürzel, darunter S, R, HR …; die Tabelle summiert alle zählenden Läufe, die Punkte
+  je Lauf stehen über der Tabelle. Der Fortschritt zählt Runden, „Nächstes Rennen“ nennt den Lauf („R3 ·
+  Qualifying“). Das Fahrer-Detail nennt **Poles**, **Ø Start** und das **Quali-Duell** gegen den Teamkollegen. „Läuft
+  gerade“ und „Heute im Einsatz“ zeigen den heutigen Lauf und die Chips der Runde.
+
+<table>
+<tr>
+<td><img src="../assets/serien/serien-laeufe-seite.png" alt="Seite einer Rennliga mit Rennwochenenden: Rennraster mit Kopf je Runde über Sprint und Hauptrennen, Kalender mit Lauf-Chips" width="560"></td>
+<td><img src="../assets/serien/serien-laeufe-handy.png" alt="Rennkalender am Handy mit Lauf-Chips Quali, Sprint und Hauptrennen" width="220"></td>
+</tr>
+</table>
 
 Das Team je Rennen kommt aus der Spalte **Team** im Ergebnisblatt, sonst gilt das Standard-Team des Teilnehmers. Am Handy
 stehen Karten statt der Tabellen.
