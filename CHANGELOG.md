@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.21.0](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/compare/v1.20.0...v1.21.0) (2026-10-21)
+
+
+### Neu
+
+* Abzeichen „Podest extern“ und „Dauerbrenner“ für externe Wettbewerbe, ohne Jahreswertungs-Punkte ([#1750](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1750)) ([81402e0](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/81402e09c8dee3785cc1fa62934cbf8f757d104b))
+* Referenz-Karten aus einer Saison führen zur Saison-Seite ([#1750](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1750)) ([81402e0](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/81402e09c8dee3785cc1fa62934cbf8f757d104b))
+* Referenzen – Auswahl „Gehört zur Saison“, Abzeichen „aus Saison …“ und Hinweis auf Serien in der Verwaltung ([#1750](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1750)) ([81402e0](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/81402e09c8dee3785cc1fa62934cbf8f757d104b))
+* Saison abschließen – aus dem Endstand einer Saison wird die Referenz mit Endplatz, Team und Einzelwertungen ([#1750](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1750)) ([81402e0](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/81402e09c8dee3785cc1fa62934cbf8f757d104b))
+* Saison-Kopf zeigt „Referenz: Platz 6 von 8 · ansehen“ ([#1750](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1750)) ([81402e0](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/81402e09c8dee3785cc1fa62934cbf8f757d104b))
+
 ## 1.20.0 (21.10.2026)
 
 ### Neu
