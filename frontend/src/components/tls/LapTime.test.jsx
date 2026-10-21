@@ -2,7 +2,12 @@ import { act, render, screen } from "@testing-library/react";
 import { LAP_COUNT_MS, LapTime, firstShow, formatLapLike, introOnce, parseLap } from "./LapTime";
 
 // Timing-Board (#1077): Rundenzeiten zählen beim ersten Erscheinen einmal hoch. Am Ende steht exakt der Text vom
-// Server; ohne `play` und mit „Bewegung reduzieren“ steht er sofort da.
+// Server - angezeigt mit Komma (#1969, wie lib/raceTime); ohne `play` und mit „Bewegung reduzieren“ steht er sofort da.
+// Gezählt wird mit dem einen Baustein CountUp: während des Zählens steht die Zahl im Teil für die Augen.
+
+function shown(cell) {
+  return cell.querySelector("[aria-hidden='true']")?.textContent ?? cell.textContent;
+}
 
 afterEach(() => {
   vi.useRealTimers();
@@ -28,9 +33,9 @@ test("formatLapLike hält die Form der Vorlage: gleiche Stellen, gleiches Trennz
   expect(formatLapLike(1000, "DNF")).toBe("DNF");
 });
 
-test("ohne play steht die Zeit sofort da - auch ein Text, der keine Zeit ist", () => {
+test("ohne play steht die Zeit sofort da, mit Komma - auch ein Text, der keine Zeit ist", () => {
   render(<><LapTime value="1:24.587" data-testid="zeit" /><LapTime value="DNF" play data-testid="dnf" /></>);
-  expect(screen.getByTestId("zeit")).toHaveTextContent("1:24.587");
+  expect(screen.getByTestId("zeit")).toHaveTextContent("1:24,587");
   expect(screen.getByTestId("zeit")).not.toHaveAttribute("data-counting");
   expect(screen.getByTestId("dnf")).toHaveTextContent("DNF");
   expect(screen.getByTestId("dnf")).not.toHaveAttribute("data-counting");
@@ -40,14 +45,14 @@ test("mit play zählt die Zeit hoch und endet exakt beim Text vom Server", () =>
   vi.useFakeTimers({ toFake: ["requestAnimationFrame", "cancelAnimationFrame", "performance", "setTimeout", "clearTimeout"] });
   render(<LapTime value="1:24.587" play data-testid="zeit" />);
   const cell = screen.getByTestId("zeit");
-  expect(cell).toHaveTextContent("0:00.000");
-  expect(cell).toHaveAttribute("data-counting", "1");
+  expect(shown(cell)).toBe("0:00,000");
+  expect(cell).toHaveAttribute("data-counting", "true");
   act(() => { vi.advanceTimersByTime(LAP_COUNT_MS / 2); });
-  const half = parseLap(cell.textContent);
+  const half = parseLap(shown(cell));
   expect(half).toBeGreaterThan(40000);
   expect(half).toBeLessThan(84587);
   act(() => { vi.advanceTimersByTime(LAP_COUNT_MS); });
-  expect(cell).toHaveTextContent("1:24.587");
+  expect(cell).toHaveTextContent("1:24,587");
   expect(cell).not.toHaveAttribute("data-counting");
 });
 
@@ -57,7 +62,7 @@ test("mit „Bewegung reduzieren“ zählt nichts", () => {
   Object.defineProperty(window, "matchMedia", { configurable: true, writable: true, value: () => ({ matches: true, addEventListener() {}, removeEventListener() {} }) });
   try {
     render(<LapTime value="1:24.587" play data-testid="zeit" />);
-    expect(screen.getByTestId("zeit")).toHaveTextContent("1:24.587");
+    expect(screen.getByTestId("zeit")).toHaveTextContent("1:24,587");
     expect(screen.getByTestId("zeit")).not.toHaveAttribute("data-counting");
   } finally {
     if (original) window.matchMedia = original;
@@ -91,11 +96,11 @@ test("neue Bestzeit (#1585): mit from läuft die Zeit kurz von der alten zur neu
   vi.useFakeTimers({ toFake: ["requestAnimationFrame", "cancelAnimationFrame", "performance", "setTimeout", "clearTimeout"] });
   render(<LapTime value="1:23.412" play from={83824} duration={LAP_COUNT_MS / 2} data-testid="zeit" />);
   const cell = screen.getByTestId("zeit");
-  expect(cell).toHaveTextContent("1:23.824");
+  expect(shown(cell)).toBe("1:23,824");
   act(() => { vi.advanceTimersByTime(LAP_COUNT_MS / 4); });
-  const half = parseLap(cell.textContent);
+  const half = parseLap(shown(cell));
   expect(half).toBeLessThan(83824);
   expect(half).toBeGreaterThanOrEqual(83412);
   act(() => { vi.advanceTimersByTime(LAP_COUNT_MS); });
-  expect(cell).toHaveTextContent("1:23.412");
+  expect(cell).toHaveTextContent("1:23,412");
 });

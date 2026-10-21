@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "@/lib/api";
-import { useCountUp } from "@/hooks/useCountUp";
+import { CountUp } from "@/components/tls/motion/CountUp";
 import { displayTitle, entryTitle, formatDate, gameTitle, shortTitle } from "@/components/tls/references/referenceParts";
 import { Chevron, Mark, MedalMark, PlaceRing, SectionHead, medalTone } from "@/components/tls/references/overviewParts";
 import { linkedSeasons, timelineGroups } from "@/lib/referencesOverview";
@@ -118,13 +118,12 @@ export function MemberReferences({ profile }) {
 }
 
 function MedalCount({ medal, last }) {
-  const [shown, ref] = useCountUp(medal.count);
   const tone = medalTone(medal.placement);
   return (
-    <div ref={ref} data-testid={`member-reference-medal-${medal.key}`} className={`flex items-center gap-3 ${last ? "" : "pr-4 mr-4 sm:pr-[22px] sm:mr-[22px] border-r border-white/[0.08]"}`}>
+    <div data-testid={`member-reference-medal-${medal.key}`} className={`flex items-center gap-3 ${last ? "" : "pr-4 mr-4 sm:pr-[22px] sm:mr-[22px] border-r border-white/[0.08]"}`}>
       <MedalMark placement={medal.placement} className="hidden sm:block w-[30px] h-[30px]" />
       <div className="flex flex-col">
-        <span className={`font-display font-bold text-[40px] sm:text-[44px] leading-[0.9] tabular-nums ${tone.text}`}>{shown}</span>
+        <span className={`font-display font-bold text-[40px] sm:text-[44px] leading-[0.9] tabular-nums ${tone.text}`}><CountUp value={Number(medal.count) || 0} /></span>
         <span className="text-xs font-bold uppercase tracking-[0.16em] text-zinc-300">{medal.label}</span>
       </div>
     </div>

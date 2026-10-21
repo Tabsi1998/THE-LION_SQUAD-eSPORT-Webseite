@@ -1,9 +1,11 @@
-import { useEffect, useRef, useState } from "react";
-import { MOTION, motionAllowed } from "@/lib/motion";
+import { CountUp } from "@/components/tls/motion/CountUp";
+import { MOTION } from "@/lib/motion";
+import { formatRaceTime } from "@/lib/raceTime";
 
 // Timing-Board (#1077): eine Rundenzeit zählt beim ersten Erscheinen der Bestenliste einmal hoch - wie auf einer
-// Anzeigetafel. Am Ende steht immer exakt der Text vom Server; gerechnet wird nur für die Bewegung dazwischen.
-// Ohne `play`, mit „Bewegung reduzieren“ oder bei einem Text, der keine Zeit ist, steht der Wert sofort da.
+// Anzeigetafel. Gezählt wird mit dem einen Baustein CountUp (#1969); angezeigt wie überall mit Komma („1:24,587“,
+// lib/raceTime), gespeichert bleibt der Text vom Server. Ohne `play`, mit „Bewegung reduzieren“ oder bei einem Text,
+// der keine Zeit ist, steht der Wert sofort da.
 // Neue Bestzeit (#1585): mit `from` (Millisekunden der alten Zeit) läuft die Zahl kurz von der alten zur neuen.
 
 const LAP = /^(?:(\d+):)?(?:(\d{1,2}):)?(\d{1,2})[.,](\d{1,3})$/;
@@ -37,35 +39,12 @@ export function formatLapLike(ms, template) {
 }
 
 export function LapTime({ value, play = false, from = 0, duration = LAP_COUNT_MS, className = "", ...rest }) {
-  const target = parseLap(value);
-  const start = Number.isFinite(Number(from)) ? Number(from) : 0;
-  const animate = useRef(Boolean(play) && target !== null && motionAllowed());
-  const [shown, setShown] = useState(() => (animate.current ? formatLapLike(start, value) : null));
-
-  useEffect(() => {
-    if (!animate.current || typeof window === "undefined" || typeof window.requestAnimationFrame !== "function") {
-      setShown(null);
-      return undefined;
-    }
-    let frame = 0;
-    const began = window.performance.now();
-    const step = (now) => {
-      const progress = Math.min(1, (now - began) / duration);
-      if (progress >= 1) {
-        animate.current = false;
-        setShown(null);
-        return;
-      }
-      setShown(formatLapLike(start + (target - start) * (1 - (1 - progress) ** 3), value));
-      frame = window.requestAnimationFrame(step);
-    };
-    frame = window.requestAnimationFrame(step);
-    return () => window.cancelAnimationFrame(frame);
-    // Nur beim ersten Erscheinen: ein neuer Wert aus der Live-Aktualisierung steht sofort da.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  return <span className={`tabular-nums ${className}`} data-counting={shown !== null ? "1" : undefined} {...rest}>{shown ?? value}</span>;
+  const shown = formatRaceTime(value);
+  const start = Number(from);
+  // Die alte Zeit in der Form der neuen - CountUp zählt von dort aus.
+  const startText = Number.isFinite(start) && start > 0 ? formatLapLike(start, shown) : undefined;
+  // Live-Aktualisierung: die Tafel setzt eine neue Zeit selbst in Szene (useLapBoardMotion) - kein zweites Aufleuchten.
+  return <CountUp value={shown} from={startText} play={play} duration={duration} flash={false} className={className} {...rest} />;
 }
 
 /** Einmal je Besuch und Schlüssel: true beim ersten Aufruf, danach false (auch nach einem Neuladen im selben Tab). */

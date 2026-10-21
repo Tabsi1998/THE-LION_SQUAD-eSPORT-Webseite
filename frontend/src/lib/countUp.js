@@ -11,6 +11,11 @@ export const COUNT_UP_STAGGER_MS = MICRO.countStagger;
 
 const BODY = /^\d+(?::\d{2}){0,2}(?:[.,]\d{1,6})?$/;
 
+/** Ganze Zahlen mit Tausenderpunkt, wie auf der ganzen Seite („1.234“) - die Schreibweise für `CountUp format`. */
+export function formatCount(value) {
+  return Number(value).toLocaleString("de-AT");
+}
+
 /** Die Form einer Zahl als Wert: gezählt in ganzen Schritten, geschrieben mit `format` (Vorgabe: wie sie ist). */
 function numberShape(value, format) {
   const total = Number(value);

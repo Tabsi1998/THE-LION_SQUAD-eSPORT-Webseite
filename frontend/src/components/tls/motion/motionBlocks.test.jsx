@@ -1,3 +1,5 @@
+import { readFileSync, readdirSync } from "node:fs";
+import path from "node:path";
 import { act, render, screen } from "@testing-library/react";
 import { Glow, Press, StaggerIn } from "./index";
 import { MICRO, MOTION } from "@/lib/motion";
@@ -92,6 +94,23 @@ describe("StaggerIn", () => {
       restore();
     }
   });
+});
+
+test("ein Baustein zum Hochzählen: keine eigene Zähl-Schleife mehr neben CountUp", () => {
+  const root = path.join(process.cwd(), "src");
+  const offenders = [];
+  const walk = (dir) => {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) walk(full);
+      else if (/\.(js|jsx)$/.test(entry.name) && !/\.test\./.test(entry.name)) {
+        const text = readFileSync(full, "utf8");
+        if (text.includes("function useCountUp") || text.includes("easeOutExpo") || text.includes("hooks/useCountUp")) offenders.push(path.relative(root, full));
+      }
+    }
+  };
+  walk(root);
+  expect(offenders).toEqual([]);
 });
 
 test("Press: Klasse für Anheben und Nachgeben, flach ohne Anheben, beliebiges Element", () => {
