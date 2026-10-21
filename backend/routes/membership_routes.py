@@ -276,6 +276,28 @@ async def _attach_linked_accounts(db, rows: list[dict], items: list[dict], publi
     return items
 
 
+async def _attach_appearances(db, references: list[dict], profile_id: str) -> None:
+    """Einsätze der Person je Referenz mit verknüpfter Saison (#1931) - „5 von 7 Spielen“ in der Zeile „Aufstellung“:
+    ``appearances: {played, of, unit, team}``. Verknüpft ist die Saison an der Referenz (``series_id``) oder an der
+    Saison (``reference_id``); gezählt wird nur in sichtbaren Saisons."""
+    from services.series_appearances import profile_appearances
+
+    ref_ids = [ref["id"] for ref in references if ref.get("id")]
+    series_ids = [ref["series_id"] for ref in references if ref.get("series_id")]
+    if not ref_ids:
+        return
+    seasons = await db.reference_series.find(
+        {"$or": [{"id": {"$in": series_ids}}, {"reference_id": {"$in": ref_ids}}]},
+        {"_id": 0, "id": 1, "lineage_id": 1, "visibility": 1, "status": 1, "team_name": 1, "own_teams": 1,
+         "reference_id": 1}).to_list(None)
+    found = await profile_appearances(db, profile_id, seasons)
+    owner = {season["reference_id"]: season["id"] for season in seasons if season.get("reference_id")}
+    for ref in references:
+        season_id = ref.get("series_id") or owner.get(ref.get("id"))
+        if season_id in found:
+            ref["appearances"] = found[season_id]
+
+
 async def _attach_reference_stats(db, item: dict, profile_id: str) -> dict:
     refs_raw = await db.references.find(
         {"member_profile_ids": profile_id, "is_active": {"$ne": False}},
@@ -287,6 +309,7 @@ async def _attach_reference_stats(db, item: dict, profile_id: str) -> dict:
         from services.reference_season_links import attach_season_links
         references = _sort_references(await _enrich_references(refs_raw))[:30]
         await attach_season_links(db, references, None)  # #1750: Karte führt zur Saison-Seite
+        await _attach_appearances(db, references, profile_id)
     else:
         references = []
     # Je Teilnahme zählt der Eintrag, in dem diese Person steht (#409): ein Einzelstarter hat

@@ -8,16 +8,23 @@ Serie, #1926 - früher nur ``team_name``; erkannt auch an anderer Schreibweise o
 - ``table``: Tabelle mit markierten eigenen Teams, Bewegung seit dem Spieltag davor und Form (nur für eigene Teams,
   je Team aus seinen Spielen - die übrigen Spiele der Liga kennt die Seite nicht, Entscheidung 3).
 - ``rank_history``: bester Platz eines eigenen Teams nach jedem gewerteten Spieltag.
-- ``matchdays``: je Termin das eigene Spiel - Gegner, Heim/Auswärts, Ergebnis, Maps, Ausgang und Punkte.
-- ``lineup``: Einsätze je Spieler (Name nur als Text, nur Vereinsmitglieder mit Profil-Link, ausgeblendete Namen
-  fehlen). Gäste stehen getrennt und zählen nicht in die Vereinsstatistik: nur Vereinsmitglieder bekommen die Einsätze
-  über alle sichtbaren Saisons der Spur.
+- ``matchdays``: je Termin das eigene Spiel - Gegner, Heim/Auswärts, Ergebnis, Maps, Ausgang und Punkte; dazu (#1931)
+  Tag und Uhrzeit des Spiels, je Map wer sie gewählt hat (``picked``: ``own``, ``opponent``, ``decider``), die Banns
+  (``by``: ``own``/``opponent``) und die übrigen Spiele des Spieltags (``others``), wenn sie mitgespeichert sind.
+- ``record`` (#1931): Bilanz je eigenem Team - Spiele, Siege, Unentschieden, Niederlagen, Punkte, Maps (Ergebnis der
+  Spiele) und Runden (Summe der Map-Ergebnisse; ``rounds_matches`` sagt, aus wie vielen Spielen mit Maps).
+- ``lineup``: Kader und Einsätze je Spieler (Name nur als Text, nur Vereinsmitglieder mit Profil-Link, ausgeblendete
+  Namen fehlen). Gäste stehen getrennt und zählen nicht in die Vereinsstatistik: nur Vereinsmitglieder bekommen die
+  Einsätze über alle sichtbaren Saisons der Spur. Seit #1931 steht der ganze Kader da (``default_team`` = eigenes Team),
+  auch wer noch nicht gespielt hat - je Spieler „``appearances`` von ``of``“ und die Spieltage als Ersatz
+  (``services/series_appearances.py``).
 - ``path``: Liga-Weg - alle sichtbaren Saisons der Spur mit Stufe, bestem Platz eines eigenen Teams von N und Punkten.
 """
 from __future__ import annotations
 
 from services.own_teams import Matcher, own_team_names, own_teams
 from services.scoring_rules import match_points, normalize_rules
+from services.series_appearances import team_league_appearances
 from services.visibility import user_can_see
 
 TABLE_FIELDS = ("rank", "played", "won", "drawn", "lost", "score_for", "score_against", "score_diff", "points")
@@ -48,13 +55,31 @@ def own_match(sheet: dict, teams) -> dict | None:
     own = Matcher(teams if isinstance(teams, (list, tuple)) else [teams])
     matches = sheet.get("matches") or []
     others = [str(match.get(side) or "").strip() for match in matches for side in ("home", "away")]
-    for match in matches:
+    for index, match in enumerate(matches):
         home, away = str(match.get("home") or "").strip(), str(match.get("away") or "").strip()
         if not own or own.is_own(home, others):
-            return {**match, "_own": own.canonical(home, others)}
+            return {**match, "_own": own.canonical(home, others), "_index": index}
         if own.is_own(away, others):
-            return {**match, "_away": True, "_own": own.canonical(away, others)}
+            return {**match, "_away": True, "_own": own.canonical(away, others), "_index": index}
     return None
+
+
+PICK_SIDES = {"home": ("own", "opponent"), "away": ("opponent", "own")}
+
+
+def _side(value, away: bool):
+    """``home``/``away`` aus eigener Sicht: ``own`` oder ``opponent`` (``decider`` bleibt)."""
+    if value not in PICK_SIDES:
+        return value if value == "decider" else None
+    return PICK_SIDES[value][1 if away else 0]
+
+
+def _others(sheet: dict, match: dict | None) -> list[dict]:
+    """Die übrigen Spiele des Spieltags (#1931) - nur Teams und Ergebnis."""
+    skip = (match or {}).get("_index")
+    return [{"home": item.get("home"), "away": item.get("away"), "home_score": _number(item.get("home_score")),
+             "away_score": _number(item.get("away_score"))}
+            for index, item in enumerate(sheet.get("matches") or []) if index != skip]
 
 
 def _match_view(match: dict, rules: dict) -> dict:
@@ -65,14 +90,42 @@ def _match_view(match: dict, rules: dict) -> dict:
     maps = []
     for item in match.get("maps") or []:
         own, theirs = _number(item.get(side)), _number(item.get(other))
-        maps.append({"name": item.get("name"), "score_for": own, "score_against": theirs,
-                     "outcome": match_points(own, theirs, rules)[0]})
+        entry = {"name": item.get("name"), "score_for": own, "score_against": theirs,
+                 "outcome": match_points(own, theirs, rules)[0]}
+        if item.get("picked_by"):
+            entry["picked"] = _side(item["picked_by"], away)
+        maps.append(entry)
     return {
         "opponent": match.get("home") if away else match.get("away"), "home": not away,
         "score_for": score_for, "score_against": score_against, "outcome": outcome, "points": _number(points),
         "maps": maps, "lineup_size": len(match.get("lineup") or []),
         "team": match.get("_own"),  # welches eigene Team gespielt hat (#1926)
+        # #1931: Tag und Uhrzeit des Spiels (sonst gilt der Termin), Banns aus eigener Sicht.
+        "club_day": match.get("club_day"), "time": match.get("time"),
+        "bans": [{"name": item.get("name"), "by": _side(item.get("by"), away)} for item in match.get("bans") or []],
     }
+
+
+def _record(views: list[dict], teams: list[str]) -> list[dict]:
+    """Bilanz je eigenem Team (#1931) aus den eigenen Spielen: S/U/N, Punkte, Maps und Runden."""
+    out = []
+    for team in teams:
+        mine = [view for view in views if view["team"] == team]
+        if not mine:
+            continue
+        with_maps = [view for view in mine if view["maps"]]
+        out.append({
+            "team": team, "played": len(mine),
+            **{key: sum(1 for view in mine if view["outcome"] == outcome)
+               for key, outcome in (("won", "win"), ("drawn", "draw"), ("lost", "loss"))},
+            "points": _number(sum(view["points"] for view in mine)),
+            "maps_for": _number(sum(view["score_for"] for view in mine)),
+            "maps_against": _number(sum(view["score_against"] for view in mine)),
+            "rounds_for": _number(sum(item["score_for"] for view in with_maps for item in view["maps"])),
+            "rounds_against": _number(sum(item["score_against"] for view in with_maps for item in view["maps"])),
+            "rounds_matches": len(with_maps),
+        })
+    return out
 
 
 async def visible_seasons(db, user, lineage_id: str) -> list[dict]:
@@ -130,17 +183,16 @@ async def _lineup(db, series: dict, seasons: list[dict], sheets: dict, own_days:
     sid = series["id"]
     participants = {item["id"]: item for item in await db.reference_participants.find(
         {"series_id": sid},
-        {"_id": 0, "id": 1, "name": 1, "name_hidden": 1, "is_club_member": 1, "link": 1, "profile_id": 1},
+        {"_id": 0, "id": 1, "name": 1, "name_hidden": 1, "is_club_member": 1, "link": 1, "profile_id": 1, "kind": 1,
+         "default_team": 1},
     ).to_list(None)}
 
     def member(item: dict) -> bool:
         return bool(item.get("is_club_member")) and item.get("link") == "member"
 
-    played: dict[str, list[str]] = {}
-    for round_id, match in own_days:
-        for pid in dict.fromkeys(match.get("lineup") or []):
-            if pid in participants:
-                played.setdefault(pid, []).append(round_id)
+    # Kader und Einsätze (#1931): wer gespielt hat oder im Kader eines eigenen Teams steht.
+    counted = team_league_appearances(own_days, list(participants.values()), own_teams(series))
+    played = {pid: item for pid, item in counted.items() if pid in participants}
 
     # Einsätze über alle sichtbaren Saisons - nur Vereinsmitglieder (über ihr Vereinsprofil).
     season_ids = [item["id"] for item in seasons]
@@ -164,7 +216,7 @@ async def _lineup(db, series: dict, seasons: list[dict], sheets: dict, own_days:
             slugs[profile["id"]] = profile.get("slug")
 
     players = []
-    for pid, round_ids in played.items():
+    for pid, count in played.items():
         item = participants[pid]
         is_member = member(item)
         hidden = bool(item.get("name_hidden"))
@@ -173,8 +225,11 @@ async def _lineup(db, series: dict, seasons: list[dict], sheets: dict, own_days:
             "club_member": is_member, "guest": not is_member,
             # Link nur zu öffentlich sichtbaren Profilen: aktiv (wie die Profilseite) und Name nicht ausgeblendet.
             "profile_slug": slugs.get(item.get("profile_id")) if is_member and not hidden else None,
-            "round_ids": round_ids, "appearances": len(round_ids),
+            "round_ids": count["round_ids"], "appearances": count["played"],
             "all_seasons": career.get(item.get("profile_id")) if is_member and item.get("profile_id") else None,
+            # #1931: „appearances von of“, Ersatz-Spieltage, im Kader und für welches eigene Team.
+            "of": count["of"], "bench_round_ids": count["bench_round_ids"], "in_roster": count["in_roster"],
+            "team": count["team"],
         })
     players.sort(key=lambda player: (not player["club_member"], -player["appearances"], player["name_hidden"],
                                      str(player["name"] or "").casefold(), player["key"]))
@@ -220,14 +275,15 @@ async def team_league_view(db, user, lineage: dict, series: dict, rounds: list[d
     sheets = await _published(db, [item["id"] for item in seasons])
     own_sheets = sheets.get(sid, {})
 
-    matchdays, own_days, form = [], [], {}
+    matchdays, own_days, form, views = [], [], {}, []
     for item in rounds:
         sheet = own_sheets.get(item["id"])
         match = own_match(sheet, teams) if sheet else None
         view = _match_view(match, rules) if match else None
-        matchdays.append({"round": item, "match": view})
+        matchdays.append({"round": item, "match": view, "others": _others(sheet, match) if sheet else []})
         if match:
             own_days.append((item["id"], match))
+            views.append(view)
             form.setdefault(match.get("_own"), []).append(OUTCOME_LETTERS[view["outcome"]])
 
     by_season = await _table_snapshots(db, [item["id"] for item in seasons])
@@ -246,6 +302,8 @@ async def team_league_view(db, user, lineage: dict, series: dict, rounds: list[d
         "table": _table(snapshots[-1] if snapshots else None, teams, form),
         "rank_history": history,
         "matchdays": matchdays,
+        "record": _record(views, [*own_team_names(series), *sorted({view["team"] for view in views
+                                                                    if view["team"] not in own_team_names(series)})]),
         "lineup": await _lineup(db, series, seasons, sheets, own_days),
         "path": _path(series, seasons, by_season),
     }
