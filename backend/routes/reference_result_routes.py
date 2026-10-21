@@ -241,6 +241,18 @@ async def _round_rules(db, series: dict, round_doc: dict) -> dict:
         raise HTTPException(422, BROKEN_RULES) from None
 
 
+async def _quali_pole(db, series: dict, round_doc: dict) -> tuple[str, int] | None:
+    """Rennen einer Runde mit Läufen (#1930): Pole-Inhaber und Platz aus dem veröffentlichten Haupt-Qualifying, aus dem
+    der Lauf seinen Startplatz nimmt - ``None`` ohne (etwa ein Rennen aus F1-Altdaten, Bestand #1927)."""
+    rounds = await db.reference_rounds.find({"series_id": series["id"], "archived_at": None}, {"_id": 0}).to_list(None)
+    ids = [rnd["id"] for rnd in rounds if race_weekend.session_kind(rnd.get("session")) == "qualifying"]
+    if not ids:
+        return None
+    sheets = {sheet["round_id"]: sheet async for sheet in db.reference_round_results.find(
+        {"series_id": series["id"], "round_id": {"$in": ids}, "status": "published"}, {"_id": 0})}
+    return race_weekend.quali_pole(series, rounds, round_doc, sheets)
+
+
 async def _sheet(db, series_id: str, round_id: str) -> dict | None:
     return await db.reference_round_results.find_one({"series_id": series_id, "round_id": round_id}, {"_id": 0})
 
@@ -313,10 +325,14 @@ async def _prepare(db, access: SeriesAccess, round_doc: dict, body: ResultSheetI
     series_results.check(resolution, rules, round_doc, club_today(), own_teams(access.series))
     if race_weekend.session_kind(round_doc.get("session")) == "qualifying":
         # Qualifying (#1930): dass es nicht zur Wertung zählt, ist gewollt; die Pole setzt sich im Qualifying fürs
-        # Rennen selbst (nicht im Shootout).
+        # Rennen selbst (nicht im Shootout) - beim ersten gültigen Platz, eine Marke auf einer anderen Zeile fällt weg.
         if race_weekend.is_main_qualifying(round_doc.get("session")):
-            race_weekend.mark_pole(resolution.rows)
+            resolution.warnings.extend(race_weekend.mark_pole(resolution.rows))
         resolution.warnings[:] = [item for item in resolution.warnings if item["code"] != "round_not_counted"]
+    elif await _kind(db, access.series) == "racing":
+        # Rennen mit Haupt-Qualifying in derselben Runde: die Pole hat dessen erster gültiger Platz.
+        resolution.warnings.extend(race_weekend.clear_race_pole(
+            resolution.rows, await _quali_pole(db, access.series, round_doc)))
     if not resolution.errors:
         # Zur Sicherheit wie beim Rechnen - die Prüfung oben fängt dieselben Fälle schon mit Zeilenangabe ab.
         try:

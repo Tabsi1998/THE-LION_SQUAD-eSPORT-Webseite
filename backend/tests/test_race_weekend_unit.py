@@ -220,9 +220,10 @@ def test_place_one_of_a_qualifying_gets_the_pole():
     rows = [{"participant_id": "b", "place": 2, "marks": []}, {"participant_id": "a", "place": 1, "marks": []}]
     race_weekend.mark_pole(rows)
     assert [row["marks"] for row in rows] == [[], ["pole"]]
+    # Eine Marke von Hand auf Platz 2 überstimmt Platz 1 nicht - sie fällt weg (Codex Runde 2, #1930).
     marked = [{"participant_id": "a", "place": 1, "marks": []}, {"participant_id": "b", "place": 2, "marks": ["pole"]}]
     race_weekend.mark_pole(marked)
-    assert [row["marks"] for row in marked] == [[], ["pole"]]
+    assert [row["marks"] for row in marked] == [["pole"], []]
 
 
 PEOPLE = [{"id": pid, "name": name} for pid, name in (("a", "Anna Probe"), ("b", "Bert Bolzt"), ("c", "Carl Kurve"))]
@@ -366,6 +367,44 @@ def test_a_disqualified_first_place_does_not_get_the_pole():
     results = _results([snap for snap in snapshots if snap["scope"] == "drivers"][-1])
     assert [pid for pid in "ab" if "pole" in results[pid]["r"]["marks"]] == ["b"]
     assert results["b"]["r"]["points"] == 28
+
+
+def test_a_manual_pole_mark_on_another_row_does_not_overrule_the_first_valid_place():
+    # Codex Runde 2 (#1930): Die Pole hat der erste gültige Platz des Haupt-Qualifyings - überall dieselbe Regel.
+    rows = [{"index": 0, "participant_id": "a", "place": 1, "marks": []},
+            {"index": 1, "participant_id": "b", "place": 2, "marks": ["pole"]},
+            {"index": 2, "participant_id": "c", "place": 3, "marks": []}]
+    assert race_weekend.pole_holder(rows) == "a"
+    # Die Marke auf Platz 2 fällt weg - mit Hinweis an ihrer Zeile.
+    assert race_weekend.mark_pole(rows) == [{"code": "pole_moved", "message": "Pole hat Platz 1 – Marke entfernt",
+                                             "rows": [1]}]
+    assert [row["marks"] for row in rows] == [["pole"], [], []]
+    assert race_weekend.mark_pole(rows) == []
+    # Die Pole am Rennen: eine Marke auf einer anderen Zeile zählt nicht, die Pole (samt Bonus) hat Platz 1 des
+    # Qualifyings - auch wenn das Blatt des Qualifyings eine Marke auf Platz 2 trägt.
+    rounds = _rounds(("q", "R1", "Qualifying", False), ("r", "R1", "Rennen", True))
+    sheets = {"q": _sheet(("a", 1, {}), ("b", 2, {"marks": ["pole"]})),
+              "r": _sheet(("b", 1, {"marks": ["pole"]}), ("a", 2, {}))}
+    snapshots = race_weekend.standings(rules={"points_by_place": [25, 18], "bonuses": {"pole": {"points": 3}}},
+                                       rounds=rounds, sheets=sheets, participants=PEOPLE)
+    results = _results([snap for snap in snapshots if snap["scope"] == "drivers"][-1])
+    assert [pid for pid in "ab" if "pole" in results[pid]["r"]["marks"]] == ["a"]
+    assert (results["a"]["r"]["points"], results["b"]["r"]["points"]) == (21, 25)
+
+
+def test_without_a_qualifying_a_manual_pole_mark_in_the_race_stays():
+    # Bestand #1927: Ein Rennen ohne Qualifying (etwa aus F1-Altdaten) behält die Pole-Marke von Hand - in einer Saison
+    # ohne Läufe wie in einer Runde mit Läufen, aber ohne Qualifying.
+    rules = {"points_by_place": [25, 18], "bonuses": {"pole": {"points": 3}}}
+    for rounds in (_rounds(("r", "R1", None, True)), _rounds(("s", "R1", "Sprint", True), ("r", "R1", "Rennen", True))):
+        sheets = {rnd["id"]: _sheet(("a", 1, {}), ("b", 2, {"marks": ["pole"]})) for rnd in rounds}
+        snapshots = race_weekend.standings(rules=rules, rounds=rounds, sheets=sheets, participants=PEOPLE)
+        results = _results([snap for snap in snapshots if snap["scope"] == "drivers"][-1])
+        assert [pid for pid in "ab" if "pole" in results[pid]["r"]["marks"]] == ["b"]
+        assert results["b"]["r"]["points"] == 21
+    quali = [{"index": 0, "participant_id": "a", "place": 1, "marks": []}]
+    race = {"id": "r", "code": "R1"}
+    assert race_weekend.quali_pole({}, _rounds(("r", "R1", None, True)), race, {"q": quali}) is None
 
 
 def _drivers(snapshots):

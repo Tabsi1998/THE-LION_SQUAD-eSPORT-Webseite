@@ -225,6 +225,61 @@ async def test_grid_and_pole_of_the_race_come_from_the_qualifying(flow):
     assert page["progress"]["scored"] == 1
 
 
+def _moved(preview):
+    return [item for item in preview["warnings"] if item["code"] == "pole_moved"]
+
+
+@pytest.mark.asyncio
+async def test_a_manual_pole_mark_on_another_row_gives_way_to_place_one(flow):
+    # Codex Runde 2 (#1930): Die Pole hat der erste gültige Platz des Haupt-Qualifyings - im Blatt, am Rennen und auf
+    # der Seite gleich. Eine Marke von Hand auf einer anderen Zeile fällt weg, mit Hinweis an ihrer Zeile.
+    lineage, series = await _series(flow, {"formats": [{"sessions": [{"label": "Qualifying"}, {"label": "Rennen"}]}]},
+                                    bonuses={"pole": {"points": 1}})
+    quali, race = (await _paste(flow, series, count=1))["rounds"]
+    names = _people(3)
+    quali_rows = [{"place": 1, "name": names[0]}, {"place": 2, "name": names[1], "marks": ["pole"]},
+                  {"place": 3, "name": names[2]}]
+    url = f"{ADMIN}/series/{series['id']}/rounds/{quali['id']}/results"
+    preview = (await flow.post(f"{url}/preview", json={"rows": quali_rows})).json()
+    assert [row["marks"] for row in preview["rows"]] == [["pole"], [], []]
+    assert _moved(preview) == [{"code": "pole_moved", "message": "Pole hat Platz 1 – Marke entfernt", "rows": [1]}]
+    sheet = (await _publish(flow, series, quali["id"], quali_rows))["sheet"]
+    assert [row["marks"] for row in sheet["rows"]] == [["pole"], [], []]
+
+    race_rows = [{"place": 1, "name": names[1], "marks": ["pole"]}, {"place": 2, "name": names[0]},
+                 {"place": 3, "name": names[2]}]
+    race_url = f"{ADMIN}/series/{series['id']}/rounds/{race['id']}/results"
+    preview = (await flow.post(f"{race_url}/preview", json={"rows": race_rows})).json()
+    assert _moved(preview) == [{"code": "pole_moved", "message": "Pole hat Platz 1 im Qualifying – Marke entfernt",
+                                "rows": [0]}]
+    assert [row["marks"] for row in preview["rows"]] == [[], [], []]
+    await _publish(flow, series, race["id"], race_rows)
+
+    flow.act_as(None)
+    page = (await flow.get(f"{PUBLIC}/{lineage['slug']}/{series['season_slug']}")).json()
+    rows = {row["name"]: row for row in page["standings"]["rows"]}
+    assert [name for name in names if "pole" in rows[name]["results"][0]["marks"]] == [names[0]]
+    assert (rows[names[0]]["points"], rows[names[1]]["points"]) == (18 + 1, 25)
+    assert page["racing"]["qualifying"][0]["pole"] == rows[names[0]]["key"]
+
+
+@pytest.mark.asyncio
+async def test_a_race_without_a_qualifying_keeps_its_manual_pole_mark(flow):
+    # Bestand #1927: Ohne Qualifying (etwa ein Rennen aus F1-Altdaten) bleibt die Pole-Marke von Hand - ohne Hinweis.
+    lineage, series = await _series(flow, bonuses={"pole": {"points": 1}})
+    race = (await _paste(flow, series, count=1))["rounds"][0]
+    names = _people(2)
+    race_rows = [{"place": 1, "name": names[0]}, {"place": 2, "name": names[1], "marks": ["pole"]}]
+    race_url = f"{ADMIN}/series/{series['id']}/rounds/{race['id']}/results"
+    preview = (await flow.post(f"{race_url}/preview", json={"rows": race_rows})).json()
+    assert _moved(preview) == [] and [row["marks"] for row in preview["rows"]] == [[], ["pole"]]
+    await _publish(flow, series, race["id"], race_rows)
+    flow.act_as(None)
+    page = (await flow.get(f"{PUBLIC}/{lineage['slug']}/{series['season_slug']}")).json()
+    rows = {row["name"]: row for row in page["standings"]["rows"]}
+    assert rows[names[1]]["results"][0]["marks"] == ["pole"] and rows[names[1]]["points"] == 18 + 1
+
+
 @pytest.mark.asyncio
 async def test_a_sprint_counts_with_its_own_points(flow):
     lineage, series = await _series(flow, QUALI_SPRINT_RACE)

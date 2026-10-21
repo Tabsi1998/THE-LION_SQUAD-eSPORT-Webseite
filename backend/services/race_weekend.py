@@ -19,9 +19,11 @@ ab Runde X wechselnd), Kürzel-Varianten beim Einfügen, Punkte je Lauf, Pole un
 - **Einfügen:** „R1S“, „R1 S“, „R1-Sprint“, „R1 Sprint“ → Kürzel R1, Lauf Sprint (``take_code``); eine Zeile ohne Lauf
   legt alle Läufe der Vorgabe an (``race_weekend_paste.expand_paste``), eine Zeile mit Lauf nur diesen.
 - **Rechnen** (``standings``): je Lauf das eigene Punkteschema; ein leerer Startplatz kommt aus dem Qualifying bzw. der
-  umgekehrten Wertung (eingetragene Werte, etwa nach Strafen, bleiben); die Pole des Qualifyings (Platz 1, im Blatt als
-  Marke ``pole`` gesetzt - ``mark_pole``) zählt am ersten Rennen der Runde, das seinen Startplatz aus diesem
-  Qualifying nimmt - so zählt ein Pole-Bonus wie bisher am Rennen. Zählt das Qualifying selbst, bleibt die Pole dort.
+  umgekehrten Wertung (eingetragene Werte, etwa nach Strafen, bleiben); die Pole des Haupt-Qualifyings (sein erster
+  gültiger Platz, im Blatt als Marke ``pole`` gesetzt - ``mark_pole``; eine Marke von Hand auf einer anderen Zeile
+  fällt weg) zählt am ersten Rennen der Runde, das seinen Startplatz aus diesem Qualifying nimmt - so zählt ein
+  Pole-Bonus wie bisher am Rennen. Zählt das Qualifying selbst, bleibt die Pole dort. Ein Rennen ohne Qualifying
+  behält seine Pole-Marke von Hand (Bestand #1927).
 """
 from __future__ import annotations
 
@@ -392,26 +394,75 @@ def _valid_place(row: dict) -> int | None:
     return place
 
 
+def _pole(rows: list[dict]) -> tuple[str, int] | None:
+    valid = [(place, row) for row in rows or [] if (place := _valid_place(row)) is not None]
+    if not valid:
+        return None
+    place, row = min(valid, key=lambda item: item[0])
+    return row["participant_id"], place
+
+
 def pole_holder(rows: list[dict]) -> str | None:
-    """Wer im Qualifying die Pole hat - überall dieselbe Regel: eine gültige Zeile mit der Marke ``pole``, sonst der
-    erste gültige Platz (ohne Nichtstart und Disqualifikation; liegt Platz 1 disqualifiziert, ist es Platz 2)."""
-    valid = sorted(((place, row) for row in rows or [] if (place := _valid_place(row)) is not None),
-                   key=lambda item: item[0])
-    marked = next((row["participant_id"] for _, row in valid if "pole" in (row.get("marks") or [])), None)
-    return marked or (valid[0][1]["participant_id"] if valid else None)
+    """Wer im Qualifying die Pole hat - überall dieselbe Regel: der erste gültige Platz (ohne Nichtstart und
+    Disqualifikation; liegt Platz 1 disqualifiziert, ist es Platz 2). Eine Marke ``pole`` auf einer anderen Zeile zählt
+    nicht."""
+    pole = _pole(rows)
+    return pole[0] if pole else None
 
 
-def mark_pole(rows: list[dict]) -> None:
-    """Qualifying: die Pole (``pole_holder``) bekommt die Marke ``pole``, eine ungültige verliert sie. ``rows`` wie aus
-    ``series_results.resolve`` (an Ort und Stelle)."""
-    holder = pole_holder(rows)
+def _clear_pole(rows: list[dict], holder: str | None) -> list[int]:
+    """Die Marke ``pole`` fällt auf jeder Zeile außer der des Pole-Inhabers weg (an Ort und Stelle). Liefert die
+    Zeilen (``index``), an denen sie wegfiel."""
+    moved = []
     for row in rows:
-        marks = set(row.get("marks") or [])
-        if row.get("participant_id") and row["participant_id"] == holder:
-            marks.add("pole")
-        else:
-            marks.discard("pole")
-        row["marks"] = sorted(marks)
+        marks = row.get("marks") or []
+        if "pole" in marks and not (holder and row.get("participant_id") == holder):
+            row["marks"] = [mark for mark in marks if mark != "pole"]
+            moved.append(row.get("index"))
+    return sorted(index for index in moved if index is not None)
+
+
+def _pole_moved(message: str, indexes: list[int]) -> list[dict]:
+    return [{"code": "pole_moved", "message": message, "rows": indexes}] if indexes else []
+
+
+def mark_pole(rows: list[dict]) -> list[dict]:
+    """Haupt-Qualifying: die Pole (``pole_holder``) bekommt die Marke ``pole``; eine Marke auf einer anderen Zeile fällt
+    weg. ``rows`` wie aus ``series_results.resolve`` (an Ort und Stelle). Liefert den Prüfhinweis dazu (leer ohne)."""
+    pole = _pole(rows)
+    if not pole:
+        _clear_pole(rows, None)
+        return []
+    for row in rows:
+        if row.get("participant_id") == pole[0] and "pole" not in (row.get("marks") or []):
+            row["marks"] = sorted({*(row.get("marks") or []), "pole"})
+    return _pole_moved(f"Pole hat Platz {pole[1]} – Marke entfernt", _clear_pole(rows, pole[0]))
+
+
+def quali_pole(series: dict, rounds: list[dict], round_doc: dict, sheets: dict) -> tuple[str, int] | None:
+    """Rennen oder Sprint einer Runde mit Läufen: Pole-Inhaber und sein Platz aus dem Haupt-Qualifying derselben Runde,
+    aus dem der Lauf seinen Startplatz nimmt (``sheets``: veröffentlichte Blätter je Termin) - ``None`` ohne ein solches
+    Qualifying (etwa ein Rennen aus F1-Altdaten, ein Sprint aus dem Shootout oder ein Startplatz von Hand)."""
+    weekend = series.get("weekend")
+    rounds = [*[item for item in rounds if item.get("id") != round_doc.get("id")], round_doc]
+    plan = round_plan(rounds, weekend)
+    entry = plan.get(round_doc.get("id"))
+    if not entry or entry["config"]["kind"] == "qualifying" or entry["config"]["grid"] != "qualifying":
+        return None
+    group = next(group for group in weekend_groups(rounds, weekend)
+                 if any(rnd["id"] == round_doc["id"] for rnd in group["rounds"]))
+    source = _quali_for(group["rounds"], round_doc, plan, sheets)
+    if not source or not is_main_qualifying(source.get("session")):
+        return None
+    return _pole(sheets[source["id"]].get("rows") or [])
+
+
+def clear_race_pole(rows: list[dict], pole: tuple[str, int] | None) -> list[dict]:
+    """Blatt eines Rennens mit Haupt-Qualifying (``quali_pole``): eine Pole-Marke auf einer anderen Zeile als der des
+    Pole-Inhabers fällt weg - mit Prüfhinweis. Ohne Qualifying bleibt die Marke von Hand (Bestand #1927)."""
+    if not pole:
+        return []
+    return _pole_moved(f"Pole hat Platz {pole[1]} im Qualifying – Marke entfernt", _clear_pole(rows, pole[0]))
 
 
 def _quali_for(sessions: list[dict], target: dict, plan: dict, sheets: dict) -> dict | None:
@@ -429,7 +480,8 @@ def _quali_for(sessions: list[dict], target: dict, plan: dict, sheets: dict) -> 
 def with_qualifying(rounds: list[dict], sheets: dict, plan: dict, weekend: dict | None = None) -> dict:
     """Blätter mit Startplatz und Pole aus dem Qualifying derselben Runde - nur, wo der Startplatz leer ist und der Lauf
     ihn aus dem Qualifying nimmt. Die Pole (nur aus dem Qualifying fürs Rennen, und nur wenn es selbst nicht zählt)
-    zählt am ersten Rennen, das seinen Startplatz daraus nimmt, sonst am ersten Lauf. Ändert nichts an ``sheets``."""
+    zählt am ersten Rennen, das seinen Startplatz daraus nimmt, sonst am ersten Lauf; eine Pole-Marke von Hand auf
+    einer anderen Zeile eines solchen Laufs fällt weg. Ändert nichts an ``sheets``."""
     out = dict(sheets)
     for group in weekend_groups(rounds, weekend):
         sessions = group["rounds"]
@@ -451,20 +503,26 @@ def with_qualifying(rounds: list[dict], sheets: dict, plan: dict, weekend: dict 
             places = {row["participant_id"]: row["place"] for row in out[source["id"]].get("rows") or []
                       if row.get("participant_id") and row.get("place")}
             rows = out[rnd["id"]].get("rows") or []
-            pole = None
-            if rnd["id"] in poled and not any("pole" in (row.get("marks") or []) for row in rows):
-                pole = pole_holder(out[source["id"]].get("rows") or [])
-            out[rnd["id"]] = {**out[rnd["id"]], "rows": [_derived(row, places, pole) for row in rows]}
+            # Aus dem Haupt-Qualifying hat die Pole sein erster gültiger Platz - eine Marke von Hand auf einer anderen
+            # Zeile des Laufs zählt nicht (Codex Runde 2). Der Shootout setzt keine Pole.
+            holder = None
+            if is_main_qualifying(source.get("session")):
+                holder = pole_holder(out[source["id"]].get("rows") or [])
+            pole = holder if rnd["id"] in poled else None
+            out[rnd["id"]] = {**out[rnd["id"]], "rows": [_derived(row, places, pole, holder) for row in rows]}
     return out
 
 
-def _derived(row: dict, places: dict, pole: str | None) -> dict:
+def _derived(row: dict, places: dict, pole: str | None, holder: str | None = None) -> dict:
     pid = row.get("participant_id")
     out = row
     if not row.get("grid") and pid in places:
         out = {**out, "grid": places[pid]}
+    marks = row.get("marks") or []
+    if holder and pid != holder and "pole" in marks:
+        out = {**out, "marks": [mark for mark in marks if mark != "pole"]}
     if pole and pid == pole:
-        out = {**out, "marks": sorted({*(row.get("marks") or []), "pole"})}
+        out = {**out, "marks": sorted({*marks, "pole"})}
     return out
 
 
