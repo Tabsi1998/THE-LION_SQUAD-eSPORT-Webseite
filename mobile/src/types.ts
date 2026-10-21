@@ -1,3 +1,5 @@
+import type { NewsResult, NewsSignup } from "./lib/newsCards";
+
 export type User = {
   id: string;
   email: string;
@@ -378,11 +380,14 @@ export type NewsPost = {
   published_at?: string | null;
   created_at?: string | null;
   pinned?: boolean;
-  linked_events?: ClubEvent[];
+  // Stand der Anmeldung je verknüpftem Turnier bzw. Event (#1912, vom Server wie im Web) für die Anmelde-Karten.
+  linked_events?: Array<ClubEvent & { signup?: NewsSignup | null }>;
   linked_f1_challenges?: F1Challenge[];
-  linked_tournaments?: Tournament[];
+  linked_tournaments?: Array<Tournament & { signup?: NewsSignup | null }>;
   content_embeds?: ContentEmbed[];
   mentioned_users?: PublicUser[];
+  // Ergebnis-News (#1912): Sieger des verknüpften Turniers, nur wenn der Server ihn mitliefert.
+  result?: NewsResult | null;
 };
 
 export type ContentEmbed = {

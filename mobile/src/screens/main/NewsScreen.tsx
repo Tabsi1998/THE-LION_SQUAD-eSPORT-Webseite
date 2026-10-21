@@ -7,6 +7,7 @@ import { Card } from "../../components/Card";
 import { ListItemFadeIn, useListEntrance } from "../../components/FadeIn";
 import { EmptyState, SkeletonList } from "../../components/ListState";
 import { MediaImage } from "../../components/MediaImage";
+import { NewsTextCard } from "../../components/NewsTextCard";
 import { Screen } from "../../components/Screen";
 import { seasonScrollProps } from "../../seasons/sky/scroll";
 import { Body, Heading, Muted, Title } from "../../components/Text";
@@ -212,11 +213,16 @@ function FeaturedNewsCard({ post, onPress }: { post: NewsPost; onPress: () => vo
   return (
     <Pressable onPress={onPress} style={({ pressed }) => [pressed && styles.pressed]}>
       <Card style={styles.featuredCard} perch={`news-featured-${post.id}`}>
-        <MediaImage
-          uri={post.banner_url}
-          style={styles.featuredImage}
-          fallback={<Ionicons name="newspaper-outline" color={colors.gold} size={30} />}
-        />
+        {/* Ohne Bild die Text-Karte (#1912) statt einer leeren Fläche mit Symbol. */}
+        {post.banner_url ? (
+          <MediaImage
+            uri={post.banner_url}
+            style={styles.featuredImage}
+            fallback={<Ionicons name="newspaper-outline" color={colors.gold} size={30} />}
+          />
+        ) : (
+          <NewsTextCard news={post} style={styles.featuredImage} testID={`news-text-card-${post.id}`} />
+        )}
         <View style={styles.featuredBody}>
           <View style={styles.top}>
             {post.pinned ? <Muted style={styles.badgePinned}>TOP</Muted> : null}
@@ -240,11 +246,15 @@ function NewsCard({ post, onPress }: { post: NewsPost; onPress: () => void }) {
   return (
     <Pressable onPress={onPress} style={({ pressed }) => [pressed && styles.pressed]}>
       <Card style={styles.card} perch={`news-${post.id}`}>
-        <MediaImage
-          uri={post.banner_url}
-          style={styles.image}
-          fallback={<Ionicons name="newspaper-outline" color={colors.gold} size={24} />}
-        />
+        {post.banner_url ? (
+          <MediaImage
+            uri={post.banner_url}
+            style={styles.image}
+            fallback={<Ionicons name="newspaper-outline" color={colors.gold} size={24} />}
+          />
+        ) : (
+          <NewsTextCard news={post} size="thumb" style={styles.image} testID={`news-text-card-${post.id}`} />
+        )}
         <View style={styles.text}>
           <View style={styles.top}>
             <Body style={styles.title}>{post.title}</Body>
