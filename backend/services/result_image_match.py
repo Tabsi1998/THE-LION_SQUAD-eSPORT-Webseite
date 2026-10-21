@@ -21,6 +21,7 @@ vom Wert abweicht. Gespeichert wird hier nichts - erst, wenn jemand das Blatt pr
 """
 from __future__ import annotations
 
+from collections import Counter
 from dataclasses import dataclass, field
 from difflib import SequenceMatcher
 
@@ -28,6 +29,7 @@ from services import series_identity
 from services.result_image_ocr import Read, Reading
 
 MARKS = ("dnf", "dns", "dsq")
+OUT_WORDS = {"OUT", "0UT", "QUT", "OU7"}  # „OUT“ statt Platz, auch leicht verlesen
 LAP_WORDS = {"runde": "Runde", "runden": "Runden", "lap": "Lap", "laps": "Laps"}
 # Leicht verwechselte Zeichen - nur für den Vergleich von Namen, nie für den angezeigten Wert.
 _LOOKALIKE = str.maketrans({"0": "o", "1": "l", "i": "l", "5": "s", "8": "b", "6": "b", "2": "z"})
@@ -50,10 +52,12 @@ def _compact(text: str) -> str:
 
 
 def _mark(text: str) -> str | None:
-    """„DNF“, „DNS“ oder „DSQ“ - auch leicht verlesen („ONF“, „DNE“)."""
+    """„DNF“, „DNS“ oder „DSQ“ - auch leicht verlesen („ONF“, „DNE“). „OUT“ (ausgeschieden) zählt als Ausfall."""
     key = _compact(text).upper()
     if len(key) != 3 or key.isdigit():
         return None
+    if key in OUT_WORDS:
+        return "dnf"
     for mark in MARKS:
         if key == mark.upper():
             return mark
@@ -62,10 +66,27 @@ def _mark(text: str) -> str | None:
 
 
 def _digits(text: str, *, fix: bool) -> str | None:
-    key = _compact(text)
+    key = _compact(text).strip(".,:;'`´\"")  # Punkt oder Strich am Rand aus der Erkennung („44.“)
     if fix:
         key = key.translate(_DIGIT_FIX)
     return key if key.isdigit() and len(key) <= 3 else None
+
+
+def digits_of(text: str) -> str | None:
+    """Eine Zahl mit höchstens drei Ziffern (Platz, Startnummer, Grid) - leicht verlesene Ziffern gehen."""
+    return _digits(text, fix=True)
+
+
+def mark_of(text: str) -> str | None:
+    """„dnf“, „dns“ oder „dsq“ - oder ``None``."""
+    return _mark(text)
+
+
+def is_placeholder(text: str) -> bool:
+    """Ein Platzhalter statt eines Werts, etwa „--:--:--,---“ oder „+--:--,---“ (keine Zeit, kein Abstand)."""
+    key = _compact(text)
+    return (len(key) >= 3 and all(char in "-–—_:.,+" for char in key)
+            and sum(char in "-–—_" for char in key) >= 2)
 
 
 def parse_time(text: str, *, fix: bool = False) -> tuple[float, str] | None:
@@ -132,12 +153,17 @@ def _parse(kind: str, read: Read, *, page: bool):
     if kind == "number":
         digits = _digits(read.text, fix=page)
         return ("number", digits.lstrip("0") or "0") if digits else None
+    if kind in ("time", "gap") and is_placeholder(read.text):
+        return ("empty", None)
     if kind == "time":
         mark = _mark(read.text)
         if mark:
             return ("mark", mark)
         parsed = parse_time(read.text, fix=page)
-        return ("time", parsed) if parsed else None
+        if parsed:
+            return ("time", parsed)
+        lapped = parse_gap(read.text)  # Überrundete: „+1 Runden“ statt einer Zeit
+        return ("lap", lapped[0]) if lapped and lapped[1] is None else None
     if kind == "gap":
         parsed = parse_gap(read.text, fix=page)
         return ("gap", parsed) if parsed else None
@@ -163,6 +189,8 @@ def _display(parsed) -> str:
         return value[0]
     if kind == "mark":
         return value.upper()
+    if kind == "empty":
+        return ""
     return str(value)
 
 
@@ -185,7 +213,10 @@ def decide(kind: str, page: Read | None, strip: Read | None, min_conf: float) ->
     parsed_reads = [(read, parsed) for read, parsed in reads if parsed is not None]
     if not parsed_reads:
         best = max(reads, key=lambda item: item[0].conf)[0]
-        return Decision(value=None, text=clean_text(best.text), sure=False, raw=best.text, conf=best.conf)
+        text = clean_text(best.text)
+        if kind in ("time", "gap") and not any(char.isdigit() for char in text):
+            text = ""  # Zeiten haben Ziffern - verlesene Platzhalter („+--:--,---“) nicht ins Feld, nur gelb
+        return Decision(value=None, text=text, sure=False, raw=best.text, conf=best.conf)
     if len(parsed_reads) == 2 and _same(parsed_reads[0][1], parsed_reads[1][1]):
         # Zwei unabhängige Lesungen sagen dasselbe - dafür reicht weniger Sicherheit je Wort.
         read, parsed = max(parsed_reads, key=lambda item: item[0].conf)
@@ -258,7 +289,7 @@ def best_name(texts: list[str], pool: list[Candidate]) -> list[tuple[float, Cand
 
 
 # ---------------------------------------------------------------- Ganzes Blatt
-FIELDS = ("place", "start_number", "name", "team", "grid", "time", "gap")
+FIELDS = ("place", "start_number", "name", "team", "grid", "time", "gap", "points")
 
 
 def _row_decisions(row, columns: dict[str, dict], min_conf: float) -> dict[str, Decision]:
@@ -267,32 +298,72 @@ def _row_decisions(row, columns: dict[str, dict], min_conf: float) -> dict[str, 
 
 
 def _check_places(rows: list[dict[str, Decision]]) -> None:
-    """Plätze ohne Lücke: der erste gelesene Platz gibt den Anfang, danach je Zeile eins mehr. Ausfälle (DNF, DNS,
-    DSQ) haben keinen Platz und zählen nicht mit."""
-    expected = None
+    """Plätze ohne Lücke, je Zeile eins mehr. Wo die Reihe beginnt, sagt die Mehrheit der gelesenen Plätze - ein
+    verlesener erster Platz macht so nicht alle anderen gelb. Ausfälle (DNF, DNS, DSQ) haben keinen Platz und zählen
+    nicht mit."""
+    ranked = [row["place"] for row in rows if row.get("place") is not None and not _row_marks(row)]
+    offsets = Counter(place.value - index for index, place in enumerate(ranked) if isinstance(place.value, int))
+    start = max(offsets.items(), key=lambda item: (item[1], -abs(item[0] - 1)))[0] if offsets else 1
+    for index, place in enumerate(ranked):
+        place.sure = isinstance(place.value, int) and place.value == start + index
+
+
+def _lapped(decision: Decision | None) -> str | None:
+    """„+1 Runde(n)“ in Zeit oder Abstand - sonst ``None``."""
+    if decision is None:
+        return None
+    value = decision.value
+    if isinstance(value, tuple) and len(value) == 2 and value[1] is None and isinstance(value[0], str):
+        return value[0]
+    return value if isinstance(value, str) and value.startswith("+") else None
+
+
+def _leader_time(rows: list[dict[str, Decision]]) -> tuple[float | None, bool]:
+    """Zeit des Siegers: was die meisten Zeilen als Zeit minus Abstand ergeben (auf die Tausendstel) - so macht eine
+    verlesene Siegerzeit nicht alle Abstände gelb. Ohne Mehrheit (mindestens zwei Zeilen) die erste gelesene Zeit.
+    Liefert die Zeit und ob eine Mehrheit sie bestätigt."""
+    first = None
+    votes: Counter = Counter()
     for row in rows:
-        place = row.get("place")
-        if place is None or _row_marks(row):
+        time, gap = row.get("time"), row.get("gap")
+        if not (time and isinstance(time.value, tuple)):
             continue
-        value = place.value if isinstance(place.value, int) else None
-        if expected is None:
-            expected = value if value is not None else 1
-        place.sure = value == expected
-        expected += 1
+        if first is None:
+            first = time.value[0]
+        if gap and isinstance(gap.value, tuple) and gap.value[1] is not None:
+            votes[round(time.value[0] - gap.value[1], 3)] += 1
+    if votes:
+        value, count = votes.most_common(1)[0]
+        if count >= 2:
+            return value, True
+    return first, False
 
 
 def _check_times(rows: list[dict[str, Decision]]) -> None:
-    """Zeit = Zeit des Ersten + Abstand; ohne Abstand müssen Zeiten wenigstens steigen."""
+    """Zeit = Zeit des Siegers + Abstand; ohne Abstand müssen Zeiten wenigstens steigen. Überrundete: steht „+1 Runde“
+    in Zeit und Abstand gleich, oder ist die Zeit kleiner als die des Vordermanns, passt der Abstand „+N Runden“."""
+    winner, voted = _leader_time(rows)
     leader = None
     previous = None
     for row in rows:
         time, gap = row.get("time"), row.get("gap")
+        laps = _lapped(gap)
+        if laps and _lapped(time) == laps:
+            time.sure = gap.sure = True
+            continue
         seconds = time.value[0] if time and isinstance(time.value, tuple) else None
         if seconds is None:
             continue
+        if laps and previous is not None and seconds + TIME_TOLERANCE < previous:
+            gap.sure = True
         if leader is None:
-            leader = seconds
+            leader = winner if winner is not None else seconds
             previous = seconds
+            # Der Sieger: bestätigt, wenn seine Zeit zur Mehrheit passt; passt sie nicht, ist sie verlesen - gelb.
+            if abs(seconds - leader) > TIME_TOLERANCE:
+                time.sure = False
+            elif voted:
+                time.sure = True
             continue
         gap_seconds = gap.value[1] if gap and isinstance(gap.value, tuple) else None
         if gap_seconds is not None:
@@ -301,6 +372,19 @@ def _check_times(rows: list[dict[str, Decision]]) -> None:
         if gap_seconds is not None and previous is not None and seconds + TIME_TOLERANCE < previous:
             time.sure = False
         previous = seconds
+
+
+def _check_gaps_in_columns(rows: list[dict[str, Decision]]) -> None:
+    """Startnummer, Team und Startplatz stehen in jeder Zeile: hat die Spalte in mindestens der Hälfte der Zeilen einen
+    Wert, ist eine leere Zelle verdächtig (etwa dunkelgraue Schrift auf dunklem Grund) - gelb."""
+    for name in ("start_number", "team", "grid"):
+        cells = [row.get(name) for row in rows if row.get(name) is not None]
+        filled = [cell for cell in cells if cell.raw]
+        if not cells or len(filled) * 2 < len(rows):
+            continue
+        for cell in cells:
+            if not cell.raw:
+                cell.sure = False
 
 
 def _check_grid(rows: list[dict[str, Decision]]) -> None:
@@ -337,20 +421,51 @@ def build(reading: Reading, template: dict, participants: list[dict], *, aliases
         place, time = row.get("place"), row.get("time")
         if place and time and place.mark and place.mark == time.mark:
             place.sure = time.sure = True
+        # Ausfall: statt Zeit und Abstand stehen Platzhalter - auch verlesen (ohne Ziffern) sind sie leer, nicht gelb.
+        if _row_marks(row):
+            for key in ("time", "gap"):
+                cell = row.get(key)
+                if cell is not None and cell.value is None and not cell.mark and not any(
+                        char.isdigit() for char in cell.raw):
+                    cell.text, cell.sure = "", True
     _check_places(rows)
     _check_times(rows)
     _check_grid(rows)
+    _check_gaps_in_columns(rows)
 
     pool = candidates(participants, aliases)
     teams = sorted({str(row.get("default_team")) for row in participants if row.get("default_team")})
     chosen = _match_people(reading, rows, pool, name_match, name_sure)
 
     out_rows = []
-    for index, (row, match) in enumerate(zip(rows, chosen)):
+    for index, (row, match, raw) in enumerate(zip(rows, chosen, reading.rows)):
         out_rows.append(_row_out(index, row, match, teams, name_match, name_sure, team_match))
+        out_rows[-1]["color"] = raw.color
     header = _header_out(reading, pool, min_conf, name_match, name_sure)
     uncertain_rows = sum(1 for row in out_rows if row["uncertain"])
-    return {"rows": out_rows, **header, "uncertain_rows": uncertain_rows}
+    return {"rows": out_rows, **header, "uncertain_rows": uncertain_rows, "team_colors": team_colors(out_rows),
+            "is_result": _looks_like_result(rows, template)}
+
+
+def team_colors(rows: list[dict]) -> dict[str, str]:
+    """Vorschlag für die Teamfarben (#1950): je Team die häufigste Schriftfarbe seiner Zeilen. Nur ein Vorschlag -
+    gespeichert wird nichts."""
+    seen: dict[str, Counter] = {}
+    for row in rows:
+        if row.get("team") and row.get("color"):
+            seen.setdefault(row["team"], Counter())[row["color"]] += 1
+    return {team: counts.most_common(1)[0][0] for team, counts in sorted(seen.items())}
+
+
+def _looks_like_result(rows: list[dict[str, Decision]], template: dict) -> bool:
+    """Ein Ergebnis hat in den Feldern ``template["needs"]`` (Rennliga: Zeit) in mindestens der Hälfte der Zeilen einen
+    Wert - eine Zeit, „+1 Runde“ oder „DNF“. Saisontabellen und Kalender haben das nicht."""
+    for field_name in template.get("needs") or []:
+        filled = sum(1 for row in rows if row.get(field_name) is not None
+                     and (row[field_name].mark or row[field_name].value not in (None, "")))
+        if filled * 2 < len(rows):
+            return False
+    return True
 
 
 def _match_people(reading: Reading, rows: list[dict[str, Decision]], pool: list[Candidate], name_match: float,
@@ -424,7 +539,7 @@ def _row_out(index: int, row: dict[str, Decision], match: dict | None, teams: li
     place = row.get("place")
     marks = _row_marks(row)
     out = {"index": index, "place": None, "dnf": "dnf" in marks, "marks": marks, "start_number": None, "name": "",
-           "participant_id": None, "team": None, "grid": None, "time": None, "gap": None}
+           "participant_id": None, "team": None, "grid": None, "time": None, "gap": None, "points": None}
     if place:
         out["place"] = place.value if isinstance(place.value, int) and not place.mark else None
         flag("place", place, place.text)
@@ -463,21 +578,26 @@ def _row_out(index: int, row: dict[str, Decision], match: dict | None, teams: li
             flag("start_number", number, out["start_number"])
 
     team, team_sure = _team_out(row.get("team"), match, teams, team_match, name_sure)
+    team_cell = row.get("team")
+    if team_cell is not None and not team_cell.raw and not team_cell.sure:
+        # Leere Zelle in einer Spalte, die sonst Teams hat: das Team des Teilnehmers vorschlagen - gelb.
+        team = (match["candidate"].participant.get("default_team") if match else None) or None
+        team_sure = False
     out["team"] = team
-    if row.get("team"):
+    if team_cell is not None:
         if not team_sure:
             uncertain.append("team")
         raw_team = clean_text(row["team"].raw)
         if raw_team and raw_team != team:
             read["team"] = raw_team
 
-    for key in ("grid", "time", "gap"):
+    for key in ("grid", "time", "gap", "points"):
         decision = row.get(key)
         if decision is None:
             continue
-        if key == "grid":
-            out["grid"] = decision.value if isinstance(decision.value, str) and decision.value.isdigit() else None
-            out["grid"] = int(out["grid"]) if out["grid"] else None
+        if key in ("grid", "points"):
+            value = decision.value if isinstance(decision.value, str) and decision.value.isdigit() else None
+            out[key] = int(value) if value else None
         elif decision.mark:
             out[key] = None
         else:
@@ -503,20 +623,29 @@ def _person(text: str, pool: list[Candidate], name_match: float, name_sure: floa
 
 def _header_out(reading: Reading, pool: list[Candidate], min_conf: float, name_match: float,
                 name_sure: float) -> dict:
-    out: dict = {"track": None, "fastest_lap": None, "driver_of_the_day": None}
+    out: dict = {"track": None, "session": None, "fastest_lap": None, "pole": None, "driver_of_the_day": None}
     track = reading.header.get("track")
     if track and clean_text(track.text):
         out["track"] = {"name": clean_text(track.text)[:TEXT_LIMIT],
                         "uncertain": [] if track.conf >= min_conf else ["name"]}
-    lap = reading.header.get("fastest_lap")
-    if lap and lap.text.strip():
-        name_words, time_text, exact = _split_lap(lap.text.split())
+    session = reading.header.get("session")
+    if session and clean_text(session.text):
+        # Nur ein Hinweis, bis es Läufe je Termin gibt (#1930): Rennen, Sprint oder Qualifying.
+        name = clean_text(session.text)[:40]
+        key = series_identity.normalize_name(name)
+        kind = "qualifying" if key.startswith("quali") else "sprint" if key.startswith("sprint") else "race"
+        out["session"] = {"name": name, "kind": kind}
+    for key in ("fastest_lap", "pole"):
+        lap = reading.header.get(key)
+        if not lap or not lap.text.strip():
+            continue
+        name_words, time_text, exact = _split_lap(clean_text(lap.text).split())
         name, pid, sure = _person(" ".join(name_words), pool, name_match, name_sure)
         uncertain = [] if sure or (not pid and lap.conf >= min_conf) else ["name"]
         if not exact or not _time_word_sure(lap, min_conf):
             uncertain.append("time")
-        out["fastest_lap"] = {"name": name[:TEXT_LIMIT], "participant_id": pid, "time": time_text,
-                              "uncertain": uncertain, "read": clean_text(lap.text)[:TEXT_LIMIT]}
+        out[key] = {"name": name[:TEXT_LIMIT], "participant_id": pid, "time": time_text, "uncertain": uncertain,
+                    "read": clean_text(lap.text)[:TEXT_LIMIT]}
     dotd = reading.header.get("driver_of_the_day")
     if dotd and dotd.text.strip():
         name, pid, sure = _person(dotd.text, pool, name_match, name_sure)

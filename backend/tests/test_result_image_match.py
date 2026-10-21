@@ -93,7 +93,7 @@ def test_clean_reading_is_sure_and_snaps_to_participants():
     first, second, third = out["rows"]
     assert first == {"index": 0, "place": 1, "dnf": False, "marks": [], "start_number": "7", "name": "Anna Probe",
                      "participant_id": "anna", "team": "Rotor Racing", "grid": 2, "time": "1:32:15.123", "gap": None,
-                     "uncertain": [], "read": {}}
+                     "points": None, "uncertain": [], "read": {}, "color": None}
     assert (second["gap"], second["participant_id"]) == ("+2.333", "bert")
     assert (third["place"], third["dnf"], third["marks"], third["time"]) == (None, True, ["dnf"], None)
 
@@ -163,6 +163,82 @@ def test_unread_place_is_never_sure():
     ), TEMPLATE, PEOPLE)
     bert = out["rows"][1]
     assert (bert["place"], bert["dnf"], bert["uncertain"]) == (None, True, ["place"])
+
+
+def test_one_misread_place_or_leader_time_does_not_poison_the_rest():
+    """Ein verlesener erster Platz oder eine verlesene Zeit des Siegers ist gelb - die übrigen Zeilen bleiben sicher:
+    Reihenfolge und Zeit des Siegers ergeben sich aus der Mehrheit der Zeilen."""
+    places = build(reading(row("6", name="Anna Probe"), row("2", name="Bert Bolzt"), row("3", name="Carl Kurve"),
+                           row("4", name="Dora Neu")), TEMPLATE, PEOPLE)
+    assert [item["uncertain"] for item in places["rows"]] == [["place"], [], [], []]
+    times = build(reading(
+        row("1", name="Anna Probe", time="30:26.500"),  # richtig wäre 30:26.300
+        row("2", name="Bert Bolzt", time="30:27.043", gap="+0.743"),
+        row("3", name="Carl Kurve", time="30:44.141", gap="+17.841"),
+    ), TEMPLATE, PEOPLE)
+    assert [item["uncertain"] for item in times["rows"]] == [["time"], [], []]
+
+
+def test_empty_cell_in_a_filled_column_is_yellow():
+    """Steht in fast allen Zeilen ein Team, eine Startnummer, ein Startplatz, ist eine leere Zelle verdächtig (etwa
+    dunkelgraue Schrift auf dunklem Grund) - gelb. Mit erkanntem Teilnehmer kommt das Team aus der Saison."""
+    out = build(reading(row("1", "7", "Anna Probe", "Rotor Racing", "2"),
+                        row("2", "12", "Bert Bolzt", "Blaupfeil GP", "1"),
+                        row("3", "", "Dora Neu", "", "")), TEMPLATE, PEOPLE)
+    dora = out["rows"][2]
+    assert {"start_number", "team", "grid"} <= set(dora["uncertain"])
+    known = build(reading(row("1", "7", "Anna Probe", "Rotor Racing"), row("2", "", "Bert Bolzt", "")),
+                  TEMPLATE, PEOPLE)
+    bert = known["rows"][1]
+    assert (bert["team"], "team" in bert["uncertain"]) == ("Blaupfeil GP", True)
+
+
+def test_tables_without_times_are_no_result():
+    """Eine Saisontabelle (Punkte statt Zeiten) oder der Kalender ist kein Rennergebnis; Platzhalter zählen nicht."""
+    table = build(reading(row("1", "37", "Anna Probe", "Sonstige", "65"), row("2", "7", "Bert Bolzt", "Sonstige", "65"),
+                          row("3", "25", "Carl Kurve", "Sonstige", "49", "--:--:--,---")), TEMPLATE, PEOPLE)
+    assert table["is_result"] is False
+    race = build(reading(row("1", name="Anna Probe", time="33:31,908", gap="+--:--,---"),
+                         row("2", name="Bert Bolzt", time="+1 Runden", gap="+1 Runden"),
+                         row("", name="Carl Kurve", time="--:--:--,---", gap="+--:--,---")), TEMPLATE, PEOPLE)
+    assert race["is_result"] is True
+    # Platzhalter sind leer und sicher, „+1 Runden“ in Zeit und Abstand bestätigen sich gegenseitig.
+    first, lapped, out = race["rows"]
+    assert (first["time"], first["gap"], first["uncertain"]) == ("33:31.908", None, [])
+    assert (lapped["time"], lapped["gap"], lapped["uncertain"]) == ("+1 Runden", "+1 Runden", [])
+    assert (out["time"], out["gap"]) == (None, None)
+
+
+def test_out_points_session_and_team_colors():
+    """„OUT“ statt Platz ist ein Ausfall; Punkte aus dem Bild; Art der Sitzung als Hinweis; Teamfarbe als Vorschlag."""
+    first, second, out_row = (row("1", "7", "Anna Probe", "Rotor Racing", time="1:32:15.123"),
+                              row("2", "12", "Bert Bolzt", "Blaupfeil GP", time="1:32:17.456", gap="+2.333"),
+                              row("OUT", "21", "Carl Kurve", "Rotor Racing"))
+    first.cells["points"], second.cells["points"] = r("25"), r("18")
+    first.color, second.color, out_row.color = "#e62832", "#3c6eff", "#e62832"
+    out = build(reading(first, second, out_row, header={"session": r("Qualifying")}), TEMPLATE, PEOPLE)
+    anna, bert, carl = out["rows"]
+    assert (anna["points"], bert["points"], carl["points"]) == (25, 18, None)
+    assert (carl["place"], carl["dnf"], carl["marks"]) == (None, True, ["dnf"])
+    assert out["session"] == {"name": "Qualifying", "kind": "qualifying"}
+    assert out["team_colors"] == {"Blaupfeil GP": "#3c6eff", "Rotor Racing": "#e62832"}
+    assert anna["color"] == "#e62832"
+
+
+def test_unreadable_placeholders_in_out_rows_are_fine():
+    """In einer Ausfall-Zeile stehen statt Zeit und Abstand Platzhalter - auch verlesen ohne Ziffern sind sie leer und
+    nicht gelb."""
+    out = build(reading(row("1", name="Anna Probe", time="1:32:15.123"),
+                        row("DNF", name="Bert Bolzt", time="enlanlenmen", gap="a")), TEMPLATE, PEOPLE)
+    bert = out["rows"][1]
+    assert (bert["dnf"], bert["time"], bert["gap"], bert["uncertain"]) == (True, None, None, [])
+
+
+def test_unreadable_time_stays_empty_but_yellow():
+    out = build(reading(row("1", name="Anna Probe", time="1:32:15.123"), row("2", name="Bert Bolzt", gap="deine")),
+                TEMPLATE, PEOPLE)
+    bert = out["rows"][1]
+    assert (bert["gap"], "gap" in bert["uncertain"], bert["read"]["gap"]) == (None, True, "deine")
 
 
 def test_long_reads_are_cut_to_what_the_sheet_takes():

@@ -13,7 +13,7 @@ import sys
 import zlib
 
 import pytest
-from PIL import Image
+from PIL import Image, ImageDraw
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
@@ -193,6 +193,66 @@ def test_tesseract_runs_without_shell_network_or_files(monkeypatch):
     assert set(kwargs["env"]) <= {"OMP_THREAD_LIMIT", "LC_ALL", "PATH", "TESSDATA_PREFIX"}
 
 
+def test_columns_come_from_the_data_not_from_fixed_positions():
+    """Echtes Layout: „Name“ steht über der Startnummer, die Namen selbst haben keine Überschrift, Zeiten sind links
+    bündig, im Qualifying fehlt Grid. Die Spalten ergeben sich aus dem, was in ihnen steht."""
+    def line(top, *cells):
+        return result_image_ocr.Line([
+            result_image_ocr.Word(text, 95, left, top, 7 * len(text), 14, ("1", "1", str(top)))
+            for text, left in cells])
+    entries = [("45", "Probe_Anna", "Rotor", "1:28,783", "+--:--,---"),
+               ("8", "Probe_Bert", "Blaupfeil", "1:29,142", "+0,359"),
+               ("7", "Probe_Carl", "Kometen", "1:29,294", "+0,511"),
+               ("13", "Probe_Dora", "Nordlicht", "1:29,778", "+0,995")]
+    rows = [line(100 + 40 * index, (str(index + 1), 55), (number, 115), (name, 169), (team, 323), (time, 503),
+                 (gap, 595))
+            for index, (number, name, team, time, gap) in enumerate(entries)]
+    columns = TEMPLATE["columns"]
+    name_index = next(i for i, column in enumerate(columns) if column["field"] == "name")
+    labels = {name_index: result_image_ocr.Cell([result_image_ocr.Word("Name", 95, 111, 60, 28, 14)])}
+    planned = result_image_ocr.plan_columns(rows, columns, labels, 14)
+    fields = [{columns[index]["field"]: " ".join(w.text for w in cell.words) for index, cell in row.items()}
+              for row in planned]
+    assert fields[1] == {"place": "2", "start_number": "8", "name": "Probe_Bert", "team": "Blaupfeil",
+                         "time": "1:29,142", "gap": "+0,359"}
+    assert all("grid" not in row for row in fields)
+
+
+def test_header_values_below_labels_side_by_side():
+    """Kopf wie bei echten Rennligen: drei Beschriftungen nebeneinander, Name und Zeit je darunter; die Strecke ohne
+    die Art der Sitzung. Reste von Linien („|“) gehören nicht zur Zeit."""
+    def words(top, *items):
+        return result_image_ocr.Line([
+            result_image_ocr.Word(text, 95, left, top, 10 * len(text), 20, ("1", "1", str(top)))
+            for text, left in items])
+    lines = [
+        words(10, ("Probering", 100)),
+        words(40, ("Rennen", 100)),
+        words(100, ("Schnellste", 100), ("Rennrunde:", 210), ("Pole:", 400), ("Fahrer", 600), ("des", 670),
+              ("Tages:", 710)),
+        words(130, ("Probe_Anna", 100), ("Probe_Bert", 400), ("Probe_Carl", 600)),
+        words(160, ("1:17,853", 100), ("1:16,119", 400), ("|", 900)),
+    ]
+    header = result_image_ocr._header_fields(lines, TEMPLATE)
+    assert {key: value.text for key, value in header.items()} == {
+        "fastest_lap": "Probe_Anna 1:17,853", "pole": "Probe_Bert 1:16,119", "driver_of_the_day": "Probe_Carl",
+        "track": "Probering", "session": "Rennen"}
+    session_only = result_image_ocr._header_fields([words(10, ("Qualifying", 100)), words(40, ("Probering", 100))],
+                                                   TEMPLATE)
+    assert session_only["track"].text == "Probering"
+    assert session_only["session"].text == "Qualifying"
+
+
+def test_text_color_is_the_color_of_the_letters():
+    """Teamfarbe als Vorschlag: die Schriftfarbe einer Zelle, nicht ihr Grund."""
+    img = Image.new("RGB", (200, 60), (21, 21, 30))
+    ImageDraw.Draw(img).rectangle((20, 15, 80, 45), fill=(230, 40, 50))  # „Schrift“ in Rot
+    cell = result_image_ocr.Cell([result_image_ocr.Word("44", 95, 30, 20, 120, 50)])  # bei Faktor 2 gelesen
+    assert result_image_ocr.text_color(img, cell, 2.0) == "#e62832"
+    empty = result_image_ocr.Cell([result_image_ocr.Word("x", 95, 300, 80, 40, 20)])
+    assert result_image_ocr.text_color(img, empty, 2.0) is None
+
+
 def test_too_many_rows_stop_before_the_column_reads(monkeypatch):
     """Mehr Ergebniszeilen als das Blatt nimmt: abbrechen, bevor die Spalten einzeln gelesen werden - die Antwort bleibt
     klein, der Server rechnet nicht weiter."""
@@ -213,6 +273,8 @@ def test_too_many_rows_stop_before_the_column_reads(monkeypatch):
     image = Image.new("RGB", (1200, 600), (20, 20, 30))
     full = result_image_ocr.read(image, TEMPLATE, max_rows=12)
     assert (full.too_many_rows, len(full.rows)) == (False, 12)
+    assert any(whitelist for whitelist in calls)  # sonst werden Zahlenspalten mit Whitelist gelesen
     calls.clear()
     cut = result_image_ocr.read(image, TEMPLATE, max_rows=11)
-    assert (cut.too_many_rows, cut.rows, calls) == (True, [], [None])
+    assert (cut.too_many_rows, cut.rows) == (True, [])
+    assert calls and not any(whitelist for whitelist in calls)  # nur die Seite, keine Spalte

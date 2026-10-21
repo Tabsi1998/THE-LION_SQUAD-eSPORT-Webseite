@@ -7,11 +7,15 @@ Eine Vorlage ist reine Beschreibung - gelesen wird in ``result_image_ocr``, abge
   ``name``, ``team``, ``grid``, ``time``, ``gap``), ``kind`` sagt, wie gelesen wird (``place``, ``number``, ``text``,
   ``time``, ``gap``), ``labels`` sind die Überschriften, an denen die Spalte im Bild wiedererkannt wird (leer: keine
   Überschrift), ``align`` die Ausrichtung des Inhalts und ``at`` die Lage des Ankers (linker Rand, Mitte oder rechter
-  Rand) als Anteil der Tabellenbreite - zwischen dem Anker der ersten (0) und der letzten Spalte (1). ``at`` braucht es
-  nur, wenn eine Überschrift fehlt oder nicht gelesen werden kann.
-- ``header``: die Zeilen über der Tabelle. ``track`` ist die oberste Zeile ohne eigene Beschriftung,
-  ``fastest_lap`` und ``driver_of_the_day`` beginnen mit einer der ``labels``.
+  Rand) als Anteil der Tabellenbreite - zwischen dem Anker der ersten (0) und der letzten Spalte (1). Zugeordnet wird
+  zuerst aus den Daten (``result_image_ocr.plan_columns``: Spalten des Bilds nach Inhalt, in dieser Reihenfolge);
+  ``align`` und ``at`` braucht es nur, wenn das nicht aufgeht.
+- ``header``: die Zeilen über der Tabelle. ``session`` ist die Art der Sitzung (eines der Wörter, etwa „Rennen“ oder
+  „Qualifying“), ``track`` die oberste Zeile ohne eigene Beschriftung (ohne die Art);
+  ``fastest_lap``, ``pole`` und ``driver_of_the_day`` haben ihren Wert hinter einer der ``labels`` oder darunter.
 - ``background``: „dark“ (helle Schrift auf dunklem Grund - wird umgekehrt), „light“ oder „auto“.
+- ``needs``: Felder, die in mindestens der Hälfte der Zeilen einen Wert haben müssen - sonst ist das Bild kein
+  Ergebnis dieser Art (etwa eine Saisontabelle oder der Kalender) und wird abgelehnt.
 - ``min_confidence``: darunter (0-100, Sicherheit der Texterkennung je Wort) gilt eine Zelle als unsicher.
 - ``name_match``/``name_sure``: ab welcher Ähnlichkeit (0-1) ein gelesener Name einem bekannten Teilnehmer zugeordnet
   wird und ab wann ohne gelbe Markierung; ``team_match`` dasselbe für Teams (wenige und bekannt, darum niedriger).
@@ -32,13 +36,17 @@ TEMPLATES: tuple[dict, ...] = (
     {
         "id": DEFAULT_ID,
         "name": "Rennliga-Ergebnis (dunkel)",
-        "description": "Kopf mit Strecke, schnellster Rennrunde und Fahrer des Tages; Spalten Pos, Startnummer, Name, "
-                       "Team, Grid, Time, Gap; DNF statt Platz; dunkler Hintergrund.",
+        "description": "Kopf mit Strecke, Art (Rennen, Qualifying), schnellster Rennrunde, Pole und Fahrer des Tages; "
+                       "Spalten Pos, Startnummer, Name, Team, Grid, Time, Gap, Punkte (fehlende Spalten bleiben leer); "
+                       "DNF oder OUT statt Platz; dunkler Hintergrund.",
         "kinds": ["racing"],
         "background": "dark",
         "header": {
             "track": {"labels": ["Strecke", "Track", "Circuit"]},
+            "session": {"labels": ["Rennen", "Hauptrennen", "Sprint", "Sprintrennen", "Qualifying", "Quali", "Race",
+                                   "Feature"]},
             "fastest_lap": {"labels": ["Schnellste Rennrunde", "Schnellste Runde", "Fastest Lap"]},
+            "pole": {"labels": ["Pole", "Pole Position"]},
             "driver_of_the_day": {"labels": ["Fahrer des Tages", "Driver of the Day"]},
         },
         "columns": [
@@ -51,7 +59,10 @@ TEMPLATES: tuple[dict, ...] = (
             {"field": "grid", "kind": "number", "labels": ["Grid", "Start"], "align": "center", "at": 0.667},
             {"field": "time", "kind": "time", "labels": ["Time", "Zeit"], "align": "right", "at": 0.825},
             {"field": "gap", "kind": "gap", "labels": ["Gap", "Abstand", "Interval"], "align": "right", "at": 1.0},
+            {"field": "points", "kind": "number", "labels": ["Punkte", "Pkt", "Pkt.", "Points", "Pts"],
+             "align": "right", "at": 1.12},
         ],
+        "needs": ["time"],
         "min_confidence": 80,
         "name_match": 0.72,
         "name_sure": 0.9,

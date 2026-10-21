@@ -33,7 +33,7 @@ import warnings
 from dataclasses import dataclass, field
 from functools import lru_cache
 
-from PIL import Image, ImageChops, ImageOps, UnidentifiedImageError
+from PIL import Image, ImageChops, ImageDraw, ImageFilter, ImageOps, UnidentifiedImageError
 
 from services.image_upload import (
     MAX_BYTES, MAX_IMAGE_DIMENSION, MAX_IMAGE_PIXELS, MAX_IMAGE_UPLOAD_MB, PIL_IMAGE_FORMATS,
@@ -56,10 +56,14 @@ LANGUAGES = os.environ.get("RESULT_IMAGE_OCR_LANGUAGES", "eng+deu")
 TARGET_TEXT_HEIGHT = 40  # Pixel - so liest Tesseract Bildschirmschrift am sichersten
 MAX_SCALE = 4.0
 MAX_WORK_SIDE = 6000
+PROBE_WIDTH = 1600  # Breite der schnellen Lesung, aus der die Schrifthöhe kommt
+# Seitenlesungen (Tesseract „psm“): ein Block (6) und eine Spalte mit Zeilen verschiedener Größe (4) - es gilt die mit
+# mehr Ergebniszeilen (``_page_lines``).
+PAGE_PSMS = (6, 4)
 MIN_SIDE = 40
 
 WHITELISTS = {
-    "place": "0123456789DNFSQ",
+    "place": "0123456789DNFSQOUT",
     "number": "0123456789",
     "time": "0123456789:.,DNFSQ",
     "gap": "0123456789:.,+-RundeLapsDNFSQ",
@@ -199,6 +203,52 @@ class Prepared:
     dark: bool
 
 
+def remove_lines(gray: Image.Image) -> Image.Image:
+    """Lange waagrechte und senkrechte Linien (Rahmen, Trennlinien der Zeilen) übermalen - an ihnen scheitert die
+    Zeilensuche von Tesseract. Linie ist, was mehr als 60 % der Breite bzw. Höhe deckt."""
+    threshold = _otsu(gray.histogram())
+    ink = gray.point(lambda level: 255 if level <= threshold else 0)
+    rows = ink.resize((1, ink.height), Image.Resampling.BOX).tobytes()
+    cols = ink.resize((ink.width, 1), Image.Resampling.BOX).tobytes()
+    out = gray.copy()
+    draw = ImageDraw.Draw(out)
+    for y, level in enumerate(rows):
+        if level > 153:
+            draw.line((0, y, out.width, y), fill=255)
+    for x, level in enumerate(cols):
+        if level > 153:
+            draw.line((x, 0, x, out.height), fill=255)
+    return out
+
+
+def invert_boxes(gray: Image.Image, text_height: float) -> Image.Image:
+    """Gefüllte dunkle Flächen (etwa das Feld des Siegers mit dunkler Ziffer auf hellem Grund) umkehren, damit auch dort
+    dunkle Schrift auf hellem Grund steht. Fläche ist, was über gut eine Schrifthöhe fast nur dunkel ist - fette Schrift
+    nicht."""
+    radius = max(2, int(text_height * 1.2))
+    local = gray.filter(ImageFilter.BoxBlur(radius))
+    mask = local.point(lambda level: 255 if level < 70 else 0)
+    if not mask.getbbox():
+        return gray
+    return Image.composite(ImageOps.invert(gray), gray, mask)
+
+
+def _probe_height(value: Image.Image) -> float | None:
+    """Schrifthöhe im Original aus einer schnellen Lesung: der Median der Wörter mit hoher Sicherheit. Gefüllte Felder
+    und Zeilen-Hintergründe täuschen die reine Pixelzählung (``text_bands``), Wörter nicht."""
+    probe_scale = max(1.0, min(3.0, PROBE_WIDTH / max(value.width, 1)))
+    probe = value
+    if probe_scale > 1.05:
+        probe = value.resize((round(value.width * probe_scale), round(value.height * probe_scale)),
+                             Image.Resampling.LANCZOS)
+    words = tesseract(remove_lines(probe), psm=11)
+    heights = sorted(word.height for word in words
+                     if word.conf >= 70 and sum(char.isalnum() for char in word.text) >= 2)
+    if len(heights) < 5:
+        return None
+    return float(statistics.median(heights)) / probe_scale
+
+
 def prepare(img: Image.Image, template: dict) -> Prepared:
     red, green, blue = img.convert("RGB").split()
     value = ImageChops.lighter(ImageChops.lighter(red, green), blue)
@@ -206,15 +256,19 @@ def prepare(img: Image.Image, template: dict) -> Prepared:
     dark = background == "dark" or (background == "auto" and _median_level(value) < 128)
     if dark:
         value = ImageOps.invert(value)
-    heights = sorted(bottom - top for top, bottom in text_bands(value))
-    text_height = float(statistics.median(heights)) if heights else 20.0
+    text_height = _probe_height(value)
+    if text_height is None:
+        heights = sorted(bottom - top for top, bottom in text_bands(value))
+        text_height = float(statistics.median(heights)) if heights else 20.0
     scale = max(1.0, min(MAX_SCALE, TARGET_TEXT_HEIGHT / max(text_height, 1.0)))
     scale = min(scale, MAX_WORK_SIDE / max(value.size))
     if abs(scale - 1.0) > 0.05:
         value = value.resize((round(value.width * scale), round(value.height * scale)), Image.Resampling.LANCZOS)
     else:
         scale = 1.0
-    return Prepared(image=ImageOps.autocontrast(value, cutoff=0.5), scale=scale, text_height=text_height, dark=dark)
+    value = ImageOps.autocontrast(value, cutoff=0.5)
+    value = remove_lines(invert_boxes(value, text_height * scale))
+    return Prepared(image=value, scale=scale, text_height=text_height, dark=dark)
 
 
 # ---------------------------------------------------------------- Tesseract
@@ -438,6 +492,111 @@ def column_anchors(columns: list[dict], labels: dict[int, Cell] | None, data_lin
             for index, column in enumerate(columns)]
 
 
+def _fits(kind: str, text: str) -> bool:
+    """Passt der Inhalt einer Zelle zur Art der Spalte? Nur grob - entschieden wird in ``result_image_match``."""
+    from services import result_image_match as match
+
+    key = "".join(text.split())
+    if not key:
+        return False
+    if kind in ("place", "number"):
+        digits = match.digits_of(key)
+        return bool(digits) or (kind == "place" and bool(match.mark_of(key)))
+    if kind == "text":
+        return sum(char.isalpha() for char in key) >= 2 and not match.is_placeholder(key)
+    if kind == "time":
+        return bool(match.parse_time(key, fix=True) or match.mark_of(key) or match.is_placeholder(key)
+                    or (match.parse_gap(key) and match.parse_gap(key)[1] is None))
+    if kind == "gap":
+        return bool(match.parse_gap(key, fix=True) or match.is_placeholder(key))
+    return False
+
+
+def column_groups(rows: list[list[Cell]], tolerance: float, min_share: float = 0.2) -> list[tuple[int, int]]:
+    """Spalten aus den Daten: x-Bereiche, die in mindestens ``min_share`` der Zeilen von einer Zelle bedeckt sind.
+    Lücken bis ``tolerance`` werden überbrückt."""
+    if not rows:
+        return []
+    width = max(cell.right for row in rows for cell in row) + 1
+    coverage = [0] * (width + 1)
+    for row in rows:
+        for cell in row:
+            for x in range(max(0, cell.left), min(width, cell.right)):
+                coverage[x] += 1
+    need = max(1, round(len(rows) * min_share))
+    groups: list[list[int]] = []
+    for x, count in enumerate(coverage):
+        if count < need:
+            continue
+        if groups and x - groups[-1][1] <= tolerance:
+            groups[-1][1] = x + 1
+        else:
+            groups.append([x, x + 1])
+    return [(left, right) for left, right in groups]
+
+
+def plan_columns(data_lines: list[Line], columns: list[dict], labels: dict[int, Cell] | None,
+                 height: float) -> list[dict[int, Cell]] | None:
+    """Zellen den Spalten zuordnen - aus den Daten statt aus festen Lagen: erst die Spalten des Bilds suchen (wo in
+    vielen Zeilen Zellen stehen), dann sie in ihrer Reihenfolge den Spalten der Vorlage zuordnen, je nachdem, was in
+    ihnen steht (Platz, Zahlen, Text, Zeiten, Abstände). Eine Überschrift darüber zählt mit. Fehlt eine Spalte im Bild
+    (etwa Grid im Qualifying), bleibt sie leer. ``None``, wenn das nicht aufgeht (dann gelten die Anker der Vorlage)."""
+    rows = [cells_of(line) for line in data_lines]
+    groups = column_groups(rows, tolerance=height * 0.5)
+    if len(groups) < 3:
+        return None
+    members: list[list[tuple[int, Cell]]] = [[] for _ in groups]
+    for row_index, cells in enumerate(rows):
+        for cell in cells:
+            overlaps = [min(cell.right, right) - max(cell.left, left) for left, right in groups]
+            best = max(range(len(groups)), key=lambda index: overlaps[index])
+            if overlaps[best] <= 0:
+                best = min(range(len(groups)), key=lambda index: abs((groups[index][0] + groups[index][1]) / 2
+                                                                     - cell.center))
+            members[best].append((row_index, cell))
+    score = [[0.0] * len(columns) for _ in groups]
+    for group_index, items in enumerate(members):
+        left, right = groups[group_index]
+        for col_index, column in enumerate(columns):
+            share = (sum(1 for _, cell in items if _fits(column["kind"], " ".join(w.text for w in cell.words)))
+                     / max(1, len(items)))
+            label = (labels or {}).get(col_index)
+            near = label is not None and label.left <= right + height and label.right >= left - height
+            score[group_index][col_index] = share + (0.25 if near else 0.0)
+    # Reihenfolge bleibt: Gruppe i vor Gruppe j heißt Spalte von i vor Spalte von j. Jede Gruppe höchstens einer Spalte.
+    groups_n, columns_n = len(groups), len(columns)
+    best = [[0.0] * (columns_n + 1) for _ in range(groups_n + 1)]
+    choice: dict[tuple[int, int], tuple[int, int, int | None]] = {}
+    for g in range(1, groups_n + 1):
+        for c in range(0, columns_n + 1):
+            options = [(best[g - 1][c], (g - 1, c, None))]
+            if c > 0:
+                options.append((best[g][c - 1], (g, c - 1, None)))
+                value = score[g - 1][c - 1]
+                if value >= 0.5:
+                    options.append((best[g - 1][c - 1] + value, (g - 1, c - 1, c - 1)))
+            best[g][c], choice[(g, c)] = max(options, key=lambda item: item[0])
+    mapping: dict[int, int] = {}
+    g, c = groups_n, columns_n
+    while g > 0 and (g, c) in choice:
+        prev_g, prev_c, assigned = choice[(g, c)]
+        if assigned is not None:
+            mapping[g - 1] = assigned
+        g, c = prev_g, prev_c
+    fields = {columns[index]["field"] for index in mapping.values()}
+    if "name" not in fields or len(mapping) < 3:
+        return None
+    out: list[dict[int, Cell]] = [{} for _ in rows]
+    for group_index, items in enumerate(members):
+        col_index = mapping.get(group_index)
+        if col_index is None:
+            continue
+        for row_index, cell in items:
+            found = out[row_index].get(col_index)
+            out[row_index][col_index] = Cell(found.words + cell.words) if found else cell
+    return out
+
+
 def assign(cells: list[Cell], columns: list[dict], anchors: list[float]) -> dict[int, Cell]:
     """Zellen einer Zeile den Spalten zuordnen: je Zelle die Spalte mit dem nächsten Anker (in deren Ausrichtung),
     in der Reihenfolge von links nach rechts. Landen zwei Zellen in derselben Spalte, werden sie verbunden."""
@@ -469,6 +628,7 @@ class Read:
 class RowReading:
     cells: dict[str, Read] = field(default_factory=dict)  # Seite
     strips: dict[str, Read] = field(default_factory=dict)  # Streifen (Zahlen mit Whitelist)
+    color: str | None = None  # Schriftfarbe von Startnummer bzw. Team als „#rrggbb“ (Vorschlag für die Teamfarbe)
 
 
 @dataclass
@@ -489,31 +649,83 @@ def _read(words: list[Word], *, joiner: str = " ") -> Read:
                 [(word.text, word.conf) for word in ordered])
 
 
-def _header_fields(lines: list[Line], template: dict) -> dict[str, Read]:
-    """Kopf über der Tabelle: Zeilen, die mit einer Beschriftung der Vorlage beginnen, und die Strecke."""
-    spec = template.get("header") or {}
-    out: dict[str, Read] = {}
-    unlabeled: list[Line] = []
-    for line in lines:
-        words = sorted(line.words, key=lambda word: word.left)
-        matched = None
-        for key, item in spec.items():
-            for label in item.get("labels") or []:
-                count = len(label.split())
-                if len(words) < count:
-                    continue
-                head = _norm(" ".join(word.text for word in words[:count]))
-                if head and _similar(head, _norm(label)) >= 0.75:
-                    matched = (key, words[count:])
-                    break
-            if matched:
+def _label_spans(words: list[Word], spec: dict) -> list[tuple[str, int, int]]:
+    """Beschriftungen der Vorlage in einer Zeile (Wörter nach x): (Schlüssel, erstes Wort, Wort nach der Beschriftung).
+    Längere Beschriftungen zuerst; leicht verlesen geht (Ähnlichkeit ab 0,75)."""
+    labels = sorted(((key, label) for key, item in spec.items() for label in item.get("labels") or []),
+                    key=lambda item: -len(item[1].split()))
+    found, index = [], 0
+    while index < len(words):
+        hit = None
+        for key, label in labels:
+            count = len(label.split())
+            if index + count > len(words):
+                continue
+            head = _norm(" ".join(word.text for word in words[index:index + count]))
+            if head and _similar(head, _norm(label)) >= 0.75:
+                hit = (key, index, index + count)
                 break
-        if matched and matched[1] and matched[0] not in out:
-            out[matched[0]] = _read(matched[1])
-        elif not matched:
-            unlabeled.append(line)
-    if "track" in spec and "track" not in out and unlabeled:
-        out["track"] = _read(unlabeled[0].words)
+        if hit:
+            found.append(hit)
+            index = hit[2]
+        else:
+            index += 1
+    return found
+
+
+def _read_lines(groups: list[list[Word]]) -> Read:
+    """Eine Lesung aus mehreren Zeilen (etwa Name, darunter die Zeit) - Zeile für Zeile, je Zeile von links."""
+    words = [word for group in groups for word in sorted(group, key=lambda item: item.left)]
+    return Read(" ".join(word.text for word in words).strip(), min((word.conf for word in words), default=0.0),
+                [(word.text, word.conf) for word in words])
+
+
+def _header_fields(lines: list[Line], template: dict) -> dict[str, Read]:
+    """Kopf über der Tabelle. Eine Beschriftung der Vorlage („Schnellste Rennrunde:“, „Pole:“, „Fahrer des Tages:“)
+    hat ihren Wert dahinter in derselben Zeile - oder, wenn dort nichts steht, darunter in bis zu zwei Zeilen im selben
+    Bereich (Name, darunter die Zeit; mehrere Beschriftungen nebeneinander). Die Art der Sitzung („Qualifying“,
+    „Rennen“, ``session``) ist ein Wort für sich; die Strecke ist die oberste Zeile ohne Beschriftung, ohne die Art."""
+    spec = {key: item for key, item in (template.get("header") or {}).items() if key not in ("track", "session")}
+    out: dict[str, Read] = {}
+    used: set[int] = set()
+    rows = [sorted(line.words, key=lambda word: word.left) for line in lines]
+    spans = [_label_spans(words, spec) for words in rows]
+    for line_index, words in enumerate(rows):
+        if not spans[line_index]:
+            continue
+        used.add(line_index)
+        height = lines[line_index].height
+        for number, (key, start, end) in enumerate(spans[line_index]):
+            following = spans[line_index][number + 1] if number + 1 < len(spans[line_index]) else None
+            same = words[end:following[1] if following else len(words)]
+            groups = [same] if same else []
+            if not same:
+                left = words[start].left - height
+                right = words[following[1]].left - height * 0.5 if following else float("inf")
+                for below in (line_index + 1, line_index + 2):
+                    if below >= len(rows) or spans[below]:
+                        break
+                    picked = [word for word in rows[below] if left <= word.left < right
+                              and any(char.isalnum() for char in word.text)]  # keine Reste von Linien
+                    if picked:
+                        groups.append(picked)
+                        used.add(below)
+            if groups and key not in out:
+                out[key] = _read_lines(groups)
+    sessions = {_norm(word) for word in ((template.get("header") or {}).get("session") or {}).get("labels") or []}
+    for line_index, words in enumerate(rows):
+        hit = next((word for word in words if line_index not in used and _norm(word.text) in sessions), None)
+        if hit and "session" not in out:
+            out["session"] = _read([hit])
+    if "track" in (template.get("header") or {}) and "track" not in out:
+        for line_index, words in enumerate(rows):
+            if line_index in used:
+                continue
+            clean = [word for word in words if word.conf >= 50 and sum(char.isalpha() for char in word.text) >= 3
+                     and _norm(word.text) not in sessions]
+            if clean:
+                out["track"] = _read(clean)
+                break
     return out
 
 
@@ -567,7 +779,7 @@ def read(img: Image.Image, template: dict, *, max_rows: int | None = None) -> Re
     ``max_rows`` Ergebniszeilen im Bild, bricht es vor dem Lesen der Spalten ab (``too_many_rows``)."""
     prepared = prepare(img, template)
     columns = template["columns"]
-    lines = lines_of(tesseract(prepared.image, psm=6))
+    lines = _page_lines(prepared)
     reading = Reading(template_id=template["id"], text_height=prepared.text_height, scale=prepared.scale)
     found = header_line(lines, columns)
     if found:
@@ -583,10 +795,12 @@ def read(img: Image.Image, template: dict, *, max_rows: int | None = None) -> Re
     if max_rows is not None and len(data_lines) > max_rows:
         reading.too_many_rows = True
         return reading
-    anchors = column_anchors(columns, labels, data_lines)
     reading.header = _header_fields(above, template)
-
-    assigned = [assign(cells_of(line), columns, anchors) for line in data_lines]
+    height = statistics.median(line.height for line in data_lines) if data_lines else TARGET_TEXT_HEIGHT
+    assigned = plan_columns(data_lines, columns, labels, height)
+    if assigned is None:
+        anchors = column_anchors(columns, labels, data_lines)
+        assigned = [assign(cells_of(line), columns, anchors) for line in data_lines]
     confidences = []
     for row in assigned:
         reading.rows.append(RowReading(cells={
@@ -605,4 +819,79 @@ def read(img: Image.Image, template: dict, *, max_rows: int | None = None) -> Re
                              (max(before) if before else None, min(after) if after else None))
         for row_index, value in reads.items():
             reading.rows[row_index].strips[column["field"]] = value
+    _retry_places(prepared, columns, assigned, data_lines, reading)
+    fields = [column["field"] for column in columns]
+    for row, cells in zip(reading.rows, assigned):
+        for wanted in ("start_number", "team"):
+            if wanted in fields and cells.get(fields.index(wanted)):
+                row.color = text_color(img, cells[fields.index(wanted)], prepared.scale)
+                if row.color:
+                    break
     return reading
+
+
+def text_color(img: Image.Image, cell: Cell, scale: float) -> str | None:
+    """Schriftfarbe einer Zelle im Originalbild als „#rrggbb“: der Median der Pixel, die sich deutlich vom Grund
+    abheben. Grund ist der Rand um die Zelle (zwei Pixel Abstand). Für Teamfarben: Startnummer und Team stehen in der
+    Farbe des Teams."""
+    pad = 2
+    box = (max(0, int(cell.left / scale) - pad), max(0, int(min(word.top for word in cell.words) / scale) - pad),
+           min(img.width, int(cell.right / scale) + 1 + pad),
+           min(img.height, int(max(word.bottom for word in cell.words) / scale) + 1 + pad))
+    if box[2] - box[0] < 2 + 2 * pad or box[3] - box[1] < 2 + 2 * pad:
+        return None
+    region = img.convert("RGB").crop(box)
+    width, height = region.size
+    raw = region.tobytes()
+    pixels = [tuple(raw[index:index + 3]) for index in range(0, len(raw), 3)]
+    values = [max(pixel) for pixel in pixels]
+    border = [values[y * width + x] for y in range(height) for x in range(width)
+              if x in (0, width - 1) or y in (0, height - 1)]
+    background = sorted(border)[len(border) // 2]
+    ink = sorted(((abs(value - background), pixel) for pixel, value in zip(pixels, values)
+                  if abs(value - background) > 60), key=lambda item: -item[0])
+    if len(ink) < 4:
+        return None
+    core = [pixel for _, pixel in ink[: max(4, len(ink) // 2)]]  # Kern der Schrift, ohne geglättete Ränder
+    channels = [sorted(pixel[index] for pixel in core)[len(core) // 2] for index in range(3)]
+    return "#{:02x}{:02x}{:02x}".format(*channels)
+
+
+def _page_lines(prepared: Prepared) -> list[Line]:
+    """Die ganze Seite lesen - als ein Block (6) und als Spalte mit Zeilen verschiedener Größe (4). Es gilt die Lesung
+    mit den meisten Ergebniszeilen: „ein Block“ ist bei schlichten Tabellen genauer, verliert aber bei Bildern mit
+    großem Kopf, Flaggen und Feldern ganze Zeilen. Bei Gleichstand gilt der Block."""
+    best: tuple[int, list[Line]] | None = None
+    for psm in PAGE_PSMS:
+        lines = lines_of(tesseract(prepared.image, psm=psm))
+        count = sum(1 for line in lines if _is_result_line(line, 2))
+        if best is None or count > best[0]:
+            best = (count, lines)
+    return best[1] if best else []
+
+
+def _retry_places(prepared: Prepared, columns: list[dict], assigned: list[dict[int, Cell]], data_lines: list[Line],
+                  reading: Reading) -> None:
+    """Zweiter Versuch für Plätze, die keine Lesung hat - etwa ein blasses „DNF“ auf dunklem Feld: die Zelle allein,
+    Kontrast nur in ihr gestreckt, als eine Zeile mit Whitelist."""
+    index = next((i for i, column in enumerate(columns) if column["field"] == "place"), None)
+    if index is None or not data_lines:
+        return
+    found = [row[index] for row in assigned if row.get(index)]
+    if not found:
+        return
+    height = statistics.median(line.height for line in data_lines)
+    left = max(0, int(min(cell.left for cell in found) - height * 0.8))
+    right = min(prepared.image.width, int(max(cell.right for cell in found) + height * 0.8))
+    for row_index, row in enumerate(reading.rows):
+        if row.cells.get("place") or row.strips.get("place"):
+            continue
+        line = data_lines[row_index]
+        top = max(0, int(line.top - height * 0.4))
+        bottom = min(prepared.image.height, int(line.bottom + height * 0.4))
+        if right - left < 4 or bottom - top < 4:
+            continue
+        cell = ImageOps.autocontrast(prepared.image.crop((left, top, right, bottom)), cutoff=1)
+        words = tesseract(cell, psm=7, whitelist=WHITELISTS["place"])
+        if words:
+            row.strips["place"] = _read(words, joiner="")
