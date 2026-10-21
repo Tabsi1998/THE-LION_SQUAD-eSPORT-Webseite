@@ -16,9 +16,11 @@ Server nimmt nur strukturierte Zeilen. Kurzfassung des Vertrags: ``docs/entwickl
 ``official_team_totals``, ``official_table``, ``note``, ``status`` („draft“/„published“), ``version`` und
 ``pending_draft`` (Entwurf neben dem veröffentlichten Blatt oder ``null``). ``target`` sagt, wohin Übernehmen schreibt.
 ``series.own_team_list`` nennt die eigenen Teams samt Schreibweisen (#1931) - damit erkennt die Oberfläche beim Einfügen
-der Begegnungsliste das eigene Spiel. Team-Liga (#1931): ``matches`` hält das eigene Spiel und die übrigen Spiele des
-Spieltags; Maps mit Wahl (``picked_by``: home, away, decider) und Aufstellung je Map, Banns und Termin des Spiels
-(``day``, ``time``) - siehe ``services/team_league_sheet.py``.
+der Begegnungsliste das eigene Spiel; ``series.map_names`` die Map-Namen, die in der Saison schon stehen (Vorschläge,
+häufigste zuerst). Team-Liga (#1931): ``matches`` hält das eigene Spiel und die übrigen Spiele des Spieltags; Maps in
+der Reihenfolge des Vetos mit Rolle (``banned``, ``picked``, ``decider``, ``played``), wer (``own``/``opponent``),
+optional ``map_id`` (Map-Bibliothek, #1616) und Aufstellung je Map, dazu Termin des Spiels (``day``, ``time``) - siehe
+``services/team_league_sheet.py``.
 Captains bekommen keine ``*_by``-Kennungen.
 
 **Captains** sehen nur, wer bekannt ist und wer neu - keine Zuordnung, keinen Alias, keine Vereinsmitgliedschaft
@@ -30,8 +32,9 @@ Captains bekommen keine ``*_by``-Kennungen.
              "manual", marks: ["dnf"|"dns"|"dsq"|"fastest_lap"|"pole"], penalty_points: 0, official_total?, note?,
              grid?, time?, gap?, dnf?}],
      fastest_lap?: {participant_id? | name?, start_number?, time?}, driver_of_the_day?: "Name" | {participant_id? | name?},
-     matches: [{home, away, home_score, away_score, maps: [{name, home_score, away_score, picked_by?, lineup?}],
-                lineup: [{participant_id? | name?, start_number?}], bans?: [{name, by?}], day?, time?}],
+     matches: [{home, away, home_score, away_score, maps: [{name, map_id?, role?, by?, home_score?, away_score?,
+                                                            lineup?}],
+                lineup: [{participant_id? | name?, start_number?}], day?, time?}],
      official_team_totals: {"<Team>": Zahl}, official_table: [{team, rank?, played?, won?, drawn?, lost?,
                                                                 score_for?, score_against?, score_diff?, points?}],
      note?}
@@ -169,19 +172,16 @@ class ResultFastestLap(ResultParticipantRef):
 
 
 class ResultMapEntry(BaseModel):
-    """Eine Map: Ergebnis, wer sie gewählt hat (#1931: ``home``, ``away`` oder ``decider``) und optional die
-    Aufstellung dieser Map."""
+    """Eine Map im Veto (#1931): Name, später die Kennung aus der Map-Bibliothek (``map_id``, #1616), die Rolle
+    (``banned``, ``picked``, ``decider``, ``played`` - ohne Rolle gespielt), bei Bann und Wahl wer (``own``/``opponent``),
+    das Ergebnis (nicht bei Bann) und optional die Aufstellung dieser Map."""
     name: str = Field(min_length=1, max_length=80)
-    home_score: float = Field(ge=0, le=RESULT_MAX_SCORE, allow_inf_nan=False)
-    away_score: float = Field(ge=0, le=RESULT_MAX_SCORE, allow_inf_nan=False)
-    picked_by: Optional[Literal["home", "away", "decider"]] = None
+    map_id: Optional[str] = Field(default=None, max_length=80)
+    role: Optional[Literal["banned", "picked", "decider", "played"]] = None
+    by: Optional[Literal["own", "opponent"]] = None
+    home_score: Optional[float] = Field(default=None, ge=0, le=RESULT_MAX_SCORE, allow_inf_nan=False)
+    away_score: Optional[float] = Field(default=None, ge=0, le=RESULT_MAX_SCORE, allow_inf_nan=False)
     lineup: List[ResultParticipantRef] = Field(default_factory=list, max_length=MAX_LINEUP)
-
-
-class ResultBan(BaseModel):
-    """Eine gesperrte Map (#1931) und wer sie gesperrt hat."""
-    name: str = Field(min_length=1, max_length=80)
-    by: Optional[Literal["home", "away"]] = None
 
 
 class ResultMatchEntry(BaseModel):
@@ -193,7 +193,6 @@ class ResultMatchEntry(BaseModel):
     away_score: float = Field(ge=0, le=RESULT_MAX_SCORE, allow_inf_nan=False)
     maps: List[ResultMapEntry] = Field(default_factory=list, max_length=MAX_MAPS)
     lineup: List[ResultParticipantRef] = Field(default_factory=list, max_length=MAX_LINEUP)
-    bans: List[ResultBan] = Field(default_factory=list, max_length=MAX_MAPS)
     day: Optional[str] = Field(default=None, max_length=10)
     time: Optional[str] = Field(default=None, max_length=5)
 
@@ -532,6 +531,26 @@ async def preview_results(series_id: str, round_id: str, body: ResultSheetInput,
 
 
 # ---------------------------------------------------------------- Lesen
+MAX_MAP_NAMES = 60
+
+
+async def _map_names(db, series_id: str) -> list[str]:
+    """Map-Namen, die in den Blättern der Saison schon stehen (auch im Entwurf daneben) - als Vorschläge, häufigste
+    zuerst (#1931). Gleich ist, was ohne Groß/klein gleich ist; gezeigt wird die erste Schreibweise."""
+    seen: dict[str, list] = {}
+    async for sheet in db.reference_round_results.find(
+            {"series_id": series_id}, {"_id": 0, "matches.maps.name": 1, "pending_draft.matches.maps.name": 1}):
+        for content in (sheet, sheet.get("pending_draft") or {}):
+            for match in content.get("matches") or []:
+                for item in match.get("maps") or []:
+                    name = series_results.clean(item.get("name"))
+                    if name:
+                        entry = seen.setdefault(name.casefold(), [name, 0])
+                        entry[1] += 1
+    ordered = sorted(seen.values(), key=lambda entry: (-entry[1], entry[0].casefold()))
+    return [name for name, _ in ordered[:MAX_MAP_NAMES]]
+
+
 @router.get(BASE)
 async def get_results(series_id: str, round_id: str, access: SeriesAccess = Depends(require_series_editor)):
     """Termin, Blatt (mit Entwurf daneben), Stand der Version und die Teilnehmer zur Auswahl."""
@@ -547,6 +566,7 @@ async def get_results(series_id: str, round_id: str, access: SeriesAccess = Depe
                    "own_teams": own_team_names(access.series),
                    "rules": await _round_rules(db, access.series, round_doc),
                    "own_team_list": own_teams(access.series),
+                   "map_names": await _map_names(db, series_id),
                    "publish_mode": access.series.get("publish_mode")},
         "access": access.summary(), "version": _version(existing), "sheet": _sheet_view(existing, access),
         "target": access.edit_target(existing),

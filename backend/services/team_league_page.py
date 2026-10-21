@@ -9,8 +9,9 @@ Serie, #1926 - früher nur ``team_name``; erkannt auch an anderer Schreibweise o
   je Team aus seinen Spielen - die übrigen Spiele der Liga kennt die Seite nicht, Entscheidung 3).
 - ``rank_history``: bester Platz eines eigenen Teams nach jedem gewerteten Spieltag.
 - ``matchdays``: je Termin das eigene Spiel - Gegner, Heim/Auswärts, Ergebnis, Maps, Ausgang und Punkte; dazu (#1931)
-  Tag und Uhrzeit des Spiels, je Map wer sie gewählt hat (``picked``: ``own``, ``opponent``, ``decider``), die Banns
-  (``by``: ``own``/``opponent``) und die übrigen Spiele des Spieltags (``others``), wenn sie mitgespeichert sind.
+  Tag und Uhrzeit des Spiels, je gespielter Map wer sie gewählt hat (``picked``: ``own``, ``opponent``, ``decider``),
+  die gesperrten Maps (``bans`` mit ``by``: ``own``/``opponent``), ``map_id`` für die spätere Map-Bibliothek (#1616)
+  und die übrigen Spiele des Spieltags (``others``), wenn sie mitgespeichert sind.
 - ``record`` (#1931): Bilanz je eigenem Team - Spiele, Siege, Unentschieden, Niederlagen, Punkte, Maps (Ergebnis der
   Spiele) und Runden (Summe der Map-Ergebnisse; ``rounds_matches`` sagt, aus wie vielen Spielen mit Maps).
 - ``lineup``: Kader und Einsätze je Spieler (Name nur als Text, nur Vereinsmitglieder mit Profil-Link, ausgeblendete
@@ -25,6 +26,7 @@ from __future__ import annotations
 from services.own_teams import Matcher, own_team_names, own_teams
 from services.scoring_rules import match_points, normalize_rules
 from services.series_appearances import team_league_appearances
+from services.team_league_sheet import is_played
 from services.visibility import user_can_see
 
 TABLE_FIELDS = ("rank", "played", "won", "drawn", "lost", "score_for", "score_against", "score_diff", "points")
@@ -64,14 +66,13 @@ def own_match(sheet: dict, teams) -> dict | None:
     return None
 
 
-PICK_SIDES = {"home": ("own", "opponent"), "away": ("opponent", "own")}
-
-
-def _side(value, away: bool):
-    """``home``/``away`` aus eigener Sicht: ``own`` oder ``opponent`` (``decider`` bleibt)."""
-    if value not in PICK_SIDES:
-        return value if value == "decider" else None
-    return PICK_SIDES[value][1 if away else 0]
+def _picked(item: dict):
+    """Wer eine gespielte Map gewählt hat (#1931): ``own``, ``opponent``, ``decider`` - ohne Angabe ``None``."""
+    if item.get("role") == "decider":
+        return "decider"
+    if item.get("role") == "picked" and item.get("by") in ("own", "opponent"):
+        return item["by"]
+    return None
 
 
 def _others(sheet: dict, match: dict | None) -> list[dict]:
@@ -87,22 +88,27 @@ def _match_view(match: dict, rules: dict) -> dict:
     side, other = ("away_score", "home_score") if away else ("home_score", "away_score")
     score_for, score_against = _number(match.get(side)), _number(match.get(other))
     outcome, points = match_points(score_for, score_against, rules)
-    maps = []
+    maps, bans = [], []
     for item in match.get("maps") or []:
+        if not is_played(item):
+            bans.append({"name": item.get("name"), "by": item.get("by"), "map_id": item.get("map_id")})
+            continue
         own, theirs = _number(item.get(side)), _number(item.get(other))
         entry = {"name": item.get("name"), "score_for": own, "score_against": theirs,
                  "outcome": match_points(own, theirs, rules)[0]}
-        if item.get("picked_by"):
-            entry["picked"] = _side(item["picked_by"], away)
+        # #1931: wer gewählt hat und die Kennung aus der späteren Map-Bibliothek (#1616) - nur, wenn angegeben.
+        if _picked(item):
+            entry["picked"] = _picked(item)
+        if item.get("map_id"):
+            entry["map_id"] = item["map_id"]
         maps.append(entry)
     return {
         "opponent": match.get("home") if away else match.get("away"), "home": not away,
         "score_for": score_for, "score_against": score_against, "outcome": outcome, "points": _number(points),
         "maps": maps, "lineup_size": len(match.get("lineup") or []),
         "team": match.get("_own"),  # welches eigene Team gespielt hat (#1926)
-        # #1931: Tag und Uhrzeit des Spiels (sonst gilt der Termin), Banns aus eigener Sicht.
-        "club_day": match.get("club_day"), "time": match.get("time"),
-        "bans": [{"name": item.get("name"), "by": _side(item.get("by"), away)} for item in match.get("bans") or []],
+        # #1931: Tag und Uhrzeit des Spiels (sonst gilt der Termin), gesperrte Maps mit wer (own/opponent).
+        "club_day": match.get("club_day"), "time": match.get("time"), "bans": bans,
     }
 
 

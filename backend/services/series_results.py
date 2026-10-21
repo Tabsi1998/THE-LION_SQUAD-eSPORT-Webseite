@@ -24,8 +24,9 @@ Finalgrenze. Laden, Speichern und das Neurechnen der Stände machen die Routen (
   stehen; die schnellste Runde setzt die Marke an ihrer Zeile (so zählt ein Bonus), eine Zeit ohne Namen gehört zur
   markierten Zeile. Gespeichert wird nur, was angegeben ist - ein Blatt ohne diese Felder bleibt wie bisher.
 - **Team-Liga** (#1931): neben dem eigenen Spiel dürfen die übrigen Spiele des Spieltags stehen - die Warnung
-  „eigenes Team fehlt“ kommt nur, wenn es in keinem Spiel spielt. Maps mit Wahl und Aufstellung je Map, Banns und der
-  Termin des Spiels: ``services/team_league_sheet.py``.
+  „eigenes Team fehlt“ kommt nur, wenn es in keinem Spiel spielt. Maps mit Rolle im Veto (Bann, Wahl, Decider,
+  gespielt), wer, späterer Map-Kennung und Aufstellung je Map sowie der Termin des Spiels:
+  ``services/team_league_sheet.py``. Der Abgleich Maps ↔ Ergebnis zählt nur gespielte Maps.
 
 Meldungen werden nur aus den Eingaben gebaut, nie aus Ausnahmen.
 """
@@ -254,11 +255,11 @@ def resolve(entry: dict, participants: list[dict], rules: dict) -> Resolution:
         lineup = _lineup_ids(out, raw.get("lineup"), lookup, index, f"Spiel {index + 1}, Aufstellung")
         maps = []
         for number_of_map, item in enumerate(raw.get("maps") or [], start=1):
-            # Aufstellung je Map (#1931) - nur, wenn angegeben.
-            map_lineup = _lineup_ids(out, item.get("lineup"), lookup, index, f"Spiel {index + 1}, Map {number_of_map}")
-            maps.append({"name": clean(item.get("name"))[:80], "home_score": number(float(item.get("home_score") or 0)),
-                         "away_score": number(float(item.get("away_score") or 0)),
-                         **team_league_sheet.map_extras(item, map_lineup)})
+            # Kennung, Rolle im Veto, wer und Aufstellung je Map (#1931) - nur, wenn angegeben; eine gesperrte Map hat
+            # weder Ergebnis noch Aufstellung.
+            refs = item.get("lineup") if team_league_sheet.is_played(item) else None
+            map_lineup = _lineup_ids(out, refs, lookup, index, f"Spiel {index + 1}, Map {number_of_map}")
+            maps.append(team_league_sheet.map_entry(item, map_lineup))
         extras, problem = team_league_sheet.match_extras(raw)
         if problem:
             out.errors.append(_problem("match_time", f"Spiel {index + 1}: {problem}", match=index))
@@ -438,9 +439,10 @@ def _matches(resolution: Resolution, own_teams) -> list[dict]:
             text = f"Das eigene Team „{own.names[0]}“ spielt" if single else "Keines der eigenen Teams spielt"
             problems.append(_problem("own_team_missing", f"{text} in keinem der Spiele."))
     for index, match in enumerate(matches):
-        if match["maps"]:
-            home = sum(1 for item in match["maps"] if item["home_score"] > item["away_score"])
-            away = sum(1 for item in match["maps"] if item["away_score"] > item["home_score"])
+        played = [item for item in match["maps"] if team_league_sheet.is_played(item)]  # ohne gesperrte (#1931)
+        if played:
+            home = sum(1 for item in played if item["home_score"] > item["away_score"])
+            away = sum(1 for item in played if item["away_score"] > item["home_score"])
             if (home, away) != (match["home_score"], match["away_score"]):
                 problems.append(_problem(
                     "maps_differ", f"Spiel {index + 1}: Die Maps ergeben {home}:{away}, eingetragen ist "

@@ -1,12 +1,16 @@
 """Team-Liga im Ergebnisblatt (#1931) - ohne Datenbank: was ein Spiel über Ergebnis, Maps und Aufstellung hinaus trägt.
 
-``series_results.resolve`` ruft das je Spiel auf. Gespeichert wird nur, was angegeben ist - ein Blatt ohne diese Angaben
-bleibt genau wie bisher:
+``series_results.resolve`` ruft das je Spiel und je Map auf. Gespeichert wird nur, was angegeben ist - ein Blatt ohne
+diese Angaben bleibt genau wie bisher:
 
-- **Map:** ``picked_by`` - wer sie gewählt hat (``home``, ``away`` oder ``decider``, die übrig gebliebene Map) - und
-  optional eine eigene Aufstellung (``lineup``, Kennungen wie beim Spiel). Die Aufstellung des Spiels ist dann die
-  Vereinigung aus der Aufstellung des Spiels und denen der Maps: wer eine Map gespielt hat, hat das Spiel gespielt.
-- **Banns:** ``bans`` - gesperrte Maps mit der Seite, die sie gesperrt hat (``home``, ``away`` oder offen).
+- **Map:** Name (Freitext) und optional ``map_id`` - die Kennung aus einer späteren Map-Bibliothek je Spiel (#1616), die
+  hier schon mitgespeichert wird, damit die Bibliothek ohne Umbau andocken kann. Die **Rolle** im Veto: ``banned``
+  (gesperrt, ohne Ergebnis), ``picked`` (gewählt), ``decider`` (die übrig gebliebene) oder ``played`` (gespielt, ohne
+  Angabe zur Wahl - so gilt jede Map ohne Rolle). ``by`` sagt bei Bann und Wahl, wer: ``own`` (wir) oder ``opponent``.
+  Gespielte Maps tragen das Ergebnis (``home_score``/``away_score``) und optional eine eigene Aufstellung (``lineup``).
+  Die Reihenfolge der Liste ist die des Vetos.
+- **Aufstellung des Spiels:** die Vereinigung aus der Aufstellung des Spiels und denen der Maps - wer eine Map gespielt
+  hat, hat das Spiel gespielt.
 - **Termin des Spiels:** ``club_day`` (Wiener Tag) und ``time`` („HH:MM“ Wiener Zeit), mit beidem dazu ``starts_at`` in
   UTC - etwa aus der eingefügten Begegnungsliste des Veranstalters. Ohne Tag gilt der Tag des Termins.
 
@@ -15,15 +19,22 @@ eigenen Teams der Saison (``own_teams.Matcher``). So rechnet die Tabelle aus all
 """
 from __future__ import annotations
 
+import math
+
 from services.reference_calendar import ClockError, clock_gap_message, vienna_start
 
-PICKS = ("home", "away", "decider")
-BAN_SIDES = ("home", "away")
-MAX_BANS = 15
+ROLES = ("banned", "picked", "decider", "played")
+SIDES = ("own", "opponent")
+MAX_MAP_ID = 80
 
 
 def _clean(value) -> str:
     return " ".join(str(value or "").split())
+
+
+def _score(value):
+    number = float(value or 0)
+    return int(number) if math.isfinite(number) and number.is_integer() else number
 
 
 def union(*lists) -> list[str]:
@@ -31,33 +42,35 @@ def union(*lists) -> list[str]:
     return list(dict.fromkeys(pid for items in lists for pid in items or [] if pid))
 
 
-def map_extras(raw: dict, lineup: list[str] | None) -> dict:
-    """Wahl und Aufstellung einer Map - nur, was angegeben ist."""
-    out = {}
-    if raw.get("picked_by") in PICKS:
-        out["picked_by"] = raw["picked_by"]
-    if lineup:
-        out["lineup"] = lineup
-    return out
+def is_played(item: dict) -> bool:
+    """Gespielt ist jede Map außer einer gesperrten - auch eine ohne Rolle (so sind ältere Blätter gespeichert)."""
+    return item.get("role") != "banned"
 
 
-def bans(raw: dict) -> list[dict]:
-    out = []
-    for item in (raw.get("bans") or [])[:MAX_BANS]:
-        name = _clean((item or {}).get("name"))[:80]
-        if name:
-            side = item.get("by")
-            out.append({"name": name, "by": side if side in BAN_SIDES else None})
+def map_entry(raw: dict, lineup: list[str] | None) -> dict:
+    """Eine Map des Blatts: Name, Ergebnis (nicht bei Bann) und - nur wenn angegeben - Kennung, Rolle, wer und
+    Aufstellung."""
+    out: dict = {"name": _clean(raw.get("name"))[:80]}
+    map_id = _clean(raw.get("map_id"))[:MAX_MAP_ID]
+    if map_id:
+        out["map_id"] = map_id
+    role = raw.get("role") if raw.get("role") in ROLES else None
+    if role:
+        out["role"] = role
+    if role in ("banned", "picked") and raw.get("by") in SIDES:
+        out["by"] = raw["by"]
+    if role != "banned":
+        out["home_score"] = _score(raw.get("home_score"))
+        out["away_score"] = _score(raw.get("away_score"))
+        if lineup:
+            out["lineup"] = lineup
     return out
 
 
 def match_extras(raw: dict) -> tuple[dict, str | None]:
-    """Banns und Termin eines Spiels: ``(Felder, Meldung)`` - die Meldung, wenn es die Uhrzeit an dem Tag in Wien nicht
-    gibt (dann ohne Termin)."""
+    """Termin eines Spiels: ``(Felder, Meldung)`` - die Meldung, wenn es die Uhrzeit an dem Tag in Wien nicht gibt
+    (dann ohne Termin)."""
     out: dict = {}
-    found = bans(raw)
-    if found:
-        out["bans"] = found
     day, clock = raw.get("day") or None, raw.get("time") or None
     if day:
         out["club_day"] = day
@@ -67,5 +80,5 @@ def match_extras(raw: dict) -> tuple[dict, str | None]:
         try:
             out["starts_at"] = vienna_start(day, clock)
         except ClockError:
-            return {key: value for key, value in out.items() if key == "bans"}, clock_gap_message(day, clock)
+            return {}, clock_gap_message(day, clock)
     return out, None

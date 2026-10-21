@@ -45,14 +45,21 @@ def _schedule():
 
 
 def _maps_of(day: int, own_home: bool):
-    """Drei Maps je eigenem Spiel (bis 6 Runden); Ergebnis aus Sicht des Heimteams."""
+    """Veto wie in S&D: zwei Banns, zwei Wahlen, Decider - drei gespielte Maps (bis 6 Runden); Ergebnis aus Sicht des
+    Heimteams."""
     own_wins = [(6, 3), (6, 4), (2, 6)] if day % 3 else [(4, 6), (6, 5), (3, 6)]
-    maps = []
+    maps = [{"name": "Karte 4", "role": "banned", "by": "own"}, {"name": "Karte 5", "role": "banned", "by": "opponent"}]
+    roles = [("picked", "own"), ("picked", "opponent"), ("decider", None)]
     for number, (mine, theirs) in enumerate(own_wins, start=1):
         home, away = (mine, theirs) if own_home else (theirs, mine)
-        maps.append({"name": f"Karte {number}", "home_score": home, "away_score": away,
-                     "picked_by": ["home", "away", "decider"][number - 1]})
+        role, by = roles[number - 1]
+        maps.append({"name": f"Karte {number}", "home_score": home, "away_score": away, "role": role,
+                     **({"by": by} if by else {})})
     return maps
+
+
+def _played(maps):
+    return [game for game in maps if game.get("role") != "banned"]
 
 
 def _other_score(day: int, index: int):
@@ -103,11 +110,10 @@ async def _enter_season(flow, series):
         for index, (home, away) in enumerate(games):
             if OWN in (home, away):
                 maps = _maps_of(number, home == OWN)
-                won = sum(1 for game in maps if (game["home_score"] > game["away_score"]) == (home == OWN))
+                won = sum(1 for game in _played(maps) if (game["home_score"] > game["away_score"]) == (home == OWN))
                 home_score, away_score = (won, 3 - won) if home == OWN else (3 - won, won)
                 matches.append({"home": home, "away": away, "home_score": home_score, "away_score": away_score,
-                                "time": "20:30", "maps": maps, "lineup": [{"name": name} for name in lineup],
-                                "bans": [{"name": "Karte 4", "by": "home"}, {"name": "Karte 5", "by": "away"}]})
+                                "time": "20:30", "maps": maps, "lineup": [{"name": name} for name in lineup]})
             else:
                 home_score, away_score = _other_score(number, index)
                 matches.append({"home": home, "away": away, "home_score": home_score, "away_score": away_score})
@@ -123,7 +129,7 @@ def _expected_table():
         for index, (home, away) in enumerate(games):
             if OWN in (home, away):
                 maps = _maps_of(number, home == OWN)
-                won = sum(1 for game in maps if (game["home_score"] > game["away_score"]) == (home == OWN))
+                won = sum(1 for game in _played(maps) if (game["home_score"] > game["away_score"]) == (home == OWN))
                 scores = (won, 3 - won) if home == OWN else (3 - won, won)
             else:
                 scores = _other_score(number, index)
@@ -185,10 +191,11 @@ async def test_matchday_cards_carry_maps_with_picks_bans_the_time_and_the_other_
     own_home = next(game for game in games if OWN in game)[0] == OWN
     match = first["match"]
     assert match["time"] == "20:30" and match["home"] is own_home
-    assert [item["picked"] for item in match["maps"]] == (
-        ["own", "opponent", "decider"] if own_home else ["opponent", "own", "decider"])
-    assert match["bans"] == ([{"name": "Karte 4", "by": "own"}, {"name": "Karte 5", "by": "opponent"}] if own_home
-                             else [{"name": "Karte 4", "by": "opponent"}, {"name": "Karte 5", "by": "own"}])
+    # Wer gewählt bzw. gesperrt hat, steht schon aus eigener Sicht im Blatt - egal ob daheim oder auswärts.
+    assert match["home"] is own_home
+    assert [item["picked"] for item in match["maps"]] == ["own", "opponent", "decider"]
+    assert match["bans"] == [{"name": "Karte 4", "by": "own", "map_id": None},
+                             {"name": "Karte 5", "by": "opponent", "map_id": None}]
     assert [(item["home"], item["away"]) for item in first["others"]] == [game for game in games if OWN not in game]
 
 

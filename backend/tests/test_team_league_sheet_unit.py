@@ -25,29 +25,40 @@ def _own_match(**extra):
     return {"home": "Probe Löwen", "away": "Probe Falken", "home_score": 2, "away_score": 1, **extra}
 
 
-def test_maps_keep_who_picked_them_and_a_lineup_each_and_the_match_lineup_is_their_union():
+def test_maps_in_veto_order_with_role_side_map_id_and_a_lineup_each_and_the_match_lineup_is_their_union():
     out = resolve({"matches": [_own_match(
-        maps=[{"name": "Karte Nord", "home_score": 6, "away_score": 3, "picked_by": "home",
+        maps=[{"name": "Karte Ost", "role": "banned", "by": "own", "home_score": 9,
+               "lineup": [{"participant_id": "p-dora"}]},
+              {"name": " Karte  Hafen ", "role": "banned", "by": "opponent", "map_id": "map-hafen"},
+              {"name": "Karte Nord", "home_score": 6, "away_score": 3, "role": "picked", "by": "own",
+               "map_id": "map-nord",
                "lineup": [{"participant_id": "p-anna"}, {"name": "Bert Probe"}, {"participant_id": "p-carl"},
                           {"name": "Neu Nora"}]},
-              {"name": "Karte Süd", "home_score": 4, "away_score": 6, "picked_by": "away",
+              {"name": "Karte Süd", "home_score": 4, "away_score": 6, "role": "picked", "by": "opponent",
                "lineup": [{"participant_id": "p-anna"}, {"participant_id": "p-dora"}]},
-              {"name": "Karte West", "home_score": 6, "away_score": 5, "picked_by": "decider"}],
-        lineup=[{"participant_id": "p-bert"}],
-        bans=[{"name": "Karte Ost", "by": "home"}, {"name": " Karte  Hafen ", "by": "away"}])]}, PEOPLE, RULES)
+              {"name": "Karte West", "home_score": 6, "away_score": 5, "role": "decider", "by": "own"}],
+        lineup=[{"participant_id": "p-bert"}])]}, PEOPLE, RULES)
     assert out.errors == []
     match = out.matches[0]
+    # Eine gesperrte Map hat weder Ergebnis noch Aufstellung - ihre Aufstellung zählt nicht.
     assert match["lineup"] == ["p-bert", "p-anna", "p-carl", "neu:neunora", "p-dora"]
-    assert [(item["name"], item.get("picked_by"), item.get("lineup")) for item in match["maps"]] == [
-        ("Karte Nord", "home", ["p-anna", "p-bert", "p-carl", "neu:neunora"]),
-        ("Karte Süd", "away", ["p-anna", "p-dora"]),
-        ("Karte West", "decider", None)]
-    assert match["bans"] == [{"name": "Karte Ost", "by": "home"}, {"name": "Karte Hafen", "by": "away"}]
+    assert match["maps"] == [
+        {"name": "Karte Ost", "role": "banned", "by": "own"},
+        {"name": "Karte Hafen", "map_id": "map-hafen", "role": "banned", "by": "opponent"},
+        {"name": "Karte Nord", "map_id": "map-nord", "role": "picked", "by": "own", "home_score": 6, "away_score": 3,
+         "lineup": ["p-anna", "p-bert", "p-carl", "neu:neunora"]},
+        {"name": "Karte Süd", "role": "picked", "by": "opponent", "home_score": 4, "away_score": 6,
+         "lineup": ["p-anna", "p-dora"]},
+        {"name": "Karte West", "role": "decider", "home_score": 6, "away_score": 5},
+    ]
     assert list(out.new_people) == ["neunora"]
+    # Der Abgleich Maps ↔ Ergebnis zählt nur gespielte Maps: 2:1 passt.
+    check(out, RULES, ROUND, TODAY, OWN)
+    assert "maps_differ" not in _codes(out.warnings)
 
     saved = replace_new_ids(out.content(), {"neunora": "p-nora"})
     assert saved["matches"][0]["lineup"][3] == "p-nora"
-    assert saved["matches"][0]["maps"][0]["lineup"] == ["p-anna", "p-bert", "p-carl", "p-nora"]
+    assert saved["matches"][0]["maps"][2]["lineup"] == ["p-anna", "p-bert", "p-carl", "p-nora"]
 
 
 def test_a_match_without_extras_is_stored_exactly_as_before():

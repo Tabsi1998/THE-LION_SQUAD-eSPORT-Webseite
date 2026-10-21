@@ -139,12 +139,13 @@ async def _matchday(flow, series, code="ST1", day="2026-05-13"):
 def _sheet(**own):
     return {"matches": [
         {"home": OWN, "away": "Probe Falken", "home_score": 2, "away_score": 1, "day": "2026-05-14", "time": "21:15",
-         "bans": [{"name": "Karte Ost", "by": "home"}, {"name": "Karte Hafen", "by": "away"}],
-         "maps": [{"name": "Karte Nord", "home_score": 6, "away_score": 3, "picked_by": "home",
+         "maps": [{"name": "Karte Ost", "role": "banned", "by": "own"},
+                  {"name": "Karte Hafen", "role": "banned", "by": "opponent"},
+                  {"name": "Karte Nord", "home_score": 6, "away_score": 3, "role": "picked", "by": "own",
                    "lineup": [{"name": "Probe Anna"}, {"name": "Probe Bert"}]},
-                  {"name": "Karte Süd", "home_score": 4, "away_score": 6, "picked_by": "away",
+                  {"name": "Karte Süd", "home_score": 4, "away_score": 6, "role": "picked", "by": "opponent",
                    "lineup": [{"name": "Probe Anna"}, {"name": "Probe Cleo"}]},
-                  {"name": "Karte West", "home_score": 6, "away_score": 5, "picked_by": "decider"}],
+                  {"name": "Karte West", "home_score": 6, "away_score": 5, "role": "decider"}],
          **own},
         {"home": "Probe Adler", "away": "Probe Eulen", "home_score": 0, "away_score": 2},
         {"home": "Probe Wölfe", "away": "Probe Bären", "home_score": 1, "away_score": 1},
@@ -162,6 +163,7 @@ async def test_a_matchday_with_the_other_matches_saves_maps_bans_time_and_lineup
     assert loaded.status_code == 200, loaded.text
     assert loaded.json()["series"]["own_team_list"] == [{"name": OWN, "aliases": []}]
     assert loaded.json()["round"]["at_home"] is True
+    assert loaded.json()["series"]["map_names"] == []
 
     preview = await flow.post(f"{base}/preview", json=_sheet())
     assert preview.status_code == 200, preview.text
@@ -173,10 +175,10 @@ async def test_a_matchday_with_the_other_matches_saves_maps_bans_time_and_lineup
     ids = {row["name"]: row["id"] async for row in flow.db.reference_participants.find({})}
     own = saved.json()["sheet"]["matches"][0]
     assert own["lineup"] == [ids["Probe Anna"], ids["Probe Bert"], ids["Probe Cleo"]]
-    assert [(item["picked_by"], item.get("lineup")) for item in own["maps"]] == [
-        ("home", [ids["Probe Anna"], ids["Probe Bert"]]), ("away", [ids["Probe Anna"], ids["Probe Cleo"]]),
-        ("decider", None)]
-    assert own["bans"] == [{"name": "Karte Ost", "by": "home"}, {"name": "Karte Hafen", "by": "away"}]
+    assert [(item.get("role"), item.get("by"), item.get("lineup")) for item in own["maps"]] == [
+        ("banned", "own", None), ("banned", "opponent", None),
+        ("picked", "own", [ids["Probe Anna"], ids["Probe Bert"]]),
+        ("picked", "opponent", [ids["Probe Anna"], ids["Probe Cleo"]]), ("decider", None, None)]
     assert (own["club_day"], own["time"], own["starts_at"]) == ("2026-05-14", "21:15", "2026-05-14T19:15:00+00:00")
     assert len(saved.json()["sheet"]["matches"]) == 3
 
@@ -184,3 +186,8 @@ async def test_a_matchday_with_the_other_matches_saves_maps_bans_time_and_lineup
     table = await flow.db.reference_standings.find_one({"series_id": series["id"], "scope": "table"})
     assert sorted(row["team"] for row in table["rows"]) == sorted(
         [OWN, "Probe Falken", "Probe Adler", "Probe Eulen", "Probe Wölfe", "Probe Bären"])
+
+    # Vorschläge für die Map-Namen beim nächsten Spieltag: was in der Saison schon steht, häufigste zuerst.
+    second = await _matchday(flow, series, code="ST2", day="2026-05-20")
+    again = await flow.get(f"{ADMIN}/series/{series['id']}/rounds/{second['id']}/results")
+    assert again.json()["series"]["map_names"] == ["Karte Hafen", "Karte Nord", "Karte Ost", "Karte Süd", "Karte West"]
