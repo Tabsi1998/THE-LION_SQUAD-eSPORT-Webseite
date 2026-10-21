@@ -149,6 +149,14 @@ test("detailsOf: langer Titel nur, wenn er vom kurzen abweicht; Aufstellung nur 
   expect(plain.detailUrl).toBe("/references/b");
 });
 
+test("detailsOf: „Saison ansehen“ kommt aus season_link der Referenz (#1750), sonst aus der Spur", () => {
+  const seasonLink = { lineage_slug: "nsdl-sd", season_slug: "s4-league-a", label: "NSDL · Season 4 · League A", season_end: true };
+  const item = { ...ref("c", "2026-01-01", 2), display_title: "NSDL Season 4", season_link: seasonLink };
+  expect(detailsOf(item, "p-nova", null).seasonUrl).toBe("/references/series/nsdl-sd/s4-league-a");
+  const link = { lineage: { slug: "andere-spur" }, season: { season_slug: "alt" } };
+  expect(detailsOf(item, "p-nova", link).seasonUrl).toBe("/references/series/nsdl-sd/s4-league-a");
+});
+
 // ---------------------------------------------------------------- Liga-Weg der Person
 
 const LINEAGE = {

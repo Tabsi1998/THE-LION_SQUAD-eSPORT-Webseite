@@ -37,6 +37,12 @@ test("„Über uns“: die drei neuesten Pokale, klein ohne Spielnamen", () => {
   expect(fieldSize({ best_placement: 2, entries: [] })).toBe("");
 });
 
+test("ein Pokal aus einer Saison führt zur Saison-Seite (#1750)", () => {
+  const season = { ...ITEMS[2], season_link: { lineage_slug: "probe-liga", season_slug: "saison-3", label: "Probe Liga · Saison 3", season_end: true } };
+  render(<MemoryRouter><TrophyShelf items={[season]} testId="t" /></MemoryRouter>);
+  expect(screen.getByTestId("t-silver")).toHaveAttribute("href", "/references/series/probe-liga/saison-3");
+});
+
 test("ohne Pokale bleibt die Vitrine weg", () => {
   const { container } = render(<MemoryRouter><TrophyShelf items={[]} /></MemoryRouter>);
   expect(container).toBeEmptyDOMElement();

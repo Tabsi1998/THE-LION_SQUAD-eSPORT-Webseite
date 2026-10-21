@@ -6,7 +6,8 @@ import { seoTextPreview } from "@/lib/textPreview";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { EntryRow, FieldChips, GameChip, MEDAL, PlacementBadge, RefButton, SectionTitle, bestPlacement, displayTitle, entriesOf, entryTitle, formatDate, medalOf, memberName, referenceGameName } from "@/components/tls/references/referenceParts";
-import { Users } from "lucide-react";
+import { Flag, Users } from "lucide-react";
+import { referenceHref } from "@/lib/seasonClose";
 import { RunningSeries } from "@/components/tls/references/RunningSeries";
 import { HonorHeader } from "@/components/tls/references/HonorHeader";
 import { Showcase } from "@/components/tls/references/Showcase";
@@ -151,6 +152,11 @@ export function ReferenceDetailPage() {
                 {[item.organizer, item.league, item.season].filter(Boolean).join(" · ")}
               </p>
               <FieldChips item={item} className="mt-4" />
+              {item.season_link && (
+                <Link to={referenceHref(item)} data-testid="reference-detail-season" className="mt-4 inline-flex items-center gap-1.5 px-2.5 py-1.5 border border-[#29B6E8]/40 bg-[#29B6E8]/10 hover:bg-[#29B6E8]/20 rounded-sm text-[11px] uppercase tracking-widest font-bold text-[#29B6E8] transition-colors">
+                  <Flag className="w-3.5 h-3.5" aria-hidden="true" /> aus Saison {item.season_link.label}
+                </Link>
+              )}
             </div>
           </div>
         </div>

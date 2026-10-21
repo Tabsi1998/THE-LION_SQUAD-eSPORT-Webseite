@@ -10,6 +10,7 @@ import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { memberNews, tileNote } from "@/lib/memberArea";
 import { viennaDate } from "@/lib/vienna";
+import { referenceHref } from "@/lib/seasonClose";
 
 // /verein (#1147): das Ziel des Eintrags „Verein“ in der Handy-Leiste - derselbe Aufbau wie der Tab in der App.
 // Mitglieder sehen oben kurz ihren Mitgliederbereich (mit dem Weg zu /members/area), alle anderen „Mitglied werden“ mit
@@ -191,7 +192,7 @@ export default function VereinPage() {
               {references.length ? (
                 <div className="space-y-2">
                   {references.map((ref) => (
-                    <Link key={ref.id} to={`/references/${ref.id}`} className="flex items-center gap-3 border border-white/10 bg-[#121212] rounded-sm p-3 hover:border-[#29B6E8]/45 transition">
+                    <Link key={ref.id} to={referenceHref(ref)} data-testid={`verein-reference-${ref.id}`} className="flex items-center gap-3 border border-white/10 bg-[#121212] rounded-sm p-3 hover:border-[#29B6E8]/45 transition">
                       <span className="min-w-0 flex-1 font-bold text-sm truncate">{ref.title || ref.name}</span>
                       <ChevronRight className="w-4 h-4 text-white/35 shrink-0" />
                     </Link>

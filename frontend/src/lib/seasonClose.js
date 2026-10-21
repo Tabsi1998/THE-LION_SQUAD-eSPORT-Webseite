@@ -70,10 +70,18 @@ export function seasonOf(reference, lineages) {
   return { seriesId: found.series.id, label: seasonName(found.lineage, found.series), seasonEnd: found.series.reference_id === reference.id };
 }
 
-/** Wohin die Karte einer Referenz führt: zur Saison-Seite, wenn sie aus einer Saison stammt, sonst zur Referenz. */
-export function referenceHref(item, link = null) {
+/**
+ * Die Saison-Seite einer Referenz: zuerst aus `season_link` vom Server, sonst aus der Spur der Übersicht (`link` aus
+ * „Serien und Ligen“); leer, wenn die Referenz zu keiner sichtbaren Saison gehört.
+ */
+export function seasonHref(item, link = null) {
   const season = item?.season_link;
   if (season?.lineage_slug && season?.season_slug) return `/references/series/${season.lineage_slug}/${season.season_slug}`;
   if (link?.lineage?.slug && link?.season?.season_slug) return `/references/series/${link.lineage.slug}/${link.season.season_slug}`;
-  return `/references/${item?.id}`;
+  return "";
+}
+
+/** Wohin die Karte einer Referenz führt: zur Saison-Seite, wenn sie aus einer Saison stammt, sonst zur Referenz. */
+export function referenceHref(item, link = null) {
+  return seasonHref(item, link) || `/references/${item?.id}`;
 }
