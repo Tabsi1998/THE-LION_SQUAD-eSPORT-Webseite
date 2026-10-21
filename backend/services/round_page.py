@@ -16,14 +16,16 @@ schnellste Runde, Fahrer des Tages) und die Punkte je Lauf aus dem letzten Fahre
 - **Teamfarbe** je Team aus der Saison (``team_colors``, einstellbar in der Verwaltung); ohne Farbe bleibt es neutral.
 - **Hervorgehoben** (``own``): Vereinsmitglieder und Fahrer eigener Teams (#1926, auch in anderer Schreibweise).
 - **Zusammenfassung** (``summary``): Sieger und schnellste Runde des Hauptrennens, Pole aus dem Haupt-Qualifying (mit
-  Zeit; ohne Qualifying die Pole-Marke im Rennen) und Fahrer des Tages - je als Kennung der Zeile. Je Lauf der beste
-  öffentliche Vereinsfahrer (``best_club``).
+  Zeit; nur ohne Quali-Ergebnis die Pole-Marke im Rennen, nie aus einem Lauf mit umgekehrter Aufstellung,
+  #1960) und Fahrer des Tages - je als Kennung der Zeile. Je Lauf der beste öffentliche Vereinsfahrer (``best_club``).
+- **Sonderregeln** (#1960): je Lauf ``grid_source`` und ``reverse_top`` (umgekehrte Aufstellung: keine Pole-Marke,
+  vorn steht Startplatz 1) sowie ``no_score_reason`` und ``no_score_note`` (Termin ohne Wertung - keine Punkte).
 - **Original** (``original``): Platz für das Original-Bild des Veranstalters (#1933) - bis dahin immer ``None``.
 """
 from __future__ import annotations
 
 from services.own_teams import Matcher, own_teams
-from services.race_weekend import is_main_qualifying, pole_holder, session_kind
+from services.race_weekend import SESSION_REVERSES, is_main_qualifying, pole_holder, round_plan, session_kind
 
 OUT_MARKS = ("dns", "dsq", "dnf")
 STATUS_ORDER = {"finished": 0, "dnf": 1, "dsq": 2, "dns": 3}
@@ -115,6 +117,7 @@ class _Context:
         self.people = people
         self.participants = participants
         self.results = results
+        self.weekend = series.get("weekend")  # #1960: Startplatz-Quelle je Lauf (umgekehrte Aufstellung)
         self.colors = team_color_map(series)
         self.matcher = Matcher(own_teams(series))
         defaults = [clean(item.get("default_team")) for item in participants.values() if item.get("default_team")]
@@ -173,12 +176,18 @@ def best_club(rows: list[dict], public: set) -> str | None:
     return entries[0]["key"] if entries else None
 
 
-def session_view(item: dict, sheet: dict | None, ctx: _Context, public: set, key: str) -> dict:
-    """Ein Lauf mit seinen Zeilen und den Spalten, die etwas zeigen."""
+def session_view(item: dict, sheet: dict | None, ctx: _Context, public: set, key: str,
+                 config: dict | None = None) -> dict:
+    """Ein Lauf mit seinen Zeilen und den Spalten, die etwas zeigen. ``config``: die Vorgabe des Laufs (#1930) - mit
+    umgekehrter Aufstellung aus einem Lauf (#1960) hat er keine Pole: wer vorn steht, hat Startplatz 1."""
     counts = item.get("counts", True) is not False
+    grid_source = (config or {}).get("grid")
+    reversed_grid = grid_source in SESSION_REVERSES
     raw = [row for row in (sheet or {}).get("rows") or [] if row.get("participant_id")]
     others = [clean(row.get("team")) for row in raw if clean(row.get("team"))]
     rows = _sorted_rows([ctx.row(row, item["id"], sheet or {}, others, counts) for row in raw])
+    if reversed_grid:
+        rows = [{**row, "marks": [mark for mark in row["marks"] if mark != "pole"]} for row in rows]
     columns = [field for field in COLUMN_FIELDS if any(row.get(field) not in (None, "") for row in rows)]
     kind = item.get("session_kind") or session_kind(item.get("session"))
     pole = None
@@ -192,6 +201,9 @@ def session_view(item: dict, sheet: dict | None, ctx: _Context, public: set, key
         "kind": kind, "state": item.get("state"), "club_day": item.get("club_day"), "time": item.get("time"),
         "counts": counts, "has_result": bool(rows), "columns": columns, "rows": rows,
         "pole": pole, "best_club": best_club(rows, public),
+        # #1960: Termin ohne Wertung mit Grund und die Quelle des Startplatzes (umgekehrt: nur die ersten N).
+        "no_score_reason": item.get("no_score_reason"), "no_score_note": item.get("no_score_note"),
+        "grid_source": grid_source, "reverse_top": (config or {}).get("reverse_top") if reversed_grid else None,
         "original": None,  # #1933: Original-Bild des Veranstalters
     }
 
@@ -237,7 +249,10 @@ def summary(sessions: list[dict], main: dict | None) -> dict:
     quali = next((item for item in sessions if item["pole"]), None)
     if quali:
         out["pole"] = {**quali["pole"], "session": quali["key"]}
-    elif main:
+    elif main and not any(item["kind"] == "qualifying" and item["has_result"] for item in sessions) \
+            and main.get("grid_source") not in SESSION_REVERSES:
+        # Nur eine Runde ohne Ergebnis eines Qualifyings nimmt die Pole-Marke des Rennens (Bestand #1927) - nie ein
+        # Lauf mit umgekehrter Aufstellung (#1960).
         marked = next((row for row in main["rows"] if "pole" in row["marks"]), None)
         if marked:
             out["pole"] = {"key": marked["key"], "session": main["key"], "time": None}
@@ -258,13 +273,15 @@ def round_view(rounds: list[dict], number: int, sheets: dict, ctx: _Context, peo
     numbers = sorted(groups)
     index = numbers.index(number)
     public = set(public_club_keys(people))
+    plan = round_plan(rounds, ctx.weekend)
     used: dict[str, int] = {}
     sessions = []
     for item in groups[number]:
         key = session_key(item.get("session"))
         used[key] = used.get(key, 0) + 1
         sessions.append(session_view(item, sheets.get(item["id"]), ctx, public,
-                                     key if used[key] == 1 else f"{key}-{used[key]}"))
+                                     key if used[key] == 1 else f"{key}-{used[key]}",
+                                     (plan.get(item["id"]) or {}).get("config")))
     main = main_session(sessions)
     return {
         "round": _head(groups[number], number, len(numbers)),

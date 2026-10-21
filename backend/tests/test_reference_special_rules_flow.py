@@ -336,6 +336,77 @@ async def test_a_sprint_in_reverse_qualifying_order_top_two_without_pole(flow):
     assert race["p-lion1"]["marks"] == ["pole"]
 
 
+@pytest.mark.asyncio
+async def test_round_page_and_statistics_know_reversed_grids_no_score_rounds_and_cancelled_seasons(flow):
+    """Rundenseite und Statistik (#1950) mit den Sonderregeln: der umgekehrte Sprint zeigt Startplatz 1 statt Pole, die
+    Pole kommt nur aus dem Qualifying, ein Termin ohne Wertung zählt in der Statistik nicht und zeigt seinen Grund,
+    Anpassungen bleiben aus den Punkten je Lauf draußen, eine abgebrochene Saison sagt es."""
+    await _board(flow)
+    lineage = await _lineage(flow, title="Probe Racing F4")
+    weekend = {"formats": [{"from_round": 1, "sessions": [
+        {"label": "Qualifying"}, {"label": "Sprint", "offset": 30, "grid": "reverse_qualifying", "reverse_top": 2},
+        {"label": "Hauptrennen", "offset": 60, "grid": "qualifying"}]}]}
+    series = await _season(flow, lineage, weekend=weekend,
+                           rules={**RULES, "bonuses": {"pole": {"points": 2}}, "team_scoring": {"enabled": False}})
+    pasted = await flow.post(f"{ADMIN}/series/{series['id']}/rounds/paste", json={
+        "text": "R1 · 08.11.2026 20:00 · Probe Ring\nR2 · 15.11.2026 20:00 · Probe Ring", "apply": True})
+    assert pasted.status_code == 200, pasted.text
+    ids = {(item["weekend"], item["session"]): item["id"] for item in pasted.json()["rounds"]}
+    await flow.db.reference_participants.insert_many([
+        {"series_id": series["id"], "is_club_member": False, "name_hidden": False, **person} for person in PEOPLE])
+    sheets = {
+        (1, "Qualifying"): (["p-lion1", "p-lion2", "p-ext1", "p-ext2"], {}),
+        # Eine Pole-Marke von Hand im umgekehrten Sprint zählt nicht.
+        (1, "Sprint"): (["p-ext1", "p-lion2", "p-lion1", "p-ext2"], {"p-ext1": ["pole"]}),
+        (1, "Hauptrennen"): (["p-lion1", "p-ext1", "p-lion2", "p-ext2"], {}),
+        (2, "Hauptrennen"): (["p-ext2", "p-ext1"], {}),
+    }
+    for key, (order, marks) in sheets.items():
+        await flow.db.reference_round_results.insert_one({
+            "id": f"blatt-{key[0]}-{key[1]}", "series_id": series["id"], "round_id": ids[key], "status": "published",
+            "rows": [{"participant_id": pid, "place": place, "marks": marks.get(pid, [])}
+                     for place, pid in enumerate(order, start=1)]})
+        await flow.db.reference_rounds.update_one({"id": ids[key]}, {"$set": {"status": "scored"}})
+    version = (await flow.get(f"{ADMIN}/series/{series['id']}/calendar")).json()["version"]
+    no_score = await flow.patch(f"{ADMIN}/series/{series['id']}/rounds/{ids[(2, 'Hauptrennen')]}", json={
+        "no_score_reason": "too_few", "no_score_note": "Nur zwei am Start", "expected_version": version})
+    assert no_score.status_code == 200, no_score.text
+    assert (await flow.post(f"{ADMIN}/series/{series['id']}/adjustments", json={
+        "participant_id": "p-lion1", "points": -5, "reason": "Video fehlt", "day": "2026-11-08"})).status_code == 200
+    cancelled = await flow.patch(f"{ADMIN}/series/{series['id']}", json={"status": "cancelled",
+                                                                          "cancel_reason": "Serverwechsel"})
+    assert cancelled.status_code == 200, cancelled.text
+    base = f"{PUBLIC}/{lineage['slug']}/{series['season_slug']}"
+
+    page = (await flow.get(f"{base}/rounds/1")).json()
+    assert (page["series"]["status"], page["series"]["cancel_reason"]) == ("cancelled", "Serverwechsel")
+    sessions = {item["key"]: item for item in page["sessions"]}
+    sprint, race = sessions["sprint"], sessions["hauptrennen"]
+    assert (sprint["grid_source"], sprint["reverse_top"]) == ("reverse_qualifying", 2)
+    assert {row["key"]: row["grid"] for row in sprint["rows"]} == {"p-lion2": 1, "p-lion1": 2, "p-ext1": 3, "p-ext2": 4}
+    assert all("pole" not in row["marks"] for row in sprint["rows"])
+    assert (race["grid_source"], race["reverse_top"]) == ("qualifying", None)
+    race_rows = {row["key"]: row for row in race["rows"]}
+    assert race_rows["p-lion1"]["marks"] == ["pole"]
+    # Punkte je Lauf ohne Anpassung: 10 für den Sieg plus 2 für die Pole - die −5 gehören in die Gesamtwertung.
+    assert race_rows["p-lion1"]["points"] == 12
+    assert page["summary"]["pole"]["key"] == "p-lion1" and page["summary"]["pole"]["session"] == "qualifying"
+
+    second = (await flow.get(f"{base}/rounds/2")).json()
+    late = next(item for item in second["sessions"] if item["key"] == "hauptrennen")
+    assert (late["no_score_reason"], late["no_score_note"], late["counts"]) == ("too_few", "Nur zwei am Start", False)
+    assert all(row["points"] is None for row in late["rows"])
+    assert second["summary"]["pole"] is None
+
+    stats = (await flow.get(f"{base}/statistics")).json()
+    assert stats["series"]["status"] == "cancelled"
+    drivers = {row["key"]: row for row in stats["drivers"]}
+    assert (drivers["p-lion1"]["poles"], drivers["p-ext1"]["poles"]) == (1, 0)
+    assert (drivers["p-lion1"]["wins"], drivers["p-ext1"]["wins"]) == (1, 1)
+    # Der Termin ohne Wertung (p-ext2 gewinnt R2) zählt in der Statistik nicht.
+    assert drivers["p-ext2"]["wins"] == 0 and drivers["p-ext2"]["races"] == 2
+
+
 # ---------------------------------------------------------------- Termin ohne Wertung
 @pytest.mark.asyncio
 async def test_a_round_without_score_has_a_public_reason_and_too_few_starters_warn(flow):

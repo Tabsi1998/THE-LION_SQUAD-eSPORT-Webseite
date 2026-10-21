@@ -37,13 +37,11 @@ export function sessionGridLines(weekend) {
   const lines = [];
   for (const format of formats) {
     for (const session of format.sessions || []) {
-      const grid = GRID_ALIASES[session.grid] || session.grid;
-      const words = GRID_WORDS[grid];
+      const words = gridWords(session.grid, session.reverse_top);
       if (!words) continue;
-      const top = SESSION_REVERSES.includes(grid) && session.reverse_top ? ` (Top ${session.reverse_top})` : "";
       const from = formats.length > 1 && format.from_round > 1 ? `ab Runde ${format.from_round} ` : "";
-      const line = `${from}${session.label}: ${words}${top}`;
-      const key = `${String(session.label).toLowerCase()}|${words}${top}`;
+      const line = `${from}${session.label}: ${words}`;
+      const key = `${String(session.label).toLowerCase()}|${words}`;
       if (seen.has(key)) continue;
       seen.add(key);
       lines.push(line);
@@ -53,6 +51,15 @@ export function sessionGridLines(weekend) {
 }
 // Der frühere Wert heißt jetzt „vor der Runde“ (wie im Server).
 const GRID_ALIASES = { reverse_standings: "reverse_standings_before_round" };
+
+/** Eine umgekehrte Startaufstellung in Worten - „Start in umgekehrter Quali-Reihenfolge (Top 8)“; leer bei Eingabe
+ * und aus dem Qualifying (#1960, auch für die Rundenseite). */
+export function gridWords(grid, top = null) {
+  const source = GRID_ALIASES[grid] || grid;
+  const words = GRID_WORDS[source];
+  if (!words) return "";
+  return SESSION_REVERSES.includes(source) && top ? `${words} (Top ${top})` : words;
+}
 
 /** Punkte je Lauf: wie das Rennen (das Schema der Saison), keine oder eine eigene Liste. */
 export const SESSION_POINTS_OPTIONS = [["series", "Wie Rennen"], ["none", "Keine Punkte"], ["own", "Eigene Liste"]];

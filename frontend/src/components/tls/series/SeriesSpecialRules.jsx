@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { AlertTriangle, ArrowRight } from "lucide-react";
+import { gridWords } from "@/lib/raceWeekend";
 import {
   adjustmentDetail, adjustmentSum, adjustmentText, adjustmentTitle, cancelledText, noScoreText, ruleChangeLines, successorLink, teamDeviationText, teamModeLabel,
   teamSourceLabel,
@@ -99,6 +100,19 @@ export function TeamSource({ teams, scoring, rounds = [] }) {
           </ul>
         </details>
       )}
+    </div>
+  );
+}
+
+/** Rundenseite (#1950): je Lauf „Ohne Wertung · Grund“ und die umgekehrte Startaufstellung („Start in umgekehrter
+ * Quali-Reihenfolge (Top 8)“) - wer vorn steht, hat dort Startplatz 1, nicht die Pole. */
+export function SessionRuleNotes({ session }) {
+  const grid = gridWords(session?.grid_source, session?.reverse_top);
+  if (!grid && !noScoreText(session)) return null;
+  return (
+    <div className="mb-3 flex flex-col gap-1 text-sm" data-testid="round-session-rules">
+      <NoScoreNote round={session} className="!text-sm" />
+      {grid && <span className="text-white/65" data-testid="round-session-grid">{grid}</span>}
     </div>
   );
 }

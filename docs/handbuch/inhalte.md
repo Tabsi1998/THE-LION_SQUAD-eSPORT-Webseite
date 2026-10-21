@@ -751,10 +751,13 @@ einstellbar, nichts ist für eine Liga fest eingebaut:
   bleibt. Die **Pole** bleibt beim Schnellsten im Qualifying: Ein umgekehrter Lauf hat keine Pole (wer vorn steht, hat
   Startplatz 1; eine Pole-Marke im Blatt fällt mit Hinweis weg). Der Pole-Bonus zählt am ersten Rennen mit Startplatz
   aus dem Qualifying, gibt es keins, am Qualifying selbst. Die Serienseite nennt es unter **Startaufstellung**
-  („Sprint: Start in umgekehrter Quali-Reihenfolge (Top 8)“).
+  („Sprint: Start in umgekehrter Quali-Reihenfolge (Top 8)“), die Ergebnisseite der Runde über der Tabelle des Laufs.
+  Zusammenfassung und Statistik zählen die Pole nur aus dem Qualifying (eine Pole-Marke im Rennen nur, wenn die Runde
+  kein Quali-Ergebnis hat – nie in einem umgekehrten Lauf).
 - **Termin ohne Wertung:** Im Termin **Ohne Wertung – Grund**: **Zu wenig Fahrer**, **Serverausfall bzw. Nachholung**,
   **Neustart** oder **Anderer Grund**, dazu ein kurzer Text. Der Termin zählt dann nicht und zeigt öffentlich
-  „Ohne Wertung · Zu wenig Fahrer – …“ – anders als **Abgesagt**, das nicht stattgefunden hat. **Mindestens am Start**
+  „Ohne Wertung · Zu wenig Fahrer – …“ – anders als **Abgesagt**, das nicht stattgefunden hat. Die Ergebnisseite der
+  Runde zeigt den Lauf mit Grund und ohne Punkte, die Statistik der Saison zählt ihn nicht. **Mindestens am Start**
   (Regeln der Saison, Abschnitt „Was zählt“) lässt beim Eintragen einen Hinweis erscheinen, wenn weniger am Start sind.
 - **Teamwertung bei Wechseln:** **Je Rennen für das gefahrene Team** (Vorgabe) oder **Aktuelle Besetzung: alle
   Saisonpunkte der Fahrer, die jetzt im Team sind** – wer das Team wechselt, nimmt seine Punkte mit; wer die Liga

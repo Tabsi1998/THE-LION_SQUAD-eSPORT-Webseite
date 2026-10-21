@@ -55,7 +55,9 @@ async def _racing(db, user: dict | None, lineage_slug: str, season_slug: str) ->
 def _head(lineage: dict, series: dict) -> dict:
     return {
         "lineage": {key: lineage.get(key) for key in ("title", "slug", "kind", "label", "organizer", "game_name")},
-        "series": {key: series.get(key) for key in ("season", "tier", "title", "season_slug", "status")},
+        # #1960: eine abgebrochene Saison sagt es mit Tag und Grund auch auf der Rundenseite.
+        "series": {key: series.get(key) for key in ("season", "tier", "title", "season_slug", "status", "cancelled_on",
+                                                    "cancel_reason")},
         "own_teams": own_team_names(series),
     }
 

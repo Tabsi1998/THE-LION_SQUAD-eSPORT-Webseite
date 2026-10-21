@@ -233,6 +233,11 @@ Mehrere Runden an einem Termin (etwa TFT-Lobbys R1–R5), gerechnet in `services
   Startplatz bleibt; Pole-Marken fallen weg (beim Prüfen Warnung `pole_moved`, `race_weekend.clear_reverse_pole`).
   Übernimmt kein Lauf der Runde den Startplatz aus dem Qualifying, zählt der Pole-Bonus der Saison am Qualifying
   (`pole_at_qualifying`: ein Blatt nur mit der Pole-Zeile ohne Platz, nur beim Rechnen).
+- **Rundenseite und Statistik (#1950):** je Lauf `grid_source`, `reverse_top`, `no_score_reason` und `no_score_note`
+  (`round_page.session_view`); ein umgekehrter Lauf hat keine Pole-Marke. Die Zusammenfassung und
+  `season_statistics.tally` nehmen die Pole aus dem Haupt-Qualifying - die Marke eines Rennens nur ohne Quali-Ergebnis
+  und nie aus einem umgekehrten Lauf. Ein Lauf ohne Wertung zählt in der Statistik nicht; die Punkte je Lauf kommen ohne
+  Anpassungen. Der Kopf beider Seiten trägt `series.cancelled_on` und `.cancel_reason`.
 
 ## Version, Entwurf daneben und Protokoll
 
