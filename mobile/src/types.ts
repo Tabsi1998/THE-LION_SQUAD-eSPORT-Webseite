@@ -91,6 +91,9 @@ export type Tournament = {
   platform?: string | null;
   max_participants?: number | null;
   participant_count?: number;
+  // Länge der Warteliste (#1941) - nur die Zahl; ältere Server schicken sie nicht.
+  waitlist_count?: number | null;
+  check_in_closed_at?: string | null;
   format_label?: string;
   public_phase?: { countdown_kind?: string | null; label?: string; state?: string; target_at?: string | null };
   start_date?: string | null;

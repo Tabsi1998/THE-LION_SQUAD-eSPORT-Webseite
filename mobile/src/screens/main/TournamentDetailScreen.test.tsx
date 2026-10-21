@@ -282,6 +282,21 @@ describe("Bestätigungs-Blatt", () => {
     expect(mockPost).toHaveBeenCalledWith("/tournaments/t1/register", expect.objectContaining({ accept_rules: true, accept_privacy: true }));
   });
 
+  // Voller Cup (#1941, App-Teil): Kopfzeile und Knopf sagen „Warteliste“ - wie im Web.
+  test("voller Cup: die Kopfzeile nennt die Warteliste mit Platz, der Knopf heißt „Auf die Warteliste“", async () => {
+    await openSheet({ ...SOLO, max_participants: 16, participant_count: 16, waitlist_count: 2 });
+    expect(screen.getByTestId("register-sheet")).toHaveTextContent(/Der Cup ist voll – du kommst auf die Warteliste \(Platz 3\)\./);
+    expect(screen.getByTestId("tournament-register-submit")).toHaveTextContent("Auf die Warteliste");
+    await fireEvent.press(screen.getByTestId("tournament-register-submit"));
+    await waitFor(() => expect(mockPost).toHaveBeenCalledTimes(1));
+  });
+
+  test("voller Cup bei altem Server ohne Länge der Warteliste: ohne Platz, kein Absturz", async () => {
+    await openSheet({ ...SOLO, max_participants: 16, participant_count: 16 });
+    expect(screen.getByTestId("register-sheet")).toHaveTextContent(/Der Cup ist voll – du kommst auf die Warteliste\./);
+    expect(screen.getByTestId("tournament-register-submit")).toHaveTextContent("Auf die Warteliste");
+  });
+
   test("ohne eigene Regeln sagt das Blatt, was gilt", async () => {
     await openSheet({ ...SOLO, rules: "" });
     expect(screen.getByTestId("register-sheet-rules")).toHaveTextContent(/keine eigenen Regeln hinterlegt/);

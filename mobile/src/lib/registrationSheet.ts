@@ -80,5 +80,18 @@ export function placeLine(tournament?: SheetTournament | null): string {
   return location ? `${label} · ${location}` : label;
 }
 
+/**
+ * Voller Cup (#1941, App-Teil): „Der Cup ist voll – du kommst auf die Warteliste (Platz 3).“ - wie waitlistLead im Web.
+ * Ohne Länge der Warteliste (`waitlist_count`, alter Server) ohne Platz; mit freien Plätzen oder ohne Höchstzahl leer.
+ */
+export function waitlistLead(tournament?: { max_participants?: number | null; participant_count?: number | null; waitlist_count?: number | null } | null): string {
+  const max = Number(tournament?.max_participants) || 0;
+  const taken = Number(tournament?.participant_count) || 0;
+  if (!max || taken < max) return "";
+  const waiting = tournament?.waitlist_count;
+  const place = typeof waiting === "number" && Number.isInteger(waiting) && waiting >= 0 ? ` (Platz ${waiting + 1})` : "";
+  return `Der Cup ist voll – du kommst auf die Warteliste${place}.`;
+}
+
 /** Ohne eigene Regeln sagt das Blatt, was gilt. */
 export const NO_RULES_TEXT = "Für dieses Turnier sind keine eigenen Regeln hinterlegt – es gelten Fair Play und die Anweisungen der Turnierleitung.";
