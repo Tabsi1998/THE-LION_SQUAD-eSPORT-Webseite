@@ -23,7 +23,7 @@ from models import (
     new_id,
     now_utc,
 )
-from services import reference_running_cache, reference_series, series_partners
+from services import reference_running_cache, reference_series, season_close, series_partners
 from services.own_teams import clean_teams, own_teams, team_conflicts
 from services.series_identity import normalize_name
 from services.reference_series_access import SeriesAccess, require_series_editor
@@ -144,8 +144,36 @@ async def update_lineage(lineage_id: str, body: ReferenceLineageUpdate, me: dict
         updates["slug"] = await unique_slug(db.reference_lineages, source, current_id=lineage_id,
                                             fallback=SLUG_FALLBACK)
         apply_slug_history(existing, updates)
-    await db.reference_lineages.update_one({"id": lineage_id}, {"$set": {**updates, **_stamp(me)}})
+    if "visibility" not in updates:
+        await db.reference_lineages.update_one({"id": lineage_id}, {"$set": {**updates, **_stamp(me)}})
+        return await _lineage(db, lineage_id)
+    # Sichtbarkeit der Spur (#1970): erst die Sperren aller ihrer Saisons (feste Reihenfolge), dann Spur und Referenzen
+    # zusammen ändern - ist eine Saison besetzt, kommt 409, bevor irgendetwas geändert ist. Die Referenzen aller Saisons
+    # folgen einer strengeren Spur sofort; Lockern öffnet keine.
+    series_ids = [item["id"] async for item in db.reference_series.find({"lineage_id": lineage_id}, {"_id": 0, "id": 1})]
+    tightened: list[str] = []
+    async with reference_series.series_write_all(db, series_ids):
+        await db.reference_lineages.update_one({"id": lineage_id}, {"$set": {**updates, **_stamp(me)}})
+        for series_id in series_ids:
+            _, ids = await season_close.tighten_references(db, series_id)
+            tightened += [rid for rid in ids if rid not in tightened]
+    await _log_tightened(db, "reference_lineage.references_tightened", lineage_id, me, updates["visibility"],
+                         tightened)
     return await _lineage(db, lineage_id)
+
+
+async def _log_tightened(db, action: str, target_id: str, me: dict, visibility: str | None,
+                         reference_ids: list[str]) -> None:
+    """Adminprotokoll (#1970): wie viele Referenzen wegen einer strengeren Saison bzw. Spur angepasst wurden. Danach
+    gilt die neue Sichtbarkeit auch in der gemerkten Antwort der Startseite."""
+    if not reference_ids:
+        return
+    await db.audit_logs.insert_one({
+        "id": new_id(), "action": action, "actor_id": me["id"], "target_id": target_id,
+        "data": {"count": len(reference_ids), "reference_ids": reference_ids, "visibility": visibility},
+        "created_at": now_utc().isoformat(),
+    })
+    reference_running_cache.reset()
 
 
 async def _set_lineage_archived(lineage_id: str, archived: bool, me: dict) -> dict:
@@ -192,6 +220,11 @@ async def create_series(body: ReferenceSeriesCreate, me: dict = Depends(require_
     })
     await db.reference_series.insert_one(doc)
     doc.pop("_id", None)
+    if doc.get("reference_id"):
+        # Gleich mit einer Referenz verknüpft (#1970): sie wird mindestens so streng wie Saison und Spur.
+        async with reference_series.series_write(db, doc["id"]):
+            required, tightened = await season_close.tighten_references(db, doc["id"])
+        await _log_tightened(db, "reference_series.references_tightened", doc["id"], me, required, tightened)
     return doc
 
 
@@ -281,6 +314,9 @@ async def update_series(series_id: str, body: ReferenceSeriesUpdate, me: dict = 
             "data": {"previous": existing.get("weekend"), "weekend": saved.get("weekend")},
             "created_at": now_utc().isoformat(),
         })
+    # Strenger gestellt oder neu verknüpft (#1970): die Referenzen der Saison folgen sofort - Lockern öffnet nichts.
+    required, tightened = await season_close.tighten_references(db, series_id)
+    await _log_tightened(db, "reference_series.references_tightened", series_id, me, required, tightened)
     if rules_changed or teams_changed or weekend_changed:
         # Andere Schreibweisen eines eigenen Teams zählen erst nach dem Neurechnen als dieses Team (#1926).
         await reference_series.recompute_standings(db, saved)

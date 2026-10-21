@@ -19,13 +19,15 @@ oder Saisonpunkte, und keine Sammlung wird mit dem Turnierbereich geteilt.
   nie zwei Sperren ineinander. Ist eine Saison gerade besetzt, merkt sie sich den Nachtrag (``alias_followups``), und
   der nächste Vorgang unter ihrer Sperre zieht ihn nach (``series_write``) - nie halbe Daten in einer Saison. Mehrere
   Aliase auf einmal (Sammelaktion, Zusammenführen, #1929): je Saison die Sperre einmal und einmal neu rechnen.
+- **Mehrere zugleich** (``series_write_all``, #1970): nur für die Sichtbarkeit einer Spur bzw. Referenz und ihrer
+  Saisons - alle Sperren vorab in fester Reihenfolge, damit bei 409 nichts halb geändert ist.
 """
 from __future__ import annotations
 
 import functools
 import inspect
 import logging
-from contextlib import asynccontextmanager
+from contextlib import AsyncExitStack, asynccontextmanager
 
 from fastapi import HTTPException
 
@@ -76,6 +78,17 @@ async def series_write(db, series_id: str):
             yield
     except MutationLockBusy:
         raise HTTPException(409, SERIES_BUSY) from None
+
+
+@asynccontextmanager
+async def series_write_all(db, series_ids):
+    """Die Sperren mehrerer Saisons zusammen (#1970: Spur bzw. Referenz und alle verknüpften Saisons). Immer in fester
+    Reihenfolge (nach ``id``) geholt, damit zwei solche Vorgänge nie aufeinander warten; jede Sperre wartet höchstens
+    ``SERIES_WAIT_SECONDS``. Ist eine besetzt, kommt 409, bevor etwas geändert ist."""
+    async with AsyncExitStack() as stack:
+        for series_id in sorted({sid for sid in series_ids if sid}):
+            await stack.enter_async_context(series_write(db, series_id))
+        yield
 
 
 def series_locked(handler):

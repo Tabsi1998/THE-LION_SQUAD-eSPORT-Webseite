@@ -18,7 +18,8 @@ sonst die gewählte, die schon zur Saison gehört (``series_id``), sonst entsteh
 höchstens einmal in der Vitrine. Ohne Endstand (etwa eine Team-Liga ohne Tabelle) gibt es keinen Abschluss. Beim
 Aktualisieren kommen nur Platz und Feldgröße aus der Saison, die sie wirklich hat (``merge_entries``); Titel, Texte,
 Bezeichnungen, von Hand eingetragene Namen und Profile bleiben, Spieler aus der Saison folgen ihr
-(``season_close_origin`` merkt sich die Herkunft). Die Referenz wird nie offener als Saison und Spur. Die Bezeichnung
+(``season_close_origin`` merkt sich die Herkunft). Die Referenz wird nie offener als Saison und Spur - auch nicht, wenn
+diese später strenger werden (``tighten_references``, #1970). Die Bezeichnung
 eines Eintrags (etwa „Tabelle“) ist nur eine Vorgabe und lässt sich in der Referenz umbenennen. Punkte für die
 Jahreswertung entstehen dabei nie - nur Abzeichen.
 """
@@ -217,6 +218,64 @@ async def season_visibility(db, series_id: str | None) -> str | None:
         return None
     lineage = await db.reference_lineages.find_one({"id": series.get("lineage_id")}, {"_id": 0, "visibility": 1}) or {}
     return _visibility(lineage.get("visibility"), series.get("visibility"))
+
+
+async def linked_series_ids(db, reference_id: str | None, *series_ids: str | None) -> list[str]:
+    """Alle Saisons, mit denen eine Referenz verknüpft ist (#1970): ``series_ids`` (ihr ``series_id``, alt und neu) und
+    jede Saison, deren ``reference_id`` auf sie zeigt."""
+    ids = [sid for sid in series_ids if sid]
+    if reference_id:
+        ids += [item["id"] async for item in db.reference_series.find({"reference_id": reference_id},
+                                                                      {"_id": 0, "id": 1})]
+    return list(dict.fromkeys(ids))
+
+
+async def required_visibility(db, series_ids) -> str | None:
+    """Wie streng eine Referenz dieser Saisons mindestens sein muss - die strengste über alle (``None`` ohne Saison)."""
+    levels = [level for sid in series_ids if (level := await season_visibility(db, sid))]
+    return stricter(*levels) if levels else None
+
+
+def _looser_than(required: str) -> dict:
+    """Offener als gefordert: jede Stufe davor - auch fehlende oder unbekannte Werte zählen als öffentlich."""
+    return {"$nin": list(VISIBILITY_ORDER[VISIBILITY_ORDER.index(required):])}
+
+
+async def settle_reference(db, reference_id: str) -> str | None:
+    """Nach dem Speichern einer Referenz (#1970): gilt inzwischen eine strengere Saison - etwa weil sie gleichzeitig
+    verknüpft wurde -, wird die Referenz sofort so streng. Liefert die neue Sichtbarkeit, wenn angepasst wurde."""
+    ref = await db.references.find_one({"id": reference_id}, {"_id": 0, "id": 1, "series_id": 1})
+    if ref is None:
+        return None
+    required = await required_visibility(db, await linked_series_ids(db, reference_id, ref.get("series_id")))
+    if not required:
+        return None
+    written = await db.references.update_one({"id": reference_id, "visibility": _looser_than(required)},
+                                             {"$set": {"visibility": required, "updated_at": now_utc().isoformat()}})
+    return required if written.modified_count else None
+
+
+async def tighten_references(db, series_id: str) -> tuple[str | None, list[str]]:
+    """Verknüpfte Referenzen einer Saison mindestens so streng wie Saison und Spur machen (#1970) - gleich, wenn eine
+    davon strenger gestellt oder eine Referenz verknüpft wird, nicht erst beim nächsten Speichern. Verknüpft ist eine
+    Referenz über ``series_id`` an ihr oder ``reference_id`` an der Saison. Nur strenger, nie offener: wer lockert,
+    öffnet keine Referenz. Unter der Sperre der Saison aufrufen (``reference_series.series_write``). Liefert die
+    geforderte Sichtbarkeit und die angepassten Referenzen."""
+    series = await db.reference_series.find_one({"id": series_id}, {"_id": 0, "id": 1, "reference_id": 1})
+    required = await season_visibility(db, series_id)
+    if not series or not required:
+        return required, []
+    linked: list[dict] = [{"series_id": series_id}]
+    if series.get("reference_id"):
+        linked.append({"id": series["reference_id"]})
+    looser = {"$or": linked, "visibility": _looser_than(required)}
+    ids = [item["id"] async for item in db.references.find(looser, {"_id": 0, "id": 1})]
+    if ids:
+        # Bedingt geschrieben: was seither schon strenger gestellt wurde, bleibt so. ``updated_at`` steigt, damit ein
+        # offenes Formular nicht still die alte Sichtbarkeit zurückschreibt (``expected_updated_at``).
+        await db.references.update_many({**looser, "id": {"$in": ids}},
+                                        {"$set": {"visibility": required, "updated_at": now_utc().isoformat()}})
+    return required, ids
 
 
 async def proposed_reference(db, series: dict, lineage: dict) -> dict:

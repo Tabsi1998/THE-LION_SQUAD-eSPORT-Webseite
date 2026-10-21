@@ -15,7 +15,7 @@ from services import partner_pages, sponsor_images
 from services.notification_preferences import enqueue_newsletter_for_item
 from services.user_notifications import create_user_notification
 from services.slug_utils import apply_slug_history, find_by_slug_or_history, slug_source_for_update, unique_slug
-from services import dolibarr_policy, reference_checks, reference_season_links, season_close
+from services import dolibarr_policy, reference_checks, reference_season_links, reference_series, season_close
 from services import partner_series_view, reference_running_cache
 from models import (
     NewsCreate, NewsUpdate, SponsorCreate, SponsorUpdate,
@@ -1637,15 +1637,17 @@ async def create_reference(body: ReferenceCreate, me: dict = Depends(require_are
     if doc.get("game_id") and not await db.games.find_one({"id": doc["game_id"]}, {"id": 1}):
         raise HTTPException(404, "Spiel nicht gefunden.")
     await _check_reference_series(db, doc.get("series_id"))
-    # Gehört zur Saison (#1750): nie offener als Saison und Spur.
-    required = await season_close.season_visibility(db, doc.get("series_id"))
-    if required:
-        doc["visibility"] = season_close.stricter(doc.get("visibility"), required)
     await _freeze_reference_members(db, doc)
     doc["id"] = new_id()
-    doc["created_at"] = now_utc().isoformat()
-    doc["updated_at"] = now_utc().isoformat()
-    await db.references.insert_one(doc)
+    series_ids = [doc["series_id"]] if doc.get("series_id") else []
+    # Gehört zur Saison (#1750): nie offener als Saison und Spur - unter der Sperre der Saison, damit eine gleichzeitige
+    # Änderung der Saison (#1970) nicht danebenläuft.
+    async with reference_series.series_write_all(db, series_ids):
+        required = await season_close.required_visibility(db, series_ids)
+        if required:
+            doc["visibility"] = season_close.stricter(doc.get("visibility"), required)
+        doc["created_at"] = doc["updated_at"] = now_utc().isoformat()
+        await db.references.insert_one(doc)
     doc.pop("_id", None)
     return {**(await _enrich_references([doc]))[0], "check_warnings": await _reference_warnings(db, doc)}
 
@@ -1676,24 +1678,33 @@ async def update_reference(rid: str, body: ReferenceUpdate, expected_updated_at:
     existing = await db.references.find_one({"id": rid}, {"_id": 0})
     if not existing:
         raise HTTPException(404, "Referenz nicht gefunden.")
-    # Gehört zur Saison (#1750): nie offener als Saison und Spur - auch wenn nur die Sichtbarkeit geändert wird.
-    required = await season_close.season_visibility(
-        db, updates["series_id"] if "series_id" in updates else existing.get("series_id"))
-    if required:
-        visibility = season_close.stricter(updates.get("visibility") or existing.get("visibility"), required)
-        if "visibility" in updates or visibility != existing.get("visibility"):
-            updates["visibility"] = visibility
-    if "entries" in updates or any(key in updates for key in LEGACY_ENTRY_FIELDS):
-        await _freeze_reference_members(db, updates, existing)
-    if not updates:
-        return {"ok": True}
-    updates["updated_at"] = now_utc().isoformat()
-    query = {"id": rid}
-    if expected_updated_at is not None:
-        query["updated_at"] = expected_updated_at
-    res = await db.references.update_one(query, {"$set": updates})
-    if res.matched_count == 0:
-        raise HTTPException(409, REFERENCE_OUTDATED)
+    # Gehört zur Saison (#1750): nie offener als alle verknüpften Saisons und Spuren - über ``series_id`` an der
+    # Referenz wie über ``reference_id`` an einer Saison (#1970) -, auch wenn nur die Sichtbarkeit geändert wird. Unter
+    # den Sperren dieser Saisons (alte und neue), damit eine gleichzeitige Änderung einer Saison nicht danebenläuft.
+    target_series = updates["series_id"] if "series_id" in updates else existing.get("series_id")
+    lock_ids = await season_close.linked_series_ids(db, rid, existing.get("series_id"), target_series)
+    async with reference_series.series_write_all(db, lock_ids):
+        existing = await db.references.find_one({"id": rid}, {"_id": 0}) or existing
+        required = await season_close.required_visibility(
+            db, await season_close.linked_series_ids(db, rid, target_series))
+        if required:
+            visibility = season_close.stricter(updates.get("visibility") or existing.get("visibility"), required)
+            if "visibility" in updates or visibility != existing.get("visibility"):
+                updates["visibility"] = visibility
+        if "entries" in updates or any(key in updates for key in LEGACY_ENTRY_FIELDS):
+            await _freeze_reference_members(db, updates, existing)
+        if not updates:
+            return {"ok": True}
+        updates["updated_at"] = now_utc().isoformat()
+        query = {"id": rid}
+        if expected_updated_at is not None:
+            query["updated_at"] = expected_updated_at
+        res = await db.references.update_one(query, {"$set": updates})
+        if res.matched_count == 0:
+            raise HTTPException(409, REFERENCE_OUTDATED)
+    # Kam währenddessen eine Verknüpfung über eine weitere Saison dazu (deren Sperre hier nicht gehalten wurde), gilt
+    # auch deren Sichtbarkeit sofort.
+    await season_close.settle_reference(db, rid)
     saved = await db.references.find_one({"id": rid}, {"_id": 0})
     return {**(await _enrich_references([saved]))[0], "check_warnings": await _reference_warnings(db, saved)}
 
