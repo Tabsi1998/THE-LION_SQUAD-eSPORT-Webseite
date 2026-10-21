@@ -268,12 +268,17 @@ async def _running(user: dict | None, today: str) -> dict:
             visible_pairs.append((lineage, series))
     if not visible_pairs:
         return {"today": today, "items": []}
-    # Der nächste offene Termin je Serie in EINER Abfrage: nicht abgesagt, nicht gewertet, nicht archiviert, ab heute.
-    next_day = {item["_id"]: item["day"] async for item in db.reference_rounds.aggregate([
-        {"$match": {"series_id": {"$in": [series["id"] for _, series in visible_pairs]},
-                    "club_day": {"$gte": today}, "status": {"$nin": ["cancelled", "scored"]},
-                    "archived_at": None}},
-        {"$group": {"_id": "$series_id", "day": {"$min": "$club_day"}}}])}
+    # Der nächste offene Termin je Serie in EINER Abfrage: nicht abgesagt, nicht gewertet, nicht archiviert, ab heute -
+    # oder ein Spieltag-Zeitraum, der vor heute begann und noch läuft (#1931): er zählt als heute.
+    next_day: dict = {}
+    async for item in db.reference_rounds.find(
+            {"series_id": {"$in": [series["id"] for _, series in visible_pairs]},
+             "$or": [{"club_day": {"$gte": today}}, {"club_day_end": {"$gte": today}}],
+             "status": {"$nin": ["cancelled", "scored"]}, "archived_at": None},
+            {"_id": 0, "series_id": 1, "club_day": 1}):
+        day = max(str(item.get("club_day") or today), today)
+        if day < next_day.get(item["series_id"], "9999"):
+            next_day[item["series_id"]] = day
     # Heute zuerst (der nächste Termin ist dann heute), dann nach nächstem Termin, ohne Termin ans Ende.
     visible_pairs.sort(key=lambda pair: (next_day.get(pair[1]["id"]) or "9999", pair[1].get("order_index") or 0,
                                          str(pair[0].get("title") or "")))
