@@ -60,6 +60,12 @@ test("Discord-Server wählen: Auswahl aus dem Verzeichnis, Speichern schickt die
   await waitFor(() => expect(apiMock.patch).toHaveBeenLastCalledWith("/games/g1", expect.objectContaining({ discord_guild_id: null })));
 });
 
+// Map-Bibliothek (#1616): je Spiel ein Weg zu seinen Maps.
+test("jedes Spiel führt zu seiner Map-Bibliothek", async () => {
+  render(<MemoryRouter><AdminGamesPage /></MemoryRouter>);
+  expect(await screen.findByTestId("game-maps-mario-kart-8")).toHaveAttribute("href", "/admin/games/g1/maps");
+});
+
 test("Bearbeiten öffnet das Seitenblatt mit den Werten; Speichern schickt das Spiel und schließt es", async () => {
   render(<MemoryRouter><AdminGamesPage /></MemoryRouter>);
   expect(await screen.findByTestId("game-edit-mario-kart-8")).toBeInTheDocument();
