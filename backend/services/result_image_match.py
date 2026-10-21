@@ -36,6 +36,12 @@ _DIGIT_FIX = str.maketrans({"O": "0", "o": "0", "D": "0", "Q": "0", "I": "1", "l
                             "S": "5", "s": "5", "B": "8", "Z": "2", "z": "2", ",": "."})
 TIME_TOLERANCE = 0.0015
 AGREEMENT_BONUS = 20
+# Ein Platz (oder „DNF“) steht in jeder Zeile - ist er nicht gelesen, ist die Zelle unsicher. Leer sein darf etwa der
+# Abstand des Siegers.
+REQUIRED_KINDS = {"place"}
+# Längen wie im Ergebnis-Blatt (``reference_result_routes.ResultEntryRow``) - so bleibt die Antwort klein.
+TEXT_LIMIT = 120
+FIELD_LIMITS = {"name": TEXT_LIMIT, "team": TEXT_LIMIT, "start_number": 10, "time": 20, "gap": 20}
 
 
 # ---------------------------------------------------------------- Lesen und Werte
@@ -175,7 +181,7 @@ def decide(kind: str, page: Read | None, strip: Read | None, min_conf: float) ->
     reads = [(read, _parse(kind, read, page=is_page)) for read, is_page in ((page, True), (strip, False)) if read]
     reads = [(read, parsed) for read, parsed in reads if read.text.strip()]
     if not reads:
-        return Decision()
+        return Decision(sure=kind not in REQUIRED_KINDS)
     parsed_reads = [(read, parsed) for read, parsed in reads if parsed is not None]
     if not parsed_reads:
         best = max(reads, key=lambda item: item[0].conf)[0]
@@ -478,7 +484,11 @@ def _row_out(index: int, row: dict[str, Decision], match: dict | None, teams: li
             out[key] = decision.text or None
         flag(key, decision, decision.text)
     out["uncertain"] = [name for name in FIELDS if name in uncertain]
-    out["read"] = read
+    # Die Antwort bleibt klein und passt ins Blatt (Name und Team höchstens 120 Zeichen, Startnummer 10).
+    for key, limit in FIELD_LIMITS.items():
+        if isinstance(out[key], str):
+            out[key] = out[key][:limit].strip() or ("" if key == "name" else None)
+    out["read"] = {key: value[:TEXT_LIMIT] for key, value in read.items()}
     return out
 
 
@@ -496,7 +506,8 @@ def _header_out(reading: Reading, pool: list[Candidate], min_conf: float, name_m
     out: dict = {"track": None, "fastest_lap": None, "driver_of_the_day": None}
     track = reading.header.get("track")
     if track and clean_text(track.text):
-        out["track"] = {"name": clean_text(track.text), "uncertain": [] if track.conf >= min_conf else ["name"]}
+        out["track"] = {"name": clean_text(track.text)[:TEXT_LIMIT],
+                        "uncertain": [] if track.conf >= min_conf else ["name"]}
     lap = reading.header.get("fastest_lap")
     if lap and lap.text.strip():
         name_words, time_text, exact = _split_lap(lap.text.split())
@@ -504,14 +515,14 @@ def _header_out(reading: Reading, pool: list[Candidate], min_conf: float, name_m
         uncertain = [] if sure or (not pid and lap.conf >= min_conf) else ["name"]
         if not exact or not _time_word_sure(lap, min_conf):
             uncertain.append("time")
-        out["fastest_lap"] = {"name": name, "participant_id": pid, "time": time_text, "uncertain": uncertain,
-                              "read": clean_text(lap.text)}
+        out["fastest_lap"] = {"name": name[:TEXT_LIMIT], "participant_id": pid, "time": time_text,
+                              "uncertain": uncertain, "read": clean_text(lap.text)[:TEXT_LIMIT]}
     dotd = reading.header.get("driver_of_the_day")
     if dotd and dotd.text.strip():
         name, pid, sure = _person(dotd.text, pool, name_match, name_sure)
         uncertain = [] if sure or (not pid and dotd.conf >= min_conf) else ["name"]
-        out["driver_of_the_day"] = {"name": name, "participant_id": pid, "uncertain": uncertain,
-                                    "read": clean_text(dotd.text)}
+        out["driver_of_the_day"] = {"name": name[:TEXT_LIMIT], "participant_id": pid, "uncertain": uncertain,
+                                    "read": clean_text(dotd.text)[:TEXT_LIMIT]}
     return out
 
 

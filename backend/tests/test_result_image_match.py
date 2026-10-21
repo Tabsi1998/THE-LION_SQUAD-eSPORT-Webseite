@@ -152,6 +152,28 @@ def test_places_run_without_gaps():
     assert (agreed["rows"][1]["place"], agreed["rows"][1]["uncertain"]) == (2, [])
 
 
+def test_unread_place_is_never_sure():
+    """Ein nicht gelesener Platz ist gelb - auch in einer Ausfall-Zeile, deren „DNF“ nur in der Zeit-Spalte steht. Der
+    Abstand des Siegers darf leer sein, ein Platz nicht."""
+    assert decide("place", None, None, 80).sure is False
+    assert decide("gap", None, None, 80).sure is True
+    out = build(reading(
+        row("1", name="Anna Probe", time="1:32:15.123"),
+        row("", name="Bert Bolzt", time="DNF"),
+    ), TEMPLATE, PEOPLE)
+    bert = out["rows"][1]
+    assert (bert["place"], bert["dnf"], bert["uncertain"]) == (None, True, ["place"])
+
+
+def test_long_reads_are_cut_to_what_the_sheet_takes():
+    """Die Antwort bleibt klein: Namen und Teams höchstens 120 Zeichen wie im Blatt, Startnummern 10."""
+    out = build(reading(row("1", "1234567890123", "Langer " * 40, "Team " * 40)), TEMPLATE, [])
+    first = out["rows"][0]
+    assert len(first["name"]) <= 120 and len(first["team"]) <= 120
+    assert len(first["read"].get("name", "")) <= 120
+    assert first["start_number"] is None or len(first["start_number"]) <= 10
+
+
 def test_time_equals_leader_plus_gap():
     out = build(reading(
         row("1", name="Anna Probe", time="1:32:15.123"),

@@ -56,6 +56,18 @@ test("ist die schnellste Runde unsicher, sind die Marken der Zeile gelb; ohne Ke
   expect([timeOnly[1].marks, timeOnly[1].ocr.uncertain]).toEqual([["fastest_lap"], ["start_number"]]);
 });
 
+test("ein nicht gelesener Platz ist immer gelb – die Reihenfolge, die das Blatt einsetzt, ist nur geschätzt", () => {
+  const rows = imageToRows({ ...RESULT, rows: [
+    { ...RESULT.rows[0], place: null, uncertain: [] },
+    { ...RESULT.rows[2], place: null, uncertain: [] },
+  ] }, PARTICIPANTS);
+  // Ohne Platz und ohne Ausfall: gelb, auch wenn der Server es nicht sagt. Ein Ausfall hat keinen Platz – nicht gelb.
+  expect(rows[0].ocr.uncertain).toEqual(["place"]);
+  expect([rows[1].no_place, rows[1].ocr]).toEqual([true, null]);
+  // Erst wer den Platz einträgt oder „Passt so“ drückt, hat ihn geprüft.
+  expect(afterEdit(rows[0], ["place"]).ocr).toBeNull();
+});
+
 test("ändern nimmt die gelbe Markierung vom Feld, „Passt so“ von der Zeile", () => {
   const [, bert, dora] = imageToRows(RESULT, PARTICIPANTS);
   expect(isUncertain(bert, "start_number")).toBe(true);

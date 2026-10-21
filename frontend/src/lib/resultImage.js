@@ -64,6 +64,9 @@ export function imageToRows(result, participants = []) {
       : matchParticipant(row.name, participants);
     const marks = [...(row.marks || [])];
     const uncertain = (row.uncertain || []).filter((field) => SHOWN_FIELDS.includes(field));
+    // Ohne gelesenen Platz setzt das Blatt die Reihenfolge ein – das ist geschätzt und bleibt gelb, bis jemand prüft.
+    // Ein Ausfall (DNF, DNS, DSQ) hat keinen Platz.
+    if (!row.place && !marks.some((mark) => OUT_MARKS.includes(mark)) && !uncertain.includes("place")) uncertain.push("place");
     if (sameDriver(fastest, row)) {
       if (!marks.includes("fastest_lap")) marks.push("fastest_lap");
       // Gelb nur, wenn unsicher ist, WER die schnellste Runde fuhr – eine unsichere Zeit ändert die Marke nicht.
