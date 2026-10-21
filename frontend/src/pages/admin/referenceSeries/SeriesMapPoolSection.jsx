@@ -23,13 +23,19 @@ export function SeriesMapPoolSection({ series }) {
   useApiInvalidation(load, ["map-pools", "games"]);
 
   if (!data) return null;
+  // 409: inzwischen hat jemand anderes gespeichert - Hinweis zeigen und den aktuellen Stand laden.
+  const failed = async (err) => {
+    toast.error(formatApiError(err.response?.data?.detail));
+    if (err.response?.status === 409) await load();
+    return false;
+  };
   const save = async (body) => {
     try {
       await api.put(`/map-pools/reference-series/${series.id}`, body);
       toast.success("Map-Pool der Saison gespeichert.");
       await load();
     } catch (err) {
-      toast.error(formatApiError(err.response?.data?.detail));
+      await failed(err);
     }
   };
   const clear = async () => {
@@ -40,8 +46,7 @@ export function SeriesMapPoolSection({ series }) {
       await load();
       return true;
     } catch (err) {
-      toast.error(formatApiError(err.response?.data?.detail));
-      return false;
+      return failed(err);
     }
   };
   const sources = data.previous

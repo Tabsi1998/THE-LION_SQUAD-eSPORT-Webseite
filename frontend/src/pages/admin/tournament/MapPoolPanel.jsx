@@ -30,6 +30,12 @@ export function MapPoolPanel({ tournamentId, canEdit = true }) {
   useEffect(() => { load(); }, [load]);
   useApiInvalidation(load, ["map-pools", "games"]);
 
+  // 409: inzwischen hat jemand anderes gespeichert - Hinweis zeigen und den aktuellen Stand laden.
+  const failed = async (err) => {
+    toast.error(formatApiError(err.response?.data?.detail));
+    if (err.response?.status === 409) await load();
+    return false;
+  };
   const save = (path) => async (body) => {
     try {
       await api.put(`/map-pools/tournaments/${tournamentId}${path}`, body);
@@ -37,8 +43,7 @@ export function MapPoolPanel({ tournamentId, canEdit = true }) {
       await load();
       return true;
     } catch (err) {
-      toast.error(formatApiError(err.response?.data?.detail));
-      return false;
+      return failed(err);
     }
   };
   const clear = (path, question) => async () => {
@@ -49,8 +54,7 @@ export function MapPoolPanel({ tournamentId, canEdit = true }) {
       await load();
       return true;
     } catch (err) {
-      toast.error(formatApiError(err.response?.data?.detail));
-      return false;
+      return failed(err);
     }
   };
 

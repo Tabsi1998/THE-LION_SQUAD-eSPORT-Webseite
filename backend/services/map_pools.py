@@ -27,6 +27,7 @@ from __future__ import annotations
 from typing import List, Optional
 
 from pydantic import BaseModel, Field
+from pymongo.errors import DuplicateKeyError
 
 from models import GAME_MODES_MAX, new_id, now_utc
 from services import game_maps
@@ -189,40 +190,55 @@ async def _snapshot_groups(db, game: dict, body: MapPoolSave) -> list[dict]:
     return groups
 
 
-async def _write(db, *, scope: str, scope_id: str, game_id: str | None, user: dict, groups: list[dict],
-                 cleared: bool, note: str | None, tournament_id: str | None) -> dict:
-    previous = await latest(db, scope, scope_id)
+CHANGED_MEANWHILE = "Der Map-Pool wurde inzwischen geändert - bitte neu laden."
+
+
+async def _write(db, *, previous: dict | None, scope: str, scope_id: str, game_id: str | None, user: dict,
+                 groups: list[dict], cleared: bool, note: str | None, tournament_id: str | None) -> dict:
+    """Die nächste Version nach ``previous`` - dem Stand, den der Aufrufer gelesen und geprüft hat. Der eindeutige
+    Index (scope, scope_id, version) in database.py macht das Einfügen zum atomaren Vergleich: Hat inzwischen jemand
+    anderes diese Nummer geschrieben, scheitert es mit DuplicateKeyError - das wird 409, nie 500 und nie ein stilles
+    Überschreiben."""
     doc = {
         "id": new_id(), "scope": scope, "scope_id": scope_id, "tournament_id": tournament_id, "game_id": game_id,
         "version": int((previous or {}).get("version") or 0) + 1, "cleared": cleared, "modes": groups,
         "note": " ".join(str(note or "").split()) or None,
         "created_at": now_utc().isoformat(), "created_by": user["id"],
     }
-    await db.map_pools.insert_one(dict(doc))
+    try:
+        await db.map_pools.insert_one(dict(doc))
+    except DuplicateKeyError:
+        raise MapProblem(CHANGED_MEANWHILE, 409) from None
     return doc
+
+
+def _current_version(previous: dict | None) -> int:
+    """Die Version des geltenden Pools aus der neuesten Version - 0 ohne Pool oder nach dem Entfernen."""
+    return int(previous.get("version") or 0) if previous and not previous.get("cleared") else 0
 
 
 async def save(db, *, scope: str, scope_id: str, game: dict | None, body: MapPoolSave, user: dict,
                tournament_id: str | None = None) -> dict:
-    """Eine neue Version speichern - ``MapProblem`` (422/409), wenn etwas nicht passt."""
+    """Eine neue Version speichern - ``MapProblem`` (422/409), wenn etwas nicht passt. Geprüft und weitergezählt wird
+    an demselben gelesenen Stand; gleichzeitige Speicherungen fängt ``_write`` ab."""
     if not game:
         raise MapProblem("Ohne Spiel gibt es keinen Map-Pool - erst ein Spiel wählen.")
-    if body.expected_version is not None:
-        existing = await current(db, scope, scope_id)
-        if int((existing or {}).get("version") or 0) != body.expected_version:
-            raise MapProblem("Der Map-Pool wurde inzwischen geändert - bitte neu laden.", 409)
+    previous = await latest(db, scope, scope_id)
+    if body.expected_version is not None and _current_version(previous) != body.expected_version:
+        raise MapProblem(CHANGED_MEANWHILE, 409)
     groups = await _snapshot_groups(db, game, body)
-    return await _write(db, scope=scope, scope_id=scope_id, game_id=game["id"], user=user, groups=groups,
-                        cleared=False, note=body.note, tournament_id=tournament_id)
+    return await _write(db, previous=previous, scope=scope, scope_id=scope_id, game_id=game["id"], user=user,
+                        groups=groups, cleared=False, note=body.note, tournament_id=tournament_id)
 
 
 async def clear(db, *, scope: str, scope_id: str, user: dict, tournament_id: str | None = None) -> dict | None:
-    """Den Pool entfernen - als eigene Version, die alte bleibt lesbar. Ohne Pool passiert nichts."""
-    existing = await current(db, scope, scope_id)
-    if not existing:
+    """Den Pool entfernen - als eigene Version, die alte bleibt lesbar. Ohne Pool passiert nichts. Gleichzeitig mit
+    einer anderen Änderung: ``MapProblem`` 409."""
+    previous = await latest(db, scope, scope_id)
+    if not _current_version(previous):
         return None
-    return await _write(db, scope=scope, scope_id=scope_id, game_id=existing.get("game_id"), user=user, groups=[],
-                        cleared=True, note=None, tournament_id=tournament_id)
+    return await _write(db, previous=previous, scope=scope, scope_id=scope_id, game_id=(previous or {}).get("game_id"),
+                        user=user, groups=[], cleared=True, note=None, tournament_id=tournament_id)
 
 
 # ---------------------------------------------------------------- Turnier und Phase

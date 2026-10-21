@@ -8,6 +8,7 @@ vi.mock("@/components/tls/ConfirmDialog", () => ({ useConfirm: () => async () =>
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
 const { MapPoolPanel } = await import("./MapPoolPanel");
+const { toast } = await import("sonner");
 
 const GAME = { id: "g1", name: "Probe Shooter", modes: [{ mode: "snd", label: "Suchen & Zerstören" }] };
 const LIBRARY = [{ id: "hafen", name: "Hafenkante", modes: ["snd"] }, { id: "nebel", name: "Nebelwerk", modes: ["snd"] }];
@@ -60,4 +61,17 @@ test("ein eigener Pool der Phase lässt sich entfernen – dann gilt wieder der 
   fireEvent.click(screen.getByTestId("stage-pool-edit-s2"));
   fireEvent.click(await screen.findByTestId("stage-pool-s2-clear"));
   await waitFor(() => expect(apiMock.delete).toHaveBeenCalledWith("/map-pools/tournaments/t1/stages/s2"));
+});
+
+// Gleichzeitig geändert (409): Hinweis zeigen und den aktuellen Stand neu laden, statt mit dem alten weiterzumachen.
+test("ein Pool, den inzwischen jemand anderes geändert hat, wird mit Hinweis neu geladen", async () => {
+  const detail = "Der Map-Pool wurde inzwischen geändert - bitte neu laden.";
+  apiMock.put.mockRejectedValueOnce({ response: { status: 409, data: { detail } } });
+  renderPanel();
+  await screen.findByTestId("tournament-pool");
+  expect(apiMock.get).toHaveBeenCalledTimes(1);
+  fireEvent.click(screen.getByRole("checkbox", { name: "Hafenkante in Suchen & Zerstören" }));
+  fireEvent.click(screen.getByTestId("tournament-pool-save"));
+  await waitFor(() => expect(toast.error).toHaveBeenCalledWith(detail));
+  await waitFor(() => expect(apiMock.get).toHaveBeenCalledTimes(2));
 });

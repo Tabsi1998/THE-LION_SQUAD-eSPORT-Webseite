@@ -77,7 +77,10 @@ async def _save_for_tournament(db, tournament: dict, scope: str, scope_id: str, 
 
 
 async def _clear_for_tournament(db, tournament: dict, scope: str, scope_id: str, me: dict) -> dict:
-    doc = await map_pools.clear(db, scope=scope, scope_id=scope_id, user=me, tournament_id=tournament["id"])
+    try:
+        doc = await map_pools.clear(db, scope=scope, scope_id=scope_id, user=me, tournament_id=tournament["id"])
+    except MapProblem as problem:
+        raise _refuse(problem) from None
     if doc:
         await _audit_tournament_action(db, "tournament.map_pool.clear", me.get("id"), tournament["id"],
                                        {"scope": scope, "scope_id": scope_id, "version": doc["version"]})
@@ -165,7 +168,10 @@ async def save_series_map_pool(series_id: str, body: MapPoolSave,
 async def clear_series_map_pool(series_id: str, access: SeriesAccess = Depends(require_series_editor)):
     access.require_board()
     db = get_db()
-    doc = await map_pools.clear(db, scope="reference_series", scope_id=access.series_id, user=access.user)
+    try:
+        doc = await map_pools.clear(db, scope="reference_series", scope_id=access.series_id, user=access.user)
+    except MapProblem as problem:
+        raise _refuse(problem) from None
     if doc:
         await _audit_series(db, access.user, access.series_id, "reference_series.map_pool.clear", doc)
     return {"ok": True}

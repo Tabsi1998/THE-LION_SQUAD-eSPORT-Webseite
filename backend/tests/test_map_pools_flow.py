@@ -338,3 +338,77 @@ async def test_a_lineage_without_game_keeps_free_text_and_has_no_pool(flow):
     assert refused.status_code == 422
     page = (await flow.get(f"/api/reference-series/public/{lineage['slug']}/{season['season_slug']}")).json()
     assert page["map_pool"] is None
+
+
+# ---------------------------------------------------------------- Gleichzeitig speichern
+
+async def unique_versions(flow):
+    """Wie database.py: je Wettbewerb jede Versionsnummer nur einmal - mongomock legt Indizes nicht von selbst an."""
+    await flow.db.map_pools.create_index([("scope", 1), ("scope_id", 1), ("version", -1)], unique=True)
+
+
+@pytest.mark.asyncio
+async def test_two_parallel_saves_of_the_same_version_give_one_success_and_one_conflict(flow, monkeypatch):
+    import asyncio
+
+    import routes.map_pool_routes as pool_routes
+    from flow_harness import InterleavedReads
+
+    _admin, game, maps = await setup_library(flow)
+    _lineage, _previous, season = await setup_season(flow, game)
+    await unique_versions(flow)
+    url = f"/api/map-pools/reference-series/{season['id']}"
+    # Beide lesen den alten Stand, bevor einer schreibt - wie zwei Worker auf echtem MongoDB.
+    gate = InterleavedReads(flow.db, "map_pools")
+    monkeypatch.setattr(pool_routes, "get_db", lambda: gate)
+    first, second = await asyncio.gather(
+        flow.put(url, json=pool_body(("snd", [maps["Nebelwerk"]]), expected_version=0)),
+        flow.put(url, json=pool_body(("snd", [maps["Hafenkante"]]), expected_version=0)))
+
+    assert sorted([first.status_code, second.status_code]) == [200, 409]
+    conflict = first if first.status_code == 409 else second
+    assert "inzwischen geändert" in conflict.json()["detail"]
+    assert await flow.db.map_pools.count_documents({"scope_id": season["id"]}) == 1
+
+
+@pytest.mark.asyncio
+async def test_two_parallel_tournament_saves_never_give_500(flow, monkeypatch):
+    import asyncio
+
+    import routes.map_pool_routes as pool_routes
+    from flow_harness import InterleavedReads
+
+    _admin, game, maps = await setup_library(flow)
+    tournament = await flow.create_tournament(game_id=game["id"])
+    await unique_versions(flow)
+    url = f"/api/map-pools/tournaments/{tournament['id']}"
+    gate = InterleavedReads(flow.db, "map_pools")
+    monkeypatch.setattr(pool_routes, "get_db", lambda: gate)
+    first, second = await asyncio.gather(
+        flow.put(url, json=pool_body(("snd", [maps["Nebelwerk"]]), expected_version=0)),
+        flow.put(url, json=pool_body(("snd", [maps["Hafenkante"]]), expected_version=0)))
+
+    assert sorted([first.status_code, second.status_code]) == [200, 409]
+    assert await flow.db.map_pools.count_documents({"scope_id": tournament["id"]}) == 1
+
+
+@pytest.mark.asyncio
+async def test_a_save_after_a_parallel_change_does_not_overwrite_it(flow, monkeypatch):
+    """Ohne erwartete Version: zwei gleichzeitige Speicherungen bekommen nie dieselbe Nummer - die zweite ist 409."""
+    import asyncio
+
+    import routes.map_pool_routes as pool_routes
+    from flow_harness import InterleavedReads
+
+    _admin, game, maps = await setup_library(flow)
+    _lineage, _previous, season = await setup_season(flow, game)
+    await unique_versions(flow)
+    url = f"/api/map-pools/reference-series/{season['id']}"
+    await flow.put(url, json=pool_body(("snd", [maps["Nebelwerk"]])))
+    gate = InterleavedReads(flow.db, "map_pools")
+    monkeypatch.setattr(pool_routes, "get_db", lambda: gate)
+    saved, cleared = await asyncio.gather(flow.put(url, json=pool_body(("snd", [maps["Hafenkante"]]))), flow.delete(url))
+
+    assert sorted([saved.status_code, cleared.status_code]) == [200, 409]
+    versions = [row["version"] async for row in flow.db.map_pools.find({"scope_id": season["id"]}, {"version": 1})]
+    assert sorted(versions) == [1, 2]

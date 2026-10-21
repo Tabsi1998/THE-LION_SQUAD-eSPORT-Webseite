@@ -9,6 +9,7 @@ vi.mock("@/components/tls/ConfirmDialog", () => ({ useConfirm: () => async () =>
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
 const { SeriesMapPoolSection } = await import("./SeriesMapPoolSection");
+const { toast } = await import("sonner");
 
 const GAME = { id: "g1", name: "Probe Shooter", modes: [{ mode: "snd", label: "Suchen & Zerstören" }] };
 const LIBRARY = [{ id: "hafen", name: "Hafenkante", modes: ["snd"] }, { id: "nebel", name: "Nebelwerk", modes: ["snd"] }];
@@ -34,4 +35,15 @@ test("ohne Spiel der Spur sagt der Abschnitt, dass Freitext bleibt", async () =>
   apiMock.get.mockResolvedValue({ data: { game: null, library: [], pool: null, previous: null } });
   render(<MemoryRouter><SeriesMapPoolSection series={{ id: "s1" }} /></MemoryRouter>);
   expect(await screen.findByTestId("series-map-pool-no-game")).toHaveTextContent("Freitext");
+});
+
+test("hat inzwischen jemand anderes gespeichert (409), kommt der Hinweis und der neue Stand", async () => {
+  const detail = "Der Map-Pool wurde inzwischen geändert - bitte neu laden.";
+  apiMock.get.mockResolvedValue({ data: { game: GAME, library: LIBRARY, pool: null, previous: PREVIOUS } });
+  apiMock.put.mockRejectedValueOnce({ response: { status: 409, data: { detail } } });
+  render(<MemoryRouter><SeriesMapPoolSection series={{ id: "s1" }} /></MemoryRouter>);
+  fireEvent.change(await screen.findByTestId("series-map-pool-copy"), { target: { value: "previous" } });
+  fireEvent.click(screen.getByTestId("series-map-pool-save"));
+  await waitFor(() => expect(toast.error).toHaveBeenCalledWith(detail));
+  await waitFor(() => expect(apiMock.get).toHaveBeenCalledTimes(2));
 });

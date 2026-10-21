@@ -16,6 +16,7 @@ import re
 from typing import List, Literal, Optional
 
 from pydantic import BaseModel, Field, field_validator
+from pymongo.errors import DuplicateKeyError
 
 from models import GAME_MODES_MAX, now_utc
 from services.slug_utils import slugify
@@ -28,6 +29,7 @@ SLUG_MAX = 80
 IMAGE_URL = re.compile(r"/api/static/uploads/[A-Za-z0-9][A-Za-z0-9_.-]{0,150}\.(png|webp|jpg|jpeg)")
 IMAGE_REFUSED = "Bild bitte über „Hochladen“ oder die Mediathek wählen (PNG, JPG oder WebP)."
 STATUSES = ("active", "archived")
+SLUG_TAKEN = "Der Slug „{slug}“ ist in diesem Spiel schon vergeben."
 # Was eine Map nach außen zeigt - Verwaltung und Pools lesen dieselben Felder.
 PUBLIC_FIELDS = ("id", "game_id", "slug", "name", "image_url", "note", "external_ref", "order", "status", "modes",
                  "archived_at", "created_at", "created_by", "updated_at", "updated_by")
@@ -156,7 +158,7 @@ async def _check_unique(db, game_id: str, *, name: str | None = None, slug: str 
     if name is not None and any(name_key(row.get("name")) == name_key(name) for row in others):
         raise MapProblem(f"Die Map „{name}“ gibt es in diesem Spiel schon.", 409)
     if slug is not None and any(row.get("slug") == slug for row in others):
-        raise MapProblem(f"Der Slug „{slug}“ ist in diesem Spiel schon vergeben.", 409)
+        raise MapProblem(SLUG_TAKEN.format(slug=slug), 409)
 
 
 async def create(db, game: dict, body: GameMapCreate, user: dict, new_id: str) -> dict:
@@ -173,7 +175,11 @@ async def create(db, game: dict, body: GameMapCreate, user: dict, new_id: str) -
         "order": int((last or {}).get("order") or 0) + 1, "status": "active", "archived_at": None,
         "created_at": now, "created_by": user["id"], "updated_at": now, "updated_by": user["id"],
     }
-    await db.game_maps.insert_one(dict(doc))
+    try:
+        await db.game_maps.insert_one(dict(doc))
+    except DuplicateKeyError:
+        # Gleichzeitig angelegt: der eindeutige Index (game_id, slug) aus database.py entscheidet - 409, nie 500.
+        raise MapProblem(SLUG_TAKEN.format(slug=slug), 409) from None
     return public_map(doc)
 
 
@@ -200,7 +206,10 @@ async def update(db, game: dict, current: dict, body: GameMapUpdate, user: dict)
         updates["status"] = status
         updates["archived_at"] = now_utc().isoformat() if status == "archived" else None
     updates.update({"updated_at": now_utc().isoformat(), "updated_by": user["id"]})
-    await db.game_maps.update_one({"id": current["id"]}, {"$set": updates})
+    try:
+        await db.game_maps.update_one({"id": current["id"]}, {"$set": updates})
+    except DuplicateKeyError:
+        raise MapProblem(SLUG_TAKEN.format(slug=updates.get("slug") or current.get("slug")), 409) from None
     return public_map({**current, **updates})
 
 

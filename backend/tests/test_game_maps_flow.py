@@ -212,6 +212,28 @@ async def test_the_library_has_a_limit_but_no_fixed_number_of_maps(flow):
 
 
 @pytest.mark.asyncio
+async def test_two_parallel_creates_of_the_same_map_give_one_map_and_one_conflict(flow, monkeypatch):
+    """Die Bibliothek hat keine Versionen, aber einen eindeutigen Slug je Spiel (database.py): legen zwei gleichzeitig
+    dieselbe Map an, bekommt der zweite 409 statt 500."""
+    import asyncio
+
+    import routes.game_map_routes as map_routes
+    from flow_harness import InterleavedReads
+
+    await as_admin(flow)
+    game = await new_game(flow)
+    await flow.db.game_maps.create_index([("game_id", 1), ("slug", 1)], unique=True)
+    gate = InterleavedReads(flow.db, "game_maps")
+    monkeypatch.setattr(map_routes, "get_db", lambda: gate)
+    first, second = await asyncio.gather(
+        flow.post(f"/api/games/{game['id']}/maps", json={"name": "Hafenkante"}),
+        flow.post(f"/api/games/{game['id']}/maps", json={"name": "Hafenkante"}))
+
+    assert sorted([first.status_code, second.status_code]) == [200, 409]
+    assert await flow.db.game_maps.count_documents({"game_id": game["id"]}) == 1
+
+
+@pytest.mark.asyncio
 async def test_a_map_image_stays_in_use_while_a_saved_pool_shows_it(flow):
     from services import media_audit
 
