@@ -54,6 +54,8 @@ function MapSheet({ game, item, onClose, onSaved }) {
         <TextField label="Slug" maxLength={80} value={form.slug} onChange={(value) => set("slug", value)}
           placeholder={item?.id ? "" : "leer: aus dem Namen"} hint="Eindeutig in diesem Spiel; bleibt beim Umbenennen gleich." testId="game-map-slug" />
       </FormGrid>
+      <TextField label="Weitere Schreibweisen" value={form.aliases} onChange={(value) => set("aliases", value)} placeholder="z. B. Harbour Edge, Hafen"
+        hint="Mit Komma getrennt, etwa wie der Veranstalter die Map nennt – das Ergebnisblatt der Team-Liga erkennt sie daran." testId="game-map-aliases" />
       <ImageUpload value={form.image_url} onChange={(value) => set("image_url", value || "")} label="Bild (16 : 9)" testId="game-map-image" variant="wide" allowLibrary />
       <fieldset className="space-y-2">
         <legend className="text-[11px] font-bold uppercase tracking-widest text-white/60">Modi</legend>
