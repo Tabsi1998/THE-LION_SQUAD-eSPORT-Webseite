@@ -149,7 +149,8 @@ export const RacingDriverDetail = forwardRef(function RacingDriverDetail({ row, 
   const withSessions = hasSessions(season.perRace.map((item) => item.round));
   const withGrid = season.gridRaces > 0;
   const poles = poleCount(row, rounds, qualifying);
-  const average = averageGridLabel(averageGrid(row?.results));
+  // Ø Start nur in Saisons mit Läufen (#1930) - eine bestehende Saison sieht aus wie bisher.
+  const average = hasSessions(rounds) ? averageGridLabel(averageGrid(row?.results)) : "";
   const stats = [
     count(season.wins, "Sieg", "Siege"), count(season.podiums, "Podium", "Podien"),
     count(season.fastestLaps, "schnellste Runde", "schnellste Runden"), count(season.dnfs, "Ausfall", "Ausfälle"),
