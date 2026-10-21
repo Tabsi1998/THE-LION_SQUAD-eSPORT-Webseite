@@ -178,7 +178,8 @@ def test_team_league_lineup_maps_own_team_and_official_table():
     check(out, SCHEME, ROUND, TODAY, own_teams="Probe Löwen")
     assert out.errors == []
     assert out.matches[0]["lineup"] == ["p-anna", "neu:neunora"]
-    assert _codes(out.warnings) == ["maps_differ", "own_team_missing", "table_team_twice", "table_rank_partial"]
+    # Das zweite Spiel ist ein übriges Spiel des Spieltags (#1931) - ohne eigenes Team, ohne Warnung.
+    assert _codes(out.warnings) == ["maps_differ", "table_team_twice", "table_rank_partial"]
     assert out.warnings[0]["message"] == "Spiel 1: Die Maps ergeben 1:1, eingetragen ist 2:1."
     assert out.official_table[0] == {"team": "Probe Löwen", "rank": 1, "played": None, "won": None, "drawn": None,
                                      "lost": None, "score_for": None, "score_against": None, "score_diff": None,

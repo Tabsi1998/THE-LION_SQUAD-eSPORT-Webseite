@@ -23,6 +23,9 @@ Finalgrenze. Laden, Speichern und das Neurechnen der Stände machen die Routen (
   (``driver_of_the_day``) - genau die Felder, die auch die Texterkennung (#1756) liefert. Beide müssen in der Liste
   stehen; die schnellste Runde setzt die Marke an ihrer Zeile (so zählt ein Bonus), eine Zeit ohne Namen gehört zur
   markierten Zeile. Gespeichert wird nur, was angegeben ist - ein Blatt ohne diese Felder bleibt wie bisher.
+- **Team-Liga** (#1931): neben dem eigenen Spiel dürfen die übrigen Spiele des Spieltags stehen - die Warnung
+  „eigenes Team fehlt“ kommt nur, wenn es in keinem Spiel spielt. Maps mit Wahl und Aufstellung je Map, Banns und der
+  Termin des Spiels: ``services/team_league_sheet.py``.
 
 Meldungen werden nur aus den Eingaben gebaut, nie aus Ausnahmen.
 """
@@ -31,7 +34,7 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass, field
 
-from services import series_identity
+from services import series_identity, team_league_sheet
 from services.own_teams import Matcher
 from services.scoring_rules import result_points
 
@@ -248,24 +251,24 @@ def resolve(entry: dict, participants: list[dict], rules: dict) -> Resolution:
     _race_extras(out, entry, lookup, seen)
 
     for index, raw in enumerate(entry.get("matches") or []):
-        lineup: list[str] = []
-        for ref in raw.get("lineup") or []:
-            located = _locate(ref, lookup, f"Spiel {index + 1}, Aufstellung")
-            if located.problem:
-                out.errors.append({**located.problem, "match": index})
-                continue
-            if located.note:
-                out.warnings.append({**located.note, "match": index})
-            _remember_new(out, located, ref, match=index)
-            if located.participant_id not in lineup:
-                lineup.append(located.participant_id)
+        lineup = _lineup_ids(out, raw.get("lineup"), lookup, index, f"Spiel {index + 1}, Aufstellung")
+        maps = []
+        for number_of_map, item in enumerate(raw.get("maps") or [], start=1):
+            # Aufstellung je Map (#1931) - nur, wenn angegeben.
+            map_lineup = _lineup_ids(out, item.get("lineup"), lookup, index, f"Spiel {index + 1}, Map {number_of_map}")
+            maps.append({"name": clean(item.get("name"))[:80], "home_score": number(float(item.get("home_score") or 0)),
+                         "away_score": number(float(item.get("away_score") or 0)),
+                         **team_league_sheet.map_extras(item, map_lineup)})
+        extras, problem = team_league_sheet.match_extras(raw)
+        if problem:
+            out.errors.append(_problem("match_time", f"Spiel {index + 1}: {problem}", match=index))
         out.matches.append({
             "home": clean(raw.get("home"))[:120], "away": clean(raw.get("away"))[:120],
             "home_score": number(float(raw.get("home_score") or 0)),
             "away_score": number(float(raw.get("away_score") or 0)),
-            "maps": [{"name": clean(item.get("name"))[:80], "home_score": number(float(item.get("home_score") or 0)),
-                      "away_score": number(float(item.get("away_score") or 0))} for item in raw.get("maps") or []],
-            "lineup": lineup,
+            "maps": maps,
+            "lineup": team_league_sheet.union(lineup, *(item.get("lineup") for item in maps)),
+            **extras,
         })
 
     out.official_team_totals = {clean(team)[:120]: number(float(value))
@@ -275,6 +278,22 @@ def resolve(entry: dict, participants: list[dict], rules: dict) -> Resolution:
         row.update({key: number(float(raw[key])) if raw.get(key) is not None else None for key in TABLE_NUMBERS})
         out.official_table.append(row)
     return out
+
+
+def _lineup_ids(out: Resolution, refs, lookup: _Lookup, index: int, where: str) -> list[str]:
+    """Die Kennungen einer Aufstellung (des Spiels oder einer Map), jede einmal; Probleme nennen das Spiel."""
+    lineup: list[str] = []
+    for ref in refs or []:
+        located = _locate(ref, lookup, where)
+        if located.problem:
+            out.errors.append({**located.problem, "match": index})
+            continue
+        if located.note:
+            out.warnings.append({**located.note, "match": index})
+        _remember_new(out, located, ref, match=index)
+        if located.participant_id not in lineup:
+            lineup.append(located.participant_id)
+    return lineup
 
 
 def _named(ref) -> bool:
@@ -338,7 +357,9 @@ def replace_new_ids(content: dict, created: dict[str, str]) -> dict:
 
     out = dict(content)
     out["rows"] = [{**row, "participant_id": real(row["participant_id"])} for row in content.get("rows") or []]
-    out["matches"] = [{**match, "lineup": [real(pid) for pid in match.get("lineup") or []]}
+    out["matches"] = [{**match, "lineup": [real(pid) for pid in match.get("lineup") or []],
+                       "maps": [{**item, "lineup": [real(pid) for pid in item["lineup"]]} if item.get("lineup")
+                                else item for item in match.get("maps") or []]}
                       for match in content.get("matches") or []]
     out["official_totals"] = {real(pid): value for pid, value in (content.get("official_totals") or {}).items()}
     if content.get("fastest_lap") and content["fastest_lap"].get("participant_id"):
@@ -405,11 +426,18 @@ def _matches(resolution: Resolution, own_teams) -> list[dict]:
     # Eigene Teams (#1926): eines davon muss spielen - erkannt auch an anderer Schreibweise oder einem Alias.
     own = Matcher(own_teams if isinstance(own_teams, (list, tuple)) else [own_teams])
     others = _sheet_teams(resolution)
-    for index, match in enumerate(resolution.matches):
-        if own and not (own.is_own(match["home"], others) or own.is_own(match["away"], others)):
-            text = (f"Das eigene Team „{own.names[0]}“ spielt" if len(own.names) == 1
-                    else "Keines der eigenen Teams spielt")
-            problems.append(_problem("own_team_missing", f"Spiel {index + 1}: {text} darin nicht.", match=index))
+    # Die übrigen Spiele des Spieltags (#1931) brauchen kein eigenes Team - eines der Spiele muss es aber haben.
+    matches = resolution.matches
+    if own and matches and not any(own.is_own(match["home"], others) or own.is_own(match["away"], others)
+                                   for match in matches):
+        single = len(own.names) == 1
+        if len(matches) == 1:
+            text = f"Das eigene Team „{own.names[0]}“ spielt" if single else "Keines der eigenen Teams spielt"
+            problems.append(_problem("own_team_missing", f"Spiel 1: {text} darin nicht.", match=0))
+        else:
+            text = f"Das eigene Team „{own.names[0]}“ spielt" if single else "Keines der eigenen Teams spielt"
+            problems.append(_problem("own_team_missing", f"{text} in keinem der Spiele."))
+    for index, match in enumerate(matches):
         if match["maps"]:
             home = sum(1 for item in match["maps"] if item["home_score"] > item["away_score"])
             away = sum(1 for item in match["maps"] if item["away_score"] > item["home_score"])
