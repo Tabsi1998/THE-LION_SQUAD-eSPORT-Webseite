@@ -1,5 +1,7 @@
 // „Heute im Einsatz“ auf der Startseite (#1753): aus dem schlanken Endpunkt der laufenden Saisons (#1748) nur, was heute
-// (Wiener Tag) ansteht, dazu je Saison eine kurze Zeile - Runde, Uhrzeit, gemeldete Vereinsleute. Namen gibt es hier nie.
+// (Wiener Tag) ansteht, dazu je Saison eine kurze Zeile - Runde, Gegner (Team-Liga, #1931), Uhrzeit, gemeldete
+// Vereinsleute. Namen von Personen gibt es hier nie.
+import { opponentText } from "@/lib/referenceCalendar";
 
 const ROUND_WORD = { racing: "Rennen", team_league: "Spieltag" };
 const PEOPLE_WORD = { racing: "Vereinsfahrer" };
@@ -18,6 +20,7 @@ export function todayFacts(item) {
   const count = Number(item?.club_count) || 0;
   return [
     round,
+    opponentText(next),
     next.time ? `${next.time} Uhr` : "",
     count > 0 ? `${count} ${PEOPLE_WORD[kind] || "Vereinsspieler"}` : "",
   ].filter(Boolean);
