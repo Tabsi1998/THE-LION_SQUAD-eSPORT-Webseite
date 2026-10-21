@@ -176,17 +176,18 @@ export function FastLapQuickEntry({ challenge, track, times, guests, onGuestCrea
           <button type="button" className="tls-keypad__key tls-keypad__key--wide text-sm uppercase tracking-wider" onClick={() => press("clear")} data-testid="fl-key-clear">Leeren</button>
         </div>
 
+        {/* Alle Versuche gefahren (#1941): Eintragen und „ungültig“ sind gesperrt - nur die Korrektur bleibt. */}
         <div className="mt-4 grid grid-cols-2 gap-2">
-          <button disabled={submitting || !driver} data-testid="fl-quick-save" className="tls-btn tls-btn--primary col-span-2 py-3.5 rounded-sm font-bold uppercase tracking-wider disabled:opacity-40">
+          <button disabled={submitting || !driver || (!correcting && !allowed)} data-testid="fl-quick-save" className="tls-btn tls-btn--primary col-span-2 py-3.5 rounded-sm font-bold uppercase tracking-wider disabled:opacity-40">
             {correcting ? "Korrektur speichern" : "Eintragen"}
           </button>
           {!correcting && (
-            <button type="button" disabled={submitting || !driver} onClick={() => save({ next: true })} data-testid="fl-quick-save-next" className="tls-btn tls-btn--secondary col-span-2 py-3 rounded-sm font-bold uppercase tracking-wider inline-flex items-center justify-center gap-2 disabled:opacity-40">
+            <button type="button" disabled={submitting || !driver || !allowed} onClick={() => save({ next: true })} data-testid="fl-quick-save-next" className="tls-btn tls-btn--secondary col-span-2 py-3 rounded-sm font-bold uppercase tracking-wider inline-flex items-center justify-center gap-2 disabled:opacity-40">
               <SkipForward className="w-4 h-4 shrink-0" /> <span>Eintragen &amp; nächster Fahrer</span>
             </button>
           )}
           {!correcting && (
-            <button type="button" disabled={submitting || !driver} onClick={() => setReasonsOpen((open) => !open)} aria-expanded={reasonsOpen} data-testid="fl-quick-invalid" className="tls-btn tls-btn--danger py-2.5 rounded-sm font-bold uppercase tracking-wider text-xs inline-flex items-center justify-center gap-2 disabled:opacity-40">
+            <button type="button" disabled={submitting || !driver || !allowed} onClick={() => setReasonsOpen((open) => !open)} aria-expanded={reasonsOpen} data-testid="fl-quick-invalid" className="tls-btn tls-btn--danger py-2.5 rounded-sm font-bold uppercase tracking-wider text-xs inline-flex items-center justify-center gap-2 disabled:opacity-40">
               <Flag className="w-3.5 h-3.5" /> Ungültig
             </button>
           )}
@@ -196,7 +197,7 @@ export function FastLapQuickEntry({ challenge, track, times, guests, onGuestCrea
             </button>
           )}
         </div>
-        {reasonsOpen && !correcting && (
+        {reasonsOpen && !correcting && allowed && (
           <div className="mt-2 grid grid-cols-2 gap-1.5 tls-reveal" data-testid="fl-quick-reasons">
             {INVALID_REASONS.map((reason) => (
               <button key={reason} type="button" disabled={submitting} onClick={() => save({ invalidReason: reason })} className="tls-btn tls-btn--danger py-2 rounded-sm text-xs">

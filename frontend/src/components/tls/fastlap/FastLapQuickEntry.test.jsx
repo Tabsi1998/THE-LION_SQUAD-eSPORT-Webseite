@@ -60,10 +60,24 @@ test("alle Versuche gefahren: Eintragen ist gesperrt und die Anzeige sagt es", a
   quick({ times: [1, 2, 3].map(() => ({ user_id: null, guest_id: "g-1" })) });
   chooseAnna();
   expect(screen.getByTestId("fl-quick-attempt")).toHaveTextContent("Alle 3 Versuche gefahren");
+  // #1941 (F12): die Knöpfe sind gesperrt, nicht erst die Antwort des Servers.
+  expect(screen.getByTestId("fl-quick-save")).toBeDisabled();
+  expect(screen.getByTestId("fl-quick-save-next")).toBeDisabled();
+  expect(screen.getByTestId("fl-quick-invalid")).toBeDisabled();
   typeKeys("8", "4");
-  fireEvent.click(screen.getByTestId("fl-quick-save"));
+  // Enter am Ziffernblock der Tastatur: dieselbe Sperre mit Hinweis.
+  fireEvent.submit(screen.getByTestId("fl-quick-time").closest("form"));
   await waitFor(() => expect(toastMock.error).toHaveBeenCalledWith("Alle 3 Versuche gefahren"));
   expect(apiMock.post).not.toHaveBeenCalled();
+});
+
+test("#1941: nach dem letzten Versuch bleibt „Letzte korrigieren“ möglich", async () => {
+  quick({ times: [1, 2].map(() => ({ user_id: null, guest_id: "g-1" })) });
+  chooseAnna();
+  typeKeys("8", "4");
+  fireEvent.click(screen.getByTestId("fl-quick-save"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledTimes(1));
+  expect(screen.getByTestId("fl-quick-correct")).toBeEnabled();
 });
 
 test("ohne Grenze zählt die Anzeige nur hoch", () => {
