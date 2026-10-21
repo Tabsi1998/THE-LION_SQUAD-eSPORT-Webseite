@@ -1,5 +1,31 @@
 # Changelog
 
+## 1.19.0 (21.10.2026)
+
+### Neu
+
+* Chronik – kurze Titel „Veranstalter · Liga · Saison“ wie im Mitgliederprofil (#1944)
+* Mitgliederprofil – „Details“ zur Referenz in der aufgeklappten Zeile (#1944)
+* Mitgliederprofil – Chronik je Jahr als kompakte, aufklappbare Liste mit kurzem Titel und Aufstellung (#1944)
+* Mitgliederprofil – Liga-Weg der Person ab zwei Saisons einer Spur (#1944)
+* Mitgliederprofil – Vereinsplatzierungen ohne Nullen: nur vorhandene Medaillen, sonst „Bestes Ergebnis“ (#1944)
+* Turnier bearbeiten warnt bei widersprüchlichen Zeiten (#1938)
+
+### Fehlerbehebungen
+
+* „Dein Stand“ nennt die wirksamen Check-in-Zeiten (#1938)
+* „Nicht erschienen“ nennt den Nachrücker von der Warteliste (#1941)
+* Anmelde-Blatt nennt bei vollem Cup die Warteliste (#1941)
+* Check-in von Hand setzt die wirksamen Zeiten (#1938)
+* Fast Lap am Handy – Schnelleingabe ohne Trennstrich, Team-Tabelle ganz (#1941)
+* Fast Lap sperrt „Eintragen“ nach dem letzten Versuch (#1941)
+* FFA-Läufe mit Auslosung nach der Runde – Zusammenlegen lässt keine doppelte Quelle mehr (#1596)
+* Gewinn-Meldung sagt „1. Platz bei …“ statt „1. Platz Platz bei …“ (#1941)
+* Show-Auslosung und Fristen erreichen jedes laufende Turnier (#1940)
+* Turnierbaum zeigt den lesbaren Stationsnamen statt des Gerätekürzels (#1941)
+* Verborgenes oder falsches Turnier zeigt eine Meldung statt ewig „Lade Turnier“ (#1939)
+* Zeitleiste der Turnierseite folgt Status und Phase (#1938)
+
 ## 1.18.0 (21.10.2026)
 
 ### Neu
