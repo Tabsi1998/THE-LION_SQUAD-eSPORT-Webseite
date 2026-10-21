@@ -423,6 +423,12 @@ export function ResultEntrySheet({ series, round, onClose, onSaved }) {
       setForm((current) => ({ ...current, ...imageFormFields(result, current.raceOcr), rows: imageToRows(result, participants) }));
       setPasting(false);
       setCheckImage(true);
+      // Teamfarben aus dem Bild (#1950): nur ein Vorschlag, übernommen wird er bei den Teamfarben der Saison.
+      if (Object.keys(result.team_colors || {}).length) {
+        Promise.resolve()
+          .then(() => api.post(`/reference-series/admin/series/${series.id}/team-colors/suggestions`, { colors: result.team_colors }))
+          .catch(() => {});
+      }
     },
   });
 
