@@ -157,6 +157,14 @@ test("detailsOf: „Saison ansehen“ kommt aus season_link der Referenz (#1750)
   expect(detailsOf(item, "p-nova", link).seasonUrl).toBe("/references/series/nsdl-sd/s4-league-a");
 });
 
+test("detailsOf: Einsätze der Person aus der verknüpften Saison (#1931) – „5 von 7 Spielen“, ohne Daten leer", () => {
+  const item = { ...ref("a", "2025-01-01", 6), appearances: { played: 5, of: 7, unit: "matches", team: "Probe Löwen" } };
+  expect(detailsOf(item, "p-nova", null).played).toBe("5 von 7 Spielen");
+  const races = { ...ref("b", "2025-01-01", 2, { entry: { kind: "solo", lineup_members: [NOVA] } }), appearances: { played: 3, of: 5, unit: "races" } };
+  expect(detailsOf(races, "p-nova", null).played).toBe("3 von 5 Rennen");
+  expect(detailsOf(ref("c", "2025-01-01", 1), "p-nova", null).played).toBe("");
+});
+
 // ---------------------------------------------------------------- Liga-Weg der Person
 
 const LINEAGE = {
