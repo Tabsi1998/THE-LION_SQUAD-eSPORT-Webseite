@@ -23,16 +23,21 @@ def r(text: str, conf: float = 95) -> Read:
     return Read(text, conf, [(word, conf) for word in text.split()])
 
 
-def row(place="", number="", name="", team="", grid="", time="", gap="", *, strips=None, conf=95) -> RowReading:
+def row(place="", number="", name="", team="", grid="", time="", gap="", *, strips=None, alts=None, points="",
+        conf=95) -> RowReading:
     cells = {key: r(value, conf) for key, value in (
         ("place", place), ("start_number", number), ("name", name), ("team", team), ("grid", grid), ("time", time),
-        ("gap", gap)) if value}
-    return RowReading(cells=cells, strips={key: r(value) if isinstance(value, str) else value
-                                           for key, value in (strips or {}).items()})
+        ("gap", gap), ("points", points)) if value}
+    out = RowReading(cells=cells, strips={key: r(value) if isinstance(value, str) else value
+                                          for key, value in (strips or {}).items()})
+    out.alts = {key: r(value) for key, value in (alts or {}).items()}
+    return out
 
 
-def reading(*rows, header=None) -> Reading:
-    return Reading(template_id=TEMPLATE["id"], header=header or {}, rows=list(rows), header_found=True)
+def reading(*rows, header=None, labelled=None) -> Reading:
+    out = Reading(template_id=TEMPLATE["id"], header=header or {}, rows=list(rows), header_found=True)
+    out.labelled = labelled
+    return out
 
 
 # ---------------------------------------------------------------- Werte
@@ -206,15 +211,114 @@ def test_unread_place_is_never_sure():
 def test_one_misread_place_or_leader_time_does_not_poison_the_rest():
     """Ein verlesener erster Platz oder eine verlesene Zeit des Siegers ist gelb - die übrigen Zeilen bleiben sicher:
     Reihenfolge und Zeit des Siegers ergeben sich aus der Mehrheit der Zeilen."""
-    places = build(reading(row("6", name="Anna Probe"), row("2", name="Bert Bolzt"), row("3", name="Carl Kurve"),
+    places = build(reading(row("1", name="Anna Probe"), row("2", name="Bert Bolzt"), row("9", name="Carl Kurve"),
                            row("4", name="Dora Neu")), TEMPLATE, PEOPLE)
-    assert [item["uncertain"] for item in places["rows"]] == [["place"], [], [], []]
+    assert [item["uncertain"] for item in places["rows"]] == [[], [], ["place"], []]
     times = build(reading(
         row("1", name="Anna Probe", time="30:26.500"),  # richtig wäre 30:26.300
         row("2", name="Bert Bolzt", time="30:27.043", gap="+0.743"),
         row("3", name="Carl Kurve", time="30:44.141", gap="+17.841"),
     ), TEMPLATE, PEOPLE)
     assert [item["uncertain"] for item in times["rows"]] == [["time"], [], []]
+
+
+def test_place_one_in_the_box_comes_from_the_order():
+    """Platz 1 im farbigen Kasten (#1981): nicht oder verlesen gelesen, aber alle anderen laufen lückenlos 2…n - dann
+    ist es Platz 1, nicht gelb. Eine klar gelesene andere Zahl weiter unten bleibt gelb (dann fehlt vielleicht eine
+    Zeile); stimmen zwei Zeilen nicht, wird nichts geraten."""
+    for first in ("", "@", "C)", "6"):
+        out = build(reading(row(first, name="Anna Probe"), row("2", name="Bert Bolzt"), row("3", name="Carl Kurve"),
+                            row("4", name="Dora Neu")), TEMPLATE, PEOPLE)
+        assert [(item["place"], item["uncertain"]) for item in out["rows"]] == [
+            (1, []), (2, []), (3, []), (4, [])], first
+    gap_below = build(reading(row("1"), row("2"), row("3"), row("5")), TEMPLATE, [])
+    assert [item["uncertain"] for item in gap_below["rows"]] == [[], [], [], ["place"]]
+    # Eine 5 als 6 gelesen, die 6 steht darunter: der Platz ist doppelt - aus der Reihenfolge ist es die 5.
+    taken = build(reading(row("1"), row("2"), row("3"), row("4"), row("6"), row("6"), row("7")), TEMPLATE, [])
+    assert [(item["place"], item["uncertain"]) for item in taken["rows"]][4] == (5, [])
+    two_off = build(reading(row(""), row("2"), row("7"), row("4")), TEMPLATE, [])
+    assert [item["uncertain"] for item in two_off["rows"]] == [["place"], [], ["place"], []]
+
+
+def test_leader_has_no_gap_even_if_the_placeholder_is_misread():
+    """Platz 1 hat keinen Abstand (#1981): der Platzhalter „+--:--,---“ - auch verlesen („deln“, „a“) - ist „kein
+    Abstand“, nicht gelb. Ein echter Abstand beim Ersten passt nicht - gelb."""
+    for placeholder in ("+--:--,---", "--:--.---", "deln", "a", "So"):
+        out = build(reading(
+            row("1", name="Anna Probe", time="1:31,770", gap=placeholder, strips={"gap": "a"}),
+            row("2", name="Bert Bolzt", time="1:32,134", gap="+0,364"),
+            row("3", name="Carl Kurve", time="1:32,754", gap="+0,984"),
+        ), TEMPLATE, PEOPLE)
+        leader = out["rows"][0]
+        assert (leader["gap"], leader["uncertain"]) == (None, []), placeholder
+    wrong = build(reading(row("1", time="1:31,770", gap="+0,500"), row("2", time="1:32,134", gap="+0,364"),
+                          row("3", time="1:32,754", gap="+0,984")), TEMPLATE, [])
+    assert "gap" in wrong["rows"][0]["uncertain"]
+
+
+def test_times_take_their_separators_from_the_format():
+    """Rennzeit „m:ss,mmm“, Abstand „+s,mmm“ bzw. „+m:ss,mmm“ (#1981): die Trennzeichen setzt die Form - ein fehlender
+    oder als Punkt gelesener Doppelpunkt ändert nichts. Gespeichert wird wie bisher mit Punkt. Fehlt eine Ziffer
+    (Trennzeichen passen nicht zur Form), ist die Zelle gelb."""
+    out = build(reading(
+        row("1", name="Anna Probe", time="1:31,770", gap="+--:--,---"),
+        row("2", name="Bert Bolzt", time="132,134", gap="+0,364", strips={"time": "1.32,134"}),
+        row("3", name="Carl Kurve", time="1:32:754", gap="+0.984"),
+        row("4", name="Dora Neu", time="1:45,23", gap="+13,462"),
+        row("5", name="Emil Eck", time="2:04,878", gap="+33,108"),
+    ), TEMPLATE, PEOPLE)
+    assert [(item["time"], item["gap"]) for item in out["rows"]] == [
+        ("1:31.770", None), ("1:32.134", "+0.364"), ("1:32.754", "+0.984"), ("1:45,23", "+13.462"),
+        ("2:04.878", "+33.108")]
+    assert [item["uncertain"] for item in out["rows"]][:3] == [[], [], []]
+    assert "time" in out["rows"][3]["uncertain"]  # wie gelesen, aber gelb
+    # Lange Abstände und Rennzeiten über eine Stunde.
+    race = build(reading(row("1", time="31:55,056"), row("2", time="3201253", gap="+6,197"),
+                         row("3", time="33:29,934", gap="+1:34,878")), TEMPLATE, [])
+    assert [(item["time"], item["gap"]) for item in race["rows"]] == [
+        ("31:55.056", None), ("32:01.253", "+6.197"), ("33:29.934", "+1:34.878")]
+
+
+def test_a_quali_whose_times_lost_their_colon_is_still_a_result():
+    """Echter Fall (#1981): In einem Quali-Bild las die Erkennung „132,134“ statt „1:32,134“ - bisher keine Zeit, und
+    weil so weniger als die Hälfte der Zeilen eine Zeit hatte, galt das Bild als Tabelle ohne Zeiten (422)."""
+    out = build(reading(
+        row("1", name="Anna Probe", time="1:31,770", gap="+--:--,---"),
+        row("2", name="Bert Bolzt", time="132,134", gap="+0,364"),
+        row("3", name="Carl Kurve", time="132,754", gap="+0,984"),
+        row("4", name="Dora Neu", time="1:332,856", gap="+1,086", strips={"time": "132,856"}),
+        row("5", name="Emil Eck", time="134,358", gap="+2,588"),
+    ), TEMPLATE, PEOPLE)
+    assert out["is_result"] is True
+    assert [item["time"] for item in out["rows"]] == ["1:31.770", "1:32.134", "1:32.754", "1:32.856", "1:34.358"]
+
+
+def test_a_third_reading_that_disagrees_makes_digits_yellow():
+    """3 und 5 (#1981): Seite und Streifen sagen „35“, die dritte Lesung (größer, eigene Schwelle) „33“ - gelb, nie
+    still falsch. Sagt sie dasselbe, bleibt es sicher."""
+    agree = build(reading(row("1", "35", "Neu Name", alts={"start_number": "35"}), row("2"), row("3")), TEMPLATE, [])
+    assert agree["rows"][0]["uncertain"] == []
+    differ = build(reading(row("1", "35", "Neu Name", strips={"start_number": "35"}, alts={"start_number": "33"}),
+                           row("2"), row("3")), TEMPLATE, [])
+    assert differ["rows"][0]["uncertain"] == ["start_number"]
+    # Zeit = Zeit des Ersten + Abstand ist die stärkere Gegenprobe: sie bestätigt trotz anderer dritter Lesung.
+    second = row("2", time="1:32,134", gap="+0,364", alts={"time": "1:32,154", "gap": "+0,564"})
+    times = build(reading(row("1", time="1:31,770"), second, row("3", time="1:32,754", gap="+0,984")), TEMPLATE, [])
+    assert times["rows"][1]["uncertain"] == []
+
+
+def test_lines_and_unlabelled_points_never_become_points():
+    """Echter Fall (#1981): Der Rand der Tabelle („|“) stand in der Punkte-Spalte und wurde zu „1 Punkt“ in jeder
+    Zeile. Ein Strich ist keine Ziffer, und Punkte gelten nur, wenn ihre Überschrift im Bild steht."""
+    border = build(reading(row("1", points="|"), row("2", points="|"), row("3", points="|"),
+                           labelled={"place", "time"}), TEMPLATE, [])
+    assert [(item["points"], item["uncertain"]) for item in border["rows"]] == [(None, [])] * 3
+    no_label = build(reading(row("1", points="25"), row("2", points="18"), labelled={"place"}), TEMPLATE, [])
+    assert [(item["points"], item["uncertain"]) for item in no_label["rows"]] == [(None, []), (None, [])]
+    labelled = build(reading(row("1", points="25"), row("2", points="18"), labelled={"place", "points"}),
+                     TEMPLATE, [])
+    assert [item["points"] for item in labelled["rows"]] == [25, 18]
+    assert decide("number", r("|"), None, 80).text == ""
 
 
 def test_empty_cell_in_a_filled_column_is_yellow():
