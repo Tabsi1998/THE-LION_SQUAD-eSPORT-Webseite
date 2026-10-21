@@ -261,14 +261,16 @@ Mehrere Runden an einem Termin (etwa TFT-Lobbys R1–R5), gerechnet in `services
   eigene Zuordnung gültig, die andere Saison bleibt ganz unverändert und merkt sich den Nachtrag (`alias_followups`);
   der nächste Vorgang unter ihrer Sperre zieht ihn nach. Die Antwort nennt das (`other_series: {updated, pending}`,
   `notice`), das Protokoll ebenso (`also_assigned_in`, `pending_series`).
-- **Teilnehmer nachträglich bearbeiten (#1929, nur Vorstand):** `PATCH …/participants/{id}` (Name, Startnummer, Team)
+- **Teilnehmer nachträglich bearbeiten (#1929, nur Vorstand):** `PATCH …/participants/{id}` (Name, Startnummer, Team,
+  `current_team` von Hand, #1960)
   schreibt `reference_series.participant_update` mit altem und neuem Wert und rechnet neu; ein Name, den es in der
   Saison schon gibt, bekommt 409 (zusammenführen). `POST …/participants/bulk-assign` (`participant_ids`, `link` „guest“
   oder „external“) ordnet alle unter einer Sperre zu und rechnet einmal neu; andere Saisons ziehen danach je einmal
   nach (`reference_series.follow_aliases_elsewhere`). `POST …/participants/{id}/merge` (`duplicate_id`) schreibt die
   Kennung in Blättern, Entwürfen daneben und offiziellen Werten um (je Blatt eine Revision mit Grund `merge` und
   Version +1) und rechnet neu – nennt ein Inhalt beide, 409 und nichts geändert. Die Aliase der anderen Schreibweise
-  ziehen zum behaltenen um (`extra_alias_ids`) und folgen seiner Zuordnung, auch in anderen Saisons.
+  ziehen zum behaltenen um (`extra_alias_ids`) und folgen seiner Zuordnung, auch in anderen Saisons. Startnummer,
+  `default_team` und `current_team` behält der behaltene; fehlen sie dort, kommen sie vom anderen (`MERGE_TAKES`).
   `DELETE …/participants/{id}` nur ohne Ergebnis (sonst 409). Protokoll: `.participant_bulk_assign`,
   `.participant_merge`, `.participant_delete`.
 - **Alle Aliase eines Teilnehmers:** der seiner Zuordnung (`alias_id`), der seines Namens und weitere aus

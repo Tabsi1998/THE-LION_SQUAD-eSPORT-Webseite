@@ -119,7 +119,7 @@ from services import (
     team_league_maps, tournament_days,
 )
 from services.dolibarr_policy import club_today
-from services.own_teams import own_team_names, own_teams
+from services.own_teams import Matcher, own_team_names, own_teams
 from services.reference_series_access import EDIT_PENDING_DRAFT, SeriesAccess, require_series_editor
 from services.scoring_rules import MAX_CUSTOM_BONUSES, MAX_DAY_ROUNDS, is_no_team, result_points, validate_sheet
 from services.series_participants import build_index, new_participant, remove_unused_new
@@ -390,8 +390,11 @@ async def _unknown_teams(db, series: dict, round_doc: dict, resolution, particip
                          rules: dict) -> list[dict]:
     """Teams einer Zeile, die es in der Saison noch nicht gibt (#1960) - meist ein Tippfehler („Team 2“). Bekannt sind die
     eigenen Teams, die Standard-Teams der Teilnehmer und die Teams der übrigen Blätter; ein Eintrag „kein Team“
-    (``no_team_names``) ist nie neu. Ohne bekannte Teams (erste Runde) bleibt es still. Nur ein Hinweis."""
-    known = {series_adjustments.team_key(name): name for name in own_team_names(series)}
+    (``no_team_names``) ist nie neu, ebenso wenig eine Schreibweise, die ``own_teams.Matcher`` einem eigenen Team
+    zuordnet (Alias). Ohne bekannte Teams (erste Runde) bleibt es still. Nur ein Hinweis."""
+    matcher = Matcher(own_teams(series))
+    sheet_teams = [row.get("team") for row in resolution.rows if row.get("team")]
+    known = {series_adjustments.team_key(name): name for name in matcher.names}
     for person in participants:
         if person.get("default_team"):
             known.setdefault(series_adjustments.team_key(person["default_team"]), person["default_team"])
@@ -406,7 +409,8 @@ async def _unknown_teams(db, series: dict, round_doc: dict, resolution, particip
     names: dict[str, str] = {}
     for row in resolution.rows:
         key = series_adjustments.team_key(row.get("team"))
-        if key and key not in known and not is_no_team(row["team"], rules):
+        if (key and key not in known and not is_no_team(row["team"], rules)
+                and not matcher.is_own(row["team"], sheet_teams)):
             found.setdefault(key, []).append(row["index"])
             names.setdefault(key, row["team"])
     out = []

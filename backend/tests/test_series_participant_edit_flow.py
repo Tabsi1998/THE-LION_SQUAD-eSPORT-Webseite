@@ -396,6 +396,29 @@ async def test_merging_two_spellings_moves_all_results_and_drafts_and_recomputes
 
 
 @pytest.mark.asyncio
+async def test_merging_takes_the_manual_current_team_only_when_the_kept_one_has_none(flow):
+    """„Aktuelles Team (von Hand)“ (#1960) wie Startnummer und Team: der Wert des behaltenen bleibt, fehlt er, kommt
+    der des anderen."""
+    ctx = await _setup(flow)
+    own = ctx["own"]["id"]
+    people = {}
+    for name, team in (("Probe Cora", None), ("Probe Kora", "Fremd Blau"), ("Probe Dora", "Fremd Rot"),
+                       ("Probe Tora", "Fremd Blau")):
+        people[name] = await _add(flow, own, name)
+        if team:
+            saved = await flow.patch(f"{ADMIN}/series/{own}/participants/{people[name]['id']}",
+                                     json={"current_team": team})
+            assert saved.status_code == 200, saved.text
+    url = f"{ADMIN}/series/{own}/participants/{{}}/merge"
+    taken = await flow.post(url.format(people["Probe Cora"]["id"]), json={"duplicate_id": people["Probe Kora"]["id"]})
+    assert taken.status_code == 200, taken.text
+    assert taken.json()["current_team"] == "Fremd Blau"
+    kept = await flow.post(url.format(people["Probe Dora"]["id"]), json={"duplicate_id": people["Probe Tora"]["id"]})
+    assert kept.status_code == 200, kept.text
+    assert kept.json()["current_team"] == "Fremd Rot"
+
+
+@pytest.mark.asyncio
 async def test_merging_keeps_the_decision_of_the_duplicate_when_the_kept_one_is_still_open(flow):
     ctx = await _setup(flow)
     own = ctx["own"]["id"]

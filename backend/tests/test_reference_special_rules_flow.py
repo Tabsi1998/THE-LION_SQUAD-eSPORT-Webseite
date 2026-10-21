@@ -514,6 +514,25 @@ async def test_substitutes_keep_their_entry_and_new_team_names_are_flagged(flow)
     assert {row["team"]: row["points"] for row in teams} == {"Probe Loewen": 6, "Team 2": 4, "Fremd Rot": 3}
 
 
+@pytest.mark.asyncio
+async def test_a_spelling_of_an_own_team_is_never_an_unknown_team(flow):
+    """Eine hinterlegte Schreibweise eines eigenen Teams („Probe Loewen“ für „Probe Löwen“) ist bekannt - so wie
+    ``own_teams.Matcher`` sie beim Rechnen zuordnet; nur ein wirklich neues Team bekommt den Hinweis."""
+    await _board(flow)
+    lineage = await _lineage(flow)
+    series = await _season(flow, lineage, own_teams=[{"name": "Probe Löwen", "aliases": ["Probe Loewen"]}])
+    rounds = await _rounds(flow, series, "R1")
+    await flow.db.reference_participants.insert_many([
+        {"series_id": series["id"], "is_club_member": False, "name_hidden": False, **person} for person in PEOPLE])
+    preview = await flow.post(f"{ADMIN}/series/{series['id']}/rounds/{rounds['R1']}/results/preview", json={
+        "rows": [{"participant_id": "p-lion1", "place": 1, "team": "Probe Loewen"},
+                 {"participant_id": "p-lion2", "place": 2, "team": "probe  löwen"},
+                 {"participant_id": "p-ext1", "place": 3, "team": "Team 2"}]})
+    assert preview.status_code == 200, preview.text
+    unknown = [(item["rows"], item["message"]) for item in preview.json()["warnings"] if item["code"] == "team_unknown"]
+    assert unknown == [([2], "Team „Team 2“ gibt es in dieser Saison noch nicht")]
+
+
 # ---------------------------------------------------------------- Termin ohne Wertung
 @pytest.mark.asyncio
 async def test_a_round_without_score_has_a_public_reason_and_too_few_starters_warn(flow):
