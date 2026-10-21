@@ -165,15 +165,17 @@ for (const width of [390, 768, 1440, 2560]) {
       await noSideScroll(page);
     });
 
-    test(`Erfolge & Referenzen: die Vitrine mit festen Reihen (${width})`, async ({ page }) => {
+    test(`Erfolge & Referenzen: die Vitrine mit Hauptkarte und festen Reihen (${width})`, async ({ page }) => {
       await mockServer(page);
       await page.goto("/references");
-      const first = page.getByTestId("reference-trophy-r1");
-      await expect(first).toBeVisible();
+      // Seit #1878: der größte Erfolg (gleiche Stufe, gleicher Platz - der neueste) als Hauptkarte, die übrigen als Kacheln.
+      await expect(page.getByTestId("references-showcase")).toHaveAttribute("data-reference-id", "r1");
+      const rest = REFERENCES.items.filter((item) => item.id !== "r1");
+      await expect(page.getByTestId(`reference-trophy-${rest[0].id}`)).toBeVisible();
       const tops = [];
-      for (const item of REFERENCES.items) tops.push(Math.round((await box(page.getByTestId(`reference-trophy-${item.id}`))).y));
+      for (const item of rest) tops.push(Math.round((await box(page.getByTestId(`reference-trophy-${item.id}`))).y));
       const perRow = tops.filter((top) => Math.abs(top - tops[0]) <= 2).length;
-      expect(perRow).toBe(width >= 1024 ? 5 : width >= 640 ? 3 : 2);
+      expect(perRow).toBe(width >= 2000 ? 4 : width >= 768 ? 3 : 2);
       await noSideScroll(page);
     });
 

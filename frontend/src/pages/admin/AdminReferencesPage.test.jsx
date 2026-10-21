@@ -124,3 +124,25 @@ test("Partner II (#469): der Partner-Haken an der Referenz geht als partner_ids 
   await waitFor(() => expect(apiMock.patch).toHaveBeenCalledTimes(1));
   expect(apiMock.patch.mock.calls[0][1].partner_ids).toEqual(["p1"]);
 });
+
+test("Vitrine (#1878): die Hauptkarte ist automatisch oder eine fest gewählte Podest-Referenz", async () => {
+  const gold = { ...LEGACY_ITEM, id: "r2", display_title: "Winter Cup", best_placement: 1, medal: "gold", start_date: "2026-02-01" };
+  const open = { ...LEGACY_ITEM, id: "r3", display_title: "Ohne Platz", best_placement: null, medal: null, entries: [] };
+  mockApi([gold, open]);
+  const base = apiMock.get.getMockImplementation();
+  apiMock.get.mockImplementation(async (url) => (url === "/references/admin/showcase" ? { data: { mode: "auto", reference_id: null } } : base(url)));
+  apiMock.patch.mockImplementation(async (url, body) => ({ data: body }));
+  render(<MemoryRouter><AdminReferencesPage /></MemoryRouter>);
+  const select = await screen.findByTestId("reference-showcase-select");
+  await waitFor(() => expect(select).toHaveValue("auto"));
+  const options = [...select.querySelectorAll("option")].map((option) => [option.value, option.textContent]);
+  expect(options).toEqual([["auto", "Automatisch: höchster Platz in der höchsten Stufe, bei Gleichstand der neueste"], ["r2", "1. Platz · Winter Cup · 2026"]]);
+
+  fireEvent.change(select, { target: { value: "r2" } });
+  fireEvent.click(screen.getByTestId("reference-showcase-save"));
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/references/admin/showcase", { mode: "pinned", reference_id: "r2" }));
+  fireEvent.change(select, { target: { value: "auto" } });
+  fireEvent.click(screen.getByTestId("reference-showcase-save"));
+  await waitFor(() => expect(apiMock.patch).toHaveBeenLastCalledWith("/references/admin/showcase", { mode: "auto", reference_id: null }));
+  expect(toastMock.success).toHaveBeenCalled();
+});

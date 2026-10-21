@@ -16,7 +16,7 @@ from services.user_notifications import create_user_notification
 from services.slug_utils import apply_slug_history, find_by_slug_or_history, slug_source_for_update, unique_slug
 from models import (
     NewsCreate, NewsUpdate, SponsorCreate, SponsorUpdate,
-    PartnerCreate, PartnerUpdate, ReferenceCreate, ReferenceUpdate,
+    PartnerCreate, PartnerUpdate, ReferenceCreate, ReferenceShowcaseSettings, ReferenceUpdate,
     GalleryAlbumCreate, GalleryAlbumUpdate,
     GallerySectionCreate, GallerySectionUpdate,
     GalleryPhotoCreate, GalleryPhotoUpdate,
@@ -1411,7 +1411,49 @@ async def list_references(game_id: Optional[str] = None, user: dict | None = Dep
     refs = await db.references.find(query, {"_id": 0}).to_list(1000)
     refs = await _filter_visible(refs, user)
     refs = _sort_references(await _enrich_references(refs))
-    return {"items": refs, "summary": _reference_summary(refs)}
+    showcase = await _get_reference_showcase(db)
+    # Eine fest gewählte Hauptkarte nur, wenn der Besucher sie sehen darf - sonst wählt die Seite selbst.
+    if showcase["reference_id"] and showcase["reference_id"] not in {item.get("id") for item in refs}:
+        showcase = dict(REFERENCE_SHOWCASE_DEFAULT)
+    return {"items": refs, "summary": _reference_summary(refs), "showcase": showcase}
+
+
+# Vitrine (#1878): welcher Erfolg die Hauptkarte bekommt. Vorgabe „auto“ - die Seite wählt den höchsten Platz in der
+# höchsten Stufe, bei Gleichstand den neuesten (frontend/src/lib/referencesOverview.js); sonst eine feste Referenz.
+REFERENCE_SHOWCASE_DEFAULT = {"mode": "auto", "reference_id": None}
+
+
+async def _get_reference_showcase(db) -> dict:
+    doc = await db.settings.find_one({"id": "reference_showcase"}, {"_id": 0, "mode": 1, "reference_id": 1}) or {}
+    if doc.get("mode") == "pinned" and doc.get("reference_id"):
+        return {"mode": "pinned", "reference_id": doc["reference_id"]}
+    return dict(REFERENCE_SHOWCASE_DEFAULT)
+
+
+@router.get("/references/admin/showcase")
+async def admin_get_reference_showcase(me: dict = Depends(require_area("content"))):
+    return await _get_reference_showcase(get_db())
+
+
+@router.patch("/references/admin/showcase")
+async def admin_update_reference_showcase(body: ReferenceShowcaseSettings, me: dict = Depends(require_area("content"))):
+    db = get_db()
+    reference_id = body.reference_id.strip() if body.mode == "pinned" and body.reference_id else None
+    if reference_id and not await db.references.find_one({"id": reference_id}, {"_id": 1}):
+        raise HTTPException(404, "Referenz nicht gefunden.")
+    previous = await _get_reference_showcase(db)
+    await db.settings.update_one({"id": "reference_showcase"}, {"$set": {
+        "id": "reference_showcase", "mode": body.mode if reference_id else "auto", "reference_id": reference_id,
+        "updated_at": now_utc().isoformat()}}, upsert=True)
+    saved = await _get_reference_showcase(db)
+    # Adminprotokoll: wer die Hauptkarte wann von welcher auf welche Auswahl gestellt hat - nur bei einer Änderung.
+    if saved != previous:
+        await db.audit_logs.insert_one({
+            "id": new_id(), "action": "references.showcase_change", "actor_id": me["id"],
+            "target_id": "reference_showcase", "data": {"previous": previous, "showcase": saved},
+            "created_at": now_utc().isoformat(),
+        })
+    return saved
 
 
 @router.get("/references/admin")

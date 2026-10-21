@@ -91,6 +91,10 @@
     "visibility": "public"
    }
   ],
+  "showcase": {
+   "mode": "auto",
+   "reference_id": null
+  },
   "summary": {
    "active": 0,
    "bronze": 0,
@@ -446,6 +450,10 @@
     "visibility": "public"
    }
   ],
+  "showcase": {
+   "mode": "auto",
+   "reference_id": null
+  },
   "summary": {
    "active": 1,
    "bronze": 0,
