@@ -100,6 +100,18 @@ export function CountUp({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [play, playKey, visible, countable]);
 
+  // Drucken bzw. PDF: sofort der Endwert - auch für Werte, die noch nie im Bild waren (dazu index.css @media print).
+  // Crawler und Teilen-Vorschau lesen den Endwert ohnehin aus dem DOM (sr-only).
+  useEffect(() => {
+    if (phase === "done" || typeof window === "undefined") return undefined;
+    const settle = () => {
+      finished.current = playKey;
+      setRun({ key: playKey, phase: "done" });
+    };
+    window.addEventListener("beforeprint", settle);
+    return () => window.removeEventListener("beforeprint", settle);
+  }, [phase, playKey]);
+
   // Live-Nachladen: ein geänderter Wert nach dem Zählen leuchtet einmal kurz auf.
   const [flashes, setFlashes] = useState(0);
   const lastText = useRef(text);

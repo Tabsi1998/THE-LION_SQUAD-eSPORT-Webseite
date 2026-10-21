@@ -158,3 +158,17 @@ test("ein Wert, der erst nach dem Laden kommt, zählt dann noch", () => {
   expect(screen.getByTestId("zahl")).toHaveTextContent("42");
   expect(screen.getByTestId("zahl")).not.toHaveAttribute("data-glow");
 });
+test("Drucken: vor dem Druck steht sofort der Endwert, auch wenn der Wert nie im Bild war", () => {
+  vi.useFakeTimers(TIMERS);
+  const original = globalThis.IntersectionObserver;
+  globalThis.IntersectionObserver = class { observe() {} disconnect() {} };
+  try {
+    render(<CountUp value="31:55,056" data-testid="zeit" />);
+    expect(shown("zeit")).toBe("00:00,000");
+    act(() => { window.dispatchEvent(new Event("beforeprint")); });
+    expect(screen.getByTestId("zeit")).toHaveTextContent("31:55,056");
+    expect(screen.getByTestId("zeit")).not.toHaveAttribute("data-counting");
+  } finally {
+    globalThis.IntersectionObserver = original;
+  }
+});
