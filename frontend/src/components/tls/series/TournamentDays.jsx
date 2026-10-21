@@ -185,7 +185,7 @@ function PlayerDetail({ rows, row, days, scheme, bonuses, topN, onPick, detailRe
           {row.club_member && row.profile_slug ? <Link to={`/members/${row.profile_slug}`} className="hover:text-[#29B6E8]">{nameOf(row)}</Link> : nameOf(row)}
         </span>
         <span className="text-sm text-white/70 tabular-nums" data-testid="series-player-summary">
-          Platz {row.rank} · {formatNumber(row.points)} Saisonpunkte{row.bonus_points ? ` (davon ${formatNumber(row.bonus_points)} Sonderbonus)` : ""} · {summary.played} {summary.played === 1 ? "Turniertag" : "Turniertage"} · {summary.wins} {summary.wins === 1 ? "Sieg" : "Siege"} · {summary.topN(topN)}× Top {topN}
+          Platz {row.rank} · {formatNumber(row.points)} Saisonpunkte{row.bonus_points ? ` (davon ${formatNumber(row.bonus_points)} Sonderbonus)` : ""} · {summary.played} {summary.played === 1 ? "Turniertag" : "Turniertage"} · {summary.wins} {summary.wins === 1 ? "Sieg" : "Siege"} · {`${summary.topN(topN)}×\u00a0Top\u00a0${topN}`}
         </span>
       </div>
       {/* eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- eine scrollbare Fläche muss per Tastatur erreichbar sein (axe: scrollable-region-focusable) */}

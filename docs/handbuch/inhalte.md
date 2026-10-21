@@ -400,7 +400,9 @@ Streichergebnisse** (es zählen die besten „Runden im Kalender minus N“), Ak
 der Vorrang bei Gleichstand (der Reihe nach, sonst teilen sich beide den Platz) und die Teamwertung (wie viele Fahrer je
 Rennen zählen, ob Gäste zählen). Eine Team-Liga hat stattdessen Punkte für Sieg, Unentschieden und Niederlage. In
 einer Saison mit Läufen ist jede Runde eine Einheit: Streichergebnisse, „beste N“, Aktivitätspunkte und „gefahrene
-Runden“ zählen Runden, gestrichen wird immer eine ganze Runde (die Summe ihrer Läufe), nie ein einzelner Lauf.
+Runden“ zählen Runden, gestrichen wird immer eine ganze Runde (die Summe ihrer Läufe), nie ein einzelner Lauf. Eine
+Turnierserie kann dazu **Turniertage** mit mehreren Runden je Termin führen, eigene **Sonderboni** und den Vorrang
+**„Mehr Plätze unter den besten N“** – siehe „Turniertage“ unten.
 
 Ändert ihr eine Regel mitten in der Saison, steigt die **Version**, der **Hinweis zur Regeländerung** steht bei der Saison
 und im Protokoll, und alle Tabellen der Saison werden neu gerechnet.
@@ -576,6 +578,46 @@ gespeicherten Stand und ist nicht für Suchmaschinen gedacht (`noindex`).
 <td><img src="../assets/serien/serien-seite-turnierserie-handy.png" alt="Dieselbe Seite am Handy mit Karten statt Tabelle" width="220"></td>
 </tr>
 </table>
+
+**Turniertage (mehrere Runden an einem Termin):** Manche Turnierserien spielen an einem Termin mehrere Runden bzw.
+Lobbys (etwa R1–R5 mit je acht Plätzen). Die Summe der Runden (**GES P**) ergibt den Tagesplatz, daraus kommen die
+Saisonpunkte nach dem Punkteschlüssel der Saison.
+
+- **Einrichten** (Saison bearbeiten, Bereich **Turniertage**): **Runden je Turniertag** (leer oder 0 heißt aus),
+  **Rundenpunkte je Platz** (Vorgabe 8, 7 … 1 – Platz in der Lobby samt Bots) und eigene **Sonderboni** mit Name und
+  Punkten, etwa „Bingo 3“. Sonderboni zählen zusätzlich und werden nie gestrichen, auch nicht bei „beste N“. Beim
+  **Vorrang bei Gleichstand** gibt es **Mehr Plätze unter den besten N** mit eigenem N (etwa: Siege, dann Top 4, dann
+  zweite Plätze …). Der Haken **Namen ohne Tag der Spielkennung zeigen** zeigt „TheLostFriday#TLS“ auf der Serienseite
+  als „TheLostFriday“. Ob mit oder ohne Tag: beides ist dieselbe Person, auch beim Einfügen.
+- **Ergebnis eintragen:** Je Zeile stehen R1…Rn und GES P. In die Runden kommen die **Punkte wie beim Veranstalter** –
+  ist eine Lobby nicht voll, füllt das Spiel sie mit Bots, und wer hinter einem Bot Letzter wird, bekommt 2 statt 1
+  Punkt; darum rechnet das Blatt nichts aus der Reihenfolge der Spieler. Unter **Mehr** lassen sich je Runde der
+  **Platz in der Lobby** (samt Bots) und die **Lobby** eintragen; ohne Punkte zählt dann der Platz nach den
+  Rundenpunkten, die Punkte stehen blass im Feld. GES P leer heißt Summe der Runden; trägt ihr den Wert des Veranstalters
+  ein, gilt er (weicht er ab, sagt es die Vorschau). Ohne eingetragenen Platz **bestimmt GES P den Platz** –
+  gleiche Summe heißt **Gleichstand** (zweimal Platz 4, danach Platz 6) ohne Warnung. **Double Up** oben im Blatt
+  schaltet Zweierteams ein: je Zeile **mit …** den Partner wählen, beide bekommen denselben Platz und dieselben Punkte.
+  Sonderboni stehen als Chip an der Zeile („Bingo +3“), die Marke **Ausgestiegen** zählt die restlichen Runden mit 0.
+- **Liste einfügen:** eine Tabelle mit Kopfzeile aus Excel oder von der Seite des Veranstalters – Name, **R 1 … R 5**,
+  **GES P**, gern mit Platz und je Sonderbonus einer Spalte mit seinem Namen (x, ja oder ✓ heißt abgehakt).
+- **Serienseite:** Unter der Gesamtwertung (mit eigener Spalte **Boni**) stehen die **Turniertage**: je Termin die
+  Runden mit Platzfarben (Gold, Silber, Bronze, Top 4 grün), GES P und die Saisonpunkte; im Double Up mit Partner.
+  **Lobbys** zeigt je Runde die Lobbys wie beim Veranstalter, wenn sie eingetragen sind. Ein Name öffnet das
+  **Spieler-Detail** mit Tagesplatz, Runden, Tages- und Saisonpunkten je Turniertag; am Handy stehen die Runden unter dem
+  Termin.
+
+<table>
+<tr>
+<td><img src="../assets/serien/serien-turniertage-seite.png" alt="Serienseite: Turniertag T2 mit Runden R1 bis R5, Platzfarben, GES P, Gleichstand auf Platz 4 und Ausgestiegen" width="560"></td>
+<td><img src="../assets/serien/serien-turniertage-detail-handy.png" alt="Spieler-Detail am Handy mit Tagesplatz, Runden, GES P und Saisonpunkten je Turniertag" width="220"></td>
+</tr>
+<tr>
+<td><img src="../assets/serien/serien-turniertage-ergebnisblatt.png" alt="Ergebnis eintragen: je Zeile R1 bis R5 und GES P, Platz aus der Tagessumme, Double Up oben" width="560"></td>
+<td><img src="../assets/serien/serien-turniertage-regeln.png" alt="Saison bearbeiten: Runden je Turniertag, Rundenpunkte je Platz und Sonderbonus Bingo" width="220"></td>
+</tr>
+</table>
+
+<img src="../assets/serien/serien-turniertage-lobbys.png" alt="Lobby-Ansicht einer Runde mit zwei Lobbys und Platzfarben" width="560">
 
 **Seite Team-Liga:** Bei einer Spur vom Typ Team-Liga zeigt dieselbe Adresse statt der Gesamtwertung die Liga aus
 Sicht der eigenen Teams (Liste **Eigene Teams** der Saison; spielen mehrere, steht im Spielplan, welches gespielt
