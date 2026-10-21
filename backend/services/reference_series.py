@@ -31,11 +31,10 @@ from fastapi import HTTPException
 
 from database import get_db
 from models import new_id, now_utc
-from services import series_participants
+from services import race_weekend, series_participants
 from services.own_teams import own_teams
 from services.mutation_lock import MutationLockBusy, mutation_lock, series_write_resource
 from services.scoring_rules import normalize_rules
-from services.series_standings import compute_standings
 
 logger = logging.getLogger("tls.reference_series")
 SERIES_BUSY = "In dieser Saison wird gerade schon etwas gespeichert. Bitte gleich noch einmal versuchen."
@@ -197,8 +196,10 @@ async def recompute_standings(db, series: dict) -> int:
     sheets = {row["round_id"]: row async for row in db.reference_round_results.find(
         {"series_id": sid, "status": "published"}, {"_id": 0})}
     participants = await db.reference_participants.find({"series_id": sid}, {"_id": 0}).to_list(None)
-    snapshots = compute_standings(rules=series.get("rules") or {}, rounds=rounds, sheets=sheets,
-                                  participants=participants, own_teams=own_teams(series))
+    # Mit Punkten je Lauf, Startplatz und Pole aus dem Qualifying (#1930) - ohne Läufe wie ``compute_standings``.
+    snapshots = race_weekend.standings(rules=series.get("rules") or {}, rounds=rounds, sheets=sheets,
+                                       participants=participants, own_teams=own_teams(series),
+                                       weekend=series.get("weekend"))
     computed_at = now_utc().isoformat()
     kept = []
     for snapshot in snapshots:

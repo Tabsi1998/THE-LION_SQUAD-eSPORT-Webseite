@@ -1598,6 +1598,19 @@ def _series_rules(value: Optional[dict]) -> Optional[dict]:
     return value
 
 
+def _weekend(value: Optional[dict]) -> Optional[dict]:
+    """Läufe je Runde (#1930) - geprüft und vervollständigt in ``services/race_weekend.py``."""
+    from services.race_weekend import normalize_weekend
+
+    return normalize_weekend(value)
+
+
+def _session(value: Optional[str]) -> Optional[str]:
+    from services.race_weekend import clean_session
+
+    return clean_session(value)
+
+
 def _clock(value: Optional[str]) -> Optional[str]:
     text = (value or "").strip()
     if not text:
@@ -1697,11 +1710,17 @@ class ReferenceSeriesCreate(BaseModel):
     order_index: int = 0
     season_result: Optional[ReferenceSeasonResult] = None  # #1898: Vermerk statt Ableitung aus dem Stufennamen
     result_image_template: Optional[str] = Field(default=None, max_length=60)  # #1756: Vorlage für Ergebnis-Bilder
+    weekend: Optional[Dict[str, Any]] = None  # #1930: Läufe je Runde, auch ab Runde X wechselnd
 
     @field_validator("rules")
     @classmethod
     def _rules(cls, value):
         return _series_rules(value)
+
+    @field_validator("weekend")
+    @classmethod
+    def _check_weekend(cls, value):
+        return _weekend(value)
 
     @field_validator("default_time")
     @classmethod
@@ -1734,11 +1753,17 @@ class ReferenceSeriesUpdate(BaseModel):
     order_index: Optional[int] = None
     season_result: Optional[ReferenceSeasonResult] = None
     result_image_template: Optional[str] = Field(default=None, max_length=60)  # #1756: Vorlage für Ergebnis-Bilder
+    weekend: Optional[Dict[str, Any]] = None
 
     @field_validator("rules")
     @classmethod
     def _rules(cls, value):
         return _series_rules(value)
+
+    @field_validator("weekend")
+    @classmethod
+    def _check_weekend(cls, value):
+        return _weekend(value)
 
     @field_validator("default_time")
     @classmethod
@@ -1775,11 +1800,19 @@ class ReferenceRoundCreate(BaseModel):
     # ``False`` heißt von Hand gewählt (auch „ohne Flagge“) - dann bleibt es, auch wenn sich die Strecke ändert.
     country_code: Optional[str] = Field(default=None, max_length=2)
     country_auto: bool = True
+    # #1930: Lauf des Rennwochenendes („Qualifying“, „Sprint“ …); leer heißt Rennen. Ohne Angabe von ``counts`` zählt
+    # ein Qualifying nicht zur Wertung.
+    session: Optional[str] = Field(default=None, max_length=30)
 
     @field_validator("country_code")
     @classmethod
     def _country(cls, value):
         return _round_country(value)
+
+    @field_validator("session")
+    @classmethod
+    def _check_session(cls, value):
+        return _session(value)
 
 
 class ReferenceRoundUpdate(BaseModel):
@@ -1796,11 +1829,17 @@ class ReferenceRoundUpdate(BaseModel):
     note: Optional[str] = Field(default=None, max_length=1000)
     country_code: Optional[str] = Field(default=None, max_length=2)
     country_auto: Optional[bool] = None
+    session: Optional[str] = Field(default=None, max_length=30)
 
     @field_validator("country_code")
     @classmethod
     def _country(cls, value):
         return _round_country(value)
+
+    @field_validator("session")
+    @classmethod
+    def _check_session(cls, value):
+        return _session(value)
 
 
 class ReferenceParticipantCreate(BaseModel):

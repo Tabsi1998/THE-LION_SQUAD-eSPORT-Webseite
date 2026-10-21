@@ -9,6 +9,10 @@ Gelöscht wird nichts: Termine werden archiviert. Nach jeder Änderung rechnet d
 (abgesagte Runden zählen nicht zur Rundenzahl, ``counts`` nimmt eine Runde aus der Wertung). Jede Änderung läuft unter
 der Sperre der Saison, wie das Eintragen der Ergebnisse (``reference_series.series_locked``, #1744).
 
+Rennwochenende (#1930): Ein Termin trägt seinen Lauf (``session``, leer heißt Rennen); Termine mit gleichem Kürzel sind
+eine Runde (``weekend``, ``services/race_weekend.py``). Ein neues Qualifying zählt ohne Angabe nicht zur Wertung. Eine
+eingefügte Zeile ohne Lauf legt alle Läufe an, die die Saison für diese Runde vorgibt („Läufe je Runde“).
+
 Öffentlich: ``/api/reference-series/public/<spur>/<saison>/calendar`` - nur, wenn Spur und Serie sichtbar und nicht
 archiviert sind, ohne Notizen. Die Felder (Titel, Ort, Tag, Zeitpunkt, Status) sind so gewählt, dass der Vereinskalender
 (``calendar_items``, Stufe 2, #1752) sie später übernehmen kann.
@@ -25,7 +29,7 @@ from pymongo import ReturnDocument
 from auth import get_optional_user, require_area
 from database import get_db
 from models import ReferenceRoundCreate, ReferenceRoundUpdate, _clock, new_id, now_utc
-from services import reference_running_cache, reference_series
+from services import race_weekend, race_weekend_paste, reference_running_cache, reference_series
 from services.dolibarr_policy import club_today
 from services.round_countries import detect_country
 from services.series_standings import ordered_rounds
@@ -40,7 +44,8 @@ router = APIRouter(prefix="/api/reference-series", tags=["reference-series"],
                    dependencies=[Depends(reference_running_cache.reset_after_write)])
 
 PUBLIC_FIELDS = ("id", "position", "code", "title", "venue", "starts_at", "club_day", "time", "state", "status",
-                 "original_starts_at", "original_club_day", "kind", "counts", "opponent", "country_code")
+                 "original_starts_at", "original_club_day", "kind", "counts", "opponent", "country_code",
+                 "session", "session_kind", "weekend")
 
 
 def _day(value: Optional[str]) -> Optional[str]:
@@ -182,8 +187,8 @@ async def _log(db, action: str, me: dict, series_id: str, data: dict) -> None:
 
 def _brief(doc: dict) -> dict:
     """Knapper Stand eines neuen Termins fürs Protokoll: gesetzte Felder, Art und Wertung nur, wenn abweichend."""
-    out = {key: doc.get(key) for key in ("code", "title", "venue", "club_day", "starts_at", "order", "opponent",
-                                         "country_code") if doc.get(key) is not None}
+    out = {key: doc.get(key) for key in ("code", "session", "title", "venue", "club_day", "starts_at", "order",
+                                         "opponent", "country_code") if doc.get(key) is not None}
     if doc.get("kind", "regular") != "regular":
         out["kind"] = doc["kind"]
     if doc.get("counts") is False:
@@ -206,7 +211,8 @@ def _new_round(series_id: str, me: dict, **fields) -> dict:
         "id": new_id(), "series_id": series_id, "order": 0, "code": None, "title": None, "venue": None,
         "club_day": None, "starts_at": None, "status": "planned", "original_starts_at": None,
         "original_club_day": None, "cancelled_from": None, "status_note": None, "kind": "regular", "counts": True,
-        "opponent": None, "note": None, "country_code": None, "country_auto": True, "source": "manual",
+        "opponent": None, "note": None, "country_code": None, "country_auto": True, "session": None,
+        "source": "manual",
         "archived_at": None,
         "created_at": now, "created_by": me["id"], **_stamp(me), **fields,
     }
@@ -221,6 +227,8 @@ async def _calendar(db, series_id: str) -> dict:
     view = calendar_view(rounds, published, today)
     archived = sorted((item for item in rounds if item.get("archived_at")),
                       key=lambda item: (item.get("order") or 0, str(item.get("id"))))
+    # Runde und Art des Laufs (#1930): Termine mit gleichem Kürzel sind ein Rennwochenende.
+    race_weekend.annotate([*view["rounds"], *archived])
     for item in [*view["rounds"], *archived]:
         item["time"] = vienna_clock(item.get("starts_at"))
     return {"today": today, "version": int(series.get("calendar_version") or 0), **view, "archived": archived}
@@ -248,9 +256,11 @@ async def create_round(series_id: str, body: RoundCreateBody, me: dict = Depends
     else:
         when = _when_from_instant(body.starts_at)
     first = await _claim(db, series_id, body.expected_version, orders=1)
+    # Ein Qualifying zählt ohne ausdrückliche Angabe nicht zur Wertung (#1930).
+    counts = body.counts if "counts" in body.model_fields_set else race_weekend.default_session(body.session)["counts"]
     # Die Nummer vergibt immer die Folge - ein mitgeschicktes ``order`` zählt nicht (Reihenfolge nur über Ordnen).
-    doc = _new_round(series_id, me, order=first, code=_text(body.code),
-                     title=_text(body.title), venue=_text(body.venue), **when, kind=body.kind, counts=body.counts,
+    doc = _new_round(series_id, me, order=first, code=_text(body.code), session=body.session,
+                     title=_text(body.title), venue=_text(body.venue), **when, kind=body.kind, counts=counts,
                      opponent=_text(body.opponent), note=_text(body.note),
                      **_country(body.country_auto, body.country_code, _text(body.venue), _text(body.title)))
     await db.reference_rounds.insert_one(doc)
@@ -272,7 +282,8 @@ async def update_round(series_id: str, round_id: str, body: RoundUpdateBody,
         raise HTTPException(422, "Die Reihenfolge ändern „Ordnen“ und „Nach Datum ordnen“.")
     if "status" in raw or "original_starts_at" in raw:
         raise HTTPException(422, "Den Status ändern Verschieben, Absagen und das Ergebnis.")
-    updates: dict = {key: _text(raw[key]) for key in ("code", "title", "venue", "opponent", "note") if key in raw}
+    updates: dict = {key: _text(raw[key]) for key in ("code", "session", "title", "venue", "opponent", "note")
+                     if key in raw}
     updates.update({key: raw[key] for key in ("kind", "counts") if raw.get(key) is not None})
     if "day" in raw or "time" in raw:
         day = raw["day"] if "day" in raw else existing.get("club_day")
@@ -453,16 +464,20 @@ async def paste_rounds(series_id: str, body: RoundPasteBody, me: dict = Depends(
     parsed = parse_round_lines(body.text, season=series.get("season"), today=club_today(),
                                default_weekday=series.get("default_weekday"),
                                default_time=series.get("default_time"))
+    # Läufe je Runde (#1930): eine Zeile ohne Lauf legt alle Läufe an, die die Saison für ihre Runde vorgibt.
+    existing = await db.reference_rounds.find({"series_id": series_id}, {"_id": 0}).to_list(None)
+    parsed = race_weekend_paste.expand_paste(parsed, series.get("weekend"), existing)
     if not body.apply:
         return parsed
     if parsed["errors"] or not parsed["rows"]:
         raise HTTPException(422, {"message": "Die Liste hat Fehler." if parsed["errors"] else "Die Liste ist leer.",
                                   "errors": parsed["errors"]})
-    order = await _claim(db, series_id, body.expected_version, orders=len(parsed["rows"]))
-    docs = [_new_round(series_id, me, order=order + offset, code=row["code"], venue=row["venue"],
-                       club_day=row["day"], starts_at=row["starts_at"], source="paste",
-                       country_code=row["country_code"], country_auto=True)
-            for offset, row in enumerate(parsed["rows"])]
+    order = await _claim(db, series_id, body.expected_version, orders=parsed["count"])
+    planned = [(row, item) for row in parsed["rows"] for item in row["sessions"]]
+    docs = [_new_round(series_id, me, order=order + offset, code=row["code"], session=item["session"],
+                       venue=row["venue"], club_day=item["day"], starts_at=item["starts_at"], counts=item["counts"],
+                       source="paste", country_code=row["country_code"], country_auto=True)
+            for offset, (row, item) in enumerate(planned)]
     await db.reference_rounds.insert_many(docs)
     await _log(db, "reference_round.paste", me, series_id, {"count": len(docs), "round_ids": [doc["id"] for doc in docs],
                                                          "codes": [doc["code"] for doc in docs]})

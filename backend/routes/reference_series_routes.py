@@ -37,7 +37,8 @@ router = APIRouter(prefix="/api/reference-series", tags=["reference-series"],
 LINEAGE_NULLABLE = {"organizer", "label", "game_id", "game_name", "external_url", "description", "tier_order",
                     "result_image_template"}
 SERIES_NULLABLE = {"tier", "title", "default_weekday", "default_time", "team_name", "official_table_url",
-                   "external_url", "description", "reference_id", "season_result", "result_image_template"}
+                   "external_url", "description", "reference_id", "season_result", "result_image_template",
+                   "weekend"}
 SLUG_FALLBACK = "serie"
 
 
@@ -246,6 +247,10 @@ async def update_series(series_id: str, body: ReferenceSeriesUpdate, me: dict = 
                             "rules_note": (note or "").strip() or None, "rules_changed_at": changed_at,
                             "rules_changed_by": me["id"],
                             "rules_history": [*(existing.get("rules_history") or []), replaced]})
+    # Läufe je Runde (#1930): Punkte und Startplatz je Lauf ändern die Stände - neu rechnen und im Protokoll festhalten.
+    weekend_changed = "weekend" in updates and updates["weekend"] != existing.get("weekend")
+    if "weekend" in updates and not weekend_changed:
+        updates.pop("weekend")
     if "season" in updates or "tier" in updates:
         season = updates.get("season", existing.get("season"))
         tier = updates.get("tier", existing.get("tier"))
@@ -269,7 +274,13 @@ async def update_series(series_id: str, body: ReferenceSeriesUpdate, me: dict = 
                      "rules": saved["rules"]},
             "created_at": now_utc().isoformat(),
         })
-    if rules_changed or teams_changed:
+    if weekend_changed:
+        await db.audit_logs.insert_one({
+            "id": new_id(), "action": "reference_series.weekend_change", "actor_id": me["id"], "target_id": series_id,
+            "data": {"previous": existing.get("weekend"), "weekend": saved.get("weekend")},
+            "created_at": now_utc().isoformat(),
+        })
+    if rules_changed or teams_changed or weekend_changed:
         # Andere Schreibweisen eines eigenen Teams zählen erst nach dem Neurechnen als dieses Team (#1926).
         await reference_series.recompute_standings(db, saved)
     return saved

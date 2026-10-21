@@ -103,7 +103,8 @@ def _official(row: dict, official) -> None:
 
 
 # ---------------------------------------------------------------- Fahrer und Spieler
-def _results_by_participant(rules: dict, upto: list[dict], sheets: dict, seq_of: dict) -> dict[str, list[dict]]:
+def _results_by_participant(rules: dict, upto: list[dict], sheets: dict, seq_of: dict,
+                            round_rules: dict | None = None) -> dict[str, list[dict]]:
     found: dict[str, list[dict]] = {}
     # Jeder Teilnehmer steht höchstens einmal im Blatt - das prüft validate_sheet vor dem Rechnen.
     for item in upto:
@@ -113,7 +114,8 @@ def _results_by_participant(rules: dict, upto: list[dict], sheets: dict, seq_of:
             pid = row.get("participant_id")
             if not pid:
                 continue
-            scored = result_points(row, rules)
+            # Punkte je Lauf (#1930): ein Sprint kann ein eigenes Schema haben.
+            scored = result_points(row, (round_rules or {}).get(item["id"], rules))
             details = {key: row[key] for key in ("start_number", "grid", "time", "gap")
                        if row.get(key) not in (None, "")}
             if fastest.get("participant_id") == pid and fastest.get("time"):
@@ -130,11 +132,11 @@ def _results_by_participant(rules: dict, upto: list[dict], sheets: dict, seq_of:
 
 
 def _driver_rows(rules: dict, upto: list[dict], sheets: dict, seq_of: dict, total_rounds: int,
-                 people: dict) -> list[dict]:
+                 people: dict, round_rules: dict | None = None) -> list[dict]:
     activity = rules["activity_points"]
     official = sheets[upto[-1]["id"]].get("official_totals") or {}
     rows = []
-    for pid, results in _results_by_participant(rules, upto, sheets, seq_of).items():
+    for pid, results in _results_by_participant(rules, upto, sheets, seq_of, round_rules).items():
         counted, dropped = counted_results(results, rules, total_rounds)
         counted_points = sum(item["points"] for item in results if item["round_id"] in counted)
         bonus = sum(activity["points"] for item in results
@@ -160,13 +162,14 @@ def _driver_rows(rules: dict, upto: list[dict], sheets: dict, seq_of: dict, tota
 
 
 # ---------------------------------------------------------------- Teams
-def _team_rows(rules: dict, upto: list[dict], sheets: dict, seq_of: dict, people: dict) -> list[dict]:
+def _team_rows(rules: dict, upto: list[dict], sheets: dict, seq_of: dict, people: dict,
+               round_rules: dict | None = None) -> list[dict]:
     config = rules["team_scoring"]
     official = sheets[upto[-1]["id"]].get("official_team_totals") or {}
     teams: dict[str, dict] = {}
     for item in upto:
         per_team: dict[str, list[dict]] = {}
-        for pid, results in _results_by_participant(rules, [item], sheets, seq_of).items():
+        for pid, results in _results_by_participant(rules, [item], sheets, seq_of, round_rules).items():
             person = people.get(pid) or {}
             if person.get("link") == "guest" and not config["guests_count"]:
                 continue
@@ -260,10 +263,11 @@ def _own_spelling(sheet: dict, matcher: Matcher) -> dict:
 
 # ---------------------------------------------------------------- Alles zusammen
 def compute_standings(*, rules: dict, rounds: list[dict], sheets: dict[str, dict], participants: list[dict],
-                      own_teams=()) -> list[dict]:
+                      own_teams=(), round_rules: dict | None = None) -> list[dict]:
     """Je gewerteter Runde und Wertung ein Stand: ``{"round_id", "round_seq", "scope", "rows"}`` in
     Kalender-Reihenfolge. ``own_teams``: die eigenen Teams (Namen oder ``{name, aliases}``, #1926) - ihre
-    Schreibweisen zählen als ein Team."""
+    Schreibweisen zählen als ein Team. ``round_rules``: normalisierte Regeln je Termin, die für die Punkte einer Zeile
+    statt ``rules`` gelten (Punkte je Lauf, #1930, ``services/race_weekend.py``)."""
     rules = normalize_rules(rules)
     matcher = Matcher(own_teams)
     if matcher:
@@ -285,9 +289,10 @@ def compute_standings(*, rules: dict, rounds: list[dict], sheets: dict[str, dict
         upto = scored[: index + 1]
         scopes = []
         if any(sheets[done["id"]].get("rows") for done in upto):
-            drivers = _driver_rows(rules, upto, sheets, seq_of, total_rounds, people)
+            drivers = _driver_rows(rules, upto, sheets, seq_of, total_rounds, people, round_rules)
             scopes.append(("drivers", "participant_id", drivers))
-            teams = _team_rows(rules, upto, sheets, seq_of, people) if rules["team_scoring"]["enabled"] else []
+            teams = (_team_rows(rules, upto, sheets, seq_of, people, round_rules)
+                     if rules["team_scoring"]["enabled"] else [])
             if teams:
                 scopes.append(("teams", "team", teams))
         if any(sheets[done["id"]].get("matches") or sheets[done["id"]].get("official_table") for done in upto):

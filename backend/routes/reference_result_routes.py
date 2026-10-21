@@ -75,6 +75,11 @@ gewertet sind.
   kein Alias - beides steht im Löschfilter, falls der Vorstand dazwischen zuordnet) und in keinem Blatt der Saison
   stehen (``series_participants.remove_unused_new``).
 
+**Rennwochenende (#1930):** Ein Termin mit Lauf (``round.session``, ``round.session_kind``) rechnet mit dem
+Punkteschema seines Laufs (``race_weekend.rules_for_round`` - ``series.rules`` im Ausgangsstand ist dieses). Im Blatt
+eines Qualifyings bekommt Platz 1 die Marke ``pole`` (außer eine Zeile trägt sie schon), der Hinweis „zählt nicht zur
+Wertung“ entfällt dort. Startplatz und Pole des Rennens kommen beim Rechnen aus dem Qualifying desselben Wochenendes.
+
 **POST …/results/approve** und **POST …/results/discard** (nur Vorstand), Body ``{expected_version}``: Freigeben
 veröffentlicht den Entwurf daneben (ohne einen solchen das Blatt im Entwurf) samt Revision, Protokoll
 (``reference_result.approve``) und Neurechnen; Verwerfen entfernt den Entwurf daneben (``reference_result.discard``),
@@ -96,13 +101,12 @@ from pymongo.errors import DuplicateKeyError
 from database import get_db
 from match_rules import RESULT_MAX_SCORE
 from models import ReferencePointsSource, ReferenceResultMark, ReferenceResultStatus, new_id, now_utc
-from services import reference_running_cache, reference_series, series_identity, series_results
+from services import race_weekend, reference_running_cache, reference_series, series_identity, series_results
 from services.dolibarr_policy import club_today
 from services.own_teams import own_team_names, own_teams
 from services.reference_series_access import EDIT_PENDING_DRAFT, SeriesAccess, require_series_editor
-from services.scoring_rules import normalize_rules, result_points, validate_sheet
+from services.scoring_rules import result_points, validate_sheet
 from services.series_participants import build_index, new_participant, remove_unused_new
-from services.series_standings import compute_standings
 
 # Jeder schreibende Aufruf leert den Cache der laufenden Saisons (#1753, Startseite).
 router = APIRouter(prefix="/api/reference-series", tags=["reference-series"],
@@ -119,7 +123,7 @@ STALE = "Das Ergebnis wurde inzwischen geändert – bitte neu laden."
 BROKEN_RULES = "Die Regeln der Serie lassen sich nicht anwenden – bitte in der Saison prüfen."
 BROKEN_SHEETS = "Die Ergebnisse der Serie lassen sich so nicht werten – bitte die veröffentlichten Blätter prüfen."
 ROUND_FIELDS = ("id", "order", "code", "title", "venue", "club_day", "starts_at", "status", "kind", "counts",
-                "opponent", "country_code")
+                "opponent", "country_code", "session")
 PARTICIPANT_FIELDS = ("id", "name", "start_number", "default_team", "kind", "is_club_member", "link_status")
 # Captains: nur, wer in der Saison steht - Zuordnung, Alias und Vereinsmitgliedschaft liest nur die Verwaltung (#1743).
 CAPTAIN_PARTICIPANT_FIELDS = ("id", "name", "start_number", "default_team", "kind")
@@ -228,9 +232,11 @@ class ResultDecision(BaseModel):
 
 
 # ---------------------------------------------------------------- Hilfen
-def _rules(series: dict) -> dict:
+async def _round_rules(db, series: dict, round_doc: dict) -> dict:
+    """Regeln für das Blatt dieses Termins: mit dem Punkteschema seines Laufs (#1930)."""
+    rounds = await db.reference_rounds.find({"series_id": series["id"]}, {"_id": 0}).to_list(None)
     try:
-        return normalize_rules(series.get("rules") or {})
+        return race_weekend.rules_for_round(series, rounds, round_doc)
     except ValueError:
         raise HTTPException(422, BROKEN_RULES) from None
 
@@ -265,7 +271,8 @@ async def _update_if_current(db, sheet_id: str, expected: int, update: dict) -> 
 
 
 def _round_view(round_doc: dict) -> dict:
-    return {key: round_doc.get(key) for key in ROUND_FIELDS}
+    return {**{key: round_doc.get(key) for key in ROUND_FIELDS},
+            "session_kind": race_weekend.session_kind(round_doc.get("session"))}
 
 
 def _without_ids(doc: dict) -> dict:
@@ -300,10 +307,14 @@ async def _kind(db, series: dict) -> str | None:
 
 async def _prepare(db, access: SeriesAccess, round_doc: dict, body: ResultSheetInput):
     """Zuordnen und prüfen. Liefert Regeln, Teilnehmer der Serie und die ``Resolution`` mit Fehlern und Warnungen."""
-    rules = _rules(access.series)
+    rules = await _round_rules(db, access.series, round_doc)
     participants = await _participants(db, access.series_id)
     resolution = series_results.resolve(body.model_dump(), participants, rules)
     series_results.check(resolution, rules, round_doc, club_today(), own_teams(access.series))
+    if race_weekend.session_kind(round_doc.get("session")) == "qualifying":
+        # Qualifying (#1930): die Pole setzt sich selbst, und dass es nicht zur Wertung zählt, ist gewollt.
+        race_weekend.mark_pole(resolution.rows)
+        resolution.warnings[:] = [item for item in resolution.warnings if item["code"] != "round_not_counted"]
     if not resolution.errors:
         # Zur Sicherheit wie beim Rechnen - die Prüfung oben fängt dieselben Fälle schon mit Zeilenangabe ab.
         try:
@@ -331,8 +342,9 @@ async def _snapshots(db, series: dict, rules: dict, round_doc: dict, content: di
         {"series_id": sid, "status": "published"}, {"_id": 0})}
     sheets[round_doc["id"]] = content
     try:
-        return compute_standings(rules=rules, rounds=rounds, sheets=sheets, participants=people,
-                                 own_teams=own_teams(series))
+        return race_weekend.standings(rules=series.get("rules") or {}, rounds=rounds, sheets=sheets,
+                                      participants=people, own_teams=own_teams(series),
+                                      weekend=series.get("weekend"))
     except ValueError:
         raise HTTPException(422, BROKEN_SHEETS) from None
 
@@ -479,7 +491,8 @@ async def get_results(series_id: str, round_id: str, access: SeriesAccess = Depe
         "round": _round_view(round_doc),
         "series": {"id": access.series_id, "kind": await _kind(db, access.series),
                    "team_name": access.series.get("team_name"),
-                   "own_teams": own_team_names(access.series), "rules": _rules(access.series),
+                   "own_teams": own_team_names(access.series),
+                   "rules": await _round_rules(db, access.series, round_doc),
                    "publish_mode": access.series.get("publish_mode")},
         "access": access.summary(), "version": _version(existing), "sheet": _sheet_view(existing, access),
         "target": access.edit_target(existing),
