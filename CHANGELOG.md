@@ -1,19 +1,18 @@
 # Changelog
 
-## [1.24.0](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/compare/v1.23.0...v1.24.0) (2026-10-21)
-
+## 1.24.0 (21.10.2026)
 
 ### Neu
 
-* Ergebnisliste einfügen erkennt Spalten „R 1 … R 5“, „GES P“ und Sonderboni ([#1961](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1961)) ([c13fdc3](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/c13fdc3e84a5928c1f6859cd444dafdf9c7d29b5))
-* Serienseite – Turniertage mit R1…Rn und Summe, Platzfarben, Lobby-Ansicht und Spieler-Detail mit Tages- und Saisonpunkten ([#1961](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1961)) ([c13fdc3](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/c13fdc3e84a5928c1f6859cd444dafdf9c7d29b5))
-* Serienseite und Verwaltung zeigen Runden je Turniertag, Sonderboni und „Top N“ in den Regeln, Gesamtwertung mit Spalte Boni ([#1961](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1961)) ([c13fdc3](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/c13fdc3e84a5928c1f6859cd444dafdf9c7d29b5))
-* Spielkennung mit Tag („Name#TLS“) gilt als dieselbe Person, Serienseite wahlweise ohne Tag ([#1961](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1961)) ([c13fdc3](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/c13fdc3e84a5928c1f6859cd444dafdf9c7d29b5))
-* Turnierserien – eigene Sonderboni je Saison (etwa Bingo +3), je Zeile abhakbar, getrennt ausgewiesen und nie gestrichen ([#1961](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1961)) ([c13fdc3](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/c13fdc3e84a5928c1f6859cd444dafdf9c7d29b5))
-* Turnierserien – geteilte Plätze ohne Warnung: Gleichstand (4, 4, 6) und Double Up mit Partner ([#1961](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1961)) ([c13fdc3](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/c13fdc3e84a5928c1f6859cd444dafdf9c7d29b5))
-* Turnierserien – Gleichstand-Regel „Mehr Plätze unter den besten N“ mit einstellbarem N ([#1961](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1961)) ([c13fdc3](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/c13fdc3e84a5928c1f6859cd444dafdf9c7d29b5))
-* Turnierserien – Marke „Ausgestiegen“ im Ergebnisblatt ([#1961](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1961)) ([c13fdc3](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/c13fdc3e84a5928c1f6859cd444dafdf9c7d29b5))
-* Turnierserien – Runden je Turniertag (R1…Rn), Tagessumme GES P und Tagesplatz daraus, Rundenpunkte wie beim Veranstalter gelesen ([#1961](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1961)) ([c13fdc3](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/c13fdc3e84a5928c1f6859cd444dafdf9c7d29b5))
+* Ergebnisliste einfügen erkennt Spalten „R 1 … R 5“, „GES P“ und Sonderboni (#1961)
+* Serienseite – Turniertage mit R1…Rn und Summe, Platzfarben, Lobby-Ansicht und Spieler-Detail mit Tages- und Saisonpunkten (#1961)
+* Serienseite und Verwaltung zeigen Runden je Turniertag, Sonderboni und „Top N“ in den Regeln, Gesamtwertung mit Spalte Boni (#1961)
+* Spielkennung mit Tag („Name#TLS“) gilt als dieselbe Person, Serienseite wahlweise ohne Tag (#1961)
+* Turnierserien – eigene Sonderboni je Saison (etwa Bingo +3), je Zeile abhakbar, getrennt ausgewiesen und nie gestrichen (#1961)
+* Turnierserien – geteilte Plätze ohne Warnung: Gleichstand (4, 4, 6) und Double Up mit Partner (#1961)
+* Turnierserien – Gleichstand-Regel „Mehr Plätze unter den besten N“ mit einstellbarem N (#1961)
+* Turnierserien – Marke „Ausgestiegen“ im Ergebnisblatt (#1961)
+* Turnierserien – Runden je Turniertag (R1…Rn), Tagessumme GES P und Tagesplatz daraus, Rundenpunkte wie beim Veranstalter gelesen (#1961)
 
 ## 1.23.0 (21.10.2026)
 
