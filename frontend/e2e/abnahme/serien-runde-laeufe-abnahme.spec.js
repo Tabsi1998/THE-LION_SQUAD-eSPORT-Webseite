@@ -167,6 +167,9 @@ test.describe("Abnahme #1930: Runde mit Läufen - Ablauf je Runde", () => {
       // Vorschau je Lauf: Sprint mit seiner Liste, Hauptrennen wie die Saison.
       await expect(sprint.getByTestId("weekend-session-preview")).toHaveText("P1 12 · P2 9 · P3 7 · P4 6 · P5 5 · … · P9 1");
       await expect(first.getByTestId("weekend-session-preview").nth(1)).toHaveText("P1 25 · P2 18 · P3 15 · P4 12 · P5 10 · … · P10 1");
+      // Ablauf je Runde: „Format 1 · ab Runde 1“ mit den Läufen in zeitlicher Reihenfolge.
+      await expect(first.getByTestId("weekend-format-title")).toHaveText("Format 1 · ab Runde 1");
+      await expect(first.getByTestId("weekend-format-summary")).toHaveText("Blitz-Quali + Sprint + Hauptrennen");
       await admin.getByTestId("weekend-phase-add").click();
       const second = admin.getByTestId("weekend-format").nth(1);
       await second.getByTestId("weekend-format-from").fill("5");
