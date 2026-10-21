@@ -1,0 +1,21 @@
+/* Flagge je Termin (#1925): kleine Fläche mit Haarlinie, damit Weiß und Schwarz auf dunklem Grund nicht zerfließen. */
+.tls-flag {
+  display: inline-block;
+  flex-shrink: 0;
+  object-fit: cover;
+  border-radius: 2px;
+  outline: 1px solid rgb(255 255 255 / 0.16);
+  outline-offset: -1px;
+  vertical-align: -0.15em;
+}
+
+.tls-flag-line {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  min-width: 0;
+}
+
+.tls-flag-line > .tls-flag {
+  align-self: center;
+}

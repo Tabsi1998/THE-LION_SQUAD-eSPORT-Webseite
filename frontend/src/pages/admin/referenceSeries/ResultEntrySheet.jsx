@@ -9,6 +9,7 @@ import {
   pastedToRows, problemsByRow, scoredText, sheetToForm,
 } from "@/lib/referenceResults";
 import { ResultPreview } from "./ResultPreview";
+import { VenueWithFlag } from "@/components/tls/CountryFlag";
 import { toast } from "sonner";
 import { ClipboardList, Plus, RefreshCw, SlidersHorizontal, Trash2, X } from "lucide-react";
 
@@ -497,7 +498,7 @@ export function ResultEntrySheet({ series, round, onClose, onSaved }) {
         <>
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-white/60" data-testid="result-round">
             <span className="tabular-nums">{roundWhen(data.round)}</span>
-            {data.round.venue && <span>· {data.round.venue}</span>}
+            {(data.round.venue || data.round.country_code) && <span>· <VenueWithFlag round={{ venue: data.round.venue, country_code: data.round.country_code }} /></span>}
             {sheetStatus && <span className="text-[10px] font-bold uppercase tracking-widest text-white/45">{sheetStatus === "published" ? "veröffentlicht" : "Entwurf"} · Stand {data.version}</span>}
             <span className="text-[10px] font-bold uppercase tracking-widest text-white/45">{organizerMode ? "Punkte laut Veranstalter" : "Punkte nach Schlüssel"}</span>
           </div>

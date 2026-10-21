@@ -4,6 +4,7 @@ import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { STATE_LABELS, STATE_TONES, dayLabel, moveIds, roundLabel, roundWhen, suggestNextDay } from "@/lib/referenceCalendar";
 import { PasteSheet, PostponeSheet, RoundSheet } from "./RoundSheets";
+import { VenueWithFlag } from "@/components/tls/CountryFlag";
 import { toast } from "sonner";
 import { AlertTriangle, Archive, ArchiveRestore, ArrowDown, ArrowDownUp, ArrowUp, Ban, CalendarClock, ClipboardList, Pencil, Plus, RotateCcw } from "lucide-react";
 
@@ -139,7 +140,7 @@ export function SeriesCalendarSection({ series }) {
               <div className="min-w-0 flex-1">
                 <div className={`text-sm ${round.state === "cancelled" ? "text-white/45" : "text-white"}`}>
                   <span className="tabular-nums">{roundWhen(round)}</span>
-                  {(round.venue || round.title) && <span className="text-white/60"> · {[round.title, round.venue].filter(Boolean).join(" · ")}</span>}
+                  {(round.venue || round.title || round.country_code) && <span className="text-white/60"> · <VenueWithFlag round={round} /></span>}
                   {round.opponent && <span className="text-white/60"> · gegen {round.opponent}</span>}
                 </div>
                 <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-white/45">

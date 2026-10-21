@@ -122,6 +122,9 @@
 .tls-racing-race[data-medal] .tls-racing-race__place { color: var(--tls-race-medal); }
 .tls-racing-race__code { font-size: 10px; line-height: 1; letter-spacing: 0.04em; color: rgb(255 255 255 / 0.38); white-space: nowrap; }
 .tls-racing-race[data-state="cancelled"] .tls-racing-race__code { text-decoration: line-through; }
+/* Flagge unter dem Kürzel (#1925): feste Höhe, damit Rennen ohne Land in der Reihe bleiben; abgesagt blass. */
+.tls-racing-race__flag { display: flex; align-items: center; justify-content: center; height: 11px; }
+.tls-racing-race[data-state="cancelled"] .tls-racing-race__flag { opacity: 0.35; }
 @media (max-width: 420px) {
   .tls-racing-races { gap: 2px; }
   .tls-racing-race__code { font-size: 9px; }

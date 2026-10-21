@@ -313,3 +313,31 @@ test("noch ohne Ergebnis: Hinweis statt Tabellen", async () => {
   expect(within(section).getByTestId("series-no-table")).toHaveTextContent("Noch keine Ergebnisse");
   expect(screen.queryByTestId("racing-garage")).toBeNull();
 });
+
+test("Flaggen (#1925): Rennkalender, Spaltenköpfe des Rennrasters und Fahrer-Detail, Alternativtext = Landesname", async () => {
+  const rounds = BODY.rounds.map((round) => ({ ...round, country_code: { r1: "IT", r2: "AZ", r4: "JP" }[round.id] || null }));
+  renderAt("/references/series/probe-racing/2026-f1?fahrer=lion1", { ...BODY, rounds });
+  const calendar = await screen.findByTestId("racing-calendar");
+  const items = within(calendar).getAllByTestId("racing-round");
+  expect(within(items[0]).getByRole("img", { name: "Italien" })).toHaveAttribute("src", "/assets/flags/it.svg");
+  expect(items[0]).toHaveTextContent("Probering");
+  expect(within(items[2]).queryByRole("img")).toBeNull();
+  // Ohne Ort steht das Land neben der Flagge.
+  expect(items[3]).toHaveTextContent("Japan");
+
+  const table = within(screen.getByTestId("racing-drivers")).getByTestId("series-table");
+  const heads = within(table).getAllByTestId("series-round-flag");
+  expect(heads.map((head) => within(head).getByRole("img").getAttribute("alt"))).toEqual(["Italien", "Aserbaidschan", "Japan"]);
+
+  const detail = screen.getByTestId("racing-driver");
+  const races = within(detail).getAllByTestId("racing-driver-race");
+  expect(races[1]).toHaveAttribute("title", expect.stringContaining("R2 (Aserbaidschan)"));
+  expect(races[1].querySelector("img")).toHaveAttribute("alt", "Aserbaidschan");
+});
+
+test("ohne Länder bleibt alles wie bisher: keine Flaggen", async () => {
+  renderAt("/references/series/probe-racing/2026-f1?fahrer=lion1");
+  await screen.findByTestId("racing-calendar");
+  expect(screen.queryAllByTestId("country-flag")).toEqual([]);
+  expect(screen.queryAllByTestId("series-round-flag")).toEqual([]);
+});

@@ -5,6 +5,8 @@ import { formatNumber } from "@/lib/standingsTable";
 import { roundLabel } from "@/lib/referenceCalendar";
 import { barShare, driverSeason, garageName, raceCellLabel } from "@/lib/racingLeague";
 import { GuestBadge } from "@/components/tls/series/RacingParts";
+import { CountryFlag } from "@/components/tls/CountryFlag";
+import { countryName } from "@/lib/countryFlags";
 import "./racingLeague.css";
 
 // Vereins-Garage der Rennliga (#1746): je Vereinsteam die Fahrer und das Teamduell, darunter das Detail eines
@@ -115,7 +117,8 @@ export function RacingGarageTeams({ garage, rows, drivers, selectedKey, onSelect
 }
 
 function raceTitle(item) {
-  const name = roundLabel(item.round);
+  const country = countryName(item.round.country_code);
+  const name = `${roundLabel(item.round)}${country ? ` (${country})` : ""}`;
   if (item.cell) return raceCellLabel(item.cell, name);
   if (item.round.state === "cancelled") return `${name}: abgesagt`;
   return `${name}: ${item.round.state === "scored" ? "nicht dabei" : "noch offen"}`;
@@ -125,6 +128,7 @@ function raceTitle(item) {
  * Balken mit Platz. `flash` lässt den Rahmen nach einem Sprung aus der Tabelle einmal aufleuchten. */
 export const RacingDriverDetail = forwardRef(function RacingDriverDetail({ row, driver, rounds, flash }, ref) {
   const season = driverSeason(row, rounds);
+  const withFlags = season.perRace.some((item) => item.round.country_code);
   const stats = [
     count(season.wins, "Sieg", "Siege"), count(season.podiums, "Podium", "Podien"),
     count(season.fastestLaps, "schnellste Runde", "schnellste Runden"), count(season.dnfs, "Ausfall", "Ausfälle"),
@@ -185,6 +189,12 @@ export const RacingDriverDetail = forwardRef(function RacingDriverDetail({ row, 
                   </span>
                   <span className="tls-racing-race__place" aria-hidden="true">{item.cell ? item.cell.text : "–"}</span>
                   <span className="tls-racing-race__code" aria-hidden="true">{roundLabel(item.round)}</span>
+                  {/* Flagge des Rennens (#1925) unter dem Kürzel - eine Leiste der Länder entlang der Saison. */}
+                  {withFlags && (
+                    <span className="tls-racing-race__flag" aria-hidden="true">
+                      <CountryFlag code={item.round.country_code} size="xs" />
+                    </span>
+                  )}
                   <span className="sr-only">{title}</span>
                 </li>
               );

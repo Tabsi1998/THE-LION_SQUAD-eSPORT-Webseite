@@ -6,6 +6,7 @@ import { formatDiff, formatNumber } from "@/lib/standingsTable";
 import { PUBLIC_STATE_LABELS, STATE_TONES, dayLabel, roundLabel, roundWhen } from "@/lib/referenceCalendar";
 import { nameOf } from "@/lib/referenceSeriesTable";
 import { raceCell, raceCellLabel, raceSummary } from "@/lib/racingLeague";
+import { VenueWithFlag } from "@/components/tls/CountryFlag";
 import "./racingLeague.css";
 
 // Bausteine der Rennliga (#1746): Umschalter der Saisons, Zellen des Rennrasters, Namen (nur Vereinsfahrer öffnen ihr
@@ -148,7 +149,9 @@ export function RacingCalendar({ rounds, rows, onSelect, publicKeys }) {
                 <span className={`w-12 shrink-0 font-black tabular-nums ${round.kind === "final" ? "text-[var(--tls-honor)]" : "text-white/80"}`}>{roundLabel(round)}</span>
                 <div className="min-w-0 flex-1">
                   <span className={`block text-sm tabular-nums ${round.state === "cancelled" ? "text-white/45" : "text-white"}`}>{roundWhen(round)}</span>
-                  {(round.title || round.venue) && <span className="block text-sm text-white/60">{[round.title, round.venue].filter(Boolean).join(" · ")}</span>}
+                  {(round.title || round.venue || round.country_code) && (
+                    <span className="block text-sm text-white/60" data-testid="racing-round-venue"><VenueWithFlag round={round} /></span>
+                  )}
                   {round.original_club_day && <span className="block text-[11px] text-white/45">ursprünglich {dayLabel(round.original_club_day)}</span>}
                   {(summary?.winner || best) && (
                     <div className="mt-2 space-y-1">

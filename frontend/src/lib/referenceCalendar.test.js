@@ -44,5 +44,6 @@ test("Formular und Body: neuer Termin mit Vorschlag, leere Uhrzeit heißt ohne U
   expect(existing).toMatchObject({ code: "R1", day: "2026-11-05", time: "", counts: false });
   expect(roundPayload({ ...existing, venue: "  Probering ", note: " " })).toEqual({
     code: "R1", title: null, venue: "Probering", day: "2026-11-05", time: null, kind: "regular", counts: false, opponent: null, note: null,
+    country_auto: true,
   });
 });
