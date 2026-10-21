@@ -56,6 +56,14 @@ test("Abweichungen lesbar: Platz, Tagespunkte, Rundenpunkte, Marken, neu, fällt
   expect(changeLines([{ participant_id: "p", name: "X", kind: "changed", fields: { marks: [["left"], []] } }])[0].text).toBe("nicht mehr ausgestiegen");
 });
 
+test("gleiche Rundenpunkte: es kommen nur Platz und Lobby dazu bzw. sie ändern sich", () => {
+  const typed = [{ points: 8 }, { points: 7 }];
+  const fetched = [{ place: 1, points: 8, lobby: "1" }, { place: 2, points: 7, lobby: "2" }];
+  const line = (before, after) => changeLines([{ participant_id: "p", name: "X", kind: "changed", fields: { day_rounds: [before, after] } }])[0].text;
+  expect(line(typed, fetched)).toBe("Runden: Platz und Lobby ergänzt");
+  expect(line(fetched, [{ place: 1, points: 8, lobby: "2" }, fetched[1]])).toBe("Runden: Platz bzw. Lobby geändert");
+});
+
 test("Übernehmen schickt genau, was die Vorschau gezeigt hat", () => {
   const items = [item({ ref: "1", fingerprint: "f1", expected_version: 0 }), item({ ref: "2", fingerprint: "f2", expected_version: 3, round: { id: "r2" } })];
   expect(applyBody(items, ["2"])).toEqual({ items: [{ ref: "2", fingerprint: "f2", expected_version: 3, round_id: "r2" }] });

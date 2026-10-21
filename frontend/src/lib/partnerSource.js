@@ -78,7 +78,15 @@ function fieldParts(fields) {
   const parts = [];
   if (fields.place) parts.push(`Platz ${shown(fields.place[0])} → ${shown(fields.place[1])}`);
   if (fields.day_points) parts.push(`Tagespunkte ${shown(fields.day_points[0])} → ${shown(fields.day_points[1])}`);
-  if (fields.day_rounds) parts.push(`Runden ${roundsShown(fields.day_rounds[0])} → ${roundsShown(fields.day_rounds[1])}`);
+  if (fields.day_rounds) {
+    const [before, after] = fields.day_rounds.map(roundsShown);
+    if (before !== after) parts.push(`Runden ${before} → ${after}`);
+    else {
+      // Gleiche Punkte: nur Platz in der Lobby bzw. Lobby kommen dazu oder ändern sich.
+      const located = (fields.day_rounds[0] || []).some((entry) => entry && (entry.place || entry.lobby));
+      parts.push(located ? "Runden: Platz bzw. Lobby geändert" : "Runden: Platz und Lobby ergänzt");
+    }
+  }
   if (fields.marks) {
     const before = (fields.marks[0] || []).includes("left");
     const after = (fields.marks[1] || []).includes("left");
