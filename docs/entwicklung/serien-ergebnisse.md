@@ -66,6 +66,10 @@ und `driver_of_the_day` – nur, wo angegeben.
 - Die Serienseite liefert `team_league.record` (Bilanz je eigenem Team), je Spieltag `others` und in `lineup.players`
   `of`, `bench_round_ids`, `in_roster` und `team`; das Mitgliederprofil je verknüpfter Referenz `appearances`
   (`{played, of, unit, team}`, `services/series_appearances.py`).
+- Je eigenem Spiel `veto`: das ganze Veto in seiner Reihenfolge (`name`, `role`, `played`, `by?`, `map_id?`, `picked?`,
+  bei gespielten Maps dazu `score_for`, `score_against`, `outcome`). Eine Wahl bzw. ein Decider ohne Ergebnis steht dort
+  mit `played: false` – die Web-Karte zeigt sie abgeschwächt mit „nicht gespielt“. `maps` bleibt bei den gespielten
+  Maps (so liest es die App), `bans` bei den gesperrten.
 
 **Eigene Teams (#1926):** Die Serie hat `own_teams` (`[{name, aliases}]`, `team_name` = das erste). Ein Team aus der
 Liste, aus `matches` oder der Tabelle zählt als eigenes, wenn Name oder Alias ohne Groß/klein, Leer- und Satzzeichen

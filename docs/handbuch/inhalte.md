@@ -587,8 +587,9 @@ Team, das in den Spielen anders geschrieben ist („Gegner e.V.“ statt „Gegn
 werden nie neu gerechnet. Das eigene Team ist als „Verein“ markiert, mit Form (die letzten
 fünf eigenen Spiele) und darunter dem **Platzierungsverlauf** nach jedem Spieltag. Der **Spielplan** zeigt jeden
 Spieltag als Karte: Tag und Uhrzeit des Spiels (bei einem Zeitraum beide Tage), Gegner mit Heim oder Auswärts, das
-Ergebnis (Rand und Kürzel S/U/N in Sieg- bzw. Niederlagen-Farbe), die gespielten Maps (mit Ergebnis) mit **Unsere
-Wahl**, **Wahl Gegner** oder **Decider**, die gebannten Maps und – zugeklappt – die **weiteren Spiele** des Spieltags.
+Ergebnis (Rand und Kürzel S/U/N in Sieg- bzw. Niederlagen-Farbe), das ganze Veto in seiner Reihenfolge – die Maps mit
+**Unsere Wahl**, **Wahl Gegner** oder **Decider** (eine Wahl bzw. der Decider ohne Ergebnis, etwa beim 2:0,
+abgeschwächt mit „nicht gespielt“), darunter die gebannten Maps – und zugeklappt die **weiteren Spiele** des Spieltags.
 Spielen zwei eigene Teams am selben Spieltag, stehen beide Spiele auf der Karte. Der **Kader** zeigt alle
 Spieler der eigenen Teams, auch wer noch nicht gespielt hat: je Spieltag ein Haken (gespielt) oder **E** (Ersatz – im
 Kader, aber nicht aufgestellt), unter **Einsätze** etwa „2 von 5“ (von den Spielen des Teams mit Aufstellung).
@@ -600,8 +601,8 @@ der Kader im Abschnitt **Kader** der Saison.
 
 <table>
 <tr>
-<td><img src="../assets/serien/serien-seite-teamliga-breit.png" alt="Seite einer Team-Liga mit Spieltagen, Bilanz, Tabelle, Spieltagen als Karten mit Maps und Bann, Kader mit Einsätzen und Liga-Weg" width="560"></td>
-<td><img src="../assets/serien/serien-seite-teamliga-handy.png" alt="Dieselbe Seite am Handy mit 360 px, die weiteren Spiele des ersten Spieltags aufgeklappt" width="220"></td>
+<td><img src="../assets/serien/serien-seite-teamliga-breit.png" alt="Seite einer Team-Liga mit Spieltagen, Bilanz, Tabelle, Spieltagen als Karten mit dem ganzen Veto (nicht gespielter Decider abgeschwächt) und Bann, Kader mit Einsätzen und Liga-Weg" width="560"></td>
+<td><img src="../assets/serien/serien-seite-teamliga-handy.png" alt="Dieselbe Seite am Handy mit 390 px, die weiteren Spiele des ersten Spieltags aufgeklappt" width="220"></td>
 </tr>
 </table>
 
