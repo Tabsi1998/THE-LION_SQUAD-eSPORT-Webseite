@@ -101,23 +101,19 @@ export function organizerUrl(item) {
 
 /**
  * Was die aufgeklappte Zeile zeigt: den langen Titel (nur wenn er vom kurzen abweicht), Format-Marken, die Aufstellung
- * (nur im Team) und die Links. `empty`, wenn nichts davon da ist - dann klappt die Zeile nicht auf.
+ * (nur im Team) und die Links - „Saison ansehen“ (nur mit Saison), „Details“ zur Referenz (immer: Bericht, Partner und
+ * Ort stehen dort) und „Beim Veranstalter“.
  */
 export function detailsOf(item, profileId, link = null) {
   const entry = ownEntry(item);
   const full = displayTitle(item);
-  const fullTitle = full !== shortTitle(item, link) ? full : "";
-  const tags = formatTags(item);
-  const lineup = entry && entry.kind !== "solo" ? lineupOf(entry, profileId) : [];
-  const seasonUrl = link?.lineage?.slug && link?.season?.season_slug ? seriesAddress(link.lineage, link.season) : "";
-  const external = organizerUrl(item);
   return {
-    fullTitle,
-    tags,
-    lineup,
-    seasonUrl,
-    organizerUrl: external,
-    empty: !fullTitle && !tags.length && !lineup.length && !seasonUrl && !external,
+    fullTitle: full !== shortTitle(item, link) ? full : "",
+    tags: formatTags(item),
+    lineup: entry && entry.kind !== "solo" ? lineupOf(entry, profileId) : [],
+    seasonUrl: link?.lineage?.slug && link?.season?.season_slug ? seriesAddress(link.lineage, link.season) : "",
+    detailUrl: `/references/${item.id}`,
+    organizerUrl: organizerUrl(item),
   };
 }
 

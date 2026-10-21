@@ -130,7 +130,7 @@ test("organizerUrl: Turnierseite, sonst Ergebnis, sonst Bracket", () => {
   expect(organizerUrl({})).toBe("");
 });
 
-test("detailsOf: langer Titel nur, wenn er vom kurzen abweicht; Aufstellung nur im Team; Saison-Link nur mit Saison", () => {
+test("detailsOf: langer Titel nur, wenn er vom kurzen abweicht; Aufstellung nur im Team; Saison-Link nur mit Saison; Details immer", () => {
   const item = { ...ref("a", "2025-01-01", 6), display_title: "SEASON #3 POWERED BY NORDLICHT®", organizer: "NSDL", league: "Newcomer League I", season: "Season 3", format: "HC", external_url: "https://a.example" };
   const link = { lineage: { slug: "nsdl-sd" }, season: { season: "Season 3", tier: "Newcomer League I", season_slug: "s3-newcomer" } };
   const details = detailsOf(item, "p-nova", link);
@@ -138,14 +138,15 @@ test("detailsOf: langer Titel nur, wenn er vom kurzen abweicht; Aufstellung nur 
   expect(details.tags).toEqual(["HC"]);
   expect(details.lineup.map((person) => person.name)).toEqual(["NovaKessel", "KaiFunke"]);
   expect(details.seasonUrl).toBe("/references/series/nsdl-sd/s3-newcomer");
+  expect(details.detailUrl).toBe("/references/a");
   expect(details.organizerUrl).toBe("https://a.example");
-  expect(details.empty).toBe(false);
 
+  // Bericht, Partner und Ort stehen auf der Detailseite - der Link dorthin fehlt nie.
   const plain = detailsOf({ ...ref("b", "2025-01-01", 1, { entry: { kind: "solo", lineup_members: [NOVA] } }), display_title: "Autumn Cup" }, "p-nova", null);
   expect(plain.fullTitle).toBe("");
   expect(plain.lineup).toEqual([]);
   expect(plain.seasonUrl).toBe("");
-  expect(plain.empty).toBe(true);
+  expect(plain.detailUrl).toBe("/references/b");
 });
 
 // ---------------------------------------------------------------- Liga-Weg der Person

@@ -14,7 +14,8 @@ import "@/components/tls/references/references.css";
 // Teilnahmen, Spiele, „seit“), darunter der Liga-Weg der Person je Spur (nur mit verknüpfter Saison) und die Chronik je
 // Jahr als kompakte Liste. Jede Zeile zeigt den eigenen Platz, den kurzen Titel (der lange im Tooltip und in den
 // Details), Spiel, Team mit „von N Teams“ und Datum; aufgeklappt Format, Aufstellung mit der Person hervorgehoben und
-// die Links. Es steht immer nur eine Zeile offen, zu Beginn die neueste. Die Logik steht in lib/memberReferences.js.
+// die Links „Saison ansehen“, „Details“ (Bericht, Partner, Ort) und „Beim Veranstalter“. Es steht immer nur eine Zeile
+// offen, zu Beginn die neueste. Die Logik steht in lib/memberReferences.js.
 
 const CARD = "min-w-0 bg-surface-1 border border-white/[0.09] rounded-[10px] px-5 py-[18px] md:px-6 md:py-[22px]";
 
@@ -39,13 +40,11 @@ export function MemberReferences({ profile }) {
   const linked = useMemo(() => linkedSeasons(lineages), [lineages]);
   const paths = useMemo(() => memberPaths(lineages, references), [lineages, references]);
   const groups = useMemo(() => timelineGroups(references), [references]);
-  // `undefined`: noch nichts gewählt - offen steht die neueste Zeile mit Details; `null`: alle zu.
+  // `undefined`: noch nichts gewählt - offen steht die neueste Zeile; `null`: alle zu.
   const [chosen, setChosen] = useState(undefined);
   if (!references.length) return null;
 
-  const detailsById = new Map(references.map((item) => [item.id, detailsOf(item, profile.id, linked.get(item.id))]));
-  const newest = groups.flatMap((group) => group.items).find((item) => !detailsById.get(item.id).empty);
-  const openId = chosen === undefined ? newest?.id || null : chosen;
+  const openId = chosen === undefined ? groups[0]?.items[0]?.id || null : chosen;
   const medals = profileMedals(profile.reference_stats);
   const best = medals.length ? null : bestResult(references);
   const facts = profileFacts(references);
@@ -105,7 +104,7 @@ export function MemberReferences({ profile }) {
                   key={item.id}
                   item={item}
                   link={linked.get(item.id)}
-                  details={detailsById.get(item.id)}
+                  profileId={profile.id}
                   open={openId === item.id}
                   onToggle={() => setChosen(openId === item.id ? null : item.id)}
                 />
@@ -186,7 +185,7 @@ function MemberPath({ path }) {
   );
 }
 
-function ChronicleItem({ item, link, details, open, onToggle }) {
+function ChronicleItem({ item, link, profileId, open, onToggle }) {
   const entry = ownEntry(item);
   const placement = Number(entry?.placement) || null;
   const title = shortTitle(item, link);
@@ -196,40 +195,29 @@ function ChronicleItem({ item, link, details, open, onToggle }) {
   const game = gameTitle(item);
   const date = formatDate(item.start_date) || formatDate(item.end_date);
   const panelId = `member-reference-details-${item.id}`;
-  const expandable = !details.empty;
-  const row = "w-full flex items-start sm:items-center sm:flex-wrap gap-3 sm:gap-x-5 sm:gap-y-2.5 py-3.5 sm:py-4 sm:px-2 text-left text-white";
-  const content = (
-    <>
-      <PlaceRing placement={placement} />
-      <span className="flex-1 sm:flex-[1_1_300px] min-w-0 flex flex-col gap-0.5">
-        <span data-testid="member-reference-title" title={full !== title ? full : undefined} className="font-bold text-base sm:text-[17px] leading-[1.3] break-words [overflow-wrap:anywhere]">{title}</span>
-        <span className="sm:hidden text-[13px] text-zinc-400 break-words">{[game, date].filter(Boolean).join(" · ")}</span>
-        <span className="hidden sm:block text-sm text-zinc-400 break-words">{game}</span>
-        <span className="sm:hidden text-[13px] text-zinc-300 break-words [overflow-wrap:anywhere]">{[team, size].filter(Boolean).join(" · ")}</span>
-      </span>
-      <span className="hidden sm:flex sm:flex-[1_1_220px] min-w-0 flex-col gap-0.5">
-        <span className="text-sm text-zinc-200 break-words [overflow-wrap:anywhere]">{team}</span>
-        {size && <span className="text-[13px] text-quiet">{size}</span>}
-      </span>
-      <span className="hidden sm:block sm:flex-[0_0_96px] text-sm text-quiet tabular-nums">{date}</span>
-      {expandable ? <Chevron down className="tls-ref-chev mt-[11px] sm:mt-0" /> : <span className="w-[18px] shrink-0" aria-hidden="true" />}
-    </>
-  );
   return (
     <li className="border-b border-white/[0.07]" data-testid={`member-reference-${item.id}`}>
-      {expandable ? (
-        <button type="button" onClick={onToggle} aria-expanded={open} aria-controls={panelId} data-testid={`member-reference-row-${item.id}`} className={`tls-ref-row ${row} bg-transparent border-0 cursor-pointer`}>
-          {content}
-        </button>
-      ) : (
-        <div className={row} data-testid={`member-reference-row-${item.id}`}>{content}</div>
-      )}
-      {expandable && open && <Details id={panelId} details={details} />}
+      <button type="button" onClick={onToggle} aria-expanded={open} aria-controls={panelId} data-testid={`member-reference-row-${item.id}`} className="tls-ref-row w-full flex items-start sm:items-center sm:flex-wrap gap-3 sm:gap-x-5 sm:gap-y-2.5 py-3.5 sm:py-4 sm:px-2 text-left text-white bg-transparent border-0 cursor-pointer">
+        <PlaceRing placement={placement} />
+        <span className="flex-1 sm:flex-[1_1_300px] min-w-0 flex flex-col gap-0.5">
+          <span data-testid="member-reference-title" title={full !== title ? full : undefined} className="font-bold text-base sm:text-[17px] leading-[1.3] break-words [overflow-wrap:anywhere]">{title}</span>
+          <span className="sm:hidden text-[13px] text-zinc-400 break-words">{[game, date].filter(Boolean).join(" · ")}</span>
+          <span className="hidden sm:block text-sm text-zinc-400 break-words">{game}</span>
+          <span className="sm:hidden text-[13px] text-zinc-300 break-words [overflow-wrap:anywhere]">{[team, size].filter(Boolean).join(" · ")}</span>
+        </span>
+        <span className="hidden sm:flex sm:flex-[1_1_220px] min-w-0 flex-col gap-0.5">
+          <span className="text-sm text-zinc-200 break-words [overflow-wrap:anywhere]">{team}</span>
+          {size && <span className="text-[13px] text-quiet">{size}</span>}
+        </span>
+        <span className="hidden sm:block sm:flex-[0_0_96px] text-sm text-quiet tabular-nums">{date}</span>
+        <Chevron down className="tls-ref-chev mt-[11px] sm:mt-0" />
+      </button>
+      {open && <Details id={panelId} itemId={item.id} details={detailsOf(item, profileId, link)} />}
     </li>
   );
 }
 
-function Details({ id, details }) {
+function Details({ id, itemId, details }) {
   const blocks = [];
   if (details.fullTitle) {
     blocks.push(<p key="title" className="m-0 text-sm text-zinc-300 break-words [overflow-wrap:anywhere]">{details.fullTitle}</p>);
@@ -247,14 +235,15 @@ function Details({ id, details }) {
       </div>,
     );
   }
-  if (details.seasonUrl || details.organizerUrl) {
-    blocks.push(
-      <div key="links" className="flex flex-wrap gap-2.5">
-        {details.seasonUrl && <Link to={details.seasonUrl} className="tls-btn tls-btn--primary inline-flex items-center min-h-[40px] px-3.5 rounded text-sm font-bold no-underline">Saison ansehen</Link>}
-        {details.organizerUrl && <a href={details.organizerUrl} target="_blank" rel="noreferrer" className="tls-btn tls-btn--quiet inline-flex items-center min-h-[40px] px-3.5 rounded text-sm font-bold no-underline">Beim Veranstalter</a>}
-      </div>,
-    );
-  }
+  // Links: Saison ansehen (nur mit Saison), Details zur Referenz (Bericht, Partner, Ort), Beim Veranstalter.
+  const button = "tls-btn inline-flex items-center min-h-[40px] px-3.5 rounded text-sm font-bold no-underline";
+  blocks.push(
+    <div key="links" className="flex flex-wrap gap-2.5" data-testid={`member-reference-links-${itemId}`}>
+      {details.seasonUrl && <Link to={details.seasonUrl} className={`${button} tls-btn--primary`}>Saison ansehen</Link>}
+      <Link to={details.detailUrl} className={`${button} tls-btn--quiet`}>Details</Link>
+      {details.organizerUrl && <a href={details.organizerUrl} target="_blank" rel="noreferrer" className={`${button} tls-btn--quiet`}>Beim Veranstalter</a>}
+    </div>,
+  );
   return (
     <div id={id} data-testid={id} className="tls-ref-open pl-[52px] sm:pl-[72px] pr-2 pt-1 pb-5 flex flex-col gap-3.5">
       {blocks.map((block, index) => <div key={block.key} style={{ "--tls-ref-i": index }} className="min-w-0">{block}</div>)}

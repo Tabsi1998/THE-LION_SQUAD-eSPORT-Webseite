@@ -172,9 +172,12 @@ test("Details klappen auf: Format, Aufstellung mit der Person hervorgehoben, Bei
   expect(people[1]).toHaveAttribute("data-self", "true");
   expect(people[0]).toHaveAttribute("data-self", "false");
   expect(people[0]).toHaveAttribute("href", "/members/benny");
-  expect(within(details).getByRole("link", { name: "Beim Veranstalter" })).toHaveAttribute("href", "https://cup.example/winter");
-  // Ohne Saison kein „Saison ansehen“, ohne Daten kein „X von Y Spielen“.
-  expect(within(details).queryByRole("link", { name: "Saison ansehen" })).toBeNull();
+  // Links: Details (Bericht, Partner, Ort auf der Detailseite), dann Beim Veranstalter; ohne Saison kein „Saison ansehen“.
+  const links = within(screen.getByTestId("member-reference-links-r1")).getAllByRole("link");
+  expect(links.map((link) => link.textContent)).toEqual(["Details", "Beim Veranstalter"]);
+  expect(links[0]).toHaveAttribute("href", "/references/r1");
+  expect(links[1]).toHaveAttribute("href", "https://cup.example/winter");
+  // Ohne Daten kein „X von Y Spielen“.
   expect(details).not.toHaveTextContent(/von \d+ Spielen/);
 
   fireEvent.click(team);
@@ -182,15 +185,15 @@ test("Details klappen auf: Format, Aufstellung mit der Person hervorgehoben, Bei
   expect(screen.queryByTestId("member-reference-details-r1")).toBeNull();
 });
 
-test("ohne Details klappt nichts auf: die Zeile bleibt eine einfache Zeile ohne Pfeil", async () => {
+test("auch ohne weitere Angaben klappt jede Zeile auf - mindestens mit „Details“ zur Referenz", async () => {
   const bare = { ...SOLO_CUP, id: "r9", result_url: null, start_date: "2026-03-01" };
   profileData = { ...PODIUM_PROFILE, references: [withOwn(bare), ...PODIUM_PROFILE.references] };
   renderProfile();
   const row = await screen.findByTestId("member-reference-row-r9");
-  expect(row.tagName).not.toBe("BUTTON");
-  expect(row).not.toHaveAttribute("aria-expanded");
-  // Offen steht dann die neueste Zeile mit Details.
-  expect(screen.getByTestId("member-reference-row-r2")).toHaveAttribute("aria-expanded", "true");
+  expect(row.tagName).toBe("BUTTON");
+  expect(row).toHaveAttribute("aria-expanded", "true");
+  const links = within(screen.getByTestId("member-reference-links-r9")).getAllByRole("link");
+  expect(links.map((link) => [link.textContent, link.getAttribute("href")])).toEqual([["Details", "/references/r9"]]);
 });
 
 test("der lange Veranstalter-Titel steht in den Details", async () => {
@@ -203,6 +206,7 @@ test("der lange Veranstalter-Titel steht in den Details", async () => {
 
 test("mit Saison: Liga-Weg der Person mit ihrem Platz und Vermerk, Link zur Serie, in den Details „Saison ansehen“", async () => {
   lineageData = LINEAGES;
+  profileData = { ...PODIUM_PROFILE, references: PODIUM_PROFILE.references.map((item) => (item.id === "r3" ? { ...item, external_url: "https://psdl.example/s3" } : item)) };
   renderProfile();
   const path = await screen.findByTestId("member-path-psdl");
   expect(apiMock.get).toHaveBeenCalledWith("/reference-series/public/lineages");
@@ -213,8 +217,13 @@ test("mit Saison: Liga-Weg der Person mit ihrem Platz und Vermerk, Link zur Seri
   expect(within(path).getByRole("link", { name: "Zur Serie" })).toHaveAttribute("href", "/references/series/psdl/s4-league-a");
 
   fireEvent.click(screen.getByTestId("member-reference-row-r3"));
-  const details = screen.getByTestId("member-reference-details-r3");
-  expect(within(details).getByRole("link", { name: "Saison ansehen" })).toHaveAttribute("href", "/references/series/psdl/s3-newcomer");
+  // Reihenfolge: Saison ansehen, Details, Beim Veranstalter.
+  const links = within(screen.getByTestId("member-reference-links-r3")).getAllByRole("link");
+  expect(links.map((link) => [link.textContent, link.getAttribute("href")])).toEqual([
+    ["Saison ansehen", "/references/series/psdl/s3-newcomer"],
+    ["Details", "/references/r3"],
+    ["Beim Veranstalter", "https://psdl.example/s3"],
+  ]);
 });
 
 test("ohne verknüpfte Saison kein Liga-Weg; fällt der Abruf aus, bleibt die Liste", async () => {
