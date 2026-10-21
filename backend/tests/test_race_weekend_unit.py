@@ -407,6 +407,39 @@ def test_without_a_qualifying_a_manual_pole_mark_in_the_race_stays():
     assert race_weekend.quali_pole({}, _rounds(("r", "R1", None, True)), race, {"q": quali}) is None
 
 
+NO_VALID_PLACE = "Kein gültiger Platz im Qualifying – Pole-Marke entfernt"
+
+
+def test_a_qualifying_without_a_valid_place_has_no_pole_and_says_so():
+    # Codex Runde 3 (#1930): Alle Plätze ungültig (DNS/DSQ) - keine Pole; eine Marke fällt mit Hinweis weg, nicht still.
+    rows = [{"index": 0, "participant_id": "a", "place": 1, "marks": ["dsq", "pole"]},
+            {"index": 1, "participant_id": "b", "place": 2, "marks": ["dns"]}]
+    assert race_weekend.pole_holder(rows) is None
+    assert race_weekend.mark_pole(rows) == [{"code": "pole_moved", "message": NO_VALID_PLACE, "rows": [0]}]
+    assert [row["marks"] for row in rows] == [["dsq"], ["dns"]]
+    assert race_weekend.mark_pole(rows) == []
+
+
+def test_a_race_with_a_qualifying_without_a_valid_place_gets_no_pole():
+    # Codex Runde 3 (#1930): Die Pole-Marke von Hand bleibt nur im Rennen ohne Qualifying. Gibt es ein Qualifying, aber
+    # keinen gültigen Platz, hat niemand die Pole - die Marke im Rennen fällt weg und bringt keinen Bonus.
+    rounds = _rounds(("q", "R1", "Qualifying", False), ("r", "R1", "Rennen", True))
+    sheets = {"q": _sheet(("a", 1, {"marks": ["dns"]}), ("b", 2, {"marks": ["dsq"]})),
+              "r": _sheet(("a", 1, {}), ("b", 2, {"marks": ["pole"]}))}
+    snapshots = race_weekend.standings(rules={"points_by_place": [25, 18], "bonuses": {"pole": {"points": 3}}},
+                                       rounds=rounds, sheets=sheets, participants=PEOPLE)
+    results = _results([snap for snap in snapshots if snap["scope"] == "drivers"][-1])
+    assert [pid for pid in "ab" if "pole" in results[pid]["r"]["marks"]] == []
+    assert results["b"]["r"]["points"] == 18
+    # Im Blatt des Rennens: die Marke fällt beim Prüfen weg, mit Hinweis an ihrer Zeile.
+    pole = race_weekend.quali_pole({}, rounds, rounds[1], sheets)
+    assert pole is not None and pole[0] is None
+    race = [{"index": 0, "participant_id": "a", "place": 1, "marks": []},
+            {"index": 1, "participant_id": "b", "place": 2, "marks": ["pole"]}]
+    assert race_weekend.clear_race_pole(race, pole) == [{"code": "pole_moved", "message": NO_VALID_PLACE, "rows": [1]}]
+    assert [row["marks"] for row in race] == [[], []]
+
+
 def _drivers(snapshots):
     return {row["participant_id"]: row for row in [snap for snap in snapshots if snap["scope"] == "drivers"][-1]["rows"]}
 

@@ -281,6 +281,35 @@ async def test_a_race_without_a_qualifying_keeps_its_manual_pole_mark(flow):
 
 
 @pytest.mark.asyncio
+async def test_a_qualifying_without_a_valid_place_leaves_the_race_without_a_pole(flow):
+    # Codex Runde 3 (#1930): Ein Qualifying, in dem alle ungültig sind (DNS/DSQ), hat keine Pole - die Marke fällt im
+    # Qualifying und im Rennen mit Hinweis weg, und niemand bekommt den Pole-Bonus.
+    no_place = "Kein gültiger Platz im Qualifying – Pole-Marke entfernt"
+    lineage, series = await _series(flow, {"formats": [{"sessions": [{"label": "Qualifying"}, {"label": "Rennen"}]}]},
+                                    bonuses={"pole": {"points": 1}})
+    quali, race = (await _paste(flow, series, count=1))["rounds"]
+    names = _people(2)
+    quali_rows = [{"place": 1, "name": names[0], "marks": ["dns", "pole"]}, {"place": 2, "name": names[1], "marks": ["dsq"]}]
+    url = f"{ADMIN}/series/{series['id']}/rounds/{quali['id']}/results"
+    preview = (await flow.post(f"{url}/preview", json={"rows": quali_rows})).json()
+    assert _moved(preview) == [{"code": "pole_moved", "message": no_place, "rows": [0]}]
+    await _publish(flow, series, quali["id"], quali_rows)
+
+    race_rows = [{"place": 1, "name": names[0]}, {"place": 2, "name": names[1], "marks": ["pole"]}]
+    race_url = f"{ADMIN}/series/{series['id']}/rounds/{race['id']}/results"
+    preview = (await flow.post(f"{race_url}/preview", json={"rows": race_rows})).json()
+    assert _moved(preview) == [{"code": "pole_moved", "message": no_place, "rows": [1]}]
+    assert [row["marks"] for row in preview["rows"]] == [[], []]
+    await _publish(flow, series, race["id"], race_rows)
+    flow.act_as(None)
+    page = (await flow.get(f"{PUBLIC}/{lineage['slug']}/{series['season_slug']}")).json()
+    rows = {row["name"]: row for row in page["standings"]["rows"]}
+    assert [name for name in names if "pole" in rows[name]["results"][0]["marks"]] == []
+    assert rows[names[1]]["points"] == 18
+    assert page["racing"]["qualifying"][0]["pole"] is None
+
+
+@pytest.mark.asyncio
 async def test_a_sprint_counts_with_its_own_points(flow):
     lineage, series = await _series(flow, QUALI_SPRINT_RACE)
     rounds = (await _paste(flow, series, count=1))["rounds"]
