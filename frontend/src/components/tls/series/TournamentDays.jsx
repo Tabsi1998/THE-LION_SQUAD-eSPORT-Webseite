@@ -16,9 +16,11 @@ const CHIP = "min-h-[36px] px-3 rounded-md border text-[12px] font-bold uppercas
 const CHIP_ON = "border-[#29B6E8]/70 bg-[#29B6E8]/10 text-[#29B6E8]";
 const CHIP_OFF = "border-white/15 text-white/65 hover:text-white hover:border-white/30";
 
-function RoundCell({ entry, index, scheme }) {
+/** Punkte einer Runde mit Platzfarbe. Den Platz aus den Punkten ableiten (`infer`) geht nur bei Einzelspielern - im
+ * Double Up gelten für ein Team andere Punkte, dort zählt nur ein eingetragener Platz. */
+function RoundCell({ entry, index, scheme, infer = true }) {
   if (!entry) return <span className="text-white/20" aria-label={`R${index + 1}: nicht gespielt`}>–</span>;
-  const place = roundPlace(entry, scheme);
+  const place = infer ? roundPlace(entry, scheme) : entry.place || null;
   const label = `R${index + 1}: ${formatNumber(entry.points)} ${Number(entry.points) === 1 ? "Punkt" : "Punkte"}${place ? `, Platz ${place}` : ""}${entry.lobby ? `, Lobby ${entry.lobby}` : ""}`;
   return (
     <span className="tls-day-cell" data-tone={placeTone(place) || undefined} title={label} data-testid="series-day-round">
@@ -90,7 +92,7 @@ function DayTableView({ table, count, scheme, bonuses, onOpen }) {
                   <Badges item={item} bonuses={bonuses} />
                 </th>
                 {columns.map((index) => (
-                  <td key={index} className="px-1.5 py-2 text-center align-middle text-white/80"><RoundCell entry={item.day_rounds?.[index]} index={index} scheme={scheme} /></td>
+                  <td key={index} className="px-1.5 py-2 text-center align-middle text-white/80"><RoundCell entry={item.day_rounds?.[index]} index={index} scheme={scheme} infer={!item.partner} /></td>
                 ))}
                 <td className="px-2 py-2 text-right align-middle font-display text-base font-bold text-white" data-testid="series-day-total">{item.day_points ?? "–"}</td>
                 <td className="pr-4 pl-2 py-2 text-right align-middle text-white/80"><SeasonPoints item={item} /></td>
@@ -115,7 +117,7 @@ function DayTableView({ table, count, scheme, bonuses, onOpen }) {
             </div>
             {columns.length > 0 && (
               <div className="mt-1.5 pl-10 flex flex-wrap gap-1 text-[12px]">
-                {columns.map((index) => <RoundCell key={index} entry={item.day_rounds?.[index]} index={index} scheme={scheme} />)}
+                {columns.map((index) => <RoundCell key={index} entry={item.day_rounds?.[index]} index={index} scheme={scheme} infer={!item.partner} />)}
               </div>
             )}
           </li>
@@ -187,13 +189,13 @@ function PlayerDetail({ rows, row, days, scheme, bonuses, topN, onPick, detailRe
         </span>
       </div>
       {/* eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- eine scrollbare Fläche muss per Tastatur erreichbar sein (axe: scrollable-region-focusable) */}
-      <div role="region" aria-label={`Turniertage von ${nameOf(row)}`} tabIndex={0} className="mt-3 overflow-x-auto overscroll-x-contain focus:outline-none focus-visible:ring-2 focus-visible:ring-[#29B6E8] rounded-sm">
+      <div role="region" aria-label={`Turniertage von ${nameOf(row)}`} tabIndex={0} className="relative mt-3 overflow-x-auto overscroll-x-contain focus:outline-none focus-visible:ring-2 focus-visible:ring-[#29B6E8] rounded-sm">
         <table className="w-full text-sm tabular-nums">
           <thead className="text-[11px] uppercase tracking-[0.12em] text-white/50">
             <tr className="border-b border-white/10">
               <th scope="col" className="text-left pr-2 py-2 font-semibold">Termin</th>
               <th scope="col" className="px-2 py-2 text-right font-semibold">Platz</th>
-              {Array.from({ length: count }, (_, index) => <th key={index} scope="col" className="px-1 py-2 text-center font-semibold">R{index + 1}</th>)}
+              {Array.from({ length: count }, (_, index) => <th key={index} scope="col" className="hidden sm:table-cell px-1 py-2 text-center font-semibold">R{index + 1}</th>)}
               <th scope="col" className="px-2 py-2 text-right font-semibold">GES P</th>
               <th scope="col" className="px-2 py-2 text-right font-semibold">Pkt</th>
             </tr>
@@ -205,18 +207,27 @@ function PlayerDetail({ rows, row, days, scheme, bonuses, topN, onPick, detailRe
                   <span className="font-semibold text-white">{roundLabel(round)}</span>
                   {result?.partner && <span className="block text-[11px] text-white/50">Double Up mit {nameOf(result.partner)}</span>}
                   {result && <Badges item={result} bonuses={bonuses} />}
+                  {/* Am Handy stehen die Runden unter dem Termin statt in eigenen Spalten. */}
+                  {result && count > 0 && (
+                    <span className="sm:hidden mt-1 flex flex-wrap gap-1 text-[12px]" aria-hidden="true">
+                      {Array.from({ length: count }, (_, index) => <RoundCell key={index} entry={result.day_rounds?.[index]} index={index} scheme={scheme} infer={!result.partner} />)}
+                    </span>
+                  )}
                 </th>
                 {result ? (
                   <>
                     <td className="px-2 py-2 text-right font-display font-bold text-white">{result.place ?? "–"}</td>
                     {Array.from({ length: count }, (_, index) => (
-                      <td key={index} className="px-1 py-2 text-center"><RoundCell entry={result.day_rounds?.[index]} index={index} scheme={scheme} /></td>
+                      <td key={index} className="hidden sm:table-cell px-1 py-2 text-center"><RoundCell entry={result.day_rounds?.[index]} index={index} scheme={scheme} infer={!result.partner} /></td>
                     ))}
                     <td className="px-2 py-2 text-right font-bold text-white">{result.day_points ?? "–"}</td>
                     <td className="px-2 py-2 text-right text-white/80"><SeasonPoints item={result} />{result.bonus ? <span className="text-[11px] text-[var(--tls-honor)]"> +{formatNumber(result.bonus)}</span> : null}</td>
                   </>
                 ) : (
-                  <td colSpan={count + 3} className="px-2 py-2 text-white/35">nicht dabei</td>
+                  <>
+                    <td colSpan={3} className="sm:hidden px-2 py-2 text-white/35">nicht dabei</td>
+                    <td colSpan={count + 3} className="hidden sm:table-cell px-2 py-2 text-white/35">nicht dabei</td>
+                  </>
                 )}
               </tr>
             ))}

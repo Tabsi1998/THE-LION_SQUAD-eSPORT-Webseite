@@ -70,6 +70,16 @@ test("gespeichertes Blatt zurück ins Formular: Runden, GES P, Partner mit Namen
   expect(usesDayRounds({ day_rounds: { count: 0 } }, [emptyRow()])).toBe(false);
 });
 
+test("gespeicherter Platz aus der Tagessumme bleibt im Formular leer und folgt den Runden, ein Platz von Hand bleibt", () => {
+  const form = sheetToForm({ rows: [
+    { participant_id: "p1", place: 1, points_source: "scheme", marks: [], day_rounds: [{ place: 1 }, { points: 8 }] },
+    { participant_id: "p2", place: 2, points_source: "scheme", marks: [], day_rounds: [{ points: 7 }, { points: 7 }] },
+    { participant_id: "p3", place: 2, points_source: "scheme", marks: [], day_rounds: [{ points: 1 }] },
+  ] }, [{ id: "p1", name: "Ada" }, { id: "p2", name: "Bea" }, { id: "p3", name: "Cem" }], { rules: RULES });
+  expect(form.rows.map((row) => row.place)).toEqual(["", "", "2"]);
+  expect(Object.values(autoPlaces(form.rows, { scheme: SCHEME }))).toEqual([1, 2, 3]);
+});
+
 test("ungültige Runden halten das Blatt auf", () => {
   expect(dayFieldErrors({ rounds: [emptyRound({ points: "acht" }), emptyRound({ place: "0" }), emptyRound({ place: "101" })], day_points: "x" })).toEqual({
     round_0: "R1: Punkte als Zahl.", round_place_1: "R2: Platz als ganze Zahl von 1 bis 100.", round_place_2: "R3: Platz als ganze Zahl von 1 bis 100.", day_points: "GES P als Zahl.",

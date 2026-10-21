@@ -57,7 +57,8 @@ export function lobbies(table, index, scheme = []) {
     const entry = item.day_rounds?.[index];
     if (!entry || !entry.lobby) continue;
     if (!groups.has(entry.lobby)) groups.set(entry.lobby, []);
-    groups.get(entry.lobby).push({ item, entry, place: roundPlace(entry, scheme) });
+    // Im Double Up gelten für ein Team andere Punkte - dort zählt nur ein eingetragener Platz.
+    groups.get(entry.lobby).push({ item, entry, place: item.partner ? entry.place || null : roundPlace(entry, scheme) });
   }
   if (!groups.size) return null;
   return [...groups.entries()]

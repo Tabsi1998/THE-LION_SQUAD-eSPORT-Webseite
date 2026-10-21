@@ -333,7 +333,7 @@ export function ResultEntrySheet({ series, round, onClose, onSaved }) {
       setStale(false);
       const sheet = result.sheet;
       const source = result.target === "pending_draft" && sheet?.pending_draft ? sheet.pending_draft : sheet;
-      setForm(sheetToForm(source, result.participants, { kind: result.series?.kind, teamName: result.series?.team_name, opponent: result.round?.opponent }));
+      setForm(sheetToForm(source, result.participants, { kind: result.series?.kind, teamName: result.series?.team_name, opponent: result.round?.opponent, rules: result.series?.rules }));
     } catch (err) {
       toast.error(formatApiError(err.response?.data?.detail) || "Ergebnis nicht geladen.");
       onClose();

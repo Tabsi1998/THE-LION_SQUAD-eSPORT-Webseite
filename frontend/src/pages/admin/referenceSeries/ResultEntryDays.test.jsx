@@ -60,6 +60,24 @@ test("Rundenmatrix einfügen: R1–R5 je Zeile, GES P bestimmt den Platz, Gleich
   await waitFor(() => expect(apiMock.post.mock.calls.at(-1)[1].rows[3].marks).toEqual(["left"]));
 });
 
+test("gespeicherte Runden nur mit Platz: die Punkte daraus stehen als Vorschlag im Feld, Platz und Lobby unter „Mehr“", async () => {
+  apiMock.get.mockResolvedValue({ data: {
+    round: ROUND, series: { id: "serie-1", kind: "series", rules: RULES }, access: { role: "board", can_publish: true }, version: 1, target: "sheet",
+    participants: [{ id: "p1", name: "Ada Ausgedacht" }],
+    sheet: { status: "published", version: 1, rows: [{ participant_id: "p1", place: 1, points_source: "scheme", marks: [], day_rounds: [{ place: 2, lobby: "1" }, { points: 8 }, { place: 7, lobby: "2" }] }] },
+  } });
+  render(<ResultEntrySheet series={SERIES} round={ROUND} onClose={() => {}} onSaved={() => {}} />);
+  const sheet = await screen.findByTestId("result-sheet");
+  await within(sheet).findAllByTestId("result-row");
+  const inputs = within(sheet).getAllByTestId("result-row-round");
+  expect(inputs.slice(0, 3).map((input) => [input.value, input.placeholder])).toEqual([["", "7"], ["8", ""], ["", "2"]]);
+  expect(inputs[0]).toHaveAttribute("title", "Platz 2 in der Lobby 1 → 7 Punkte");
+  expect(within(sheet).getByTestId("result-row-day-points")).toHaveAttribute("placeholder", "17");
+  fireEvent.click(within(sheet).getByTestId("result-row-more"));
+  expect(within(sheet).getAllByTestId("result-row-round-place").slice(0, 3).map((input) => input.value)).toEqual(["2", "", "7"]);
+  expect(within(sheet).getAllByTestId("result-row-round-lobby").slice(0, 3).map((input) => input.value)).toEqual(["1", "", "2"]);
+});
+
 test("Double Up: Partner je Zeile, ein Paar teilt den Platz, das Blatt sagt es dem Server", async () => {
   render(<ResultEntrySheet series={SERIES} round={ROUND} onClose={() => {}} onSaved={() => {}} />);
   const sheet = await screen.findByTestId("result-sheet");

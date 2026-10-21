@@ -1,6 +1,6 @@
 import { INPUT_CLASS } from "@/components/tls/FormFields";
 import { formatPoints } from "@/lib/referenceResults";
-import { emptyRound, roundsTotal } from "@/lib/tournamentDays";
+import { emptyRound, roundPoints, roundsTotal } from "@/lib/tournamentDays";
 
 // Ergebnisblatt eines Turniertags (#1961): je Zeile die Runden R1…Rn (Punkte wie beim Veranstalter gelesen - Bots in
 // einer Lobby verschieben sie, darum wird nichts aus der Reihenfolge der Menschen gerechnet), GES P mit der Summe als
@@ -36,11 +36,13 @@ export function DayRoundsLine({ row, number, count, scheme, doubleUp, invalid, o
       {Array.from({ length: count }, (_, index) => {
         const entry = row.rounds?.[index] || emptyRound();
         const bad = invalid?.[`round_${index}`];
+        // Nur ein Platz eingetragen: die Punkte daraus stehen blass als Vorschlag im Feld.
+        const fromPlace = entry.place && !String(entry.points).trim() ? roundPoints(entry, scheme) : null;
         return (
           <label key={index} className="block w-11">
             <span className={LABEL}>R{index + 1}</span>
-            <input aria-label={`Runde ${index + 1} Zeile ${number}`} inputMode="decimal" value={entry.points} placeholder={entry.place ? "P" : ""}
-              title={entry.place ? `Platz ${entry.place} in der Lobby` : "Punkte der Runde"}
+            <input aria-label={`Runde ${index + 1} Zeile ${number}`} inputMode="decimal" value={entry.points} placeholder={fromPlace === null ? "" : formatPoints(fromPlace)}
+              title={entry.place ? `Platz ${entry.place} in der Lobby${entry.lobby ? ` ${entry.lobby}` : ""}${fromPlace === null ? "" : ` → ${formatPoints(fromPlace)} Punkte`}` : "Punkte der Runde"}
               onChange={(event) => onChange(setRound(row, index, { points: event.target.value }))} data-testid="result-row-round"
               aria-invalid={bad ? true : undefined} className={`${SMALL_INPUT} !px-1 text-center tabular-nums ${bad ? INVALID : ""}`} />
           </label>

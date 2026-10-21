@@ -50,10 +50,18 @@ function participantName(participants, id) {
   return (participants || []).find((person) => person.id === id)?.name || "";
 }
 
-/** Ein gespeichertes Blatt (oder der Entwurf daneben) zurück ins Formular. */
-export function sheetToForm(content, participants = [], { kind, teamName, opponent } = {}) {
+/** Turniertag (#1961): ein gespeicherter Platz, der genau aus der Tagessumme kommt, bleibt im Formular leer - so folgt er
+ * weiter den Runden, wenn jemand sie ändert. Ein abweichender (von Hand eingetragener) Platz bleibt stehen. */
+function followDayPlaces(rows, rules, doubleUp) {
+  const derived = dayPlaces(rows, { scheme: schemeOf(rules), doubleUp });
+  if (!derived) return rows;
+  return rows.map((row) => (row.place && derived[row.key] !== null && String(derived[row.key]) === row.place ? { ...row, place: "" } : row));
+}
+
+/** Ein gespeichertes Blatt (oder der Entwurf daneben) zurück ins Formular. `rules` (der Saison): für Turniertage. */
+export function sheetToForm(content, participants = [], { kind, teamName, opponent, rules = {} } = {}) {
   const totals = content?.official_totals || {};
-  const rows = (content?.rows || []).map((row) => emptyRow({
+  const rows = followDayPlaces((content?.rows || []).map((row) => emptyRow({
     participant_id: row.participant_id || "",
     name: participantName(participants, row.participant_id),
     team: text(row.team),
@@ -76,7 +84,7 @@ export function sheetToForm(content, participants = [], { kind, teamName, oppone
     day_points: text(row.day_points),
     partner: participantName(participants, row.partner_id),
     bonus_keys: [...(row.bonus_keys || [])],
-  }));
+  })), rules, Boolean(content?.double_up));
   const people = (ids) => (ids || []).map((id) => ({ participant_id: id, name: participantName(participants, id) }));
   const matches = (content?.matches || []).map((match) => ({
     ...emptyMatch({ home: match.home, away: match.away }),

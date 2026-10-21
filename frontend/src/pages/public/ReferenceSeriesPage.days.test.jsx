@@ -34,7 +34,7 @@ const ROWS = [
   ] },
   { ...bea, rank: 2, points: 65, bonus_points: 3, tiebreak: "top_n", results: [
     { round_id: "t1", place: 2, points: 30, day_points: 30, day_rounds: [{ points: 7, place: 2, lobby: "A" }, { points: 5, lobby: "B" }, { points: 6 }, { points: 6 }, { points: 6 }], bonus: 3, bonus_keys: ["bingo"], counted: true },
-    { round_id: "t2", place: 1, points: 35, day_points: 20, day_rounds: same(4), partner: { name: null, name_hidden: true, club_member: false, profile_slug: null }, counted: true },
+    { round_id: "t2", place: 1, points: 35, day_points: 20, day_rounds: [{ points: 8 }, { points: 4 }, { points: 4 }, { points: 2 }, { points: 2 }], partner: { name: null, name_hidden: true, club_member: false, profile_slug: null }, counted: true },
   ] },
   { ...person("c", "Cem Muster"), rank: 3, points: 49, bonus_points: 0, tiebreak: null, results: [
     { round_id: "t1", place: 3, points: 26, day_points: 9, day_rounds: [{ points: 8, lobby: "B" }, { points: 1, lobby: "A" }], marks: ["left"], counted: true },
@@ -90,6 +90,8 @@ test("Tagesansicht: der letzte Turniertag zuerst, R1–R5 mit Summe, Double Up m
   const table = within(days).getByTestId("series-day-table");
   const rows = within(table).getAllByTestId("series-day-row");
   expect(rows.map((row) => within(row).getByTestId("series-day-total").textContent)).toEqual(["20", "20", "16", "16"]);
+  // Im Double Up keine Platzfarbe aus Team-Punkten.
+  expect(within(rows[0]).getAllByTestId("series-day-round").every((cell) => !cell.hasAttribute("data-tone"))).toBe(true);
   // Ein ausgeblendeter Name bleibt es auch als Partner.
   expect(within(rows[0]).getByTestId("series-day-partner")).toHaveTextContent("mit Name ausgeblendet");
   expect(within(rows[1]).getByText("Name ausgeblendet")).toBeInTheDocument();
@@ -144,6 +146,9 @@ test("Hilfen: Platz aus den Punkten nur eindeutig, Farben, Reihenfolge eines Tag
   expect(dayRounds(BODY.rounds, ROWS).map((round) => round.id)).toEqual(["t1", "t2"]);
   expect(dayTable(ROWS, "t2").map((item) => item.key)).toEqual(["b", "d", "a", "c"]);
   expect(lobbies(dayTable(ROWS, "t2"), 0, SCHEME)).toBeNull();
+  // Double Up: Team-Punkte sagen nichts über den Platz - nur ein eingetragener zählt.
+  const duo = [{ key: "x", partner: ada, day_rounds: [{ points: 8, lobby: "A" }] }, { key: "y", partner: ada, day_rounds: [{ points: 3, place: 2, lobby: "A" }] }];
+  expect(lobbies(duo, 0, SCHEME)[0].members.map((member) => [member.item.key, member.place])).toEqual([["y", 2], ["x", null]]);
   expect(playerDays(ROWS[0], dayRounds(BODY.rounds, ROWS))).toMatchObject({ played: 2, wins: 1, dayPoints: 56 });
   expect(tiebreakLabel({ tiebreakers: ["top_n"], tiebreak_top_n: 3 })).toBe("mehr Plätze unter den besten 3");
 });
