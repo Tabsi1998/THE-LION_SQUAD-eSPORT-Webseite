@@ -68,7 +68,9 @@ test("Gast: Login als Personen-Symbol mit Namen, der Knopf kurz „Beitreten“ 
   const register = screen.getByTestId("nav-register");
   expect(register.className).toMatch(/whitespace-nowrap/);
   expect(within(register).getByText("Mitglied werden").className).toMatch(/lg:hidden/);
-  expect(within(register).getByText("Beitreten").className).toMatch(/(^|\s)hidden(\s|$).*lg:inline.*min-\[1440px\]:hidden/);
+  const joinClasses = within(register).getByText("Beitreten").className.split(/\s+/);
+  expect(joinClasses).toEqual(expect.arrayContaining(["hidden", "min-[1440px]:hidden"]));
+  expect(joinClasses.some((name) => name.startsWith("lg:inline"))).toBe(true);
 });
 
 // Saison-Deko-Schalter (#1239): Gäste finden ihn am Handy unten im Menü (bis 1023 px gilt das Handy-Menü), am PC in der
