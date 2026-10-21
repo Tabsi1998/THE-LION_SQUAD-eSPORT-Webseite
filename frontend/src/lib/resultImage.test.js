@@ -56,6 +56,27 @@ test("ist die schnellste Runde unsicher, sind die Marken der Zeile gelb; ohne Ke
   expect([timeOnly[1].marks, timeOnly[1].ocr.uncertain]).toEqual([["fastest_lap"], ["start_number"]]);
 });
 
+test("Punkte aus dem Bild gehen als Punkte laut Veranstalter mit; die Art der Sitzung steht im Kopf", () => {
+  const rows = imageToRows({ ...RESULT, rows: [{ ...RESULT.rows[0], points: 25, color: "#e62832" }] }, PARTICIPANTS);
+  expect([rows[0].points, rows[0].color]).toEqual(["25", "#e62832"]);
+  const { payload } = formToPayload({ rows, matches: [], table: [], teamTotals: {}, note: "" });
+  expect([payload.rows[0].points, payload.rows[0].points_source]).toEqual([25, "organizer"]);
+  expect(imageHeader({ rows: [], track: { name: "Probering", uncertain: [] }, session: { name: "Qualifying", kind: "qualifying" } })).toEqual([
+    { key: "track", label: "Strecke", value: "Probering", uncertain: false },
+    { key: "session", label: "Art", value: "Qualifying", uncertain: false },
+  ]);
+});
+
+test("Pole aus dem Kopf des Bilds wird Marke an der Zeile; unsicherer Fahrer macht die Marken gelb", () => {
+  const rows = imageToRows({ ...RESULT, pole: { name: "Anna Probe", participant_id: "p1", time: "1:30.000", uncertain: [] } }, PARTICIPANTS);
+  expect([rows[0].marks, rows[0].ocr]).toEqual([["pole"], null]);
+  const unsure = imageToRows({ ...RESULT, pole: { name: "Anna Probe", participant_id: "p1", time: null, uncertain: ["name"] } }, PARTICIPANTS);
+  expect(unsure[0].ocr.uncertain).toEqual(["marks"]);
+  expect(imageHeader({ rows: [], pole: { name: "Anna Probe", time: "1:30.000", uncertain: [] } })).toEqual([
+    { key: "pole", label: "Pole", value: "Anna Probe · 1:30.000", uncertain: false },
+  ]);
+});
+
 test("ein nicht gelesener Platz ist immer gelb – die Reihenfolge, die das Blatt einsetzt, ist nur geschätzt", () => {
   const rows = imageToRows({ ...RESULT, rows: [
     { ...RESULT.rows[0], place: null, uncertain: [] },

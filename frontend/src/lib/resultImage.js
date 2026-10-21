@@ -10,12 +10,14 @@ import { emptyRow, matchParticipant } from "@/lib/referenceResults";
 import { cleanText } from "@/lib/resultPaste";
 
 export const IMAGE_TYPES = ["image/png", "image/jpeg", "image/webp"];
-// Felder, die das Blatt zeigt – nur sie können gelb werden. Startplatz, Zeit und Abstand liest der Server mit; sie
-// gehen mit, sobald das Blatt sie hat (#1927), und kommen dann hier dazu.
-export const SHOWN_FIELDS = ["place", "start_number", "name", "team", "marks"];
+// Felder, die das Blatt zeigt – nur sie können gelb werden.
+export const SHOWN_FIELDS = ["place", "start_number", "name", "team", "points", "marks"];
+// Startplatz, Zeit und Abstand liest der Server mit und sie gehen schon in die Zeile (`grid`, `time`, `gap`). Sobald das
+// Blatt sie zeigt (#1927/#1949), kommen sie in SHOWN_FIELDS – und ihre Eingabefelder bekommen `ocrMark` wie die übrigen.
+export const PENDING_FIELDS = ["grid", "time", "gap"];
 export const FIELD_LABELS = {
-  place: "Platz", start_number: "Startnummer", name: "Name", team: "Team", marks: "Marken", grid: "Startplatz",
-  time: "Zeit", gap: "Abstand",
+  place: "Platz", start_number: "Startnummer", name: "Name", team: "Team", points: "Punkte", marks: "Marken",
+  grid: "Startplatz", time: "Zeit", gap: "Abstand",
 };
 const OUT_MARKS = ["dnf", "dns", "dsq"];
 
@@ -52,11 +54,12 @@ function sameDriver(head, row) {
 }
 
 /**
- * Die gelesenen Zeilen als Formularzeilen. Die schnellste Runde wird zur Marke an der Zeile ihres Fahrers, der Fahrer
- * des Tages zum Feld `driver_of_the_day`. Ein Ausfall ohne Platz bleibt ohne Platz.
+ * Die gelesenen Zeilen als Formularzeilen. Schnellste Runde und Pole werden Marken an der Zeile ihres Fahrers, der
+ * Fahrer des Tages zum Feld `driver_of_the_day`. Ein Ausfall ohne Platz bleibt ohne Platz.
  */
 export function imageToRows(result, participants = []) {
   const fastest = result?.fastest_lap;
+  const pole = result?.pole;
   const dotd = result?.driver_of_the_day;
   return (result?.rows || []).map((row) => {
     const known = row.participant_id
@@ -67,10 +70,12 @@ export function imageToRows(result, participants = []) {
     // Ohne gelesenen Platz setzt das Blatt die Reihenfolge ein – das ist geschätzt und bleibt gelb, bis jemand prüft.
     // Ein Ausfall (DNF, DNS, DSQ) hat keinen Platz.
     if (!row.place && !marks.some((mark) => OUT_MARKS.includes(mark)) && !uncertain.includes("place")) uncertain.push("place");
-    if (sameDriver(fastest, row)) {
-      if (!marks.includes("fastest_lap")) marks.push("fastest_lap");
-      // Gelb nur, wenn unsicher ist, WER die schnellste Runde fuhr – eine unsichere Zeit ändert die Marke nicht.
-      if (fastest.uncertain?.includes("name")) uncertain.push("marks");
+    // Schnellste Runde und Pole werden Marken an der Zeile ihres Fahrers. Gelb nur, wenn unsicher ist, WER sie fuhr –
+    // eine unsichere Zeit ändert die Marke nicht.
+    for (const [head, mark] of [[fastest, "fastest_lap"], [pole, "pole"]]) {
+      if (!sameDriver(head, row)) continue;
+      if (!marks.includes(mark)) marks.push(mark);
+      if (head.uncertain?.includes("name")) uncertain.push("marks");
     }
     return emptyRow({
       participant_id: known?.id || "",
@@ -80,9 +85,12 @@ export function imageToRows(result, participants = []) {
       no_place: !row.place && marks.some((mark) => OUT_MARKS.includes(mark)),
       marks,
       start_number: row.start_number || "",
+      // Punkte aus dem Bild gelten als „laut Veranstalter“ und werden gegen den Schlüssel geprüft.
+      points: row.points === null || row.points === undefined ? "" : String(row.points),
       grid: row.grid === null || row.grid === undefined ? "" : String(row.grid),
       time: row.time || "",
       gap: row.gap || "",
+      color: row.color || "",
       driver_of_the_day: sameDriver(dotd, row),
       from_image: true,
       ocr: uncertain.length ? { uncertain: [...new Set(uncertain)], read: row.read || {} } : null,
@@ -138,9 +146,15 @@ export function uncertainText(row) {
 export function imageHeader(result) {
   const out = [];
   if (result?.track?.name) out.push({ key: "track", label: "Strecke", value: result.track.name, uncertain: Boolean(result.track.uncertain?.length) });
+  // Die Art ist nur ein Hinweis, bis es Läufe je Termin gibt (#1930).
+  if (result?.session?.name) out.push({ key: "session", label: "Art", value: result.session.name, uncertain: false });
   if (result?.fastest_lap?.name || result?.fastest_lap?.time) {
     const lap = result.fastest_lap;
     out.push({ key: "fastest_lap", label: "Schnellste Rennrunde", value: [lap.name, lap.time].filter(Boolean).join(" · "), uncertain: Boolean(lap.uncertain?.length) });
+  }
+  if (result?.pole?.name || result?.pole?.time) {
+    const pole = result.pole;
+    out.push({ key: "pole", label: "Pole", value: [pole.name, pole.time].filter(Boolean).join(" · "), uncertain: Boolean(pole.uncertain?.length) });
   }
   if (result?.driver_of_the_day?.name) {
     out.push({ key: "driver_of_the_day", label: "Fahrer des Tages", value: result.driver_of_the_day.name, uncertain: Boolean(result.driver_of_the_day.uncertain?.length) });

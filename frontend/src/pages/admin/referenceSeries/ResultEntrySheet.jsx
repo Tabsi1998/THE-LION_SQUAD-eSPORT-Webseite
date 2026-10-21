@@ -107,7 +107,7 @@ function ResultRow({ row, index, autoPlace, organizerMode, problems, info, inval
           onChange={(event) => onChange({ team: event.target.value })} data-testid="result-row-team" {...mark("team").props} className={`${SMALL_INPUT} ${mark("team").className} order-last col-start-2 col-end-6 sm:order-none sm:col-start-auto sm:col-end-auto`} />
         <input aria-label={`Punkte Zeile ${number}`} inputMode="decimal" value={row.points} placeholder="Pkt"
           title={organizerMode ? "Punkte laut Veranstalter" : "Leer: nach Schlüssel. Eingetragen: laut Veranstalter (wird geprüft)."}
-          onChange={(event) => onChange({ points: event.target.value })} data-testid="result-row-points" {...invalidProps(invalid, "points")} className={`${SMALL_INPUT} text-right tabular-nums ${invalid?.points ? INVALID : ""}`} />
+          onChange={(event) => onChange({ points: event.target.value })} data-testid="result-row-points" {...invalidProps(invalid, "points")} {...mark("points").props} className={`${SMALL_INPUT} text-right tabular-nums ${mark("points").className} ${invalid?.points ? INVALID : ""}`} />
         <button type="button" className={`${ICON_BUTTON} ${open ? "text-[#29B6E8]" : ""}`} onClick={() => setOpen((value) => !value)} aria-expanded={open} aria-label={`Mehr zu Zeile ${number}`} title="Marken, Strafpunkte, Startnummer, Startplatz, Zeit, Abstand" data-testid="result-row-more">
           <SlidersHorizontal className="w-4 h-4" />
         </button>
