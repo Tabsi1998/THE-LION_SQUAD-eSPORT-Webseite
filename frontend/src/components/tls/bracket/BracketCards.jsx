@@ -3,7 +3,7 @@ import { useContext, useEffect, useId, useRef, useState } from "react";
 import { animate } from "framer-motion";
 import { Link, useInRouterContext } from "react-router-dom";
 import { resolveMediaUrl } from "@/lib/api";
-import { formatMatchStatus } from "@/lib/tournamentLabels";
+import { formatMatchStatus, stationText } from "@/lib/tournamentLabels";
 import { asInstant, viennaDateTime } from "@/lib/vienna";
 import { initials } from "@/lib/slotSource";
 import { MOTION, motionAllowed } from "@/lib/motion";
@@ -43,10 +43,9 @@ export function formatNodeDateTime(value) {
   return viennaDateTime(date, { dateStyle: "short", timeStyle: "short" });
 }
 
+/** Die Station im Klartext (#1941): „Station 5 · Switch 2“ wie überall - nie das Gerätekürzel, nie eine Kennung. */
 export function getStationLabel(match) {
-  const station = match?.station_label || match?.station_name || match?.station?.name || match?.station_id || "";
-  if (!station) return "";
-  return /^station\b/i.test(station) ? station : `Station ${station}`;
+  return stationText(match);
 }
 
 /** Name im Knoten: die Anmeldung, sonst leer - ein Setzplatz vor dem Start zeigt nichts (Betreiber, 23.09.). */
