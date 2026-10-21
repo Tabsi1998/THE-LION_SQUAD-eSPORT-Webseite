@@ -49,8 +49,17 @@ und `driver_of_the_day` – nur, wo angegeben.
   wenn es die Uhrzeit nicht gibt).
 - `maps` in der Reihenfolge des Vetos: `name`, optional `map_id` (spätere Map-Bibliothek, #1616), `role` (`banned`,
   `picked`, `decider`, `played` – ohne Rolle gespielt), `by` (`own`/`opponent`, nur bei Bann und Wahl), bei gespielten
-  Maps `home_score`/`away_score` und optional `lineup`. Die Aufstellung des Spiels ist die Vereinigung mit denen der
-  Maps; `maps_differ` zählt nur gespielte Maps.
+  Maps `home_score`/`away_score` und optional `lineup`. Gespielt ist eine Map mit Ergebnis: `played` (oder ohne Rolle)
+  braucht beide Stände, Wahl und Decider beide oder keinen (ein Decider bei 2:0 bleibt leer), eine Aufstellung je Map
+  nur mit Ergebnis – sonst Fehler `map_score_missing` bzw. `map_lineup_unplayed` mit `match`, `map` (Index) und
+  `map_field`. Nichts wird still 0:0. Die Aufstellung des Spiels ist die Vereinigung mit denen der Maps (das Formular
+  nimmt eine im Spiel abgewählte Person auch aus allen Maps); `maps_differ` zählt nur Maps mit Ergebnis.
+- Mehrere eigene Teams am selben Spieltag: jedes Spiel eines eigenen Teams zählt (Karte, Bilanz, Form, Einsätze);
+  `matchdays[].matches` listet sie, `match` bleibt das erste.
+- Mit `official_table` gilt sie für Teams und Plätze: Teams aus den Spielen in anderer Schreibweise zählen für ihre
+  Zeile (wörtlich, gleiche Normalform oder eindeutiger Anfang, `services/team_names.py`), ohne passende Zeile bekommen
+  sie keine eigene (Warnung `table_team_unknown`); offizielle Plätze werden nie neu gerechnet, Teams ohne Platz stehen
+  dahinter nach Punkten.
 - GET liefert dazu `series.own_team_list` (eigene Teams samt Schreibweisen) und `series.map_names` (schon verwendete
   Map-Namen der Saison, häufigste zuerst). Der Kader eines eigenen Teams sind die Teilnehmer mit diesem `default_team`
   (`participants/batch` mit `team`).

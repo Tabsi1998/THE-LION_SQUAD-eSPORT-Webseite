@@ -582,11 +582,14 @@ hat). Oben die **Spieltage** (ein Feld je Spieltag – Sieg cyan, Niederlage gra
 Balken nach Anteil, **Maps** (Ergebnis der Spiele) und **Runden** (Summe der Map-Ergebnisse, nur aus Spielen mit Maps)
 jeweils mit Differenz. Die **Tabelle** ist die Tabelle laut Veranstalter vom letzten eingetragenen Spieltag, sonst aus
 allen eingetragenen Spielen gerechnet; Punkte für Sieg, Unentschieden und Niederlage und der Vorrang bei Gleichstand
-stehen darüber und kommen aus den Regeln der Saison. Das eigene Team ist als „Verein“ markiert, mit Form (die letzten
+stehen darüber und kommen aus den Regeln der Saison. Die Tabelle laut Veranstalter bestimmt Teams und Plätze: ein
+Team, das in den Spielen anders geschrieben ist („Gegner e.V.“ statt „Gegner“), zählt für seine Zeile, und ihre Plätze
+werden nie neu gerechnet. Das eigene Team ist als „Verein“ markiert, mit Form (die letzten
 fünf eigenen Spiele) und darunter dem **Platzierungsverlauf** nach jedem Spieltag. Der **Spielplan** zeigt jeden
 Spieltag als Karte: Tag und Uhrzeit des Spiels (bei einem Zeitraum beide Tage), Gegner mit Heim oder Auswärts, das
-Ergebnis (Rand und Kürzel S/U/N in Sieg- bzw. Niederlagen-Farbe), die Maps mit **Unsere Wahl**, **Wahl Gegner** oder
-**Decider**, die gebannten Maps und – zugeklappt – die **weiteren Spiele** des Spieltags. Der **Kader** zeigt alle
+Ergebnis (Rand und Kürzel S/U/N in Sieg- bzw. Niederlagen-Farbe), die gespielten Maps (mit Ergebnis) mit **Unsere
+Wahl**, **Wahl Gegner** oder **Decider**, die gebannten Maps und – zugeklappt – die **weiteren Spiele** des Spieltags.
+Spielen zwei eigene Teams am selben Spieltag, stehen beide Spiele auf der Karte. Der **Kader** zeigt alle
 Spieler der eigenen Teams, auch wer noch nicht gespielt hat: je Spieltag ein Haken (gespielt) oder **E** (Ersatz – im
 Kader, aber nicht aufgestellt), unter **Einsätze** etwa „2 von 5“ (von den Spielen des Teams mit Aufstellung).
 Vereinsmitglieder verlinken auf ihr Profil und haben unter **Gesamt** ihre Einsätze über alle Saisons der Spur; Gäste
@@ -815,18 +818,24 @@ einem gewerteten Termin **Ergebnis ändern**. Das öffnet das Blatt des Termins.
   Ergebnis) und einfügen. Logo- und Link-Spalten („Zum Matchup“) stören nicht, `17.06.2026 20:30 Uhr` ist ein Termin;
   stehen mehrere Spieltage untereinander („Begegnungen des 2. Spieltags“, „Zeitraum: …“), nimmt das Blatt den zum
   Termin passenden oder fragt nach. Das **eigene Spiel** wird an den eigenen Teams (samt Schreibweisen) erkannt und
-  ausgefüllt – Heim/Auswärts, Ergebnis, Tag und Uhrzeit; die **übrigen Spiele** mit Ergebnis kommen dazu, wenn
+  ausgefüllt – Heim/Auswärts, Ergebnis, Tag und Uhrzeit; spielen zwei eigene Teams am selben Spieltag, werden beide
+  erkannt („Eigene Spiele erkannt“). Die **übrigen Spiele** mit Ergebnis kommen dazu, wenn
   **Übrige Spiele mitspeichern** an ist (sie stehen dann beim Spieltag und zählen in die eigene Tabelle). Noch offene
   Spiele (`-:-`) werden nicht übernommen.
   Im eigenen Spiel stehen die **Maps in der Reihenfolge des Vetos**: je Map der Name (mit Vorschlägen aus den schon
   verwendeten Maps der Saison) und die Rolle – **Gespielt**, **Unsere Wahl**, **Wahl Gegner**, **Decider**, **Unser Bann**
-  oder **Bann Gegner**; gesperrte Maps haben kein Ergebnis. Die **Aufstellung** ist eine Ankreuzliste aus dem **Kader**
+  oder **Bann Gegner**; gesperrte Maps haben kein Ergebnis. Eine **gespielte** Map braucht beide Stände; **Wahl** und
+  **Decider** dürfen leer bleiben, wenn sie nicht gespielt wurden (etwa der Decider bei 2:0) – sie zählen dann nicht.
+  Ein leerer Stand wird nie zu 0:0. Die **Aufstellung** ist eine Ankreuzliste aus dem **Kader**
   des Teams; mit **je Map** bekommt jede gespielte Map ihre eigene (wer eine Map gespielt hat, hat das Spiel gespielt).
+  Darum gilt: in einer Map angekreuzt heißt auch im Spiel angekreuzt, und wer im Spiel abgewählt wird, fällt auch aus
+  allen Maps.
   **Aufstellung einfügen** nimmt die Liste von der Match-Seite („Seasonteam-Mitglieder | Warorga“): ein Häkchen,
   `x` oder `ja` kreuzt an. Wird das Häkchen beim Kopieren zum Bild und fehlt, stehen die Namen zum Ankreuzen da.
   Weitere Namen gehen über **Weiterer Name**. Darunter die **Tabelle laut Veranstalter**: einfügen, etwa
   `1. Team 10 7 1 2 22` oder mit Kopfzeile (Platz, Team, Spiele, Siege, Unentschieden, Niederlagen, Ergebnis, Punkte –
-  auch mit leerer Logo-Spalte).
+  auch mit leerer Logo-Spalte). Sie bestimmt Teams und Plätze; passt ein Team aus den Spielen zu keiner ihrer Zeilen,
+  weist die Prüfung darauf hin – dann die Schreibweise angleichen.
 
 <table>
 <tr>
