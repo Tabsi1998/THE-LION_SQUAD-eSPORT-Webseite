@@ -585,6 +585,22 @@ Aufstellung, dazu bei Bedarf die Tabelle laut Veranstalter.
 </tr>
 </table>
 
+**Map-Pool der Saison:** Hat die Spur ein **Spiel** (bei einer Team-Liga steht der Abschnitt auch ohne, mit Hinweis),
+wählt der Vorstand auf der Seite der Saison im Abschnitt **Map-Pool der Saison** die Maps der Saison – je Modus aus der
+Map-Bibliothek des Spiels (**Admin → eSports → Spiele → Maps**, siehe [Turniere 3.14](turniere.md#314-maps-und-map-pools)).
+Anhaken, mit den Pfeilen sortieren, **Vorgabe des Spiels** nimmt alle freigegebenen Maps, **Übernehmen von … Pool der
+Saison 2025** startet mit dem Pool einer anderen Saison der Spur. **Speichern** legt eine neue Version an: Spätere
+Änderungen an der Bibliothek (Name, Bild, archiviert) ändern den gespeicherten Pool und alte Ergebnisse nicht. Die
+Serienseite zeigt den Pool unten als Karten mit Bild. Ohne Spiel oder ohne Pool bleibt bei den Maps der Freitext wie
+bisher.
+
+<table>
+<tr>
+<td><img src="../assets/serien/serien-map-pool-saison.png" alt="Abschnitt Map-Pool der Saison: je Modus die gewählten Maps mit Reihenfolge" width="460"></td>
+<td><img src="../assets/serien/serien-map-pool-seite.png" alt="Serienseite: Map-Pool der Saison als Karten mit Bild, je Modus" width="400"></td>
+</tr>
+</table>
+
 **Seite Rennliga:** Eine Spur der Art **Rennliga** zeigt unter derselben Adresse ihre eigene Seite:
 
 - Oben der **Umschalter** zwischen den Saisons und Ligen der Spur (etwa 2026 · F1, 2026 · F2, die Vorsaison) –
