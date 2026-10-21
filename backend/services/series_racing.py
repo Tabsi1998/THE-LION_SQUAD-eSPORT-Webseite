@@ -51,7 +51,8 @@ async def lineage_seasons(db, user: dict | None, lineage: dict, current_id: str)
 def driver_teams(rows: list[dict], participants: dict, matcher: Matcher | None = None) -> dict:
     """Je Fahrer der Fahrerwertung: Team je Rennen, aktuelles Team (das des letzten Rennens) und „Gast“. ``matcher``
     führt das Standard-Team auf den Namen eines eigenen Teams zurück (#1926) - wie beim Rechnen, mit allen
-    Standard-Teams als Gegenüber. Das Team je Rennen steht schon so im gespeicherten Stand."""
+    Standard-Teams als Gegenüber. Das Team je Rennen steht schon so im gespeicherten Stand - was im Feld steht (#1960):
+    ein Rennen ohne Team hat keines. Das Standard-Team gilt nur als Team des Fahrers, wenn kein Rennen eines nennt."""
     defaults = [_text(person.get("default_team")) for person in participants.values() if person.get("default_team")]
     out = {}
     for row in rows:
@@ -60,7 +61,7 @@ def driver_teams(rows: list[dict], participants: dict, matcher: Matcher | None =
         default = _text(person.get("default_team")) or None
         if matcher and default:
             default = matcher.canonical(default, defaults)
-        round_teams = {item.get("round_id"): _text(item.get("team")) or default for item in row.get("results") or []}
+        round_teams = {item.get("round_id"): _text(item.get("team")) or None for item in row.get("results") or []}
         current = next((team for team in reversed(list(round_teams.values())) if team), default)
         out[pid] = {"team": current, "guest": person.get("link") == "guest", "round_teams": round_teams,
                     "team_since": _team_since(round_teams, current)}

@@ -70,15 +70,22 @@ export function teamSourceLabel(teams, rounds = []) {
 
 const teamKey = (value) => String(value ?? "").split(/\s+/).filter(Boolean).join(" ").toLowerCase();
 
-/** Wofür eine Zeile im Ergebnisblatt in der Teamwertung zählt, wenn es nicht dasteht (#1960): ohne Team das
- * Stammteam („zählt für: Turbo (Stammteam)“), mit einem Eintrag „kein Team“ für keines. Sonst leer. */
-export function teamFallbackText(row, participants = [], scoring = null) {
-  if (!scoring?.enabled) return "";
+const isNoTeam = (scoring, team) => (scoring?.no_team_names || []).some((name) => teamKey(name) === teamKey(team));
+
+/** Wofür eine Zeile im Ergebnisblatt in der Teamwertung zählt, wenn es nicht für ein Team ist (#1960, was im Feld
+ * steht, zählt): ohne Team „zählt für kein Team“ - mit dem Stammteam des Teilnehmers zum Eintragen (`default_team`) -,
+ * mit einem Eintrag „kein Team“ wie „Ersatzfahrer“ „zählt für kein Team (Ersatz)“. Sonst `null`. `participantId`: die
+ * Kennung aus der Vorschau, wenn erst der Server den Namen zugeordnet hat. */
+export function teamCountHint(row, participants = [], scoring = null, participantId = "") {
+  if (!scoring?.enabled) return null;
   const team = String(row?.team || "").trim();
-  if (team) return (scoring.no_team_names || []).some((name) => teamKey(name) === teamKey(team)) ? "zählt für kein Team (Ersatz)" : "";
-  const person = (participants || []).find((item) => item.id && item.id === row?.participant_id)
+  if (team) return isNoTeam(scoring, team) ? { text: "zählt für kein Team (Ersatz)", default_team: "" } : null;
+  const id = row?.participant_id || participantId;
+  if (!id && !String(row?.name || "").trim()) return null;
+  const person = (participants || []).find((item) => item.id && item.id === id)
     || (participants || []).find((item) => teamKey(item.name) && teamKey(item.name) === teamKey(row?.name));
-  return person?.default_team ? `zählt für: ${person.default_team} (Stammteam)` : "";
+  const fallback = String(person?.default_team || "").trim();
+  return { text: "zählt für kein Team", default_team: fallback && !isNoTeam(scoring, fallback) ? fallback : "" };
 }
 
 /** Gesamt im Modus „aktuelle Besetzung“ - wie beim Veranstalter, die Zellen je Rennen zeigen das gefahrene Team. */

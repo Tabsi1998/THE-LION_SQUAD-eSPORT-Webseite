@@ -120,14 +120,16 @@ export function sheetToForm(content, participants = [], { kind, teamName, oppone
   };
 }
 
-/** Eingefügte Zeilen (aus `parseResultPaste`) als Formularzeilen – bekannte Namen gleich mit Kennung. */
-export function pastedToRows(parsed, participants = []) {
+/** Eingefügte Zeilen (aus `parseResultPaste`) als Formularzeilen – bekannte Namen gleich mit Kennung. `prefillTeam`
+ * (#1960, Liste ohne Team-Spalte): bekannte Namen bekommen ihr Stammteam sichtbar ins Feld; mit Team-Spalte gilt, was
+ * dasteht - ein leeres Feld heißt kein Team. */
+export function pastedToRows(parsed, participants = [], { prefillTeam = false } = {}) {
   return parsed.map((row) => {
     const known = matchParticipant(row.name, participants);
     return emptyRow({
       participant_id: known?.id || "",
       name: row.name,
-      team: row.team || "",
+      team: row.team || (prefillTeam && known?.default_team) || "",
       place: text(row.place),
       points: text(row.points),
       marks: [...row.marks],

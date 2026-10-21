@@ -148,7 +148,9 @@ async def _twenty_guests(flow, ctx) -> dict:
         ids[name] = row["id"]
     earlier_ids = {row["name"]: row["id"] async for row in flow.db.reference_participants.find({"series_id": earlier})}
     assert all([(await _person(flow, pid))["link"] == "guest" for pid in earlier_ids.values()])
-    await _publish(flow, own, ctx["rounds"][0], _places([ids[name] for name in names]))
+    # Das Standard-Team steht im Feld, wie beim Eintragen vorbelegt (#1960: ein leeres Feld hieße kein Team).
+    await _publish(flow, own, ctx["rounds"][0], [{**row, "team": teams[names[index]]}
+                                                 for index, row in enumerate(_places([ids[name] for name in names]))])
     await _publish(flow, earlier, ctx["earlier_round"],
                    [{**row, "team": teams[names[index]]}
                     for index, row in enumerate(_places([earlier_ids[name] for name in names]))])
@@ -291,17 +293,20 @@ async def test_editing_name_number_and_team_is_logged_and_recomputed(flow):
     own = ctx["own"]["id"]
     anna = await _add(flow, own, "Probe Anah", default_team="Fremd Rot")
     bert = await _add(flow, own, "Probe Bert", default_team="Fremd Rot")
-    await _publish(flow, own, ctx["rounds"][0], _places([anna["id"], bert["id"]]))
+    # R1 mit dem Standard-Team im Feld (wie vorbelegt), R2 mit leerem Feld.
+    await _publish(flow, own, ctx["rounds"][0], _places([anna["id"], bert["id"]], team="Fremd Rot"))
+    await _publish(flow, own, ctx["rounds"][1], _places([anna["id"], bert["id"]]))
     response = await flow.patch(f"{ADMIN}/series/{own}/participants/{anna['id']}",
                                 json={"name": "Probe Anna", "start_number": "7", "default_team": "Fremd Blau"})
     assert response.status_code == 200, response.text
     saved = response.json()
     assert (saved["name"], saved["name_normalized"], saved["start_number"], saved["default_team"]) == (
         "Probe Anna", "probeanna", "7", "Fremd Blau")
-    # Neu gerechnet: Anna zählt jetzt für ihr neues Team.
-    teams = {row["team"]: row["computed_points"]
-             for row in (await _standings_match_a_fresh_recompute(flow, own))[(ctx["rounds"][0], "teams")]}
-    assert teams == {"Fremd Blau": 20, "Fremd Rot": 19}
+    # Neu gerechnet - aber was im Blatt steht, zählt (#1960): ein neues Standard-Team zieht gefahrene Rennen nicht um,
+    # ein leeres Team-Feld zählt für kein Team.
+    standings = await _standings_match_a_fresh_recompute(flow, own)
+    teams = {row["team"]: row["computed_points"] for row in standings[(ctx["rounds"][1], "teams")]}
+    assert teams == {"Fremd Rot": 39}
     log = await flow.db.audit_logs.find_one({"action": "reference_series.participant_update"}, {"_id": 0})
     assert log["target_id"] == anna["id"] and log["actor_id"] == ctx["board"]["id"]
     assert log["data"]["changes"] == {"name": ["Probe Anah", "Probe Anna"], "start_number": [None, "7"],

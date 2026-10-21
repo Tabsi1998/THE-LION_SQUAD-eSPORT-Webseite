@@ -36,7 +36,8 @@ PEOPLE = [
     {"id": "p-hidden", "name": "Fremd Versteckt", "link": "external", "default_team": "Fremd Rot",
      "name_hidden": True},
 ]
-# Platz je Rennen; (Kennung, Marken, Team im Rennen) - ohne Team gilt das Standard-Team.
+# Platz je Rennen; (Kennung, Marken, Team im Rennen) - ohne Angabe steht das Standard-Team im Feld (#1960: beim
+# Eintragen vorbelegt bzw. von Migration 10 nachgetragen; ein leeres Feld hieße kein Team).
 SHEETS = {
     "R1": [("p-ext1", ["fastest_lap"], None), ("p-lion1", [], "Probe Löwen"), ("p-ext2", [], None),
            ("p-lion2", [], None), ("p-guest", [], None), ("p-lion3", [], None), ("p-hidden", [], None)],
@@ -79,11 +80,12 @@ async def _setup(flow, rules=RULES, **series_extra):
                                                        "display_name": f"Probe Lion {number}", "is_active": True})
     await flow.db.reference_participants.insert_many([
         {"series_id": series["id"], "is_club_member": False, "name_hidden": False, **person} for person in PEOPLE])
+    defaults = {person["id"]: person["default_team"] for person in PEOPLE}
     for code, order in SHEETS.items():
         rows = []
         for place, (pid, marks, team) in enumerate(order, start=1):
             rows.append({"participant_id": pid, "place": None if "dns" in marks else place, "marks": marks,
-                         "team": team})
+                         "team": team or defaults[pid]})
         await flow.db.reference_round_results.insert_one({
             "id": f"blatt-{code}", "series_id": series["id"], "round_id": rounds[code], "status": "published",
             "rows": rows})

@@ -78,13 +78,15 @@ async def _rounds(flow, series, *codes):
 
 
 async def _publish(flow, series, rounds, results: dict, **extra_by_code):
-    """``results``: Kürzel → Kennungen in Platz-Reihenfolge (Team = Standard-Team, außer ``(Kennung, Team)``)."""
+    """``results``: Kürzel → Kennungen in Platz-Reihenfolge (Team = Standard-Team im Feld, wie vorbelegt, außer
+    ``(Kennung, Team)``)."""
     await flow.db.reference_participants.insert_many([
         {"series_id": series["id"], "is_club_member": False, "name_hidden": False, **person} for person in PEOPLE])
+    defaults = {person["id"]: person.get("default_team") for person in PEOPLE}
     for code, order in results.items():
         rows = []
         for place, item in enumerate(order, start=1):
-            pid, team = item if isinstance(item, tuple) else (item, None)
+            pid, team = item if isinstance(item, tuple) else (item, defaults.get(item))
             rows.append({"participant_id": pid, "place": place, "marks": [], "team": team})
         await flow.db.reference_round_results.insert_one({
             "id": f"blatt-{code}", "series_id": series["id"], "round_id": rounds[code], "status": "published",
@@ -508,10 +510,12 @@ async def test_substitutes_keep_their_entry_and_new_team_names_are_flagged(flow)
     saved = await flow.put(url, json={"rows": rows, "status": "published", "expected_version": 0})
     assert saved.status_code == 200, saved.text
     assert saved.json()["sheet"]["rows"][0]["team"] == "Ersatzfahrer"
+    # Was im Feld steht, zählt (#1960): ein leeres Team bleibt leer - der Server trägt kein Stammteam nach.
+    assert saved.json()["sheet"]["rows"][3].get("team") in (None, "")
     teams = (await _page(flow, lineage, series))["racing"]["teams"]["rows"]
     assert "Ersatzfahrer" not in {row["team"] for row in teams}
-    # Lion Eins zählt als Ersatzfahrer nicht für die Löwen, Fremd Zwei ohne Team fürs Stammteam.
-    assert {row["team"]: row["points"] for row in teams} == {"Probe Loewen": 6, "Team 2": 4, "Fremd Rot": 3}
+    # Lion Eins zählt als Ersatzfahrer nicht für die Löwen, Fremd Zwei ohne Team für keines.
+    assert {row["team"]: row["points"] for row in teams} == {"Probe Loewen": 6, "Team 2": 4}
 
 
 @pytest.mark.asyncio

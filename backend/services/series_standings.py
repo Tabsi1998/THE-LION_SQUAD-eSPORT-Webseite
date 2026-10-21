@@ -7,7 +7,7 @@ gewerteter Runde einen Stand je Wertung (``scope``):
   (``tiebreak`` nennt das Kriterium, das gegen die Zeile darüber entschieden hat) und der offizielle Wert des
   Veranstalters (``official_totals`` im Blatt der Runde) mit Abweichung zur eigenen Summe.
 - ``teams``: Teamwertung, wenn eingeschaltet - je Rennen die besten ``counting_drivers`` eines Teams (Team je Rennen
-  aus der Zeile, sonst das Standard-Team; ``no_team_names`` wie „Ersatzfahrer“ zählen für keines). Mit
+  aus der Zeile; leer oder ``no_team_names`` wie „Ersatzfahrer“: kein Team, #1960). Mit
   ``team_scoring.mode = current_lineup`` (#1960) ist Gesamt die Summe der Saisonpunkte der Fahrer, deren aktuelles Team
   es ist; ein Gast zählt fürs Team, wenn ``guests_count`` an ist. Die Teamwertung laut Veranstalter
   (``official_team_totals``) gilt für Platz und Punkte. Ohne ein einziges Team gibt es keinen (leeren) Teamstand.
@@ -227,12 +227,12 @@ def _driver_rows(rules: dict, upto: list[dict], sheets: dict, seq_of: dict, tota
 
 
 # ---------------------------------------------------------------- Teams
-def _ride_team(result: dict, person: dict, rules: dict) -> str | None:
-    """Für welches Team eine Fahrt zählt (#1960): das Team der Zeile - es hat immer Vorrang -, nur ohne Team der Zeile
-    das Stammteam (``default_team``, Altdaten). Ein Ersatz-Einsatz (``team_scoring.no_team_names``, etwa
-    „Ersatzfahrer“) zählt für kein Team, auch nicht fürs Stammteam."""
-    team = result["team"] or person.get("default_team")
-    return None if not team or is_no_team(team, rules) else team
+def _ride_team(result: dict, rules: dict) -> str | None:
+    """Für welches Team eine Fahrt zählt (#1960): was im Feld steht. Ein leeres Feld heißt kein Team - kein stiller
+    Rückfall aufs Stammteam (neue Zeilen bekommen es beim Eintragen sichtbar vorbelegt, Altdaten hat Migration 10
+    gefüllt). Ein Ersatz-Einsatz (``team_scoring.no_team_names``, etwa „Ersatzfahrer“) zählt ebenso für kein Team."""
+    team = result["team"]
+    return None if not team or not str(team).strip() or is_no_team(team, rules) else team
 
 
 def _current_teams(rules: dict, upto: list[dict], sheets: dict, seq_of: dict, people: dict, pids,
@@ -243,7 +243,7 @@ def _current_teams(rules: dict, upto: list[dict], sheets: dict, seq_of: dict, pe
     current: dict[str, str] = {}
     for item in upto:
         for pid, results in _results_by_participant(rules, [item], sheets, seq_of, round_rules).items():
-            team = _ride_team(results[0], people.get(pid) or {}, rules)
+            team = _ride_team(results[0], rules)
             if team:
                 current[pid] = team
     out: dict[str, str] = {}
@@ -277,7 +277,7 @@ def _team_rows(rules: dict, upto: list[dict], sheets: dict, seq_of: dict, people
             if person.get("link") == "guest" and not config["guests_count"]:
                 continue
             result = results[0]
-            team = _ride_team(result, person, rules)
+            team = _ride_team(result, rules)
             if team:
                 per_team.setdefault(team, []).append({**result, "participant_id": pid})
         for team, drivers in per_team.items():

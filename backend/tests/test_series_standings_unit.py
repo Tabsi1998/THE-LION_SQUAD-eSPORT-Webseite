@@ -23,8 +23,11 @@ def _round(round_id, order, status="scored", counts=True):
 
 
 def _rows(*places):
-    """``("anna", 1), ("bert", 2, ["dnf"])`` → Ergebnisblatt-Zeilen."""
-    return [{"participant_id": item[0], "place": item[1], "marks": list(item[2]) if len(item) > 2 else []} for item in places]
+    """``("anna", 1), ("bert", 2, ["dnf"])`` → Ergebnisblatt-Zeilen - mit dem Standard-Team im Feld, wie es beim Eintragen
+    vorbelegt wird (#1960: ein leeres Feld hieße kein Team)."""
+    teams = {person["id"]: person["default_team"] for person in PARTICIPANTS}
+    return [{"participant_id": item[0], "place": item[1], "team": teams.get(item[0]),
+             "marks": list(item[2]) if len(item) > 2 else []} for item in places]
 
 
 def _rules(**overrides):
@@ -146,10 +149,10 @@ def test_each_scored_round_keeps_its_own_standing_with_the_movement_since_the_la
 
 
 # ---------------------------------------------------------------- Teamwertung
-TEAM_ROUND = {"rows": [
-    {"participant_id": "anna", "place": 1, "marks": []},
-    {"participant_id": "bert", "place": 2, "marks": []},
-    {"participant_id": "gast", "place": 3, "marks": []},
+TEAM_ROUND = {"rows": [  # das Standard-Team steht im Feld, wie beim Eintragen vorbelegt (#1960)
+    {"participant_id": "anna", "place": 1, "marks": [], "team": "Löwen"},
+    {"participant_id": "bert", "place": 2, "marks": [], "team": "Falken"},
+    {"participant_id": "gast", "place": 3, "marks": [], "team": "Löwen"},
     {"participant_id": "dora", "place": 4, "marks": [], "team": "Löwen"},  # fährt dieses Rennen für die Löwen
 ]}
 
@@ -172,7 +175,8 @@ def test_without_guests_the_next_driver_of_the_team_counts():
 def test_team_scoring_without_any_team_produces_no_empty_team_standing():
     rules = _rules(team_scoring={"enabled": True})
     loners = [{"id": "anna", "name": "Anna Probe", "link": "member"}]
-    snapshots = compute_standings(rules=rules, rounds=[_round("r1", 1)], sheets={"r1": {"rows": _rows(("anna", 1))}},
+    snapshots = compute_standings(rules=rules, rounds=[_round("r1", 1)],
+                                  sheets={"r1": {"rows": [{"participant_id": "anna", "place": 1, "marks": []}]}},
                                   participants=loners)
     assert {snap["scope"] for snap in snapshots} == {"drivers"}
 

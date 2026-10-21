@@ -27,7 +27,8 @@ def _rules(mode):
 
 
 def _sheet(*order, bonus=None):
-    return {"r1": {"rows": [{"participant_id": pid, "place": place, "marks": [], "team": None,
+    teams = {person["id"]: person["default_team"] for person in PEOPLE}  # wie beim Eintragen vorbelegt
+    return {"r1": {"rows": [{"participant_id": pid, "place": place, "marks": [], "team": teams[pid],
                              **({"bonus_keys": ["bingo"]} if pid == bonus else {})}
                             for place, pid in enumerate(order, start=1)]}}
 

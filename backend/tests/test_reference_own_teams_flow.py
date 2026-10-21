@@ -89,9 +89,10 @@ async def _racing(flow, teams=TEAMS):
     ]
     await flow.db.reference_participants.insert_many(
         [{"series_id": series["id"], "is_club_member": False, "name_hidden": False, **person} for person in people])
+    # Ohne eigenes Team im Bild steht das Standard-Team im Feld (#1960: vorbelegt bzw. migriert).
     sheets = [
-        [("a", None), ("g", "Probe DarkFriday"), ("x", None)],
-        [("g", "probe-darkfriday"), ("x", None), ("a", None)],
+        [("a", "Probe Löwen"), ("g", "Probe DarkFriday"), ("x", "Fremd Rot")],
+        [("g", "probe-darkfriday"), ("x", "Fremd Rot"), ("a", "Probe Löwen")],
     ]
     for round_id, order in zip(rounds, sheets):
         await flow.db.reference_round_results.insert_one({

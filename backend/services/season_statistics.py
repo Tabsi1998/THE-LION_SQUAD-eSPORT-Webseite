@@ -55,7 +55,6 @@ def tally(rounds: list[dict], sheets: dict, participants: dict, series: dict,
     Blätter je Termin, ``results``: je (Fahrer, Termin) das Ergebnis aus dem letzten Fahrerstand. Liefert (Fahrer,
     Teams, eigene Teams)."""
     matcher = Matcher(own_teams(series))
-    defaults = [clean(item.get("default_team")) for item in participants.values() if item.get("default_team")]
     drivers: dict[str, dict] = {}
     teams: dict[str, dict] = {}
     own: set = set()
@@ -69,11 +68,9 @@ def tally(rounds: list[dict], sheets: dict, participants: dict, series: dict,
                   and item["id"] in sheets}
 
     def team_of(row: dict, others: list[str]) -> str | None:
+        # Was im Feld steht (#1960): ein leeres Team heißt kein Team - kein Rückfall aufs Standard-Team.
         team = clean(row.get("team"))
-        if team:
-            return matcher.canonical(team, others)
-        default = clean((participants.get(row.get("participant_id")) or {}).get("default_team"))
-        return matcher.canonical(default, defaults) if default else None
+        return matcher.canonical(team, others) if team else None
 
     def bump(pid: str, team: str | None, key: str, amount=1) -> None:
         drivers.setdefault(pid, _blank())[key] += amount

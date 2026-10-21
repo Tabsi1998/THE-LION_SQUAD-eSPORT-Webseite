@@ -12,7 +12,7 @@ import {
 import { ResultPreview } from "./ResultPreview";
 import { TeamLeagueEntry } from "./TeamLeagueEntry";
 import { OfficialTeamTotals } from "./OfficialTeamTotals";
-import { teamFallbackText } from "@/lib/seriesSpecialRules";
+import { teamCountHint } from "@/lib/seriesSpecialRules";
 import { VenueWithFlag } from "@/components/tls/CountryFlag";
 import { ResultImageButton, ResultImageRowNote, ResultImageSummary, ocrMark, useResultImage } from "./ResultImageImport";
 import { RACE_FIELD_GROUPS, afterEdit, confirmRow, imageFormFields, imageToRows, isUncertain, openImageItems, replaceRaceMarks } from "@/lib/resultImage";
@@ -92,7 +92,7 @@ function FieldErrors({ fields, testId }) {
   );
 }
 
-function ResultRow({ row, index, autoPlace, organizerMode, qualifying = false, day = null, problems, info, invalid, onChange, onHint, onRemove, onConfirmImage, teamHint = "" }) {
+function ResultRow({ row, index, autoPlace, organizerMode, qualifying = false, day = null, problems, info, invalid, onChange, onHint, onRemove, onConfirmImage, teamHint = null }) {
   const scored = info?.scored;
   // Offen von selbst nur, wo etwas Ungewöhnliches steht (Strafe, Gesamtstand, „zählen statt Schlüssel“) oder eine Eingabe
   // ungültig ist. Startnummer, Startplatz, Zeit und Abstand (#1927) stehen zugeklappt kurz unter der Zeile - so bleibt
@@ -182,8 +182,19 @@ function ResultRow({ row, index, autoPlace, organizerMode, qualifying = false, d
       )}
       {open && day && <DayRoundsDetails row={row} number={number} count={day.count} invalid={invalid} onChange={onChange} />}
       {!open && raceLine && <div className="mt-1 text-[11px] text-white/55 tabular-nums" data-testid="result-row-race">{raceLine}</div>}
-      {/* #1960: ohne Team zählt die Zeile fürs Stammteam, „Ersatzfahrer“ für keines - sichtbar, nicht still. */}
-      {teamHint && <div className="mt-1 text-[11px] text-white/55" data-testid="result-row-team-hint">{teamHint}</div>}
+      {/* #1960: was im Feld steht, zählt - ohne Team (oder mit „Ersatzfahrer“) für kein Team; das Stammteam lässt sich
+          mit einem Klick eintragen. */}
+      {teamHint && (
+        <div className="mt-1 flex flex-wrap items-center gap-x-2 text-[11px] text-white/55">
+          <span data-testid="result-row-team-hint">{teamHint.text}</span>
+          {teamHint.default_team && (
+            <button type="button" onClick={() => onChange({ team: teamHint.default_team })} data-testid="result-row-team-default"
+              className="underline underline-offset-2 hover:text-white">
+              Stammteam {teamHint.default_team} eintragen
+            </button>
+          )}
+        </div>
+      )}
       {info && (
         <div className="mt-1 flex flex-wrap items-center gap-x-2 text-[11px] text-white/45 tabular-nums">
           {/* Bekannt oder neu sagt die Vorschau jedem; ob jemand Vereinsmitglied ist, nur dem Vorstand. */}
@@ -458,7 +469,8 @@ export function ResultEntrySheet({ series, round, onClose, onSaved }) {
   const pasteRows = (text) => {
     const result = parseResultPaste(text, { bonuses: rules.custom_bonuses || [] });
     if (result.rows.length) {
-      const rows = pastedToRows(result.rows, participants);
+      // Ohne Team-Spalte steht das Stammteam sichtbar im Feld (#1960) - löschen heißt: zählt für kein Team.
+      const rows = pastedToRows(result.rows, participants, { prefillTeam: !result.team_column });
       const next = {
         ...form, rows,
         // Schnellste Runde und Fahrer des Tages aus der Liste (#1927) - sonst bleibt, was schon eingetragen ist. Gelb
@@ -680,7 +692,7 @@ export function ResultEntrySheet({ series, round, onClose, onSaved }) {
                     problems={problems.byRow[row.key]} info={infoByKey[row.key]}
                     onChange={(values) => updateRow(row.key, values)} onHint={() => updateRow(row.key, hintToPoints(row, participants))} onRemove={() => removeRow(row.key)}
                     onConfirmImage={() => confirmImageRow(row.key)}
-                    teamHint={kind === "racing" && !qualifying ? teamFallbackText(row, participants, rules.team_scoring) : ""} />
+                    teamHint={kind === "racing" && !qualifying ? teamCountHint(row, participants, rules.team_scoring, infoByKey[row.key]?.participant_id) : null} />
                 ))}
               </ol>
               <button type="button" onClick={addRow} data-testid="result-row-add" className="tls-btn tls-btn--secondary px-3 py-2 rounded-sm text-xs font-bold uppercase tracking-wider inline-flex items-center gap-2">

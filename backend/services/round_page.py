@@ -120,17 +120,13 @@ class _Context:
         self.weekend = series.get("weekend")  # #1960: Startplatz-Quelle je Lauf (umgekehrte Aufstellung)
         self.colors = team_color_map(series)
         self.matcher = Matcher(own_teams(series))
-        defaults = [clean(item.get("default_team")) for item in participants.values() if item.get("default_team")]
-        self.defaults = defaults
 
     def team(self, row: dict, others: list[str]) -> str | None:
+        # Was im Feld steht (#1960): ein leeres Team heißt kein Team - kein Rückfall aufs Standard-Team.
         team = clean(row.get("team"))
-        if team:
-            return self.matcher.canonical(team, others) if self.matcher else team
-        default = clean((self.participants.get(row.get("participant_id")) or {}).get("default_team"))
-        if not default:
+        if not team:
             return None
-        return self.matcher.canonical(default, self.defaults) if self.matcher else default
+        return self.matcher.canonical(team, others) if self.matcher else team
 
     def row(self, row: dict, round_id: str, sheet: dict, others: list[str], counts: bool) -> dict:
         pid = row.get("participant_id")

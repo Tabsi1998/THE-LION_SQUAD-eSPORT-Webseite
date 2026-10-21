@@ -723,8 +723,8 @@ bisher.
 </tr>
 </table>
 
-Das Team je Rennen kommt aus der Spalte **Team** im Ergebnisblatt, sonst gilt das Standard-Team des Teilnehmers. Am Handy
-stehen Karten statt der Tabellen.
+Das Team je Rennen kommt aus der Spalte **Team** im Ergebnisblatt – was dort steht, zählt; ein leeres Feld heißt kein
+Team. Am Handy stehen Karten statt der Tabellen.
 
 **Sonderregeln (Rennliga).** Regelwerke externer Ligen haben Fälle, die kein Rennergebnis sind. Alles ist je Saison
 einstellbar, nichts ist für eine Liga fest eingebaut:
@@ -759,13 +759,19 @@ einstellbar, nichts ist für eine Liga fest eingebaut:
   „Ohne Wertung · Zu wenig Fahrer – …“ – anders als **Abgesagt**, das nicht stattgefunden hat. Die Ergebnisseite der
   Runde zeigt den Lauf mit Grund und ohne Punkte, die Statistik der Saison zählt ihn nicht. **Mindestens am Start**
   (Regeln der Saison, Abschnitt „Was zählt“) lässt beim Eintragen einen Hinweis erscheinen, wenn weniger am Start sind.
+- **Team im Ergebnis – was im Feld steht, zählt:** Eine neue Zeile bekommt das Standard-Team des Teilnehmers sichtbar
+  ins Feld – beim Eintragen eines bekannten Namens und beim Einfügen einer Liste ohne Team-Spalte. Wer wirklich ohne
+  Team fährt: Team löschen, dann zählt die Fahrt für kein Team (die Fahrerwertung bleibt). Die Zeile sagt dann
+  „zählt für kein Team“, mit dem Knopf **Stammteam … eintragen**, falls das Löschen ein Versehen war. Eine Liste mit
+  Team-Spalte und die Bild-Erkennung übernehmen, was dasteht; eine leere Team-Zelle aus dem Bild bleibt leer und gelb
+  (oft steht dort ein farbiges Schild, das beim Lesen wegfällt). Ein neues Standard-Team am Teilnehmer ändert gefahrene
+  Rennen nicht. Ältere Ergebnisse ohne Team haben beim Update einmal ihr damaliges Standard-Team bekommen, damit
+  keine Saison Punkte verliert.
 - **Ersatzfahrer:** Steht im Ergebnis als Team **Ersatzfahrer** (oder ein anderer Eintrag aus **Kein Team (Ersatz)** in
   den Regeln der Saison), zählt die Fahrt für kein Team – auch nicht fürs Standard-Team des Fahrers – und die
-  Teamwertung hat keine Zeile „Ersatzfahrer“. Die Fahrerwertung bleibt, wie sie ist. Ein Team in der Zeile geht immer
-  vor; nur ohne Team zählt das Standard-Team, und das Ergebnisblatt sagt es an der Zeile („zählt für: Turbo
-  (Stammteam)“). Die Bild-Erkennung lässt „Ersatzfahrer“ stehen; eine leere Team-Zelle bleibt leer und gelb (oft steht
-  dort ein farbiges Schild, das beim Lesen wegfällt). Ein Team, das es in der Saison noch nicht gibt, bekommt beim
-  Prüfen einen Hinweis („Team „Team 2“ gibt es in dieser Saison noch nicht – meintest du …?“).
+  Teamwertung hat keine Zeile „Ersatzfahrer“. Die Fahrerwertung bleibt, wie sie ist; die Zeile im Ergebnisblatt sagt
+  „zählt für kein Team (Ersatz)“. Die Bild-Erkennung lässt „Ersatzfahrer“ stehen. Ein Team, das es in der Saison noch
+  nicht gibt, bekommt beim Prüfen einen Hinweis („Team „Team 2“ gibt es in dieser Saison noch nicht – meintest du …?“).
 - **Teamwertung bei Wechseln:** **Je Rennen für das gefahrene Team** (Vorgabe) oder **Aktuelle Besetzung: alle
   Saisonpunkte der Fahrer, die jetzt im Team sind** – wie beim Veranstalter: Die Zellen je Rennen zeigen das Team, für
   das gefahren wurde (Ersatzfahrten für keines, „–“ ohne Fahrt). **Gesamt und Platz** sind die Saisonpunkte aller
@@ -925,8 +931,8 @@ Verknüpfungen sieht nur die Verwaltung (Bereich Redaktion).
 für ein Vereinsteam, ist aber kein Mitglied, **Extern** sind alle anderen. Über der Liste filtert ihr nach **Alle**,
 **Mitglieder**, **Gäste**, **Extern** oder **Offen** und sucht nach Name, Startnummer, Team oder Profil.
 
-- **Bearbeiten** (Stift am Ende der Zeile): Name wie beim Veranstalter, Startnummer, Standard-Team und die Zuordnung
-  (Mitglied mit Profil, Gast oder Extern). Wird ein Mitglied oder Gast extern, fragt die Seite nach – jeder Alias des
+- **Bearbeiten** (Stift am Ende der Zeile): Name wie beim Veranstalter, Startnummer, Standard-Team (Vorschlag für neue
+  Ergebniszeilen) und die Zuordnung (Mitglied mit Profil, Gast oder Extern). Wird ein Mitglied oder Gast extern, fragt die Seite nach – jeder Alias des
   Teilnehmers wird dann in allen Saisons zurückgenommen. Gibt es den neuen Namen in der Saison schon, sagt die Seite
   das: dann zusammenführen.
 - **Mehrere auf einmal:** Haken setzen – **Alle auswählen** nimmt nur, was Filter und Suche gerade zeigen – und

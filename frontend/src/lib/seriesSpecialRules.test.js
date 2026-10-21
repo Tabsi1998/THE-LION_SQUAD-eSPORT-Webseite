@@ -1,18 +1,23 @@
 import { describe, expect, test } from "vitest";
 import {
   adjustmentErrors, adjustmentLine, adjustmentPayload, adjustmentSum, adjustmentText, adjustmentTitle, adjustmentToForm, cancelledText, emptyAdjustment,
-  noScoreText, parseTeamTotals, ruleChangeLines, successorLink, teamDeviationText, teamFallbackText, teamModeLabel, teamSinceLabel, teamSourceLabel,
+  noScoreText, parseTeamTotals, ruleChangeLines, successorLink, teamCountHint, teamDeviationText, teamModeLabel, teamSinceLabel, teamSourceLabel,
   teamTotalsObject,
 } from "@/lib/seriesSpecialRules";
 
-test("Ergebnisblatt: ohne Team zählt die Zeile sichtbar fürs Stammteam, „Ersatzfahrer“ für keines (#1960)", () => {
+test("Ergebnisblatt: leeres Team zählt für kein Team - mit Stammteam zum Eintragen; „Ersatzfahrer“ ebenso (#1960)", () => {
   const scoring = { enabled: true, no_team_names: ["Ersatzfahrer"] };
-  const people = [{ id: "p1", name: "Chris Probe", default_team: "Turbo Probe" }];
-  expect(teamFallbackText({ participant_id: "p1", team: "" }, people, scoring)).toBe("zählt für: Turbo Probe (Stammteam)");
-  expect(teamFallbackText({ participant_id: "", name: "chris  probe", team: "" }, people, scoring)).toBe("zählt für: Turbo Probe (Stammteam)");
-  expect(teamFallbackText({ participant_id: "p1", team: " ersatzfahrer " }, people, scoring)).toBe("zählt für kein Team (Ersatz)");
-  expect(teamFallbackText({ participant_id: "p1", team: "Löwen Probe" }, people, scoring)).toBe("");
-  expect(teamFallbackText({ participant_id: "p1", team: "" }, people, { enabled: false })).toBe("");
+  const people = [{ id: "p1", name: "Chris Probe", default_team: "Turbo Probe" }, { id: "p2", name: "Ohne Stamm" }];
+  const none = (default_team) => ({ text: "zählt für kein Team", default_team });
+  expect(teamCountHint({ participant_id: "p1", team: "" }, people, scoring)).toEqual(none("Turbo Probe"));
+  expect(teamCountHint({ participant_id: "", name: "chris  probe", team: "" }, people, scoring)).toEqual(none("Turbo Probe"));
+  // Erst die Vorschau hat den Namen zugeordnet (etwa über einen Alias): ihre Kennung zählt.
+  expect(teamCountHint({ participant_id: "", name: "Chrissi", team: "" }, people, scoring, "p1")).toEqual(none("Turbo Probe"));
+  expect(teamCountHint({ participant_id: "p2", team: "" }, people, scoring)).toEqual(none(""));
+  expect(teamCountHint({ participant_id: "p1", team: " ersatzfahrer " }, people, scoring)).toEqual({ text: "zählt für kein Team (Ersatz)", default_team: "" });
+  expect(teamCountHint({ participant_id: "p1", team: "Löwen Probe" }, people, scoring)).toBeNull();
+  expect(teamCountHint({ participant_id: "", name: " ", team: "" }, people, scoring)).toBeNull();
+  expect(teamCountHint({ participant_id: "p1", team: "" }, people, { enabled: false })).toBeNull();
 });
 
 // Sonderregeln einer Rennliga (#1960) - nur erfundene Namen.

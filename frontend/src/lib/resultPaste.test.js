@@ -212,7 +212,7 @@ test("kaputte Zeilen: Fehler mit Zeilennummer, der Rest wird gelesen", () => {
 });
 
 test("leer und unbekanntes Format: klare Rückmeldung statt stiller Leere", () => {
-  expect(parseResultPaste("")).toEqual({ format: null, header: false, rows: [], errors: [] });
+  expect(parseResultPaste("")).toEqual({ format: null, header: false, team_column: false, rows: [], errors: [] });
   expect(parseResultPaste("   \n\n").rows).toEqual([]);
   const unknown = parseResultPaste("1\n2\n3");
   expect(unknown.rows).toEqual([]);

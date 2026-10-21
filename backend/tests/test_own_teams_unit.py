@@ -44,11 +44,14 @@ PEOPLE = [
 def test_team_scoring_counts_an_own_team_once_whatever_the_spelling():
     rules = normalize_rules({"points_by_place": SCHEME, "team_scoring": {"enabled": True}})
     rounds = [{"id": "r1", "order": 1, "status": "scored"}, {"id": "r2", "order": 2, "status": "scored"}]
+    # Ohne gelesenes Team steht das Standard-Team in der Zeile (#1960: beim Eintragen vorbelegt, Altdaten migriert).
     sheets = {
         "r1": {"rows": [{"participant_id": "a", "place": 1, "team": "PDF Racing"},
-                        {"participant_id": "c", "place": 2}, {"participant_id": "b", "place": 3}]},
+                        {"participant_id": "c", "place": 2, "team": "Fremd Rot"},
+                        {"participant_id": "b", "place": 3, "team": "Probe DarkFriday"}]},
         "r2": {"rows": [{"participant_id": "b", "place": 1, "team": "probe darkfriday"},
-                        {"participant_id": "a", "place": 2}, {"participant_id": "c", "place": 3}]},
+                        {"participant_id": "a", "place": 2, "team": "Probe-DarkFriday"},
+                        {"participant_id": "c", "place": 3, "team": "Fremd Rot"}]},
     }
     # Die Standard-Teams von a und b sind zwei wörtlich verschiedene Schreibweisen - zusammen gehören sie nur, weil
     # „Probe DarkFriday“ als Schreibweise eingetragen ist. „probe darkfriday“ im zweiten Rennen passt ohnehin.
@@ -65,7 +68,8 @@ def test_team_scoring_counts_an_own_team_once_whatever_the_spelling():
 def test_without_own_teams_spellings_stay_apart_as_before():
     rules = normalize_rules({"points_by_place": SCHEME, "team_scoring": {"enabled": True}})
     rounds = [{"id": "r1", "order": 1, "status": "scored"}]
-    sheets = {"r1": {"rows": [{"participant_id": "a", "place": 1}, {"participant_id": "b", "place": 2}]}}
+    sheets = {"r1": {"rows": [{"participant_id": "a", "place": 1, "team": "Probe-DarkFriday"},
+                              {"participant_id": "b", "place": 2, "team": "Probe DarkFriday"}]}}
     snapshots = compute_standings(rules=rules, rounds=rounds, sheets=sheets, participants=PEOPLE)
     table = [snap for snap in snapshots if snap["scope"] == "teams"][-1]["rows"]
     assert sorted(row["team"] for row in table) == ["Probe DarkFriday", "Probe-DarkFriday"]

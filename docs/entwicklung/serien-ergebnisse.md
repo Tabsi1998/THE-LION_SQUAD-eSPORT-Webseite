@@ -214,13 +214,23 @@ Mehrere Runden an einem Termin (etwa TFT-Lobbys R1–R5), gerechnet in `services
   Fahrer-Anpassungen ändern die Teamwertung je Rennen nicht (in der aktuellen Besetzung über die Saisonpunkte des
   Fahrers), Team-Anpassungen die Fahrerwertung nie; wer nur eine Anpassung hat, steht in der Tabelle. Sonderboni
   (#1961, `bonus_points`) und Anpassungen zählen je genau einmal und stehen getrennt an der Zeile.
-- **Teamwertung:** Eine Fahrt zählt für das Team der Zeile, ohne Team für `default_team` des Teilnehmers
-  (`series_standings._ride_team`); ein Name aus `team_scoring.no_team_names` (Vorgabe `["Ersatzfahrer"]`, je Saison
+- **Team der Zeile - was im Feld steht, zählt:** Eine Fahrt zählt für das Team der Zeile; leer (auch nur Leerraum)
+  heißt kein Team, ohne Rückfall auf `default_team` (`series_standings._ride_team`, ebenso `round_page`,
+  `season_statistics` und `series_racing.driver_teams` je Rennen). Das Web belegt neue Zeilen sichtbar vor: bekannter
+  Name (`ResultEntrySheet` `updateRow`, `hintToPoints`) und eingefügte Liste ohne Team-Spalte (`parseResultPaste`
+  `team_column`, `pastedToRows(…, {prefillTeam})`); Bild und Liste mit Team-Spalte bleiben, wie gelesen. Ohne Team
+  zeigt die Zeile „zählt für kein Team“ mit Knopf „Stammteam … eintragen“ (`seriesSpecialRules.teamCountHint`). Der
+  Server füllt nie selbst nach. Migration 10 `reference_result_row_teams` (`migrations.migrate_result_row_teams`) hat
+  Altdaten einmal gefüllt: in Saisons mit Teamwertung Zeilen mit Teilnehmer und leerem Team (Blatt und
+  `pending_draft`) mit dessen `default_team`, nie ein `no_team_names`-Eintrag; je Saison Protokoll
+  `reference_series.team_backfill` (`rows`, `round_ids`) und Neurechnen.
+- **Teamwertung:** Ein Name aus `team_scoring.no_team_names` (Vorgabe `["Ersatzfahrer"]`, je Saison
   einstellbar, Vergleich ohne Groß/klein und Leerraum, `scoring_rules.is_no_team`) zählt für kein Team und bekommt keine
   Zeile. `team_scoring.mode` `per_race` (Vorgabe: Gesamt = Summe der Zellen) oder `current_lineup` (wie beim
   Veranstalter: Zellen je Rennen weiter nach Team der Zeile; Gesamt = Saisonpunkte der Fahrerwertung aller Fahrer, deren
-  aktuelles Team es ist, plus Team-Anpassungen; `_current_teams`: Team der letzten Fahrt, die kein Ersatz war, sonst
-  `default_team`; `participant.current_team` von Hand geht vor, ein `no_team_names`-Eintrag dort heißt „kein Team“).
+  aktuelles Team es ist, plus Team-Anpassungen; `_current_teams`: Team der letzten Fahrt mit Team, die kein Ersatz war,
+  sonst `default_team`; `participant.current_team` von Hand geht vor, ein `no_team_names`-Eintrag dort heißt „kein
+  Team“).
   `official_team_totals` des letzten Blatts gilt für Platz und Punkte, auch für Teams, die nur dort stehen (Vergleich
   ohne Groß/klein), nur der Vorstand schreibt es. Öffentlich `racing.teams.source` (`official`/`computed`) und je Fahrer
   `team_since` (erstes Rennen der letzten Folge im aktuellen Team, nur nach einem Wechsel). Beim Prüfen eines Blatts

@@ -32,8 +32,9 @@ def _round(number, day=None):
 
 
 def _sheet(*order, teams=None, **extra):
-    """``"anna", "bert"`` → Plätze 1, 2 …; ``teams`` = Team je Zeile (sonst das Standard-Team)."""
-    teams = teams or {}
+    """``"anna", "bert"`` → Plätze 1, 2 …; ``teams`` = Team je Zeile, sonst steht das Standard-Team im Feld - wie beim
+    Eintragen vorbelegt (#1960: ein leeres Feld hieße kein Team)."""
+    teams = {**{person["id"]: person.get("default_team") for person in PEOPLE}, **(teams or {})}
     return {"rows": [{"participant_id": pid, "place": place, "marks": [], "team": teams.get(pid)}
                      for place, pid in enumerate(order, start=1)], **extra}
 

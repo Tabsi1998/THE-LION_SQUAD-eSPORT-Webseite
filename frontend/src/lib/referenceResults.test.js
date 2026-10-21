@@ -64,6 +64,17 @@ test("eingefügte Liste: bekannte Namen gleich mit Kennung", () => {
   ]);
 });
 
+test("eingefügte Liste ohne Team-Spalte: bekannte Namen bekommen ihr Stammteam sichtbar ins Feld (#1960)", () => {
+  const plain = parseResultPaste("1. Alpha  25\n2. Beta  18\n3. Gamma  15");
+  expect(plain.team_column).toBe(false);
+  expect(pastedToRows(plain.rows, PEOPLE, { prefillTeam: !plain.team_column }).map((row) => row.team)).toEqual(["Probe Racing", "Test GP", ""]);
+  // Mit Team-Spalte gilt, was dasteht - ein leeres Feld bleibt leer (zählt für kein Team).
+  const table = parseResultPaste("Pl\tFahrer\tTeam\tPkt\n1\tAlpha\tErsatzfahrer\t25\n2\tBeta\t\t18");
+  expect(table.team_column).toBe(true);
+  expect(pastedToRows(table.rows, PEOPLE, { prefillTeam: !table.team_column }).map((row) => row.team)).toEqual(["Ersatzfahrer", ""]);
+  expect(parseResultPaste("1\tAlpha\tTest GP\t25").team_column).toBe(true);
+});
+
 test("Meldungen der Vorschau landen an der richtigen Formularzeile, Spiele und Allgemeines oben", () => {
   const { byRow, general } = problemsByRow({
     errors: [{ code: "duplicate", message: "Teilnehmer doppelt.", rows: [0, 1] }, { code: "empty", message: "Leer.", rows: [] }],

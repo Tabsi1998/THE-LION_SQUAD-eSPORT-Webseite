@@ -2,8 +2,8 @@
 nur erfundene Namen.
 
 - Ein Ersatz-Einsatz (``team_scoring.no_team_names``, Vorgabe „Ersatzfahrer“) zählt für kein Team, auch nicht fürs
-  Stammteam, und steht nicht als eigene Zeile in der Teamwertung. Ein Team der Zeile geht immer vor; nur ohne Team der
-  Zeile gilt das Stammteam (Altdaten).
+  Stammteam, und steht nicht als eigene Zeile in der Teamwertung. Was im Feld steht, zählt: ein leeres Team heißt kein
+  Team (das Stammteam wird beim Eintragen sichtbar vorbelegt, Altdaten füllt Migration 10).
 - ``current_lineup``: die Zellen je Rennen bleiben beim gefahrenen Team; Gesamt und Platz sind die Saisonpunkte der
   Fahrer, deren aktuelles Team es ist (Team der letzten Fahrt, die kein Ersatz war) - samt ihrer Ersatz-Einsätze.
 """
@@ -52,7 +52,7 @@ SINGAPUR = [
 def test_a_regular_driver_as_substitute_counts_for_no_team():
     """Wie Singapur: der Stammfahrer fährt als Ersatzfahrer, sein Teamkollege fällt aus - das Team bekommt 0, und eine
     Zeile „Ersatzfahrer“ gibt es nicht. Die Fahrerwertung bleibt, wie sie war."""
-    sheets = {"r1": _sheet(("lina", None), ("emil", "Eisbrecher Probe"), ("chris", "Ersatzfahrer"),
+    sheets = {"r1": _sheet(("lina", "Löwen Probe"), ("emil", "Eisbrecher Probe"), ("chris", "Ersatzfahrer"),
                            ("matti", "Turbo Probe", "dnf"))}
     snaps = compute_standings(rules=_rules(), rounds=[_round(1)], sheets=sheets, participants=SINGAPUR)
     teams = _teams(snaps)
@@ -69,10 +69,20 @@ def test_a_regular_driver_as_substitute_counts_for_no_team():
     assert {row["team"]: row["points"] for row in _teams(reserve)}["ERSATZFAHRER"] == 4
 
 
-def test_without_a_team_in_the_row_the_regular_team_counts_as_before():
-    sheets = {"r1": _sheet(("chris", None), ("matti", None), ("lina", None))}
-    teams = _teams(compute_standings(rules=_rules(), rounds=[_round(1)], sheets=sheets, participants=SINGAPUR))
-    assert [(row["team"], row["points"]) for row in teams] == [("Turbo Probe", 16), ("Löwen Probe", 4)]
+def test_an_empty_team_field_counts_for_no_team_not_the_regular_team():
+    """Entscheidung zu #1960: was im Feld steht, zählt. Ein leeres Team heißt kein Team - auch mit Stammteam; die
+    Fahrerwertung bleibt."""
+    sheets = {"r1": _sheet(("chris", None), ("matti", "Turbo Probe"), ("lina", ""))}
+    snaps = compute_standings(rules=_rules(), rounds=[_round(1)], sheets=sheets, participants=SINGAPUR)
+    assert [(row["team"], row["points"], row["driver_ids"]) for row in _teams(snaps)] == [("Turbo Probe", 6, ["matti"])]
+    drivers = {row["participant_id"]: row["points"] for row in
+               [snap for snap in snaps if snap["scope"] == "drivers"][-1]["rows"]}
+    assert drivers == {"chris": 10, "matti": 6, "lina": 4}
+    # Aktuelle Besetzung: die Fahrt ohne Team zählt in keiner Zelle.
+    lineup = _teams(compute_standings(rules=_rules(mode="current_lineup"), rounds=[_round(1)], sheets=sheets,
+                                      participants=SINGAPUR))
+    assert {row["team"]: row["round_points"][0]["driver_ids"] for row in lineup if row["round_points"]} == {
+        "Turbo Probe": ["matti"]}
 
 
 def test_no_team_names_are_a_season_setting():

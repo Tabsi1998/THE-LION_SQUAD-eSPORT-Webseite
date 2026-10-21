@@ -127,6 +127,66 @@ async def migrate_game_map_keys(db) -> str:
     return f"{filled} map spellings reserved, {skipped} skipped"
 
 
+def _row_teams_filled(rows, defaults: dict, rules: dict) -> tuple[list, int]:
+    """Zeilen mit Teilnehmer und leerem Team bekommen dessen Standard-Team (Migration 10). Ein Eintrag wie
+    „Ersatzfahrer“ steht schon im Feld und bleibt; ein Standard-Team aus ``no_team_names`` wird nie eingetragen."""
+    from services.scoring_rules import is_no_team
+
+    out, filled = [], 0
+    for row in rows or []:
+        team = " ".join(str(row.get("team") or "").split())
+        default = " ".join(str(defaults.get(row.get("participant_id")) or "").split())
+        if not team and row.get("participant_id") and default and not is_no_team(default, rules):
+            row = {**row, "team": default}
+            filled += 1
+        out.append(row)
+    return out, filled
+
+
+async def migrate_result_row_teams(db) -> str:
+    """Leeres Team heißt kein Team (#1960): bisher zählte eine Ergebniszeile ohne Team still für das Standard-Team ihres
+    Teilnehmers. Damit bestehende Saisons keine Punkte verlieren, bekommen solche Zeilen dieses Standard-Team einmal als
+    echten Wert - nur in Saisons mit Teamwertung, im Blatt und im Entwurf daneben. Danach wird die Saison neu gerechnet;
+    je Saison ein Protokolleintrag mit der Zahl. Ein zweiter Lauf findet nichts mehr (idempotent)."""
+    from services import reference_series
+    from services.scoring_rules import normalize_rules
+
+    now = datetime.now(timezone.utc).isoformat()
+    total = seasons = 0
+    async for series in db.reference_series.find({"rules.team_scoring.enabled": True}, {"_id": 0}):
+        try:
+            rules = normalize_rules(series.get("rules"))
+        except ValueError:
+            continue
+        defaults = {person["id"]: person.get("default_team") async for person in db.reference_participants.find(
+            {"series_id": series["id"]}, {"_id": 0, "id": 1, "default_team": 1})}
+        filled_rows, round_ids = 0, []
+        async for sheet in db.reference_round_results.find({"series_id": series["id"]}, {"_id": 0}):
+            changes, count = {}, 0
+            rows, filled = _row_teams_filled(sheet.get("rows"), defaults, rules)
+            if filled:
+                changes["rows"], count = rows, count + filled
+            draft = sheet.get("pending_draft")
+            if isinstance(draft, dict):
+                rows, filled = _row_teams_filled(draft.get("rows"), defaults, rules)
+                if filled:
+                    changes["pending_draft.rows"], count = rows, count + filled
+            if changes:
+                await db.reference_round_results.update_one({"id": sheet["id"]}, {"$set": changes})
+                filled_rows += count
+                round_ids.append(sheet.get("round_id"))
+        if not filled_rows:
+            continue
+        await db.audit_logs.insert_one({
+            "id": new_id(), "action": "reference_series.team_backfill", "actor_id": "migration",
+            "target_id": series["id"], "created_at": now,
+            "data": {"rows": filled_rows, "round_ids": round_ids, "reason": "#1960 leeres Team heißt kein Team"}})
+        await reference_series.recompute_standings(db, series)
+        total += filled_rows
+        seasons += 1
+    return f"{total} result rows in {seasons} series got their default team"
+
+
 MIGRATIONS = (
     (1, "encrypt_legacy_integration_credentials", migrate_plaintext_secrets),
     (2, "team_leader_role_to_player", migrate_team_leader_role),
@@ -138,6 +198,7 @@ MIGRATIONS = (
     (7, "reference_round_countries", migrate_round_countries),
     (8, "reference_series_own_teams", migrate_series_own_teams),
     (9, "game_map_spelling_keys", migrate_game_map_keys),  # #1616
+    (10, "reference_result_row_teams", migrate_result_row_teams),  # #1960: leeres Team heißt kein Team
 )
 
 

@@ -470,7 +470,7 @@ function fastestFromColumn(rows) {
 
 /**
  * Ergebnisliste aus der Zwischenablage.
- * Liefert `{format, header, rows: [{line, place, name, team, points, start_number, marks, points_hint, grid, time, gap}], errors: [{line, text, message}]}`,
+ * Liefert `{format, header, team_column, rows: [{line, place, name, team, points, start_number, marks, points_hint, grid, time, gap}], errors: [{line, text, message}]}`,
  * dazu `fastest_lap` (`{name, time}`) und `driver_of_the_day` (`{name}`), wenn die Liste sie nennt (#1927).
  * `points_hint` (`{points, text}` oder `null`): Zeilenformat mit einer Zahl am Ende, die auch zum Namen gehören kann.
  * `place` und `points` sind `null`, wenn die Liste sie nicht nennt – dann zählt die Reihenfolge bzw. der Schlüssel.
@@ -518,7 +518,10 @@ export function parseResultPaste(text, { maxRows = MAX_PASTE_ROWS, bonuses = [] 
     errors.unshift({ line: null, text: "", message: "Format nicht erkannt. Je Zeile ein Teilnehmer, etwa „1. Name  25“ oder eine Tabelle mit Tab, „|“ oder „;“." });
   }
   const fastest = race.fastest_lap || fastestFromColumn(rows);
-  const out = { format: lines.length ? separator.format : null, header: Boolean(keys), rows: rows.map(({ best_lap: _lap, ...row }) => row), errors };
+  // Hat die Liste eine Team-Spalte (#1960)? Mit Kopfzeile laut Kopf, sonst wenn eine Zeile ein Team nennt. Ohne Spalte
+  // belegt das Blatt die Zeilen mit dem Stammteam vor; mit Spalte gilt, was dasteht - leer heißt kein Team.
+  const teamColumn = keys ? keys.includes("team") : rows.some((row) => row.team);
+  const out = { format: lines.length ? separator.format : null, header: Boolean(keys), team_column: teamColumn, rows: rows.map(({ best_lap: _lap, ...row }) => row), errors };
   if (fastest) out.fastest_lap = fastest;
   if (race.driver_of_the_day) out.driver_of_the_day = race.driver_of_the_day;
   return out;
