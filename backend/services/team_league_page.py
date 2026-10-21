@@ -26,7 +26,7 @@ from __future__ import annotations
 from services.own_teams import Matcher, own_team_names, own_teams
 from services.scoring_rules import match_points, normalize_rules
 from services.series_appearances import team_league_appearances
-from services.team_league_sheet import is_played
+from services.team_league_sheet import is_played, own_match  # noqa: F401 - own_match gehört zur Seite (#1747)
 from services.visibility import user_can_see
 
 TABLE_FIELDS = ("rank", "played", "won", "drawn", "lost", "score_for", "score_against", "score_diff", "points")
@@ -48,22 +48,6 @@ def _rules(series: dict) -> dict:
         return normalize_rules(series.get("rules") or {})
     except ValueError:
         return normalize_rules({})
-
-
-def own_match(sheet: dict, teams) -> dict | None:
-    """Das Spiel eines eigenen Teams im Blatt (``teams``: die eigenen Teams oder ein Name). Ohne eigene Teams gilt das
-    erste Spiel mit dem Heimteam als eigenes (so legt das Ergebnis-Blatt ein Spiel an). ``_own`` nennt das eigene
-    Team, ``_away`` sagt, ob es auswärts spielt."""
-    own = Matcher(teams if isinstance(teams, (list, tuple)) else [teams])
-    matches = sheet.get("matches") or []
-    others = [str(match.get(side) or "").strip() for match in matches for side in ("home", "away")]
-    for index, match in enumerate(matches):
-        home, away = str(match.get("home") or "").strip(), str(match.get("away") or "").strip()
-        if not own or own.is_own(home, others):
-            return {**match, "_own": own.canonical(home, others), "_index": index}
-        if own.is_own(away, others):
-            return {**match, "_away": True, "_own": own.canonical(away, others), "_index": index}
-    return None
 
 
 def _picked(item: dict):

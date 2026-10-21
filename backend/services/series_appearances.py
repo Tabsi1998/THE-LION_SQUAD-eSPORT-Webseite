@@ -15,6 +15,7 @@ from __future__ import annotations
 
 from services.own_teams import Matcher, own_teams
 from services.series_standings import ordered_rounds
+from services.team_league_sheet import own_match
 from services.visibility import user_can_see
 
 UNITS = {"team_league": "matches", "racing": "races"}
@@ -60,8 +61,6 @@ def team_league_appearances(own_days: list[tuple[str, dict]], participants: list
 
 
 async def _team_league(db, series: dict, pids: set[str]) -> dict | None:
-    from services.team_league_page import own_match  # hier: team_league_page liest dieses Modul
-
     rounds = ordered_rounds(await db.reference_rounds.find(
         {"series_id": series["id"], "archived_at": None},
         {"_id": 0, "id": 1, "order": 1, "starts_at": 1}).to_list(None))

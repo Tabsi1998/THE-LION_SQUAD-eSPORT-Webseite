@@ -15,12 +15,13 @@ diese Angaben bleibt genau wie bisher:
   UTC - etwa aus der eingefügten Begegnungsliste des Veranstalters. Ohne Tag gilt der Tag des Termins.
 
 Das eigene Spiel und die übrigen Spiele des Spieltags stehen gemeinsam in ``matches``; welches das eigene ist, sagen die
-eigenen Teams der Saison (``own_teams.Matcher``). So rechnet die Tabelle aus allen eingetragenen Spielen.
+eigenen Teams der Saison (``own_teams.Matcher``, ``own_match``). So rechnet die Tabelle aus allen eingetragenen Spielen.
 """
 from __future__ import annotations
 
 import math
 
+from services.own_teams import Matcher
 from services.reference_calendar import ClockError, clock_gap_message, vienna_start
 
 ROLES = ("banned", "picked", "decider", "played")
@@ -65,6 +66,22 @@ def map_entry(raw: dict, lineup: list[str] | None) -> dict:
         if lineup:
             out["lineup"] = lineup
     return out
+
+
+def own_match(sheet: dict, teams) -> dict | None:
+    """Das Spiel eines eigenen Teams im Blatt (``teams``: die eigenen Teams oder ein Name). Ohne eigene Teams gilt das
+    erste Spiel mit dem Heimteam als eigenes (so legt das Ergebnis-Blatt ein Spiel an). ``_own`` nennt das eigene
+    Team, ``_away`` sagt, ob es auswärts spielt."""
+    own = Matcher(teams if isinstance(teams, (list, tuple)) else [teams])
+    matches = sheet.get("matches") or []
+    others = [str(match.get(side) or "").strip() for match in matches for side in ("home", "away")]
+    for index, match in enumerate(matches):
+        home, away = str(match.get("home") or "").strip(), str(match.get("away") or "").strip()
+        if not own or own.is_own(home, others):
+            return {**match, "_own": own.canonical(home, others), "_index": index}
+        if own.is_own(away, others):
+            return {**match, "_away": True, "_own": own.canonical(away, others), "_index": index}
+    return None
 
 
 def match_extras(raw: dict) -> tuple[dict, str | None]:
