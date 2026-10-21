@@ -117,6 +117,22 @@ async def test_five_tournament_days_through_the_routes_match_the_example_table(f
 
 
 @pytest.mark.asyncio
+async def test_saving_an_older_season_unchanged_keeps_its_rules_version(flow):
+    """Eine Saison von vor #1961 hat die neuen Regeln (Runden, Sonderboni, Top N) nicht gespeichert. Speichert jemand sie
+    unverändert, ist das keine Regeländerung - keine neue Version, kein Eintrag in der Regel-Historie."""
+    _, series, _ = await _setup(flow)
+    old = {key: value for key, value in series["rules"].items()
+           if key not in ("day_rounds", "custom_bonuses", "tiebreak_top_n")}
+    old["tiebreakers"] = ["wins", "countback"]
+    await flow.db.reference_series.update_one({"id": series["id"]}, {"$set": {"rules": old}})
+    unchanged = await flow.patch(f"{ADMIN}/series/{series['id']}", json={"rules": old})
+    assert unchanged.status_code == 200, unchanged.text
+    assert (unchanged.json()["rules_version"], unchanged.json()["rules_history"]) == (1, [])
+    changed = await flow.patch(f"{ADMIN}/series/{series['id']}", json={"rules": {**old, "tiebreak_top_n": 3}})
+    assert changed.json()["rules_version"] == 2 and changed.json()["rules"]["tiebreak_top_n"] == 3
+
+
+@pytest.mark.asyncio
 async def test_closing_the_season_takes_the_ranks_after_the_tiebreak(flow):
     lineage, series, rounds = await _setup(flow)
     for index, (entry, round_id) in enumerate(zip(DAYS.values(), rounds)):

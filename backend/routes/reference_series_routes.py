@@ -49,6 +49,14 @@ def _rules(raw: dict) -> dict:
         raise HTTPException(422, f"Regeln: {exc}") from exc
 
 
+def _completed(stored) -> dict | None:
+    """Gespeicherte Regeln mit den Standards neuer Felder - ``None``, wenn sie sich nicht mehr anwenden lassen."""
+    try:
+        return normalize_rules(stored or {})
+    except ValueError:
+        return None
+
+
 async def _check_game(db, game_id: str | None) -> None:
     if game_id and not await db.games.find_one({"id": game_id}, {"_id": 1}):
         raise HTTPException(404, "Spiel nicht gefunden.")
@@ -267,7 +275,8 @@ async def update_series(series_id: str, body: ReferenceSeriesUpdate, me: dict = 
     rules_changed = False
     if "rules" in updates:
         rules = _rules(updates["rules"])
-        if rules == existing.get("rules"):
+        # Verglichen wird mit dem vervollständigten alten Stand: neue Regeln mit Standard (etwa #1961) sind keine Änderung.
+        if rules in (existing.get("rules"), _completed(existing.get("rules"))):
             updates.pop("rules")
         else:
             rules_changed = True
