@@ -111,6 +111,39 @@ test("Chronik mit Spiel-Filter: neueste zuerst, eine Saison öffnet in der App, 
   open.mockRestore();
 });
 
+const probeCups = (count: number): ClubReference[] => Array.from({ length: count }, (_, index) => ({
+  id: `r${index}`, display_title: `Probe-Cup ${index}`, best_placement: (index % 12) + 1,
+  start_date: new Date(Date.UTC(2026, 0, 1) - index * 86400000).toISOString(),
+  game: index % 2 ? { id: "rl", name: "Rocket League" } : { id: "mk", name: "Mario Kart 8" },
+}));
+
+test("lange Chronik: von 1000 Einträgen zuerst 20, „Mehr anzeigen“ holt je 20 dazu - ein Spiel-Filter beginnt wieder oben", async () => {
+  const many = probeCups(1000);
+  mockGet.mockResolvedValue({ data: { items: [] } });
+  await render(<ClubSuccess items={many} summary={{ total: 1000 }} showcase={null} onOpenSeason={jest.fn()} />);
+  await waitFor(() => expect(screen.getByTestId("club-success-chronicle")).toBeTruthy());
+  const rows = () => screen.queryAllByTestId(/^club-success-row-/);
+  expect(rows()).toHaveLength(20);
+  expect(screen.getByText("Mehr anzeigen (980 weitere)")).toBeTruthy();
+  await fireEvent.press(screen.getByTestId("club-success-more"));
+  expect(rows()).toHaveLength(40);
+  expect(screen.getByText("Mehr anzeigen (960 weitere)")).toBeTruthy();
+  await fireEvent.press(screen.getByTestId("club-success-game-rl"));
+  expect(rows()).toHaveLength(20);
+  expect(rows()[0].props.testID).toBe("club-success-row-r1");
+});
+
+test("am Ende der Chronik verschwindet „Mehr anzeigen“", async () => {
+  mockGet.mockResolvedValue({ data: { items: [] } });
+  await render(<ClubSuccess items={probeCups(45)} summary={{ total: 45 }} showcase={null} onOpenSeason={jest.fn()} />);
+  await waitFor(() => expect(screen.getByTestId("club-success-chronicle")).toBeTruthy());
+  await fireEvent.press(screen.getByTestId("club-success-more"));
+  expect(screen.getByText("Mehr anzeigen (5 weitere)")).toBeTruthy();
+  await fireEvent.press(screen.getByTestId("club-success-more"));
+  expect(screen.queryAllByTestId(/^club-success-row-/)).toHaveLength(45);
+  expect(screen.queryByTestId("club-success-more")).toBeNull();
+});
+
 test("alter Server: ohne Bilanz, Spuren und laufende Saisons nur Vitrine und Chronik - keine Nullen", async () => {
   mockGet.mockRejectedValue(new Error("404"));
   await render(<ClubSuccess items={[{ id: "alt", title: "Herbst-Cup", placement: 3, start_date: "2024-10-01" }]} summary={null} showcase={undefined} onOpenSeason={jest.fn()} />);

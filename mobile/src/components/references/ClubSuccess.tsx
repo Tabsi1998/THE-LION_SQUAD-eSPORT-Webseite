@@ -24,6 +24,7 @@ import {
 import { WEB_BASE_URL } from "../../lib/siteUrls";
 import { colors, roles, surfaces } from "../../theme";
 import { FadeIn, staggerDelay } from "../FadeIn";
+import { Button } from "../Button";
 import { EmptyState } from "../ListState";
 import { CountryFlag } from "./CountryFlag";
 import { Body, Muted } from "../Text";
@@ -36,6 +37,10 @@ import { FilterChip, MedalMark, PathStrip, PlaceRing, ProgressFill, SectionLabel
 // Eine Saison öffnet in der App, eine Referenz ohne Saison im Web.
 
 const MEDALS: Array<[1 | 2 | 3, "gold" | "silver" | "bronze", string]> = [[1, "gold", "Siege"], [2, "silver", "Zweite"], [3, "bronze", "Dritte"]];
+
+// Die Chronik zeigt erst so viele Zeilen und holt mit „Mehr anzeigen“ je so viele dazu: /references liefert bis zu
+// 1000 Teilnahmen, und die Zeilen stehen in der Seite (keine eigene, verschachtelte Liste).
+export const CHRONICLE_PAGE = 20;
 
 /** Laufende Saisons und Serien & Ligen: eigene Endpunkte; ein alter Server ohne sie zeigt die Abschnitte nicht. */
 function useSeriesOverview() {
@@ -70,8 +75,13 @@ export function ClubSuccess({ items, summary, showcase, onOpenSeason }: {
   const podium = useMemo(() => podiumItems(items), [items]);
   const main = useMemo(() => pickShowcase(podium.length ? podium : items, showcase, linked), [podium, items, showcase, linked]);
   const [game, setGame] = useState("all");
+  const [limit, setLimit] = useState(CHRONICLE_PAGE);
   const games = useMemo(() => gameOptions(items), [items]);
   const rows = useMemo(() => clubChronicle(game === "all" ? items : items.filter((item) => gameKey(item) === game), linked), [items, game, linked]);
+  const pickGame = (key: string) => {
+    setGame(key);
+    setLimit(CHRONICLE_PAGE);
+  };
 
   if (!items.length && !running.length && !lineages.length) {
     return <EmptyState icon="medal-outline" title="Noch keine Referenzen" detail="Externe Turniere und Ligen, bei denen der Verein angetreten ist, erscheinen hier." />;
@@ -138,14 +148,14 @@ export function ClubSuccess({ items, summary, showcase, onOpenSeason }: {
             <SectionLabel>Chronik</SectionLabel>
             {games.length > 1 ? (
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips} accessibilityLabel="Spiel">
-                <FilterChip label="Alle" selected={game === "all"} onPress={() => setGame("all")} testID="club-success-game-all" />
+                <FilterChip label="Alle" selected={game === "all"} onPress={() => pickGame("all")} testID="club-success-game-all" />
                 {games.map((option) => (
-                  <FilterChip key={option.key} label={option.title} selected={game === option.key} onPress={() => setGame(option.key)} testID={`club-success-game-${option.key}`} />
+                  <FilterChip key={option.key} label={option.title} selected={game === option.key} onPress={() => pickGame(option.key)} testID={`club-success-game-${option.key}`} />
                 ))}
               </ScrollView>
             ) : null}
             <View style={styles.list}>
-              {rows.map((row) => (
+              {rows.slice(0, limit).map((row) => (
                 <Pressable
                   key={row.id}
                   onPress={() => (row.season ? onOpenSeason(row.season) : openReferenceInWeb(row.id))}
@@ -163,6 +173,16 @@ export function ClubSuccess({ items, summary, showcase, onOpenSeason }: {
                 </Pressable>
               ))}
             </View>
+            {rows.length > limit ? (
+              <Button
+                label={`Mehr anzeigen (${rows.length - limit} weitere)`}
+                variant="quiet"
+                compact
+                onPress={() => setLimit((value) => value + CHRONICLE_PAGE)}
+                style={styles.more}
+                testID="club-success-more"
+              />
+            ) : null}
           </View>
         </FadeIn>
       ) : null}
@@ -294,5 +314,6 @@ const styles = StyleSheet.create({
   rowText: { flex: 1, gap: 1, minWidth: 0 },
   rowTitle: { color: ink.text, fontSize: 15, fontWeight: "700", lineHeight: 20 },
   rowSub: { color: ink.muted, fontSize: 13 },
+  more: { alignSelf: "flex-start", marginTop: 4 },
   pressed: { opacity: 0.72 },
 });
