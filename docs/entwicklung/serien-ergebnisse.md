@@ -104,8 +104,8 @@ passt; die Stände führen es unter seinem Namen.
 
 Ein Screenshot des Veranstalters wird **auf dem eigenen Server** gelesen (Tesseract im Backend-Image, kein externer
 Dienst) und landet als Zeilen im Blatt – gespeichert wird beim Lesen nichts, auch das Bild nicht. Route:
-`backend/routes/reference_result_image_routes.py`, Lesen: `services/result_image_ocr.py`, Werte und Abgleich:
-`services/result_image_match.py`, Vorlagen: `services/result_image_templates.py`, Web: `lib/resultImage.js` und
+`backend/routes/reference_result_image_routes.py`, Lesen: `services/result_image_ocr.py`, Werte aus Text:
+`services/result_image_values.py`, Entscheiden und Abgleich: `services/result_image_match.py`, Vorlagen: `services/result_image_templates.py`, Web: `lib/resultImage.js` und
 `pages/admin/referenceSeries/ResultImageImport.jsx`.
 
 - **Vorlage je Veranstalter-Layout:** Spalten (Überschriften, Ausrichtung, ungefähre Lage) und Kopf des Bilds sind

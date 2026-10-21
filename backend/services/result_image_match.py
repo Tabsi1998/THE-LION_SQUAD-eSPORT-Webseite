@@ -27,15 +27,10 @@ from difflib import SequenceMatcher
 
 from services import series_identity
 from services.result_image_ocr import Read, Reading
+from services.result_image_values import DIGIT_FIX, compact, is_placeholder, mark_of, parse_gap, parse_time, read_digits
 
-MARKS = ("dnf", "dns", "dsq")
-OUT_WORDS = {"OUT", "0UT", "QUT", "OU7"}  # „OUT“ statt Platz, auch leicht verlesen
-LAP_WORDS = {"runde": "Runde", "runden": "Runden", "lap": "Lap", "laps": "Laps"}
 # Leicht verwechselte Zeichen - nur für den Vergleich von Namen, nie für den angezeigten Wert.
 _LOOKALIKE = str.maketrans({"0": "o", "1": "l", "i": "l", "5": "s", "8": "b", "6": "b", "2": "z"})
-# In Zahlenspalten der Seitenlesung (ohne Whitelist): Buchstaben, die eigentlich Ziffern sind.
-_DIGIT_FIX = str.maketrans({"O": "0", "o": "0", "D": "0", "Q": "0", "I": "1", "l": "1", "|": "1", "i": "1",
-                            "S": "5", "s": "5", "B": "8", "Z": "2", "z": "2", ",": "."})
 TIME_TOLERANCE = 0.0015
 AGREEMENT_BONUS = 20
 # Ein Platz (oder „DNF“) steht in jeder Zeile - ist er nicht gelesen, ist die Zelle unsicher. Leer sein darf etwa der
@@ -47,90 +42,6 @@ FIELD_LIMITS = {"name": TEXT_LIMIT, "team": TEXT_LIMIT, "start_number": 10, "tim
 
 
 # ---------------------------------------------------------------- Lesen und Werte
-def _compact(text: str) -> str:
-    return "".join(str(text or "").split())
-
-
-def _mark(text: str) -> str | None:
-    """„DNF“, „DNS“ oder „DSQ“ - auch leicht verlesen („ONF“, „DNE“). „OUT“ (ausgeschieden) zählt als Ausfall."""
-    key = _compact(text).upper()
-    if len(key) != 3 or key.isdigit():
-        return None
-    if key in OUT_WORDS:
-        return "dnf"
-    for mark in MARKS:
-        if key == mark.upper():
-            return mark
-    best = max(MARKS, key=lambda mark: SequenceMatcher(None, key, mark.upper()).ratio())
-    return best if SequenceMatcher(None, key, best.upper()).ratio() >= 0.66 and key[1:2] in ("N", "S") else None
-
-
-def _digits(text: str, *, fix: bool) -> str | None:
-    key = _compact(text).strip(".,:;'`´\"")  # Punkt oder Strich am Rand aus der Erkennung („44.“)
-    if fix:
-        key = key.translate(_DIGIT_FIX)
-    return key if key.isdigit() and len(key) <= 3 else None
-
-
-def digits_of(text: str) -> str | None:
-    """Eine Zahl mit höchstens drei Ziffern (Platz, Startnummer, Grid) - leicht verlesene Ziffern gehen."""
-    return _digits(text, fix=True)
-
-
-def mark_of(text: str) -> str | None:
-    """„dnf“, „dns“ oder „dsq“ - oder ``None``."""
-    return _mark(text)
-
-
-def is_placeholder(text: str) -> bool:
-    """Ein Platzhalter statt eines Werts, etwa „--:--:--,---“ oder „+--:--,---“ (keine Zeit, kein Abstand)."""
-    key = _compact(text)
-    return (len(key) >= 3 and all(char in "-–—_:.,+" for char in key)
-            and sum(char in "-–—_" for char in key) >= 2)
-
-
-def parse_time(text: str, *, fix: bool = False) -> tuple[float, str] | None:
-    """„1:32:15.123“, „32:15.123“ oder „1:31.207“ - Sekunden und die Schreibweise mit Punkt vor den Tausendsteln."""
-    key = _compact(text)
-    if fix:
-        key = key.translate(_DIGIT_FIX)
-    key = key.replace(",", ".")
-    if key.count(".") != 1:
-        return None
-    clock, fraction = key.split(".")
-    if not fraction.isdigit() or not 1 <= len(fraction) <= 3:
-        return None
-    parts = clock.split(":")
-    if not 1 <= len(parts) <= 3 or not all(part.isdigit() for part in parts):
-        return None
-    if any(len(part) != 2 for part in parts[1:]) or len(parts[0]) > 2 or (len(parts) > 1 and int(parts[-1]) > 59):
-        return None
-    if len(parts) == 3 and int(parts[1]) > 59:
-        return None
-    seconds = 0.0
-    for part in parts:
-        seconds = seconds * 60 + int(part)
-    return seconds + int(fraction) / (10 ** len(fraction)), f"{clock}.{fraction}"
-
-
-def parse_gap(text: str, *, fix: bool = False) -> tuple[str, float | None] | None:
-    """„+2.333“, „+1:03.177“ (Sekunden) oder „+1 Runde“ (ohne Sekunden). Das Plus darf fehlen."""
-    key = _compact(text)
-    if not key:
-        return None
-    body = key[1:] if key[0] in "+-#" else key
-    digits = ""
-    while digits.__len__() < len(body) and body[len(digits)].isdigit():
-        digits += body[len(digits)]
-    word = body[len(digits):].casefold()
-    if digits and word in LAP_WORDS:
-        return f"+{int(digits)} {LAP_WORDS[word]}", None
-    parsed = parse_time(body, fix=fix)
-    if parsed is None:
-        return None
-    return f"+{parsed[1]}", parsed[0]
-
-
 @dataclass
 class Decision:
     value: object = None  # int, str oder (Sekunden, Text) - je nach Art
@@ -145,18 +56,18 @@ class Decision:
 def _parse(kind: str, read: Read, *, page: bool):
     """Wert einer Lesung oder ``None``. ``page``: Seitenlesung ohne Whitelist - Ziffern dürfen verlesen sein."""
     if kind == "place":
-        mark = _mark(read.text)
+        mark = mark_of(read.text)
         if mark:
             return ("mark", mark)
-        digits = _digits(read.text, fix=page)
+        digits = read_digits(read.text, fix=page)
         return ("place", int(digits)) if digits and 0 < int(digits) <= 999 else None
     if kind == "number":
-        digits = _digits(read.text, fix=page)
+        digits = read_digits(read.text, fix=page)
         return ("number", digits.lstrip("0") or "0") if digits else None
     if kind in ("time", "gap") and is_placeholder(read.text):
         return ("empty", None)
     if kind == "time":
-        mark = _mark(read.text)
+        mark = mark_of(read.text)
         if mark:
             return ("mark", mark)
         parsed = parse_time(read.text, fix=page)
@@ -673,7 +584,7 @@ def _split_lap(words: list[str]) -> tuple[list[str], str | None, bool]:
         if parsed:
             return words[:cut], parsed[1], True
     if words and sum(char.isdigit() for char in words[-1]) >= max(2, len(words[-1]) * 0.6):
-        tail = _compact(words[-1]).translate(_DIGIT_FIX)
+        tail = compact(words[-1]).translate(DIGIT_FIX)
         clock, _, fraction = tail.partition(".")
         guess = parse_time(f"{clock[:-2]}:{clock[-2:]}.{fraction}") if len(clock) >= 3 and clock.isdigit() else None
         return words[:-1], guess[1] if guess else None, False

@@ -35,6 +35,7 @@ from functools import lru_cache
 
 from PIL import Image, ImageChops, ImageDraw, ImageFilter, ImageOps, UnidentifiedImageError
 
+from services import result_image_values as image_values
 from services.image_upload import (
     MAX_BYTES, MAX_IMAGE_DIMENSION, MAX_IMAGE_PIXELS, MAX_IMAGE_UPLOAD_MB, PIL_IMAGE_FORMATS,
 )
@@ -494,21 +495,20 @@ def column_anchors(columns: list[dict], labels: dict[int, Cell] | None, data_lin
 
 def _fits(kind: str, text: str) -> bool:
     """Passt der Inhalt einer Zelle zur Art der Spalte? Nur grob - entschieden wird in ``result_image_match``."""
-    from services import result_image_match as match
-
     key = "".join(text.split())
     if not key:
         return False
     if kind in ("place", "number"):
-        digits = match.digits_of(key)
-        return bool(digits) or (kind == "place" and bool(match.mark_of(key)))
+        digits = image_values.digits_of(key)
+        return bool(digits) or (kind == "place" and bool(image_values.mark_of(key)))
     if kind == "text":
-        return sum(char.isalpha() for char in key) >= 2 and not match.is_placeholder(key)
+        return sum(char.isalpha() for char in key) >= 2 and not image_values.is_placeholder(key)
     if kind == "time":
-        return bool(match.parse_time(key, fix=True) or match.mark_of(key) or match.is_placeholder(key)
-                    or (match.parse_gap(key) and match.parse_gap(key)[1] is None))
+        lapped = image_values.parse_gap(key)
+        return bool(image_values.parse_time(key, fix=True) or image_values.mark_of(key)
+                    or image_values.is_placeholder(key) or (lapped and lapped[1] is None))
     if kind == "gap":
-        return bool(match.parse_gap(key, fix=True) or match.is_placeholder(key))
+        return bool(image_values.parse_gap(key, fix=True) or image_values.is_placeholder(key))
     return False
 
 
