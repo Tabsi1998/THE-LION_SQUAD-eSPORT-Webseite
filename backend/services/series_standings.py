@@ -10,7 +10,9 @@ gewerteter Runde einen Stand je Wertung (``scope``):
   aus der Zeile, sonst das Standard-Team); ein Gast zählt fürs Team, wenn ``guests_count`` an ist. Ohne ein einziges
   Team gibt es keinen (leeren) Teamstand.
 - ``table``: Tabelle einer Team-Liga aus den eingetragenen Spielen; hat das Blatt die Tabelle des Veranstalters
-  (``official_table``), gilt sie, abgeglichen wird das eigene Team (``own_teams``).
+  (``official_table``), gilt sie für Teams und Plätze: Teams aus den Spielen in anderer Schreibweise zählen für ihre
+  Zeile (``team_names.align_to_table``), ohne passende Zeile bekommen sie keine eigene, und offizielle Plätze werden nie
+  neu gerechnet. Abgeglichen wird das eigene Team (``own_teams``).
 
 Gewertet wird eine Runde mit Status ``scored`` und Blatt; Runden mit ``counts=False`` (etwa ein Finale außerhalb der
 Wertung) bleiben draußen. Eine abgesagte Runde hat keinen Stand und zählt nicht zu den Runden des Kalenders, behält aber
@@ -25,6 +27,7 @@ from services.own_teams import Matcher
 from services.scoring_rules import (
     counted_results, league_table, normalize_rules, rank_with_ties, result_points, validate_sheet,
 )
+from services.team_names import align_to_table
 
 WORST = -math.inf
 TABLE_FIELDS = ("played", "won", "drawn", "lost", "score_for", "score_against", "score_diff")
@@ -218,13 +221,30 @@ def _team_rows(rules: dict, upto: list[dict], sheets: dict, seq_of: dict, people
 
 
 # ---------------------------------------------------------------- Tabelle der Team-Liga
+def _team(value) -> str:
+    return " ".join(str(value or "").split())
+
+
+def _table_rank(rows: list[dict], rules: dict) -> None:
+    field = {"score_diff": "score_diff", "score_for": "score_for", "wins": "won"}
+    rank_with_ties(rows, lambda row: (row["points"], *(row[field[name]] for name in rules["table_tiebreakers"])))
+
+
 def _table_rows(rules: dict, upto: list[dict], sheets: dict, own_teams: set[str]) -> list[dict]:
-    computed = {row["team"]: row for row in league_table(
-        [match for item in upto for match in sheets[item["id"]].get("matches") or []], rules)}
-    official = {str(row.get("team") or "").strip(): row for row in sheets[upto[-1]["id"]].get("official_table") or []
-                if str(row.get("team") or "").strip()}
+    matches = [match for item in upto for match in sheets[item["id"]].get("matches") or []]
+    official = {_team(row.get("team")): row for row in sheets[upto[-1]["id"]].get("official_table") or []
+                if _team(row.get("team"))}
+    if official:
+        # Die Tabelle des Veranstalters ist für Teams und Plätze maßgeblich (Prüfung #1931): ein Team aus den Spielen in
+        # anderer Schreibweise zählt für seine Zeile, eines ohne passende Zeile bekommt keine eigene - die Prüfung des
+        # Ergebnisblatts nennt es (``table_team_unknown``).
+        mapping, _unclear = align_to_table([match.get(side) for match in matches for side in ("home", "away")],
+                                           list(official))
+        matches = [{**match, "home": mapping.get(_team(match.get("home")), match.get("home")),
+                    "away": mapping.get(_team(match.get("away")), match.get("away"))} for match in matches]
+    computed = {_team(row["team"]): row for row in league_table(matches, rules)}
     rows = []
-    for team in sorted(set(computed) | set(official), key=lambda name: (name.casefold(), name)):
+    for team in sorted(official or computed, key=lambda name: (name.casefold(), name)):
         mine, theirs = computed.get(team) or {}, official.get(team)
         row = {"team": team, **{field: mine.get(field, 0) for field in TABLE_FIELDS},
                "computed_points": mine.get("points", 0)}
@@ -237,14 +257,20 @@ def _table_rows(rules: dict, upto: list[dict], sheets: dict, own_teams: set[str]
                             if row["official_points"] is not None and team in own_teams and team in computed else None)
         row["_official_rank"] = theirs.get("rank") if theirs else None
         rows.append(row)
-    if official and all(isinstance(row["_official_rank"], int) for row in rows):
-        for row in rows:
+    ranked = [row for row in rows if isinstance(row["_official_rank"], int)]
+    if ranked:
+        # Offizielle Plätze werden nie neu gerechnet; Teams ohne Platz folgen dahinter, nach Punkten.
+        rest = [row for row in rows if not isinstance(row["_official_rank"], int)]
+        for row in ranked:
             row["rank"] = row["_official_rank"]
-        rows.sort(key=lambda row: (row["rank"], row["team"].casefold()))
+        _table_rank(rest, rules)
+        top = max(row["rank"] for row in ranked)
+        for row in rest:
+            row["rank"] += top
+        rows = ranked + rest
     else:
-        field = {"score_diff": "score_diff", "score_for": "score_for", "wins": "won"}
-        rank_with_ties(rows, lambda row: (row["points"], *(row[field[name]] for name in rules["table_tiebreakers"])))
-        rows.sort(key=lambda row: (row["rank"], row["team"].casefold()))
+        _table_rank(rows, rules)
+    rows.sort(key=lambda row: (row["rank"], row["team"].casefold()))
     for row in rows:
         row.pop("_official_rank", None)
     return rows

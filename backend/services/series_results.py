@@ -35,7 +35,7 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass, field
 
-from services import series_identity, team_league_sheet
+from services import series_identity, team_league_sheet, team_names
 from services.own_teams import Matcher
 from services.scoring_rules import result_points
 
@@ -457,9 +457,24 @@ def _matches(resolution: Resolution, own_teams) -> list[dict]:
             teams[row["team"].casefold()] = 0
     ranks = [row["rank"] for row in resolution.official_table]
     if any(rank is not None for rank in ranks) and any(rank is None for rank in ranks):
-        problems.append(_problem("table_rank_partial", "In der Tabelle fehlt bei manchen Teams der Platz - die "
-                                 "Reihenfolge wird aus den Punkten gerechnet."))
+        problems.append(_problem("table_rank_partial", "In der Tabelle fehlt bei manchen Teams der Platz - sie stehen "
+                                 "hinter den Teams mit Platz, nach Punkten."))
+    problems.extend(_table_teams(resolution, own, others))
     return problems
+
+
+def _table_teams(resolution: Resolution, own: Matcher, others: list[str]) -> list[dict]:
+    """Teams aus den Spielen, die zu keiner Zeile der Tabelle laut Veranstalter passen (Prüfung #1931): die Tabelle ist
+    maßgeblich, sie bekommen keine eigene Zeile - statt still eine Doppelzeile zu bauen, nennt die Prüfung sie."""
+    if not resolution.official_table or not resolution.matches:
+        return []
+    table = [own.canonical(row["team"], others) for row in resolution.official_table if row.get("team")]
+    names = [own.canonical(match[side], others) for match in resolution.matches for side in ("home", "away")
+             if match.get(side)]
+    _mapping, unclear = team_names.align_to_table(names, table)
+    return [_problem("table_team_unknown", f"„{name}“ aus den Spielen passt zu keinem Team der Tabelle laut "
+                     "Veranstalter - es bekommt keine eigene Zeile. Bitte die Schreibweise angleichen.")
+            for name in unclear]
 
 
 def _sheet_teams(resolution: Resolution) -> list[str]:
