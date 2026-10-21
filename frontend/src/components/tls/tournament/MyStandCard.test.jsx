@@ -45,6 +45,16 @@ test("vor Ort im laufenden Turnier (#1556): „Du bist als Nächstes an Station 
   expect(screen.queryByTestId("queue-stub")).toBeNull();
 });
 
+test("#1938: der Check-in nennt die wirksamen Zeiten - nie „ab 10:56 bis 10:48“", () => {
+  const { unmount } = renderCard({
+    status: "live", check_in_from: "2099-10-21T08:56:00+00:00", check_in_until: "2026-10-21T08:48:00+00:00", check_in_closed_at: "2026-10-21T08:49:00+00:00",
+  }, { status: "checked_in" });
+  expect(screen.getByTestId("tournament-my-checkin")).toHaveTextContent(/^bis 21\.10\.2026, 10:48$/);
+  unmount();
+  renderCard({ status: "check_in", check_in_from: "2026-10-21T08:30:00+00:00", check_in_until: "2099-10-21T08:55:00+00:00" }, { status: "approved" });
+  expect(screen.getByTestId("tournament-my-checkin")).toHaveTextContent("ab 21.10.2026, 10:30 bis 21.10.2099, 10:55");
+});
+
 test("#1888: nach dem Ende keine Warteschlange mehr, auch wenn der Rohstatus noch „live“ ist", () => {
   const { unmount } = renderCard({ status: "live", event_mode: "local", public_phase: { state: "completed" } }, { status: "checked_in" });
   expect(screen.queryByTestId("queue-stub")).toBeNull();

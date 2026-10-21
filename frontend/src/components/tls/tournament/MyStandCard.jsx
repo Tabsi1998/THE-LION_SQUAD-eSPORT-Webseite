@@ -2,7 +2,7 @@ import { Link } from "react-router-dom";
 import { CalendarClock, Users, Wallet } from "lucide-react";
 import { StatusBadge } from "@/components/tls/StatusBadge";
 import { StepBar, tournamentStep, tournamentSteps } from "@/components/tls/StepBar";
-import { formatDateTime } from "@/lib/datetime";
+import { checkInLine } from "@/lib/checkInTimes";
 import { formatCents } from "@/lib/pricing";
 import { TeamDayPanel } from "@/components/tls/tournament/TeamDayPanel";
 import { ResultShareButton } from "@/components/tls/ResultShareButton";
@@ -28,6 +28,7 @@ export function MyStandCard({ tournament: t, registration: myReg, team = null, i
   // Nach dem Check-in-Ende (#1551) steht der Baum - der Status bleibt „Check-in“, der Knopf geht weg.
   const checkinOpen = t.status === "check_in" && !t.check_in_closed_at;
   const line = paymentLine(myReg.price);
+  const checkIn = checkInLine(t);
   // Wo die Anmeldung steht (#1081): Freigabe, Startgeld, Check-in, Turnier - immer aus dem echten Stand.
   const steps = tournamentSteps(t, myReg);
   const step = tournamentStep(steps, myReg);
@@ -48,8 +49,9 @@ export function MyStandCard({ tournament: t, registration: myReg, team = null, i
         {!line && t.offer && myReg.user_id && ["pending", "waitlist"].includes(myReg.status) ? (
           <div className="flex items-start gap-2"><Wallet className="w-4 h-4 text-white/50 mt-0.5" /><div><dt className="text-[10px] font-bold uppercase tracking-widest text-white/50">Startgeld</dt><dd className="text-white/60" data-testid="tournament-price-pending">Bezahlt wird erst, wenn deine Teilnahme bestätigt ist.</dd></div></div>
         ) : null}
-        {(t.check_in_from || t.check_in_until) ? (
-          <div className="flex items-start gap-2"><CalendarClock className="w-4 h-4 text-white/50 mt-0.5" /><div><dt className="text-[10px] font-bold uppercase tracking-widest text-white/50">Check-in</dt><dd data-testid="tournament-my-checkin">{t.check_in_from ? `ab ${formatDateTime(t.check_in_from)}` : ""}{t.check_in_until ? ` bis ${formatDateTime(t.check_in_until)}` : ""}{staffOnlyCheckIn ? " · vor Ort bei der Turnierleitung" : ""}</dd></div></div>
+        {/* Die wirksamen Zeiten (#1938): nach einem Check-in von Hand nie „ab 10:56 bis 10:48“. */}
+        {checkIn ? (
+          <div className="flex items-start gap-2"><CalendarClock className="w-4 h-4 text-white/50 mt-0.5" /><div><dt className="text-[10px] font-bold uppercase tracking-widest text-white/50">Check-in</dt><dd data-testid="tournament-my-checkin">{checkIn}{staffOnlyCheckIn ? " · vor Ort bei der Turnierleitung" : ""}</dd></div></div>
         ) : null}
       </dl>
       {/* Vor Ort im laufenden Turnier (#1556): wo und wann dein nächstes Spiel ist - aus der Warteschlange je Station. */}
