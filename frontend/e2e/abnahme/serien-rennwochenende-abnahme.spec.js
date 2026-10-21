@@ -164,6 +164,9 @@ test.describe("Abnahme #1930: Rennwochenende mit Läufen", () => {
       await sprint.getByTestId("weekend-session-offset").fill("30");
       await sprint.getByTestId("weekend-session-points-mode").selectOption("own");
       await sprint.getByTestId("weekend-session-points").fill("12-9-7-6-5-4-3-2-1");
+      // Vorschau je Lauf: Sprint mit seiner Liste, Hauptrennen wie die Saison.
+      await expect(sprint.getByTestId("weekend-session-preview")).toHaveText("P1 12 · P2 9 · P3 7 · P4 6 · P5 5 · … · P9 1");
+      await expect(first.getByTestId("weekend-session-preview").nth(1)).toHaveText("P1 25 · P2 18 · P3 15 · P4 12 · P5 10 · … · P10 1");
       await admin.getByTestId("weekend-phase-add").click();
       const second = admin.getByTestId("weekend-format").nth(1);
       await second.getByTestId("weekend-format-from").fill("5");
@@ -172,7 +175,7 @@ test.describe("Abnahme #1930: Rennwochenende mit Läufen", () => {
       await second.getByTestId("weekend-session-offset").nth(1).fill("0");
       for (const select of await second.getByTestId("weekend-session-grid").all()) await select.selectOption("reverse_standings");
       // Hoch genug, dass der ganze Abschnitt im Blatt steht (sonst liegt der Kopf des Blatts darüber).
-      await admin.setViewportSize({ width: 1440, height: 2000 });
+      await admin.setViewportSize({ width: 1440, height: 2800 });
       await admin.getByTestId("series-weekend").scrollIntoViewIfNeeded();
       await shot(admin.getByTestId("series-weekend"), "nachher-laeufe-je-runde-1440");
       await admin.setViewportSize({ width: 1440, height: 900 });
@@ -288,6 +291,19 @@ test.describe("Abnahme #1930: Rennwochenende mit Läufen", () => {
       await expect(detail.getByTestId("racing-driver-stats")).toContainText(`Quali-Duell 1:1 gegen ${lena}`);
       await shot(anon, "nachher-seite-1440", { fullPage: true });
       await shot(anon.getByTestId("racing-drivers"), "nachher-rennraster-1440");
+      // Wertung je Lauf: die eigene Sprint-Tabelle - R1 und R2 nach 12-9-7-6-5-4.
+      const tabs = anon.getByTestId("racing-table-tabs");
+      await expect(tabs.getByRole("button")).toHaveText(["Gesamt", "Rennen", "Sprint"]);
+      await anon.getByTestId("racing-table-sprint").click();
+      const sprintRows = anon.getByTestId("racing-drivers").getByTestId("series-table").getByTestId("series-row");
+      await expect(sprintRows).toHaveCount(6);
+      const sprintTotals = await sprintRows.evaluateAll((items) => items.map((row) => {
+        const cells = row.querySelectorAll("td");
+        return Number(cells[cells.length - 2].textContent);
+      }));
+      expect(sprintTotals).toEqual([18, 18, 16, 13, 12, 9]);
+      await shot(anon.getByTestId("racing-drivers"), "nachher-sprint-tabelle-1440");
+      await anon.getByTestId("racing-table-all").click();
       await shot(cal, "nachher-rennkalender-1440");
       await shot(anon.getByTestId("racing-garage"), "nachher-fahrer-detail-1440");
 
@@ -315,6 +331,9 @@ test.describe("Abnahme #1930: Rennwochenende mit Läufen", () => {
         await areaShot(anon, anon.getByTestId("racing-calendar"), `nachher-rennkalender-${width}`);
         if (width === 390) {
           await shot(anon, "nachher-seite-390", { fullPage: true });
+          await anon.getByTestId("racing-table-sprint").click();
+          await expect(anon.getByTestId("racing-drivers").getByTestId("series-cards")).toBeVisible();
+          await areaShot(anon, anon.getByTestId("racing-drivers"), "nachher-sprint-tabelle-390");
           await anon.goto("/references");
           await noOverflow(anon);
           const running = anon.getByTestId(`running-card-${lineage.slug}-${series.season_slug}`);
