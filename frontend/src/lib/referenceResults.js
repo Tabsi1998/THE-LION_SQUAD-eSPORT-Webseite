@@ -3,11 +3,13 @@
 // ausschließlich `lib/resultPaste.js`.
 
 import { cleanText, parseNumber, parsePlace } from "@/lib/resultPaste";
+import { dayFieldErrors, dayPlaces, dayRowPayload, emptyRound, roundsToForm, schemeOf } from "@/lib/tournamentDays";
 
 export const MARK_OPTIONS = [
   ["dnf", "DNF"], ["dns", "DNS"], ["dsq", "DSQ"], ["fastest_lap", "Schnellste Runde"], ["pole", "Pole"],
 ];
-export const MARK_LABELS = Object.fromEntries(MARK_OPTIONS);
+// „Ausgestiegen“ (#1961) gibt es nur im Blatt eines Turniertags (lib/tournamentDays.js).
+export const MARK_LABELS = { ...Object.fromEntries(MARK_OPTIONS), left: "Ausgestiegen" };
 
 let counter = 0;
 function nextKey(prefix) {
@@ -22,7 +24,9 @@ export function emptyRow(values = {}) {
     key: nextKey("row"), participant_id: "", name: "", team: "", place: "", points: "", override: false, marks: [],
     penalty_points: "", start_number: "", official_total: "", note: "", source: "", points_hint: null,
     // Rennergebnis (#1927): Startplatz, Rennzeit, Abstand - als Text wie eingegeben. Strafsekunden (#1950) nur zur Anzeige.
-    grid: "", time: "", gap: "", penalty_seconds: "", ...values,
+    grid: "", time: "", gap: "", penalty_seconds: "",
+    // Turniertag (#1961): Runden R1…Rn ({points, place, lobby}), GES P, Partner im Double Up (Name), Sonderboni.
+    rounds: [], day_points: "", partner: "", bonus_keys: [], ...values,
   };
 }
 
@@ -68,6 +72,10 @@ export function sheetToForm(content, participants = [], { kind, teamName, oppone
     time: text(row.time),
     gap: text(row.gap),
     penalty_seconds: row.penalty_seconds ? text(row.penalty_seconds) : "",
+    rounds: roundsToForm(row.day_rounds),
+    day_points: text(row.day_points),
+    partner: participantName(participants, row.partner_id),
+    bonus_keys: [...(row.bonus_keys || [])],
   }));
   const people = (ids) => (ids || []).map((id) => ({ participant_id: id, name: participantName(participants, id) }));
   const matches = (content?.matches || []).map((match) => ({
@@ -95,6 +103,8 @@ export function sheetToForm(content, participants = [], { kind, teamName, oppone
       time: text(content?.fastest_lap?.time),
     },
     driverOfTheDay: participantName(participants, content?.driver_of_the_day),
+    // Turniertag (#1961): Zweierteams teilen Platz und Punkte.
+    doubleUp: Boolean(content?.double_up),
   };
 }
 
@@ -114,6 +124,10 @@ export function pastedToRows(parsed, participants = []) {
       grid: text(row.grid),
       time: row.time || "",
       gap: row.gap || "",
+      // Rundenmatrix (#1961): „R 1 … R 5, GES P“ und Spalten der Sonderboni.
+      rounds: (row.rounds || []).map((value) => emptyRound({ points: text(value) })),
+      day_points: text(row.day_points),
+      bonus_keys: [...(row.bonus_keys || [])],
     });
   });
 }
@@ -158,6 +172,7 @@ export function fieldErrors(form) {
   const out = {};
   const add = (key, field, message) => { if (message) (out[key] ||= {})[field] = message; };
   for (const row of form.rows) {
+    for (const [field, message] of Object.entries(dayFieldErrors(row))) add(row.key, field, message);
     if (text(row.place).trim() && parsePlace(row.place) === null) add(row.key, "place", "Platz als ganze Zahl von 1 bis 1000.");
     if (text(row.grid).trim() && parsePlace(row.grid) === null) add(row.key, "grid", "Startplatz als ganze Zahl von 1 bis 1000.");
     add(row.key, "points", checkNumber(row.points, { min: -LIMITS.points, max: LIMITS.points, message: "Punkte als Zahl, etwa 25 oder 12,5." }));
@@ -238,8 +253,11 @@ function rowReference(name, rows) {
   return { name: row ? cleanText(row.name) : wanted };
 }
 
-/** Platz aus der Reihenfolge je Zeile (für leere Platzfelder): gezählt werden nur ausgefüllte Zeilen. */
-export function autoPlaces(rows) {
+/** Platz aus der Reihenfolge je Zeile (für leere Platzfelder): gezählt werden nur ausgefüllte Zeilen. Trägt eine Zeile
+ * eine Tagessumme (#1961), bestimmt sie den Platz - Gleichstand teilt ihn, ein Paar im Double Up auch. */
+export function autoPlaces(rows, { scheme = [], doubleUp = false } = {}) {
+  const byDay = dayPlaces(rows, { scheme, doubleUp });
+  if (byDay) return Object.fromEntries(Object.entries(byDay).map(([key, place]) => [key, rows.find((row) => row.key === key)?.no_place ? null : place]));
   const out = {};
   let seen = 0;
   for (const row of rows) {
@@ -254,11 +272,13 @@ export function autoPlaces(rows) {
  * Das Formular als Body für Vorschau und Übernehmen. Leere Zeilen fallen weg; ohne eingetragenen Platz zählt die
  * Reihenfolge (Nichtstart ohne Platz). Punkte: leer = nach Schlüssel; eingetragen = laut Veranstalter (geprüft gegen den
  * Schlüssel) oder – mit „überschreiben“ – als Wert, der zählt. `rowKeys[i]` ist die Formularzeile zu Zeile `i` im Body.
+ * `rules` (die der Saison): das Rundenschema für den Platz aus der Tagessumme (#1961).
  */
-export function formToPayload(form) {
+export function formToPayload(form, rules = {}) {
   const rowKeys = [];
   const rows = [];
-  const auto = autoPlaces(form.rows);
+  const doubleUp = Boolean(form.doubleUp);
+  const auto = autoPlaces(form.rows, { scheme: schemeOf(rules), doubleUp });
   form.rows.forEach((row) => {
     if (!filled(row)) return;
     const points = number(row.points);
@@ -275,6 +295,7 @@ export function formToPayload(form) {
       penalty_points: number(row.penalty_points) || 0,
       official_total: number(row.official_total),
       note: text(row.note).trim() || null,
+      ...dayRowPayload(row, { doubleUp, reference: (name) => rowReference(name, form.rows) }),
     };
     rowKeys.push(row.key);
     rows.push(out);
@@ -324,6 +345,7 @@ export function formToPayload(form) {
   if (fastest || lapTime) payload.fastest_lap = { ...(fastest || {}), time: lapTime || null };
   const driver = rowReference(form.driverOfTheDay, form.rows);
   if (driver) payload.driver_of_the_day = driver;
+  if (doubleUp) payload.double_up = true;
   return { payload, rowKeys };
 }
 
