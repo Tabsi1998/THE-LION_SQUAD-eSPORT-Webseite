@@ -56,6 +56,15 @@ def number(value):
     return value
 
 
+NO_TIME_CHARS = frozenset("-:.,–—")
+
+
+def lap_text(value) -> str | None:
+    """Zeit oder Abstand als Text (höchstens 20 Zeichen); ein Platzhalter wie „--:--.---“ ist keine Zeit (#1927)."""
+    text = clean(value)[:20]
+    return None if not text or set(text) <= NO_TIME_CHARS else text
+
+
 def is_new(participant_id) -> bool:
     return str(participant_id or "").startswith(NEW_PREFIX)
 
@@ -223,7 +232,7 @@ def resolve(entry: dict, participants: list[dict], rules: dict) -> Resolution:
                "penalty_points": number(float(raw.get("penalty_points") or 0)),
                "note": clean(raw.get("note"))[:300] or None,
                "start_number": clean(raw.get("start_number"))[:10] or None, "grid": raw.get("grid") or None,
-               "time": clean(raw.get("time"))[:20] or None, "gap": clean(raw.get("gap"))[:20] or None}
+               "time": lap_text(raw.get("time")), "gap": lap_text(raw.get("gap"))}
         out.rows.append(row)
         if located.participant_id:
             seen.setdefault(located.participant_id, []).append(index)
@@ -287,7 +296,7 @@ def _race_extras(out: Resolution, entry: dict, lookup: _Lookup, seen: dict) -> N
     """Schnellste Runde und Fahrer des Tages (#1927) den Zeilen zuordnen."""
     fastest = entry.get("fastest_lap")
     if isinstance(fastest, dict):
-        time = clean(fastest.get("time"))[:20] or None
+        time = lap_text(fastest.get("time"))
         pid = _in_list(out, fastest, lookup, seen, "Schnellste Runde", "fastest_lap_not_in_list")
         if pid is None and not any(clean(fastest.get(key)) for key in ("participant_id", "name", "start_number")):
             marked = [row["participant_id"] for row in out.rows

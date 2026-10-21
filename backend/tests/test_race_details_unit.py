@@ -99,3 +99,14 @@ def test_the_standing_carries_the_race_details_only_where_given():
     assert rows["p-nora"]["driver_of_the_day"] is True
     assert "driver_of_the_day" not in rows["p-anna"] and "fastest_lap_time" not in rows["p-anna"]
     assert (rows["p-carl"]["marks"], rows["p-carl"]["grid"]) == (["dnf"], 2)
+
+
+def test_a_placeholder_without_time_is_no_time():
+    # So liefert eine Grafik einen Ausfall: „OUT“ als Feld dnf, Zeit und Abstand als Platzhalter.
+    out = resolve({"rows": [{"place": 1, "name": "Anna Probe", "time": "1:32:45.123"},
+                            {"place": None, "name": "Bert Bolzt", "time": "--:--.---", "gap": "--.---", "dnf": True}],
+                   "fastest_lap": {"name": "Anna Probe", "time": "--:--.---"}}, PEOPLE, SCHEME)
+    content = out.content()
+    assert content["rows"][1] == {"participant_id": "p-bert", "place": None, "team": None, "points": None,
+                                  "points_source": "scheme", "marks": ["dnf"], "penalty_points": 0, "note": None}
+    assert content["fastest_lap"] == {"participant_id": "p-anna", "time": None}

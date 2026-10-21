@@ -23,8 +23,9 @@ const NO_TEAM = "Kein Team erkannt.";
 
 const SEPARATORS = [["\t", "tab"], ["|", "pipe"], [";", "semicolon"]];
 
+// „OUT“ schreibt etwa die PRL für einen Ausfall mit 0 Punkten (#1927), auch als „DNF/OUT“.
 const MARK_WORDS = {
-  dnf: "dnf", ret: "dnf", ausfall: "dnf", aufgegeben: "dnf",
+  dnf: "dnf", ret: "dnf", ausfall: "dnf", aufgegeben: "dnf", out: "dnf", "dnf/out": "dnf", "out/dnf": "dnf",
   dns: "dns", "nicht gestartet": "dns",
   dsq: "dsq", dq: "dsq", disq: "dsq", disqualifiziert: "dsq",
   fl: "fastest_lap", "schnellste runde": "fastest_lap", "fastest lap": "fastest_lap",
@@ -148,7 +149,17 @@ export function parsePlace(value) {
 }
 
 export function parseMark(value) {
-  return MARK_WORDS[cleanText(value).toLowerCase()] || null;
+  return MARK_WORDS[cleanText(value).toLowerCase().split(" / ").join("/")] || null;
+}
+
+const NO_TIME_CHARS = new Set(["-", ":", ".", ",", "–", "—"]);
+
+/** Platzhalter ohne Zeit („--:--.---“, „--.---“): keine Zeit, kein Abstand, kein Name (#1927). */
+export function isNoTime(value) {
+  const text = cleanText(value);
+  if (!text) return false;
+  for (const char of text) if (!NO_TIME_CHARS.has(char)) return false;
+  return true;
 }
 
 function isRuler(cells) {
@@ -276,6 +287,10 @@ function lineRow(text) {
   const marks = [];
   while (items.length > 1) {
     const last = items[items.length - 1];
+    if (isNoTime(last.text)) {
+      items.pop();
+      continue;
+    }
     const mark = parseMark(last.text);
     if (mark) {
       if (!marks.includes(mark)) marks.unshift(mark);
@@ -321,6 +336,7 @@ function cellRow(cells) {
       if (!marks.includes(mark)) marks.push(mark);
       return;
     }
+    if (isNoTime(cell)) return;
     if (isGap(cell)) {
       // Ohne Kopfzeile: „+…“ ist der Abstand, eine Zelle mit „:“ die Zeit (#1927).
       if (cell.startsWith("+")) gap ||= cell;
@@ -355,6 +371,7 @@ function headerRow(cells, keys) {
       return;
     }
     if (!key) return;
+    if ((key === "time" || key === "gap" || key === "best_lap") && isNoTime(cell)) return;
     if (key === "place") row.place = parsePlace(cell);
     else if (key === "points") row.points = parseNumber(cell);
     else if (key === "name") row.name = cell;

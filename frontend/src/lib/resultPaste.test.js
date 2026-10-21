@@ -70,6 +70,37 @@ test("Zeilen „Schnellste Runde: …“ und „Fahrer des Tages: …“ gehöre
 
 const pick = (rows, ...keys) => rows.map((row) => Object.fromEntries(keys.map((key) => [key, row[key]])));
 
+test("„OUT“ und „DNF/OUT“ sind ein Ausfall, „--:--.---“ ist keine Zeit – in jeder Spalte und im Zeilenformat", () => {
+  expect(parseMark("OUT")).toBe("dnf");
+  expect(parseMark("DNF/OUT")).toBe("dnf");
+  expect(parseMark("out / dnf")).toBe("dnf");
+  const table = parseResultPaste([
+    "Pos\tFahrer\tZeit\tAbstand\tPunkte",
+    "1\tAlpha\t1:32:45.123\t\t35",
+    "2\tBeta\tOUT\t\t0",
+    "3\tGamma\t--:--.---\tDNF/OUT\t0",
+    "4\tDelta\t--:--.---\t--.---\t",
+  ].join("\n"));
+  expect(table.errors).toEqual([]);
+  expect(pick(table.rows, "name", "time", "gap", "marks")).toEqual([
+    { name: "Alpha", time: "1:32:45.123", gap: "", marks: [] },
+    { name: "Beta", time: "", gap: "", marks: ["dnf"] },
+    { name: "Gamma", time: "", gap: "", marks: ["dnf"] },
+    { name: "Delta", time: "", gap: "", marks: [] },
+  ]);
+  const lines = parseResultPaste("18. Probe Fahrer OUT\n19. Probe Zwei DNF/OUT");
+  expect(pick(lines.rows, "name", "marks", "time")).toEqual([
+    { name: "Probe Fahrer", marks: ["dnf"], time: "" },
+    { name: "Probe Zwei", marks: ["dnf"], time: "" },
+  ]);
+  // Ohne Kopfzeile: der Platzhalter ist weder Zeit noch Name, die Punkte bleiben die letzte Zahl.
+  const bare = parseResultPaste("20\tProbe Drei\tTeam\t--:--.---\t0\n21\tProbe Vier\tTeam\tOUT\t0");
+  expect(pick(bare.rows, "name", "team", "marks", "time", "points")).toEqual([
+    { name: "Probe Drei", team: "Team", marks: [], time: "", points: 0 },
+    { name: "Probe Vier", team: "Team", marks: ["dnf"], time: "", points: 0 },
+  ]);
+});
+
 test("Bausteine: Leerraum, Zahlen, Plätze und Marken", () => {
   expect(cleanText("  Probe\u00a0 Fahrer\t ")).toBe("Probe Fahrer");
   expect(parseNumber("25")).toBe(25);
