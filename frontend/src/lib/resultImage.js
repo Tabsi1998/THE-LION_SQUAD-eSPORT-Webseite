@@ -66,7 +66,8 @@ export function imageToRows(result, participants = []) {
     const uncertain = (row.uncertain || []).filter((field) => SHOWN_FIELDS.includes(field));
     if (sameDriver(fastest, row)) {
       if (!marks.includes("fastest_lap")) marks.push("fastest_lap");
-      if (fastest.uncertain?.length) uncertain.push("marks");
+      // Gelb nur, wenn unsicher ist, WER die schnellste Runde fuhr – eine unsichere Zeit ändert die Marke nicht.
+      if (fastest.uncertain?.includes("name")) uncertain.push("marks");
     }
     return emptyRow({
       participant_id: known?.id || "",

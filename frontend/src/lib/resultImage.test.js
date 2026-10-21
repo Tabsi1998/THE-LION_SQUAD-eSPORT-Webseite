@@ -51,6 +51,9 @@ test("ist die schnellste Runde unsicher, sind die Marken der Zeile gelb; ohne Ke
   expect(rows[2].marks).toEqual(["dnf", "fastest_lap"]);
   expect(rows[2].ocr.uncertain).toEqual(["name", "marks"]);
   expect(rows[1].marks).toEqual([]);
+  // Nur die Zeit unsicher: die Marke sitzt beim richtigen Fahrer, nichts wird gelb.
+  const timeOnly = imageToRows({ ...RESULT, fastest_lap: { ...RESULT.fastest_lap, time: "4:31.207", uncertain: ["time"] } }, PARTICIPANTS);
+  expect([timeOnly[1].marks, timeOnly[1].ocr.uncertain]).toEqual([["fastest_lap"], ["start_number"]]);
 });
 
 test("ändern nimmt die gelbe Markierung vom Feld, „Passt so“ von der Zeile", () => {

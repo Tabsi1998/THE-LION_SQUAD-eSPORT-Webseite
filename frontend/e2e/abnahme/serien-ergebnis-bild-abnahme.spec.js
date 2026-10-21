@@ -58,6 +58,11 @@ async function pasteImage(page, file, type) {
   }, { data: base64, mime: type });
 }
 
+/** Erst wenn keine Meldung mehr oben steht - sonst liegt sie über dem Bild. */
+async function noToasts(page) {
+  await expect(page.locator("[data-sonner-toast]")).toHaveCount(0, { timeout: 15_000 });
+}
+
 const EXPECTED = {
   place: (row) => (row.place ? String(row.place) : ""),
   name: (row) => row.name,
@@ -95,12 +100,29 @@ test.describe("Abnahme #1756: Ergebnis-Bild auslesen - einfügen, Vorschau, korr
       expect(info.template.id).toBe("rennliga-dunkel");
       expect(info.available, "Tesseract fehlt im Backend-Image").toBe(true);
 
+      // 0. Die Vorlage wählt der Vorstand an der Spur (Standard der Art, ausdrücklich gewählt oder „Aus“).
+      await admin.goto("/admin/reference-series");
+      await admin.getByTestId(`lineage-edit-${lineage.id}`).click();
+      const lineageSheet = admin.getByTestId("lineage-sheet");
+      const choice = lineageSheet.getByTestId("lineage-image-template");
+      await expect(choice).toHaveValue("");
+      await choice.selectOption("rennliga-dunkel");
+      await shot(admin, lineageSheet, "spur-vorlage-1440");
+      await lineageSheet.getByTestId("lineage-save").click();
+      await expect(lineageSheet).toHaveCount(0);
+      const lineages = (await ok(await admin.request.get(SERIES))).lineages;
+      expect(lineages.find((item) => item.id === lineage.id).result_image_template).toBe("rennliga-dunkel");
+      await noToasts(admin);
+
       // 1. Leeres Blatt mit dem neuen Knopf (vorher), dann Strg+V mit einem leicht unscharfen Bild.
       await admin.goto(`/admin/reference-series/${series.id}`);
       await admin.getByTestId("results-round").filter({ hasText: "R1" }).getByTestId("results-open").click();
       const sheet = admin.getByTestId("result-sheet");
       await expect(sheet.getByTestId("result-image-pick")).toBeVisible();
       await shot(admin, sheet, "ergebnis-bild-vorher-1440");
+      await admin.setViewportSize({ width: 390, height: 844 });
+      await shot(admin, sheet, "ergebnis-bild-vorher-390");
+      await admin.setViewportSize({ width: 1440, height: 900 });
       await pasteImage(admin, images.blurry, "image/jpeg");
       await expect(sheet.getByTestId("result-image-summary")).toBeVisible({ timeout: 60_000 });
       await expect(sheet.getByTestId("result-row")).toHaveCount(images.sheet.rows.length);
@@ -143,8 +165,8 @@ test.describe("Abnahme #1756: Ergebnis-Bild auslesen - einfügen, Vorschau, korr
       expect(marks[ids[images.sheet.fastest_name]]).toContain("fastest_lap");
       expect(marks[ids[images.sheet.rows.at(-1).name]]).toContain("dnf");
 
-      // 3. Am Handy: „Bild auslesen“ mit einem sauberen Screenshot - nichts gelb, nichts gespeichert.
-      await admin.setViewportSize({ width: 390, height: 844 });
+      // 3. „Bild auslesen“ mit einem sauberen Screenshot - nichts gelb, nichts gespeichert; danach am Handy (390 px).
+      await noToasts(admin);
       await admin.getByTestId("results-round").filter({ hasText: "R1" }).getByTestId("results-open").click();
       await expect(sheet.getByTestId("result-image-pick")).toBeVisible();
       await sheet.getByTestId("result-image-file").setInputFiles(images.clean);
@@ -154,13 +176,15 @@ test.describe("Abnahme #1756: Ergebnis-Bild auslesen - einfügen, Vorschau, korr
       await expect(sheet.getByTestId("result-row-name")).toHaveCount(images.sheet.rows.length);
       expect(await sheet.getByTestId("result-row-name").evaluateAll((inputs) => inputs.map((input) => input.value))).toEqual(images.sheet.rows.map((row) => row.name));
       await expect(sheet.getByTestId("result-preview")).toBeVisible();
+      await shot(admin, sheet, "ergebnis-bild-nachher-1440");
+      await admin.setViewportSize({ width: 390, height: 844 });
       const overflow = await admin.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
       expect(overflow).toBeLessThanOrEqual(0);
       await shot(admin, sheet, "ergebnis-bild-nachher-390");
       await sheet.getByTestId("result-image-enlarge").click();
+      await expect(sheet.getByTestId("result-image-shrink")).toBeVisible();
       await shot(admin, sheet, "ergebnis-bild-gross-390");
       await admin.setViewportSize({ width: 1440, height: 900 });
-      await shot(admin, sheet, "ergebnis-bild-nachher-1440");
       await sheet.getByTestId("result-sheet-cancel").click();
       expect((await ok(await admin.request.get(results))).version).toBe(stored.version);
       expect(problems).toEqual([]);
