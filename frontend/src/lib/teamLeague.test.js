@@ -1,5 +1,6 @@
 import {
-  OUTCOMES, mapShare, matchPointsLabel, matchdayProgress, pathRankLabel, rankTrend, tableRows, tableTiebreakLabel,
+  OUTCOMES, PICK_LABELS, appearanceText, banText, cellState, mapShare, matchPointsLabel, matchdayProgress, pathRankLabel,
+  rankTrend, recordSummary, squadGroups, tableRows, tableTiebreakLabel,
 } from "./teamLeague";
 
 // Team-Liga (#1747): nur Beschriftungen und Umformungen dessen, was der Server gespeichert liefert. Erfundene Namen.
@@ -46,6 +47,36 @@ test("Map-Anteil für den kleinen Balken, ohne Division durch null", () => {
 test("Platzierungsverlauf: Richtung je Spieltag", () => {
   expect(rankTrend([{ rank: 3 }, { rank: 1 }, { rank: 1 }, { rank: 2 }]).map((item) => item.direction)).toEqual([null, "up", "same", "down"]);
   expect(OUTCOMES.win.letter).toBe("S");
+});
+
+test("Bilanz (#1931): S-U-N, Maps und Runden mit Differenz – Runden nur aus Spielen mit Maps", () => {
+  const item = { team: "Probe Löwen", played: 7, won: 5, drawn: 1, lost: 1, points: 16, maps_for: 15, maps_against: 6, rounds_for: 112, rounds_against: 85, rounds_matches: 7 };
+  expect(recordSummary(item)).toEqual({ team: "Probe Löwen", played: 7, won: 5, drawn: 1, lost: 1, points: 16, maps: "15:6", mapsDiff: "+9", rounds: "112:85", roundsDiff: "+27", roundsPartial: false });
+  const partial = recordSummary({ ...item, rounds_for: 30, rounds_against: 34, rounds_matches: 2 });
+  expect([partial.rounds, partial.roundsDiff, partial.roundsPartial]).toEqual(["30:34", "−4", true]);
+  expect(recordSummary({ ...item, rounds_matches: 0 }).rounds).toBe("");
+});
+
+test("Maps: wer gewählt hat und Banns aus eigener Sicht in Worten", () => {
+  expect(PICK_LABELS).toEqual({ own: "Unsere Wahl", opponent: "Wahl Gegner", decider: "Decider" });
+  expect(banText([{ name: "Karte Ost", by: "own" }, { name: "Karte Hafen", by: "opponent" }, { name: "Karte Süd", by: null }]))
+    .toBe("Karte Ost (wir) · Karte Hafen (Gegner) · Karte Süd");
+  expect(banText([])).toBe("");
+});
+
+test("Kader (#1931): je Spieltag gespielt oder Ersatz, „5 von 7“, Gruppen je eigenem Team und Gäste", () => {
+  const anna = { key: "a", name: "Anna", club_member: true, guest: false, round_ids: ["r1", "r2"], bench_round_ids: ["r3"], appearances: 2, of: 3, team: "Probe Löwen", in_roster: true };
+  const bert = { key: "b", name: "Bert", club_member: true, guest: false, round_ids: [], bench_round_ids: ["r1"], appearances: 0, of: 1, team: "Probe Löwen B", in_roster: true };
+  const gast = { key: "g", name: "Gast", club_member: false, guest: true, round_ids: ["r1"], bench_round_ids: [], appearances: 1, of: 1, team: "Probe Löwen", in_roster: false };
+  expect(["r1", "r3", "r9"].map((id) => cellState(anna, id))).toEqual(["played", "bench", ""]);
+  expect(appearanceText(anna)).toBe("2 von 3");
+  expect(appearanceText({ appearances: 4 })).toBe("4");
+  const single = squadGroups({ players: [anna, gast] }, ["Probe Löwen"]);
+  expect(single.map((group) => [group.key, group.label, group.players.map((player) => player.key)])).toEqual([
+    ["members", null, ["a"]], ["guests", "Gäste", ["g"]]]);
+  const two = squadGroups({ players: [anna, bert, gast] }, ["Probe Löwen", "Probe Löwen B"]);
+  expect(two.map((group) => [group.label, group.players.map((player) => player.key)])).toEqual([
+    ["Probe Löwen", ["a"]], ["Probe Löwen B", ["b"]], ["Gäste", ["g"]]]);
 });
 
 test("Liga-Weg: Platz von N, auch ohne Tabelle", () => {
