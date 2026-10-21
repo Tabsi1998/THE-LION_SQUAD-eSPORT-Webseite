@@ -193,6 +193,7 @@ GitHub sortiert Releases nach Veröffentlichungsdatum, nicht nach Version. Alte 
 
 Neueste oben.
 
+- `1.7.5`: Build 99, Verein › Erfolge im neuen Design, Saison-Ansicht für Renn- und Team-Ligen, Profil-Referenzen (#1945), News-Filter mit Anzahl und Such-Symbol (#1946), wirksame Check-in-Zeiten und Wartelisten-Platz (#1938, #1941)
 - `1.7.4`: Build 98, Galerie-Großansicht über Bildtext und Reiterleiste (#1910), News als Text-Karte mit Sieger und Anmelde-Karte nach dem ersten Absatz (#1912), Profile ohne Nullen und leere Reiter, privates Profil ohne Referenzen und Teams (#1916)
 - `1.7.3`: Build 97, „nicht erschienen“ im Lauf vorbelegt und im Baum durchgestrichen (#1840), Abzeichen einzeilig und mit Farbe wie im Web (#1797, #1869), Fast-Lap-Titel ohne Wortbruch und Symbol ohne Überlappung (#1867, #1868), Teilnehmerliste ohne Rohwerte (#1870)
 - `1.7.2`: Build 96, „Mein Kalender“ mit eigenen Terminen und persönlichem Kalender-Abo, Eintrag in den Einstellungen und einmaliger Hinweis nach der Anmeldung (#1788)

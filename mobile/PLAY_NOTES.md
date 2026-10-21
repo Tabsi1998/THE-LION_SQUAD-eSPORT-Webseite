@@ -12,6 +12,16 @@ Regeln:
 - Höchstens 500 Zeichen inklusive Zeilenumbrüchen (Grenze von Google Play).
 - Kurz und für Mitglieder verständlich: was sie in der App merken, keine Issue-Nummern, keine Technik.
 
+## 1.7.5
+
+Neu in 1.7.5:
+• Verein › Erfolge neu: Ehrentafel, Läuft gerade, Vitrine, Liga-Weg, Chronik
+• Neue Saison-Ansicht für Rennligen und Team-Ligen mit Flaggen und Tabelle
+• Profil › Referenzen: bestes Ergebnis, Liga-Weg, Chronik je Jahr
+• News: Kategorien mit Anzahl, Suche als Symbol
+• Voller Cup: Anmeldung zeigt deinen Platz auf der Warteliste
+• Check-in-Zeiten zeigen, was wirklich gilt
+
 ## 1.7.4
 
 Neu in 1.7.4:
