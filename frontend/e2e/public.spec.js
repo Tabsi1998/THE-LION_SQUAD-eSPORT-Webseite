@@ -724,7 +724,7 @@ test("public profile renders references from profile payload", async ({ page }) 
   await page.getByTestId("profile-tab-references").click();
   await expect(page.getByTestId("public-profile-references")).toBeVisible();
   await expect(page.getByTestId("profile-reference-season:tournament:t1")).toContainText("Winter Cup");
-  await expect(page.getByTestId("profile-reference-fastlap:c1:track1")).toContainText("1:22.123");
+  await expect(page.getByTestId("profile-reference-fastlap:c1:track1")).toContainText("1:22,123");
 });
 
 test("public pages do not create horizontal page scroll on mobile and tablet", async ({ page }) => {

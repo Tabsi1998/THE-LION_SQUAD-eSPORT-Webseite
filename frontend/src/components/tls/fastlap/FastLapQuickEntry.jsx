@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Delete, Flag, RotateCcw, SkipForward } from "lucide-react";
 import { toast } from "sonner";
 import { api, formatRequestError } from "@/lib/api";
-import { formatLapTime, plausibilityText } from "@/lib/laptime";
+import { formatLapTime, plausibilityText, showLapTime } from "@/lib/laptime";
 import {
   INVALID_REASONS, attemptLabel, attemptsUsedBy, canDriveAgain, keypadInput, timePreview,
 } from "@/lib/fastLapEvent";
@@ -108,7 +108,7 @@ export function FastLapQuickEntry({ challenge, track, times, guests, onGuestCrea
       setLast({ ...data, driverName: driver.name });
       setText("");
       setReasonsOpen(false);
-      toast.success(invalidReason ? `${driver.name}: ungültig (${invalidReason})` : `${driver.name}: ${formatLapTime(data.time_ms)}`);
+      toast.success(invalidReason ? `${driver.name}: ungültig (${invalidReason})` : `${driver.name}: ${showLapTime(data.time_ms)}`);
       onSaved?.();
       if (next) await handOver();
     });
@@ -210,7 +210,7 @@ export function FastLapQuickEntry({ challenge, track, times, guests, onGuestCrea
         )}
         {last && !correcting && (
           <div className="mt-3 text-xs text-white/50 truncate" data-testid="fl-quick-last">
-            Zuletzt: <span className="text-white/80">{last.driverName}</span> · {last.is_invalid ? "ungültig" : formatLapTime(last.time_ms)}
+            Zuletzt: <span className="text-white/80">{last.driverName}</span> · {last.is_invalid ? "ungültig" : showLapTime(last.time_ms)}
           </div>
         )}
         <div className="mt-2 hidden sm:block text-[11px] text-white/35">Tastatur: Enter = eintragen · + = eintragen &amp; nächster Fahrer · / = Doppelpunkt</div>

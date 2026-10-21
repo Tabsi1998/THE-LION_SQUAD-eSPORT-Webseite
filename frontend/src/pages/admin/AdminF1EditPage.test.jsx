@@ -199,7 +199,7 @@ test("unplausible Zeit: erst nachfragen; Nein speichert nichts, Ja schickt die B
   confirmMock.mockResolvedValueOnce(false);
   await chooseDriverAndType("12");
   await waitFor(() => expect(confirmMock).toHaveBeenCalledTimes(1));
-  expect(confirmMock.mock.calls[0][0].description).toContain("0:12.000");
+  expect(confirmMock.mock.calls[0][0].description).toContain("0:12,000");
   expect(apiMock.post).not.toHaveBeenCalled();
   fireEvent.click(screen.getByTestId("f1-add-time-submit"));
   await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/f1/challenges/c-1/times", expect.objectContaining({ time_ms: 12000, confirm_implausible: true })));

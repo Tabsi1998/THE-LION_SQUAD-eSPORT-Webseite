@@ -1,7 +1,7 @@
 // Fast Lap vor Ort (#1585): Versuche, Schlüssel einer Zeile (auch für Gäste ohne Konto) und der Ziffernblock der
 // Schnelleingabe. Die Zahl der Versuche kommt immer vom Server (`max_attempts`, null = unbegrenzt) - nichts ist fest
 // auf 3. Die Grenze setzt der Server durch; hier steht nur, was angezeigt wird.
-import { formatLapTime, parseLapTime } from "./laptime";
+import { parseLapTime, showLapTime } from "./laptime";
 
 /** Gründe für „ungültig“ mit einem Tipp - der Server verlangt mindestens 5 Zeichen. */
 export const INVALID_REASONS = Object.freeze(["Strecke verlassen", "Abkürzung", "Kollision", "Runde nicht beendet"]);
@@ -70,7 +70,7 @@ export function timePreview(text) {
   const ms = parseLapTime(text);
   if (ms === null) return { ms: null, text: "", ok: false };
   if (Number.isNaN(ms) || ms <= 0) return { ms: null, text: "nicht lesbar", ok: false };
-  return { ms, text: formatLapTime(ms), ok: true };
+  return { ms, text: showLapTime(ms), ok: true };
 }
 
 /** Das Feld „Versuche je Person“: die eingestellte Zahl, leer = unbegrenzt. Neue Challenges starten mit 3. */

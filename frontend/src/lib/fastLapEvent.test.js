@@ -103,7 +103,7 @@ describe("Ziffernblock", () => {
 
 describe("Vorschau der Zeit", () => {
   it("zeigt die gelesene Zeit, „nicht lesbar“ oder nichts", () => {
-    expect(timePreview("84,587")).toEqual({ ms: 84587, text: "1:24.587", ok: true });
+    expect(timePreview("84,587")).toEqual({ ms: 84587, text: "1:24,587", ok: true });
     expect(timePreview("1:75")).toEqual({ ms: null, text: "nicht lesbar", ok: false });
     expect(timePreview("")).toEqual({ ms: null, text: "", ok: false });
   });

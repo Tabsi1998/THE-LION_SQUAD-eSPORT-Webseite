@@ -14,6 +14,7 @@ import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { AlertTriangle, Clock, Flag, ShieldAlert, ArrowRight } from "lucide-react";
 import { viennaDateTime } from "@/lib/vienna";
+import { showLapTime } from "@/lib/laptime";
 
 const KIND_META = {
   lap_penalty: { icon: Clock, color: "#FF9500", label: "Strafzeit" },
@@ -117,7 +118,7 @@ function PenaltyCard({ p }) {
             {p.raw_time_str && p.raw_time_str !== "—" && (
               <>
                 <span>·</span>
-                <span>Roh-Zeit: <span className="text-white/70 font-mono">{p.raw_time_str}</span></span>
+                <span>Roh-Zeit: <span className="text-white/70 font-mono">{showLapTime(p.raw_time_str)}</span></span>
               </>
             )}
           </div>

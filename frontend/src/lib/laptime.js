@@ -1,6 +1,9 @@
 // Rundenzeiten als Text (#613, #1584): „1:32.450“, „1:32,450“, „92.45“ oder „1:32“ → Millisekunden, und zurück. Leer
 // heißt „keine Zeit“ (null); Unlesbares gibt NaN, damit das Formular es melden kann. Der eine Parser für Zeiten und
-// Zielzeiten - dieselben Fälle (laptime.cases.json) prüfen auch die App und der Server.
+// Zielzeiten - dieselben Fälle (laptime.cases.json) prüfen auch die App und der Server. Angezeigt wird mit Komma
+// (`showLapTime`, #1969), gespeichert unverändert mit Punkt.
+
+import { formatRaceTime } from "./raceTime";
 
 export function parseLapTime(text) {
   const raw = String(text ?? "").trim().replace(",", ".");
@@ -21,6 +24,13 @@ export function formatLapTime(ms) {
   const seconds = Math.floor((total % 60000) / 1000);
   const millis = total % 1000;
   return `${minutes}:${String(seconds).padStart(2, "0")}.${String(millis).padStart(3, "0")}`;
+}
+
+/** Zum Anzeigen (#1969): mit Komma wie bei den Rennserien (lib/raceTime) - „1:24,587“, „+0,412“. Nimmt Millisekunden
+ *  oder einen Text vom Server (time_str, gap_str). Gespeichert und verglichen wird weiter mit `formatLapTime` (Punkt). */
+export function showLapTime(value) {
+  if (value === null || value === undefined || value === "") return "";
+  return formatRaceTime(typeof value === "number" ? formatLapTime(value) : value);
 }
 
 // Plausibilität je Strecke (#1584): Standard unter 20 Sekunden oder über 10 Minuten - wie services/laptime.py.
@@ -47,6 +57,6 @@ export function plausibilityText(ms, track) {
   if (!warning) return "";
   const [low, high] = plausibleRange(track);
   return warning === "too_fast"
-    ? `${formatLapTime(ms)} ist schneller als die erwartete Untergrenze ${formatLapTime(low)}. Trotzdem speichern?`
-    : `${formatLapTime(ms)} ist langsamer als die erwartete Obergrenze ${formatLapTime(high)}. Trotzdem speichern?`;
+    ? `${showLapTime(ms)} ist schneller als die erwartete Untergrenze ${showLapTime(low)}. Trotzdem speichern?`
+    : `${showLapTime(ms)} ist langsamer als die erwartete Obergrenze ${showLapTime(high)}. Trotzdem speichern?`;
 }

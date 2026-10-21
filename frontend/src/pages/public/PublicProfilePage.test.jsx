@@ -114,7 +114,7 @@ test("Referenzen-Reiter: Filter nach Art, darunter Turnier-Teilnahmen und Fast-L
   fireEvent.click(screen.getByTestId("profile-reference-filter-fastlap"));
   const list = screen.getByTestId("public-profile-references");
   expect(list.querySelectorAll("[data-testid^='profile-reference-']")).toHaveLength(1);
-  expect(list).toHaveTextContent("1:05.123");
+  expect(list).toHaveTextContent("1:05,123");
   // Teilnahmen: nur Turniere ohne Referenz (der Winter Cup steht schon oben mit Rang).
   expect(screen.getByTestId("public-profile-tournaments")).toHaveTextContent("Weitere Teilnahmen (1)");
   expect(screen.getByTestId("public-profile-tournaments")).toHaveTextContent("Summer Cup");

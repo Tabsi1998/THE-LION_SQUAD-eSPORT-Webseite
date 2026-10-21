@@ -1,11 +1,12 @@
 // Fast-Lap-TV mit Bestzeit-Moment (#1127): alte und neue Rangliste der gezeigten Strecke im Browser vergleichen. Nur
 // echte Verbesserungen lösen etwas aus - ein Neuladen ohne neue Zeit bewegt nichts. Eine schnellere Zeit bekommt kurz
-// „−1.204 s · persönliche Bestzeit“ an die Zeile, eine erste Zeit „Neu“. Ist es die schnellste Zeit überhaupt (echt
+// „−1,204 s · persönliche Bestzeit“ an die Zeile, eine erste Zeit „Neu“. Ist es die schnellste Zeit überhaupt (echt
 // schneller, nicht gleich schnell, ohne Strafsekunden), kommt der Bestzeit-Moment: Name, Zeit, Abstand und wer sie
 // vorher hatte. Strafsekunden und ungültige Zeiten sortiert der Server ein (die Zeiten kommen in Millisekunden, mit
 // Strafe) - sie machen nichts schneller und lösen keinen Moment aus. Schlüssel einer Zeile ist `participant_id` - so
 // haben auch Gäste ohne Konto (#1585) ihre eigenen Hinweise; `userId` im Ergebnis ist dieser Schlüssel.
 import { participantKey } from "./fastLapEvent";
+import { showLapTime } from "./laptime";
 
 function byRank(a, b) {
   const rank = (entry) => (Number.isFinite(Number(entry.rank)) ? Number(entry.rank) : Number.POSITIVE_INFINITY);
@@ -52,12 +53,12 @@ export function compareBoards(previous, next) {
   return { improved, added, best };
 }
 
-/** „−1.204 s“ - mit echtem Minuszeichen; schneller ist negativ. */
+/** „−1,204 s“ - mit echtem Minuszeichen und Komma (#1969); schneller ist negativ. */
 export function deltaText(ms) {
   if (!Number.isFinite(Number(ms))) return "";
   const value = Number(ms);
   const sign = value < 0 ? "−" : value > 0 ? "+" : "±";
-  return `${sign}${(Math.abs(value) / 1000).toFixed(3)} s`;
+  return `${sign}${(Math.abs(value) / 1000).toFixed(3).replace(".", ",")} s`;
 }
 
 /** Was kurz an der Zeile steht: „−1.204 s · persönliche Bestzeit“, „Neu“, bei der Bestzeit „Bestzeit“. */
@@ -69,9 +70,9 @@ export function rowChips(change) {
   return chips;
 }
 
-/** „vorher KartKönigin · 1:22.399“ - wer die Bestzeit vorher hatte; bei eigener Verbesserung „vorher selbst …“. */
+/** „vorher KartKönigin · 1:22,399“ - wer die Bestzeit vorher hatte; bei eigener Verbesserung „vorher selbst …“. */
 export function previousHolderText(best) {
   if (!best?.previous) return "die erste Zeit auf dieser Strecke";
-  const time = best.previous.time_str || "";
+  const time = showLapTime(best.previous.time_str || "");
   return best.ownRecord ? `vorher selbst ${time}`.trim() : `vorher ${best.previous.display_name || "jemand anderes"} · ${time}`.trim();
 }
