@@ -56,6 +56,15 @@ test("Dauern über die Tailwind-Namen (duration-fast …), nie als duration-[var
   expect(offenders).toEqual([]);
 });
 
+test("Puls (#1969): eine Farbe über --tls-pulse-rgb, Vorgabe Gold, Varianten Cyan, Rot und Grün aus den Farb-Rollen", () => {
+  expect(css).toContain("@keyframes tls-run-pulse { 0% { box-shadow: 0 0 0 0 rgb(var(--tls-pulse-rgb) / 0.55); }");
+  expect(css).toContain(".tls-run-pulse { --tls-pulse-rgb: var(--tls-honor-rgb);");
+  for (const [variant, role] of [["brand", "brand"], ["live", "live"], ["ok", "ok"]]) {
+    expect(css).toContain(`.tls-run-pulse--${variant} { --tls-pulse-rgb: var(--tls-${role}-rgb); }`);
+  }
+  expect(css).not.toContain("box-shadow: 0 0 0 0 rgb(var(--tls-honor-rgb) / 0.55)");
+});
+
 test("motionSeconds und motionTransition rechnen aus den festen Werten", () => {
   expect(motionSeconds("fast")).toBe(0.15);
   expect(motionSeconds("gibt-es-nicht")).toBe(0.24);
