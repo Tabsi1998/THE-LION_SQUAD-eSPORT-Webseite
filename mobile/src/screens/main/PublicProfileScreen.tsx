@@ -291,14 +291,16 @@ export function ProfileView({ username, navigation, own, header, scrollRef }: { 
   const headerStats = shown ? profileStats(shown) : [];
   const display = shown?.display_name || shown?.username || "Spieler";
   const member = Boolean(shown?.is_club_member);
-  const referenceCount = (Array.isArray(shown?.references?.items) ? shown?.references?.items?.length || 0 : 0) + (shown?.tournaments?.length || 0) + (shown?.f1_bests?.length || 0);
+  // Wie im Web: ein privates Profil zeigt anderen weder Referenzen noch Teams (der Server antwortet ohnehin mit 404).
+  const hiddenForOthers = !ownMode && shown?.privacy_public_profile === false;
+  const referenceCount = hiddenForOthers ? 0 : (Array.isArray(shown?.references?.items) ? shown?.references?.items?.length || 0 : 0) + (shown?.tournaments?.length || 0) + (shown?.f1_bests?.length || 0);
   const tabs = profileTabs({
     own: ownMode,
     clubMember: member,
     achievements: achievements.awards?.length || 0,
     awards: shown?.awards?.length || 0,
     references: referenceCount,
-    teams: shown?.teams?.length || 0,
+    teams: hiddenForOthers ? 0 : shown?.teams?.length || 0,
     honours: shown?.honours?.length || 0,
   });
   const activeTab = tabs.some((item) => item.key === tab) ? tab : "overview";
