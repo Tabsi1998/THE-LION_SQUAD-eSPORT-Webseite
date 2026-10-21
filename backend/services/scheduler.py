@@ -865,6 +865,8 @@ async def _prepare_tournament_transition(db, doc: dict, next_status: str) -> boo
         tournament = {**doc, "status": next_status}
         if doc.get("status") == "check_in":
             await close_check_in(db, tournament, None)
+            # Das frühere Check-in-Ende (#1938) steht jetzt am Turnier - der Statuswechsel prüft gegen diesen Stand.
+            doc["check_in_until"] = tournament.get("check_in_until")
         else:
             await _finalize_bracket_for_checkin(db, tournament, None)
         if next_status == "live":

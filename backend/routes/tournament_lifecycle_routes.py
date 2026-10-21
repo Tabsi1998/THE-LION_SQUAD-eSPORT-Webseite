@@ -22,6 +22,7 @@ from services.tv_display import ROUND_SPONSOR_MAX, pause_until_value, round_spon
 from models import now_utc
 from services.log_safe import log_safe
 from services.change_events import reset_scope_cache
+from services.public_phase import parse_dt
 from routes.tournament_common import (
     _apply_match_plan,
     _audit_tournament_action,
@@ -168,6 +169,16 @@ async def _finalize_bracket_for_checkin(
     return None
 
 
+def _check_in_begin(tournament: dict, now_iso: str) -> dict:
+    """„Check-in starten“ vor der eingestellten Zeit (#1938): der Check-in läuft ab jetzt - „Check-in öffnet“ folgt dem,
+    sonst stünde auf der Turnierseite „Check-in öffnet in 5 Minuten“, während eingecheckt wird. Ohne Zeit wird der
+    Beginn festgehalten; eine schon vergangene Zeit bleibt stehen."""
+    planned = parse_dt(tournament.get("check_in_from"))
+    if planned and planned <= parse_dt(now_iso):
+        return {}
+    return {"check_in_from": now_iso}
+
+
 async def close_check_in(db, tournament: dict, actor_id: str | None) -> dict | None:
     """Check-in-Ende (#1551, E5): der Baum entsteht aus denen, die eingecheckt sind - nicht schon beim Öffnen. Das
     Turnier bleibt im Status „Check-in“ (der Status springt nicht mehr auf „Anmeldung geschlossen“ zurück); am Turnier
@@ -177,10 +188,15 @@ async def close_check_in(db, tournament: dict, actor_id: str | None) -> dict | N
     if tournament.get("check_in_closed_at"):
         return built
     closed_at = now_utc().isoformat()
-    result = await db.tournaments.update_one(
-        {"id": tid, "check_in_closed_at": None},
-        {"$set": {"check_in_closed_at": closed_at, "updated_at": closed_at}},
-    )
+    change = {"check_in_closed_at": closed_at, "updated_at": closed_at}
+    # Endet der Check-in früher als eingestellt (Turnier starten), gilt das wirkliche Ende (#1938) - Turnierseite, TV und
+    # App zeigten sonst ein Ende nach dem Start. Das übergebene Turnier trägt es mit (Statuswechsel im Scheduler).
+    planned_end = parse_dt(tournament.get("check_in_until"))
+    if not planned_end or planned_end > parse_dt(closed_at):
+        change["check_in_until"] = closed_at
+    result = await db.tournaments.update_one({"id": tid, "check_in_closed_at": None}, {"$set": change})
+    if getattr(result, "modified_count", 0) and "check_in_until" in change:
+        tournament["check_in_until"] = closed_at
     if getattr(result, "modified_count", 0):
         participant_count = await db.tournament_registrations.count_documents({"tournament_id": tid, "status": "checked_in"})
         await _audit_tournament_action(db, "tournament.checkin.close", actor_id, tid, {
@@ -371,6 +387,8 @@ async def set_status(tid: str, body: dict, me: dict = Depends(get_current_user),
     if prev != status:
         changed_at = now_utc().isoformat()
         change: dict = {"$set": {"status": status, "updated_at": changed_at, **pause_set}}
+        if status == "check_in":
+            change["$set"].update(_check_in_begin(t, changed_at))
         if status == "check_in" and t.get("check_in_closed_at"):
             pause_unset = {**pause_unset, "check_in_closed_at": ""}
         if pause_unset:
