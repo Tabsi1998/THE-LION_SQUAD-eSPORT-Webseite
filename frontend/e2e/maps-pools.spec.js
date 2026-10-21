@@ -43,8 +43,31 @@ async function mockServer(page) {
     return route.fulfill({ contentType: "application/json", body: JSON.stringify({ game: GAME, maps: MAPS, limit: 200 }) });
   });
   await page.route("**/api/reference-series/public/probe-liga/2026", json(PAGE));
+  await page.route("**/api/reference-series/public/probe-liga/2025", json(TEAM_LEAGUE_PAGE));
   return created;
 }
+
+// Team-Liga (#1616 an #1931): ein Spieltag mit Veto aus der Bibliothek und die Statistik je Map.
+const STEP = (name, role, extra = {}) => ({ name, role, map_id: name.toLowerCase(), image_url: `/api/static/uploads/${name.toLowerCase()}.webp`, played: false, ...extra });
+const VETO = [
+  STEP("Nebelwerk", "banned", { by: "own" }), STEP("Sturmdeck", "banned", { by: "opponent" }),
+  STEP("Hafenkante", "picked", { by: "own", picked: "own", played: true, score_for: 6, score_against: 3, outcome: "win" }),
+  STEP("Kupfermine", "picked", { by: "opponent", picked: "opponent", played: true, score_for: 2, score_against: 6, outcome: "loss" }),
+  STEP("Glutsenke", "decider", { picked: "decider", played: true, score_for: 6, score_against: 5, outcome: "win" }),
+];
+const LEAGUE_MATCH = { opponent: "Probe Falken", home: true, score_for: 2, score_against: 1, outcome: "win", points: 3, lineup_size: 4, team: "Probe Löwen",
+  maps: VETO.filter((step) => step.played), bans: VETO.filter((step) => step.role === "banned"), veto: VETO };
+const LEAGUE_ROUND = { id: "r1", position: 1, code: "ST1", club_day: "2025-10-01", time: "20:00", state: "scored", kind: "regular", counts: true, opponent: "Probe Falken" };
+const TEAM_LEAGUE_PAGE = {
+  ...PAGE, lineage: { ...PAGE.lineage, kind: "team_league" }, series: { ...PAGE.series, season: "2025", season_slug: "2025" }, map_pool: null,
+  rounds: [LEAGUE_ROUND], progress: { total: 1, scored: 1, cancelled: 0, remaining: 0, next: null },
+  team_league: {
+    team_name: "Probe Löwen", own_teams: ["Probe Löwen"], rules: { match_points: { win: 3, draw: 1, loss: 0 }, table_tiebreakers: [] },
+    table: null, rank_history: [], record: [], lineup: { round_ids: [], players: [] }, path: [],
+    matchdays: [{ round: LEAGUE_ROUND, match: LEAGUE_MATCH, matches: [LEAGUE_MATCH], others: [] }],
+    map_stats: [{ name: "Hafenkante", map_id: "hafenkante", image_url: null, played: 1, won: 1, drawn: 0, lost: 0, picked_own: 1, picked_opponent: 0, picked: 0, decider: 0, banned_own: 0, banned_opponent: 0, banned: 0 }],
+  },
+};
 
 async function noSideScroll(page) {
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
@@ -78,6 +101,18 @@ for (const [width, height] of [[390, 844], [1440, 900]]) {
     await expect(pool.getByRole("heading", { level: 2 })).toHaveText("Map-Pool");
     await expect(pool.getByTestId("map-card")).toHaveCount(2);
     await expect(pool.getByTestId("map-card").first()).toContainText("Nebelwerk");
+    await noSideScroll(page);
+  });
+
+  test(`Team-Liga (${width} px): Veto als Karten, Statistik je Map`, async ({ page }) => {
+    await page.setViewportSize({ width, height });
+    await mockServer(page);
+    await page.goto("/references/series/probe-liga/2025");
+    const cards = page.getByTestId("team-league-veto").getByTestId("team-league-veto-card");
+    await expect(cards).toHaveCount(5);
+    await expect(cards.nth(2)).toHaveAttribute("data-outcome", "win");
+    await expect(cards.nth(0).getByTestId("team-league-veto-label")).toHaveText("Bann · wir");
+    await expect(page.getByTestId("team-league-map-stats").getByTestId("team-league-map-stat")).toHaveCount(1);
     await noSideScroll(page);
   });
 }
