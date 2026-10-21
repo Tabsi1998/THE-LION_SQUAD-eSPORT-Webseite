@@ -26,6 +26,16 @@ def _ordinal(rank: int) -> str:
     return f"{rank}."
 
 
+def place_phrase(label, place: int) -> str:
+    """Der Platz für die Gewinn-Meldung (#1941): „1. Platz“ - „Platz“ steht genau einmal. Eine Bezeichnung mit „Platz“
+    („1. Platz“, „Platz 2“, „Letzter Platz“) bleibt, eine bloße Zahl („3.“) oder keine bekommt es dazu, ein eigener
+    Name („Sieger“) bleibt, wie er ist."""
+    text = " ".join(str(label or "").split())
+    if not text or text.rstrip(".").isdigit():
+        return f"{text.rstrip('.') or place}. Platz"
+    return text
+
+
 def _resolve_prize_place(raw_place, placements: dict[int, list[dict]]) -> int | None:
     try:
         if str(raw_place).lower() in {"last", "letzter", "-1"}:
@@ -123,7 +133,7 @@ async def auto_create_for_tournament(tid: str) -> int:
                     await create_user_notification(
                         uid,
                         "Gewinn vorgemerkt",
-                        f"{doc.get('place_label') or _ordinal(place)} Platz bei {t.get('title') or 'dem Turnier'}: {prize_text}. Sobald der Gewinn abholbereit ist, bekommst du die nächste Meldung.",
+                        f"{place_phrase(doc.get('place_label'), place)} bei {t.get('title') or 'dem Turnier'}: {prize_text}. Sobald der Gewinn abholbereit ist, bekommst du die nächste Meldung.",
                         url="/me/prizes",
                         kind="prize_pending",
                         meta={"tournament_id": tid, "pickup_id": doc["id"], "place": place},

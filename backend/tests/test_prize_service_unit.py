@@ -178,6 +178,49 @@ def test_auto_create_tournament_prizes_supports_grouped_stage_prizes(monkeypatch
     assert "special" not in by_group
 
 
+def test_place_phrase_says_platz_exactly_once():
+    """#1941 (F8): „1. Platz bei …“ - nie „1. Platz Platz bei …“, auch nicht ohne Bezeichnung oder mit „Platz 2“."""
+    assert prize_service.place_phrase("1. Platz", 1) == "1. Platz"
+    assert prize_service.place_phrase("Platz 2", 2) == "Platz 2"
+    assert prize_service.place_phrase("Letzter Platz", 8) == "Letzter Platz"
+    assert prize_service.place_phrase("", 3) == "3. Platz"
+    assert prize_service.place_phrase(None, 3) == "3. Platz"
+    assert prize_service.place_phrase("3.", 3) == "3. Platz"
+    assert prize_service.place_phrase("Sieger", 1) == "Sieger"
+
+
+def test_the_prize_message_names_the_place_once(monkeypatch):
+    sent = []
+
+    async def notify(user_id, title, body, **_kwargs):
+        sent.append((user_id, title, body))
+
+    from services import user_notifications
+    monkeypatch.setattr(user_notifications, "create_user_notification", notify)
+    db = FakeDb(
+        tournaments=[{
+            "id": "t3", "title": "Probe-Cup", "slug": "probe-cup",
+            "prize_places": [{"group": "overall", "place": 1, "label": "1. Platz", "value": "Pokal"},
+                             {"group": "overall", "place": 2, "value": "Medaille"}],
+        }],
+        registrations=[
+            {"id": "reg-a", "tournament_id": "t3", "user_id": "u-a"},
+            {"id": "reg-b", "tournament_id": "t3", "user_id": "u-b"},
+        ],
+        matches_v2=[{
+            "id": "m1", "tournament_id": "t3", "status": "completed", "round": 1, "section": "MAIN",
+            "results": [{"registration_id": "reg-a", "rank": 1}, {"registration_id": "reg-b", "rank": 2}],
+        }],
+    )
+    monkeypatch.setattr(prize_service, "get_db", lambda: db)
+
+    assert asyncio.run(prize_service.auto_create_for_tournament("t3")) == 2
+    bodies = {user_id: body for user_id, _title, body in sent}
+    assert bodies["u-a"].startswith("1. Platz bei Probe-Cup: Pokal."), bodies["u-a"]
+    assert bodies["u-b"].startswith("2. Platz bei Probe-Cup: Medaille."), bodies["u-b"]
+    assert all("Platz Platz" not in body for body in bodies.values())
+
+
 def test_auto_create_fastlap_prizes_per_track(monkeypatch):
     db = FakeDb(
         f1_challenges=[{
