@@ -23,6 +23,7 @@ from services.advancement_draw import draw_group_of, group_sources, group_target
 from services.match_v2_results import DECIDED_OR_VOID, MatchV2ResultError, _pot_ranks, _advancement_result_rank, \
     build_show_draw_application
 from services.mutation_lock import MutationLockBusy, mutation_lock, tournament_write_resource
+from services.live_sweep import live_tournaments_with
 
 logger = logging.getLogger("tls.draw_show")
 
@@ -259,10 +260,11 @@ async def _draw_due(db, tournament: dict, entry: dict) -> int:
 
 
 async def sweep(db, *, now: datetime | None = None) -> dict:
-    """Ein Lauf über alle laufenden Turniere: erinnern, was fällig ist, auslosen, was überfällig ist."""
+    """Ein Lauf über alle laufenden Turniere mit wartender Auslosung (#1940): erinnern, was fällig ist, auslosen, was
+    überfällig ist."""
     now = now or now_utc()
     reminded = drawn = 0
-    tournaments = await db.tournaments.find({"status": "live"}, {"_id": 0, "creation_key": 0, "billing": 0}).to_list(200)
+    tournaments = await live_tournaments_with(db, {"draw_ready": {"$type": "object"}}, job="draw_show", now=now)
     for tournament in tournaments:
         matches = await db.matches_v2.find(
             {"tournament_id": tournament["id"], "draw_ready": {"$type": "object"}, "is_preview": {"$ne": True}}, {"_id": 0},

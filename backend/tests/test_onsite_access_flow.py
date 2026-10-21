@@ -184,6 +184,25 @@ async def test_seats_and_waitlist_apply_as_always(flow):
 
 
 @pytest.mark.asyncio
+async def test_a_full_cup_says_how_long_the_waitlist_is(flow):
+    """#1941 (F4): Das Bestätigungs-Blatt nennt bei vollem Cup den Wartelistenplatz - schlanke und volle Ansicht
+    tragen die Länge der Warteliste (nur die Zahl, keine Namen)."""
+    tournament = await members_tournament(flow, max_participants=1)
+    await flow.register(tournament, await flow.add_user(name="Erster"))
+    await flow.register(tournament, await flow.add_user(name="Wartender"), status="waitlist")
+    token = await onsite_token(flow, tournament)
+    await guest(flow)
+    await redeem(flow, token)
+    slim = (await flow.get(f"/api/tournaments/{tournament['slug']}")).json()
+    assert slim["onsite_view"] is True
+    assert slim["participant_count"] == 1 and slim["waitlist_count"] == 1
+
+    flow.act_as(await flow.add_staff())
+    full = (await flow.get(f"/api/tournaments/{tournament['slug']}")).json()
+    assert full.get("onsite_view") is not True and full["waitlist_count"] == 1
+
+
+@pytest.mark.asyncio
 async def test_closed_registration_stays_closed_with_access(flow):
     tournament = await members_tournament(flow, status="check_in")
     token = await onsite_token(flow, tournament)

@@ -11,7 +11,8 @@ import { normalizeDateTimeFields, toDateTimeLocalInput } from "@/lib/datetime";
 import { buildDirtyPayload, hasPayloadChanges } from "@/lib/dirtyPayload";
 import { billingFormError, formToBilling, tournamentBillingToForm } from "@/lib/pricing";
 import { toast } from "sonner";
-import { RefreshCw } from "lucide-react";
+import { AlertTriangle, RefreshCw } from "lucide-react";
+import { dateWarnings } from "@/lib/tournamentDateWarnings";
 import { useAuth } from "@/context/AuthContext";
 import { gameOptionLabel } from "@/lib/gameLabels";
 import { RULE_PRESETS, ruleModeSummary, rulePresetKey, rulePresetWarnings } from "@/lib/tournamentRulePresets";
@@ -189,6 +190,7 @@ export function TournamentEditForm({ tournament, stages = [], onSaved, onRebuild
     api.get("/events?include_drafts=true").then(({ data }) => setEvents(data || [])).catch(() => setEvents([]));
   }, []);
   const set = (k, v) => setF((x) => ({ ...x, [k]: v }));
+  const timeWarnings = dateWarnings(f);
   // Spiel-Daten (#1554): woher die Dauer kommt, und was das Spiel für Best-of und Laufgröße vorschlägt.
   const selectedGame = games.find((game) => game.id === f.game_id) || null;
   const modes = gameModes(selectedGame);
@@ -334,6 +336,18 @@ export function TournamentEditForm({ tournament, stages = [], onSaved, onRebuild
             <TextField label="Anmeldung endet" type="datetime-local" value={f.registration_open_until} onChange={(v)=>set("registration_open_until",v)} testId="tr-edit-reg-until"/>
             <TextField label="Check-in öffnet" type="datetime-local" value={f.check_in_from} onChange={(v)=>set("check_in_from",v)} testId="tr-edit-checkin-from"/>
             <TextField label="Check-in endet" type="datetime-local" value={f.check_in_until} onChange={(v)=>set("check_in_until",v)} testId="tr-edit-checkin-until"/>
+            {/* Planung prüfen (#1938): widersprüchliche Zeiten wie beim Anlegen - gespeichert wird trotzdem. */}
+            {timeWarnings.length > 0 && (
+              <div className="rounded-sm border border-[#FFD700]/30 bg-[#FFD700]/5 p-4 text-sm text-[#FFD700]" role="status" data-testid="tr-edit-planning-warnings">
+                <div className="flex items-start gap-3">
+                  <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" aria-hidden="true" />
+                  <div className="space-y-1">
+                    <div className="text-[11px] font-bold uppercase tracking-widest">Planung prüfen</div>
+                    {timeWarnings.map((warning) => <div key={warning}>{warning}</div>)}
+                  </div>
+                </div>
+              </div>
+            )}
             <CheckField label="Öffentliche Anmeldung erlauben" checked={f.registration_enabled} onChange={(v)=>set("registration_enabled",v)} />
             {/* Anmeldung im Discord (#885): Vorgabe an. */}
             <CheckField label="Anmeldung über Discord erlauben" hint="Mit verknüpftem Konto über /anmelden oder den Knopf „Anmelden“ – privat, mit denselben Regeln; Teams meldet der Kapitän an." checked={f.discord_registration} onChange={(v)=>set("discord_registration",v)} accent="#5865F2" testId="tr-edit-discord-registration" />

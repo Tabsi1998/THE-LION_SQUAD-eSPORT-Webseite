@@ -340,6 +340,15 @@ def _rebuild_group(graph: _Graph, heats: list[dict], buckets: list[list[tuple]],
     linked_byes = [(copy.deepcopy(slot), entry) for heat in heats for slot in heat.get("slots") or []
                    if slot.get("status") == "bye" and (slot.get("source_result") or {}).get("removed_registration_id")
                    and (entry := _feeding_entry(graph, slot, heat["id"])) is not None]
+    linked = {id(entry) for _slot, entry in linked_byes}
+    # Ein bleibender Lauf bekommt neue Platznummern. Ein Freilos-Platz, für den der entschiedene Vorlauf niemanden
+    # geschickt hat (#1596, gemischt: das Los gab dem Vorlauf weniger Fahrer, als er weiterschicken durfte), behält
+    # seinen Platz samt Weiterleitung - sonst zeigte sie auf eine Nummer, die jetzt ein anderer Lauf beliefert (zwei
+    # Quellen auf einem Platz) oder die es nicht mehr gibt.
+    kept_byes = {heat["id"]: [(copy.deepcopy(slot), entry) for slot in heat.get("slots") or []
+                              if slot.get("status") == "bye" and (slot.get("source_result") or {}).get("skipped")
+                              and (entry := _feeding_entry(graph, slot, heat["id"])) is not None and id(entry) not in linked]
+                 for heat in survivors}
     merged: dict[str, dict] = {}
     scheduled = sorted(str(heat.get("scheduled_at")) for heat in heats if heat.get("scheduled_at"))
     received: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))
@@ -364,6 +373,11 @@ def _rebuild_group(graph: _Graph, heats: list[dict], buckets: list[list[tuple]],
                 slot["slot"] = len(new_slots) + 1
                 new_slots.append(slot)
                 entry.update({"to_match_id": survivor["id"], "to_match_key": survivor.get("match_key"), "to_slot": slot["slot"]})
+        for slot, entry in kept_byes.get(survivor["id"]) or []:
+            slot.pop("moved_to", None)
+            slot["slot"] = len(new_slots) + 1
+            new_slots.append(slot)
+            entry.update({"to_match_id": survivor["id"], "to_match_key": survivor.get("match_key"), "to_slot": slot["slot"]})
         while len(new_slots) < 2:
             new_slots.append(_bye_slot(len(new_slots) + 1))
         survivor["slots"] = new_slots

@@ -767,3 +767,24 @@ test("Betrieb: Neu auslosen für eine ausgeloste Runde", async () => {
   await user.click(await screen.findByTestId("confirm-dialog-confirm"));
   await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/tournaments/t-1/stages/s-1/redraw", { group: "WB:2" }));
 });
+
+// #1941 (F9): Nach „Nicht erschienen“ mit Nachrücken nennt die Meldung, wer von der Warteliste nachgerückt ist.
+test("Nicht erschienen mit Nachrücker: die Meldung nennt den Namen", async () => {
+  const { toast } = await import("sonner");
+  apiMock.get.mockImplementation((url) => {
+    const path = String(url);
+    if (path.includes("/registrations")) return Promise.resolve({ data: [
+      { id: "r-paul", status: "approved", display_name: "PistenPaul" },
+      { id: "r-bea", status: "waitlist", display_name: "Begleitung Bea" },
+    ] });
+    if (path.includes("/tournaments/t-1") && !path.includes("/t-1/")) return Promise.resolve({ data: { ...TOURNAMENT, status: "check_in" } });
+    return Promise.resolve(routeFor(path));
+  });
+  apiMock.post.mockResolvedValue({ data: { id: "r-paul", status: "no_show", waitlist_moved_up: ["r-bea"], placement: null } });
+  const user = userEvent.setup();
+  renderPage();
+  await screen.findByRole("heading", { name: "Winter Cup 2026" });
+  await user.click((await screen.findAllByRole("button", { name: "Nicht erschienen" }))[0]);
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/tournaments/t-1/registrations/r-paul/checkin", { status: "no_show" }));
+  await waitFor(() => expect(toast.success).toHaveBeenCalledWith("Nicht erschienen gesetzt – Nachrücker: Begleitung Bea."));
+});

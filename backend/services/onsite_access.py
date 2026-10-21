@@ -238,7 +238,7 @@ def set_pass_cookie(response, value: str, max_age: int) -> None:
 
 SLIM_FIELDS = (
     "id", "slug", "title", "status", "public_phase", "start_date", "end_date", "banner_url", "team_mode", "team_size",
-    "max_participants", "participant_count", "registration_enabled", "registration_open_from", "registration_open_until",
+    "max_participants", "participant_count", "waitlist_count", "registration_enabled", "registration_open_from", "registration_open_until",
     "check_in_from", "check_in_until", "is_invite_only", "event_mode", "location", "platform", "format", "format_label",
     "offer",
 )

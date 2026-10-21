@@ -37,6 +37,8 @@ import { useCountdownDays } from "@/hooks/useCountdownDays";
 import { MyStandCard } from "@/components/tls/tournament/MyStandCard";
 import { isPublicLive } from "@/lib/publicPhase";
 import { OnsiteTournamentView } from "@/components/tls/tournament/OnsiteTournamentView";
+import { TournamentUnavailable } from "@/components/tls/tournament/TournamentUnavailable";
+import { problemKind } from "@/lib/loadProblem";
 import { RegistrationSheet } from "@/components/tls/tournament/RegistrationSheet";
 import { FriendsAtEvent } from "@/components/tls/FriendsAtEvent";
 import { offerFriendsHint } from "@/lib/friendsHint";
@@ -122,9 +124,26 @@ function TournamentDetailView() {
     if (user !== undefined) setLoadedFor(`${slug}:${user?.id || "guest"}`);
   }, [slug, user, accessToken]);
 
+  // Ohne Turnier eine Meldung statt ewig „Lade Turnier“ (#1939): 404, 403 oder ohne Netz. Die Meldung gehört zu genau
+  // diesem Abruf (Turnier, Konto, Zugang) - solange die Anmeldung noch lädt, bleibt das Skelett.
+  const loadKey = `${slug}:${user === undefined ? "pending" : user?.id || "guest"}:${accessToken}`;
+  const [loadProblem, setLoadProblem] = useState(null);
+  const refresh = useCallback(async () => {
+    try {
+      await load();
+      setLoadProblem(null);
+    } catch (error) {
+      setLoadProblem({ key: loadKey, kind: problemKind(error) });
+    }
+  }, [load, loadKey]);
+  const retry = () => {
+    setLoadProblem(null);
+    refresh();
+  };
+
   useEffect(() => {
-    load();
-  }, [load]);
+    refresh();
+  }, [refresh]);
 
   // Aus der News (#1266): ?anmelden=1 führt zur Anmeldung - braucht sie Angaben (Team, Spieler-IDs, Kosten), öffnet
   // sich das Formular; sonst rückt der Anmelde-Knopf ins Bild und bekommt den Fokus, damit niemand ungefragt angemeldet
@@ -148,7 +167,7 @@ function TournamentDetailView() {
   }, [wantsSignup, t, loadedFor, slug, myReg, user]);
 
   // Nur Änderungen dieses Turniers (#1801) - bis es geladen ist, jede.
-  useLiveRefresh(load, ["tournaments"], { fallbackMs: 10000, tournamentId: t?.id });
+  useLiveRefresh(refresh, ["tournaments"], { fallbackMs: 10000, tournamentId: t?.id });
   const countdownDays = useCountdownDays();
 
   // Sieger-Moment (#1180): wer Platz 1 bis 3 belegt hat, bekommt nach dem Ende einmal je Browser seine Karte - über die
@@ -225,7 +244,18 @@ function TournamentDetailView() {
     }, "Abmeldung fehlgeschlagen.");
   };
 
-  if (!t) return <PublicLayout><PublicLoadingState label="Lade Turnier" /></PublicLayout>;
+  if (!t) {
+    const problem = user !== undefined && loadProblem?.key === loadKey ? loadProblem.kind : null;
+    if (!problem) return <PublicLayout><PublicLoadingState label="Lade Turnier" /></PublicLayout>;
+    const loginHref = `/login?next=${encodeURIComponent(`/tournaments/${slug}${accessToken ? `?access=${accessToken}` : ""}`)}`;
+    return (
+      <PublicLayout>
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 py-14" data-testid="tournament-unavailable">
+          <TournamentUnavailable kind={problem} user={user} loginHref={loginHref} onRetry={retry} />
+        </div>
+      </PublicLayout>
+    );
+  }
   if (t.onsite_view) {
     return (
       <PublicLayout>

@@ -15,6 +15,7 @@ import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { TOURNAMENT_FORMAT_OPTIONS } from "@/lib/tournamentLabels";
 import { gameOptionLabel } from "@/lib/gameLabels";
 import { RULE_PRESETS, ruleModeSummary, rulePresetKey, rulePresetWarnings } from "@/lib/tournamentRulePresets";
+import { dateWarnings } from "@/lib/tournamentDateWarnings";
 import { toast } from "sonner";
 import { AlertTriangle } from "lucide-react";
 
@@ -35,31 +36,16 @@ const PRIZE_GROUP_OPTIONS = [
 ];
 const BRONZE_FORMATS = new Set(["single_elim"]);
 
-function dateFromInput(value) {
-  if (!value) return null;
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? null : date;
-}
-
 function buildPlanningWarnings(form, isTeam) {
   const warnings = [];
   const minParticipants = Number(form.min_participants || 0);
   const maxParticipants = Number(form.max_participants || 0);
-  const start = dateFromInput(form.start_date);
-  const end = dateFromInput(form.end_date);
-  const registrationFrom = dateFromInput(form.registration_open_from);
-  const registrationUntil = dateFromInput(form.registration_open_until);
-  const checkinFrom = dateFromInput(form.check_in_from);
-  const checkinUntil = dateFromInput(form.check_in_until);
 
   if (minParticipants && maxParticipants && minParticipants > maxParticipants) {
     warnings.push(`${isTeam ? "Min Teams" : "Min Spieler"} ist größer als ${isTeam ? "Max Teams" : "Max Spieler"}.`);
   }
-  if (start && end && end < start) warnings.push("Das Ende liegt vor dem Start.");
-  if (registrationFrom && registrationUntil && registrationUntil < registrationFrom) warnings.push("Die Anmeldung endet vor ihrer Öffnung.");
-  if (checkinFrom && checkinUntil && checkinUntil < checkinFrom) warnings.push("Der Check-in endet vor seiner Öffnung.");
-  if (registrationUntil && start && registrationUntil > start) warnings.push("Die Anmeldung endet nach dem Turnierstart.");
-  if (checkinUntil && start && checkinUntil > start) warnings.push("Der Check-in endet nach dem Turnierstart.");
+  // Die Zeiten prüft dieselbe Regel wie beim Bearbeiten (#1938).
+  warnings.push(...dateWarnings(form));
   if (form.status === "scheduled" && !form.start_date) warnings.push("Angekündigte Turniere sollten eine Startzeit haben.");
   if (form.twitch_enabled && !String(form.twitch_channel || "").trim()) warnings.push("Twitch ist aktiv, aber kein Kanal ist eingetragen.");
   return warnings;

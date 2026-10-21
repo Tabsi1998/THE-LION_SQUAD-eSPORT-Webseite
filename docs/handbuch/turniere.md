@@ -66,7 +66,10 @@ Turniere. **Ohne 2FA** erscheint stattdessen der Hinweis **2FA einrichten**, sie
    **Anmeldung endet**. Unter „Weitere Zeiten und Sonderfälle“: **Ende**, **Anmeldung öffnet**, **Check-in öffnet**,
    **Check-in endet**, **Nur Einladung**, **Anmeldung über Discord erlauben**, **Vereinsmitglieder von der Selbstanmeldung
    ausschließen** und, wenn das Turnier zu einem Event gehört, **Anmeldung nur mit Event-Anmeldung**. Unter dem Kasten warnt
-   **Planung prüfen** bei widersprüchlichen Zeiten.
+   **Planung prüfen** bei widersprüchlichen Zeiten – beim Bearbeiten genauso, direkt unter **Check-in endet** (etwa „Der
+   Check-in endet vor seiner Öffnung.“). Gespeichert wird trotzdem.
+
+   <img src="../assets/turniere/planung-pruefen-bearbeiten-handy.png" alt="Turnier bearbeiten am Handy: Check-in endet liegt vor Check-in öffnet, darunter der gelbe Kasten Planung prüfen" width="300">
 6. Weiter unten, aufklappbar: **Darstellung und Regeln** (Slug, Plattform, Beschreibung, Banner, **Regeln**,
    Partner), **Spieloptionen** (Best of, Seeding, Gegner der nächsten Runde, Spiel um Platz 3), **Preise**, **Streaming und
    externe Links**. Schreibt die **Regeln** hinein, bevor die Anmeldung aufgeht – was ihr festlegt (Frist bis zum
@@ -176,7 +179,8 @@ eurer **Regeln** – schreibt das Wichtigste also nach oben.
 <img src="../assets/turniere/anmelde-blatt-handy.png" alt="Anmelde-Blatt am Handy mit Start, Check-in, Ort, Regeln kurz und dem Knopf Verbindlich anmelden" width="300">
 
 - Die Anmeldung gilt **sofort als Bestätigt**, solange Platz ist. Ist das Turnier voll, kommt die Person auf die
-  **Warteliste**. Beides bekommt sie als Nachricht.
+  **Warteliste**. Beides bekommt sie als Nachricht. Bei vollem Turnier sagt es schon das Blatt: „Der Cup ist voll – du
+  kommst auf die Warteliste (Platz 3)“, der Knopf heißt dann **Auf die Warteliste**.
 - Es geht nur im Status **Anmeldung offen** und im Zeitfenster **Anmeldung öffnet / endet**. Mit dem Haken
   **Nur Einladung** gibt es keine Selbstanmeldung.
 - Selbst abmelden können sich Spieler nicht mehr, wenn sie eingecheckt sind oder das Turnier läuft; dann geht es nur
@@ -197,7 +201,8 @@ verbindlichen Teilnahme: Warteliste kostet nichts. Alles Weitere steht in [Abrec
   Eingecheckt, Nicht erschienen. Beim Ablehnen fragt die Seite nach einem freiwilligen Grund; die Person bekommt eine
   Nachricht. Wird bis zum Ende des Check-ins ein Platz frei (Absage, **Nicht erschienen**, Entfernen), rückt die
   älteste Anmeldung der Warteliste von selbst nach und bekommt eine Nachricht. Danach entscheidet ihr (3.4).
-- Die Knöpfe **Check-in**, **Auschecken**, **Nicht erschienen**, **Entfernen**.
+- Die Knöpfe **Check-in**, **Auschecken**, **Nicht erschienen**, **Entfernen**. Rückt nach **Nicht erschienen**
+  jemand von der Warteliste nach, nennt die Meldung den Namen („Nicht erschienen gesetzt – Nachrücker: …“).
 - **Disqualifizieren** und **Austritt** (nur Strukturrollen, nur im laufenden Turnier): der erste Klick zeigt den
   Umbauplan in Worten („E: Lena kommt kampflos weiter.“), erst **Austritt eintragen** bzw. **Disqualifizieren** macht
   ihn wirksam; ein freiwilliger Grund geht in die Nachricht an die Person. Die Regeln: im K.-o. und Doppel-K.-o. kommt der Gegner kampflos weiter, ein
@@ -234,6 +239,12 @@ verbindlichen Teilnahme: Warteliste kostet nichts. Alles Weitere steht in [Abrec
   gelten wie immer.
 - Nach der Anmeldung sieht die Person das ganze Turnier – Baum, Spielplan, eigene Spiele, Ergebnis melden –, aber
   nichts anderes aus dem Mitgliederbereich. Meldet sie sich ab, ist das Turnier wieder verborgen.
+- Wer den Link ohne Zugang öffnet (weitergeleitet, nicht Mitglied, nicht angemeldet), sieht „Dieses Turnier ist nur für
+  Mitglieder bzw. über den QR-Code vor Ort sichtbar“ mit dem Hinweis, den QR-Code am Eingang zu scannen, und – ohne
+  Konto – **Anmelden**. Ein Tippfehler im Link (oder ein verborgenes Turnier) zeigt „Turnier nicht gefunden“, ohne
+  Netz kommt **Nochmal versuchen**.
+
+  <img src="../assets/turniere/nur-mitglieder-handy.png" alt="Turnierseite am Handy ohne Zugang: schlafender Löwe, Dieses Turnier ist nur für Mitglieder bzw. über den QR-Code vor Ort sichtbar, QR-Code am Eingang scannen, Knöpfe Anmelden und Zur Turnierliste" width="300">
 
 ### 3.4 Check-in und der Wechsel zum festen Baum
 
@@ -242,10 +253,14 @@ verbindlichen Teilnahme: Warteliste kostet nichts. Alles Weitere steht in [Abrec
 - **Vor Ort:** Der Knopf heißt für Spieler „Check-in vor Ort“ und ist gesperrt. Die Turnierleitung setzt den Haken:
   im Reiter **Teilnehmer** **Check-in** (das Gegenstück ist **Auschecken**). Wer nicht kommt: **Nicht erschienen**.
 - **Check-in starten** (Hauptknopf oben im Turnier, solange noch kein Check-in läuft) setzt den Status **Check-in
-  offen**. Der Baum bleibt bis zum Ende des Check-ins eine Vorschau; bis dahin rücken Wartende nach.
+  offen**. Der Baum bleibt bis zum Ende des Check-ins eine Vorschau; bis dahin rücken Wartende nach. Vor der
+  eingestellten Zeit gestartet, steht **Check-in öffnet** danach auf dem wirklichen Beginn.
 - **Ende des Check-ins** (die Zeit **Check-in endet**, oder **Turnier starten**, wenn keine Zeit gesetzt ist): Der
   Turnierbaum entsteht **nur aus den Eingecheckten**. Der Status bleibt **Check-in offen**, bis das Turnier startet;
-  öffentlich steht „Anmeldung geschlossen“, und Spieler können nicht mehr selbst einchecken.
+  öffentlich steht „Anmeldung geschlossen“, und Spieler können nicht mehr selbst einchecken. Endet der Check-in früher
+  als eingestellt (**Turnier starten**), steht **Check-in endet** auf diesem Zeitpunkt. Die Zeitleiste der Turnierseite
+  folgt dem Stand: Erreichtes ist abgehakt, was läuft, steht als „Check-in läuft“ bzw. „Turnier läuft“, ein Countdown
+  nur für Kommendes.
 - Ohne Check-in (direkt **Turnier starten**) kommen alle **Bestätigten** in den Baum.
 - **Nachrücker** nach dem Ende des Check-ins: Wer jetzt eingecheckt, bestätigt oder über **Teilnehmer hinzufügen**
   eingetragen wird, übernimmt genau einen freien Platz – zuerst den einer Person mit **Nicht erschienen**, sonst einen

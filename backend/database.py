@@ -269,6 +269,11 @@ async def init_indexes():
     await db.matches_v2.create_index("id", unique=True)
     await db.matches_v2.create_index([("tournament_id", 1), ("stage_id", 1)])
     await db.matches_v2.create_index([("stage_id", 1), ("match_key", 1)])
+    # Die Minuten-Jobs (#1940): Turniere mit wartender Auslosung bzw. offenen Spielen - gesucht von den Spielen her
+    # (services/live_sweep). Der erste nur über die wenigen Spiele, die gerade auf ihr Los warten.
+    await db.matches_v2.create_index([("tournament_id", 1)], name="draw_ready_pending",
+                                     partialFilterExpression={"draw_ready": {"$type": "object"}})
+    await db.matches_v2.create_index([("status", 1), ("tournament_id", 1)])
     await db.match_schedule_proposals.create_index("id", unique=True)
     await db.match_schedule_proposals.create_index([("match_id", 1), ("created_at", -1)])
     await db.match_chat_messages.create_index("id", unique=True)

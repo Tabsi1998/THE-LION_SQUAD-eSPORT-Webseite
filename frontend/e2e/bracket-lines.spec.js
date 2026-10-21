@@ -243,14 +243,18 @@ for (const width of [1440, 375]) {
 }
 
 // Laufendes Spiel mit langem Stationsnamen (break-ui): der Live-Hinweis steht in einer eigenen Zeile unter dem Titel und
-// kürzt mit „…“ - Titel und „4 Spieler · 2 kommen weiter“ brechen nicht Wort für Wort um.
+// kürzt mit „…“ - Titel und „4 Spieler · 2 kommen weiter“ brechen nicht Wort für Wort um. Die Station steht im Klartext
+// des Servers (#1941), nie mit dem Gerätekürzel.
 for (const width of [1440, 375]) {
   test(`Web ${width}: laufendes Spiel mit langem Stationsnamen - Titel bleibt einzeilig`, async ({ page }) => {
     await page.setViewportSize({ width, height: 900 });
-    const station = "Station Switch 3 - switch2 im großen Saal hinten links";
+    const station = "Station Switch 3 im großen Saal hinten links · Switch 2";
     const live = (data) => {
       const heat = data.matches_v2.find((match) => match.match_key === "C");
-      Object.assign(heat, { status: "in_progress", station_label: station, started_at: new Date(Date.now() - 167000).toISOString() });
+      Object.assign(heat, {
+        status: "in_progress", station_label: "Station Switch 3 im großen Saal hinten links - switch2", station_text: station,
+        started_at: new Date(Date.now() - 167000).toISOString(),
+      });
       return data;
     };
     const tournament = await mockWeb(page, "ffa16de_start", live);
