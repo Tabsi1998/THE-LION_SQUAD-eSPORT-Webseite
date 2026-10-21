@@ -16,7 +16,7 @@ Redaktion) und gültige Captains dieser Saison ([Rollen](../ROLLEN.md)); ein Ter
 | `POST …/results/approve` | Vorstand: Entwurf daneben (oder Blatt im Entwurf) veröffentlichen | 200; 409 ohne Entwurf oder bei veraltetem Stand |
 | `POST …/results/discard` | Vorstand: Entwurf daneben verwerfen | 200; 409 ohne Entwurf oder bei veraltetem Stand |
 | `GET …/results/image` | Ob ein Ergebnis-Bild gelesen werden kann und mit welcher Vorlage (#1756) | `{template, available, max_mb, formats}` |
-| `POST …/results/image` | Ergebnis-Bild lesen (Body = das Bild), **speichert nichts** | Zeilen mit unsicheren Feldern, Kopf des Bilds; 409 ohne Vorlage, 413/400 bei Größe oder Format, 422 ohne Tabelle, 429 Rate-Limit, 503 ohne Tesseract |
+| `POST …/results/image` | Ergebnis-Bild lesen (Body = das Bild), **speichert nichts** | Zeilen mit unsicheren Feldern, Kopf des Bilds; 409 ohne Vorlage, 413/400 bei Größe oder Format, 422 ohne Tabelle oder ohne Zeiten (Saisontabelle, Kalender) und bei mehr als 500 Zeilen, 429 Rate-Limit, 503 ohne Tesseract |
 
 **Captains** sehen nur, wer in der Saison bekannt ist und wer neu (`rows[].match`, `is_new`) – keine Zuordnung, keinen
 Alias, keine Vereinsmitgliedschaft. Diese Felder bekommt nur der Vorstand: `participants[].is_club_member` und
@@ -111,15 +111,32 @@ Dienst) und landet als Zeilen im Blatt – gespeichert wird beim Lesen nichts, a
 - **Vorlage je Veranstalter-Layout:** Spalten (Überschriften, Ausrichtung, ungefähre Lage) und Kopf des Bilds sind
   einmal festgelegt. Der Vorstand wählt sie je Spur und – abweichend – je Saison (`result_image_template`); ohne Wahl
   gilt die Standard-Vorlage der Art („Rennliga-Ergebnis (dunkel)“ für Rennligen), `none` schaltet ab.
-- **Lesen:** hellster Farbkanal (farbige Schrift bleibt kräftig), bei dunklem Grund umgekehrt, auf etwa 40 Pixel
-  Schrifthöhe vergrößert. Einmal die ganze Seite, dann jede Spalte als Streifen – Zahlen mit Zeichen-Whitelist.
+- **Lesen:** hellster Farbkanal (farbige Schrift bleibt kräftig), bei dunklem Grund umgekehrt, Trennlinien und
+  farbige Kästen entfernt, auf etwa 40 Pixel Schrifthöhe vergrößert (die Höhe wird vorab mit einer groben Lesung
+  geschätzt). Einmal die ganze Seite, dann jede Spalte als Streifen – Zahlen mit Zeichen-Whitelist.
+- **Spalten aus den Daten:** `result_image_ocr.plan_columns` sucht die Spalten des Bilds an den gelesenen Zeilen und
+  ordnet sie den Spalten der Vorlage nach Inhalt (Platz, Zahl, Text, Zeit, Abstand) und Reihenfolge zu; Überschriften
+  geben nur einen Bonus. Fehlt eine Spalte im Bild (etwa Grid im Qualifying, Punkte), bleibt sie leer. Erst wenn das
+  nicht aufgeht, gelten `align`/`at` der Vorlage.
+- **Werte:** OUT/DNF/DNS/DSQ statt Platz oder Zeit sind ein Ausfall; Platzhalter wie `--:--.---` heißen „keine Zeit“.
+  Überrundete („+1 Runde“) stehen in Zeit oder Abstand.
 - **Unsicher (gelb)** ist eine Zelle, wenn die beiden Lesungen sich widersprechen oder die Sicherheit unter der Schwelle
-  der Vorlage liegt – außer eine Gegenprobe bestätigt sie: Plätze ohne Lücke, Zeit = Zeit des Ersten + Abstand, Grid
-  einmalig, **Startnummer als Anker** (Nummer und Name zeigen auf denselben Teilnehmer). Namen werden unscharf mit den
-  Teilnehmern der Saison abgeglichen (für den Vorstand auch über deren Aliase), Teams mit den Standard-Teams.
+  der Vorlage liegt – außer eine Gegenprobe bestätigt sie: Plätze und Zeit des Ersten nach der Mehrheit der Zeilen
+  (ein verlesener erster Platz zieht die Spalte nicht mit), Zeit = Zeit des Ersten + Abstand, Grid einmalig,
+  **Startnummer als Anker** (Nummer und Name zeigen auf denselben Teilnehmer). Namen und Teams sind nur sicher, wenn
+  beide Lesungen Zeichen für Zeichen gleich und je für sich sicher sind - oder der Abgleich sie sicher einem
+  Teilnehmer zuordnet. Abgeglichen wird unscharf mit den Teilnehmern der Saison (für den Vorstand auch über deren
+  Aliase), Teams mit den Standard-Teams. Leere Zellen in sonst gefüllten Spalten sind gelb, ein nie gelesener Platz
+  ebenso.
+- **Kopf:** `track` (oberste Zeile ohne Beschriftung), `session {name, kind}` (Rennen, Sprint, Qualifying - nur ein
+  Hinweis, bis es Läufe je Termin gibt, #1930), `pole` und `fastest_lap {name, time}`, `driver_of_the_day`; der Wert
+  darf hinter oder unter der Beschriftung stehen. Passt die Strecke zu einem anderen Termin der Saison, nennt die
+  Warnung `other_track` ihn (`suggested_round`).
 - **Antwort:** `rows` mit `place`, `dnf`, `marks`, `start_number`, `name`, `participant_id`, `team`, `grid`, `time`,
-  `gap`, `uncertain` (Felder) und `read` (was im Bild stand, wenn es abweicht); dazu `track`, `fastest_lap {name, time}`,
-  `driver_of_the_day`, `uncertain_rows` und `warnings`. Felder, die das Blatt (noch) nicht zeigt, fallen im Web weg.
+  `gap`, `points`, `color` (Schriftfarbe von Startnummer oder Team), `uncertain` (Felder) und `read` (was im Bild
+  stand, wenn es abweicht); dazu der Kopf, `team_colors {Team: "#rrggbb"}` (Vorschlag für Teamfarben, #1950 - nur in
+  der Antwort), `uncertain_rows` und `warnings`. Felder, die das Blatt (noch) nicht zeigt (`grid`, `time`, `gap`, siehe
+  `PENDING_FIELDS` in `lib/resultImage.js`), gehen in die Zeile, werden aber nicht gelb angezeigt.
 - **Im Blatt:** die Zeilen ersetzen die Liste, die Vorschau prüft gleich. Gelbe Felder verlieren die Markierung, wenn
   jemand sie ändert oder die Zeile mit „Passt so“ bestätigt; übernommen wird erst ohne gelbe Zeilen.
 - **Sicherheit:** Rechte wie beim Eintragen; Größe am Kopf der Anfrage, Pixel am Kopf der Bilddatei; das Bild kommt als

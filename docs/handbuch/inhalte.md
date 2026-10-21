@@ -612,9 +612,11 @@ einem gewerteten Termin **Ergebnis ändern**. Das öffnet das Blatt des Termins.
   `Schnellste Runde: Name 1:31.456` und `Fahrer des Tages: Name` füllen die Felder des Rennens.
 - **Bild auslesen** (Rennligen): den Ergebnis-Screenshot des Veranstalters mit **Strg+V** ins Blatt einfügen oder über
   **Bild auslesen** wählen – am Handy geht auch die Kamera. Der eigene Server liest das Bild (kein fremder Dienst, das
-  Bild wird nicht gespeichert) und füllt die Liste: Platz, Startnummer, Name, Team, DNF und die schnellste Runde als
-  Marke; die Vorschau prüft gleich. Darüber steht **Aus dem Bild gelesen** mit dem Bild zum Vergleichen (antippen
-  vergrößert), Strecke, schnellster Rennrunde und Fahrer des Tages. **Gelbe Felder** sind unsicher, darunter steht, was
+  Bild wird nicht gespeichert) und füllt die Liste: Platz, Startnummer, Name, Team, Punkte (falls im Bild), DNF bzw.
+  OUT und die schnellste Runde und Pole als Marken; die Vorschau prüft gleich. Darüber steht **Aus dem Bild gelesen**
+  mit dem Bild zum Vergleichen (antippen vergrößert), Strecke, Art (Rennen oder Qualifying – nur als Hinweis),
+  schnellster Rennrunde, Pole und Fahrer des Tages. Passt die Strecke zu einem anderen Termin der Saison, sagt ein
+  Hinweis, zu welchem. **Gelbe Felder** sind unsicher, darunter steht, was
   im Bild stand. Ändern nimmt die Markierung weg, **Passt so** bestätigt die ganze Zeile. Übernehmen geht erst, wenn
   nichts mehr gelb ist – bis dahin heißt der Knopf **Gelbe Zeilen prüfen** und springt zur ersten. Wie das Bild
   aufgebaut ist, sagt die **Vorlage für Ergebnis-Bilder** an der Spur (eine Saison kann abweichen): Standard für
@@ -687,6 +689,7 @@ aktuellen Stand, eure Eingaben bleiben stehen, und die Vorschau prüft neu. Jede
 | Kein Knopf **Bild auslesen** | Für die Art gibt es keine Vorlage (Team-Liga, Turnierserie) oder sie steht auf **Aus** | Spur oder Saison bearbeiten → **Vorlage für Ergebnis-Bilder** |
 | „Texterkennung gerade nicht verfügbar“ | Dem Server fehlt Tesseract (altes Image) | Server mit `update.sh` aktualisieren; bis dahin **Liste einfügen** |
 | Viele Zeilen gelb | Bild unscharf, klein oder abfotografiert | Screenshot statt Foto, ganzes Ergebnis ohne Zoom; sonst gelbe Felder nach dem Bild korrigieren |
+| „Das Bild sieht nicht nach einem Rennergebnis aus“ | Eingefügt wurde die Saisontabelle oder der Kalender (keine Zeiten) | Das Ergebnis dieses Termins einfügen |
 
 ---
 
