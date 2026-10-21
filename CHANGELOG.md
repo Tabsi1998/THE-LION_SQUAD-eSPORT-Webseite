@@ -1,22 +1,20 @@
 # Changelog
 
-## [1.15.0](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/compare/v1.14.0...v1.15.0) (2026-10-21)
-
+## 1.15.0 (21.10.2026)
 
 ### Neu
 
-* Liga-Weg der Team-Liga zeigt den Vermerk der Saison ([#1898](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1898)) ([5b007c3](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/5b007c37c94df53ede2e4f7b61c8af882586769f))
-* Liga-Weg, Ehrentafel und Vitrine nutzen zuerst den Vermerk der Saison und die Reihenfolge der Stufen ([#1898](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1898)) ([5b007c3](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/5b007c37c94df53ede2e4f7b61c8af882586769f))
-* Referenzen prüfen beim Speichern Datum und Platzierung, Hinweise am Feld und Liste der Auffälligkeiten ([#1755](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1755)) ([5b007c3](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/5b007c37c94df53ede2e4f7b61c8af882586769f))
-* Saison mit Ergebnis-Vermerk (Aufstieg, Abstieg, Klassenerhalt, Meister) und Spur mit eigener Reihenfolge der Stufen ([#1898](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1898)) ([5b007c3](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/5b007c37c94df53ede2e4f7b61c8af882586769f))
-* Saison-Deko-Schalter für Gäste am Handy unten im Menü ([#1239](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1239)) ([1c5a3e9](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/1c5a3e9bf457285e0aa1c0de9a3c71e9b8f2faff))
-
+* Liga-Weg der Team-Liga zeigt den Vermerk der Saison (#1898)
+* Liga-Weg, Ehrentafel und Vitrine nutzen zuerst den Vermerk der Saison und die Reihenfolge der Stufen (#1898)
+* Referenzen prüfen beim Speichern Datum und Platzierung, Hinweise am Feld und Liste der Auffälligkeiten (#1755)
+* Saison mit Ergebnis-Vermerk (Aufstieg, Abstieg, Klassenerhalt, Meister) und Spur mit eigener Reihenfolge der Stufen (#1898)
+* Saison-Deko-Schalter für Gäste am Handy unten im Menü (#1239)
 
 ### Fehlerbehebungen
 
-* Kopfzeile zwischen 1024 und 1439 px mit Löwenkopf, Login-Symbol und „Beitreten“ – nichts bricht um ([#1234](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1234)) ([1c5a3e9](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/1c5a3e9bf457285e0aa1c0de9a3c71e9b8f2faff))
-* Saison-Mütze sitzt auch auf dem Löwenkopf der kompakten Kopfzeile ([#1234](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1234)) ([1c5a3e9](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/1c5a3e9bf457285e0aa1c0de9a3c71e9b8f2faff))
-* Untermenüs öffnen sich am Tablet per Antippen und mit der Tastatur ([#1233](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1233)) ([1c5a3e9](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/1c5a3e9bf457285e0aa1c0de9a3c71e9b8f2faff))
+* Kopfzeile zwischen 1024 und 1439 px mit Löwenkopf, Login-Symbol und „Beitreten“ – nichts bricht um (#1234)
+* Saison-Mütze sitzt auch auf dem Löwenkopf der kompakten Kopfzeile (#1234)
+* Untermenüs öffnen sich am Tablet per Antippen und mit der Tastatur (#1233)
 
 ## 1.14.0 (21.10.2026)
 
