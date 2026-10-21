@@ -70,31 +70,45 @@ Logik ohne Datenbank in `backend/services/race_weekend.py`, das Einfügen in `ra
 Runde X“ allgemein in `round_phases.py` (wiederverwendbar, etwa für Regeländerungen je Runde, #1960).
 
 - **Termin:** `session` (Lauf, freier Text bis 30 Zeichen, leer = Rennen). Die Art (`session_kind`: `qualifying`,
-  `sprint`, `race`) kommt aus dem Namen. Termine mit gleichem Kürzel (ohne Leerraum, Groß/klein egal) sind eine Runde;
-  der Kalender liefert je Termin `weekend` (Nummer der Runde in Kalender-Reihenfolge, abgesagte zählen mit, archivierte
+  `sprint`, `race`) kommt aus dem Namen. Termine mit gleichem Kürzel (ohne Leerraum, Groß/klein egal) sind eine Runde –
+  aber nur, wenn ein Termin einen Lauf hat oder die Serie einen Ablauf je Runde (`race_weekend.by_code`); sonst ist jeder
+  Termin seine eigene Runde (alte Saisons mit zweimal „R1“ bleiben, wie sie sind; im Web `groupWeekends`).
+  Der Kalender liefert je Termin `weekend` (Nummer der Runde in Kalender-Reihenfolge, abgesagte zählen mit, archivierte
   nicht), `session` und `session_kind` – Verwaltung, Serienseite und `/public/running` (`next.session`,
-  `next.sessions`). Ein neuer Termin ohne `counts` zählt nach der Vorgabe seines Laufs (`race_weekend.planned_config`) –
-  ein Qualifying ohne Punkte nicht. „Shootout“ (Sprint-Qualifying) ist ein Qualifying ohne Pole
-  (`race_weekend.is_main_qualifying`).
+  `next.sessions`). „Shootout“ (Sprint-Qualifying) ist ein Qualifying ohne Pole (`race_weekend.is_main_qualifying`).
+- **Wertung je Termin:** `counts` folgt der Vorgabe seines Laufs (`race_weekend.planned_config`, ein Qualifying ohne
+  Punkte zählt nicht), solange `counts_manual` `false` ist – neue Termine ohne `counts` und die eingefügte Liste.
+  `recompute_standings` gleicht sie nach jeder Änderung des Ablaufs an (`race_weekend.counts_updates`, erhöht
+  `calendar_version`). `counts` am Termin (POST oder PATCH) setzt `counts_manual: true`, `PATCH {counts: null}` gibt die
+  Wertung an die Vorgabe zurück. Termine ohne das Feld (vor #1930) bleiben unverändert.
 - **Ablauf je Runde:** Serie `weekend = {formats: [{from_round, sessions: [{label, offset, counts, points, dnf,
   fastest_lap, grid}]}]}`. `points`: `series` (Schema der Saison = wie das Rennen), `none` oder Liste je Platz – ein
   Qualifying mit Liste zählt ohne Angabe von `counts`; `dnf`: `series`, `place` (Punkte nach Platz trotz DNF) oder `none`
-  (0); `fastest_lap`: `null` (wie die Saison) oder Bonuspunkte; `grid`: `manual`, `qualifying` oder
-  `reverse_standings`. Eine Änderung rechnet neu und steht im Protokoll (`reference_series.weekend_change`). Die
+  (0); `fastest_lap`: `null` (wie die Saison) oder Bonuspunkte; `grid`: `manual`, `qualifying`,
+  `reverse_standings_before_round` (Fahrerwertung vor dem ersten Lauf der Runde; der alte Wert `reverse_standings` ist
+  ein Alias dafür) oder `reverse_standings_after_previous_session` (Fahrerwertung nach dem Lauf davor, also samt Sprint
+  derselben Runde). Eine Änderung rechnet neu und steht im Protokoll (`reference_series.weekend_change`). Die
   eingefügte Terminliste legt je Zeile ohne Lauf alle Läufe des gültigen Abschnitts an (`offset` in Minuten ab der
-  Uhrzeit der Zeile, ohne Uhrzeit nur ganze Tage); `R1S`, `R1 Sprint`, `R1 Q` … nur diesen Lauf. Doppelte Läufe einer
-  Runde sind ein Fehler der Zeile. Die Antwort der Vorschau hat je Zeile `sessions` und `count` (Termine gesamt).
+  Uhrzeit der Zeile, ohne Uhrzeit nur ganze Tage, ein negativer Versatz bleibt am Tag); `R1S`, `R1 Sprint`, `R1 Q` …
+  nur diesen Lauf. Ein Lauf-Wort zählt nur vor einem Trenner, Tab, entferntem Datum (`race_weekend.GAP`) oder dem
+  Zeilenende (`R1 Race of Champions` ist ein Titel). Eine Zeile ohne Kürzel mit mehreren Läufen bekommt ein freies
+  (`R{n}`, sonst `Runde {n}`, `R{n}a` …). Doppelte Läufe einer Runde sind ein Fehler der Zeile. Die Antwort der
+  Vorschau hat je Zeile `sessions` und `count` (Termine gesamt).
 - **Rechnen** (`race_weekend.standings` statt `compute_standings`, gleiche Ausgabe): Punkte je Lauf über `round_rules`
-  in `compute_standings`; ein leerer Startplatz kommt aus dem Qualifying derselben Runde bzw. der umgekehrten
-  Fahrerwertung nach der letzten gewerteten Runde davor (wer dort fehlt, bekommt keinen); die Pole (Marke im Blatt des
-  Qualifyings, sonst Platz 1) zählt am ersten Lauf der Runde mit `grid: qualifying` – nur, wenn das Qualifying nicht
-  selbst zählt. Gespeichert wird davon nichts im Blatt; es steht nur im gerechneten Stand.
-- **Blatt eines Qualifyings:** `round.session_kind` im Ausgangsstand; beim Prüfen bekommt Platz 1 die Marke `pole`
-  (außer eine Zeile trägt sie schon), die Warnung `round_not_counted` entfällt. Der Ausgangsstand liefert die Regeln des
-  Laufs (`series.rules` mit seinem Punkteschema).
+  in `compute_standings`. Mit `units` (Termin → Runde, nur bei `by_code`) zählen Streichergebnisse, „beste N“,
+  Aktivitätspunkte und `rounds_played` je Runde: gestrichen wird eine ganze Runde (Summe ihrer Läufe), `counted` und
+  `dropped` nennen weiter Termine. Ein leerer Startplatz kommt aus dem Hauptqualifying derselben Runde (der Sprint aus
+  dem Shootout, wenn es einen gibt) bzw. aus der umgekehrten Fahrerwertung nach `grid` (wer dort fehlt, bekommt
+  keinen). Die Pole (`race_weekend.pole_holder`: eine gültige Marke `pole`, sonst der erste gültige Platz ohne DSQ/DNS)
+  zählt am ersten Rennen der Runde, das seinen Startplatz aus dem Hauptqualifying nimmt (sonst am Sprint) – nur, wenn
+  das Qualifying nicht selbst zählt. Gespeichert wird davon nichts im Blatt; es steht nur im gerechneten Stand.
+- **Blatt eines Qualifyings:** `round.session_kind` im Ausgangsstand; beim Prüfen setzt `race_weekend.mark_pole` die
+  Marke `pole` nach derselben Regel (eine ungültige Marke fällt weg), die Warnung `round_not_counted` entfällt. Der
+  Ausgangsstand liefert die Regeln des Laufs (`series.rules` mit seinem Punkteschema).
 - **Serienseite (Rennliga):** `progress` zählt Runden (gewertet, wenn alle zählenden Läufe gewertet sind),
   `series.weekend` für „Punkte je Lauf“, `racing.qualifying` = je veröffentlichtem Qualifying fürs Rennen die Plätze der
-  Fahrer der Fahrerwertung (nur Kennungen) für Poles und Quali-Duell. Die Tabellen je Lauf („Gesamt · Rennen · Sprint ·
+  Fahrer der Fahrerwertung (nur Kennungen) und `pole` (`pole_holder`) für Poles und Quali-Duell; „Ø Start“ nur in
+  Saisons mit Läufen. Die Tabellen je Lauf („Gesamt · Rennen · Sprint ·
   Quali“) zählt das Web aus den Punkten je Lauf im gespeicherten Stand (`lib/raceWeekend.js`, `sessionTables`). Zwei
   Ligen als gemeinsame Fälle für Server und Web: `frontend/src/lib/raceWeekendLeagues.json`.
 
