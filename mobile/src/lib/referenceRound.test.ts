@@ -3,6 +3,7 @@ import { noScoreText } from "./seriesSpecialRules";
 import {
   countFrame,
   countShape,
+  countsUp,
   emptyText,
   leaders,
   metricText,
@@ -143,4 +144,12 @@ test("Statistik (#1950): Rang je Kennzahl mit geteiltem Platz, Ø-Werte aufsteig
   expect(metricText(rows[0], "gained")).toBe("+3");
   expect(metricText(rows[1], "gained")).toBe("−2");
   expect(metricText(rows[2], "wins")).toBe("–");
+});
+
+test("nur die ersten 24 Zeilen zählen hoch - große Felder starten keine 60 Animationen", () => {
+  expect(countsUp(0)).toBe(true);
+  expect(countsUp(23)).toBe(true);
+  expect(countsUp(24)).toBe(false);
+  expect(countsUp(59)).toBe(false);
+  expect(countsUp(-1)).toBe(false);
 });

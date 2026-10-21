@@ -16,6 +16,7 @@ import { gridWords } from "../../lib/raceWeekend";
 import {
   COUNT_UP_MS,
   countDelay,
+  countsUp,
   emptyText,
   mobileMain,
   mobileSub,
@@ -294,7 +295,9 @@ function ResultRow({ row, index, playKey, shows }: { row: RoundRow; index: numbe
       </View>
       {main ? (
         <View style={styles.right}>
-          {shows.times ? <CountUpText text={main} playKey={playKey} delay={delay} style={[styles.main, !finished && styles.mainOut]} /> : <Body style={styles.main}>{main}</Body>}
+          {shows.times && countsUp(index)
+            ? <CountUpText text={main} playKey={playKey} delay={delay} style={[styles.main, !finished && styles.mainOut]} />
+            : <Body style={[styles.main, !finished && styles.mainOut]}>{main}</Body>}
           {subText ? <Muted style={styles.sub}>{subText}</Muted> : null}
         </View>
       ) : null}

@@ -345,6 +345,11 @@ export function countDelay(index: number): number {
   return Math.min(Math.max(0, index), COUNT_UP_MAX_ROWS) * COUNT_UP_STAGGER_MS;
 }
 
+/** Nur die ersten 24 Zeilen zählen hoch - weiter unten steht der Wert gleich da (spart Animationen bei großen Feldern). */
+export function countsUp(index: number): boolean {
+  return index >= 0 && index < COUNT_UP_MAX_ROWS;
+}
+
 // ---------------------------------------------------------------- Statistik der Saison
 
 export type StatRow = {
