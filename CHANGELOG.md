@@ -1,5 +1,20 @@
 # Changelog
 
+## 1.17.0 (21.10.2026)
+
+### Neu
+
+* Fast-Lap-Seite zeigt TV- und PDF-Knöpfe nur für die Leitung, für alle „Downloads“ mit eigener Urkunde (#1277)
+* Fast-Lap-Urkunden gibt es nur für die Person selbst und die Leitung (#1277)
+* Profile zeigen keine Nullen, keine leeren Reiter und keinen Biografie-Platzhalter (#1268)
+* Seite „Neu auf der Website“ mit Link und Punkt in der Fußzeile (#1240)
+* Sponsoren- und Partner-Logos einfarbig weiß, Farbe beim Drüberfahren (#1321)
+* Verwaltung hat eine weiße Logo-Fassung und einen Hinweis bei Logos mit Kasten (#1321)
+
+### Fehlerbehebungen
+
+* Podium im Profil zählt Fast-Lap-Plätze 1 bis 3 mit (#1268)
+
 ## 1.16.0 (21.10.2026)
 
 ### Neu
