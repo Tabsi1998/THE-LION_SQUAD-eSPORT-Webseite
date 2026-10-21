@@ -1,5 +1,47 @@
 # Changelog
 
+## 1.13.0 (21.10.2026)
+
+### Neu
+
+* Admin-Menü zeigt „Zuletzt“ ganz oben (#1291)
+* Anmelden mit kurzem Bestätigungs-Blatt für jede Turnier-Anmeldung (#1261)
+* Countdown-Schwelle unter Branding einstellbar (#1264)
+* Großer Countdown der Startseite nur bei Terminen in den nächsten 14 Tagen (#1264)
+* Login hat oben den Link „Zurück zur Website“ (#1242)
+* Startseite zeigt „Heute im Einsatz“ an Renn- und Spieltagen (#1753)
+* Zeitleiste der Turnierseite nennt Termine nach derselben Regel (#1264)
+* Zustands-Schild zählt nur, wenn es bald so weit ist (#1264)
+
+### Fehlerbehebungen
+
+* „Dein Stand“ zeigt die Warteschlange nur, solange das Turnier läuft (#1888)
+* Auf der Anmeldeseite heißt es überall „Anmelden“ (#1242)
+* Betriebsskripte media-report und uploads-inventory im Backend-Container aufrufbar (#1583)
+* Bildfelder sagen, dass SVG nicht geht (#1419)
+* Chat sortiert und zählt neue Nachrichten nach Zeitpunkt statt nach Text (#1049)
+* Chat-Kopf zählt Nachrichten ohne Zeitzone nach Wiener Uhr (#1049)
+* Content-Audit startet nur mit ausdrücklich gewählter Basis-URL und bricht bei Weiterleitung auf die echte Seite ab (#1007)
+* Discord-Statistik zählt aktive Konten nur auf den Servern der Übersicht (#981)
+* Dokument-Formular nennt die Sichtbarkeit wie die Plakette – Mitglieder, Vorstand (#1367)
+* Dokumentenliste in Worten – Sichtbarkeit als Plakette, Zähler als Satz, nur ansehen (#1367)
+* Eingeklapptes Admin-Menü ist nicht mehr per Tastatur erreichbar, Öffnen führt den Fokus hinein (#1289)
+* gescheiterte Nebenwirkungen werden geloggt statt verschluckt (#934)
+* Geteilter Platz 1 zählt in der Statistik nicht mehr als Sieg (#1806)
+* Livestream-Karte der Turnierseite verschwindet nach dem Ende (#1888)
+* Login zeigt keinen roten Fehler, wenn der stille Passkey-Vorschlag scheitert (#1242)
+* Mitgliederprofile nur noch als Reiter „Öffentliche Profile“ unter Mitglieder (#1365)
+* Siegesserie folgt dem Abschluss der Spiele, nicht späteren Korrekturen (#1806)
+* Startseite der Verwaltung zählt Konten als Konten und neue Vereinsmitglieder extra (#1378)
+* Statuspille der Event-TV-Tafel folgt der öffentlichen Phase (#1888)
+* SVG-Upload zeigt eine klare Meldung statt „Ungültige Bilddatei“ (#1419)
+* Verwaltung am Tablet hochkant mit einklappbarem Menü (#1289)
+* Web-Kalender sortiert die Termine eines Tages nach Zeitpunkt statt nach Text (#1567)
+
+### Dokumentation
+
+* Platzhalter-Adressen in INSTALL.md nicht mehr als Link (#1789)
+
 ## 1.12.2 (20.10.2026)
 
 ### Schneller
