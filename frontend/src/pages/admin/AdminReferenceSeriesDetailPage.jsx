@@ -126,7 +126,7 @@ export default function AdminReferenceSeriesDetailPage() {
                 </p>
               )}
             </div>
-            {board && <div className="flex items-center gap-2 shrink-0 flex-wrap">
+            {board && <div className="flex items-center gap-2 shrink-0 flex-wrap max-w-full">
               {!archived && (
                 <button type="button" onClick={openClose} data-testid="series-detail-close" className="tls-btn tls-btn--primary px-4 py-2 rounded-sm text-xs font-bold uppercase tracking-wider inline-flex items-center gap-2">
                   <Flag className="w-3.5 h-3.5" /> Saison abschließen
