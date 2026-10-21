@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Star, Timer } from "lucide-react";
 import { CountryFlag } from "@/components/tls/CountryFlag";
 import { CountUp } from "@/components/tls/motion/CountUp";
+import { Glow } from "@/components/tls/motion/Glow";
 import { COUNT_UP_MS, COUNT_UP_STAGGER_MS } from "@/lib/countUp";
 import { formatNumber } from "@/lib/standingsTable";
 import { nameOf } from "@/lib/referenceSeriesTable";
@@ -17,7 +18,7 @@ import "./roundResults.css";
 // (CountUp, je Zeile 25 ms versetzt); am Ende leuchten Pole und schnellste Runde einmal auf, Vereinszeilen glänzen kurz.
 
 const MAX_STAGGER_ROWS = 24;
-const GLOW = new Set(["pole", "fastest_lap"]);
+const GLOW = new Map([["pole", "pole"], ["fastest_lap", "fastest"]]);
 
 function rowDelay(index) {
   return Math.min(index, MAX_STAGGER_ROWS) * COUNT_UP_STAGGER_MS;
@@ -147,18 +148,21 @@ export function SessionTabs({ sessions, current, onPick, panelId }) {
 
 function Badge({ badge, short = false, glow, index }) {
   const Icon = badge.key === "fastest_lap" ? Timer : badge.key === "driver_of_the_day" ? Star : null;
-  return (
-    <span
-      className="tls-round-badge"
-      data-badge={badge.key}
-      data-glow={glow && GLOW.has(badge.key) ? "true" : undefined}
-      style={glow && GLOW.has(badge.key) ? { "--tls-glow-delay": glowDelay(index) } : undefined}
-      data-testid="round-badge"
-    >
+  const content = (
+    <>
       {Icon && <Icon strokeWidth={2.5} aria-hidden="true" fill={badge.key === "driver_of_the_day" ? "currentColor" : "none"} />}
       {short ? badge.short : badge.label}
-    </span>
+    </>
   );
+  if (glow && GLOW.has(badge.key)) {
+    // Baustein Glow (#1969): am Ende des Hochzählens leuchtet das Abzeichen einmal in seiner Farbe auf.
+    return (
+      <Glow active tone={GLOW.get(badge.key)} delay={rowDelay(index) + COUNT_UP_MS} className="tls-round-badge" data-badge={badge.key} data-testid="round-badge">
+        {content}
+      </Glow>
+    );
+  }
+  return <span className="tls-round-badge" data-badge={badge.key} data-testid="round-badge">{content}</span>;
 }
 
 function DriverName({ row }) {

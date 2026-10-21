@@ -1,4 +1,5 @@
-import { COUNT_UP_MS, COUNT_UP_STAGGER_MS, countFrame, countShape, easeOutCubic, formatShape } from "./countUp";
+import { COUNT_UP_MS, COUNT_UP_STAGGER_MS, countFrame, countShape, countStart, easeOutCubic, formatShape } from "./countUp";
+import { MICRO } from "./motion";
 
 // Hochzählen (#1950): Zeiten, Abstände und Zahlen laufen in der Form ihres Endwerts hoch, Wörter stehen sofort.
 
@@ -45,8 +46,35 @@ describe("countFrame", () => {
     expect(formatShape(countShape("2:00.000"), 61005)).toBe("1:01.005");
   });
 
-  it("dauert etwa 0,9 s und versetzt je Zeile um 25 ms", () => {
+  it("dauert etwa 0,9 s und versetzt je Zeile um 25 ms - aus den Bewegungs-Werten (#1969)", () => {
     expect(COUNT_UP_MS).toBe(900);
     expect(COUNT_UP_STAGGER_MS).toBe(25);
+    expect(COUNT_UP_MS).toBe(MICRO.count);
+    expect(COUNT_UP_STAGGER_MS).toBe(MICRO.countStagger);
+  });
+});
+
+describe("eine Art zu zählen für alles (#1969)", () => {
+  it("Zahlen als Wert zählen in ganzen Schritten und mit eigener Schreibweise", () => {
+    const shape = countShape(1234, (value) => value.toLocaleString("de-DE"));
+    expect(shape).toMatchObject({ numeric: true, total: 1234, text: "1.234" });
+    expect(countFrame(shape, 0)).toBe("0");
+    expect(countFrame(shape, 1)).toBe("1.234");
+    expect(countFrame(countShape(35), 0.5)).toBe(String(Math.round(35 * easeOutCubic(0.5))));
+    expect(countShape(0)).toBeNull();
+    expect(countShape(Number.NaN)).toBeNull();
+  });
+
+  it("vom alten Wert aus: eine neue Bestzeit läuft von der alten zur neuen, auch abwärts", () => {
+    const shape = countShape("1:23.412");
+    const start = countStart(shape, "1:23.824");
+    expect(start).toBe(83824);
+    expect(countFrame(shape, 0, start)).toBe("1:23.824");
+    expect(countFrame(shape, 1, start)).toBe("1:23.412");
+    // Andere Stellenzahl hinter dem Komma wird umgerechnet, Unlesbares heißt null.
+    expect(countStart(countShape("1:23,41"), "1:23.824")).toBe(8382);
+    expect(countStart(shape, "DNF")).toBe(0);
+    expect(countStart(countShape(40), 35)).toBe(35);
+    expect(countStart(shape, undefined)).toBe(0);
   });
 });

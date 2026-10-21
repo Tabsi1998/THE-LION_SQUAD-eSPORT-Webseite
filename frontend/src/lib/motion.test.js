@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import { MOTION, motionAllowed, motionSeconds, motionTransition } from "./motion";
+import { MICRO, MOTION, motionAllowed, motionSeconds, motionTransition } from "./motion";
 
 // Bewegungs-Regeln (#1070): drei Dauern und eine Kurve stehen an drei Stellen - JS, CSS und App. Dieser Test hält
 // sie zusammen: wer eine Zahl ändert, muss alle drei ändern.
@@ -27,6 +27,20 @@ test("mit „Bewegung reduzieren“ stellt das CSS an einer Stelle alle Dauern a
   expect(rule).toContain("@media (prefers-reduced-motion: reduce)");
   for (const key of ["fast", "mid", "slow"]) expect(rule).toContain(`--tls-motion-${key}: 0.01ms;`);
   expect(rule).toContain("--tls-motion-on: 0;");
+});
+
+test("Mikro-Bewegung (#1969): Hochzählen, Aufleuchten und Staffelung stehen in JS und CSS gleich", () => {
+  expect(MICRO).toEqual({ count: 900, countStagger: 25, stagger: 50, staggerMax: 12, glow: 840 });
+  expect(css).toContain(`--tls-motion-count: ${MICRO.count}ms;`);
+  expect(css).toContain(`--tls-motion-glow: ${MICRO.glow}ms;`);
+  expect(css).toContain(`--tls-stagger-step: ${MICRO.stagger}ms;`);
+  // Gestaffelt werden nur die ersten zwölf Einträge.
+  expect(css).toContain(`.tls-stagger[data-stagger="run"] > :nth-child(-n+${MICRO.staggerMax})`);
+  const block = css.slice(css.indexOf("/* Bewegungs-Regeln: Bewegung reduzieren */"));
+  const rule = block.slice(0, block.indexOf("}\n}") + 3);
+  expect(rule).toContain("--tls-motion-count: 0.01ms;");
+  expect(rule).toContain("--tls-motion-glow: 0.01ms;");
+  expect(rule).toContain("--tls-stagger-step: 0ms;");
 });
 
 test("motionSeconds und motionTransition rechnen aus den festen Werten", () => {

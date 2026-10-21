@@ -48,6 +48,10 @@
   /* Wege über die Fläche (#1561, lib/motion EASE_MOVE): weich an, weich ab - der Flug im Turnierbaum und seine Linie. */
   --tls-ease-move: cubic-bezier(0.77, 0, 0.175, 1);
   --tls-motion-on: 1;
+  /* Mikro-Bewegung (#1969, lib/motion MICRO): Hochzählen, kurzes Aufleuchten, Versatz beim gestaffelten Erscheinen. */
+  --tls-motion-count: 900ms;
+  --tls-motion-glow: 840ms;
+  --tls-stagger-step: 50ms;
 }
 
 * { border-color: rgba(255,255,255,0.1); }
@@ -682,6 +686,59 @@ button.tls-bracket-row:active, .tls-bracket-head:active { transform: scale(calc(
 
 .tls-hide-scrollbar { scrollbar-width: none; -ms-overflow-style: none; }
 .tls-hide-scrollbar::-webkit-scrollbar { display: none; width: 0; height: 0; }
+
+/* Bewegung: Bausteine (#1969, components/tls/motion). Nur Verschieben, Skalieren und Deckkraft; mit „Bewegung
+   reduzieren“ stehen alle Dauern auf 0 und --tls-motion-on auf 0 (Bewegungs-Regeln weiter unten).
+   - Glow: ein Schein hinter Abzeichen oder Wert leuchtet einmal auf (nur seine Deckkraft bewegt sich).
+   - StaggerIn: die ersten zwölf Einträge steigen nacheinander auf, der Rest steht sofort.
+   - Press: Karten heben sich unter der Maus um 2 px und geben beim Drücken leicht nach. */
+.tls-glow { position: relative; --tls-glow-rgb: var(--tls-brand-rgb); }
+.tls-glow[data-tone="honor"] { --tls-glow-rgb: var(--tls-honor-rgb); }
+.tls-glow[data-tone="ok"] { --tls-glow-rgb: var(--tls-ok-rgb); }
+.tls-glow[data-tone="pole"] { --tls-glow-rgb: var(--tls-pole-rgb); }
+.tls-glow[data-tone="fastest"] { --tls-glow-rgb: var(--tls-fastest-rgb); }
+.tls-glow::after {
+  content: ""; position: absolute; inset: -3px; border-radius: var(--tls-glow-radius, 6px); pointer-events: none; opacity: 0;
+  background: rgb(var(--tls-glow-rgb) / 0.1);
+  box-shadow: 0 0 0 2px rgb(var(--tls-glow-rgb) / 0.3), 0 2px 14px 1px rgb(var(--tls-glow-rgb) / 0.45);
+}
+.tls-glow[data-glow="on"]::after { animation: tls-glow-once var(--tls-motion-glow) var(--tls-ease) both; animation-delay: var(--tls-glow-delay, 0ms); }
+/* Jede weitere Änderung wechselt zwischen „on“ und „again“ - ein neuer Name startet das Aufleuchten neu. */
+.tls-glow[data-glow="again"]::after { animation: tls-glow-again var(--tls-motion-glow) var(--tls-ease) both; }
+@keyframes tls-glow-once { 0% { opacity: 0; } 35% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes tls-glow-again { 0% { opacity: 0; } 35% { opacity: 1; } 100% { opacity: 0; } }
+
+@keyframes tls-stagger-in { from { opacity: 0; transform: translateY(calc(8px * var(--tls-motion-on))); } }
+.tls-stagger[data-stagger="wait"] > :nth-child(-n+12) { opacity: 0; }
+.tls-stagger[data-stagger="run"] > :nth-child(-n+12) {
+  animation: tls-stagger-in var(--tls-motion-slow) var(--tls-ease) both;
+  animation-delay: calc(var(--tls-stagger-i, 0) * var(--tls-stagger-step));
+}
+.tls-stagger > :nth-child(2) { --tls-stagger-i: 1; }
+.tls-stagger > :nth-child(3) { --tls-stagger-i: 2; }
+.tls-stagger > :nth-child(4) { --tls-stagger-i: 3; }
+.tls-stagger > :nth-child(5) { --tls-stagger-i: 4; }
+.tls-stagger > :nth-child(6) { --tls-stagger-i: 5; }
+.tls-stagger > :nth-child(7) { --tls-stagger-i: 6; }
+.tls-stagger > :nth-child(8) { --tls-stagger-i: 7; }
+.tls-stagger > :nth-child(9) { --tls-stagger-i: 8; }
+.tls-stagger > :nth-child(10) { --tls-stagger-i: 9; }
+.tls-stagger > :nth-child(11) { --tls-stagger-i: 10; }
+.tls-stagger > :nth-child(12) { --tls-stagger-i: 11; }
+
+.tls-press { transition: transform var(--tls-motion-fast) var(--tls-ease), border-color var(--tls-motion-fast) var(--tls-ease); }
+@media (hover: hover) and (pointer: fine) {
+  .tls-press:not(.tls-press--flat):hover { transform: translateY(calc(-2px * var(--tls-motion-on))); }
+}
+.tls-press:active { transform: scale(calc(1 - 0.03 * var(--tls-motion-on))); }
+
+@media (prefers-reduced-motion: reduce) {
+  .tls-glow[data-glow]::after, .tls-stagger[data-stagger="run"] > * { animation: none; }
+  .tls-stagger[data-stagger="wait"] > * { opacity: 1; }
+}
+@media print {
+  .tls-stagger > * { opacity: 1 !important; animation: none !important; }
+}
 
 /* Wischleiste (#1950, für alle Leisten gedacht): seitlich verschiebbar im Vereinsstil - eine dünne Leiste in Cyan statt
    der weißen Systemleiste, die Ränder laufen weich aus, wo es weitergeht. Wo der Browser Animationen am Scrollen kennt,
@@ -2038,6 +2095,9 @@ input.no-spin::-webkit-outer-spin-button, input.no-spin::-webkit-inner-spin-butt
     --tls-motion-fast: 0.01ms;
     --tls-motion-mid: 0.01ms;
     --tls-motion-slow: 0.01ms;
+    --tls-motion-count: 0.01ms;
+    --tls-motion-glow: 0.01ms;
+    --tls-stagger-step: 0ms;
     --tls-motion-on: 0;
   }
 }

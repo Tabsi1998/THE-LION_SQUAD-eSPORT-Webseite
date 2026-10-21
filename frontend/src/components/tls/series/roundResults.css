@@ -99,27 +99,19 @@
 .tls-round-badge {
   display: inline-flex; align-items: center; gap: 0.25rem; padding: 1px 7px; border-radius: 4px; white-space: nowrap;
   font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; line-height: 1.5;
-  color: var(--tls-surface-0); --glow: var(--tls-brand-rgb);
+  color: var(--tls-surface-0);
 }
 .tls-round-badge svg { width: 11px; height: 11px; }
-.tls-round-badge[data-badge="pole"] { background: rgb(var(--tls-pole-rgb)); --glow: var(--tls-pole-rgb); }
-.tls-round-badge[data-badge="fastest_lap"] { background: rgb(var(--tls-fastest-rgb)); --glow: var(--tls-fastest-rgb); }
+.tls-round-badge[data-badge="pole"] { background: var(--tls-pole); }
+.tls-round-badge[data-badge="fastest_lap"] { background: var(--tls-fastest); }
 .tls-round-badge[data-badge="driver_of_the_day"] { background: var(--tls-honor); }
 .tls-round-badge[data-badge="dnf"],
 .tls-round-badge[data-badge="dsq"] { color: var(--tls-text-muted); background: transparent; box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.22); }
 .tls-round-badge[data-badge="penalty"] { color: var(--tls-warn); background: rgb(var(--tls-warn-rgb) / 0.12); }
 .tls-round-penalty { color: var(--tls-warn); font-size: 14px; }
 
-/* Detail-Runde: am Ende des Hochzählens leuchten Pole und schnellste Runde einmal auf, Vereinszeilen glänzen leise. */
-.tls-round-badge[data-glow="true"] {
-  animation: tls-round-glow calc(var(--tls-motion-slow) * 2) var(--tls-ease) both;
-  animation-delay: var(--tls-glow-delay, 0ms);
-}
-@keyframes tls-round-glow {
-  0% { box-shadow: 0 0 0 0 rgb(var(--glow) / 0); }
-  35% { box-shadow: 0 0 0 3px rgb(var(--glow) / 0.3), 0 2px 14px 1px rgb(var(--glow) / 0.45); }
-  100% { box-shadow: 0 0 0 0 rgb(var(--glow) / 0); }
-}
+/* Detail-Runde: am Ende des Hochzählens leuchten Pole und schnellste Runde einmal auf (Baustein Glow, index.css),
+   Vereinszeilen glänzen leise. */
 .tls-round-row[data-own="true"][data-shine="true"],
 .tls-round-item[data-own="true"][data-shine="true"] {
   animation: tls-round-shine calc(var(--tls-motion-slow) * 2) var(--tls-ease) both;
@@ -161,5 +153,5 @@
 .tls-round-row[data-own="true"] .tls-stats-sticky { background: linear-gradient(rgb(var(--tls-brand-rgb) / 0.06), rgb(var(--tls-brand-rgb) / 0.06)), var(--tls-surface-0); }
 
 @media (prefers-reduced-motion: reduce) {
-  .tls-round-panel, .tls-round-badge[data-glow="true"], .tls-round-row[data-shine="true"], .tls-round-item[data-shine="true"] { animation: none; }
+  .tls-round-panel, .tls-round-row[data-shine="true"], .tls-round-item[data-shine="true"] { animation: none; }
 }
