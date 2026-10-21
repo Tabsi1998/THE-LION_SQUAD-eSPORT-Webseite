@@ -6,6 +6,7 @@ import { parseLineupPaste } from "@/lib/lineupPaste";
 import { dayLabel } from "@/lib/referenceCalendar";
 import {
   applyLineupPaste, applyMatchday, isOwnMatch, ownTeamMatcher, pickMatchday, rosterFor, setMapLineup, toggleLineup,
+  toggleMatchLineup,
 } from "@/lib/teamLeagueEntry";
 import { Check, ClipboardList, Plus, Trash2, X } from "lucide-react";
 
@@ -219,7 +220,7 @@ function LineupPicker({ match, roster, participants, onChange }) {
     const parsed = parseLineupPaste(text);
     const outcome = applyLineupPaste(match, parsed, participants, roster);
     setExtra((current) => [...current, ...outcome.extra.filter((entry) => !current.some((item) => sameEntry({ participant_id: item.id, name: item.name }, entry)))]);
-    if (outcome.marked) onChange({ lineup: outcome.match.lineup });
+    if (outcome.marked) onChange({ lineup: outcome.match.lineup, maps: outcome.match.maps });
     setNotice({ marked: outcome.marked, count: parsed.rows.length, errors: parsed.errors });
     if (parsed.rows.length) setPasting(false);
     return parsed.rows.length > 0;
@@ -256,7 +257,7 @@ function LineupPicker({ match, roster, participants, onChange }) {
         <ul className="flex flex-wrap gap-1.5" data-testid="result-lineup" aria-label="Kader zum Ankreuzen">
           {people.map((entry) => (
             <li key={entry.id || entry.name}>
-              <PersonToggle person={entry} on={inLineup(entry)} onToggle={() => onChange({ lineup: toggleLineup(match.lineup, entry) })} />
+              <PersonToggle person={entry} on={inLineup(entry)} onToggle={() => onChange(toggleMatchLineup(match, entry))} />
             </li>
           ))}
         </ul>

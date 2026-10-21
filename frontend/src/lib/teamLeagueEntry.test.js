@@ -3,7 +3,7 @@ import { parseMatchdayPaste } from "@/lib/matchdayPaste";
 import { parseLineupPaste } from "@/lib/lineupPaste";
 import {
   applyLineupPaste, applyMatchday, appearancesText, isOwnMatch, ownTeamMatcher, pickMatchday, rosterFor, setMapLineup,
-  toggleLineup,
+  toggleLineup, toggleMatchLineup,
 } from "@/lib/teamLeagueEntry";
 
 // Team-Liga einfacher eintragen (#1931): eigenes Spiel erkennen, Begegnungsliste ins Formular, Kader als Ankreuzliste,
@@ -138,6 +138,24 @@ test("Aufstellung je Map: die Person kommt in die Map und bleibt im Spiel", () =
   expect(next.lineup).toEqual([{ participant_id: "p-anna", name: "Anna" }]);
   const off = setMapLineup(next, match.maps[0].key, PEOPLE[0]);
   expect(off.maps[0].lineup).toEqual([]);
+});
+
+test("Aufstellung im Spiel abwählen (Prüfung #1931): die Person fällt auch aus allen Maps, auch beim Einfügen", () => {
+  const anna = { participant_id: "p-anna", name: "Anna" };
+  const bert = { participant_id: "p-bert", name: "Bert" };
+  const match = { ...emptyMatch({ home: "Probe Löwen", away: "Probe Falken" }), lineup: [anna, bert], maps: [
+    emptyMap({ name: "Karte Nord", lineup: [anna, bert] }), emptyMap({ name: "Karte Süd", lineup: [anna] })] };
+  const off = toggleMatchLineup(match, PEOPLE[0]);
+  expect(off.lineup).toEqual([bert]);
+  expect(off.maps.map((item) => item.lineup)).toEqual([[bert], []]);
+  // Ankreuzen im Spiel ändert die Maps nicht.
+  const on = toggleMatchLineup(off, PEOPLE[0]);
+  expect(on.lineup).toEqual([bert, anna]);
+  expect(on.maps.map((item) => item.lineup)).toEqual([[bert], []]);
+
+  const pasted = applyLineupPaste(match, parseLineupPaste("Seasonteam-Mitglieder\tWarorga\nAnna\t-\nBert\t✓"), PEOPLE, []);
+  expect(pasted.match.lineup).toEqual([bert]);
+  expect(pasted.match.maps.map((item) => item.lineup)).toEqual([[bert], []]);
 });
 
 test("mehrere Spieltage eingefügt: der zum Termin passende über Nummer, Zeitraum oder Tag", () => {

@@ -144,6 +144,29 @@ test("Kader als Ankreuzliste, Maps im Veto mit Rolle und Aufstellung je Map, Nam
   });
 });
 
+test("Aufstellung abwählen (Prüfung #1931): wer im Spiel abgewählt wird, fällt auch aus den Maps - nichts kommt zurück", async () => {
+  await openSheet();
+  fireEvent.change(screen.getByTestId("result-match-home-score"), { target: { value: "1" } });
+  fireEvent.change(screen.getByTestId("result-match-away-score"), { target: { value: "0" } });
+  fireEvent.click(screen.getByTestId("result-map-add"));
+  fireEvent.change(screen.getByTestId("result-map-name"), { target: { value: "Karte Nord" } });
+  fireEvent.change(screen.getByTestId("result-map-home"), { target: { value: "6" } });
+  fireEvent.change(screen.getByTestId("result-map-away"), { target: { value: "2" } });
+  fireEvent.click(screen.getByTestId("result-lineup-per-map"));
+  // In der Map angekreuzt - steht damit auch im Spiel.
+  fireEvent.click(within(screen.getByTestId("result-map-lineup")).getAllByTestId("result-map-lineup-person")[1]);
+  const picker = screen.getByTestId("result-lineup-picker");
+  const bert = within(picker).getAllByTestId("result-lineup-person")[1];
+  expect(bert).toHaveAttribute("aria-pressed", "true");
+  // Im Spiel abgewählt - raus aus Spiel und Map.
+  fireEvent.click(bert);
+  expect(bert).toHaveAttribute("aria-pressed", "false");
+  expect(within(screen.getByTestId("result-map-lineup")).getAllByTestId("result-map-lineup-person")[1]).toHaveAttribute("aria-pressed", "false");
+  const body = await payload();
+  expect(body.matches[0].lineup).toEqual([]);
+  expect(body.matches[0].maps).toEqual([{ name: "Karte Nord", home_score: 6, away_score: 2 }]);
+});
+
 test("Aufstellung von der Match-Seite: Häkchen setzen an, ohne Häkchen ein Hinweis zum Ankreuzen", async () => {
   await openSheet();
   fireEvent.click(screen.getByTestId("result-lineup-paste-toggle"));

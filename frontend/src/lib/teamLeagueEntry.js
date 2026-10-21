@@ -69,6 +69,20 @@ export function toggleLineup(lineup = [], person) {
   return [...lineup, { participant_id: person.id || "", name: person.name || "" }];
 }
 
+/**
+ * Regel der Aufstellung (Prüfung #1931): die Aufstellung des Spiels umfasst immer die aller Maps - wer eine Map spielt,
+ * hat das Spiel gespielt (so rechnet auch der Server: Spiel = Vereinigung aus Spiel und Maps). Darum: in einer Map
+ * ankreuzen setzt die Person auch im Spiel an; im Spiel abwählen nimmt sie auch aus allen Maps. So kommt eine abgewählte
+ * Person nie über eine Map zurück.
+ */
+export function toggleMatchLineup(match, person) {
+  const lineup = toggleLineup(match.lineup || [], person);
+  if (lineup.length > (match.lineup || []).length) return { ...match, lineup };
+  const maps = (match.maps || []).map((item) => ((item.lineup || []).some((entry) => sameEntry(entry, person))
+    ? { ...item, lineup: item.lineup.filter((entry) => !sameEntry(entry, person)) } : item));
+  return { ...match, lineup, maps };
+}
+
 /** Person in der Aufstellung einer Map an- oder abhaken - wer eine Map spielt, steht auch in der des Spiels. */
 export function setMapLineup(match, mapKey, person) {
   let added = false;
@@ -168,13 +182,13 @@ export function applyLineupPaste(match, parsed, participants = [], roster = []) 
   const inRoster = (person) => roster.some((entry) => (person.id ? entry.id === person.id : literal(entry.name) === literal(person.name)));
   const extra = people.map(({ person }) => person).filter((person) => !inRoster(person));
   if (!parsed?.marked) return { match, marked: false, extra };
-  let lineup = [...(match.lineup || [])];
+  let next = { ...match, lineup: [...(match.lineup || [])] };
   for (const { person, played } of people) {
-    const has = lineup.some((entry) => sameEntry(entry, person));
-    if (played === true && !has) lineup = [...lineup, { participant_id: person.id || "", name: person.name }];
-    if (played === false && has) lineup = lineup.filter((entry) => !sameEntry(entry, person));
+    const has = next.lineup.some((entry) => sameEntry(entry, person));
+    // Abwählen nimmt die Person auch aus den Maps (Regel bei `toggleMatchLineup`).
+    if ((played === true && !has) || (played === false && has)) next = toggleMatchLineup(next, person);
   }
-  return { match: { ...match, lineup }, marked: true, extra };
+  return { match: next, marked: true, extra };
 }
 
 const UNITS = {

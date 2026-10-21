@@ -14,7 +14,8 @@ diese Angaben bleibt genau wie bisher:
   Decider dürfen ohne Ergebnis sein (ein Decider bei 2:0 wird nicht gespielt) und bleiben dann leer - nie still 0:0.
   Eine gesperrte Map hat nie ein Ergebnis.
 - **Aufstellung des Spiels:** die Vereinigung aus der Aufstellung des Spiels und denen der Maps - wer eine Map gespielt
-  hat, hat das Spiel gespielt.
+  hat, hat das Spiel gespielt. Das Formular hält sich an dieselbe Regel (Prüfung #1931): wer im Spiel abgewählt wird,
+  fällt auch aus allen Maps (``toggleMatchLineup`` in ``frontend/src/lib/teamLeagueEntry.js``).
 - **Termin des Spiels:** ``club_day`` (Wiener Tag) und ``time`` („HH:MM“ Wiener Zeit), mit beidem dazu ``starts_at`` in
   UTC - etwa aus der eingefügten Begegnungsliste des Veranstalters. Ohne Tag gilt der Tag des Termins.
 
