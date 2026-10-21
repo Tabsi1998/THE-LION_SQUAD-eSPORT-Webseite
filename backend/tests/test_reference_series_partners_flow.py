@@ -16,7 +16,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 
 from flow_harness import make_flow  # noqa: E402
 from routes import reference_round_routes, reference_series_public_routes  # noqa: E402
-from services import migrations, reference_running_cache  # noqa: E402
+from services import migrations, partner_pages, reference_running_cache  # noqa: E402
 
 ADMIN = "/api/reference-series/admin"
 PUBLIC = "/api/reference-series/public"
@@ -171,9 +171,12 @@ async def test_partner_page_lists_lineage_with_both_seasons_place_and_running(fl
 @pytest.mark.asyncio
 async def test_inactive_partner_disappears_everywhere(flow):
     admin, (host, helper, sponsor), lineage, (done, running) = await _setup(flow)
+    # „Läuft gerade“ ist gemerkt (Cache) - das Deaktivieren des Partners muss ihn sofort leeren.
+    flow.act_as(None)
+    assert _names((await flow.get(f"{PUBLIC}/running")).json()["items"][0]["organizers"]) == ["Probe Ananas"]
+    flow.act_as(admin)
     response = await flow.patch(f"/api/partners/{host['id']}", json={"is_active": False})
     assert response.status_code == 200, response.text
-    reference_running_cache.reset()
     flow.act_as(None)
     page = (await flow.get(f"{PUBLIC}/{lineage['slug']}/{running['season_slug']}")).json()
     assert page["partners"]["organizers"] == []
@@ -182,6 +185,46 @@ async def test_inactive_partner_disappears_everywhere(flow):
     paths = (await flow.get(f"{PUBLIC}/lineages")).json()["items"]
     assert paths[0]["lineage"]["organizers"] == [] and paths[0]["seasons"][0]["organizers"] == []
     assert (await flow.get(f"/api/partners/{host['slug']}")).status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_deleting_or_renaming_a_partner_clears_the_running_cache(flow):
+    admin, (host, helper, sponsor), lineage, (done, running) = await _setup(flow)
+    flow.act_as(None)
+    assert _names((await flow.get(f"{PUBLIC}/running")).json()["items"][0]["organizers"]) == ["Probe Ananas"]
+    flow.act_as(admin)
+    renamed = await flow.patch(f"/api/partners/{host['id']}", json={"name": "Probe Ananas Neu"})
+    assert renamed.status_code == 200
+    flow.act_as(None)
+    assert _names((await flow.get(f"{PUBLIC}/running")).json()["items"][0]["organizers"]) == ["Probe Ananas Neu"]
+    flow.act_as(admin)
+    deleted = await flow.delete(f"/api/partners/{host['id']}")
+    assert deleted.status_code == 200
+    flow.act_as(None)
+    assert (await flow.get(f"{PUBLIC}/running")).json()["items"][0]["organizers"] == []
+
+
+@pytest.mark.asyncio
+async def test_partner_logo_comes_from_the_common_partner_badge(flow, monkeypatch):
+    """Logo und Kurzform wie bei allen Partner-Abzeichen (``partner_pages.partner_badge``) - keine eigene Übernahme
+    der ``logo_url``; mit Dolibarr-Bildern gilt dort die Variante für dunklen Grund."""
+    admin, (host, helper, sponsor), lineage, (done, running) = await _setup(flow)
+    await flow.db.partners.update_one({"id": host["id"]}, {"$set": {"dolibarr_images": {"logo": {
+        "dark": {"url": "/api/static/uploads/dolibarr-partner-1-logo-dark.png"}}}}})
+    flow.act_as(None)
+    page = (await flow.get(f"{PUBLIC}/{lineage['slug']}/{running['season_slug']}")).json()
+    assert page["partners"]["organizers"][0]["logo_url"] == "/api/static/uploads/dolibarr-partner-1-logo-dark.png"
+
+    calls = []
+
+    def badge(doc):
+        calls.append(doc.get("id"))
+        return {"id": doc.get("id"), "slug": doc.get("slug"), "name": doc.get("name"), "logo_url": "/geprüft.png", "kind": None}
+
+    monkeypatch.setattr(partner_pages, "partner_badge", badge)
+    page = (await flow.get(f"{PUBLIC}/{lineage['slug']}/{running['season_slug']}")).json()
+    assert host["id"] in calls
+    assert {item["logo_url"] for item in page["partners"]["organizers"] + page["partners"]["contributors"]} == {"/geprüft.png"}
 
 
 @pytest.mark.asyncio

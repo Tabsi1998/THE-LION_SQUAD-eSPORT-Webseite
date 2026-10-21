@@ -16,6 +16,7 @@ from services.notification_preferences import enqueue_newsletter_for_item
 from services.user_notifications import create_user_notification
 from services.slug_utils import apply_slug_history, find_by_slug_or_history, slug_source_for_update, unique_slug
 from services import dolibarr_policy, reference_checks, reference_season_links, season_close
+from services import partner_series_view, reference_running_cache
 from models import (
     NewsCreate, NewsUpdate, SponsorCreate, SponsorUpdate,
     PartnerCreate, PartnerUpdate, ReferenceCreate, ReferenceShowcaseSettings, ReferenceUpdate,
@@ -1371,7 +1372,11 @@ async def admin_list_partners(me: dict = Depends(require_area("content"))):
     return rows
 
 
-@router.post("/partners")
+# #1934: Partner-Abzeichen stehen im Cache von „Läuft gerade“ - jede Änderung am Partner leert ihn sofort.
+PARTNER_WRITE = [Depends(reference_running_cache.reset_after_write)]
+
+
+@router.post("/partners", dependencies=PARTNER_WRITE)
 async def create_partner(body: PartnerCreate, me: dict = Depends(require_area("content"))):
     db = get_db()
     data = body.model_dump()
@@ -1387,8 +1392,8 @@ async def create_partner(body: PartnerCreate, me: dict = Depends(require_area("c
     return doc
 
 
-@router.put("/partners/{pid}")
-@router.patch("/partners/{pid}")
+@router.put("/partners/{pid}", dependencies=PARTNER_WRITE)
+@router.patch("/partners/{pid}", dependencies=PARTNER_WRITE)
 async def update_partner(pid: str, body: PartnerUpdate, me: dict = Depends(require_area("content"))):
     db = get_db()
     nullable_fields = {
@@ -1420,7 +1425,7 @@ async def update_partner(pid: str, body: PartnerUpdate, me: dict = Depends(requi
     return await db.partners.find_one({"id": pid}, {"_id": 0})
 
 
-@router.delete("/partners/{pid}")
+@router.delete("/partners/{pid}", dependencies=PARTNER_WRITE)
 async def delete_partner(pid: str, me: dict = Depends(require_area("content"))):
     db = get_db()
     await db.partners.delete_one({"id": pid})
@@ -1441,6 +1446,8 @@ async def get_partner_page(slug: str, user: dict | None = Depends(get_optional_u
     view["discord"] = await partner_pages.discord_widget(doc.get("discord_guild_id")) if doc.get("discord_guild_id") else None
     view["news"] = await _partner_news(db, doc, user)
     view["shared"] = await partner_pages.shared_for_partner(db, doc["id"], user=user, enrich_references=_enrich_references)
+    # #1934: Ligen und Serien mit dem Partner (Spuren und Saisons, nie interne).
+    view["shared"]["series"] = await partner_series_view.for_partner(db, doc["id"], user)
     view["redirected"] = from_history
     return view
 

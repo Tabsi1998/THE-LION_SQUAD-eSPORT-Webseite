@@ -6,7 +6,9 @@ import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 // nicht sichtbar heißt 404, eine alte Adresse führt zur aktuellen. Fremde Namen ohne Link. Nur erfundene Namen.
 
 const apiMock = { get: vi.fn() };
-vi.mock("@/lib/api", () => ({ api: apiMock, formatApiError: (detail) => detail || "Fehler", resolveMediaUrl: (value) => value || "" }));
+vi.mock("@/lib/api", () => ({ api: apiMock, formatApiError: (detail) => detail || "Fehler", resolveMediaUrl: (value) => (value ? `/api/static${value}` : "") }));
+// #1934: Logos laufen über den gemeinsamen Logo-Baustein (SmartLogo) mit resolveMediaUrl - hier als Attrappe.
+vi.mock("@/components/tls/SmartLogo", () => ({ SmartLogo: ({ src, className }) => <img data-smart-logo="true" src={src} alt="" className={className} /> }));
 vi.mock("@/components/tls/PublicLayout", () => ({ PublicLayout: ({ children }) => <div>{children}</div> }));
 vi.mock("@/hooks/useApiInvalidation", () => ({ useApiInvalidation: () => {} }));
 vi.mock("@/hooks/useDocumentTitle", () => ({ useDocumentTitle: vi.fn() }));
@@ -192,8 +194,8 @@ test("Kopf: Veranstaltet von mit Original-Logo und Link, Mitwirkende darunter", 
   const host = screen.getByTestId("series-organizer-probe-ananas");
   expect(host).toHaveAttribute("href", "/partners/probe-ananas");
   expect(host).toHaveTextContent("Probe Ananas");
-  const logo = host.querySelector("img");
-  expect(logo).toHaveAttribute("src", "/uploads/ananas.png");
+  const logo = host.querySelector("img[data-smart-logo]");
+  expect(logo).toHaveAttribute("src", "/api/static/uploads/ananas.png");
   expect(logo.className).not.toMatch(/grayscale|invert|brightness|opacity/);
   expect(screen.getByTestId("series-contributors")).toHaveTextContent("Mit Probe Kokos · Probe Mango");
   expect(screen.getByTestId("series-contributor-probe-mango")).toHaveAttribute("href", "/partners/probe-mango");

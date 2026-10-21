@@ -6,12 +6,13 @@ Datenmodell (kompatibel zu #469): Spur und Saison tragen ``partner_ids`` (Reihen
 eigene ergänzen (etwa einen Sponsor nur dieser Season); steht ein Partner an beiden, gilt die Rolle der Saison.
 
 Nach außen gehen nur aktive Partner (Kurzform wie ``partner_pages.partner_badge`` mit ``role``) - gesammelt geladen,
-nie je Spur oder Saison. Blatt-Modul ohne Routen-Importe; „Ligen und Serien mit uns“ der Partnerseite steht in
+nie je Spur oder Saison; Kurzform und Logo kommen aus ``partner_pages.partner_badge`` wie bei Events und Turnieren.
+Ohne Routen-Importe; „Ligen und Serien mit uns“ der Partnerseite steht in
 ``services/partner_series_view.py``.
 """
 from __future__ import annotations
 
-from services import sponsor_images
+from services import partner_pages
 
 ORGANIZER = "organizer"
 CONTRIBUTOR = "contributor"
@@ -33,26 +34,10 @@ async def clean(db, updates: dict, existing: dict | None = None) -> None:
         return
     existing = existing or {}
     ids = updates["partner_ids"] if "partner_ids" in updates else existing.get("partner_ids")
-    ids = await _active_ids(db, ids)
+    ids = await partner_pages.clean_partner_ids(db, ids)
     roles = updates.get("partner_roles") if "partner_roles" in updates else None
     updates["partner_ids"] = ids
     updates["partner_roles"] = clean_roles(ids, roles, existing.get("partner_roles"))
-
-
-async def _active_ids(db, ids) -> list[str]:
-    """Nur echte, aktive Partner - in der Reihenfolge des Formulars, ohne Doppelte (wie ``partner_pages.clean_partner_ids``)."""
-    wanted = list(dict.fromkeys(str(item).strip() for item in (ids or []) if str(item or "").strip()))
-    if not wanted:
-        return []
-    rows = await db.partners.find({"id": {"$in": wanted}, "is_active": {"$ne": False}}, {"_id": 0, "id": 1}).to_list(None)
-    found = {row["id"] for row in rows}
-    return [item for item in wanted if item in found]
-
-
-def badge(doc: dict) -> dict:
-    """Kurzform eines Partners wie ``partner_pages.partner_badge``: Name, Adresse, Logo (Original) und Art."""
-    return {"id": doc.get("id"), "slug": doc.get("slug"), "name": doc.get("name"),
-            "logo_url": sponsor_images.pick(doc, "logo")[0], "kind": doc.get("kind")}
 
 
 def effective(lineage: dict, series: dict | None = None) -> list[tuple[str, str]]:
@@ -72,7 +57,7 @@ async def badges(db, ids) -> dict[str, dict]:
     if not wanted:
         return {}
     rows = await db.partners.find({"id": {"$in": wanted}, "is_active": {"$ne": False}}, PARTNER_FIELDS).to_list(None)
-    return {row["id"]: badge(row) for row in rows}
+    return {row["id"]: partner_pages.partner_badge(row) for row in rows}
 
 
 def grouped(pairs: list[tuple[str, str]], by_id: dict) -> dict:

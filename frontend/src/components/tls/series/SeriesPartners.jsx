@@ -1,6 +1,7 @@
 import { Fragment } from "react";
 import { Link } from "react-router-dom";
 import { resolveMediaUrl } from "@/lib/api";
+import { SmartLogo } from "@/components/tls/SmartLogo";
 
 // Kopf der Serienseite (#1934): „Veranstaltet von“ mit dem Logo des Partners im Original (keine Einfärbung) und dem
 // Namen, verlinkt zur Partnerseite; mitwirkende Partner in einer Zeile darunter. Nur aktive Partner (Server).
@@ -24,7 +25,9 @@ export function SeriesPartners({ partners }) {
               className="group inline-flex items-center gap-2.5 min-h-[44px] max-w-full text-white no-underline"
             >
               {partner.logo_url && (
-                <img src={resolveMediaUrl(partner.logo_url)} alt="" loading="lazy" decoding="async" className="h-8 w-auto max-w-[120px] object-contain shrink-0" />
+                <span className="h-8 max-w-[min(120px,30vw)] shrink-0 inline-flex items-center" data-testid="series-organizer-logo">
+                  <SmartLogo src={resolveMediaUrl(partner.logo_url)} alt="" className="max-h-8 max-w-full w-auto h-auto" />
+                </span>
               )}
               <span className="font-semibold break-words [overflow-wrap:anywhere] underline-offset-4 decoration-white/30 group-hover:underline group-hover:text-[#29B6E8] transition-colors">{partner.name}</span>
             </Link>

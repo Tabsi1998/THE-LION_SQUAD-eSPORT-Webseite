@@ -6,7 +6,9 @@ import { MemoryRouter } from "react-router-dom";
 // einer Referenz. Nur erfundene Namen.
 
 const apiMock = { get: vi.fn() };
-vi.mock("@/lib/api", () => ({ api: apiMock, resolveMediaUrl: (value) => value || "" }));
+vi.mock("@/lib/api", () => ({ api: apiMock, resolveMediaUrl: (value) => (value ? `/api/static${value}` : "") }));
+// #1934: Logos laufen über den gemeinsamen Logo-Baustein (SmartLogo) mit resolveMediaUrl - hier als Attrappe.
+vi.mock("@/components/tls/SmartLogo", () => ({ SmartLogo: ({ src, className }) => <img data-smart-logo="true" src={src} alt="" className={className} /> }));
 vi.mock("@/components/tls/PublicLayout", () => ({ PublicLayout: ({ children }) => <div>{children}</div> }));
 vi.mock("@/hooks/useApiInvalidation", () => ({ useApiInvalidation: () => {} }));
 vi.mock("@/hooks/useDocumentTitle", () => ({ useDocumentTitle: () => {} }));
@@ -45,8 +47,8 @@ test("Läuft gerade und Serien & Ligen tragen das Abzeichen des veranstaltenden 
   const card = await screen.findByTestId("running-card-probe-ananas-liga-2026");
   const badge = within(card).getByTestId("partner-host-badge");
   expect(badge).toHaveTextContent("Probe Ananas");
-  expect(badge.querySelector("img")).toHaveAttribute("src", "/uploads/ananas.png");
-  expect(badge.querySelector("img").className).not.toMatch(/grayscale|invert|brightness/);
+  expect(badge.querySelector("img[data-smart-logo]")).toHaveAttribute("src", "/api/static/uploads/ananas.png");
+  expect(badge.querySelector("img[data-smart-logo]").className).not.toMatch(/grayscale|invert|brightness/);
   expect(within(screen.getByTestId("references-lineage-probe-ananas-liga")).getByTestId("partner-host-badge")).toHaveTextContent("Probe Ananas");
 });
 
