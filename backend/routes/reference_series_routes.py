@@ -24,6 +24,7 @@ from models import (
     now_utc,
 )
 from services import reference_running_cache, reference_series, season_close, series_partners
+from services.dolibarr_policy import club_today
 from services.own_teams import clean_teams, own_teams, team_conflicts
 from services.series_identity import normalize_name
 from services.reference_series_access import SeriesAccess, require_series_editor
@@ -38,7 +39,7 @@ LINEAGE_NULLABLE = {"organizer", "label", "game_id", "game_name", "external_url"
                     "result_image_template"}
 SERIES_NULLABLE = {"tier", "title", "default_weekday", "default_time", "team_name", "official_table_url",
                    "external_url", "description", "reference_id", "season_result", "result_image_template",
-                   "weekend"}
+                   "weekend", "cancelled_on", "cancel_reason", "successor_id"}
 SLUG_FALLBACK = "serie"
 
 
@@ -307,6 +308,7 @@ async def update_series(series_id: str, body: ReferenceSeriesUpdate, me: dict = 
         updates.update({"archived_at": now_utc().isoformat(), "archived_from": existing.get("status")})
     elif status and status != "archived":
         updates.update({"archived_at": None, "archived_from": None})
+    updates.update(await _cancellation(db, existing, updates, series_id))
     await db.reference_series.update_one({"id": series_id}, {"$set": {**updates, **_stamp(me)}})
     saved = await _series(db, series_id)
     if rules_changed:
@@ -330,6 +332,26 @@ async def update_series(series_id: str, body: ReferenceSeriesUpdate, me: dict = 
         # Andere Schreibweisen eines eigenen Teams zählen erst nach dem Neurechnen als dieses Team (#1926).
         await reference_series.recompute_standings(db, saved)
     return saved
+
+
+async def _cancellation(db, existing: dict, updates: dict, series_id: str) -> dict:
+    """Saison abgebrochen (#1960): mit Tag (leer heißt heute, Wiener Tag) und Grund; wer den Status wieder ändert, nimmt
+    beides zurück. Der Nachfolger muss eine andere, vorhandene Saison sein (meist der Neustart derselben Spur)."""
+    out: dict = {}
+    status = updates.get("status", existing.get("status"))
+    if status == "cancelled":
+        if not (updates.get("cancelled_on") if "cancelled_on" in updates else existing.get("cancelled_on")):
+            out["cancelled_on"] = club_today()
+        if "cancel_reason" in updates:
+            out["cancel_reason"] = " ".join(str(updates["cancel_reason"] or "").split()) or None
+    elif "status" in updates and status != "archived":
+        out.update({"cancelled_on": None, "cancel_reason": None})
+    successor = updates.get("successor_id")
+    if successor:
+        if successor == series_id:
+            raise HTTPException(422, "Eine Saison kann nicht ihr eigener Nachfolger sein.")
+        await _series(db, successor)
+    return out
 
 
 @router.post("/admin/series/{series_id}/archive")

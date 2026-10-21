@@ -1538,8 +1538,11 @@ class ReferenceShowcaseSettings(BaseModel):
 # Gerechnet wird mit ``services/scoring_rules.py`` und ``services/series_standings.py``; Routen in
 # ``routes/reference_series_routes.py``. Alle Werte einer Serie sind einstellbar, nichts ist fest verdrahtet.
 ReferenceSeriesKind = Literal["series", "racing", "team_league"]  # Turnierserie, Rennliga, Team-Liga
-ReferenceSeriesStatus = Literal["planned", "active", "completed", "archived"]
+# #1960: „cancelled“ = Saison abgebrochen (Ergebnisse bleiben sichtbar, kein Meister, keine Platzierung).
+ReferenceSeriesStatus = Literal["planned", "active", "completed", "cancelled", "archived"]
 ReferenceSeriesOpenStatus = Literal["planned", "active", "completed"]
+# #1960: Grund, warum ein Termin ohne Wertung bleibt (unterschieden von „abgesagt“).
+ReferenceNoScoreReason = Literal["too_few", "outage", "restart", "other"]
 ReferenceSeriesPublishMode = Literal["review", "direct"]  # Captain: Entwurf mit Freigabe des Vorstands oder direkt
 ReferenceRoundStatus = Literal["planned", "scored", "cancelled", "postponed"]
 # Ergebnis der Saison (#1898): Aufstieg, Abstieg, Klassenerhalt, Meister - leer heißt: aus dem Stufennamen ableiten.
@@ -1767,6 +1770,10 @@ class ReferenceSeriesUpdate(BaseModel):
     result_image_template: Optional[str] = Field(default=None, max_length=60)  # #1756: Vorlage für Ergebnis-Bilder
     weekend: Optional[Dict[str, Any]] = None
     hide_name_tags: Optional[bool] = None  # #1961
+    # #1960: Saison abgebrochen - Tag (Wiener Tag, leer = heute) und Grund; Nachfolger = die neue Saison (Neustart).
+    cancelled_on: Optional[str] = Field(default=None, max_length=10)
+    cancel_reason: Optional[str] = Field(default=None, max_length=300)
+    successor_id: Optional[str] = Field(default=None, max_length=80)
 
     @field_validator("rules")
     @classmethod
@@ -1787,6 +1794,17 @@ class ReferenceSeriesUpdate(BaseModel):
     @classmethod
     def _image_template(cls, value):
         return _result_image_template(value)
+
+    @field_validator("cancelled_on")
+    @classmethod
+    def _cancelled_on(cls, value):
+        text = (value or "").strip()
+        if not text:
+            return None
+        try:
+            return datetime.strptime(text, "%Y-%m-%d").date().isoformat()
+        except ValueError as exc:
+            raise ValueError("Abgebrochen am: Tag als JJJJ-MM-TT.") from exc
 
 
 def _round_country(value):
@@ -1816,6 +1834,10 @@ class ReferenceRoundCreate(BaseModel):
     # #1930: Lauf einer Runde („Qualifying“, „Sprint“ …); leer heißt Rennen. Ohne Angabe von ``counts`` zählt
     # ein Qualifying nicht zur Wertung.
     session: Optional[str] = Field(default=None, max_length=30)
+    # #1960: Termin ohne Wertung mit Grund (zu wenig Fahrer, Serverausfall bzw. Nachholung, Neustart, anderer) und
+    # kurzem Text - öffentlich, unterschieden von „abgesagt“. Ein Grund nimmt den Termin aus der Wertung.
+    no_score_reason: Optional[ReferenceNoScoreReason] = None
+    no_score_note: Optional[str] = Field(default=None, max_length=200)
 
     @field_validator("country_code")
     @classmethod
@@ -1843,6 +1865,8 @@ class ReferenceRoundUpdate(BaseModel):
     country_code: Optional[str] = Field(default=None, max_length=2)
     country_auto: Optional[bool] = None
     session: Optional[str] = Field(default=None, max_length=30)
+    no_score_reason: Optional[ReferenceNoScoreReason] = None  # #1960
+    no_score_note: Optional[str] = Field(default=None, max_length=200)
 
     @field_validator("country_code")
     @classmethod

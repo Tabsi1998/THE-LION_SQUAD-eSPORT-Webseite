@@ -40,6 +40,7 @@ from services.rate_limit import enforce_rate_limit
 from services.reference_calendar import calendar_view, vienna_clock
 from services.scoring_rules import normalize_rules
 from services.series_racing import racing_block
+from services.series_rule_changes import rule_changes
 from services.series_standings import RACE_DETAILS
 from services.team_league_page import team_league_view
 from services.visibility import user_can_see
@@ -48,13 +49,17 @@ router = APIRouter(prefix="/api/reference-series", tags=["reference-series"])
 
 LINEAGE_FIELDS = ("title", "slug", "kind", "label", "organizer", "game_name", "external_url", "tier_order")
 SERIES_FIELDS = ("season", "tier", "title", "season_slug", "status", "default_weekday", "default_time",
-                 "external_url", "official_table_url", "rules_version", "season_result", "weekend")
+                 "external_url", "official_table_url", "rules_version", "season_result", "weekend",
+                 "cancelled_on", "cancel_reason")  # #1960: Saison abgebrochen
 RULE_FIELDS = ("points_mode", "points_by_place", "bonuses", "dnf_points", "dns_points", "dsq_points", "count_mode",
                "count_n", "activity_points", "final_top_n", "tiebreakers",
                # Turniertage (#1961): Runden je Termin mit Schema, Sonderboni, N der Regel „Top N“.
                "day_rounds", "custom_bonuses", "tiebreak_top_n")
 ROW_FIELDS = ("rank", "points", "computed_points", "official_points", "deviation", "activity_points", "tiebreak",
-              "wins", "podiums", "rounds_played", "bonus_points")
+              "wins", "podiums", "rounds_played", "bonus_points", "adjustment_points")
+# Anpassungen (#1960) gehen mit Punkten, Grund, Tag und Termin hinaus - öffentlich als „−5“ mit Grund.
+ADJUSTMENT_FIELDS = ("points", "reason", "day", "round_id")
+SUCCESSOR_FIELDS = ("season", "tier", "title", "season_slug", "status")
 # Noch offen ist jede Wertungsrunde, die nicht gewertet ist (auch „Ergebnis folgt“); kommend sind nur diese:
 UPCOMING_STATES = ("planned", "today", "postponed")
 # Von einer Person geht nur das hinaus, was die Tabelle zeigt - keine Startnummer, kein Team, keine Kennungen.
@@ -116,6 +121,7 @@ def _standing_row(row: dict, people: dict) -> dict:
         "key": row.get("participant_id"),
         **(people.get(row.get("participant_id")) or HIDDEN_PERSON),
         **{field: row.get(field) for field in ROW_FIELDS},
+        "adjustments": [{key: item.get(key) for key in ADJUSTMENT_FIELDS} for item in row.get("adjustments") or []],
         "previous_rank": None if change is None or rank is None else rank + change,
         "results": [{
             "round_id": item.get("round_id"), "place": item.get("place"), "points": item.get("points"),
@@ -452,9 +458,26 @@ async def public_lineages(request: Request, user: dict | None = Depends(get_opti
     return {"items": items}
 
 
+async def _successor(db, user: dict | None, series: dict) -> dict | None:
+    """Nachfolger einer Saison (#1960, etwa der Neustart nach einem Abbruch) - nur, wenn er samt Spur sichtbar und nicht
+    archiviert ist; dazu die Adresse."""
+    successor_id = series.get("successor_id")
+    if not successor_id or successor_id == series.get("id"):
+        return None
+    found = await db.reference_series.find_one({"id": successor_id}, {"_id": 0})
+    if not found or found.get("status") == "archived" or not await user_can_see(user, found.get("visibility")):
+        return None
+    lineage = await db.reference_lineages.find_one({"id": found.get("lineage_id")}, {"_id": 0}) or {}
+    if not lineage or lineage.get("is_archived") or not await user_can_see(user, lineage.get("visibility")):
+        return None
+    return {**{key: found.get(key) for key in SUCCESSOR_FIELDS}, "lineage_slug": lineage.get("slug"),
+            "lineage_title": lineage.get("title")}
+
+
 @router.get("/public/{lineage_slug}/{season_slug}")
 async def public_series(lineage_slug: str, season_slug: str, user: dict | None = Depends(get_optional_user)):
-    """Die Serienseite: liest nur Gespeichertes (Kalender, letzter Stand, Ergebnisblatt des Finales)."""
+    """Die Serienseite: liest nur Gespeichertes (Kalender, letzter Stand, Ergebnisblatt des Finales). Dazu (#1960) der
+    Nachfolger einer Saison und die Regeländerungen (``series_rule_changes``)."""
     db = get_db()
     lineage, series = await visible_series(db, user, lineage_slug, season_slug)
     sid = series["id"]
@@ -474,6 +497,8 @@ async def public_series(lineage_slug: str, season_slug: str, user: dict | None =
         # #1934: „Veranstaltet von“ und Mitwirkende - nur aktive Partner.
         "partners": await series_partners.for_series_page(db, lineage, series),
         "rules": _rules(series),
+        "successor": await _successor(db, user, series),
+        "rule_changes": rule_changes(series, rounds),
         "today": calendar["today"],
         "progress": _progress(rounds, by_weekend=lineage.get("kind") == "racing"),
         "rounds": [_public_round(item) for item in rounds],

@@ -111,7 +111,8 @@ async def test_racing_page_has_the_stored_team_standings_with_drivers_per_race(f
         ("p-hidden", 6)]
 
     racing = body["racing"]
-    assert racing["team_scoring"] == {"enabled": True, "counting_drivers": 2, "guests_count": True}
+    assert racing["team_scoring"] == {"enabled": True, "counting_drivers": 2, "guests_count": True,
+                                      "mode": "per_race"}
     teams = racing["teams"]
     assert teams["round_id"] == rounds["R2"]
     assert [(row["key"], row["team"], row["rank"], row["points"], row["previous_rank"]) for row in teams["rows"]] == [
@@ -171,8 +172,10 @@ async def test_each_driver_has_the_team_per_race_and_guests_are_marked(flow):
     flow.act_as(None)
     drivers = (await flow.get(_url(lineage, series))).json()["racing"]["drivers"]
 
-    assert drivers["p-ext2"] == {"team": "Fremd Blau", "guest": False,
+    # Im Team seit (#1960): nach dem Wechsel das erste Rennen im aktuellen Team.
+    assert drivers["p-ext2"] == {"team": "Fremd Blau", "guest": False, "team_since": rounds["R2"],
                                  "round_teams": {rounds["R1"]: "Fremd Rot", rounds["R2"]: "Fremd Blau"}}
+    assert drivers["p-lion1"]["team_since"] is None
     assert drivers["p-guest"]["guest"] is True and drivers["p-guest"]["team"] == "Probe Löwen B"
     # Auch ein Nichtstart fährt für sein Standard-Team.
     assert drivers["p-lion2"]["round_teams"] == {rounds["R1"]: "Probe Löwen", rounds["R2"]: "Probe Löwen"}
@@ -187,9 +190,10 @@ async def test_racing_extras_never_carry_hidden_names_or_link_details(flow):
     racing = response.json()["racing"]
 
     assert "Fremd Versteckt" not in response.text
-    # Vom Fahrer gehen nur Team, Team je Rennen und „Gast“ hinaus - keine Startnummer, kein Profil, keine Verknüpfung.
+    # Vom Fahrer gehen nur Team, Team je Rennen, „im Team seit“ (#1960) und „Gast“ hinaus - keine Startnummer, kein
+    # Profil, keine Verknüpfung.
     for item in racing["drivers"].values():
-        assert set(item) == {"team", "guest", "round_teams"}
+        assert set(item) == {"team", "guest", "round_teams", "team_since"}
     assert "profil-lion1" not in response.text and '"44"' not in response.text
 
 

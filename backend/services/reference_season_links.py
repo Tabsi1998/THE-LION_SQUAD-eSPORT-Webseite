@@ -48,4 +48,6 @@ async def attach_season_links(db, items: list[dict], user: dict | None) -> list[
         item["season_link"] = {"lineage_slug": lineage.get("slug"), "season_slug": series.get("season_slug"),
                                "label": season_label(lineage, series),
                                "season_end": series.get("reference_id") == item["id"]}
+        if series.get("status") == "cancelled":
+            item["season_link"]["cancelled"] = True  # #1960: Saison abgebrochen - die Chronik sagt es dazu
     return items
