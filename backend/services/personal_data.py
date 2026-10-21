@@ -189,6 +189,8 @@ CLUB_CONTENT = frozenset({
     # und Stände. Teilnehmer und Aliase stehen bei den Daten zur Person.
     "reference_lineages", "reference_round_result_revisions", "reference_round_results", "reference_rounds",
     "reference_series", "reference_standings",
+    # Maps je Spiel und Map-Pools je Wettbewerb (#1616) - nur die Kennung, wer angelegt bzw. gespeichert hat.
+    "game_maps", "map_pools",
 })
 
 NO_PERSON = frozenset({

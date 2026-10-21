@@ -30,6 +30,7 @@ TARGETS: list[tuple[str, list[str]]] = [
     ("tournaments", ["banner_url", "cover_url"]),
     ("f1_challenges", ["banner_url", "cover_url"]),
     ("f1_tracks", ["image_url"]),
+    ("game_maps", ["image_url"]),
     ("seasons", ["banner_url"]),
     ("gallery_albums", ["cover_url"]),
     ("gallery_photos", ["image_url", "thumbnail_url", "video_url"]),
@@ -56,6 +57,8 @@ USAGE_TARGETS: list[tuple[str, list[str]]] = [
     ("stickers", ["url"]),
     ("gallery_photos", ["original_url"]),
     ("game_servers", ["server_icon_url"]),
+    # Map-Pools (#1616): der Snapshot zeigt das Bild von damals, auch wenn die Map inzwischen ein neues hat.
+    ("map_pools", ["modes.maps.image_url"]),
     # Bilder aus der Mitgliederverwaltung je Hintergrund (``services.sponsor_images``).
     *((collection, [f"dolibarr_images.{kind}.{variant}.url" for kind in ("logo", "banner") for variant in ("dark", "light")])
       for collection in ("sponsors", "partners")),
@@ -72,7 +75,7 @@ COLLECTION_LABELS = {
     "f1_challenges": "Fast Lap", "f1_tracks": "Strecke", "seasons": "Jahreswertung",
     "gallery_albums": "Galerie-Album", "gallery_photos": "Galerie-Foto", "member_benefits": "Mitgliedervorteil",
     "club_member_profiles": "Vereinsprofil", "advent_doors": "Adventkalender", "stickers": "Sticker",
-    "game_servers": "Spielserver",
+    "game_servers": "Spielserver", "game_maps": "Map", "map_pools": "Map-Pool",
 }
 FIELD_LABELS = {
     "logo_url": "Logo", "logo_light_url": "Logo hell", "logo_dark_url": "Logo dunkel",
@@ -83,7 +86,7 @@ FIELD_LABELS = {
     "description": "Beschreibung", "program": "Programm", "bio": "Über mich", "rules": "Regeln", "prize_pool": "Preise",
     **{f"award_images.{place}": f"Gewinnerbild Platz {place}" for place in ("1", "2", "3")},
     "tools.image_url": "Bild eines Werkzeugs", "media_url": "Bild oder Video", "url": "Bild",
-    "original_url": "Original", "server_icon_url": "Server-Symbol",
+    "original_url": "Original", "server_icon_url": "Server-Symbol", "modes.maps.image_url": "Bild einer Map",
     **{f"dolibarr_images.{kind}.{variant}.url":
        f"{kind.capitalize()} aus der Mitgliederverwaltung ({'dunkler' if variant == 'dark' else 'heller'} Hintergrund)"
        for kind in ("logo", "banner") for variant in ("dark", "light")},
@@ -112,6 +115,7 @@ SCOPE_TARGETS: list[tuple[str, list[str], str]] = [
     ("tournaments", ["banner_url", "cover_url"], "admin"),
     ("f1_challenges", ["banner_url", "cover_url"], "admin"),
     ("f1_tracks", ["image_url"], "admin"),
+    ("game_maps", ["image_url"], "admin"),
     ("seasons", ["banner_url"], "admin"),
     ("member_benefits", ["image_url"], "admin"),
     ("club_member_profiles", ["photo_url", "cover_url"], "admin"),

@@ -27,7 +27,7 @@ from fastapi import APIRouter, Depends, Request
 from auth import get_optional_user
 from database import get_db
 from routes.reference_round_routes import PUBLIC_FIELDS, _calendar, visible_series
-from services import race_weekend, reference_running_cache, series_partners
+from services import map_pools, race_weekend, reference_running_cache, series_partners
 from services.dolibarr_policy import club_today
 from services.own_teams import Matcher, own_teams
 from services.rate_limit import enforce_rate_limit
@@ -462,4 +462,6 @@ async def public_series(lineage_slug: str, season_slug: str, user: dict | None =
         "team_league": await team_league_view(db, user, lineage, series, [_public_round(item) for item in rounds]),
         # Rennliga (#1746): Saisons, Teamwertung, Team je Rennen und Vereinsteams - bei anderen Arten ``None``.
         "racing": await racing_block(db, user, lineage, series, people, latest),
+        # Map-Pool der Saison (#1616) als Snapshot - ``None`` ohne Pool oder ohne Spiel der Spur.
+        "map_pool": await map_pools.series_pool(db, lineage, series),
     }
