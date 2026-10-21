@@ -68,20 +68,30 @@ def map_entry(raw: dict, lineup: list[str] | None) -> dict:
     return out
 
 
-def own_match(sheet: dict, teams) -> dict | None:
-    """Das Spiel eines eigenen Teams im Blatt (``teams``: die eigenen Teams oder ein Name). Ohne eigene Teams gilt das
-    erste Spiel mit dem Heimteam als eigenes (so legt das Ergebnis-Blatt ein Spiel an). ``_own`` nennt das eigene
-    Team, ``_away`` sagt, ob es auswärts spielt."""
+def own_matches(sheet: dict, teams) -> list[dict]:
+    """Alle Spiele eigener Teams im Blatt, in der Reihenfolge des Blatts (``teams``: die eigenen Teams oder ein Name) -
+    spielen zwei eigene Teams am selben Spieltag, sind es zwei. Ohne eigene Teams gilt das erste Spiel mit dem
+    Heimteam als eigenes (so legt das Ergebnis-Blatt ein Spiel an). ``_own`` nennt das eigene Team, ``_away`` sagt, ob
+    es auswärts spielt, ``_index`` die Stelle im Blatt."""
     own = Matcher(teams if isinstance(teams, (list, tuple)) else [teams])
     matches = sheet.get("matches") or []
     others = [str(match.get(side) or "").strip() for match in matches for side in ("home", "away")]
+    found = []
     for index, match in enumerate(matches):
         home, away = str(match.get("home") or "").strip(), str(match.get("away") or "").strip()
-        if not own or own.is_own(home, others):
-            return {**match, "_own": own.canonical(home, others), "_index": index}
-        if own.is_own(away, others):
-            return {**match, "_away": True, "_own": own.canonical(away, others), "_index": index}
-    return None
+        if not own:
+            return [{**match, "_own": home, "_index": index}]
+        if own.is_own(home, others):
+            found.append({**match, "_own": own.canonical(home, others), "_index": index})
+        elif own.is_own(away, others):
+            found.append({**match, "_away": True, "_own": own.canonical(away, others), "_index": index})
+    return found
+
+
+def own_match(sheet: dict, teams) -> dict | None:
+    """Das erste Spiel eines eigenen Teams im Blatt (``own_matches``) - oder ``None``."""
+    found = own_matches(sheet, teams)
+    return found[0] if found else None
 
 
 def match_extras(raw: dict) -> tuple[dict, str | None]:

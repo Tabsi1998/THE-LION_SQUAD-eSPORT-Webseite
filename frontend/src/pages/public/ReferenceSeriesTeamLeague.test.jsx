@@ -165,6 +165,19 @@ test("Spieltage als Karten (#1931): Uhrzeit des Spiels, Wahl je Map, Banns und d
   expect(screen.getByTestId("team-league-next")).toHaveTextContent("@ Fremd Adler");
 });
 
+test("Zwei eigene Teams am selben Spieltag (Prüfung #1931): beide Spiele mit Team, Gegner und Ergebnis in der Karte", async () => {
+  const black = { opponent: "Fremd Bären", home: false, score_for: 2, score_against: 0, outcome: "win", points: 3, team: "Probe Löwen B", maps: [], bans: [], club_day: null, time: null, lineup_size: 1 };
+  const gold = { ...BODY.team_league.matchdays[0].match, team: "Probe Löwen", bans: [], club_day: null, time: null };
+  const matchdays = [{ round: ROUNDS[0], match: gold, matches: [gold, black], others: [] }, ...BODY.team_league.matchdays.slice(1)];
+  renderPage({ ...BODY, team_league: { ...BODY.team_league, own_teams: ["Probe Löwen", "Probe Löwen B"], matchdays } });
+  const [first] = await screen.findAllByTestId("team-league-matchday");
+  const blocks = within(first).getAllByTestId("team-league-own-match");
+  expect(blocks).toHaveLength(2);
+  expect(blocks[1]).toHaveTextContent("Probe Löwen B gegen Fremd Bären");
+  expect(within(blocks[1]).getByRole("img", { name: "Sieg 2:0, 3 Punkte" })).toBeInTheDocument();
+  expect(within(blocks[0]).getByRole("img", { name: "Sieg 3:1, 2 Punkte" })).toBeInTheDocument();
+});
+
 test("Kader (#1931): der ganze Kader mit „von“ und Ersatz je Spieltag", async () => {
   renderPage({ ...BODY, team_league: SEASON_1931 });
   const lineup = await screen.findByTestId("team-league-lineup");

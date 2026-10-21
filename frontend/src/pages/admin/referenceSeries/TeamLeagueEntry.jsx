@@ -111,7 +111,10 @@ function MatchdayPaste({ form, setForm, ownTeams, round, onDone }) {
     return true;
   };
 
-  const own = result?.outcome?.own;
+  // Alle erkannten eigenen Spiele - bei mehreren eigenen Teams am selben Spieltag je Team eines (Prüfung #1931).
+  const owns = result?.outcome?.owns || [];
+  const own = owns[0];
+  const shown = owns.map((row) => `${row.home} ${row.home_score ?? "–"}:${row.away_score ?? "–"} ${row.away}`).join(" · ");
   return (
     <div className="space-y-2">
       <PasteArea label="Begegnungsliste einfügen" testId="result-matchday-paste" onApply={apply}
@@ -136,7 +139,7 @@ function MatchdayPaste({ form, setForm, ownTeams, round, onDone }) {
       {result?.outcome && (
         <p className={`text-sm ${own ? "text-white/75" : "text-amber-200"}`} data-testid="result-matchday-summary" role="status">
           {own
-            ? <>Eigenes Spiel erkannt: <span className="text-white font-semibold">{own.home} {own.home_score ?? "–"}:{own.away_score ?? "–"} {own.away}</span></>
+            ? <>{owns.length > 1 ? "Eigene Spiele erkannt: " : "Eigenes Spiel erkannt: "}<span className="text-white font-semibold">{shown}</span></>
             : "Kein eigenes Spiel erkannt – stehen die eigenen Teams und ihre Schreibweisen in der Saison?"}
           {result.block?.number ? ` · ${result.block.number}. Spieltag` : ""}
           {result.outcome.others ? ` · ${result.outcome.others} ${result.outcome.others === 1 ? "weiteres Spiel" : "weitere Spiele"} übernommen` : ""}

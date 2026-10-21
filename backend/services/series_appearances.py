@@ -15,7 +15,7 @@ from __future__ import annotations
 
 from services.own_teams import Matcher, own_teams
 from services.series_standings import ordered_rounds
-from services.team_league_sheet import own_match
+from services.team_league_sheet import own_matches
 from services.visibility import user_can_see
 
 UNITS = {"team_league": "matches", "racing": "races"}
@@ -69,8 +69,7 @@ async def _team_league(db, series: dict, pids: set[str]) -> dict | None:
     teams = own_teams(series)
     own_days = []
     for item in rounds:
-        match = own_match(sheets[item["id"]], teams) if item["id"] in sheets else None
-        if match:
+        for match in own_matches(sheets[item["id"]], teams) if item["id"] in sheets else []:
             own_days.append((item["id"], match))
     people = await db.reference_participants.find(
         {"series_id": series["id"]}, {"_id": 0, "id": 1, "kind": 1, "default_team": 1}).to_list(None)

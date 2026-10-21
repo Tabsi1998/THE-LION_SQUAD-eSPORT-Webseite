@@ -78,6 +78,24 @@ test("Spieltag einfügen: aus „Alle“ der passende Spieltag, das eigene Spiel
   ]);
 });
 
+test("zwei eigene Teams am selben Spieltag (Prüfung #1931): beide erkannt, beide bearbeitbar, beide im Vertrag", async () => {
+  const body = data();
+  await openSheet({ ...body, series: { ...body.series, own_teams: ["Probe Löwen", "Probe Löwen B"],
+    own_team_list: [{ name: "Probe Löwen", aliases: [] }, { name: "Probe Löwen B", aliases: [] }] } });
+  fireEvent.change(screen.getByTestId("result-matchday-paste-text"), { target: { value: [
+    "Termin\tHeim\tAuswärts\tErgebnis",
+    "17.06.2026 20:30 Uhr\tProbe Löwen B\tProbe Adler\t2:1",
+    "18.06.2026 21:00 Uhr\tProbe Falken\tProbe Löwen\t0:2",
+  ].join("\n") } });
+  fireEvent.click(screen.getByTestId("result-matchday-paste-apply"));
+  expect(screen.getByTestId("result-matchday-summary")).toHaveTextContent("Eigene Spiele erkannt: Probe Löwen B 2:1 Probe Adler · Probe Falken 0:2 Probe Löwen");
+  expect(screen.getAllByTestId("result-match")).toHaveLength(2);
+  expect(screen.queryAllByTestId("result-other")).toHaveLength(0);
+  const sent = await payload();
+  expect(sent.matches.map((match) => [match.home, match.away, match.home_score, match.away_score])).toEqual([
+    ["Probe Löwen B", "Probe Adler", 2, 1], ["Probe Falken", "Probe Löwen", 0, 2]]);
+});
+
 test("ohne „übrige Spiele mitspeichern“ bleibt nur das eigene Spiel", async () => {
   await openSheet();
   fireEvent.click(screen.getByTestId("result-matchday-keep-others"));

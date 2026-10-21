@@ -62,6 +62,23 @@ test("Begegnungsliste: das eigene Spiel wird erkannt und ausgefüllt, die übrig
   expect(without.form.matches).toHaveLength(1);
   const none = applyMatchday(form, parseMatchdayPaste("Probe Adler;Probe Eulen;0:2").rows, { ownTeams: OWN, keepOthers: true });
   expect(none.own).toBeNull();
+  expect(none.owns).toEqual([]);
+});
+
+test("zwei eigene Teams am selben Spieltag (Prüfung #1931): beide eigenen Spiele erkannt, keines unter den übrigen", () => {
+  const form = sheetToForm(null, PEOPLE, { kind: "team_league", teamName: "Probe Löwen", opponent: "Probe Adler" });
+  const pasted = parseMatchdayPaste([
+    "10.06.2026 20:30;Probe Löwen B;Probe Adler;2:1",
+    "11.06.2026 20:30;Probe Eulen;Probe Löwen;0:2",
+    "12.06.2026 20:30;Probe Wölfe;Probe Bären;1:1",
+  ].join("\n")).rows;
+  const result = applyMatchday(form, pasted, { ownTeams: OWN, keepOthers: true });
+  expect(result.owns.map((row) => [row.home, row.away])).toEqual([["Probe Löwen B", "Probe Adler"], ["Probe Eulen", "Probe Löwen"]]);
+  expect(result.others).toBe(1);
+  const own = ownTeamMatcher(OWN);
+  expect(result.form.matches.filter((match) => isOwnMatch(match, own)).map((match) => [match.home, match.away, match.home_score])).toEqual([
+    ["Probe Löwen B", "Probe Adler", "2"], ["Probe Eulen", "Probe Löwen", "0"]]);
+  expect(result.form.matches).toHaveLength(3);
 });
 
 test("Maps im Veto (Rolle, wer, Kennung, Aufstellung je Map) gehen in den Vertrag – ohne Angaben bleibt das Spiel wie bisher", () => {

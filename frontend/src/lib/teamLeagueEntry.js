@@ -118,7 +118,8 @@ export function applyMatchday(form, rows, { ownTeams = [], keepOthers = true } =
       matches.push({ ...emptyMatch({ home: row.home, away: row.away }), home_score: text(row.home_score), away_score: text(row.away_score) });
     }
   }
-  return { form: { ...form, matches }, own: ownRows[0] || null, others: keepOthers ? played.length : 0, open: otherRows.length - played.length };
+  // `owns`: alle erkannten eigenen Spiele - bei mehreren eigenen Teams am selben Spieltag je Team eines (Prüfung #1931).
+  return { form: { ...form, matches }, own: ownRows[0] || null, owns: ownRows, others: keepOthers ? played.length : 0, open: otherRows.length - played.length };
 }
 
 function codeNumber(code) {

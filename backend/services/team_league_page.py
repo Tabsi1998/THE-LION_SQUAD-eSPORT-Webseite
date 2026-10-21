@@ -26,7 +26,7 @@ from __future__ import annotations
 from services.own_teams import Matcher, own_team_names, own_teams
 from services.scoring_rules import match_points, normalize_rules
 from services.series_appearances import team_league_appearances
-from services.team_league_sheet import is_played, own_match  # noqa: F401 - own_match gehört zur Seite (#1747)
+from services.team_league_sheet import is_played, own_match, own_matches  # noqa: F401 - own_match für Leser (#1747)
 from services.visibility import user_can_see
 
 TABLE_FIELDS = ("rank", "played", "won", "drawn", "lost", "score_for", "score_against", "score_diff", "points")
@@ -59,12 +59,12 @@ def _picked(item: dict):
     return None
 
 
-def _others(sheet: dict, match: dict | None) -> list[dict]:
-    """Die übrigen Spiele des Spieltags (#1931) - nur Teams und Ergebnis."""
-    skip = (match or {}).get("_index")
+def _others(sheet: dict, own: list[dict]) -> list[dict]:
+    """Die übrigen Spiele des Spieltags (#1931) - ohne die eigenen, nur Teams und Ergebnis."""
+    skip = {match.get("_index") for match in own}
     return [{"home": item.get("home"), "away": item.get("away"), "home_score": _number(item.get("home_score")),
              "away_score": _number(item.get("away_score"))}
-            for index, item in enumerate(sheet.get("matches") or []) if index != skip]
+            for index, item in enumerate(sheet.get("matches") or []) if index not in skip]
 
 
 def _match_view(match: dict, rules: dict) -> dict:
@@ -192,10 +192,10 @@ async def _lineup(db, series: dict, seasons: list[dict], sheets: dict, own_days:
     career: dict[str, int] = {}
     for season in seasons:
         for sheet in sheets.get(season["id"], {}).values():
-            match = own_match(sheet, own_teams(season))
-            for pid in dict.fromkeys((match or {}).get("lineup") or []):
-                if pid in profile_of:
-                    career[profile_of[pid]] = career.get(profile_of[pid], 0) + 1
+            for match in own_matches(sheet, own_teams(season)):
+                for pid in dict.fromkeys(match.get("lineup") or []):
+                    if pid in profile_of:
+                        career[profile_of[pid]] = career.get(profile_of[pid], 0) + 1
 
     profiles = [item["profile_id"] for pid, item in participants.items()
                 if pid in played and member(item) and item.get("profile_id")]
@@ -223,7 +223,8 @@ async def _lineup(db, series: dict, seasons: list[dict], sheets: dict, own_days:
         })
     players.sort(key=lambda player: (not player["club_member"], -player["appearances"], player["name_hidden"],
                                      str(player["name"] or "").casefold(), player["key"]))
-    return {"round_ids": [round_id for round_id, match in own_days if match.get("lineup")], "players": players}
+    return {"round_ids": list(dict.fromkeys(round_id for round_id, match in own_days if match.get("lineup"))),
+            "players": players}
 
 
 async def _table_snapshots(db, series_ids: list[str]) -> dict[str, list[dict]]:
@@ -268,10 +269,12 @@ async def team_league_view(db, user, lineage: dict, series: dict, rounds: list[d
     matchdays, own_days, form, views = [], [], {}, []
     for item in rounds:
         sheet = own_sheets.get(item["id"])
-        match = own_match(sheet, teams) if sheet else None
-        view = _match_view(match, rules) if match else None
-        matchdays.append({"round": item, "match": view, "others": _others(sheet, match) if sheet else []})
-        if match:
+        # Alle eigenen Spiele des Spieltags - bei mehreren eigenen Teams je Team eines (#1926, Prüfung #1931).
+        own = own_matches(sheet, teams) if sheet else []
+        day_views = [_match_view(match, rules) for match in own]
+        matchdays.append({"round": item, "match": day_views[0] if day_views else None, "matches": day_views,
+                          "others": _others(sheet, own) if sheet else []})
+        for match, view in zip(own, day_views):
             own_days.append((item["id"], match))
             views.append(view)
             form.setdefault(match.get("_own"), []).append(OUTCOME_LETTERS[view["outcome"]])

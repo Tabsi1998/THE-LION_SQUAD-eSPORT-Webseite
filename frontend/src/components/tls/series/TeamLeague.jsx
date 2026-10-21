@@ -221,35 +221,54 @@ function matchWhen(round, match) {
   return roundWhen(round);
 }
 
-// Ein Spieltag als Karte (#1931). `showTeam`: mehrere eigene Teams in der Saison (#1926) - dann steht vor dem Gegner,
-// welches eigene Team gespielt hat.
-function MatchdayCard({ day, index, showTeam }) {
-  const { round, match, others } = day;
+// Ein eigenes Spiel in der Karte: Gegner mit Heim/Auswärts, Maps mit Wahl und Banns. Spielen mehrere eigene Teams am
+// selben Spieltag, steht jedes Spiel als eigener Block mit Team und Ergebnis (Prüfung #1931).
+function OwnMatch({ round, match, showTeam, withScore }) {
   const opponent = match?.opponent || round.opponent;
   const side = match ? (match.home ? "Heim" : "Auswärts") : sideLabel(round);
   return (
-    <li className="tls-tl-card tls-series-row" style={stagger(index)} data-testid="team-league-matchday" data-state={round.state} data-outcome={match?.outcome}>
+    <div className="tls-tl-card__match" data-testid="team-league-own-match" data-outcome={match?.outcome}>
+      <div className="flex items-start justify-between gap-3">
+        {opponent ? (
+          <p className="mt-2 text-[17px] leading-snug text-white font-semibold break-words [overflow-wrap:anywhere]">
+            {showTeam && match?.team && <span className="text-[#29B6E8]" data-testid="team-league-own-team">{match.team} </span>}
+            <span className="text-white/45 font-normal">gegen </span>{opponent}
+            {side && <span className="ml-2 align-middle text-[10px] font-bold uppercase tracking-widest text-white/45">{side}</span>}
+          </p>
+        ) : <p className="mt-2 text-sm text-white/45">Gegner offen</p>}
+        {withScore && match && <span className="mt-2"><Score match={match} /></span>}
+      </div>
+      {match && <Maps maps={match.maps} />}
+      {match?.bans?.length > 0 && <p className="mt-2 text-xs text-white/50" data-testid="team-league-bans"><span className="text-white/35">Bann: </span>{banText(match.bans)}</p>}
+    </div>
+  );
+}
+
+// Ein Spieltag als Karte (#1931). `showTeam`: mehrere eigene Teams in der Saison (#1926) - dann steht vor dem Gegner,
+// welches eigene Team gespielt hat; spielen mehrere am selben Spieltag, stehen alle ihre Spiele in der Karte.
+function MatchdayCard({ day, index, showTeam }) {
+  const { round, match, others } = day;
+  const matches = day.matches?.length ? day.matches : match ? [match] : [];
+  const single = matches.length <= 1;
+  return (
+    <li className="tls-tl-card tls-series-row" style={stagger(index)} data-testid="team-league-matchday" data-state={round.state}
+      data-outcome={single ? match?.outcome : undefined}>
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <span className="font-black tabular-nums text-white/85 mr-2">{roundLabel(round)}</span>
-          <span className={`text-sm tabular-nums ${round.state === "cancelled" ? "text-white/45" : "text-white/65"}`}>{matchWhen(round, match)}</span>
+          <span className={`text-sm tabular-nums ${round.state === "cancelled" ? "text-white/45" : "text-white/65"}`}>{matchWhen(round, single ? match : null)}</span>
           {round.original_club_day && <span className="block text-[11px] text-white/45">ursprünglich {dayLabel(round.original_club_day)}</span>}
         </div>
-        {match ? <Score match={match} /> : (
+        {single && match ? <Score match={match} /> : null}
+        {!matches.length && (
           <span className={`inline-flex items-center px-2 py-0.5 border rounded-sm text-[10px] font-bold uppercase tracking-widest whitespace-nowrap ${STATE_TONES[round.state] || STATE_TONES.planned}`}>
             {PUBLIC_STATE_LABELS[round.state] || round.state}
           </span>
         )}
       </div>
-      {opponent ? (
-        <p className="mt-2 text-[17px] leading-snug text-white font-semibold break-words [overflow-wrap:anywhere]">
-          {showTeam && match?.team && <span className="text-[#29B6E8]" data-testid="team-league-own-team">{match.team} </span>}
-          <span className="text-white/45 font-normal">gegen </span>{opponent}
-          {side && <span className="ml-2 align-middle text-[10px] font-bold uppercase tracking-widest text-white/45">{side}</span>}
-        </p>
-      ) : <p className="mt-2 text-sm text-white/45">Gegner offen</p>}
-      {match && <Maps maps={match.maps} />}
-      {match?.bans?.length > 0 && <p className="mt-2 text-xs text-white/50" data-testid="team-league-bans"><span className="text-white/35">Bann: </span>{banText(match.bans)}</p>}
+      {matches.length ? matches.map((item, position) => (
+        <OwnMatch key={`${item.team || "team"}-${position}`} round={round} match={item} showTeam={showTeam} withScore={!single} />
+      )) : <OwnMatch round={round} match={null} showTeam={showTeam} withScore={false} />}
       <OtherMatches others={others} />
     </li>
   );

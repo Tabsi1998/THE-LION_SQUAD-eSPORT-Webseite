@@ -245,3 +245,45 @@ async def test_the_member_profile_counts_races_of_a_racing_season(flow):
     profile = (await flow.get("/api/membership/profiles/fahrer-r")).json()
     reference = next(item for item in profile["references"] if item["id"] == "ref-rennen")
     assert reference["appearances"] == {"played": 1, "of": 2, "unit": "races", "team": None}
+
+
+@pytest.mark.asyncio
+async def test_two_own_teams_on_the_same_matchday_each_get_card_record_and_appearances(flow):
+    """Prüfung #1931, Punkt 1: spielen zwei eigene Teams am selben Spieltag, zählt jedes - Karte, Bilanz, Form und
+    Einsätze je eigenem Team; nur fremde Spiele stehen unter „weitere Spiele“."""
+    await migrations.migrate_points_scheme_templates(flow.db)
+    admin = await flow.add_user(role="club_admin", name="vorstand")
+    flow.act_as(admin)
+    lineage = (await flow.post(f"{ADMIN}/lineages", json={"title": "Probe Liga Zwei", "kind": "team_league"})).json()
+    series = (await flow.post(f"{ADMIN}/series", json={
+        "lineage_id": lineage["id"], "season": "2026", "rules": RULES, "status": "active",
+        "own_teams": [{"name": "Lions Black", "aliases": []}, {"name": "Lions Gold", "aliases": []}]})).json()
+    item = (await flow.post(f"{ADMIN}/series/{series['id']}/rounds", json={"code": "ST1", "day": "2026-06-10"})).json()
+    for team, names in (("Lions Black", ["Black Eins", "Black Zwei"]), ("Lions Gold", ["Gold Eins", "Gold Zwei"])):
+        await flow.post(f"{ADMIN}/series/{series['id']}/participants/batch", json={"names": names, "team": team})
+    # Reihenfolge wie in der Begegnungsliste des Veranstalters: Gold zuerst.
+    saved = await flow.put(f"{ADMIN}/series/{series['id']}/rounds/{item['id']}/results", json={"matches": [
+        {"home": "Lions Gold", "away": "Gegner A", "home_score": 2, "away_score": 0,
+         "lineup": [{"name": "Gold Eins"}, {"name": "Gold Zwei"}]},
+        {"home": "Gegner B", "away": "Lions Black", "home_score": 0, "away_score": 2,
+         "lineup": [{"name": "Black Eins"}]},
+        {"home": "Gegner C", "away": "Gegner D", "home_score": 1, "away_score": 1},
+    ], "status": "published", "expected_version": 0})
+    assert saved.status_code == 200, saved.text
+
+    flow.act_as(None)
+    league = (await flow.get(f"{PUBLIC}/{lineage['slug']}/{series['season_slug']}")).json()["team_league"]
+    day = league["matchdays"][0]
+    assert [(view["team"], view["opponent"], view["home"]) for view in day["matches"]] == [
+        ("Lions Gold", "Gegner A", True), ("Lions Black", "Gegner B", False)]
+    assert day["match"]["team"] == "Lions Gold"
+    assert [(item["home"], item["away"]) for item in day["others"]] == [("Gegner C", "Gegner D")]
+    assert [(item["team"], item["played"], item["won"]) for item in league["record"]] == [
+        ("Lions Black", 1, 1), ("Lions Gold", 1, 1)]
+    form = {row["team"]: row["form"] for row in league["table"]["rows"] if row["own"]}
+    assert form == {"Lions Black": ["W"], "Lions Gold": ["W"]}
+    players = {player["name"]: player for player in league["lineup"]["players"]}
+    assert {name: (player["appearances"], player["of"], player["team"], len(player["bench_round_ids"]))
+            for name, player in players.items()} == {
+        "Gold Eins": (1, 1, "Lions Gold", 0), "Gold Zwei": (1, 1, "Lions Gold", 0),
+        "Black Eins": (1, 1, "Lions Black", 0), "Black Zwei": (0, 1, "Lions Black", 1)}
