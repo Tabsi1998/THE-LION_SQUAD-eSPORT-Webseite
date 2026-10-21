@@ -15,7 +15,9 @@ und der Parser für eingefügte Terminlisten.
   Serie (sonst eine Woche) nach der Zeile davor, ohne Uhrzeit die Standard-Uhrzeit. Aus dem Ort kommt das Land
   (``country_code``, #1925) - etwa „R1 · 18.06.2026 · Aserbaidschan“. Ein Lauf am Kürzel („R1S“, „R1 Sprint“, „R1 Q“,
   #1930) kommt nach ``session`` statt in den Ort (``race_weekend.take_code``); die Ablauf je Runde legt
-  ``race_weekend.expand_paste`` an.
+  ``race_weekend.expand_paste`` an. Team-Liga (#1931): „vs Team X“ (Heimspiel) bzw. „@ Team X“ (auswärts) wird zum
+  Gegner, „13.05.–17.05.“ zum Spieltag-Zeitraum (``day_end``) - beides liest ``services/team_league_calendar.py``
+  aus dem, was nach Kürzel und Lauf als Ort bleibt. Mit Zeitraum ist ein Spieltag bis zu seinem letzten Tag „heute“.
 """
 from __future__ import annotations
 
@@ -26,6 +28,7 @@ from services.dolibarr_policy import CLUB_TZ
 from services.race_weekend import GAP, take_code
 from services.round_countries import detect_country
 from services.series_standings import ordered_rounds
+from services.team_league_calendar import MAX_OPPONENT, take_opponent, take_window, window_end
 
 STATES = ("planned", "today", "missing", "cancelled", "postponed", "scored")
 MAX_LINES = 200
@@ -98,9 +101,10 @@ def round_status(rnd: dict, has_result: bool, today: str) -> str:
     if has_result or stored == "scored":
         return "scored"
     day = rnd.get("club_day") or club_day_of(rnd.get("starts_at"))
-    if day and day == today:
+    last = max(day, rnd.get("club_day_end") or day) if day else None  # Spieltag-Zeitraum (#1931)
+    if day and day <= today <= last:
         return "today"
-    if day and day < today:
+    if last and last < today:
         return "missing"
     return "postponed" if stored == "postponed" else "planned"
 
@@ -164,8 +168,9 @@ def parse_round_lines(text: str, *, season: str | None, today: str, default_week
     rows, errors = [], []
     previous: date | None = None
     for number, raw in lines:
-        rest = raw
+        rest, window = take_window(raw)
         day: date | None = None
+        day_end: date | None = None
         error = None
         iso = _ISO_DATE.search(rest)
         dot = None if iso else _DOT_DATE.search(rest)
@@ -190,6 +195,8 @@ def parse_round_lines(text: str, *, season: str | None, today: str, default_week
                 day = date(y, m, d)
             except ValueError:
                 error = f"Datum {shown} gibt es nicht."
+        if window and day and not error:
+            day_end, error = window_end(day, window)
         clock = None
         found = _CLOCK.search(rest)
         if found and not error:
@@ -199,7 +206,8 @@ def parse_round_lines(text: str, *, season: str | None, today: str, default_week
             clock = f"{hours:02d}:{minutes:02d}"
             rest = rest[:found.start()] + f" {GAP} " + rest[found.end():]
         code, session, rest = take_code(rest)
-        venue = _clean_venue(rest) or None
+        # Gegner erst nach Kürzel und Lauf (#1931): „vs“/„@“ sind keine Lauf-Wörter, ein Lauf-Wort kein Gegner.
+        venue, opponent, at_home = take_opponent(_clean_venue(rest) or None)
         if not error and day is None:
             if previous is None:
                 error = "Datum fehlt (TT.MM.)."
@@ -212,6 +220,8 @@ def parse_round_lines(text: str, *, season: str | None, today: str, default_week
             error = f"Ort ist zu lang (höchstens {MAX_VENUE} Zeichen)."
         if not error and code and len(code) > MAX_CODE:
             error = f"Kürzel ist zu lang (höchstens {MAX_CODE} Zeichen)."
+        if not error and opponent and len(opponent) > MAX_OPPONENT:
+            error = f"Gegner ist zu lang (höchstens {MAX_OPPONENT} Zeichen)."
         clock = clock or default_time
         starts_at = None
         if not error:
@@ -229,5 +239,6 @@ def parse_round_lines(text: str, *, season: str | None, today: str, default_week
         rows.append({"line": number, "text": raw, "code": code, "session": session, "venue": venue,
                      "day": day.isoformat(),
                      "time": clock, "starts_at": starts_at, "derived_day": undated,
-                     "warning": warning, "country_code": detect_country(venue)})
+                     "warning": warning, "country_code": detect_country(venue), "opponent": opponent,
+                     "at_home": at_home, "day_end": day_end.isoformat() if day_end else None})
     return {"rows": [] if errors else rows, "errors": errors}

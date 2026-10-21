@@ -171,7 +171,8 @@ def _running_progress(rounds: list[dict], by_weekend: bool = False) -> dict:
     return {"total": counts["total"], "scored": counts["scored"]}
 
 
-NEXT_FIELDS = ("code", "title", "club_day", "state", "country_code", "session")
+# Team-Liga (#1931): dazu Gegner, Heim/Auswärts und Ende des Spieltags.
+NEXT_FIELDS = ("code", "title", "club_day", "state", "country_code", "session", "opponent", "at_home", "club_day_end")
 
 
 def _running_next(rounds: list[dict], by_weekend: bool = False) -> dict | None:
