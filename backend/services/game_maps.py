@@ -31,8 +31,11 @@ IMAGE_REFUSED = "Bild bitte über „Hochladen“ oder die Mediathek wählen (PN
 STATUSES = ("active", "archived")
 SLUG_TAKEN = "Der Slug „{slug}“ ist in diesem Spiel schon vergeben."
 # Was eine Map nach außen zeigt - Verwaltung und Pools lesen dieselben Felder.
-PUBLIC_FIELDS = ("id", "game_id", "slug", "name", "image_url", "note", "external_ref", "order", "status", "modes",
-                 "archived_at", "created_at", "created_by", "updated_at", "updated_by")
+PUBLIC_FIELDS = ("id", "game_id", "slug", "name", "aliases", "image_url", "note", "external_ref", "order", "status",
+                 "modes", "archived_at", "created_at", "created_by", "updated_at", "updated_by")
+# Weitere Schreibweisen (#1616 an #1931), etwa der englische Name beim Veranstalter: das Ergebnisblatt der Team-Liga
+# ordnet einen eingetippten oder eingefügten Namen darüber der Map zu.
+ALIASES_MAX = 10
 
 
 def _text(value) -> str:
@@ -44,9 +47,22 @@ def _optional_text(value):
     return text or None
 
 
+def clean_aliases(values, name: str | None = None) -> list[str]:
+    """Schreibweisen ohne Leerraum am Rand, jede einmal (ohne Groß/klein), ohne den Namen selbst."""
+    out: list[str] = []
+    seen = {_text(name).casefold()} if name else set()
+    for value in values or []:
+        text = _text(value)[:NAME_MAX]
+        if text and text.casefold() not in seen:
+            seen.add(text.casefold())
+            out.append(text)
+    return out[:ALIASES_MAX]
+
+
 class GameMapCreate(BaseModel):
     name: str = Field(min_length=1, max_length=NAME_MAX)
     slug: Optional[str] = Field(default=None, max_length=SLUG_MAX)
+    aliases: List[str] = Field(default_factory=list, max_length=ALIASES_MAX * 2)
     image_url: Optional[str] = Field(default=None, max_length=300)
     note: Optional[str] = Field(default=None, max_length=500)
     external_ref: Optional[str] = Field(default=None, max_length=120)
@@ -66,6 +82,7 @@ class GameMapCreate(BaseModel):
 class GameMapUpdate(BaseModel):
     name: Optional[str] = Field(default=None, min_length=1, max_length=NAME_MAX)
     slug: Optional[str] = Field(default=None, max_length=SLUG_MAX)
+    aliases: Optional[List[str]] = Field(default=None, max_length=ALIASES_MAX * 2)
     image_url: Optional[str] = Field(default=None, max_length=300)
     note: Optional[str] = Field(default=None, max_length=500)
     external_ref: Optional[str] = Field(default=None, max_length=120)
@@ -129,7 +146,7 @@ def name_key(value) -> str:
 
 
 def public_map(doc: dict) -> dict:
-    return {key: doc.get(key) for key in PUBLIC_FIELDS}
+    return {**{key: doc.get(key) for key in PUBLIC_FIELDS}, "aliases": doc.get("aliases") or []}
 
 
 async def maps_of(db, game_id: str, *, active_only: bool = False) -> list[dict]:
@@ -170,8 +187,9 @@ async def create(db, game: dict, body: GameMapCreate, user: dict, new_id: str) -
     last = await db.game_maps.find_one({"game_id": game["id"]}, {"_id": 0, "order": 1}, sort=[("order", -1)])
     now = now_utc().isoformat()
     doc = {
-        "id": new_id, "game_id": game["id"], "slug": slug, "name": body.name, "image_url": clean_image(body.image_url),
-        "note": body.note, "external_ref": body.external_ref, "modes": clean_modes(game, body.modes),
+        "id": new_id, "game_id": game["id"], "slug": slug, "name": body.name,
+        "aliases": clean_aliases(body.aliases, body.name), "image_url": clean_image(body.image_url), "note": body.note,
+        "external_ref": body.external_ref, "modes": clean_modes(game, body.modes),
         "order": int((last or {}).get("order") or 0) + 1, "status": "active", "archived_at": None,
         "created_at": now, "created_by": user["id"], "updated_at": now, "updated_by": user["id"],
     }
@@ -201,6 +219,8 @@ async def update(db, game: dict, current: dict, body: GameMapUpdate, user: dict)
             updates[key] = raw[key]
     if raw.get("modes") is not None:
         updates["modes"] = clean_modes(game, raw["modes"])
+    if raw.get("aliases") is not None:
+        updates["aliases"] = clean_aliases(raw["aliases"], updates.get("name") or current.get("name"))
     status = raw.get("status")
     if status and status != current.get("status"):
         updates["status"] = status
