@@ -12,7 +12,8 @@ und der Parser für eingefügte Terminlisten.
 - **Einfügen** (``parse_round_lines``): je Zeile Kürzel, Datum, optional Uhrzeit und Ort in beliebiger Reihenfolge,
   getrennt durch Leerzeichen, ``·``, ``|``, ``;`` oder Tabulator - etwa „R1 · 05.11. · Ort“. Ohne Jahr gilt das erste
   Jahr der Saison, und springt das Datum zurück, das nächste Jahr. Ohne Datum folgt der nächste Standard-Wochentag der
-  Serie (sonst eine Woche) nach der Zeile davor, ohne Uhrzeit die Standard-Uhrzeit.
+  Serie (sonst eine Woche) nach der Zeile davor, ohne Uhrzeit die Standard-Uhrzeit. Aus dem Ort kommt das Land
+  (``country_code``, #1925) - etwa „R1 · 18.06.2026 · Aserbaidschan“.
 """
 from __future__ import annotations
 
@@ -20,6 +21,7 @@ import re
 from datetime import date, datetime, timedelta, timezone
 
 from services.dolibarr_policy import CLUB_TZ
+from services.round_countries import detect_country
 from services.series_standings import ordered_rounds
 
 STATES = ("planned", "today", "missing", "cancelled", "postponed", "scored")
@@ -224,5 +226,5 @@ def parse_round_lines(text: str, *, season: str | None, today: str, default_week
             warning = "Nicht am Standard-Wochentag."
         rows.append({"line": number, "text": raw, "code": code, "venue": venue, "day": day.isoformat(),
                      "time": clock, "starts_at": starts_at, "derived_day": undated,
-                     "warning": warning})
+                     "warning": warning, "country_code": detect_country(venue)})
     return {"rows": [] if errors else rows, "errors": errors}

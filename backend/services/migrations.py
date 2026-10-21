@@ -70,6 +70,22 @@ async def migrate_points_scheme_templates(db) -> str:
     return f"{added} points scheme templates added"
 
 
+async def migrate_round_countries(db) -> str:
+    """Flaggen (#1925): bestehende Termine bekommen ihr Land aus Ort bzw. Titel - nur, wo das Feld leer ist und niemand
+    von Hand „ohne Flagge“ gewählt hat. Ein gesetztes Land bleibt, ein Termin ohne Treffer bleibt leer."""
+    from services.round_countries import detect_country
+
+    empty = {"country_code": {"$in": [None, ""]}, "country_auto": {"$ne": False}}
+    filled = 0
+    async for item in db.reference_rounds.find(empty, {"_id": 0, "id": 1, "venue": 1, "title": 1}):
+        code = detect_country(item.get("venue"), item.get("title"))
+        if code:
+            await db.reference_rounds.update_one({"id": item["id"], **empty},
+                                                 {"$set": {"country_code": code, "country_auto": True}})
+            filled += 1
+    return f"{filled} round countries filled"
+
+
 MIGRATIONS = (
     (1, "encrypt_legacy_integration_credentials", migrate_plaintext_secrets),
     (2, "team_leader_role_to_player", migrate_team_leader_role),
@@ -78,6 +94,7 @@ MIGRATIONS = (
     # #1029: dieselben Schritte noch einmal - die Löschung räumt seither mehr Sammlungen auf (services/personal_data.py).
     (5, "deleted_account_leftovers_1029", migrate_deleted_account_leftovers),
     (6, "reference_points_schemes", migrate_points_scheme_templates),
+    (7, "reference_round_countries", migrate_round_countries),
 )
 
 

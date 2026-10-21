@@ -116,7 +116,7 @@ STALE = "Das Ergebnis wurde inzwischen geändert – bitte neu laden."
 BROKEN_RULES = "Die Regeln der Serie lassen sich nicht anwenden – bitte in der Saison prüfen."
 BROKEN_SHEETS = "Die Ergebnisse der Serie lassen sich so nicht werten – bitte die veröffentlichten Blätter prüfen."
 ROUND_FIELDS = ("id", "order", "code", "title", "venue", "club_day", "starts_at", "status", "kind", "counts",
-                "opponent")
+                "opponent", "country_code")
 PARTICIPANT_FIELDS = ("id", "name", "start_number", "default_team", "kind", "is_club_member", "link_status")
 # Captains: nur, wer in der Saison steht - Zuordnung, Alias und Vereinsmitgliedschaft liest nur die Verwaltung (#1743).
 CAPTAIN_PARTICIPANT_FIELDS = ("id", "name", "start_number", "default_team", "kind")

@@ -1700,6 +1700,13 @@ class ReferenceSeriesUpdate(BaseModel):
         return _clock(value)
 
 
+def _round_country(value):
+    """Land eines Termins (#1925): ein Code aus der Auswahl, groß geschrieben; leer heißt ohne."""
+    from services.round_countries import clean_code
+
+    return clean_code(value)
+
+
 class ReferenceRoundCreate(BaseModel):
     """Termin einer Serie (#1742): Zeit in UTC, der Vereinstag in Wien wird daraus gerechnet."""
     order: int = Field(default=0, ge=0)
@@ -1713,6 +1720,15 @@ class ReferenceRoundCreate(BaseModel):
     counts: bool = True  # zählt zur Wertung
     opponent: Optional[str] = Field(default=None, max_length=120)  # Team-Liga
     note: Optional[str] = Field(default=None, max_length=1000)
+    # #1925: Land des Termins (ISO 3166-1 alpha-2) für die Flagge. ``country_auto``: aus Ort bzw. Titel erkannt;
+    # ``False`` heißt von Hand gewählt (auch „ohne Flagge“) - dann bleibt es, auch wenn sich die Strecke ändert.
+    country_code: Optional[str] = Field(default=None, max_length=2)
+    country_auto: bool = True
+
+    @field_validator("country_code")
+    @classmethod
+    def _country(cls, value):
+        return _round_country(value)
 
 
 class ReferenceRoundUpdate(BaseModel):
@@ -1727,6 +1743,13 @@ class ReferenceRoundUpdate(BaseModel):
     counts: Optional[bool] = None
     opponent: Optional[str] = Field(default=None, max_length=120)
     note: Optional[str] = Field(default=None, max_length=1000)
+    country_code: Optional[str] = Field(default=None, max_length=2)
+    country_auto: Optional[bool] = None
+
+    @field_validator("country_code")
+    @classmethod
+    def _country(cls, value):
+        return _round_country(value)
 
 
 class ReferenceParticipantCreate(BaseModel):

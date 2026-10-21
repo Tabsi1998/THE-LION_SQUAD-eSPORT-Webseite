@@ -150,7 +150,7 @@ def _running_next(rounds: list[dict]) -> dict | None:
     item = next((item for item in rounds if item["state"] in UPCOMING_STATES), None)
     if not item:
         return None
-    return {**{key: item.get(key) for key in ("code", "title", "club_day", "state")},
+    return {**{key: item.get(key) for key in ("code", "title", "club_day", "state", "country_code")},
             "time": vienna_clock(item.get("starts_at"))}
 
 
