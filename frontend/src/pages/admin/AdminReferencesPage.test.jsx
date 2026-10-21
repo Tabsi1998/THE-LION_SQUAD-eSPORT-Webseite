@@ -65,13 +65,14 @@ test("Neue Referenz: Felder statt Titel, zwei Einzelstarter mit je eigener Platz
   fireEvent.change(screen.getByTestId("reference-season"), { target: { value: "Season 3" } });
   fireEvent.click(await screen.findByTestId("reference-platform-PS"));
 
-  fireEvent.click(screen.getByTestId("reference-add-solo"));
+  // Schnell-Eintrag (#1936): eine neue Referenz beginnt mit einem Team-Eintrag.
+  fireEvent.change(screen.getByTestId("reference-entry-0-kind"), { target: { value: "solo" } });
   fireEvent.click(screen.getByTestId("reference-entry-0-member-p1"));
   fireEvent.change(screen.getByTestId("reference-entry-0-placement"), { target: { value: "1" } });
   fireEvent.click(screen.getByTestId("reference-add-solo"));
   fireEvent.click(screen.getByTestId("reference-entry-1-member-p2"));
   fireEvent.change(screen.getByTestId("reference-entry-1-placement"), { target: { value: "4" } });
-  fireEvent.change(screen.getByTestId("reference-entry-1-participants"), { target: { value: "32" } });
+  fireEvent.change(screen.getByTestId("reference-entry-1-count"), { target: { value: "32" } });
 
   fireEvent.submit(screen.getByTestId("reference-sheet"));
   await waitFor(() => expect(saveCalls()).toHaveLength(1));
@@ -89,6 +90,7 @@ test("ohne Eintrag wird nicht gespeichert", async () => {
   render(<MemoryRouter><AdminReferencesPage /></MemoryRouter>);
   fireEvent.click(await screen.findByTestId("reference-new"));
   fireEvent.change(screen.getByTestId("reference-title"), { target: { value: "Winter Cup" } });
+  fireEvent.click(screen.getByTestId("reference-entry-0-remove"));
   expect(screen.getByTestId("reference-entries-empty")).toBeInTheDocument();
   fireEvent.submit(screen.getByTestId("reference-sheet"));
   await waitFor(() => expect(toastMock.error).toHaveBeenCalled());
@@ -111,7 +113,7 @@ test("Prüfung: Hinweise erscheinen am Feld, gespeichert wird trotzdem mit Hinwe
   fireEvent.change(screen.getByTestId("reference-start-date"), { target: { value: "2026-03-01" } });
   fireEvent.change(screen.getByTestId("reference-end-date"), { target: { value: "2028-03-01" } });
   fireEvent.change(screen.getByTestId("reference-entry-0-placement"), { target: { value: "12" } });
-  fireEvent.change(screen.getByTestId("reference-entry-0-teams"), { target: { value: "8" } });
+  fireEvent.change(screen.getByTestId("reference-entry-0-count"), { target: { value: "8" } });
 
   expect(await screen.findByTestId("reference-end-date-warnings")).toHaveTextContent("731 Tage");
   expect(await screen.findByTestId("reference-entry-0-warnings")).toHaveTextContent("Platz 12");
@@ -265,4 +267,88 @@ test("Speichern nennt den Stand beim Öffnen; ist die Referenz inzwischen geänd
   await waitFor(() => expect(apiMock.patch).toHaveBeenCalledTimes(1));
   expect(apiMock.patch.mock.calls[0][2]).toEqual({ params: { expected_updated_at: "2026-10-21T10:00:00+00:00" } });
   await waitFor(() => expect(toastMock.error).toHaveBeenCalledWith("Die Referenz wurde inzwischen geändert"));
+});
+
+// Schnell-Eintrag (#1936): oben nur das Nötige für ein Tagesturnier, der Rest unter „Weitere Angaben“.
+test("Schnell-Eintrag: ein Tagesturnier mit sechs Eingaben und sinnvollen Vorgaben", async () => {
+  mockApi([]);
+  render(<MemoryRouter><AdminReferencesPage /></MemoryRouter>);
+  fireEvent.click(await screen.findByTestId("reference-new"));
+  expect(screen.getByTestId("reference-more")).not.toHaveAttribute("open");
+  expect(screen.queryByTestId("reference-like-last")).toBeNull();
+
+  fireEvent.change(screen.getByTestId("reference-title"), { target: { value: "Probe Nacht Cup" } });
+  fireEvent.change(screen.getByTestId("reference-game"), { target: { value: "g1" } });
+  fireEvent.change(screen.getByTestId("reference-start-date"), { target: { value: "2020-03-14" } });
+  fireEvent.click(screen.getByTestId("reference-entry-0-member-p1"));
+  fireEvent.change(screen.getByTestId("reference-entry-0-placement"), { target: { value: "3" } });
+  fireEvent.change(screen.getByTestId("reference-entry-0-count"), { target: { value: "12" } });
+  expect(screen.getByTestId("reference-status")).toHaveValue("completed");
+
+  fireEvent.submit(screen.getByTestId("reference-sheet"));
+  await waitFor(() => expect(saveCalls()).toHaveLength(1));
+  const payload = saveCalls()[0][1];
+  expect(payload).toEqual(expect.objectContaining({
+    title: "Probe Nacht Cup", game_id: "g1", start_date: "2020-03-14", end_date: "2020-03-14",
+    status: "completed", visibility: "public", is_active: true, order_index: 0, organizer: null, league: null, series_id: null,
+  }));
+  expect(payload.entries).toEqual([expect.objectContaining({ kind: "team", team_name: "THE LION SQUAD", member_profile_ids: ["p1"], placement: 3, team_count: 12, participant_count: null })]);
+});
+
+test("Schnell-Eintrag: Status nach dem Datum, bis jemand ihn selbst wählt", async () => {
+  mockApi([]);
+  render(<MemoryRouter><AdminReferencesPage /></MemoryRouter>);
+  fireEvent.click(await screen.findByTestId("reference-new"));
+  fireEvent.change(screen.getByTestId("reference-title"), { target: { value: "Probe Zukunft Cup" } });
+  fireEvent.change(screen.getByTestId("reference-start-date"), { target: { value: "2099-05-01" } });
+  expect(screen.getByTestId("reference-status")).toHaveValue("planned");
+  fireEvent.change(screen.getByTestId("reference-status"), { target: { value: "active" } });
+  fireEvent.change(screen.getByTestId("reference-start-date"), { target: { value: "2020-05-01" } });
+  expect(screen.getByTestId("reference-status")).toHaveValue("active");
+  fireEvent.submit(screen.getByTestId("reference-sheet"));
+  await waitFor(() => expect(saveCalls()).toHaveLength(1));
+  expect(saveCalls()[0][1]).toEqual(expect.objectContaining({ status: "active", start_date: "2020-05-01", end_date: "2020-05-01" }));
+});
+
+test("Wie letztes Mal: Spiel, Veranstalter und Team der zuletzt angelegten Referenz", async () => {
+  const older = { ...LEGACY_ITEM, id: "r-alt", display_title: "Alter Cup", organizer: "Alt Verband", game_id: "", created_at: "2026-01-01T10:00:00+00:00" };
+  const newest = {
+    ...LEGACY_ITEM, id: "r-neu", display_title: "Probe Abend Cup", organizer: "Probe Verband", game_id: "g1", created_at: "2026-10-12T10:00:00+00:00",
+    entries: [{ id: "e9", kind: "team", team_name: "Probe Löwen", member_profile_ids: ["p1", "p2"], lineup: [], placement: 4 }],
+  };
+  mockApi([older, newest]);
+  render(<MemoryRouter><AdminReferencesPage /></MemoryRouter>);
+  fireEvent.click(await screen.findByTestId("reference-new"));
+  const button = screen.getByTestId("reference-like-last");
+  expect(button).toHaveTextContent("Probe Abend Cup");
+  fireEvent.click(button);
+  expect(screen.getByTestId("reference-game")).toHaveValue("g1");
+  expect(screen.getByTestId("reference-organizer")).toHaveValue("Probe Verband");
+  expect(screen.getByTestId("reference-entry-0-team")).toHaveValue("Probe Löwen");
+  expect(screen.getByTestId("reference-entry-0-member-p1")).toBeChecked();
+  expect(screen.getByTestId("reference-entry-0-member-p2")).toBeChecked();
+  expect(screen.getByTestId("reference-entry-0-placement")).toHaveValue(null);
+  expect(screen.getByTestId("reference-title")).toHaveValue("");
+});
+
+test("Bearbeiten: „Weitere Angaben“ offen, wenn dort etwas steht, sonst zu; die Referenz bleibt unverändert", async () => {
+  const plain = {
+    id: "r-tag", title: "Probe Abend Cup", display_title: "Probe Abend Cup", platforms: [], status: "completed", visibility: "public", is_active: true,
+    order_index: 0, mode: "online", game_id: "g1", start_date: "2020-10-12", end_date: "2020-10-12",
+    entries: [{ id: "e3", kind: "solo", member_profile_ids: ["p1"], lineup: [], placement: 4, participant_count: 24 }],
+  };
+  mockApi([plain, LEGACY_ITEM]);
+  render(<MemoryRouter><AdminReferencesPage /></MemoryRouter>);
+  fireEvent.click(await screen.findByTestId("reference-edit-r-tag"));
+  expect(screen.getByTestId("reference-more")).not.toHaveAttribute("open");
+  expect(screen.queryByTestId("reference-like-last")).toBeNull();
+  expect(screen.getByTestId("reference-entry-0-count")).toHaveValue(24);
+  fireEvent.submit(screen.getByTestId("reference-sheet"));
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledTimes(1));
+  expect(apiMock.patch.mock.calls[0][1]).toEqual(expect.objectContaining({ status: "completed", start_date: "2020-10-12", end_date: "2020-10-12", order_index: 0 }));
+  expect(apiMock.patch.mock.calls[0][1].entries).toEqual([expect.objectContaining({ kind: "solo", placement: 4, participant_count: 24, team_count: null })]);
+
+  await waitFor(() => expect(screen.queryByTestId("reference-sheet")).toBeNull());
+  fireEvent.click(screen.getByTestId("reference-edit-r1"));
+  expect(screen.getByTestId("reference-more")).toHaveAttribute("open");
 });

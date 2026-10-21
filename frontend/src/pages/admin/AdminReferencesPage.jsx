@@ -13,11 +13,12 @@ import { gameOptionLabel } from "@/lib/gameLabels";
 import { checkKey, warningSummary, warningsByField } from "@/lib/referenceChecks";
 import { AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
-import { ExternalLink, Flag, Medal, Pencil, Plus, Save, Trash2, User, Users } from "lucide-react";
-import { viennaDate } from "@/lib/vienna";
+import { ExternalLink, Flag, History, Medal, Pencil, Plus, Save, Trash2, User, Users } from "lucide-react";
+import { viennaDate, viennaDay } from "@/lib/vienna";
 import { podiumItems, yearOf } from "@/lib/referencesOverview";
 import { bestPlacement } from "@/components/tls/references/referenceParts";
 import { seasonOf, seasonOptions } from "@/lib/seasonClose";
+import { countKey, hasMoreDetails, lastReference, likeLastTime, quickDate, quickStatus } from "@/lib/referenceQuickEntry";
 
 // Referenzen (#409): eine Referenz ist eine Turnierteilnahme des Vereins mit Einträgen - entweder
 // ein Team (Spieler treten gemeinsam an, eine Platzierung) oder mehrere Einzelstarter mit je
@@ -325,7 +326,7 @@ export default function AdminReferencesPage() {
         {items.length === 0 && <div className="text-center py-16 border border-dashed border-white/15 rounded-sm text-white/40 font-display tracking-widest">NOCH KEINE REFERENZEN</div>}
       </div>
 
-      {editing && <ReferenceForm reference={editing} games={games} memberProfiles={memberProfiles} partners={partners} lineages={lineages} suggestions={suggestions} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); load(); }} />}
+      {editing && <ReferenceForm reference={editing} games={games} memberProfiles={memberProfiles} partners={partners} lineages={lineages} suggestions={suggestions} items={items} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); load(); }} />}
     </AdminLayout>
   );
 }
@@ -645,14 +646,25 @@ function FieldWarnings({ messages, testId }) {
   );
 }
 
-function ReferenceForm({ reference, games, memberProfiles, partners = [], lineages = [], suggestions, onClose, onSaved }) {
+// Schnell-Eintrag (#1936): Oben steht nur, was ein Tagesturnier braucht - Turniername, Spiel, Datum, wer angetreten ist,
+// „Platz von N“ und ein Link. Alles andere liegt unter „Weitere Angaben“; beim Bearbeiten ist der Bereich offen, wenn dort
+// etwas steht. Neue Referenzen bekommen den Status nach dem Datum, bis jemand ihn selbst wählt.
+function ReferenceForm({ reference, games, memberProfiles, partners = [], lineages = [], suggestions, items = [], onClose, onSaved }) {
   const isNew = !reference.id;
+  const today = viennaDay(new Date());
   // Eine Referenz des Saisonabschlusses kennt ihre Saison auch ohne eigenes `series_id` (#1750).
-  const [form, setForm] = useState(() => ({ ...referenceToForm(reference), series_id: reference.series_id || seasonOf(reference, lineages)?.seriesId || "" }));
+  const [form, setForm] = useState(() => {
+    const initial = { ...referenceToForm(reference), series_id: reference.series_id || seasonOf(reference, lineages)?.seriesId || "" };
+    return isNew && initial.entries.length === 0 ? { ...initial, entries: [emptyEntry("team")] } : initial;
+  });
+  const [moreOpen] = useState(() => !isNew && hasMoreDetails(form, today));
+  const [statusTouched, setStatusTouched] = useState(!isNew);
   const season = seasonOf({ id: reference.id, series_id: form.series_id }, lineages);
+  const last = useMemo(() => (isNew ? lastReference(items) : null), [isNew, items]);
   const [saving, setSaving] = useState(false);
   const [platformInput, setPlatformInput] = useState("");
   const set = (key, value) => setForm((current) => ({ ...current, [key]: value }));
+  const setDay = (value) => setForm((current) => ({ ...current, ...quickDate(current, value) }));
   const setEntry = (key, patch) => setForm((current) => ({
     ...current,
     entries: current.entries.map((entry) => (entry.key === key ? { ...entry, ...(typeof patch === "function" ? patch(entry) : patch) } : entry)),
@@ -670,7 +682,9 @@ function ReferenceForm({ reference, games, memberProfiles, partners = [], lineag
     setPlatformInput("");
   };
 
-  const payload = useMemo(() => formToPayload(form), [form]);
+  // Vorgabe: Status nach dem Datum (#1936) - nur bei neuen Referenzen und nur, bis jemand ihn selbst wählt.
+  const status = statusTouched ? (form.status || "completed") : quickStatus(form.start_date, form.entries[0]?.placement, today);
+  const payload = useMemo(() => formToPayload({ ...form, status }), [form, status]);
   const warnings = useReferenceWarnings(payload);
   const warningsAt = (field) => warnings[field] || [];
 
@@ -709,58 +723,33 @@ function ReferenceForm({ reference, games, memberProfiles, partners = [], lineag
 
   return (
     <AdminSheet title={isNew ? "Neue Referenz" : "Referenz bearbeiten"} eyebrow="Verein" size="xl" onClose={onClose} onSubmit={save} saving={saving} submitTestId="reference-save" testId="reference-sheet">
-      <FormSection title="Turnier" hint="Plattform, Format, Liga und Saison sind eigene Felder – der Titel ist nur noch der Turniername.">
-        <TextField label="Turniername" value={form.title} onChange={(v) => set("title", v)} suggestions={suggestions.titles} required testId="reference-title" placeholder="z.B. Autumn Cup 2026" />
-        <FormGrid cols={3}>
-          <TextField label="Veranstalter" value={form.organizer} onChange={(v) => set("organizer", v)} suggestions={suggestions.organizers} testId="reference-organizer" />
-          <TextField label="Liga" value={form.league} onChange={(v) => set("league", v)} suggestions={suggestions.leagues} testId="reference-league" placeholder="z.B. Liga A" />
-          <TextField label="Saison" value={form.season} onChange={(v) => set("season", v)} suggestions={suggestions.seasons} testId="reference-season" placeholder="z.B. Season 3 oder 2026" />
-        </FormGrid>
-        <SelectField label="Gehört zur Saison" value={form.series_id} onChange={(v) => set("series_id", v)} options={seasonOptions(lineages, form.series_id)} testId="reference-series"
-          hint="Für eine Liga oder Serie: Die Karte führt dann zur Saison-Seite, und beim Abschluss der Saison wird diese Referenz aktualisiert statt doppelt angelegt. Sichtbar ist sie höchstens so offen wie die Saison." />
-        {season?.seasonEnd && (
-          <p className="border border-[#29B6E8]/30 bg-[#29B6E8]/5 rounded-sm px-3 py-2 text-sm text-white/75" data-testid="reference-season-end">
-            Referenz des Saisonabschlusses: Ihr Endplatz wird in der Saison gepflegt – <Link to={`/admin/reference-series/${season.seriesId}`} className="text-[#29B6E8] font-semibold underline-offset-2 hover:underline">zur Saison</Link>, dort „Saison abschließen“.
-          </p>
+      {season?.seasonEnd && (
+        <p className="border border-[#29B6E8]/30 bg-[#29B6E8]/5 rounded-sm px-3 py-2 text-sm text-white/75" data-testid="reference-season-end">
+          Referenz des Saisonabschlusses: Ihr Endplatz wird in der Saison gepflegt – <Link to={`/admin/reference-series/${season.seriesId}`} className="text-[#29B6E8] font-semibold underline-offset-2 hover:underline">zur Saison</Link>, dort „Saison abschließen“.
+        </p>
+      )}
+
+      <FormSection title="Turnier" hint="Für ein Tagesturnier reicht, was hier steht. Veranstalter, Liga, Format und mehr unter „Weitere Angaben“.">
+        {last && (
+          <button type="button" onClick={() => setForm((current) => likeLastTime(current, last))} data-testid="reference-like-last" className="w-full sm:w-auto inline-flex items-center gap-2 px-3 py-2 border border-[#29B6E8]/45 rounded-sm text-left text-xs font-bold text-[#29B6E8] hover:bg-[#29B6E8]/10">
+            <History className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+            <span className="min-w-0"><span className="uppercase tracking-wider">Wie letztes Mal</span> <span className="font-normal text-white/55 normal-case tracking-normal">– Spiel, Veranstalter und Team von „{last.display_title || last.title}“</span></span>
+          </button>
         )}
-        <PartnerPicker partners={partners} value={form.partner_ids} onChange={(v) => set("partner_ids", v)} testPrefix="reference-partner" hint="Der Partner zeigt die Referenz auf seiner Seite unter „Gemeinsam“. Steht ein Partner als Veranstalter, gehört sie ihm auch ohne Haken." />
-        <FormGrid cols={3}>
-          <TextField label="Format" value={form.format} onChange={(v) => set("format", v)} suggestions={suggestions.formats} testId="reference-format" placeholder="z.B. HC, CORE, S&D 4vs4" />
+        <TextField label="Turniername" value={form.title} onChange={(v) => set("title", v)} suggestions={suggestions.titles} required testId="reference-title" placeholder="z.B. Autumn Cup 2026" />
+        <FormGrid>
           <SelectField label="Spiel" value={form.game_id || ""} onChange={(v) => set("game_id", v)} options={[["", "— Spiel wählen —"], ...games.map((game) => [game.id, gameOptionLabel(game)])]} testId="reference-game" />
-          <TextField label="Spielname falls nicht vorhanden" value={form.game_name} onChange={(v) => set("game_name", v)} suggestions={suggestions.gameNames} testId="reference-game-name" />
+          <GermanDateField id="reference-start-date" label="Datum" value={(form.start_date || "").slice(0, 10)} onChange={setDay} testId="reference-start-date" allowFuture />
         </FormGrid>
-        <FieldLabel label="Plattformen" hint="Mehrfachauswahl; eigene mit Enter hinzufügen.">
-          <div className="flex flex-wrap gap-1.5" data-testid="reference-platforms">
-            {platformChoices.map((platform) => (
-              <button
-                key={platform.key}
-                type="button"
-                onClick={() => togglePlatform(platform.key)}
-                data-testid={`reference-platform-${platform.key}`}
-                className={`px-2.5 py-1 border rounded-sm text-[11px] font-bold uppercase tracking-wider ${form.platforms.includes(platform.key) ? "border-[#29B6E8] bg-[#29B6E8]/15 text-[#29B6E8]" : "border-white/10 bg-[#121212] text-white/60 hover:border-white/30"}`}
-              >
-                {platform.label}
-              </button>
-            ))}
-            <input
-              value={platformInput}
-              onChange={(e) => setPlatformInput(e.target.value)}
-              onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addPlatform(); } }}
-              onBlur={addPlatform}
-              placeholder="Weitere …"
-              data-testid="reference-platform-input"
-              className="bg-[#0A0A0A] border border-white/10 focus:border-[#29B6E8] px-2.5 py-1 rounded-sm text-[11px] text-white focus:outline-none w-28"
-            />
-          </div>
-        </FieldLabel>
+        <TextField label="Link (optional)" value={form.external_url} onChange={(v) => set("external_url", v)} placeholder="https://..." testId="reference-link" hint="Turnierseite oder Ergebnis. Weitere Links unter „Weitere Angaben“." />
       </FormSection>
 
-      <FormSection title="Einträge" hint="Wer für den Verein angetreten ist: ein Team mit gemeinsamer Platzierung oder Einzelstarter mit je eigener Platzierung. Beides ist in derselben Teilnahme möglich.">
+      <FormSection title="Wer und Platz" hint="Ein Team oder ein Spieler aus den Vereinsprofilen. Beides ist in derselben Teilnahme möglich.">
         {form.entries.length === 0 && (
           <div className="border border-dashed border-white/15 rounded-sm p-4 text-sm text-white/45" data-testid="reference-entries-empty">Noch kein Eintrag – lege ein Team oder einen Einzelstarter an.</div>
         )}
         {form.entries.map((entry, index) => (
-          <EntryEditor
+          <QuickEntry
             key={entry.key}
             entry={entry}
             index={index}
@@ -777,38 +766,93 @@ function ReferenceForm({ reference, games, memberProfiles, partners = [], lineag
         </div>
       </FormSection>
 
-      <FormSection title="Rahmen">
-        <FormGrid cols={4}>
-          <GermanDateField id="reference-start-date" label="Start" value={(form.start_date || "").slice(0, 10)} onChange={(v) => set("start_date", v)} testId="reference-start-date" allowFuture />
-          <GermanDateField id="reference-end-date" label="Ende" value={(form.end_date || "").slice(0, 10)} onChange={(v) => set("end_date", v)} testId="reference-end-date" allowFuture />
-          <TextField label="Ort" value={form.location} onChange={(v) => set("location", v)} suggestions={suggestions.locations} testId="reference-location" />
-          <SelectField label="Modus" value={form.mode} onChange={(v) => set("mode", v)} options={MODE_OPTIONS} testId="reference-mode" />
-        </FormGrid>
-        <FieldWarnings messages={warningsAt("end_date")} testId="reference-end-date-warnings" />
-        <FormGrid>
-          <TextField label="Turnier-Webseite" value={form.external_url} onChange={(v) => set("external_url", v)} placeholder="https://..." />
-          <TextField label="Bracket / Tabelle" value={form.bracket_url} onChange={(v) => set("bracket_url", v)} placeholder="https://..." />
-          <TextField label="Match-Webseite" value={form.match_url} onChange={(v) => set("match_url", v)} placeholder="https://..." />
-          <TextField label="Ergebnis-Link" value={form.result_url} onChange={(v) => set("result_url", v)} placeholder="https://..." />
-        </FormGrid>
-        <FormGrid cols={4}>
-          <SelectField label="Status" value={form.status || "completed"} onChange={(v) => set("status", v)} options={STATUS_OPTIONS} testId="reference-status" />
-          <SelectField label="Sichtbarkeit" value={form.visibility} onChange={(v) => set("visibility", v)} options={VISIBILITY_OPTIONS} testId="reference-visibility" />
-          <TextField label="Reihenfolge" type="number" value={form.order_index} onChange={(v) => set("order_index", v)} testId="reference-order" />
-          <CheckField label="Aktiv" checked={form.is_active !== false} onChange={(v) => set("is_active", v)} testId="reference-active" className="self-end pb-2" />
-        </FormGrid>
-      </FormSection>
+      <FormSection collapsible defaultOpen={moreOpen} title="Weitere Angaben" hint="Veranstalter, Partner, Liga und Saison, Format, Plattformen, Ort, Modus, weitere Links, Texte und Anzeige." testId="reference-more">
+        <FormSection plain title="Veranstalter und Liga" hint="Plattform, Format, Liga und Saison sind eigene Felder – der Titel ist nur noch der Turniername.">
+          <FormGrid cols={3}>
+            <TextField label="Veranstalter" value={form.organizer} onChange={(v) => set("organizer", v)} suggestions={suggestions.organizers} testId="reference-organizer" />
+            <TextField label="Liga" value={form.league} onChange={(v) => set("league", v)} suggestions={suggestions.leagues} testId="reference-league" placeholder="z.B. Liga A" />
+            <TextField label="Saison" value={form.season} onChange={(v) => set("season", v)} suggestions={suggestions.seasons} testId="reference-season" placeholder="z.B. Season 3 oder 2026" />
+          </FormGrid>
+          <SelectField label="Gehört zur Saison" value={form.series_id} onChange={(v) => set("series_id", v)} options={seasonOptions(lineages, form.series_id)} testId="reference-series"
+            hint="Für eine Liga oder Serie: Die Karte führt dann zur Saison-Seite, und beim Abschluss der Saison wird diese Referenz aktualisiert statt doppelt angelegt. Sichtbar ist sie höchstens so offen wie die Saison." />
+          <PartnerPicker partners={partners} value={form.partner_ids} onChange={(v) => set("partner_ids", v)} testPrefix="reference-partner" hint="Der Partner zeigt die Referenz auf seiner Seite unter „Gemeinsam“. Steht ein Partner als Veranstalter, gehört sie ihm auch ohne Haken." />
+        </FormSection>
 
-      <FormSection title="Texte">
-        <TextAreaField label="Beschreibung" value={form.description} onChange={(v) => set("description", v)} testId="reference-description" />
-        <TextAreaField label="Highlights / Notizen" value={form.highlights} onChange={(v) => set("highlights", v)} testId="reference-highlights" />
+        <FormSection plain title="Format und Plattformen">
+          <FormGrid>
+            <TextField label="Format" value={form.format} onChange={(v) => set("format", v)} suggestions={suggestions.formats} testId="reference-format" placeholder="z.B. HC, CORE, S&D 4vs4" />
+            <TextField label="Spielname falls nicht vorhanden" value={form.game_name} onChange={(v) => set("game_name", v)} suggestions={suggestions.gameNames} testId="reference-game-name" />
+          </FormGrid>
+          <FieldLabel label="Plattformen" hint="Mehrfachauswahl; eigene mit Enter hinzufügen.">
+            <div className="flex flex-wrap gap-1.5" data-testid="reference-platforms">
+              {platformChoices.map((platform) => (
+                <button
+                  key={platform.key}
+                  type="button"
+                  onClick={() => togglePlatform(platform.key)}
+                  data-testid={`reference-platform-${platform.key}`}
+                  className={`px-2.5 py-1 border rounded-sm text-[11px] font-bold uppercase tracking-wider ${form.platforms.includes(platform.key) ? "border-[#29B6E8] bg-[#29B6E8]/15 text-[#29B6E8]" : "border-white/10 bg-[#121212] text-white/60 hover:border-white/30"}`}
+                >
+                  {platform.label}
+                </button>
+              ))}
+              <input
+                value={platformInput}
+                onChange={(e) => setPlatformInput(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addPlatform(); } }}
+                onBlur={addPlatform}
+                placeholder="Weitere …"
+                data-testid="reference-platform-input"
+                className="bg-[#0A0A0A] border border-white/10 focus:border-[#29B6E8] px-2.5 py-1 rounded-sm text-[11px] text-white focus:outline-none w-28"
+              />
+            </div>
+          </FieldLabel>
+        </FormSection>
+
+        <FormSection plain title="Ablauf" hint="Das Ende nur bei mehreren Tagen – sonst gilt das Datum oben.">
+          <FormGrid cols={3}>
+            <GermanDateField id="reference-end-date" label="Ende" value={(form.end_date || "").slice(0, 10)} onChange={(v) => set("end_date", v)} testId="reference-end-date" allowFuture />
+            <TextField label="Ort" value={form.location} onChange={(v) => set("location", v)} suggestions={suggestions.locations} testId="reference-location" />
+            <SelectField label="Modus" value={form.mode} onChange={(v) => set("mode", v)} options={MODE_OPTIONS} testId="reference-mode" />
+          </FormGrid>
+          <FieldWarnings messages={warningsAt("end_date")} testId="reference-end-date-warnings" />
+          <FormGrid cols={3}>
+            <TextField label="Bracket / Tabelle" value={form.bracket_url} onChange={(v) => set("bracket_url", v)} placeholder="https://..." testId="reference-bracket-url" />
+            <TextField label="Match-Webseite" value={form.match_url} onChange={(v) => set("match_url", v)} placeholder="https://..." testId="reference-match-url" />
+            <TextField label="Ergebnis-Link" value={form.result_url} onChange={(v) => set("result_url", v)} placeholder="https://..." testId="reference-result-url" />
+          </FormGrid>
+        </FormSection>
+
+        {form.entries.length > 0 && (
+          <FormSection plain title="Zu den Einträgen" hint="Label der Platzierung, externe Spieler ohne Vereinsprofil und die zweite Feldgröße.">
+            {form.entries.map((entry, index) => (
+              <EntryDetails key={entry.key} entry={entry} index={index} suggestions={suggestions} onChange={(patch) => setEntry(entry.key, patch)} />
+            ))}
+          </FormSection>
+        )}
+
+        <FormSection plain title="Anzeige">
+          <FormGrid cols={4}>
+            <SelectField label="Status" value={status} onChange={(v) => { setStatusTouched(true); set("status", v); }} options={STATUS_OPTIONS} testId="reference-status" hint={statusTouched ? undefined : "Automatisch nach dem Datum."} />
+            <SelectField label="Sichtbarkeit" value={form.visibility} onChange={(v) => set("visibility", v)} options={VISIBILITY_OPTIONS} testId="reference-visibility" />
+            <TextField label="Reihenfolge" type="number" value={form.order_index} onChange={(v) => set("order_index", v)} testId="reference-order" hint="0 = automatisch nach Datum." />
+            <CheckField label="Aktiv" checked={form.is_active !== false} onChange={(v) => set("is_active", v)} testId="reference-active" className="self-end pb-2" />
+          </FormGrid>
+        </FormSection>
+
+        <FormSection plain title="Texte">
+          <TextAreaField label="Beschreibung" value={form.description} onChange={(v) => set("description", v)} testId="reference-description" />
+          <TextAreaField label="Highlights / Notizen" value={form.highlights} onChange={(v) => set("highlights", v)} testId="reference-highlights" />
+        </FormSection>
       </FormSection>
     </AdminSheet>
   );
 }
 
-function EntryEditor({ entry, index, profiles, suggestions, onChange, onRemove, warnings = [] }) {
+// Ein Eintrag im Schnell-Eintrag (#1936): Team oder Einzelstarter, wer aus den Vereinsprofilen, „Platz von N“.
+function QuickEntry({ entry, index, profiles, suggestions, onChange, onRemove, warnings = [] }) {
   const isSolo = entry.kind === "solo";
+  const count = countKey(entry);
   const toggleMember = (profileId) => onChange((current) => {
     const ids = current.member_profile_ids || [];
     if (current.kind === "solo") return { ...current, member_profile_ids: ids.includes(profileId) ? [] : [profileId] };
@@ -840,14 +884,30 @@ function EntryEditor({ entry, index, profiles, suggestions, onChange, onRemove, 
         single={isSolo}
         testIdPrefix={`reference-entry-${index}`}
       />
-      <TextField label={isSolo ? "Externer Spieler (falls kein Vereinsprofil)" : "Weitere externe Spieler"} value={entry.lineup_text} onChange={(v) => onChange({ lineup_text: v })} placeholder={isSolo ? "Name" : "Name 1, Name 2, Name 3"} testId={`reference-entry-${index}-lineup`} />
-      <FormGrid cols={4}>
+      <FormGrid>
         <TextField label="Platz" type="number" min="1" value={entry.placement} onChange={(v) => onChange({ placement: v })} testId={`reference-entry-${index}-placement`} />
-        <TextField label="Label" value={entry.placement_label} onChange={(v) => onChange({ placement_label: v })} placeholder="z.B. Podium" suggestions={suggestions.placementLabels} testId={`reference-entry-${index}-label`} />
-        <TextField label="Teilnehmer" type="number" min="1" value={entry.participant_count} onChange={(v) => onChange({ participant_count: v })} testId={`reference-entry-${index}-participants`} />
-        <TextField label="Teams" type="number" min="1" value={entry.team_count} onChange={(v) => onChange({ team_count: v })} testId={`reference-entry-${index}-teams`} />
+        <TextField label={count === "team_count" ? "von … Teams" : "von … Teilnehmern"} type="number" min="1" value={entry[count]} onChange={(v) => onChange({ [count]: v })} testId={`reference-entry-${index}-count`} />
       </FormGrid>
       <FieldWarnings messages={warnings} testId={`reference-entry-${index}-warnings`} />
+    </div>
+  );
+}
+
+// Was zu einem Eintrag sonst noch gehört (#1936) - unter „Weitere Angaben“: Label, externe Spieler, die zweite Feldgröße.
+function EntryDetails({ entry, index, suggestions, onChange }) {
+  const isSolo = entry.kind === "solo";
+  const other = countKey(entry) === "team_count" ? "participant_count" : "team_count";
+  const who = isSolo ? "Einzelstarter" : (entry.team_name || "Team");
+  return (
+    <div className="border border-white/10 bg-[#0A0A0A] rounded-sm p-3 space-y-3" data-testid={`reference-entry-${index}-details`}>
+      <div className="text-[11px] font-bold uppercase tracking-widest text-white/55">Eintrag {index + 1} · {who}</div>
+      <TextField label={isSolo ? "Externer Spieler (falls kein Vereinsprofil)" : "Weitere externe Spieler"} value={entry.lineup_text} onChange={(v) => onChange({ lineup_text: v })} placeholder={isSolo ? "Name" : "Name 1, Name 2, Name 3"} testId={`reference-entry-${index}-lineup`} />
+      <FormGrid>
+        <TextField label="Label" value={entry.placement_label} onChange={(v) => onChange({ placement_label: v })} placeholder="z.B. Podium" suggestions={suggestions.placementLabels} testId={`reference-entry-${index}-label`} />
+        {other === "participant_count"
+          ? <TextField label="Teilnehmer" type="number" min="1" value={entry.participant_count} onChange={(v) => onChange({ participant_count: v })} testId={`reference-entry-${index}-participants`} />
+          : <TextField label="Teams" type="number" min="1" value={entry.team_count} onChange={(v) => onChange({ team_count: v })} testId={`reference-entry-${index}-teams`} />}
+      </FormGrid>
     </div>
   );
 }
