@@ -14,7 +14,8 @@ jest.mock("../../lib/api", () => ({
 }));
 jest.mock("@expo/vector-icons", () => ({ Ionicons: () => null }));
 
-const navigation = { navigate: jest.fn(), setOptions: jest.fn() } as never;
+const nav = { navigate: jest.fn(), push: jest.fn(), setOptions: jest.fn() };
+const navigation = nav as never;
 const routeFor = (lineage?: string, season?: string) => ({ key: "season", name: "ReferenceSeason", params: { lineage, season } }) as never;
 
 const res = (round_id: string, place: number | null, points: number, marks: string[] = []) => ({ round_id, place, points, marks });
@@ -123,6 +124,96 @@ test("Team-Liga: Spieltage mit Ergebnis aus eigener Sicht und Tabelle", async ()
   expect(within(screen.getByTestId("season-matchday-b")).getByText("Geplant")).toBeTruthy();
   await fireEvent.press(screen.getByRole("tab", { name: "Tabelle" }));
   expect(screen.getByTestId("season-league-Lions Probe").props.accessibilityLabel).toContain("unser Team");
+});
+
+// ---------------------------------------------------------------- #1974: Runde mit Läufen, Sonderregeln, Statistik
+
+const lauf = (id: string, session: string, kind: string, weekend: number, extra: Record<string, unknown> = {}) => ({
+  id, code: `R${weekend}`, session, session_kind: kind, weekend, club_day: "2026-10-08", state: "scored", kind: "regular", counts: kind !== "qualifying", ...extra,
+});
+const WEEKEND = {
+  ...RACING,
+  series: { ...RACING.series, status: "cancelled", cancelled_on: "2026-11-20", cancel_reason: "Neustart mit anderem Auto" },
+  successor: { season: "2027", title: "PRL 36 · Season 2027", season_slug: "2027", lineage_slug: "prl", lineage_title: "Probe Racing League" },
+  rule_changes: [{ kind: "format", from_round: 5, to_round: null, day: "2026-11-12", note: null, sessions: ["Sprint", "Hauptrennen"] }],
+  rounds: [
+    lauf("q3", "Qualifying", "qualifying", 3, { venue: "Baku", country_code: "az", time: "19:30" }),
+    lauf("s3", "Sprint", "sprint", 3, { time: "19:50" }),
+    lauf("r3", "Rennen", "race", 3, { time: "20:30" }),
+  ],
+  standings: { rows: [
+    { key: "ext1", rank: 1, points: 33, name: "Fremd Eins", club_member: false, results: [res("s3", 1, 8), res("r3", 1, 25)] },
+    { key: "mira", rank: 2, points: 20, name: "Mira Stahl", club_member: true, results: [res("s3", 2, 7), res("r3", 2, 18)],
+      adjustment_points: -5, adjustments: [{ points: -5, reason: "Nichtteilnahme nach Anmeldung", day: "2026-11-02", round_id: null }] },
+  ] },
+};
+
+test("Kalender je Runde (#1930): Lauf-Chips mit Uhrzeit, die Runde und ein Chip öffnen das Ergebnis", async () => {
+  mockGet.mockResolvedValue({ data: WEEKEND });
+  await render(<ReferenceSeasonScreen navigation={navigation} route={routeFor("prl", "2026")} />);
+  await waitFor(() => expect(screen.getByTestId("season-round-q3")).toBeTruthy());
+  // Eine Zeile je Runde, nicht je Lauf.
+  expect(screen.queryByTestId("season-round-s3")).toBeNull();
+  const chips = screen.getByTestId("season-round-sessions-q3");
+  expect(within(chips).getByText("Quali")).toBeTruthy();
+  expect(within(chips).getByText("19:30")).toBeTruthy();
+  expect(within(chips).getByText("Sprint")).toBeTruthy();
+  expect(within(screen.getByTestId("season-round-q3")).getByText("Bester Vereinsfahrer · Sprint: Mira Stahl · P2")).toBeTruthy();
+  await fireEvent.press(screen.getByTestId("session-chip-s3"));
+  expect(nav.navigate).toHaveBeenCalledWith("ReferenceRound", { lineage: "prl", season: "2026", round: 3, session: "sprint" });
+  await fireEvent.press(screen.getByTestId("season-round-q3"));
+  expect(nav.navigate).toHaveBeenCalledWith("ReferenceRound", { lineage: "prl", season: "2026", round: 3 });
+});
+
+test("Sonderregeln (#1960): Saison abgebrochen mit Nachfolger, Regeländerung, „−5“ mit Grund", async () => {
+  mockGet.mockResolvedValue({ data: WEEKEND });
+  await render(<ReferenceSeasonScreen navigation={navigation} route={routeFor("prl", "2026")} />);
+  await waitFor(() => expect(screen.getByTestId("series-season-notice")).toBeTruthy());
+  expect(screen.getByText("Saison abgebrochen am 20.11.2026 – Neustart mit anderem Auto. Die gefahrenen Ergebnisse bleiben stehen – ohne Meister.")).toBeTruthy();
+  await fireEvent.press(screen.getByTestId("series-successor"));
+  expect(nav.push).toHaveBeenCalledWith("ReferenceSeason", { lineage: "prl", season: "2027" });
+
+  await fireEvent.press(screen.getByRole("tab", { name: "Tabelle" }));
+  expect(within(screen.getByTestId("series-rule-changes")).getByText("Ab R5 · 12.11.2026")).toBeTruthy();
+  expect(within(screen.getByTestId("series-rule-changes")).getByText("Ablauf: Sprint + Hauptrennen")).toBeTruthy();
+  const mira = screen.getByTestId("season-table-mira");
+  expect(within(mira).getByText("−5").props.accessibilityLabel).toBe("Anpassung −5 · Nichtteilnahme nach Anmeldung · 02.11.2026");
+  expect(within(screen.getByTestId("series-adjustments")).getByText("Mira Stahl · Nichtteilnahme nach Anmeldung · 02.11.2026")).toBeTruthy();
+
+  // Wertung je Lauf (#1930): Sprint-Tabelle ohne Anpassungen.
+  await fireEvent.press(screen.getByTestId("season-table-kind-sprint"));
+  expect(within(screen.getByTestId("season-table-mira")).getByText("7")).toBeTruthy();
+  expect(within(screen.getByTestId("season-table-mira")).queryByText("−5")).toBeNull();
+  expect(screen.queryByTestId("series-adjustments")).toBeNull();
+});
+
+test("Statistik (#1950): lädt beim Öffnen, sortiert nach der gewählten Kennzahl, Vereinsfahrer hervorgehoben", async () => {
+  mockGet.mockImplementation((path: string) => Promise.resolve({ data: path.endsWith("/statistics") ? {
+    drivers: [
+      { key: "ext1", name: "Fremd Eins", club_member: false, wins: 2, podiums: 2, avg_grid: 1.5 },
+      { key: "mira", name: "Mira Stahl", club_member: true, wins: 0, podiums: 2, avg_grid: 4.5 },
+    ],
+    teams: [],
+    metrics: { drivers: ["wins", "podiums", "avg_grid"], teams: [] },
+  } : WEEKEND }));
+  await render(<ReferenceSeasonScreen navigation={navigation} route={{ key: "s", name: "ReferenceSeason", params: { lineage: "prl", season: "2026", view: "statistik" } } as never} />);
+  await waitFor(() => expect(screen.getByTestId("season-statistics")).toBeTruthy());
+  expect(mockGet).toHaveBeenCalledWith("/reference-series/public/prl/2026/statistics");
+  expect(screen.getByRole("tab", { name: "Statistik" }).props.accessibilityState).toEqual({ selected: true });
+  expect(screen.getByTestId("season-statistics-row-ext1").props.accessibilityLabel).toContain("Platz 1");
+  expect(screen.getByTestId("season-statistics-row-mira").props.accessibilityLabel).toContain("Verein");
+  await fireEvent.press(screen.getByTestId("season-statistics-card-podiums"));
+  expect(screen.getByTestId("season-statistics-row-mira").props.accessibilityLabel).toContain("Platz 1");
+  await fireEvent.press(screen.getByTestId("season-statistics-card-avg_grid"));
+  expect(screen.getByTestId("season-statistics-row-ext1").props.accessibilityLabel).toContain("Ø Start 1,5");
+});
+
+test("Statistik auf einem älteren Server: Hinweis statt Absturz", async () => {
+  mockGet.mockImplementation((path: string) => (path.endsWith("/statistics") ? Promise.reject(new Error("404")) : Promise.resolve({ data: RACING })));
+  await render(<ReferenceSeasonScreen navigation={navigation} route={routeFor("prl", "2026")} />);
+  await waitFor(() => expect(screen.getByRole("tab", { name: "Statistik" })).toBeTruthy());
+  await fireEvent.press(screen.getByRole("tab", { name: "Statistik" }));
+  await waitFor(() => expect(screen.getByText("Die Statistik lässt sich gerade nicht laden.")).toBeTruthy());
 });
 
 test("„Im Web öffnen“ führt zur Serienseite im Web", async () => {

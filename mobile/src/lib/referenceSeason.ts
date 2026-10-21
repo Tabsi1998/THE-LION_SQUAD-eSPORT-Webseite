@@ -1,7 +1,25 @@
 import { countryCode, countryName } from "./countryFlags";
 import { formatRaceTime } from "./raceTime";
+import {
+  averageGrid,
+  averageGridLabel,
+  chipLabel,
+  groupWeekends,
+  hasSessions,
+  poleCount,
+  qualiDuel,
+  roundKind,
+  sessionGridLines,
+  sessionPointsLines,
+  sessionTables,
+  type QualifyingEntry,
+  type WeekendRound,
+  type WeekendSettings,
+} from "./raceWeekend";
 import { KIND_LABELS, type LineageInfo } from "./references";
 import { HIDDEN_NAME, dayLabel, formatNumber, nameOf, number, roundLabel } from "./seriesFormat";
+import type { SeasonPartners } from "./seriesPartners";
+import { adjustmentDetail, adjustmentText, noScoreText, teamSinceLabel, type AdjustedRow, type RuleChange, type Successor } from "./seriesSpecialRules";
 
 // Saison einer Serie in der App (#1945, nur lesen): was der Screen aus /api/reference-series/public/<spur>/<saison>
 // liest - dieselben Regeln wie die Serienseite im Web (frontend/src/lib/racingLeague.js, teamLeague.js,
@@ -10,29 +28,35 @@ import { HIDDEN_NAME, dayLabel, formatNumber, nameOf, number, roundLabel } from 
 // (`racing.club_drivers` vom Server). Fehlt ein Teil (alter Server), bleibt der Abschnitt leer - nie ein Absturz.
 // Mit #1949: Land je Termin (#1925), mehrere eigene Teams (#1926) und das Rennergebnis mit Startplatz, Zeit, Abstand,
 // schnellster Runde und Fahrer des Tages (#1927) - jeweils nur, wenn der Server es schickt.
+// Mit #1974 (alles optional, ein älterer Server sieht aus wie bisher): Runde mit Läufen (#1930) - Kalender je Runde mit
+// Lauf-Chips, Wertung je Lauf, Poles, Ø Start und Quali-Duell; Sonderregeln (#1960) - Anpassungen, Abbruch mit
+// Nachfolger, Termin ohne Wertung, Regeländerungen, Quelle und Modus der Teamwertung, „im Team seit“; Turnierserien
+// (#1961) - Turniertage und Boni; Partner (#1934) - „Veranstaltet von“.
 
-export type SeasonRound = {
-  id: string;
-  position?: number | null;
-  code?: string | null;
-  title?: string | null;
-  venue?: string | null;
-  club_day?: string | null;
-  time?: string | null;
-  state?: string | null;
-  kind?: string | null;
-  counts?: boolean | null;
+export type SeasonRound = WeekendRound & {
   opponent?: string | null;
   original_club_day?: string | null;
   /** Land des Termins (ISO 3166-1 alpha-2) - kommt mit #1925; ältere Server schicken es nicht. */
   country_code?: string | null;
+  /** Team-Liga (#1931): Heimspiel, und bis wann ein Spieltag läuft. */
+  at_home?: boolean | null;
+  club_day_end?: string | null;
+  /** Termin ohne Wertung (#1960). */
+  no_score_reason?: string | null;
+  no_score_note?: string | null;
 };
 export type RoundResult = {
   round_id?: string; place?: number | null; points?: number | null; marks?: string[] | null; counted?: boolean; dropped?: boolean;
   // Rennergebnis (#1927), nur wo eingetragen.
   start_number?: string | null; grid?: number | null; time?: string | null; gap?: string | null; fastest_lap_time?: string | null; driver_of_the_day?: boolean | null;
+  // Turniertag (#1961), nur wo eingetragen.
+  day_rounds?: Array<{ points?: number | null; place?: number | null; lobby?: string | null } | null> | null;
+  day_points?: number | null;
+  bonus?: number | null;
+  bonus_keys?: string[] | null;
+  partner?: { name?: string | null; name_hidden?: boolean | null; club_member?: boolean | null } | null;
 };
-export type StandingRow = {
+export type StandingRow = AdjustedRow & {
   key?: string | null;
   rank?: number | null;
   points?: number | null;
@@ -41,6 +65,11 @@ export type StandingRow = {
   club_member?: boolean | null;
   profile_slug?: string | null;
   results?: RoundResult[] | null;
+  /** Sonderboni (#1961) - schon in den Punkten. */
+  bonus_points?: number | null;
+};
+type TeamStandingRow = AdjustedRow & {
+  team?: string | null; rank?: number | null; points?: number | null; official_points?: number | null; computed_points?: number | null; deviation?: number | null;
 };
 type Match = { team?: string | null; opponent?: string | null; home?: boolean | null; outcome?: string | null; score_for?: number | null; score_against?: number | null; points?: number | null; maps?: Array<{ name?: string | null; score_for?: number | null; score_against?: number | null; outcome?: string | null }> | null };
 type TableRow = { key?: string | null; team?: string | null; rank?: number | null; points?: number | null; played?: number | null; won?: number | null; drawn?: number | null; lost?: number | null; own?: boolean | null };
@@ -48,8 +77,24 @@ type TableRow = { key?: string | null; team?: string | null; rank?: number | nul
 /** Die Antwort der Serienseite - jedes Feld kann fehlen. */
 export type SeasonPage = {
   lineage?: LineageInfo | null;
-  series?: { season?: string | null; tier?: string | null; title?: string | null; season_slug?: string | null; status?: string | null } | null;
-  progress?: { total?: number | null; scored?: number | null } | null;
+  series?: {
+    season?: string | null; tier?: string | null; title?: string | null; season_slug?: string | null; status?: string | null;
+    /** Abgebrochen (#1960). */
+    cancelled_on?: string | null; cancel_reason?: string | null;
+    /** Ablauf je Runde (#1930): Läufe, Punkte und Startaufstellung je Format. */
+    weekend?: WeekendSettings;
+  } | null;
+  /** Veranstalter und Mitwirkende (#1934). */
+  partners?: SeasonPartners;
+  /** Nachfolger einer abgebrochenen Saison (#1960). */
+  successor?: Successor;
+  rule_changes?: RuleChange[] | null;
+  rules?: {
+    day_rounds?: { count?: number | null; points_by_place?: number[] | null } | null;
+    custom_bonuses?: Array<{ key?: string | null; label?: string | null; points?: number | null }> | null;
+    tiebreak_top_n?: number | null;
+  } | null;
+  progress?: { total?: number | null; scored?: number | null; cancelled?: number | null } | null;
   rounds?: SeasonRound[] | null;
   standings?: { rows?: StandingRow[] | null } | null;
   team_league?: {
@@ -61,8 +106,13 @@ export type SeasonPage = {
   racing?: {
     club_drivers?: string[] | null;
     club_teams?: string[] | null;
-    drivers?: Record<string, { team?: string | null; guest?: boolean | null } | undefined> | null;
-    teams?: { rows?: Array<{ team?: string | null; rank?: number | null; points?: number | null }> | null } | null;
+    /** `team_since` (#1960): ab welchem Lauf im aktuellen Team - nur nach einem Wechsel. */
+    drivers?: Record<string, { team?: string | null; guest?: boolean | null; team_since?: string | null } | undefined> | null;
+    teams?: { rows?: TeamStandingRow[] | null; source?: string | null; round_id?: string | null } | null;
+    /** Teamwertung (#1960): wie viele zählen, Gäste, Modus. */
+    team_scoring?: { enabled?: boolean | null; counting_drivers?: number | null; guests_count?: boolean | null; mode?: string | null } | null;
+    /** Je Qualifying die Plätze und die Pole (#1930) - für Poles und das Quali-Duell. */
+    qualifying?: QualifyingEntry[] | null;
   } | null;
 };
 
@@ -88,12 +138,13 @@ export function seasonWebPath(lineage: string, season: string): string {
   return `/references/series/${encodeURIComponent(lineage)}/${encodeURIComponent(season)}`;
 }
 
-export type SeasonTabKey = "calendar" | "table" | "drivers" | "matchdays";
+export type SeasonTabKey = "calendar" | "table" | "drivers" | "statistics" | "matchdays" | "squad" | "maps" | "days";
 
-/** Reiter je Art: Rennliga Kalender, Tabelle, Fahrer; Team-Liga Spieltage, Tabelle; Turnierserie Termine, Tabelle. */
+/** Reiter je Art: Rennliga Kalender, Tabelle, Fahrer, Statistik (#1950); Team-Liga Spieltage, Tabelle; Turnierserie
+ * Termine, Tabelle. */
 export function seasonTabs(page: SeasonPage | null | undefined): Array<{ key: SeasonTabKey; label: string }> {
   const kind = seasonKind(page);
-  if (kind === "racing") return [{ key: "calendar", label: "Kalender" }, { key: "table", label: "Tabelle" }, { key: "drivers", label: "Fahrer" }];
+  if (kind === "racing") return [{ key: "calendar", label: "Kalender" }, { key: "table", label: "Tabelle" }, { key: "drivers", label: "Fahrer" }, { key: "statistics", label: "Statistik" }];
   if (kind === "team_league") return [{ key: "matchdays", label: "Spieltage" }, { key: "table", label: "Tabelle" }];
   return [{ key: "calendar", label: "Termine" }, { key: "table", label: "Tabelle" }];
 }
@@ -187,30 +238,65 @@ export function raceSummary(rows: StandingRow[] | null | undefined, roundId: str
   return { winner, bestClub: club[0] || null };
 }
 
-export type RoundRow = { key: string; code: string; place: string; country: string; countryName: string; state: string; tone: StateTone; when: string; winner: string; best: string; final: boolean };
+export type RoundLine = { key: string; kind: "winner" | "best"; label: string; text: string };
 
-/** Der Kalender als Zeilen: Kürzel, Ort, Land (Code für die Flagge, #1925), Stand und Tag; bei einem gewerteten
- * Rennen der Sieger (nur ein öffentlicher Vereinsfahrer) und sonst der beste öffentliche Vereinsfahrer mit Platz. */
+export type RoundRow = {
+  key: string; code: string; place: string; country: string; countryName: string; state: string; tone: StateTone; when: string; final: boolean;
+  /** Sieger (nur ein öffentlicher Vereinsfahrer) und bester öffentlicher Vereinsfahrer je gewertetem Rennen der Runde. */
+  results: RoundLine[];
+  /** Die Läufe der Runde für die Chips (#1930) - leer bei einem einzelnen Rennen ohne Lauf. */
+  sessions: SeasonRound[];
+  /** „Ohne Wertung · …“ je Lauf (#1960). */
+  notes: string[];
+  /** „ursprünglich Do., 05.11.2026“ bei einem verschobenen Termin. */
+  moved: string;
+  /** Nummer der Runde für ihre Ergebnisseite (#1950) - nur Rennliga und nur, wenn der Server sie schickt. */
+  number: number | null;
+};
+
+/** Der Kalender als Zeilen - je Runde eine (#1930): Kürzel, Ort, Land (Code für die Flagge, #1925), Stand der Runde und
+ * Tag (bei mehreren Läufen ohne Uhrzeit, die steht an den Chips); je gewertetem Rennen der Runde der Sieger (nur ein
+ * öffentlicher Vereinsfahrer) und sonst der beste öffentliche Vereinsfahrer mit Platz. */
 export function roundRows(page: SeasonPage | null | undefined): RoundRow[] {
   const rows = page?.standings?.rows || [];
   const publicKeys = page?.racing?.club_drivers || [];
-  return (page?.rounds || []).filter((round) => round?.id).map((round) => {
-    const summary = page?.racing && round.state === "scored" ? raceSummary(rows, round.id, publicKeys) : null;
-    const best = summary?.bestClub && summary.bestClub.row !== summary.winner ? summary.bestClub : null;
-    const country = countryCode(round.country_code);
+  const racing = Boolean(page?.racing);
+  return groupWeekends(page?.rounds || []).map((group) => {
+    const lead = group.lead;
+    // Wie im Web: je gewertetem, zählendem Lauf außer dem Qualifying.
+    const races = group.rounds.filter((round) => roundKind(round) !== "qualifying" && round.counts !== false);
+    const multiRace = races.length > 1;
+    const results: RoundLine[] = [];
+    if (racing) {
+      for (const round of races.filter((item) => item.state === "scored")) {
+        const summary = raceSummary(rows, round.id, publicKeys);
+        const suffix = multiRace ? ` · ${chipLabel(round)}` : "";
+        if (summary.winner) results.push({ key: `${round.id}-winner`, kind: "winner", label: `Sieg${suffix}`, text: nameOf(summary.winner) });
+        const best = summary.bestClub && summary.bestClub.row !== summary.winner ? summary.bestClub : null;
+        if (best) results.push({ key: `${round.id}-best`, kind: "best", label: `Bester Vereinsfahrer${suffix}`, text: `${nameOf(best.row)} · ${best.cell.place ? `P${best.cell.place}` : best.cell.text}` });
+      }
+    }
+    const country = countryCode(group.country_code);
+    const state = group.state;
     return {
-      key: round.id,
-      code: roundLabel(round),
+      key: lead.id,
+      code: roundLabel(lead),
       // Ohne Titel und Ort steht der Landesname da - wie VenueWithFlag im Web.
-      place: [[round.title, round.venue].filter(Boolean).join(" · ") || countryName(country), round.opponent ? `gegen ${round.opponent}` : ""].filter(Boolean).join(" · "),
+      place: [[group.title, group.venue].filter(Boolean).join(" · ") || countryName(country), lead.opponent ? `gegen ${lead.opponent}` : ""].filter(Boolean).join(" · "),
       country,
       countryName: countryName(country),
-      state: PUBLIC_STATE_LABELS[String(round.state)] || "",
-      tone: STATE_TONES[String(round.state)] || "planned",
-      when: roundWhen(round),
-      winner: summary?.winner ? nameOf(summary.winner) : "",
-      best: best ? `${nameOf(best.row)} · ${best.cell.place ? `P${best.cell.place}` : best.cell.text}` : "",
-      final: round.kind === "final",
+      state: PUBLIC_STATE_LABELS[state] || "",
+      tone: STATE_TONES[state] || "planned",
+      when: roundWhen({ ...lead, state, time: group.multi ? null : lead.time }),
+      final: group.kind === "final",
+      results,
+      sessions: group.multi ? group.rounds : [],
+      notes: group.rounds.map((round) => {
+        const text = noScoreText(round);
+        return text && group.multi ? `${chipLabel(round)}: ${text}` : text;
+      }).filter(Boolean),
+      moved: lead.original_club_day && lead.original_club_day !== lead.club_day ? `ursprünglich ${dayLabel(lead.original_club_day)}` : "",
+      number: racing ? group.number : null,
     };
   });
 }
@@ -222,22 +308,68 @@ export function mobileRows<T extends { club_member?: boolean | null }>(rows: T[]
   return list.filter((row, index) => index < top || row.club_member);
 }
 
-export type TableLine = { key: string; pos: string; name: string; team: string; points: string; club: boolean; hidden: boolean; club_member: boolean };
+export type TableLine = {
+  key: string; pos: string; name: string; team: string; points: string; club: boolean; hidden: boolean; club_member: boolean;
+  /** Anpassungen der Zeile (#1960) für die Marke „−5“ an den Punkten. */
+  adjust: AdjustedRow | null;
+  /** Sonderboni (#1961): „+3“ - schon in den Punkten. */
+  bonus: string;
+};
 
-/** Fahrerwertung (bzw. Gesamtwertung) oder Teamwertung als Zeilen. */
-export function racingTableRows(page: SeasonPage | null | undefined, scope: "drivers" | "teams"): TableLine[] {
+/** Wertung je Lauf (#1930): „Gesamt“ und je Art mit zählenden Läufen „Rennen“, „Sprint“, „Quali“ - erst ab zwei Arten. */
+export function tableKinds(page: SeasonPage | null | undefined): Array<{ key: string; label: string }> {
+  const tables = sessionTables(page?.standings?.rows || [], page?.rounds || []);
+  return tables.length ? [{ key: "all", label: "Gesamt" }, ...tables.map((table) => ({ key: table.kind, label: table.label }))] : [];
+}
+
+/** Fahrerwertung (bzw. Gesamtwertung, je Lauf mit `kind`) oder Teamwertung als Zeilen. */
+export function racingTableRows(page: SeasonPage | null | undefined, scope: "drivers" | "teams", kind = "all"): TableLine[] {
   if (scope === "teams") {
     const club = new Set(page?.racing?.club_teams || []);
     return (page?.racing?.teams?.rows || []).map((row, index) => ({
       key: String(row.team || index), pos: row.rank ? String(row.rank) : "–", name: row.team || "", team: "",
       points: formatNumber(row.points), club: club.has(String(row.team)), hidden: false, club_member: club.has(String(row.team)),
+      adjust: row, bonus: "",
     }));
   }
   const drivers = page?.racing?.drivers || {};
-  return (page?.standings?.rows || []).map((row, index) => ({
+  const table = kind !== "all" ? sessionTables(page?.standings?.rows || [], page?.rounds || []).find((item) => item.kind === kind) : null;
+  const bonuses = (page?.rules?.custom_bonuses || []).length > 0;
+  return (table ? table.rows : page?.standings?.rows || []).map((row, index) => ({
     key: String(row.key || index), pos: row.rank ? String(row.rank) : "–", name: nameOf(row), team: drivers[String(row.key)]?.team || "",
     points: formatNumber(row.points), club: Boolean(row.club_member), hidden: Boolean(row.name_hidden || !row.name), club_member: Boolean(row.club_member),
+    adjust: table ? null : row,
+    bonus: bonuses && number(row.bonus_points) > 0 ? `+${formatNumber(row.bonus_points)}` : "",
   }));
+}
+
+/** Die Anpassungen der Tabelle als Liste (#1960) - am Handy statt eines Tooltips: „−5“ und „Name · Grund · R4 · Tag“. */
+export function adjustmentLines(page: SeasonPage | null | undefined, scope: "drivers" | "teams"): Array<{ key: string; points: string; negative: boolean; text: string }> {
+  const rows: Array<AdjustedRow & { key?: string | null; team?: string | null; name?: string | null; name_hidden?: boolean | null }> = scope === "teams" ? page?.racing?.teams?.rows || [] : page?.standings?.rows || [];
+  const rounds = page?.rounds || [];
+  return rows.flatMap((row, rowIndex) => (row.adjustments || []).map((item, index) => ({
+    key: `${row.key || row.team || rowIndex}-${index}`,
+    points: adjustmentText(item?.points),
+    negative: number(item?.points) < 0,
+    text: [scope === "teams" ? row.team || "" : nameOf(row), adjustmentDetail(item, rounds)].filter(Boolean).join(" · "),
+  })));
+}
+
+/** Ablauf je Runde in Worten über der Fahrerwertung (#1930, #1960): Punkte je Lauf und umgekehrte Startaufstellung. */
+export function racingRuleLines(page: SeasonPage | null | undefined): Array<{ key: string; label: string; text: string }> {
+  const weekend = page?.series?.weekend;
+  return [
+    { key: "points", label: "Punkte je Lauf", text: sessionPointsLines(weekend).join("; ") },
+    { key: "grid", label: "Startaufstellung", text: sessionGridLines(weekend).join("; ") },
+  ].filter((line) => line.text);
+}
+
+/** Teamwertung in Worten: wie viele Fahrer je Rennen zählen und ob Gäste mitzählen - leer ohne Teamwertung. */
+export function teamRuleLabel(scoring: { enabled?: boolean | null; counting_drivers?: number | null; guests_count?: boolean | null } | null | undefined): string {
+  if (!scoring?.enabled) return "";
+  const n = Number(scoring.counting_drivers) || 0;
+  const counting = n === 1 ? "zählt der beste Fahrer" : n > 1 ? `zählen die besten ${n} Fahrer` : "zählen alle Fahrer";
+  return `Je Rennen ${counting} eines Teams. Gäste zählen ${scoring.guests_count ? "" : "nicht "}fürs Team.`;
 }
 
 /** Wer ein Fahrer-Detail bekommt: nur die Kennungen, die der Server nennt, und davon nur Vereinsmitglieder mit Namen. */
@@ -248,28 +380,55 @@ export function clubDrivers(rows: StandingRow[] | null | undefined, publicKeys: 
 
 const count = (value: number, one: string, many: string) => (value ? `${value} ${value === 1 ? one : many}` : "");
 
-/** Fahrer (Garage): je öffentlichem Vereinsfahrer Platz, Team, Punkte und seine Saison - nur Zahlen über null. */
-export function driverCards(page: SeasonPage | null | undefined): Array<{ key: string; name: string; pos: string; meta: string; stats: string }> {
+/** Name eines Teamkollegen außerhalb der Tabelle: ein öffentlicher Vereinsfahrer mit Namen, sonst „Vereinsfahrer“ bzw.
+ * „Gastfahrer“ (wie garageName im Web). */
+function mateName(row: StandingRow, publicKeys: string[]): string {
+  if (row.name && !row.name_hidden && row.club_member && publicKeys.includes(String(row.key))) return row.name;
+  return row.club_member ? "Vereinsfahrer" : "Gastfahrer";
+}
+
+export type DriverCard = { key: string; name: string; pos: string; meta: string; stats: string; adjustments: Array<{ key: string; points: string; negative: boolean; text: string }> };
+
+/** Fahrer (Garage): je öffentlichem Vereinsfahrer Platz, Team („im Team seit R2“, #1960), Punkte und seine Saison - nur
+ * Zahlen über null; mit Läufen (#1930) Poles je Runde, Ø Start und das Quali-Duell gegen den Teamkollegen mit den
+ * meisten gemeinsamen Qualifyings; dazu seine Anpassungen (#1960). */
+export function driverCards(page: SeasonPage | null | undefined): DriverCard[] {
   const drivers = page?.racing?.drivers || {};
-  return clubDrivers(page?.standings?.rows, page?.racing?.club_drivers).map((row) => {
+  const rows = page?.standings?.rows || [];
+  const rounds = page?.rounds || [];
+  const publicKeys = page?.racing?.club_drivers || [];
+  const qualifying = page?.racing?.qualifying || [];
+  const weekends = hasSessions(rounds);
+  return clubDrivers(rows, publicKeys).map((row) => {
+    const key = String(row.key);
     const cells = (row.results || []).map(raceCell).filter((cell): cell is RaceCell => Boolean(cell));
     const finished = cells.filter(classified).map((cell) => cell.place as number);
+    const team = drivers[key]?.team || "";
+    const mates = team ? rows.filter((other) => String(other.key) !== key && drivers[String(other.key)]?.team === team) : [];
+    const duel = qualifying.length ? mates.map((mate) => ({ mate, ...qualiDuel(key, String(mate.key), qualifying) })).sort((a, b) => b.sessions - a.sessions)[0] : null;
+    const grid = weekends ? averageGrid(row.results) : null;
     const stats = [
       count(cells.filter((cell) => cell.status !== "dns").length, "Rennen", "Rennen"),
       count(finished.filter((place) => place === 1).length, "Sieg", "Siege"),
       count(finished.filter((place) => place <= 3).length, "Podium", "Podien"),
-      count(cells.filter((cell) => cell.pole).length, "Pole", "Poles"),
+      count(poleCount(row, rounds, qualifying), "Pole", "Poles"),
       count(cells.filter((cell) => cell.fastest).length, "schnellste Runde", "schnellste Runden"),
+      count(cells.filter((cell) => cell.status === "dnf").length, "Ausfall", "Ausfälle"),
       // Rennergebnis (#1927): wie im Fahrer-Detail des Webs.
       cells.some((cell) => cell.dotd) ? `${cells.filter((cell) => cell.dotd).length}× Fahrer des Tages` : "",
       cells.some((cell) => cell.gained !== null) ? gainedWords(cells.reduce((sum, cell) => sum + (cell.gained || 0), 0)) : "",
+      averageGridLabel(grid),
+      duel?.sessions ? `Quali-Duell ${duel.a}:${duel.b} gegen ${mateName(duel.mate, publicKeys)}` : "",
     ].filter(Boolean).join(" · ");
     return {
-      key: String(row.key),
+      key,
       name: nameOf(row),
       pos: row.rank ? `P${row.rank}` : "",
-      meta: [drivers[String(row.key)]?.team, `${formatNumber(row.points)} ${number(row.points) === 1 ? "Punkt" : "Punkte"}`].filter(Boolean).join(" · "),
+      meta: [team, team ? teamSinceLabel(drivers[key], rounds) : "", `${formatNumber(row.points)} ${number(row.points) === 1 ? "Punkt" : "Punkte"}`].filter(Boolean).join(" · "),
       stats,
+      adjustments: (row.adjustments || []).map((item, index) => ({
+        key: `${key}-${index}`, points: adjustmentText(item?.points), negative: number(item?.points) < 0, text: adjustmentDetail(item, rounds),
+      })),
     };
   });
 }
