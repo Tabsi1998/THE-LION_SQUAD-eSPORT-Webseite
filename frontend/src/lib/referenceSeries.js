@@ -19,6 +19,18 @@ export const TIEBREAKER_OPTIONS = [
   ["latest_result", "Besseres letztes Ergebnis"],
 ];
 export const TABLE_TIEBREAKER_OPTIONS = [["", "—"], ["score_diff", "Differenz"], ["score_for", "Erzielte Punkte"], ["wins", "Siege"]];
+// Vorlagen für Ergebnis-Bilder (#1756) - dieselben Kennungen wie backend/services/result_image_templates.py. Ohne Wahl
+// gilt die Standard-Vorlage der Art, „none“ schaltet das Auslesen ab.
+export const RESULT_IMAGE_TEMPLATES = [{ id: "rennliga-dunkel", name: "Rennliga-Ergebnis (dunkel)", kinds: ["racing"] }];
+
+/** Auswahl der Vorlage für Ergebnis-Bilder. Spur: „Standard der Art“; Saison (`inherit`): „wie bei der Spur“. Leer,
+ *  wenn für die Art keine Vorlage passt und nichts gewählt ist - dann zeigt das Formular das Feld nicht. */
+export function resultImageOptions(kind, { inherit = false, value = "" } = {}) {
+  const fitting = RESULT_IMAGE_TEMPLATES.filter((item) => item.kinds.includes(kind));
+  if (!fitting.length && !value) return [];
+  const fallback = inherit ? "Wie bei der Spur" : fitting.length ? `Standard: ${fitting[0].name}` : "Keine Vorlage";
+  return [["", fallback], ...RESULT_IMAGE_TEMPLATES.map((item) => [item.id, item.name]), ["none", "Aus – kein Auslesen"]];
+}
 
 const text = (value) => (value === null || value === undefined ? "" : String(value));
 const number = (value, fallback = 0) => {
@@ -91,6 +103,8 @@ export const emptyLineage = {
   visibility: "public", slug: "", order_index: 0,
   // #1898: eigene Reihenfolge der Stufen (höchste zuerst); null heißt Vorgabe aus der Zahl im Namen.
   tier_order: null,
+  // #1756: Vorlage für Ergebnis-Bilder; leer heißt Standard der Art.
+  result_image_template: "",
 };
 
 export function lineageToForm(lineage = {}) {
@@ -108,6 +122,7 @@ export function lineagePayload(form) {
     game_id: blank(form.game_id), partner_ids: form.partner_ids || [], external_url: blank(form.external_url),
     description: blank(form.description), visibility: form.visibility, order_index: Number(form.order_index) || 0,
     tier_order: Array.isArray(form.tier_order) && form.tier_order.length ? form.tier_order : null,
+    result_image_template: blank(form.result_image_template),
     ...(String(form.slug || "").trim() ? { slug: String(form.slug).trim() } : {}),
   };
 }
@@ -154,6 +169,7 @@ export function seriesToForm(series = {}, rules = series.rules) {
     visibility: series.visibility || "public",
     description: series.description || "",
     season_result: series.season_result || "",
+    result_image_template: series.result_image_template || "",
     rules_note: "",
     rules: rulesToForm(rules || {}),
   };
@@ -176,6 +192,8 @@ export function seriesPayload(form, { isNew = false, archived = false } = {}) {
     description: blank(form.description),
     // #1898: Ergebnis der Saison - leer heißt: der Liga-Weg leitet es aus den Stufen ab.
     season_result: form.season_result || null,
+    // #1756: leer heißt „wie bei der Spur“.
+    result_image_template: form.result_image_template || null,
     rules: formToRules(form.rules),
   };
   // Eine archivierte Serie behält beim Bearbeiten ihren Stand; zurück holt sie „Zurückholen“.
