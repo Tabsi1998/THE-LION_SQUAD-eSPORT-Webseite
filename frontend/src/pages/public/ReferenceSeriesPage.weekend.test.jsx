@@ -151,3 +151,61 @@ test("Wertung je Lauf: Gesamt · Rennen · Sprint - die eigene Sprint-Tabelle mi
   fireEvent.click(screen.getByTestId("racing-table-all"));
   expect(pointsOf(within(drivers).getByTestId("series-table"))).toEqual([["Probe Lion Eins", "37"], ["Probe Lion Zwei", "27"], ["Fremd Eins", "22"]]);
 });
+
+
+// Ergebnis je Runde (#1950): Kalenderzeile, Lauf-Chips und der Kopf im Raster führen zur Ergebnisseite der Runde.
+test("Kalenderzeile, Lauf-Chips und Kopf im Raster führen zur Ergebnisseite der Runde", async () => {
+  renderPage();
+  const calendar = await screen.findByTestId("racing-calendar");
+  const links = within(calendar).getAllByTestId("racing-round-link");
+  expect(links.map((link) => link.getAttribute("href"))).toEqual([
+    "/references/series/probe-rennliga/2026-f2/runde/1", "/references/series/probe-rennliga/2026-f2/runde/2"]);
+  const chips = within(within(calendar).getAllByTestId("racing-round")[0]).getAllByTestId("session-chip");
+  expect(chips.map((chip) => chip.getAttribute("href"))).toEqual([
+    "/references/series/probe-rennliga/2026-f2/runde/1?lauf=qualifying",
+    "/references/series/probe-rennliga/2026-f2/runde/1?lauf=sprint",
+    "/references/series/probe-rennliga/2026-f2/runde/1?lauf=hauptrennen",
+  ]);
+  const table = within(screen.getByTestId("racing-drivers")).getByTestId("series-table");
+  const heads = within(table).getAllByTestId("series-weekend-head");
+  expect(within(heads[0]).getByTestId("series-round-link")).toHaveAttribute("href", "/references/series/probe-rennliga/2026-f2/runde/1");
+  const sessions = within(table).getAllByTestId("series-session-head");
+  expect(within(sessions[0]).getByRole("link")).toHaveAttribute("href", "/references/series/probe-rennliga/2026-f2/runde/1?lauf=sprint");
+});
+
+const STATS = {
+  drivers: [
+    { key: "lion1", name: "Probe Lion Eins", club_member: true, profile_slug: "probe-lion-1", wins: 2, podiums: 2, poles: 1, avg_grid: 4.5, races: 2 },
+    { key: "ext1", name: "Fremd Eins", club_member: false, wins: 0, podiums: 2, poles: 0, avg_grid: 2, races: 2 },
+  ],
+  teams: [{ key: "Probe Löwen", team: "Probe Löwen", own: true, wins: 2, podiums: 4, poles: 1, avg_grid: 4.5, races: 4 }],
+  metrics: { drivers: ["wins", "podiums", "poles", "avg_grid"], teams: ["wins", "podiums", "poles", "avg_grid"] },
+};
+
+test("Reiter Statistik: je Kennzahl die Spitze und die Tabelle, nur Kennzahlen, die vorkommen", async () => {
+  apiMock.get.mockImplementation((url) => Promise.resolve({ data: url.endsWith("/statistics") ? STATS : BODY }));
+  render(
+    <MemoryRouter initialEntries={["/references/series/probe-rennliga/2026-f2"]}>
+      <Routes><Route path="/references/series/:lineageSlug/:seasonSlug" element={<ReferenceSeriesPage />} /></Routes>
+    </MemoryRouter>,
+  );
+  const tab = await screen.findByTestId("racing-view-statistik");
+  expect(screen.getByTestId("racing-view-saison")).toHaveAttribute("aria-selected", "true");
+  fireEvent.click(tab);
+  const stats = await screen.findByTestId("season-stats");
+  expect(apiMock.get).toHaveBeenCalledWith("/reference-series/public/probe-rennliga/2026-f2/statistics");
+  expect(screen.queryByTestId("racing-calendar")).not.toBeInTheDocument();
+  const leaders = within(stats).getByTestId("season-stats-leaders");
+  expect(within(leaders).getAllByRole("button").map((button) => button.textContent)).toEqual(
+    ["Meiste Siege", "Meiste Podien", "Meiste Poles", "Bester Ø Startplatz"]);
+  const table = within(stats).getByTestId("season-stats-table");
+  expect(within(table).queryByText("Ausf.")).not.toBeInTheDocument();
+  const rows = within(table).getAllByTestId("season-stats-row");
+  expect(rows[0]).toHaveTextContent("Probe Lion Eins");
+  expect(rows[0]).toHaveAttribute("data-own", "true");
+  // Nach Ø Start sortiert: der kleinste zuerst.
+  fireEvent.click(within(table).getByTestId("season-stats-sort-avg_grid"));
+  expect(within(table).getAllByTestId("season-stats-row")[0]).toHaveTextContent("Fremd Eins");
+  fireEvent.click(within(stats).getByTestId("season-stats-teams"));
+  expect(within(within(stats).getByTestId("season-stats-table")).getAllByTestId("season-stats-row")[0]).toHaveTextContent("Probe Löwen");
+});

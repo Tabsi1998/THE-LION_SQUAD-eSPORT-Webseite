@@ -55,6 +55,17 @@
 }
 .tls-series-badge--guess { color: var(--tls-honor); box-shadow: inset 0 0 0 1px rgb(var(--tls-honor-rgb) / 0.5); }
 
+/* Kopf des Rennrasters (#1950): Flagge und Kürzel führen zur Ergebnisseite der Runde, das Kürzel eines Laufs zu seinem
+   Reiter - unterstrichen erst unter der Maus, damit der Kopf ruhig bleibt. */
+.tls-series-head-link {
+  display: inline-flex; color: inherit; border-radius: 2px; text-underline-offset: 3px;
+  transition: color var(--tls-motion-fast) var(--tls-ease);
+}
+.tls-series-head-link:focus-visible { outline: 2px solid var(--tls-brand); outline-offset: 2px; }
+@media (hover: hover) and (pointer: fine) {
+  .tls-series-head-link:hover { color: var(--tls-brand); text-decoration: underline; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .tls-series-row, .tls-series-row .tls-standing-move { animation: tls-series-fade 150ms ease both; animation-delay: 0ms; }
 }

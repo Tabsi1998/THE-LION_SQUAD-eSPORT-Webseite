@@ -13,6 +13,8 @@ import {
   DriverCell, GuestBadge, RaceCell, RacingCalendar, RacingPoints, SeasonSwitcher,
 } from "@/components/tls/series/RacingParts";
 import { RacingDriverDetail, RacingGarageTeams } from "@/components/tls/series/RacingGarage";
+import { SeasonStatistics } from "@/components/tls/series/SeasonStatistics";
+import { roundPath, sessionKey } from "@/lib/roundResults";
 import "./racingLeague.css";
 
 // Seite einer Rennliga (#1746) unter /references/series/<spur>/<saison>: Umschalter der Saisons, Fortschritt in
@@ -24,9 +26,13 @@ import "./racingLeague.css";
 // Hat die Saison Läufe, zählt der Fortschritt Runden, das Raster fasst die Läufe einer Runde unter einem Kopf zusammen,
 // der Kalender zeigt je Runde die Lauf-Chips, und das Fahrer-Detail nennt Poles, Ø Start und das Quali-Duell. Zählen
 // mehrere Arten von Läufen, schaltet „Gesamt · Rennen · Sprint · Quali“ zwischen der Gesamtwertung und den Tabellen je
-// Lauf um (etwa die eigene Sprint-Tabelle) - gezählt aus dem gespeicherten Stand.
+// Lauf um (etwa die eigene Sprint-Tabelle) - gezählt aus dem gespeicherten Stand. Ergebnis je Runde (#1950): Flagge und
+// Kürzel im Raster, die Kalenderzeile und die Lauf-Chips führen zur Ergebnisseite der Runde; der Reiter „Statistik“
+// (?ansicht=statistik) zeigt je Fahrer und Team die Kennzahlen der Saison.
 
 const FAHRER = "fahrer";
+const VIEW = "ansicht";
+const VIEWS = [["saison", "Saison"], ["statistik", "Statistik"]];
 
 function TeamCell({ row, index, rows, drivers, lead }) {
   const names = (row.drivers || []).map((key) => ({ key, row: rows.find((item) => item.key === key), guest: drivers[key]?.guest }));
@@ -73,6 +79,21 @@ export function RacingLeague({ data }) {
   const drivers = useMemo(() => racing.drivers || {}, [racing.drivers]);
   const [params, setParams] = useSearchParams();
   const [flash, setFlash] = useState(0);
+  const view = params.get(VIEW) === "statistik" ? "statistik" : "saison";
+  const lineageSlug = data.lineage?.slug;
+  const seasonSlug = data.series?.season_slug;
+  // Ergebnisseite einer Runde (#1950): Runde aus dem Kalender, auf Wunsch mit dem Reiter des Laufs.
+  const roundHref = useCallback((round, withSession = false) => roundPath(lineageSlug, seasonSlug, round?.weekend,
+    withSession ? sessionKey(round?.session) : ""), [lineageSlug, seasonSlug]);
+  const sessionHref = useCallback((round) => roundHref(round, true), [roundHref]);
+  const pickView = useCallback((key) => {
+    setParams((current) => {
+      const next = new URLSearchParams(current);
+      if (key === "statistik") next.set(VIEW, key);
+      else next.delete(VIEW);
+      return next;
+    }, { replace: true, preventScrollReset: true });
+  }, [setParams]);
   const detailRef = useRef(null);
 
   // Wer ein Detail bekommt und außerhalb der Tabellen mit Namen steht, sagt der Server (öffentliche Vereinsfahrer).
@@ -125,6 +146,26 @@ export function RacingLeague({ data }) {
       <SeasonSwitcher seasons={racing.seasons} lineageSlug={data.lineage?.slug} />
       <SeriesProgress progress={data.progress} rounds={rounds} words={PROGRESS_WORDS.racing} weekends={weekends} />
 
+      <div role="tablist" aria-label="Bereiche der Saison" className="tls-series-views tls-swipe mt-10" data-testid="racing-views">
+        {VIEWS.map(([key, label]) => (
+          <button key={key} type="button" role="tab" id={`racing-view-${key}`} aria-selected={view === key} aria-controls="racing-view-panel"
+            tabIndex={view === key ? 0 : -1} className="tls-series-view" onClick={() => pickView(key)}
+            onKeyDown={(event) => {
+              if (event.key !== "ArrowRight" && event.key !== "ArrowLeft") return;
+              event.preventDefault();
+              const other = key === "saison" ? "statistik" : "saison";
+              pickView(other);
+              document.getElementById(`racing-view-${other}`)?.focus();
+            }}
+            data-testid={`racing-view-${key}`}>
+            {label}
+          </button>
+        ))}
+      </div>
+
+      <div id="racing-view-panel" role="tabpanel" aria-labelledby={`racing-view-${view}`}>
+      {view === "statistik" ? <SeasonStatistics lineageSlug={lineageSlug} seasonSlug={seasonSlug} /> : (<>
+
       {/* Die Garage steht, sobald es Vereinsteams gibt; nur das Detail braucht einen öffentlichen Vereinsfahrer. */}
       {(garage.length > 0 || selected) && (
         <section className="mt-10" aria-labelledby="racing-garage-title" data-testid="racing-garage">
@@ -159,6 +200,7 @@ export function RacingLeague({ data }) {
           renderPoints={(row) => <RacingPoints row={row} />}
           extraColumn={{ header: "Abstand", title: "Abstand zur Spitze in Punkten", cell: (row) => <span data-testid="racing-gap">{gapLabel(row, tableRows)}</span> }}
           weekends={weekends}
+          roundHref={roundHref}
         />
       </section>
 
@@ -177,12 +219,15 @@ export function RacingLeague({ data }) {
             renderPoints={(row) => <RacingPoints row={row} />}
             extraColumn={{ header: "Abstand", title: "Abstand zur Spitze in Punkten", cell: (row) => <span data-testid="racing-gap">{gapLabel(row, teamRows)}</span> }}
             weekends={weekends}
+            roundHref={roundHref}
           />
         </section>
       )}
 
       <SeriesFinal final={data.final} />
-      <RacingCalendar rounds={rounds} rows={rows} onSelect={jumpTo} publicKeys={publicKeys} />
+      <RacingCalendar rounds={rounds} rows={rows} onSelect={jumpTo} publicKeys={publicKeys} hrefFor={sessionHref} roundHref={roundHref} />
+      </>)}
+      </div>
     </>
   );
 }

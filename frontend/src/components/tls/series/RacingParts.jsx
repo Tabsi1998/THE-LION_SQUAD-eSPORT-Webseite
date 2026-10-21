@@ -162,8 +162,9 @@ function StateBadge({ state }) {
 /** Rennkalender: je Runde eine Zeile - Kürzel, Tag, Ort mit Flagge und, bei einer Runde mit Läufen (#1930), die
  * Lauf-Chips „Quali · Sprint · Rennen“ mit Uhrzeit und Status. Bei gewerteten Rennen der Sieger (nur ein öffentlicher
  * Vereinsfahrer - ein fremder Name steht nur in der Tabelle), sonst der beste öffentliche Vereinsfahrer mit Platz.
- * `hrefFor(lauf)` macht die Chips zu Links (Ergebnis je Lauf, #1950). */
-export function RacingCalendar({ rounds, rows, onSelect, publicKeys, hrefFor }) {
+ * `hrefFor(lauf)` macht die Chips zu Links (Ergebnis je Lauf, #1950), `roundHref(lauf)` Kürzel, Tag und Ort zum Link auf
+ * die Ergebnisseite der Runde. */
+export function RacingCalendar({ rounds, rows, onSelect, publicKeys, hrefFor, roundHref }) {
   const weekends = groupWeekends(rounds);
   return (
     <section className="mt-12" aria-labelledby="racing-calendar-title" data-testid="racing-calendar">
@@ -177,8 +178,9 @@ export function RacingCalendar({ rounds, rows, onSelect, publicKeys, hrefFor }) 
             const races = weekend.rounds.filter((item) => item.counts !== false && roundKind(item) !== "qualifying");
             const scoredCount = races.filter((item) => item.state === "scored").length;
             const original = weekend.rounds.find((item) => item.original_club_day)?.original_club_day;
-            return (
-              <li key={weekend.key} className="py-3 flex flex-wrap items-start gap-x-3" data-testid="racing-round" data-state={weekend.state} data-sessions={weekend.multi ? weekend.rounds.length : undefined}>
+            const href = roundHref?.(round);
+            const head = (
+              <>
                 <span className={`w-12 shrink-0 font-black tabular-nums ${weekend.kind === "final" ? "text-[var(--tls-honor)]" : "text-white/80"}`}>{roundLabel(round)}</span>
                 <div className="min-w-0 flex-1">
                   <span className={`block text-sm tabular-nums ${weekend.state === "cancelled" ? "text-white/45" : "text-white"}`}>{weekend.multi ? roundWhen({ ...round, time: null }) : roundWhen(round)}</span>
@@ -187,6 +189,13 @@ export function RacingCalendar({ rounds, rows, onSelect, publicKeys, hrefFor }) 
                   )}
                   {original && <span className="block text-[11px] text-white/45">ursprünglich {dayLabel(original)}</span>}
                 </div>
+              </>
+            );
+            return (
+              <li key={weekend.key} className="py-3 flex flex-wrap items-start gap-x-3" data-testid="racing-round" data-state={weekend.state} data-sessions={weekend.multi ? weekend.rounds.length : undefined}>
+                {href ? (
+                  <Link to={href} className="tls-racing-round-link flex flex-1 min-w-0 items-start gap-3" title="Ergebnis der Runde" data-testid="racing-round-link">{head}</Link>
+                ) : head}
                 <StateBadge state={weekend.state} />
                 {/* Chips und Sieger in voller Breite unter Tag und Ort - am Handy passen so zwei Chips in eine Zeile. */}
                 {(weekend.multi || scoredCount > 0) && (
