@@ -196,11 +196,12 @@ test("Rennliga (#1927): Tabelle mit Nr, Start, Zeit, Abstand, Ausfall, schnellst
   expect(body.driver_of_the_day).toEqual({ name: "Gamma" });
   // Je Rennen sichtbar und änderbar; je Zeile unter „Mehr“.
   expect(screen.getByTestId("result-fastest-name")).toHaveValue("Beta");
-  expect(screen.getByTestId("result-fastest-time")).toHaveValue("1:31.456");
+  // Angezeigt mit Komma wie beim Veranstalter (#1981), gespeichert mit Punkt (oben).
+  expect(screen.getByTestId("result-fastest-time")).toHaveValue("1:31,456");
   expect(screen.getByTestId("result-dotd")).toHaveValue("Gamma");
   // Zugeklappt kurz unter jeder Zeile, aufgeklappt als Felder.
   expect(within(sheet).getAllByTestId("result-row-race").map((line) => line.textContent)).toEqual([
-    "Nr. 7 · Startplatz 3 · 1:32:45.123", "Nr. 12 · Startplatz 1 · +5.204", "Nr. 21 · Startplatz 2"]);
+    "Nr. 7 · Startplatz 3 · 1:32:45,123", "Nr. 12 · Startplatz 1 · +5,204", "Nr. 21 · Startplatz 2"]);
   fireEvent.click(within(sheet).getAllByTestId("result-row-more")[0]);
   expect(within(sheet).getByTestId("result-row-grid")).toHaveValue("3");
   fireEvent.change(within(sheet).getByTestId("result-row-grid"), { target: { value: "0" } });

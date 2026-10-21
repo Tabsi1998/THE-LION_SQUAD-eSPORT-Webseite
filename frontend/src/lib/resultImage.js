@@ -6,6 +6,7 @@
 // Ändern eines gelben Felds nimmt die Markierung von diesem Feld, „Passt so“ von der ganzen Zeile. Übernommen wird erst,
 // wenn keine Zeile mehr gelb ist – gespeichert hat der Server beim Lesen nichts.
 
+import { formatRaceTime } from "@/lib/raceTime";
 import { emptyRow, matchParticipant } from "@/lib/referenceResults";
 import { cleanText } from "@/lib/resultPaste";
 
@@ -55,16 +56,18 @@ function sameDriver(head, row) {
 
 /**
  * Die gelesenen Zeilen als Formularzeilen. Die Pole wird Marke an der Zeile ihres Fahrers; schnellste Runde und Fahrer
- * des Tages sind Felder des Rennens (`imageFormFields`). Ein Ausfall ohne Platz bleibt ohne Platz.
+ * des Tages sind Felder des Rennens (`imageFormFields`). Ein Ausfall ohne Platz bleibt ohne Platz. Zeiten wie im Blatt
+ * angezeigt (Komma, #1981). `points: false` - ein Lauf ohne Punkte (Qualifying ohne Wertung, Schema ohne Punkte):
+ * gelesene Punkte gehen nie ins Blatt (#1981).
  */
-export function imageToRows(result, participants = []) {
+export function imageToRows(result, participants = [], { points: withPoints = true } = {}) {
   const pole = result?.pole;
   return (result?.rows || []).map((row) => {
     const known = row.participant_id
       ? participants.find((person) => person.id === row.participant_id) || null
       : matchParticipant(row.name, participants);
     const marks = [...(row.marks || [])];
-    const uncertain = (row.uncertain || []).filter((field) => SHOWN_FIELDS.includes(field));
+    const uncertain = (row.uncertain || []).filter((field) => SHOWN_FIELDS.includes(field) && (withPoints || field !== "points"));
     // Ohne gelesenen Platz setzt das Blatt die Reihenfolge ein – das ist geschätzt und bleibt gelb, bis jemand prüft.
     // Ein Ausfall (DNF, DNS, DSQ) hat keinen Platz.
     if (!row.place && !marks.some((mark) => OUT_MARKS.includes(mark)) && !uncertain.includes("place")) uncertain.push("place");
@@ -83,10 +86,10 @@ export function imageToRows(result, participants = []) {
       marks,
       start_number: row.start_number || "",
       // Punkte aus dem Bild gelten als „laut Veranstalter“ und werden gegen den Schlüssel geprüft.
-      points: row.points === null || row.points === undefined ? "" : String(row.points),
+      points: !withPoints || row.points === null || row.points === undefined ? "" : String(row.points),
       grid: row.grid === null || row.grid === undefined ? "" : String(row.grid),
-      time: row.time || "",
-      gap: row.gap || "",
+      time: formatRaceTime(row.time),
+      gap: formatRaceTime(row.gap),
       color: row.color || "",
       from_image: true,
       ocr: uncertain.length ? { uncertain: [...new Set(uncertain)], read: row.read || {} } : null,
@@ -130,7 +133,7 @@ export function imageFormFields(result, current = null) {
   };
   const lap = result?.fastest_lap;
   if (lap?.name || lap?.time) {
-    out.fastestLap = { name: lap.name || "", time: lap.time || "" };
+    out.fastestLap = { name: lap.name || "", time: formatRaceTime(lap.time) };
     replaced.push(...RACE_FIELD_GROUPS.fastestLap);
     flag("fastest_lap_name", lap, "name");
     flag("fastest_lap_time", lap, "time");
@@ -190,11 +193,11 @@ export function imageHeader(result) {
   if (result?.session?.name) out.push({ key: "session", label: "Art", value: result.session.name, uncertain: false });
   if (result?.fastest_lap?.name || result?.fastest_lap?.time) {
     const lap = result.fastest_lap;
-    out.push({ key: "fastest_lap", label: "Schnellste Rennrunde", value: [lap.name, lap.time].filter(Boolean).join(" · "), uncertain: Boolean(lap.uncertain?.length) });
+    out.push({ key: "fastest_lap", label: "Schnellste Rennrunde", value: [lap.name, formatRaceTime(lap.time)].filter(Boolean).join(" · "), uncertain: Boolean(lap.uncertain?.length) });
   }
   if (result?.pole?.name || result?.pole?.time) {
     const pole = result.pole;
-    out.push({ key: "pole", label: "Pole", value: [pole.name, pole.time].filter(Boolean).join(" · "), uncertain: Boolean(pole.uncertain?.length) });
+    out.push({ key: "pole", label: "Pole", value: [pole.name, formatRaceTime(pole.time)].filter(Boolean).join(" · "), uncertain: Boolean(pole.uncertain?.length) });
   }
   if (result?.driver_of_the_day?.name) {
     out.push({ key: "driver_of_the_day", label: "Fahrer des Tages", value: result.driver_of_the_day.name, uncertain: Boolean(result.driver_of_the_day.uncertain?.length) });

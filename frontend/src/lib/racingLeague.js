@@ -5,6 +5,7 @@
 // steht, sagt der Server (`racing.club_drivers`: öffentlich sichtbare Vereinsmitglieder); alle anderen heißen außerhalb
 // der Tabellen „Gastfahrer“ - fremde Namen stehen nur in den Tabellen. Punkte fürs Team kommen aus der gespeicherten
 // Teamwertung (`driver_points`), nie aus einer eigenen Rechnung.
+import { formatRaceTime } from "@/lib/raceTime";
 import { formatDiff, formatNumber } from "@/lib/standingsTable";
 import { resultIn, roundColumns } from "@/lib/referenceSeriesTable";
 
@@ -37,10 +38,11 @@ export function raceCell(result) {
   return {
     grid,
     gained: status === "finished" && place && grid ? grid - place : null,
-    time: result.time || "",
-    gap: result.gap || "",
+    // Zeiten wie beim Veranstalter mit Komma (#1981) - gespeichert ist Punkt (ältere Blätter auch Komma).
+    time: formatRaceTime(result.time),
+    gap: formatRaceTime(result.gap),
     startNumber: result.start_number || "",
-    fastestTime: result.fastest_lap_time || "",
+    fastestTime: formatRaceTime(result.fastest_lap_time),
     dotd: Boolean(result.driver_of_the_day),
     status,
     place,

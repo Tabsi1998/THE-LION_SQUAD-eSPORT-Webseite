@@ -2,6 +2,7 @@
 // wandeln. Gerechnet und geprüft wird im Server (Vorschau) – hier wird nur übersetzt. Text aus der Zwischenablage liest
 // ausschließlich `lib/resultPaste.js`.
 
+import { formatRaceTime, normalizeRaceTime } from "@/lib/raceTime";
 import { cleanText, parseNumber, parsePlace } from "@/lib/resultPaste";
 import { dayFieldErrors, dayPlaces, dayRowPayload, emptyRound, roundsToForm, schemeOf } from "@/lib/tournamentDays";
 
@@ -23,7 +24,8 @@ export function emptyRow(values = {}) {
   return {
     key: nextKey("row"), participant_id: "", name: "", team: "", place: "", points: "", override: false, marks: [],
     penalty_points: "", start_number: "", official_total: "", note: "", source: "", points_hint: null,
-    // Rennergebnis (#1927): Startplatz, Rennzeit, Abstand - als Text wie eingegeben. Strafsekunden (#1950) nur zur Anzeige.
+    // Rennergebnis (#1927): Startplatz, Rennzeit, Abstand - Zeiten im Formular wie angezeigt (Komma, #1981), gespeichert
+    // mit Punkt (`formToPayload`). Strafsekunden (#1950) nur zur Anzeige.
     grid: "", time: "", gap: "", penalty_seconds: "",
     // Turniertag (#1961): Runden R1…Rn ({points, place, lobby}), GES P, Partner im Double Up (Name), Sonderboni.
     rounds: [], day_points: "", partner: "", bonus_keys: [], ...values,
@@ -77,8 +79,8 @@ export function sheetToForm(content, participants = [], { kind, teamName, oppone
     source: row.points_source || "",
     start_number: text(row.start_number),
     grid: text(row.grid),
-    time: text(row.time),
-    gap: text(row.gap),
+    time: formatRaceTime(row.time),
+    gap: formatRaceTime(row.gap),
     penalty_seconds: row.penalty_seconds ? text(row.penalty_seconds) : "",
     rounds: roundsToForm(row.day_rounds),
     day_points: text(row.day_points),
@@ -108,7 +110,7 @@ export function sheetToForm(content, participants = [], { kind, teamName, oppone
     // Je Rennen (#1927): schnellste Runde mit Zeit und Fahrer des Tages - im Formular über den Namen der Zeile.
     fastestLap: {
       name: participantName(participants, content?.fastest_lap?.participant_id),
-      time: text(content?.fastest_lap?.time),
+      time: formatRaceTime(content?.fastest_lap?.time),
     },
     driverOfTheDay: participantName(participants, content?.driver_of_the_day),
     // Turniertag (#1961): Zweierteams teilen Platz und Punkte.
@@ -130,8 +132,8 @@ export function pastedToRows(parsed, participants = []) {
       start_number: row.start_number || "",
       points_hint: row.points_hint || null,
       grid: text(row.grid),
-      time: row.time || "",
-      gap: row.gap || "",
+      time: formatRaceTime(row.time),
+      gap: formatRaceTime(row.gap),
       // Rundenmatrix (#1961): „R 1 … R 5, GES P“ und Spalten der Sonderboni.
       rounds: (row.rounds || []).map((value) => emptyRound({ points: text(value) })),
       day_points: text(row.day_points),
@@ -243,7 +245,8 @@ function raceDetails(row) {
   const grid = parsePlace(row.grid);
   if (grid !== null) out.grid = grid;
   for (const key of ["time", "gap"]) {
-    const value = cleanText(row[key]);
+    // Gespeichert mit Punkt wie bisher, egal ob mit Punkt oder Komma eingegeben (#1981); Platzhalter = keine Zeit.
+    const value = normalizeRaceTime(cleanText(row[key]));
     if (value) out[key] = value.slice(0, 20);
   }
   const seconds = parseNumber(row.penalty_seconds);
@@ -349,7 +352,7 @@ export function formToPayload(form, rules = {}) {
   const note = text(form.note).trim();
   const payload = { rows, matches, official_team_totals: { ...(form.teamTotals || {}) }, official_table, note: note || null };
   const fastest = rowReference(form.fastestLap?.name, form.rows);
-  const lapTime = cleanText(form.fastestLap?.time).slice(0, 20);
+  const lapTime = normalizeRaceTime(cleanText(form.fastestLap?.time)).slice(0, 20);
   if (fastest || lapTime) payload.fastest_lap = { ...(fastest || {}), time: lapTime || null };
   const driver = rowReference(form.driverOfTheDay, form.rows);
   if (driver) payload.driver_of_the_day = driver;

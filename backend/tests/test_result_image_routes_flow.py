@@ -264,6 +264,33 @@ async def test_track_in_the_image_suggests_the_round(flow, fake_ocr):
 
 
 @pytest.mark.asyncio
+async def test_quali_whose_times_lost_their_colon_is_read_without_points(flow, fake_ocr):
+    """Echte Fälle (#1981): Im Quali-Bild las die Erkennung „132,134“ statt „1:32,134“ - die Route lehnte es als
+    „keine Zeiten“ ab (422). Und der Rand der Tabelle („|“) wurde in jeder Zeile zu „1 Punkt“. Jetzt: gelesen, Zeiten
+    wie gespeichert mit Punkt, kein Abstand beim Ersten, keine Punkte."""
+    ctx = await _setup(flow)
+
+    def read(text):
+        return Read(text, 95, [(word, 95) for word in text.split()])
+
+    lines = [("1", "7", "Anna Probe", "1:31,770", "+--:--,---"), ("2", "12", "Bert Bolzt", "132,134", "+0,364"),
+             ("3", "5", "Carl Kurve", "132,754", "+0,984"), ("4", "9", "Dora Neu", "134,358", "+2,588")]
+    fake_ocr.reading = Reading(
+        template_id="rennliga-dunkel", header_found=True, text_height=20, mean_conf=95,
+        rows=[RowReading(cells={"place": read(place), "start_number": read(number), "name": read(name),
+                                "time": read(time), "gap": read(gap), "points": read("|")})
+              for place, number, name, time, gap in lines])
+    fake_ocr.reading.labelled = {"place", "start_number", "name", "time", "gap"}
+    answer = await flow.post(ctx["url"], content=_png(), headers=PNG)
+    assert answer.status_code == 200, answer.text
+    rows = answer.json()["rows"]
+    assert [(row["time"], row["gap"], row["points"]) for row in rows] == [
+        ("1:31.770", None, None), ("1:32.134", "+0.364", None), ("1:32.754", "+0.984", None),
+        ("1:34.358", "+2.588", None)]
+    assert all("points" not in row["uncertain"] for row in rows)
+
+
+@pytest.mark.asyncio
 async def test_tables_without_times_are_refused(flow, fake_ocr):
     """Eine Saisontabelle oder der Kalender (keine Zeiten) wird nicht als Ergebnis angeboten."""
     ctx = await _setup(flow)

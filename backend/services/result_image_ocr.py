@@ -67,6 +67,11 @@ PROBE_WIDTH = 1600  # Breite der schnellen Lesung, aus der die Schrifthöhe komm
 PAGE_PSMS = (6, 4)
 MIN_SIDE = 40
 
+# Dritte Lesung der Ziffern-Spalten (#1981): größer und mit eigener Schwelle (Otsu) - 3 und 5 kippen dann anders.
+ALT_SCALE = 1.5
+ALT_KINDS = ("place", "number", "time", "gap")
+BOX_HEIGHT = 64  # Pixel: so hoch wird eine einzelne Platz-Zelle (etwa Platz 1 im farbigen Kasten) gelesen
+
 WHITELISTS = {
     "place": "0123456789DNFSQOUT",
     "number": "0123456789",
@@ -666,6 +671,7 @@ class Read:
 class RowReading:
     cells: dict[str, Read] = field(default_factory=dict)  # Seite
     strips: dict[str, Read] = field(default_factory=dict)  # Streifen (Zahlen mit Whitelist)
+    alts: dict[str, Read] = field(default_factory=dict)  # dritte Lesung der Ziffern, anders vorbereitet (#1981)
     color: str | None = None  # Schriftfarbe von Startnummer bzw. Team als „#rrggbb“ (Vorschlag für die Teamfarbe)
 
 
@@ -681,6 +687,7 @@ class Reading:
     too_many_rows: bool = False  # mehr Ergebniszeilen als ``max_rows`` - dann ohne Zeilen und ohne Kopf
     out_of_time: bool = False  # Zeitbudget aufgebraucht - nicht alles zweimal gelesen
     unchecked: set[str] = field(default_factory=set)  # Felder ohne zweite Lesung (Streifen) - sie werden gelb
+    labelled: set[str] | None = None  # Spalten, deren Überschrift im Bild steht (``None``: nicht bekannt)
 
 
 def _read(words: list[Word], *, joiner: str = " ") -> Read:
@@ -776,8 +783,10 @@ def _similar(left: str, right: str) -> float:
 
 
 def _strip_reads(prepared: Prepared, column: dict, cells: list[Cell | None], data_lines: list[Line],
-                 neighbours: tuple[float | None, float | None]) -> dict[int, Read]:
-    """Eine Spalte als Streifen lesen - Zahlenspalten mit Whitelist. Liefert je Datenzeile (Index) die Lesung."""
+                 neighbours: tuple[float | None, float | None], *, alternate: bool = False) -> dict[int, Read]:
+    """Eine Spalte als Streifen lesen - Zahlenspalten mit Whitelist. Liefert je Datenzeile (Index) die Lesung.
+    ``alternate``: der Streifen größer (``ALT_SCALE``) und schwarz-weiß nach eigener Schwelle - eine unabhängigere
+    dritte Lesung für Ziffern."""
     present = [cell for cell in cells if cell is not None]
     if not present or not data_lines:
         return {}
@@ -795,10 +804,16 @@ def _strip_reads(prepared: Prepared, column: dict, cells: list[Cell | None], dat
     if box[2] - box[0] < 4 or box[3] - box[1] < 4:
         return {}
     strip = prepared.image.crop(box)
+    factor = 1.0
+    if alternate:
+        factor = ALT_SCALE
+        strip = strip.resize((round(strip.width * factor), round(strip.height * factor)), Image.Resampling.LANCZOS)
+        level = _otsu(strip.histogram())
+        strip = strip.point(lambda value: 255 if value > level else 0)
     words = _ocr(strip, psm=6, whitelist=WHITELISTS.get(column["kind"]))
     by_line: dict[int, list[Word]] = {}
     for word in words:
-        center = word.cy + box[1]
+        center = word.cy / factor + box[1]
         best = min(range(len(data_lines)), key=lambda index: abs(
             (data_lines[index].top + data_lines[index].bottom) / 2 - center))
         line = data_lines[best]
@@ -849,6 +864,7 @@ def _read_in_budget(img: Image.Image, template: dict, max_rows: int | None) -> R
         reading.too_many_rows = True
         return reading
     reading.header = _header_fields(above, template)
+    reading.labelled = {columns[index]["field"] for index in (labels or {})}
     height = statistics.median(line.height for line in data_lines) if data_lines else TARGET_TEXT_HEIGHT
     assigned = plan_columns(data_lines, columns, labels, height)
     if assigned is None:
@@ -880,9 +896,22 @@ def _read_in_budget(img: Image.Image, template: dict, max_rows: int | None) -> R
             continue
         for row_index, value in reads.items():
             reading.rows[row_index].strips[column["field"]] = value
+        if column["kind"] not in ALT_KINDS:
+            continue
+        try:
+            alternates = _strip_reads(prepared, column, cells, data_lines,
+                                      (max(before) if before else None, min(after) if after else None),
+                                      alternate=True)
+        except OutOfTime:
+            # Ohne dritte Lesung ist diese Ziffern-Spalte nicht vollständig gegengelesen - gelb wie die übrigen.
+            reading.out_of_time = True
+            reading.unchecked.add(column["field"])
+            continue
+        for row_index, value in alternates.items():
+            reading.rows[row_index].alts[column["field"]] = value
     if not reading.out_of_time:
         try:
-            _retry_places(prepared, columns, assigned, data_lines, reading)
+            _retry_places(prepared, columns, assigned, data_lines, reading, img)
         except OutOfTime:
             reading.out_of_time = True  # nicht gelesene Plätze bleiben gelb
     fields = [column["field"] for column in columns]
@@ -941,10 +970,44 @@ def _page_lines(prepared: Prepared) -> tuple[list[Line], bool]:
     return (best[1] if best else []), False
 
 
+def _place_parses(text: str) -> bool:
+    if image_values.mark_of(text):
+        return True
+    digits = image_values.read_digits(text, fix=True)
+    return bool(digits) and 0 < int(digits) <= 999
+
+
+def _box_read(img: Image.Image, center: tuple[float, float], height: float, scale: float,
+              binary: bool) -> list[Word]:
+    """Eine Platz-Zelle allein aus dem Originalbild - für Platz 1 im farbigen Kasten (#1981): nur das Innere um die
+    Mitte (ohne Rand des Kastens), hellster Farbkanal, Kontrast gestreckt bzw. schwarz-weiß, groß und mit Rand, als
+    ein einzelnes Zeichen gelesen."""
+    center_x, center_y = center
+    half_width, half_height = height * 0.45, height * 0.55
+    box = (max(0, int((center_x - half_width) / scale)), max(0, int((center_y - half_height) / scale)),
+           min(img.width, int((center_x + half_width) / scale)), min(img.height, int((center_y + half_height) / scale)))
+    if box[2] - box[0] < 4 or box[3] - box[1] < 4:
+        return []
+    red, green, blue = img.convert("RGB").crop(box).split()
+    cell = ImageOps.autocontrast(ImageChops.lighter(ImageChops.lighter(red, green), blue), cutoff=1)
+    if binary:
+        level = _otsu(cell.histogram())
+        cell = cell.point(lambda value: 255 if value > level else 0)
+    pixels = cell.tobytes()
+    if sum(1 for value in pixels if value > 127) * 2 < len(pixels):
+        cell = ImageOps.invert(cell)  # die Schrift soll dunkel auf hellem Grund stehen
+    factor = BOX_HEIGHT / max(cell.height, 1)
+    cell = cell.resize((max(1, round(cell.width * factor)), BOX_HEIGHT), Image.Resampling.LANCZOS)
+    canvas = Image.new("L", (cell.width + 40, cell.height + 40), 255)
+    canvas.paste(cell, (20, 20))
+    return _ocr(canvas, psm=10, whitelist=WHITELISTS["place"])
+
+
 def _retry_places(prepared: Prepared, columns: list[dict], assigned: list[dict[int, Cell]], data_lines: list[Line],
-                  reading: Reading) -> None:
-    """Zweiter Versuch für Plätze, die keine Lesung hat - etwa ein blasses „DNF“ auf dunklem Feld: die Zelle allein,
-    Kontrast nur in ihr gestreckt, als eine Zeile mit Whitelist."""
+                  reading: Reading, img: Image.Image | None = None) -> None:
+    """Zweiter Versuch für Plätze ohne brauchbare Lesung. Erst die Zelle allein im Originalbild (``_box_read``: Platz 1
+    im farbigen Kasten, #1981), dann die Zelle im vorbereiteten Bild als Zeile mit Whitelist (etwa ein blasses „DNF“
+    auf dunklem Feld). Es gilt der erste Versuch, der einen Platz oder Ausfall ergibt."""
     index = next((i for i, column in enumerate(columns) if column["field"] == "place"), None)
     if index is None or not data_lines:
         return
@@ -954,15 +1017,25 @@ def _retry_places(prepared: Prepared, columns: list[dict], assigned: list[dict[i
     height = statistics.median(line.height for line in data_lines)
     left = max(0, int(min(cell.left for cell in found) - height * 0.8))
     right = min(prepared.image.width, int(max(cell.right for cell in found) + height * 0.8))
+    center_x = statistics.median((cell.left + cell.right) / 2 for cell in found)
     for row_index, row in enumerate(reading.rows):
-        if row.cells.get("place") or row.strips.get("place"):
+        if any(read and _place_parses(read.text) for read in (row.cells.get("place"), row.strips.get("place"))):
             continue
         line = data_lines[row_index]
         top = max(0, int(line.top - height * 0.4))
         bottom = min(prepared.image.height, int(line.bottom + height * 0.4))
         if right - left < 4 or bottom - top < 4:
             continue
-        cell = ImageOps.autocontrast(prepared.image.crop((left, top, right, bottom)), cutoff=1)
-        words = _ocr(cell, psm=7, whitelist=WHITELISTS["place"])
-        if words:
-            row.strips["place"] = _read(words, joiner="")
+        attempts = []
+        if img is not None:
+            center = (assigned[row_index][index].center if assigned[row_index].get(index) else center_x,
+                      (line.top + line.bottom) / 2)
+            attempts += [lambda binary=binary: _box_read(img, center, height, prepared.scale, binary)
+                         for binary in (False, True)]
+        attempts.append(lambda: _ocr(ImageOps.autocontrast(prepared.image.crop((left, top, right, bottom)), cutoff=1),
+                                     psm=7, whitelist=WHITELISTS["place"]))
+        for attempt in attempts:
+            words = attempt()
+            if words and _place_parses("".join(word.text for word in words)):
+                row.strips["place"] = _read(words, joiner="")
+                break

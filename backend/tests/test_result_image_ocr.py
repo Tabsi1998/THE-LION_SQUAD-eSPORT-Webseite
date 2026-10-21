@@ -70,6 +70,25 @@ def test_clean_screenshot_is_read_completely_without_corrections():
     assert (out["fastest_lap"]["name"], out["fastest_lap"]["time"], out["fastest_lap"]["uncertain"]) == (
         "Mia Motorhaube", "1:31.207", [])
     assert (out["driver_of_the_day"]["name"], out["driver_of_the_day"]["uncertain"]) == ("Otto Ostwind", [])
+    # Wie in der Liga (#1981): Platz 1 im farbigen Kasten, Platzhalter statt Abstand, Zeiten mit Komma, Rand der
+    # Tabelle - gespeichert mit Punkt, ohne Abstand beim Ersten, keine Punkte aus dem Rand.
+    assert (out["rows"][0]["place"], out["rows"][0]["gap"], out["rows"][1]["time"]) == (1, None, "1:32:17.456")
+    assert all(row["points"] is None for row in out["rows"])
+
+
+@needs_tesseract
+def test_quali_layout_without_grid_is_a_result():
+    """Echter Fall (#1981): ein Quali-Bild (Pos | Nr. + Name | Team | Time | Gap) wurde als „keine Zeiten“ abgelehnt.
+    Gelesen wird es vollständig - Platz 1 im Kasten, kein Abstand beim Ersten, keine Punkte; Zeit und Abstand ohne Gelb.
+    Die Schrift der Testhilfe liest die fette 5 als 6: die Reihenfolge belegt die 5 vor, gelb (Codex zu #1981)."""
+    sheet = fixture.quali_sheet()
+    out = _read(fixture.png_bytes(fixture.render(sheet, grid=False)), _people(sheet))
+    assert out["is_result"] is True
+    got = [(row["place"], row["start_number"], row["name"], row["team"], row["time"], row["gap"], row["points"])
+           for row in out["rows"]]
+    assert got == [(row.place, row.number, row.name, row.team, row.time, row.gap or None, None) for row in sheet.rows]
+    assert not any({"time", "gap", "points"} & set(row["uncertain"]) for row in out["rows"])
+    assert "place" not in out["rows"][0]["uncertain"]  # Platz 1 im Kasten grün
 
 
 @needs_tesseract
@@ -326,13 +345,22 @@ def test_time_budget_per_image_leaves_the_rest_yellow(monkeypatch):
     monkeypatch.setattr(result_image_ocr, "tesseract", fake_tesseract)
     monkeypatch.setattr(result_image_ocr, "_clock", lambda: clock[0])
     image = Image.new("RGB", (1200, 600), (20, 20, 30))
-    # Schrifthöhe, zwei Seitenlesungen, die Platz-Spalte - dann ist das Budget von 35 s aufgebraucht.
-    reading = result_image_ocr.read(image, TEMPLATE, budget_seconds=35)
-    assert calls == [35, 25, 15, 5]
+    # Schrifthöhe, zwei Seitenlesungen, Platz-Spalte und ihre dritte Lesung - dann ist das Budget von 45 s weg.
+    reading = result_image_ocr.read(image, TEMPLATE, budget_seconds=45)
+    assert calls == [45, 35, 25, 15, 5]
     assert reading.out_of_time and len(reading.rows) == 12
     assert {"name", "time"} <= reading.unchecked and "place" not in reading.unchecked
     out = result_image_match.build(reading, TEMPLATE, [])
     assert all({"name", "time"} <= set(row["uncertain"]) for row in out["rows"])
+    # Codex zu #1981: reicht die Zeit nur für die Streifen-Lesung der Platz-Spalte, nicht für ihre dritte Lesung, ist
+    # auch sie nicht vollständig gegengelesen - ungeprüft und gelb (bisher blieb sie grün).
+    clock[0] = 0.0
+    calls.clear()
+    short = result_image_ocr.read(image, TEMPLATE, budget_seconds=35)
+    assert calls == [35, 25, 15, 5]
+    assert "place" in short.unchecked
+    out = result_image_match.build(short, TEMPLATE, [])
+    assert all("place" in row["uncertain"] for row in out["rows"])
     # Mit genug Zeit ist nichts ungeprüft.
     clock[0] = 0.0
     plenty = result_image_ocr.read(image, TEMPLATE, budget_seconds=600)
@@ -341,6 +369,32 @@ def test_time_budget_per_image_leaves_the_rest_yellow(monkeypatch):
     clock[0] = 0.0
     with pytest.raises(result_image_ocr.OutOfTime):
         result_image_ocr.read(image, TEMPLATE, budget_seconds=8)
+
+
+def test_place_box_and_third_reading_of_digits(monkeypatch):
+    """#1981: Ein Platz ohne brauchbare Lesung (Platz 1 im farbigen Kasten, gelesen als „@“) wird allein aus dem
+    Originalbild gelesen - als einzelnes Zeichen (psm 10). Ziffern-Spalten bekommen eine dritte Lesung, größer und
+    schwarz-weiß; Überschriften im Bild werden gemerkt."""
+    calls = []
+
+    def fake_tesseract(img, *, psm, whitelist=None, timeout=None):
+        calls.append((psm, whitelist, img.size))
+        if psm == 10:
+            return [result_image_ocr.Word("1", 92, 30, 20, 20, 30, ("1", "1", "0"))]
+        words = _fake_page(5)
+        words[0] = result_image_ocr.Word("@", 60, 20, 40, 20, 20, ("1", "1", "0"))
+        return words
+
+    monkeypatch.setattr(result_image_ocr, "tesseract", fake_tesseract)
+    reading = result_image_ocr.read(Image.new("RGB", (1200, 400), (20, 20, 30)), TEMPLATE)
+    assert reading.rows[0].strips["place"].text == "1"
+    assert any(psm == 10 and whitelist == result_image_ocr.WHITELISTS["place"] for psm, whitelist, _ in calls)
+    # Dritte Lesung: Platz und Zeit (Ziffern), nicht der Name.
+    assert {"place", "time"} <= set(reading.rows[1].alts) and "name" not in reading.rows[1].alts
+    assert reading.labelled == set()  # keine Kopfzeile im Bild
+    out = result_image_match.build(reading, TEMPLATE, [])
+    assert [row["place"] for row in out["rows"]] == [1, 2, 3, 4, 5]
+    assert "place" not in out["rows"][0]["uncertain"]
 
 
 def test_too_many_rows_stop_before_the_column_reads(monkeypatch):

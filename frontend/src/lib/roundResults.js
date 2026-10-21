@@ -4,6 +4,7 @@
 // in der Tabelle: außerhalb (Zusammenfassung) mit Namen nur öffentliche Vereinsfahrer (`club_drivers` vom Server), wie
 // beim Rennkalender der Serienseite - sonst das Team.
 import { formatNumber } from "@/lib/standingsTable";
+import { formatRaceTime } from "@/lib/raceTime";
 import { countryName } from "@/lib/countryFlags";
 import { dayLabel } from "@/lib/referenceCalendar";
 import { nameOf } from "@/lib/referenceSeriesTable";
@@ -95,23 +96,26 @@ export function movementLabel(move) {
 /** Zeit-Spalte: die Zeit; steht nur ein Abstand da (wie beim Veranstalter ab Platz 2), bleibt sie leer, sonst ein
  * Strich. Abstand-Spalte: der Abstand, sonst bei Ausfall das Wort. */
 export function timeText(row) {
-  if (row?.time) return row.time;
-  return row?.gap ? "" : "–";
+  const time = formatRaceTime(row?.time);
+  if (time) return time;
+  return formatRaceTime(row?.gap) ? "" : "–";
 }
 
 export function gapText(row) {
-  if (row?.gap) return row.gap;
+  const gap = formatRaceTime(row?.gap);
+  if (gap) return gap;
   return row?.status && row.status !== "finished" ? STATUS_WORD[row.status] || "" : "";
 }
 
-/** Handy: rechts groß die gefahrene Zeit (sonst Abstand bzw. Ausfall), darunter klein Abstand und Punkte. */
+/** Handy: rechts groß die gefahrene Zeit (sonst Abstand bzw. Ausfall), darunter klein Abstand und Punkte. Zeiten wie
+ * beim Veranstalter mit Komma (#1981). */
 export function mobileMain(row) {
-  return row?.time || row?.gap || (row?.status !== "finished" ? STATUS_WORD[row?.status] : "") || "–";
+  return formatRaceTime(row?.time) || formatRaceTime(row?.gap) || (row?.status !== "finished" ? STATUS_WORD[row?.status] : "") || "–";
 }
 
 export function mobileSub(row, { points = false } = {}) {
   const parts = [];
-  if (row?.time && row?.gap) parts.push(row.gap);
+  if (formatRaceTime(row?.time) && formatRaceTime(row?.gap)) parts.push(formatRaceTime(row.gap));
   if (points && row?.points !== null && row?.points !== undefined) parts.push(`${formatNumber(row.points)} P`);
   return parts.join(" · ");
 }
@@ -171,8 +175,8 @@ export function summaryCards(page, session) {
   add("winner", "Sieger", summary.winner, (row, person) => ({
     sub: [person.named ? person.team : "", row?.grid ? `von Startplatz ${row.grid}` : ""].filter(Boolean).join(" · "),
   }));
-  add("pole", "Pole", summary.pole, () => ({ count: summary.pole?.time || "" }));
-  add("fastest_lap", "Schnellste Runde", summary.fastest_lap, () => ({ count: summary.fastest_lap?.time || "" }));
+  add("pole", "Pole", summary.pole, () => ({ count: formatRaceTime(summary.pole?.time) }));
+  add("fastest_lap", "Schnellste Runde", summary.fastest_lap, () => ({ count: formatRaceTime(summary.fastest_lap?.time) }));
   add("driver_of_the_day", "Fahrer des Tages", summary.driver_of_the_day, (row, person) => ({ sub: person.named ? person.team : "" }));
   const best = session?.best_club ? (session.rows || []).find((row) => row.key === session.best_club) : null;
   if (best) {

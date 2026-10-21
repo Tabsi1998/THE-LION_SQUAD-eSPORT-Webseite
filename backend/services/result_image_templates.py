@@ -9,7 +9,10 @@ Eine Vorlage ist reine Beschreibung - gelesen wird in ``result_image_ocr``, abge
   Überschrift), ``align`` die Ausrichtung des Inhalts und ``at`` die Lage des Ankers (linker Rand, Mitte oder rechter
   Rand) als Anteil der Tabellenbreite - zwischen dem Anker der ersten (0) und der letzten Spalte (1). Zugeordnet wird
   zuerst aus den Daten (``result_image_ocr.plan_columns``: Spalten des Bilds nach Inhalt, in dieser Reihenfolge);
-  ``align`` und ``at`` braucht es nur, wenn das nicht aufgeht.
+  ``align`` und ``at`` braucht es nur, wenn das nicht aufgeht. ``needs_label``: die Spalte gilt nur, wenn ihre
+  Überschrift im Bild steht (Punkte - sonst landen etwa Strafsekunden oder der Rand der Tabelle darin).
+- ``time_format``: wie der Veranstalter Zeiten schreibt (``decimals``: Nachkommastellen). Die Trennzeichen setzt diese
+  Form, nicht das gelesene Zeichen (``result_image_values.parse_clock``); geliefert wird wie gespeichert mit Punkt.
 - ``header``: die Zeilen über der Tabelle. ``session`` ist die Art der Sitzung (eines der Wörter, etwa „Rennen“ oder
   „Qualifying“), ``track`` die oberste Zeile ohne eigene Beschriftung (ohne die Art);
   ``fastest_lap``, ``pole`` und ``driver_of_the_day`` haben ihren Wert hinter einer der ``labels`` oder darunter.
@@ -60,8 +63,10 @@ TEMPLATES: tuple[dict, ...] = (
             {"field": "time", "kind": "time", "labels": ["Time", "Zeit"], "align": "right", "at": 0.825},
             {"field": "gap", "kind": "gap", "labels": ["Gap", "Abstand", "Interval"], "align": "right", "at": 1.0},
             {"field": "points", "kind": "number", "labels": ["Punkte", "Pkt", "Pkt.", "Points", "Pts"],
-             "align": "right", "at": 1.12},
+             "align": "right", "at": 1.12, "needs_label": True},
         ],
+        # Rennzeit „m:ss,mmm“ bzw. „mm:ss,mmm“, Abstand „+s,mmm“ bzw. „+m:ss,mmm“ (#1981).
+        "time_format": {"decimals": 3},
         "needs": ["time"],
         "min_confidence": 80,
         "name_match": 0.72,

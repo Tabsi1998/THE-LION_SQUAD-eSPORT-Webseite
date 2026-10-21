@@ -30,9 +30,10 @@ test("die gelesenen Zeilen werden Zeilen des Blatts – mit Kennung, Marken, Aus
     ["p2", "Bert Bolzt", "2", "Blaupfeil GP", "12"],
     ["", "Dora Neu", "", "Kometen Team", "31"],
   ]);
-  // Startplatz, Zeit und Abstand gehen in die Zeile (#1927); die schnellste Runde ist ein Feld des Rennens, keine Marke.
+  // Startplatz, Zeit und Abstand gehen in die Zeile (#1927) - angezeigt mit Komma wie beim Veranstalter (#1981); die
+  // schnellste Runde ist ein Feld des Rennens, keine Marke.
   expect(rows[1].marks).toEqual([]);
-  expect([rows[1].grid, rows[1].time, rows[1].gap]).toEqual(["1", "1:32:17.456", "+2.333"]);
+  expect([rows[1].grid, rows[1].time, rows[1].gap]).toEqual(["1", "1:32:17,456", "+2,333"]);
   expect([rows[2].marks, rows[2].no_place]).toEqual([["dnf"], true]);
   // Gelb sind die Felder, die das Blatt zeigt – auch Startplatz, Zeit und Abstand.
   expect(rows.map((row) => row.ocr?.uncertain || [])).toEqual([[], ["start_number", "time"], ["name"]]);
@@ -51,7 +52,7 @@ test("die gelesenen Zeilen werden Zeilen des Blatts – mit Kennung, Marken, Aus
 
 test("unsichere schnellste Runde oder Fahrer des Tages sind gelbe Felder des Rennens und halten das Übernehmen auf", () => {
   const fields = imageFormFields({ ...RESULT, fastest_lap: { name: "Bert Bolzt", participant_id: "p2", time: "4:31.207", uncertain: ["time"], read: "Bert Bolzt 431,207" } });
-  expect(fields.fastestLap).toEqual({ name: "Bert Bolzt", time: "4:31.207" });
+  expect(fields.fastestLap).toEqual({ name: "Bert Bolzt", time: "4:31,207" });
   expect(fields.raceOcr).toEqual({ uncertain: ["fastest_lap_time", "driver_of_the_day"], read: { fastest_lap_time: "Bert Bolzt 431,207" } });
   const rows = imageToRows(RESULT, PARTICIPANTS);
   expect(openImageItems({ rows, ...fields })).toBe(3);
@@ -79,8 +80,16 @@ test("Pole aus dem Kopf des Bilds wird Marke an der Zeile; unsicherer Fahrer mac
   const unsure = imageToRows({ ...RESULT, pole: { name: "Anna Probe", participant_id: "p1", time: null, uncertain: ["name"] } }, PARTICIPANTS);
   expect(unsure[0].ocr.uncertain).toEqual(["marks"]);
   expect(imageHeader({ rows: [], pole: { name: "Anna Probe", time: "1:30.000", uncertain: [] } })).toEqual([
-    { key: "pole", label: "Pole", value: "Anna Probe · 1:30.000", uncertain: false },
+    { key: "pole", label: "Pole", value: "Anna Probe · 1:30,000", uncertain: false },
   ]);
+});
+
+test("in einem Lauf ohne Punkte gehen gelesene Punkte nie ins Blatt (#1981)", () => {
+  const read = { ...RESULT, rows: [{ ...RESULT.rows[0], points: 1, uncertain: ["points"] }, { ...RESULT.rows[1], points: 1, uncertain: [] }] };
+  const rows = imageToRows(read, PARTICIPANTS, { points: false });
+  expect(rows.map((row) => row.points)).toEqual(["", ""]);
+  expect(rows[0].ocr).toBeNull();
+  expect(imageToRows(read, PARTICIPANTS).map((row) => row.points)).toEqual(["1", "1"]);
 });
 
 test("ein nicht gelesener Platz ist immer gelb – die Reihenfolge, die das Blatt einsetzt, ist nur geschätzt", () => {
@@ -112,7 +121,7 @@ test("ändern nimmt die gelbe Markierung vom Feld, „Passt so“ von der Zeile"
 
 test("Kopf des Bilds als Felder des Blatts (schnellste Runde, Fahrer des Tages)", () => {
   expect(imageFormFields(RESULT)).toEqual({
-    fastestLap: { name: "Bert Bolzt", time: "1:31.207" }, driverOfTheDay: "Anna Probe",
+    fastestLap: { name: "Bert Bolzt", time: "1:31,207" }, driverOfTheDay: "Anna Probe",
     raceOcr: { uncertain: ["driver_of_the_day"], read: {} },
   });
   expect(imageFormFields({ rows: [], fastest_lap: null, driver_of_the_day: null })).toEqual({ raceOcr: null });
@@ -136,7 +145,7 @@ test("ein zweites Bild ohne Kopf lässt stehende Werte gelb – ersetzt werden n
 test("Kopf des Bilds für die Übersicht", () => {
   expect(imageHeader(RESULT)).toEqual([
     { key: "track", label: "Strecke", value: "Probering Nord", uncertain: false },
-    { key: "fastest_lap", label: "Schnellste Rennrunde", value: "Bert Bolzt · 1:31.207", uncertain: false },
+    { key: "fastest_lap", label: "Schnellste Rennrunde", value: "Bert Bolzt · 1:31,207", uncertain: false },
     { key: "driver_of_the_day", label: "Fahrer des Tages", value: "Anna Probe", uncertain: true },
   ]);
   expect(imageHeader({ rows: [] })).toEqual([]);
