@@ -583,14 +583,14 @@ def _play_with_random_removals(matches: list[dict], rng: random.Random, *, stage
 
 
 # Ausscheiden fest und sofort zufällig (#1590). „Auslosung nach der Runde“ fehlt bei K.-o. und Doppel-K.-o. bewusst.
-# FFA-Läufe fest und sofort (#1596): ein Austritt streicht die Weiterleitung eines gefahrenen Laufs nicht mehr (keine
-# zwei „Finals“), leere Plätze aus einem Ausscheiden ziehen beim Zusammenlegen mit (keine doppelte Quelle). „Gemischt“
-# bleibt hier noch draußen: mit echtem Los tritt die doppelte Quelle sehr selten noch auf (gemessen 1 von 1.200 Läufen,
-# vorher 24 von 800) - der Rest steht in #1596.
+# FFA-Läufe in allen drei Modi (#1596): ein Austritt streicht die Weiterleitung eines gefahrenen Laufs nicht mehr (keine
+# zwei „Finals“), leere Plätze aus einem Ausscheiden ziehen beim Zusammenlegen mit (keine doppelte Quelle). Gemischt kam
+# die doppelte Quelle noch selten vor (1 von 1.200 Läufen): ein Freilos-Platz, für den der Vorlauf nach dem Los niemanden
+# schickte, fiel beim Zusammenlegen weg. Er zieht jetzt samt Weiterleitung mit - 0 von 18.240 Läufen mit festem Los.
 REMOVAL_MODES = [None, INSTANT]
 REMOVAL_MODE_IDS = ["fest", "sofort"]
-FFA_REMOVAL_MODES = [None, INSTANT]
-FFA_REMOVAL_MODE_IDS = ["fest", "sofort"]
+FFA_REMOVAL_MODES = [None, SHUFFLE, INSTANT]
+FFA_REMOVAL_MODE_IDS = ["fest", "gemischt", "sofort"]
 
 
 @pytest.mark.parametrize("mode", REMOVAL_MODES, ids=REMOVAL_MODE_IDS)
@@ -658,6 +658,28 @@ def test_a_withdrawal_without_replacement_keeps_the_way_of_a_driven_heat():
     matches = build_matches_v2_from_schema(base, stage, registrations(31))
     _rebuild(matches, stage)
     _play_with_random_removals(matches, random.Random(11), stage=stage)
+    last_round = max(m["round"] for m in matches if m["status"] == "completed")
+    finals = [m["match_key"] for m in matches if m["status"] == "completed" and not m.get("advancement") and m["round"] == last_round]
+    assert len(finals) == 1, f"genau ein Finale: {finals}"
+
+
+def test_merging_after_a_draw_keeps_one_source_per_slot(monkeypatch):
+    """#1596, gemischt: 33 Fahrer, Laufgröße 4, Quote 2, Ausfälle mit Startwert 10565, Los mit Startwert 261461. Das Los
+    gab Lauf O nur einen Fahrer, O kam kampflos weiter; dessen zweiter Platz im Folgelauf R blieb ein Freilos. Als R nach
+    einem Ausscheiden mit S zusammengelegt wurde, fiel dieser Freilos-Platz weg, die Weiterleitung von O zeigte aber
+    weiter auf seine Nummer - die bekam P: zwei Quellen auf einem Platz. Jetzt zieht jeder Freilos-Platz, auf den noch
+    eine Weiterleitung zeigt, mit in den Sammellauf."""
+    from services import advancement_draw, custom_bracket, match_v2_results
+
+    draw = random.Random(261461)
+    for module in (advancement_draw, custom_bracket, match_v2_results):
+        monkeypatch.setattr(module, "DRAW_RNG", draw)
+    stage = {"id": "s", "number": 1, "stage_type": "ffa_custom_bracket", "match_type": "ffa",
+             "settings": {"match_size": 4, "qualifiers_per_match": 2, "min_players": 2}}
+    base = {"id": "t", "seeding_mode": "manual", "max_participants": 33, **SHUFFLE}
+    matches = build_matches_v2_from_schema(base, stage, registrations(33))
+    _rebuild(matches, stage)
+    _play_with_random_removals(matches, random.Random(10565), stage=stage)
     last_round = max(m["round"] for m in matches if m["status"] == "completed")
     finals = [m["match_key"] for m in matches if m["status"] == "completed" and not m.get("advancement") and m["round"] == last_round]
     assert len(finals) == 1, f"genau ein Finale: {finals}"
