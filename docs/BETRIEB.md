@@ -211,7 +211,11 @@ RESULT_IMAGE_RATE_LIMIT=30            # Bilder je Konto …
 RESULT_IMAGE_RATE_WINDOW_SECONDS=600  # … in diesem Zeitfenster
 RESULT_IMAGE_CONCURRENCY=1            # gleichzeitig gelesene Bilder (CPU)
 RESULT_IMAGE_OCR_TIMEOUT_SECONDS=20   # je Aufruf von Tesseract
+RESULT_IMAGE_OCR_BUDGET_SECONDS=60    # alle Aufrufe je Bild zusammen - danach ist der Rest gelb
 ```
+
+Je Konto wird ein Bild zur Zeit gelesen; dekodiert wird erst, wenn ein Platz frei ist (wer wartet, hält nur die
+Datei). Reicht das Zeitbudget nicht für die ganze Seite, kommt eine feste Meldung (422).
 
 Fehlt Tesseract (etwa ein altes Image), sagt das Blatt „Texterkennung gerade nicht verfügbar“ – Einfügen und Abtippen
 gehen weiter. Prüfen: `docker compose exec backend tesseract --list-langs` (muss `deu` und `eng` nennen).

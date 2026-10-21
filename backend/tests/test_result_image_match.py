@@ -143,6 +143,33 @@ def test_fuzzy_names_and_new_names():
     assert (plain["rows"][0]["name"], plain["rows"][0]["participant_id"]) == ("Carl Kurue", None)
 
 
+def test_names_and_teams_need_both_reads_to_agree():
+    """Seite und Streifen widersprechen sich: auch wenn eine Lesung genau zu einem Teilnehmer bzw. Team passt, ist das
+    Feld gelb - mit beiden Lesungen als Hinweis."""
+    out = build(reading(
+        row("1", "", "Anna Probe", "Rotor Racing", strips={"name": "Dora Neumann", "team": "Rotor Racing"}),
+        row("2", "", "Bert Bolzt", "Blaupfeil GP", strips={"name": "Bert Bolzt", "team": "Rotor Racing"}),
+        row("3", "", "Carl Kurve", "Rotor Racing", strips={"name": "Carl Kurve", "team": "Rotor Racing"}),
+    ), TEMPLATE, PEOPLE)
+    anna, bert, carl = out["rows"]
+    assert (anna["participant_id"], anna["uncertain"]) == ("anna", ["name"])
+    assert anna["read"] == {"name": "Anna Probe / Dora Neumann"}
+    assert (bert["participant_id"], bert["team"], bert["uncertain"]) == ("bert", "Blaupfeil GP", ["team"])
+    assert bert["read"] == {"team": "Blaupfeil GP / Rotor Racing"}
+    assert (carl["participant_id"], carl["uncertain"], carl["read"]) == ("carl", [], {})
+
+
+def test_row_that_loses_its_participant_to_another_row_is_yellow():
+    """Zwei Zeilen lesen denselben Teilnehmer: die mit passender Startnummer bekommt ihn, die andere bleibt beim
+    gelesenen Namen - gelb, denn doppelt oder verlesen."""
+    out = build(reading(row("1", "99", "Anna Probe"), row("2", "7", "Anna Probe", strips={"start_number": "7"})),
+                TEMPLATE, PEOPLE)
+    lost, anna = out["rows"]
+    assert (anna["participant_id"], anna["uncertain"]) == ("anna", [])
+    assert (lost["participant_id"], lost["name"], lost["uncertain"]) == (None, "Anna Probe", ["name"])
+    assert lost["read"] == {"name": "Anna Probe"}
+
+
 def test_aliases_count_like_names():
     aliases = [{"name": "Alter Tag", "participant_id": "anna"}]
     with_alias = build(reading(row("1", "", "Alter Tag")), TEMPLATE, PEOPLE, aliases=aliases)

@@ -3,6 +3,7 @@ gehören, Vorlage je Spur und Saison (Standard je Art, abschaltbar), Größe am 
 Meldungen, Rate-Limit je Konto, Aliase nur für den Vorstand - und gespeichert wird nichts. Mit Tesseract zusätzlich
 einmal Ende-zu-Ende über die Route. Nur erfundene Namen."""
 import pathlib
+import struct
 import sys
 from datetime import date, timedelta
 
@@ -18,7 +19,7 @@ from routes import reference_result_image_routes as image_routes, reference_resu
 from services import migrations, result_image_ocr  # noqa: E402
 from services.dolibarr_policy import club_today  # noqa: E402
 from services.result_image_ocr import Read, Reading, RowReading  # noqa: E402
-from test_result_image_ocr import needs_tesseract  # noqa: E402
+from test_result_image_ocr import _png_in_two_blocks, needs_tesseract  # noqa: E402
 
 ADMIN = "/api/reference-series/admin"
 PNG = {"Content-Type": "image/png"}
@@ -295,6 +296,81 @@ async def test_warnings_for_other_track_and_blurry_images(flow, fake_ocr):
     fake_ocr.reading = reading
     codes = [item["code"] for item in (await flow.post(ctx["url"], content=_png(), headers=PNG)).json()["warnings"]]
     assert codes == ["no_header", "blurry", "other_track"]
+
+
+@pytest.mark.asyncio
+async def test_broken_png_is_400_not_500(flow, fake_ocr):
+    """Kaputter Chunk mitten in den Bilddaten: Pillow wirft ``SyntaxError`` - die Route antwortet 400 mit fester
+    Meldung."""
+    ctx = await _setup(flow)
+    first, rest, end = _png_in_two_blocks()
+    broken = first + struct.pack(">I", len(rest)) + b"\x01\x02\x03\x04" + rest + b"\x00\x00\x00\x00" + end
+    answer = await flow.post(ctx["url"], content=broken, headers=PNG)
+    assert (answer.status_code, answer.json()["detail"]) == (400, result_image_ocr.BROKEN)
+    assert fake_ocr.calls == 0
+
+
+@pytest.mark.asyncio
+async def test_one_image_per_account_and_decoding_only_with_a_free_place(flow, fake_ocr, monkeypatch):
+    """Dekodiert wird erst mit einem freien Platz zum Lesen - wer wartet, hält nur die Datei. Je Konto ein Bild zur
+    Zeit; nach einem Fehler ist das Konto wieder frei."""
+    ctx = await _setup(flow)
+
+    class Gate:
+        held = False
+
+        async def acquire(self):
+            Gate.held = True
+            return True
+
+        def release(self):
+            Gate.held = False
+
+    seen = []
+    real_open = result_image_ocr.open_image
+
+    def open_image(data):
+        seen.append(Gate.held)
+        return real_open(data)
+
+    monkeypatch.setattr(image_routes, "_gate", Gate())
+    monkeypatch.setattr(result_image_ocr, "open_image", open_image)
+    assert (await flow.post(ctx["url"], content=_png(), headers=PNG)).status_code == 200
+    assert (seen, Gate.held) == ([True], False)
+
+    image_routes._reading_accounts.add(ctx["board"]["id"])  # das erste Bild dieses Kontos wird noch gelesen
+    try:
+        busy = await flow.post(ctx["url"], content=_png(), headers=PNG)
+        assert (busy.status_code, busy.json()["detail"]) == (429, image_routes.BUSY_ACCOUNT)
+        assert len(seen) == 1  # nicht einmal geöffnet
+        flow.act_as(ctx["captain"])  # ein anderes Konto liest weiter
+        assert (await flow.post(ctx["url"], content=_png(), headers=PNG)).status_code == 200
+    finally:
+        image_routes._reading_accounts.discard(ctx["board"]["id"])
+    flow.act_as(ctx["board"])
+    assert (await flow.post(ctx["url"], content=b"kein Bild", headers=PNG)).status_code == 400
+    assert image_routes._reading_accounts == set()
+    assert Gate.held is False
+
+
+@pytest.mark.asyncio
+async def test_time_budget_leaves_the_rest_yellow_or_refuses(flow, fake_ocr, monkeypatch):
+    """Reichte das Zeitbudget nicht für die zweite Lesung einer Spalte, ist sie gelb und eine Warnung sagt es. Reichte
+    es nicht einmal für die Seite: 422 mit fester Meldung."""
+    ctx = await _setup(flow)
+    reading = _fake_reading(("Anna Probe", "7"), ("Bert Bolzt", "12"))
+    reading.out_of_time, reading.unchecked = True, {"time", "gap"}
+    fake_ocr.reading = reading
+    data = (await flow.post(ctx["url"], content=_png(), headers=PNG)).json()
+    assert [item["code"] for item in data["warnings"]] == ["out_of_time"]
+    assert [row["uncertain"] for row in data["rows"]] == [["time"], ["time"]]  # Abstand stand nirgends
+
+    def slow(image, template, **_):
+        raise result_image_ocr.OutOfTime()
+
+    monkeypatch.setattr(result_image_ocr, "read", slow)
+    answer = await flow.post(ctx["url"], content=_png(), headers=PNG)
+    assert (answer.status_code, answer.json()["detail"]) == (422, image_routes.TOO_SLOW)
 
 
 # ---------------------------------------------------------------- Ende-zu-Ende

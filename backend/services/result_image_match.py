@@ -26,7 +26,7 @@ from dataclasses import dataclass, field
 from difflib import SequenceMatcher
 
 from services import series_identity
-from services.result_image_ocr import Read, Reading
+from services.result_image_ocr import Read, Reading, RowReading
 from services.result_image_values import DIGIT_FIX, compact, is_placeholder, mark_of, parse_gap, parse_time, read_digits
 
 # Leicht verwechselte Zeichen - nur für den Vergleich von Namen, nie für den angezeigten Wert.
@@ -356,12 +356,18 @@ def build(reading: Reading, template: dict, participants: list[dict], *, aliases
 
     pool = candidates(participants, aliases)
     teams = sorted({str(row.get("default_team")) for row in participants if row.get("default_team")})
-    chosen = _match_people(reading, rows, pool, name_match, name_sure)
+    chosen, lost = _match_people(reading, rows, pool, name_match, name_sure)
 
     out_rows = []
     for index, (row, match, raw) in enumerate(zip(rows, chosen, reading.rows)):
-        out_rows.append(_row_out(index, row, match, teams, name_match, name_sure, team_match))
+        out_rows.append(_row_out(index, row, match, teams, name_match, name_sure, team_match, raw=raw,
+                                 lost=index in lost))
         out_rows[-1]["color"] = raw.color
+    # Reichte das Zeitbudget nicht für die zweite Lesung einer Spalte, ist dort jede gelesene Zelle ungeprüft - gelb.
+    for out, raw in zip(out_rows, reading.rows):
+        unchecked = {name for name in reading.unchecked if name in FIELDS and name in raw.cells}
+        if unchecked - set(out["uncertain"]):
+            out["uncertain"] = [name for name in FIELDS if name in out["uncertain"] or name in unchecked]
     header = _header_out(reading, pool, min_conf, name_match, name_sure)
     uncertain_rows = sum(1 for row in out_rows if row["uncertain"])
     return {"rows": out_rows, **header, "uncertain_rows": uncertain_rows, "team_colors": team_colors(out_rows),
@@ -390,12 +396,13 @@ def _looks_like_result(rows: list[dict[str, Decision]], template: dict) -> bool:
 
 
 def _match_people(reading: Reading, rows: list[dict[str, Decision]], pool: list[Candidate], name_match: float,
-                  name_sure: float) -> list[dict | None]:
-    """Je Zeile der Teilnehmer (oder ``None``) mit Ähnlichkeit und ob die Startnummer passt. Jeder höchstens einmal:
-    die besser passende Zeile gewinnt."""
+                  name_sure: float) -> tuple[list[dict | None], set[int]]:
+    """Je Zeile der Teilnehmer (oder ``None``) mit Ähnlichkeit, ob die Startnummer passt und ob jede Lesung des Namens
+    zu ihm passt (``agree``). Jeder höchstens einmal: die besser passende Zeile gewinnt - die Zeilen, die ihren
+    Teilnehmer so verlieren, kommen als zweiter Wert zurück."""
     proposals = []
     for index, (row, raw) in enumerate(zip(rows, reading.rows)):
-        texts = [read.text for read in (raw.cells.get("name"), raw.strips.get("name")) if read]
+        texts = [read.text for read in (raw.cells.get("name"), raw.strips.get("name")) if read and read.text.strip()]
         numbers = set()
         for read, page in ((raw.cells.get("start_number"), True), (raw.strips.get("start_number"), False)):
             parsed = _parse("number", read, page=page) if read else None
@@ -411,21 +418,50 @@ def _match_people(reading: Reading, rows: list[dict[str, Decision]], pool: list[
             if best is None or combined > best["combined"]:
                 best = {"candidate": candidate, "score": score, "number_hit": number_hit, "combined": combined,
                         "index": index}
+        if best:
+            # Seite und Streifen müssen beide auf diesen Teilnehmer zeigen - liest eine „Max Muster“ und die andere
+            # „Tim Kunz“, ist der Name nicht sicher, auch wenn eine Lesung genau passt.
+            names = [name for name in best["candidate"].names if name]
+            best["agree"] = all(max((similarity(text, name) for name in names), default=0.0) >= name_match
+                                for text in texts)
+            best["texts"] = texts
         proposals.append(best)
     taken: dict[str, dict] = {}
+    lost: set[int] = set()
     for proposal in sorted((item for item in proposals if item), key=lambda item: -item["combined"]):
         pid = proposal["candidate"].participant["id"]
         if pid in taken:
             proposals[proposal["index"]] = None
+            lost.add(proposal["index"])
         else:
             taken[pid] = proposal
-    return proposals
+    return proposals, lost
+
+
+def _reads_text(texts: list[str]) -> str:
+    """Was im Bild stand - bei zwei verschiedenen Lesungen beide („Max Muster / Tim Kunz“)."""
+    seen: list[str] = []
+    for text in texts:
+        cleaned = clean_text(text)
+        if cleaned and cleaned not in seen:
+            seen.append(cleaned)
+    return " / ".join(seen)
+
+
+def _all_reads_say(texts: list[str], known: list[str], team: str, threshold: float) -> bool:
+    """Zeigt jede Lesung (Seite, Streifen) auf dasselbe bekannte Team, jeweils ab ``threshold``?"""
+    for text in texts:
+        score, best = max(((similarity(text, item), item) for item in known), key=lambda pair: pair[0])
+        if best != team or score < threshold:
+            return False
+    return True
 
 
 def _team_out(decision: Decision | None, match: dict | None, teams: list[str], team_match: float,
-              name_sure: float) -> tuple[str | None, bool]:
-    """Das Team: ein bekanntes (zuerst das des Teilnehmers) ab ``team_match`` - gelb unter ``name_sure`` -, sonst wie
-    gelesen. Teams sind wenige und bekannt, darum reicht weniger Ähnlichkeit als bei Namen."""
+              name_sure: float, texts: list[str] | None = None) -> tuple[str | None, bool]:
+    """Das Team: ein bekanntes (zuerst das des Teilnehmers) ab ``team_match`` - gelb unter ``name_sure`` oder wenn die
+    Lesungen (``texts``: Seite, Streifen) auf verschiedene Teams zeigen -, sonst wie gelesen. Teams sind wenige und
+    bekannt, darum reicht weniger Ähnlichkeit als bei Namen."""
     if decision is None or not decision.text:
         return None, True
     read = decision.text
@@ -438,14 +474,14 @@ def _team_out(decision: Decision | None, match: dict | None, teams: list[str], t
     if scored:
         score, team = max(scored, key=lambda item: item[0])
         if score >= name_sure:
-            return team, True
+            return team, _all_reads_say(texts or [read], preferred, team, name_sure)
         if score >= team_match:
             return team, False
     return read, decision.sure
 
 
 def _row_out(index: int, row: dict[str, Decision], match: dict | None, teams: list[str], name_match: float,
-             name_sure: float, team_match: float) -> dict:
+             name_sure: float, team_match: float, *, raw: RowReading | None = None, lost: bool = False) -> dict:
     uncertain: list[str] = []
     read: dict[str, str] = {}
 
@@ -473,9 +509,11 @@ def _row_out(index: int, row: dict[str, Decision], match: dict | None, teams: li
         out["name"] = person.get("name") or ""
         own_number = str(person.get("start_number") or "").strip()
         name_ok = match["score"] >= name_sure or (match["score"] >= name_match and match["number_hit"])
-        if name and not name_ok:
+        if name and not (name_ok and match.get("agree", True)):
             uncertain.append("name")
-        if name and name.raw and clean_text(name.raw) != out["name"]:
+        if name and not match.get("agree", True):
+            read["name"] = _reads_text(match.get("texts") or [name.raw])
+        elif name and name.raw and clean_text(name.raw) != out["name"]:
             read["name"] = clean_text(name.raw)
         if own_number:
             # Die Startnummer des Teilnehmers gilt. Gelb nur, wenn im Bild eine andere stand - ohne gelesene Nummer
@@ -492,13 +530,19 @@ def _row_out(index: int, row: dict[str, Decision], match: dict | None, teams: li
         if name:
             out["name"] = name.text
             flag("name", name, out["name"])
+            if lost and "name" not in uncertain:
+                # Der Name passte zu einem Teilnehmer, den eine andere Zeile besser trifft - doppelt oder verlesen.
+                uncertain.append("name")
+                read.setdefault("name", clean_text(name.raw))
         else:
             uncertain.append("name")
         if number:
             out["start_number"] = number.text or None
             flag("start_number", number, out["start_number"])
 
-    team, team_sure = _team_out(row.get("team"), match, teams, team_match, name_sure)
+    team_texts = [read_.text for read_ in ((raw.cells.get("team"), raw.strips.get("team")) if raw else ())
+                  if read_ and read_.text.strip()]
+    team, team_sure = _team_out(row.get("team"), match, teams, team_match, name_sure, team_texts)
     team_cell = row.get("team")
     if team_cell is not None and not team_cell.raw and not team_cell.sure:
         # Leere Zelle in einer Spalte, die sonst Teams hat: das Team des Teilnehmers vorschlagen - gelb.
@@ -508,7 +552,7 @@ def _row_out(index: int, row: dict[str, Decision], match: dict | None, teams: li
     if team_cell is not None:
         if not team_sure:
             uncertain.append("team")
-        raw_team = clean_text(row["team"].raw)
+        raw_team = _reads_text(team_texts) if len(team_texts) > 1 and not team_sure else clean_text(row["team"].raw)
         if raw_team and raw_team != team:
             read["team"] = raw_team
 

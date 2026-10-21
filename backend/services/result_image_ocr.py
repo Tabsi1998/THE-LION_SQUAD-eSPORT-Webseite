@@ -28,12 +28,14 @@ import os
 import shutil
 import statistics
 import subprocess
+import time
 import unicodedata
 import warnings
+from contextvars import ContextVar
 from dataclasses import dataclass, field
 from functools import lru_cache
 
-from PIL import Image, ImageChops, ImageDraw, ImageFilter, ImageOps, UnidentifiedImageError
+from PIL import Image, ImageChops, ImageDraw, ImageFilter, ImageOps
 
 from services import result_image_values as image_values
 from services.image_upload import (
@@ -51,8 +53,10 @@ def _env_number(name: str, default: float, minimum: float) -> float:
     return value if value >= minimum else default
 
 
-# Einstellbar über die Umgebung (Standard in Klammern): Zeitlimit je Aufruf von Tesseract, Sprachen.
+# Einstellbar über die Umgebung (Standard in Klammern): Zeitlimit je Aufruf von Tesseract, Zeitbudget je Bild
+# (alle Aufrufe zusammen - danach bleibt der Rest ungeprüft und gelb), Sprachen.
 TIMEOUT_SECONDS = _env_number("RESULT_IMAGE_OCR_TIMEOUT_SECONDS", 20, 1)
+BUDGET_SECONDS = _env_number("RESULT_IMAGE_OCR_BUDGET_SECONDS", 60, 5)
 LANGUAGES = os.environ.get("RESULT_IMAGE_OCR_LANGUAGES", "eng+deu")
 TARGET_TEXT_HEIGHT = 40  # Pixel - so liest Tesseract Bildschirmschrift am sichersten
 MAX_SCALE = 4.0
@@ -73,6 +77,19 @@ WHITELISTS = {
 
 class OcrUnavailable(Exception):
     """Tesseract fehlt oder antwortet nicht - die Meldung an die Oberfläche ist fest."""
+
+
+class OutOfTime(Exception):
+    """Das Zeitbudget für dieses Bild ist aufgebraucht, bevor die Seite gelesen war."""
+
+
+# Ende des Zeitbudgets des Bilds, das gerade gelesen wird (``read`` setzt es; je Thread bzw. Aufruf getrennt).
+_DEADLINE: ContextVar[float | None] = ContextVar("result_image_deadline", default=None)
+MIN_CALL_SECONDS = 0.5  # weniger Restzeit lohnt keinen Aufruf mehr
+
+
+def _clock() -> float:
+    return time.monotonic()
 
 
 TOO_LARGE = f"Das Bild ist zu groß (höchstens {MAX_IMAGE_UPLOAD_MB} MB)."
@@ -108,7 +125,8 @@ def open_image(data: bytes) -> Opened:
             img = Image.open(io.BytesIO(data))  # liest nur den Kopf
     except Image.DecompressionBombError:
         return Opened(status=413, message=TOO_MANY_PIXELS)
-    except (UnidentifiedImageError, OSError, ValueError):
+    except Exception as exc:  # noqa: BLE001 - jeder Fehler am Kopf (Pillow wirft auch SyntaxError) ist „kein Bild“
+        logger.info("[result-image] header not readable: %s", type(exc).__name__)
         return Opened(status=400, message=NOT_AN_IMAGE)
     detected = (img.format or "").upper()
     if detected not in PIL_IMAGE_FORMATS:
@@ -122,7 +140,8 @@ def open_image(data: bytes) -> Opened:
         img.load()
         img = ImageOps.exif_transpose(img)
         img = img.convert("RGB")
-    except (OSError, ValueError, Image.DecompressionBombError):
+    except Exception as exc:  # noqa: BLE001 - wie image_upload: jeder Dekodierfehler (auch SyntaxError) ist 400
+        logger.info("[result-image] image not decodable: %s", type(exc).__name__)
         return Opened(status=400, message=BROKEN)
     if max(img.size) > MAX_IMAGE_DIMENSION:
         img.thumbnail((MAX_IMAGE_DIMENSION, MAX_IMAGE_DIMENSION), Image.Resampling.LANCZOS)
@@ -242,7 +261,7 @@ def _probe_height(value: Image.Image) -> float | None:
     if probe_scale > 1.05:
         probe = value.resize((round(value.width * probe_scale), round(value.height * probe_scale)),
                              Image.Resampling.LANCZOS)
-    words = tesseract(remove_lines(probe), psm=11)
+    words = _ocr(remove_lines(probe), psm=11)
     heights = sorted(word.height for word in words
                      if word.conf >= 70 and sum(char.isalnum() for char in word.text) >= 2)
     if len(heights) < 5:
@@ -327,8 +346,10 @@ def available() -> bool:
     return bool(command()) and bool(languages())
 
 
-def tesseract(img: Image.Image, *, psm: int, whitelist: str | None = None) -> list[Word]:
-    """Ein Aufruf: Bild über stdin, Wörter (TSV) über stdout."""
+def tesseract(img: Image.Image, *, psm: int, whitelist: str | None = None,
+              timeout: float | None = None) -> list[Word]:
+    """Ein Aufruf: Bild über stdin, Wörter (TSV) über stdout. ``timeout`` (Sekunden) höchstens ``TIMEOUT_SECONDS``."""
+    limit = min(TIMEOUT_SECONDS, timeout) if timeout else TIMEOUT_SECONDS
     cmd = command()
     if not cmd:
         raise OcrUnavailable()
@@ -339,10 +360,10 @@ def tesseract(img: Image.Image, *, psm: int, whitelist: str | None = None) -> li
         args += ["-c", f"tessedit_char_whitelist={whitelist}"]
     args.append("tsv")
     try:
-        done = subprocess.run(args, input=buffer.getvalue(), capture_output=True, timeout=TIMEOUT_SECONDS,
+        done = subprocess.run(args, input=buffer.getvalue(), capture_output=True, timeout=limit,
                               env=_environment(), check=False)
     except subprocess.TimeoutExpired:
-        logger.warning("[result-image] tesseract timed out after %ss", TIMEOUT_SECONDS)
+        logger.warning("[result-image] tesseract timed out after %ss", round(limit, 1))
         raise OcrUnavailable() from None
     except OSError:
         logger.warning("[result-image] tesseract could not be started")
@@ -364,6 +385,23 @@ def tesseract(img: Image.Image, *, psm: int, whitelist: str | None = None) -> li
         if text and conf >= 0:
             words.append(Word(text, conf, left, top, width, height, (parts[2], parts[3], parts[4])))
     return words
+
+
+def _ocr(img: Image.Image, *, psm: int, whitelist: str | None = None) -> list[Word]:
+    """Tesseract im Zeitbudget des Bilds: ein Aufruf darf höchstens die Restzeit dauern; ist sie aufgebraucht, kommt
+    ``OutOfTime`` statt eines Aufrufs."""
+    deadline = _DEADLINE.get()
+    if deadline is None:
+        return tesseract(img, psm=psm, whitelist=whitelist)
+    left = deadline - _clock()
+    if left < MIN_CALL_SECONDS:
+        raise OutOfTime()
+    try:
+        return tesseract(img, psm=psm, whitelist=whitelist, timeout=left)
+    except OcrUnavailable:
+        if deadline - _clock() < MIN_CALL_SECONDS:
+            raise OutOfTime() from None  # nicht Tesseract fehlt - das Budget war zu Ende
+        raise
 
 
 # ---------------------------------------------------------------- Zeilen, Zellen, Spalten
@@ -641,6 +679,8 @@ class Reading:
     scale: float = 1.0
     mean_conf: float = 0.0
     too_many_rows: bool = False  # mehr Ergebniszeilen als ``max_rows`` - dann ohne Zeilen und ohne Kopf
+    out_of_time: bool = False  # Zeitbudget aufgebraucht - nicht alles zweimal gelesen
+    unchecked: set[str] = field(default_factory=set)  # Felder ohne zweite Lesung (Streifen) - sie werden gelb
 
 
 def _read(words: list[Word], *, joiner: str = " ") -> Read:
@@ -755,7 +795,7 @@ def _strip_reads(prepared: Prepared, column: dict, cells: list[Cell | None], dat
     if box[2] - box[0] < 4 or box[3] - box[1] < 4:
         return {}
     strip = prepared.image.crop(box)
-    words = tesseract(strip, psm=6, whitelist=WHITELISTS.get(column["kind"]))
+    words = _ocr(strip, psm=6, whitelist=WHITELISTS.get(column["kind"]))
     by_line: dict[int, list[Word]] = {}
     for word in words:
         center = word.cy + box[1]
@@ -774,13 +814,26 @@ def _is_result_line(line: Line, min_cells: int) -> bool:
     return len(cells_of(line)) >= min_cells and any(char.isdigit() for char in line.text)
 
 
-def read(img: Image.Image, template: dict, *, max_rows: int | None = None) -> Reading:
+def read(img: Image.Image, template: dict, *, max_rows: int | None = None,
+         budget_seconds: float | None = None) -> Reading:
     """Das Bild nach der Vorlage lesen - ohne Abgleich mit Teilnehmern (``result_image_match``). Stehen mehr als
-    ``max_rows`` Ergebniszeilen im Bild, bricht es vor dem Lesen der Spalten ab (``too_many_rows``)."""
+    ``max_rows`` Ergebniszeilen im Bild, bricht es vor dem Lesen der Spalten ab (``too_many_rows``).
+
+    Alle Aufrufe von Tesseract zusammen haben ein Zeitbudget (``BUDGET_SECONDS``). Reicht es nicht für die Seite, kommt
+    ``OutOfTime``; reicht es nur nicht für die zweiten Lesungen, stehen die Spalten ohne in ``unchecked`` (gelb)."""
+    token = _DEADLINE.set(_clock() + (budget_seconds or BUDGET_SECONDS))
+    try:
+        return _read_in_budget(img, template, max_rows)
+    finally:
+        _DEADLINE.reset(token)
+
+
+def _read_in_budget(img: Image.Image, template: dict, max_rows: int | None) -> Reading:
     prepared = prepare(img, template)
     columns = template["columns"]
-    lines = _page_lines(prepared)
-    reading = Reading(template_id=template["id"], text_height=prepared.text_height, scale=prepared.scale)
+    lines, timed_out = _page_lines(prepared)
+    reading = Reading(template_id=template["id"], text_height=prepared.text_height, scale=prepared.scale,
+                      out_of_time=timed_out)
     found = header_line(lines, columns)
     if found:
         header_index, labels = found
@@ -812,14 +865,26 @@ def read(img: Image.Image, template: dict, *, max_rows: int | None = None) -> Re
 
     # Zweite Lesung je Spalte als Streifen; die Grenzen zu den Nachbarspalten sind deren gelesene Zellen.
     for index, column in enumerate(columns):
+        if reading.out_of_time:
+            reading.unchecked.add(column["field"])
+            continue
         cells = [row.get(index) for row in assigned]
         before = [row[index - 1].right for row in assigned if index > 0 and row.get(index - 1)]
         after = [row[index + 1].left for row in assigned if index + 1 < len(columns) and row.get(index + 1)]
-        reads = _strip_reads(prepared, column, cells, data_lines,
-                             (max(before) if before else None, min(after) if after else None))
+        try:
+            reads = _strip_reads(prepared, column, cells, data_lines,
+                                 (max(before) if before else None, min(after) if after else None))
+        except OutOfTime:
+            reading.out_of_time = True
+            reading.unchecked.add(column["field"])
+            continue
         for row_index, value in reads.items():
             reading.rows[row_index].strips[column["field"]] = value
-    _retry_places(prepared, columns, assigned, data_lines, reading)
+    if not reading.out_of_time:
+        try:
+            _retry_places(prepared, columns, assigned, data_lines, reading)
+        except OutOfTime:
+            reading.out_of_time = True  # nicht gelesene Plätze bleiben gelb
     fields = [column["field"] for column in columns]
     for row, cells in zip(reading.rows, assigned):
         for wanted in ("start_number", "team"):
@@ -857,17 +922,23 @@ def text_color(img: Image.Image, cell: Cell, scale: float) -> str | None:
     return "#{:02x}{:02x}{:02x}".format(*channels)
 
 
-def _page_lines(prepared: Prepared) -> list[Line]:
+def _page_lines(prepared: Prepared) -> tuple[list[Line], bool]:
     """Die ganze Seite lesen - als ein Block (6) und als Spalte mit Zeilen verschiedener Größe (4). Es gilt die Lesung
     mit den meisten Ergebniszeilen: „ein Block“ ist bei schlichten Tabellen genauer, verliert aber bei Bildern mit
-    großem Kopf, Flaggen und Feldern ganze Zeilen. Bei Gleichstand gilt der Block."""
+    großem Kopf, Flaggen und Feldern ganze Zeilen. Bei Gleichstand gilt der Block. Liefert dazu, ob das Zeitbudget
+    nur noch für die erste Lesung reichte."""
     best: tuple[int, list[Line]] | None = None
     for psm in PAGE_PSMS:
-        lines = lines_of(tesseract(prepared.image, psm=psm))
+        try:
+            lines = lines_of(_ocr(prepared.image, psm=psm))
+        except OutOfTime:
+            if best is None:
+                raise
+            return best[1], True  # die zweite Lesung der Seite passte nicht mehr ins Budget
         count = sum(1 for line in lines if _is_result_line(line, 2))
         if best is None or count > best[0]:
             best = (count, lines)
-    return best[1] if best else []
+    return (best[1] if best else []), False
 
 
 def _retry_places(prepared: Prepared, columns: list[dict], assigned: list[dict[int, Cell]], data_lines: list[Line],
@@ -892,6 +963,6 @@ def _retry_places(prepared: Prepared, columns: list[dict], assigned: list[dict[i
         if right - left < 4 or bottom - top < 4:
             continue
         cell = ImageOps.autocontrast(prepared.image.crop((left, top, right, bottom)), cutoff=1)
-        words = tesseract(cell, psm=7, whitelist=WHITELISTS["place"])
+        words = _ocr(cell, psm=7, whitelist=WHITELISTS["place"])
         if words:
             row.strips["place"] = _read(words, joiner="")

@@ -32,7 +32,10 @@ Saisontabellen und Kalender (keine Zeiten) lehnt die Route mit 422 ab.
   der Bilddatei, vor dem Dekodieren) - wie bei jedem Bild-Upload (``services/image_upload.py``). Das Bild wird nur im
   Speicher gelesen; die Anfrage wird dafür nicht als Formular (mit Zwischendatei) angenommen.
 - **Rate-Limit** je Konto: ``RESULT_IMAGE_RATE_LIMIT`` Bilder je ``RESULT_IMAGE_RATE_WINDOW_SECONDS`` (Standard 30 in
-  10 Minuten); gleichzeitig liest der Server höchstens ``RESULT_IMAGE_CONCURRENCY`` Bilder (Standard 1).
+  10 Minuten), je Konto ein Bild zur Zeit; gleichzeitig liest der Server höchstens ``RESULT_IMAGE_CONCURRENCY`` Bilder
+  (Standard 1). Dekodiert wird erst mit einem freien Platz - wer wartet, hält nur die Datei, kein entpacktes Bild.
+- **Zeitbudget** je Bild (``RESULT_IMAGE_OCR_BUDGET_SECONDS``, Standard 60): reicht es nicht für die Seite, kommt 422;
+  reicht es nur nicht für die zweiten Lesungen, ist der Rest gelb (Warnung ``out_of_time``).
 - **Datenschutz:** Aliase der Mitglieder helfen beim Wiedererkennen nur, wenn der Vorstand liest (wie in #1743);
   Captains bekommen nur, was sie im Blatt ohnehin sehen (Name und Kennung der Teilnehmer).
 - Meldungen sind feste Texte, nie aus einer Ausnahme gebaut. Lesen und Abgleich: ``services/result_image_ocr.py`` und
@@ -76,11 +79,16 @@ RATE_WINDOW_SECONDS = _env_int("RESULT_IMAGE_RATE_WINDOW_SECONDS", 600)
 CONCURRENCY = _env_int("RESULT_IMAGE_CONCURRENCY", 1)
 QUEUE_SECONDS = 30
 _gate = asyncio.Semaphore(CONCURRENCY)
+_reading_accounts: set[str] = set()  # Konten, deren Bild dieser Prozess gerade liest - je Konto eins zur Zeit
 
 NO_TEMPLATE = ("Für diese Serie ist keine Vorlage für Ergebnis-Bilder festgelegt. Der Vorstand wählt sie bei Spur oder "
                "Saison.")
 UNAVAILABLE = "Die Texterkennung ist auf dem Server gerade nicht verfügbar. Bitte die Liste einfügen oder abtippen."
 BUSY = "Gerade wird schon ein Bild gelesen. Bitte gleich noch einmal versuchen."
+BUSY_ACCOUNT = "Dein letztes Bild wird noch gelesen. Bitte warte, bis es fertig ist."
+TOO_SLOW = ("Das Bild braucht zu lange zum Lesen. Bitte nur die Ergebnistabelle als Screenshot einfügen - oder die "
+            "Liste einfügen.")
+OUT_OF_TIME = "Das Bild war zu aufwendig, um alles zweimal zu lesen - die gelben Felder bitte genau prüfen."
 TOO_MANY = "Zu viele Bilder in kurzer Zeit. Bitte warte noch {wait}."
 NO_TABLE = ("Im Bild wurde keine Ergebnistabelle gefunden. Passt die Vorlage zum Bild? Sonst die Liste einfügen oder "
             "abtippen.")
@@ -165,6 +173,8 @@ def _warnings(reading: result_image_ocr.Reading, built: dict, round_doc: dict, s
     out = []
     if not reading.header_found:
         out.append({"code": "no_header", "message": NO_HEADER})
+    if reading.out_of_time:
+        out.append({"code": "out_of_time", "message": OUT_OF_TIME})
     if reading.text_height < 8 or reading.mean_conf < 85:
         out.append({"code": "blurry", "message": BLURRY})
     venue = str(round_doc.get("venue") or "").strip()
@@ -177,6 +187,28 @@ def _warnings(reading: result_image_ocr.Reading, built: dict, round_doc: dict, s
         out.append({"code": "other_track", "message": (
             f"Im Bild steht die Strecke „{track[:80]}“, beim Termin „{venue[:80]}“ - richtiges Bild?")})
     return out
+
+
+async def _read_in_turn(body: bytes, template: dict) -> tuple[result_image_ocr.Reading, float]:
+    """Mit freiem Platz (``_gate``) dekodieren und lesen - wartende Anfragen halten nur die Datei."""
+    try:
+        await asyncio.wait_for(_gate.acquire(), timeout=QUEUE_SECONDS)
+    except asyncio.TimeoutError:
+        raise HTTPException(503, BUSY) from None
+    started = time.monotonic()
+    try:
+        opened = await asyncio.to_thread(result_image_ocr.open_image, body)
+        del body
+        if opened.image is None:
+            raise HTTPException(opened.status, opened.message)
+        # Höchstens so viele Zeilen wie die Vorschau des Blatts nimmt - dieselbe Grenze (``MAX_ROWS``).
+        return await asyncio.to_thread(result_image_ocr.read, opened.image, template, max_rows=MAX_ROWS), started
+    except result_image_ocr.OcrUnavailable:
+        raise HTTPException(503, UNAVAILABLE) from None
+    except result_image_ocr.OutOfTime:
+        raise HTTPException(422, TOO_SLOW) from None
+    finally:
+        _gate.release()
 
 
 @router.get(BASE)
@@ -202,23 +234,15 @@ async def read_result_image(series_id: str, round_id: str, request: Request,
         raise HTTPException(503, UNAVAILABLE)
     await enforce_rate_limit(request, "result_image", RATE_LIMIT, RATE_WINDOW_SECONDS,
                              subject=keyed_subject(access.user["id"]), message=TOO_MANY)
-    opened = result_image_ocr.open_image(await _body(request))
-    if opened.image is None:
-        raise HTTPException(opened.status, opened.message)
-
+    # Je Konto ein Bild zur Zeit - so stellt niemand viele große Dateien in die Warteschlange.
+    account = access.user["id"]
+    if account in _reading_accounts:
+        raise HTTPException(429, BUSY_ACCOUNT)
+    _reading_accounts.add(account)
     try:
-        await asyncio.wait_for(_gate.acquire(), timeout=QUEUE_SECONDS)
-    except asyncio.TimeoutError:
-        raise HTTPException(503, BUSY) from None
-    started = time.monotonic()
-    try:
-        # Höchstens so viele Zeilen wie die Vorschau des Blatts nimmt - dieselbe Grenze (``MAX_ROWS``).
-        reading = await asyncio.to_thread(result_image_ocr.read, opened.image, template, max_rows=MAX_ROWS)
-    except result_image_ocr.OcrUnavailable:
-        raise HTTPException(503, UNAVAILABLE) from None
+        reading, started = await _read_in_turn(await _body(request), template)
     finally:
-        _gate.release()
-    opened.image = None  # das Bild wird nicht mehr gebraucht
+        _reading_accounts.discard(account)
     if reading.too_many_rows:
         raise HTTPException(422, TOO_MANY_ROWS)
 

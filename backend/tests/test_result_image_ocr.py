@@ -8,6 +8,7 @@ Ohne Tesseract (etwa unter Windows) werden die Lese-Tests übersprungen; die CI 
 import io
 import os
 import pathlib
+import random
 import struct
 import sys
 import zlib
@@ -108,6 +109,52 @@ def _png_header(width: int, height: int) -> bytes:
         return struct.pack(">I", len(body)) + kind + body + struct.pack(">I", zlib.crc32(kind + body) & 0xFFFFFFFF)
     ihdr = struct.pack(">IIBBBBB", width, height, 8, 2, 0, 0, 0)
     return b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", ihdr) + chunk(b"IEND", b"")
+
+
+def _png_chunk(kind: bytes, body: bytes) -> bytes:
+    return struct.pack(">I", len(body)) + kind + body + struct.pack(">I", zlib.crc32(kind + body) & 0xFFFFFFFF)
+
+
+def _png_in_two_blocks(side: int = 64) -> tuple[bytes, bytes, bytes]:
+    """Eine gültige PNG-Datei mit zwei Datenblöcken (IDAT): Kopf, erster Block und der Rest getrennt - so lässt sich der
+    zweite Block beim Fuzzen gezielt verderben. Pillow liest ihn erst beim Dekodieren."""
+    raw = b"".join(b"\x00" + bytes((x * 3 + y) % 256 for x in range(side * 3)) for y in range(side))
+    packed = zlib.compress(raw, 9)
+    half = len(packed) // 2
+    head = b"\x89PNG\r\n\x1a\n" + _png_chunk(b"IHDR", struct.pack(">IIBBBBB", side, side, 8, 2, 0, 0, 0))
+    return head + _png_chunk(b"IDAT", packed[:half]), packed[half:], _png_chunk(b"IEND", b"")
+
+
+def test_broken_png_chunks_give_400_never_an_error():
+    """Kaputte Chunks: Pillow wirft beim Dekodieren auch ``SyntaxError`` („broken PNG file“). Das ist eine feste
+    Meldung mit 400 - nie eine Ausnahme (500)."""
+    first, rest, end = _png_in_two_blocks()
+    assert result_image_ocr.open_image(first + _png_chunk(b"IDAT", rest) + end).image is not None
+    bad_type = struct.pack(">I", len(rest)) + b"\x01\x02\x03\x04" + rest + b"\x00\x00\x00\x00"
+    opened = result_image_ocr.open_image(first + bad_type + end)
+    assert (opened.image, opened.status, opened.message) == (None, 400, result_image_ocr.BROKEN)
+
+    # Fuzzen: Typ, Länge, Prüfsumme und Inhalt der Chunks verderben, abschneiden - fest gesetzter Zufall.
+    good = first + _png_chunk(b"IDAT", rest) + end
+    rng = random.Random(1756)
+    for attempt in range(400):
+        data = bytearray(good)
+        kind = attempt % 4
+        if kind == 0:
+            data[len(first) + 4:len(first) + 8] = bytes(rng.randrange(256) for _ in range(4))  # Typ des 2. Blocks
+        elif kind == 1:
+            data[len(first):len(first) + 4] = struct.pack(">I", rng.randrange(2 ** 31))  # Länge
+        elif kind == 2:
+            data = data[:rng.randrange(20, len(good))]  # abgeschnitten
+        else:
+            for _ in range(rng.randint(1, 6)):
+                data[rng.randrange(8, len(good))] ^= rng.randrange(1, 256)
+        result = result_image_ocr.open_image(bytes(data))
+        assert result.status in (200, 400, 413), attempt
+        assert (result.image is None) == (result.status != 200), attempt
+        assert result.message in ("", result_image_ocr.BROKEN, result_image_ocr.NOT_AN_IMAGE,
+                                  result_image_ocr.WRONG_FORMAT, result_image_ocr.TOO_MANY_PIXELS,
+                                  result_image_ocr.TOO_SMALL), attempt
 
 
 def test_pixel_limit_is_checked_on_the_header_before_decoding():
@@ -253,12 +300,55 @@ def test_text_color_is_the_color_of_the_letters():
     assert result_image_ocr.text_color(img, empty, 2.0) is None
 
 
+def _fake_page(rows: int = 12) -> list:
+    words = []
+    for index in range(rows):
+        top = 40 + index * 40
+        line = ("1", "1", str(index))
+        words += [result_image_ocr.Word(str(index + 1), 95, 20, top, 20, 20, line),
+                  result_image_ocr.Word(f"Probe{index}", 95, 200, top, 120, 20, line),
+                  result_image_ocr.Word("1:32.123", 95, 900, top, 100, 20, line)]
+    return words
+
+
+def test_time_budget_per_image_leaves_the_rest_yellow(monkeypatch):
+    """Alle Aufrufe von Tesseract zusammen haben ein Zeitbudget. Jeder Aufruf darf höchstens die Restzeit dauern; ist
+    sie weg, bleiben die übrigen Spalten ohne zweite Lesung - und gelb. Reicht es nicht einmal für die Seite:
+    ``OutOfTime``."""
+    clock = [0.0]
+    calls = []
+
+    def fake_tesseract(img, *, psm, whitelist=None, timeout=None):
+        calls.append(timeout)
+        clock[0] += 10  # jeder Aufruf dauert zehn Sekunden
+        return _fake_page()
+
+    monkeypatch.setattr(result_image_ocr, "tesseract", fake_tesseract)
+    monkeypatch.setattr(result_image_ocr, "_clock", lambda: clock[0])
+    image = Image.new("RGB", (1200, 600), (20, 20, 30))
+    # Schrifthöhe, zwei Seitenlesungen, die Platz-Spalte - dann ist das Budget von 35 s aufgebraucht.
+    reading = result_image_ocr.read(image, TEMPLATE, budget_seconds=35)
+    assert calls == [35, 25, 15, 5]
+    assert reading.out_of_time and len(reading.rows) == 12
+    assert {"name", "time"} <= reading.unchecked and "place" not in reading.unchecked
+    out = result_image_match.build(reading, TEMPLATE, [])
+    assert all({"name", "time"} <= set(row["uncertain"]) for row in out["rows"])
+    # Mit genug Zeit ist nichts ungeprüft.
+    clock[0] = 0.0
+    plenty = result_image_ocr.read(image, TEMPLATE, budget_seconds=600)
+    assert (plenty.out_of_time, plenty.unchecked) == (False, set())
+    # Nicht einmal Zeit für die Seite.
+    clock[0] = 0.0
+    with pytest.raises(result_image_ocr.OutOfTime):
+        result_image_ocr.read(image, TEMPLATE, budget_seconds=8)
+
+
 def test_too_many_rows_stop_before_the_column_reads(monkeypatch):
     """Mehr Ergebniszeilen als das Blatt nimmt: abbrechen, bevor die Spalten einzeln gelesen werden - die Antwort bleibt
     klein, der Server rechnet nicht weiter."""
     calls = []
 
-    def fake_tesseract(img, *, psm, whitelist=None):
+    def fake_tesseract(img, *, psm, whitelist=None, timeout=None):
         calls.append(whitelist)
         words = []
         for index in range(12):

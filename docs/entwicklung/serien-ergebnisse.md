@@ -125,9 +125,10 @@ Dienst) und landet als Zeilen im Blatt – gespeichert wird beim Lesen nichts, a
   (ein verlesener erster Platz zieht die Spalte nicht mit), Zeit = Zeit des Ersten + Abstand, Grid einmalig,
   **Startnummer als Anker** (Nummer und Name zeigen auf denselben Teilnehmer). Namen und Teams sind nur sicher, wenn
   beide Lesungen Zeichen für Zeichen gleich und je für sich sicher sind - oder der Abgleich sie sicher einem
-  Teilnehmer zuordnet. Abgeglichen wird unscharf mit den Teilnehmern der Saison (für den Vorstand auch über deren
-  Aliase), Teams mit den Standard-Teams. Leere Zellen in sonst gefüllten Spalten sind gelb, ein nie gelesener Platz
-  ebenso.
+  Teilnehmer bzw. bekannten Team zuordnet und beide Lesungen dorthin zeigen (sonst gelb, `read` nennt beide).
+  Abgeglichen wird unscharf mit den Teilnehmern der Saison (für den Vorstand auch über deren Aliase), Teams mit den
+  Standard-Teams; jeder Teilnehmer höchstens einmal - die Zeile, die ihn an eine andere verliert, ist gelb. Leere Zellen
+  in sonst gefüllten Spalten sind gelb, ein nie gelesener Platz ebenso.
 - **Kopf:** `track` (oberste Zeile ohne Beschriftung), `session {name, kind}` (Rennen, Sprint, Qualifying - nur ein
   Hinweis, bis es Läufe je Termin gibt, #1930), `pole` und `fastest_lap {name, time}`, `driver_of_the_day`; der Wert
   darf hinter oder unter der Beschriftung stehen. Passt die Strecke zu einem anderen Termin der Saison, nennt die
@@ -142,9 +143,11 @@ Dienst) und landet als Zeilen im Blatt – gespeichert wird beim Lesen nichts, a
   Gelbe Felder verlieren die Markierung, wenn jemand sie ändert oder die Zeile bzw. das Rennen mit „Passt so“
   bestätigt; übernommen wird erst, wenn nichts mehr gelb ist (`openImageItems`). Welche Felder gelb werden können,
   steht in `SHOWN_FIELDS` und `RACE_FIELDS` (`lib/resultImage.js`).
-- **Sicherheit:** Rechte wie beim Eintragen; Größe am Kopf der Anfrage, Pixel am Kopf der Bilddatei; das Bild kommt als
-  Body (keine Zwischendatei) und geht über stdin an Tesseract (ohne Shell, leere Umgebung, Zeitlimit); Rate-Limit je
-  Konto; Meldungen sind feste Texte. Einstellungen in [Betrieb](../BETRIEB.md). Für das Original am Termin (#1933)
+- **Sicherheit:** Rechte wie beim Eintragen; Größe am Kopf der Anfrage, Pixel am Kopf der Bilddatei; jeder
+  Dekodierfehler (Pillow wirft auch `SyntaxError`) ist 400 mit fester Meldung; das Bild kommt als Body (keine
+  Zwischendatei) und geht über stdin an Tesseract (ohne Shell, leere Umgebung, Zeitlimit je Aufruf und Zeitbudget je
+  Bild - danach bleibt der Rest ungeprüft und gelb, `Reading.unchecked`); Rate-Limit je Konto, je Konto ein Bild zur
+  Zeit, dekodiert wird erst mit freiem Platz (`_gate`); Meldungen sind feste Texte. Einstellungen in [Betrieb](../BETRIEB.md). Für das Original am Termin (#1933)
   liefert `result_image_ocr.encode_original(opened)` das neu kodierte Bild (gedreht, ohne EXIF) - gespeichert wird es
   erst dort.
 - **Tests:** synthetische Screenshots mit erfundenen Namen (`backend/tests/result_image_fixture.py`). Ohne Tesseract
