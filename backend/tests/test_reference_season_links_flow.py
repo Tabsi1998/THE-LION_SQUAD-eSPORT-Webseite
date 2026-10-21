@@ -59,8 +59,8 @@ async def test_list_and_detail_carry_the_season_link(flow):
     assert items["Probe Cup Mai"]["season_link"] == {**expected, "season_end": False}
     assert items["Probe Liga 2026"]["season_link"] == {**expected, "season_end": True}
     # Nicht sichtbare Saison: keine Verknüpfung nach außen.
-    assert items["Probe Liga 2025"]["season_link"] is None
-    assert items["Probe Einzelturnier"]["season_link"] is None
+    assert items["Probe Liga 2025"].get("season_link") is None
+    assert items["Probe Einzelturnier"].get("season_link") is None
     detail = (await flow.get(f"/api/references/{refs['closing']['id']}")).json()
     assert detail["season_link"] == {**expected, "season_end": True}
 
@@ -71,7 +71,7 @@ async def test_archived_season_is_not_linked(flow):
     assert (await flow.post(f"{ADMIN}/series/{season['id']}/archive")).status_code == 200
     flow.act_as(None)
     detail = (await flow.get(f"/api/references/{refs['linked']['id']}")).json()
-    assert detail["season_link"] is None
+    assert detail.get("season_link") is None
 
 
 @pytest.mark.asyncio
@@ -79,7 +79,7 @@ async def test_member_profile_cards_lead_to_the_season(flow):
     lineage, season, _, _ = await _setup(flow)
     flow.act_as(None)
     profile = (await flow.get("/api/membership/profiles/probe-alpha")).json()
-    links = {item["title"]: item["season_link"] for item in profile["references"]}
+    links = {item["title"]: item.get("season_link") for item in profile["references"]}
     assert links["Probe Liga 2026"]["season_slug"] == season["season_slug"]
     assert links["Probe Liga 2026"]["lineage_slug"] == lineage["slug"]
     assert links["Probe Einzelturnier"] is None

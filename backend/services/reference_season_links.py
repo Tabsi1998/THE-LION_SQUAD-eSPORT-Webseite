@@ -4,7 +4,8 @@ Eine Referenz gehört zu einer Saison, wenn sie selbst darauf zeigt (``series_id
 Saison sie als ihre Referenz vermerkt (``reference_id``, entsteht beim Abschluss). ``season_link`` trägt nur, was die
 Karte braucht: Adresse von Spur und Saison, die Bezeichnung („Probe Liga · 2026 · Division 2“) und ``season_end`` -
 ob es die Referenz des Saisonabschlusses ist, deren Endplatz in der Saison gepflegt wird. Nach außen nur, wenn Spur und
-Saison für den Besucher sichtbar und nicht archiviert sind; sonst ``None``. Gesammelt geladen, nie je Referenz.
+Saison für den Besucher sichtbar und nicht archiviert sind; sonst fehlt das Feld - Referenzen ohne Saison antworten
+genau wie vorher (``tests/golden/references_api.json``). Gesammelt geladen, nie je Referenz.
 """
 from __future__ import annotations
 
@@ -39,7 +40,7 @@ async def attach_season_links(db, items: list[dict], user: dict | None) -> list[
     for item in items:
         series = by_id.get(item.get("series_id")) or closing.get(item.get("id"))
         lineage = lineages.get((series or {}).get("lineage_id"))
-        item["season_link"] = None
+        item.pop("season_link", None)
         if not series or not lineage or lineage.get("is_archived") or series.get("status") == "archived":
             continue
         if not await visible(lineage.get("visibility")) or not await visible(series.get("visibility")):
