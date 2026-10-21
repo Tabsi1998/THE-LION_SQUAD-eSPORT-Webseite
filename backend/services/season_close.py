@@ -297,51 +297,96 @@ def _match_key(entry: dict) -> str | None:
     return f"team:{name}" if name else None
 
 
+def _origin(entry: dict, *, created: bool, team, label, profiles, dropped=()) -> dict:
+    """Herkunft eines Eintrags (``season_close_origin``): von der Saison angelegt?, der stabile Schlüssel aus dem
+    Vorschlag (eigenes Team bzw. Person, nicht der Name im Eintrag), was die Saison zuletzt als Teamnamen und
+    Bezeichnung hineingeschrieben hat, welche Profile aus ihr kamen und welche jemand davon von Hand entfernt hat."""
+    return {"created": created, "key": entry["key"], "team": team, "label": label, "profiles": list(profiles),
+            "dropped": list(dropped)}
+
+
 def new_entries(proposed: list[dict]) -> tuple[list[dict], dict]:
     """Einträge einer neuen Referenz samt Herkunft: alle stammen aus der Saison."""
-    docs = [{**_entry_doc(entry), "id": new_id()} for entry in proposed]
-    return docs, {doc["id"]: {"created": True, "profiles": list(doc["member_profile_ids"])} for doc in docs}
+    docs, origin = [], {}
+    for entry in proposed:
+        doc = {**_entry_doc(entry), "id": new_id()}
+        docs.append(doc)
+        origin[doc["id"]] = _origin(entry, created=True, team=doc["team_name"], label=doc["placement_label"],
+                                    profiles=doc["member_profile_ids"])
+    return docs, origin
 
 
-def merge_entries(existing: list[dict], proposed: list[dict], origin: dict | None = None) -> tuple[list[dict], dict]:
+def _has_hand_data(entry: dict, known: dict) -> bool:
+    """Steckt in einem Eintrag etwas von Hand? Alles außer Platz, „von N“ und den Spielern aus der Saison: externe
+    Namen, die andere Zahl, eine andere Bezeichnung oder ein anderer Teamname als die Saison geschrieben hat, eigene
+    Profile."""
+    if not known.get("created"):
+        return True
+    solo = entry.get("kind") == "solo"
+    if entry.get("lineup") or entry.get("team_count" if solo else "participant_count"):
+        return True
+    if (entry.get("placement_label") or None) != (known.get("label") or None):
+        return True
+    if not solo and (entry.get("team_name") or None) != (known.get("team") or None):
+        return True
+    return bool(set(entry.get("member_profile_ids") or []) - set(known.get("profiles") or []))
+
+
+def _find(entry: dict, free: list[dict], origin: dict, matcher: Matcher | None) -> dict | None:
+    """Der bestehende Eintrag zum Vorschlag: zuerst über den stabilen Schlüssel des letzten Abschlusses, dann - wenn das
+    eigene Team in der Saison umbenannt wurde - über den alten Namen, der jetzt Schreibweise ist, zuletzt über Name bzw.
+    Person. Ein von Hand umbenannter Eintrag bleibt so derselbe."""
+    for item in free:
+        if (origin.get(item["id"]) or {}).get("key") == entry["key"]:
+            return item
+    if entry["kind"] == "team" and matcher:
+        for item in free:
+            if item.get("kind") == "solo":
+                continue
+            names = (item.get("team_name"), (origin.get(item["id"]) or {}).get("team"))
+            if any(name and matcher.resolve(name) == entry["team_name"] for name in names):
+                return item
+    return next((item for item in free if _match_key(item) == entry["key"]), None)
+
+
+def merge_entries(existing: list[dict], proposed: list[dict], origin: dict | None = None,
+                  matcher: Matcher | None = None) -> tuple[list[dict], dict]:
     """Einträge der bestehenden Referenz mit dem Vorschlag zusammenführen. ``origin`` (an der Referenz als
-    ``season_close_origin``) merkt sich je Eintrag, ob ihn die Saison angelegt hat und welche Profile aus ihr kamen.
+    ``season_close_origin``, siehe ``_origin``) merkt sich die Herkunft je Eintrag; ``matcher`` kennt die eigenen Teams
+    samt Schreibweisen.
 
-    - Gleicher Eintrag (Team nach Name, Einzel nach Person): Platz und Feldgröße nur, wenn die Saison sie wirklich hat
-      (ein Team setzt nur „von N Teams“, ein Einzel nur „von N“ - die andere Zahl bleibt); eine abgebrochene Saison
-      nimmt den Platz weg. Eine eigene Bezeichnung bleibt.
-    - Spieler: von Hand ergänzte Profile bleiben; die aus der Saison folgen ihr - wer jetzt ausgeblendet, Gast oder
-      nicht mehr dabei ist, geht.
-    - Neue Einträge kommen dazu. Einträge, die die Saison angelegt hat und nicht mehr kennt, gehen; von Hand angelegte
-      bleiben, wie sie sind.
+    - Zuordnung über den stabilen Schlüssel (``_find``) - nie über einen von Hand geänderten Namen allein.
+    - Aus der Saison kommen nur Platz und „von N“ (ein Team nur „von N Teams“, ein Einzel nur „von N“ - die andere Zahl
+      bleibt; eine abgebrochene Saison nimmt den Platz weg) und die Saison-Spieler. Teamname und Bezeichnung folgen der
+      Saison nur, solange sie niemand geändert hat; eine eigene Bezeichnung, externe Namen und von Hand ergänzte
+      Profile bleiben, von Hand entfernte Saison-Spieler bleiben draußen.
+    - Spieler aus der Saison folgen ihr: wer jetzt ausgeblendet, Gast oder nicht mehr dabei ist, geht.
+    - Neue Einträge kommen dazu. Ein Eintrag, den die Saison angelegt hat und nicht mehr kennt, geht nur ohne
+      Handdaten; mit Handdaten bleibt er, nur ohne die Spieler aus der Saison. Von Hand angelegte bleiben, wie sie sind.
     Liefert die Einträge und die neue Herkunft."""
     origin = origin or {}
     out: list[dict] = []
-    by_key: dict[str, dict] = {}
     for entry in existing:
-        if not isinstance(entry, dict):
-            continue
-        copy = dict(entry)
-        copy["id"] = copy.get("id") or new_id()
-        out.append(copy)
-        key = _match_key(copy)
-        if key and key not in by_key:
-            by_key[key] = copy
+        if isinstance(entry, dict):
+            out.append({**entry, "id": entry.get("id") or new_id()})
     fresh: dict = {}
     for entry in proposed:
-        target = by_key.get(entry["key"])
+        target = _find(entry, [item for item in out if item["id"] not in fresh], origin, matcher)
         if target is None:
             doc = {**_entry_doc(entry), "id": new_id()}
             out.append(doc)
-            fresh[doc["id"]] = {"created": True, "profiles": list(doc["member_profile_ids"])}
+            fresh[doc["id"]] = _origin(entry, created=True, team=doc["team_name"], label=doc["placement_label"],
+                                       profiles=doc["member_profile_ids"])
             continue
         known = origin.get(target["id"]) or {}
+        created = bool(known.get("created"))
         from_season = set(known.get("profiles") or [])
         current = list(target.get("member_profile_ids") or [])
+        dropped = set(known.get("dropped") or []) | (from_season - set(current))  # von Hand entfernt
         hand = [pid for pid in current if pid not in from_season]
         wanted = entry["member_profile_ids"]
         target["member_profile_ids"] = ([pid for pid in current if pid in hand or pid in wanted]
-                                        + [pid for pid in wanted if pid not in current])
+                                        + [pid for pid in wanted if pid not in current and pid not in dropped])
         if entry.get("cancelled"):
             target["placement"] = None
         elif entry["placement"] is not None:
@@ -349,11 +394,24 @@ def merge_entries(existing: list[dict], proposed: list[dict], origin: dict | Non
         field = "participant_count" if entry["kind"] == "solo" else "team_count"
         if entry[field] is not None:
             target[field] = entry[field]
-        target["placement_label"] = target.get("placement_label") or entry["placement_label"]
-        fresh[target["id"]] = {"created": bool(known.get("created")),
-                               "profiles": [pid for pid in wanted if pid not in hand]}
-    kept = [entry for entry in out
-            if entry["id"] in fresh or not (origin.get(entry["id"]) or {}).get("created")]
+        team, label = known.get("team"), known.get("label")
+        if created and entry["kind"] == "team" and (target.get("team_name") or None) == (team or None):
+            target["team_name"] = team = entry["team_name"]
+        untouched = created and (target.get("placement_label") or None) == (label or None)
+        if untouched or not target.get("placement_label"):
+            target["placement_label"] = label = entry["placement_label"]
+        fresh[target["id"]] = _origin(entry, created=created, team=team, label=label,
+                                      profiles=[pid for pid in wanted if pid not in hand and pid not in dropped],
+                                      dropped=[pid for pid in wanted if pid in dropped])
+    kept = []
+    for item in out:
+        known = origin.get(item["id"])
+        if item["id"] not in fresh and known:
+            if known.get("created") and not _has_hand_data(item, known):
+                continue  # aus der Saison, unverändert, und die Saison kennt ihn nicht mehr
+            season = set(known.get("profiles") or [])
+            item["member_profile_ids"] = [pid for pid in item.get("member_profile_ids") or [] if pid not in season]
+        kept.append(item)
     return kept, fresh
 
 
@@ -386,7 +444,8 @@ async def close(db, series: dict, lineage: dict, reference_id: str | None, me: d
         await db.references.insert_one(doc)
         reference_id, created = doc["id"], True
     else:
-        merged, origin = merge_entries(target.get("entries") or [], entries, target.get("season_close_origin"))
+        merged, origin = merge_entries(target.get("entries") or [], entries, target.get("season_close_origin"),
+                                       Matcher(own_teams(series)))
         updates = {"entries": merged, "series_id": series["id"], "status": "completed", "updated_at": now,
                    "season_close_origin": origin,
                    # Nie offener als Saison und Spur - sonst stünde eine Mitglieder-Saison öffentlich da.

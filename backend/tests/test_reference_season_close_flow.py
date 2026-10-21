@@ -424,3 +424,86 @@ async def test_an_outdated_reference_form_cannot_overwrite_the_season_end(flow):
     fresh = await flow.patch(f"/api/references/{old['id']}", params={"expected_updated_at": saved["updated_at"]},
                              json={"highlights": "Starke Saison"})
     assert fresh.status_code == 200, fresh.text
+
+
+# ---------------------------------------------------------------- Prüfung Runde 2: Handdaten gehen nie verloren
+async def _closed(flow, setup=_team_league):
+    _, series = await setup(flow)
+    first = (await flow.post(_close(series), json={"reference_id": None})).json()
+    return series, await flow.db.references.find_one({"id": first["reference_id"]}, {"_id": 0})
+
+
+async def _edit(flow, reference, change):
+    """Wie das Formular: alle Einträge zurückschicken, einer davon von Hand geändert."""
+    entries = [dict(entry) for entry in reference["entries"]]
+    change(entries)
+    response = await flow.patch(f"/api/references/{reference['id']}", json={"entries": entries},
+                                params={"expected_updated_at": reference["updated_at"]})
+    assert response.status_code == 200, response.text
+
+
+async def _set_rank(flow, series, rank):
+    await flow.db.reference_standings.update_many(
+        {"series_id": series["id"], "scope": "table", "rows.team": OWN}, {"$set": {"rows.$.rank": rank}})
+
+
+@pytest.mark.asyncio
+async def test_hand_edits_of_a_season_entry_survive_closing_again(flow):
+    """Probe A: externer Spieler, eigene Bezeichnung und eigener Teamname - der Eintrag bleibt, nur Platz und Feldgröße
+    kommen aus der Saison."""
+    await _board(flow)
+    series, reference = await _closed(flow)
+    entry_id = reference["entries"][0]["id"]
+    await _edit(flow, reference, lambda entries: entries[0].update(
+        {"team_name": "TLS Probe Löwen", "lineup": ["Probe Extern"], "placement_label": "Endstand Hand"}))
+    await _set_rank(flow, series, 4)
+    assert (await flow.post(_close(series), json={"reference_id": None})).status_code == 200
+    saved = await flow.db.references.find_one({"id": reference["id"]}, {"_id": 0})
+    [team] = saved["entries"]
+    assert (team["id"], team["team_name"], team["lineup"], team["placement_label"]) == (
+        entry_id, "TLS Probe Löwen", ["Probe Extern"], "Endstand Hand")
+    assert (team["placement"], team["team_count"]) == (4, 8)
+    assert team["member_profile_ids"] == ["profil-alpha", "profil-beta"]
+
+
+@pytest.mark.asyncio
+async def test_hand_lineup_survives_renaming_the_own_team_in_the_season(flow):
+    """Probe B: das eigene Team heißt in der Saison neu, der alte Name bleibt Schreibweise - derselbe Eintrag bleibt."""
+    await _board(flow)
+    series, reference = await _closed(flow)
+    entry_id = reference["entries"][0]["id"]
+    await _edit(flow, reference, lambda entries: entries[0].update({"lineup": ["Probe Extern"]}))
+    renamed = await flow.patch(f"{ADMIN}/series/{series['id']}",
+                               json={"own_teams": [{"name": "Probe Löwen eSport", "aliases": [OWN]}]})
+    assert renamed.status_code == 200, renamed.text
+    assert (await flow.post(_close(series), json={"reference_id": None})).status_code == 200
+    saved = await flow.db.references.find_one({"id": reference["id"]}, {"_id": 0})
+    [team] = saved["entries"]
+    # Der Name kam aus der Saison und folgt ihr; der Spieler von Hand bleibt.
+    assert (team["id"], team["team_name"], team["lineup"], team["placement"]) == (
+        entry_id, "Probe Löwen eSport", ["Probe Extern"], 6)
+
+
+@pytest.mark.asyncio
+async def test_a_season_entry_with_hand_data_is_kept_when_the_season_no_longer_has_it(flow):
+    """Ein Eintrag mit Handdaten wird nie gelöscht - nur die Spieler aus der Saison gehen."""
+    await _board(flow)
+    series, reference = await _closed(flow, _racing)
+    await _edit(flow, reference, lambda entries: entries[1].update({"lineup": ["Probe Begleiter"]}))
+    await flow.db.reference_participants.update_one(
+        {"id": "rc-alpha"}, {"$set": {"link": "guest", "is_club_member": False}})
+    assert (await flow.post(_close(series), json={"reference_id": None})).status_code == 200
+    saved = await flow.db.references.find_one({"id": reference["id"]}, {"_id": 0})
+    solo = saved["entries"][1]
+    assert (solo["kind"], solo["lineup"], solo["member_profile_ids"], solo["placement"]) == (
+        "solo", ["Probe Begleiter"], [], 3)
+
+
+@pytest.mark.asyncio
+async def test_a_season_player_removed_by_hand_stays_removed(flow):
+    await _board(flow)
+    series, reference = await _closed(flow)
+    await _edit(flow, reference, lambda entries: entries[0].update({"member_profile_ids": ["profil-alpha"]}))
+    assert (await flow.post(_close(series), json={"reference_id": None})).status_code == 200
+    team, _ = await _entry(flow, reference["id"])
+    assert team["member_profile_ids"] == ["profil-alpha"]
