@@ -203,6 +203,37 @@ Mehrere Runden an einem Termin (etwa TFT-Lobbys R1–R5), gerechnet in `services
   Serienseite, Kader der Team-Liga, Rundenseite und Statistik (#1950) die Namen ohne Tag; das Mitgliederprofil zeigt nur
   Profilnamen. Team-Namen (`team_names`, #1931) nutzen nur `normalize_name` und bleiben unberührt.
 
+## Sonderregeln einer Rennliga (#1960)
+
+- **Anpassungen** (`services/series_adjustments.py`, Routen `routes/reference_adjustment_routes.py`): in der Saison
+  `adjustments = [{id, kind: participant|team, participant_id, team, points, reason, day, round_id}]`, nur Vorstand,
+  `POST/PATCH/DELETE …/admin/series/<id>/adjustments[/<kennung>]` unter der Sperre der Saison, Protokoll
+  `reference_series.adjustment_create|update|delete`, danach Neurechnen. Der Rechenkern zählt je Stand die Anpassungen,
+  die schon gelten (mit Termin ab dessen Stand, sonst ab dem letzten gewerteten Termin an oder vor ihrem Tag), in
+  `computed_points`; die Zeile trägt `adjustment_points` und `adjustments` (öffentlich Punkte, Grund, Tag, Termin).
+  Fahrer-Anpassungen ändern die Teamwertung nicht und umgekehrt; wer nur eine Anpassung hat, steht in der Tabelle.
+- **Teamwertung:** `team_scoring.mode` `per_race` (Vorgabe) oder `current_lineup` (`series_standings._current_lineup`:
+  Team des letzten Rennens, je Team höchstens so viele Fahrer, wie es in einem Rennen am meisten am Start hatte, die
+  zuletzt gefahrenen). `official_team_totals` des letzten Blatts gilt für Platz und Punkte, auch für Teams, die nur dort
+  stehen (Vergleich ohne Groß/klein). Öffentlich `racing.teams.source` (`official`/`computed`) und je Fahrer
+  `team_since` (erstes Rennen der letzten Folge im aktuellen Team, nur nach einem Wechsel).
+- **Saison abgebrochen:** Status `cancelled` mit `cancelled_on` (leer = heute) und `cancel_reason`; ein anderer Status
+  nimmt beides zurück. `successor_id` (andere, vorhandene Saison). Öffentlich `series.cancelled_on`, `.cancel_reason` und
+  `successor` (nur sichtbar und nicht archiviert, mit Adressen); `season_link.cancelled` an Referenzen. Saison
+  abschließen lässt den Status und gibt keinen Platz (`season_close.NO_PLACEMENT_STATUSES`).
+- **Termin ohne Wertung:** `no_score_reason` (`too_few`, `outage`, `restart`, `other`) und `no_score_note` (öffentlich in
+  `PUBLIC_FIELDS`); ein Grund setzt `counts: false` von Hand, `counts` true oder `null` nimmt ihn zurück.
+  `rules.min_participants`: Warnung `too_few_participants` beim Prüfen.
+- **Regeländerungen** (`services/series_rule_changes.py`): öffentlich `rule_changes` - je Format ab Runde 2 `{kind:
+  format, from_round, to_round, day, note, sessions}` (`weekend.formats[].note`, Tag des ersten Termins der Runde) und je
+  Regel-Version ab 2 mit Hinweis `{kind: rules, version, day, note}`.
+- **Umgekehrte Startaufstellung** (`race_weekend.with_session_reverse`): `grid` `reverse_qualifying` (Haupt-Qualifying
+  derselben Runde) oder `reverse_previous_session` (letzter Lauf davor mit Ergebnis), optional `reverse_top` (1-100,
+  fehlt sonst ganz). Gültige Plätze umgedreht (nur die ersten N), ohne gültigen Platz dahinter, ein eingetragener
+  Startplatz bleibt; Pole-Marken fallen weg (beim Prüfen Warnung `pole_moved`, `race_weekend.clear_reverse_pole`).
+  Übernimmt kein Lauf der Runde den Startplatz aus dem Qualifying, zählt der Pole-Bonus der Saison am Qualifying
+  (`pole_at_qualifying`: ein Blatt nur mit der Pole-Zeile ohne Platz, nur beim Rechnen).
+
 ## Version, Entwurf daneben und Protokoll
 
 - **Nacheinander je Saison:** Ergebnis speichern, freigeben, verwerfen und zurücknehmen sowie alle Kalender-Änderungen
