@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.17.1 (21.10.2026)
+
+### Fehlerbehebungen
+
+* Sponsoren- und Partner-Logos wieder im Original statt weiß (#1321)
+
 ## 1.17.0 (21.10.2026)
 
 ### Neu
