@@ -13,6 +13,7 @@ import { offerFriendsHint } from "../../lib/friendsHint";
 import { offerCalendarHint } from "../../lib/calendarHint";
 import { ErrorState, PartialLoadNotice, SkeletonList } from "../../components/ListState";
 import { MediaImage } from "../../components/MediaImage";
+import { SponsorLogo } from "../../components/SponsorLogo";
 import { PlayAlongSheet } from "../../components/PlayAlongSheet";
 import { RichText } from "../../components/RichText";
 import { Screen } from "../../components/Screen";
@@ -68,7 +69,7 @@ type EventDetail = ClubEvent & {
   tournaments?: Tournament[];
   f1_challenges?: F1Challenge[];
   news?: NewsPost[];
-  sponsors?: Array<{ id: string; name: string; tier?: string; logo_url?: string | null; url?: string | null; link?: string | null }>;
+  sponsors?: Array<{ id: string; name: string; tier?: string; logo_url?: string | null; logo_mono_url?: string | null; logo_transparent?: boolean | null; url?: string | null; link?: string | null }>;
   albums?: Array<{ id: string; slug?: string; title?: string; cover_url?: string | null; image_url?: string | null }>;
 };
 
@@ -684,7 +685,8 @@ export function EventDetailScreen({ navigation, route }: Props) {
             <View style={styles.logoGrid}>
               {event.sponsors.map((sponsor) => (
                 <Pressable key={sponsor.id} onPress={() => openSponsor(sponsor)} style={({ pressed }) => [styles.logoItem, pressed && styles.pressed]}>
-                  <MediaImage uri={sponsor.logo_url} resizeMode="contain" style={styles.logo} fallback={<Body style={styles.logoText}>{sponsor.name.slice(0, 2).toUpperCase()}</Body>} />
+                  {/* Einfarbig weiß (#1916): weiße Fassung, durchsichtig eingefärbt oder auf ruhiger Fläche. */}
+                  <SponsorLogo logo={sponsor} style={styles.logo} testID={`event-sponsor-${sponsor.id}`} fallback={<Body style={styles.logoText}>{sponsor.name.slice(0, 2).toUpperCase()}</Body>} />
                   <Muted numberOfLines={2}>{sponsor.name}</Muted>
                 </Pressable>
               ))}

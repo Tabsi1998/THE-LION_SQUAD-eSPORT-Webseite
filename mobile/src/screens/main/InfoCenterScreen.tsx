@@ -12,6 +12,7 @@ import { EmptyState, ErrorState, PartialLoadNotice, SkeletonList, loadProblem, t
 import { LoewenRangFrame } from "../../components/LoewenRangFrame";
 import { frameLabel } from "../../lib/loewenRang";
 import { MediaImage } from "../../components/MediaImage";
+import { SponsorLogo } from "../../components/SponsorLogo";
 import { Screen } from "../../components/Screen";
 import { SegmentedTabs } from "../../components/SegmentedTabs";
 import { Body, Heading, Muted, Title } from "../../components/Text";
@@ -199,10 +200,11 @@ function Sponsors({ items }: { items: any[] }) {
                       <MediaImage uri={sponsor.banner_url} resizeMode="contain" style={styles.sponsorBannerImage} />
                     </View>
                   ) : null}
-                  <MediaImage
-                    uri={sponsor.logo_url}
-                    resizeMode="contain"
+                  {/* Einfarbig weiß (#1916): weiße Fassung, durchsichtig eingefärbt oder auf ruhiger Fläche. */}
+                  <SponsorLogo
+                    logo={sponsor}
                     style={[styles.sponsorLogo, { height: sponsor.banner_url ? Math.round(tier.logoHeight * 0.6) : tier.logoHeight }]}
+                    testID={`sponsor-logo-${sponsor.id}`}
                     fallback={
                       <Body style={styles.sponsorFallback} numberOfLines={2}>
                         {sponsor.name || "?"}
@@ -227,10 +229,10 @@ function Partners({ items }: { items: any[] }) {
         <LinkedCard key={partner.id || partner.username || index} url={partner.url || partner.link}>
           <Card style={styles.card}>
             <View style={styles.logoRow}>
-              <MediaImage
-                uri={partner.logo_url || partner.avatar_url}
-                resizeMode="contain"
+              <SponsorLogo
+                logo={partner.logo_url || partner.logo_mono_url ? partner : { logo_url: partner.avatar_url }}
                 style={styles.logoBox}
+                testID={`partner-logo-${partner.id}`}
                 fallback={<Body style={styles.logoFallback}>{(partner.name || partner.display_name || partner.username || "?").slice(0, 2).toUpperCase()}</Body>}
               />
               <View style={styles.logoTextWrap}>
