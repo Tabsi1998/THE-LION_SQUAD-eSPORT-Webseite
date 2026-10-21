@@ -8,7 +8,9 @@ import {
   applyLineupPaste, applyMatchday, isOwnMatch, ownTeamMatcher, pickMatchday, rosterFor, setMapLineup, toggleLineup,
   toggleMatchLineup,
 } from "@/lib/teamLeagueEntry";
-import { Check, ClipboardList, Plus, Trash2, X } from "lucide-react";
+import { canonicalMapName, choiceList, mapState, pickMap, withMapName } from "@/lib/teamLeagueMaps";
+import { LazyImg } from "@/components/tls/LazyImg";
+import { Check, ClipboardList, Map as MapIcon, Plus, Trash2, X } from "lucide-react";
 
 // Team-Liga im Ergebnisblatt (#1931): „Spieltag einfügen“ (Begegnungsliste des Veranstalters - das eigene Spiel wird
 // erkannt und ausgefüllt, die übrigen kommen auf Wunsch mit), das eigene Spiel mit Tag und Uhrzeit, die Maps in der
@@ -162,7 +164,51 @@ function roleValue(item) {
   return item.role === "decider" ? "decider" : "";
 }
 
-function MapRow({ match, item, index, errors, onChange, onRemove }) {
+// Map-Bild im Blatt (#1616): klein neben dem Namen bzw. im Pool - ohne Bild ein ruhiges Symbol.
+function MapThumb({ item, testId, size = "w-14" }) {
+  return (
+    <span className={`relative ${size} shrink-0 overflow-hidden rounded-sm border border-white/10 bg-[#121212]`} style={{ aspectRatio: "16 / 9" }} data-testid={testId} aria-hidden="true">
+      {item?.image_url ? (
+        <LazyImg src={item.image_url} alt="" sizes="56px" widths={[160]} className="absolute inset-0 h-full w-full object-cover" />
+      ) : (
+        <span className="absolute inset-0 flex items-center justify-center text-[#29B6E8]/40"><MapIcon className="w-3.5 h-3.5" /></span>
+      )}
+    </span>
+  );
+}
+
+// Der Map-Pool der Saison (#1616) über den Maps: je Modus die Maps mit Bild - ein Klick setzt die Map in die nächste
+// freie Zeile des Vetos (oder hängt eine an). Gilt kein Pool, steht die Vorgabe des Spiels da.
+function MapPoolStrip({ choices, onPick }) {
+  const groups = (choices?.modes || []).filter((group) => group.maps?.length);
+  if (!groups.length) return null;
+  return (
+    <div className="space-y-2 rounded-sm border border-white/10 bg-[#121212] p-2.5" data-testid="result-map-pool">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <span className={LABEL}>{choices.source === "pool" ? "Map-Pool der Saison" : "Maps des Spiels"}</span>
+        <span className="text-[11px] text-white/45">In der Reihenfolge des Vetos antippen, dann Rolle und Ergebnis.</span>
+      </div>
+      {groups.map((group) => (
+        <div key={group.mode || "alle"} className="space-y-1">
+          {groups.length > 1 || group.mode ? <span className="block text-[10px] font-bold uppercase tracking-widest text-[#29B6E8]/80">{group.label || group.mode}</span> : null}
+          <ul className="flex flex-wrap gap-1.5">
+            {group.maps.map((choice) => (
+              <li key={choice.map_id}>
+                <button type="button" onClick={() => onPick(choice)} aria-label={`${choice.name} ins Veto`}
+                  className="inline-flex items-center gap-2 rounded-sm border border-white/10 bg-[#0A0A0A] py-1 pl-1 pr-2.5 text-xs text-white/80 transition-colors hover:border-[#29B6E8]/60 hover:text-white active:scale-[0.97] focus-visible:outline focus-visible:outline-1 focus-visible:outline-[#29B6E8]">
+                  <MapThumb item={choice} />
+                  {choice.name}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function MapRow({ match, item, index, errors, choices, onChange, onRemove }) {
   const invalid = errors?.[item.key];
   const set = (values) => onChange({ maps: match.maps.map((entry) => (entry.key === item.key ? { ...entry, ...values } : entry)) });
   const setRole = (value) => {
@@ -171,9 +217,21 @@ function MapRow({ match, item, index, errors, onChange, onRemove }) {
   };
   const number = index + 1;
   const banned = isBanned(item);
+  // Zuordnung zur Bibliothek (#1616): Name, Slug oder weitere Schreibweise setzt die Kennung; ein unbekannter Name bleibt
+  // als Freitext und ist gelb markiert, damit er nicht übersehen wird.
+  const state = mapState(item, choices);
+  const known = item.map_id ? choiceList(choices).find((entry) => entry.map_id === item.map_id) : null;
+  const unknown = state === "unknown";
   return (
     <div className="grid grid-cols-[minmax(0,1fr)_auto_auto] sm:grid-cols-[minmax(0,1fr)_9.5rem_auto_auto] items-center gap-2" data-testid="result-map" data-role={item.role || "played"}>
-      <input aria-label={`Map ${number}`} value={item.name} maxLength={80} placeholder="Map" list="result-map-names" onChange={(event) => set({ name: event.target.value })} {...invalidProps(invalid, "name")} className={`${SMALL_INPUT} min-w-0 ${invalid?.name ? INVALID : ""}`} data-testid="result-map-name" />
+      <div className="flex min-w-0 items-center gap-2">
+        {known ? <MapThumb item={known} testId="result-map-thumb" size="w-9 sm:w-14" /> : null}
+        <input aria-label={`Map ${number}`} value={item.name} maxLength={80} placeholder="Map" list="result-map-names"
+          onChange={(event) => set(withMapName({}, event.target.value, choices))}
+          onBlur={() => { if (item.map_id) set({ name: canonicalMapName(item, choices) }); }}
+          {...invalidProps(invalid, "name")} data-unknown={unknown ? "true" : undefined} aria-describedby={unknown ? `${item.key}-unknown` : undefined}
+          className={`${SMALL_INPUT} min-w-0 ${invalid?.name ? INVALID : unknown ? "!border-amber-300/70" : ""}`} data-testid="result-map-name" />
+      </div>
       <select aria-label={`Map ${number}: Rolle im Veto`} value={roleValue(item)} onChange={(event) => setRole(event.target.value)} data-testid="result-map-role"
         className={`${SMALL_INPUT} order-last col-span-3 sm:order-none sm:col-span-1`}>
         {ROLE_OPTIONS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
@@ -188,6 +246,11 @@ function MapRow({ match, item, index, errors, onChange, onRemove }) {
         </div>
       )}
       <button type="button" className={ICON_BUTTON} onClick={onRemove} aria-label={`Map ${number} entfernen`}><X className="w-4 h-4" /></button>
+      {unknown ? (
+        <p id={`${item.key}-unknown`} className="order-last col-span-full -mt-1 text-[11px] text-amber-200" data-testid="result-map-unknown">
+          Nicht im Map-Pool – bleibt als Freitext. Fehlt die Map, in der Bibliothek anlegen oder als weitere Schreibweise eintragen.
+        </p>
+      ) : null}
     </div>
   );
 }
@@ -290,7 +353,7 @@ function LineupPicker({ match, roster, participants, onChange }) {
   );
 }
 
-function OwnMatch({ match, index, isOwn, participants, errors, onChange, onRemove }) {
+function OwnMatch({ match, index, isOwn, participants, errors, choices, onChange, onRemove }) {
   const invalid = errors?.[match.key];
   const team = isOwn(match.home) || isOwn(match.away);
   const roster = useMemo(() => rosterFor(participants, team, isOwn), [participants, team, isOwn]);
@@ -320,8 +383,9 @@ function OwnMatch({ match, index, isOwn, participants, errors, onChange, onRemov
       </div>
       <div className="space-y-1.5">
         <span className={LABEL}>Maps · in der Reihenfolge des Vetos</span>
+        <MapPoolStrip choices={choices} onPick={(choice) => onChange({ maps: pickMap(match, choice, emptyMap).maps })} />
         {match.maps.map((item, mapIndex) => (
-          <MapRow key={item.key} match={match} item={item} index={mapIndex} errors={errors} onChange={onChange} onRemove={() => onChange({ maps: match.maps.filter((entry) => entry.key !== item.key) })} />
+          <MapRow key={item.key} match={match} item={item} index={mapIndex} errors={errors} choices={choices} onChange={onChange} onRemove={() => onChange({ maps: match.maps.filter((entry) => entry.key !== item.key) })} />
         ))}
         <button type="button" onClick={() => onChange({ maps: [...match.maps, emptyMap()] })} data-testid="result-map-add" className={QUIET_BUTTON}>
           <Plus className="w-3.5 h-3.5" /> Map
@@ -366,7 +430,7 @@ function OtherMatches({ matches, errors, onChange, onRemove, onAdd }) {
  * Der Team-Liga-Teil des Ergebnisblatts. `ownTeams`: die eigenen Teams der Saison (`[{name, aliases}]`), `round` der
  * Termin, `participants` die Teilnehmer (Kader über ihr Team), `invalid` die Feldfehler des Formulars.
  */
-export function TeamLeagueEntry({ form, setForm, ownTeams, round, participants, invalid, mapNames = [] }) {
+export function TeamLeagueEntry({ form, setForm, ownTeams, round, participants, invalid, mapNames = [], mapChoices = null }) {
   const [pasting, setPasting] = useState(() => !form.matches.some((match) => String(match.home_score || "").trim()));
   const isOwn = useMemo(() => ownTeamMatcher(ownTeams), [ownTeams]);
   const own = form.matches.filter((match) => isOwnMatch(match, isOwn));
@@ -382,7 +446,7 @@ export function TeamLeagueEntry({ form, setForm, ownTeams, round, participants, 
     <div className="space-y-3" data-testid="result-team-league">
       {/* Map-Namen: schon in der Saison verwendete und die im Blatt (#1931). */}
       <datalist id="result-map-names">
-        {[...new Set([...mapNames, ...form.matches.flatMap((match) => match.maps.map((item) => String(item.name || "").trim()))].filter(Boolean))].map((name) => <option key={name} value={name} />)}
+        {[...new Set([...choiceList(mapChoices).map((item) => item.name), ...mapNames, ...form.matches.flatMap((match) => match.maps.map((item) => String(item.name || "").trim()))].filter(Boolean))].map((name) => <option key={name} value={name} />)}
       </datalist>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h3 className="text-[11px] font-bold uppercase tracking-widest text-[#29B6E8]">Spieltag</h3>
@@ -393,7 +457,7 @@ export function TeamLeagueEntry({ form, setForm, ownTeams, round, participants, 
       </div>
       {pasting && <MatchdayPaste form={form} setForm={setForm} ownTeams={ownTeams} round={round} />}
       {editable.map((match, index) => (
-        <OwnMatch key={match.key} match={match} index={index} isOwn={isOwn} participants={participants} errors={invalid}
+        <OwnMatch key={match.key} match={match} index={index} isOwn={isOwn} participants={participants} errors={invalid} choices={mapChoices}
           onChange={(values) => updateMatch(match.key, values)} onRemove={() => removeMatch(match.key)} />
       ))}
       {(editable.length === 0 || (ownTeams || []).length > 1) && (

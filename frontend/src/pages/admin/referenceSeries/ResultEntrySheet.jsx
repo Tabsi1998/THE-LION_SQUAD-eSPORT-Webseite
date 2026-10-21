@@ -625,7 +625,7 @@ export function ResultEntrySheet({ series, round, onClose, onSaved }) {
 
           {teamLeague && (
             <section className="space-y-3" data-testid="result-matches">
-              <TeamLeagueEntry form={form} setForm={setForm} ownTeams={ownTeams} round={data.round} participants={participants} invalid={invalid} mapNames={data.series?.map_names || []} />
+              <TeamLeagueEntry form={form} setForm={setForm} ownTeams={ownTeams} round={data.round} participants={participants} invalid={invalid} mapNames={data.series?.map_names || []} mapChoices={data.series?.map_choices || null} />
               <OfficialTable rows={form.table} onPaste={pasteTable} onClear={() => update({ table: [] })} />
             </section>
           )}
