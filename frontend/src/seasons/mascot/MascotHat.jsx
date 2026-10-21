@@ -70,7 +70,7 @@ export function useImageSpot(selector, measure, deps) {
     if (typeof document === "undefined") return undefined;
     let image = null;
     const run = () => {
-      image = document.querySelector(selector);
+      image = typeof selector === "function" ? selector(document) : document.querySelector(selector);
       if (!image || !image.complete || !(image.naturalWidth > 0)) {
         setSpot(null);
         return;
@@ -126,11 +126,25 @@ export function MascotHatButton({ Art, size, style, moving, label, title, testId
 }
 
 /**
+ * Das Logo im Kopf, das gerade zu sehen ist (#1234): zwischen 1024 und 1439 px der Löwenkopf, sonst der Schriftzug - das
+ * andere ist ausgeblendet und 0 px breit. Ohne sichtbares Logo das erste, wie bisher.
+ */
+function visibleHeaderLogo(doc) {
+  const logos = [...doc.querySelectorAll("header [data-testid='tls-logo']")];
+  return logos.find((logo) => logo.getBoundingClientRect().width > 0) || logos[0] || null;
+}
+
+/** Welche Form das Logo im Kopf hat: der Löwenkopf der kompakten Kopfzeile oder der Schriftzug. */
+function headerLogoKind(image) {
+  return image.closest("[data-header-logo='mascot']") ? "mascot" : "wordmark";
+}
+
+/**
  * Das Stück auf dem Löwen im Kopf der Seite: in der Kopfzeile selbst (Koordinaten relativ zu ihr) - so klebt es mit
  * ihr oben, und was über der Kopfzeile liegt (Dialoge), liegt auch über dem Stück.
  */
 export function HeaderMascotHat({ className = "", crown = false, share = 0.46, ...props }) {
-  const spot = useImageSpot("header [data-testid='tls-logo']", (image) => {
+  const spot = useImageSpot(visibleHeaderLogo, (image) => {
     const rect = image.getBoundingClientRect();
     const header = image.closest("header");
     if (rect.width < 20 || !header) return null;
@@ -139,7 +153,8 @@ export function HeaderMascotHat({ className = "", crown = false, share = 0.46, .
     // `crown` (#855): auf dem Kopf statt auf dem höchsten Punkt der Mähne - für Hüte, die gerade sitzen sollen; eine Zahl
     // legt die Stelle entlang des Kopfes fest (0 = links, 1 = rechts, `true` = Mitte).
     const along = typeof crown === "number" ? crown : 0.5;
-    const head = (crown ? crownTop(image, "wordmark", along) : headTop(image, "wordmark")) || HEAD_FALLBACK.wordmark;
+    const kind = headerLogoKind(image);
+    const head = (crown ? crownTop(image, kind, along) : headTop(image, kind)) || HEAD_FALLBACK[kind];
     // Im Kopf ist über dem Löwen kaum Platz. Ein Hut (`crown`) wird so groß, wie darüber Platz ist - die Kopfzeile
     // drückte ihn sonst nach unten ins Gesicht; alles andere bleibt ganz in der Kopfzeile und sitzt dafür etwas tiefer.
     const room = Math.floor((rect.top + head.y * rect.height - (frame.top + 2)) / 1.15);

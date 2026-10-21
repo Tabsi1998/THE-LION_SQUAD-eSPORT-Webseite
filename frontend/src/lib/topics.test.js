@@ -60,3 +60,9 @@ test("die Handy-Leiste hat die fünf Einträge der App und kennt jedes Thema", (
   expect(activeSection("/fastlap/monza")).toBe("events");
   expect(activeSection("/account/invoices")).toBe("profile");
 });
+
+test("Saison-Deko: Angemeldete unter Einstellungen → Darstellung, Gäste je Gerät an einem Platz (#1239)", () => {
+  const deco = WEB_TOPICS.find((entry) => entry.topic === "Saison-Deko und Einstellungen");
+  expect(deco.place).toBe("Einstellungen → Darstellung (Gäste: am Handy im Menü, am PC in der Fußzeile)");
+  expect(deco.menu).toBeNull();
+});

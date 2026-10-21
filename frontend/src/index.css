@@ -2018,6 +2018,13 @@ input.no-spin::-webkit-outer-spin-button, input.no-spin::-webkit-inner-spin-butt
 .tls-nav-link[aria-current="page"]::after {
   transform: scaleX(1);
 }
+/* Kompakte Kopfzeile (#1234): zwischen 1024 und 1439 px rücken die Menüpunkte zusammen - die Linie folgt dem Abstand. */
+@media (min-width: 1024px) {
+  .tls-nav-link::after { left: 0.375rem; right: 0.375rem; }
+}
+@media (min-width: 1440px) {
+  .tls-nav-link::after { left: 1rem; right: 1rem; }
+}
 
 /* Seitenwechsel (#1073): der neue Inhalt blendet ein - nur Deckkraft, Kopf und Footer bleiben stehen. Zwei gleiche
    Animationen im Wechsel, damit jede neue Seite sie neu startet, ohne dass die Seite neu aufgebaut wird. Ohne
