@@ -1,19 +1,17 @@
 # Changelog
 
-## [1.16.0](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/compare/v1.15.0...v1.16.0) (2026-10-21)
-
+## 1.16.0 (21.10.2026)
 
 ### Neu
 
-* Angepinnte News als breiter Aufmacher auf News-Seite und Startseite ([#1342](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1342)) ([5e0d0bc](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/5e0d0bc009faaf0eb7a3112692ab875bdd4c3015))
-* News führen direkt zur Anmeldung – Karte mit Datum, freien Plätzen und Stand nach dem ersten Absatz ([#1266](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1266)) ([5e0d0bc](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/5e0d0bc009faaf0eb7a3112692ab875bdd4c3015))
-* News ohne Bild bekommen eine Text-Karte im Vereinsstil, Ergebnis-News zeigen den Sieger mit Pokal ([#1343](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1343)) ([5e0d0bc](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/5e0d0bc009faaf0eb7a3112692ab875bdd4c3015))
-* News-Kategorien nur mit Artikeln und Anzahl, eine Wisch-Zeile mit Suche als Symbol ([#1249](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1249)) ([5e0d0bc](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/5e0d0bc009faaf0eb7a3112692ab875bdd4c3015))
-
+* Angepinnte News als breiter Aufmacher auf News-Seite und Startseite (#1342)
+* News führen direkt zur Anmeldung – Karte mit Datum, freien Plätzen und Stand nach dem ersten Absatz (#1266)
+* News ohne Bild bekommen eine Text-Karte im Vereinsstil, Ergebnis-News zeigen den Sieger mit Pokal (#1343)
+* News-Kategorien nur mit Artikeln und Anzahl, eine Wisch-Zeile mit Suche als Symbol (#1249)
 
 ### Fehlerbehebungen
 
-* Dasselbe News-Bild steht nie zweimal nebeneinander ([#1343](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1343)) ([5e0d0bc](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/5e0d0bc009faaf0eb7a3112692ab875bdd4c3015))
+* Dasselbe News-Bild steht nie zweimal nebeneinander (#1343)
 
 ## 1.15.0 (21.10.2026)
 
