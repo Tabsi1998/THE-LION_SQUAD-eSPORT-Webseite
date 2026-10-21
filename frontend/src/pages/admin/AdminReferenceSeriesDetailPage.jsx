@@ -16,6 +16,7 @@ import { SeriesAdjustmentsSection } from "./referenceSeries/SeriesAdjustmentsSec
 import { cancelledText, teamModeLabel } from "@/lib/seriesSpecialRules";
 import { SeasonCloseSheet } from "./referenceSeries/SeasonCloseSheet";
 import { SeriesMapPoolSection } from "./referenceSeries/SeriesMapPoolSection";
+import { SeriesPartnerSourceSection } from "./referenceSeries/SeriesPartnerSourceSection";
 import { seasonLabel } from "./AdminReferenceSeriesPage";
 import { dayLabel, publishText } from "@/lib/referenceSeriesStaff";
 import { referenceLine, seasonName } from "@/lib/seasonClose";
@@ -165,6 +166,8 @@ export default function AdminReferenceSeriesDetailPage() {
             {board && <SeriesParticipantsSection series={series} onChanged={load} />}
             {/* Kader je eigenem Team (#1931) - nur Team-Liga, nur Vorstand. */}
             {board && lineage.kind === "team_league" && <SeriesRosterSection series={series} />}
+            {/* Partner-Plattform (#1964): Turniertage samt Runden als Entwurf holen - Turnierserie, nur Vorstand. */}
+            {board && lineage.kind === "series" && <SeriesPartnerSourceSection series={series} onChanged={load} />}
             <SeriesResultsSection series={series} onChanged={load} />
             {/* Teamfarben für die Ergebnistabelle je Runde (#1950) - nur Rennliga, nur Vorstand. */}
             {board && lineage.kind === "racing" && <SeriesTeamColorsSection series={series} />}

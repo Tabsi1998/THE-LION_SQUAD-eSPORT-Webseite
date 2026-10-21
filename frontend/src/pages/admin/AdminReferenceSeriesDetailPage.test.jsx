@@ -95,6 +95,28 @@ test("Turnierserie (#1961): Runden je Turniertag, Sonderboni und „Top N“ in 
   expect(body.rules.tiebreakers).toEqual(["wins", "top_n"]);
 });
 
+// Partner-Plattform (#1964): nur in einer Turnierserie und nur für den Vorstand.
+test("Turnierserie: der Vorstand sieht die Partner-Plattform, eine Rennliga und Captains nicht", async () => {
+  const partnerUrl = "/reference-series/admin/series/serie-1/partner-source";
+  apiMock.get.mockImplementation(async (url) => ({ data: url === partnerUrl ? { source: null, choices: [], partners: [] }
+    : { ...SERIES, lineage: { ...SERIES.lineage, kind: "series" }, access: { role: "board", can_publish: true } } }));
+  const { unmount } = renderAt();
+  expect(await screen.findByTestId("series-partner-source")).toHaveTextContent("Partner-Plattform");
+  expect(apiMock.get).toHaveBeenCalledWith(partnerUrl);
+  unmount();
+  apiMock.get.mockReset();
+  apiMock.get.mockResolvedValue({ data: SERIES });
+  const racing = renderAt();
+  await screen.findByRole("heading", { level: 1 });
+  expect(screen.queryByTestId("series-partner-source")).toBeNull();
+  racing.unmount();
+  apiMock.get.mockResolvedValue({ data: { ...SERIES, lineage: { ...SERIES.lineage, kind: "series" }, access: { role: "captain", can_publish: false, valid_until: "2026-12-31" } } });
+  renderAt();
+  await screen.findByTestId("series-detail-captain");
+  expect(screen.queryByTestId("series-partner-source")).toBeNull();
+  expect(apiMock.get.mock.calls.map(([url]) => url).filter((url) => url.includes("partner-source"))).toEqual([]);
+});
+
 test("Bearbeiten öffnet das Seitenblatt der Saison, Archivieren archiviert", async () => {
   renderAt();
   await screen.findByRole("heading", { level: 1 });
