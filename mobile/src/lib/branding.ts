@@ -1,4 +1,5 @@
 import { resolveMediaUrl } from "./api";
+import { COUNTDOWN_DAYS_DEFAULT, countdownDays } from "./countdownRule";
 
 // Markenbilder und Vereinsname aus den Einstellungen (#229). Die App ist dunkel, also zählt wie
 // im Web (Logo.jsx) zuerst die Fassung für dunklen Hintergrund. Ohne Einstellungen - offline,
@@ -12,16 +13,19 @@ export type PublicBranding = {
   logo_dark_url?: string | null;
   logo_light_url?: string | null;
   mascot_url?: string | null;
+  // Ab wie vielen Tagen ein Countdown läuft (#1897); ältere Server liefern das Feld nicht - dann gilt die Vorgabe 14.
+  countdown_days?: number | string | null;
 };
 
 export type Branding = {
   clubName: string;
   logoUrl: string;
   mascotUrl: string;
+  countdownDays: number;
   loaded: boolean;
 };
 
-export const DEFAULT_BRANDING: Branding = { clubName: DEFAULT_CLUB_NAME, logoUrl: "", mascotUrl: "", loaded: false };
+export const DEFAULT_BRANDING: Branding = { clubName: DEFAULT_CLUB_NAME, logoUrl: "", mascotUrl: "", countdownDays: COUNTDOWN_DAYS_DEFAULT, loaded: false };
 
 export function brandingFromSettings(data: PublicBranding | null | undefined): Branding {
   const name = String(data?.club_name || "").trim();
@@ -29,6 +33,7 @@ export function brandingFromSettings(data: PublicBranding | null | undefined): B
     clubName: name || DEFAULT_CLUB_NAME,
     logoUrl: resolveMediaUrl(data?.logo_dark_url || data?.logo_url || ""),
     mascotUrl: resolveMediaUrl(data?.mascot_url || data?.logo_dark_url || data?.logo_url || ""),
+    countdownDays: countdownDays(data?.countdown_days),
     loaded: true,
   };
 }

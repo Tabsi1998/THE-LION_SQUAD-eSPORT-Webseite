@@ -5,7 +5,7 @@ import { brandingFromSettings, DEFAULT_BRANDING, DEFAULT_CLUB_NAME } from "./bra
 test("ohne Einstellungen gelten die eingebauten Werte", () => {
   expect(DEFAULT_BRANDING.loaded).toBe(false);
   const empty = brandingFromSettings(null);
-  expect(empty).toEqual({ clubName: DEFAULT_CLUB_NAME, logoUrl: "", mascotUrl: "", loaded: true });
+  expect(empty).toEqual({ clubName: DEFAULT_CLUB_NAME, logoUrl: "", mascotUrl: "", countdownDays: 14, loaded: true });
   expect(brandingFromSettings({ club_name: "   " }).clubName).toBe(DEFAULT_CLUB_NAME);
 });
 
@@ -24,4 +24,14 @@ test("die Fassung für dunklen Hintergrund kommt zuerst, das Maskottchen fällt 
   const withMascot = brandingFromSettings({ mascot_url: "https://cdn.example/m.png", logo_url: "/api/static/uploads/std.png" });
   expect(withMascot.mascotUrl).toBe("https://cdn.example/m.png");
   expect(withMascot.logoUrl).toContain("/api/static/uploads/std.png");
+});
+
+// Countdown-Schwelle (#1897): kommt als countdown_days aus /settings/public; ein älterer Server liefert sie nicht.
+test("die Countdown-Schwelle kommt aus den Einstellungen, ohne gültigen Wert gilt 14", () => {
+  expect(DEFAULT_BRANDING.countdownDays).toBe(14);
+  expect(brandingFromSettings({ club_name: "LION" }).countdownDays).toBe(14);
+  expect(brandingFromSettings({ countdown_days: 21 }).countdownDays).toBe(21);
+  expect(brandingFromSettings({ countdown_days: null }).countdownDays).toBe(14);
+  expect(brandingFromSettings({ countdown_days: 0 }).countdownDays).toBe(14);
+  expect(brandingFromSettings({ countdown_days: 500 }).countdownDays).toBe(14);
 });
