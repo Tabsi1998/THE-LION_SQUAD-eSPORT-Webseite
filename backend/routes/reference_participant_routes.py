@@ -24,13 +24,15 @@ from pydantic import BaseModel, Field
 from auth import require_area
 from database import get_db
 from models import ReferenceParticipantCreate, ReferenceParticipantUpdate, new_id, now_utc
-from services import reference_series, series_identity
+from services import reference_running_cache, reference_series, series_identity
 from services.series_participants import (
     apply_alias, build_index, clean, club_profiles, follower_series, move_followers, new_participant, open_series,
     profile_name, series_game_id,
 )
 
-router = APIRouter(prefix="/api/reference-series", tags=["reference-series"])
+# Jeder schreibende Aufruf leert den Cache der laufenden Saisons (#1753, Startseite).
+router = APIRouter(prefix="/api/reference-series", tags=["reference-series"],
+                   dependencies=[Depends(reference_running_cache.reset_after_write)])
 
 MAX_BATCH = 200
 # Diese Felder ändert nur das Zuordnen - so bleibt jede Verknüpfung bestätigt und im Protokoll.

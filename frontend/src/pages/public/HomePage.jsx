@@ -12,6 +12,7 @@ import { Reveal } from "@/components/tls/Reveal";
 import { MascotBadge } from "@/components/tls/Logo";
 import { LazyImg } from "@/components/tls/LazyImg";
 import { SeasonPassWidget } from "@/components/tls/SeasonPassWidget";
+import { HomeTodayStrip } from "@/components/tls/HomeTodayStrip";
 import { SponsorTicker } from "@/components/tls/SponsorTicker";
 import { LiveStreamSlider } from "@/components/tls/LiveStreamSlider";
 import { TwitchClips } from "@/components/tls/TwitchClips";
@@ -70,6 +71,9 @@ export default function HomePage() {
     <PublicLayout>
       {/* Live Banner — only when something is actually live */}
       {state?.has_live && <LiveBanner state={state} />}
+      {/* Heute im Einsatz (#1753): nur an Renn- und Spieltagen der Serien, sonst fehlt der Streifen ganz. Wie das
+          Live-Banner über dem Kopf, damit man ihn auch am Handy ohne Scrollen sieht. */}
+      <HomeTodayStrip />
 
       {/* Hero */}
       <section ref={heroRef} className="relative overflow-hidden border-b border-white/10 bg-grid-dense">

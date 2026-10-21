@@ -20,6 +20,7 @@ from fastapi import APIRouter, Depends, Request
 from auth import get_optional_user
 from database import get_db
 from routes.reference_round_routes import PUBLIC_FIELDS, _calendar, visible_series
+from services import reference_running_cache
 from services.dolibarr_policy import club_today
 from services.rate_limit import enforce_rate_limit
 from services.reference_calendar import calendar_view, vienna_clock
@@ -171,8 +172,23 @@ async def public_running(request: Request, user: dict | None = Depends(get_optio
     in gesammelten Abfragen (je Sammlung eine), nie je Saison; je Adresse begrenzt. Steht heute (Wiener Tag) ein Termin an, kommt die
     Saison zuerst und trägt ``today``."""
     await enforce_rate_limit(request, "reference-running", 60, 60)
-    db = get_db()
     today = club_today()
+    # Startseiten-Last (#1753): die Antwort hängt nur am Tag und an den Stufen, die ``user`` sieht - gemerkt wird sie
+    # je Tag und Stufe kurz (services/reference_running_cache.py), die Verwaltung leert sie bei jedem Schreiben.
+    key = (today, *[await user_can_see(user, level) for level in VISIBILITY_LEVELS])
+    cached = reference_running_cache.get(key)
+    if cached is not None:
+        return cached
+    body = await _running(user, today)
+    reference_running_cache.put(key, body)
+    return body
+
+
+VISIBILITY_LEVELS = ("community", "members", "internal")
+
+
+async def _running(user: dict | None, today: str) -> dict:
+    db = get_db()
     seen: dict = {}
 
     async def visible(value) -> bool:
@@ -231,6 +247,12 @@ async def public_running(request: Request, user: dict | None = Depends(get_optio
     active = {item["id"] async for item in db.club_member_profiles.find(
         {"id": {"$in": profile_ids}, "is_active": {"$ne": False}}, {"_id": 0, "id": 1})} if profile_ids else set()
     club_ids = {item["id"] for item in candidates if item.get("profile_id") in active}
+    # Wie viele Vereinsmitglieder je Saison gemeldet sind (#1753, „Heute im Einsatz“ auf der Startseite): nur die Zahl.
+    club_count: dict = {}
+    if club_ids:
+        async for item in db.reference_participants.find(
+                {"id": {"$in": list(club_ids)}, "series_id": {"$in": ids}}, {"_id": 0, "series_id": 1}):
+            club_count[item["series_id"]] = club_count.get(item["series_id"], 0) + 1
     game_ids = list({lineage["game_id"] for lineage, _ in shown if lineage.get("game_id")})
     games = {item["id"]: item async for item in db.games.find(
         {"id": {"$in": game_ids}}, {"_id": 0, "id": 1, "name": 1, "short_name": 1, "logo_url": 1})} if game_ids else {}
@@ -248,6 +270,7 @@ async def public_running(request: Request, user: dict | None = Depends(get_optio
             "next": _running_next(rounds),
             "today": any(item["state"] == "today" for item in rounds),
             "club": _club_place(lineage, series, snapshots, club_ids),
+            "club_count": club_count.get(series["id"], 0),
             "_order": (series.get("order_index") or 0),
         })
     items.sort(key=lambda item: (not item["today"], (item["next"] or {}).get("club_day") or "9999", item["_order"],

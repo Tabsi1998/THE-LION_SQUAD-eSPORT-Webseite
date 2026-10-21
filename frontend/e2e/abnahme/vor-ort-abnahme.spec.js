@@ -108,6 +108,11 @@ test("Begleitperson: scannen, schlanke Ansicht, anmelden, mitspielen - abmelden,
   await shot(page, "schlanke-ansicht-angemeldet-handy");
 
   await page.getByTestId("onsite-register-btn").click();
+  // Bestätigungs-Blatt (#1261): Zusammenfassung, dann „Verbindlich anmelden“.
+  await expect(page.getByRole("dialog")).toBeVisible();
+  await expect(page.getByTestId("register-sheet-place")).toBeVisible();
+  await shot(page, "anmelde-blatt-handy");
+  await page.getByTestId("tournament-register-submit").click();
   await expect(page.getByTestId("tournament-actions")).toBeVisible();
   await expect(page.getByTestId("onsite-tournament-view")).toHaveCount(0);
   expect((await page.request.get(`/api/tournaments/${tid}/bracket`)).status()).toBe(200);

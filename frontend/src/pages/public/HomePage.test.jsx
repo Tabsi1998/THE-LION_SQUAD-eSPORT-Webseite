@@ -228,3 +228,23 @@ test("ein gescheitertes Nachladen lässt die Startseite stehen und sagt es (#983
   expect(screen.getByTestId("load-stale")).toHaveTextContent("letzten Stand");
   expect(screen.queryByTestId("public-error-state")).toBeNull();
 });
+
+// „Heute im Einsatz“ (#1753): an Renn- und Spieltagen steht der Streifen über dem Kopf, sonst nicht.
+test("Heute im Einsatz: Streifen über dem Kopf nur mit heutigem Termin", async () => {
+  const running = { today: "2026-09-22", items: [{ lineage: { title: "Probe Monatscup", slug: "probe-cup", kind: "series" }, series: { season: "2026", season_slug: "2026" }, next: { code: "Q2", state: "today", time: "20:00" }, today: true, club_count: 1 }] };
+  apiMock.get.mockImplementation((path) => Promise.resolve({ data: path === "/reference-series/public/running" ? running : stateWith(12) }));
+  const view = render(<MemoryRouter><HomePage /></MemoryRouter>);
+  const strip = await screen.findByTestId("home-today");
+  expect(strip).toHaveTextContent("Probe Monatscup");
+  // Einmal je Seitenaufruf, kein Polling: auch ein Neuladen der Startseite über den Strom fragt nicht nochmal.
+  await act(async () => { await invalidate({ resource: "tournaments" }); });
+  await act(async () => { await new Promise((done) => setTimeout(done, 50)); });
+  expect(apiMock.get.mock.calls.filter(([path]) => path === "/reference-series/public/running")).toHaveLength(1);
+  expect(strip.compareDocumentPosition(screen.getByTestId("home-hero-grain")) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  view.unmount();
+
+  apiMock.get.mockImplementation((path) => Promise.resolve({ data: path === "/reference-series/public/running" ? { ...running, items: [] } : stateWith(12) }));
+  render(<MemoryRouter><HomePage /></MemoryRouter>);
+  await screen.findByTestId("home-next-tournament-cup");
+  expect(screen.queryByTestId("home-today")).toBeNull();
+});

@@ -70,13 +70,82 @@ test("Discord-Server zum Spiel (#626): Kachel mit Status; ohne Server keine Kach
   expect(screen.queryByTestId("game-discord-tile")).toBeNull();
 });
 
-test("ohne Startgeld meldet der Knopf sofort an - wie bisher", async () => {
+// Bestätigungs-Blatt (#1261): jede Anmeldung geht über das Blatt - auch Einzel ohne Startgeld und ohne Kennungen.
+const RULES = "Fair Play gilt immer. Ergebnisse meldet der Sieger. Wer zu spät kommt, verliert kampflos. Proteste gehen an die Turnierleitung.";
+
+test("Einzel ohne Startgeld (#1261): der Knopf öffnet das Blatt, erst „Verbindlich anmelden“ meldet an", async () => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(new Date("2026-05-20T10:00:00Z"));
+  try {
+    const user = userEvent.setup();
+    mockApi({ ...base, rules: RULES, start_date: "2026-05-23T19:00:00Z", check_in_from: "2026-05-23T18:00:00Z", check_in_until: "2026-05-23T18:45:00Z" });
+    renderPage();
+    await user.click(await screen.findByTestId("tournament-register-btn"));
+    const sheet = await screen.findByRole("dialog", { name: /Herbst-Cup/ });
+    expect(apiMock.post).not.toHaveBeenCalled();
+    expect(sheet).toHaveAttribute("aria-modal", "true");
+    expect(sheet.contains(document.activeElement)).toBe(true);
+    expect(screen.getByTestId("register-sheet-start")).toHaveTextContent("Sa 23. Mai · 21:00");
+    expect(screen.getByTestId("register-sheet-checkin")).toHaveTextContent("Sa 23. Mai · 20:00–20:45");
+    expect(screen.getByTestId("register-sheet-place")).toHaveTextContent("Online");
+    expect(screen.queryByTestId("register-sheet-fee")).toBeNull();
+    expect(screen.getByTestId("register-sheet-rules")).toHaveTextContent("Fair Play gilt immer. Ergebnisse meldet der Sieger. Wer zu spät kommt, verliert kampflos.");
+    expect(screen.getByTestId("register-sheet-rules")).not.toHaveTextContent("Proteste");
+    expect(sheet).toHaveTextContent("Mit der Anmeldung akzeptierst du die Turnierregeln und den Datenschutz");
+    await user.click(screen.getByTestId("register-sheet-rules-all"));
+    expect(screen.getByTestId("register-sheet-rules-full")).toHaveTextContent("Proteste gehen an die Turnierleitung.");
+    const submit = screen.getByTestId("tournament-register-submit");
+    expect(submit).toHaveTextContent("Verbindlich anmelden");
+    await user.click(submit);
+    await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/tournaments/t1/register", expect.objectContaining({ accept_rules: true, accept_privacy: true, accept_costs: false, selected_positions: [] }), expect.anything()));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  } finally {
+    vi.useRealTimers();
+  }
+});
+
+test("Abbrechen, Schließen und Escape (#1261): keine Anmeldung, der Fokus geht zurück auf den Knopf", async () => {
+  const user = userEvent.setup();
+  mockApi(base);
+  renderPage();
+  const button = await screen.findByTestId("tournament-register-btn");
+  await user.click(button);
+  await user.click(await screen.findByTestId("register-sheet-cancel"));
+  expect(screen.queryByRole("dialog")).toBeNull();
+  await waitFor(() => expect(document.activeElement).toBe(screen.getByTestId("tournament-register-btn")));
+  await user.click(screen.getByTestId("tournament-register-btn"));
+  await screen.findByRole("dialog");
+  await user.keyboard("{Escape}");
+  expect(screen.queryByRole("dialog")).toBeNull();
+  await user.click(screen.getByTestId("tournament-register-btn"));
+  await user.click(await screen.findByRole("button", { name: "Schließen" }));
+  expect(screen.queryByRole("dialog")).toBeNull();
+  expect(apiMock.post).not.toHaveBeenCalled();
+});
+
+test("Tab bleibt im Blatt (#1261)", async () => {
   const user = userEvent.setup();
   mockApi(base);
   renderPage();
   await user.click(await screen.findByTestId("tournament-register-btn"));
-  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/tournaments/t1/register", expect.objectContaining({ accept_costs: false, selected_positions: [] }), expect.anything()));
-  expect(screen.queryByTestId("tournament-offer")).not.toBeInTheDocument();
+  const sheet = await screen.findByRole("dialog");
+  for (let step = 0; step < 8; step += 1) {
+    await user.tab();
+    expect(sheet.contains(document.activeElement)).toBe(true);
+  }
+});
+
+test("Spieler-Kennungen (#1261): im selben Blatt, die Anmeldung schickt sie mit", async () => {
+  const user = userEvent.setup();
+  mockApi({ ...base, event_mode: "local", location: "Vereinsheim Probehausen", game: { ...base.game, player_id_fields: [{ key: "epic", label: "Epic-ID", required: true }] } });
+  renderPage();
+  await user.click(await screen.findByTestId("tournament-register-btn"));
+  await screen.findByRole("dialog");
+  expect(screen.getByTestId("register-sheet-place")).toHaveTextContent("Vor Ort · Vereinsheim Probehausen");
+  expect(screen.getByTestId("register-sheet-rules")).toHaveTextContent("keine eigenen Regeln");
+  await user.type(screen.getByLabelText(/Epic-ID/), "probe-123");
+  await user.click(screen.getByTestId("tournament-register-submit"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/tournaments/t1/register", expect.objectContaining({ player_ids: { epic: "probe-123" } }), expect.anything()));
 });
 
 test("mit Startgeld steht der Betrag vorne, und angemeldet wird erst mit dem Haken", async () => {
@@ -92,6 +161,7 @@ test("mit Startgeld steht der Betrag vorne, und angemeldet wird erst mit dem Hak
   expect(screen.getByTestId("tournament-register-steps")).toHaveTextContent("Startgeld");
   expect(submit).toBeDisabled();
   expect(screen.getByTestId("tournament-quote")).toHaveTextContent("10,00 €");
+  expect(screen.getByTestId("register-sheet-fee")).toHaveTextContent("10,00 € Startgeld");
   await user.click(screen.getByTestId("tournament-accept-costs"));
   expect(submit).toBeEnabled();
   expect(submit).toHaveTextContent("Verbindlich anmelden · 10,00 €");
@@ -112,6 +182,9 @@ test("bei Teams rechnet die Summe mit der Teamgröße und die Teamleitung übern
   await user.click(screen.getByTestId("tournament-register-btn"));
   expect(await screen.findByTestId("tournament-quote")).toHaveTextContent("50,00 €");
   expect(screen.getByTestId("tournament-accept-costs").closest("label")).toHaveTextContent("für das Team");
+  // Teams im selben Blatt (#1261): Team-Auswahl und Zusammenfassung zusammen.
+  expect(screen.getByRole("dialog")).toContainElement(screen.getByLabelText(/Team/, { selector: "select" }));
+  expect(screen.getByTestId("register-sheet-fee")).toHaveTextContent("50,00 €");
 });
 
 test("die eigene Anmeldung zeigt den eingefrorenen Preis, Warteliste den Hinweis", async () => {
@@ -347,11 +420,16 @@ test("schlanke Ansicht ohne Konto: „Mitspielen“ führt zu Login mit Rückweg
   expect(await screen.findByTestId("location-probe")).toHaveTextContent("/login?next=%2Ftournaments%2Fcup");
 });
 
-test("schlanke Ansicht mit Konto: „Mitspielen“ meldet an", async () => {
+test("schlanke Ansicht mit Konto: „Mitspielen“ öffnet das Blatt (#1261), „Verbindlich anmelden“ meldet an", async () => {
   const user = userEvent.setup();
-  mockApi(SLIM);
+  mockApi({ ...SLIM, location: "Halle Probe" });
   renderPage();
   await user.click(await screen.findByTestId("onsite-register-btn"));
+  expect(await screen.findByRole("dialog")).toBeInTheDocument();
+  expect(screen.getByTestId("register-sheet-place")).toHaveTextContent("Vor Ort · Halle Probe");
+  expect(screen.getByTestId("register-sheet-rules")).toHaveTextContent("alle Regeln siehst du nach der Anmeldung");
+  expect(apiMock.post).not.toHaveBeenCalled();
+  await user.click(screen.getByTestId("tournament-register-submit"));
   await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/tournaments/t1/register", expect.objectContaining({ accept_rules: true }), expect.anything()));
 });
 

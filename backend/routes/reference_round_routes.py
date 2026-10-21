@@ -25,7 +25,7 @@ from pymongo import ReturnDocument
 from auth import get_optional_user, require_area
 from database import get_db
 from models import ReferenceRoundCreate, ReferenceRoundUpdate, _clock, new_id, now_utc
-from services import reference_series
+from services import reference_running_cache, reference_series
 from services.dolibarr_policy import club_today
 from services.series_standings import ordered_rounds
 from services.reference_calendar import (
@@ -34,7 +34,9 @@ from services.reference_calendar import (
 from services.reference_series_access import SeriesAccess, require_series_editor
 from services.visibility import user_can_see
 
-router = APIRouter(prefix="/api/reference-series", tags=["reference-series"])
+# Jeder schreibende Aufruf leert den Cache der laufenden Saisons (#1753, Startseite).
+router = APIRouter(prefix="/api/reference-series", tags=["reference-series"],
+                   dependencies=[Depends(reference_running_cache.reset_after_write)])
 
 PUBLIC_FIELDS = ("id", "position", "code", "title", "venue", "starts_at", "club_day", "time", "state", "status",
                  "original_starts_at", "original_club_day", "kind", "counts", "opponent")

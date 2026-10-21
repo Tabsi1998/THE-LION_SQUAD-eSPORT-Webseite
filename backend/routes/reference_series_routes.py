@@ -23,12 +23,14 @@ from models import (
     new_id,
     now_utc,
 )
-from services import partner_pages, reference_series
+from services import partner_pages, reference_running_cache, reference_series
 from services.reference_series_access import SeriesAccess, require_series_editor
 from services.scoring_rules import normalize_rules
 from services.slug_utils import apply_slug_history, slug_source_for_update, slugify, unique_slug
 
-router = APIRouter(prefix="/api/reference-series", tags=["reference-series"])
+# Jeder schreibende Aufruf leert den Cache der laufenden Saisons (#1753, Startseite).
+router = APIRouter(prefix="/api/reference-series", tags=["reference-series"],
+                   dependencies=[Depends(reference_running_cache.reset_after_write)])
 
 LINEAGE_NULLABLE = {"organizer", "label", "game_id", "game_name", "external_url", "description"}
 SERIES_NULLABLE = {"tier", "title", "default_weekday", "default_time", "team_name", "official_table_url",
