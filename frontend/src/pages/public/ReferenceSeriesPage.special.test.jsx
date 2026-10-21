@@ -94,6 +94,12 @@ test("Teamwertung „keine“: kein leerer Teamreiter", async () => {
   expect(screen.queryByText("Teamwertung")).toBeNull();
 });
 
+test("Startaufstellung: Sprint in umgekehrter Quali-Reihenfolge (Top 8) steht bei den Regeln", async () => {
+  const weekend = { formats: [{ from_round: 1, sessions: [{ label: "Qualifying", grid: "manual", counts: false, points: "none" }, { label: "Sprint", grid: "reverse_qualifying", reverse_top: 8, counts: true, points: "series" }] }] };
+  renderPage({ ...BODY, series: { ...BODY.series, weekend } });
+  expect(await screen.findByTestId("racing-session-grid")).toHaveTextContent("Startaufstellung Sprint: Start in umgekehrter Quali-Reihenfolge (Top 8)");
+});
+
 test("Regeländerung ab Runde X und Termin ohne Wertung (anders als abgesagt)", async () => {
   renderPage();
   const changes = await screen.findByTestId("series-rule-changes");

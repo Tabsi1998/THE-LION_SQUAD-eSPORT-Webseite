@@ -6,7 +6,7 @@ import { nameOf } from "@/lib/referenceSeriesTable";
 import {
   barShare, bonusLabel, clubDrivers, garageName, garageTeams, gapLabel, teamRuleLabel, teamTableRows,
 } from "@/lib/racingLeague";
-import { hasSessions, qualiDuel, sessionPointsLines, sessionTables } from "@/lib/raceWeekend";
+import { hasSessions, qualiDuel, sessionGridLines, sessionPointsLines, sessionTables } from "@/lib/raceWeekend";
 import { SeriesStandings } from "@/components/tls/series/SeriesStandings";
 import { PROGRESS_WORDS, SeriesFinal, SeriesProgress, SeriesRules } from "@/components/tls/series/SeriesParts";
 import {
@@ -108,6 +108,7 @@ export function RacingLeague({ data }) {
   const teamRule = teamRuleLabel(racing.team_scoring);
   const weekends = hasSessions(rounds);
   const sessionPoints = sessionPointsLines(data.series?.weekend);
+  const sessionGrid = sessionGridLines(data.series?.weekend);
   const qualifying = useMemo(() => racing.qualifying || [], [racing.qualifying]);
   const tables = useMemo(() => sessionTables(rows, rounds), [rows, rounds]);
   const [tableKind, setTableKind] = useState("all");
@@ -181,6 +182,8 @@ export function RacingLeague({ data }) {
         <SeriesRules rules={data.rules} />
         {bonus && <p className="mt-2 text-sm text-white/70" data-testid="racing-bonus"><span className="text-white/45">Bonus </span>{bonus}</p>}
         {sessionPoints.length > 0 && <p className="mt-2 text-sm text-white/70" data-testid="racing-session-points"><span className="text-white/45">Punkte je Lauf </span>{sessionPoints.join("; ")}</p>}
+        {/* Umgekehrte Startaufstellung je Lauf (#1960): „Sprint: Start in umgekehrter Quali-Reihenfolge (Top 8)“. */}
+        {sessionGrid.length > 0 && <p className="mt-2 text-sm text-white/70" data-testid="racing-session-grid"><span className="text-white/45">Startaufstellung </span>{sessionGrid.join("; ")}</p>}
         {/* Regeländerung ab Runde X (#1960): Format ab Runde (#1930) und Regel-Versionen mit Tag und Hinweis. */}
         <RuleChanges changes={data.rule_changes} />
         {tables.length > 0 && (

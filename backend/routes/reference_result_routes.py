@@ -401,9 +401,15 @@ async def _prepare(db, access: SeriesAccess, round_doc: dict, body: ResultSheetI
             resolution.warnings.extend(race_weekend.mark_pole(resolution.rows))
         resolution.warnings[:] = [item for item in resolution.warnings if item["code"] != "round_not_counted"]
     elif await _kind(db, access.series) == "racing":
-        # Rennen mit Haupt-Qualifying in derselben Runde: die Pole hat dessen erster gültiger Platz.
-        resolution.warnings.extend(race_weekend.clear_race_pole(
-            resolution.rows, await _quali_pole(db, access.series, round_doc)))
+        rounds = await db.reference_rounds.find({"series_id": access.series_id, "archived_at": None},
+                                                {"_id": 0}).to_list(None)
+        if race_weekend.reversed_grid(access.series, rounds, round_doc):
+            # Umgekehrte Aufstellung (#1960): in diesem Lauf gibt es keine Pole - eine Marke fällt mit Hinweis weg.
+            resolution.warnings.extend(race_weekend.clear_reverse_pole(resolution.rows))
+        else:
+            # Rennen mit Haupt-Qualifying in derselben Runde: die Pole hat dessen erster gültiger Platz.
+            resolution.warnings.extend(race_weekend.clear_race_pole(
+                resolution.rows, await _quali_pole(db, access.series, round_doc)))
     if not resolution.errors:
         # Zur Sicherheit wie beim Rechnen - die Prüfung oben fängt dieselben Fälle schon mit Zeilenangabe ab.
         try:

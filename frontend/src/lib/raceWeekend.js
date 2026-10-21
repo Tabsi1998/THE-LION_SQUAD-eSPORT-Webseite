@@ -15,7 +15,42 @@ export const GRID_OPTIONS = [
   ["qualifying", "Aus dem Qualifying"],
   ["reverse_standings_before_round", "Umgekehrte WM-Reihenfolge vor der Runde"],
   ["reverse_standings_after_previous_session", "Umgekehrte WM-Reihenfolge nach dem Lauf davor"],
+  // #1960: umgekehrt aus einem Lauf derselben Runde, optional nur die ersten N („reverse_top“).
+  ["reverse_qualifying", "Umgekehrtes Qualifying"],
+  ["reverse_previous_session", "Umgekehrtes Ergebnis des Laufs davor"],
 ];
+/** Startplatz-Quellen mit „nur die ersten … umdrehen“. */
+export const SESSION_REVERSES = ["reverse_qualifying", "reverse_previous_session"];
+
+const GRID_WORDS = {
+  reverse_standings_before_round: "Start in umgekehrter WM-Reihenfolge vor der Runde",
+  reverse_standings_after_previous_session: "Start in umgekehrter WM-Reihenfolge nach dem Lauf davor",
+  reverse_qualifying: "Start in umgekehrter Quali-Reihenfolge",
+  reverse_previous_session: "Start in umgekehrter Reihenfolge des Laufs davor",
+};
+
+/** Startaufstellung je Lauf in Worten für die Serienseite (#1960): nur umgekehrte Aufstellungen - „Sprint: Start in
+ * umgekehrter Quali-Reihenfolge (Top 8)“; ändert sich der Ablauf ab einer Runde, mit „ab Runde 5“. */
+export function sessionGridLines(weekend) {
+  const formats = weekend?.formats || [];
+  const seen = new Set();
+  const lines = [];
+  for (const format of formats) {
+    for (const session of format.sessions || []) {
+      const grid = GRID_ALIASES[session.grid] || session.grid;
+      const words = GRID_WORDS[grid];
+      if (!words) continue;
+      const top = SESSION_REVERSES.includes(grid) && session.reverse_top ? ` (Top ${session.reverse_top})` : "";
+      const from = formats.length > 1 && format.from_round > 1 ? `ab Runde ${format.from_round} ` : "";
+      const line = `${from}${session.label}: ${words}${top}`;
+      const key = `${String(session.label).toLowerCase()}|${words}${top}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      lines.push(line);
+    }
+  }
+  return lines;
+}
 // Der frühere Wert heißt jetzt „vor der Runde“ (wie im Server).
 const GRID_ALIASES = { reverse_standings: "reverse_standings_before_round" };
 
@@ -246,6 +281,7 @@ export function weekendToForm(weekend) {
       dnf: session.dnf || "series",
       fastest_lap: session.fastest_lap === null || session.fastest_lap === undefined ? "" : String(session.fastest_lap),
       grid: GRID_ALIASES[session.grid] || session.grid || "manual",
+      reverse_top: session.reverse_top ? String(session.reverse_top) : "",
     })),
   }));
 }
@@ -286,6 +322,8 @@ export function weekendPayload(formats) {
         // Leer heißt wie die Saison.
         fastest_lap: String(session.fastest_lap ?? "").trim() === "" ? null : Number(String(session.fastest_lap).replace(",", ".")) || 0,
         grid: session.grid,
+        // „Nur die ersten … umdrehen“ (#1960): nur bei umgekehrter Aufstellung aus einem Lauf, leer heißt alle.
+        ...(SESSION_REVERSES.includes(session.grid) && String(session.reverse_top ?? "").trim() ? { reverse_top: Number(session.reverse_top) } : {}),
       })),
     })),
   };

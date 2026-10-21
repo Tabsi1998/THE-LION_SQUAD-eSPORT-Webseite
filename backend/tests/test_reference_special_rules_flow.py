@@ -291,6 +291,51 @@ async def test_f2_with_format_one_and_two_shows_the_rule_change(flow):
     assert changes[1]["day"]
 
 
+# ---------------------------------------------------------------- Umgekehrte Startaufstellung
+@pytest.mark.asyncio
+async def test_a_sprint_in_reverse_qualifying_order_top_two_without_pole(flow):
+    await _board(flow)
+    lineage = await _lineage(flow, title="Probe Racing F3")
+    weekend = {"formats": [{"from_round": 1, "sessions": [
+        {"label": "Qualifying"}, {"label": "Sprint", "offset": 30, "grid": "reverse_qualifying", "reverse_top": 2},
+        {"label": "Hauptrennen", "offset": 60, "grid": "qualifying"}]}]}
+    series = await _season(flow, lineage, weekend=weekend,
+                           rules={**RULES, "bonuses": {"pole": {"points": 2}}, "team_scoring": {"enabled": False}})
+    assert series["weekend"]["formats"][0]["sessions"][1]["reverse_top"] == 2
+    pasted = await flow.post(f"{ADMIN}/series/{series['id']}/rounds/paste",
+                             json={"text": "R1 · 08.11.2026 20:00 · Probe Ring", "apply": True})
+    assert pasted.status_code == 200, pasted.text
+    ids = {item["session"]: item["id"] for item in pasted.json()["rounds"]}
+    await flow.db.reference_participants.insert_many([
+        {"series_id": series["id"], "is_club_member": False, "name_hidden": False, **person} for person in PEOPLE])
+
+    # Beim Eintragen fällt eine Pole-Marke im umgekehrten Sprint mit Hinweis weg.
+    preview = await flow.post(f"{ADMIN}/series/{series['id']}/rounds/{ids['Sprint']}/results/preview", json={
+        "rows": [{"participant_id": "p-ext1", "place": 1, "marks": ["pole"]}, {"participant_id": "p-lion1", "place": 2}]})
+    assert preview.status_code == 200, preview.text
+    moved = [item for item in preview.json()["warnings"] if item["code"] == "pole_moved"]
+    assert moved and "keine Pole" in moved[0]["message"]
+
+    for session, order in (("Qualifying", ["p-lion1", "p-lion2", "p-ext1", "p-ext2"]),
+                           ("Sprint", ["p-ext1", "p-lion2", "p-lion1", "p-ext2"]),
+                           ("Hauptrennen", ["p-lion1", "p-ext1", "p-lion2", "p-ext2"])):
+        await flow.db.reference_round_results.insert_one({
+            "id": f"blatt-{session}", "series_id": series["id"], "round_id": ids[session], "status": "published",
+            "rows": [{"participant_id": pid, "place": place, "marks": ["pole"] if session == "Sprint" and place == 1
+                      else []} for place, pid in enumerate(order, start=1)]})
+        await flow.db.reference_rounds.update_one({"id": ids[session]}, {"$set": {"status": "scored"}})
+    stored = await flow.db.reference_series.find_one({"id": series["id"]}, {"_id": 0})
+    await reference_series.recompute_standings(flow.db, stored)
+    rows = (await _page(flow, lineage, series))["standings"]["rows"]
+    sprint = {row["key"]: next(item for item in row["results"] if item["round_id"] == ids["Sprint"]) for row in rows}
+    # Top 2 umgedreht: Quali-P2 startet von 1, Quali-P1 von 2, dahinter wie im Qualifying - und keine Pole im Sprint.
+    assert {key: item.get("grid") for key, item in sprint.items()} == {
+        "p-lion2": 1, "p-lion1": 2, "p-ext1": 3, "p-ext2": 4}
+    assert all("pole" not in item["marks"] for item in sprint.values())
+    race = {row["key"]: next(item for item in row["results"] if item["round_id"] == ids["Hauptrennen"]) for row in rows}
+    assert race["p-lion1"]["marks"] == ["pole"]
+
+
 # ---------------------------------------------------------------- Termin ohne Wertung
 @pytest.mark.asyncio
 async def test_a_round_without_score_has_a_public_reason_and_too_few_starters_warn(flow):
