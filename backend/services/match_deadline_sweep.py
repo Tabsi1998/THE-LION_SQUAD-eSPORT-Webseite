@@ -22,6 +22,7 @@ from services.match_deadlines import (
     no_show_due_text,
     single_report,
 )
+from services.live_sweep import live_tournaments_with
 from services.match_timing import registration_name
 from services.match_v2_results import MatchV2ResultError
 from services.mutation_lock import MutationLockBusy, mutation_lock, tournament_write_resource
@@ -137,11 +138,11 @@ async def _auto_confirm(db, tournament: dict, match_id: str, stage: dict | None,
 
 
 async def sweep(db, *, now: datetime | None = None) -> dict:
-    """Ein Lauf über alle laufenden Turniere. Gibt zurück, wie viele Vorschläge und Bestätigungen er geschrieben hat."""
+    """Ein Lauf über alle laufenden Turniere mit offenen Spielen (#1940). Gibt zurück, wie viele Vorschläge und
+    Bestätigungen er geschrieben hat."""
     now = now or now_utc()
     proposed = confirmed = 0
-    tournaments = await db.tournaments.find(
-        {"status": "live"}, {"_id": 0, "creation_key": 0, "billing": 0}).to_list(200)
+    tournaments = await live_tournaments_with(db, {"status": {"$in": SWEEP_STATUSES}}, job="match_deadlines", now=now)
     for tournament in tournaments:
         stage_rows = await db.tournament_stages.find({"tournament_id": tournament["id"]}, {"_id": 0}).to_list(50)
         stages = {row["id"]: row for row in stage_rows if row.get("id")}
