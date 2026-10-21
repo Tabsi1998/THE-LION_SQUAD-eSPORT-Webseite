@@ -240,7 +240,7 @@ export function SeriesCalendarSection({ series }) {
         </details>
       )}
 
-      {sheet?.type === "round" && <RoundSheet series={series} lineage={lineage} round={sheet.round} suggestion={sheet.suggestion} version={calendar?.version} onClose={() => setSheet(null)} onSaved={saved} onStale={load} />}
+      {sheet?.type === "round" && <RoundSheet series={series} lineage={lineage} round={sheet.round} rounds={rounds} suggestion={sheet.suggestion} version={calendar?.version} onClose={() => setSheet(null)} onSaved={saved} onStale={load} />}
       {sheet?.type === "postpone" && <PostponeSheet series={series} round={sheet.round} version={calendar?.version} onClose={() => setSheet(null)} onSaved={saved} onStale={load} />}
       {sheet?.type === "paste" && <PasteSheet series={series} lineage={lineage} version={calendar?.version} onClose={() => setSheet(null)} onSaved={saved} onStale={load} />}
     </section>

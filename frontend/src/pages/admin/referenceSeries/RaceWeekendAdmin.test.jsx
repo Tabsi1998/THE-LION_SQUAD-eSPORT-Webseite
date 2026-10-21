@@ -67,7 +67,7 @@ test("Saison: Ablauf je Runde festlegen, Sprint mit eigenem Schema, ab Runde 5 a
   fireEvent.change(within(second).getByTestId("weekend-format-from"), { target: { value: "5" } });
   // Ab Runde 5 ohne Qualifying - der Startplatz kommt aus der umgekehrten WM-Reihenfolge.
   fireEvent.click(within(second).getAllByTestId("weekend-session-remove")[0]);
-  for (const select of within(second).getAllByTestId("weekend-session-grid")) fireEvent.change(select, { target: { value: "reverse_standings" } });
+  for (const select of within(second).getAllByTestId("weekend-session-grid")) fireEvent.change(select, { target: { value: "reverse_standings_before_round" } });
 
   fireEvent.click(screen.getByTestId("series-save"));
   await waitFor(() => expect(apiMock.patch).toHaveBeenCalled());
@@ -79,8 +79,8 @@ test("Saison: Ablauf je Runde festlegen, Sprint mit eigenem Schema, ab Runde 5 a
       lauf({ label: "Sprint", offset: 60, counts: true, points: [12, 9, 7, 6, 5, 4, 3, 2, 1], grid: "manual", dnf: "place" }),
     ] },
     { from_round: 5, sessions: [
-      lauf({ label: "Rennen", offset: 30, counts: true, points: "series", grid: "reverse_standings", fastest_lap: 1 }),
-      lauf({ label: "Sprint", offset: 60, counts: true, points: [12, 9, 7, 6, 5, 4, 3, 2, 1], grid: "reverse_standings", dnf: "place" }),
+      lauf({ label: "Rennen", offset: 30, counts: true, points: "series", grid: "reverse_standings_before_round", fastest_lap: 1 }),
+      lauf({ label: "Sprint", offset: 60, counts: true, points: [12, 9, 7, 6, 5, 4, 3, 2, 1], grid: "reverse_standings_before_round", dnf: "place" }),
     ] },
   ] });
 });
@@ -129,8 +129,42 @@ test("neuer Termin mit Lauf: ein Qualifying zählt von selbst nicht", async () =
   expect(screen.getByTestId("round-counts")).not.toBeChecked();
   fireEvent.click(screen.getByTestId("round-save"));
   await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/reference-series/admin/series/serie-1/rounds", expect.objectContaining({
-    code: "R3", session: "Qualifying", counts: false,
+    code: "R3", session: "Qualifying",
   })));
+  // Die Wertung sagt der Server aus der Vorgabe - ohne Haken von Hand geht sie nicht mit (Prüfer #1930).
+  expect(apiMock.post.mock.calls[0][1]).not.toHaveProperty("counts");
+});
+
+const F2_SERIES = { ...SERIES, weekend: { formats: [{ from_round: 1, sessions: [
+  { label: "Qualifying", offset: 0, counts: true, points: [2], grid: "manual" },
+  { label: "Rennen", offset: 30, counts: true, points: "series", grid: "qualifying" },
+] }] } };
+
+test("Wertung nach dem Ablauf: ein Qualifying mit Punkten zählt, ein Haken von Hand geht mit", async () => {
+  render(<SeriesCalendarSection series={F2_SERIES} />);
+  await screen.findAllByTestId("calendar-weekend");
+  fireEvent.click(screen.getByTestId("calendar-new"));
+  fireEvent.change(screen.getByTestId("round-code"), { target: { value: "R3" } });
+  fireEvent.change(screen.getByTestId("round-session"), { target: { value: "Qualifying" } });
+  expect(screen.getByTestId("round-counts")).toBeChecked();
+  fireEvent.click(screen.getByTestId("round-counts"));
+  fireEvent.click(screen.getByTestId("round-save"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalled());
+  expect(apiMock.post.mock.calls[0][1]).toMatchObject({ session: "Qualifying", counts: false });
+});
+
+test("Wertung von Hand an die Vorgabe zurückgeben: counts null", async () => {
+  const rounds = CALENDAR.rounds.map((round) => (round.id === "f1" ? { ...round, counts_manual: true, counts: false } : round));
+  apiMock.get.mockResolvedValue({ data: { ...CALENDAR, rounds } });
+  render(<SeriesCalendarSection series={F2_SERIES} />);
+  const weekends = await screen.findAllByTestId("calendar-weekend");
+  fireEvent.click(within(within(weekends[0]).getAllByTestId("calendar-round")[2]).getByTestId("round-edit"));
+  expect(screen.getByTestId("round-counts")).not.toBeChecked();
+  fireEvent.click(screen.getByTestId("round-counts-auto"));
+  expect(screen.getByTestId("round-counts")).toBeChecked();
+  fireEvent.click(screen.getByTestId("round-save"));
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalled());
+  expect(apiMock.patch.mock.calls[0][1]).toMatchObject({ counts: null });
 });
 
 test("Terminliste: die Vorschau zeigt je Zeile die Läufe, übernommen werden alle Termine", async () => {

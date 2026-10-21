@@ -28,8 +28,8 @@ const F2 = { formats: [
     lauf({ label: "Hauptrennen", offset: 75, counts: true, points: "series", grid: "qualifying", fastest_lap: 1 }),
   ] },
   { from_round: 5, sessions: [
-    lauf({ label: "Sprint", offset: 0, counts: true, points: [12, 9, 7], grid: "reverse_standings" }),
-    lauf({ label: "Hauptrennen", offset: 45, counts: true, points: "none", grid: "reverse_standings", dnf: "none" }),
+    lauf({ label: "Sprint", offset: 0, counts: true, points: [12, 9, 7], grid: "reverse_standings_before_round" }),
+    lauf({ label: "Hauptrennen", offset: 45, counts: true, points: "none", grid: "reverse_standings_after_previous_session", dnf: "none" }),
   ] },
 ] };
 
@@ -125,7 +125,9 @@ test("Termine mit gleicher Runde sind EINE Runde - mit Ort, Flagge und Status au
   expect(hasSessions(WEEKEND)).toBe(true);
   expect(hasSessions([WEEKEND[3]])).toBe(false);
   // Ohne Runden-Nummer vom Server gruppiert das Kürzel.
-  expect(groupWeekends([{ id: "a", code: "R 1" }, { id: "b", code: "r1" }]).map((group) => group.rounds.length)).toEqual([2]);
+  expect(groupWeekends([{ id: "a", code: "R 1", session: "Sprint" }, { id: "b", code: "r1" }]).map((group) => group.rounds.length)).toEqual([2]);
+  // Eine alte Saison ohne Läufe mit zweimal „R1“ bleibt Termin für Termin (Prüfer #1930).
+  expect(groupWeekends([{ id: "a", code: "R1" }, { id: "b", code: "R1" }]).map((group) => group.rounds.length)).toEqual([1, 1]);
 });
 
 test("Status einer Runde: abgesagt nur ganz, gewertet erst mit allen Läufen", () => {
@@ -148,12 +150,15 @@ test("Fahrer-Detail: Ø Start, Poles je Runde einmal, Quali-Duell", () => {
   expect(averageGridLabel(3)).toBe("Ø Start 3");
   expect(averageGrid([{ grid: null }])).toBeNull();
   const qualifying = [
-    { round_id: "q1", places: { anna: 1, bert: 2 } },
-    { round_id: "q2", places: { anna: 3, bert: 2 } },
-    { round_id: "q3", places: { anna: 1 } },
+    { round_id: "q1", places: { anna: 1, bert: 2 }, pole: "anna" },
+    { round_id: "q2", places: { anna: 3, bert: 2 }, pole: "bert" },
+    { round_id: "q3", places: { anna: 1 }, pole: "anna" },
+    // Platz 1 disqualifiziert: die Pole nennt der Server (hier Bert) - Platz 1 allein zählt nicht.
+    { round_id: "q4", places: { anna: 1, bert: 2 }, pole: "bert" },
   ];
   const rounds = [...WEEKEND, { id: "q2", weekend: 2 }, { id: "q3", weekend: 3 }];
   // Pole am Rennen und Platz 1 im Qualifying derselben Runde zählen einmal.
   expect(poleCount({ key: "anna", results }, rounds, qualifying)).toBe(2);
-  expect(qualiDuel("anna", "bert", qualifying)).toEqual({ sessions: 2, a: 1, b: 1 });
+  expect(poleCount({ key: "bert", results: [] }, rounds, qualifying)).toBe(2);
+  expect(qualiDuel("anna", "bert", qualifying)).toEqual({ sessions: 3, a: 2, b: 1 });
 });

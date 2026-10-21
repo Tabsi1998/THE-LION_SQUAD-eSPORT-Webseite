@@ -13,8 +13,11 @@ export const MAX_SESSION = 30;
 export const GRID_OPTIONS = [
   ["manual", "Eingabe"],
   ["qualifying", "Aus dem Qualifying"],
-  ["reverse_standings", "Umgekehrte WM-Reihenfolge"],
+  ["reverse_standings_before_round", "Umgekehrte WM-Reihenfolge vor der Runde"],
+  ["reverse_standings_after_previous_session", "Umgekehrte WM-Reihenfolge nach dem Lauf davor"],
 ];
+// Der frühere Wert heißt jetzt „vor der Runde“ (wie im Server).
+const GRID_ALIASES = { reverse_standings: "reverse_standings_before_round" };
 
 /** Punkte je Lauf: wie das Rennen (das Schema der Saison), keine oder eine eigene Liste. */
 export const SESSION_POINTS_OPTIONS = [["series", "Wie Rennen"], ["none", "Keine Punkte"], ["own", "Eigene Liste"]];
@@ -83,10 +86,16 @@ export function sessionLabel(round) {
   return label ? `${code} · ${label}` : code;
 }
 
-function weekendKey(round) {
+function codeKey(code) {
+  return String(code || "").split(/\s+/).join("").toLowerCase();
+}
+
+/** Die Runde eines Termins: die Nummer vom Server, sonst das Kürzel - aber nur mit Läufen (`byCode`); eine alte Saison
+ * mit zweimal „R1“ bleibt Termin für Termin (wie im Server). */
+function weekendKey(round, byCode = true) {
   if (round?.weekend) return `w${round.weekend}`;
-  const code = String(round?.code || "").split(/\s+/).join("").toLowerCase();
-  return code ? `c${code}` : `id${round?.id}`;
+  const code = codeKey(round?.code);
+  return code && byCode ? `c${code}` : `id${round?.id}`;
 }
 
 /** Hat die Saison Läufe? Erst dann zeigen Kalender und Raster Chips. */
@@ -110,8 +119,9 @@ export function weekendState(rounds) {
 export function groupWeekends(rounds) {
   const groups = [];
   const byKey = new Map();
+  const byCode = hasSessions(rounds);
   for (const round of rounds || []) {
-    const key = weekendKey(round);
+    const key = weekendKey(round, byCode);
     let group = byKey.get(key);
     if (!group) {
       group = { key, number: round.weekend || groups.length + 1, rounds: [] };
@@ -234,9 +244,26 @@ export function weekendToForm(weekend) {
       points: Array.isArray(session.points) ? session.points.join(", ") : "",
       dnf: session.dnf || "series",
       fastest_lap: session.fastest_lap === null || session.fastest_lap === undefined ? "" : String(session.fastest_lap),
-      grid: session.grid || "manual",
+      grid: GRID_ALIASES[session.grid] || session.grid || "manual",
     })),
   }));
+}
+
+/** Die Vorgabe für einen Termin mit Kürzel `code` und Lauf `label` (für das Formular, bevor gespeichert ist): in der
+ * Runde dieses Kürzels, sonst in der nächsten - gleicher Name, dann gleiche Art, sonst der Standard der Art (wie
+ * `race_weekend.planned_config` im Server; gespeichert entscheidet der Server). */
+export function plannedSession(weekend, rounds, code, label) {
+  const key = codeKey(code);
+  const list = rounds || [];
+  const match = key ? list.find((round) => codeKey(round.code) === key && round.weekend) : null;
+  const number = match?.weekend || Math.max(0, ...list.map((round) => Number(round.weekend) || 0)) + 1;
+  const phase = (weekend?.formats || []).filter((format) => (Number(format.from_round) || 1) <= number).pop();
+  const kind = sessionKind(label);
+  const name = String(label || "").trim().toLowerCase();
+  const sessions = phase?.sessions || [];
+  const hit = sessions.find((session) => name && String(session.label).trim().toLowerCase() === name)
+    || sessions.find((session) => sessionKind(session.label) === kind);
+  return hit || { label, counts: kind !== "qualifying" };
 }
 
 /** Formular → Ablauf je Runde für den Server; ohne Abschnitt `null` (keine Vorgabe). */
@@ -329,16 +356,19 @@ export function averageGridLabel(value) {
   return `Ø Start ${String(rounded).replace(".", ",")}`;
 }
 
-/** Poles eines Fahrers: je Runde höchstens eine - aus der Pole am Rennen und Platz 1 im Qualifying (`qualifying` vom
- * Server: je Qualifying die Plätze). `rounds` ordnet Termine ihrer Runde zu. */
+/** Poles eines Fahrers: je Runde höchstens eine - aus der Pole am Rennen und der Pole im Qualifying (`qualifying` vom
+ * Server: je Qualifying die Plätze und `pole` nach der Regel des Servers, ohne Disqualifikation). `rounds` ordnet
+ * Termine ihrer Runde zu. */
 export function poleCount(row, rounds, qualifying) {
-  const weekendOf = new Map((rounds || []).map((round) => [round.id, weekendKey(round)]));
+  const byCode = hasSessions(rounds);
+  const weekendOf = new Map((rounds || []).map((round) => [round.id, weekendKey(round, byCode)]));
   const seen = new Set();
   for (const item of row?.results || []) {
     if ((item.marks || []).includes("pole")) seen.add(weekendOf.get(item.round_id) || item.round_id);
   }
   for (const quali of qualifying || []) {
-    if (quali?.places?.[row?.key] === 1) seen.add(weekendOf.get(quali.round_id) || quali.round_id);
+    const holder = quali && "pole" in quali ? quali.pole : null;
+    if (holder && holder === row?.key) seen.add(weekendOf.get(quali.round_id) || quali.round_id);
   }
   return seen.size;
 }
