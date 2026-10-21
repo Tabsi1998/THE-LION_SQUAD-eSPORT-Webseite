@@ -1,12 +1,13 @@
 import { Ionicons } from "@expo/vector-icons";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { FlatList, Pressable, RefreshControl, ScrollView, StyleSheet, TextInput, View } from "react-native";
+import { FlatList, Pressable, RefreshControl, StyleSheet, View } from "react-native";
 import { useBranding } from "../../branding/BrandingProvider";
 import { Card } from "../../components/Card";
 import { ListItemFadeIn, useListEntrance } from "../../components/FadeIn";
 import { EmptyState, SkeletonList } from "../../components/ListState";
 import { MediaImage } from "../../components/MediaImage";
+import { NewsFilterRow } from "../../components/NewsFilterRow";
 import { NewsTextCard } from "../../components/NewsTextCard";
 import { Screen } from "../../components/Screen";
 import { seasonScrollProps } from "../../seasons/sky/scroll";
@@ -14,6 +15,8 @@ import { Body, Heading, Muted, Title } from "../../components/Text";
 import { api, errorMessage } from "../../lib/api";
 import { formatDate, formatNewsCategory } from "../../lib/format";
 import { applyScope, internalLabel, type ScopeFilter } from "../../lib/memberArea";
+import { withoutRepeatedBanners } from "../../lib/newsCards";
+import { newsCategoryCounts, newsCategoryKey } from "../../lib/newsFilter";
 import type { MoreStackParamList } from "../../navigation/types";
 import { colors, radius } from "../../theme";
 import type { NewsPost } from "../../types";
@@ -50,19 +53,14 @@ export function NewsScreen({ navigation }: Props) {
     load();
   }, [load]);
 
-  const categories = useMemo(() => {
-    const cats = new Set<string>();
-    for (const item of items) {
-      if (item.category) cats.add(item.category);
-    }
-    return Array.from(cats).sort();
-  }, [items]);
-
   const hasInternal = useMemo(() => applyScope(items, "club").length > 0, [items]);
+  const scoped = useMemo(() => applyScope(items, scope), [items, scope]);
+  // Kategorien mit Anzahl (#1946, wie im Web): nur genutzte; gezählt wird, was „Alle“ bzw. „Verein“ gerade zeigt.
+  const categories = useMemo(() => newsCategoryCounts(scoped, activeCategory), [scoped, activeCategory]);
   const filtered = useMemo(() => {
-    let result = applyScope(items, scope);
+    let result = scoped;
     if (activeCategory) {
-      result = result.filter((item) => item.category === activeCategory);
+      result = result.filter((item) => newsCategoryKey(item.category) === activeCategory);
     }
     if (search.trim()) {
       const q = search.trim().toLowerCase();
@@ -75,13 +73,15 @@ export function NewsScreen({ navigation }: Props) {
       );
     }
     return result;
-  }, [items, activeCategory, scope, search]);
+  }, [scoped, activeCategory, search]);
 
-  const featuredPost = useMemo(() => filtered.find((item) => item.pinned) || filtered[0] || null, [filtered]);
-  const listItems = useMemo(
-    () => (featuredPost ? filtered.filter((item) => item.id !== featuredPost.id) : filtered),
-    [featuredPost, filtered]
-  );
+  // Dasselbe Bild nie zweimal hintereinander (#1946, wie im Web): in der Reihenfolge, in der die Karten stehen, bekommt
+  // die Wiederholung die Text-Karte.
+  const [featuredPost, listItems] = useMemo((): [NewsPost | null, NewsPost[]] => {
+    const lead = filtered.find((item) => item.pinned) || filtered[0] || null;
+    const shown = withoutRepeatedBanners(lead ? [lead, ...filtered.filter((item) => item.id !== lead.id)] : filtered);
+    return lead ? [shown[0], shown.slice(1)] : [null, shown];
+  }, [filtered]);
 
   if (loading) {
     return (
@@ -115,24 +115,6 @@ export function NewsScreen({ navigation }: Props) {
               <Muted>Aktuelle Ankündigungen, Updates und Vereinsnews.</Muted>
             )}
 
-            <View style={styles.searchRow}>
-              <Ionicons name="search-outline" color={colors.muted} size={16} style={styles.searchIcon} />
-              <TextInput
-                style={styles.searchInput}
-                placeholder="News durchsuchen ..."
-                placeholderTextColor={colors.muted}
-                value={search}
-                onChangeText={setSearch}
-                returnKeyType="search"
-                clearButtonMode="while-editing"
-              />
-              {search.length > 0 ? (
-                <Pressable onPress={() => setSearch("")} hitSlop={8}>
-                  <Ionicons name="close-circle" color={colors.muted} size={16} />
-                </Pressable>
-              ) : null}
-            </View>
-
             {hasInternal ? (
               <View style={styles.scopeRow} testID="news-scope">
                 {(["all", "club"] as ScopeFilter[]).map((key) => (
@@ -143,22 +125,8 @@ export function NewsScreen({ navigation }: Props) {
               </View>
             ) : null}
 
-            {categories.length > 0 ? (
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
-                <Pressable onPress={() => setActiveCategory(null)} style={[styles.chip, activeCategory === null && styles.chipActive]}>
-                  <Muted style={[styles.chipText, activeCategory === null && styles.chipTextActive]}>Alle</Muted>
-                </Pressable>
-                {categories.map((cat) => (
-                  <Pressable
-                    key={cat}
-                    onPress={() => setActiveCategory(activeCategory === cat ? null : cat)}
-                    style={[styles.chip, activeCategory === cat && styles.chipActive]}
-                  >
-                    <Muted style={[styles.chipText, activeCategory === cat && styles.chipTextActive]}>{formatNewsCategory(cat)}</Muted>
-                  </Pressable>
-                ))}
-              </ScrollView>
-            ) : null}
+            {/* Kategorien mit Anzahl und die Suche als Symbol in derselben Wischzeile (#1946, wie im Web). */}
+            <NewsFilterRow categories={categories} total={scoped.length} active={activeCategory} onSelect={setActiveCategory} query={search} onQuery={setSearch} />
 
             {search || activeCategory ? (
               <Muted style={styles.resultCount}>
@@ -306,30 +274,6 @@ const styles = StyleSheet.create({
     fontWeight: "900",
     textTransform: "uppercase",
   },
-  searchRow: {
-    alignItems: "center",
-    backgroundColor: "rgba(255,255,255,0.05)",
-    borderColor: colors.border,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    flexDirection: "row",
-    gap: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-  },
-  searchIcon: {
-    flexShrink: 0,
-  },
-  searchInput: {
-    color: colors.white,
-    flex: 1,
-    fontSize: 14,
-    padding: 0,
-  },
-  chips: {
-    gap: 8,
-    paddingRight: 4,
-  },
   chip: {
     backgroundColor: "rgba(255,255,255,0.05)",
     borderColor: colors.border,
@@ -338,15 +282,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 7,
   },
-  chipActive: {
-    backgroundColor: "rgba(41,182,232,0.16)",
-    borderColor: "rgba(41,182,232,0.42)",
-  },
   chipText: {
     fontWeight: "900",
-  },
-  chipTextActive: {
-    color: colors.cyan,
   },
   scopeRow: {
     flexDirection: "row",

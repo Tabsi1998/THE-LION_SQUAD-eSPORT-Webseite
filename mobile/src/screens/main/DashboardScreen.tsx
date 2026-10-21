@@ -24,6 +24,7 @@ import { seasonLine, splitHomeTimeline, type HomeItem } from "../../lib/dashboar
 import { childSummary, nestUnderEvents } from "../../lib/eventGroups";
 import { displayName, formatEventType, formatNewsCategory, formatStatus, formatWhen, placeParts, upperDe } from "../../lib/format";
 import { stationText } from "../../lib/matchText";
+import { withoutRepeatedBanners } from "../../lib/newsCards";
 import { isGuestUser } from "../../live";
 import { openSignIn, openTab } from "../../navigation/rootNavigation";
 import { FeedbackSheet } from "../../components/FeedbackSheet";
@@ -378,7 +379,8 @@ export function DashboardScreen({ navigation, route }: Props) {
 
         <Section title="News" actionLabel="Alle News" onAction={() => navigation.navigate("NewsList")}>
           {data.news.length ? (
-            data.news.slice(0, 3).map((post, index) => (
+            // Dasselbe Bild nie zweimal hintereinander (#1946, wie die Startseite im Web).
+            withoutRepeatedBanners(data.news.slice(0, 3)).map((post, index) => (
               <ListItemFadeIn key={post.id} entrance={entrance} id={`news-${post.id}`} index={index}>
                 <NewsCard
                   post={post}

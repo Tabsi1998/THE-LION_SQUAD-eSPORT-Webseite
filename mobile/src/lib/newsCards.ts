@@ -49,6 +49,21 @@ export function textCardSentence(news: { excerpt?: string | null; summary?: stri
   return `${(lastSpace > max * 0.5 ? cut.slice(0, lastSpace) : cut).replace(/[\s,;:–-]+$/, "")}…`;
 }
 
+/**
+ * Keine gleichen Bilder hintereinander (#1946, wie withoutRepeatedBanners im Web, #1343): steht dasselbe Bild schon
+ * weiter vorne, bekommt die Karte die Text-Karte statt einer Wiederholung.
+ */
+export function withoutRepeatedBanners<T extends { banner_url?: string | null }>(items: T[] | null | undefined): T[] {
+  const seen = new Set<string>();
+  return (items || []).map((item) => {
+    const url = item?.banner_url;
+    if (!url) return item;
+    if (seen.has(url)) return { ...item, banner_url: null };
+    seen.add(url);
+    return item;
+  });
+}
+
 /** Dunkle Fläche je News-Kategorie (weiße Schrift darauf), Grau ohne eigene Farbe - wie NEWS_CATEGORY_COLORS_DARK. */
 const CATEGORY_DARK: Record<string, string> = {
   tournaments: kindColorsDark.tournament,

@@ -1,4 +1,4 @@
-import { newsCategoryColorDark, newsResult, seatsLine, signupItems, splitAfterFirstParagraph, stateLine, textCardSentence } from "./newsCards";
+import { newsCategoryColorDark, newsResult, seatsLine, signupItems, splitAfterFirstParagraph, stateLine, textCardSentence, withoutRepeatedBanners } from "./newsCards";
 
 // News-Karten der App (#1912) - dieselben Regeln wie im Web (frontend/src/lib/newsCards.js, NewsTextCard.jsx,
 // NewsSignupCard.jsx und splitAfterFirstParagraph in NewsDetailPage.jsx).
@@ -65,4 +65,23 @@ test("Erster Absatz: HTML bis zum ersten </p>, Text bis zur ersten Leerzeile auÃ
   expect(splitAfterFirstParagraph("Eins\n\nZwei\n\nDrei")).toEqual(["Eins", "Zwei\n\nDrei"]);
   expect(splitAfterFirstParagraph("```\na\n\nb\n```\n\nRest")).toEqual(["```\na\n\nb\n```", "Rest"]);
   expect(splitAfterFirstParagraph("Nur einer")).toEqual(["Nur einer", ""]);
+});
+
+// Keine gleichen Bilder hintereinander (#1946, wie withoutRepeatedBanners im Web, #1343).
+test("dasselbe Bild steht nie zweimal: die Wiederholung wird zur Text-Karte", () => {
+  const out = withoutRepeatedBanners([
+    { id: "1", banner_url: "/cover.webp" },
+    { id: "2", banner_url: "/cover.webp" },
+    { id: "3", banner_url: "/anders.webp" },
+    { id: "4", banner_url: null },
+    { id: "5", banner_url: "/cover.webp" },
+  ]);
+  expect(out.map((item) => item.banner_url)).toEqual(["/cover.webp", null, "/anders.webp", null, null]);
+  expect(out.map((item) => item.id)).toEqual(["1", "2", "3", "4", "5"]);
+});
+
+test("ohne Bilder oder ohne Liste bleibt alles, wie es ist", () => {
+  const items = [{ id: "1" }, { id: "2", banner_url: "" }];
+  expect(withoutRepeatedBanners(items)).toEqual(items);
+  expect(withoutRepeatedBanners(undefined)).toEqual([]);
 });
