@@ -19,6 +19,7 @@ from auth import get_optional_user, require_area
 from models import now_utc
 from services import founding
 from services.visibility import user_can_see
+from services.news_cards import attach_result_winners
 from services import event_days
 from services.public_phase import derive_public_phase
 
@@ -288,7 +289,13 @@ async def home_state(user: dict | None = Depends(get_optional_user)):
         key=lambda n: (_parse_dt(n.get("published_at") or n.get("created_at")) or datetime.min.replace(tzinfo=timezone.utc), bool(n.get("pinned"))),
         reverse=True,
     )
+    # Der Aufmacher (#1342): dieselbe News wie oben auf der News-Seite - die neueste angepinnte, sonst die neueste.
+    lead_news = next((n for n in visible_news if n.get("pinned")), None) or (visible_news[0] if visible_news else None)
     visible_news = visible_news[:8]
+    if lead_news and lead_news not in visible_news:
+        visible_news = [lead_news, *visible_news[:7]]
+    # Ergebnis-News tragen den Sieger (#1343) - die Text-Karte ohne Bild zeigt ihn mit Pokal.
+    await attach_result_winners(db, visible_news, user)
 
     stats = {
         "news": len([n for n in news if (n.get("visibility") in (None, "public")) and not ((_parse_dt(n.get("published_at") or n.get("created_at")) or now) > now)]),
@@ -310,7 +317,7 @@ async def home_state(user: dict | None = Depends(get_optional_user)):
         "soon": soon,
         "upcoming": upcoming,
         "news": visible_news,
-        "featured_news": visible_news[:1],
+        "featured_news": [lead_news] if lead_news else [],
         "stats": stats,
         "club_numbers": club_numbers,
         "club_numbers_shown": club_numbers_shown,

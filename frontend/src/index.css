@@ -683,6 +683,31 @@ button.tls-bracket-row:active, .tls-bracket-head:active { transform: scale(calc(
 .tls-hide-scrollbar { scrollbar-width: none; -ms-overflow-style: none; }
 .tls-hide-scrollbar::-webkit-scrollbar { display: none; width: 0; height: 0; }
 
+/* News-Filter (#1249): weiche Knöpfe in einer Zeile zum Wischen. Der rechte Rand läuft weich aus - so sieht man, dass
+   es weitergeht. Drücken gibt kurz nach, das Suchfeld gleitet beim Aufklappen leicht von rechts herein. */
+.tls-news-pills { padding-inline-end: 24px; -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent); }
+.tls-news-pill { transition: background-color var(--tls-motion-fast) ease, color var(--tls-motion-fast) ease, transform var(--tls-motion-fast) var(--tls-ease); }
+.tls-news-pill:active { transform: scale(calc(1 - 0.03 * var(--tls-motion-on))); }
+.tls-news-search { transition: opacity 200ms var(--tls-ease), transform 200ms var(--tls-ease); }
+@starting-style {
+  .tls-news-search { opacity: 0; transform: translateX(calc(8px * var(--tls-motion-on))); }
+}
+
+/* Text-Karte ohne Bild (#1343): beim Drüberfahren schiebt sich der angeschnittene Löwe ein Stück herein und wird
+   etwas heller - dieselbe Geste wie das Bild einer Karte, nur ruhiger. Ohne Maus und mit „Bewegung reduzieren“ still. */
+.tls-news-textcard__lion { transition: transform var(--tls-motion-mid) var(--tls-ease), opacity var(--tls-motion-mid) ease; opacity: 0.85; }
+@media (hover: hover) and (pointer: fine) {
+  .tls-card:hover .tls-news-textcard__lion { transform: translate(calc(-6px * var(--tls-motion-on)), calc(-4px * var(--tls-motion-on))); opacity: 1; }
+}
+.tls-card:focus-visible .tls-news-textcard__lion { opacity: 1; }
+
+/* Anmelde-Karte in der News (#1266): der Pfeil zeigt beim Drüberfahren ein Stück weiter - wohin es geht. */
+.tls-news-signup__arrow { transition: transform var(--tls-motion-fast) var(--tls-ease); }
+@media (hover: hover) and (pointer: fine) {
+  .tls-news-signup__go:hover .tls-news-signup__arrow { transform: translateX(calc(3px * var(--tls-motion-on))); }
+}
+.tls-news-signup__go:focus-visible .tls-news-signup__arrow { transform: translateX(calc(3px * var(--tls-motion-on))); }
+
 /* ===== Premium rarity frames (animated conic-gradient borders) ===== */
 @property --tls-angle { syntax: "<angle>"; initial-value: 0deg; inherits: false; }
 @keyframes tls-rotate { to { --tls-angle: 360deg; } }

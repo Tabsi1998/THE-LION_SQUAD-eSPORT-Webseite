@@ -97,6 +97,26 @@ Die Liste unter Content → News hat Suche, Filter nach Kategorie und Sichtbarke
 - Discord: Öffentliche News gehen über den Bot in den Kanal, den ihr unter Verbindungen → Discord gewählt habt
   ([Discord](discord.md)). Alles Nicht-Öffentliche geht nie in einen öffentlichen Kanal.
 
+**So erscheint ein Beitrag auf der Website** – die Redaktion muss dafür nichts extra tun:
+
+- **Angepinnt** heißt: Der Beitrag steht als breiter **Aufmacher** oben auf **/news** und auf der Startseite – Bild links,
+  Kategorie, Titel, Kurzbeschreibung und „Weiterlesen“ rechts (am Handy untereinander). Sind mehrere angepinnt, ist der
+  neueste der Aufmacher, die anderen stehen vorne im Raster. Ohne angepinnten Beitrag zeigt die Startseite den neuesten.
+- **Ohne Banner** bekommt der Beitrag eine **Text-Karte**: eine Fläche in der Farbe der Kategorie (Turniere Cyan, Events
+  Violett, Verein und Mitglieder Gold, sonst Grau) mit dem ersten Satz der Kurzbeschreibung und dem Vereinslöwen. Ist ein
+  Turnier mit veröffentlichten Ergebnissen verknüpft, zeigt die Karte stattdessen Pokal und den Sieger. Dasselbe Bild steht
+  nie zweimal nebeneinander – die Wiederholung bekommt ebenfalls die Text-Karte.
+- **Filter** über der Liste: nur Kategorien, in denen der Besucher wirklich etwas sieht, mit Anzahl; eine Zeile zum Wischen,
+  die Suche als Lupe am Ende.
+- **Verknüpfte Turniere und Events** (höchstens drei) stehen als Karte **nach dem ersten Absatz**: Beginn, freie Plätze und
+  **Anmelden** – das führt direkt zur Anmeldung auf der Turnier- bzw. Event-Seite. Ist die Anmeldung zu, steht dort der Stand
+  (ausgebucht, öffnet am …, läuft, Ergebnisse). Schreibt den wichtigsten Satz also in den ersten Absatz.
+
+<table><tr>
+<td><img src="../assets/news/news-aufmacher.png" alt="News-Seite: angepinnter Beitrag als breiter Aufmacher, darüber die Filterzeile" width="560"></td>
+<td><img src="../assets/news/news-anmeldekarte-handy.png" alt="Anmelde-Karten im Beitrag am Handy: Turnier mit freien Plätzen und Anmelden, Event ausgebucht" width="220"></td>
+</tr></table>
+
 ### 3.2 Die Medien-Bibliothek
 
 **Admin → Content → Medien** (Seite „Medien-Browser“). Hier liegt alles Hochgeladene: News-Bilder, Galerie, Sponsoren, Banner.

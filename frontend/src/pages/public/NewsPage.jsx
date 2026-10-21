@@ -9,7 +9,11 @@ import { PublicLoadingState } from "@/components/tls/PublicLoadingState";
 import { LazyImg } from "@/components/tls/LazyImg";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
-import { ArrowRight, Pin, Newspaper, Crown, Lock, Search, X } from "lucide-react";
+import { ArrowRight, Pin, Crown, Lock } from "lucide-react";
+import { NewsFilterRow } from "@/components/tls/NewsFilterRow";
+import { NewsTextCard } from "@/components/tls/NewsTextCard";
+import { NewsLead } from "@/components/tls/NewsLead";
+import { withoutRepeatedBanners } from "@/lib/newsCards";
 import { formatAgo } from "@/lib/datetime";
 import { newsCategoryColor } from "@/lib/categoryColors";
 
@@ -19,7 +23,7 @@ export default function NewsPage() {
   useDocumentTitle("News", "Aktuelle News, Ergebnisse, Ankündigungen, Events und Turnier-Updates von THE LION SQUAD eSports aus Tirol.");
   const [searchParams, setSearchParams] = useSearchParams();
   const [list, setList] = useState([]);
-  const [meta, setMeta] = useState({ categories: [], visibilities: [] });
+  const [meta, setMeta] = useState({ categories: [], in_use: [], visibilities: [] });
   const [activeCat, setActiveCat] = useState(searchParams.get("category") || "");
   const [searchQuery, setSearchQuery] = useState(searchParams.get("q") || "");
   const [loading, setLoading] = useState(true);
@@ -64,8 +68,10 @@ export default function NewsPage() {
 
   const hasSearch = Boolean(searchQuery.trim());
 
-  const pinned = list.filter((n) => n.pinned);
-  const rest = list.filter((n) => !n.pinned);
+  // Dasselbe Bild nie zweimal (#1343): die Wiederholung bekommt die Text-Karte.
+  const shown = withoutRepeatedBanners(list);
+  const lead = shown.find((n) => n.pinned) || null;
+  const grid = shown.filter((n) => n !== lead);
 
   return (
     <PublicLayout>
@@ -76,43 +82,14 @@ export default function NewsPage() {
           Alles was im Rudel passiert — von Turnier-Recaps über Eventankündigungen bis zu Vereinsthemen.
         </p>
 
-        <div className="mt-8 space-y-4">
-          <div className="relative max-w-xl">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/35" />
-            <input
-              type="search"
-              value={searchQuery}
-              onChange={(e) => updateNewsFilters({ q: e.target.value })}
-              placeholder="News suchen"
-              data-testid="news-search"
-              className="w-full rounded-sm border border-white/10 bg-[#0A0A0A] py-3 pl-10 pr-11 text-sm text-white outline-none transition placeholder:text-white/30 focus:border-[#29B6E8]/60"
-            />
-            {hasSearch && (
-              <button
-                type="button"
-                onClick={() => updateNewsFilters({ q: "" })}
-                aria-label="Suche leeren"
-                className="absolute right-2 top-1/2 inline-flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-sm text-white/45 transition hover:bg-white/10 hover:text-white"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            )}
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <button
-              onClick={() => updateNewsFilters({ category: "" })}
-              data-testid="news-filter-all"
-              className={`px-4 py-2 text-xs uppercase tracking-wider font-bold rounded-sm transition ${!activeCat ? "bg-[#29B6E8] text-black" : "border border-white/10 text-white/60 hover:text-white"}`}
-            >Alle</button>
-            {meta.categories.map((c) => (
-              <button
-                key={c.k}
-                onClick={() => updateNewsFilters({ category: c.k })}
-                data-testid={`news-filter-${c.k}`}
-                className={`px-4 py-2 text-xs uppercase tracking-wider font-bold rounded-sm transition ${activeCat === c.k ? "bg-[#29B6E8] text-black" : "border border-white/10 text-white/60 hover:text-white"}`}
-              >{c.l}</button>
-            ))}
-          </div>
+        <div className="mt-8">
+          <NewsFilterRow
+            categories={meta.in_use || []}
+            active={activeCat}
+            onSelect={(category) => updateNewsFilters({ category })}
+            query={searchQuery}
+            onQuery={(q) => updateNewsFilters({ q })}
+          />
         </div>
 
         {loading ? (
@@ -127,23 +104,18 @@ export default function NewsPage() {
             className="mt-10"
           />
         ) : (
-          <div className="mt-10 space-y-10">
-            {pinned.length > 0 && (
-              <div>
-                <div className="text-[11px] uppercase tracking-widest text-white/80 font-bold mb-3 flex items-center gap-2">
-                  <Pin className="w-3.5 h-3.5" /> Angepinnt
-                </div>
-                <Reveal className="tls-reveal-grid grid md:grid-cols-2 gap-5">
-                  {pinned.map((n) => <NewsCard key={n.id} n={n} featured />)}
-                </Reveal>
-              </div>
-            )}
-            <div>
-              {pinned.length > 0 && <div className="text-[11px] uppercase tracking-widest text-white/40 font-bold mb-3">Aktuell</div>}
-              <Reveal className="tls-reveal-grid grid md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-5">
-                {rest.map((n) => <NewsCard key={n.id} n={n} />)}
+          <div className="mt-8 space-y-8">
+            {/* Die angepinnte News als breiter Aufmacher (#1342) - weitere angepinnte stehen vorne im Raster. */}
+            {lead && (
+              <Reveal className="tls-reveal-grid">
+                <NewsLead news={lead} priority />
               </Reveal>
-            </div>
+            )}
+            {grid.length > 0 && (
+              <Reveal className="tls-reveal-grid grid md:grid-cols-2 lg:grid-cols-3 gap-5" data-testid="news-grid">
+                {grid.map((n) => <NewsCard key={n.id} n={n} />)}
+              </Reveal>
+            )}
           </div>
         )}
       </section>
@@ -151,7 +123,7 @@ export default function NewsPage() {
   );
 }
 
-function NewsCard({ n, featured = false }) {
+function NewsCard({ n }) {
   // Farbe je Kategorie (#1305): Turniere Cyan, Events Violett, Verein und Mitglieder Gold, alles andere Grau.
   const c = newsCategoryColor(n.category);
   const VIcon = VIS_ICON[n.visibility];
@@ -160,15 +132,13 @@ function NewsCard({ n, featured = false }) {
       to={`/news/${n.slug}`}
       data-testid={`news-card-${n.slug}`}
       data-season-anchor="card"
-      className={`tls-card tls-reveal-item group border border-white/10 rounded-sm bg-[#121212] overflow-hidden flex flex-col ${featured ? "lg:col-span-1" : ""}`}
+      className={`tls-card tls-reveal-item group border border-white/10 rounded-sm bg-[#121212] overflow-hidden flex flex-col`}
     >
       <div className="aspect-video bg-[#0A0A0A] overflow-hidden">
         {n.banner_url ? (
           <LazyImg src={n.banner_url} alt="" sizes="(min-width: 1024px) 33vw, (min-width: 768px) 50vw, 100vw" className="w-full h-full object-cover tls-card__media" />
         ) : (
-          <div className="w-full h-full flex items-center justify-center" style={{ background: `linear-gradient(135deg, ${c}33, #0A0A0A 48%, #121212)` }}>
-            <Newspaper className="w-10 h-10 text-white/20" />
-          </div>
+          <NewsTextCard news={n} />
         )}
         </div>
       <div className="p-5 flex-1 flex flex-col">
@@ -178,7 +148,7 @@ function NewsCard({ n, featured = false }) {
           {VIcon && <VIcon className="w-3 h-3 text-honor" />}
           <span className="text-white/45 ml-auto normal-case tracking-normal">{formatAgo(n.published_at || n.created_at)}</span>
         </div>
-        <h3 className={`mt-2 font-heading font-black leading-tight break-words line-clamp-3 ${featured ? "text-xl md:text-2xl" : "text-lg"} tls-card__title`}>
+        <h3 className={`mt-2 font-heading font-black leading-tight break-words line-clamp-3 text-lg tls-card__title`}>
           {n.title}
         </h3>
         {n.excerpt && <p className="mt-2 text-sm text-white/65 line-clamp-3 flex-1">{n.excerpt}</p>}

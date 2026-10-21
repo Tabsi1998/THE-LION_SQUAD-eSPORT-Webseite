@@ -26,6 +26,9 @@ import { SkeletonCards, SkeletonDetailHeader } from "@/components/tls/Skeleton";
 import { ArrowRight, Flag, Trophy, Calendar, Newspaper, Pin, Radio, Timer, Users } from "lucide-react";
 import { formatAgo, formatWhen } from "@/lib/datetime";
 import { KIND_COLORS } from "@/lib/categoryColors";
+import { withoutRepeatedBanners } from "@/lib/newsCards";
+import { NewsTextCard } from "@/components/tls/NewsTextCard";
+import { NewsLead } from "@/components/tls/NewsLead";
 import { eventSortTime, scheduleLine } from "@/lib/eventDays";
 import { childSummary, nestUnderEvents } from "@/lib/eventGroups";
 import { LoadState, LoadStaleNotice } from "@/components/tls/LoadState";
@@ -63,8 +66,9 @@ export default function HomePage() {
   // Ein Stand, eine Liste: sonst sähe der Änderungsvergleich in NextUp bei jedem Tick neue Objekte.
   // Ein Event mit seinen Turnieren und Fast Laps ist eine Zeile (#1182) - aus drei Karten wird eine.
   const timeline = useMemo(() => (state ? nestUnderEvents(buildHomeTimeline(state)).slice(0, 5) : []), [state]);
-  const primaryNews = state?.featured_news?.[0] || state?.news?.[0] || null;
-  const newsItems = homeNews(state, primaryNews?.id).slice(0, 3);
+  const leadNews = state?.featured_news?.[0] || state?.news?.[0] || null;
+  // Dasselbe Bild nie zweimal nebeneinander (#1343): die Wiederholung bekommt die Text-Karte.
+  const [primaryNews = null, ...newsItems] = withoutRepeatedBanners(leadNews ? [leadNews, ...homeNews(state, leadNews.id).slice(0, 3)] : []);
   const isEmptyHome = state && !state.has_live && !timeline.length && !primaryNews && !newsItems.length;
 
   return (
@@ -143,7 +147,8 @@ export default function HomePage() {
       {state && (primaryNews || timeline.length > 0) && (
         <Reveal as="section" className="border-b border-white/10 bg-[#080808]/35" data-testid="home-current">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 md:py-12 min-w-0">
-            {primaryNews && <FeaturedNews news={primaryNews} />}
+            {/* Derselbe Aufmacher wie auf der News-Seite (#1342): die angepinnte News, sonst die neueste. */}
+            {primaryNews && <NewsLead news={primaryNews} testId={`home-featured-news-${primaryNews.slug}`} />}
             <div className={`${primaryNews ? "mt-8 md:mt-10 border-t border-white/10 pt-8 md:pt-10" : ""}`}>
               <NextUp items={timeline} />
             </div>
@@ -377,31 +382,6 @@ function BoardTeaser({ contacts }) {
   );
 }
 
-function FeaturedNews({ news }) {
-  return (
-    <Link to={`/news/${news.slug}`} data-testid={`home-featured-news-${news.slug}`} data-season-anchor="card"
-      className="tls-card group tls-reveal-item border border-white/10 rounded-sm bg-[#111] overflow-hidden grid lg:grid-cols-[minmax(0,1fr)_minmax(22rem,0.9fr)] min-w-0">
-      <div className="aspect-[16/9] lg:aspect-auto bg-[#070707] overflow-hidden">
-        {news.banner_url ? (
-          <LazyImg src={news.banner_url} alt="" sizes="(min-width: 1024px) 45vw, 100vw" className="w-full h-full object-cover object-center opacity-90 tls-card__media" />
-        ) : (
-          <div className="w-full h-full bg-gradient-to-br from-[#29B6E8]/20 via-[#101010] to-black" />
-        )}
-      </div>
-      <div className="p-5 md:p-7 lg:p-8 flex flex-col justify-center min-w-0">
-        <div className="inline-flex items-center gap-2 text-[10px] uppercase tracking-widest font-bold text-[#29B6E8]">
-          <Newspaper className="w-3 h-3" /> Neueste News {news.pinned && <Pin className="w-3 h-3 text-white" aria-label="Angepinnt" />}
-        </div>
-        <h2 className="mt-3 max-w-2xl font-heading text-2xl md:text-3xl xl:text-[2.2rem] font-black uppercase leading-[1.03] tls-card__title break-words line-clamp-4">{news.title}</h2>
-        {news.excerpt && <p className="mt-4 max-w-2xl text-white/65 text-sm md:text-base leading-relaxed line-clamp-3">{news.excerpt}</p>}
-        <span className="mt-5 inline-flex items-center gap-2 text-xs uppercase tracking-wider font-bold text-white/55 group-hover:text-[#29B6E8]">
-          Lesen <ArrowRight className="tls-card__arrow w-3.5 h-3.5" />
-        </span>
-      </div>
-    </Link>
-  );
-}
-
 // Countdown zum nächsten Termin und Live-Zahlen je Karte (#224). Kommt über den Strom eine
 // Änderung für eine Karte, leuchtet sie kurz und trägt ein paar Sekunden „Neu“ - beim ersten
 // Laden nicht. Mit „Bewegung reduzieren“ bleibt das Leuchten aus, das Kennzeichen nicht.
@@ -535,7 +515,7 @@ function NewsCard({ news, featured = false, index = 0, count = 1 }) {
             className={`relative w-full h-full ${tall ? "object-cover lg:object-contain" : "object-cover"} tls-card__media`} />
         </div>
       ) : (
-        <div className={`${media} bg-gradient-to-br from-[#29B6E8]/20 via-[#0A0A0A] to-[#0A0A0A]`} />
+        <div className={`${media} relative bg-[#0A0A0A] overflow-hidden`}><NewsTextCard news={news} size={featured ? "lg" : "md"} /></div>
       )}
       <div className={`p-4 ${tall ? "" : "flex-1"}`}>
         <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-widest font-bold text-[#29B6E8]">

@@ -163,6 +163,21 @@ test("Mitglieder sehen im Hero keine Zeile - der Mitgliederbereich steht im Benu
   expect(screen.queryByText("Zum Mitgliederbereich")).toBeNull();
 });
 
+// News ohne Bild (#1343): nie eine leere Fläche, und dasselbe Bild steht nie zweimal nebeneinander.
+test("News ohne Bild und doppelte Bilder bekommen die Text-Karte", async () => {
+  const news = [
+    { id: "a", slug: "a", title: "A", category: "club", excerpt: "Satz A.", banner_url: "/kart.webp", published_at: "2026-09-21T10:00:00Z" },
+    { id: "b", slug: "b", title: "B", category: "club", excerpt: "Satz B.", banner_url: "/kart.webp", published_at: "2026-09-20T10:00:00Z" },
+    { id: "c", slug: "c", title: "C", category: "recap", excerpt: "Satz C.", published_at: "2026-09-19T10:00:00Z", result: { winner: "NeonFalke", tournament: "Kart-Cup" } },
+  ];
+  apiMock.get.mockImplementation(async (url) => (url.startsWith("/board") ? { data: [] } : { data: { ...stateWith(1), news, featured_news: [news[0]] } }));
+  render(<MemoryRouter><HomePage /></MemoryRouter>);
+  await screen.findByTestId("home-news-b");
+  expect(screen.getByTestId("home-featured-news-a").querySelector("[data-testid='news-text-card']")).toBeNull();
+  expect(screen.getByTestId("home-news-b").querySelector("[data-testid='news-text-card']")).toHaveTextContent("Satz B.");
+  expect(screen.getByTestId("home-news-c").querySelector("[data-testid='news-text-card']")).toHaveTextContent("1. NeonFalke");
+});
+
 // Startseite I (#832): wie die große News im Raster steht, und wie weit das Licht dem Zeiger folgt.
 test("News-Raster: allein ganze Breite, zu zweit 2:1, zu dritt links über zwei Zeilen", () => {
   expect(newsCardSpan(true, 1)).toBe("lg:col-span-3");

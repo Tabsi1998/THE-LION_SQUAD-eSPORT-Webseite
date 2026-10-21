@@ -12,6 +12,7 @@ import { StatusBadge } from "@/components/tls/StatusBadge";
 import { PhaseBadge } from "@/components/tls/PhaseBadge";
 import { AuthFormAlert } from "@/components/tls/AuthFormFields";
 import { useLiveRefresh } from "@/hooks/useLiveRefresh";
+import { prefersReducedMotion } from "@/hooks/useLiveChanges";
 import { useChatRead } from "@/hooks/useChats";
 import { useSubmissionGuard } from "@/hooks/useSubmissionGuard";
 import { toast } from "sonner";
@@ -74,6 +75,7 @@ function TournamentDetailView() {
   const { submitting: loading, submitOnce } = useSubmissionGuard();
   const [actionError, setActionError] = useState("");
   const [registerModal, setRegisterModal] = useState(false);
+  const [loadedFor, setLoadedFor] = useState("");
   const confirm = useConfirm();
   const seoDescription = seoTextPreview(t?.description || t?.rules, "eSports Turnier von THE LION SQUAD mit Anmeldung, Check-in, Bracket und Rangliste.");
   useDocumentTitle(t?.title || "Turnier", seoDescription, {
@@ -116,11 +118,34 @@ function TournamentDetailView() {
     }
     const teamIds = new Set(teams.map((team) => team.id));
     setMyReg(user ? r.find((x) => x.user_id === user.id || x.is_mine || (x.team_id && teamIds.has(x.team_id))) || null : null);
+    // Erst wenn die Anmeldung geklärt ist (user undefined = lädt noch), darf ?anmelden=1 handeln.
+    if (user !== undefined) setLoadedFor(`${slug}:${user?.id || "guest"}`);
   }, [slug, user, accessToken]);
 
   useEffect(() => {
     load();
   }, [load]);
+
+  // Aus der News (#1266): ?anmelden=1 führt zur Anmeldung - braucht sie Angaben (Team, Spieler-IDs, Kosten), öffnet
+  // sich das Formular; sonst rückt der Anmelde-Knopf ins Bild und bekommt den Fokus, damit niemand ungefragt angemeldet
+  // ist. Wer schon angemeldet ist oder es nicht kann, sieht einfach die Seite. Nur einmal je Aufruf.
+  const wantsSignup = searchParams.get("anmelden") === "1";
+  const signupHandled = useRef(false);
+  useEffect(() => {
+    if (!wantsSignup || signupHandled.current || !t || !loadedFor.startsWith(`${slug}:`)) return;
+    signupHandled.current = true;
+    if (myReg || t.onsite_view) return;
+    const needsForm = (t.team_mode || "solo") !== "solo" || t.offer || (t.game?.effective_player_id_fields || t.game?.player_id_fields || []).length;
+    if (user && needsForm && getRegistrationState(t, "Anmeldung").canRegister) {
+      setRegisterModal(true);
+      return;
+    }
+    window.requestAnimationFrame?.(() => {
+      const button = document.querySelector("[data-testid='tournament-register-btn'], [data-testid='tournament-event-first']");
+      button?.scrollIntoView?.({ behavior: prefersReducedMotion() ? "auto" : "smooth", block: "center" });
+      button?.focus?.({ preventScroll: true });
+    });
+  }, [wantsSignup, t, loadedFor, slug, myReg, user]);
 
   // Nur Änderungen dieses Turniers (#1801) - bis es geladen ist, jede.
   useLiveRefresh(load, ["tournaments"], { fallbackMs: 10000, tournamentId: t?.id });

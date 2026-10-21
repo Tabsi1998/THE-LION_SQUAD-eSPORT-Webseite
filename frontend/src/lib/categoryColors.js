@@ -40,6 +40,14 @@ export function newsCategoryColor(category) {
   return NEWS_CATEGORY_COLORS[category] || ROLE_COLORS.quiet;
 }
 
+/** Dunkle Fassung je News-Kategorie (#1343) - die Fläche der Text-Karte mit weißer Schrift, Grau ohne eigene Farbe. */
+export const NEWS_CATEGORY_COLORS_DARK = { tournaments: KIND_COLORS_DARK.tournament, events: KIND_COLORS_DARK.event, club: KIND_COLORS_DARK.club, members: KIND_COLORS_DARK.club };
+export const NEWS_CATEGORY_DARK_FALLBACK = "#3A3A44";
+
+export function newsCategoryColorDark(category) {
+  return NEWS_CATEGORY_COLORS_DARK[category] || NEWS_CATEGORY_DARK_FALLBACK;
+}
+
 // ---------------------------------------------------------------- Kontrast (WCAG 2.1)
 function luminance(hex) {
   const [r, g, b] = [1, 3, 5].map((index) => {

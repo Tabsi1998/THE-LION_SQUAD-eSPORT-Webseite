@@ -45,9 +45,9 @@ function mockApi(tournament, registrations = [], discord = { available: false })
   });
 }
 
-function renderPage() {
+function renderPage(path = "/tournaments/cup") {
   return render(
-    <MemoryRouter initialEntries={["/tournaments/cup"]}>
+    <MemoryRouter initialEntries={[path]}>
       <Routes><Route path="/tournaments/:slug" element={<TournamentDetailPage />} /></Routes>
     </MemoryRouter>,
   );
@@ -146,6 +146,23 @@ test("Spieler-Kennungen (#1261): im selben Blatt, die Anmeldung schickt sie mit"
   await user.type(screen.getByLabelText(/Epic-ID/), "probe-123");
   await user.click(screen.getByTestId("tournament-register-submit"));
   await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/tournaments/t1/register", expect.objectContaining({ player_ids: { epic: "probe-123" } }), expect.anything()));
+});
+
+// Aus der News (#1266): „Anmelden“ führt mit ?anmelden=1 hierher - nie ungefragt angemeldet.
+test("?anmelden=1 mit Formular (Startgeld): das Formular ist gleich offen", async () => {
+  mockApi({ ...base, offer: OFFER });
+  renderPage("/tournaments/cup?anmelden=1");
+  expect(await screen.findByTestId("tournament-register-submit")).toBeDisabled();
+  expect(apiMock.post).not.toHaveBeenCalledWith("/tournaments/t1/register", expect.anything(), expect.anything());
+});
+
+test("?anmelden=1 ohne Formular: der Anmelde-Knopf bekommt den Fokus, angemeldet wird erst mit dem Klick", async () => {
+  apiMock.post.mockClear();
+  mockApi(base);
+  renderPage("/tournaments/cup?anmelden=1");
+  const button = await screen.findByTestId("tournament-register-btn");
+  await waitFor(() => expect(button).toHaveFocus());
+  expect(apiMock.post).not.toHaveBeenCalled();
 });
 
 test("mit Startgeld steht der Betrag vorne, und angemeldet wird erst mit dem Haken", async () => {

@@ -13,7 +13,7 @@ vi.mock("@/hooks/useDocumentTitle", () => ({ useDocumentTitle: () => {} }));
 vi.mock("@/hooks/useCanonicalSlugRedirect", () => ({ useCanonicalSlugRedirect: () => {} }));
 vi.mock("sonner", () => ({ toast: toastMock }));
 
-const { default: NewsDetailPage, stripLeadingTitle, readingMinutes } = await import("./NewsDetailPage");
+const { default: NewsDetailPage, stripLeadingTitle, readingMinutes, splitAfterFirstParagraph } = await import("./NewsDetailPage");
 
 const POST = {
   id: "n1", slug: "mario-kart-abgesagt", title: "Mario Kart 8 Deluxe Championship 2026 abgesagt", category: "events", pinned: true,
@@ -78,4 +78,34 @@ test("stripLeadingTitle nimmt nur eine Überschrift weg, die den Titel wiederhol
   expect(stripLeadingTitle("<h2><span><b>Mario <i>Kart</i></b> abgesagt</span></h2><p>Text</p>", "Mario Kart abgesagt")).toBe("<p>Text</p>");
   expect(stripLeadingTitle("<h2><<b>b>Mario Kart abgesagt</h2><p>Text</p>", "Mario Kart abgesagt")).toBe("<h2><<b>b>Mario Kart abgesagt</h2><p>Text</p>");
   expect(readingMinutes("wort ".repeat(450))).toBe(2);
+});
+
+// News führen direkt zur Anmeldung (#1266): die Karte steht nach dem ersten Absatz, ohne Stand ändert sich nichts.
+test("verknüpftes Turnier: die Anmelde-Karte steht nach dem ersten Absatz", async () => {
+  const post = { ...POST, linked_events: [], linked_tournaments: [{ id: "t1", slug: "kart-cup", title: "Kart-Cup", signup: { state: "open", start_date: "2026-11-14T17:00:00Z", taken: 3, max: 8, spots_left: 5 } }] };
+  apiMock.get.mockImplementation(async (url) => (url.startsWith("/news?") ? { data: LIST } : { data: post }));
+  renderPage();
+  const card = await screen.findByTestId("news-signup-kart-cup");
+  const article = screen.getByTestId("news-article");
+  const first = screen.getByText(/Leider müssen wir euch heute mitteilen/);
+  const second = screen.getByText("Zu wenige Anmeldungen");
+  expect(article.contains(card)).toBe(true);
+  expect(first.compareDocumentPosition(card) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(card.compareDocumentPosition(second) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  // Die Seitenleiste „Verknüpft“ bleibt.
+  expect(screen.getByTestId("news-linked")).toHaveTextContent("Kart-Cup");
+});
+
+test("ohne Anmelde-Stand keine Karte im Text", async () => {
+  renderPage();
+  await screen.findByTestId("news-article");
+  expect(screen.queryByTestId("news-signups")).toBeNull();
+});
+
+test("erster Absatz: Markdown an der Leerzeile, HTML nach dem ersten </p>, nicht im Code-Block", () => {
+  expect(splitAfterFirstParagraph("Eins.\n\nZwei.\n\nDrei.")).toEqual(["Eins.", "Zwei.\n\nDrei."]);
+  expect(splitAfterFirstParagraph("<p>Eins</p><p>Zwei</p>")).toEqual(["<p>Eins</p>", "<p>Zwei</p>"]);
+  const fence = "```";
+  expect(splitAfterFirstParagraph(`${fence}\na\n\nb\n${fence}\n\nDanach`)).toEqual([`${fence}\na\n\nb\n${fence}`, "Danach"]);
+  expect(splitAfterFirstParagraph("Nur einer.")).toEqual(["Nur einer.", ""]);
 });

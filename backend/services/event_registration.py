@@ -60,19 +60,11 @@ def validated_companion_count(event: dict, value: int | None) -> int:
     return companion_count
 
 
-async def summary(db, event: dict, exclude_registration_id: str | None = None) -> dict:
-    """Plätze, Warteliste und Zähler - dieselbe Rechnung für Formular, Teilnehmerliste und Discord-Zusammenfassung."""
-    # In der Datenbank gezählt, über alle Anmeldungen (#1037): Eine gelesene Liste hätte eine Obergrenze, und was darüber
-    # liegt, zählte nicht mit. Je Status Anzahl und Begleitpersonen (nicht negativ; was keine Zahl ist, zählt 0).
-    match = {"event_id": event["id"]}
-    if exclude_registration_id:
-        match["id"] = {"$ne": exclude_registration_id}
-    rows = await db.event_registrations.aggregate([
-        {"$match": match},
-        {"$group": {"_id": "$status", "count": {"$sum": 1},
-                    "companions": {"$sum": {"$max": [0, {"$ifNull": ["$companion_count", 0]}]}}}},
-    ]).to_list(None)
-    by_status = {row["_id"]: (int(row.get("count") or 0), int(row.get("companions") or 0)) for row in rows}
+COUNT_GROUP = {"count": {"$sum": 1}, "companions": {"$sum": {"$max": [0, {"$ifNull": ["$companion_count", 0]}]}}}
+
+
+def _summary_from(by_status: dict, event: dict) -> dict:
+    """Die Rechnung aus den Zählern je Status ``{status: (Anzahl, Begleitpersonen)}``."""
 
     def count(*statuses: str) -> int:
         return sum(by_status.get(status, (0, 0))[0] for status in statuses)
@@ -99,6 +91,37 @@ async def summary(db, event: dict, exclude_registration_id: str | None = None) -
         "spots_left": spots_left,
         "max_participants": max_participants,
     }
+
+
+async def summary(db, event: dict, exclude_registration_id: str | None = None) -> dict:
+    """Plätze, Warteliste und Zähler - dieselbe Rechnung für Formular, Teilnehmerliste und Discord-Zusammenfassung."""
+    # In der Datenbank gezählt, über alle Anmeldungen (#1037): Eine gelesene Liste hätte eine Obergrenze, und was darüber
+    # liegt, zählte nicht mit. Je Status Anzahl und Begleitpersonen (nicht negativ; was keine Zahl ist, zählt 0).
+    match = {"event_id": event["id"]}
+    if exclude_registration_id:
+        match["id"] = {"$ne": exclude_registration_id}
+    rows = await db.event_registrations.aggregate([
+        {"$match": match},
+        {"$group": {"_id": "$status", **COUNT_GROUP}},
+    ]).to_list(None)
+    by_status = {row["_id"]: (int(row.get("count") or 0), int(row.get("companions") or 0)) for row in rows}
+    return _summary_from(by_status, event)
+
+
+async def summaries(db, events: list[dict]) -> dict[str, dict]:
+    """Dieselbe Rechnung für mehrere Events mit einer Abfrage - Listen (z. B. verknüpfte Events einer News)."""
+    ids = [event["id"] for event in events if event.get("id")]
+    if not ids:
+        return {}
+    rows = await db.event_registrations.aggregate([
+        {"$match": {"event_id": {"$in": ids}}},
+        {"$group": {"_id": {"event_id": "$event_id", "status": "$status"}, **COUNT_GROUP}},
+    ]).to_list(None)
+    by_event: dict[str, dict] = {}
+    for row in rows:
+        key = row["_id"]
+        by_event.setdefault(key["event_id"], {})[key.get("status")] = (int(row.get("count") or 0), int(row.get("companions") or 0))
+    return {event["id"]: _summary_from(by_event.get(event["id"], {}), event) for event in events if event.get("id")}
 
 
 async def ensure_can_register(db, event: dict, me: dict, *, has_access: bool = False, register_access: dict | None = None) -> None:
