@@ -9,6 +9,7 @@ import { SeriesForm } from "./referenceSeries/SeriesForm";
 import { SeriesCalendarSection } from "./referenceSeries/SeriesCalendarSection";
 import { SeriesParticipantsSection } from "./referenceSeries/SeriesParticipantsSection";
 import { SeriesResultsSection } from "./referenceSeries/SeriesResultsSection";
+import { SeriesRosterSection } from "./referenceSeries/SeriesRosterSection";
 import { SeriesStaffSection } from "./referenceSeries/SeriesStaffSection";
 import { SeasonCloseSheet } from "./referenceSeries/SeasonCloseSheet";
 import { seasonLabel } from "./AdminReferenceSeriesPage";
@@ -150,6 +151,8 @@ export default function AdminReferenceSeriesDetailPage() {
             <SeriesCalendarSection series={series} onChanged={load} />
             {/* Zuordnung der Namen (Aliase, Verknüpfungen) bleibt beim Vorstand (#1743) - Captains sehen sie nicht. */}
             {board && <SeriesParticipantsSection series={series} onChanged={load} />}
+            {/* Kader je eigenem Team (#1931) - nur Team-Liga, nur Vorstand. */}
+            {board && lineage.kind === "team_league" && <SeriesRosterSection series={series} />}
             <SeriesResultsSection series={series} onChanged={load} />
             {board && <SeriesStaffSection series={series} />}
           </div>
