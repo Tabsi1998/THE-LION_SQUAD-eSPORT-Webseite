@@ -34,6 +34,24 @@ def test_gegen_names_the_opponent_without_a_side_and_a_place_stays_the_place():
     assert (plain["opponent"], plain["at_home"]) == ("Probe Eulen", True)
 
 
+def test_opponent_and_session_words_do_not_get_in_each_others_way():
+    """#1930 und #1931 zusammen: „vs“/„@“ sind keine Lauf-Wörter, ein Lauf-Wort nach dem Kürzel bleibt der Lauf, und
+    ein Gegner, der wie ein Lauf heißt, bleibt der Gegner."""
+    rows = _parse("ST1 vs Probe Falken · 13.05.2026\n"
+                  "ST2 @ Probe Rennen · 20.05.–24.05.\n"
+                  "ST3 · 27.05. · vs Sprint\n"
+                  "R1 Sprint · 07.06.2026 · Spa\n"
+                  "R2 Q · 14.06. 20:00 · vs Probe Wölfe")["rows"]
+    assert [(row["code"], row["session"], row["opponent"], row["at_home"], row["venue"], row["day_end"])
+            for row in rows] == [
+        ("ST1", None, "Probe Falken", True, None, None),
+        ("ST2", None, "Probe Rennen", False, None, "2026-05-24"),
+        ("ST3", None, "Sprint", True, None, None),
+        ("R1", "Sprint", None, None, "Spa", None),
+        ("R2", "Qualifying", "Probe Wölfe", True, None, None),
+    ]
+
+
 def test_a_line_without_opponent_has_none():
     row = _row("R1 · 05.11. · Probering")
     assert (row["opponent"], row["at_home"], row["day_end"]) == (None, None, None)
