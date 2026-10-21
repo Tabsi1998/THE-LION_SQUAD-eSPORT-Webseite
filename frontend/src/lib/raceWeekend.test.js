@@ -39,6 +39,14 @@ test("Ablauf je Runde: Formular hin und zurück ohne Verlust, leer heißt keine 
   expect(weekendToForm(null)).toEqual([]);
 });
 
+test("Ablauf je Runde: der Hinweis zur Regeländerung geht mit (#1960), leer gar nicht", () => {
+  const noted = { formats: [F2.formats[0], { ...F2.formats[1], note: "Ab R5 kein Qualifying" }] };
+  expect(weekendPayload(weekendToForm(noted))).toEqual(noted);
+  const form = weekendToForm(noted);
+  form[1].note = "   ";
+  expect(weekendPayload(form).formats[1]).not.toHaveProperty("note");
+});
+
 test("Vorschau eines Schemas: P1 35 · P2 30 … und keine Punkte", () => {
   expect(pointsPreview([35, 30, 26, 23, 20, 17, 15, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1]))
     .toBe("P1 35 · P2 30 · P3 26 · P4 23 · P5 20 · … · P20 1");

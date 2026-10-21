@@ -9,6 +9,7 @@ import { raceCell, raceCellLabel, raceSummary } from "@/lib/racingLeague";
 import { chipLabel, groupWeekends, roundKind } from "@/lib/raceWeekend";
 import { VenueWithFlag } from "@/components/tls/CountryFlag";
 import { SessionChips } from "@/components/tls/series/SessionChips";
+import { NoScoreNote } from "@/components/tls/series/SeriesSpecialRules";
 import "./racingLeague.css";
 
 // Bausteine der Rennliga (#1746): Umschalter der Saisons, Zellen des Rennrasters, Namen (nur Vereinsfahrer öffnen ihr
@@ -34,6 +35,7 @@ export function SeasonSwitcher({ seasons, lineageSlug }) {
             >
               {seasonName(season)}
               {season.status === "active" && <span className="tls-season-tab__live">läuft</span>}
+              {season.status === "cancelled" && <span className="text-[10px] uppercase tracking-[0.12em] text-white/45">abgebrochen</span>}
             </Link>
           </li>
         ))}
@@ -188,6 +190,8 @@ export function RacingCalendar({ rounds, rows, onSelect, publicKeys, hrefFor, ro
                     <span className="block text-sm text-white/60" data-testid="racing-round-venue"><VenueWithFlag round={weekend} /></span>
                   )}
                   {original && <span className="block text-[11px] text-white/45">ursprünglich {dayLabel(original)}</span>}
+                  {/* Termin ohne Wertung mit Grund (#1960) - je Lauf, der einen hat. */}
+                  {weekend.rounds.map((item) => <NoScoreNote key={item.id} round={item} label={weekend.multi ? chipLabel(item) : ""} />)}
                 </div>
               </>
             );

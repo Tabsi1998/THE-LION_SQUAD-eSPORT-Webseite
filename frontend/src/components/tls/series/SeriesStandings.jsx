@@ -5,6 +5,7 @@ import { formatNumber, rankMove } from "@/lib/standingsTable";
 import { roundLabel } from "@/lib/referenceCalendar";
 import { groupWeekends, sessionAbbr, sessionLabel } from "@/lib/raceWeekend";
 import { CountryFlag } from "@/components/tls/CountryFlag";
+import { AdjustmentMark } from "@/components/tls/series/SeriesSpecialRules";
 import {
   cutlineAfter, mobileRows, nameOf, resultIn, resultLabel, roundColumns, tiebreakHint, visibleRows,
 } from "@/lib/referenceSeriesTable";
@@ -53,10 +54,14 @@ function Name({ row }) {
 export function Points({ row, topN }) {
   const hint = tiebreakHint(row.tiebreak, topN);
   return (
-    <span title={hint || undefined} className={hint ? "underline decoration-dotted decoration-white/30 underline-offset-4" : undefined}>
-      {formatNumber(row.points)}
-      {hint && <span className="sr-only"> ({hint})</span>}
-    </span>
+    <>
+      <span title={hint || undefined} className={hint ? "underline decoration-dotted decoration-white/30 underline-offset-4" : undefined}>
+        {formatNumber(row.points)}
+        {hint && <span className="sr-only"> ({hint})</span>}
+      </span>
+      {/* Anpassung (#1960): „−5“ mit Grund im Tooltip - etwa für Nichtteilnahme nach Anmeldung. */}
+      <AdjustmentMark row={row} />
+    </>
   );
 }
 

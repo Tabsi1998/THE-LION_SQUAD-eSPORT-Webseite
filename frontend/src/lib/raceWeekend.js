@@ -236,6 +236,7 @@ export function emptyFormat(values = {}) {
 export function weekendToForm(weekend) {
   return (weekend?.formats || []).map((format) => emptyFormat({
     from_round: String(format.from_round ?? 1),
+    note: format.note || "",
     sessions: (format.sessions || []).map((session) => emptySession({
       label: session.label || "",
       offset: String(session.offset ?? 0),
@@ -273,6 +274,8 @@ export function weekendPayload(formats) {
   return {
     formats: list.map((format) => ({
       from_round: Number(format.from_round) || 1,
+      // Hinweis zur Regeländerung (#1960) - steht ab dieser Runde auf der Serienseite.
+      ...(String(format.note || "").trim() ? { note: String(format.note).trim() } : {}),
       sessions: format.sessions.filter((session) => String(session.label || "").trim()).map((session) => ({
         label: String(session.label).trim(),
         offset: Number(String(session.offset || "0").replace(",", ".")) || 0,
@@ -320,8 +323,10 @@ export function sessionTables(rows, rounds) {
     const list = (rows || []).map((row) => {
       const results = (row.results || []).filter((item) => ids.has(item.round_id));
       const points = results.reduce((sum, item) => sum + (Number(item.points) || 0), 0);
+      // Anpassungen (#1960) gehören zur Gesamtwertung, nicht zur Tabelle eines Laufs.
       return { ...row, results: results.map((item) => ({ ...item, dropped: false })), points, computed_points: points,
-        official_points: null, deviation: null, tiebreak: null, previous_rank: null, _countback: countback(results), _has: results.length > 0 };
+        official_points: null, deviation: null, tiebreak: null, previous_rank: null, adjustments: [], adjustment_points: 0,
+        _countback: countback(results), _has: results.length > 0 };
     }).filter((row) => row._has);
     list.sort((a, b) => ahead(a, b) || String(a.name || "").localeCompare(String(b.name || ""), "de"));
     list.forEach((row, index) => {

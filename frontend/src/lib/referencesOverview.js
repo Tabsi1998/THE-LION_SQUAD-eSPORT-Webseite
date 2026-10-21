@@ -171,7 +171,8 @@ export function chronicleCount(shown, total) {
 // ---------------------------------------------------------------- Liga-Weg
 
 /**
- * Der Liga-Weg einer Spur aus ihren Saisons (in Reihenfolge): je Saison der Vermerk - „läuft“ für die laufende, sonst
+ * Der Liga-Weg einer Spur aus ihren Saisons (in Reihenfolge): je Saison der Vermerk - „läuft“ für die laufende,
+ * „abgebrochen“ für eine abgebrochene Saison (#1960), sonst
  * das „Ergebnis der Saison“ aus der Verwaltung (Aufstieg, Abstieg, Klassenerhalt, Meister; #1898). Ohne Vermerk
  * „Aufstieg“ oder „Abstieg“, wenn die nächste Saison eine vergleichbare höhere bzw. tiefere Stufe hat - nach der
  * Reihenfolge der Stufen der Spur (`tierOrder`), sonst nach der Zahl im Namen. Gibt es in einer Saison mehrere Stufen,
@@ -186,6 +187,8 @@ export function leaguePath(seasons, tierOrder = null) {
     const next = list[index + 1];
     let note = "";
     if (current) note = "läuft";
+    // Abgebrochen (#1960): kein Auf- oder Abstieg aus den Stufen - ein Neustart in anderer Stufe ist kein Aufstieg.
+    else if (item.status === "cancelled") note = "abgebrochen";
     else if (item.season_result) note = seasonNote(item, next, tierOrder);
     else if (next && next.season !== item.season && perSeason.get(item.season) === 1 && perSeason.get(next.season) === 1) {
       note = seasonNote(item, next, tierOrder);

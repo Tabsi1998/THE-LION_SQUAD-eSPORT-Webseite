@@ -15,6 +15,7 @@ import {
 import { RacingDriverDetail, RacingGarageTeams } from "@/components/tls/series/RacingGarage";
 import { SeasonStatistics } from "@/components/tls/series/SeasonStatistics";
 import { roundPath, sessionKey } from "@/lib/roundResults";
+import { RuleChanges, TeamSource } from "@/components/tls/series/SeriesSpecialRules";
 import "./racingLeague.css";
 
 // Seite einer Rennliga (#1746) unter /references/series/<spur>/<saison>: Umschalter der Saisons, Fortschritt in
@@ -180,6 +181,8 @@ export function RacingLeague({ data }) {
         <SeriesRules rules={data.rules} />
         {bonus && <p className="mt-2 text-sm text-white/70" data-testid="racing-bonus"><span className="text-white/45">Bonus </span>{bonus}</p>}
         {sessionPoints.length > 0 && <p className="mt-2 text-sm text-white/70" data-testid="racing-session-points"><span className="text-white/45">Punkte je Lauf </span>{sessionPoints.join("; ")}</p>}
+        {/* Regeländerung ab Runde X (#1960): Format ab Runde (#1930) und Regel-Versionen mit Tag und Hinweis. */}
+        <RuleChanges changes={data.rule_changes} />
         {tables.length > 0 && (
           <div className="mt-5 flex flex-wrap gap-2" role="group" aria-label="Wertung je Lauf" data-testid="racing-table-tabs">
             {[["all", "Gesamt"], ...tables.map((item) => [item.kind, item.label])].map(([kind, label]) => (
@@ -208,6 +211,8 @@ export function RacingLeague({ data }) {
         <section className="mt-12" aria-labelledby="racing-teams-title" data-testid="racing-teams">
           <h2 id="racing-teams-title" className="font-heading text-2xl font-black uppercase">Teamwertung</h2>
           {teamRule && <p className="mt-3 text-sm text-white/70" data-testid="racing-team-rule">{teamRule}</p>}
+          {/* Quelle („laut Veranstalter“ bzw. „berechnet“) und Modus der Teamwertung (#1960). */}
+          <TeamSource teams={racing.teams} scoring={racing.team_scoring} rounds={rounds} />
           <SeriesStandings
             standings={{ rows: teamRows }}
             rounds={rounds}
