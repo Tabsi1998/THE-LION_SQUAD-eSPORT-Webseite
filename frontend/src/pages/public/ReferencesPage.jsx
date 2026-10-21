@@ -132,6 +132,9 @@ export function ReferenceDetailPage() {
   const entries = entriesOf(item);
   const medal = medalOf(item);
   const cover = item.game?.cover_url;
+  // Nur ausgefüllte Angaben (#1936): ohne Veranstalter, Liga und Saison keine leere Zeile, ohne Link kein leerer Block.
+  const byline = [item.organizer, item.league, item.season].filter(Boolean).join(" · ");
+  const hasLinks = [item.external_url, item.bracket_url, item.match_url, item.result_url].some(Boolean);
   return (
     <PublicLayout>
       <section className="relative overflow-hidden border-b border-white/10" data-testid="reference-detail-hero">
@@ -148,9 +151,7 @@ export function ReferenceDetailPage() {
                 {medal && <Badge className={`${MEDAL[medal].soft} ${MEDAL[medal].text}`}>{MEDAL[medal].label}</Badge>}
               </div>
               <h1 className="mt-3 font-heading text-4xl md:text-5xl xl:text-6xl font-black uppercase leading-[0.95] break-words max-w-5xl">{displayTitle(item)}</h1>
-              <p className="mt-3 text-lg text-white/70">
-                {[item.organizer, item.league, item.season].filter(Boolean).join(" · ")}
-              </p>
+              {byline && <p className="mt-3 text-lg text-white/70" data-testid="reference-detail-organizer">{byline}</p>}
               <FieldChips item={item} className="mt-4" />
               {item.season_link && (
                 <Link to={referenceHref(item)} data-testid="reference-detail-season" className="tls-btn tls-btn--secondary mt-4 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-sm text-[11px] uppercase tracking-widest font-bold">
@@ -176,12 +177,14 @@ export function ReferenceDetailPage() {
           </div>
           <aside className="space-y-3 xl:sticky xl:top-24">
             <MetaList item={item} />
-            <div className="grid gap-2">
-              <RefButton href={item.external_url} label="Turnierseite" />
-              <RefButton href={item.bracket_url} label="Bracket" />
-              <RefButton href={item.match_url} label="Matchseite" />
-              <RefButton href={item.result_url} label="Ergebnis" />
-            </div>
+            {hasLinks && (
+              <div className="grid gap-2" data-testid="reference-detail-links">
+                <RefButton href={item.external_url} label="Turnierseite" />
+                <RefButton href={item.bracket_url} label="Bracket" />
+                <RefButton href={item.match_url} label="Matchseite" />
+                <RefButton href={item.result_url} label="Ergebnis" />
+              </div>
+            )}
           </aside>
         </div>
       </section>
@@ -190,6 +193,11 @@ export function ReferenceDetailPage() {
 }
 
 // ---------------------------------------------------------------- Bausteine
+
+// Ein Tag steht einmal (#1936): gleiche Start- und Endtage nicht als „12.10.2026 – 12.10.2026“.
+function dateSpan(item) {
+  return [...new Set([formatDate(item.start_date), formatDate(item.end_date)].filter(Boolean))].join(" – ");
+}
 
 function MetaList({ item }) {
   const rows = [
@@ -205,7 +213,7 @@ function MetaList({ item }) {
     ["Liga", item.league],
     ["Saison", item.season],
     ["Modus", modeLabels[item.mode] || item.mode],
-    ["Datum", [formatDate(item.start_date), formatDate(item.end_date)].filter(Boolean).join(" – ")],
+    ["Datum", dateSpan(item)],
     ["Ort", item.location],
   ].filter(([, value]) => value);
   return (

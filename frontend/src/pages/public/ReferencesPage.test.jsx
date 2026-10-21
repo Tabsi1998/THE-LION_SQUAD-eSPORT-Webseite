@@ -389,6 +389,31 @@ test("Partner II (#469): die Detailseite nennt den Partner mit Link auf die Part
   expect(await screen.findByTestId("reference-detail-partner-pineapps-esports")).toHaveAttribute("href", "/partners/pineapps-esports");
 });
 
+// Schnell-Eintrag (#1936): ein Tagesturnier zeigt nur, was ausgefüllt ist - ohne leere Zeile, Datum nur einmal.
+test("Detailseite eines Tagesturniers: nur ausgefüllte Felder, ein Tag steht einmal", async () => {
+  apiMock.get.mockResolvedValue({ data: {
+    id: "r9", title: "Probe Abend Cup", display_title: "Probe Abend Cup", platforms: [], status: "completed", mode: "online",
+    game_id: "g1", game: { id: "g1", name: "Probespiel" }, best_placement: 4, medal: null, start_date: "2026-10-12", end_date: "2026-10-12",
+    entries: [{ id: "e9", kind: "solo", placement: 4, participant_count: 24, lineup_members: [{ profile_id: "p3", display_name: "Silberpfeil" }], lineup: [] }],
+  } });
+  render(<MemoryRouter initialEntries={["/references/r9"]}><Routes><Route path="/references/:id" element={<ReferenceDetailPage />} /></Routes></MemoryRouter>);
+  const meta = await screen.findByTestId("reference-detail-meta");
+  expect(meta).toHaveTextContent("12.10.2026");
+  expect(meta).not.toHaveTextContent("–");
+  expect(meta).not.toHaveTextContent("Veranstalter");
+  expect(screen.queryByTestId("reference-detail-organizer")).toBeNull();
+  expect(screen.queryByTestId("reference-detail-links")).toBeNull();
+  expect(screen.queryByTestId("reference-chips-r9")).toBeNull();
+});
+
+test("Detailseite: mehrere Tage als Spanne, Veranstalter-Zeile und Links nur mit Inhalt", async () => {
+  apiMock.get.mockResolvedValue({ data: { ...ITEMS[0], start_date: "2026-10-10", end_date: "2026-10-12", external_url: "https://example.org/cup" } });
+  render(<MemoryRouter initialEntries={["/references/r1"]}><Routes><Route path="/references/:id" element={<ReferenceDetailPage />} /></Routes></MemoryRouter>);
+  expect(await screen.findByTestId("reference-detail-meta")).toHaveTextContent("10.10.2026 – 12.10.2026");
+  expect(screen.getByTestId("reference-detail-organizer")).toHaveTextContent("ESL · Liga X · Season 3");
+  expect(within(screen.getByTestId("reference-detail-links")).getByRole("link")).toHaveAttribute("href", "https://example.org/cup");
+});
+
 // ---------------------------------------------------------------- Jahr für Jahr (#1748)
 
 const at = (id, start_date, extra = {}) => ({ id, start_date, ...extra });
