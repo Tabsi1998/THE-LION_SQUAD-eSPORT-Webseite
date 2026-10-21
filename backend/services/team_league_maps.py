@@ -9,8 +9,9 @@
   ``mode`` nur, wenn sie dafür freigegeben ist). Sonst das Problem ``map_unknown`` an der Map (wie die übrigen
   Prüfungen, mit ``match``, ``map``, ``map_field``). Name und Bild kommen nie aus der Eingabe, sondern aus dem Pool
   (Snapshot) bzw. der Bibliothek und werden beim Speichern ins Blatt geschrieben. Ausnahme: Steht genau diese Map an
-  genau dieser Stelle schon im gespeicherten Blatt des Termins (auch im Entwurf daneben) - gleiche Begegnung, gleiche
-  Map-Nummer, gleiche Kennung, gleicher Modus (``place``) -, behält sie Name und Bild von damals, auch wenn sie
+  genau dieser Stelle schon im gespeicherten Blatt des Termins (auch im Entwurf daneben) - gleiche Begegnung (bei
+  derselben Begegnung mehrmals im Blatt: die wievielte), gleiche Map-Nummer, gleiche Kennung, gleicher Modus
+  (``place``) -, behält sie Name und Bild von damals, auch wenn sie
   inzwischen aus dem Pool gefallen, umbenannt oder archiviert ist. So zeigt ein altes Spiel die Map wie damals, und eine
   Map lässt sich nicht über ein altes Spiel woandershin einschleusen.
 - **Statistik** (``map_stats``): je Map aus den eigenen Spielen der Saison (Veto aus ``team_league_page``): gebannt und
@@ -67,10 +68,22 @@ def _team(value) -> str:
     return " ".join(str(value or "").split()).casefold()
 
 
-def place(match: dict, map_index: int, item: dict) -> tuple:
-    """Die Stelle einer Map im Blatt: Begegnung (Heim, Gast), Map-Nummer, Kennung und Modus. Nur an genau derselben
+def pairings(matches: list[dict]) -> list[tuple]:
+    """Je Spiel des Blatts seine Begegnung: Heim, Gast und die wievielte Begegnung dieser Teams im Blatt (0, 1 …) - so
+    bleibt ein zweites Mal dieselbe Begegnung von der ersten unterscheidbar (dritte Runde #1616)."""
+    seen: dict[tuple, int] = {}
+    out = []
+    for match in matches or []:
+        teams = (_team(match.get("home")), _team(match.get("away")))
+        out.append((*teams, seen.get(teams, 0)))
+        seen[teams] = seen.get(teams, 0) + 1
+    return out
+
+
+def place(pairing: tuple, map_index: int, item: dict) -> tuple:
+    """Die Stelle einer Map im Blatt: Begegnung (``pairings``), Map-Nummer, Kennung und Modus. Nur an genau derselben
     Stelle behält eine gespeicherte Map ihren Snapshot (Nachprüfung #1616)."""
-    return (_team(match.get("home")), _team(match.get("away")), map_index, item.get("map_id"), item.get("mode") or "")
+    return (*pairing, map_index, item.get("map_id"), item.get("mode") or "")
 
 
 def saved_maps(sheet: dict | None) -> dict[tuple, dict]:
@@ -78,10 +91,11 @@ def saved_maps(sheet: dict | None) -> dict[tuple, dict]:
     gespeicherte Snapshot (Name, Bild)."""
     out: dict[tuple, dict] = {}
     for content in (sheet or {}, (sheet or {}).get("pending_draft") or {}):
-        for match in content.get("matches") or []:
+        matches = content.get("matches") or []
+        for pairing, match in zip(pairings(matches), matches):
             for map_index, item in enumerate(match.get("maps") or []):
                 if item.get("map_id"):
-                    out.setdefault(place(match, map_index, item),
+                    out.setdefault(place(pairing, map_index, item),
                                    {"name": item.get("name"), "image_url": item.get("image_url")})
     return out
 
@@ -120,12 +134,12 @@ async def attach(db, series: dict, resolution, sheet: dict | None = None) -> Non
     kept = saved_maps(sheet)
     rows = {row["id"]: row for row in await db.game_maps.find({"id": {"$in": wanted}}, {"_id": 0}).to_list(None)}
     pool = map_pools.valid_for(await map_pools.current(db, "reference_series", series["id"]), (game or {}).get("id"))
-    for match_index, match in enumerate(resolution.matches):
+    for match_index, (pairing, match) in enumerate(zip(pairings(resolution.matches), resolution.matches)):
         for map_index, item in enumerate(match.get("maps") or []):
             map_id = item.get("map_id")
             if not map_id:
                 continue
-            snapshot, reason = kept.get(place(match, map_index, item)), None
+            snapshot, reason = kept.get(place(pairing, map_index, item)), None
             if not snapshot:
                 snapshot, reason = _allowed(game, pool, rows, map_id, item.get("mode")) if game else (
                     None, "gehört zu keinem Spiel dieser Serie")

@@ -273,6 +273,24 @@ async def test_the_kept_old_map_is_bound_to_its_place_in_the_saved_match(flow):
     assert [(item["match"], item["map"]) for item in problems if item["code"] == "map_unknown"] == [(1, 0)]
 
 
+@pytest.mark.asyncio
+async def test_a_copied_match_with_the_same_teams_does_not_reuse_the_kept_map(flow):
+    """Dritte Runde: dieselbe Begegnung ein zweites Mal ins Blatt kopiert - der gespeicherte Snapshot gilt nur für so
+    viele Begegnungen, wie gespeichert waren (je Begegnung nach ihrer Reihenfolge im Blatt)."""
+    _game, maps, _lineage, series, round_doc = await _setup(flow)
+    sturm = maps["Sturmdeck"]["id"]
+    sheet = _one_map({"name": "Sturmdeck", "map_id": sturm, "mode": "snd"})
+    saved = await flow.put(_base(series, round_doc), json={**sheet, "status": "published", "expected_version": 0})
+    assert saved.status_code == 200, saved.text
+    await flow.put(f"/api/map-pools/reference-series/{series['id']}", json={"modes": [
+        {"mode": "snd", "map_ids": [maps["Nebelwerk"]["id"]]}]})
+    original = sheet["matches"][0]
+    twice = {"matches": [original, {**original}]}
+    preview = await flow.post(f"{_base(series, round_doc)}/preview", json=twice)
+    problems = [(item["match"], item["map"]) for item in preview.json()["errors"] if item["code"] == "map_unknown"]
+    assert problems == [(1, 0)]
+
+
 # ---------------------------------------------------------------- Befund 2: Name und Bild nie aus der Eingabe
 @pytest.mark.asyncio
 async def test_name_and_image_of_a_library_map_never_come_from_the_input(flow):
