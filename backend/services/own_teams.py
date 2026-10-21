@@ -48,6 +48,27 @@ def clean_teams(raw) -> list[dict]:
     return out[:MAX_TEAMS]
 
 
+def team_conflicts(raw) -> list[str]:
+    """Widersprüche in der Liste, die beim Speichern abgelehnt werden (422): eine Schreibweise, die der Name eines
+    anderen eigenen Teams ist, oder dieselbe Schreibweise bei zwei Teams - sonst wäre still unklar, wohin ein Ergebnis
+    gehört."""
+    teams = clean_teams(raw)
+    names = {_literal(team["name"]): team["name"] for team in teams}
+    owner: dict[str, str] = {}
+    out = []
+    for team in teams:
+        for alias in team["aliases"]:
+            literal = _literal(alias)
+            other = names.get(literal)
+            if other and other != team["name"]:
+                out.append(f"Die Schreibweise „{alias}“ von „{team['name']}“ ist der Name des eigenen Teams „{other}“.")
+            elif literal in owner and owner[literal] != team["name"]:
+                out.append(f"Die Schreibweise „{alias}“ steht bei „{owner[literal]}“ und „{team['name']}“.")
+            else:
+                owner.setdefault(literal, team["name"])
+    return out
+
+
 def own_teams(series: dict | None) -> list[dict]:
     """Die eigenen Teams der Saison: die Liste, sonst das alte Feld ``team_name`` als einziges Team."""
     series = series or {}
@@ -67,8 +88,13 @@ class Matcher:
         self.names: list[str] = []
         self._exact: dict[str, str] = {}
         self._by_key: dict[str, list[str]] = {}
-        for team in clean_teams(teams):
+        cleaned = clean_teams(teams)
+        # Erst alle Namen, dann die Schreibweisen: der genaue Name eines eigenen Teams geht immer vor dem Alias eines
+        # anderen (beim Speichern lehnt ``team_conflicts`` so eine Liste ohnehin ab).
+        for team in cleaned:
             self.names.append(team["name"])
+            self._exact.setdefault(_literal(team["name"]), team["name"])
+        for team in cleaned:
             for text in (team["name"], *team["aliases"]):
                 self._exact.setdefault(_literal(text), team["name"])
                 owners = self._by_key.setdefault(normalize_name(text), [])

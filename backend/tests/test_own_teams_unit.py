@@ -136,3 +136,16 @@ def test_the_sheet_check_names_a_spelling_that_is_not_merged():
     quiet = series_results.resolve({"rows": [{"name": "Bert", "place": 1, "team": "Probe DarkFriday"}]}, [], rules)
     series_results.check(quiet, rules, {"status": "planned"}, "2026-11-01", [{"name": "Probe-DarkFriday"}])
     assert "own_team_spelling" not in [warning["code"] for warning in quiet.warnings]
+
+
+def test_the_exact_name_of_an_own_team_wins_over_another_teams_alias():
+    teams = [{"name": "Probe Alpha", "aliases": ["Probe Bravo"]}, {"name": "Probe Bravo"}]
+    matcher = own_teams.Matcher(teams)
+    assert matcher.canonical("Probe Bravo") == "Probe Bravo"
+    assert matcher.canonical("probe bravo") == "Probe Bravo"
+    assert own_teams.team_conflicts(teams) == [
+        "Die Schreibweise „Probe Bravo“ von „Probe Alpha“ ist der Name des eigenen Teams „Probe Bravo“."]
+    shared = [{"name": "Probe Alpha", "aliases": ["PA"]}, {"name": "Probe Bravo", "aliases": ["pa"]}]
+    assert own_teams.team_conflicts(shared) == [
+        "Die Schreibweise „pa“ steht bei „Probe Alpha“ und „Probe Bravo“."]
+    assert own_teams.team_conflicts([{"name": "Probe Alpha", "aliases": ["PA"]}, {"name": "Probe Bravo"}]) == []

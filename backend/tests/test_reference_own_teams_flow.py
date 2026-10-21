@@ -176,3 +176,20 @@ async def test_the_migration_takes_the_old_team_over_once(flow):
     assert stored["liste"]["own_teams"] == [{"name": "Probe X", "aliases": []}]
     assert "own_teams" not in stored["ohne"]
     assert any(version == 8 for version, _, _ in migrations.MIGRATIONS)
+
+
+@pytest.mark.asyncio
+async def test_a_list_where_an_alias_is_another_own_team_is_refused_with_a_message(flow):
+    await _admin(flow)
+    lineage = await _lineage(flow)
+    clash = [{"name": "Probe Alpha", "aliases": ["Probe Bravo"]}, {"name": "Probe Bravo"}]
+    created = await flow.post(f"{ADMIN}/series", json={"lineage_id": lineage["id"], "season": "2026",
+                                                       "own_teams": clash})
+    assert created.status_code == 422
+    assert "„Probe Bravo“ von „Probe Alpha“ ist der Name des eigenen Teams „Probe Bravo“" in created.json()["detail"]
+    series = (await flow.post(f"{ADMIN}/series", json={"lineage_id": lineage["id"], "season": "2026",
+                                                       "own_teams": clash[1:]})).json()
+    patched = await flow.patch(f"{ADMIN}/series/{series['id']}", json={"own_teams": clash})
+    assert patched.status_code == 422
+    stored = await flow.db.reference_series.find_one({"id": series["id"]}, {"_id": 0})
+    assert stored["own_teams"] == [{"name": "Probe Bravo", "aliases": []}]

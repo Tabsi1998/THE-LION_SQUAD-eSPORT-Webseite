@@ -24,7 +24,7 @@ from models import (
     now_utc,
 )
 from services import partner_pages, reference_running_cache, reference_series
-from services.own_teams import clean_teams, own_teams
+from services.own_teams import clean_teams, own_teams, team_conflicts
 from services.series_identity import normalize_name
 from services.reference_series_access import SeriesAccess, require_series_editor
 from services.scoring_rules import normalize_rules
@@ -200,6 +200,9 @@ def _teams(teams, team_name, existing: dict | None = None) -> dict:
         name = " ".join(str(team_name or "").split())
         same = [team for team in own_teams(existing) if normalize_name(team["name"]) == normalize_name(name)]
         teams = (same or [{"name": name}]) if name else []
+    conflicts = team_conflicts(teams)
+    if conflicts:
+        raise HTTPException(422, " ".join(conflicts))
     cleaned = clean_teams(teams)
     return {"own_teams": cleaned, "team_name": cleaned[0]["name"] if cleaned else None}
 
