@@ -21,8 +21,8 @@ export function emptyRow(values = {}) {
   return {
     key: nextKey("row"), participant_id: "", name: "", team: "", place: "", points: "", override: false, marks: [],
     penalty_points: "", start_number: "", official_total: "", note: "", source: "", points_hint: null,
-    // Rennergebnis (#1927): Startplatz, Rennzeit, Abstand - als Text wie eingegeben.
-    grid: "", time: "", gap: "", ...values,
+    // Rennergebnis (#1927): Startplatz, Rennzeit, Abstand - als Text wie eingegeben. Strafsekunden (#1950) nur zur Anzeige.
+    grid: "", time: "", gap: "", penalty_seconds: "", ...values,
   };
 }
 
@@ -59,6 +59,7 @@ export function sheetToForm(content, participants = [], { kind, teamName, oppone
     grid: text(row.grid),
     time: text(row.time),
     gap: text(row.gap),
+    penalty_seconds: row.penalty_seconds ? text(row.penalty_seconds) : "",
   }));
   const matches = (content?.matches || []).map((match) => ({
     ...emptyMatch({ home: match.home, away: match.away }),
@@ -127,7 +128,7 @@ function number(value) {
   return parseNumber(value);
 }
 
-const LIMITS = { points: 10000, penalty: 10000, total: 100000, score: 1_000_000_000 };
+const LIMITS = { points: 10000, penalty: 10000, total: 100000, score: 1_000_000_000, seconds: 3600 };
 
 function checkNumber(value, { min, max, message }) {
   if (!text(value).trim()) return null;
@@ -147,6 +148,7 @@ export function fieldErrors(form) {
     if (text(row.grid).trim() && parsePlace(row.grid) === null) add(row.key, "grid", "Startplatz als ganze Zahl von 1 bis 1000.");
     add(row.key, "points", checkNumber(row.points, { min: -LIMITS.points, max: LIMITS.points, message: "Punkte als Zahl, etwa 25 oder 12,5." }));
     add(row.key, "penalty_points", checkNumber(row.penalty_points, { min: 0, max: LIMITS.penalty, message: "Strafpunkte als Zahl ab 0." }));
+    add(row.key, "penalty_seconds", checkNumber(row.penalty_seconds, { min: 0, max: LIMITS.seconds, message: "Strafsekunden als Zahl von 0 bis 3600." }));
     add(row.key, "official_total", checkNumber(row.official_total, { min: -LIMITS.total, max: LIMITS.total, message: "Gesamtstand als Zahl." }));
   }
   // Schnellste Runde (#1927): eine Zeit braucht ihren Fahrer - den Namen oder genau eine markierte Zeile.
@@ -201,6 +203,8 @@ function raceDetails(row) {
     const value = cleanText(row[key]);
     if (value) out[key] = value.slice(0, 20);
   }
+  const seconds = parseNumber(row.penalty_seconds);
+  if (seconds !== null && seconds > 0) out.penalty_seconds = seconds;
   return out;
 }
 

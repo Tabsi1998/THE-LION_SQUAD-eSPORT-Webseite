@@ -39,8 +39,8 @@ NEW_PREFIX = "neu:"
 CONTENT_FIELDS = ("rows", "matches", "official_totals", "official_team_totals", "official_table", "note",
                   "fastest_lap", "driver_of_the_day")
 ROW_FIELDS = ("participant_id", "place", "team", "points", "points_source", "marks", "penalty_points", "note")
-# Angaben aus Veranstalter-Grafiken (#1927): nur gespeichert, wenn eingetragen.
-RACE_FIELDS = ("start_number", "grid", "time", "gap")
+# Angaben aus Veranstalter-Grafiken (#1927): nur gespeichert, wenn eingetragen. Strafsekunden (#1950) nur zur Anzeige.
+RACE_FIELDS = ("start_number", "grid", "time", "gap", "penalty_seconds")
 TABLE_NUMBERS = ("played", "won", "drawn", "lost", "score_for", "score_against", "score_diff", "points")
 
 
@@ -232,7 +232,8 @@ def resolve(entry: dict, participants: list[dict], rules: dict) -> Resolution:
                "penalty_points": number(float(raw.get("penalty_points") or 0)),
                "note": clean(raw.get("note"))[:300] or None,
                "start_number": clean(raw.get("start_number"))[:10] or None, "grid": raw.get("grid") or None,
-               "time": lap_text(raw.get("time")), "gap": lap_text(raw.get("gap"))}
+               "time": lap_text(raw.get("time")), "gap": lap_text(raw.get("gap")),
+               "penalty_seconds": number(float(raw["penalty_seconds"])) if raw.get("penalty_seconds") else None}
         out.rows.append(row)
         if located.participant_id:
             seen.setdefault(located.participant_id, []).append(index)

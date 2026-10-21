@@ -89,10 +89,10 @@ function ResultRow({ row, index, autoPlace, organizerMode, qualifying = false, p
   // ungültig ist. Startnummer, Startplatz, Zeit und Abstand (#1927) stehen zugeklappt kurz unter der Zeile - so bleibt
   // eine eingefügte Liste mit 20 Fahrern überschaubar. Aus dem Bild (#1756) auch, wenn ein Feld darunter gelb ist - offen
   // ab dem Anlegen, damit es beim Korrigieren nicht zuklappt.
-  const [opened, setOpen] = useState(() => Boolean(row.penalty_points || row.official_total || row.override
+  const [opened, setOpen] = useState(() => Boolean(row.penalty_points || row.penalty_seconds || row.official_total || row.override
     || ["start_number", "grid", "time", "gap"].some((field) => isUncertain(row, field))));
-  const open = opened || Boolean(invalid?.grid || invalid?.penalty_points || invalid?.official_total);
-  const raceLine = [row.start_number && `Nr. ${row.start_number}`, row.grid && `Startplatz ${row.grid}`, row.time, row.gap].filter(Boolean).join(" · ");
+  const open = opened || Boolean(invalid?.grid || invalid?.penalty_points || invalid?.penalty_seconds || invalid?.official_total);
+  const raceLine = [row.start_number && `Nr. ${row.start_number}`, row.grid && `Startplatz ${row.grid}`, row.time, row.gap, row.penalty_seconds && `+${row.penalty_seconds} s Strafe`].filter(Boolean).join(" · ");
   const mark = (field) => ocrMark(row, field, index);
   const level = invalid || problems?.some((item) => item.level === "error") ? "error" : problems?.length || row.ocr ? "warning" : null;
   const toggleMark = (mark) => onChange({ marks: row.marks.includes(mark) ? row.marks.filter((item) => item !== mark) : [...row.marks, mark] });
@@ -150,6 +150,8 @@ function ResultRow({ row, index, autoPlace, organizerMode, qualifying = false, p
             <input value={row.time} maxLength={20} onChange={(event) => onChange({ time: event.target.value })} data-testid="result-row-time" {...mark("time").props} className={`${SMALL_INPUT} tabular-nums ${mark("time").className}`} /></label>
           <label className="block"><span className={LABEL}>Abstand</span>
             <input value={row.gap} maxLength={20} onChange={(event) => onChange({ gap: event.target.value })} data-testid="result-row-gap" {...mark("gap").props} className={`${SMALL_INPUT} tabular-nums ${mark("gap").className}`} /></label>
+          <label className="block"><span className={LABEL}>Strafsekunden</span>
+            <input inputMode="decimal" value={row.penalty_seconds} title="Zeitstrafe in Sekunden – nur Anzeige in der Ergebnistabelle" onChange={(event) => onChange({ penalty_seconds: event.target.value })} data-testid="result-row-penalty-seconds" {...invalidProps(invalid, "penalty_seconds")} className={`${SMALL_INPUT} tabular-nums ${invalid?.penalty_seconds ? INVALID : ""}`} /></label>
           <label className="block"><span className={LABEL}>Gesamt laut Veranst.</span>
             <input inputMode="decimal" value={row.official_total} onChange={(event) => onChange({ official_total: event.target.value })} data-testid="result-row-total" {...invalidProps(invalid, "official_total")} className={`${SMALL_INPUT} ${invalid?.official_total ? INVALID : ""}`} /></label>
           {!organizerMode && (

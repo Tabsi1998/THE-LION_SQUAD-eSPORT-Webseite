@@ -188,3 +188,20 @@ test("eingefügte Liste mit Rennspalten: Startplatz, Zeit und Abstand landen in 
   expect(rows.map((row) => [row.participant_id, row.start_number, row.grid, row.time, row.gap])).toEqual([
     ["p1", "7", "3", "1:32:45.1", ""], ["p2", "12", "1", "", "+5.2"]]);
 });
+
+// ---------------------------------------------------------------- Strafsekunden (#1950)
+test("Strafsekunden gehen hin und zurück, nur über null; Unsinn ist ein Feldfehler", () => {
+  const sheet = { rows: [
+    { participant_id: "p1", place: 1, points_source: "scheme", marks: [], penalty_points: 0, penalty_seconds: 5 },
+    { participant_id: "p2", place: 2, points_source: "scheme", marks: [], penalty_points: 0 },
+  ] };
+  const form = sheetToForm(sheet, PEOPLE);
+  expect(form.rows.map((row) => row.penalty_seconds)).toEqual(["5", ""]);
+  const { payload } = formToPayload(form);
+  expect(payload.rows[0].penalty_seconds).toBe(5);
+  expect(payload.rows[1]).not.toHaveProperty("penalty_seconds");
+  const wrong = { ...form, rows: [{ ...form.rows[0], penalty_seconds: "fünf" }, { ...form.rows[1], penalty_seconds: "2,5" }] };
+  expect(fieldErrors(wrong)[form.rows[0].key]).toEqual({ penalty_seconds: "Strafsekunden als Zahl von 0 bis 3600." });
+  expect(fieldErrors(wrong)[form.rows[1].key]).toBeUndefined();
+  expect(formToPayload({ ...form, rows: [{ ...form.rows[1], penalty_seconds: "2,5" }] }).payload.rows[0].penalty_seconds).toBe(2.5);
+});
