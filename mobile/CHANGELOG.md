@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.7.5 - 2026-10-21
+
+- Mobile: Verein › Erfolge neu: Ehrentafel ohne Nullen, Läuft gerade, Vitrine, Serien und Ligen mit Liga-Weg und eine Chronik mit Spiel-Filter. (#1945)
+- Mobile: Neue Saison-Ansicht für Rennligen und Team-Ligen: Kalender mit Flaggen, Tabelle, Fahrer und Spieltage. (#1945)
+- Mobile: Profil › Referenzen: bestes Ergebnis, Liga-Weg und Chronik je Jahr mit Aufstellung zum Aufklappen. (#1945)
+- Mobile: News: Kategorien mit Anzahl, Suche als Symbol, keine gleichen Bilder direkt hintereinander. (#1946)
+- Mobile: Turniere: Die Check-in-Zeiten zeigen, was wirklich gilt; bei vollem Cup nennt die Anmeldung deinen Platz auf der Warteliste. (#1938, #1941)
+
 ## 1.7.4 - 2026-10-21
 
 - Mobile: Galerie: Die Großansicht bleibt über Bildtext und Reiterleiste, auf jedem Handy. (#1910)
