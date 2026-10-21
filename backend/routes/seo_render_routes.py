@@ -247,6 +247,8 @@ async def resolve_meta(raw_path: str, request: Request) -> dict:
         return await member_profile_meta(db, slug, meta, origin)
     if first in {"u", "players"} and slug:
         return await user_profile_meta(db, slug, meta, origin)
+    if first == "references" and slug == "series" and len(parts) > 5 and parts[4] == "runde":
+        return await reference_round_meta(db, unquote(parts[2]), unquote(parts[3]), parts[5], meta, origin)
     if first == "references" and slug == "series" and len(parts) > 3:
         return await reference_series_meta(db, unquote(parts[2]), unquote(parts[3]), meta, origin)
     if first == "references" and slug:
@@ -745,6 +747,41 @@ async def reference_series_meta(db, lineage_slug: str, season_slug: str, base: d
     }
     meta["json_ld"] = webpage_json_ld(meta)
     return add_breadcrumbs(meta, origin, [("Referenzen", "/references")], title)
+
+
+async def reference_round_meta(db, lineage_slug: str, season_slug: str, number: str, base: dict, origin: str) -> dict:
+    """Runde einer Rennliga (#1950): Kürzel, Ort und Läufe für die Teilen-Karte - nie Namen; nicht indexiert wie die
+    Serienseite. Ein eigenes Teilen-Bild gibt es (wie bei der Serienseite) nicht, es gilt das Bild der Seite."""
+    from routes.reference_round_routes import _calendar, visible_series
+    from services.round_page import group_rounds
+    try:
+        lineage, series = await visible_series(db, None, lineage_slug, season_slug)
+        wanted = int(number)
+    except (HTTPException, ValueError):
+        raise HTTPException(404, "SEO-Vorschau nicht gefunden.") from None
+    rounds = group_rounds((await _calendar(db, series["id"]))["rounds"]).get(wanted)
+    if lineage.get("kind") != "racing" or not rounds:
+        raise HTTPException(404, "SEO-Vorschau nicht gefunden.")
+    season = " · ".join(str(part) for part in (series.get("season"), series.get("tier")) if part)
+    series_title = series.get("title") or " ".join(part for part in (lineage.get("title"), season) if part)
+    place = next((item.get("title") or item.get("venue") for item in rounds if item.get("title") or item.get("venue")),
+                 None)
+    label = " · ".join(part for part in (rounds[0].get("code") or f"Runde {wanted}", place) if part)
+    sessions = " · ".join(dict.fromkeys(item.get("session") or "Rennen" for item in rounds))
+    series_path = f"/references/series/{lineage.get('slug') or lineage_slug}/{series.get('season_slug') or season_slug}"
+    canonical = f"{origin}{series_path}/runde/{wanted}"
+    meta = {
+        **base,
+        "title": f"{label} · {series_title} · {base['site_name']}",
+        "description": seo_description(f"Ergebnisse {label}: {sessions}", prefix=series_title,
+                                       details=[lineage.get("organizer"), lineage.get("game_name")]),
+        "url": canonical,
+        "canonical": canonical,
+        "robots": "noindex, follow",
+        "type": "website",
+    }
+    meta["json_ld"] = webpage_json_ld(meta)
+    return add_breadcrumbs(meta, origin, [("Referenzen", "/references"), (series_title, series_path)], label)
 
 
 def static_page_meta(slug: str, base: dict) -> dict | None:
