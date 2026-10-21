@@ -560,7 +560,9 @@ async def call_and_start(ctx: Context, tid: str, budget: int, start: bool = True
         if done >= budget:
             break
         nxt = station.get("next")
-        if station.get("running") or not nxt or not nxt.get("ready") or station.get("status") == "broken":
+        # Nur aufrufen: ein schon aufgerufenes Spiel überspringen, sonst bleibt --anzahl daran hängen (Generalprobe 3).
+        if (station.get("running") or not nxt or not nxt.get("ready") or station.get("status") == "broken"
+                or (not start and nxt.get("state") == "called")):
             continue
         body = {"station_id": station["id"], "match_id": nxt["match_id"]}
         if nxt.get("state") != "called":

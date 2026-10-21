@@ -132,7 +132,8 @@ hier `http://127.0.0.1:23000/vor-ort#…`. Den kann nur ein Handy mit `adb rever
 | Turnierleitung | Reiter **Teilnehmer** neu laden | 15 Zeilen, jede mit dem Zeichen **Vor Ort** |
 | Turnierleitung | **Aushang drucken** öffnen | A4-Blatt mit Turnier, Termin, Spiel, großem QR-Code; der Code steht nirgends lesbar im Text |
 | Turnierleitung (Handy als Begleitperson) | Privates Fenster in Chrome, QR-Code vom Aushang am PC-Bildschirm scannen | schlanke Turnierseite: Titel, Termin, Spiel, „1 von 16 Plätzen frei“, **Mitspielen** |
-| Turnierleitung (Handy) | **Mitspielen** → Anmelden als `gast@abnahme.lionsquad.at` → zurück → **Mitspielen** | Anmeldung bestätigt, danach das ganze Turnier (Baum, Spielplan) |
+| Turnierleitung (Handy) | **Mitspielen** → Anmelden als `gast@abnahme.lionsquad.at` → zurück → **Mitspielen** | Bestätigungs-Blatt von unten (#1261): Start, Check-in, Ort „Vor Ort“, Regeln kurz, unten fest **Verbindlich anmelden** |
+| Turnierleitung (Handy) | **Verbindlich anmelden** | Anmeldung bestätigt, danach das ganze Turnier (Baum, Spielplan); Abbrechen oder ein Tipp daneben meldet nicht an |
 | Claude | `$PM anmelden --warteliste` | Spieler 16 (ZickZackZoe): „Warteliste“ – der Cup ist voll |
 | Turnierleitung | TV ansehen | Anmelde-Bildschirm mit QR-Code und Zahl der Plätze |
 
@@ -192,7 +193,7 @@ Ende ihrer Vorläufe an, auch wenn eine Station früher frei ist – das ist gew
 
 | Wer | Was | Erwartung |
 | --- | --- | --- |
-| Turnierleitung | **Turnier starten** | ggf. Rückfrage „Mit Hinweisen live schalten?“, dann Status „Live“; TV schaltet auf den Baum |
+| Turnierleitung | **Turnier starten** | ggf. Rückfrage „Mit Hinweisen live schalten?“, dann Status „Live“; TV schaltet auf den Baum; öffentlich „Läuft“ auch vor der Planzeit (#1881), Hallen-Tafel mit Pille „Live“ und „läuft“ im Tagesplan (#1888) |
 | Turnierleitung (Handy) | Turnier → **Turnierleitung** → Reiter **Stationen** | je Station „Als Nächstes“ mit **Aufrufen**; oben der Verzug |
 | Turnierleitung (Handy) | An Station 1 **Aufrufen** | „Aufgerufen · antreten bis … · nicht erschienen ab …“; Aufruf-Tafel und TV zeigen den Aufruf mit Countdown |
 | Turnierleitung (Handy) | **Gestartet** | Spielzeit-Uhr läuft ohne Neuladen („0:12 / 12 Min.“) |
@@ -227,8 +228,8 @@ Ist Runde 1 fertig und noch ein Lauf offen: `$PM spielen` (ruft auf, startet, tr
 | Turnierleitung (Handy) | Reiter **Braucht Aufmerksamkeit** | zwei Karten „Auslosung bereit · 8 Namen“ (Winner Runde 2, Loser Runde 1) mit Topf und „automatisch in 6 Min.“ |
 | Turnierleitung (PC) | Verwaltung des Cups → Reiter **Spiele** → Kasten **Auslosung** | zwei Zeilen „Winner Runde 2 – Auslosung bereit“ und „Loser Runde 1 – Auslosung bereit“, je mit **Jetzt auslosen** (#1860) |
 | Turnierleitung (Handy) | **Jetzt auslosen**, TV dabei ansehen | TV-Moment „Auslosung · … · 8 Namen auf 2 Spiele“, die Namen fahren in ihre Läufe; im Kasten „Auslosung“ „Winner Runde 2 – ausgelost am …“ |
-| Turnierleitung (Handy) | **Die zweite Karte sofort auslosen** – solange #1858 offen ist | beide Runden gelost; im Reiter **Stationen** haben die freien Stationen **Aufrufen** für E, F, LA und LB |
-| Turnierleitung | Erst wenn #1858 behoben ist: die zweite Karte 6 Minuten liegen lassen (optional, wenn Zeit ist) | nach 3 Min. Erinnerung, nach 6 Min. lost der Server selbst; die bereiten Läufe der anderen Runde lassen sich derweil aufrufen |
+| Turnierleitung (Handy) | Die zweite Karte (Loser Runde 1) **liegen lassen**, Reiter **Stationen** | zwei freie Stationen mit **Aufrufen** für E und F, Prognose „jetzt“ (#1858, #1872); LA und LB stehen an den anderen Stationen mit „wartet auf die Auslosung“ und nehmen keiner Station das Aufrufen |
+| Turnierleitung | Bis zur Frist warten (Zeit für den Sofort-Cup unten) | nach 3 Min. Erinnerung „Auslosung wartet“ im Postfach, nach 6 Min. lost der Server selbst, TV-Moment „Auslosung · Loser Runde 1“; danach vier Stationen mit **Aufrufen** für E, F, LA und LB. Lost er nicht: läuft der Stand schon lange (viele Seeds, über 200 Turniere „live“), erreicht der Job den Cup nicht – Stand frisch bauen (Phase 0) oder von Hand auslosen |
 | Claude | `$PM spielen --turnier sofort --anzahl 2` | zwei Viertelfinale im Sofort-Cup gewertet |
 | Turnierleitung | Sofort-Cup: Baum am PC (oder TV-Link dafür) | jeder Sieger steht **sofort** auf einem zufälligen freien Platz im Halbfinale, die anderen Plätze zeigen „Sieger aus Viertelfinale“ |
 | Turnierleitung | Im Sofort-Cup selbst ein Viertelfinale eintragen | nach 10 Sekunden fährt der Name in Runde 2 |
@@ -239,10 +240,11 @@ Ist Runde 1 fertig und noch ein Lauf offen: `$PM spielen` (ruft auf, startet, tr
 
 | Wer | Was | Erwartung |
 | --- | --- | --- |
-| Claude | `$PM station --nur-aufrufen --anzahl 1` | ein Lauf aufgerufen, nicht gestartet |
+| Claude | `$PM station --nur-aufrufen --anzahl 1` | ein Lauf aufgerufen, nicht gestartet (ein schon aufgerufener wird übersprungen) |
 | Turnierleitung | Reiter **Teilnehmer**: bei einem Spieler aus einem noch wartenden Lauf **Austritt** | Umbauplan in Worten („… der Platz wird frei, 3 bleiben.“), Grund optional |
 | Turnierleitung | **Austritt eintragen** | Status „Ausgetreten“; der Lauf spielt mit 3 weiter, Baum und TV zeigen es |
 | Claude (nach 3 Minuten) | `$PM fristen` | „1 neuer Vorschlag ‚nicht erschienen‘“ |
+| Turnierleitung (Handy) | Kommt keiner: den Lauf in **Stationen** ansehen | lag seine Planzeit beim Aufruf noch vorn (der Cup läuft schneller als geplant), gilt „nicht erschienen ab <Planzeit>“ – bis dahin warten oder `$PM station --nur-aufrufen --anzahl 1` für einen Lauf, dessen Planzeit vorbei ist |
 | Turnierleitung (Handy) | **Braucht Aufmerksamkeit**: Fall „Nicht erschienen?“ – er nennt den Lauf wie Baum und Stationen („Loser Runde 1 · Durchgang LA“, #1860) –, mit „<Name> nicht erschienen“ und „+5 Min. verlängern“ | ein Tipp auf einen Namen: der Lauf bleibt offen, die Person ist markiert (Baum durchgestrichen, TV „nicht angetreten“, Strafe im Protokoll); im Ergebnis-Fenster ist **Nicht erschienen** schon gesetzt – nach dem Eintragen der Anwesenden steht sie hinten, die zwei Besten kommen weiter (#1823) |
 
 ---
@@ -358,3 +360,15 @@ Die Generalprobe lief ein zweites Mal mit allen Fixes. Ins Drehbuch übernommen:
   freien Stationen). Kasten „Auslosung“ und Fall „Nicht erschienen?“ nennen den Baumteil (#1860).
 - Phase 10: Der Lasttest misst nur allein auf dem PC Verlässliches.
 - Phase 13: Der Aufbau setzt Gewinne für Platz 1–3, sonst legt das Veröffentlichen keine an.
+
+## Bekannt aus Durchlauf 3 (21.10.)
+
+Die Generalprobe lief ein drittes Mal (Stand 1.17.0, eigener Stand `lsw-abnahme-gp3`). Ins Drehbuch übernommen:
+
+- Phase 2: Jede Anmeldung geht über das Bestätigungs-Blatt (#1261), auch „Mitspielen“ in der schlanken Vor-Ort-Ansicht.
+- Phase 6: „Turnier starten“ vor der Planzeit zeigt öffentlich und auf der Hallen-Tafel „Läuft“ (#1881, #1888).
+- Phase 8: #1858 ist behoben – die zweite Auslosungskarte bleibt liegen, die bereiten Läufe sind derweil aufrufbar; nach
+  3 Minuten Erinnerung, nach 6 Minuten lost der Server. Der Job liest höchstens 200 laufende Turniere: auf einem Stand
+  mit sehr vielen Seeds erreicht er den Cup nicht (darum in Phase 0 frisch bauen).
+- Phase 9: `station --nur-aufrufen` überspringt schon aufgerufene Läufe; ruft man vor der Planzeit auf, gilt „nicht
+  erschienen“ erst ab der Planzeit.
