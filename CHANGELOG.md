@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.21.0 (21.10.2026)
+
+### Neu
+
+* Abzeichen „Podest extern“ und „Dauerbrenner“ für externe Wettbewerbe, ohne Jahreswertungs-Punkte (#1750)
+* Referenz-Karten aus einer Saison führen zur Saison-Seite (#1750)
+* Referenzen – Auswahl „Gehört zur Saison“, Abzeichen „aus Saison …“ und Hinweis auf Serien in der Verwaltung (#1750)
+* Saison abschließen – aus dem Endstand einer Saison wird die Referenz mit Endplatz, Team und Einzelwertungen (#1750)
+* Saison-Kopf zeigt „Referenz: Platz 6 von 8 · ansehen“ (#1750)
+
 ## 1.20.0 (21.10.2026)
 
 ### Neu
