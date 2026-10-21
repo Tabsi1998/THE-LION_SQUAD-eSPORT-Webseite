@@ -3,7 +3,7 @@ import { api, formatApiError } from "@/lib/api";
 import { AdminSheet } from "@/components/tls/AdminSheet";
 import { FormGrid } from "@/components/tls/AdminForm";
 import { CheckField, SelectField, TextAreaField, TextField } from "@/components/tls/FormFields";
-import { ROUND_KIND_OPTIONS, dayLabel, roundLabel, roundPayload, roundToForm } from "@/lib/referenceCalendar";
+import { ROUND_KIND_OPTIONS, dayLabel, opponentText, roundLabel, roundPayload, roundToForm } from "@/lib/referenceCalendar";
 import { COUNTRY_OPTIONS, countryName } from "@/lib/countryFlags";
 import { MAX_SESSION, SESSION_CHOICES, plannedSession, sessionLabel } from "@/lib/raceWeekend";
 import { CountryFlag, VenueWithFlag } from "@/components/tls/CountryFlag";
@@ -12,7 +12,11 @@ import { toast } from "sonner";
 // Seitenblätter des Kalenders (#1742): Termin anlegen/bearbeiten, verschieben und eine Terminliste einfügen.
 // Gerechnet und geprüft wird im Server - auch die eingefügte Liste: die Vorschau kommt vom Server, übernommen wird nur
 // eine fehlerfreie Liste. Rennliga (#1930): ein Termin hat seinen Lauf (Qualifying, Sprint, Rennen …) - Termine mit
-// gleichem Kürzel sind eine Runde; die Terminliste legt je Zeile alle Läufe an, die die Saison vorgibt.
+// gleichem Kürzel sind eine Runde; die Terminliste legt je Zeile alle Läufe an, die die Saison vorgibt. Team-Liga
+// (#1931): je Termin Gegner, Heim/Auswärts und das Ende des Spieltags; die Liste liest „vs Team“ (Heim), „@ Team“
+// (auswärts) und „13.05.–17.05.“.
+
+const SIDE_OPTIONS = [["", "Offen"], ["home", "Heim"], ["away", "Auswärts"]];
 
 const base = (series) => `/reference-series/admin/series/${series.id}/rounds`;
 
@@ -47,7 +51,7 @@ export function RoundSheet({ series, lineage, round, rounds = [], suggestion, ve
     event.preventDefault();
     setSaving(true);
     try {
-      const payload = roundPayload(form);
+      const payload = roundPayload(form, { teamLeague: lineage?.kind === "team_league" });
       if (racing && counts === "auto") {
         if (isNew || round?.counts_manual === false) delete payload.counts;
         else payload.counts = null;
@@ -80,7 +84,12 @@ export function RoundSheet({ series, lineage, round, rounds = [], suggestion, ve
         <TextField label="Tag" type="date" value={form.day} onChange={(v) => set("day", v)} hint="Leer: Termin noch offen." testId="round-day" />
         <TextField label="Uhrzeit" type="time" value={form.time} onChange={(v) => set("time", v)} hint="Wiener Zeit. Vorgabe ist die Standard-Uhrzeit der Saison; leer: ohne Uhrzeit." testId="round-time" />
         <SelectField label="Art" value={form.kind} onChange={(v) => set("kind", v)} options={ROUND_KIND_OPTIONS} testId="round-kind" />
-        {lineage?.kind === "team_league" && <TextField label="Gegner" value={form.opponent} onChange={(v) => set("opponent", v)} maxLength={120} testId="round-opponent" />}
+        {lineage?.kind === "team_league" && (<>
+          <TextField label="Gegner" value={form.opponent} onChange={(v) => set("opponent", v)} maxLength={120} testId="round-opponent" />
+          <SelectField label="Heim oder auswärts" value={form.at_home} onChange={(v) => set("at_home", v)} options={SIDE_OPTIONS} testId="round-side" />
+          <TextField label="Spieltag bis" type="date" value={form.day_end} onChange={(v) => set("day_end", v)} min={form.day || undefined}
+            hint="Optional: letzter Tag, an dem gespielt werden kann – bis dahin fehlt kein Ergebnis." testId="round-day-end" />
+        </>)}
       </FormGrid>
       <TextField label="Eigener Titel" value={form.title} onChange={(v) => set("title", v)} maxLength={160} hint="Optional, etwa „Saisonfinale“." testId="round-title" />
       <CheckField label="Zählt zur Wertung" checked={shownCounts} onChange={(v) => { setCounts("manual"); set("counts", v); }} testId="round-counts"
@@ -170,11 +179,16 @@ export function PasteSheet({ series, lineage, version, onClose, onSaved, onStale
   };
 
   const defaults = [series.default_time && `${series.default_time} Uhr`].filter(Boolean).join(", ");
+  const teamLeague = lineage?.kind === "team_league";
+  const placeholder = teamLeague
+    ? "ST1 · 13.05.2026 20:30 · vs Team A\nST2 · 20.05.–24.05. · @ Team B\nST3 · 27.05. · vs Team C"
+    : "R1 · 05.11. · Strecke\nR2 · 12.11. 20:00 · Strecke\nR3 Strecke";
+  const teamHint = teamLeague ? " Team-Liga: „vs Team“ heißt Heimspiel, „@ Team“ auswärts; „13.05.–17.05.“ ist ein Spieltag mit Zeitraum." : "";
   return (
     <AdminSheet title="Terminliste einfügen" eyebrow={lineage?.title} size="lg" onClose={onClose} onSubmit={submit} saving={saving}
       submitLabel={ready ? `${total} Termine übernehmen` : "Vorschau"} savingLabel={ready ? "Übernehme …" : "Prüfe …"} submitTestId="paste-submit" testId="paste-sheet">
-      <TextAreaField label="Je Zeile ein Termin" value={text} onChange={edit} rows={8} testId="paste-text" placeholder={"R1 · 05.11. · Strecke\nR2 · 12.11. 20:00 · Strecke\nR3 Strecke"}
-        hint={`Kürzel, Datum (TT.MM. oder TT.MM.JJJJ), optional Uhrzeit und Ort – aus dem Ort kommt die Flagge. Ohne Datum: der nächste Standard-Wochentag nach der Zeile davor. Ohne Uhrzeit: ${defaults || "ohne Uhrzeit"}.${lineage?.kind === "racing" ? " Rennliga: Eine Zeile je Runde legt alle Läufe an, die die Saison vorgibt (Ablauf je Runde); „R1 Sprint“, „R1S“ oder „R1 Q“ nur diesen Lauf." : ""}`} />
+      <TextAreaField label="Je Zeile ein Termin" value={text} onChange={edit} rows={8} testId="paste-text" placeholder={placeholder}
+        hint={`Kürzel, Datum (TT.MM. oder TT.MM.JJJJ), optional Uhrzeit und Ort – aus dem Ort kommt die Flagge. Ohne Datum: der nächste Standard-Wochentag nach der Zeile davor. Ohne Uhrzeit: ${defaults || "ohne Uhrzeit"}.${lineage?.kind === "racing" ? " Rennliga: Eine Zeile je Runde legt alle Läufe an, die die Saison vorgibt (Ablauf je Runde); „R1 Sprint“, „R1S“ oder „R1 Q“ nur diesen Lauf." : ""}${teamHint}`} />
       {preview && preview.errors.length > 0 && (
         <div className="border border-red-400/40 bg-red-400/10 rounded-sm p-3 text-sm text-red-200 space-y-1" data-testid="paste-errors" role="alert">
           <div className="font-bold">Die Liste hat Fehler – übernommen wird erst eine fehlerfreie Liste.</div>
@@ -194,7 +208,7 @@ export function PasteSheet({ series, lineage, version, onClose, onSaved, onStale
                   <th className="py-1.5 pr-3 font-bold">Kürzel</th>
                   <th className="py-1.5 pr-3 font-bold">Tag</th>
                   <th className="py-1.5 pr-3 font-bold">{withSessions ? "Läufe" : "Uhrzeit"}</th>
-                  <th className="py-1.5 font-bold">Ort</th>
+                  <th className="py-1.5 font-bold">{teamLeague ? "Gegner · Ort" : "Ort"}</th>
                 </tr>
               </thead>
               <tbody>
@@ -203,6 +217,7 @@ export function PasteSheet({ series, lineage, version, onClose, onSaved, onStale
                     <td className="py-1.5 pr-3 font-bold">{row.code || "–"}</td>
                     <td className="py-1.5 pr-3 whitespace-nowrap">
                       {dayLabel(row.day)}
+                      {row.day_end && <span className="block text-[11px] text-white/60" data-testid="paste-day-end">bis {dayLabel(row.day_end)}</span>}
                       {row.derived_day && <span className="block text-[11px] text-white/45">aus dem Wochentag</span>}
                       {row.warning && <span className="block text-[11px] text-amber-300">{row.warning}</span>}
                     </td>
@@ -220,7 +235,8 @@ export function PasteSheet({ series, lineage, version, onClose, onSaved, onStale
                       ) : (row.time || "–")}
                     </td>
                     <td className="py-1.5" data-testid="paste-venue">
-                      {row.venue ? <VenueWithFlag round={{ venue: row.venue, country_code: row.country_code }} /> : "–"}
+                      {row.opponent && <span className="block font-semibold text-white" data-testid="paste-opponent">{opponentText(row)}</span>}
+                      {row.venue ? <VenueWithFlag round={{ venue: row.venue, country_code: row.country_code }} /> : (row.opponent ? null : "–")}
                     </td>
                   </tr>
                 ))}

@@ -1,6 +1,7 @@
 import { bestPlacement, entriesOf, entryPeople, gameKey, gameTitle, hasMember, memberEntryOf, referenceInstant, timeOf } from "@/components/tls/references/referenceParts";
 import { dayNoon, viennaDate, viennaDay } from "@/lib/vienna";
 import { seasonNote, tierRank } from "@/lib/seriesTiers";
+import { opponentText } from "@/lib/referenceCalendar";
 
 // Referenzen-Übersicht (#1878): die Logik hinter Ehrentafel, Vitrine, Liga-Weg und Chronik - ohne Oberfläche, damit
 // sie für sich getestet ist. Gerechnet wird nur Anzeige: Platzierungen, Medaillen und Stände kommen vom Server.
@@ -244,15 +245,24 @@ export function nextTitle(kind, next) {
   return NEXT_TITLES[kind] || "Nächster Termin";
 }
 
-/** Der nächste Termin: heute „R7 · 20:30“, sonst „Do 22.10. · 20:00 · ST4“ (Wiener Tag) - mit Lauf (#1930) „R3 ·
- * Qualifying · 20:00“. */
+function shortDay(day) {
+  const noon = day ? dayNoon(day) : null;
+  return noon ? `${viennaDate(noon, { weekday: "short" }).replace(/\.$/, "")} ${viennaDate(noon, { day: "2-digit", month: "2-digit" })}` : "";
+}
+
+/**
+ * Der nächste Termin: heute „R7 · 20:30“, sonst „Do 22.10. · 20:00 · ST4“ (Wiener Tag) - mit Lauf (#1930) „R3 ·
+ * Qualifying · 20:00“. Team-Liga (#1931): dazu der Gegner („vs“/„@“), ein Spieltag mit Zeitraum zeigt beide Tage
+ * statt der Uhrzeit.
+ */
 export function nextValue(next) {
   if (!next) return "Kein Termin offen";
   const label = [next.code || next.title || "", next.session || ""].filter(Boolean).join(" · ");
-  if (next.state === "today") return [label, next.time].filter(Boolean).join(" · ");
-  const noon = next.club_day ? dayNoon(next.club_day) : null;
-  const day = noon ? `${viennaDate(noon, { weekday: "short" }).replace(/\.$/, "")} ${viennaDate(noon, { day: "2-digit", month: "2-digit" })}` : "";
-  return [day, next.time, label].filter(Boolean).join(" · ");
+  const opponent = opponentText(next);
+  if (next.state === "today") return [label, next.time, opponent].filter(Boolean).join(" · ");
+  const window = next.club_day_end && next.club_day_end !== next.club_day;
+  const day = window ? `${shortDay(next.club_day)}–${shortDay(next.club_day_end)}` : shortDay(next.club_day);
+  return [day, window ? "" : next.time, label, opponent].filter(Boolean).join(" · ");
 }
 
 const PLACE_TITLES = { racing: "Bester Fahrer", team_league: "Tabelle", series: "Gesamtwertung" };

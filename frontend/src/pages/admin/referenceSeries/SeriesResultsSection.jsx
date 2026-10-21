@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { api, formatApiError } from "@/lib/api";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
-import { STATE_LABELS, STATE_TONES, dayLabel, roundLabel, roundWhen } from "@/lib/referenceCalendar";
+import { STATE_LABELS, STATE_TONES, dayLabel, opponentText, roundLabel, roundWhen } from "@/lib/referenceCalendar";
 import { groupWeekends, hasSessions } from "@/lib/raceWeekend";
 import { SessionChips } from "@/components/tls/series/SessionChips";
 import { ResultEntrySheet } from "./ResultEntrySheet";
@@ -79,7 +79,7 @@ export function SeriesResultsSection({ series, onChanged }) {
                 <div className="min-w-0 flex-1 text-sm">
                   <span className="tabular-nums text-white">{roundWhen(round)}</span>
                   {(round.title || round.venue || round.country_code) && <span className="text-white/60"> · <VenueWithFlag round={round} /></span>}
-                  {round.opponent && <span className="text-white/60"> · gegen {round.opponent}</span>}
+                  {round.opponent && <span className="text-white/60"> · {opponentText(round)}</span>}
                 </div>
                 <span className={`inline-flex items-center px-2 py-0.5 border rounded-sm text-[10px] font-bold uppercase tracking-widest whitespace-nowrap ${STATE_TONES[round.state] || STATE_TONES.planned}`}>
                   {STATE_LABELS[round.state] || round.state}

@@ -304,6 +304,10 @@ test("Läuft gerade: Fortschritt, Termin und Platz in der Sprache der Art", () =
   expect(nextValue(null)).toBe("Kein Termin offen");
   // Runde mit Läufen (#1930): der nächste Lauf.
   expect(nextValue({ state: "today", code: "R3", session: "Qualifying", time: "20:00", club_day: "2026-11-09" })).toBe("R3 · Qualifying · 20:00");
+  // Team-Liga (#1931): der Gegner mit Seite, ein Spieltag mit Zeitraum ohne Uhrzeit.
+  expect(nextValue({ state: "planned", code: "ST4", time: "20:00", club_day: "2026-10-22", opponent: "Probe Falken", at_home: true })).toBe("Do 22.10. · 20:00 · ST4 · vs Probe Falken");
+  expect(nextValue({ state: "today", code: "ST4", time: "20:00", club_day: "2026-10-22", opponent: "Probe Falken", at_home: false })).toBe("ST4 · 20:00 · @ Probe Falken");
+  expect(nextValue({ state: "planned", code: "ST5", time: "20:00", club_day: "2026-10-26", club_day_end: "2026-10-30", opponent: "Probe Adler" })).toBe("Mo 26.10.–Fr 30.10. · ST5 · gegen Probe Adler");
   expect(placeTitle("racing")).toBe("Bester Fahrer");
   expect(placeTitle("team_league")).toBe("Tabelle");
   expect(placeTitle("series")).toBe("Gesamtwertung");

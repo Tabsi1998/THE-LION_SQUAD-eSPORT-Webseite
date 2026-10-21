@@ -1,4 +1,4 @@
-import { addDays, dayLabel, moveIds, roundLabel, roundPayload, roundToForm, roundWhen, suggestNextDay, weekdayOf } from "./referenceCalendar";
+import { addDays, dayLabel, moveIds, opponentText, roundLabel, roundPayload, roundToForm, roundWhen, sideLabel, suggestNextDay, weekdayOf } from "./referenceCalendar";
 
 // Kalender externer Serien (#1742): nur Beschriftung und Vorschläge in Kalendertagen - der Status kommt vom Server.
 
@@ -35,6 +35,25 @@ test("Reihenfolge tauschen, am Rand nichts", () => {
   expect(moveIds(rounds, 1, 1)).toEqual(["a", "c", "b"]);
   expect(moveIds(rounds, 0, -1)).toBeNull();
   expect(moveIds(rounds, 2, 1)).toBeNull();
+});
+
+test("Team-Liga (#1931): Heim/Auswärts und Ende des Spieltags im Formular, Gegner und Zeitraum in Worten", () => {
+  const form = roundToForm({ id: "r1", club_day: "2026-05-13", club_day_end: "2026-05-17", at_home: false, opponent: "Probe Wölfe" });
+  expect(form).toMatchObject({ day: "2026-05-13", day_end: "2026-05-17", at_home: "away", opponent: "Probe Wölfe" });
+  expect(roundPayload(form, { teamLeague: true })).toMatchObject({ at_home: false, day_end: "2026-05-17", opponent: "Probe Wölfe" });
+  expect(roundPayload({ ...form, at_home: "", day_end: "" }, { teamLeague: true })).toMatchObject({ at_home: null, day_end: null });
+  expect(roundPayload(form)).not.toHaveProperty("at_home");
+  expect(roundToForm({ id: "r2", at_home: true }).at_home).toBe("home");
+
+  expect(roundWhen({ club_day: "2026-05-13", club_day_end: "2026-05-17", time: "20:00" })).toBe("Mi., 13.05. – So., 17.05.2026");
+  expect(roundWhen({ club_day: "2026-12-29", club_day_end: "2027-01-02" })).toBe("Di., 29.12.2026 – Sa., 02.01.2027");
+  expect(opponentText({ opponent: "Probe Falken", at_home: true })).toBe("vs Probe Falken");
+  expect(opponentText({ opponent: "Probe Falken", at_home: false })).toBe("@ Probe Falken");
+  expect(opponentText({ opponent: "Probe Falken" })).toBe("gegen Probe Falken");
+  expect(opponentText({ opponent: "" })).toBe("");
+  expect(sideLabel({ at_home: true })).toBe("Heim");
+  expect(sideLabel({ at_home: false })).toBe("Auswärts");
+  expect(sideLabel({})).toBe("");
 });
 
 test("Formular und Body: neuer Termin mit Vorschlag, leere Uhrzeit heißt ohne Uhrzeit", () => {

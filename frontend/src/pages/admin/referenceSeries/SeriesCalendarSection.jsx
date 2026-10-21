@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { api, formatApiError } from "@/lib/api";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
-import { STATE_LABELS, STATE_TONES, dayLabel, moveIds, roundLabel, roundWhen, suggestNextDay } from "@/lib/referenceCalendar";
+import { STATE_LABELS, STATE_TONES, dayLabel, moveIds, opponentText, roundLabel, roundWhen, suggestNextDay } from "@/lib/referenceCalendar";
 import { groupWeekends, hasSessions, sessionLabel } from "@/lib/raceWeekend";
 import { PasteSheet, PostponeSheet, RoundSheet } from "./RoundSheets";
 import { VenueWithFlag } from "@/components/tls/CountryFlag";
@@ -176,7 +176,7 @@ export function SeriesCalendarSection({ series }) {
                 <div className={`text-sm ${round.state === "cancelled" ? "text-white/45" : "text-white"}`}>
                   <span className="tabular-nums">{roundWhen(round)}</span>
                   {(round.venue || round.title || round.country_code) && <span className="text-white/60"> · <VenueWithFlag round={round} /></span>}
-                  {round.opponent && <span className="text-white/60"> · gegen {round.opponent}</span>}
+                  {round.opponent && <span className="text-white/60"> · {opponentText(round)}</span>}
                 </div>
                 <RoundNotes round={round} />
               </div>

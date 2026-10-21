@@ -62,12 +62,39 @@ export function dayLabel(day) {
   return viennaDate(dayNoon(day), { weekday: "short", day: "2-digit", month: "2-digit", year: "numeric" });
 }
 
-/** Tag und Uhrzeit eines Termins: „Do., 05.11.2026 · 20:30“, ohne Uhrzeit nur der Tag, ohne Tag „Termin offen“. */
+/**
+ * Tag und Uhrzeit eines Termins: „Do., 05.11.2026 · 20:30“, ohne Uhrzeit nur der Tag, ohne Tag „Termin offen“. Ein
+ * Spieltag mit Zeitraum (Team-Liga, #1931) zeigt beide Tage ohne Uhrzeit: „Mi., 13.05. – So., 17.05.2026“.
+ */
 export function roundWhen(round) {
   const day = dayLabel(round?.club_day);
   if (!day) return "Termin offen";
+  const end = round.club_day_end && round.club_day_end !== round.club_day ? dayLabel(round.club_day_end) : "";
+  if (end) {
+    const sameYear = round.club_day.slice(0, 4) === round.club_day_end.slice(0, 4);
+    const start = sameYear ? viennaDate(dayNoon(round.club_day), { weekday: "short", day: "2-digit", month: "2-digit" }) : day;
+    return `${start} – ${end}`;
+  }
   return round.time ? `${day} · ${round.time}` : day;
 }
+
+/** Gegner eines Spieltags (#1931): „vs Team“ daheim, „@ Team“ auswärts, sonst „gegen Team“ - leer ohne Gegner. */
+export function opponentText(round) {
+  const name = String(round?.opponent || "").trim();
+  if (!name) return "";
+  if (round.at_home === true) return `vs ${name}`;
+  if (round.at_home === false) return `@ ${name}`;
+  return `gegen ${name}`;
+}
+
+/** „Heim“, „Auswärts“ oder leer. */
+export function sideLabel(round) {
+  if (round?.at_home === true) return "Heim";
+  if (round?.at_home === false) return "Auswärts";
+  return "";
+}
+
+const SIDE_FORM = { true: "home", false: "away" };
 
 /** Kurzname eines Termins: Kürzel, sonst „Termin 3“. */
 export function roundLabel(round) {
@@ -108,12 +135,17 @@ export function roundToForm(round = {}, { day = "", time = "" } = {}) {
     counts: round.counts !== false,
     opponent: round.opponent || "",
     note: round.note || "",
+    // Team-Liga (#1931): Heim („home“), Auswärts („away“) oder offen („“), letzter Tag des Spieltags.
+    at_home: SIDE_FORM[round.at_home] || "",
+    day_end: round.club_day_end || "",
   };
 }
 
-/** Formular → Body für POST/PATCH; leere Uhrzeit heißt „ohne Uhrzeit“. Land automatisch: der Server erkennt es. Lauf
- * (#1930): leer heißt Rennen. */
-export function roundPayload(form) {
+/**
+ * Formular → Body für POST/PATCH; leere Uhrzeit heißt „ohne Uhrzeit“. Land automatisch: der Server erkennt es. Lauf
+ * (#1930): leer heißt Rennen. `teamLeague`: dazu Heim/Auswärts und das Ende des Spieltags (#1931).
+ */
+export function roundPayload(form, { teamLeague = false } = {}) {
   return {
     ...countryPayload(form.country),
     code: form.code.trim() || null,
@@ -126,5 +158,6 @@ export function roundPayload(form) {
     counts: Boolean(form.counts),
     opponent: form.opponent.trim() || null,
     note: form.note.trim() || null,
+    ...(teamLeague ? { at_home: form.at_home === "home" ? true : form.at_home === "away" ? false : null, day_end: form.day_end || null } : {}),
   };
 }
