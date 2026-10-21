@@ -1590,3 +1590,42 @@ async def _helper_shifts(ctx):
 async def _helper_hours(ctx):
     """Helferstunden: die Stunden dieser Dienste (notiert oder die Länge der Schicht) - volle Stunden zählen."""
     return int(float((await ctx.club_record()).get("hours") or 0))
+
+
+# ------------------------------------------------------------------ Katalog F (#1750): externe Wettbewerbe
+# Aus den Referenzen des Vereins: je Eintrag, in dem die Person (über ihr Vereinsprofil) steht. Nur aktive,
+# abgeschlossene Referenzen - laufende und geplante haben noch keinen Endplatz. Abzeichen ohne Saisonpunkte.
+
+async def _external_entries(ctx) -> list[tuple[dict, dict]]:
+    async def load():
+        profiles = {row["id"] async for row in ctx.db.club_member_profiles.find(
+            {"user_id": ctx.user_id}, {"_id": 0, "id": 1})}
+        if not profiles:
+            return []
+        refs = await ctx.db.references.find(
+            {"entries.member_profile_ids": {"$in": list(profiles)}, "is_active": {"$ne": False},
+             "status": {"$nin": ["planned", "active"]}},
+            {"_id": 0, "id": 1, "series_id": 1, "entries": 1}).to_list(5000)
+        return [(ref, entry) for ref in refs for entry in ref.get("entries") or []
+                if isinstance(entry, dict) and profiles & set(entry.get("member_profile_ids") or [])]
+    return await ctx._memo("external_entries", load)
+
+
+def _external_place(entry: dict) -> int:
+    try:
+        return int(entry.get("placement") or 0)
+    except (TypeError, ValueError):
+        return 0
+
+
+@counter("external_podiums", "club")
+async def _external_podiums(ctx):
+    """Podest extern: eigene Einträge mit Platz 1 bis 3 - Team und Einzel getrennt."""
+    return sum(1 for _ref, entry in await _external_entries(ctx) if 1 <= _external_place(entry) <= 3)
+
+
+@counter("external_seasons", "club")
+async def _external_seasons(ctx):
+    """Dauerbrenner: Referenzen einer Saison (``series_id``) mit eigenem Endplatz - eine abgebrochene Saison hat keinen."""
+    return len({ref["id"] for ref, entry in await _external_entries(ctx)
+                if ref.get("series_id") and _external_place(entry) >= 1})

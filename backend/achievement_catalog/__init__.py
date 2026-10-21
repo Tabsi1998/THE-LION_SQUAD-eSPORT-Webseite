@@ -22,6 +22,7 @@ from .catalog_c import REDEFINED as REDEFINED_C, REPLACED as REPLACED_C  # noqa:
 from .catalog_d import GROUPS_D, TIERS_D  # noqa: F401
 from .catalog_d import REDEFINED as REDEFINED_D, REPLACED as REPLACED_D  # noqa: F401
 from .catalog_e import GROUPS_E, TIERS_E  # noqa: F401
+from .catalog_f import GROUPS_F, TIERS_F  # noqa: F401
 
 # Zähler aus services/achievement_counters.py (#616): alle live, die Prüfung verlangt bekannte Schlüssel.
 COUNTER_KEYS_V2 = (
@@ -56,6 +57,8 @@ COUNTER_KEYS_V2 = (
     "halloween_bats_scared", "season_collectibles_total",
     # Anmeldung (#1871): auch im alten Block, hier zusätzlich leicht für die Auswertung gleich nach der Anmeldung
     "tournaments_registered", "distinct_games_registered", "distinct_formats",
+    # Katalog F (#1750): Abzeichen aus externen Wettbewerben
+    "external_podiums", "external_seasons",
 )
 CONDITION_KEY_STATUS.update({key: "live" for key in COUNTER_KEYS_V2})
 
@@ -70,8 +73,8 @@ REDEFINED_OLD_TIERS: dict[str, list[str]] = {}
 for _old in ACHIEVEMENT_TIERS:
     if _old["group_code"] in _REDEFINED_CODES:
         REDEFINED_OLD_TIERS.setdefault(_old["group_code"], []).append(_old["code"])
-ACHIEVEMENT_GROUPS[:] = [g for g in ACHIEVEMENT_GROUPS if g["code"] not in _RETIRED] + GROUPS_A + GROUPS_B + GROUPS_C + GROUPS_D + GROUPS_E
-ACHIEVEMENT_TIERS[:] = [t for t in ACHIEVEMENT_TIERS if t["group_code"] not in _RETIRED] + TIERS_A + TIERS_B + TIERS_C + TIERS_D + TIERS_E
+ACHIEVEMENT_GROUPS[:] = [g for g in ACHIEVEMENT_GROUPS if g["code"] not in _RETIRED] + GROUPS_A + GROUPS_B + GROUPS_C + GROUPS_D + GROUPS_E + GROUPS_F
+ACHIEVEMENT_TIERS[:] = [t for t in ACHIEVEMENT_TIERS if t["group_code"] not in _RETIRED] + TIERS_A + TIERS_B + TIERS_C + TIERS_D + TIERS_E + TIERS_F
 GROUP_MAPPING.update(REPLACED)
 GROUP_MAPPING.update(REPLACED_B)
 GROUP_MAPPING.update(REPLACED_C)
