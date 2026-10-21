@@ -325,6 +325,7 @@ async def update_series(series_id: str, body: ReferenceSeriesUpdate, me: dict = 
             "data": {"previous": existing.get("weekend"), "weekend": saved.get("weekend")},
             "created_at": now_utc().isoformat(),
         })
+    await _log_cancellation(db, me, series_id, existing, saved)
     # Strenger gestellt oder neu verknüpft (#1970): die Referenzen der Saison folgen sofort - Lockern öffnet nichts.
     required, tightened = await season_close.tighten_references(db, series_id)
     await _log_tightened(db, "reference_series.references_tightened", series_id, me, required, tightened)
@@ -348,10 +349,59 @@ async def _cancellation(db, existing: dict, updates: dict, series_id: str) -> di
         out.update({"cancelled_on": None, "cancel_reason": None})
     successor = updates.get("successor_id")
     if successor:
-        if successor == series_id:
-            raise HTTPException(422, "Eine Saison kann nicht ihr eigener Nachfolger sein.")
-        await _series(db, successor)
+        await _check_successor(db, existing, successor)
     return out
+
+
+SUCCESSOR_SELF = "Eine Saison kann nicht ihr eigener Nachfolger sein."
+SUCCESSOR_OTHER_LINEAGE = "Der Nachfolger muss eine Saison derselben Spur sein."
+SUCCESSOR_LOOP = "Dieser Nachfolger führt über seine Nachfolger zurück zu dieser Saison."
+SUCCESSOR_MAX_STEPS = 200
+
+
+async def _check_successor(db, existing: dict, successor_id: str) -> None:
+    """Nachfolger (#1960): eine andere Saison derselben Spur, und die Kette ihrer Nachfolger führt nie zurück zu dieser
+    Saison - sonst 422."""
+    if successor_id == existing["id"]:
+        raise HTTPException(422, SUCCESSOR_SELF)
+    target = await _series(db, successor_id)
+    if target.get("lineage_id") != existing.get("lineage_id"):
+        raise HTTPException(422, SUCCESSOR_OTHER_LINEAGE)
+    seen = {existing["id"]}
+    step = target
+    for _ in range(SUCCESSOR_MAX_STEPS):
+        if step["id"] in seen:
+            raise HTTPException(422, SUCCESSOR_LOOP)
+        seen.add(step["id"])
+        following = step.get("successor_id")
+        if not following:
+            return
+        step = await db.reference_series.find_one({"id": following}, {"_id": 0, "id": 1, "successor_id": 1})
+        if not step:
+            return
+    raise HTTPException(422, SUCCESSOR_LOOP)
+
+
+async def _log_cancellation(db, me: dict, series_id: str, existing: dict, saved: dict) -> None:
+    """Protokoll (#1960): Abbruch und Zurücknehmen der Saison mit Tag, Grund und Nachfolger; ein anderer Nachfolger
+    ebenso."""
+    was, now = existing.get("status") == "cancelled", saved.get("status") == "cancelled"
+    data = {"cancelled_on": saved.get("cancelled_on"), "reason": saved.get("cancel_reason"),
+            "successor_id": saved.get("successor_id")}
+    if now and (not was or any(existing.get(key) != saved.get(key)
+                               for key in ("cancelled_on", "cancel_reason", "successor_id"))):
+        action = "reference_series.cancel"
+    elif was and not now and saved.get("status") != "archived":
+        action = "reference_series.cancel_undo"
+        data = {"status": saved.get("status"), "previous_cancelled_on": existing.get("cancelled_on"),
+                "previous_reason": existing.get("cancel_reason"), "successor_id": saved.get("successor_id")}
+    elif existing.get("successor_id") != saved.get("successor_id"):
+        action = "reference_series.successor"
+        data = {"previous_successor_id": existing.get("successor_id"), "successor_id": saved.get("successor_id")}
+    else:
+        return
+    await db.audit_logs.insert_one({"id": new_id(), "action": action, "actor_id": me["id"], "target_id": series_id,
+                                    "data": data, "created_at": now_utc().isoformat()})
 
 
 @router.post("/admin/series/{series_id}/archive")

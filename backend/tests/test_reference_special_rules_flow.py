@@ -407,6 +407,82 @@ async def test_round_page_and_statistics_know_reversed_grids_no_score_rounds_and
     assert drivers["p-ext2"]["wins"] == 0 and drivers["p-ext2"]["races"] == 2
 
 
+# ---------------------------------------------------------------- Prüfung (Codex)
+@pytest.mark.asyncio
+async def test_a_captain_never_changes_the_official_team_standings(flow):
+    await _board(flow)
+    lineage = await _lineage(flow)
+    series = await _season(flow, lineage)
+    rounds = await _rounds(flow, series, "R1")
+    await flow.db.reference_participants.insert_many([
+        {"series_id": series["id"], "is_club_member": False, "name_hidden": False, **person} for person in PEOPLE])
+    url = f"{ADMIN}/series/{series['id']}/rounds/{rounds['R1']}/results"
+    rows = [{"participant_id": "p-lion1", "place": 1}, {"participant_id": "p-ext1", "place": 2}]
+    saved = await flow.put(url, json={"rows": rows, "official_team_totals": {"Fremd Rot": 40}, "status": "draft",
+                                      "expected_version": 0})
+    assert saved.status_code == 200, saved.text
+
+    captain = await flow.add_user(name="captain-probe")
+    await flow.db.memberships.update_one({"user_id": captain["id"]},
+                                         {"$set": {"user_id": captain["id"], "member_status": "active"}}, upsert=True)
+    staff = await flow.post(f"{ADMIN}/series/{series['id']}/staff",
+                            json={"user_id": captain["id"], "valid_until": "2099-12-31"})
+    assert staff.status_code == 200, staff.text
+    flow.act_as(captain)
+    changed = await flow.put(url, json={"rows": rows, "official_team_totals": {"Fremd Rot": 99, "Probe Löwen": 1},
+                                        "status": "draft", "expected_version": 1})
+    assert changed.status_code == 200, changed.text
+    sheet = await flow.db.reference_round_results.find_one({"round_id": rounds["R1"]}, {"_id": 0})
+    assert sheet["official_team_totals"] == {"Fremd Rot": 40} and sheet["version"] == 2
+    preview = await flow.post(f"{url}/preview", json={"rows": rows, "official_team_totals": {"Fremd Rot": 99}})
+    assert preview.status_code == 200, preview.text
+    teams = {row["team"]: row for row in preview.json()["standings"]["scopes"]["teams"]}
+    assert teams["Fremd Rot"]["official_points"] == 40
+
+
+@pytest.mark.asyncio
+async def test_a_successor_is_another_season_of_the_same_lineage_without_a_loop(flow):
+    await _board(flow)
+    lineage = await _lineage(flow)
+    other_lineage = await _lineage(flow, title="Probe Racing Andere")
+    first = await _season(flow, lineage, season="2025")
+    second = await _season(flow, lineage, season="2026")
+    third = await _season(flow, lineage, season="2027")
+    foreign = await _season(flow, other_lineage, season="2026")
+    url = f"{ADMIN}/series/{{}}"
+    other = await flow.patch(url.format(first["id"]), json={"successor_id": foreign["id"]})
+    assert other.status_code == 422 and "derselben Spur" in other.json()["detail"]
+    assert (await flow.patch(url.format(first["id"]), json={"successor_id": first["id"]})).status_code == 422
+    assert (await flow.patch(url.format(first["id"]), json={"successor_id": second["id"]})).status_code == 200
+    assert (await flow.patch(url.format(second["id"]), json={"successor_id": third["id"]})).status_code == 200
+    loop = await flow.patch(url.format(third["id"]), json={"successor_id": first["id"]})
+    assert loop.status_code == 422 and "zurück" in loop.json()["detail"]
+    assert (await flow.db.reference_series.find_one({"id": third["id"]})).get("successor_id") is None
+
+
+@pytest.mark.asyncio
+async def test_cancelling_and_reinstating_a_season_is_logged_with_reason_and_successor(flow):
+    await _board(flow)
+    lineage = await _lineage(flow)
+    old = await _season(flow, lineage, season="2026", tier="F1")
+    restart = await _season(flow, lineage, season="2026", tier="F1 Neustart")
+    url = f"{ADMIN}/series/{old['id']}"
+    cancelled = await flow.patch(url, json={"status": "cancelled", "cancel_reason": "Neustart mit anderem Auto",
+                                            "successor_id": restart["id"]})
+    assert cancelled.status_code == 200, cancelled.text
+    log = await flow.db.audit_logs.find_one({"action": "reference_series.cancel", "target_id": old["id"]})
+    assert log["data"] == {"cancelled_on": "2026-11-20", "reason": "Neustart mit anderem Auto",
+                           "successor_id": restart["id"]}
+    assert (await flow.patch(url, json={"status": "active"})).status_code == 200
+    undo = await flow.db.audit_logs.find_one({"action": "reference_series.cancel_undo", "target_id": old["id"]})
+    assert undo["data"] == {"status": "active", "previous_cancelled_on": "2026-11-20",
+                            "previous_reason": "Neustart mit anderem Auto", "successor_id": restart["id"]}
+    # Ein unveränderter Abschnitt schreibt keinen weiteren Eintrag.
+    assert (await flow.patch(url, json={"status": "active"})).status_code == 200
+    actions = [item["action"] async for item in flow.db.audit_logs.find({"target_id": old["id"]})]
+    assert actions.count("reference_series.cancel") == 1 and actions.count("reference_series.cancel_undo") == 1
+
+
 # ---------------------------------------------------------------- Termin ohne Wertung
 @pytest.mark.asyncio
 async def test_a_round_without_score_has_a_public_reason_and_too_few_starters_warn(flow):

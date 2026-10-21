@@ -685,8 +685,9 @@ export function ResultEntrySheet({ series, round, onClose, onSaved }) {
             </section>
           )}
           {kind === "racing" && !qualifying && <RaceExtras form={form} onChange={update} invalid={invalid.race} problems={problems.byField} />}
-          {/* Teamwertung laut Veranstalter (#1960): sichtbare Eingabe mit Einfügen - sie gilt dann für Platz und Punkte. */}
-          {kind === "racing" && !qualifying && rules.team_scoring?.enabled && (
+          {/* Teamwertung laut Veranstalter (#1960): sichtbare Eingabe mit Einfügen - sie gilt dann für Platz und Punkte.
+              Nur der Vorstand: was ein Captain schickt, übernimmt der Server nicht. */}
+          {board && kind === "racing" && !qualifying && rules.team_scoring?.enabled && (
             <OfficialTeamTotals key={`${data.version}-${mine ? "mine" : "stand"}`} totals={form.teamTotals} teams={teams} onChange={(teamTotals) => update({ teamTotals })} />
           )}
 

@@ -420,6 +420,14 @@ async def _prepare(db, access: SeriesAccess, round_doc: dict, body: ResultSheetI
     return rules, participants, resolution
 
 
+def _board_fields(access: SeriesAccess, body, existing: dict | None):
+    """Felder, die nur der Vorstand schreibt (#1960): die Teamwertung laut Veranstalter gilt für Platz und Punkte der
+    Teamwertung - ein Captain ändert sie nicht. Was er schickt, zählt nicht; es bleibt der gespeicherte Wert des Blatts."""
+    if access.is_board:
+        return body
+    return body.model_copy(update={"official_team_totals": dict((existing or {}).get("official_team_totals") or {})})
+
+
 def _refuse(resolution: series_results.Resolution) -> None:
     if resolution.errors:
         raise HTTPException(422, {"message": "Das Blatt hat Fehler.", "errors": resolution.errors,
@@ -528,6 +536,7 @@ async def preview_results(series_id: str, round_id: str, body: ResultSheetInput,
     db = get_db()
     round_doc = await access.round(round_id)
     existing = await _sheet(db, series_id, round_id)
+    body = _board_fields(access, body, existing)
     rules, participants, resolution = await _prepare(db, access, round_doc, body)
     unknown, auto_members = await _unknown_names(db, access, resolution)
     club = club_members = None
@@ -745,6 +754,7 @@ async def save_results(series_id: str, round_id: str, body: ResultSave,
         existing = await _sheet(db, series_id, round_id)
         _require_version(existing, body.expected_version)
         target = access.edit_target(existing)
+        body = _board_fields(access, body, existing)
         _, _, resolution = await _prepare(db, access, round_doc, body)
         _refuse(resolution)
 
