@@ -88,7 +88,7 @@ async def test_the_page_shows_head_rules_progress_standings_and_the_final(flow):
 
     assert body["lineage"] == {"title": "Probe Monatscup", "slug": lineage["slug"], "kind": "series",
                                "label": "1vs1", "organizer": "Probe Liga", "game_name": "Probespiel",
-                               "external_url": None}
+                               "external_url": None, "tier_order": None}
     assert body["series"]["season"] == "2026"
     assert (body["rules"]["final_top_n"], body["rules"]["count_mode"], body["rules"]["count_n"]) == (2, "drop_n", 1)
     assert body["rules"]["points_by_place"] == [10, 8, 6, 4]

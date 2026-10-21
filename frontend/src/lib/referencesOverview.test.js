@@ -80,6 +80,43 @@ test("Liga-Weg: Division 3 → Division 2 ist ein Aufstieg, auch mit Format oder
   expect(unknown.steps.map((step) => step.note)).toEqual(["", ""]);
 });
 
+test("Liga-Weg (#1898): Vermerk „Aufstieg“ zeigt Aufstieg, auch wenn die Namen keine Zahl tragen", () => {
+  const path = leaguePath([
+    { season: "2024", tier: "Silber", status: "completed", season_result: "promoted" },
+    { season: "2025", tier: "Gold", status: "completed", season_result: "champion" },
+    { season: "2026", tier: "Gold", status: "completed", season_result: "stayed" },
+    { season: "2027", tier: "Gold", status: "active", season_result: "relegated" },
+  ]);
+  // Die laufende Saison bleibt „läuft“, auch mit Vermerk.
+  expect(path.steps.map((step) => step.note)).toEqual(["Aufstieg", "Meister", "Klassenerhalt", "läuft"]);
+  expect(path.promotions).toBe(1);
+  expect(path.summary).toBe("4 Saisons · 1 Aufstieg");
+  // Der Vermerk gilt vor der Ableitung: Liga 2 → Liga 1 wäre ein Aufstieg, eingetragen ist „Abstieg“.
+  const marked = leaguePath([
+    { season: "2025", tier: "Liga 2", status: "completed", season_result: "relegated" },
+    { season: "2026", tier: "Liga 1", status: "completed" },
+  ]);
+  expect(marked.steps.map((step) => step.note)).toEqual(["Abstieg", ""]);
+});
+
+test("Liga-Weg (#1898): ohne Vermerk zählt die Reihenfolge der Spur, sonst die Zahl im Namen als Rückfall", () => {
+  const seasons = [
+    { season: "2025", tier: "Silber", status: "completed" },
+    { season: "2026", tier: "Gold", status: "completed" },
+  ];
+  expect(leaguePath(seasons).steps.map((step) => step.note)).toEqual(["", ""]);
+  expect(leaguePath(seasons, ["Gold", "Silber"]).steps.map((step) => step.note)).toEqual(["Aufstieg", ""]);
+  // Eine eigene Reihenfolge dreht die Zahl im Namen um.
+  const numbered = [
+    { season: "2025", tier: "Liga 1", status: "completed" },
+    { season: "2026", tier: "Liga 3", status: "completed" },
+  ];
+  expect(leaguePath(numbered).steps[0].note).toBe("Abstieg");
+  expect(leaguePath(numbered, ["Liga 3", "Liga 2", "Liga 1"]).steps[0].note).toBe("Aufstieg");
+  // Ehrentafel: die Aufstiege zählen mit der Reihenfolge der Spur.
+  expect(honorStats({ lineages: [{ lineage: { tier_order: ["Gold", "Silber"] }, seasons }] }).promotions).toBe(1);
+});
+
 // ---------------------------------------------------------------- Hauptkarte
 
 test("Hauptkarte automatisch: höchste Stufe vor höchstem Platz, bei Gleichstand die neueste", () => {
@@ -101,6 +138,15 @@ test("Hauptkarte: die Stufe der verknüpften Saison gilt vor dem Liga-Feld der R
   const items = [ref("saison", "2024-01-01", 2, { league: "Probe Liga" }), ref("cup", "2026-01-01", 1, { league: "Liga 2" })];
   const linked = new Map([["saison", { season: { tier: "Liga 1" } }]]);
   expect(pickShowcase(items, { mode: "auto" }, linked)?.id).toBe("saison");
+});
+
+test("Hauptkarte (#1898): die Reihenfolge der Stufen der Spur gilt vor der Zahl im Namen", () => {
+  const items = [ref("gold-dritter", "2024-01-01", 3), ref("liga2-sieg", "2026-01-01", 1, { league: "Liga 2" })];
+  const linked = new Map([["gold-dritter", { lineage: { tier_order: ["Gold", "Silber"] }, season: { tier: "Gold" } }]]);
+  expect(pickShowcase(items, { mode: "auto" }, linked)?.id).toBe("gold-dritter");
+  // Ohne eigene Reihenfolge ist „Gold“ nicht vergleichbar - dann gewinnt die Liga 2.
+  const plain = new Map([["gold-dritter", { lineage: {}, season: { tier: "Gold" } }]]);
+  expect(pickShowcase(items, { mode: "auto" }, plain)?.id).toBe("liga2-sieg");
 });
 
 test("Hauptkarte fest gewählt: die gewählte, solange sie in der Vitrine steht - sonst automatisch", () => {

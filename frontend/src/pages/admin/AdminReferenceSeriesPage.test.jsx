@@ -136,3 +136,48 @@ test("Archivieren fragt nach und löscht nichts; Zurückholen holt zurück", asy
   fireEvent.click(screen.getByTestId("lineage-restore-spur-alt"));
   await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/reference-series/admin/lineages/spur-alt/restore"));
 });
+
+// Auf- und Abstieg je Saison (#1898): Vermerk an der Saison, eigene Reihenfolge der Stufen an der Spur.
+test("Saison: Ergebnis der Saison wird gespeichert", async () => {
+  renderPage();
+  await screen.findByText("Probe Racing F1");
+  fireEvent.click(screen.getByTestId("series-edit-serie-1"));
+  expect(screen.getByTestId("series-season-result")).toHaveValue("");
+  fireEvent.change(screen.getByTestId("series-season-result"), { target: { value: "promoted" } });
+  fireEvent.submit(screen.getByTestId("series-sheet"));
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/reference-series/admin/series/serie-1", expect.objectContaining({ season_result: "promoted" })));
+});
+
+test("Spur: Reihenfolge der Stufen - Vorgabe aus der Zahl, Verschieben legt sie fest, Vorgabe nimmt sie zurück", async () => {
+  const lineage = {
+    id: "spur-2", slug: "probe-liga", title: "Probe Liga 4vs4", kind: "team_league", is_archived: false,
+    series: [
+      { id: "s-a", lineage_id: "spur-2", season: "2025", tier: "Liga 2", season_slug: "2025-liga-2", status: "completed", rules: DEFAULT_RULES },
+      { id: "s-b", lineage_id: "spur-2", season: "2026", tier: "Liga 1", season_slug: "2026-liga-1", status: "active", rules: DEFAULT_RULES },
+      { id: "s-c", lineage_id: "spur-2", season: "2027", tier: "Gold", season_slug: "2027-gold", status: "planned", rules: DEFAULT_RULES },
+    ],
+  };
+  apiMock.get.mockImplementation(async (url) => (url === "/reference-series/admin" ? { data: { ...OVERVIEW, lineages: [lineage] } } : { data: [] }));
+  apiMock.patch.mockResolvedValue({ data: { id: "spur-2" } });
+  renderPage();
+  await screen.findByText("Probe Liga 4vs4");
+  fireEvent.click(screen.getByTestId("lineage-edit-spur-2"));
+  const order = () => within(screen.getByTestId("lineage-tier-order")).getAllByRole("listitem").map((item) => item.textContent);
+  expect(order()).toEqual(["1.Liga 1", "2.Liga 2", "3.Gold"]);
+  expect(screen.queryByTestId("lineage-tier-reset")).toBeNull();
+
+  fireEvent.click(screen.getByTestId("lineage-tier-2-up"));
+  fireEvent.click(screen.getByTestId("lineage-tier-1-up"));
+  expect(order()).toEqual(["1.Gold", "2.Liga 1", "3.Liga 2"]);
+  fireEvent.submit(screen.getByTestId("lineage-sheet"));
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/reference-series/admin/lineages/spur-2", expect.objectContaining({ tier_order: ["Gold", "Liga 1", "Liga 2"] })));
+
+  apiMock.patch.mockClear();
+  await waitFor(() => expect(screen.queryByTestId("lineage-sheet")).toBeNull());
+  fireEvent.click(screen.getByTestId("lineage-edit-spur-2"));
+  fireEvent.click(screen.getByTestId("lineage-tier-2-up"));
+  fireEvent.click(screen.getByTestId("lineage-tier-reset"));
+  expect(order()).toEqual(["1.Liga 1", "2.Liga 2", "3.Gold"]);
+  fireEvent.submit(screen.getByTestId("lineage-sheet"));
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/reference-series/admin/lineages/spur-2", expect.objectContaining({ tier_order: null })));
+});

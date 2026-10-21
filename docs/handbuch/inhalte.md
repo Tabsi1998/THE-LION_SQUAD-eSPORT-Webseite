@@ -204,6 +204,21 @@ je Stufe) und eine **Mappe als PDF** zum Hochladen. Interessierte sehen auf der 
 **Plattform**, **Format**, **Liga**, **Saison** als eigene Felder, Spiele (Mehrfachauswahl), Turnier-Webseite, Bracket/Tabelle,
 Highlights/Notizen. Dazu **Einträge**: ein **Team** mit gemeinsamer Platzierung oder mehrere **Einzelstarter** mit je eigener
 Platzierung, beides in derselben Teilnahme möglich. Spieler wählt ihr aus den Vereinsprofilen; externe Spieler tragt ihr als Namen ein.
+
+**Prüfung beim Speichern:** Das Formular prüft Datum und Platzierung und zeigt einen orangen Hinweis direkt am Feld –
+wenn das Ende vor dem Start liegt, mehr als ein Jahr nach dem Start (Tippfehler beim Jahr?), eine abgeschlossene
+Teilnahme erst in der Zukunft endet oder der Platz größer ist als die Zahl der Teilnehmer bzw. Teams. Das sind nur
+Hinweise: gespeichert wird trotzdem, die Meldung danach nennt die Zahl der Hinweise. Unter **Auffälligkeiten** stehen
+alle Referenzen mit Hinweis, auch alte, jede mit Stift zum Bearbeiten. Dort stellt ihr auch ein, ab wie vielen Tagen
+zwischen Start und Ende ein Hinweis kommt (Vorgabe 365) und ob ein Ende in der Zukunft auffallen soll.
+
+<table>
+<tr>
+<td><img src="../assets/referenzen/referenzen-pruefung-formular.png" alt="Referenz bearbeiten: orange Hinweise unter dem Platz und unter dem Enddatum" width="420"></td>
+<td><img src="../assets/referenzen/referenzen-auffaelligkeiten.png" alt="Bereich Auffälligkeiten mit zwei Referenzen, ihren Hinweisen und den Einstellungen der Prüfung" width="420"></td>
+</tr>
+</table>
+
 Mit **Vorschläge speichern** pflegt ihr die Auswahllisten für Formate und Platzierungen. Einen Partner als Veranstalter oder per Haken
 zu nennen, zeigt die Referenz auch auf seiner Seite.
 
@@ -267,6 +282,25 @@ Rennen zählen, ob Gäste zählen). Eine Team-Liga hat stattdessen Punkte für S
 und im Protokoll, und alle Tabellen der Saison werden neu gerechnet.
 
 <img src="../assets/serien/serien-saison-seite.png" alt="Seite einer Saison mit Regeln, Version und Hinweis zur letzten Änderung" width="560">
+
+**Auf- und Abstieg:** An jeder Saison gibt es das Feld **Ergebnis der Saison** (Aufstieg, Abstieg, Klassenerhalt,
+Meister oder leer). Steht dort etwas, gilt es – auch wenn die Stufen keine Zahl im Namen tragen. Ist es leer, wird
+Auf- und Abstieg aus den Stufen abgeleitet. Die **Reihenfolge der Stufen** (höchste zuerst) steht an der Spur: Vorgabe
+ist die Zahl im Namen („Liga 1“ vor „Liga 2“); mit den Pfeilen legt ihr eine eigene Reihenfolge fest, etwa für
+„Gold“ und „Silber“, **Vorgabe aus den Namen** nimmt sie zurück. Der Vermerk steht klein im Liga-Weg – unter
+**Serien & Ligen** auf der Übersicht und auf der Seite der Team-Liga gleich (Aufstieg grün, Meister gold, Abstieg und
+Klassenerhalt grau); die Ehrentafel zählt die Aufstiege mit, die Vitrine wählt mit der Reihenfolge der Spur.
+
+<table>
+<tr>
+<td><img src="../assets/serien/serien-stufen-reihenfolge.png" alt="Spur bearbeiten: Reihenfolge der Stufen mit Pfeilen und dem Knopf Vorgabe aus den Namen" width="420"></td>
+<td><img src="../assets/serien/serien-ergebnis-der-saison.png" alt="Saison bearbeiten am Handy: Feld Ergebnis der Saison mit Aufstieg" width="200"></td>
+</tr>
+</table>
+
+<img src="../assets/serien/serien-liga-weg-vermerk.png" alt="Serien und Ligen: Liga-Weg Bronze, Silber, Gold mit dem Vermerk Aufstieg ohne Zahl im Stufennamen" width="560">
+
+<img src="../assets/serien/serien-team-liga-weg-vermerk.png" alt="Liga-Weg auf der Seite der Team-Liga mit denselben Vermerken" width="480">
 
 **Archivieren statt Löschen:** Spur und Saison lassen sich nur archivieren; **Archivierte zeigen** blendet sie ein,
 **Zurückholen** macht es rückgängig. Ein Klick auf die Saison öffnet ihre Seite mit Regeln, Version und Kalender.

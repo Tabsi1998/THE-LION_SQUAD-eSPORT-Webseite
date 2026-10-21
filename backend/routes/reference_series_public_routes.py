@@ -34,9 +34,9 @@ from services.visibility import user_can_see
 
 router = APIRouter(prefix="/api/reference-series", tags=["reference-series"])
 
-LINEAGE_FIELDS = ("title", "slug", "kind", "label", "organizer", "game_name", "external_url")
+LINEAGE_FIELDS = ("title", "slug", "kind", "label", "organizer", "game_name", "external_url", "tier_order")
 SERIES_FIELDS = ("season", "tier", "title", "season_slug", "status", "default_weekday", "default_time",
-                 "external_url", "official_table_url", "rules_version")
+                 "external_url", "official_table_url", "rules_version", "season_result")
 RULE_FIELDS = ("points_mode", "points_by_place", "bonuses", "dnf_points", "dns_points", "dsq_points", "count_mode",
                "count_n", "activity_points", "final_top_n", "tiebreakers")
 ROW_FIELDS = ("rank", "points", "computed_points", "official_points", "deviation", "activity_points", "tiebreak",
@@ -288,8 +288,9 @@ async def _running(user: dict | None, today: str) -> dict:
     return {"today": today, "items": items[:RUNNING_LIMIT]}
 
 
-LINEAGE_LIST_FIELDS = ("title", "slug", "kind", "label", "organizer", "game_name")
-PATH_SEASON_FIELDS = ("season", "tier", "title", "season_slug", "status")
+# Reihenfolge der Stufen der Spur und Ergebnis der Saison (#1898): Liga-Weg und Vitrine nutzen sie vor der Ableitung.
+LINEAGE_LIST_FIELDS = ("title", "slug", "kind", "label", "organizer", "game_name", "tier_order")
+PATH_SEASON_FIELDS = ("season", "tier", "title", "season_slug", "status", "season_result")
 
 
 def _natural(value) -> tuple:

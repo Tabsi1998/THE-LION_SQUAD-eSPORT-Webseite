@@ -89,6 +89,8 @@ export function formToRules(form) {
 export const emptyLineage = {
   title: "", kind: "racing", label: "", organizer: "", game_id: "", partner_ids: [], external_url: "", description: "",
   visibility: "public", slug: "", order_index: 0,
+  // #1898: eigene Reihenfolge der Stufen (höchste zuerst); null heißt Vorgabe aus der Zahl im Namen.
+  tier_order: null,
 };
 
 export function lineageToForm(lineage = {}) {
@@ -105,6 +107,7 @@ export function lineagePayload(form) {
     title: String(form.title || "").trim(), kind: form.kind, label: blank(form.label), organizer: blank(form.organizer),
     game_id: blank(form.game_id), partner_ids: form.partner_ids || [], external_url: blank(form.external_url),
     description: blank(form.description), visibility: form.visibility, order_index: Number(form.order_index) || 0,
+    tier_order: Array.isArray(form.tier_order) && form.tier_order.length ? form.tier_order : null,
     ...(String(form.slug || "").trim() ? { slug: String(form.slug).trim() } : {}),
   };
 }
@@ -125,6 +128,7 @@ export function seriesToForm(series = {}, rules = series.rules) {
     external_url: series.external_url || "",
     visibility: series.visibility || "public",
     description: series.description || "",
+    season_result: series.season_result || "",
     rules_note: "",
     rules: rulesToForm(rules || {}),
   };
@@ -144,6 +148,8 @@ export function seriesPayload(form, { isNew = false, archived = false } = {}) {
     external_url: blank(form.external_url),
     visibility: form.visibility,
     description: blank(form.description),
+    // #1898: Ergebnis der Saison - leer heißt: der Liga-Weg leitet es aus den Stufen ab.
+    season_result: form.season_result || null,
     rules: formToRules(form.rules),
   };
   // Eine archivierte Serie behält beim Bearbeiten ihren Stand; zurück holt sie „Zurückholen“.

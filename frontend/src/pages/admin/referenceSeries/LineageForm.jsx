@@ -1,10 +1,12 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { api, formatApiError } from "@/lib/api";
 import { AdminSheet } from "@/components/tls/AdminSheet";
 import { FormGrid } from "@/components/tls/AdminForm";
-import { SelectField, TextAreaField, TextField } from "@/components/tls/FormFields";
+import { FieldLabel, SelectField, TextAreaField, TextField } from "@/components/tls/FormFields";
 import { KIND_OPTIONS, VISIBILITY_OPTIONS, lineageToForm, lineagePayload } from "@/lib/referenceSeries";
 import { gameOptionLabel } from "@/lib/gameLabels";
+import { moveTier, tierOrderList } from "@/lib/seriesTiers";
+import { ArrowDown, ArrowUp } from "lucide-react";
 import { toast } from "sonner";
 
 // Spur (#1741): die Klammer über den Saisons, etwa eine Rennliga mit der Bezeichnung „F1“. Die Adresse entsteht aus dem
@@ -47,6 +49,37 @@ export function LineageForm({ lineage, games = [], onClose, onSaved }) {
         <TextField label="Reihenfolge" type="number" value={form.order_index} onChange={(v) => set("order_index", Number(v) || 0)} testId="lineage-order" />
       </FormGrid>
       <TextAreaField label="Beschreibung" value={form.description} onChange={(v) => set("description", v)} testId="lineage-description" />
+      <TierOrderField tiers={(lineage?.series || []).map((item) => item.tier)} value={form.tier_order} onChange={(v) => set("tier_order", v)} />
     </AdminSheet>
+  );
+}
+
+// Reihenfolge der Stufen (#1898): höchste zuerst. Vorgabe ist die Zahl im Namen („Liga 1“ vor „Liga 2“); wer etwas
+// verschiebt, legt die Reihenfolge der Spur fest, „Vorgabe“ nimmt sie zurück. Liga-Weg und Vitrine nutzen sie, wenn eine
+// Saison keinen eigenen Vermerk hat.
+function TierOrderField({ tiers, value, onChange }) {
+  const list = useMemo(() => tierOrderList(tiers, value), [tiers, value]);
+  const custom = Array.isArray(value) && value.length > 0;
+  const hint = list.length < 2
+    ? "Sobald die Saisons mindestens zwei Stufen haben, lässt sich hier ihre Reihenfolge festlegen."
+    : custom ? "Eigene Reihenfolge der Spur." : "Vorgabe aus der Zahl im Namen – verschieben legt eine eigene Reihenfolge fest.";
+  return (
+    <FieldLabel label="Reihenfolge der Stufen (höchste zuerst)" hint={hint}>
+      {list.length > 0 && (
+        <ol className="space-y-1" data-testid="lineage-tier-order">
+          {list.map((tier, index) => (
+            <li key={tier} className="flex items-center gap-2 border border-white/10 bg-[#0A0A0A] rounded-sm px-3 py-1.5 text-sm" data-testid={`lineage-tier-${index}`}>
+              <span className="w-5 text-white/40 tabular-nums">{index + 1}.</span>
+              <span className="flex-1 min-w-0 truncate">{tier}</span>
+              <button type="button" onClick={() => onChange(moveTier(list, index, -1))} disabled={index === 0} aria-label={`${tier} höher`} data-testid={`lineage-tier-${index}-up`} className="p-1 text-white/50 hover:text-[#29B6E8] disabled:opacity-30"><ArrowUp className="w-4 h-4" /></button>
+              <button type="button" onClick={() => onChange(moveTier(list, index, 1))} disabled={index === list.length - 1} aria-label={`${tier} tiefer`} data-testid={`lineage-tier-${index}-down`} className="p-1 text-white/50 hover:text-[#29B6E8] disabled:opacity-30"><ArrowDown className="w-4 h-4" /></button>
+            </li>
+          ))}
+        </ol>
+      )}
+      {custom && (
+        <button type="button" onClick={() => onChange(null)} data-testid="lineage-tier-reset" className="mt-2 text-xs uppercase tracking-wider font-bold text-[#29B6E8] hover:underline">Vorgabe aus den Namen</button>
+      )}
+    </FieldLabel>
   );
 }
