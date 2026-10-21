@@ -441,6 +441,19 @@ def test_a_substitute_entry_stays_as_read():
     assert other["rows"][0]["team"] == "Reverse Pole"
 
 
+def test_a_different_game_tag_stays_another_person_and_the_team_stays_as_read():
+    """Zusammenspiel mit #1961: „Name#BBB“ ist nicht „Name#AAA“ (Ähnlichkeit 0) - die Zeile bekommt keinen Teilnehmer,
+    sein Stammteam auch nicht. „Ersatzfahrer“ bleibt stehen, eine leere Team-Zelle bleibt leer und gelb."""
+    people = [*PEOPLE, {"id": "max", "name": "Max#AAA", "default_team": "Rasta Fahrer"}]
+    assert similarity("Max#BBB", "Max#AAA") == 0
+    out = build(reading(row("1", "7", "Anna Probe", "Rotor Racing"), row("2", "12", "Bert Bolzt", "Blaupfeil GP"),
+                        row("3", "", "Max#BBB", "Ersatzfahrer"), row("4", "", "Max#AAA", "")),
+                TEMPLATE, people, no_team_names=["Ersatzfahrer"])
+    other, own = out["rows"][2], out["rows"][3]
+    assert (other["participant_id"], other["team"]) == (None, "Ersatzfahrer")
+    assert (own["participant_id"], own["team"], "team" in own["uncertain"]) == ("max", None, True)
+
+
 def test_tables_without_times_are_no_result():
     """Eine Saisontabelle (Punkte statt Zeiten) oder der Kalender ist kein Rennergebnis; Platzhalter zählen nicht."""
     table = build(reading(row("1", "37", "Anna Probe", "Sonstige", "65"), row("2", "7", "Bert Bolzt", "Sonstige", "65"),

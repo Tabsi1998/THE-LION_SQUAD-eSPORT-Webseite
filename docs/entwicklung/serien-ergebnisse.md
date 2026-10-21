@@ -211,7 +211,9 @@ Mehrere Runden an einem Termin (etwa TFT-Lobbys R1–R5), gerechnet in `services
   `reference_series.adjustment_create|update|delete`, danach Neurechnen. Der Rechenkern zählt je Stand die Anpassungen,
   die schon gelten (mit Termin ab dessen Stand, sonst ab dem letzten gewerteten Termin an oder vor ihrem Tag), in
   `computed_points`; die Zeile trägt `adjustment_points` und `adjustments` (öffentlich Punkte, Grund, Tag, Termin).
-  Fahrer-Anpassungen ändern die Teamwertung nicht und umgekehrt; wer nur eine Anpassung hat, steht in der Tabelle.
+  Fahrer-Anpassungen ändern die Teamwertung je Rennen nicht (in der aktuellen Besetzung über die Saisonpunkte des
+  Fahrers), Team-Anpassungen die Fahrerwertung nie; wer nur eine Anpassung hat, steht in der Tabelle. Sonderboni
+  (#1961, `bonus_points`) und Anpassungen zählen je genau einmal und stehen getrennt an der Zeile.
 - **Teamwertung:** Eine Fahrt zählt für das Team der Zeile, ohne Team für `default_team` des Teilnehmers
   (`series_standings._ride_team`); ein Name aus `team_scoring.no_team_names` (Vorgabe `["Ersatzfahrer"]`, je Saison
   einstellbar, Vergleich ohne Groß/klein und Leerraum, `scoring_rules.is_no_team`) zählt für kein Team und bekommt keine
