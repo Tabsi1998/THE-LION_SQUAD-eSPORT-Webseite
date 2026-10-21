@@ -71,6 +71,16 @@ async def test_finished_external_seasons_count_once_per_season_reference(flow):
 
 
 @pytest.mark.asyncio
+async def test_two_references_of_one_season_count_once(flow):
+    """Prüfung 21.10.: eine Saison zählt einmal - auch wenn eine alte Referenz von Hand dazu verknüpft ist."""
+    user = await _seed(flow)
+    await flow.db.references.insert_one(_ref("saison-2026-hand", [
+        {"kind": "team", "team_name": "Probe Löwen", "member_profile_ids": ["profil-alpha"], "placement": 5}],
+        series_id="serie-2026"))
+    assert await _count(user["id"], "external_seasons") == 2
+
+
+@pytest.mark.asyncio
 async def test_without_club_profile_nothing_counts(flow):
     await _seed(flow)
     stranger = await flow.add_user(role="user", name="probe-gast")

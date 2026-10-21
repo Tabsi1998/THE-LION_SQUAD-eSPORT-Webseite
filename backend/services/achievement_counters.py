@@ -1626,6 +1626,7 @@ async def _external_podiums(ctx):
 
 @counter("external_seasons", "club")
 async def _external_seasons(ctx):
-    """Dauerbrenner: Referenzen einer Saison (``series_id``) mit eigenem Endplatz - eine abgebrochene Saison hat keinen."""
-    return len({ref["id"] for ref, entry in await _external_entries(ctx)
+    """Dauerbrenner: Saisons (``series_id``) mit eigenem Endplatz in einer ihrer Referenzen - jede Saison einmal, auch
+    wenn mehrere Referenzen zu ihr gehören; eine abgebrochene Saison hat keinen Endplatz."""
+    return len({ref["series_id"] for ref, entry in await _external_entries(ctx)
                 if ref.get("series_id") and _external_place(entry) >= 1})
