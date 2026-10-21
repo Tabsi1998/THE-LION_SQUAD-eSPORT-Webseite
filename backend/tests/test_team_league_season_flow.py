@@ -287,3 +287,43 @@ async def test_two_own_teams_on_the_same_matchday_each_get_card_record_and_appea
             for name, player in players.items()} == {
         "Gold Eins": (1, 1, "Lions Gold", 0), "Gold Zwei": (1, 1, "Lions Gold", 0),
         "Black Eins": (1, 1, "Lions Black", 0), "Black Zwei": (0, 1, "Lions Black", 1)}
+
+
+@pytest.mark.asyncio
+async def test_a_played_map_needs_its_result_an_unplayed_pick_or_decider_stays_empty(flow):
+    """Prüfung #1931, Punkt 3: eine gespielte Map ohne Ergebnis wird nicht still 0:0 - 422 mit Hinweis auf Spiel, Map
+    und Feld. Bann, Wahl und Decider dürfen ohne Ergebnis sein (ein Decider bei 2:0 wird nicht gespielt): sie bleiben
+    leer, zählen nicht für Maps und Runden und stehen nicht unter den gespielten Maps."""
+    _, lineage, series = await _setup(flow)
+    item = (await flow.post(f"{ADMIN}/series/{series['id']}/rounds", json={"code": "ST1", "day": "2026-06-10"})).json()
+    base = f"{ADMIN}/series/{series['id']}/rounds/{item['id']}/results"
+    played = [{"name": "Karte 1", "role": "picked", "by": "own", "home_score": 6, "away_score": 2},
+              {"name": "Karte 2", "role": "picked", "by": "opponent", "home_score": 6, "away_score": 4}]
+
+    missing = await flow.put(base, json={"matches": [
+        {"home": OWN, "away": "Probe Falken", "home_score": 3, "away_score": 0,
+         "maps": [*played, {"name": "Karte 3", "role": "played", "home_score": 6}]}],
+        "status": "published", "expected_version": 0})
+    assert missing.status_code == 422, missing.text
+    errors = missing.json()["detail"]["errors"]
+    assert [(error["code"], error["match"], error["map"], error["map_field"]) for error in errors] == [
+        ("map_score_missing", 0, 2, "away_score")]
+    assert errors[0]["message"] == "Spiel 1, Map 3: Das Ergebnis fehlt - eine gespielte Map braucht beide Stände."
+
+    saved = await flow.put(base, json={"matches": [
+        {"home": OWN, "away": "Probe Falken", "home_score": 2, "away_score": 0,
+         "maps": [{"name": "Karte 4", "role": "banned", "by": "own"}, *played,
+                  {"name": "Karte 3", "role": "decider"}]}],
+        "status": "published", "expected_version": 0})
+    assert saved.status_code == 200, saved.text
+    stored = await flow.db.reference_round_results.find_one({"round_id": item["id"]}, {"_id": 0})
+    assert stored["matches"][0]["maps"][-1] == {"name": "Karte 3", "role": "decider"}
+    assert not any(problem["code"] == "maps_differ" for problem in saved.json().get("warnings") or [])
+
+    flow.act_as(None)
+    league = (await flow.get(f"{PUBLIC}/{lineage['slug']}/{series['season_slug']}")).json()["team_league"]
+    match = league["matchdays"][0]["match"]
+    assert [entry["name"] for entry in match["maps"]] == ["Karte 1", "Karte 2"]
+    assert [entry["name"] for entry in match["bans"]] == ["Karte 4"]
+    record = league["record"][0]
+    assert (record["rounds_for"], record["rounds_against"]) == (12, 6)

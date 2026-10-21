@@ -256,7 +256,12 @@ def resolve(entry: dict, participants: list[dict], rules: dict) -> Resolution:
         maps = []
         for number_of_map, item in enumerate(raw.get("maps") or [], start=1):
             # Kennung, Rolle im Veto, wer und Aufstellung je Map (#1931) - nur, wenn angegeben; eine gesperrte Map hat
-            # weder Ergebnis noch Aufstellung.
+            # weder Ergebnis noch Aufstellung. Eine gespielte Map ohne Ergebnis wird nie still 0:0 (Prüfung #1931).
+            problem = team_league_sheet.map_problem(item)
+            if problem:
+                out.errors.append(_problem("map_score_missing" if problem[0] != "lineup" else "map_lineup_unplayed",
+                                           f"Spiel {index + 1}, Map {number_of_map}: {problem[1]}", match=index,
+                                           map=number_of_map - 1, map_field=problem[0]))
             refs = item.get("lineup") if team_league_sheet.is_played(item) else None
             map_lineup = _lineup_ids(out, refs, lookup, index, f"Spiel {index + 1}, Map {number_of_map}")
             maps.append(team_league_sheet.map_entry(item, map_lineup))
@@ -439,7 +444,7 @@ def _matches(resolution: Resolution, own_teams) -> list[dict]:
             text = f"Das eigene Team „{own.names[0]}“ spielt" if single else "Keines der eigenen Teams spielt"
             problems.append(_problem("own_team_missing", f"{text} in keinem der Spiele."))
     for index, match in enumerate(matches):
-        played = [item for item in match["maps"] if team_league_sheet.is_played(item)]  # ohne gesperrte (#1931)
+        played = [item for item in match["maps"] if team_league_sheet.is_played(item)]  # nur mit Ergebnis (#1931)
         if played:
             home = sum(1 for item in played if item["home_score"] > item["away_score"])
             away = sum(1 for item in played if item["away_score"] > item["home_score"])

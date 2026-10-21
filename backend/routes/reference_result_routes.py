@@ -52,7 +52,8 @@ Antwort::
                                                           is_club_member*]}} | null,
      final: {top_n, participant_ids, entered, left} | null, latest: {round_id, round_seq, scopes} | null}
 
-``Problem`` ist ``{code, message, rows: [Index der Zeile], match?, places?, scope?}``. ``match`` sagt, wie eine Zeile
+``Problem`` ist ``{code, message, rows: [Index der Zeile], match?, places?, scope?, map?, map_field?}`` (``map``:
+Index der Map im Spiel ``match``, ``map_field``: das Feld, Prüfung #1931). ``match`` sagt, wie eine Zeile
 gefunden wurde: ``id``, ``name``, ``name_untagged``, ``start_number`` oder ``new``. Neue Namen haben in der Vorschau
 die Kennung ``neu:<Schlüssel>``. ``standings`` ist der Zwischenstand nach diesem Termin, als wäre das Blatt
 veröffentlicht; ``rank_change`` vergleicht mit dem Termin davor. ``latest`` kommt nur, wenn danach schon Termine
@@ -173,8 +174,10 @@ class ResultFastestLap(ResultParticipantRef):
 
 class ResultMapEntry(BaseModel):
     """Eine Map im Veto (#1931): Name, später die Kennung aus der Map-Bibliothek (``map_id``, #1616), die Rolle
-    (``banned``, ``picked``, ``decider``, ``played`` - ohne Rolle gespielt), bei Bann und Wahl wer (``own``/``opponent``),
-    das Ergebnis (nicht bei Bann) und optional die Aufstellung dieser Map."""
+    (``banned``, ``picked``, ``decider``, ``played`` - ohne Rolle gespielt), bei Bann und Wahl wer
+    (``own``/``opponent``), das Ergebnis (nicht bei Bann) und optional die Aufstellung dieser Map. Eine gespielte Map
+    (``played``/ohne Rolle) braucht beide Stände, Wahl und Decider beide oder keinen - sonst 422 mit ``map`` und
+    ``map_field`` im Problem (Prüfung #1931)."""
     name: str = Field(min_length=1, max_length=80)
     map_id: Optional[str] = Field(default=None, max_length=80)
     role: Optional[Literal["banned", "picked", "decider", "played"]] = None

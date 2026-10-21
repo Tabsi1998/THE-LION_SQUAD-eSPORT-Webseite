@@ -74,9 +74,11 @@ def _match_view(match: dict, rules: dict) -> dict:
     outcome, points = match_points(score_for, score_against, rules)
     maps, bans = [], []
     for item in match.get("maps") or []:
-        if not is_played(item):
+        if item.get("role") == "banned":
             bans.append({"name": item.get("name"), "by": item.get("by"), "map_id": item.get("map_id")})
             continue
+        if not is_played(item):
+            continue  # gewählt oder Decider, aber nicht gespielt (ohne Ergebnis, Prüfung #1931)
         own, theirs = _number(item.get(side)), _number(item.get(other))
         entry = {"name": item.get("name"), "score_for": own, "score_against": theirs,
                  "outcome": match_points(own, theirs, rules)[0]}

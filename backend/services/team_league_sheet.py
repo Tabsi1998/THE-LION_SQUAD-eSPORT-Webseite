@@ -7,8 +7,12 @@ diese Angaben bleibt genau wie bisher:
   hier schon mitgespeichert wird, damit die Bibliothek ohne Umbau andocken kann. Die **Rolle** im Veto: ``banned``
   (gesperrt, ohne Ergebnis), ``picked`` (gewählt), ``decider`` (die übrig gebliebene) oder ``played`` (gespielt, ohne
   Angabe zur Wahl - so gilt jede Map ohne Rolle). ``by`` sagt bei Bann und Wahl, wer: ``own`` (wir) oder ``opponent``.
-  Gespielte Maps tragen das Ergebnis (``home_score``/``away_score``) und optional eine eigene Aufstellung (``lineup``).
   Die Reihenfolge der Liste ist die des Vetos.
+- **Ergebnis einer Map** (Prüfung #1931): gespielt ist eine Map mit Ergebnis (``home_score``/``away_score``, beide
+  Stände) - nur sie zählt für Maps und Runden, nur sie trägt eine eigene Aufstellung (``lineup``). Eine gespielte Map
+  (``played`` oder ohne Rolle) braucht das Ergebnis, sonst lehnt die Prüfung das Blatt ab (``map_problem``); Wahl und
+  Decider dürfen ohne Ergebnis sein (ein Decider bei 2:0 wird nicht gespielt) und bleiben dann leer - nie still 0:0.
+  Eine gesperrte Map hat nie ein Ergebnis.
 - **Aufstellung des Spiels:** die Vereinigung aus der Aufstellung des Spiels und denen der Maps - wer eine Map gespielt
   hat, hat das Spiel gespielt.
 - **Termin des Spiels:** ``club_day`` (Wiener Tag) und ``time`` („HH:MM“ Wiener Zeit), mit beidem dazu ``starts_at`` in
@@ -38,29 +42,55 @@ def _score(value):
     return int(number) if math.isfinite(number) and number.is_integer() else number
 
 
+def _given(value) -> bool:
+    return value is not None and str(value).strip() != ""
+
+
 def union(*lists) -> list[str]:
     """Kennungen aus mehreren Listen, jede einmal, in der Reihenfolge ihres ersten Auftretens."""
     return list(dict.fromkeys(pid for items in lists for pid in items or [] if pid))
 
 
+def _role(item: dict) -> str | None:
+    return item.get("role") if item.get("role") in ROLES else None
+
+
 def is_played(item: dict) -> bool:
-    """Gespielt ist jede Map außer einer gesperrten - auch eine ohne Rolle (so sind ältere Blätter gespeichert)."""
-    return item.get("role") != "banned"
+    """Gespielt ist eine Map mit Ergebnis (beide Stände), die nicht gesperrt ist. Ältere Blätter haben bei jeder Map
+    das Ergebnis - für sie gilt jede Map ohne Rolle als gespielt wie bisher."""
+    return (_role(item) != "banned" and _given(item.get("home_score")) and _given(item.get("away_score")))
+
+
+def map_problem(raw: dict) -> tuple[str, str] | None:
+    """Was einer Map fehlt (Prüfung #1931): ``(Feld, Meldung)`` oder ``None``. Eine gespielte Map (``played`` oder
+    ohne Rolle) braucht beide Stände; Wahl und Decider entweder beide oder keinen; eine Aufstellung nur mit Ergebnis.
+    Eine gesperrte Map braucht nichts - ihr Ergebnis wird nicht gespeichert."""
+    role = _role(raw)
+    if role == "banned":
+        return None
+    missing = [side for side in ("home_score", "away_score") if not _given(raw.get(side))]
+    if role in (None, "played") and missing:
+        return missing[0], "Das Ergebnis fehlt - eine gespielte Map braucht beide Stände."
+    if len(missing) == 1:
+        return missing[0], "Beim Ergebnis fehlt ein Stand - beide eintragen oder beide leer lassen."
+    if missing and raw.get("lineup"):
+        return "lineup", "Eine Aufstellung je Map braucht das Ergebnis der Map."
+    return None
 
 
 def map_entry(raw: dict, lineup: list[str] | None) -> dict:
-    """Eine Map des Blatts: Name, Ergebnis (nicht bei Bann) und - nur wenn angegeben - Kennung, Rolle, wer und
-    Aufstellung."""
+    """Eine Map des Blatts: Name und - nur wenn angegeben - Kennung, Rolle, wer, Ergebnis (nie bei Bann, nie als
+    Ersatz 0:0) und Aufstellung (nur mit Ergebnis)."""
     out: dict = {"name": _clean(raw.get("name"))[:80]}
     map_id = _clean(raw.get("map_id"))[:MAX_MAP_ID]
     if map_id:
         out["map_id"] = map_id
-    role = raw.get("role") if raw.get("role") in ROLES else None
+    role = _role(raw)
     if role:
         out["role"] = role
     if role in ("banned", "picked") and raw.get("by") in SIDES:
         out["by"] = raw["by"]
-    if role != "banned":
+    if is_played(raw):
         out["home_score"] = _score(raw.get("home_score"))
         out["away_score"] = _score(raw.get("away_score"))
         if lineup:

@@ -112,6 +112,25 @@ test("Maps im Veto (Rolle, wer, Kennung, Aufstellung je Map) gehen in den Vertra
   expect(back.matches[0].maps[1]).toMatchObject({ map_id: "map-nord", role: "picked", by: "own", lineup: [{ participant_id: "p-anna", name: "Anna" }] });
 });
 
+test("Map ohne Ergebnis (Prüfung #1931): gespielt braucht beide Stände, Wahl und Decider bleiben leer statt 0:0", () => {
+  const match = { ...emptyMatch({ home: "Probe Löwen", away: "Probe Falken" }), home_score: "2", away_score: "0" };
+  const played = emptyMap({ name: "Karte West" });
+  const half = emptyMap({ name: "Karte Süd", role: "picked", by: "own", home_score: "6" });
+  const decider = emptyMap({ name: "Karte Nord", role: "decider" });
+  const withLineup = emptyMap({ name: "Karte Ost", role: "picked", by: "opponent", lineup: [{ participant_id: "p-anna", name: "Anna" }] });
+  const errors = fieldErrors({ rows: [], matches: [{ ...match, perMap: true, maps: [played, half, decider, withLineup] }] });
+  expect(errors[played.key]).toEqual({ home_score: "Stand fehlt.", away_score: "Stand fehlt." });
+  expect(errors[half.key]).toEqual({ away_score: "Beide Stände oder keiner." });
+  expect(errors[decider.key]).toBeUndefined();
+  expect(errors[withLineup.key]).toEqual({ lineup: "Aufstellung je Map nur mit dem Ergebnis der Map." });
+
+  const { payload } = formToPayload({ rows: [], matches: [{ ...match, maps: [
+    emptyMap({ name: "Karte Ost", role: "picked", by: "own", home_score: "6", away_score: "2" }),
+    emptyMap({ name: "Karte Süd", role: "picked", by: "opponent", home_score: "6", away_score: "3" }), decider,
+  ] }], table: [], note: "" });
+  expect(payload.matches[0].maps.at(-1)).toEqual({ name: "Karte Nord", role: "decider" });
+});
+
 test("Aufstellung je Map: die Person kommt in die Map und bleibt im Spiel", () => {
   const match = { ...emptyMatch({ home: "Probe Löwen", away: "Probe Falken" }), maps: [{ ...emptyMap(), name: "Karte Nord" }] };
   const next = setMapLineup(match, match.maps[0].key, PEOPLE[0]);

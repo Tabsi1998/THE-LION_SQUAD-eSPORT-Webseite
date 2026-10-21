@@ -188,6 +188,33 @@ def test_team_league_lineup_maps_own_team_and_official_table():
                                      "points": 3}
 
 
+def test_a_map_result_is_never_filled_in_as_zero_to_zero():
+    """Prüfung #1931, Punkt 3: gespielt (oder ohne Rolle) braucht beide Stände; Wahl und Decider beide oder keinen;
+    eine Aufstellung je Map nur mit Ergebnis; ein Bann nie mit Ergebnis."""
+    out = resolve({"matches": [{"home": "Probe Löwen", "away": "Probe Gegner", "home_score": 1, "away_score": 0,
+                                "maps": [
+                                    {"name": "Map A", "role": "banned", "by": "own", "home_score": 3, "away_score": 1},
+                                    {"name": "Map B", "role": "picked", "by": "own", "home_score": 6, "away_score": 2},
+                                    {"name": "Map C", "role": "picked", "by": "opponent"},
+                                    {"name": "Map D", "role": "decider"},
+                                    {"name": "Map E"},
+                                    {"name": "Map F", "role": "decider", "away_score": 4},
+                                    {"name": "Map G", "role": "picked", "lineup": [{"participant_id": "p-anna"}]},
+                                ]}]}, PEOPLE, SCHEME)
+    assert [(error["code"], error["map"], error["map_field"], error["message"]) for error in out.errors] == [
+        ("map_score_missing", 4, "home_score",
+         "Spiel 1, Map 5: Das Ergebnis fehlt - eine gespielte Map braucht beide Stände."),
+        ("map_score_missing", 5, "home_score",
+         "Spiel 1, Map 6: Beim Ergebnis fehlt ein Stand - beide eintragen oder beide leer lassen."),
+        ("map_lineup_unplayed", 6, "lineup", "Spiel 1, Map 7: Eine Aufstellung je Map braucht das Ergebnis der Map."),
+    ]
+    maps = out.matches[0]["maps"]
+    assert maps[0] == {"name": "Map A", "role": "banned", "by": "own"}
+    assert maps[2] == {"name": "Map C", "role": "picked", "by": "opponent"}
+    assert maps[3] == {"name": "Map D", "role": "decider"}
+    assert out.matches[0]["lineup"] == []
+
+
 def test_lineup_errors_point_to_the_match():
     out = resolve({"matches": [{"home": "A", "away": "B", "home_score": 0, "away_score": 0,
                                 "lineup": [{"participant_id": "fremd"}]}]}, PEOPLE, SCHEME)

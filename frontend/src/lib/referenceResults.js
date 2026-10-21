@@ -181,10 +181,15 @@ export function fieldErrors(form) {
       const named = text(item.name).trim();
       const scored = text(item.home_score).trim() || text(item.away_score).trim();
       if (!named && scored) add(item.key, "name", "Name der Map fehlt.");
+      // Prüfung #1931: gespielt (ohne Rolle) braucht beide Stände; Wahl und Decider beide oder keinen (ein Decider bei
+      // 2:0 wird nicht gespielt) - nie still 0:0. Eine Aufstellung je Map nur mit Ergebnis (wie im Server).
+      const vetoed = ["picked", "decider"].includes(item.role);
+      const optional = vetoed && !scored;
       for (const side of ["home_score", "away_score"]) {
-        if (named && !text(item[side]).trim()) add(item.key, side, "Stand fehlt.");
+        if (named && !optional && !text(item[side]).trim()) add(item.key, side, vetoed ? "Beide Stände oder keiner." : "Stand fehlt.");
         else add(item.key, side, checkNumber(item[side], { min: 0, max: LIMITS.score, message: "Stand als Zahl ab 0." }));
       }
+      if (named && optional && match.perMap && (item.lineup || []).some(filled)) add(item.key, "lineup", "Aufstellung je Map nur mit dem Ergebnis der Map.");
     }
   }
   return out;
@@ -287,12 +292,15 @@ export function formToPayload(form) {
             ...(item.by && ["banned", "picked"].includes(item.role) ? { by: item.by } : {}),
           };
           if (isBanned(item)) return head;
+          // Ohne Ergebnis (Wahl oder Decider, nicht gespielt) bleibt die Map leer - nie still 0:0 (Prüfung #1931).
+          const scores = {};
+          for (const side of ["home_score", "away_score"]) {
+            if (text(item[side]).trim()) scores[side] = number(item[side]) || 0;
+          }
+          if (!Object.keys(scores).length) return head;
           // Aufstellung je Map nur mit dem Schalter „je Map“ - ausgeschaltet zählt die des Spiels.
           const lineup = match.perMap ? (item.lineup || []).filter(filled).map(reference) : [];
-          return {
-            ...head, home_score: number(item.home_score) || 0, away_score: number(item.away_score) || 0,
-            ...(lineup.length ? { lineup } : {}),
-          };
+          return { ...head, ...scores, ...(lineup.length ? { lineup } : {}) };
         }),
         lineup: match.lineup.filter(filled).map(reference),
       };
