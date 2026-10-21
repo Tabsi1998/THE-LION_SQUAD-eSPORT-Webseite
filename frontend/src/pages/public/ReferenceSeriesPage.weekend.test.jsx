@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 
 // Rennwochenende (#1930) auf der Seite einer Rennliga: eine Runde mit Lauf-Chips im Kalender, ein Kopf je Runde über
@@ -124,4 +124,30 @@ test("Fahrer-Detail: Poles, Ø Start und Quali-Duell gegen den Teamkollegen", as
   expect(within(detail).getByTestId("racing-driver-stats")).toHaveTextContent("1 Pole");
   expect(within(detail).getByTestId("racing-driver-stats")).toHaveTextContent("Ø Start 4,5");
   expect(within(detail).getByTestId("racing-driver-stats")).toHaveTextContent("Quali-Duell 1:0 gegen Probe Lion Zwei");
+});
+
+function pointsOf(table) {
+  return within(table).getAllByTestId("series-row").map((row) => {
+    const cells = row.querySelectorAll("td");
+    const name = within(row).getByRole("rowheader").querySelector(".tls-racing-name, .tls-standing-name");
+    return [name.textContent, cells[cells.length - 2].textContent];
+  });
+}
+
+test("Wertung je Lauf: Gesamt · Rennen · Sprint - die eigene Sprint-Tabelle mit ihren Summen", async () => {
+  renderPage();
+  const tabs = await screen.findByTestId("racing-table-tabs");
+  expect(within(tabs).getAllByRole("button").map((button) => button.textContent)).toEqual(["Gesamt", "Rennen", "Sprint"]);
+  expect(screen.getByTestId("racing-table-all")).toHaveAttribute("aria-pressed", "true");
+  fireEvent.click(screen.getByTestId("racing-table-sprint"));
+  expect(screen.getByTestId("racing-table-sprint")).toHaveAttribute("aria-pressed", "true");
+  const drivers = screen.getByTestId("racing-drivers");
+  const table = within(drivers).getByTestId("series-table");
+  expect(pointsOf(table)).toEqual([["Probe Lion Eins", "12"], ["Probe Lion Zwei", "9"], ["Fremd Eins", "7"]]);
+  // Je Runde ist es ein Lauf - kein Kopf über mehreren Spalten.
+  expect(within(table).queryAllByTestId("series-weekend-head")).toHaveLength(0);
+  fireEvent.click(screen.getByTestId("racing-table-race"));
+  expect(pointsOf(within(drivers).getByTestId("series-table"))).toEqual([["Probe Lion Eins", "25"], ["Probe Lion Zwei", "18"], ["Fremd Eins", "15"]]);
+  fireEvent.click(screen.getByTestId("racing-table-all"));
+  expect(pointsOf(within(drivers).getByTestId("series-table"))).toEqual([["Probe Lion Eins", "37"], ["Probe Lion Zwei", "27"], ["Fremd Eins", "22"]]);
 });

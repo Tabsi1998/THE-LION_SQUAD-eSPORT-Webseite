@@ -3,7 +3,7 @@ import { api, formatApiError } from "@/lib/api";
 import { AdminSheet } from "@/components/tls/AdminSheet";
 import { FormGrid } from "@/components/tls/AdminForm";
 import { SelectField, TextAreaField, TextField } from "@/components/tls/FormFields";
-import { PUBLISH_OPTIONS, STATUS_OPTIONS, VISIBILITY_OPTIONS, WEEKDAY_OPTIONS, resultImageOptions, rulesToForm, seriesPayload, seriesToForm } from "@/lib/referenceSeries";
+import { PUBLISH_OPTIONS, STATUS_OPTIONS, VISIBILITY_OPTIONS, WEEKDAY_OPTIONS, parsePointsList, resultImageOptions, rulesToForm, seriesPayload, seriesToForm } from "@/lib/referenceSeries";
 import { SEASON_RESULT_OPTIONS } from "@/lib/seriesTiers";
 import { RulesFields } from "./RulesFields";
 import { OwnTeamsField } from "./OwnTeamsField";
@@ -79,7 +79,7 @@ export function SeriesForm({ series, lineage, schemes = [], defaultRules = {}, o
       <OwnTeamsField teams={form.own_teams} onChange={(teams) => set("own_teams", teams)} />
       <TextAreaField label="Beschreibung" value={form.description} onChange={(v) => set("description", v)} testId="series-description" />
       <RulesFields rules={form.rules} kind={lineage.kind} onChange={(rules) => set("rules", rules)} />
-      {racing && <WeekendFormatsField formats={weekend} onChange={setWeekend} />}
+      {racing && <WeekendFormatsField formats={weekend} onChange={setWeekend} racePoints={form.rules.points_mode === "scheme" ? parsePointsList(form.rules.points_by_place) : null} />}
       {!isNew && (
         <TextField label="Hinweis zur Regeländerung" value={form.rules_note} onChange={(v) => set("rules_note", v)} testId="series-rules-note"
           hint="Nur wenn sich eine Regel ändert: steht bei der Saison und im Protokoll; alle Stände werden neu gerechnet." />

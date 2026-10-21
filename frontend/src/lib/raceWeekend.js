@@ -6,7 +6,7 @@ import { roundLabel } from "@/lib/referenceCalendar";
 import { parsePointsList } from "@/lib/referenceSeries";
 
 /** Auswahl beim Lauf eines Termins - freier Text bis 30 Zeichen geht auch. */
-export const SESSION_CHOICES = ["Qualifying", "Sprint", "Rennen", "Hauptrennen", "Lauf 1", "Lauf 2"];
+export const SESSION_CHOICES = ["Qualifying", "Shootout", "Sprint", "Rennen", "Hauptrennen", "Lauf 1", "Lauf 2"];
 export const MAX_SESSION = 30;
 
 /** Quelle des Startplatzes je Lauf (Vorgabe der Saison). */
@@ -16,8 +16,11 @@ export const GRID_OPTIONS = [
   ["reverse_standings", "Umgekehrte WM-Reihenfolge"],
 ];
 
-/** Punkte je Lauf: wie die Saison, keine oder ein eigenes Schema. */
-export const SESSION_POINTS_OPTIONS = [["series", "Wie die Saison"], ["none", "Keine Punkte"], ["own", "Eigenes Schema"]];
+/** Punkte je Lauf: wie das Rennen (das Schema der Saison), keine oder eine eigene Liste. */
+export const SESSION_POINTS_OPTIONS = [["series", "Wie Rennen"], ["none", "Keine Punkte"], ["own", "Eigene Liste"]];
+
+/** Punkte trotz DNF je Lauf: wie die Saison, ja (nach Platz) oder nein (0 Punkte). */
+export const DNF_OPTIONS = [["series", "Wie die Saison"], ["place", "Ja – nach Platz"], ["none", "Nein – 0 Punkte"]];
 
 function squash(value) {
   return String(value ?? "").split(/\s+/).join("").toLowerCase().replaceAll("-", "");
@@ -43,7 +46,7 @@ export function chipLabel(round) {
   return label.replace(/qualifying/i, "Quali");
 }
 
-const ABBREVIATIONS = { qualifying: "Q", quali: "Q", sprint: "S", rennen: "R", race: "R", hauptrennen: "HR", feature: "HR" };
+const ABBREVIATIONS = { qualifying: "Q", quali: "Q", shootout: "SO", sprint: "S", rennen: "R", race: "R", hauptrennen: "HR", feature: "HR" };
 
 /** Kurzform für schmale Spalten: Q, S, R, HR, L1 … - sonst die Anfangsbuchstaben (höchstens drei). */
 export function sessionAbbr(round) {
@@ -169,8 +172,18 @@ export function emptySession(values = {}) {
   const kind = sessionKind(values.label);
   return {
     label: "", offset: "0", counts: kind !== "qualifying", points_mode: kind === "qualifying" ? "none" : "series",
-    points: "", grid: kind === "race" ? "qualifying" : "manual", ...values, key: values.key || nextKey("lauf"),
+    points: "", dnf: "series", fastest_lap: "", grid: kind === "race" ? "qualifying" : "manual", ...values,
+    key: values.key || nextKey("lauf"),
   };
+}
+
+/** Vorschau eines Schemas: „P1 35 · P2 30 · P3 26 · … · P20 1“ - leer heißt „keine Punkte“. */
+export function pointsPreview(list, { head = 5 } = {}) {
+  const points = (list || []).map((value) => String(value).replace(".", ","));
+  if (!points.length || points.every((value) => Number(value.replace(",", ".")) === 0)) return "Keine Punkte";
+  const shown = points.slice(0, head).map((value, index) => `P${index + 1} ${value}`);
+  if (points.length > head) shown.push("…", `P${points.length} ${points[points.length - 1]}`);
+  return shown.join(" · ");
 }
 
 /** Ein Abschnitt „ab Runde X“ im Formular - neu mit Qualifying und Rennen (+30 Minuten). */
@@ -193,6 +206,8 @@ export function weekendToForm(weekend) {
       counts: session.counts !== false,
       points_mode: Array.isArray(session.points) ? "own" : session.points || "series",
       points: Array.isArray(session.points) ? session.points.join(", ") : "",
+      dnf: session.dnf || "series",
+      fastest_lap: session.fastest_lap === null || session.fastest_lap === undefined ? "" : String(session.fastest_lap),
       grid: session.grid || "manual",
     })),
   }));
@@ -211,10 +226,60 @@ export function weekendPayload(formats) {
         counts: Boolean(session.counts),
         // Wie „Punkte je Platz“ der Saison: „12, 9, 7“ oder „12-9-7“.
         points: session.points_mode === "own" ? parsePointsList(session.points) : session.points_mode,
+        dnf: session.dnf || "series",
+        // Leer heißt wie die Saison.
+        fastest_lap: String(session.fastest_lap ?? "").trim() === "" ? null : Number(String(session.fastest_lap).replace(",", ".")) || 0,
         grid: session.grid,
       })),
     })),
   };
+}
+
+// ---------------------------------------------------------------- Tabellen je Lauf
+
+const TABLE_KINDS = [["race", "Rennen"], ["sprint", "Sprint"], ["qualifying", "Quali"]];
+
+function countback(results) {
+  const places = results.map((item) => Number(item.place)).filter((place) => Number.isInteger(place) && place > 0);
+  const top = Math.max(0, ...places);
+  return Array.from({ length: top }, (_, index) => places.filter((place) => place === index + 1).length);
+}
+
+function ahead(a, b) {
+  if (a.points !== b.points) return b.points - a.points;
+  for (let index = 0; index < Math.max(a._countback.length, b._countback.length); index += 1) {
+    const diff = (b._countback[index] || 0) - (a._countback[index] || 0);
+    if (diff) return diff;
+  }
+  return 0;
+}
+
+/** Wertung je Lauf (#1930, „eigene Sprint-Tabelle“): je Art mit zählenden Läufen (Rennen, Sprint, Quali) die Punkte
+ * aus dem gespeicherten Stand, nur aus diesen Läufen - Rang nach Punkten, dann mehr Siege, zweite Plätze … in diesen
+ * Läufen; sonst geteilter Platz. Erst ab zwei Arten - sonst ist die Gesamtwertung schon die Tabelle. */
+export function sessionTables(rows, rounds) {
+  const counting = (rounds || []).filter((round) => round.kind !== "final" && round.counts !== false);
+  const present = TABLE_KINDS.filter(([kind]) => counting.some((round) => roundKind(round) === kind));
+  if (present.length < 2) return [];
+  return present.map(([kind, label]) => {
+    const own = counting.filter((round) => roundKind(round) === kind);
+    const ids = new Set(own.map((round) => round.id));
+    const list = (rows || []).map((row) => {
+      const results = (row.results || []).filter((item) => ids.has(item.round_id));
+      const points = results.reduce((sum, item) => sum + (Number(item.points) || 0), 0);
+      return { ...row, results: results.map((item) => ({ ...item, dropped: false })), points, computed_points: points,
+        official_points: null, deviation: null, tiebreak: null, previous_rank: null, _countback: countback(results), _has: results.length > 0 };
+    }).filter((row) => row._has);
+    list.sort((a, b) => ahead(a, b) || String(a.name || "").localeCompare(String(b.name || ""), "de"));
+    list.forEach((row, index) => {
+      row.rank = index > 0 && ahead(list[index - 1], row) === 0 ? list[index - 1].rank : index + 1;
+    });
+    for (const row of list) {
+      delete row._countback;
+      delete row._has;
+    }
+    return { kind, label, rounds: own, rows: list };
+  });
 }
 
 // ---------------------------------------------------------------- Fahrer-Detail

@@ -1,18 +1,20 @@
 import { FormSection } from "@/components/tls/AdminForm";
 import { CheckField, SelectField, TextField } from "@/components/tls/FormFields";
 import {
-  GRID_OPTIONS, MAX_SESSION, SESSION_CHOICES, SESSION_POINTS_OPTIONS, emptyFormat, emptySession, sessionKind,
+  DNF_OPTIONS, GRID_OPTIONS, MAX_SESSION, SESSION_CHOICES, SESSION_POINTS_OPTIONS, emptyFormat, emptySession, pointsPreview, sessionKind,
 } from "@/lib/raceWeekend";
+import { parsePointsList } from "@/lib/referenceSeries";
 import { Plus, X } from "lucide-react";
 
 // Läufe je Runde (#1930): der Ablauf eines Rennwochenendes als Vorgabe der Saison - je Lauf Name, Uhrzeit-Versatz,
-// Wertung, Punkte (wie die Saison, keine oder ein eigenes Schema) und woher der Startplatz kommt. Ändert sich der Ablauf
+// Wertung, Punkte (wie das Rennen, keine oder eine eigene Liste - mit Vorschau „P1 35 · P2 30 …“), Punkte trotz DNF,
+// Bonus für die schnellste Runde und woher der Startplatz kommt. Ändert sich der Ablauf
 // mitten in der Saison, gilt ein weiterer Abschnitt „ab Runde X“. Die Terminliste legt je Zeile alle Läufe an; bestehende
 // Termine ändert die Vorgabe nicht, Punkte und Startplätze rechnet der Server aber neu.
 
 const ICON_BUTTON = "p-2 rounded-sm text-white/45 hover:text-white hover:bg-white/5 transition active:scale-[0.97]";
 
-function SessionRow({ session, index, onChange, onRemove, removable }) {
+function SessionRow({ session, index, onChange, onRemove, removable, racePoints }) {
   const setLabel = (label) => {
     // Ein Qualifying zählt in der Regel nicht und bringt keine Punkte - die Felder folgen der Wahl, bleiben aber änderbar.
     const kind = sessionKind(label);
@@ -20,6 +22,12 @@ function SessionRow({ session, index, onChange, onRemove, removable }) {
     if (kind === was) return onChange({ label });
     return onChange({ label, counts: kind !== "qualifying", points_mode: kind === "qualifying" ? "none" : "series", grid: kind === "race" ? "qualifying" : "manual" });
   };
+  // Ein Qualifying mit eigener Liste (etwa P1 = 2) zählt, ohne Punkte nicht - der Haken folgt, bleibt aber änderbar.
+  const setPoints = (points_mode) => {
+    if (sessionKind(session.label) !== "qualifying") return onChange({ points_mode });
+    return onChange({ points_mode, counts: points_mode !== "none" });
+  };
+  const list = session.points_mode === "own" ? parsePointsList(session.points) : session.points_mode === "series" ? racePoints || [] : [];
   return (
     <li className="space-y-2 border-t border-white/5 pt-3 first:border-t-0 first:pt-0" data-testid="weekend-session">
       {/* Oben Name, Versatz und Entfernen; darunter Punkte und Startplatz in voller Breite - die Auswahl bleibt lesbar. */}
@@ -32,22 +40,29 @@ function SessionRow({ session, index, onChange, onRemove, removable }) {
       </div>
       <div className="grid gap-2 sm:grid-cols-2">
         <div className="space-y-2 min-w-0">
-          <SelectField label="Punkte" value={session.points_mode} onChange={(points_mode) => onChange({ points_mode })} options={SESSION_POINTS_OPTIONS} testId="weekend-session-points-mode" />
+          <SelectField label="Punkte" value={session.points_mode} onChange={setPoints} options={SESSION_POINTS_OPTIONS} testId="weekend-session-points-mode" />
           {session.points_mode === "own" && (
             <TextField label="Punkte je Platz" value={session.points} onChange={(points) => onChange({ points })} placeholder="12, 9, 7, 6, 5" testId="weekend-session-points" />
           )}
+          <p className="text-xs text-white/55 tabular-nums" data-testid="weekend-session-preview">
+            {session.points_mode === "series" && racePoints === null ? "Wie das Rennen (laut Veranstalter)" : pointsPreview(list)}
+          </p>
         </div>
         <div className="space-y-2 min-w-0">
           <SelectField label="Startplatz" value={session.grid} onChange={(grid) => onChange({ grid })} options={GRID_OPTIONS} testId="weekend-session-grid" />
           <CheckField label="Zählt zur Wertung" checked={session.counts} onChange={(counts) => onChange({ counts })} testId="weekend-session-counts" />
         </div>
+        <SelectField label="Punkte trotz DNF" value={session.dnf} onChange={(dnf) => onChange({ dnf })} options={DNF_OPTIONS} testId="weekend-session-dnf" />
+        <TextField label="Schnellste Runde: Bonus" type="number" min="0" step="any" value={session.fastest_lap} onChange={(fastest_lap) => onChange({ fastest_lap })}
+          placeholder="wie die Saison" hint="Leer: wie die Saison." testId="weekend-session-fastest-lap" />
       </div>
     </li>
   );
 }
 
-/** `formats`: Abschnitte aus `weekendToForm`; `onChange` bekommt die neue Liste. Leer heißt: keine Vorgabe. */
-export function WeekendFormatsField({ formats, onChange }) {
+/** `formats`: Abschnitte aus `weekendToForm`; `onChange` bekommt die neue Liste. Leer heißt: keine Vorgabe. `racePoints`:
+ * das Schema der Saison (für „Wie Rennen“ in der Vorschau). */
+export function WeekendFormatsField({ formats, onChange, racePoints = [] }) {
   const update = (key, values) => onChange(formats.map((format) => (format.key === key ? { ...format, ...values } : format)));
   const updateSession = (format, sessionKey, values) => update(format.key, {
     sessions: format.sessions.map((session) => (session.key === sessionKey ? { ...session, ...values } : session)),
@@ -87,7 +102,7 @@ export function WeekendFormatsField({ formats, onChange }) {
                 </div>
                 <ol className="space-y-2">
                   {format.sessions.map((session, position) => (
-                    <SessionRow key={session.key} session={session} index={position} removable={format.sessions.length > 1}
+                    <SessionRow key={session.key} session={session} index={position} removable={format.sessions.length > 1} racePoints={racePoints}
                       onChange={(values) => updateSession(format, session.key, values)}
                       onRemove={() => update(format.key, { sessions: format.sessions.filter((item) => item.key !== session.key) })} />
                   ))}

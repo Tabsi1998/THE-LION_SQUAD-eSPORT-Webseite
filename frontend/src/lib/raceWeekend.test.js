@@ -1,17 +1,19 @@
 import {
-  averageGrid, averageGridLabel, chipLabel, groupWeekends, hasSessions, nextSessionLabel, poleCount, qualiDuel, sessionAbbr,
-  sessionKind, sessionLabel, sessionPointsLines, weekendPayload, weekendState, weekendToForm,
+  averageGrid, averageGridLabel, chipLabel, groupWeekends, hasSessions, nextSessionLabel, poleCount, pointsPreview, qualiDuel,
+  sessionAbbr, sessionKind, sessionLabel, sessionPointsLines, sessionTables, weekendPayload, weekendState, weekendToForm,
 } from "./raceWeekend";
+import LEAGUES from "./raceWeekendLeagues.json";
 
+const lauf = (values) => ({ dnf: "series", fastest_lap: null, ...values });
 const F2 = { formats: [
   { from_round: 1, sessions: [
-    { label: "Qualifying", offset: 0, counts: false, points: "none", grid: "manual" },
-    { label: "Sprint", offset: 30, counts: true, points: [12, 9, 7], grid: "manual" },
-    { label: "Hauptrennen", offset: 75, counts: true, points: "series", grid: "qualifying" },
+    lauf({ label: "Qualifying", offset: 0, counts: true, points: [2], grid: "manual" }),
+    lauf({ label: "Sprint", offset: 30, counts: true, points: [12, 9, 7], grid: "manual", dnf: "place", fastest_lap: 0 }),
+    lauf({ label: "Hauptrennen", offset: 75, counts: true, points: "series", grid: "qualifying", fastest_lap: 1 }),
   ] },
   { from_round: 5, sessions: [
-    { label: "Sprint", offset: 0, counts: true, points: [12, 9, 7], grid: "reverse_standings" },
-    { label: "Hauptrennen", offset: 45, counts: true, points: "none", grid: "reverse_standings" },
+    lauf({ label: "Sprint", offset: 0, counts: true, points: [12, 9, 7], grid: "reverse_standings" }),
+    lauf({ label: "Hauptrennen", offset: 45, counts: true, points: "none", grid: "reverse_standings", dnf: "none" }),
   ] },
 ] };
 
@@ -21,8 +23,55 @@ test("Läufe je Runde: Formular hin und zurück ohne Verlust, leer heißt keine 
   expect(weekendToForm(null)).toEqual([]);
 });
 
+test("Vorschau eines Schemas: P1 35 · P2 30 … und keine Punkte", () => {
+  expect(pointsPreview([35, 30, 26, 23, 20, 17, 15, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1]))
+    .toBe("P1 35 · P2 30 · P3 26 · P4 23 · P5 20 · … · P20 1");
+  expect(pointsPreview([2])).toBe("P1 2");
+  expect(pointsPreview([])).toBe("Keine Punkte");
+  expect(pointsPreview([0, 0])).toBe("Keine Punkte");
+});
+
+// Die beiden Ligen aus der Veranstalter-App (raceWeekendLeagues.json - der Server rechnet dieselben Fälle nach): aus den
+// Punkten je Lauf werden die Gesamtsumme und die Tabellen je Lauf, etwa die eigene Sprint-Tabelle.
+describe.each(LEAGUES.leagues)("$name", (league) => {
+  const names = Object.fromEntries(LEAGUES.people.map((person) => [person.id, person.name]));
+  const places = Object.fromEntries(Object.entries(league.sheets).map(([rid, rows]) => [rid, Object.fromEntries(rows.map(([pid, place]) => [pid, place]))]));
+  const rows = LEAGUES.people.map((person) => ({
+    key: person.id, name: names[person.id],
+    results: Object.entries(league.expected.points).filter(([, points]) => person.id in points)
+      .map(([rid, points]) => ({ round_id: rid, points: points[person.id], place: places[rid][person.id], marks: [] })),
+  }));
+
+  test("Summen der Gesamtwertung", () => {
+    const totals = Object.fromEntries(rows.map((row) => [row.key, row.results.reduce((sum, item) => sum + item.points, 0)]));
+    expect(Object.fromEntries(league.expected.totals)).toEqual(totals);
+  });
+
+  test("Tabellen je Lauf mit Rang und Summe", () => {
+    const tables = sessionTables(rows, league.rounds);
+    expect(tables.map((table) => table.kind)).toEqual(Object.keys(league.expected.tables));
+    for (const table of tables) {
+      expect(table.rows.map((row) => [row.key, row.points])).toEqual(league.expected.tables[table.kind]);
+      expect(table.rounds.every((round) => round.counts !== false)).toBe(true);
+    }
+    expect(tables.map((table) => table.label)).toEqual(["Rennen", "Sprint", "Quali"].slice(0, tables.length));
+  });
+});
+
+test("Tabellen je Lauf erst ab zwei Arten; gleiche Punkte und Plätze teilen den Rang", () => {
+  const rounds = [{ id: "r1", session: "Rennen", counts: true }, { id: "s1", session: "Sprint", counts: true }];
+  const rows = [
+    { key: "a", name: "Probe A", results: [{ round_id: "s1", points: 9, place: 2 }] },
+    { key: "b", name: "Probe B", results: [{ round_id: "s1", points: 9, place: 2 }] },
+    { key: "c", name: "Probe C", results: [{ round_id: "r1", points: 25, place: 1 }] },
+  ];
+  const sprint = sessionTables(rows, rounds).find((table) => table.kind === "sprint");
+  expect(sprint.rows.map((row) => [row.key, row.rank, row.points])).toEqual([["a", 1, 9], ["b", 1, 9]]);
+  expect(sessionTables(rows, [rounds[0]])).toEqual([]);
+});
+
 test("Punkte je Lauf in Worten - ab Runde X nur, was sich ändert", () => {
-  expect(sessionPointsLines(F2)).toEqual(["Sprint: 12 · 9 · 7", "ab Runde 5 Hauptrennen: keine Punkte"]);
+  expect(sessionPointsLines(F2)).toEqual(["Qualifying: 2", "Sprint: 12 · 9 · 7", "ab Runde 5 Hauptrennen: keine Punkte"]);
   expect(sessionPointsLines(null)).toEqual([]);
 });
 

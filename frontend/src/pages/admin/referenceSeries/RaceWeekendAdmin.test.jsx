@@ -40,7 +40,7 @@ beforeEach(() => {
 });
 
 test("Saison: Läufe je Runde festlegen, Sprint mit eigenem Schema, ab Runde 5 anders", async () => {
-  render(<SeriesForm series={{ id: "serie-1", season: "2026", status: "active", rules: {} }} lineage={LINEAGE} onClose={() => {}} onSaved={() => {}} />);
+  render(<SeriesForm series={{ id: "serie-1", season: "2026", status: "active", rules: { points_mode: "scheme", points_by_place: [25, 18, 15, 12, 10, 8, 6, 4, 2, 1] } }} lineage={LINEAGE} onClose={() => {}} onSaved={() => {}} />);
   fireEvent.click(screen.getByTestId("weekend-add"));
   const format = screen.getByTestId("weekend-format");
   expect(within(format).getAllByTestId("weekend-session-label").map((input) => input.value)).toEqual(["Qualifying", "Rennen"]);
@@ -49,6 +49,18 @@ test("Saison: Läufe je Runde festlegen, Sprint mit eigenem Schema, ab Runde 5 a
   fireEvent.change(within(sessions[2]).getByTestId("weekend-session-points-mode"), { target: { value: "own" } });
   fireEvent.change(within(sessions[2]).getByTestId("weekend-session-points"), { target: { value: "12-9-7-6-5-4-3-2-1" } });
   fireEvent.change(within(sessions[2]).getByTestId("weekend-session-offset"), { target: { value: "60" } });
+  // Vorschau je Lauf: das Rennen wie die Saison (Formel-1-Standard 25-18-15 …), der Sprint mit seiner Liste.
+  expect(within(sessions[1]).getByTestId("weekend-session-preview")).toHaveTextContent("P1 25 · P2 18 · P3 15 · P4 12 · P5 10 · … · P10 1");
+  expect(within(sessions[2]).getByTestId("weekend-session-preview")).toHaveTextContent("P1 12 · P2 9 · P3 7 · P4 6 · P5 5 · … · P9 1");
+  // Ein Qualifying mit eigener Liste (P1 = 2) zählt von selbst; Punkte trotz DNF und Bonus je Lauf.
+  fireEvent.change(within(sessions[0]).getByTestId("weekend-session-points-mode"), { target: { value: "own" } });
+  fireEvent.change(within(sessions[0]).getByTestId("weekend-session-points"), { target: { value: "2" } });
+  expect(within(sessions[0]).getByTestId("weekend-session-counts")).toBeChecked();
+  expect(within(sessions[0]).getByTestId("weekend-session-preview")).toHaveTextContent("P1 2");
+  fireEvent.change(within(sessions[2]).getByTestId("weekend-session-dnf"), { target: { value: "place" } });
+  fireEvent.change(within(sessions[1]).getByTestId("weekend-session-fastest-lap"), { target: { value: "1" } });
+  fireEvent.change(within(sessions[0]).getByTestId("weekend-session-label"), { target: { value: "Shootout" } });
+  fireEvent.change(within(sessions[0]).getByTestId("weekend-session-label"), { target: { value: "Qualifying" } });
 
   fireEvent.click(screen.getByTestId("weekend-phase-add"));
   const second = screen.getAllByTestId("weekend-format")[1];
@@ -59,15 +71,16 @@ test("Saison: Läufe je Runde festlegen, Sprint mit eigenem Schema, ab Runde 5 a
 
   fireEvent.click(screen.getByTestId("series-save"));
   await waitFor(() => expect(apiMock.patch).toHaveBeenCalled());
+  const lauf = (values) => ({ dnf: "series", fastest_lap: null, ...values });
   expect(apiMock.patch.mock.calls[0][1].weekend).toEqual({ formats: [
     { from_round: 1, sessions: [
-      { label: "Qualifying", offset: 0, counts: false, points: "none", grid: "manual" },
-      { label: "Rennen", offset: 30, counts: true, points: "series", grid: "qualifying" },
-      { label: "Sprint", offset: 60, counts: true, points: [12, 9, 7, 6, 5, 4, 3, 2, 1], grid: "manual" },
+      lauf({ label: "Qualifying", offset: 0, counts: true, points: [2], grid: "manual" }),
+      lauf({ label: "Rennen", offset: 30, counts: true, points: "series", grid: "qualifying", fastest_lap: 1 }),
+      lauf({ label: "Sprint", offset: 60, counts: true, points: [12, 9, 7, 6, 5, 4, 3, 2, 1], grid: "manual", dnf: "place" }),
     ] },
     { from_round: 5, sessions: [
-      { label: "Rennen", offset: 30, counts: true, points: "series", grid: "reverse_standings" },
-      { label: "Sprint", offset: 60, counts: true, points: [12, 9, 7, 6, 5, 4, 3, 2, 1], grid: "reverse_standings" },
+      lauf({ label: "Rennen", offset: 30, counts: true, points: "series", grid: "reverse_standings", fastest_lap: 1 }),
+      lauf({ label: "Sprint", offset: 60, counts: true, points: [12, 9, 7, 6, 5, 4, 3, 2, 1], grid: "reverse_standings", dnf: "place" }),
     ] },
   ] });
 });
