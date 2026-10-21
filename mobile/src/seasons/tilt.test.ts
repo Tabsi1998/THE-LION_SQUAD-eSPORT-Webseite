@@ -101,3 +101,111 @@ test("ohne Sensor am Gerät bleibt alles still bei 0", async () => {
   expect(seen).toEqual([{ x: 0, y: 0 }]);
   stop();
 });
+
+// Start im Hintergrund (#1004): Die Frage „gibt es den Sensor?“ ist asynchron. Was in der Zwischenzeit passiert
+// (Hintergrund, letzter Zuhörer weg, weitere Zuhörer), darf keinen Sensor im Hintergrund oder doppelt starten.
+type TiltLike = { subscribe: (listener: (tilt: { x: number; y: number }) => void) => () => void };
+
+function freshSource(): TiltLike {
+  return new (Object.getPrototypeOf(tiltSource).constructor)();
+}
+
+/** Die Antwort auf „gibt es den Sensor?“ kommt erst, wenn der Test sie gibt. */
+function pendingAvailability() {
+  let answer: (value: boolean) => void = () => {};
+  (DeviceMotion.isAvailableAsync as jest.Mock).mockImplementation(() => new Promise<boolean>((resolve) => { answer = resolve; }));
+  return (value: boolean) => answer(value);
+}
+
+/** AppState mit Startzustand; `change(…)` spielt einen Wechsel ab. */
+function appStateFrom(initial: string) {
+  const handlers: Array<(status: string) => void> = [];
+  const removed = jest.fn();
+  const spy = jest.spyOn(AppState, "addEventListener").mockImplementation((_type, handler) => {
+    handlers.push(handler as (status: string) => void);
+    return { remove: removed } as never;
+  });
+  // Im Jest-Mock von React Native ist `currentState` keine Zeichenkette; auf dem Gerät schon.
+  const before = Object.getOwnPropertyDescriptor(AppState, "currentState");
+  Object.defineProperty(AppState, "currentState", { value: initial, configurable: true, writable: true });
+  return {
+    spy,
+    removed,
+    change: (status: string) => handlers.forEach((handler) => handler(status)),
+    restore: () => {
+      spy.mockRestore();
+      if (before) Object.defineProperty(AppState, "currentState", before);
+      else delete (AppState as { currentState?: unknown }).currentState;
+    },
+  };
+}
+
+test("Hintergrund, bevor die Sensor-Abfrage antwortet: kein Start; zurück nach vorne genau einer", async () => {
+  const answer = pendingAvailability();
+  const app = appStateFrom("active");
+  const stop = freshSource().subscribe(() => {});
+  app.change("background");
+  answer(true);
+  await flush();
+  expect(DeviceMotion.addListener).not.toHaveBeenCalled();
+  app.change("active");
+  await flush();
+  expect(DeviceMotion.addListener).toHaveBeenCalledTimes(1);
+  app.change("active");
+  await flush();
+  expect(DeviceMotion.addListener).toHaveBeenCalledTimes(1);
+  stop();
+  expect((DeviceMotion.addListener as jest.Mock).mock.results[0].value.remove).toHaveBeenCalled();
+  expect(app.removed).toHaveBeenCalled();
+  app.restore();
+});
+
+test("Zuhörer kommt schon im Hintergrund dazu: kein Start; Hintergrund → vorne startet genau einen Sensor", async () => {
+  const app = appStateFrom("background");
+  const source = freshSource();
+  const stopA = source.subscribe(() => {});
+  const stopB = source.subscribe(() => {});
+  await flush();
+  expect(DeviceMotion.addListener).not.toHaveBeenCalled();
+  app.change("active");
+  await flush();
+  expect(DeviceMotion.addListener).toHaveBeenCalledTimes(1);
+  stopA();
+  stopB();
+  app.restore();
+});
+
+test("letzter Zuhörer geht, während die Abfrage läuft: kein späterer Start, AppState von Beginn an verfolgt und wieder frei", async () => {
+  const answer = pendingAvailability();
+  const app = appStateFrom("active");
+  const stop = freshSource().subscribe(() => {});
+  expect(app.spy).toHaveBeenCalledTimes(1);
+  stop();
+  expect(app.removed).toHaveBeenCalledTimes(1);
+  answer(true);
+  await flush();
+  expect(DeviceMotion.addListener).not.toHaveBeenCalled();
+  app.restore();
+});
+
+test("parallele Zuhörer während der Abfrage: eine Abfrage, ein Sensor, aus erst mit dem letzten", async () => {
+  const answer = pendingAvailability();
+  const app = appStateFrom("active");
+  const source = freshSource();
+  const stopA = source.subscribe(() => {});
+  stopA();
+  stopA();
+  const stopB = source.subscribe(() => {});
+  const stopC = source.subscribe(() => {});
+  answer(true);
+  await flush();
+  await flush();
+  expect(DeviceMotion.isAvailableAsync).toHaveBeenCalledTimes(1);
+  expect(DeviceMotion.addListener).toHaveBeenCalledTimes(1);
+  const removed = (DeviceMotion.addListener as jest.Mock).mock.results[0].value.remove as jest.Mock;
+  stopB();
+  expect(removed).not.toHaveBeenCalled();
+  stopC();
+  expect(removed).toHaveBeenCalledTimes(1);
+  app.restore();
+});

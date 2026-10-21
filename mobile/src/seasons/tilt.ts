@@ -42,6 +42,11 @@ export function smoothTilt(current: Tilt, target: Tilt, factor = SMOOTHING): Til
 
 type Listener = (tilt: Tilt) => void;
 
+/** Im Hintergrund oder kurz verdeckt (iOS „inactive“) läuft kein Sensor; unbekannt zählt als vorne. */
+function isForeground(status: string | null | undefined): boolean {
+  return status !== "background" && status !== "inactive";
+}
+
 /** Ein Sensor für alle: wer zuhört, hält ihn an; ohne Zuhörer ist er aus. */
 class TiltSource {
   private listeners = new Set<Listener>();
@@ -50,6 +55,12 @@ class TiltSource {
   private current: Tilt = { x: 0, y: 0 };
   private restBeta: number | null = null;
   private available: boolean | null = null;
+  /** Eine Abfrage „gibt es den Sensor?“ für alle, die gleichzeitig starten. */
+  private availability: Promise<boolean> | null = null;
+  /** Vorne oder im Hintergrund - verfolgt ab dem ersten Zuhörer, nicht erst ab dem laufenden Sensor (#1004). */
+  private foreground = true;
+  /** Jede Pause und jedes Aus macht ältere, noch wartende Starts ungültig (#1004). */
+  private generation = 0;
 
   get value(): Tilt {
     return this.current;
@@ -58,31 +69,41 @@ class TiltSource {
   subscribe(listener: Listener): () => void {
     this.listeners.add(listener);
     listener(this.current);
+    this.watchAppState();
     void this.start();
     return () => {
-      this.listeners.delete(listener);
+      if (!this.listeners.delete(listener)) return;
       if (!this.listeners.size) this.stop();
     };
   }
 
+  private watchAppState() {
+    if (this.appState) return;
+    this.foreground = isForeground(AppState.currentState);
+    this.appState = AppState.addEventListener("change", (status) => {
+      this.foreground = isForeground(status);
+      if (!this.foreground) this.pause();
+      else void this.start();
+    });
+  }
+
   private async start() {
-    if (this.subscription || !this.listeners.size) return;
+    if (this.subscription || !this.listeners.size || !this.foreground) return;
+    const generation = this.generation;
     if (this.available === null) {
       try {
-        this.available = await DeviceMotion.isAvailableAsync();
+        this.availability ??= DeviceMotion.isAvailableAsync();
+        this.available = Boolean(await this.availability);
       } catch {
         this.available = false;
+      } finally {
+        this.availability = null;
       }
     }
-    if (!this.available || this.subscription || !this.listeners.size) return;
+    // Nach dem Warten neu prüfen: inzwischen im Hintergrund, alle weg oder ein anderer Start war schneller.
+    if (generation !== this.generation || !this.available || this.subscription || !this.listeners.size || !this.foreground) return;
     DeviceMotion.setUpdateInterval(UPDATE_MS);
     this.subscription = DeviceMotion.addListener((measurement) => this.handle(measurement));
-    if (!this.appState) {
-      this.appState = AppState.addEventListener("change", (status) => {
-        if (status === "background" || status === "inactive") this.pause();
-        else void this.start();
-      });
-    }
   }
 
   private handle(measurement: DeviceMotionMeasurement) {
@@ -97,6 +118,7 @@ class TiltSource {
   }
 
   private pause() {
+    this.generation += 1;
     this.subscription?.remove();
     this.subscription = null;
     if (this.current.x || this.current.y) {

@@ -14,6 +14,19 @@ test("heute die Uhrzeit, gestern „gestern“, sonst der Tag", () => {
   expect(chatTime(null, NOW)).toBe("");
 });
 
+// #1049: Serverzeiten ohne Zone sind Wiener Uhr (asInstant) - nie die Uhr des Geräts. Mit Zone gilt die Zone. Der
+// CI-Rechner läuft in UTC; lokal zusätzlich mit $env:TZ="UTC" bzw. "America/Los_Angeles" (PowerShell) prüfen.
+test("ohne Zone gilt Wiener Uhr, mit Zone die Zone - gemischt und über Mitternacht", () => {
+  expect(chatTime("2026-10-07T14:02:00", NOW)).toBe("14:02");
+  expect(chatTime("2026-10-07T00:30:00", NOW)).toBe("00:30");
+  expect(chatTime("2026-10-06T23:30:00", NOW)).toBe("gestern");
+  expect(chatTime("2026-10-05T23:30:00", NOW)).toBe("05.10.");
+  expect(chatTime("2026-10-07T14:02:00+02:00", NOW)).toBe("14:02");
+  expect(chatTime("2026-10-07T07:02:00-05:00", NOW)).toBe("14:02");
+  expect(chatTime("2026-10-06T22:30:00Z", NOW)).toBe("00:30");
+  expect(chatTime("kein datum", NOW)).toBe("");
+});
+
 test("„Gelesen“ (#1512): die Kennung als ein Pfadteil - schon kodiert aus einer Adresse nicht doppelt, mit Pfadzeichen gar nicht", async () => {
   const post = api.post as jest.Mock;
   post.mockReset().mockResolvedValue({ data: {} });

@@ -102,7 +102,7 @@ export function LoginScreen({ navigation }: Props) {
         return;
       }
       setVerificationNeeded(!mfaTicket && needsEmailVerification(err));
-      setError(errorMessage(err, "Login fehlgeschlagen."));
+      setError(errorMessage(err, "Anmeldung fehlgeschlagen."));
     } finally {
       setSubmitting(false);
     }

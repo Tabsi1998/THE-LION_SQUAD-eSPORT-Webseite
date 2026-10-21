@@ -125,3 +125,34 @@ test("Speichern scheitert (etwa keine Rechte am Team): Meldung, das alte Bild bl
   expect(screen.getByTestId("media-image")).toHaveTextContent("/api/static/uploads/alt.webp");
   expect(screen.getByTestId("pick-open").props.accessibilityLabel).toBe("Logo ändern");
 });
+
+// SVG-Upload (#1419): Erlaubt sind PNG, JPG und WebP - wie am Server und im Web. Ein SVG wird schon vor dem Hochladen
+// abgelehnt, mit demselben Satz wie am Server (backend/services/image_upload.py `SVG_REFUSED_MESSAGE`).
+const SERVER_SVG_TEXT = "SVG-Dateien gehen hier nicht. Bitte als PNG mit durchsichtigem Hintergrund (z. B. 2000 px breit) oder als WebP exportieren – die Website macht daraus alle Größen.";
+
+test("SVG aus der Galerie: kein Hochladen, der Satz des Servers, das alte Bild bleibt", async () => {
+  chooseIn("Aus der Galerie");
+  mockLibrary.mockResolvedValue({ canceled: false, assets: [{ uri: "file:///handy/logo.svg", mimeType: "image/svg+xml", fileName: "logo.svg" }] });
+  const onUploaded = jest.fn();
+  await render(<ImagePickField label="Logo" shape="square" value="/api/static/uploads/alt.webp" onUploaded={onUploaded} testID="pick" />);
+  await fireEvent.press(screen.getByTestId("pick-open"));
+  await waitFor(() => expect(screen.getByTestId("pick-message")).toHaveTextContent(SERVER_SVG_TEXT));
+  expect(mockPost).not.toHaveBeenCalled();
+  expect(onUploaded).not.toHaveBeenCalled();
+  expect(screen.queryByTestId("pick-busy")).toBeNull();
+  expect(screen.getByTestId("media-image")).toHaveTextContent("/api/static/uploads/alt.webp");
+});
+
+test("Typfilter: PNG, JPG, WebP gehen; SVG (auch nur am Namen) und andere Typen nicht; ohne Angabe entscheidet der Server", () => {
+  const { SVG_REFUSED_MESSAGE, UNSUPPORTED_IMAGE_MESSAGE, unsupportedImageText } = require("./ImagePickField");
+  expect(SVG_REFUSED_MESSAGE).toBe(SERVER_SVG_TEXT);
+  expect(unsupportedImageText({ uri: "file:///a.png", mimeType: "image/png" })).toBeNull();
+  expect(unsupportedImageText({ uri: "file:///a.jpg", mimeType: "image/jpeg" })).toBeNull();
+  expect(unsupportedImageText({ uri: "file:///a.webp", mimeType: "image/webp" })).toBeNull();
+  expect(unsupportedImageText({ uri: "content://media/42" })).toBeNull();
+  expect(unsupportedImageText({ uri: "file:///a.SVG" })).toBe(SERVER_SVG_TEXT);
+  expect(unsupportedImageText({ uri: "content://x/1", fileName: "logo.svg", mimeType: "" })).toBe(SERVER_SVG_TEXT);
+  expect(unsupportedImageText({ uri: "file:///a", mimeType: "IMAGE/SVG+XML" })).toBe(SERVER_SVG_TEXT);
+  expect(unsupportedImageText({ uri: "file:///a.gif", mimeType: "image/gif" })).toBe(UNSUPPORTED_IMAGE_MESSAGE);
+  expect(unsupportedImageText({ uri: "file:///a.bmp" })).toBe(UNSUPPORTED_IMAGE_MESSAGE);
+});

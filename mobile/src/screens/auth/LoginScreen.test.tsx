@@ -72,6 +72,19 @@ test("Passwort-Anmeldung geht zurück, woher man kam; ohne Passkey-Unterstützun
   expect(navigation.navigate).toHaveBeenCalledWith("Register");
 });
 
+// Ein Wort je Sache (#1242): Die App sagt „Anmeldung“, nicht „Login“ - auch wenn die Anmeldung ohne Grund scheitert.
+test("scheitert die Passwort-Anmeldung ohne Grund vom Server, steht „Anmeldung fehlgeschlagen.“ da", async () => {
+  (Passkey.isSupported as jest.Mock).mockReturnValue(false);
+  mockLogin.mockRejectedValueOnce({});
+  await render(<LoginScreen navigation={navigation} />);
+  await fireEvent.changeText(screen.getByLabelText("E-Mail"), "paula@club-mail.at");
+  await fireEvent.changeText(screen.getByLabelText("Passwort"), "geheim");
+  await fireEvent.press(screen.getByText("Anmelden"));
+  expect(await screen.findByText("Anmeldung fehlgeschlagen.")).toBeTruthy();
+  expect(screen.queryByText(/Login fehlgeschlagen/)).toBeNull();
+  expect(navigation.goBack).not.toHaveBeenCalled();
+});
+
 // Mehrere Passkeys (#939): fand die stille Abfrage auf diesem Handy keinen, sagt die Anmeldung das weiter - die App lädt
 // dann ein, auch wenn das Konto anderswo schon einen hat.
 test("kein Passkey auf diesem Gerät: die Passwort-Anmeldung meldet es für die Einladung", async () => {
