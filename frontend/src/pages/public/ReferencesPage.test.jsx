@@ -226,7 +226,7 @@ test("Chronik: Zeilen je Jahr mit Platz-Ring, Titel, Veranstalter, Marken und St
   const row = within(year).getByTestId("reference-card-r1");
   expect(row).toHaveAttribute("href", "/references/r1");
   expect(within(row).getByTestId("placement-badge")).toHaveAttribute("data-medal", "gold");
-  expect(within(row).getByTestId("reference-row-title")).toHaveTextContent("Winter Cup");
+  expect(within(row).getByTestId("reference-row-title")).toHaveTextContent("ESL · Liga X · Season 3");
   expect(row).toHaveTextContent("ESL");
   expect(row).toHaveTextContent("Call of Duty");
   expect(row).toHaveTextContent("HC");
@@ -240,6 +240,23 @@ test("Chronik: Zeilen je Jahr mit Platz-Ring, Titel, Veranstalter, Marken und St
   // Die Ehrentafel zeigt die Bilanz unverändert - je Eintrag gezählt vom Server.
   expect(screen.getByTestId("references-stat-gold")).toHaveTextContent("2");
   expect(screen.getByTestId("references-stat-bronze")).toHaveTextContent("3");
+});
+
+// Gesamtpaket mit dem Mitgliederprofil (#1944): dieselbe Zeile, derselbe kurze Titel - der lange steht im Tooltip.
+test("Chronik: kurzer Titel „Veranstalter · Liga · Saison“ wie im Mitgliederprofil, der Veranstalter nicht doppelt", async () => {
+  const league = { ...ITEMS[0], start_date: "2026-02-01", display_title: "SEASON #3 POWERED BY PROBE® LIGA X" };
+  references = { ...references, items: [league, { ...ITEMS[1], organizer: "Probe Cups", start_date: "2025-11-15" }] };
+  page();
+  const row = await screen.findByTestId("reference-card-r1");
+  const title = within(row).getByTestId("reference-row-title");
+  expect(title).toHaveTextContent(/^ESL · Liga X · Season 3$/);
+  expect(title).toHaveAttribute("title", "SEASON #3 POWERED BY PROBE® LIGA X");
+  expect(within(row).queryByTestId("reference-row-organizer")).toBeNull();
+  // Ohne Liga bleibt der Titel - und der Veranstalter steht darunter.
+  const cup = screen.getByTestId("reference-card-r2");
+  expect(within(cup).getByTestId("reference-row-title")).toHaveTextContent(/^Herbst Cup$/);
+  expect(within(cup).getByTestId("reference-row-title")).not.toHaveAttribute("title");
+  expect(within(cup).getByTestId("reference-row-organizer")).toHaveTextContent("Probe Cups");
 });
 
 test("Chronik: ohne Datum landen die Teilnahmen unter „Ohne Datum“", async () => {

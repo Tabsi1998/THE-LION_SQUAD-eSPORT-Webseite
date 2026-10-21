@@ -32,25 +32,33 @@ export function displayTitle(item) {
   return item.display_title || item.title || "Referenz";
 }
 
-/**
- * Der kurze Titel einer Teilnahme (#1944): „Veranstalter · Liga · Saison“ aus den Feldern statt des langen
- * Veranstalter-Titels - gehört sie zu einer Saison (#1750, `link` aus linkedSeasons), gelten Stufe und Saison der Serie
- * und notfalls der Veranstalter der Spur. Ohne Liga und Saison bleibt der Titel. `withSeason: false` gibt „Serie bzw.
- * Liga“ (Veranstalter mit Liga, sonst mit Saison). Gleiche Teile stehen nur einmal.
- */
-export function shortTitle(item, link = null, { withSeason = true } = {}) {
-  const league = String(link?.season?.tier || item.league || "").trim();
-  const season = String(link?.season?.season || item.season || "").trim();
-  if (!league && !season) return displayTitle(item);
-  const organizer = String(item.organizer || link?.lineage?.organizer || "").trim();
-  const parts = withSeason ? [organizer, league, season] : [organizer, league || season];
+function distinctParts(parts) {
   const seen = new Set();
   return parts.filter((part) => {
     const key = part.toLowerCase();
     if (!part || seen.has(key)) return false;
     seen.add(key);
     return true;
-  }).join(" · ");
+  });
+}
+
+/**
+ * Der kurze Titel einer Teilnahme (#1944): „Veranstalter · Liga · Saison“ aus den Feldern statt des langen
+ * Veranstalter-Titels - gehört sie zu einer Saison (#1750, `link` aus linkedSeasons), gelten Stufe und Saison der Serie
+ * und notfalls der Veranstalter der Spur. Nur mit Liga und mindestens zwei Angaben - sonst sagt der Titel mehr („Herbst
+ * Cup“ statt „Season 2“) und bleibt. `withSeason: false` gibt „Serie bzw. Liga“ (Veranstalter mit Liga, ohne
+ * Veranstalter Liga mit Saison). Gleiche Teile stehen nur einmal.
+ */
+export function shortTitle(item, link = null, { withSeason = true } = {}) {
+  const league = String(link?.season?.tier || item.league || "").trim();
+  if (!league) return displayTitle(item);
+  const season = String(link?.season?.season || item.season || "").trim();
+  const organizer = String(item.organizer || link?.lineage?.organizer || "").trim();
+  const full = distinctParts([organizer, league, season]);
+  const parts = withSeason ? full : distinctParts([organizer, league]);
+  if (parts.length >= 2) return parts.join(" · ");
+  if (full.length >= 2) return full.join(" · ");
+  return displayTitle(item);
 }
 
 export function entriesOf(item) {

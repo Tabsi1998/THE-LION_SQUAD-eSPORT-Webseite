@@ -29,13 +29,18 @@ const ref = (id, start, placement, extra = {}) => {
 
 // ---------------------------------------------------------------- kurzer Titel
 
-test("shortTitle: „Veranstalter · Liga · Saison“ aus den Feldern, ohne Liga und Saison bleibt der Titel", () => {
+test("shortTitle: „Veranstalter · Liga · Saison“ aus den Feldern, ohne Liga bleibt der Titel", () => {
   const league = { display_title: "SEASON #3 POWERED BY NORDLICHT® NEWCOMER LEAGUE I", organizer: "NSDL", league: "Newcomer League I", season: "Season 3" };
   expect(shortTitle(league)).toBe("NSDL · Newcomer League I · Season 3");
   expect(shortTitle({ ...league, organizer: "" })).toBe("Newcomer League I · Season 3");
   expect(shortTitle({ display_title: "Ranked Night #4", organizer: "Ranked Nights" })).toBe("Ranked Night #4");
   // Gleiche Teile nur einmal (Groß/klein egal).
   expect(shortTitle({ organizer: "Liga X", league: "liga x", season: "2026" })).toBe("Liga X · 2026");
+  // Ohne Liga oder mit nur einer Angabe bleibt der Titel: „Probe Cups · Season 2“ statt „Herbst Cup“ wäre schlechter.
+  expect(shortTitle({ display_title: "Herbst Cup", season: "Season 2" })).toBe("Herbst Cup");
+  expect(shortTitle({ display_title: "Herbst Cup", organizer: "Probe Cups", season: "Season 2" })).toBe("Herbst Cup");
+  expect(shortTitle({ display_title: "Herbst Cup", league: "Liga X" })).toBe("Herbst Cup");
+  expect(shortTitle({ display_title: "Herbst Cup", organizer: "ESL", league: "esl", season: "" })).toBe("Herbst Cup");
 });
 
 test("shortTitle: mit Saison (#1750) gelten Stufe und Saison der Serie, der Veranstalter notfalls aus der Spur", () => {
@@ -45,8 +50,11 @@ test("shortTitle: mit Saison (#1750) gelten Stufe und Saison der Serie, der Vera
 
 test("shortTitle ohne Saison: „Serie bzw. Liga“ für das beste Ergebnis", () => {
   expect(shortTitle({ organizer: "NSDL", league: "League A", season: "Season 3" }, null, { withSeason: false })).toBe("NSDL · League A");
-  expect(shortTitle({ organizer: "Lion Racing Cup", season: "2026" }, null, { withSeason: false })).toBe("Lion Racing Cup · 2026");
+  expect(shortTitle({ organizer: "Lion Racing Cup", league: "Division 1", season: "2026" }, null, { withSeason: false })).toBe("Lion Racing Cup · Division 1");
+  // Ohne Veranstalter reicht die Liga allein nicht - dann mit Saison.
+  expect(shortTitle({ league: "Division 1", season: "2026" }, null, { withSeason: false })).toBe("Division 1 · 2026");
   expect(shortTitle({ display_title: "Autumn Cup", organizer: "Kartwerk" }, null, { withSeason: false })).toBe("Autumn Cup");
+  expect(shortTitle({ display_title: "Autumn Cup", organizer: "Kartwerk", season: "2026" }, null, { withSeason: false })).toBe("Autumn Cup");
 });
 
 // ---------------------------------------------------------------- Kopf
