@@ -153,7 +153,7 @@ export function ReferenceDetailPage() {
               </p>
               <FieldChips item={item} className="mt-4" />
               {item.season_link && (
-                <Link to={referenceHref(item)} data-testid="reference-detail-season" className="mt-4 inline-flex items-center gap-1.5 px-2.5 py-1.5 border border-[#29B6E8]/40 bg-[#29B6E8]/10 hover:bg-[#29B6E8]/20 rounded-sm text-[11px] uppercase tracking-widest font-bold text-[#29B6E8] transition-colors">
+                <Link to={referenceHref(item)} data-testid="reference-detail-season" className="tls-btn tls-btn--secondary mt-4 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-sm text-[11px] uppercase tracking-widest font-bold">
                   <Flag className="w-3.5 h-3.5" aria-hidden="true" /> aus Saison {item.season_link.label}
                 </Link>
               )}
