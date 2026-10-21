@@ -13,14 +13,16 @@ Gerechnet wird nichts - alles kommt aus dem gespeicherten Stand der letzten gewe
 - **Fahrer:** je Fahrer das Team je Rennen (Team der Zeile, sonst das Standard-Team - wie die Teamwertung zählt), das
   aktuelle Team (das des letzten Rennens) und die Marke „Gast“. Mehr nicht: Namen kommen wie auf der Serienseite nur
   über die Tabelle, ohne Startnummer, Profil oder Verknüpfung.
-- **Vereinsteams:** das eigene Team der Saison (``team_name``) und jedes Team, für das ein Vereinsmitglied zuletzt
-  gefahren ist - in der Reihenfolge der Teamwertung, ohne sie nach Namen.
+- **Vereinsteams:** alle eigenen Teams der Saison (``own_teams``, #1926 - früher nur ``team_name``) und jedes Team,
+  für das ein Vereinsmitglied zuletzt gefahren ist - in der Reihenfolge der Teamwertung, ohne sie nach Namen. Andere
+  Schreibweisen eines eigenen Teams (auch als Standard-Team eines Fahrers) zählen als dieses Team.
 - **Fahrer-Detail** (``club_drivers``): nur öffentlich sichtbare Vereinsmitglieder - Mitglied, Profil aktiv, Name nicht
   ausgeblendet; dieselbe Regel wie der Profil-Link der Tabelle und der Team-Liga. Die Seite zeigt ein Detail und
   Vereinsnamen außerhalb der Tabellen nur für diese Kennungen.
 """
 from __future__ import annotations
 
+from services.own_teams import Matcher, own_teams
 from services.scoring_rules import normalize_rules
 from services.team_league_page import PATH_FIELDS as SEASON_FIELDS, visible_seasons
 
@@ -40,14 +42,17 @@ async def lineage_seasons(db, user: dict | None, lineage: dict, current_id: str)
             for item in visible]
 
 
-def driver_teams(rows: list[dict], participants: dict) -> dict:
-    """Je Fahrer der Fahrerwertung: Team je Rennen, aktuelles Team (das des letzten Rennens) und „Gast“."""
+def driver_teams(rows: list[dict], participants: dict, matcher: Matcher | None = None) -> dict:
+    """Je Fahrer der Fahrerwertung: Team je Rennen, aktuelles Team (das des letzten Rennens) und „Gast“. ``matcher``
+    führt Schreibweisen der eigenen Teams auf ihren Namen zurück (#1926)."""
+    canonical = matcher.canonical if matcher else (lambda name: name)
     out = {}
     for row in rows:
         pid = row.get("participant_id")
         person = participants.get(pid) or {}
-        default = _text(person.get("default_team")) or None
-        round_teams = {item.get("round_id"): _text(item.get("team")) or default for item in row.get("results") or []}
+        default = canonical(_text(person.get("default_team")) or None)
+        round_teams = {item.get("round_id"): canonical(_text(item.get("team")) or None) or default
+                       for item in row.get("results") or []}
         current = next((team for team in reversed(list(round_teams.values())) if team), default)
         out[pid] = {"team": current, "guest": person.get("link") == "guest", "round_teams": round_teams}
     return out
@@ -101,9 +106,9 @@ def public_club_drivers(rows: list[dict], people: dict) -> list[str]:
     return out
 
 
-def club_teams(drivers: dict, people: dict, team_order: list[str], own_team: str | None) -> list[str]:
-    """Das eigene Team der Saison und jedes Team, für das ein Vereinsmitglied zuletzt gefahren ist."""
-    teams = {own_team} if own_team else set()
+def club_teams(drivers: dict, people: dict, team_order: list[str], own: list[str] | None) -> list[str]:
+    """Die eigenen Teams der Saison und jedes Team, für das ein Vereinsmitglied zuletzt gefahren ist."""
+    teams = {team for team in own or [] if team}
     teams |= {item["team"] for pid, item in drivers.items()
               if item.get("team") and (people.get(pid) or {}).get("club_member")}
     position = {team: index for index, team in enumerate(team_order)}
@@ -124,7 +129,8 @@ async def racing_block(db, user: dict | None, lineage: dict, series: dict, peopl
     participants = {item["id"]: item async for item in db.reference_participants.find(
         {"series_id": sid}, {"_id": 0, "id": 1, "default_team": 1, "link": 1})}
     driver_rows = (latest or {}).get("rows") or []
-    drivers = driver_teams(driver_rows, participants)
+    matcher = Matcher(own_teams(series))
+    drivers = driver_teams(driver_rows, participants, matcher)
     stored = await db.reference_standings.find_one(
         {"series_id": sid, "scope": "teams"}, {"_id": 0, "round_id": 1, "round_seq": 1, "rows": 1, "computed_at": 1},
         sort=[("round_seq", -1)]) if scoring["enabled"] else None
@@ -139,6 +145,6 @@ async def racing_block(db, user: dict | None, lineage: dict, series: dict, peopl
         "team_scoring": scoring,
         "teams": teams,
         "drivers": drivers,
-        "club_teams": club_teams(drivers, people, order, _text(series.get("team_name")) or None),
+        "club_teams": club_teams(drivers, people, order, matcher.names),
         "club_drivers": public_club_drivers(driver_rows, people),
     }

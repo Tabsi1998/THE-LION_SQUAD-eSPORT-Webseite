@@ -86,6 +86,23 @@ async def migrate_round_countries(db) -> str:
     return f"{filled} round countries filled"
 
 
+async def migrate_series_own_teams(db) -> str:
+    """Mehrere eigene Teams (#1926): das bisherige Feld ``team_name`` wird das erste (und einzige) eigene Team der
+    Liste ``own_teams``. Eine Saison, die schon eine Liste hat, bleibt; ``team_name`` bleibt für ältere Leser stehen."""
+    from services.own_teams import clean_teams
+
+    moved = 0
+    async for item in db.reference_series.find(
+            {"own_teams": {"$in": [None, []]}, "team_name": {"$nin": [None, ""]}},
+            {"_id": 0, "id": 1, "team_name": 1}):
+        teams = clean_teams([item.get("team_name")])
+        if teams:
+            await db.reference_series.update_one({"id": item["id"], "own_teams": {"$in": [None, []]}},
+                                                 {"$set": {"own_teams": teams}})
+            moved += 1
+    return f"{moved} series own teams taken over"
+
+
 MIGRATIONS = (
     (1, "encrypt_legacy_integration_credentials", migrate_plaintext_secrets),
     (2, "team_leader_role_to_player", migrate_team_leader_role),
@@ -95,6 +112,7 @@ MIGRATIONS = (
     (5, "deleted_account_leftovers_1029", migrate_deleted_account_leftovers),
     (6, "reference_points_schemes", migrate_points_scheme_templates),
     (7, "reference_round_countries", migrate_round_countries),
+    (8, "reference_series_own_teams", migrate_series_own_teams),
 )
 
 

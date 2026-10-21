@@ -1638,6 +1638,19 @@ class ReferenceLineageUpdate(BaseModel):
         return _tier_order(value)
 
 
+class ReferenceOwnTeam(BaseModel):
+    """Ein eigenes Team der Saison (#1926): Name wie beim Veranstalter und weitere Schreibweisen (Alias)."""
+    name: str = Field(min_length=1, max_length=120)
+    aliases: List[str] = Field(default_factory=list, max_length=10)
+
+    @field_validator("aliases")
+    @classmethod
+    def _aliases(cls, value):
+        if any(len(str(alias)) > 120 for alias in value):
+            raise ValueError("Schreibweise höchstens 120 Zeichen.")
+        return value
+
+
 class ReferenceSeriesCreate(BaseModel):
     """Eine Saison einer Spur in einer Stufe. ``points_scheme_id`` kopiert eine Vorlage, ``rules`` überschreibt sie."""
     lineage_id: str
@@ -1650,7 +1663,8 @@ class ReferenceSeriesCreate(BaseModel):
     default_time: Optional[str] = None  # HH:MM, Wiener Zeit
     points_scheme_id: Optional[str] = None
     rules: Optional[Dict[str, Any]] = None
-    team_name: Optional[str] = Field(default=None, max_length=120)  # das eigene Team (Team-Liga, Teamwertung)
+    team_name: Optional[str] = Field(default=None, max_length=120)  # früher das eine eigene Team - heute own_teams
+    own_teams: Optional[List[ReferenceOwnTeam]] = Field(default=None, max_length=20)  # #1926: alle eigenen Teams
     official_table_url: Optional[str] = Field(default=None, max_length=500)
     external_url: Optional[str] = Field(default=None, max_length=500)
     visibility: ReferenceVisibility = "public"
@@ -1681,6 +1695,7 @@ class ReferenceSeriesUpdate(BaseModel):
     rules: Optional[Dict[str, Any]] = None
     rules_note: Optional[str] = Field(default=None, max_length=500)  # Hinweis zur Regeländerung
     team_name: Optional[str] = Field(default=None, max_length=120)
+    own_teams: Optional[List[ReferenceOwnTeam]] = Field(default=None, max_length=20)
     official_table_url: Optional[str] = Field(default=None, max_length=500)
     external_url: Optional[str] = Field(default=None, max_length=500)
     visibility: Optional[ReferenceVisibility] = None

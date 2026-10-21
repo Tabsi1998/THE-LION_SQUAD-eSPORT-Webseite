@@ -55,7 +55,8 @@ PUBLISH_ONLY_BOARD = "Veröffentlichen gibt in dieser Serie der Vorstand frei. S
 # Was ein Captain von Saison und Spur sieht - ausdrücklich, damit neue Verwaltungsfelder nicht von selbst hinausgehen.
 CAPTAIN_SERIES_FIELDS = (
     "id", "lineage_id", "season", "tier", "title", "season_slug", "status", "publish_mode", "default_weekday",
-    "default_time", "rules", "rules_version", "rules_note", "team_name", "official_table_url", "external_url",
+    "default_time", "rules", "rules_version", "rules_note", "team_name", "own_teams", "official_table_url",
+    "external_url",
 )
 CAPTAIN_LINEAGE_FIELDS = ("id", "title", "kind", "label", "organizer", "game_id", "game_name")
 

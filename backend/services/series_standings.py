@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import math
 
+from services.own_teams import Matcher
 from services.scoring_rules import (
     counted_results, league_table, normalize_rules, rank_with_ties, result_points, validate_sheet,
 )
@@ -215,12 +216,33 @@ def _table_rows(rules: dict, upto: list[dict], sheets: dict, own_teams: set[str]
     return rows
 
 
+# ---------------------------------------------------------------- Eigene Teams
+def _own_spelling(sheet: dict, matcher: Matcher) -> dict:
+    """Ein Blatt mit den Namen der eigenen Teams (#1926): andere Schreibweisen und Aliase eines eigenen Teams werden
+    zu seinem Namen - in Zeilen, Spielen, Tabelle und Teamwerten laut Veranstalter. Fremde Teams bleiben."""
+    out = dict(sheet)
+    out["rows"] = [{**row, "team": matcher.canonical(row.get("team"))} for row in sheet.get("rows") or []]
+    out["matches"] = [{**match, "home": matcher.canonical(match.get("home")),
+                       "away": matcher.canonical(match.get("away"))} for match in sheet.get("matches") or []]
+    out["official_table"] = [{**row, "team": matcher.canonical(row.get("team"))}
+                             for row in sheet.get("official_table") or []]
+    out["official_team_totals"] = {matcher.canonical(team): value
+                                   for team, value in (sheet.get("official_team_totals") or {}).items()}
+    return out
+
+
 # ---------------------------------------------------------------- Alles zusammen
 def compute_standings(*, rules: dict, rounds: list[dict], sheets: dict[str, dict], participants: list[dict],
                       own_teams=()) -> list[dict]:
     """Je gewerteter Runde und Wertung ein Stand: ``{"round_id", "round_seq", "scope", "rows"}`` in
-    Kalender-Reihenfolge."""
+    Kalender-Reihenfolge. ``own_teams``: die eigenen Teams (Namen oder ``{name, aliases}``, #1926) - ihre
+    Schreibweisen zählen als ein Team."""
     rules = normalize_rules(rules)
+    matcher = Matcher(own_teams)
+    if matcher:
+        sheets = {round_id: _own_spelling(sheet, matcher) for round_id, sheet in sheets.items()}
+        participants = [{**person, "default_team": matcher.canonical(person.get("default_team"))}
+                        for person in participants]
     counting = [item for item in ordered_rounds(rounds) if item.get("counts", True) is not False]
     seq_of = {item["id"]: index for index, item in enumerate(counting, start=1)}
     total_rounds = sum(1 for item in counting if item.get("status") != "cancelled")
@@ -228,7 +250,7 @@ def compute_standings(*, rules: dict, rounds: list[dict], sheets: dict[str, dict
     for item in scored:
         validate_sheet(sheets[item["id"]], item["id"])
     people = {person["id"]: person for person in participants if person.get("id")}
-    own = {str(team).strip() for team in own_teams if str(team or "").strip()}
+    own = set(matcher.names)
     snapshots: list[dict] = []
     previous: dict[str, dict] = {}
     for index, item in enumerate(scored):

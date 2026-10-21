@@ -27,6 +27,7 @@ import math
 from dataclasses import dataclass, field
 
 from services import series_identity
+from services.own_teams import Matcher
 from services.scoring_rules import result_points
 
 NEW_PREFIX = "neu:"
@@ -312,13 +313,15 @@ def _points(resolution: Resolution, rules: dict) -> list[dict]:
     return problems
 
 
-def _matches(resolution: Resolution, own_team: str | None) -> list[dict]:
+def _matches(resolution: Resolution, own_teams) -> list[dict]:
     problems = []
-    own = clean(own_team).casefold()
+    # Eigene Teams (#1926): eines davon muss spielen - erkannt auch an anderer Schreibweise oder einem Alias.
+    own = Matcher(own_teams if isinstance(own_teams, (list, tuple)) else [own_teams])
     for index, match in enumerate(resolution.matches):
-        if own and own not in (match["home"].casefold(), match["away"].casefold()):
-            problems.append(_problem("own_team_missing", f"Spiel {index + 1}: Das eigene Team „{clean(own_team)}“ "
-                                     "spielt darin nicht.", match=index))
+        if own and not (own.is_own(match["home"]) or own.is_own(match["away"])):
+            text = (f"Das eigene Team „{own.names[0]}“ spielt" if len(own.names) == 1
+                    else "Keines der eigenen Teams spielt")
+            problems.append(_problem("own_team_missing", f"Spiel {index + 1}: {text} darin nicht.", match=index))
         if match["maps"]:
             home = sum(1 for item in match["maps"] if item["home_score"] > item["away_score"])
             away = sum(1 for item in match["maps"] if item["away_score"] > item["home_score"])
@@ -341,8 +344,9 @@ def _matches(resolution: Resolution, own_team: str | None) -> list[dict]:
     return problems
 
 
-def check(resolution: Resolution, rules: dict, round_doc: dict, today: str, own_team: str | None = None) -> None:
-    """Fehler und Warnungen zum Blatt ergänzen (an ``resolution.errors`` und ``.warnings``)."""
+def check(resolution: Resolution, rules: dict, round_doc: dict, today: str, own_teams=None) -> None:
+    """Fehler und Warnungen zum Blatt ergänzen (an ``resolution.errors`` und ``.warnings``). ``own_teams``: die eigenen
+    Teams der Saison (Liste aus ``own_teams.own_teams``, ein einzelner Name geht auch)."""
     errors, warnings = resolution.errors, resolution.warnings
     if not resolution.rows and not resolution.matches and not resolution.official_table:
         errors.append(_problem("empty", "Das Blatt ist leer - mindestens eine Zeile, ein Spiel oder die Tabelle."))
@@ -357,7 +361,7 @@ def check(resolution: Resolution, rules: dict, round_doc: dict, today: str, own_
         warnings.append(_problem("round_not_counted", "Der Termin zählt nicht zur Wertung."))
     warnings.extend(_places(resolution))
     warnings.extend(_points(resolution, rules))
-    warnings.extend(_matches(resolution, own_team))
+    warnings.extend(_matches(resolution, own_teams))
 
 
 def official_warnings(rows: list[dict], names: dict[str, str], *, scope: str) -> list[dict]:

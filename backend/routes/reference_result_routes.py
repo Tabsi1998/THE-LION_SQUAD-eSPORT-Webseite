@@ -8,7 +8,7 @@ Server nimmt nur strukturierte Zeilen. Kurzfassung des Vertrags: ``docs/entwickl
 
 **GET …/results** - Ausgangsstand zum Eintragen::
 
-    {round, series: {id, kind, team_name, rules, publish_mode}, access: {role, can_publish, valid_until?},
+    {round, series: {id, kind, team_name, own_teams, rules, publish_mode}, access: {role, can_publish, valid_until?},
      version, sheet | null, target: "sheet" | "pending_draft",
      participants: [{id, name, start_number, default_team, kind, is_club_member*, link_status*}]}
 
@@ -96,6 +96,7 @@ from match_rules import RESULT_MAX_SCORE
 from models import ReferencePointsSource, ReferenceResultMark, ReferenceResultStatus, new_id, now_utc
 from services import reference_running_cache, reference_series, series_identity, series_results
 from services.dolibarr_policy import club_today
+from services.own_teams import own_team_names, own_teams
 from services.reference_series_access import EDIT_PENDING_DRAFT, SeriesAccess, require_series_editor
 from services.scoring_rules import normalize_rules, result_points, validate_sheet
 from services.series_participants import build_index, new_participant, remove_unused_new
@@ -283,7 +284,7 @@ async def _prepare(db, access: SeriesAccess, round_doc: dict, body: ResultSheetI
     rules = _rules(access.series)
     participants = await _participants(db, access.series_id)
     resolution = series_results.resolve(body.model_dump(), participants, rules)
-    series_results.check(resolution, rules, round_doc, club_today(), access.series.get("team_name"))
+    series_results.check(resolution, rules, round_doc, club_today(), own_teams(access.series))
     if not resolution.errors:
         # Zur Sicherheit wie beim Rechnen - die Prüfung oben fängt dieselben Fälle schon mit Zeilenangabe ab.
         try:
@@ -312,7 +313,7 @@ async def _snapshots(db, series: dict, rules: dict, round_doc: dict, content: di
     sheets[round_doc["id"]] = content
     try:
         return compute_standings(rules=rules, rounds=rounds, sheets=sheets, participants=people,
-                                 own_teams=[series.get("team_name") or ""])
+                                 own_teams=own_teams(series))
     except ValueError:
         raise HTTPException(422, BROKEN_SHEETS) from None
 
@@ -458,7 +459,8 @@ async def get_results(series_id: str, round_id: str, access: SeriesAccess = Depe
     return {
         "round": _round_view(round_doc),
         "series": {"id": access.series_id, "kind": await _kind(db, access.series),
-                   "team_name": access.series.get("team_name"), "rules": _rules(access.series),
+                   "team_name": access.series.get("team_name"),
+                   "own_teams": own_team_names(access.series), "rules": _rules(access.series),
                    "publish_mode": access.series.get("publish_mode")},
         "access": access.summary(), "version": _version(existing), "sheet": _sheet_view(existing, access),
         "target": access.edit_target(existing),

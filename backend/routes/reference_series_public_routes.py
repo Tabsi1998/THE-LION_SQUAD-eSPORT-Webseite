@@ -25,6 +25,7 @@ from database import get_db
 from routes.reference_round_routes import PUBLIC_FIELDS, _calendar, visible_series
 from services import reference_running_cache
 from services.dolibarr_policy import club_today
+from services.own_teams import Matcher, own_teams
 from services.rate_limit import enforce_rate_limit
 from services.reference_calendar import calendar_view, vienna_clock
 from services.scoring_rules import normalize_rules
@@ -155,13 +156,14 @@ def _running_next(rounds: list[dict]) -> dict | None:
 
 
 def _club_place(lineage: dict, series: dict, snapshots: dict, club_ids: set) -> dict | None:
-    """Platz des Vereins im letzten gespeicherten Stand: bei der Team-Liga das eigene Team in der Tabelle, sonst der
-    beste Platz eines Vereinsmitglieds in der Gesamtwertung. Ohne Stand oder ohne Eintrag ``None``."""
+    """Platz des Vereins im letzten gespeicherten Stand: bei der Team-Liga der beste Platz eines eigenen Teams in der
+    Tabelle (#1926: alle eigenen Teams, auch in anderer Schreibweise), sonst der beste Platz eines Vereinsmitglieds in
+    der Gesamtwertung. Ohne Stand oder ohne Eintrag ``None``."""
     if lineage.get("kind") == "team_league":
         rows = (snapshots.get((series["id"], "table")) or {}).get("rows") or []
-        own = (series.get("team_name") or "").strip()
-        mine = next((row for row in rows if own and row.get("team") == own and row.get("rank")), None)
-        return {"rank": mine["rank"], "of": len(rows)} if mine else None
+        own = Matcher(own_teams(series))
+        ranks = [row["rank"] for row in rows if row.get("rank") and own.is_own(row.get("team"))]
+        return {"rank": min(ranks), "of": len(rows)} if ranks else None
     rows = (snapshots.get((series["id"], "drivers")) or {}).get("rows") or []
     ranks = [row["rank"] for row in rows if row.get("rank") and row.get("participant_id") in club_ids]
     return {"rank": min(ranks), "of": len(rows)} if ranks else None
@@ -215,7 +217,7 @@ async def _running(user: dict | None, today: str) -> dict:
     # und Teilnehmer werden danach nur für diese Serien geladen, damit die Last mit der Zahl der Serien nicht wächst.
     all_series = await db.reference_series.find({"status": "active"}, {
         "_id": 0, "id": 1, "lineage_id": 1, "visibility": 1, "season": 1, "tier": 1, "title": 1, "season_slug": 1,
-        "team_name": 1, "order_index": 1}).to_list(None)
+        "team_name": 1, "own_teams": 1, "order_index": 1}).to_list(None)
     lineages = {item["id"]: item async for item in db.reference_lineages.find(
         {"id": {"$in": list({s["lineage_id"] for s in all_series})}},
         {"_id": 0, "id": 1, "slug": 1, "title": 1, "kind": 1, "label": 1, "game_id": 1, "game_name": 1,
@@ -335,7 +337,8 @@ async def public_lineages(request: Request, user: dict | None = Depends(get_opti
     if seasons_by:
         async for series in db.reference_series.find(
                 {"lineage_id": {"$in": list(seasons_by)}, "status": {"$ne": "archived"}},
-                {"_id": 0, "id": 1, "lineage_id": 1, "visibility": 1, "team_name": 1, "reference_id": 1,
+                {"_id": 0, "id": 1, "lineage_id": 1, "visibility": 1, "team_name": 1, "own_teams": 1,
+                 "reference_id": 1,
                  "order_index": 1, **{key: 1 for key in PATH_SEASON_FIELDS}}):
             if await visible(series.get("visibility")):
                 seasons_by[series["lineage_id"]].append(series)
