@@ -100,6 +100,17 @@ async def test_a_pasted_calendar_sets_the_country_per_line(flow):
 
 
 @pytest.mark.asyncio
+async def test_a_city_or_name_in_the_title_sets_no_country(flow):
+    _, series = await _setup(flow)
+    bodies = [{"code": "R1", "title": "Austin Powers Gedächtnisrennen", "day": "2026-06-04"},
+              {"code": "R2", "title": "Las Vegas Nacht", "venue": "Probe-Ring", "day": "2026-06-11"},
+              {"code": "R3", "title": "Lauf in Monza", "day": "2026-06-18"}]
+    created = [(await flow.post(_rounds(series), json=body)).json() for body in bodies]
+    # Stadt oder Name im Titel setzt kein Land, eine Strecke im Titel schon.
+    assert [item["country_code"] for item in created] == [None, None, "IT"]
+
+
+@pytest.mark.asyncio
 async def test_the_result_sheet_names_the_country_of_its_round(flow):
     _, series = await _setup(flow)
     round_doc = (await flow.post(_rounds(series), json={"code": "R1", "venue": "Suzuka", "day": "2026-05-28"})).json()

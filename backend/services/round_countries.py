@@ -1,8 +1,11 @@
 """Land eines Termins externer Serien (#1925): die Flagge je Rennen, wie sie Veranstalter-Grafiken zeigen.
 
-- **Erkennen** (``detect_country``): aus Ort bzw. Strecke, dann aus dem Titel - deutsche und englische Ländernamen,
-  bekannte Strecken- und Städtenamen und Klammerzusätze („USA (Miami)“). Verglichen wird ohne Akzente, ohne Groß- und
-  Kleinschreibung und nur mit ganzen Wörtern („Spa“ ist nicht „Spanien“). Kein Treffer bleibt leer.
+- **Erkennen** (``detect_country``): zuerst aus Ort bzw. Strecke - deutsche und englische Ländernamen, bekannte
+  Strecken- und Städtenamen und Klammerzusätze („USA (Miami)“). Nur ohne Treffer dort aus dem Titel, und im Titel nur
+  Länder und Strecken: bloße Städte und Wörter, die auch Namen sind (``VENUE_ONLY``: „Austin Powers …“), zählen dort
+  nicht.
+  Verglichen wird ohne Akzente, ohne Groß- und Kleinschreibung und nur mit ganzen Wörtern („Spa“ ist nicht „Spanien“).
+  Kein Treffer bleibt leer.
 - **Liste:** ``COUNTRIES`` ist die Auswahl im Termin; die Website hat dieselbe Liste mit den deutschen Namen
   (``frontend/src/lib/countries.json``) und zu jedem Land eine Flagge (``frontend/public/assets/flags``). Ein Test
   hält beide gleich.
@@ -80,28 +83,37 @@ _ALIASES: tuple[tuple[str, str], ...] = tuple(sorted(
      if _words(alias)},
     key=lambda item: (-len(item[0]), item[0])))
 
+# Nur im Ort bzw. in der Strecke: bloße Städte und Wörter, die auch Vor- oder Nachnamen sind („Austin Powers …“,
+# „Spielberg“, „Holland“, „Monaco“). Im freien Titel zählen nur Länder- und Streckennamen.
+VENUE_ONLY = frozenset(_words(alias) for alias in (
+    "Abu Dhabi", "Dubai", "Buenos Aires", "Spielberg", "Melbourne", "Adelaide", "Bathurst", "Baku", "Spa",
+    "Sao Paulo", "Montreal", "Gilles Villeneuve", "Shanghai", "Zhuhai", "Brno", "Brünn", "Barcelona", "Madrid",
+    "Valencia", "Jerez", "Paul Ricard", "Budapest", "India", "Fuji", "Marrakesch", "Marrakech", "Monaco",
+    "Monte Carlo", "Monte-Carlo", "Mexico City", "Mexiko-Stadt", "Hermanos Rodriguez", "Holland", "Poznan", "Sochi",
+    "Sotschi", "Jeddah", "Dschidda", "Istanbul", "Austin", "Miami", "Las Vegas", "Indianapolis", "Indy", "Long Beach",
+    "Daytona", "Hanoi",
+))
+_TITLE_ALIASES = tuple(item for item in _ALIASES if item[0] not in VENUE_ONLY)
 
-def _find(text: str) -> str | None:
+
+def _find(text: str, aliases=_ALIASES) -> str | None:
     """Das Land der frühesten Fundstelle im Text (bei gleicher Stelle die längste Schreibweise)."""
     words = _words(text)
     if not words:
         return None
     padded = f" {words} "
     best: tuple[int, int, str] | None = None
-    for alias, code in _ALIASES:
+    for alias, code in aliases:
         at = padded.find(f" {alias} ")
         if at >= 0 and (best is None or (at, -len(alias)) < best[:2]):
             best = (at, -len(alias), code)
     return best[2] if best else None
 
 
-def detect_country(*texts) -> str | None:
-    """Land aus Ort bzw. Strecke, dann aus dem Titel (ISO-Code) - ``None`` ohne Treffer."""
-    for text in texts:
-        found = _find(text)
-        if found:
-            return found
-    return None
+def detect_country(venue=None, title=None) -> str | None:
+    """Land (ISO-Code) aus Ort bzw. Strecke - mit allen Schreibweisen; nur ohne Treffer aus dem Titel, dort nur Länder
+    und Strecken (``VENUE_ONLY`` zählt nicht). ``None`` ohne Treffer."""
+    return _find(venue) or _find(title, _TITLE_ALIASES)
 
 
 def clean_code(value) -> str | None:

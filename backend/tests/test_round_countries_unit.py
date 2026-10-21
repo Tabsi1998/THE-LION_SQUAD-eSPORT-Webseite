@@ -48,6 +48,26 @@ def test_bracket_additions_and_title_after_venue():
     assert round_countries.detect_country("Monza", "Saisonfinale Abu Dhabi") == "IT"
 
 
+@pytest.mark.parametrize(("title", "code"), [
+    # Im Titel zählen nur Länder- und Streckennamen …
+    ("GP von Belgien", "BE"), ("Rennen in Monza", "IT"), ("Spa-Francorchamps Klassiker", "BE"), ("Lauf am COTA", "US"),
+    ("Mexico City Grand Prix", "MX"),
+    # … keine bloßen Städte und keine Wörter, die auch Vor- oder Nachnamen sind.
+    ("Austin Powers Gedächtnisrennen", None), ("Las Vegas Nacht", None), ("Spa-Abend", None), ("Holland Cup", None),
+    ("Monaco Franze Pokal", None), ("Spielberg Spezial", None), ("Saisonfinale Abu Dhabi", None),
+])
+def test_the_title_only_knows_countries_and_tracks(title, code):
+    assert round_countries.detect_country(None, title) == code
+    assert round_countries.detect_country("", title) == code
+
+
+def test_the_venue_knows_cities_and_name_like_words():
+    assert round_countries.detect_country("Austin") == "US"
+    assert round_countries.detect_country("Monaco", "Austin Powers Gedächtnisrennen") == "MC"
+    assert round_countries.detect_country("Spielberg") == "AT"
+    assert round_countries.detect_country("Holland") == "NL"
+
+
 def test_no_match_stays_empty_and_words_only_count_whole():
     assert round_countries.detect_country("Probe-Ring") is None
     assert round_countries.detect_country("") is None
