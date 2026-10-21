@@ -273,8 +273,9 @@ Auf der Seite der Challenge stehen ganz oben (solange die Ergebnisse nicht verö
 **Schnelleingabe**
 
 1. **Fahrer** wählen: **Konto** (Personensuche) oder **Gast**. Steht genau eine Person **Am Start**, ist sie schon gewählt.
-2. Rechts oben steht **Versuch 2 von 3** (die eingestellte Zahl). Sind alle Versuche gefahren, steht dort „Alle 3
-   Versuche gefahren“ und Eintragen geht nicht mehr.
+2. Rechts oben (am Handy unter der Überschrift) steht **Versuch 2 von 3** (die eingestellte Zahl). Sind alle Versuche
+   gefahren, steht dort „Alle 3 Versuche gefahren“; **Eintragen**, **Eintragen & nächster Fahrer** und **Ungültig** sind
+   dann gesperrt, **Letzte korrigieren** geht weiter.
 3. Zeit am großen **Ziffernblock** tippen (`1`, `:`, `2`, `4`, `,`, `5`, `8`, `7`) oder mit der Tastatur. Unter dem Feld
    steht, was die Seite liest („= 1:24.587“) oder „nicht lesbar“. Unplausible Zeiten fragen wie immer nach.
 4. **Eintragen** – oder **Eintragen & nächster Fahrer**: dann verlässt die Person die Liste „Am Start“, und die
