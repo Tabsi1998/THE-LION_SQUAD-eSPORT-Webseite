@@ -1,5 +1,38 @@
 # Changelog
 
+## 1.23.0 (21.10.2026)
+
+### Neu
+
+* Mitgliederprofil – „Aufstellung · 5 von 7 Spielen“ aus der verknüpften Saison (#1931)
+* Partnerseite – Ligen und Serien mit uns (#1934)
+* Referenzen – Ergebnisseite je Runde mit Reitern je Lauf, Zusammenfassung und hochzählenden Zeiten (#1950)
+* Referenzen – Kalender, Lauf-Chips und Rennraster führen zur Ergebnisseite der Runde (#1950)
+* Referenzen – Map-Pool je Saison, Serienseite zeigt die Maps mit Bild (#1616)
+* Referenzen – Reiter „Statistik“ auf der Seite einer Rennliga (#1950)
+* Referenzen – Strafsekunden je Zeile im Ergebnisblatt (#1950)
+* Referenzen – Teamfarben je Saison mit Vorschlag aus dem Ergebnis-Bild (#1950)
+* Referenzen – Teilen-Karte der Runde mit Runde, Ort und Läufen (#1950)
+* Referenzen-Übersicht – Partner-Abzeichen bei Chronik, Läuft gerade und Serien & Ligen (#1934)
+* Referenzen-Übersicht und Startseite – nächster Spieltag mit Gegner (#1931)
+* Saison abschließen übernimmt auch die Partner der Saison (#1934)
+* Serienseite – Veranstaltet von mit Partner-Logo, Mitwirkende darunter (#1934)
+* Spiele – Map-Bibliothek mit Bild, Modi, Reihenfolge und Archiv (#1616)
+* Spiele – Modus ohne Dauer für Maps (#1616)
+* Team-Liga – „Spieltag einfügen“ erkennt die eigenen Spiele und übernimmt die übrigen Spiele des Spieltags (#1931)
+* Team-Liga – Kader je eigenem Team, Aufstellung als Ankreuzliste, je Map oder von der Match-Seite eingefügt (#1931)
+* Team-Liga – Maps im Veto mit Wahl, Bann und Decider, die Spieltag-Karte zeigt das ganze Veto (#1931)
+* Team-Liga – Serienseite mit Bilanz, Spieltagen als Karten und Kader mit Einsätzen (#1931)
+* Team-Liga – Terminliste mit Gegner („vs“/„@“), Heim/Auswärts und Spieltag-Zeitraum (#1931)
+* Turniere – Map-Pool je Turnier und Phase, Turnierseite zeigt die Maps (#1616)
+* Verwaltung Serien – Partner mit Rolle (Veranstalter/Mitwirkender) an Spur und Saison wählen (#1934)
+
+### Fehlerbehebungen
+
+* Referenzen – Sichtbarkeit verknüpfter Referenzen folgt einer strengeren Saison (#1970)
+* Team-Liga – Map ohne Ergebnis wird nicht mehr still 0:0 (#1931)
+* Team-Liga – Tabelle laut Veranstalter bleibt maßgeblich, andere Schreibweisen nur über ganze Wörter (#1931)
+
 ## 1.22.0 (21.10.2026)
 
 ### Neu
