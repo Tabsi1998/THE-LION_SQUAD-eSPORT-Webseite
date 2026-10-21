@@ -13,6 +13,10 @@ Runde. Gerechnet wird hier nichts: die Tabelle ist der gespeicherte Stand nach d
 (``reference_standings``), das Finale das veröffentlichte Ergebnisblatt seiner Runde. Namen kommen beim Lesen dazu
 (Entscheidung 2): fremde Namen nur als Text in der Tabelle - ohne Link und ohne Profil; ein ausgeblendeter Name kommt
 gar nicht erst mit. Nur Vereinsmitglieder tragen den Link zu ihrem Vereinsprofil. Die Seite ist ``noindex``.
+
+**Runde mit Läufen (#1930):** Jeder Termin trägt seinen Lauf (``session``, ``session_kind``) und seine Runde
+(``weekend``). Bei der Rennliga zählt der Fortschritt in Runden (alle zählenden Läufe einer Runde gewertet), der nächste
+Termin nennt seinen Lauf, und „Läuft gerade“ bringt dazu die Läufe der Runde (``next.sessions``).
 """
 from __future__ import annotations
 
@@ -23,7 +27,7 @@ from fastapi import APIRouter, Depends, Request
 from auth import get_optional_user
 from database import get_db
 from routes.reference_round_routes import PUBLIC_FIELDS, _calendar, visible_series
-from services import reference_running_cache
+from services import race_weekend, reference_running_cache
 from services.dolibarr_policy import club_today
 from services.own_teams import Matcher, own_teams
 from services.rate_limit import enforce_rate_limit
@@ -38,13 +42,12 @@ router = APIRouter(prefix="/api/reference-series", tags=["reference-series"])
 
 LINEAGE_FIELDS = ("title", "slug", "kind", "label", "organizer", "game_name", "external_url", "tier_order")
 SERIES_FIELDS = ("season", "tier", "title", "season_slug", "status", "default_weekday", "default_time",
-                 "external_url", "official_table_url", "rules_version", "season_result")
+                 "external_url", "official_table_url", "rules_version", "season_result", "weekend")
 RULE_FIELDS = ("points_mode", "points_by_place", "bonuses", "dnf_points", "dns_points", "dsq_points", "count_mode",
                "count_n", "activity_points", "final_top_n", "tiebreakers")
 ROW_FIELDS = ("rank", "points", "computed_points", "official_points", "deviation", "activity_points", "tiebreak",
               "wins", "podiums", "rounds_played")
-# Noch offen: geplant, heute, verschoben - und „Ergebnis folgt“ (vorbei, aber noch nicht gewertet).
-OPEN_STATES = ("planned", "today", "postponed", "missing")
+# Noch offen ist jede Wertungsrunde, die nicht gewertet ist (auch „Ergebnis folgt“); kommend sind nur diese:
 UPCOMING_STATES = ("planned", "today", "postponed")
 # Von einer Person geht nur das hinaus, was die Tabelle zeigt - keine Startnummer, kein Team, keine Kennungen.
 HIDDEN_PERSON = {"name": None, "name_hidden": True, "club_member": False, "profile_slug": None}
@@ -110,17 +113,36 @@ def _public_round(item: dict) -> dict:
     return {key: item.get(key) for key in PUBLIC_FIELDS}
 
 
-def _progress(rounds: list[dict]) -> dict:
-    """Fortschritt der Wertungsrunden (ohne Finale und Runden außerhalb der Wertung), dazu der nächste Termin."""
+def _units(rounds: list[dict], by_weekend: bool) -> list[list[dict]]:
+    """Die Wertungsrunden (ohne Finale und Termine außerhalb der Wertung): je Termin - bei der Rennliga je
+    Runde mit allen zählenden Läufen (#1930)."""
     regular = [item for item in rounds if item.get("kind") != "final" and item.get("counts", True) is not False]
-    live = [item for item in regular if item["state"] != "cancelled"]
+    if not by_weekend:
+        return [[item] for item in regular]
+    units: dict = {}
+    for item in regular:
+        units.setdefault(item.get("weekend") or item["id"], []).append(item)
+    return list(units.values())
+
+
+def _unit_scored(unit: list[dict]) -> bool:
+    return all(item["state"] == "scored" for item in unit if item["state"] != "cancelled")
+
+
+def _counts(rounds: list[dict], by_weekend: bool) -> dict:
+    """Wertungsrunden gesamt, gewertet und abgesagt (eine Runde ist abgesagt, wenn alle ihre Läufe es sind)."""
+    units = _units(rounds, by_weekend)
+    live = [unit for unit in units if any(item["state"] != "cancelled" for item in unit)]
+    scored = sum(1 for unit in live if _unit_scored(unit))
+    return {"total": len(live), "scored": scored, "cancelled": len(units) - len(live)}
+
+
+def _progress(rounds: list[dict], by_weekend: bool = False) -> dict:
+    """Fortschritt der Wertungsrunden (ohne Finale und Runden außerhalb der Wertung), dazu der nächste Termin."""
+    counts = _counts(rounds, by_weekend)
     upcoming = next((item for item in rounds if item["state"] in UPCOMING_STATES), None)
-    return {
-        "total": len(live), "scored": sum(1 for item in live if item["state"] == "scored"),
-        "cancelled": len(regular) - len(live),
-        "remaining": sum(1 for item in live if item["state"] in OPEN_STATES),
-        "next": _public_round(upcoming) if upcoming else None,
-    }
+    return {**counts, "remaining": counts["total"] - counts["scored"],
+            "next": _public_round(upcoming) if upcoming else None}
 
 
 async def _final(db, series_id: str, rounds: list[dict], people: dict) -> dict | None:
@@ -143,19 +165,29 @@ async def _final(db, series_id: str, rounds: list[dict], people: dict) -> dict |
 RUNNING_LIMIT = 12
 
 
-def _running_progress(rounds: list[dict]) -> dict:
+def _running_progress(rounds: list[dict], by_weekend: bool = False) -> dict:
     """Wertungsrunden wie ``_progress``: ohne Finale, ohne Runden außerhalb der Wertung, ohne abgesagte."""
-    live = [item for item in rounds if item.get("kind") != "final" and item.get("counts", True) is not False
-            and item["state"] != "cancelled"]
-    return {"total": len(live), "scored": sum(1 for item in live if item["state"] == "scored")}
+    counts = _counts(rounds, by_weekend)
+    return {"total": counts["total"], "scored": counts["scored"]}
 
 
-def _running_next(rounds: list[dict]) -> dict | None:
+NEXT_FIELDS = ("code", "title", "club_day", "state", "country_code", "session")
+
+
+def _running_next(rounds: list[dict], by_weekend: bool = False) -> dict | None:
+    """Der nächste offene Termin mit seinem Lauf - bei der Rennliga dazu alle Läufe seiner Runde (#1930), wenn es
+    mehrere sind (Lauf, Tag, Uhrzeit, Status)."""
     item = next((item for item in rounds if item["state"] in UPCOMING_STATES), None)
     if not item:
         return None
-    return {**{key: item.get(key) for key in ("code", "title", "club_day", "state", "country_code")},
-            "time": vienna_clock(item.get("starts_at"))}
+    out = {**{key: item.get(key) for key in NEXT_FIELDS}, "time": vienna_clock(item.get("starts_at"))}
+    sessions = [other for other in rounds if by_weekend and item.get("weekend")
+                and other.get("weekend") == item.get("weekend")]
+    if len(sessions) > 1:
+        out["sessions"] = [{"session": other.get("session"), "club_day": other.get("club_day"),
+                            "time": vienna_clock(other.get("starts_at")), "state": other["state"],
+                            "next": other.get("id") == item.get("id")} for other in sessions]
+    return out
 
 
 def _club_place(lineage: dict, series: dict, snapshots: dict, club_ids: set) -> dict | None:
@@ -221,7 +253,7 @@ async def _running(user: dict | None, today: str) -> dict:
     # und Teilnehmer werden danach nur für diese Serien geladen, damit die Last mit der Zahl der Serien nicht wächst.
     all_series = await db.reference_series.find({"status": "active"}, {
         "_id": 0, "id": 1, "lineage_id": 1, "visibility": 1, "season": 1, "tier": 1, "title": 1, "season_slug": 1,
-        "team_name": 1, "own_teams": 1, "order_index": 1}).to_list(None)
+        "team_name": 1, "own_teams": 1, "order_index": 1, "weekend": 1}).to_list(None)
     lineages = {item["id"]: item async for item in db.reference_lineages.find(
         {"id": {"$in": list({s["lineage_id"] for s in all_series})}},
         {"_id": 0, "id": 1, "slug": 1, "title": 1, "kind": 1, "label": 1, "game_id": 1, "game_name": 1,
@@ -273,15 +305,17 @@ async def _running(user: dict | None, today: str) -> dict:
 
     items = []
     for lineage, series in shown:
-        rounds = calendar_view(rounds_by[series["id"]], published[series["id"]], today)["rounds"]
+        rounds = race_weekend.annotate(calendar_view(rounds_by[series["id"]], published[series["id"]], today)["rounds"],
+                                       series.get("weekend"))
+        racing = lineage.get("kind") == "racing"
         game = games.get(lineage.get("game_id")) or {}
         items.append({
             "lineage": {"title": lineage.get("title"), "slug": lineage.get("slug"), "kind": lineage.get("kind"),
                         "label": lineage.get("label"), "game_name": lineage.get("game_name") or game.get("name")},
             "game": {key: game.get(key) for key in ("name", "short_name", "logo_url")} if game else None,
             "series": {key: series.get(key) for key in ("season", "tier", "title", "season_slug")},
-            "progress": _running_progress(rounds),
-            "next": _running_next(rounds),
+            "progress": _running_progress(rounds, racing),
+            "next": _running_next(rounds, racing),
             "today": any(item["state"] == "today" for item in rounds),
             "club": _club_place(lineage, series, snapshots, club_ids),
             "club_count": club_count.get(series["id"], 0),
@@ -404,7 +438,7 @@ async def public_series(lineage_slug: str, season_slug: str, user: dict | None =
         "series": {key: series.get(key) for key in SERIES_FIELDS},
         "rules": _rules(series),
         "today": calendar["today"],
-        "progress": _progress(rounds),
+        "progress": _progress(rounds, by_weekend=lineage.get("kind") == "racing"),
         "rounds": [_public_round(item) for item in rounds],
         "standings": None if not latest else {
             "round_id": latest.get("round_id"), "round_seq": latest.get("round_seq"),

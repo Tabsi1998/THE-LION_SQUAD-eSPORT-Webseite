@@ -1,0 +1,99 @@
+{
+  "_comment": "Runde mit Läufen (#1930): zwei Ligen mit Punkten je Lauf wie in der Veranstalter-App, je eine Runde mit erfundenen Fahrern. Server (backend/tests/test_race_weekend_leagues_unit.py) rechnet die Punkte und Summen nach, das Web (lib/raceWeekend.test.js) die Tabellen je Lauf.",
+  "people": [
+    { "id": "anna", "name": "Probe Anna" },
+    { "id": "bert", "name": "Probe Bert" },
+    { "id": "carla", "name": "Probe Carla" },
+    { "id": "dino", "name": "Probe Dino" }
+  ],
+  "leagues": [
+    {
+      "name": "F1-Liga (wie PRL35)",
+      "rules": {
+        "points_mode": "scheme",
+        "points_by_place": [35, 30, 26, 23, 20, 17, 15, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1],
+        "dnf_points": 0,
+        "bonuses": { "fastest_lap": { "points": 0 }, "pole": { "points": 0 } }
+      },
+      "weekend": {
+        "formats": [{ "sessions": [
+          { "label": "Shootout", "offset": 0, "points": "none", "grid": "manual" },
+          { "label": "Sprint", "offset": 30, "points": [12, 9, 7, 6, 5, 4, 3, 2, 1], "grid": "qualifying" },
+          { "label": "Qualifying", "offset": 1440, "points": "none" },
+          { "label": "Rennen", "offset": 1470, "points": "series", "grid": "qualifying" }
+        ] }]
+      },
+      "rounds": [
+        { "id": "f1-so", "code": "R1", "session": "Shootout", "session_kind": "qualifying", "counts": false },
+        { "id": "f1-s", "code": "R1", "session": "Sprint", "session_kind": "sprint", "counts": true },
+        { "id": "f1-q", "code": "R1", "session": "Qualifying", "session_kind": "qualifying", "counts": false },
+        { "id": "f1-r", "code": "R1", "session": "Rennen", "session_kind": "race", "counts": true }
+      ],
+      "sheets": {
+        "f1-so": [["carla", 1, []], ["anna", 2, []], ["bert", 3, []], ["dino", 4, []]],
+        "f1-s": [["anna", 1, []], ["carla", 2, []], ["dino", 3, []], ["bert", 4, ["dnf"]]],
+        "f1-q": [["bert", 1, ["pole"]], ["anna", 2, []], ["dino", 3, []], ["carla", 4, []]],
+        "f1-r": [["bert", 1, []], ["anna", 2, []], ["carla", 3, []], ["dino", 4, ["fastest_lap"]]]
+      },
+      "expected": {
+        "points": {
+          "f1-s": { "anna": 12, "carla": 9, "dino": 7, "bert": 0 },
+          "f1-r": { "bert": 35, "anna": 30, "carla": 26, "dino": 23 }
+        },
+        "grid": {
+          "f1-s": { "carla": 1, "anna": 2, "bert": 3, "dino": 4 },
+          "f1-r": { "bert": 1, "anna": 2, "dino": 3, "carla": 4 }
+        },
+        "poles": { "f1-r": "bert" },
+        "totals": [["anna", 42], ["bert", 35], ["carla", 35], ["dino", 30]],
+        "tables": {
+          "race": [["bert", 35], ["anna", 30], ["carla", 26], ["dino", 23]],
+          "sprint": [["anna", 12], ["carla", 9], ["dino", 7], ["bert", 0]]
+        }
+      }
+    },
+    {
+      "name": "F2-Liga (wie PRL50)",
+      "rules": {
+        "points_mode": "scheme",
+        "points_by_place": [35, 30, 26, 23, 20, 17, 15, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1],
+        "dnf_points": 0,
+        "bonuses": { "fastest_lap": { "points": 0 }, "pole": { "points": 0 } }
+      },
+      "weekend": {
+        "formats": [{ "sessions": [
+          { "label": "Qualifying", "offset": 0, "points": [2] },
+          { "label": "Sprint", "offset": 30, "points": "series", "grid": "manual" },
+          { "label": "Rennen", "offset": 90, "points": "series", "grid": "qualifying" }
+        ] }]
+      },
+      "rounds": [
+        { "id": "f2-q", "code": "R1", "session": "Qualifying", "session_kind": "qualifying", "counts": true },
+        { "id": "f2-s", "code": "R1", "session": "Sprint", "session_kind": "sprint", "counts": true },
+        { "id": "f2-r", "code": "R1", "session": "Rennen", "session_kind": "race", "counts": true }
+      ],
+      "sheets": {
+        "f2-q": [["dino", 1, ["pole"]], ["bert", 2, []], ["anna", 3, []], ["carla", 4, []]],
+        "f2-s": [["carla", 1, []], ["dino", 2, []], ["anna", 3, []], ["bert", 4, []]],
+        "f2-r": [["anna", 1, []], ["bert", 2, []], ["carla", 3, []], ["dino", null, ["dnf"]]]
+      },
+      "expected": {
+        "points": {
+          "f2-q": { "dino": 2, "bert": 0, "anna": 0, "carla": 0 },
+          "f2-s": { "carla": 35, "dino": 30, "anna": 26, "bert": 23 },
+          "f2-r": { "anna": 35, "bert": 30, "carla": 26, "dino": 0 }
+        },
+        "grid": {
+          "f2-r": { "dino": 1, "bert": 2, "anna": 3, "carla": 4 }
+        },
+        "poles": { "f2-q": "dino" },
+        "totals": [["anna", 61], ["carla", 61], ["bert", 53], ["dino", 32]],
+        "tables": {
+          "race": [["anna", 35], ["bert", 30], ["carla", 26], ["dino", 0]],
+          "sprint": [["carla", 35], ["dino", 30], ["anna", 26], ["bert", 23]],
+          "qualifying": [["dino", 2], ["bert", 0], ["anna", 0], ["carla", 0]]
+        }
+      }
+    }
+  ]
+}

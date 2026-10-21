@@ -12,7 +12,9 @@ export function todayItems(data) {
 export function todayFacts(item) {
   const kind = item?.lineage?.kind;
   const next = item?.next || {};
-  const round = next.code ? `${ROUND_WORD[kind] || "Runde"} ${next.code}` : next.title || "";
+  // Runde mit Läufen (#1930): der heutige Lauf statt des Worts „Rennen“ - „R3 · Qualifying“.
+  const word = next.session ? next.code : next.code && `${ROUND_WORD[kind] || "Runde"} ${next.code}`;
+  const round = [word || next.title || "", next.session || ""].filter(Boolean).join(" · ");
   const count = Number(item?.club_count) || 0;
   return [
     round,

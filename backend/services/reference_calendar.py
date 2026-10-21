@@ -13,7 +13,9 @@ und der Parser für eingefügte Terminlisten.
   getrennt durch Leerzeichen, ``·``, ``|``, ``;`` oder Tabulator - etwa „R1 · 05.11. · Ort“. Ohne Jahr gilt das erste
   Jahr der Saison, und springt das Datum zurück, das nächste Jahr. Ohne Datum folgt der nächste Standard-Wochentag der
   Serie (sonst eine Woche) nach der Zeile davor, ohne Uhrzeit die Standard-Uhrzeit. Aus dem Ort kommt das Land
-  (``country_code``, #1925) - etwa „R1 · 18.06.2026 · Aserbaidschan“.
+  (``country_code``, #1925) - etwa „R1 · 18.06.2026 · Aserbaidschan“. Ein Lauf am Kürzel („R1S“, „R1 Sprint“, „R1 Q“,
+  #1930) kommt nach ``session`` statt in den Ort (``race_weekend.take_code``); die Ablauf je Runde legt
+  ``race_weekend.expand_paste`` an.
 """
 from __future__ import annotations
 
@@ -21,6 +23,7 @@ import re
 from datetime import date, datetime, timedelta, timezone
 
 from services.dolibarr_policy import CLUB_TZ
+from services.race_weekend import GAP, take_code
 from services.round_countries import detect_country
 from services.series_standings import ordered_rounds
 
@@ -32,7 +35,6 @@ MAX_VENUE = 160
 _ISO_DATE = re.compile(r"(?<!\d)(\d{4})-(\d{1,2})-(\d{1,2})(?!\d)")
 _DOT_DATE = re.compile(r"(?<![\d.])(\d{1,2})\.(\d{1,2})\.(\d{4}|\d{2})?(?![\d])")
 _CLOCK = re.compile(r"(?<![\d:])(\d{1,2}):(\d{2})(?:\s*Uhr)?(?![\d:])", re.IGNORECASE)
-_CODE = re.compile(r"^\s*([A-Za-zÄÖÜäöü]{1,6}\s?\d{1,3}|\d{1,3})\.?(?=[\s·|;\t]|$)")
 _SPLIT = re.compile(r"[·|;]| [–-] ")
 _YEAR = re.compile(r"(?<!\d)(\d{4})(?!\d)")
 
@@ -104,7 +106,10 @@ def round_status(rnd: dict, has_result: bool, today: str) -> str:
 
 
 def round_label(rnd: dict, position: int) -> str:
-    return (rnd.get("code") or "").strip() or f"Termin {position}"
+    """Kürzel eines Termins (sonst „Termin N“), mit Lauf (#1930): „R1 Sprint“."""
+    code = (rnd.get("code") or "").strip() or f"Termin {position}"
+    session = " ".join(str(rnd.get("session") or "").split())
+    return f"{code} {session}" if session else code
 
 
 def calendar_view(rounds: list[dict], result_round_ids, today: str) -> dict:
@@ -174,7 +179,8 @@ def parse_round_lines(text: str, *, season: str | None, today: str, default_week
                 given = dot.group(3)
                 y = (2000 + int(given) if len(given) == 2 else int(given)) if given else None
                 shown = f"{d:02d}.{m:02d}." + (given or "")
-            rest = rest[:match.start()] + " " + rest[match.end():]
+            # Die Lücke bleibt als Trenner sichtbar (``GAP``) - für ein Lauf-Wort davor („R1 Sprint 07.03. Spa“).
+            rest = rest[:match.start()] + f" {GAP} " + rest[match.end():]
             try:
                 if y is None:
                     # Erst das Jahr, dann das Datum - sonst scheitert der 29.02. am Jahr vor dem Schaltjahr.
@@ -191,12 +197,8 @@ def parse_round_lines(text: str, *, season: str | None, today: str, default_week
             if hours > 23 or minutes > 59:
                 error = f"Uhrzeit {found.group(1)}:{found.group(2)} gibt es nicht."
             clock = f"{hours:02d}:{minutes:02d}"
-            rest = rest[:found.start()] + " " + rest[found.end():]
-        code = None
-        found_code = _CODE.match(rest)
-        if found_code:
-            code = " ".join(found_code.group(1).split())
-            rest = rest[found_code.end():]
+            rest = rest[:found.start()] + f" {GAP} " + rest[found.end():]
+        code, session, rest = take_code(rest)
         venue = _clean_venue(rest) or None
         if not error and day is None:
             if previous is None:
@@ -224,7 +226,8 @@ def parse_round_lines(text: str, *, season: str | None, today: str, default_week
         warning = None
         if default_weekday is not None and not undated and day.weekday() != default_weekday:
             warning = "Nicht am Standard-Wochentag."
-        rows.append({"line": number, "text": raw, "code": code, "venue": venue, "day": day.isoformat(),
+        rows.append({"line": number, "text": raw, "code": code, "session": session, "venue": venue,
+                     "day": day.isoformat(),
                      "time": clock, "starts_at": starts_at, "derived_day": undated,
                      "warning": warning, "country_code": detect_country(venue)})
     return {"rows": [] if errors else rows, "errors": errors}

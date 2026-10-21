@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
 import { api, formatApiError } from "@/lib/api";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
-import { STATE_LABELS, STATE_TONES, roundLabel, roundWhen } from "@/lib/referenceCalendar";
+import { STATE_LABELS, STATE_TONES, dayLabel, roundLabel, roundWhen } from "@/lib/referenceCalendar";
+import { groupWeekends, hasSessions } from "@/lib/raceWeekend";
+import { SessionChips } from "@/components/tls/series/SessionChips";
 import { ResultEntrySheet } from "./ResultEntrySheet";
 import { VenueWithFlag } from "@/components/tls/CountryFlag";
 import { UnknownNamesSheet } from "./UnknownNamesSheet";
@@ -10,7 +12,8 @@ import { ListOrdered, PenLine } from "lucide-react";
 // Ergebnisse eintragen (#1744, Paket P5b): je Termin der Saison „Ergebnis eintragen“ – das Blatt mit der dynamischen
 // Liste, dem Einfügen aus der Zwischenablage und der Vorschau des Servers liegt in `ResultEntrySheet`. Abgesagte Termine
 // fehlen hier, sie bekommen kein Ergebnis. Vorstand und Captains der Saison sehen den Abschnitt; was beim Übernehmen
-// passiert (Entwurf, veröffentlichen, Entwurf daneben), sagt der Server je Termin.
+// passiert (Entwurf, veröffentlichen, Entwurf daneben), sagt der Server je Termin. Rennliga mit Läufen (#1930): je Runde
+// eine Zeile, jeder Lauf ein Chip in der Farbe seines Status - ein Tipp öffnet sein Ergebnisblatt.
 
 export function SeriesResultsSection({ series, onChanged }) {
   const [calendar, setCalendar] = useState(null);
@@ -41,6 +44,7 @@ export function SeriesResultsSection({ series, onChanged }) {
   }, [load, onChanged]);
 
   const rounds = (calendar?.rounds || []).filter((round) => round.status !== "cancelled");
+  const weekends = series.lineage?.kind === "racing" && hasSessions(rounds) ? groupWeekends(rounds) : null;
   return (
     <section className="border border-white/10 rounded-sm bg-[#121212] p-4" data-testid="series-results" aria-labelledby="series-results-title">
       <h2 id="series-results-title" className="text-[11px] font-bold uppercase tracking-widest text-[#29B6E8]">Ergebnisse</h2>
@@ -48,7 +52,24 @@ export function SeriesResultsSection({ series, onChanged }) {
       {calendar && rounds.length === 0 && (
         <p className="mt-3 text-sm text-white/55" data-testid="results-empty">Noch keine Termine – Ergebnisse gibt es je Termin im Kalender.</p>
       )}
-      {rounds.length > 0 && (
+      {weekends && (
+        <>
+          <p className="mt-1 text-xs text-white/50">Je Lauf ein Ergebnis – den Lauf antippen.</p>
+          <ol className="mt-2 divide-y divide-white/5" data-testid="results-weekends">
+            {weekends.map((weekend) => (
+              <li key={weekend.key} className="py-2.5 flex items-start gap-3" data-testid="results-weekend" data-state={weekend.state}>
+                <div className="w-12 shrink-0 pt-0.5 text-sm font-black tabular-nums text-white/80">{roundLabel(weekend.lead)}</div>
+                <div className="min-w-0 flex-1 text-sm">
+                  <span className="tabular-nums text-white">{dayLabel(weekend.lead.club_day) || "Termin offen"}</span>
+                  {(weekend.title || weekend.venue || weekend.country_code) && <span className="text-white/60"> · <VenueWithFlag round={weekend} /></span>}
+                  <SessionChips rounds={weekend.rounds} admin showTime onOpen={setOpen} className="mt-2" testId="results-sessions" />
+                </div>
+              </li>
+            ))}
+          </ol>
+        </>
+      )}
+      {rounds.length > 0 && !weekends && (
         <ol className="mt-3 divide-y divide-white/5" data-testid="results-rounds">
           {rounds.map((round) => {
             const scored = round.state === "scored";

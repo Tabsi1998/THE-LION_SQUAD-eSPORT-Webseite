@@ -43,7 +43,10 @@ test("Formular und Body: neuer Termin mit Vorschlag, leere Uhrzeit heißt ohne U
   const existing = roundToForm({ id: "r1", code: "R1", club_day: "2026-11-05", time: null, counts: false }, { day: "2026-11-12", time: "20:30" });
   expect(existing).toMatchObject({ code: "R1", day: "2026-11-05", time: "", counts: false });
   expect(roundPayload({ ...existing, venue: "  Probering ", note: " " })).toEqual({
-    code: "R1", title: null, venue: "Probering", day: "2026-11-05", time: null, kind: "regular", counts: false, opponent: null, note: null,
+    code: "R1", session: null, title: null, venue: "Probering", day: "2026-11-05", time: null, kind: "regular", counts: false, opponent: null, note: null,
     country_auto: true,
   });
+  // Lauf (#1930): getrimmt, leer heißt Rennen.
+  expect(roundPayload({ ...existing, session: " Sprint " }).session).toBe("Sprint");
+  expect(roundToForm({ id: "r2", session: "Qualifying" }).session).toBe("Qualifying");
 });

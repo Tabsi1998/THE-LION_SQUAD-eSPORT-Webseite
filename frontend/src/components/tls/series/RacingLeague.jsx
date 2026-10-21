@@ -4,8 +4,9 @@ import { formatNumber } from "@/lib/standingsTable";
 import { motionAllowed } from "@/lib/motion";
 import { nameOf } from "@/lib/referenceSeriesTable";
 import {
-  barShare, bonusLabel, clubDrivers, garageTeams, gapLabel, teamRuleLabel, teamTableRows,
+  barShare, bonusLabel, clubDrivers, garageName, garageTeams, gapLabel, teamRuleLabel, teamTableRows,
 } from "@/lib/racingLeague";
+import { hasSessions, qualiDuel, sessionPointsLines, sessionTables } from "@/lib/raceWeekend";
 import { SeriesStandings } from "@/components/tls/series/SeriesStandings";
 import { PROGRESS_WORDS, SeriesFinal, SeriesProgress, SeriesRules } from "@/components/tls/series/SeriesParts";
 import {
@@ -19,7 +20,11 @@ import "./racingLeague.css";
 // Ausfall, Abstand, Abweichung zum offiziellen Wert), Teamwertung mit Balken und der Rennkalender. Die Tabellen sind
 // die der Turnierserie (SeriesStandings) mit eigenen Zellen. Das Detail eines Vereinsfahrers steht in der Adresse
 // (?fahrer=…), damit es sich teilen lässt; es gibt es nur für Kennungen, die der Server in `club_drivers` nennt
-// (öffentlich sichtbare Vereinsmitglieder) - eine andere Kennung in der Adresse öffnet nichts.
+// (öffentlich sichtbare Vereinsmitglieder) - eine andere Kennung in der Adresse öffnet nichts. Runde mit Läufen (#1930):
+// Hat die Saison Läufe, zählt der Fortschritt Runden, das Raster fasst die Läufe einer Runde unter einem Kopf zusammen,
+// der Kalender zeigt je Runde die Lauf-Chips, und das Fahrer-Detail nennt Poles, Ø Start und das Quali-Duell. Zählen
+// mehrere Arten von Läufen, schaltet „Gesamt · Rennen · Sprint · Quali“ zwischen der Gesamtwertung und den Tabellen je
+// Lauf um (etwa die eigene Sprint-Tabelle) - gezählt aus dem gespeicherten Stand.
 
 const FAHRER = "fahrer";
 
@@ -79,6 +84,22 @@ export function RacingLeague({ data }) {
   const teamLead = Math.max(0, ...teamRows.map((row) => Number(row.points) || 0));
   const bonus = bonusLabel(data.rules);
   const teamRule = teamRuleLabel(racing.team_scoring);
+  const weekends = hasSessions(rounds);
+  const sessionPoints = sessionPointsLines(data.series?.weekend);
+  const qualifying = useMemo(() => racing.qualifying || [], [racing.qualifying]);
+  const tables = useMemo(() => sessionTables(rows, rounds), [rows, rounds]);
+  const [tableKind, setTableKind] = useState("all");
+  const table = tables.find((item) => item.kind === tableKind) || null;
+  const tableRows = table ? table.rows : rows;
+  // Quali-Duell (#1930): gegen den Teamkollegen aus der Garage mit den meisten gemeinsamen Qualifyings.
+  const duel = useMemo(() => {
+    if (!selected || !qualifying.length) return null;
+    const team = garage.find((item) => item.drivers.some((row) => row.key === selected.key));
+    const best = (team?.drivers || []).filter((row) => row.key !== selected.key)
+      .map((row) => ({ row, ...qualiDuel(selected.key, row.key, qualifying) }))
+      .sort((x, y) => y.sessions - x.sessions)[0];
+    return best?.sessions ? { name: garageName(best.row, publicKeys).name, a: best.a, b: best.b, sessions: best.sessions } : null;
+  }, [selected, qualifying, garage, publicKeys]);
 
   const select = useCallback((key, { jump = false } = {}) => {
     setParams((current) => {
@@ -102,14 +123,14 @@ export function RacingLeague({ data }) {
   return (
     <>
       <SeasonSwitcher seasons={racing.seasons} lineageSlug={data.lineage?.slug} />
-      <SeriesProgress progress={data.progress} rounds={rounds} words={PROGRESS_WORDS.racing} />
+      <SeriesProgress progress={data.progress} rounds={rounds} words={PROGRESS_WORDS.racing} weekends={weekends} />
 
       {/* Die Garage steht, sobald es Vereinsteams gibt; nur das Detail braucht einen öffentlichen Vereinsfahrer. */}
       {(garage.length > 0 || selected) && (
         <section className="mt-10" aria-labelledby="racing-garage-title" data-testid="racing-garage">
           <h2 id="racing-garage-title" className="font-heading text-2xl font-black uppercase">Vereins-Garage</h2>
           <RacingGarageTeams garage={garage} rows={rows} drivers={drivers} selectedKey={selected?.key} onSelect={select} publicKeys={publicKeys} />
-          {selected && <RacingDriverDetail ref={detailRef} row={selected} driver={drivers[selected.key]} rounds={rounds} flash={flash} />}
+          {selected && <RacingDriverDetail ref={detailRef} row={selected} driver={drivers[selected.key]} rounds={rounds} flash={flash} qualifying={qualifying} qualiDuel={duel} />}
         </section>
       )}
 
@@ -117,16 +138,27 @@ export function RacingLeague({ data }) {
         <h2 id="racing-drivers-title" className="font-heading text-2xl font-black uppercase">Fahrerwertung</h2>
         <SeriesRules rules={data.rules} />
         {bonus && <p className="mt-2 text-sm text-white/70" data-testid="racing-bonus"><span className="text-white/45">Bonus </span>{bonus}</p>}
+        {sessionPoints.length > 0 && <p className="mt-2 text-sm text-white/70" data-testid="racing-session-points"><span className="text-white/45">Punkte je Lauf </span>{sessionPoints.join("; ")}</p>}
+        {tables.length > 0 && (
+          <div className="mt-5 flex flex-wrap gap-2" role="group" aria-label="Wertung je Lauf" data-testid="racing-table-tabs">
+            {[["all", "Gesamt"], ...tables.map((item) => [item.kind, item.label])].map(([kind, label]) => (
+              <button key={kind} type="button" className="tls-season-tab" aria-pressed={tableKind === kind} onClick={() => setTableKind(kind)} data-testid={`racing-table-${kind}`}>
+                {label}
+              </button>
+            ))}
+          </div>
+        )}
         <SeriesStandings
-          standings={data.standings}
-          rounds={rounds}
-          rules={data.rules}
-          label="Fahrerwertung"
+          standings={table ? { rows: table.rows } : data.standings}
+          rounds={table ? table.rounds : rounds}
+          rules={table ? null : data.rules}
+          label={table ? `${table.label}-Wertung` : "Fahrerwertung"}
           filterLabel="Nur Vereinsfahrer"
           renderName={(row) => <DriverCell row={row} driver={drivers[row.key]} onSelect={jumpTo} canOpen={publicKeys.includes(row.key)} />}
           renderResult={(result, name) => <RaceCell result={result} name={name} />}
           renderPoints={(row) => <RacingPoints row={row} />}
-          extraColumn={{ header: "Abstand", title: "Abstand zur Spitze in Punkten", cell: (row) => <span data-testid="racing-gap">{gapLabel(row, rows)}</span> }}
+          extraColumn={{ header: "Abstand", title: "Abstand zur Spitze in Punkten", cell: (row) => <span data-testid="racing-gap">{gapLabel(row, tableRows)}</span> }}
+          weekends={weekends}
         />
       </section>
 
@@ -144,6 +176,7 @@ export function RacingLeague({ data }) {
             renderResult={(result, name) => <TeamResult result={result} name={name} rows={rows} />}
             renderPoints={(row) => <RacingPoints row={row} />}
             extraColumn={{ header: "Abstand", title: "Abstand zur Spitze in Punkten", cell: (row) => <span data-testid="racing-gap">{gapLabel(row, teamRows)}</span> }}
+            weekends={weekends}
           />
         </section>
       )}

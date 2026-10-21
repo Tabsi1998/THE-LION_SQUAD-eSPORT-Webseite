@@ -5,6 +5,7 @@ import { roundLabel, roundWhen } from "@/lib/referenceCalendar";
 import { finalNeeds, maxRoundPoints } from "@/lib/finalCalc";
 import { VenueWithFlag } from "@/components/tls/CountryFlag";
 import { countLabel, nameOf, roundColumns, schemeLabel, tiebreakLabel } from "@/lib/referenceSeriesTable";
+import { groupWeekends, sessionLabel } from "@/lib/raceWeekend";
 import "./referenceSeries.css";
 
 // Bausteine der Serienseite (#1745): Rundenfortschritt mit nächstem Termin, Regeln, Finalrechner (ausdrücklich ein
@@ -16,9 +17,13 @@ export const PROGRESS_WORDS = {
   racing: { rounds: "Rennen", next: "Nächstes Rennen: " },
 };
 
-/** Ein Feld je Wertungsrunde (gewertet in Cyan), das Finale in Gold am Ende; darunter der nächste Termin. */
-export function SeriesProgress({ progress, rounds, words = PROGRESS_WORDS.series }) {
-  const steps = roundColumns(rounds);
+/** Ein Feld je Wertungsrunde (gewertet in Cyan), das Finale in Gold am Ende; darunter der nächste Termin. Mit
+ * `weekends` ist ein Feld eine Runde mit allen ihren Läufen (Runde mit Läufen, #1930) - gewertet, wenn alle es sind. */
+export function SeriesProgress({ progress, rounds, words = PROGRESS_WORDS.series, weekends = false }) {
+  const columns = roundColumns(rounds);
+  const steps = weekends
+    ? groupWeekends(columns).map((group) => ({ ...group.lead, id: group.key, state: group.state }))
+    : columns;
   const final = (rounds || []).find((round) => round.kind === "final");
   const next = progress?.next;
   return (
@@ -40,7 +45,7 @@ export function SeriesProgress({ progress, rounds, words = PROGRESS_WORDS.series
       {next && (
         <p className="mt-3 text-sm text-white/70" data-testid="series-next">
           <span className="text-white/45">{next.kind === "final" ? "Als Nächstes das Finale: " : words.next}</span>
-          <span className="text-white font-semibold">{roundLabel(next)}</span>
+          <span className="text-white font-semibold">{sessionLabel(next)}</span>
           <span className="tabular-nums"> · {roundWhen(next)}</span>
           {(next.venue || next.country_code) && <span> · <VenueWithFlag round={{ venue: next.venue, country_code: next.country_code }} /></span>}
         </p>

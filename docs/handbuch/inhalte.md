@@ -349,7 +349,9 @@ monatliche **Turnierserien**, **Rennligen** mit Fahrer- und Teamwertung und **Te
 Pole (bis Platz X), Punkte bei Ausfall, Nichtstart und Disqualifikation, **alle Runden**, **beste N** oder **N
 Streichergebnisse** (es zählen die besten „Runden im Kalender minus N“), Aktivitätspunkte ab Runde X, die Finalgrenze,
 der Vorrang bei Gleichstand (der Reihe nach, sonst teilen sich beide den Platz) und die Teamwertung (wie viele Fahrer je
-Rennen zählen, ob Gäste zählen). Eine Team-Liga hat stattdessen Punkte für Sieg, Unentschieden und Niederlage.
+Rennen zählen, ob Gäste zählen). Eine Team-Liga hat stattdessen Punkte für Sieg, Unentschieden und Niederlage. In
+einer Saison mit Läufen ist jede Runde eine Einheit: Streichergebnisse, „beste N“, Aktivitätspunkte und „gefahrene
+Runden“ zählen Runden, gestrichen wird immer eine ganze Runde (die Summe ihrer Läufe), nie ein einzelner Lauf.
 
 Ändert ihr eine Regel mitten in der Saison, steigt die **Version**, der **Hinweis zur Regeländerung** steht bei der Saison
 und im Protokoll, und alle Tabellen der Saison werden neu gerechnet.
@@ -437,6 +439,53 @@ bekommt keine Platzierung (der Status „abgebrochen“ kommt mit einem eigenen 
 Hat ein Termin kein Ergebnis, obwohl danach schon gewertet ist, steht oben der Hinweis **Lücke im Kalender** – meist
 fehlt das Ergebnis, oder der Termin wurde abgesagt.
 
+**Runde mit Läufen (Rennliga).** Eine Runde (gleiches Kürzel, etwa R1) kann mehrere **Läufe** haben:
+Qualifying, Shootout (Sprint-Qualifying), Sprint, Rennen, Hauptrennen, Lauf 1, Lauf 2 oder ein eigener Name. Jeder Lauf
+ist ein eigener Termin mit eigenem Ergebnisblatt, gezeigt wird aber eine Runde. Bestehende Termine ohne Lauf sind Rennen
+und bleiben, wie sie sind: Gleiche Kürzel bilden nur dann eine Runde, wenn Termine einen Lauf haben oder die Saison einen
+Ablauf je Runde hat – eine alte Saison mit zweimal „R1“ behält zwei Runden.
+
+- **Ablauf je Runde** (Saison bearbeiten, nur bei einer Rennliga): **Ablauf festlegen** legt Format 1 an, etwa
+  „Quali + Sprint + Hauptrennen“. Je Lauf gibt es Name, **Versatz** in Minuten ab der Uhrzeit der Zeile, **Punkte**
+  (**Wie Rennen** = das Schema der Saison, **Keine Punkte** oder **Eigene Liste** wie `12-9-7-6-5-4-3-2-1`; darunter
+  steht die Vorschau „P1 35 · P2 30 …“), **Startplatz** (Eingabe, aus dem Qualifying, **Umgekehrte WM-Reihenfolge vor
+  der Runde** oder **… nach dem Lauf davor** – dann zählt für das Hauptrennen auch der Sprint derselben Runde),
+  **Zählt zur Wertung**, **Punkte trotz DNF** und den **Bonus für die schnellste Runde** (leer: wie die
+  Saison). Ein Qualifying zählt nicht – mit eigener Liste (etwa P1 = 2 Punkte) zählt es von selbst. Ändert sich der
+  Ablauf mitten in der Saison, kommt mit **Format ab Runde …** ein weiteres Format dazu, etwa ab Runde 5 ohne Qualifying.
+  Ändert ihr Punkte oder Startplatz, rechnet die Seite alle Stände neu. Beispiel F1-Liga: Shootout und Qualifying ohne Punkte, Sprint `12-9-7-6-5-4-3-2-1`, Rennen wie die
+  Saison (`35-30-26-…-1`); F2-Liga: Qualifying `2` (die Pole bringt 2 Punkte), Sprint und Rennen wie die Saison.
+- **Liste einfügen:** Eine Zeile je Runde (`R1 · 07.03.2026 · Australien`) legt alle Läufe der Vorgabe an – 8 Zeilen
+  ergeben bei Quali, Sprint und Rennen 24 Läufe. Eine Zeile mit Lauf legt nur diesen an: `R1 Sprint`, `R1S`, `R1 S`,
+  `R1-Sprint`, `R1 Q`, `R1 Quali`, `R1 Shootout`, `R1 Rennen`, `R1 Race` oder `R1 Feature`. Ein Lauf-Wort zählt nur,
+  wenn danach ein Trenner (`·`, `-`, `|` …) oder das Zeilenende kommt: `R1 Race of Champions` ist ein Rennen namens „Race
+  of Champions“, kein Lauf. Eine Zeile ohne Kürzel bekommt eines (`R3`), damit ihre Läufe eine Runde bleiben. Ein
+  negativer Versatz ohne Uhrzeit bleibt am Tag der Zeile. Einen Lauf, den es in der Runde schon gibt, weist die Vorschau ab.
+- **Termin:** Feld **Lauf**. Ob ein Lauf zählt, sagt der Ablauf je Runde (ein Qualifying ohne Punkte nicht), und ändert
+  sich der Ablauf, gehen alle Läufe mit. Setzt ihr den Haken **Zählt zur Wertung** von Hand, bleibt er – **Wertung wie
+  der Ablauf** gibt ihn an die Vorgabe zurück. Jeder Lauf lässt sich einzeln verschieben, absagen und archivieren.
+- **Ergebnis eines Qualifyings:** Platz, Startnummer, Name, Team, **Zeit** und Abstand. Ohne Zeit (`--:--.---`) geht
+  auch. Die **Pole** bekommt von selbst der erste gültige Platz – ist Platz 1 disqualifiziert oder nicht gestartet, der
+  nächste; überall gilt dieselbe Regel. Eine Pole-Marke von Hand auf einer anderen Zeile fällt weg, die Prüfung sagt
+  es an der Zeile („Pole hat Platz 1 – Marke entfernt“). Ist kein Platz gültig (alle DNS oder DSQ), hat niemand die
+  Pole („Kein gültiger Platz im Qualifying – Pole-Marke entfernt“). Im Shootout gibt es keine Pole, er setzt nur den
+  Startplatz des Sprints. Das Einfügen liest die Quali-Liste mit Time und Gap.
+- **Startplatz:** Ist er im Lauf leer, kommt er nach der Vorgabe: das Rennen aus dem Qualifying derselben Runde, der
+  Sprint aus dem Shootout, wenn es einen gibt (sonst aus dem Qualifying), oder aus der umgekehrten Fahrerwertung. Ein
+  eingetragener Startplatz, etwa nach einer Strafe, bleibt. Die Pole zählt am Rennen, das seinen Startplatz aus dem
+  Qualifying nimmt, samt Pole-Bonus der Saison; eine Pole-Marke im Rennen auf einem anderen Fahrer fällt dann weg
+  („Pole hat Platz 1 im Qualifying – Marke entfernt“), ohne gültigen Platz im Qualifying jede. Nur ein Rennen ohne
+  Qualifying behält seine Pole-Marke.
+- **Ergebnisse eintragen:** je Runde eine Zeile, jeder Lauf ein Chip in der Farbe seines Status – ein Tipp öffnet sein
+  Blatt.
+
+<table>
+<tr>
+<td><img src="../assets/serien/serien-laeufe-je-runde.png" alt="Saison bearbeiten: Ablauf je Runde mit Qualifying, Sprint mit eigenem Schema und Hauptrennen, ab Runde 5 anders" width="420"></td>
+<td><img src="../assets/serien/serien-laeufe-kalender.png" alt="Kalender der Verwaltung: je Runde ein Kopf, darunter Qualifying, Sprint und Hauptrennen mit eigenem Status" width="420"></td>
+</tr>
+</table>
+
 <table>
 <tr>
 <td><img src="../assets/serien/serien-kalender-einfuegen.png" alt="Blatt Terminliste einfügen mit der Vorschau der erkannten Termine" width="420"></td>
@@ -514,6 +563,25 @@ Aufstellung, dazu bei Bedarf die Tabelle laut Veranstalter.
   Gäste markiert; darüber, wie viele Fahrer je Rennen zählen und ob Gäste mitzählen.
 - **Rennkalender:** alle Termine mit Status; bei gewerteten Rennen der Sieger, wenn er aus dem Verein ist, sonst der
   beste Vereinsfahrer mit Platz.
+- **Runde mit Läufen:** Hat die Saison Läufe, steht im Kalender je Runde eine Zeile mit Flagge, Ort und den **Lauf-Chips**
+  „Quali · Sprint · Rennen“ (Uhrzeit und Status), der Sieger je zählendem Lauf darunter. Im Rennraster steht über Sprint
+  und Rennen ein Kopf mit Flagge und Kürzel, darunter S, R, HR …; die Tabelle summiert alle zählenden Läufe, die Punkte
+  je Lauf stehen über der Tabelle. Zählen mehrere Arten von Läufen, schaltet **Gesamt · Rennen · Sprint · Quali** um –
+  etwa auf die eigene **Sprint-Tabelle** mit den Sprint-Punkten allein (Rang nach Punkten, dann mehr Siege, zweite
+  Plätze … in diesen Läufen). Der Fortschritt zählt Runden, „Nächstes Rennen“ nennt den Lauf („R3 ·
+  Qualifying“). Das Fahrer-Detail nennt **Poles**, **Ø Start** (nur in Saisons mit Läufen) und das **Quali-Duell**
+  gegen den Teamkollegen. „Läuft
+  gerade“ und „Heute im Einsatz“ zeigen den heutigen Lauf und die Chips der Runde.
+
+<table>
+<tr>
+<td><img src="../assets/serien/serien-laeufe-seite.png" alt="Rennraster einer F2 mit Kopf je Runde über Sprint und Hauptrennen, Flaggen und Punkten je Lauf" width="560"></td>
+<td rowspan="2"><img src="../assets/serien/serien-laeufe-handy.png" alt="Rennkalender am Handy mit Lauf-Chips Quali, Sprint und Hauptrennen" width="220"></td>
+</tr>
+<tr>
+<td><img src="../assets/serien/serien-laeufe-sprint-tabelle.png" alt="Wertung je Lauf: Umschalter Gesamt, Rennen, Sprint mit der eigenen Sprint-Tabelle" width="560"></td>
+</tr>
+</table>
 
 Das Team je Rennen kommt aus der Spalte **Team** im Ergebnisblatt, sonst gilt das Standard-Team des Teilnehmers. Am Handy
 stehen Karten statt der Tabellen.

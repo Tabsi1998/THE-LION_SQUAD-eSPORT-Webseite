@@ -4,6 +4,7 @@ import { METALS } from "@/components/tls/TrophyShelf";
 import { formatNumber } from "@/lib/standingsTable";
 import { roundLabel } from "@/lib/referenceCalendar";
 import { barShare, driverSeason, gainedWords, garageName, raceCellLabel } from "@/lib/racingLeague";
+import { averageGrid, averageGridLabel, hasSessions, poleCount, sessionAbbr, sessionLabel } from "@/lib/raceWeekend";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { GuestBadge } from "@/components/tls/series/RacingParts";
 import { CountryFlag } from "@/components/tls/CountryFlag";
@@ -132,25 +133,33 @@ function Gain({ gained, index }) {
 
 function raceTitle(item) {
   const country = countryName(item.round.country_code);
-  const name = `${roundLabel(item.round)}${country ? ` (${country})` : ""}`;
+  const name = `${sessionLabel(item.round)}${country ? ` (${country})` : ""}`;
   if (item.cell) return raceCellLabel(item.cell, name);
   if (item.round.state === "cancelled") return `${name}: abgesagt`;
   return `${name}: ${item.round.state === "scored" ? "nicht dabei" : "noch offen"}`;
 }
 
 /** Detail eines Vereinsfahrers: Platz, Punkte, Rennen, Siege, Podien, schnellste Runden, Ausfälle und je Rennen ein
- * Balken mit Platz. `flash` lässt den Rahmen nach einem Sprung aus der Tabelle einmal aufleuchten. */
-export const RacingDriverDetail = forwardRef(function RacingDriverDetail({ row, driver, rounds, flash }, ref) {
+ * Balken mit Platz. `flash` lässt den Rahmen nach einem Sprung aus der Tabelle einmal aufleuchten. Runde mit Läufen
+ * (#1930): Poles je Runde einmal (Pole am Rennen oder Platz 1 im Qualifying, `qualifying` vom Server), Ø Startplatz,
+ * Quali-Duell gegen den Teamkollegen (`qualiDuel`: `{ name, a, b, sessions }`) und je Balken der Lauf (S, R …). */
+export const RacingDriverDetail = forwardRef(function RacingDriverDetail({ row, driver, rounds, flash, qualifying, qualiDuel }, ref) {
   const season = driverSeason(row, rounds);
   const withFlags = season.perRace.some((item) => item.round.country_code);
+  const withSessions = hasSessions(season.perRace.map((item) => item.round));
   const withGrid = season.gridRaces > 0;
+  const poles = poleCount(row, rounds, qualifying);
+  // Ø Start nur in Saisons mit Läufen (#1930) - eine bestehende Saison sieht aus wie bisher.
+  const average = hasSessions(rounds) ? averageGridLabel(averageGrid(row?.results)) : "";
   const stats = [
     count(season.wins, "Sieg", "Siege"), count(season.podiums, "Podium", "Podien"),
     count(season.fastestLaps, "schnellste Runde", "schnellste Runden"), count(season.dnfs, "Ausfall", "Ausfälle"),
   ];
-  if (season.poles) stats.push(count(season.poles, "Pole", "Poles"));
+  if (poles) stats.push(count(poles, "Pole", "Poles"));
   if (season.driverOfTheDay) stats.push(`${season.driverOfTheDay}× Fahrer des Tages`);
   if (withGrid) stats.push(gainedWords(season.gained));
+  if (average) stats.push(average);
+  if (qualiDuel?.sessions) stats.push(`Quali-Duell ${qualiDuel.a}:${qualiDuel.b} gegen ${qualiDuel.name}`);
   return (
     <section
       ref={ref}
@@ -178,8 +187,10 @@ export const RacingDriverDetail = forwardRef(function RacingDriverDetail({ row, 
         <p className="mt-1 text-sm text-white/65 tabular-nums" data-testid="racing-driver-stats">{stats.join(" · ")}</p>
       </div>
       {season.perRace.length > 0 && (
+        // `relative`: die Texte für Screenreader (sr-only, absolut) bleiben in der Scroll-Fläche - sonst schieben sie bei vielen
+        // Läufen (#1930) am Handy die ganze Seite seitlich hinaus.
         // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- eine scrollbare Fläche muss per Tastatur erreichbar sein (axe: scrollable-region-focusable)
-        <div role="region" aria-label="Punkte je Rennen" tabIndex={0} className="mt-4 -mx-1 px-1 pb-1 overflow-x-auto overscroll-x-contain focus:outline-none focus-visible:ring-2 focus-visible:ring-[#29B6E8] rounded">
+        <div role="region" aria-label="Punkte je Rennen" tabIndex={0} className="relative mt-4 -mx-1 px-1 pb-1 overflow-x-auto overscroll-x-contain focus:outline-none focus-visible:ring-2 focus-visible:ring-[#29B6E8] rounded">
           <ol className="tls-racing-races">
             {season.perRace.map((item, index) => {
               const metal = item.cell?.medal ? METALS[item.cell.medal] : null;
@@ -208,6 +219,8 @@ export const RacingDriverDetail = forwardRef(function RacingDriverDetail({ row, 
                   {/* Startplatz → Ziel (#1927): gutgemachte Plätze grün nach oben, verlorene nach unten. */}
                   {withGrid && <Gain gained={item.cell?.gained ?? null} index={index} />}
                   <span className="tls-racing-race__code" aria-hidden="true">{roundLabel(item.round)}</span>
+                  {/* Lauf der Runde (#1930): S, R, HR … unter dem Kürzel - feste Höhe, damit die Reihe gerade bleibt. */}
+                  {withSessions && <span className="tls-racing-race__session" aria-hidden="true">{item.round.session ? sessionAbbr(item.round) : ""}</span>}
                   {/* Flagge des Rennens (#1925) unter dem Kürzel - eine Leiste der Länder entlang der Saison. */}
                   {withFlags && (
                     <span className="tls-racing-race__flag" aria-hidden="true">

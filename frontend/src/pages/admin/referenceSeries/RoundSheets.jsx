@@ -5,12 +5,14 @@ import { FormGrid } from "@/components/tls/AdminForm";
 import { CheckField, SelectField, TextAreaField, TextField } from "@/components/tls/FormFields";
 import { ROUND_KIND_OPTIONS, dayLabel, roundLabel, roundPayload, roundToForm } from "@/lib/referenceCalendar";
 import { COUNTRY_OPTIONS, countryName } from "@/lib/countryFlags";
+import { MAX_SESSION, SESSION_CHOICES, plannedSession, sessionLabel } from "@/lib/raceWeekend";
 import { CountryFlag, VenueWithFlag } from "@/components/tls/CountryFlag";
 import { toast } from "sonner";
 
 // Seitenblätter des Kalenders (#1742): Termin anlegen/bearbeiten, verschieben und eine Terminliste einfügen.
 // Gerechnet und geprüft wird im Server - auch die eingefügte Liste: die Vorschau kommt vom Server, übernommen wird nur
-// eine fehlerfreie Liste.
+// eine fehlerfreie Liste. Rennliga (#1930): ein Termin hat seinen Lauf (Qualifying, Sprint, Rennen …) - Termine mit
+// gleichem Kürzel sind eine Runde; die Terminliste legt je Zeile alle Läufe an, die die Saison vorgibt.
 
 const base = (series) => `/reference-series/admin/series/${series.id}/rounds`;
 
@@ -29,17 +31,27 @@ function countryHint(round, choice) {
   return "Bleibt, auch wenn sich die Strecke ändert.";
 }
 
-export function RoundSheet({ series, lineage, round, suggestion, version, onClose, onSaved, onStale }) {
+export function RoundSheet({ series, lineage, round, rounds = [], suggestion, version, onClose, onSaved, onStale }) {
   const isNew = !round?.id;
+  const racing = lineage?.kind === "racing";
   const [form, setForm] = useState(() => roundToForm(round || {}, suggestion));
   const [saving, setSaving] = useState(false);
+  // Rennliga (#1930): Die Wertung folgt der Vorgabe des Laufs („Ablauf je Runde“), bis jemand den Haken von Hand setzt.
+  // Erst dann geht sie mit; „Wie der Ablauf“ gibt sie an die Vorgabe zurück (``counts: null``).
+  const [counts, setCounts] = useState(() => (racing && (isNew || round?.counts_manual === false) ? "auto" : "manual"));
   const set = (key, value) => setForm((current) => ({ ...current, [key]: value }));
+  const planned = plannedSession(series?.weekend, rounds.filter((item) => item.id !== round?.id), form.code, form.session);
+  const shownCounts = counts === "auto" ? planned.counts !== false : form.counts;
 
   const save = async (event) => {
     event.preventDefault();
     setSaving(true);
     try {
       const payload = roundPayload(form);
+      if (racing && counts === "auto") {
+        if (isNew || round?.counts_manual === false) delete payload.counts;
+        else payload.counts = null;
+      }
       // Mit dem Stand des Kalenders, den die Seite kennt - war jemand schneller, kommt 409.
       if (isNew) await api.post(base(series), { ...payload, expected_version: version });
       else await api.patch(`${base(series)}/${round.id}`, { ...payload, expected_version: version });
@@ -54,9 +66,14 @@ export function RoundSheet({ series, lineage, round, suggestion, version, onClos
   };
 
   return (
-    <AdminSheet title={isNew ? "Neuer Termin" : `${roundLabel(round)} bearbeiten`} eyebrow={lineage?.title} onClose={onClose} onSubmit={save} saving={saving} submitTestId="round-save" testId="round-sheet">
+    <AdminSheet title={isNew ? "Neuer Termin" : `${round.session ? sessionLabel(round) : roundLabel(round)} bearbeiten`} eyebrow={lineage?.title} onClose={onClose} onSubmit={save} saving={saving} submitTestId="round-save" testId="round-sheet">
       <FormGrid>
-        <TextField label="Kürzel" value={form.code} onChange={(v) => set("code", v)} placeholder="R1" maxLength={20} testId="round-code" />
+        <TextField label="Kürzel" value={form.code} onChange={(v) => set("code", v)} placeholder="R1" maxLength={20} testId="round-code"
+          hint={lineage?.kind === "racing" ? "Gleiches Kürzel heißt gleiche Runde – etwa Qualifying und Rennen von R1." : undefined} />
+        {lineage?.kind === "racing" && (
+          <TextField label="Lauf" value={form.session} onChange={(v) => set("session", v)} suggestions={SESSION_CHOICES} maxLength={MAX_SESSION} placeholder="Rennen" testId="round-session"
+            hint="Leer: Rennen. Ob der Lauf zählt, sagt der Ablauf je Runde – etwa ein Qualifying ohne Punkte nicht." />
+        )}
         <TextField label="Strecke oder Ort" value={form.venue} onChange={(v) => set("venue", v)} maxLength={160} testId="round-venue" />
         <SelectField label="Land (Flagge)" value={form.country} onChange={(v) => set("country", v)} options={COUNTRY_CHOICES} testId="round-country"
           hint={countryHint(round, form.country)} />
@@ -66,7 +83,16 @@ export function RoundSheet({ series, lineage, round, suggestion, version, onClos
         {lineage?.kind === "team_league" && <TextField label="Gegner" value={form.opponent} onChange={(v) => set("opponent", v)} maxLength={120} testId="round-opponent" />}
       </FormGrid>
       <TextField label="Eigener Titel" value={form.title} onChange={(v) => set("title", v)} maxLength={160} hint="Optional, etwa „Saisonfinale“." testId="round-title" />
-      <CheckField label="Zählt zur Wertung" checked={form.counts} onChange={(v) => set("counts", v)} testId="round-counts" hint="Aus: Die Runde steht im Kalender, geht aber nicht in die Tabelle ein." />
+      <CheckField label="Zählt zur Wertung" checked={shownCounts} onChange={(v) => { setCounts("manual"); set("counts", v); }} testId="round-counts"
+        hint={racing && counts === "auto"
+          ? "Wie der Ablauf je Runde. Ein Haken von Hand bleibt, auch wenn sich der Ablauf ändert."
+          : "Aus: Die Runde steht im Kalender, geht aber nicht in die Tabelle ein."} />
+      {racing && counts === "manual" && (
+        <button type="button" onClick={() => setCounts("auto")} data-testid="round-counts-auto"
+          className="tls-btn tls-btn--quiet self-start px-3 py-1.5 rounded-sm text-[11px] font-bold uppercase tracking-wider">
+          Wertung wie der Ablauf
+        </button>
+      )}
       <TextAreaField label="Notiz" value={form.note} onChange={(v) => set("note", v)} rows={2} hint="Nur in der Verwaltung sichtbar." testId="round-note" />
       {!isNew && series.default_time && <p className="text-xs text-white/45">Standard der Saison: {series.default_time} Uhr.</p>}
     </AdminSheet>
@@ -112,6 +138,9 @@ export function PasteSheet({ series, lineage, version, onClose, onSaved, onStale
   const [preview, setPreview] = useState(null);
   const [saving, setSaving] = useState(false);
   const ready = preview && preview.text === text && !preview.errors.length && preview.rows.length > 0;
+  // Ablauf je Runde (#1930): eine Zeile kann mehrere Termine ergeben.
+  const total = preview?.count ?? preview?.rows?.length ?? 0;
+  const withSessions = Boolean(preview?.rows?.some((row) => (row.sessions || []).some((item) => item.session)));
 
   const edit = (value) => {
     setText(value);
@@ -143,9 +172,9 @@ export function PasteSheet({ series, lineage, version, onClose, onSaved, onStale
   const defaults = [series.default_time && `${series.default_time} Uhr`].filter(Boolean).join(", ");
   return (
     <AdminSheet title="Terminliste einfügen" eyebrow={lineage?.title} size="lg" onClose={onClose} onSubmit={submit} saving={saving}
-      submitLabel={ready ? `${preview.rows.length} Termine übernehmen` : "Vorschau"} savingLabel={ready ? "Übernehme …" : "Prüfe …"} submitTestId="paste-submit" testId="paste-sheet">
+      submitLabel={ready ? `${total} Termine übernehmen` : "Vorschau"} savingLabel={ready ? "Übernehme …" : "Prüfe …"} submitTestId="paste-submit" testId="paste-sheet">
       <TextAreaField label="Je Zeile ein Termin" value={text} onChange={edit} rows={8} testId="paste-text" placeholder={"R1 · 05.11. · Strecke\nR2 · 12.11. 20:00 · Strecke\nR3 Strecke"}
-        hint={`Kürzel, Datum (TT.MM. oder TT.MM.JJJJ), optional Uhrzeit und Ort – aus dem Ort kommt die Flagge. Ohne Datum: der nächste Standard-Wochentag nach der Zeile davor. Ohne Uhrzeit: ${defaults || "ohne Uhrzeit"}.`} />
+        hint={`Kürzel, Datum (TT.MM. oder TT.MM.JJJJ), optional Uhrzeit und Ort – aus dem Ort kommt die Flagge. Ohne Datum: der nächste Standard-Wochentag nach der Zeile davor. Ohne Uhrzeit: ${defaults || "ohne Uhrzeit"}.${lineage?.kind === "racing" ? " Rennliga: Eine Zeile je Runde legt alle Läufe an, die die Saison vorgibt (Ablauf je Runde); „R1 Sprint“, „R1S“ oder „R1 Q“ nur diesen Lauf." : ""}`} />
       {preview && preview.errors.length > 0 && (
         <div className="border border-red-400/40 bg-red-400/10 rounded-sm p-3 text-sm text-red-200 space-y-1" data-testid="paste-errors" role="alert">
           <div className="font-bold">Die Liste hat Fehler – übernommen wird erst eine fehlerfreie Liste.</div>
@@ -164,7 +193,7 @@ export function PasteSheet({ series, lineage, version, onClose, onSaved, onStale
                 <tr className="text-left text-[10px] uppercase tracking-widest text-white/45">
                   <th className="py-1.5 pr-3 font-bold">Kürzel</th>
                   <th className="py-1.5 pr-3 font-bold">Tag</th>
-                  <th className="py-1.5 pr-3 font-bold">Uhrzeit</th>
+                  <th className="py-1.5 pr-3 font-bold">{withSessions ? "Läufe" : "Uhrzeit"}</th>
                   <th className="py-1.5 font-bold">Ort</th>
                 </tr>
               </thead>
@@ -177,7 +206,19 @@ export function PasteSheet({ series, lineage, version, onClose, onSaved, onStale
                       {row.derived_day && <span className="block text-[11px] text-white/45">aus dem Wochentag</span>}
                       {row.warning && <span className="block text-[11px] text-amber-300">{row.warning}</span>}
                     </td>
-                    <td className="py-1.5 pr-3">{row.time || "–"}</td>
+                    <td className="py-1.5 pr-3" data-testid="paste-sessions">
+                      {withSessions ? (
+                        <ul className="space-y-0.5">
+                          {(row.sessions || []).map((item, index) => (
+                            <li key={index} className="whitespace-nowrap">
+                              <span className="font-semibold">{item.session || "Rennen"}</span>
+                              <span className="text-white/55 tabular-nums">{` ${item.day !== row.day ? `${dayLabel(item.day)} ` : ""}${item.time || ""}`}</span>
+                              {item.counts === false && <span className="text-[11px] text-white/45"> · zählt nicht</span>}
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (row.time || "–")}
+                    </td>
                     <td className="py-1.5" data-testid="paste-venue">
                       {row.venue ? <VenueWithFlag round={{ venue: row.venue, country_code: row.country_code }} /> : "–"}
                     </td>

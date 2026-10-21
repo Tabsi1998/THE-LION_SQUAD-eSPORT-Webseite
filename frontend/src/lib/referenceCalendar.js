@@ -99,6 +99,7 @@ export function roundToForm(round = {}, { day = "", time = "" } = {}) {
   return {
     country: countryChoice(round),
     code: round.code || "",
+    session: round.session || "",
     title: round.title || "",
     venue: round.venue || "",
     day: round.id ? round.club_day || "" : day,
@@ -110,11 +111,13 @@ export function roundToForm(round = {}, { day = "", time = "" } = {}) {
   };
 }
 
-/** Formular → Body für POST/PATCH; leere Uhrzeit heißt „ohne Uhrzeit“. Land automatisch: der Server erkennt es. */
+/** Formular → Body für POST/PATCH; leere Uhrzeit heißt „ohne Uhrzeit“. Land automatisch: der Server erkennt es. Lauf
+ * (#1930): leer heißt Rennen. */
 export function roundPayload(form) {
   return {
     ...countryPayload(form.country),
     code: form.code.trim() || null,
+    session: String(form.session || "").trim() || null,
     title: form.title.trim() || null,
     venue: form.venue.trim() || null,
     day: form.day || null,

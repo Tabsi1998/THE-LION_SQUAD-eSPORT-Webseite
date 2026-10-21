@@ -6,12 +6,14 @@ import { CountryFlag } from "@/components/tls/CountryFlag";
 import { todayFacts, todayItems } from "@/lib/homeToday";
 import { seriesAddress } from "@/lib/referenceSeries";
 import { GameMark } from "@/components/tls/references/referenceParts";
+import { SessionChips } from "@/components/tls/series/SessionChips";
 
 // „Heute im Einsatz“ (#1753): an Renn- und Spieltagen ein schmaler Streifen über dem Kopf der Startseite - je Saison
 // mit heutigem Termin eine Karte (Serie, Saison, Runde, Uhrzeit, gemeldete Vereinsleute), die zur Serienseite mit der
 // Tabelle führt. Gestaltet wie die Karten „Läuft gerade“ der Referenzen-Übersicht: goldener Chip „Heute“ mit dezentem
 // Puls, Karten blenden gestaffelt ein. Mit „Bewegung reduzieren“ stehen Puls und Einblenden still (index.css,
 // .tls-run-*). Steht heute nichts an oder scheitert der Abruf, gibt es den Streifen nicht - die Seite bleibt wie sie ist.
+// Runde mit Läufen (#1930): statt „Rennen R3“ der heutige Lauf („R3 · Qualifying“), darunter die Lauf-Chips der Runde.
 
 export function HomeTodayStrip() {
   const [items, setItems] = useState([]);
@@ -70,6 +72,7 @@ function TodayCard({ item, index }) {
               </Fragment>
             ))}
           </div>
+          {item.next?.sessions?.length > 1 && <SessionChips rounds={item.next.sessions.map((entry, position) => ({ ...entry, id: `${position}` }))} showTime className="mt-1.5" testId="home-today-sessions" />}
         </div>
         <span className="shrink-0 inline-flex items-center gap-1 text-[11px] font-bold uppercase tracking-[0.14em] text-brand">
           <span className="hidden sm:inline">Tabelle</span>

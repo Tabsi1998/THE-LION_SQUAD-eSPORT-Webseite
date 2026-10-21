@@ -16,6 +16,9 @@ Gerechnet wird nichts - alles kommt aus dem gespeicherten Stand der letzten gewe
 - **Vereinsteams:** alle eigenen Teams der Saison (``own_teams``, #1926 - früher nur ``team_name``) und jedes Team,
   für das ein Vereinsmitglied zuletzt gefahren ist - in der Reihenfolge der Teamwertung, ohne sie nach Namen. Andere
   Schreibweisen eines eigenen Teams (auch als Standard-Team eines Fahrers) zählen als dieses Team.
+- **Qualifying** (``qualifying``, #1930): je veröffentlichtem Qualifying fürs Rennen (nicht dem Shootout), das nicht
+  abgesagt ist, die Plätze der Fahrer aus der Fahrerwertung - nur Kennungen, wie die Tabelle sie hat. Daraus zählt die
+  Seite Poles und das Quali-Duell.
 - **Fahrer-Detail** (``club_drivers``): nur öffentlich sichtbare Vereinsmitglieder - Mitglied, Profil aktiv, Name nicht
   ausgeblendet; dieselbe Regel wie der Profil-Link der Tabelle und der Team-Liga. Die Seite zeigt ein Detail und
   Vereinsnamen außerhalb der Tabellen nur für diese Kennungen.
@@ -23,6 +26,7 @@ Gerechnet wird nichts - alles kommt aus dem gespeicherten Stand der letzten gewe
 from __future__ import annotations
 
 from services.own_teams import Matcher, own_teams
+from services.race_weekend import is_main_qualifying, pole_holder
 from services.scoring_rules import normalize_rules
 from services.team_league_page import PATH_FIELDS as SEASON_FIELDS, visible_seasons
 
@@ -117,6 +121,28 @@ def club_teams(drivers: dict, people: dict, team_order: list[str], own: list[str
     return sorted(teams, key=lambda team: (position.get(team, len(position)), team.casefold(), team))
 
 
+async def qualifying_places(db, series_id: str, wanted: set) -> list[dict]:
+    """Je veröffentlichtem Qualifying der Saison (nicht archiviert, nicht abgesagt) die Plätze der Fahrer in ``wanted``:
+    ``[{"round_id", "places": {Kennung: Platz}, "pole": Kennung | None}]``."""
+    rounds = await db.reference_rounds.find(
+        {"series_id": series_id, "archived_at": None, "session": {"$nin": [None, ""]}},
+        {"_id": 0, "id": 1, "session": 1, "status": 1}).to_list(None)
+    quali = [item["id"] for item in rounds
+             if is_main_qualifying(item.get("session")) and item.get("status") != "cancelled"]
+    if not quali:
+        return []
+    out = []
+    async for sheet in db.reference_round_results.find(
+            {"series_id": series_id, "status": "published", "round_id": {"$in": quali}},
+            {"_id": 0, "round_id": 1, "rows": 1}):
+        places = {row["participant_id"]: row["place"] for row in sheet.get("rows") or []
+                  if row.get("participant_id") in wanted and row.get("place")}
+        # Die Pole nach derselben Regel wie beim Rechnen (ohne Disqualifikation) - nur, wenn sie in der Tabelle steht.
+        pole = pole_holder(sheet.get("rows") or [])
+        out.append({"round_id": sheet["round_id"], "places": places, "pole": pole if pole in wanted else None})
+    return sorted(out, key=lambda item: quali.index(item["round_id"]))
+
+
 async def racing_block(db, user: dict | None, lineage: dict, series: dict, people: dict,
                        latest: dict | None) -> dict | None:
     """Der Rennliga-Teil der Serienseite - bei anderen Arten ``None``. ``people``: öffentliche Personen der Saison (wie
@@ -149,4 +175,5 @@ async def racing_block(db, user: dict | None, lineage: dict, series: dict, peopl
         "drivers": drivers,
         "club_teams": club_teams(drivers, people, order, matcher.names),
         "club_drivers": public_club_drivers(driver_rows, people),
+        "qualifying": await qualifying_places(db, sid, {row.get("participant_id") for row in driver_rows}),
     }

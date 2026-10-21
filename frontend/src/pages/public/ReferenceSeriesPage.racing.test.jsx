@@ -367,6 +367,8 @@ test("Rennergebnis (#1927): Fahrer des Tages im Raster, Startplatz → Ziel und 
   const gains = within(detail).getAllByTestId("racing-driver-gain");
   expect(gains.map((gain) => [gain.dataset.dir, gain.textContent])).toEqual([["up", "3"], ["same", "±0"]]);
   expect(within(detail).getByTestId("racing-driver-stats")).toHaveTextContent("1× Fahrer des Tages · 3 Plätze gutgemacht");
+  // Ø Start nur in Saisons mit Läufen (#1930) - diese Saison ohne Läufe sieht aus wie bisher.
+  expect(within(detail).getByTestId("racing-driver-stats")).not.toHaveTextContent("Ø Start");
 });
 
 test("ohne Länder bleibt alles wie bisher: keine Flaggen", async () => {

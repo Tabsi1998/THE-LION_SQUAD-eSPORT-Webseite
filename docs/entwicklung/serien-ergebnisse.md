@@ -64,6 +64,63 @@ passt; die Stände führen es unter seinem Namen.
   fehlen bei „laut Veranstalter“, Abweichung zum offiziellen Wert, Maps passen nicht zum Ergebnis, kein eigenes Team
   im Spiel, Team doppelt in der Tabelle, schnellste Runde mehrfach markiert, Termin in der Zukunft oder ohne Wertung.
 
+## Runde mit Läufen (#1930)
+
+Logik ohne Datenbank in `backend/services/race_weekend.py`, das Einfügen in `race_weekend_paste.py`, die Regel „ab
+Runde X“ allgemein in `round_phases.py` (wiederverwendbar, etwa für Regeländerungen je Runde, #1960).
+
+- **Termin:** `session` (Lauf, freier Text bis 30 Zeichen, leer = Rennen). Die Art (`session_kind`: `qualifying`,
+  `sprint`, `race`) kommt aus dem Namen. Termine mit gleichem Kürzel (ohne Leerraum, Groß/klein egal) sind eine Runde –
+  aber nur, wenn ein Termin einen Lauf hat oder die Serie einen Ablauf je Runde (`race_weekend.by_code`); sonst ist jeder
+  Termin seine eigene Runde (alte Saisons mit zweimal „R1“ bleiben, wie sie sind; im Web `groupWeekends`).
+  Der Kalender liefert je Termin `weekend` (Nummer der Runde in Kalender-Reihenfolge, abgesagte zählen mit, archivierte
+  nicht), `session` und `session_kind` – Verwaltung, Serienseite und `/public/running` (`next.session`,
+  `next.sessions`). „Shootout“ (Sprint-Qualifying) ist ein Qualifying ohne Pole (`race_weekend.is_main_qualifying`).
+- **Wertung je Termin:** `counts` folgt der Vorgabe seines Laufs (`race_weekend.planned_config`, ein Qualifying ohne
+  Punkte zählt nicht), solange `counts_manual` `false` ist – neue Termine ohne `counts` und die eingefügte Liste.
+  `recompute_standings` gleicht sie nach jeder Änderung des Ablaufs an (`race_weekend.counts_updates`, erhöht
+  `calendar_version`). `counts` am Termin (POST oder PATCH) setzt `counts_manual: true`, `PATCH {counts: null}` gibt die
+  Wertung an die Vorgabe zurück. Termine ohne das Feld (vor #1930) bleiben unverändert.
+- **Ablauf je Runde:** Serie `weekend = {formats: [{from_round, sessions: [{label, offset, counts, points, dnf,
+  fastest_lap, grid}]}]}`. `points`: `series` (Schema der Saison = wie das Rennen), `none` oder Liste je Platz – ein
+  Qualifying mit Liste zählt ohne Angabe von `counts`; `dnf`: `series`, `place` (Punkte nach Platz trotz DNF) oder `none`
+  (0); `fastest_lap`: `null` (wie die Saison) oder Bonuspunkte; `grid`: `manual`, `qualifying`,
+  `reverse_standings_before_round` (Fahrerwertung vor dem ersten Lauf der Runde; der alte Wert `reverse_standings` ist
+  ein Alias dafür) oder `reverse_standings_after_previous_session` (Fahrerwertung nach dem Lauf davor, also samt Sprint
+  derselben Runde). Eine Änderung rechnet neu und steht im Protokoll (`reference_series.weekend_change`). Die
+  eingefügte Terminliste legt je Zeile ohne Lauf alle Läufe des gültigen Abschnitts an (`offset` in Minuten ab der
+  Uhrzeit der Zeile, ohne Uhrzeit nur ganze Tage, ein negativer Versatz bleibt am Tag); `R1S`, `R1 Sprint`, `R1 Q` …
+  nur diesen Lauf. Ein Lauf-Wort zählt nur vor einem Trenner, Tab, entferntem Datum (`race_weekend.GAP`) oder dem
+  Zeilenende (`R1 Race of Champions` ist ein Titel). Eine Zeile ohne Kürzel mit mehreren Läufen bekommt ein freies
+  (`R{n}`, sonst `Runde {n}`, `R{n}a` …). Doppelte Läufe einer Runde sind ein Fehler der Zeile. Die Antwort der
+  Vorschau hat je Zeile `sessions` und `count` (Termine gesamt).
+- **Rechnen** (`race_weekend.standings` statt `compute_standings`, gleiche Ausgabe): Punkte je Lauf über `round_rules`
+  in `compute_standings`. Mit `units` (Termin → Runde, nur bei `by_code`) zählen Streichergebnisse, „beste N“,
+  Aktivitätspunkte und `rounds_played` je Runde: gestrichen wird eine ganze Runde (Summe ihrer Läufe), `counted` und
+  `dropped` nennen weiter Termine. Ein leerer Startplatz kommt aus dem Hauptqualifying derselben Runde (der Sprint aus
+  dem Shootout, wenn es einen gibt) bzw. aus der umgekehrten Fahrerwertung nach `grid` (wer dort fehlt, bekommt
+  keinen). Die Pole (`race_weekend.pole_holder`: der erste gültige Platz des Hauptqualifyings ohne DSQ/DNS – eine
+  Marke `pole` auf einer anderen Zeile zählt nicht) zählt am ersten Rennen der Runde, das seinen Startplatz aus dem
+  Hauptqualifying nimmt (sonst am Sprint) – nur, wenn das Qualifying nicht selbst zählt. In jedem Lauf mit Startplatz
+  aus dem Hauptqualifying fällt eine Pole-Marke auf einer anderen Zeile weg, ohne gültigen Platz im Qualifying jede.
+  Gespeichert wird davon nichts im Blatt; es
+  steht nur im gerechneten Stand. Ein Rennen ohne Qualifying behält seine Marke von Hand (Bestand #1927).
+- **Blatt eines Qualifyings:** `round.session_kind` im Ausgangsstand; beim Prüfen setzt `race_weekend.mark_pole` die
+  Marke `pole` nach derselben Regel, eine Marke auf einer anderen Zeile fällt weg – mit der Warnung `pole_moved` an
+  dieser Zeile („Pole hat Platz 1 – Marke entfernt“, ohne gültigen Platz `race_weekend.NO_POLE`: „Kein gültiger
+  Platz im Qualifying – Pole-Marke entfernt“); die Warnung `round_not_counted` entfällt. Der Ausgangsstand
+  liefert die Regeln des Laufs (`series.rules` mit seinem Punkteschema).
+- **Blatt eines Rennens:** Nimmt es Startplatz und Pole aus einem veröffentlichten Hauptqualifying derselben Runde
+  (`race_weekend.quali_pole`; `(None, None)`, wenn darin kein Platz gültig ist), fällt beim Prüfen eine Pole-Marke
+  auf einem anderen Fahrer weg, ohne gültigen Platz jede (`clear_race_pole`,
+  Warnung `pole_moved`: „Pole hat Platz 1 im Qualifying – Marke entfernt“).
+- **Serienseite (Rennliga):** `progress` zählt Runden (gewertet, wenn alle zählenden Läufe gewertet sind),
+  `series.weekend` für „Punkte je Lauf“, `racing.qualifying` = je veröffentlichtem Qualifying fürs Rennen die Plätze der
+  Fahrer der Fahrerwertung (nur Kennungen) und `pole` (`pole_holder`) für Poles und Quali-Duell; „Ø Start“ nur in
+  Saisons mit Läufen. Die Tabellen je Lauf („Gesamt · Rennen · Sprint ·
+  Quali“) zählt das Web aus den Punkten je Lauf im gespeicherten Stand (`lib/raceWeekend.js`, `sessionTables`). Zwei
+  Ligen als gemeinsame Fälle für Server und Web: `frontend/src/lib/raceWeekendLeagues.json`.
+
 ## Version, Entwurf daneben und Protokoll
 
 - **Nacheinander je Saison:** Ergebnis speichern, freigeben, verwerfen und zurücknehmen sowie alle Kalender-Änderungen

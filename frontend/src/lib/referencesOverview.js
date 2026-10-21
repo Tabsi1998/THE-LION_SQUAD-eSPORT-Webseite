@@ -244,10 +244,11 @@ export function nextTitle(kind, next) {
   return NEXT_TITLES[kind] || "Nächster Termin";
 }
 
-/** Der nächste Termin: heute „R7 · 20:30“, sonst „Do 22.10. · 20:00 · ST4“ (Wiener Tag). */
+/** Der nächste Termin: heute „R7 · 20:30“, sonst „Do 22.10. · 20:00 · ST4“ (Wiener Tag) - mit Lauf (#1930) „R3 ·
+ * Qualifying · 20:00“. */
 export function nextValue(next) {
   if (!next) return "Kein Termin offen";
-  const label = next.code || next.title || "";
+  const label = [next.code || next.title || "", next.session || ""].filter(Boolean).join(" · ");
   if (next.state === "today") return [label, next.time].filter(Boolean).join(" · ");
   const noon = next.club_day ? dayNoon(next.club_day) : null;
   const day = noon ? `${viennaDate(noon, { weekday: "short" }).replace(/\.$/, "")} ${viennaDate(noon, { day: "2-digit", month: "2-digit" })}` : "";
