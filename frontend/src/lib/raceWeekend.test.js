@@ -1,8 +1,18 @@
 import {
-  averageGrid, averageGridLabel, chipLabel, groupWeekends, hasSessions, nextSessionLabel, poleCount, pointsPreview, qualiDuel,
-  sessionAbbr, sessionKind, sessionLabel, sessionPointsLines, sessionTables, weekendPayload, weekendState, weekendToForm,
+  averageGrid, averageGridLabel, chipLabel, groupWeekends, hasSessions, isMainQualifying, nextSessionLabel, poleCount, pointsPreview,
+  qualiDuel, qualifyingMode, sessionAbbr, sessionKind, sessionLabel, sessionPointsLines, sessionTables, weekendPayload, weekendState,
+  weekendToForm,
 } from "./raceWeekend";
 import LEAGUES from "./raceWeekendLeagues.json";
+
+test("Kopf eines Qualifyings: Punkte nur, wenn es zählt; Pole nicht im Shootout", () => {
+  expect(qualifyingMode({ session: "Qualifying", counts: false })).toBe("Qualifying · ohne Punkte · Pole von selbst");
+  expect(qualifyingMode({ session: "Qualifying", counts: true })).toBe("Qualifying · Punkte nach Schlüssel · Pole von selbst");
+  expect(qualifyingMode({ session: "Shootout", counts: false })).toBe("Shootout · ohne Punkte");
+  expect([isMainQualifying({ session: "Blitz-Qualifying" }), isMainQualifying({ session: "Sprint-Qualifying" }), isMainQualifying({ session: "Sprint" })])
+    .toEqual([true, false, false]);
+  expect(sessionAbbr({ session: "Shootout" })).toBe("SO");
+});
 
 const lauf = (values) => ({ dnf: "series", fastest_lap: null, ...values });
 const F2 = { formats: [

@@ -39,6 +39,21 @@ export function roundKind(round) {
   return round?.session_kind || sessionKind(round?.session);
 }
 
+/** Das Qualifying fürs Rennen - nicht das Sprint-Qualifying (Shootout): nur dort gibt es die Pole (wie im Server). */
+export function isMainQualifying(round) {
+  const key = squash(round?.session);
+  return roundKind(round) === "qualifying" && !key.includes("shootout") && !key.includes("sprint");
+}
+
+/** Kopf des Ergebnisblatts eines Qualifyings: Lauf, Punkte (nur wenn er zählt) und ob die Pole von selbst kommt. */
+export function qualifyingMode(round) {
+  return [
+    String(round?.session || "").trim() || "Qualifying",
+    round?.counts === false ? "ohne Punkte" : "Punkte nach Schlüssel",
+    isMainQualifying(round) ? "Pole von selbst" : "",
+  ].filter(Boolean).join(" · ");
+}
+
 /** Name des Laufs auf einem Chip: „Quali“, „Sprint“, „Rennen“, „Hauptrennen“ - ohne Lauf „Rennen“. */
 export function chipLabel(round) {
   const label = String(round?.session || "").trim();

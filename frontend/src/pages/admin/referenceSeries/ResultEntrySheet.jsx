@@ -3,7 +3,7 @@ import { api, formatApiError } from "@/lib/api";
 import { AdminSheet } from "@/components/tls/AdminSheet";
 import { INPUT_CLASS, TextAreaField } from "@/components/tls/FormFields";
 import { roundWhen } from "@/lib/referenceCalendar";
-import { roundKind, sessionLabel } from "@/lib/raceWeekend";
+import { qualifyingMode, roundKind, sessionLabel } from "@/lib/raceWeekend";
 import { parseResultPaste, parseTablePaste } from "@/lib/resultPaste";
 import {
   MARK_OPTIONS, autoPlaces, countFieldErrors, fieldErrors, hintToPoints, emptyMap, emptyMatch, emptyRow, formStamp, formToPayload, formatPoints, matchParticipant,
@@ -620,7 +620,7 @@ export function ResultEntrySheet({ series, round, onClose, onSaved }) {
             <span className="tabular-nums">{roundWhen(data.round)}</span>
             {(data.round.venue || data.round.country_code) && <span>· <VenueWithFlag round={{ venue: data.round.venue, country_code: data.round.country_code }} /></span>}
             {sheetStatus && <span className="text-[10px] font-bold uppercase tracking-widest text-white/45">{sheetStatus === "published" ? "veröffentlicht" : "Entwurf"} · Stand {data.version}</span>}
-            <span className="text-[10px] font-bold uppercase tracking-widest text-white/45" data-testid="result-mode">{qualifying ? "Qualifying · ohne Punkte · Pole von selbst" : organizerMode ? "Punkte laut Veranstalter" : "Punkte nach Schlüssel"}</span>
+            <span className="text-[10px] font-bold uppercase tracking-widest text-white/45" data-testid="result-mode">{qualifying ? qualifyingMode(data.round) : organizerMode ? "Punkte laut Veranstalter" : "Punkte nach Schlüssel"}</span>
           </div>
 
           {stale && (

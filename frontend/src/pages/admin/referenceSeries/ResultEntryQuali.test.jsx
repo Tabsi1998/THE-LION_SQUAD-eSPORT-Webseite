@@ -10,7 +10,7 @@ vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 const { ResultEntrySheet } = await import("./ResultEntrySheet");
 
 const SERIES = { id: "serie-1", lineage: { title: "Probe Rennliga", kind: "racing" }, access: { role: "board", can_publish: true } };
-const ROUND = { id: "q1", code: "R1", session: "Qualifying", session_kind: "qualifying", club_day: "2026-03-07", venue: "Probering" };
+const ROUND = { id: "q1", code: "R1", session: "Qualifying", session_kind: "qualifying", counts: false, club_day: "2026-03-07", venue: "Probering" };
 
 beforeEach(() => {
   for (const fn of Object.values(apiMock)) fn.mockReset();
