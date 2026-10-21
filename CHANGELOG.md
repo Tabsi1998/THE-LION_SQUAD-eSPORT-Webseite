@@ -1,5 +1,33 @@
 # Changelog
 
+## [1.19.0](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/compare/v1.18.0...v1.19.0) (2026-10-21)
+
+
+### Neu
+
+* Chronik – kurze Titel „Veranstalter · Liga · Saison“ wie im Mitgliederprofil ([#1944](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1944)) ([18c9640](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/18c96408ed52828911ec9bf43d893fc84b5732f5))
+* Mitgliederprofil – „Details“ zur Referenz in der aufgeklappten Zeile ([#1944](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1944)) ([18c9640](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/18c96408ed52828911ec9bf43d893fc84b5732f5))
+* Mitgliederprofil – Chronik je Jahr als kompakte, aufklappbare Liste mit kurzem Titel und Aufstellung ([#1944](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1944)) ([18c9640](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/18c96408ed52828911ec9bf43d893fc84b5732f5))
+* Mitgliederprofil – Liga-Weg der Person ab zwei Saisons einer Spur ([#1944](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1944)) ([18c9640](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/18c96408ed52828911ec9bf43d893fc84b5732f5))
+* Mitgliederprofil – Vereinsplatzierungen ohne Nullen: nur vorhandene Medaillen, sonst „Bestes Ergebnis“ ([#1944](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1944)) ([18c9640](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/18c96408ed52828911ec9bf43d893fc84b5732f5))
+* Turnier bearbeiten warnt bei widersprüchlichen Zeiten ([#1938](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1938)) ([b39cdc5](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/b39cdc513fd9334bdcc78f0a39f518af04f15ccd))
+
+
+### Fehlerbehebungen
+
+* „Dein Stand“ nennt die wirksamen Check-in-Zeiten ([#1938](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1938)) ([b39cdc5](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/b39cdc513fd9334bdcc78f0a39f518af04f15ccd))
+* „Nicht erschienen“ nennt den Nachrücker von der Warteliste ([#1941](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1941)) ([b39cdc5](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/b39cdc513fd9334bdcc78f0a39f518af04f15ccd))
+* Anmelde-Blatt nennt bei vollem Cup die Warteliste ([#1941](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1941)) ([b39cdc5](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/b39cdc513fd9334bdcc78f0a39f518af04f15ccd))
+* Check-in von Hand setzt die wirksamen Zeiten ([#1938](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1938)) ([b39cdc5](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/b39cdc513fd9334bdcc78f0a39f518af04f15ccd))
+* Fast Lap am Handy – Schnelleingabe ohne Trennstrich, Team-Tabelle ganz ([#1941](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1941)) ([b39cdc5](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/b39cdc513fd9334bdcc78f0a39f518af04f15ccd))
+* Fast Lap sperrt „Eintragen“ nach dem letzten Versuch ([#1941](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1941)) ([b39cdc5](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/b39cdc513fd9334bdcc78f0a39f518af04f15ccd))
+* FFA-Läufe mit Auslosung nach der Runde – Zusammenlegen lässt keine doppelte Quelle mehr ([#1596](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1596)) ([b39cdc5](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/b39cdc513fd9334bdcc78f0a39f518af04f15ccd))
+* Gewinn-Meldung sagt „1. Platz bei …“ statt „1. Platz Platz bei …“ ([#1941](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1941)) ([b39cdc5](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/b39cdc513fd9334bdcc78f0a39f518af04f15ccd))
+* Show-Auslosung und Fristen erreichen jedes laufende Turnier ([#1940](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1940)) ([b39cdc5](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/b39cdc513fd9334bdcc78f0a39f518af04f15ccd))
+* Turnierbaum zeigt den lesbaren Stationsnamen statt des Gerätekürzels ([#1941](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1941)) ([b39cdc5](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/b39cdc513fd9334bdcc78f0a39f518af04f15ccd))
+* Verborgenes oder falsches Turnier zeigt eine Meldung statt ewig „Lade Turnier“ ([#1939](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1939)) ([b39cdc5](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/b39cdc513fd9334bdcc78f0a39f518af04f15ccd))
+* Zeitleiste der Turnierseite folgt Status und Phase ([#1938](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1938)) ([b39cdc5](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/b39cdc513fd9334bdcc78f0a39f518af04f15ccd))
+
 ## 1.18.0 (21.10.2026)
 
 ### Neu
