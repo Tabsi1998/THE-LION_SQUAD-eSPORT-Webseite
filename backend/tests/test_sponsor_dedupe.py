@@ -3,7 +3,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from services.sponsor_utils import dedupe_public_sponsors
+from services.sponsor_utils import dedupe_public_sponsors, drop_legacy_logo_fields, public_sponsor_view
 
 
 def test_public_sponsors_are_deduped_by_logo_before_rendering():
@@ -24,7 +24,7 @@ def test_event_sponsors_use_same_logo_dedupe_rule():
         {"id": "event-b", "name": "Sponsor A Duplicate", "logo_url": "/uploads/a.png"},
     ]
 
-    assert dedupe_public_sponsors(sponsors) == [{**sponsors[0], "since_year": None, "until_year": None, "logo_transparent": None}]
+    assert dedupe_public_sponsors(sponsors) == [{**sponsors[0], "since_year": None, "until_year": None}]
 
 
 def test_public_view_strips_contacts_notes_and_dolibarr_references_but_keeps_the_years():
@@ -33,5 +33,13 @@ def test_public_view_strips_contacts_notes_and_dolibarr_references_but_keeps_the
         "id": "a", "name": "Sponsor A", "logo_url": "/uploads/a.png", "contact_name": "P. Beispiel", "contact_email": "p@example.test",
         "internal_notes": "geheim", "dolibarr_id": 12, "contract_start": "2024-03-01", "contract_end": "2026-12-31", "show_on_home": True,
     }])[0]
-    assert view == {"id": "a", "name": "Sponsor A", "logo_url": "/uploads/a.png", "show_on_home": True, "since_year": 2024, "until_year": 2026,
-                    "logo_transparent": None}
+    assert view == {"id": "a", "name": "Sponsor A", "logo_url": "/uploads/a.png", "show_on_home": True, "since_year": 2024, "until_year": 2026}
+
+
+def test_old_white_logo_fields_stay_inside():
+    # Die weiße Logo-Fassung (#1321) ist zurückgenommen: alte Felder gehen weder öffentlich noch in der Verwaltung hinaus.
+    doc = {"id": "a", "name": "Sponsor A", "logo_url": "/uploads/a.png", "logo_mono_url": "/uploads/a-mono.png", "logo_transparent": True}
+    view = public_sponsor_view(dict(doc))
+    assert view["logo_url"] == "/uploads/a.png"
+    assert "logo_mono_url" not in view and "logo_transparent" not in view
+    assert "logo_mono_url" not in drop_legacy_logo_fields(dict(doc))

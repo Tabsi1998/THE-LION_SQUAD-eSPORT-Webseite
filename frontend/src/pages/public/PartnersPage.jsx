@@ -2,10 +2,10 @@ import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { Reveal } from "@/components/tls/Reveal";
-import { api } from "@/lib/api";
+import { api, resolveMediaUrl } from "@/lib/api";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
-import { SponsorLogo } from "@/components/tls/SponsorLogo";
+import { SmartLogo } from "@/components/tls/SmartLogo";
 import { ChannelIcon, channelColor } from "@/components/tls/ChannelIcon";
 import { ArrowRight, ExternalLink, Handshake, Star } from "lucide-react";
 
@@ -73,7 +73,7 @@ export default function PartnersPage() {
                 <article key={p.id} data-testid={`partner-card-${p.slug || p.id}`} className="tls-card tls-reveal-item grid lg:grid-cols-2 gap-0 border border-white/10 rounded-sm bg-[#101010] overflow-hidden transition">
                   <Link to={target} className={`${idx % 2 === 1 ? "lg:order-2" : ""} min-h-72 bg-[#070707] border-b lg:border-b-0 ${idx % 2 === 1 ? "lg:border-l" : "lg:border-r"} border-white/10 flex items-center justify-center p-10`}>
                     {p.logo_url ? (
-                      <span className="h-44 w-[80%] flex items-center justify-center"><SponsorLogo logo={p} alt={p.name} testId={`partner-logo-${p.slug || p.id}`} /></span>
+                      <SmartLogo src={resolveMediaUrl(p.logo_url)} alt={p.name} className="max-h-44 max-w-[80%] w-auto h-auto" />
                     ) : (
                       <Handshake className="w-14 h-14 text-[#29B6E8]" />
                     )}

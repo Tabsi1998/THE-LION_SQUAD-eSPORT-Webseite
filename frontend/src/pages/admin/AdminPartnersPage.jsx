@@ -7,7 +7,6 @@ import { CheckField, SelectField, TextAreaField, TextField } from "@/components/
 import { DolibarrSourceBlock, dolibarrLocked, useDolibarrSource } from "@/components/tls/DolibarrSourceBlock";
 import { imageSourceText, shownLogo } from "@/lib/sponsorImages";
 import { ImageUpload } from "@/components/tls/ImageUpload";
-import { LogoToneHint } from "@/components/tls/SponsorLogo";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { toast } from "sonner";
@@ -20,7 +19,7 @@ import { SOCIAL_PLATFORMS } from "@/lib/socialIcons";
 // kommen Name und Art, der Rest bleibt hier.
 
 export const emptyPartner = {
-  name: "", slug: "", logo_url: "", logo_mono_url: "", link: "", description: "", kind: "verein", is_active: true, order_index: 0,
+  name: "", slug: "", logo_url: "", link: "", description: "", kind: "verein", is_active: true, order_index: 0,
   about: "", since: "", discord_invite: "", discord_guild_id: "", twitch_channel: "",
   youtube_url: "", x_url: "", instagram_url: "", tiktok_url: "", social_links: [], tools: [],
 };
@@ -196,9 +195,6 @@ function PartnerForm({ partner, locked = new Set(), onClose, onSaved }) {
     <AdminSheet title={isNew ? "Neuer Partner" : "Partner bearbeiten"} eyebrow="Verein" onClose={onClose} onSubmit={save} saving={saving} submitTestId="partner-save" testId="partner-sheet">
       <TextField label="Name" value={form.name} onChange={(v) => set("name", v)} required testId="partner-name" {...lock("name")} />
       <ImageUpload value={form.logo_url} onChange={(v) => set("logo_url", v)} label="Logo" testId="partner-logo" variant="square" endpoint="/uploads/logo" allowLibrary />
-      {/* Einfarbig (#1321): die Website zeigt Logos weiß, beim Drüberfahren in Farbe. */}
-      <ImageUpload value={form.logo_mono_url} onChange={(v) => set("logo_mono_url", v)} label="Weiße Fassung (optional)" testId="partner-logo-mono" variant="square" endpoint="/uploads/logo" allowLibrary />
-      <LogoToneHint saved={partner} currentLogoUrl={form.logo_url} currentMonoUrl={form.logo_mono_url} testId="partner-logo-tone-hint" />
       {imageSourceText(partner?.dolibarr_image_summary) && (
         <p className="text-xs text-white/60 border border-white/10 rounded-sm px-3 py-2" data-testid="partner-images-hint">
           {imageSourceText(partner.dolibarr_image_summary)}. Die Website zeigt die Fassung für dunklen Hintergrund; das Logo hier springt nur ein, wo

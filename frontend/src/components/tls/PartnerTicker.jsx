@@ -21,8 +21,6 @@ export function partnerTickerItems(partners) {
       key: partner.id || partner.slug || partner.name,
       name: partner.name,
       logo_url: partner.logo_url,
-      logo_mono_url: partner.logo_mono_url,
-      logo_transparent: partner.logo_transparent,
       to: partner.slug ? `/partners/${partner.slug}` : undefined,
       href: partner.slug ? undefined : partner.link || undefined,
     }));
@@ -56,7 +54,6 @@ export function PartnerTicker({ className = "", heading = "Partner" }) {
         groupPaddingClass="pr-4 sm:pr-6 md:pr-8"
         verticalClass="py-1"
         reverse
-        hoverColor={false}
         testId="partner-ticker-band"
       />
     </section>

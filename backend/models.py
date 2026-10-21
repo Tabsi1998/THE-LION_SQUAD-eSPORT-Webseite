@@ -1305,8 +1305,6 @@ SponsorContractStatus = Literal["planned", "active", "paused", "expired", "cance
 class SponsorCreate(BaseModel):
     name: str
     logo_url: Optional[str] = None
-    # Weiße Fassung des Logos (#1321): die Website zeigt Logos einfarbig weiß, beim Drüberfahren in Farbe.
-    logo_mono_url: Optional[str] = None
     link: Optional[str] = None
     description: Optional[str] = None
     tier: SponsorTier = "bronze"
@@ -1331,7 +1329,6 @@ class SponsorCreate(BaseModel):
 class SponsorUpdate(BaseModel):
     name: Optional[str] = None
     logo_url: Optional[str] = None
-    logo_mono_url: Optional[str] = None
     link: Optional[str] = None
     description: Optional[str] = None
     tier: Optional[SponsorTier] = None
@@ -1374,7 +1371,6 @@ class PartnerCreate(BaseModel):
     name: str
     slug: Optional[str] = None
     logo_url: Optional[str] = None
-    logo_mono_url: Optional[str] = None
     link: Optional[str] = None
     description: Optional[str] = None
     kind: str = "verein"
@@ -1398,7 +1394,6 @@ class PartnerUpdate(BaseModel):
     name: Optional[str] = None
     slug: Optional[str] = None
     logo_url: Optional[str] = None
-    logo_mono_url: Optional[str] = None
     link: Optional[str] = None
     description: Optional[str] = None
     kind: Optional[str] = None

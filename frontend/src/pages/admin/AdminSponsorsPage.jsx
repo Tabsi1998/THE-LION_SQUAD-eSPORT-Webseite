@@ -8,7 +8,6 @@ import { GermanDateField } from "@/components/tls/GermanDateField";
 import { DolibarrSourceBlock, dolibarrLocked, useDolibarrSource } from "@/components/tls/DolibarrSourceBlock";
 import { imageSourceText, shownLogo } from "@/lib/sponsorImages";
 import { ImageUpload } from "@/components/tls/ImageUpload";
-import { LogoToneHint } from "@/components/tls/SponsorLogo";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { SponsoringOfferPanel } from "@/pages/admin/sponsors/SponsoringOfferPanel";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
@@ -260,7 +259,7 @@ function SponsorForm({ sponsor, events = [], locked = new Set(), onClose, onSave
   const initialTier = sponsor?.tier && ["main","platinum","gold","silver","bronze"].includes(sponsor.tier) ? sponsor.tier : "bronze";
   const initialDefaults = TIER_DEFAULTS[initialTier] || TIER_DEFAULTS.bronze;
   const [form, setForm] = useState({
-    name: sponsor?.name || "", logo_url: sponsor?.logo_url || "", logo_mono_url: sponsor?.logo_mono_url || "",
+    name: sponsor?.name || "", logo_url: sponsor?.logo_url || "",
     link: sponsor?.link || "", description: sponsor?.description || "",
     tier: initialTier,
     is_active: sponsor?.is_active !== false,
@@ -336,9 +335,6 @@ function SponsorForm({ sponsor, events = [], locked = new Set(), onClose, onSave
           <TextField label="Link (URL)" value={form.link} onChange={(v) => set("link", v)} testId="sponsor-link" placeholder="https://…" />
         </FormGrid>
         <ImageUpload value={form.logo_url} onChange={(v) => set("logo_url", v)} label="Logo" testId="sponsor-logo" variant="square" endpoint="/uploads/sponsor-logo" allowLibrary />
-        {/* Einfarbig (#1321): die Website zeigt Logos weiß, beim Drüberfahren in Farbe. */}
-        <ImageUpload value={form.logo_mono_url} onChange={(v) => set("logo_mono_url", v)} label="Weiße Fassung (optional)" testId="sponsor-logo-mono" variant="square" endpoint="/uploads/sponsor-logo" allowLibrary />
-        <LogoToneHint saved={sponsor} currentLogoUrl={form.logo_url} currentMonoUrl={form.logo_mono_url} testId="sponsor-logo-tone-hint" />
         {imageSourceText(sponsor?.dolibarr_image_summary) && (
           <p className="text-xs text-white/60 border border-white/10 rounded-sm px-3 py-2" data-testid="sponsor-images-hint">
             {imageSourceText(sponsor.dolibarr_image_summary)}. Die Website und die App zeigen die Fassung für dunklen Hintergrund, Mails und PDFs die helle;
