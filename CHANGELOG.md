@@ -1,5 +1,25 @@
 # Changelog
 
+## [1.26.0](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/compare/v1.25.0...v1.26.0) (2026-10-21)
+
+
+### Neu
+
+* Rennligen – Anpassungen ±Punkte je Saison mit Grund, öffentlich als „−5“ ([#1960](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1960)) ([10074a1](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/10074a1dc6cdab78a03a798b542db4b75da5c404))
+* Rennligen – Regeländerung ab Runde X mit Tag und Hinweis auf der Serienseite ([#1960](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1960)) ([10074a1](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/10074a1dc6cdab78a03a798b542db4b75da5c404))
+* Rennligen – Saison abgebrochen mit Grund und Nachfolger, im Liga-Weg und in der Chronik ([#1960](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1960)) ([10074a1](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/10074a1dc6cdab78a03a798b542db4b75da5c404))
+* Rennligen – Startaufstellung aus umgekehrtem Qualifying oder Lauf davor, nur die ersten N ([#1960](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1960)) ([10074a1](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/10074a1dc6cdab78a03a798b542db4b75da5c404))
+* Rennligen – Teamwertung laut Veranstalter im Ergebnisblatt eintragen oder einfügen ([#1960](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1960)) ([10074a1](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/10074a1dc6cdab78a03a798b542db4b75da5c404))
+* Rennligen – Teamwertung nach aktueller Besetzung, Quelle und Modus, „im Team seit“ ([#1960](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1960)) ([10074a1](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/10074a1dc6cdab78a03a798b542db4b75da5c404))
+* Rennligen – Termin ohne Wertung mit Grund, Mindestzahl am Start als Hinweis ([#1960](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1960)) ([10074a1](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/10074a1dc6cdab78a03a798b542db4b75da5c404))
+* Rundenseite und Statistik – umgekehrte Aufstellung ohne Pole, Termin ohne Wertung, abgebrochene Saison ([#1960](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1960)) ([10074a1](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/10074a1dc6cdab78a03a798b542db4b75da5c404))
+
+
+### Fehlerbehebungen
+
+* Rennligen – Ersatzfahrer zählen nicht fürs Stammteam; Teamnamen ohne Teamwertung je Saison einstellbar ([#1960](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1960)) ([10074a1](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/10074a1dc6cdab78a03a798b542db4b75da5c404))
+* Rennligen – leeres Team heißt kein Team; neue Zeilen bekommen das Stammteam sichtbar vorbelegt ([#1960](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1960)) ([10074a1](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/10074a1dc6cdab78a03a798b542db4b75da5c404))
+
 ## 1.25.0 (21.10.2026)
 
 ### Neu
