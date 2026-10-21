@@ -198,9 +198,16 @@ test("Rennliga (#1927): Tabelle mit Nr, Start, Zeit, Abstand, Ausfall, schnellst
   expect(screen.getByTestId("result-fastest-name")).toHaveValue("Beta");
   expect(screen.getByTestId("result-fastest-time")).toHaveValue("1:31.456");
   expect(screen.getByTestId("result-dotd")).toHaveValue("Gamma");
-  expect(within(sheet).getAllByTestId("result-row-grid").map((input) => input.value)).toEqual(["3", "1", "2"]);
-  fireEvent.change(within(sheet).getAllByTestId("result-row-grid")[0], { target: { value: "0" } });
+  // Zugeklappt kurz unter jeder Zeile, aufgeklappt als Felder.
+  expect(within(sheet).getAllByTestId("result-row-race").map((line) => line.textContent)).toEqual([
+    "Nr. 7 · Startplatz 3 · 1:32:45.123", "Nr. 12 · Startplatz 1 · +5.204", "Nr. 21 · Startplatz 2"]);
+  fireEvent.click(within(sheet).getAllByTestId("result-row-more")[0]);
+  expect(within(sheet).getByTestId("result-row-grid")).toHaveValue("3");
+  fireEvent.change(within(sheet).getByTestId("result-row-grid"), { target: { value: "0" } });
   expect(screen.getByTestId("result-invalid")).toBeInTheDocument();
+  // Ungültig bleibt das Feld sichtbar, auch beim Zuklappen.
+  fireEvent.click(within(sheet).getAllByTestId("result-row-more")[0]);
+  expect(within(sheet).getByTestId("result-row-grid")).toHaveAttribute("aria-invalid", "true");
 });
 
 test("Team-Liga: kein Feld für schnellste Runde und Fahrer des Tages", async () => {

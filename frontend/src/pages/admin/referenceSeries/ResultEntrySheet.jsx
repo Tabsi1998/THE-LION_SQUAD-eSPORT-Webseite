@@ -81,7 +81,12 @@ function FieldErrors({ fields, testId }) {
 
 function ResultRow({ row, index, autoPlace, organizerMode, problems, info, invalid, onChange, onHint, onRemove }) {
   const scored = info?.scored;
-  const [open, setOpen] = useState(() => Boolean(row.penalty_points || row.start_number || row.official_total || row.override || row.grid || row.time || row.gap));
+  // Offen von selbst nur, wo etwas Ungewöhnliches steht (Strafe, Gesamtstand, „zählen statt Schlüssel“) oder eine Eingabe
+  // ungültig ist. Startnummer, Startplatz, Zeit und Abstand (#1927) stehen zugeklappt kurz unter der Zeile - so bleibt
+  // eine eingefügte Liste mit 20 Fahrern überschaubar.
+  const [opened, setOpen] = useState(() => Boolean(row.penalty_points || row.official_total || row.override));
+  const open = opened || Boolean(invalid?.grid || invalid?.penalty_points || invalid?.official_total);
+  const raceLine = [row.start_number && `Nr. ${row.start_number}`, row.grid && `Startplatz ${row.grid}`, row.time, row.gap].filter(Boolean).join(" · ");
   const level = invalid || problems?.some((item) => item.level === "error") ? "error" : problems?.length ? "warning" : null;
   const toggleMark = (mark) => onChange({ marks: row.marks.includes(mark) ? row.marks.filter((item) => item !== mark) : [...row.marks, mark] });
   const number = index + 1;
@@ -129,9 +134,9 @@ function ResultRow({ row, index, autoPlace, organizerMode, problems, info, inval
           <label className="block"><span className={LABEL}>Startplatz</span>
             <input inputMode="numeric" value={row.grid} onChange={(event) => onChange({ grid: event.target.value })} data-testid="result-row-grid" {...invalidProps(invalid, "grid")} className={`${SMALL_INPUT} tabular-nums ${invalid?.grid ? INVALID : ""}`} /></label>
           <label className="block"><span className={LABEL}>Zeit</span>
-            <input value={row.time} maxLength={20} placeholder="1:32:45.123" onChange={(event) => onChange({ time: event.target.value })} data-testid="result-row-time" className={`${SMALL_INPUT} tabular-nums`} /></label>
+            <input value={row.time} maxLength={20} onChange={(event) => onChange({ time: event.target.value })} data-testid="result-row-time" className={`${SMALL_INPUT} tabular-nums`} /></label>
           <label className="block"><span className={LABEL}>Abstand</span>
-            <input value={row.gap} maxLength={20} placeholder="+5.204" onChange={(event) => onChange({ gap: event.target.value })} data-testid="result-row-gap" className={`${SMALL_INPUT} tabular-nums`} /></label>
+            <input value={row.gap} maxLength={20} onChange={(event) => onChange({ gap: event.target.value })} data-testid="result-row-gap" className={`${SMALL_INPUT} tabular-nums`} /></label>
           <label className="block"><span className={LABEL}>Gesamt laut Veranst.</span>
             <input inputMode="decimal" value={row.official_total} onChange={(event) => onChange({ official_total: event.target.value })} data-testid="result-row-total" {...invalidProps(invalid, "official_total")} className={`${SMALL_INPUT} ${invalid?.official_total ? INVALID : ""}`} /></label>
           {!organizerMode && (
@@ -142,6 +147,7 @@ function ResultRow({ row, index, autoPlace, organizerMode, problems, info, inval
           )}
         </div>
       )}
+      {!open && raceLine && <div className="mt-1 text-[11px] text-white/55 tabular-nums" data-testid="result-row-race">{raceLine}</div>}
       {info && (
         <div className="mt-1 flex flex-wrap items-center gap-x-2 text-[11px] text-white/45 tabular-nums">
           {/* Bekannt oder neu sagt die Vorschau jedem; ob jemand Vereinsmitglied ist, nur dem Vorstand. */}
