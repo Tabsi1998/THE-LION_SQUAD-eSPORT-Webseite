@@ -104,7 +104,8 @@ def allowed_base_url(key, value) -> str | None:
     if parts.path not in ("", "/") or parts.query or parts.fragment or not parts.hostname:
         return None
     normal = f"https://{parts.hostname.lower()}"
-    return normal if normal in found.base_urls else None
+    # Zurück kommt immer der Eintrag aus der festen Liste selbst, nie der eingegebene Text.
+    return next((url for url in found.base_urls if url == normal), None)
 
 
 def public_hint(source, partners: dict | None) -> dict | None:
@@ -124,7 +125,7 @@ def _url(key: str, base_url, path: str, ref=None) -> str:
     base = allowed_base_url(key, base_url)
     if base is None or (ref is not None and not tft_dashboard.valid_ref(ref)):
         raise SourceError(NOT_ALLOWED)
-    return base + (path.format(ref=str(ref)) if ref is not None else path)
+    return base + (path.format(ref=int(ref)) if ref is not None else path)
 
 
 # ---------------------------------------------------------------- Abruf
