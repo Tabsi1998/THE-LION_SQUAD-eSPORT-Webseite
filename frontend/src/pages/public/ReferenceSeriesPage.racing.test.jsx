@@ -359,9 +359,10 @@ test("Rennergebnis (#1927): Fahrer des Tages im Raster, Startplatz → Ziel und 
   const lion = within(table).getAllByTestId("series-row")[1];
   const cells = within(lion).getAllByTestId("race-cell");
   expect(within(cells[0]).getByTestId("race-dotd")).toBeTruthy();
-  expect(cells[0]).toHaveAttribute("title", "R1: Platz 2, 18 Punkte, von Startplatz 5 (3 Plätze gutgemacht), Abstand +5.204, Fahrer des Tages");
+  // Zeiten wie beim Veranstalter mit Komma (#1981).
+  expect(cells[0]).toHaveAttribute("title", "R1: Platz 2, 18 Punkte, von Startplatz 5 (3 Plätze gutgemacht), Abstand +5,204, Fahrer des Tages");
   const leader = within(table).getAllByTestId("series-row")[0];
-  expect(within(leader).getAllByTestId("race-cell")[0]).toHaveAttribute("title", expect.stringContaining("Zeit 1:32:45.123, schnellste Runde 1:31.456"));
+  expect(within(leader).getAllByTestId("race-cell")[0]).toHaveAttribute("title", expect.stringContaining("Zeit 1:32:45,123, schnellste Runde 1:31,456"));
 
   const detail = screen.getByTestId("racing-driver");
   const gains = within(detail).getAllByTestId("racing-driver-gain");

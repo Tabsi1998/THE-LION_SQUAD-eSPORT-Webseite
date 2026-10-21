@@ -16,6 +16,7 @@ import { ResultImageButton, ResultImageRowNote, ResultImageSummary, ocrMark, use
 import { RACE_FIELD_GROUPS, afterEdit, confirmRow, imageFormFields, imageToRows, isUncertain, openImageItems, replaceRaceMarks } from "@/lib/resultImage";
 import { DAY_MARK_OPTIONS, roundCount, schemeOf, usesDayRounds } from "@/lib/tournamentDays";
 import { BonusChips, DayRoundsDetails, DayRoundsLine, DoubleUpToggle } from "./DayRoundsFields";
+import { formatRaceTime } from "@/lib/raceTime";
 import { toast } from "sonner";
 import { ClipboardList, Plus, RefreshCw, SlidersHorizontal, X } from "lucide-react";
 
@@ -100,7 +101,12 @@ function ResultRow({ row, index, autoPlace, organizerMode, qualifying = false, d
   const placeInvalid = Object.keys(invalid || {}).some((field) => field.startsWith("round_place_"));
   const open = opened || Boolean(invalid?.grid || invalid?.penalty_points || invalid?.penalty_seconds || invalid?.official_total || placeInvalid);
   const markOptions = day ? DAY_MARK_OPTIONS : MARK_OPTIONS;
-  const raceLine = [row.start_number && `Nr. ${row.start_number}`, row.grid && `Startplatz ${row.grid}`, row.time, row.gap, row.penalty_seconds && `+${row.penalty_seconds} s Strafe`].filter(Boolean).join(" · ");
+  const raceLine = [row.start_number && `Nr. ${row.start_number}`, row.grid && `Startplatz ${row.grid}`, formatRaceTime(row.time), formatRaceTime(row.gap), row.penalty_seconds && `+${row.penalty_seconds} s Strafe`].filter(Boolean).join(" · ");
+  // Zeiten (#1981): Punkt oder Komma eingeben - danach steht Komma da, wie beim Veranstalter.
+  const tidy = (field) => () => {
+    const shown = formatRaceTime(row[field]);
+    if (shown !== row[field]) onChange({ [field]: shown });
+  };
   const mark = (field) => ocrMark(row, field, index);
   const level = invalid || problems?.some((item) => item.level === "error") ? "error" : problems?.length || row.ocr ? "warning" : null;
   const toggleMark = (mark) => onChange({ marks: row.marks.includes(mark) ? row.marks.filter((item) => item !== mark) : [...row.marks, mark] });
@@ -118,8 +124,8 @@ function ResultRow({ row, index, autoPlace, organizerMode, qualifying = false, d
           onChange={(event) => onChange({ team: event.target.value })} data-testid="result-row-team" {...mark("team").props} className={`${SMALL_INPUT} ${mark("team").className} order-last col-start-2 col-end-6 sm:order-none sm:col-start-auto sm:col-end-auto`} />
         {/* Qualifying (#1930): die Zeit statt der Punkte in der Zeile. */}
         {qualifying ? (
-          <input aria-label={`Zeit Zeile ${number}`} value={row.time} placeholder="Zeit" maxLength={20} title="Rundenzeit; leer oder „--:--.---“: ohne Zeit"
-            onChange={(event) => onChange({ time: event.target.value })} data-testid="result-row-quali-time" {...mark("time").props} className={`${SMALL_INPUT} text-right tabular-nums ${mark("time").className}`} />
+          <input aria-label={`Zeit Zeile ${number}`} value={row.time} placeholder="Zeit" maxLength={20} title="Rundenzeit, etwa 1:31,456; leer oder „--:--,---“: ohne Zeit"
+            onChange={(event) => onChange({ time: event.target.value })} onBlur={tidy("time")} data-testid="result-row-quali-time" {...mark("time").props} className={`${SMALL_INPUT} text-right tabular-nums ${mark("time").className}`} />
         ) : (
           <input aria-label={`Punkte Zeile ${number}`} inputMode="decimal" value={row.points} placeholder="Pkt"
             title={organizerMode ? "Punkte laut Veranstalter" : "Leer: nach Schlüssel. Eingetragen: laut Veranstalter (wird geprüft)."}
@@ -157,9 +163,9 @@ function ResultRow({ row, index, autoPlace, organizerMode, qualifying = false, d
           <label className="block"><span className={LABEL}>Startplatz</span>
             <input inputMode="numeric" value={row.grid} onChange={(event) => onChange({ grid: event.target.value })} data-testid="result-row-grid" {...invalidProps(invalid, "grid")} {...mark("grid").props} className={`${SMALL_INPUT} tabular-nums ${mark("grid").className} ${invalid?.grid ? INVALID : ""}`} /></label>
           <label className="block"><span className={LABEL}>Zeit</span>
-            <input value={row.time} maxLength={20} onChange={(event) => onChange({ time: event.target.value })} data-testid="result-row-time" {...mark("time").props} className={`${SMALL_INPUT} tabular-nums ${mark("time").className}`} /></label>
+            <input value={row.time} maxLength={20} onChange={(event) => onChange({ time: event.target.value })} onBlur={tidy("time")} data-testid="result-row-time" {...mark("time").props} className={`${SMALL_INPUT} tabular-nums ${mark("time").className}`} /></label>
           <label className="block"><span className={LABEL}>Abstand</span>
-            <input value={row.gap} maxLength={20} onChange={(event) => onChange({ gap: event.target.value })} data-testid="result-row-gap" {...mark("gap").props} className={`${SMALL_INPUT} tabular-nums ${mark("gap").className}`} /></label>
+            <input value={row.gap} maxLength={20} onChange={(event) => onChange({ gap: event.target.value })} onBlur={tidy("gap")} data-testid="result-row-gap" {...mark("gap").props} className={`${SMALL_INPUT} tabular-nums ${mark("gap").className}`} /></label>
           <label className="block"><span className={LABEL}>Strafsekunden</span>
             <input inputMode="decimal" value={row.penalty_seconds} title="Zeitstrafe in Sekunden – nur Anzeige in der Ergebnistabelle" onChange={(event) => onChange({ penalty_seconds: event.target.value })} data-testid="result-row-penalty-seconds" {...invalidProps(invalid, "penalty_seconds")} className={`${SMALL_INPUT} tabular-nums ${invalid?.penalty_seconds ? INVALID : ""}`} /></label>
           <label className="block"><span className={LABEL}>Gesamt laut Veranst.</span>
@@ -217,8 +223,12 @@ function RaceExtras({ form, onChange, invalid, problems = {} }) {
           onChange={(event) => set("fastestLap", { ...form.fastestLap, name: event.target.value }, "fastest_lap_name")} data-testid="result-fastest-name"
           aria-invalid={lapInvalid || undefined} {...mark("fastest_lap_name").props} className={`${SMALL_INPUT} ${mark("fastest_lap_name").className} ${lapInvalid ? INVALID : ""}`} /></label>
       <label className="block"><span className={LABEL}>Rundenzeit</span>
-        <input value={form.fastestLap.time} maxLength={20} placeholder="1:31.456"
-          onChange={(event) => set("fastestLap", { ...form.fastestLap, time: event.target.value }, "fastest_lap_time")} data-testid="result-fastest-time"
+        <input value={form.fastestLap.time} maxLength={20} placeholder="1:31,456"
+          onChange={(event) => set("fastestLap", { ...form.fastestLap, time: event.target.value }, "fastest_lap_time")}
+          onBlur={() => {
+            const shown = formatRaceTime(form.fastestLap.time);
+            if (shown !== form.fastestLap.time) set("fastestLap", { ...form.fastestLap, time: shown }, "fastest_lap_time");
+          }} data-testid="result-fastest-time"
           {...mark("fastest_lap_time").props} className={`${SMALL_INPUT} tabular-nums ${mark("fastest_lap_time").className}`} /></label>
       <label className="block min-w-0"><span className={LABEL}>Fahrer des Tages</span>
         <input value={form.driverOfTheDay} list="result-row-names" maxLength={120} placeholder="Name aus der Liste"
@@ -445,7 +455,7 @@ export function ResultEntrySheet({ series, round, onClose, onSaved }) {
         ...form, rows,
         // Schnellste Runde und Fahrer des Tages aus der Liste (#1927) - sonst bleibt, was schon eingetragen ist. Gelb
         // aus einem Bild verlieren nur die Felder, die die Liste ersetzt; was stehen bleibt, ist weiter ungeprüft.
-        ...(result.fastest_lap ? { fastestLap: { name: result.fastest_lap.name || "", time: result.fastest_lap.time || "" } } : {}),
+        ...(result.fastest_lap ? { fastestLap: { name: result.fastest_lap.name || "", time: formatRaceTime(result.fastest_lap.time) } } : {}),
         ...(result.driver_of_the_day ? { driverOfTheDay: result.driver_of_the_day.name || "" } : {}),
         raceOcr: replaceRaceMarks(form.raceOcr, [
           ...(result.fastest_lap ? RACE_FIELD_GROUPS.fastestLap : []),

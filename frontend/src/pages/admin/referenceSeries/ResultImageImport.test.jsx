@@ -91,12 +91,12 @@ test("Knopf „Bild auslesen“: gelesen wird im Server, die Zeilen ersetzen die
   expect([body.rows[1].grid, body.rows[1].time, body.rows[1].gap]).toEqual([1, "1:32:17.456", "+2.333"]);
   expect([body.fastest_lap, body.driver_of_the_day]).toEqual([{ participant_id: "p2", time: "1:31.207" }, { participant_id: "p1" }]);
   expect([screen.getByTestId("result-fastest-name").value, screen.getByTestId("result-fastest-time").value, screen.getByTestId("result-dotd").value])
-    .toEqual(["Bert Bolzt", "1:31.207", "Anna Probe"]);
+    .toEqual(["Bert Bolzt", "1:31,207", "Anna Probe"]);
   expect(screen.queryByTestId("result-race-ocr")).toBeNull();
   // Übersicht: Vorlage, Kopf, Hinweis, wie viele Zeilen gelb sind.
   const summary = screen.getByTestId("result-image-summary");
   expect(within(summary).getByTestId("result-image-counts")).toHaveTextContent("3 Zeilen in die Liste übernommen · Vorlage Rennliga-Ergebnis (dunkel)");
-  expect(within(summary).getByTestId("result-image-header")).toHaveTextContent("Schnellste RennrundeBert Bolzt · 1:31.207");
+  expect(within(summary).getByTestId("result-image-header")).toHaveTextContent("Schnellste RennrundeBert Bolzt · 1:31,207");
   expect(within(summary).getByTestId("result-image-status")).toHaveTextContent("2 Zeilen sind gelb");
   expect(within(summary).getByTestId("result-image-warnings")).toHaveTextContent("unscharf");
   // Gelb: genau die unsicheren Felder, darunter was im Bild stand.
@@ -192,7 +192,7 @@ test("eine eingefügte Liste oder ein zweites Bild ohne Kopf geben ungeprüfte F
   fireEvent.change(screen.getByTestId("result-paste-text"), { target: { value: "1. Anna Probe\n2. Bert Bolzt" } });
   fireEvent.click(screen.getByTestId("result-paste-apply"));
   await waitFor(() => expect(screen.getAllByTestId("result-row")).toHaveLength(2), WAIT);
-  expect(screen.getByTestId("result-fastest-time")).toHaveValue("1:37.207");
+  expect(screen.getByTestId("result-fastest-time")).toHaveValue("1:37,207");
   expect(screen.getByTestId("result-fastest-time")).toHaveAttribute("data-ocr-uncertain", "fastest_lap_time");
   expect(screen.getByTestId("result-image-open")).toHaveTextContent("Eine Zeile aus dem Bild ist noch gelb");
 
@@ -209,7 +209,7 @@ test("eine eingefügte Liste oder ein zweites Bild ohne Kopf geben ungeprüfte F
   fireEvent.click(screen.getByTestId("result-paste-toggle"));
   fireEvent.change(screen.getByTestId("result-paste-text"), { target: { value: "1. Anna Probe\n2. Bert Bolzt\nSchnellste Runde: Bert Bolzt 1:31.207" } });
   fireEvent.click(screen.getByTestId("result-paste-apply"));
-  await waitFor(() => expect(screen.getByTestId("result-fastest-time")).toHaveValue("1:31.207"), WAIT);
+  await waitFor(() => expect(screen.getByTestId("result-fastest-time")).toHaveValue("1:31,207"), WAIT);
   expect(screen.getByTestId("result-fastest-time")).not.toHaveAttribute("data-ocr-uncertain");
   expect(screen.queryByTestId("result-image-open")).toBeNull();
 }, 15000);

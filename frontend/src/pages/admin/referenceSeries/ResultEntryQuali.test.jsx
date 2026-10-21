@@ -37,10 +37,16 @@ test("Qualifying: Zeit statt Punkte, keine Rennzusätze, Quali-Liste mit Time un
   ].join("\n") } });
   fireEvent.click(screen.getByTestId("result-paste-apply"));
   const times = await within(sheet).findAllByTestId("result-row-quali-time");
-  expect(times.map((input) => input.value)).toEqual(["1:21.004", "1:21.363", ""]);
+  // Angezeigt mit Komma wie beim Veranstalter (#1981), gespeichert mit Punkt.
+  expect(times.map((input) => input.value)).toEqual(["1:21,004", "1:21,363", ""]);
   await waitFor(() => expect(apiMock.post).toHaveBeenCalled());
   const rows = apiMock.post.mock.calls.at(-1)[1].rows;
   expect(rows.map((row) => [row.place, row.name, row.start_number, row.time ?? null, row.gap ?? null])).toEqual([
     [1, "Probe Anna", "7", "1:21.004", null], [2, "Probe Bert", "12", "1:21.363", "+0.359"], [3, "Probe Carl", "21", null, null],
   ]);
+  // Eingabe mit Punkt: nach dem Verlassen steht Komma da; gespeichert wird mit Punkt.
+  fireEvent.change(times[2], { target: { value: "1:22.5" } });
+  fireEvent.blur(times[2]);
+  expect(within(sheet).getAllByTestId("result-row-quali-time")[2]).toHaveValue("1:22,5");
 });
+

@@ -147,8 +147,9 @@ test("Rennergebnis: Startnummer, Startplatz, Zeit, Abstand, schnellste Runde und
     driver_of_the_day: "p1",
   };
   const form = sheetToForm(sheet, PEOPLE);
-  expect(form.rows.map((row) => [row.start_number, row.grid, row.time, row.gap])).toEqual([["7", "3", "1:32:45.123", ""], ["", "1", "", "+5.204"]]);
-  expect(form.fastestLap).toEqual({ name: "Beta", time: "1:31.456" });
+  // Im Blatt mit Komma wie beim Veranstalter (#1981), gespeichert wieder mit Punkt.
+  expect(form.rows.map((row) => [row.start_number, row.grid, row.time, row.gap])).toEqual([["7", "3", "1:32:45,123", ""], ["", "1", "", "+5,204"]]);
+  expect(form.fastestLap).toEqual({ name: "Beta", time: "1:31,456" });
   expect(form.driverOfTheDay).toBe("Alpha");
   const { payload } = formToPayload(form);
   expect(payload.rows[0]).toMatchObject({ participant_id: "p1", start_number: "7", grid: 3, time: "1:32:45.123" });
@@ -186,7 +187,20 @@ test("eingefügte Liste mit Rennspalten: Startplatz, Zeit und Abstand landen in 
   const parsed = parseResultPaste("Pos\tNr\tFahrer\tStart\tZeit\tAbstand\n1\t7\tAlpha\t3\t1:32:45.1\t\n2\t12\tBeta\t1\t\t+5.2");
   const rows = pastedToRows(parsed.rows, PEOPLE);
   expect(rows.map((row) => [row.participant_id, row.start_number, row.grid, row.time, row.gap])).toEqual([
-    ["p1", "7", "3", "1:32:45.1", ""], ["p2", "12", "1", "", "+5.2"]]);
+    ["p1", "7", "3", "1:32:45,1", ""], ["p2", "12", "1", "", "+5,2"]]);
+});
+
+test("Zeiten (#1981): mit Punkt oder Komma eingegeben, gespeichert mit Punkt; alte Blätter mit Komma bleiben lesbar", () => {
+  const rows = [
+    emptyRow({ name: "Alpha", participant_id: "p1", time: "1:20,361" }),
+    emptyRow({ name: "Beta", participant_id: "p2", time: "1:20.407", gap: "+0,046" }),
+    emptyRow({ name: "Gamma", time: "--:--.---", gap: "+--:--,---" }),
+  ];
+  const { payload } = formToPayload({ rows, matches: [], table: [], note: "", fastestLap: { name: "Alpha", time: "1:19,999" }, driverOfTheDay: "" });
+  expect(payload.rows.map((row) => [row.time, row.gap])).toEqual([["1:20.361", undefined], ["1:20.407", "+0.046"], [undefined, undefined]]);
+  expect(payload.fastest_lap.time).toBe("1:19.999");
+  const old = sheetToForm({ rows: [{ participant_id: "p1", place: 1, marks: [], points_source: "scheme", time: "1:20,361", gap: "+0.046" }] }, PEOPLE);
+  expect([old.rows[0].time, old.rows[0].gap]).toEqual(["1:20,361", "+0,046"]);
 });
 
 // ---------------------------------------------------------------- Strafsekunden (#1950)
