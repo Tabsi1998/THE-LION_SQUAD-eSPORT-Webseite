@@ -24,7 +24,7 @@ Captains bekommen keine ``*_by``-Kennungen.
 
     {rows: [{participant_id? | name?, start_number?, place?, team?, points?, points_source: "scheme"|"organizer"|
              "manual", marks: ["dnf"|"dns"|"dsq"|"fastest_lap"|"pole"], penalty_points: 0, official_total?, note?,
-             grid?, time?, gap?, dnf?}],
+             grid?, time?, gap?, dnf?, penalty_seconds?}],
      fastest_lap?: {participant_id? | name?, start_number?, time?}, driver_of_the_day?: "Name" | {participant_id? | name?},
      matches: [{home, away, home_score, away_score, maps: [{name, home_score, away_score}],
                 lineup: [{participant_id? | name?, start_number?}]}],
@@ -156,6 +156,8 @@ class ResultEntryRow(ResultParticipantRef):
     time: Optional[str] = Field(default=None, max_length=20)
     gap: Optional[str] = Field(default=None, max_length=20)
     dnf: Optional[bool] = None
+    # Zeitstrafe in Sekunden (#1950) - nur Anzeige in der Ergebnistabelle, ändert keine Punkte.
+    penalty_seconds: Optional[float] = Field(default=None, ge=0, le=3600, allow_inf_nan=False)
 
 
 class ResultFastestLap(ResultParticipantRef):

@@ -62,6 +62,7 @@ from routes.reference_result_image_routes import router as reference_result_imag
 from routes.reference_staff_routes import router as reference_staff_router
 from routes.reference_season_close_routes import router as reference_season_close_router
 from routes.reference_series_public_routes import router as reference_series_public_router
+from routes.reference_round_page_routes import router as reference_round_page_router
 from routes.mobile_routes import router as mobile_router
 from routes.admin_routes import router as admin_router
 from routes.ops_routes import router as ops_router
@@ -328,6 +329,7 @@ app.include_router(reference_result_image_router)  # Ergebnis-Bild auslesen (#17
 app.include_router(reference_staff_router)
 app.include_router(reference_season_close_router)  # Saison abschließen (#1750)
 app.include_router(reference_series_public_router)
+app.include_router(reference_round_page_router)  # Ergebnistabelle je Runde, Statistik, Teamfarben (#1950)
 app.include_router(mobile_router)
 app.include_router(admin_router)
 app.include_router(ops_router)

@@ -683,6 +683,32 @@ button.tls-bracket-row:active, .tls-bracket-head:active { transform: scale(calc(
 .tls-hide-scrollbar { scrollbar-width: none; -ms-overflow-style: none; }
 .tls-hide-scrollbar::-webkit-scrollbar { display: none; width: 0; height: 0; }
 
+/* Wischleiste (#1950, für alle Leisten gedacht): seitlich verschiebbar im Vereinsstil - eine dünne Leiste in Cyan statt
+   der weißen Systemleiste, die Ränder laufen weich aus, wo es weitergeht. Wo der Browser Animationen am Scrollen kennt,
+   zeigt der Verlauf genau die Seite, auf der noch etwas liegt (links erst nach dem Wischen, rechts bis zum Ende) und
+   bleibt ganz weg, wenn nichts übersteht; sonst läuft nur der rechte Rand aus. */
+@property --tls-swipe-fade-start { syntax: "<length>"; inherits: false; initial-value: 0px; }
+@property --tls-swipe-fade-end { syntax: "<length>"; inherits: false; initial-value: 0px; }
+.tls-swipe {
+  overflow-x: auto; overscroll-behavior-x: contain; padding-bottom: 8px;
+  scrollbar-width: thin; scrollbar-color: var(--tls-cyan) rgb(255 255 255 / 0.06);
+  --tls-swipe-fade-end: 24px;
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 var(--tls-swipe-fade-start), #000 calc(100% - var(--tls-swipe-fade-end)), transparent);
+  mask-image: linear-gradient(90deg, transparent, #000 var(--tls-swipe-fade-start), #000 calc(100% - var(--tls-swipe-fade-end)), transparent);
+}
+.tls-swipe::-webkit-scrollbar { height: 4px; }
+.tls-swipe::-webkit-scrollbar-track { background: rgb(255 255 255 / 0.06); border-radius: 999px; }
+.tls-swipe::-webkit-scrollbar-thumb { background: var(--tls-cyan); border-radius: 999px; }
+@keyframes tls-swipe-edges {
+  0% { --tls-swipe-fade-start: 0px; --tls-swipe-fade-end: 24px; }
+  8% { --tls-swipe-fade-start: 24px; }
+  92% { --tls-swipe-fade-end: 24px; }
+  100% { --tls-swipe-fade-start: 24px; --tls-swipe-fade-end: 0px; }
+}
+@supports (animation-timeline: scroll()) {
+  .tls-swipe { --tls-swipe-fade-end: 0px; animation: tls-swipe-edges linear both; animation-timeline: scroll(self inline); }
+}
+
 /* News-Filter (#1249): weiche Knöpfe in einer Zeile zum Wischen. Der rechte Rand läuft weich aus - so sieht man, dass
    es weitergeht. Drücken gibt kurz nach, das Suchfeld gleitet beim Aufklappen leicht von rechts herein. */
 .tls-news-pills { padding-inline-end: 24px; -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent); }

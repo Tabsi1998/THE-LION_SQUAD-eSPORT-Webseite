@@ -10,6 +10,7 @@ import { SeriesCalendarSection } from "./referenceSeries/SeriesCalendarSection";
 import { SeriesParticipantsSection } from "./referenceSeries/SeriesParticipantsSection";
 import { SeriesResultsSection } from "./referenceSeries/SeriesResultsSection";
 import { SeriesStaffSection } from "./referenceSeries/SeriesStaffSection";
+import { SeriesTeamColorsSection } from "./referenceSeries/SeriesTeamColorsSection";
 import { SeasonCloseSheet } from "./referenceSeries/SeasonCloseSheet";
 import { seasonLabel } from "./AdminReferenceSeriesPage";
 import { dayLabel, publishText } from "@/lib/referenceSeriesStaff";
@@ -151,6 +152,8 @@ export default function AdminReferenceSeriesDetailPage() {
             {/* Zuordnung der Namen (Aliase, Verknüpfungen) bleibt beim Vorstand (#1743) - Captains sehen sie nicht. */}
             {board && <SeriesParticipantsSection series={series} onChanged={load} />}
             <SeriesResultsSection series={series} onChanged={load} />
+            {/* Teamfarben für die Ergebnistabelle je Runde (#1950) - nur Rennliga, nur Vorstand. */}
+            {board && lineage.kind === "racing" && <SeriesTeamColorsSection series={series} />}
             {board && <SeriesStaffSection series={series} />}
           </div>
           {board && editing && <SeriesForm series={series} lineage={lineage} onClose={() => setEditing(false)} onSaved={() => { setEditing(false); load(); }} />}

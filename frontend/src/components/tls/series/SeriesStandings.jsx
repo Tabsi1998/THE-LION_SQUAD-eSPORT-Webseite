@@ -89,21 +89,29 @@ function columnName(round, index) {
   return sessionLabel({ ...round, position: round.position || index + 1 });
 }
 
-function RoundHead({ round, index }) {
+/** Kopf einer Spalte als Link zur Ergebnisseite der Runde (#1950) - ohne `href` nur der Inhalt. */
+function HeadLink({ href, title, children }) {
+  if (!href) return children;
+  return <Link to={href} className="tls-series-head-link" title={title} data-testid="series-round-link">{children}</Link>;
+}
+
+function RoundHead({ round, index, href }) {
   const label = roundLabel({ ...round, position: round.position || index + 1 });
   // Flagge des Rennens (#1925) über dem Kürzel - Spalten ohne Land bleiben auf derselben Grundlinie.
-  if (!round.country_code) return label;
+  if (!round.country_code) return <HeadLink href={href} title={`Ergebnis ${label}`}>{label}</HeadLink>;
   return (
-    <span className="inline-flex flex-col items-end gap-1" data-testid="series-round-flag">
-      <CountryFlag code={round.country_code} size="sm" />
-      {label}
-    </span>
+    <HeadLink href={href} title={`Ergebnis ${label}`}>
+      <span className="inline-flex flex-col items-end gap-1" data-testid="series-round-flag">
+        <CountryFlag code={round.country_code} size="sm" />
+        {label}
+      </span>
+    </HeadLink>
   );
 }
 
 /** Kopf mit Runden über ihren Läufen (#1930): eine Runde mit einem Lauf steht über zwei Zeilen, eine mit mehreren
  * spannt über ihre Läufe, darunter je Lauf das Kürzel. */
-function WeekendHead({ groups, columns, label, extraColumn }) {
+function WeekendHead({ groups, columns, label, extraColumn, roundHref }) {
   const cancelled = (round) => (round.state === "cancelled" ? "line-through text-white/25" : "");
   const sub = groups.filter((group) => group.rounds.length > 1).flatMap((group) => group.rounds);
   return (
@@ -119,11 +127,13 @@ function WeekendHead({ groups, columns, label, extraColumn }) {
               title={group.state === "cancelled" ? "Abgesagt" : undefined}
               className={`px-2 font-semibold whitespace-nowrap ${single ? "py-2.5 text-right align-bottom border-b border-white/10" : "pt-2.5 pb-1 text-center align-bottom"} ${single ? cancelled(group.rounds[0]) : group.state === "cancelled" ? "line-through text-white/25" : ""}`}
               data-testid={single ? undefined : "series-weekend-head"}>
-              {single ? <RoundHead round={group.rounds[0]} index={index} /> : (
-                <span className="inline-flex flex-col items-center gap-1">
-                  {group.country_code && <CountryFlag code={group.country_code} size="sm" />}
-                  <span className="border-b border-white/15 px-1 pb-0.5">{roundLabel({ ...group.lead, position: group.lead.position || index + 1 })}</span>
-                </span>
+              {single ? <RoundHead round={group.rounds[0]} index={index} href={roundHref?.(group.rounds[0])} /> : (
+                <HeadLink href={roundHref?.(group.lead)} title={`Ergebnis ${roundLabel({ ...group.lead, position: group.lead.position || index + 1 })}`}>
+                  <span className="inline-flex flex-col items-center gap-1">
+                    {group.country_code && <CountryFlag code={group.country_code} size="sm" />}
+                    <span className="border-b border-white/15 px-1 pb-0.5">{roundLabel({ ...group.lead, position: group.lead.position || index + 1 })}</span>
+                  </span>
+                </HeadLink>
               )}
             </th>
           );
@@ -134,7 +144,7 @@ function WeekendHead({ groups, columns, label, extraColumn }) {
       <tr>
         {sub.map((round) => (
           <th key={round.id} scope="col" title={round.session || "Rennen"} className={`px-2 pb-2 pt-0 text-right font-semibold text-[10px] text-white/40 border-b border-white/10 ${cancelled(round)}`} data-testid="series-session-head">
-            {sessionAbbr(round)}
+            <HeadLink href={roundHref?.(round, true)} title={`Ergebnis ${round.session || "Rennen"}`}>{sessionAbbr(round)}</HeadLink>
           </th>
         ))}
       </tr>
@@ -149,7 +159,7 @@ function DesktopTable({ rows, columns, groups, topN, cutAfter, label, view }) {
     // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- eine scrollbare Fläche muss per Tastatur erreichbar sein (axe: scrollable-region-focusable)
     <div role="region" aria-label={label} tabIndex={0} className="tls-standings hidden md:block border border-white/10 rounded-md bg-[var(--tls-surface-1)] overflow-x-auto overscroll-x-contain focus:outline-none focus-visible:ring-2 focus-visible:ring-[#29B6E8]" data-testid="series-table">
       <table className="w-full text-sm tabular-nums">
-        {groups ? <WeekendHead groups={groups} columns={columns} label={label} extraColumn={extraColumn} /> : (
+        {groups ? <WeekendHead groups={groups} columns={columns} label={label} extraColumn={extraColumn} roundHref={view.roundHref} /> : (
         <thead className="text-[11px] uppercase tracking-[0.12em] text-white/50">
           <tr className="border-b border-white/10">
             <th scope="col" className="text-left pl-4 pr-1 py-2.5 w-16 font-semibold">#</th>
@@ -157,12 +167,7 @@ function DesktopTable({ rows, columns, groups, topN, cutAfter, label, view }) {
             {columns.map((round, index) => (
               <th key={round.id} scope="col" title={round.state === "cancelled" ? "Abgesagt" : undefined} className={`px-2 py-2.5 text-right align-bottom font-semibold whitespace-nowrap ${round.state === "cancelled" ? "line-through text-white/25" : ""}`}>
                 {/* Flagge des Rennens (#1925) über dem Kürzel - Spalten ohne Land bleiben auf derselben Grundlinie. */}
-                {round.country_code ? (
-                  <span className="inline-flex flex-col items-end gap-1" data-testid="series-round-flag">
-                    <CountryFlag code={round.country_code} size="sm" />
-                    {roundLabel({ ...round, position: round.position || index + 1 })}
-                  </span>
-                ) : roundLabel({ ...round, position: round.position || index + 1 })}
+                <RoundHead round={round} index={index} href={view.roundHref?.(round)} />
               </th>
             ))}
             <th scope="col" title={`Punkte der ${label}`} className={`text-right ${extraColumn ? "px-2" : "pr-4 pl-2"} py-2.5 font-semibold`}>Pkt</th>
@@ -255,10 +260,11 @@ function MobileCards({ rows, allCount, columns, topN, expanded, onExpand, view }
 /** `standings`: gespeicherter Stand vom Server; `rounds`: Kalender der Saison; `rules`: Regeln der Serie. `label` nennt
  * die Wertung, `filterLabel` den Filter (ohne: kein Filter); `renderName(row, index)`, `renderResult(result, name, row)`,
  * `renderPoints(row)` und `extraColumn` ({ header, title, cell(row) }) ersetzen die Teile der Zeile. `weekends` fasst
- * die Läufe einer Runde unter einem Kopf zusammen (Runde mit Läufen, #1930). */
+ * die Läufe einer Runde unter einem Kopf zusammen (Runde mit Läufen, #1930). `roundHref(lauf, mitLauf)` macht Flagge
+ * und Kürzel im Kopf zu Links auf die Ergebnisseite der Runde (#1950), das Kürzel eines Laufs auf seinen Reiter. */
 export function SeriesStandings({
   standings, rounds, rules, label = "Gesamtwertung", filterLabel = "Nur Vereinsspieler",
-  renderName, renderResult, renderPoints, extraColumn = null, weekends = false,
+  renderName, renderResult, renderPoints, extraColumn = null, weekends = false, roundHref = null,
 }) {
   const [clubOnly, setClubOnly] = useState(false);
   const [expanded, setExpanded] = useState(false);
@@ -279,6 +285,7 @@ export function SeriesStandings({
     renderResult: renderResult || DEFAULT_VIEW.renderResult,
     renderPoints: renderPoints || DEFAULT_VIEW.renderPoints,
     extraColumn,
+    roundHref,
   };
 
   if (!all.length) return <p className="mt-3 text-sm text-white/55" data-testid="series-no-table">Noch keine Ergebnisse – die Tabelle erscheint nach der ersten gewerteten Runde.</p>;

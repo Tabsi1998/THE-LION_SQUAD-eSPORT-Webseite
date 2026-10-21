@@ -249,3 +249,21 @@ test("Fehler des Servers: feste Meldung, die Liste bleibt", async () => {
   expect(toastMock.error).toHaveBeenLastCalledWith(expect.stringContaining("Nur PNG, JPG oder WebP"));
   expect(apiMock.post).toHaveBeenCalledTimes(1);
 });
+
+// Teamfarben aus dem Bild (#1950): der Vorschlag geht an die Saison, übernommen wird er erst bei den Teamfarben.
+test("die Schriftfarben aus dem Bild gehen als Vorschlag für die Teamfarben an die Saison", async () => {
+  setup();
+  apiMock.post.mockImplementation(async (url) => ({ data: url.endsWith("/image") ? { ...READ, team_colors: { "Rotor Racing": "#e10600" } } : PREVIEW }));
+  await screen.findByTestId("result-image-pick");
+  fireEvent.change(screen.getByTestId("result-image-file"), { target: { files: [png()] } });
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith(
+    "/reference-series/admin/series/serie-1/team-colors/suggestions", { colors: { "Rotor Racing": "#e10600" } }), WAIT);
+});
+
+test("ohne Schriftfarben im Bild geht kein Vorschlag an die Saison", async () => {
+  setup();
+  await screen.findByTestId("result-image-pick");
+  fireEvent.change(screen.getByTestId("result-image-file"), { target: { files: [png()] } });
+  await waitFor(() => expect(screen.getAllByTestId("result-row")).toHaveLength(3), WAIT);
+  expect(apiMock.post.mock.calls.some(([url]) => url.includes("team-colors"))).toBe(false);
+});
