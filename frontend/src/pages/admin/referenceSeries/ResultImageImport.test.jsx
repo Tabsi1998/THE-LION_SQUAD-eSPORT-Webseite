@@ -56,6 +56,15 @@ function pasteImage(file, target = window) {
   return event;
 }
 
+// Unter Last hängt das Blatt den Strg+V-Empfänger erst nach dem ersten Bild an: einfügen, bis der Server das Bild bekommt
+// (genau einmal), statt nur einmal zu feuern und auf Glück zu hoffen.
+async function pasteUntilRead(file) {
+  await waitFor(() => {
+    if (!apiMock.post.mock.calls.some(([url, body]) => url.endsWith("/image") && body === file)) pasteImage(file);
+    expect(apiMock.post).toHaveBeenCalledWith(`${BASE}/image`, file, expect.anything());
+  }, WAIT);
+}
+
 beforeEach(() => {
   for (const fn of Object.values(apiMock)) fn.mockReset();
   toastMock.success.mockReset();
@@ -102,7 +111,7 @@ test("Knopf „Bild auslesen“: gelesen wird im Server, die Zeilen ersetzen die
 test("übernommen wird erst ohne gelbe Zeilen: ändern oder „Passt so“", async () => {
   setup();
   await screen.findByTestId("result-image-pick");
-  pasteImage(png());
+  await pasteUntilRead(png());
   await waitFor(() => expect(screen.getAllByTestId("result-row")).toHaveLength(3), WAIT);
   await waitFor(() => expect(screen.getByTestId("result-submit")).toHaveTextContent("Gelbe Zeilen prüfen"), WAIT);
   expect(screen.queryByTestId("result-save-draft")).toBeNull();
@@ -138,7 +147,7 @@ test("gelbe Zeit und gelbe Felder des Rennens: „Mehr“ steht offen, ändern o
   setup();
   apiMock.post.mockImplementation(async (url) => ({ data: url.endsWith("/image") ? read : PREVIEW }));
   await screen.findByTestId("result-image-pick");
-  pasteImage(png());
+  await pasteUntilRead(png());
   await waitFor(() => expect(screen.getAllByTestId("result-row")).toHaveLength(3), WAIT);
   await waitFor(() => expect(screen.getByTestId("result-submit")).toHaveTextContent("Gelbe Zeilen prüfen"), WAIT);
   expect(screen.getByTestId("result-image-open")).toHaveTextContent("2 Zeilen aus dem Bild sind noch gelb");
@@ -174,7 +183,7 @@ test("eine eingefügte Liste oder ein zweites Bild ohne Kopf geben ungeprüfte F
   setup();
   apiMock.post.mockImplementation(async (url) => ({ data: url.endsWith("/image") ? read : PREVIEW }));
   await screen.findByTestId("result-image-pick");
-  pasteImage(png());
+  await pasteUntilRead(png());
   await waitFor(() => expect(screen.getByTestId("result-fastest-time")).toHaveAttribute("data-ocr-uncertain", "fastest_lap_time"), WAIT);
   expect(screen.getByTestId("result-image-open")).toHaveTextContent("Eine Zeile aus dem Bild ist noch gelb");
 
@@ -189,7 +198,7 @@ test("eine eingefügte Liste oder ein zweites Bild ohne Kopf geben ungeprüfte F
 
   // Zweites Bild ohne Kopf: ebenso.
   apiMock.post.mockImplementation(async (url) => ({ data: url.endsWith("/image") ? { ...read, fastest_lap: null, driver_of_the_day: null } : PREVIEW }));
-  pasteImage(png("zweites.png"));
+  await pasteUntilRead(png("zweites.png"));
   await waitFor(() => expect(screen.getAllByTestId("result-row")).toHaveLength(3), WAIT);
   expect(screen.getByTestId("result-fastest-time")).toHaveAttribute("data-ocr-uncertain", "fastest_lap_time");
   await waitFor(() => expect(screen.getByTestId("result-submit")).toHaveTextContent("Gelbe Zeilen prüfen"), WAIT);
