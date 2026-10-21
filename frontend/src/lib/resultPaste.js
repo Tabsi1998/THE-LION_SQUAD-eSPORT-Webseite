@@ -12,6 +12,8 @@
 //   beste Runde – die schnellste daraus wird die schnellste Runde des Rennens. Ohne Kopfzeile zählt eine Zelle mit „:“
 //   als Zeit, eine mit „+“ als Abstand. Zeilen „Schnellste Runde: Name 1:31.456“ und „Fahrer des Tages: Name“ gehören
 //   zum Rennen, nicht in die Liste. Die Felder heißen wie bei der Texterkennung (#1756): start_number, grid, time, gap.
+// - Turniertag (#1961): mit Kopfzeile die Spalten der Runden („R 1“ … „R 5“, „R1“, „Runde 1“) als Rundenpunkte, „GES P“
+//   als Tagessumme und je Sonderbonus der Saison eine Spalte mit seinem Namen („Bingo“: x, ja, ✓ oder eine Zahl > 0).
 // Ganz ohne reguläre Ausdrücke auf der Eingabe (nur Zeichen für Zeichen), damit auch sehr lange Texte schnell bleiben.
 // Was sich nicht lesen lässt, kommt als Fehler mit Zeilennummer zurück – nichts wird still verschluckt.
 
@@ -45,7 +47,35 @@ const RESULT_HEADERS = {
   time: ["zeit", "time", "rennzeit", "gesamtzeit", "race time"],
   gap: ["abstand", "gap", "rückstand", "interval", "intervall", "diff", "differenz"],
   best_lap: ["beste runde", "best lap", "bestlap", "schnellste runde", "fastest lap", "rundenbestzeit", "beste"],
+  // Tagessumme eines Turniertags (#1961).
+  day_points: ["ges p", "ges. p", "gesp", "ges", "tagessumme", "tagespunkte"],
 };
+
+// Spalten der Runden eines Turniertags (#1961): Wort und Nummer, mit oder ohne Leerzeichen („R 1“, „R1“, „Runde 3“).
+const ROUND_WORDS = ["runde", "round", "rd", "r"];
+const MAX_ROUNDS = 20;
+const NO_BONUS = new Set(["0", "-", "–", "nein", "no", "n"]);
+
+function roundHeader(word) {
+  for (const prefix of ROUND_WORDS) {
+    if (!word.startsWith(prefix)) continue;
+    const rest = word.slice(prefix.length).trimStart();
+    if (!rest || rest.length > 2) continue;
+    let digits = true;
+    for (const char of rest) if (!isDigit(char)) digits = false;
+    const number = digits ? Number(rest) : 0;
+    if (number >= 1 && number <= MAX_ROUNDS) return `round:${number}`;
+  }
+  return null;
+}
+
+/** Ist ein Sonderbonus in der Zelle abgehakt? Leer, „0“, „-“ und „nein“ heißen nein. */
+function bonusTicked(cell) {
+  const value = cleanText(cell).toLowerCase();
+  if (!value || NO_BONUS.has(value)) return false;
+  const number = parseNumber(value);
+  return number === null || number > 0;
+}
 
 // Zeilen, die zum Rennen gehören statt zu einem Fahrer (#1927): Präfix, dann „:“.
 const RACE_LINES = [
@@ -218,18 +248,25 @@ function splitCells(text, separator) {
   return cells;
 }
 
-function headerKey(cell, headers) {
+function headerKey(cell, headers, extra = null) {
   let word = cleanText(cell).toLowerCase();
   if (word.endsWith(".") && word.length > 1) word = word.slice(0, -1);
   for (const [key, words] of Object.entries(headers)) if (words.includes(word)) return key;
-  return null;
+  return extra ? extra(word) : null;
 }
 
-/** Kopfzeile: keine Zahl darin und mindestens ein bekannter Spaltenname – liefert Spalte → Schlüssel. */
-function readHeader(cells, headers, required) {
+/** Kopfzeile: keine Zahl darin und mindestens ein bekannter Spaltenname – liefert Spalte → Schlüssel. `extra(word)`
+ * erkennt weitere Spalten (Runden und Sonderboni eines Turniertags, #1961). */
+function readHeader(cells, headers, required, extra = null) {
   if (cells.some((cell) => parseNumber(cell) !== null)) return null;
-  const keys = cells.map((cell) => headerKey(cell, headers));
+  const keys = cells.map((cell) => headerKey(cell, headers, extra));
   return keys.includes(required) ? keys : null;
+}
+
+/** Runden- und Bonus-Spalten einer Ergebnisliste: `round:N` bzw. `bonus:<Kennung>` (Name des Bonus der Saison). */
+function dayColumns(bonuses) {
+  const byLabel = new Map((bonuses || []).map((bonus) => [cleanText(bonus.label).toLowerCase(), bonus.key]));
+  return (word) => roundHeader(word) || (byLabel.has(word) ? `bonus:${byLabel.get(word)}` : null);
 }
 
 // ---------------------------------------------------------------- Ergebnisliste
@@ -313,7 +350,11 @@ function lineRow(text) {
     }
     break;
   }
-  return { place, name: items.map((item) => item.text).join(" "), team: "", points, start_number: "", marks, points_hint: hint, grid: null, time: "", gap: "" };
+  return { place, name: items.map((item) => item.text).join(" "), team: "", points, start_number: "", marks, points_hint: hint, grid: null, time: "", gap: "", ...noDay() };
+}
+
+function noDay() {
+  return { rounds: [], day_points: null, bonus_keys: [] };
 }
 
 function cellRow(cells) {
@@ -356,14 +397,25 @@ function cellRow(cells) {
     place = numbers.shift();
   }
   const points = numbers.length ? numbers[numbers.length - 1] : null;
-  return { place, name, team, points, start_number: startNumber, marks, points_hint: null, grid: null, time, gap };
+  return { place, name, team, points, start_number: startNumber, marks, points_hint: null, grid: null, time, gap, ...noDay() };
 }
 
 function headerRow(cells, keys) {
-  const row = { place: null, name: "", team: "", points: null, start_number: "", marks: [], points_hint: null, grid: null, time: "", gap: "" };
+  const row = { place: null, name: "", team: "", points: null, start_number: "", marks: [], points_hint: null, grid: null, time: "", gap: "", ...noDay() };
   keys.forEach((key, index) => {
     const cell = cells[index] || "";
     if (!cell) return;
+    // Turniertag (#1961): Runde N, Sonderbonus. Eine leere oder unlesbare Runde bleibt leer (nicht gespielt).
+    if (key && key.startsWith("round:")) {
+      const number = Number(key.slice(6));
+      while (row.rounds.length < number) row.rounds.push(null);
+      row.rounds[number - 1] = parseNumber(cell);
+      return;
+    }
+    if (key && key.startsWith("bonus:")) {
+      if (bonusTicked(cell) && !row.bonus_keys.includes(key.slice(6))) row.bonus_keys.push(key.slice(6));
+      return;
+    }
     // Marken stehen oft in der Zeit- oder Punktespalte („DNF“) – sie zählen in jeder Spalte.
     const mark = key === "name" || key === "team" ? null : parseMark(cell);
     if (mark) {
@@ -381,7 +433,9 @@ function headerRow(cells, keys) {
     else if (key === "time") row.time = cell.slice(0, 20);
     else if (key === "gap") row.gap = cell.slice(0, 20);
     else if (key === "best_lap") row.best_lap = cell.slice(0, 20);
+    else if (key === "day_points") row.day_points = parseNumber(cell);
   });
+  while (row.rounds.length && row.rounds[row.rounds.length - 1] === null) row.rounds.pop();
   return row;
 }
 
@@ -420,8 +474,10 @@ function fastestFromColumn(rows) {
  * dazu `fastest_lap` (`{name, time}`) und `driver_of_the_day` (`{name}`), wenn die Liste sie nennt (#1927).
  * `points_hint` (`{points, text}` oder `null`): Zeilenformat mit einer Zahl am Ende, die auch zum Namen gehören kann.
  * `place` und `points` sind `null`, wenn die Liste sie nicht nennt – dann zählt die Reihenfolge bzw. der Schlüssel.
+ * Turniertag (#1961): `rounds` (Punkte je Runde, `null` = leer), `day_points` (GES P) und `bonus_keys` - erkannt über die
+ * Kopfzeile; `bonuses` sind die Sonderboni der Saison (`{key, label}`), ihre Namen sind Spalten.
  */
-export function parseResultPaste(text, { maxRows = MAX_PASTE_ROWS } = {}) {
+export function parseResultPaste(text, { maxRows = MAX_PASTE_ROWS, bonuses = [] } = {}) {
   const errors = [];
   const race = {};
   const lines = readLines(text, maxRows, errors).filter((line) => {
@@ -438,7 +494,7 @@ export function parseResultPaste(text, { maxRows = MAX_PASTE_ROWS } = {}) {
       const cells = splitCells(line.text, separator);
       if (isRuler(cells)) return;
       if (position === 0 || (position === 1 && !rows.length && !keys)) {
-        const header = readHeader(cells, RESULT_HEADERS, "name");
+        const header = readHeader(cells, RESULT_HEADERS, "name", dayColumns(bonuses));
         if (header) {
           keys = header;
           return;
