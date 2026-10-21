@@ -156,7 +156,15 @@ function ChronicleRow({ row, open, onToggle, username, own, publicView, onOpenSe
           {row.detail ? <Muted style={styles.detailText}>{row.detail}</Muted> : null}
           {row.lineup.length ? (
             <>
-              <Muted style={styles.label}>Aufstellung</Muted>
+              {/* Einsätze in der Saison (#1931) wie im Web: „Aufstellung · 5 von 7 Spielen“, die Zahl leiser. */}
+              <Muted
+                style={styles.label}
+                accessibilityLabel={["Aufstellung", row.played].filter(Boolean).join(" · ")}
+                testID={`profile-reference-lineup-${row.id}`}
+              >
+                Aufstellung
+                {row.played ? <Muted style={styles.labelPlayed}>{` · ${row.played}`}</Muted> : null}
+              </Muted>
               <View style={styles.lineup}>
                 {row.lineup.map((person, index) => (
                   <View
@@ -171,6 +179,8 @@ function ChronicleRow({ row, open, onToggle, username, own, publicView, onOpenSe
                 ))}
               </View>
             </>
+          ) : row.played ? (
+            <Muted style={styles.detailText} testID={`profile-reference-played-${row.id}`}>{`Einsätze · ${row.played}`}</Muted>
           ) : null}
           {showPath && personal ? <TournamentPathPanel item={personal} username={username} own={own} publicView={publicView} /> : null}
           {row.source === "club" ? (
@@ -199,6 +209,7 @@ const styles = StyleSheet.create({
   best: { alignItems: "center", flexDirection: "row", gap: 14 },
   flex: { flex: 1, minWidth: 0 },
   label: { color: ink.muted, fontSize: 11, fontWeight: "800", letterSpacing: 1.8, textTransform: "uppercase" },
+  labelPlayed: { color: ink.quiet, fontWeight: "600" },
   bestTitle: { color: ink.text, fontSize: 16, fontWeight: "700" },
   bestSub: { color: ink.quiet, fontSize: 13 },
   facts: { flexDirection: "row", gap: 8 },

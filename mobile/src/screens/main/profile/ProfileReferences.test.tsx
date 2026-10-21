@@ -78,6 +78,25 @@ test("Zeile aufklappen: Team, Aufstellung mit der Person hervorgehoben und „Sa
   expect(screen.getByTestId("profile-reference-detail-club:liga2")).toBeTruthy();
 });
 
+test("Aufstellung mit Einsätzen (#1931): „Aufstellung · 5 von 7 Spielen“, ohne Aufstellung „Einsätze · …“", async () => {
+  const withPlayed = {
+    ...CLUB,
+    references: [
+      { ...CLUB.references[2], appearances: { played: 5, of: 7, unit: "matches" } },
+      { ...CLUB.references[1], entries: [{ id: "solo", kind: "solo", placement: 5, member_profile_ids: [ME] }], appearances: { played: 3, of: 5, unit: "races" } },
+    ],
+  };
+  await render(<ProfileReferences personal={[]} club={withPlayed} username="mira" onOpenSeason={jest.fn()} onOpenPersonal={jest.fn()} empty={null} />);
+  await fireEvent.press(screen.getByTestId("profile-reference-club:newcomer"));
+  const detail = screen.getByTestId("profile-reference-detail-club:newcomer");
+  expect(within(detail).getByTestId("profile-reference-lineup-club:newcomer").props.accessibilityLabel).toBe("Aufstellung · 5 von 7 Spielen");
+  expect(within(detail).getByText("5 von 7 Spielen", { exact: false })).toBeTruthy();
+
+  await fireEvent.press(screen.getByTestId("profile-reference-club:liga2"));
+  const solo = screen.getByTestId("profile-reference-detail-club:liga2");
+  expect(within(solo).getByText("Einsätze · 3 von 5 Rennen")).toBeTruthy();
+});
+
 test("ohne Saison führt die Zeile ins Web", async () => {
   const open = jest.spyOn(Linking, "openURL").mockResolvedValue(true);
   await render(<ProfileReferences personal={[]} club={{ ...CLUB, lineages: [] }} username="mira" onOpenSeason={jest.fn()} onOpenPersonal={jest.fn()} empty={null} />);

@@ -58,7 +58,22 @@ export type ClubReference = {
   member_profile_ids?: string[] | null;
   lineup_members?: LineupMember[] | null;
   entries?: ReferenceEntry[] | null;
+  /** Einsätze der Person in der verknüpften Saison (#1931, nur im Mitgliederprofil) - ältere Server schicken es nicht. */
+  appearances?: Appearances | null;
 };
+
+/** „5 von 7 Spielen“: gespielt, von wie vielen, und ob Spiele, Rennen oder Runden gezählt sind. */
+export type Appearances = { played?: number | null; of?: number | null; unit?: "matches" | "races" | "rounds" | string | null; team?: string | null };
+
+const APPEARANCE_UNITS: Record<string, [string, string]> = { matches: ["Spiel", "Spielen"], races: ["Rennen", "Rennen"], rounds: ["Runde", "Runden"] };
+
+/** Einsätze als Text wie im Web (lib/teamLeagueEntry.js): „5 von 7 Spielen“, „1 von 1 Spiel“ - ohne Angabe leer. */
+export function appearancesText(appearances: Appearances | null | undefined): string {
+  const of = Number(appearances?.of) || 0;
+  if (!of) return "";
+  const [one, many] = APPEARANCE_UNITS[String(appearances?.unit)] || APPEARANCE_UNITS.matches;
+  return `${Number(appearances?.played) || 0} von ${of} ${of === 1 ? one : many}`;
+}
 
 export type ReferenceSummaryData = { total?: number; gold?: number; silver?: number; bronze?: number; games?: number; podiums?: number } | null | undefined;
 export type Showcase = { mode?: "auto" | "pinned" | string; reference_id?: string | null } | null | undefined;
