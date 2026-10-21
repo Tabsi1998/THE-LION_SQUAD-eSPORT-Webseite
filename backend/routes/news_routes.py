@@ -15,7 +15,7 @@ from services import partner_pages, sponsor_images
 from services.notification_preferences import enqueue_newsletter_for_item
 from services.user_notifications import create_user_notification
 from services.slug_utils import apply_slug_history, find_by_slug_or_history, slug_source_for_update, unique_slug
-from services import dolibarr_policy, reference_checks
+from services import dolibarr_policy, reference_checks, reference_season_links, season_close
 from models import (
     NewsCreate, NewsUpdate, SponsorCreate, SponsorUpdate,
     PartnerCreate, PartnerUpdate, ReferenceCreate, ReferenceShowcaseSettings, ReferenceUpdate,
@@ -1455,6 +1455,8 @@ async def list_references(game_id: Optional[str] = None, user: dict | None = Dep
     refs = await db.references.find(query, {"_id": 0}).to_list(1000)
     refs = await _filter_visible(refs, user)
     refs = _sort_references(await _enrich_references(refs))
+    # #1750: die Karte einer Referenz aus einer Saison führt zur Saison-Seite.
+    await reference_season_links.attach_season_links(db, refs, user)
     showcase = await _get_reference_showcase(db)
     # Eine fest gewählte Hauptkarte nur, wenn der Besucher sie sehen darf - sonst wählt die Seite selbst.
     if showcase["reference_id"] and showcase["reference_id"] not in {item.get("id") for item in refs}:
@@ -1610,6 +1612,7 @@ async def get_reference(rid: str, user: dict | None = Depends(get_optional_user)
     visible = await _filter_visible([ref], user)
     if not visible:
         raise HTTPException(404, "Referenz nicht gefunden.")
+    await reference_season_links.attach_season_links(db, visible, user)
     return (await _enrich_references(visible))[0]
 
 
@@ -1627,6 +1630,10 @@ async def create_reference(body: ReferenceCreate, me: dict = Depends(require_are
     if doc.get("game_id") and not await db.games.find_one({"id": doc["game_id"]}, {"id": 1}):
         raise HTTPException(404, "Spiel nicht gefunden.")
     await _check_reference_series(db, doc.get("series_id"))
+    # Gehört zur Saison (#1750): nie offener als Saison und Spur.
+    required = await season_close.season_visibility(db, doc.get("series_id"))
+    if required:
+        doc["visibility"] = season_close.stricter(doc.get("visibility"), required)
     await _freeze_reference_members(db, doc)
     doc["id"] = new_id()
     doc["created_at"] = now_utc().isoformat()
@@ -1636,9 +1643,16 @@ async def create_reference(body: ReferenceCreate, me: dict = Depends(require_are
     return {**(await _enrich_references([doc]))[0], "check_warnings": await _reference_warnings(db, doc)}
 
 
+REFERENCE_OUTDATED = ("Die Referenz wurde inzwischen geändert - etwa beim Abschluss ihrer Saison. Bitte neu laden "
+                      "und noch einmal speichern.")
+
+
 @router.put("/references/{rid}")
 @router.patch("/references/{rid}")
-async def update_reference(rid: str, body: ReferenceUpdate, me: dict = Depends(require_area("content"))):
+async def update_reference(rid: str, body: ReferenceUpdate, expected_updated_at: Optional[str] = None,
+                           me: dict = Depends(require_area("content"))):
+    """``expected_updated_at`` (Formular, #1750): gespeichert wird nur, wenn die Referenz seit dem Öffnen niemand
+    geändert hat - etwa der Abschluss ihrer Saison; sonst 409 statt den Endplatz still zu überschreiben."""
     db = get_db()
     nullable_fields = {
         "organizer", "league", "season", "format", "game_id", "game_name", "team_name", "placement",
@@ -1652,17 +1666,27 @@ async def update_reference(rid: str, body: ReferenceUpdate, me: dict = Depends(r
     if updates.get("game_id") and not await db.games.find_one({"id": updates["game_id"]}, {"id": 1}):
         raise HTTPException(404, "Spiel nicht gefunden.")
     await _check_reference_series(db, updates.get("series_id"))
+    existing = await db.references.find_one({"id": rid}, {"_id": 0})
+    if not existing:
+        raise HTTPException(404, "Referenz nicht gefunden.")
+    # Gehört zur Saison (#1750): nie offener als Saison und Spur - auch wenn nur die Sichtbarkeit geändert wird.
+    required = await season_close.season_visibility(
+        db, updates["series_id"] if "series_id" in updates else existing.get("series_id"))
+    if required:
+        visibility = season_close.stricter(updates.get("visibility") or existing.get("visibility"), required)
+        if "visibility" in updates or visibility != existing.get("visibility"):
+            updates["visibility"] = visibility
     if "entries" in updates or any(key in updates for key in LEGACY_ENTRY_FIELDS):
-        existing = await db.references.find_one({"id": rid}, {"_id": 0})
-        if not existing:
-            raise HTTPException(404, "Referenz nicht gefunden.")
         await _freeze_reference_members(db, updates, existing)
     if not updates:
         return {"ok": True}
     updates["updated_at"] = now_utc().isoformat()
-    res = await db.references.update_one({"id": rid}, {"$set": updates})
+    query = {"id": rid}
+    if expected_updated_at is not None:
+        query["updated_at"] = expected_updated_at
+    res = await db.references.update_one(query, {"$set": updates})
     if res.matched_count == 0:
-        raise HTTPException(404, "Referenz nicht gefunden.")
+        raise HTTPException(409, REFERENCE_OUTDATED)
     saved = await db.references.find_one({"id": rid}, {"_id": 0})
     return {**(await _enrich_references([saved]))[0], "check_warnings": await _reference_warnings(db, saved)}
 

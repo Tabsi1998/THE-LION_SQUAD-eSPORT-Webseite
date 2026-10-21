@@ -237,6 +237,20 @@ test("nur eine Saison der Spur: kein Liga-Weg, die Zeile führt trotzdem zur Sai
   expect(screen.queryByTestId("member-paths")).toBeNull();
 });
 
+test("Referenz aus einer Saison (#1750): „Saison ansehen“ kommt aus season_link, auch ohne Spuren-Abruf", async () => {
+  const season = { lineage_slug: "probe-liga", season_slug: "season-3", label: "Probe Liga · Season 3", season_end: true };
+  profileData = { ...PODIUM_PROFILE, references: PODIUM_PROFILE.references.map((item) => (item.id === "r1" ? { ...item, season_link: season } : item)) };
+  apiMock.get.mockImplementation((url) => {
+    if (url === "/reference-series/public/lineages") return Promise.reject(new Error("aus"));
+    return Promise.resolve({ data: profileData });
+  });
+  renderProfile();
+  fireEvent.click(await screen.findByTestId("member-reference-row-r1"));
+  const links = within(screen.getByTestId("member-reference-links-r1")).getAllByRole("link");
+  expect(links[0]).toHaveTextContent("Saison ansehen");
+  expect(links[0]).toHaveAttribute("href", "/references/series/probe-liga/season-3");
+});
+
 test("ohne verknüpfte Saison kein Liga-Weg; fällt der Abruf aus, bleibt die Liste", async () => {
   apiMock.get.mockImplementation((url) => {
     if (url === "/reference-series/public/lineages") return Promise.reject(new Error("aus"));

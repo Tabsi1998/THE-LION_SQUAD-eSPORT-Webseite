@@ -199,3 +199,70 @@ test("Vitrine (#1878): die Hauptkarte ist automatisch oder eine fest gewählte P
   await waitFor(() => expect(apiMock.patch).toHaveBeenLastCalledWith("/references/admin/showcase", { mode: "auto", reference_id: null }));
   expect(toastMock.success).toHaveBeenCalled();
 });
+
+// Saison abschließen (#1750): Hinweis oben, Abzeichen „aus Saison …“ mit Link, Auswahl „Gehört zur Saison“.
+const LINEAGES = [{
+  id: "spur-1", title: "Probe Liga", slug: "probe-liga", is_archived: false,
+  series: [
+    { id: "s-2026", season: "2026", tier: "Division 2", status: "completed", reference_id: "r-ende" },
+    { id: "s-2027", season: "2027", tier: "", status: "active" },
+  ],
+}];
+
+function mockSeasons(items) {
+  mockApi(items);
+  const base = apiMock.get.getMockImplementation();
+  apiMock.get.mockImplementation(async (url) => (url === "/reference-series/admin" ? { data: { lineages: LINEAGES } } : base(url)));
+}
+
+test("Hinweis oben: einzelne Turniere hier, Ligen und Saisons unter Serien", async () => {
+  mockSeasons([]);
+  render(<MemoryRouter><AdminReferencesPage /></MemoryRouter>);
+  const hint = await screen.findByTestId("reference-hint");
+  expect(hint).toHaveTextContent("Einzelne Turniere und Cups hier – Ligen und Saisons unter Serien, deren Referenz entsteht beim Abschluss automatisch");
+  expect(screen.getByRole("link", { name: "Serien" })).toHaveAttribute("href", "/admin/reference-series");
+});
+
+test("Referenz aus einer Saison: Abzeichen „aus Saison …“ mit Link, Endplatz-Hinweis im Formular", async () => {
+  const ending = { ...LEGACY_ITEM, id: "r-ende", display_title: "Probe Liga 2026", series_id: "s-2026" };
+  const linked = { ...LEGACY_ITEM, id: "r-cup", display_title: "Probe Cup", series_id: "s-2027" };
+  mockSeasons([ending, linked, LEGACY_ITEM]);
+  render(<MemoryRouter><AdminReferencesPage /></MemoryRouter>);
+  const badge = await screen.findByTestId("reference-season-r-ende");
+  expect(badge).toHaveTextContent("aus Saison Probe Liga · 2026 · Division 2");
+  expect(badge).toHaveAttribute("href", "/admin/reference-series/s-2026");
+  expect(screen.getByTestId("reference-season-r-cup")).toHaveTextContent("aus Saison Probe Liga · 2027");
+  expect(screen.queryByTestId("reference-season-r1")).toBeNull();
+
+  fireEvent.click(screen.getByTestId("reference-edit-r-ende"));
+  expect(screen.getByTestId("reference-series")).toHaveValue("s-2026");
+  expect(screen.getByTestId("reference-season-end")).toHaveTextContent("Ihr Endplatz wird in der Saison gepflegt");
+});
+
+test("Gehört zur Saison: eine alte Referenz mit einer Saison verknüpfen", async () => {
+  mockSeasons([LEGACY_ITEM]);
+  render(<MemoryRouter><AdminReferencesPage /></MemoryRouter>);
+  fireEvent.click(await screen.findByTestId("reference-edit-r1"));
+  const select = screen.getByTestId("reference-series");
+  expect(select).toHaveValue("");
+  await waitFor(() => expect([...select.querySelectorAll("option")].map((option) => option.textContent)).toEqual([
+    "Keine – einzelnes Turnier oder Cup", "Probe Liga · 2026 · Division 2", "Probe Liga · 2027",
+  ]));
+  fireEvent.change(select, { target: { value: "s-2027" } });
+  expect(screen.queryByTestId("reference-season-end")).toBeNull();
+  fireEvent.submit(screen.getByTestId("reference-sheet"));
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledTimes(1));
+  expect(apiMock.patch.mock.calls[0][1].series_id).toBe("s-2027");
+});
+
+// Prüfung 21.10. (#1750): ein vor dem Saisonabschluss geöffnetes Formular überschreibt den Endplatz nicht still.
+test("Speichern nennt den Stand beim Öffnen; ist die Referenz inzwischen geändert, sagt es das", async () => {
+  mockSeasons([{ ...LEGACY_ITEM, updated_at: "2026-10-21T10:00:00+00:00" }]);
+  apiMock.patch.mockRejectedValue({ response: { status: 409, data: { detail: "Die Referenz wurde inzwischen geändert" } } });
+  render(<MemoryRouter><AdminReferencesPage /></MemoryRouter>);
+  fireEvent.click(await screen.findByTestId("reference-edit-r1"));
+  fireEvent.submit(screen.getByTestId("reference-sheet"));
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledTimes(1));
+  expect(apiMock.patch.mock.calls[0][2]).toEqual({ params: { expected_updated_at: "2026-10-21T10:00:00+00:00" } });
+  await waitFor(() => expect(toastMock.error).toHaveBeenCalledWith("Die Referenz wurde inzwischen geändert"));
+});

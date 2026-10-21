@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { seriesAddress } from "@/lib/referenceSeries";
+import { referenceHref } from "@/lib/seasonClose";
 import { formatLabel, pickShowcase, podiumItems, startersOf, yearOf } from "@/lib/referencesOverview";
 import { bestPlacement, displayTitle, entriesOf, gameTitle } from "@/components/tls/references/referenceParts";
 import { Mark, PlaceRing, SectionHead, TrophyMark, medalTone } from "@/components/tls/references/overviewParts";
@@ -8,6 +8,7 @@ import { Mark, PlaceRing, SectionHead, TrophyMark, medalTone } from "@/component
 // Saison, Kennzahlen und wer für uns am Start war -, daneben die übrigen Podestplätze als ruhige Kacheln, die neuesten
 // zuerst. Welche Teilnahme die Hauptkarte bekommt, stellt die Verwaltung ein (Vorgabe: höchster Platz in der höchsten
 // Stufe, bei Gleichstand der neueste - lib/referencesOverview.js). Gold, Silber und Bronze nur als Ring und Schrift.
+// Karten aus einer Saison führen zur Saison-Seite (#1750).
 
 function seasonOf(item, link) {
   const season = link?.season?.season || item.season || "";
@@ -28,7 +29,7 @@ export function Showcase({ items, showcase, linked, index = 3 }) {
         <MainCard item={main} link={linked?.get(main.id)} pinned={showcase?.mode === "pinned" && showcase.reference_id === main.id} />
         {rest.length > 0 && (
           <div className="flex-[2_1_560px] min-w-0 grid grid-cols-2 md:grid-cols-[repeat(auto-fill,minmax(min(100%,200px),1fr))] gap-2.5 md:gap-3 content-start">
-            {rest.map((item) => <TrophyTile key={item.id} item={item} />)}
+            {rest.map((item) => <TrophyTile key={item.id} item={item} link={linked?.get(item.id)} />)}
           </div>
         )}
       </div>
@@ -49,7 +50,8 @@ function MainCard({ item, link, pinned }) {
     starters.length ? { value: starters.length, label: "für uns am Start" } : null,
   ].filter(Boolean);
   const marks = [gameTitle(item), formatLabel(item, link), seasonOf(item, link)].filter(Boolean);
-  const to = link ? seriesAddress(link.lineage, link.season) : `/references/${item.id}`;
+  const to = referenceHref(item, link);
+  const season = to !== `/references/${item.id}`;
   return (
     <Link
       to={to}
@@ -82,17 +84,17 @@ function MainCard({ item, link, pinned }) {
             <span className="hidden md:inline">Für uns am Start: </span><span className="text-white font-semibold">{starters.join(", ")}</span>
           </span>
         )}
-        <span className="text-brand font-bold">{link ? "Zur Saison →" : "Zur Referenz →"}</span>
+        <span className="text-brand font-bold">{season ? "Zur Saison →" : "Zur Referenz →"}</span>
       </div>
     </Link>
   );
 }
 
-function TrophyTile({ item }) {
+function TrophyTile({ item, link }) {
   const placement = bestPlacement(item);
   const tone = medalTone(placement);
   return (
-    <Link to={`/references/${item.id}`} data-testid={`reference-trophy-${item.id}`} data-medal={tone.key} className="tls-ref-lift min-w-0 flex flex-col gap-2 md:gap-2.5 p-3.5 md:p-4 bg-surface-1 border border-white/[0.08] rounded-[10px] text-white no-underline">
+    <Link to={referenceHref(item, link)} data-testid={`reference-trophy-${item.id}`} data-medal={tone.key} className="tls-ref-lift min-w-0 flex flex-col gap-2 md:gap-2.5 p-3.5 md:p-4 bg-surface-1 border border-white/[0.08] rounded-[10px] text-white no-underline">
       <div className="flex items-center gap-2.5">
         <PlaceRing placement={placement} size="sm" />
         <span className={`hidden md:inline text-xs font-bold uppercase tracking-[0.14em] ${tone.text}`}>{placement}. Platz</span>

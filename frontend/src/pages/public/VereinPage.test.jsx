@@ -84,3 +84,16 @@ test("Gast: oben „Mitglied werden“ mit drei Gründen, darunter News, Galerie
   expect(screen.getByTestId("partner-ticker")).toBeInTheDocument();
   expect(apiMock.get).not.toHaveBeenCalledWith("/membership/me");
 });
+
+test("Referenzen: eine Referenz aus einer Saison führt zur Saison-Seite (#1750)", async () => {
+  authState.user = null;
+  authState.isClubMember = false;
+  const base = apiMock.get.getMockImplementation();
+  apiMock.get.mockImplementation(async (url) => (url === "/references" ? { data: { items: [
+    { id: "r1", title: "Landesmeisterschaft 2026" },
+    { id: "r2", title: "Probe Liga Saison 3", season_link: { lineage_slug: "probe-liga", season_slug: "saison-3", label: "Probe Liga · Saison 3" } },
+  ] } } : base(url)));
+  renderPage();
+  expect(await screen.findByTestId("verein-reference-r2")).toHaveAttribute("href", "/references/series/probe-liga/saison-3");
+  expect(screen.getByTestId("verein-reference-r1")).toHaveAttribute("href", "/references/r1");
+});

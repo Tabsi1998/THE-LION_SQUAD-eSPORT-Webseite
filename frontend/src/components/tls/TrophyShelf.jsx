@@ -1,9 +1,11 @@
 import { useId } from "react";
 import { Link } from "react-router-dom";
 import { bestPlacement, displayTitle, entriesOf, gameTitle, medalOf, timeOf } from "@/components/tls/references/referenceParts";
+import { referenceHref } from "@/lib/seasonClose";
 
 // Die Erfolgswand als Vitrine (#1334): jeder Podestplatz ein gezeichneter Pokal in Gold, Silber oder Bronze auf einem
-// Regalbrett, darunter Platz, Wettbewerb (zwei Zeilen erlaubt) und „11 Teams“. Ein Klick öffnet die Details wie bisher.
+// Regalbrett, darunter Platz, Wettbewerb (zwei Zeilen erlaubt) und „11 Teams“. Ein Klick öffnet die Details wie bisher -
+// ein Pokal aus einer Saison führt zur Saison-Seite (#1750).
 // Gold bekommt beim Drüberfahren einen ruhigen Lichtschimmer - nie mit „Bewegung reduzieren“ (index.css, --tls-motion-on).
 
 export const METALS = {
@@ -68,7 +70,7 @@ export function TrophyShelf({ items, compact = false, testId = "trophy-shelf" })
         const size = fieldSize(item);
         return (
           <li key={item.id} className="tls-trophy-shelf__slot">
-            <Link to={`/references/${item.id}`} data-testid={`${testId}-${item.id}`} data-season-anchor="card" className={`tls-card tls-card--own tls-trophy tls-trophy--${medal} group flex flex-col items-center text-center gap-1.5 rounded-sm px-2 pt-2 pb-4`}>
+            <Link to={referenceHref(item)} data-testid={`${testId}-${item.id}`} data-season-anchor="card" className={`tls-card tls-card--own tls-trophy tls-trophy--${medal} group flex flex-col items-center text-center gap-1.5 rounded-sm px-2 pt-2 pb-4`}>
               <TrophyCup medal={medal} className={compact ? "w-14 h-16" : "w-16 h-[4.5rem] sm:w-20 sm:h-[5.5rem]"} />
               <span className={`text-[11px] font-bold uppercase tracking-[0.18em] ${metal.text}`}>{bestPlacement(item)}. Platz</span>
               <span className="tls-card__title font-bold text-sm leading-tight break-words">{displayTitle(item)}</span>

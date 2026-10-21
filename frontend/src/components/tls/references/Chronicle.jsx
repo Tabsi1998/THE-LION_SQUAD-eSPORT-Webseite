@@ -4,11 +4,13 @@ import { chronicleCount, filterChronicle, formatLabel, gameOptions, medalCounts,
 import { bestPlacement, displayTitle, formatDate, gameTitle, memberEntryOf, referenceInstant, shortTitle } from "@/components/tls/references/referenceParts";
 import { Chevron, Mark, PlaceRing, SectionHead } from "@/components/tls/references/overviewParts";
 import { viennaDate } from "@/lib/vienna";
+import { referenceHref } from "@/lib/seasonClose";
 
 // Chronik (#1878, ersetzt „Jahr für Jahr“): alle Teilnahmen als Liste je Jahr mit Medaillen-Zusammenfassung. Jede Zeile
 // zeigt Platz-Ring, Titel (kurz wie im Mitgliederprofil, #1944) und Veranstalter, Spiel- und Format-Marke, unsere Starter (jeder Name nur einmal) und das
 // Datum und führt zur Detailseite. Filter: Spiel-Chips und „Nur Podest“, dazu die Person aus dem Profil (#859); die
 // Anzahl steht als „x von y Teilnahmen“. Am Handy werden die Zeilen kompakt, die Filter lassen sich wischen.
+// Eine Teilnahme aus einer Saison (#1750) führt zur Saison-Seite statt zur Detailseite.
 
 const chipBase = "shrink-0 inline-flex items-center gap-2 min-h-[44px] px-4 rounded-full border text-sm font-semibold whitespace-nowrap transition-colors duration-fast";
 const chipIdle = "border-white/[0.14] bg-transparent text-zinc-300 hover:border-white/40 hover:text-white";
@@ -94,7 +96,7 @@ function ChronicleRow({ item, link, memberId }) {
   const composed = title !== full;
   return (
     <li className="border-b border-white/[0.07]">
-      <Link to={`/references/${item.id}`} data-testid={`reference-card-${item.id}`} className="tls-ref-row flex items-start sm:items-center sm:flex-wrap gap-3 sm:gap-x-5 sm:gap-y-2.5 py-3.5 sm:py-4 sm:px-2 text-white no-underline">
+      <Link to={referenceHref(item, link)} data-testid={`reference-card-${item.id}`} className="tls-ref-row flex items-start sm:items-center sm:flex-wrap gap-3 sm:gap-x-5 sm:gap-y-2.5 py-3.5 sm:py-4 sm:px-2 text-white no-underline">
         <PlaceRing placement={placement} />
         <span className="flex-1 sm:flex-[1_1_280px] min-w-0 flex flex-col gap-1 sm:gap-0.5">
           <span className="font-bold text-base sm:text-[17px] leading-[1.3] break-words [overflow-wrap:anywhere]" title={composed ? full : undefined} data-testid="reference-row-title">{title}</span>

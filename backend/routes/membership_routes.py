@@ -284,7 +284,9 @@ async def _attach_reference_stats(db, item: dict, profile_id: str) -> dict:
     refs_raw = [ref for ref in refs_raw if await user_can_see(None, ref.get("visibility") or "public")]
     if refs_raw:
         from routes.news_routes import _enrich_references, _sort_references
+        from services.reference_season_links import attach_season_links
         references = _sort_references(await _enrich_references(refs_raw))[:30]
+        await attach_season_links(db, references, None)  # #1750: Karte führt zur Saison-Seite
     else:
         references = []
     # Je Teilnahme zählt der Eintrag, in dem diese Person steht (#409): ein Einzelstarter hat

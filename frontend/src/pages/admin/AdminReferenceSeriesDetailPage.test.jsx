@@ -89,3 +89,81 @@ test("eine unbekannte Saison sagt es klar", async () => {
   renderAt("/admin/reference-series/gibt-es-nicht");
   expect(await screen.findByTestId("series-detail-missing")).toHaveTextContent("Serie nicht gefunden.");
 });
+
+// Saison abschließen (#1750): Vorschlag mit Endständen im Seitenblatt, Bestätigung legt die Referenz an oder
+// aktualisiert sie; danach steht im Kopf „Referenz: Platz 6 von 8 · ansehen“.
+const PREVIEW = {
+  cancelled: false, open_rounds: 1, current: null, target_id: null, candidates: [],
+  reference: { title: "Probe Racing F1", season: "2026" },
+  entries: [
+    { key: "team:probe", kind: "team", team_name: "Probe Löwen", placement: 2, team_count: 5, placement_label: "Teamwertung",
+      members: [{ profile_id: "p-a", name: "Alpha" }], member_profile_ids: ["p-a"] },
+    { key: "solo:p-a", kind: "solo", placement: 3, participant_count: 12, placement_label: "Fahrerwertung",
+      members: [{ profile_id: "p-a", name: "Alpha" }], member_profile_ids: ["p-a"] },
+  ],
+};
+
+function mockClose(preview = PREVIEW, series = SERIES) {
+  apiMock.get.mockImplementation(async (url) => ({ data: url.endsWith("/close") ? preview : series }));
+}
+
+test("Saison abschließen zeigt den Vorschlag und legt die Referenz an", async () => {
+  mockClose();
+  apiMock.post.mockResolvedValue({ data: { reference_id: "ref-neu", created: true, status: "completed" } });
+  renderAt();
+  fireEvent.click(await screen.findByTestId("series-detail-close"));
+  // Der Vorschlag wird beim Öffnen frisch geladen.
+  expect(await screen.findByTestId("season-close-entry-team:probe")).toHaveTextContent("Platz 2 von 5 Teams · Teamwertung");
+  expect(screen.getByRole("dialog", { name: "Saison abschließen" })).toHaveTextContent("Probe Löwen");
+  expect(screen.getByTestId("season-close-entry-solo:p-a")).toHaveTextContent("Platz 3 von 12 · Fahrerwertung");
+  expect(screen.getByTestId("season-close-open")).toHaveTextContent("1 Termin ohne Ergebnis");
+  expect(screen.getByTestId("season-close-target")).toHaveValue("");
+  fireEvent.click(screen.getByTestId("season-close-save"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/reference-series/admin/series/serie-1/close", { reference_id: null }));
+});
+
+test("eine schon verknüpfte Referenz wird vorgeschlagen und aktualisiert", async () => {
+  mockClose({ ...PREVIEW, open_rounds: 0, target_id: "ref-alt", candidates: [{ id: "ref-alt", title: "Alte Referenz", season: "2026" }] });
+  apiMock.post.mockResolvedValue({ data: { reference_id: "ref-alt", created: false } });
+  renderAt();
+  fireEvent.click(await screen.findByTestId("series-detail-close"));
+  expect(await screen.findByTestId("season-close-target")).toHaveValue("ref-alt");
+  expect(screen.queryByTestId("season-close-open")).toBeNull();
+  expect(screen.getByTestId("season-close-save")).toHaveTextContent("Referenz aktualisieren");
+  fireEvent.click(screen.getByTestId("season-close-save"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/reference-series/admin/series/serie-1/close", { reference_id: "ref-alt" }));
+});
+
+test("abgebrochene Saison: Hinweis, die Einträge bleiben ohne Platz", async () => {
+  mockClose({ ...PREVIEW, cancelled: true, entries: PREVIEW.entries.map((entry) => ({ ...entry, placement: null, placement_label: "Saison abgebrochen" })) });
+  renderAt();
+  fireEvent.click(await screen.findByTestId("series-detail-close"));
+  expect(await screen.findByTestId("season-close-cancelled")).toBeInTheDocument();
+  expect(screen.getByTestId("season-close-entry-team:probe")).toHaveTextContent("Ohne Platz · Saison abgebrochen");
+});
+
+test("ohne Endstand (Team-Liga ohne Tabelle) ist der Abschluss gesperrt, mit Hinweis", async () => {
+  mockClose({ ...PREVIEW, entries: [] });
+  renderAt();
+  fireEvent.click(await screen.findByTestId("series-detail-close"));
+  expect(await screen.findByTestId("season-close-empty")).toHaveTextContent("Noch kein Endstand");
+  expect(screen.getByTestId("season-close-save")).toBeDisabled();
+  fireEvent.click(screen.getByTestId("season-close-save"));
+  expect(apiMock.post).not.toHaveBeenCalled();
+});
+
+test("Kopf: „Referenz: Platz 6 von 8 · ansehen“ führt zur Referenz", async () => {
+  mockClose({ ...PREVIEW, current: { id: "ref-ende", title: "Probe Racing F1", placement: 6, of: 8, label: "Tabelle", team: true } });
+  renderAt();
+  const line = await screen.findByTestId("series-detail-reference");
+  expect(line).toHaveTextContent("Referenz: Platz 6 von 8 · ansehen");
+  expect(screen.getByRole("link", { name: "ansehen" })).toHaveAttribute("href", "/references/ref-ende");
+});
+
+test("Captain: kein Abschluss und kein Vorschlag", async () => {
+  mockClose(PREVIEW, { ...SERIES, access: { role: "captain", can_publish: false, valid_until: "2026-12-31" } });
+  renderAt();
+  await screen.findByTestId("series-detail-captain");
+  expect(screen.queryByTestId("series-detail-close")).toBeNull();
+  expect(apiMock.get.mock.calls.map(([url]) => url).filter((url) => url.endsWith("/close"))).toEqual([]);
+});

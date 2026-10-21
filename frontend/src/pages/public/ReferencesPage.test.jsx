@@ -183,7 +183,8 @@ test("Vitrine: die Verwaltung wählt die Hauptkarte, die übrigen Podestplätze 
   expect(card).toHaveTextContent("Ausgewählt vom Verein");
   const tiles = within(screen.getByTestId("references-trophies")).getAllByTestId(/^reference-trophy-/);
   expect(tiles.map((tile) => tile.getAttribute("data-testid"))).toEqual(["reference-trophy-r4", "reference-trophy-r1"]);
-  expect(tiles[1]).toHaveAttribute("href", "/references/r1");
+  // r1 gehört zur Saison 2025 der Spur - die Kachel führt zur Saison-Seite (#1750).
+  expect(tiles[1]).toHaveAttribute("href", "/references/series/probe-racing/2025-liga-2");
   expect(tiles[1]).toHaveTextContent("1. PlatzWinter CupCall of Duty · 2025");
   expect(within(tiles[0]).getByTestId("placement-badge")).toHaveAttribute("data-medal", "bronze");
 });
@@ -352,6 +353,35 @@ test("Mitmachen-Band: ohne Discord-Einladung nur „Mitglied werden“", async (
 });
 
 // ---------------------------------------------------------------- Detailseite
+
+// Saison abschließen (#1750): eine Referenz aus einer Saison führt zur Saison-Seite - Chronik, Kacheln und Detail.
+const SEASON_LINK = { lineage_slug: "probe-liga", season_slug: "season-3", label: "Probe Liga · Season 3 · Division 2", season_end: true };
+
+test("Chronik und Vitrine: die Karte einer Referenz aus einer Saison führt zur Saison-Seite", async () => {
+  const silver = { ...ITEMS[1], id: "r3", display_title: "Probe Liga", best_placement: 2, medal: "silver", start_date: "2026-04-01", season_link: SEASON_LINK,
+    entries: [{ id: "e4", kind: "team", team_name: "LION A", placement: 2, team_count: 8, lineup_members: [], lineup: [] }] };
+  references = { ...references, items: [{ ...ITEMS[0], start_date: "2026-05-01" }, silver] };
+  page();
+  const row = await screen.findByTestId("reference-card-r3");
+  expect(row).toHaveAttribute("href", "/references/series/probe-liga/season-3");
+  expect(screen.getByTestId("reference-card-r1")).toHaveAttribute("href", "/references/r1");
+  expect(screen.getByTestId("reference-trophy-r3")).toHaveAttribute("href", "/references/series/probe-liga/season-3");
+});
+
+test("Detailseite: „aus Saison …“ mit Link zur Saison-Seite", async () => {
+  apiMock.get.mockResolvedValue({ data: { ...ITEMS[0], season_link: SEASON_LINK } });
+  render(<MemoryRouter initialEntries={["/references/r1"]}><Routes><Route path="/references/:id" element={<ReferenceDetailPage />} /></Routes></MemoryRouter>);
+  const link = await screen.findByTestId("reference-detail-season");
+  expect(link).toHaveTextContent("aus Saison Probe Liga · Season 3 · Division 2");
+  expect(link).toHaveAttribute("href", "/references/series/probe-liga/season-3");
+});
+
+test("Detailseite ohne Saison: kein Saison-Link", async () => {
+  apiMock.get.mockResolvedValue({ data: { ...ITEMS[0], season_link: null } });
+  render(<MemoryRouter initialEntries={["/references/r1"]}><Routes><Route path="/references/:id" element={<ReferenceDetailPage />} /></Routes></MemoryRouter>);
+  await screen.findByTestId("reference-detail-entries");
+  expect(screen.queryByTestId("reference-detail-season")).toBeNull();
+});
 
 test("Partner II (#469): die Detailseite nennt den Partner mit Link auf die Partnerseite", async () => {
   apiMock.get.mockResolvedValue({ data: { ...ITEMS[0], partners: [{ id: "p1", slug: "pineapps-esports", name: "PineApps eSports" }] } });

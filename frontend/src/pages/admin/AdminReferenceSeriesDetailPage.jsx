@@ -10,16 +10,20 @@ import { SeriesCalendarSection } from "./referenceSeries/SeriesCalendarSection";
 import { SeriesParticipantsSection } from "./referenceSeries/SeriesParticipantsSection";
 import { SeriesResultsSection } from "./referenceSeries/SeriesResultsSection";
 import { SeriesStaffSection } from "./referenceSeries/SeriesStaffSection";
+import { SeasonCloseSheet } from "./referenceSeries/SeasonCloseSheet";
 import { seasonLabel } from "./AdminReferenceSeriesPage";
 import { dayLabel, publishText } from "@/lib/referenceSeriesStaff";
+import { referenceLine, seasonName } from "@/lib/seasonClose";
 import { toast } from "sonner";
-import { Archive, ArchiveRestore, ArrowLeft, Pencil } from "lucide-react";
+import { Archive, ArchiveRestore, ArrowLeft, Flag, Pencil } from "lucide-react";
 
 // Seite einer Saison (#1741): Kopf mit Spur, Saison, Status und Regeln; Bearbeiten im Seitenblatt, Archivieren statt
 // Löschen. Kalender (#1742), Teilnehmer (#1743), Ergebnisse (#1744) und Captains (#1749) sind eigene Abschnitte, die
 // ihre Pakete füllen.
 // Captains (#1749) öffnen dieselbe Seite über „Mein Dienst“: der Server sagt in `access`, was die Person hier darf -
 // Bearbeiten, Archivieren und die Captain-Verwaltung bleiben beim Vorstand.
+// Saison abschließen (#1750, nur Vorstand, auch nachträglich): der Vorschlag mit den Endständen kommt im Seitenblatt,
+// der Kopf zeigt danach „Referenz: Platz 6 von 8 · ansehen“.
 
 const KIND_LABELS = Object.fromEntries(KIND_OPTIONS);
 const COUNT_LABELS = Object.fromEntries(COUNT_MODE_OPTIONS);
@@ -51,6 +55,8 @@ export default function AdminReferenceSeriesDetailPage() {
   const [series, setSeries] = useState(null);
   const [missing, setMissing] = useState("");
   const [editing, setEditing] = useState(false);
+  const [closing, setClosing] = useState(false);
+  const [preview, setPreview] = useState(null);
   const confirm = useConfirm();
 
   const load = useCallback(async () => {
@@ -66,6 +72,23 @@ export default function AdminReferenceSeriesDetailPage() {
   useEffect(() => { load(); }, [load]);
   useApiInvalidation(load, ["reference-series"]);
 
+  const board = (series?.access?.role || "board") === "board";
+  const loadPreview = useCallback(async () => {
+    try {
+      const { data } = await api.get(`/reference-series/admin/series/${seriesId}/close`);
+      setPreview(data && Array.isArray(data.entries) ? data : null);
+    } catch {
+      setPreview(null);
+    }
+  }, [seriesId]);
+  // Der Vorschlag kennt die Referenz der Saison - nur der Vorstand darf ihn sehen.
+  useEffect(() => { if (series && board) loadPreview(); }, [series, board, loadPreview]);
+  const openClose = () => {
+    setPreview(null);
+    setClosing(true);
+    loadPreview();
+  };
+
   const archived = series?.status === "archived";
   const toggleArchive = async () => {
     if (!archived && !await confirm({ title: "Saison archivieren?", description: "Gelöscht wird nichts – „Zurückholen“ macht es rückgängig.", confirmLabel: "Archivieren" })) return;
@@ -80,7 +103,7 @@ export default function AdminReferenceSeriesDetailPage() {
 
   const lineage = series?.lineage || {};
   const access = series?.access || { role: "board", can_publish: true };
-  const board = access.role === "board";
+  const current = preview?.current;
   return (
     <AdminLayout>
       <Link to={board ? "/admin/reference-series" : "/admin/dienst"} data-testid="series-detail-back" className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-white/50 hover:text-[#29B6E8]">
@@ -97,8 +120,18 @@ export default function AdminReferenceSeriesDetailPage() {
               </div>
               <h1 className="font-heading text-3xl md:text-4xl font-black uppercase mt-1">{seasonLabel(series)}</h1>
               <div className="mt-1 text-[10px] uppercase tracking-widest font-bold text-white/45">{STATUS_LABELS[series.status] || series.status}</div>
+              {board && current && (
+                <p className="mt-2 text-sm text-white/70" data-testid="series-detail-reference">
+                  Referenz: <span className="text-white font-semibold tabular-nums">{referenceLine(current)}</span> · <Link to={`/references/${current.id}`} className="text-[#29B6E8] hover:text-white underline-offset-2 hover:underline">ansehen</Link>
+                </p>
+              )}
             </div>
-            {board && <div className="flex items-center gap-2 shrink-0">
+            {board && <div className="flex items-center gap-2 shrink-0 flex-wrap max-w-full">
+              {!archived && (
+                <button type="button" onClick={openClose} data-testid="series-detail-close" className="tls-btn tls-btn--primary px-4 py-2 rounded-sm text-xs font-bold uppercase tracking-wider inline-flex items-center gap-2">
+                  <Flag className="w-3.5 h-3.5" /> Saison abschließen
+                </button>
+              )}
               <button type="button" onClick={() => setEditing(true)} data-testid="series-detail-edit" className="tls-btn tls-btn--secondary px-4 py-2 rounded-sm text-xs font-bold uppercase tracking-wider inline-flex items-center gap-2">
                 <Pencil className="w-3.5 h-3.5" /> Bearbeiten
               </button>
@@ -121,6 +154,10 @@ export default function AdminReferenceSeriesDetailPage() {
             {board && <SeriesStaffSection series={series} />}
           </div>
           {board && editing && <SeriesForm series={series} lineage={lineage} onClose={() => setEditing(false)} onSaved={() => { setEditing(false); load(); }} />}
+          {board && closing && (
+            <SeasonCloseSheet key={preview ? "bereit" : "laedt"} series={series} label={seasonName(lineage, series)} preview={preview}
+              onClose={() => setClosing(false)} onDone={() => { setClosing(false); load(); }} />
+          )}
         </>
       )}
     </AdminLayout>

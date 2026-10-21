@@ -254,6 +254,12 @@ je Person und Kalendermonat die ersten **vier** Einträge voll, danach nur noch 
 **Achievements** sind Profilpunkte und fließen nicht still in die Jahreswertung. Reine Community-Aktivität zählt nur, wenn sie als
 Event, Challenge oder manuelle Admin-Wertung eingetragen ist.
 
+**Externe Wettbewerbe** (Referenzen und Serien, [Inhalte](inhalte.md) 3.8 und 3.9) bringen **keine Jahreswertungs-Punkte**, nur
+Abzeichen in der Kategorie **Verein (nur Mitglieder)**: **Podest extern** (Platz 1 bis 3 in einer Referenz, Team oder Einzel – jeder
+Eintrag zählt einmal) und **Dauerbrenner** (externe Saisons mit Endplatz, die man für den Verein zu Ende gespielt hat). Gezählt wird
+aus den Referenzen, in denen die Person über ihr Vereinsprofil steht; nach „Saison abschließen“ werden die Spieler gleich neu
+ausgewertet, sonst spätestens in der nächtlichen Auswertung.
+
 ### 3.7 Saisonabschluss und Saison-MVP
 
 Ist die Saison vorbei, setzt ihr den **Status auf „Abgeschlossen“** (Jahreswertung → **Bearbeiten**). Dabei geschieht einmalig:
