@@ -152,6 +152,44 @@ async def test_round_page_of_a_racing_season_shows_names_without_tag_like_the_se
 
 
 @pytest.mark.asyncio
+async def test_team_league_roster_shows_names_without_tag_like_the_series_page(flow):
+    """Codex 3: Kader und Einsätze der Team-Liga mit „Namen ohne Tag“ der Saison - wie Serienseite, Rundenseite und
+    Statistik. Eine Startnummer mit Leerzeichen davor bleibt."""
+    await _setup(flow)
+    league = (await flow.post(f"{ADMIN}/lineages", json={"title": "Probe Team-Liga", "kind": "team_league"})).json()
+    season = (await flow.post(f"{ADMIN}/series", json={"lineage_id": league["id"], "season": "2026",
+                                                       "team_name": "Probe Löwen", "hide_name_tags": True})).json()
+    day = (await flow.post(f"{ADMIN}/series/{season['id']}/rounds",
+                           json={"day": _day(-3), "code": "ST1", "opponent": "Probe Gegner"})).json()
+    saved = await flow.put(_url(season, day["id"]), json={"matches": [{
+        "home": "Probe Löwen", "away": "Probe Gegner", "home_score": 2, "away_score": 0,
+        "lineup": [{"name": "Kira Kunst#LION"}, {"name": "Max Muster #123"}]}],
+        "status": "published", "expected_version": 0})
+    assert saved.status_code == 200, saved.text
+    flow.act_as(None)
+    page = (await flow.get(f"{PUBLIC}/{league['slug']}/{season['season_slug']}")).json()
+    assert sorted(player["name"] for player in page["team_league"]["lineup"]["players"]) == [
+        "Kira Kunst", "Max Muster #123"]
+
+
+@pytest.mark.asyncio
+async def test_rules_and_sheets_beyond_the_limits_are_refused(flow):
+    """Codex 4 bis 6 über die echten Routen: zu langer Bonus-Name und N über 64 → 422; mehr Runden als die Saison je
+    Turniertag führt → Fehler in der Vorschau, Übernehmen 422."""
+    lineage, series, rounds = await _setup(flow)
+    long_bonus = await flow.patch(f"{ADMIN}/series/{series['id']}", json={
+        "rules": {**RULES, "custom_bonuses": [{"label": "Sonderbonus mit einem viel zu langen Namen x", "points": 3}]}})
+    assert long_bonus.status_code == 422 and "höchstens 40 Zeichen" in long_bonus.text
+    many = await flow.patch(f"{ADMIN}/series/{series['id']}", json={"rules": {**RULES, "tiebreak_top_n": 65}})
+    assert many.status_code == 422 and "höchstens 64" in many.text
+    sheet = {"rows": [{"name": NAMES["a"], "day_rounds": [{"points": 8}] * 6}]}
+    preview = (await flow.post(_url(series, rounds[0], "/preview"), json=sheet)).json()
+    assert [item["code"] for item in preview["errors"]] == ["day_rounds_too_many"] and not preview["can_save"]
+    refused = await flow.put(_url(series, rounds[0]), json={**sheet, "status": "published", "expected_version": 0})
+    assert refused.status_code == 422
+
+
+@pytest.mark.asyncio
 async def test_closing_the_season_takes_the_ranks_after_the_tiebreak(flow):
     lineage, series, rounds = await _setup(flow)
     for index, (entry, round_id) in enumerate(zip(DAYS.values(), rounds)):

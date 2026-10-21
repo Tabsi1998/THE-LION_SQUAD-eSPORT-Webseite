@@ -26,6 +26,7 @@ from __future__ import annotations
 from services.own_teams import Matcher, own_team_names, own_teams
 from services.scoring_rules import match_points, normalize_rules
 from services.series_appearances import team_league_appearances
+from services.series_identity import without_game_tag
 from services.team_league_sheet import is_played, own_match, own_matches  # noqa: F401 - own_match für Leser (#1747)
 from services.visibility import user_can_see
 
@@ -219,12 +220,15 @@ async def _lineup(db, series: dict, seasons: list[dict], sheets: dict, own_days:
             slugs[profile["id"]] = profile.get("slug")
 
     players = []
+    # #1961: Namen wie auf der Serienseite - mit „Namen ohne Tag“ der Saison ohne Tag der Spielkennung.
+    hide_tags = bool(series.get("hide_name_tags"))
     for pid, count in played.items():
         item = participants[pid]
         is_member = member(item)
         hidden = bool(item.get("name_hidden"))
+        shown = without_game_tag(item.get("name")) if hide_tags else item.get("name")
         players.append({
-            "key": pid, "name": None if hidden else item.get("name"), "name_hidden": hidden,
+            "key": pid, "name": None if hidden else shown, "name_hidden": hidden,
             "club_member": is_member, "guest": not is_member,
             # Link nur zu öffentlich sichtbaren Profilen: aktiv (wie die Profilseite) und Name nicht ausgeblendet.
             "profile_slug": slugs.get(item.get("profile_id")) if is_member and not hidden else None,

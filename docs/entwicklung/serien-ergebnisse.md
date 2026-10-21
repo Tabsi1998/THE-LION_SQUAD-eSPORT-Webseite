@@ -176,13 +176,15 @@ Mehrere Runden an einem Termin (etwa TFT-Lobbys R1–R5), gerechnet in `services
 - **Regeln:** `day_rounds: {count, points_by_place}` (Spalten R1…Rn als Vorgabe, `0` = aus; Rundenpunkte je Platz in
   der Lobby, Vorgabe 8…1), `custom_bonuses: [{key, label, points}]` (Name frei, Kennung aus dem Namen, bleibt beim
   Umbenennen) und `tiebreak_top_n` für den Vorrang `top_n` („mehr Plätze unter den besten N“, Plätze = Tagesplätze).
+  Grenzen (sonst 422): `count` 0–20, Bonus-Name höchstens 40 Zeichen (nie still gekürzt), höchstens 10 Boni, N 1–64.
   Saison-Feld `hide_name_tags`: die Serienseite zeigt „Name#TLS“ als „Name“.
 - **Zeile:** `day_rounds: [{place?, points?, lobby?} | null]` – Punkte gelten wie gelesen (Bots verschieben sie), sonst
   aus dem Platz samt Bots; `null` = nicht gespielt (0, etwa nach Marke `left` „Ausgestiegen“). `day_points` = GES P des
   Veranstalters (gilt vor der Summe, Warnung `day_points_differ`). `partner: {participant_id | name}` (Double Up, muss
   in der Liste stehen; Fehler `partner_not_in_list`, `partner_self`, `partner_conflict`; die Gegenseite bekommt ihn
   mit). `bonus_keys` (unbekannte fallen weg: `bonus_unknown`). Am Blatt `double_up: true` (Warnungen
-  `partner_missing`, `partner_place_differs`).
+  `partner_missing`, `partner_place_differs`). Mehr Runden als `day_rounds.count` (bei 0 jede) sind ein Fehler
+  `day_rounds_too_many` - Übernehmen antwortet 422.
 - **Platz:** Ohne Platz bestimmt die Tagessumme ihn – Wettbewerbsrang (4, 4, 6), ein Paar ist eine Einheit (1, 1, 2, 2).
   Zweimal „4.“ mit gleicher Tagessumme oder mit „6.“ danach und Paare im Double Up geben keine Warnung `place_twice`,
   der übersprungene Platz keine `place_gap`. Die Saisonpunkte kommen wie bisher aus dem Platz (oder laut Veranstalter).
@@ -193,10 +195,13 @@ Mehrere Runden an einem Termin (etwa TFT-Lobbys R1–R5), gerechnet in `services
   `day_points`, `bonus`, `bonus_keys` und `partner` (Person wie in der Tabelle, ohne Kennung).
 - **Einfügen** (`lib/resultPaste.js`): mit Kopfzeile Spalten „R 1“ … „R n“, „GES P“ und je Sonderbonus seine Spalte.
 - **Spielkennung mit Tag:** `series_identity.without_game_tag` – „Name#TAG“ (3–5 Buchstaben oder Ziffern direkt am
-  Namen) zählt wie ein Clan-Tag: ohne Tag gleicher Name = dieselbe Person (Treffer `name_untagged`). Eine Startnummer
-  mit Leerzeichen davor („Max Muster #123“) bleibt Teil des Namens. Mit `hide_name_tags` zeigen Serienseite, Rundenseite
-  und Statistik (#1950) die Namen ohne Tag; Team-Namen (`team_names`, #1931) nutzen nur `normalize_name` und bleiben
-  unberührt.
+  Namen): gleich sind nur gleicher Tag und Tag ↔ ohne Tag (Treffer `name_untagged`, passt der Name ohne Tag auf
+  mehrere: `ambiguous_name`). Zwei verschiedene Tags („Name#AAA“, „Name#BBB“) sind verschiedene Personen
+  (`tags_conflict`) - nie von selbst zugeordnet, auch nicht in der Bild-Erkennung. Ein bestätigter Alias für „Name“ ordnet
+  „Name#TAG“ von selbst zu, einer für „Name#AAA“ nie „Name#BBB“ (verglichen mit dem gespeicherten `name` des Alias).
+  Eine Startnummer mit Leerzeichen davor („Max Muster #123“) bleibt Teil des Namens. Mit `hide_name_tags` zeigen
+  Serienseite, Kader der Team-Liga, Rundenseite und Statistik (#1950) die Namen ohne Tag; das Mitgliederprofil zeigt nur
+  Profilnamen. Team-Namen (`team_names`, #1931) nutzen nur `normalize_name` und bleiben unberührt.
 
 ## Version, Entwurf daneben und Protokoll
 

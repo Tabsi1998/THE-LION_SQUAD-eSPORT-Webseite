@@ -9,6 +9,7 @@ import pytest
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 
 from services import series_identity, tournament_days  # noqa: E402
+from services.result_image_match import similarity  # noqa: E402
 from services.scoring_rules import normalize_rules  # noqa: E402
 from services.series_results import check, resolve  # noqa: E402
 from services.series_standings import compute_standings  # noqa: E402
@@ -236,3 +237,55 @@ def test_racing_names_with_a_start_number_after_hash_stay_different_people():
                   drivers, normalize_rules({}))
     assert [(row["participant_id"], row["match"]) for row in out.rows] == [
         ("neu:maxmuster456", "new"), ("p-max", "name")]
+
+
+def test_two_different_game_tags_are_two_people_and_only_tag_or_no_tag_match():
+    """Codex 1: „Name#AAA“ nie von selbst „Name#BBB“. Gleich sind nur gleicher Tag und Tag ↔ ohne Tag; passt der Name
+    ohne Tag auf mehrere, ist er wie bisher mehrdeutig."""
+    people = [{"id": "p-ida", "name": "Ida Imagin#AAA"}, {"id": "p-jo1", "name": "Jo Jux#AAA"},
+              {"id": "p-jo2", "name": "Jo Jux#BBB"}, {"id": "p-kim", "name": "Kim Kunst"}]
+    out = resolve({"rows": [{"name": "Ida Imagin#BBB", "place": 1}, {"name": "ida imagin#aaa", "place": 2},
+                            {"name": "Kim Kunst#LION", "place": 3}, {"name": "Jo Jux", "place": 4},
+                            {"name": "Jo Jux#CCC", "place": 5}]}, people, normalize_rules({}))
+    assert [(row["participant_id"], row["match"]) for row in out.rows] == [
+        ("neu:idaimaginbbb", "new"), ("p-ida", "name"), ("p-kim", "name_untagged"), (None, None),
+        ("neu:jojuxccc", "new")]
+    assert [item["code"] for item in out.errors] == ["ambiguous_name"]
+    assert series_identity.tags_conflict("Ida#AAA", "Ida#BBB") and not series_identity.tags_conflict("Ida#AAA", "Ida")
+    # Auch die Bild-Erkennung (#1756) hält zwei Tags auseinander, ohne Tag bleibt es derselbe Name.
+    assert similarity("Ida Imagin#AAA", "Ida Imagin#BBB") == 0.0 and similarity("Ida Imagin#AAA", "Ida Imagin") == 1.0
+
+
+def test_an_alias_for_the_name_without_tag_applies_to_name_with_tag_but_not_across_tags():
+    """Codex 2: ein bestätigter Alias für „Name“ ordnet „Name#TAG“ von selbst zu (keine offene Doppel-Person in der
+    neuen Saison); ein Alias für „Name#AAA“ nie „Name#BBB“."""
+    plain = {"id": "a1", "name": "Kim Kunst", "name_normalized": "kimkunst", "target": "member", "profile_id": "pr-1"}
+    tagged = {"id": "a2", "name": "Ida Imagin#AAA", "name_normalized": "idaimaginaaa", "target": "member",
+              "profile_id": "pr-2"}
+    index = series_identity.IdentityIndex(profiles={"pr-1": "Kim", "pr-2": "Ida"}, aliases=[plain, tagged])
+    assert series_identity.exact_alias(index, "Kim Kunst#LION")["id"] == "a1"
+    assert series_identity.exact_alias(index, "Ida Imagin#AAA")["id"] == "a2"
+    assert series_identity.exact_alias(index, "Ida Imagin#BBB") is None
+    assert series_identity.suggest(index, "Ida Imagin#BBB") == []
+    # Ein Clan-Tag bleibt wie bisher nur ein Vorschlag.
+    assert series_identity.exact_alias(index, "[TLS] Kim Kunst") is None
+
+
+def test_more_rounds_than_the_season_holds_are_an_error():
+    """Codex 4: R1–R20 werden nicht einfach angenommen - mehr Runden als je Turniertag eingestellt ist ein Fehler."""
+    six = _checked({"rows": [_row("a", [8, 7, 6, 5, 4, 3]), _row("b", _same(1))]})
+    assert [(item["code"], item["rows"]) for item in six.errors] == [("day_rounds_too_many", [0])]
+    assert "6 Runden, die Saison führt 5 je Turniertag" in six.errors[0]["message"]
+    off = resolve({"rows": [_row("a", [8])]}, PEOPLE, normalize_rules({}))
+    assert [item["code"] for item in off.errors] == ["day_rounds_too_many"]
+    assert "erst in der Saison einstellen" in off.errors[0]["message"]
+
+
+def test_bonus_names_and_top_n_have_limits_instead_of_cutting():
+    """Codex 5 und 6: ein zu langer Bonus-Name wird nicht still gekürzt, N von „Top N“ liegt zwischen 1 und 64."""
+    with pytest.raises(ValueError, match="höchstens 40 Zeichen"):
+        normalize_rules({"custom_bonuses": [{"label": "B" * 41, "points": 1}]})
+    assert normalize_rules({"custom_bonuses": [{"label": "B" * 40, "points": 1}]})["custom_bonuses"][0]["label"] == "B" * 40
+    with pytest.raises(ValueError, match="höchstens 64"):
+        normalize_rules({"tiebreak_top_n": 65})
+    assert normalize_rules({"tiebreak_top_n": 64})["tiebreak_top_n"] == 64

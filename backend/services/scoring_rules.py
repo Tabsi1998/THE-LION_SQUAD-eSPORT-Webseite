@@ -43,6 +43,7 @@ MAX_DAY_ROUND_PLACES = 100
 MAX_CUSTOM_BONUSES = 10
 MAX_BONUS_LABEL = 40
 MAX_BONUS_KEY = 30
+MAX_TOP_N = 64  # N der Gleichstand-Regel „Top N“ (#1961): 1 bis 64
 
 DEFAULT_RULES: dict = {
     "points_mode": "scheme",
@@ -159,6 +160,8 @@ def normalize_rules(raw: dict | None) -> dict:
     rules["day_rounds"] = _day_rounds(raw.get("day_rounds"))
     rules["custom_bonuses"] = _custom_bonuses(raw.get("custom_bonuses"))
     rules["tiebreak_top_n"] = _whole(rules["tiebreak_top_n"], "tiebreak_top_n", minimum=1)
+    if rules["tiebreak_top_n"] > MAX_TOP_N:
+        raise ValueError(f"tiebreak_top_n: höchstens {MAX_TOP_N}.")
     return rules
 
 
@@ -197,7 +200,9 @@ def _custom_bonuses(value) -> list[dict]:
     for index, item in enumerate(value, start=1):
         if not isinstance(item, dict):
             raise ValueError(f"custom_bonuses: Bonus {index} ohne Angaben.")
-        label = " ".join(str(item.get("label") or "").split())[:MAX_BONUS_LABEL]
+        label = " ".join(str(item.get("label") or "").split())
+        if len(label) > MAX_BONUS_LABEL:
+            raise ValueError(f"custom_bonuses: Name von Bonus {index} höchstens {MAX_BONUS_LABEL} Zeichen.")
         key = bonus_key(item.get("key") or label)
         if not label or not key:
             raise ValueError(f"custom_bonuses: Bonus {index} braucht einen Namen mit Buchstaben oder Ziffern.")

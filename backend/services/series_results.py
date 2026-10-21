@@ -104,7 +104,10 @@ class _Lookup:
         full = [row for pid, row in self.by_id.items() if self.keys[pid] and self.keys[pid][0] == keys[0]]
         if full:
             return full, "name"
-        loose = [row for pid, row in self.by_id.items() if set(self.keys[pid]) & set(keys)]
+        # Ohne Clan-Tag bzw. ohne Tag der Spielkennung - zwei verschiedene Tags („Name#AAA“, „Name#BBB“) sind aber
+        # verschiedene Personen und passen nie (#1961).
+        loose = [row for pid, row in self.by_id.items() if set(self.keys[pid]) & set(keys)
+                 and not series_identity.tags_conflict(name, row.get("name"))]
         return loose, "name_untagged"
 
     def by_number(self, start_number: str) -> list[dict]:
@@ -324,6 +327,13 @@ def _day_fields(raw: dict, rules: dict, out: Resolution, index: int) -> dict:
     """Turniertag einer Zeile (#1961): Runden, Tagessumme des Veranstalters und Sonderboni - nur, was angegeben ist.
     Unbekannte Boni fallen mit Warnung weg."""
     rounds = tournament_days.clean_rounds(raw.get("day_rounds"))
+    allowed = rules["day_rounds"]["count"]
+    if len(rounds) > allowed:
+        # Mehr Runden als die Saison je Turniertag führt: nie still abschneiden oder annehmen.
+        text = (f"die Saison führt {allowed} je Turniertag" if allowed
+                else "die Saison führt keine Runden je Turniertag - erst in der Saison einstellen")
+        out.errors.append(_problem("day_rounds_too_many", f"Zeile {index + 1}: {len(rounds)} Runden, {text}.",
+                                   [index]))
     given = raw.get("day_points")
     known = {bonus["key"] for bonus in rules["custom_bonuses"]}
     wanted = list(dict.fromkeys(str(key) for key in raw.get("bonus_keys") or []))
