@@ -228,6 +228,8 @@ async def get_tournament(slug_or_id: str, include_draft: bool = False, access: s
         suffix = f"?{urlencode({'access': access})}" if access else ""
         return RedirectResponse(url=f"/api/tournaments/{quote(str(t['slug']), safe='')}{suffix}", status_code=301)
     await _enrich_tournament(t, user)
+    # Wie lang die Warteliste ist (#1941): das Bestätigungs-Blatt nennt bei vollem Cup den Platz - nur die Zahl.
+    t["waitlist_count"] = await db.tournament_registrations.count_documents({"tournament_id": t["id"], "status": "waitlist"})
     if onsite_only:
         _expose_offer(t, False)
         return onsite_access.slim_view(t)

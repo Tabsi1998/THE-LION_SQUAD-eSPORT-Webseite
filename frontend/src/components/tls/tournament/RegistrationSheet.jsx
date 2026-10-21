@@ -8,7 +8,7 @@ import { formatWhen } from "@/lib/datetime";
 import { gameLabel } from "@/lib/gameLabels";
 import { renderMarkdownLite } from "@/lib/markdownLite";
 import { formatCents, previewQuote, startFeeSummary } from "@/lib/pricing";
-import { checkInWindow, placeLine, rulesSummary } from "@/lib/registrationSheet";
+import { checkInWindow, placeLine, rulesSummary, waitlistLead } from "@/lib/registrationSheet";
 
 // Bestätigungs-Blatt der Turnier-Anmeldung (#1261): jede Anmeldung auf der Website geht hierüber - Einzel und Team, mit
 // und ohne Startgeld, mit und ohne Spieler-Kennungen, auf der Turnierseite und in der schlanken Vor-Ort-Ansicht. Oben
@@ -62,11 +62,16 @@ export function RegistrationSheet({ tournament, user, myTeams = [], loading, err
     : "Für dieses Turnier sind keine eigenen Regeln hinterlegt – es gelten Fair Play und die Anweisungen der Turnierleitung.";
   const rules = rulesSummary(tournament.rules);
   const fee = offer?.enabled ? startFeeSummary(offer, { teamMode: tournament.team_mode || "solo", teamSize: tournament.team_size }) : "";
-  const lead = needsTeam
+  // Voller Cup (#1941): Kopfzeile und Knopf sagen „Warteliste“ - bezahlt wird erst mit dem Nachrücken.
+  const waitlist = waitlistLead(tournament);
+  const lead = waitlist || (needsTeam
     ? "Wähle das Team aus, das du als Leader oder Co-Leader anmelden möchtest."
     : fields.length
       ? `${gameLabel(game)} benötigt Spieler-IDs${sourceSlug !== game.slug ? ` aus ${game.identity_game_name || "dem Hauptspiel"}` : ""}.`
-      : `Du meldest dich als ${user?.display_name || user?.username || "du"} an.`;
+      : `Du meldest dich als ${user?.display_name || user?.username || "du"} an.`);
+  const submitLabel = waitlist
+    ? "Auf die Warteliste"
+    : quote && !quote.free ? `Verbindlich anmelden · ${formatCents(quote.total_cents, quote.currency)}` : "Verbindlich anmelden";
 
   return (
     <div
@@ -204,7 +209,7 @@ export function RegistrationSheet({ tournament, user, myTeams = [], loading, err
                 data-testid="tournament-register-submit"
                 className="tls-btn tls-btn--primary min-h-12 rounded-sm px-5 text-sm font-bold uppercase tracking-wider disabled:opacity-50 sm:min-h-11 sm:text-xs"
               >
-                {loading ? "Sendet…" : quote && !quote.free ? `Verbindlich anmelden · ${formatCents(quote.total_cents, quote.currency)}` : "Verbindlich anmelden"}
+                {loading ? "Sendet…" : submitLabel}
               </button>
             </div>
           </div>

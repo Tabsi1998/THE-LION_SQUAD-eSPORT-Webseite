@@ -44,3 +44,17 @@ export function placeLine(tournament) {
   const location = mode === "online" ? "" : String(tournament?.location || "").trim();
   return location ? `${label} · ${location}` : label;
 }
+
+/**
+ * Voller Cup (#1941): „Der Cup ist voll – du kommst auf die Warteliste (Platz 3).“ - dieselbe Regel wie die schlanke
+ * Vor-Ort-Ansicht („Alle Plätze belegt – Warteliste“). Ohne Länge der Warteliste (ältere Antwort) ohne Platz; mit
+ * freien Plätzen oder ohne Höchstzahl leer.
+ */
+export function waitlistLead(tournament) {
+  const max = Number(tournament?.max_participants) || 0;
+  const taken = Number(tournament?.participant_count) || 0;
+  if (!max || taken < max) return "";
+  const waiting = Number(tournament?.waitlist_count);
+  const place = Number.isInteger(waiting) && waiting >= 0 ? ` (Platz ${waiting + 1})` : "";
+  return `Der Cup ist voll – du kommst auf die Warteliste${place}.`;
+}
