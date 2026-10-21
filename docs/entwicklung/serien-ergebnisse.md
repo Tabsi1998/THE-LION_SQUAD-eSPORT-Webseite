@@ -62,6 +62,14 @@ nach der Runde). Team-Liga: `matches` mit `home`, `away`, Ergebnis, `maps` und `
   eigene Zuordnung gültig, die andere Saison bleibt ganz unverändert und merkt sich den Nachtrag (`alias_followups`);
   der nächste Vorgang unter ihrer Sperre zieht ihn nach. Die Antwort nennt das (`other_series: {updated, pending}`,
   `notice`), das Protokoll ebenso (`also_assigned_in`, `pending_series`).
+- **Teilnehmer nachträglich bearbeiten (#1929, nur Vorstand):** `PATCH …/participants/{id}` (Name, Startnummer, Team)
+  schreibt `reference_series.participant_update` mit altem und neuem Wert und rechnet neu; ein Name, den es in der
+  Saison schon gibt, bekommt 409 (zusammenführen). `POST …/participants/bulk-assign` (`participant_ids`, `link` „guest“
+  oder „external“) ordnet alle unter einer Sperre zu und rechnet einmal neu; andere Saisons ziehen danach je einmal
+  nach (`reference_series.follow_aliases_elsewhere`). `POST …/participants/{id}/merge` (`duplicate_id`) schreibt die
+  Kennung in Blättern, Entwürfen daneben und offiziellen Werten um (Version +1 je Blatt) und rechnet neu – nennt ein
+  Inhalt beide, 409 und nichts geändert. `DELETE …/participants/{id}` nur ohne Ergebnis (sonst 409). Protokoll:
+  `.participant_bulk_assign`, `.participant_merge`, `.participant_delete`.
 - `expected_version` ist Pflicht (0 ohne Blatt); ein veralteter Stand der Seite bekommt 409. Zwei gleichzeitige
   Übernahmen auf denselben Stand: eine gewinnt, die andere bekommt 409.
 - Ist das Blatt veröffentlicht und die Person darf nicht veröffentlichen (`target: "pending_draft"`), landet die

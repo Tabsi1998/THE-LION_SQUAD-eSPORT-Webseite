@@ -11,6 +11,10 @@ Alles hier ist Verwaltung im Bereich Redaktion („content“): Aliase und Verkn
 - Gäste zählen fürs Team, nie für den Verein (``is_club_member`` nur bei Mitgliedern); danach wird neu gerechnet.
 - Anlegen, Bearbeiten und Zuordnen laufen unter der Sperre der Saison (``reference_series.series_locked``, #1744);
   mitgezogene andere Saisons rechnen danach je unter ihrer eigenen Sperre neu (``recompute_locked``).
+- **Nachträglich bearbeiten** (#1929): Name, Startnummer und Team ändern (Protokoll, Neurechnen), mehrere auf einmal als
+  Gast oder Extern (``bulk-assign``: eine Sperre, einmal neu rechnen, andere Saisons danach je einmal), zwei
+  Schreibweisen zusammenführen (``merge``: Ergebnisse samt Entwürfen wandern mit) und Teilnehmer ohne Ergebnis
+  entfernen. Alles nur für den Vorstand (Bereich Redaktion) - ein Captain ordnet nie zu (#1749).
 
 Modelle, Indexe und Datenschutz-Einordnung liegen seit dem Datenmodell (#1741) in ``models.py``, ``database.py`` und
 ``services/personal_data.py``; Kontolöschung und Auskunft in ``account_erasure`` und ``dsgvo_routes``."""
@@ -24,10 +28,10 @@ from pydantic import BaseModel, Field
 from auth import require_area
 from database import get_db
 from models import ReferenceParticipantCreate, ReferenceParticipantUpdate, new_id, now_utc
-from services import reference_running_cache, reference_series, series_identity
+from services import reference_calendar, reference_running_cache, reference_series, series_identity
 from services.series_participants import (
-    apply_alias, build_index, clean, club_profiles, follower_series, move_followers, new_participant, open_series,
-    profile_name, series_game_id,
+    apply_alias, build_index, clean, club_profiles, content_participant_ids, follower_series, move_followers,
+    new_participant, open_series, profile_name, series_game_id, sheet_participant_ids, swap_participant,
 )
 
 # Jeder schreibende Aufruf leert den Cache der laufenden Saisons (#1753, Startseite).
@@ -49,6 +53,17 @@ class ParticipantAssign(BaseModel):
     link: Literal["member", "guest", "external"]
     profile_id: Optional[str] = None
     guest_name: Optional[str] = Field(default=None, max_length=120)
+
+
+class ParticipantBulkAssign(BaseModel):
+    """Sammelaktion (#1929): mehrere Teilnehmer der Saison als Gast oder Extern - Mitglied geht nur einzeln (Profil)."""
+    participant_ids: List[str] = Field(min_length=1, max_length=MAX_BATCH)
+    link: Literal["guest", "external"]
+
+
+class ParticipantMerge(BaseModel):
+    """Zusammenführen (#1929): ``duplicate_id`` geht im Teilnehmer aus dem Pfad auf."""
+    duplicate_id: str = Field(min_length=1, max_length=80)
 
 
 UNUSABLE_NAME = "Der Name braucht mindestens einen Buchstaben oder eine Ziffer (ohne Clan-Tag)."
@@ -78,6 +93,23 @@ async def _participant(db, series_id: str, participant_id: str) -> dict:
     return found
 
 
+async def _log(db, action: str, me: dict, target_id: str, data: dict) -> None:
+    await db.audit_logs.insert_one({"id": new_id(), "action": action, "actor_id": me["id"], "target_id": target_id,
+                                    "data": data, "created_at": now_utc().isoformat()})
+
+
+async def _round_labels(db, series_id: str) -> dict[str, str]:
+    """Kürzel je Termin (sonst „Termin N“) für Meldungen - wie im Kalender gezählt."""
+    rounds = await db.reference_rounds.find({"series_id": series_id}, {"_id": 0}).to_list(None)
+    active = [item for item in reference_calendar.ordered_rounds(rounds) if not item.get("archived_at")]
+    return {item["id"]: reference_calendar.round_label(item, position) for position, item in enumerate(active, start=1)}
+
+
+def _pending_notice(pending: list[str]) -> str:
+    word = "Saison wird" if len(pending) == 1 else "Saisons werden"
+    return f"{len(pending)} weitere {word} gerade bearbeitet und beim nächsten Speichern dort nachgezogen."
+
+
 # ---------------------------------------------------------------- Lesen
 def _with_profile(row: dict, profiles: dict[str, str]) -> dict:
     return {**row, "profile_name": profiles.get(row.get("profile_id")) if row.get("profile_id") else None}
@@ -102,7 +134,15 @@ async def list_participants(series_id: str, me: dict = Depends(require_area("con
     await _series(db, series_id)
     rows = await db.reference_participants.find({"series_id": series_id}, {"_id": 0}).to_list(None)
     profiles = {pid: profile_name(row) for pid, row in (await club_profiles(db)).items()}
-    return {"participants": [_with_profile(row, profiles) for row in _sorted(rows)], "counts": _counts(rows)}
+    # Zur Wahl beim Bearbeiten (#1929): aktive Vereinsprofile, nur Name und Kennung. ``in_results``: steht in einem
+    # Ergebnis (auch im Entwurf) - entfernen geht dann nur über Zusammenführen.
+    choices = sorted(({"id": pid, "name": name} for pid, name in profiles.items()),
+                     key=lambda item: (item["name"].casefold(), item["id"]))
+    used: set[str] = set()
+    async for sheet in db.reference_round_results.find({"series_id": series_id}, {"_id": 0}):
+        used |= sheet_participant_ids(sheet)
+    listed = [{**_with_profile(row, profiles), "in_results": row["id"] in used} for row in _sorted(rows)]
+    return {"participants": listed, "counts": _counts(rows), "profiles": choices}
 
 
 @router.get("/admin/series/{series_id}/unknown-names")
@@ -165,21 +205,126 @@ async def create_participants(series_id: str, body: ParticipantBatch, me: dict =
 @reference_series.series_locked
 async def update_participant(series_id: str, participant_id: str, body: ReferenceParticipantUpdate,
                              me: dict = Depends(require_area("content"))):
-    """Name, Startnummer, Team, Art und Ausblenden. Die Verknüpfung ändert nur das Zuordnen."""
+    """Name, Startnummer, Team, Art und Ausblenden. Die Verknüpfung ändert nur das Zuordnen.
+
+    Jede Änderung kommt ins Protokoll (``reference_series.participant_update``, alter und neuer Wert), danach wird neu
+    gerechnet - das Team zählt in der Teamwertung, der Name beim Gleichstand (#1929). Ein Name, den es in der Saison
+    schon gibt, ist ein Fall fürs Zusammenführen (409)."""
     db = get_db()
-    await _series(db, series_id)
-    await _participant(db, series_id, participant_id)
+    series = await _series(db, series_id)
+    before = await _participant(db, series_id, participant_id)
     raw = body.model_dump(exclude_unset=True)
     updates = {key: value for key, value in raw.items()
                if key not in LINK_FIELDS and (value is not None or key in PARTICIPANT_NULLABLE)}
     if "name" in updates:
         updates["name"] = _usable(clean(updates["name"]))
         updates["name_normalized"] = series_identity.normalize_name(updates["name"])
+        if updates["name_normalized"] != before.get("name_normalized") and await db.reference_participants.find_one(
+                {"series_id": series_id, "name_normalized": updates["name_normalized"], "id": {"$ne": participant_id}},
+                {"_id": 0, "id": 1}):
+            raise HTTPException(409, f"„{updates['name']}“ steht schon in dieser Saison. Führ die beiden zusammen, "
+                                     "statt umzubenennen.")
     for key in PARTICIPANT_NULLABLE & set(updates):
         updates[key] = clean(updates[key]) or None
+    changes = {key: [before.get(key), value] for key, value in updates.items()
+               if key != "name_normalized" and before.get(key) != value}
+    if not changes:
+        return before
+    written = {key: updates[key] for key in changes}
+    if "name" in changes:
+        written["name_normalized"] = updates["name_normalized"]
     await db.reference_participants.update_one({"id": participant_id}, {"$set": {
-        **updates, "updated_at": now_utc().isoformat(), "updated_by": me["id"]}})
+        **written, "updated_at": now_utc().isoformat(), "updated_by": me["id"]}})
+    await _log(db, "reference_series.participant_update", me, participant_id,
+               {"series_id": series_id, "changes": changes})
+    await reference_series.recompute_standings(db, series)
     return await _participant(db, series_id, participant_id)
+
+
+# ---------------------------------------------------------------- Zusammenführen und Entfernen
+MERGE_TAKES = ("start_number", "default_team")
+LINK_STATE = (*sorted(LINK_FIELDS), "link_status", "link_source", "alias_id", "decided_at", "decided_by")
+
+
+@router.post("/admin/series/{series_id}/participants/{participant_id}/merge")
+@reference_series.series_locked
+async def merge_participant(series_id: str, participant_id: str, body: ParticipantMerge,
+                            me: dict = Depends(require_area("content"))):
+    """Zwei Schreibweisen derselben Person zusammenführen (#1929): ``duplicate_id`` geht in diesem Teilnehmer auf.
+
+    Seine Ergebnisse wandern mit - im Blatt, im Entwurf daneben und in Blättern, die noch Entwurf sind; jedes geänderte
+    Blatt bekommt eine neue Version (offene Seiten zum Eintragen laden dann neu). Danach wird neu gerechnet. Der
+    behaltene Teilnehmer behält Name und Zuordnung; fehlende Startnummer und fehlendes Team kommen vom anderen, ein
+    ausgeblendeter Name bleibt ausgeblendet, und ist er selbst noch offen, übernimmt er die Zuordnung des anderen.
+    Nennt ein Ergebnis beide, wird nichts zusammengeführt (409) - dort müsste erst eine Zeile weg."""
+    if body.duplicate_id == participant_id:
+        raise HTTPException(422, "Ein Teilnehmer lässt sich nicht mit sich selbst zusammenführen.")
+    db = get_db()
+    series = await _series(db, series_id)
+    kept = await _participant(db, series_id, participant_id)
+    duplicate = await _participant(db, series_id, body.duplicate_id)
+    old, new = duplicate["id"], kept["id"]
+    sheets = await db.reference_round_results.find({"series_id": series_id}, {"_id": 0}).to_list(None)
+    labels = await _round_labels(db, series_id)
+    for sheet in sheets:
+        if any({old, new} <= content_participant_ids(source) for source in (sheet, sheet.get("pending_draft") or {})):
+            where = labels.get(sheet.get("round_id")) or "einem archivierten Termin"
+            raise HTTPException(409, f"„{kept['name']}“ und „{duplicate['name']}“ stehen beide im Ergebnis von "
+                                     f"{where}. Erst dort eine der beiden Zeilen entfernen, dann zusammenführen.")
+
+    moved = []
+    for sheet in sheets:
+        pending = sheet.get("pending_draft")
+        named = old in sheet_participant_ids(sheet)
+        if not named and old not in ((pending or {}).get("created_participant_ids") or []):
+            continue
+        update = swap_participant({key: sheet[key] for key in ("rows", "matches", "official_totals") if key in sheet},
+                                  old, new)
+        if pending:
+            update["pending_draft"] = swap_participant(pending, old, new)
+        await db.reference_round_results.update_one(
+            {"id": sheet["id"]}, {"$set": update, **({"$inc": {"version": 1}} if named else {})})
+        if named:
+            moved.append(sheet["round_id"])
+
+    fill = {key: duplicate.get(key) for key in MERGE_TAKES if not kept.get(key) and duplicate.get(key)}
+    if duplicate.get("name_hidden") and not kept.get("name_hidden"):
+        fill["name_hidden"] = True
+    adopted = kept.get("link_status") == "open" and duplicate.get("link_status") == "decided"
+    if adopted:
+        fill.update({key: duplicate.get(key) for key in LINK_STATE})
+    await db.reference_participants.update_one({"id": new}, {"$set": {
+        **fill, "updated_at": now_utc().isoformat(), "updated_by": me["id"]}})
+    await db.reference_participants.delete_one({"id": old, "series_id": series_id})
+    await reference_series.recompute_standings(db, series)
+    await _log(db, "reference_series.participant_merge", me, new, {
+        "series_id": series_id, "name": kept["name"], "duplicate_id": old, "duplicate_name": duplicate["name"],
+        "duplicate_link": duplicate.get("link"), "duplicate_status": duplicate.get("link_status"),
+        "duplicate_profile_id": duplicate.get("profile_id"), "round_ids": moved, "taken_over": sorted(fill),
+        "adopted_link": adopted})
+    return await _participant(db, series_id, new)
+
+
+@router.delete("/admin/series/{series_id}/participants/{participant_id}")
+@reference_series.series_locked
+async def delete_participant(series_id: str, participant_id: str, me: dict = Depends(require_area("content"))):
+    """Einen Teilnehmer ohne Ergebnis entfernen (#1929), etwa einen Tippfehler aus der Starterliste. Steht er in einem
+    Ergebnis - auch in einem Entwurf -, geht das nur über Zusammenführen (409). Ein Alias bleibt: er gilt über alle
+    Saisons und wird nur über „Extern“ zurückgenommen."""
+    db = get_db()
+    await _series(db, series_id)
+    row = await _participant(db, series_id, participant_id)
+    async for sheet in db.reference_round_results.find({"series_id": series_id}, {"_id": 0}):
+        if participant_id in sheet_participant_ids(sheet):
+            where = (await _round_labels(db, series_id)).get(sheet.get("round_id")) or "einem archivierten Termin"
+            raise HTTPException(409, f"„{row['name']}“ steht im Ergebnis von {where}. Entfernen geht nur über "
+                                     "Zusammenführen.")
+    await db.reference_participants.delete_one({"id": participant_id, "series_id": series_id})
+    await _log(db, "reference_series.participant_delete", me, participant_id, {
+        "series_id": series_id, "name": row["name"], "start_number": row.get("start_number"),
+        "default_team": row.get("default_team"), "link": row.get("link"), "link_status": row.get("link_status"),
+        "profile_id": row.get("profile_id")})
+    return {"removed": participant_id}
 
 
 # ---------------------------------------------------------------- Zuordnen
@@ -227,26 +372,72 @@ async def assign_participant(series_id: str, participant_id: str, body: Particip
     async with reference_series.series_write(db, series_id):
         done = await _assign(db, series_id, participant_id, body, me)
     updated, pending, moved = await reference_series.follow_alias_elsewhere(db, done["others"], done["followup"])
-    await db.audit_logs.insert_one({
-        "id": new_id(), "action": "reference_series.participant_assign", "actor_id": me["id"],
-        "target_id": participant_id,
-        "data": {**done["audit"], "also_assigned_in": updated, "pending_series": pending,
-                 "followers": [*done["followers"], *moved]},
-        "created_at": now_utc().isoformat(),
-    })
+    await _log(db, "reference_series.participant_assign", me, participant_id, {
+        **done["audit"], "also_assigned_in": updated, "pending_series": pending,
+        "followers": [*done["followers"], *moved]})
     out = await _participant(db, series_id, participant_id)
     out["other_series"] = {"updated": updated, "pending": pending}
     if pending:
-        word = "Saison wird" if len(pending) == 1 else "Saisons werden"
-        out["notice"] = (f"{len(pending)} weitere {word} gerade bearbeitet und beim nächsten Speichern dort "
-                         "nachgezogen.")
+        out["notice"] = _pending_notice(pending)
     return out
 
 
-async def _assign(db, series_id: str, participant_id: str, body: ParticipantAssign, me: dict) -> dict:
+@router.post("/admin/series/{series_id}/participants/bulk-assign")
+async def bulk_assign_participants(series_id: str, body: ParticipantBulkAssign,
+                                   me: dict = Depends(require_area("content"))):
+    """Sammelaktion (#1929): mehrere Teilnehmer der Saison auf einmal als Gast oder Extern - je Teilnehmer wie das
+    Zuordnen (Gast speichert den Alias, Extern nimmt ihn zurück), aber gesammelt: alle unter EINER Sperre dieser Saison,
+    danach einmal neu rechnen. Andere Saisons, die über einen Alias daran hängen, ziehen erst danach nach - je Saison
+    einmal unter ihrer eigenen Sperre (``follow_aliases_elsewhere``), nie zwei Sperren ineinander; eine besetzte
+    merkt sich die Nachträge. Wer schon so zugeordnet ist, bleibt unverändert. Gehört ein Teilnehmer nicht zur Saison
+    (404) oder taugt ein Name nicht für einen Alias (422), wird keiner geändert. Ein Protokolleintrag für alle."""
+    db = get_db()
+    wanted = list(dict.fromkeys(body.participant_ids))
+    request = ParticipantAssign(link=body.link)
+    async with reference_series.series_write(db, series_id):
+        series = await _series(db, series_id)
+        found = {row["id"]: row for row in await db.reference_participants.find(
+            {"series_id": series_id, "id": {"$in": wanted}}, {"_id": 0}).to_list(None)}
+        if len(found) != len(wanted):
+            raise HTTPException(404, "Teilnehmer nicht gefunden.")
+        todo = [found[pid] for pid in wanted
+                if not (found[pid].get("link_status") == "decided" and found[pid].get("link") == body.link)]
+        unusable = [row["name"] for row in todo if not series_identity.is_usable_name(row["name"])]
+        if body.link == "guest" and unusable:
+            raise HTTPException(422, f"{UNUSABLE_NAME} Bitte erst den Namen korrigieren: {', '.join(unusable)}")
+        plan: dict[str, list[dict]] = {}
+        items = []
+        for row in todo:
+            done = await _assign(db, series_id, row["id"], request, me, recompute=False)
+            for other in done["others"]:
+                plan.setdefault(other, []).append(done["followup"])
+            audit = done["audit"]
+            items.append({"participant_id": row["id"], "name": row["name"], "previous_link": row.get("link"),
+                          "previous_status": row.get("link_status"), "previous_profile_id": row.get("profile_id"),
+                          "alias_id": audit["alias_id"], "replaced_alias": audit["replaced_alias"],
+                          "followers": done["followers"]})
+        if todo:
+            await reference_series.recompute_standings(db, series)
+    updated, pending, moved = await reference_series.follow_aliases_elsewhere(db, plan)
+    changed = [row["id"] for row in todo]
+    if changed:
+        await _log(db, "reference_series.participant_bulk_assign", me, series_id, {
+            "series_id": series_id, "link": body.link, "items": items, "also_assigned_in": updated,
+            "pending_series": pending, "followers_elsewhere": moved})
+    done_ids = set(changed)
+    out = {"changed": changed, "unchanged": [pid for pid in wanted if pid not in done_ids],
+           "other_series": {"updated": updated, "pending": pending}}
+    if pending:
+        out["notice"] = _pending_notice(pending)
+    return out
+
+
+async def _assign(db, series_id: str, participant_id: str, body: ParticipantAssign, me: dict, *,
+                  recompute: bool = True) -> dict:
     """Das Zuordnen in dieser Saison, samt Neurechnen - nur unter ihrer Sperre aufrufen. Ändert keine andere Saison;
     liefert, welche anderen Saisons der Alias mitzieht (``others``), den Nachtrag dafür (``followup``), die hier
-    gefolgten Teilnehmer und die Angaben fürs Protokoll."""
+    gefolgten Teilnehmer und die Angaben fürs Protokoll. Eine Sammelaktion rechnet selbst einmal am Ende
+    (``recompute=False``)."""
     series = await _series(db, series_id)
     participant = await _participant(db, series_id, participant_id)
     game_id = await series_game_id(db, series)
@@ -290,7 +481,8 @@ async def _assign(db, series_id: str, participant_id: str, body: ParticipantAssi
         "decided_at": now, "decided_by": me["id"], "updated_at": now, "updated_by": me["id"]}})
     replaced = ({key: previous_alias.get(key) for key in ("id", "target", "profile_id", "confirmed_at")}
                 if previous_alias else None)
-    await reference_series.recompute_standings(db, series)
+    if recompute:
+        await reference_series.recompute_standings(db, series)
     others.discard(series_id)
     return {
         "others": sorted(others) if followed else [],

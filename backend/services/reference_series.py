@@ -17,7 +17,8 @@ oder Saisonpunkte, und keine Sammlung wird mit dem Turnierbereich geteilt.
 - **Andere Saisons** (``follow_alias_elsewhere``): Zieht eine Zuordnung über den Alias andere Saisons mit, ändert sie
   dort erst nach Freigabe der eigenen Sperre etwas - je Saison unter deren Sperre, Änderung und Neurechnen zusammen,
   nie zwei Sperren ineinander. Ist eine Saison gerade besetzt, merkt sie sich den Nachtrag (``alias_followups``), und
-  der nächste Vorgang unter ihrer Sperre zieht ihn nach (``series_write``) - nie halbe Daten in einer Saison.
+  der nächste Vorgang unter ihrer Sperre zieht ihn nach (``series_write``) - nie halbe Daten in einer Saison. Eine
+  Sammelaktion (``follow_aliases_elsewhere``, #1929) holt je Saison die Sperre einmal und rechnet einmal neu.
 """
 from __future__ import annotations
 
@@ -97,19 +98,29 @@ async def follow_alias_elsewhere(db, series_ids, followup: dict) -> tuple[list[s
     ihrer Sperre: Teilnehmer folgen dem Alias, dann neu rechnen. Ist eine Saison besetzt, merkt sie sich den Nachtrag
     (``alias_followups``) für ihren nächsten Vorgang. Liefert (aktualisierte Saisons, wartende Saisons, geänderte
     Teilnehmer)."""
+    return await follow_aliases_elsewhere(db, {series_id: [followup] for series_id in series_ids})
+
+
+async def follow_aliases_elsewhere(db, plan: dict[str, list[dict]]) -> tuple[list[str], list[str], list[str]]:
+    """Wie ``follow_alias_elsewhere``, für mehrere Zuordnungen auf einmal (Sammelaktion, #1929): ``plan`` nennt je
+    Saison ihre Nachträge. Jede Saison holt ihre Sperre einmal, zieht alle Nachträge nach und rechnet einmal neu; ist
+    sie besetzt, merkt sie sich alle für ihren nächsten Vorgang."""
     updated, pending, changed = [], [], []
-    for series_id in series_ids:
+    for series_id, followups in plan.items():
         try:
             async with series_write(db, series_id):
-                moved = await series_participants.follow_alias(db, series_id, followup)
+                moved = []
+                for followup in followups:
+                    moved += await series_participants.follow_alias(db, series_id, followup)
                 series = await db.reference_series.find_one({"id": series_id}, {"_id": 0})
                 if moved and series:
                     await recompute_standings(db, series)
         except HTTPException as exc:
             if exc.status_code != 409:
                 raise
-            await db.reference_series.update_one({"id": series_id}, {"$push": {"alias_followups": {
-                **followup, "id": new_id(), "requested_at": now_utc().isoformat()}}})
+            requested_at = now_utc().isoformat()
+            await db.reference_series.update_one({"id": series_id}, {"$push": {"alias_followups": {"$each": [
+                {**followup, "id": new_id(), "requested_at": requested_at} for followup in followups]}}})
             pending.append(series_id)
             continue
         updated.append(series_id)
