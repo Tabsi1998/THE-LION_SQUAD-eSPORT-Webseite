@@ -1,13 +1,13 @@
 import { Link } from "react-router-dom";
-import { ArrowRight, ExternalLink, Handshake, Medal, Trophy, User, Users } from "lucide-react";
+import { ExternalLink, Trophy, User, Users } from "lucide-react";
 import { resolveMediaUrl } from "@/lib/api";
 import { gameLabel } from "@/lib/gameLabels";
 import { gameCode } from "@/components/tls/GamesShelf";
-import { useCountUp } from "@/hooks/useCountUp";
 import { asInstant, viennaDate } from "@/lib/vienna";
 
-// Bausteine der Referenzen (#409, #859): Medaillen, Platz-Abzeichen, Karte einer Teilnahme, Einträge mit Aufstellung -
-// gemeinsam für die Referenzen-Seite und die Vereinsplatzierungen im Mitgliederprofil, damit beide gleich aussehen.
+// Bausteine der Referenzen (#409, #859): Platz-Abzeichen, Spiel-Zeichen, Einträge mit Aufstellung, Titel und Datum -
+// gemeinsam für die Referenzen-Seiten. Die Vereinsplatzierungen im Mitgliederprofil (#1944) zeigen dieselbe Chronik
+// wie die Übersicht (MemberReferences.jsx); die alten Medaillen-Kacheln und Karten gibt es nicht mehr.
 
 export const MEDAL = {
   gold: { label: "Gold", ring: "from-[#FFF2A8] via-[#FFD700] to-[#9A7400]", text: "text-[#FFD700]", soft: "bg-[#FFD700]/10 border-[#FFD700]/40", glow: "shadow-[0_0_48px_rgba(255,215,0,0.22)]" },
@@ -30,6 +30,27 @@ export function referenceGameName(item) {
 
 export function displayTitle(item) {
   return item.display_title || item.title || "Referenz";
+}
+
+/**
+ * Der kurze Titel einer Teilnahme (#1944): „Veranstalter · Liga · Saison“ aus den Feldern statt des langen
+ * Veranstalter-Titels - gehört sie zu einer Saison (#1750, `link` aus linkedSeasons), gelten Stufe und Saison der Serie
+ * und notfalls der Veranstalter der Spur. Ohne Liga und Saison bleibt der Titel. `withSeason: false` gibt „Serie bzw.
+ * Liga“ (Veranstalter mit Liga, sonst mit Saison). Gleiche Teile stehen nur einmal.
+ */
+export function shortTitle(item, link = null, { withSeason = true } = {}) {
+  const league = String(link?.season?.tier || item.league || "").trim();
+  const season = String(link?.season?.season || item.season || "").trim();
+  if (!league && !season) return displayTitle(item);
+  const organizer = String(item.organizer || link?.lineage?.organizer || "").trim();
+  const parts = withSeason ? [organizer, league, season] : [organizer, league || season];
+  const seen = new Set();
+  return parts.filter((part) => {
+    const key = part.toLowerCase();
+    if (!part || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  }).join(" · ");
 }
 
 export function entriesOf(item) {
@@ -129,37 +150,6 @@ export function SectionTitle({ icon: Icon, accent, eyebrow, title, hint }) {
   );
 }
 
-export function MedalStat({ medal, value, testId }) {
-  const [shown, ref] = useCountUp(value);
-  const tone = MEDAL[medal];
-  return (
-    <div ref={ref} className={`border rounded-sm px-3 sm:px-4 py-3 sm:py-4 flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 ${tone.soft}`} data-testid={testId}>
-      <MedalEmblem medal={medal} size="md" />
-      <div>
-        <div className={`font-heading text-3xl md:text-4xl font-black tabular-nums ${tone.text}`}>{shown}</div>
-        <div className="text-[10px] uppercase tracking-widest font-bold text-white/50">{tone.label}</div>
-      </div>
-    </div>
-  );
-}
-
-export function CountLine({ label, value, testId }) {
-  return <span data-testid={testId}><span className="text-white font-bold tabular-nums">{value}</span> {label}</span>;
-}
-
-// Die Medaille: ein Kreis mit metallischem Verlauf - Gold, Silber oder Bronze.
-export function MedalEmblem({ medal, size = "md" }) {
-  const tone = MEDAL[medal];
-  const dims = size === "lg" ? "w-16 h-16" : size === "sm" ? "w-8 h-8" : "w-12 h-12";
-  return (
-    <span className={`${dims} shrink-0 rounded-full bg-gradient-to-br ${tone.ring} p-[3px] ${tone.glow}`} aria-hidden="true">
-      <span className="w-full h-full rounded-full bg-[#0A0A0A]/80 flex items-center justify-center">
-        <Medal className={`${size === "lg" ? "w-7 h-7" : size === "sm" ? "w-4 h-4" : "w-5 h-5"} ${tone.text}`} />
-      </span>
-    </span>
-  );
-}
-
 // Die Platzierung als Abzeichen: Ring in Medaillenfarbe (oder neutral), Zahl groß, „Dabei“ ohne Platz.
 export function PlacementBadge({ placement, medal, size = "md" }) {
   const tone = medal ? MEDAL[medal] : null;
@@ -240,52 +230,6 @@ export function FieldChips({ item, className = "" }) {
         <span key={chip} className="px-2 py-1 border border-white/10 bg-white/[0.03] rounded-sm text-[10px] uppercase tracking-widest text-white/50 font-bold">{chip}</span>
       ))}
     </div>
-  );
-}
-
-// Eine Teilnahme in der Zeitleiste: Platzierung links, Titel und Chips, dann die Einträge.
-export function ReferenceCard({ item, entry = null, testId = "" }) {
-  // Mit `entry` (Mitgliederprofil, #859): die Platzierung des eigenen Teams oder Einzelstarts dieser Person - nicht die
-  // beste der ganzen Teilnahme (#409) - und nur dieser Eintrag.
-  const entries = entry ? [entry] : entriesOf(item);
-  const placement = entry ? (Number(entry.placement) || null) : bestPlacement(item);
-  const medal = entry ? (entry.medal || medalForPlacement(placement)) : medalOf(item);
-  const tone = medal ? MEDAL[medal] : null;
-  const single = entries.length === 1 ? entries[0] : null;
-  return (
-    <article className={`relative overflow-hidden h-full flex flex-col border rounded-sm bg-[#111] p-4 transition hover:border-[#29B6E8]/40 ${tone ? tone.soft : "border-white/10"}`} data-testid={testId || `reference-card-${item.id}`}>
-      {tone && <div className={`absolute top-0 left-0 bottom-0 w-1 bg-gradient-to-b ${tone.ring}`} />}
-      <div className="flex items-start gap-4">
-        <PlacementBadge placement={placement} medal={medal} />
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2 flex-wrap">
-            <GameChip item={item} />
-            {item.organizer && <span className="text-[10px] uppercase tracking-widest text-white/40 font-bold truncate">{item.organizer}</span>}
-            {(item.partners || []).map((partner) => (
-              <Link key={partner.id} to={`/partners/${partner.slug || partner.id}`} data-testid={`reference-partner-${partner.slug || partner.id}`} className="inline-flex items-center gap-1 text-[10px] uppercase tracking-widest font-bold text-[#29B6E8] hover:text-white">
-                <Handshake className="w-3 h-3" /> {partner.name}
-              </Link>
-            ))}
-          </div>
-          <Link to={`/references/${item.id}`} className="block mt-2 font-heading text-lg md:text-xl font-black uppercase leading-tight break-words hover:text-[#29B6E8] transition">{displayTitle(item)}</Link>
-          <p className="mt-1 text-xs text-white/50">
-            {[formatDate(item.start_date), item.location, single?.team_count ? `${single.team_count} Teams` : single?.participant_count ? `${single.participant_count} Teilnehmer` : ""].filter(Boolean).join(" · ")}
-          </p>
-          <FieldChips item={item} className="mt-2" />
-        </div>
-      </div>
-      <div className="mt-4 grid gap-2">
-        {entries.map((entry) => <EntryRow key={entry.id} entry={entry} />)}
-      </div>
-      <div className="mt-auto pt-4 flex flex-wrap items-center gap-2">
-        <Link to={`/references/${item.id}`} className="inline-flex items-center gap-1.5 text-[11px] uppercase tracking-wider font-bold text-[#29B6E8] hover:text-white">Details <ArrowRight className="w-3 h-3" /></Link>
-        <span className="ml-auto flex flex-wrap gap-2">
-          <RefButton href={item.external_url} label="Turnier" compact />
-          <RefButton href={item.bracket_url} label="Bracket" compact />
-          <RefButton href={item.result_url} label="Ergebnis" compact />
-        </span>
-      </div>
-    </article>
   );
 }
 

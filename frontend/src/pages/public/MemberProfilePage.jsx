@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { ArrowLeft, Crown, ExternalLink, Gamepad2, Monitor, Radio, Trophy, User as UserIcon } from "lucide-react";
+import { ArrowLeft, Crown, ExternalLink, Gamepad2, Monitor, Radio, User as UserIcon } from "lucide-react";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { LazyImg } from "@/components/tls/LazyImg";
 import { SizedImage } from "@/components/tls/SizedImage";
@@ -9,7 +9,7 @@ import { RichContent } from "@/components/tls/RichContent";
 import { StreamEmbed } from "@/components/tls/StreamEmbed";
 import { AccountLevelPill, AccountLevelProgress, accountLevelFrameClass } from "@/components/tls/AccountLevel";
 import { LevelAvatarFrame } from "@/components/tls/LevelAvatarFrame";
-import { CountLine, MedalStat, ReferenceCard, SectionTitle, entriesOf } from "@/components/tls/references/referenceParts";
+import { MemberReferences } from "@/components/tls/references/MemberReferences";
 import { api } from "@/lib/api";
 import { seoTextPreview } from "@/lib/textPreview";
 import { headNameClass, isLongHeadName } from "@/lib/headName";
@@ -88,44 +88,6 @@ export default function MemberProfilePage() {
         )}
       </section>
     </PublicLayout>
-  );
-}
-
-/** Der eigene Eintrag einer Teilnahme (#409): ein Einzelstarter zeigt seine Platzierung, ein Teammitglied die seines Teams. */
-export function memberEntry(item) {
-  return item.member_entry || entriesOf(item)[0] || item;
-}
-
-/**
- * Vereinsplatzierungen im Mitgliederprofil (#859): dieselben Bausteine wie die Referenzen-Seite - Medaillen mit
- * Zahlen, darunter Podest, Einzel und Team, dann je Teilnahme die Karte mit der Platzierung dieser Person.
- */
-function MemberReferences({ profile }) {
-  const references = profile.references || [];
-  const stats = profile.reference_stats || {};
-  if (!references.length) return null;
-  return (
-    <section className="mt-10 border-t border-white/10 pt-8" data-testid="member-references">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <SectionTitle icon={Trophy} accent="#FFD700" eyebrow="Referenzen" title="Vereinsplatzierungen" />
-        <Link to={`/references?${new URLSearchParams({ member: profile.id, name: profile.gamertag || profile.display_name || "" })}`} data-testid="member-references-all" className="tls-btn tls-btn--quiet inline-flex items-center gap-2 px-3 py-2 text-xs font-bold uppercase tracking-wider rounded-sm">
-          Alle Referenzen
-        </Link>
-      </div>
-      <div className="mt-6 grid grid-cols-3 gap-2 sm:gap-3 max-w-3xl" data-testid="member-reference-numbers">
-        <MedalStat medal="gold" value={stats.gold || 0} testId="member-reference-stat-gold" />
-        <MedalStat medal="silver" value={stats.silver || 0} testId="member-reference-stat-silver" />
-        <MedalStat medal="bronze" value={stats.bronze || 0} testId="member-reference-stat-bronze" />
-      </div>
-      <div className="mt-4 flex flex-wrap gap-x-6 gap-y-2 text-sm text-white/60">
-        <CountLine label="Podestplätze" value={stats.podiums || 0} testId="member-reference-stat-podiums" />
-        <CountLine label="als Einzelstarter" value={stats.solo || 0} testId="member-reference-stat-solo" />
-        <CountLine label="im Team" value={stats.team || 0} testId="member-reference-stat-team" />
-      </div>
-      <div className="mt-6 grid lg:grid-cols-2 gap-3">
-        {references.map((item) => <ReferenceCard key={item.id} item={item} entry={memberEntry(item)} testId={`member-reference-${item.id}`} />)}
-      </div>
-    </section>
   );
 }
 
