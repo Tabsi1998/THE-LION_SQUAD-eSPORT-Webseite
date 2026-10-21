@@ -16,10 +16,17 @@ Server fehlt.
 **POST …/results/image** - Body ist das Bild selbst (PNG, JPG oder WebP, ``Content-Type`` beliebig; geprüft wird der
 Inhalt). Antwort::
 
-    {template, rows: [{index, place, dnf, marks, start_number, name, participant_id, team, grid, time, gap,
-                       uncertain: [Feld], read: {Feld: gelesen}}],
-     track: {name, uncertain} | null, fastest_lap: {name, participant_id, time, uncertain, read} | null,
-     driver_of_the_day: {name, participant_id, uncertain, read} | null, uncertain_rows, warnings: [{code, message}]}
+    {template, rows: [{index, place, dnf, marks, start_number, name, participant_id, team, grid, time, gap, points,
+                       color, uncertain: [Feld], read: {Feld: gelesen}}],
+     track: {name, uncertain} | null, session: {name, kind: race|sprint|qualifying} | null,
+     fastest_lap | pole: {name, participant_id, time, uncertain, read} | null,
+     driver_of_the_day: {name, participant_id, uncertain, read} | null, uncertain_rows,
+     team_colors: {Team: "#rrggbb"}, suggested_round: {id, code, venue, club_day} | null,
+     warnings: [{code, message}]}
+
+``session`` und ``suggested_round`` (der Termin, zu dem die Strecke im Bild passt) sind nur Hinweise; ``color`` und
+``team_colors`` (Schriftfarbe von Startnummer bzw. Team) sind ein Vorschlag für Teamfarben - gespeichert wird nichts.
+Saisontabellen und Kalender (keine Zeiten) lehnt die Route mit 422 ab.
 
 - **Grenzen:** Größe ``MAX_IMAGE_UPLOAD_MB`` (schon am Kopf der Anfrage geprüft), Pixel ``MAX_IMAGE_PIXELS`` (am Kopf
   der Bilddatei, vor dem Dekodieren) - wie bei jedem Bild-Upload (``services/image_upload.py``). Das Bild wird nur im
@@ -77,6 +84,8 @@ BUSY = "Gerade wird schon ein Bild gelesen. Bitte gleich noch einmal versuchen."
 TOO_MANY = "Zu viele Bilder in kurzer Zeit. Bitte warte noch {wait}."
 NO_TABLE = ("Im Bild wurde keine Ergebnistabelle gefunden. Passt die Vorlage zum Bild? Sonst die Liste einfügen oder "
             "abtippen.")
+NOT_A_RESULT = ("Das Bild sieht nicht nach einem Rennergebnis aus (keine Zeiten) - etwa eine Saisontabelle oder der "
+                "Kalender? Bitte das Ergebnis dieses Termins einfügen.")
 TOO_MANY_ROWS = (f"Im Bild stehen mehr als {MAX_ROWS} Ergebniszeilen - so viele nimmt ein Ergebnis-Blatt nicht. Bitte "
                  "nur das Ergebnis dieses Termins einfügen.")
 BLURRY = "Das Bild ist unscharf oder sehr klein - bitte die gelben Felder genau prüfen."
@@ -131,15 +140,40 @@ async def _aliases(db, series: dict, participants: list[dict]) -> list[dict]:
     return out
 
 
-def _warnings(reading: result_image_ocr.Reading, built: dict, round_doc: dict) -> list[dict]:
+async def _suggested_round(db, series_id: str, round_doc: dict, track: str) -> dict | None:
+    """Der Termin der Saison, zu dem die Strecke im Bild passt - wenn es nicht dieser ist. Nur ein Vorschlag."""
+    if not track:
+        return None
+    rounds = await db.reference_rounds.find(
+        {"series_id": series_id, "archived_at": None},
+        {"_id": 0, "id": 1, "code": 1, "title": 1, "venue": 1, "club_day": 1, "order": 1}).to_list(500)
+
+    def score(item: dict) -> float:
+        return max((result_image_match.similarity(track, str(item.get(key) or "")) for key in ("venue", "title")),
+                   default=0.0)
+
+    scored = sorted(((score(item), item) for item in rounds), key=lambda pair: (-pair[0], pair[1].get("order") or 0))
+    if not scored or scored[0][0] < 0.72 or scored[0][1]["id"] == round_doc["id"]:
+        return None
+    if score(round_doc) >= scored[0][0]:
+        return None
+    best = scored[0][1]
+    return {key: best.get(key) for key in ("id", "code", "venue", "club_day")}
+
+
+def _warnings(reading: result_image_ocr.Reading, built: dict, round_doc: dict, suggestion: dict | None) -> list[dict]:
     out = []
     if not reading.header_found:
         out.append({"code": "no_header", "message": NO_HEADER})
-    if reading.text_height < 12 or reading.mean_conf < 85:
+    if reading.text_height < 8 or reading.mean_conf < 85:
         out.append({"code": "blurry", "message": BLURRY})
     venue = str(round_doc.get("venue") or "").strip()
     track = (built.get("track") or {}).get("name") or ""
-    if venue and track and result_image_match.similarity(track, venue) < 0.72:
+    if suggestion:
+        label = " · ".join(str(part) for part in (suggestion.get("code"), suggestion.get("venue")) if part)
+        out.append({"code": "other_track", "message": (
+            f"Im Bild steht „{track[:80]}“ - das passt zum Termin {label[:100]}, nicht zu diesem. Richtiger Termin?")})
+    elif venue and track and result_image_match.similarity(track, venue) < 0.72:
         out.append({"code": "other_track", "message": (
             f"Im Bild steht die Strecke „{track[:80]}“, beim Termin „{venue[:80]}“ - richtiges Bild?")})
     return out
@@ -195,5 +229,8 @@ async def read_result_image(series_id: str, round_id: str, request: Request,
                 time.monotonic() - started)
     if not built["rows"]:
         raise HTTPException(422, NO_TABLE)
-    return {"template": result_image_templates.summary(template), **built,
-            "warnings": _warnings(reading, built, round_doc)}
+    if not built.pop("is_result"):
+        raise HTTPException(422, NOT_A_RESULT)
+    suggestion = await _suggested_round(db, series_id, round_doc, (built.get("track") or {}).get("name") or "")
+    return {"template": result_image_templates.summary(template), **built, "suggested_round": suggestion,
+            "warnings": _warnings(reading, built, round_doc, suggestion)}

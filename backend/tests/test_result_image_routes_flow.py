@@ -71,10 +71,11 @@ async def _setup(flow, *, kind: str = "racing", people=None):
             "url": url, "ids": ids}
 
 
-def _fake_reading(*names_and_numbers) -> Reading:
+def _fake_reading(*names_and_numbers, times: bool = True) -> Reading:
     def read(text):
         return Read(text, 95, [(word, 95) for word in text.split()])
-    rows = [RowReading(cells={"place": read(str(index)), "start_number": read(number), "name": read(name)})
+    rows = [RowReading(cells={"place": read(str(index)), "start_number": read(number), "name": read(name),
+                              **({"time": read(f"1:3{index}.123")} if times else {})})
             for index, (name, number) in enumerate(names_and_numbers, start=1)]
     return Reading(template_id="rennliga-dunkel", rows=rows, header_found=True, text_height=20, mean_conf=95,
                    header={"track": read("Probering Nord")})
@@ -240,6 +241,34 @@ async def test_row_limit_is_the_one_of_the_sheet(flow, fake_ocr):
     answer = await flow.post(ctx["url"], content=_png(), headers=PNG)
     assert (answer.status_code, answer.json()["detail"]) == (422, image_routes.TOO_MANY_ROWS)
     assert "500" in image_routes.TOO_MANY_ROWS
+
+
+@pytest.mark.asyncio
+async def test_track_in_the_image_suggests_the_round(flow, fake_ocr):
+    """Steht im Bild eine andere Strecke, schlägt die Antwort den passenden Termin der Saison vor - nur als Hinweis."""
+    ctx = await _setup(flow)
+    other = (await flow.post(f"{ADMIN}/series/{ctx['series']['id']}/rounds",
+                             json={"day": _day(-14), "code": "R2", "venue": "Großbritannien"})).json()
+    reading = _fake_reading(("Anna Probe", "7"))
+    reading.header = {"track": Read("Grossbritanien", 95, [("Grossbritanien", 95)]),
+                      "session": Read("Qualifying", 95, [("Qualifying", 95)])}
+    fake_ocr.reading = reading
+    data = (await flow.post(ctx["url"], content=_png(), headers=PNG)).json()
+    assert data["suggested_round"]["id"] == other["id"]
+    assert data["session"] == {"name": "Qualifying", "kind": "qualifying"}
+    assert [item["code"] for item in data["warnings"]] == ["other_track"]
+    assert "R2" in data["warnings"][0]["message"]
+    fake_ocr.reading = _fake_reading(("Anna Probe", "7"))  # „Probering Nord“ wie der Termin selbst
+    assert (await flow.post(ctx["url"], content=_png(), headers=PNG)).json()["suggested_round"] is None
+
+
+@pytest.mark.asyncio
+async def test_tables_without_times_are_refused(flow, fake_ocr):
+    """Eine Saisontabelle oder der Kalender (keine Zeiten) wird nicht als Ergebnis angeboten."""
+    ctx = await _setup(flow)
+    fake_ocr.reading = _fake_reading(("Anna Probe", "7"), ("Bert Bolzt", "12"), times=False)
+    answer = await flow.post(ctx["url"], content=_png(), headers=PNG)
+    assert (answer.status_code, answer.json()["detail"]) == (422, image_routes.NOT_A_RESULT)
 
 
 @pytest.mark.asyncio
