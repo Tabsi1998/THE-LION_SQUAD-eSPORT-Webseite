@@ -24,7 +24,7 @@ const running = [{
   lineage: { title: "Probe Racing League", slug: "prl", kind: "racing", game_name: "F1 26" },
   series: { season: "2026", title: "PRL 35 · Season 2026", season_slug: "2026" },
   progress: { total: 24, scored: 11 },
-  next: { code: "R12", state: "today", time: "20:00", club_day: "2026-10-21" },
+  next: { code: "R12", state: "today", time: "20:00", club_day: "2026-10-21", country_code: "nl" },
   today: true,
   club: { rank: 4, of: 20 },
 }];
@@ -45,6 +45,8 @@ function answer(path: string) {
 beforeEach(() => {
   jest.clearAllMocks();
   mockGet.mockImplementation(answer);
+  // Flaggen (#1925) kommen von der Website - im Test ohne Netz: dann steht der Ländercode da.
+  (global as unknown as { fetch: unknown }).fetch = jest.fn(async () => { throw new Error("offline"); });
 });
 
 test("Ehrentafel nur mit Werten über null, darunter Teilnahmen, Spiele und „seit“", async () => {
@@ -65,6 +67,9 @@ test("Läuft gerade, Vitrine, Serien und Ligen führen zur Saison in der App", a
   expect(within(card).getByText("Rennliga · F1 26")).toBeTruthy();
   expect(within(card).getByText("PRL 35 · Season 2026")).toBeTruthy();
   expect(within(card).getByText("Heute · R12 · 20:00")).toBeTruthy();
+  // Die Flagge des nächsten Termins (#1925) - ohne Netz als Ländercode.
+  await waitFor(() => expect(within(card).getByText("NL")).toBeTruthy());
+  expect(within(card).getByLabelText("Niederlande")).toBeTruthy();
   expect(within(card).getByText("Bester Vereinsfahrer: P4 von 20")).toBeTruthy();
   expect(screen.getByTestId("reference-pulse")).toBeTruthy();
   await fireEvent.press(card);

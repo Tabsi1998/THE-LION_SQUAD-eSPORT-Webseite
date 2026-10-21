@@ -4,6 +4,7 @@ import { Linking, Pressable, RefreshControl, ScrollView, StyleSheet, View } from
 import { Button } from "../../components/Button";
 import { FadeIn } from "../../components/FadeIn";
 import { ErrorState, SkeletonList, loadProblem, type LoadProblem } from "../../components/ListState";
+import { CountryFlag } from "../../components/references/CountryFlag";
 import { FilterChip, ink } from "../../components/references/parts";
 import { Screen } from "../../components/Screen";
 import { Body, Muted } from "../../components/Text";
@@ -34,8 +35,8 @@ import { colors, roles, surfaces } from "../../theme";
 // Garage); Team-Liga: Spieltage und Tabelle; Turnierserie: Termine und Tabelle. Die Daten kommen aus dem öffentlichen
 // Endpunkt der Serienseite des Webs, die Logik steht in lib/referenceSeason.ts. Was die App (noch) nicht zeigt -
 // Rennraster, Regeln, Finale, Aufstellung, Platzierungsverlauf -, öffnet „Im Web öffnen“. Das Land eines Termins steht
-// als Text, bis die App Flaggen hat (#1925). „Veranstaltet von Partner“ (#1934) und die Lauf-Chips (#1930) kommen mit
-// ihren Issues.
+// als Flagge da (#1925, Datei von der Website). „Veranstaltet von Partner“ (#1934) und die Lauf-Chips (#1930) kommen
+// mit ihren Issues.
 
 type Props = NativeStackScreenProps<MoreStackParamList, "ReferenceSeason">;
 
@@ -178,8 +179,8 @@ function Calendar({ page }: { page: SeasonPage }) {
           <View style={styles.roundBody}>
             <View style={styles.roundTop}>
               {row.country ? (
-                <View style={styles.country} accessibilityLabel={`Land ${row.country}`} testID="season-round-country">
-                  <Muted style={styles.countryText}>{row.country}</Muted>
+                <View testID="season-round-country">
+                  <CountryFlag code={row.country} height={15} />
                 </View>
               ) : null}
               <Body style={[styles.venue, row.tone === "cancelled" && styles.cancelled]}>{row.place || row.code}</Body>
@@ -335,8 +336,6 @@ const styles = StyleSheet.create({
   code: { color: ink.muted, fontSize: 18, fontVariant: ["tabular-nums"], fontWeight: "800", width: 44 },
   roundBody: { flex: 1, gap: 6, minWidth: 0 },
   roundTop: { alignItems: "center", flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  country: { alignItems: "center", borderColor: "rgba(255,255,255,0.18)", borderRadius: 2, borderWidth: 1, justifyContent: "center", minWidth: 24, paddingHorizontal: 3 },
-  countryText: { color: ink.soft, fontSize: 10, fontWeight: "800", letterSpacing: 0.5, lineHeight: 14 },
   venue: { color: ink.text, flexShrink: 1, fontSize: 15, fontWeight: "700" },
   cancelled: { color: ink.muted, textDecorationLine: "line-through" },
   spacer: { flex: 1 },

@@ -1,3 +1,4 @@
+import { countryCode } from "./countryFlags";
 import { asInstant, dayNoon, viennaDate, viennaDay } from "./vienna";
 
 /** Ein Datum vom Server als Zeitpunkt - null ohne gültigen Wert. */
@@ -86,7 +87,7 @@ export type RunningItem = {
   today?: boolean | null;
   club?: ClubPlace;
 };
-export type NextRound = { code?: string | null; title?: string | null; club_day?: string | null; state?: string | null; time?: string | null };
+export type NextRound = { code?: string | null; title?: string | null; club_day?: string | null; state?: string | null; time?: string | null; country_code?: string | null };
 
 export type SeasonTarget = { lineage: string; season: string };
 export type SeasonLink = { lineage: LineageInfo; season: LineageSeason };
@@ -560,6 +561,8 @@ export function runningView(item: RunningItem) {
     next: item.next ? [nextTitle(kind, item.next), nextValue(item.next)].filter(Boolean).join(" · ") : "",
     progress: total > 0 ? { scored, total, share: scored / total, text: progressText(kind, scored, total) } : null,
     place: placeLine(kind, item.club),
+    // Land des nächsten Termins (#1925) - die Karte zeigt seine Flagge vor dem Termin.
+    country: countryCode(item.next?.country_code),
     season: lineage.slug && series.season_slug ? { lineage: lineage.slug, season: series.season_slug } : null,
   };
 }

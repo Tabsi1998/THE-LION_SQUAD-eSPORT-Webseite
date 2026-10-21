@@ -25,6 +25,7 @@ import { WEB_BASE_URL } from "../../lib/siteUrls";
 import { colors, roles, surfaces } from "../../theme";
 import { FadeIn, staggerDelay } from "../FadeIn";
 import { EmptyState } from "../ListState";
+import { CountryFlag } from "./CountryFlag";
 import { Body, Muted } from "../Text";
 import { FilterChip, MedalMark, PathStrip, PlaceRing, ProgressFill, SectionLabel, ink, medalTone } from "./parts";
 
@@ -194,7 +195,10 @@ function RunningCard({ item, onOpen }: { item: RunningItem; onOpen: (target: Sea
       </View>
       {view.next || view.progress ? (
         <View style={styles.nextRow}>
-          <Muted style={[styles.next, styles.flex]}>{view.next}</Muted>
+          <View style={[styles.nextText, styles.flex]}>
+            {view.country ? <CountryFlag code={view.country} height={12} /> : null}
+            <Muted style={[styles.next, styles.flex]}>{view.next}</Muted>
+          </View>
           {view.progress ? <Muted style={styles.progress}>{`${view.progress.scored} / ${view.progress.total}`}</Muted> : null}
         </View>
       ) : null}
@@ -272,6 +276,7 @@ const styles = StyleSheet.create({
   todayChip: { alignItems: "center", backgroundColor: roles.honor, borderRadius: 4, flexDirection: "row", gap: 6, paddingHorizontal: 8, paddingVertical: 3 },
   todayText: { color: "#06121A", fontSize: 11, fontWeight: "800", letterSpacing: 1.1, textTransform: "uppercase" },
   nextRow: { flexDirection: "row", gap: 8, justifyContent: "space-between" },
+  nextText: { alignItems: "center", flexDirection: "row", gap: 6 },
   next: { color: ink.second, fontSize: 13 },
   progress: { color: ink.second, fontSize: 13, fontVariant: ["tabular-nums"] },
   place: { color: ink.soft, fontSize: 13 },

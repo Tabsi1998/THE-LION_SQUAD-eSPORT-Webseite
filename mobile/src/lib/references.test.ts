@@ -228,10 +228,12 @@ test("Karte „Läuft gerade“: Art und Spiel, Saison, Termin, Fortschritt und 
     lineage: { title: "Probe Racing League", slug: "prl", kind: "racing", game_name: "F1 26" },
     series: { season: "2026", tier: "Liga 1", title: null, season_slug: "2026-liga-1" },
     progress: { total: 24, scored: 11 },
-    next: { code: "R12", state: "today", time: "20:00", club_day: "2026-10-21" },
+    next: { code: "R12", state: "today", time: "20:00", club_day: "2026-10-21", country_code: "nl" },
     today: true,
     club: { rank: 4, of: 20 },
   });
+  // Land des nächsten Termins für die Flagge (#1925).
+  expect(racing.country).toBe("NL");
   expect(racing).toMatchObject({
     key: "prl/2026-liga-1", kind: "Rennliga · F1 26", title: "Probe Racing League · 2026 · Liga 1", today: true,
     next: "Heute · R12 · 20:00", progress: { scored: 11, total: 24 }, place: "Bester Vereinsfahrer: P4 von 20",
@@ -246,6 +248,6 @@ test("Karte „Läuft gerade“: Art und Spiel, Saison, Termin, Fortschritt und 
     today: false,
     club: null,
   });
-  expect(league).toMatchObject({ kind: "Team-Liga", title: "Probe Liga · Newcomer I · S3", next: "", progress: null, place: "Platz noch offen" });
+  expect(league).toMatchObject({ kind: "Team-Liga", title: "Probe Liga · Newcomer I · S3", next: "", progress: null, place: "Platz noch offen", country: "" });
   expect(runningView({ lineage: { slug: "pl", title: "Probe Liga", kind: "team_league" }, series: { season_slug: "s3" }, club: { rank: 3, of: 8 } }).place).toBe("Platz 3 von 8");
 });

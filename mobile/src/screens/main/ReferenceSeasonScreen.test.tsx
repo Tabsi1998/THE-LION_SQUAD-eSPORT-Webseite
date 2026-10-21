@@ -41,11 +41,15 @@ const RACING = {
   team_league: null,
 };
 
+// Flaggen (#1925) lädt die App von der Website - hier eine kleine Probe-Flagge.
+const fetchMock = jest.fn(async () => ({ ok: true, text: async () => "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 3 2\"><path fill=\"#c60b1e\" d=\"M0 0h3v2H0z\"/></svg>" }));
+
 beforeEach(() => {
   jest.clearAllMocks();
+  (global as unknown as { fetch: unknown }).fetch = fetchMock;
 });
 
-test("Rennliga: Kopf mit Kennzahlen, Kalender mit Land als Text und bestem Vereinsfahrer", async () => {
+test("Rennliga: Kopf mit Kennzahlen, Kalender mit Flagge und bestem Vereinsfahrer", async () => {
   mockGet.mockResolvedValue({ data: RACING });
   await render(<ReferenceSeasonScreen navigation={navigation} route={routeFor("prl", "2026")} />);
   await waitFor(() => expect(screen.getByText("PRL 35 · Season 2026")).toBeTruthy());
@@ -58,7 +62,9 @@ test("Rennliga: Kopf mit Kennzahlen, Kalender mit Land als Text und bestem Verei
 
   const r9 = screen.getByTestId("season-round-r9");
   expect(within(r9).getByText("Barcelona")).toBeTruthy();
-  expect(within(r9).getByText("ES")).toBeTruthy();
+  await waitFor(() => expect(within(r9).getByTestId("country-flag-svg")).toBeTruthy());
+  expect(within(r9).getByLabelText("Spanien")).toBeTruthy();
+  expect(fetchMock).toHaveBeenCalledWith(expect.stringMatching(/\/assets\/flags\/es\.svg$/));
   expect(within(r9).getByText("Gewertet")).toBeTruthy();
   expect(within(r9).getByText("Bester Vereinsfahrer: Mira Stahl · P2")).toBeTruthy();
   const r12 = screen.getByTestId("season-round-r12");

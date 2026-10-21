@@ -1,3 +1,4 @@
+import { countryCode, countryName } from "./countryFlags";
 import { dayNoon, viennaDate } from "./vienna";
 import { KIND_LABELS, type LineageInfo } from "./references";
 
@@ -6,6 +7,8 @@ import { KIND_LABELS, type LineageInfo } from "./references";
 // referenceCalendar.js, referenceSeriesTable.js). Der Server rechnet und speichert alles; hier wird nur beschriftet.
 // Fremde Namen stehen nur in Tabellen. Außerhalb der Tabellen nennt die App nur öffentliche Vereinsfahrer
 // (`racing.club_drivers` vom Server). Fehlt ein Teil (alter Server), bleibt der Abschnitt leer - nie ein Absturz.
+// Mit #1949: Land je Termin (#1925), mehrere eigene Teams (#1926) und das Rennergebnis mit Startplatz, Zeit, Abstand,
+// schnellster Runde und Fahrer des Tages (#1927) - jeweils nur, wenn der Server es schickt.
 
 export type SeasonRound = {
   id: string;
@@ -23,7 +26,11 @@ export type SeasonRound = {
   /** Land des Termins (ISO 3166-1 alpha-2) - kommt mit #1925; ältere Server schicken es nicht. */
   country_code?: string | null;
 };
-export type RoundResult = { round_id?: string; place?: number | null; points?: number | null; marks?: string[] | null; counted?: boolean; dropped?: boolean };
+export type RoundResult = {
+  round_id?: string; place?: number | null; points?: number | null; marks?: string[] | null; counted?: boolean; dropped?: boolean;
+  // Rennergebnis (#1927), nur wo eingetragen.
+  start_number?: string | null; grid?: number | null; time?: string | null; gap?: string | null; fastest_lap_time?: string | null; driver_of_the_day?: boolean | null;
+};
 export type StandingRow = {
   key?: string | null;
   rank?: number | null;
@@ -34,7 +41,7 @@ export type StandingRow = {
   profile_slug?: string | null;
   results?: RoundResult[] | null;
 };
-type Match = { opponent?: string | null; home?: boolean | null; outcome?: string | null; score_for?: number | null; score_against?: number | null; points?: number | null; maps?: Array<{ name?: string | null; score_for?: number | null; score_against?: number | null; outcome?: string | null }> | null };
+type Match = { team?: string | null; opponent?: string | null; home?: boolean | null; outcome?: string | null; score_for?: number | null; score_against?: number | null; points?: number | null; maps?: Array<{ name?: string | null; score_for?: number | null; score_against?: number | null; outcome?: string | null }> | null };
 type TableRow = { key?: string | null; team?: string | null; rank?: number | null; points?: number | null; played?: number | null; won?: number | null; drawn?: number | null; lost?: number | null; own?: boolean | null };
 
 /** Die Antwort der Serienseite - jedes Feld kann fehlen. */
@@ -45,6 +52,8 @@ export type SeasonPage = {
   rounds?: SeasonRound[] | null;
   standings?: { rows?: StandingRow[] | null } | null;
   team_league?: {
+    /** Die eigenen Teams der Saison (#1926) - bei mehreren steht vor dem Gegner, welches gespielt hat. */
+    own_teams?: string[] | null;
     matchdays?: Array<{ round?: SeasonRound | null; match?: Match | null }> | null;
     table?: { rows?: TableRow[] | null } | null;
   } | null;
@@ -136,15 +145,32 @@ export function roundLabel(round: SeasonRound | null | undefined): string {
 const MEDALS: Record<number, "gold" | "silver" | "bronze"> = { 1: "gold", 2: "silver", 3: "bronze" };
 const STATUS_TEXT: Record<string, string> = { dnf: "DNF", dns: "DNS", dsq: "DSQ" };
 
-export type RaceCell = { status: string; place: number | null; text: string; medal: "gold" | "silver" | "bronze" | null; fastest: boolean; pole: boolean; dropped: boolean; points: number | null | undefined };
+export type RaceCell = {
+  status: string; place: number | null; text: string; medal: "gold" | "silver" | "bronze" | null; fastest: boolean; pole: boolean; dropped: boolean; points: number | null | undefined;
+  grid: number | null; gained: number | null; time: string; gap: string; startNumber: string; fastestTime: string; dotd: boolean;
+};
 
-/** Eine Zelle des Rennrasters: Platz (Podium in Medaillenfarbe) oder DNF/DNS/DSQ, dazu schnellste Runde und Pole. */
+function positive(value: unknown): number | null {
+  return Number.isInteger(value) && Number(value) > 0 ? Number(value) : null;
+}
+
+/** Eine Zelle des Rennrasters: Platz (Podium in Medaillenfarbe) oder DNF/DNS/DSQ, dazu schnellste Runde und Pole. Aus dem
+ * Rennergebnis (#1927), wenn eingetragen: Startplatz, gutgemachte Plätze (nur im Ziel), Zeit, Abstand, Startnummer, Zeit
+ * der schnellsten Runde und „Fahrer des Tages“. */
 export function raceCell(result: RoundResult | null | undefined): RaceCell | null {
   if (!result) return null;
   const marks = new Set(result.marks || []);
   const status = ["dsq", "dns", "dnf"].find((mark) => marks.has(mark)) || "finished";
-  const place = Number.isInteger(result.place) && Number(result.place) > 0 ? Number(result.place) : null;
+  const place = positive(result.place);
+  const grid = positive(result.grid);
   return {
+    grid,
+    gained: status === "finished" && place && grid ? grid - place : null,
+    time: result.time || "",
+    gap: result.gap || "",
+    startNumber: result.start_number || "",
+    fastestTime: result.fastest_lap_time || "",
+    dotd: Boolean(result.driver_of_the_day),
     status,
     place,
     text: STATUS_TEXT[status] || (place ? String(place) : "–"),
@@ -154,6 +180,14 @@ export function raceCell(result: RoundResult | null | undefined): RaceCell | nul
     dropped: Boolean(result.dropped),
     points: result.points,
   };
+}
+
+/** Gutgemachte Plätze in Worten: „3 Plätze gutgemacht“, „1 Platz verloren“, „Platz gehalten“. */
+export function gainedWords(gained: number | null | undefined): string {
+  if (gained === null || gained === undefined) return "";
+  if (gained === 0) return "Platz gehalten";
+  const value = Math.abs(gained);
+  return `${value} ${value === 1 ? "Platz" : "Plätze"} ${gained > 0 ? "gutgemacht" : "verloren"}`;
 }
 
 export function resultIn(row: StandingRow | null | undefined, roundId: string): RoundResult | null {
@@ -173,9 +207,9 @@ export function raceSummary(rows: StandingRow[] | null | undefined, roundId: str
   return { winner, bestClub: club[0] || null };
 }
 
-export type RoundRow = { key: string; code: string; place: string; country: string; state: string; tone: StateTone; when: string; winner: string; best: string; final: boolean };
+export type RoundRow = { key: string; code: string; place: string; country: string; countryName: string; state: string; tone: StateTone; when: string; winner: string; best: string; final: boolean };
 
-/** Der Kalender als Zeilen: Kürzel, Ort, Land (als Text, bis #1925 Flaggen bringt), Stand und Tag; bei einem gewerteten
+/** Der Kalender als Zeilen: Kürzel, Ort, Land (Code für die Flagge, #1925), Stand und Tag; bei einem gewerteten
  * Rennen der Sieger (nur ein öffentlicher Vereinsfahrer) und sonst der beste öffentliche Vereinsfahrer mit Platz. */
 export function roundRows(page: SeasonPage | null | undefined): RoundRow[] {
   const rows = page?.standings?.rows || [];
@@ -183,11 +217,14 @@ export function roundRows(page: SeasonPage | null | undefined): RoundRow[] {
   return (page?.rounds || []).filter((round) => round?.id).map((round) => {
     const summary = page?.racing && round.state === "scored" ? raceSummary(rows, round.id, publicKeys) : null;
     const best = summary?.bestClub && summary.bestClub.row !== summary.winner ? summary.bestClub : null;
+    const country = countryCode(round.country_code);
     return {
       key: round.id,
       code: roundLabel(round),
-      place: [round.venue || round.title || "", round.opponent ? `gegen ${round.opponent}` : ""].filter(Boolean).join(" · "),
-      country: String(round.country_code || "").trim().toUpperCase().slice(0, 2),
+      // Ohne Titel und Ort steht der Landesname da - wie VenueWithFlag im Web.
+      place: [[round.title, round.venue].filter(Boolean).join(" · ") || countryName(country), round.opponent ? `gegen ${round.opponent}` : ""].filter(Boolean).join(" · "),
+      country,
+      countryName: countryName(country),
       state: PUBLIC_STATE_LABELS[String(round.state)] || "",
       tone: STATE_TONES[String(round.state)] || "planned",
       when: roundWhen(round),
@@ -243,6 +280,9 @@ export function driverCards(page: SeasonPage | null | undefined): Array<{ key: s
       count(finished.filter((place) => place <= 3).length, "Podium", "Podien"),
       count(cells.filter((cell) => cell.pole).length, "Pole", "Poles"),
       count(cells.filter((cell) => cell.fastest).length, "schnellste Runde", "schnellste Runden"),
+      // Rennergebnis (#1927): wie im Fahrer-Detail des Webs.
+      cells.some((cell) => cell.dotd) ? `${cells.filter((cell) => cell.dotd).length}× Fahrer des Tages` : "",
+      cells.some((cell) => cell.gained !== null) ? gainedWords(cells.reduce((sum, cell) => sum + (cell.gained || 0), 0)) : "",
     ].filter(Boolean).join(" · ");
     return {
       key: String(row.key),
@@ -273,13 +313,16 @@ export type MatchdayRow = { key: string; code: string; when: string; opponent: s
 
 /** Die Spieltage der Team-Liga: Gegner, Heim/Auswärts und Ergebnis aus eigener Sicht - offen mit Stand. */
 export function matchdayRows(page: SeasonPage | null | undefined): MatchdayRow[] {
+  // Mehrere eigene Teams (#1926): vor dem Gegner steht, welches eigene Team gespielt hat.
+  const showTeam = (page?.team_league?.own_teams || []).length > 1;
   return (page?.team_league?.matchdays || []).filter((day) => day?.round?.id).map(({ round, match }) => {
     const opponent = match?.opponent || round?.opponent || "";
+    const team = showTeam && match?.team ? `${match.team} ` : "";
     return {
       key: String(round?.id),
       code: roundLabel(round),
       when: roundWhen(round),
-      opponent: opponent ? `gegen ${opponent}` : "",
+      opponent: opponent ? `${team}gegen ${opponent}` : "",
       side: match ? (match.home ? "Heim" : "Auswärts") : "",
       score: match ? `${formatNumber(match.score_for)}:${formatNumber(match.score_against)}` : "",
       outcome: match ? OUTCOMES[String(match.outcome)]?.word || "" : "",

@@ -1,5 +1,6 @@
 import {
   driverCards,
+  gainedWords,
   leagueTableRows,
   matchdayRows,
   mobileRows,
@@ -81,7 +82,7 @@ test("Kennzahlen ohne Nullen: Runden, bester Vereinsfahrer und bestes Vereinstea
   ]);
 });
 
-test("Kalender: Kürzel, Ort, Land als Text, Stand, Tag - heute als „Heute“; ohne Land kein Platzhalter", () => {
+test("Kalender: Kürzel, Ort, Land, Stand, Tag - heute als „Heute“; ohne Land kein Platzhalter", () => {
   const rows = roundRows(RACING);
   expect(rows.map((row) => [row.code, row.place, row.country, row.state, row.when])).toEqual([
     ["R9", "Barcelona", "ES", "Gewertet", "Do., 30.04.2026 · 20:00"],
@@ -103,6 +104,15 @@ test("Kalender: Kürzel, Ort, Land als Text, Stand, Tag - heute als „Heute“;
 test("Rennzelle und Rennen auf einen Blick: nur öffentliche Vereinsfahrer außerhalb der Tabelle", () => {
   expect(raceCell(res("r1", 2, 0, ["dnf"]))).toMatchObject({ text: "DNF", status: "dnf", medal: null });
   expect(raceCell(res("r1", 1, 25, ["fastest_lap"]))).toMatchObject({ text: "1", medal: "gold", fastest: true });
+  // Rennergebnis (#1927), wenn eingetragen: Startplatz, gutgemachte Plätze (nur im Ziel), Zeit, Abstand, Startnummer,
+  // schnellste Runde mit Zeit und Fahrer des Tages.
+  expect(raceCell({ ...res("r1", 2, 18, ["fastest_lap"]), grid: 6, time: "1:32:10.456", gap: "+3.2", start_number: "44", fastest_lap_time: "1:31.456", driver_of_the_day: true }))
+    .toMatchObject({ grid: 6, gained: 4, time: "1:32:10.456", gap: "+3.2", startNumber: "44", fastestTime: "1:31.456", dotd: true });
+  expect(raceCell({ ...res("r1", 3, 0, ["dnf"]), grid: 1 })).toMatchObject({ grid: 1, gained: null });
+  expect(raceCell(res("r1", 4, 12))).toMatchObject({ grid: null, gained: null, dotd: false, time: "" });
+  expect(gainedWords(3)).toBe("3 Plätze gutgemacht");
+  expect(gainedWords(-1)).toBe("1 Platz verloren");
+  expect(gainedWords(0)).toBe("Platz gehalten");
   const summary = raceSummary(ROWS, "r9", ["mira", "kai"]);
   expect(summary.winner).toBeNull();
   expect(summary.bestClub?.row.key).toBe("mira");
@@ -130,6 +140,14 @@ test("Fahrer (Garage): nur öffentliche Vereinsfahrer, mit Platz, Team, Punkten 
     { key: "mira", name: "Mira Stahl", pos: "P4", meta: "TLS-DarkFriday · 214 Punkte", stats: "2 Rennen · 1 Sieg · 2 Podien · 1 Pole · 1 schnellste Runde" },
     { key: "kai", name: "Kai Funke", pos: "P6", meta: "TLS-Lions · 176 Punkte", stats: "2 Rennen · 1 Podium" },
   ]);
+  // Mit Rennergebnis (#1927): Fahrer des Tages und gutgemachte Plätze wie im Fahrer-Detail des Webs.
+  const detailed: SeasonPage = { ...RACING, standings: { rows: [{ key: "mira", rank: 4, points: 43, name: "Mira Stahl", club_member: true, results: [{ ...res("r9", 2, 18), grid: 7, driver_of_the_day: true }, { ...res("r10", 1, 25), grid: 2 }] }] } };
+  expect(driverCards(detailed)[0].stats).toBe("2 Rennen · 1 Sieg · 2 Podien · 1× Fahrer des Tages · 6 Plätze gutgemacht");
+});
+
+test("Kalender mit Land: Code und Name für die Flagge, auch ohne Ort", () => {
+  const rows = roundRows({ rounds: [{ id: "x", code: "R1", state: "planned", country_code: "az" }, { id: "y", code: "R2", state: "planned", country_code: "zz" }] });
+  expect(rows.map((row) => [row.country, row.countryName, row.place])).toEqual([["AZ", "Aserbaidschan", "Aserbaidschan"], ["", "", ""]]);
 });
 
 test("Team-Liga: Spieltage mit Gegner, Ergebnis aus eigener Sicht und Tabelle mit eigenem Team", () => {
@@ -149,6 +167,10 @@ test("Team-Liga: Spieltage mit Gegner, Ergebnis aus eigener Sicht und Tabelle mi
     ["ST2", "gegen Fremd Bären", "", "", "", "Geplant"],
   ]);
   expect(days[0].maps).toEqual(["Hacienda 6:2"]);
+  // Mehrere eigene Teams (#1926): vor dem Gegner steht, welches eigene Team gespielt hat.
+  const two: SeasonPage = { ...page, team_league: { ...page.team_league, own_teams: ["Lions A", "Lions B"], matchdays: [{ round: { id: "a", code: "ST1", state: "scored" }, match: { team: "Lions B", opponent: "Fremd Adler", home: false, outcome: "loss", score_for: 1, score_against: 3 } }] } };
+  expect(matchdayRows(two)[0].opponent).toBe("Lions B gegen Fremd Adler");
+  expect(days[0].opponent).toBe("gegen Fremd Adler");
   expect(leagueTableRows(page).map((row) => [row.pos, row.name, row.played, row.points, row.own])).toEqual([["1", "Fremd Adler", "2", "6", false], ["2", "Lions Probe", "1", "3,5", true]]);
   // Alter Server ohne Team-Liga-Teil: leer, kein Absturz.
   expect(matchdayRows({ lineage: { kind: "team_league" } })).toEqual([]);
