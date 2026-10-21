@@ -494,6 +494,37 @@ Verknüpfungen sieht nur die Verwaltung (Bereich Redaktion).
 </tr>
 </table>
 
+**Teilnehmer nachträglich bearbeiten:** Kurz zur Zuordnung – **Mitglied** zählt für Verein und Profil, **Gast** fährt
+für ein Vereinsteam, ist aber kein Mitglied, **Extern** sind alle anderen. Über der Liste filtert ihr nach **Alle**,
+**Mitglieder**, **Gäste**, **Extern** oder **Offen** und sucht nach Name, Startnummer, Team oder Profil.
+
+- **Bearbeiten** (Stift am Ende der Zeile): Name wie beim Veranstalter, Startnummer, Standard-Team und die Zuordnung
+  (Mitglied mit Profil, Gast oder Extern). Wird ein Mitglied oder Gast extern, fragt die Seite nach – jeder Alias des
+  Teilnehmers wird dann in allen Saisons zurückgenommen. Gibt es den neuen Namen in der Saison schon, sagt die Seite
+  das: dann zusammenführen.
+- **Mehrere auf einmal:** Haken setzen – **Alle auswählen** nimmt nur, was Filter und Suche gerade zeigen – und
+  **Als Gast** oder **Als Extern**. Geht dabei eine Zuordnung verloren, fragt die Seite einmal für alle nach. Die
+  Saison wird danach einmal neu gerechnet, andere Saisons mit demselben Alias ziehen mit. Beispiel: alle Fremden
+  versehentlich als Gast angelegt – Filter **Gäste**, **Alle auswählen**, die echten Gäste wieder abwählen,
+  **Als Extern**, bestätigen.
+- **Zusammenführen:** Genau zwei auswählen (dieselbe Person unter zwei Schreibweisen) und festlegen, welcher Eintrag
+  bleibt. Die Ergebnisse des anderen wandern mit, auch Entwürfe, danach wird neu gerechnet; jedes geänderte Ergebnis
+  behält seinen alten Stand als Revision. Die Zuordnung des behaltenen gilt danach auch für die andere Schreibweise, in
+  allen Saisons. Stehen beide im selben Ergebnis, geht es nicht – dort erst eine der beiden Zeilen entfernen.
+- **Entfernen** steht im Blatt „Teilnehmer bearbeiten“ nur bei Namen ohne Ergebnis; sonst führt der Weg übers
+  Zusammenführen.
+
+Jede Änderung steht im Protokoll. Bearbeiten und zuordnen darf nur der Vorstand, ein Captain nicht.
+
+<img src="../assets/serien/serien-teilnehmer-auswahl.png" alt="Teilnehmer mit Filter Gäste, 17 von 20 ausgewählt, darüber Als Gast und Als Extern" width="560">
+
+<table>
+<tr>
+<td><img src="../assets/serien/serien-teilnehmer-bearbeiten.png" alt="Blatt Teilnehmer bearbeiten am Handy mit Name, Startnummer, Standard-Team und Zuordnung" width="200"></td>
+<td><img src="../assets/serien/serien-teilnehmer-zusammenfuehren.png" alt="Blatt Zusammenführen am Handy: welcher Eintrag bleibt" width="200"></td>
+</tr>
+</table>
+
 #### Ergebnisse eintragen
 
 Auf der Seite der Saison steht unter **Ergebnisse** jeder Termin (außer abgesagten) mit **Ergebnis eintragen** – bei

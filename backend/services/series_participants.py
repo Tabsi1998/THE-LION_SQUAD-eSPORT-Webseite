@@ -13,6 +13,8 @@
   war, folgt seiner Korrektur; offene Teilnehmer mit demselben Namen werden zugeordnet. Immer nur in den genannten
   Saisons und unter deren Sperre - die eigene Saison beim Zuordnen, jede andere danach unter ihrer eigenen
   (``follow_alias``; ist sie besetzt, merkt sich die Saison den Nachtrag in ``alias_followups``).
+- **Zusammenführen** (``swap_participant``, #1929): zwei Schreibweisen derselben Person - die Ergebnisse des einen
+  wandern zum anderen, nur wenn kein Inhalt beide nennt (``content_participant_ids``).
 """
 from __future__ import annotations
 
@@ -151,16 +153,38 @@ async def new_participant(db, series: dict, index: series_identity.IdentityIndex
 
 
 # ---------------------------------------------------------------- Zurücknehmen
-def sheet_participant_ids(sheet: dict) -> set[str]:
-    """Alle Teilnehmer, die ein Ergebnisblatt nennt - im Blatt und im Entwurf daneben: Zeilen, Aufstellungen und
-    offizielle Werte."""
-    found: set[str] = set()
-    for source in (sheet, sheet.get("pending_draft") or {}):
-        found |= {row.get("participant_id") for row in source.get("rows") or []}
-        found |= {pid for match in source.get("matches") or [] for pid in match.get("lineup") or []}
-        found |= set(source.get("official_totals") or {})
+def content_participant_ids(content: dict) -> set[str]:
+    """Wen ein Inhalt nennt - das Blatt selbst oder der Entwurf daneben: Zeilen, Aufstellungen und offizielle Werte."""
+    found = {row.get("participant_id") for row in content.get("rows") or []}
+    found |= {pid for match in content.get("matches") or [] for pid in match.get("lineup") or []}
+    found |= set(content.get("official_totals") or {})
     found.discard(None)
     return found
+
+
+def sheet_participant_ids(sheet: dict) -> set[str]:
+    """Alle Teilnehmer, die ein Ergebnisblatt nennt - im Blatt und im Entwurf daneben."""
+    return content_participant_ids(sheet) | content_participant_ids(sheet.get("pending_draft") or {})
+
+
+def swap_participant(content: dict, old: str, new: str) -> dict:
+    """Zusammenführen (#1929): ``old`` im Inhalt (Blatt oder Entwurf daneben) durch ``new`` ersetzen - Zeilen,
+    Aufstellungen, offizielle Werte. Nur für Inhalte, die nicht beide nennen. Aus ``created_participant_ids`` (wen
+    Entwürfe neu angelegt haben) fällt ``old`` weg; ``new`` kommt nicht dazu, Verwerfen entfernt ihn also nie."""
+    def swap(pid):
+        return new if pid == old else pid
+
+    out = dict(content)
+    if content.get("rows"):
+        out["rows"] = [{**row, "participant_id": swap(row.get("participant_id"))} for row in content["rows"]]
+    if content.get("matches"):
+        out["matches"] = [{**match, "lineup": [swap(pid) for pid in match.get("lineup") or []]}
+                          for match in content["matches"]]
+    if content.get("official_totals"):
+        out["official_totals"] = {swap(pid): value for pid, value in content["official_totals"].items()}
+    if content.get("created_participant_ids"):
+        out["created_participant_ids"] = [pid for pid in content["created_participant_ids"] if pid != old]
+    return out
 
 
 async def remove_unused_new(db, series_id: str, candidate_ids) -> list[dict]:
