@@ -13,6 +13,7 @@ sind zwei verschiedene Maps.
 from __future__ import annotations
 
 import re
+import time
 import unicodedata
 from typing import List, Literal, Optional
 
@@ -228,31 +229,67 @@ async def release_keys(db, game_id: str, map_id: str, *, keep=None, only=None) -
     await db.game_map_keys.delete_many(query)
 
 
+TAKE_ATTEMPTS = 3
+# So lange gilt ein frisch belegter Schlüssel als in Arbeit (die Map wird gerade angelegt oder umbenannt), auch wenn
+# ihn noch keine Map führt - erst danach darf ihn eine andere Map als verwaist übernehmen.
+KEY_FRESH_SECONDS = 120
+
+
+async def _take_key(db, game_id: str, map_id: str, key: str) -> str | None:
+    """Einen Schlüssel für ``map_id`` belegen. ``None``: belegt. Sonst der Name der Map, die ihn führt.
+
+    Selbstheilend (dritte Runde #1616): gehört der Schlüssel einer Map, die es nicht mehr gibt oder die ihn nicht mehr
+    führt (Name, Slug, Schreibweise) - etwa nach einem Abbruch beim Löschen, Umbenennen oder Freigeben -, wird er
+    übernommen, sobald er nicht mehr frisch ist (``KEY_FRESH_SECONDS``). Das Übernehmen ist ein bedingtes Umschreiben
+    auf genau den alten, nicht mehr frischen Eintrag, das Neuanlegen geht über den eindeutigen Index; ändert sich
+    dazwischen etwas, wird neu geprüft."""
+    for _attempt in range(TAKE_ATTEMPTS):
+        now = time.time()
+        other = await db.game_map_keys.find_one({"game_id": game_id, "key": key}, {"_id": 0, "map_id": 1, "at": 1})
+        if not other:
+            try:
+                await db.game_map_keys.insert_one({"game_id": game_id, "key": key, "map_id": map_id, "at": now})
+                return None
+            except DuplicateKeyError:
+                continue
+        owner = await db.game_maps.find_one({"id": other.get("map_id"), "game_id": game_id},
+                                            {"_id": 0, "name": 1, "slug": 1, "aliases": 1})
+        if owner and key in spelling_keys(owner.get("name"), owner.get("slug"), owner.get("aliases")):
+            return owner.get("name") or "einer anderen Map"
+        stale = now - KEY_FRESH_SECONDS
+        if (other.get("at") or 0) > stale:
+            return (owner or {}).get("name") or "einer anderen Map"
+        taken = await db.game_map_keys.find_one_and_update(
+            {"game_id": game_id, "key": key, "map_id": other.get("map_id"),
+             "$or": [{"at": {"$exists": False}}, {"at": {"$lte": stale}}]},
+            {"$set": {"map_id": map_id, "at": now}})
+        if taken:
+            return None
+    return "einer anderen Map"
+
+
 async def reserve_keys(db, game_id: str, map_id: str, spellings: dict[str, str]) -> list[str]:
     """Die Schlüssel (``spelling_keys``) einer Map belegen - atomar über den eindeutigen Index (game_id, key) in
-    ``game_map_keys``: zwei gleichzeitige Anfragen bekommen dieselbe Schreibweise nie beide. Gehört ein Schlüssel einer
-    anderen Map: ``MapProblem`` 409, und was dieser Aufruf schon belegt hat, wird zurückgenommen. Liefert die neu
-    belegten Schlüssel."""
-    owned = {row["key"] async for row in db.game_map_keys.find({"game_id": game_id, "map_id": map_id},
-                                                               {"_id": 0, "key": 1})}
+    ``game_map_keys``: zwei gleichzeitige Anfragen bekommen dieselbe Schreibweise nie beide. Führt eine andere Map einen
+    Schlüssel: ``MapProblem`` 409; verwaiste Schlüssel werden übernommen (``_take_key``). Die schon eigenen werden
+    zuerst aufgefrischt, damit sie keiner übernimmt, solange diese Map sie gerade (wieder) bekommt. Scheitert der Aufruf
+    - aus welchem Grund auch immer -, wird zurückgenommen, was er belegt hat. Liefert die neu belegten Schlüssel."""
+    mine = {"game_id": game_id, "map_id": map_id}
+    await db.game_map_keys.update_many({**mine, "key": {"$in": sorted(spellings)}}, {"$set": {"at": time.time()}})
+    owned = {row["key"] async for row in db.game_map_keys.find(mine, {"_id": 0, "key": 1})}
     added: list[str] = []
+    done = False
     try:
         for key in sorted(set(spellings) - owned):
-            other = await db.game_map_keys.find_one({"game_id": game_id, "key": key}, {"_id": 0, "map_id": 1})
-            if not other:
-                try:
-                    await db.game_map_keys.insert_one({"game_id": game_id, "key": key, "map_id": map_id})
-                    added.append(key)
-                    continue
-                except DuplicateKeyError:
-                    other = await db.game_map_keys.find_one({"game_id": game_id, "key": key}, {"_id": 0, "map_id": 1})
-            owner = await db.game_maps.find_one({"id": (other or {}).get("map_id")}, {"_id": 0, "name": 1})
-            raise _spelling_taken(spellings[key], (owner or {}).get("name") or "einer anderen Map")
-    except MapProblem:
-        if added:
+            owner = await _take_key(db, game_id, map_id, key)
+            if owner:
+                raise _spelling_taken(spellings[key], owner)
+            added.append(key)
+        done = True
+        return added
+    finally:
+        if not done and added:
             await release_keys(db, game_id, map_id, only=added)
-        raise
-    return added
 
 
 async def create(db, game: dict, body: GameMapCreate, user: dict, new_id: str) -> dict:

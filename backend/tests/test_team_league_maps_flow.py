@@ -448,3 +448,44 @@ async def test_existing_maps_get_their_spellings_reserved_by_the_migration(flow)
     clash = await flow.post(f"/api/games/{game['id']}/maps", json={"name": "Sturmdeck", "aliases": ["fog works"]})
     assert clash.status_code == 409
     assert any(version == 9 and name == "game_map_spelling_keys" for version, name, _ in migrations.MIGRATIONS)
+
+
+@pytest.mark.asyncio
+async def test_an_orphaned_spelling_key_does_not_block_but_a_real_one_does(flow):
+    """Dritte Runde, selbstheilend: ein Schlüssel, dessen Map es nicht mehr gibt oder der nicht mehr zu ihr passt (etwa
+    nach einem Abbruch beim Löschen oder Umbenennen), wird übernommen; ein echter blockiert weiter."""
+    admin = await flow.add_user(role="superadmin", name="admin")
+    flow.act_as(admin)
+    game = (await flow.post("/api/games", json=SHOOTER)).json()
+    base = f"/api/games/{game['id']}/maps"
+    nebel = (await flow.post(base, json={"name": "Nebelwerk", "aliases": ["Fog Works"]})).json()
+    # Verwaist: Map gelöscht, Schlüssel geblieben - und ein alter Name, den Nebelwerk nicht mehr führt.
+    await flow.db.game_map_keys.insert_many([
+        {"game_id": game["id"], "key": "glutsenke", "map_id": "geloeschte-map"},
+        {"game_id": game["id"], "key": "altername", "map_id": nebel["id"]}])
+    glut = await flow.post(base, json={"name": "Glutsenke"})
+    assert glut.status_code == 200, glut.text
+    renamed = await flow.post(base, json={"name": "Alter Name"})
+    assert renamed.status_code == 200, renamed.text
+    owners = {row["key"]: row["map_id"] async for row in flow.db.game_map_keys.find({"game_id": game["id"]})}
+    assert (owners["glutsenke"], owners["altername"]) == (glut.json()["id"], renamed.json()["id"])
+    # Echt belegt: Nebelwerk führt „Fog Works“ weiter.
+    real = await flow.post(base, json={"name": "Sturmdeck", "aliases": ["fog-works"]})
+    assert real.status_code == 409
+    assert owners["fogworks"] == nebel["id"]
+
+
+@pytest.mark.asyncio
+async def test_a_fresh_spelling_key_of_a_map_still_being_saved_is_not_taken_over(flow):
+    """Ein eben belegter Schlüssel, dessen Map gerade erst angelegt wird (noch ohne Eintrag), ist nicht verwaist."""
+    import time
+
+    admin = await flow.add_user(role="superadmin", name="admin")
+    flow.act_as(admin)
+    game = (await flow.post("/api/games", json=SHOOTER)).json()
+    await flow.db.game_map_keys.insert_one({"game_id": game["id"], "key": "glutsenke", "map_id": "map-im-anlegen",
+                                            "at": time.time()})
+    clash = await flow.post(f"/api/games/{game['id']}/maps", json={"name": "Glutsenke"})
+    assert clash.status_code == 409
+    row = await flow.db.game_map_keys.find_one({"game_id": game["id"], "key": "glutsenke"})
+    assert row["map_id"] == "map-im-anlegen"
