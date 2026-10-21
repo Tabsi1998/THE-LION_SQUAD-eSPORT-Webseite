@@ -15,7 +15,7 @@ import { AuthFormAlert } from "@/components/tls/AuthFormFields";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useLiveRefresh } from "@/hooks/useLiveRefresh";
 import { useCanonicalSlugRedirect } from "@/hooks/useCanonicalSlugRedirect";
-import { Award, Tv, Trophy, Flag, Calendar, Trash2, FileDown } from "lucide-react";
+import { Award, Tv, Trophy, Flag, Calendar, Trash2, FileDown, ChevronDown } from "lucide-react";
 import { formatDateTime, getRegistrationState, hasOnlineRegistration } from "@/lib/datetime";
 import { renderMarkdownLite } from "@/lib/markdownLite";
 import { safeHttpUrl } from "@/lib/safeLink";
@@ -108,7 +108,10 @@ export default function F1DetailPage() {
   const hasOnlineSubmission = hasOnlineRegistration(challenge);
   const registration = hasOnlineSubmission ? getRegistrationState(challenge, "Einreichung") : null;
   const showResultPdf = PUBLIC_RESULT_STATUSES.has(challenge.status);
-  const showCertificates = showResultPdf || isTournamentLead;
+  // Knöpfe nur, wo sie gebraucht werden (#1277): TV/Beamer und alle Urkunden nur für die Leitung der Fast Lap
+  // (Zuteilung mit Zeit-Recht) und Konten mit dem Bereich Turniere; alle anderen bekommen „Downloads“.
+  const isLead = Boolean(isTournamentLead || challenge.can_manage_times);
+  const showCertificates = isLead && (showResultPdf || isTournamentLead);
   const maxAttempts = board?.max_attempts ?? null;
   const largestGap = Math.max(0, ...(board?.entries || []).map((entry) => Number(entry.gap_ms) || 0));
 
@@ -152,63 +155,39 @@ export default function F1DetailPage() {
               </div>
             </div>
           )}
-          {(challenge.block_club_member_results || challenge.allow_club_reference_times !== false) && (
-            <div className="mt-4 border border-[#FFD700]/25 bg-[#FFD700]/5 rounded-sm px-4 py-3 text-sm max-w-3xl">
-              <div className="font-bold uppercase tracking-wider text-xs text-[#FFD700]">Vereins-Referenzzeiten</div>
-              <div className="mt-1 text-white/60">
-                {challenge.block_club_member_results
-                  ? "Diese Challenge ist für externe Teilnehmer gewertet. Vereinsmitglieder erscheinen nur als Referenzzeiten außer Wertung."
-                  : "Vereins-Referenzzeiten sind separat möglich und zählen nicht zur offiziellen Rangliste."}
-                {challenge.show_club_reference_times === false && <span> Die Referenzen sind aktuell nur intern sichtbar.</span>}
-              </div>
+          {/* Aus dem Kasten wird ein Satz (#1277) - nur, wenn Mitglieder hier wirklich außer Wertung fahren. */}
+          {challenge.block_club_member_results && challenge.allow_club_reference_times !== false && (
+            <p data-testid="f1-reference-note" className="mt-4 text-sm text-white/60">Vereinsmitglieder fahren außer Wertung mit.</p>
+          )}
+          {isLead && (
+            <div className="mt-6 flex flex-wrap gap-3" data-testid="f1-lead-tools">
+              <Link to={`/display/f1/${challenge.id}${activeTrack ? `?track=${activeTrack}` : ""}`} target="_blank" data-testid="f1-tv-link" className="tls-btn tls-btn--primary inline-flex items-center gap-2 px-5 py-2.5 font-bold uppercase tracking-wider rounded-sm">
+                <Tv className="w-4 h-4" /> TV / Beamer Modus
+              </Link>
+              {showCertificates && (
+                <a
+                  href={`${API}/exports/f1/${challenge.slug || challenge.id}/certificates.pdf${f1ResultQuery({ track_id: activeTrack, access: accessToken })}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  data-testid="f1-certificates"
+                  className="tls-btn tls-btn--secondary inline-flex items-center gap-2 px-5 py-2.5 font-bold uppercase tracking-wider rounded-sm"
+                >
+                  <Award className="w-4 h-4" /> {showResultPdf ? "Urkunden" : "Urkunden jetzt drucken"}
+                </a>
+              )}
+              {showResultPdf && challenge.is_championship && (
+                <a
+                  href={`${API}/exports/f1/${challenge.slug || challenge.id}/championship-certificates.pdf${f1ResultQuery({ access: accessToken })}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  data-testid="f1-championship-certificates"
+                  className="tls-btn tls-btn--secondary inline-flex items-center gap-2 px-5 py-2.5 font-bold uppercase tracking-wider rounded-sm"
+                >
+                  <Award className="w-4 h-4" /> Gesamtwertungs-Urkunden
+                </a>
+              )}
             </div>
           )}
-          <div className="mt-6 flex flex-wrap gap-3">
-            <Link to={`/display/f1/${challenge.id}${activeTrack ? `?track=${activeTrack}` : ""}`} target="_blank" data-testid="f1-tv-link" className="tls-btn tls-btn--primary inline-flex items-center gap-2 px-5 py-2.5 font-bold uppercase tracking-wider rounded-sm">
-              <Tv className="w-4 h-4" /> TV / Beamer Modus
-            </Link>
-            {showResultPdf && (
-              <a
-                href={`${API}/exports/f1/${challenge.slug || challenge.id}/leaderboard.pdf${f1ResultQuery({ track_id: activeTrack, access: accessToken })}`}
-                target="_blank"
-                rel="noreferrer"
-                className="tls-btn tls-btn--secondary inline-flex items-center gap-2 px-5 py-2.5 font-bold uppercase tracking-wider rounded-sm"
-              >
-                <FileDown className="w-4 h-4" /> Ergebnis-PDF
-              </a>
-            )}
-            {showCertificates && (
-              <a
-                href={`${API}/exports/f1/${challenge.slug || challenge.id}/certificates.pdf${f1ResultQuery({ track_id: activeTrack, access: accessToken })}`}
-                target="_blank"
-                rel="noreferrer"
-                data-testid="f1-certificates"
-                className="tls-btn tls-btn--secondary inline-flex items-center gap-2 px-5 py-2.5 font-bold uppercase tracking-wider rounded-sm"
-              >
-                <Award className="w-4 h-4" /> {showResultPdf ? "Urkunden" : "Urkunden jetzt drucken"}
-              </a>
-            )}
-            {showResultPdf && challenge.is_championship && (
-              <a
-                href={`${API}/exports/f1/${challenge.slug || challenge.id}/championship.pdf${f1ResultQuery({ access: accessToken })}`}
-                target="_blank"
-                rel="noreferrer"
-                className="tls-btn tls-btn--secondary inline-flex items-center gap-2 px-5 py-2.5 font-bold uppercase tracking-wider rounded-sm"
-              >
-                <Trophy className="w-4 h-4" /> Gesamtwertung-PDF
-              </a>
-            )}
-            {showResultPdf && challenge.is_championship && (
-              <a
-                href={`${API}/exports/f1/${challenge.slug || challenge.id}/championship-certificates.pdf${f1ResultQuery({ access: accessToken })}`}
-                target="_blank"
-                rel="noreferrer"
-                className="tls-btn tls-btn--secondary inline-flex items-center gap-2 px-5 py-2.5 font-bold uppercase tracking-wider rounded-sm"
-              >
-                <Award className="w-4 h-4" /> Gesamtwertungs-Urkunden
-              </a>
-            )}
-          </div>
         </div>
       </div>
 
@@ -394,7 +373,7 @@ export default function F1DetailPage() {
                   <th className="text-right px-4 py-3">Siege</th>
                   <th className="text-right px-4 py-3">Rennen</th>
                   <th className="text-right px-4 py-3 font-display">Punkte</th>
-                  {showResultPdf && <th className="text-right px-4 py-3">Urkunde</th>}
+                  {showResultPdf && isLead && <th className="text-right px-4 py-3">Urkunde</th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/5">
@@ -405,7 +384,7 @@ export default function F1DetailPage() {
                     <td className="px-4 py-3 text-right">{s.wins}</td>
                     <td className="px-4 py-3 text-right">{s.races}</td>
                     <td className="px-4 py-3 text-right font-display font-bold text-[#29B6E8] text-lg">{s.points}</td>
-                    {showResultPdf && (
+                    {showResultPdf && isLead && (
                       <td className="px-4 py-3 text-right">
                         {s.rank <= 4 ? (
                           <a href={`${API}/exports/f1/${challenge.slug || challenge.id}/championship-certificates/${s.user_id}.pdf${f1ResultQuery({ access: accessToken })}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-[#FFD700] hover:text-white">
@@ -420,8 +399,70 @@ export default function F1DetailPage() {
             </table>
           </div>
         )}
+        {showResultPdf && (
+          <FastLapDownloads
+            challenge={challenge}
+            activeTrack={activeTrack}
+            accessToken={accessToken}
+            user={user}
+            board={board}
+            championship={championship}
+          />
+        )}
       </div>
     </PublicLayout>
+  );
+}
+
+const DOWNLOAD_LINK = "tls-btn tls-btn--secondary inline-flex items-center gap-2 px-3 py-2 text-xs font-bold uppercase tracking-wider rounded-sm";
+
+/**
+ * „Downloads“ (#1277): für alle erst mit Ergebnissen - Ergebnis-PDF, bei einer Championship die Gesamtwertung, angemeldet
+ * die eigene Urkunde (Urkunden gibt es für die ersten vier Plätze). Am Handy eine aufklappbare Zeile, ab sm offen.
+ */
+function FastLapDownloads({ challenge, activeTrack, accessToken, user, board, championship }) {
+  const [open, setOpen] = useState(false);
+  const base = `${API}/exports/f1/${challenge.slug || challenge.id}`;
+  const ownKey = user?.id || "";
+  const ownEntry = ownKey ? (board?.entries || []).find((entry) => participantKey(entry) === ownKey && entry.rank <= 4) : null;
+  const ownStanding = ownKey && challenge.is_championship
+    ? (championship?.standings || []).find((row) => row.user_id === ownKey && row.rank <= 4)
+    : null;
+  return (
+    <section data-testid="f1-downloads" className="border border-white/10 rounded-sm bg-[#121212]">
+      <button
+        type="button"
+        onClick={() => setOpen((value) => !value)}
+        aria-expanded={open}
+        aria-controls="f1-downloads-list"
+        data-testid="f1-downloads-toggle"
+        className="sm:hidden w-full flex items-center justify-between gap-3 px-4 py-3 text-xs font-bold uppercase tracking-widest text-white/70"
+      >
+        Downloads
+        <ChevronDown className={`w-4 h-4 transition-transform duration-[var(--tls-motion-fast)] ${open ? "rotate-180" : ""}`} aria-hidden="true" />
+      </button>
+      <div className="hidden sm:block px-4 pt-3 text-[11px] font-bold uppercase tracking-widest text-white/50">Downloads</div>
+      <div id="f1-downloads-list" className={`${open ? "flex" : "hidden"} sm:flex flex-wrap gap-2 px-4 pb-4 pt-1 sm:pt-3`}>
+        <a href={`${base}/leaderboard.pdf${f1ResultQuery({ track_id: activeTrack, access: accessToken })}`} target="_blank" rel="noreferrer" data-testid="f1-result-pdf" className={DOWNLOAD_LINK}>
+          <FileDown className="w-3.5 h-3.5" /> Ergebnis-PDF
+        </a>
+        {ownEntry && (
+          <a href={`${base}/certificates/${encodeURIComponent(ownKey)}.pdf${f1ResultQuery({ track_id: activeTrack, access: accessToken })}`} target="_blank" rel="noreferrer" data-testid="f1-own-certificate" className={DOWNLOAD_LINK}>
+            <Award className="w-3.5 h-3.5" /> Meine Urkunde
+          </a>
+        )}
+        {challenge.is_championship && (
+          <a href={`${base}/championship.pdf${f1ResultQuery({ access: accessToken })}`} target="_blank" rel="noreferrer" data-testid="f1-championship-pdf" className={DOWNLOAD_LINK}>
+            <Trophy className="w-3.5 h-3.5" /> Gesamtwertung-PDF
+          </a>
+        )}
+        {ownStanding && (
+          <a href={`${base}/championship-certificates/${encodeURIComponent(ownKey)}.pdf${f1ResultQuery({ access: accessToken })}`} target="_blank" rel="noreferrer" data-testid="f1-own-championship-certificate" className={DOWNLOAD_LINK}>
+            <Award className="w-3.5 h-3.5" /> Meine Gesamtwertungs-Urkunde
+          </a>
+        )}
+      </div>
+    </section>
   );
 }
 

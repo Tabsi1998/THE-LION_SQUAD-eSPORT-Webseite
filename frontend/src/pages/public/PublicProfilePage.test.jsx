@@ -20,7 +20,7 @@ vi.mock("@/hooks/useApiInvalidation", () => ({ useApiInvalidation: () => {} }));
 vi.mock("@/hooks/useDocumentTitle", () => ({ useDocumentTitle: () => {} }));
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
-const { default: PublicProfilePage, podiumHighlights } = await import("./PublicProfilePage");
+const { default: PublicProfilePage, podiumHighlights, profileTabs } = await import("./PublicProfilePage");
 
 const PROFILE = {
   id: "u1", username: "paula", display_name: "Paula B.", bio: "Racing seit 2019.", role: "moderator", country: "AT",
@@ -192,23 +192,22 @@ test("Angeheftete stehen zuerst in der Uebersicht, der Reiter zeigt Kategorie-Ba
   expect(screen.queryByTestId("profile-achievements-private")).toBeNull();
 });
 
-test("private Erfolge: Hinweis statt Liste, keine Angehefteten", async () => {
+test("private Erfolge: Hinweis statt Liste, keine Angehefteten - und kein leerer Reiter (#1268)", async () => {
   mockApiWithAchievements({ groups: [], awards: [], pinned: [], hidden: { total: 0, earned: 0 }, achievements_hidden: true });
   renderPage();
   expect(await screen.findByTestId("profile-achievements-private")).toHaveTextContent("Paula B. zeigt Erfolge nicht öffentlich.");
   expect(screen.queryByTestId("profile-pinned-awards")).toBeNull();
-  fireEvent.click(screen.getByTestId("profile-tab-badges"));
-  expect(await screen.findByText("Erfolge sind privat")).toBeInTheDocument();
+  expect(screen.queryByTestId("profile-tab-badges")).toBeNull();
   expect(screen.queryByTestId("achievement-groups")).toBeNull();
 });
 
 // Ehrungen (#848): eigener Reiter neben den Auszeichnungen - nur, wenn es freigegebene gibt.
-test("Ehrungen: eigener Reiter für Mitglieder (#1149) - ohne freigegebene Ehrungen ein Satz, ohne Mitgliedschaft kein Reiter", async () => {
+test("Ehrungen: Reiter nur mit freigegebenen Ehrungen (#1268) - ohne Mitgliedschaft auch nicht", async () => {
   mockApi();
   const { unmount } = renderPage();
   await screen.findByRole("heading", { level: 1 });
-  fireEvent.click(screen.getByTestId("profile-tab-honours"));
-  expect(screen.getByTestId("public-profile-honours-empty")).toHaveTextContent("Keine Ehrungen freigegeben.");
+  expect(screen.queryByTestId("profile-tab-honours")).toBeNull();
+  expect(screen.queryByText("Keine Ehrungen freigegeben.")).toBeNull();
   unmount();
 
   apiMock.get.mockImplementation(async (url) => {
@@ -244,8 +243,10 @@ test("dieselben Reiter in derselben Reihenfolge wie in der App; „Erfolge“ st
   mockApi();
   renderPage();
   await screen.findByRole("heading", { level: 1 });
-  const tabs = ["overview", "badges", "awards", "references", "teams", "honours"].map((key) => screen.getByTestId(`profile-tab-${key}`).textContent.replace(/ \(\d+\)$/, ""));
-  expect(tabs).toEqual(["Übersicht", "Erfolge", "Auszeichnungen", "Referenzen", "Teams", "Ehrungen"]);
+  const tabs = screen.getAllByTestId(/^profile-tab-/).map((node) => node.textContent.replace(/ \(\d+\)$/, ""));
+  // Andere sehen nur Reiter mit Inhalt (#1268): Paula hat keine Auszeichnungen und keine Ehrungen.
+  expect(tabs).toEqual(["Übersicht", "Erfolge", "Referenzen", "Teams"]);
+  expect(profileTabs({ own: true, clubMember: true }).map(([, label]) => label)).toEqual(["Übersicht", "Erfolge", "Auszeichnungen", "Referenzen", "Teams", "Ehrungen"]);
   expect(screen.getByTestId("profile-stat-badges")).toHaveTextContent("Erfolge");
   expect(screen.queryByTestId("profile-private-box")).toBeNull();
   expect(screen.queryByTestId("profile-as-others")).toBeNull();
@@ -302,4 +303,71 @@ test("Spielerprofil: ein Name mit 24 Zeichen kommt eine Stufe kleiner", async ()
   expect(name).toHaveTextContent("NachtfalkeDerSuperliga24");
   expect(name.className).toContain("tls-head-name tls-head-name--long");
   expect(name.className).toContain("text-2xl sm:text-3xl lg:text-4xl");
+});
+
+// Profile ohne Nullen (#1268): Kennzahlen nur über null, kein Reiter mit „(0)“ für andere, das eigene Profil behält
+// leere Reiter mit einem Satz, was man tun kann.
+const EMPTY_PROFILE = {
+  ...PROFILE, bio: "", twitch_handle: "", show_twitch_embed: false, is_club_member: false, teams: [], tournaments: [], f1_bests: [],
+  stats: { points: 40, wins: 0, top3: 1, tournaments: 0, fast_laps: 2, twitch_live_sessions: 0 },
+  references: { stats: { total: 1, tournaments: 0, fastlaps: 1, wins: 0, podiums: 1 }, items: [{ id: "ref-fast", kind: "fastlap", title: "Hotlap", subtitle: "Monza", rank: 3, time_str: "1:20.000", target_id: "hotlap" }] },
+};
+
+function mockEmptyProfile() {
+  apiMock.get.mockImplementation(async (url) => {
+    if (url === "/users/public/paula") return { data: EMPTY_PROFILE };
+    if (url === "/achievements/user/u1") return { data: { groups: [], awards: [] } };
+    return { data: [] };
+  });
+}
+
+test("Zahlenleiste ohne Nullen: Podium mit Fast-Lap-Platz, keine Siege 0", async () => {
+  mockEmptyProfile();
+  renderPage();
+  await screen.findByRole("heading", { level: 1 });
+  expect(screen.getByTestId("profile-stat-top3")).toHaveTextContent("1");
+  expect(screen.getByTestId("profile-stat-points")).toHaveTextContent("40");
+  expect(screen.getByTestId("profile-stat-fastlaps")).toHaveTextContent("2");
+  for (const key of ["wins", "tournaments", "badges", "streams"]) expect(screen.queryByTestId(`profile-stat-${key}`)).toBeNull();
+  fireEvent.click(screen.getByTestId("profile-tab-references"));
+  expect(screen.getByTestId("profile-reference-stat-podiums")).toHaveTextContent("1");
+  expect(screen.queryByTestId("profile-reference-stat-wins")).toBeNull();
+});
+
+test("andere sehen keine leeren Reiter und kein „(0)“", async () => {
+  mockEmptyProfile();
+  renderPage();
+  await screen.findByRole("heading", { level: 1 });
+  const labels = screen.getAllByTestId(/^profile-tab-/).map((node) => node.textContent);
+  expect(labels).toEqual(["Übersicht", "Referenzen (1)"]);
+  expect(labels.join(" ")).not.toMatch(/\(0\)/);
+});
+
+test("eigenes Profil: leere Reiter bleiben, ohne „(0)“, mit einem Satz und Link", async () => {
+  authState.user = { id: "u1", username: "paula" };
+  try {
+    mockEmptyProfile();
+    renderPage();
+    await screen.findByTestId("profile-private-box");
+    expect(screen.getByTestId("profile-tab-teams")).toHaveTextContent(/^Teams$/);
+    expect(screen.getByTestId("profile-tab-awards")).toHaveTextContent(/^Auszeichnungen$/);
+    fireEvent.click(screen.getByTestId("profile-tab-teams"));
+    const empty = screen.getByTestId("profile-teams-empty");
+    expect(empty).toHaveTextContent("Noch kein Team – Teams entdecken");
+    expect(within(empty).getByRole("link", { name: "Teams entdecken" })).toHaveAttribute("href", "/teams");
+  } finally {
+    authState.user = null;
+  }
+});
+
+test("ein Reiter aus der Adresse, den andere nicht sehen, fällt auf die Übersicht zurück", async () => {
+  mockEmptyProfile();
+  render(
+    <MemoryRouter initialEntries={["/u/paula?tab=teams"]}>
+      <Routes><Route path="/u/:username" element={<PublicProfilePage />} /></Routes>
+    </MemoryRouter>
+  );
+  await screen.findByRole("heading", { level: 1 });
+  expect(screen.getByTestId("profile-tab-overview").className).toMatch(/text-\[#29B6E8\]/);
+  expect(screen.queryByTestId("profile-teams-empty")).toBeNull();
 });

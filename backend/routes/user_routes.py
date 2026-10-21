@@ -792,6 +792,9 @@ async def get_public_profile(username: str, view_as: str | None = None, viewer: 
             is_p1 = own["rank"] == 1
             if is_p1:
                 stats["pole_positions"] += 1
+            # Profile ohne Nullen (#1268): ein Fast-Lap-Platz 1 bis 3 je Strecke zählt beim Podium mit.
+            if own["rank"] <= 3:
+                stats["top3"] += 1
             f1_bests.append({
                 "track": tr, "challenge": chall_docs.get(cid),
                 "time_ms": own["effective_ms"],

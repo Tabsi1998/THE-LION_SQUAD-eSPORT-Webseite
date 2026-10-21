@@ -206,3 +206,13 @@ async def test_new_best_message_only_for_a_really_faster_lap(flow, monkeypatch):
     faster = await flow.post(f"/api/f1/challenges/{cid}/times", json={"user_id": people["emil"]["id"], "track_id": tid, "time_ms": 79999})
     assert faster.status_code == 200, faster.text
     assert len(sent) == 1
+
+
+@pytest.mark.asyncio
+async def test_profile_podium_counts_fastlap_places(flow):
+    """Profile ohne Nullen (#1268): „Podium“ zählt Fast-Lap-Plätze 1 bis 3 je Strecke mit, Referenzzeiten nicht."""
+    _cid, _tid, _people, _ids = await stage(flow)
+    stats = {name: (await flow.get(f"/api/users/public/{name}")).json()["stats"] for name in ("anna", "emil", "dora")}
+    assert stats["anna"]["top3"] == 1
+    assert stats["emil"]["top3"] == 1, "Platz 3 in einer Fast Lap ist ein Podium"
+    assert stats["dora"]["top3"] == 0, "Vereins-Referenzzeiten zählen nicht"

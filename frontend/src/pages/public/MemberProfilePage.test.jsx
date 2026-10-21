@@ -39,6 +39,14 @@ function renderProfile() {
   );
 }
 
+// Profile ohne Platzhaltertexte (#1268): ohne Biografie fehlt der Absatz einfach.
+test("ohne Biografie kein Platzhaltertext", async () => {
+  apiMock.get.mockResolvedValue({ data: { ...PROFILE, bio: "" } });
+  renderProfile();
+  expect(await screen.findByTestId("member-references")).toBeInTheDocument();
+  expect(screen.queryByText(/Noch keine Biografie/)).toBeNull();
+});
+
 test("Medaillen mit Zahlen, Podest/Einzel/Team und je Karte die eigene Platzierung", async () => {
   apiMock.get.mockResolvedValue({ data: PROFILE });
   renderProfile();

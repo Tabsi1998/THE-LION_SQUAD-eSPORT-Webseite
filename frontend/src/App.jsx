@@ -95,6 +95,8 @@ const EmailVerificationPage = lazy(() => import("@/pages/public/EmailVerificatio
 const PrivacyPage = lazy(() => import("@/pages/public/LegalPages").then((m) => ({ default: m.PrivacyPage })));
 const ImprintPage = lazy(() => import("@/pages/public/LegalPages").then((m) => ({ default: m.ImprintPage })));
 const TermsPage = lazy(() => import("@/pages/public/LegalPages").then((m) => ({ default: m.TermsPage })));
+// „Neu auf der Website“ (#1240): die letzten Neuerungen aus src/whatsnew.json.
+const WhatsNewPage = lazy(() => import("@/pages/public/WhatsNewPage"));
 
 const DashboardPage = lazy(() => import("@/pages/user/DashboardPage"));
 const YearReviewPage = lazy(() => import("@/pages/user/YearReviewPage"));
@@ -303,6 +305,7 @@ function App() {
           <Route path="/privacy" element={<PrivacyPage />} />
           <Route path="/imprint" element={<ImprintPage />} />
           <Route path="/terms" element={<TermsPage />} />
+          <Route path="/neu" element={<WhatsNewPage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />

@@ -517,19 +517,26 @@ export default function PublicProfilePage() {
     { key: "tournaments", icon: Flag, label: "Turniere", value: s.tournaments || tournaments.length || 0 },
     { key: "fastlaps", icon: TrendingUp, label: "Fast Laps", value: s.fast_laps || 0 },
     ...((twitchChannel || s.twitch_live_sessions > 0) ? [{ key: "streams", icon: Radio, label: "Streams", value: s.twitch_live_sessions || 0, color: "#9146FF" }] : []),
-  ];
+  ].filter(nonZeroStat);
 
   // Dieselben Reiter in derselben Reihenfolge wie in der App (#1149); Mitglieder zusätzlich „Ehrungen“.
-  const tabs = [
-    ["overview", "Übersicht"],
-    ["badges", `Erfolge (${badges.length})`],
-    ["awards", `Auszeichnungen (${awards.length})`],
-    ["references", `Referenzen (${referenceStats.total || referenceItems.length})`],
-    ["teams", `Teams (${teams.length})`],
-    ...(profile.is_club_member || honours.length ? [["honours", `Ehrungen (${honours.length})`]] : []),
-  ];
+  // Profile ohne Nullen (#1268): kein „(0)“; leere Reiter sehen andere gar nicht, das eigene Profil behält sie mit
+  // einem Satz, was man tun kann.
+  const referenceCount = referenceStats.total || referenceItems.length;
+  const tabs = profileTabs({
+    own: ownMode,
+    badges: badges.length,
+    awards: awards.length,
+    references: referenceCount,
+    referencesContent: referenceCount + openTournaments.length + fastLaps.length,
+    teams: teams.length,
+    honours: honours.length,
+    clubMember: Boolean(profile.is_club_member),
+  });
+  // Ein Reiter aus der Adresse, den es (für diese Sicht) nicht gibt, fällt auf die Übersicht zurück.
+  const activeTab = tabs.some(([key]) => key === tab) ? tab : "overview";
 
-  const lockedTab = isPrivate && (tab === "references" || tab === "teams");
+  const lockedTab = isPrivate && (activeTab === "references" || activeTab === "teams");
 
   return (
     <PublicLayout>
@@ -678,9 +685,11 @@ export default function PublicProfilePage() {
             )}
           </div>
 
-          <div className="mt-6 pb-6 grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-7 gap-2 sm:gap-3" data-testid="profile-stats">
-            {headerStats.map((stat) => <QuickStat key={stat.key} icon={stat.icon} label={stat.label} value={stat.value} color={stat.color} glory={stat.glory} testId={`profile-stat-${stat.key}`} />)}
-          </div>
+          {headerStats.length > 0 ? (
+            <div className="mt-6 pb-6 grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-7 gap-2 sm:gap-3" data-testid="profile-stats">
+              {headerStats.map((stat) => <QuickStat key={stat.key} icon={stat.icon} label={stat.label} value={stat.value} color={stat.color} glory={stat.glory} testId={`profile-stat-${stat.key}`} />)}
+            </div>
+          ) : <div className="pb-6" />}
           {isOwnProfile && (
             <div className="mb-6 flex items-center justify-between gap-4 border border-white/10 bg-[#121212] rounded-sm px-4 py-3 max-w-xl" data-testid="profile-as-others">
               <span>
@@ -698,7 +707,7 @@ export default function PublicProfilePage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex gap-1 overflow-x-auto">
           {tabs.map(([k, l]) => (
             <button key={k} onClick={() => setTab(k)} data-testid={`profile-tab-${k}`}
-              className={`px-4 py-3 text-xs font-bold uppercase tracking-wider whitespace-nowrap transition ${tab === k ? "text-[#29B6E8] border-b-2 border-[#29B6E8]" : "text-white/60 hover:text-white"}`}>
+              className={`px-4 py-3 text-xs font-bold uppercase tracking-wider whitespace-nowrap transition ${activeTab === k ? "text-[#29B6E8] border-b-2 border-[#29B6E8]" : "text-white/60 hover:text-white"}`}>
               {l}
             </button>
           ))}
@@ -713,7 +722,7 @@ export default function PublicProfilePage() {
           </div>
         )}
 
-        {tab === "overview" && (
+        {activeTab === "overview" && (
           <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_22rem] xl:grid-cols-[minmax(0,1fr)_24rem]">
             <div className="space-y-8 min-w-0" data-testid="profile-overview-main">
               {ownMode && <PrivateBox />}
@@ -804,8 +813,8 @@ export default function PublicProfilePage() {
           </div>
         )}
 
-        {tab === "badges" && ownMode && <OwnAchievements />}
-        {tab === "badges" && !ownMode && (
+        {activeTab === "badges" && ownMode && <OwnAchievements />}
+        {activeTab === "badges" && !ownMode && (
           <div className="space-y-6">
             {achievementsHidden ? (
               <div className="border border-dashed border-white/15 rounded-sm px-6 py-14 text-center" data-testid="profile-achievements-private">
@@ -846,7 +855,7 @@ export default function PublicProfilePage() {
 
         {/* Auszeichnungen (#230, eigener Reiter): Banner und Trophäen aus veröffentlichten Turnieren -
             keine Referenzen (die sind die Turnier-Historie). Das eigene Profil kann eines als Profilbanner wählen. */}
-        {tab === "awards" && (
+        {activeTab === "awards" && (
           <div className="space-y-3" data-testid="public-profile-awards">
             <h2 className="font-heading text-2xl font-bold uppercase flex items-center gap-2"><Trophy className="w-5 h-5 text-[#FFD700]" /> Auszeichnungen</h2>
             {awards.length > 0 ? (
@@ -877,11 +886,8 @@ export default function PublicProfilePage() {
 
         {/* Ehrungen (#848, eigener Reiter): aus der Mitgliederakte - Ehrenmitgliedschaft, Verdienstnadel, Jubiläum.
             Keine Auszeichnungen: die kommen aus Turnieren. */}
-        {tab === "honours" && ownMode && <HonoursPanel />}
-        {tab === "honours" && !ownMode && honours.length === 0 && (
-          <div className="py-16 text-center text-white/40" data-testid="public-profile-honours-empty">Keine Ehrungen freigegeben.</div>
-        )}
-        {tab === "honours" && !ownMode && honours.length > 0 && (
+        {activeTab === "honours" && ownMode && <HonoursPanel />}
+        {activeTab === "honours" && !ownMode && honours.length > 0 && (
           <div className="space-y-3" data-testid="public-profile-honours">
             <h2 className="font-heading text-2xl font-bold uppercase flex items-center gap-2"><Award className="w-5 h-5 text-[#FFD700]" /> Ehrungen</h2>
             <ul className="grid gap-3 md:grid-cols-2">
@@ -891,14 +897,16 @@ export default function PublicProfilePage() {
         )}
 
         {/* Referenzen: die Turnier- und Fast-Lap-Historie mit Filter; Teilnahmen und Bestzeiten darunter. */}
-        {tab === "references" && !isPrivate && (
+        {activeTab === "references" && !isPrivate && (
           <div className="space-y-8">
             <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 sm:gap-3" data-testid="profile-reference-stats">
-              <QuickStat icon={Trophy} label="Referenzen" value={referenceStats.total || referenceItems.length} color="#29B6E8" />
-              <QuickStat icon={Crown} label="Siege" value={referenceStats.wins || 0} color="#FFD700" glory />
-              <QuickStat icon={Medal} label="Podien" value={referenceStats.podiums || 0} color="#C0C0C0" glory />
-              <QuickStat icon={Flag} label="Turniere" value={referenceStats.tournaments || 0} />
-              <QuickStat icon={Radio} label="Fast Laps" value={referenceStats.fastlaps || 0} />
+              {[
+                { key: "total", icon: Trophy, label: "Referenzen", value: referenceCount, color: "#29B6E8" },
+                { key: "wins", icon: Crown, label: "Siege", value: referenceStats.wins || 0, color: "#FFD700", glory: true },
+                { key: "podiums", icon: Medal, label: "Podien", value: referenceStats.podiums || 0, color: "#C0C0C0", glory: true },
+                { key: "tournaments", icon: Flag, label: "Turniere", value: referenceStats.tournaments || 0 },
+                { key: "fastlaps", icon: Radio, label: "Fast Laps", value: referenceStats.fastlaps || 0 },
+              ].filter(nonZeroStat).map((stat) => <QuickStat key={stat.key} icon={stat.icon} label={stat.label} value={stat.value} color={stat.color} glory={stat.glory} testId={`profile-reference-stat-${stat.key}`} />)}
             </div>
             {referenceItems.length ? (
               <section>
@@ -926,7 +934,7 @@ export default function PublicProfilePage() {
                   ))}
                 </div>
               </section>
-            ) : <EmptyState text="Keine öffentlichen Referenzen." />}
+            ) : ownMode ? <EmptyState text="Noch keine Referenzen" action={{ to: "/tournaments", label: "Turniere entdecken" }} testId="profile-references-empty" /> : <EmptyState text="Keine öffentlichen Referenzen." />}
 
             {openTournaments.length > 0 && (
               <section data-testid="public-profile-tournaments">
@@ -959,7 +967,7 @@ export default function PublicProfilePage() {
           </div>
         )}
 
-        {tab === "teams" && !isPrivate && (
+        {activeTab === "teams" && !isPrivate && (
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
             {teams.length ? (
               teams.map((tm) => (
@@ -969,7 +977,7 @@ export default function PublicProfilePage() {
                   {tm.description && <p className="mt-2 text-sm text-white/60 line-clamp-2">{tm.description}</p>}
                 </Link>
               ))
-            ) : <EmptyState text="Noch kein Team." />}
+            ) : <EmptyState text="Noch kein Team" action={ownMode ? { to: "/teams", label: "Teams entdecken" } : null} testId="profile-teams-empty" />}
           </div>
         )}
       </div>
@@ -1334,6 +1342,32 @@ function TournamentRow({ t, expanded = false }) {
   );
 }
 
-function EmptyState({ text }) {
-  return <div className="py-12 text-center text-white/40 font-display tracking-widest text-sm">{text}</div>;
+function EmptyState({ text, action = null, testId }) {
+  return (
+    <div className="py-12 text-center text-white/40 font-display tracking-widest text-sm" data-testid={testId}>
+      {text}
+      {action && <> – <Link to={action.to} className="text-[#29B6E8] hover:underline">{action.label}</Link></>}
+    </div>
+  );
+}
+
+/** Kennzahlen nur über null (#1268). */
+function nonZeroStat(stat) {
+  return Number(stat.value) > 0;
+}
+
+/**
+ * Reiter des Profils (#1149, #1268): Anzahl nur über null; für andere nur Reiter mit Inhalt, im eigenen Profil alle
+ * (Ehrungen für Mitglieder), damit dort ein Satz sagen kann, was man tun kann.
+ */
+export function profileTabs({ own, badges = 0, awards = 0, references = 0, referencesContent = references, teams = 0, honours = 0, clubMember = false }) {
+  const count = (value) => (value > 0 ? ` (${value})` : "");
+  return [
+    ["overview", "Übersicht", true],
+    ["badges", `Erfolge${count(badges)}`, own || badges > 0],
+    ["awards", `Auszeichnungen${count(awards)}`, own || awards > 0],
+    ["references", `Referenzen${count(references)}`, own || referencesContent > 0],
+    ["teams", `Teams${count(teams)}`, own || teams > 0],
+    ["honours", `Ehrungen${count(honours)}`, honours > 0 || (own && clubMember)],
+  ].filter(([, , shown]) => shown).map(([key, label]) => [key, label]);
 }

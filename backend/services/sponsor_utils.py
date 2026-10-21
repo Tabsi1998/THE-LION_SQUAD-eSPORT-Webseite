@@ -1,4 +1,4 @@
-from services import sponsor_images
+from services import logo_tone, sponsor_images
 
 
 def sponsor_public_key(sponsor: dict) -> str:
@@ -26,6 +26,8 @@ def public_sponsor_view(sponsor: dict) -> dict:
     end = str(sponsor.get("contract_end") or "")[:4]
     view["since_year"] = int(start) if start.isdigit() else None
     view["until_year"] = int(end) if end.isdigit() else None
+    # Einfarbig weiß (#1321): färbbar ist nur ein durchsichtiges Logo - sonst die weiße Fassung oder das Original.
+    view["logo_transparent"] = logo_tone.logo_transparent(view.get("logo_url"))
     return view
 
 

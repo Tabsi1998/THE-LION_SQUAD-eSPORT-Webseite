@@ -81,8 +81,11 @@ export function logoSourceFor(src, boxWidth, density = typeof window !== "undefi
   return sizedUpload(src, variantWidthFor(Math.ceil(boxWidth * Math.min(Math.max(density, 1), 2))));
 }
 
-export function SmartLogo({ src, alt = "", className = "", fallbackClassName = "" }) {
+export function SmartLogo({ src, alt = "", className = "", fallbackClassName = "", onSize = null }) {
   const canvasRef = useRef(null);
+  // Seitenverhältnis nach dem Zuschneiden (#1321): SponsorLogo macht damit alle Logos optisch gleich groß.
+  const onSizeRef = useRef(onSize);
+  useEffect(() => { onSizeRef.current = onSize; });
   const [fallback, setFallback] = useState(false);
   const [loadedSrc, setLoadedSrc] = useState(src);
 
@@ -111,6 +114,7 @@ export function SmartLogo({ src, alt = "", className = "", fallbackClassName = "
         canvas.height = Math.max(1, Math.round(box.sh * scale));
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         ctx.drawImage(image, box.sx, box.sy, box.sw, box.sh, 0, 0, canvas.width, canvas.height);
+        onSizeRef.current?.(canvas.width, canvas.height);
       } catch {
         setFallback(true);
       }
@@ -126,7 +130,10 @@ export function SmartLogo({ src, alt = "", className = "", fallbackClassName = "
 
   if (!src) return null;
   if (fallback) {
-    return <img src={loadedSrc || src} alt={alt} loading="lazy" decoding="async" className={fallbackClassName || className} />;
+    return (
+      <img src={loadedSrc || src} alt={alt} loading="lazy" decoding="async" className={fallbackClassName || className}
+        onLoad={(event) => onSizeRef.current?.(event.currentTarget.naturalWidth, event.currentTarget.naturalHeight)} />
+    );
   }
   return <canvas ref={canvasRef} role={alt ? "img" : undefined} aria-label={alt || undefined} className={`block ${className}`} />;
 }

@@ -542,3 +542,41 @@ async def test_an_entry_that_is_on_track_cannot_move_up(flow):
     assert response.status_code == 409
     row = await flow.db.f1_queue.find_one({"id": entry["id"]})
     assert row["state"] == "on_track"
+
+
+# ------------------------------------------------------------------ Urkunden nach der Veröffentlichung
+
+@pytest.mark.asyncio
+async def test_after_publishing_certificates_go_to_the_person_and_the_lead_only(flow):
+    """Ergebnis-PDF für alle; alle Urkunden nur für die Leitung; eine Urkunde für die Person selbst oder die Leitung."""
+    cid, tid, driver, lead, helper = await setup(flow)
+    other = await flow.add_user(name="andere")
+    await enter(flow, cid, tid, user=driver, time_ms=80000)
+    await enter(flow, cid, tid, user=other, time_ms=81000)
+    await flow.db.f1_challenges.update_one({"id": cid}, {"$set": {"status": "results_published"}})
+    base = f"/api/exports/f1/{cid}"
+    own = f"{base}/certificates/{driver['id']}.pdf"
+    params = {"track_id": tid}
+
+    async def status(who, url, **kwargs):
+        flow.act_as(who)
+        return (await flow.get(url, **kwargs)).status_code
+
+    # Gast: Ergebnis-PDF ja, Urkunden nein.
+    assert await status(None, f"{base}/leaderboard.pdf", params=params) == 200
+    assert await status(None, own, params=params) == 403
+    assert await status(None, f"{base}/certificates.pdf", params=params) == 403
+    assert await status(None, f"{base}/championship-certificates.pdf") == 403
+    assert await status(None, f"{base}/championship-certificates/{driver['id']}.pdf") == 403
+    # Fremde Person: nur die eigene Urkunde.
+    assert await status(other, own, params=params) == 403
+    assert await status(other, f"{base}/certificates/{other['id']}.pdf", params=params) == 200
+    assert await status(other, f"{base}/certificates.pdf", params=params) == 403
+    assert await status(other, f"{base}/championship-certificates/{driver['id']}.pdf") == 403
+    # Die Person selbst.
+    assert await status(driver, own, params=params) == 200
+    # Leitung (Bereich Turniere) und Zuteilung der Fast Lap.
+    assert await status(lead, own, params=params) == 200
+    assert await status(lead, f"{base}/certificates.pdf", params=params) == 200
+    assert await status(helper, f"{base}/certificates.pdf", params=params) == 200
+    assert await status(helper, own, params=params) == 200
