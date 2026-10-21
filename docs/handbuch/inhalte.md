@@ -225,10 +225,27 @@ je Stufe) und eine **Mappe als PDF** zum Hochladen. Interessierte sehen auf der 
 Highlights/Notizen. Dazu **Einträge**: ein **Team** mit gemeinsamer Platzierung oder mehrere **Einzelstarter** mit je eigener
 Platzierung, beides in derselben Teilnahme möglich. Spieler wählt ihr aus den Vereinsprofilen; externe Spieler tragt ihr als Namen ein.
 
+**Schnell-Eintrag für ein Tagesturnier:** Oben im Formular steht nur, was ein Tagesturnier braucht – **Turniername**,
+**Spiel**, **Datum** (ein Tag, das Ende folgt von selbst), **wer** angetreten ist (ein Team oder ein Spieler aus den
+Vereinsprofilen), **Platz von N** und optional ein **Link**. Eine neue Referenz beginnt schon mit einem Team-Eintrag.
+**Wie letztes Mal** übernimmt Spiel, Veranstalter und Team der zuletzt angelegten Referenz. Alles andere – Veranstalter
+und Partner, Liga und Saison, Format, Plattformen, Ende bei mehreren Tagen, Ort, Modus, weitere Links, Label und zweite
+Feldgröße der Einträge, Status, Sichtbarkeit, Reihenfolge, Texte – klappt unter **Weitere Angaben** auf. Beim Bearbeiten
+ist der Bereich offen, wenn dort etwas steht. Vorgaben: Der Status folgt dem Datum (vorbei = abgeschlossen, später =
+geplant, heute mit Platz abgeschlossen), bis ihr ihn selbst wählt; sichtbar für alle, aktiv, Reihenfolge 0 = automatisch
+nach Datum. Die Seite der Referenz zeigt nur, was ausgefüllt ist.
+
+<table>
+<tr>
+<td><img src="../assets/referenzen/referenzen-schnell-eintrag.png" alt="Neue Referenz am Handy: oben Wie letztes Mal, Turniername, Spiel, Datum und Link" width="220"></td>
+<td><img src="../assets/referenzen/referenzen-schnell-eintrag-platz.png" alt="Neue Referenz am Handy: Eintrag mit Spieler aus den Vereinsprofilen, Platz 3 von 12" width="220"></td>
+</tr>
+</table>
+
 **Einzelne Turniere und Cups hier – Ligen und Saisons unter Serien** (3.9): Deren Referenz entsteht beim **Abschluss der
 Saison** automatisch, mit Endplatz, Feldgröße und Spielern; das steht auch oben auf der Seite. Eine Referenz, die zu einer
 Saison gehört, trägt in der Liste das Abzeichen **aus Saison …** mit Link zur Saison. Für ältere Referenzen gibt es im
-Formular die Auswahl **Gehört zur Saison**: verknüpft, führt die Karte auf der Website zur Seite der Saison, und beim
+Formular unter **Weitere Angaben** die Auswahl **Gehört zur Saison**: verknüpft, führt die Karte auf der Website zur Seite der Saison, und beim
 Abschluss der Saison wird diese Referenz aktualisiert statt doppelt angelegt. Sichtbar ist sie dann höchstens so offen
 wie Saison und Spur (eine Saison „Nur Mitglieder“ macht auch die Referenz „Nur Mitglieder“). Ist es die Referenz des
 Saisonabschlusses, sagt das Formular, dass ihr Endplatz in der Saison gepflegt wird. Hat jemand die Referenz geändert,
