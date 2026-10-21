@@ -3,7 +3,8 @@ import { Link } from "react-router-dom";
 import { METALS } from "@/components/tls/TrophyShelf";
 import { formatNumber } from "@/lib/standingsTable";
 import { roundLabel } from "@/lib/referenceCalendar";
-import { barShare, driverSeason, garageName, raceCellLabel } from "@/lib/racingLeague";
+import { barShare, driverSeason, gainedWords, garageName, raceCellLabel } from "@/lib/racingLeague";
+import { ChevronDown, ChevronUp } from "lucide-react";
 import { GuestBadge } from "@/components/tls/series/RacingParts";
 import { CountryFlag } from "@/components/tls/CountryFlag";
 import { countryName } from "@/lib/countryFlags";
@@ -116,6 +117,19 @@ export function RacingGarageTeams({ garage, rows, drivers, selectedKey, onSelect
   );
 }
 
+/** Plätze gutgemacht in einem Rennen: Pfeil und Zahl; ohne Startplatz (oder ohne Zielankunft) bleibt der Platz leer. */
+function Gain({ gained, index }) {
+  if (gained === null) return <span className="tls-racing-race__gain" aria-hidden="true" />;
+  const dir = gained > 0 ? "up" : gained < 0 ? "down" : "same";
+  const Icon = dir === "up" ? ChevronUp : dir === "down" ? ChevronDown : null;
+  return (
+    <span className="tls-racing-race__gain" data-dir={dir} style={{ "--i": index }} aria-hidden="true" data-testid="racing-driver-gain">
+      {Icon && <Icon strokeWidth={3} />}
+      {dir === "same" ? "±0" : Math.abs(gained)}
+    </span>
+  );
+}
+
 function raceTitle(item) {
   const country = countryName(item.round.country_code);
   const name = `${roundLabel(item.round)}${country ? ` (${country})` : ""}`;
@@ -129,11 +143,14 @@ function raceTitle(item) {
 export const RacingDriverDetail = forwardRef(function RacingDriverDetail({ row, driver, rounds, flash }, ref) {
   const season = driverSeason(row, rounds);
   const withFlags = season.perRace.some((item) => item.round.country_code);
+  const withGrid = season.gridRaces > 0;
   const stats = [
     count(season.wins, "Sieg", "Siege"), count(season.podiums, "Podium", "Podien"),
     count(season.fastestLaps, "schnellste Runde", "schnellste Runden"), count(season.dnfs, "Ausfall", "Ausfälle"),
   ];
   if (season.poles) stats.push(count(season.poles, "Pole", "Poles"));
+  if (season.driverOfTheDay) stats.push(`${season.driverOfTheDay}× Fahrer des Tages`);
+  if (withGrid) stats.push(gainedWords(season.gained));
   return (
     <section
       ref={ref}
@@ -188,6 +205,8 @@ export const RacingDriverDetail = forwardRef(function RacingDriverDetail({ row, 
                     )}
                   </span>
                   <span className="tls-racing-race__place" aria-hidden="true">{item.cell ? item.cell.text : "–"}</span>
+                  {/* Startplatz → Ziel (#1927): gutgemachte Plätze grün nach oben, verlorene nach unten. */}
+                  {withGrid && <Gain gained={item.cell?.gained ?? null} index={index} />}
                   <span className="tls-racing-race__code" aria-hidden="true">{roundLabel(item.round)}</span>
                   {/* Flagge des Rennens (#1925) unter dem Kürzel - eine Leiste der Länder entlang der Saison. */}
                   {withFlags && (

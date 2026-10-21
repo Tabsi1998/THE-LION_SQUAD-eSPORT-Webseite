@@ -1,6 +1,72 @@
-import { cleanText, parseMark, parseNumber, parsePlace, parseResultPaste, parseTablePaste } from "@/lib/resultPaste";
+import { cleanText, lapSeconds, parseMark, parseNumber, parsePlace, parseResultPaste, parseTablePaste } from "@/lib/resultPaste";
 
 // Ergebnisliste einfügen (#1744): der einzige Text-Parser für Ergebnisse externer Serien. Nur erfundene Namen.
+
+// ---------------------------------------------------------------- Rennergebnis (#1927)
+test("Rundenzeiten lassen sich vergleichen: 1:31.456, 1:31,456, 91.456, 1:02:03.5", () => {
+  expect(lapSeconds("1:31.456")).toBeCloseTo(91.456, 3);
+  expect(lapSeconds("1:31,456")).toBeCloseTo(91.456, 3);
+  expect(lapSeconds("91.456")).toBeCloseTo(91.456, 3);
+  expect(lapSeconds("1:02:03.5")).toBeCloseTo(3723.5, 3);
+  expect(lapSeconds("DNF")).toBeNull();
+  expect(lapSeconds("")).toBeNull();
+});
+
+test("Tab-Tabelle mit Startnummer, Startplatz, Zeit, Abstand und bester Runde: alles erkannt, schnellste Runde aus der Spalte", () => {
+  const text = [
+    "Pos\tNr\tFahrer\tTeam\tStart\tZeit\tAbstand\tBeste Runde\tPunkte",
+    "1\t7\tAlpha\tProbe Löwen\t3\t1:32:45.123\t\t1:31.902\t35",
+    "2\t12\tBeta\tProbe DarkFriday\t1\t\t+5.204\t1:31.456\t30",
+    "3\t88\tGamma\tFremd Rot\t5\t\t+1 Runde\t1:32.010\t26",
+    "4\t21\tDelta\tFremd Rot\t2\tDNF\t\t1:33.100\t",
+  ].join("\n");
+  const result = parseResultPaste(text);
+  expect(result.errors).toEqual([]);
+  expect(result.header).toBe(true);
+  expect(pick(result.rows, "place", "start_number", "name", "team", "grid", "time", "gap", "marks", "points")).toEqual([
+    { place: 1, start_number: "7", name: "Alpha", team: "Probe Löwen", grid: 3, time: "1:32:45.123", gap: "", marks: [], points: 35 },
+    { place: 2, start_number: "12", name: "Beta", team: "Probe DarkFriday", grid: 1, time: "", gap: "+5.204", marks: [], points: 30 },
+    { place: 3, start_number: "88", name: "Gamma", team: "Fremd Rot", grid: 5, time: "", gap: "+1 Runde", marks: [], points: 26 },
+    { place: 4, start_number: "21", name: "Delta", team: "Fremd Rot", grid: 2, time: "", gap: "", marks: ["dnf"], points: null },
+  ]);
+  expect(result.fastest_lap).toEqual({ name: "Beta", time: "1:31.456" });
+});
+
+test("„|“- und „;“-Tabellen mit englischen Spaltennamen (Grid, Time, Gap)", () => {
+  const pipe = parseResultPaste("| # | Driver | Grid | Time | Gap |\n|---|---|---|---|---|\n| 1 | Alpha | 2 | 58:01.3 | |\n| 2 | Beta | 1 | | +0.8 |");
+  expect(pick(pipe.rows, "place", "name", "grid", "time", "gap")).toEqual([
+    { place: 1, name: "Alpha", grid: 2, time: "58:01.3", gap: "" },
+    { place: 2, name: "Beta", grid: 1, time: "", gap: "+0.8" },
+  ]);
+  const semicolon = parseResultPaste("Platz;Name;Startplatz;Rückstand\n1;Alpha;4;\n2;Beta;3;+2,5");
+  expect(pick(semicolon.rows, "place", "name", "grid", "gap")).toEqual([
+    { place: 1, name: "Alpha", grid: 4, gap: "" },
+    { place: 2, name: "Beta", grid: 3, gap: "+2,5" },
+  ]);
+});
+
+test("ohne Kopfzeile: Zeit und Abstand aus den Zellen, Punkte bleiben die letzte Zahl", () => {
+  const result = parseResultPaste("1\t44\tAlpha\tProbe Racing\t1:32:45.1\t25\n2\t7\tBeta\tTest GP\t+1,2\t18");
+  expect(pick(result.rows, "place", "start_number", "name", "time", "gap", "points")).toEqual([
+    { place: 1, start_number: "44", name: "Alpha", time: "1:32:45.1", gap: "", points: 25 },
+    { place: 2, start_number: "7", name: "Beta", time: "", gap: "+1,2", points: 18 },
+  ]);
+});
+
+test("Zeilen „Schnellste Runde: …“ und „Fahrer des Tages: …“ gehören zum Rennen, nicht in die Liste", () => {
+  const result = parseResultPaste("1. Alpha  35\n2. Beta  30\n3. Gamma  26\nSchnellste Runde: Beta 1:31.456\nFahrer des Tages: Gamma");
+  expect(result.errors).toEqual([]);
+  expect(result.rows.map((row) => row.name)).toEqual(["Alpha", "Beta", "Gamma"]);
+  expect(result.fastest_lap).toEqual({ name: "Beta", time: "1:31.456" });
+  expect(result.driver_of_the_day).toEqual({ name: "Gamma" });
+  // Englisch und in einer Tabelle; eine Zeile ohne Zeit nennt nur den Fahrer.
+  const english = parseResultPaste("1\tAlpha\t25\nFastest lap:\tAlpha\nDriver of the day:\tAlpha");
+  expect(english.rows).toHaveLength(1);
+  expect(english.fastest_lap).toEqual({ name: "Alpha", time: "" });
+  expect(english.driver_of_the_day).toEqual({ name: "Alpha" });
+  // Ohne diese Angaben bleibt das Ergebnis wie bisher.
+  expect(parseResultPaste("1. Alpha  25")).not.toHaveProperty("fastest_lap");
+});
 
 const pick = (rows, ...keys) => rows.map((row) => Object.fromEntries(keys.map((key) => [key, row[key]])));
 

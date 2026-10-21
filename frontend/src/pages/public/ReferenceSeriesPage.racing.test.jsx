@@ -346,9 +346,36 @@ test("Flaggen (#1925): Rennkalender, Spaltenköpfe des Rennrasters und Fahrer-De
   expect(races[1].querySelector("img")).toHaveAttribute("alt", "Aserbaidschan");
 });
 
+test("Rennergebnis (#1927): Fahrer des Tages im Raster, Startplatz → Ziel und gutgemachte Plätze im Fahrer-Detail", async () => {
+  const details = {
+    ext1: { r1: { grid: 2, time: "1:32:45.123", fastest_lap_time: "1:31.456" } },
+    lion1: { r1: { grid: 5, gap: "+5.204", driver_of_the_day: true }, r2: { grid: 1, start_number: "7" } },
+  };
+  const rows = ROWS.map((item) => ({
+    ...item, results: item.results.map((entry) => ({ ...entry, ...(details[item.key]?.[entry.round_id] || {}) })),
+  }));
+  renderAt("/references/series/probe-racing/2026-f1?fahrer=lion1", { ...BODY, standings: { ...BODY.standings, rows } });
+  const table = within(await screen.findByTestId("racing-drivers")).getByTestId("series-table");
+  const lion = within(table).getAllByTestId("series-row")[1];
+  const cells = within(lion).getAllByTestId("race-cell");
+  expect(within(cells[0]).getByTestId("race-dotd")).toBeTruthy();
+  expect(cells[0]).toHaveAttribute("title", "R1: Platz 2, 18 Punkte, von Startplatz 5 (3 Plätze gutgemacht), Abstand +5.204, Fahrer des Tages");
+  const leader = within(table).getAllByTestId("series-row")[0];
+  expect(within(leader).getAllByTestId("race-cell")[0]).toHaveAttribute("title", expect.stringContaining("Zeit 1:32:45.123, schnellste Runde 1:31.456"));
+
+  const detail = screen.getByTestId("racing-driver");
+  const gains = within(detail).getAllByTestId("racing-driver-gain");
+  expect(gains.map((gain) => [gain.dataset.dir, gain.textContent])).toEqual([["up", "3"], ["same", "±0"]]);
+  expect(within(detail).getByTestId("racing-driver-stats")).toHaveTextContent("1× Fahrer des Tages · 3 Plätze gutgemacht");
+});
+
 test("ohne Länder bleibt alles wie bisher: keine Flaggen", async () => {
   renderAt("/references/series/probe-racing/2026-f1?fahrer=lion1");
   await screen.findByTestId("racing-calendar");
+  // Ohne Startplätze und Fahrer des Tages: keine neuen Zeichen im Raster und im Detail.
+  expect(screen.queryAllByTestId("race-dotd")).toEqual([]);
+  expect(screen.queryAllByTestId("racing-driver-gain")).toEqual([]);
+  expect(screen.getByTestId("racing-driver-stats")).not.toHaveTextContent("gutgemacht");
   expect(screen.queryAllByTestId("country-flag")).toEqual([]);
   expect(screen.queryAllByTestId("series-round-flag")).toEqual([]);
 });

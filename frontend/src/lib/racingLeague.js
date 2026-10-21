@@ -21,13 +21,27 @@ function pointsWord(value) {
   return `${formatNumber(value)} ${points(value) === 1 ? "Punkt" : "Punkte"}`;
 }
 
-/** Zelle im Rennraster: Platz (Podium in Gold, Silber, Bronze) oder DNF/DNS/DSQ, dazu schnellste Runde und Pole. */
+function positive(value) {
+  return Number.isInteger(value) && value > 0 ? value : null;
+}
+
+/** Zelle im Rennraster: Platz (Podium in Gold, Silber, Bronze) oder DNF/DNS/DSQ, dazu schnellste Runde und Pole. Aus
+ * dem Rennergebnis (#1927), wenn eingetragen: Startplatz, gutgemachte Plätze (nur im Ziel), Zeit, Abstand, Startnummer,
+ * Zeit der schnellsten Runde und „Fahrer des Tages“. */
 export function raceCell(result) {
   if (!result) return null;
   const marks = new Set(result.marks || []);
   const status = ["dsq", "dns", "dnf"].find((mark) => marks.has(mark)) || "finished";
-  const place = Number.isInteger(result.place) && result.place > 0 ? result.place : null;
+  const place = positive(result.place);
+  const grid = positive(result.grid);
   return {
+    grid,
+    gained: status === "finished" && place && grid ? grid - place : null,
+    time: result.time || "",
+    gap: result.gap || "",
+    startNumber: result.start_number || "",
+    fastestTime: result.fastest_lap_time || "",
+    dotd: Boolean(result.driver_of_the_day),
     status,
     place,
     text: STATUS_TEXT[status] || (place ? String(place) : "–"),
@@ -39,12 +53,25 @@ export function raceCell(result) {
   };
 }
 
-/** Die Zelle für Screenreader und Tooltip: „R1: Platz 1, 26 Punkte, schnellste Runde“. */
+/** Gutgemachte Plätze in Worten: „3 Plätze gutgemacht“, „1 Platz verloren“, „Platz gehalten“. */
+export function gainedWords(gained) {
+  if (gained === null || gained === undefined) return "";
+  if (gained === 0) return "Platz gehalten";
+  const count = Math.abs(gained);
+  return `${count} ${count === 1 ? "Platz" : "Plätze"} ${gained > 0 ? "gutgemacht" : "verloren"}`;
+}
+
+/** Die Zelle für Screenreader und Tooltip: „R1: Platz 1, 26 Punkte, von Startplatz 4 (3 Plätze gutgemacht), schnellste
+ * Runde 1:31.456, Fahrer des Tages“. */
 export function raceCellLabel(cell, roundName) {
   if (!cell) return `${roundName}: nicht dabei`;
   const parts = [STATUS_WORDS[cell.status] || (cell.place ? `Platz ${cell.place}` : "ohne Platz"), pointsWord(cell.points)];
-  if (cell.fastest) parts.push("schnellste Runde");
+  if (cell.grid) parts.push(`von Startplatz ${cell.grid}${cell.gained !== null ? ` (${gainedWords(cell.gained)})` : ""}`);
+  if (cell.time) parts.push(`Zeit ${cell.time}`);
+  if (cell.gap) parts.push(`Abstand ${cell.gap}`);
+  if (cell.fastest) parts.push(cell.fastestTime ? `schnellste Runde ${cell.fastestTime}` : "schnellste Runde");
   if (cell.pole) parts.push("Pole");
+  if (cell.dotd) parts.push("Fahrer des Tages");
   if (cell.dropped) parts.push("gestrichen");
   return `${roundName}: ${parts.join(", ")}`;
 }
@@ -78,8 +105,9 @@ export function raceSummary(rows, roundId, publicKeys = []) {
   return { winner, bestClub: club[0] || null };
 }
 
-/** Die Saison eines Fahrers: Rennen (ohne Nichtstart), Siege, Podien, schnellste Runden, Pole, Ausfälle, bester Platz
- * und je Wertungsrunde die Zelle mit Punkten. */
+/** Die Saison eines Fahrers: Rennen (ohne Nichtstart), Siege, Podien, schnellste Runden, Pole, Ausfälle, bester Platz,
+ * gutgemachte Plätze (Summe über die Rennen im Ziel mit Startplatz, #1927), „Fahrer des Tages“ und je Wertungsrunde die
+ * Zelle mit Punkten. */
 export function driverSeason(row, rounds) {
   const cells = (row?.results || []).map(raceCell).filter(Boolean);
   const finished = cells.filter(classified).map((cell) => cell.place);
@@ -94,6 +122,9 @@ export function driverSeason(row, rounds) {
     fastestLaps: cells.filter((cell) => cell.fastest).length,
     poles: cells.filter((cell) => cell.pole).length,
     dnfs: cells.filter((cell) => cell.status === "dnf").length,
+    gained: cells.reduce((sum, cell) => sum + (cell.gained || 0), 0),
+    gridRaces: cells.filter((cell) => cell.gained !== null).length,
+    driverOfTheDay: cells.filter((cell) => cell.dotd).length,
     bestPlace: finished.length ? Math.min(...finished) : null,
     perRace,
     maxPoints: Math.max(0, ...perRace.map((item) => item.points || 0)),

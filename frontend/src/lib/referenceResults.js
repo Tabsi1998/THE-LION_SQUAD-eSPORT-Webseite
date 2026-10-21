@@ -20,7 +20,9 @@ const text = (value) => (value === null || value === undefined ? "" : String(val
 export function emptyRow(values = {}) {
   return {
     key: nextKey("row"), participant_id: "", name: "", team: "", place: "", points: "", override: false, marks: [],
-    penalty_points: "", start_number: "", official_total: "", note: "", source: "", points_hint: null, ...values,
+    penalty_points: "", start_number: "", official_total: "", note: "", source: "", points_hint: null,
+    // Rennergebnis (#1927): Startplatz, Rennzeit, Abstand - als Text wie eingegeben.
+    grid: "", time: "", gap: "", ...values,
   };
 }
 
@@ -53,6 +55,10 @@ export function sheetToForm(content, participants = [], { kind, teamName, oppone
     official_total: text(totals[row.participant_id]),
     note: text(row.note),
     source: row.points_source || "",
+    start_number: text(row.start_number),
+    grid: text(row.grid),
+    time: text(row.time),
+    gap: text(row.gap),
   }));
   const matches = (content?.matches || []).map((match) => ({
     ...emptyMatch({ home: match.home, away: match.away }),
@@ -68,6 +74,12 @@ export function sheetToForm(content, participants = [], { kind, teamName, oppone
     // Teamwerte laut Veranstalter haben (noch) kein eigenes Feld im Blatt – sie gehen unverändert wieder mit.
     teamTotals: { ...(content?.official_team_totals || {}) },
     note: text(content?.note),
+    // Je Rennen (#1927): schnellste Runde mit Zeit und Fahrer des Tages - im Formular über den Namen der Zeile.
+    fastestLap: {
+      name: participantName(participants, content?.fastest_lap?.participant_id),
+      time: text(content?.fastest_lap?.time),
+    },
+    driverOfTheDay: participantName(participants, content?.driver_of_the_day),
   };
 }
 
@@ -84,6 +96,9 @@ export function pastedToRows(parsed, participants = []) {
       marks: [...row.marks],
       start_number: row.start_number || "",
       points_hint: row.points_hint || null,
+      grid: text(row.grid),
+      time: row.time || "",
+      gap: row.gap || "",
     });
   });
 }
@@ -129,6 +144,7 @@ export function fieldErrors(form) {
   const add = (key, field, message) => { if (message) (out[key] ||= {})[field] = message; };
   for (const row of form.rows) {
     if (text(row.place).trim() && parsePlace(row.place) === null) add(row.key, "place", "Platz als ganze Zahl von 1 bis 1000.");
+    if (text(row.grid).trim() && parsePlace(row.grid) === null) add(row.key, "grid", "Startplatz als ganze Zahl von 1 bis 1000.");
     add(row.key, "points", checkNumber(row.points, { min: -LIMITS.points, max: LIMITS.points, message: "Punkte als Zahl, etwa 25 oder 12,5." }));
     add(row.key, "penalty_points", checkNumber(row.penalty_points, { min: 0, max: LIMITS.penalty, message: "Strafpunkte als Zahl ab 0." }));
     add(row.key, "official_total", checkNumber(row.official_total, { min: -LIMITS.total, max: LIMITS.total, message: "Gesamtstand als Zahl." }));
@@ -167,6 +183,30 @@ function filled(row) {
   return Boolean(row.participant_id || text(row.name).trim());
 }
 
+/** Angaben aus dem Rennergebnis (#1927) - nur, was eingetragen ist; Startplatz als Zahl. */
+function raceDetails(row) {
+  const out = {};
+  const startNumber = text(row.start_number).trim();
+  if (startNumber) out.start_number = startNumber.slice(0, 10);
+  const grid = parsePlace(row.grid);
+  if (grid !== null) out.grid = grid;
+  for (const key of ["time", "gap"]) {
+    const value = cleanText(row[key]);
+    if (value) out[key] = value.slice(0, 20);
+  }
+  return out;
+}
+
+/** Wer in der Liste gemeint ist (schnellste Runde, Fahrer des Tages): die Kennung der Zeile mit diesem Namen, sonst
+ * der Name - der Server ordnet ihn zu und meldet, wenn er nicht in der Liste steht. */
+function rowReference(name, rows) {
+  const wanted = cleanText(name);
+  if (!wanted) return null;
+  const row = rows.find((item) => filled(item) && cleanText(item.name).toLowerCase() === wanted.toLowerCase());
+  if (row?.participant_id) return { participant_id: row.participant_id };
+  return { name: row ? cleanText(row.name) : wanted };
+}
+
 /** Platz aus der Reihenfolge je Zeile (für leere Platzfelder): gezählt werden nur ausgefüllte Zeilen. */
 export function autoPlaces(rows) {
   const out = {};
@@ -194,6 +234,7 @@ export function formToPayload(form) {
     const explicitPlace = parsePlace(row.place);
     const out = {
       ...reference(row),
+      ...raceDetails(row),
       place: explicitPlace !== null ? Math.trunc(explicitPlace) : auto[row.key],
       team: text(row.team).trim() || null,
       points,
@@ -225,7 +266,13 @@ export function formToPayload(form) {
     return out;
   });
   const note = text(form.note).trim();
-  return { payload: { rows, matches, official_team_totals: { ...(form.teamTotals || {}) }, official_table, note: note || null }, rowKeys };
+  const payload = { rows, matches, official_team_totals: { ...(form.teamTotals || {}) }, official_table, note: note || null };
+  const fastest = rowReference(form.fastestLap?.name, form.rows);
+  const lapTime = cleanText(form.fastestLap?.time).slice(0, 20);
+  if (fastest || lapTime) payload.fastest_lap = { ...(fastest || {}), time: lapTime || null };
+  const driver = rowReference(form.driverOfTheDay, form.rows);
+  if (driver) payload.driver_of_the_day = driver;
+  return { payload, rowKeys };
 }
 
 /** Fehler und Warnungen der Vorschau je Formularzeile (`{key: [{level, message}]}`) und die ohne Zeile. */

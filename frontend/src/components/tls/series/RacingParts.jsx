@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { Timer } from "lucide-react";
+import { Star, Timer } from "lucide-react";
 import { METALS } from "@/components/tls/TrophyShelf";
 import { Points } from "@/components/tls/series/SeriesStandings";
 import { formatDiff, formatNumber } from "@/lib/standingsTable";
@@ -88,6 +88,8 @@ export function RaceCell({ result, name }) {
       >
         {cell.text}
         {cell.fastest && <Timer className="tls-race-fastest" strokeWidth={2.5} data-testid="race-fastest" />}
+        {/* Fahrer des Tages (#1927): kleiner goldener Stern unten rechts - gegenüber der Stoppuhr oben. */}
+        {cell.dotd && <Star className="tls-race-dotd" strokeWidth={2.5} fill="currentColor" data-testid="race-dotd" />}
       </span>
       <span className="sr-only">{label}</span>
     </>

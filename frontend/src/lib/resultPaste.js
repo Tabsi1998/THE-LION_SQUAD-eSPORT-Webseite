@@ -8,6 +8,10 @@
 // - Tabellen mit Tab (aus Excel oder einer Website kopiert), „|“ oder „;“ als Trenner – mit oder ohne Kopfzeile
 //   („Platz | Fahrer | Team | Punkte“). Ohne Kopfzeile: erste Zahl Platz, erster Text Name, zweiter Text Team, letzte
 //   Zahl Punkte, eine Zahl vor dem Namen Startnummer; „Name;Platz“ geht auch.
+// - Rennergebnis (#1927): Spalten Startnummer, Startplatz („Start“, „Grid“), Zeit, Abstand („+5.204“, „+1 Runde“) und
+//   beste Runde – die schnellste daraus wird die schnellste Runde des Rennens. Ohne Kopfzeile zählt eine Zelle mit „:“
+//   als Zeit, eine mit „+“ als Abstand. Zeilen „Schnellste Runde: Name 1:31.456“ und „Fahrer des Tages: Name“ gehören
+//   zum Rennen, nicht in die Liste. Die Felder heißen wie bei der Texterkennung (#1756): start_number, grid, time, gap.
 // Ganz ohne reguläre Ausdrücke auf der Eingabe (nur Zeichen für Zeichen), damit auch sehr lange Texte schnell bleiben.
 // Was sich nicht lesen lässt, kommt als Fehler mit Zeilennummer zurück – nichts wird still verschluckt.
 
@@ -36,7 +40,17 @@ const RESULT_HEADERS = {
   points: ["punkte", "pkt", "pts", "points"],
   start_number: ["nr", "startnummer", "no", "nummer", "number", "startnr"],
   marks: ["status", "info", "bemerkung"],
+  grid: ["start", "startplatz", "startpos", "grid", "quali", "qualifying"],
+  time: ["zeit", "time", "rennzeit", "gesamtzeit", "race time"],
+  gap: ["abstand", "gap", "rückstand", "interval", "intervall", "diff", "differenz"],
+  best_lap: ["beste runde", "best lap", "bestlap", "schnellste runde", "fastest lap", "rundenbestzeit", "beste"],
 };
+
+// Zeilen, die zum Rennen gehören statt zu einem Fahrer (#1927): Präfix, dann „:“.
+const RACE_LINES = [
+  ["schnellste runde", "fastest_lap"], ["fastest lap", "fastest_lap"],
+  ["fahrer des tages", "driver_of_the_day"], ["driver of the day", "driver_of_the_day"], ["dotd", "driver_of_the_day"],
+];
 
 const TABLE_HEADERS = {
   rank: ["platz", "pl", "pos", "position", "rang", "rank", "#"],
@@ -105,6 +119,21 @@ export function parseNumber(value) {
   if (!digits || text.endsWith(",") || text.endsWith(".")) return null;
   const number = Number(text.replace(",", "."));
   return Number.isFinite(number) ? number : null;
+}
+
+/** Rundenzeit in Sekunden („1:31.456“, „1:31,456“, „91.456“, „1:02:03.5“) – sonst `null`. Nur zum Vergleichen. */
+export function lapSeconds(value) {
+  const text = cleanText(value);
+  if (!text) return null;
+  const parts = text.split(":");
+  if (parts.length > 3) return null;
+  let total = 0;
+  for (let index = 0; index < parts.length; index += 1) {
+    const part = parseNumber(parts[index]);
+    if (part === null || part < 0 || (index < parts.length - 1 && !Number.isInteger(part))) return null;
+    total = total * 60 + part;
+  }
+  return total;
 }
 
 /** Platz wie „1“, „1.“, „1)“ oder „#1“ (1–1000) – sonst `null`. */
@@ -269,7 +298,7 @@ function lineRow(text) {
     }
     break;
   }
-  return { place, name: items.map((item) => item.text).join(" "), team: "", points, start_number: "", marks, points_hint: hint };
+  return { place, name: items.map((item) => item.text).join(" "), team: "", points, start_number: "", marks, points_hint: hint, grid: null, time: "", gap: "" };
 }
 
 function cellRow(cells) {
@@ -277,6 +306,8 @@ function cellRow(cells) {
   let name = "";
   let team = "";
   let startNumber = "";
+  let time = "";
+  let gap = "";
   const numbers = [];
   const marks = [];
   cells.forEach((cell, index) => {
@@ -290,7 +321,12 @@ function cellRow(cells) {
       if (!marks.includes(mark)) marks.push(mark);
       return;
     }
-    if (isGap(cell)) return;
+    if (isGap(cell)) {
+      // Ohne Kopfzeile: „+…“ ist der Abstand, eine Zelle mit „:“ die Zeit (#1927).
+      if (cell.startsWith("+")) gap ||= cell;
+      else time ||= cell;
+      return;
+    }
     const number = parseNumber(cell);
     if (number !== null) {
       if (!name && place !== null && !startNumber) startNumber = cell;
@@ -304,11 +340,11 @@ function cellRow(cells) {
     place = numbers.shift();
   }
   const points = numbers.length ? numbers[numbers.length - 1] : null;
-  return { place, name, team, points, start_number: startNumber, marks, points_hint: null };
+  return { place, name, team, points, start_number: startNumber, marks, points_hint: null, grid: null, time, gap };
 }
 
 function headerRow(cells, keys) {
-  const row = { place: null, name: "", team: "", points: null, start_number: "", marks: [], points_hint: null };
+  const row = { place: null, name: "", team: "", points: null, start_number: "", marks: [], points_hint: null, grid: null, time: "", gap: "" };
   keys.forEach((key, index) => {
     const cell = cells[index] || "";
     if (!cell) return;
@@ -324,19 +360,58 @@ function headerRow(cells, keys) {
     else if (key === "name") row.name = cell;
     else if (key === "team") row.team = cell;
     else if (key === "start_number") row.start_number = cell.slice(0, 10);
+    else if (key === "grid") row.grid = parsePlace(cell);
+    else if (key === "time") row.time = cell.slice(0, 20);
+    else if (key === "gap") row.gap = cell.slice(0, 20);
+    else if (key === "best_lap") row.best_lap = cell.slice(0, 20);
   });
   return row;
 }
 
+/** „Schnellste Runde: Name 1:31.456“ oder „Fahrer des Tages: Name“ – sonst `null`. Trenner zählen als Leerzeichen. */
+function raceLine(text) {
+  let flat = "";
+  for (const char of normalizeText(text)) flat += char === "\t" || char === "|" || char === ";" ? " " : char;
+  const line = cleanText(flat);
+  const lower = line.toLowerCase();
+  for (const [prefix, kind] of RACE_LINES) {
+    if (!lower.startsWith(prefix)) continue;
+    const rest = line.slice(prefix.length).trimStart();
+    if (!rest.startsWith(":")) continue;
+    const words = cleanText(rest.slice(1)).split(" ").filter(Boolean);
+    if (kind === "driver_of_the_day") return { kind, value: { name: words.join(" ").slice(0, MAX_NAME) } };
+    const last = words[words.length - 1] || "";
+    const timed = words.length > 1 && lapSeconds(last) !== null && (last.includes(":") || last.includes(".") || last.includes(","));
+    return { kind, value: { name: (timed ? words.slice(0, -1) : words).join(" ").slice(0, MAX_NAME), time: timed ? last.slice(0, 20) : "" } };
+  }
+  return null;
+}
+
+/** Die schnellste Runde aus der Spalte „Beste Runde“: die kleinste Zeit. */
+function fastestFromColumn(rows) {
+  let best = null;
+  for (const row of rows) {
+    const seconds = lapSeconds(row.best_lap);
+    if (seconds !== null && (!best || seconds < best.seconds)) best = { seconds, name: row.name, time: row.best_lap };
+  }
+  return best ? { name: best.name, time: best.time } : null;
+}
+
 /**
  * Ergebnisliste aus der Zwischenablage.
- * Liefert `{format, header, rows: [{line, place, name, team, points, start_number, marks, points_hint}], errors: [{line, text, message}]}`.
+ * Liefert `{format, header, rows: [{line, place, name, team, points, start_number, marks, points_hint, grid, time, gap}], errors: [{line, text, message}]}`,
+ * dazu `fastest_lap` (`{name, time}`) und `driver_of_the_day` (`{name}`), wenn die Liste sie nennt (#1927).
  * `points_hint` (`{points, text}` oder `null`): Zeilenformat mit einer Zahl am Ende, die auch zum Namen gehören kann.
  * `place` und `points` sind `null`, wenn die Liste sie nicht nennt – dann zählt die Reihenfolge bzw. der Schlüssel.
  */
 export function parseResultPaste(text, { maxRows = MAX_PASTE_ROWS } = {}) {
   const errors = [];
-  const lines = readLines(text, maxRows, errors);
+  const race = {};
+  const lines = readLines(text, maxRows, errors).filter((line) => {
+    const found = raceLine(line.text);
+    if (found) race[found.kind] = found.value;
+    return !found;
+  });
   const separator = pickSeparator(lines);
   const rows = [];
   let keys = null;
@@ -369,7 +444,11 @@ export function parseResultPaste(text, { maxRows = MAX_PASTE_ROWS } = {}) {
   if (!rows.length && lines.length && errors.every((error) => error.message === NO_NAME)) {
     errors.unshift({ line: null, text: "", message: "Format nicht erkannt. Je Zeile ein Teilnehmer, etwa „1. Name  25“ oder eine Tabelle mit Tab, „|“ oder „;“." });
   }
-  return { format: lines.length ? separator.format : null, header: Boolean(keys), rows, errors };
+  const fastest = race.fastest_lap || fastestFromColumn(rows);
+  const out = { format: lines.length ? separator.format : null, header: Boolean(keys), rows: rows.map(({ best_lap: _lap, ...row }) => row), errors };
+  if (fastest) out.fastest_lap = fastest;
+  if (race.driver_of_the_day) out.driver_of_the_day = race.driver_of_the_day;
+  return out;
 }
 
 // ---------------------------------------------------------------- Tabelle laut Veranstalter (Team-Liga)

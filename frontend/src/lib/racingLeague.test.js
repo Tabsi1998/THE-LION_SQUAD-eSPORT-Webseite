@@ -118,6 +118,27 @@ test("Fahrer-Detail: Rennen, Siege, Podien, schnellste Runden, Ausfälle und Pun
   expect(driverSeason(ROWS[1], ROUNDS)).toMatchObject({ wins: 1, podiums: 2, poles: 1, bestPlace: 1 });
 });
 
+test("Rennergebnis (#1927): Startplatz → Ziel, Plätze gutgemacht, Zeit, Abstand, schnellste Runde mit Zeit, Fahrer des Tages", () => {
+  const winner = raceCell(result("r1", 1, 36, ["fastest_lap"], { grid: 4, time: "1:32:45.123", start_number: "7", fastest_lap_time: "1:31.456", driver_of_the_day: true }));
+  expect(winner).toMatchObject({ grid: 4, gained: 3, time: "1:32:45.123", gap: "", startNumber: "7", fastestTime: "1:31.456", dotd: true });
+  expect(raceCellLabel(winner, "R1")).toBe("R1: Platz 1, 36 Punkte, von Startplatz 4 (3 Plätze gutgemacht), Zeit 1:32:45.123, schnellste Runde 1:31.456, Fahrer des Tages");
+  const lost = raceCell(result("r1", 5, 20, [], { grid: 2, gap: "+12.5" }));
+  expect(lost.gained).toBe(-3);
+  expect(raceCellLabel(lost, "R2")).toBe("R2: Platz 5, 20 Punkte, von Startplatz 2 (3 Plätze verloren), Abstand +12.5");
+  expect(raceCellLabel(raceCell(result("r1", 3, 26, [], { grid: 3 })), "R3")).toBe("R3: Platz 3, 26 Punkte, von Startplatz 3 (Platz gehalten)");
+  // Ein Ausfall hat keinen Gewinn - nur den Startplatz.
+  const out = raceCell(result("r1", null, 0, ["dnf"], { grid: 1 }));
+  expect(out.gained).toBeNull();
+  expect(raceCellLabel(out, "R4")).toBe("R4: ausgefallen, 0 Punkte, von Startplatz 1");
+  // Ohne die Angaben: wie bisher.
+  expect(raceCell(result("r1", 2, 18))).toMatchObject({ grid: null, gained: null, dotd: false, fastestTime: "" });
+
+  const row = { key: "x", results: [
+    result("r1", 1, 36, [], { grid: 4, driver_of_the_day: true }), result("r2", 6, 15, [], { grid: 2 }), result("r4", 3, 26)] };
+  expect(driverSeason(row, ROUNDS)).toMatchObject({ gained: -1, gridRaces: 2, driverOfTheDay: 1 });
+  expect(driverSeason(ROWS[0], ROUNDS)).toMatchObject({ gained: 0, gridRaces: 0, driverOfTheDay: 0 });
+});
+
 test("Teamduell: wer im selben Team vor dem anderen ins Ziel kam; Punkte fürs Team aus der gespeicherten Teamwertung", () => {
   // Der Server sagt, was jeder fürs Team gezählt hat (hier zählt der Gast nicht) - das Web rechnet nicht nach.
   const juniors = { team: "Probe Löwen B", driver_points: { lion3: 24 } };
