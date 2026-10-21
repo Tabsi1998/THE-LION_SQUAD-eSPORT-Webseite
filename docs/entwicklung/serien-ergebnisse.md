@@ -73,9 +73,13 @@ Runde X“ allgemein in `round_phases.py` (wiederverwendbar, etwa für Regeländ
   `sprint`, `race`) kommt aus dem Namen. Termine mit gleichem Kürzel (ohne Leerraum, Groß/klein egal) sind eine Runde;
   der Kalender liefert je Termin `weekend` (Nummer der Runde in Kalender-Reihenfolge, abgesagte zählen mit, archivierte
   nicht), `session` und `session_kind` – Verwaltung, Serienseite und `/public/running` (`next.session`,
-  `next.sessions`). Ein neues Qualifying ohne `counts` zählt nicht zur Wertung.
-- **Läufe je Runde:** Serie `weekend = {formats: [{from_round, sessions: [{label, offset, counts, points, grid}]}]}`.
-  `points`: `series` (Schema der Saison), `none` oder Liste je Platz; `grid`: `manual`, `qualifying` oder
+  `next.sessions`). Ein neuer Termin ohne `counts` zählt nach der Vorgabe seines Laufs (`race_weekend.planned_config`) –
+  ein Qualifying ohne Punkte nicht. „Shootout“ (Sprint-Qualifying) ist ein Qualifying ohne Pole
+  (`race_weekend.is_main_qualifying`).
+- **Läufe je Runde:** Serie `weekend = {formats: [{from_round, sessions: [{label, offset, counts, points, dnf,
+  fastest_lap, grid}]}]}`. `points`: `series` (Schema der Saison = wie das Rennen), `none` oder Liste je Platz – ein
+  Qualifying mit Liste zählt ohne Angabe von `counts`; `dnf`: `series`, `place` (Punkte nach Platz trotz DNF) oder `none`
+  (0); `fastest_lap`: `null` (wie die Saison) oder Bonuspunkte; `grid`: `manual`, `qualifying` oder
   `reverse_standings`. Eine Änderung rechnet neu und steht im Protokoll (`reference_series.weekend_change`). Die
   eingefügte Terminliste legt je Zeile ohne Lauf alle Läufe des gültigen Abschnitts an (`offset` in Minuten ab der
   Uhrzeit der Zeile, ohne Uhrzeit nur ganze Tage); `R1S`, `R1 Sprint`, `R1 Q` … nur diesen Lauf. Doppelte Läufe einer
@@ -89,8 +93,10 @@ Runde X“ allgemein in `round_phases.py` (wiederverwendbar, etwa für Regeländ
   (außer eine Zeile trägt sie schon), die Warnung `round_not_counted` entfällt. Der Ausgangsstand liefert die Regeln des
   Laufs (`series.rules` mit seinem Punkteschema).
 - **Serienseite (Rennliga):** `progress` zählt Runden (gewertet, wenn alle zählenden Läufe gewertet sind),
-  `series.weekend` für „Punkte je Lauf“, `racing.qualifying` = je veröffentlichtem Qualifying die Plätze der Fahrer der
-  Fahrerwertung (nur Kennungen) für Poles und Quali-Duell.
+  `series.weekend` für „Punkte je Lauf“, `racing.qualifying` = je veröffentlichtem Qualifying fürs Rennen die Plätze der
+  Fahrer der Fahrerwertung (nur Kennungen) für Poles und Quali-Duell. Die Tabellen je Lauf („Gesamt · Rennen · Sprint ·
+  Quali“) zählt das Web aus den Punkten je Lauf im gespeicherten Stand (`lib/raceWeekend.js`, `sessionTables`). Zwei
+  Ligen als gemeinsame Fälle für Server und Web: `frontend/src/lib/raceWeekendLeagues.json`.
 
 ## Version, Entwurf daneben und Protokoll
 
