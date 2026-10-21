@@ -58,6 +58,7 @@ from routes.reference_series_routes import router as reference_series_router
 from routes.reference_round_routes import router as reference_round_router
 from routes.reference_participant_routes import router as reference_participant_router
 from routes.reference_result_routes import router as reference_result_router
+from routes.reference_result_image_routes import router as reference_result_image_router
 from routes.reference_staff_routes import router as reference_staff_router
 from routes.reference_series_public_routes import router as reference_series_public_router
 from routes.mobile_routes import router as mobile_router
@@ -322,6 +323,7 @@ app.include_router(reference_series_router)
 app.include_router(reference_round_router)
 app.include_router(reference_participant_router)
 app.include_router(reference_result_router)
+app.include_router(reference_result_image_router)  # Ergebnis-Bild auslesen (#1756)
 app.include_router(reference_staff_router)
 app.include_router(reference_series_public_router)
 app.include_router(mobile_router)

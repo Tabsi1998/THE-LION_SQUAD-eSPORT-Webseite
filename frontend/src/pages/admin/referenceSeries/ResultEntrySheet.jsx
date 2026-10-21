@@ -10,6 +10,8 @@ import {
 } from "@/lib/referenceResults";
 import { ResultPreview } from "./ResultPreview";
 import { VenueWithFlag } from "@/components/tls/CountryFlag";
+import { ResultImageButton, ResultImageRowNote, ResultImageSummary, ocrMark, useResultImage } from "./ResultImageImport";
+import { RACE_FIELD_GROUPS, afterEdit, confirmRow, imageFormFields, imageToRows, isUncertain, openImageItems, replaceRaceMarks } from "@/lib/resultImage";
 import { toast } from "sonner";
 import { ClipboardList, Plus, RefreshCw, SlidersHorizontal, Trash2, X } from "lucide-react";
 
@@ -79,15 +81,18 @@ function FieldErrors({ fields, testId }) {
   );
 }
 
-function ResultRow({ row, index, autoPlace, organizerMode, problems, info, invalid, onChange, onHint, onRemove }) {
+function ResultRow({ row, index, autoPlace, organizerMode, problems, info, invalid, onChange, onHint, onRemove, onConfirmImage }) {
   const scored = info?.scored;
   // Offen von selbst nur, wo etwas Ungewöhnliches steht (Strafe, Gesamtstand, „zählen statt Schlüssel“) oder eine Eingabe
   // ungültig ist. Startnummer, Startplatz, Zeit und Abstand (#1927) stehen zugeklappt kurz unter der Zeile - so bleibt
-  // eine eingefügte Liste mit 20 Fahrern überschaubar.
-  const [opened, setOpen] = useState(() => Boolean(row.penalty_points || row.official_total || row.override));
+  // eine eingefügte Liste mit 20 Fahrern überschaubar. Aus dem Bild (#1756) auch, wenn ein Feld darunter gelb ist - offen
+  // ab dem Anlegen, damit es beim Korrigieren nicht zuklappt.
+  const [opened, setOpen] = useState(() => Boolean(row.penalty_points || row.official_total || row.override
+    || ["start_number", "grid", "time", "gap"].some((field) => isUncertain(row, field))));
   const open = opened || Boolean(invalid?.grid || invalid?.penalty_points || invalid?.official_total);
   const raceLine = [row.start_number && `Nr. ${row.start_number}`, row.grid && `Startplatz ${row.grid}`, row.time, row.gap].filter(Boolean).join(" · ");
-  const level = invalid || problems?.some((item) => item.level === "error") ? "error" : problems?.length ? "warning" : null;
+  const mark = (field) => ocrMark(row, field, index);
+  const level = invalid || problems?.some((item) => item.level === "error") ? "error" : problems?.length || row.ocr ? "warning" : null;
   const toggleMark = (mark) => onChange({ marks: row.marks.includes(mark) ? row.marks.filter((item) => item !== mark) : [...row.marks, mark] });
   const number = index + 1;
   return (
@@ -96,14 +101,14 @@ function ResultRow({ row, index, autoPlace, organizerMode, problems, info, inval
       {/* Handy: Platz, Name, Punkte und Knöpfe in einer Zeile, das Team darunter; ab sm alles in einer Zeile. */}
       <div className="grid grid-cols-[3.5rem_minmax(0,1fr)_4.5rem_auto_auto] sm:grid-cols-[3.5rem_minmax(0,1fr)_9rem_5rem_auto_auto] items-center gap-2">
         <input aria-label={`Platz Zeile ${number}`} inputMode="numeric" value={row.place} placeholder={autoPlace ? String(autoPlace) : "–"}
-          onChange={(event) => onChange({ place: event.target.value })} data-testid="result-row-place" {...invalidProps(invalid, "place")} className={`${SMALL_INPUT} text-center tabular-nums ${invalid?.place ? INVALID : ""}`} />
+          onChange={(event) => onChange({ place: event.target.value })} data-testid="result-row-place" {...invalidProps(invalid, "place")} {...mark("place").props} className={`${SMALL_INPUT} text-center tabular-nums ${mark("place").className} ${invalid?.place ? INVALID : ""}`} />
         <input aria-label={`Name Zeile ${number}`} value={row.name} list="result-participants" placeholder="Name wie beim Veranstalter" maxLength={120}
-          onChange={(event) => onChange({ name: event.target.value, participant_id: "" })} data-testid="result-row-name" className={SMALL_INPUT} />
+          onChange={(event) => onChange({ name: event.target.value, participant_id: "" })} data-testid="result-row-name" {...mark("name").props} className={`${SMALL_INPUT} ${mark("name").className}`} />
         <input aria-label={`Team Zeile ${number}`} value={row.team} list="result-teams" placeholder="Team" maxLength={120}
-          onChange={(event) => onChange({ team: event.target.value })} data-testid="result-row-team" className={`${SMALL_INPUT} order-last col-start-2 col-end-6 sm:order-none sm:col-start-auto sm:col-end-auto`} />
+          onChange={(event) => onChange({ team: event.target.value })} data-testid="result-row-team" {...mark("team").props} className={`${SMALL_INPUT} ${mark("team").className} order-last col-start-2 col-end-6 sm:order-none sm:col-start-auto sm:col-end-auto`} />
         <input aria-label={`Punkte Zeile ${number}`} inputMode="decimal" value={row.points} placeholder="Pkt"
           title={organizerMode ? "Punkte laut Veranstalter" : "Leer: nach Schlüssel. Eingetragen: laut Veranstalter (wird geprüft)."}
-          onChange={(event) => onChange({ points: event.target.value })} data-testid="result-row-points" {...invalidProps(invalid, "points")} className={`${SMALL_INPUT} text-right tabular-nums ${invalid?.points ? INVALID : ""}`} />
+          onChange={(event) => onChange({ points: event.target.value })} data-testid="result-row-points" {...invalidProps(invalid, "points")} {...mark("points").props} className={`${SMALL_INPUT} text-right tabular-nums ${mark("points").className} ${invalid?.points ? INVALID : ""}`} />
         <button type="button" className={`${ICON_BUTTON} ${open ? "text-[#29B6E8]" : ""}`} onClick={() => setOpen((value) => !value)} aria-expanded={open} aria-label={`Mehr zu Zeile ${number}`} title="Marken, Strafpunkte, Startnummer, Startplatz, Zeit, Abstand" data-testid="result-row-more">
           <SlidersHorizontal className="w-4 h-4" />
         </button>
@@ -112,7 +117,7 @@ function ResultRow({ row, index, autoPlace, organizerMode, problems, info, inval
         </button>
       </div>
       {(open || row.marks.length > 0) && (
-        <div className="mt-2 flex flex-wrap gap-1.5" role="group" aria-label={`Marken Zeile ${number}`}>
+        <div className={`mt-2 flex flex-wrap gap-1.5 ${isUncertain(row, "marks") ? "rounded-sm ring-1 ring-amber-400/60 p-1" : ""}`} role="group" aria-label={`Marken Zeile ${number}`}>
           {MARK_OPTIONS.map(([mark, label]) => {
             const active = row.marks.includes(mark);
             if (!open && !active) return null;
@@ -130,13 +135,13 @@ function ResultRow({ row, index, autoPlace, organizerMode, problems, info, inval
           <label className="block"><span className={LABEL}>Strafpunkte</span>
             <input inputMode="decimal" value={row.penalty_points} onChange={(event) => onChange({ penalty_points: event.target.value })} data-testid="result-row-penalty" {...invalidProps(invalid, "penalty_points")} className={`${SMALL_INPUT} ${invalid?.penalty_points ? INVALID : ""}`} /></label>
           <label className="block"><span className={LABEL}>Startnummer</span>
-            <input value={row.start_number} maxLength={10} onChange={(event) => onChange({ start_number: event.target.value })} data-testid="result-row-start" className={SMALL_INPUT} /></label>
+            <input value={row.start_number} maxLength={10} onChange={(event) => onChange({ start_number: event.target.value })} data-testid="result-row-start" {...mark("start_number").props} className={`${SMALL_INPUT} ${mark("start_number").className}`} /></label>
           <label className="block"><span className={LABEL}>Startplatz</span>
-            <input inputMode="numeric" value={row.grid} onChange={(event) => onChange({ grid: event.target.value })} data-testid="result-row-grid" {...invalidProps(invalid, "grid")} className={`${SMALL_INPUT} tabular-nums ${invalid?.grid ? INVALID : ""}`} /></label>
+            <input inputMode="numeric" value={row.grid} onChange={(event) => onChange({ grid: event.target.value })} data-testid="result-row-grid" {...invalidProps(invalid, "grid")} {...mark("grid").props} className={`${SMALL_INPUT} tabular-nums ${mark("grid").className} ${invalid?.grid ? INVALID : ""}`} /></label>
           <label className="block"><span className={LABEL}>Zeit</span>
-            <input value={row.time} maxLength={20} onChange={(event) => onChange({ time: event.target.value })} data-testid="result-row-time" className={`${SMALL_INPUT} tabular-nums`} /></label>
+            <input value={row.time} maxLength={20} onChange={(event) => onChange({ time: event.target.value })} data-testid="result-row-time" {...mark("time").props} className={`${SMALL_INPUT} tabular-nums ${mark("time").className}`} /></label>
           <label className="block"><span className={LABEL}>Abstand</span>
-            <input value={row.gap} maxLength={20} onChange={(event) => onChange({ gap: event.target.value })} data-testid="result-row-gap" className={`${SMALL_INPUT} tabular-nums`} /></label>
+            <input value={row.gap} maxLength={20} onChange={(event) => onChange({ gap: event.target.value })} data-testid="result-row-gap" {...mark("gap").props} className={`${SMALL_INPUT} tabular-nums ${mark("gap").className}`} /></label>
           <label className="block"><span className={LABEL}>Gesamt laut Veranst.</span>
             <input inputMode="decimal" value={row.official_total} onChange={(event) => onChange({ official_total: event.target.value })} data-testid="result-row-total" {...invalidProps(invalid, "official_total")} className={`${SMALL_INPUT} ${invalid?.official_total ? INVALID : ""}`} /></label>
           {!organizerMode && (
@@ -163,15 +168,19 @@ function ResultRow({ row, index, autoPlace, organizerMode, problems, info, inval
         </div>
       )}
       <FieldErrors fields={invalid} testId="result-row-invalid" />
+      <ResultImageRowNote row={row} onConfirm={onConfirmImage} />
       <RowProblems items={problems} />
     </li>
   );
 }
 
 // Je Rennen (#1927): schnellste Runde mit Zeit und Fahrer des Tages - Namen aus der Liste oben (Vorschläge). Feldfehler
-// (Zeit ohne Fahrer) und Meldungen der Vorschau zu diesen Feldern stehen direkt darunter.
+// (Zeit ohne Fahrer) und Meldungen der Vorschau zu diesen Feldern stehen direkt darunter. Aus dem Bild (#1756) sind
+// unsichere Felder gelb wie an den Zeilen: Ändern nimmt die Markierung weg, „Passt so“ bestätigt alle.
 function RaceExtras({ form, onChange, invalid, problems = {} }) {
-  const set = (key, values) => onChange({ [key]: values });
+  const imageMarks = { ocr: form.raceOcr };
+  const mark = (field) => ocrMark(imageMarks, field);
+  const set = (key, values, field) => onChange({ [key]: values, ...(form.raceOcr ? { raceOcr: afterEdit(imageMarks, [field]).ocr } : {}) });
   const lapInvalid = Boolean(invalid?.fastest_lap || problems.fastest_lap?.some((item) => item.level === "error"));
   const dayInvalid = Boolean(problems.driver_of_the_day?.some((item) => item.level === "error"));
   const messages = [
@@ -182,15 +191,21 @@ function RaceExtras({ form, onChange, invalid, problems = {} }) {
     <section className="border border-white/10 rounded-sm bg-[#0A0A0A] p-3 grid gap-2 sm:grid-cols-[minmax(0,1fr)_8rem_minmax(0,1fr)] items-end" data-testid="result-race">
       <label className="block min-w-0"><span className={LABEL}>Schnellste Runde</span>
         <input value={form.fastestLap.name} list="result-row-names" maxLength={120} placeholder="Name aus der Liste"
-          onChange={(event) => set("fastestLap", { ...form.fastestLap, name: event.target.value })} data-testid="result-fastest-name"
-          aria-invalid={lapInvalid || undefined} className={`${SMALL_INPUT} ${lapInvalid ? INVALID : ""}`} /></label>
+          onChange={(event) => set("fastestLap", { ...form.fastestLap, name: event.target.value }, "fastest_lap_name")} data-testid="result-fastest-name"
+          aria-invalid={lapInvalid || undefined} {...mark("fastest_lap_name").props} className={`${SMALL_INPUT} ${mark("fastest_lap_name").className} ${lapInvalid ? INVALID : ""}`} /></label>
       <label className="block"><span className={LABEL}>Rundenzeit</span>
         <input value={form.fastestLap.time} maxLength={20} placeholder="1:31.456"
-          onChange={(event) => set("fastestLap", { ...form.fastestLap, time: event.target.value })} data-testid="result-fastest-time" className={`${SMALL_INPUT} tabular-nums`} /></label>
+          onChange={(event) => set("fastestLap", { ...form.fastestLap, time: event.target.value }, "fastest_lap_time")} data-testid="result-fastest-time"
+          {...mark("fastest_lap_time").props} className={`${SMALL_INPUT} tabular-nums ${mark("fastest_lap_time").className}`} /></label>
       <label className="block min-w-0"><span className={LABEL}>Fahrer des Tages</span>
         <input value={form.driverOfTheDay} list="result-row-names" maxLength={120} placeholder="Name aus der Liste"
-          onChange={(event) => set("driverOfTheDay", event.target.value)} data-testid="result-dotd"
-          aria-invalid={dayInvalid || undefined} className={`${SMALL_INPUT} ${dayInvalid ? INVALID : ""}`} /></label>
+          onChange={(event) => set("driverOfTheDay", event.target.value, "driver_of_the_day")} data-testid="result-dotd"
+          aria-invalid={dayInvalid || undefined} {...mark("driver_of_the_day").props} className={`${SMALL_INPUT} ${mark("driver_of_the_day").className} ${dayInvalid ? INVALID : ""}`} /></label>
+      {form.raceOcr && (
+        <div className="sm:col-span-3">
+          <ResultImageRowNote row={imageMarks} onConfirm={() => onChange({ raceOcr: null })} testId="result-race-ocr" />
+        </div>
+      )}
       {messages.length > 0 && (
         <ul className="sm:col-span-3 space-y-0.5 text-xs" data-testid="result-race-problems" role="alert">
           {messages.map((item, index) => (
@@ -386,6 +401,18 @@ export function ResultEntrySheet({ series, round, onClose, onSaved }) {
   const participants = useMemo(() => data?.participants || [], [data]);
   // Vorschläge fürs Team: zuerst die eigenen Teams der Saison (#1926), dann die Standard-Teams der Teilnehmer.
   const teams = useMemo(() => [...new Set([...(data?.series?.own_teams || []), ...participants.map((person) => person.default_team)].filter(Boolean))], [data, participants]);
+  // Ergebnis-Bild (#1756): die gelesenen Zeilen ersetzen die Liste wie „Liste einfügen“, danach prüft die Vorschau.
+  const [checkImage, setCheckImage] = useState(false);
+  const image = useResultImage({
+    base,
+    onRead: (result) => {
+      // Schnellste Runde und Fahrer des Tages gehen in die Felder des Rennens (#1927); was das Bild nicht ersetzt,
+      // bleibt – mit seiner gelben Markierung.
+      setForm((current) => ({ ...current, ...imageFormFields(result, current.raceOcr), rows: imageToRows(result, participants) }));
+      setPasting(false);
+      setCheckImage(true);
+    },
+  });
 
   const built = useMemo(() => (form ? formToPayload(form) : null), [form]);
   const stamp = built ? formStamp(built.payload) : "";
@@ -412,9 +439,12 @@ export function ResultEntrySheet({ series, round, onClose, onSaved }) {
           if (!next.team && known.default_team) next.team = known.default_team;
         }
       }
-      return next;
+      // Was jemand ändert, ist geprüft: die gelbe Markierung aus dem Bild fällt für diese Felder weg.
+      return afterEdit(next, Object.keys(values));
     }),
   }));
+  const confirmImageRow = (key) => setForm((current) => ({ ...current, rows: current.rows.map((row) => (row.key === key ? confirmRow(row) : row)) }));
+  const imageOpen = form ? openImageItems(form) : 0;
   const hinted = form ? form.rows.filter((row) => row.points_hint).length : 0;
   const allHintsToPoints = () => setForm((current) => ({
     ...current,
@@ -430,15 +460,28 @@ export function ResultEntrySheet({ series, round, onClose, onSaved }) {
     return result;
   };
 
+  useEffect(() => {
+    if (!checkImage || !built) return;
+    setCheckImage(false);
+    runPreview(built.payload, stamp).catch((err) => toast.error(formatApiError(err.response?.data?.detail)));
+    // runPreview ist je Darstellung neu, ändert aber nichts am Ablauf - entscheidend ist der Stand des Formulars.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [checkImage, built, stamp]);
+
   const pasteRows = (text) => {
     const result = parseResultPaste(text);
     if (result.rows.length) {
       const rows = pastedToRows(result.rows, participants);
       const next = {
         ...form, rows,
-        // Schnellste Runde und Fahrer des Tages aus der Liste (#1927) - sonst bleibt, was schon eingetragen ist.
+        // Schnellste Runde und Fahrer des Tages aus der Liste (#1927) - sonst bleibt, was schon eingetragen ist. Gelb
+        // aus einem Bild verlieren nur die Felder, die die Liste ersetzt; was stehen bleibt, ist weiter ungeprüft.
         ...(result.fastest_lap ? { fastestLap: { name: result.fastest_lap.name || "", time: result.fastest_lap.time || "" } } : {}),
         ...(result.driver_of_the_day ? { driverOfTheDay: result.driver_of_the_day.name || "" } : {}),
+        raceOcr: replaceRaceMarks(form.raceOcr, [
+          ...(result.fastest_lap ? RACE_FIELD_GROUPS.fastestLap : []),
+          ...(result.driver_of_the_day ? RACE_FIELD_GROUPS.driverOfTheDay : []),
+        ]),
       };
       setForm(next);
       setPasting(result.errors.length > 0);
@@ -471,7 +514,19 @@ export function ResultEntrySheet({ series, round, onClose, onSaved }) {
     toast.error("Das Ergebnis wurde inzwischen geändert – bitte neu laden.");
   };
 
+  // Gelbe Zeilen aus dem Bild: erst prüfen, dann übernehmen – „Gelbe Zeilen prüfen“ springt zur ersten.
+  const showImageOpen = () => {
+    toast.error(`${imageOpen === 1 ? "Eine Zeile aus dem Bild ist" : `${imageOpen} Zeilen aus dem Bild sind`} noch gelb – bitte prüfen oder mit „Passt so“ bestätigen.`);
+    const first = document.querySelector('[data-testid="result-sheet"] [data-ocr-uncertain], [data-testid="result-sheet"] [data-testid="result-row-ocr-confirm"]');
+    first?.scrollIntoView?.({ block: "center" });
+    first?.focus?.();
+  };
+
   const save = async (status) => {
+    if (imageOpen) {
+      showImageOpen();
+      return;
+    }
     setSaving(true);
     try {
       const { data: result } = await api.put(base, { ...built.payload, status, expected_version: data.version });
@@ -524,6 +579,7 @@ export function ResultEntrySheet({ series, round, onClose, onSaved }) {
       save(canPublish ? "published" : "draft");
       return;
     }
+    // Die Vorschau prüft auch mit gelben Zeilen - übernommen wird erst danach (siehe save).
     setSaving(true);
     try {
       await runPreview(built.payload, stamp);
@@ -535,7 +591,7 @@ export function ResultEntrySheet({ series, round, onClose, onSaved }) {
     }
   };
 
-  const submitLabel = !ready ? (fresh ? "Erneut prüfen" : "Vorschau") : toPendingDraft ? "Entwurf zur Freigabe" : canPublish ? "Veröffentlichen" : "Als Entwurf speichern";
+  const submitLabel = !ready ? (fresh ? "Erneut prüfen" : "Vorschau") : imageOpen ? "Gelbe Zeilen prüfen" : toPendingDraft ? "Entwurf zur Freigabe" : canPublish ? "Veröffentlichen" : "Als Entwurf speichern";
   const sheetStatus = data?.sheet?.status;
   const pending = board ? data?.sheet?.pending_draft : null;
   const filledRows = built?.payload.rows.length || 0;
@@ -543,7 +599,7 @@ export function ResultEntrySheet({ series, round, onClose, onSaved }) {
   return (
     <AdminSheet title={`Ergebnis ${round ? roundLabel(round) : ""}`} eyebrow={series.lineage?.title} size="xl" onClose={onClose} onSubmit={submit} saving={saving}
       submitLabel={submitLabel} savingLabel={ready ? "Übernehme …" : "Prüfe …"} submitTestId="result-submit" testId="result-sheet" noValidate
-      footer={ready && canPublish ? (
+      footer={ready && canPublish && !imageOpen ? (
         <button type="button" disabled={saving} onClick={() => save("draft")} data-testid="result-save-draft" className="tls-btn tls-btn--secondary px-4 py-2.5 rounded-sm text-xs font-bold uppercase tracking-wider disabled:opacity-50">
           Nur als Entwurf
         </button>
@@ -616,10 +672,14 @@ export function ResultEntrySheet({ series, round, onClose, onSaved }) {
             <section className="space-y-2" data-testid="result-rows-section">
               <div className="flex items-center justify-between gap-2 flex-wrap">
                 <h3 className="text-[11px] font-bold uppercase tracking-widest text-[#29B6E8]">Ergebnisliste{filledRows ? ` · ${filledRows}` : ""}</h3>
-                <button type="button" onClick={() => setPasting((value) => !value)} aria-expanded={pasting} data-testid="result-paste-toggle" className="tls-btn tls-btn--quiet px-3 py-1.5 rounded-sm text-[11px] font-bold uppercase tracking-wider inline-flex items-center gap-1.5">
-                  <ClipboardList className="w-3.5 h-3.5" /> Liste einfügen
-                </button>
+                <div className="flex flex-wrap items-center gap-2">
+                  <button type="button" onClick={() => setPasting((value) => !value)} aria-expanded={pasting} data-testid="result-paste-toggle" className="tls-btn tls-btn--quiet px-3 py-1.5 rounded-sm text-[11px] font-bold uppercase tracking-wider inline-flex items-center gap-1.5">
+                    <ClipboardList className="w-3.5 h-3.5" /> Liste einfügen
+                  </button>
+                  <ResultImageButton image={image} />
+                </div>
               </div>
+              <ResultImageSummary image={image} rows={form.rows} raceOcr={form.raceOcr} />
               {hinted > 1 && (
                 <div className="flex flex-wrap items-center gap-2 border border-amber-400/40 bg-amber-400/10 rounded-sm px-3 py-2 text-xs text-amber-100" data-testid="result-hints">
                   <span className="flex-1 min-w-[12rem]">{hinted} Zeilen enden auf eine Zahl – Teil des Namens oder Punkte?</span>
@@ -634,7 +694,8 @@ export function ResultEntrySheet({ series, round, onClose, onSaved }) {
                 {form.rows.map((row, index) => (
                   <ResultRow key={row.key} row={row} index={index} autoPlace={auto[row.key]} organizerMode={organizerMode} invalid={invalid[row.key]}
                     problems={problems.byRow[row.key]} info={infoByKey[row.key]}
-                    onChange={(values) => updateRow(row.key, values)} onHint={() => updateRow(row.key, hintToPoints(row, participants))} onRemove={() => removeRow(row.key)} />
+                    onChange={(values) => updateRow(row.key, values)} onHint={() => updateRow(row.key, hintToPoints(row, participants))} onRemove={() => removeRow(row.key)}
+                    onConfirmImage={() => confirmImageRow(row.key)} />
                 ))}
               </ol>
               <button type="button" onClick={addRow} data-testid="result-row-add" className="tls-btn tls-btn--secondary px-3 py-2 rounded-sm text-xs font-bold uppercase tracking-wider inline-flex items-center gap-2">
@@ -655,6 +716,11 @@ export function ResultEntrySheet({ series, round, onClose, onSaved }) {
           {invalidCount > 0 && (
             <p className="border border-red-400/40 bg-red-400/10 rounded-sm px-3 py-2 text-sm text-red-100" role="alert" data-testid="result-invalid">
               {invalidCount === 1 ? "Eine Eingabe ist ungültig" : `${invalidCount} Eingaben sind ungültig`} – rot markiert. Geprüft und gespeichert wird erst, wenn alles stimmt.
+            </p>
+          )}
+          {imageOpen > 0 && (
+            <p className="border border-amber-400/40 bg-amber-400/10 rounded-sm px-3 py-2 text-sm text-amber-100" role="status" data-testid="result-image-open">
+              {imageOpen === 1 ? "Eine Zeile aus dem Bild ist" : `${imageOpen} Zeilen aus dem Bild sind`} noch gelb – prüfen, korrigieren oder mit „Passt so“ bestätigen. Übernommen wird erst danach.
             </p>
           )}
           {fresh && <ResultPreview preview={preview} general={problems.general} board={board} />}

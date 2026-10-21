@@ -3,7 +3,7 @@ import { api, formatApiError } from "@/lib/api";
 import { AdminSheet } from "@/components/tls/AdminSheet";
 import { FormGrid } from "@/components/tls/AdminForm";
 import { FieldLabel, SelectField, TextAreaField, TextField } from "@/components/tls/FormFields";
-import { KIND_OPTIONS, VISIBILITY_OPTIONS, lineageToForm, lineagePayload } from "@/lib/referenceSeries";
+import { KIND_OPTIONS, VISIBILITY_OPTIONS, lineageToForm, lineagePayload, resultImageOptions } from "@/lib/referenceSeries";
 import { gameOptionLabel } from "@/lib/gameLabels";
 import { moveTier, tierOrderList } from "@/lib/seriesTiers";
 import { ArrowDown, ArrowUp } from "lucide-react";
@@ -18,6 +18,7 @@ export function LineageForm({ lineage, games = [], onClose, onSaved }) {
   const [saving, setSaving] = useState(false);
   const set = (key, value) => setForm((current) => ({ ...current, [key]: value }));
   const gameOptions = [["", "—"], ...games.map((game) => [game.id, gameOptionLabel(game)])];
+  const imageOptions = resultImageOptions(form.kind, { value: form.result_image_template });
 
   const save = async (event) => {
     event.preventDefault();
@@ -47,6 +48,10 @@ export function LineageForm({ lineage, games = [], onClose, onSaved }) {
         <SelectField label="Sichtbarkeit" value={form.visibility} onChange={(v) => set("visibility", v)} options={VISIBILITY_OPTIONS} testId="lineage-visibility" />
         <TextField label="Adresse (Slug)" value={form.slug} onChange={(v) => set("slug", v)} placeholder="wird aus dem Titel gebildet" hint={isNew ? "" : "Die alte Adresse leitet weiter."} testId="lineage-slug" />
         <TextField label="Reihenfolge" type="number" value={form.order_index} onChange={(v) => set("order_index", Number(v) || 0)} testId="lineage-order" />
+        {imageOptions.length > 0 && (
+          <SelectField label="Vorlage für Ergebnis-Bilder" value={form.result_image_template} onChange={(v) => set("result_image_template", v)} options={imageOptions} testId="lineage-image-template"
+            hint="So liest „Bild auslesen“ den Screenshot des Veranstalters. Eine Saison kann abweichen." />
+        )}
       </FormGrid>
       <TextAreaField label="Beschreibung" value={form.description} onChange={(v) => set("description", v)} testId="lineage-description" />
       <TierOrderField tiers={(lineage?.series || []).map((item) => item.tier)} value={form.tier_order} onChange={(v) => set("tier_order", v)} />
