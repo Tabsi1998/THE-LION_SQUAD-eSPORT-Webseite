@@ -128,12 +128,13 @@ export function FastLapQuickEntry({ challenge, track, times, guests, onGuestCrea
 
   return (
     <section className="min-w-0 border border-[#29B6E8]/25 bg-[#0d1418] rounded-sm p-4 sm:p-5" data-testid="fl-quick" aria-label="Schnelleingabe">
-      <div className="flex items-start justify-between gap-3 mb-4">
+      {/* Am Handy (#1941): die Überschrift ohne Trennstrich, das Abzeichen in einer Zeile - ist es zu eng, rückt es darunter. */}
+      <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-2 mb-4">
         <div className="min-w-0">
-          <h2 className="font-heading font-bold uppercase text-lg leading-tight">Schnelleingabe</h2>
+          <h2 className="font-heading font-bold uppercase text-lg leading-tight [hyphens:manual]">Schnelleingabe</h2>
           <div className="text-xs text-white/45 mt-0.5 truncate">{track?.name || "Strecke wählen"}</div>
         </div>
-        <div className={`tls-attempt-chip max-w-[55%] text-right ${status.tone}`} data-testid="fl-quick-attempt" key={`${driver?.id || ""}:${used}`}>{status.text}</div>
+        <div className={`tls-attempt-chip whitespace-nowrap ${status.tone}`} data-testid="fl-quick-attempt" key={`${driver?.id || ""}:${used}`}>{status.text}</div>
       </div>
 
       {onTrack.length > 0 && !driver && (

@@ -87,7 +87,9 @@ export function F1StaffPanel({ challengeId, staff, staffError = "", onChanged })
           {staffError ? (
             <div className="px-4 py-8 text-center text-sm text-white/55" data-testid="f1-staff-error">{staffError}</div>
           ) : (
-            <table className="w-full text-sm">
+            // Am Handy (#1941): die Tabelle scrollt seitlich statt Status und Aktionen abzuschneiden.
+            <div className="overflow-x-auto" data-testid="f1-staff-table">
+            <table className="w-full text-sm min-w-[560px]">
               <thead className="bg-[#0A0A0A] text-[11px] uppercase tracking-widest text-white/50">
                 <tr>
                   <th className="text-left px-4 py-3">Person</th>
@@ -120,6 +122,7 @@ export function F1StaffPanel({ challengeId, staff, staffError = "", onChanged })
                 {staff.length === 0 && <tr><td colSpan="4" className="text-center py-8 text-white/40">Noch keine Fast-Lap-Zeitnehmer</td></tr>}
               </tbody>
             </table>
+            </div>
           )}
         </div>
       </div>
