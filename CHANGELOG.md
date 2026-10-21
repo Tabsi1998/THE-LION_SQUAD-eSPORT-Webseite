@@ -1,5 +1,21 @@
 # Changelog
 
+## [1.18.0](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/compare/v1.17.1...v1.18.0) (2026-10-21)
+
+
+### Neu
+
+* doppelte Teilnehmer zusammenführen und Teilnehmer ohne Ergebnis entfernen ([#1929](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1929)) ([a65b012](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/a65b012ac2b6c9335a3688ffef4f893265762b4c))
+* Ergebnisblatt mit Startnummer, Startplatz, Zeit, Abstand, schnellster Runde und Fahrer des Tages ([#1927](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1927)) ([4985aaa](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/4985aaa25503e0afba5254019df7eef5f9034696))
+* Flaggen bei Terminen und Rennen, automatisch aus Strecke oder Ort erkannt ([#1925](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1925)) ([4985aaa](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/4985aaa25503e0afba5254019df7eef5f9034696))
+* Garage, Teamwertung, „Unser Platz“ und Liga-Weg zählen alle eigenen Teams ([#1926](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1926)) ([4985aaa](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/4985aaa25503e0afba5254019df7eef5f9034696))
+* Land eines Termins wählbar, auch beim Einfügen der Terminliste ([#1925](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1925)) ([4985aaa](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/4985aaa25503e0afba5254019df7eef5f9034696))
+* Liste einfügen erkennt Start-, Zeit-, Abstand- und Bestrunden-Spalten sowie „OUT“ als Ausfall ([#1927](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1927)) ([4985aaa](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/4985aaa25503e0afba5254019df7eef5f9034696))
+* Mehrere eigene Teams je Saison mit Schreibweisen ([#1926](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1926)) ([4985aaa](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/4985aaa25503e0afba5254019df7eef5f9034696))
+* Rennraster zeigt den Fahrer des Tages, Fahrer-Detail die gutgemachten Plätze ([#1927](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1927)) ([4985aaa](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/4985aaa25503e0afba5254019df7eef5f9034696))
+* Teilnehmer einer Saison nachträglich bearbeiten – Name, Startnummer, Team und Zuordnung je Zeile ([#1929](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1929)) ([a65b012](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/a65b012ac2b6c9335a3688ffef4f893265762b4c))
+* Teilnehmer filtern, suchen und mehrere auf einmal als Gast oder Extern markieren ([#1929](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1929)) ([a65b012](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/a65b012ac2b6c9335a3688ffef4f893265762b4c))
+
 ## 1.17.1 (21.10.2026)
 
 ### Fehlerbehebungen
