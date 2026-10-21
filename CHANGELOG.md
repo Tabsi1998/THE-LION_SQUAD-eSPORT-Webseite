@@ -1,14 +1,13 @@
 # Changelog
 
-## [1.20.0](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/compare/v1.19.0...v1.20.0) (2026-10-21)
-
+## 1.20.0 (21.10.2026)
 
 ### Neu
 
-* Aus dem Bild auch Startplatz, Zeit, Abstand, Punkte, Pole, schnellste Runde und Fahrer des Tages übernehmen ([#1756](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1756)) ([16c5e19](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/16c5e19e8418c704840a5fe073b95670373f1027))
-* Ergebnis-Screenshot einer Rennliga im Ergebnis-Blatt auslesen – Strg+V oder Bild wählen, unsichere Felder gelb ([#1756](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1756)) ([16c5e19](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/16c5e19e8418c704840a5fe073b95670373f1027))
-* Termin zur Strecke im Bild vorschlagen, Saisontabellen und Kalender ablehnen ([#1756](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1756)) ([16c5e19](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/16c5e19e8418c704840a5fe073b95670373f1027))
-* Vorlage für Ergebnis-Bilder je Spur und Saison wählen ([#1756](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1756)) ([16c5e19](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/16c5e19e8418c704840a5fe073b95670373f1027))
+* Aus dem Bild auch Startplatz, Zeit, Abstand, Punkte, Pole, schnellste Runde und Fahrer des Tages übernehmen (#1756)
+* Ergebnis-Screenshot einer Rennliga im Ergebnis-Blatt auslesen – Strg+V oder Bild wählen, unsichere Felder gelb (#1756)
+* Termin zur Strecke im Bild vorschlagen, Saisontabellen und Kalender ablehnen (#1756)
+* Vorlage für Ergebnis-Bilder je Spur und Saison wählen (#1756)
 
 ## 1.19.0 (21.10.2026)
 
