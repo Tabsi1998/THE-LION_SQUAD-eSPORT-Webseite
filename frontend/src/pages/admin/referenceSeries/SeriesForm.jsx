@@ -9,13 +9,15 @@ import { RulesFields } from "./RulesFields";
 import { OwnTeamsField } from "./OwnTeamsField";
 import { WeekendFormatsField } from "./WeekendFormatsField";
 import { weekendPayload, weekendToForm } from "@/lib/raceWeekend";
+import { SeriesPartnersField } from "./SeriesPartnersField";
+import { inheritedPartners } from "@/lib/seriesPartners";
 import { toast } from "sonner";
 
 // Saison einer Spur (#1741): Saison und Stufe ergeben die Adresse, die Vorlage füllt die Regeln vor (kopiert, nicht
 // verknüpft). Ändert sich beim Bearbeiten eine Regel, rechnet der Server alle Stände neu und vermerkt den Hinweis.
 // Rennliga (#1930): dazu „Ablauf je Runde“ - der Ablauf einer Runde mit Läufen, auch ab Runde X wechselnd.
 
-export function SeriesForm({ series, lineage, schemes = [], defaultRules = {}, onClose, onSaved }) {
+export function SeriesForm({ series, lineage, schemes = [], defaultRules = {}, partners = [], onClose, onSaved }) {
   const isNew = !series?.id;
   const archived = series?.status === "archived";
   const [form, setForm] = useState(() => seriesToForm({ ...(series || {}), lineage_id: lineage.id }, isNew ? defaultRules : series.rules));
@@ -77,6 +79,10 @@ export function SeriesForm({ series, lineage, schemes = [], defaultRules = {}, o
         )}
       </FormGrid>
       <OwnTeamsField teams={form.own_teams} onChange={(teams) => set("own_teams", teams)} />
+      {/* #1934: die Saison erbt die Partner der Spur und kann eigene ergänzen, etwa einen Sponsor dieser Season. */}
+      <SeriesPartnersField partners={partners} value={form} onChange={(next) => setForm((current) => ({ ...current, ...next }))}
+        inherited={inheritedPartners(lineage, partners)} testPrefix="series-partner"
+        hint="Zusätzlich zu den Partnern der Spur, nur für diese Saison – etwa ein Sponsor dieser Season." />
       <TextAreaField label="Beschreibung" value={form.description} onChange={(v) => set("description", v)} testId="series-description" />
       <RulesFields rules={form.rules} kind={lineage.kind} onChange={(rules) => set("rules", rules)} />
       {racing && <WeekendFormatsField formats={weekend} onChange={setWeekend} racePoints={form.rules.points_mode === "scheme" ? parsePointsList(form.rules.points_by_place) : null} />}

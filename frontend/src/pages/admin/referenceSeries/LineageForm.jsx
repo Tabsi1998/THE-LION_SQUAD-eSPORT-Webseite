@@ -6,19 +6,26 @@ import { FieldLabel, SelectField, TextAreaField, TextField } from "@/components/
 import { KIND_OPTIONS, VISIBILITY_OPTIONS, lineageToForm, lineagePayload, resultImageOptions } from "@/lib/referenceSeries";
 import { gameOptionLabel } from "@/lib/gameLabels";
 import { moveTier, tierOrderList } from "@/lib/seriesTiers";
+import { organizerSuggestion } from "@/lib/seriesPartners";
+import { SeriesPartnersField } from "./SeriesPartnersField";
 import { ArrowDown, ArrowUp } from "lucide-react";
 import { toast } from "sonner";
 
 // Spur (#1741): die Klammer über den Saisons, etwa eine Rennliga mit der Bezeichnung „F1“. Die Adresse entsteht aus dem
 // Titel; wird er geändert, leitet die alte Adresse weiter.
 
-export function LineageForm({ lineage, games = [], onClose, onSaved }) {
+export function LineageForm({ lineage, games = [], partners = [], onClose, onSaved }) {
   const isNew = !lineage?.id;
   const [form, setForm] = useState(() => lineageToForm(lineage || {}));
   const [saving, setSaving] = useState(false);
   const set = (key, value) => setForm((current) => ({ ...current, [key]: value }));
   const gameOptions = [["", "—"], ...games.map((game) => [game.id, gameOptionLabel(game)])];
   const imageOptions = resultImageOptions(form.kind, { value: form.result_image_template });
+  // #1934: Partner mit Rolle; ist einer Veranstalter und das Feld „Veranstalter“ leer, steht sein Name als Vorschlag drin.
+  const changePartners = (next) => setForm((current) => {
+    const suggestion = organizerSuggestion(partners, next, current.organizer);
+    return { ...current, ...next, ...(suggestion ? { organizer: suggestion } : {}) };
+  });
 
   const save = async (event) => {
     event.preventDefault();
@@ -53,6 +60,8 @@ export function LineageForm({ lineage, games = [], onClose, onSaved }) {
             hint="So liest „Bild auslesen“ den Screenshot des Veranstalters. Eine Saison kann abweichen." />
         )}
       </FormGrid>
+      <SeriesPartnersField partners={partners} value={form} onChange={changePartners}
+        hint="Veranstalter stehen mit Logo im Kopf der Serienseite, Mitwirkende darunter. Die Partnerseite zeigt die Spur unter „Ligen und Serien mit uns“." />
       <TextAreaField label="Beschreibung" value={form.description} onChange={(v) => set("description", v)} testId="lineage-description" />
       <TierOrderField tiers={(lineage?.series || []).map((item) => item.tier)} value={form.tier_order} onChange={(v) => set("tier_order", v)} />
     </AdminSheet>

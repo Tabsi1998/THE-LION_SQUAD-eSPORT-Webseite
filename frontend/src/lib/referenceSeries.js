@@ -99,7 +99,7 @@ export function formToRules(form) {
 }
 
 export const emptyLineage = {
-  title: "", kind: "racing", label: "", organizer: "", game_id: "", partner_ids: [], external_url: "", description: "",
+  title: "", kind: "racing", label: "", organizer: "", game_id: "", partner_ids: [], partner_roles: {}, external_url: "", description: "",
   visibility: "public", slug: "", order_index: 0,
   // #1898: eigene Reihenfolge der Stufen (höchste zuerst); null heißt Vorgabe aus der Zahl im Namen.
   tier_order: null,
@@ -119,7 +119,8 @@ export function lineagePayload(form) {
   const blank = (value) => (String(value ?? "").trim() === "" ? null : String(value).trim());
   return {
     title: String(form.title || "").trim(), kind: form.kind, label: blank(form.label), organizer: blank(form.organizer),
-    game_id: blank(form.game_id), partner_ids: form.partner_ids || [], external_url: blank(form.external_url),
+    game_id: blank(form.game_id), partner_ids: form.partner_ids || [], partner_roles: form.partner_roles || {},
+    external_url: blank(form.external_url),
     description: blank(form.description), visibility: form.visibility, order_index: Number(form.order_index) || 0,
     tier_order: Array.isArray(form.tier_order) && form.tier_order.length ? form.tier_order : null,
     result_image_template: blank(form.result_image_template),
@@ -170,6 +171,9 @@ export function seriesToForm(series = {}, rules = series.rules) {
     description: series.description || "",
     season_result: series.season_result || "",
     result_image_template: series.result_image_template || "",
+    // #1934: eigene Partner der Saison – die der Spur erbt sie ohnehin.
+    partner_ids: Array.isArray(series.partner_ids) ? series.partner_ids : [],
+    partner_roles: series.partner_roles || {},
     rules_note: "",
     rules: rulesToForm(rules || {}),
   };
@@ -194,6 +198,8 @@ export function seriesPayload(form, { isNew = false, archived = false } = {}) {
     season_result: form.season_result || null,
     // #1756: leer heißt „wie bei der Spur“.
     result_image_template: form.result_image_template || null,
+    partner_ids: form.partner_ids || [],
+    partner_roles: form.partner_roles || {},
     rules: formToRules(form.rules),
   };
   // Eine archivierte Serie behält beim Bearbeiten ihren Stand; zurück holt sie „Zurückholen“.
