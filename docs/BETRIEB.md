@@ -199,6 +199,23 @@ proxy_max_temp_file_size 0;
 
 Keine aggressive Cache-Regel auf `/api/uploads/*`.
 
+## Ergebnis-Bilder auslesen (#1756)
+
+Im Ergebnis-Blatt einer Serie liest „Bild auslesen“ (oder Strg+V) einen Screenshot des Veranstalters. Gelesen wird
+**im Backend-Container** mit Tesseract (Englisch und Deutsch, feste Versionen im `backend/Dockerfile`) – ohne externen
+Dienst. Das Bild bleibt im Speicher und wird nicht gespeichert; Tesseract bekommt es über stdin, ohne Shell, mit leerer
+Umgebung und Zeitlimit. Grenzen wie bei jedem Bild-Upload (`MAX_IMAGE_UPLOAD_MB`, `MAX_IMAGE_PIXELS`), dazu:
+
+```env
+RESULT_IMAGE_RATE_LIMIT=30            # Bilder je Konto …
+RESULT_IMAGE_RATE_WINDOW_SECONDS=600  # … in diesem Zeitfenster
+RESULT_IMAGE_CONCURRENCY=1            # gleichzeitig gelesene Bilder (CPU)
+RESULT_IMAGE_OCR_TIMEOUT_SECONDS=20   # je Aufruf von Tesseract
+```
+
+Fehlt Tesseract (etwa ein altes Image), sagt das Blatt „Texterkennung gerade nicht verfügbar“ – Einfügen und Abtippen
+gehen weiter. Prüfen: `docker compose exec backend tesseract --list-langs` (muss `deu` und `eng` nennen).
+
 ## Suchmaschinen und Search Console
 
 Welche Pfade indexiert, privat, umgeleitet oder entfernt sind, steht in

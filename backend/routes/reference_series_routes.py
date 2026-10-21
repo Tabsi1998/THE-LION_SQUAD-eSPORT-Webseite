@@ -34,9 +34,10 @@ from services.slug_utils import apply_slug_history, slug_source_for_update, slug
 router = APIRouter(prefix="/api/reference-series", tags=["reference-series"],
                    dependencies=[Depends(reference_running_cache.reset_after_write)])
 
-LINEAGE_NULLABLE = {"organizer", "label", "game_id", "game_name", "external_url", "description", "tier_order"}
+LINEAGE_NULLABLE = {"organizer", "label", "game_id", "game_name", "external_url", "description", "tier_order",
+                    "result_image_template"}
 SERIES_NULLABLE = {"tier", "title", "default_weekday", "default_time", "team_name", "official_table_url",
-                   "external_url", "description", "reference_id", "season_result"}
+                   "external_url", "description", "reference_id", "season_result", "result_image_template"}
 SLUG_FALLBACK = "serie"
 
 

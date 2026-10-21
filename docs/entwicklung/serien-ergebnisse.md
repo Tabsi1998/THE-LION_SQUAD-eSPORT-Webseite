@@ -15,6 +15,8 @@ Redaktion) und gültige Captains dieser Saison ([Rollen](../ROLLEN.md)); ein Ter
 | `PUT …/results` | Übernehmen mit `status` und `expected_version` | 200; 409 bei veraltetem Stand; 422 mit Fehlern; 403 beim Veröffentlichen ohne Recht |
 | `POST …/results/approve` | Vorstand: Entwurf daneben (oder Blatt im Entwurf) veröffentlichen | 200; 409 ohne Entwurf oder bei veraltetem Stand |
 | `POST …/results/discard` | Vorstand: Entwurf daneben verwerfen | 200; 409 ohne Entwurf oder bei veraltetem Stand |
+| `GET …/results/image` | Ob ein Ergebnis-Bild gelesen werden kann und mit welcher Vorlage (#1756) | `{template, available, max_mb, formats}` |
+| `POST …/results/image` | Ergebnis-Bild lesen (Body = das Bild), **speichert nichts** | Zeilen mit unsicheren Feldern, Kopf des Bilds; 409 ohne Vorlage, 413/400 bei Größe oder Format, 422 ohne Tabelle, 429 Rate-Limit, 503 ohne Tesseract |
 
 **Captains** sehen nur, wer in der Saison bekannt ist und wer neu (`rows[].match`, `is_new`) – keine Zuordnung, keinen
 Alias, keine Vereinsmitgliedschaft. Diese Felder bekommt nur der Vorstand: `participants[].is_club_member` und
@@ -97,3 +99,31 @@ passt; die Stände führen es unter seinem Namen.
 - Jede Änderung legt den alten Stand in `reference_round_result_revisions` ab und steht im Adminprotokoll
   (`reference_result.save`, `.pending_draft`, `.approve`, `.discard`). Veröffentlichen oder Zurücknehmen rechnet die
   Stände der Serie neu und setzt den Termin auf „gewertet“ bzw. zurück.
+
+## Ergebnis-Bild auslesen (#1756)
+
+Ein Screenshot des Veranstalters wird **auf dem eigenen Server** gelesen (Tesseract im Backend-Image, kein externer
+Dienst) und landet als Zeilen im Blatt – gespeichert wird beim Lesen nichts, auch das Bild nicht. Route:
+`backend/routes/reference_result_image_routes.py`, Lesen: `services/result_image_ocr.py`, Werte und Abgleich:
+`services/result_image_match.py`, Vorlagen: `services/result_image_templates.py`, Web: `lib/resultImage.js` und
+`pages/admin/referenceSeries/ResultImageImport.jsx`.
+
+- **Vorlage je Veranstalter-Layout:** Spalten (Überschriften, Ausrichtung, ungefähre Lage) und Kopf des Bilds sind
+  einmal festgelegt. Der Vorstand wählt sie je Spur und – abweichend – je Saison (`result_image_template`); ohne Wahl
+  gilt die Standard-Vorlage der Art („Rennliga-Ergebnis (dunkel)“ für Rennligen), `none` schaltet ab.
+- **Lesen:** hellster Farbkanal (farbige Schrift bleibt kräftig), bei dunklem Grund umgekehrt, auf etwa 40 Pixel
+  Schrifthöhe vergrößert. Einmal die ganze Seite, dann jede Spalte als Streifen – Zahlen mit Zeichen-Whitelist.
+- **Unsicher (gelb)** ist eine Zelle, wenn die beiden Lesungen sich widersprechen oder die Sicherheit unter der Schwelle
+  der Vorlage liegt – außer eine Gegenprobe bestätigt sie: Plätze ohne Lücke, Zeit = Zeit des Ersten + Abstand, Grid
+  einmalig, **Startnummer als Anker** (Nummer und Name zeigen auf denselben Teilnehmer). Namen werden unscharf mit den
+  Teilnehmern der Saison abgeglichen (für den Vorstand auch über deren Aliase), Teams mit den Standard-Teams.
+- **Antwort:** `rows` mit `place`, `dnf`, `marks`, `start_number`, `name`, `participant_id`, `team`, `grid`, `time`,
+  `gap`, `uncertain` (Felder) und `read` (was im Bild stand, wenn es abweicht); dazu `track`, `fastest_lap {name, time}`,
+  `driver_of_the_day`, `uncertain_rows` und `warnings`. Felder, die das Blatt (noch) nicht zeigt, fallen im Web weg.
+- **Im Blatt:** die Zeilen ersetzen die Liste, die Vorschau prüft gleich. Gelbe Felder verlieren die Markierung, wenn
+  jemand sie ändert oder die Zeile mit „Passt so“ bestätigt; übernommen wird erst ohne gelbe Zeilen.
+- **Sicherheit:** Rechte wie beim Eintragen; Größe am Kopf der Anfrage, Pixel am Kopf der Bilddatei; das Bild kommt als
+  Body (keine Zwischendatei) und geht über stdin an Tesseract (ohne Shell, leere Umgebung, Zeitlimit); Rate-Limit je
+  Konto; Meldungen sind feste Texte. Einstellungen in [Betrieb](../BETRIEB.md).
+- **Tests:** synthetische Screenshots mit erfundenen Namen (`backend/tests/result_image_fixture.py`). Ohne Tesseract
+  werden die Lese-Tests übersprungen; die CI installiert es und setzt `REQUIRE_TESSERACT=1`.

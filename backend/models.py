@@ -1545,6 +1545,18 @@ ReferenceSeasonResult = Literal["promoted", "relegated", "stayed", "champion"]
 TIER_ORDER_MAX = 30
 
 
+def _result_image_template(value: Optional[str]) -> Optional[str]:
+    """Vorlage für Ergebnis-Bilder (#1756): eine mitgelieferte Vorlage, „none“ (abgeschaltet) oder leer (Vorgabe)."""
+    from services import result_image_templates
+
+    text = (value or "").strip()
+    if not text:
+        return None
+    if text != result_image_templates.NONE and text not in result_image_templates.ids():
+        raise ValueError("Unbekannte Vorlage für Ergebnis-Bilder.")
+    return text
+
+
 def _tier_order(value):
     """Reihenfolge der Stufen einer Spur (#1898), höchste zuerst: getrimmt, ohne Leere und Doppelte (Groß/klein egal).
     Leer heißt ``None`` - dann gilt die Vorgabe aus der Zahl im Stufennamen."""
@@ -1610,11 +1622,17 @@ class ReferenceLineageCreate(BaseModel):
     slug: Optional[str] = Field(default=None, max_length=90)
     order_index: int = 0
     tier_order: Optional[List[str]] = None  # #1898: eigene Reihenfolge der Stufen, höchste zuerst
+    result_image_template: Optional[str] = Field(default=None, max_length=60)  # #1756: Vorlage für Ergebnis-Bilder
 
     @field_validator("tier_order")
     @classmethod
     def _tiers(cls, value):
         return _tier_order(value)
+
+    @field_validator("result_image_template")
+    @classmethod
+    def _image_template(cls, value):
+        return _result_image_template(value)
 
 
 class ReferenceLineageUpdate(BaseModel):
@@ -1631,11 +1649,17 @@ class ReferenceLineageUpdate(BaseModel):
     slug: Optional[str] = Field(default=None, max_length=90)
     order_index: Optional[int] = None
     tier_order: Optional[List[str]] = None
+    result_image_template: Optional[str] = Field(default=None, max_length=60)  # #1756: Vorlage für Ergebnis-Bilder
 
     @field_validator("tier_order")
     @classmethod
     def _tiers(cls, value):
         return _tier_order(value)
+
+    @field_validator("result_image_template")
+    @classmethod
+    def _image_template(cls, value):
+        return _result_image_template(value)
 
 
 class ReferenceOwnTeam(BaseModel):
@@ -1672,6 +1696,7 @@ class ReferenceSeriesCreate(BaseModel):
     reference_id: Optional[str] = None  # Stufe 2: Saisonende als Referenz (#1750)
     order_index: int = 0
     season_result: Optional[ReferenceSeasonResult] = None  # #1898: Vermerk statt Ableitung aus dem Stufennamen
+    result_image_template: Optional[str] = Field(default=None, max_length=60)  # #1756: Vorlage für Ergebnis-Bilder
 
     @field_validator("rules")
     @classmethod
@@ -1682,6 +1707,11 @@ class ReferenceSeriesCreate(BaseModel):
     @classmethod
     def _time(cls, value):
         return _clock(value)
+
+    @field_validator("result_image_template")
+    @classmethod
+    def _image_template(cls, value):
+        return _result_image_template(value)
 
 
 class ReferenceSeriesUpdate(BaseModel):
@@ -1703,6 +1733,7 @@ class ReferenceSeriesUpdate(BaseModel):
     reference_id: Optional[str] = None
     order_index: Optional[int] = None
     season_result: Optional[ReferenceSeasonResult] = None
+    result_image_template: Optional[str] = Field(default=None, max_length=60)  # #1756: Vorlage für Ergebnis-Bilder
 
     @field_validator("rules")
     @classmethod
@@ -1713,6 +1744,11 @@ class ReferenceSeriesUpdate(BaseModel):
     @classmethod
     def _time(cls, value):
         return _clock(value)
+
+    @field_validator("result_image_template")
+    @classmethod
+    def _image_template(cls, value):
+        return _result_image_template(value)
 
 
 def _round_country(value):
