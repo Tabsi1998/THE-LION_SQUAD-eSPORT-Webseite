@@ -70,8 +70,9 @@ test("Fehler: je nach Art eigener Text - ohne Netz und bei Fehlern „Nochmal ve
 test("Offline-Leiste: erscheint ohne Netz mit dem Stand der gezeigten Daten und verschwindet mit dem Netz", async () => {
   await render(<OfflineBar />);
   expect(screen.queryByTestId("offline-bar")).toBeNull();
-  // 12:05 UTC = 14:05 in Wien (Sommerzeit).
+  // 12:05 UTC = 14:05 in Wien (Sommerzeit). Die Uhr steht am selben Tag - ein Stand von heute zeigt nur die Uhrzeit (#1058).
   const stand = Date.UTC(2026, 9, 8, 12, 5);
+  jest.useFakeTimers({ now: Date.UTC(2026, 9, 8, 15, 0), advanceTimers: true });
   await act(async () => {
     network.noteOffline(stand);
   });
@@ -85,6 +86,20 @@ test("Offline-Leiste: erscheint ohne Netz mit dem Stand der gezeigten Daten und 
     network.noteFresh();
   });
   expect(screen.queryByTestId("offline-bar")).toBeNull();
+  jest.useRealTimers();
+});
+
+test("Offline-Leiste: Daten von gestern tragen den Tag (#1058)", async () => {
+  jest.useFakeTimers({ now: Date.UTC(2026, 9, 9, 8, 0), advanceTimers: true });
+  await render(<OfflineBar />);
+  await act(async () => {
+    network.noteOffline(Date.UTC(2026, 9, 8, 12, 5));
+  });
+  expect(screen.getByTestId("offline-bar")).toHaveTextContent("Offline · Stand gestern 14:05 · zum Aktualisieren ziehen");
+  await act(async () => {
+    network.noteFresh();
+  });
+  jest.useRealTimers();
 });
 
 test("ohne bekannten Stand nur „Offline“; die Leiste hat einen Satz für den Vorleser", async () => {

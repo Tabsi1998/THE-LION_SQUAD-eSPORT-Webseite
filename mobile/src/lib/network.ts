@@ -1,6 +1,7 @@
 import { useSyncExternalStore } from "react";
 import { API_URL } from "../config";
-import { viennaTime } from "./vienna";
+import { formatWhen } from "./format";
+import { dayBefore, viennaDay, viennaTime } from "./vienna";
 
 // Netz der App (#1152): Der API-Client meldet jede Antwort. Eine echte Antwort heißt „online“ und merkt sich die
 // Uhrzeit; ein Netzwerkfehler oder eine Antwort aus dem Zwischenspeicher heißt „offline“ - mit dem Stand der gezeigten
@@ -72,10 +73,18 @@ export function useNetwork(): NetworkState {
   return useSyncExternalStore(subscribeNetwork, networkSnapshot, networkSnapshot);
 }
 
-/** „Offline · Stand 14:05“ - ohne bekannten Stand nur „Offline“. */
-export function offlineLabel(stand: number | null): string {
+/**
+ * „Offline · Stand 14:05“ - ohne bekannten Stand nur „Offline“. Sind die Daten nicht von heute, steht der Tag dabei (#1058):
+ * „Stand gestern 14:05“, älter „Stand So 18. Oktober · 14:05“ (Schreibweise wie formatWhen, Wiener Zeit).
+ */
+export function offlineLabel(stand: number | null, now: Date = new Date()): string {
   if (!stand) return "Offline";
-  return `Offline · Stand ${viennaTime(stand, { hour: "2-digit", minute: "2-digit" })}`;
+  const clock = viennaTime(stand, { hour: "2-digit", minute: "2-digit" });
+  const day = viennaDay(stand);
+  const today = viennaDay(now);
+  if (day === today) return `Offline · Stand ${clock}`;
+  if (day === dayBefore(today)) return `Offline · Stand gestern ${clock}`;
+  return `Offline · Stand ${formatWhen(stand, { now })}`;
 }
 
 /** Nur für Tests. */

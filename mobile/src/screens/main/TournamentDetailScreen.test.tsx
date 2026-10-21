@@ -8,8 +8,9 @@ import { expectLateAnswerDiscarded } from "./lateAnswer.testkit";
 // müssen - geprüft wird das Team beim Anmelden auf dem Server.
 
 const mockGet = jest.fn();
+const mockPost = jest.fn();
 jest.mock("../../lib/api", () => ({
-  api: { get: (...args: unknown[]) => mockGet(...args), post: jest.fn(), delete: jest.fn() },
+  api: { get: (...args: unknown[]) => mockGet(...args), post: (...args: unknown[]) => mockPost(...args), delete: jest.fn() },
   errorMessage: (error: unknown, fallback: string) => (error instanceof Error ? error.message : fallback),
 }));
 // Ein festes Objekt: der Screen lädt neu, wenn sich `user` ändert - ein neues Objekt je Render wäre eine Endlosschleife.
@@ -222,4 +223,79 @@ test("eigene Teams kommen nicht: das Turnier steht, die Seite sagt es statt stil
   await render(<TournamentDetailScreen navigation={navigation} route={route} />);
   await waitFor(() => expect(screen.getByTestId("tournament-partial-load")).toBeTruthy());
   expect(screen.getAllByText("LAN-Cup").length).toBeGreaterThan(0);
+});
+
+// Anmelden mit kurzem Bestätigungs-Blatt (#1904, App-Teil von #1261): auch ein Einzelturnier ohne Startgeld und ohne
+// Kennungen meldet nicht mehr mit einem Tipp an. Erst das Blatt mit Start, Check-in, Ort und den Regeln in drei Sätzen,
+// dann „Verbindlich anmelden“; Abbrechen meldet nicht an.
+describe("Bestätigungs-Blatt", () => {
+  const SOLO = {
+    ...TOURNAMENT,
+    event_gate: null,
+    start_date: "2026-05-23T18:00:00Z",
+    check_in_from: "2026-05-23T17:00:00Z",
+    check_in_until: "2026-05-23T17:45:00Z",
+    event_mode: "local",
+    location: "Vereinsheim",
+    rules: "Fair Play gilt immer. Ergebnisse meldet der Sieger. Zu spät heißt verloren. Der vierte Satz bleibt im Ganzen.",
+  };
+
+  beforeEach(() => {
+    mockPost.mockResolvedValue({ data: {} });
+  });
+
+  async function openSheet(tournament: Record<string, unknown>) {
+    answer(tournament);
+    await render(<TournamentDetailScreen navigation={navigation} route={route} />);
+    await waitFor(() => expect(screen.getByText("Zum Turnier anmelden")).toBeTruthy());
+    await fireEvent.press(screen.getByText("Zum Turnier anmelden"));
+  }
+
+  test("Einzelturnier ohne Startgeld: der Tipp öffnet das Blatt und meldet nicht sofort an", async () => {
+    await openSheet(SOLO);
+    expect(mockPost).not.toHaveBeenCalled();
+    expect(screen.getByTestId("register-sheet")).toBeTruthy();
+    expect(screen.getByTestId("register-sheet-start")).toHaveTextContent(/Sa 23\. Mai · 20:00/);
+    expect(screen.getByTestId("register-sheet-checkin")).toHaveTextContent(/19:00–19:45/);
+    expect(screen.getByTestId("register-sheet-place")).toHaveTextContent("Vor Ort · Vereinsheim");
+    expect(screen.getByTestId("register-sheet-rules")).toHaveTextContent(/Fair Play gilt immer. Ergebnisse meldet der Sieger. Zu spät heißt verloren./);
+    expect(screen.getByTestId("register-sheet-rules")).not.toHaveTextContent(/vierte Satz/);
+    expect(screen.getByTestId("register-sheet-consent")).toHaveTextContent(/akzeptierst du die Turnierregeln und den Datenschutz/);
+    // „Alle Regeln“ zeigt den Rest.
+    await fireEvent.press(screen.getByTestId("register-sheet-rules-all"));
+    expect(screen.getByTestId("register-sheet-rules-full")).toHaveTextContent(/vierte Satz/);
+  });
+
+  test("Abbrechen meldet nicht an", async () => {
+    await openSheet(SOLO);
+    await fireEvent.press(screen.getByTestId("register-sheet-cancel"));
+    expect(mockPost).not.toHaveBeenCalled();
+    expect(screen.queryByTestId("register-sheet")).toBeNull();
+  });
+
+  test("erst „Verbindlich anmelden“ meldet an - genau einmal", async () => {
+    await openSheet(SOLO);
+    expect(screen.getByTestId("tournament-register-submit")).toHaveTextContent("Verbindlich anmelden");
+    await fireEvent.press(screen.getByTestId("tournament-register-submit"));
+    await waitFor(() => expect(mockPost).toHaveBeenCalledTimes(1));
+    expect(mockPost).toHaveBeenCalledWith("/tournaments/t1/register", expect.objectContaining({ accept_rules: true, accept_privacy: true }));
+  });
+
+  test("ohne eigene Regeln sagt das Blatt, was gilt", async () => {
+    await openSheet({ ...SOLO, rules: "" });
+    expect(screen.getByTestId("register-sheet-rules")).toHaveTextContent(/keine eigenen Regeln hinterlegt/);
+    expect(screen.queryByTestId("register-sheet-rules-all")).toBeNull();
+  });
+
+  test("Startgeld steht in der Zusammenfassung, angemeldet wird erst mit der Kostenübernahme", async () => {
+    const offer = { enabled: true, currency: "EUR", positions: [{ key: "fee", label: "Startgeld", amount_cents: 500, basis: "per_registration", optional: false }] };
+    await openSheet({ ...SOLO, offer });
+    expect(screen.getByTestId("register-sheet-fee")).toHaveTextContent(/5,00/);
+    expect(screen.getByTestId("tournament-register-submit")).toHaveTextContent(/Verbindlich anmelden · 5,00/);
+    await fireEvent.press(screen.getByTestId("tournament-register-submit"));
+    expect(mockPost).not.toHaveBeenCalled();
+    await fireEvent.press(screen.getByTestId("tournament-accept-costs"));
+    await fireEvent.press(screen.getByTestId("tournament-register-submit"));
+    await waitFor(() => expect(mockPost).toHaveBeenCalledTimes(1));
+  });
 });

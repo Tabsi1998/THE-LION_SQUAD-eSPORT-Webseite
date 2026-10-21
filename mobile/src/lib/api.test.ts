@@ -144,6 +144,24 @@ test("offline wird auf zwischengespeicherte Daten zurueckgegriffen - erkennbar m
   network.resetNetwork();
 });
 
+test("offline über mehrere Anfragen zeigt die Leiste den ältesten Stand der gezeigten Daten (#1058)", async () => {
+  network.resetNetwork();
+  mockGetStaleEntry
+    .mockResolvedValueOnce({ data: { a: 1 }, timestamp: 1_700_000_500_000, ttl: 86400000 })
+    .mockResolvedValueOnce({ data: { b: 2 }, timestamp: 1_700_000_000_000, ttl: 86400000 })
+    .mockResolvedValueOnce({ data: { c: 3 }, timestamp: 1_700_000_900_000, ttl: 86400000 });
+  handler = async (config) => {
+    throw networkError(config);
+  };
+
+  await api.get("/dashboard");
+  await api.get("/news");
+  await api.get("/events");
+
+  expect(network.networkSnapshot()).toEqual({ offline: true, stand: 1_700_000_000_000 });
+  network.resetNetwork();
+});
+
 test("frische Antworten sind nicht als Cache markiert", async () => {
   handler = async (config) => ({ data: { ok: true }, status: 200, headers: {}, config });
 
