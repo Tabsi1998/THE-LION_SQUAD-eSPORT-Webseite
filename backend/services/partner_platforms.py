@@ -107,6 +107,19 @@ def allowed_base_url(key, value) -> str | None:
     return normal if normal in found.base_urls else None
 
 
+def public_hint(source, partners: dict | None) -> dict | None:
+    """Hinweis „Daten von …“ für die Serienseite: Name des Partners der Plattform, ihre Adresse und - wenn in der
+    Quelle gewählt und an der Saison verknüpft (#1934) - der Partner mit seiner Seite. Ohne Quelle ``None``."""
+    found = platform(source.get("platform")) if isinstance(source, dict) else None
+    if found is None:
+        return None
+    people = [*((partners or {}).get("organizers") or []), *((partners or {}).get("contributors") or [])]
+    partner = next((item for item in people if item.get("id") and item.get("id") == source.get("partner_id")), None)
+    return {"provider": found.provider,
+            "url": allowed_base_url(found.key, source.get("base_url")) or found.base_urls[0],
+            "partner": {key: partner.get(key) for key in ("id", "slug", "name")} if partner else None}
+
+
 def _url(key: str, base_url, path: str, ref=None) -> str:
     base = allowed_base_url(key, base_url)
     if base is None or (ref is not None and not tft_dashboard.valid_ref(ref)):
