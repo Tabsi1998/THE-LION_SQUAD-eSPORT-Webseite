@@ -379,8 +379,9 @@ def _matches(resolution: Resolution, own_teams) -> list[dict]:
     problems = []
     # Eigene Teams (#1926): eines davon muss spielen - erkannt auch an anderer Schreibweise oder einem Alias.
     own = Matcher(own_teams if isinstance(own_teams, (list, tuple)) else [own_teams])
+    others = _sheet_teams(resolution)
     for index, match in enumerate(resolution.matches):
-        if own and not (own.is_own(match["home"]) or own.is_own(match["away"])):
+        if own and not (own.is_own(match["home"], others) or own.is_own(match["away"], others)):
             text = (f"Das eigene Team „{own.names[0]}“ spielt" if len(own.names) == 1
                     else "Keines der eigenen Teams spielt")
             problems.append(_problem("own_team_missing", f"Spiel {index + 1}: {text} darin nicht.", match=index))
@@ -406,6 +407,26 @@ def _matches(resolution: Resolution, own_teams) -> list[dict]:
     return problems
 
 
+def _sheet_teams(resolution: Resolution) -> list[str]:
+    names = [row["team"] for row in resolution.rows if row.get("team")]
+    names += [match[side] for match in resolution.matches for side in ("home", "away") if match.get(side)]
+    return names + [row["team"] for row in resolution.official_table if row.get("team")]
+
+
+def _spellings(resolution: Resolution, own_teams) -> list[dict]:
+    """Schreibweisen, die wie ein eigenes Team aussehen, aber nicht still zusammengelegt werden (#1926): ein wörtlich
+    anderes Team mit derselben Schreibweise steht daneben, oder sie passt zu mehreren eigenen Teams."""
+    own = Matcher(own_teams if isinstance(own_teams, (list, tuple)) else [own_teams])
+    problems = []
+    for conflict in own.spelling_conflicts(_sheet_teams(resolution)):
+        name = conflict["name"]
+        rows = [row["index"] for row in resolution.rows if clean(row.get("team")).casefold() == name.casefold()]
+        alike = " und ".join(f"„{team}“" for team in conflict["teams"])
+        problems.append(_problem("own_team_spelling", f"„{name}“ sieht aus wie {alike} - es zählt nicht als eigenes "
+                                 "Team. Ist es dasselbe Team, in der Saison als Schreibweise eintragen.", rows))
+    return problems
+
+
 def check(resolution: Resolution, rules: dict, round_doc: dict, today: str, own_teams=None) -> None:
     """Fehler und Warnungen zum Blatt ergänzen (an ``resolution.errors`` und ``.warnings``). ``own_teams``: die eigenen
     Teams der Saison (Liste aus ``own_teams.own_teams``, ein einzelner Name geht auch)."""
@@ -428,6 +449,7 @@ def check(resolution: Resolution, rules: dict, round_doc: dict, today: str, own_
                                  f"({_rows_text(fastest)}).", fastest))
     warnings.extend(_points(resolution, rules))
     warnings.extend(_matches(resolution, own_teams))
+    warnings.extend(_spellings(resolution, own_teams))
 
 
 def official_warnings(rows: list[dict], names: dict[str, str], *, scope: str) -> list[dict]:

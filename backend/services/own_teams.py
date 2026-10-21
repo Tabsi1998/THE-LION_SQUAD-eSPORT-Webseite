@@ -2,11 +2,13 @@
 
 - **Liste** (``own_teams``): je Team der Name wie beim Veranstalter und weitere Schreibweisen (``aliases``). Eine Saison
   von früher hat nur das Feld ``team_name`` - es gilt dann als einziges eigenes Team (die Migration schreibt es in die
-  Liste). ``team_name`` bleibt beim Speichern das erste Team, damit ältere Leser weiter funktionieren.
-- **Zuordnung** (``Matcher``): ein Team aus einem Ergebnis gehört zu einem eigenen Team, wenn sein Schlüssel
-  (``series_identity.normalize_name``: ohne Akzente, Groß/klein, Leer- und Satzzeichen) zum Namen oder zu einem Alias
-  passt - „TLS-DarkFriday“, „TLS DarkFriday“ und „tls_darkfriday“ sind dasselbe Team. Fremde Teams bleiben wie
-  geschrieben.
+  Liste). ``team_name`` bleibt beim Speichern das erste Team, damit ältere Leser weiter funktionieren. Doppelt ist nur
+  ein wörtlich gleicher Name (ohne Groß/klein und doppelte Leerzeichen): „A-B“ und „AB“ bleiben zwei Teams.
+- **Zuordnung** (``Matcher``): Name oder ausdrücklicher Alias eines eigenen Teams gelten immer. Eine andere Schreibweise
+  mit demselben Schlüssel (``series_identity.normalize_name``: ohne Akzente, Groß/klein, Leer- und Satzzeichen - etwa
+  „TLS DarkFriday“ für „TLS-DarkFriday“) zählt nur, wenn sie zu genau einem eigenen Team passt und im selben Blatt
+  (``others``) kein zweites, wörtlich anderes Team mit diesem Schlüssel steht. Sonst bleibt sie ein eigenes, fremdes
+  Team - nie still zusammengelegt; die Prüfung des Ergebnisblatts nennt den Fall (``spelling_conflicts``).
 """
 from __future__ import annotations
 
@@ -20,23 +22,27 @@ def _clean(value) -> str:
     return " ".join(str(value or "").split())[:120]
 
 
+def _literal(value) -> str:
+    """Ein Name wörtlich, nur ohne Groß/klein und doppelte Leerzeichen."""
+    return _clean(value).casefold()
+
+
 def clean_teams(raw) -> list[dict]:
-    """Liste aufräumen: leere und doppelte Namen (nach Schlüssel) fallen weg, Aliase ohne Doppel und ohne den Namen."""
+    """Liste aufräumen: leere und wörtlich doppelte Namen fallen weg, Aliase ohne Doppel und ohne den Namen."""
     out: list[dict] = []
     seen: set[str] = set()
     for item in raw or []:
         entry = item if isinstance(item, dict) else {"name": item}
         name = _clean(entry.get("name"))
-        key = normalize_name(name)
-        if not key or key in seen:
+        literal = _literal(name)
+        if not normalize_name(name) or literal in seen:
             continue
-        seen.add(key)
-        aliases, keys = [], {key}
+        seen.add(literal)
+        aliases, known = [], {literal}
         for alias in entry.get("aliases") or []:
             text = _clean(alias)
-            alias_key = normalize_name(text)
-            if alias_key and alias_key not in keys:
-                keys.add(alias_key)
+            if normalize_name(text) and _literal(text) not in known:
+                known.add(_literal(text))
                 aliases.append(text)
         out.append({"name": name, "aliases": aliases[:MAX_ALIASES]})
     return out[:MAX_TEAMS]
@@ -55,24 +61,58 @@ def own_team_names(series: dict | None) -> list[str]:
 
 
 class Matcher:
-    """Ordnet Teamnamen den eigenen Teams zu (Name oder Alias, nach Schlüssel)."""
+    """Ordnet Teamnamen den eigenen Teams zu: wörtlich über Name und Alias, über den Schlüssel nur eindeutig."""
 
     def __init__(self, teams):
         self.names: list[str] = []
-        self._by_key: dict[str, str] = {}
+        self._exact: dict[str, str] = {}
+        self._by_key: dict[str, list[str]] = {}
         for team in clean_teams(teams):
             self.names.append(team["name"])
             for text in (team["name"], *team["aliases"]):
-                self._by_key.setdefault(normalize_name(text), team["name"])
+                self._exact.setdefault(_literal(text), team["name"])
+                owners = self._by_key.setdefault(normalize_name(text), [])
+                if team["name"] not in owners:
+                    owners.append(team["name"])
 
-    def canonical(self, name):
-        """Der Name des eigenen Teams, zu dem ``name`` gehört - sonst ``name`` unverändert."""
+    def resolve(self, name, others=()) -> str | None:
+        """Das eigene Team zu ``name`` - oder ``None``. ``others``: die übrigen Teamnamen desselben Blatts."""
         if not name:
-            return name
-        return self._by_key.get(normalize_name(name), name)
+            return None
+        literal = _literal(name)
+        if literal in self._exact:
+            return self._exact[literal]
+        key = normalize_name(name)
+        owners = self._by_key.get(key) or []
+        if len(owners) != 1:
+            return None
+        if any(_literal(other) != literal and normalize_name(other) == key for other in others or () if other):
+            return None
+        return owners[0]
 
-    def is_own(self, name) -> bool:
-        return bool(name) and normalize_name(name) in self._by_key
+    def canonical(self, name, others=()):
+        """Der Name des eigenen Teams, zu dem ``name`` gehört - sonst ``name`` unverändert."""
+        return self.resolve(name, others) or name
+
+    def is_own(self, name, others=()) -> bool:
+        return self.resolve(name, others) is not None
+
+    def spelling_conflicts(self, names) -> list[dict]:
+        """Schreibweisen im Blatt, die wie ein eigenes Team aussehen, aber nicht zugeordnet werden: ``{name, teams}`` -
+        ``teams`` sind die eigenen Teams bzw. die wörtlich anderen Namen mit demselben Schlüssel."""
+        listed = list(dict.fromkeys(_clean(name) for name in names if _clean(name)))
+        out = []
+        for name in listed:
+            literal = _literal(name)
+            if literal in self._exact:
+                continue
+            key = normalize_name(name)
+            owners = self._by_key.get(key) or []
+            if not owners or self.resolve(name, listed) is not None:
+                continue
+            rivals = [other for other in listed if _literal(other) != literal and normalize_name(other) == key]
+            out.append({"name": name, "teams": list(dict.fromkeys([*rivals, *owners]))})
+        return out
 
     def __bool__(self) -> bool:
         return bool(self.names)

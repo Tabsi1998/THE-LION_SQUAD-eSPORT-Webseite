@@ -46,12 +46,14 @@ def own_match(sheet: dict, teams) -> dict | None:
     erste Spiel mit dem Heimteam als eigenes (so legt das Ergebnis-Blatt ein Spiel an). ``_own`` nennt das eigene
     Team, ``_away`` sagt, ob es auswärts spielt."""
     own = Matcher(teams if isinstance(teams, (list, tuple)) else [teams])
-    for match in sheet.get("matches") or []:
+    matches = sheet.get("matches") or []
+    others = [str(match.get(side) or "").strip() for match in matches for side in ("home", "away")]
+    for match in matches:
         home, away = str(match.get("home") or "").strip(), str(match.get("away") or "").strip()
-        if not own or own.is_own(home):
-            return {**match, "_own": own.canonical(home)}
-        if own.is_own(away):
-            return {**match, "_away": True, "_own": own.canonical(away)}
+        if not own or own.is_own(home, others):
+            return {**match, "_own": own.canonical(home, others)}
+        if own.is_own(away, others):
+            return {**match, "_away": True, "_own": own.canonical(away, others)}
     return None
 
 
@@ -101,7 +103,8 @@ async def _published(db, series_ids: list[str]) -> dict[str, dict[str, dict]]:
 def _own_row(rows: list[dict], teams) -> dict | None:
     """Die Zeile des bestplatzierten eigenen Teams."""
     own = Matcher(teams)
-    mine = [row for row in rows if own.is_own(row.get("team"))]
+    others = [row.get("team") for row in rows]
+    mine = [row for row in rows if own.is_own(row.get("team"), others)]
     return min(mine, key=lambda row: (row.get("rank") is None, row.get("rank") or 0), default=None)
 
 
@@ -109,14 +112,16 @@ def _table(latest: dict | None, teams, form: dict[str, list[str]]) -> dict | Non
     if not latest:
         return None
     own = Matcher(teams)
+    others = [row.get("team") for row in latest.get("rows") or []]
     rows = []
     for row in latest.get("rows") or []:
         change, rank = row.get("rank_change"), row.get("rank")
-        mine = own.is_own(row.get("team"))
+        mine = own.is_own(row.get("team"), others)
         rows.append({
             "key": row.get("team"), "team": row.get("team"), **{field: row.get(field) for field in TABLE_FIELDS},
             "previous_rank": None if change is None or rank is None else rank + change,
-            "own": mine, "form": (form.get(own.canonical(row.get("team"))) or [])[-FORM_LENGTH:] if mine else [],
+            "own": mine,
+            "form": (form.get(own.canonical(row.get("team"), others)) or [])[-FORM_LENGTH:] if mine else [],
         })
     return {"round_id": latest.get("round_id"), "round_seq": latest.get("round_seq"), "rows": rows}
 

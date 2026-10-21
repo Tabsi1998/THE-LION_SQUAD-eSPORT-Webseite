@@ -50,7 +50,9 @@ def test_team_scoring_counts_an_own_team_once_whatever_the_spelling():
         "r2": {"rows": [{"participant_id": "b", "place": 1, "team": "probe darkfriday"},
                         {"participant_id": "a", "place": 2}, {"participant_id": "c", "place": 3}]},
     }
-    teams = [{"name": "Probe-DarkFriday", "aliases": ["PDF Racing"]}]
+    # Die Standard-Teams von a und b sind zwei wörtlich verschiedene Schreibweisen - zusammen gehören sie nur, weil
+    # „Probe DarkFriday“ als Schreibweise eingetragen ist. „probe darkfriday“ im zweiten Rennen passt ohnehin.
+    teams = [{"name": "Probe-DarkFriday", "aliases": ["PDF Racing", "Probe DarkFriday"]}]
     snapshots = compute_standings(rules=rules, rounds=rounds, sheets=sheets, participants=PEOPLE, own_teams=teams)
     table = [snap for snap in snapshots if snap["scope"] == "teams"][-1]["rows"]
     assert [(row["team"], row["points"]) for row in table] == [("Probe-DarkFriday", 30), ("Fremd Rot", 10)]
@@ -79,3 +81,58 @@ def test_the_own_team_check_of_a_match_knows_every_own_team(home, away, missing)
                          "2026-11-01", [{"name": "Probe Löwen"}, {"name": "Probe Löwen B"}])
     codes = [warning["code"] for warning in resolution.warnings]
     assert ("own_team_missing" in codes) is missing
+
+
+# ---------------------------------------------------------------- Schreibweisen ohne stilles Zusammenlegen
+def test_two_own_teams_that_only_differ_in_spelling_stay_two_teams():
+    teams = own_teams.clean_teams([{"name": "A-B"}, {"name": "AB"}, {"name": "a-b"}])
+    # Nur wörtlich gleiche Namen (ohne Groß/klein) sind doppelt - „A-B“ und „AB“ bleiben zwei Teams.
+    assert [team["name"] for team in teams] == ["A-B", "AB"]
+    matcher = own_teams.Matcher(teams)
+    assert (matcher.canonical("a-b"), matcher.canonical("ab")) == ("A-B", "AB")
+    # Eine dritte Schreibweise passt zu beiden - sie gehört keinem.
+    assert matcher.canonical("A B") == "A B"
+    assert not matcher.is_own("A B")
+
+
+def test_a_spelling_counts_only_without_a_literally_different_team_of_the_same_form_beside_it():
+    matcher = own_teams.Matcher([{"name": "Probe-DarkFriday", "aliases": ["PDF Racing"]}])
+    assert matcher.canonical("Probe DarkFriday", ["Probe DarkFriday", "Fremd Rot"]) == "Probe-DarkFriday"
+    # Steht „Probe-DarkFriday“ wörtlich daneben, ist „Probe DarkFriday“ ein anderes Team.
+    assert matcher.canonical("Probe DarkFriday", ["Probe DarkFriday", "Probe-DarkFriday"]) == "Probe DarkFriday"
+    assert not matcher.is_own("Probe DarkFriday", ["Probe-DarkFriday"])
+    # Name und ausdrücklicher Alias gelten immer.
+    assert matcher.canonical("Probe-DarkFriday", ["Probe DarkFriday"]) == "Probe-DarkFriday"
+    assert matcher.canonical("pdf racing", ["PDF-Racing"]) == "Probe-DarkFriday"
+
+
+def test_standings_keep_a_colliding_spelling_apart():
+    rules = normalize_rules({"points_by_place": SCHEME, "team_scoring": {"enabled": True}})
+    rounds = [{"id": "r1", "order": 1, "status": "scored"}]
+    sheets = {"r1": {"rows": [{"participant_id": "a", "place": 1, "team": "Probe-DarkFriday"},
+                              {"participant_id": "b", "place": 2, "team": "Probe DarkFriday"},
+                              {"participant_id": "c", "place": 3, "team": "Fremd Rot"}]}}
+    snapshots = compute_standings(rules=rules, rounds=rounds, sheets=sheets, participants=PEOPLE,
+                                  own_teams=[{"name": "Probe-DarkFriday"}])
+    table = [snap for snap in snapshots if snap["scope"] == "teams"][-1]["rows"]
+    assert [(row["team"], row["points"]) for row in table] == [
+        ("Probe-DarkFriday", 10), ("Probe DarkFriday", 6), ("Fremd Rot", 4)]
+
+
+def test_the_sheet_check_names_a_spelling_that_is_not_merged():
+    rules = normalize_rules({"points_by_place": SCHEME})
+    resolution = series_results.resolve({"rows": [
+        {"name": "Anna", "place": 1, "team": "Probe-DarkFriday"},
+        {"name": "Bert", "place": 2, "team": "Probe DarkFriday"},
+        {"name": "Carl", "place": 3, "team": "A B"}]}, [], rules)
+    series_results.check(resolution, rules, {"status": "planned"}, "2026-11-01",
+                         [{"name": "Probe-DarkFriday"}, {"name": "A-B"}, {"name": "AB"}])
+    spelling = [warning for warning in resolution.warnings if warning["code"] == "own_team_spelling"]
+    assert len(spelling) == 2
+    assert "„Probe DarkFriday“" in spelling[0]["message"] and "„Probe-DarkFriday“" in spelling[0]["message"]
+    assert spelling[0]["rows"] == [1]
+    assert "„A B“" in spelling[1]["message"] and "„A-B“" in spelling[1]["message"]
+    # Ohne Doppel im Blatt zählt die Schreibweise still als das eigene Team - kein Hinweis.
+    quiet = series_results.resolve({"rows": [{"name": "Bert", "place": 1, "team": "Probe DarkFriday"}]}, [], rules)
+    series_results.check(quiet, rules, {"status": "planned"}, "2026-11-01", [{"name": "Probe-DarkFriday"}])
+    assert "own_team_spelling" not in [warning["code"] for warning in quiet.warnings]

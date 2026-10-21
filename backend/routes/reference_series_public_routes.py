@@ -165,7 +165,8 @@ def _club_place(lineage: dict, series: dict, snapshots: dict, club_ids: set) -> 
     if lineage.get("kind") == "team_league":
         rows = (snapshots.get((series["id"], "table")) or {}).get("rows") or []
         own = Matcher(own_teams(series))
-        ranks = [row["rank"] for row in rows if row.get("rank") and own.is_own(row.get("team"))]
+        others = [row.get("team") for row in rows]
+        ranks = [row["rank"] for row in rows if row.get("rank") and own.is_own(row.get("team"), others)]
         return {"rank": min(ranks), "of": len(rows)} if ranks else None
     rows = (snapshots.get((series["id"], "drivers")) or {}).get("rows") or []
     ranks = [row["rank"] for row in rows if row.get("rank") and row.get("participant_id") in club_ids]
