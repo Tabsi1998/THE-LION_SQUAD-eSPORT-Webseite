@@ -562,7 +562,10 @@ Aufstellung, dazu bei Bedarf die Tabelle laut Veranstalter.
 <table>
 <tr>
 <td><img src="../assets/serien/serien-laeufe-seite.png" alt="Rennraster einer F2 mit Kopf je Runde über Sprint und Hauptrennen, Flaggen und Punkten je Lauf" width="560"></td>
-<td><img src="../assets/serien/serien-laeufe-handy.png" alt="Rennkalender am Handy mit Lauf-Chips Quali, Sprint und Hauptrennen" width="220"></td>
+<td rowspan="2"><img src="../assets/serien/serien-laeufe-handy.png" alt="Rennkalender am Handy mit Lauf-Chips Quali, Sprint und Hauptrennen" width="220"></td>
+</tr>
+<tr>
+<td><img src="../assets/serien/serien-laeufe-sprint-tabelle.png" alt="Wertung je Lauf: Umschalter Gesamt, Rennen, Sprint mit der eigenen Sprint-Tabelle" width="560"></td>
 </tr>
 </table>
 
