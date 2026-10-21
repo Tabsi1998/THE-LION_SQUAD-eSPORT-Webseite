@@ -159,6 +159,16 @@ test("Rennergebnis: Startnummer, Startplatz, Zeit, Abstand, schnellste Runde und
   expect(payload.driver_of_the_day).toEqual({ participant_id: "p1" });
 });
 
+test("Rennergebnis: eine Rundenzeit ohne Fahrer ist ein Feldfehler - außer genau eine Zeile ist markiert", () => {
+  const rows = [emptyRow({ name: "Alpha", participant_id: "p1" }), emptyRow({ name: "Beta", participant_id: "p2" })];
+  const form = { rows, matches: [], table: [], note: "", fastestLap: { name: "", time: "1:31.4" }, driverOfTheDay: "" };
+  expect(fieldErrors(form).race).toEqual({ fastest_lap: "Zur Rundenzeit fehlt der Fahrer – Namen eintragen oder genau eine Zeile als „Schnellste Runde“ markieren." });
+  const marked = { ...form, rows: [{ ...rows[0], marks: ["fastest_lap"] }, rows[1]] };
+  expect(fieldErrors(marked).race).toBeUndefined();
+  expect(fieldErrors({ ...form, fastestLap: { name: "Beta", time: "1:31.4" } }).race).toBeUndefined();
+  expect(fieldErrors({ ...form, fastestLap: { name: "", time: "" } }).race).toBeUndefined();
+});
+
 test("Rennergebnis: neue Namen gehen als Name, ohne Angaben fehlen die Felder, ein falscher Startplatz ist ein Feldfehler", () => {
   const rows = [emptyRow({ name: "Neu Nora", grid: "x" }), emptyRow({ name: "Alpha", participant_id: "p1" })];
   const form = { rows, matches: [], table: [], note: "", fastestLap: { name: " neu nora ", time: " 1:31.4 " }, driverOfTheDay: "Gar Keiner" };

@@ -149,6 +149,13 @@ export function fieldErrors(form) {
     add(row.key, "penalty_points", checkNumber(row.penalty_points, { min: 0, max: LIMITS.penalty, message: "Strafpunkte als Zahl ab 0." }));
     add(row.key, "official_total", checkNumber(row.official_total, { min: -LIMITS.total, max: LIMITS.total, message: "Gesamtstand als Zahl." }));
   }
+  // Schnellste Runde (#1927): eine Zeit braucht ihren Fahrer - den Namen oder genau eine markierte Zeile.
+  const lapTime = cleanText(form.fastestLap?.time);
+  const lapDriver = cleanText(form.fastestLap?.name);
+  const markedRows = form.rows.filter((row) => filled(row) && row.marks.includes("fastest_lap")).length;
+  if (lapTime && !lapDriver && markedRows !== 1) {
+    add("race", "fastest_lap", "Zur Rundenzeit fehlt der Fahrer – Namen eintragen oder genau eine Zeile als „Schnellste Runde“ markieren.");
+  }
   for (const match of form.matches) {
     const used = text(match.home).trim() || text(match.away).trim();
     for (const side of ["home_score", "away_score"]) {
@@ -279,7 +286,13 @@ export function formToPayload(form) {
 export function problemsByRow(preview, rowKeys = []) {
   const byRow = {};
   const general = [];
+  // Meldungen zu einem Feld des Rennens (#1927: schnellste Runde, Fahrer des Tages) stehen an diesem Feld.
+  const byField = {};
   const add = (problem, level) => {
+    if (problem.field) {
+      (byField[problem.field] ||= []).push({ level, message: problem.message });
+      return;
+    }
     const indexes = problem.match === undefined || problem.match === null ? problem.rows || [] : [];
     const keys = indexes.map((index) => rowKeys[index]).filter(Boolean);
     if (!keys.length) {
@@ -290,7 +303,7 @@ export function problemsByRow(preview, rowKeys = []) {
   };
   (preview?.errors || []).forEach((problem) => add(problem, "error"));
   (preview?.warnings || []).forEach((problem) => add(problem, "warning"));
-  return { byRow, general };
+  return { byRow, general, byField };
 }
 
 /** Rechnung einer Zeile kurz: „25 Pkt (24 + 1 Bonus)“. */

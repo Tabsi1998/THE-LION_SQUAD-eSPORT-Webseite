@@ -210,6 +210,28 @@ test("Rennliga (#1927): Tabelle mit Nr, Start, Zeit, Abstand, Ausfall, schnellst
   expect(within(sheet).getByTestId("result-row-grid")).toHaveAttribute("aria-invalid", "true");
 });
 
+test("Rennliga (#1927): Rundenzeit ohne Fahrer hält das Prüfen auf, Meldungen des Servers stehen am Feld", async () => {
+  setup();
+  await openRound();
+  fireEvent.change(screen.getAllByTestId("result-row-name")[0], { target: { value: "Alpha" } });
+  fireEvent.change(screen.getByTestId("result-fastest-time"), { target: { value: "1:31.456" } });
+  const race = screen.getByTestId("result-race");
+  expect(within(race).getByTestId("result-race-problems")).toHaveTextContent("Zur Rundenzeit fehlt der Fahrer");
+  expect(screen.getByTestId("result-fastest-name")).toHaveAttribute("aria-invalid", "true");
+  fireEvent.click(screen.getByTestId("result-submit"));
+  expect(apiMock.post).not.toHaveBeenCalled();
+  expect(screen.getByTestId("result-invalid")).toBeInTheDocument();
+
+  // Mit Fahrer geht es zum Server; eine Meldung zu diesem Feld steht dann am Feld, nicht oben in der Vorschau.
+  apiMock.post.mockResolvedValueOnce({ data: { ...PREVIEW, can_save: false, warnings: [],
+    errors: [{ code: "fastest_lap_not_in_list", field: "fastest_lap", rows: [], message: "Schnellste Runde: „Gamma“ steht nicht in der Ergebnisliste." }] } });
+  fireEvent.change(screen.getByTestId("result-fastest-name"), { target: { value: "Gamma" } });
+  fireEvent.click(screen.getByTestId("result-submit"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalled());
+  expect(await within(race).findByTestId("result-race-problems")).toHaveTextContent("„Gamma“ steht nicht in der Ergebnisliste");
+  expect(screen.getByTestId("result-preview")).not.toHaveTextContent("„Gamma“ steht nicht");
+});
+
 test("Team-Liga: kein Feld für schnellste Runde und Fahrer des Tages", async () => {
   setup({ data: resultData({ series: { id: "serie-1", kind: "team_league", team_name: "Probe Lions", rules: { points_mode: "scheme" } } }) });
   await openRound();

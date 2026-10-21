@@ -110,3 +110,18 @@ def test_a_placeholder_without_time_is_no_time():
     assert content["rows"][1] == {"participant_id": "p-bert", "place": None, "team": None, "points": None,
                                   "points_source": "scheme", "marks": ["dnf"], "penalty_points": 0, "note": None}
     assert content["fastest_lap"] == {"participant_id": "p-anna", "time": None}
+
+
+def test_a_fastest_lap_time_without_a_driver_is_refused():
+    rows = [{"participant_id": "p-anna", "place": 1}, {"participant_id": "p-bert", "place": 2}]
+    out = resolve({"rows": rows, "fastest_lap": {"time": "1:31.456"}}, PEOPLE, SCHEME)
+    assert [(problem["code"], problem.get("field")) for problem in out.errors] == [
+        ("fastest_lap_without_driver", "fastest_lap")]
+    assert "Fahrer" in out.errors[0]["message"]
+    assert out.content()["fastest_lap"] is None
+    # Zwei markierte Zeilen sind genauso offen.
+    twice = [{**row, "marks": ["fastest_lap"]} for row in rows]
+    assert [problem["code"] for problem in resolve({"rows": twice, "fastest_lap": {"time": "1:31.4"}}, PEOPLE,
+                                                   SCHEME).errors] == ["fastest_lap_without_driver"]
+    # Ohne Zeit und ohne Fahrer ist nichts eingetragen - kein Fehler.
+    assert resolve({"rows": rows, "fastest_lap": {"time": ""}}, PEOPLE, SCHEME).errors == []

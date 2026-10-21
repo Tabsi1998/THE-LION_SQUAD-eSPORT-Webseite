@@ -277,17 +277,22 @@ def resolve(entry: dict, participants: list[dict], rules: dict) -> Resolution:
     return out
 
 
-def _in_list(out: Resolution, ref, lookup: _Lookup, seen: dict, where: str, code: str) -> str | None:
-    """Wer bei schnellster Runde bzw. Fahrer des Tages gemeint ist - muss eine Zeile der Liste sein."""
-    if not isinstance(ref, dict) or not any(clean(ref.get(key)) for key in ("participant_id", "name", "start_number")):
+def _named(ref) -> bool:
+    return isinstance(ref, dict) and any(clean(ref.get(key)) for key in ("participant_id", "name", "start_number"))
+
+
+def _in_list(out: Resolution, ref, lookup: _Lookup, seen: dict, where: str, code: str, field: str) -> str | None:
+    """Wer bei schnellster Runde bzw. Fahrer des Tages gemeint ist - muss eine Zeile der Liste sein. Probleme tragen
+    ``field`` (``fastest_lap``, ``driver_of_the_day``), damit die Oberfläche sie am Feld zeigt."""
+    if not _named(ref):
         return None
     located = _locate(ref, lookup, where)
     if located.problem:
-        out.errors.append(located.problem)
+        out.errors.append({**located.problem, "field": field})
         return None
     if located.participant_id not in seen:
         label = located.name or clean(ref.get("start_number"))
-        out.errors.append(_problem(code, f"{where}: „{label}“ steht nicht in der Ergebnisliste."))
+        out.errors.append(_problem(code, f"{where}: „{label}“ steht nicht in der Ergebnisliste.", field=field))
         return None
     return located.participant_id
 
@@ -297,21 +302,32 @@ def _race_extras(out: Resolution, entry: dict, lookup: _Lookup, seen: dict) -> N
     fastest = entry.get("fastest_lap")
     if isinstance(fastest, dict):
         time = lap_text(fastest.get("time"))
-        pid = _in_list(out, fastest, lookup, seen, "Schnellste Runde", "fastest_lap_not_in_list")
-        if pid is None and not any(clean(fastest.get(key)) for key in ("participant_id", "name", "start_number")):
+        pid = _in_list(out, fastest, lookup, seen, "Schnellste Runde", "fastest_lap_not_in_list", "fastest_lap")
+        if pid is None and not _named(fastest):
             marked = [row["participant_id"] for row in out.rows
                       if row["participant_id"] and "fastest_lap" in row["marks"]]
             pid = marked[0] if len(marked) == 1 else None
+            if pid is None and time:
+                # Eine Zeit ohne Fahrer wäre ein verwaister Wert - abgelehnt, mit Hinweis am Feld.
+                out.errors.append(_problem(
+                    "fastest_lap_without_driver", "Schnellste Runde: Zur Zeit fehlt der Fahrer - bitte den Fahrer "
+                    "eintragen oder genau eine Zeile als „Schnellste Runde“ markieren.", field="fastest_lap"))
+                return _driver_of_the_day(out, entry, lookup, seen)
         if pid:
             for row in out.rows:
                 if row["participant_id"] == pid and "fastest_lap" not in row["marks"]:
                     row["marks"] = sorted([*row["marks"], "fastest_lap"])
-        if pid or time:
+        if pid:
             out.fastest_lap = {"participant_id": pid, "time": time}
+    _driver_of_the_day(out, entry, lookup, seen)
+
+
+def _driver_of_the_day(out: Resolution, entry: dict, lookup: _Lookup, seen: dict) -> None:
     day = entry.get("driver_of_the_day")
     if isinstance(day, str):
         day = {"name": day}
-    out.driver_of_the_day = _in_list(out, day, lookup, seen, "Fahrer des Tages", "driver_of_the_day_not_in_list")
+    out.driver_of_the_day = _in_list(out, day, lookup, seen, "Fahrer des Tages", "driver_of_the_day_not_in_list",
+                                     "driver_of_the_day")
 
 
 def replace_new_ids(content: dict, created: dict[str, str]) -> dict:

@@ -168,20 +168,36 @@ function ResultRow({ row, index, autoPlace, organizerMode, problems, info, inval
   );
 }
 
-// Je Rennen (#1927): schnellste Runde mit Zeit und Fahrer des Tages - Namen aus der Liste oben (Vorschläge).
-function RaceExtras({ form, onChange }) {
+// Je Rennen (#1927): schnellste Runde mit Zeit und Fahrer des Tages - Namen aus der Liste oben (Vorschläge). Feldfehler
+// (Zeit ohne Fahrer) und Meldungen der Vorschau zu diesen Feldern stehen direkt darunter.
+function RaceExtras({ form, onChange, invalid, problems = {} }) {
   const set = (key, values) => onChange({ [key]: values });
+  const lapInvalid = Boolean(invalid?.fastest_lap || problems.fastest_lap?.some((item) => item.level === "error"));
+  const dayInvalid = Boolean(problems.driver_of_the_day?.some((item) => item.level === "error"));
+  const messages = [
+    ...(invalid?.fastest_lap ? [{ level: "error", message: invalid.fastest_lap }] : []),
+    ...(problems.fastest_lap || []), ...(problems.driver_of_the_day || []),
+  ];
   return (
     <section className="border border-white/10 rounded-sm bg-[#0A0A0A] p-3 grid gap-2 sm:grid-cols-[minmax(0,1fr)_8rem_minmax(0,1fr)] items-end" data-testid="result-race">
       <label className="block min-w-0"><span className={LABEL}>Schnellste Runde</span>
         <input value={form.fastestLap.name} list="result-row-names" maxLength={120} placeholder="Name aus der Liste"
-          onChange={(event) => set("fastestLap", { ...form.fastestLap, name: event.target.value })} data-testid="result-fastest-name" className={SMALL_INPUT} /></label>
+          onChange={(event) => set("fastestLap", { ...form.fastestLap, name: event.target.value })} data-testid="result-fastest-name"
+          aria-invalid={lapInvalid || undefined} className={`${SMALL_INPUT} ${lapInvalid ? INVALID : ""}`} /></label>
       <label className="block"><span className={LABEL}>Rundenzeit</span>
         <input value={form.fastestLap.time} maxLength={20} placeholder="1:31.456"
           onChange={(event) => set("fastestLap", { ...form.fastestLap, time: event.target.value })} data-testid="result-fastest-time" className={`${SMALL_INPUT} tabular-nums`} /></label>
       <label className="block min-w-0"><span className={LABEL}>Fahrer des Tages</span>
         <input value={form.driverOfTheDay} list="result-row-names" maxLength={120} placeholder="Name aus der Liste"
-          onChange={(event) => set("driverOfTheDay", event.target.value)} data-testid="result-dotd" className={SMALL_INPUT} /></label>
+          onChange={(event) => set("driverOfTheDay", event.target.value)} data-testid="result-dotd"
+          aria-invalid={dayInvalid || undefined} className={`${SMALL_INPUT} ${dayInvalid ? INVALID : ""}`} /></label>
+      {messages.length > 0 && (
+        <ul className="sm:col-span-3 space-y-0.5 text-xs" data-testid="result-race-problems" role="alert">
+          {messages.map((item, index) => (
+            <li key={index} className={item.level === "error" ? "text-red-300" : "text-amber-300"}>{item.message}</li>
+          ))}
+        </ul>
+      )}
     </section>
   );
 }
@@ -626,7 +642,7 @@ export function ResultEntrySheet({ series, round, onClose, onSaved }) {
               </button>
             </section>
           )}
-          {kind === "racing" && <RaceExtras form={form} onChange={update} />}
+          {kind === "racing" && <RaceExtras form={form} onChange={update} invalid={invalid.race} problems={problems.byField} />}
 
           {teamLeague && form.rows.length === 0 && (
             <button type="button" onClick={addRow} data-testid="result-row-add" className="tls-btn tls-btn--quiet px-3 py-2 rounded-sm text-xs font-bold uppercase tracking-wider inline-flex items-center gap-2">
