@@ -50,6 +50,7 @@ import { GameDiscordTile } from "@/components/tls/DiscordServerTile";
 import { viennaDateTime } from "@/lib/vienna";
 import { ShareButton } from "@/components/tls/ShareButton";
 import { Podium } from "@/components/tls/podium/Podium";
+import { TournamentMapPools } from "@/components/tls/maps/TournamentMapPools";
 import { markPlacementShown, placementFor, placementShown } from "@/lib/placementMoment";
 import { ceremonyQueue } from "@/components/achievements/ceremony/queue";
 
@@ -450,6 +451,8 @@ function TournamentDetailView() {
               <PrizeList prizePlaces={t.prize_places} prizePool={t.prize_pool} />
             </section>
           )}
+          {/* Map-Pool (#1616): nur mit Spiel - ein Cup ohne Maps fragt gar nicht danach. */}
+          {t.game_id ? <TournamentMapPools tournamentId={t.id} /> : null}
           {podiumRows.length > 0 && (
             <section>
               <h2 className="font-heading text-2xl font-bold uppercase mb-8 flex items-center gap-2"><Trophy className="w-4 h-4 text-[#FFD700]" /> Podest</h2>

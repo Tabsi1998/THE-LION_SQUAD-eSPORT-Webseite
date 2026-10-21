@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { ConfirmDialogProvider } from "@/components/tls/ConfirmDialog";
@@ -176,6 +176,27 @@ test("die Arbeitsreiter sind vorhanden und lassen sich wechseln", async () => {
   await user.click(editTab);
 
   expect(editTab.className).toContain("border-b-2");
+});
+
+// Map-Pool (#1616): ein Reiter „Maps“ nur, wenn das Turnier ein Spiel hat - ein maploser Cup bleibt wie er ist.
+test("der Reiter Maps erscheint nur mit Spiel und zeigt den Pool-Editor", async () => {
+  const user = userEvent.setup();
+  renderPage();
+  await screen.findByRole("heading", { name: "Winter Cup 2026" });
+  expect(screen.queryByTestId("admin-tr-tab-maps")).not.toBeInTheDocument();
+  cleanup();
+
+  apiMock.get.mockImplementation((url) => {
+    const path = String(url);
+    if (path.startsWith("/map-pools/")) return Promise.resolve({ data: { game: null, library: [], tournament: null, stages: [] } });
+    const routed = routeFor(path);
+    return Promise.resolve(routed.data === TOURNAMENT ? { data: { ...TOURNAMENT, game_id: "g-1" } } : routed);
+  });
+  renderPage();
+  await screen.findByRole("heading", { name: "Winter Cup 2026" });
+  await user.click(screen.getByTestId("admin-tr-tab-maps"));
+  expect(await screen.findByTestId("map-pool-panel")).toBeInTheDocument();
+  expect(apiMock.get).toHaveBeenCalledWith("/map-pools/tournaments/t-1/admin");
 });
 
 test("der Gruppenreiter erscheint nur bei Gruppenformat", async () => {

@@ -70,6 +70,24 @@ test("Discord-Server zum Spiel (#626): Kachel mit Status; ohne Server keine Kach
   expect(screen.queryByTestId("game-discord-tile")).toBeNull();
 });
 
+// Map-Pool (#1616): mit Spiel lädt die Seite die Pools und zeigt sie als Karten; ohne Spiel fragt sie gar nicht.
+test("Map-Pool des Turniers erscheint mit Spiel, ein Cup ohne Spiel fragt nicht danach", async () => {
+  mockApi(base);
+  const { unmount } = renderPage();
+  expect(await screen.findByTestId("tournament-title")).toBeInTheDocument();
+  expect(apiMock.get).not.toHaveBeenCalledWith("/map-pools/tournaments/t1");
+  unmount();
+
+  const pool = { id: "p1", origin: "tournament", modes: [{ mode: "snd", label: "Suchen & Zerstören", maps: [{ map_id: "nebel", name: "Nebelwerk" }] }] };
+  apiMock.get.mockImplementation((path) => {
+    if (path === "/tournaments/cup") return Promise.resolve({ data: { ...base, game_id: "g1" } });
+    if (path === "/map-pools/tournaments/t1") return Promise.resolve({ data: { tournament: pool, stages: [] } });
+    return Promise.resolve({ data: [] });
+  });
+  renderPage();
+  expect(await screen.findByTestId("map-pool")).toHaveTextContent("Nebelwerk");
+});
+
 // Bestätigungs-Blatt (#1261): jede Anmeldung geht über das Blatt - auch Einzel ohne Startgeld und ohne Kennungen.
 const RULES = "Fair Play gilt immer. Ergebnisse meldet der Sieger. Wer zu spät kommt, verliert kampflos. Proteste gehen an die Turnierleitung.";
 
