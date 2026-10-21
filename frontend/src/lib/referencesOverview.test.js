@@ -270,6 +270,17 @@ test("Liga-Weg: ohne vergleichbare Stufe und bei zwei Stufen in einer Saison kei
   expect(leaguePath([{ season: "1", status: "completed" }]).summary).toBe("1 Saison");
 });
 
+test("Liga-Weg: eine abgebrochene Saison heißt so - ihr Neustart in einer anderen Stufe ist kein Aufstieg (#1960)", () => {
+  const path = leaguePath([
+    { season: "2025", tier: "Liga 2", status: "completed", season_slug: "2025" },
+    { season: "2026", tier: "Liga 2", status: "cancelled", season_slug: "2026" },
+    { season: "2027", tier: "Liga 1", status: "active", season_slug: "2027" },
+  ]);
+  expect(path.steps.map((step) => [step.season, step.note])).toEqual([["2025", ""], ["2026", "abgebrochen"], ["2027", "läuft"]]);
+  expect(path.promotions).toBe(0);
+  expect(path.target.season_slug).toBe("2027");
+});
+
 // ---------------------------------------------------------------- Ehrentafel
 
 test("Ehrentafel: Medaillen aus der Bilanz, laufende Saisons und Aufstiege aus den Spuren, seit dem ersten Jahr", () => {

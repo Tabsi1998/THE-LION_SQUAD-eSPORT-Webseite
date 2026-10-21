@@ -454,7 +454,7 @@ offener als Saison und Spur. Stellst du Saison oder Spur später strenger (etwa 
 ihre Referenzen sofort; das Adminprotokoll nennt, wie viele angepasst wurden. Lockern öffnet keine Referenz – das machst du
 bei Bedarf in der Referenz selbst. So zählt die Vitrine jede Saison genau einmal. Danach steht im Kopf der Saison **Referenz: Platz 6 von 8 ·
 ansehen**. Jahreswertungs-Punkte gibt es dafür keine, nur Abzeichen ([Erfolge](erfolge.md) 3.6). Eine abgebrochene Saison
-bekommt keine Platzierung (der Status „abgebrochen“ kommt mit einem eigenen Paket).
+(Status **Abgebrochen**, siehe „Sonderregeln“ unten) bekommt keine Platzierung und bleibt beim Abschließen abgebrochen.
 
 <table>
 <tr>
@@ -506,7 +506,8 @@ Ablauf je Runde hat – eine alte Saison mit zweimal „R1“ behält zwei Runde
   „Quali + Sprint + Hauptrennen“. Je Lauf gibt es Name, **Versatz** in Minuten ab der Uhrzeit der Zeile, **Punkte**
   (**Wie Rennen** = das Schema der Saison, **Keine Punkte** oder **Eigene Liste** wie `12-9-7-6-5-4-3-2-1`; darunter
   steht die Vorschau „P1 35 · P2 30 …“), **Startplatz** (Eingabe, aus dem Qualifying, **Umgekehrte WM-Reihenfolge vor
-  der Runde** oder **… nach dem Lauf davor** – dann zählt für das Hauptrennen auch der Sprint derselben Runde),
+  der Runde** oder **… nach dem Lauf davor** – dann zählt für das Hauptrennen auch der Sprint derselben Runde –,
+  **Umgekehrtes Qualifying** oder **Umgekehrtes Ergebnis des Laufs davor**, beide mit **Nur die ersten … umdrehen**),
   **Zählt zur Wertung**, **Punkte trotz DNF** und den **Bonus für die schnellste Runde** (leer: wie die
   Saison). Ein Qualifying zählt nicht – mit eigener Liste (etwa P1 = 2 Punkte) zählt es von selbst. Ändert sich der
   Ablauf mitten in der Saison, kommt mit **Format ab Runde …** ein weiteres Format dazu, etwa ab Runde 5 ohne Qualifying.
@@ -722,8 +723,84 @@ bisher.
 </tr>
 </table>
 
-Das Team je Rennen kommt aus der Spalte **Team** im Ergebnisblatt, sonst gilt das Standard-Team des Teilnehmers. Am Handy
-stehen Karten statt der Tabellen.
+Das Team je Rennen kommt aus der Spalte **Team** im Ergebnisblatt – was dort steht, zählt; ein leeres Feld heißt kein
+Team. Am Handy stehen Karten statt der Tabellen.
+
+**Sonderregeln (Rennliga).** Regelwerke externer Ligen haben Fälle, die kein Rennergebnis sind. Alles ist je Saison
+einstellbar, nichts ist für eine Liga fest eingebaut:
+
+- **Anpassungen** (Seite der Saison, nur Vorstand): ±Punkte ohne Rennergebnis – etwa **−5** für Nichtteilnahme nach
+  Anmeldung, verspätete Ab- oder Anmeldung oder ein fehlendes Video. Je Anpassung **Teilnehmer** (Fahrerwertung) oder
+  **Team** (Teamwertung), **Punkte** (Minus zieht ab), **Grund**, **Tag** und optional der **Termin**. Mit Termin zählt
+  sie ab dessen Stand, sonst ab dem Stand an ihrem Tag. Öffentlich steht sie als kleines **−5** an den Punkten (der
+  Grund im Tooltip) und im Fahrer-Detail mit Grund, Termin und Tag – der Grund ist also für alle lesbar. So erklärt sich
+  eine Abweichung zur offiziellen Tabelle: Stimmen die Anpassungen, verschwindet die goldene Abweichung.
+- **Saison abgebrochen:** Saison bearbeiten → Status **Abgebrochen**, dazu **Abgebrochen am** (leer: heute) und der
+  **Grund**. Die gefahrenen Ergebnisse bleiben sichtbar, es gibt keinen Meister und keine Platzierung; die Serienseite
+  sagt es oben. **Nachfolger** verweist auf die neue Saison der Spur, etwa den Neustart mit anderem Auto – die
+  Serienseite verlinkt sie. Im Liga-Weg und im Saison-Umschalter steht **abgebrochen** (kein abgeleiteter Auf- oder
+  Abstieg), in der Chronik die Marke **abgebrochen**.
+- **Regeländerung ab Runde X:** Ändert sich der Ablauf mitten in der Saison, bekommt das neue Format unter **Ablauf je
+  Runde** einen **Hinweis zur Regeländerung** („Ab R5 kein Qualifying, Start in umgekehrter WM-Reihenfolge“). Die
+  Serienseite zeigt unter **Regeländerungen** den Hinweis mit dem Tag der ersten Runde dieses Formats, dazu jede
+  Regel-Version mit **Hinweis zur Regeländerung**.
+- **Umgekehrte Startaufstellung:** **Umgekehrtes Qualifying** – der Lauf startet in umgekehrter Reihenfolge des
+  Qualifyings derselben Runde; **Umgekehrtes Ergebnis des Laufs davor** – etwa der Sprint aus dem umgekehrten
+  Hauptrennen. **Nur die ersten … umdrehen** (etwa 8): Quali-P8 startet von 1 … P1 von 8, ab P9 wie im Qualifying; leer
+  heißt alle. Wer im Qualifying keinen gültigen Platz hat (DNS, DSQ), startet hinten; ein eingetragener Startplatz
+  bleibt. Die **Pole** bleibt beim Schnellsten im Qualifying: Ein umgekehrter Lauf hat keine Pole (wer vorn steht, hat
+  Startplatz 1; eine Pole-Marke im Blatt fällt mit Hinweis weg). Der Pole-Bonus zählt am ersten Rennen mit Startplatz
+  aus dem Qualifying, gibt es keins, am Qualifying selbst. Die Serienseite nennt es unter **Startaufstellung**
+  („Sprint: Start in umgekehrter Quali-Reihenfolge (Top 8)“), die Ergebnisseite der Runde über der Tabelle des Laufs.
+  Zusammenfassung und Statistik zählen die Pole nur aus dem Qualifying (eine Pole-Marke im Rennen nur, wenn die Runde
+  kein Quali-Ergebnis hat – nie in einem umgekehrten Lauf).
+- **Termin ohne Wertung:** Im Termin **Ohne Wertung – Grund**: **Zu wenig Fahrer**, **Serverausfall bzw. Nachholung**,
+  **Neustart** oder **Anderer Grund**, dazu ein kurzer Text. Der Termin zählt dann nicht und zeigt öffentlich
+  „Ohne Wertung · Zu wenig Fahrer – …“ – anders als **Abgesagt**, das nicht stattgefunden hat. Die Ergebnisseite der
+  Runde zeigt den Lauf mit Grund und ohne Punkte, die Statistik der Saison zählt ihn nicht. **Mindestens am Start**
+  (Regeln der Saison, Abschnitt „Was zählt“) lässt beim Eintragen einen Hinweis erscheinen, wenn weniger am Start sind.
+- **Team im Ergebnis – was im Feld steht, zählt:** Eine neue Zeile bekommt das Standard-Team des Teilnehmers sichtbar
+  ins Feld – beim Eintragen eines bekannten Namens und beim Einfügen einer Liste ohne Team-Spalte. Wer wirklich ohne
+  Team fährt: Team löschen, dann zählt die Fahrt für kein Team (die Fahrerwertung bleibt). Die Zeile sagt dann
+  „zählt für kein Team“, mit dem Knopf **Stammteam … eintragen**, falls das Löschen ein Versehen war. Eine Liste mit
+  Team-Spalte und die Bild-Erkennung übernehmen, was dasteht; eine leere Team-Zelle aus dem Bild bleibt leer und gelb
+  (oft steht dort ein farbiges Schild, das beim Lesen wegfällt). Ein neues Standard-Team am Teilnehmer ändert gefahrene
+  Rennen nicht. Ältere Ergebnisse ohne Team haben beim Update einmal ihr damaliges Standard-Team bekommen, damit
+  keine Saison Punkte verliert.
+- **Ersatzfahrer:** Steht im Ergebnis als Team **Ersatzfahrer** (oder ein anderer Eintrag aus **Kein Team (Ersatz)** in
+  den Regeln der Saison), zählt die Fahrt für kein Team – auch nicht fürs Standard-Team des Fahrers – und die
+  Teamwertung hat keine Zeile „Ersatzfahrer“. Die Fahrerwertung bleibt, wie sie ist; die Zeile im Ergebnisblatt sagt
+  „zählt für kein Team (Ersatz)“. Die Bild-Erkennung lässt „Ersatzfahrer“ stehen. Ein Team, das es in der Saison noch
+  nicht gibt, bekommt beim Prüfen einen Hinweis („Team „Team 2“ gibt es in dieser Saison noch nicht – meintest du …?“).
+- **Teamwertung bei Wechseln:** **Je Rennen für das gefahrene Team** (Vorgabe) oder **Aktuelle Besetzung: alle
+  Saisonpunkte der Fahrer, die jetzt im Team sind** – wie beim Veranstalter: Die Zellen je Rennen zeigen das Team, für
+  das gefahren wurde (Ersatzfahrten für keines, „–“ ohne Fahrt). **Gesamt und Platz** sind die Saisonpunkte aller
+  Fahrer, deren aktuelles Team es ist – samt ihrer Ersatzfahrten und Abzüge, plus Team-Anpassungen. Aktuelles Team ist
+  das Team der letzten Fahrt, die kein Ersatz war; wer nie für ein Team gefahren ist, zählt fürs Standard-Team. Wer
+  ohne Fahrt umgesetzt wurde oder die Liga verlassen hat, bekommt am Teilnehmer **Aktuelles Team (von Hand)**
+  („Ersatzfahrer“ heißt: in keinem Team). Abweichungen zwischen Zellensumme und Gesamt sind dann gewollt, die Tabelle
+  sagt es. Das Fahrer-Detail nennt nach einem Wechsel **im Team seit R12**.
+- **Teamwertung laut Veranstalter:** Im Ergebnisblatt eines Rennens (Rennliga mit Teamwertung) steht **Teamwertung laut
+  Veranstalter** – Teams mit Punkten eintragen oder mit **Einfügen** aus der Tabelle des Veranstalters übernehmen
+  („1. Team A 123“). Ist sie da, gilt sie für Platz und Punkte der Teamwertung; die eigene Rechnung steht nur noch als
+  Prüfhinweis darunter („Eigene Rechnung weicht bei einem Team ab“). Sie gilt für den Stand nach dieser Runde – nach der
+  nächsten Runde wieder einfügen, sonst rechnet die Seite selbst. Weichen nur einzelne Teams ab, genügt eine
+  **Anpassung** für das Team. Die Teamwertung nennt **Quelle** („laut Veranstalter (nach R12)“ bzw. „berechnet“) und
+  **Modus**.
+- **Ohne Teamwertung** (Regeln: „Teamwertung führen“ aus, etwa eine F2 ohne Konstrukteurs-WM) fehlt der Bereich ganz.
+
+<table>
+<tr>
+<td><img src="../assets/serien/serien-sonderregeln-fahrerwertung.png" alt="Fahrerwertung mit Startaufstellung, Regeländerung ab R5 und der Marke −5 an den Punkten zweier Fahrer" width="560"></td>
+<td><img src="../assets/serien/serien-sonderregeln-fahrer-detail.png" alt="Fahrer-Detail am Handy: im Team seit R4 und die Anpassung −5 mit Grund" width="220"></td>
+</tr>
+<tr>
+<td><img src="../assets/serien/serien-sonderregeln-teamwertung.png" alt="Teamwertung mit Quelle laut Veranstalter, Modus aktuelle Besetzung und Prüfhinweis zur eigenen Rechnung" width="560"></td>
+<td><img src="../assets/serien/serien-sonderregeln-anpassungen.png" alt="Verwaltung am Handy: Liste der Anpassungen mit −5 für zwei Fahrer und +4 für ein Team" width="220"></td>
+</tr>
+</table>
+
+<img src="../assets/serien/serien-sonderregeln-teamwertung-einfuegen.png" alt="Ergebnisblatt am Handy: Teamwertung laut Veranstalter mit drei Teams, Einfügen und Leeren" width="220">
 
 <table>
 <tr>
@@ -805,8 +882,8 @@ nie. Läuft nichts, fehlt der Bereich ganz. Zum Ändern genügt der Status der S
 Platz und einem Vermerk: **läuft** für die laufende Saison (hervorgehoben), **Aufstieg** oder **Abstieg**, wenn die
 nächste Saison eine höhere oder tiefere Stufe hat. Verglichen wird die Zahl direkt nach **Liga**, **Division**, **Div**,
 **Stufe**, **Tier** oder **League** („Division 3“ → „Division 2“ ist ein Aufstieg, auch als „4v4 Division 3“; „1. Liga“
-geht ebenso). Spielformate wie 4v4 und Jahreszahlen zählen nicht – ohne solche Zahl bleibt der Vermerk leer. Die Karte
-führt zur laufenden, sonst zur neuesten Saison.
+geht ebenso). Spielformate wie 4v4 und Jahreszahlen zählen nicht – ohne solche Zahl bleibt der Vermerk leer. Eine
+abgebrochene Saison heißt **abgebrochen**. Die Karte führt zur laufenden, sonst zur neuesten Saison.
 
 <img src="../assets/referenzen/referenzen-serien-breit.png" alt="Serien und Ligen: je Spur der Liga-Weg mit Saison, Stufe, Platz, Aufstieg und laufender Saison" width="560">
 
@@ -854,8 +931,8 @@ Verknüpfungen sieht nur die Verwaltung (Bereich Redaktion).
 für ein Vereinsteam, ist aber kein Mitglied, **Extern** sind alle anderen. Über der Liste filtert ihr nach **Alle**,
 **Mitglieder**, **Gäste**, **Extern** oder **Offen** und sucht nach Name, Startnummer, Team oder Profil.
 
-- **Bearbeiten** (Stift am Ende der Zeile): Name wie beim Veranstalter, Startnummer, Standard-Team und die Zuordnung
-  (Mitglied mit Profil, Gast oder Extern). Wird ein Mitglied oder Gast extern, fragt die Seite nach – jeder Alias des
+- **Bearbeiten** (Stift am Ende der Zeile): Name wie beim Veranstalter, Startnummer, Standard-Team (Vorschlag für neue
+  Ergebniszeilen) und die Zuordnung (Mitglied mit Profil, Gast oder Extern). Wird ein Mitglied oder Gast extern, fragt die Seite nach – jeder Alias des
   Teilnehmers wird dann in allen Saisons zurückgenommen. Gibt es den neuen Namen in der Saison schon, sagt die Seite
   das: dann zusammenführen.
 - **Mehrere auf einmal:** Haken setzen – **Alle auswählen** nimmt nur, was Filter und Suche gerade zeigen – und
@@ -1026,6 +1103,9 @@ aktuellen Stand, eure Eingaben bleiben stehen, und die Vorschau prüft neu. Jede
 | Seite „Über uns“ zeigt keine Zahl | Zähler mit null bleiben weg | Gewollt |
 | `/references/series/…` zeigt „Hier ist kein Rudel“ | Saison oder Spur archiviert, Adresse falsch, oder die Sichtbarkeit ist enger (etwa „Nur Mitglieder“) | Sichtbarkeit und Status prüfen |
 | Termin steht auf **Ergebnis fehlt**, fand aber nie statt | Nicht abgesagt | **Absagen** – dann fehlt er nicht mehr |
+| Termin wurde gefahren, zählt aber laut Veranstalter nicht | Kein Grund „ohne Wertung“ gesetzt | Termin → **Ohne Wertung – Grund** (etwa zu wenig Fahrer) |
+| Fahrer liegt genau 5 Punkte über der offiziellen Tabelle (goldene Abweichung) | Abzug des Veranstalters ohne Rennergebnis | Seite der Saison → **Anpassungen** → −5 mit Grund |
+| Teamwertung weicht von der offiziellen ab, obwohl die Fahrer stimmen | Andere Zählweise bei Teamwechseln | Regeln → **Teamwertung bei Wechseln**, oder im Ergebnisblatt **Teamwertung laut Veranstalter** einfügen |
 | Ergebnis-Blatt meldet „inzwischen geändert“ | Jemand anderes hat das Ergebnis gespeichert | **Neu laden**, Vorschau prüfen, dann übernehmen |
 | Captain-Änderung ist nicht öffentlich | Das Ergebnis war veröffentlicht – die Änderung ist ein Entwurf daneben | Vorstand: im Blatt **Freigeben** |
 | Rennliga ohne Vereins-Garage | Kein Teilnehmer ist als Mitglied zugeordnet, und die Saison hat kein eigenes Team | **Unbekannte Namen** → **Bestätigen**, oder das eigene Team der Saison eintragen |

@@ -413,7 +413,8 @@ def test_lines_and_unlabelled_points_never_become_points():
 
 def test_empty_cell_in_a_filled_column_is_yellow():
     """Steht in fast allen Zeilen ein Team, eine Startnummer, ein Startplatz, ist eine leere Zelle verdächtig (etwa
-    dunkelgraue Schrift auf dunklem Grund) - gelb. Mit erkanntem Teilnehmer kommt das Team aus der Saison."""
+    dunkelgraue Schrift auf dunklem Grund) - gelb. Das Team bleibt leer (#1960): oft stand dort ein farbiges Schild
+    wie „Ersatzfahrer“, das beim Lesen wegfällt - das Stammteam vorzuschlagen, hieße es still dafür zu zählen."""
     out = build(reading(row("1", "7", "Anna Probe", "Rotor Racing", "2"),
                         row("2", "12", "Bert Bolzt", "Blaupfeil GP", "1"),
                         row("3", "", "Dora Neu", "", "")), TEMPLATE, PEOPLE)
@@ -422,7 +423,35 @@ def test_empty_cell_in_a_filled_column_is_yellow():
     known = build(reading(row("1", "7", "Anna Probe", "Rotor Racing"), row("2", "", "Bert Bolzt", "")),
                   TEMPLATE, PEOPLE)
     bert = known["rows"][1]
-    assert (bert["team"], "team" in bert["uncertain"]) == ("Blaupfeil GP", True)
+    assert (bert["team"], "team" in bert["uncertain"]) == (None, True)
+
+
+def test_a_substitute_entry_stays_as_read():
+    """„Ersatzfahrer“ (#1960, Eintrag „kein Team“ der Saison) bleibt im Team-Feld - auch wenn ein bekanntes Team ähnlich
+    heißt und der Fahrer ein Stammteam hat."""
+    people = [*PEOPLE, {"id": "rasta", "name": "Rasta Probe", "start_number": "33", "default_team": "Rasta Fahrer"}]
+    out = build(reading(row("1", "7", "Anna Probe", "Ersatzfahrer"), row("2", "12", "Bert Bolzt", "Blaupfeil GP"),
+                        row("3", "33", "Rasta Probe", "Rasta Fahrer")),
+                TEMPLATE, people, no_team_names=["Ersatzfahrer"])
+    anna = out["rows"][0]
+    assert anna["team"] == "Ersatzfahrer" and anna["participant_id"] == "anna"
+    # Ein unbekanntes Team bleibt ebenso stehen, wie gelesen.
+    other = build(reading(row("1", "7", "Anna Probe", "Reverse Pole"), row("2", "12", "Bert Bolzt", "Blaupfeil GP")),
+                  TEMPLATE, PEOPLE, no_team_names=["Ersatzfahrer"])
+    assert other["rows"][0]["team"] == "Reverse Pole"
+
+
+def test_a_different_game_tag_stays_another_person_and_the_team_stays_as_read():
+    """Zusammenspiel mit #1961: „Name#BBB“ ist nicht „Name#AAA“ (Ähnlichkeit 0) - die Zeile bekommt keinen Teilnehmer,
+    sein Stammteam auch nicht. „Ersatzfahrer“ bleibt stehen, eine leere Team-Zelle bleibt leer und gelb."""
+    people = [*PEOPLE, {"id": "max", "name": "Max#AAA", "default_team": "Rasta Fahrer"}]
+    assert similarity("Max#BBB", "Max#AAA") == 0
+    out = build(reading(row("1", "7", "Anna Probe", "Rotor Racing"), row("2", "12", "Bert Bolzt", "Blaupfeil GP"),
+                        row("3", "", "Max#BBB", "Ersatzfahrer"), row("4", "", "Max#AAA", "")),
+                TEMPLATE, people, no_team_names=["Ersatzfahrer"])
+    other, own = out["rows"][2], out["rows"][3]
+    assert (other["participant_id"], other["team"]) == (None, "Ersatzfahrer")
+    assert (own["participant_id"], own["team"], "team" in own["uncertain"]) == ("max", None, True)
 
 
 def test_tables_without_times_are_no_result():

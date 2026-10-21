@@ -203,6 +203,65 @@ Mehrere Runden an einem Termin (etwa TFT-Lobbys R1–R5), gerechnet in `services
   Serienseite, Kader der Team-Liga, Rundenseite und Statistik (#1950) die Namen ohne Tag; das Mitgliederprofil zeigt nur
   Profilnamen. Team-Namen (`team_names`, #1931) nutzen nur `normalize_name` und bleiben unberührt.
 
+## Sonderregeln einer Rennliga (#1960)
+
+- **Anpassungen** (`services/series_adjustments.py`, Routen `routes/reference_adjustment_routes.py`): in der Saison
+  `adjustments = [{id, kind: participant|team, participant_id, team, points, reason, day, round_id}]`, nur Vorstand,
+  `POST/PATCH/DELETE …/admin/series/<id>/adjustments[/<kennung>]` unter der Sperre der Saison, Protokoll
+  `reference_series.adjustment_create|update|delete`, danach Neurechnen. Der Rechenkern zählt je Stand die Anpassungen,
+  die schon gelten (mit Termin ab dessen Stand, sonst ab dem letzten gewerteten Termin an oder vor ihrem Tag), in
+  `computed_points`; die Zeile trägt `adjustment_points` und `adjustments` (öffentlich Punkte, Grund, Tag, Termin).
+  Fahrer-Anpassungen ändern die Teamwertung je Rennen nicht (in der aktuellen Besetzung über die Saisonpunkte des
+  Fahrers), Team-Anpassungen die Fahrerwertung nie; wer nur eine Anpassung hat, steht in der Tabelle. Sonderboni
+  (#1961, `bonus_points`) und Anpassungen zählen je genau einmal und stehen getrennt an der Zeile.
+- **Team der Zeile - was im Feld steht, zählt:** Eine Fahrt zählt für das Team der Zeile; leer (auch nur Leerraum)
+  heißt kein Team, ohne Rückfall auf `default_team` (`series_standings._ride_team`, ebenso `round_page`,
+  `season_statistics` und `series_racing.driver_teams` je Rennen). Das Web belegt neue Zeilen sichtbar vor: bekannter
+  Name (`ResultEntrySheet` `updateRow`, `hintToPoints`) und eingefügte Liste ohne Team-Spalte (`parseResultPaste`
+  `team_column`, `pastedToRows(…, {prefillTeam})`); Bild und Liste mit Team-Spalte bleiben, wie gelesen. Ohne Team
+  zeigt die Zeile „zählt für kein Team“ mit Knopf „Stammteam … eintragen“ (`seriesSpecialRules.teamCountHint`). Der
+  Server füllt nie selbst nach. Migration 10 `reference_result_row_teams` (`migrations.migrate_result_row_teams`)
+  füllt Altdaten einmal: in allen Saisons (auch ohne Teamwertung) Zeilen mit Teilnehmer und leerem Team (Blatt und
+  `pending_draft`) mit dessen `default_team`, nie ein `no_team_names`-Eintrag. Je Saison unter `series_write`, je Blatt
+  mit Versionsfilter; `team_backfill_pending` (vor dem ersten Schreiben) und `team_backfill_at` (nach Neurechnen und
+  Protokoll `reference_series.team_backfill` mit `rows`, `round_ids`) an der Saison - neu gerechnet nur, wo sich etwas
+  geändert hat. Eine Saison mit Fehler hält die anderen nicht auf; die Migration wirft dann `MigrationIncomplete`,
+  bleibt offen und macht beim nächsten Start weiter (der Start läuft weiter). Die Sperre des Laufs wird je Saison
+  verlängert (`migrations.extend_migration_lease`).
+- **Teamwertung:** Ein Name aus `team_scoring.no_team_names` (Vorgabe `["Ersatzfahrer"]`, je Saison
+  einstellbar, Vergleich ohne Groß/klein und Leerraum, `scoring_rules.is_no_team`) zählt für kein Team und bekommt keine
+  Zeile. `team_scoring.mode` `per_race` (Vorgabe: Gesamt = Summe der Zellen) oder `current_lineup` (wie beim
+  Veranstalter: Zellen je Rennen weiter nach Team der Zeile; Gesamt = Saisonpunkte der Fahrerwertung aller Fahrer, deren
+  aktuelles Team es ist, plus Team-Anpassungen; `_current_teams`: Team der letzten Fahrt mit Team, die kein Ersatz war,
+  sonst `default_team`; `participant.current_team` von Hand geht vor, ein `no_team_names`-Eintrag dort heißt „kein
+  Team“).
+  `official_team_totals` des letzten Blatts gilt für Platz und Punkte, auch für Teams, die nur dort stehen (Vergleich
+  ohne Groß/klein), nur der Vorstand schreibt es. Öffentlich `racing.teams.source` (`official`/`computed`) und je Fahrer
+  `team_since` (erstes Rennen der letzten Folge im aktuellen Team, nur nach einem Wechsel). Beim Prüfen eines Blatts
+  meldet `team_unknown` ein Team, das es in der Saison noch nicht gibt (eigene Teams, Standard-Teams, andere Blätter),
+  mit Vorschlag „meintest du …?“ bei ähnlichem Namen; still, solange die Saison noch kein Team kennt.
+- **Saison abgebrochen:** Status `cancelled` mit `cancelled_on` (leer = heute) und `cancel_reason`; ein anderer Status
+  nimmt beides zurück. `successor_id` (andere, vorhandene Saison). Öffentlich `series.cancelled_on`, `.cancel_reason` und
+  `successor` (nur sichtbar und nicht archiviert, mit Adressen); `season_link.cancelled` an Referenzen. Saison
+  abschließen lässt den Status und gibt keinen Platz (`season_close.NO_PLACEMENT_STATUSES`).
+- **Termin ohne Wertung:** `no_score_reason` (`too_few`, `outage`, `restart`, `other`) und `no_score_note` (öffentlich in
+  `PUBLIC_FIELDS`); ein Grund setzt `counts: false` von Hand, `counts` true oder `null` nimmt ihn zurück.
+  `rules.min_participants`: Warnung `too_few_participants` beim Prüfen.
+- **Regeländerungen** (`services/series_rule_changes.py`): öffentlich `rule_changes` - je Format ab Runde 2 `{kind:
+  format, from_round, to_round, day, note, sessions}` (`weekend.formats[].note`, Tag des ersten Termins der Runde) und je
+  Regel-Version ab 2 mit Hinweis `{kind: rules, version, day, note}`.
+- **Umgekehrte Startaufstellung** (`race_weekend.with_session_reverse`): `grid` `reverse_qualifying` (Haupt-Qualifying
+  derselben Runde) oder `reverse_previous_session` (letzter Lauf davor mit Ergebnis), optional `reverse_top` (1-100,
+  fehlt sonst ganz). Gültige Plätze umgedreht (nur die ersten N), ohne gültigen Platz dahinter, ein eingetragener
+  Startplatz bleibt; Pole-Marken fallen weg (beim Prüfen Warnung `pole_moved`, `race_weekend.clear_reverse_pole`).
+  Übernimmt kein Lauf der Runde den Startplatz aus dem Qualifying, zählt der Pole-Bonus der Saison am Qualifying
+  (`pole_at_qualifying`: ein Blatt nur mit der Pole-Zeile ohne Platz, nur beim Rechnen).
+- **Rundenseite und Statistik (#1950):** je Lauf `grid_source`, `reverse_top`, `no_score_reason` und `no_score_note`
+  (`round_page.session_view`); ein umgekehrter Lauf hat keine Pole-Marke. Die Zusammenfassung und
+  `season_statistics.tally` nehmen die Pole aus dem Haupt-Qualifying - die Marke eines Rennens nur ohne Quali-Ergebnis
+  und nie aus einem umgekehrten Lauf. Ein Lauf ohne Wertung zählt in der Statistik nicht; die Punkte je Lauf kommen ohne
+  Anpassungen. Der Kopf beider Seiten trägt `series.cancelled_on` und `.cancel_reason`.
+
 ## Version, Entwurf daneben und Protokoll
 
 - **Nacheinander je Saison:** Ergebnis speichern, freigeben, verwerfen und zurücknehmen sowie alle Kalender-Änderungen
@@ -218,14 +277,16 @@ Mehrere Runden an einem Termin (etwa TFT-Lobbys R1–R5), gerechnet in `services
   eigene Zuordnung gültig, die andere Saison bleibt ganz unverändert und merkt sich den Nachtrag (`alias_followups`);
   der nächste Vorgang unter ihrer Sperre zieht ihn nach. Die Antwort nennt das (`other_series: {updated, pending}`,
   `notice`), das Protokoll ebenso (`also_assigned_in`, `pending_series`).
-- **Teilnehmer nachträglich bearbeiten (#1929, nur Vorstand):** `PATCH …/participants/{id}` (Name, Startnummer, Team)
+- **Teilnehmer nachträglich bearbeiten (#1929, nur Vorstand):** `PATCH …/participants/{id}` (Name, Startnummer, Team,
+  `current_team` von Hand, #1960)
   schreibt `reference_series.participant_update` mit altem und neuem Wert und rechnet neu; ein Name, den es in der
   Saison schon gibt, bekommt 409 (zusammenführen). `POST …/participants/bulk-assign` (`participant_ids`, `link` „guest“
   oder „external“) ordnet alle unter einer Sperre zu und rechnet einmal neu; andere Saisons ziehen danach je einmal
   nach (`reference_series.follow_aliases_elsewhere`). `POST …/participants/{id}/merge` (`duplicate_id`) schreibt die
   Kennung in Blättern, Entwürfen daneben und offiziellen Werten um (je Blatt eine Revision mit Grund `merge` und
   Version +1) und rechnet neu – nennt ein Inhalt beide, 409 und nichts geändert. Die Aliase der anderen Schreibweise
-  ziehen zum behaltenen um (`extra_alias_ids`) und folgen seiner Zuordnung, auch in anderen Saisons.
+  ziehen zum behaltenen um (`extra_alias_ids`) und folgen seiner Zuordnung, auch in anderen Saisons. Startnummer,
+  `default_team` und `current_team` behält der behaltene; fehlen sie dort, kommen sie vom anderen (`MERGE_TAKES`).
   `DELETE …/participants/{id}` nur ohne Ergebnis (sonst 409). Protokoll: `.participant_bulk_assign`,
   `.participant_merge`, `.participant_delete`.
 - **Alle Aliase eines Teilnehmers:** der seiner Zuordnung (`alias_id`), der seines Namens und weitere aus
@@ -281,8 +342,10 @@ Dienst) und landet als Zeilen im Blatt – gespeichert wird beim Lesen nichts, a
   beide Lesungen Zeichen für Zeichen gleich und je für sich sicher sind - oder der Abgleich sie sicher einem
   Teilnehmer bzw. bekannten Team zuordnet und beide Lesungen dorthin zeigen (sonst gelb, `read` nennt beide).
   Abgeglichen wird unscharf mit den Teilnehmern der Saison (für den Vorstand auch über deren Aliase), Teams mit den
-  Standard-Teams; jeder Teilnehmer höchstens einmal - die Zeile, die ihn an eine andere verliert, ist gelb. Leere Zellen
-  in sonst gefüllten Spalten sind gelb, ein nie gelesener Platz ebenso.
+  Standard-Teams; jeder Teilnehmer höchstens einmal - die Zeile, die ihn an eine andere verliert, ist gelb. Ein Eintrag
+  aus `team_scoring.no_team_names` („Ersatzfahrer“) bleibt stehen und wird nie auf ein ähnliches Team gezogen. Leere
+  Zellen in sonst gefüllten Spalten sind gelb, ein nie gelesener Platz ebenso; eine leere Team-Zelle bleibt leer (kein
+  Vorschlag mit dem Standard-Team - oft war dort ein farbiges Schild, das die Vorbereitung entfernt).
 - **Kopf:** `track` (oberste Zeile ohne Beschriftung), `session {name, kind}` (Rennen, Sprint, Qualifying - nur ein
   Hinweis, bis es Läufe je Termin gibt, #1930), `pole` und `fastest_lap {name, time}`, `driver_of_the_day`; der Wert
   darf hinter oder unter der Beschriftung stehen. Passt die Strecke zu einem anderen Termin der Saison, nennt die

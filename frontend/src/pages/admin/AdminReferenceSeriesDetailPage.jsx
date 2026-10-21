@@ -12,6 +12,8 @@ import { SeriesResultsSection } from "./referenceSeries/SeriesResultsSection";
 import { SeriesRosterSection } from "./referenceSeries/SeriesRosterSection";
 import { SeriesStaffSection } from "./referenceSeries/SeriesStaffSection";
 import { SeriesTeamColorsSection } from "./referenceSeries/SeriesTeamColorsSection";
+import { SeriesAdjustmentsSection } from "./referenceSeries/SeriesAdjustmentsSection";
+import { cancelledText, teamModeLabel } from "@/lib/seriesSpecialRules";
 import { SeasonCloseSheet } from "./referenceSeries/SeasonCloseSheet";
 import { SeriesMapPoolSection } from "./referenceSeries/SeriesMapPoolSection";
 import { seasonLabel } from "./AdminReferenceSeriesPage";
@@ -54,6 +56,7 @@ function RulesSummary({ series }) {
       {bonuses && <div data-testid="series-detail-bonuses">Sonderboni: {bonuses}</div>}
       <div>{countText(rules)}{rules.final_top_n ? ` · Finale: die besten ${rules.final_top_n}` : ""}</div>
       {tiebreak && <div>Vorrang: {tiebreak}</div>}
+      {rules.team_scoring?.enabled && <div data-testid="series-detail-team-mode">Teamwertung: {teamModeLabel(rules.team_scoring)}</div>}
       {series.rules_note && <div className="text-white/50">Hinweis zur letzten Änderung: {series.rules_note}</div>}
     </div>
   );
@@ -129,6 +132,7 @@ export default function AdminReferenceSeriesDetailPage() {
               </div>
               <h1 className="font-heading text-3xl md:text-4xl font-black uppercase mt-1">{seasonLabel(series)}</h1>
               <div className="mt-1 text-[10px] uppercase tracking-widest font-bold text-white/45">{STATUS_LABELS[series.status] || series.status}</div>
+              {cancelledText(series) && <p className="mt-1 text-sm text-amber-200/90" data-testid="series-detail-cancelled">{cancelledText(series)}</p>}
               {board && current && (
                 <p className="mt-2 text-sm text-white/70" data-testid="series-detail-reference">
                   Referenz: <span className="text-white font-semibold tabular-nums">{referenceLine(current)}</span> · <Link to={`/references/${current.id}`} className="text-[#29B6E8] hover:text-white underline-offset-2 hover:underline">ansehen</Link>
@@ -166,6 +170,8 @@ export default function AdminReferenceSeriesDetailPage() {
             {board && lineage.kind === "racing" && <SeriesTeamColorsSection series={series} />}
             {/* Map-Pool der Saison (#1616): mit Spiel der Spur, bei der Team-Liga auch ohne (Hinweis auf den Freitext). */}
             {board && (lineage.game_id || lineage.kind === "team_league") && <SeriesMapPoolSection series={series} />}
+            {/* Anpassungen (#1960): ±Punkte ohne Rennergebnis - nur der Vorstand. */}
+            {board && <SeriesAdjustmentsSection series={series} onChanged={load} />}
             {board && <SeriesStaffSection series={series} />}
           </div>
           {board && editing && <SeriesForm series={series} lineage={lineage} onClose={() => setEditing(false)} onSaved={() => { setEditing(false); load(); }} />}

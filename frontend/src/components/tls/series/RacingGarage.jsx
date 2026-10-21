@@ -7,6 +7,8 @@ import { barShare, driverSeason, gainedWords, garageName, raceCellLabel } from "
 import { averageGrid, averageGridLabel, hasSessions, poleCount, sessionAbbr, sessionLabel } from "@/lib/raceWeekend";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { GuestBadge } from "@/components/tls/series/RacingParts";
+import { AdjustmentList } from "@/components/tls/series/SeriesSpecialRules";
+import { teamSinceLabel } from "@/lib/seriesSpecialRules";
 import { CountryFlag } from "@/components/tls/CountryFlag";
 import { countryName } from "@/lib/countryFlags";
 import "./racingLeague.css";
@@ -173,7 +175,13 @@ export const RacingDriverDetail = forwardRef(function RacingDriverDetail({ row, 
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
             <h3 id="racing-driver-name" className="font-heading text-2xl font-black uppercase leading-tight break-words">{row.name}</h3>
-            {driver?.team && <p className="text-sm text-white/55">{driver.team}</p>}
+            {driver?.team && (
+              <p className="text-sm text-white/55">
+                {driver.team}
+                {/* Teamwechsel (#1960): ab welchem Rennen der Fahrer im aktuellen Team ist. */}
+                {teamSinceLabel(driver, rounds) && <span className="text-white/40" data-testid="racing-driver-team-since">{` · ${teamSinceLabel(driver, rounds)}`}</span>}
+              </p>
+            )}
           </div>
           {row.profile_slug && (
             <Link to={`/members/${row.profile_slug}`} className="tls-btn tls-btn--quiet inline-flex items-center min-h-[40px] px-3 rounded-md text-[12px] font-bold uppercase tracking-[0.12em]">
@@ -185,6 +193,8 @@ export const RacingDriverDetail = forwardRef(function RacingDriverDetail({ row, 
           {`P${row.rank} in der Fahrerwertung · ${formatNumber(row.points)} ${Number(row.points) === 1 ? "Punkt" : "Punkte"} · ${season.races} Rennen`}
         </p>
         <p className="mt-1 text-sm text-white/65 tabular-nums" data-testid="racing-driver-stats">{stats.join(" · ")}</p>
+        {/* Anpassungen (#1960): öffentlich als „−5“ mit Grund - erklären die Abweichung zur Rennsumme. */}
+        <AdjustmentList row={row} rounds={rounds} className="mt-2" />
       </div>
       {season.perRace.length > 0 && (
         // `relative`: die Texte für Screenreader (sr-only, absolut) bleiben in der Scroll-Fläche - sonst schieben sie bei vielen

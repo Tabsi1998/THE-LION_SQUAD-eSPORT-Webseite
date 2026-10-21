@@ -7,6 +7,7 @@ import { ROUND_KIND_OPTIONS, dayLabel, opponentText, roundLabel, roundPayload, r
 import { COUNTRY_OPTIONS, countryName } from "@/lib/countryFlags";
 import { MAX_SESSION, SESSION_CHOICES, plannedSession, sessionLabel } from "@/lib/raceWeekend";
 import { CountryFlag, VenueWithFlag } from "@/components/tls/CountryFlag";
+import { NO_SCORE_OPTIONS } from "@/lib/seriesSpecialRules";
 import { toast } from "sonner";
 
 // Seitenblätter des Kalenders (#1742): Termin anlegen/bearbeiten, verschieben und eine Terminliste einfügen.
@@ -38,14 +39,16 @@ function countryHint(round, choice) {
 export function RoundSheet({ series, lineage, round, rounds = [], suggestion, version, onClose, onSaved, onStale }) {
   const isNew = !round?.id;
   const racing = lineage?.kind === "racing";
-  const [form, setForm] = useState(() => roundToForm(round || {}, suggestion));
+  // Termin ohne Wertung mit Grund (#1960): öffentlich, unterschieden von „abgesagt“ - ein Grund nimmt ihn aus der Wertung.
+  const [form, setForm] = useState(() => ({ ...roundToForm(round || {}, suggestion), no_score_reason: round?.no_score_reason || "", no_score_note: round?.no_score_note || "" }));
   const [saving, setSaving] = useState(false);
   // Rennliga (#1930): Die Wertung folgt der Vorgabe des Laufs („Ablauf je Runde“), bis jemand den Haken von Hand setzt.
   // Erst dann geht sie mit; „Wie der Ablauf“ gibt sie an die Vorgabe zurück (``counts: null``).
   const [counts, setCounts] = useState(() => (racing && (isNew || round?.counts_manual === false) ? "auto" : "manual"));
   const set = (key, value) => setForm((current) => ({ ...current, [key]: value }));
   const planned = plannedSession(series?.weekend, rounds.filter((item) => item.id !== round?.id), form.code, form.session);
-  const shownCounts = counts === "auto" ? planned.counts !== false : form.counts;
+  const noScore = Boolean(form.no_score_reason);
+  const shownCounts = noScore ? false : counts === "auto" ? planned.counts !== false : form.counts;
 
   const save = async (event) => {
     event.preventDefault();
@@ -55,6 +58,13 @@ export function RoundSheet({ series, lineage, round, rounds = [], suggestion, ve
       if (racing && counts === "auto") {
         if (isNew || round?.counts_manual === false) delete payload.counts;
         else payload.counts = null;
+      }
+      if (noScore) {
+        delete payload.counts;
+        payload.no_score_reason = form.no_score_reason;
+        payload.no_score_note = form.no_score_note.trim() || null;
+      } else if (round?.no_score_reason) {
+        payload.no_score_reason = null;
       }
       // Mit dem Stand des Kalenders, den die Seite kennt - war jemand schneller, kommt 409.
       if (isNew) await api.post(base(series), { ...payload, expected_version: version });
@@ -92,11 +102,16 @@ export function RoundSheet({ series, lineage, round, rounds = [], suggestion, ve
         </>)}
       </FormGrid>
       <TextField label="Eigener Titel" value={form.title} onChange={(v) => set("title", v)} maxLength={160} hint="Optional, etwa „Saisonfinale“." testId="round-title" />
-      <CheckField label="Zählt zur Wertung" checked={shownCounts} onChange={(v) => { setCounts("manual"); set("counts", v); }} testId="round-counts"
+      <CheckField label="Zählt zur Wertung" checked={shownCounts} onChange={(v) => { setCounts("manual"); setForm((current) => ({ ...current, counts: v, ...(v ? { no_score_reason: "", no_score_note: "" } : {}) })); }} testId="round-counts"
         hint={racing && counts === "auto"
           ? "Wie der Ablauf je Runde. Ein Haken von Hand bleibt, auch wenn sich der Ablauf ändert."
           : "Aus: Die Runde steht im Kalender, geht aber nicht in die Tabelle ein."} />
-      {racing && counts === "manual" && (
+      <FormGrid>
+        <SelectField label="Ohne Wertung – Grund" value={form.no_score_reason} onChange={(v) => set("no_score_reason", v)} options={NO_SCORE_OPTIONS} testId="round-no-score"
+          hint="Öffentlich am Termin, anders als „abgesagt“: gefahren oder angesetzt, aber nicht gewertet." />
+        {noScore && <TextField label="Kurz erklärt" value={form.no_score_note} onChange={(v) => set("no_score_note", v)} maxLength={200} placeholder="Nur fünf Fahrer am Start" testId="round-no-score-note" />}
+      </FormGrid>
+      {racing && counts === "manual" && !noScore && (
         <button type="button" onClick={() => setCounts("auto")} data-testid="round-counts-auto"
           className="tls-btn tls-btn--quiet self-start px-3 py-1.5 rounded-sm text-[11px] font-bold uppercase tracking-wider">
           Wertung wie der Ablauf

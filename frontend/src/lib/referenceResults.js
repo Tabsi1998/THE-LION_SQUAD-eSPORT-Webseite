@@ -105,7 +105,8 @@ export function sheetToForm(content, participants = [], { kind, teamName, oppone
     rows: rows.length || kind === "team_league" ? rows : [emptyRow()],
     matches,
     table: (content?.official_table || []).map((row) => ({ ...row })),
-    // Teamwerte laut Veranstalter haben (noch) kein eigenes Feld im Blatt – sie gehen unverändert wieder mit.
+    // Teamwertung laut Veranstalter (#1960): bei der Rennliga mit Teamwertung eigenes Feld im Blatt
+    // (OfficialTeamTotals), sonst geht sie unverändert wieder mit.
     teamTotals: { ...(content?.official_team_totals || {}) },
     note: text(content?.note),
     // Je Rennen (#1927): schnellste Runde mit Zeit und Fahrer des Tages - im Formular über den Namen der Zeile.
@@ -119,14 +120,16 @@ export function sheetToForm(content, participants = [], { kind, teamName, oppone
   };
 }
 
-/** Eingefügte Zeilen (aus `parseResultPaste`) als Formularzeilen – bekannte Namen gleich mit Kennung. */
-export function pastedToRows(parsed, participants = []) {
+/** Eingefügte Zeilen (aus `parseResultPaste`) als Formularzeilen – bekannte Namen gleich mit Kennung. `prefillTeam`
+ * (#1960, Liste ohne Team-Spalte): bekannte Namen bekommen ihr Stammteam sichtbar ins Feld; mit Team-Spalte gilt, was
+ * dasteht - ein leeres Feld heißt kein Team. */
+export function pastedToRows(parsed, participants = [], { prefillTeam = false } = {}) {
   return parsed.map((row) => {
     const known = matchParticipant(row.name, participants);
     return emptyRow({
       participant_id: known?.id || "",
       name: row.name,
-      team: row.team || "",
+      team: row.team || (prefillTeam && known?.default_team) || "",
       place: text(row.place),
       points: text(row.points),
       marks: [...row.marks],

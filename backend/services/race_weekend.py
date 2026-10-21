@@ -14,8 +14,13 @@ ab Runde X wechselnd), Kürzel-Varianten beim Einfügen, Punkte je Lauf, Pole un
   trotz DNF (``dnf``: ``series``, ``place`` = nach Platz, ``none`` = 0), Bonus für die schnellste Runde
   (``fastest_lap``: ``None`` = wie die Saison, sonst die Punkte) und der Quelle des Startplatzes (``grid``: ``manual`` =
   Eingabe, ``qualifying`` = Qualifying derselben Runde, ``reverse_standings`` = umgekehrte Reihenfolge der
-  Fahrerwertung vor der Runde). Ein Qualifying zählt nicht - außer es hat eine eigene Liste (etwa P1 = 2 Punkte)
+  Fahrerwertung vor der Runde, #1960: ``reverse_qualifying`` = umgekehrtes Haupt-Qualifying derselben Runde,
+  ``reverse_previous_session`` = umgekehrtes Ergebnis des Laufs davor, beide optional nur die ersten N
+  ``reverse_top``). Ein Qualifying zählt nicht - außer es hat eine eigene Liste (etwa P1 = 2 Punkte)
   oder ``counts`` sagt es ausdrücklich.
+- **Umgekehrte Aufstellung aus einem Lauf** (#1960, ``with_session_reverse``): ohne gültigen Platz (DNS, DSQ) hinten,
+  ein Startplatz von Hand bleibt; ein solcher Lauf hat keine Pole. Übernimmt kein Lauf der Runde seinen Startplatz
+  aus dem Qualifying, zählt der Pole-Bonus der Saison am Qualifying (``pole_at_qualifying``) - nur der Bonus.
 - **Einfügen:** „R1S“, „R1 S“, „R1-Sprint“, „R1 Sprint“ → Kürzel R1, Lauf Sprint (``take_code``); eine Zeile ohne Lauf
   legt alle Läufe der Vorgabe an (``race_weekend_paste.expand_paste``), eine Zeile mit Lauf nur diesen.
 - **Rechnen** (``standings``): je Lauf das eigene Punkteschema; ein leerer Startplatz kommt aus dem Qualifying bzw. der
@@ -35,6 +40,7 @@ from services.series_standings import compute_standings, ordered_rounds
 
 MAX_SESSION = 30
 MAX_SESSIONS = 6
+MAX_NOTE = 200  # Hinweis zur Regeländerung je Abschnitt (#1960)
 MAX_POINTS = 100
 OFFSET_RANGE = (-24 * 60, 7 * 24 * 60)
 SESSION_CHOICES = ("Qualifying", "Shootout", "Sprint", "Rennen", "Hauptrennen", "Lauf 1", "Lauf 2")
@@ -45,7 +51,13 @@ KINDS = ("qualifying", "sprint", "race")
 # davor (etwa das Hauptrennen nach dem Sprint). ``reverse_standings`` ist der frühere Name für „vor der Runde“.
 REVERSE_BEFORE_ROUND = "reverse_standings_before_round"
 REVERSE_AFTER_PREVIOUS = "reverse_standings_after_previous_session"
-GRID_SOURCES = ("manual", "qualifying", REVERSE_BEFORE_ROUND, REVERSE_AFTER_PREVIOUS)
+# Umgekehrte Startaufstellung aus einem Lauf derselben Runde (#1960): aus dem Haupt-Qualifying bzw. dem Ergebnis des
+# Laufs davor - optional nur die ersten N (``reverse_top``), dahinter wie im Lauf.
+REVERSE_QUALIFYING = "reverse_qualifying"
+REVERSE_PREVIOUS_SESSION = "reverse_previous_session"
+SESSION_REVERSES = (REVERSE_QUALIFYING, REVERSE_PREVIOUS_SESSION)
+REVERSE_TOP_MAX = 100
+GRID_SOURCES = ("manual", "qualifying", REVERSE_BEFORE_ROUND, REVERSE_AFTER_PREVIOUS, *SESSION_REVERSES)
 GRID_ALIASES = {"reverse_standings": REVERSE_BEFORE_ROUND}
 DEFAULT_GRID = {"qualifying": "manual", "sprint": "manual", "race": "qualifying"}
 POINT_CHOICES = ("series", "none")
@@ -270,7 +282,7 @@ def _session(raw, field: str) -> dict:
         lap = None
     # Ein Qualifying mit eigener Liste (etwa P1 = 2) zählt - sonst nicht, außer es steht ausdrücklich da.
     default_counts = kind != "qualifying" or isinstance(points, list)
-    return {
+    out = {
         "label": label,
         "offset": _whole(raw.get("offset"), f"{field}: Versatz in Minuten", *OFFSET_RANGE, 0),
         "counts": default_counts if counts is None else bool(counts),
@@ -279,6 +291,14 @@ def _session(raw, field: str) -> dict:
         "fastest_lap": lap,
         "grid": grid,
     }
+    # „Nur die ersten N umdrehen“ (#1960) - nur bei umgekehrter Aufstellung aus einem Lauf; ohne Angabe fehlt das Feld,
+    # damit ältere Vorgaben genau so bleiben, wie sie sind.
+    top = raw.get("reverse_top")
+    if top is not None and top != "":
+        if grid not in SESSION_REVERSES:
+            raise ValueError(f"{field}: „nur die ersten … umdrehen“ gibt es nur bei umgekehrter Aufstellung.")
+        out["reverse_top"] = _whole(top, f"{field}: nur die ersten … umdrehen", 1, REVERSE_TOP_MAX, 0)
+    return out
 
 
 def _format(raw: dict, where: str) -> dict:
@@ -291,7 +311,11 @@ def _format(raw: dict, where: str) -> dict:
     keys = [label_key(item["label"]) for item in out]
     if len(set(keys)) != len(keys):
         raise ValueError(f"{where}: Jeder Lauf nur einmal.")
-    return {"sessions": out}
+    # Hinweis zur Regeländerung (#1960): steht ab dieser Runde auf der Serienseite („Ab R5 kein Qualifying …“).
+    note = " ".join(str(raw.get("note") or "").split())
+    if len(note) > MAX_NOTE:
+        raise ValueError(f"{where}: Hinweis höchstens {MAX_NOTE} Zeichen.")
+    return {"sessions": out, **({"note": note} if note else {})}
 
 
 def normalize_weekend(raw) -> dict | None:
@@ -571,8 +595,121 @@ def with_reverse_grid(rounds: list[dict], sheets: dict, plan: dict, snapshots: l
     return sheets if out is None else out
 
 
+def reverse_order(rows: list[dict], top: int | None = None) -> dict[str, int]:
+    """Startplätze in umgekehrter Reihenfolge eines Laufs (#1960): die gültigen Plätze (ohne DNS/DSQ) umgedreht - mit
+    ``top`` nur die ersten N, dahinter wie im Lauf; wer keinen gültigen Platz hat, startet dahinter (nach Platz, sonst
+    nach Kennung). Kennung → Startplatz."""
+    valid = sorted((place, row["participant_id"]) for row in rows or []
+                   if (place := _valid_place(row)) is not None)
+    order = [pid for _place, pid in valid]
+    count = min(top, len(order)) if top else len(order)
+    ranked = order[:count][::-1] + order[count:]
+    seen = set(ranked)
+    rest = sorted((row for row in rows or [] if row.get("participant_id") and row["participant_id"] not in seen),
+                  key=lambda row: (_place_number(row), str(row["participant_id"])))
+    ranked += [row["participant_id"] for row in rest]
+    return {pid: index for index, pid in enumerate(ranked, start=1)}
+
+
+def _place_number(row: dict) -> float:
+    try:
+        place = int(row.get("place"))
+    except (TypeError, ValueError):
+        return math.inf
+    return place if place >= 1 else math.inf
+
+
+def _session_source(sessions: list[dict], target: dict, plan: dict, sheets: dict) -> dict | None:
+    """Woher ein umgekehrter Lauf seine Aufstellung nimmt: aus dem Haupt-Qualifying derselben Runde bzw. aus dem
+    letzten Lauf davor mit Ergebnis (nicht abgesagt)."""
+    usable = [rnd for rnd in sessions if rnd["id"] in sheets and rnd.get("status") != "cancelled"
+              and rnd["id"] != target["id"]]
+    if plan[target["id"]]["config"]["grid"] == REVERSE_QUALIFYING:
+        return next((rnd for rnd in usable if plan[rnd["id"]]["config"]["kind"] == "qualifying"
+                     and is_main_qualifying(rnd.get("session"))), None)
+    before = [rnd for rnd in usable if sessions.index(rnd) < sessions.index(target)]
+    return before[-1] if before else None
+
+
+def _without_pole(row: dict) -> dict:
+    marks = row.get("marks") or []
+    return {**row, "marks": [mark for mark in marks if mark != "pole"]} if "pole" in marks else row
+
+
+def with_session_reverse(rounds: list[dict], sheets: dict, plan: dict, weekend: dict | None = None) -> dict:
+    """Blätter mit umgekehrter Startaufstellung aus einem Lauf derselben Runde (#1960, ``reverse_qualifying``,
+    ``reverse_previous_session``): ein leerer Startplatz kommt aus ``reverse_order`` des Quell-Laufs, ein eingetragener
+    bleibt. Ein solcher Lauf hat keine Pole - eine Marke von Hand fällt weg (die Pole bleibt beim Qualifying). Ohne
+    Änderung kommt ``sheets`` selbst zurück."""
+    out = None
+    for group in weekend_groups(rounds, weekend):
+        sessions = group["rounds"]
+        for rnd in sessions:
+            config = plan[rnd["id"]]["config"]
+            if rnd["id"] not in sheets or config["grid"] not in SESSION_REVERSES:
+                continue
+            source = _session_source(sessions, rnd, plan, sheets)
+            grid = reverse_order(sheets[source["id"]].get("rows") or [], config.get("reverse_top")) if source else {}
+            out = out if out is not None else dict(sheets)
+            out[rnd["id"]] = {**sheets[rnd["id"]], "rows": [_without_pole(_derived(row, grid, None))
+                                                          for row in sheets[rnd["id"]].get("rows") or []]}
+    return sheets if out is None else out
+
+
+def reversed_grid(series: dict, rounds: list[dict], round_doc: dict) -> bool:
+    """Nimmt der Lauf dieses Termins seine Aufstellung umgekehrt aus einem Lauf derselben Runde (#1960)?"""
+    plan = round_plan([*[item for item in rounds if item.get("id") != round_doc.get("id")], round_doc],
+                      series.get("weekend"))
+    entry = plan.get(round_doc.get("id"))
+    return bool(entry) and entry["config"]["grid"] in SESSION_REVERSES
+
+
+REVERSED_NO_POLE = "Umgekehrte Startaufstellung – in diesem Lauf gibt es keine Pole, Marke entfernt"
+
+
+def clear_reverse_pole(rows: list[dict]) -> list[dict]:
+    """Blatt eines Laufs mit umgekehrter Aufstellung (#1960): jede Pole-Marke fällt weg - mit Prüfhinweis. Wer vorn
+    startet, hat Startplatz 1, nicht die Pole."""
+    return _pole_moved(REVERSED_NO_POLE, _clear_pole(rows, None))
+
+
+def _pole_takers(rounds: list[dict], sheets: dict, plan: dict, weekend: dict | None) -> set[str]:
+    """Die Haupt-Qualifyings, deren Pole ein Lauf mit Startplatz aus dem Qualifying übernimmt (wie in
+    ``with_qualifying``)."""
+    taken: set[str] = set()
+    for group in weekend_groups(rounds, weekend):
+        sessions = group["rounds"]
+        for rnd in sessions:
+            config = plan[rnd["id"]]["config"]
+            if rnd["id"] in sheets and config["kind"] != "qualifying" and config["grid"] == "qualifying":
+                source = _quali_for(sessions, rnd, plan, sheets)
+                if source and is_main_qualifying(source.get("session")):
+                    taken.add(source["id"])
+    return taken
+
+
+def pole_at_qualifying(rounds: list[dict], sheets: dict, plan: dict, rules: dict,
+                       weekend: dict | None = None) -> dict[str, str]:
+    """Pole-Bonus am Qualifying (#1960): übernimmt kein Lauf der Runde seinen Startplatz aus dem Haupt-Qualifying (etwa
+    nur umgekehrte Aufstellungen), bleibt der Bonus der Saison beim Qualifying - auch wenn es sonst nicht zählt.
+    Haupt-Qualifying → Pole-Inhaber; leer ohne Pole-Bonus der Saison."""
+    if not (rules["bonuses"]["pole"]["points"] or 0):
+        return {}
+    taken = _pole_takers(rounds, sheets, plan, weekend)
+    out = {}
+    for rnd in rounds:
+        config = (plan.get(rnd.get("id")) or {}).get("config") or {}
+        if (rnd["id"] in sheets and rnd["id"] not in taken and config.get("kind") == "qualifying"
+                and is_main_qualifying(rnd.get("session")) and rnd.get("counts") is False
+                and rnd.get("status") != "cancelled"):
+            holder = pole_holder(sheets[rnd["id"]].get("rows") or [])
+            if holder:
+                out[rnd["id"]] = holder
+    return out
+
+
 def standings(*, rules: dict, rounds: list[dict], sheets: dict, participants: list[dict], own_teams=(),
-              weekend: dict | None = None) -> list[dict]:
+              weekend: dict | None = None, adjustments=None) -> list[dict]:
     """Die Stände wie ``compute_standings``, mit Punkten je Lauf, Startplatz und Pole aus dem Qualifying und der
     umgekehrten Wertung als Startplatz. Mit Läufen zählt eine Runde als Einheit (``units``): Aktivitätspunkte, gefahrene
     Runden und Streichergebnisse je Runde, nicht je Lauf. Der Startplatz ändert keine Punkte - die umgekehrte Wertung
@@ -582,9 +719,19 @@ def standings(*, rules: dict, rounds: list[dict], sheets: dict, participants: li
     per_round = {rid: own for rid, entry in plan.items()
                  if (own := round_rules(base, entry["config"])) is not base}
     units = {rid: entry["unit"] for rid, entry in plan.items()} if by_code(rounds, weekend) else None
-    enriched = with_qualifying(rounds, sheets, plan, weekend)
+    enriched = with_session_reverse(rounds, with_qualifying(rounds, sheets, plan, weekend), plan, weekend)
+    # Pole-Bonus am Qualifying (#1960): das Qualifying zählt dann nur mit diesem Bonus - ohne Plätze, die bei Siegen oder
+    # Gleichstand mitzählen würden. Gespeichert wird davon nichts im Blatt.
+    poles = pole_at_qualifying(rounds, sheets, plan, base, weekend)
+    if poles:
+        rounds = [{**rnd, "counts": True} if rnd.get("id") in poles else rnd for rnd in rounds]
+        bonus = {**base["bonuses"], "fastest_lap": {"points": 0, "max_place": None},
+                 "pole": {**base["bonuses"]["pole"], "max_place": None}}
+        for quali_id, holder in poles.items():
+            enriched = {**enriched, quali_id: {"rows": [{"participant_id": holder, "place": None, "marks": ["pole"]}]}}
+            per_round[quali_id] = {**base, "points_by_place": [], "bonuses": bonus}
     common = {"rules": rules, "rounds": rounds, "participants": participants, "own_teams": own_teams,
-              "round_rules": per_round, "units": units}
+              "round_rules": per_round, "units": units, "adjustments": adjustments}
     snapshots = compute_standings(sheets=enriched, **common)
     reversed_grid = with_reverse_grid(rounds, enriched, plan, snapshots, weekend)
     if reversed_grid is not enriched:

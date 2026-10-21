@@ -85,6 +85,30 @@ test("Saison: Ablauf je Runde festlegen, Sprint mit eigenem Schema, ab Runde 5 a
   ] });
 });
 
+test("Saison (#1960): Sprint in umgekehrter Quali-Reihenfolge (Top 8), Hinweis zur Regeländerung ab Runde 5", async () => {
+  render(<SeriesForm series={{ id: "serie-1", season: "2026", status: "active", rules: { points_mode: "scheme", points_by_place: [25, 18, 15] } }} lineage={LINEAGE} onClose={() => {}} onSaved={() => {}} />);
+  fireEvent.click(screen.getByTestId("weekend-add"));
+  const format = screen.getByTestId("weekend-format");
+  expect(within(format).queryByTestId("weekend-format-note")).toBeNull();
+  fireEvent.click(within(format).getByTestId("weekend-session-add"));
+  const sprint = within(format).getAllByTestId("weekend-session")[2];
+  expect(within(sprint).queryByTestId("weekend-session-reverse-top")).toBeNull();
+  fireEvent.change(within(sprint).getByTestId("weekend-session-grid"), { target: { value: "reverse_qualifying" } });
+  fireEvent.change(within(sprint).getByTestId("weekend-session-reverse-top"), { target: { value: "8" } });
+  fireEvent.click(screen.getByTestId("weekend-phase-add"));
+  const second = screen.getAllByTestId("weekend-format")[1];
+  fireEvent.change(within(second).getByTestId("weekend-format-from"), { target: { value: "5" } });
+  fireEvent.change(within(second).getByTestId("weekend-format-note"), { target: { value: "Ab R5 Sprint aus dem umgekehrten Hauptrennen" } });
+  fireEvent.change(within(second).getAllByTestId("weekend-session-grid")[2], { target: { value: "reverse_previous_session" } });
+  fireEvent.click(screen.getByTestId("series-save"));
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalled());
+  const [first, fifth] = apiMock.patch.mock.calls[0][1].weekend.formats;
+  expect(first.sessions[2]).toMatchObject({ label: "Sprint", grid: "reverse_qualifying", reverse_top: 8 });
+  expect(first).not.toHaveProperty("note");
+  expect(fifth).toMatchObject({ from_round: 5, note: "Ab R5 Sprint aus dem umgekehrten Hauptrennen" });
+  expect(fifth.sessions[2]).toMatchObject({ grid: "reverse_previous_session", reverse_top: 8 });
+});
+
 test("Saison ohne Läufe schickt keine Vorgabe", async () => {
   render(<SeriesForm series={{ id: "serie-1", season: "2026", rules: {} }} lineage={LINEAGE} onClose={() => {}} onSaved={() => {}} />);
   fireEvent.click(screen.getByTestId("series-save"));

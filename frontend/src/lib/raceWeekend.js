@@ -15,9 +15,51 @@ export const GRID_OPTIONS = [
   ["qualifying", "Aus dem Qualifying"],
   ["reverse_standings_before_round", "Umgekehrte WM-Reihenfolge vor der Runde"],
   ["reverse_standings_after_previous_session", "Umgekehrte WM-Reihenfolge nach dem Lauf davor"],
+  // #1960: umgekehrt aus einem Lauf derselben Runde, optional nur die ersten N („reverse_top“).
+  ["reverse_qualifying", "Umgekehrtes Qualifying"],
+  ["reverse_previous_session", "Umgekehrtes Ergebnis des Laufs davor"],
 ];
+/** Startplatz-Quellen mit „nur die ersten … umdrehen“. */
+export const SESSION_REVERSES = ["reverse_qualifying", "reverse_previous_session"];
+
+const GRID_WORDS = {
+  reverse_standings_before_round: "Start in umgekehrter WM-Reihenfolge vor der Runde",
+  reverse_standings_after_previous_session: "Start in umgekehrter WM-Reihenfolge nach dem Lauf davor",
+  reverse_qualifying: "Start in umgekehrter Quali-Reihenfolge",
+  reverse_previous_session: "Start in umgekehrter Reihenfolge des Laufs davor",
+};
+
+/** Startaufstellung je Lauf in Worten für die Serienseite (#1960): nur umgekehrte Aufstellungen - „Sprint: Start in
+ * umgekehrter Quali-Reihenfolge (Top 8)“; ändert sich der Ablauf ab einer Runde, mit „ab Runde 5“. */
+export function sessionGridLines(weekend) {
+  const formats = weekend?.formats || [];
+  const seen = new Set();
+  const lines = [];
+  for (const format of formats) {
+    for (const session of format.sessions || []) {
+      const words = gridWords(session.grid, session.reverse_top);
+      if (!words) continue;
+      const from = formats.length > 1 && format.from_round > 1 ? `ab Runde ${format.from_round} ` : "";
+      const line = `${from}${session.label}: ${words}`;
+      const key = `${String(session.label).toLowerCase()}|${words}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      lines.push(line);
+    }
+  }
+  return lines;
+}
 // Der frühere Wert heißt jetzt „vor der Runde“ (wie im Server).
 const GRID_ALIASES = { reverse_standings: "reverse_standings_before_round" };
+
+/** Eine umgekehrte Startaufstellung in Worten - „Start in umgekehrter Quali-Reihenfolge (Top 8)“; leer bei Eingabe
+ * und aus dem Qualifying (#1960, auch für die Rundenseite). */
+export function gridWords(grid, top = null) {
+  const source = GRID_ALIASES[grid] || grid;
+  const words = GRID_WORDS[source];
+  if (!words) return "";
+  return SESSION_REVERSES.includes(source) && top ? `${words} (Top ${top})` : words;
+}
 
 /** Punkte je Lauf: wie das Rennen (das Schema der Saison), keine oder eine eigene Liste. */
 export const SESSION_POINTS_OPTIONS = [["series", "Wie Rennen"], ["none", "Keine Punkte"], ["own", "Eigene Liste"]];
@@ -236,6 +278,7 @@ export function emptyFormat(values = {}) {
 export function weekendToForm(weekend) {
   return (weekend?.formats || []).map((format) => emptyFormat({
     from_round: String(format.from_round ?? 1),
+    note: format.note || "",
     sessions: (format.sessions || []).map((session) => emptySession({
       label: session.label || "",
       offset: String(session.offset ?? 0),
@@ -245,6 +288,7 @@ export function weekendToForm(weekend) {
       dnf: session.dnf || "series",
       fastest_lap: session.fastest_lap === null || session.fastest_lap === undefined ? "" : String(session.fastest_lap),
       grid: GRID_ALIASES[session.grid] || session.grid || "manual",
+      reverse_top: session.reverse_top ? String(session.reverse_top) : "",
     })),
   }));
 }
@@ -273,6 +317,8 @@ export function weekendPayload(formats) {
   return {
     formats: list.map((format) => ({
       from_round: Number(format.from_round) || 1,
+      // Hinweis zur Regeländerung (#1960) - steht ab dieser Runde auf der Serienseite.
+      ...(String(format.note || "").trim() ? { note: String(format.note).trim() } : {}),
       sessions: format.sessions.filter((session) => String(session.label || "").trim()).map((session) => ({
         label: String(session.label).trim(),
         offset: Number(String(session.offset || "0").replace(",", ".")) || 0,
@@ -283,6 +329,8 @@ export function weekendPayload(formats) {
         // Leer heißt wie die Saison.
         fastest_lap: String(session.fastest_lap ?? "").trim() === "" ? null : Number(String(session.fastest_lap).replace(",", ".")) || 0,
         grid: session.grid,
+        // „Nur die ersten … umdrehen“ (#1960): nur bei umgekehrter Aufstellung aus einem Lauf, leer heißt alle.
+        ...(SESSION_REVERSES.includes(session.grid) && String(session.reverse_top ?? "").trim() ? { reverse_top: Number(session.reverse_top) } : {}),
       })),
     })),
   };
@@ -320,8 +368,10 @@ export function sessionTables(rows, rounds) {
     const list = (rows || []).map((row) => {
       const results = (row.results || []).filter((item) => ids.has(item.round_id));
       const points = results.reduce((sum, item) => sum + (Number(item.points) || 0), 0);
+      // Anpassungen (#1960) gehören zur Gesamtwertung, nicht zur Tabelle eines Laufs.
       return { ...row, results: results.map((item) => ({ ...item, dropped: false })), points, computed_points: points,
-        official_points: null, deviation: null, tiebreak: null, previous_rank: null, _countback: countback(results), _has: results.length > 0 };
+        official_points: null, deviation: null, tiebreak: null, previous_rank: null, adjustments: [], adjustment_points: 0,
+        _countback: countback(results), _has: results.length > 0 };
     }).filter((row) => row._has);
     list.sort((a, b) => ahead(a, b) || String(a.name || "").localeCompare(String(b.name || ""), "de"));
     list.forEach((row, index) => {

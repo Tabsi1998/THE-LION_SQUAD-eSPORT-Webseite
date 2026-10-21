@@ -1,6 +1,6 @@
 import {
   averageGrid, averageGridLabel, chipLabel, groupWeekends, hasSessions, isMainQualifying, nextSessionLabel, poleCount, pointsPreview,
-  qualiDuel, qualifyingMode, sessionAbbr, sessionKind, sessionLabel, sessionPointsLines, sessionTables, weekendPayload, weekendState,
+  qualiDuel, qualifyingMode, sessionAbbr, sessionGridLines, sessionKind, sessionLabel, sessionPointsLines, sessionTables, weekendPayload, weekendState,
   weekendToForm, formatSummary,
 } from "./raceWeekend";
 import LEAGUES from "./raceWeekendLeagues.json";
@@ -37,6 +37,31 @@ test("Ablauf je Runde: Formular hin und zurück ohne Verlust, leer heißt keine 
   expect(weekendPayload(weekendToForm(F2))).toEqual(F2);
   expect(weekendPayload([])).toBeNull();
   expect(weekendToForm(null)).toEqual([]);
+});
+
+test("Umgekehrte Aufstellung aus einem Lauf (#1960): „nur die ersten …“ geht hin und zurück, sonst gar nicht", () => {
+  const reversed = { formats: [{ from_round: 1, sessions: [
+    lauf({ label: "Qualifying", offset: 0, counts: false, points: "none", grid: "manual" }),
+    lauf({ label: "Sprint", offset: 30, counts: true, points: [12, 9, 7], grid: "reverse_qualifying", reverse_top: 8 }),
+    lauf({ label: "Hauptrennen", offset: 60, counts: true, points: "series", grid: "reverse_previous_session" }),
+  ] }] };
+  expect(weekendPayload(weekendToForm(reversed))).toEqual(reversed);
+  const form = weekendToForm(reversed);
+  form[0].sessions[1].grid = "manual";
+  expect(weekendPayload(form).formats[0].sessions[1]).not.toHaveProperty("reverse_top");
+  expect(sessionGridLines(reversed)).toEqual([
+    "Sprint: Start in umgekehrter Quali-Reihenfolge (Top 8)", "Hauptrennen: Start in umgekehrter Reihenfolge des Laufs davor"]);
+  expect(sessionGridLines(F2)).toEqual([
+    "ab Runde 5 Sprint: Start in umgekehrter WM-Reihenfolge vor der Runde", "ab Runde 5 Hauptrennen: Start in umgekehrter WM-Reihenfolge nach dem Lauf davor"]);
+  expect(sessionGridLines(null)).toEqual([]);
+});
+
+test("Ablauf je Runde: der Hinweis zur Regeländerung geht mit (#1960), leer gar nicht", () => {
+  const noted = { formats: [F2.formats[0], { ...F2.formats[1], note: "Ab R5 kein Qualifying" }] };
+  expect(weekendPayload(weekendToForm(noted))).toEqual(noted);
+  const form = weekendToForm(noted);
+  form[1].note = "   ";
+  expect(weekendPayload(form).formats[1]).not.toHaveProperty("note");
 });
 
 test("Vorschau eines Schemas: P1 35 · P2 30 … und keine Punkte", () => {

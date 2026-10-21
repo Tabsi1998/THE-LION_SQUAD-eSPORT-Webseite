@@ -266,8 +266,10 @@ async def test_a_guest_counts_for_the_team_but_not_for_the_club(flow):
     await flow.db.reference_rounds.insert_one({"id": "r1", "series_id": sid, "order": 1, "status": "scored",
                                                "counts": True, "kind": "regular", "archived_at": None})
     await flow.db.reference_round_results.insert_one({"id": "b1", "series_id": sid, "round_id": "r1", "status": "published",
-                                                      "rows": [{"participant_id": member["id"], "place": 1},
-                                                               {"participant_id": guest["id"], "place": 2}]})
+                                                      "rows": [{"participant_id": member["id"], "place": 1,
+                                                                "team": "Löwen Probe"},
+                                                               {"participant_id": guest["id"], "place": 2,
+                                                                "team": "Löwen Probe"}]})
     series = await flow.db.reference_series.find_one({"id": sid}, {"_id": 0})
     from services import reference_series
     await reference_series.recompute_standings(flow.db, series)

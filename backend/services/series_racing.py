@@ -30,7 +30,9 @@ from services.race_weekend import is_main_qualifying, pole_holder
 from services.scoring_rules import normalize_rules
 from services.team_league_page import PATH_FIELDS as SEASON_FIELDS, visible_seasons
 
-TEAM_ROW_FIELDS = ("rank", "tiebreak", "points", "computed_points", "official_points", "deviation")
+TEAM_ROW_FIELDS = ("rank", "tiebreak", "points", "computed_points", "official_points", "deviation",
+                   "adjustment_points")
+ADJUSTMENT_FIELDS = ("points", "reason", "day", "round_id")
 
 
 def _text(value) -> str:
@@ -49,7 +51,8 @@ async def lineage_seasons(db, user: dict | None, lineage: dict, current_id: str)
 def driver_teams(rows: list[dict], participants: dict, matcher: Matcher | None = None) -> dict:
     """Je Fahrer der Fahrerwertung: Team je Rennen, aktuelles Team (das des letzten Rennens) und „Gast“. ``matcher``
     führt das Standard-Team auf den Namen eines eigenen Teams zurück (#1926) - wie beim Rechnen, mit allen
-    Standard-Teams als Gegenüber. Das Team je Rennen steht schon so im gespeicherten Stand."""
+    Standard-Teams als Gegenüber. Das Team je Rennen steht schon so im gespeicherten Stand - was im Feld steht (#1960):
+    ein Rennen ohne Team hat keines. Das Standard-Team gilt nur als Team des Fahrers, wenn kein Rennen eines nennt."""
     defaults = [_text(person.get("default_team")) for person in participants.values() if person.get("default_team")]
     out = {}
     for row in rows:
@@ -58,10 +61,26 @@ def driver_teams(rows: list[dict], participants: dict, matcher: Matcher | None =
         default = _text(person.get("default_team")) or None
         if matcher and default:
             default = matcher.canonical(default, defaults)
-        round_teams = {item.get("round_id"): _text(item.get("team")) or default for item in row.get("results") or []}
+        round_teams = {item.get("round_id"): _text(item.get("team")) or None for item in row.get("results") or []}
         current = next((team for team in reversed(list(round_teams.values())) if team), default)
-        out[pid] = {"team": current, "guest": person.get("link") == "guest", "round_teams": round_teams}
+        out[pid] = {"team": current, "guest": person.get("link") == "guest", "round_teams": round_teams,
+                    "team_since": _team_since(round_teams, current)}
     return out
+
+
+def _team_since(round_teams: dict, current: str | None) -> str | None:
+    """Ab welchem Rennen ein Fahrer im aktuellen Team ist (#1960) - nur nach einem Wechsel, sonst ``None``: der erste
+    Termin der letzten Folge mit diesem Team."""
+    since = None
+    changed = False
+    for round_id, team in round_teams.items():
+        if not team:
+            continue
+        if team == current:
+            since = since or round_id
+        else:
+            since, changed = None, True
+    return since if changed else None
 
 
 def _number(value):
@@ -93,6 +112,7 @@ def team_rows(rows: list[dict], results: dict | None = None) -> list[dict]:
             "key": row.get("team"), "team": row.get("team"),
             **{field: row.get(field) for field in TEAM_ROW_FIELDS},
             "previous_rank": None if change is None or rank is None else rank + change,
+            "adjustments": [{key: item.get(key) for key in ADJUSTMENT_FIELDS} for item in row.get("adjustments") or []],
             "drivers": list(row.get("driver_ids") or []),
             "driver_points": {pid: _number(points) for pid, points in contribution.items()},
             "results": [{"round_id": item.get("round_id"), "points": item.get("points"),
@@ -162,10 +182,13 @@ async def racing_block(db, user: dict | None, lineage: dict, series: dict, peopl
     stored = await db.reference_standings.find_one(
         {"series_id": sid, "scope": "teams"}, {"_id": 0, "round_id": 1, "round_seq": 1, "rows": 1, "computed_at": 1},
         sort=[("round_seq", -1)]) if scoring["enabled"] else None
+    rows = team_rows((stored or {}).get("rows") or [], driver_results(driver_rows))
     teams = None if not stored else {
         "round_id": stored.get("round_id"), "round_seq": stored.get("round_seq"),
         "computed_at": stored.get("computed_at"),
-        "rows": team_rows(stored.get("rows") or [], driver_results(driver_rows)),
+        # Quelle (#1960): laut Veranstalter, sobald das letzte Blatt die Teamwertung trägt - sonst berechnet.
+        "source": "official" if any(row.get("official_points") is not None for row in rows) else "computed",
+        "rows": rows,
     }
     order = [row["team"] for row in (teams or {}).get("rows") or []]
     return {

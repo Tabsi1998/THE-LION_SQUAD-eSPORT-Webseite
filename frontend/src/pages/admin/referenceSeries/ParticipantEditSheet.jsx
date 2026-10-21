@@ -23,7 +23,7 @@ export function fieldChanges(row, form) {
   const out = {};
   const name = form.name.trim();
   if (name && name !== row.name) out.name = name;
-  for (const [key, value] of [["start_number", form.start_number], ["default_team", form.default_team]]) {
+  for (const [key, value] of [["start_number", form.start_number], ["default_team", form.default_team], ["current_team", form.current_team ?? ""]]) {
     const next = value.trim() || null;
     if (next !== (row[key] || null)) out[key] = next;
   }
@@ -43,7 +43,7 @@ export function linkChange(row, form) {
 export function ParticipantEditSheet({ series, row, profiles = [], onClose, onSaved }) {
   const confirm = useConfirm();
   const [form, setForm] = useState(() => ({
-    name: row.name || "", start_number: row.start_number || "", default_team: row.default_team || "",
+    name: row.name || "", start_number: row.start_number || "", default_team: row.default_team || "", current_team: row.current_team || "",
     link: currentLink(row), profile_id: row.profile_id || "",
   }));
   const [saving, setSaving] = useState(false);
@@ -118,6 +118,11 @@ export function ParticipantEditSheet({ series, row, profiles = [], onClose, onSa
         <TextField label="Standard-Team" maxLength={120} value={form.default_team} onChange={set("default_team")} testId="participant-edit-team"
           hint="Gilt, wenn im Ergebnis kein Team steht." />
       </div>
+      {/* #1960: Teamwertung nach aktueller Besetzung - wer ohne Fahrt umgesetzt wurde oder die Liga verlassen hat. */}
+      {series.rules?.team_scoring?.mode === "current_lineup" && (
+        <TextField label="Aktuelles Team (von Hand)" maxLength={120} value={form.current_team} onChange={set("current_team")} testId="participant-edit-current-team"
+          hint="Leer: das Team der letzten Fahrt. „Ersatzfahrer“ heißt: in keinem Team (etwa nach dem Ausstieg)." />
+      )}
       <div className="space-y-3">
         <SelectField label="Zuordnung" value={form.link} onChange={set("link")} options={linkOptions} testId="participant-edit-link" />
         {form.link === "member" && (

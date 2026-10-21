@@ -1,7 +1,7 @@
 import { FormSection } from "@/components/tls/AdminForm";
 import { CheckField, SelectField, TextField } from "@/components/tls/FormFields";
 import {
-  DNF_OPTIONS, GRID_OPTIONS, MAX_SESSION, SESSION_CHOICES, SESSION_POINTS_OPTIONS, emptyFormat, emptySession, formatSummary, pointsPreview, sessionKind,
+  DNF_OPTIONS, GRID_OPTIONS, MAX_SESSION, SESSION_CHOICES, SESSION_POINTS_OPTIONS, SESSION_REVERSES, emptyFormat, emptySession, formatSummary, pointsPreview, sessionKind,
 } from "@/lib/raceWeekend";
 import { parsePointsList } from "@/lib/referenceSeries";
 import { Plus, X } from "lucide-react";
@@ -50,6 +50,11 @@ function SessionRow({ session, index, onChange, onRemove, removable, racePoints 
         </div>
         <div className="space-y-2 min-w-0">
           <SelectField label="Startplatz" value={session.grid} onChange={(grid) => onChange({ grid })} options={GRID_OPTIONS} testId="weekend-session-grid" />
+          {/* #1960: umgekehrt aus einem Lauf derselben Runde - optional nur die ersten N, dahinter wie im Lauf. */}
+          {SESSION_REVERSES.includes(session.grid) && (
+            <TextField label="Nur die ersten … umdrehen" type="number" min="1" max="100" value={session.reverse_top || ""} onChange={(reverse_top) => onChange({ reverse_top })}
+              placeholder="alle" hint="Leer: alle. Etwa 8 – Platz 8 startet vorn, ab Platz 9 wie im Lauf." testId="weekend-session-reverse-top" />
+          )}
           <CheckField label="Zählt zur Wertung" checked={session.counts} onChange={(counts) => onChange({ counts })} testId="weekend-session-counts" />
         </div>
         <SelectField label="Punkte trotz DNF" value={session.dnf} onChange={(dnf) => onChange({ dnf })} options={DNF_OPTIONS} testId="weekend-session-dnf" />
@@ -104,6 +109,11 @@ export function WeekendFormatsField({ formats, onChange, racePoints = [] }) {
                     <X className="w-4 h-4" />
                   </button>
                 </div>
+                {/* Regeländerung ab Runde X (#1960): der Hinweis steht mit dem Tag der Runde auf der Serienseite. */}
+                {index > 0 && (
+                  <TextField label="Hinweis zur Regeländerung" value={format.note || ""} onChange={(note) => update(format.key, { note })} maxLength={200}
+                    placeholder={`Ab R${format.from_round || "…"} kein Qualifying, Start in umgekehrter WM-Reihenfolge`} hint="Öffentlich auf der Serienseite, mit dem Tag der ersten Runde dieses Formats." testId="weekend-format-note" />
+                )}
                 <ol className="space-y-2">
                   {format.sessions.map((session, position) => (
                     <SessionRow key={session.key} session={session} index={position} removable={format.sessions.length > 1} racePoints={racePoints}

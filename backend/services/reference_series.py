@@ -220,7 +220,7 @@ async def recompute_standings(db, series: dict) -> int:
     # Mit Punkten je Lauf, Startplatz und Pole aus dem Qualifying (#1930) - ohne Läufe wie ``compute_standings``.
     snapshots = race_weekend.standings(rules=series.get("rules") or {}, rounds=rounds, sheets=sheets,
                                        participants=participants, own_teams=own_teams(series),
-                                       weekend=series.get("weekend"))
+                                       weekend=series.get("weekend"), adjustments=series.get("adjustments"))
     computed_at = now_utc().isoformat()
     kept = []
     for snapshot in snapshots:

@@ -24,6 +24,7 @@ from models import (
     now_utc,
 )
 from services import reference_running_cache, reference_series, season_close, series_partners
+from services.dolibarr_policy import club_today
 from services.own_teams import clean_teams, own_teams, team_conflicts
 from services.series_identity import normalize_name
 from services.reference_series_access import SeriesAccess, require_series_editor
@@ -38,7 +39,7 @@ LINEAGE_NULLABLE = {"organizer", "label", "game_id", "game_name", "external_url"
                     "result_image_template"}
 SERIES_NULLABLE = {"tier", "title", "default_weekday", "default_time", "team_name", "official_table_url",
                    "external_url", "description", "reference_id", "season_result", "result_image_template",
-                   "weekend"}
+                   "weekend", "cancelled_on", "cancel_reason", "successor_id"}
 SLUG_FALLBACK = "serie"
 
 
@@ -307,6 +308,7 @@ async def update_series(series_id: str, body: ReferenceSeriesUpdate, me: dict = 
         updates.update({"archived_at": now_utc().isoformat(), "archived_from": existing.get("status")})
     elif status and status != "archived":
         updates.update({"archived_at": None, "archived_from": None})
+    updates.update(await _cancellation(db, existing, updates, series_id))
     await db.reference_series.update_one({"id": series_id}, {"$set": {**updates, **_stamp(me)}})
     saved = await _series(db, series_id)
     if rules_changed:
@@ -323,6 +325,7 @@ async def update_series(series_id: str, body: ReferenceSeriesUpdate, me: dict = 
             "data": {"previous": existing.get("weekend"), "weekend": saved.get("weekend")},
             "created_at": now_utc().isoformat(),
         })
+    await _log_cancellation(db, me, series_id, existing, saved)
     # Strenger gestellt oder neu verknüpft (#1970): die Referenzen der Saison folgen sofort - Lockern öffnet nichts.
     required, tightened = await season_close.tighten_references(db, series_id)
     await _log_tightened(db, "reference_series.references_tightened", series_id, me, required, tightened)
@@ -330,6 +333,75 @@ async def update_series(series_id: str, body: ReferenceSeriesUpdate, me: dict = 
         # Andere Schreibweisen eines eigenen Teams zählen erst nach dem Neurechnen als dieses Team (#1926).
         await reference_series.recompute_standings(db, saved)
     return saved
+
+
+async def _cancellation(db, existing: dict, updates: dict, series_id: str) -> dict:
+    """Saison abgebrochen (#1960): mit Tag (leer heißt heute, Wiener Tag) und Grund; wer den Status wieder ändert, nimmt
+    beides zurück. Der Nachfolger muss eine andere, vorhandene Saison sein (meist der Neustart derselben Spur)."""
+    out: dict = {}
+    status = updates.get("status", existing.get("status"))
+    if status == "cancelled":
+        if not (updates.get("cancelled_on") if "cancelled_on" in updates else existing.get("cancelled_on")):
+            out["cancelled_on"] = club_today()
+        if "cancel_reason" in updates:
+            out["cancel_reason"] = " ".join(str(updates["cancel_reason"] or "").split()) or None
+    elif "status" in updates and status != "archived":
+        out.update({"cancelled_on": None, "cancel_reason": None})
+    successor = updates.get("successor_id")
+    if successor:
+        await _check_successor(db, existing, successor)
+    return out
+
+
+SUCCESSOR_SELF = "Eine Saison kann nicht ihr eigener Nachfolger sein."
+SUCCESSOR_OTHER_LINEAGE = "Der Nachfolger muss eine Saison derselben Spur sein."
+SUCCESSOR_LOOP = "Dieser Nachfolger führt über seine Nachfolger zurück zu dieser Saison."
+SUCCESSOR_MAX_STEPS = 200
+
+
+async def _check_successor(db, existing: dict, successor_id: str) -> None:
+    """Nachfolger (#1960): eine andere Saison derselben Spur, und die Kette ihrer Nachfolger führt nie zurück zu dieser
+    Saison - sonst 422."""
+    if successor_id == existing["id"]:
+        raise HTTPException(422, SUCCESSOR_SELF)
+    target = await _series(db, successor_id)
+    if target.get("lineage_id") != existing.get("lineage_id"):
+        raise HTTPException(422, SUCCESSOR_OTHER_LINEAGE)
+    seen = {existing["id"]}
+    step = target
+    for _ in range(SUCCESSOR_MAX_STEPS):
+        if step["id"] in seen:
+            raise HTTPException(422, SUCCESSOR_LOOP)
+        seen.add(step["id"])
+        following = step.get("successor_id")
+        if not following:
+            return
+        step = await db.reference_series.find_one({"id": following}, {"_id": 0, "id": 1, "successor_id": 1})
+        if not step:
+            return
+    raise HTTPException(422, SUCCESSOR_LOOP)
+
+
+async def _log_cancellation(db, me: dict, series_id: str, existing: dict, saved: dict) -> None:
+    """Protokoll (#1960): Abbruch und Zurücknehmen der Saison mit Tag, Grund und Nachfolger; ein anderer Nachfolger
+    ebenso."""
+    was, now = existing.get("status") == "cancelled", saved.get("status") == "cancelled"
+    data = {"cancelled_on": saved.get("cancelled_on"), "reason": saved.get("cancel_reason"),
+            "successor_id": saved.get("successor_id")}
+    if now and (not was or any(existing.get(key) != saved.get(key)
+                               for key in ("cancelled_on", "cancel_reason", "successor_id"))):
+        action = "reference_series.cancel"
+    elif was and not now and saved.get("status") != "archived":
+        action = "reference_series.cancel_undo"
+        data = {"status": saved.get("status"), "previous_cancelled_on": existing.get("cancelled_on"),
+                "previous_reason": existing.get("cancel_reason"), "successor_id": saved.get("successor_id")}
+    elif existing.get("successor_id") != saved.get("successor_id"):
+        action = "reference_series.successor"
+        data = {"previous_successor_id": existing.get("successor_id"), "successor_id": saved.get("successor_id")}
+    else:
+        return
+    await db.audit_logs.insert_one({"id": new_id(), "action": action, "actor_id": me["id"], "target_id": series_id,
+                                    "data": data, "created_at": now_utc().isoformat()})
 
 
 @router.post("/admin/series/{series_id}/archive")

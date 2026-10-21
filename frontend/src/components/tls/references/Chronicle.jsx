@@ -98,6 +98,7 @@ function ChronicleRow({ item, link, memberId }) {
   const composed = title !== full;
   // #1934: veranstaltet ein Partner des Vereins, steht sein Abzeichen statt des Veranstalter-Textes da.
   const host = chronicleHost(item, link);
+  const cancelled = Boolean(item.season_link?.cancelled);
   return (
     <li className="border-b border-white/[0.07]">
       <Link to={referenceHref(item, link)} data-testid={`reference-card-${item.id}`} className="tls-ref-row flex items-start sm:items-center sm:flex-wrap gap-3 sm:gap-x-5 sm:gap-y-2.5 py-3.5 sm:py-4 sm:px-2 text-white no-underline">
@@ -106,12 +107,14 @@ function ChronicleRow({ item, link, memberId }) {
           <span className="font-bold text-base sm:text-[17px] leading-[1.3] break-words [overflow-wrap:anywhere]" title={composed ? full : undefined} data-testid="reference-row-title">{title}</span>
           {host ? <PartnerHostBadge partner={host} className="mt-0.5" />
             : item.organizer && !composed && <span className="hidden sm:block text-sm text-zinc-400 break-words" data-testid="reference-row-organizer">{item.organizer}</span>}
-          <span className="sm:hidden text-[13px] text-zinc-400 break-words">{[game, format, shortDate].filter(Boolean).join(" · ")}</span>
+          <span className="sm:hidden text-[13px] text-zinc-400 break-words">{[game, format, cancelled ? "abgebrochen" : "", shortDate].filter(Boolean).join(" · ")}</span>
           {starters && <span className="sm:hidden text-[13px] text-zinc-300 break-words [overflow-wrap:anywhere]" data-testid="reference-row-starters-phone">{starters}</span>}
         </span>
         <span className="hidden sm:flex sm:flex-[1_1_220px] min-w-0 flex-wrap gap-1.5">
           <Mark>{game}</Mark>
           <Mark>{format}</Mark>
+          {/* Saison abgebrochen (#1960): ohne Platz, aber als Teilnahme in der Chronik. */}
+          {cancelled && <Mark>abgebrochen</Mark>}
         </span>
         <span className="hidden sm:block sm:flex-[1_1_180px] min-w-0 text-sm text-zinc-300 break-words [overflow-wrap:anywhere]" data-testid="reference-row-starters">{starters}</span>
         <span className="hidden sm:block sm:flex-[0_0_110px] text-sm text-quiet tabular-nums">{formatDate(item.start_date) || formatDate(item.end_date)}</span>

@@ -36,7 +36,8 @@ PEOPLE = [
     {"id": "p-hidden", "name": "Fremd Versteckt", "link": "external", "default_team": "Fremd Rot",
      "name_hidden": True},
 ]
-# Platz je Rennen; (Kennung, Marken, Team im Rennen) - ohne Team gilt das Standard-Team.
+# Platz je Rennen; (Kennung, Marken, Team im Rennen) - ohne Angabe steht das Standard-Team im Feld (#1960: beim
+# Eintragen vorbelegt bzw. von Migration 10 nachgetragen; ein leeres Feld hieße kein Team).
 SHEETS = {
     "R1": [("p-ext1", ["fastest_lap"], None), ("p-lion1", [], "Probe Löwen"), ("p-ext2", [], None),
            ("p-lion2", [], None), ("p-guest", [], None), ("p-lion3", [], None), ("p-hidden", [], None)],
@@ -79,11 +80,12 @@ async def _setup(flow, rules=RULES, **series_extra):
                                                        "display_name": f"Probe Lion {number}", "is_active": True})
     await flow.db.reference_participants.insert_many([
         {"series_id": series["id"], "is_club_member": False, "name_hidden": False, **person} for person in PEOPLE])
+    defaults = {person["id"]: person["default_team"] for person in PEOPLE}
     for code, order in SHEETS.items():
         rows = []
         for place, (pid, marks, team) in enumerate(order, start=1):
             rows.append({"participant_id": pid, "place": None if "dns" in marks else place, "marks": marks,
-                         "team": team})
+                         "team": team or defaults[pid]})
         await flow.db.reference_round_results.insert_one({
             "id": f"blatt-{code}", "series_id": series["id"], "round_id": rounds[code], "status": "published",
             "rows": rows})
@@ -111,7 +113,8 @@ async def test_racing_page_has_the_stored_team_standings_with_drivers_per_race(f
         ("p-hidden", 6)]
 
     racing = body["racing"]
-    assert racing["team_scoring"] == {"enabled": True, "counting_drivers": 2, "guests_count": True}
+    assert racing["team_scoring"] == {"enabled": True, "counting_drivers": 2, "guests_count": True,
+                                      "mode": "per_race", "no_team_names": ["Ersatzfahrer"]}
     teams = racing["teams"]
     assert teams["round_id"] == rounds["R2"]
     assert [(row["key"], row["team"], row["rank"], row["points"], row["previous_rank"]) for row in teams["rows"]] == [
@@ -171,8 +174,10 @@ async def test_each_driver_has_the_team_per_race_and_guests_are_marked(flow):
     flow.act_as(None)
     drivers = (await flow.get(_url(lineage, series))).json()["racing"]["drivers"]
 
-    assert drivers["p-ext2"] == {"team": "Fremd Blau", "guest": False,
+    # Im Team seit (#1960): nach dem Wechsel das erste Rennen im aktuellen Team.
+    assert drivers["p-ext2"] == {"team": "Fremd Blau", "guest": False, "team_since": rounds["R2"],
                                  "round_teams": {rounds["R1"]: "Fremd Rot", rounds["R2"]: "Fremd Blau"}}
+    assert drivers["p-lion1"]["team_since"] is None
     assert drivers["p-guest"]["guest"] is True and drivers["p-guest"]["team"] == "Probe Löwen B"
     # Auch ein Nichtstart fährt für sein Standard-Team.
     assert drivers["p-lion2"]["round_teams"] == {rounds["R1"]: "Probe Löwen", rounds["R2"]: "Probe Löwen"}
@@ -187,9 +192,10 @@ async def test_racing_extras_never_carry_hidden_names_or_link_details(flow):
     racing = response.json()["racing"]
 
     assert "Fremd Versteckt" not in response.text
-    # Vom Fahrer gehen nur Team, Team je Rennen und „Gast“ hinaus - keine Startnummer, kein Profil, keine Verknüpfung.
+    # Vom Fahrer gehen nur Team, Team je Rennen, „im Team seit“ (#1960) und „Gast“ hinaus - keine Startnummer, kein
+    # Profil, keine Verknüpfung.
     for item in racing["drivers"].values():
-        assert set(item) == {"team", "guest", "round_teams"}
+        assert set(item) == {"team", "guest", "round_teams", "team_since"}
     assert "profil-lion1" not in response.text and '"44"' not in response.text
 
 

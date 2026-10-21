@@ -11,7 +11,8 @@ gewerteten Runde (``reference_standings``) und den veröffentlichten Ergebnisbl�
   im veröffentlichten Finale, gilt der Platz im Finale.
 - Nur Vereinsmitglieder (Verknüpfung „member“, Profil aktiv, Name nicht ausgeblendet) - Gäste zählen nicht in die
   Vereinsstatistik und stehen in keiner Referenz.
-- **Abgebrochen** (``NO_PLACEMENT_STATUSES``, Status kommt mit #1960): dieselben Einträge, aber ohne Platz.
+- **Abgebrochen** (``NO_PLACEMENT_STATUSES``, Status „cancelled“ seit #1960): dieselben Einträge, aber ohne Platz;
+  die Saison bleibt beim Abschluss abgebrochen (wird nicht „abgeschlossen“).
 
 **Bestätigen** (``close``): Hat die Saison schon ihre Referenz (``reference_id``), wird genau diese aktualisiert -
 sonst die gewählte, die schon zur Saison gehört (``series_id``), sonst entsteht eine neue. So steht jede Saison
@@ -31,8 +32,7 @@ from models import ReferenceCreate, new_id, now_utc
 from services.own_teams import Matcher, own_teams
 from services.series_identity import normalize_name
 
-# Status, mit denen eine Saison keine Platzierung bekommt. „cancelled“ (abgebrochen) kommt mit #1960 - bis dahin gibt
-# es ihn nur in der Datenbank, der Abschluss behandelt ihn schon richtig.
+# Status, mit denen eine Saison keine Platzierung bekommt: „cancelled“ (abgebrochen, #1960).
 NO_PLACEMENT_STATUSES = frozenset({"cancelled"})
 CANCELLED_LABEL = "Saison abgebrochen"
 # Vorgaben für die Bezeichnung eines Eintrags je Wertung - in der Referenz umbenennbar, beim erneuten Abschluss bleibt

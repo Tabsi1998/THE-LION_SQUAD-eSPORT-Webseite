@@ -44,7 +44,7 @@ router = APIRouter(prefix="/api/reference-series", tags=["reference-series"],
 MAX_BATCH = 200
 # Diese Felder ändert nur das Zuordnen - so bleibt jede Verknüpfung bestätigt und im Protokoll.
 LINK_FIELDS = {"link", "profile_id", "guest_name", "is_club_member"}
-PARTICIPANT_NULLABLE = {"start_number", "default_team"}
+PARTICIPANT_NULLABLE = {"start_number", "default_team", "current_team"}  # current_team: #1960
 
 
 class ParticipantBatch(BaseModel):
@@ -259,7 +259,7 @@ async def update_participant(series_id: str, participant_id: str, body: Referenc
 
 
 # ---------------------------------------------------------------- Zusammenführen und Entfernen
-MERGE_TAKES = ("start_number", "default_team")
+MERGE_TAKES = ("start_number", "default_team", "current_team")
 LINK_STATE = (*sorted(LINK_FIELDS), "link_status", "link_source", "alias_id", "decided_at", "decided_by")
 
 
@@ -287,7 +287,8 @@ async def merge_participant(series_id: str, participant_id: str, body: Participa
     Seine Ergebnisse wandern mit - im Blatt, im Entwurf daneben und in Blättern, die noch Entwurf sind; jedes geänderte
     Blatt bekommt eine Revision mit dem alten Stand (Grund „merge“) und eine neue Version (offene Seiten zum Eintragen
     laden dann neu). Danach wird neu gerechnet. Der behaltene Teilnehmer behält Name und Zuordnung; fehlende
-    Startnummer und fehlendes Team kommen vom anderen, ein ausgeblendeter Name bleibt ausgeblendet, und ist er selbst
+    Startnummer, fehlendes Team und fehlendes aktuelles Team von Hand (#1960) kommen vom anderen, ein ausgeblendeter
+    Name bleibt ausgeblendet, und ist er selbst
     noch offen, übernimmt er die Zuordnung des anderen. Nennt ein Ergebnis beide, wird nichts zusammengeführt (409).
 
     **Aliase:** Die Aliase des anderen Namens ziehen zum behaltenen um (``extra_alias_ids``) und zeigen danach auf

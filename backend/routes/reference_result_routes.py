@@ -101,6 +101,7 @@ ist). Ohne etwas freizugeben oder zu verwerfen: 409.
 """
 from __future__ import annotations
 
+import difflib
 import math
 from datetime import date
 from typing import Dict, List, Literal, Optional
@@ -114,13 +115,13 @@ from database import get_db
 from match_rules import RESULT_MAX_SCORE
 from models import ReferencePointsSource, ReferenceResultMark, ReferenceResultStatus, _clock, new_id, now_utc
 from services import (
-    race_weekend, reference_running_cache, reference_series, series_identity, series_results, team_league_maps,
-    tournament_days,
+    race_weekend, reference_running_cache, reference_series, series_adjustments, series_identity, series_results,
+    team_league_maps, tournament_days,
 )
 from services.dolibarr_policy import club_today
-from services.own_teams import own_team_names, own_teams
+from services.own_teams import Matcher, own_team_names, own_teams
 from services.reference_series_access import EDIT_PENDING_DRAFT, SeriesAccess, require_series_editor
-from services.scoring_rules import MAX_CUSTOM_BONUSES, MAX_DAY_ROUNDS, result_points, validate_sheet
+from services.scoring_rules import MAX_CUSTOM_BONUSES, MAX_DAY_ROUNDS, is_no_team, result_points, validate_sheet
 from services.series_participants import build_index, new_participant, remove_unused_new
 
 # Jeder schreibende Aufruf leert den Cache der laufenden Saisons (#1753, Startseite).
@@ -385,6 +386,42 @@ async def _kind(db, series: dict) -> str | None:
     return lineage.get("kind")
 
 
+async def _unknown_teams(db, series: dict, round_doc: dict, resolution, participants: list[dict],
+                         rules: dict) -> list[dict]:
+    """Teams einer Zeile, die es in der Saison noch nicht gibt (#1960) - meist ein Tippfehler („Team 2“). Bekannt sind die
+    eigenen Teams, die Standard-Teams der Teilnehmer und die Teams der übrigen Blätter; ein Eintrag „kein Team“
+    (``no_team_names``) ist nie neu, ebenso wenig eine Schreibweise, die ``own_teams.Matcher`` einem eigenen Team
+    zuordnet (Alias). Ohne bekannte Teams (erste Runde) bleibt es still. Nur ein Hinweis."""
+    matcher = Matcher(own_teams(series))
+    sheet_teams = [row.get("team") for row in resolution.rows if row.get("team")]
+    known = {series_adjustments.team_key(name): name for name in matcher.names}
+    for person in participants:
+        if person.get("default_team"):
+            known.setdefault(series_adjustments.team_key(person["default_team"]), person["default_team"])
+    async for sheet in db.reference_round_results.find(
+            {"series_id": series["id"], "round_id": {"$ne": round_doc["id"]}}, {"_id": 0, "rows.team": 1}):
+        for row in sheet.get("rows") or []:
+            if row.get("team"):
+                known.setdefault(series_adjustments.team_key(row["team"]), row["team"])
+    if not known:
+        return []
+    found: dict[str, list[int]] = {}
+    names: dict[str, str] = {}
+    for row in resolution.rows:
+        key = series_adjustments.team_key(row.get("team"))
+        if (key and key not in known and not is_no_team(row["team"], rules)
+                and not matcher.is_own(row["team"], sheet_teams)):
+            found.setdefault(key, []).append(row["index"])
+            names.setdefault(key, row["team"])
+    out = []
+    for key, rows in found.items():
+        close = difflib.get_close_matches(key, list(known), n=1, cutoff=0.6)
+        hint = f" – meintest du „{known[close[0]]}“?" if close else ""
+        out.append({"code": "team_unknown", "message": f"Team „{names[key]}“ gibt es in dieser Saison noch nicht{hint}",
+                    "rows": rows})
+    return out
+
+
 async def _prepare(db, access: SeriesAccess, round_doc: dict, body: ResultSheetInput):
     """Zuordnen und prüfen. Liefert Regeln, Teilnehmer der Serie und die ``Resolution`` mit Fehlern und Warnungen."""
     rules = await _round_rules(db, access.series, round_doc)
@@ -401,9 +438,16 @@ async def _prepare(db, access: SeriesAccess, round_doc: dict, body: ResultSheetI
             resolution.warnings.extend(race_weekend.mark_pole(resolution.rows))
         resolution.warnings[:] = [item for item in resolution.warnings if item["code"] != "round_not_counted"]
     elif await _kind(db, access.series) == "racing":
-        # Rennen mit Haupt-Qualifying in derselben Runde: die Pole hat dessen erster gültiger Platz.
-        resolution.warnings.extend(race_weekend.clear_race_pole(
-            resolution.rows, await _quali_pole(db, access.series, round_doc)))
+        rounds = await db.reference_rounds.find({"series_id": access.series_id, "archived_at": None},
+                                                {"_id": 0}).to_list(None)
+        if race_weekend.reversed_grid(access.series, rounds, round_doc):
+            # Umgekehrte Aufstellung (#1960): in diesem Lauf gibt es keine Pole - eine Marke fällt mit Hinweis weg.
+            resolution.warnings.extend(race_weekend.clear_reverse_pole(resolution.rows))
+        else:
+            # Rennen mit Haupt-Qualifying in derselben Runde: die Pole hat dessen erster gültiger Platz.
+            resolution.warnings.extend(race_weekend.clear_race_pole(
+                resolution.rows, await _quali_pole(db, access.series, round_doc)))
+    resolution.warnings.extend(await _unknown_teams(db, access.series, round_doc, resolution, participants, rules))
     if not resolution.errors:
         # Zur Sicherheit wie beim Rechnen - die Prüfung oben fängt dieselben Fälle schon mit Zeilenangabe ab.
         try:
@@ -412,6 +456,14 @@ async def _prepare(db, access: SeriesAccess, round_doc: dict, body: ResultSheetI
             resolution.errors.append({"code": "invalid_sheet", "message": "Das Blatt lässt sich so nicht werten.",
                                       "rows": []})
     return rules, participants, resolution
+
+
+def _board_fields(access: SeriesAccess, body, existing: dict | None):
+    """Felder, die nur der Vorstand schreibt (#1960): die Teamwertung laut Veranstalter gilt für Platz und Punkte der
+    Teamwertung - ein Captain ändert sie nicht. Was er schickt, zählt nicht; es bleibt der gespeicherte Wert des Blatts."""
+    if access.is_board:
+        return body
+    return body.model_copy(update={"official_team_totals": dict((existing or {}).get("official_team_totals") or {})})
 
 
 def _refuse(resolution: series_results.Resolution) -> None:
@@ -433,7 +485,7 @@ async def _snapshots(db, series: dict, rules: dict, round_doc: dict, content: di
     try:
         return race_weekend.standings(rules=series.get("rules") or {}, rounds=rounds, sheets=sheets,
                                       participants=people, own_teams=own_teams(series),
-                                      weekend=series.get("weekend"))
+                                      weekend=series.get("weekend"), adjustments=series.get("adjustments"))
     except ValueError:
         raise HTTPException(422, BROKEN_SHEETS) from None
 
@@ -522,6 +574,7 @@ async def preview_results(series_id: str, round_id: str, body: ResultSheetInput,
     db = get_db()
     round_doc = await access.round(round_id)
     existing = await _sheet(db, series_id, round_id)
+    body = _board_fields(access, body, existing)
     rules, participants, resolution = await _prepare(db, access, round_doc, body)
     unknown, auto_members = await _unknown_names(db, access, resolution)
     club = club_members = None
@@ -739,6 +792,7 @@ async def save_results(series_id: str, round_id: str, body: ResultSave,
         existing = await _sheet(db, series_id, round_id)
         _require_version(existing, body.expected_version)
         target = access.edit_target(existing)
+        body = _board_fields(access, body, existing)
         _, _, resolution = await _prepare(db, access, round_doc, body)
         _refuse(resolution)
 

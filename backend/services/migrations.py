@@ -1,6 +1,12 @@
-"""Small, ordered MongoDB migration runner for idempotent schema/data changes."""
+"""Small, ordered MongoDB migration runner for idempotent schema/data changes.
+
+Eine Migration, die nur teilweise fertig wird, wirft ``MigrationIncomplete``: sie wird nicht als erledigt vermerkt und
+läuft beim nächsten Start erneut, der Start selbst geht weiter. Lange Migrationen verlängern die Sperre des Laufs
+zwischen ihren Schritten (``extend_migration_lease``)."""
 from __future__ import annotations
 
+import contextvars
+import logging
 import os
 import socket
 from datetime import datetime, timedelta, timezone
@@ -10,6 +16,30 @@ from pymongo.errors import DuplicateKeyError
 
 from models import new_id
 from services.secret_migration import migrate_plaintext_secrets
+
+logger = logging.getLogger("tls.migrations")
+# So lange gilt die Sperre eines Migrationslaufs ab dem Holen bzw. ab der letzten Verlängerung.
+LEASE_MINUTES = 10
+_LEASE_OWNER: contextvars.ContextVar[str | None] = contextvars.ContextVar("migration_lease_owner", default=None)
+
+
+class MigrationIncomplete(RuntimeError):
+    """Eine Migration ist nur teilweise durchgelaufen: sie bleibt offen und läuft beim nächsten Start erneut. Der Start
+    geht weiter - ``run_pending_migrations`` protokolliert sie und fährt mit den übrigen fort."""
+
+
+async def extend_migration_lease(db) -> bool:
+    """Die Sperre des laufenden Migrationslaufs um ``LEASE_MINUTES`` verlängern - für lange Migrationen zwischen zwei
+    Schritten. Ohne laufenden Lauf (Tests, Aufruf von Hand) ``True``; gehört die Sperre nicht mehr diesem Lauf,
+    ``False`` - dann hört die Migration auf."""
+    owner = _LEASE_OWNER.get()
+    if owner is None:
+        return True
+    now = datetime.now(timezone.utc)
+    result = await db.schema_migration_lock.update_one(
+        {"_id": "global", "owner": owner},
+        {"$set": {"locked_until": now + timedelta(minutes=LEASE_MINUTES), "updated_at": now}})
+    return getattr(result, "matched_count", 0) == 1
 
 
 async def migrate_team_leader_role(db) -> str:
@@ -127,6 +157,127 @@ async def migrate_game_map_keys(db) -> str:
     return f"{filled} map spellings reserved, {skipped} skipped"
 
 
+def _row_teams_filled(rows, defaults: dict, rules: dict) -> tuple[list, int]:
+    """Zeilen mit Teilnehmer und leerem Team bekommen dessen Standard-Team (Migration 10). Ein Eintrag wie
+    „Ersatzfahrer“ steht schon im Feld und bleibt; ein Standard-Team aus ``no_team_names`` wird nie eingetragen."""
+    from services.scoring_rules import is_no_team
+
+    out, filled = [], 0
+    for row in rows or []:
+        team = " ".join(str(row.get("team") or "").split())
+        default = " ".join(str(defaults.get(row.get("participant_id")) or "").split())
+        if not team and row.get("participant_id") and default and not is_no_team(default, rules):
+            row = {**row, "team": default}
+            filled += 1
+        out.append(row)
+    return out, filled
+
+
+TEAM_BACKFILL_REASON = "#1960 leeres Team heißt kein Team"
+
+
+def _sheet_updates(sheets, defaults: dict, rules: dict) -> list[tuple[dict, dict, int, str | None]]:
+    """Je Blatt mit etwas zu füllen (Blatt und Entwurf daneben): Filter mit ``version``, Änderung, Zahl der Zeilen,
+    Termin. Der Versionsfilter sorgt dafür, dass nie über ein Blatt geschrieben wird, das sich seit dem Lesen geändert
+    hat."""
+    out = []
+    for sheet in sheets:
+        changes, count = {}, 0
+        rows, filled = _row_teams_filled(sheet.get("rows"), defaults, rules)
+        if filled:
+            changes["rows"], count = rows, count + filled
+        draft = sheet.get("pending_draft")
+        if isinstance(draft, dict):
+            rows, filled = _row_teams_filled(draft.get("rows"), defaults, rules)
+            if filled:
+                changes["pending_draft.rows"], count = rows, count + filled
+        if changes:
+            out.append(({"id": sheet["id"], "version": sheet.get("version")}, {"$set": changes}, count,
+                        sheet.get("round_id")))
+    return out
+
+
+async def _backfill_series(db, series_id: str, now: str) -> tuple[int, bool]:
+    """Eine Saison unter ihrer Sperre (``reference_series.series_write``) füllen. Vor dem ersten Schreiben merkt sich die
+    Saison ``team_backfill_pending``; erst nach Neurechnen und Protokoll gilt sie als fertig (``team_backfill_at``).
+    Bricht etwas dazwischen ab, rechnet der nächste Lauf sie neu und protokolliert, auch wenn nichts mehr zu füllen ist.
+    Liefert (gefüllte Zeilen, neu gerechnet)."""
+    from services import reference_series
+    from services.scoring_rules import normalize_rules
+
+    async with reference_series.series_write(db, series_id):
+        series = await db.reference_series.find_one({"id": series_id}, {"_id": 0})
+        if not series or series.get("team_backfill_at"):
+            return 0, False
+        rules = normalize_rules(series.get("rules"))
+        defaults = {person["id"]: person.get("default_team") async for person in db.reference_participants.find(
+            {"series_id": series_id}, {"_id": 0, "id": 1, "default_team": 1})}
+        sheets = await db.reference_round_results.find(
+            {"series_id": series_id}, {"_id": 0, "id": 1, "round_id": 1, "version": 1, "rows": 1,
+                                       "pending_draft": 1}).to_list(None) if defaults else []
+        updates = _sheet_updates(sheets, defaults, rules)
+        filled, round_ids = 0, []
+        if updates:
+            await db.reference_series.update_one({"id": series_id}, {"$set": {"team_backfill_pending.started_at": now}})
+            try:
+                for selector, change, count, round_id in updates:
+                    result = await db.reference_round_results.update_one(selector, change)
+                    if getattr(result, "matched_count", 0) != 1:
+                        raise RuntimeError(f"Ergebnisblatt {selector['id']} hat sich beim Füllen geändert")
+                    filled += count
+                    round_ids.append(round_id)
+            finally:
+                if filled:
+                    await db.reference_series.update_one({"id": series_id}, {
+                        "$inc": {"team_backfill_pending.rows": filled},
+                        "$addToSet": {"team_backfill_pending.round_ids": {"$each": round_ids}}})
+        pending = (await db.reference_series.find_one(
+            {"id": series_id}, {"_id": 0, "team_backfill_pending": 1}) or {}).get("team_backfill_pending")
+        if pending:
+            await reference_series.recompute_standings(db, series)
+            await db.audit_logs.insert_one({
+                "id": new_id(), "action": "reference_series.team_backfill", "actor_id": "migration",
+                "target_id": series_id, "created_at": now,
+                "data": {"rows": pending.get("rows", 0), "round_ids": pending.get("round_ids", []),
+                         "reason": TEAM_BACKFILL_REASON}})
+        await db.reference_series.update_one({"id": series_id}, {"$set": {"team_backfill_at": now},
+                                                                 "$unset": {"team_backfill_pending": ""}})
+        return filled, bool(pending)
+
+
+async def migrate_result_row_teams(db) -> str:
+    """Leeres Team heißt kein Team (#1960): bisher zählte eine Ergebniszeile ohne Team still für das Standard-Team ihres
+    Teilnehmers. Damit keine Saison Punkte verliert, bekommen solche Zeilen dieses Standard-Team einmal als echten Wert -
+    in allen Saisons mit Teilnehmern (auch ohne Teamwertung: wird sie später eingeschaltet, stimmen die Teams schon),
+    im Blatt und im Entwurf daneben. Je Saison unter ihrer Sperre, mit Versionsfilter je Blatt; neu gerechnet und
+    protokolliert (``reference_series.team_backfill`` mit der Zahl) wird nur, wo sich etwas geändert hat.
+
+    Fehler: eine Saison, die scheitert (besetzt, Blatt geändert, Neurechnen), hält die anderen nicht auf. Am Ende wirft
+    die Migration ``MigrationIncomplete`` - sie bleibt offen, und der nächste Start nimmt sich die Saisons ohne
+    ``team_backfill_at`` erneut vor. Last: je Blatt mit etwas zu füllen ein kurzes ``update_one``, je Saison wenige
+    Dutzend; die Sperre des Laufs wird vor jeder Saison verlängert, die 10 Minuten gelten also je Saison."""
+    now = datetime.now(timezone.utc).isoformat()
+    series_ids = [item["id"] async for item in db.reference_series.find(
+        {"team_backfill_at": {"$exists": False}}, {"_id": 0, "id": 1}) if item.get("id")]
+    rows = recomputed = checked = 0
+    failed: list[str] = []
+    for series_id in series_ids:
+        if not await extend_migration_lease(db):
+            raise MigrationIncomplete("lease lost - the next start continues")
+        try:
+            filled, changed = await _backfill_series(db, series_id, now)
+        except Exception:
+            logger.exception("Migration 10: Saison %s nicht fertig - der nächste Start versucht es erneut", series_id)
+            failed.append(series_id)
+            continue
+        rows += filled
+        recomputed += int(changed)
+        checked += 1
+    if failed:
+        raise MigrationIncomplete(f"{len(failed)} series not finished: {', '.join(failed[:20])}")
+    return f"{rows} result rows filled, {recomputed} series recomputed, {checked} series checked"
+
+
 MIGRATIONS = (
     (1, "encrypt_legacy_integration_credentials", migrate_plaintext_secrets),
     (2, "team_leader_role_to_player", migrate_team_leader_role),
@@ -138,11 +289,13 @@ MIGRATIONS = (
     (7, "reference_round_countries", migrate_round_countries),
     (8, "reference_series_own_teams", migrate_series_own_teams),
     (9, "game_map_spelling_keys", migrate_game_map_keys),  # #1616
+    (10, "reference_result_row_teams", migrate_result_row_teams),  # #1960: leeres Team heißt kein Team
 )
 
 
 async def run_pending_migrations(db) -> list[dict]:
-    """Run each migration once. A short lease avoids startup-worker races."""
+    """Run each migration once. A short lease avoids startup-worker races. Eine Migration, die ``MigrationIncomplete``
+    wirft, wird nicht vermerkt und läuft beim nächsten Start erneut; die übrigen laufen weiter."""
     now = datetime.now(timezone.utc)
     owner = f"{socket.gethostname()}:{os.getpid()}:{new_id()}"
     try:
@@ -155,7 +308,7 @@ async def run_pending_migrations(db) -> list[dict]:
                     {"locked_until": {"$exists": False}},
                 ],
             },
-            {"$set": {"owner": owner, "locked_until": now + timedelta(minutes=10), "updated_at": now}},
+            {"$set": {"owner": owner, "locked_until": now + timedelta(minutes=LEASE_MINUTES), "updated_at": now}},
             upsert=True,
             return_document=ReturnDocument.AFTER,
         )
@@ -165,12 +318,18 @@ async def run_pending_migrations(db) -> list[dict]:
         return []
 
     applied: list[dict] = []
+    token = _LEASE_OWNER.set(owner)
     try:
         completed = set(await db.schema_migrations.distinct("version"))
         for version, name, migration in MIGRATIONS:
             if version in completed:
                 continue
-            result = await migration(db)
+            try:
+                result = await migration(db)
+            except MigrationIncomplete as exc:
+                logger.error("[migration] %s %s ist noch nicht fertig und läuft beim nächsten Start erneut: %s",
+                             version, name, exc)
+                continue
             finished_at = datetime.now(timezone.utc)
             record = {"version": version, "name": name, "result": result, "applied_at": finished_at}
             await db.schema_migrations.update_one(
@@ -179,6 +338,7 @@ async def run_pending_migrations(db) -> list[dict]:
             applied.append(record)
         return applied
     finally:
+        _LEASE_OWNER.reset(token)
         await db.schema_migration_lock.update_one(
             {"_id": "global", "owner": owner},
             {"$set": {"locked_until": datetime.now(timezone.utc)}, "$unset": {"owner": ""}},

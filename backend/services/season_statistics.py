@@ -5,8 +5,10 @@ Ergebnisblättern.
 - **Läufe:** gezählt werden Läufe, die zur Wertung zählen, nicht abgesagt und nicht archiviert sind; ein Qualifying
   zählt nur für die Pole. Siege und Podien gelten wie in der Fahrerwertung (``series_standings._stats``) in jedem
   gewerteten Lauf, der kein Qualifying ist (Rennen und Sprint).
-- **Pole:** je Runde eine - der erste gültige Platz im Haupt-Qualifying (``race_weekend.pole_holder``), ohne Qualifying
-  die Pole-Marke im Rennen (Bestand #1927). So zählt eine Pole nie doppelt, auch wenn das Rennen die Marke trägt.
+- **Pole:** je Runde eine - der erste gültige Platz im Haupt-Qualifying (``race_weekend.pole_holder``), nur in einer
+  Runde ohne Quali-Ergebnis die Pole-Marke im Rennen (Bestand #1927), nie aus einem Lauf mit umgekehrter Aufstellung
+  (#1960). So zählt eine Pole nie doppelt, auch wenn das Rennen die Marke trägt.
+- **Ohne Wertung** (#1960): ein Termin ohne Wertung zählt nicht - wie jeder Lauf mit ``counts: false``.
 - **Ø Start, Ø Ziel, gutgemacht:** Start aus dem Startplatz, Ziel aus dem Platz (nur im Ziel); gutgemacht ist die
   Summe aus Startplatz minus Zielplatz über die Läufe, in denen beides steht.
 - **Kennzahlen** (``metrics``): nur die, die in der Saison vorkommen - keine Spalte voller Nullen.
@@ -16,7 +18,7 @@ Ergebnisblättern.
 from __future__ import annotations
 
 from services.own_teams import Matcher, own_teams
-from services.race_weekend import is_main_qualifying, pole_holder, session_kind
+from services.race_weekend import SESSION_REVERSES, is_main_qualifying, pole_holder, round_plan, session_kind
 from services.round_page import clean, place_of, status_of
 
 COUNTS = ("wins", "podiums", "poles", "fastest_laps", "driver_of_the_day", "dnfs", "gained")
@@ -53,18 +55,22 @@ def tally(rounds: list[dict], sheets: dict, participants: dict, series: dict,
     Blätter je Termin, ``results``: je (Fahrer, Termin) das Ergebnis aus dem letzten Fahrerstand. Liefert (Fahrer,
     Teams, eigene Teams)."""
     matcher = Matcher(own_teams(series))
-    defaults = [clean(item.get("default_team")) for item in participants.values() if item.get("default_team")]
     drivers: dict[str, dict] = {}
     teams: dict[str, dict] = {}
     own: set = set()
     poles: dict = {}
+    # #1960: Poles nur aus dem Qualifying - die Pole-Marke eines Rennens zählt nur in einer Runde ohne Ergebnis eines
+    # Haupt-Qualifyings und nie in einem Lauf mit umgekehrter Aufstellung.
+    plan = round_plan(rounds, series.get("weekend"))
+    with_quali = {item.get("weekend") or item["id"] for item in rounds
+                  if (item.get("session_kind") or session_kind(item.get("session"))) == "qualifying"
+                  and is_main_qualifying(item.get("session")) and item.get("state") != "cancelled"
+                  and item["id"] in sheets}
 
     def team_of(row: dict, others: list[str]) -> str | None:
+        # Was im Feld steht (#1960): ein leeres Team heißt kein Team - kein Rückfall aufs Standard-Team.
         team = clean(row.get("team"))
-        if team:
-            return matcher.canonical(team, others)
-        default = clean((participants.get(row.get("participant_id")) or {}).get("default_team"))
-        return matcher.canonical(default, defaults) if default else None
+        return matcher.canonical(team, others) if team else None
 
     def bump(pid: str, team: str | None, key: str, amount=1) -> None:
         drivers.setdefault(pid, _blank())[key] += amount
@@ -88,6 +94,8 @@ def tally(rounds: list[dict], sheets: dict, participants: dict, series: dict,
                     poles[weekend] = (holder, team_of(row, others), True)
             continue
         fastest = (sheet.get("fastest_lap") or {}).get("participant_id")
+        grid_source = ((plan.get(item["id"]) or {}).get("config") or {}).get("grid")
+        race_pole = weekend not in with_quali and grid_source not in SESSION_REVERSES
         for row in rows:
             pid = row["participant_id"]
             team = team_of(row, others)
@@ -131,7 +139,7 @@ def tally(rounds: list[dict], sheets: dict, participants: dict, series: dict,
             if sheet.get("driver_of_the_day") == pid:
                 bump(pid, team, "driver_of_the_day")
             # Ohne Qualifying zählt die Pole-Marke im Rennen (je Runde einmal).
-            if "pole" in marks and weekend not in poles:
+            if race_pole and "pole" in marks and weekend not in poles:
                 poles[weekend] = (pid, team, False)
     for pid, team, _ in poles.values():
         bump(pid, team, "poles")

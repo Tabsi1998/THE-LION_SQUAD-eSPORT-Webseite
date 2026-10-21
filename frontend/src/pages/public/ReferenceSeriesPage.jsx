@@ -13,6 +13,7 @@ import { TeamLeagueSections } from "@/components/tls/series/TeamLeague";
 import { RacingLeague } from "@/components/tls/series/RacingLeague";
 import { VenueWithFlag } from "@/components/tls/CountryFlag";
 import { MapPoolView } from "@/components/tls/maps/MapPoolView";
+import { NoScoreNote, RuleChanges, SeasonNotice } from "@/components/tls/series/SeriesSpecialRules";
 import { NotFoundPage } from "@/pages/ErrorPages";
 import { SeriesPartners } from "@/components/tls/series/SeriesPartners";
 import { TournamentDays } from "@/components/tls/series/TournamentDays";
@@ -63,6 +64,8 @@ function Calendar({ rounds }) {
                   </span>
                 )}
                 {round.original_club_day && <span className="block text-[11px] text-white/45">ursprünglich {dayLabel(round.original_club_day)}</span>}
+                <NoScoreNote round={round} />
+
               </span>
               <span className={`inline-flex items-center px-2 py-0.5 border rounded-sm text-[10px] font-bold uppercase tracking-widest whitespace-nowrap ${STATE_TONES[round.state] || STATE_TONES.planned}`}>
                 {PUBLIC_STATE_LABELS[round.state] || round.state}
@@ -122,6 +125,8 @@ export default function ReferenceSeriesPage() {
             <p className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">{eyebrow || "Serie"}</p>
             <h1 className="font-heading text-4xl md:text-5xl font-black uppercase mt-2">{title}</h1>
             <SeriesPartners partners={data.partners} />
+            {/* Saison abgebrochen (#1960): Hinweis mit Grund und Nachfolger - die gefahrenen Ergebnisse bleiben. */}
+            <SeasonNotice series={data.series} successor={data.successor} />
             {data.lineage?.kind === "team_league" && <TeamLeagueSections data={data} />}
             {data.racing && <RacingLeague data={data} />}
             {data.lineage?.kind !== "team_league" && !data.racing && (<>
@@ -129,7 +134,9 @@ export default function ReferenceSeriesPage() {
             <section className="mt-10" aria-labelledby="series-page-table">
               <h2 id="series-page-table" className="font-heading text-2xl font-black uppercase">Gesamtwertung</h2>
               <SeriesRules rules={data.rules} />
+              <RuleChanges changes={data.rule_changes} />
               <SeriesStandings standings={data.standings} rounds={rounds} rules={data.rules} extraColumn={bonusColumn(data.rules)} />
+
               <FinalCalculator standings={data.standings} rules={data.rules} progress={data.progress} />
             </section>
             <TournamentDays standings={data.standings} rounds={rounds} rules={data.rules} />

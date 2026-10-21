@@ -51,7 +51,8 @@ router = APIRouter(prefix="/api/reference-series", tags=["reference-series"],
 
 PUBLIC_FIELDS = ("id", "position", "code", "title", "venue", "starts_at", "club_day", "time", "state", "status",
                  "original_starts_at", "original_club_day", "kind", "counts", "opponent", "country_code",
-                 "session", "session_kind", "weekend", "at_home", "club_day_end")
+                 "session", "session_kind", "weekend", "at_home", "club_day_end", "no_score_reason",
+                 "no_score_note")
 
 
 def _day(value: Optional[str]) -> Optional[str]:
@@ -242,6 +243,8 @@ def _new_round(series_id: str, me: dict, **fields) -> dict:
         # #1930: ``counts`` folgt der Vorgabe des Laufs, bis jemand sie am Termin von Hand setzt.
         "counts_manual": False,
         "opponent": None, "note": None, "country_code": None, "country_auto": True, "session": None,
+        # #1960: Termin ohne Wertung mit Grund - öffentlich, unterschieden von „abgesagt“.
+        "no_score_reason": None, "no_score_note": None,
         "source": "manual",
         "archived_at": None, "at_home": None, "club_day_end": None,
         "created_at": now, "created_by": me["id"], **_stamp(me), **fields,
@@ -289,8 +292,11 @@ async def create_round(series_id: str, body: RoundCreateBody, me: dict = Depends
     window_end = _window(when["club_day"], body.day_end)
     first = await _claim(db, series_id, body.expected_version, orders=1)
     # Ohne ausdrückliche Angabe gilt die Vorgabe des Laufs (#1930): ein Qualifying zählt nicht - außer es hat Punkte.
-    manual = "counts" in body.model_fields_set
-    if manual:
+    # Ein Grund „ohne Wertung“ (#1960) nimmt den Termin aus der Wertung.
+    manual = "counts" in body.model_fields_set or bool(body.no_score_reason)
+    if body.no_score_reason:
+        counts = False
+    elif manual:
         counts = body.counts
     else:
         existing = await db.reference_rounds.find({"series_id": series_id}, {"_id": 0}).to_list(None)
@@ -298,7 +304,8 @@ async def create_round(series_id: str, body: RoundCreateBody, me: dict = Depends
     # Die Nummer vergibt immer die Folge - ein mitgeschicktes ``order`` zählt nicht (Reihenfolge nur über Ordnen).
     doc = _new_round(series_id, me, order=first, code=_text(body.code), session=body.session,
                      title=_text(body.title), venue=_text(body.venue), **when, kind=body.kind, counts=counts,
-                     counts_manual=manual,
+                     counts_manual=manual, no_score_reason=body.no_score_reason,
+                     no_score_note=_text(body.no_score_note) if body.no_score_reason else None,
                      opponent=_text(body.opponent), note=_text(body.note), at_home=body.at_home,
                      club_day_end=window_end,
                      **_country(body.country_auto, body.country_code, _text(body.venue), _text(body.title)))
@@ -329,6 +336,18 @@ async def update_round(series_id: str, round_id: str, body: RoundUpdateBody,
     if "counts" in raw:
         updates.update({"counts": raw["counts"], "counts_manual": True} if raw["counts"] is not None
                        else {"counts_manual": False})
+        if raw["counts"] is not False:
+            updates.update({"no_score_reason": None, "no_score_note": None})
+    # Ohne Wertung mit Grund (#1960): der Grund nimmt den Termin aus der Wertung; ohne Grund kein Text.
+    if "no_score_reason" in raw:
+        updates["no_score_reason"] = raw["no_score_reason"]
+        if raw["no_score_reason"]:
+            updates.update({"counts": False, "counts_manual": True})
+        else:
+            updates["no_score_note"] = None
+    reason = updates["no_score_reason"] if "no_score_reason" in updates else existing.get("no_score_reason")
+    if "no_score_note" in raw and reason:
+        updates["no_score_note"] = _text(raw["no_score_note"])
     if "day" in raw or "time" in raw:
         day = raw["day"] if "day" in raw else existing.get("club_day")
         clock = raw["time"] if "time" in raw else vienna_clock(existing.get("starts_at"))

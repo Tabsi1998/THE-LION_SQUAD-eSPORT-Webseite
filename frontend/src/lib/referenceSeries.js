@@ -3,7 +3,8 @@
 // nur zwischen Formularfeldern und Werten gewandelt. Gerechnet wird im Server (services/scoring_rules.py).
 
 export const KIND_OPTIONS = [["series", "Turnierserie"], ["racing", "Rennliga"], ["team_league", "Team-Liga"]];
-export const STATUS_OPTIONS = [["planned", "Geplant"], ["active", "Läuft"], ["completed", "Abgeschlossen"]];
+// #1960: „Abgebrochen“ - Ergebnisse bleiben sichtbar, ohne Meister und ohne Platzierung.
+export const STATUS_OPTIONS = [["planned", "Geplant"], ["active", "Läuft"], ["completed", "Abgeschlossen"], ["cancelled", "Abgebrochen"]];
 export const STATUS_LABELS = { ...Object.fromEntries(STATUS_OPTIONS), archived: "Archiviert" };
 export const PUBLISH_OPTIONS = [["review", "Entwurf, der Vorstand gibt frei"], ["direct", "Captain veröffentlicht direkt"]];
 export const VISIBILITY_OPTIONS = [["public", "Öffentlich"], ["community", "Community"], ["members", "Vereinsmitglieder"], ["internal", "Intern"]];
@@ -83,6 +84,11 @@ export function rulesToForm(rules = {}) {
     team_enabled: Boolean(team.enabled),
     team_counting_drivers: text(team.counting_drivers),
     team_guests_count: team.guests_count !== false,
+    // #1960: Teamwertung je Rennen (Vorgabe) oder nach aktueller Besetzung; Mindestzahl am Start je Termin.
+    team_mode: team.mode || "per_race",
+    // Einträge „kein Team“ (Ersatzfahrer) als Text, je Name durch Komma getrennt; ohne Angabe die Vorgabe des Servers.
+    team_no_team_names: Array.isArray(team.no_team_names) ? team.no_team_names.join(", ") : "Ersatzfahrer",
+    min_participants: text(rules.min_participants),
     match_win: text(match.win ?? 3),
     match_draw: text(match.draw ?? 1),
     match_loss: text(match.loss ?? 0),
@@ -107,7 +113,12 @@ export function formToRules(form) {
     activity_points: { points: number(form.activity_points), from_round: number(form.activity_from_round, 1) },
     final_top_n: optional(form.final_top_n),
     tiebreakers: (form.tiebreakers || []).filter(Boolean),
-    team_scoring: { enabled: Boolean(form.team_enabled), counting_drivers: optional(form.team_counting_drivers), guests_count: Boolean(form.team_guests_count) },
+    team_scoring: {
+      enabled: Boolean(form.team_enabled), counting_drivers: optional(form.team_counting_drivers), guests_count: Boolean(form.team_guests_count),
+      mode: form.team_mode || "per_race",
+      no_team_names: String(form.team_no_team_names ?? "Ersatzfahrer").split(/[,;\n]/).map((name) => name.trim()).filter(Boolean),
+    },
+    min_participants: optional(form.min_participants),
     match_points: { win: number(form.match_win), draw: number(form.match_draw), loss: number(form.match_loss) },
     table_tiebreakers: (form.table_tiebreakers || []).filter(Boolean),
     day_rounds: { count: number(form.day_rounds_count), points_by_place: parsePointsList(form.day_rounds_points) },
@@ -196,6 +207,10 @@ export function seriesToForm(series = {}, rules = series.rules) {
     partner_roles: series.partner_roles || {},
     // #1961: Namen öffentlich ohne Tag der Spielkennung („Name#TLS“ → „Name“).
     hide_name_tags: Boolean(series.hide_name_tags),
+    // #1960: Saison abgebrochen (Tag, Grund) und Nachfolger.
+    cancelled_on: series.cancelled_on || "",
+    cancel_reason: series.cancel_reason || "",
+    successor_id: series.successor_id || "",
     rules_note: "",
     rules: rulesToForm(rules || {}),
   };
@@ -230,8 +245,14 @@ export function seriesPayload(form, { isNew = false, archived = false } = {}) {
   if (isNew) {
     payload.lineage_id = form.lineage_id;
     payload.points_scheme_id = blank(form.points_scheme_id);
-  } else if (String(form.rules_note || "").trim()) {
-    payload.rules_note = String(form.rules_note).trim();
+    return payload;
+  }
+  if (String(form.rules_note || "").trim()) payload.rules_note = String(form.rules_note).trim();
+  // #1960: Nachfolger (etwa der Neustart); abgebrochen mit Tag (leer heißt heute) und Grund - nur mit diesem Status.
+  payload.successor_id = form.successor_id || null;
+  if (!archived && form.status === "cancelled") {
+    payload.cancelled_on = form.cancelled_on || null;
+    payload.cancel_reason = blank(form.cancel_reason);
   }
   return payload;
 }

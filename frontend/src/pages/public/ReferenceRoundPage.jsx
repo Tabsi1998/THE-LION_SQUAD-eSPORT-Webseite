@@ -8,6 +8,7 @@ import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { emptyText, pickSession, roundHeading, roundPath, SESSION_PARAM, summaryCards } from "@/lib/roundResults";
 import { RoundHead, RoundSummary, ResultList, ResultTable, SessionTabs } from "@/components/tls/series/RoundResults";
+import { SeasonNotice, SessionRuleNotes } from "@/components/tls/series/SeriesSpecialRules";
 import { NotFoundPage } from "@/pages/ErrorPages";
 
 // Ergebnisseite einer Runde der Rennliga (#1950) unter /references/series/<spur>/<saison>/runde/<nr>: eigene Adresse
@@ -82,6 +83,8 @@ export default function ReferenceRoundPage() {
         {!current ? <SkeletonLines lines={6} /> : (
           <>
             <RoundHead page={current} lineageSlug={lineageSlug} seasonSlug={seasonSlug} />
+            {/* Saison abgebrochen (#1960): auch auf der Rundenseite, mit Tag und Grund. */}
+            <SeasonNotice series={current.series} successor={null} />
             <RoundSummary cards={cards} playKey={playKey} />
             <SessionTabs sessions={current.sessions || []} current={session?.key} onPick={pick} panelId={panelId} />
             <section
@@ -94,6 +97,8 @@ export default function ReferenceRoundPage() {
               data-testid="round-panel"
               data-session={session?.key}
             >
+              {/* #1960: Termin ohne Wertung mit Grund, umgekehrte Startaufstellung des Laufs. */}
+              <SessionRuleNotes session={session} />
               {session?.has_result ? (
                 <>
                   <ResultTable session={session} playKey={playKey} />
