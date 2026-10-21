@@ -315,7 +315,10 @@ Werten über null:
 - **Chronik je Jahr:** eine Zeile je Teilnahme mit dem eigenen Platz, kurzem Titel, Spiel, Team mit „von N Teams“ und
   Datum. Ein Klick klappt die Details auf: langer Titel, Format und Plattform, die Aufstellung (die Person selbst
   hervorgehoben), **Saison ansehen** (nur mit Saison), **Details** (die Seite der Referenz mit Bericht, Partnern und Ort)
-  und **Beim Veranstalter** (Turnierseite, sonst Ergebnis oder Bracket). Offen steht immer nur eine Zeile.
+  und **Beim Veranstalter** (Turnierseite, sonst Ergebnis oder Bracket). Offen steht immer nur eine Zeile. Ist die
+  Referenz mit einer Saison verknüpft, steht bei der Aufstellung, wie oft die Person dabei war – etwa
+  **Aufstellung · 5 von 7 Spielen** (Team-Liga, aus Aufstellung und Kader) bzw. **Einsätze · 3 von 5 Rennen**
+  (Rennliga).
 
 **Alle Referenzen** öffnet die Chronik oben mit „Nur …“.
 
@@ -465,7 +468,10 @@ bekommt keine Platzierung (der Status „abgebrochen“ kommt mit einem eigenen 
   Neujahr zählt es weiter. Eine Zeile ohne Datum bekommt den nächsten **Standard-Wochentag** nach der Zeile davor,
   ohne Uhrzeit gilt die **Standard-Uhrzeit**. **Vorschau** zeigt, was daraus wird; hat eine Zeile einen Fehler, steht
   er mit Zeilennummer da, und übernommen wird erst eine fehlerfreie Liste. Aus dem Ort kommt die **Flagge**, etwa
-  `R1 · 18.06.2026 · Aserbaidschan`.
+  `R1 · 18.06.2026 · Aserbaidschan`. **Team-Liga:** `vs Team` heißt Heimspiel, `@ Team` auswärts, `gegen Team` lässt
+  die Seite offen; `13.05.–17.05.` (auch `13.–17.05.`) ist ein Spieltag mit Zeitraum – etwa
+  `ST2 · 13.05.–17.05. · @ Team X`. Die Vorschau zeigt Gegner und Zeitraum. Mit Zeitraum ist der Spieltag bis zu seinem
+  letzten Tag „Heute“, „Ergebnis fehlt“ kommt erst danach.
 - **Flagge:** Jeder Termin bekommt sein Land automatisch aus Strecke oder Ort, sonst aus dem Titel – deutsche und
   englische Ländernamen, bekannte Strecken und Städte (Monza, Spa, Suzuka, Interlagos, COTA, Baku, Yas Marina …) und
   Zusätze wie „USA (Miami)“. Ohne Treffer bleibt der Termin ohne Flagge. Im Termin wählt ihr unter **Land (Flagge)**
@@ -474,7 +480,8 @@ bekommt keine Platzierung (der Status „abgebrochen“ kommt mit einem eigenen 
   bei „Läuft gerade“ und „Heute im Einsatz“.
 - **Termin:** einzeln anlegen; Tag und Uhrzeit sind mit dem nächsten Standard-Wochentag und der Standard-Uhrzeit
   vorbefüllt. Art **Finale**, **Zählt zur Wertung** (aus: steht im Kalender, geht aber nicht in die Tabelle) und bei
-  einer Team-Liga der Gegner. Die Notiz sieht nur die Verwaltung.
+  einer Team-Liga der Gegner, **Heim oder auswärts** und **Spieltag bis** (letzter Tag, an dem gespielt werden kann).
+  Verschieben macht daraus einen festen Tag. Die Notiz sieht nur die Verwaltung.
 - **Verschieben** (Kalender-Symbol): neuer Tag und Uhrzeit. Der ursprüngliche Tag bleibt beim Termin stehen, auch wenn
   ihr noch einmal verschiebt.
 - **Absagen** (Verbotszeichen): ein abgesagter Termin fehlt nie und zählt nicht zur Rundenzahl der Wertung;
@@ -541,6 +548,9 @@ Ablauf je Runde hat – eine alte Saison mit zweimal „R1“ behält zwei Runde
 <td><img src="../assets/serien/serien-kalender-flaggen.png" alt="Kalender einer Rennliga mit 24 Rennen, jedes mit der Flagge seines Landes" width="420"></td>
 <td><img src="../assets/serien/serien-termin-land.png" alt="Termin bearbeiten am Handy: Land automatisch aus der Strecke, erkannt Australien" width="200"></td>
 </tr>
+<tr>
+<td colspan="2"><img src="../assets/serien/serien-kalender-teamliga.png" alt="Terminliste einer Team-Liga: Vorschau mit Gegner (vs heim, @ auswärts) und Spieltag-Zeitraum" width="560"></td>
+</tr>
 </table>
 
 **Öffentlich** steht der Kalender unter `/references/series/<spur>/<saison>` – mit der Sichtbarkeit von Spur und Saison
@@ -567,21 +577,28 @@ gespeicherten Stand und ist nicht für Suchmaschinen gedacht (`noindex`).
 
 **Seite Team-Liga:** Bei einer Spur vom Typ Team-Liga zeigt dieselbe Adresse statt der Gesamtwertung die Liga aus
 Sicht der eigenen Teams (Liste **Eigene Teams** der Saison; spielen mehrere, steht im Spielplan, welches gespielt
-hat). Oben die **Spieltage** (ein Feld je Spieltag – Sieg cyan, Niederlage grau) und der nächste Spieltag mit Gegner. Die **Tabelle** ist die Tabelle laut Veranstalter vom letzten
-eingetragenen Spieltag, sonst aus den eigenen Spielen gerechnet; Punkte für Sieg, Unentschieden und Niederlage und der
-Vorrang bei Gleichstand stehen darüber und kommen aus den Regeln der Saison. Das eigene Team ist als „Verein“ markiert,
-mit Form (die letzten fünf eigenen Spiele) und darunter dem **Platzierungsverlauf** nach jedem Spieltag. Der
-**Spielplan** zeigt je Spieltag Gegner, Heim oder Auswärts, das Ergebnis und die Maps. Die **Aufstellung** zählt, wer an
-welchem Spieltag gespielt hat: Vereinsmitglieder verlinken auf ihr Profil und haben unter **Gesamt** ihre Einsätze über
-alle Saisons der Spur; Gäste stehen getrennt und zählen nicht in die Vereinsstatistik. Der **Liga-Weg** listet alle
-Saisons der Spur mit Stufe, Platz von N und Punkten – Platz 1 bis 3 in den Farben der Pokale, die aktuelle Saison
-markiert, die anderen verlinkt. Eingetragen wird alles im Blatt **Ergebnis eintragen** des Spieltags: Spiel mit Maps und
-Aufstellung, dazu bei Bedarf die Tabelle laut Veranstalter.
+hat). Oben die **Spieltage** (ein Feld je Spieltag – Sieg cyan, Niederlage grau) und der nächste Spieltag mit Gegner
+(„vs“ heim, „@“ auswärts). Darunter die **Bilanz** je eigenem Team: Siege, Unentschieden und Niederlagen mit einem
+Balken nach Anteil, **Maps** (Ergebnis der Spiele) und **Runden** (Summe der Map-Ergebnisse, nur aus Spielen mit Maps)
+jeweils mit Differenz. Die **Tabelle** ist die Tabelle laut Veranstalter vom letzten eingetragenen Spieltag, sonst aus
+allen eingetragenen Spielen gerechnet; Punkte für Sieg, Unentschieden und Niederlage und der Vorrang bei Gleichstand
+stehen darüber und kommen aus den Regeln der Saison. Das eigene Team ist als „Verein“ markiert, mit Form (die letzten
+fünf eigenen Spiele) und darunter dem **Platzierungsverlauf** nach jedem Spieltag. Der **Spielplan** zeigt jeden
+Spieltag als Karte: Tag und Uhrzeit des Spiels (bei einem Zeitraum beide Tage), Gegner mit Heim oder Auswärts, das
+Ergebnis (Rand und Kürzel S/U/N in Sieg- bzw. Niederlagen-Farbe), die Maps mit **Unsere Wahl**, **Wahl Gegner** oder
+**Decider**, die gebannten Maps und – zugeklappt – die **weiteren Spiele** des Spieltags. Der **Kader** zeigt alle
+Spieler der eigenen Teams, auch wer noch nicht gespielt hat: je Spieltag ein Haken (gespielt) oder **E** (Ersatz – im
+Kader, aber nicht aufgestellt), unter **Einsätze** etwa „2 von 5“ (von den Spielen des Teams mit Aufstellung).
+Vereinsmitglieder verlinken auf ihr Profil und haben unter **Gesamt** ihre Einsätze über alle Saisons der Spur; Gäste
+stehen getrennt und zählen nicht in die Vereinsstatistik, mehrere eigene Teams stehen je Team. Der **Liga-Weg** listet
+alle Saisons der Spur mit Stufe, Platz von N und Punkten – Platz 1 bis 3 in den Farben der Pokale, die aktuelle Saison
+markiert, die anderen verlinkt. Eingetragen wird alles im Blatt **Ergebnis eintragen** des Spieltags (siehe unten),
+der Kader im Abschnitt **Kader** der Saison.
 
 <table>
 <tr>
-<td><img src="../assets/serien/serien-seite-teamliga-breit.png" alt="Seite einer Team-Liga mit Spieltagen, Tabelle, Platzierungsverlauf, Spielplan, Aufstellung und Liga-Weg" width="560"></td>
-<td><img src="../assets/serien/serien-seite-teamliga-handy.png" alt="Dieselbe Seite am Handy" width="220"></td>
+<td><img src="../assets/serien/serien-seite-teamliga-breit.png" alt="Seite einer Team-Liga mit Spieltagen, Bilanz, Tabelle, Spieltagen als Karten mit Maps und Bann, Kader mit Einsätzen und Liga-Weg" width="560"></td>
+<td><img src="../assets/serien/serien-seite-teamliga-handy.png" alt="Dieselbe Seite am Handy mit 360 px, die weiteren Spiele des ersten Spieltags aufgeklappt" width="220"></td>
 </tr>
 </table>
 
@@ -734,6 +751,15 @@ für ein Vereinsteam, ist aber kein Mitglied, **Extern** sind alle anderen. Übe
 
 Jede Änderung steht im Protokoll. Bearbeiten und zuordnen darf nur der Vorstand, ein Captain nicht.
 
+**Kader (Team-Liga):** Bei einer Team-Liga steht unter den Teilnehmern der Abschnitt **Kader** – je eigenem Team der
+Saison die Spieler, mit Mitglied, Gast, Extern oder offen. **Kader einfügen** nimmt einen Namen je Zeile, gern die Liste
+„Seasonteam-Mitglieder“ von der Match-Seite (Kopfzeile und Häkchen-Spalte stören nicht): neue Namen kommen gleich in
+den Kader, vorhandene werden dem Team zugeordnet. Das Kreuz nimmt jemanden heraus – der Teilnehmer bleibt, nur sein
+Team ist leer. Im Ergebnis wird die Aufstellung aus diesem Kader angekreuzt; wer im Kader steht und nicht aufgestellt
+ist, gilt an dem Spieltag als Ersatz. Daraus kommen die Einsätze auf der Seite der Saison und im Mitgliederprofil.
+
+<img src="../assets/serien/serien-teamliga-kader.png" alt="Abschnitt Kader einer Team-Liga mit zehn Spielern und dem Knopf Kader einfügen" width="560">
+
 <img src="../assets/serien/serien-teilnehmer-auswahl.png" alt="Teilnehmer mit Filter Gäste, 17 von 20 ausgewählt, darüber Als Gast und Als Extern" width="560">
 
 <table>
@@ -784,9 +810,23 @@ einem gewerteten Termin **Ergebnis ändern**. Das öffnet das Blatt des Termins.
   springt zur ersten. Wie das Bild
   aufgebaut ist, sagt die **Vorlage für Ergebnis-Bilder** an der Spur (eine Saison kann abweichen): Standard für
   Rennligen ist „Rennliga-Ergebnis (dunkel)“, **Aus** schaltet das Auslesen ab.
-- **Team-Liga:** statt der Liste das **Spiel** – eigenes Team und Gegner (aus dem Termin vorbefüllt), Ergebnis, die
-  **Maps** und die **Aufstellung** (wer gespielt hat). Darunter die **Tabelle laut Veranstalter**: einfügen, etwa
-  `1. Team 10 7 1 2 22` oder mit Kopfzeile (Pl, Team, Sp, S, U, N, Maps, Pkt).
+- **Team-Liga:** statt der Liste der **Spieltag**. Am schnellsten geht es über **Spieltag einfügen**: die
+  Begegnungsliste des Veranstalters kopieren (etwa „Spieltage → Alle“ im Browser markieren – Termin, Heim, Auswärts,
+  Ergebnis) und einfügen. Logo- und Link-Spalten („Zum Matchup“) stören nicht, `17.06.2026 20:30 Uhr` ist ein Termin;
+  stehen mehrere Spieltage untereinander („Begegnungen des 2. Spieltags“, „Zeitraum: …“), nimmt das Blatt den zum
+  Termin passenden oder fragt nach. Das **eigene Spiel** wird an den eigenen Teams (samt Schreibweisen) erkannt und
+  ausgefüllt – Heim/Auswärts, Ergebnis, Tag und Uhrzeit; die **übrigen Spiele** mit Ergebnis kommen dazu, wenn
+  **Übrige Spiele mitspeichern** an ist (sie stehen dann beim Spieltag und zählen in die eigene Tabelle). Noch offene
+  Spiele (`-:-`) werden nicht übernommen.
+  Im eigenen Spiel stehen die **Maps in der Reihenfolge des Vetos**: je Map der Name (mit Vorschlägen aus den schon
+  verwendeten Maps der Saison) und die Rolle – **Gespielt**, **Unsere Wahl**, **Wahl Gegner**, **Decider**, **Unser Bann**
+  oder **Bann Gegner**; gesperrte Maps haben kein Ergebnis. Die **Aufstellung** ist eine Ankreuzliste aus dem **Kader**
+  des Teams; mit **je Map** bekommt jede gespielte Map ihre eigene (wer eine Map gespielt hat, hat das Spiel gespielt).
+  **Aufstellung einfügen** nimmt die Liste von der Match-Seite („Seasonteam-Mitglieder | Warorga“): ein Häkchen,
+  `x` oder `ja` kreuzt an. Wird das Häkchen beim Kopieren zum Bild und fehlt, stehen die Namen zum Ankreuzen da.
+  Weitere Namen gehen über **Weiterer Name**. Darunter die **Tabelle laut Veranstalter**: einfügen, etwa
+  `1. Team 10 7 1 2 22` oder mit Kopfzeile (Platz, Team, Spiele, Siege, Unentschieden, Niederlagen, Ergebnis, Punkte –
+  auch mit leerer Logo-Spalte).
 
 <table>
 <tr>
@@ -810,6 +850,9 @@ Vorschau neu prüfen.
 <tr>
 <td><img src="../assets/serien/serien-ergebnis-rennergebnis.png" alt="Ergebnisblatt am Handy: eingefügte Liste mit Startnummer, Startplatz, Zeit und Abstand" width="200"></td>
 <td><img src="../assets/serien/serien-ergebnis-schnellste-runde.png" alt="Felder Schnellste Runde mit Rundenzeit und Fahrer des Tages unter der Liste" width="420"></td>
+</tr>
+<tr>
+<td colspan="2"><img src="../assets/serien/serien-teamliga-spieltag.png" alt="Team-Liga: Spieltag eingefügt – eigenes Spiel erkannt, Maps im Veto mit Bann, Wahl und Decider, Aufstellung aus dem Kader angekreuzt, übrige Spiele darunter" width="560"></td>
 </tr>
 </table>
 

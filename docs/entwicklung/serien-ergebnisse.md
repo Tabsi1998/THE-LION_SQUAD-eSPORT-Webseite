@@ -41,6 +41,23 @@ Bonus zählt), eine Zeit ohne Namen gehört zur markierten Zeile, zwei Markierun
 (Kennung); in den Ständen tragen die Ergebnisse je Rennen `start_number`, `grid`, `time`, `gap`, `fastest_lap_time`
 und `driver_of_the_day` – nur, wo angegeben.
 
+**Team-Liga (#1931)** – alles optional, gespeichert nur, was angegeben ist:
+- `matches` hält das eigene Spiel und die übrigen Spiele des Spieltags; welches das eigene ist, sagen die eigenen Teams.
+  Die Warnung `own_team_missing` kommt nur, wenn in keinem Spiel ein eigenes Team spielt; die Tabelle rechnet aus allen
+  Spielen.
+- Je Spiel `day`/`time` (Wiener Tag und Uhrzeit, gespeichert als `club_day`, `time`, `starts_at`; Fehler `match_time`,
+  wenn es die Uhrzeit nicht gibt).
+- `maps` in der Reihenfolge des Vetos: `name`, optional `map_id` (spätere Map-Bibliothek, #1616), `role` (`banned`,
+  `picked`, `decider`, `played` – ohne Rolle gespielt), `by` (`own`/`opponent`, nur bei Bann und Wahl), bei gespielten
+  Maps `home_score`/`away_score` und optional `lineup`. Die Aufstellung des Spiels ist die Vereinigung mit denen der
+  Maps; `maps_differ` zählt nur gespielte Maps.
+- GET liefert dazu `series.own_team_list` (eigene Teams samt Schreibweisen) und `series.map_names` (schon verwendete
+  Map-Namen der Saison, häufigste zuerst). Der Kader eines eigenen Teams sind die Teilnehmer mit diesem `default_team`
+  (`participants/batch` mit `team`).
+- Die Serienseite liefert `team_league.record` (Bilanz je eigenem Team), je Spieltag `others` und in `lineup.players`
+  `of`, `bench_round_ids`, `in_roster` und `team`; das Mitgliederprofil je verknüpfter Referenz `appearances`
+  (`{played, of, unit, team}`, `services/series_appearances.py`).
+
 **Eigene Teams (#1926):** Die Serie hat `own_teams` (`[{name, aliases}]`, `team_name` = das erste). Ein Team aus der
 Liste, aus `matches` oder der Tabelle zählt als eigenes, wenn Name oder Alias ohne Groß/klein, Leer- und Satzzeichen
 passt; die Stände führen es unter seinem Namen.
