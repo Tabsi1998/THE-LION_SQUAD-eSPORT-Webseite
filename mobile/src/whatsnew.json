@@ -1,11 +1,12 @@
 {
-  "version": "1.7.3",
-  "build": 97,
-  "date": "2026-10-20",
+  "version": "1.7.4",
+  "build": 98,
+  "date": "2026-10-21",
   "items": [
-    "Ergebnis eintragen: Wer im Lauf als „nicht erschienen“ vorgemerkt ist, steht im Ergebnis-Fenster schon so da – wie auf der Website. Im Turnierbaum sind Vorgemerkte durchgestrichen, solange es noch kein Ergebnis gibt.",
-    "Abzeichen wie „ANGEKÜNDIGT“ bleiben in einer Zeile und färben sich nach dem Zustand wie auf der Website.",
-    "Fast Lap: Lange Titel brechen nur zwischen Wörtern um, das Tacho-Symbol verdeckt das Abzeichen nicht mehr.",
-    "Match: Die Teilnehmerliste zeigt keine englischen Rohwerte wie „Filled“ mehr."
+    "Galerie: Die Großansicht bleibt über Bildtext und Reiterleiste, auf jedem Handy.",
+    "News: Beiträge ohne Bild erscheinen als Text-Karte, Ergebnis-News nennen den Sieger.",
+    "News: Die Anmelde-Karte steht direkt unter dem ersten Absatz.",
+    "Profile: keine Nullen mehr in der Zahlenleiste und keine leeren Reiter.",
+    "Profile: Ein privates Profil zeigt anderen keine Referenzen und Teams – wie auf der Website."
   ]
 }

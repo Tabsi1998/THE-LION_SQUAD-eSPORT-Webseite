@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.7.4 - 2026-10-21
+
+- Mobile: Galerie: Die Großansicht bleibt über Bildtext und Reiterleiste, auf jedem Handy. (#1910)
+- Mobile: News: Beiträge ohne Bild erscheinen als Text-Karte, Ergebnis-News nennen den Sieger. (#1912)
+- Mobile: News: Die Anmelde-Karte steht direkt unter dem ersten Absatz. (#1912)
+- Mobile: Profile: keine Nullen mehr in der Zahlenleiste und keine leeren Reiter. (#1916)
+- Mobile: Profile: Ein privates Profil zeigt anderen keine Referenzen und Teams – wie auf der Website. (#1916)
+
 ## 1.7.3 - 2026-10-20
 
 - Mobile: Ergebnis eintragen: Wer im Lauf als „nicht erschienen“ vorgemerkt ist, steht im Ergebnis-Fenster schon so da – wie auf der Website. Im Turnierbaum sind Vorgemerkte durchgestrichen, solange es noch kein Ergebnis gibt. (#1840)
