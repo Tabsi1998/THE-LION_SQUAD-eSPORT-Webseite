@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { countKey, hasMoreDetails, lastReference, likeLastTime, quickDate, quickStatus } from "./referenceQuickEntry";
+import { anyPlacement, countKey, hasMoreDetails, lastReference, likeLastTime, quickDate, quickStatus } from "./referenceQuickEntry";
 
 // Schnell-Eintrag (#1936): Vorgaben für ein Tagesturnier und wann „Weitere Angaben“ offen stehen.
 
@@ -86,24 +86,38 @@ describe("Wie letztes Mal", () => {
   const items = [
     { id: "a", created_at: "2026-09-01T10:00:00+00:00", game_id: "g1", organizer: "Alt", entries: [] },
     { id: "b", created_at: "2026-10-12T10:00:00+00:00", game_id: "g2", game_name: "", organizer: "Probe Verband",
-      entries: [{ kind: "team", team_name: "Probe Löwen", member_profile_ids: ["p1", "p2"], placement: 1 }] },
+      entries: [{ kind: "team", team_name: "Probe Löwen", member_profile_ids: ["p1", "p2"], lineup: ["Fremder Gast"], placement: 1 }] },
     { id: "c", entries: [] },
   ];
   test("die zuletzt angelegte Referenz", () => {
     expect(lastReference(items).id).toBe("b");
     expect(lastReference([])).toBeNull();
   });
-  test("übernimmt Spiel, Veranstalter und Team, nicht Platz und Name", () => {
-    const form = { ...BASE, title: "Neu", game_id: "", organizer: "", entries: [{ ...BASE.entries[0], member_profile_ids: [], placement: "", team_count: "" }] };
+  test("übernimmt Spiel, Veranstalter und Teamname - keine Aufstellung, nicht Platz und Name", () => {
+    const form = { ...BASE, title: "Neu", game_id: "", organizer: "", entries: [{ ...BASE.entries[0], member_profile_ids: [], lineup_text: "", placement: "", team_count: "" }] };
     const next = likeLastTime(form, items[1]);
     expect(next.title).toBe("Neu");
     expect(next.game_id).toBe("g2");
     expect(next.organizer).toBe("Probe Verband");
-    expect(next.entries[0]).toEqual(expect.objectContaining({ kind: "team", team_name: "Probe Löwen", member_profile_ids: ["p1", "p2"], placement: "" }));
+    expect(next.entries[0]).toEqual(expect.objectContaining({ kind: "team", team_name: "Probe Löwen", member_profile_ids: [], lineup_text: "", placement: "" }));
   });
-  test("ein Einzelstarter wird übernommen", () => {
-    const solo = { game_id: "g1", entries: [{ kind: "solo", member_profile_ids: ["p3"] }] };
-    const next = likeLastTime(BASE, solo);
-    expect(next.entries[0]).toEqual(expect.objectContaining({ kind: "solo", team_name: "", member_profile_ids: ["p3"] }));
+  test("schon gewählte Spieler bleiben, ein Einzelstarter der letzten Referenz ändert den Eintrag nicht", () => {
+    const form = { ...BASE, entries: [{ ...BASE.entries[0], member_profile_ids: ["p9"] }] };
+    expect(likeLastTime(form, items[1]).entries[0].member_profile_ids).toEqual(["p9"]);
+    const solo = { game_id: "g1", entries: [{ kind: "solo", member_profile_ids: ["p3"], lineup: ["Gast"] }] };
+    expect(likeLastTime(form, solo).entries[0]).toEqual(form.entries[0]);
+  });
+});
+
+describe("anyPlacement", () => {
+  test("der Platz irgendeines Eintrags zählt", () => {
+    expect(anyPlacement([{ placement: "" }, { placement: 5 }])).toBe(5);
+    expect(anyPlacement([{ placement: "" }, {}])).toBe("");
+    expect(anyPlacement(undefined)).toBe("");
+  });
+  test("heute mit Platz im zweiten Eintrag: abgeschlossen, kein Grund für „Weitere Angaben“ wegen des Status", () => {
+    expect(quickStatus(TODAY, anyPlacement([{ placement: "" }, { placement: "2" }]), TODAY)).toBe("completed");
+    const form = { ...BASE, start_date: TODAY, end_date: TODAY, entries: [{ ...BASE.entries[0], placement: "" }] };
+    expect(hasMoreDetails({ ...form, status: "active" }, TODAY)).toBe(false);
   });
 });

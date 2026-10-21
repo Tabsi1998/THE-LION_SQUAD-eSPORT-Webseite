@@ -10,6 +10,11 @@ export function quickStatus(day, placement, today) {
   return String(placement ?? "").trim() ? "completed" : "active";
 }
 
+/** Der Platz irgendeines Eintrags - steht einer, ist ein Turnier von heute abgeschlossen. Leer, wenn keiner einen hat. */
+export function anyPlacement(entries) {
+  return (entries || []).map((entry) => entry?.placement).find(filled) ?? "";
+}
+
 /** Ein Tag: Das Ende folgt dem Start, solange es leer ist oder auf dem alten Start stand. Ein eigenes Ende bleibt. */
 export function quickDate(form, day) {
   const start = String(form.start_date || "").slice(0, 10);
@@ -48,7 +53,7 @@ export function hasMoreDetails(form, today) {
     const other = countKey(first) === "team_count" ? "participant_count" : "team_count";
     if (filled(first.placement_label) || filled(first.lineup_text) || filled(first[other])) return true;
   }
-  return (form.status || "completed") !== quickStatus(start, first?.placement, today);
+  return (form.status || "completed") !== quickStatus(start, anyPlacement(entries), today);
 }
 
 /** Die zuletzt angelegte Referenz (nach `created_at`); ohne Zeitstempel zählt sie nicht. */
@@ -61,21 +66,13 @@ export function lastReference(items) {
   return last;
 }
 
-/** „Wie letztes Mal“: Spiel, Veranstalter und Team (bzw. Einzelstarter) der letzten Referenz als Vorschlag. Name, Datum und Platz bleiben. */
+/** „Wie letztes Mal“: Spiel, Veranstalter und Teamname der letzten Referenz als Vorschlag - keine Aufstellung, Vereins- und
+ * externe Spieler wählt ihr jedes Mal neu. Name, Datum und Platz bleiben. */
 export function likeLastTime(form, last) {
   if (!last) return form;
-  const source = (last.entries || [])[0];
+  const source = (last.entries || []).find((entry) => entry?.kind !== "solo" && String(entry?.team_name || "").trim());
   const entries = [...(form.entries || [])];
-  if (source && entries[0]) {
-    const solo = source.kind === "solo";
-    entries[0] = {
-      ...entries[0],
-      kind: solo ? "solo" : "team",
-      team_name: solo ? "" : (source.team_name || entries[0].team_name || ""),
-      member_profile_ids: [...(source.member_profile_ids || [])],
-      lineup_text: (source.lineup || []).join(", "),
-    };
-  }
+  if (source && entries[0] && entries[0].kind !== "solo") entries[0] = { ...entries[0], team_name: source.team_name.trim() };
   return {
     ...form,
     game_id: last.game_id || "",

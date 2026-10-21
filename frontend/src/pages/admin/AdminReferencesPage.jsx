@@ -18,7 +18,7 @@ import { viennaDate, viennaDay } from "@/lib/vienna";
 import { podiumItems, yearOf } from "@/lib/referencesOverview";
 import { bestPlacement } from "@/components/tls/references/referenceParts";
 import { seasonOf, seasonOptions } from "@/lib/seasonClose";
-import { countKey, hasMoreDetails, lastReference, likeLastTime, quickDate, quickStatus } from "@/lib/referenceQuickEntry";
+import { anyPlacement, countKey, hasMoreDetails, lastReference, likeLastTime, quickDate, quickStatus } from "@/lib/referenceQuickEntry";
 
 // Referenzen (#409): eine Referenz ist eine Turnierteilnahme des Vereins mit Einträgen - entweder
 // ein Team (Spieler treten gemeinsam an, eine Platzierung) oder mehrere Einzelstarter mit je
@@ -683,7 +683,9 @@ function ReferenceForm({ reference, games, memberProfiles, partners = [], lineag
   };
 
   // Vorgabe: Status nach dem Datum (#1936) - nur bei neuen Referenzen und nur, bis jemand ihn selbst wählt.
-  const status = statusTouched ? (form.status || "completed") : quickStatus(form.start_date, form.entries[0]?.placement, today);
+  // Steht irgendein Eintrag schon mit Platz, gilt ein Turnier von heute als abgeschlossen.
+  const autoStatus = (day) => quickStatus(form.start_date, anyPlacement(form.entries), day);
+  const status = statusTouched ? (form.status || "completed") : autoStatus(today);
   const payload = useMemo(() => formToPayload({ ...form, status }), [form, status]);
   const warnings = useReferenceWarnings(payload);
   const warningsAt = (field) => warnings[field] || [];
@@ -698,8 +700,10 @@ function ReferenceForm({ reference, games, memberProfiles, partners = [], lineag
     try {
       // Stand beim Öffnen (#1750): hat inzwischen etwa der Abschluss der Saison die Referenz geändert, sagt der Server 409.
       const url = `/references/${reference.id}`;
-      const request = isNew ? api.post("/references", payload)
-        : reference.updated_at ? api.patch(url, payload, { params: { expected_updated_at: reference.updated_at } }) : api.patch(url, payload);
+      // Der Wiener Tag gilt beim Speichern - ein über Mitternacht offenes Formular nimmt den neuen Tag (#1936).
+      const body = statusTouched ? payload : { ...payload, status: autoStatus(viennaDay(new Date())) };
+      const request = isNew ? api.post("/references", body)
+        : reference.updated_at ? api.patch(url, body, { params: { expected_updated_at: reference.updated_at } }) : api.patch(url, body);
       const { data } = await request;
       // Prüfung (#1755): gespeichert ist trotzdem - die Hinweise stehen danach unter „Auffälligkeiten“.
       const summary = warningSummary(data?.check_warnings);

@@ -310,11 +310,48 @@ test("Schnell-Eintrag: Status nach dem Datum, bis jemand ihn selbst wählt", asy
   expect(saveCalls()[0][1]).toEqual(expect.objectContaining({ status: "active", start_date: "2020-05-01", end_date: "2020-05-01" }));
 });
 
-test("Wie letztes Mal: Spiel, Veranstalter und Team der zuletzt angelegten Referenz", async () => {
+test("Schnell-Eintrag: heute mit Platz nur im zweiten Eintrag gilt als abgeschlossen", async () => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(new Date("2026-10-21T12:00:00+02:00"));
+  try {
+    mockApi([]);
+    render(<MemoryRouter><AdminReferencesPage /></MemoryRouter>);
+    fireEvent.click(await screen.findByTestId("reference-new"));
+    fireEvent.change(screen.getByTestId("reference-title"), { target: { value: "Probe Heute Cup" } });
+    fireEvent.change(screen.getByTestId("reference-start-date"), { target: { value: "2026-10-21" } });
+    expect(screen.getByTestId("reference-status")).toHaveValue("active");
+    fireEvent.click(screen.getByTestId("reference-add-solo"));
+    fireEvent.change(screen.getByTestId("reference-entry-1-placement"), { target: { value: "2" } });
+    expect(screen.getByTestId("reference-status")).toHaveValue("completed");
+  } finally {
+    vi.useRealTimers();
+  }
+});
+
+test("Schnell-Eintrag: über Mitternacht offen - beim Speichern zählt der neue Wiener Tag", async () => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(new Date("2026-10-21T23:50:00+02:00"));
+  try {
+    mockApi([]);
+    render(<MemoryRouter><AdminReferencesPage /></MemoryRouter>);
+    fireEvent.click(await screen.findByTestId("reference-new"));
+    fireEvent.change(screen.getByTestId("reference-title"), { target: { value: "Probe Nacht Cup" } });
+    fireEvent.change(screen.getByTestId("reference-start-date"), { target: { value: "2026-10-21" } });
+    expect(screen.getByTestId("reference-status")).toHaveValue("active");
+    vi.setSystemTime(new Date("2026-10-22T00:10:00+02:00"));
+    fireEvent.submit(screen.getByTestId("reference-sheet"));
+    await waitFor(() => expect(saveCalls()).toHaveLength(1));
+    expect(saveCalls()[0][1].status).toBe("completed");
+  } finally {
+    vi.useRealTimers();
+  }
+});
+
+test("Wie letztes Mal: Spiel, Veranstalter und Teamname der zuletzt angelegten Referenz, keine Aufstellung", async () => {
   const older = { ...LEGACY_ITEM, id: "r-alt", display_title: "Alter Cup", organizer: "Alt Verband", game_id: "", created_at: "2026-01-01T10:00:00+00:00" };
   const newest = {
     ...LEGACY_ITEM, id: "r-neu", display_title: "Probe Abend Cup", organizer: "Probe Verband", game_id: "g1", created_at: "2026-10-12T10:00:00+00:00",
-    entries: [{ id: "e9", kind: "team", team_name: "Probe Löwen", member_profile_ids: ["p1", "p2"], lineup: [], placement: 4 }],
+    entries: [{ id: "e9", kind: "team", team_name: "Probe Löwen", member_profile_ids: ["p1", "p2"], lineup: ["Fremder Gast"], placement: 4 }],
   };
   mockApi([older, newest]);
   render(<MemoryRouter><AdminReferencesPage /></MemoryRouter>);
@@ -325,8 +362,9 @@ test("Wie letztes Mal: Spiel, Veranstalter und Team der zuletzt angelegten Refer
   expect(screen.getByTestId("reference-game")).toHaveValue("g1");
   expect(screen.getByTestId("reference-organizer")).toHaveValue("Probe Verband");
   expect(screen.getByTestId("reference-entry-0-team")).toHaveValue("Probe Löwen");
-  expect(screen.getByTestId("reference-entry-0-member-p1")).toBeChecked();
-  expect(screen.getByTestId("reference-entry-0-member-p2")).toBeChecked();
+  expect(screen.getByTestId("reference-entry-0-member-p1")).not.toBeChecked();
+  expect(screen.getByTestId("reference-entry-0-member-p2")).not.toBeChecked();
+  expect(screen.getByTestId("reference-entry-0-lineup")).toHaveValue("");
   expect(screen.getByTestId("reference-entry-0-placement")).toHaveValue(null);
   expect(screen.getByTestId("reference-title")).toHaveValue("");
 });

@@ -228,11 +228,12 @@ Platzierung, beides in derselben Teilnahme möglich. Spieler wählt ihr aus den 
 **Schnell-Eintrag für ein Tagesturnier:** Oben im Formular steht nur, was ein Tagesturnier braucht – **Turniername**,
 **Spiel**, **Datum** (ein Tag, das Ende folgt von selbst), **wer** angetreten ist (ein Team oder ein Spieler aus den
 Vereinsprofilen), **Platz von N** und optional ein **Link**. Eine neue Referenz beginnt schon mit einem Team-Eintrag.
-**Wie letztes Mal** übernimmt Spiel, Veranstalter und Team der zuletzt angelegten Referenz. Alles andere – Veranstalter
+**Wie letztes Mal** übernimmt Spiel, Veranstalter und Teamname der zuletzt angelegten Referenz – die Spieler wählt ihr
+jedes Mal neu. Alles andere – Veranstalter
 und Partner, Liga und Saison, Format, Plattformen, Ende bei mehreren Tagen, Ort, Modus, weitere Links, Label und zweite
 Feldgröße der Einträge, Status, Sichtbarkeit, Reihenfolge, Texte – klappt unter **Weitere Angaben** auf. Beim Bearbeiten
 ist der Bereich offen, wenn dort etwas steht. Vorgaben: Der Status folgt dem Datum (vorbei = abgeschlossen, später =
-geplant, heute mit Platz abgeschlossen), bis ihr ihn selbst wählt; sichtbar für alle, aktiv, Reihenfolge 0 = automatisch
+geplant, heute abgeschlossen, sobald ein Eintrag einen Platz hat; maßgeblich ist der Tag beim Speichern), bis ihr ihn selbst wählt; sichtbar für alle, aktiv, Reihenfolge 0 = automatisch
 nach Datum. Die Seite der Referenz zeigt nur, was ausgefüllt ist.
 
 <table>
