@@ -12,6 +12,7 @@ import { StatusBadge } from "../../components/StatusBadge";
 import { Body, Heading, Muted, Title } from "../../components/Text";
 import { useAuth } from "../../auth/AuthContext";
 import { api, errorMessage } from "../../lib/api";
+import { checkInLine } from "../../lib/checkInTimes";
 import { formatDate, formatDateTime, formatStatus, formatTournamentFormat, formatWhen } from "../../lib/format";
 import { stationText } from "../../lib/matchText";
 import { describeSlot, finderFor, isMatchDone, plannedText } from "../../lib/slotSource";
@@ -179,10 +180,9 @@ export function TournamentDetailScreen({ navigation, route }: Props) {
   const checkInNow = checkInState(tournament);
   const canCheckIn = Boolean(!staffOnlyCheckIn && canManageOwnRegistration && ownRegistration?.status === "approved" && checkInNow.open);
   const checkInOver = Boolean(!staffOnlyCheckIn && ownRegistration?.status === "approved" && checkInNow.over && ["check_in", "live", "paused"].includes(String(tournament?.status || "")));
-  const checkInWindow = [
-    tournament?.check_in_from ? `ab ${formatDateTime(tournament.check_in_from)}` : "",
-    tournament?.check_in_until ? `bis ${formatDateTime(tournament.check_in_until)}` : "",
-  ].filter(Boolean).join(" ");
+  // Die wirksamen Zeiten (#1938, wie im Web): nach einem Check-in von Hand nie „ab 10:56 bis 10:48“ und keine Öffnung in
+  // der Zukunft, während der Check-in schon läuft; früher beendet gilt das wirkliche Ende.
+  const checkInWindow = checkInLine(tournament);
   const canSelfUnregister = Boolean(
     registered &&
       canManageOwnRegistration &&

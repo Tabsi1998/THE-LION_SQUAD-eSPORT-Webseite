@@ -121,8 +121,9 @@ test("vor Ort: kein Check-in-Knopf, sondern „Check-in vor Ort bei der Turnierl
   answer({ ...checkIn, event_mode: "local" });
   const view = await render(<TournamentDetailScreen navigation={navigation} route={route} />);
   await waitFor(() => expect(screen.getByTestId("tournament-checkin-local")).toBeTruthy());
+  // Wirksame Zeiten (#1938): der Check-in läuft schon, die eingestellte Öffnung liegt noch vor uns - dann kein „ab …“.
   expect(screen.getByTestId("tournament-checkin-local")).toHaveTextContent(
-    "Check-in vor Ort bei der Turnierleitung · ab 14.11.2026, 18:00 bis 14.11.2026, 18:45",
+    "Check-in vor Ort bei der Turnierleitung · bis 14.11.2026, 18:45",
   );
   expect(screen.queryByText("Jetzt einchecken")).toBeNull();
   await view.unmount();
