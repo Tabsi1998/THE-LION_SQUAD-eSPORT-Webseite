@@ -20,7 +20,7 @@ function TournamentDayFields({ rules, set }) {
       <div className="space-y-2" data-testid="series-rules-bonuses">
         {bonuses.map((bonus, index) => (
           <div key={bonus.formKey} className="grid grid-cols-[minmax(0,1fr)_6rem_auto] items-end gap-2" data-testid="series-rules-bonus">
-            <TextField label={`Sonderbonus ${index + 1}`} value={bonus.label} onChange={(v) => setBonus(bonus.formKey, { label: v })} placeholder="Bingo" testId="series-rules-bonus-label" />
+            <TextField label={`Sonderbonus ${index + 1}`} value={bonus.label} onChange={(v) => setBonus(bonus.formKey, { label: v })} placeholder="Bingo" maxLength={40} testId="series-rules-bonus-label" />
             <TextField label="Punkte" type="number" step="any" min="0" value={bonus.points} onChange={(v) => setBonus(bonus.formKey, { points: v })} testId="series-rules-bonus-points" />
             <button type="button" onClick={() => set("custom_bonuses", bonuses.filter((item) => item.formKey !== bonus.formKey))} aria-label={`Sonderbonus ${bonus.label || index + 1} entfernen`}
               className="mb-1 p-2 rounded-sm text-white/45 hover:text-white hover:bg-white/5 transition active:scale-[0.97]" data-testid="series-rules-bonus-remove">
@@ -96,7 +96,7 @@ export function RulesFields({ rules, kind, onChange }) {
             <SelectField key={index} label={`Vorrang ${index + 1}`} value={value} onChange={(v) => setAt("tiebreakers", index, v)} options={TIEBREAKER_OPTIONS} testId={`series-rules-tiebreaker-${index}`} />
           ))}
           {rules.tiebreakers.includes("top_n") && (
-            <TextField label="N für „Top N“" type="number" min="1" value={rules.tiebreak_top_n} onChange={(v) => set("tiebreak_top_n", v)} hint="Etwa 4: wer öfter unter den besten vier war." testId="series-rules-top-n" />
+            <TextField label="N für „Top N“" type="number" min="1" max="64" value={rules.tiebreak_top_n} onChange={(v) => set("tiebreak_top_n", v)} hint="Etwa 4: wer öfter unter den besten vier war." testId="series-rules-top-n" />
           )}
         </FormGrid>
       </FormSection>

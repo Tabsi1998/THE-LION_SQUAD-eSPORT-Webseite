@@ -78,6 +78,9 @@ test("Turnierserie (#1961): Runden je Turniertag, Sonderboni und „Top N“ in 
   expect(screen.getByTestId("series-rules-day-points")).toHaveValue("8, 7, 6, 5, 4, 3, 2, 1");
   expect(screen.getAllByTestId("series-rules-bonus-label").map((input) => input.value)).toEqual(["Bingo"]);
   expect(screen.getByTestId("series-rules-top-n")).toHaveValue(4);
+  // Grenzen wie im Server: Bonus-Name höchstens 40 Zeichen, N von 1 bis 64.
+  expect(screen.getByTestId("series-rules-top-n")).toHaveAttribute("max", "64");
+  expect(screen.getAllByTestId("series-rules-bonus-label")[0]).toHaveAttribute("maxlength", "40");
   fireEvent.click(screen.getByTestId("series-rules-bonus-add"));
   fireEvent.change(screen.getAllByTestId("series-rules-bonus-label")[1], { target: { value: "Joker" } });
   fireEvent.change(screen.getAllByTestId("series-rules-bonus-points")[1], { target: { value: "2" } });
