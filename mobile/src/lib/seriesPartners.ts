@@ -1,4 +1,4 @@
-import { KIND_LABELS } from "./references";
+import { KIND_LABELS } from "./seriesFormat";
 
 // Partner an Serien und Ligen in der App (#1934, #1974), wie im Web (frontend/src/lib/seriesPartners.js,
 // components/tls/series/SeriesPartners.jsx, references/PartnerHostBadge.jsx, PartnerSeries.jsx): „Veranstaltet von“ mit

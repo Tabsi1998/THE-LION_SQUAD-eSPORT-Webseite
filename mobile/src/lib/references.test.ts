@@ -250,4 +250,25 @@ test("Karte „Läuft gerade“: Art und Spiel, Saison, Termin, Fortschritt und 
   });
   expect(league).toMatchObject({ kind: "Team-Liga", title: "Probe Liga · Newcomer I · S3", next: "", progress: null, place: "Platz noch offen", country: "" });
   expect(runningView({ lineage: { slug: "pl", title: "Probe Liga", kind: "team_league" }, series: { season_slug: "s3" }, club: { rank: 3, of: 8 } }).place).toBe("Platz 3 von 8");
+  // Älterer Server ohne Läufe und Veranstalter: keine Chips, kein Abzeichen.
+  expect(league).toMatchObject({ sessions: [], host: null });
+});
+
+test("Nächster Lauf (#1930): Lauf am Termin, Chips der Läufe; Gegner mit Heim/Auswärts; Spieltag über mehrere Tage", () => {
+  expect(nextValue({ state: "planned", code: "R3", session: "Qualifying", time: "19:30", club_day: "2026-10-22" })).toBe("Do 22.10. · 19:30 · R3 · Qualifying");
+  expect(nextValue({ state: "today", code: "R3", session: "Sprint", time: "19:50" })).toBe("R3 · Sprint · 19:50");
+  expect(nextValue({ state: "planned", code: "ST7", opponent: "Fremd Adler", at_home: false, club_day: "2026-10-21", club_day_end: "2026-10-25", time: "20:00" })).toBe("Mi 21.10.–So 25.10. · ST7 · @ Fremd Adler");
+  expect(nextValue({ state: "today", code: "ST7", opponent: "Fremd Adler", at_home: true })).toBe("ST7 · vs Fremd Adler");
+  const view = runningView({
+    lineage: { title: "Probe Racing League", slug: "prl", kind: "racing" },
+    series: { season_slug: "2026" },
+    next: { code: "R3", session: "Qualifying", state: "planned", club_day: "2026-10-22", time: "19:30", sessions: [
+      { session: "Qualifying", club_day: "2026-10-22", time: "19:30", state: "planned", next: true },
+      { session: null, club_day: "2026-10-22", time: "20:30", state: "planned", next: false },
+    ] },
+    organizers: [{ id: "p1", slug: "probe-ananas", name: "Probe Ananas", logo_url: "/api/static/uploads/ananas.png" }],
+  });
+  expect(view.sessions.map((round) => [round.id, round.session, round.time])).toEqual([["s0", "Qualifying", "19:30"], ["s1", null, "20:30"]]);
+  // Veranstalter als Partner-Abzeichen (#1934).
+  expect(view.host?.name).toBe("Probe Ananas");
 });

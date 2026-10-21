@@ -6,6 +6,9 @@ import { dayNoon, viennaDate } from "./vienna";
 
 export const HIDDEN_NAME = "Name ausgeblendet";
 
+/** Art einer Serie in Worten (lib/references.ts gibt sie weiter). */
+export const KIND_LABELS: Record<string, string> = { series: "Turnierserie", racing: "Rennliga", team_league: "Team-Liga" };
+
 export function number(value: unknown): number {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : 0;
