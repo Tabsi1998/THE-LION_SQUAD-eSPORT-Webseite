@@ -124,9 +124,9 @@ test("lineupOf: jede Person einmal, die Person selbst markiert, Profil-Links ble
 });
 
 test("organizerUrl: Turnierseite, sonst Ergebnis, sonst Bracket", () => {
-  expect(organizerUrl({ external_url: "https://a.example", result_url: "https://b.example" })).toBe("https://a.example");
-  expect(organizerUrl({ result_url: "https://b.example", bracket_url: "https://c.example" })).toBe("https://b.example");
-  expect(organizerUrl({ bracket_url: "https://c.example" })).toBe("https://c.example");
+  expect(organizerUrl({ external_url: "https://a.example", result_url: "https://b.example" })).toBe("https://a.example/");
+  expect(organizerUrl({ result_url: "https://b.example", bracket_url: "https://c.example" })).toBe("https://b.example/");
+  expect(organizerUrl({ bracket_url: "https://c.example" })).toBe("https://c.example/");
   expect(organizerUrl({})).toBe("");
 });
 
@@ -139,7 +139,7 @@ test("detailsOf: langer Titel nur, wenn er vom kurzen abweicht; Aufstellung nur 
   expect(details.lineup.map((person) => person.name)).toEqual(["NovaKessel", "KaiFunke"]);
   expect(details.seasonUrl).toBe("/references/series/nsdl-sd/s3-newcomer");
   expect(details.detailUrl).toBe("/references/a");
-  expect(details.organizerUrl).toBe("https://a.example");
+  expect(details.organizerUrl).toBe("https://a.example/");
 
   // Bericht, Partner und Ort stehen auf der Detailseite - der Link dorthin fehlt nie.
   const plain = detailsOf({ ...ref("b", "2025-01-01", 1, { entry: { kind: "solo", lineup_members: [NOVA] } }), display_title: "Autumn Cup" }, "p-nova", null);
@@ -180,4 +180,9 @@ test("memberPaths: ohne verknüpfte Saison kein Liga-Weg", () => {
   expect(memberPaths([LINEAGE], [ref("x", "2025-01-01", 2)])).toEqual([]);
   expect(memberPaths([], [ref("a", "2025-01-01", 2)])).toEqual([]);
   expect(memberPaths(undefined, undefined)).toEqual([]);
+});
+
+test("organizerUrl: nur http(s) - javascript: und ftp: fallen weg, der nächste sichere Link zählt", () => {
+  expect(organizerUrl({ external_url: "javascript:alert(1)", result_url: "ftp://x.example/a", bracket_url: "https://c.example/b" })).toBe("https://c.example/b");
+  expect(organizerUrl({ external_url: "javascript:alert(1)" })).toBe("");
 });

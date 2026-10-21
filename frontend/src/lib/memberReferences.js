@@ -1,5 +1,6 @@
 import { displayTitle, entriesOf, platformLabel, referenceInstant, shortTitle, timeOf } from "@/components/tls/references/referenceParts";
 import { leaguePath, yearOf } from "@/lib/referencesOverview";
+import { safeHttpUrl } from "@/lib/safeLink";
 import { seriesAddress } from "@/lib/referenceSeries";
 import { viennaDate } from "@/lib/vienna";
 
@@ -94,9 +95,13 @@ export function lineupOf(entry, profileId) {
   return people;
 }
 
-/** „Beim Veranstalter“: die Turnierseite, sonst das Ergebnis, sonst das Bracket. */
+/** „Beim Veranstalter“: die Turnierseite, sonst das Ergebnis, sonst das Bracket - nur als http(s), nie `javascript:`. */
 export function organizerUrl(item) {
-  return item.external_url || item.result_url || item.bracket_url || "";
+  for (const value of [item.external_url, item.result_url, item.bracket_url]) {
+    const url = safeHttpUrl(value);
+    if (url) return url;
+  }
+  return "";
 }
 
 /**
