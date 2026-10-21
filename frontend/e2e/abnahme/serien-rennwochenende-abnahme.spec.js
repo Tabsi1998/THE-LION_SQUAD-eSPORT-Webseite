@@ -29,6 +29,14 @@ async function shot(target, name, options = {}) {
   await target.screenshot({ path: path.join(SHOTS, `${name}.png`), ...options });
 }
 
+/** Bild eines Bereichs ohne feste Kopf- und Fußleisten darüber (am Handy liegen sie sonst über dem Ausschnitt). */
+async function areaShot(page, locator, name) {
+  if (!SHOTS) return;
+  const style = await page.addStyleTag({ content: "header, nav, .fixed, .sticky, .tls-skip-link { visibility: hidden !important; }" });
+  await shot(locator, name);
+  await style.evaluate((node) => node.remove());
+}
+
 async function send(page, method, url, data) {
   const cookies = await page.context().cookies();
   const csrf = decodeURIComponent(cookies.find((cookie) => cookie.name === "csrf_token")?.value || "");
@@ -163,7 +171,11 @@ test.describe("Abnahme #1930: Rennwochenende mit Läufen", () => {
       await second.getByTestId("weekend-session-offset").first().fill("45");
       await second.getByTestId("weekend-session-offset").nth(1).fill("0");
       for (const select of await second.getByTestId("weekend-session-grid").all()) await select.selectOption("reverse_standings");
+      // Hoch genug, dass der ganze Abschnitt im Blatt steht (sonst liegt der Kopf des Blatts darüber).
+      await admin.setViewportSize({ width: 1440, height: 2000 });
+      await admin.getByTestId("series-weekend").scrollIntoViewIfNeeded();
       await shot(admin.getByTestId("series-weekend"), "nachher-laeufe-je-runde-1440");
+      await admin.setViewportSize({ width: 1440, height: 900 });
       await admin.getByTestId("series-save").click();
       await expect(admin.getByTestId("series-sheet")).toBeHidden();
       const saved = await ok(await send(admin, "GET", `${SERIES}/series/${series.id}`));
@@ -300,7 +312,7 @@ test.describe("Abnahme #1930: Rennwochenende mit Läufen", () => {
         const chip = anon.getByTestId("racing-calendar").getByTestId("session-chip").first();
         const size = await chip.evaluate((node) => parseFloat(getComputedStyle(node).fontSize));
         expect(size).toBeGreaterThanOrEqual(11);
-        await shot(anon.getByTestId("racing-calendar"), `nachher-rennkalender-${width}`);
+        await areaShot(anon, anon.getByTestId("racing-calendar"), `nachher-rennkalender-${width}`);
         if (width === 390) {
           await shot(anon, "nachher-seite-390", { fullPage: true });
           await anon.goto("/references");
@@ -314,8 +326,8 @@ test.describe("Abnahme #1930: Rennwochenende mit Läufen", () => {
       await admin.goto(`/admin/reference-series/${series.id}`);
       await expect(admin.getByTestId("calendar-weekend")).toHaveCount(8);
       await noOverflow(admin);
-      await shot(admin.getByTestId("series-calendar"), "nachher-kalender-verwaltung-390");
-      await shot(admin.getByTestId("series-results"), "nachher-ergebnisse-verwaltung-390");
+      await areaShot(admin, admin.getByTestId("series-calendar"), "nachher-kalender-verwaltung-390");
+      await areaShot(admin, admin.getByTestId("series-results"), "nachher-ergebnisse-verwaltung-390");
       expect(problems).toEqual([]);
 
       // F1: Qualifying und Rennen - der Startplatz kommt aus dem Qualifying, die Pole wird gezählt.

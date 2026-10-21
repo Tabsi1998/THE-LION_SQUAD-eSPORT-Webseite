@@ -201,18 +201,19 @@ export function SeriesCalendarSection({ series }) {
                 </div>
                 <StateBadge state={weekend.state} />
               </div>
-              <ol className="mt-1.5 sm:ml-[3.75rem] border-l border-white/10 pl-3 space-y-1">
+              <ol className="mt-1.5 sm:ml-[3.75rem] border-l border-white/10 pl-3 space-y-1.5">
                 {weekend.rounds.map((round) => {
                   const index = rounds.indexOf(round);
+                  // Handy: Lauf, Zeit und Status in einer Zeile, die Knöpfe darunter; ab sm alles in einer Zeile.
                   return (
-                    <li key={round.id} data-testid="calendar-round" data-state={round.state} className={`flex flex-wrap items-center gap-x-3 gap-y-1 ${hintIds.has(round.id) ? "bg-amber-400/[0.04]" : ""}`}>
-                      <span className={`w-28 shrink-0 text-[11px] font-bold uppercase tracking-[0.1em] ${round.state === "cancelled" ? "text-white/40 line-through" : "text-white/75"}`} data-testid="calendar-session">{round.session || "Rennen"}</span>
-                      <span className="min-w-0 flex-1">
+                    <li key={round.id} data-testid="calendar-round" data-state={round.state} className={`grid grid-cols-[6.5rem_minmax(0,1fr)_auto] sm:grid-cols-[7rem_minmax(0,1fr)_auto_auto] items-center gap-x-3 gap-y-1 ${hintIds.has(round.id) ? "bg-amber-400/[0.04]" : ""}`}>
+                      <span className={`text-[11px] font-bold uppercase tracking-[0.1em] [overflow-wrap:anywhere] ${round.state === "cancelled" ? "text-white/40 line-through" : "text-white/75"}`} data-testid="calendar-session">{round.session || "Rennen"}</span>
+                      <span className="min-w-0">
                         <span className={`block text-sm tabular-nums ${round.state === "cancelled" ? "text-white/45" : "text-white/85"}`}>{round.club_day !== weekend.lead.club_day ? roundWhen(round) : round.time || "ohne Uhrzeit"}</span>
                         <RoundNotes round={round} />
                       </span>
                       <StateBadge state={round.state} />
-                      {board && actions(round, index)}
+                      {board && <div className="col-span-3 sm:col-span-1 -ml-1.5 sm:ml-0">{actions(round, index)}</div>}
                     </li>
                   );
                 })}

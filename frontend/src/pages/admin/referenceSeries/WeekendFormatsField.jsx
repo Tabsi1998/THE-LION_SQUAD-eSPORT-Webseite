@@ -21,22 +21,27 @@ function SessionRow({ session, index, onChange, onRemove, removable }) {
     return onChange({ label, counts: kind !== "qualifying", points_mode: kind === "qualifying" ? "none" : "series", grid: kind === "race" ? "qualifying" : "manual" });
   };
   return (
-    <li className="grid gap-2 sm:grid-cols-[minmax(0,1.3fr)_6rem_minmax(0,1fr)_minmax(0,1.2fr)_auto] items-start border-t border-white/5 pt-2 first:border-t-0 first:pt-0" data-testid="weekend-session">
-      <TextField label={`Lauf ${index + 1}`} value={session.label} onChange={setLabel} suggestions={SESSION_CHOICES} maxLength={MAX_SESSION} placeholder="Rennen" testId="weekend-session-label" />
-      <TextField label="Versatz (Min.)" type="number" step="5" value={session.offset} onChange={(offset) => onChange({ offset })} testId="weekend-session-offset" />
-      <div className="space-y-2 min-w-0">
-        <SelectField label="Punkte" value={session.points_mode} onChange={(points_mode) => onChange({ points_mode })} options={SESSION_POINTS_OPTIONS} testId="weekend-session-points-mode" />
-        {session.points_mode === "own" && (
-          <TextField label="Punkte je Platz" value={session.points} onChange={(points) => onChange({ points })} placeholder="12, 9, 7, 6, 5" testId="weekend-session-points" />
-        )}
+    <li className="space-y-2 border-t border-white/5 pt-3 first:border-t-0 first:pt-0" data-testid="weekend-session">
+      {/* Oben Name, Versatz und Entfernen; darunter Punkte und Startplatz in voller Breite - die Auswahl bleibt lesbar. */}
+      <div className="grid grid-cols-[minmax(0,1fr)_6.5rem_auto] gap-2 items-end">
+        <TextField label={`Lauf ${index + 1}`} value={session.label} onChange={setLabel} suggestions={SESSION_CHOICES} maxLength={MAX_SESSION} placeholder="Rennen" testId="weekend-session-label" />
+        <TextField label="Versatz (Min.)" type="number" step="5" value={session.offset} onChange={(offset) => onChange({ offset })} testId="weekend-session-offset" />
+        <button type="button" onClick={onRemove} disabled={!removable} className={`${ICON_BUTTON} disabled:opacity-25`} aria-label={`Lauf ${index + 1} entfernen`} title="Entfernen" data-testid="weekend-session-remove">
+          <X className="w-4 h-4" />
+        </button>
       </div>
-      <div className="space-y-2 min-w-0">
-        <SelectField label="Startplatz" value={session.grid} onChange={(grid) => onChange({ grid })} options={GRID_OPTIONS} testId="weekend-session-grid" />
-        <CheckField label="Zählt zur Wertung" checked={session.counts} onChange={(counts) => onChange({ counts })} testId="weekend-session-counts" />
+      <div className="grid gap-2 sm:grid-cols-2">
+        <div className="space-y-2 min-w-0">
+          <SelectField label="Punkte" value={session.points_mode} onChange={(points_mode) => onChange({ points_mode })} options={SESSION_POINTS_OPTIONS} testId="weekend-session-points-mode" />
+          {session.points_mode === "own" && (
+            <TextField label="Punkte je Platz" value={session.points} onChange={(points) => onChange({ points })} placeholder="12, 9, 7, 6, 5" testId="weekend-session-points" />
+          )}
+        </div>
+        <div className="space-y-2 min-w-0">
+          <SelectField label="Startplatz" value={session.grid} onChange={(grid) => onChange({ grid })} options={GRID_OPTIONS} testId="weekend-session-grid" />
+          <CheckField label="Zählt zur Wertung" checked={session.counts} onChange={(counts) => onChange({ counts })} testId="weekend-session-counts" />
+        </div>
       </div>
-      <button type="button" onClick={onRemove} disabled={!removable} className={`${ICON_BUTTON} sm:mt-5 justify-self-end disabled:opacity-25`} aria-label={`Lauf ${index + 1} entfernen`} title="Entfernen" data-testid="weekend-session-remove">
-        <X className="w-4 h-4" />
-      </button>
     </li>
   );
 }

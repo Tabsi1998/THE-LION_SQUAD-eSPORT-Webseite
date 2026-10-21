@@ -178,7 +178,7 @@ export function RacingCalendar({ rounds, rows, onSelect, publicKeys, hrefFor }) 
             const scoredCount = races.filter((item) => item.state === "scored").length;
             const original = weekend.rounds.find((item) => item.original_club_day)?.original_club_day;
             return (
-              <li key={weekend.key} className="py-3 flex items-start gap-3" data-testid="racing-round" data-state={weekend.state} data-sessions={weekend.multi ? weekend.rounds.length : undefined}>
+              <li key={weekend.key} className="py-3 flex flex-wrap items-start gap-x-3" data-testid="racing-round" data-state={weekend.state} data-sessions={weekend.multi ? weekend.rounds.length : undefined}>
                 <span className={`w-12 shrink-0 font-black tabular-nums ${weekend.kind === "final" ? "text-[var(--tls-honor)]" : "text-white/80"}`}>{roundLabel(round)}</span>
                 <div className="min-w-0 flex-1">
                   <span className={`block text-sm tabular-nums ${weekend.state === "cancelled" ? "text-white/45" : "text-white"}`}>{weekend.multi ? roundWhen({ ...round, time: null }) : roundWhen(round)}</span>
@@ -186,16 +186,21 @@ export function RacingCalendar({ rounds, rows, onSelect, publicKeys, hrefFor }) 
                     <span className="block text-sm text-white/60" data-testid="racing-round-venue"><VenueWithFlag round={weekend} /></span>
                   )}
                   {original && <span className="block text-[11px] text-white/45">ursprünglich {dayLabel(original)}</span>}
-                  {weekend.multi && <SessionChips rounds={weekend.rounds} showTime hrefFor={hrefFor} className="mt-2" />}
-                  {scoredCount > 0 && (
-                    <div className="mt-2 space-y-1">
-                      {weekend.rounds.map((item) => (
-                        <RoundSummary key={item.id} round={item} rows={rows} publicKeys={publicKeys} onSelect={onSelect} session={races.length > 1 ? chipLabel(item) : ""} />
-                      ))}
-                    </div>
-                  )}
                 </div>
                 <StateBadge state={weekend.state} />
+                {/* Chips und Sieger in voller Breite unter Tag und Ort - am Handy passen so zwei Chips in eine Zeile. */}
+                {(weekend.multi || scoredCount > 0) && (
+                  <div className="basis-full min-w-0 pl-[3.75rem]">
+                    {weekend.multi && <SessionChips rounds={weekend.rounds} showTime hrefFor={hrefFor} className="mt-2" />}
+                    {scoredCount > 0 && (
+                      <div className="mt-2 space-y-1">
+                        {weekend.rounds.map((item) => (
+                          <RoundSummary key={item.id} round={item} rows={rows} publicKeys={publicKeys} onSelect={onSelect} session={races.length > 1 ? chipLabel(item) : ""} />
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
               </li>
             );
           })}
