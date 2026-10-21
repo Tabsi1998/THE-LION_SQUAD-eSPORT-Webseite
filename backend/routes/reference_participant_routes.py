@@ -28,7 +28,7 @@ from pydantic import BaseModel, Field
 from auth import require_area
 from database import get_db
 from models import ReferenceParticipantCreate, ReferenceParticipantUpdate, new_id, now_utc
-from services import reference_calendar, reference_running_cache, reference_series, series_identity
+from services import reference_calendar, reference_running_cache, reference_series, series_identity, series_results
 from services.series_participants import (
     apply_alias, build_index, clean, club_profiles, content_participant_ids, follower_series, move_followers,
     new_participant, open_series, profile_name, series_game_id, sheet_participant_ids, swap_participant,
@@ -246,23 +246,58 @@ MERGE_TAKES = ("start_number", "default_team")
 LINK_STATE = (*sorted(LINK_FIELDS), "link_status", "link_source", "alias_id", "decided_at", "decided_by")
 
 
+async def _merge_revision(db, sheet: dict, kind: str, me: dict) -> str:
+    """Der Stand vor dem Zusammenführen als Revision - wie beim Speichern (``reference_result_routes._revision``):
+    das Blatt selbst (``kind`` „sheet“) oder der Entwurf daneben („pending_draft“), Grund „merge“."""
+    source = sheet if kind == "sheet" else sheet.get("pending_draft") or {}
+    revision = {
+        "id": new_id(), "result_id": sheet["id"], "series_id": sheet["series_id"], "round_id": sheet["round_id"],
+        "kind": kind, "reason": "merge", "version": int(sheet.get("version") or 0),
+        "status": sheet.get("status") if kind == "sheet" else "draft",
+        "content": {key: source.get(key) for key in series_results.CONTENT_FIELDS},
+        "author_id": source.get("updated_by") or source.get("created_by"),
+        "replaced_at": now_utc().isoformat(), "replaced_by": me["id"],
+    }
+    await db.reference_round_result_revisions.insert_one(dict(revision))
+    return revision["id"]
+
+
 @router.post("/admin/series/{series_id}/participants/{participant_id}/merge")
-@reference_series.series_locked
 async def merge_participant(series_id: str, participant_id: str, body: ParticipantMerge,
                             me: dict = Depends(require_area("content"))):
     """Zwei Schreibweisen derselben Person zusammenführen (#1929): ``duplicate_id`` geht in diesem Teilnehmer auf.
 
     Seine Ergebnisse wandern mit - im Blatt, im Entwurf daneben und in Blättern, die noch Entwurf sind; jedes geänderte
-    Blatt bekommt eine neue Version (offene Seiten zum Eintragen laden dann neu). Danach wird neu gerechnet. Der
-    behaltene Teilnehmer behält Name und Zuordnung; fehlende Startnummer und fehlendes Team kommen vom anderen, ein
-    ausgeblendeter Name bleibt ausgeblendet, und ist er selbst noch offen, übernimmt er die Zuordnung des anderen.
-    Nennt ein Ergebnis beide, wird nichts zusammengeführt (409) - dort müsste erst eine Zeile weg."""
+    Blatt bekommt eine Revision mit dem alten Stand (Grund „merge“) und eine neue Version (offene Seiten zum Eintragen
+    laden dann neu). Danach wird neu gerechnet. Der behaltene Teilnehmer behält Name und Zuordnung; fehlende
+    Startnummer und fehlendes Team kommen vom anderen, ein ausgeblendeter Name bleibt ausgeblendet, und ist er selbst
+    noch offen, übernimmt er die Zuordnung des anderen. Nennt ein Ergebnis beide, wird nichts zusammengeführt (409).
+
+    **Aliase:** Die Aliase des anderen Namens ziehen zum behaltenen um (``extra_alias_ids``) und zeigen danach auf
+    seine Zuordnung - ist er extern, werden sie zurückgenommen. Andere Saisons ziehen wie beim Zuordnen erst nach der
+    eigenen Sperre nach (``follow_aliases_elsewhere``), je Saison unter ihrer eigenen."""
     if body.duplicate_id == participant_id:
         raise HTTPException(422, "Ein Teilnehmer lässt sich nicht mit sich selbst zusammenführen.")
     db = get_db()
+    async with reference_series.series_write(db, series_id):
+        done = await _merge(db, series_id, participant_id, body.duplicate_id, me)
+    updated, pending, moved = await reference_series.follow_aliases_elsewhere(db, done["plan"])
+    await _log(db, "reference_series.participant_merge", me, participant_id, {
+        **done["audit"], "also_assigned_in": updated, "pending_series": pending,
+        "followers": [*done["audit"]["followers"], *moved]})
+    out = await _participant(db, series_id, participant_id)
+    out["other_series"] = {"updated": updated, "pending": pending}
+    if pending:
+        out["notice"] = _pending_notice(pending)
+    return out
+
+
+async def _merge(db, series_id: str, participant_id: str, duplicate_id: str, me: dict) -> dict:
+    """Das Zusammenführen in dieser Saison, samt Neurechnen - nur unter ihrer Sperre aufrufen. Liefert den Plan für
+    andere Saisons und die Angaben fürs Protokoll."""
     series = await _series(db, series_id)
     kept = await _participant(db, series_id, participant_id)
-    duplicate = await _participant(db, series_id, body.duplicate_id)
+    duplicate = await _participant(db, series_id, duplicate_id)
     old, new = duplicate["id"], kept["id"]
     sheets = await db.reference_round_results.find({"series_id": series_id}, {"_id": 0}).to_list(None)
     labels = await _round_labels(db, series_id)
@@ -272,21 +307,30 @@ async def merge_participant(series_id: str, participant_id: str, body: Participa
             raise HTTPException(409, f"„{kept['name']}“ und „{duplicate['name']}“ stehen beide im Ergebnis von "
                                      f"{where}. Erst dort eine der beiden Zeilen entfernen, dann zusammenführen.")
 
-    moved = []
+    moved, revisions = [], []
     for sheet in sheets:
         pending = sheet.get("pending_draft")
-        named = old in sheet_participant_ids(sheet)
-        if not named and old not in ((pending or {}).get("created_participant_ids") or []):
+        in_sheet = old in content_participant_ids(sheet)
+        in_pending = bool(pending) and (old in content_participant_ids(pending)
+                                        or old in (pending.get("created_participant_ids") or []))
+        if not (in_sheet or in_pending):
             continue
+        if in_sheet:
+            revisions.append(await _merge_revision(db, sheet, "sheet", me))
+        if in_pending:
+            revisions.append(await _merge_revision(db, sheet, "pending_draft", me))
         update = swap_participant({key: sheet[key] for key in ("rows", "matches", "official_totals") if key in sheet},
                                   old, new)
         if pending:
             update["pending_draft"] = swap_participant(pending, old, new)
+        named = old in sheet_participant_ids(sheet)
         await db.reference_round_results.update_one(
             {"id": sheet["id"]}, {"$set": update, **({"$inc": {"version": 1}} if named else {})})
         if named:
             moved.append(sheet["round_id"])
 
+    game_id = await series_game_id(db, series)
+    duplicate_aliases = await _aliases_of(db, duplicate, game_id)
     fill = {key: duplicate.get(key) for key in MERGE_TAKES if not kept.get(key) and duplicate.get(key)}
     if duplicate.get("name_hidden") and not kept.get("name_hidden"):
         fill["name_hidden"] = True
@@ -296,13 +340,26 @@ async def merge_participant(series_id: str, participant_id: str, body: Participa
     await db.reference_participants.update_one({"id": new}, {"$set": {
         **fill, "updated_at": now_utc().isoformat(), "updated_by": me["id"]}})
     await db.reference_participants.delete_one({"id": old, "series_id": series_id})
+
+    # Die Aliase der anderen Schreibweise gehören jetzt zum behaltenen und folgen seiner Zuordnung.
+    final = await _participant(db, series_id, new)
+    moving = [alias for alias in duplicate_aliases if alias["id"] != final.get("alias_id")]
+    if final.get("link_status") == "decided":
+        link = {key: final.get(key) for key in LINK_FIELDS}
+        kept_ids, plan, followers = await _align_aliases(db, series_id, new, moving, link, me)
+    else:
+        kept_ids, plan, followers = [alias["id"] for alias in moving], {}, []
+    extra = [alias_id for alias_id in dict.fromkeys([*(final.get("extra_alias_ids") or []), *kept_ids])
+             if alias_id != final.get("alias_id")]
+    await db.reference_participants.update_one({"id": new}, {"$set": {"extra_alias_ids": extra}})
     await reference_series.recompute_standings(db, series)
-    await _log(db, "reference_series.participant_merge", me, new, {
+    return {"plan": plan, "audit": {
         "series_id": series_id, "name": kept["name"], "duplicate_id": old, "duplicate_name": duplicate["name"],
         "duplicate_link": duplicate.get("link"), "duplicate_status": duplicate.get("link_status"),
-        "duplicate_profile_id": duplicate.get("profile_id"), "round_ids": moved, "taken_over": sorted(fill),
-        "adopted_link": adopted})
-    return await _participant(db, series_id, new)
+        "duplicate_profile_id": duplicate.get("profile_id"), "round_ids": moved, "revision_ids": revisions,
+        "taken_over": sorted(fill), "adopted_link": adopted, "aliases": [alias["id"] for alias in moving],
+        "aliases_withdrawn": final.get("link") == "external" and final.get("link_status") == "decided",
+        "followers": followers}}
 
 
 @router.delete("/admin/series/{series_id}/participants/{participant_id}")
@@ -346,6 +403,59 @@ async def _save_alias(db, *, name: str, game_id: str | None, link: dict, source:
     return await db.reference_aliases.find_one(key, {"_id": 0}), previous
 
 
+async def _aliases_of(db, participant: dict, game_id: str | None) -> list[dict]:
+    """Alle Aliase, die zu diesem Teilnehmer gehören (#1929): der seiner Zuordnung (``alias_id``), der seines Namens und
+    weitere aus Zusammenführen oder einem früheren Namen (``extra_alias_ids``). Jeder nur einmal."""
+    ids = [alias_id for alias_id in [participant.get("alias_id"), *(participant.get("extra_alias_ids") or [])]
+           if alias_id]
+    found = {row["id"]: row for row in await db.reference_aliases.find({"id": {"$in": ids}}, {"_id": 0}).to_list(None)}
+    by_name = await db.reference_aliases.find_one(
+        {"name_normalized": series_identity.normalize_name(participant.get("name") or ""), "game_id": game_id},
+        {"_id": 0})
+    if by_name:
+        found.setdefault(by_name["id"], by_name)
+    return list(found.values())
+
+
+async def _align_aliases(db, series_id: str, participant_id: str, aliases: list[dict], link: dict,
+                         me: dict) -> tuple[list[str], dict[str, list[dict]], list[str]]:
+    """Weitere Aliase eines Teilnehmers (zusammengeführte Schreibweise, früherer Name) an seine Zuordnung angleichen -
+    unter der Sperre der Saison aufrufen. Extern nimmt sie zurück; Mitglied und Gast lassen sie auf dieselbe Person
+    zeigen. In dieser Saison folgen die Teilnehmer gleich; andere Saisons liefert der Plan für
+    ``reference_series.follow_aliases_elsewhere``. Liefert (bleibende Alias-Kennungen, Plan, gefolgte Teilnehmer)."""
+    me_ref = {"id": me["id"]}
+    kept_ids, plan, followers = [], {}, []
+    for alias in aliases:
+        if link["link"] == "external":
+            await db.reference_aliases.delete_one({"id": alias["id"]})
+            followers += await move_followers(db, alias["id"], link, me_ref, participant_id, [series_id])
+            others = await follower_series(db, alias["id"], participant_id)
+        else:
+            now = now_utc().isoformat()
+            await db.reference_aliases.update_one({"id": alias["id"]}, {"$set": {
+                "target": "member" if link["link"] == "member" else "guest", "profile_id": link["profile_id"],
+                "guest_name": link["guest_name"], "confirmed_by": me["id"], "confirmed_at": now, "updated_at": now}})
+            fresh = await db.reference_aliases.find_one({"id": alias["id"]}, {"_id": 0})
+            followers += await move_followers(db, alias["id"], link, me_ref, participant_id, [series_id])
+            followers += await apply_alias(db, fresh, me_ref, participant_id, [series_id])
+            others = (await follower_series(db, alias["id"], participant_id)) | (
+                await open_series(db, fresh, participant_id))
+            kept_ids.append(alias["id"])
+        others.discard(series_id)
+        for other in sorted(others):
+            plan.setdefault(other, []).append(
+                {"alias_id": alias["id"], "skip_id": participant_id, "requested_by": me["id"]})
+    return kept_ids, plan, followers
+
+
+def _join_plans(*plans: dict[str, list[dict]]) -> dict[str, list[dict]]:
+    out: dict[str, list[dict]] = {}
+    for plan in plans:
+        for series_id, followups in plan.items():
+            out.setdefault(series_id, []).extend(followups)
+    return out
+
+
 async def _link_for(db, body: ParticipantAssign, participant: dict) -> dict:
     if body.link == "member":
         profile = await db.club_member_profiles.find_one({"id": body.profile_id or "", "is_active": {"$ne": False}},
@@ -371,7 +481,7 @@ async def assign_participant(series_id: str, participant_id: str, body: Particip
     db = get_db()
     async with reference_series.series_write(db, series_id):
         done = await _assign(db, series_id, participant_id, body, me)
-    updated, pending, moved = await reference_series.follow_alias_elsewhere(db, done["others"], done["followup"])
+    updated, pending, moved = await reference_series.follow_aliases_elsewhere(db, done["plan"])
     await _log(db, "reference_series.participant_assign", me, participant_id, {
         **done["audit"], "also_assigned_in": updated, "pending_series": pending,
         "followers": [*done["followers"], *moved]})
@@ -409,8 +519,7 @@ async def bulk_assign_participants(series_id: str, body: ParticipantBulkAssign,
         items = []
         for row in todo:
             done = await _assign(db, series_id, row["id"], request, me, recompute=False)
-            for other in done["others"]:
-                plan.setdefault(other, []).append(done["followup"])
+            plan = _join_plans(plan, done["plan"])
             audit = done["audit"]
             items.append({"participant_id": row["id"], "name": row["name"], "previous_link": row.get("link"),
                           "previous_status": row.get("link_status"), "previous_profile_id": row.get("profile_id"),
@@ -435,14 +544,18 @@ async def bulk_assign_participants(series_id: str, body: ParticipantBulkAssign,
 async def _assign(db, series_id: str, participant_id: str, body: ParticipantAssign, me: dict, *,
                   recompute: bool = True) -> dict:
     """Das Zuordnen in dieser Saison, samt Neurechnen - nur unter ihrer Sperre aufrufen. Ändert keine andere Saison;
-    liefert, welche anderen Saisons der Alias mitzieht (``others``), den Nachtrag dafür (``followup``), die hier
-    gefolgten Teilnehmer und die Angaben fürs Protokoll. Eine Sammelaktion rechnet selbst einmal am Ende
-    (``recompute=False``)."""
+    liefert, welche anderen Saisons die Aliase mitziehen, samt Nachträgen (``plan`` je Saison für
+    ``follow_aliases_elsewhere``), die hier gefolgten Teilnehmer und die Angaben fürs Protokoll. Eine Sammelaktion
+    rechnet selbst einmal am Ende (``recompute=False``).
+
+    Hat der Teilnehmer weitere Aliase (zusammengeführte Schreibweise, früherer Name - ``_aliases_of``), folgen sie der
+    neuen Zuordnung: „Extern“ nimmt alle zurück, Mitglied und Gast lassen alle auf dieselbe Person zeigen (#1929)."""
     series = await _series(db, series_id)
     participant = await _participant(db, series_id, participant_id)
     game_id = await series_game_id(db, series)
     link = await _link_for(db, body, participant)
     me_ref = {"id": me["id"]}
+    own_aliases = await _aliases_of(db, participant, game_id)
 
     alias_id, previous_alias, others, followers, followed = None, None, set(), [], None
     # Kam die Zuordnung über einen Alias, wird genau dieser korrigiert (Quelle gemerkt in ``alias_id``).
@@ -475,21 +588,26 @@ async def _assign(db, series_id: str, participant_id: str, body: ParticipantAssi
         others = (await follower_series(db, alias_id, participant_id)) | (
             await open_series(db, alias, participant_id))
 
+    extras = [alias for alias in own_aliases if alias["id"] != followed]
+    extra_ids, extra_plan, extra_followers = await _align_aliases(db, series_id, participant_id, extras, link, me)
+    followers += extra_followers
+
     now = now_utc().isoformat()
     await db.reference_participants.update_one({"id": participant_id}, {"$set": {
-        **link, "link_status": "decided", "link_source": source, "alias_id": alias_id,
+        **link, "link_status": "decided", "link_source": source, "alias_id": alias_id, "extra_alias_ids": extra_ids,
         "decided_at": now, "decided_by": me["id"], "updated_at": now, "updated_by": me["id"]}})
     replaced = ({key: previous_alias.get(key) for key in ("id", "target", "profile_id", "confirmed_at")}
                 if previous_alias else None)
     if recompute:
         await reference_series.recompute_standings(db, series)
     others.discard(series_id)
+    followup = {"alias_id": followed, "skip_id": participant_id, "requested_by": me["id"]}
+    own_plan = {other: [followup] for other in sorted(others)} if followed else {}
     return {
-        "others": sorted(others) if followed else [],
-        "followup": {"alias_id": followed, "skip_id": participant_id, "requested_by": me["id"]},
+        "plan": _join_plans(own_plan, extra_plan),
         "followers": followers,
         "audit": {"series_id": series_id, "link": link["link"], "profile_id": link["profile_id"],
                   "previous_link": participant.get("link"), "previous_status": participant.get("link_status"),
                   "previous_profile_id": participant.get("profile_id"), "alias_id": alias_id,
-                  "replaced_alias": replaced},
+                  "replaced_alias": replaced, "further_aliases": [alias["id"] for alias in extras]},
     }

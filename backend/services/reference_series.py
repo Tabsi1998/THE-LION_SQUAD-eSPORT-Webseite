@@ -14,11 +14,11 @@ oder Saisonpunkte, und keine Sammlung wird mit dem Turnierbereich geteilt.
   speichern, freigeben, verwerfen, alle Kalender-Änderungen, Teilnehmer anlegen und zuordnen, Regeln ändern,
   archivieren und zurückholen - läuft unter einer Sperre je Saison (``services/mutation_lock.py``), samt
   Versionsprüfung, Termin-Status, Aufräumen und Neurechnen. So rechnet nie ein älterer Stand über einen neueren.
-- **Andere Saisons** (``follow_alias_elsewhere``): Zieht eine Zuordnung über den Alias andere Saisons mit, ändert sie
+- **Andere Saisons** (``follow_aliases_elsewhere``): Zieht eine Zuordnung über den Alias andere Saisons mit, ändert sie
   dort erst nach Freigabe der eigenen Sperre etwas - je Saison unter deren Sperre, Änderung und Neurechnen zusammen,
   nie zwei Sperren ineinander. Ist eine Saison gerade besetzt, merkt sie sich den Nachtrag (``alias_followups``), und
-  der nächste Vorgang unter ihrer Sperre zieht ihn nach (``series_write``) - nie halbe Daten in einer Saison. Eine
-  Sammelaktion (``follow_aliases_elsewhere``, #1929) holt je Saison die Sperre einmal und rechnet einmal neu.
+  der nächste Vorgang unter ihrer Sperre zieht ihn nach (``series_write``) - nie halbe Daten in einer Saison. Mehrere
+  Aliase auf einmal (Sammelaktion, Zusammenführen, #1929): je Saison die Sperre einmal und einmal neu rechnen.
 """
 from __future__ import annotations
 
@@ -93,18 +93,12 @@ def series_locked(handler):
     return locked
 
 
-async def follow_alias_elsewhere(db, series_ids, followup: dict) -> tuple[list[str], list[str], list[str]]:
-    """Eine Zuordnung in anderen Saisons nachziehen - erst nach Freigabe der eigenen Sperre aufrufen. Je Saison unter
-    ihrer Sperre: Teilnehmer folgen dem Alias, dann neu rechnen. Ist eine Saison besetzt, merkt sie sich den Nachtrag
-    (``alias_followups``) für ihren nächsten Vorgang. Liefert (aktualisierte Saisons, wartende Saisons, geänderte
-    Teilnehmer)."""
-    return await follow_aliases_elsewhere(db, {series_id: [followup] for series_id in series_ids})
-
-
 async def follow_aliases_elsewhere(db, plan: dict[str, list[dict]]) -> tuple[list[str], list[str], list[str]]:
-    """Wie ``follow_alias_elsewhere``, für mehrere Zuordnungen auf einmal (Sammelaktion, #1929): ``plan`` nennt je
-    Saison ihre Nachträge. Jede Saison holt ihre Sperre einmal, zieht alle Nachträge nach und rechnet einmal neu; ist
-    sie besetzt, merkt sie sich alle für ihren nächsten Vorgang."""
+    """Zuordnungen in anderen Saisons nachziehen - erst nach Freigabe der eigenen Sperre aufrufen. ``plan`` nennt je
+    Saison ihre Nachträge (ein Alias je Nachtrag; mehrere bei Sammelaktion und Zusammenführen, #1929). Je Saison einmal
+    unter ihrer Sperre: Teilnehmer folgen den Aliasen, dann einmal neu rechnen. Ist eine Saison besetzt, merkt sie sich
+    die Nachträge (``alias_followups``) für ihren nächsten Vorgang. Liefert (aktualisierte Saisons, wartende Saisons,
+    geänderte Teilnehmer)."""
     updated, pending, changed = [], [], []
     for series_id, followups in plan.items():
         try:

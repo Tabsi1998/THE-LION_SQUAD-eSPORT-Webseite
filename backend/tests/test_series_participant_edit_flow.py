@@ -382,6 +382,18 @@ async def test_merging_two_spellings_moves_all_results_and_drafts_and_recomputes
         anna["id"], ana["id"], "Probe Ana")
     assert sorted(log["data"]["round_ids"]) == sorted(rounds)
 
+    # Jedes geänderte Blatt hat eine Revision mit dem alten Stand - die alte Kennung bleibt nachvollziehbar.
+    revisions = await flow.db.reference_round_result_revisions.find({"reason": "merge"}, {"_id": 0}).to_list(None)
+    by_round = {(row["round_id"], row["kind"]): row for row in revisions}
+    assert sorted(by_round) == sorted([(rounds[0], "pending_draft"), (rounds[1], "sheet"), (rounds[2], "sheet")])
+    old_r2 = by_round[(rounds[1], "sheet")]
+    assert [row["participant_id"] for row in old_r2["content"]["rows"]] == [ana["id"], bert["id"]]
+    assert (old_r2["version"], old_r2["status"], old_r2["replaced_by"]) == (second["version"], "published",
+                                                                            ctx["board"]["id"])
+    assert [row["participant_id"] for row in by_round[(rounds[0], "pending_draft")]["content"]["rows"]] == [
+        ana["id"], bert["id"]]
+    assert sorted(log["data"]["revision_ids"]) == sorted(row["id"] for row in revisions)
+
 
 @pytest.mark.asyncio
 async def test_merging_keeps_the_decision_of_the_duplicate_when_the_kept_one_is_still_open(flow):
@@ -393,6 +405,73 @@ async def test_merging_keeps_the_decision_of_the_duplicate_when_the_kept_one_is_
     kept = (await flow.post(f"{ADMIN}/series/{own}/participants/{open_one['id']}/merge",
                             json={"duplicate_id": guest["id"]})).json()
     assert (kept["link"], kept["link_status"], kept["guest_name"]) == ("guest", "decided", "Probe-Offen Gast")
+
+
+@pytest.mark.asyncio
+async def test_after_merging_extern_takes_back_the_aliases_of_both_names_in_every_season(flow):
+    ctx = await _setup(flow)
+    own, earlier = ctx["own"]["id"], ctx["earlier"]["id"]
+    waiting = await _add(flow, earlier, "Probe Gastname")
+    kept = await _add(flow, own, "Probe Offen")
+    guest = await _add(flow, own, "Probe Gastname")
+    await _assign(flow, own, guest["id"], link="guest")  # Alias „Probe Gastname“, die Vorsaison folgt
+    assert (await _person(flow, waiting["id"]))["link"] == "guest"
+    merged = await flow.post(f"{ADMIN}/series/{own}/participants/{kept['id']}/merge",
+                             json={"duplicate_id": guest["id"]})
+    assert merged.status_code == 200, merged.text
+    assert merged.json()["link"] == "guest"
+
+    # „Extern“ nimmt jeden Alias des Teilnehmers zurück - auch den der zusammengeführten Schreibweise, überall.
+    response = await _assign(flow, own, kept["id"], link="external")
+    assert response.status_code == 200, response.text
+    assert response.json()["other_series"] == {"updated": [earlier], "pending": []}
+    assert await flow.db.reference_aliases.count_documents({}) == 0
+    assert (await _person(flow, waiting["id"]))["link"] == "external"
+    assert (await _add(flow, ctx["earlier"]["id"], "Probe-Gastname"))["link_status"] == "open"
+
+
+@pytest.mark.asyncio
+async def test_merging_points_the_alias_of_the_other_spelling_to_the_kept_assignment(flow):
+    ctx = await _setup(flow)
+    await flow.db.club_member_profiles.insert_one({"id": "p-bert", "display_name": "Bert Probe", "is_active": True})
+    own, earlier = ctx["own"]["id"], ctx["earlier"]["id"]
+    there = await _add(flow, earlier, "Probe Zweitname")
+    kept = await _add(flow, own, "Probe Erstname")
+    duplicate = await _add(flow, own, "Probe Zweitname")
+    await _assign(flow, own, kept["id"], link="guest")
+    await _assign(flow, own, duplicate["id"], link="member", profile_id="p-bert")
+    assert (await _person(flow, there["id"]))["profile_id"] == "p-bert"
+
+    merged = await flow.post(f"{ADMIN}/series/{own}/participants/{kept['id']}/merge",
+                             json={"duplicate_id": duplicate["id"]})
+    assert merged.status_code == 200, merged.text
+    assert merged.json()["other_series"] == {"updated": [earlier], "pending": []}
+    # Beide Schreibweisen meinen jetzt dieselbe Person: die Zuordnung des behaltenen gilt, auch in der Vorsaison.
+    alias = await flow.db.reference_aliases.find_one({"name_normalized": "probezweitname"}, {"_id": 0})
+    assert (alias["target"], alias["profile_id"]) == ("guest", None)
+    moved = await _person(flow, there["id"])
+    assert (moved["link"], moved["profile_id"], moved["is_club_member"]) == ("guest", None, False)
+    log = await flow.db.audit_logs.find_one({"action": "reference_series.participant_merge"}, {"_id": 0})
+    assert log["data"]["aliases"] == [alias["id"]] and log["data"]["also_assigned_in"] == [earlier]
+
+    await _assign(flow, own, kept["id"], link="external")
+    assert await flow.db.reference_aliases.count_documents({}) == 0
+    assert (await _person(flow, there["id"]))["link"] == "external"
+
+
+@pytest.mark.asyncio
+async def test_extern_after_renaming_takes_back_the_alias_of_the_old_name(flow):
+    ctx = await _setup(flow)
+    own, earlier = ctx["own"]["id"], ctx["earlier"]["id"]
+    there = await _add(flow, earlier, "Probe Altname")
+    row = await _add(flow, own, "Probe Altname")
+    await _assign(flow, own, row["id"], link="guest")
+    assert (await _person(flow, there["id"]))["link"] == "guest"
+    renamed = await flow.patch(f"{ADMIN}/series/{own}/participants/{row['id']}", json={"name": "Probe Neuname"})
+    assert renamed.status_code == 200, renamed.text
+    await _assign(flow, own, row["id"], link="external")
+    assert await flow.db.reference_aliases.count_documents({}) == 0
+    assert (await _person(flow, there["id"]))["link"] == "external"
 
 
 @pytest.mark.asyncio
