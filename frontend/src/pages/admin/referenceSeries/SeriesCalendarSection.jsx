@@ -213,7 +213,8 @@ export function SeriesCalendarSection({ series }) {
                         <RoundNotes round={round} />
                       </span>
                       <StateBadge state={round.state} />
-                      {board && <div className="col-span-3 sm:col-span-1 -ml-1.5 sm:ml-0">{actions(round, index)}</div>}
+                      {/* Feste Breite ab sm (sechs Knöpfe): so stehen die Status der Läufe untereinander. */}
+                      {board && <div className="col-span-3 sm:col-span-1 -ml-1.5 sm:ml-0 sm:w-[9.75rem] sm:flex sm:justify-end">{actions(round, index)}</div>}
                     </li>
                   );
                 })}

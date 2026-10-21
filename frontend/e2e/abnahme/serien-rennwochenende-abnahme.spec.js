@@ -317,7 +317,10 @@ test.describe("Abnahme #1930: Rennwochenende mit Läufen", () => {
           await shot(anon, "nachher-seite-390", { fullPage: true });
           await anon.goto("/references");
           await noOverflow(anon);
-          await shot(anon.getByTestId(`running-card-${lineage.slug}-${series.season_slug}`), "nachher-laeuft-gerade-390");
+          const running = anon.getByTestId(`running-card-${lineage.slug}-${series.season_slug}`);
+          await running.scrollIntoViewIfNeeded();
+          await expect(running.getByTestId("running-sessions")).toBeVisible();
+          await areaShot(anon, running, "nachher-laeuft-gerade-390");
           await anon.goto("/");
           await shot(anon.getByTestId("home-today"), "nachher-heute-im-einsatz-390");
         }
