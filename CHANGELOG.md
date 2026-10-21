@@ -1,15 +1,14 @@
 # Changelog
 
-## [1.14.0](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/compare/v1.13.0...v1.14.0) (2026-10-21)
-
+## 1.14.0 (21.10.2026)
 
 ### Neu
 
-* Referenzen – „Läuft gerade“ als Kartenreihe mit Chip „Heute“ und Fortschritt in Segmenten ([#1878](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1878)) ([9018d97](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/9018d97793235a656fe3b6cdeb0b047d447de4f7))
-* Referenzen – Chronik je Jahr mit Spiel-Chips und „Nur Podest“ ([#1878](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1878)) ([9018d97](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/9018d97793235a656fe3b6cdeb0b047d447de4f7))
-* Referenzen – Hauptkarte der Vitrine in der Verwaltung wählbar, Wechsel im Adminprotokoll ([#1878](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1878)) ([9018d97](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/9018d97793235a656fe3b6cdeb0b047d447de4f7))
-* Referenzen – Serien & Ligen mit Liga-Weg auf der Übersicht ([#1878](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1878)) ([9018d97](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/9018d97793235a656fe3b6cdeb0b047d447de4f7))
-* Referenzen – Übersicht neu gestaltet: Ehrentafel, Vitrine mit Hauptkarte, Mitmachen-Band ([#1878](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1878)) ([9018d97](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/9018d97793235a656fe3b6cdeb0b047d447de4f7))
+* Referenzen – „Läuft gerade“ als Kartenreihe mit Chip „Heute“ und Fortschritt in Segmenten (#1878)
+* Referenzen – Chronik je Jahr mit Spiel-Chips und „Nur Podest“ (#1878)
+* Referenzen – Hauptkarte der Vitrine in der Verwaltung wählbar, Wechsel im Adminprotokoll (#1878)
+* Referenzen – Serien & Ligen mit Liga-Weg auf der Übersicht (#1878)
+* Referenzen – Übersicht neu gestaltet: Ehrentafel, Vitrine mit Hauptkarte, Mitmachen-Band (#1878)
 
 ## 1.13.0 (21.10.2026)
 
