@@ -1,5 +1,6 @@
 import { opsDetail, opsTone } from "@/lib/ops";
 import { attentionLine, firstAttention } from "@/lib/billing";
+import { countWord } from "@/lib/adminWords";
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "@/lib/api";
@@ -63,7 +64,7 @@ export default function AdminDashboardPage() {
     { label: "Datenbank", ok: sys?.database?.ok, detail: sys?.database?.ok ? "verbunden" : "Problem", icon: Database, to: "/admin/settings/status" },
     { label: "Mail / SMTP", ok: sys?.smtp?.ok, detail: sys?.smtp?.ok ? (sys?.smtp?.provider || "aktiv") : "nicht konfiguriert", icon: Mail, to: "/admin/settings/smtp" },
     { label: "Discord", ok: sys?.discord?.ok, detail: sys?.discord?.ok ? "aktiv" : "aus", icon: MessageSquare, to: "/admin/integrations/discord" },
-    { label: "Scheduler", ok: sys?.scheduler?.running, detail: sys?.scheduler?.running ? `${(sys?.scheduler?.jobs || []).length} Jobs` : "gestoppt", icon: Activity, to: "/admin/settings/status" },
+    { label: "Scheduler", ok: sys?.scheduler?.running, detail: sys?.scheduler?.running ? countWord((sys?.scheduler?.jobs || []).length, "Job", "Jobs") : "gestoppt", icon: Activity, to: "/admin/settings/status" },
     { label: "Mail-Queue", ok: queueFailed ? false : queuePending ? null : true, detail: `${queuePending} offen · ${queueFailed} Fehler`, icon: Server, to: "/admin/settings/mail-queue" },
     { label: "Push-Tokens", ok: Number(data?.mobile_push?.active_tokens || 0) > 0 ? true : null, detail: `${data?.mobile_push?.active_tokens ?? 0} aktiv`, icon: BellRing, to: "/admin/mobile-push" },
   ].filter((chip) => may(chip.to));
@@ -127,14 +128,14 @@ export default function AdminDashboardPage() {
     },
     {
       label: "Ergebnis-Konflikte",
-      detail: `${data?.open_disputes ?? 0} offene Disputes`,
+      detail: countWord(data?.open_disputes, "offener Streitfall", "offene Streitfälle"),
       to: "/admin/tournaments?status=live",
       icon: AlertTriangle,
       tone: (data?.open_disputes || 0) > 0 ? "#FF3B30" : "#00FF88",
     },
     {
       label: "Gemeldete Ergebnisse",
-      detail: `${reportedResults} warten auf Bestätigung`,
+      detail: `${reportedResults} ${reportedResults === 1 ? "wartet" : "warten"} auf Bestätigung`,
       to: "/admin/tournaments?status=live",
       icon: ClipboardCheck,
       tone: reportedResults > 0 ? "#FFD700" : "#00FF88",
@@ -142,7 +143,7 @@ export default function AdminDashboardPage() {
     },
     {
       label: "Terminvorschläge",
-      detail: `${scheduleDeadlines} Fristen laufen in 24 Stunden ab`,
+      detail: `${countWord(scheduleDeadlines, "Frist läuft", "Fristen laufen")} in 24 Stunden ab`,
       to: "/admin/tournaments?status=live",
       icon: Clock,
       tone: scheduleDeadlines > 0 ? "#FFD700" : "#00FF88",
@@ -150,7 +151,7 @@ export default function AdminDashboardPage() {
     },
     {
       label: "Moderation",
-      detail: `${moderationReports} offene Meldungen`,
+      detail: countWord(moderationReports, "offene Meldung", "offene Meldungen"),
       to: "/admin/moderation",
       icon: MessageCircleWarning,
       tone: moderationReports > 0 ? "#FF3B30" : "#00FF88",
@@ -165,7 +166,7 @@ export default function AdminDashboardPage() {
     // Prüffälle der Abrechnung (#321): nur für Finanzen - die Seite dahinter ist für andere gesperrt.
     ...(canFinance ? [{
       label: "Abrechnung prüfen",
-      detail: `${billingCases} Prüffälle (Storno mit Beleg, Überzahlung, Abweichung)`,
+      detail: `${countWord(billingCases, "Prüffall", "Prüffälle")} (Storno mit Beleg, Überzahlung, Abweichung)`,
       to: "/admin/finance",
       icon: Wallet,
       tone: billingCases > 0 ? "#FF3B30" : "#00FF88",
@@ -182,7 +183,7 @@ export default function AdminDashboardPage() {
     // Sponsoring läuft aus (#405): 30 Tage vorher, damit verlängert oder verabschiedet wird - nur für die Redaktion.
     ...(canContent ? [{
       label: "Sponsoring läuft aus",
-      detail: `${sponsorsExpiring} Verträge enden in 30 Tagen`,
+      detail: `${countWord(sponsorsExpiring, "Vertrag endet", "Verträge enden")} in 30 Tagen`,
       to: "/admin/sponsors",
       icon: Star,
       tone: sponsorsExpiring > 0 ? "#FFD700" : "#00FF88",
@@ -190,7 +191,7 @@ export default function AdminDashboardPage() {
     }] : []),
     {
       label: "Mitgliedsanträge",
-      detail: `${pendingApplications} offene Anträge`,
+      detail: countWord(pendingApplications, "offener Antrag", "offene Anträge"),
       to: "/admin/membership-applications?status=pending",
       icon: Inbox,
       tone: pendingApplications > 0 ? "#FFD700" : "#00FF88",
@@ -211,7 +212,7 @@ export default function AdminDashboardPage() {
     },
     {
       label: "Push-Monitoring",
-      detail: `${data?.mobile_push?.active_tokens ?? 0} aktive Tokens, ${pushErrors} Fehler`,
+      detail: `${countWord(data?.mobile_push?.active_tokens, "aktives Token", "aktive Tokens")}, ${pushErrors} Fehler`,
       to: "/admin/mobile-push",
       icon: BellRing,
       tone: pushErrors > 0 ? "#FF3B30" : (data?.mobile_push?.active_tokens || 0) > 0 ? "#00FF88" : "#FFD700",
@@ -317,6 +318,8 @@ export default function AdminDashboardPage() {
   }));
   const totalLogins30d = growthData.reduce((sum, d) => sum + (d.logins || 0), 0);
   const newUsers30d = growthData.reduce((sum, d) => sum + (d.new_users || 0), 0);
+  // Neue Vereinsmitglieder (#1378) zählt der Server aus der Mitgliedschaft - Konten sind keine Mitglieder.
+  const newClubMembers30d = growth?.new_members;
 
   return (
     <AdminLayout>
@@ -508,20 +511,25 @@ export default function AdminDashboardPage() {
             <div className="text-[10px] uppercase tracking-[0.28em] text-[#29B6E8] font-bold inline-flex items-center gap-2">
               <TrendingUp className="w-3.5 h-3.5" /> Wachstum · letzte 30 Tage
             </div>
-            <h2 className="font-heading font-bold uppercase text-lg mt-1">Logins & Mitglieder</h2>
+            <h2 className="font-heading font-bold uppercase text-lg mt-1">Logins, Konten & Vereinsmitglieder</h2>
           </div>
-          <div className="flex gap-5 text-right">
+          {/* Am Handy als Kacheln untereinander (2 x 2), ab sm in einer Zeile wie bisher. */}
+          <div className="grid grid-cols-2 gap-4 w-full sm:w-auto sm:flex sm:gap-5 sm:text-right">
             <div>
               <div className="text-[10px] uppercase tracking-widest text-white/45 font-bold">Logins</div>
               <div className="font-display font-bold text-2xl text-[#29B6E8] tabular-nums">{totalLogins30d}</div>
             </div>
             <div>
-              <div className="text-[10px] uppercase tracking-widest text-white/45 font-bold">Neue Mitglieder</div>
-              <div className="font-display font-bold text-2xl text-[#00FF88] tabular-nums">{newUsers30d}</div>
+              <div className="text-[10px] uppercase tracking-widest text-white/45 font-bold">Neue Konten</div>
+              <div className="font-display font-bold text-2xl text-[#00FF88] tabular-nums" data-testid="growth-new-accounts">{newUsers30d}</div>
             </div>
             <div>
-              <div className="text-[10px] uppercase tracking-widest text-white/45 font-bold">Gesamt</div>
-              <div className="font-display font-bold text-2xl text-[#FFD700] tabular-nums">{growthData.length ? growthData[growthData.length - 1].total_users : "—"}</div>
+              <div className="text-[10px] uppercase tracking-widest text-white/45 font-bold">Konten gesamt</div>
+              <div className="font-display font-bold text-2xl text-[#FFD700] tabular-nums" data-testid="growth-total-accounts">{growthData.length ? growthData[growthData.length - 1].total_users : "—"}</div>
+            </div>
+            <div>
+              <div className="text-[10px] uppercase tracking-widest text-white/45 font-bold">Neue Vereinsmitglieder</div>
+              <div className="font-display font-bold text-2xl text-white tabular-nums" data-testid="growth-new-club-members">{newClubMembers30d ?? "—"}</div>
             </div>
           </div>
         </div>
@@ -545,7 +553,7 @@ export default function AdminDashboardPage() {
               <Tooltip
                 contentStyle={{ background: "#0A0A0A", border: "1px solid rgba(255,255,255,0.14)", borderRadius: 4, fontSize: 12 }}
                 labelStyle={{ color: "rgba(255,255,255,0.6)", fontWeight: 700 }}
-                formatter={(value, name) => [value, name === "logins" ? "Logins" : name === "new_users" ? "Neue Mitglieder" : "Mitglieder gesamt"]}
+                formatter={(value, name) => [value, name === "logins" ? "Logins" : name === "new_users" ? "Neue Konten" : "Konten gesamt"]}
               />
               <Area yAxisId="left" type="monotone" dataKey="logins" name="logins" stroke="#29B6E8" strokeWidth={2} fill="url(#growthLogins)" />
               <Area yAxisId="left" type="monotone" dataKey="new_users" name="new_users" stroke="#00FF88" strokeWidth={1.5} fill="url(#growthUsers)" />
@@ -555,8 +563,8 @@ export default function AdminDashboardPage() {
         </div>
         <div className="mt-3 flex flex-wrap gap-4 text-[10px] uppercase tracking-widest font-bold">
           <span className="inline-flex items-center gap-1.5 text-white/55"><span className="w-2.5 h-2.5 rounded-full bg-[#29B6E8]" /> Logins / Tag</span>
-          <span className="inline-flex items-center gap-1.5 text-white/55"><span className="w-2.5 h-2.5 rounded-full bg-[#00FF88]" /> Neue Mitglieder / Tag</span>
-          <span className="inline-flex items-center gap-1.5 text-white/55"><span className="w-2.5 h-2.5 rounded-full bg-[#FFD700]" /> Mitglieder gesamt</span>
+          <span className="inline-flex items-center gap-1.5 text-white/55"><span className="w-2.5 h-2.5 rounded-full bg-[#00FF88]" /> Neue Konten / Tag</span>
+          <span className="inline-flex items-center gap-1.5 text-white/55"><span className="w-2.5 h-2.5 rounded-full bg-[#FFD700]" /> Konten gesamt</span>
         </div>
       </div>
       )}

@@ -124,9 +124,10 @@ async def documents_meta():
             {"k": "template", "l": "Vorlage"},
             {"k": "other", "l": "Sonstiges"},
         ],
+        # Dieselben Wörter wie die Plakette in der Liste (#1367); die Werte bleiben.
         "visibilities": [
-            {"k": "members", "l": "Nur Vereinsmitglieder"},
-            {"k": "internal", "l": "Nur intern (Admins)"},
+            {"k": "members", "l": "Mitglieder"},
+            {"k": "internal", "l": "Vorstand"},
         ],
     }
 

@@ -8,7 +8,6 @@ import { MemoryRouter } from "react-router-dom";
 const apiMock = { get: vi.fn(), post: vi.fn(), patch: vi.fn(), delete: vi.fn() };
 const toastMock = { success: vi.fn(), error: vi.fn(), info: vi.fn() };
 vi.mock("@/lib/api", () => ({ api: apiMock, formatRequestError: (e, f) => f, resolveMediaUrl: (v) => v || "", suggestSlug: (v) => String(v || "").toLowerCase() }));
-vi.mock("@/components/tls/AdminLayout", () => ({ AdminLayout: ({ children }) => <div>{children}</div> }));
 vi.mock("@/components/tls/ImageUpload", () => ({ ImageUpload: ({ testId }) => <div data-testid={testId} /> }));
 vi.mock("@/components/tls/MarkdownEditor", () => ({ MarkdownEditor: ({ testId }) => <textarea data-testid={testId} readOnly /> }));
 vi.mock("@/components/tls/GermanDateField", () => ({ GermanDateField: ({ testId }) => <input data-testid={testId} readOnly /> }));
@@ -16,7 +15,7 @@ vi.mock("@/components/tls/ConfirmDialog", () => ({ useConfirm: () => async () =>
 vi.mock("@/hooks/useApiInvalidation", () => ({ useApiInvalidation: () => {} }));
 vi.mock("sonner", () => ({ toast: toastMock }));
 
-const AdminClubMemberProfilesPage = (await import("./AdminClubMemberProfilesPage")).default;
+const { ClubMemberProfilesAdminContent: AdminClubMemberProfilesPage } = await import("./AdminClubMemberProfilesPage");
 
 const PROFILES = [
   { id: "p1", display_name: "Paula Beispiel", gamertag: "paula-b", slug: "paula-b", user_id: null, linked_account: null, games: [], platforms: [], is_active: true, account_unlinked_at: "2026-09-24T10:00:00Z" },

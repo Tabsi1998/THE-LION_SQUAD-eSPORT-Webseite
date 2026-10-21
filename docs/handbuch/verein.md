@@ -6,11 +6,10 @@ Helferdienste, Unterlagen), wie ihr den Vorstand auf der Website zeigt und wer w
 
 **Wo im Admin:**
 
-- **Admin → Mitglieder → Mitglieder** (`/admin/members`, Seitenname „Mitgliederverwaltung“) – Mitgliedschaften und die öffentliche Mitgliederseite
+- **Admin → Mitglieder → Mitglieder** (`/admin/members`) – Reiter **Mitgliedschaften** und **Öffentliche Profile** (die Profile im öffentlichen Verzeichnis, direkt: `/admin/members?tab=profiles`)
 - **Admin → Mitglieder → Bewerbungen** (`/admin/membership-applications`) – Anträge, Einladungen, die Seite „Mitglied werden“
-- **Admin → Mitglieder → Mitgliederprofile** (`/admin/member-profiles`, Seitenname „Vereinsmitglieder“) – die Profile im öffentlichen Verzeichnis
 - **Admin → Mitglieder → Mitgliedervorteile** (`/admin/benefits`) – Vorteile für Mitglieder
-- **Admin → Mitglieder → Dokumente** (`/admin/documents`, Seitenname „Dokumente & Downloads“) – Vereinsdokumente wie Statuten und Protokolle
+- **Admin → Mitglieder → Dokumente** (`/admin/documents`) – Vereinsdokumente wie Statuten und Protokolle
 - **Admin → Mitglieder → Einlass (Versammlung)** (`/admin/einlass`) – Mitgliedskarte am Eingang scannen
 - **Admin → Mitglieder → Alle Benutzer** – Konten, Rollen, Sperren, (siehe Kapitel „Erste Schritte im Admin“)
 - **Admin → Mitglieder → Dolibarr** – Verbindung zur Mitgliederverwaltung, siehe [Dolibarr](../DOLIBARR.md)
@@ -63,7 +62,7 @@ Wer das sieht: der Bereich **Vereinsverwaltung** (auch, wer einen aktiven Vorsta
 3. **Vorstand besetzen:** Admin → Verein → Vorstand (3.4).
 4. **Statuten bereitstellen:** entweder in Dolibarr freigeben, oder Admin → Mitglieder → Dokumente → **Neues Dokument** in der
    Kategorie **Statuten** (3.5).
-5. **Mitgliederprofile:** Admin → Mitglieder → Mitgliederprofile → **Profil erstellen** (3.8). Mit Dolibarr entstehen sie über
+5. **Öffentliche Profile:** Admin → Mitglieder → Mitglieder → Reiter **Öffentliche Profile** → **Profil erstellen** (3.10). Mit Dolibarr entstehen sie über
    die Einwilligung von selbst.
 6. **Testen:** mit einem Test-Konto den Weg „Mitglied werden“ bis zum Antrag durchgehen (3.1).
 
@@ -154,8 +153,13 @@ erklären** (mit Wunschdatum, der letzte Tag wird in der Mitgliederverwaltung ge
 ### 3.6 Vereinsdokumente, Vorteile und Persönliches
 
 - **Dokumente:** Admin → Mitglieder → Dokumente → **Neues Dokument**: Datei, Titel, Kategorie (Statuten, Protokolle, Formular,
-  Regelwerk, Leitlinie, Download, Media Kit, Präsentation, Vorlage, Sonstiges), **Sichtbarkeit**, Tags und der Haken **Download
+  Regelwerk, Leitlinie, Download, Media Kit, Präsentation, Vorlage, Sonstiges), **Sichtbarkeit** (**Mitglieder** oder **Vorstand**), Tags und der Haken **Download
   erlauben** (Standard ist nur die Ansicht im Browser). Mitglieder finden sie unter **Vereinsdokumente**.
+  Die Liste sagt es in Worten: die Plakette **Alle**, **Mitglieder** oder **Vorstand** zeigt, wer ein Dokument sehen darf;
+  darunter steht, wie oft es angesehen und heruntergeladen wurde („1-mal angesehen · 3-mal heruntergeladen“) und ob
+  **Herunterladen erlaubt** ist oder es **nur ansehen** gibt. Am Handy stehen die Dokumente als Karten.
+
+  <img src="../assets/verwaltung/dokumente-liste.png" alt="Dokumentenliste mit den Plaketten Alle, Mitglieder und Vorstand und den Zählern als Satz" width="720">
 - **Mitgliedervorteile:** Admin → Mitglieder → Mitgliedervorteile: Titel, Text, Link, Gültigkeit, **Sichtbar für Mitgliedsarten**
   (leer = alle), **Aktiv**. Mitglieder sehen sie im Mitgliederbereich und in der App.
 - **Persönliche Unterlagen** (Bestätigungen, Schreiben) legt der Vorstand in der Vereinsakte in Dolibarr ab; das Mitglied
@@ -191,12 +195,15 @@ Apple und Google Wallet gibt es noch nicht. Mehr: [Dolibarr](../DOLIBARR.md).
 
 ### 3.10 Mitgliederverzeichnis und Profile
 
-**Admin → Mitglieder → Mitgliederprofile** (Seite „Vereinsmitglieder“): Redaktionelle Profile mit großem Bild, Bio, Games und
+**Admin → Mitglieder → Mitglieder → Reiter Öffentliche Profile** (seit #1365 die einzige Stelle; die alte Adresse
+`/admin/member-profiles` öffnet den Reiter, die Menüsuche „Profile“ findet ihn): Redaktionelle Profile mit großem Bild, Bio, Games und
 Plattformen. **Profil erstellen** legt nur das Vereinsprofil an; ein Profil ist **kein Konto und keine Mitgliedschaft**. Das
 Website-Konto verknüpft ihr im Profil im Kasten **Konto** (optional). Funktionen wie Obmann oder Kassier kommen automatisch aus
 dem Vorstand. Mit Dolibarr kommen Mitglieder mit Einwilligung von selbst ins Verzeichnis (`/members`).
 
-**Admin → Mitglieder → Mitglieder** (Seite „Mitgliederverwaltung“, Reiter **Mitgliedschaften** und **Öffentliche Mitgliederseite**): Suche
+<img src="../assets/verwaltung/oeffentliche-profile.png" alt="Seite Mitglieder mit dem Reiter Öffentliche Profile und den Profilkarten" width="720">
+
+**Admin → Mitglieder → Mitglieder** (Reiter **Mitgliedschaften** und **Öffentliche Profile**): Suche
 nach Name, E-Mail oder Mitgliedsnummer; **Mitgliedschaft bearbeiten**. Führt Dolibarr die Mitgliedschaft, kommen Status, Art,
 Nummer und Beginn von dort und lassen sich hier nicht ändern; **interne Notizen** (sieht das Mitglied nicht) und
 **Mitgliedsnummer auf öffentlichem Profil anzeigen** bleiben hier.

@@ -57,7 +57,8 @@ function navMetrics(page) {
   return page.evaluate(() => {
     const nav = document.querySelector("nav.admin-scroll");
     const navBox = nav.getBoundingClientRect();
-    const links = [...nav.querySelectorAll("a")];
+    // „Zuletzt“ (#1291) ist kein fester Eintrag und zählt nicht mit.
+    const links = [...nav.querySelectorAll("a:not([data-recent])")];
     const active = nav.querySelector("[aria-current='page']");
     const inView = (el) => {
       const r = el.getBoundingClientRect();
@@ -71,6 +72,12 @@ function navMetrics(page) {
       activeInView: active ? inView(active) : null,
     };
   });
+}
+
+// Die Leiste ist eingeklappt nur verschoben (translate), nicht versteckt - sichtbar heißt: sie ragt in den Bildschirm.
+async function menuOnScreen(page) {
+  const box = await page.locator("aside").boundingBox();
+  return box.x + box.width > 1;
 }
 
 test.describe("Adminmenü", () => {
@@ -99,8 +106,9 @@ test.describe("Adminmenü", () => {
     // 79 mit den acht Plattformen aus Welle 2 und Mastodon/Bluesky aus Welle 3 (#547).
     // 80 mit „Jahreszeiten“ unter Auftritt (#633), 81 mit „Adventkalender“ unter Content (#641),
     // 82 mit „Ostereiersuche“ unter Content (#646), 83 mit „Einlass (Versammlung)“ unter Mitglieder (#845),
-    // 84 mit „TV & Beamer“ unter eSports (#1110), 85 mit „Serien“ unter Verein (#1741).
-    expect((await navMetrics(page)).entries).toBe(85);
+    // 84 mit „TV & Beamer“ unter eSports (#1110), 85 mit „Serien“ unter Verein (#1741),
+    // 84 ohne „Mitgliederprofile“ - jetzt der Reiter „Öffentliche Profile“ unter Mitglieder (#1365).
+    expect((await navMetrics(page)).entries).toBe(84);
   });
 
   test("eine Gruppe lässt sich zuklappen und bleibt es nach dem Neuladen", async ({ page }) => {
@@ -152,6 +160,96 @@ test.describe("Adminmenü", () => {
 
     await expect(page.getByTestId("admin-nav-sponsors")).toBeVisible();
     await expect(page.getByTestId("admin-nav-group-Verein")).toHaveAttribute("aria-expanded", "true");
+  });
+
+  test("„Zuletzt“ steht ganz oben, zählt nicht als fester Eintrag und führt zurück", async ({ page }) => {
+    await page.goto("/admin/mobile-push");
+    await expect(page.getByTestId("admin-nav-search")).toBeVisible();
+    await page.getByTestId("admin-nav-admin").click();
+    await expect(page.getByTestId("admin-nav-recent")).toBeVisible();
+    const first = await page.evaluate(() => document.querySelector("nav.admin-scroll [data-testid^='admin-nav-group-']").dataset.testid);
+    expect(first).toBe("admin-nav-group-Zuletzt");
+    expect((await navMetrics(page)).entries).toBe(84);
+    await page.getByTestId("admin-nav-recent-mobile-push").click();
+    await expect(page).toHaveURL(/\/admin\/mobile-push$/);
+  });
+
+  // Tablet hochkant (#1289): bis 1023 px Menü-Knopf und volle Breite für den Inhalt, ab 1024 px fest links.
+  for (const width of [768, 820]) {
+    test(`bei ${width} px steht kein festes Menü links, der Inhalt hat die volle Breite`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 1180 });
+      await page.goto("/admin");
+      await expect(page.getByTestId("admin-menu-open")).toBeVisible();
+      expect(await menuOnScreen(page)).toBe(false);
+      const main = await page.locator("#main-content").boundingBox();
+      expect(main.x).toBeLessThanOrEqual(1);
+      await page.getByTestId("admin-menu-open").click();
+      await expect.poll(() => menuOnScreen(page)).toBe(true);
+      await page.getByTestId("admin-menu-overlay").click({ position: { x: width - 20, y: 400 } });
+      await expect.poll(() => menuOnScreen(page)).toBe(false);
+    });
+  }
+
+  // Barrierefreiheit (Codex-Prüfung): eingeklappt erreicht die Tastatur das Menü nicht; offen springt der Fokus hinein,
+  // Escape schließt und gibt den Fokus an den Menü-Knopf zurück.
+  test("bei 820 px: eingeklapptes Menü ist nicht per Tab erreichbar, Öffnen und Escape führen den Fokus", async ({ page }) => {
+    await page.setViewportSize({ width: 820, height: 1180 });
+    await page.goto("/admin");
+    const button = page.getByTestId("admin-menu-open");
+    await expect(button).toBeVisible();
+    await button.focus();
+    const inMenu = () => page.evaluate(() => Boolean(document.activeElement?.closest("aside")));
+    for (let step = 0; step < 6; step += 1) {
+      await page.keyboard.press("Shift+Tab");
+      expect(await inMenu()).toBe(false);
+    }
+
+    await button.focus();
+    await page.keyboard.press("Enter");
+    await expect.poll(inMenu).toBe(true);
+    await expect.poll(() => page.evaluate(() => Boolean(document.activeElement?.closest("nav.admin-scroll")))).toBe(true);
+
+    await page.keyboard.press("Escape");
+    await expect(button).toBeFocused();
+    await expect.poll(() => menuOnScreen(page)).toBe(false);
+    await page.keyboard.press("Shift+Tab");
+    expect(await inMenu()).toBe(false);
+  });
+
+  test("ab 1024 px steht das Menü fest links wie bisher", async ({ page }) => {
+    await page.setViewportSize({ width: 1024, height: 768 });
+    await page.goto("/admin");
+    await expect(page.getByTestId("admin-nav-search")).toBeVisible();
+    await expect(page.getByTestId("admin-menu-open")).toBeHidden();
+    const main = await page.locator("#main-content").boundingBox();
+    expect(main.x).toBeGreaterThanOrEqual(255);
+    expect((await navMetrics(page)).entries).toBe(84);
+  });
+
+  test("am Telefon wird „Zuletzt“ beim Nachführen zum aktiven Eintrag nie angeschnitten", async ({ page }) => {
+    await page.addInitScript(() => {
+      window.localStorage.setItem("tls_admin_recent_v1:admin-1", JSON.stringify(["/admin/documents", "/admin"]));
+    });
+    await page.route("**/api/users**", (route) => route.fulfill({ contentType: "application/json", body: "[]" }));
+    await page.route("**/api/membership/**", (route) => route.fulfill({ contentType: "application/json", body: route.request().url().includes("/meta") ? "{\"statuses\":[],\"types\":[]}" : "[]" }));
+    await page.setViewportSize({ width: 390, height: 844 });
+    // Mitglieder steht so tief, dass das Nachführen „Zuletzt“ ohne Vorkehrung halb aus dem Bild schob.
+    await page.goto("/admin/members");
+    await page.getByTestId("admin-menu-open").click();
+    await expect(page.getByTestId("admin-nav-recent")).toBeAttached();
+    await page.waitForTimeout(300);
+    const state = await page.evaluate(() => {
+      const nav = document.querySelector("nav.admin-scroll").getBoundingClientRect();
+      const heading = document.querySelector("[data-testid='admin-nav-group-Zuletzt']").getBoundingClientRect();
+      const recent = document.querySelector("[data-testid='admin-nav-recent']").getBoundingClientRect();
+      const active = document.querySelector("nav.admin-scroll [aria-current='page']").getBoundingClientRect();
+      return {
+        recentCut: recent.top < nav.top - 1 && recent.bottom > nav.top + 1,
+        headingCut: heading.top < nav.top - 1 && heading.bottom > nav.top - 1,
+        activeInView: active.top >= nav.top - 1 && active.bottom <= nav.bottom + 1,
+      };
+    });
+    expect(state).toEqual({ recentCut: false, headingCut: false, activeInView: true });
   });
 
   test("am Telefon bleibt das Menü im Schubfach bedienbar", async ({ page }) => {

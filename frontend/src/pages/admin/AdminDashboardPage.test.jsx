@@ -118,3 +118,38 @@ test("Kassier mit der Antwort des Servers: nur Finanz-Aufgaben, keine fremden Bl
   for (const testId of ["dashboard-kpis", "dashboard-today", "dashboard-audit-log", "dashboard-growth-widget"]) expect(screen.queryByTestId(testId)).toBeNull();
   expect(requested()).not.toContain("/admin/growth-stats?days=30");
 });
+
+// Kasten „Wachstum“ (#1378): Konten heißen Konten, die neuen Vereinsmitglieder kommen aus der Mitgliedschaft; alle
+// Zahlen in richtiger Ein- und Mehrzahl.
+test("Vereinsverwaltung: Wachstum nennt Konten Konten und zählt neue Vereinsmitglieder extra", async () => {
+  authState.user = { id: "c", role: "club_admin", ...mfa };
+  apiMock.get.mockImplementation((url) => {
+    if (url === "/admin/dashboard") return Promise.resolve({ data: DASHBOARD });
+    if (url === "/admin/growth-stats?days=30") {
+      return Promise.resolve({ data: { window_days: 30, new_members: 1, days: [
+        { date: "2026-10-01", logins: 3, new_users: 2, total_users: 40 },
+        { date: "2026-10-02", logins: 1, new_users: 1, total_users: 41 },
+      ] } });
+    }
+    return Promise.resolve({ data: {} });
+  });
+  render(<MemoryRouter><AdminDashboardPage /></MemoryRouter>);
+  const box = await screen.findByTestId("dashboard-growth-widget");
+  await waitFor(() => expect(screen.getByTestId("growth-new-accounts")).toHaveTextContent("3"));
+  expect(screen.getByTestId("growth-total-accounts")).toHaveTextContent("41");
+  expect(screen.getByTestId("growth-new-club-members")).toHaveTextContent("1");
+  expect(box).toHaveTextContent("Neue Konten");
+  expect(box).toHaveTextContent("Konten gesamt");
+  expect(box).toHaveTextContent("Neue Vereinsmitglieder");
+  expect(box.textContent).not.toMatch(/Neue Mitglieder|Mitglieder gesamt/);
+});
+
+test("Startseite: Zahlen in richtiger Ein- und Mehrzahl, Streitfälle statt Disputes", async () => {
+  await renderAs({ id: "s", role: "superadmin", ...mfa });
+  await screen.findByTestId("dashboard-task-reported-results");
+  const page = document.body.textContent;
+  for (const text of ["1 offener Streitfall", "2 offene Meldungen", "1 Vertrag endet in 30 Tagen", "1 offener Antrag", "1 wartet auf Bestätigung", "1 Prüffall"]) {
+    expect(page).toContain(text);
+  }
+  for (const wrong of ["Disputes", "1 offene Anträge", "1 Verträge", "1 warten", "1 Prüffälle"]) expect(page).not.toContain(wrong);
+});

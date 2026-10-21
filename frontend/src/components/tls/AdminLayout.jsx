@@ -7,6 +7,8 @@ import { LayoutDashboard, Trophy, Gamepad2, Users as UsersIcon, CalendarDays, Fl
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePublicSiteSettings } from "@/hooks/usePublicSiteSettings";
 import { OfflineBar } from "@/components/tls/OfflineBar";
+import { ADMIN_RECENT_MAX, readRecentAdminPages, rememberRecentAdminPage } from "@/lib/adminRecent";
+import { useModalBehavior } from "@/hooks/useModalBehavior";
 
 // Sidebar-Gruppen (#408, #512): Verein (Vereinsdaten, Vorstand, Sponsoren, Partner, Referenzen,
 // Kontakt-Inbox), Mitglieder (mit Dolibarr - die Seite nennt sich Mitgliederverwaltung), Finanzen,
@@ -42,7 +44,9 @@ export const ADMIN_GROUPS = [
     label: "Mitglieder",
     items: [
       { to: "/admin/members", label: "Mitglieder", icon: Crown, areas: ["club"] },
-      { to: "/admin/member-profiles", label: "Mitgliederprofile", icon: UserCheck, areas: ["club"] },
+      // Die öffentlichen Profile sind seit #1365 nur noch der Reiter „Öffentliche Profile“ unter Mitglieder - ein
+      // Wegweiser für die Suche, kein eigener Menüpunkt; die alte Adresse leitet dorthin.
+      { to: "/admin/members?tab=profiles", label: "Mitglieder: Öffentliche Profile", icon: UserCheck, areas: ["club"], searchOnly: true },
       { to: "/admin/membership-applications", label: "Bewerbungen", icon: Inbox, areas: ["club"] },
       { to: "/admin/benefits", label: "Mitgliedervorteile", icon: Gift, areas: ["club"] },
       { to: "/admin/documents", label: "Dokumente", icon: FileText, areas: ["club"] },
@@ -147,7 +151,7 @@ const ADMIN_SEARCH_TERMS = {
   "/admin/app-releases": ["app", "apk", "release", "version", "update", "build", "lionsapp"],
   "/admin/members": ["verein", "mitgliedschaft", "beitrag", "verzeichnis", "einwilligung", "dolibarr", "mitgliedsnummer"],
   "/admin/moderation": ["moderation", "wortfilter", "sperre", "gesperrt", "meldungen", "gemeldet", "blockiert", "strikes", "chat"],
-  "/admin/member-profiles": ["profile", "spielerprofile", "vereinsspieler"],
+  "/admin/members?tab=profiles": ["profile", "mitgliederprofile", "spielerprofile", "vereinsspieler", "vereinsmitglieder", "mitgliederverzeichnis", "öffentliche seite"],
   "/admin/membership-applications": ["antraege", "beitritt", "join"],
   "/admin/benefits": ["vorteile", "rabatte"],
   "/admin/documents": ["dateien", "downloads"],
@@ -271,6 +275,21 @@ export function linkAreas(to) {
   return best ? best.areas : null;
 }
 
+// „Zuletzt“ (#1291): aus den gemerkten Wegen die Menüeinträge, die die Person gerade sehen darf - neueste zuerst,
+// jede Seite einmal, ohne die gerade offene Seite, höchstens fünf. Wegweiser (searchOnly) kommen nicht hinein.
+export function recentNavItems(user, recentTos, currentTo, disabledPlatforms = []) {
+  const visible = new Map(navGroupsFor(user, "", disabledPlatforms).flatMap((group) => group.items).map((item) => [item.to, item]));
+  const seen = new Set();
+  const items = [];
+  for (const to of Array.isArray(recentTos) ? recentTos : []) {
+    if (to === currentTo || seen.has(to) || !visible.has(to)) continue;
+    seen.add(to);
+    items.push(visible.get(to));
+    if (items.length === ADMIN_RECENT_MAX) break;
+  }
+  return items;
+}
+
 export function canOpenAdminLink(user, to) {
   if (!String(to || "").startsWith("/admin") && !String(to || "").startsWith("/setup")) return true;
   const areas = linkAreas(to);
@@ -303,17 +322,53 @@ function writeCollapsedGroups(labels) {
 
 // Der längste passende Eintrag gewinnt, damit "/admin" nicht jede Unterseite
 // für sich beansprucht.
-function groupLabelForPath(pathname) {
+function menuEntryForPath(pathname) {
   let best = null;
   for (const group of ADMIN_GROUPS) {
     for (const item of group.items) {
+      if (item.searchOnly) continue;
       const hit = pathname === item.to || (!item.end && pathname.startsWith(`${item.to}/`));
       if (hit && (!best || item.to.length > best.route.length)) {
         best = { route: item.to, label: group.label };
       }
     }
   }
-  return best ? best.label : null;
+  return best;
+}
+
+const RECENT_GROUP = "Zuletzt";
+
+// Menü zum aktiven Eintrag führen, ohne „Zuletzt“ anzuschneiden (#1291): steht die Gruppe da, beginnt die Liste oben
+// bei ihr; nur wenn der aktive Eintrag dann nicht zu sehen ist, rückt sie nach (die Einträge halten mit scroll-margin
+// Abstand zum Rand). Ragt „Zuletzt“ danach nur noch halb ins Bild, rückt die Liste die Gruppe ganz hinaus - eine
+// Überschrift wird nie abgeschnitten.
+export function scrollMenuToActive(nav) {
+  if (!nav) return;
+  const recent = nav.querySelector("[data-testid='admin-nav-recent']");
+  if (recent) nav.scrollTop = 0;
+  const active = nav.querySelector("[aria-current='page']");
+  if (!active) return;
+  active.scrollIntoView({ block: "nearest" });
+  if (!recent) return;
+  const top = nav.getBoundingClientRect().top;
+  const box = recent.getBoundingClientRect();
+  if (box.top < top && box.bottom > top) nav.scrollTop += box.bottom - top;
+}
+
+// Ab lg (1024 px) steht das Menü fest links (#1289); darunter ist es eine ausklappende Leiste.
+const WIDE_QUERY = "(min-width: 1024px)";
+
+function useWideLayout() {
+  const [wide, setWide] = useState(() => typeof window !== "undefined" && typeof window.matchMedia === "function" && window.matchMedia(WIDE_QUERY).matches);
+  useEffect(() => {
+    if (typeof window.matchMedia !== "function") return undefined;
+    const query = window.matchMedia(WIDE_QUERY);
+    const onChange = () => setWide(query.matches);
+    onChange();
+    query.addEventListener?.("change", onChange);
+    return () => query.removeEventListener?.("change", onChange);
+  }, []);
+  return wide;
 }
 
 export function AdminLayout({ children }) {
@@ -321,6 +376,17 @@ export function AdminLayout({ children }) {
   const nav = useNavigate();
   const location = useLocation();
   const [openMobile, setOpenMobile] = useState(false);
+  // Barrierefreiheit: die eingeklappte Leiste ist nur verschoben - ohne `inert` erreichte die Tastatur unsichtbare
+  // Einträge. Offen verhält sie sich wie ein Dialog (Fokus hinein, Tab bleibt drin, Escape schließt).
+  const wide = useWideLayout();
+  const drawerOpen = openMobile && !wide;
+  const drawerHidden = !openMobile && !wide;
+  const menuButtonRef = useRef(null);
+  const closeDrawer = useCallback(() => {
+    setOpenMobile(false);
+    menuButtonRef.current?.focus();
+  }, []);
+  const asideRef = useModalBehavior(drawerOpen, closeDrawer);
   const [navQuery, setNavQuery] = useState("");
   const site = usePublicSiteSettings();
   const disabledPlatforms = site?.disabled_platforms;
@@ -345,7 +411,21 @@ export function AdminLayout({ children }) {
   // zur Einrichtung - danach zurück auf diese Seite.
   const mfaHint = adminWithoutSecondFactor(user);
 
-  const activeGroup = groupLabelForPath(location.pathname);
+  const activeEntry = menuEntryForPath(location.pathname);
+  const activeGroup = activeEntry ? activeEntry.label : null;
+  const activeRoute = activeEntry ? activeEntry.route : null;
+
+  // „Zuletzt“ (#1291): jede geöffnete Verwaltungsseite merkt sich ihren Menüpunkt (Unterseiten zählen zum Eintrag).
+  const userId = user?.id;
+  const [recentTos, setRecentTos] = useState(() => readRecentAdminPages(userId));
+  useEffect(() => {
+    const stored = readRecentAdminPages(userId);
+    setRecentTos(activeRoute ? rememberRecentAdminPage(userId, activeRoute, stored) : stored);
+  }, [activeRoute, userId]);
+  const recentItems = useMemo(
+    () => (searchQuery ? [] : recentNavItems(user, recentTos, activeRoute, disabledPlatforms)),
+    [activeRoute, disabledPlatforms, recentTos, searchQuery, user],
+  );
   const [collapsedGroups, setCollapsedGroups] = useState(() => {
     const stored = readCollapsedGroups();
     // Voreinstellung: alles offen. Eine Voreinstellung, die etwas wegräumt,
@@ -385,17 +465,36 @@ export function AdminLayout({ children }) {
   // "Push-Tests" und sah im Menü nur die Gruppe "Übersicht".
   const navRef = useRef(null);
   useEffect(() => {
-    navRef.current?.querySelector("[aria-current='page']")?.scrollIntoView({ block: "nearest" });
-  }, [location.pathname, collapsedGroups, searchQuery]);
+    scrollMenuToActive(navRef.current);
+  }, [location.pathname, collapsedGroups, searchQuery, recentItems.length]);
+
+  // Beim Öffnen der Leiste: Fokus auf „Zuletzt“, sonst auf den ersten Eintrag (nach useModalBehavior, das sich den
+  // Menü-Knopf als Rückweg merkt).
+  useEffect(() => {
+    if (!drawerOpen) return undefined;
+    // Einen Takt später: so gewinnt dieser Fokus sicher gegen den ersten Fokus von useModalBehavior (das Logo).
+    const timer = window.setTimeout(() => {
+      const nav = navRef.current;
+      const target = nav?.querySelector(`[data-testid='admin-nav-group-${RECENT_GROUP}']`) || nav?.querySelector("a[href]");
+      target?.focus({ preventScroll: true });
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [drawerOpen]);
 
   return (
     <div className="min-h-screen bg-[#0A0A0A] text-white flex">
       <a href="#main-content" className="tls-skip-link">Zum Inhalt springen</a>
       {/* Sidebar */}
-      <aside className={`fixed md:sticky top-0 left-0 h-screen w-64 bg-[#0A0A0A] border-r border-white/10 z-40 transform transition-transform flex flex-col ${openMobile ? "translate-x-0" : "-translate-x-full md:translate-x-0"}`}>
+      {/* Bis 1023 px (Handy, Tablet hochkant) klappt das Menü aus, erst ab lg steht es fest links (#1289). */}
+      <aside
+        ref={asideRef}
+        inert={drawerHidden}
+        aria-hidden={drawerHidden ? "true" : undefined}
+        className={`fixed lg:sticky top-0 left-0 h-screen w-64 bg-[#0A0A0A] border-r border-white/10 z-40 transform transition-transform flex flex-col ${openMobile ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}`}
+      >
         <div className="p-5 border-b border-white/10 flex items-center justify-between shrink-0">
           <Logo size="sm" />
-          <button className="md:hidden p-1" onClick={() => setOpenMobile(false)} aria-label="Admin-Menü schließen">
+          <button className="lg:hidden p-1" onClick={() => setOpenMobile(false)} aria-label="Admin-Menü schließen">
             <X className="w-4 h-4" />
           </button>
         </div>
@@ -444,6 +543,41 @@ export function AdminLayout({ children }) {
               </span>
             </Link>
           )}
+          {recentItems.length > 0 && (
+            <div className="mb-3" data-testid="admin-nav-recent">
+              <button
+                type="button"
+                onClick={() => toggleGroup(RECENT_GROUP)}
+                aria-expanded={groupIsOpen(RECENT_GROUP)}
+                data-testid={`admin-nav-group-${RECENT_GROUP}`}
+                className="w-full flex items-center justify-between gap-2 px-3 py-1.5 text-[9px] font-black uppercase tracking-[0.25em] text-white/25 hover:text-white/60 transition-colors"
+              >
+                <span className="truncate">{RECENT_GROUP}</span>
+                <span className="flex items-center gap-1.5 shrink-0">
+                  {!groupIsOpen(RECENT_GROUP) && <span className="tabular-nums tracking-normal text-white/20">{recentItems.length}</span>}
+                  <ChevronDown className={`w-3 h-3 transition-transform ${groupIsOpen(RECENT_GROUP) ? "" : "-rotate-90"}`} />
+                </span>
+              </button>
+              {groupIsOpen(RECENT_GROUP) && (
+                <div className="space-y-0.5">
+                  {/* Kein NavLink: die offene Seite steht nicht in „Zuletzt“, und die festen Einträge behalten ihre Kennung. */}
+                  {recentItems.map((it) => (
+                    <Link
+                      key={it.to}
+                      to={it.to}
+                      onClick={() => setOpenMobile(false)}
+                      data-recent="true"
+                      data-testid={`admin-nav-recent-${it.to.split("/").pop() || "dashboard"}`}
+                      className="flex items-center gap-3 px-3 py-2 rounded-sm text-sm font-semibold text-white/70 hover:text-white hover:bg-white/5 transition-all"
+                    >
+                      <it.icon className="w-4 h-4 shrink-0" />
+                      <span className="truncate">{it.label}</span>
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
           {visibleGroups.map((group) => {
             const open = groupIsOpen(group.label);
             return (
@@ -472,7 +606,7 @@ export function AdminLayout({ children }) {
                         onClick={() => setOpenMobile(false)}
                         data-testid={`admin-nav-${it.to.split("/").pop() || "dashboard"}`}
                         className={({ isActive }) =>
-                          `flex items-center gap-3 px-3 py-2.5 rounded-sm text-sm font-semibold transition-all ${
+                          `flex items-center gap-3 px-3 py-2.5 scroll-my-3 rounded-sm text-sm font-semibold transition-all ${
                             isActive
                               ? "bg-[#29B6E8]/15 text-[#29B6E8] border-l-2 border-[#29B6E8]"
                               : "text-white/70 hover:text-white hover:bg-white/5"
@@ -532,15 +666,16 @@ export function AdminLayout({ children }) {
       {/* Mobile overlay */}
       {openMobile && (
         <div
-          className="md:hidden fixed inset-0 bg-black/60 z-30"
+          data-testid="admin-menu-overlay"
+          className="lg:hidden fixed inset-0 bg-black/60 z-30"
           onClick={() => setOpenMobile(false)}
         />
       )}
 
       {/* Main */}
       <div className="flex-1 min-w-0">
-        <div className="md:hidden sticky top-0 z-30 bg-[#0A0A0A] border-b border-white/10 p-3 flex items-center justify-between">
-          <button onClick={() => setOpenMobile(true)} className="p-2" data-testid="admin-menu-open" aria-label="Admin-Menü öffnen" aria-expanded={openMobile}>
+        <div className="lg:hidden sticky top-0 z-30 bg-[#0A0A0A] border-b border-white/10 p-3 flex items-center justify-between">
+          <button ref={menuButtonRef} onClick={() => setOpenMobile(true)} className="p-2" data-testid="admin-menu-open" aria-label="Admin-Menü öffnen" aria-expanded={openMobile}>
             <Menu className="w-5 h-5" />
           </button>
           <Logo size="sm" />

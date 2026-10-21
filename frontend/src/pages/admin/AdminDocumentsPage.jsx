@@ -8,6 +8,7 @@ import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { toast } from "sonner";
 import { Plus, Trash2, FileText, Pin, UploadCloud, Eye, Download } from "lucide-react";
+import { documentVisibility, timesDone } from "@/lib/adminWords";
 
 const parseUploadMb = (value, fallback) => {
   const parsed = Number(value);
@@ -26,6 +27,35 @@ const CATEGORY_LABELS = {
   media_kit: "Media Kit", presentation: "Präsentation", template: "Vorlage",
   other: "Sonstiges",
 };
+
+// Liste in Worten (#1367): Sichtbarkeit als Plakette, Zähler als Satz, „nur ansehen“ statt des Rohwerts.
+function VisibilityBadge({ value }) {
+  const { label, cls } = documentVisibility(value);
+  return (
+    <span data-testid="doc-visibility-badge" className={`inline-flex items-center rounded-sm border px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest ${cls}`}>
+      {label}
+    </span>
+  );
+}
+
+function usageLine(doc) {
+  return `${timesDone(doc.view_count, "angesehen")} · ${timesDone(doc.download_count, "heruntergeladen")}`;
+}
+
+function DownloadRule({ allowed }) {
+  return <span className={allowed ? "text-ok" : "text-white/45"}>{allowed ? "Herunterladen erlaubt" : "nur ansehen"}</span>;
+}
+
+function DocActions({ doc, onEdit, onRemove, testPrefix = "doc" }) {
+  return (
+    <>
+      <a href={`${API}/documents/${doc.id}/view`} target="_blank" rel="noreferrer" className="text-xs font-bold uppercase px-3 py-1 rounded-sm border border-white/15 text-white/70 hover:text-white inline-flex items-center gap-1"><Eye className="w-3 h-3" /> Ansicht</a>
+      <a href={`${API}/documents/${doc.id}/download`} target="_blank" rel="noreferrer" className="text-xs font-bold uppercase px-3 py-1 rounded-sm border border-white/15 text-white/70 hover:text-white inline-flex items-center gap-1"><Download className="w-3 h-3" /> Datei</a>
+      <button onClick={onEdit} data-testid={`${testPrefix}-edit-${doc.id}`} className="text-xs font-bold uppercase px-3 py-1 rounded-sm border border-[#FFD700]/40 text-[#FFD700] hover:bg-[#FFD700]/10">Bearbeiten</button>
+      <button onClick={onRemove} data-testid={`${testPrefix}-delete-${doc.id}`} aria-label={`„${doc.title}“ löschen`} className="text-xs font-bold uppercase px-3 py-1 rounded-sm border border-[#FF3B30]/40 text-[#FF3B30] hover:bg-[#FF3B30]/10 inline-flex items-center"><Trash2 className="w-3 h-3" /></button>
+    </>
+  );
+}
 
 function fmtSize(bytes) {
   if (!bytes) return "—";
@@ -60,7 +90,8 @@ export default function AdminDocumentsPage() {
     <AdminLayout>
       <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
         <div>
-          <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#FFD700]">VEREINS-CMS</span>
+          {/* Augenbraue = Menügruppe (#1363). */}
+          <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#FFD700]">Mitglieder</span>
           <h1 className="font-heading text-3xl md:text-4xl font-black uppercase mt-1">Dokumente</h1>
         </div>
         <button onClick={() => setEditing({})} data-testid="docs-new" className="inline-flex items-center gap-2 px-4 py-2 bg-[#FFD700] text-black font-bold uppercase tracking-wider text-xs rounded-sm hover:bg-[#e8c200] transition">
@@ -74,23 +105,47 @@ export default function AdminDocumentsPage() {
           <div className="font-heading font-bold">Noch keine Dokumente</div>
         </div>
       ) : (
-        <div className="border border-white/10 rounded-sm bg-[#121212] overflow-hidden">
+        <>
+        {/* Am Handy Karten mit Plakette (#1367), ab md die Tabelle. */}
+        <ul className="md:hidden space-y-3" data-testid="docs-cards">
+          {list.map((d) => (
+            <li key={d.id} data-testid={`doc-card-${d.id}`} className="border border-white/10 rounded-sm bg-[#121212] p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="font-bold text-white flex items-center gap-1.5">
+                    {d.pinned && <Pin className="w-3 h-3 shrink-0 text-honor" />}
+                    <span className="break-words">{d.title}</span>
+                  </div>
+                  <div className="text-[11px] text-white/50 truncate">{d.original_filename}</div>
+                </div>
+                <VisibilityBadge value={d.visibility} />
+              </div>
+              <div className="mt-2 text-[10px] uppercase tracking-widest text-honor font-bold">{CATEGORY_LABELS[d.category] || "Sonstiges"} · <span className="text-white/60">{fmtSize(d.file_size)}</span></div>
+              <div className="mt-1 text-xs text-white/55">{usageLine(d)}</div>
+              <div className="mt-1 text-xs font-semibold"><DownloadRule allowed={d.allow_download} /></div>
+              <div className="mt-3 flex flex-wrap gap-1.5">
+                <DocActions doc={d} onEdit={() => setEditing(d)} onRemove={() => remove(d.id)} testPrefix="doc-card" />
+              </div>
+            </li>
+          ))}
+        </ul>
+        <div className="hidden md:block border border-white/10 rounded-sm bg-[#121212] overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-sm min-w-[800px]">
               <thead className="bg-[#0A0A0A] text-[11px] uppercase tracking-widest text-white/50">
                 <tr>
                   <th className="text-left px-4 py-3">Titel</th>
                   <th className="text-left px-4 py-3">Kategorie</th>
-                  <th className="text-left px-4 py-3">Sichtbar</th>
+                  <th className="text-left px-4 py-3">Sichtbar für</th>
                   <th className="text-left px-4 py-3">Größe</th>
                   <th className="text-left px-4 py-3">Nutzung</th>
-                  <th className="text-left px-4 py-3">Download</th>
+                  <th className="text-left px-4 py-3">Herunterladen</th>
                   <th className="text-center px-4 py-3">Aktion</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/5">
                 {list.map((d) => (
-                  <tr key={d.id}>
+                  <tr key={d.id} data-testid={`doc-row-${d.id}`}>
                     <td className="px-4 py-3">
                       <div className="font-bold text-white flex items-center gap-1.5">
                         {d.pinned && <Pin className="w-3 h-3 text-[#FFD700]" />}
@@ -98,18 +153,15 @@ export default function AdminDocumentsPage() {
                       </div>
                       <div className="text-[11px] text-white/50 truncate max-w-xs">{d.original_filename}</div>
                     </td>
-                    <td className="px-4 py-3 text-[10px] uppercase tracking-widest text-[#FFD700] font-bold">{CATEGORY_LABELS[d.category] || d.category}</td>
-                    <td className="px-4 py-3 text-[10px] uppercase tracking-widest text-white/60 font-bold">{d.visibility}</td>
+                    <td className="px-4 py-3 text-[10px] uppercase tracking-widest text-[#FFD700] font-bold">{CATEGORY_LABELS[d.category] || "Sonstiges"}</td>
+                    <td className="px-4 py-3"><VisibilityBadge value={d.visibility} /></td>
                     <td className="px-4 py-3 text-xs text-white/65">{fmtSize(d.file_size)}</td>
-                    <td className="px-4 py-3 text-xs text-white/55">{d.view_count || 0} Ansicht(en) · {d.download_count || 0} Download(s)</td>
-                    <td className="px-4 py-3 text-[10px] uppercase tracking-widest font-bold">
-                      <span className={d.allow_download ? "text-[#00FF88]" : "text-white/35"}>{d.allow_download ? "erlaubt" : "inline"}</span>
+                    <td className="px-4 py-3 text-xs text-white/55">{usageLine(d)}</td>
+                    <td className="px-4 py-3 text-xs font-semibold">
+                      <DownloadRule allowed={d.allow_download} />
                     </td>
                     <td className="px-4 py-3 text-center space-x-1 whitespace-nowrap">
-                      <a href={`${API}/documents/${d.id}/view`} target="_blank" rel="noreferrer" className="text-xs font-bold uppercase px-3 py-1 rounded-sm border border-white/15 text-white/70 hover:text-white inline-flex items-center gap-1"><Eye className="w-3 h-3" /> Ansicht</a>
-                      <a href={`${API}/documents/${d.id}/download`} target="_blank" rel="noreferrer" className="text-xs font-bold uppercase px-3 py-1 rounded-sm border border-white/15 text-white/70 hover:text-white inline-flex items-center gap-1"><Download className="w-3 h-3" /> Datei</a>
-                      <button onClick={() => setEditing(d)} data-testid={`doc-edit-${d.id}`} className="text-xs font-bold uppercase px-3 py-1 rounded-sm border border-[#FFD700]/40 text-[#FFD700] hover:bg-[#FFD700]/10">Bearbeiten</button>
-                      <button onClick={() => remove(d.id)} data-testid={`doc-delete-${d.id}`} className="text-xs font-bold uppercase px-3 py-1 rounded-sm border border-[#FF3B30]/40 text-[#FF3B30] hover:bg-[#FF3B30]/10 inline-flex items-center"><Trash2 className="w-3 h-3" /></button>
+                      <DocActions doc={d} onEdit={() => setEditing(d)} onRemove={() => remove(d.id)} />
                     </td>
                   </tr>
                 ))}
@@ -117,6 +169,7 @@ export default function AdminDocumentsPage() {
             </table>
           </div>
         </div>
+        </>
       )}
 
       {editing && <DocModal doc={editing} meta={meta} onClose={() => setEditing(null)} onSaved={load} />}
@@ -236,7 +289,7 @@ function DocModal({ doc, meta, onClose, onSaved }) {
         <TextField label="Sortierung" value={form.order_index} onChange={(v) => set("order_index", v)} testId="doc-order" />
         <CheckField label="Anpinnen" checked={form.pinned} onChange={(v) => set("pinned", v)} accent="#FFD700" className="self-end pb-2" testId="doc-pinned" />
       </FormGrid>
-      <CheckField label="Download erlauben" hint="Standard ist nur Inline-Ansicht. Aktivieren, wenn Mitglieder die Datei bewusst herunterladen sollen." checked={form.allow_download} onChange={(v) => set("allow_download", v)} accent="#FFD700" testId="doc-allow-download" />
+      <CheckField label="Download erlauben" hint="Standard ist „nur ansehen“ im Browser. Aktivieren, wenn Mitglieder die Datei bewusst herunterladen sollen." checked={form.allow_download} onChange={(v) => set("allow_download", v)} accent="#FFD700" testId="doc-allow-download" />
     </AdminSheet>
   );
 }

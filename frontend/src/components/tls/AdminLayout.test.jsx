@@ -48,7 +48,7 @@ test("Finanzen sind eine eigene Gruppe; Dolibarr liegt bei den Mitgliedern (#512
   expect(group("Finanzen").items[0].areas).toEqual(["finance"]);
   expect(group("Content").items.some((item) => item.to === "/admin/downloads")).toBe(true);
   expect(group("System").items.some((item) => item.to === "/admin/downloads")).toBe(false);
-  expect(group("Mitglieder").items.filter((item) => !item.searchOnly).map((item) => item.label)).toEqual(["Mitglieder", "Mitgliederprofile", "Bewerbungen", "Mitgliedervorteile", "Dokumente", "Einlass (Versammlung)", "Alle Benutzer", "Dolibarr"]);
+  expect(group("Mitglieder").items.filter((item) => !item.searchOnly).map((item) => item.label)).toEqual(["Mitglieder", "Bewerbungen", "Mitgliedervorteile", "Dokumente", "Einlass (Versammlung)", "Alle Benutzer", "Dolibarr"]);
   expect(group("Mitglieder").items.find((item) => item.to === "/admin/dolibarr").areas).toEqual(["club", "system"]);
   // Menüname = Seitentitel (#512): Jahreswertung, Gewinne, Fast Lap, App-Logs, Push-Tests.
   expect(group("eSports").items.map((item) => item.label)).toEqual(expect.arrayContaining(["Fast Lap", "Jahreswertung", "Gewinne"]));
@@ -232,4 +232,20 @@ test("Knöpfe außerhalb des Menüs fragen dieselbe Liste (canOpenAdminLink)", (
   expect(canOpenAdminLink(editor, "/admin/tournaments/new")).toBe(false);
   expect(canOpenAdminLink(editor, "/admin/gibt-es-nicht")).toBe(false);
   expect(canOpenAdminLink(editor, "/events/sommerfest")).toBe(true);
+});
+
+// Mitgliederprofile an einer Stelle (#1365): kein eigener Menüpunkt mehr, der Reiter „Öffentliche Profile“ unter
+// Mitglieder; die Suchwörter des alten Menüpunkts führen dorthin.
+test("Öffentliche Profile: kein eigener Menüpunkt, die Suche findet den Reiter unter Mitglieder", () => {
+  const all = ADMIN_GROUPS.flatMap((entry) => entry.items);
+  expect(all.some((item) => item.to === "/admin/member-profiles")).toBe(false);
+  const plain = navGroupsFor(SYSTEM_USER, "").flatMap((entry) => entry.items).map((item) => item.to);
+  expect(plain).not.toContain("/admin/members?tab=profiles");
+  for (const query of ["profile", "Öffentliche Profile", "spielerprofile", "vereinsspieler"]) {
+    const hits = navGroupsFor(SYSTEM_USER, query).flatMap((entry) => entry.items);
+    expect(hits.map((item) => item.to), query).toContain("/admin/members?tab=profiles");
+  }
+  // Nur für die Vereinsverwaltung - die Redaktion findet den Reiter nicht.
+  const content = { role: "player", areas: ["content"], mfa_enabled: true, auth_mfa_verified: true };
+  expect(navGroupsFor(content, "profile").flatMap((entry) => entry.items).map((item) => item.to)).not.toContain("/admin/members?tab=profiles");
 });

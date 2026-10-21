@@ -16,6 +16,8 @@ test("die Kachel Betrieb wird rot bei roten Checks oder offenen Fehlern, gelb be
   expect(opsTone({ slow_requests_24h: 21 })).toBe("#FFD700");
   expect(opsDetail({ open_error_groups: 0, slow_requests_24h: 2, checks: { status: "warn", counts: { warn: 1 } } }))
     .toBe("0 Fehlergruppen offen, 2 langsame Anfragen in 24 h, Checks: 1 gelb");
+  // Einzahl (#1378): „1 Fehlergruppe offen“, nicht „1 Fehlergruppen“.
+  expect(opsDetail({ open_error_groups: 1, slow_requests_24h: 1 })).toBe("1 Fehlergruppe offen, 1 langsame Anfrage in 24 h");
 });
 
 test("Messwerte und Bewertungen sind lesbar", () => {

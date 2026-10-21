@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { Crown, Edit3, Eye, Plus, Search, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import { AdminLayout } from "@/components/tls/AdminLayout";
 import { AdminSheet } from "@/components/tls/AdminSheet";
 import { FormGrid, FormSection } from "@/components/tls/AdminForm";
 import { CheckField, FieldLabel, SelectField, TextField } from "@/components/tls/FormFields";
@@ -112,8 +111,8 @@ export function ClubMemberProfilesAdminContent() {
     <>
       <div className="flex items-end justify-between flex-wrap gap-4 mb-6">
         <div>
-          <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#FFD700]">Öffentliche Seite</span>
-          <h1 className="font-heading text-3xl md:text-4xl font-black uppercase mt-1">Mitglieder&shy;profile</h1>
+          {/* Reiter unter Mitglieder (#1365): die Seite trägt schon die Überschrift „Mitglieder“ - hier eine Stufe darunter. */}
+          <h2 className="font-heading text-xl md:text-2xl font-black uppercase">Öffentliche Profile</h2>
           <p className="text-sm text-white/60 mt-1 max-w-3xl">
             Redaktionelle Mitgliederübersicht mit festen Profilen, großen Bildern, Bio, Games und Plattformen. Funktionen wie Obmann/Kassier kommen automatisch aus dem Vorstand.
             Ein Profil ist kein Konto und keine Mitgliedschaft: „Profil erstellen“ legt nur das Vereinsprofil an – das Website-Konto verknüpfst du im Profil unter „Konto“ (optional).
@@ -201,14 +200,6 @@ export function ClubMemberProfilesAdminContent() {
   );
 }
 
-export default function AdminClubMemberProfilesPage() {
-  return (
-    <AdminLayout>
-      <ClubMemberProfilesAdminContent />
-    </AdminLayout>
-  );
-}
-
 function ProfileModal({ entry, profiles = [], onClose, onSaved }) {
   const [form, setForm] = useState(entry.form);
   const [saving, setSaving] = useState(false);
@@ -260,7 +251,7 @@ function ProfileModal({ entry, profiles = [], onClose, onSaved }) {
 
   // Seitenblatt statt 1152-px-Fenster (#435): Person, Biografie, Bilder und Anzeige als Abschnitte.
   return (
-    <AdminSheet title={isEdit ? "Profil bearbeiten" : "Profil erstellen"} eyebrow="Mitgliederprofile" accent="#FFD700" size="xl" onClose={onClose} onSubmit={submit} saving={saving} submitTestId="club-member-save" testId="club-member-sheet">
+    <AdminSheet title={isEdit ? "Profil bearbeiten" : "Profil erstellen"} eyebrow="Öffentliche Profile" accent="#FFD700" size="xl" onClose={onClose} onSubmit={submit} saving={saving} submitTestId="club-member-save" testId="club-member-sheet">
       <FormSection title="Person" accent="#FFD700">
         <FormGrid>
           <TextField label="Gamertag" value={form.gamertag} onChange={(v) => set("gamertag", v)} placeholder="z.B. Tabsi98" testId="club-member-gamertag" />

@@ -119,7 +119,7 @@ export default function AdminBoardPage() {
             {" "}Obmann oder Obfrau: der Titel richtet sich nach dem Geschlecht im Profil.
           </p>
           <p className="mt-2 text-white/50 text-xs max-w-xl" data-testid="board-photo-hint">
-            Die Fotos kommen aus den <Link to="/admin/member-profiles" className="text-[#29B6E8] hover:text-white">Mitgliederprofilen</Link>. Am schönsten freigestellt (ohne Hintergrund) – der Verein legt seinen dahinter; Fotos mit Hintergrund stehen einheitlich in Vereinsfarben. Offene Funktionen zeigt die Vorstandsseite als „Wir suchen …“ mit dem Satz, den du hier je Funktion einträgst.
+            Die Fotos kommen aus den <Link to="/admin/members?tab=profiles" className="text-[#29B6E8] hover:text-white">öffentlichen Profilen</Link>. Am schönsten freigestellt (ohne Hintergrund) – der Verein legt seinen dahinter; Fotos mit Hintergrund stehen einheitlich in Vereinsfarben. Offene Funktionen zeigt die Vorstandsseite als „Wir suchen …“ mit dem Satz, den du hier je Funktion einträgst.
           </p>
         </div>
         {!readOnly && (
