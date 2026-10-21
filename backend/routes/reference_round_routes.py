@@ -9,9 +9,9 @@ Gelöscht wird nichts: Termine werden archiviert. Nach jeder Änderung rechnet d
 (abgesagte Runden zählen nicht zur Rundenzahl, ``counts`` nimmt eine Runde aus der Wertung). Jede Änderung läuft unter
 der Sperre der Saison, wie das Eintragen der Ergebnisse (``reference_series.series_locked``, #1744).
 
-Rennwochenende (#1930): Ein Termin trägt seinen Lauf (``session``, leer heißt Rennen); Termine mit gleichem Kürzel sind
+Runde mit Läufen (#1930): Ein Termin trägt seinen Lauf (``session``, leer heißt Rennen); Termine mit gleichem Kürzel sind
 eine Runde (``weekend``, ``services/race_weekend.py``). Ein neues Qualifying zählt ohne Angabe nicht zur Wertung. Eine
-eingefügte Zeile ohne Lauf legt alle Läufe an, die die Saison für diese Runde vorgibt („Läufe je Runde“).
+eingefügte Zeile ohne Lauf legt alle Läufe an, die die Saison für diese Runde vorgibt („Ablauf je Runde“).
 
 Öffentlich: ``/api/reference-series/public/<spur>/<saison>/calendar`` - nur, wenn Spur und Serie sichtbar und nicht
 archiviert sind, ohne Notizen. Die Felder (Titel, Ort, Tag, Zeitpunkt, Status) sind so gewählt, dass der Vereinskalender
@@ -227,7 +227,7 @@ async def _calendar(db, series_id: str) -> dict:
     view = calendar_view(rounds, published, today)
     archived = sorted((item for item in rounds if item.get("archived_at")),
                       key=lambda item: (item.get("order") or 0, str(item.get("id"))))
-    # Runde und Art des Laufs (#1930): Termine mit gleichem Kürzel sind ein Rennwochenende.
+    # Runde und Art des Laufs (#1930): Termine mit gleichem Kürzel sind eine Runde mit Läufen.
     race_weekend.annotate([*view["rounds"], *archived])
     for item in [*view["rounds"], *archived]:
         item["time"] = vienna_clock(item.get("starts_at"))
@@ -468,7 +468,7 @@ async def paste_rounds(series_id: str, body: RoundPasteBody, me: dict = Depends(
     parsed = parse_round_lines(body.text, season=series.get("season"), today=club_today(),
                                default_weekday=series.get("default_weekday"),
                                default_time=series.get("default_time"))
-    # Läufe je Runde (#1930): eine Zeile ohne Lauf legt alle Läufe an, die die Saison für ihre Runde vorgibt.
+    # Ablauf je Runde (#1930): eine Zeile ohne Lauf legt alle Läufe an, die die Saison für ihre Runde vorgibt.
     existing = await db.reference_rounds.find({"series_id": series_id}, {"_id": 0}).to_list(None)
     parsed = race_weekend_paste.expand_paste(parsed, series.get("weekend"), existing)
     if not body.apply:

@@ -159,7 +159,7 @@ function StateBadge({ state }) {
   );
 }
 
-/** Rennkalender: je Runde eine Zeile - Kürzel, Tag, Ort mit Flagge und, bei einem Rennwochenende (#1930), die
+/** Rennkalender: je Runde eine Zeile - Kürzel, Tag, Ort mit Flagge und, bei einer Runde mit Läufen (#1930), die
  * Lauf-Chips „Quali · Sprint · Rennen“ mit Uhrzeit und Status. Bei gewerteten Rennen der Sieger (nur ein öffentlicher
  * Vereinsfahrer - ein fremder Name steht nur in der Tabelle), sonst der beste öffentliche Vereinsfahrer mit Platz.
  * `hrefFor(lauf)` macht die Chips zu Links (Ergebnis je Lauf, #1950). */

@@ -15,7 +15,7 @@ import "./referenceSeries.css";
 // Linie „Finalgrenze“, Filter „Nur Vereinsspieler“. Am Handy Karten (Top 10 und Vereinsspieler, alles aufklappbar)
 // statt der breiten Tabelle. Fremde Namen sind reiner Text, nur Vereinsmitglieder verlinken auf ihr Profil.
 // Die Rennliga (#1746) nutzt dieselbe Tabelle für Fahrer- und Teamwertung: Name, Ergebniszelle und Punkte lassen sich
-// über `render…` ersetzen, eine Spalte (etwa „Abstand“) kommt über `extraColumn` dazu. Rennwochenende (#1930): mit
+// über `render…` ersetzen, eine Spalte (etwa „Abstand“) kommt über `extraColumn` dazu. Runde mit Läufen (#1930): mit
 // `weekends` steht über den Läufen einer Runde EIN Kopf (Flagge, Kürzel), darunter je Lauf sein Kürzel (S, R …).
 
 function places(by) {
@@ -255,7 +255,7 @@ function MobileCards({ rows, allCount, columns, topN, expanded, onExpand, view }
 /** `standings`: gespeicherter Stand vom Server; `rounds`: Kalender der Saison; `rules`: Regeln der Serie. `label` nennt
  * die Wertung, `filterLabel` den Filter (ohne: kein Filter); `renderName(row, index)`, `renderResult(result, name, row)`,
  * `renderPoints(row)` und `extraColumn` ({ header, title, cell(row) }) ersetzen die Teile der Zeile. `weekends` fasst
- * die Läufe einer Runde unter einem Kopf zusammen (Rennwochenende, #1930). */
+ * die Läufe einer Runde unter einem Kopf zusammen (Runde mit Läufen, #1930). */
 export function SeriesStandings({
   standings, rounds, rules, label = "Gesamtwertung", filterLabel = "Nur Vereinsspieler",
   renderName, renderResult, renderPoints, extraColumn = null, weekends = false,
@@ -265,7 +265,7 @@ export function SeriesStandings({
   const all = useMemo(() => standings?.rows || [], [standings]);
   const rows = visibleRows(all, { clubOnly });
   const plain = useMemo(() => roundColumns(rounds), [rounds]);
-  // Rennwochenende (#1930): die Läufe einer Runde nebeneinander unter einem Kopf - nur, wenn eine Runde mehrere hat.
+  // Runde mit Läufen (#1930): die Läufe einer Runde nebeneinander unter einem Kopf - nur, wenn eine Runde mehrere hat.
   const groups = useMemo(() => {
     if (!weekends) return null;
     const found = groupWeekends(plain);

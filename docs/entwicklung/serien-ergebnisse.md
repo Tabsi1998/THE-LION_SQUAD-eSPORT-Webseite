@@ -64,7 +64,7 @@ passt; die Stände führen es unter seinem Namen.
   fehlen bei „laut Veranstalter“, Abweichung zum offiziellen Wert, Maps passen nicht zum Ergebnis, kein eigenes Team
   im Spiel, Team doppelt in der Tabelle, schnellste Runde mehrfach markiert, Termin in der Zukunft oder ohne Wertung.
 
-## Rennwochenende mit Läufen (#1930)
+## Runde mit Läufen (#1930)
 
 Logik ohne Datenbank in `backend/services/race_weekend.py`, das Einfügen in `race_weekend_paste.py`, die Regel „ab
 Runde X“ allgemein in `round_phases.py` (wiederverwendbar, etwa für Regeländerungen je Runde, #1960).
@@ -76,7 +76,7 @@ Runde X“ allgemein in `round_phases.py` (wiederverwendbar, etwa für Regeländ
   `next.sessions`). Ein neuer Termin ohne `counts` zählt nach der Vorgabe seines Laufs (`race_weekend.planned_config`) –
   ein Qualifying ohne Punkte nicht. „Shootout“ (Sprint-Qualifying) ist ein Qualifying ohne Pole
   (`race_weekend.is_main_qualifying`).
-- **Läufe je Runde:** Serie `weekend = {formats: [{from_round, sessions: [{label, offset, counts, points, dnf,
+- **Ablauf je Runde:** Serie `weekend = {formats: [{from_round, sessions: [{label, offset, counts, points, dnf,
   fastest_lap, grid}]}]}`. `points`: `series` (Schema der Saison = wie das Rennen), `none` oder Liste je Platz – ein
   Qualifying mit Liste zählt ohne Angabe von `counts`; `dnf`: `series`, `place` (Punkte nach Platz trotz DNF) oder `none`
   (0); `fastest_lap`: `null` (wie die Saison) oder Bonuspunkte; `grid`: `manual`, `qualifying` oder

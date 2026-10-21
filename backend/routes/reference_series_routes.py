@@ -247,7 +247,7 @@ async def update_series(series_id: str, body: ReferenceSeriesUpdate, me: dict = 
                             "rules_note": (note or "").strip() or None, "rules_changed_at": changed_at,
                             "rules_changed_by": me["id"],
                             "rules_history": [*(existing.get("rules_history") or []), replaced]})
-    # Läufe je Runde (#1930): Punkte und Startplatz je Lauf ändern die Stände - neu rechnen und im Protokoll festhalten.
+    # Ablauf je Runde (#1930): Punkte und Startplatz je Lauf ändern die Stände - neu rechnen und im Protokoll festhalten.
     weekend_changed = "weekend" in updates and updates["weekend"] != existing.get("weekend")
     if "weekend" in updates and not weekend_changed:
         updates.pop("weekend")

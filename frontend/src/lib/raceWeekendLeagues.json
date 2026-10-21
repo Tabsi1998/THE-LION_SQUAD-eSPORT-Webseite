@@ -1,5 +1,5 @@
 {
-  "_comment": "Rennwochenende (#1930): zwei Ligen mit Punkten je Lauf wie in der Veranstalter-App, je ein Wochenende mit erfundenen Fahrern. Server (backend/tests/test_race_weekend_leagues_unit.py) rechnet die Punkte und Summen nach, das Web (lib/raceWeekend.test.js) die Tabellen je Lauf.",
+  "_comment": "Runde mit Läufen (#1930): zwei Ligen mit Punkten je Lauf wie in der Veranstalter-App, je eine Runde mit erfundenen Fahrern. Server (backend/tests/test_race_weekend_leagues_unit.py) rechnet die Punkte und Summen nach, das Web (lib/raceWeekend.test.js) die Tabellen je Lauf.",
   "people": [
     { "id": "anna", "name": "Probe Anna" },
     { "id": "bert", "name": "Probe Bert" },

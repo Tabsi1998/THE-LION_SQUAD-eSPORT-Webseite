@@ -1,4 +1,4 @@
-// Rennwochenende (#1930): Termine mit demselben Kürzel sind EINE Runde mit mehreren Läufen (Qualifying, Sprint,
+// Runde mit Läufen (#1930): Termine mit demselben Kürzel sind EINE Runde mit mehreren Läufen (Qualifying, Sprint,
 // Rennen …). Der Server sagt je Termin seinen Lauf (`session`), dessen Art (`session_kind`) und die Runde (`weekend`);
 // hier wird nur gruppiert, beschriftet und gezählt - für Kalender, Rennraster, Verwaltung, „Läuft gerade“ und „Heute im
 // Einsatz“. Ein Termin ohne Lauf ist ein Rennen, bestehende Saisons sehen also aus wie bisher.
@@ -174,7 +174,7 @@ export function sessionPointsLines(weekend) {
   return lines;
 }
 
-// ---------------------------------------------------------------- Läufe je Runde (Verwaltung)
+// ---------------------------------------------------------------- Ablauf je Runde (Verwaltung)
 
 let formKey = 0;
 const nextKey = (prefix) => {
@@ -201,7 +201,18 @@ export function pointsPreview(list, { head = 5 } = {}) {
   return shown.join(" · ");
 }
 
-/** Ein Abschnitt „ab Runde X“ im Formular - neu mit Qualifying und Rennen (+30 Minuten). */
+/** Die Läufe eines Formats in zeitlicher Reihenfolge (nach Versatz, wie die Terminliste sie anlegt): „Quali + Sprint +
+ * Hauptrennen“. */
+export function formatSummary(sessions) {
+  const named = (sessions || []).filter((session) => String(session?.label || "").trim());
+  if (!named.length) return "Noch kein Lauf";
+  return [...named]
+    .sort((a, b) => (Number(a.offset) || 0) - (Number(b.offset) || 0))
+    .map((session) => chipLabel({ session: session.label }))
+    .join(" + ");
+}
+
+/** Ein Format („ab Runde X“) im Formular - neu mit Qualifying und Rennen (+30 Minuten). */
 export function emptyFormat(values = {}) {
   return {
     from_round: "1",
@@ -211,7 +222,7 @@ export function emptyFormat(values = {}) {
   };
 }
 
-/** Läufe je Runde vom Server → Formular. */
+/** Ablauf je Runde vom Server → Formular. */
 export function weekendToForm(weekend) {
   return (weekend?.formats || []).map((format) => emptyFormat({
     from_round: String(format.from_round ?? 1),
@@ -228,7 +239,7 @@ export function weekendToForm(weekend) {
   }));
 }
 
-/** Formular → Läufe je Runde für den Server; ohne Abschnitt `null` (keine Vorgabe). */
+/** Formular → Ablauf je Runde für den Server; ohne Abschnitt `null` (keine Vorgabe). */
 export function weekendPayload(formats) {
   const list = (formats || []).filter((format) => (format.sessions || []).some((session) => String(session.label || "").trim()));
   if (!list.length) return null;

@@ -1,9 +1,15 @@
 import {
   averageGrid, averageGridLabel, chipLabel, groupWeekends, hasSessions, isMainQualifying, nextSessionLabel, poleCount, pointsPreview,
   qualiDuel, qualifyingMode, sessionAbbr, sessionKind, sessionLabel, sessionPointsLines, sessionTables, weekendPayload, weekendState,
-  weekendToForm,
+  weekendToForm, formatSummary,
 } from "./raceWeekend";
 import LEAGUES from "./raceWeekendLeagues.json";
+
+test("Ablauf je Runde: ein Format in Worten, Läufe in zeitlicher Reihenfolge", () => {
+  expect(formatSummary([{ label: "Qualifying", offset: "0" }, { label: "Hauptrennen", offset: "75" }, { label: "Sprint", offset: "30" }]))
+    .toBe("Quali + Sprint + Hauptrennen");
+  expect(formatSummary([{ label: " " }])).toBe("Noch kein Lauf");
+});
 
 test("Kopf eines Qualifyings: Punkte nur, wenn es zählt; Pole nicht im Shootout", () => {
   expect(qualifyingMode({ session: "Qualifying", counts: false })).toBe("Qualifying · ohne Punkte · Pole von selbst");
@@ -27,7 +33,7 @@ const F2 = { formats: [
   ] },
 ] };
 
-test("Läufe je Runde: Formular hin und zurück ohne Verlust, leer heißt keine Vorgabe", () => {
+test("Ablauf je Runde: Formular hin und zurück ohne Verlust, leer heißt keine Vorgabe", () => {
   expect(weekendPayload(weekendToForm(F2))).toEqual(F2);
   expect(weekendPayload([])).toBeNull();
   expect(weekendToForm(null)).toEqual([]);
@@ -85,7 +91,7 @@ test("Punkte je Lauf in Worten - ab Runde X nur, was sich ändert", () => {
   expect(sessionPointsLines(null)).toEqual([]);
 });
 
-// Rennwochenende (#1930): eine Runde mit Läufen - gruppieren, beschriften, zählen. Nur erfundene Namen und Orte.
+// Runde mit Läufen (#1930): eine Runde mit Läufen - gruppieren, beschriften, zählen. Nur erfundene Namen und Orte.
 
 const WEEKEND = [
   { id: "q1", code: "R1", session: "Qualifying", session_kind: "qualifying", weekend: 1, state: "scored", counts: false, venue: "Probering", country_code: "AT" },

@@ -1,4 +1,4 @@
-"""Rennwochenende mit Läufen (#1930) über die echten Routen: „Läufe je Runde“ als Vorgabe der Saison (auch ab Runde X
+"""Runde mit Läufen (#1930) über die echten Routen: „Ablauf je Runde“ als Vorgabe der Saison (auch ab Runde X
 wechselnd), eine Zeile je Runde legt alle Läufe an, Qualifying zählt nicht und setzt die Pole selbst, Startplatz und
 Pole des Rennens kommen aus dem Qualifying, ein Sprint hat sein eigenes Punkteschema, die Serienseite zählt Runden statt
 Läufe und „Läuft gerade“ nennt den nächsten Lauf. Nur erfundene Namen und Orte."""

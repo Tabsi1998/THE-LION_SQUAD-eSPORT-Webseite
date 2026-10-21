@@ -3,7 +3,7 @@ import { PUBLIC_STATE_LABELS, STATE_LABELS, STATE_TONES, dayLabel } from "@/lib/
 import { chipLabel } from "@/lib/raceWeekend";
 import { dayNoon, viennaDate } from "@/lib/vienna";
 
-// Lauf-Chips eines Rennwochenendes (#1930): „Quali · Sprint · Rennen“ in einer Zeile, je Chip in der Farbe seines
+// Lauf-Chips einer Runde (#1930): „Quali · Sprint · Rennen“ in einer Zeile, je Chip in der Farbe seines
 // Status (wie die Status-Abzeichen des Kalenders), optional mit Uhrzeit - an einem anderen Tag als der erste Lauf mit
 // Wochentag. Ein Chip ist ein Link (`hrefFor`), ein Knopf (`onOpen`, etwa „Ergebnis eintragen“ in der Verwaltung) oder
 // reiner Text. So docken die Ergebnis-Ansicht je Lauf (#1950) und die Verwaltung an, ohne die Chips neu zu bauen.

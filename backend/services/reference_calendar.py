@@ -14,7 +14,7 @@ und der Parser für eingefügte Terminlisten.
   Jahr der Saison, und springt das Datum zurück, das nächste Jahr. Ohne Datum folgt der nächste Standard-Wochentag der
   Serie (sonst eine Woche) nach der Zeile davor, ohne Uhrzeit die Standard-Uhrzeit. Aus dem Ort kommt das Land
   (``country_code``, #1925) - etwa „R1 · 18.06.2026 · Aserbaidschan“. Ein Lauf am Kürzel („R1S“, „R1 Sprint“, „R1 Q“,
-  #1930) kommt nach ``session`` statt in den Ort (``race_weekend.take_code``); die Läufe je Runde legt
+  #1930) kommt nach ``session`` statt in den Ort (``race_weekend.take_code``); die Ablauf je Runde legt
   ``race_weekend.expand_paste`` an.
 """
 from __future__ import annotations

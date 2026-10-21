@@ -1,7 +1,7 @@
 """Vorgaben „ab Runde X“ (#1930) - ohne Datenbank, für jede Einstellung einer Saison, die mitten in der Saison wechselt.
 
 Gespeichert wird eine Liste von Abschnitten ``[{"from_round": 1, ...}, {"from_round": 5, ...}]``: Ein Abschnitt gilt ab
-seiner Runde bis vor den nächsten. So wechselt etwa der Ablauf eines Rennwochenendes nach Runde 4 (Format 1 bis R4,
+seiner Runde bis vor den nächsten. So wechselt etwa der Ablauf einer Runde mit Läufen nach Runde 4 (Format 1 bis R4,
 Format 2 ab R5). ``normalize_phases`` prüft und sortiert, ``phase_for`` liefert den Abschnitt einer Runde,
 ``phase_ranges`` die Bereiche zum Anzeigen („R1–R4“, „ab R5“). Was ein Abschnitt sonst enthält, prüft der Aufrufer
 (``normalize_item``) - die Regel „ab Runde X“ selbst steht nur hier und lässt sich für weitere Vorgaben (etwa

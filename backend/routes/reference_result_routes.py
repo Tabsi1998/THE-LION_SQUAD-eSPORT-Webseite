@@ -75,10 +75,10 @@ gewertet sind.
   kein Alias - beides steht im Löschfilter, falls der Vorstand dazwischen zuordnet) und in keinem Blatt der Saison
   stehen (``series_participants.remove_unused_new``).
 
-**Rennwochenende (#1930):** Ein Termin mit Lauf (``round.session``, ``round.session_kind``) rechnet mit dem
+**Runde mit Läufen (#1930):** Ein Termin mit Lauf (``round.session``, ``round.session_kind``) rechnet mit dem
 Punkteschema seines Laufs (``race_weekend.rules_for_round`` - ``series.rules`` im Ausgangsstand ist dieses). Im Blatt
 eines Qualifyings bekommt Platz 1 die Marke ``pole`` (außer eine Zeile trägt sie schon), der Hinweis „zählt nicht zur
-Wertung“ entfällt dort. Startplatz und Pole des Rennens kommen beim Rechnen aus dem Qualifying desselben Wochenendes.
+Wertung“ entfällt dort. Startplatz und Pole des Rennens kommen beim Rechnen aus dem Qualifying derselben Runde.
 
 **POST …/results/approve** und **POST …/results/discard** (nur Vorstand), Body ``{expected_version}``: Freigeben
 veröffentlicht den Entwurf daneben (ohne einen solchen das Blatt im Entwurf) samt Revision, Protokoll

@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 
-// Rennwochenende (#1930) auf der Seite einer Rennliga: eine Runde mit Lauf-Chips im Kalender, ein Kopf je Runde über
+// Runde mit Läufen (#1930) auf der Seite einer Rennliga: eine Runde mit Lauf-Chips im Kalender, ein Kopf je Runde über
 // Sprint und Rennen im Raster, Fortschritt in Runden, der nächste Lauf, Punkte je Lauf und im Fahrer-Detail Poles, Ø Start
 // und das Quali-Duell. Nur erfundene Namen und Orte.
 

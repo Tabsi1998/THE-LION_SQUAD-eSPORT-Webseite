@@ -3,8 +3,8 @@ const path = require("node:path");
 const { test, expect } = require("@playwright/test");
 const { ENABLED, STATE_FILE, state, signIn, watch } = require("./abnahmeSession");
 
-// Abnahme gegen den echten Server (docs/entwicklung/abnahme-lokal.md): Rennwochenende mit Läufen (#1930). Eine F2 mit
-// „Läufe je Runde“ (R1–R4 Blitz-Qualifying, Sprint mit eigenem Schema, Hauptrennen; ab R5 Sprint und Hauptrennen aus der
+// Abnahme gegen den echten Server (docs/entwicklung/abnahme-lokal.md): Runde mit Läufen (#1930). Eine F2 mit
+// „Ablauf je Runde“ (R1–R4 Blitz-Qualifying, Sprint mit eigenem Schema, Hauptrennen; ab R5 Sprint und Hauptrennen aus der
 // umgekehrten WM-Reihenfolge) bekommt 8 Zeilen als Terminliste - 20 Läufe, im Kalender 8 Runden. Zwei Runden werden
 // gewertet: Qualifying mit Zeiten (Pole von selbst), Sprint, Hauptrennen ohne Startplatz (kommt aus dem Qualifying). Eine
 // F1 mit Qualifying und Rennen zählt die Pole. Ohne Anmeldung zeigen Kalender, Rennraster, Fahrer-Detail, „Läuft gerade“
@@ -75,7 +75,7 @@ async function noOverflow(page) {
   expect(overflow, wide.join("\n")).toBeLessThanOrEqual(0);
 }
 
-test.describe("Abnahme #1930: Rennwochenende mit Läufen", () => {
+test.describe("Abnahme #1930: Runde mit Läufen - Ablauf je Runde", () => {
   test.skip(!ENABLED, "nur für die lokale Abnahme (ABNAHME=1, siehe docs/entwicklung/abnahme-lokal.md)");
   test.skip(ENABLED && !state?.accounts?.admin, `Kein Seed-Stand: ${STATE_FILE} - erst scripts/seed_abnahme.py laufen lassen`);
   test.describe.configure({ mode: "serial", timeout: 300_000 });
@@ -151,7 +151,7 @@ test.describe("Abnahme #1930: Rennwochenende mit Läufen", () => {
       }));
       archive.unshift(["series", series.id]);
 
-      // Läufe je Runde über die Verwaltung: Format 1 (R1–R4), ab R5 ohne Qualifying in umgekehrter WM-Reihenfolge.
+      // Ablauf je Runde über die Verwaltung: Format 1 (R1–R4), ab R5 ohne Qualifying in umgekehrter WM-Reihenfolge.
       await admin.goto(`/admin/reference-series/${series.id}`);
       await admin.getByTestId("series-detail-edit").click();
       await admin.getByTestId("weekend-add").click();

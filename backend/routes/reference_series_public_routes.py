@@ -14,7 +14,7 @@ Runde. Gerechnet wird hier nichts: die Tabelle ist der gespeicherte Stand nach d
 (Entscheidung 2): fremde Namen nur als Text in der Tabelle - ohne Link und ohne Profil; ein ausgeblendeter Name kommt
 gar nicht erst mit. Nur Vereinsmitglieder tragen den Link zu ihrem Vereinsprofil. Die Seite ist ``noindex``.
 
-**Rennwochenende (#1930):** Jeder Termin trägt seinen Lauf (``session``, ``session_kind``) und seine Runde
+**Runde mit Läufen (#1930):** Jeder Termin trägt seinen Lauf (``session``, ``session_kind``) und seine Runde
 (``weekend``). Bei der Rennliga zählt der Fortschritt in Runden (alle zählenden Läufe einer Runde gewertet), der nächste
 Termin nennt seinen Lauf, und „Läuft gerade“ bringt dazu die Läufe der Runde (``next.sessions``).
 """
@@ -115,7 +115,7 @@ def _public_round(item: dict) -> dict:
 
 def _units(rounds: list[dict], by_weekend: bool) -> list[list[dict]]:
     """Die Wertungsrunden (ohne Finale und Termine außerhalb der Wertung): je Termin - bei der Rennliga je
-    Rennwochenende mit allen zählenden Läufen (#1930)."""
+    Runde mit allen zählenden Läufen (#1930)."""
     regular = [item for item in rounds if item.get("kind") != "final" and item.get("counts", True) is not False]
     if not by_weekend:
         return [[item] for item in regular]

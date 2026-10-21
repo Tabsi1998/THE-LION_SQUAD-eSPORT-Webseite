@@ -302,7 +302,7 @@ test("Läuft gerade: Fortschritt, Termin und Platz in der Sprache der Art", () =
   expect(nextValue({ state: "planned", code: "ST4", time: "20:00", club_day: "2026-10-22" })).toBe("Do 22.10. · 20:00 · ST4");
   expect(nextValue({ state: "planned", title: "Finale", time: null, club_day: "2026-10-24" })).toBe("Sa 24.10. · Finale");
   expect(nextValue(null)).toBe("Kein Termin offen");
-  // Rennwochenende (#1930): der nächste Lauf.
+  // Runde mit Läufen (#1930): der nächste Lauf.
   expect(nextValue({ state: "today", code: "R3", session: "Qualifying", time: "20:00", club_day: "2026-11-09" })).toBe("R3 · Qualifying · 20:00");
   expect(placeTitle("racing")).toBe("Bester Fahrer");
   expect(placeTitle("team_league")).toBe("Tabelle");

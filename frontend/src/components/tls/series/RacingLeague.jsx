@@ -20,7 +20,7 @@ import "./racingLeague.css";
 // Ausfall, Abstand, Abweichung zum offiziellen Wert), Teamwertung mit Balken und der Rennkalender. Die Tabellen sind
 // die der Turnierserie (SeriesStandings) mit eigenen Zellen. Das Detail eines Vereinsfahrers steht in der Adresse
 // (?fahrer=…), damit es sich teilen lässt; es gibt es nur für Kennungen, die der Server in `club_drivers` nennt
-// (öffentlich sichtbare Vereinsmitglieder) - eine andere Kennung in der Adresse öffnet nichts. Rennwochenende (#1930):
+// (öffentlich sichtbare Vereinsmitglieder) - eine andere Kennung in der Adresse öffnet nichts. Runde mit Läufen (#1930):
 // Hat die Saison Läufe, zählt der Fortschritt Runden, das Raster fasst die Läufe einer Runde unter einem Kopf zusammen,
 // der Kalender zeigt je Runde die Lauf-Chips, und das Fahrer-Detail nennt Poles, Ø Start und das Quali-Duell. Zählen
 // mehrere Arten von Läufen, schaltet „Gesamt · Rennen · Sprint · Quali“ zwischen der Gesamtwertung und den Tabellen je

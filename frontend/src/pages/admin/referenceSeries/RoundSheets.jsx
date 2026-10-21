@@ -125,7 +125,7 @@ export function PasteSheet({ series, lineage, version, onClose, onSaved, onStale
   const [preview, setPreview] = useState(null);
   const [saving, setSaving] = useState(false);
   const ready = preview && preview.text === text && !preview.errors.length && preview.rows.length > 0;
-  // Läufe je Runde (#1930): eine Zeile kann mehrere Termine ergeben.
+  // Ablauf je Runde (#1930): eine Zeile kann mehrere Termine ergeben.
   const total = preview?.count ?? preview?.rows?.length ?? 0;
   const withSessions = Boolean(preview?.rows?.some((row) => (row.sessions || []).some((item) => item.session)));
 
@@ -161,7 +161,7 @@ export function PasteSheet({ series, lineage, version, onClose, onSaved, onStale
     <AdminSheet title="Terminliste einfügen" eyebrow={lineage?.title} size="lg" onClose={onClose} onSubmit={submit} saving={saving}
       submitLabel={ready ? `${total} Termine übernehmen` : "Vorschau"} savingLabel={ready ? "Übernehme …" : "Prüfe …"} submitTestId="paste-submit" testId="paste-sheet">
       <TextAreaField label="Je Zeile ein Termin" value={text} onChange={edit} rows={8} testId="paste-text" placeholder={"R1 · 05.11. · Strecke\nR2 · 12.11. 20:00 · Strecke\nR3 Strecke"}
-        hint={`Kürzel, Datum (TT.MM. oder TT.MM.JJJJ), optional Uhrzeit und Ort – aus dem Ort kommt die Flagge. Ohne Datum: der nächste Standard-Wochentag nach der Zeile davor. Ohne Uhrzeit: ${defaults || "ohne Uhrzeit"}.${lineage?.kind === "racing" ? " Rennliga: Eine Zeile je Runde legt alle Läufe an, die die Saison vorgibt (Läufe je Runde); „R1 Sprint“, „R1S“ oder „R1 Q“ nur diesen Lauf." : ""}`} />
+        hint={`Kürzel, Datum (TT.MM. oder TT.MM.JJJJ), optional Uhrzeit und Ort – aus dem Ort kommt die Flagge. Ohne Datum: der nächste Standard-Wochentag nach der Zeile davor. Ohne Uhrzeit: ${defaults || "ohne Uhrzeit"}.${lineage?.kind === "racing" ? " Rennliga: Eine Zeile je Runde legt alle Läufe an, die die Saison vorgibt (Ablauf je Runde); „R1 Sprint“, „R1S“ oder „R1 Q“ nur diesen Lauf." : ""}`} />
       {preview && preview.errors.length > 0 && (
         <div className="border border-red-400/40 bg-red-400/10 rounded-sm p-3 text-sm text-red-200 space-y-1" data-testid="paste-errors" role="alert">
           <div className="font-bold">Die Liste hat Fehler – übernommen wird erst eine fehlerfreie Liste.</div>

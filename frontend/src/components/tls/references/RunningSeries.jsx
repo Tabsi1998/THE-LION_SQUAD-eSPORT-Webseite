@@ -10,7 +10,7 @@ import { SessionChips } from "@/components/tls/series/SessionChips";
 // Segmenten, nächstem Termin und unserem Platz als große Zahl. Was heute ansteht, kommt zuerst (Server) und trägt den
 // goldenen Chip „Heute“ mit dezentem Puls. Am Handy wischt man waagrecht von Karte zu Karte. Die Daten lädt die Seite
 // (schlanker Endpunkt, nur sichtbare aktive Saisons, keine Namen); ohne laufende Saison erscheint der Bereich nicht.
-// Rennwochenende (#1930): der nächste Termin nennt seinen Lauf, darunter die Lauf-Chips der Runde mit Uhrzeit.
+// Runde mit Läufen (#1930): der nächste Termin nennt seinen Lauf, darunter die Lauf-Chips der Runde mit Uhrzeit.
 
 // Bis zu so vielen Terminen zeigt der Balken Segmente, darüber einen durchgehenden Balken.
 const MAX_SEGMENTS = 30;

@@ -1,4 +1,4 @@
-"""Terminliste einfügen mit Läufen (#1930): je Zeile die Läufe, die „Läufe je Runde“ für ihre Runde vorgibt - mit
+"""Terminliste einfügen mit Läufen (#1930): je Zeile die Läufe, die „Ablauf je Runde“ für ihre Runde vorgibt - mit
 Uhrzeit-Versatz. Eigenes Modul, damit ``race_weekend`` (das ``models`` beim Prüfen nutzt) nicht vom Kalender abhängt.
 """
 from __future__ import annotations

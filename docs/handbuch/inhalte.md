@@ -437,19 +437,19 @@ bekommt keine Platzierung (der Status „abgebrochen“ kommt mit einem eigenen 
 Hat ein Termin kein Ergebnis, obwohl danach schon gewertet ist, steht oben der Hinweis **Lücke im Kalender** – meist
 fehlt das Ergebnis, oder der Termin wurde abgesagt.
 
-**Rennwochenende mit Läufen (Rennliga).** Eine Runde (gleiches Kürzel, etwa R1) kann mehrere **Läufe** haben:
+**Runde mit Läufen (Rennliga).** Eine Runde (gleiches Kürzel, etwa R1) kann mehrere **Läufe** haben:
 Qualifying, Shootout (Sprint-Qualifying), Sprint, Rennen, Hauptrennen, Lauf 1, Lauf 2 oder ein eigener Name. Jeder Lauf
 ist ein eigener Termin mit eigenem Ergebnisblatt, gezeigt wird aber eine Runde. Bestehende Termine ohne Lauf sind Rennen
 und bleiben, wie sie sind.
 
-- **Läufe je Runde** (Saison bearbeiten, nur bei einer Rennliga): **Läufe festlegen** legt den Ablauf an. Je Lauf gibt
-  es Name, **Versatz** in Minuten ab der Uhrzeit der Zeile, **Punkte** (**Wie Rennen** = das Schema der Saison,
-  **Keine Punkte** oder **Eigene Liste** wie `12-9-7-6-5-4-3-2-1`; darunter steht die Vorschau „P1 35 · P2 30 …“),
-  **Startplatz** (Eingabe, aus dem Qualifying oder in umgekehrter WM-Reihenfolge), **Zählt zur Wertung**, **Punkte trotz
-  DNF** und den **Bonus für die schnellste Runde** (leer: wie die Saison). Ein Qualifying zählt nicht – mit eigener
-  Liste (etwa P1 = 2 Punkte) zählt es von selbst. Ändert sich der Ablauf mitten in der Saison, kommt mit **Ab Runde …
-  anders** ein Abschnitt dazu, etwa ab Runde 5 ohne Qualifying. Ändert ihr Punkte oder Startplatz, rechnet die Seite
-  alle Stände neu. Beispiel F1-Liga: Shootout und Qualifying ohne Punkte, Sprint `12-9-7-6-5-4-3-2-1`, Rennen wie die
+- **Ablauf je Runde** (Saison bearbeiten, nur bei einer Rennliga): **Ablauf festlegen** legt Format 1 an, etwa
+  „Quali + Sprint + Hauptrennen“. Je Lauf gibt es Name, **Versatz** in Minuten ab der Uhrzeit der Zeile, **Punkte**
+  (**Wie Rennen** = das Schema der Saison, **Keine Punkte** oder **Eigene Liste** wie `12-9-7-6-5-4-3-2-1`; darunter
+  steht die Vorschau „P1 35 · P2 30 …“), **Startplatz** (Eingabe, aus dem Qualifying oder in umgekehrter
+  WM-Reihenfolge), **Zählt zur Wertung**, **Punkte trotz DNF** und den **Bonus für die schnellste Runde** (leer: wie die
+  Saison). Ein Qualifying zählt nicht – mit eigener Liste (etwa P1 = 2 Punkte) zählt es von selbst. Ändert sich der
+  Ablauf mitten in der Saison, kommt mit **Format ab Runde …** ein weiteres Format dazu, etwa ab Runde 5 ohne Qualifying.
+  Ändert ihr Punkte oder Startplatz, rechnet die Seite alle Stände neu. Beispiel F1-Liga: Shootout und Qualifying ohne Punkte, Sprint `12-9-7-6-5-4-3-2-1`, Rennen wie die
   Saison (`35-30-26-…-1`); F2-Liga: Qualifying `2` (die Pole bringt 2 Punkte), Sprint und Rennen wie die Saison.
 - **Liste einfügen:** Eine Zeile je Runde (`R1 · 07.03.2026 · Australien`) legt alle Läufe der Vorgabe an – 8 Zeilen
   ergeben bei Quali, Sprint und Rennen 24 Läufe. Eine Zeile mit Lauf legt nur diesen an: `R1 Sprint`, `R1S`, `R1 S`,
@@ -468,7 +468,7 @@ und bleiben, wie sie sind.
 
 <table>
 <tr>
-<td><img src="../assets/serien/serien-laeufe-je-runde.png" alt="Saison bearbeiten: Läufe je Runde mit Qualifying, Sprint mit eigenem Schema und Hauptrennen, ab Runde 5 anders" width="420"></td>
+<td><img src="../assets/serien/serien-laeufe-je-runde.png" alt="Saison bearbeiten: Ablauf je Runde mit Qualifying, Sprint mit eigenem Schema und Hauptrennen, ab Runde 5 anders" width="420"></td>
 <td><img src="../assets/serien/serien-laeufe-kalender.png" alt="Kalender der Verwaltung: je Runde ein Kopf, darunter Qualifying, Sprint und Hauptrennen mit eigenem Status" width="420"></td>
 </tr>
 </table>
@@ -550,7 +550,7 @@ Aufstellung, dazu bei Bedarf die Tabelle laut Veranstalter.
   Gäste markiert; darüber, wie viele Fahrer je Rennen zählen und ob Gäste mitzählen.
 - **Rennkalender:** alle Termine mit Status; bei gewerteten Rennen der Sieger, wenn er aus dem Verein ist, sonst der
   beste Vereinsfahrer mit Platz.
-- **Rennwochenende:** Hat die Saison Läufe, steht im Kalender je Runde eine Zeile mit Flagge, Ort und den **Lauf-Chips**
+- **Runde mit Läufen:** Hat die Saison Läufe, steht im Kalender je Runde eine Zeile mit Flagge, Ort und den **Lauf-Chips**
   „Quali · Sprint · Rennen“ (Uhrzeit und Status), der Sieger je zählendem Lauf darunter. Im Rennraster steht über Sprint
   und Rennen ein Kopf mit Flagge und Kürzel, darunter S, R, HR …; die Tabelle summiert alle zählenden Läufe, die Punkte
   je Lauf stehen über der Tabelle. Zählen mehrere Arten von Läufen, schaltet **Gesamt · Rennen · Sprint · Quali** um –

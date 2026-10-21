@@ -18,7 +18,7 @@ export const PROGRESS_WORDS = {
 };
 
 /** Ein Feld je Wertungsrunde (gewertet in Cyan), das Finale in Gold am Ende; darunter der nächste Termin. Mit
- * `weekends` ist ein Feld eine Runde mit allen ihren Läufen (Rennwochenende, #1930) - gewertet, wenn alle es sind. */
+ * `weekends` ist ein Feld eine Runde mit allen ihren Läufen (Runde mit Läufen, #1930) - gewertet, wenn alle es sind. */
 export function SeriesProgress({ progress, rounds, words = PROGRESS_WORDS.series, weekends = false }) {
   const columns = roundColumns(rounds);
   const steps = weekends

@@ -13,7 +13,7 @@ import { SessionChips } from "@/components/tls/series/SessionChips";
 // Tabelle führt. Gestaltet wie die Karten „Läuft gerade“ der Referenzen-Übersicht: goldener Chip „Heute“ mit dezentem
 // Puls, Karten blenden gestaffelt ein. Mit „Bewegung reduzieren“ stehen Puls und Einblenden still (index.css,
 // .tls-run-*). Steht heute nichts an oder scheitert der Abruf, gibt es den Streifen nicht - die Seite bleibt wie sie ist.
-// Rennwochenende (#1930): statt „Rennen R3“ der heutige Lauf („R3 · Qualifying“), darunter die Lauf-Chips der Runde.
+// Runde mit Läufen (#1930): statt „Rennen R3“ der heutige Lauf („R3 · Qualifying“), darunter die Lauf-Chips der Runde.
 
 export function HomeTodayStrip() {
   const [items, setItems] = useState([]);

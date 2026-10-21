@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 
-// Rennwochenende in der Verwaltung (#1930): „Läufe je Runde“ in der Saison (auch ab Runde X anders), der Kalender mit
+// Runde mit Läufen in der Verwaltung (#1930): „Ablauf je Runde“ in der Saison (auch ab Runde X anders), der Kalender mit
 // einem Kopf je Runde und ihren Läufen, Ergebnisse je Lauf über Chips, ein neuer Termin mit Lauf (Qualifying zählt nicht)
 // und die Terminliste mit den Läufen je Zeile. Nur erfundene Orte.
 
@@ -39,7 +39,7 @@ beforeEach(() => {
   apiMock.patch.mockResolvedValue({ data: {} });
 });
 
-test("Saison: Läufe je Runde festlegen, Sprint mit eigenem Schema, ab Runde 5 anders", async () => {
+test("Saison: Ablauf je Runde festlegen, Sprint mit eigenem Schema, ab Runde 5 anders", async () => {
   render(<SeriesForm series={{ id: "serie-1", season: "2026", status: "active", rules: { points_mode: "scheme", points_by_place: [25, 18, 15, 12, 10, 8, 6, 4, 2, 1] } }} lineage={LINEAGE} onClose={() => {}} onSaved={() => {}} />);
   fireEvent.click(screen.getByTestId("weekend-add"));
   const format = screen.getByTestId("weekend-format");

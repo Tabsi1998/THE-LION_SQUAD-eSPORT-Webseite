@@ -1599,7 +1599,7 @@ def _series_rules(value: Optional[dict]) -> Optional[dict]:
 
 
 def _weekend(value: Optional[dict]) -> Optional[dict]:
-    """Läufe je Runde (#1930) - geprüft und vervollständigt in ``services/race_weekend.py``."""
+    """Ablauf je Runde (#1930) - geprüft und vervollständigt in ``services/race_weekend.py``."""
     from services.race_weekend import normalize_weekend
 
     return normalize_weekend(value)
@@ -1710,7 +1710,7 @@ class ReferenceSeriesCreate(BaseModel):
     order_index: int = 0
     season_result: Optional[ReferenceSeasonResult] = None  # #1898: Vermerk statt Ableitung aus dem Stufennamen
     result_image_template: Optional[str] = Field(default=None, max_length=60)  # #1756: Vorlage für Ergebnis-Bilder
-    weekend: Optional[Dict[str, Any]] = None  # #1930: Läufe je Runde, auch ab Runde X wechselnd
+    weekend: Optional[Dict[str, Any]] = None  # #1930: Ablauf je Runde, auch ab Runde X wechselnd
 
     @field_validator("rules")
     @classmethod
@@ -1800,7 +1800,7 @@ class ReferenceRoundCreate(BaseModel):
     # ``False`` heißt von Hand gewählt (auch „ohne Flagge“) - dann bleibt es, auch wenn sich die Strecke ändert.
     country_code: Optional[str] = Field(default=None, max_length=2)
     country_auto: bool = True
-    # #1930: Lauf des Rennwochenendes („Qualifying“, „Sprint“ …); leer heißt Rennen. Ohne Angabe von ``counts`` zählt
+    # #1930: Lauf einer Runde („Qualifying“, „Sprint“ …); leer heißt Rennen. Ohne Angabe von ``counts`` zählt
     # ein Qualifying nicht zur Wertung.
     session: Optional[str] = Field(default=None, max_length=30)
 

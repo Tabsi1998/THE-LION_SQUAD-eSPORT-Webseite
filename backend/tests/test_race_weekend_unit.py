@@ -1,4 +1,4 @@
-"""Rennwochenende mit Läufen (#1930) ohne Datenbank: Lauf je Termin, Kürzel-Varianten beim Einfügen, „Läufe je Runde“
+"""Runde mit Läufen (#1930) ohne Datenbank: Lauf je Termin, Kürzel-Varianten beim Einfügen, „Ablauf je Runde“
 auch ab Runde X wechselnd, Punkte je Lauf, Pole und Startplatz aus dem Qualifying, umgekehrte Wertung als Startplatz.
 Nur erfundene Namen und Orte."""
 import pathlib
@@ -82,7 +82,7 @@ def test_a_pasted_list_keeps_the_session_out_of_the_venue():
         ("R1", "Sprint", "Australien", "AU"), ("R1", None, "Australien", "AU")]
 
 
-# ---------------------------------------------------------------- Läufe je Runde
+# ---------------------------------------------------------------- Ablauf je Runde
 def test_the_weekend_template_fills_in_defaults_per_kind():
     weekend = race_weekend.normalize_weekend(F2)
     first, second = weekend["formats"]

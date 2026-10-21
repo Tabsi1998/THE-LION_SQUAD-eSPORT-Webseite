@@ -140,7 +140,7 @@ function raceTitle(item) {
 }
 
 /** Detail eines Vereinsfahrers: Platz, Punkte, Rennen, Siege, Podien, schnellste Runden, Ausfälle und je Rennen ein
- * Balken mit Platz. `flash` lässt den Rahmen nach einem Sprung aus der Tabelle einmal aufleuchten. Rennwochenende
+ * Balken mit Platz. `flash` lässt den Rahmen nach einem Sprung aus der Tabelle einmal aufleuchten. Runde mit Läufen
  * (#1930): Poles je Runde einmal (Pole am Rennen oder Platz 1 im Qualifying, `qualifying` vom Server), Ø Startplatz,
  * Quali-Duell gegen den Teamkollegen (`qualiDuel`: `{ name, a, b, sessions }`) und je Balken der Lauf (S, R …). */
 export const RacingDriverDetail = forwardRef(function RacingDriverDetail({ row, driver, rounds, flash, qualifying, qualiDuel }, ref) {

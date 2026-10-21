@@ -13,7 +13,7 @@ import { toast } from "sonner";
 
 // Saison einer Spur (#1741): Saison und Stufe ergeben die Adresse, die Vorlage füllt die Regeln vor (kopiert, nicht
 // verknüpft). Ändert sich beim Bearbeiten eine Regel, rechnet der Server alle Stände neu und vermerkt den Hinweis.
-// Rennliga (#1930): dazu „Läufe je Runde“ - der Ablauf eines Rennwochenendes, auch ab Runde X wechselnd.
+// Rennliga (#1930): dazu „Ablauf je Runde“ - der Ablauf einer Runde mit Läufen, auch ab Runde X wechselnd.
 
 export function SeriesForm({ series, lineage, schemes = [], defaultRules = {}, onClose, onSaved }) {
   const isNew = !series?.id;

@@ -1,26 +1,26 @@
-"""Rennwochenende mit Läufen (#1930) - ohne Datenbank: Lauf je Termin, „Läufe je Runde“ als Vorgabe der Saison (auch
+"""Runde mit Läufen (#1930) - ohne Datenbank: Lauf je Termin, „Ablauf je Runde“ als Vorgabe der Saison (auch
 ab Runde X wechselnd), Kürzel-Varianten beim Einfügen, Punkte je Lauf, Pole und Startplatz aus dem Qualifying.
 
 - **Lauf** (``session``): ein Termin ist weiter ein eigener Termin mit eigenem Ergebnisblatt, trägt aber einen Lauf
   („Qualifying“, „Sprint“, „Rennen“, „Hauptrennen“, „Lauf 1“ … - freier Text bis 30 Zeichen). Leer heißt Rennen, so
   bleiben bestehende Termine unverändert. Die Art (``session_kind``: ``qualifying``, ``sprint``, ``race``) kommt aus dem
   Namen: „Blitz-Qualifying“ ist ein Qualifying, „Sprint“ ein Sprint, alles andere ein Rennen.
-- **Rennwochenende:** Termine mit demselben Kürzel (ohne Leerraum, Groß/klein egal) bilden eine Runde; ein Termin ohne
+- **Runde mit Läufen:** Termine mit demselben Kürzel (ohne Leerraum, Groß/klein egal) bilden eine Runde; ein Termin ohne
   Kürzel ist seine eigene Runde. Gezählt werden die Runden in Kalender-Reihenfolge (``weekend_groups``), abgesagte
   zählen mit, archivierte nicht - das ist die „Runde X“ der Vorgaben.
-- **Läufe je Runde** (Serie ``weekend``): ``{"formats": [{"from_round": 1, "sessions": [...]}, …]}`` - je Abschnitt
+- **Ablauf je Runde** (Serie ``weekend``): ``{"formats": [{"from_round": 1, "sessions": [...]}, …]}`` - je Abschnitt
   (``round_phases``, „ab Runde X“) die Läufe mit Name, Uhrzeit-Versatz in Minuten (``offset``), Wertung (``counts``),
   Punkten (``points``: ``series`` = Schema der Saison wie das Rennen, ``none`` oder eine eigene Liste je Platz), Punkte
   trotz DNF (``dnf``: ``series``, ``place`` = nach Platz, ``none`` = 0), Bonus für die schnellste Runde
   (``fastest_lap``: ``None`` = wie die Saison, sonst die Punkte) und der Quelle des Startplatzes (``grid``: ``manual`` =
-  Eingabe, ``qualifying`` = Qualifying desselben Wochenendes, ``reverse_standings`` = umgekehrte Reihenfolge der
-  Fahrerwertung vor dem Wochenende). Ein Qualifying zählt nicht - außer es hat eine eigene Liste (etwa P1 = 2 Punkte)
+  Eingabe, ``qualifying`` = Qualifying derselben Runde, ``reverse_standings`` = umgekehrte Reihenfolge der
+  Fahrerwertung vor der Runde). Ein Qualifying zählt nicht - außer es hat eine eigene Liste (etwa P1 = 2 Punkte)
   oder ``counts`` sagt es ausdrücklich.
 - **Einfügen:** „R1S“, „R1 S“, „R1-Sprint“, „R1 Sprint“ → Kürzel R1, Lauf Sprint (``take_code``); eine Zeile ohne Lauf
   legt alle Läufe der Vorgabe an (``race_weekend_paste.expand_paste``), eine Zeile mit Lauf nur diesen.
 - **Rechnen** (``standings``): je Lauf das eigene Punkteschema; ein leerer Startplatz kommt aus dem Qualifying bzw. der
   umgekehrten Wertung (eingetragene Werte, etwa nach Strafen, bleiben); die Pole des Qualifyings (Platz 1, im Blatt als
-  Marke ``pole`` gesetzt - ``mark_pole``) zählt am ersten Rennen des Wochenendes, das seinen Startplatz aus diesem
+  Marke ``pole`` gesetzt - ``mark_pole``) zählt am ersten Rennen der Runde, das seinen Startplatz aus diesem
   Qualifying nimmt - so zählt ein Pole-Bonus wie bisher am Rennen. Zählt das Qualifying selbst, bleibt die Pole dort.
 """
 from __future__ import annotations
@@ -148,7 +148,7 @@ def take_code(text: str) -> tuple[str | None, str | None, str]:
     return None, None, raw
 
 
-# ---------------------------------------------------------------- Rennwochenende
+# ---------------------------------------------------------------- Runde mit Läufen
 def weekend_key(rnd: dict) -> str | None:
     """Schlüssel der Runde: das Kürzel ohne Leerraum, Groß/klein egal - ohne Kürzel ``None`` (eigene Runde)."""
     key = "".join(str(rnd.get("code") or "").split()).casefold()
@@ -182,7 +182,7 @@ def annotate(rounds: list[dict]) -> list[dict]:
     return rounds
 
 
-# ---------------------------------------------------------------- Läufe je Runde
+# ---------------------------------------------------------------- Ablauf je Runde
 def _whole(value, field: str, low: int, high: int, default: int) -> int:
     if value is None or value == "":
         return default
@@ -265,12 +265,12 @@ def _format(raw: dict, where: str) -> dict:
 
 
 def normalize_weekend(raw) -> dict | None:
-    """„Läufe je Runde“ geprüft und vervollständigt - ohne Abschnitte ``None`` (dann gibt es keine Vorgabe)."""
+    """„Ablauf je Runde“ geprüft und vervollständigt - ohne Abschnitte ``None`` (dann gibt es keine Vorgabe)."""
     if raw is None:
         return None
     if not isinstance(raw, dict):
-        raise ValueError("Läufe je Runde: Angaben fehlen.")
-    formats = normalize_phases(raw.get("formats"), _format, label="Läufe je Runde")
+        raise ValueError("Ablauf je Runde: Angaben fehlen.")
+    formats = normalize_phases(raw.get("formats"), _format, label="Format")
     return {"formats": formats} if formats else None
 
 
@@ -371,7 +371,7 @@ def _quali_for(sessions: list[dict], index: int, plan: dict, sheets: dict) -> di
 
 
 def with_qualifying(rounds: list[dict], sheets: dict, plan: dict) -> dict:
-    """Blätter mit Startplatz und Pole aus dem Qualifying desselben Wochenendes - nur, wo der Startplatz leer ist und
+    """Blätter mit Startplatz und Pole aus dem Qualifying derselben Runde - nur, wo der Startplatz leer ist und
     der Lauf ihn aus dem Qualifying nimmt. Ändert nichts an ``sheets``."""
     out = dict(sheets)
     poled: set[str] = set()
@@ -411,8 +411,8 @@ def _derived(row: dict, places: dict, pole: str | None) -> dict:
 
 
 def with_reverse_grid(rounds: list[dict], sheets: dict, plan: dict, snapshots: list[dict]) -> dict:
-    """Blätter mit Startplatz in umgekehrter Reihenfolge der Fahrerwertung nach der letzten gewerteten Runde vor dem
-    Wochenende - wer hinten liegt, startet vorn. Wer dort nicht steht, bekommt keinen Startplatz; ein eingetragener
+    """Blätter mit Startplatz in umgekehrter Reihenfolge der Fahrerwertung nach der letzten gewerteten Runde davor -
+    wer hinten liegt, startet vorn. Wer dort nicht steht, bekommt keinen Startplatz; ein eingetragener
     bleibt. Ohne Änderung kommt ``sheets`` selbst zurück."""
     groups = weekend_groups(rounds)
     active = [rnd for rnd in ordered_rounds(rounds) if not rnd.get("archived_at")]
