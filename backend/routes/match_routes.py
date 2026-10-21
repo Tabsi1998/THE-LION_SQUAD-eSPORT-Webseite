@@ -33,7 +33,7 @@ from models import (
     new_id,
 )
 from services.competition_read import canonical_match_for_source, find_match_source
-from services.match_overview import operational_match_overviews, own_match_overviews
+from services.match_overview import own_match_overviews
 from services.match_duration import load_duration_game, with_effective_durations
 from services.match_public_view import public_match_view, public_tournament_view
 from services.match_planning import (
@@ -689,11 +689,6 @@ async def my_upcoming(me: dict = Depends(get_current_user)):
     return matches
 
 
-@router.get("/operations")
-async def operational_matches(me: dict = Depends(get_current_user)):
-    return await operational_match_overviews(get_db(), me)
-
-
 @router.get("/{match_id}/page")
 async def get_match_page(match_id: str, user: dict | None = Depends(get_optional_user)):
     match, collection = await _find_match_any(match_id)
@@ -933,8 +928,8 @@ async def post_match_chat(match_id: str, body: MatchChatCreate, request: Request
         try:
             from services import xp
             await xp.grant(me["id"], "community_chat", doc["id"])
-        except Exception:  # noqa: BLE001
-            pass
+        except Exception as exc:  # noqa: BLE001 - XP hält keine Nachricht auf
+            logger.warning("[xp] community_chat für Nachricht %s nicht gutgeschrieben type=%s", doc["id"], type(exc).__name__)
         try:
             await _notify_match_chat_message(db, match, collection, me, doc)
         except Exception:

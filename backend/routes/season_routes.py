@@ -9,7 +9,7 @@ from typing import Optional, List, Literal
 from datetime import datetime
 
 from database import get_db
-from auth import require_admin, get_current_user
+from auth import require_admin
 from services.slug_utils import apply_slug_history, find_by_slug_or_history, slug_source_for_update, unique_slug
 from services.competition_read import load_competition_read_model, observe_structure_read
 from services.competition_standings import standings_for_structure
@@ -137,89 +137,6 @@ async def update_season(sid: str, body: SeasonUpdate, me: dict = Depends(require
 async def delete_season(sid: str, me: dict = Depends(require_admin())):
     db = get_db()
     await db.seasons.delete_one({"$or": [{"id": sid}, {"slug": sid}]})
-    return {"ok": True}
-
-
-# ---------- Phase 7: Jahreswertung v2 (Vereinsplattform spec) ----------
-@season_router.get("/v2/leaderboard")
-async def leaderboard_v2(
-    season_id: str | None = None,
-    only_members: bool = False,
-    only_community: bool = False,
-    rookie_only: bool = False,
-    teams: bool = False,
-    source_type: str | None = None,
-    limit: int = 100,
-):
-    """Aggregated standings using the Phase 7 points formula
-    (base × weight × participant_factor + bonus, with farming protection)."""
-    from services.season_service import aggregate_leaderboard
-    rows = await aggregate_leaderboard(
-        season_id=season_id,
-        only_members=only_members,
-        only_community=only_community,
-        rookie_only=rookie_only,
-        teams=teams,
-        source_type=source_type,
-        limit=limit,
-    )
-    for i, r in enumerate(rows):
-        r["rank"] = i + 1
-    return {"standings": rows}
-
-
-@season_router.get("/v2/me")
-async def my_season_points(me: dict = Depends(get_current_user)):
-    db = get_db()
-    season = await db.seasons.find_one({"status": "active"}, {"_id": 0})
-    if not season:
-        return {"season": None, "total": 0, "entries": []}
-    entries = await db.season_points.find(
-        {"season_id": season["id"], "user_id": me["id"]}, {"_id": 0},
-    ).sort("created_at", -1).to_list(500)
-    total = round(sum(e.get("total_points", 0) for e in entries), 1)
-    from services.season_service import _achievement_summaries, _summarise_point_entries
-    achievements = (await _achievement_summaries(db, [me["id"]])).get(me["id"], {})
-    return {
-        "season": season,
-        "total": total,
-        "season_points": total,
-        "entries": entries,
-        "source_breakdown": _summarise_point_entries(entries, max(int(season.get("drop_worst") or 0), 0)).get("source_breakdown", []),
-        "achievement_count": achievements.get("achievement_count", 0),
-        "achievement_points": achievements.get("achievement_points", 0),
-        "profile_points": achievements.get("achievement_points", 0),
-    }
-
-
-@season_router.post("/v2/award")
-async def award_points_admin(body: dict, me: dict = Depends(require_admin())):
-    """Admin: manually award season points to a user/team."""
-    from services.season_service import award_points
-    res = await award_points(
-        user_id=body.get("user_id"),
-        team_id=body.get("team_id"),
-        source_type=body.get("source_type", "custom"),
-        source_id=body.get("source_id"),
-        source_name=body.get("source_name", "Manuelle Vergabe"),
-        rank=body.get("rank"),
-        num_participants=int(body.get("num_participants", 1)),
-        weight=float(body["weight"]) if body.get("weight") is not None else None,
-        bonus=int(body.get("bonus", 0)),
-        bonus_reason=body.get("bonus_reason"),
-        farming_exempt=bool(body.get("farming_exempt", False)),
-    )
-    if res is None:
-        raise HTTPException(400, "Keine aktive Saison.")
-    return res
-
-
-@season_router.delete("/v2/entry/{entry_id}")
-async def delete_season_entry(entry_id: str, me: dict = Depends(require_admin())):
-    db = get_db()
-    res = await db.season_points.delete_one({"id": entry_id})
-    if res.deleted_count == 0:
-        raise HTTPException(404, "Eintrag nicht gefunden.")
     return {"ok": True}
 
 

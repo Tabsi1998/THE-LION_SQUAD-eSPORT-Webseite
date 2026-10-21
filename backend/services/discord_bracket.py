@@ -174,7 +174,7 @@ def bracket_embed(tournament: dict, matches: list[dict], stages: list[dict], reg
 
 def content_hash(embed: dict) -> str:
     body = {key: value for key, value in embed.items() if key != "footer"}
-    return hashlib.sha1(json.dumps(body, sort_keys=True, ensure_ascii=False).encode("utf-8")).hexdigest()
+    return hashlib.sha1(json.dumps(body, sort_keys=True, ensure_ascii=False).encode("utf-8"), usedforsecurity=False).hexdigest()
 
 
 async def _load(db, tournament: dict) -> tuple[list[dict], list[dict], list[dict], str]:

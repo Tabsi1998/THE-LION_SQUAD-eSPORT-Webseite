@@ -446,18 +446,6 @@ async def sync_game_server(server_id: str, me: dict = Depends(require_club_admin
     return await _sync_one(db, server)
 
 
-@router.post("/{server_id}/touch")
-async def touch_game_server(server_id: str, me: dict = Depends(require_club_admin())):
-    db = get_db()
-    res = await db.game_servers.update_one(
-        {"id": server_id},
-        {"$set": {"last_sync_at": now_utc().isoformat(), "updated_at": now_utc().isoformat(), "last_sync_error": None, "last_sync_note": None}},
-    )
-    if res.matched_count == 0:
-        raise HTTPException(404, "Server nicht gefunden.")
-    return await db.game_servers.find_one({"id": server_id}, {"_id": 0})
-
-
 @router.delete("/seeded-defaults")
 async def delete_seeded_default_game_servers(me: dict = Depends(require_club_admin())):
     db = get_db()

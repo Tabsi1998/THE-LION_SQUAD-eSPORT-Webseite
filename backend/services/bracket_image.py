@@ -131,7 +131,7 @@ def signature(sections: list[dict]) -> str:
     compact = [[[{"status": match.get("status"), "slots": [(slot.get("registration_id"), (slot.get("source") or {}).get("type")) for slot in match.get("slots") or []],
                   "results": sorted((str(row.get("registration_id")), str(row.get("outcome")), str(row.get("score"))) for row in match.get("results") or []),
                   "at": match.get("scheduled_at")} for match in round_matches] for round_matches in section["rounds"]] for section in sections]
-    return hashlib.sha1(json.dumps(compact, sort_keys=True, ensure_ascii=False, default=str).encode("utf-8")).hexdigest()
+    return hashlib.sha1(json.dumps(compact, sort_keys=True, ensure_ascii=False, default=str).encode("utf-8"), usedforsecurity=False).hexdigest()
 
 
 def render(tournament: dict, matches: list[dict], stages: list[dict], registrations: list[dict], *, final: bool = False,

@@ -113,8 +113,8 @@ async def count_message(db, user_id: str) -> None:
     try:
         from services import xp
         await xp.grant(user_id, "discord_message", now)
-    except Exception:  # noqa: BLE001
-        pass
+    except Exception as exc:  # noqa: BLE001 - XP hält keine Zählung auf
+        logger.warning("[xp] discord_message für %s nicht gutgeschrieben type=%s", user_id, type(exc).__name__)
     # Erfolge „Discord-Aktiv“ sollen nicht auf den nächtlichen Durchlauf warten (#301: Schlange, je Person einmal).
     from services.achievement_queue import request_evaluation
     await request_evaluation([user_id], "discord_message", sources={"discord", "community"})

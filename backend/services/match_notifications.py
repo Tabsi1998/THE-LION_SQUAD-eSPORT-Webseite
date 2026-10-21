@@ -111,8 +111,8 @@ async def notify_match_result_confirmed(db, match: dict, collection_name: str = 
     try:
         from services.achievement_queue import request_evaluation
         await request_evaluation(user_ids, "match_result")
-    except Exception:  # noqa: BLE001
-        pass
+    except Exception as exc:  # noqa: BLE001 - Erfolge halten kein Ergebnis auf
+        logger.warning("[achievements] Ergebnis nicht zur Auswertung vorgemerkt type=%s", type(exc).__name__)
 
     regs_by_id = {reg["id"]: reg for reg in registrations if reg.get("id")}
     tournament = await db.tournaments.find_one(

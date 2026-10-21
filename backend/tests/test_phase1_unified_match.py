@@ -61,17 +61,14 @@ class TestAuthAndNotifications:
         assert data.get("role") in {"superadmin", "club_admin"}
 
     def test_notifications_me_returns_200(self, admin_client):
-        r = admin_client.get(f"{BASE_URL}/api/notifications/me")
+        # Die eine Benachrichtigungs-API der Website (#933: /api/notifications/* entfallen).
+        r = admin_client.get(f"{BASE_URL}/api/admin/notifications")
         assert r.status_code == 200, f"expected 200, got {r.status_code}: {r.text[:300]}"
         body = r.json()
         assert isinstance(body, (list, dict))
         if isinstance(body, list):
             for item in body:
                 assert "_id" not in item
-
-    def test_notifications_unread_count(self, admin_client):
-        r = admin_client.get(f"{BASE_URL}/api/notifications/me/unread-count")
-        assert r.status_code == 200, r.text[:300]
 
 
 # --- unified match write path ---------------------------------------------

@@ -13,6 +13,7 @@ dort frei ist, und schickt den Aufruf. Der Vorstand sieht die offenen Schichten 
 """
 from __future__ import annotations
 
+import logging
 from datetime import date, timedelta
 
 from fastapi import HTTPException
@@ -147,7 +148,8 @@ async def send_reminders(db, *, today: date | None = None) -> dict:
         checked += 1
         try:
             view = await dolibarr_helper_shifts.overview(db, user, today=day)
-        except Exception:  # noqa: BLE001 - eine Person ohne Verbindung hält die anderen nicht auf
+        except Exception as exc:  # noqa: BLE001 - eine Person ohne Verbindung hält die anderen nicht auf
+            logging.getLogger("tls.helper_calls").warning("Helferschichten für %s nicht geladen type=%s", uid, type(exc).__name__)
             continue
         if not view.get("available"):
             continue

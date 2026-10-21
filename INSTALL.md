@@ -44,7 +44,7 @@ sudo docker compose ps
 sudo docker compose logs -f
 ```
 
-The frontend is now at http://your-server:3000 and backend at http://your-server:8001.
+The frontend is now at `http://your-server:3000` and backend at `http://your-server:8001`.
 
 ## 4. Reverse Proxy (Nginx Proxy Manager)
 

@@ -469,8 +469,8 @@ async def post_team_chat(team_id: str, body: TeamChatCreate, me: dict = Depends(
         try:
             from services import xp
             await xp.grant(me["id"], "team_chat", message["id"])
-        except Exception:  # noqa: BLE001
-            pass
+        except Exception as exc:  # noqa: BLE001 - XP hält keine Nachricht auf
+            logger.warning("[xp] team_chat für Nachricht %s nicht gutgeschrieben type=%s", message["id"], type(exc).__name__)
     from services.change_events import publish_user_change
     if verdict == "hold":
         await publish_user_change([me["id"]], "teams")

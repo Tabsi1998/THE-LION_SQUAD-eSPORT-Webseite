@@ -141,7 +141,7 @@ async def _finish_reset_side_effects(db, match: dict, reset_docs: list[dict], no
     try:
         await publish_tournament_event(str(match.get("tournament_id") or ""), "result_corrected", match_ids=[match.get("id")])
     except Exception:  # noqa: BLE001
-        pass
+        logger.debug("Live-Meldung „korrigiert“ für Match %s nicht verschickt", match.get("id"), exc_info=True)
 
 
 async def _finish_result_side_effects(db, match: dict, force: bool, dispute_resolved: bool = False) -> None:
@@ -150,7 +150,7 @@ async def _finish_result_side_effects(db, match: dict, force: bool, dispute_reso
         from services.discord_bracket import request_refresh
         request_refresh(str(match.get("tournament_id") or ""))
     except Exception:  # noqa: BLE001
-        pass
+        logger.debug("Discord-Baum für Turnier %s nicht vorgemerkt", match.get("tournament_id"), exc_info=True)
     try:
         await notify_match_result_confirmed(db, match, "matches_v2", force=force, dispute_resolved=dispute_resolved)
     except Exception as exc:

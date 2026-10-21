@@ -238,26 +238,31 @@ async def test_club_category_of_other_profiles_needs_the_second_factor_or_a_memb
 # ------------------------------------------------------------------ Dokumente und Uploads
 
 @pytest.mark.asyncio
-async def test_locked_document_downloads_need_the_second_factor(flow):
+async def test_locked_document_downloads_need_the_second_factor(flow, monkeypatch, tmp_path):
+    from routes import document_routes
+
+    # Der Download selbst (#933: nicht mehr das entfallene „track-download“) - mit einer echten Datei.
+    monkeypatch.setattr(document_routes, "PRIVATE_DOC_DIR", tmp_path)
+    (tmp_path / "protokoll.pdf").write_bytes(b"%PDF-1.4\n")
     admin = await flow.add_user(role="club_admin", name="clubadmin")
     doc = {"id": new_id(), "title": "Protokoll Vorstandssitzung", "visibility": "members", "allow_download": False,
-           "filename": "protokoll.pdf", "created_at": "2026-09-01T10:00:00+00:00"}
+           "filename": "protokoll.pdf", "storage_key": "protokoll.pdf", "created_at": "2026-09-01T10:00:00+00:00"}
     await flow.db.documents.insert_one(dict(doc))
 
     flow.act_as(admin)
-    assert (await flow.post(f"/api/documents/{doc['id']}/track-download")).status_code == 200
+    assert (await flow.get(f"/api/documents/{doc['id']}/download")).status_code == 200
     # Als Mitglied sieht der Club-Admin das Dokument auch ohne Zwei-Faktor - der gesperrte Download nennt sie.
     flow.act_as({**without_second_factor(admin), "is_club_member": True})
-    refused = await flow.post(f"/api/documents/{doc['id']}/track-download")
+    refused = await flow.get(f"/api/documents/{doc['id']}/download")
     assert refused.status_code == 403
     assert refused.json()["detail"] == MFA_MESSAGE
     # Ohne Mitgliedschaft und ohne Zwei-Faktor öffnet die Rolle das Dokument gar nicht.
     flow.act_as(without_second_factor(admin))
-    assert (await flow.post(f"/api/documents/{doc['id']}/track-download")).status_code == 403
+    assert (await flow.get(f"/api/documents/{doc['id']}/download")).status_code == 403
     # Ein Mitglied ohne Adminrolle bekommt den allgemeinen Satz.
     member = await flow.add_user(role="player", name="mitglied")
     flow.act_as({**without_second_factor(member), "is_club_member": True})
-    refused = await flow.post(f"/api/documents/{doc['id']}/track-download")
+    refused = await flow.get(f"/api/documents/{doc['id']}/download")
     assert refused.status_code == 403
     assert refused.json()["detail"] == "Download ist für dieses Dokument deaktiviert."
 

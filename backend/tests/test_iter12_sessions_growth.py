@@ -296,7 +296,7 @@ class TestVideoUpload:
         headers = {k: v for k, v in admin_a.headers.items() if k != "Content-Type"}
         headers.update(csrf_headers(admin_a))
         r = requests.post(
-            f"{BASE_URL}/api/uploads/video",
+            f"{BASE_URL}/api/uploads/media?media_scope=gallery",  # #933: /uploads/video entfallen
             cookies=requests.utils.dict_from_cookiejar(admin_a.cookies),
             headers=headers,
             files={"file": ("TEST_iter12.mp4", payload, "video/mp4")},

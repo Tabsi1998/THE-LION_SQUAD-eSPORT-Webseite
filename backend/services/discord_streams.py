@@ -94,7 +94,7 @@ async def stream_values(stream: dict, verdict: dict, common: dict, *, now: datet
 def _hash(rendered: dict) -> str:
     """Was zählt, ob bearbeitet wird: Inhalt ohne Zeitstempel und ohne den Zusatz am Vorschaubild."""
     embed = {key: value for key, value in rendered["embed"].items() if key not in ("timestamp", "image")}
-    return hashlib.sha1(json.dumps({"content": rendered.get("content"), "embed": embed}, sort_keys=True, ensure_ascii=False).encode("utf-8")).hexdigest()
+    return hashlib.sha1(json.dumps({"content": rendered.get("content"), "embed": embed}, sort_keys=True, ensure_ascii=False).encode("utf-8"), usedforsecurity=False).hexdigest()
 
 
 async def _visible_streams(db) -> list[tuple[dict, dict]]:

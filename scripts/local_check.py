@@ -1041,12 +1041,12 @@ def backend_compile(context: Context) -> str:
 
 
 def backend_lint(context: Context) -> str:
-    """The lint gate the CI enforces: undefined names and syntax hazards."""
-    completed = context.run(venv_python(), "-m", "flake8", "backend", "--select=E9,F63,F7,F82",
+    """The lint gate the CI enforces: undefined names, syntax hazards, unused imports and variables (#934)."""
+    completed = context.run(venv_python(), "-m", "flake8", "backend", "--select=E9,F63,F7,F82,F401,F841",
                             "--exclude=backend/tests", check=False, timeout=900)
     if completed.returncode != 0:
-        raise StepFailed("flake8 found undefined names or syntax hazards:\n" + tail(completed))
-    return "no undefined names or syntax hazards"
+        raise StepFailed("flake8 found undefined names, syntax hazards or unused imports/variables:\n" + tail(completed))
+    return "no undefined names, syntax hazards or unused imports/variables"
 
 
 def backend_audit(context: Context) -> str:
@@ -1086,7 +1086,7 @@ def backend_steps() -> list:
     return [
         Step("backend", "venv", f"Python {BACKEND_PYTHON} with both requirement files", backend_environment),
         Step("backend", "compile", "The backend compiles", backend_compile, ("venv",)),
-        Step("backend", "lint", "No undefined names or syntax hazards", backend_lint, ("venv",)),
+        Step("backend", "lint", "No undefined names, syntax hazards or unused imports", backend_lint, ("venv",)),
         Step("backend", "audit", "No known vulnerabilities in the dependencies", backend_audit, ("venv",)),
         Step("backend", "tests", f"The suite, with the {COVERAGE_FLOOR}% coverage floor", backend_tests,
              ("venv",)),

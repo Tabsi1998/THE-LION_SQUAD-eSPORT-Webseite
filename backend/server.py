@@ -92,7 +92,6 @@ from routes.phase_fg_routes import (
 )
 from routes.seo_render_routes import router as seo_render_router
 from routes.penalty_routes import router as penalty_router, admin_router as penalty_admin_router
-from routes.notification_routes import router as notification_router
 from routes.membership_routes import router as membership_router
 from routes.document_routes import router as document_router, account_router as account_document_router
 from routes.home_routes import router as home_router
@@ -384,7 +383,6 @@ app.include_router(sponsoring_router)
 app.include_router(search_router)
 app.include_router(penalty_router)
 app.include_router(penalty_admin_router)
-app.include_router(notification_router)
 
 # Static uploads: only public media files are served directly. Documents are
 # streamed through visibility-aware /api/documents/{id}/download.

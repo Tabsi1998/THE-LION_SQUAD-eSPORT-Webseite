@@ -128,7 +128,7 @@ async def auto_create_for_tournament(tid: str) -> int:
                         kind="prize_pending",
                         meta={"tournament_id": tid, "pickup_id": doc["id"], "place": place},
                     )
-                except Exception as exc:
+                except Exception:
                     logger.warning("[prizes] notification failed for pickup %s", _log_safe(doc.get("id")), exc_info=True)
             logger.info("[prizes] created pickup %s place %s tournament %s", _log_safe(doc.get("id")), place, _log_safe(tid))
     return created

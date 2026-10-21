@@ -250,7 +250,7 @@ async def send_mobile_push_for_notification(notification: dict[str, Any]) -> int
             {"$set": {"last_sent_at": now}},
         )
         return len(push_tokens)
-    except Exception as exc:
+    except Exception:
         logger.warning("Expo push delivery failed for notification %s", _log_safe(notification.get("id"), 80), exc_info=True)
         return 0
 
@@ -265,7 +265,7 @@ async def _check_receipts_for_tokens(tokens: list[dict[str, Any]]) -> dict[str, 
             response = await client.post(EXPO_RECEIPTS_URL, json={"ids": ticket_ids})
             response.raise_for_status()
         result = response.json()
-    except Exception as exc:
+    except Exception:
         logger.warning("Expo push receipt check failed", exc_info=True)
         return {"checked": 0, "receipts": [], "disabled": 0, "errors": 0, "error": "Receipt-Prüfung fehlgeschlagen."}
 

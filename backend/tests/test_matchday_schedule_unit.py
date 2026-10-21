@@ -354,7 +354,6 @@ def test_an_agreed_time_outside_the_week_still_counts():
 
 
 def test_an_agreed_time_in_the_match_is_not_overwritten_by_the_default():
-    window = matchday_window(TUESDAY, 1)
     agreed = fixture("m1", 1, scheduled_at=(TUESDAY + timedelta(days=9)).isoformat(), schedule_source="accepted", status="scheduled")
     assert schedule_writes(league(), [agreed], []) == []
 

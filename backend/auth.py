@@ -355,7 +355,7 @@ async def touch_session_activity(db, user_id: str, family_id: str, now: datetime
             {"$set": {"last_active": now}},
         )
     except Exception:  # noqa: BLE001 - die Anzeige ist kein Grund, einen Aufruf scheitern zu lassen
-        pass
+        logger.debug("last_active nicht aktualisiert", exc_info=True)
 
 
 async def get_current_user(request: Request) -> dict:

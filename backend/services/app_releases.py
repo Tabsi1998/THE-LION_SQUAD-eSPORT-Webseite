@@ -138,7 +138,7 @@ async def store_release(db, *, build: int, version: str, notes: str, chunks: Asy
     digest = hashlib.sha256()
     # MD5 zusätzlich: die App kann eine Datei auf der Platte nur per MD5 prüfen
     # (expo-file-system getInfoAsync), SHA-256 bleibt für Menschen und GitHub.
-    md5 = hashlib.md5()
+    md5 = hashlib.md5(usedforsecurity=False)
     size = 0
     head = b""
     with partial.open("wb") as handle:

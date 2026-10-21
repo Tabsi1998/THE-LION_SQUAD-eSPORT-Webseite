@@ -12,6 +12,7 @@ Endpoints:
   GET    /robots.txt                            — search-engine robots
 """
 import hashlib
+import logging
 import os
 import re
 from pathlib import Path
@@ -29,6 +30,8 @@ from auth import get_current_user, require_area
 from models import new_id, now_utc
 from services import account_erasure, media_audit
 from services.media_formats import PUBLIC_IMAGE_EXTS, PUBLIC_MEDIA_EXTS, PUBLIC_ORIGINAL_EXTS, PUBLIC_VIDEO_EXTS
+
+logger = logging.getLogger(__name__)
 
 UPLOAD_DIR = Path(os.environ.get("UPLOAD_DIR", "/app/backend/uploads"))
 PUBLIC_UPLOAD_DIR = UPLOAD_DIR / "public"
@@ -348,7 +351,8 @@ async def admin_rotate_media(filename: str, body: RotateMediaBody, me: dict = De
         rotated.save(p, format=image_format, **save_kwargs)
     except UnidentifiedImageError:
         raise HTTPException(400, "Ungültige Bilddatei.")
-    except OSError as exc:
+    except OSError:
+        logger.warning("media rotate failed", exc_info=True)
         raise HTTPException(500, "Drehen fehlgeschlagen.")
 
     stat = p.stat()

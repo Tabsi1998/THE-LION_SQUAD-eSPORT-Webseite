@@ -660,42 +660,6 @@ async def upload_media(
     return result
 
 
-@router.post("/video")
-async def upload_video(
-    request: Request,
-    file: UploadFile = File(...),
-    me: dict = Depends(require_area("content", "tournaments", "club")),
-    media_scope: str = "gallery",
-):
-    started_at = time.perf_counter()
-    scope_for_log = media_scope or "gallery"
-    try:
-        scope_for_log = _clean_media_scope(media_scope, me)
-        await _enforce_upload_rate_limit(request, me, "video", scope_for_log)
-        result = await _upload_video_impl(file, me, scope_for_log)
-    except HTTPException as exc:
-        await _record_upload_exception(request, me, file, endpoint="/uploads/video", media_scope=scope_for_log, kind="video", started_at=started_at, exc=exc)
-        raise
-    except Exception as exc:
-        await _record_upload_exception(request, me, file, endpoint="/uploads/video", media_scope=scope_for_log, kind="video", started_at=started_at, exc=exc)
-        raise
-    await _record_upload_event(
-        request,
-        me,
-        endpoint="/uploads/video",
-        media_scope=scope_for_log,
-        filename=file.filename,
-        size=result.get("size") or _upload_declared_size(file),
-        mime=file.content_type,
-        kind="video",
-        status="success",
-        status_code=200,
-        duration_ms=_duration_ms(started_at),
-        result=result,
-    )
-    return result
-
-
 @router.get("/events")
 async def list_upload_events(
     limit: int = 80,

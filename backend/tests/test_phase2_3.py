@@ -3,7 +3,7 @@ Swiss/Groups generator, Stations assign/clear, F1 time PATCH (proof_url/is_inval
 import time
 import pytest
 import requests
-from conftest import BASE_URL, ADMIN_EMAIL, ADMIN_PASSWORD, DEMO_EMAIL, DEMO_PASSWORD
+from conftest import BASE_URL
 
 
 def _new_demo_session():

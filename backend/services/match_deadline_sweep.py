@@ -132,7 +132,7 @@ async def _auto_confirm(db, tournament: dict, match_id: str, stage: dict | None,
 
         await publish_api_change("POST", f"/api/matches/{match_id}/result", 200)
     except Exception:  # noqa: BLE001 - die Anzeige holt es beim nächsten Abruf
-        pass
+        logger.debug("Live-Meldung für Match %s nicht verschickt", match_id, exc_info=True)
     return 1
 
 

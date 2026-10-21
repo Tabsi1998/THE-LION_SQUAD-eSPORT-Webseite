@@ -184,7 +184,7 @@ def content_hash(rendered: dict) -> str:
     body = {key: value for key, value in embed.items() if key not in ("footer", "timestamp")}
     if rendered.get("content"):
         body["__content"] = rendered["content"]
-    return hashlib.sha1(json.dumps(body, sort_keys=True, ensure_ascii=False).encode("utf-8")).hexdigest()
+    return hashlib.sha1(json.dumps(body, sort_keys=True, ensure_ascii=False).encode("utf-8"), usedforsecurity=False).hexdigest()
 
 
 async def server_games(db, guild_id: str) -> tuple[set[str], str]:

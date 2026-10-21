@@ -231,7 +231,7 @@ async def _publish_one(db, match_id: str, hold_id: str | None, moment: str) -> b
 
         await publish_api_change("POST", f"/api/matches/{match_id}/result", 200)
     except Exception:  # noqa: BLE001 - die Anzeige holt es beim nächsten Abruf
-        pass
+        logger.debug("Live-Meldung für Match %s nicht verschickt", match_id, exc_info=True)
     return True
 
 
@@ -384,7 +384,7 @@ async def _revert_published(db, match: dict, *, actor_id: str, hold_id: str | No
 
         await publish_api_change("POST", f"/api/matches/{match['id']}/result/undo", 200)
     except Exception:  # noqa: BLE001
-        pass
+        logger.debug("Live-Meldung für Match %s nicht verschickt", match.get("id"), exc_info=True)
     return {"ok": True, "undone": True, "held": False, "cleared_matches": cleared}
 
 

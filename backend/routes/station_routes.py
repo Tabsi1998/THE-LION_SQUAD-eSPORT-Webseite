@@ -1,4 +1,5 @@
 """Station routes."""
+import logging
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, HTTPException, Depends
@@ -339,8 +340,8 @@ async def _assign_match_to_station(db, station: dict, match: dict, collection_na
         # einmal gespeichert behält „aufgerufen um“ und schickt nichts Neues.
         try:
             await notify_match_called(db, {**match, **match_updates}, station, match_updates["called_at"])
-        except Exception:  # noqa: BLE001 - eine Nachricht hält keine Reservierung auf
-            pass
+        except Exception as exc:  # noqa: BLE001 - eine Nachricht hält keine Reservierung auf
+            logging.getLogger("tls.stations").warning("Aufruf für Match %s nicht verschickt type=%s", match.get("id"), type(exc).__name__)
 
 
 @router.post("/bulk")

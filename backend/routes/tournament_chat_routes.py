@@ -219,8 +219,8 @@ async def post_tournament_chat(tid: str, body: TournamentChatCreate, me: dict = 
         try:
             from services import xp
             await xp.grant(me["id"], "community_chat", doc["id"])
-        except Exception:  # noqa: BLE001
-            pass
+        except Exception as exc:  # noqa: BLE001 - XP hält keine Nachricht auf
+            logging.getLogger("tls.tournament").warning("[xp] community_chat für Nachricht %s nicht gutgeschrieben type=%s", doc["id"], type(exc).__name__)
         mentioned_user_ids = await _notify_tournament_mentions(db, tournament, me, doc)
         await _notify_tournament_chat_message(db, tournament, me, doc, mentioned_user_ids)
     try:

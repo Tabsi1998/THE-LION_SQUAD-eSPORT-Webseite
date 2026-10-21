@@ -3,15 +3,69 @@ ersten und letzten Tag, Listen und Detailseite tragen den Plan, Turniere unter d
 eintägiges Event bleibt, wie es ist."""
 import pathlib
 import sys
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 
 import pytest
 import pytest_asyncio
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 
+import models  # noqa: E402
 from flow_harness import make_flow  # noqa: E402
 from models import now_utc  # noqa: E402
+
+BACKEND = pathlib.Path(__file__).resolve().parent.parent
+TESTS = pathlib.Path(__file__).resolve().parent
+REAL_DATETIME = datetime
+REAL_DATE = date
+REAL_NOW_UTC = models.now_utc
+
+
+def freeze_clock(monkeypatch, moment: datetime) -> None:
+    """Stellt die Uhr der ganzen Anwendung auf `moment` (#1906).
+
+    Routen und Dienste lesen die Zeit über `now_utc()`, `datetime.now()` oder `date.today()`. Jede dieser Stellen
+    in den geladenen Backend-Modulen bekommt dieselbe stehende Uhr, damit ein Lauf über Mitternacht (Wien) nicht
+    zwischen Aufbau und Prüfung den Tag wechselt."""
+
+    class _Same(type):
+        def __instancecheck__(cls, obj):
+            return isinstance(obj, cls.__bases__[0])
+
+        def __subclasscheck__(cls, sub):
+            return issubclass(sub, cls.__bases__[0])
+
+    class FrozenDatetime(REAL_DATETIME, metaclass=_Same):
+        @classmethod
+        def now(cls, tz=None):
+            return moment.astimezone(tz) if tz else moment.astimezone().replace(tzinfo=None)
+
+        @classmethod
+        def utcnow(cls):
+            return moment.astimezone(timezone.utc).replace(tzinfo=None)
+
+    class FrozenDate(REAL_DATE, metaclass=_Same):
+        @classmethod
+        def today(cls):
+            return moment.astimezone().date()
+
+    def frozen_now_utc():
+        return moment.astimezone(timezone.utc)
+
+    for module in list(sys.modules.values()):
+        path = getattr(module, "__file__", None)
+        if not path:
+            continue
+        path = pathlib.Path(path).resolve()
+        if BACKEND not in path.parents or TESTS in path.parents:
+            continue
+        for name, value in list(vars(module).items()):
+            if value is REAL_DATETIME:
+                monkeypatch.setattr(module, name, FrozenDatetime)
+            elif value is REAL_DATE:
+                monkeypatch.setattr(module, name, FrozenDate)
+            elif value is REAL_NOW_UTC:
+                monkeypatch.setattr(module, name, frozen_now_utc)
 
 
 @pytest_asyncio.fixture
@@ -102,13 +156,21 @@ async def test_single_day_events_are_untouched(flow):
 
 
 @pytest.mark.asyncio
-async def test_days_reach_calendar_home_app_and_daily_center(flow):
+@pytest.mark.parametrize(("wall_clock", "today_hours"), [
+    # Kurz vor Mitternacht läuft nur noch ein Tag, der über Mitternacht hinaus geht.
+    ((2026, 11, 12, 23, 59, 59), ("20:00", "02:00")),
+    ((2026, 11, 13, 0, 0, 1), ("00:00", "23:59")),
+], ids=["vor-mitternacht", "nach-mitternacht"])
+async def test_days_reach_calendar_home_app_and_daily_center(flow, monkeypatch, wall_clock, today_hours):
     from services.daily_center import club_day_window, today_items
     from services.event_days import VIENNA, derived_range, normalize_days
 
+    # Die Uhr steht knapp vor bzw. nach Mitternacht in Wien (#1906) - mit echter Uhr kippte der Test, wenn der
+    # Tageswechsel zwischen Aufbau und Prüfung lag.
+    freeze_clock(monkeypatch, datetime(*wall_clock, tzinfo=VIENNA))
     admin = await flow.add_user(role="tournament_admin", name="tl")
     flow.act_as(admin)
-    today = now_utc().astimezone(VIENNA).date()
+    today = models.now_utc().astimezone(VIENNA).date()
     # Tag 1 war gestern, Tag 2 ist morgen: das Event „läuft“, steckt aber gerade in der Pause zwischen zwei Tagen.
     days = [
         {"date": (today - timedelta(days=1)).isoformat(), "start": "10:00", "end": "12:00"},
@@ -146,9 +208,10 @@ async def test_days_reach_calendar_home_app_and_daily_center(flow):
     assert row["schedule"]["count"] == 3 and row["schedule"]["now"]["state"] == "break"
 
     # Tageszentrale: ohne Tag heute nicht in „heute“, obwohl der Zeitraum den Tag umfasst; mit Tag heute mit Satz.
-    now = now_utc()
-    all_day = normalize_days([{"date": today.isoformat(), "start": "00:00", "end": "23:59"}, {"date": (today + timedelta(days=3)).isoformat(), "start": "10:00", "end": "12:00"}])
+    now = models.now_utc()
+    start, end = today_hours
+    all_day = normalize_days([{"date": today.isoformat(), "start": start, "end": end}, {"date": (today + timedelta(days=3)).isoformat(), "start": "10:00", "end": "12:00"}])
     await flow.db.events.insert_one({"id": "e-heute", "slug": "heute", "name": "Heute dabei", "status": "live", "visibility": "public", "days": all_day, **derived_range(all_day)})
     titles = [item["title"] for item in await today_items(flow.db, now)]
-    assert titles == ["Heute dabei · Heute 00:00–23:59"], titles
+    assert titles == [f"Heute dabei · Heute {start}–{end}"], titles
     assert club_day_window(now)[0] <= now
