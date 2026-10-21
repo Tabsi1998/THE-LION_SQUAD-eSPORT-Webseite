@@ -682,7 +682,11 @@ function ReferenceForm({ reference, games, memberProfiles, partners = [], lineag
     }
     setSaving(true);
     try {
-      const { data } = isNew ? await api.post("/references", payload) : await api.patch(`/references/${reference.id}`, payload);
+      // Stand beim Öffnen (#1750): hat inzwischen etwa der Abschluss der Saison die Referenz geändert, sagt der Server 409.
+      const url = `/references/${reference.id}`;
+      const request = isNew ? api.post("/references", payload)
+        : reference.updated_at ? api.patch(url, payload, { params: { expected_updated_at: reference.updated_at } }) : api.patch(url, payload);
+      const { data } = await request;
       // Prüfung (#1755): gespeichert ist trotzdem - die Hinweise stehen danach unter „Auffälligkeiten“.
       const summary = warningSummary(data?.check_warnings);
       if (summary) toast.warning(summary);
@@ -713,7 +717,7 @@ function ReferenceForm({ reference, games, memberProfiles, partners = [], lineag
           <TextField label="Saison" value={form.season} onChange={(v) => set("season", v)} suggestions={suggestions.seasons} testId="reference-season" placeholder="z.B. Season 3 oder 2026" />
         </FormGrid>
         <SelectField label="Gehört zur Saison" value={form.series_id} onChange={(v) => set("series_id", v)} options={seasonOptions(lineages, form.series_id)} testId="reference-series"
-          hint="Für eine Liga oder Serie: Die Karte führt dann zur Saison-Seite, und beim Abschluss der Saison wird diese Referenz aktualisiert statt doppelt angelegt." />
+          hint="Für eine Liga oder Serie: Die Karte führt dann zur Saison-Seite, und beim Abschluss der Saison wird diese Referenz aktualisiert statt doppelt angelegt. Sichtbar ist sie höchstens so offen wie die Saison." />
         {season?.seasonEnd && (
           <p className="border border-[#29B6E8]/30 bg-[#29B6E8]/5 rounded-sm px-3 py-2 text-sm text-white/75" data-testid="reference-season-end">
             Referenz des Saisonabschlusses: Ihr Endplatz wird in der Saison gepflegt – <Link to={`/admin/reference-series/${season.seriesId}`} className="text-[#29B6E8] font-semibold underline-offset-2 hover:underline">zur Saison</Link>, dort „Saison abschließen“.

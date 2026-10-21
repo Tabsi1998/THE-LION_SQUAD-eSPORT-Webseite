@@ -254,3 +254,15 @@ test("Gehört zur Saison: eine alte Referenz mit einer Saison verknüpfen", asyn
   await waitFor(() => expect(apiMock.patch).toHaveBeenCalledTimes(1));
   expect(apiMock.patch.mock.calls[0][1].series_id).toBe("s-2027");
 });
+
+// Prüfung 21.10. (#1750): ein vor dem Saisonabschluss geöffnetes Formular überschreibt den Endplatz nicht still.
+test("Speichern nennt den Stand beim Öffnen; ist die Referenz inzwischen geändert, sagt es das", async () => {
+  mockSeasons([{ ...LEGACY_ITEM, updated_at: "2026-10-21T10:00:00+00:00" }]);
+  apiMock.patch.mockRejectedValue({ response: { status: 409, data: { detail: "Die Referenz wurde inzwischen geändert" } } });
+  render(<MemoryRouter><AdminReferencesPage /></MemoryRouter>);
+  fireEvent.click(await screen.findByTestId("reference-edit-r1"));
+  fireEvent.submit(screen.getByTestId("reference-sheet"));
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledTimes(1));
+  expect(apiMock.patch.mock.calls[0][2]).toEqual({ params: { expected_updated_at: "2026-10-21T10:00:00+00:00" } });
+  await waitFor(() => expect(toastMock.error).toHaveBeenCalledWith("Die Referenz wurde inzwischen geändert"));
+});

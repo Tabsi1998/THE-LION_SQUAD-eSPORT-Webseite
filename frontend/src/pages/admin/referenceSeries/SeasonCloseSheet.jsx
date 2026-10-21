@@ -8,7 +8,8 @@ import { toast } from "sonner";
 
 // Saison abschließen (#1750): der Vorschlag mit den Endständen der Saison - je eigenem Team der Platz aus Tabelle bzw.
 // Teamwertung, je Vereinsmitglied die Einzelwertung. Die Bestätigung legt die Referenz an oder aktualisiert die der
-// Saison bzw. eine schon verknüpfte; der Server rechnet den Vorschlag dabei neu (services/season_close.py).
+// Saison bzw. eine schon verknüpfte; der Server rechnet den Vorschlag dabei neu (services/season_close.py). Ohne
+// Endstand (etwa eine Team-Liga ohne Tabelle) bleibt der Knopf gesperrt, der Hinweis sagt, was fehlt.
 
 function openText(count) {
   return `${count} ${count === 1 ? "Termin" : "Termine"} ohne Ergebnis – der Vorschlag nimmt den letzten gespeicherten Stand.`;
@@ -39,7 +40,8 @@ export function SeasonCloseSheet({ series, label, preview, onClose, onDone }) {
 
   return (
     <AdminSheet title="Saison abschließen" eyebrow={label} size="lg" onClose={onClose} onSubmit={save} saving={saving}
-      submitLabel={target ? "Referenz aktualisieren" : "Referenz anlegen"} savingLabel="Schließe ab …" submitTestId="season-close-save" testId="season-close">
+      submitLabel={target ? "Referenz aktualisieren" : "Referenz anlegen"} savingLabel="Schließe ab …" submitTestId="season-close-save" testId="season-close"
+      submitDisabled={!entries.length}>
       {!preview ? (
         <p className="text-sm text-white/50" data-testid="season-close-loading">Lade den Endstand …</p>
       ) : (

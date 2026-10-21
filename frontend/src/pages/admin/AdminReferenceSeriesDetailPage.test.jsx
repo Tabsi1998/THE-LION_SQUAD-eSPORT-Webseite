@@ -142,6 +142,16 @@ test("abgebrochene Saison: Hinweis, die Einträge bleiben ohne Platz", async () 
   expect(screen.getByTestId("season-close-entry-team:probe")).toHaveTextContent("Ohne Platz · Saison abgebrochen");
 });
 
+test("ohne Endstand (Team-Liga ohne Tabelle) ist der Abschluss gesperrt, mit Hinweis", async () => {
+  mockClose({ ...PREVIEW, entries: [] });
+  renderAt();
+  fireEvent.click(await screen.findByTestId("series-detail-close"));
+  expect(await screen.findByTestId("season-close-empty")).toHaveTextContent("Noch kein Endstand");
+  expect(screen.getByTestId("season-close-save")).toBeDisabled();
+  fireEvent.click(screen.getByTestId("season-close-save"));
+  expect(apiMock.post).not.toHaveBeenCalled();
+});
+
 test("Kopf: „Referenz: Platz 6 von 8 · ansehen“ führt zur Referenz", async () => {
   mockClose({ ...PREVIEW, current: { id: "ref-ende", title: "Probe Racing F1", placement: 6, of: 8, label: "Tabelle", team: true } });
   renderAt();

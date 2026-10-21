@@ -6,7 +6,8 @@ import { X } from "lucide-react";
 // bleibt daneben sichtbar; am Handy Vollbild. Kopf mit Titel und Schließen, scrollender Inhalt,
 // feste Leiste unten mit Abbrechen und Speichern. Esc und ein Klick daneben schließen, der
 // Hintergrund scrollt nicht mit. Die Bausteine darin sind dieselben wie in der Editor-Seite
-// (`FormSection`, `FormGrid`, Felder aus `FormFields.jsx`).
+// (`FormSection`, `FormGrid`, Felder aus `FormFields.jsx`). `submitDisabled` sperrt Speichern, solange es nichts
+// zu speichern gibt (etwa „Saison abschließen“ ohne Endstand, #1750).
 
 const WIDTHS = {
   md: "sm:max-w-[36rem]",
@@ -14,7 +15,7 @@ const WIDTHS = {
   xl: "sm:max-w-[56rem]",
 };
 
-export function AdminSheet({ title, eyebrow, accent = "#29B6E8", size = "md", onClose, onSubmit, saving = false, submitLabel = "Speichern", savingLabel = "Speichere …", submitTestId, cancelLabel = "Abbrechen", footer, testId = "admin-sheet", noValidate = false, children }) {
+export function AdminSheet({ title, eyebrow, accent = "#29B6E8", size = "md", onClose, onSubmit, saving = false, submitLabel = "Speichern", savingLabel = "Speichere …", submitTestId, cancelLabel = "Abbrechen", footer, testId = "admin-sheet", noValidate = false, submitDisabled = false, children }) {
   const panelRef = useRef(null);
 
   useEffect(() => {
@@ -67,7 +68,7 @@ export function AdminSheet({ title, eyebrow, accent = "#29B6E8", size = "md", on
           </button>
           {footer}
           {onSubmit && (
-            <button type="submit" disabled={saving} data-testid={submitTestId} style={{ backgroundColor: accent }} className="ml-auto inline-flex items-center gap-2 px-5 py-2.5 text-black text-xs uppercase tracking-wider font-bold rounded-sm hover:opacity-90 disabled:opacity-50 transition">
+            <button type="submit" disabled={saving || submitDisabled} data-testid={submitTestId} style={{ backgroundColor: accent }} className="ml-auto inline-flex items-center gap-2 px-5 py-2.5 text-black text-xs uppercase tracking-wider font-bold rounded-sm hover:opacity-90 disabled:opacity-50 transition">
               {saving ? savingLabel : submitLabel}
             </button>
           )}
