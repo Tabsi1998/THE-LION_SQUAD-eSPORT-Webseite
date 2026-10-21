@@ -1,4 +1,5 @@
 import { countryCode, countryName } from "./countryFlags";
+import { formatRaceTime } from "./raceTime";
 import { dayNoon, viennaDate } from "./vienna";
 import { KIND_LABELS, type LineageInfo } from "./references";
 
@@ -166,10 +167,11 @@ export function raceCell(result: RoundResult | null | undefined): RaceCell | nul
   return {
     grid,
     gained: status === "finished" && place && grid ? grid - place : null,
-    time: result.time || "",
-    gap: result.gap || "",
+    // Zeiten mit Komma wie beim Veranstalter (#1981).
+    time: formatRaceTime(result.time),
+    gap: formatRaceTime(result.gap),
     startNumber: result.start_number || "",
-    fastestTime: result.fastest_lap_time || "",
+    fastestTime: formatRaceTime(result.fastest_lap_time),
     dotd: Boolean(result.driver_of_the_day),
     status,
     place,

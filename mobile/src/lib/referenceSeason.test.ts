@@ -105,9 +105,11 @@ test("Rennzelle und Rennen auf einen Blick: nur öffentliche Vereinsfahrer auße
   expect(raceCell(res("r1", 2, 0, ["dnf"]))).toMatchObject({ text: "DNF", status: "dnf", medal: null });
   expect(raceCell(res("r1", 1, 25, ["fastest_lap"]))).toMatchObject({ text: "1", medal: "gold", fastest: true });
   // Rennergebnis (#1927), wenn eingetragen: Startplatz, gutgemachte Plätze (nur im Ziel), Zeit, Abstand, Startnummer,
-  // schnellste Runde mit Zeit und Fahrer des Tages.
+  // schnellste Runde mit Zeit und Fahrer des Tages. Zeiten mit Komma wie beim Veranstalter (#1981).
   expect(raceCell({ ...res("r1", 2, 18, ["fastest_lap"]), grid: 6, time: "1:32:10.456", gap: "+3.2", start_number: "44", fastest_lap_time: "1:31.456", driver_of_the_day: true }))
-    .toMatchObject({ grid: 6, gained: 4, time: "1:32:10.456", gap: "+3.2", startNumber: "44", fastestTime: "1:31.456", dotd: true });
+    .toMatchObject({ grid: 6, gained: 4, time: "1:32:10,456", gap: "+3,2", startNumber: "44", fastestTime: "1:31,456", dotd: true });
+  // Ein Platzhalter beim Sieger heißt „keine Zeit“.
+  expect(raceCell({ ...res("r1", 1, 25), gap: "+--:--,---" })).toMatchObject({ gap: "" });
   expect(raceCell({ ...res("r1", 3, 0, ["dnf"]), grid: 1 })).toMatchObject({ grid: 1, gained: null });
   expect(raceCell(res("r1", 4, 12))).toMatchObject({ grid: null, gained: null, dotd: false, time: "" });
   expect(gainedWords(3)).toBe("3 Plätze gutgemacht");
