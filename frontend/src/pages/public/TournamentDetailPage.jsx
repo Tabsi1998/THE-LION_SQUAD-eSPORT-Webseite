@@ -32,8 +32,10 @@ import { formatTeamMode, formatTournamentDisplay } from "@/lib/tournamentLabels"
 import { gameLabel } from "@/lib/gameLabels";
 import { formatCents, previewQuote, startFeeSummary } from "@/lib/pricing";
 import { TournamentTabs } from "@/components/tls/tournament/TournamentTabs";
-import { TournamentTimeline, countdownText, timelineSteps } from "@/components/tls/tournament/TournamentTimeline";
+import { TournamentTimeline, stepCountdown, timelineSteps } from "@/components/tls/tournament/TournamentTimeline";
+import { useCountdownDays } from "@/hooks/useCountdownDays";
 import { MyStandCard } from "@/components/tls/tournament/MyStandCard";
+import { isPublicLive } from "@/lib/publicPhase";
 import { OnsiteTournamentView } from "@/components/tls/tournament/OnsiteTournamentView";
 import { FriendsAtEvent } from "@/components/tls/FriendsAtEvent";
 import { offerFriendsHint } from "@/lib/friendsHint";
@@ -122,6 +124,7 @@ function TournamentDetailView() {
 
   // Nur Änderungen dieses Turniers (#1801) - bis es geladen ist, jede.
   useLiveRefresh(load, ["tournaments"], { fallbackMs: 10000, tournamentId: t?.id });
+  const countdownDays = useCountdownDays();
 
   // Sieger-Moment (#1180): wer Platz 1 bis 3 belegt hat, bekommt nach dem Ende einmal je Browser seine Karte - über die
   // Zeremonie-Warteschlange, also nie zugleich mit einem Erfolg.
@@ -327,7 +330,7 @@ function TournamentDetailView() {
                 : "border-white/10 bg-[#121212] text-white/60"
           }`} data-testid="tournament-registration-state">
             <div className="font-bold uppercase tracking-wider text-xs">{registration.label}</div>
-            {nextStep && <div className="mt-1 text-white/55">{nextStep.label} {countdownText(nextStep.ms)} – alle Termine unten in der Zeitleiste.</div>}
+            {nextStep && <div className="mt-1 text-white/55">{stepCountdown(nextStep, Date.now(), countdownDays)} – alle Termine unten in der Zeitleiste.</div>}
             {!nextStep && !t.registration_open_from && !t.registration_open_until && <div className="mt-1 text-white/55">Status wird vom Admin gesteuert.</div>}
             {clubMemberBlocked && <div className="mt-1 text-[#FFD700]/75">Dieses Turnier ist für externe Teilnehmer vorgesehen. Vereinsmitglieder können sich hier nicht selbst anmelden.</div>}
             {eventGate && !myReg && (
@@ -405,7 +408,8 @@ function TournamentDetailView() {
               <Podium rows={podiumRows} registrations={regs} />
             </section>
           )}
-          {t.status === "live" && <TournamentLiveStreams tournament={t} />}
+          {/* Die Livestream-Karte folgt der öffentlichen Phase (#1888): nach dem Ende keine, auch wenn der Status noch „live“ ist. */}
+          {isPublicLive(t) && <TournamentLiveStreams tournament={t} />}
           {(t.has_live_stream || (t.twitch_enabled && t.twitch_channel)) && (
             <section data-testid="tournament-stream"><StreamEmbed source={t} /></section>
           )}

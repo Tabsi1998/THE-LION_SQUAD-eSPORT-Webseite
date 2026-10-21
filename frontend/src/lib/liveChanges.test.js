@@ -28,13 +28,16 @@ test("Startseite: Signatur und Zahlenzeile je Karte", () => {
   expect(liveCountLine({})).toBe("");
 });
 
-test("Countdown in ganzen Worten, ohne Sekunden", () => {
-  const now = Date.parse("2026-09-22T10:00:00Z");
-  expect(formatCountdown(Date.parse("2026-09-25T00:30:00Z"), now)).toBe("in 2 Tagen, 14 Stunden");
-  expect(formatCountdown(Date.parse("2026-09-23T10:00:00Z"), now)).toBe("in 1 Tag");
-  expect(formatCountdown(Date.parse("2026-09-22T12:05:00Z"), now)).toBe("in 2 Stunden, 5 Minuten");
-  expect(formatCountdown(Date.parse("2026-09-22T11:00:00Z"), now)).toBe("in 1 Stunde");
+test("Countdown nach der einen Regel (#1264): Tage, morgen, heute, Minuten - ohne Sekunden", () => {
+  const now = Date.parse("2026-09-22T10:00:00Z"); // 12:00 in Wien
+  expect(formatCountdown(Date.parse("2026-09-25T00:30:00Z"), now)).toBe("in 3 Tagen");
+  expect(formatCountdown(Date.parse("2026-09-23T10:00:00Z"), now)).toBe("morgen 12:00");
+  expect(formatCountdown(Date.parse("2026-09-22T12:05:00Z"), now)).toBe("heute 14:05");
+  expect(formatCountdown(Date.parse("2026-09-22T11:00:00Z"), now)).toBe("heute 13:00");
   expect(formatCountdown(Date.parse("2026-09-22T10:04:00Z"), now)).toBe("in 4 Minuten");
+  // Weiter weg zählt die Startseite nicht - dort steht dann gar kein großer Countdown.
+  expect(formatCountdown(Date.parse("2027-02-22T10:00:00Z"), now)).toBe("im Februar");
+  expect(formatCountdown(Date.parse("2026-10-20T10:00:00Z"), now, 30)).toBe("in 28 Tagen");
   expect(formatCountdown(Date.parse("2026-09-22T10:00:30Z"), now)).toBe("in unter einer Minute");
   expect(formatCountdown(now - 1, now)).toBe("jetzt");
   expect(formatCountdown(NaN, now)).toBe("");

@@ -44,3 +44,11 @@ test("vor Ort im laufenden Turnier (#1556): „Du bist als Nächstes an Station 
   renderCard({ status: "check_in", event_mode: "local" }, { status: "approved" });
   expect(screen.queryByTestId("queue-stub")).toBeNull();
 });
+
+test("#1888: nach dem Ende keine Warteschlange mehr, auch wenn der Rohstatus noch „live“ ist", () => {
+  const { unmount } = renderCard({ status: "live", event_mode: "local", public_phase: { state: "completed" } }, { status: "checked_in" });
+  expect(screen.queryByTestId("queue-stub")).toBeNull();
+  unmount();
+  renderCard({ status: "live", event_mode: "local", public_phase: { state: "live" } }, { status: "checked_in" });
+  expect(screen.getByTestId("queue-stub")).toHaveTextContent("t1");
+});

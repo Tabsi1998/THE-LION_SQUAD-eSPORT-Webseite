@@ -132,6 +132,8 @@ def _legacy_results(match: dict) -> list[dict]:
 
 def _stage_results(match: dict) -> list[dict]:
     results: list[dict] = []
+    # Ein geteilter Platz 1 ist ein Unentschieden (#1806) - dieselbe Regel wie services/match_winner.
+    shared_first = sum(1 for result in match.get("results") or [] if result.get("rank") == 1) > 1
     for result in match.get("results") or []:
         rank = result.get("rank")
         if result.get("forfeit"):
@@ -139,7 +141,7 @@ def _stage_results(match: dict) -> list[dict]:
         elif result.get("dnf"):
             outcome = "dnf"
         elif rank == 1:
-            outcome = "winner"
+            outcome = "draw" if shared_first else "winner"
         elif rank is not None:
             outcome = "placed"
         else:
@@ -243,6 +245,7 @@ def _common_match_fields(match: dict, collection: str, engine: str) -> dict:
         "status": match.get("status") or "pending",
         "scheduled_at": match.get("scheduled_at"),
         "updated_at": match.get("updated_at"),
+        "completed_at": match.get("completed_at"),
         "duration_minutes": match.get("duration_minutes"),
         "station_id": match.get("station_id"),
         "station": deepcopy(match.get("station")),

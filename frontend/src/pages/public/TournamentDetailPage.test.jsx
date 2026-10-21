@@ -154,7 +154,8 @@ test("Anmeldung offen: Anmelden ist die eine Hauptaktion, die anderen Wege sind 
   expect(screen.getByTestId("tournament-tabs")).toHaveTextContent("Übersicht");
   expect(screen.getByTestId("tournament-tab-participants")).toHaveTextContent("Teilnehmer (0)");
   expect(screen.getByTestId("tournament-timeline-registration_close")).toHaveTextContent("Anmeldung endet");
-  expect(screen.getByTestId("tournament-timeline-next")).toHaveTextContent("Anmeldung endet in");
+  // Weit weg kein Countdown, sondern der Monat (#1264).
+  expect(screen.getByTestId("tournament-timeline-next")).toHaveTextContent("Anmeldung endet im Oktober 2099");
   expect(screen.getAllByText(/Anmeldung endet/).length).toBe(3); // Statuskasten, Zeitleiste, „nächster Schritt“ - nicht mehr in der Seitenleiste
   expect(screen.queryByText("Anmeldung öffnet", { selector: "span" })).toBeInTheDocument();
   expect(screen.getAllByText(/Anmeldung öffnet/).length).toBe(1); // nur in der Zeitleiste
@@ -423,4 +424,15 @@ test("die Seite hört nach dem Laden nur noch auf das eigene Turnier", async () 
   expect(page()[0].options.tournamentId).toBeFalsy();
   await screen.findAllByText("Herbst-Cup");
   await waitFor(() => expect(page().at(-1).options.tournamentId).toBe("t1"));
+});
+
+test("#1888: die Livestream-Karte folgt der öffentlichen Phase - nach dem Ende keine, solange es läuft schon", async () => {
+  mockApi({ ...base, status: "live", public_phase: { state: "completed", label: "Beendet" } });
+  const { unmount } = renderPage();
+  expect(await screen.findByTestId("tournament-title")).toBeInTheDocument();
+  expect(screen.queryByTestId("tournament-live-streams-stub")).toBeNull();
+  unmount();
+  mockApi({ ...base, status: "live", public_phase: { state: "live", label: "Läuft" } });
+  renderPage();
+  expect(await screen.findByTestId("tournament-live-streams-stub")).toBeInTheDocument();
 });

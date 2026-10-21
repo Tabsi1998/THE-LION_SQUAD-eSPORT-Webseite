@@ -1,6 +1,8 @@
 import { CalendarClock, Check } from "lucide-react";
 import { formatDateTime } from "@/lib/datetime";
 import { AddToCalendar } from "@/components/tls/AddToCalendar";
+import { useCountdownDays } from "@/hooks/useCountdownDays";
+import { COUNTDOWN_DAYS_DEFAULT, whenPhrase, whenText } from "@/lib/countdownRule";
 
 // Turnierseite (#401): die Termine genau einmal - als Zeitleiste Anmeldung → Check-in → Start → Ende,
 // mit dem nächsten Schritt hervorgehoben und einem Countdown in Worten. Vorher standen sie im grünen
@@ -23,18 +25,20 @@ export function timelineSteps(t, now = Date.now()) {
   return steps.map((step) => ({ ...step, next: next ? step.key === next.key : false }));
 }
 
-export function countdownText(ms, now = Date.now()) {
-  const diff = ms - now;
-  if (diff <= 0) return "jetzt";
-  const minutes = Math.round(diff / 60000);
-  if (minutes < 60) return `in ${minutes} Min.`;
-  const hours = Math.round(diff / 3600000);
-  if (hours < 48) return `in ${hours} Std.`;
-  const days = Math.round(diff / 86400000);
-  return `in ${days} Tagen`;
+// Die Zeitangabe nach der einen Regel (#1264): ab der Schwelle „in 3 Tagen“, „morgen 14:00“, „in 45 Minuten“; weiter
+// weg das Datum oder der Monat - keine „Min.“ und „Std.“ mehr.
+export function countdownText(ms, now = Date.now(), days = COUNTDOWN_DAYS_DEFAULT) {
+  return whenText(ms, { now, days })?.text || "";
+}
+
+/** Der Schritt mit seiner Zeitangabe: „Start in 3 Tagen“, „Anmeldung endet am Fr 30. Oktober“, „Start im März“. */
+export function stepCountdown(step, now = Date.now(), days = COUNTDOWN_DAYS_DEFAULT) {
+  if (!step) return "";
+  return whenPhrase(step.label, whenText(step.ms, { now, days }));
 }
 
 export function TournamentTimeline({ tournament: t, calendarItem = null }) {
+  const days = useCountdownDays();
   const steps = timelineSteps(t);
   const next = steps.find((step) => step.next);
   if (!steps.length) return null;
@@ -42,7 +46,7 @@ export function TournamentTimeline({ tournament: t, calendarItem = null }) {
     <section className="border border-white/10 rounded-sm bg-[#121212] p-4" data-testid="tournament-timeline">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="font-heading font-bold uppercase text-sm inline-flex items-center gap-2"><CalendarClock className="w-4 h-4 text-[#29B6E8]" /> Termine</div>
-        {next ? <div className="text-xs text-[#29B6E8] font-bold uppercase tracking-wider" data-testid="tournament-timeline-next">{next.label} {countdownText(next.ms)}</div> : <div className="text-xs text-white/40">Alle Termine vorbei</div>}
+        {next ? <div className="text-xs text-[#29B6E8] font-bold uppercase tracking-wider" data-testid="tournament-timeline-next">{stepCountdown(next, Date.now(), days)}</div> : <div className="text-xs text-white/40">Alle Termine vorbei</div>}
       </div>
       <ol className="mt-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
         {steps.map((step) => (

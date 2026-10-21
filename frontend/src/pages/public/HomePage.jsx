@@ -18,6 +18,8 @@ import { TwitchClips } from "@/components/tls/TwitchClips";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { useChangedKeys, useCountdown } from "@/hooks/useLiveChanges";
+import { useCountdownDays } from "@/hooks/useCountdownDays";
+import { isCountdownDue } from "@/lib/countdownRule";
 import { liveCountLine, nextCountdownTarget, timelineSignature } from "@/lib/liveChanges";
 import { SkeletonCards, SkeletonDetailHeader } from "@/components/tls/Skeleton";
 import { ArrowRight, Flag, Trophy, Calendar, Newspaper, Pin, Radio, Timer, Users } from "lucide-react";
@@ -401,8 +403,11 @@ function FeaturedNews({ news }) {
 // Laden nicht. Mit „Bewegung reduzieren“ bleibt das Leuchten aus, das Kennzeichen nicht.
 function NextUp({ items }) {
   const changed = useChangedKeys(items, timelineKey, timelineSignature);
-  const target = nextCountdownTarget(items);
-  const countdown = useCountdown(target?.targetMs || null);
+  // Der große Countdown nur, wenn es bald so weit ist (#1264): innerhalb der Schwelle (Vorgabe 14 Tage, Branding).
+  const days = useCountdownDays();
+  const next = nextCountdownTarget(items);
+  const target = next && isCountdownDue(next.targetMs, { days }) ? next : null;
+  const countdown = useCountdown(target?.targetMs || null, days);
   if (!items.length) return (
     <div className="border border-dashed border-white/15 rounded-sm p-6 text-white/45 min-w-0">
       <div className="text-[10px] uppercase tracking-widest font-bold text-white/40">Nächster Termin</div>

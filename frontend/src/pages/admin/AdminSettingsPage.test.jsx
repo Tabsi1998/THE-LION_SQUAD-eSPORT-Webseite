@@ -276,3 +276,32 @@ test("alte Reiter-Links landen auf der neuen Seite: ?tab=email → Resend (#546)
   );
   expect(await screen.findByTestId("settings-section")).toBeInTheDocument();
 });
+
+// Countdown nur, wenn es bald so weit ist (#1264): die Schwelle steht unter Branding, leer heißt Vorgabe 14.
+test("Branding: „Countdown ab … Tagen vorher“ speichert die Zahl, leer geht als „Vorgabe“ zurück", async () => {
+  apiMock.get.mockImplementation((url) => {
+    const path = String(url);
+    if (path.startsWith("/settings/branding")) return Promise.resolve({ data: { club_name: "THE LION SQUAD", countdown_days: 10 } });
+    return Promise.resolve(responseFor(path));
+  });
+  const user = userEvent.setup();
+  render(
+    <ConfirmDialogProvider>
+      <MemoryRouter initialEntries={["/admin/settings/branding"]}>
+        <Routes><Route path="/admin/settings/:section" element={<AdminSettingsPage />} /></Routes>
+      </MemoryRouter>
+    </ConfirmDialogProvider>
+  );
+  const field = await screen.findByTestId("brand-countdown-days");
+  await waitFor(() => expect(field).toHaveValue(10));
+  expect(field).toHaveAttribute("placeholder", "14");
+  await user.clear(field);
+  await user.type(field, "21");
+  await user.click(screen.getByTestId("brand-save"));
+  await waitFor(() => expect(apiMock.put).toHaveBeenCalledWith("/settings/branding", { countdown_days: 21 }));
+
+  apiMock.put.mockClear();
+  await user.clear(screen.getByTestId("brand-countdown-days"));
+  await user.click(screen.getByTestId("brand-save"));
+  await waitFor(() => expect(apiMock.put).toHaveBeenCalledWith("/settings/branding", { countdown_days: null }));
+});

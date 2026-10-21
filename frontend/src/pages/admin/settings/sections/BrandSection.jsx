@@ -4,6 +4,7 @@ import { BrandField, BrandSelect, LegalTextArea } from "../fields";
 import { SetupGuide } from "@/components/tls/SetupGuide";
 import { Trash2, Plus } from "lucide-react";
 import { BannerPreview, BannerScopePicker, BrandNumberField, BrandDateTimeField } from "./parts";
+import { COUNTDOWN_DAYS_DEFAULT, DATE_DAYS as COUNTDOWN_DAYS_MAX } from "@/lib/countdownRule";
 
 export function BrandSection({ brand, siteBanners, bannerForm, editingBannerId, savingBanner, savingBrand, generatingFavicon, imageUploadBusy, setBrandField, saveBrand, setBannerField, applyBannerTemplate, editBanner, resetBannerForm, saveSiteBanner, deleteSiteBanner, faviconDarkOnly, generateUniversalFavicon }) {
   return (
@@ -21,6 +22,10 @@ export function BrandSection({ brand, siteBanners, bannerForm, editingBannerId, 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <BrandField label="Zeitzone" value={brand.timezone} onChange={(v) => setBrandField("timezone", v)} testId="brand-tz" />
           <BrandField label="Kontakt E-Mail" value={brand.contact_email} onChange={(v) => setBrandField("contact_email", v)} testId="brand-contact-email" />
+        </div>
+        {/* Countdown nur, wenn es bald so weit ist (#1264): davor zeigt die Website Datum oder Monat. Leer = Vorgabe 14. */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <BrandNumberField label={`Countdown ab … Tagen vorher (1–${COUNTDOWN_DAYS_MAX}, leer = ${COUNTDOWN_DAYS_DEFAULT})`} value={brand.countdown_days} min={1} max={COUNTDOWN_DAYS_MAX} placeholder={String(COUNTDOWN_DAYS_DEFAULT)} onChange={(v) => setBrandField("countdown_days", v >= 1 ? Math.min(COUNTDOWN_DAYS_MAX, Math.round(v)) : null)} testId="brand-countdown-days" />
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <ImageUpload value={brand.logo_url} onChange={(v) => setBrandField("logo_url", v)} label="Standard-Logo" testId="brand-logo" variant="square" allowLibrary />

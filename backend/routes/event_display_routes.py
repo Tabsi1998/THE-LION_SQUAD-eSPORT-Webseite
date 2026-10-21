@@ -81,6 +81,10 @@ async def _build(db, event: dict) -> dict:
     for tournament in tournaments:
         brackets.append(display_bracket_payload(await _build_bracket_payload(db, dict(tournament), None, False)))
         tournament["public_phase"] = derive_public_phase(tournament, "tournament")
+    # Die Statuspille und der Tagesplan folgen der öffentlichen Phase (#1881, #1888), nicht dem Rohstatus.
+    for challenge in challenges:
+        challenge["public_phase"] = derive_public_phase(challenge, "f1")
+    event = {**event, "public_phase": derive_public_phase(event, "event")}
     for row in (*tournaments, *challenges):
         row["event_day"] = event_days.day_of(event, row.get("start_date"))
     # Die Stationen der gezeigten Turniere und die nur am Event - eine Station, die an beidem hängt, nur einmal. Hängt

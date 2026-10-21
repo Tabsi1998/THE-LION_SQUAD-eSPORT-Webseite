@@ -31,6 +31,18 @@ DEFAULT_SOCIAL_LINKS = [
     {"platform": "twitch", "label": "Twitch", "url": "https://www.twitch.tv/the_lion_squad_esports", "enabled": True},
 ]
 
+# Countdown nur, wenn es bald so weit ist (#1264): Vorgabe 14 Tage; ab 61 Tagen steht ohnehin der Monat da.
+COUNTDOWN_DAYS_DEFAULT = 14
+COUNTDOWN_DAYS_MAX = 60
+
+
+def public_countdown_days(value) -> int:
+    """Die Schwelle für die Website - ein fehlender oder ungültiger Wert ist die Vorgabe."""
+    if isinstance(value, int) and not isinstance(value, bool) and 1 <= value <= COUNTDOWN_DAYS_MAX:
+        return value
+    return COUNTDOWN_DAYS_DEFAULT
+
+
 SOCIAL_LEGACY_FIELDS = {
     "discord": "discord_invite_url",
     "whatsapp": "whatsapp_channel_url",
@@ -116,6 +128,9 @@ class BrandingSettings(BaseModel):
     play_store_url: Optional[str] = None
     # App-Store-Link (#1084): wie Google Play - leer, bis die LionsAPP für iOS öffentlich ist; bis dahin „bald im App Store“.
     app_store_url: Optional[str] = None
+    # Countdown nur, wenn es bald so weit ist (#1264): ab so vielen Tagen vorher zählt die Website („in 13 Tagen“),
+    # davor stehen Datum oder Monat. Leer heißt Vorgabe (COUNTDOWN_DAYS_DEFAULT).
+    countdown_days: Optional[int] = Field(None, ge=1, le=COUNTDOWN_DAYS_MAX)
     twitch_channel: Optional[str] = None
     analytics_provider: Optional[Literal["", "google", "plausible"]] = None
     google_analytics_id: Optional[str] = None
@@ -766,6 +781,7 @@ async def public_settings(response: Response):
         "discord_invite_url": b.get("discord_invite_url") or "https://discord.com/invite/thelionsquadesports",
         "play_store_url": (b.get("play_store_url") or "").strip(),
         "app_store_url": (b.get("app_store_url") or "").strip(),
+        "countdown_days": public_countdown_days(b.get("countdown_days")),
         "twitch_channel": b.get("twitch_channel") or "the_lion_squad_esports",
         "whatsapp_channel_url": b.get("whatsapp_channel_url") or "https://whatsapp.com/channel/0029VaaWufTGU3BNG6VOxo1I",
         "analytics_provider": b.get("analytics_provider") or "",

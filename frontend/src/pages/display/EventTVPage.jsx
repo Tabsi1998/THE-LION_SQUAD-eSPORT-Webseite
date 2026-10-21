@@ -11,6 +11,7 @@ import { useEventHall } from "@/components/tv/useEventHall";
 import { useLowMomentTimer, useMinuteTick, useSponsorMoments, useTvSponsors } from "@/components/tv/tvHooks";
 import { callsOf } from "@/lib/tvCalls";
 import { dayPlan } from "@/lib/tvDayPlan";
+import { publicState } from "@/lib/publicPhase";
 import { formatBracketSection, matchRoundLabel } from "@/lib/tournamentLabels";
 import { isLiveMatch, matchName, stationName } from "@/lib/tvLive";
 import { forecastText, nextUp } from "@/lib/tvForecast";
@@ -25,7 +26,9 @@ import { sponsorFor, sponsorPlan } from "@/lib/tvSponsors";
 // Seit #1564: dieselbe Station aus mehreren Turnieren steht nur einmal da (bis die Stationen dem Event gehören, #1555),
 // und „Als Nächstes“ nennt das nächste Spiel mit Prognose, Station und Verzug.
 
-const ACTIVE_STATUSES = new Set(["live", "check_in", "checkin_open", "registration_open", "paused"]);
+// Die Pille oben folgt der öffentlichen Phase (#1888), nicht dem Rohstatus: nach dem Ende kein „Live“ mehr, zwischen
+// zwei Tagen eines mehrtägigen Events die Pause.
+const ACTIVE_STATUSES = new Set(["live", "check_in", "checkin_open", "registration_open", "paused", "day_break"]);
 
 export default function EventTVPage() {
   return (
@@ -35,7 +38,7 @@ export default function EventTVPage() {
   );
 }
 
-function statusLabel(status) {
+function statusLabel(status, fallback) {
   return {
     draft: "Entwurf",
     scheduled: "Geplant",
@@ -45,11 +48,12 @@ function statusLabel(status) {
     checkin_open: "Check-in",
     live: "Live",
     paused: "Pause",
+    day_break: "Pause",
     completed: "Beendet",
     results_published: "Ergebnisse",
     archived: "Archiv",
     cancelled: "Abgesagt",
-  }[status] || status || "Offen";
+  }[status] || fallback || status || "Offen";
 }
 
 function EventTv() {
@@ -121,6 +125,7 @@ function EventTv() {
   const heroImage = event.banner_url || event.cover_url ? resolveMediaUrl(event.banner_url || event.cover_url) : "";
   const place = [event.location, event.city].filter(Boolean).join(", ");
   const hasItems = Boolean(plan?.lanes.length);
+  const eventState = publicState(event);
 
   return (
     <div className="tv-page" data-testid="event-tv">
@@ -134,7 +139,7 @@ function EventTv() {
             {place ? <span className="inline-flex items-center gap-[0.4em]"><MapPin className="tv-icon tv-gold" /> {place}</span> : null}
           </span>
         ) : null}
-        aside={<TvPill tone={ACTIVE_STATUSES.has(event.status) ? (event.status === "live" ? "live" : "accent") : "muted"} live={event.status === "live"}>{statusLabel(event.status)}</TvPill>}
+        aside={<TvPill testId="tv-event-status" tone={ACTIVE_STATUSES.has(eventState) ? (eventState === "live" ? "live" : "accent") : "muted"} live={eventState === "live"}>{statusLabel(eventState, event.public_phase?.label)}</TvPill>}
       />
 
       <DisplayStatusBanner error={loadError} lastUpdated={lastUpdated} label="Event-Daten" onRetry={load} />

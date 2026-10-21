@@ -218,3 +218,33 @@ test("#1564: „Als Nächstes“ in der Halle nennt das nächste Spiel mit Progn
   // Mit Uhrzeit „ca. 16:40 · PC 4“, ohne geplante Zeit nur die Station.
   expect(next).toHaveTextContent(/Spiel [A-Z]+ · (ca\. \d{2}:\d{2} · )?PC \d/);
 });
+
+test("#1888: die Statuspille oben folgt der öffentlichen Phase - ein stehen gebliebenes „live“ nach dem Ende zeigt „Beendet“", async () => {
+  const hall = hallEvent({ now: Date.now(), stations: 4 });
+  serve({ ...hall, event: { ...hall.event, status: "live", public_phase: { state: "completed", label: "Beendet" } } });
+  renderAt("/display/event/event-1");
+  const pill = await screen.findByTestId("tv-event-status");
+  expect(pill).toHaveTextContent("Beendet");
+  expect(pill).not.toHaveTextContent("Live");
+  expect(pill.querySelector(".tv-live-dot")).toBeNull();
+  expect(pill).not.toHaveClass("tv-pill--live");
+});
+
+test("#1888: läuft das Event öffentlich, zeigt die Pille „Live“ mit Punkt - auch ohne Rohstatus „live“", async () => {
+  const hall = hallEvent({ now: Date.now(), stations: 4 });
+  serve({ ...hall, event: { ...hall.event, status: "scheduled", public_phase: { state: "live", label: "Läuft" } } });
+  renderAt("/display/event/event-1");
+  const pill = await screen.findByTestId("tv-event-status");
+  expect(pill).toHaveTextContent("Live");
+  expect(pill.querySelector(".tv-live-dot")).not.toBeNull();
+});
+
+test("#1888: zwischen zwei Tagen steht die Pause, kein Fachwort", async () => {
+  const hall = hallEvent({ now: Date.now(), stations: 4 });
+  serve({ ...hall, event: { ...hall.event, status: "live", public_phase: { state: "day_break", label: "Tag 1/2" } } });
+  renderAt("/display/event/event-1");
+  const pill = await screen.findByTestId("tv-event-status");
+  expect(pill).toHaveTextContent("Pause");
+  expect(pill).not.toHaveTextContent("day_break");
+  expect(pill.querySelector(".tv-live-dot")).toBeNull();
+});
