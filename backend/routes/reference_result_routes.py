@@ -23,7 +23,9 @@ Captains bekommen keine ``*_by``-Kennungen.
 **POST …/results/preview** - ändert nichts. Body (``ResultSheetInput``)::
 
     {rows: [{participant_id? | name?, start_number?, place?, team?, points?, points_source: "scheme"|"organizer"|
-             "manual", marks: ["dnf"|"dns"|"dsq"|"fastest_lap"|"pole"], penalty_points: 0, official_total?, note?}],
+             "manual", marks: ["dnf"|"dns"|"dsq"|"fastest_lap"|"pole"], penalty_points: 0, official_total?, note?,
+             grid?, time?, gap?, dnf?}],
+     fastest_lap?: {participant_id? | name?, start_number?, time?}, driver_of_the_day?: "Name" | {participant_id? | name?},
      matches: [{home, away, home_score, away_score, maps: [{name, home_score, away_score}],
                 lineup: [{participant_id? | name?, start_number?}]}],
      official_team_totals: {"<Team>": Zahl}, official_table: [{team, rank?, played?, won?, drawn?, lost?,
@@ -145,6 +147,16 @@ class ResultEntryRow(ResultParticipantRef):
     penalty_points: float = Field(default=0, ge=0, le=10000, allow_inf_nan=False)
     official_total: Optional[float] = Field(default=None, ge=-TOTAL_LIMIT, le=TOTAL_LIMIT, allow_inf_nan=False)
     note: Optional[str] = Field(default=None, max_length=300)
+    # Rennergebnis (#1927), Felder wie aus der Texterkennung (#1756): Startplatz, Rennzeit, Abstand, Ausfall.
+    grid: Optional[int] = Field(default=None, ge=1, le=1000)
+    time: Optional[str] = Field(default=None, max_length=20)
+    gap: Optional[str] = Field(default=None, max_length=20)
+    dnf: Optional[bool] = None
+
+
+class ResultFastestLap(ResultParticipantRef):
+    """Schnellste Runde eines Rennens (#1927): wer (muss in der Liste stehen) und die Zeit - beides optional."""
+    time: Optional[str] = Field(default=None, max_length=20)
 
 
 class ResultMapEntry(BaseModel):
@@ -184,6 +196,13 @@ class ResultSheetInput(BaseModel):
     official_team_totals: Dict[str, float] = Field(default_factory=dict)
     official_table: List[ResultTableEntry] = Field(default_factory=list, max_length=MAX_TABLE)
     note: Optional[str] = Field(default=None, max_length=1000)
+    fastest_lap: Optional[ResultFastestLap] = None  # #1927
+    driver_of_the_day: Optional[ResultParticipantRef] = None  # #1927, auch nur als Name
+
+    @field_validator("driver_of_the_day", mode="before")
+    @classmethod
+    def _day_driver(cls, value):
+        return {"name": value} if isinstance(value, str) else value
 
     @field_validator("official_team_totals")
     @classmethod

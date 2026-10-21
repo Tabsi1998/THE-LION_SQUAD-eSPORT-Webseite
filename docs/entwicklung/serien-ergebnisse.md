@@ -29,6 +29,20 @@ Eine Zeile nennt den Teilnehmer über `participant_id`, `name` (wie beim Veranst
 nach der Runde). Team-Liga: `matches` mit `home`, `away`, Ergebnis, `maps` und `lineup` (Teilnehmer wie oben), dazu
 `official_table` (Tabelle laut Veranstalter nach dem Spieltag) und `official_team_totals`.
 
+**Rennergebnis (#1927)** – alles optional, genau die Felder der Texterkennung (#1756): je Zeile `start_number`, `grid`
+(Startplatz), `time` (Rennzeit) und `gap` (Abstand, Text wie „+5.204“ oder „+1 Runde“) sowie `dnf: true` (wird zur
+Marke `dnf`); je Rennen `fastest_lap: {name | participant_id | start_number, time}` und `driver_of_the_day` (Name als
+Text oder wie eine Zeile). Schnellste Runde und Fahrer des Tages müssen in der Liste stehen (sonst die Fehler
+`fastest_lap_not_in_list`, `driver_of_the_day_not_in_list`); die schnellste Runde setzt die Marke an ihrer Zeile (ein
+Bonus zählt), eine Zeit ohne Namen gehört zur markierten Zeile, zwei Markierungen ergeben die Warnung
+`fastest_lap_twice`. Gespeichert wird im Blatt `fastest_lap: {participant_id, time}` und `driver_of_the_day`
+(Kennung); in den Ständen tragen die Ergebnisse je Rennen `start_number`, `grid`, `time`, `gap`, `fastest_lap_time`
+und `driver_of_the_day` – nur, wo angegeben.
+
+**Eigene Teams (#1926):** Die Serie hat `own_teams` (`[{name, aliases}]`, `team_name` = das erste). Ein Team aus der
+Liste, aus `matches` oder der Tabelle zählt als eigenes, wenn Name oder Alias ohne Groß/klein, Leer- und Satzzeichen
+passt; die Stände führen es unter seinem Namen.
+
 - **Punkte:** In einer Serie mit Punkteschlüssel zählt der Schlüssel. Nur `points_source: "manual"` (Haken „Punkte
   zählen statt Schlüssel“) überschreibt ihn mit dem eingetragenen Wert. `organizer` speichert den Wert des
   Veranstalters und vergleicht ihn nur – weicht er ab, kommt die Warnung `points_differ`, gezählt wird weiter der
@@ -42,10 +56,11 @@ nach der Runde). Team-Liga: `matches` mit `home`, `away`, Ergebnis, `maps` und `
   Teilnehmer, die nur ein ersetzter Entwurf angelegt hat. Gelöscht wird unter der Sperre der Saison (siehe unten);
   „offen und ohne Alias“ steht im Löschfilter selbst, weil die Zuordnung (#1743) ohne diese Sperre läuft.
 - **Fehler** (halten das Übernehmen auf): Teilnehmer doppelt, unbekannte Kennung oder Startnummer, Name fehlt,
-  unbrauchbar oder mehrdeutig, leeres Blatt, abgesagter oder archivierter Termin.
+  unbrauchbar oder mehrdeutig, leeres Blatt, abgesagter oder archivierter Termin, schnellste Runde oder Fahrer des
+  Tages nicht in der Liste.
 - **Warnungen:** Platz doppelt, Lücke oder fehlend, Nichtstart mit Platz, Punkte passen nicht zum Schlüssel oder
-  fehlen bei „laut Veranstalter“, Abweichung zum offiziellen Wert, Maps passen nicht zum Ergebnis, eigenes Team fehlt
-  im Spiel, Team doppelt in der Tabelle, Termin in der Zukunft oder ohne Wertung.
+  fehlen bei „laut Veranstalter“, Abweichung zum offiziellen Wert, Maps passen nicht zum Ergebnis, kein eigenes Team
+  im Spiel, Team doppelt in der Tabelle, schnellste Runde mehrfach markiert, Termin in der Zukunft oder ohne Wertung.
 
 ## Version, Entwurf daneben und Protokoll
 

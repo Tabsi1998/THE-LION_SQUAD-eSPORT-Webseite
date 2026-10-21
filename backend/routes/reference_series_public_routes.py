@@ -30,6 +30,7 @@ from services.rate_limit import enforce_rate_limit
 from services.reference_calendar import calendar_view, vienna_clock
 from services.scoring_rules import normalize_rules
 from services.series_racing import racing_block
+from services.series_standings import RACE_DETAILS
 from services.team_league_page import team_league_view
 from services.visibility import user_can_see
 
@@ -99,6 +100,8 @@ def _standing_row(row: dict, people: dict) -> dict:
             "round_id": item.get("round_id"), "place": item.get("place"), "points": item.get("points"),
             "marks": item.get("marks") or [], "counted": item.get("round_id") in counted,
             "dropped": item.get("round_id") in dropped,
+            # Rennergebnis (#1927): Startnummer, Startplatz, Zeit, Abstand, schnellste Runde, Fahrer des Tages.
+            **{key: item[key] for key in RACE_DETAILS if item.get(key) not in (None, "")},
         } for item in row.get("results") or []],
     }
 

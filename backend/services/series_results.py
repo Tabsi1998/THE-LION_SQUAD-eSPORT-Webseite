@@ -18,6 +18,11 @@ Finalgrenze. Laden, Speichern und das Neurechnen der Stände machen die Routen (
   „Punkte laut Veranstalter“ zählt jede Zeile wie eingetragen („organizer“).
 - **Finalgrenze** (``final_line``): wer nach dieser Runde unter den besten ``final_top_n`` steht, wer neu drin ist und
   wer herausgefallen ist.
+- **Rennergebnis** (#1927): je Zeile optional Startnummer, Startplatz (``grid``), Rennzeit (``time``), Abstand (``gap``)
+  und ``dnf`` (wird zur Marke), je Rennen die schnellste Runde (``fastest_lap``: wer und Zeit) und der Fahrer des Tages
+  (``driver_of_the_day``) - genau die Felder, die auch die Texterkennung (#1756) liefert. Beide müssen in der Liste
+  stehen; die schnellste Runde setzt die Marke an ihrer Zeile (so zählt ein Bonus), eine Zeit ohne Namen gehört zur
+  markierten Zeile. Gespeichert wird nur, was angegeben ist - ein Blatt ohne diese Felder bleibt wie bisher.
 
 Meldungen werden nur aus den Eingaben gebaut, nie aus Ausnahmen.
 """
@@ -31,7 +36,11 @@ from services.own_teams import Matcher
 from services.scoring_rules import result_points
 
 NEW_PREFIX = "neu:"
-CONTENT_FIELDS = ("rows", "matches", "official_totals", "official_team_totals", "official_table", "note")
+CONTENT_FIELDS = ("rows", "matches", "official_totals", "official_team_totals", "official_table", "note",
+                  "fastest_lap", "driver_of_the_day")
+ROW_FIELDS = ("participant_id", "place", "team", "points", "points_source", "marks", "penalty_points", "note")
+# Angaben aus Veranstalter-Grafiken (#1927): nur gespeichert, wenn eingetragen.
+RACE_FIELDS = ("start_number", "grid", "time", "gap")
 TABLE_NUMBERS = ("played", "won", "drawn", "lost", "score_for", "score_against", "score_diff", "points")
 
 
@@ -102,18 +111,23 @@ class Resolution:
     official_team_totals: dict = field(default_factory=dict)
     official_table: list[dict] = field(default_factory=list)
     note: str | None = None
+    fastest_lap: dict | None = None  # {participant_id, time} (#1927)
+    driver_of_the_day: str | None = None
     new_people: dict[str, dict] = field(default_factory=dict)  # Schlüssel → Name, Startnummer, Team, Zeilen
     errors: list[dict] = field(default_factory=list)
     warnings: list[dict] = field(default_factory=list)
 
     def content(self) -> dict:
         """Das Blatt zum Speichern und Rechnen (Kennungen neuer Namen noch als ``neu:…``)."""
-        rows = [{key: row[key] for key in ("participant_id", "place", "team", "points", "points_source", "marks",
-                                           "penalty_points", "note")} for row in self.rows if row["participant_id"]]
+        rows = [{**{key: row[key] for key in ROW_FIELDS},
+                 **{key: row[key] for key in RACE_FIELDS if row.get(key) is not None}}
+                for row in self.rows if row["participant_id"]]
         return {"rows": rows, "matches": [dict(match) for match in self.matches],
                 "official_totals": dict(self.official_totals),
                 "official_team_totals": dict(self.official_team_totals),
-                "official_table": [dict(row) for row in self.official_table], "note": self.note}
+                "official_table": [dict(row) for row in self.official_table], "note": self.note,
+                "fastest_lap": dict(self.fastest_lap) if self.fastest_lap else None,
+                "driver_of_the_day": self.driver_of_the_day}
 
 
 def _locate(ref: dict, lookup: _Lookup, where: str) -> Located:
@@ -200,11 +214,16 @@ def resolve(entry: dict, participants: list[dict], rules: dict) -> Resolution:
             out.warnings.append({**located.note, "rows": [index]})
         team = clean(raw.get("team"))[:120] or None
         source, points = _points_source(raw, rules)
-        marks = sorted({str(mark) for mark in raw.get("marks") or []})
+        marks = {str(mark) for mark in raw.get("marks") or []}
+        if raw.get("dnf"):
+            marks.add("dnf")  # Ausfall als Feld (so liefert ihn die Texterkennung) ist die Marke „dnf“
         row = {"index": index, "participant_id": located.participant_id, "match": located.match,
                "name": located.name, "place": raw.get("place") or None, "team": team, "points": points,
-               "points_source": source, "marks": marks, "penalty_points": number(float(raw.get("penalty_points") or 0)),
-               "note": clean(raw.get("note"))[:300] or None}
+               "points_source": source, "marks": sorted(marks),
+               "penalty_points": number(float(raw.get("penalty_points") or 0)),
+               "note": clean(raw.get("note"))[:300] or None,
+               "start_number": clean(raw.get("start_number"))[:10] or None, "grid": raw.get("grid") or None,
+               "time": clean(raw.get("time"))[:20] or None, "gap": clean(raw.get("gap"))[:20] or None}
         out.rows.append(row)
         if located.participant_id:
             seen.setdefault(located.participant_id, []).append(index)
@@ -217,6 +236,7 @@ def resolve(entry: dict, participants: list[dict], rules: dict) -> Resolution:
             name = next(row["name"] for row in out.rows if row["participant_id"] == pid)
             out.errors.append(_problem("duplicate_participant",
                                        f"„{name}“ steht mehrfach im Blatt ({_rows_text(indices)}).", indices))
+    _race_extras(out, entry, lookup, seen)
 
     for index, raw in enumerate(entry.get("matches") or []):
         lineup: list[str] = []
@@ -248,6 +268,43 @@ def resolve(entry: dict, participants: list[dict], rules: dict) -> Resolution:
     return out
 
 
+def _in_list(out: Resolution, ref, lookup: _Lookup, seen: dict, where: str, code: str) -> str | None:
+    """Wer bei schnellster Runde bzw. Fahrer des Tages gemeint ist - muss eine Zeile der Liste sein."""
+    if not isinstance(ref, dict) or not any(clean(ref.get(key)) for key in ("participant_id", "name", "start_number")):
+        return None
+    located = _locate(ref, lookup, where)
+    if located.problem:
+        out.errors.append(located.problem)
+        return None
+    if located.participant_id not in seen:
+        label = located.name or clean(ref.get("start_number"))
+        out.errors.append(_problem(code, f"{where}: „{label}“ steht nicht in der Ergebnisliste."))
+        return None
+    return located.participant_id
+
+
+def _race_extras(out: Resolution, entry: dict, lookup: _Lookup, seen: dict) -> None:
+    """Schnellste Runde und Fahrer des Tages (#1927) den Zeilen zuordnen."""
+    fastest = entry.get("fastest_lap")
+    if isinstance(fastest, dict):
+        time = clean(fastest.get("time"))[:20] or None
+        pid = _in_list(out, fastest, lookup, seen, "Schnellste Runde", "fastest_lap_not_in_list")
+        if pid is None and not any(clean(fastest.get(key)) for key in ("participant_id", "name", "start_number")):
+            marked = [row["participant_id"] for row in out.rows
+                      if row["participant_id"] and "fastest_lap" in row["marks"]]
+            pid = marked[0] if len(marked) == 1 else None
+        if pid:
+            for row in out.rows:
+                if row["participant_id"] == pid and "fastest_lap" not in row["marks"]:
+                    row["marks"] = sorted([*row["marks"], "fastest_lap"])
+        if pid or time:
+            out.fastest_lap = {"participant_id": pid, "time": time}
+    day = entry.get("driver_of_the_day")
+    if isinstance(day, str):
+        day = {"name": day}
+    out.driver_of_the_day = _in_list(out, day, lookup, seen, "Fahrer des Tages", "driver_of_the_day_not_in_list")
+
+
 def replace_new_ids(content: dict, created: dict[str, str]) -> dict:
     """Die Kennungen ``neu:<Schlüssel>`` durch die der angelegten Teilnehmer ersetzen (``created``: Schlüssel →
     Kennung)."""
@@ -259,6 +316,11 @@ def replace_new_ids(content: dict, created: dict[str, str]) -> dict:
     out["matches"] = [{**match, "lineup": [real(pid) for pid in match.get("lineup") or []]}
                       for match in content.get("matches") or []]
     out["official_totals"] = {real(pid): value for pid, value in (content.get("official_totals") or {}).items()}
+    if content.get("fastest_lap") and content["fastest_lap"].get("participant_id"):
+        fastest = content["fastest_lap"]
+        out["fastest_lap"] = {**fastest, "participant_id": real(fastest["participant_id"])}
+    if content.get("driver_of_the_day"):
+        out["driver_of_the_day"] = real(content["driver_of_the_day"])
     return out
 
 
@@ -360,6 +422,10 @@ def check(resolution: Resolution, rules: dict, round_doc: dict, today: str, own_
     if round_doc.get("counts") is False:
         warnings.append(_problem("round_not_counted", "Der Termin zählt nicht zur Wertung."))
     warnings.extend(_places(resolution))
+    fastest = [row["index"] for row in resolution.rows if row["participant_id"] and "fastest_lap" in row["marks"]]
+    if len(fastest) > 1:
+        warnings.append(_problem("fastest_lap_twice", f"Die schnellste Runde ist mehrfach markiert "
+                                 f"({_rows_text(fastest)}).", fastest))
     warnings.extend(_points(resolution, rules))
     warnings.extend(_matches(resolution, own_teams))
 

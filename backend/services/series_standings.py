@@ -28,6 +28,10 @@ from services.scoring_rules import (
 
 WORST = -math.inf
 TABLE_FIELDS = ("played", "won", "drawn", "lost", "score_for", "score_against", "score_diff")
+RESULT_FIELDS = ("round_id", "place", "points", "source", "marks", "team")
+# Angaben aus dem Rennergebnis (#1927) - nur, wo eingetragen: Startnummer, Startplatz, Zeit, Abstand, schnellste Runde
+# mit Zeit und Fahrer des Tages.
+RACE_DETAILS = ("start_number", "grid", "time", "gap", "fastest_lap_time", "driver_of_the_day")
 
 
 def ordered_rounds(rounds: list[dict]) -> list[dict]:
@@ -103,15 +107,24 @@ def _results_by_participant(rules: dict, upto: list[dict], sheets: dict, seq_of:
     found: dict[str, list[dict]] = {}
     # Jeder Teilnehmer steht höchstens einmal im Blatt - das prüft validate_sheet vor dem Rechnen.
     for item in upto:
-        for row in sheets[item["id"]].get("rows") or []:
+        sheet = sheets[item["id"]]
+        fastest = sheet.get("fastest_lap") or {}
+        for row in sheet.get("rows") or []:
             pid = row.get("participant_id")
             if not pid:
                 continue
             scored = result_points(row, rules)
+            details = {key: row[key] for key in ("start_number", "grid", "time", "gap")
+                       if row.get(key) not in (None, "")}
+            if fastest.get("participant_id") == pid and fastest.get("time"):
+                details["fastest_lap_time"] = fastest["time"]
+            if sheet.get("driver_of_the_day") == pid:
+                details["driver_of_the_day"] = True
             found.setdefault(pid, []).append({
                 "round_id": item["id"], "seq": seq_of[item["id"]], "place": row.get("place") or None,
                 "marks": sorted(set(row.get("marks") or [])), "team": row.get("team") or None,
                 "points": scored["points"], "source": scored["source"], "participated": scored["participated"],
+                **details,
             })
     return found
 
@@ -131,8 +144,8 @@ def _driver_rows(rules: dict, upto: list[dict], sheets: dict, seq_of: dict, tota
             "participant_id": pid, "computed_points": _number(counted_points + bonus),
             "activity_points": _number(bonus),
             "counted_round_ids": counted, "dropped_round_ids": dropped,
-            "results": [{key: item[key] for key in ("round_id", "place", "points", "source", "marks", "team")}
-                        for item in results],
+            "results": [{**{key: item[key] for key in RESULT_FIELDS},
+                         **{key: item[key] for key in RACE_DETAILS if key in item}} for item in results],
             "wins": stats["wins"], "podiums": stats["podiums"],
             "rounds_played": sum(1 for item in results if item["participated"]), "_stats": stats,
         }
