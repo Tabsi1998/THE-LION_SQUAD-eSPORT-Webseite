@@ -1,6 +1,7 @@
 import { FormGrid, FormSection } from "@/components/tls/AdminForm";
 import { CheckField, SelectField, TextField } from "@/components/tls/FormFields";
 import { COUNT_MODE_OPTIONS, POINTS_MODE_OPTIONS, TABLE_TIEBREAKER_OPTIONS, TIEBREAKER_OPTIONS, emptyBonus } from "@/lib/referenceSeries";
+import { TEAM_MODE_OPTIONS } from "@/lib/seriesSpecialRules";
 import { Plus, X } from "lucide-react";
 
 // Regeln einer Serie (#1741) - alles einstellbar, nichts fest verdrahtet. Die Felder kommen aus `rulesToForm`, gerechnet
@@ -85,6 +86,8 @@ export function RulesFields({ rules, kind, onChange }) {
           <TextField label="Finale: die besten" type="number" min="1" value={rules.final_top_n} onChange={(v) => set("final_top_n", v)} hint="Leer: kein Finale." testId="series-rules-final" />
           <TextField label="Aktivitätspunkte je Runde" type="number" step="any" min="0" value={rules.activity_points} onChange={(v) => set("activity_points", v)} testId="series-rules-activity" />
           <TextField label="… ab Runde" type="number" min="1" value={rules.activity_from_round} onChange={(v) => set("activity_from_round", v)} testId="series-rules-activity-from" />
+          {/* #1960: darunter bleibt ein Termin laut Regeln ohne Wertung - das Eintragen weist darauf hin. */}
+          <TextField label="Mindestens am Start" type="number" min="1" value={rules.min_participants} onChange={(v) => set("min_participants", v)} hint="Leer: keine Mindestzahl." testId="series-rules-min-participants" />
         </FormGrid>
       </FormSection>
 
@@ -107,6 +110,9 @@ export function RulesFields({ rules, kind, onChange }) {
           <FormGrid>
             <TextField label="Fahrer, die je Rennen zählen" type="number" min="1" value={rules.team_counting_drivers} onChange={(v) => set("team_counting_drivers", v)} hint="Leer: alle." testId="series-rules-team-drivers" />
             <CheckField label="Gäste zählen fürs Team" checked={rules.team_guests_count} onChange={(v) => set("team_guests_count", v)} testId="series-rules-team-guests" />
+            {/* #1960: wechselt ein Fahrer das Team, zählen seine Punkte je Rennen fürs gefahrene Team oder ganz fürs neue. */}
+            <SelectField label="Teamwertung bei Wechseln" value={rules.team_mode || "per_race"} onChange={(v) => set("team_mode", v)} options={TEAM_MODE_OPTIONS} testId="series-rules-team-mode"
+              hint="Gibt es die Teamwertung des Veranstalters, gilt sie – beim Eintragen einfügen." />
           </FormGrid>
         )}
       </FormSection>

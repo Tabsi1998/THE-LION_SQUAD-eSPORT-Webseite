@@ -105,7 +105,8 @@ export function sheetToForm(content, participants = [], { kind, teamName, oppone
     rows: rows.length || kind === "team_league" ? rows : [emptyRow()],
     matches,
     table: (content?.official_table || []).map((row) => ({ ...row })),
-    // Teamwerte laut Veranstalter haben (noch) kein eigenes Feld im Blatt – sie gehen unverändert wieder mit.
+    // Teamwertung laut Veranstalter (#1960): bei der Rennliga mit Teamwertung eigenes Feld im Blatt
+    // (OfficialTeamTotals), sonst geht sie unverändert wieder mit.
     teamTotals: { ...(content?.official_team_totals || {}) },
     note: text(content?.note),
     // Je Rennen (#1927): schnellste Runde mit Zeit und Fahrer des Tages - im Formular über den Namen der Zeile.

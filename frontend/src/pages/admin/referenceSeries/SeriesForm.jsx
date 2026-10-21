@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { api, formatApiError } from "@/lib/api";
 import { AdminSheet } from "@/components/tls/AdminSheet";
 import { FormGrid } from "@/components/tls/AdminForm";
@@ -29,6 +29,25 @@ export function SeriesForm({ series, lineage, schemes = [], defaultRules = {}, p
     const scheme = schemes.find((item) => item.id === id);
     setForm((current) => ({ ...current, points_scheme_id: id, rules: rulesToForm(scheme ? scheme.rules : defaultRules) }));
   };
+  // Nachfolger (#1960): eine andere Saison derselben Spur - aus der Übersicht, wenn die Seite die Saisons nicht mitgibt.
+  const [seasons, setSeasons] = useState(() => lineage.series || null);
+  useEffect(() => {
+    if (isNew || seasons) return undefined;
+    let alive = true;
+    (async () => {
+      let found = [];
+      try {
+        const response = await api.get("/reference-series/admin");
+        found = (response?.data?.lineages || []).find((item) => item.id === lineage.id)?.series || [];
+      } catch {
+        found = [];
+      }
+      if (alive) setSeasons(found);
+    })();
+    return () => { alive = false; };
+  }, [isNew, seasons, lineage.id]);
+  const successors = [["", "—"], ...(seasons || []).filter((item) => item.id !== series?.id && item.status !== "archived")
+    .map((item) => [item.id, [item.season, item.tier].filter(Boolean).join(" · ") || item.title || "Saison"])];
   const imageOptions = resultImageOptions(lineage.kind, { inherit: true, value: form.result_image_template || lineage.result_image_template });
   const schemeOptions = [
     ["", "Ohne Vorlage (Standard)"],
@@ -64,7 +83,18 @@ export function SeriesForm({ series, lineage, schemes = [], defaultRules = {}, p
       </FormGrid>
       <TextField label="Eigener Titel" value={form.title} onChange={(v) => set("title", v)} hint="Leer: der Titel der Spur." testId="series-title" />
       <FormGrid>
-        {!archived && <SelectField label="Status" value={form.status} onChange={(v) => set("status", v)} options={STATUS_OPTIONS} testId="series-status" />}
+        {!archived && <SelectField label="Status" value={form.status} onChange={(v) => set("status", v)} options={isNew ? STATUS_OPTIONS.filter(([value]) => value !== "cancelled") : STATUS_OPTIONS} testId="series-status" />}
+        {/* Saison abgebrochen (#1960): Tag und Grund stehen öffentlich auf der Serienseite - ohne Meister, ohne Platz. */}
+        {!archived && form.status === "cancelled" && (
+          <>
+            <TextField label="Abgebrochen am" type="date" value={form.cancelled_on} onChange={(v) => set("cancelled_on", v)} hint="Leer: heute." testId="series-cancelled-on" />
+            <TextField label="Grund des Abbruchs" value={form.cancel_reason} onChange={(v) => set("cancel_reason", v)} maxLength={300} placeholder="Neustart mit anderem Auto" hint="Öffentlich auf der Serienseite." testId="series-cancel-reason" />
+          </>
+        )}
+        {!isNew && successors.length > 1 && (
+          <SelectField label="Nachfolger" value={form.successor_id} onChange={(v) => set("successor_id", v)} options={successors} testId="series-successor"
+            hint="Die Saison, die diese ablöst – etwa der Neustart nach einem Abbruch. Die Serienseite verlinkt sie." />
+        )}
         <SelectField label="Einträge eines Captains" value={form.publish_mode} onChange={(v) => set("publish_mode", v)} options={PUBLISH_OPTIONS} testId="series-publish-mode" />
         <SelectField label="Standard-Wochentag" value={form.default_weekday} onChange={(v) => set("default_weekday", v)} options={WEEKDAY_OPTIONS} testId="series-weekday" />
         <TextField label="Standard-Uhrzeit" type="time" value={form.default_time} onChange={(v) => set("default_time", v)} hint="Wiener Zeit." testId="series-time" />

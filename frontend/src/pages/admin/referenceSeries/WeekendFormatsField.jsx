@@ -104,6 +104,11 @@ export function WeekendFormatsField({ formats, onChange, racePoints = [] }) {
                     <X className="w-4 h-4" />
                   </button>
                 </div>
+                {/* Regeländerung ab Runde X (#1960): der Hinweis steht mit dem Tag der Runde auf der Serienseite. */}
+                {index > 0 && (
+                  <TextField label="Hinweis zur Regeländerung" value={format.note || ""} onChange={(note) => update(format.key, { note })} maxLength={200}
+                    placeholder={`Ab R${format.from_round || "…"} kein Qualifying, Start in umgekehrter WM-Reihenfolge`} hint="Öffentlich auf der Serienseite, mit dem Tag der ersten Runde dieses Formats." testId="weekend-format-note" />
+                )}
                 <ol className="space-y-2">
                   {format.sessions.map((session, position) => (
                     <SessionRow key={session.key} session={session} index={position} removable={format.sessions.length > 1} racePoints={racePoints}

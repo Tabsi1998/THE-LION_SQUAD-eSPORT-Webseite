@@ -11,6 +11,7 @@ import {
 } from "@/lib/referenceResults";
 import { ResultPreview } from "./ResultPreview";
 import { TeamLeagueEntry } from "./TeamLeagueEntry";
+import { OfficialTeamTotals } from "./OfficialTeamTotals";
 import { VenueWithFlag } from "@/components/tls/CountryFlag";
 import { ResultImageButton, ResultImageRowNote, ResultImageSummary, ocrMark, useResultImage } from "./ResultImageImport";
 import { RACE_FIELD_GROUPS, afterEdit, confirmRow, imageFormFields, imageToRows, isUncertain, openImageItems, replaceRaceMarks } from "@/lib/resultImage";
@@ -684,6 +685,10 @@ export function ResultEntrySheet({ series, round, onClose, onSaved }) {
             </section>
           )}
           {kind === "racing" && !qualifying && <RaceExtras form={form} onChange={update} invalid={invalid.race} problems={problems.byField} />}
+          {/* Teamwertung laut Veranstalter (#1960): sichtbare Eingabe mit Einfügen - sie gilt dann für Platz und Punkte. */}
+          {kind === "racing" && !qualifying && rules.team_scoring?.enabled && (
+            <OfficialTeamTotals key={`${data.version}-${mine ? "mine" : "stand"}`} totals={form.teamTotals} teams={teams} onChange={(teamTotals) => update({ teamTotals })} />
+          )}
 
           {teamLeague && form.rows.length === 0 && (
             <button type="button" onClick={addRow} data-testid="result-row-add" className="tls-btn tls-btn--quiet px-3 py-2 rounded-sm text-xs font-bold uppercase tracking-wider inline-flex items-center gap-2">

@@ -6,6 +6,7 @@ import { STATE_LABELS, STATE_TONES, dayLabel, moveIds, opponentText, roundLabel,
 import { groupWeekends, hasSessions, sessionLabel } from "@/lib/raceWeekend";
 import { PasteSheet, PostponeSheet, RoundSheet } from "./RoundSheets";
 import { VenueWithFlag } from "@/components/tls/CountryFlag";
+import { noScoreText } from "@/lib/seriesSpecialRules";
 import { toast } from "sonner";
 import { AlertTriangle, Archive, ArchiveRestore, ArrowDown, ArrowDownUp, ArrowUp, Ban, CalendarClock, ClipboardList, Pencil, Plus, RotateCcw } from "lucide-react";
 
@@ -23,7 +24,7 @@ function RoundNotes({ round }) {
   return (
     <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-white/45">
       {round.kind === "final" && <span className="uppercase tracking-widest font-bold text-[#29B6E8]">Finale</span>}
-      {round.counts === false && <span>zählt nicht zur Wertung</span>}
+      {round.counts === false && <span data-testid="round-no-score">{noScoreText(round) || "zählt nicht zur Wertung"}</span>}
       {round.original_club_day && <span data-testid="round-original">ursprünglich {dayLabel(round.original_club_day)}</span>}
       {round.status_note && <span>– {round.status_note}</span>}
     </div>
