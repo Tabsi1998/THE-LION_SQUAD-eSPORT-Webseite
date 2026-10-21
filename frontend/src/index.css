@@ -730,7 +730,10 @@ button.tls-bracket-row:active, .tls-bracket-head:active { transform: scale(calc(
 .tls-stagger > :nth-child(11) { --tls-stagger-i: 10; }
 .tls-stagger > :nth-child(12) { --tls-stagger-i: 11; }
 
-.tls-press { transition: transform var(--tls-motion-fast) var(--tls-ease), border-color var(--tls-motion-fast) var(--tls-ease); }
+.tls-press {
+  transition: transform var(--tls-motion-fast) var(--tls-ease), border-color var(--tls-motion-fast) var(--tls-ease),
+    background-color var(--tls-motion-fast) var(--tls-ease), color var(--tls-motion-fast) var(--tls-ease);
+}
 @media (hover: hover) and (pointer: fine) {
   .tls-press:not(.tls-press--flat):hover { transform: translateY(calc(-2px * var(--tls-motion-on))); }
 }

@@ -16,7 +16,8 @@ import { StaggerIn } from "@/components/tls/motion/StaggerIn";
 // Anzahl steht als „x von y Teilnahmen“. Am Handy werden die Zeilen kompakt, die Filter lassen sich wischen.
 // Eine Teilnahme aus einer Saison (#1750) führt zur Saison-Seite statt zur Detailseite.
 
-const chipBase = "shrink-0 inline-flex items-center gap-2 min-h-[44px] px-4 rounded-full border text-sm font-semibold whitespace-nowrap transition-colors duration-fast";
+// Filter-Chips geben beim Drücken leicht nach (Baustein Press als Klasse, flach - ohne Anheben in der Leiste, #1969).
+const chipBase = "tls-press tls-press--flat shrink-0 inline-flex items-center gap-2 min-h-[44px] px-4 rounded-full border text-sm font-semibold whitespace-nowrap";
 const chipIdle = "border-white/[0.14] bg-transparent text-zinc-300 hover:border-white/40 hover:text-white";
 
 export const Chronicle = forwardRef(function Chronicle({ items, linked, memberId = "", memberLabel = "", onClearMember, index = 5 }, ref) {
