@@ -57,6 +57,9 @@ async def init_indexes():
     # Map-Bibliothek je Spiel und Map-Pools je Wettbewerb mit Versionen (#1616)
     await db.game_maps.create_index("id", unique=True)
     await db.game_maps.create_index([("game_id", 1), ("slug", 1)], unique=True)
+    # Name, Slug und weitere Schreibweisen je Spiel nur einmal (``game_maps.reserve_keys``) - atomar über diesen Index.
+    await db.game_map_keys.create_index([("game_id", 1), ("key", 1)], unique=True)
+    await db.game_map_keys.create_index("map_id")
     await db.map_pools.create_index("id", unique=True)
     await db.map_pools.create_index([("scope", 1), ("scope_id", 1), ("version", -1)], unique=True)
     await db.map_pools.create_index([("tournament_id", 1), ("scope", 1)])

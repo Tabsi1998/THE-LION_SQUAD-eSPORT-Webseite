@@ -8,9 +8,11 @@
   Saison (mit ``mode`` genau aus diesem Modus, sonst aus irgendeinem), ohne Pool aus den aktiven Maps des Spiels (mit
   ``mode`` nur, wenn sie dafür freigegeben ist). Sonst das Problem ``map_unknown`` an der Map (wie die übrigen
   Prüfungen, mit ``match``, ``map``, ``map_field``). Name und Bild kommen nie aus der Eingabe, sondern aus dem Pool
-  (Snapshot) bzw. der Bibliothek und werden beim Speichern ins Blatt geschrieben. Ausnahme: Steht die Map schon im
-  gespeicherten Blatt dieses Termins (auch im Entwurf daneben), behält sie Name und Bild von damals - auch wenn sie
-  inzwischen aus dem Pool gefallen, umbenannt oder archiviert ist. So zeigt ein altes Spiel die Map wie damals.
+  (Snapshot) bzw. der Bibliothek und werden beim Speichern ins Blatt geschrieben. Ausnahme: Steht genau diese Map an
+  genau dieser Stelle schon im gespeicherten Blatt des Termins (auch im Entwurf daneben) - gleiche Begegnung, gleiche
+  Map-Nummer, gleiche Kennung, gleicher Modus (``place``) -, behält sie Name und Bild von damals, auch wenn sie
+  inzwischen aus dem Pool gefallen, umbenannt oder archiviert ist. So zeigt ein altes Spiel die Map wie damals, und eine
+  Map lässt sich nicht über ein altes Spiel woandershin einschleusen.
 - **Statistik** (``map_stats``): je Map aus den eigenen Spielen der Saison (Veto aus ``team_league_page``): gebannt und
   gewählt (von uns, vom Gegner, ohne Angabe), Decider, gespielt, Siege, Unentschieden, Niederlagen. Maps mit Kennung
   zählen über die Kennung, Freitext über den Namen (ohne Groß/klein).
@@ -61,15 +63,26 @@ async def choices(db, series: dict) -> dict | None:
     return {"source": "library", "game": map_pools.game_summary(game), "pool_version": None, "modes": modes}
 
 
-def saved_maps(sheet: dict | None) -> dict[str, dict]:
-    """Die Maps mit Kennung, die im gespeicherten Blatt eines Termins stehen (auch im Entwurf daneben) - je Kennung der
+def _team(value) -> str:
+    return " ".join(str(value or "").split()).casefold()
+
+
+def place(match: dict, map_index: int, item: dict) -> tuple:
+    """Die Stelle einer Map im Blatt: Begegnung (Heim, Gast), Map-Nummer, Kennung und Modus. Nur an genau derselben
+    Stelle behält eine gespeicherte Map ihren Snapshot (Nachprüfung #1616)."""
+    return (_team(match.get("home")), _team(match.get("away")), map_index, item.get("map_id"), item.get("mode") or "")
+
+
+def saved_maps(sheet: dict | None) -> dict[tuple, dict]:
+    """Die Maps mit Kennung im gespeicherten Blatt eines Termins (auch im Entwurf daneben) - je Stelle (``place``) der
     gespeicherte Snapshot (Name, Bild)."""
-    out: dict[str, dict] = {}
+    out: dict[tuple, dict] = {}
     for content in (sheet or {}, (sheet or {}).get("pending_draft") or {}):
         for match in content.get("matches") or []:
-            for item in match.get("maps") or []:
-                if item.get("map_id") and item["map_id"] not in out:
-                    out[item["map_id"]] = {"name": item.get("name"), "image_url": item.get("image_url")}
+            for map_index, item in enumerate(match.get("maps") or []):
+                if item.get("map_id"):
+                    out.setdefault(place(match, map_index, item),
+                                   {"name": item.get("name"), "image_url": item.get("image_url")})
     return out
 
 
@@ -112,7 +125,7 @@ async def attach(db, series: dict, resolution, sheet: dict | None = None) -> Non
             map_id = item.get("map_id")
             if not map_id:
                 continue
-            snapshot, reason = kept.get(map_id), None
+            snapshot, reason = kept.get(place(match, map_index, item)), None
             if not snapshot:
                 snapshot, reason = _allowed(game, pool, rows, map_id, item.get("mode")) if game else (
                     None, "gehört zu keinem Spiel dieser Serie")

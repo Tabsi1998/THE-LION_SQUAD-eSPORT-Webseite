@@ -243,6 +243,36 @@ async def test_a_saved_match_keeps_its_old_map_when_saved_again(flow):
     assert "map_unknown" in await _codes(flow, series, second, _one_map({"name": "Sturmdeck", "map_id": sturm}))
 
 
+@pytest.mark.asyncio
+async def test_the_kept_old_map_is_bound_to_its_place_in_the_saved_match(flow):
+    """Nachprüfung: die Ausnahme gilt nur für dieselbe Map an derselben Stelle - gleiches Spiel, gleiche Map-Nummer,
+    gleiche Kennung, gleicher Modus. Sonst ließe sich eine aus dem Pool gefallene Map anderswo einschleusen."""
+    _game, maps, _lineage, series, round_doc = await _setup(flow)
+    sturm = maps["Sturmdeck"]["id"]
+    saved = await flow.put(_base(series, round_doc), json={
+        **_one_map({"name": "Sturmdeck", "map_id": sturm, "mode": "snd"}), "status": "published", "expected_version": 0})
+    assert saved.status_code == 200, saved.text
+    await flow.put(f"/api/map-pools/reference-series/{series['id']}", json={"modes": [
+        {"mode": "snd", "map_ids": [maps["Nebelwerk"]["id"]]}]})
+    same = _one_map({"name": "Sturmdeck", "map_id": sturm, "mode": "snd"})
+    assert await _codes(flow, series, round_doc, same) == []
+
+    # Andere Map-Nummer: eine Map davor eingeschoben.
+    moved = _one_map({"name": "Sturmdeck", "map_id": sturm, "mode": "snd"})
+    moved["matches"][0]["maps"].insert(0, {"name": "Karte Frei", "role": "banned", "by": "own"})
+    assert "map_unknown" in await _codes(flow, series, round_doc, moved)
+    # Anderer Modus an derselben Stelle.
+    assert "map_unknown" in await _codes(flow, series, round_doc, _one_map(
+        {"name": "Sturmdeck", "map_id": sturm, "mode": "stellung"}))
+    # Anderes Spiel im selben Blatt.
+    other = {"matches": [*same["matches"], {"home": "Probe Adler", "away": "Probe Eulen", "home_score": 1,
+                                            "away_score": 0, "maps": [{"name": "Sturmdeck", "map_id": sturm,
+                                                                       "mode": "snd", "home_score": 6, "away_score": 1}]}]}
+    preview = await flow.post(f"{_base(series, round_doc)}/preview", json=other)
+    problems = preview.json()["errors"]
+    assert [(item["match"], item["map"]) for item in problems if item["code"] == "map_unknown"] == [(1, 0)]
+
+
 # ---------------------------------------------------------------- Befund 2: Name und Bild nie aus der Eingabe
 @pytest.mark.asyncio
 async def test_name_and_image_of_a_library_map_never_come_from_the_input(flow):
@@ -325,3 +355,78 @@ async def test_a_spelling_may_not_point_to_another_map_of_the_game(flow):
     # Die eigene Map stört sich nicht an sich selbst.
     own = await flow.patch(f"{base}/{nebel['id']}", json={"aliases": ["Fog Works", "Nebel"]})
     assert own.status_code == 200, own.text
+
+
+@pytest.mark.asyncio
+async def test_renaming_or_a_new_slug_may_not_point_to_another_map(flow):
+    """Nachprüfung: Umbenennen und neuer Slug werden wie beim Anlegen gegen Name, Slug und Schreibweisen der anderen
+    Maps geprüft (ohne Groß/klein, Leer- und Satzzeichen)."""
+    admin = await flow.add_user(role="superadmin", name="admin")
+    flow.act_as(admin)
+    game = (await flow.post("/api/games", json=SHOOTER)).json()
+    base = f"/api/games/{game['id']}/maps"
+    await flow.post(base, json={"name": "Nebelwerk", "aliases": ["Fog Works"]})
+    hafen = (await flow.post(base, json={"name": "Hafenkante"})).json()
+    renamed = await flow.patch(f"{base}/{hafen['id']}", json={"name": "Fog-Works"})
+    new_slug = await flow.patch(f"{base}/{hafen['id']}", json={"slug": "fog-works"})
+    assert (renamed.status_code, new_slug.status_code) == (409, 409)
+    assert "Nebelwerk" in new_slug.json()["detail"]
+    # Eigene Schreibweisen bleiben frei: Name und Slug der Map selbst.
+    fine = await flow.patch(f"{base}/{hafen['id']}", json={"slug": "hafen-kante", "aliases": ["Hafen Kante"]})
+    assert fine.status_code == 200, fine.text
+
+
+async def _parallel_creates(flow, monkeypatch, gated: str, unique_keys: bool):
+    import asyncio
+
+    import routes.game_map_routes as map_routes
+    from flow_harness import InterleavedReads
+
+    admin = await flow.add_user(role="superadmin", name="admin")
+    flow.act_as(admin)
+    game = (await flow.post("/api/games", json=SHOOTER)).json()
+    if unique_keys:
+        await flow.db.game_map_keys.create_index([("game_id", 1), ("key", 1)], unique=True)
+    gate = InterleavedReads(flow.db, gated)
+    monkeypatch.setattr(map_routes, "get_db", lambda: gate)
+    base = f"/api/games/{game['id']}/maps"
+    # Verschiedene Namen und Slugs, aber dieselbe Schreibweise - nur eine darf sie bekommen.
+    first, second = await asyncio.gather(flow.post(base, json={"name": "Hafenkante", "aliases": ["Fog Works"]}),
+                                         flow.post(base, json={"name": "Nebelwerk", "aliases": ["Fog-Works"]}))
+    return game, first, second
+
+
+@pytest.mark.asyncio
+async def test_two_parallel_creates_with_the_same_spelling_give_one_conflict(flow, monkeypatch):
+    game, first, second = await _parallel_creates(flow, monkeypatch, "game_maps", unique_keys=True)
+    assert sorted([first.status_code, second.status_code]) == [200, 409]
+    assert await flow.db.game_maps.count_documents({"game_id": game["id"]}) == 1
+
+
+@pytest.mark.asyncio
+async def test_the_unique_spelling_index_decides_when_both_checks_pass(flow, monkeypatch):
+    """Lesen beide den alten Stand der Schreibweisen, entscheidet der eindeutige Index (game_id, key) - 409, nie 500."""
+    game, first, second = await _parallel_creates(flow, monkeypatch, "game_map_keys", unique_keys=True)
+    assert sorted([first.status_code, second.status_code]) == [200, 409]
+    assert await flow.db.game_maps.count_documents({"game_id": game["id"]}) == 1
+    keys = [row["key"] async for row in flow.db.game_map_keys.find({"game_id": game["id"]})]
+    assert sorted(keys).count("fogworks") == 1
+
+
+@pytest.mark.asyncio
+async def test_existing_maps_get_their_spellings_reserved_by_the_migration(flow):
+    """Altbestand ohne belegte Schreibweisen: die Migration belegt sie; bei Doppelten gewinnt die erste Map."""
+    admin = await flow.add_user(role="superadmin", name="admin")
+    flow.act_as(admin)
+    game = (await flow.post("/api/games", json=SHOOTER)).json()
+    await flow.db.game_maps.insert_many([
+        {"id": "alt-1", "game_id": game["id"], "slug": "hafenkante", "name": "Hafenkante", "aliases": ["Fog Works"],
+         "modes": [], "order": 1, "status": "active"},
+        {"id": "alt-2", "game_id": game["id"], "slug": "nebelwerk", "name": "Nebelwerk", "aliases": ["Fog-Works"],
+         "modes": [], "order": 2, "status": "active"}])
+    assert await migrations.migrate_game_map_keys(flow.db) == "3 map spellings reserved, 1 skipped"
+    owners = {row["key"]: row["map_id"] async for row in flow.db.game_map_keys.find({"game_id": game["id"]})}
+    assert owners == {"hafenkante": "alt-1", "fogworks": "alt-1", "nebelwerk": "alt-2"}
+    clash = await flow.post(f"/api/games/{game['id']}/maps", json={"name": "Sturmdeck", "aliases": ["fog works"]})
+    assert clash.status_code == 409
+    assert any(version == 9 and name == "game_map_spelling_keys" for version, name, _ in migrations.MIGRATIONS)
