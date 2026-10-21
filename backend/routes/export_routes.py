@@ -164,6 +164,30 @@ async def _result_export_allowed_for_request(
     return bool(await validate_access_link(db, access, resource_type, item.get("id"), user, "view"))
 
 
+async def _f1_certificate_lead(challenge: dict, user: dict | None) -> bool:
+    """Leitung der Fast Lap (#1277): Bereich Turniere oder eine Zuteilung mit Zeit-Recht - wie ``can_manage_times``."""
+    if _is_export_staff(user):
+        return True
+    if not user:
+        return False
+    from routes.f1_routes import F1_RESULT_STAFF_ROLES, _has_f1_staff_permission
+    return await _has_f1_staff_permission(user, challenge["id"], F1_RESULT_STAFF_ROLES)
+
+
+async def _require_f1_all_certificates(challenge: dict, user: dict | None) -> None:
+    """Alle Urkunden auf einmal gibt es nur für die Leitung."""
+    if not await _f1_certificate_lead(challenge, user):
+        raise HTTPException(status_code=403, detail="Alle Urkunden gibt es nur für die Leitung der Fast Lap.")
+
+
+async def _require_f1_own_certificate(challenge: dict, user: dict | None, person_id: str) -> None:
+    """Eine Urkunde gibt es für die Person selbst (angemeldet, eigener Eintrag) und für die Leitung."""
+    if user and user.get("id") == person_id:
+        return
+    if not await _f1_certificate_lead(challenge, user):
+        raise HTTPException(status_code=403, detail="Diese Urkunde gibt es nur für die Person selbst und die Leitung.")
+
+
 def _certificate_source_from_item(item: dict, subtitle: str) -> dict:
     return {
         "title": item.get("title") or item.get("name") or "THE LION SQUAD",
@@ -435,6 +459,7 @@ async def pdf_f1_certificates(slug_or_id: str, track_id: Optional[str] = None, a
     c = await _get_visible_challenge(slug_or_id, user, access=access)
     if not await _result_export_allowed(c, user):
         raise HTTPException(status_code=403, detail="Urkunden sind erst nach Challenge-Ende öffentlich.")
+    await _require_f1_all_certificates(c, user)
     lb = await f1_lb(c["id"], track_id, access, user)
     rows = _top_certificate_rows(lb.get("entries") or [])
     if not rows:
@@ -466,6 +491,7 @@ async def pdf_f1_certificate(slug_or_id: str, user_id: str, track_id: Optional[s
     c = await _get_visible_challenge(slug_or_id, user, access=access)
     if not await _result_export_allowed(c, user):
         raise HTTPException(status_code=403, detail="Urkunden sind erst nach Challenge-Ende öffentlich.")
+    await _require_f1_own_certificate(c, user, user_id)
     lb = await f1_lb(c["id"], track_id, access, user)
     rows = lb.get("entries") or []
     # Gäste ohne Konto (#1585) stehen mit ``guest-<Kennung>`` in der Tabelle - ``participant_id`` ist bei allen der Schlüssel.
@@ -519,6 +545,7 @@ async def pdf_f1_championship_certificates(slug_or_id: str, access: Optional[str
     c = await _get_visible_challenge(slug_or_id, user, access=access)
     if not await _result_export_allowed(c, user):
         raise HTTPException(status_code=403, detail="Urkunden sind erst nach Challenge-Ende öffentlich.")
+    await _require_f1_all_certificates(c, user)
     cs = await f1_champ(c["id"], access, user)
     rows = _top_certificate_rows(cs.get("standings") or [])
     if not rows:
@@ -549,6 +576,7 @@ async def pdf_f1_championship_certificate(slug_or_id: str, user_id: str, access:
     c = await _get_visible_challenge(slug_or_id, user, access=access)
     if not await _result_export_allowed(c, user):
         raise HTTPException(status_code=403, detail="Urkunden sind erst nach Challenge-Ende öffentlich.")
+    await _require_f1_own_certificate(c, user, user_id)
     cs = await f1_champ(c["id"], access, user)
     rows = cs.get("standings") or []
     row = next((item for item in rows if item.get("user_id") == user_id), None)
