@@ -1,11 +1,10 @@
 # Changelog
 
-## [1.17.1](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/compare/v1.17.0...v1.17.1) (2026-10-21)
-
+## 1.17.1 (21.10.2026)
 
 ### Fehlerbehebungen
 
-* Sponsoren- und Partner-Logos wieder im Original statt weiß ([#1321](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1321)) ([49d6826](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/49d68264e5bc13cbbe42b9e90be0a5ee3f39b05e))
+* Sponsoren- und Partner-Logos wieder im Original statt weiß (#1321)
 
 ## 1.17.0 (21.10.2026)
 
