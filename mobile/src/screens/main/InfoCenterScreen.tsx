@@ -274,7 +274,6 @@ function Partners({ items, onOpenSeason }: { items: any[]; onOpenSeason: (target
                     ))}
                   </View>
                 ) : null}
-                <PartnerSeriesList partner={partner} lineages={lineages} onOpenSeason={onOpenSeason} />
                 {partner.slug || partner.id ? (
                   <Pressable accessibilityRole="link" onPress={() => openLink(`${WEB_BASE_URL}/partners/${partner.slug || partner.id}`)} testID={`partner-page-${partner.id}`}>
                     <Muted style={styles.link}>Partnerseite öffnen</Muted>
@@ -282,6 +281,8 @@ function Partners({ items, onOpenSeason }: { items: any[]; onOpenSeason: (target
                 ) : partner.url || partner.link ? <Muted style={styles.link}>Website öffnen</Muted> : null}
               </View>
             </View>
+            {/* Über die ganze Breite der Karte - die Saisons brauchen Platz. */}
+            <PartnerSeriesList partner={partner} lineages={lineages} onOpenSeason={onOpenSeason} />
           </Card>
         </LinkedCard>
       ))}
@@ -309,10 +310,12 @@ function PartnerSeriesList({ partner, lineages, onOpenSeason }: { partner: any; 
         >
           <View style={styles.partnerSeasonText}>
             <Muted style={styles.partnerSeasonEyebrow}>{item.eyebrow}</Muted>
-            <Body style={styles.partnerSeasonTitle}>{item.title}</Body>
+            <View style={styles.partnerSeasonTitleRow}>
+              <Body style={styles.partnerSeasonTitle}>{item.title}</Body>
+              {item.running ? <Muted style={styles.partnerRunning}>Läuft gerade</Muted> : null}
+            </View>
             <Muted style={styles.partnerSeasonMeta}>{[item.season, item.club].filter(Boolean).join(" · ")}</Muted>
           </View>
-          {item.running ? <Muted style={styles.partnerRunning}>Läuft gerade</Muted> : null}
           <Ionicons name="chevron-forward" size={16} color={colors.cyan} />
         </Pressable>
       ))}
@@ -464,7 +467,8 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   // „Ligen und Serien mit uns“ (#1934).
-  partnerSeries: { borderTopColor: colors.border, borderTopWidth: 1, gap: 6, marginTop: 10, paddingTop: 10 },
+  partnerSeries: { borderTopColor: colors.border, borderTopWidth: 1, gap: 6, paddingTop: 10 },
+  partnerSeasonTitleRow: { alignItems: "center", flexDirection: "row", flexWrap: "wrap", gap: 6 },
   partnerSeriesHead: { color: colors.muted, fontSize: 11, fontWeight: "800", letterSpacing: 1.6, textTransform: "uppercase" },
   partnerSeason: { alignItems: "center", flexDirection: "row", gap: 8, minHeight: 44, paddingVertical: 4 },
   partnerSeasonText: { flex: 1, minWidth: 0 },

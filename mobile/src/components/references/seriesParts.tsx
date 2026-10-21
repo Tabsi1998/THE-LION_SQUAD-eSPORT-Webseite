@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import React, { useEffect, useRef } from "react";
-import { Animated, Linking, Pressable, ScrollView, StyleSheet, View, type StyleProp, type ViewStyle } from "react-native";
+import { Animated, Linking, Pressable, StyleSheet, View, type StyleProp, type ViewStyle } from "react-native";
 import { motionEasing } from "../../lib/motion";
 import { chipLabel, chipWhen, type WeekendRound } from "../../lib/raceWeekend";
 import { PUBLIC_STATE_LABELS, stateTone, type StateTone } from "../../lib/referenceSeason";
@@ -34,12 +34,13 @@ export function StateChip({ label, tone }: { label: string; tone: StateTone }) {
   return <Muted style={[styles.state, { color: look.fg, backgroundColor: look.bg }]}>{label}</Muted>;
 }
 
-/** Die Läufe einer Runde als Chips (#1930): „Quali 19:30 · Sprint · Rennen“ je in der Farbe ihres Stands. Tippen öffnet
- * die Runde mit diesem Lauf - ohne Ziel (älterer Server) nur zum Lesen. */
+/** Die Läufe einer Runde als Chips (#1930): „Quali 19:30 · Sprint · Rennen“ je in der Farbe ihres Stands, umbrechend -
+ * so steht auch der letzte Lauf mit Uhrzeit da. Tippen öffnet die Runde mit diesem Lauf - ohne Ziel (älterer Server) nur
+ * zum Lesen. */
 export function SessionChips<T extends WeekendRound>({ rounds, onOpen, testID }: { rounds: T[]; onOpen?: ((round: T) => void) | null; testID?: string }) {
   if (rounds.length < 1) return null;
   return (
-    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips} accessibilityLabel="Läufe der Runde" testID={testID}>
+    <View style={styles.chips} accessibilityLabel="Läufe der Runde" testID={testID}>
       {rounds.map((round) => {
         const tone = stateTone(round.state);
         const look = STATE_STYLES[tone];
@@ -70,7 +71,7 @@ export function SessionChips<T extends WeekendRound>({ rounds, onOpen, testID }:
           </View>
         );
       })}
-    </ScrollView>
+    </View>
   );
 }
 
@@ -219,7 +220,7 @@ export function GlowOnce({ delay = 0, color = colors.cyan, peak = 0.16, trigger,
 
 const styles = StyleSheet.create({
   state: { borderRadius: 4, fontSize: 11, fontWeight: "800", letterSpacing: 0.9, overflow: "hidden", paddingHorizontal: 7, paddingVertical: 2, textTransform: "uppercase" },
-  chips: { gap: 6, paddingRight: 4 },
+  chips: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
   chip: { alignItems: "center", backgroundColor: surfaces.s2, borderColor: "rgba(255,255,255,0.1)", borderRadius: 999, borderWidth: 1, flexDirection: "row", gap: 6, minHeight: 30, paddingHorizontal: 10 },
   chipToday: { borderColor: "rgba(255,215,0,0.45)" },
   chipDot: { borderRadius: 3, height: 6, width: 6 },

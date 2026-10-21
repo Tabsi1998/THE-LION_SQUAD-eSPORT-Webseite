@@ -59,7 +59,7 @@ test("Kopf, Zusammenfassung ohne fremde Namen und das Hauptrennen mit hochzähle
   await render(<ReferenceRoundScreen navigation={navigation as never} route={routeFor({ lineage: "prl", season: "2026", round: 3 })} />);
   await waitFor(() => expect(screen.getByText("Aserbaidschan")).toBeTruthy());
   expect(mockGet).toHaveBeenCalledWith("/reference-series/public/prl/2026/rounds/3");
-  expect(screen.getByTestId("round-eyebrow").props.children).toBe("Runde 3 von 24 · Do., 08.10.2026");
+  expect(screen.getByTestId("round-eyebrow").props.children).toBe("Runde 3 von 24");
   expect(screen.getByTestId("round-subline").props.children).toBe("R3 · Do., 08.10.2026 · Baku City Circuit");
 
   // Ein fremder Sieger steht nur mit seinem Team da, ein öffentlicher Vereinsfahrer mit Namen.

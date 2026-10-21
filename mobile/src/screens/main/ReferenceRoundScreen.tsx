@@ -143,7 +143,8 @@ export function ReferenceRoundScreen({ navigation, route }: Props) {
           <View style={styles.headRow} testID="round-head">
             {round.country_code ? <CountryFlag code={round.country_code} height={26} /> : null}
             <View style={styles.flex}>
-              <Muted style={styles.eyebrow} testID="round-eyebrow">{roundEyebrow(round)}</Muted>
+              {/* Am Handy wie im Web: oben nur „Runde 1 von 24“, Tag und Strecke stehen in der Zeile unter dem Namen. */}
+              {round.number ? <Muted style={styles.eyebrow} testID="round-eyebrow">{roundEyebrow({ number: round.number, total: round.total })}</Muted> : null}
               <Body style={styles.title} accessibilityRole="header">{heading}</Body>
               <Muted style={styles.subline} testID="round-subline">{roundSubline(round, sub)}</Muted>
             </View>
@@ -318,7 +319,7 @@ const styles = StyleSheet.create({
   head: { borderBottomColor: ink.line, borderBottomWidth: 1, paddingBottom: 14, paddingHorizontal: 16, paddingTop: 18 },
   headRow: { alignItems: "center", flexDirection: "row", gap: 12 },
   flex: { flex: 1, minWidth: 0 },
-  eyebrow: { color: colors.cyan, fontSize: 11, fontVariant: ["tabular-nums"], fontWeight: "800", letterSpacing: 2, textTransform: "uppercase" },
+  eyebrow: { color: colors.cyan, fontSize: 11, fontVariant: ["tabular-nums"], fontWeight: "800", letterSpacing: 1.6, textTransform: "uppercase" },
   title: { color: ink.text, fontSize: 22, fontWeight: "900", lineHeight: 26, marginTop: 2, textTransform: "uppercase" },
   subline: { color: ink.second, fontSize: 13, fontVariant: ["tabular-nums"], marginTop: 2 },
   nav: { flexDirection: "row", gap: 6 },
