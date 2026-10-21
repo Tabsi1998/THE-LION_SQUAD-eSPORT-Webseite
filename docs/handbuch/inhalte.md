@@ -893,7 +893,8 @@ einem gewerteten Termin **Ergebnis ändern**. Das öffnet das Blatt des Termins.
   **Strafpunkte**, **Startnummer**, **Startplatz**, **Zeit**, **Abstand**, **Strafsekunden** (nur Anzeige in der
   Ergebnistabelle der Runde), den **Gesamtstand laut Veranstalter** (wird mit
   der eigenen Rechnung verglichen) und **Punkte zählen statt Schlüssel**, wenn ein Wert bewusst vom Schlüssel abweicht.
-  Zugeklappt stehen Startnummer, Startplatz, Zeit und Abstand kurz unter der Zeile.
+  Zugeklappt stehen Startnummer, Startplatz, Zeit und Abstand kurz unter der Zeile. **Zeiten** stehen überall wie beim
+  Veranstalter mit Komma (`1:20,361`, Abstand `+0,046` bzw. `+1:34,878`); eingeben darf man Punkt oder Komma.
 - **Rennliga:** unter der Liste je Rennen die **Schnellste Runde** (Name aus der Liste und Rundenzeit) und der **Fahrer
   des Tages**. Beide müssen in der Liste stehen; die schnellste Runde setzt die Marke an ihrer Zeile, so zählt ein Bonus.
   Alles ist freiwillig – die Punkte kommen weiter aus dem Schlüssel.
@@ -917,7 +918,8 @@ einem gewerteten Termin **Ergebnis ändern**. Das öffnet das Blatt des Termins.
   unsicher, darunter steht, was im Bild stand; ist Startplatz, Zeit oder Abstand gelb, steht **Mehr** gleich offen.
   Ändern nimmt die Markierung weg, **Passt so** bestätigt die ganze Zeile (beim Rennen: schnellste Runde und Fahrer des
   Tages). Übernehmen geht erst, wenn nichts mehr gelb ist – bis dahin heißt der Knopf **Gelbe Zeilen prüfen** und
-  springt zur ersten. Wie das Bild
+  springt zur ersten. Platz 1 im farbigen Kasten und der fehlende Abstand beim Ersten sind kein Fall für Gelb; ein Lauf
+  ohne Punkte (etwa das Qualifying) übernimmt keine Punkte aus dem Bild. Wie das Bild
   aufgebaut ist, sagt die **Vorlage für Ergebnis-Bilder** an der Spur (eine Saison kann abweichen): Standard für
   Rennligen ist „Rennliga-Ergebnis (dunkel)“, **Aus** schaltet das Auslesen ab.
 - **Team-Liga:** statt der Liste der **Spieltag**. Am schnellsten geht es über **Spieltag einfügen**: die

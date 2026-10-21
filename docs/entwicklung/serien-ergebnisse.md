@@ -252,13 +252,25 @@ Dienst) und landet als Zeilen im Blatt – gespeichert wird beim Lesen nichts, a
   gilt die Standard-Vorlage der Art („Rennliga-Ergebnis (dunkel)“ für Rennligen), `none` schaltet ab.
 - **Lesen:** hellster Farbkanal (farbige Schrift bleibt kräftig), bei dunklem Grund umgekehrt, Trennlinien und
   farbige Kästen entfernt, auf etwa 40 Pixel Schrifthöhe vergrößert (die Höhe wird vorab mit einer groben Lesung
-  geschätzt). Einmal die ganze Seite, dann jede Spalte als Streifen – Zahlen mit Zeichen-Whitelist.
+  geschätzt). Einmal die ganze Seite, dann jede Spalte als Streifen – Zahlen mit Zeichen-Whitelist. Ziffern-Spalten
+  (Platz, Startnummer, Startplatz, Zeit, Abstand) ein drittes Mal: größer und schwarz-weiß nach eigener Schwelle
+  (`RowReading.alts`, #1981) - widerspricht diese Lesung (3/5), ist die Zelle gelb.
+- **Platz 1 im farbigen Kasten** (#1981): ohne brauchbare Lesung wird die Zelle allein aus dem Originalbild gelesen
+  (`_box_read`: nur das Innere, Kontrast gestreckt, als einzelnes Zeichen). Hilfsweise ergibt er sich aus der
+  Reihenfolge: passt genau eine Zeile nicht und laufen alle anderen lückenlos, ist ihr Platz klar, wenn sie die erste
+  ist, nicht gelesen wurde oder einen Platz trägt, den schon eine andere Zeile hat.
 - **Spalten aus den Daten:** `result_image_ocr.plan_columns` sucht die Spalten des Bilds an den gelesenen Zeilen und
   ordnet sie den Spalten der Vorlage nach Inhalt (Platz, Zahl, Text, Zeit, Abstand) und Reihenfolge zu; Überschriften
   geben nur einen Bonus. Fehlt eine Spalte im Bild (etwa Grid im Qualifying, Punkte), bleibt sie leer. Erst wenn das
-  nicht aufgeht, gelten `align`/`at` der Vorlage.
-- **Werte:** OUT/DNF/DNS/DSQ statt Platz oder Zeit sind ein Ausfall; Platzhalter wie `--:--.---` heißen „keine Zeit“.
-  Überrundete („+1 Runde“) stehen in Zeit oder Abstand.
+  nicht aufgeht, gelten `align`/`at` der Vorlage. Punkte gelten nur, wenn ihre Überschrift im Bild steht
+  (`needs_label`, `Reading.labelled`); ein Strich (Rand der Tabelle) ist nie eine Ziffer.
+- **Werte:** OUT/DNF/DNS/DSQ statt Platz oder Zeit sind ein Ausfall; Platzhalter wie `--:--.---` heißen „keine Zeit“,
+  beim Ersten (Platz 1) ist alles ohne gültigen Abstand „kein Abstand“ (auch ein verlesener Platzhalter).
+  Überrundete („+1 Runde“) stehen in Zeit oder Abstand. **Zeiten aus der Form** (`time_format`, `parse_clock`, #1981):
+  es zählen die Ziffern, die Trennzeichen setzt die Form (Rennzeit `m:ss,mmm`, Abstand `+s,mmm` bzw. `+m:ss,mmm`) - ein
+  fehlender oder als Punkt gelesener Doppelpunkt ändert nichts; passen gelesene Trennzeichen nicht zur Form (eine
+  Ziffer fehlt), ist die Zelle gelb. Geliefert und gespeichert wird mit Punkt (`1:28.783`), angezeigt im Web mit Komma
+  (`lib/raceTime.js`).
 - **Unsicher (gelb)** ist eine Zelle, wenn die beiden Lesungen sich widersprechen oder die Sicherheit unter der Schwelle
   der Vorlage liegt – außer eine Gegenprobe bestätigt sie: Plätze und Zeit des Ersten nach der Mehrheit der Zeilen
   (ein verlesener erster Platz zieht die Spalte nicht mit), Zeit = Zeit des Ersten + Abstand, Grid einmalig,
