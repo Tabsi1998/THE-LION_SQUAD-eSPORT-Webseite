@@ -192,8 +192,11 @@ Mehrere Runden an einem Termin (etwa TFT-Lobbys R1–R5), gerechnet in `services
 - **Serienseite:** `rules` mit `day_rounds`, `custom_bonuses`, `tiebreak_top_n`; Ergebnisse mit `day_rounds`,
   `day_points`, `bonus`, `bonus_keys` und `partner` (Person wie in der Tabelle, ohne Kennung).
 - **Einfügen** (`lib/resultPaste.js`): mit Kopfzeile Spalten „R 1“ … „R n“, „GES P“ und je Sonderbonus seine Spalte.
-- **Spielkennung mit Tag:** `series_identity.without_game_tag` – „Name#TAG“ (3–5 Buchstaben oder Ziffern) zählt wie
-  ein Clan-Tag: ohne Tag gleicher Name = dieselbe Person (Treffer `name_untagged`).
+- **Spielkennung mit Tag:** `series_identity.without_game_tag` – „Name#TAG“ (3–5 Buchstaben oder Ziffern direkt am
+  Namen) zählt wie ein Clan-Tag: ohne Tag gleicher Name = dieselbe Person (Treffer `name_untagged`). Eine Startnummer
+  mit Leerzeichen davor („Max Muster #123“) bleibt Teil des Namens. Mit `hide_name_tags` zeigen Serienseite, Rundenseite
+  und Statistik (#1950) die Namen ohne Tag; Team-Namen (`team_names`, #1931) nutzen nur `normalize_name` und bleiben
+  unberührt.
 
 ## Version, Entwurf daneben und Protokoll
 

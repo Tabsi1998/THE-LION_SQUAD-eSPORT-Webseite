@@ -133,6 +133,25 @@ async def test_saving_an_older_season_unchanged_keeps_its_rules_version(flow):
 
 
 @pytest.mark.asyncio
+async def test_round_page_of_a_racing_season_shows_names_without_tag_like_the_series_page(flow):
+    """Rundenseite (#1950): Namen wie auf der Serienseite - mit ``hide_name_tags`` ohne Tag der Spielkennung, eine
+    Startnummer mit Leerzeichen davor bleibt. Eine Turnierserie hat keine Rundenseite (404)."""
+    lineage, series, rounds = await _setup(flow)
+    racing = (await flow.post(f"{ADMIN}/lineages", json={"title": "Probe Rennliga", "kind": "racing"})).json()
+    season = (await flow.post(f"{ADMIN}/series", json={"lineage_id": racing["id"], "season": "2026",
+                                                       "hide_name_tags": True})).json()
+    race = (await flow.post(f"{ADMIN}/series/{season['id']}/rounds", json={"day": _day(-3), "code": "R1"})).json()
+    saved = await flow.put(_url(season, race["id"]), json={"rows": [
+        {"name": "Rita Rennt#EUW", "place": 1}, {"name": "Max Muster #123", "place": 2}],
+        "status": "published", "expected_version": 0})
+    assert saved.status_code == 200, saved.text
+    flow.act_as(None)
+    page = (await flow.get(f"{PUBLIC}/{racing['slug']}/{season['season_slug']}/rounds/1")).json()
+    assert [row["name"] for row in page["sessions"][0]["rows"]] == ["Rita Rennt", "Max Muster #123"]
+    assert (await flow.get(f"{PUBLIC}/{lineage['slug']}/{series['season_slug']}/rounds/1")).status_code == 404
+
+
+@pytest.mark.asyncio
 async def test_closing_the_season_takes_the_ranks_after_the_tiebreak(flow):
     lineage, series, rounds = await _setup(flow)
     for index, (entry, round_id) in enumerate(zip(DAYS.values(), rounds)):

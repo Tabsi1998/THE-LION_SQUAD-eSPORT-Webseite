@@ -9,7 +9,8 @@
   und Team die Kennzahlen, die in der Saison vorkommen (``services/season_statistics.py``).
 
 Fremde Namen kommen nur wie in den Tabellen der Serienseite (``_people``): ein ausgeblendeter Name gar nicht, dann auch
-keine Startnummer. Wer außerhalb der Tabelle mit Namen stehen darf, nennt ``club_drivers``.
+keine Startnummer; mit ``hide_name_tags`` der Saison ohne Tag der Spielkennung (#1961). Wer außerhalb der Tabelle mit
+Namen stehen darf, nennt ``club_drivers``.
 
 **Verwaltung - Teamfarben** (je Team und Saison, für Startnummer und Teamname wie in den Veranstalter-Grafiken):
 
@@ -66,7 +67,7 @@ async def public_round(lineage_slug: str, season_slug: str, number: int,
     db = get_db()
     lineage, series = await _racing(db, user, lineage_slug, season_slug)
     calendar = await _calendar(db, series["id"])
-    people = await _people(db, series["id"])
+    people = await _people(db, series["id"], hide_tags=bool(series.get("hide_name_tags")))  # #1961: wie die Serienseite
     view = await load_round(db, series, calendar["rounds"], number, people)
     if view is None:
         raise HTTPException(404, NOT_FOUND)
@@ -79,7 +80,7 @@ async def public_statistics(lineage_slug: str, season_slug: str, user: dict | No
     db = get_db()
     lineage, series = await _racing(db, user, lineage_slug, season_slug)
     calendar = await _calendar(db, series["id"])
-    people = await _people(db, series["id"])
+    people = await _people(db, series["id"], hide_tags=bool(series.get("hide_name_tags")))  # #1961: wie die Serienseite
     return {**_head(lineage, series), **await load_statistics(db, series, calendar["rounds"], people)}
 
 

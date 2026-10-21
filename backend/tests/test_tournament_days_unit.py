@@ -220,10 +220,19 @@ def test_rules_default_to_no_day_rounds_and_check_bonuses_and_top_n():
 # ---------------------------------------------------------------- Spielkennung mit Tag
 def test_a_name_with_game_tag_is_the_same_person_and_shows_without_tag():
     assert series_identity.without_game_tag("TheLostFriday#TLS") == "TheLostFriday"
-    assert series_identity.without_game_tag("Ada Ausgedacht #EUW1") == "Ada Ausgedacht"
-    # Kein Tag: zu kurz, zu lang, Leerzeichen darin, nur ein Tag.
-    for name in ("Lion #1", "Probe#ABCDEF", "Probe#AB C", "#TLS"):
+    assert series_identity.without_game_tag("Ada Ausgedacht#EUW1") == "Ada Ausgedacht"
+    # Kein Tag: zu kurz, zu lang, Leerzeichen darin, nur ein Tag - und eine Startnummer mit Leerzeichen davor wie in
+    # Rennlisten („Max Muster #123“, „#77 Max“) bleibt Teil des Namens.
+    for name in ("Lion #1", "Probe#ABCDEF", "Probe#AB C", "#TLS", "Max Muster #123", "#77 Max Muster"):
         assert series_identity.without_game_tag(name) == name
     assert "thelostfriday" in series_identity.name_keys("TheLostFriday#TLS")
     out = resolve({"rows": [{"name": "Ada Ausgedacht#TLS", "place": 1}]}, PEOPLE, normalize_rules(RULES))
     assert (out.rows[0]["participant_id"], out.rows[0]["match"]) == ("p-a", "name_untagged")
+
+
+def test_racing_names_with_a_start_number_after_hash_stay_different_people():
+    drivers = [{"id": "p-max", "name": "Max Muster #123"}]
+    out = resolve({"rows": [{"name": "Max Muster #456", "place": 1}, {"name": "max muster #123", "place": 2}]},
+                  drivers, normalize_rules({}))
+    assert [(row["participant_id"], row["match"]) for row in out.rows] == [
+        ("neu:maxmuster456", "new"), ("p-max", "name")]
