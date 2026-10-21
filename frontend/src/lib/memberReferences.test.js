@@ -182,6 +182,12 @@ test("memberPaths: ohne verknüpfte Saison kein Liga-Weg", () => {
   expect(memberPaths(undefined, undefined)).toEqual([]);
 });
 
+test("memberPaths: wie in der App erst ab zwei Saisons einer Spur - eine Saison steht schon in der Chronik", () => {
+  expect(memberPaths([LINEAGE], [ref("a", "2025-05-19", 4)])).toEqual([]);
+  const [path] = memberPaths([LINEAGE], [ref("a", "2025-05-19", 4), ref("b", "2025-06-18", 5)]);
+  expect(path.steps.map((step) => step.season)).toEqual(["Season 3", "Season 4"]);
+});
+
 test("organizerUrl: nur http(s) - javascript: und ftp: fallen weg, der nächste sichere Link zählt", () => {
   expect(organizerUrl({ external_url: "javascript:alert(1)", result_url: "ftp://x.example/a", bracket_url: "https://c.example/b" })).toBe("https://c.example/b");
   expect(organizerUrl({ external_url: "javascript:alert(1)" })).toBe("");

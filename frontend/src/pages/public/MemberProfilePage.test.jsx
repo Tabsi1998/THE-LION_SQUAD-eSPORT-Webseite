@@ -53,7 +53,8 @@ const LINEAGES = {
     lineage: { title: "PSDL 3vs3", slug: "psdl", kind: "team_league", organizer: "PSDL", tier_order: null },
     seasons: [
       { season: "Season 3", tier: "Newcomer League I", season_slug: "s3-newcomer", status: "completed", season_result: "promoted", club: { rank: 4, of: 7 }, reference_ids: ["r3"] },
-      { season: "Season 4", tier: "League A", season_slug: "s4-league-a", status: "active", club: null, reference_ids: [] },
+      { season: "Season 4", tier: "League A", season_slug: "s4-league-a", status: "completed", club: { rank: 3, of: 8 }, reference_ids: ["r1"] },
+      { season: "Season 5", tier: "League A", season_slug: "s5-league-a", status: "active", club: null, reference_ids: [] },
     ],
   }],
 };
@@ -212,9 +213,9 @@ test("mit Saison: Liga-Weg der Person mit ihrem Platz und Vermerk, Link zur Seri
   expect(apiMock.get).toHaveBeenCalledWith("/reference-series/public/lineages");
   expect(path).toHaveTextContent("Liga-Weg · PSDL 3vs3");
   const steps = within(path).getAllByTestId("member-path-step");
-  // Nur die Saisons der Person - die laufende Saison ohne sie fehlt.
-  expect(steps.map((step) => step.textContent)).toEqual(["Season 3Newcomer League I4. · Aufstieg"]);
-  expect(within(path).getByRole("link", { name: "Zur Serie" })).toHaveAttribute("href", "/references/series/psdl/s4-league-a");
+  // Nur die Saisons der Person mit ihrem eigenen Platz - die laufende Saison ohne sie fehlt.
+  expect(steps.map((step) => step.textContent)).toEqual(["Season 3Newcomer League I4. · Aufstieg", "Season 4League A2. Platz"]);
+  expect(within(path).getByRole("link", { name: "Zur Serie" })).toHaveAttribute("href", "/references/series/psdl/s5-league-a");
 
   fireEvent.click(screen.getByTestId("member-reference-row-r3"));
   // Reihenfolge: Saison ansehen, Details, Beim Veranstalter.
@@ -224,6 +225,16 @@ test("mit Saison: Liga-Weg der Person mit ihrem Platz und Vermerk, Link zur Seri
     ["Details", "/references/r3"],
     ["Beim Veranstalter", "https://psdl.example/s3"],
   ]);
+});
+
+test("nur eine Saison der Spur: kein Liga-Weg, die Zeile führt trotzdem zur Saison", async () => {
+  const [lineage] = LINEAGES.items;
+  lineageData = { items: [{ ...lineage, seasons: lineage.seasons.map((season) => ({ ...season, reference_ids: season.reference_ids.filter((id) => id === "r3") })) }] };
+  renderProfile();
+  fireEvent.click(await screen.findByTestId("member-reference-row-r3"));
+  const links = screen.getByTestId("member-reference-links-r3");
+  expect(await within(links).findByRole("link", { name: "Saison ansehen" })).toHaveAttribute("href", "/references/series/psdl/s3-newcomer");
+  expect(screen.queryByTestId("member-paths")).toBeNull();
 });
 
 test("ohne verknüpfte Saison kein Liga-Weg; fällt der Abruf aus, bleibt die Liste", async () => {

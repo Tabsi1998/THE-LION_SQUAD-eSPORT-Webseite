@@ -122,8 +122,11 @@ export function detailsOf(item, profileId, link = null) {
   };
 }
 
+// Ein Weg braucht mindestens zwei Saisons - wie in der App; eine einzelne Saison steht schon in der Chronik.
+const MIN_PATH_SEASONS = 2;
+
 /**
- * Der Liga-Weg der Person (#1944): je Spur, in der sie in mindestens einer Saison stand, nur diese Saisons - mit ihrem
+ * Der Liga-Weg der Person (#1944): je Spur, in der sie in mindestens zwei Saisons stand, nur diese Saisons - mit ihrem
  * eigenen Platz (sonst dem des Vereins) und dem Vermerk der Saison aus dem ganzen Weg der Spur (Aufstieg, läuft …).
  * „Zur Serie“ führt wie auf der Übersicht zur laufenden, sonst neuesten Saison der Spur.
  */
@@ -137,7 +140,7 @@ export function memberPaths(lineages, references) {
       .map((step) => ({ step, ref: (step.reference_ids || []).map((id) => own.get(id)).find(Boolean) }))
       .filter(({ ref }) => ref)
       .map(({ step, ref }) => ({ ...step, place: ownPlacement(ref) || Number(step.club?.rank) || null }));
-    if (!steps.length) continue;
+    if (steps.length < MIN_PATH_SEASONS) continue;
     paths.push({
       lineage: item.lineage,
       steps,
