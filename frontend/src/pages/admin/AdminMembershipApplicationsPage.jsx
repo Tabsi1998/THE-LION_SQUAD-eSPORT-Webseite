@@ -122,14 +122,14 @@ export default function AdminMembershipApplicationsPage() {
       <InvitationsBox reloadKey={invitationsKey} />
       <JoinPageBox />
 
-      <div className="mt-6 flex gap-1 border-b border-white/10 overflow-x-auto">
+      <div className="mt-6 flex gap-1 border-b border-white/10 tls-swipe pb-0">
         {TABS.map(t => (
           <button key={t.key} onClick={() => selectTab(t.key)} data-testid={`apps-tab-${t.key}`} className={`shrink-0 px-4 py-2 text-xs font-bold uppercase tracking-wider border-b-2 transition ${tab === t.key ? "" : "border-transparent text-white/50 hover:text-white"}`} style={tab === t.key ? { borderColor: t.color, color: t.color } : {}}>{t.label}</button>
         ))}
       </div>
 
       {/* PC: Tabelle; Tablet und Handy: Karten. */}
-      <div className="mt-6 hidden lg:block border border-white/10 bg-[#121212] rounded-sm overflow-x-auto">
+      <div className="mt-6 hidden lg:block border border-white/10 bg-[#121212] rounded-sm tls-swipe pb-0">
         <table className="w-full text-sm" data-testid="apps-table">
           <thead className="bg-[#0A0A0A] text-[11px] uppercase tracking-widest text-white/50">
             <tr>

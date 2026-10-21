@@ -89,7 +89,7 @@ export function ChatStickerPicker({ open, onClose, onPick, disabled = false }) {
       </div>
 
       {!searching && list.length > 1 && (
-        <div className="mt-2 flex gap-1.5 overflow-x-auto pb-1" role="tablist" aria-label="Stickerpakete">
+        <div className="mt-2 flex gap-1.5 tls-swipe pb-1" role="tablist" aria-label="Stickerpakete">
           {list.map((pack) => {
             const selected = pack.id === activePack?.id;
             return (

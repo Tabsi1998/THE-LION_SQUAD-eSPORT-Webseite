@@ -273,7 +273,7 @@ function OfficialTable({ rows, onPaste, onClear }) {
         {rows.length > 0 && <button type="button" onClick={onClear} data-testid="result-table-clear" className="tls-btn tls-btn--quiet px-2.5 py-1.5 rounded-sm text-[10px] font-bold uppercase tracking-wider">Leeren</button>}
       </div>
       {rows.length > 0 ? (
-        <div className="overflow-x-auto">
+        <div className="tls-swipe pb-0">
           <table className="w-full text-sm tabular-nums">
             <thead>
               <tr className="text-left text-[10px] uppercase tracking-widest text-white/45">

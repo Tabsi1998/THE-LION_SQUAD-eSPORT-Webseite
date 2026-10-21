@@ -88,7 +88,7 @@ export function StatsTab() {
         )}
         testId="stats-rarity"
       >
-        <div className="overflow-x-auto">
+        <div className="tls-swipe pb-0">
           <table className="w-full text-xs min-w-[640px]">
             <thead className="text-[10px] uppercase tracking-widest text-white/45">
               <tr><th className="text-left py-2 pr-3">Stufe</th><th className="text-left py-2 pr-3">Gruppe</th><th className="text-left py-2 pr-3">Kategorie</th><th className="text-right py-2 pr-3">Personen</th><th className="text-left py-2 w-1/4">Anteil</th></tr>

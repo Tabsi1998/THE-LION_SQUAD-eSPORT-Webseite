@@ -41,7 +41,7 @@ function StandingsScope({ scope, rows, final }) {
   return (
     <div data-testid={`preview-standings-${scope}`}>
       <div className="text-[10px] font-bold uppercase tracking-widest text-white/45 mb-1">{SCOPE_LABELS[scope] || scope}</div>
-      <div className="overflow-x-auto max-h-80 overflow-y-auto border border-white/5 rounded-sm">
+      <div className="tls-swipe pb-0 max-h-80 overflow-y-auto border border-white/5 rounded-sm">
         <table className="w-full text-sm tabular-nums">
           <thead className="sticky top-0 bg-[#121212]">
             <tr className="text-left text-[10px] uppercase tracking-widest text-white/45">

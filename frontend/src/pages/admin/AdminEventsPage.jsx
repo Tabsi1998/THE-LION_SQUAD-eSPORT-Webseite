@@ -244,7 +244,7 @@ export default function AdminEventsPage() {
           {filteredList.length === 0 && <li className="py-10 text-center text-sm text-white/40">Keine Events für diesen Filter.</li>}
         </ul>
         <div className="hidden md:block border border-white/10 rounded-sm bg-[#121212] overflow-hidden">
-          <div className="overflow-x-auto">
+          <div className="tls-swipe pb-0">
             <table className="w-full text-sm min-w-[900px]">
               <thead className="bg-[#0A0A0A] text-[11px] uppercase tracking-widest text-white/50">
                 <tr>

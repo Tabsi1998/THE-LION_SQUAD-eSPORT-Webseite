@@ -216,7 +216,7 @@ export function PasteSheet({ series, lineage, version, onClose, onSaved, onStale
       )}
       {preview && !preview.errors.length && (
         preview.rows.length ? (
-          <div className="overflow-x-auto" data-testid="paste-preview">
+          <div className="tls-swipe pb-0" data-testid="paste-preview">
             <table className="w-full text-sm">
               <thead>
                 <tr className="text-left text-[10px] uppercase tracking-widest text-white/45">

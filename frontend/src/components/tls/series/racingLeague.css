@@ -61,9 +61,7 @@
 [data-club="true"] .tls-racing-bar > span { background: var(--tls-brand); }
 @keyframes tls-racing-draw-x { from { transform: scaleX(0); } }
 
-/* Umschalter der Saisons: Reiter in einer Zeile, am Handy seitlich verschiebbar. */
-.tls-season-tabs { scrollbar-width: none; }
-.tls-season-tabs::-webkit-scrollbar { display: none; }
+/* Umschalter der Saisons: Reiter in einer Zeile, am Handy seitlich verschiebbar - mit der Wischleiste tls-swipe (#1969). */
 .tls-season-tab {
   display: inline-flex; align-items: center; gap: 0.5rem; min-height: 40px; padding: 0 0.85rem; border-radius: 6px;
   white-space: nowrap; font-size: 13px; font-weight: 700; color: rgb(255 255 255 / 0.68);

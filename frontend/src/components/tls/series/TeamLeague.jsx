@@ -437,7 +437,7 @@ function Lineup({ lineup, rounds, ownTeams }) {
         <p className="mt-3 text-sm text-white/55">Noch kein Kader und keine Aufstellung eingetragen.</p>
       ) : (
         // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- eine scrollbare Fläche muss per Tastatur erreichbar sein (axe: scrollable-region-focusable)
-        <div role="region" aria-label="Kader" tabIndex={0} className="tls-standings mt-4 border border-white/10 rounded-md bg-[var(--tls-surface-1)] overflow-x-auto overscroll-x-contain focus:outline-none focus-visible:ring-2 focus-visible:ring-[#29B6E8]">
+        <div role="region" aria-label="Kader" tabIndex={0} className="tls-standings mt-4 border border-white/10 rounded-md bg-[var(--tls-surface-1)] tls-swipe pb-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#29B6E8]">
           <table className="w-full text-sm tabular-nums">
             <thead className="text-[11px] uppercase tracking-[0.12em] text-white/50">
               <tr className="border-b border-white/10">

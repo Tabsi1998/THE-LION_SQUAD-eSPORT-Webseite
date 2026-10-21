@@ -276,7 +276,7 @@ export default function F1DetailPage() {
                     {marks.best.gapMs !== null && <span className="font-display tabular-nums text-white/70">{deltaText(marks.best.gapMs)}</span>}
                   </div>
                 )}
-                <div className="overflow-x-auto">
+                <div className="tls-swipe pb-0">
                 {/* Timing-Board (#1077): beim ersten Erscheinen zählen die Zeiten einmal hoch, Platz 1 bis 3 tragen einen
                     Strich in Gold, Silber und Bronze, beim Drüberfahren läuft ein Lichtstreif durch die Zeile. */}
                 <table ref={boardRef} className="tls-lap-board w-full text-sm" data-intro={introOnce(board?.track?.id ? `fastlap:${challenge.id}:${board.track.id}` : "") ? "1" : undefined} data-testid="f1-board">

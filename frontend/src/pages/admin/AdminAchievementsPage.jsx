@@ -56,7 +56,7 @@ export default function AdminAchievementsPage() {
         Katalog, Vergaben, Saisonabschluss, XP und Vorschau an einem Ort. Jede Aktion steht im Protokoll unter „Vergeben“.
       </p>
 
-      <div className="mt-6 flex gap-1 border-b border-white/10 overflow-x-auto" role="tablist">
+      <div className="mt-6 flex gap-1 border-b border-white/10 tls-swipe pb-0" role="tablist">
         {TABS.map(({ key, label, icon: Icon }) => (
           <button
             key={key}

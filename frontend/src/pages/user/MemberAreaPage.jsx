@@ -408,7 +408,7 @@ function JumpBar({ entries, present, active, onJump }) {
   }, [active]);
   return (
     <nav aria-label="Mitgliederbereich" data-testid="member-area-links" className="tls-area-jump">
-      <ul ref={listRef} className="tls-area-jump__list">
+      <ul ref={listRef} className="tls-area-jump__list tls-swipe pb-0">
         {entries.map((entry) => {
           const here = present.has(entry.key);
           const current = here && active === entry.key;

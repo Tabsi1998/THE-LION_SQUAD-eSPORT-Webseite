@@ -54,7 +54,7 @@ export function NewsFilterRow({ categories = [], active = "", onSelect, query = 
   return (
     <div className="flex items-center gap-2 min-w-0" data-testid="news-filters">
       <div
-        className="tls-news-pills tls-hide-scrollbar flex flex-nowrap items-center gap-2 overflow-x-auto min-w-0 flex-1 py-1"
+        className="tls-news-pills flex flex-nowrap items-center gap-2 tls-swipe min-w-0 flex-1 py-1"
         data-testid="news-filter-row"
         role="group"
         aria-label="Kategorien"

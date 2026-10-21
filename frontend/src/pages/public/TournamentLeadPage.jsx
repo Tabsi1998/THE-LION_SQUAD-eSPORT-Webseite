@@ -212,7 +212,7 @@ export default function TournamentLeadPage() {
         <div className="text-[11px] uppercase tracking-[0.3em] text-[#FFD700] font-bold">Turnierleitung</div>
         <h1 className="mt-1 font-heading text-2xl md:text-4xl font-black uppercase [overflow-wrap:anywhere]">{data?.tournament?.title || "…"}</h1>
 
-        <div className="mt-6 flex items-center gap-1 overflow-x-auto border-b border-white/10" role="tablist" aria-label="Turnierleitung">
+        <div className="mt-6 flex items-center gap-1 tls-swipe pb-0 border-b border-white/10" role="tablist" aria-label="Turnierleitung">
           {[["attention", <><span className={queue ? "hidden sm:inline" : ""}>Braucht </span>Aufmerksamkeit ({cases})</>, AlertTriangle], ...(queue ? [["stations", "Stationen", MonitorPlay]] : []), ["results", "Ergebnisse", ClipboardCheck]].map(([key, label, Icon]) => (
             <button key={key} type="button" role="tab" aria-selected={activeTab === key} onClick={() => setTab(key)} className={`inline-flex min-h-[44px] shrink-0 items-center gap-1.5 sm:gap-2 whitespace-nowrap border-b-2 px-2 sm:px-3 text-xs sm:text-sm font-bold uppercase tracking-wider ${activeTab === key ? "border-[#29B6E8] text-white" : "border-transparent text-white/50"}`} data-testid={`lead-tab-${key}`}>
               <Icon className={`${queue ? "hidden sm:block" : ""} w-4 h-4 shrink-0 ${key === "attention" && cases ? "text-[#FFD700]" : "text-[#29B6E8]"}`} /> {label}

@@ -131,10 +131,14 @@ img, video, canvas, svg {
 /* Selection */
 ::selection { background: var(--tls-cyan); color: #000; }
 
-/* Scrollbar */
+/* Scrollleisten (#1969): die Seite ist dunkel - `color-scheme: dark` gibt Seitenleiste, Formularteile und Systemleisten
+   die dunkle Fassung statt der weißen. Die Seitenleiste selbst: dunkle Spur, grauer Daumen. Waagrechte Wischflächen
+   tragen dazu die dünne Cyan-Leiste (`tls-swipe`). */
+:root { color-scheme: dark; }
+html { scrollbar-color: #2C2C33 var(--tls-surface-0); }
 ::-webkit-scrollbar { width: 10px; height: 10px; }
-::-webkit-scrollbar-track { background: #000; }
-::-webkit-scrollbar-thumb { background: #222; border-radius: 2px; }
+::-webkit-scrollbar-track { background: var(--tls-surface-0); }
+::-webkit-scrollbar-thumb { background: #2C2C33; border-radius: 999px; border: 2px solid var(--tls-surface-0); }
 ::-webkit-scrollbar-thumb:hover { background: var(--tls-cyan); }
 
 /* Neon grid background */
@@ -740,22 +744,28 @@ button.tls-bracket-row:active, .tls-bracket-head:active { transform: scale(calc(
   .tls-stagger > * { opacity: 1 !important; animation: none !important; }
 }
 
-/* Wischleiste (#1950, für alle Leisten gedacht): seitlich verschiebbar im Vereinsstil - eine dünne Leiste in Cyan statt
-   der weißen Systemleiste, die Ränder laufen weich aus, wo es weitergeht. Wo der Browser Animationen am Scrollen kennt,
-   zeigt der Verlauf genau die Seite, auf der noch etwas liegt (links erst nach dem Wischen, rechts bis zum Ende) und
-   bleibt ganz weg, wenn nichts übersteht; sonst läuft nur der rechte Rand aus. */
+/* Wischleiste (#1950, Baustein des Design-Systems #1969): JEDE waagrechte Wischfläche in Web und Verwaltung trägt
+   `tls-swipe` statt `overflow-x-auto` - Karten-Reihen, Reiterleisten, breite Tabellen, Liga-Weg, Chips.
+   - Eine dünne Leiste: Daumen in Cyan, dunkle Spur, abgerundet - nie ganz versteckt, sonst merkt niemand das Wischen.
+   - Wo der Browser Animationen am Scrollen kennt, läuft der Rand weich aus, wo es weitergeht (rechts bis zum Ende,
+     links erst nach dem Wischen); steht nichts über, bleibt der Verlauf ganz weg. Ohne diese Fähigkeit bleibt nur die
+     Leiste - ein fester Verlauf schnitte sonst die letzte Spalte an, auch wenn nichts übersteht.
+   - `position: relative`: was absolut liegt (Text nur für Screenreader), bleibt in der Fläche und macht die Seite nie
+     breiter.
+   - Abstand zur Leiste (8 px), Lage und Scrollen stehen in :where() - Tailwind-Klassen wie `pb-0` oder
+     `sm:overflow-visible` (am PC umbrechen statt wischen) gewinnen immer.
+   - Eigene Animationen am selben Element vertragen sich nicht mit dem Verlauf - dann eine Hülle drumherum legen. */
 @property --tls-swipe-fade-start { syntax: "<length>"; inherits: false; initial-value: 0px; }
 @property --tls-swipe-fade-end { syntax: "<length>"; inherits: false; initial-value: 0px; }
-.tls-swipe {
-  overflow-x: auto; overscroll-behavior-x: contain; padding-bottom: 8px;
-  scrollbar-width: thin; scrollbar-color: var(--tls-cyan) rgb(255 255 255 / 0.06);
-  --tls-swipe-fade-end: 24px;
-  -webkit-mask-image: linear-gradient(90deg, transparent, #000 var(--tls-swipe-fade-start), #000 calc(100% - var(--tls-swipe-fade-end)), transparent);
-  mask-image: linear-gradient(90deg, transparent, #000 var(--tls-swipe-fade-start), #000 calc(100% - var(--tls-swipe-fade-end)), transparent);
+:where(.tls-swipe) { position: relative; overflow-x: auto; padding-bottom: 8px; }
+/* Texte aus der Verwaltung (prose-cms: Code und Tabellen) bekommen dieselbe Leiste, ohne eigene Klasse im Inhalt. */
+.tls-swipe, .prose-cms pre, .prose-cms .prose-cms-table {
+  overscroll-behavior-x: contain;
+  scrollbar-width: thin; scrollbar-color: var(--tls-cyan) rgb(255 255 255 / 0.08);
 }
-.tls-swipe::-webkit-scrollbar { height: 4px; }
-.tls-swipe::-webkit-scrollbar-track { background: rgb(255 255 255 / 0.06); border-radius: 999px; }
-.tls-swipe::-webkit-scrollbar-thumb { background: var(--tls-cyan); border-radius: 999px; }
+:is(.tls-swipe, .prose-cms pre, .prose-cms .prose-cms-table)::-webkit-scrollbar { height: 4px; }
+:is(.tls-swipe, .prose-cms pre, .prose-cms .prose-cms-table)::-webkit-scrollbar-track { background: rgb(255 255 255 / 0.08); border-radius: 999px; }
+:is(.tls-swipe, .prose-cms pre, .prose-cms .prose-cms-table)::-webkit-scrollbar-thumb { background: var(--tls-cyan); border-radius: 999px; }
 @keyframes tls-swipe-edges {
   0% { --tls-swipe-fade-start: 0px; --tls-swipe-fade-end: 24px; }
   8% { --tls-swipe-fade-start: 24px; }
@@ -763,12 +773,15 @@ button.tls-bracket-row:active, .tls-bracket-head:active { transform: scale(calc(
   100% { --tls-swipe-fade-start: 24px; --tls-swipe-fade-end: 0px; }
 }
 @supports (animation-timeline: scroll()) {
-  .tls-swipe { --tls-swipe-fade-end: 0px; animation: tls-swipe-edges linear both; animation-timeline: scroll(self inline); }
+  .tls-swipe {
+    -webkit-mask-image: linear-gradient(90deg, transparent, #000 var(--tls-swipe-fade-start), #000 calc(100% - var(--tls-swipe-fade-end)), transparent);
+    mask-image: linear-gradient(90deg, transparent, #000 var(--tls-swipe-fade-start), #000 calc(100% - var(--tls-swipe-fade-end)), transparent);
+    animation: tls-swipe-edges linear both; animation-timeline: scroll(self inline);
+  }
 }
 
-/* News-Filter (#1249): weiche Knöpfe in einer Zeile zum Wischen. Der rechte Rand läuft weich aus - so sieht man, dass
-   es weitergeht. Drücken gibt kurz nach, das Suchfeld gleitet beim Aufklappen leicht von rechts herein. */
-.tls-news-pills { padding-inline-end: 24px; -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent); }
+/* News-Filter (#1249): weiche Knöpfe in einer Zeile zum Wischen - Leiste und auslaufender Rand kommen vom Baustein
+   tls-swipe (#1969). Drücken gibt kurz nach, das Suchfeld gleitet beim Aufklappen leicht von rechts herein. */
 .tls-news-pill { transition: background-color var(--tls-motion-fast) ease, color var(--tls-motion-fast) ease, transform var(--tls-motion-fast) var(--tls-ease); }
 .tls-news-pill:active { transform: scale(calc(1 - 0.03 * var(--tls-motion-on))); }
 .tls-news-search { transition: opacity 200ms var(--tls-ease), transform 200ms var(--tls-ease); }
@@ -2534,14 +2547,11 @@ html[data-season-still-cards] .tls-card[data-season-perch="card"]:focus-visible 
 @media (min-width: 1024px) {
   .tls-area-jump { margin-inline: -2rem; padding-inline: 2rem; }
 }
+/* Wischen über den Baustein tls-swipe (#1969) - die Leiste bleibt sichtbar. */
 .tls-area-jump__list {
   display: flex;
   gap: 0.25rem;
-  overflow-x: auto;
-  overscroll-behavior-x: contain;
-  scrollbar-width: none;
 }
-.tls-area-jump__list::-webkit-scrollbar { display: none; }
 .tls-area-jump__item {
   position: relative;
   display: inline-flex;
@@ -3334,7 +3344,7 @@ html[data-season-still-cards] .tls-card[data-season-perch="card"]:focus-visible 
 
 /* Zeitleiste */
 .mp-timeline { --mp-label: 168px; }
-.mp-timeline__scroll { overflow-x: auto; overscroll-behavior-x: contain; scrollbar-color: rgba(255, 255, 255, 0.22) transparent; scrollbar-width: thin; border: 1px solid rgba(255, 255, 255, 0.06); border-radius: 2px; }
+.mp-timeline__scroll { border: 1px solid rgba(255, 255, 255, 0.06); border-radius: 2px; }
 .mp-timeline__canvas { position: relative; min-width: 100%; }
 .mp-timeline__head { display: grid; grid-template-columns: var(--mp-label) 1fr; height: 26px; border-bottom: 1px solid rgba(255, 255, 255, 0.08); }
 .mp-timeline__corner { position: sticky; left: 0; z-index: 3; background: var(--tls-surface-1); }
@@ -3393,7 +3403,7 @@ html[data-season-still-cards] .tls-card[data-season-perch="card"]:focus-visible 
 .mp-hint { font-size: 12px; color: rgba(255, 255, 255, 0.45); max-width: 90ch; }
 
 /* Wer wartet auf wen */
-.mp-flow-scroll { overflow-x: auto; scrollbar-color: rgba(255, 255, 255, 0.22) transparent; scrollbar-width: thin; padding-bottom: 4px; }
+.mp-flow-scroll { padding-bottom: 4px; }
 .mp-flow { position: relative; }
 .mp-flow__col { position: absolute; top: 0; left: 0; font-size: 11px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: rgba(255, 255, 255, 0.4); }
 .mp-flow__edges { position: absolute; inset: 0; overflow: visible; }
@@ -3423,7 +3433,7 @@ html[data-season-still-cards] .tls-card[data-season-perch="card"]:focus-visible 
 .mp-flow__detail { margin-top: 12px; display: grid; gap: 3px; padding: 10px 12px; font-size: 14px; color: rgba(255, 255, 255, 0.8); background: var(--tls-surface-2); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 2px; overflow-wrap: anywhere; }
 
 /* Reihenfolge */
-.mp-order-scroll { position: relative; overflow-x: auto; }
+.mp-order-scroll { position: relative; }
 .mp-order { width: 100%; min-width: 640px; border-collapse: collapse; font-size: 14px; }
 .mp-order th { text-align: left; padding: 8px 10px; font-size: 11px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: rgba(255, 255, 255, 0.5); border-bottom: 1px solid rgba(255, 255, 255, 0.1); white-space: nowrap; }
 .mp-order td { padding: 9px 10px; border-bottom: 1px solid rgba(255, 255, 255, 0.05); vertical-align: middle; }
@@ -3479,7 +3489,6 @@ html[data-season-still-cards] .tls-card[data-season-perch="card"]:focus-visible 
 .mp-remote[data-tone="running"] .mp-remote__state { color: var(--tls-live); }
 .mp-remote[data-tone="open"] .mp-remote__state { color: var(--tls-brand); }
 .mp-remote[data-tone="accepted"] .mp-remote__state { color: var(--tls-ok); }
-.mp-weeks-scroll { overflow-x: auto; scrollbar-color: rgba(255, 255, 255, 0.22) transparent; scrollbar-width: thin; }
 .mp-weeks { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(220px, 1fr); gap: 10px; }
 .mp-week { padding: 12px; border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 2px; background: var(--tls-surface-0); min-width: 0; }
 .mp-week[data-current="true"] { border-color: rgb(var(--tls-brand-rgb) / 0.55); }

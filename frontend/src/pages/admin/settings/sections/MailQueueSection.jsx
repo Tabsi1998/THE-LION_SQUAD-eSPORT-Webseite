@@ -191,7 +191,7 @@ export function MailQueueSection({ queue, queueStats, queueFilter, setQueueFilte
       ) : (
         <>
           <div className="hidden lg:block border border-white/10 bg-[#121212] rounded-sm overflow-hidden" data-testid="queue-table">
-            <div className="overflow-x-auto">
+            <div className="tls-swipe pb-0">
               <table className="w-full text-sm min-w-[680px]">
                 <thead className="bg-[#0A0A0A] text-[11px] uppercase tracking-widest text-white/50">
                   <tr>

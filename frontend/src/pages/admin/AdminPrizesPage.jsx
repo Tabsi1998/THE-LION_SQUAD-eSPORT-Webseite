@@ -235,7 +235,7 @@ export default function AdminPrizesPage() {
           ))}
         </div>
 
-        <div className="hidden md:block overflow-x-auto">
+        <div className="hidden md:block tls-swipe pb-0">
           <table className="w-full text-sm min-w-[900px]">
             <thead className="bg-[#0A0A0A] text-[11px] uppercase tracking-widest text-white/50">
               <tr>

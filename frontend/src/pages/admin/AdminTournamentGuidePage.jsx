@@ -48,7 +48,7 @@ export default function AdminTournamentGuidePage() {
       <section id="turnierformen" className="mt-10 scroll-mt-24" data-testid="guide-game-types">
         <h2 className="font-heading text-xl font-black uppercase inline-flex items-center gap-2"><Gamepad2 className="w-5 h-5 text-[#FFD700]" /> 2 · Nach Turnierform</h2>
         <p className="mt-2 text-sm text-white/55">Teamgröße, übliche Serie und was im Regelwerk stehen sollte. Die Liste wächst mit den Spielen, die der Verein wirklich spielt.</p>
-        <div className="mt-4 border border-white/10 rounded-sm bg-[#121212] overflow-x-auto">
+        <div className="mt-4 border border-white/10 rounded-sm bg-[#121212] tls-swipe pb-0">
           <table className="w-full text-sm min-w-[720px]">
             <thead className="bg-[#0A0A0A] text-[11px] uppercase tracking-widest text-white/50">
               <tr>

@@ -705,7 +705,7 @@ export default function PublicProfilePage() {
 
       {/* Reiter */}
       <div className="border-b border-white/10 sticky top-0 bg-[#0A0A0A]/95 backdrop-blur-sm z-20">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex gap-1 overflow-x-auto">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex gap-1 tls-swipe pb-0">
           {tabs.map(([k, l]) => (
             <button key={k} onClick={() => setTab(k)} data-testid={`profile-tab-${k}`}
               className={`px-4 py-3 text-xs font-bold uppercase tracking-wider whitespace-nowrap transition ${activeTab === k ? "text-[#29B6E8] border-b-2 border-[#29B6E8]" : "text-white/60 hover:text-white"}`}>

@@ -88,7 +88,7 @@ export function F1StaffPanel({ challengeId, staff, staffError = "", onChanged })
             <div className="px-4 py-8 text-center text-sm text-white/55" data-testid="f1-staff-error">{staffError}</div>
           ) : (
             // Am Handy (#1941): die Tabelle scrollt seitlich statt Status und Aktionen abzuschneiden.
-            <div className="overflow-x-auto" data-testid="f1-staff-table">
+            <div className="tls-swipe pb-0" data-testid="f1-staff-table">
             <table className="w-full text-sm min-w-[560px]">
               <thead className="bg-[#0A0A0A] text-[11px] uppercase tracking-widest text-white/50">
                 <tr>

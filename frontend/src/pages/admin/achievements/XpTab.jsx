@@ -72,7 +72,7 @@ export function XpTab({ board = false }) {
               <Stat label="Login-Serie" value={view.login_streak || 0} hint="Tage in Folge" accent="#00FF88" />
             </div>
             <Panel title={`Tagesdeckel heute (${caps.day})`} icon={Gauge} accent="#29B6E8" hint="Wie oft eine Quelle heute schon XP gebracht hat – volle Deckel bringen bis Mitternacht nichts mehr." testId="xp-caps">
-              <div className="overflow-x-auto">
+              <div className="tls-swipe pb-0">
                 <table className="w-full text-xs min-w-[480px]">
                   <thead className="text-[10px] uppercase tracking-widest text-white/45">
                     <tr><th className="text-left py-2 pr-3">Quelle</th><th className="text-right py-2 pr-3">XP je Mal</th><th className="text-left py-2 pr-3">Heute</th><th className="text-right py-2">Stand</th></tr>

@@ -226,7 +226,7 @@ export function OrderList({ items, laneNames, canEdit, onRelease, editor }) {
   const [open, setOpen] = useState(null);
   const editable = (item) => typeof canEdit === "function" ? canEdit(item) : Boolean(canEdit);
   return (
-    <div className="mp-order-scroll">
+    <div className="mp-order-scroll tls-swipe pb-0">
       <table className="mp-order" data-testid="mp-order">
         <thead>
           <tr><th>#</th><th>Spiel</th><th>Zeit</th><th>Station</th><th>Dauer</th><th><span className="sr-only">Aktion</span></th></tr>

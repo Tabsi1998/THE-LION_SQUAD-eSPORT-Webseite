@@ -27,7 +27,7 @@ export const Chronicle = forwardRef(function Chronicle({ items, linked, memberId
     <section ref={ref} id="chronik" aria-labelledby="references-timeline-title" className="tls-ref-anchor tls-ref-rise max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-12 md:pt-[88px]" style={{ "--tls-ref-i": index }} data-testid="references-timeline">
       <SectionHead id="references-timeline-title" eyebrow="Alle Teilnahmen" title="Chronik" hint={items.length ? <span data-testid="references-count">{chronicleCount(shown.length, items.length)}</span> : null} />
       {items.length > 0 && (
-        <div className="tls-ref-scroll -mx-4 px-4 sm:mx-0 sm:px-0 flex sm:flex-wrap items-center gap-2 overflow-x-auto sm:overflow-visible pt-1 pb-4 md:pt-3 md:pb-[18px] border-b border-white/[0.08]" role="group" aria-label="Filter der Chronik" data-testid="references-filters">
+        <div className="tls-ref-scroll -mx-4 px-4 sm:mx-0 sm:px-0 flex sm:flex-wrap items-center gap-2 tls-swipe sm:overflow-visible pt-1 pb-4 md:pt-3 md:pb-[18px] border-b border-white/[0.08]" role="group" aria-label="Filter der Chronik" data-testid="references-filters">
           {memberId && (
             <button type="button" onClick={onClearMember} data-testid="references-member" className={`${chipBase} border-brand bg-brand/[0.14] text-white`} aria-label={`Filter „Nur ${memberLabel}“ entfernen`}>
               Nur {memberLabel} <span aria-hidden="true">×</span>

@@ -72,7 +72,7 @@ function DayTableView({ table, count, scheme, bonuses, onOpen }) {
   return (
     <>
       {/* eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- eine scrollbare Fläche muss per Tastatur erreichbar sein (axe: scrollable-region-focusable) */}
-      <div role="region" aria-label="Tagesansicht" tabIndex={0} className="tls-standings hidden md:block mt-4 border border-white/10 rounded-md bg-[var(--tls-surface-1)] overflow-x-auto overscroll-x-contain focus:outline-none focus-visible:ring-2 focus-visible:ring-[#29B6E8]" data-testid="series-day-table">
+      <div role="region" aria-label="Tagesansicht" tabIndex={0} className="tls-standings hidden md:block mt-4 border border-white/10 rounded-md bg-[var(--tls-surface-1)] tls-swipe pb-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#29B6E8]" data-testid="series-day-table">
         <table className="w-full text-sm tabular-nums">
           <thead className="text-[11px] uppercase tracking-[0.12em] text-white/50">
             <tr className="border-b border-white/10">
@@ -133,7 +133,7 @@ function LobbyView({ table, count, scheme, onOpen }) {
   const groups = lobbies(table, round, scheme) || [];
   return (
     <div className="mt-4" data-testid="series-lobbies">
-      <div className="flex gap-1.5 overflow-x-auto pb-1" role="group" aria-label="Runde">
+      <div className="flex gap-1.5 tls-swipe pb-1" role="group" aria-label="Runde">
         {Array.from({ length: count }, (_, at) => (
           <button key={at} type="button" aria-pressed={at === round} onClick={() => setIndex(at)} className={`${CHIP} ${at === round ? CHIP_ON : CHIP_OFF}`} data-testid="series-lobby-round">R{at + 1}</button>
         ))}
@@ -189,7 +189,7 @@ function PlayerDetail({ rows, row, days, scheme, bonuses, topN, onPick, detailRe
         </span>
       </div>
       {/* eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- eine scrollbare Fläche muss per Tastatur erreichbar sein (axe: scrollable-region-focusable) */}
-      <div role="region" aria-label={`Turniertage von ${nameOf(row)}`} tabIndex={0} className="relative mt-3 overflow-x-auto overscroll-x-contain focus:outline-none focus-visible:ring-2 focus-visible:ring-[#29B6E8] rounded-sm">
+      <div role="region" aria-label={`Turniertage von ${nameOf(row)}`} tabIndex={0} className="relative mt-3 tls-swipe pb-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#29B6E8] rounded-sm">
         <table className="w-full text-sm tabular-nums">
           <thead className="text-[11px] uppercase tracking-[0.12em] text-white/50">
             <tr className="border-b border-white/10">
@@ -276,7 +276,7 @@ export function TournamentDays({ standings, rounds, rules }) {
           </div>
         )}
       </div>
-      <div className="mt-4 flex gap-1.5 overflow-x-auto pb-1" role="group" aria-label="Turniertag">
+      <div className="mt-4 flex gap-1.5 tls-swipe pb-1" role="group" aria-label="Turniertag">
         {days.map((round) => (
           <button key={round.id} type="button" aria-pressed={round.id === current.id} onClick={() => setDayId(round.id)} title={roundWhen(round)}
             className={`${CHIP} ${round.id === current.id ? CHIP_ON : CHIP_OFF}`} data-testid="series-day-pick">{roundLabel(round)}</button>

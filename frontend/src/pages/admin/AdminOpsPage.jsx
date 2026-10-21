@@ -240,7 +240,7 @@ export default function AdminOpsPage() {
                 {isExpanded ? (
                   <div className="border-t border-white/10 p-4 space-y-3">
                     {row.stack ? (
-                      <pre className="text-[11px] leading-relaxed text-white/70 bg-[#0A0A0A] border border-white/10 rounded-sm p-3 overflow-x-auto max-h-96">{row.stack}</pre>
+                      <pre className="text-[11px] leading-relaxed text-white/70 bg-[#0A0A0A] border border-white/10 rounded-sm p-3 tls-swipe max-h-96">{row.stack}</pre>
                     ) : (
                       <p className="text-sm text-white/50">Keine Ausnahme – der Server hat diese Antwort bewusst gesendet.</p>
                     )}
@@ -263,7 +263,7 @@ export default function AdminOpsPage() {
         </div>
       ) : (
         <div className="space-y-4">
-          <div className="border border-white/10 bg-[#121212] rounded-sm overflow-x-auto">
+          <div className="border border-white/10 bg-[#121212] rounded-sm tls-swipe pb-0">
             <table className="w-full text-sm">
               <thead>
                 <tr className="text-[10px] uppercase tracking-widest text-white/40 border-b border-white/10">
@@ -328,7 +328,7 @@ function VitalsTab({ vitals, loading }) {
           );
         })}
       </div>
-      <div className="border border-white/10 bg-[#121212] rounded-sm overflow-x-auto">
+      <div className="border border-white/10 bg-[#121212] rounded-sm tls-swipe pb-0">
         <table className="w-full text-sm">
           <thead>
             <tr className="text-[10px] uppercase tracking-widest text-white/40 border-b border-white/10">

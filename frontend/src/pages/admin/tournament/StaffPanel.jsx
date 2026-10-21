@@ -101,7 +101,7 @@ export function TournamentStaffPanel({ tournamentId, staff, staffError = "", onC
       </form>
       <div className="lg:col-span-2 border border-white/10 bg-[#121212] rounded-sm overflow-hidden">
         {staffError ? <div className="px-4 py-10 text-center text-sm text-white/55" data-testid="tournament-staff-error">{staffError}</div> : (
-        <div className="overflow-x-auto">
+        <div className="tls-swipe pb-0">
           <table className="w-full text-sm min-w-[760px]">
             <thead className="bg-[#0A0A0A] text-[11px] uppercase tracking-widest text-white/50">
               <tr>
