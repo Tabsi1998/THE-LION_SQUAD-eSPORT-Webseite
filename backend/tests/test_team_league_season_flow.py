@@ -327,3 +327,9 @@ async def test_a_played_map_needs_its_result_an_unplayed_pick_or_decider_stays_e
     assert [entry["name"] for entry in match["bans"]] == ["Karte 4"]
     record = league["record"][0]
     assert (record["rounds_for"], record["rounds_against"]) == (12, 6)
+    # Das ganze Veto in seiner Reihenfolge (Obmann, #1931): auch der nicht gespielte Decider, ohne Ergebnis.
+    assert [(entry["name"], entry["role"], entry["played"]) for entry in match["veto"]] == [
+        ("Karte 4", "banned", False), ("Karte 1", "picked", True), ("Karte 2", "picked", True),
+        ("Karte 3", "decider", False)]
+    assert match["veto"][1]["score_for"] == 6 and match["veto"][1]["picked"] == "own"
+    assert "score_for" not in match["veto"][3] and match["veto"][3]["picked"] == "decider"

@@ -72,13 +72,23 @@ def _match_view(match: dict, rules: dict) -> dict:
     side, other = ("away_score", "home_score") if away else ("home_score", "away_score")
     score_for, score_against = _number(match.get(side)), _number(match.get(other))
     outcome, points = match_points(score_for, score_against, rules)
-    maps, bans = [], []
+    maps, bans, veto = [], [], []
     for item in match.get("maps") or []:
+        # Das ganze Veto in seiner Reihenfolge (#1931): Banns, Wahlen und Decider - auch eine Wahl bzw. ein Decider
+        # ohne Ergebnis (nicht gespielt, etwa beim 2:0). ``maps`` bleibt bei den gespielten (so liest es die App).
+        step = {"name": item.get("name"), "role": item.get("role") or "played", "played": is_played(item)}
+        for key in ("by", "map_id"):
+            if item.get(key):
+                step[key] = item[key]
+        if _picked(item):
+            step["picked"] = _picked(item)
         if item.get("role") == "banned":
             bans.append({"name": item.get("name"), "by": item.get("by"), "map_id": item.get("map_id")})
+            veto.append(step)
             continue
         if not is_played(item):
-            continue  # gewählt oder Decider, aber nicht gespielt (ohne Ergebnis, Prüfung #1931)
+            veto.append(step)
+            continue
         own, theirs = _number(item.get(side)), _number(item.get(other))
         entry = {"name": item.get("name"), "score_for": own, "score_against": theirs,
                  "outcome": match_points(own, theirs, rules)[0]}
@@ -88,13 +98,14 @@ def _match_view(match: dict, rules: dict) -> dict:
         if item.get("map_id"):
             entry["map_id"] = item["map_id"]
         maps.append(entry)
+        veto.append({**step, **entry})
     return {
         "opponent": match.get("home") if away else match.get("away"), "home": not away,
         "score_for": score_for, "score_against": score_against, "outcome": outcome, "points": _number(points),
         "maps": maps, "lineup_size": len(match.get("lineup") or []),
         "team": match.get("_own"),  # welches eigene Team gespielt hat (#1926)
         # #1931: Tag und Uhrzeit des Spiels (sonst gilt der Termin), gesperrte Maps mit wer (own/opponent).
-        "club_day": match.get("club_day"), "time": match.get("time"), "bans": bans,
+        "club_day": match.get("club_day"), "time": match.get("time"), "bans": bans, "veto": veto,
     }
 
 

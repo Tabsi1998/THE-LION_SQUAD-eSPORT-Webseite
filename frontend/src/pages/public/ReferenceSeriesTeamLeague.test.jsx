@@ -165,6 +165,27 @@ test("Spieltage als Karten (#1931): Uhrzeit des Spiels, Wahl je Map, Banns und d
   expect(screen.getByTestId("team-league-next")).toHaveTextContent("@ Fremd Adler");
 });
 
+test("Ganzes Veto (#1931): nicht gespielte Wahl bzw. Decider stehen abgeschwächt mit „nicht gespielt“ in der Reihenfolge des Vetos", async () => {
+  const match = {
+    ...SEASON_1931.matchdays[0].match, score_for: 2, score_against: 0,
+    maps: [{ name: "Karte Nord", score_for: 6, score_against: 2, outcome: "win", picked: "own" }, { name: "Karte West", score_for: 6, score_against: 4, outcome: "win", picked: "opponent" }],
+    veto: [
+      { name: "Karte Ost", role: "banned", by: "own", played: false },
+      { name: "Karte Nord", role: "picked", by: "own", played: true, picked: "own", score_for: 6, score_against: 2, outcome: "win" },
+      { name: "Karte West", role: "picked", by: "opponent", played: true, picked: "opponent", score_for: 6, score_against: 4, outcome: "win" },
+      { name: "Karte Süd", role: "decider", played: false, picked: "decider" },
+    ],
+    bans: [{ name: "Karte Ost", by: "own" }],
+  };
+  renderPage({ ...BODY, team_league: { ...SEASON_1931, matchdays: [{ ...SEASON_1931.matchdays[0], match }] } });
+  const day = (await screen.findAllByTestId("team-league-matchday"))[0];
+  const rows = within(within(day).getByTestId("team-league-maps")).getAllByRole("listitem");
+  expect(rows.map((row) => row.textContent)).toEqual(["Karte NordUnsere Wahl6:2Sieg", "Karte WestWahl Gegner6:4Sieg", "Karte SüdDecidernicht gespielt"]);
+  expect(rows[2]).toHaveAttribute("data-played", "false");
+  expect(rows[0]).not.toHaveAttribute("data-played");
+  expect(within(day).getByTestId("team-league-bans")).toHaveTextContent("Bann: Karte Ost (wir)");
+});
+
 test("Zwei eigene Teams am selben Spieltag (Prüfung #1931): beide Spiele mit Team, Gegner und Ergebnis in der Karte", async () => {
   const black = { opponent: "Fremd Bären", home: false, score_for: 2, score_against: 0, outcome: "win", points: 3, team: "Probe Löwen B", maps: [], bans: [], club_day: null, time: null, lineup_size: 1 };
   const gold = { ...BODY.team_league.matchdays[0].match, team: "Probe Löwen", bans: [], club_day: null, time: null };

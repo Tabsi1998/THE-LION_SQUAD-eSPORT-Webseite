@@ -175,21 +175,34 @@ function Score({ match }) {
   );
 }
 
-// Maps einer Karte: Name, wer sie gewählt hat (#1931), Stand aus eigener Sicht und der kleine Balken.
-function Maps({ maps }) {
+// Maps einer Karte: Name, wer sie gewählt hat (#1931), Stand aus eigener Sicht und der kleine Balken. Mit dem ganzen
+// Veto (`veto`) stehen auch Wahl bzw. Decider ohne Ergebnis in seiner Reihenfolge - abgeschwächt, „nicht gespielt“;
+// die Banns stehen darunter in ihrer eigenen Zeile.
+function Maps({ match }) {
+  const maps = Array.isArray(match.veto) ? match.veto.filter((map) => map.role !== "banned") : match.maps || [];
   if (!maps.length) return null;
   return (
     <ul className="tls-tl-maps" aria-label="Maps" data-testid="team-league-maps">
-      {maps.map((map, index) => (
-        // Maps können gleich heißen (Rückspiel auf derselben Karte) - der Index gehört zum Schlüssel.
-        <li key={`${map.name}-${index}`} className="tls-tl-map" data-outcome={map.outcome} style={{ "--share": mapShare(map) }}>
-          <span className="tls-tl-map__name">{map.name}</span>
-          {map.picked && <span className="tls-tl-map__pick" data-picked={map.picked} data-testid="team-league-map-pick">{PICK_LABELS[map.picked]}</span>}
-          <span className="tabular-nums text-white/85">{formatNumber(map.score_for)}:{formatNumber(map.score_against)}</span>
-          <span className="tls-tl-map__bar" aria-hidden="true"><span className="tls-tl-map__fill" /></span>
-          <span className="sr-only">{OUTCOMES[map.outcome]?.word}</span>
-        </li>
-      ))}
+      {maps.map((map, index) => {
+        const unplayed = map.played === false;
+        return (
+          // Maps können gleich heißen (Rückspiel auf derselben Karte) - der Index gehört zum Schlüssel.
+          <li key={`${map.name}-${index}`} className="tls-tl-map" data-outcome={unplayed ? undefined : map.outcome}
+            data-played={unplayed ? "false" : undefined} style={unplayed ? undefined : { "--share": mapShare(map) }}>
+            <span className="tls-tl-map__name">{map.name}</span>
+            {map.picked && <span className="tls-tl-map__pick" data-picked={map.picked} data-testid="team-league-map-pick">{PICK_LABELS[map.picked]}</span>}
+            {unplayed ? (
+              <span className="tls-tl-map__unplayed">nicht gespielt</span>
+            ) : (
+              <>
+                <span className="tabular-nums text-white/85">{formatNumber(map.score_for)}:{formatNumber(map.score_against)}</span>
+                <span className="tls-tl-map__bar" aria-hidden="true"><span className="tls-tl-map__fill" /></span>
+                <span className="sr-only">{OUTCOMES[map.outcome]?.word}</span>
+              </>
+            )}
+          </li>
+        );
+      })}
     </ul>
   );
 }
@@ -238,7 +251,7 @@ function OwnMatch({ round, match, showTeam, withScore }) {
         ) : <p className="mt-2 text-sm text-white/45">Gegner offen</p>}
         {withScore && match && <span className="mt-2"><Score match={match} /></span>}
       </div>
-      {match && <Maps maps={match.maps} />}
+      {match && <Maps match={match} />}
       {match?.bans?.length > 0 && <p className="mt-2 text-xs text-white/50" data-testid="team-league-bans"><span className="text-white/35">Bann: </span>{banText(match.bans)}</p>}
     </div>
   );
