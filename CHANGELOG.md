@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.16.0 (21.10.2026)
+
+### Neu
+
+* Angepinnte News als breiter Aufmacher auf News-Seite und Startseite (#1342)
+* News führen direkt zur Anmeldung – Karte mit Datum, freien Plätzen und Stand nach dem ersten Absatz (#1266)
+* News ohne Bild bekommen eine Text-Karte im Vereinsstil, Ergebnis-News zeigen den Sieger mit Pokal (#1343)
+* News-Kategorien nur mit Artikeln und Anzahl, eine Wisch-Zeile mit Suche als Symbol (#1249)
+
+### Fehlerbehebungen
+
+* Dasselbe News-Bild steht nie zweimal nebeneinander (#1343)
+
 ## 1.15.0 (21.10.2026)
 
 ### Neu
