@@ -6,6 +6,10 @@ gespeicherten **Alias** (``reference_aliases``, mit Quelle und wer wann bestäti
 
 - **Vergleichbar** macht ``normalize_name``: Groß/Klein, Leerzeichen, Satz- und Sonderzeichen, Akzente und Breiten
   zählen nicht. Clan-Tags in Klammern („[TLS] Name“, „Name (TLS)“) sind optional - ein Treffer ohne Tag sagt es dazu.
+  Ebenso der Tag einer Spielkennung wie bei Riot („Name#TLS“, #1961: 3 bis 5 Buchstaben oder Ziffern direkt nach „#“,
+  ohne Leerzeichen davor - „Max #123“ bleibt ganz) - „Name#TLS“ und „Name“ sind dieselbe Person, auch über einen Alias
+  für „Name“. Zwei verschiedene Tags („Name#AAA“, „Name#BBB“) sind verschiedene Personen und passen nie von selbst
+  (``tags_conflict``). ``without_game_tag`` zeigt einen Namen ohne diesen Tag.
 - **Vorschläge** kommen nur bei *gleichem* Schlüssel, nie bei bloß ähnlichen Namen. Reihenfolge der Gründe: bestätigter
   Alias, Spiel-ID im Konto (Reiter „Gaming“ - je Spiel und die Plattform-Kennungen), Name im Profil; die Startnummer
   aus einer früheren Saison derselben Spur ist nur ein Hinweis und wird nie von selbst übernommen.
@@ -27,11 +31,27 @@ VIENNA = ZoneInfo("Europe/Vienna")
 _TAG_OPEN = "[({<"
 _TAG_CLOSE = "])}>"
 _TAG_MAX = 12
+# Tag einer Spielkennung am Ende („Name#TLS“, Riot-ID): 3 bis 5 Buchstaben oder Ziffern nach dem letzten „#“.
+_GAME_TAG_LENGTH = (3, 5)
+
+
+def without_game_tag(value) -> str:
+    """Der Name ohne den Tag einer Spielkennung am Ende („TheLostFriday#TLS“ → „TheLostFriday“, #1961). Das „#“ hängt
+    direkt am Namen wie bei der Riot-ID - eine Startnummer mit Leerzeichen davor („Max Muster #123“, „#7 Max“) bleibt
+    Teil des Namens. Bliebe nichts übrig oder passt der Tag nicht, kommt der Name ohne Leerraum außen zurück."""
+    text = str(value or "").strip()
+    at = text.rfind("#")
+    tag = text[at + 1:] if at > 0 and not text[at - 1].isspace() else ""
+    low, high = _GAME_TAG_LENGTH
+    if not low <= len(tag) <= high or not all(char.isascii() and char.isalnum() for char in tag):
+        return text
+    name = text[:at]
+    return name if normalize_name(name) else text
 
 
 def _without_clan_tags(value) -> str:
-    """Der Text ohne Clan-Tags am Anfang und Ende und ohne Leerraum außen."""
-    text = str(value or "").strip()
+    """Der Text ohne Tag einer Spielkennung, ohne Clan-Tags am Anfang und Ende und ohne Leerraum außen."""
+    text = without_game_tag(value)
     while text and text[0] in _TAG_OPEN:
         end = next((i for i in range(1, min(len(text), _TAG_MAX + 2)) if text[i] in _TAG_CLOSE), -1)
         if end < 2:
@@ -63,6 +83,27 @@ def normalize_name(value) -> str:
     text = unicodedata.normalize("NFKD", str(value or ""))
     text = "".join(char for char in text if not unicodedata.combining(char)).casefold()
     return "".join(char for char in text if char.isalnum())
+
+
+def game_tag(value) -> str | None:
+    """Der Tag der Spielkennung eines Namens („Name#TLS“ → „tls“), ohne Tag ``None``."""
+    text = str(value or "").strip()
+    stripped = without_game_tag(text)
+    return text[len(stripped) + 1:].casefold() if stripped != text else None
+
+
+def tags_conflict(left, right) -> bool:
+    """Tragen beide Namen den Tag einer Spielkennung und sind die Tags verschieden? Dann sind es verschiedene Personen
+    („Name#AAA“ und „Name#BBB“) - sie werden nie von selbst zusammengelegt (#1961)."""
+    mine, theirs = game_tag(left), game_tag(right)
+    return mine is not None and theirs is not None and mine != theirs
+
+
+def same_but_tag(left, right) -> bool:
+    """Gleich bis auf den Tag der Spielkennung: derselbe Name ohne Tag, und nur einer trägt einen Tag oder beide
+    denselben („Name#TLS“ ↔ „Name“). Clan-Tags zählen dabei mit - „[TLS] Name“ bleibt ein bloßer Vorschlag."""
+    key = normalize_name(without_game_tag(left))
+    return bool(key) and key == normalize_name(without_game_tag(right)) and not tags_conflict(left, right)
 
 
 def strip_clan_tags(value) -> str:
@@ -129,19 +170,25 @@ class IdentityIndex:
             self.profile_names = [{"profile_id": pid, "value": name} for pid, name in self.profiles.items()]
 
 
-def _hit(keys: tuple[str, ...], value) -> str | None:
-    """``full``, wenn der volle Schlüssel gleich ist, ``untagged``, wenn erst ohne Clan-Tag, sonst ``None``."""
+def _hit(keys: tuple[str, ...], value, name=None) -> str | None:
+    """``full``, wenn der volle Schlüssel gleich ist (oder nur der Tag einer Spielkennung fehlt, #1961), ``untagged``,
+    wenn erst ohne Clan-Tag, sonst ``None``. Verschiedene Tags (``name`` gegen ``value``) passen nie."""
     theirs = name_keys(value)
-    if not keys or not theirs:
+    if not keys or not theirs or (name is not None and tags_conflict(name, value)):
         return None
-    if keys[0] == theirs[0]:
+    if keys[0] == theirs[0] or (name is not None and same_but_tag(name, value)):
         return "full"
     return "untagged" if set(keys) & set(theirs) else None
 
 
-def _alias_hit(keys: tuple[str, ...], alias: dict) -> str | None:
+def _alias_hit(keys: tuple[str, ...], alias: dict, name=None) -> str | None:
+    """Wie ``_hit`` für einen gespeicherten Alias. Ein Alias für „Name“ gilt voll auch für „Name#TAG“, einer für
+    „Name#AAA“ nie für „Name#BBB“ (#1961) - dafür zählt der gespeicherte Name des Alias."""
     stored = alias.get("name_normalized") or ""
-    if keys and stored == keys[0]:
+    original = alias.get("name")
+    if name is not None and original and tags_conflict(name, original):
+        return None
+    if keys and (stored == keys[0] or (name is not None and original and same_but_tag(name, original))):
         return "full"
     return "untagged" if stored and stored in keys else None
 
@@ -155,7 +202,7 @@ def exact_alias(index: IdentityIndex, name) -> dict | None:
     Vorstand entscheidet über die Vorschläge. Gleiche Eingaben ergeben in jeder Reihenfolge dasselbe."""
     keys = name_keys(name)
     hits = [alias for alias in index.aliases
-            if _alias_hit(keys, alias) == "full" and alias.get("game_id") in (index.game_id, None)]
+            if _alias_hit(keys, alias, name) == "full" and alias.get("game_id") in (index.game_id, None)]
     bound = [alias for alias in hits if index.game_id and alias.get("game_id") == index.game_id]
     tier = sorted(bound or hits, key=lambda alias: str(alias.get("id") or ""))
     if not tier:
@@ -190,7 +237,7 @@ def suggest(index: IdentityIndex, name, start_number: str | None = None) -> list
         item["_reasons"].append((BASIS_ORDER.index(basis), basis, reason))
 
     for alias in index.aliases:
-        hit = _alias_hit(keys, alias)
+        hit = _alias_hit(keys, alias, name)
         if not hit:
             continue
         day = vienna_date(alias.get("confirmed_at"))
@@ -200,12 +247,12 @@ def suggest(index: IdentityIndex, name, start_number: str | None = None) -> list
         add(alias.get("target") or "member", alias.get("profile_id"), alias.get("guest_name"), "alias",
             reason + (" – ohne Clan-Tag" if hit == "untagged" else ""))
     for entry in index.game_ids:
-        hit = _hit(keys, entry.get("value"))
+        hit = _hit(keys, entry.get("value"), name)
         if hit:
             add("member", entry.get("profile_id"), None, "game_id",
                 f"Spiel-ID passt ({entry.get('label')})" + (" – ohne Clan-Tag" if hit == "untagged" else ""))
     for entry in index.profile_names:
-        hit = _hit(keys, entry.get("value"))
+        hit = _hit(keys, entry.get("value"), name)
         if hit:
             add("member", entry.get("profile_id"), None, "profile_name",
                 "Name im Profil passt" + (" – ohne Clan-Tag" if hit == "untagged" else ""))

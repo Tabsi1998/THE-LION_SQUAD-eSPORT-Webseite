@@ -18,11 +18,17 @@ Gewertet wird eine Runde mit Status ``scored`` und Blatt; Runden mit ``counts=Fa
 Wertung) bleiben draußen. Eine abgesagte Runde hat keinen Stand und zählt nicht zu den Runden des Kalenders, behält aber
 ihre Nummer (``round_seq``). Namen stehen nicht im Stand, nur Kennungen - sie kommen beim Lesen dazu, damit Umbenennen
 und Ausblenden nicht neu rechnen müssen. Gleiche Eingaben ergeben immer denselben Stand, egal in welcher Reihenfolge.
+
+Turniertage (#1961, ``services/tournament_days.py``): Jedes Ergebnis trägt - wo eingetragen - die Runden des Termins
+(``day_rounds`` mit den Punkten, die zählen), die Tagessumme (``day_points``), den Partner im Double Up (``partner_id``)
+und seine Sonderboni (``bonus``, ``bonus_keys``). Sonderboni zählen wie Aktivitätspunkte getrennt (``bonus_points``) und
+werden nie gestrichen. Der Vorrang ``top_n`` zählt Plätze unter den besten ``tiebreak_top_n``.
 """
 from __future__ import annotations
 
 import math
 
+from services import tournament_days
 from services.own_teams import Matcher
 from services.scoring_rules import (
     counted_results, league_table, normalize_rules, rank_with_ties, result_points, validate_sheet,
@@ -35,6 +41,8 @@ RESULT_FIELDS = ("round_id", "place", "points", "source", "marks", "team")
 # Angaben aus dem Rennergebnis (#1927) - nur, wo eingetragen: Startnummer, Startplatz, Zeit, Abstand, schnellste Runde
 # mit Zeit und Fahrer des Tages.
 RACE_DETAILS = ("start_number", "grid", "time", "gap", "fastest_lap_time", "driver_of_the_day")
+# Turniertag (#1961) - nur, wo eingetragen: Runden des Termins, Tagessumme, Partner im Double Up, Sonderboni.
+DAY_DETAILS = ("day_rounds", "day_points", "partner_id", "bonus", "bonus_keys")
 
 
 def ordered_rounds(rounds: list[dict]) -> list[dict]:
@@ -58,9 +66,11 @@ def _stats(results: list[dict]) -> dict:
                          if item["participated"] and item.get("place") and "dsq" not in item["marks"]}}
 
 
-def _criterion(name: str, stats: dict, max_place: int, latest_first: list[str]):
+def _criterion(name: str, stats: dict, max_place: int, latest_first: list[str], top_n: int = 4):
     if name == "wins":
         return stats["wins"]
+    if name == "top_n":
+        return sum(1 for place in stats["places"] if place <= top_n)
     if name == "podiums":
         return stats["podiums"]
     if name == "countback":
@@ -73,13 +83,13 @@ def _criterion(name: str, stats: dict, max_place: int, latest_first: list[str]):
     raise ValueError(name)
 
 
-def _rank(rows: list[dict], criteria: list[str], upto: list[dict], sort_name) -> None:
+def _rank(rows: list[dict], criteria: list[str], upto: list[dict], sort_name, top_n: int = 4) -> None:
     """Rang nach Punkten und Vorrang, gleichrangige nach ``sort_name``; ``tiebreak`` an jeder Zeile, die bei gleichen
     Punkten wegen eines Kriteriums hinter der darüber steht."""
     max_place = max([place for row in rows for place in row["_stats"]["places"]] or [1])
     latest_first = [item["id"] for item in reversed(upto)]
     for row in rows:
-        row["_criteria"] = [_criterion(name, row["_stats"], max_place, latest_first) for name in criteria]
+        row["_criteria"] = [_criterion(name, row["_stats"], max_place, latest_first, top_n) for name in criteria]
     rank_with_ties(rows, lambda row: (row["points"], *row["_criteria"]))
     rows.sort(key=lambda row: (row["rank"], *sort_name(row)))
     for above, row in zip([None, *rows], rows):
@@ -118,7 +128,8 @@ def _results_by_participant(rules: dict, upto: list[dict], sheets: dict, seq_of:
             if not pid:
                 continue
             # Punkte je Lauf (#1930): ein Sprint kann ein eigenes Schema haben.
-            scored = result_points(row, (round_rules or {}).get(item["id"], rules))
+            own_rules = (round_rules or {}).get(item["id"], rules)
+            scored = result_points(row, own_rules)
             details = {key: row[key] for key in ("start_number", "grid", "time", "gap")
                        if row.get(key) not in (None, "")}
             if fastest.get("participant_id") == pid and fastest.get("time"):
@@ -129,9 +140,25 @@ def _results_by_participant(rules: dict, upto: list[dict], sheets: dict, seq_of:
                 "round_id": item["id"], "seq": seq_of[item["id"]], "place": row.get("place") or None,
                 "marks": sorted(set(row.get("marks") or [])), "team": row.get("team") or None,
                 "points": scored["points"], "source": scored["source"], "participated": scored["participated"],
-                **details,
+                **details, **_day_details(row, own_rules),
             })
     return found
+
+
+def _day_details(row: dict, rules: dict) -> dict:
+    """Turniertag (#1961) - nur, was die Zeile trägt: Runden mit den Punkten, die zählen, Tagessumme, Partner, Boni."""
+    out: dict = {}
+    if row.get("day_rounds"):
+        out["day_rounds"] = tournament_days.rounds_with_points(row, rules)
+    total = tournament_days.day_total(row, rules)
+    if total is not None:
+        out["day_points"] = total
+    if row.get("partner_id"):
+        out["partner_id"] = row["partner_id"]
+    bonus, keys = tournament_days.bonus_points(row, rules)
+    if keys:
+        out["bonus"], out["bonus_keys"] = bonus, keys
+    return out
 
 
 def _per_unit(results: list[dict], unit_of: dict, unit_seq: dict) -> list[dict]:
@@ -162,13 +189,16 @@ def _driver_rows(rules: dict, upto: list[dict], sheets: dict, seq_of: dict, tota
         counted_points = sum(item["points"] for item in results if item["round_id"] in counted)
         bonus = sum(activity["points"] for item in units
                     if item["participated"] and item["seq"] >= activity["from_round"])
+        # Sonderboni (#1961): getrennt wie Aktivitätspunkte, nie gestrichen.
+        extra = sum(item.get("bonus") or 0 for item in results)
         stats = _stats(results)
         row = {
-            "participant_id": pid, "computed_points": _number(counted_points + bonus),
-            "activity_points": _number(bonus),
+            "participant_id": pid, "computed_points": _number(counted_points + bonus + extra),
+            "activity_points": _number(bonus), "bonus_points": _number(extra),
             "counted_round_ids": counted, "dropped_round_ids": dropped,
             "results": [{**{key: item[key] for key in RESULT_FIELDS},
-                         **{key: item[key] for key in RACE_DETAILS if key in item}} for item in results],
+                         **{key: item[key] for key in (*RACE_DETAILS, *DAY_DETAILS) if key in item}}
+                        for item in results],
             "wins": stats["wins"], "podiums": stats["podiums"],
             "rounds_played": sum(1 for item in units if item["participated"]), "_stats": stats,
         }
@@ -178,7 +208,7 @@ def _driver_rows(rules: dict, upto: list[dict], sheets: dict, seq_of: dict, tota
     def by_name(row: dict) -> tuple:
         return str((people.get(row["participant_id"]) or {}).get("name") or "").casefold(), row["participant_id"]
 
-    _rank(rows, rules["tiebreakers"], upto, by_name)
+    _rank(rows, rules["tiebreakers"], upto, by_name, rules["tiebreak_top_n"])
     return rows
 
 
@@ -216,7 +246,8 @@ def _team_rows(rules: dict, upto: list[dict], sheets: dict, seq_of: dict, people
         entry["_stats"] = _stats(entry.pop("_results"))
         _official(entry, official.get(entry["team"]))
         rows.append(entry)
-    _rank(rows, rules["tiebreakers"], upto, lambda row: (row["team"].casefold(), row["team"]))
+    _rank(rows, rules["tiebreakers"], upto, lambda row: (row["team"].casefold(), row["team"]),
+          rules["tiebreak_top_n"])
     return rows
 
 

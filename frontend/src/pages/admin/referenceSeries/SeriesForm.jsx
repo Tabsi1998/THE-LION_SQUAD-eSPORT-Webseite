@@ -2,7 +2,7 @@ import { useState } from "react";
 import { api, formatApiError } from "@/lib/api";
 import { AdminSheet } from "@/components/tls/AdminSheet";
 import { FormGrid } from "@/components/tls/AdminForm";
-import { SelectField, TextAreaField, TextField } from "@/components/tls/FormFields";
+import { CheckField, SelectField, TextAreaField, TextField } from "@/components/tls/FormFields";
 import { PUBLISH_OPTIONS, STATUS_OPTIONS, VISIBILITY_OPTIONS, WEEKDAY_OPTIONS, parsePointsList, resultImageOptions, rulesToForm, seriesPayload, seriesToForm } from "@/lib/referenceSeries";
 import { SEASON_RESULT_OPTIONS } from "@/lib/seriesTiers";
 import { RulesFields } from "./RulesFields";
@@ -84,6 +84,9 @@ export function SeriesForm({ series, lineage, schemes = [], defaultRules = {}, p
         inherited={inheritedPartners(lineage, partners)} testPrefix="series-partner"
         hint="Zusätzlich zu den Partnern der Spur, nur für diese Saison – etwa ein Sponsor dieser Season." />
       <TextAreaField label="Beschreibung" value={form.description} onChange={(v) => set("description", v)} testId="series-description" />
+      {/* #1961: „Name#TLS“ und „Name“ sind ohnehin dieselbe Person - öffentlich wahlweise ohne den Tag. */}
+      <CheckField label="Namen ohne Tag der Spielkennung zeigen" checked={form.hide_name_tags} onChange={(v) => set("hide_name_tags", v)} testId="series-hide-tags"
+        hint="Auf der Serienseite steht „TheLostFriday#TLS“ dann als „TheLostFriday“. Die Verwaltung zeigt immer den vollen Namen." />
       <RulesFields rules={form.rules} kind={lineage.kind} onChange={(rules) => set("rules", rules)} />
       {racing && <WeekendFormatsField formats={weekend} onChange={setWeekend} racePoints={form.rules.points_mode === "scheme" ? parsePointsList(form.rules.points_by_place) : null} />}
       {!isNew && (

@@ -172,7 +172,10 @@ def _name_forms(name: str) -> set[str]:
 
 
 def similarity(read: str, known: str) -> float:
-    """Ähnlichkeit 0-1 zweier Namen, unempfindlich gegen Groß/klein, Leerzeichen, Clan-Tags und Verwechsler."""
+    """Ähnlichkeit 0-1 zweier Namen, unempfindlich gegen Groß/klein, Leerzeichen, Clan-Tags und Verwechsler. Zwei
+    verschiedene Tags einer Spielkennung („Name#AAA“, „Name#BBB“, #1961) sind verschiedene Personen: 0."""
+    if series_identity.tags_conflict(read, known):
+        return 0.0
     best = 0.0
     for left in _name_forms(read):
         for right in _name_forms(known):

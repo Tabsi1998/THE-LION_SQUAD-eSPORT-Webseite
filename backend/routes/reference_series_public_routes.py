@@ -17,6 +17,12 @@ gar nicht erst mit. Nur Vereinsmitglieder tragen den Link zu ihrem Vereinsprofil
 **Runde mit Läufen (#1930):** Jeder Termin trägt seinen Lauf (``session``, ``session_kind``) und seine Runde
 (``weekend``). Bei der Rennliga zählt der Fortschritt in Runden (alle zählenden Läufe einer Runde gewertet), der nächste
 Termin nennt seinen Lauf, und „Läuft gerade“ bringt dazu die Läufe der Runde (``next.sessions``).
+
+**Turniertage (#1961):** Die Regeln nennen Runden je Termin (``day_rounds``), Sonderboni (``custom_bonuses``) und das N
+der Regel „Top N“. Jedes Ergebnis der Gesamtwertung trägt - wo eingetragen - die Runden R1…Rn (Platz, Punkte, Lobby),
+die Tagessumme, Sonderboni und den Partner im Double Up (wie jede Person der Tabelle, ohne Kennung); die Zeile die
+Summe der Sonderboni (``bonus_points``). Führt die Saison Namen ohne Tag (``hide_name_tags``), kommt „Name#TLS“ als
+„Name“.
 """
 from __future__ import annotations
 
@@ -27,7 +33,7 @@ from fastapi import APIRouter, Depends, Request
 from auth import get_optional_user
 from database import get_db
 from routes.reference_round_routes import PUBLIC_FIELDS, _calendar, visible_series
-from services import map_pools, race_weekend, reference_running_cache, series_partners
+from services import map_pools, race_weekend, reference_running_cache, series_identity, series_partners
 from services.dolibarr_policy import club_today
 from services.own_teams import Matcher, own_teams
 from services.rate_limit import enforce_rate_limit
@@ -44,9 +50,11 @@ LINEAGE_FIELDS = ("title", "slug", "kind", "label", "organizer", "game_name", "e
 SERIES_FIELDS = ("season", "tier", "title", "season_slug", "status", "default_weekday", "default_time",
                  "external_url", "official_table_url", "rules_version", "season_result", "weekend")
 RULE_FIELDS = ("points_mode", "points_by_place", "bonuses", "dnf_points", "dns_points", "dsq_points", "count_mode",
-               "count_n", "activity_points", "final_top_n", "tiebreakers")
+               "count_n", "activity_points", "final_top_n", "tiebreakers",
+               # Turniertage (#1961): Runden je Termin mit Schema, Sonderboni, N der Regel „Top N“.
+               "day_rounds", "custom_bonuses", "tiebreak_top_n")
 ROW_FIELDS = ("rank", "points", "computed_points", "official_points", "deviation", "activity_points", "tiebreak",
-              "wins", "podiums", "rounds_played")
+              "wins", "podiums", "rounds_played", "bonus_points")
 # Noch offen ist jede Wertungsrunde, die nicht gewertet ist (auch „Ergebnis folgt“); kommend sind nur diese:
 UPCOMING_STATES = ("planned", "today", "postponed")
 # Von einer Person geht nur das hinaus, was die Tabelle zeigt - keine Startnummer, kein Team, keine Kennungen.
@@ -61,9 +69,9 @@ def _rules(series: dict) -> dict:
     return {key: rules[key] for key in RULE_FIELDS}
 
 
-async def _people(db, series_id: str) -> dict:
+async def _people(db, series_id: str, *, hide_tags: bool = False) -> dict:
     """Teilnehmer der Serie mit dem, was öffentlich gezeigt wird: Name (außer ausgeblendet), Vereinsmitglied ja/nein
-    und nur bei Mitgliedern der Link zum Vereinsprofil."""
+    und nur bei Mitgliedern der Link zum Vereinsprofil. ``hide_tags`` (#1961): Namen ohne Tag der Spielkennung."""
     participants = await db.reference_participants.find(
         {"series_id": series_id},
         {"_id": 0, "id": 1, "name": 1, "name_hidden": 1, "is_club_member": 1, "link": 1, "profile_id": 1},
@@ -82,10 +90,20 @@ async def _people(db, series_id: str) -> dict:
         if item.get("name_hidden"):
             out[item["id"]] = {**HIDDEN_PERSON, "club_member": member}
             continue
+        name = item.get("name")
         out[item["id"]] = {
-            "name": item.get("name"), "name_hidden": False, "club_member": member,
-            "profile_slug": slugs.get(item.get("profile_id")) if member else None,
+            "name": series_identity.without_game_tag(name) if hide_tags else name, "name_hidden": False,
+            "club_member": member, "profile_slug": slugs.get(item.get("profile_id")) if member else None,
         }
+    return out
+
+
+def _day(item: dict, people: dict) -> dict:
+    """Turniertag (#1961) eines Ergebnisses: Runden, Tagessumme, Sonderboni und der Partner im Double Up - der Partner
+    wie jede Person der Tabelle (Name, ausgeblendet, Verein), ohne Kennung."""
+    out = {key: item[key] for key in ("day_rounds", "day_points", "bonus", "bonus_keys") if item.get(key) is not None}
+    if item.get("partner_id"):
+        out["partner"] = people.get(item["partner_id"]) or HIDDEN_PERSON
     return out
 
 
@@ -105,6 +123,7 @@ def _standing_row(row: dict, people: dict) -> dict:
             "dropped": item.get("round_id") in dropped,
             # Rennergebnis (#1927): Startnummer, Startplatz, Zeit, Abstand, schnellste Runde, Fahrer des Tages.
             **{key: item[key] for key in RACE_DETAILS if item.get(key) not in (None, "")},
+            **_day(item, people),
         } for item in row.get("results") or []],
     }
 
@@ -441,7 +460,7 @@ async def public_series(lineage_slug: str, season_slug: str, user: dict | None =
     sid = series["id"]
     calendar = await _calendar(db, sid)
     rounds = calendar["rounds"]
-    people = await _people(db, sid)
+    people = await _people(db, sid, hide_tags=bool(series.get("hide_name_tags")))
     latest = await db.reference_standings.find_one(
         {"series_id": sid, "scope": "drivers"},
         {"_id": 0, "round_id": 1, "round_seq": 1, "rows": 1, "computed_at": 1}, sort=[("round_seq", -1)])

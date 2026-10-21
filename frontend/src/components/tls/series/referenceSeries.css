@@ -66,7 +66,26 @@
   .tls-series-head-link:hover { color: var(--tls-brand); text-decoration: underline; }
 }
 
+/* Turniertage (#1961): Rundenpunkte mit Platzfarben wie beim Veranstalter - Gold, Silber, Bronze, Top 4 grün; sonst
+   schlicht. Badges für Ausgestiegen, Sonderbonus und Double Up. Namen öffnen das Spieler-Detail; dessen Kopf hebt sich
+   beim Wechsel kurz an. */
+.tls-day-cell {
+  display: inline-flex; align-items: center; justify-content: center; min-width: 1.75rem; padding: 1px 4px;
+  border-radius: 3px; font-variant-numeric: tabular-nums;
+}
+.tls-day-cell[data-tone="gold"] { color: var(--tls-honor); background: rgb(var(--tls-honor-rgb) / 0.14); }
+.tls-day-cell[data-tone="silver"] { color: var(--tls-silver); background: rgb(var(--tls-silver-rgb) / 0.14); }
+.tls-day-cell[data-tone="bronze"] { color: var(--tls-bronze); background: rgb(var(--tls-bronze-rgb) / 0.16); }
+.tls-day-cell[data-tone="top"] { color: var(--tls-ok); background: rgb(var(--tls-ok-rgb) / 0.12); }
+.tls-day-badge--left { color: rgb(255 255 255 / 0.6); box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.2); }
+.tls-day-badge--bonus { color: var(--tls-honor); box-shadow: inset 0 0 0 1px rgb(var(--tls-honor-rgb) / 0.5); }
+.tls-day-badge--duo { color: var(--tls-brand); box-shadow: inset 0 0 0 1px var(--tls-brand); }
+.tls-day-name { transition: color var(--tls-motion-fast) var(--tls-ease); text-underline-offset: 4px; }
+.tls-day-name:hover, .tls-day-name:focus-visible { color: var(--tls-brand); text-decoration: underline; outline: none; }
+.tls-day-detail__head { animation: tls-series-in 240ms var(--tls-ease) both; }
+
 @media (prefers-reduced-motion: reduce) {
   .tls-series-row, .tls-series-row .tls-standing-move { animation: tls-series-fade 150ms ease both; animation-delay: 0ms; }
+  .tls-day-detail__head { animation: tls-series-fade 150ms ease both; }
 }
 @keyframes tls-series-fade { from { opacity: 0; } to { opacity: 1; } }

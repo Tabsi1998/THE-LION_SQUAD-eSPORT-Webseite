@@ -50,8 +50,8 @@ function Name({ row }) {
   );
 }
 
-export function Points({ row }) {
-  const hint = tiebreakHint(row.tiebreak);
+export function Points({ row, topN }) {
+  const hint = tiebreakHint(row.tiebreak, topN);
   return (
     <span title={hint || undefined} className={hint ? "underline decoration-dotted decoration-white/30 underline-offset-4" : undefined}>
       {formatNumber(row.points)}
@@ -283,7 +283,8 @@ export function SeriesStandings({
   const view = {
     renderName: renderName || DEFAULT_VIEW.renderName,
     renderResult: renderResult || DEFAULT_VIEW.renderResult,
-    renderPoints: renderPoints || DEFAULT_VIEW.renderPoints,
+    // „Top N“ (#1961): der Hinweis nennt das N der Saison.
+    renderPoints: renderPoints || ((row) => <Points row={row} topN={rules?.tiebreak_top_n} />),
     extraColumn,
     roundHref,
   };

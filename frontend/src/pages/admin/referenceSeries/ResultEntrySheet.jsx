@@ -14,6 +14,8 @@ import { TeamLeagueEntry } from "./TeamLeagueEntry";
 import { VenueWithFlag } from "@/components/tls/CountryFlag";
 import { ResultImageButton, ResultImageRowNote, ResultImageSummary, ocrMark, useResultImage } from "./ResultImageImport";
 import { RACE_FIELD_GROUPS, afterEdit, confirmRow, imageFormFields, imageToRows, isUncertain, openImageItems, replaceRaceMarks } from "@/lib/resultImage";
+import { DAY_MARK_OPTIONS, roundCount, schemeOf, usesDayRounds } from "@/lib/tournamentDays";
+import { BonusChips, DayRoundsDetails, DayRoundsLine, DoubleUpToggle } from "./DayRoundsFields";
 import { toast } from "sonner";
 import { ClipboardList, Plus, RefreshCw, SlidersHorizontal, X } from "lucide-react";
 
@@ -26,6 +28,8 @@ import { ClipboardList, Plus, RefreshCw, SlidersHorizontal, X } from "lucide-rea
 // Rennliga (#1927): je Zeile unter „Mehr“ auch Startplatz, Zeit und Abstand, je Rennen schnellste Runde mit Zeit und
 // Fahrer des Tages – das Einfügen füllt sie aus Tabellen mit diesen Spalten. Qualifying (#1930): statt der Punkte die
 // Zeit in der Zeile, keine schnellste Runde und kein Fahrer des Tages; die Pole setzt der Server (Platz 1).
+// Turniertag (#1961, DayRoundsFields): je Zeile R1…Rn und GES P, Platz aus der Tagessumme, Double Up mit Partner,
+// Sonderboni als Chips und die Marke „Ausgestiegen“.
 
 const SMALL_INPUT = `${INPUT_CLASS} !py-1.5 text-sm`;
 const LABEL = "text-[10px] font-bold uppercase tracking-widest text-white/45";
@@ -85,7 +89,7 @@ function FieldErrors({ fields, testId }) {
   );
 }
 
-function ResultRow({ row, index, autoPlace, organizerMode, qualifying = false, problems, info, invalid, onChange, onHint, onRemove, onConfirmImage }) {
+function ResultRow({ row, index, autoPlace, organizerMode, qualifying = false, day = null, problems, info, invalid, onChange, onHint, onRemove, onConfirmImage }) {
   const scored = info?.scored;
   // Offen von selbst nur, wo etwas Ungewöhnliches steht (Strafe, Gesamtstand, „zählen statt Schlüssel“) oder eine Eingabe
   // ungültig ist. Startnummer, Startplatz, Zeit und Abstand (#1927) stehen zugeklappt kurz unter der Zeile - so bleibt
@@ -93,7 +97,9 @@ function ResultRow({ row, index, autoPlace, organizerMode, qualifying = false, p
   // ab dem Anlegen, damit es beim Korrigieren nicht zuklappt.
   const [opened, setOpen] = useState(() => Boolean(row.penalty_points || row.penalty_seconds || row.official_total || row.override
     || ["start_number", "grid", "time", "gap"].some((field) => isUncertain(row, field))));
-  const open = opened || Boolean(invalid?.grid || invalid?.penalty_points || invalid?.penalty_seconds || invalid?.official_total);
+  const placeInvalid = Object.keys(invalid || {}).some((field) => field.startsWith("round_place_"));
+  const open = opened || Boolean(invalid?.grid || invalid?.penalty_points || invalid?.penalty_seconds || invalid?.official_total || placeInvalid);
+  const markOptions = day ? DAY_MARK_OPTIONS : MARK_OPTIONS;
   const raceLine = [row.start_number && `Nr. ${row.start_number}`, row.grid && `Startplatz ${row.grid}`, row.time, row.gap, row.penalty_seconds && `+${row.penalty_seconds} s Strafe`].filter(Boolean).join(" · ");
   const mark = (field) => ocrMark(row, field, index);
   const level = invalid || problems?.some((item) => item.level === "error") ? "error" : problems?.length || row.ocr ? "warning" : null;
@@ -126,9 +132,11 @@ function ResultRow({ row, index, autoPlace, organizerMode, qualifying = false, p
           <X className="w-4 h-4" />
         </button>
       </div>
-      {(open || row.marks.length > 0) && (
+      {day && <DayRoundsLine row={row} number={number} count={day.count} scheme={day.scheme} doubleUp={day.doubleUp} invalid={invalid} onChange={onChange} />}
+      {(open || row.marks.length > 0 || (day && row.bonus_keys?.length > 0)) && (
         <div className={`mt-2 flex flex-wrap gap-1.5 ${isUncertain(row, "marks") ? "rounded-sm ring-1 ring-amber-400/60 p-1" : ""}`} role="group" aria-label={`Marken Zeile ${number}`}>
-          {MARK_OPTIONS.map(([mark, label]) => {
+          {day && <BonusChips row={row} bonuses={day.bonuses} open={open} number={number} onChange={onChange} />}
+          {markOptions.map(([mark, label]) => {
             const active = row.marks.includes(mark);
             if (!open && !active) return null;
             return (
@@ -164,12 +172,15 @@ function ResultRow({ row, index, autoPlace, organizerMode, qualifying = false, p
           )}
         </div>
       )}
+      {open && day && <DayRoundsDetails row={row} number={number} count={day.count} invalid={invalid} onChange={onChange} />}
       {!open && raceLine && <div className="mt-1 text-[11px] text-white/55 tabular-nums" data-testid="result-row-race">{raceLine}</div>}
       {info && (
         <div className="mt-1 flex flex-wrap items-center gap-x-2 text-[11px] text-white/45 tabular-nums">
           {/* Bekannt oder neu sagt die Vorschau jedem; ob jemand Vereinsmitglied ist, nur dem Vorstand. */}
           <span data-testid="result-row-known" className={info.is_new ? "font-bold uppercase tracking-widest text-amber-300" : undefined}>{info.is_new ? "neu" : "bekannt"}</span>
-          {scored && <span data-testid="result-row-scored">= {scoredText(scored)}</span>}
+          {/* Turniertag (#1961): Tagessumme und Tagesplatz, dann die Saisonpunkte. */}
+          {info.day_points !== null && info.day_points !== undefined && <span data-testid="result-row-day-total">Tag {formatPoints(info.day_points)}{info.place ? ` · Platz ${info.place}` : ""}</span>}
+          {scored && <span data-testid="result-row-scored">= {scoredText(scored)}{info.bonus ? ` + ${formatPoints(info.bonus)} Sonderbonus` : ""}</span>}
         </div>
       )}
       {row.points_hint && (
@@ -322,7 +333,7 @@ export function ResultEntrySheet({ series, round, onClose, onSaved }) {
       setStale(false);
       const sheet = result.sheet;
       const source = result.target === "pending_draft" && sheet?.pending_draft ? sheet.pending_draft : sheet;
-      setForm(sheetToForm(source, result.participants, { kind: result.series?.kind, teamName: result.series?.team_name, opponent: result.round?.opponent }));
+      setForm(sheetToForm(source, result.participants, { kind: result.series?.kind, teamName: result.series?.team_name, opponent: result.round?.opponent, rules: result.series?.rules }));
     } catch (err) {
       toast.error(formatApiError(err.response?.data?.detail) || "Ergebnis nicht geladen.");
       onClose();
@@ -368,7 +379,12 @@ export function ResultEntrySheet({ series, round, onClose, onSaved }) {
     return names.map((name) => ({ name, aliases: [] }));
   }, [data]);
 
-  const built = useMemo(() => (form ? formToPayload(form) : null), [form]);
+  // Turniertag (#1961): Runden je Termin, Sonderboni und Double Up - sobald die Saison Runden führt oder das Blatt sie hat.
+  const day = useMemo(() => {
+    if (!form || kind === "team_league" || kind === "racing" || !usesDayRounds(rules, form.rows)) return null;
+    return { count: roundCount(rules, form.rows), scheme: schemeOf(rules), doubleUp: Boolean(form.doubleUp), bonuses: rules.custom_bonuses || [] };
+  }, [form, rules, kind]);
+  const built = useMemo(() => (form ? formToPayload(form, rules) : null), [form, rules]);
   const stamp = built ? formStamp(built.payload) : "";
   const fresh = Boolean(preview && preview.stamp === stamp);
   const problems = useMemo(() => problemsByRow(fresh ? preview : null, built?.rowKeys), [fresh, preview, built]);
@@ -376,7 +392,7 @@ export function ResultEntrySheet({ series, round, onClose, onSaved }) {
     if (!fresh || !built) return {};
     return Object.fromEntries((preview.rows || []).map((row) => [built.rowKeys[row.index], row]));
   }, [fresh, preview, built]);
-  const auto = useMemo(() => (form ? autoPlaces(form.rows) : {}), [form]);
+  const auto = useMemo(() => (form ? autoPlaces(form.rows, { scheme: schemeOf(rules), doubleUp: Boolean(form.doubleUp) }) : {}), [form, rules]);
 
   const update = (changes) => setForm((current) => ({ ...current, ...changes }));
   const updateRow = (key, values) => setForm((current) => ({
@@ -422,7 +438,7 @@ export function ResultEntrySheet({ series, round, onClose, onSaved }) {
   }, [checkImage, built, stamp]);
 
   const pasteRows = (text) => {
-    const result = parseResultPaste(text);
+    const result = parseResultPaste(text, { bonuses: rules.custom_bonuses || [] });
     if (result.rows.length) {
       const rows = pastedToRows(result.rows, participants);
       const next = {
@@ -439,7 +455,7 @@ export function ResultEntrySheet({ series, round, onClose, onSaved }) {
       setForm(next);
       setPasting(result.errors.length > 0);
       // Danach gleich prüfen lassen – so stehen Fehler und Punkte sofort an den Zeilen.
-      const pasted = formToPayload(next);
+      const pasted = formToPayload(next, rules);
       runPreview(pasted.payload, formStamp(pasted.payload)).catch((err) => toast.error(formatApiError(err.response?.data?.detail)));
     }
     return result;
@@ -632,13 +648,17 @@ export function ResultEntrySheet({ series, round, onClose, onSaved }) {
                   <button type="button" onClick={allHintsToPoints} data-testid="result-hints-points" className="tls-btn tls-btn--quiet px-2.5 py-1.5 rounded-sm text-[10px] font-bold uppercase tracking-wider">Bei allen: letzte Zahl = Punkte</button>
                 </div>
               )}
-              {pasting && (
+              {pasting && (day ? (
+                <PasteBox onApply={pasteRows} label="Ergebnisliste einfügen" testId="result-paste" placeholder={"Name\tR 1\tR 2\tR 3\tR 4\tR 5\tGES P\nProbe Eins\t8\t7\t8\t6\t8\t37"}
+                  hint={`Tabelle mit Kopfzeile aus Excel oder von der Seite des Veranstalters (Tab, „|“, „;“): Name, R 1 … R ${day.count || 5}, GES P – gern mit Platz${day.bonuses.length ? ` und je Bonus eine Spalte (${day.bonuses.map((bonus) => bonus.label).join(", ")})` : ""}. Ohne Platz bestimmt GES P den Platz. Ersetzt die Liste unten.`} />
+              ) : (
                 <PasteBox onApply={pasteRows} label="Ergebnisliste einfügen" testId="result-paste" placeholder={"1. Name  25\n2. Name 18 Pkt\n3. Name DNF"}
                   hint="Je Zeile ein Teilnehmer: „1. Name  25“ (Punkte mit zwei Leerzeichen oder „Pkt“ abgesetzt), nur Namen in Reihenfolge oder eine Tabelle aus Excel oder einer Website (Tab, „|“, „;“) – gern mit Spalten Nr, Start, Zeit, Abstand und Beste Runde. Dazu „Schnellste Runde: Name 1:31.456“ und „Fahrer des Tages: Name“. Ersetzt die Liste unten." />
-              )}
+              ))}
+              {day && <DoubleUpToggle value={day.doubleUp} onChange={(value) => update({ doubleUp: value })} />}
               <ol className="divide-y divide-white/5" data-testid="result-rows">
                 {form.rows.map((row, index) => (
-                  <ResultRow key={row.key} row={row} index={index} autoPlace={auto[row.key]} organizerMode={organizerMode} qualifying={qualifying} invalid={invalid[row.key]}
+                  <ResultRow key={row.key} row={row} index={index} autoPlace={auto[row.key]} organizerMode={organizerMode} qualifying={qualifying} day={day} invalid={invalid[row.key]}
                     problems={problems.byRow[row.key]} info={infoByKey[row.key]}
                     onChange={(values) => updateRow(row.key, values)} onHint={() => updateRow(row.key, hintToPoints(row, participants))} onRemove={() => removeRow(row.key)}
                     onConfirmImage={() => confirmImageRow(row.key)} />

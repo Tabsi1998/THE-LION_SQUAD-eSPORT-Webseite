@@ -17,6 +17,7 @@ import { SeriesMapPoolSection } from "./referenceSeries/SeriesMapPoolSection";
 import { seasonLabel } from "./AdminReferenceSeriesPage";
 import { dayLabel, publishText } from "@/lib/referenceSeriesStaff";
 import { referenceLine, seasonName } from "@/lib/seasonClose";
+import { bonusRulesLabel, dayRoundsLabel } from "@/lib/referenceSeriesTable";
 import { toast } from "sonner";
 import { Archive, ArchiveRestore, ArrowLeft, Flag, Pencil } from "lucide-react";
 
@@ -41,11 +42,16 @@ function countText(rules) {
 function RulesSummary({ series }) {
   const rules = series.rules || {};
   const points = rules.points_mode === "organizer" ? "Punkte laut Veranstalter" : `Punkte je Platz: ${(rules.points_by_place || []).join(", ") || "–"}`;
-  const tiebreak = (rules.tiebreakers || []).map((key) => TIEBREAK_LABELS[key] || key).join(", ");
+  const tiebreak = (rules.tiebreakers || []).map((key) => (key === "top_n" ? `Mehr Plätze unter den besten ${rules.tiebreak_top_n || 4}` : TIEBREAK_LABELS[key] || key)).join(", ");
+  // Turniertage (#1961): Runden je Termin und Sonderboni, wenn die Saison welche führt.
+  const days = dayRoundsLabel(rules);
+  const bonuses = bonusRulesLabel(rules);
   return (
     <div className="border border-white/10 rounded-sm bg-[#121212] p-4 text-sm text-white/70 space-y-1" data-testid="series-detail-rules">
       <div className="text-[11px] font-bold uppercase tracking-widest text-[#29B6E8]">Regeln · Version {series.rules_version || 1}</div>
       <div>{points}</div>
+      {days && <div data-testid="series-detail-days">{days}</div>}
+      {bonuses && <div data-testid="series-detail-bonuses">Sonderboni: {bonuses}</div>}
       <div>{countText(rules)}{rules.final_top_n ? ` · Finale: die besten ${rules.final_top_n}` : ""}</div>
       {tiebreak && <div>Vorrang: {tiebreak}</div>}
       {series.rules_note && <div className="text-white/50">Hinweis zur letzten Änderung: {series.rules_note}</div>}

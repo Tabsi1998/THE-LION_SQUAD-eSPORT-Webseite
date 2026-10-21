@@ -18,6 +18,10 @@ füllt fehlende Werte mit Standards und weist Unsinn ab; alle anderen Funktionen
   Entscheidet keines, teilen sich beide den Platz (``rank_with_ties``: 1, 2, 2, 4).
 - **Team-Liga:** Punkte für Sieg, Unentschieden und Niederlage (``match_points``) statt fest 3/1/0, Tabelle mit
   ``table_tiebreakers`` (``score_diff``, ``score_for``, ``wins``).
+- **Turniertage (#1961):** ``day_rounds`` - Runden innerhalb eines Termins (``count`` Spalten R1…Rn als Vorgabe,
+  0 = aus, und ihr Punkteschema, Vorgabe 8…1), ``custom_bonuses`` - eigene Sonderboni je Saison (Name und Punkte, etwa
+  „Bingo 3P“), ``tiebreak_top_n`` - das N der Gleichstand-Regel ``top_n`` („mehr Plätze unter den besten N“).
+  Gerechnet wird damit in ``services/tournament_days.py``.
 """
 from __future__ import annotations
 
@@ -25,14 +29,21 @@ import math
 from typing import Callable
 
 from services.fastlap_standings import DEFAULT_POINTS
+from services.series_identity import normalize_name
 
 POINTS_MODES = ("scheme", "organizer")
 COUNT_MODES = ("all", "best_n", "drop_n")
-TIEBREAKERS = ("wins", "podiums", "countback", "best_place", "latest_result")
+TIEBREAKERS = ("wins", "top_n", "podiums", "countback", "best_place", "latest_result")
 TABLE_TIEBREAKERS = ("score_diff", "score_for", "wins")
-MARKS = ("dnf", "dns", "dsq", "fastest_lap", "pole")
+MARKS = ("dnf", "dns", "dsq", "fastest_lap", "pole", "left")
 BONUS_MARKS = ("fastest_lap", "pole")
 POINT_SOURCES = ("scheme", "organizer", "manual")
+MAX_DAY_ROUNDS = 20
+MAX_DAY_ROUND_PLACES = 100
+MAX_CUSTOM_BONUSES = 10
+MAX_BONUS_LABEL = 40
+MAX_BONUS_KEY = 30
+MAX_TOP_N = 64  # N der Gleichstand-Regel „Top N“ (#1961): 1 bis 64
 
 DEFAULT_RULES: dict = {
     "points_mode": "scheme",
@@ -49,6 +60,10 @@ DEFAULT_RULES: dict = {
     "team_scoring": {"enabled": False, "counting_drivers": None, "guests_count": True},
     "match_points": {"win": 3, "draw": 1, "loss": 0},
     "table_tiebreakers": ["score_diff", "score_for"],
+    # Turniertage (#1961): aus, bis eine Saison Runden je Termin führt; Rundenpunkte Vorgabe 8…1.
+    "day_rounds": {"count": 0, "points_by_place": [8, 7, 6, 5, 4, 3, 2, 1]},
+    "custom_bonuses": [],
+    "tiebreak_top_n": 4,
 }
 
 
@@ -142,7 +157,60 @@ def normalize_rules(raw: dict | None) -> dict:
     points = {**DEFAULT_RULES["match_points"], **(raw.get("match_points") or {})}
     rules["match_points"] = {key: _number(points.get(key), f"match_points.{key}") for key in ("win", "draw", "loss")}
     rules["table_tiebreakers"] = _criteria(rules["table_tiebreakers"], "table_tiebreakers", TABLE_TIEBREAKERS)
+    rules["day_rounds"] = _day_rounds(raw.get("day_rounds"))
+    rules["custom_bonuses"] = _custom_bonuses(raw.get("custom_bonuses"))
+    rules["tiebreak_top_n"] = _whole(rules["tiebreak_top_n"], "tiebreak_top_n", minimum=1)
+    if rules["tiebreak_top_n"] > MAX_TOP_N:
+        raise ValueError(f"tiebreak_top_n: höchstens {MAX_TOP_N}.")
     return rules
+
+
+def _day_rounds(value) -> dict:
+    """Runden je Termin (#1961): Zahl der Spalten (0 = aus) und Punkte je Platz in der Runde (Platz 1 zuerst)."""
+    if value is not None and not isinstance(value, dict):
+        raise ValueError("day_rounds: Angaben fehlen.")
+    raw = {**DEFAULT_RULES["day_rounds"], **(value or {})}
+    count = _whole(raw.get("count"), "day_rounds.count", allow_none=True, minimum=0) or 0
+    if count > MAX_DAY_ROUNDS:
+        raise ValueError(f"day_rounds.count: höchstens {MAX_DAY_ROUNDS} Runden.")
+    scheme = raw.get("points_by_place")
+    if not isinstance(scheme, (list, tuple)):
+        raise ValueError("day_rounds.points_by_place: Liste erwartet.")
+    if len(scheme) > MAX_DAY_ROUND_PLACES:
+        raise ValueError(f"day_rounds.points_by_place: höchstens {MAX_DAY_ROUND_PLACES} Plätze.")
+    return {"count": count,
+            "points_by_place": [_number(item, "day_rounds.points_by_place", minimum=0) for item in scheme]}
+
+
+def bonus_key(value) -> str:
+    """Kennung eines Sonderbonus aus seinem Namen: nur Buchstaben und Ziffern, klein („Bingo!“ → „bingo“)."""
+    return normalize_name(value)[:MAX_BONUS_KEY]
+
+
+def _custom_bonuses(value) -> list[dict]:
+    """Eigene Sonderboni je Saison (#1961): ``[{key, label, points}]`` - Name frei, Punkte ab 0, jeder nur einmal. Die
+    Kennung bleibt, wenn der Name sich ändert; ohne Kennung kommt sie aus dem Namen."""
+    if value in (None, ""):
+        return []
+    if not isinstance(value, (list, tuple)):
+        raise ValueError("custom_bonuses: Liste erwartet.")
+    if len(value) > MAX_CUSTOM_BONUSES:
+        raise ValueError(f"custom_bonuses: höchstens {MAX_CUSTOM_BONUSES} Boni.")
+    out: list[dict] = []
+    for index, item in enumerate(value, start=1):
+        if not isinstance(item, dict):
+            raise ValueError(f"custom_bonuses: Bonus {index} ohne Angaben.")
+        label = " ".join(str(item.get("label") or "").split())
+        if len(label) > MAX_BONUS_LABEL:
+            raise ValueError(f"custom_bonuses: Name von Bonus {index} höchstens {MAX_BONUS_LABEL} Zeichen.")
+        key = bonus_key(item.get("key") or label)
+        if not label or not key:
+            raise ValueError(f"custom_bonuses: Bonus {index} braucht einen Namen mit Buchstaben oder Ziffern.")
+        if any(entry["key"] == key for entry in out):
+            raise ValueError(f"custom_bonuses: „{label}“ steht doppelt.")
+        out.append({"key": key, "label": label,
+                    "points": _number(item.get("points"), f"custom_bonuses.{index}.points", minimum=0)})
+    return out
 
 
 # ---------------------------------------------------------------- Rang

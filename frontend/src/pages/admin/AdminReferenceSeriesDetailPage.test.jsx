@@ -63,6 +63,38 @@ test("mit Spiel der Spur wählt der Vorstand den Map-Pool der Saison (#1616)", a
   expect(apiMock.get).toHaveBeenCalledWith("/map-pools/reference-series/serie-1");
 });
 
+test("Turnierserie (#1961): Runden je Turniertag, Sonderboni und „Top N“ in den Regeln, im Blatt bearbeitbar", async () => {
+  apiMock.get.mockResolvedValue({ data: { ...SERIES, lineage: { ...SERIES.lineage, kind: "series" }, rules: {
+    ...RULES, tiebreakers: ["wins", "top_n"], tiebreak_top_n: 4,
+    day_rounds: { count: 5, points_by_place: [8, 7, 6, 5, 4, 3, 2, 1] }, custom_bonuses: [{ key: "bingo", label: "Bingo", points: 3 }],
+  } } });
+  renderAt();
+  await screen.findByRole("heading", { level: 1 });
+  expect(screen.getByTestId("series-detail-days")).toHaveTextContent("5 Runden je Turniertag, Platz 1 bis 8: 8 · 7 · 6 · 5 · 4 · 3 · 2 · 1");
+  expect(screen.getByTestId("series-detail-bonuses")).toHaveTextContent("Sonderboni: Bingo +3");
+  expect(screen.getByTestId("series-detail-rules")).toHaveTextContent("Vorrang: Mehr Siege, Mehr Plätze unter den besten 4");
+  fireEvent.click(screen.getByTestId("series-detail-edit"));
+  expect(screen.getByTestId("series-rules-day-rounds")).toHaveValue(5);
+  expect(screen.getByTestId("series-rules-day-points")).toHaveValue("8, 7, 6, 5, 4, 3, 2, 1");
+  expect(screen.getAllByTestId("series-rules-bonus-label").map((input) => input.value)).toEqual(["Bingo"]);
+  expect(screen.getByTestId("series-rules-top-n")).toHaveValue(4);
+  // Grenzen wie im Server: Bonus-Name höchstens 40 Zeichen, N von 1 bis 64.
+  expect(screen.getByTestId("series-rules-top-n")).toHaveAttribute("max", "64");
+  expect(screen.getAllByTestId("series-rules-bonus-label")[0]).toHaveAttribute("maxlength", "40");
+  fireEvent.click(screen.getByTestId("series-rules-bonus-add"));
+  fireEvent.change(screen.getAllByTestId("series-rules-bonus-label")[1], { target: { value: "Joker" } });
+  fireEvent.change(screen.getAllByTestId("series-rules-bonus-points")[1], { target: { value: "2" } });
+  fireEvent.click(screen.getByTestId("series-hide-tags"));
+  apiMock.patch.mockResolvedValue({ data: {} });
+  fireEvent.click(screen.getByTestId("series-save"));
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalled());
+  const body = apiMock.patch.mock.calls.at(-1)[1];
+  expect(body.hide_name_tags).toBe(true);
+  expect(body.rules.custom_bonuses).toEqual([{ key: "bingo", label: "Bingo", points: 3 }, { label: "Joker", points: 2 }]);
+  expect(body.rules.day_rounds).toEqual({ count: 5, points_by_place: [8, 7, 6, 5, 4, 3, 2, 1] });
+  expect(body.rules.tiebreakers).toEqual(["wins", "top_n"]);
+});
+
 test("Bearbeiten öffnet das Seitenblatt der Saison, Archivieren archiviert", async () => {
   renderAt();
   await screen.findByRole("heading", { level: 1 });

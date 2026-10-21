@@ -169,6 +169,40 @@ Runde X“ allgemein in `round_phases.py` (wiederverwendbar, etwa für Regeländ
   Quali“) zählt das Web aus den Punkten je Lauf im gespeicherten Stand (`lib/raceWeekend.js`, `sessionTables`). Zwei
   Ligen als gemeinsame Fälle für Server und Web: `frontend/src/lib/raceWeekendLeagues.json`.
 
+## Turniertage (#1961)
+
+Mehrere Runden an einem Termin (etwa TFT-Lobbys R1–R5), gerechnet in `services/tournament_days.py`:
+
+- **Regeln:** `day_rounds: {count, points_by_place}` (Spalten R1…Rn als Vorgabe, `0` = aus; Rundenpunkte je Platz in
+  der Lobby, Vorgabe 8…1), `custom_bonuses: [{key, label, points}]` (Name frei, Kennung aus dem Namen, bleibt beim
+  Umbenennen) und `tiebreak_top_n` für den Vorrang `top_n` („mehr Plätze unter den besten N“, Plätze = Tagesplätze).
+  Grenzen (sonst 422): `count` 0–20, Bonus-Name höchstens 40 Zeichen (nie still gekürzt), höchstens 10 Boni, N 1–64.
+  Saison-Feld `hide_name_tags`: die Serienseite zeigt „Name#TLS“ als „Name“.
+- **Zeile:** `day_rounds: [{place?, points?, lobby?} | null]` – Punkte gelten wie gelesen (Bots verschieben sie), sonst
+  aus dem Platz samt Bots; `null` = nicht gespielt (0, etwa nach Marke `left` „Ausgestiegen“). `day_points` = GES P des
+  Veranstalters (gilt vor der Summe, Warnung `day_points_differ`). `partner: {participant_id | name}` (Double Up, muss
+  in der Liste stehen; Fehler `partner_not_in_list`, `partner_self`, `partner_conflict`; die Gegenseite bekommt ihn
+  mit). `bonus_keys` (unbekannte fallen weg: `bonus_unknown`). Am Blatt `double_up: true` (Warnungen
+  `partner_missing`, `partner_place_differs`). Mehr Runden als `day_rounds.count` (bei 0 jede) sind ein Fehler
+  `day_rounds_too_many` - Übernehmen antwortet 422.
+- **Platz:** Ohne Platz bestimmt die Tagessumme ihn – Wettbewerbsrang (4, 4, 6), ein Paar ist eine Einheit (1, 1, 2, 2).
+  Zweimal „4.“ mit gleicher Tagessumme oder mit „6.“ danach und Paare im Double Up geben keine Warnung `place_twice`,
+  der übersprungene Platz keine `place_gap`. Die Saisonpunkte kommen wie bisher aus dem Platz (oder laut Veranstalter).
+- **Stand:** Ergebnisse tragen `day_rounds` (mit den Punkten, die zählen), `day_points`, `partner_id`, `bonus`,
+  `bonus_keys`; die Zeile `bonus_points`. Sonderboni zählen wie Aktivitätspunkte getrennt und nie gestrichen.
+- **Vorschau:** je Zeile `day_rounds`, `day_points` (Tagessumme), `bonus`, `partner_id`, `bonus_keys`.
+- **Serienseite:** `rules` mit `day_rounds`, `custom_bonuses`, `tiebreak_top_n`; Ergebnisse mit `day_rounds`,
+  `day_points`, `bonus`, `bonus_keys` und `partner` (Person wie in der Tabelle, ohne Kennung).
+- **Einfügen** (`lib/resultPaste.js`): mit Kopfzeile Spalten „R 1“ … „R n“, „GES P“ und je Sonderbonus seine Spalte.
+- **Spielkennung mit Tag:** `series_identity.without_game_tag` – „Name#TAG“ (3–5 Buchstaben oder Ziffern direkt am
+  Namen): gleich sind nur gleicher Tag und Tag ↔ ohne Tag (Treffer `name_untagged`, passt der Name ohne Tag auf
+  mehrere: `ambiguous_name`). Zwei verschiedene Tags („Name#AAA“, „Name#BBB“) sind verschiedene Personen
+  (`tags_conflict`) - nie von selbst zugeordnet, auch nicht in der Bild-Erkennung. Ein bestätigter Alias für „Name“ ordnet
+  „Name#TAG“ von selbst zu, einer für „Name#AAA“ nie „Name#BBB“ (verglichen mit dem gespeicherten `name` des Alias).
+  Eine Startnummer mit Leerzeichen davor („Max Muster #123“) bleibt Teil des Namens. Mit `hide_name_tags` zeigen
+  Serienseite, Kader der Team-Liga, Rundenseite und Statistik (#1950) die Namen ohne Tag; das Mitgliederprofil zeigt nur
+  Profilnamen. Team-Namen (`team_names`, #1931) nutzen nur `normalize_name` und bleiben unberührt.
+
 ## Version, Entwurf daneben und Protokoll
 
 - **Nacheinander je Saison:** Ergebnis speichern, freigeben, verwerfen und zurücknehmen sowie alle Kalender-Änderungen
