@@ -92,7 +92,7 @@ function FieldErrors({ fields, testId }) {
   );
 }
 
-function ResultRow({ row, index, autoPlace, organizerMode, qualifying = false, day = null, problems, info, invalid, onChange, onHint, onRemove, onConfirmImage, teamHint = null }) {
+function ResultRow({ row, index, autoPlace, organizerMode, qualifying = false, day = null, problems, info, invalid, onChange, onHint, onRemove, onConfirmImage, teamHint = null, showTeam = true }) {
   const scored = info?.scored;
   // Offen von selbst nur, wo etwas Ungewöhnliches steht (Strafe, Gesamtstand, „zählen statt Schlüssel“) oder eine Eingabe
   // ungültig ist. Startnummer, Startplatz, Zeit und Abstand (#1927) stehen zugeklappt kurz unter der Zeile - so bleibt
@@ -116,14 +116,17 @@ function ResultRow({ row, index, autoPlace, organizerMode, qualifying = false, d
   return (
     <li data-testid="result-row" data-level={level || undefined}
       className={`py-2.5 pl-2 border-l-2 ${level === "error" ? "border-red-400/70" : level === "warning" ? "border-amber-400/60" : "border-transparent"}`}>
-      {/* Handy: Platz, Name, Punkte und Knöpfe in einer Zeile, das Team darunter; ab sm alles in einer Zeile. */}
-      <div className="grid grid-cols-[3.5rem_minmax(0,1fr)_4.5rem_auto_auto] sm:grid-cols-[3.5rem_minmax(0,1fr)_9rem_5rem_auto_auto] items-center gap-2">
+      {/* Handy: Platz, Name, Punkte und Knöpfe in einer Zeile, das Team darunter; ab sm alles in einer Zeile. Ohne Teams in
+          der Saison (#1969) fällt das Team-Feld samt seiner Zeile weg. */}
+      <div className={`grid grid-cols-[3.5rem_minmax(0,1fr)_4.5rem_auto_auto] ${showTeam ? "sm:grid-cols-[3.5rem_minmax(0,1fr)_9rem_5rem_auto_auto]" : "sm:grid-cols-[3.5rem_minmax(0,1fr)_5rem_auto_auto]"} items-center gap-2`}>
         <input aria-label={`Platz Zeile ${number}`} inputMode="numeric" value={row.place} placeholder={autoPlace ? String(autoPlace) : "–"}
           onChange={(event) => onChange({ place: event.target.value })} data-testid="result-row-place" {...invalidProps(invalid, "place")} {...mark("place").props} className={`${SMALL_INPUT} text-center tabular-nums ${mark("place").className} ${invalid?.place ? INVALID : ""}`} />
         <input aria-label={`Name Zeile ${number}`} value={row.name} list="result-participants" placeholder="Name wie beim Veranstalter" maxLength={120}
           onChange={(event) => onChange({ name: event.target.value, participant_id: "" })} data-testid="result-row-name" {...mark("name").props} className={`${SMALL_INPUT} ${mark("name").className}`} />
-        <input aria-label={`Team Zeile ${number}`} value={row.team} list="result-teams" placeholder="Team" maxLength={120}
-          onChange={(event) => onChange({ team: event.target.value })} data-testid="result-row-team" {...mark("team").props} className={`${SMALL_INPUT} ${mark("team").className} order-last col-start-2 col-end-6 sm:order-none sm:col-start-auto sm:col-end-auto`} />
+        {showTeam && (
+          <input aria-label={`Team Zeile ${number}`} value={row.team} list="result-teams" placeholder="Team" maxLength={120}
+            onChange={(event) => onChange({ team: event.target.value })} data-testid="result-row-team" {...mark("team").props} className={`${SMALL_INPUT} ${mark("team").className} order-last col-start-2 col-end-6 sm:order-none sm:col-start-auto sm:col-end-auto`} />
+        )}
         {/* Qualifying (#1930): die Zeit statt der Punkte in der Zeile. */}
         {qualifying ? (
           <input aria-label={`Zeit Zeile ${number}`} value={row.time} placeholder="Zeit" maxLength={20} title="Rundenzeit, etwa 1:31,456; leer oder „--:--,---“: ohne Zeit"
@@ -382,6 +385,9 @@ export function ResultEntrySheet({ series, round, onClose, onSaved }) {
   const participants = useMemo(() => data?.participants || [], [data]);
   // Vorschläge fürs Team: zuerst die eigenen Teams der Saison (#1926), dann die Standard-Teams der Teilnehmer.
   const teams = useMemo(() => [...new Set([...(data?.series?.own_teams || []), ...participants.map((person) => person.default_team)].filter(Boolean))], [data, participants]);
+  // Das Team-Feld (#1969): nur mit Teamwertung, mit Teams der Saison oder der Teilnehmer - oder wenn schon ein Team
+  // eingetragen ist (eingefügte Liste, Bild). Einzel-Serien ohne Teams sparen sich am Handy die zweite Zeile.
+  const showTeam = Boolean(rules.team_scoring?.enabled) || teams.length > 0 || Boolean(form?.rows?.some((row) => String(row.team || "").trim()));
   // Ergebnis-Bild (#1756): die gelesenen Zeilen ersetzen die Liste wie „Liste einfügen“, danach prüft die Vorschau.
   const [checkImage, setCheckImage] = useState(false);
   const image = useResultImage({
@@ -692,7 +698,8 @@ export function ResultEntrySheet({ series, round, onClose, onSaved }) {
                     problems={problems.byRow[row.key]} info={infoByKey[row.key]}
                     onChange={(values) => updateRow(row.key, values)} onHint={() => updateRow(row.key, hintToPoints(row, participants))} onRemove={() => removeRow(row.key)}
                     onConfirmImage={() => confirmImageRow(row.key)}
-                    teamHint={kind === "racing" && !qualifying ? teamCountHint(row, participants, rules.team_scoring, infoByKey[row.key]?.participant_id) : null} />
+                    teamHint={kind === "racing" && !qualifying ? teamCountHint(row, participants, rules.team_scoring, infoByKey[row.key]?.participant_id) : null}
+                    showTeam={showTeam} />
                 ))}
               </ol>
               <button type="button" onClick={addRow} data-testid="result-row-add" className="tls-btn tls-btn--secondary px-3 py-2 rounded-sm text-xs font-bold uppercase tracking-wider inline-flex items-center gap-2">

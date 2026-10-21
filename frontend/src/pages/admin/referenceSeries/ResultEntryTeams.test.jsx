@@ -66,3 +66,29 @@ test("Liste ohne Team-Spalte: vorbelegt; mit Team-Spalte gilt, was dasteht", asy
   expect(within(sheet).getAllByTestId("result-row-team-hint").map((hint) => hint.textContent)).toEqual(["zählt für kein Team (Ersatz)", "zählt für kein Team"]);
   expect(within(sheet).getByTestId("result-row-team-default")).toHaveTextContent("Stammteam Löwen Probe eintragen");
 });
+
+// Einzel-Serien ohne Teams (#1969): das Feld „Team“ nahm am Handy eine eigene Zeile ein, obwohl die Saison keine Teams
+// führt. Ohne Teamwertung und ohne Teams bleibt es weg; sobald es Teams gibt (Saison, Stammteams, eingefügte Liste), steht es.
+test("ohne Teamwertung und ohne Teams kein Team-Feld - mit Teams bleibt es", async () => {
+  apiMock.get.mockResolvedValue({ data: {
+    round: ROUND, series: { id: "serie-1", kind: "racing", rules: { points_mode: "scheme", points_by_place: [10, 6, 4] } },
+    access: { role: "board", can_publish: true }, version: 0, sheet: null, target: "sheet", participants: [{ id: "p1", name: "Chris Probe" }],
+  } });
+  const sheet = await openSheet();
+  expect(within(sheet).getAllByTestId("result-row-name").length).toBeGreaterThan(0);
+  expect(within(sheet).queryByTestId("result-row-team")).toBeNull();
+  // Eine eingefügte Liste mit Team-Spalte bringt das Feld zurück - nichts Eingetragenes verschwindet.
+  fireEvent.click(within(sheet).getByTestId("result-paste-toggle"));
+  fireEvent.change(screen.getByTestId("result-paste-text"), { target: { value: "Pos\tName\tTeam\n1\tChris Probe\tTurbo Probe" } });
+  fireEvent.click(screen.getByTestId("result-paste-apply"));
+  await waitFor(() => expect(within(sheet).getAllByTestId("result-row-team").map((input) => input.value)).toEqual(["Turbo Probe"]));
+});
+
+test("ohne Teamwertung, aber mit Stammteams der Teilnehmer steht das Team-Feld", async () => {
+  apiMock.get.mockResolvedValue({ data: {
+    round: ROUND, series: { id: "serie-1", kind: "racing", rules: { points_mode: "scheme", points_by_place: [10, 6, 4] } },
+    access: { role: "board", can_publish: true }, version: 0, sheet: null, target: "sheet", participants: PEOPLE,
+  } });
+  const sheet = await openSheet();
+  expect(within(sheet).getAllByTestId("result-row-team").length).toBeGreaterThan(0);
+});
