@@ -7,6 +7,7 @@ import { Card } from "../../components/Card";
 import { ContentCard } from "../../components/ContentCard";
 import { ErrorState, PartialLoadNotice, SkeletonList } from "../../components/ListState";
 import { MediaImage } from "../../components/MediaImage";
+import { NewsSignupCards } from "../../components/NewsSignupCards";
 import { RichText } from "../../components/RichText";
 import { Screen } from "../../components/Screen";
 import { seasonScrollProps } from "../../seasons/sky/scroll";
@@ -14,6 +15,7 @@ import { Body, Heading, Muted, Title } from "../../components/Text";
 import { api, errorMessage } from "../../lib/api";
 import type { ContentTarget } from "../../lib/contentLinks";
 import { formatDate, placeParts } from "../../lib/format";
+import { signupItems, splitAfterFirstParagraph, type SignupItem } from "../../lib/newsCards";
 import { isGuestUser } from "../../live";
 import type { MoreStackParamList } from "../../navigation/types";
 import { colors, radius } from "../../theme";
@@ -65,6 +67,12 @@ export function NewsDetailScreen({ navigation, route }: Props) {
     navigation.navigate("PublicProfile", { username: target.id });
   }, [navigation]);
 
+  // Anmelde-Karten (#1912): „Anmelden“ öffnet das Turnier bzw. Event, dort kommt das Bestätigungs-Blatt (#1904).
+  const openSignup = useCallback((item: SignupItem) => {
+    if (item.kind === "event") navigation.navigate("EventDetail", { id: item.id });
+    else navigation.navigate("TournamentDetail", { id: item.id });
+  }, [navigation]);
+
   if (!post && loading) {
     return (
       <Screen>
@@ -95,9 +103,12 @@ export function NewsDetailScreen({ navigation, route }: Props) {
           <Muted>{formatDate(post.published_at || post.created_at)}{post.category ? ` · ${post.category}` : ""}</Muted>
           <Title>{post.title}</Title>
           {post.content || post.body ? (
-            <RichText text={post.content || post.body} embeds={post.content_embeds} onOpenContent={openContentTarget} />
+            <ArticleText post={post} onOpenContent={openContentTarget} onOpenSignup={openSignup} />
           ) : (
-            <Muted>Kein weiterer Inhalt hinterlegt.</Muted>
+            <>
+              <Muted>Kein weiterer Inhalt hinterlegt.</Muted>
+              <NewsSignupCards post={post} onOpen={openSignup} />
+            </>
           )}
         </View>
 
@@ -183,6 +194,19 @@ export function NewsDetailScreen({ navigation, route }: Props) {
         ) : null}
       </ScrollView>
     </Screen>
+  );
+}
+
+/** Der Text mit den Anmelde-Karten nach dem ersten Absatz (#1912, wie im Web) - ohne Karten am Stück. */
+function ArticleText({ post, onOpenContent, onOpenSignup }: { post: NewsPost; onOpenContent: (target: ContentTarget) => void; onOpenSignup: (item: SignupItem) => void }) {
+  const text = post.content || post.body || "";
+  const [first, rest] = useMemo(() => (signupItems(post).length ? splitAfterFirstParagraph(text) : [text, ""]), [post, text]);
+  return (
+    <>
+      <RichText text={first} embeds={post.content_embeds} onOpenContent={onOpenContent} />
+      <NewsSignupCards post={post} onOpen={onOpenSignup} />
+      {rest ? <RichText text={rest} embeds={post.content_embeds} onOpenContent={onOpenContent} /> : null}
+    </>
   );
 }
 
