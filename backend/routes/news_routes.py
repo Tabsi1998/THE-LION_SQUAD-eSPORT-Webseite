@@ -15,7 +15,7 @@ from services import partner_pages, sponsor_images
 from services.notification_preferences import enqueue_newsletter_for_item
 from services.user_notifications import create_user_notification
 from services.slug_utils import apply_slug_history, find_by_slug_or_history, slug_source_for_update, unique_slug
-from services import dolibarr_policy, reference_checks
+from services import dolibarr_policy, reference_checks, reference_season_links
 from models import (
     NewsCreate, NewsUpdate, SponsorCreate, SponsorUpdate,
     PartnerCreate, PartnerUpdate, ReferenceCreate, ReferenceShowcaseSettings, ReferenceUpdate,
@@ -1455,6 +1455,8 @@ async def list_references(game_id: Optional[str] = None, user: dict | None = Dep
     refs = await db.references.find(query, {"_id": 0}).to_list(1000)
     refs = await _filter_visible(refs, user)
     refs = _sort_references(await _enrich_references(refs))
+    # #1750: die Karte einer Referenz aus einer Saison führt zur Saison-Seite.
+    await reference_season_links.attach_season_links(db, refs, user)
     showcase = await _get_reference_showcase(db)
     # Eine fest gewählte Hauptkarte nur, wenn der Besucher sie sehen darf - sonst wählt die Seite selbst.
     if showcase["reference_id"] and showcase["reference_id"] not in {item.get("id") for item in refs}:
@@ -1610,6 +1612,7 @@ async def get_reference(rid: str, user: dict | None = Depends(get_optional_user)
     visible = await _filter_visible([ref], user)
     if not visible:
         raise HTTPException(404, "Referenz nicht gefunden.")
+    await reference_season_links.attach_season_links(db, visible, user)
     return (await _enrich_references(visible))[0]
 
 
