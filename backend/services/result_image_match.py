@@ -144,8 +144,10 @@ def decide(kind: str, page: Read | None, strip: Read | None, min_conf: float, *,
         parsed = _parse(kind, read, page=is_page, fmt=fmt)
         if parsed is not None and all(_display(parsed) != _display(item) for item in decision.options):
             decision.options.append(parsed)
-    if decision.text and any(_display(item) != decision.text for item in decision.options):
-        decision.sure, decision.disagree = False, True  # die Lesungen widersprechen sich (auch die dritte)
+    # Die Lesungen widersprechen sich (auch die dritte) - auch, wenn Seite und Streifen nur einen Platzhalter oder
+    # nichts lasen, eine Lesung aber einen Wert. Ausfall-Zeilen und der Abstand des Siegers entscheidet ``build`` neu.
+    if any(_display(item) != decision.text for item in decision.options):
+        decision.sure, decision.disagree = False, True
     return decision
 
 
@@ -398,7 +400,9 @@ def _check_leader_gap(rows: list[dict[str, Decision]]) -> None:
     Abstand ist darum „kein Abstand“ - sicher. Ein echter Abstand beim Ersten passt nicht - gelb."""
     for row in rows:
         place, gap = row.get("place"), row.get("gap")
-        if not (place and gap is not None and place.value == 1 and not _row_marks(row)):
+        # Nur beim sicheren Platz 1 - ist er selbst gelb (etwa ein verlesener anderer Platz), bleibt der Abstand, wie
+        # gelesen, und wird nicht still gelöscht.
+        if not (place and gap is not None and place.value == 1 and place.sure and not _row_marks(row)):
             continue
         seconds = gap.value[1] if isinstance(gap.value, tuple) else None
         # Liest eine der Lesungen einen echten Abstand, widerspricht sie dem Platzhalter - gelb.

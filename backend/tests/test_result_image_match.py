@@ -360,6 +360,43 @@ def test_an_unsure_third_reading_does_not_contradict():
     assert unsure["rows"][0]["uncertain"] == []
 
 
+def _leader_and_third():
+    leader = row("1", "7", "Anna Probe", time="1:28,783", gap="+--:--,---",
+                 strips={"place": "1", "time": "1:28,783", "gap": "+--:--,---"})
+    third = row("3", "21", "Carl Kurve", time="1:31,000", gap="+2,217",
+                strips={"place": "3", "time": "1:31,000", "gap": "+2,217"})
+    return leader, third
+
+
+def test_a_value_in_the_third_reading_beside_a_placeholder_is_yellow():
+    """Prüfer zu #1981: Lesen Seite und Streifen nur den Platzhalter (oder gar nichts), die dritte Lesung aber sicher
+    eine Zeit, sind Zeit und Abstand gelb - nicht leer und grün. In einer Ausfall-Zeile und beim Abstand des Siegers
+    bleibt der Platzhalter leer und grün."""
+    leader, third = _leader_and_third()
+    placeholder = row("2", "12", "Bert Bolzt", time="--:--,---", gap="+--:--,---",
+                      strips={"place": "2", "time": "--:--,---", "gap": "+--:--,---"},
+                      alts={"time": "1:30,000", "gap": "+1,217"})
+    unread = row("2", "12", "Bert Bolzt", strips={"place": "2"}, alts={"time": "1:30,000", "gap": "+1,217"})
+    for second in (placeholder, unread):
+        out = build(reading(leader, second, third), TEMPLATE, PEOPLE)
+        assert [item["uncertain"] for item in out["rows"]] == [[], ["time", "gap"], []]
+    out_row = row("DNF", "12", "Bert Bolzt", time="--:--,---", gap="+--:--,---",
+                  strips={"place": "DNF", "time": "--:--,---", "gap": "+--:--,---"}, alts={"gap": "+1,217"})
+    out = build(reading(leader, third, out_row), TEMPLATE, PEOPLE)
+    assert (out["rows"][2]["time"], out["rows"][2]["gap"], out["rows"][2]["uncertain"]) == (None, None, [])
+
+
+def test_the_gap_of_an_unsure_first_place_is_not_cleared():
+    """Prüfer zu #1981: Ein „Platz 1“, der selbst gelb ist (hier eine verlesene 2), löscht seinen Abstand nicht still -
+    der unlesbare Abstand bleibt gelb."""
+    leader, _ = _leader_and_third()
+    misread = row("1", "12", "Bert Bolzt", time="1:30,000", gap="+1,2x7",
+                  strips={"place": "1", "time": "1:30,000", "gap": "+1,2?7"})
+    out = build(reading(leader, misread), TEMPLATE, PEOPLE)
+    assert out["rows"][0]["uncertain"] == []
+    assert out["rows"][1]["uncertain"] == ["place", "gap"]
+
+
 def test_lines_and_unlabelled_points_never_become_points():
     """Echter Fall (#1981): Der Rand der Tabelle („|“) stand in der Punkte-Spalte und wurde zu „1 Punkt“ in jeder
     Zeile. Ein Strich ist keine Ziffer, und Punkte gelten nur, wenn ihre Überschrift im Bild steht."""
