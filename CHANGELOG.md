@@ -1,5 +1,20 @@
 # Changelog
 
+## 1.18.0 (21.10.2026)
+
+### Neu
+
+* doppelte Teilnehmer zusammenführen und Teilnehmer ohne Ergebnis entfernen (#1929)
+* Ergebnisblatt mit Startnummer, Startplatz, Zeit, Abstand, schnellster Runde und Fahrer des Tages (#1927)
+* Flaggen bei Terminen und Rennen, automatisch aus Strecke oder Ort erkannt (#1925)
+* Garage, Teamwertung, „Unser Platz“ und Liga-Weg zählen alle eigenen Teams (#1926)
+* Land eines Termins wählbar, auch beim Einfügen der Terminliste (#1925)
+* Liste einfügen erkennt Start-, Zeit-, Abstand- und Bestrunden-Spalten sowie „OUT“ als Ausfall (#1927)
+* Mehrere eigene Teams je Saison mit Schreibweisen (#1926)
+* Rennraster zeigt den Fahrer des Tages, Fahrer-Detail die gutgemachten Plätze (#1927)
+* Teilnehmer einer Saison nachträglich bearbeiten – Name, Startnummer, Team und Zuordnung je Zeile (#1929)
+* Teilnehmer filtern, suchen und mehrere auf einmal als Gast oder Extern markieren (#1929)
+
 ## 1.17.1 (21.10.2026)
 
 ### Fehlerbehebungen
