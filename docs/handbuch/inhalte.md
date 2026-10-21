@@ -229,8 +229,11 @@ Platzierung, beides in derselben Teilnahme möglich. Spieler wählt ihr aus den 
 Saison** automatisch, mit Endplatz, Feldgröße und Spielern; das steht auch oben auf der Seite. Eine Referenz, die zu einer
 Saison gehört, trägt in der Liste das Abzeichen **aus Saison …** mit Link zur Saison. Für ältere Referenzen gibt es im
 Formular die Auswahl **Gehört zur Saison**: verknüpft, führt die Karte auf der Website zur Seite der Saison, und beim
-Abschluss der Saison wird diese Referenz aktualisiert statt doppelt angelegt. Ist es die Referenz des Saisonabschlusses,
-sagt das Formular, dass ihr Endplatz in der Saison gepflegt wird.
+Abschluss der Saison wird diese Referenz aktualisiert statt doppelt angelegt. Sichtbar ist sie dann höchstens so offen
+wie Saison und Spur (eine Saison „Nur Mitglieder“ macht auch die Referenz „Nur Mitglieder“). Ist es die Referenz des
+Saisonabschlusses, sagt das Formular, dass ihr Endplatz in der Saison gepflegt wird. Hat jemand die Referenz geändert,
+während ihr das Formular offen hattet – etwa beim Abschluss der Saison –, speichert es nicht still darüber, sondern bittet,
+neu zu laden.
 
 <table>
 <tr>
@@ -385,12 +388,16 @@ abgeschlossene Team-Liga) öffnet **Saison abschließen** den Vorschlag mit dem 
 - **Einzelwertungen:** je Vereinsmitglied der Platz in der Fahrer- bzw. Gesamtwertung, etwa „Platz 3 von 12 ·
   Fahrerwertung“. Steht die Person im veröffentlichten Finale, gilt der Platz im Finale.
 - Gäste und ausgeblendete Namen stehen nicht darin. Fehlen noch Ergebnisse, sagt ein Hinweis, wie viele Termine offen sind.
+- Ohne Endstand – etwa eine Team-Liga, deren Tabelle noch nicht eingefügt ist – bleibt der Knopf gesperrt, der Hinweis
+  sagt, was fehlt.
 
 **Referenz anlegen** legt die Referenz an, die Saison gilt dann als abgeschlossen. Gehört schon eine Referenz zur Saison
 („Gehört zur Saison“, 3.8), ist sie vorgewählt und wird **aktualisiert** statt doppelt angelegt; hat die Saison ihre
 Referenz schon, gibt es nur diese. Erneut abschließen – etwa nach einer Korrektur der Tabelle – aktualisiert dieselbe
-Referenz: Platz und Feldgröße kommen aus der Saison, Titel, Texte, eigene Bezeichnungen und von Hand eingetragene Namen
-bleiben. So zählt die Vitrine jede Saison genau einmal. Danach steht im Kopf der Saison **Referenz: Platz 6 von 8 ·
+Referenz: Platz und Feldgröße kommen aus der Saison, soweit sie sie hat; Titel, Texte, eigene Bezeichnungen, von Hand
+eingetragene Namen und Zahlen bleiben. Die Spieler aus der Saison folgen ihr – wer inzwischen ausgeblendet, Gast oder nicht
+mehr dabei ist, verschwindet aus der Referenz; von Hand dazugenommene Spieler und Einträge bleiben. Die Referenz wird nie
+offener als Saison und Spur. So zählt die Vitrine jede Saison genau einmal. Danach steht im Kopf der Saison **Referenz: Platz 6 von 8 ·
 ansehen**. Jahreswertungs-Punkte gibt es dafür keine, nur Abzeichen ([Erfolge](erfolge.md) 3.6). Eine abgebrochene Saison
 bekommt keine Platzierung (der Status „abgebrochen“ kommt mit einem eigenen Paket).
 
