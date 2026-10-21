@@ -306,8 +306,8 @@ Werten über null:
 der Saison, zu der die Referenz gehört, sonst aus dem Feld **Liga**; es zählt die Zahl nach Liga, Division, Div, Stufe,
 Tier oder League („Liga 1“ vor „Liga 2“, ohne solche Zahl ganz unten). Oder ihr wählt eine der Podest-Referenzen fest – dann steht auf der Karte „Ausgewählt vom Verein“.
 Gehört die Hauptkarte zu einer Saison, führt sie zur Seite der Saison, sonst zur Referenz. Dasselbe gilt für jede Karte einer
-Referenz aus einer Saison – in Vitrine, Chronik, „Über uns“, /verein und im Mitgliederprofil; ihre Detailseite zeigt
-**aus Saison …** mit Link.
+Referenz aus einer Saison – in Vitrine, Chronik, „Über uns“ und /verein; im Mitgliederprofil führt **Saison ansehen** in
+der aufgeklappten Zeile dorthin. Ihre Detailseite zeigt **aus Saison …** mit Link.
 
 <table>
 <tr>
