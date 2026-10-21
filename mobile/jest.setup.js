@@ -153,6 +153,8 @@ jest.mock("react-native-reanimated", () => {
       return ref.current;
     },
     runOnJS: (fn) => fn,
+    // Hochzählen der Rennzeiten (#1974): im Test ohne „Bewegung reduzieren“ - Tests stellen es selbst um.
+    useReducedMotion: () => false,
     withTiming: (toValue) => toValue,
     withSpring: (toValue) => toValue,
     withSequence: (...steps) => steps[steps.length - 1],

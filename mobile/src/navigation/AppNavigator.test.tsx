@@ -22,7 +22,7 @@ jest.mock("./screenRegistry", () => {
     DETAIL_SCREENS: names(["TournamentDetail", "EventDetail", "FastLapDetail", "MatchDetail", "TournamentChat", "TeamDetail", "TeamChat", "PublicProfile",
       "DirectThread", "NewsList", "NewsDetail", "Gallery", "GalleryAlbum", "GalleryViewer", "Notifications", "Search", "SeasonPass", "AchievementShowcase",
       "AdventCalendar", "EasterHunt", "MyInvoices", "MyPrizes", "MyMembership", "MemberDocuments", "MemberMeetings", "MemberHelperShifts", "MemberCard",
-      "Admission", "InfoCenter", "ReferenceSeason", "ClubAbout", "YearReview", "Settings", "ProfileEdit", "CalendarSubscription"]),
+      "Admission", "InfoCenter", "ReferenceSeason", "ReferenceRound", "ClubAbout", "YearReview", "Settings", "ProfileEdit", "CalendarSubscription"]),
   };
 });
 const mockAuth = { user: { id: "u-1", username: "neonfalke", display_name: "NeonFalke", role: "player" } as Record<string, unknown> | null, loading: false };
@@ -249,6 +249,9 @@ test("jeder Detail-Screen mit Kennung hat eine eigene Seite je Kennung (#1000)",
   expect(detailRouteId("GalleryViewer", { albumId: "al-1", index: 3 })).toBe("al-1");
   // Saison einer Serie (#1945): Spur und Saison zusammen sind die Kennung.
   expect(detailRouteId("ReferenceSeason", { lineage: "prl", season: "2026" })).toBe("prl/2026");
+  // Runde (#1974): Runde 3 und Runde 4 sind zwei Seiten - der Lauf ist nur ein Reiter derselben Seite.
+  expect(detailRouteId("ReferenceRound", { lineage: "prl", season: "2026", round: 3 })).toBe("prl/2026/3");
+  expect(detailRouteId("ReferenceRound", { lineage: "prl", season: "2026", round: 3, session: "sprint" })).toBe("prl/2026/3");
   expect(detailRouteId("Settings", undefined)).toBeUndefined();
   expect(detailRouteId("NewsDetail", undefined)).toBeUndefined();
 });

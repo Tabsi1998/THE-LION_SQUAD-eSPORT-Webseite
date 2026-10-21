@@ -202,7 +202,12 @@ export function targetFromUrl(url?: string | null): AppTarget | null {
   if (first === "teams" && second) return detail("TeamDetail", query.get("einladung") ? { id: second, invite: query.get("einladung") } : { id: second });
   if (first === "news" && second) return detail("NewsDetail", { id: second });
   // Saison einer Serie (#1945): /references/series/<spur>/<saison> öffnet die Saison in der App.
-  if (first === "references" && second === "series" && third && parts[3]) return detail("ReferenceSeason", { lineage: third, season: parts[3] });
+  if (first === "references" && second === "series" && third && parts[3]) {
+    // Ergebnis einer Runde (#1974): …/runde/<nr>?lauf=<lauf> öffnet die Runde mit dem Reiter des Laufs.
+    const round = parts[4] === "runde" && /^\d{1,3}$/.test(parts[5] || "") ? Number(parts[5]) : 0;
+    if (round > 0) return detail("ReferenceRound", { lineage: third, season: parts[3], round, ...(query.get("lauf") ? { session: query.get("lauf") } : {}) });
+    return detail("ReferenceSeason", { lineage: third, season: parts[3], ...(query.get("ansicht") === "statistik" ? { view: "statistik" } : {}) });
+  }
   if ((first === "galerie" || first === "gallery") && second) return detail("GalleryAlbum", { id: second });
   if (first === "messages" && second) return detail("DirectThread", { userId: second });
   // Das eigene Profil (/u/me) ist der Tab Profil; jedes andere Profil legt sich über den aktuellen Tab.

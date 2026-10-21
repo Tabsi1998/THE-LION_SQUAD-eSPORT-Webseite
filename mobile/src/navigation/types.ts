@@ -96,7 +96,10 @@ export type DetailParamList = {
   Admission: undefined;
   InfoCenter: { section?: "sponsors" | "partners" | "events" | "benefits" | "references" | "profiles" } | undefined;
   // Saison einer Serie (#1945, nur lesen): Rennliga, Team-Liga oder Turnierserie - aus Verein › Erfolge und dem Profil.
-  ReferenceSeason: { lineage: string; season: string };
+  // `view` (#1974): „statistik“ öffnet den Reiter Statistik (aus /references/series/…?ansicht=statistik).
+  ReferenceSeason: { lineage: string; season: string; view?: string };
+  // Ergebnis einer Runde (#1950, #1974): Rennliga, Runde nach Nummer, optional mit Lauf (`session`, wie ?lauf= im Web).
+  ReferenceRound: { lineage: string; season: string; round: number; session?: string };
   // Über uns, Vorstand, Werte, Kontakt (#1024): kurz in der App, lange Seiten bleiben auf der Website.
   ClubAbout: undefined;
   // Jahresrückblick „Dein Jahr bei LION“ (#1195): ab Mitte Dezember; Vorschau für die Verwaltung.

@@ -1,7 +1,7 @@
 import { countryCode, countryName } from "./countryFlags";
 import { formatRaceTime } from "./raceTime";
-import { dayNoon, viennaDate } from "./vienna";
 import { KIND_LABELS, type LineageInfo } from "./references";
+import { HIDDEN_NAME, dayLabel, formatNumber, nameOf, number, roundLabel } from "./seriesFormat";
 
 // Saison einer Serie in der App (#1945, nur lesen): was der Screen aus /api/reference-series/public/<spur>/<saison>
 // liest - dieselben Regeln wie die Serienseite im Web (frontend/src/lib/racingLeague.js, teamLeague.js,
@@ -66,22 +66,8 @@ export type SeasonPage = {
   } | null;
 };
 
-export const HIDDEN_NAME = "Name ausgeblendet";
+export { HIDDEN_NAME, dayLabel, formatNumber, nameOf, roundLabel };
 export const MOBILE_TOP = 10;
-
-function number(value: unknown): number {
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : 0;
-}
-
-/** Zahl wie in den Tabellen des Webs: Komma statt Punkt. */
-export function formatNumber(value: unknown): string {
-  return String(number(value)).replace(".", ",");
-}
-
-export function nameOf(row: StandingRow | null | undefined): string {
-  return row?.name_hidden || !row?.name ? HIDDEN_NAME : row.name;
-}
 
 export function seasonKind(page: SeasonPage | null | undefined): string {
   if (page?.racing) return "racing";
@@ -120,12 +106,9 @@ export const PUBLIC_STATE_LABELS: Record<string, string> = {
 export type StateTone = "done" | "today" | "missing" | "cancelled" | "postponed" | "planned";
 const STATE_TONES: Record<string, StateTone> = { scored: "done", today: "today", missing: "missing", cancelled: "cancelled", postponed: "postponed", planned: "planned" };
 
-const DAY_RE = /^\d{4}-\d{2}-\d{2}$/;
-
-/** „Do., 05.11.2026“ - leer ohne Tag. */
-export function dayLabel(day: string | null | undefined): string {
-  if (!day || !DAY_RE.test(day)) return "";
-  return viennaDate(dayNoon(day), { weekday: "short", day: "2-digit", month: "2-digit", year: "numeric" });
+/** Farbe eines Stands (Chip, Lauf-Chip). */
+export function stateTone(state: string | null | undefined): StateTone {
+  return STATE_TONES[String(state)] || "planned";
 }
 
 /** Tag und Uhrzeit eines Termins; heute „Heute · 20:00“, ohne Tag „Termin offen“. */
@@ -134,11 +117,6 @@ export function roundWhen(round: SeasonRound | null | undefined): string {
   const day = dayLabel(round?.club_day);
   if (!day) return "Termin offen";
   return round?.time ? `${day} · ${round.time}` : day;
-}
-
-/** Kurzname eines Termins: Kürzel, sonst „Termin 3“. */
-export function roundLabel(round: SeasonRound | null | undefined): string {
-  return String(round?.code || "").trim() || `Termin ${round?.position || ""}`.trim();
 }
 
 // ---------------------------------------------------------------- Rennliga
