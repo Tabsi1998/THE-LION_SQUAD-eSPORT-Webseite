@@ -65,7 +65,7 @@ export function GamesShelf({ games, joined = {}, testIdPrefix = "games-shelf", f
   return (
     <div data-testid={testIdPrefix}>
       {competitive.length > 0 && (
-        <ul className="-mx-4 px-4 sm:mx-0 sm:px-0 flex gap-3 tls-swipe snap-x snap-mandatory pb-2 sm:grid sm:grid-cols-4 lg:grid-cols-6 sm:overflow-visible sm:pb-0" data-testid={`${testIdPrefix}-competitive`}>
+        <ul className="-mx-4 px-4 sm:mx-0 sm:px-0 flex gap-3 tls-swipe tls-swipe--room snap-x snap-mandatory pb-2 sm:grid sm:grid-cols-4 lg:grid-cols-6 sm:overflow-visible sm:pb-0 sm:[mask-image:none] sm:[-webkit-mask-image:none]" data-testid={`${testIdPrefix}-competitive`}>
           {competitive.map((game) => {
             const cover = game.cover_url || game.logo_url;
             const server = game.discord ? { ...game.discord, member: joined[game.discord.guild_id] } : null;

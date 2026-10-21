@@ -177,7 +177,7 @@ export function LiveStreamSlider() {
         </div>
 
         {streams.length > 1 && (
-          <div className="mt-4 flex gap-3 tls-swipe pb-2">
+          <div className="mt-4 flex gap-3 tls-swipe tls-swipe--room pb-2">
             {streams.map((stream) => {
               const itemChannel = twitchChannel(stream);
               const isActive = itemChannel === channel;

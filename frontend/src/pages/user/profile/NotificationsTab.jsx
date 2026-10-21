@@ -100,7 +100,7 @@ export function NotificationsTab({ form, set, setNotificationPreference, notific
             <p className="text-xs text-white/50">Ein ausgeschalteter Kanal blendet seine Spalte aus; die Einstellungen darin bleiben erhalten.</p>
           </div>
         </div>
-        <div className="tls-swipe pb-0 md:overflow-visible -mx-5 px-5">
+        <div className="tls-swipe pb-0 md:overflow-visible -mx-5 px-5 md:[mask-image:none] md:[-webkit-mask-image:none]">
           <table className="w-full min-w-[560px] md:min-w-0 text-sm border-separate border-spacing-0">
             <thead className="md:sticky md:top-20 z-10 bg-[#121212] text-[10px] uppercase tracking-widest text-white/45">
               <tr>

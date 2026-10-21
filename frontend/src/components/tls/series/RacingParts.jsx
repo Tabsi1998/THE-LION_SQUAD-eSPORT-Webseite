@@ -24,7 +24,7 @@ function seasonName(season) {
 export function SeasonSwitcher({ seasons, lineageSlug }) {
   if (!Array.isArray(seasons) || seasons.length < 2) return null;
   return (
-    <nav aria-label="Saisons und Ligen" className="tls-season-tabs mt-6 -mx-4 px-4 sm:mx-0 sm:px-0 tls-swipe" data-testid="racing-seasons">
+    <nav aria-label="Saisons und Ligen" className="tls-season-tabs mt-6 -mx-4 px-4 sm:mx-0 sm:px-0 tls-swipe tls-swipe--room" data-testid="racing-seasons">
       <ul className="flex gap-2 w-max py-1">
         {seasons.map((season) => (
           <li key={season.season_slug}>

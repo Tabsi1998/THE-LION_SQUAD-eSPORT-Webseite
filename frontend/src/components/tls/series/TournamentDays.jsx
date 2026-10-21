@@ -133,7 +133,7 @@ function LobbyView({ table, count, scheme, onOpen }) {
   const groups = lobbies(table, round, scheme) || [];
   return (
     <div className="mt-4" data-testid="series-lobbies">
-      <div className="flex gap-1.5 tls-swipe pb-1" role="group" aria-label="Runde">
+      <div className="flex gap-1.5 tls-swipe tls-swipe--room pb-1" role="group" aria-label="Runde">
         {Array.from({ length: count }, (_, at) => (
           <button key={at} type="button" aria-pressed={at === round} onClick={() => setIndex(at)} className={`${CHIP} ${at === round ? CHIP_ON : CHIP_OFF}`} data-testid="series-lobby-round">R{at + 1}</button>
         ))}
@@ -276,7 +276,7 @@ export function TournamentDays({ standings, rounds, rules }) {
           </div>
         )}
       </div>
-      <div className="mt-4 flex gap-1.5 tls-swipe pb-1" role="group" aria-label="Turniertag">
+      <div className="mt-4 flex gap-1.5 tls-swipe tls-swipe--room pb-1" role="group" aria-label="Turniertag">
         {days.map((round) => (
           <button key={round.id} type="button" aria-pressed={round.id === current.id} onClick={() => setDayId(round.id)} title={roundWhen(round)}
             className={`${CHIP} ${round.id === current.id ? CHIP_ON : CHIP_OFF}`} data-testid="series-day-pick">{roundLabel(round)}</button>

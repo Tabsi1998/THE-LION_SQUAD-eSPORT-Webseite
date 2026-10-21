@@ -159,7 +159,7 @@ function MemberPath({ path }) {
         {path.address && <Link to={path.address} className="text-sm font-semibold text-brand hover:text-white no-underline transition-colors duration-fast">Zur Serie</Link>}
       </div>
       {/* Am Handy eine Reihe zum Wischen (wie in der App), breit umbrechend mit Pfeilen. */}
-      <ol className="tls-ref-scroll tls-ref-snap list-none m-0 p-0 flex items-stretch gap-2 tls-swipe sm:flex-wrap sm:overflow-visible" aria-label={`Liga-Weg ${lineage.title}`}>
+      <ol className="tls-ref-scroll tls-ref-snap list-none m-0 p-0 flex items-stretch gap-2 tls-swipe tls-swipe--room sm:flex-wrap sm:overflow-visible sm:[mask-image:none] sm:[-webkit-mask-image:none]" aria-label={`Liga-Weg ${lineage.title}`}>
         {steps.map((step, index) => (
           <li key={step.season_slug || `${step.season}-${step.tier}`} className="shrink-0 sm:shrink flex items-center gap-2 min-w-0">
             <span
