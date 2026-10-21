@@ -53,6 +53,22 @@ def round_matches(days: list[dict], rounds: list[dict], platform_key: str) -> di
     return out
 
 
+def _t_number(code) -> int | None:
+    text = str(code or "").strip().upper()
+    return int(text[1:]) if len(text) > 1 and text[0] == "T" and text[1:].isascii() and text[1:].isdigit() else None
+
+
+def next_code(rounds: list[dict], taken: set[str] | None = None) -> str:
+    """Kürzel für einen neuen Termin: „T<n>“ nach dem höchsten „T<Zahl>“ der Saison (archivierte zählen mit), ohne
+    solche Kürzel nach der Zahl der Termine - nie eines, das es schon gibt."""
+    numbers = [number for number in (_t_number(item.get("code")) for item in rounds) if number is not None]
+    used = {str(item.get("code") or "").strip().upper() for item in rounds} | {code.upper() for code in taken or ()}
+    number = max(numbers) + 1 if numbers else len(rounds) + 1
+    while f"T{number}" in used:
+        number += 1
+    return f"T{number}"
+
+
 def _value(row: dict, key: str):
     value = row.get(key)
     if key == "marks":

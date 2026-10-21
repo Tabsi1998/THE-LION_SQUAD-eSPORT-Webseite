@@ -197,6 +197,7 @@ async def test_taking_over_creates_rounds_and_drafts_but_never_publishes(flow):
         ("2026-12-11", "903", "partner", "planned")]
     by_ref = {item["partner_ref"]["ref"]: item for item in rounds}
     assert by_ref["901"]["title"] == "Turnier 1 - Probe Masters - Online"
+    assert [by_ref[ref]["code"] for ref in ("901", "902", "903")] == ["T1", "T2", "T3"]
 
     day = await _sheet(flow, by_ref["901"]["id"])
     assert day["status"] == "draft" and day["version"] == 1

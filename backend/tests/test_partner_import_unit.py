@@ -84,6 +84,15 @@ def test_what_the_club_added_by_hand_is_kept_and_not_counted_as_a_difference():
     assert new["rows"][0].get("bonus_keys") is None  # das Original bleibt unberührt
 
 
+def test_a_new_round_gets_the_next_free_code_like_t1_t2():
+    """Ein neuer Termin bekommt ein Kürzel wie „T3“ - sonst hieße er nur „Termin 3“. Gezählt wird ab dem höchsten
+    „T<Zahl>“ der Saison, archivierte zählen mit; ohne solche Kürzel nach der Zahl der Termine."""
+    assert partner_import.next_code([]) == "T1"
+    assert partner_import.next_code([{"code": "T1"}, {"code": "t4", "archived_at": "x"}, {"code": "Finale"}]) == "T5"
+    assert partner_import.next_code([{"code": "R1"}, {"code": None}]) == "T3"
+    assert partner_import.next_code([{"code": "T2"}], taken={"T3"}) == "T4"
+
+
 def test_the_fingerprint_changes_with_the_content_only():
     day = {"ref": "901", "rows": [{"name": "Ada Ausgedacht#AAA", "place": 1}]}
     same = {"rows": [{"place": 1, "name": "Ada Ausgedacht#AAA"}], "ref": "901"}

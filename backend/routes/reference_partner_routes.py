@@ -308,7 +308,7 @@ async def _create_round(db, access: SeriesAccess, series: dict, day: dict, ref: 
     existing = await db.reference_rounds.find({"series_id": access.series_id}, {"_id": 0}).to_list(None)
     counts = race_weekend.planned_config(series.get("weekend"), existing, None, None)["counts"]
     title = series_results.clean(day.get("name"))[:160] or None
-    doc = _new_round(access.series_id, access.user, order=first, title=title,
+    doc = _new_round(access.series_id, access.user, order=first, title=title, code=partner_import.next_code(existing),
                      **_when(day.get("club_day"), series.get("default_time")), counts=counts, source="partner",
                      partner_ref=ref, **_country(True, None, None, title))
     await db.reference_rounds.insert_one(doc)
