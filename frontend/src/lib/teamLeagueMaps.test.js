@@ -35,9 +35,11 @@ describe("Zuordnung eines Namens zur Bibliothek", () => {
   });
 
   it("ein getippter Name setzt die Kennung – ein unbekannter nimmt sie weg, der Text bleibt", () => {
-    const item = { key: "m1", name: "", map_id: "" };
-    expect(withMapName(item, "harbour edge", CHOICES)).toMatchObject({ name: "harbour edge", map_id: "hafen" });
-    expect(withMapName({ ...item, map_id: "hafen" }, "Hafenk", CHOICES)).toMatchObject({ name: "Hafenk", map_id: "" });
+    const item = { key: "m1", name: "", map_id: "", mode: "" };
+    // Hafenkante steht in zwei Modi - ohne eindeutigen Modus prüft der Server in irgendeinem Modus des Pools.
+    expect(withMapName(item, "harbour edge", CHOICES)).toMatchObject({ name: "harbour edge", map_id: "hafen", mode: "" });
+    expect(withMapName(item, "Ember Pit", CHOICES)).toMatchObject({ map_id: "glut", mode: "stellung" });
+    expect(withMapName({ ...item, map_id: "hafen", mode: "snd" }, "Hafenk", CHOICES)).toMatchObject({ name: "Hafenk", map_id: "", mode: "" });
     expect(withMapName(item, "Nebelwerk", null)).toMatchObject({ name: "Nebelwerk", map_id: "" });
     // Beim Verlassen des Felds steht der Name aus der Bibliothek da.
     expect(canonicalMapName({ name: "harbour edge", map_id: "hafen" }, CHOICES)).toBe("Hafenkante");
@@ -54,8 +56,8 @@ describe("Zuordnung eines Namens zur Bibliothek", () => {
 
   it("ein Klick im Pool füllt die erste leere Map, sonst kommt eine neue dazu", () => {
     const match = { maps: [{ key: "a", name: "Nebelwerk", map_id: "nebel" }, { key: "b", name: "", map_id: "" }] };
-    const filled = pickMap(match, { map_id: "hafen", name: "Hafenkante" }, () => ({ key: "neu", name: "", map_id: "" }));
-    expect(filled.maps.map((item) => [item.key, item.name, item.map_id])).toEqual([["a", "Nebelwerk", "nebel"], ["b", "Hafenkante", "hafen"]]);
+    const filled = pickMap(match, { map_id: "hafen", name: "Hafenkante", mode: "snd" }, () => ({ key: "neu", name: "", map_id: "" }));
+    expect(filled.maps.map((item) => [item.key, item.name, item.map_id, item.mode])).toEqual([["a", "Nebelwerk", "nebel", undefined], ["b", "Hafenkante", "hafen", "snd"]]);
     const added = pickMap(filled, { map_id: "glut", name: "Glutsenke" }, () => ({ key: "neu", name: "", map_id: "" }));
     expect(added.maps.map((item) => item.key)).toEqual(["a", "b", "neu"]);
   });

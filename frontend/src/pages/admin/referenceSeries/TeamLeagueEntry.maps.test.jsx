@@ -60,7 +60,8 @@ test("der Map-Pool der Saison steht je Modus mit Bild da – ein Klick setzt die
   fireEvent.change(screen.getAllByTestId("result-map-home")[0], { target: { value: "6" } });
   fireEvent.change(screen.getAllByTestId("result-map-away")[0], { target: { value: "3" } });
   const maps = (await payload()).matches[0].maps;
-  expect(maps.map((item) => [item.name, item.map_id, item.role || ""])).toEqual([["Hafenkante", "hafen", "banned"], ["Nebelwerk", "nebel", ""]]);
+  // Der Modus aus dem Pool geht mit - der Server prüft die Map genau in diesem Modus.
+  expect(maps.map((item) => [item.name, item.map_id, item.mode, item.role || ""])).toEqual([["Hafenkante", "hafen", "snd", "banned"], ["Nebelwerk", "nebel", "snd", ""]]);
 });
 
 test("ein getippter Name findet die Map über ihre Schreibweise, ein unbekannter wird gelb markiert und bleibt", async () => {

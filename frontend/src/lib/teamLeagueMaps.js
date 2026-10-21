@@ -15,10 +15,12 @@ export function choiceList(choices) {
       if (!item?.map_id) continue;
       const known = out.get(item.map_id);
       const label = group.label || "";
+      // `modeKeys`: die Kennungen der Modi, in denen die Map zur Wahl steht (#1616) - für die Prüfung im Server.
       if (known) {
         if (label && !known.modes.includes(label)) known.modes.push(label);
+        if (group.mode && !known.modeKeys.includes(group.mode)) known.modeKeys.push(group.mode);
       } else {
-        out.set(item.map_id, { ...item, aliases: item.aliases || [], modes: label ? [label] : [] });
+        out.set(item.map_id, { ...item, aliases: item.aliases || [], modes: label ? [label] : [], modeKeys: group.mode ? [group.mode] : [] });
       }
     }
   }
@@ -39,10 +41,14 @@ export function findMap(name, choices) {
   return loose.length === 1 ? loose[0] : null;
 }
 
-/** Name einer Map im Formular ändern: passt er zur Bibliothek, kommt die Kennung dazu, sonst fällt sie weg. */
+/**
+ * Name einer Map im Formular ändern: passt er zur Bibliothek, kommt die Kennung dazu, sonst fällt sie weg. Den Modus
+ * gibt es nur, wenn die Map in genau einem Modus zur Wahl steht - sonst prüft der Server in irgendeinem.
+ */
 export function withMapName(item, name, choices) {
   const found = findMap(name, choices);
-  return { ...item, name, map_id: found ? found.map_id : "" };
+  const mode = found && found.modeKeys.length === 1 ? found.modeKeys[0] : "";
+  return { ...item, name, map_id: found ? found.map_id : "", mode };
 }
 
 /** Beim Verlassen des Felds: der Name aus der Auswahl statt der getippten Schreibweise. */
@@ -64,11 +70,12 @@ export function mapState(item, choices) {
   return "unknown";
 }
 
-/** Eine Map aus dem Pool ins Spiel: in die erste Map ohne Namen, sonst als neue Map am Ende. */
+/** Eine Map aus dem Pool ins Spiel: in die erste Map ohne Namen, sonst als neue Map am Ende - mit dem Modus, unter dem
+ * sie angetippt wurde. */
 export function pickMap(match, choice, emptyMap) {
   const maps = match.maps || [];
   const free = maps.findIndex((item) => !cleanText(item.name) && !item.map_id);
-  const values = { name: choice.name, map_id: choice.map_id };
+  const values = { name: choice.name, map_id: choice.map_id, mode: choice.mode || "" };
   if (free >= 0) return { ...match, maps: maps.map((item, index) => (index === free ? { ...item, ...values } : item)) };
   return { ...match, maps: [...maps, { ...emptyMap(), ...values }] };
 }

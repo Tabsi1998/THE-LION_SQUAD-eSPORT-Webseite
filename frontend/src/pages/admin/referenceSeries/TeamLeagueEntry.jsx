@@ -194,7 +194,7 @@ function MapPoolStrip({ choices, onPick }) {
           <ul className="flex flex-wrap gap-1.5">
             {group.maps.map((choice) => (
               <li key={choice.map_id}>
-                <button type="button" onClick={() => onPick(choice)} aria-label={`${choice.name} ins Veto`}
+                <button type="button" onClick={() => onPick({ ...choice, mode: group.mode || "" })} aria-label={`${choice.name} ins Veto`}
                   className="inline-flex items-center gap-2 rounded-sm border border-white/10 bg-[#0A0A0A] py-1 pl-1 pr-2.5 text-xs text-white/80 transition-colors hover:border-[#29B6E8]/60 hover:text-white active:scale-[0.97] focus-visible:outline focus-visible:outline-1 focus-visible:outline-[#29B6E8]">
                   <MapThumb item={choice} />
                   {choice.name}
