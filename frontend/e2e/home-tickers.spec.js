@@ -5,8 +5,7 @@ const { test, expect } = require("@playwright/test");
 // Partner mit Logo, das Logo führt auf die Partnerseite). Beide Footer-Bänder liegen auf demselben Grund, keines
 // bringt eine eigene Fläche mit. Über jedem Band steht eine kleine Überschrift; über den Sponsoren ist so viel Luft
 // wie unter den Partnern, dazwischen klarer Abstand, und die Partner stehen dichter als die Sponsoren.
-// Optisch gleich groß (#1321, löst „jedes Logo füllt die Höhe seines Kastens“ ab): jedes Logo bleibt in seinem
-// Kasten und füllt etwa dieselbe Fläche - eine breite Wortmarke wird nicht riesig, ein Emblem nicht winzig.
+// Jedes Logo füllt die Höhe seines Kastens - auch eine winzige Vorlage wächst mit.
 // Ohne Partner-Logos kein zweites Band, ohne Sponsoren und Partner kein Block. Bei 390, 768, 1440 und 2560 px
 // läuft nichts seitlich über; mit „Bewegung reduzieren“ stehen alle Bänder still. Bilder in SHOT_DIR.
 
@@ -116,25 +115,13 @@ test.describe("Logo-Bänder: Sponsoren groß auf der Startseite, Sponsoren und P
       expect(looks[0]).toBe("rgba(0, 0, 0, 0)|0px|0px");
       expect(looks[1]).toBe(looks[0]);
 
-      // Optisch gleich groß (#1321): Wortmarke, Emblem und die winzige Vorlage bleiben in ihrem Kasten und füllen etwa
-      // dieselbe Fläche (gemessen am gezeichneten Logo, nicht am Kasten).
-      const shares = [];
+      // Jedes Logo füllt die Höhe seines Kastens - Wortmarke, Emblem und die winzige Vorlage gleich.
       for (const name of ["Gamers Heaven", "eSport Verein B", "LAN Crew"]) {
         const link = partners.getByTitle(name).first();
-        await expect(link.locator(".tls-sponsor-logo[style]")).toHaveCount(1);
-        const share = await link.evaluate((node) => {
-          const box = node.getBoundingClientRect();
-          const art = node.querySelector("canvas, img");
-          const frame = art.getBoundingClientRect();
-          const ratio = (art.width || art.naturalWidth) / (art.height || art.naturalHeight);
-          const width = Math.min(frame.width, frame.height * ratio);
-          const height = width / ratio;
-          return { inside: frame.width <= box.width + 1 && frame.height <= box.height + 1, share: (width * height) / (box.width * box.height) };
-        });
-        expect(share.inside, name).toBe(true);
-        shares.push(share.share);
+        const linkBox = await link.boundingBox();
+        const drawn = await link.locator("canvas, img").first().boundingBox();
+        expect(Math.abs(drawn.height - linkBox.height), name).toBeLessThanOrEqual(1);
       }
-      expect(Math.max(...shares) / Math.min(...shares)).toBeLessThan(2);
       expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBe(0);
 
       if (SHOTS) {

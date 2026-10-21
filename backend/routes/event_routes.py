@@ -468,7 +468,7 @@ async def _decorate_event(event: dict, include_sponsors: bool = False) -> dict:
     if include_sponsors:
         await _attach_event_sponsors(event)
         # Partner II (#469): Partnervereine beim Event, Kurzform mit Link auf die Partnerseite.
-        await partner_pages.attach_partners(get_db(), event, tone=True)
+        await partner_pages.attach_partners(get_db(), event)
     return event
 
 

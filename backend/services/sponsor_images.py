@@ -15,9 +15,6 @@ from __future__ import annotations
 
 import hashlib
 import logging
-from io import BytesIO
-
-from PIL import Image, UnidentifiedImageError
 
 from storage import UPLOAD_DIR
 
@@ -69,21 +66,6 @@ def admin_summary(doc: dict) -> dict:
     }
 
 
-def oversized(content: bytes) -> bool:
-    """Ist das Bild laut Kopf größer, als ein Upload sein darf? Gelesen wird nur der Kopf, nichts wird dekodiert.
-    Ein Kopf, den Pillow nicht lesen kann, gilt hier nicht als zu groß - geprüft werden Art, Größe und Prüfsumme."""
-    from services.logo_tone import header_too_large
-
-    try:
-        with Image.open(BytesIO(content)) as image:
-            width, height = image.size
-    except Image.DecompressionBombError:
-        return True
-    except (OSError, UnidentifiedImageError, ValueError):
-        return False
-    return header_too_large(width, height)
-
-
 def _name_of(entry: dict | None) -> str:
     url = str((entry or {}).get("url") or "")
     return url.rsplit("/", 1)[-1] if url.startswith("/api/static/uploads/") else ""
@@ -120,9 +102,6 @@ async def _fetch(client, partner_id: int, kind: str, variant: str, wanted: dict)
     if answer.get("status") != 200 or not content or not extension or len(content) > MAX_BYTES or hashlib.sha256(content).hexdigest() != sha:
         logger.warning("[sponsor-images] Partner %s %s/%s abgewiesen (Status %s, Art %s, Prüfsumme passt: %s)", partner_id, kind, variant,
                        answer.get("status"), content_type or "?", hashlib.sha256(content).hexdigest() == sha)
-        return None
-    if oversized(content):
-        logger.warning("[sponsor-images] Partner %s %s/%s abgewiesen: Bild zu groß", partner_id, kind, variant)
         return None
     name = f"{PREFIX}{int(partner_id)}-{kind}-{variant}-{sha[:12]}.{extension}"
     UPLOAD_DIR.mkdir(parents=True, exist_ok=True)

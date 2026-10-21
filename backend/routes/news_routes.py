@@ -11,7 +11,7 @@ from services.visibility import user_can_see, filter_visible
 from services.content_embed_service import resolve_content_embeds
 from services.news_cards import attach_result_winners, event_signups, tournament_signups
 from services.sponsor_utils import dedupe_public_sponsors, public_sponsor_view
-from services import logo_tone, partner_pages, sponsor_images
+from services import partner_pages, sponsor_images
 from services.notification_preferences import enqueue_newsletter_for_item
 from services.user_notifications import create_user_notification
 from services.slug_utils import apply_slug_history, find_by_slug_or_history, slug_source_for_update, unique_slug
@@ -812,8 +812,6 @@ async def admin_list_sponsors(me: dict = Depends(require_area("content"))):
         _sponsor_defaults(s)
         # Bilder aus Dolibarr (#880): welche Fassungen da sind und was die Website zeigt - der Upload bleibt der Rückfall.
         s["dolibarr_image_summary"] = sponsor_images.admin_summary(s)
-        # Einfarbig (#1321): ein Logo mit Kasten braucht eine durchsichtige oder weiße Fassung - die Verwaltung sagt es.
-        s["logo_transparent"] = logo_tone.logo_transparent(sponsor_images.pick(s, "logo")[0])
     sp.sort(key=lambda s: (_TIER_ORDER.get(s["tier"], 99), s.get("order_index") or 0, s.get("name") or ""))
     return sp
 
@@ -835,7 +833,7 @@ async def create_sponsor(body: SponsorCreate, me: dict = Depends(require_area("c
 async def update_sponsor(sid: str, body: SponsorUpdate, me: dict = Depends(require_area("content"))):
     db = get_db()
     nullable_fields = {
-        "logo_url", "logo_mono_url", "link", "description", "event_ids",
+        "logo_url", "link", "description", "event_ids",
         "contract_start", "contract_end", "contact_name", "contact_email",
         "contact_phone", "internal_notes",
     }
@@ -1368,7 +1366,6 @@ async def admin_list_partners(me: dict = Depends(require_area("content"))):
     rows = [await _ensure_partner_slug(db, p) for p in partners]
     for row in rows:
         row["dolibarr_image_summary"] = sponsor_images.admin_summary(row)
-        row["logo_transparent"] = logo_tone.logo_transparent(sponsor_images.pick(row, "logo")[0])
     return rows
 
 
@@ -1393,7 +1390,7 @@ async def create_partner(body: PartnerCreate, me: dict = Depends(require_area("c
 async def update_partner(pid: str, body: PartnerUpdate, me: dict = Depends(require_area("content"))):
     db = get_db()
     nullable_fields = {
-        "logo_url", "logo_mono_url", "link", "description", "about", "since", "discord_invite", "discord_guild_id",
+        "logo_url", "link", "description", "about", "since", "discord_invite", "discord_guild_id",
         "twitch_channel", "youtube_url", "x_url", "instagram_url", "tiktok_url",
     }
     raw = body.model_dump(exclude_unset=True)

@@ -198,12 +198,6 @@ die Alben.
   Reihenfolge und Texte bleiben hier. Logo und Banner kommen ab Vereinsmodul 1.9 aus Dolibarr. Technik: [Dolibarr](../DOLIBARR.md).
 - Pflegeknöpfe für Bilder (**Bilder migrieren**, **URLs reparieren**, **Fehlende leeren**) braucht ihr nur bei Bedarf, jeweils mit Rückfrage.
 - Auf der Kommandozentrale erinnert „Sponsoring läuft aus“ 30 Tage vorher.
-- **Einfarbig:** Auf Sponsoren- und Partner-Seite, Startseite, Event-Seite, in der Fußzeile und im TV-Laufband stehen alle
-  Logos weiß und etwa gleich groß; mit der Maus darüber (oder per Tastatur) zeigen sie ihre Farbe – nicht in der Fußzeile
-  und am TV, am Handy bleiben sie weiß. Ein durchsichtiges Logo (PNG/WebP mit freiem Rand) färbt die Website selbst weiß.
-  Hat das Logo einen Kasten, ladet unter **Weiße Fassung (optional)** eine weiße Version hoch – sonst steht es im
-  Original auf einer ruhigen Fläche, und das Blatt zeigt den Hinweis „Bitte eine durchsichtige oder weiße Fassung
-  hochladen.“ Dasselbe Feld gibt es bei den Partnern (3.7).
 
 **Sponsor werden** (Kasten **Sponsor werden** unten auf derselben Seite): Einleitung, **Zahlen – nur echte** (selbst eingetragen
 oder von der Website gezählt, zum Beispiel „Besuche im Monat“), **Stufen in der Tabelle**, **Was jede Stufe bekommt** (Leistungen

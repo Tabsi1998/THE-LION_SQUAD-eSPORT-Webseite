@@ -22,8 +22,8 @@ TARGETS: list[tuple[str, list[str]]] = [
     ("settings", ["logo_url", "logo_light_url", "logo_dark_url", "share_banner_url", "mascot_url", "qr_logo_url", "favicon_url", "favicon_light_url", "favicon_dark_url", "avatar_url"]),
     ("users", ["avatar_url", "banner_url"]),
     ("teams", ["logo_url", "banner_url"]),
-    ("sponsors", ["logo_url", "logo_mono_url", "banner_url"]),
-    ("partners", ["logo_url", "logo_mono_url", "banner_url"]),
+    ("sponsors", ["logo_url", "banner_url"]),
+    ("partners", ["logo_url", "banner_url"]),
     ("news_posts", ["banner_url", "cover_url"]),
     ("events", ["banner_url", "cover_url"]),
     ("games", ["cover_url", "logo_url"]),
@@ -75,7 +75,7 @@ COLLECTION_LABELS = {
     "game_servers": "Spielserver",
 }
 FIELD_LABELS = {
-    "logo_url": "Logo", "logo_mono_url": "Logo weiß", "logo_light_url": "Logo hell", "logo_dark_url": "Logo dunkel",
+    "logo_url": "Logo", "logo_light_url": "Logo hell", "logo_dark_url": "Logo dunkel",
     "share_banner_url": "Bild beim Teilen", "mascot_url": "Maskottchen", "qr_logo_url": "Logo im QR-Code",
     "favicon_url": "Favicon", "favicon_light_url": "Favicon hell", "favicon_dark_url": "Favicon dunkel",
     "avatar_url": "Profilbild", "banner_url": "Banner", "cover_url": "Titelbild", "image_url": "Bild",

@@ -5,7 +5,7 @@ import { PublicLayout } from "@/components/tls/PublicLayout";
 import { Reveal } from "@/components/tls/Reveal";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
-import { SponsorLogo } from "@/components/tls/SponsorLogo";
+import { SmartLogo } from "@/components/tls/SmartLogo";
 import { ArrowRight, Calendar, Check, FileText, Handshake, Mail, Minus, Star } from "lucide-react";
 
 const tierLabel = { main: "Hauptsponsor", platinum: "Platin", gold: "Gold", silver: "Silber", bronze: "Bronze" };
@@ -112,7 +112,7 @@ export default function SponsorsPage() {
                     ) : null}
                     <div className={`${(s.banner_url ? tierLogoWithBanner : tierLogo)[t] || tierLogo.bronze} w-full flex items-center justify-center overflow-hidden`}>
                       {s.logo_url ? (
-                        <SponsorLogo logo={s} alt={s.name} testId={`sponsor-logo-${s.id}`} />
+                        <SmartLogo src={resolveMediaUrl(s.logo_url)} alt={s.name} className="max-w-full max-h-full w-auto h-auto" />
                       ) : (
                         <span className="sr-only">{s.name}</span>
                       )}
@@ -139,7 +139,7 @@ export default function SponsorsPage() {
                 <a key={s.id} href={s.link || undefined} target={s.link ? "_blank" : undefined} rel="noreferrer" aria-label={s.name} data-testid={`sponsor-former-${s.id}`}
                   className="tls-card tls-card--gold tls-reveal-item border border-white/10 rounded-sm bg-[#0C0C0C] p-3 flex flex-col items-center gap-2">
                   <div className="h-16 w-full flex items-center justify-center overflow-hidden grayscale">
-                    <SponsorLogo logo={s} alt={s.name} />
+                    <SmartLogo src={resolveMediaUrl(s.logo_url)} alt={s.name} className="max-w-full max-h-full w-auto h-auto" />
                   </div>
                   <span className="text-[10px] uppercase tracking-widest font-bold text-white/40 tabular-nums">
                     {s.since_year && s.until_year && s.since_year !== s.until_year ? `${s.since_year}–${s.until_year}` : s.until_year || s.since_year || ""}

@@ -5,7 +5,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { api, resolveMediaUrl } from "@/lib/api";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
-import { SponsorLogo } from "@/components/tls/SponsorLogo";
+import { SmartLogo } from "@/components/tls/SmartLogo";
 import { BAND_HEADING_CLASS, LogoTicker, marqueeDuration, repeatForLoop } from "@/components/tls/LogoTicker";
 
 const tierBox = {
@@ -62,10 +62,7 @@ export function SponsorTicker({ className = "", compact = false, placement = "ho
   // Hauptsponsor mit Banner aus dem Vereinsmodul (#880): auf der Startseite groß über dem Laufband.
   const mainBanner = spotlight ? sponsors.find((s) => s.tier === "main" && s.banner_url) : null;
   if (!logoSponsors.length && !mainBanner) return null;
-  const items = logoSponsors.map((s) => ({
-    key: sponsorKey(s), name: s.name, logo_url: s.logo_url, logo_mono_url: s.logo_mono_url, logo_transparent: s.logo_transparent,
-    href: s.link || undefined, tier: s.tier,
-  }));
+  const items = logoSponsors.map((s) => ({ key: sponsorKey(s), name: s.name, logo_url: s.logo_url, href: s.link || undefined, tier: s.tier }));
   const boxClassFor = (item) => (compact ? COMPACT_BOX : spotlight ? SPOTLIGHT_BOX : tierBox[item.tier] || tierBox.bronze);
   const shellClass = compact
     ? "bg-transparent"
@@ -107,7 +104,6 @@ export function SponsorTicker({ className = "", compact = false, placement = "ho
           gapClass={compact ? "gap-5 sm:gap-8 md:gap-12" : spotlight ? "gap-14" : "gap-16"}
           groupPaddingClass={compact ? "pr-5 sm:pr-8 md:pr-12" : spotlight ? "pr-14" : "pr-16"}
           verticalClass={compact ? (heading ? "py-1" : "py-2") : spotlight ? "py-5 md:py-6" : "py-5"}
-          hoverColor={!compact}
           testId="sponsor-ticker-band"
         />
       )}
@@ -149,8 +145,7 @@ export function SponsorGrid({ max = 4, placement = "tv", marquee = false, still 
   const speed = marqueeDuration(items.length, 5.5, 72);
   const renderLogo = (s, index, groupIndex = 0, duplicate = false) => (
     <a key={`${groupIndex}-${sponsorKey(s)}-${index}`} href={s.link || undefined} target={s.link ? "_blank" : undefined} rel="noreferrer" tabIndex={duplicate ? -1 : undefined} className={`tv-sponsor ${s.tier === "main" ? "tv-sponsor--main" : ""}`} title={s.name}>
-      {/* TV-Laufband einfarbig (#1321) - der große Sponsor-Moment bleibt in Farbe. */}
-      <SponsorLogo logo={s} alt={s.name} hoverColor={false} />
+      <SmartLogo src={resolveMediaUrl(s.logo_url)} alt={s.name} className="max-h-full max-w-full w-auto h-auto" />
     </a>
   );
   return (
