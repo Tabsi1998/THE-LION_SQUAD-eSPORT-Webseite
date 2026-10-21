@@ -37,7 +37,7 @@ export function GameMatchDataFields({ value, onChange, testPrefix = "game-edit" 
     >
       <div className="space-y-2">
         <div className="flex items-baseline justify-between gap-3">
-          <div className="text-[11px] font-bold uppercase tracking-widest text-white/60">Dauer je Modus</div>
+          <div className="text-[11px] font-bold uppercase tracking-widest text-white/60">Modi und Dauer</div>
           <button
             type="button"
             onClick={() => set("match_modes", [...modes, emptyMode()])}
@@ -113,6 +113,11 @@ export function GameMatchDataFields({ value, onChange, testPrefix = "game-edit" 
         )}
         {modes.some((mode) => mode.per_game) && (
           <p className="text-xs text-white/45">Je Einzelspiel: ein Best of 3 plant 2,5 Spiele, ein Best of 5 vier.</p>
+        )}
+        {modes.length > 0 && (
+          <p className="text-xs text-white/45" data-testid={`${testPrefix}-modes-maps`}>
+            Minuten freiwillig – ein Modus ohne Dauer dient nur den Maps (Spiele → Maps). Umbenennen behält die Zuordnung.
+          </p>
         )}
       </div>
 
