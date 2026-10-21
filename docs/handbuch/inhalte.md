@@ -267,8 +267,9 @@ Werten über null:
 
 - **Kopf:** die eigenen Medaillen, die es gibt. Ohne Podest steht dort **Bestes Ergebnis** mit Platz, Liga, Monat und
   „von N Teams“. Daneben Teilnahmen, Spiele und „seit“.
-- **Liga-Weg:** nur, wenn Teilnahmen zu einer Saison gehören (3.9). Je Spur die Saisons der Person mit ihrem Platz und dem
-  Vermerk der Saison (Aufstieg, läuft …), dazu **Zur Serie**. Am Handy lässt sich die Reihe wischen.
+- **Liga-Weg:** nur, wenn die Person in mindestens zwei Saisons derselben Spur stand (3.9) – wie in der App; eine einzelne
+  Saison steht schon in der Chronik. Je Spur die Saisons der Person mit ihrem Platz und dem Vermerk der Saison (Aufstieg,
+  läuft …), dazu **Zur Serie**. Am Handy lässt sich die Reihe wischen.
 - **Chronik je Jahr:** eine Zeile je Teilnahme mit dem eigenen Platz, kurzem Titel, Spiel, Team mit „von N Teams“ und
   Datum. Ein Klick klappt die Details auf: langer Titel, Format und Plattform, die Aufstellung (die Person selbst
   hervorgehoben), **Saison ansehen** (nur mit Saison), **Details** (die Seite der Referenz mit Bericht, Partnern und Ort)
