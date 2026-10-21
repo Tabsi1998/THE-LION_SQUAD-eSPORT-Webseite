@@ -253,7 +253,7 @@ async def _running(user: dict | None, today: str) -> dict:
     # und Teilnehmer werden danach nur für diese Serien geladen, damit die Last mit der Zahl der Serien nicht wächst.
     all_series = await db.reference_series.find({"status": "active"}, {
         "_id": 0, "id": 1, "lineage_id": 1, "visibility": 1, "season": 1, "tier": 1, "title": 1, "season_slug": 1,
-        "team_name": 1, "own_teams": 1, "order_index": 1}).to_list(None)
+        "team_name": 1, "own_teams": 1, "order_index": 1, "weekend": 1}).to_list(None)
     lineages = {item["id"]: item async for item in db.reference_lineages.find(
         {"id": {"$in": list({s["lineage_id"] for s in all_series})}},
         {"_id": 0, "id": 1, "slug": 1, "title": 1, "kind": 1, "label": 1, "game_id": 1, "game_name": 1,
@@ -305,7 +305,8 @@ async def _running(user: dict | None, today: str) -> dict:
 
     items = []
     for lineage, series in shown:
-        rounds = race_weekend.annotate(calendar_view(rounds_by[series["id"]], published[series["id"]], today)["rounds"])
+        rounds = race_weekend.annotate(calendar_view(rounds_by[series["id"]], published[series["id"]], today)["rounds"],
+                                       series.get("weekend"))
         racing = lineage.get("kind") == "racing"
         game = games.get(lineage.get("game_id")) or {}
         items.append({

@@ -131,15 +131,33 @@ def _results_by_participant(rules: dict, upto: list[dict], sheets: dict, seq_of:
     return found
 
 
+def _per_unit(results: list[dict], unit_of: dict, unit_seq: dict) -> list[dict]:
+    """Ergebnisse je Einheit (#1930): mit Läufen eine Runde (Summe ihrer Läufe), sonst der Termin selbst."""
+    units: dict = {}
+    for item in results:
+        key = unit_of.get(item["round_id"], item["round_id"])
+        entry = units.setdefault(key, {"round_id": key, "seq": unit_seq.get(key, item["seq"]), "points": 0,
+                                       "participated": False})
+        entry["points"] += item["points"]
+        entry["participated"] = entry["participated"] or item["participated"]
+    return list(units.values())
+
+
 def _driver_rows(rules: dict, upto: list[dict], sheets: dict, seq_of: dict, total_rounds: int,
-                 people: dict, round_rules: dict | None = None) -> list[dict]:
+                 people: dict, round_rules: dict | None = None, unit_of: dict | None = None,
+                 unit_seq: dict | None = None) -> list[dict]:
     activity = rules["activity_points"]
     official = sheets[upto[-1]["id"]].get("official_totals") or {}
+    unit_of, unit_seq = unit_of or {}, unit_seq or {}
     rows = []
     for pid, results in _results_by_participant(rules, upto, sheets, seq_of, round_rules).items():
-        counted, dropped = counted_results(results, rules, total_rounds)
+        # Gezählt, gestrichen, Aktivitätspunkte und gefahrene Runden je Einheit - mit Läufen je Runde (#1930).
+        units = _per_unit(results, unit_of, unit_seq)
+        kept, gone = counted_results(units, rules, total_rounds)
+        counted = [item["round_id"] for item in results if unit_of.get(item["round_id"], item["round_id"]) in kept]
+        dropped = [item["round_id"] for item in results if unit_of.get(item["round_id"], item["round_id"]) in gone]
         counted_points = sum(item["points"] for item in results if item["round_id"] in counted)
-        bonus = sum(activity["points"] for item in results
+        bonus = sum(activity["points"] for item in units
                     if item["participated"] and item["seq"] >= activity["from_round"])
         stats = _stats(results)
         row = {
@@ -149,7 +167,7 @@ def _driver_rows(rules: dict, upto: list[dict], sheets: dict, seq_of: dict, tota
             "results": [{**{key: item[key] for key in RESULT_FIELDS},
                          **{key: item[key] for key in RACE_DETAILS if key in item}} for item in results],
             "wins": stats["wins"], "podiums": stats["podiums"],
-            "rounds_played": sum(1 for item in results if item["participated"]), "_stats": stats,
+            "rounds_played": sum(1 for item in units if item["participated"]), "_stats": stats,
         }
         _official(row, official.get(pid))
         rows.append(row)
@@ -263,11 +281,12 @@ def _own_spelling(sheet: dict, matcher: Matcher) -> dict:
 
 # ---------------------------------------------------------------- Alles zusammen
 def compute_standings(*, rules: dict, rounds: list[dict], sheets: dict[str, dict], participants: list[dict],
-                      own_teams=(), round_rules: dict | None = None) -> list[dict]:
+                      own_teams=(), round_rules: dict | None = None, units: dict | None = None) -> list[dict]:
     """Je gewerteter Runde und Wertung ein Stand: ``{"round_id", "round_seq", "scope", "rows"}`` in
     Kalender-Reihenfolge. ``own_teams``: die eigenen Teams (Namen oder ``{name, aliases}``, #1926) - ihre
     Schreibweisen zählen als ein Team. ``round_rules``: normalisierte Regeln je Termin, die für die Punkte einer Zeile
-    statt ``rules`` gelten (Punkte je Lauf, #1930, ``services/race_weekend.py``)."""
+    statt ``rules`` gelten (Punkte je Lauf, #1930, ``services/race_weekend.py``). ``units``: Termin → Runde - dann zählen
+    Aktivitätspunkte, gefahrene Runden und Streichergebnisse je Runde (Summe ihrer Läufe) statt je Termin."""
     rules = normalize_rules(rules)
     matcher = Matcher(own_teams)
     if matcher:
@@ -277,7 +296,11 @@ def compute_standings(*, rules: dict, rounds: list[dict], sheets: dict[str, dict
                         for person in participants]
     counting = [item for item in ordered_rounds(rounds) if item.get("counts", True) is not False]
     seq_of = {item["id"]: index for index, item in enumerate(counting, start=1)}
-    total_rounds = sum(1 for item in counting if item.get("status") != "cancelled")
+    unit_of = {item["id"]: (units or {}).get(item["id"], item["id"]) for item in counting}
+    unit_seq: dict = {}
+    for item in counting:
+        unit_seq.setdefault(unit_of[item["id"]], len(unit_seq) + 1)
+    total_rounds = len({unit_of[item["id"]] for item in counting if item.get("status") != "cancelled"})
     scored = [item for item in counting if item.get("status") == "scored" and item["id"] in sheets]
     for item in scored:
         validate_sheet(sheets[item["id"]], item["id"])
@@ -289,7 +312,8 @@ def compute_standings(*, rules: dict, rounds: list[dict], sheets: dict[str, dict
         upto = scored[: index + 1]
         scopes = []
         if any(sheets[done["id"]].get("rows") for done in upto):
-            drivers = _driver_rows(rules, upto, sheets, seq_of, total_rounds, people, round_rules)
+            drivers = _driver_rows(rules, upto, sheets, seq_of, total_rounds, people, round_rules, unit_of,
+                                   unit_seq)
             scopes.append(("drivers", "participant_id", drivers))
             teams = (_team_rows(rules, upto, sheets, seq_of, people, round_rules)
                      if rules["team_scoring"]["enabled"] else [])

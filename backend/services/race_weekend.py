@@ -39,7 +39,12 @@ SESSION_CHOICES = ("Qualifying", "Shootout", "Sprint", "Rennen", "Hauptrennen", 
 # Allgemeine Namen eines Laufs: beim Einfügen gilt der Lauf derselben Art aus der Vorgabe („R1 Feature“ → Hauptrennen).
 GENERIC_LABELS = ("Qualifying", "Sprint", "Rennen")
 KINDS = ("qualifying", "sprint", "race")
-GRID_SOURCES = ("manual", "qualifying", "reverse_standings")
+# Startplatz: Eingabe, aus dem Qualifying derselben Runde, umgekehrte Fahrerwertung vor der Runde oder nach dem Lauf
+# davor (etwa das Hauptrennen nach dem Sprint). ``reverse_standings`` ist der frühere Name für „vor der Runde“.
+REVERSE_BEFORE_ROUND = "reverse_standings_before_round"
+REVERSE_AFTER_PREVIOUS = "reverse_standings_after_previous_session"
+GRID_SOURCES = ("manual", "qualifying", REVERSE_BEFORE_ROUND, REVERSE_AFTER_PREVIOUS)
+GRID_ALIASES = {"reverse_standings": REVERSE_BEFORE_ROUND}
 DEFAULT_GRID = {"qualifying": "manual", "sprint": "manual", "race": "qualifying"}
 POINT_CHOICES = ("series", "none")
 DNF_CHOICES = ("series", "place", "none")  # Punkte trotz DNF: wie die Saison, ja (nach Platz), nein (0)
@@ -85,12 +90,25 @@ def is_main_qualifying(label) -> bool:
 
 
 # ---------------------------------------------------------------- Kürzel beim Einfügen
+# Wo die Terminliste Datum oder Uhrzeit herausgenommen hat, steht dieses Zeichen (``str.isspace`` zählt es als Leerraum,
+# der Ort verliert es also von selbst). Für ein Lauf-Wort gilt es als Trenner: „R1 Sprint 07.03. Spa“.
+GAP = "\x1f"
+
+
 def _boundary(raw: str, pos: int) -> bool:
     return pos >= len(raw) or raw[pos].isspace() or raw[pos] in _SEPARATORS
 
 
+def _word_ends(raw: str, pos: int) -> bool:
+    """Hinter einem Lauf-Wort: nur Leerzeichen bis zu einem Trenner (``·``, ``|``, ``;``, Tabulator, herausgenommenes
+    Datum) oder dem Zeilenende - „R1 Race of Champions“ ist darum kein Lauf."""
+    while pos < len(raw) and raw[pos] == " ":
+        pos += 1
+    return pos >= len(raw) or raw[pos] in _SEPARATORS or raw[pos] in ("\t", GAP)
+
+
 def _session_word(raw: str, pos: int) -> tuple[str | None, int]:
-    """Ein Lauf-Wort ab ``pos`` (ganzes Wort): Lauf und Ende - sonst ``(None, pos)``."""
+    """Ein Lauf-Wort ab ``pos`` (ganzes Wort, danach ein Trenner): Lauf und Ende - sonst ``(None, pos)``."""
     end = pos
     while end < len(raw) and raw[end] in _LETTERS:
         end += 1
@@ -98,10 +116,10 @@ def _session_word(raw: str, pos: int) -> tuple[str | None, int]:
     if not word:
         return None, pos
     if word in HEAT_WORDS:
-        digit = end + 1 if end < len(raw) and raw[end].isspace() else end
-        if digit < len(raw) and raw[digit] in _DIGITS and _boundary(raw, digit + 1):
+        digit = end + 1 if end < len(raw) and raw[end] == " " else end
+        if digit < len(raw) and raw[digit] in _DIGITS and _word_ends(raw, digit + 1):
             return f"Lauf {raw[digit]}", digit + 1
-    if word in SESSION_WORDS and _boundary(raw, end):
+    if word in SESSION_WORDS and _word_ends(raw, end):
         return SESSION_WORDS[word], end
     return None, pos
 
@@ -111,8 +129,8 @@ def take_code(text: str) -> tuple[str | None, str | None, str]:
 
     Kürzel wie bisher: bis sechs Buchstaben, optional ein Leerzeichen, bis drei Ziffern („R1“, „ST 5“) oder nur Ziffern,
     optional mit Punkt. Neu dahinter ein Lauf, angehängt („R1S“, „R1Q“, „R1-Sprint“) oder als eigenes Wort („R1 S“,
-    „R1 Quali“, „R1 Lauf 2“). Hängt etwas anderes am Kürzel („R1x“), ist es wie bisher kein Kürzel. Zeichen für Zeichen,
-    ohne regulären Ausdruck auf der Eingabe."""
+    „R1 Quali“, „R1 Lauf 2“) - aber nur, wenn danach ein Trenner kommt oder die Zeile endet. Hängt etwas anderes am
+    Kürzel („R1x“), ist es wie bisher kein Kürzel. Zeichen für Zeichen, ohne regulären Ausdruck auf der Eingabe."""
     raw = str(text or "")
     start = 0
     while start < len(raw) and raw[start].isspace():
@@ -135,7 +153,7 @@ def take_code(text: str) -> tuple[str | None, str | None, str]:
         pos += 1
     if _boundary(raw, pos):
         after = pos
-        while after < len(raw) and raw[after].isspace():
+        while after < len(raw) and raw[after] == " ":
             after += 1
         if after > pos:
             session, end = _session_word(raw, after)
@@ -155,14 +173,23 @@ def weekend_key(rnd: dict) -> str | None:
     return key or None
 
 
-def weekend_groups(rounds: list[dict]) -> list[dict]:
-    """Die Runden der Saison in Kalender-Reihenfolge (ohne archivierte Termine): ``{"key", "number", "rounds"}``."""
+def by_code(rounds: list[dict], weekend: dict | None = None) -> bool:
+    """Fasst die Saison Termine mit gleichem Kürzel zu einer Runde zusammen? Nur mit Läufen: Ein Termin hat einen Lauf
+    oder die Saison einen Ablauf je Runde. Eine alte Saison mit zweimal „R1“ bleibt, wie sie war."""
+    return bool((weekend or {}).get("formats")) or any(
+        clean_session(rnd.get("session")) for rnd in rounds if not rnd.get("archived_at"))
+
+
+def weekend_groups(rounds: list[dict], weekend: dict | None = None, *, merge: bool | None = None) -> list[dict]:
+    """Die Runden der Saison in Kalender-Reihenfolge (ohne archivierte Termine): ``{"key", "number", "rounds"}``.
+    Gleiches Kürzel heißt gleiche Runde nur mit Läufen (``by_code``) - sonst ist jeder Termin seine eigene Runde."""
+    merge = by_code(rounds, weekend) if merge is None else merge
     groups: list[dict] = []
     by_key: dict[str, dict] = {}
     for rnd in ordered_rounds(rounds):
         if rnd.get("archived_at"):
             continue
-        key = weekend_key(rnd)
+        key = weekend_key(rnd) if merge else None
         group = by_key.get(key) if key else None
         if group is None:
             group = {"key": key, "number": len(groups) + 1, "rounds": []}
@@ -173,9 +200,9 @@ def weekend_groups(rounds: list[dict]) -> list[dict]:
     return groups
 
 
-def annotate(rounds: list[dict]) -> list[dict]:
+def annotate(rounds: list[dict], weekend: dict | None = None) -> list[dict]:
     """Kalender-Termine mit Runde (``weekend``) und Art des Laufs (``session_kind``) - an Ort und Stelle."""
-    numbers = {rnd["id"]: group["number"] for group in weekend_groups(rounds) for rnd in group["rounds"]}
+    numbers = {rnd["id"]: group["number"] for group in weekend_groups(rounds, weekend) for rnd in group["rounds"]}
     for rnd in rounds:
         rnd["weekend"] = numbers.get(rnd.get("id"))
         rnd["session_kind"] = session_kind(rnd.get("session"))
@@ -225,6 +252,7 @@ def _session(raw, field: str) -> dict:
     kind = session_kind(label)
     counts = raw.get("counts")
     grid = raw.get("grid") or DEFAULT_GRID[kind]
+    grid = GRID_ALIASES.get(grid, grid)
     if grid not in GRID_SOURCES:
         raise ValueError(f"{field}: unbekannte Quelle des Startplatzes.")
     points = _points(raw.get("points"), kind, f"{field}: Punkte")
@@ -297,19 +325,31 @@ def planned_config(weekend: dict | None, rounds: list[dict], code, label) -> dic
     """Die Vorgabe für einen neuen Termin mit Kürzel ``code`` und Lauf ``label``: in der Runde dieses Kürzels, sonst in
     der nächsten neuen Runde."""
     key = "".join(str(code or "").split()).casefold() or None
-    groups = weekend_groups(rounds)
+    groups = weekend_groups(rounds, weekend, merge=bool(clean_session(label)) or by_code(rounds, weekend))
     number = next((group["number"] for group in groups if key and group["key"] == key), len(groups) + 1)
     return session_config(weekend, number, label)
 
 
 def round_plan(rounds: list[dict], weekend: dict | None) -> dict[str, dict]:
-    """Je Termin (ohne archivierte) die Runde und die Vorgabe seines Laufs."""
+    """Je Termin (ohne archivierte) die Runde (Nummer und Schlüssel der Gruppe) und die Vorgabe seines Laufs."""
     plan = {}
-    for group in weekend_groups(rounds):
+    for group in weekend_groups(rounds, weekend):
         for rnd in group["rounds"]:
-            plan[rnd["id"]] = {"number": group["number"],
+            plan[rnd["id"]] = {"number": group["number"], "unit": str(group["number"]),
                                "config": session_config(weekend, group["number"], rnd.get("session"))}
     return plan
+
+
+def counts_updates(rounds: list[dict], weekend: dict | None) -> dict[str, bool]:
+    """Termine, deren Wertung der Vorgabe folgt (``counts_manual`` ist ``False`` - von Hand Gesetztes und ältere Termine
+    ohne diese Angabe bleiben) und von ihr abweicht: Kennung → neue Wertung."""
+    plan = round_plan(rounds, weekend)
+    out = {}
+    for rnd in rounds:
+        entry = plan.get(rnd.get("id"))
+        if entry and rnd.get("counts_manual") is False and bool(rnd.get("counts", True)) != entry["config"]["counts"]:
+            out[rnd["id"]] = entry["config"]["counts"]
+    return out
 
 
 def round_rules(rules: dict, config: dict) -> dict:
@@ -342,61 +382,79 @@ def rules_for_round(series: dict, rounds: list[dict], round_doc: dict) -> dict:
 
 
 # ---------------------------------------------------------------- Pole und Startplatz
+def _valid_place(row: dict) -> int | None:
+    try:
+        place = int(row.get("place"))
+    except (TypeError, ValueError):
+        return None
+    if place < 1 or not row.get("participant_id") or {"dns", "dsq"} & set(row.get("marks") or []):
+        return None
+    return place
+
+
+def pole_holder(rows: list[dict]) -> str | None:
+    """Wer im Qualifying die Pole hat - überall dieselbe Regel: eine gültige Zeile mit der Marke ``pole``, sonst der
+    erste gültige Platz (ohne Nichtstart und Disqualifikation; liegt Platz 1 disqualifiziert, ist es Platz 2)."""
+    valid = sorted(((place, row) for row in rows or [] if (place := _valid_place(row)) is not None),
+                   key=lambda item: item[0])
+    marked = next((row["participant_id"] for _, row in valid if "pole" in (row.get("marks") or [])), None)
+    return marked or (valid[0][1]["participant_id"] if valid else None)
+
+
 def mark_pole(rows: list[dict]) -> None:
-    """Qualifying: Platz 1 bekommt die Marke ``pole`` - außer eine Zeile trägt sie schon. ``rows`` wie aus
+    """Qualifying: die Pole (``pole_holder``) bekommt die Marke ``pole``, eine ungültige verliert sie. ``rows`` wie aus
     ``series_results.resolve`` (an Ort und Stelle)."""
-    named = [row for row in rows if row.get("participant_id")]
-    if any("pole" in (row.get("marks") or []) for row in named):
-        return
-    first = next((row for row in named if row.get("place") == 1
-                  and not {"dns", "dsq"} & set(row.get("marks") or [])), None)
-    if first:
-        first["marks"] = sorted({*(first.get("marks") or []), "pole"})
+    holder = pole_holder(rows)
+    for row in rows:
+        marks = set(row.get("marks") or [])
+        if row.get("participant_id") and row["participant_id"] == holder:
+            marks.add("pole")
+        else:
+            marks.discard("pole")
+        row["marks"] = sorted(marks)
 
 
-def _pole_of(sheet: dict) -> str | None:
-    rows = [row for row in sheet.get("rows") or [] if row.get("participant_id")]
-    marked = next((row["participant_id"] for row in rows if "pole" in (row.get("marks") or [])), None)
-    return marked or next((row["participant_id"] for row in rows if row.get("place") == 1), None)
-
-
-def _quali_for(sessions: list[dict], index: int, plan: dict, sheets: dict) -> dict | None:
-    qualis = [(position, rnd) for position, rnd in enumerate(sessions)
-              if plan[rnd["id"]]["config"]["kind"] == "qualifying" and rnd["id"] in sheets
+def _quali_for(sessions: list[dict], target: dict, plan: dict, sheets: dict) -> dict | None:
+    """Woher ein Lauf seinen Startplatz nimmt: ein Sprint aus dem Shootout (Sprint-Qualifying) derselben Runde, wenn es
+    einen gibt, sonst - wie das Rennen - aus dem Qualifying fürs Rennen."""
+    usable = [rnd for rnd in sessions if plan[rnd["id"]]["config"]["kind"] == "qualifying" and rnd["id"] in sheets
               and rnd.get("status") != "cancelled"]
-    before = [rnd for position, rnd in qualis if position < index]
-    if before:
-        return before[-1]
-    return qualis[0][1] if qualis else None
+    main = [rnd for rnd in usable if is_main_qualifying(rnd.get("session"))]
+    shootout = [rnd for rnd in usable if not is_main_qualifying(rnd.get("session"))]
+    if plan[target["id"]]["config"]["kind"] == "sprint" and shootout:
+        return shootout[0]
+    return main[0] if main else None
 
 
-def with_qualifying(rounds: list[dict], sheets: dict, plan: dict) -> dict:
-    """Blätter mit Startplatz und Pole aus dem Qualifying derselben Runde - nur, wo der Startplatz leer ist und
-    der Lauf ihn aus dem Qualifying nimmt. Ändert nichts an ``sheets``."""
+def with_qualifying(rounds: list[dict], sheets: dict, plan: dict, weekend: dict | None = None) -> dict:
+    """Blätter mit Startplatz und Pole aus dem Qualifying derselben Runde - nur, wo der Startplatz leer ist und der Lauf
+    ihn aus dem Qualifying nimmt. Die Pole (nur aus dem Qualifying fürs Rennen, und nur wenn es selbst nicht zählt)
+    zählt am ersten Rennen, das seinen Startplatz daraus nimmt, sonst am ersten Lauf. Ändert nichts an ``sheets``."""
     out = dict(sheets)
-    poled: set[str] = set()
-    for group in weekend_groups(rounds):
+    for group in weekend_groups(rounds, weekend):
         sessions = group["rounds"]
-        for index, rnd in enumerate(sessions):
-            config = plan[rnd["id"]]["config"]
-            if config["kind"] == "qualifying" or config["grid"] != "qualifying" or rnd["id"] not in out:
-                continue
-            source = _quali_for(sessions, index, plan, out)
+        targets = [rnd for rnd in sessions if rnd["id"] in out
+                   and plan[rnd["id"]]["config"]["kind"] != "qualifying"
+                   and plan[rnd["id"]]["config"]["grid"] == "qualifying"]
+        sources = {rnd["id"]: _quali_for(sessions, rnd, plan, out) for rnd in targets}
+        poled: dict[str, str] = {}
+        for kind in ("race", "sprint"):
+            for rnd in targets:
+                source = sources[rnd["id"]]
+                if (source and plan[rnd["id"]]["config"]["kind"] == kind and source["id"] not in poled.values()
+                        and is_main_qualifying(source.get("session")) and source.get("counts") is False):
+                    poled[rnd["id"]] = source["id"]
+        for rnd in targets:
+            source = sources[rnd["id"]]
             if not source:
                 continue
             places = {row["participant_id"]: row["place"] for row in out[source["id"]].get("rows") or []
                       if row.get("participant_id") and row.get("place")}
-            sheet = out[rnd["id"]]
-            rows = sheet.get("rows") or []
+            rows = out[rnd["id"]].get("rows") or []
             pole = None
-            # Die Pole kommt nur aus dem Qualifying fürs Rennen (nicht aus dem Shootout) und wandert nur, wenn das
-            # Qualifying selbst nicht zählt - sonst steht sie schon dort.
-            main = is_main_qualifying(source.get("session"))
-            if main and source.get("counts") is False and source["id"] not in poled:
-                poled.add(source["id"])
-                if not any("pole" in (row.get("marks") or []) for row in rows):
-                    pole = _pole_of(out[source["id"]])
-            out[rnd["id"]] = {**sheet, "rows": [_derived(row, places, pole) for row in rows]}
+            if rnd["id"] in poled and not any("pole" in (row.get("marks") or []) for row in rows):
+                pole = pole_holder(out[source["id"]].get("rows") or [])
+            out[rnd["id"]] = {**out[rnd["id"]], "rows": [_derived(row, places, pole) for row in rows]}
     return out
 
 
@@ -410,27 +468,27 @@ def _derived(row: dict, places: dict, pole: str | None) -> dict:
     return out
 
 
-def with_reverse_grid(rounds: list[dict], sheets: dict, plan: dict, snapshots: list[dict]) -> dict:
-    """Blätter mit Startplatz in umgekehrter Reihenfolge der Fahrerwertung nach der letzten gewerteten Runde davor -
-    wer hinten liegt, startet vorn. Wer dort nicht steht, bekommt keinen Startplatz; ein eingetragener
-    bleibt. Ohne Änderung kommt ``sheets`` selbst zurück."""
-    groups = weekend_groups(rounds)
+def with_reverse_grid(rounds: list[dict], sheets: dict, plan: dict, snapshots: list[dict],
+                      weekend: dict | None = None) -> dict:
+    """Blätter mit Startplatz in umgekehrter Reihenfolge der Fahrerwertung - wer hinten liegt, startet vorn. Je nach
+    Vorgabe nach der letzten gewerteten Runde vor dieser Runde (``reverse_standings_before_round``) oder nach dem
+    letzten gewerteten Lauf vor diesem (``reverse_standings_after_previous_session``, etwa nach dem Sprint). Wer dort
+    nicht steht, bekommt keinen Startplatz; ein eingetragener bleibt. Ohne Änderung kommt ``sheets`` selbst zurück."""
     active = [rnd for rnd in ordered_rounds(rounds) if not rnd.get("archived_at")]
     position = {rnd["id"]: index for index, rnd in enumerate(active)}
     drivers = [snap for snap in snapshots if snap["scope"] == "drivers" and snap["round_id"] in position]
     out = None
-    for group in groups:
-        targets = [rnd for rnd in group["rounds"] if rnd["id"] in sheets
-                   and plan[rnd["id"]]["config"]["kind"] != "qualifying"
-                   and plan[rnd["id"]]["config"]["grid"] == "reverse_standings"]
-        if not targets:
-            continue
+    for group in weekend_groups(rounds, weekend):
         first = min(position[rnd["id"]] for rnd in group["rounds"])
-        before = [snap for snap in drivers if position[snap["round_id"]] < first]
-        if not before:
-            continue
-        order = [row["participant_id"] for row in before[-1]["rows"]][::-1]
-        for rnd in targets:
+        for rnd in group["rounds"]:
+            config = plan[rnd["id"]]["config"]
+            if rnd["id"] not in sheets or config["kind"] == "qualifying" or not config["grid"].startswith("reverse_"):
+                continue
+            limit = first if config["grid"] == REVERSE_BEFORE_ROUND else position[rnd["id"]]
+            before = [snap for snap in drivers if position[snap["round_id"]] < limit]
+            if not before:
+                continue
+            order = [row["participant_id"] for row in before[-1]["rows"]][::-1]
             sheet = (out or sheets)[rnd["id"]]
             rows = sheet.get("rows") or []
             present = {row.get("participant_id") for row in rows}
@@ -446,17 +504,19 @@ def with_reverse_grid(rounds: list[dict], sheets: dict, plan: dict, snapshots: l
 def standings(*, rules: dict, rounds: list[dict], sheets: dict, participants: list[dict], own_teams=(),
               weekend: dict | None = None) -> list[dict]:
     """Die Stände wie ``compute_standings``, mit Punkten je Lauf, Startplatz und Pole aus dem Qualifying und der
-    umgekehrten Wertung als Startplatz. Der Startplatz ändert keine Punkte - die umgekehrte Wertung kommt darum aus dem
-    ersten Durchgang."""
+    umgekehrten Wertung als Startplatz. Mit Läufen zählt eine Runde als Einheit (``units``): Aktivitätspunkte, gefahrene
+    Runden und Streichergebnisse je Runde, nicht je Lauf. Der Startplatz ändert keine Punkte - die umgekehrte Wertung
+    kommt darum aus dem ersten Durchgang."""
     plan = round_plan(rounds, weekend)
     base = normalize_rules(rules)
     per_round = {rid: own for rid, entry in plan.items()
                  if (own := round_rules(base, entry["config"])) is not base}
-    enriched = with_qualifying(rounds, sheets, plan)
+    units = {rid: entry["unit"] for rid, entry in plan.items()} if by_code(rounds, weekend) else None
+    enriched = with_qualifying(rounds, sheets, plan, weekend)
     common = {"rules": rules, "rounds": rounds, "participants": participants, "own_teams": own_teams,
-              "round_rules": per_round}
+              "round_rules": per_round, "units": units}
     snapshots = compute_standings(sheets=enriched, **common)
-    reversed_grid = with_reverse_grid(rounds, enriched, plan, snapshots)
+    reversed_grid = with_reverse_grid(rounds, enriched, plan, snapshots, weekend)
     if reversed_grid is not enriched:
         snapshots = compute_standings(sheets=reversed_grid, **common)
     return snapshots

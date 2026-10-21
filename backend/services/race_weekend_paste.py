@@ -5,29 +5,42 @@ from __future__ import annotations
 
 from datetime import date, datetime, timedelta
 
-from services.race_weekend import GENERIC_LABELS, label_key, session_config, weekend_groups
+from services.race_weekend import GENERIC_LABELS, by_code, label_key, session_config, weekend_groups
 from services.reference_calendar import ClockError, clock_gap_message, vienna_start
 from services.round_phases import phase_for
 
 
 def _shifted(day: str, clock: str | None, offset: int) -> tuple[str, str | None]:
+    """Tag und Uhrzeit eines Laufs mit Versatz. Ohne Uhrzeit zählen nur ganze Tage - in beide Richtungen zur Null hin,
+    ein Versatz von −30 Minuten bleibt also am selben Tag."""
     if not offset:
         return day, clock
     if clock:
         wall = datetime.combine(date.fromisoformat(day), datetime.strptime(clock, "%H:%M").time())
         moved = wall + timedelta(minutes=offset)
         return moved.date().isoformat(), moved.strftime("%H:%M")
-    return (date.fromisoformat(day) + timedelta(days=offset // (24 * 60))).isoformat(), None
+    return (date.fromisoformat(day) + timedelta(days=int(offset / (24 * 60)))).isoformat(), None
+
+
+def _own_code(number: int, numbers: dict) -> str:
+    """Ein Kürzel für eine Zeile ohne Kürzel, deren Läufe zusammenbleiben müssen: „R5“ - gibt es das schon, „Runde 5“,
+    dann mit Buchstaben."""
+    for candidate in (f"R{number}", f"Runde {number}", *(f"R{number}{letter}" for letter in "abcdefghij")):
+        if "".join(candidate.split()).casefold() not in numbers:
+            return candidate
+    return f"Runde {number}"
 
 
 def expand_paste(parsed: dict, weekend: dict | None, rounds: list[dict]) -> dict:
     """Eine geprüfte Terminliste (``reference_calendar.parse_round_lines``) mit den Läufen je Zeile (``sessions``):
     eine Zeile mit Lauf („R1 Sprint“) legt genau diesen an, eine ohne Lauf alle Läufe der Vorgabe für ihre Runde - mit
-    deren Uhrzeit-Versatz -, ohne Vorgabe einen Termin wie bisher. Ein Lauf, den es in der Runde schon gibt (im Kalender
-    oder weiter oben in der Liste), ist ein Fehler. ``count`` zählt die Termine."""
+    deren Uhrzeit-Versatz -, ohne Vorgabe einen Termin wie bisher. Eine Zeile ohne Kürzel mit mehreren Läufen bekommt
+    eines („R5“), damit ihre Läufe eine Runde bleiben. Ein Lauf, den es in der Runde schon gibt (im Kalender oder weiter
+    oben in der Liste), ist ein Fehler. ``count`` zählt die Termine."""
     if parsed.get("errors"):
         return {**parsed, "count": 0}
-    groups = weekend_groups(rounds)
+    merge = by_code(rounds, weekend) or any(row.get("session") for row in parsed.get("rows") or [])
+    groups = weekend_groups(rounds, weekend, merge=merge)
     numbers = {group["key"]: group["number"] for group in groups if group["key"]}
     taken = {(group["key"], label_key(rnd.get("session"))) for group in groups if group["key"]
              for rnd in group["rounds"] if rnd.get("session")}
@@ -35,11 +48,11 @@ def expand_paste(parsed: dict, weekend: dict | None, rounds: list[dict]) -> dict
     rows, errors = [], []
     for row in parsed.get("rows") or []:
         key = "".join(str(row.get("code") or "").split()).casefold() or None
-        if key and key in numbers:
+        if merge and key and key in numbers:
             number = numbers[key]
         else:
             number, upcoming = upcoming, upcoming + 1
-            if key:
+            if key and merge:
                 numbers[key] = number
         if row.get("session"):
             config = session_config(weekend, number, row["session"])
@@ -52,6 +65,10 @@ def expand_paste(parsed: dict, weekend: dict | None, rounds: list[dict]) -> dict
             phase = phase_for((weekend or {}).get("formats"), number)
             # In zeitlicher Reihenfolge anlegen (nach Versatz) - so stimmt die Reihenfolge im Kalender.
             plan = sorted((phase or {}).get("sessions") or [None], key=lambda item: item["offset"] if item else 0)
+        if not key and len(plan) > 1:
+            row = {**row, "code": _own_code(number, numbers)}
+            key = "".join(row["code"].split()).casefold()
+            numbers[key] = number
         sessions, error = [], None
         for config in plan:
             label = config["label"] if config else None

@@ -26,7 +26,7 @@ Gerechnet wird nichts - alles kommt aus dem gespeicherten Stand der letzten gewe
 from __future__ import annotations
 
 from services.own_teams import Matcher, own_teams
-from services.race_weekend import is_main_qualifying
+from services.race_weekend import is_main_qualifying, pole_holder
 from services.scoring_rules import normalize_rules
 from services.team_league_page import PATH_FIELDS as SEASON_FIELDS, visible_seasons
 
@@ -123,7 +123,7 @@ def club_teams(drivers: dict, people: dict, team_order: list[str], own: list[str
 
 async def qualifying_places(db, series_id: str, wanted: set) -> list[dict]:
     """Je veröffentlichtem Qualifying der Saison (nicht archiviert, nicht abgesagt) die Plätze der Fahrer in ``wanted``:
-    ``[{"round_id", "places": {Kennung: Platz}}]``."""
+    ``[{"round_id", "places": {Kennung: Platz}, "pole": Kennung | None}]``."""
     rounds = await db.reference_rounds.find(
         {"series_id": series_id, "archived_at": None, "session": {"$nin": [None, ""]}},
         {"_id": 0, "id": 1, "session": 1, "status": 1}).to_list(None)
@@ -137,7 +137,9 @@ async def qualifying_places(db, series_id: str, wanted: set) -> list[dict]:
             {"_id": 0, "round_id": 1, "rows": 1}):
         places = {row["participant_id"]: row["place"] for row in sheet.get("rows") or []
                   if row.get("participant_id") in wanted and row.get("place")}
-        out.append({"round_id": sheet["round_id"], "places": places})
+        # Die Pole nach derselben Regel wie beim Rechnen (ohne Disqualifikation) - nur, wenn sie in der Tabelle steht.
+        pole = pole_holder(sheet.get("rows") or [])
+        out.append({"round_id": sheet["round_id"], "places": places, "pole": pole if pole in wanted else None})
     return sorted(out, key=lambda item: quali.index(item["round_id"]))
 
 

@@ -23,7 +23,7 @@ import re
 from datetime import date, datetime, timedelta, timezone
 
 from services.dolibarr_policy import CLUB_TZ
-from services.race_weekend import take_code
+from services.race_weekend import GAP, take_code
 from services.round_countries import detect_country
 from services.series_standings import ordered_rounds
 
@@ -179,7 +179,8 @@ def parse_round_lines(text: str, *, season: str | None, today: str, default_week
                 given = dot.group(3)
                 y = (2000 + int(given) if len(given) == 2 else int(given)) if given else None
                 shown = f"{d:02d}.{m:02d}." + (given or "")
-            rest = rest[:match.start()] + " " + rest[match.end():]
+            # Die Lücke bleibt als Trenner sichtbar (``GAP``) - für ein Lauf-Wort davor („R1 Sprint 07.03. Spa“).
+            rest = rest[:match.start()] + f" {GAP} " + rest[match.end():]
             try:
                 if y is None:
                     # Erst das Jahr, dann das Datum - sonst scheitert der 29.02. am Jahr vor dem Schaltjahr.
@@ -196,7 +197,7 @@ def parse_round_lines(text: str, *, season: str | None, today: str, default_week
             if hours > 23 or minutes > 59:
                 error = f"Uhrzeit {found.group(1)}:{found.group(2)} gibt es nicht."
             clock = f"{hours:02d}:{minutes:02d}"
-            rest = rest[:found.start()] + " " + rest[found.end():]
+            rest = rest[:found.start()] + f" {GAP} " + rest[found.end():]
         code, session, rest = take_code(rest)
         venue = _clean_venue(rest) or None
         if not error and day is None:

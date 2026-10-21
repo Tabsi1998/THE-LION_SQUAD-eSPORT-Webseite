@@ -135,6 +135,43 @@ async def test_a_new_qualifying_with_points_in_the_template_counts(flow):
     assert created.json()["counts"] is True
 
 
+@pytest.mark.asyncio
+async def test_counts_follow_a_changed_template_unless_set_by_hand(flow):
+    _, series = await _series(flow, {"formats": [{"sessions": [{"label": "Qualifying"},
+                                                               {"label": "Rennen", "offset": 30}]}]})
+    url = f"{ADMIN}/series/{series['id']}/rounds"
+    auto = (await flow.post(url, json={"code": "R1", "session": "Qualifying", "day": "2026-03-08"})).json()
+    manual = (await flow.post(url, json={"code": "R2", "session": "Qualifying", "day": "2026-03-15",
+                                         "counts": False})).json()
+    assert [(item["counts"], item["counts_manual"]) for item in (auto, manual)] == [(False, False), (False, True)]
+    # Der Ablauf ändert sich: das Qualifying bringt jetzt P1 = 2 Punkte - wer der Vorgabe folgt, zählt jetzt.
+    changed = await flow.patch(f"{ADMIN}/series/{series['id']}", json={"weekend": {"formats": [{"sessions": [
+        {"label": "Qualifying", "points": [2]}, {"label": "Rennen", "offset": 30}]}]}})
+    assert changed.status_code == 200, changed.text
+
+    async def counts():
+        calendar = (await flow.get(f"{ADMIN}/series/{series['id']}/calendar")).json()
+        return {item["code"]: item["counts"] for item in calendar["rounds"]}
+
+    assert await counts() == {"R1": True, "R2": False}
+    # „Wie die Vorgabe“: ``counts: null`` gibt die Wertung zurück.
+    back = await flow.patch(f"{url}/{manual['id']}", json={"counts": None})
+    assert back.status_code == 200, back.text
+    assert await counts() == {"R1": True, "R2": True}
+
+
+@pytest.mark.asyncio
+async def test_an_old_season_with_the_same_code_twice_keeps_its_rounds(flow):
+    lineage, series = await _series(flow)
+    url = f"{ADMIN}/series/{series['id']}/rounds"
+    for code, day in (("R1", "2026-03-01"), ("R1", "2026-03-02"), ("R2", "2026-03-08")):
+        await flow.post(url, json={"code": code, "day": day})
+    flow.act_as(None)
+    page = (await flow.get(f"{PUBLIC}/{lineage['slug']}/{series['season_slug']}")).json()
+    assert page["progress"]["total"] == 3
+    assert [item["weekend"] for item in page["rounds"]] == [1, 2, 3]
+
+
 def _people(count=4):
     return [f"Probe Fahrer {number}" for number in range(1, count + 1)]
 
@@ -183,6 +220,8 @@ async def test_grid_and_pole_of_the_race_come_from_the_qualifying(flow):
     assert [item["round_id"] for item in places] == [quali["id"]]
     assert {rows[name]["key"]: name for name in names}[next(
         pid for pid, place in places[0]["places"].items() if place == 1)] == names[2]
+    # Die Pole nennt der Server selbst - nach derselben Regel wie beim Rechnen.
+    assert places[0]["pole"] == rows[names[2]]["key"]
     assert page["progress"]["scored"] == 1
 
 

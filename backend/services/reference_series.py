@@ -193,6 +193,14 @@ async def recompute_standings(db, series: dict) -> int:
     und den Teilnehmern. Bestehende Stände werden ersetzt, überholte entfernt. Liefert die Zahl der Stände."""
     sid = series["id"]
     rounds = await db.reference_rounds.find({"series_id": sid, "archived_at": None}, {"_id": 0}).to_list(None)
+    # Wertung je Lauf (#1930): Termine ohne Handänderung folgen der Vorgabe ihres Laufs - auch nach einer Änderung des
+    # Ablaufs oder des Kalenders. Der Kalender bekommt dann einen neuen Stand.
+    follow = race_weekend.counts_updates(rounds, series.get("weekend"))
+    for round_id, counts in follow.items():
+        await db.reference_rounds.update_one({"id": round_id, "series_id": sid}, {"$set": {"counts": counts}})
+    if follow:
+        await db.reference_series.update_one({"id": sid}, {"$inc": {"calendar_version": 1}})
+        rounds = [{**item, "counts": follow[item["id"]]} if item["id"] in follow else item for item in rounds]
     sheets = {row["round_id"]: row async for row in db.reference_round_results.find(
         {"series_id": sid, "status": "published"}, {"_id": 0})}
     participants = await db.reference_participants.find({"series_id": sid}, {"_id": 0}).to_list(None)

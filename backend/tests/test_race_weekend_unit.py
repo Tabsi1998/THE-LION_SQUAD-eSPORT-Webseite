@@ -49,7 +49,7 @@ def test_the_kind_of_a_session_comes_from_its_name(label, kind):
     ("R1 S · Australien", "R1", "Sprint"),
     ("R1-Sprint · Australien", "R1", "Sprint"),
     ("R1 Sprint · Australien", "R1", "Sprint"),
-    ("R1 Q Australien", "R1", "Qualifying"),
+    ("R1 Q · Australien", "R1", "Qualifying"),
     ("R1 Quali", "R1", "Qualifying"),
     ("R1 Qualifying", "R1", "Qualifying"),
     ("R1Q · Australien", "R1", "Qualifying"),
@@ -67,6 +67,24 @@ def test_codes_with_a_session_are_recognised(text, code, session):
     found, label, rest = race_weekend.take_code(text)
     assert (found, label) == (code, session)
     assert "Sprint" not in rest and "Quali" not in rest
+
+
+@pytest.mark.parametrize("text, code, rest", [
+    # Ein Lauf-Wort zählt nur mit Trenner danach (Prüfer #1930): „Race of Champions“ ist ein Name, kein Lauf.
+    ("R1 Race of Champions", "R1", "Race of Champions"),
+    ("R1 Q Katar", "R1", "Q Katar"),
+    ("R1 Sprint Ring · Spa", "R1", "Sprint Ring · Spa"),
+])
+def test_a_session_word_needs_a_separator_after_it(text, code, rest):
+    found, session, after = race_weekend.take_code(text)
+    assert (found, session, after.strip()) == (code, None, rest)
+
+
+def test_a_removed_date_counts_as_separator_after_a_session_word():
+    parsed = parse_round_lines("R1 Sprint 07.03.2026 Spa\nR2 Race of Champions 14.03.2026", season="2026",
+                               today="2026-01-01", default_weekday=None, default_time="20:00")
+    assert [(row["code"], row["session"], row["venue"]) for row in parsed["rows"]] == [
+        ("R1", "Sprint", "Spa"), ("R2", None, "Race of Champions")]
 
 
 @pytest.mark.parametrize("text", ["R1x · Probering", "Probering", "Abcdefg1 Ort", "R1Q2 Ort"])
@@ -115,7 +133,8 @@ def test_the_config_of_a_session_follows_the_round_and_falls_back_to_its_kind():
     assert race_weekend.session_config(weekend, 2, "Sprint")["points"][0] == 12
     assert race_weekend.session_config(weekend, 5, "Sprint")["points"] == "series"
     # „Rennen“ steht nicht in der Vorgabe - es nimmt den Lauf derselben Art (Hauptrennen).
-    assert race_weekend.session_config(weekend, 6, "Rennen")["grid"] == "reverse_standings"
+    # Der frühere Name „reverse_standings“ heißt jetzt „vor der Runde“.
+    assert race_weekend.session_config(weekend, 6, "Rennen")["grid"] == "reverse_standings_before_round"
     # Ohne Vorgabe: Qualifying ohne Punkte, Rennen mit Startplatz aus dem Qualifying.
     assert race_weekend.session_config(None, 1, "Qualifying")["points"] == "none"
     assert race_weekend.session_config(None, 1, None)["grid"] == "qualifying"
@@ -281,3 +300,145 @@ def test_existing_rounds_without_sessions_stay_as_they_are():
 
     assert race_weekend.standings(rules=rules, rounds=rounds, sheets=sheets, participants=PEOPLE) == \
         compute_standings(rules=rules, rounds=rounds, sheets=sheets, participants=PEOPLE)
+
+
+# ---------------------------------------------------------------- Prüfer #1930
+def test_a_line_without_code_keeps_its_sessions_in_one_round():
+    weekend = race_weekend.normalize_weekend({"formats": [{"sessions": [
+        {"label": "Qualifying", "offset": 0}, {"label": "Sprint", "offset": 30}, {"label": "Rennen", "offset": 90}]}]})
+    parsed = parse_round_lines("05.03.2026 · Probering\nR2 · 12.03.2026", season="2026", today="2026-01-01",
+                               default_weekday=None, default_time="20:00")
+    out = race_weekend_paste.expand_paste(parsed, weekend, [])
+    assert [(row["code"], row["weekend"]) for row in out["rows"]] == [("R1", 1), ("R2", 2)]
+    # So, wie die Route speichert: je Lauf ein Termin mit dem Kürzel der Zeile.
+    saved = [{"id": f"t{index}", "code": row["code"], "session": item["session"], "order": index}
+             for index, (row, item) in enumerate(((row, item) for row in out["rows"] for item in row["sessions"]),
+                                                 start=1)]
+    assert [(group["number"], len(group["rounds"])) for group in race_weekend.weekend_groups(saved)] == [(1, 3), (2, 3)]
+    taken = [{"id": "x", "code": "R1", "session": "Rennen", "order": 1}]
+    again = race_weekend_paste.expand_paste(parse_round_lines(
+        "19.03.2026", season="2026", today="2026-01-01", default_weekday=None, default_time="20:00"), weekend, taken)
+    assert again["rows"][0]["code"] == "R2"
+
+
+def test_a_negative_offset_without_time_stays_on_the_day():
+    weekend = race_weekend.normalize_weekend({"formats": [{"sessions": [
+        {"label": "Qualifying", "offset": -30}, {"label": "Rennen", "offset": 0}, {"label": "Sprint", "offset": -1440}]}]})
+    parsed = parse_round_lines("R1 · 07.03.2026", season="2026", today="2026-01-01", default_weekday=None,
+                               default_time=None)
+    sessions = race_weekend_paste.expand_paste(parsed, weekend, [])["rows"][0]["sessions"]
+    assert {item["session"]: item["day"] for item in sessions} == {
+        "Sprint": "2026-03-06", "Qualifying": "2026-03-07", "Rennen": "2026-03-07"}
+
+
+def test_the_race_takes_its_grid_from_the_qualifying_and_the_sprint_from_the_shootout():
+    weekend = race_weekend.normalize_weekend({"formats": [{"sessions": [
+        {"label": "Qualifying", "offset": 0}, {"label": "Shootout", "offset": 1440},
+        {"label": "Sprint", "offset": 1500, "points": [8, 7, 6], "grid": "qualifying"},
+        {"label": "Rennen", "offset": 2880, "grid": "qualifying"}]}]})
+    rounds = _rounds(("q", "R1", "Qualifying", False), ("so", "R1", "Shootout", False), ("s", "R1", "Sprint", True),
+                     ("r", "R1", "Rennen", True))
+    sheets = {"q": _sheet(("a", 1, {"marks": ["pole"]}), ("b", 2, {}), ("c", 3, {})),
+              "so": _sheet(("c", 1, {}), ("b", 2, {}), ("a", 3, {})),
+              "s": _sheet(("a", 1, {}), ("b", 2, {}), ("c", 3, {})),
+              "r": _sheet(("b", 1, {}), ("a", 2, {}), ("c", 3, {}))}
+    snapshots = race_weekend.standings(rules={"points_by_place": [25, 18, 15], "bonuses": {"pole": {"points": 3}}},
+                                       rounds=rounds, sheets=sheets, participants=PEOPLE, weekend=weekend)
+    results = _results([snap for snap in snapshots if snap["scope"] == "drivers"][-1])
+    assert {pid: results[pid]["r"]["grid"] for pid in "abc"} == {"a": 1, "b": 2, "c": 3}
+    assert {pid: results[pid]["s"]["grid"] for pid in "abc"} == {"c": 1, "b": 2, "a": 3}
+    # Die Pole kommt aus dem Qualifying fürs Rennen und zählt am Rennen - nicht am Sprint.
+    assert [pid for pid in "abc" if "pole" in results[pid]["r"]["marks"]] == ["a"]
+    assert [pid for pid in "abc" if "pole" in results[pid]["s"]["marks"]] == []
+
+
+def test_a_disqualified_first_place_does_not_get_the_pole():
+    rows = [{"participant_id": "a", "place": 1, "marks": ["dsq", "pole"]}, {"participant_id": "b", "place": 2, "marks": []},
+            {"participant_id": "c", "place": 3, "marks": []}]
+    race_weekend.mark_pole(rows)
+    assert [row["marks"] for row in rows] == [["dsq"], ["pole"], []]
+    assert race_weekend.pole_holder([{"participant_id": "a", "place": 1, "marks": ["dsq"]},
+                                     {"participant_id": "b", "place": 2, "marks": []}]) == "b"
+    rounds = _rounds(("q", "R1", "Qualifying", False), ("r", "R1", "Rennen", True))
+    sheets = {"q": _sheet(("a", 1, {"marks": ["dsq"]}), ("b", 2, {})), "r": _sheet(("b", 1, {}), ("a", 2, {}))}
+    snapshots = race_weekend.standings(rules={"points_by_place": [25, 18], "bonuses": {"pole": {"points": 3}}},
+                                       rounds=rounds, sheets=sheets, participants=PEOPLE)
+    results = _results([snap for snap in snapshots if snap["scope"] == "drivers"][-1])
+    assert [pid for pid in "ab" if "pole" in results[pid]["r"]["marks"]] == ["b"]
+    assert results["b"]["r"]["points"] == 28
+
+
+def _drivers(snapshots):
+    return {row["participant_id"]: row for row in [snap for snap in snapshots if snap["scope"] == "drivers"][-1]["rows"]}
+
+
+def test_activity_points_and_rounds_played_count_once_per_round():
+    weekend = race_weekend.normalize_weekend({"formats": [{"sessions": [
+        {"label": "Blitz-Qualifying", "points": [2]}, {"label": "Sprint", "grid": "manual"}, {"label": "Hauptrennen"}]}]})
+    rounds = _rounds(("q", "R1", "Blitz-Qualifying", True), ("s", "R1", "Sprint", True), ("f", "R1", "Hauptrennen", True),
+                     ("q2", "R2", "Blitz-Qualifying", True), ("s2", "R2", "Sprint", True))
+    sheets = {rid: _sheet(("a", 1, {}), ("b", 2, {})) for rid in ("q", "s", "f", "q2", "s2")}
+    snapshots = race_weekend.standings(rules={"points_by_place": [25, 18], "activity_points": {"points": 1, "from_round": 2}},
+                                       rounds=rounds, sheets=sheets, participants=PEOPLE, weekend=weekend)
+    rows = _drivers(snapshots)
+    # Runde 1: 2 + 25 + 25, Runde 2: 2 + 25, dazu ein Aktivitätspunkt für Runde 2 (nicht je Lauf).
+    assert (rows["a"]["points"], rows["a"]["activity_points"], rows["a"]["rounds_played"]) == (80, 1, 2)
+
+
+def test_a_drop_removes_a_whole_round_never_a_single_session():
+    weekend = race_weekend.normalize_weekend({"formats": [{"sessions": [{"label": "Qualifying", "points": [2]},
+                                                                        {"label": "Rennen"}]}]})
+    rounds = _rounds(("q1", "R1", "Qualifying", True), ("r1", "R1", "Rennen", True),
+                     ("q2", "R2", "Qualifying", True), ("r2", "R2", "Rennen", True))
+    sheets = {"q1": _sheet(("a", 1, {}), ("b", 2, {})), "r1": _sheet(("b", 1, {}), ("a", 2, {})),
+              "q2": _sheet(("b", 1, {}), ("a", 2, {})), "r2": _sheet(("a", 1, {}), ("b", 2, {}))}
+    snapshots = race_weekend.standings(rules={"points_by_place": [25, 18], "count_mode": "drop_n", "count_n": 1},
+                                       rounds=rounds, sheets=sheets, participants=PEOPLE, weekend=weekend)
+    rows = _drivers(snapshots)
+    # Anna: R1 = 2 + 18 = 20, R2 = 0 + 25 = 25 - gestrichen wird die ganze Runde 1, nicht das Qualifying.
+    assert (rows["a"]["points"], rows["a"]["dropped_round_ids"], rows["a"]["counted_round_ids"]) == (
+        25, ["q1", "r1"], ["q2", "r2"])
+    assert (rows["b"]["points"], rows["b"]["dropped_round_ids"]) == (25, ["q2", "r2"])
+
+
+def test_old_seasons_with_the_same_code_twice_stay_separate_rounds():
+    rounds = [{"id": "a", "code": "R1", "order": 1}, {"id": "b", "code": "R1", "order": 2},
+              {"id": "c", "code": "R2", "order": 3}]
+    assert [len(group["rounds"]) for group in race_weekend.weekend_groups(rounds)] == [1, 1, 1]
+    assert [item["weekend"] for item in race_weekend.annotate([dict(item) for item in rounds])] == [1, 2, 3]
+    # Mit einem Lauf oder einem Ablauf je Runde sind gleiche Kürzel eine Runde.
+    assert [len(group["rounds"]) for group in race_weekend.weekend_groups(rounds, {"formats": [{"sessions": []}]})] == [
+        2, 1]
+    with_session = [{**rounds[0], "session": "Qualifying"}, *rounds[1:]]
+    assert [len(group["rounds"]) for group in race_weekend.weekend_groups(with_session)] == [2, 1]
+
+
+def test_the_reverse_grid_after_the_previous_session_follows_the_sprint():
+    weekend = race_weekend.normalize_weekend({"formats": [
+        {"sessions": [{"label": "Rennen", "grid": "manual"}]},
+        {"from_round": 2, "sessions": [
+            {"label": "Sprint", "grid": "reverse_standings_before_round"},
+            {"label": "Hauptrennen", "offset": 60, "grid": "reverse_standings_after_previous_session"}]}]})
+    rounds = _rounds(("r1", "R1", None, True), ("s2", "R2", "Sprint", True), ("f2", "R2", "Hauptrennen", True))
+    sheets = {"r1": _sheet(("a", 1, {}), ("b", 2, {}), ("c", 3, {})),
+              "s2": _sheet(("c", 1, {}), ("b", 2, {}), ("a", 3, {})),
+              "f2": _sheet(("a", 1, {}), ("b", 2, {}), ("c", 3, {}))}
+    snapshots = race_weekend.standings(rules={"points_by_place": [25, 18, 15]}, rounds=rounds, sheets=sheets,
+                                       participants=PEOPLE, weekend=weekend)
+    results = _results([snap for snap in snapshots if snap["scope"] == "drivers"][-1])
+    # Sprint: Stand nach R1 (a, b, c) umgedreht. Hauptrennen: Stand nach dem Sprint (a 40, c 40, b 36) umgedreht.
+    assert {pid: results[pid]["s2"]["grid"] for pid in "abc"} == {"a": 3, "b": 2, "c": 1}
+    order_after_sprint = [row["participant_id"] for row in next(
+        snap for snap in snapshots if snap["scope"] == "drivers" and snap["round_id"] == "s2")["rows"]]
+    assert {pid: results[pid]["f2"]["grid"] for pid in "abc"} == {
+        pid: len(order_after_sprint) - order_after_sprint.index(pid) for pid in "abc"}
+
+
+def test_counts_follow_the_template_unless_set_by_hand():
+    weekend = race_weekend.normalize_weekend({"formats": [{"sessions": [{"label": "Qualifying", "points": [2]},
+                                                                        {"label": "Rennen"}]}]})
+    rounds = [{"id": "q", "code": "R1", "session": "Qualifying", "order": 1, "counts": False, "counts_manual": False},
+              {"id": "q2", "code": "R2", "session": "Qualifying", "order": 2, "counts": False, "counts_manual": True},
+              {"id": "old", "code": "R3", "session": "Qualifying", "order": 3, "counts": False}]
+    assert race_weekend.counts_updates(rounds, weekend) == {"q": True}
+    assert race_weekend.counts_updates(rounds, None) == {}

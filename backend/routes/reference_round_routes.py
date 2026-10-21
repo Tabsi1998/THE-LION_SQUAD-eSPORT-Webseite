@@ -9,9 +9,10 @@ Gelöscht wird nichts: Termine werden archiviert. Nach jeder Änderung rechnet d
 (abgesagte Runden zählen nicht zur Rundenzahl, ``counts`` nimmt eine Runde aus der Wertung). Jede Änderung läuft unter
 der Sperre der Saison, wie das Eintragen der Ergebnisse (``reference_series.series_locked``, #1744).
 
-Runde mit Läufen (#1930): Ein Termin trägt seinen Lauf (``session``, leer heißt Rennen); Termine mit gleichem Kürzel sind
-eine Runde (``weekend``, ``services/race_weekend.py``). Ein neues Qualifying zählt ohne Angabe nicht zur Wertung. Eine
-eingefügte Zeile ohne Lauf legt alle Läufe an, die die Saison für diese Runde vorgibt („Ablauf je Runde“).
+Runde mit Läufen (#1930): Ein Termin trägt seinen Lauf (``session``, leer heißt Rennen); mit Läufen sind Termine mit
+gleichem Kürzel eine Runde (``weekend``, ``services/race_weekend.py``). Die Wertung (``counts``) folgt der Vorgabe des
+Laufs, bis sie jemand am Termin von Hand setzt (``counts_manual``; ``counts: null`` gibt sie zurück). Eine eingefügte
+Zeile ohne Lauf legt alle Läufe an, die die Saison für diese Runde vorgibt („Ablauf je Runde“).
 
 Öffentlich: ``/api/reference-series/public/<spur>/<saison>/calendar`` - nur, wenn Spur und Serie sichtbar und nicht
 archiviert sind, ohne Notizen. Die Felder (Titel, Ort, Tag, Zeitpunkt, Status) sind so gewählt, dass der Vereinskalender
@@ -211,6 +212,8 @@ def _new_round(series_id: str, me: dict, **fields) -> dict:
         "id": new_id(), "series_id": series_id, "order": 0, "code": None, "title": None, "venue": None,
         "club_day": None, "starts_at": None, "status": "planned", "original_starts_at": None,
         "original_club_day": None, "cancelled_from": None, "status_note": None, "kind": "regular", "counts": True,
+        # #1930: ``counts`` folgt der Vorgabe des Laufs, bis jemand sie am Termin von Hand setzt.
+        "counts_manual": False,
         "opponent": None, "note": None, "country_code": None, "country_auto": True, "session": None,
         "source": "manual",
         "archived_at": None,
@@ -219,7 +222,8 @@ def _new_round(series_id: str, me: dict, **fields) -> dict:
 
 
 async def _calendar(db, series_id: str) -> dict:
-    series = await db.reference_series.find_one({"id": series_id}, {"_id": 0, "calendar_version": 1}) or {}
+    series = await db.reference_series.find_one(
+        {"id": series_id}, {"_id": 0, "calendar_version": 1, "weekend": 1}) or {}
     rounds = await db.reference_rounds.find({"series_id": series_id}, {"_id": 0}).to_list(None)
     published = [row["round_id"] async for row in db.reference_round_results.find(
         {"series_id": series_id, "status": "published"}, {"_id": 0, "round_id": 1})]
@@ -228,7 +232,7 @@ async def _calendar(db, series_id: str) -> dict:
     archived = sorted((item for item in rounds if item.get("archived_at")),
                       key=lambda item: (item.get("order") or 0, str(item.get("id"))))
     # Runde und Art des Laufs (#1930): Termine mit gleichem Kürzel sind eine Runde mit Läufen.
-    race_weekend.annotate([*view["rounds"], *archived])
+    race_weekend.annotate([*view["rounds"], *archived], series.get("weekend"))
     for item in [*view["rounds"], *archived]:
         item["time"] = vienna_clock(item.get("starts_at"))
     return {"today": today, "version": int(series.get("calendar_version") or 0), **view, "archived": archived}
@@ -257,7 +261,8 @@ async def create_round(series_id: str, body: RoundCreateBody, me: dict = Depends
         when = _when_from_instant(body.starts_at)
     first = await _claim(db, series_id, body.expected_version, orders=1)
     # Ohne ausdrückliche Angabe gilt die Vorgabe des Laufs (#1930): ein Qualifying zählt nicht - außer es hat Punkte.
-    if "counts" in body.model_fields_set:
+    manual = "counts" in body.model_fields_set
+    if manual:
         counts = body.counts
     else:
         existing = await db.reference_rounds.find({"series_id": series_id}, {"_id": 0}).to_list(None)
@@ -265,6 +270,7 @@ async def create_round(series_id: str, body: RoundCreateBody, me: dict = Depends
     # Die Nummer vergibt immer die Folge - ein mitgeschicktes ``order`` zählt nicht (Reihenfolge nur über Ordnen).
     doc = _new_round(series_id, me, order=first, code=_text(body.code), session=body.session,
                      title=_text(body.title), venue=_text(body.venue), **when, kind=body.kind, counts=counts,
+                     counts_manual=manual,
                      opponent=_text(body.opponent), note=_text(body.note),
                      **_country(body.country_auto, body.country_code, _text(body.venue), _text(body.title)))
     await db.reference_rounds.insert_one(doc)
@@ -288,7 +294,12 @@ async def update_round(series_id: str, round_id: str, body: RoundUpdateBody,
         raise HTTPException(422, "Den Status ändern Verschieben, Absagen und das Ergebnis.")
     updates: dict = {key: _text(raw[key]) for key in ("code", "session", "title", "venue", "opponent", "note")
                      if key in raw}
-    updates.update({key: raw[key] for key in ("kind", "counts") if raw.get(key) is not None})
+    updates.update({key: raw[key] for key in ("kind",) if raw.get(key) is not None})
+    # Wertung (#1930): von Hand gesetzt bleibt sie; ``counts: null`` gibt sie an die Vorgabe des Laufs zurück (das
+    # Neurechnen gleicht sie dann an).
+    if "counts" in raw:
+        updates.update({"counts": raw["counts"], "counts_manual": True} if raw["counts"] is not None
+                       else {"counts_manual": False})
     if "day" in raw or "time" in raw:
         day = raw["day"] if "day" in raw else existing.get("club_day")
         clock = raw["time"] if "time" in raw else vienna_clock(existing.get("starts_at"))
