@@ -29,7 +29,9 @@ import type { AppStackParamList, ProfileTabKey } from "../../navigation/types";
 import { seasonScrollProps } from "../../seasons/sky/scroll";
 import { colors, radius } from "../../theme";
 import type { LiveStream, PersonalReferenceItem } from "../../types";
-import { RecordCard, ReferenceWithPath } from "./profile/TournamentPath";
+import { RecordCard } from "./profile/TournamentPath";
+import { ProfileReferences } from "./profile/ProfileReferences";
+import { useMemberPlacements } from "../../lib/memberPlacements";
 import { Button } from "../../components/Button";
 
 type Props = NativeStackScreenProps<AppStackParamList, "PublicProfile">;
@@ -293,7 +295,10 @@ export function ProfileView({ username, navigation, own, header, scrollRef }: { 
   const member = Boolean(shown?.is_club_member);
   // Wie im Web: ein privates Profil zeigt anderen weder Referenzen noch Teams (der Server antwortet ohnehin mit 404).
   const hiddenForOthers = !ownMode && shown?.privacy_public_profile === false;
-  const referenceCount = hiddenForOthers ? 0 : (Array.isArray(shown?.references?.items) ? shown?.references?.items?.length || 0 : 0) + (shown?.tournaments?.length || 0) + (shown?.f1_bests?.length || 0);
+  // Vereinsplatzierungen (#1945): bei Vereinsmitgliedern über ihr öffentlich verknüpftes Vereinsprofil - nicht im eigenen
+  // Profil (das lädt sie selbst) und nie bei einem privaten Profil.
+  const club = useMemberPlacements({ own: false, username: shown?.username || "", enabled: !ownMode && !hiddenForOthers && Boolean(shown?.is_club_member) });
+  const referenceCount = hiddenForOthers ? 0 : (Array.isArray(shown?.references?.items) ? shown?.references?.items?.length || 0 : 0) + (shown?.tournaments?.length || 0) + (shown?.f1_bests?.length || 0) + (club?.references.length || 0);
   const tabs = profileTabs({
     own: ownMode,
     clubMember: member,
@@ -502,9 +507,18 @@ export function ProfileView({ username, navigation, own, header, scrollRef }: { 
         )) : null}
 
         {activeTab === "references" ? (ownMode ? own?.references : (
-          references.length ? (
+          references.length || club?.references.length ? (
+            // Referenzen im neuen Design (#1945): Kopf ohne Nullen, Liga-Weg, Chronik je Jahr.
             <View style={styles.list} testID="public-profile-references">
-              {references.map((item) => <ReferenceWithPath key={item.id} item={item} username={shown.username} publicView onOpen={openReference} />)}
+              <ProfileReferences
+                personal={references}
+                club={club}
+                username={shown.username}
+                publicView
+                onOpenSeason={(target) => navigation.navigate("ReferenceSeason" as never, target as never)}
+                onOpenPersonal={openReference}
+                empty={null}
+              />
             </View>
           ) : (shown.tournaments || []).length || (shown.f1_bests || []).length ? (
             <>

@@ -1,7 +1,8 @@
 import React from "react";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react-native";
 
-// Profil in der App (#1193): Turnierweg zum Aufklappen (eigenes Profil mit „Bild teilen“) und die Bilanz gegen Gegner.
+// Profil in der App (#1193): Turnierweg (eigenes Profil mit „Bild teilen“) - seit #1945 in der aufgeklappten Zeile der
+// Chronik - und die Bilanz gegen Gegner.
 
 const mockGet = jest.fn();
 const mockShareImage = jest.fn();
@@ -13,7 +14,7 @@ jest.mock("../../../lib/resultShare", () => ({
 }));
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const { RecordCard, ReferenceWithPath, recordLabel, stepLine } = require("./TournamentPath");
+const { RecordCard, TournamentPathPanel, recordLabel, stepLine } = require("./TournamentPath");
 
 const ITEM = { id: "tournament:t-old", kind: "tournament", title: "FC 26 Cup", target_id: "fc-26-cup", rank: 2, date: "2026-10-17T13:00:00Z", status: "results_published" };
 const PATH = {
@@ -31,12 +32,9 @@ beforeEach(() => {
   mockShareImage.mockReset();
 });
 
-test("eigenes Profil: aufklappen lädt den Weg, zeigt Runden und Endplatz und teilt das Bild", async () => {
+test("eigenes Profil: der Weg lädt beim Zeigen, zeigt Runden und Endplatz und teilt das Bild", async () => {
   mockGet.mockResolvedValue({ data: PATH });
-  await render(<ReferenceWithPath item={ITEM} username="neonfalke" own />);
-  expect(mockGet).not.toHaveBeenCalled();
-  expect(screen.getByTestId("reference-path-toggle-tournament:t-old")).toHaveTextContent("Dein Weg");
-  await fireEvent.press(screen.getByTestId("reference-path-toggle-tournament:t-old"));
+  await render(<TournamentPathPanel item={ITEM} username="neonfalke" own />);
   await waitFor(() => expect(mockGet).toHaveBeenCalledWith("/profile/neonfalke/tournaments/fc-26-cup/path", undefined));
   expect(await screen.findAllByTestId("tournament-path-step")).toHaveLength(3);
   expect(screen.getByText("Viertelfinale")).toBeTruthy();
@@ -44,23 +42,20 @@ test("eigenes Profil: aufklappen lädt den Weg, zeigt Runden und Endplatz und te
   mockShareImage.mockResolvedValue("shared");
   await fireEvent.press(screen.getByTestId("reference-share-image-tournament:t-old"));
   await waitFor(() => expect(mockShareImage).toHaveBeenCalledWith(PATH.share));
-  // Zuklappen und wieder auf: kein zweites Laden.
-  await fireEvent.press(screen.getByTestId("reference-path-toggle-tournament:t-old"));
-  expect(screen.queryByTestId("tournament-path-tournament:t-old")).toBeNull();
-  await fireEvent.press(screen.getByTestId("reference-path-toggle-tournament:t-old"));
   expect(mockGet).toHaveBeenCalledTimes(1);
 });
 
-test("fremdes Profil: öffentliche Sicht ohne Teilen; Fast Laps klappen nicht auf", async () => {
+test("fremdes Profil: öffentliche Sicht ohne Teilen; ohne Turnier kein Abruf", async () => {
   mockGet.mockResolvedValue({ data: { ...PATH, share: null } });
-  const first = await render(<ReferenceWithPath item={ITEM} username="neonfalke" publicView />);
-  await fireEvent.press(screen.getByTestId("reference-path-toggle-tournament:t-old"));
+  const first = await render(<TournamentPathPanel item={ITEM} username="neonfalke" publicView />);
   await waitFor(() => expect(mockGet).toHaveBeenCalledWith("/profile/neonfalke/tournaments/fc-26-cup/path", { params: { view_as: "public" } }));
   await screen.findAllByTestId("tournament-path-step");
   expect(screen.queryByTestId("reference-share-image-tournament:t-old")).toBeNull();
   await first.unmount();
-  await render(<ReferenceWithPath item={{ ...ITEM, kind: "fastlap" }} username="neonfalke" />);
-  expect(screen.queryByTestId("reference-path-toggle-tournament:t-old")).toBeNull();
+  mockGet.mockClear();
+  await render(<TournamentPathPanel item={{ ...ITEM, target_id: null }} username="neonfalke" />);
+  expect(screen.getByText("Für dieses Turnier gibt es keinen Weg zum Anzeigen.")).toBeTruthy();
+  expect(mockGet).not.toHaveBeenCalled();
 });
 
 test("Bilanz gegen: Siege in Cyan, Niederlagen grau, Tippen öffnet Profil bzw. Team", async () => {

@@ -13,7 +13,7 @@ import { EmptyState, ErrorState, PartialLoadNotice, loadProblem, type LoadProble
 import { MediaImage } from "../../components/MediaImage";
 import { Screen } from "../../components/Screen";
 import { HeaderButton, TabHeader, useTabScrollToTop } from "../../components/TabHeader";
-import { Body, Heading, Muted, Title } from "../../components/Text";
+import { Body, Muted, Title } from "../../components/Text";
 import { onAchievementUnlocked } from "../../lib/achievements";
 import { api } from "../../lib/api";
 import { sortAwards, type Award } from "../../lib/awards";
@@ -29,8 +29,9 @@ import type { PersonalReferenceData, PersonalReferenceItem, PrizePickup, Team } 
 import { prizeCounts } from "./MyPrizesScreen";
 import { ProfileView, type PublicProfilePayload } from "./PublicProfileScreen";
 import { SettingsGroups } from "./SettingsScreen";
-import { profileStyles, Stat, WEB_BASE_URL, type ModerationStanding } from "./profile/parts";
-import { ReferenceWithPath } from "./profile/TournamentPath";
+import { profileStyles, WEB_BASE_URL, type ModerationStanding } from "./profile/parts";
+import { ProfileReferences } from "./profile/ProfileReferences";
+import { useMemberPlacements } from "../../lib/memberPlacements";
 
 // Das eigene Profil (#1149): derselbe Aufbau wie das, was andere sehen (Kopf mit Level und Zahlenleiste, Reiter Übersicht,
 // Erfolge, Auszeichnungen, Referenzen, Teams, für Mitglieder Ehrungen). Was nur dich angeht, steht im Kasten „Nur für
@@ -76,6 +77,8 @@ function OwnProfile() {
   const [achievements, setAchievements] = useState<AchievementsMe>({ groups: [], awards: [] });
   const [evaluating, setEvaluating] = useState(false);
   const [references, setReferences] = useState<PersonalReferenceData>(EMPTY_REFERENCES);
+  // Vereinsplatzierungen (#1945): die Referenzen des Vereins, in deren Aufstellung du stehst - über dein Vereinsprofil.
+  const club = useMemberPlacements({ own: true, username: user?.username || "", enabled: Boolean(user?.is_club_member) });
   // Auszeichnungen (#230): eigene Banner und Trophäen, eine davon als Profilbanner - der Server prüft, dass sie die eigene ist.
   const [awards, setAwards] = useState<{ awards: Award[]; featured_award_id?: string | null }>({ awards: [] });
   const [prizes, setPrizes] = useState<PrizePickup[]>([]);
@@ -270,32 +273,29 @@ function OwnProfile() {
     <EmptyState icon="medal-outline" title="Noch keine Auszeichnungen" detail="Sie entstehen, wenn ein Turnier seine Ergebnisse veröffentlicht – Platz 1 bis 3 als Trophäe, alle anderen als Teilnahme-Banner." />
   );
 
+  // Referenzen im neuen Design (#1945): Kopf ohne Nullen, Liga-Weg, Chronik je Jahr - Vereinsplatzierungen und eigene
+  // Turniere zusammen; ein Turnier klappt mit seinem Weg auf (#1193, mit „Bild teilen“ #1194).
   const ownReferences = (
     <View style={styles.list}>
-      <Card style={profileStyles.card}>
-        <Heading>Meine Referenzen</Heading>
-        <Muted>Persönliche Turnier- und Fast-Lap-Historie aus deinem Konto.</Muted>
-        {/* Nur Kennzahlen über null (#1916, wie #1268 im Web). */}
-        {Number(references.stats.total) > 0 || Number(references.stats.podiums) > 0 || Number(references.stats.wins) > 0 ? (
-          <View style={profileStyles.statGrid} testID="profile-reference-stats">
-            {Number(references.stats.total) > 0 ? <Stat label="Gesamt" value={String(references.stats.total)} /> : null}
-            {Number(references.stats.podiums) > 0 ? <Stat label="Podien" value={String(references.stats.podiums)} tone="gold" /> : null}
-            {Number(references.stats.wins) > 0 ? <Stat label="Siege" value={String(references.stats.wins)} /> : null}
-          </View>
-        ) : null}
-      </Card>
-      {/* Turnierweg (#1193): jedes Turnier lässt sich aufklappen - mit „Bild teilen“ (#1194). */}
-      {references.items.length ? references.items.map((item) => <ReferenceWithPath key={item.id} item={item} username={user?.username} own onOpen={openReference} />) : notLoaded.references && problem ? (
-        <ErrorState problem={problem} title="Referenzen nicht geladen" onRetry={() => { void refresh(); }} testID="profile-references-error" />
-      ) : (
-        <EmptyState
-          icon="ribbon-outline"
-          title="Noch keine Referenzen"
-          detail="Sobald du Turniere spielst oder Fast-Lap-Zeiten eingetragen werden, erscheint deine Historie hier."
-          action={{ label: "Turniere entdecken", onPress: () => { openTab("TournamentList", { filter: "tournaments" }); }, testID: "profile-references-discover" }}
-          testID="profile-references-empty"
-        />
-      )}
+      <ProfileReferences
+        personal={references.items}
+        club={club}
+        username={user?.username}
+        own
+        onOpenSeason={(target) => go("ReferenceSeason", target)}
+        onOpenPersonal={openReference}
+        empty={notLoaded.references && problem ? (
+          <ErrorState problem={problem} title="Referenzen nicht geladen" onRetry={() => { void refresh(); }} testID="profile-references-error" />
+        ) : (
+          <EmptyState
+            icon="ribbon-outline"
+            title="Noch keine Referenzen"
+            detail="Sobald du Turniere spielst, Fast-Lap-Zeiten eingetragen werden oder du für den Verein antrittst, erscheint deine Historie hier."
+            action={{ label: "Turniere entdecken", onPress: () => { openTab("TournamentList", { filter: "tournaments" }); }, testID: "profile-references-discover" }}
+            testID="profile-references-empty"
+          />
+        )}
+      />
     </View>
   );
 
