@@ -18,6 +18,10 @@ const RULES = {
   team_scoring: { enabled: true, counting_drivers: 2, guests_count: true },
   match_points: { win: 3, draw: 1, loss: 0 },
   table_tiebreakers: ["score_diff"],
+  // Turniertage (#1961) - der Server liefert sie immer mit.
+  day_rounds: { count: 5, points_by_place: [8, 7, 6, 5, 4, 3, 2, 1] },
+  custom_bonuses: [{ key: "bingo", label: "Bingo", points: 3 }],
+  tiebreak_top_n: 4,
 };
 
 test("Punkte je Platz lassen sich in jeder üblichen Schreibweise eingeben", () => {
@@ -39,6 +43,19 @@ test("leere Felder: Ausfall nach Platz, keine Grenze, keine Finalgrenze, Vorrang
   expect(rules.final_top_n).toBeNull();
   expect(rules.tiebreakers).toEqual(["wins"]);
   expect(rulesToForm({ ...RULES, dnf_points: 2 }).dnf_points).toBe("2");
+});
+
+test("Turniertage (#1961): Runden aus, neuer Bonus ohne Kennung, leere Boni fallen weg, Namen ohne Tag", () => {
+  const form = rulesToForm({ ...RULES, day_rounds: { count: 0, points_by_place: [8, 7, 6, 5, 4, 3, 2, 1] } });
+  expect(form.day_rounds_count).toBe("");
+  form.custom_bonuses = [...form.custom_bonuses, { label: "Joker", points: "2", key: "" }, { label: "  ", points: "5", key: "" }];
+  const rules = formToRules({ ...form, day_rounds_points: "10-8-6", tiebreak_top_n: "3" });
+  expect(rules.day_rounds).toEqual({ count: 0, points_by_place: [10, 8, 6] });
+  expect(rules.custom_bonuses).toEqual([{ key: "bingo", label: "Bingo", points: 3 }, { label: "Joker", points: 2 }]);
+  expect(rules.tiebreak_top_n).toBe(3);
+  const series = seriesToForm({ hide_name_tags: true, rules: RULES });
+  expect(series.hide_name_tags).toBe(true);
+  expect(seriesPayload(series).hide_name_tags).toBe(true);
 });
 
 test("eine neue Serie nennt Spur und Vorlage, eine bestehende nicht", () => {

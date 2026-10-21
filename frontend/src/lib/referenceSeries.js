@@ -14,6 +14,7 @@ export const TIEBREAKER_OPTIONS = [
   ["", "—"],
   ["countback", "Mehr Siege, dann mehr zweite Plätze …"],
   ["wins", "Mehr Siege"],
+  ["top_n", "Mehr Plätze unter den besten N"],
   ["podiums", "Mehr Podestplätze"],
   ["best_place", "Bester Einzelplatz"],
   ["latest_result", "Besseres letztes Ergebnis"],
@@ -45,11 +46,25 @@ export function parsePointsList(value) {
   return String(value || "").split(/[^0-9.]+/).filter(Boolean).map(Number).filter((item) => !Number.isNaN(item));
 }
 
+let bonusCounter = 0;
+
+/** Ein Sonderbonus der Saison im Formular (#1961): Name und Punkte; die Kennung bleibt beim Umbenennen. */
+export function emptyBonus(values = {}) {
+  bonusCounter += 1;
+  return { key: "", label: "", points: "", formKey: `bonus-${bonusCounter}`, ...values };
+}
+
 export function rulesToForm(rules = {}) {
   const bonuses = rules.bonuses || {};
   const team = rules.team_scoring || {};
   const match = rules.match_points || {};
+  const day = rules.day_rounds || {};
   return {
+    // Turniertage (#1961): Runden je Termin, Rundenpunkte, Sonderboni und das N der Regel „Top N“.
+    day_rounds_count: text(day.count || ""),
+    day_rounds_points: (day.points_by_place || [8, 7, 6, 5, 4, 3, 2, 1]).join(", "),
+    custom_bonuses: (rules.custom_bonuses || []).map((bonus) => emptyBonus({ key: bonus.key, label: bonus.label, points: text(bonus.points) })),
+    tiebreak_top_n: text(rules.tiebreak_top_n ?? 4),
     points_mode: rules.points_mode || "scheme",
     points_by_place: (rules.points_by_place || []).join(", "),
     fastest_lap_points: text(bonuses.fastest_lap?.points ?? 0),
@@ -95,6 +110,11 @@ export function formToRules(form) {
     team_scoring: { enabled: Boolean(form.team_enabled), counting_drivers: optional(form.team_counting_drivers), guests_count: Boolean(form.team_guests_count) },
     match_points: { win: number(form.match_win), draw: number(form.match_draw), loss: number(form.match_loss) },
     table_tiebreakers: (form.table_tiebreakers || []).filter(Boolean),
+    day_rounds: { count: number(form.day_rounds_count), points_by_place: parsePointsList(form.day_rounds_points) },
+    custom_bonuses: (form.custom_bonuses || [])
+      .filter((bonus) => String(bonus.label || "").trim())
+      .map((bonus) => ({ ...(bonus.key ? { key: bonus.key } : {}), label: String(bonus.label).trim(), points: number(bonus.points) })),
+    tiebreak_top_n: number(form.tiebreak_top_n, 4),
   };
 }
 
@@ -174,6 +194,8 @@ export function seriesToForm(series = {}, rules = series.rules) {
     // #1934: eigene Partner der Saison – die der Spur erbt sie ohnehin.
     partner_ids: Array.isArray(series.partner_ids) ? series.partner_ids : [],
     partner_roles: series.partner_roles || {},
+    // #1961: Namen öffentlich ohne Tag der Spielkennung („Name#TLS“ → „Name“).
+    hide_name_tags: Boolean(series.hide_name_tags),
     rules_note: "",
     rules: rulesToForm(rules || {}),
   };
@@ -200,6 +222,7 @@ export function seriesPayload(form, { isNew = false, archived = false } = {}) {
     result_image_template: form.result_image_template || null,
     partner_ids: form.partner_ids || [],
     partner_roles: form.partner_roles || {},
+    hide_name_tags: Boolean(form.hide_name_tags),
     rules: formToRules(form.rules),
   };
   // Eine archivierte Serie behält beim Bearbeiten ihren Stand; zurück holt sie „Zurückholen“.

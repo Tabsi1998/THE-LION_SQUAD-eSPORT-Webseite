@@ -1,9 +1,41 @@
 import { FormGrid, FormSection } from "@/components/tls/AdminForm";
 import { CheckField, SelectField, TextField } from "@/components/tls/FormFields";
-import { COUNT_MODE_OPTIONS, POINTS_MODE_OPTIONS, TABLE_TIEBREAKER_OPTIONS, TIEBREAKER_OPTIONS } from "@/lib/referenceSeries";
+import { COUNT_MODE_OPTIONS, POINTS_MODE_OPTIONS, TABLE_TIEBREAKER_OPTIONS, TIEBREAKER_OPTIONS, emptyBonus } from "@/lib/referenceSeries";
+import { Plus, X } from "lucide-react";
 
 // Regeln einer Serie (#1741) - alles einstellbar, nichts fest verdrahtet. Die Felder kommen aus `rulesToForm`, gerechnet
 // wird im Server. Eine Team-Liga braucht nur Sieg/Unentschieden/Niederlage und den Vorrang ihrer Tabelle.
+// Turnierserie (#1961): dazu Runden je Turniertag mit Rundenpunkten und eigene Sonderboni; „Top N“ beim Vorrang.
+
+function TournamentDayFields({ rules, set }) {
+  const on = Number(rules.day_rounds_count) > 0;
+  const bonuses = rules.custom_bonuses || [];
+  const setBonus = (formKey, values) => set("custom_bonuses", bonuses.map((bonus) => (bonus.formKey === formKey ? { ...bonus, ...values } : bonus)));
+  return (
+    <FormSection title="Turniertage" hint="Mehrere Runden an einem Termin (etwa Lobbys R1–R5): die Summe der Runden ergibt den Tagesplatz, daraus kommen die Punkte je Platz oben. Sonderboni zählen getrennt und werden nie gestrichen." plain testId="series-rules-days-section">
+      <FormGrid cols={3}>
+        <TextField label="Runden je Turniertag" type="number" min="0" max="20" value={rules.day_rounds_count} onChange={(v) => set("day_rounds_count", v)} hint="Leer oder 0: keine Runden." testId="series-rules-day-rounds" />
+        {on && <TextField label="Rundenpunkte je Platz" value={rules.day_rounds_points} onChange={(v) => set("day_rounds_points", v)} placeholder="8, 7, 6, 5, 4, 3, 2, 1" hint="Platz in der Lobby samt Bots, Platz 1 zuerst." testId="series-rules-day-points" />}
+      </FormGrid>
+      <div className="space-y-2" data-testid="series-rules-bonuses">
+        {bonuses.map((bonus, index) => (
+          <div key={bonus.formKey} className="grid grid-cols-[minmax(0,1fr)_6rem_auto] items-end gap-2" data-testid="series-rules-bonus">
+            <TextField label={`Sonderbonus ${index + 1}`} value={bonus.label} onChange={(v) => setBonus(bonus.formKey, { label: v })} placeholder="Bingo" testId="series-rules-bonus-label" />
+            <TextField label="Punkte" type="number" step="any" min="0" value={bonus.points} onChange={(v) => setBonus(bonus.formKey, { points: v })} testId="series-rules-bonus-points" />
+            <button type="button" onClick={() => set("custom_bonuses", bonuses.filter((item) => item.formKey !== bonus.formKey))} aria-label={`Sonderbonus ${bonus.label || index + 1} entfernen`}
+              className="mb-1 p-2 rounded-sm text-white/45 hover:text-white hover:bg-white/5 transition active:scale-[0.97]" data-testid="series-rules-bonus-remove">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        ))}
+        <button type="button" onClick={() => set("custom_bonuses", [...bonuses, emptyBonus()])} data-testid="series-rules-bonus-add"
+          className="tls-btn tls-btn--quiet px-3 py-2 rounded-sm text-xs font-bold uppercase tracking-wider inline-flex items-center gap-2">
+          <Plus className="w-3.5 h-3.5" /> Sonderbonus
+        </button>
+      </div>
+    </FormSection>
+  );
+}
 
 export function RulesFields({ rules, kind, onChange }) {
   const set = (key, value) => onChange({ ...rules, [key]: value });
@@ -56,11 +88,16 @@ export function RulesFields({ rules, kind, onChange }) {
         </FormGrid>
       </FormSection>
 
+      {kind === "series" && <TournamentDayFields rules={rules} set={set} />}
+
       <FormSection title="Vorrang bei Gleichstand" hint="Der Reihe nach; entscheidet keines, teilen sich beide den Platz." plain testId="series-rules-tiebreak-section">
         <FormGrid cols={3}>
           {rules.tiebreakers.map((value, index) => (
             <SelectField key={index} label={`Vorrang ${index + 1}`} value={value} onChange={(v) => setAt("tiebreakers", index, v)} options={TIEBREAKER_OPTIONS} testId={`series-rules-tiebreaker-${index}`} />
           ))}
+          {rules.tiebreakers.includes("top_n") && (
+            <TextField label="N für „Top N“" type="number" min="1" value={rules.tiebreak_top_n} onChange={(v) => set("tiebreak_top_n", v)} hint="Etwa 4: wer öfter unter den besten vier war." testId="series-rules-top-n" />
+          )}
         </FormGrid>
       </FormSection>
 
