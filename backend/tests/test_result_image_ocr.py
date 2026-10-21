@@ -79,15 +79,16 @@ def test_clean_screenshot_is_read_completely_without_corrections():
 @needs_tesseract
 def test_quali_layout_without_grid_is_a_result():
     """Echter Fall (#1981): ein Quali-Bild (Pos | Nr. + Name | Team | Time | Gap) wurde als „keine Zeiten“ abgelehnt.
-    Gelesen wird es vollständig - Platz 1 im Kasten, kein Abstand beim Ersten, keine Punkte; Platz, Zeit und Abstand
-    ohne Gelb (die Schrift der Testhilfe liest die fette 5 als 6 - die Reihenfolge stellt das richtig)."""
+    Gelesen wird es vollständig - Platz 1 im Kasten, kein Abstand beim Ersten, keine Punkte; Zeit und Abstand ohne Gelb.
+    Die Schrift der Testhilfe liest die fette 5 als 6: die Reihenfolge belegt die 5 vor, gelb (Codex zu #1981)."""
     sheet = fixture.quali_sheet()
     out = _read(fixture.png_bytes(fixture.render(sheet, grid=False)), _people(sheet))
     assert out["is_result"] is True
     got = [(row["place"], row["start_number"], row["name"], row["team"], row["time"], row["gap"], row["points"])
            for row in out["rows"]]
     assert got == [(row.place, row.number, row.name, row.team, row.time, row.gap or None, None) for row in sheet.rows]
-    assert not any({"place", "time", "gap", "points"} & set(row["uncertain"]) for row in out["rows"])
+    assert not any({"time", "gap", "points"} & set(row["uncertain"]) for row in out["rows"])
+    assert "place" not in out["rows"][0]["uncertain"]  # Platz 1 im Kasten grün
 
 
 @needs_tesseract
@@ -344,13 +345,22 @@ def test_time_budget_per_image_leaves_the_rest_yellow(monkeypatch):
     monkeypatch.setattr(result_image_ocr, "tesseract", fake_tesseract)
     monkeypatch.setattr(result_image_ocr, "_clock", lambda: clock[0])
     image = Image.new("RGB", (1200, 600), (20, 20, 30))
-    # Schrifthöhe, zwei Seitenlesungen, die Platz-Spalte - dann ist das Budget von 35 s aufgebraucht.
-    reading = result_image_ocr.read(image, TEMPLATE, budget_seconds=35)
-    assert calls == [35, 25, 15, 5]
+    # Schrifthöhe, zwei Seitenlesungen, Platz-Spalte und ihre dritte Lesung - dann ist das Budget von 45 s weg.
+    reading = result_image_ocr.read(image, TEMPLATE, budget_seconds=45)
+    assert calls == [45, 35, 25, 15, 5]
     assert reading.out_of_time and len(reading.rows) == 12
     assert {"name", "time"} <= reading.unchecked and "place" not in reading.unchecked
     out = result_image_match.build(reading, TEMPLATE, [])
     assert all({"name", "time"} <= set(row["uncertain"]) for row in out["rows"])
+    # Codex zu #1981: reicht die Zeit nur für die Streifen-Lesung der Platz-Spalte, nicht für ihre dritte Lesung, ist
+    # auch sie nicht vollständig gegengelesen - ungeprüft und gelb (bisher blieb sie grün).
+    clock[0] = 0.0
+    calls.clear()
+    short = result_image_ocr.read(image, TEMPLATE, budget_seconds=35)
+    assert calls == [35, 25, 15, 5]
+    assert "place" in short.unchecked
+    out = result_image_match.build(short, TEMPLATE, [])
+    assert all("place" in row["uncertain"] for row in out["rows"])
     # Mit genug Zeit ist nichts ungeprüft.
     clock[0] = 0.0
     plenty = result_image_ocr.read(image, TEMPLATE, budget_seconds=600)

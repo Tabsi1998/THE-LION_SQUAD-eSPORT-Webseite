@@ -254,11 +254,14 @@ Dienst) und landet als Zeilen im Blatt – gespeichert wird beim Lesen nichts, a
   farbige Kästen entfernt, auf etwa 40 Pixel Schrifthöhe vergrößert (die Höhe wird vorab mit einer groben Lesung
   geschätzt). Einmal die ganze Seite, dann jede Spalte als Streifen – Zahlen mit Zeichen-Whitelist. Ziffern-Spalten
   (Platz, Startnummer, Startplatz, Zeit, Abstand) ein drittes Mal: größer und schwarz-weiß nach eigener Schwelle
-  (`RowReading.alts`, #1981) - widerspricht diese Lesung (3/5), ist die Zelle gelb.
+  (`RowReading.alts`, #1981) - widerspricht diese Lesung (3/5), ist die Zelle gelb. Eine Gegenprobe (Reihenfolge der
+  Plätze, Zeit = Zeit P1 + Abstand, Zeit des Siegers) bestätigt nur, wenn sie genau eine der Lesungen stützt - die
+  gilt dann (`Decision.options`, `_settle`); stützt sie keine oder mehrere, bleibt die Zelle gelb.
 - **Platz 1 im farbigen Kasten** (#1981): ohne brauchbare Lesung wird die Zelle allein aus dem Originalbild gelesen
   (`_box_read`: nur das Innere, Kontrast gestreckt, als einzelnes Zeichen). Hilfsweise ergibt er sich aus der
-  Reihenfolge: passt genau eine Zeile nicht und laufen alle anderen lückenlos, ist ihr Platz klar, wenn sie die erste
-  ist, nicht gelesen wurde oder einen Platz trägt, den schon eine andere Zeile hat.
+  Reihenfolge: passt nur die erste Zeile nicht und laufen alle anderen lückenlos 2…n, ist sie Platz 1 - grün. Jede
+  andere Ableitung (ein doppelter Platz - in Turnierserien auch ein geteilter, #1961 - oder ein fehlender mitten in
+  der Liste) wird nur vorbelegt und bleibt gelb.
 - **Spalten aus den Daten:** `result_image_ocr.plan_columns` sucht die Spalten des Bilds an den gelesenen Zeilen und
   ordnet sie den Spalten der Vorlage nach Inhalt (Platz, Zahl, Text, Zeit, Abstand) und Reihenfolge zu; Überschriften
   geben nur einen Bonus. Fehlt eine Spalte im Bild (etwa Grid im Qualifying, Punkte), bleibt sie leer. Erst wenn das

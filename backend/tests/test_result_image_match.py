@@ -233,11 +233,21 @@ def test_place_one_in_the_box_comes_from_the_order():
             (1, []), (2, []), (3, []), (4, [])], first
     gap_below = build(reading(row("1"), row("2"), row("3"), row("5")), TEMPLATE, [])
     assert [item["uncertain"] for item in gap_below["rows"]] == [[], [], [], ["place"]]
-    # Eine 5 als 6 gelesen, die 6 steht darunter: der Platz ist doppelt - aus der Reihenfolge ist es die 5.
-    taken = build(reading(row("1"), row("2"), row("3"), row("4"), row("6"), row("6"), row("7")), TEMPLATE, [])
-    assert [(item["place"], item["uncertain"]) for item in taken["rows"]][4] == (5, [])
     two_off = build(reading(row(""), row("2"), row("7"), row("4")), TEMPLATE, [])
     assert [item["uncertain"] for item in two_off["rows"]] == [["place"], [], ["place"], []]
+
+
+def test_other_derived_places_are_prefilled_but_yellow():
+    """Codex zu #1981: Grün aus der Reihenfolge nur Platz 1 in der ersten Zeile. Jede andere Ableitung - ein doppelter
+    Platz (eine 5 als 6 gelesen, oder ein geteilter Platz wie in Turnierserien, #1961) oder ein fehlender mitten in der
+    Liste - wird vorbelegt, bleibt aber gelb; was im Bild stand, steht im Hinweis."""
+    taken = build(reading(row("1"), row("2"), row("3"), row("4"), row("6"), row("6"), row("7")), TEMPLATE, [])
+    assert [(item["place"], item["uncertain"]) for item in taken["rows"]][4] == (5, ["place"])
+    assert taken["rows"][4]["read"] == {"place": "6"}
+    shared = build(reading(row("1"), row("2"), row("2"), row("4")), TEMPLATE, [])
+    assert [(item["place"], item["uncertain"]) for item in shared["rows"]][2] == (3, ["place"])
+    missing = build(reading(row("1"), row("2"), row(""), row("4")), TEMPLATE, [])
+    assert [(item["place"], item["uncertain"]) for item in missing["rows"]][2] == (3, ["place"])
 
 
 def test_leader_has_no_gap_even_if_the_placeholder_is_misread():
@@ -301,10 +311,27 @@ def test_a_third_reading_that_disagrees_makes_digits_yellow():
     differ = build(reading(row("1", "35", "Neu Name", strips={"start_number": "35"}, alts={"start_number": "33"}),
                            row("2"), row("3")), TEMPLATE, [])
     assert differ["rows"][0]["uncertain"] == ["start_number"]
-    # Zeit = Zeit des Ersten + Abstand ist die stärkere Gegenprobe: sie bestätigt trotz anderer dritter Lesung.
+    # Zeit = Zeit des Ersten + Abstand bestätigt, wenn sie genau ein Paar der Lesungen stützt.
     second = row("2", time="1:32,134", gap="+0,364", alts={"time": "1:32,154", "gap": "+0,564"})
     times = build(reading(row("1", time="1:31,770"), second, row("3", time="1:32,754", gap="+0,984")), TEMPLATE, [])
     assert times["rows"][1]["uncertain"] == []
+
+
+def test_a_check_confirms_only_the_one_reading_it_supports():
+    """Codex zu #1981: Die Probe Zeit = P1 + Abstand löschte jeden Widerspruch der Lesungen. Jetzt: passen mehrere
+    Paare (die dritte Lesung sagt 1:32,154 und +0,384 - das geht genauso auf), entscheidet die Probe nichts - gelb.
+    Passt genau eine andere Lesung als die gewählte, gilt diese."""
+    both = row("2", time="1:32,134", gap="+0,364", alts={"time": "1:32,154", "gap": "+0,384"})
+    out = build(reading(row("1", time="1:31,770"), both, row("3", time="1:32,754", gap="+0,984")), TEMPLATE, [])
+    assert {"time", "gap"} <= set(out["rows"][1]["uncertain"])
+    # Seite und Streifen lesen 1:32,154 (falsch), die dritte Lesung 1:32,134 - nur sie passt zu P1 + Abstand.
+    fixed = row("2", time="1:32,154", gap="+0,364", strips={"time": "1:32,154"}, alts={"time": "1:32,134"})
+    out = build(reading(row("1", time="1:31,770"), fixed, row("3", time="1:32,754", gap="+0,984")), TEMPLATE, [])
+    assert (out["rows"][1]["time"], out["rows"][1]["uncertain"]) == ("1:32.134", [])
+    # Die Reihenfolge stützt genau eine Lesung eines Platzes: die gilt.
+    place = build(reading(row("1"), row("2"), row("5", strips={"place": "5"}, alts={"place": "3"}), row("4")),
+                  TEMPLATE, [])
+    assert (place["rows"][2]["place"], place["rows"][2]["uncertain"]) == (3, [])
 
 
 def test_lines_and_unlabelled_points_never_become_points():

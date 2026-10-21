@@ -56,6 +56,9 @@ class Decision:
     conf: float = 0.0
     mark: str | None = None
     disagree: bool = False
+    # Ziffern: die verschiedenen Werte aller Lesungen (Seite, Streifen, dritte Lesung) - eine Gegenprobe darf einen
+    # davon bestätigen, wenn sie genau ihn stützt (``_settle``).
+    options: list = field(default_factory=list)
 
 
 def _parse(kind: str, read: Read, *, page: bool, fmt: TimeFormat | None = None):
@@ -130,11 +133,46 @@ def decide(kind: str, page: Read | None, strip: Read | None, min_conf: float, *,
     """Ein Wert aus Seiten- und Streifenlesung (siehe Modultext). Ziffern haben eine dritte Lesung ``alt`` (anders
     vorbereitet): sagt sie etwas anderes - etwa 5 statt 3 -, ist die Zelle gelb, nie still falsch."""
     decision = _decide_two(kind, page, strip, min_conf, fmt)
-    if kind in DIGIT_KINDS and alt is not None and decision.text and not is_noise(alt.text) and alt.text.strip():
-        other = _parse(kind, alt, page=False, fmt=fmt)
-        if other is not None and _display(other) != decision.text:
-            decision.sure, decision.disagree = False, True
+    if kind not in DIGIT_KINDS:
+        return decision
+    for read, is_page in ((page, True), (strip, False), (alt, False)):
+        if read is None or not read.text.strip() or is_noise(read.text):
+            continue
+        parsed = _parse(kind, read, page=is_page, fmt=fmt)
+        if parsed is not None and all(_display(parsed) != _display(item) for item in decision.options):
+            decision.options.append(parsed)
+    if decision.text and any(_display(item) != decision.text for item in decision.options):
+        decision.sure, decision.disagree = False, True  # die Lesungen widersprechen sich (auch die dritte)
     return decision
+
+
+def _take(decision: Decision, parsed) -> None:
+    """Eine der Lesungen übernehmen (Wert, Anzeige, Marke)."""
+    kind, value = parsed
+    decision.value, decision.text, decision.mark = value, _display(parsed), None
+    if kind == "mark":
+        decision.mark, decision.value = value, None
+
+
+def _settle(decision: Decision, kind: str, fits) -> None:
+    """Gegenprobe für eine Zelle: stützt sie genau eine ihrer Lesungen, gilt diese - grün; stützt sie keine oder mehrere
+    (die Lesungen widersprechen sich und die Probe entscheidet nicht), ist die Zelle gelb."""
+    matching = [item for item in _options(decision, kind) if fits(item[1])]
+    if len(matching) == 1:
+        _take(decision, matching[0])
+        decision.sure = True
+    else:
+        decision.sure = False
+
+
+def _options(decision: Decision | None, kind: str) -> list:
+    return [item for item in decision.options if item[0] == kind] if decision is not None else []
+
+
+def _confirm(decision: Decision | None) -> None:
+    """Eine Gegenprobe bestätigt - aber nie gegen widersprüchliche Lesungen."""
+    if decision is not None and not decision.disagree:
+        decision.sure = True
 
 
 def _decide_two(kind: str, page: Read | None, strip: Read | None, min_conf: float,
@@ -250,18 +288,21 @@ def _check_places(rows: list[dict[str, Decision]]) -> None:
     offsets = Counter(place.value - index for index, place in enumerate(ranked) if isinstance(place.value, int))
     start = max(offsets.items(), key=lambda item: (item[1], -abs(item[0] - 1)))[0] if offsets else 1
     for index, place in enumerate(ranked):
-        place.sure = isinstance(place.value, int) and place.value == start + index
-    # Passt genau eine Zeile nicht und laufen alle anderen lückenlos (mindestens zwei), ist ihr Platz klar: Platz 1 im
-    # farbigen Kasten, der nicht oder verlesen ankam, ein Platz ohne Lesung oder einer, den schon eine andere Zeile hat
-    # (eine 5 als 6 gelesen, und die 6 steht darunter). Eine klar gelesene andere Zahl bleibt gelb - dann fehlt
-    # vielleicht eine Zeile.
+        # Die Reihenfolge stützt höchstens eine Lesung (nur ein Wert ist start + index) - die gilt, sonst gelb.
+        _settle(place, "place", lambda value, expected=start + index: value == expected)
+    # Passt genau eine Zeile nicht und laufen alle anderen lückenlos (mindestens zwei), ist ihr Platz klar. Grün nur
+    # für Platz 1 in der ersten Zeile (der farbige Kasten, der nicht oder verlesen ankam, #1981); jede andere Lücke -
+    # ein Platz ohne Lesung oder einer, den schon eine andere Zeile hat - wird nur vorbelegt und bleibt gelb: in
+    # Turnierserien sind geteilte Plätze erlaubt (#1961), und vielleicht fehlt eine Zeile.
     off = [index for index, place in enumerate(ranked) if not place.sure]
     if len(off) == 1 and len(ranked) >= 3 and offsets:
         index = off[0]
         place = ranked[index]
         taken = place.value in {item.value for item in ranked if item is not place}
-        if place.value is None or taken or (index == 0 and start == 1):
-            place.value, place.text, place.mark, place.sure = start + index, str(start + index), None, True
+        if index == 0 and start == 1:
+            place.value, place.text, place.mark, place.sure = 1, "1", None, True
+        elif place.value is None or taken:
+            place.value, place.text, place.mark, place.sure = start + index, str(start + index), None, False
 
 
 def _lapped(decision: Decision | None) -> str | None:
@@ -305,26 +346,36 @@ def _check_times(rows: list[dict[str, Decision]]) -> None:
         time, gap = row.get("time"), row.get("gap")
         laps = _lapped(gap)
         if laps and _lapped(time) == laps:
-            time.sure = gap.sure = True
+            _confirm(time)
+            _confirm(gap)
             continue
         seconds = time.value[0] if time and isinstance(time.value, tuple) else None
         if seconds is None:
             continue
         if laps and previous is not None and seconds + TIME_TOLERANCE < previous:
-            gap.sure = True
+            _confirm(gap)
         if leader is None:
             leader = winner if winner is not None else seconds
-            previous = seconds
-            # Der Sieger: bestätigt, wenn seine Zeit zur Mehrheit passt; passt sie nicht, ist sie verlesen - gelb.
-            if abs(seconds - leader) > TIME_TOLERANCE:
+            # Der Sieger: bestätigt, wenn genau eine seiner Lesungen zur Mehrheit passt; passt keine, ist er verlesen.
+            if voted:
+                _settle(time, "time", lambda value: abs(value[0] - leader) <= TIME_TOLERANCE)
+            elif abs(seconds - leader) > TIME_TOLERANCE:
                 time.sure = False
-            elif voted:
-                time.sure = True
+            previous = time.value[0] if isinstance(time.value, tuple) else seconds
             continue
         gap_seconds = gap.value[1] if gap and isinstance(gap.value, tuple) else None
         if gap_seconds is not None:
-            consistent = abs(leader + gap_seconds - seconds) <= TIME_TOLERANCE
-            time.sure = gap.sure = consistent
+            # Zeit = Zeit des Siegers + Abstand. Widersprechen sich Lesungen (etwa 3/5), bestätigt die Probe nur ein
+            # Paar, das als einziges passt - sonst bleiben Zeit und Abstand gelb.
+            pairs = [(one, two) for one in _options(time, "time") for two in _options(gap, "gap")
+                     if two[1][1] is not None and abs(leader + two[1][1] - one[1][0]) <= TIME_TOLERANCE]
+            if len(pairs) == 1:
+                _take(time, pairs[0][0])
+                _take(gap, pairs[0][1])
+                time.sure = gap.sure = True
+            else:
+                time.sure = gap.sure = False
+            seconds = time.value[0]
         if gap_seconds is not None and previous is not None and seconds + TIME_TOLERANCE < previous:
             time.sure = False
         previous = seconds
@@ -338,7 +389,9 @@ def _check_leader_gap(rows: list[dict[str, Decision]]) -> None:
         if not (place and gap is not None and place.value == 1 and not _row_marks(row)):
             continue
         seconds = gap.value[1] if isinstance(gap.value, tuple) else None
-        if gap.value is None or (seconds is not None and seconds < TIME_TOLERANCE):
+        # Liest eine der Lesungen einen echten Abstand, widerspricht sie dem Platzhalter - gelb.
+        real = [item for item in _options(gap, "gap") if item[1][1] is None or item[1][1] >= TIME_TOLERANCE]
+        if not real and (gap.value is None or (seconds is not None and seconds < TIME_TOLERANCE)):
             gap.value, gap.text, gap.mark, gap.sure = None, "", None, True
         else:
             gap.sure = False
@@ -397,7 +450,8 @@ def build(reading: Reading, template: dict, participants: list[dict], *, aliases
     for row in rows:
         place, time = row.get("place"), row.get("time")
         if place and time and place.mark and place.mark == time.mark:
-            place.sure = time.sure = True
+            _confirm(place)
+            _confirm(time)
         # Ausfall: statt Zeit und Abstand stehen Platzhalter - auch verlesen (ohne Ziffern) sind sie leer, nicht gelb.
         if _row_marks(row):
             for key in ("time", "gap"):

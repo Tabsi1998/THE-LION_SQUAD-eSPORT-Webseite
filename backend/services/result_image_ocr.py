@@ -903,7 +903,9 @@ def _read_in_budget(img: Image.Image, template: dict, max_rows: int | None) -> R
                                       (max(before) if before else None, min(after) if after else None),
                                       alternate=True)
         except OutOfTime:
-            reading.out_of_time = True  # die übrigen Spalten bleiben ohne zweite Lesung (gelb)
+            # Ohne dritte Lesung ist diese Ziffern-Spalte nicht vollständig gegengelesen - gelb wie die übrigen.
+            reading.out_of_time = True
+            reading.unchecked.add(column["field"])
             continue
         for row_index, value in alternates.items():
             reading.rows[row_index].alts[column["field"]] = value
