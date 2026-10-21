@@ -4,18 +4,24 @@
   der Saison) wird mindestens so streng - anonym weder in der Liste, im Detail, im Profil noch in den laufenden Saisons.
 - Das Adminprotokoll nennt die Zahl der angepassten Referenzen.
 - Lockern öffnet nichts.
+- Referenz speichern: nie offener als alle verknüpften Saisons, über beide Wege; Anlegen und Verknüpfen unter der
+  Sperre der Saison (409, wenn sie besetzt ist).
+- Spur: erst alle Saison-Sperren, dann ändern - ist eine besetzt, bleibt alles, wie es war.
 Nur erfundene Namen."""
 import pathlib
 import sys
+from datetime import timedelta
 
 import pytest
 import pytest_asyncio
 
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 
 from flow_harness import make_flow  # noqa: E402
+from models import now_utc  # noqa: E402
 from routes import reference_round_routes  # noqa: E402
-from services import migrations  # noqa: E402
+from services import migrations, reference_series, season_close  # noqa: E402
 
 ADMIN = "/api/reference-series/admin"
 PUBLIC = "/api/reference-series/public"
@@ -24,6 +30,7 @@ PUBLIC = "/api/reference-series/public"
 @pytest_asyncio.fixture
 async def flow(monkeypatch):
     instance, shutdown = make_flow()
+    await instance.db.mutation_locks.create_index("resource", unique=True)
     monkeypatch.setattr(reference_round_routes, "club_today", lambda: "2026-11-20")
     try:
         yield instance
@@ -163,3 +170,71 @@ async def test_stricter_lineage_tightens_the_references_of_all_its_seasons(flow)
     flow.act_as(admin)
     await flow.patch(f"{ADMIN}/lineages/{lineage['id']}", json={"visibility": "public"})
     assert (await flow.db.references.find_one({"id": "ref-vorjahr"}))["visibility"] == "internal"
+
+
+async def _hold_lock(flow, series_id: str) -> None:
+    """Ein anderer Vorgang hält gerade die Sperre der Saison."""
+    await flow.db.mutation_locks.insert_one({"resource": f"series:{series_id}", "owner": "anderer-worker",
+                                             "expires_at": now_utc() + timedelta(minutes=1)})
+
+
+@pytest.mark.asyncio
+async def test_a_reference_linked_only_by_the_season_cannot_be_opened_again(flow):
+    _, _, series = await _setup(flow, visibility="members")
+    assert (await flow.patch(f"{ADMIN}/series/{series['id']}", json={"reference_id": "ref-fremd"})).status_code == 200
+    assert (await flow.db.references.find_one({"id": "ref-fremd"}))["visibility"] == "members"
+
+    response = await flow.patch("/api/references/ref-fremd", json={"visibility": "public", "title": "Probe Cup neu"})
+    assert response.status_code == 200, response.text
+    assert response.json()["visibility"] == "members"
+    saved = await flow.db.references.find_one({"id": "ref-fremd"})
+    assert (saved["visibility"], saved["title"]) == ("members", "Probe Cup neu")
+
+
+@pytest.mark.asyncio
+async def test_creating_or_linking_a_reference_waits_for_the_season_lock(flow, monkeypatch):
+    monkeypatch.setattr(reference_series, "SERIES_WAIT_SECONDS", 0.05)
+    _, _, series = await _setup(flow)
+    await _hold_lock(flow, series["id"])
+
+    created = await flow.post("/api/references", json={
+        "title": "Probe Neu", "series_id": series["id"], "visibility": "public",
+        "entries": [{"kind": "team", "team_name": "Probe Löwen"}]})
+    assert created.status_code == 409, created.text
+    assert await flow.db.references.find_one({"title": "Probe Neu"}) is None
+
+    linked = await flow.patch("/api/references/ref-fremd", json={"series_id": series["id"], "visibility": "community"})
+    assert linked.status_code == 409, linked.text
+    saved = await flow.db.references.find_one({"id": "ref-fremd"})
+    assert (saved.get("series_id"), saved["visibility"]) == (None, "public")
+
+
+@pytest.mark.asyncio
+async def test_a_link_made_while_saving_still_tightens_the_reference(flow):
+    """Kommt eine Verknüpfung über eine Saison dazu, deren Sperre das Speichern nicht hielt, zieht der Nachlauf nach."""
+    _, _, series = await _setup(flow, visibility="internal")
+    await flow.db.reference_series.update_one({"id": series["id"]}, {"$set": {"reference_id": "ref-fremd"}})
+    assert await season_close.settle_reference(flow.db, "ref-fremd") == "internal"
+    assert (await flow.db.references.find_one({"id": "ref-fremd"}))["visibility"] == "internal"
+    assert await season_close.settle_reference(flow.db, "ref-fremd") is None  # schon streng genug
+
+
+@pytest.mark.asyncio
+async def test_a_busy_season_leaves_lineage_and_references_untouched(flow, monkeypatch):
+    monkeypatch.setattr(reference_series, "SERIES_WAIT_SECONDS", 0.05)
+    _, lineage, series = await _setup(flow)
+    other = (await flow.post(f"{ADMIN}/series", json={
+        "lineage_id": lineage["id"], "season": "2025", "status": "completed"})).json()
+    await flow.db.references.insert_one(
+        {"id": "ref-vorjahr", "title": "Probe Racing 2025", "series_id": other["id"], "visibility": "public",
+         "is_active": True, "entries": []})
+    await _hold_lock(flow, max(series["id"], other["id"]))  # die zuletzt geholte Sperre ist besetzt
+
+    response = await flow.patch(f"{ADMIN}/lineages/{lineage['id']}", json={"visibility": "internal",
+                                                                           "title": "Probe Racing umbenannt"})
+    assert response.status_code == 409, response.text
+    saved = await flow.db.reference_lineages.find_one({"id": lineage["id"]})
+    assert (saved["visibility"], saved["title"]) == ("public", "Probe Racing F1")
+    for rid in ("ref-saison", "ref-vorjahr"):
+        assert (await flow.db.references.find_one({"id": rid}))["visibility"] == "public"
+    assert await flow.db.audit_logs.find_one({"action": "reference_lineage.references_tightened"}) is None

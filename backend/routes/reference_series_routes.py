@@ -144,19 +144,21 @@ async def update_lineage(lineage_id: str, body: ReferenceLineageUpdate, me: dict
         updates["slug"] = await unique_slug(db.reference_lineages, source, current_id=lineage_id,
                                             fallback=SLUG_FALLBACK)
         apply_slug_history(existing, updates)
-    await db.reference_lineages.update_one({"id": lineage_id}, {"$set": {**updates, **_stamp(me)}})
-    if "visibility" in updates:
-        # Strengere Spur (#1970): die Referenzen aller ihrer Saisons folgen sofort, je Saison unter deren Sperre. Ist
-        # eine Saison gerade besetzt, kommt 409 - erneutes Speichern zieht den Rest nach, angepasst wird nur Offeneres.
-        tightened: list[str] = []
-        try:
-            async for item in db.reference_series.find({"lineage_id": lineage_id}, {"_id": 0, "id": 1}):
-                async with reference_series.series_write(db, item["id"]):
-                    _, ids = await season_close.tighten_references(db, item["id"])
-                tightened += [rid for rid in ids if rid not in tightened]
-        finally:  # auch bei 409 steht im Protokoll, was schon angepasst ist
-            await _log_tightened(db, "reference_lineage.references_tightened", lineage_id, me,
-                                 updates["visibility"], tightened)
+    if "visibility" not in updates:
+        await db.reference_lineages.update_one({"id": lineage_id}, {"$set": {**updates, **_stamp(me)}})
+        return await _lineage(db, lineage_id)
+    # Sichtbarkeit der Spur (#1970): erst die Sperren aller ihrer Saisons (feste Reihenfolge), dann Spur und Referenzen
+    # zusammen ändern - ist eine Saison besetzt, kommt 409, bevor irgendetwas geändert ist. Die Referenzen aller Saisons
+    # folgen einer strengeren Spur sofort; Lockern öffnet keine.
+    series_ids = [item["id"] async for item in db.reference_series.find({"lineage_id": lineage_id}, {"_id": 0, "id": 1})]
+    tightened: list[str] = []
+    async with reference_series.series_write_all(db, series_ids):
+        await db.reference_lineages.update_one({"id": lineage_id}, {"$set": {**updates, **_stamp(me)}})
+        for series_id in series_ids:
+            _, ids = await season_close.tighten_references(db, series_id)
+            tightened += [rid for rid in ids if rid not in tightened]
+    await _log_tightened(db, "reference_lineage.references_tightened", lineage_id, me, updates["visibility"],
+                         tightened)
     return await _lineage(db, lineage_id)
 
 
