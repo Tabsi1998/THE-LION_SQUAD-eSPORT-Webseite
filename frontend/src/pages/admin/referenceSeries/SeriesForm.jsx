@@ -7,16 +7,21 @@ import { PUBLISH_OPTIONS, STATUS_OPTIONS, VISIBILITY_OPTIONS, WEEKDAY_OPTIONS, r
 import { SEASON_RESULT_OPTIONS } from "@/lib/seriesTiers";
 import { RulesFields } from "./RulesFields";
 import { OwnTeamsField } from "./OwnTeamsField";
+import { WeekendFormatsField } from "./WeekendFormatsField";
+import { weekendPayload, weekendToForm } from "@/lib/raceWeekend";
 import { toast } from "sonner";
 
 // Saison einer Spur (#1741): Saison und Stufe ergeben die Adresse, die Vorlage füllt die Regeln vor (kopiert, nicht
 // verknüpft). Ändert sich beim Bearbeiten eine Regel, rechnet der Server alle Stände neu und vermerkt den Hinweis.
+// Rennliga (#1930): dazu „Läufe je Runde“ - der Ablauf eines Rennwochenendes, auch ab Runde X wechselnd.
 
 export function SeriesForm({ series, lineage, schemes = [], defaultRules = {}, onClose, onSaved }) {
   const isNew = !series?.id;
   const archived = series?.status === "archived";
   const [form, setForm] = useState(() => seriesToForm({ ...(series || {}), lineage_id: lineage.id }, isNew ? defaultRules : series.rules));
   const [saving, setSaving] = useState(false);
+  const [weekend, setWeekend] = useState(() => weekendToForm(series?.weekend));
+  const racing = lineage.kind === "racing";
   const set = (key, value) => setForm((current) => ({ ...current, [key]: value }));
   const chooseScheme = (id) => {
     const scheme = schemes.find((item) => item.id === id);
@@ -33,6 +38,7 @@ export function SeriesForm({ series, lineage, schemes = [], defaultRules = {}, o
     setSaving(true);
     try {
       const payload = seriesPayload(form, { isNew, archived });
+      if (racing) payload.weekend = weekendPayload(weekend);
       if (isNew) await api.post("/reference-series/admin/series", payload);
       else await api.patch(`/reference-series/admin/series/${series.id}`, payload);
       toast.success("Gespeichert.");
@@ -73,6 +79,7 @@ export function SeriesForm({ series, lineage, schemes = [], defaultRules = {}, o
       <OwnTeamsField teams={form.own_teams} onChange={(teams) => set("own_teams", teams)} />
       <TextAreaField label="Beschreibung" value={form.description} onChange={(v) => set("description", v)} testId="series-description" />
       <RulesFields rules={form.rules} kind={lineage.kind} onChange={(rules) => set("rules", rules)} />
+      {racing && <WeekendFormatsField formats={weekend} onChange={setWeekend} />}
       {!isNew && (
         <TextField label="Hinweis zur Regeländerung" value={form.rules_note} onChange={(v) => set("rules_note", v)} testId="series-rules-note"
           hint="Nur wenn sich eine Regel ändert: steht bei der Saison und im Protokoll; alle Stände werden neu gerechnet." />

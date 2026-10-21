@@ -2,7 +2,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { api, formatApiError } from "@/lib/api";
 import { AdminSheet } from "@/components/tls/AdminSheet";
 import { INPUT_CLASS, TextAreaField } from "@/components/tls/FormFields";
-import { roundLabel, roundWhen } from "@/lib/referenceCalendar";
+import { roundWhen } from "@/lib/referenceCalendar";
+import { roundKind, sessionLabel } from "@/lib/raceWeekend";
 import { parseResultPaste, parseTablePaste } from "@/lib/resultPaste";
 import {
   MARK_OPTIONS, autoPlaces, countFieldErrors, fieldErrors, hintToPoints, emptyMap, emptyMatch, emptyRow, formStamp, formToPayload, formatPoints, matchParticipant,
@@ -21,7 +22,8 @@ import { ClipboardList, Plus, RefreshCw, SlidersHorizontal, Trash2, X } from "lu
 // Veranstalter zum Einfügen. Erst prüft der Server (Vorschau), dann wird übernommen – als Entwurf, veröffentlicht oder,
 // wenn das Blatt schon veröffentlicht ist und die Person nicht veröffentlichen darf, als Entwurf daneben.
 // Rennliga (#1927): je Zeile unter „Mehr“ auch Startplatz, Zeit und Abstand, je Rennen schnellste Runde mit Zeit und
-// Fahrer des Tages – das Einfügen füllt sie aus Tabellen mit diesen Spalten.
+// Fahrer des Tages – das Einfügen füllt sie aus Tabellen mit diesen Spalten. Qualifying (#1930): statt der Punkte die
+// Zeit in der Zeile, keine schnellste Runde und kein Fahrer des Tages; die Pole setzt der Server (Platz 1).
 
 const SMALL_INPUT = `${INPUT_CLASS} !py-1.5 text-sm`;
 const LABEL = "text-[10px] font-bold uppercase tracking-widest text-white/45";
@@ -81,7 +83,7 @@ function FieldErrors({ fields, testId }) {
   );
 }
 
-function ResultRow({ row, index, autoPlace, organizerMode, problems, info, invalid, onChange, onHint, onRemove, onConfirmImage }) {
+function ResultRow({ row, index, autoPlace, organizerMode, qualifying = false, problems, info, invalid, onChange, onHint, onRemove, onConfirmImage }) {
   const scored = info?.scored;
   // Offen von selbst nur, wo etwas Ungewöhnliches steht (Strafe, Gesamtstand, „zählen statt Schlüssel“) oder eine Eingabe
   // ungültig ist. Startnummer, Startplatz, Zeit und Abstand (#1927) stehen zugeklappt kurz unter der Zeile - so bleibt
@@ -106,9 +108,15 @@ function ResultRow({ row, index, autoPlace, organizerMode, problems, info, inval
           onChange={(event) => onChange({ name: event.target.value, participant_id: "" })} data-testid="result-row-name" {...mark("name").props} className={`${SMALL_INPUT} ${mark("name").className}`} />
         <input aria-label={`Team Zeile ${number}`} value={row.team} list="result-teams" placeholder="Team" maxLength={120}
           onChange={(event) => onChange({ team: event.target.value })} data-testid="result-row-team" {...mark("team").props} className={`${SMALL_INPUT} ${mark("team").className} order-last col-start-2 col-end-6 sm:order-none sm:col-start-auto sm:col-end-auto`} />
-        <input aria-label={`Punkte Zeile ${number}`} inputMode="decimal" value={row.points} placeholder="Pkt"
-          title={organizerMode ? "Punkte laut Veranstalter" : "Leer: nach Schlüssel. Eingetragen: laut Veranstalter (wird geprüft)."}
-          onChange={(event) => onChange({ points: event.target.value })} data-testid="result-row-points" {...invalidProps(invalid, "points")} {...mark("points").props} className={`${SMALL_INPUT} text-right tabular-nums ${mark("points").className} ${invalid?.points ? INVALID : ""}`} />
+        {/* Qualifying (#1930): die Zeit statt der Punkte in der Zeile. */}
+        {qualifying ? (
+          <input aria-label={`Zeit Zeile ${number}`} value={row.time} placeholder="Zeit" maxLength={20} title="Rundenzeit; leer oder „--:--.---“: ohne Zeit"
+            onChange={(event) => onChange({ time: event.target.value })} data-testid="result-row-quali-time" {...mark("time").props} className={`${SMALL_INPUT} text-right tabular-nums ${mark("time").className}`} />
+        ) : (
+          <input aria-label={`Punkte Zeile ${number}`} inputMode="decimal" value={row.points} placeholder="Pkt"
+            title={organizerMode ? "Punkte laut Veranstalter" : "Leer: nach Schlüssel. Eingetragen: laut Veranstalter (wird geprüft)."}
+            onChange={(event) => onChange({ points: event.target.value })} data-testid="result-row-points" {...invalidProps(invalid, "points")} {...mark("points").props} className={`${SMALL_INPUT} text-right tabular-nums ${mark("points").className} ${invalid?.points ? INVALID : ""}`} />
+        )}
         <button type="button" className={`${ICON_BUTTON} ${open ? "text-[#29B6E8]" : ""}`} onClick={() => setOpen((value) => !value)} aria-expanded={open} aria-label={`Mehr zu Zeile ${number}`} title="Marken, Strafpunkte, Startnummer, Startplatz, Zeit, Abstand" data-testid="result-row-more">
           <SlidersHorizontal className="w-4 h-4" />
         </button>
@@ -396,6 +404,8 @@ export function ResultEntrySheet({ series, round, onClose, onSaved }) {
   const kind = data?.series?.kind;
   const teamLeague = kind === "team_league";
   const organizerMode = rules.points_mode === "organizer";
+  // Qualifying (#1930): Zeit statt Punkte, ohne schnellste Runde und Fahrer des Tages.
+  const qualifying = kind === "racing" && roundKind(data?.round || round) === "qualifying";
   const access = data?.access || {};
   const board = access.role === "board";
   const participants = useMemo(() => data?.participants || [], [data]);
@@ -597,7 +607,7 @@ export function ResultEntrySheet({ series, round, onClose, onSaved }) {
   const filledRows = built?.payload.rows.length || 0;
 
   return (
-    <AdminSheet title={`Ergebnis ${round ? roundLabel(round) : ""}`} eyebrow={series.lineage?.title} size="xl" onClose={onClose} onSubmit={submit} saving={saving}
+    <AdminSheet title={`Ergebnis ${round ? sessionLabel(round) : ""}`} eyebrow={series.lineage?.title} size="xl" onClose={onClose} onSubmit={submit} saving={saving}
       submitLabel={submitLabel} savingLabel={ready ? "Übernehme …" : "Prüfe …"} submitTestId="result-submit" testId="result-sheet" noValidate
       footer={ready && canPublish && !imageOpen ? (
         <button type="button" disabled={saving} onClick={() => save("draft")} data-testid="result-save-draft" className="tls-btn tls-btn--secondary px-4 py-2.5 rounded-sm text-xs font-bold uppercase tracking-wider disabled:opacity-50">
@@ -610,7 +620,7 @@ export function ResultEntrySheet({ series, round, onClose, onSaved }) {
             <span className="tabular-nums">{roundWhen(data.round)}</span>
             {(data.round.venue || data.round.country_code) && <span>· <VenueWithFlag round={{ venue: data.round.venue, country_code: data.round.country_code }} /></span>}
             {sheetStatus && <span className="text-[10px] font-bold uppercase tracking-widest text-white/45">{sheetStatus === "published" ? "veröffentlicht" : "Entwurf"} · Stand {data.version}</span>}
-            <span className="text-[10px] font-bold uppercase tracking-widest text-white/45">{organizerMode ? "Punkte laut Veranstalter" : "Punkte nach Schlüssel"}</span>
+            <span className="text-[10px] font-bold uppercase tracking-widest text-white/45" data-testid="result-mode">{qualifying ? "Qualifying · ohne Punkte · Pole von selbst" : organizerMode ? "Punkte laut Veranstalter" : "Punkte nach Schlüssel"}</span>
           </div>
 
           {stale && (
@@ -692,7 +702,7 @@ export function ResultEntrySheet({ series, round, onClose, onSaved }) {
               )}
               <ol className="divide-y divide-white/5" data-testid="result-rows">
                 {form.rows.map((row, index) => (
-                  <ResultRow key={row.key} row={row} index={index} autoPlace={auto[row.key]} organizerMode={organizerMode} invalid={invalid[row.key]}
+                  <ResultRow key={row.key} row={row} index={index} autoPlace={auto[row.key]} organizerMode={organizerMode} qualifying={qualifying} invalid={invalid[row.key]}
                     problems={problems.byRow[row.key]} info={infoByKey[row.key]}
                     onChange={(values) => updateRow(row.key, values)} onHint={() => updateRow(row.key, hintToPoints(row, participants))} onRemove={() => removeRow(row.key)}
                     onConfirmImage={() => confirmImageRow(row.key)} />
@@ -703,7 +713,7 @@ export function ResultEntrySheet({ series, round, onClose, onSaved }) {
               </button>
             </section>
           )}
-          {kind === "racing" && <RaceExtras form={form} onChange={update} invalid={invalid.race} problems={problems.byField} />}
+          {kind === "racing" && !qualifying && <RaceExtras form={form} onChange={update} invalid={invalid.race} problems={problems.byField} />}
 
           {teamLeague && form.rows.length === 0 && (
             <button type="button" onClick={addRow} data-testid="result-row-add" className="tls-btn tls-btn--quiet px-3 py-2 rounded-sm text-xs font-bold uppercase tracking-wider inline-flex items-center gap-2">

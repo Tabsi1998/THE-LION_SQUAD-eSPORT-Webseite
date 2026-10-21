@@ -75,7 +75,7 @@ test("neuer Termin: Vorgabe nächster Standard-Wochentag und Standard-Uhrzeit", 
   fireEvent.change(screen.getByTestId("round-venue"), { target: { value: "Musterkurs" } });
   fireEvent.click(screen.getByTestId("round-save"));
   await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/reference-series/admin/series/serie-1/rounds", {
-    code: "R5", title: null, venue: "Musterkurs", day: "2026-11-19", time: "20:30", kind: "regular", counts: true, opponent: null, note: null,
+    code: "R5", session: null, title: null, venue: "Musterkurs", day: "2026-11-19", time: "20:30", kind: "regular", counts: true, opponent: null, note: null,
     country_auto: true, expected_version: 7,
   }));
 });
