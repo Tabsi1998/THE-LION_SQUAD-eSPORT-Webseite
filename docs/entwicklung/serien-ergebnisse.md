@@ -220,10 +220,14 @@ Mehrere Runden an einem Termin (etwa TFT-Lobbys R1–R5), gerechnet in `services
   Name (`ResultEntrySheet` `updateRow`, `hintToPoints`) und eingefügte Liste ohne Team-Spalte (`parseResultPaste`
   `team_column`, `pastedToRows(…, {prefillTeam})`); Bild und Liste mit Team-Spalte bleiben, wie gelesen. Ohne Team
   zeigt die Zeile „zählt für kein Team“ mit Knopf „Stammteam … eintragen“ (`seriesSpecialRules.teamCountHint`). Der
-  Server füllt nie selbst nach. Migration 10 `reference_result_row_teams` (`migrations.migrate_result_row_teams`) hat
-  Altdaten einmal gefüllt: in Saisons mit Teamwertung Zeilen mit Teilnehmer und leerem Team (Blatt und
-  `pending_draft`) mit dessen `default_team`, nie ein `no_team_names`-Eintrag; je Saison Protokoll
-  `reference_series.team_backfill` (`rows`, `round_ids`) und Neurechnen.
+  Server füllt nie selbst nach. Migration 10 `reference_result_row_teams` (`migrations.migrate_result_row_teams`)
+  füllt Altdaten einmal: in allen Saisons (auch ohne Teamwertung) Zeilen mit Teilnehmer und leerem Team (Blatt und
+  `pending_draft`) mit dessen `default_team`, nie ein `no_team_names`-Eintrag. Je Saison unter `series_write`, je Blatt
+  mit Versionsfilter; `team_backfill_pending` (vor dem ersten Schreiben) und `team_backfill_at` (nach Neurechnen und
+  Protokoll `reference_series.team_backfill` mit `rows`, `round_ids`) an der Saison - neu gerechnet nur, wo sich etwas
+  geändert hat. Eine Saison mit Fehler hält die anderen nicht auf; die Migration wirft dann `MigrationIncomplete`,
+  bleibt offen und macht beim nächsten Start weiter (der Start läuft weiter). Die Sperre des Laufs wird je Saison
+  verlängert (`migrations.extend_migration_lease`).
 - **Teamwertung:** Ein Name aus `team_scoring.no_team_names` (Vorgabe `["Ersatzfahrer"]`, je Saison
   einstellbar, Vergleich ohne Groß/klein und Leerraum, `scoring_rules.is_no_team`) zählt für kein Team und bekommt keine
   Zeile. `team_scoring.mode` `per_race` (Vorgabe: Gesamt = Summe der Zellen) oder `current_lineup` (wie beim
