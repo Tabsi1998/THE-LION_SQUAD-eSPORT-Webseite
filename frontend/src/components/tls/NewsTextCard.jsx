@@ -10,6 +10,9 @@ import { textCardSentence } from "@/lib/newsCards";
 //
 // size: "thumb" (kleines Vorschaubild, nur Fläche und Löwe), "md" (Karte im Raster), "lg" (Aufmacher).
 
+/** Löwe der großen Karten: 78 % hoch, unten um 24 % angeschnitten - oben bleibt gut ein Drittel der Fläche frei. */
+export const LION_PLACE = "-right-[8%] -bottom-[24%] h-[78%] w-auto";
+
 const SENTENCE_SIZE = {
   md: "text-lg sm:text-xl",
   lg: "text-xl md:text-2xl xl:text-[1.75rem]",
@@ -33,10 +36,12 @@ export function NewsTextCard({ news, size = "md", className = "" }) {
       className={`tls-news-textcard relative w-full h-full overflow-hidden ${className}`}
       style={result ? { background } :{ backgroundColor: newsCategoryColorDark(news?.category) }}
     >
+      {/* Der Löwe sitzt unten rechts angeschnitten; die oberen Ecken bleiben frei - dort darf Saison-Deko (Ostereier
+          an Karten) liegen, ohne über der Grafik zu stehen. */}
       <LionArt
         art="plain"
         size={120}
-        className={`tls-news-textcard__lion absolute pointer-events-none ${thumb ? "-right-[18%] -bottom-[30%] h-[130%] w-auto" : "-right-[10%] -bottom-[22%] h-[105%] w-auto"} ${result ? "text-honor/10" : "text-white/[0.12]"}`}
+        className={`tls-news-textcard__lion absolute pointer-events-none ${thumb ? "-right-[18%] -bottom-[30%] h-[130%] w-auto" : LION_PLACE} ${result ? "text-honor/10" : "text-white/[0.12]"}`}
       />
       {!thumb && (
         <div className={`relative h-full flex flex-col justify-end ${pad} pr-[30%]`}>

@@ -1,5 +1,5 @@
 import { render, screen } from "@testing-library/react";
-import { NewsTextCard } from "./NewsTextCard";
+import { LION_PLACE, NewsTextCard } from "./NewsTextCard";
 import { NEWS_CATEGORY_DARK_FALLBACK, KIND_COLORS_DARK } from "@/lib/categoryColors";
 
 // News ohne Bild (#1343): Fläche in der dunklen Kategorie-Farbe, ein Satz aus der News und der angeschnittene Löwe -
@@ -39,4 +39,14 @@ test("als Vorschaubild (klein) nur Fläche und Löwe", () => {
   const card = screen.getByTestId("news-text-card");
   expect(card).not.toHaveTextContent("Satz.");
   expect(card.querySelector("[data-testid='lion-art-plain']")).not.toBeNull();
+});
+
+test("der Löwe lässt die oberen Ecken frei - dort darf Saison-Deko an der Karte liegen", () => {
+  render(<NewsTextCard news={{ category: "club", excerpt: "Satz." }} />);
+  const lion = screen.getByTestId("lion-art-plain");
+  expect(lion.getAttribute("class")).toContain(LION_PLACE);
+  const height = Number(LION_PLACE.match(/h-\[(\d+)%\]/)[1]);
+  const below = Number(LION_PLACE.match(/-bottom-\[(\d+)%\]/)[1]);
+  // Oberkante des Löwen in % der Kartenhöhe: mindestens ein Drittel bleibt frei (ein Ei braucht gut 45 px).
+  expect(100 - height + below).toBeGreaterThanOrEqual(33);
 });
