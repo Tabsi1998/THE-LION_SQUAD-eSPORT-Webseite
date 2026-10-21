@@ -17,6 +17,7 @@ import {
   type WeekendSettings,
 } from "./raceWeekend";
 import { KIND_LABELS, type LineageInfo } from "./references";
+import { dayRounds } from "./seriesDays";
 import { HIDDEN_NAME, dayLabel, formatNumber, nameOf, number, roundLabel } from "./seriesFormat";
 import type { SeasonPartners } from "./seriesPartners";
 import type { MapPool, TeamLeaguePart } from "./teamLeague";
@@ -153,7 +154,8 @@ export function seasonTabs(page: SeasonPage | null | undefined): Array<{ key: Se
       ...(maps ? [{ key: "maps" as const, label: "Maps" }] : []),
     ];
   }
-  return [{ key: "calendar", label: "Termine" }, { key: "table", label: "Tabelle" }];
+  // Turniertage (#1961) nur mit Tagesdaten vom Server.
+  return [{ key: "calendar", label: "Termine" }, { key: "table", label: "Tabelle" }, ...(dayRounds(page).length ? [{ key: "days" as const, label: "Turniertage" }] : [])];
 }
 
 // ---------------------------------------------------------------- Kalender

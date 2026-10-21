@@ -259,6 +259,32 @@ test("Team-Liga (#1931, #1616): Veto-Karten mit Bild, weitere Spiele, Kader mit 
   expect(within(screen.getByTestId("season-map-pool")).getByLabelText("Hafenkante")).toBeTruthy();
 });
 
+test("Turnierserie (#1961): Reiter Turniertage mit R1…Rn, GES P, Double Up, Lobbys; Boni unter den Punkten", async () => {
+  mockGet.mockResolvedValue({ data: {
+    lineage: { title: "Probe Masters", slug: "pm", kind: "series", game_name: "Probespiel" },
+    series: { season: "2026", season_slug: "2026" },
+    rules: { day_rounds: { count: 2, points_by_place: [8, 7, 6] }, custom_bonuses: [{ key: "bingo", label: "Bingo", points: 3 }] },
+    rounds: [{ id: "t1", code: "T1", club_day: "2026-10-01", state: "scored", kind: "regular" }],
+    standings: { rows: [
+      { key: "hugo", name: "Hugo Probe", rank: 1, points: 38, bonus_points: 3, results: [{ round_id: "t1", place: 1, points: 35, day_rounds: [{ points: 8, lobby: "A" }, { points: 7, lobby: "A" }], day_points: 15, bonus_keys: ["bingo"] }] },
+      { key: "mira", name: "Mira Stahl", rank: 2, points: 30, club_member: true, results: [{ round_id: "t1", place: 2, points: 30, day_rounds: [{ points: 7, lobby: "A" }, { points: 8, lobby: "A" }], day_points: 15, partner: { name: "Gina Gedacht" } }] },
+    ] },
+  } });
+  await render(<ReferenceSeasonScreen navigation={navigation} route={routeFor("pm", "2026")} />);
+  await waitFor(() => expect(screen.getByRole("tab", { name: "Turniertage" })).toBeTruthy());
+  await fireEvent.press(screen.getByRole("tab", { name: "Tabelle" }));
+  expect(within(screen.getByTestId("season-table-hugo")).getByText("+3 Boni")).toBeTruthy();
+  await fireEvent.press(screen.getByRole("tab", { name: "Turniertage" }));
+  expect(screen.getByTestId("season-days-double-up")).toBeTruthy();
+  expect(screen.getByText("2 Runden · GES P bestimmt den Tagesplatz, daraus die Saisonpunkte")).toBeTruthy();
+  const hugo = screen.getByTestId("season-day-row-hugo");
+  expect(within(hugo).getByText("Bingo +3")).toBeTruthy();
+  expect(within(hugo).getByLabelText("R1: 8 Punkte, Platz 1, Lobby A")).toBeTruthy();
+  expect(within(screen.getByTestId("season-day-row-mira")).getByText("mit Gina Gedacht")).toBeTruthy();
+  await fireEvent.press(screen.getByTestId("season-days-lobbies"));
+  expect(within(screen.getByTestId("season-lobby-A")).getByText("Lobby A")).toBeTruthy();
+});
+
 test("„Im Web öffnen“ führt zur Serienseite im Web", async () => {
   mockGet.mockResolvedValue({ data: RACING });
   const open = jest.spyOn(Linking, "openURL").mockResolvedValue(true);

@@ -40,11 +40,11 @@ export function MapCard({ name, image, testID }: { name: string; image?: string 
 
 /** Ein Map-Pool je Modus (Saison #1616, Turnier und Phase): Überschrift mit Anzahl nur bei mehreren Gruppen oder einem
  * Modus, die Maps in zwei Spalten, gestaffelt eingeblendet. Ohne Maps nichts. */
-export function MapPoolView({ title, hint, groups, testID }: { title: string; hint?: string; groups: PoolGroup[]; testID?: string }) {
+export function MapPoolView({ title, hint, groups, testID, style }: { title: string; hint?: string; groups: PoolGroup[]; testID?: string; style?: StyleProp<ViewStyle> }) {
   if (!groups.length) return null;
   let index = 0;
   return (
-    <View style={styles.pool} testID={testID}>
+    <View style={[styles.pool, style]} testID={testID}>
       <Muted style={styles.title} accessibilityRole="header">{title}</Muted>
       {hint ? <Muted style={styles.hint}>{hint}</Muted> : null}
       {groups.map((group) => (

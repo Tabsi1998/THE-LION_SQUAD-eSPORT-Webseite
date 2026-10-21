@@ -10,6 +10,9 @@ import { SeasonDrivers } from "../../components/references/season/SeasonDrivers"
 import { SeasonStandings } from "../../components/references/season/SeasonStandings";
 import { SeasonStatistics } from "../../components/references/season/SeasonStatistics";
 import { LeagueTable, Matchdays, SeasonMaps, Squad } from "../../components/references/season/TeamLeague";
+import { TournamentDays } from "../../components/references/season/TournamentDays";
+import { MapPoolView } from "../../components/references/MapCards";
+import { poolGroups } from "../../lib/teamLeague";
 import { SeasonNotice } from "../../components/references/seriesParts";
 import { Screen } from "../../components/Screen";
 import { Body, Muted } from "../../components/Text";
@@ -148,12 +151,15 @@ export function ReferenceSeasonScreen({ navigation, route }: Props) {
 
         <View style={styles.body}>
           {active === "calendar" ? <SeasonCalendar page={page} onOpenRound={seasonKind(page) === "racing" ? openRound : undefined} /> : null}
+          {/* Map-Pool der Saison (#1616) - bei der Team-Liga im Reiter „Maps“, sonst unter den Terminen. */}
+          {active === "calendar" ? <MapPoolView title="Map-Pool" hint="Die Maps dieser Saison, je Modus." groups={poolGroups(page.map_pool)} testID="season-map-pool" style={styles.pool} /> : null}
           {active === "table" ? (seasonKind(page) === "team_league" ? <LeagueTable page={page} /> : <SeasonStandings page={page} />) : null}
           {active === "drivers" ? <SeasonDrivers page={page} /> : null}
           {active === "statistics" ? <SeasonStatistics lineage={lineage} season={season} /> : null}
           {active === "matchdays" ? <Matchdays page={page} /> : null}
           {active === "squad" ? <Squad page={page} /> : null}
           {active === "maps" ? <SeasonMaps page={page} /> : null}
+          {active === "days" ? <TournamentDays page={page} /> : null}
         </View>
         {webButton}
       </ScrollView>
@@ -177,6 +183,7 @@ const styles = StyleSheet.create({
   tabText: { color: ink.quiet, fontSize: 14, fontWeight: "700" },
   tabTextOn: { color: ink.text },
   body: { paddingBottom: 20, paddingHorizontal: 16, paddingTop: 12 },
+  pool: { marginTop: 20 },
   web: { marginHorizontal: 16, marginTop: 4 },
   pressed: { opacity: 0.72 },
 });
