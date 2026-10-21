@@ -367,7 +367,10 @@ async def test_accounts_deleted_before_this_fix_are_cleaned_once(flow, folders):
     for name, row_id in RETAINED_ROWS:
         row = await getattr(flow.db, name).find_one({"id": row_id})
         assert _aware(row["erase_after"]) == datetime(2029, 9, 30, 10, 0, tzinfo=timezone.utc), name
-    assert [row[0] for row in migrations.MIGRATIONS] == [1, 2, 3, 4, 5, 6]
+    # Fortlaufend nummeriert (spätere Migrationen kommen hinten dazu), der Nachzug von #1029 ist Nummer 5.
+    versions = [row[0] for row in migrations.MIGRATIONS]
+    assert versions == list(range(1, len(versions) + 1))
+    assert migrations.MIGRATIONS[4][1] == "deleted_account_leftovers_1029"
 
 
 @pytest.mark.asyncio
