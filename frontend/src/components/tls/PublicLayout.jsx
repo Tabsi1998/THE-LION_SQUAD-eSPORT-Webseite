@@ -326,12 +326,12 @@ export function PublicLayout({ children }) {
         <div className="border-t border-white/5" data-season-line="footer">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 flex flex-col md:flex-row items-center justify-between gap-3 text-xs text-white/40 min-w-0">
             <span>© {new Date().getFullYear()} {clubName} — {tagline}. Alle Rechte vorbehalten.</span>
-            <div className="flex flex-wrap items-center justify-center md:justify-end gap-4">
-              <WhatsNewLink className="hover:text-[#29B6E8] transition" />
+            <div className="flex flex-wrap items-center justify-center md:justify-end gap-x-2.5 gap-y-2 md:gap-4">
               <Link to="/imprint" className="hover:text-[#29B6E8] transition" data-testid="footer-imprint">Impressum</Link>
               <Link to="/privacy" className="hover:text-[#29B6E8] transition" data-testid="footer-privacy">Datenschutz</Link>
               <Link to="/terms" className="hover:text-[#29B6E8] transition">Nutzungsbedingungen</Link>
               <button type="button" onClick={openCookieSettings} className="hover:text-[#29B6E8] transition">Cookies</button>
+              <WhatsNewLink className="hover:text-[#29B6E8] transition" />
               {/* Der Deko-Schalter (#634) steht hier nur für Gäste; Angemeldete stellen ihn unter Einstellungen →
                   Darstellung ein (#1146) - die Wahl gilt fürs Konto, auch in der App. */}
               <GuestDecoSwitch />

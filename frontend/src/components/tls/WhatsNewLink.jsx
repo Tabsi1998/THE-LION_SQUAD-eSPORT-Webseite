@@ -20,11 +20,12 @@ export function WhatsNewLink({ data = whatsNew, className = "" }) {
 
   if (!items.length) return null;
   return (
-    <Link to="/neu" data-testid="footer-whatsnew" className={`relative inline-flex items-center gap-1.5 ${className}`}>
+    <Link to="/neu" data-testid="footer-whatsnew" className={`relative inline-flex items-center whitespace-nowrap ${className}`}>
       Neu
+      {/* Der Punkt sitzt hochgestellt an der Ecke und nimmt keine Breite - die Zeile am Handy bleibt einreihig. */}
       {dot && (
         <>
-          <span className="w-1.5 h-1.5 rounded-full bg-[#29B6E8]" aria-hidden="true" data-testid="footer-whatsnew-dot" />
+          <span className="absolute -top-0.5 -right-2 w-1.5 h-1.5 rounded-full bg-[#29B6E8]" aria-hidden="true" data-testid="footer-whatsnew-dot" />
           <span className="sr-only">(neue Einträge)</span>
         </>
       )}
