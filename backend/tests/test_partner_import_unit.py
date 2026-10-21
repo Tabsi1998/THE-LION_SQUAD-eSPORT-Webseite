@@ -84,6 +84,20 @@ def test_what_the_club_added_by_hand_is_kept_and_not_counted_as_a_difference():
     assert new["rows"][0].get("bonus_keys") is None  # das Original bleibt unberührt
 
 
+def test_marks_and_official_totals_set_by_hand_stay_only_left_comes_from_the_source():
+    """Prüfer zu #1964: ein von Hand gesetztes DSQ/DNS und der offizielle Gesamtstand ändern die Wertung - sie bleiben.
+    „Ausgestiegen“ kommt aus der Quelle: ein altes „left“ fällt weg, wenn die Quelle es nicht mehr meldet."""
+    old = {"rows": [_row("p-a", 1, 8, marks=["dsq", "left"]), _row("p-b", 2, 7, marks=["dns"]), _row("p-c", 3, 6)],
+           "official_totals": {"p-a": 120, "p-c": 80, "p-weg": 5}}
+    new = {"rows": [_row("p-a", 1, 8), _row("p-b", 2, 7, marks=["left"]), _row("p-c", 3, 6)], "official_totals": {}}
+    kept = partner_import.carry_over(new, old)
+    assert [row["marks"] for row in kept["rows"]] == [["dsq"], ["dns", "left"], []]
+    assert kept["official_totals"] == {"p-a": 120, "p-c": 80}
+    diff = partner_import.sheet_diff(old, kept, {})
+    assert [(change["participant_id"], change["fields"]) for change in diff["changes"]] == [
+        ("p-a", {"marks": [["dsq", "left"], ["dsq"]]}), ("p-b", {"marks": [["dns"], ["dns", "left"]]})]
+
+
 def test_a_new_round_gets_the_next_free_code_like_t1_t2():
     """Ein neuer Termin bekommt ein Kürzel wie „T3“ - sonst hieße er nur „Termin 3“. Gezählt wird ab dem höchsten
     „T<Zahl>“ der Saison, archivierte zählen mit; ohne solche Kürzel nach der Zahl der Termine."""

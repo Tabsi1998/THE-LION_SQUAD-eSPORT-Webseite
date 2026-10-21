@@ -1,4 +1,5 @@
 import { roundLabel } from "@/lib/referenceCalendar";
+import { MARK_LABELS } from "@/lib/referenceResults";
 
 // Partner-Plattform einer Turnierserie (#1964): Texte und Auswahl der Vorschau „Jetzt holen“. Der Server rechnet, was
 // Übernehmen täte (Termin, Blatt, Abweichungen) - hier wird es nur lesbar gemacht und die Auswahl gebaut. Vorgewählt
@@ -88,10 +89,12 @@ function fieldParts(fields) {
     }
   }
   if (fields.marks) {
-    const before = (fields.marks[0] || []).includes("left");
-    const after = (fields.marks[1] || []).includes("left");
-    if (after && !before) parts.push("ausgestiegen");
-    if (before && !after) parts.push("nicht mehr ausgestiegen");
+    // Jede Marke, die dazukommt oder wegfällt - „Ausgestiegen“ als Wort, die übrigen wie im Ergebnisblatt (DSQ …).
+    const before = new Set(fields.marks[0] || []);
+    const after = new Set(fields.marks[1] || []);
+    const name = (mark) => (mark === "left" ? "ausgestiegen" : MARK_LABELS[mark] || mark);
+    for (const mark of [...after].sort()) if (!before.has(mark)) parts.push(name(mark));
+    for (const mark of [...before].sort()) if (!after.has(mark)) parts.push(`nicht mehr ${name(mark)}`);
   }
   if (fields.partner_id) parts.push("Partner geändert");
   if (fields.double_up) parts.push(`Double Up: ${fields.double_up[0] ? "ja" : "nein"} → ${fields.double_up[1] ? "ja" : "nein"}`);

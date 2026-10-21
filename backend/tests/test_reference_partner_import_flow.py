@@ -313,13 +313,18 @@ async def test_an_existing_draft_is_replaced_only_after_the_preview(flow):
     _, _, _, series = await _setup(flow)
     manual = (await flow.post(f"{ADMIN}/series/{series['id']}/rounds", json={"day": "2026-10-16"})).json()
     await flow.put(f"{ADMIN}/series/{series['id']}/rounds/{manual['id']}/results", json={
-        "rows": [{"name": "Ada Ausgedacht#AAA", "place": 3}], "status": "draft", "expected_version": 0})
+        "rows": [{"name": "Ada Ausgedacht#AAA", "place": 3, "marks": ["dsq"], "official_total": 41}],
+        "status": "draft", "expected_version": 0})
     item = _items((await flow.post(_url(series, "/preview"))).json())["902"]
     assert (item["state"], item["target"], item["expected_version"]) == ("changed", "draft", 1)
+    ada_change = next(change for change in item["changes"] if change["name"] == "Ada Ausgedacht#AAA")
+    assert "marks" not in ada_change["fields"]  # die Disqualifikation von Hand bleibt - keine Abweichung
     taken = (await flow.post(_url(series, "/apply"), json=_apply_body({"items": [item]}, ["902"]))).json()
     assert taken["items"][0]["status"] == "saved"
     sheet = await _sheet(flow, manual["id"])
     assert (sheet["status"], sheet["version"], len(sheet["rows"]), sheet["double_up"]) == ("draft", 2, 8, True)
+    ada = sheet["rows"][0]
+    assert ada["marks"] == ["dsq"] and sheet["official_totals"] == {ada["participant_id"]: 41}
     revision = await flow.db.reference_round_result_revisions.find_one({"result_id": sheet["id"]}, {"_id": 0})
     assert len(revision["content"]["rows"]) == 1  # der alte Stand liegt als Revision ab
 

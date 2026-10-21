@@ -8,8 +8,9 @@ machen die Routen (``routes/reference_partner_routes.py``) mit denselben Baustei
 - **Abweichungen** (``sheet_diff``): je Person Platz, Tagessumme, Runden, Partner und Marken; dazu wer neu dazukommt
   oder wegfällt und ob das Blatt Double Up ist. Ohne Blatt ist alles „neu“, ohne Abweichung „gleich“ - dann gibt es
   nichts zu übernehmen.
-- **Von Hand ergänzt** (``carry_over``): Sonderboni, Notizen, Strafpunkte und Punkte von Hand kennt die Quelle nicht -
-  sie bleiben aus dem vorhandenen Blatt erhalten und zählen nicht als Abweichung.
+- **Von Hand ergänzt** (``carry_over``): Sonderboni, Notizen, Strafpunkte, Punkte von Hand, Marken außer „Ausgestiegen“
+  (DSQ, DNS …) und der offizielle Gesamtstand kennt die Quelle nicht - sie bleiben aus dem vorhandenen Blatt erhalten
+  und zählen nicht als Abweichung. „Ausgestiegen“ meldet die Quelle selbst.
 - **Fingerabdruck** (``fingerprint``): kurzer Prüfwert des Turniertags. Übernehmen verlangt den Wert aus der Vorschau -
   haben sich die Daten beim Partner inzwischen geändert, wird nichts still übernommen.
 """
@@ -20,6 +21,7 @@ import json
 
 COMPARED = ("place", "day_points", "day_rounds", "partner_id", "marks")
 KEPT_ROW_FIELDS = ("bonus_keys", "note", "penalty_points", "points", "points_source")
+SOURCE_MARKS = frozenset({"left"})  # Marken, die die Quelle selbst meldet - alle anderen setzt der Verein von Hand
 
 
 def _ref(round_doc: dict) -> dict | None:
@@ -118,10 +120,17 @@ def carry_over(new: dict, old: dict | None) -> dict:
         extra = {key: kept[key] for key in KEPT_ROW_FIELDS if kept.get(key) not in (None, [], "", 0)}
         if extra.get("points_source") == "scheme":
             extra.pop("points_source")
-        rows.append({**row, **extra})
+        # Marken: „Ausgestiegen“ meldet die Quelle, jede andere (DSQ, DNS …) hat der Verein gesetzt - sie bleibt.
+        by_hand = {mark for mark in kept.get("marks") or [] if mark not in SOURCE_MARKS}
+        marks = sorted({*(row.get("marks") or []), *by_hand})
+        rows.append({**row, **extra, "marks": marks})
     out = {**new, "rows": rows}
     if not out.get("note") and old.get("note"):
         out["note"] = old["note"]
+    # Offizieller Gesamtstand je Person (von Hand) - nur für, wer noch im Blatt steht; ein neuer Wert geht vor.
+    present = {row.get("participant_id") for row in rows}
+    totals = {pid: value for pid, value in (old.get("official_totals") or {}).items() if pid in present}
+    out["official_totals"] = {**totals, **(new.get("official_totals") or {})}
     return out
 
 

@@ -56,6 +56,14 @@ test("Abweichungen lesbar: Platz, Tagespunkte, Rundenpunkte, Marken, neu, fällt
   expect(changeLines([{ participant_id: "p", name: "X", kind: "changed", fields: { marks: [["left"], []] } }])[0].text).toBe("nicht mehr ausgestiegen");
 });
 
+test("jede Abweichung bei Marken ist lesbar, nicht nur „Ausgestiegen“ (Prüfer)", () => {
+  const line = (before, after) => changeLines([{ participant_id: "p", name: "X", kind: "changed", fields: { marks: [before, after] } }])[0].text;
+  expect(line(["dsq"], ["dsq", "left"])).toBe("ausgestiegen");
+  expect(line(["dns", "dsq"], [])).toBe("nicht mehr DNS · nicht mehr DSQ");
+  expect(line([], ["dnf", "fastest_lap"])).toBe("DNF · Schnellste Runde");
+  expect(line(["pole"], ["left"])).toBe("ausgestiegen · nicht mehr Pole");
+});
+
 test("gleiche Rundenpunkte: es kommen nur Platz und Lobby dazu bzw. sie ändern sich", () => {
   const typed = [{ points: 8 }, { points: 7 }];
   const fetched = [{ place: 1, points: 8, lobby: "1" }, { place: 2, points: 7, lobby: "2" }];
