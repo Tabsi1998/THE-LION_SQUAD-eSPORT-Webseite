@@ -225,6 +225,20 @@ je Stufe) und eine **Mappe als PDF** zum Hochladen. Interessierte sehen auf der 
 Highlights/Notizen. Dazu **Einträge**: ein **Team** mit gemeinsamer Platzierung oder mehrere **Einzelstarter** mit je eigener
 Platzierung, beides in derselben Teilnahme möglich. Spieler wählt ihr aus den Vereinsprofilen; externe Spieler tragt ihr als Namen ein.
 
+**Einzelne Turniere und Cups hier – Ligen und Saisons unter Serien** (3.9): Deren Referenz entsteht beim **Abschluss der
+Saison** automatisch, mit Endplatz, Feldgröße und Spielern; das steht auch oben auf der Seite. Eine Referenz, die zu einer
+Saison gehört, trägt in der Liste das Abzeichen **aus Saison …** mit Link zur Saison. Für ältere Referenzen gibt es im
+Formular die Auswahl **Gehört zur Saison**: verknüpft, führt die Karte auf der Website zur Seite der Saison, und beim
+Abschluss der Saison wird diese Referenz aktualisiert statt doppelt angelegt. Ist es die Referenz des Saisonabschlusses,
+sagt das Formular, dass ihr Endplatz in der Saison gepflegt wird.
+
+<table>
+<tr>
+<td><img src="../assets/referenzen/referenzen-aus-saison-liste.png" alt="Referenzen am Handy: Hinweis auf Serien oben, Abzeichen aus Saison an der Referenz einer Liga" width="220"></td>
+<td><img src="../assets/referenzen/referenzen-gehoert-zur-saison.png" alt="Referenz bearbeiten am Handy: Auswahl Gehört zur Saison und Hinweis, dass der Endplatz in der Saison gepflegt wird" width="220"></td>
+</tr>
+</table>
+
 **Prüfung beim Speichern:** Das Formular prüft Datum und Platzierung und zeigt einen orangen Hinweis direkt am Feld –
 wenn das Ende vor dem Start liegt, mehr als ein Jahr nach dem Start (Tippfehler beim Jahr?), eine abgeschlossene
 Teilnahme erst in der Zukunft endet oder der Platz größer ist als die Zahl der Teilnehmer bzw. Teams. Das sind nur
@@ -288,7 +302,9 @@ Werten über null:
 **Automatisch** (Vorgabe) nimmt den höchsten Platz in der höchsten Stufe, bei Gleichstand den neuesten. Die Stufe kommt aus
 der Saison, zu der die Referenz gehört, sonst aus dem Feld **Liga**; es zählt die Zahl nach Liga, Division, Div, Stufe,
 Tier oder League („Liga 1“ vor „Liga 2“, ohne solche Zahl ganz unten). Oder ihr wählt eine der Podest-Referenzen fest – dann steht auf der Karte „Ausgewählt vom Verein“.
-Gehört die Hauptkarte zu einer Saison, führt sie zur Seite der Saison, sonst zur Referenz.
+Gehört die Hauptkarte zu einer Saison, führt sie zur Seite der Saison, sonst zur Referenz. Dasselbe gilt für jede Karte einer
+Referenz aus einer Saison – in Vitrine, Chronik, „Über uns“, /verein und im Mitgliederprofil; ihre Detailseite zeigt
+**aus Saison …** mit Link.
 
 <table>
 <tr>
@@ -360,6 +376,30 @@ Klassenerhalt grau); die Ehrentafel zählt die Aufstiege mit, die Vitrine wählt
 **Zurückholen** macht es rückgängig. Ein Klick auf die Saison öffnet ihre Seite mit Regeln, Version und Kalender.
 Teilnehmer, Ergebnisse und Captains stehen weiter unten. Die bestehenden
 Referenzen bleiben, wie sie sind.
+
+**Saison abschließen.** Auf der Seite der Saison (nur Vorstand, auch nachträglich für eine schon beendete Saison, etwa eine
+abgeschlossene Team-Liga) öffnet **Saison abschließen** den Vorschlag mit dem Endstand aus der letzten gewerteten Runde:
+
+- **Team:** je eigenem Team der Platz aus der Tabelle – die des Veranstalters, sobald sie eingefügt ist, sonst der eigene
+  Stand – bzw. aus der Teamwertung, „von N Teams“. Dazu die Vereinsspieler aus den Aufstellungen bzw. die Fahrer des Teams.
+- **Einzelwertungen:** je Vereinsmitglied der Platz in der Fahrer- bzw. Gesamtwertung, etwa „Platz 3 von 12 ·
+  Fahrerwertung“. Steht die Person im veröffentlichten Finale, gilt der Platz im Finale.
+- Gäste und ausgeblendete Namen stehen nicht darin. Fehlen noch Ergebnisse, sagt ein Hinweis, wie viele Termine offen sind.
+
+**Referenz anlegen** legt die Referenz an, die Saison gilt dann als abgeschlossen. Gehört schon eine Referenz zur Saison
+(„Gehört zur Saison“, 3.8), ist sie vorgewählt und wird **aktualisiert** statt doppelt angelegt; hat die Saison ihre
+Referenz schon, gibt es nur diese. Erneut abschließen – etwa nach einer Korrektur der Tabelle – aktualisiert dieselbe
+Referenz: Platz und Feldgröße kommen aus der Saison, Titel, Texte, eigene Bezeichnungen und von Hand eingetragene Namen
+bleiben. So zählt die Vitrine jede Saison genau einmal. Danach steht im Kopf der Saison **Referenz: Platz 6 von 8 ·
+ansehen**. Jahreswertungs-Punkte gibt es dafür keine, nur Abzeichen ([Erfolge](erfolge.md) 3.6). Eine abgebrochene Saison
+bekommt keine Platzierung (der Status „abgebrochen“ kommt mit einem eigenen Paket).
+
+<table>
+<tr>
+<td><img src="../assets/serien/serien-saison-abschliessen.png" alt="Blatt Saison abschließen am Handy: Hinweis auf einen offenen Termin, Endstand Platz 6 von 8 Teams, Auswahl der Referenz" width="220"></td>
+<td><img src="../assets/serien/serien-saison-kopf-referenz.png" alt="Kopf der Saison am Handy mit Referenz Platz 6 von 8 und dem Knopf Saison abschließen" width="220"></td>
+</tr>
+</table>
 
 **Kalender der Saison.** Auf der Seite der Saison stehen alle Termine in ihrer Reihenfolge, jeder mit Status:
 **Geplant**, **Heute**, **Ergebnis fehlt** (Tag vorbei, nichts eingetragen), **Verschoben**, **Abgesagt** und
