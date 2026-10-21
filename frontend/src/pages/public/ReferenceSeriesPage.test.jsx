@@ -6,7 +6,7 @@ import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 // nicht sichtbar heißt 404, eine alte Adresse führt zur aktuellen. Fremde Namen ohne Link. Nur erfundene Namen.
 
 const apiMock = { get: vi.fn() };
-vi.mock("@/lib/api", () => ({ api: apiMock, formatApiError: (detail) => detail || "Fehler" }));
+vi.mock("@/lib/api", () => ({ api: apiMock, formatApiError: (detail) => detail || "Fehler", resolveMediaUrl: (value) => value || "" }));
 vi.mock("@/components/tls/PublicLayout", () => ({ PublicLayout: ({ children }) => <div>{children}</div> }));
 vi.mock("@/hooks/useApiInvalidation", () => ({ useApiInvalidation: () => {} }));
 vi.mock("@/hooks/useDocumentTitle", () => ({ useDocumentTitle: vi.fn() }));
@@ -176,4 +176,32 @@ test("unbekannt oder nicht sichtbar: 404", async () => {
   apiMock.get.mockRejectedValue({ response: { status: 404 } });
   renderAt("/references/series/gibt-es/nicht");
   expect(await screen.findByTestId("not-found")).toBeInTheDocument();
+});
+
+
+// ---------------------------------------------------------------- Partner (#1934)
+test("Kopf: Veranstaltet von mit Original-Logo und Link, Mitwirkende darunter", async () => {
+  apiMock.get.mockResolvedValue({ data: { ...BODY, partners: {
+    organizers: [{ id: "p1", slug: "probe-ananas", name: "Probe Ananas", logo_url: "/uploads/ananas.png", role: "organizer" }],
+    contributors: [{ id: "p2", slug: "probe-kokos", name: "Probe Kokos", logo_url: null, role: "contributor" },
+      { id: "p3", slug: "probe-mango", name: "Probe Mango", logo_url: null, role: "contributor" }],
+  } } });
+  renderAt("/references/series/probe-cup/2026-division-1");
+  const organizers = await screen.findByTestId("series-organizers");
+  expect(organizers).toHaveTextContent("Veranstaltet von");
+  const host = screen.getByTestId("series-organizer-probe-ananas");
+  expect(host).toHaveAttribute("href", "/partners/probe-ananas");
+  expect(host).toHaveTextContent("Probe Ananas");
+  const logo = host.querySelector("img");
+  expect(logo).toHaveAttribute("src", "/uploads/ananas.png");
+  expect(logo.className).not.toMatch(/grayscale|invert|brightness|opacity/);
+  expect(screen.getByTestId("series-contributors")).toHaveTextContent("Mit Probe Kokos · Probe Mango");
+  expect(screen.getByTestId("series-contributor-probe-mango")).toHaveAttribute("href", "/partners/probe-mango");
+});
+
+test("Kopf ohne Partner bleibt wie bisher", async () => {
+  apiMock.get.mockResolvedValue({ data: { ...BODY, partners: { organizers: [], contributors: [] } } });
+  renderAt("/references/series/probe-cup/2026-division-1");
+  await screen.findByRole("heading", { level: 1 });
+  expect(screen.queryByTestId("series-partners")).toBeNull();
 });
