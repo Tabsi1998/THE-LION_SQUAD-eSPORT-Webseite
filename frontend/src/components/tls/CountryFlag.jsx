@@ -1,15 +1,18 @@
-import { countryName, flagSrc } from "@/lib/countryFlags";
+import { countryName, flagRatio, flagSrc } from "@/lib/countryFlags";
 import "./countryFlag.css";
 
-// Flagge je Termin und Rennen (#1925): eigene SVG-Datei (public/assets/flags), Alternativtext = Landesname. Feste
-// Breite und Höhe im Seitenverhältnis 4:3, damit beim Laden nichts springt. Ohne bekanntes Land gibt es nichts.
+// Flagge je Termin und Rennen (#1925): Datei aus public/assets/flags (gemeinfrei, siehe README dort), Alternativtext =
+// Landesname. Fester Kasten, damit beim Laden nichts springt: gleiche Höhe je Größe, Breite nach dem echten
+// Seitenverhältnis der Flagge bis höchstens 2:1 (breitere wie Katar passen sich ein). Ohne bekanntes Land gibt es nichts.
 
-const SIZES = { xs: [14, 10.5], sm: [16, 12], md: [20, 15], lg: [24, 18] };
+const HEIGHTS = { xs: 10, sm: 12, md: 14, lg: 16 };
+const MAX_RATIO = 2;
 
 export function CountryFlag({ code, size = "md", className = "" }) {
   const src = flagSrc(code);
   if (!src) return null;
-  const [width, height] = SIZES[size] || SIZES.md;
+  const height = HEIGHTS[size] || HEIGHTS.md;
+  const width = Math.round(height * Math.min(flagRatio(code), MAX_RATIO));
   const name = countryName(code);
   return (
     <img

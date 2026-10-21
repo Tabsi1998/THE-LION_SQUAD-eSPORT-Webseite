@@ -1,20 +1,32 @@
 import { render, screen } from "@testing-library/react";
 import { CountryFlag, VenueWithFlag } from "@/components/tls/CountryFlag";
 
-// Flagge je Termin (#1925): eigene Datei, Alternativtext = Landesname, feste Größe (kein Springen beim Laden).
+// Flagge je Termin (#1925): Datei je Land, Alternativtext = Landesname, fester Kasten nach dem echten
+// Seitenverhältnis (kein Springen beim Laden).
 
-test("die Flagge ist ein Bild mit dem Landesnamen als Alternativtext und fester Größe", () => {
+const size = (img) => [img.getAttribute("width"), img.getAttribute("height")];
+
+test("die Flagge ist ein Bild mit dem Landesnamen als Alternativtext und festem Kasten", () => {
   render(<CountryFlag code="AZ" />);
   const flag = screen.getByRole("img", { name: "Aserbaidschan" });
   expect(flag.getAttribute("src")).toBe("/assets/flags/az.svg");
-  expect(flag.getAttribute("width")).toBe("20");
-  expect(flag.getAttribute("height")).toBe("15");
+  expect(size(flag)).toEqual(["28", "14"]);
   expect(flag.getAttribute("data-country")).toBe("AZ");
+});
+
+test("gleiche Höhe, Breite nach dem Seitenverhältnis bis höchstens 2:1", () => {
+  const { container, rerender } = render(<CountryFlag code="CH" />);
+  expect(size(container.querySelector("img"))).toEqual(["14", "14"]);
+  rerender(<CountryFlag code="IT" />);
+  expect(size(container.querySelector("img"))).toEqual(["21", "14"]);
+  // Katar ist breiter als 2:1 - der Kasten bleibt 2:1, die Flagge passt sich ein.
+  rerender(<CountryFlag code="QA" />);
+  expect(size(container.querySelector("img"))).toEqual(["28", "14"]);
 });
 
 test("klein für Spaltenköpfe, ohne bekanntes Land gar nichts", () => {
   const { container, rerender } = render(<CountryFlag code="it" size="sm" />);
-  expect(container.querySelector("img").getAttribute("width")).toBe("16");
+  expect(size(container.querySelector("img"))).toEqual(["18", "12"]);
   rerender(<CountryFlag code="XX" />);
   expect(container.querySelector("img")).toBeNull();
   rerender(<CountryFlag code={null} />);
