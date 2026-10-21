@@ -281,3 +281,146 @@ async def test_closing_is_for_the_board_only_and_gives_no_annual_ranking_points(
     assert queued and "club" in queued.get("sources", [])
     assert (await flow.get(f"{ADMIN}/series/gibt-es-nicht/close")).status_code == 404
     assert (await flow.post(f"{ADMIN}/series/gibt-es-nicht/close", json={})).status_code == 404
+
+
+# ---------------------------------------------------------------- Prüfung 21.10.: nachgebessert
+async def _entry(flow, reference_id, kind="team"):
+    saved = await flow.db.references.find_one({"id": reference_id}, {"_id": 0})
+    return next(entry for entry in saved["entries"] if entry["kind"] == kind), saved
+
+
+@pytest.mark.asyncio
+async def test_closing_keeps_hand_values_the_season_does_not_have(flow):
+    """Nur, was die Saison wirklich hat, kommt in die Referenz: die Teilnehmerzahl eines Team-Eintrags bleibt."""
+    await _board(flow)
+    _, series = await _racing(flow)
+    old = (await flow.post("/api/references", json={
+        "title": "Probe Racing 2026 (Hand)", "series_id": series["id"],
+        "entries": [{"kind": "team", "team_name": OWN, "placement": 4, "participant_count": 48}]})).json()
+    assert (await flow.post(_close(series), json={"reference_id": old["id"]})).status_code == 200
+    team, _ = await _entry(flow, old["id"])
+    assert (team["placement"], team["team_count"], team["participant_count"]) == (2, 5, 48)
+
+
+@pytest.mark.asyncio
+async def test_without_end_standing_nothing_is_proposed_and_closing_is_refused(flow):
+    """Team-Liga ohne Tabelle: kein leerer Team-Eintrag, kein Abschluss - der von Hand eingetragene Platz bleibt."""
+    await _board(flow)
+    lineage = (await flow.post(f"{ADMIN}/lineages", json={"title": "Probe Liga Leer", "kind": "team_league"})).json()
+    series = (await flow.post(f"{ADMIN}/series", json={
+        "lineage_id": lineage["id"], "season": "2024", "team_name": OWN, "status": "completed"})).json()
+    old = (await flow.post("/api/references", json={
+        "title": "Probe Liga 2024 (Hand)", "series_id": series["id"],
+        "entries": [{"kind": "team", "team_name": OWN, "placement": 3, "team_count": 10}]})).json()
+    assert (await flow.get(_close(series))).json()["entries"] == []
+    response = await flow.post(_close(series), json={"reference_id": old["id"]})
+    assert response.status_code == 422, response.text
+    team, saved = await _entry(flow, old["id"])
+    assert (team["placement"], team["team_count"], saved["updated_at"]) == (3, 10, old["updated_at"])
+    assert (await flow.db.reference_series.find_one({"id": series["id"]})).get("reference_id") is None
+
+
+@pytest.mark.asyncio
+async def test_cancelled_season_clears_the_placement_of_an_existing_reference(flow):
+    await _board(flow)
+    _, series = await _racing(flow)
+    old = (await flow.post("/api/references", json={
+        "title": "Probe Racing (Hand)", "series_id": series["id"],
+        "entries": [{"kind": "team", "team_name": OWN, "placement": 4, "team_count": 5}]})).json()
+    await flow.db.reference_series.update_one({"id": series["id"]}, {"$set": {"status": "cancelled"}})
+    assert (await flow.post(_close(series), json={"reference_id": old["id"]})).status_code == 200
+    team, saved = await _entry(flow, old["id"])
+    assert team["placement"] is None and saved["placement"] is None
+
+
+@pytest.mark.asyncio
+async def test_updated_reference_becomes_at_least_as_strict_as_the_season(flow):
+    """Leck „Nur Mitglieder“: eine öffentliche Referenz einer Mitglieder-Saison wird beim Abschluss nicht öffentlich."""
+    await _board(flow)
+    _, series = await _racing(flow)
+    await flow.db.reference_series.update_one({"id": series["id"]}, {"$set": {"visibility": "members"}})
+    await flow.db.references.insert_one({
+        "id": "ref-offen", "title": "Probe Racing (öffentlich)", "series_id": series["id"], "visibility": "public",
+        "status": "completed", "is_active": True, "entries": [{"id": "e-1", "kind": "team", "team_name": OWN}]})
+    assert (await flow.post(_close(series), json={"reference_id": "ref-offen"})).status_code == 200
+    assert (await flow.db.references.find_one({"id": "ref-offen"}))["visibility"] == "members"
+    flow.act_as(None)
+    assert "ref-offen" not in {item["id"] for item in (await flow.get("/api/references")).json()["items"]}
+
+
+@pytest.mark.asyncio
+async def test_belonging_to_a_season_makes_the_reference_at_least_as_strict(flow):
+    """„Gehört zur Saison“: anlegen und ändern nie offener als Spur bzw. Saison."""
+    await _board(flow)
+    lineage, series = await _racing(flow)
+    await flow.db.reference_lineages.update_one({"id": lineage["id"]}, {"$set": {"visibility": "internal"}})
+    created = (await flow.post("/api/references", json={
+        "title": "Probe", "series_id": series["id"], "visibility": "public",
+        "entries": [{"kind": "team", "team_name": OWN}]})).json()
+    assert created["visibility"] == "internal"
+    patched = (await flow.patch(f"/api/references/{created['id']}", json={"visibility": "public"})).json()
+    assert patched["visibility"] == "internal"
+    alone = (await flow.post("/api/references", json={
+        "title": "Ohne Saison", "visibility": "public", "entries": [{"kind": "team", "team_name": OWN}]})).json()
+    linked = (await flow.patch(f"/api/references/{alone['id']}", json={"series_id": series["id"]})).json()
+    assert linked["visibility"] == "internal"
+    unlinked = (await flow.patch(f"/api/references/{alone['id']}",
+                                 json={"series_id": None, "visibility": "public"})).json()
+    assert unlinked["visibility"] == "public"
+
+
+@pytest.mark.asyncio
+async def test_closing_again_drops_players_who_left_the_season_but_keeps_hand_added_ones(flow):
+    await _board(flow)
+    await flow.db.club_member_profiles.insert_one(
+        {"id": "profil-hand", "slug": "probe-hand", "display_name": "Probe Hand", "is_active": True})
+    _, series = await _team_league(flow)
+    first = (await flow.post(_close(series), json={"reference_id": None})).json()
+    team, _ = await _entry(flow, first["reference_id"])
+    # Von Hand dazu: ein Profil, das nie aus der Saison kam.
+    patched = await flow.patch(f"/api/references/{first['reference_id']}", json={"entries": [
+        {**team, "member_profile_ids": [*team["member_profile_ids"], "profil-hand"]}]})
+    assert patched.status_code == 200, patched.text
+    await flow.db.reference_participants.update_one({"id": "tl-beta"}, {"$set": {"name_hidden": True}})
+    assert (await flow.post(_close(series), json={"reference_id": None})).status_code == 200
+    team, saved = await _entry(flow, first["reference_id"])
+    assert team["member_profile_ids"] == ["profil-alpha", "profil-hand"]
+    assert [member["profile_id"] for member in team["lineup_members"]] == ["profil-alpha", "profil-hand"]
+    assert saved["member_profile_ids"] == ["profil-alpha", "profil-hand"]
+
+
+@pytest.mark.asyncio
+async def test_closing_again_drops_the_solo_entry_of_a_player_now_shown_as_guest(flow):
+    await _board(flow)
+    _, series = await _racing(flow)
+    first = (await flow.post(_close(series), json={"reference_id": None})).json()
+    hand = (await flow.patch(f"/api/references/{first['reference_id']}", json={"entries": [
+        *(await flow.db.references.find_one({"id": first["reference_id"]}))["entries"],
+        {"kind": "solo", "lineup": ["Probe Ersatz"], "placement": 9}]})).json()
+    assert len(hand["entries"]) == 3
+    await flow.db.reference_participants.update_one(
+        {"id": "rc-alpha"}, {"$set": {"link": "guest", "is_club_member": False}})
+    assert (await flow.post(_close(series), json={"reference_id": None})).status_code == 200
+    saved = await flow.db.references.find_one({"id": first["reference_id"]}, {"_id": 0})
+    # Der Eintrag aus der Saison geht, der von Hand bleibt; das Team bleibt - ohne den Gast.
+    assert [(entry["kind"], entry["placement"]) for entry in saved["entries"]] == [("team", 2), ("solo", 9)]
+    assert saved["entries"][0]["member_profile_ids"] == []
+
+
+@pytest.mark.asyncio
+async def test_an_outdated_reference_form_cannot_overwrite_the_season_end(flow):
+    """Formular vor dem Abschluss geöffnet, danach gespeichert: 409 statt still den Endplatz zu überschreiben."""
+    await _board(flow)
+    _, series = await _team_league(flow)
+    old = (await flow.post("/api/references", json={
+        "title": "Probe Liga (Hand)", "series_id": series["id"],
+        "entries": [{"kind": "team", "team_name": OWN, "placement": 7}]})).json()
+    assert (await flow.post(_close(series), json={"reference_id": old["id"]})).status_code == 200
+    stale = await flow.patch(f"/api/references/{old['id']}", params={"expected_updated_at": old["updated_at"]},
+                             json={"entries": [{**old["entries"][0], "placement": 7}]})
+    assert stale.status_code == 409, stale.text
+    team, saved = await _entry(flow, old["id"])
+    assert team["placement"] == 6
+    fresh = await flow.patch(f"/api/references/{old['id']}", params={"expected_updated_at": saved["updated_at"]},
+                             json={"highlights": "Starke Saison"})
+    assert fresh.status_code == 200, fresh.text

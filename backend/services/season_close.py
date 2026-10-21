@@ -15,9 +15,12 @@ gewerteten Runde (``reference_standings``) und den veröffentlichten Ergebnisbl�
 
 **Bestätigen** (``close``): Hat die Saison schon ihre Referenz (``reference_id``), wird genau diese aktualisiert -
 sonst die gewählte, die schon zur Saison gehört (``series_id``), sonst entsteht eine neue. So steht jede Saison
-höchstens einmal in der Vitrine. Beim Aktualisieren kommen nur Platz und Feldgröße aus der Saison; Titel, Texte,
-Bezeichnungen und von Hand eingetragene Namen bleiben. Die Bezeichnung eines Eintrags (etwa „Tabelle“) ist nur eine
-Vorgabe und lässt sich in der Referenz umbenennen. Punkte für die Jahreswertung entstehen dabei nie - nur Abzeichen.
+höchstens einmal in der Vitrine. Ohne Endstand (etwa eine Team-Liga ohne Tabelle) gibt es keinen Abschluss. Beim
+Aktualisieren kommen nur Platz und Feldgröße aus der Saison, die sie wirklich hat (``merge_entries``); Titel, Texte,
+Bezeichnungen, von Hand eingetragene Namen und Profile bleiben, Spieler aus der Saison folgen ihr
+(``season_close_origin`` merkt sich die Herkunft). Die Referenz wird nie offener als Saison und Spur. Die Bezeichnung
+eines Eintrags (etwa „Tabelle“) ist nur eine Vorgabe und lässt sich in der Referenz umbenennen. Punkte für die
+Jahreswertung entstehen dabei nie - nur Abzeichen.
 """
 from __future__ import annotations
 
@@ -38,6 +41,9 @@ DRIVER_LABELS = {"racing": "Fahrerwertung"}
 DRIVER_LABEL = "Gesamtwertung"
 VISIBILITY_ORDER = ("public", "community", "members", "internal")
 NOT_OF_SEASON = "Diese Referenz gehört nicht zu dieser Saison - bitte eine Referenz der Saison wählen oder neu anlegen."
+NO_STANDING = ("Noch kein Endstand - erst Ergebnisse eintragen oder die Tabelle des Veranstalters einfügen, dann "
+               "die Saison abschließen.")
+REFERENCE_CHANGED = "Die Referenz wurde gerade geändert - bitte die Seite neu laden und noch einmal abschließen."
 
 
 def _text(value) -> str:
@@ -150,12 +156,13 @@ async def proposed_entries(db, series: dict, lineage: dict) -> list[dict]:
     for team in teams:
         ranks = [row["rank"] for row in rows
                  if row.get("rank") and matcher.resolve(row.get("team"), others) == team["name"]]
-        if not ranks and kind != "team_league":
-            continue  # ohne Teamwertung stehen die Fahrer als Einzelwertung da - kein leerer Team-Eintrag
+        if not ranks:
+            # Ohne Tabelle bzw. Teamwertung kein leerer Team-Eintrag: die Team-Liga hat dann noch keinen Endstand
+            # (der Abschluss sperrt), bei der Rennliga stehen die Fahrer als Einzelwertung da.
+            continue
         entries.append(_entry("team", key=f"team:{normalize_name(team['name'])}", team_name=team["name"],
                               members=_members(members_of.get(team["name"], []), club),
-                              placement=min(ranks) if ranks else None, label=LABELS[scope],
-                              team_count=len(rows) or None, source=scope))
+                              placement=min(ranks), label=LABELS[scope], team_count=len(rows), source=scope))
 
     final_places, final_size = await _final_places(db, sid)
     solo = []
@@ -180,8 +187,7 @@ async def proposed_entries(db, series: dict, lineage: dict) -> list[dict]:
 
     if series.get("status") in NO_PLACEMENT_STATUSES:
         for entry in entries:
-            entry["placement"] = None
-            entry["placement_label"] = CANCELLED_LABEL
+            entry.update({"placement": None, "placement_label": CANCELLED_LABEL, "cancelled": True})
     return entries
 
 
@@ -195,6 +201,22 @@ async def _dates(db, series_id: str) -> tuple[str | None, str | None]:
 def _visibility(*levels) -> str:
     known = [level for level in levels if level in VISIBILITY_ORDER]
     return max(known, key=VISIBILITY_ORDER.index) if known else "public"
+
+
+def stricter(*levels) -> str:
+    """Die strengste der Sichtbarkeiten - eine Referenz ist nie offener als ihre Saison und deren Spur."""
+    return _visibility(*levels)
+
+
+async def season_visibility(db, series_id: str | None) -> str | None:
+    """Wie streng eine Referenz der Saison mindestens sein muss: die strengere Sichtbarkeit von Saison und Spur."""
+    if not series_id:
+        return None
+    series = await db.reference_series.find_one({"id": series_id}, {"_id": 0, "lineage_id": 1, "visibility": 1})
+    if not series:
+        return None
+    lineage = await db.reference_lineages.find_one({"id": series.get("lineage_id")}, {"_id": 0, "visibility": 1}) or {}
+    return _visibility(lineage.get("visibility"), series.get("visibility"))
 
 
 async def proposed_reference(db, series: dict, lineage: dict) -> dict:
@@ -275,23 +297,64 @@ def _match_key(entry: dict) -> str | None:
     return f"team:{name}" if name else None
 
 
-def merge_entries(existing: list[dict], proposed: list[dict]) -> list[dict]:
-    """Einträge der bestehenden Referenz mit dem Vorschlag zusammenführen: gleicher Eintrag (Team nach Name, Einzel nach
-    Person) bekommt Platz und Feldgröße aus der Saison und die Vereinsspieler dazu; eine eigene Bezeichnung und von
-    Hand eingetragene Namen bleiben. Neue Einträge kommen dazu, übrige bleiben, wie sie sind."""
-    out = [dict(entry) for entry in existing if isinstance(entry, dict)]
-    index = {_match_key(entry): position for position, entry in enumerate(out) if _match_key(entry)}
-    for entry in proposed:
-        position = index.get(entry["key"])
-        if position is None:
-            out.append(_entry_doc(entry))
+def new_entries(proposed: list[dict]) -> tuple[list[dict], dict]:
+    """Einträge einer neuen Referenz samt Herkunft: alle stammen aus der Saison."""
+    docs = [{**_entry_doc(entry), "id": new_id()} for entry in proposed]
+    return docs, {doc["id"]: {"created": True, "profiles": list(doc["member_profile_ids"])} for doc in docs}
+
+
+def merge_entries(existing: list[dict], proposed: list[dict], origin: dict | None = None) -> tuple[list[dict], dict]:
+    """Einträge der bestehenden Referenz mit dem Vorschlag zusammenführen. ``origin`` (an der Referenz als
+    ``season_close_origin``) merkt sich je Eintrag, ob ihn die Saison angelegt hat und welche Profile aus ihr kamen.
+
+    - Gleicher Eintrag (Team nach Name, Einzel nach Person): Platz und Feldgröße nur, wenn die Saison sie wirklich hat
+      (ein Team setzt nur „von N Teams“, ein Einzel nur „von N“ - die andere Zahl bleibt); eine abgebrochene Saison
+      nimmt den Platz weg. Eine eigene Bezeichnung bleibt.
+    - Spieler: von Hand ergänzte Profile bleiben; die aus der Saison folgen ihr - wer jetzt ausgeblendet, Gast oder
+      nicht mehr dabei ist, geht.
+    - Neue Einträge kommen dazu. Einträge, die die Saison angelegt hat und nicht mehr kennt, gehen; von Hand angelegte
+      bleiben, wie sie sind.
+    Liefert die Einträge und die neue Herkunft."""
+    origin = origin or {}
+    out: list[dict] = []
+    by_key: dict[str, dict] = {}
+    for entry in existing:
+        if not isinstance(entry, dict):
             continue
-        target = out[position]
-        ids = list(dict.fromkeys([*(target.get("member_profile_ids") or []), *entry["member_profile_ids"]]))
-        target.update({"placement": entry["placement"], "participant_count": entry["participant_count"],
-                       "team_count": entry["team_count"], "member_profile_ids": ids,
-                       "placement_label": target.get("placement_label") or entry["placement_label"]})
-    return out
+        copy = dict(entry)
+        copy["id"] = copy.get("id") or new_id()
+        out.append(copy)
+        key = _match_key(copy)
+        if key and key not in by_key:
+            by_key[key] = copy
+    fresh: dict = {}
+    for entry in proposed:
+        target = by_key.get(entry["key"])
+        if target is None:
+            doc = {**_entry_doc(entry), "id": new_id()}
+            out.append(doc)
+            fresh[doc["id"]] = {"created": True, "profiles": list(doc["member_profile_ids"])}
+            continue
+        known = origin.get(target["id"]) or {}
+        from_season = set(known.get("profiles") or [])
+        current = list(target.get("member_profile_ids") or [])
+        hand = [pid for pid in current if pid not in from_season]
+        wanted = entry["member_profile_ids"]
+        target["member_profile_ids"] = ([pid for pid in current if pid in hand or pid in wanted]
+                                        + [pid for pid in wanted if pid not in current])
+        if entry.get("cancelled"):
+            target["placement"] = None
+        elif entry["placement"] is not None:
+            target["placement"] = entry["placement"]
+        field = "participant_count" if entry["kind"] == "solo" else "team_count"
+        if entry[field] is not None:
+            target[field] = entry[field]
+        target["placement_label"] = target.get("placement_label") or entry["placement_label"]
+        fresh[target["id"]] = {"created": bool(known.get("created")),
+                               "profiles": [pid for pid in wanted if pid not in hand]}
+    kept = [entry for entry in out
+            if entry["id"] in fresh or not (origin.get(entry["id"]) or {}).get("created")]
+    return kept, fresh
 
 
 FILL_FIELDS = ("organizer", "league", "season", "format", "game_id", "game_name", "start_date", "end_date",
@@ -311,22 +374,31 @@ async def close(db, series: dict, lineage: dict, reference_id: str | None, me: d
     else:
         target = None
     entries = await proposed_entries(db, series, lineage)
+    if not entries:
+        raise HTTPException(422, NO_STANDING)
     now = now_utc().isoformat()
+    fields = await proposed_reference(db, series, lineage)
     if target is None:
-        fields = await proposed_reference(db, series, lineage)
-        doc = ReferenceCreate(**fields, status="completed", series_id=series["id"],
-                              entries=[_entry_doc(entry) for entry in entries]).model_dump()
+        docs, origin = new_entries(entries)
+        doc = ReferenceCreate(**fields, status="completed", series_id=series["id"], entries=docs).model_dump()
         await freeze(db, doc)
-        doc.update({"id": new_id(), "created_at": now, "updated_at": now})
+        doc.update({"id": new_id(), "created_at": now, "updated_at": now, "season_close_origin": origin})
         await db.references.insert_one(doc)
         reference_id, created = doc["id"], True
     else:
-        fields = await proposed_reference(db, series, lineage)
-        updates = {"entries": merge_entries(target.get("entries") or [], entries), "series_id": series["id"],
-                   "status": "completed", "updated_at": now,
+        merged, origin = merge_entries(target.get("entries") or [], entries, target.get("season_close_origin"))
+        updates = {"entries": merged, "series_id": series["id"], "status": "completed", "updated_at": now,
+                   "season_close_origin": origin,
+                   # Nie offener als Saison und Spur - sonst stünde eine Mitglieder-Saison öffentlich da.
+                   "visibility": stricter(target.get("visibility"), fields["visibility"]),
                    **{key: fields[key] for key in FILL_FIELDS if fields.get(key) and not target.get(key)}}
         await freeze(db, updates, target)
-        await db.references.update_one({"id": target["id"]}, {"$set": updates})
+        # Nur, wenn die Referenz seit dem Lesen niemand geändert hat - sonst 409, statt fremde Änderungen zu
+        # überschreiben.
+        written = await db.references.update_one({"id": target["id"], "updated_at": target.get("updated_at")},
+                                                 {"$set": updates})
+        if written.matched_count == 0:
+            raise HTTPException(409, REFERENCE_CHANGED)
         reference_id, created = target["id"], False
 
     series_updates = {"reference_id": reference_id, "closed_at": now, "closed_by": me["id"], "updated_at": now,

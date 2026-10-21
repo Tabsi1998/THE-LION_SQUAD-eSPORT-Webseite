@@ -44,7 +44,9 @@ async def _setup(flow):
     linked = await reference("Probe Cup Mai", series_id=season["id"])
     closing = await reference("Probe Liga 2026")
     await flow.db.reference_series.update_one({"id": season["id"]}, {"$set": {"reference_id": closing["id"]}})
-    secret = await reference("Probe Liga 2025", series_id=hidden["id"])
+    # Über das Formular würde sie „Nur Mitglieder“ (nie offener als die Saison) - hier eine ältere, öffentliche.
+    secret = await reference("Probe Liga 2025")
+    await flow.db.references.update_one({"id": secret["id"]}, {"$set": {"series_id": hidden["id"]}})
     alone = await reference("Probe Einzelturnier")
     return lineage, season, hidden, {"linked": linked, "closing": closing, "secret": secret, "alone": alone}
 
