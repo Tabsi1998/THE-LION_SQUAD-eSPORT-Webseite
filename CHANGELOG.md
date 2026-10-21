@@ -1,5 +1,22 @@
 # Changelog
 
+## 1.25.0 (21.10.2026)
+
+### Neu
+
+* Rennzeiten überall mit Komma wie beim Veranstalter (#1981)
+* Spiele – weitere Schreibweisen je Map (#1616)
+* Team-Liga – Maps im Ergebnisblatt aus dem Map-Pool mit Bild, unbekannte Namen gelb markiert (#1616)
+* Team-Liga – Statistik je Map: gespielt, Siege, Wahl und Bann (#1616)
+* Team-Liga – Veto als Karten mit Bild, gewonnene Map markiert (#1616)
+
+### Fehlerbehebungen
+
+* Ergebnis-Bild – 3/5-Verwechsler werden gelb statt still falsch (#1981)
+* Ergebnis-Bild – keine falschen Punkte aus dem Tabellenrand; Läufe ohne Punkte übernehmen keine (#1981)
+* Ergebnis-Bild – Platz 1 im farbigen Kasten nicht mehr gelb, kein Abstand beim Ersten (#1981)
+* Ergebnis-Bild – Zeiten mit verlesenem Trennzeichen richtig; Quali-Bilder nicht mehr als „keine Zeiten“ abgelehnt (#1981)
+
 ## 1.24.0 (21.10.2026)
 
 ### Neu
