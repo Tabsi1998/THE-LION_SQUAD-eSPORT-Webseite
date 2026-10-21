@@ -21,6 +21,12 @@
   color: var(--tls-brand); background: var(--tls-surface-1); box-shadow: 0 0 0 1px rgb(var(--tls-brand-rgb) / 0.45);
 }
 
+/* Fahrer des Tages (#1927): goldener Stern unten rechts, wie die Stoppuhr ein kleiner Knopf auf dem Ring. */
+.tls-race-dotd {
+  position: absolute; bottom: -4px; right: -5px; width: 13px; height: 13px; padding: 2px; border-radius: 999px;
+  color: var(--tls-honor); background: var(--tls-surface-1); box-shadow: 0 0 0 1px rgb(var(--tls-honor-rgb) / 0.45);
+}
+
 .tls-racing-guest {
   flex: none; display: inline-flex; align-items: center; padding: 1px 6px; border-radius: 3px;
   font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
@@ -122,6 +128,21 @@
 .tls-racing-race[data-medal] .tls-racing-race__place { color: var(--tls-race-medal); }
 .tls-racing-race__code { font-size: 10px; line-height: 1; letter-spacing: 0.04em; color: rgb(255 255 255 / 0.38); white-space: nowrap; }
 .tls-racing-race[data-state="cancelled"] .tls-racing-race__code { text-decoration: line-through; }
+/* Startplatz → Ziel (#1927): gutgemachte Plätze wie die Bewegung der Tabellen - nach oben in Cyan, nach unten leise.
+   Feste Höhe, damit Rennen ohne Startplatz in der Reihe bleiben. Hebt sich kurz nach seinem Balken an. */
+.tls-racing-race__gain {
+  display: inline-flex; align-items: center; justify-content: center; gap: 1px; height: 11px; white-space: nowrap;
+  font-family: 'Rajdhani', 'Bahnschrift Condensed', sans-serif; font-size: 11px; font-weight: 700; line-height: 1;
+  font-variant-numeric: tabular-nums; color: rgb(255 255 255 / 0.4);
+  animation: tls-racing-lift var(--tls-motion-mid) var(--tls-ease) backwards;
+  animation-delay: calc((260ms + var(--i, 0) * 28ms) * var(--tls-motion-on));
+}
+.tls-racing-race__gain > svg { width: 9px; height: 9px; }
+.tls-racing-race__gain[data-dir="up"] { color: var(--tls-brand); }
+.tls-racing-race__gain[data-dir="down"] { color: var(--tls-quiet); }
+/* Flagge unter dem Kürzel (#1925): feste Höhe, damit Rennen ohne Land in der Reihe bleiben; abgesagt blass. */
+.tls-racing-race__flag { display: flex; align-items: center; justify-content: center; height: 11px; }
+.tls-racing-race[data-state="cancelled"] .tls-racing-race__flag { opacity: 0.35; }
 @media (max-width: 420px) {
   .tls-racing-races { gap: 2px; }
   .tls-racing-race__code { font-size: 9px; }

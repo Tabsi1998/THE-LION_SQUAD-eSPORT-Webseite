@@ -112,8 +112,34 @@ export function lineagePayload(form) {
   };
 }
 
+// ---------------------------------------------------------------- Eigene Teams (#1926)
+let teamCounter = 0;
+
+/** Eine Zeile „Eigenes Team“ im Formular: Name und weitere Schreibweisen als Text (Komma, Strichpunkt oder Zeile). */
+export function emptyOwnTeam(values = {}) {
+  teamCounter += 1;
+  return { key: `team-${teamCounter}`, name: "", aliases: "", ...values };
+}
+
+function ownTeamsToForm(series) {
+  const teams = Array.isArray(series.own_teams) && series.own_teams.length
+    ? series.own_teams
+    : [{ name: series.team_name || "", aliases: [] }];
+  return teams.map((team) => emptyOwnTeam({ name: team.name || "", aliases: (team.aliases || []).join(", ") }));
+}
+
+function ownTeamsPayload(teams) {
+  return (teams || [])
+    .map((team) => ({
+      name: String(team.name || "").trim(),
+      aliases: String(team.aliases || "").split(/[,;\n]/).map((alias) => alias.trim()).filter(Boolean),
+    }))
+    .filter((team) => team.name);
+}
+
 export function seriesToForm(series = {}, rules = series.rules) {
   return {
+    own_teams: ownTeamsToForm(series),
     lineage_id: series.lineage_id || "",
     points_scheme_id: series.points_scheme_id || "",
     season: series.season || "",
@@ -123,7 +149,6 @@ export function seriesToForm(series = {}, rules = series.rules) {
     publish_mode: series.publish_mode || "review",
     default_weekday: series.default_weekday === null || series.default_weekday === undefined ? "" : String(series.default_weekday),
     default_time: series.default_time || "",
-    team_name: series.team_name || "",
     official_table_url: series.official_table_url || "",
     external_url: series.external_url || "",
     visibility: series.visibility || "public",
@@ -143,7 +168,8 @@ export function seriesPayload(form, { isNew = false, archived = false } = {}) {
     publish_mode: form.publish_mode,
     default_weekday: form.default_weekday === "" || form.default_weekday === null || form.default_weekday === undefined ? null : Number(form.default_weekday),
     default_time: blank(form.default_time),
-    team_name: blank(form.team_name),
+    // #1926: alle eigenen Teams - das erste gilt beim Server auch als „Eigenes Team“ (team_name) älterer Leser.
+    own_teams: ownTeamsPayload(form.own_teams),
     official_table_url: blank(form.official_table_url),
     external_url: blank(form.external_url),
     visibility: form.visibility,

@@ -175,7 +175,7 @@ def test_team_league_lineup_maps_own_team_and_official_table():
         {"team": "Probe Löwen", "rank": 1, "points": 3}, {"team": "probe löwen", "points": 0},
         {"team": "Probe Gegner", "rank": 2, "points": 0},
     ]}, PEOPLE, SCHEME)
-    check(out, SCHEME, ROUND, TODAY, own_team="Probe Löwen")
+    check(out, SCHEME, ROUND, TODAY, own_teams="Probe Löwen")
     assert out.errors == []
     assert out.matches[0]["lineup"] == ["p-anna", "neu:neunora"]
     assert _codes(out.warnings) == ["maps_differ", "own_team_missing", "table_team_twice", "table_rank_partial"]

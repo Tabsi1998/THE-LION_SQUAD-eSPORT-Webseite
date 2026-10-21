@@ -83,9 +83,21 @@ export function moveIds(rounds, index, step) {
   return ids;
 }
 
+/** Land im Formular (#1925): „auto“ (aus der Strecke erkannt), „none“ (von Hand ohne Flagge) oder der gewählte Code. */
+function countryChoice(round) {
+  if (round.country_auto !== false) return "auto";
+  return round.country_code || "none";
+}
+
+function countryPayload(choice) {
+  if (!choice || choice === "auto") return { country_auto: true };
+  return { country_auto: false, country_code: choice === "none" ? null : choice };
+}
+
 /** Formularwerte eines Termins. */
 export function roundToForm(round = {}, { day = "", time = "" } = {}) {
   return {
+    country: countryChoice(round),
     code: round.code || "",
     title: round.title || "",
     venue: round.venue || "",
@@ -98,9 +110,10 @@ export function roundToForm(round = {}, { day = "", time = "" } = {}) {
   };
 }
 
-/** Formular → Body für POST/PATCH; leere Uhrzeit heißt „ohne Uhrzeit“. */
+/** Formular → Body für POST/PATCH; leere Uhrzeit heißt „ohne Uhrzeit“. Land automatisch: der Server erkennt es. */
 export function roundPayload(form) {
   return {
+    ...countryPayload(form.country),
     code: form.code.trim() || null,
     title: form.title.trim() || null,
     venue: form.venue.trim() || null,

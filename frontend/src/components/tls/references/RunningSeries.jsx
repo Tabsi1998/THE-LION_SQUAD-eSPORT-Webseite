@@ -3,6 +3,7 @@ import { seriesAddress } from "@/lib/referenceSeries";
 import { KIND_LABELS, nextTitle, nextValue, placeTitle, progressText } from "@/lib/referencesOverview";
 import { GameMark } from "@/components/tls/references/referenceParts";
 import { SectionHead } from "@/components/tls/references/overviewParts";
+import { CountryFlag } from "@/components/tls/CountryFlag";
 
 // „Läuft gerade“ (#1748, neu gestaltet #1878): laufende Serien-Saisons mit Spur, Art, Saison/Stufe, Fortschritt in
 // Segmenten, nächstem Termin und unserem Platz als große Zahl. Was heute ansteht, kommt zuerst (Server) und trägt den
@@ -66,7 +67,10 @@ function RunningCard({ item }) {
       <div className="mt-auto grid grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)] gap-3 md:gap-4 pt-3 md:pt-4 border-t border-white/[0.08]">
         <div className="min-w-0 flex flex-col gap-1">
           <div className="text-[11px] md:text-xs font-bold uppercase tracking-[0.14em] md:tracking-[0.16em] text-quiet">{nextTitle(kind, next)}</div>
-          <div className="font-semibold text-sm md:text-base text-white break-words [overflow-wrap:anywhere]" data-testid="running-next">{nextValue(next)}</div>
+          <div className="font-semibold text-sm md:text-base text-white break-words [overflow-wrap:anywhere]" data-testid="running-next">
+            <CountryFlag code={next?.country_code} size="sm" className="mr-1.5" />
+            {nextValue(next)}
+          </div>
         </div>
         <div className="min-w-0 flex flex-col items-end gap-0.5 text-right" data-testid="running-place">
           <div className="text-[11px] md:text-xs font-bold uppercase tracking-[0.14em] md:tracking-[0.16em] text-quiet">{placeTitle(kind)}</div>

@@ -4,6 +4,8 @@ import { AdminSheet } from "@/components/tls/AdminSheet";
 import { FormGrid } from "@/components/tls/AdminForm";
 import { CheckField, SelectField, TextAreaField, TextField } from "@/components/tls/FormFields";
 import { ROUND_KIND_OPTIONS, dayLabel, roundLabel, roundPayload, roundToForm } from "@/lib/referenceCalendar";
+import { COUNTRY_OPTIONS, countryName } from "@/lib/countryFlags";
+import { CountryFlag, VenueWithFlag } from "@/components/tls/CountryFlag";
 import { toast } from "sonner";
 
 // Seitenblätter des Kalenders (#1742): Termin anlegen/bearbeiten, verschieben und eine Terminliste einfügen.
@@ -11,6 +13,21 @@ import { toast } from "sonner";
 // eine fehlerfreie Liste.
 
 const base = (series) => `/reference-series/admin/series/${series.id}/rounds`;
+
+const COUNTRY_CHOICES = [["auto", "Automatisch aus der Strecke"], ["none", "Ohne Flagge"], ...COUNTRY_OPTIONS];
+
+// Land des Termins (#1925): automatisch erkennt der Server es beim Speichern aus Strecke bzw. Titel; eine Wahl bleibt.
+function countryHint(round, choice) {
+  if (choice === "auto" && round?.country_auto !== false && round?.country_code) {
+    return (
+      <span className="inline-flex items-center gap-1.5" data-testid="round-country-detected">
+        <CountryFlag code={round.country_code} size="sm" /> Erkannt: {countryName(round.country_code)}
+      </span>
+    );
+  }
+  if (choice === "auto") return "Erkannt werden Länder, Strecken und Städte – etwa Monza, Baku oder „USA (Miami)“.";
+  return "Bleibt, auch wenn sich die Strecke ändert.";
+}
 
 export function RoundSheet({ series, lineage, round, suggestion, version, onClose, onSaved, onStale }) {
   const isNew = !round?.id;
@@ -41,6 +58,8 @@ export function RoundSheet({ series, lineage, round, suggestion, version, onClos
       <FormGrid>
         <TextField label="Kürzel" value={form.code} onChange={(v) => set("code", v)} placeholder="R1" maxLength={20} testId="round-code" />
         <TextField label="Strecke oder Ort" value={form.venue} onChange={(v) => set("venue", v)} maxLength={160} testId="round-venue" />
+        <SelectField label="Land (Flagge)" value={form.country} onChange={(v) => set("country", v)} options={COUNTRY_CHOICES} testId="round-country"
+          hint={countryHint(round, form.country)} />
         <TextField label="Tag" type="date" value={form.day} onChange={(v) => set("day", v)} hint="Leer: Termin noch offen." testId="round-day" />
         <TextField label="Uhrzeit" type="time" value={form.time} onChange={(v) => set("time", v)} hint="Wiener Zeit. Vorgabe ist die Standard-Uhrzeit der Saison; leer: ohne Uhrzeit." testId="round-time" />
         <SelectField label="Art" value={form.kind} onChange={(v) => set("kind", v)} options={ROUND_KIND_OPTIONS} testId="round-kind" />
@@ -126,7 +145,7 @@ export function PasteSheet({ series, lineage, version, onClose, onSaved, onStale
     <AdminSheet title="Terminliste einfügen" eyebrow={lineage?.title} size="lg" onClose={onClose} onSubmit={submit} saving={saving}
       submitLabel={ready ? `${preview.rows.length} Termine übernehmen` : "Vorschau"} savingLabel={ready ? "Übernehme …" : "Prüfe …"} submitTestId="paste-submit" testId="paste-sheet">
       <TextAreaField label="Je Zeile ein Termin" value={text} onChange={edit} rows={8} testId="paste-text" placeholder={"R1 · 05.11. · Strecke\nR2 · 12.11. 20:00 · Strecke\nR3 Strecke"}
-        hint={`Kürzel, Datum (TT.MM. oder TT.MM.JJJJ), optional Uhrzeit und Ort. Ohne Datum: der nächste Standard-Wochentag nach der Zeile davor. Ohne Uhrzeit: ${defaults || "ohne Uhrzeit"}.`} />
+        hint={`Kürzel, Datum (TT.MM. oder TT.MM.JJJJ), optional Uhrzeit und Ort – aus dem Ort kommt die Flagge. Ohne Datum: der nächste Standard-Wochentag nach der Zeile davor. Ohne Uhrzeit: ${defaults || "ohne Uhrzeit"}.`} />
       {preview && preview.errors.length > 0 && (
         <div className="border border-red-400/40 bg-red-400/10 rounded-sm p-3 text-sm text-red-200 space-y-1" data-testid="paste-errors" role="alert">
           <div className="font-bold">Die Liste hat Fehler – übernommen wird erst eine fehlerfreie Liste.</div>
@@ -159,7 +178,9 @@ export function PasteSheet({ series, lineage, version, onClose, onSaved, onStale
                       {row.warning && <span className="block text-[11px] text-amber-300">{row.warning}</span>}
                     </td>
                     <td className="py-1.5 pr-3">{row.time || "–"}</td>
-                    <td className="py-1.5">{row.venue || "–"}</td>
+                    <td className="py-1.5" data-testid="paste-venue">
+                      {row.venue ? <VenueWithFlag round={{ venue: row.venue, country_code: row.country_code }} /> : "–"}
+                    </td>
                   </tr>
                 ))}
               </tbody>

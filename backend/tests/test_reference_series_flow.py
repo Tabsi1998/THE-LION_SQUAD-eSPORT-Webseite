@@ -248,7 +248,7 @@ async def test_the_migration_adds_only_missing_templates_and_never_results(flow)
     assert {"organizer", "team_league_3_1_0"} <= {scheme["id"] for scheme in schemes}
     for name in ("reference_series", "reference_rounds", "reference_round_results", "reference_standings"):
         assert await getattr(db, name).count_documents({}) == 0, name
-    assert migrations.MIGRATIONS[-1][1] == "reference_points_schemes"
+    assert (6, "reference_points_schemes") in [(version, name) for version, name, _ in migrations.MIGRATIONS]
 
 
 # ---------------------------------------------------------------- Nebenstellen

@@ -21,12 +21,17 @@ from __future__ import annotations
 
 import math
 
+from services.own_teams import Matcher
 from services.scoring_rules import (
     counted_results, league_table, normalize_rules, rank_with_ties, result_points, validate_sheet,
 )
 
 WORST = -math.inf
 TABLE_FIELDS = ("played", "won", "drawn", "lost", "score_for", "score_against", "score_diff")
+RESULT_FIELDS = ("round_id", "place", "points", "source", "marks", "team")
+# Angaben aus dem Rennergebnis (#1927) - nur, wo eingetragen: Startnummer, Startplatz, Zeit, Abstand, schnellste Runde
+# mit Zeit und Fahrer des Tages.
+RACE_DETAILS = ("start_number", "grid", "time", "gap", "fastest_lap_time", "driver_of_the_day")
 
 
 def ordered_rounds(rounds: list[dict]) -> list[dict]:
@@ -102,15 +107,24 @@ def _results_by_participant(rules: dict, upto: list[dict], sheets: dict, seq_of:
     found: dict[str, list[dict]] = {}
     # Jeder Teilnehmer steht höchstens einmal im Blatt - das prüft validate_sheet vor dem Rechnen.
     for item in upto:
-        for row in sheets[item["id"]].get("rows") or []:
+        sheet = sheets[item["id"]]
+        fastest = sheet.get("fastest_lap") or {}
+        for row in sheet.get("rows") or []:
             pid = row.get("participant_id")
             if not pid:
                 continue
             scored = result_points(row, rules)
+            details = {key: row[key] for key in ("start_number", "grid", "time", "gap")
+                       if row.get(key) not in (None, "")}
+            if fastest.get("participant_id") == pid and fastest.get("time"):
+                details["fastest_lap_time"] = fastest["time"]
+            if sheet.get("driver_of_the_day") == pid:
+                details["driver_of_the_day"] = True
             found.setdefault(pid, []).append({
                 "round_id": item["id"], "seq": seq_of[item["id"]], "place": row.get("place") or None,
                 "marks": sorted(set(row.get("marks") or [])), "team": row.get("team") or None,
                 "points": scored["points"], "source": scored["source"], "participated": scored["participated"],
+                **details,
             })
     return found
 
@@ -130,8 +144,8 @@ def _driver_rows(rules: dict, upto: list[dict], sheets: dict, seq_of: dict, tota
             "participant_id": pid, "computed_points": _number(counted_points + bonus),
             "activity_points": _number(bonus),
             "counted_round_ids": counted, "dropped_round_ids": dropped,
-            "results": [{key: item[key] for key in ("round_id", "place", "points", "source", "marks", "team")}
-                        for item in results],
+            "results": [{**{key: item[key] for key in RESULT_FIELDS},
+                         **{key: item[key] for key in RACE_DETAILS if key in item}} for item in results],
             "wins": stats["wins"], "podiums": stats["podiums"],
             "rounds_played": sum(1 for item in results if item["participated"]), "_stats": stats,
         }
@@ -215,12 +229,48 @@ def _table_rows(rules: dict, upto: list[dict], sheets: dict, own_teams: set[str]
     return rows
 
 
+# ---------------------------------------------------------------- Eigene Teams
+def sheet_teams(sheet: dict) -> list[str]:
+    """Alle Teamnamen eines Blatts: Zeilen, Spiele, Tabelle und Teamwerte laut Veranstalter."""
+    names = [row.get("team") for row in sheet.get("rows") or []]
+    names += [match.get(side) for match in sheet.get("matches") or [] for side in ("home", "away")]
+    names += [row.get("team") for row in sheet.get("official_table") or []]
+    names += list((sheet.get("official_team_totals") or {}).keys())
+    return [name for name in names if name]
+
+
+def _own_spelling(sheet: dict, matcher: Matcher) -> dict:
+    """Ein Blatt mit den Namen der eigenen Teams (#1926): Name, Alias und eindeutige Schreibweisen eines eigenen Teams
+    werden zu seinem Namen - in Zeilen, Spielen, Tabelle und Teamwerten laut Veranstalter. Steht im selben Blatt ein
+    wörtlich anderes Team mit derselben Schreibweise, bleibt es getrennt (``Matcher.resolve``). Fremde Teams bleiben."""
+    others = sheet_teams(sheet)
+
+    def own(name):
+        return matcher.canonical(name, others)
+
+    out = dict(sheet)
+    out["rows"] = [{**row, "team": own(row.get("team"))} for row in sheet.get("rows") or []]
+    out["matches"] = [{**match, "home": own(match.get("home")), "away": own(match.get("away"))}
+                      for match in sheet.get("matches") or []]
+    out["official_table"] = [{**row, "team": own(row.get("team"))} for row in sheet.get("official_table") or []]
+    totals = sheet.get("official_team_totals") or {}
+    out["official_team_totals"] = {own(team): value for team, value in totals.items()}
+    return out
+
+
 # ---------------------------------------------------------------- Alles zusammen
 def compute_standings(*, rules: dict, rounds: list[dict], sheets: dict[str, dict], participants: list[dict],
                       own_teams=()) -> list[dict]:
     """Je gewerteter Runde und Wertung ein Stand: ``{"round_id", "round_seq", "scope", "rows"}`` in
-    Kalender-Reihenfolge."""
+    Kalender-Reihenfolge. ``own_teams``: die eigenen Teams (Namen oder ``{name, aliases}``, #1926) - ihre
+    Schreibweisen zählen als ein Team."""
     rules = normalize_rules(rules)
+    matcher = Matcher(own_teams)
+    if matcher:
+        sheets = {round_id: _own_spelling(sheet, matcher) for round_id, sheet in sheets.items()}
+        defaults = [person.get("default_team") for person in participants if person.get("default_team")]
+        participants = [{**person, "default_team": matcher.canonical(person.get("default_team"), defaults)}
+                        for person in participants]
     counting = [item for item in ordered_rounds(rounds) if item.get("counts", True) is not False]
     seq_of = {item["id"]: index for index, item in enumerate(counting, start=1)}
     total_rounds = sum(1 for item in counting if item.get("status") != "cancelled")
@@ -228,7 +278,7 @@ def compute_standings(*, rules: dict, rounds: list[dict], sheets: dict[str, dict
     for item in scored:
         validate_sheet(sheets[item["id"]], item["id"])
     people = {person["id"]: person for person in participants if person.get("id")}
-    own = {str(team).strip() for team in own_teams if str(team or "").strip()}
+    own = set(matcher.names)
     snapshots: list[dict] = []
     previous: dict[str, dict] = {}
     for index, item in enumerate(scored):

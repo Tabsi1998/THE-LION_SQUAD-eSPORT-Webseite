@@ -76,8 +76,33 @@ test("neuer Termin: Vorgabe nächster Standard-Wochentag und Standard-Uhrzeit", 
   fireEvent.click(screen.getByTestId("round-save"));
   await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/reference-series/admin/series/serie-1/rounds", {
     code: "R5", title: null, venue: "Musterkurs", day: "2026-11-19", time: "20:30", kind: "regular", counts: true, opponent: null, note: null,
-    expected_version: 7,
+    country_auto: true, expected_version: 7,
   }));
+});
+
+test("Flagge (#1925): Liste und Vorschau zeigen das Land, im Termin automatisch, ohne oder von Hand gewählt", async () => {
+  const rounds = ROUNDS.map((round) => (round.id === "r1" ? { ...round, venue: "Monza", country_code: "IT", country_auto: true } : round));
+  await renderSection({ ...CALENDAR, rounds });
+  const items = await screen.findAllByTestId("calendar-round");
+  expect(within(items[0]).getByRole("img", { name: "Italien" })).toHaveAttribute("src", "/assets/flags/it.svg");
+  expect(within(items[1]).queryByRole("img")).toBeNull();
+
+  fireEvent.click(within(items[0]).getByTestId("round-edit"));
+  expect(screen.getByTestId("round-country")).toHaveValue("auto");
+  expect(screen.getByTestId("round-country-detected")).toHaveTextContent("Erkannt: Italien");
+  fireEvent.change(screen.getByTestId("round-country"), { target: { value: "FR" } });
+  fireEvent.click(screen.getByTestId("round-save"));
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/reference-series/admin/series/serie-1/rounds/r1",
+    expect.objectContaining({ country_auto: false, country_code: "FR" })));
+
+  fireEvent.click(screen.getByTestId("calendar-paste"));
+  fireEvent.change(screen.getByTestId("paste-text"), { target: { value: "R5 · 18.06.2026 · Aserbaidschan" } });
+  apiMock.post.mockResolvedValueOnce({ data: { errors: [], rows: [
+    { line: 1, code: "R5", day: "2026-06-18", time: "20:30", venue: "Aserbaidschan", country_code: "AZ", derived_day: false, warning: null },
+  ] } });
+  fireEvent.click(screen.getByTestId("paste-submit"));
+  const venue = await screen.findByTestId("paste-venue");
+  expect(within(venue).getByRole("img", { name: "Aserbaidschan" })).toBeTruthy();
 });
 
 test("Liste einfügen: erst die Vorschau vom Server, dann übernehmen", async () => {

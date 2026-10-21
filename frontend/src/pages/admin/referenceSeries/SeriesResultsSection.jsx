@@ -3,6 +3,7 @@ import { api, formatApiError } from "@/lib/api";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { STATE_LABELS, STATE_TONES, roundLabel, roundWhen } from "@/lib/referenceCalendar";
 import { ResultEntrySheet } from "./ResultEntrySheet";
+import { VenueWithFlag } from "@/components/tls/CountryFlag";
 import { UnknownNamesSheet } from "./UnknownNamesSheet";
 import { ListOrdered, PenLine } from "lucide-react";
 
@@ -56,7 +57,7 @@ export function SeriesResultsSection({ series, onChanged }) {
                 <div className="w-12 shrink-0 text-sm font-black tabular-nums text-white/80">{roundLabel(round)}</div>
                 <div className="min-w-0 flex-1 text-sm">
                   <span className="tabular-nums text-white">{roundWhen(round)}</span>
-                  {(round.title || round.venue) && <span className="text-white/60"> · {[round.title, round.venue].filter(Boolean).join(" · ")}</span>}
+                  {(round.title || round.venue || round.country_code) && <span className="text-white/60"> · <VenueWithFlag round={round} /></span>}
                   {round.opponent && <span className="text-white/60"> · gegen {round.opponent}</span>}
                 </div>
                 <span className={`inline-flex items-center px-2 py-0.5 border rounded-sm text-[10px] font-bold uppercase tracking-widest whitespace-nowrap ${STATE_TONES[round.state] || STATE_TONES.planned}`}>

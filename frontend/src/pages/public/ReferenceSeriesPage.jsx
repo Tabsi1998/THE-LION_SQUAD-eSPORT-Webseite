@@ -11,6 +11,7 @@ import { SeriesStandings } from "@/components/tls/series/SeriesStandings";
 import { FinalCalculator, SeriesFinal, SeriesProgress, SeriesRules } from "@/components/tls/series/SeriesParts";
 import { TeamLeagueSections } from "@/components/tls/series/TeamLeague";
 import { RacingLeague } from "@/components/tls/series/RacingLeague";
+import { VenueWithFlag } from "@/components/tls/CountryFlag";
 import { NotFoundPage } from "@/pages/ErrorPages";
 
 // Seite einer Serie unter /references/series/<spur>/<saison> (Entscheidung 5 zu #1741), Turnierserie (#1745): Kopf,
@@ -39,8 +40,11 @@ function Calendar({ rounds }) {
               <span className={`w-12 shrink-0 font-black tabular-nums ${round.kind === "final" ? "text-[var(--tls-honor)]" : "text-white/80"}`}>{roundLabel(round)}</span>
               <span className="min-w-0 flex-1">
                 <span className={`block text-sm tabular-nums ${round.state === "cancelled" ? "text-white/45" : "text-white"}`}>{roundWhen(round)}</span>
-                {(round.title || round.venue || round.opponent) && (
-                  <span className="block text-sm text-white/60">{[round.title, round.venue, round.opponent && `gegen ${round.opponent}`].filter(Boolean).join(" · ")}</span>
+                {(round.title || round.venue || round.country_code || round.opponent) && (
+                  <span className="block text-sm text-white/60">
+                    <VenueWithFlag round={round} />
+                    {round.opponent && `${round.title || round.venue || round.country_code ? " · " : ""}gegen ${round.opponent}`}
+                  </span>
                 )}
                 {round.original_club_day && <span className="block text-[11px] text-white/45">ursprünglich {dayLabel(round.original_club_day)}</span>}
               </span>

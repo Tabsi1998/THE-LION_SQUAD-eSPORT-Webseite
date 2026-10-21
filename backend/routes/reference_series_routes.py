@@ -24,6 +24,8 @@ from models import (
     now_utc,
 )
 from services import partner_pages, reference_running_cache, reference_series
+from services.own_teams import clean_teams, own_teams, team_conflicts
+from services.series_identity import normalize_name
 from services.reference_series_access import SeriesAccess, require_series_editor
 from services.scoring_rules import normalize_rules
 from services.slug_utils import apply_slug_history, slug_source_for_update, slugify, unique_slug
@@ -176,6 +178,7 @@ async def create_series(body: ReferenceSeriesCreate, me: dict = Depends(require_
         if template is None:
             raise HTTPException(404, "Punkteschema-Vorlage nicht gefunden.")
     doc["rules"] = _rules({**(template.get("rules") or {}), **(doc.get("rules") or {})})
+    doc.update(_teams(doc.get("own_teams"), doc.get("team_name")))
     await _check_reference(db, doc.get("reference_id"))
     now = now_utc().isoformat()
     doc.update({
@@ -188,6 +191,20 @@ async def create_series(body: ReferenceSeriesCreate, me: dict = Depends(require_
     await db.reference_series.insert_one(doc)
     doc.pop("_id", None)
     return doc
+
+
+def _teams(teams, team_name, existing: dict | None = None) -> dict:
+    """Eigene Teams (#1926) und - für ältere Leser - ``team_name`` als das erste davon. Schickt ein älterer Aufruf nur
+    ``team_name``, wird es das einzige eigene Team; die Schreibweisen eines gleichnamigen Teams bleiben."""
+    if teams is None:
+        name = " ".join(str(team_name or "").split())
+        same = [team for team in own_teams(existing) if normalize_name(team["name"]) == normalize_name(name)]
+        teams = (same or [{"name": name}]) if name else []
+    conflicts = team_conflicts(teams)
+    if conflicts:
+        raise HTTPException(422, " ".join(conflicts))
+    cleaned = clean_teams(teams)
+    return {"own_teams": cleaned, "team_name": cleaned[0]["name"] if cleaned else None}
 
 
 @router.get("/admin/series/{series_id}")
@@ -207,6 +224,10 @@ async def update_series(series_id: str, body: ReferenceSeriesUpdate, me: dict = 
     note = raw.pop("rules_note", None)
     updates = {key: value for key, value in raw.items() if value is not None or key in SERIES_NULLABLE}
     await _check_reference(db, updates.get("reference_id"))
+    teams_changed = False
+    if "own_teams" in updates or "team_name" in updates:
+        updates.update(_teams(updates.get("own_teams"), updates.get("team_name"), existing))
+        teams_changed = updates["own_teams"] != own_teams(existing)
     rules_changed = False
     if "rules" in updates:
         rules = _rules(updates["rules"])
@@ -247,6 +268,8 @@ async def update_series(series_id: str, body: ReferenceSeriesUpdate, me: dict = 
                      "rules": saved["rules"]},
             "created_at": now_utc().isoformat(),
         })
+    if rules_changed or teams_changed:
+        # Andere Schreibweisen eines eigenen Teams zählen erst nach dem Neurechnen als dieses Team (#1926).
         await reference_series.recompute_standings(db, saved)
     return saved
 

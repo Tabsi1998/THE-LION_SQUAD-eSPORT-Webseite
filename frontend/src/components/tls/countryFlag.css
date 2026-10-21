@@ -1,0 +1,21 @@
+/* Flagge je Termin (#1925): Kasten nach dem Seitenverhältnis, die Flagge darin ganz sichtbar (contain). Ein feiner
+   heller Schein folgt dem Umriss der Flagge selbst (nicht dem Kasten) - so zerfließen Schwarz, Rot und Weiß (Japan)
+   nicht im dunklen Grund. */
+.tls-flag {
+  display: inline-block;
+  flex-shrink: 0;
+  object-fit: contain;
+  vertical-align: -0.15em;
+  filter: drop-shadow(0 0 0.5px rgb(255 255 255 / 0.55));
+}
+
+.tls-flag-line {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  min-width: 0;
+}
+
+.tls-flag-line > .tls-flag {
+  align-self: center;
+}

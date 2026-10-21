@@ -167,6 +167,21 @@ test("Aufstellung verlinkt nur öffentlich sichtbare Profile: kein Link bei ausg
   expect(within(lineup).queryByRole("link")).not.toBeInTheDocument();
 });
 
+test("Mehrere eigene Teams (#1926): im Spielplan steht, welches eigene Team gespielt hat", async () => {
+  const matchdays = BODY.team_league.matchdays.map((day, index) => (day.match ? { ...day, match: { ...day.match, team: index ? "Probe Löwen B" : "Probe Löwen" } } : day));
+  renderPage({ ...BODY, team_league: { ...BODY.team_league, own_teams: ["Probe Löwen", "Probe Löwen B"], matchdays } });
+  const days = await screen.findAllByTestId("team-league-matchday");
+  expect(within(days[1]).getByTestId("team-league-own-team")).toHaveTextContent("Probe Löwen B");
+  expect(days[1]).toHaveTextContent("Probe Löwen B gegen Fremd Bären");
+});
+
+test("Ein eigenes Team: der Spielplan bleibt wie bisher", async () => {
+  const matchdays = BODY.team_league.matchdays.map((day) => (day.match ? { ...day, match: { ...day.match, team: "Probe Löwen" } } : day));
+  renderPage({ ...BODY, team_league: { ...BODY.team_league, own_teams: ["Probe Löwen"], matchdays } });
+  await screen.findAllByTestId("team-league-matchday");
+  expect(screen.queryByTestId("team-league-own-team")).toBeNull();
+});
+
 test("Die Tabelle der Team-Liga bricht Namen um statt zu kürzen (eigener Rahmen)", async () => {
   renderPage();
   const wrap = await screen.findByTestId("team-league-table-wrap");

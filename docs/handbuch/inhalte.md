@@ -281,8 +281,15 @@ monatliche **Turnierserien**, **Rennligen** mit Fahrer- und Teamwertung und **Te
 - Eine **Spur** ist die Klammer, etwa „Lion Racing F1“: Titel, Art, Bezeichnung (F1, 4vs4 …), Veranstalter, Spiel und
   Sichtbarkeit. **Neue Spur** öffnet das Blatt.
 - Darunter je **Saison und Stufe** eine Serie: an der Spur **Saison**. Saison und Stufe (etwa „2026“ und „Division 1“)
-  ergeben die Adresse. Dazu Status, Standard-Wochentag und -Uhrzeit (Wiener Zeit), das eigene Team, Links und wie
+  ergeben die Adresse. Dazu Status, Standard-Wochentag und -Uhrzeit (Wiener Zeit), die eigenen Teams, Links und wie
   Einträge eines Captains erscheinen – Standard: als Entwurf, den der Vorstand freigibt.
+- **Eigene Teams:** Fährt der Verein mit mehreren Teams (etwa Hauptteam, Academy und ein drittes Team), stehen alle in
+  der Liste – je Team der Name wie beim Veranstalter und weitere **Schreibweisen**, mit Komma getrennt. Groß/klein,
+  Leer- und Bindestriche erkennt die Seite selbst: „TLS-DarkFriday“ und „TLS DarkFriday“ sind dasselbe Team. **+ Team**
+  fügt eines an, das **×** nimmt es weg. Garage, Teamwertung, „Unser Platz“ und Liga-Weg zählen alle Teams der Liste;
+  eine ältere Saison hat ihr bisheriges „Eigenes Team“ als erstes Team.
+
+<img src="../assets/serien/serien-eigene-teams.png" alt="Saison bearbeiten: Liste Eigene Teams mit drei Teams und ihren Schreibweisen" width="420">
 
 <table>
 <tr>
@@ -335,7 +342,14 @@ Referenzen bleiben, wie sie sind.
   optional Uhrzeit und Ort; trennen mit Leerzeichen, `·`, `|` oder `;`. Ohne Jahr gilt das erste Jahr der Saison, über
   Neujahr zählt es weiter. Eine Zeile ohne Datum bekommt den nächsten **Standard-Wochentag** nach der Zeile davor,
   ohne Uhrzeit gilt die **Standard-Uhrzeit**. **Vorschau** zeigt, was daraus wird; hat eine Zeile einen Fehler, steht
-  er mit Zeilennummer da, und übernommen wird erst eine fehlerfreie Liste.
+  er mit Zeilennummer da, und übernommen wird erst eine fehlerfreie Liste. Aus dem Ort kommt die **Flagge**, etwa
+  `R1 · 18.06.2026 · Aserbaidschan`.
+- **Flagge:** Jeder Termin bekommt sein Land automatisch aus Strecke oder Ort, sonst aus dem Titel – deutsche und
+  englische Ländernamen, bekannte Strecken und Städte (Monza, Spa, Suzuka, Interlagos, COTA, Baku, Yas Marina …) und
+  Zusätze wie „USA (Miami)“. Ohne Treffer bleibt der Termin ohne Flagge. Im Termin wählt ihr unter **Land (Flagge)**
+  ein anderes Land oder **Ohne Flagge** – diese Wahl bleibt, auch wenn sich die Strecke später ändert; **Automatisch aus
+  der Strecke** nimmt sie zurück. Die Flagge steht im Kalender, im Rennraster, im Fahrer-Detail, im Ergebnisblatt und
+  bei „Läuft gerade“ und „Heute im Einsatz“.
 - **Termin:** einzeln anlegen; Tag und Uhrzeit sind mit dem nächsten Standard-Wochentag und der Standard-Uhrzeit
   vorbefüllt. Art **Finale**, **Zählt zur Wertung** (aus: steht im Kalender, geht aber nicht in die Tabelle) und bei
   einer Team-Liga der Gegner. Die Notiz sieht nur die Verwaltung.
@@ -353,6 +367,10 @@ fehlt das Ergebnis, oder der Termin wurde abgesagt.
 <tr>
 <td><img src="../assets/serien/serien-kalender-einfuegen.png" alt="Blatt Terminliste einfügen mit der Vorschau der erkannten Termine" width="420"></td>
 <td><img src="../assets/serien/serien-kalender-verwaltung.png" alt="Kalender der Saison mit verschobenem und abgesagtem Termin" width="420"></td>
+</tr>
+<tr>
+<td><img src="../assets/serien/serien-kalender-flaggen.png" alt="Kalender einer Rennliga mit 24 Rennen, jedes mit der Flagge seines Landes" width="420"></td>
+<td><img src="../assets/serien/serien-termin-land.png" alt="Termin bearbeiten am Handy: Land automatisch aus der Strecke, erkannt Australien" width="200"></td>
 </tr>
 </table>
 
@@ -379,8 +397,8 @@ gespeicherten Stand und ist nicht für Suchmaschinen gedacht (`noindex`).
 </table>
 
 **Seite Team-Liga:** Bei einer Spur vom Typ Team-Liga zeigt dieselbe Adresse statt der Gesamtwertung die Liga aus
-Sicht des eigenen Teams (Feld **Eigenes Team** der Saison). Oben die **Spieltage** (ein Feld je Spieltag – Sieg cyan,
-Niederlage grau) und der nächste Spieltag mit Gegner. Die **Tabelle** ist die Tabelle laut Veranstalter vom letzten
+Sicht der eigenen Teams (Liste **Eigene Teams** der Saison; spielen mehrere, steht im Spielplan, welches gespielt
+hat). Oben die **Spieltage** (ein Feld je Spieltag – Sieg cyan, Niederlage grau) und der nächste Spieltag mit Gegner. Die **Tabelle** ist die Tabelle laut Veranstalter vom letzten
 eingetragenen Spieltag, sonst aus den eigenen Spielen gerechnet; Punkte für Sieg, Unentschieden und Niederlage und der
 Vorrang bei Gleichstand stehen darüber und kommen aus den Regeln der Saison. Das eigene Team ist als „Verein“ markiert,
 mit Form (die letzten fünf eigenen Spiele) und darunter dem **Platzierungsverlauf** nach jedem Spieltag. Der
@@ -405,14 +423,18 @@ Aufstellung, dazu bei Bedarf die Tabelle laut Veranstalter.
 - **Vereins-Garage:** je Vereinsteam die Fahrer mit Platz und Punkten und das **Teamduell** – wer in gemeinsamen
   Rennen fürs Team öfter vor dem anderen ins Ziel kam, dazu die Punkte, die jeder laut Teamwertung fürs Team geholt hat
   (nur gezählte Rennen, Gäste nur, wenn sie mitzählen). Garage und Duell sind keine Tabelle: Gäste und Fremde stehen dort
-  als **Gastfahrer** ohne Namen (Gäste mit **Gast**), ihre Namen nur in den Tabellen. Vereinsteams sind das **eigene
-  Team** der Saison und jedes Team, für das ein Vereinsmitglied zuletzt gefahren ist.
+  als **Gastfahrer** ohne Namen (Gäste mit **Gast**), ihre Namen nur in den Tabellen. Vereinsteams sind alle **eigenen
+  Teams** der Saison (auch eines ohne Rennen) und jedes Team, für das ein Vereinsmitglied zuletzt gefahren ist.
 - **Fahrer-Detail:** Ein Klick auf einen Vereinsfahrer (Garage, Tabelle oder Kalender) zeigt Platz, Punkte, Rennen,
   Siege, Podien, schnellste Runden, Ausfälle und je Rennen einen Balken mit Punkten und Platz. Die Adresse merkt sich den
   Fahrer (`?fahrer=…`), so lässt sich das Detail teilen. Ein Detail gibt es nur für Vereinsmitglieder mit aktivem Profil
-  und sichtbarem Namen – wie beim Profil-Link; für alle anderen öffnet auch die Adresse keins.
+  und sichtbarem Namen – wie beim Profil-Link; für alle anderen öffnet auch die Adresse keins. Ist der Startplatz
+  eingetragen, steht unter jedem Rennen, wie viele **Plätze gutgemacht** (Cyan, Pfeil nach oben) oder verloren
+  wurden, und oben die Summe der Saison und wie oft der Fahrer **Fahrer des Tages** war; unter den Rennen die Flaggen.
 - **Fahrerwertung** als Rennraster: je Rennen der Platz, das Podium in Gold, Silber und Bronze, eine Stoppuhr für die
-  schnellste Runde, **DNF**, **DNS** und **DSQ**, dazu Punkte und **Abstand** zur Spitze. Weicht der **Gesamtstand laut
+  schnellste Runde, ein goldener Stern für den **Fahrer des Tages**, **DNF**, **DNS** und **DSQ**, dazu Punkte und
+  **Abstand** zur Spitze; über jeder Spalte die Flagge des Rennens. Fährt man mit der Maus über eine Zelle, stehen dort
+  Startplatz, gutgemachte Plätze, Zeit, Abstand und die Zeit der schnellsten Runde. Weicht der **Gesamtstand laut
   Veranstalter** von der eigenen Summe ab (meist Strafen), steht die Abweichung klein in Gold neben den Punkten.
 - **Teamwertung** (wenn die Regeln sie einschalten): ein Balken je Team, die Punkte je Rennen, Vereinsteams in Cyan,
   Gäste markiert; darüber, wie viele Fahrer je Rennen zählen und ob Gäste mitzählen.
@@ -434,10 +456,18 @@ stehen Karten statt der Tabellen.
 
 <img src="../assets/serien/serien-seite-rennliga-teams.png" alt="Teamwertung mit Balken, Punkten je Rennen, Vereinsteams und einem Gast" width="560">
 
+<table>
+<tr>
+<td><img src="../assets/serien/serien-rennraster-flaggen.png" alt="Rennraster mit Flaggen über den Rennen, Sternen für den Fahrer des Tages und Stoppuhren für die schnellste Runde" width="420"></td>
+<td><img src="../assets/serien/serien-garage-plaetze.png" alt="Garage mit drei eigenen Teams und Fahrer-Detail mit gutgemachten Plätzen und Flaggen je Rennen" width="420"></td>
+</tr>
+</table>
+
 **Läuft gerade:** Sobald eine Saison den Status **Läuft** hat (und sichtbar, nicht archiviert ist), erscheint sie oben
 auf der Seite **Erfolge & Referenzen** (`/references`), noch vor der Vitrine. Jede Karte zeigt den Fortschritt in
 Segmenten („6 von 10 Rennen gewertet“, „3 von 7 Spieltagen gespielt“, „2 von 5 Turnieren gewertet“), den **nächsten
-Termin** und unseren Platz als große Zahl – bei der Team-Liga den Platz des eigenen Teams in der Tabelle, sonst den
+Termin** mit Flagge und unseren Platz als große Zahl – bei der Team-Liga den besten Platz eines eigenen Teams in der
+Tabelle, sonst den
 besten Platz eines Vereinsmitglieds („Noch offen“ bis zur ersten Wertung). Ein Klick führt zur Seite der Saison. Steht
 **heute** (Wiener Tag) ein Termin an, kommt die Saison zuerst und trägt den goldenen Chip **Heute** mit einem leisen Puls
 (bei „Bewegung reduzieren“ ohne Puls). Am Handy wischt man waagrecht von Karte zu Karte. Fremde Namen erscheinen dort
@@ -537,15 +567,22 @@ einem gewerteten Termin **Ergebnis ändern**. Das öffnet das Blatt des Termins.
   **laut Veranstalter** und werden gegen den Schlüssel geprüft; bei einer Saison „Punkte laut Veranstalter“ zählen sie
   direkt.
 - **Mehr** (Regler-Symbol) zeigt die Marken **DNF**, **DNS**, **DSQ**, **Schnellste Runde** und **Pole**, dazu
-  **Strafpunkte**, **Startnummer**, den **Gesamtstand laut Veranstalter** (wird mit der eigenen Rechnung verglichen) und
-  **Punkte zählen statt Schlüssel**, wenn ein Wert bewusst vom Schlüssel abweicht.
+  **Strafpunkte**, **Startnummer**, **Startplatz**, **Zeit**, **Abstand**, den **Gesamtstand laut Veranstalter** (wird mit
+  der eigenen Rechnung verglichen) und **Punkte zählen statt Schlüssel**, wenn ein Wert bewusst vom Schlüssel abweicht.
+  Zugeklappt stehen Startnummer, Startplatz, Zeit und Abstand kurz unter der Zeile.
+- **Rennliga:** unter der Liste je Rennen die **Schnellste Runde** (Name aus der Liste und Rundenzeit) und der **Fahrer
+  des Tages**. Beide müssen in der Liste stehen; die schnellste Runde setzt die Marke an ihrer Zeile, so zählt ein Bonus.
+  Alles ist freiwillig – die Punkte kommen weiter aus dem Schlüssel.
 - **Liste einfügen:** die Ergebnisliste von der Seite des Veranstalters kopieren und einfügen – etwa `1. Name 25 Pkt`,
   `3 Name DNF`, nur Namen in Reihenfolge, `Name;Platz` oder eine Tabelle aus Excel oder einer Website (Tab, `|` oder
   `;`, gern mit Kopfzeile wie „Pos | Fahrer | Team | Punkte“). **Liste übernehmen** ersetzt die Zeilen und prüft gleich.
   Was sich nicht lesen lässt, steht mit Zeilennummer darunter. Eine Zahl, die nur mit einem Leerzeichen am Namen hängt
   („Max Muster 33“), bleibt beim Namen; die Zeile fragt dann **Letzte Zahl = Punkte** oder **Gehört zum Namen** (bei
   mehreren Zeilen auch **Bei allen: letzte Zahl = Punkte**). Klar sind Punkte mit zwei Leerzeichen davor, mit „Pkt“
-  dahinter oder in einer eigenen Spalte.
+  dahinter oder in einer eigenen Spalte. Tabellen mit den Spalten **Nr**, **Start** (oder Startplatz, Grid), **Zeit**,
+  **Abstand** (Gap, Rückstand) und **Beste Runde** werden mitgelesen – die schnellste beste Runde wird die schnellste
+  Runde des Rennens. Ohne Kopfzeile gilt eine Zelle mit „:“ als Zeit und eine mit „+“ als Abstand. Zeilen wie
+  `Schnellste Runde: Name 1:31.456` und `Fahrer des Tages: Name` füllen die Felder des Rennens.
 - **Team-Liga:** statt der Liste das **Spiel** – eigenes Team und Gegner (aus dem Termin vorbefüllt), Ergebnis, die
   **Maps** und die **Aufstellung** (wer gespielt hat). Darunter die **Tabelle laut Veranstalter**: einfügen, etwa
   `1. Team 10 7 1 2 22` oder mit Kopfzeile (Pl, Team, Sp, S, U, N, Maps, Pkt).
@@ -560,6 +597,10 @@ Vorschau neu prüfen.
 <tr>
 <td><img src="../assets/serien/serien-ergebnis-eintragen.png" alt="Blatt Ergebnis eintragen mit drei Zeilen, Marken, einem Hinweis an der Zeile und unbekanntem Namen" width="420"></td>
 <td><img src="../assets/serien/serien-ergebnis-vorschau.png" alt="Vorschau mit dem Stand nach dem Termin und der Linie der Finalgrenze" width="420"></td>
+</tr>
+<tr>
+<td><img src="../assets/serien/serien-ergebnis-rennergebnis.png" alt="Ergebnisblatt am Handy: eingefügte Liste mit Startnummer, Startplatz, Zeit und Abstand" width="200"></td>
+<td><img src="../assets/serien/serien-ergebnis-schnellste-runde.png" alt="Felder Schnellste Runde mit Rundenzeit und Fahrer des Tages unter der Liste" width="420"></td>
 </tr>
 </table>
 

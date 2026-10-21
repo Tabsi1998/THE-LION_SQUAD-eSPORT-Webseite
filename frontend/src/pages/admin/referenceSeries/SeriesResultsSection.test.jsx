@@ -177,6 +177,67 @@ test("Liste einfügen ersetzt die Zeilen und prüft gleich – Fehler mit Zeilen
   await screen.findByTestId("result-preview");
 });
 
+test("Rennliga (#1927): Tabelle mit Nr, Start, Zeit, Abstand, Ausfall, schnellster Runde und Fahrer des Tages einfügen", async () => {
+  setup({ data: resultData({ round: { id: "r1", code: "R1", club_day: "2026-10-15", venue: "Baku", country_code: "AZ" } }) });
+  const sheet = await openRound();
+  expect(within(screen.getByTestId("result-round")).getByRole("img", { name: "Aserbaidschan" })).toBeTruthy();
+  fireEvent.click(screen.getByTestId("result-paste-toggle"));
+  const text = "Pos\tNr\tFahrer\tStart\tZeit\tAbstand\tBeste Runde\n1\t7\tAlpha\t3\t1:32:45.123\t\t1:31.902\n2\t12\tBeta\t1\t\t+5.204\t1:31.456\n\t21\tGamma\t2\tDNF\t\t\nFahrer des Tages: Gamma";
+  fireEvent.change(screen.getByTestId("result-paste-text"), { target: { value: text } });
+  fireEvent.click(screen.getByTestId("result-paste-apply"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalled());
+  const body = apiMock.post.mock.calls[0][1];
+  expect(body.rows).toEqual([
+    expect.objectContaining({ participant_id: "p1", place: 1, start_number: "7", grid: 3, time: "1:32:45.123" }),
+    expect.objectContaining({ participant_id: "p2", place: 2, start_number: "12", grid: 1, gap: "+5.204" }),
+    expect.objectContaining({ name: "Gamma", start_number: "21", grid: 2, marks: ["dnf"] }),
+  ]);
+  expect(body.fastest_lap).toEqual({ participant_id: "p2", time: "1:31.456" });
+  expect(body.driver_of_the_day).toEqual({ name: "Gamma" });
+  // Je Rennen sichtbar und änderbar; je Zeile unter „Mehr“.
+  expect(screen.getByTestId("result-fastest-name")).toHaveValue("Beta");
+  expect(screen.getByTestId("result-fastest-time")).toHaveValue("1:31.456");
+  expect(screen.getByTestId("result-dotd")).toHaveValue("Gamma");
+  // Zugeklappt kurz unter jeder Zeile, aufgeklappt als Felder.
+  expect(within(sheet).getAllByTestId("result-row-race").map((line) => line.textContent)).toEqual([
+    "Nr. 7 · Startplatz 3 · 1:32:45.123", "Nr. 12 · Startplatz 1 · +5.204", "Nr. 21 · Startplatz 2"]);
+  fireEvent.click(within(sheet).getAllByTestId("result-row-more")[0]);
+  expect(within(sheet).getByTestId("result-row-grid")).toHaveValue("3");
+  fireEvent.change(within(sheet).getByTestId("result-row-grid"), { target: { value: "0" } });
+  expect(screen.getByTestId("result-invalid")).toBeInTheDocument();
+  // Ungültig bleibt das Feld sichtbar, auch beim Zuklappen.
+  fireEvent.click(within(sheet).getAllByTestId("result-row-more")[0]);
+  expect(within(sheet).getByTestId("result-row-grid")).toHaveAttribute("aria-invalid", "true");
+});
+
+test("Rennliga (#1927): Rundenzeit ohne Fahrer hält das Prüfen auf, Meldungen des Servers stehen am Feld", async () => {
+  setup();
+  await openRound();
+  fireEvent.change(screen.getAllByTestId("result-row-name")[0], { target: { value: "Alpha" } });
+  fireEvent.change(screen.getByTestId("result-fastest-time"), { target: { value: "1:31.456" } });
+  const race = screen.getByTestId("result-race");
+  expect(within(race).getByTestId("result-race-problems")).toHaveTextContent("Zur Rundenzeit fehlt der Fahrer");
+  expect(screen.getByTestId("result-fastest-name")).toHaveAttribute("aria-invalid", "true");
+  fireEvent.click(screen.getByTestId("result-submit"));
+  expect(apiMock.post).not.toHaveBeenCalled();
+  expect(screen.getByTestId("result-invalid")).toBeInTheDocument();
+
+  // Mit Fahrer geht es zum Server; eine Meldung zu diesem Feld steht dann am Feld, nicht oben in der Vorschau.
+  apiMock.post.mockResolvedValueOnce({ data: { ...PREVIEW, can_save: false, warnings: [],
+    errors: [{ code: "fastest_lap_not_in_list", field: "fastest_lap", rows: [], message: "Schnellste Runde: „Gamma“ steht nicht in der Ergebnisliste." }] } });
+  fireEvent.change(screen.getByTestId("result-fastest-name"), { target: { value: "Gamma" } });
+  fireEvent.click(screen.getByTestId("result-submit"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalled());
+  expect(await within(race).findByTestId("result-race-problems")).toHaveTextContent("„Gamma“ steht nicht in der Ergebnisliste");
+  expect(screen.getByTestId("result-preview")).not.toHaveTextContent("„Gamma“ steht nicht");
+});
+
+test("Team-Liga: kein Feld für schnellste Runde und Fahrer des Tages", async () => {
+  setup({ data: resultData({ series: { id: "serie-1", kind: "team_league", team_name: "Probe Lions", rules: { points_mode: "scheme" } } }) });
+  await openRound();
+  expect(screen.queryByTestId("result-race")).toBeNull();
+});
+
 test("Zahl am Namensende: bleibt beim Namen, bis jemand „letzte Zahl = Punkte“ wählt", async () => {
   setup();
   await openRound();

@@ -9,6 +9,7 @@ import {
   pastedToRows, problemsByRow, scoredText, sheetToForm,
 } from "@/lib/referenceResults";
 import { ResultPreview } from "./ResultPreview";
+import { VenueWithFlag } from "@/components/tls/CountryFlag";
 import { toast } from "sonner";
 import { ClipboardList, Plus, RefreshCw, SlidersHorizontal, Trash2, X } from "lucide-react";
 
@@ -17,6 +18,8 @@ import { ClipboardList, Plus, RefreshCw, SlidersHorizontal, Trash2, X } from "lu
 // Marken und Strafpunkte unter „Mehr“. Team-Liga: Spiel mit Ergebnis, Maps und Aufstellung, dazu die Tabelle laut
 // Veranstalter zum Einfügen. Erst prüft der Server (Vorschau), dann wird übernommen – als Entwurf, veröffentlicht oder,
 // wenn das Blatt schon veröffentlicht ist und die Person nicht veröffentlichen darf, als Entwurf daneben.
+// Rennliga (#1927): je Zeile unter „Mehr“ auch Startplatz, Zeit und Abstand, je Rennen schnellste Runde mit Zeit und
+// Fahrer des Tages – das Einfügen füllt sie aus Tabellen mit diesen Spalten.
 
 const SMALL_INPUT = `${INPUT_CLASS} !py-1.5 text-sm`;
 const LABEL = "text-[10px] font-bold uppercase tracking-widest text-white/45";
@@ -78,7 +81,12 @@ function FieldErrors({ fields, testId }) {
 
 function ResultRow({ row, index, autoPlace, organizerMode, problems, info, invalid, onChange, onHint, onRemove }) {
   const scored = info?.scored;
-  const [open, setOpen] = useState(() => Boolean(row.penalty_points || row.start_number || row.official_total || row.override));
+  // Offen von selbst nur, wo etwas Ungewöhnliches steht (Strafe, Gesamtstand, „zählen statt Schlüssel“) oder eine Eingabe
+  // ungültig ist. Startnummer, Startplatz, Zeit und Abstand (#1927) stehen zugeklappt kurz unter der Zeile - so bleibt
+  // eine eingefügte Liste mit 20 Fahrern überschaubar.
+  const [opened, setOpen] = useState(() => Boolean(row.penalty_points || row.official_total || row.override));
+  const open = opened || Boolean(invalid?.grid || invalid?.penalty_points || invalid?.official_total);
+  const raceLine = [row.start_number && `Nr. ${row.start_number}`, row.grid && `Startplatz ${row.grid}`, row.time, row.gap].filter(Boolean).join(" · ");
   const level = invalid || problems?.some((item) => item.level === "error") ? "error" : problems?.length ? "warning" : null;
   const toggleMark = (mark) => onChange({ marks: row.marks.includes(mark) ? row.marks.filter((item) => item !== mark) : [...row.marks, mark] });
   const number = index + 1;
@@ -96,7 +104,7 @@ function ResultRow({ row, index, autoPlace, organizerMode, problems, info, inval
         <input aria-label={`Punkte Zeile ${number}`} inputMode="decimal" value={row.points} placeholder="Pkt"
           title={organizerMode ? "Punkte laut Veranstalter" : "Leer: nach Schlüssel. Eingetragen: laut Veranstalter (wird geprüft)."}
           onChange={(event) => onChange({ points: event.target.value })} data-testid="result-row-points" {...invalidProps(invalid, "points")} className={`${SMALL_INPUT} text-right tabular-nums ${invalid?.points ? INVALID : ""}`} />
-        <button type="button" className={`${ICON_BUTTON} ${open ? "text-[#29B6E8]" : ""}`} onClick={() => setOpen((value) => !value)} aria-expanded={open} aria-label={`Mehr zu Zeile ${number}`} title="Marken, Strafpunkte, Startnummer" data-testid="result-row-more">
+        <button type="button" className={`${ICON_BUTTON} ${open ? "text-[#29B6E8]" : ""}`} onClick={() => setOpen((value) => !value)} aria-expanded={open} aria-label={`Mehr zu Zeile ${number}`} title="Marken, Strafpunkte, Startnummer, Startplatz, Zeit, Abstand" data-testid="result-row-more">
           <SlidersHorizontal className="w-4 h-4" />
         </button>
         <button type="button" className={ICON_BUTTON} onClick={onRemove} aria-label={`Zeile ${number} entfernen`} title="Entfernen" data-testid="result-row-remove">
@@ -123,6 +131,12 @@ function ResultRow({ row, index, autoPlace, organizerMode, problems, info, inval
             <input inputMode="decimal" value={row.penalty_points} onChange={(event) => onChange({ penalty_points: event.target.value })} data-testid="result-row-penalty" {...invalidProps(invalid, "penalty_points")} className={`${SMALL_INPUT} ${invalid?.penalty_points ? INVALID : ""}`} /></label>
           <label className="block"><span className={LABEL}>Startnummer</span>
             <input value={row.start_number} maxLength={10} onChange={(event) => onChange({ start_number: event.target.value })} data-testid="result-row-start" className={SMALL_INPUT} /></label>
+          <label className="block"><span className={LABEL}>Startplatz</span>
+            <input inputMode="numeric" value={row.grid} onChange={(event) => onChange({ grid: event.target.value })} data-testid="result-row-grid" {...invalidProps(invalid, "grid")} className={`${SMALL_INPUT} tabular-nums ${invalid?.grid ? INVALID : ""}`} /></label>
+          <label className="block"><span className={LABEL}>Zeit</span>
+            <input value={row.time} maxLength={20} onChange={(event) => onChange({ time: event.target.value })} data-testid="result-row-time" className={`${SMALL_INPUT} tabular-nums`} /></label>
+          <label className="block"><span className={LABEL}>Abstand</span>
+            <input value={row.gap} maxLength={20} onChange={(event) => onChange({ gap: event.target.value })} data-testid="result-row-gap" className={`${SMALL_INPUT} tabular-nums`} /></label>
           <label className="block"><span className={LABEL}>Gesamt laut Veranst.</span>
             <input inputMode="decimal" value={row.official_total} onChange={(event) => onChange({ official_total: event.target.value })} data-testid="result-row-total" {...invalidProps(invalid, "official_total")} className={`${SMALL_INPUT} ${invalid?.official_total ? INVALID : ""}`} /></label>
           {!organizerMode && (
@@ -133,6 +147,7 @@ function ResultRow({ row, index, autoPlace, organizerMode, problems, info, inval
           )}
         </div>
       )}
+      {!open && raceLine && <div className="mt-1 text-[11px] text-white/55 tabular-nums" data-testid="result-row-race">{raceLine}</div>}
       {info && (
         <div className="mt-1 flex flex-wrap items-center gap-x-2 text-[11px] text-white/45 tabular-nums">
           {/* Bekannt oder neu sagt die Vorschau jedem; ob jemand Vereinsmitglied ist, nur dem Vorstand. */}
@@ -150,6 +165,40 @@ function ResultRow({ row, index, autoPlace, organizerMode, problems, info, inval
       <FieldErrors fields={invalid} testId="result-row-invalid" />
       <RowProblems items={problems} />
     </li>
+  );
+}
+
+// Je Rennen (#1927): schnellste Runde mit Zeit und Fahrer des Tages - Namen aus der Liste oben (Vorschläge). Feldfehler
+// (Zeit ohne Fahrer) und Meldungen der Vorschau zu diesen Feldern stehen direkt darunter.
+function RaceExtras({ form, onChange, invalid, problems = {} }) {
+  const set = (key, values) => onChange({ [key]: values });
+  const lapInvalid = Boolean(invalid?.fastest_lap || problems.fastest_lap?.some((item) => item.level === "error"));
+  const dayInvalid = Boolean(problems.driver_of_the_day?.some((item) => item.level === "error"));
+  const messages = [
+    ...(invalid?.fastest_lap ? [{ level: "error", message: invalid.fastest_lap }] : []),
+    ...(problems.fastest_lap || []), ...(problems.driver_of_the_day || []),
+  ];
+  return (
+    <section className="border border-white/10 rounded-sm bg-[#0A0A0A] p-3 grid gap-2 sm:grid-cols-[minmax(0,1fr)_8rem_minmax(0,1fr)] items-end" data-testid="result-race">
+      <label className="block min-w-0"><span className={LABEL}>Schnellste Runde</span>
+        <input value={form.fastestLap.name} list="result-row-names" maxLength={120} placeholder="Name aus der Liste"
+          onChange={(event) => set("fastestLap", { ...form.fastestLap, name: event.target.value })} data-testid="result-fastest-name"
+          aria-invalid={lapInvalid || undefined} className={`${SMALL_INPUT} ${lapInvalid ? INVALID : ""}`} /></label>
+      <label className="block"><span className={LABEL}>Rundenzeit</span>
+        <input value={form.fastestLap.time} maxLength={20} placeholder="1:31.456"
+          onChange={(event) => set("fastestLap", { ...form.fastestLap, time: event.target.value })} data-testid="result-fastest-time" className={`${SMALL_INPUT} tabular-nums`} /></label>
+      <label className="block min-w-0"><span className={LABEL}>Fahrer des Tages</span>
+        <input value={form.driverOfTheDay} list="result-row-names" maxLength={120} placeholder="Name aus der Liste"
+          onChange={(event) => set("driverOfTheDay", event.target.value)} data-testid="result-dotd"
+          aria-invalid={dayInvalid || undefined} className={`${SMALL_INPUT} ${dayInvalid ? INVALID : ""}`} /></label>
+      {messages.length > 0 && (
+        <ul className="sm:col-span-3 space-y-0.5 text-xs" data-testid="result-race-problems" role="alert">
+          {messages.map((item, index) => (
+            <li key={index} className={item.level === "error" ? "text-red-300" : "text-amber-300"}>{item.message}</li>
+          ))}
+        </ul>
+      )}
+    </section>
   );
 }
 
@@ -335,7 +384,8 @@ export function ResultEntrySheet({ series, round, onClose, onSaved }) {
   const access = data?.access || {};
   const board = access.role === "board";
   const participants = useMemo(() => data?.participants || [], [data]);
-  const teams = useMemo(() => [...new Set(participants.map((person) => person.default_team).filter(Boolean))], [participants]);
+  // Vorschläge fürs Team: zuerst die eigenen Teams der Saison (#1926), dann die Standard-Teams der Teilnehmer.
+  const teams = useMemo(() => [...new Set([...(data?.series?.own_teams || []), ...participants.map((person) => person.default_team)].filter(Boolean))], [data, participants]);
 
   const built = useMemo(() => (form ? formToPayload(form) : null), [form]);
   const stamp = built ? formStamp(built.payload) : "";
@@ -384,7 +434,12 @@ export function ResultEntrySheet({ series, round, onClose, onSaved }) {
     const result = parseResultPaste(text);
     if (result.rows.length) {
       const rows = pastedToRows(result.rows, participants);
-      const next = { ...form, rows };
+      const next = {
+        ...form, rows,
+        // Schnellste Runde und Fahrer des Tages aus der Liste (#1927) - sonst bleibt, was schon eingetragen ist.
+        ...(result.fastest_lap ? { fastestLap: { name: result.fastest_lap.name || "", time: result.fastest_lap.time || "" } } : {}),
+        ...(result.driver_of_the_day ? { driverOfTheDay: result.driver_of_the_day.name || "" } : {}),
+      };
       setForm(next);
       setPasting(result.errors.length > 0);
       // Danach gleich prüfen lassen – so stehen Fehler und Punkte sofort an den Zeilen.
@@ -497,7 +552,7 @@ export function ResultEntrySheet({ series, round, onClose, onSaved }) {
         <>
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-white/60" data-testid="result-round">
             <span className="tabular-nums">{roundWhen(data.round)}</span>
-            {data.round.venue && <span>· {data.round.venue}</span>}
+            {(data.round.venue || data.round.country_code) && <span>· <VenueWithFlag round={{ venue: data.round.venue, country_code: data.round.country_code }} /></span>}
             {sheetStatus && <span className="text-[10px] font-bold uppercase tracking-widest text-white/45">{sheetStatus === "published" ? "veröffentlicht" : "Entwurf"} · Stand {data.version}</span>}
             <span className="text-[10px] font-bold uppercase tracking-widest text-white/45">{organizerMode ? "Punkte laut Veranstalter" : "Punkte nach Schlüssel"}</span>
           </div>
@@ -541,6 +596,7 @@ export function ResultEntrySheet({ series, round, onClose, onSaved }) {
             {participants.map((person) => <option key={person.id} value={person.name}>{person.start_number ? `Nr. ${person.start_number}` : undefined}</option>)}
           </datalist>
           <datalist id="result-teams">{teams.map((team) => <option key={team} value={team} />)}</datalist>
+          <datalist id="result-row-names">{[...new Set(form.rows.map((row) => String(row.name || "").trim()).filter(Boolean))].map((name) => <option key={name} value={name} />)}</datalist>
 
           {teamLeague && (
             <section className="space-y-3" data-testid="result-matches">
@@ -572,7 +628,7 @@ export function ResultEntrySheet({ series, round, onClose, onSaved }) {
               )}
               {pasting && (
                 <PasteBox onApply={pasteRows} label="Ergebnisliste einfügen" testId="result-paste" placeholder={"1. Name  25\n2. Name 18 Pkt\n3. Name DNF"}
-                  hint="Je Zeile ein Teilnehmer: „1. Name  25“ (Punkte mit zwei Leerzeichen oder „Pkt“ abgesetzt), nur Namen in Reihenfolge oder eine Tabelle aus Excel oder einer Website (Tab, „|“, „;“). Ersetzt die Liste unten." />
+                  hint="Je Zeile ein Teilnehmer: „1. Name  25“ (Punkte mit zwei Leerzeichen oder „Pkt“ abgesetzt), nur Namen in Reihenfolge oder eine Tabelle aus Excel oder einer Website (Tab, „|“, „;“) – gern mit Spalten Nr, Start, Zeit, Abstand und Beste Runde. Dazu „Schnellste Runde: Name 1:31.456“ und „Fahrer des Tages: Name“. Ersetzt die Liste unten." />
               )}
               <ol className="divide-y divide-white/5" data-testid="result-rows">
                 {form.rows.map((row, index) => (
@@ -586,6 +642,8 @@ export function ResultEntrySheet({ series, round, onClose, onSaved }) {
               </button>
             </section>
           )}
+          {kind === "racing" && <RaceExtras form={form} onChange={update} invalid={invalid.race} problems={problems.byField} />}
+
           {teamLeague && form.rows.length === 0 && (
             <button type="button" onClick={addRow} data-testid="result-row-add" className="tls-btn tls-btn--quiet px-3 py-2 rounded-sm text-xs font-bold uppercase tracking-wider inline-flex items-center gap-2">
               <Plus className="w-3.5 h-3.5" /> Einzelwertung (optional)

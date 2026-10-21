@@ -163,6 +163,17 @@ test("Teamwertung: Balken und Raster, Vereinsteams hervorgehoben, Gäste markier
   expect(within(rows[0]).getAllByTestId("racing-team-cell").map((cell) => cell.textContent)).toEqual(["32", "18"]);
 });
 
+test("drei eigene Teams (#1926): alle drei in Garage und Teamwertung hervorgehoben, auch eines ohne Rennen", async () => {
+  const racing = { ...BODY.racing, club_teams: ["Probe Löwen", "Probe Löwen B", "Probe Löwen C"] };
+  renderAt("/references/series/probe-racing/2026-f1", { ...BODY, racing });
+  const garage = await screen.findByTestId("racing-garage");
+  const cards = within(garage).getAllByTestId("racing-garage-team");
+  expect(cards.map((card) => within(card).getByRole("heading", { level: 3 }).textContent)).toEqual(["Probe Löwen", "Probe Löwen B", "Probe Löwen C"]);
+  expect(cards[2]).toHaveTextContent("Noch kein Rennen gefahren.");
+  const rows = within(within(screen.getByTestId("racing-teams")).getByTestId("series-table")).getAllByTestId("series-row");
+  expect(rows.map((item) => item.dataset.club || "")).toEqual(["", "true", "true"]);
+});
+
 // Wie BODY, nur zählen Gäste nicht fürs Team: der Server meldet für den Gast keinen Beitrag (driver_points).
 const GUESTS_NOT_COUNTING = {
   ...BODY,
@@ -312,4 +323,59 @@ test("noch ohne Ergebnis: Hinweis statt Tabellen", async () => {
   const section = await screen.findByTestId("racing-drivers");
   expect(within(section).getByTestId("series-no-table")).toHaveTextContent("Noch keine Ergebnisse");
   expect(screen.queryByTestId("racing-garage")).toBeNull();
+});
+
+test("Flaggen (#1925): Rennkalender, Spaltenköpfe des Rennrasters und Fahrer-Detail, Alternativtext = Landesname", async () => {
+  const rounds = BODY.rounds.map((round) => ({ ...round, country_code: { r1: "IT", r2: "AZ", r4: "JP" }[round.id] || null }));
+  renderAt("/references/series/probe-racing/2026-f1?fahrer=lion1", { ...BODY, rounds });
+  const calendar = await screen.findByTestId("racing-calendar");
+  const items = within(calendar).getAllByTestId("racing-round");
+  expect(within(items[0]).getByRole("img", { name: "Italien" })).toHaveAttribute("src", "/assets/flags/it.svg");
+  expect(items[0]).toHaveTextContent("Probering");
+  expect(within(items[2]).queryByRole("img")).toBeNull();
+  // Ohne Ort steht das Land neben der Flagge.
+  expect(items[3]).toHaveTextContent("Japan");
+
+  const table = within(screen.getByTestId("racing-drivers")).getByTestId("series-table");
+  const heads = within(table).getAllByTestId("series-round-flag");
+  expect(heads.map((head) => within(head).getByRole("img").getAttribute("alt"))).toEqual(["Italien", "Aserbaidschan", "Japan"]);
+
+  const detail = screen.getByTestId("racing-driver");
+  const races = within(detail).getAllByTestId("racing-driver-race");
+  expect(races[1]).toHaveAttribute("title", expect.stringContaining("R2 (Aserbaidschan)"));
+  expect(races[1].querySelector("img")).toHaveAttribute("alt", "Aserbaidschan");
+});
+
+test("Rennergebnis (#1927): Fahrer des Tages im Raster, Startplatz → Ziel und gutgemachte Plätze im Fahrer-Detail", async () => {
+  const details = {
+    ext1: { r1: { grid: 2, time: "1:32:45.123", fastest_lap_time: "1:31.456" } },
+    lion1: { r1: { grid: 5, gap: "+5.204", driver_of_the_day: true }, r2: { grid: 1, start_number: "7" } },
+  };
+  const rows = ROWS.map((item) => ({
+    ...item, results: item.results.map((entry) => ({ ...entry, ...(details[item.key]?.[entry.round_id] || {}) })),
+  }));
+  renderAt("/references/series/probe-racing/2026-f1?fahrer=lion1", { ...BODY, standings: { ...BODY.standings, rows } });
+  const table = within(await screen.findByTestId("racing-drivers")).getByTestId("series-table");
+  const lion = within(table).getAllByTestId("series-row")[1];
+  const cells = within(lion).getAllByTestId("race-cell");
+  expect(within(cells[0]).getByTestId("race-dotd")).toBeTruthy();
+  expect(cells[0]).toHaveAttribute("title", "R1: Platz 2, 18 Punkte, von Startplatz 5 (3 Plätze gutgemacht), Abstand +5.204, Fahrer des Tages");
+  const leader = within(table).getAllByTestId("series-row")[0];
+  expect(within(leader).getAllByTestId("race-cell")[0]).toHaveAttribute("title", expect.stringContaining("Zeit 1:32:45.123, schnellste Runde 1:31.456"));
+
+  const detail = screen.getByTestId("racing-driver");
+  const gains = within(detail).getAllByTestId("racing-driver-gain");
+  expect(gains.map((gain) => [gain.dataset.dir, gain.textContent])).toEqual([["up", "3"], ["same", "±0"]]);
+  expect(within(detail).getByTestId("racing-driver-stats")).toHaveTextContent("1× Fahrer des Tages · 3 Plätze gutgemacht");
+});
+
+test("ohne Länder bleibt alles wie bisher: keine Flaggen", async () => {
+  renderAt("/references/series/probe-racing/2026-f1?fahrer=lion1");
+  await screen.findByTestId("racing-calendar");
+  // Ohne Startplätze und Fahrer des Tages: keine neuen Zeichen im Raster und im Detail.
+  expect(screen.queryAllByTestId("race-dotd")).toEqual([]);
+  expect(screen.queryAllByTestId("racing-driver-gain")).toEqual([]);
+  expect(screen.getByTestId("racing-driver-stats")).not.toHaveTextContent("gutgemacht");
+  expect(screen.queryAllByTestId("country-flag")).toEqual([]);
+  expect(screen.queryAllByTestId("series-round-flag")).toEqual([]);
 });

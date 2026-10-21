@@ -32,6 +32,7 @@ from fastapi import HTTPException
 from database import get_db
 from models import new_id, now_utc
 from services import series_participants
+from services.own_teams import own_teams
 from services.mutation_lock import MutationLockBusy, mutation_lock, series_write_resource
 from services.scoring_rules import normalize_rules
 from services.series_standings import compute_standings
@@ -197,7 +198,7 @@ async def recompute_standings(db, series: dict) -> int:
         {"series_id": sid, "status": "published"}, {"_id": 0})}
     participants = await db.reference_participants.find({"series_id": sid}, {"_id": 0}).to_list(None)
     snapshots = compute_standings(rules=series.get("rules") or {}, rounds=rounds, sheets=sheets,
-                                  participants=participants, own_teams=[series.get("team_name") or ""])
+                                  participants=participants, own_teams=own_teams(series))
     computed_at = now_utc().isoformat()
     kept = []
     for snapshot in snapshots:

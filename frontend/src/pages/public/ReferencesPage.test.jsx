@@ -106,6 +106,16 @@ test("Läuft gerade: heute zuerst mit goldenem Chip, Fortschritt in Segmenten, T
   expect(jump.querySelector(".tls-run-pulse")).toBeInTheDocument();
 });
 
+test("Läuft gerade: der nächste Termin trägt die Flagge seines Landes (#1925)", async () => {
+  running = { today: "2026-11-09", items: [{ ...CUP, next: { ...CUP.next, country_code: "QA" } }, LEAGUE] };
+  page();
+  const section = await screen.findByTestId("references-running");
+  const [cup, league] = within(section).getAllByTestId("running-next");
+  expect(within(cup).getByRole("img", { name: "Katar" })).toHaveAttribute("src", "/assets/flags/qa.svg");
+  expect(cup).toHaveTextContent("Q2 · 20:00");
+  expect(within(league).queryByRole("img")).toBeNull();
+});
+
 test("Läuft gerade: ein fehlgeschlagener Abruf blendet den Bereich aus", async () => {
   apiMock.get.mockImplementation((url) => {
     if (url.startsWith("/reference-series/")) return Promise.reject(new Error("x"));

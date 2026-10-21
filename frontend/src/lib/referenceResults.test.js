@@ -135,3 +135,56 @@ test("ungültige Zahlen werden nie still umgedeutet: Feldfehler je Zeile, Spiel 
   const { payload } = formToPayload({ rows: [rows[2]], matches: [], table: [], note: "" });
   expect(payload.rows[0]).toMatchObject({ place: 3, points: -2, penalty_points: 2.5, official_total: 40 });
 });
+
+// ---------------------------------------------------------------- Rennergebnis (#1927)
+test("Rennergebnis: Startnummer, Startplatz, Zeit, Abstand, schnellste Runde und Fahrer des Tages gehen hin und zurück", () => {
+  const sheet = {
+    rows: [
+      { participant_id: "p1", place: 1, team: null, points: null, points_source: "scheme", marks: [], penalty_points: 0, note: null, start_number: "7", grid: 3, time: "1:32:45.123" },
+      { participant_id: "p2", place: 2, team: null, points: null, points_source: "scheme", marks: ["fastest_lap"], penalty_points: 0, note: null, grid: 1, gap: "+5.204" },
+    ],
+    fastest_lap: { participant_id: "p2", time: "1:31.456" },
+    driver_of_the_day: "p1",
+  };
+  const form = sheetToForm(sheet, PEOPLE);
+  expect(form.rows.map((row) => [row.start_number, row.grid, row.time, row.gap])).toEqual([["7", "3", "1:32:45.123", ""], ["", "1", "", "+5.204"]]);
+  expect(form.fastestLap).toEqual({ name: "Beta", time: "1:31.456" });
+  expect(form.driverOfTheDay).toBe("Alpha");
+  const { payload } = formToPayload(form);
+  expect(payload.rows[0]).toMatchObject({ participant_id: "p1", start_number: "7", grid: 3, time: "1:32:45.123" });
+  expect(payload.rows[0]).not.toHaveProperty("gap");
+  expect(payload.rows[1]).toMatchObject({ participant_id: "p2", grid: 1, gap: "+5.204" });
+  expect(payload.rows[1]).not.toHaveProperty("start_number");
+  expect(payload.fastest_lap).toEqual({ participant_id: "p2", time: "1:31.456" });
+  expect(payload.driver_of_the_day).toEqual({ participant_id: "p1" });
+});
+
+test("Rennergebnis: eine Rundenzeit ohne Fahrer ist ein Feldfehler - außer genau eine Zeile ist markiert", () => {
+  const rows = [emptyRow({ name: "Alpha", participant_id: "p1" }), emptyRow({ name: "Beta", participant_id: "p2" })];
+  const form = { rows, matches: [], table: [], note: "", fastestLap: { name: "", time: "1:31.4" }, driverOfTheDay: "" };
+  expect(fieldErrors(form).race).toEqual({ fastest_lap: "Zur Rundenzeit fehlt der Fahrer – Namen eintragen oder genau eine Zeile als „Schnellste Runde“ markieren." });
+  const marked = { ...form, rows: [{ ...rows[0], marks: ["fastest_lap"] }, rows[1]] };
+  expect(fieldErrors(marked).race).toBeUndefined();
+  expect(fieldErrors({ ...form, fastestLap: { name: "Beta", time: "1:31.4" } }).race).toBeUndefined();
+  expect(fieldErrors({ ...form, fastestLap: { name: "", time: "" } }).race).toBeUndefined();
+});
+
+test("Rennergebnis: neue Namen gehen als Name, ohne Angaben fehlen die Felder, ein falscher Startplatz ist ein Feldfehler", () => {
+  const rows = [emptyRow({ name: "Neu Nora", grid: "x" }), emptyRow({ name: "Alpha", participant_id: "p1" })];
+  const form = { rows, matches: [], table: [], note: "", fastestLap: { name: " neu nora ", time: " 1:31.4 " }, driverOfTheDay: "Gar Keiner" };
+  expect(fieldErrors(form)[rows[0].key]).toEqual({ grid: "Startplatz als ganze Zahl von 1 bis 1000." });
+  const { payload } = formToPayload(form);
+  expect(payload.fastest_lap).toEqual({ name: "Neu Nora", time: "1:31.4" });
+  expect(payload.driver_of_the_day).toEqual({ name: "Gar Keiner" });
+  const plain = formToPayload({ rows: [emptyRow({ name: "Alpha" })], matches: [], table: [], note: "" }).payload;
+  expect(plain).not.toHaveProperty("fastest_lap");
+  expect(plain).not.toHaveProperty("driver_of_the_day");
+  expect(Object.keys(plain.rows[0])).not.toContain("grid");
+});
+
+test("eingefügte Liste mit Rennspalten: Startplatz, Zeit und Abstand landen in den Zeilen", () => {
+  const parsed = parseResultPaste("Pos\tNr\tFahrer\tStart\tZeit\tAbstand\n1\t7\tAlpha\t3\t1:32:45.1\t\n2\t12\tBeta\t1\t\t+5.2");
+  const rows = pastedToRows(parsed.rows, PEOPLE);
+  expect(rows.map((row) => [row.participant_id, row.start_number, row.grid, row.time, row.gap])).toEqual([
+    ["p1", "7", "3", "1:32:45.1", ""], ["p2", "12", "1", "", "+5.2"]]);
+});

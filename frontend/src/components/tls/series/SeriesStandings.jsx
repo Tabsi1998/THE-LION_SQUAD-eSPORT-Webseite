@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { formatNumber, rankMove } from "@/lib/standingsTable";
 import { roundLabel } from "@/lib/referenceCalendar";
+import { CountryFlag } from "@/components/tls/CountryFlag";
 import {
   cutlineAfter, mobileRows, nameOf, resultIn, resultLabel, roundColumns, tiebreakHint, visibleRows,
 } from "@/lib/referenceSeriesTable";
@@ -94,8 +95,14 @@ function DesktopTable({ rows, columns, topN, cutAfter, label, view }) {
             <th scope="col" className="text-left pl-4 pr-1 py-2.5 w-16 font-semibold">#</th>
             <th scope="col" className="text-left px-2 py-2.5 font-semibold">Name</th>
             {columns.map((round, index) => (
-              <th key={round.id} scope="col" title={round.state === "cancelled" ? "Abgesagt" : undefined} className={`px-2 py-2.5 text-right font-semibold whitespace-nowrap ${round.state === "cancelled" ? "line-through text-white/25" : ""}`}>
-                {roundLabel({ ...round, position: round.position || index + 1 })}
+              <th key={round.id} scope="col" title={round.state === "cancelled" ? "Abgesagt" : undefined} className={`px-2 py-2.5 text-right align-bottom font-semibold whitespace-nowrap ${round.state === "cancelled" ? "line-through text-white/25" : ""}`}>
+                {/* Flagge des Rennens (#1925) über dem Kürzel - Spalten ohne Land bleiben auf derselben Grundlinie. */}
+                {round.country_code ? (
+                  <span className="inline-flex flex-col items-end gap-1" data-testid="series-round-flag">
+                    <CountryFlag code={round.country_code} size="sm" />
+                    {roundLabel({ ...round, position: round.position || index + 1 })}
+                  </span>
+                ) : roundLabel({ ...round, position: round.position || index + 1 })}
               </th>
             ))}
             <th scope="col" title={`Punkte der ${label}`} className={`text-right ${extraColumn ? "px-2" : "pr-4 pl-2"} py-2.5 font-semibold`}>Pkt</th>

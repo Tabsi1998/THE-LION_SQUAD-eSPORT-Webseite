@@ -6,6 +6,7 @@ import { SelectField, TextAreaField, TextField } from "@/components/tls/FormFiel
 import { PUBLISH_OPTIONS, STATUS_OPTIONS, VISIBILITY_OPTIONS, WEEKDAY_OPTIONS, rulesToForm, seriesPayload, seriesToForm } from "@/lib/referenceSeries";
 import { SEASON_RESULT_OPTIONS } from "@/lib/seriesTiers";
 import { RulesFields } from "./RulesFields";
+import { OwnTeamsField } from "./OwnTeamsField";
 import { toast } from "sonner";
 
 // Saison einer Spur (#1741): Saison und Stufe ergeben die Adresse, die Vorlage füllt die Regeln vor (kopiert, nicht
@@ -58,13 +59,13 @@ export function SeriesForm({ series, lineage, schemes = [], defaultRules = {}, o
         <SelectField label="Einträge eines Captains" value={form.publish_mode} onChange={(v) => set("publish_mode", v)} options={PUBLISH_OPTIONS} testId="series-publish-mode" />
         <SelectField label="Standard-Wochentag" value={form.default_weekday} onChange={(v) => set("default_weekday", v)} options={WEEKDAY_OPTIONS} testId="series-weekday" />
         <TextField label="Standard-Uhrzeit" type="time" value={form.default_time} onChange={(v) => set("default_time", v)} hint="Wiener Zeit." testId="series-time" />
-        <TextField label="Eigenes Team" value={form.team_name} onChange={(v) => set("team_name", v)} hint="So heißt das Vereinsteam beim Veranstalter." testId="series-team-name" />
         <SelectField label="Sichtbarkeit" value={form.visibility} onChange={(v) => set("visibility", v)} options={VISIBILITY_OPTIONS} testId="series-visibility" />
         <SelectField label="Ergebnis der Saison" value={form.season_result} onChange={(v) => set("season_result", v)} options={SEASON_RESULT_OPTIONS} testId="series-season-result"
           hint="Leer: der Liga-Weg leitet Auf- und Abstieg aus den Stufen ab." />
         <TextField label="Offizielle Tabelle" value={form.official_table_url} onChange={(v) => set("official_table_url", v)} placeholder="https://…" testId="series-official-url" />
         <TextField label="Seite des Veranstalters" value={form.external_url} onChange={(v) => set("external_url", v)} placeholder="https://…" testId="series-external-url" />
       </FormGrid>
+      <OwnTeamsField teams={form.own_teams} onChange={(teams) => set("own_teams", teams)} />
       <TextAreaField label="Beschreibung" value={form.description} onChange={(v) => set("description", v)} testId="series-description" />
       <RulesFields rules={form.rules} kind={lineage.kind} onChange={(rules) => set("rules", rules)} />
       {!isNew && (

@@ -3,6 +3,7 @@ import { METALS } from "@/components/tls/TrophyShelf";
 import { formatNumber } from "@/lib/standingsTable";
 import { roundLabel, roundWhen } from "@/lib/referenceCalendar";
 import { finalNeeds, maxRoundPoints } from "@/lib/finalCalc";
+import { VenueWithFlag } from "@/components/tls/CountryFlag";
 import { countLabel, nameOf, roundColumns, schemeLabel, tiebreakLabel } from "@/lib/referenceSeriesTable";
 import "./referenceSeries.css";
 
@@ -41,7 +42,7 @@ export function SeriesProgress({ progress, rounds, words = PROGRESS_WORDS.series
           <span className="text-white/45">{next.kind === "final" ? "Als Nächstes das Finale: " : words.next}</span>
           <span className="text-white font-semibold">{roundLabel(next)}</span>
           <span className="tabular-nums"> · {roundWhen(next)}</span>
-          {next.venue && <span> · {next.venue}</span>}
+          {(next.venue || next.country_code) && <span> · <VenueWithFlag round={{ venue: next.venue, country_code: next.country_code }} /></span>}
         </p>
       )}
     </section>

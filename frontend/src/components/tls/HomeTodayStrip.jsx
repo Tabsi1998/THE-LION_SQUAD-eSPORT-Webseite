@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { ArrowRight } from "lucide-react";
 import { api } from "@/lib/api";
+import { CountryFlag } from "@/components/tls/CountryFlag";
 import { todayFacts, todayItems } from "@/lib/homeToday";
 import { seriesAddress } from "@/lib/referenceSeries";
 import { GameMark } from "@/components/tls/references/referenceParts";
@@ -45,6 +46,9 @@ function TodayCard({ item, index }) {
   const { lineage, series } = item;
   const season = [series.title, series.season, series.tier].filter(Boolean).join(" · ");
   const facts = todayFacts(item);
+  const parts = [season, ...facts].filter(Boolean);
+  // Die Runde ist die erste Angabe nach der Saison, wenn der nächste Termin ein Kürzel oder einen Titel hat.
+  const roundAt = item.next?.code || item.next?.title ? parts.indexOf(facts[0]) : -1;
   return (
     <li className="min-w-0">
       <Link
@@ -57,7 +61,14 @@ function TodayCard({ item, index }) {
         <div className="min-w-0 flex-1">
           <div className="font-semibold text-[15px] leading-snug text-zinc-200 break-words [overflow-wrap:anywhere]" data-testid="home-today-title">{lineage.title}</div>
           <div className="mt-0.5 text-[13px] text-zinc-400 break-words [overflow-wrap:anywhere]" data-testid="home-today-facts">
-            {[season, ...facts].filter(Boolean).join(" · ")}
+            {/* Flagge des heutigen Rennens (#1925) vor der Runde. */}
+            {parts.map((part, position) => (
+              <Fragment key={position}>
+                {position > 0 && " · "}
+                {position === roundAt && <CountryFlag code={item.next?.country_code} size="sm" className="mr-1" />}
+                {part}
+              </Fragment>
+            ))}
           </div>
         </div>
         <span className="shrink-0 inline-flex items-center gap-1 text-[11px] font-bold uppercase tracking-[0.14em] text-brand">

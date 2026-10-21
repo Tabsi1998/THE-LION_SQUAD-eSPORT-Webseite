@@ -47,6 +47,19 @@ test("zeigt nur heutige Termine nacheinander, mit Runde, Uhrzeit, Vereinsleuten 
   expect(strip.querySelector(".tls-run-pulse")).toHaveAttribute("aria-hidden", "true");
 });
 
+test("die Flagge des heutigen Rennens steht vor der Runde (#1925)", async () => {
+  const items = running.items.map((item, index) => (index === 0 ? { ...item, next: { ...item.next, country_code: "AZ" } } : item));
+  apiMock.get.mockResolvedValue({ data: { ...running, items } });
+  renderStrip();
+  await screen.findByTestId("home-today");
+  const facts = screen.getAllByTestId("home-today-facts");
+  expect(facts[0]).toHaveTextContent("2026 · Liga 2 · Rennen R5 · 20:00 Uhr · 3 Vereinsfahrer");
+  const flag = facts[0].querySelector("img");
+  expect(flag).toHaveAttribute("alt", "Aserbaidschan");
+  expect(flag.nextSibling.textContent).toBe("Rennen R5");
+  expect(facts[1].querySelector("img")).toBeNull();
+});
+
 test("ohne heutigen Termin, ohne Daten oder bei einem Fehler: kein Streifen", async () => {
   apiMock.get.mockResolvedValue({ data: { ...running, items: running.items.filter((item) => !item.today) } });
   const first = renderStrip();
