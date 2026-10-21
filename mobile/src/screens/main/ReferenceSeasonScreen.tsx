@@ -9,13 +9,12 @@ import { SeasonCalendar } from "../../components/references/season/SeasonCalenda
 import { SeasonDrivers } from "../../components/references/season/SeasonDrivers";
 import { SeasonStandings } from "../../components/references/season/SeasonStandings";
 import { SeasonStatistics } from "../../components/references/season/SeasonStatistics";
-import { SeasonNotice, StateChip } from "../../components/references/seriesParts";
+import { LeagueTable, Matchdays, SeasonMaps, Squad } from "../../components/references/season/TeamLeague";
+import { SeasonNotice } from "../../components/references/seriesParts";
 import { Screen } from "../../components/Screen";
 import { Body, Muted } from "../../components/Text";
 import { api } from "../../lib/api";
 import {
-  leagueTableRows,
-  matchdayRows,
   seasonEyebrow,
   seasonFigures,
   seasonKind,
@@ -27,7 +26,7 @@ import {
 } from "../../lib/referenceSeason";
 import { WEB_BASE_URL } from "../../lib/siteUrls";
 import type { MoreStackParamList } from "../../navigation/types";
-import { colors, surfaces } from "../../theme";
+import { colors } from "../../theme";
 
 // Saison einer Serie (#1945) nach dem freigegebenen Entwurf „AppSaison“ (21.10.2026), nur lesen: Kopf mit Art, Titel und
 // Kennzahlen (ohne Nullen), dann je Art eigene Reiter - Rennliga: Kalender, Tabelle (Fahrer/Teams), Fahrer (Vereins-
@@ -153,64 +152,12 @@ export function ReferenceSeasonScreen({ navigation, route }: Props) {
           {active === "drivers" ? <SeasonDrivers page={page} /> : null}
           {active === "statistics" ? <SeasonStatistics lineage={lineage} season={season} /> : null}
           {active === "matchdays" ? <Matchdays page={page} /> : null}
+          {active === "squad" ? <Squad page={page} /> : null}
+          {active === "maps" ? <SeasonMaps page={page} /> : null}
         </View>
         {webButton}
       </ScrollView>
     </Screen>
-  );
-}
-
-function Matchdays({ page }: { page: SeasonPage }) {
-  const rows = matchdayRows(page);
-  if (!rows.length) return <Muted style={styles.empty}>Noch keine Spieltage.</Muted>;
-  return (
-    <View>
-      {rows.map((row) => (
-        <View key={row.key} style={styles.round} testID={`season-matchday-${row.key}`}>
-          <Body style={styles.code}>{row.code}</Body>
-          <View style={styles.roundBody}>
-            <Muted style={styles.when}>{row.when}</Muted>
-            {row.opponent ? <Body style={styles.venue}>{[row.opponent, row.side].filter(Boolean).join(" · ")}</Body> : null}
-            {row.maps.length ? <Muted style={styles.maps}>{row.maps.join(" · ")}</Muted> : null}
-          </View>
-          {row.score ? (
-            <View style={styles.score} accessible accessibilityLabel={`${row.outcome} ${row.score}`}>
-              <Muted style={[styles.outcome, row.outcomeKey === "win" && styles.outcomeWin]}>{row.outcome.slice(0, 1)}</Muted>
-              <Body style={styles.scoreText}>{row.score}</Body>
-            </View>
-          ) : <StateChip label={row.state} tone={row.tone} />}
-        </View>
-      ))}
-    </View>
-  );
-}
-
-function LeagueTable({ page }: { page: SeasonPage }) {
-  const rows = leagueTableRows(page);
-  if (!rows.length) return <Muted style={styles.empty}>Die Tabelle steht hier nach dem ersten Spieltag.</Muted>;
-  return (
-    <View style={styles.table}>
-      <View style={styles.tableHead}>
-        <Muted style={[styles.headText, styles.pos]}>#</Muted>
-        <Muted style={[styles.headText, styles.flex]}>Team</Muted>
-        <Muted style={[styles.headText, styles.played]}>Sp.</Muted>
-        <Muted style={[styles.headText, styles.points]}>Pkt.</Muted>
-      </View>
-      {rows.map((row) => (
-        <View
-          key={row.key}
-          style={[styles.tableRow, row.own && styles.tableRowClub]}
-          accessible
-          accessibilityLabel={[`Platz ${row.pos}`, row.name, `${row.played} Spiele`, `${row.points} Punkte`, row.own ? "unser Team" : ""].filter(Boolean).join(", ")}
-          testID={`season-league-${row.key}`}
-        >
-          <Body style={styles.pos}>{row.pos}</Body>
-          <Body style={[styles.name, styles.flex, row.own && styles.nameClub]}>{row.name}</Body>
-          <Body style={[styles.played, styles.playedText]}>{row.played}</Body>
-          <Body style={styles.points}>{row.points}</Body>
-        </View>
-      ))}
-    </View>
   );
 }
 
@@ -230,47 +177,6 @@ const styles = StyleSheet.create({
   tabText: { color: ink.quiet, fontSize: 14, fontWeight: "700" },
   tabTextOn: { color: ink.text },
   body: { paddingBottom: 20, paddingHorizontal: 16, paddingTop: 12 },
-  empty: { color: ink.muted, paddingVertical: 14 },
-  round: { alignItems: "flex-start", borderBottomColor: ink.rowLine, borderBottomWidth: 1, flexDirection: "row", gap: 12, paddingVertical: 14 },
-  code: { color: ink.muted, fontSize: 18, fontVariant: ["tabular-nums"], fontWeight: "800", width: 44 },
-  roundBody: { flex: 1, gap: 6, minWidth: 0 },
-  roundTop: { alignItems: "center", flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  venue: { color: ink.text, flexShrink: 1, fontSize: 15, fontWeight: "700" },
-  cancelled: { color: ink.muted, textDecorationLine: "line-through" },
-  spacer: { flex: 1 },
-  state: { borderRadius: 4, fontSize: 11, fontWeight: "800", letterSpacing: 0.9, overflow: "hidden", paddingHorizontal: 7, paddingVertical: 2, textTransform: "uppercase" },
-  when: { color: ink.quiet, fontSize: 13 },
-  who: { color: ink.second, fontSize: 13 },
-  whoName: { color: ink.text, fontSize: 13, fontWeight: "700" },
-  tableWrap: { gap: 12 },
-  scope: { flexDirection: "row", gap: 6 },
-  table: { gap: 2 },
-  tableHead: { flexDirection: "row", gap: 10, paddingHorizontal: 8, paddingVertical: 6 },
-  headText: { color: ink.quiet, fontSize: 11, fontWeight: "700", letterSpacing: 1, textTransform: "uppercase" },
-  tableRow: { alignItems: "center", borderLeftColor: "transparent", borderLeftWidth: 3, borderRadius: 6, flexDirection: "row", gap: 10, paddingHorizontal: 8, paddingVertical: 10 },
-  tableRowClub: { backgroundColor: "rgba(41,182,232,0.08)", borderLeftColor: colors.cyan },
-  pos: { color: ink.muted, fontSize: 17, fontVariant: ["tabular-nums"], fontWeight: "800", width: 28 },
-  flex: { flex: 1, minWidth: 0 },
-  name: { color: ink.text, fontSize: 15, fontWeight: "500" },
-  nameClub: { fontWeight: "800" },
-  nameHidden: { color: ink.muted, fontStyle: "italic" },
-  team: { color: ink.quiet, fontSize: 12 },
-  points: { color: ink.text, fontSize: 17, fontVariant: ["tabular-nums"], fontWeight: "800", minWidth: 44, textAlign: "right" },
-  played: { minWidth: 32, textAlign: "right" },
-  playedText: { color: ink.second, fontSize: 15, fontVariant: ["tabular-nums"] },
-  more: { alignSelf: "flex-start" },
-  cards: { gap: 10, paddingTop: 4 },
-  card: { backgroundColor: surfaces.s1, borderColor: ink.cardLine, borderRadius: 12, borderWidth: 1, gap: 6, padding: 14 },
-  cardTop: { flexDirection: "row", gap: 8 },
-  cardName: { color: ink.text, fontWeight: "700" },
-  cardPos: { color: ink.text, fontSize: 18, fontVariant: ["tabular-nums"], fontWeight: "800" },
-  cardMeta: { color: ink.muted, fontSize: 13 },
-  cardStats: { color: ink.second, fontSize: 13 },
-  maps: { color: ink.muted, fontSize: 12 },
-  score: { alignItems: "center", flexDirection: "row", gap: 6 },
-  outcome: { backgroundColor: surfaces.s2, borderRadius: 4, color: ink.muted, fontSize: 11, fontWeight: "800", overflow: "hidden", paddingHorizontal: 6, paddingVertical: 1 },
-  outcomeWin: { backgroundColor: "rgba(41,182,232,0.16)", color: colors.cyan },
-  scoreText: { color: ink.text, fontSize: 18, fontVariant: ["tabular-nums"], fontWeight: "800" },
   web: { marginHorizontal: 16, marginTop: 4 },
   pressed: { opacity: 0.72 },
 });

@@ -216,6 +216,49 @@ test("Statistik auf einem älteren Server: Hinweis statt Absturz", async () => {
   await waitFor(() => expect(screen.getByText("Die Statistik lässt sich gerade nicht laden.")).toBeTruthy());
 });
 
+test("Team-Liga (#1931, #1616): Veto-Karten mit Bild, weitere Spiele, Kader mit Einsätzen, Maps mit Statistik und Pool", async () => {
+  const IMG = "/api/static/uploads/hafenkante.webp";
+  mockGet.mockResolvedValue({ data: {
+    lineage: { title: "Probe Liga", slug: "pl", kind: "team_league", game_name: "Black Ops 7" },
+    series: { season: "S3", season_slug: "s3" },
+    rounds: [{ id: "a", code: "ST1" }],
+    team_league: {
+      own_teams: ["Lions Probe"],
+      matchdays: [{
+        round: { id: "a", code: "ST1", club_day: "2026-10-01", time: "20:00", state: "scored" },
+        match: { opponent: "Fremd Adler", home: false, outcome: "win", score_for: 2, score_against: 1, points: 3, veto: [
+          { name: "Nebelwerk", role: "banned", by: "opponent", played: false, image_url: IMG },
+          { name: "Hafenkante", role: "picked", by: "own", picked: "own", played: true, score_for: 6, score_against: 3, outcome: "win", image_url: IMG },
+          { name: "Glutsenke", role: "decider", picked: "decider", played: false },
+        ] },
+        others: [{ home: "Fremd Bären", away: "Fremd Wölfe", home_score: 2, away_score: 0 }],
+      }],
+      table: { rows: [{ key: "Lions Probe", team: "Lions Probe", rank: 1, points: 3, played: 1, own: true }] },
+      lineup: { round_ids: ["a"], players: [{ key: "p1", name: "Mira Stahl", club_member: true, guest: false, round_ids: ["a"], appearances: 1, of: 1, all_seasons: 9 }] },
+      map_stats: [{ name: "Hafenkante", image_url: IMG, map_id: "hafen", played: 1, won: 1, picked_own: 1 }],
+    },
+    map_pool: { modes: [{ mode: null, label: "Alle Maps", maps: [{ map_id: "hafen", name: "Hafenkante", image_url: IMG }] }] },
+  } });
+  await render(<ReferenceSeasonScreen navigation={navigation} route={routeFor("pl", "s3")} />);
+  await waitFor(() => expect(screen.getByTestId("season-matchday-a")).toBeTruthy());
+  const day = screen.getByTestId("season-matchday-a");
+  expect(within(day).getByText("gegen Fremd Adler · Auswärts")).toBeTruthy();
+  expect(within(day).getByLabelText("Sieg 2:1, 3 Punkte")).toBeTruthy();
+  const veto = within(day).getByTestId("season-veto");
+  expect(within(veto).getByLabelText("Bann · Gegner, Nebelwerk")).toBeTruthy();
+  expect(within(veto).getByLabelText("Unsere Wahl, Hafenkante, 6:3, gewonnen")).toBeTruthy();
+  expect(within(veto).getByLabelText("Decider, Glutsenke, nicht gespielt")).toBeTruthy();
+  expect(within(day).queryByText("Fremd Wölfe")).toBeNull();
+  await fireEvent.press(within(day).getByTestId("season-matchday-others-a"));
+  expect(within(day).getByLabelText("Fremd Bären 2:0 Fremd Wölfe")).toBeTruthy();
+
+  await fireEvent.press(screen.getByRole("tab", { name: "Kader" }));
+  expect(screen.getByTestId("season-squad-p1").props.accessibilityLabel).toBe("Mira Stahl, Verein, Einsätze 1 von 1, 9 über alle Saisons");
+  await fireEvent.press(screen.getByRole("tab", { name: "Maps" }));
+  expect(screen.getByTestId("season-map-stat-hafen").props.accessibilityLabel).toBe("Hafenkante, Gespielt 1, Siege 1, Unsere Wahl 1");
+  expect(within(screen.getByTestId("season-map-pool")).getByLabelText("Hafenkante")).toBeTruthy();
+});
+
 test("„Im Web öffnen“ führt zur Serienseite im Web", async () => {
   mockGet.mockResolvedValue({ data: RACING });
   const open = jest.spyOn(Linking, "openURL").mockResolvedValue(true);

@@ -2,8 +2,6 @@ import {
   adjustmentLines,
   driverCards,
   gainedWords,
-  leagueTableRows,
-  matchdayRows,
   mobileRows,
   raceCell,
   raceSummary,
@@ -221,31 +219,4 @@ test("Fahrer (Garage): nur öffentliche Vereinsfahrer, mit Platz, Team, Punkten 
 test("Kalender mit Land: Code und Name für die Flagge, auch ohne Ort", () => {
   const rows = roundRows({ rounds: [{ id: "x", code: "R1", state: "planned", country_code: "az" }, { id: "y", code: "R2", state: "planned", country_code: "zz" }] });
   expect(rows.map((row) => [row.country, row.countryName, row.place])).toEqual([["AZ", "Aserbaidschan", "Aserbaidschan"], ["", "", ""]]);
-});
-
-test("Team-Liga: Spieltage mit Gegner, Ergebnis aus eigener Sicht und Tabelle mit eigenem Team", () => {
-  const page: SeasonPage = {
-    lineage: { kind: "team_league" },
-    team_league: {
-      matchdays: [
-        { round: { id: "a", code: "ST1", club_day: "2026-10-01", time: "20:00", state: "scored" }, match: { opponent: "Fremd Adler", home: true, outcome: "win", score_for: 3, score_against: 1, points: 3, maps: [{ name: "Hacienda", score_for: 6, score_against: 2, outcome: "win" }] } },
-        { round: { id: "b", code: "ST2", club_day: "2026-10-08", time: "20:00", state: "planned", opponent: "Fremd Bären" }, match: null },
-      ],
-      table: { rows: [{ key: "Fremd", team: "Fremd Adler", rank: 1, points: 6, played: 2, won: 2, drawn: 0, lost: 0, own: false }, { key: "Lions", team: "Lions Probe", rank: 2, points: 3.5, played: 1, own: true }] },
-    },
-  };
-  const days = matchdayRows(page);
-  expect(days.map((day) => [day.code, day.opponent, day.side, day.score, day.outcome, day.state])).toEqual([
-    ["ST1", "gegen Fremd Adler", "Heim", "3:1", "Sieg", ""],
-    ["ST2", "gegen Fremd Bären", "", "", "", "Geplant"],
-  ]);
-  expect(days[0].maps).toEqual(["Hacienda 6:2"]);
-  // Mehrere eigene Teams (#1926): vor dem Gegner steht, welches eigene Team gespielt hat.
-  const two: SeasonPage = { ...page, team_league: { ...page.team_league, own_teams: ["Lions A", "Lions B"], matchdays: [{ round: { id: "a", code: "ST1", state: "scored" }, match: { team: "Lions B", opponent: "Fremd Adler", home: false, outcome: "loss", score_for: 1, score_against: 3 } }] } };
-  expect(matchdayRows(two)[0].opponent).toBe("Lions B gegen Fremd Adler");
-  expect(days[0].opponent).toBe("gegen Fremd Adler");
-  expect(leagueTableRows(page).map((row) => [row.pos, row.name, row.played, row.points, row.own])).toEqual([["1", "Fremd Adler", "2", "6", false], ["2", "Lions Probe", "1", "3,5", true]]);
-  // Alter Server ohne Team-Liga-Teil: leer, kein Absturz.
-  expect(matchdayRows({ lineage: { kind: "team_league" } })).toEqual([]);
-  expect(leagueTableRows({})).toEqual([]);
 });

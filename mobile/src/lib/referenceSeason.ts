@@ -19,6 +19,7 @@ import {
 import { KIND_LABELS, type LineageInfo } from "./references";
 import { HIDDEN_NAME, dayLabel, formatNumber, nameOf, number, roundLabel } from "./seriesFormat";
 import type { SeasonPartners } from "./seriesPartners";
+import type { MapPool, TeamLeaguePart } from "./teamLeague";
 import { adjustmentDetail, adjustmentText, noScoreText, teamSinceLabel, type AdjustedRow, type RuleChange, type Successor } from "./seriesSpecialRules";
 
 // Saison einer Serie in der App (#1945, nur lesen): was der Screen aus /api/reference-series/public/<spur>/<saison>
@@ -71,8 +72,6 @@ export type StandingRow = AdjustedRow & {
 type TeamStandingRow = AdjustedRow & {
   team?: string | null; rank?: number | null; points?: number | null; official_points?: number | null; computed_points?: number | null; deviation?: number | null;
 };
-type Match = { team?: string | null; opponent?: string | null; home?: boolean | null; outcome?: string | null; score_for?: number | null; score_against?: number | null; points?: number | null; maps?: Array<{ name?: string | null; score_for?: number | null; score_against?: number | null; outcome?: string | null }> | null };
-type TableRow = { key?: string | null; team?: string | null; rank?: number | null; points?: number | null; played?: number | null; won?: number | null; drawn?: number | null; lost?: number | null; own?: boolean | null };
 
 /** Die Antwort der Serienseite - jedes Feld kann fehlen. */
 export type SeasonPage = {
@@ -97,12 +96,10 @@ export type SeasonPage = {
   progress?: { total?: number | null; scored?: number | null; cancelled?: number | null } | null;
   rounds?: SeasonRound[] | null;
   standings?: { rows?: StandingRow[] | null } | null;
-  team_league?: {
-    /** Die eigenen Teams der Saison (#1926) - bei mehreren steht vor dem Gegner, welches gespielt hat. */
-    own_teams?: string[] | null;
-    matchdays?: Array<{ round?: SeasonRound | null; match?: Match | null }> | null;
-    table?: { rows?: TableRow[] | null } | null;
-  } | null;
+  /** Team-Liga (#1931, #1616): Spieltage mit Spielen, Maps und Veto, Tabelle, Kader, Statistik je Map. */
+  team_league?: TeamLeaguePart;
+  /** Map-Pool der Saison (#1616). */
+  map_pool?: MapPool;
   racing?: {
     club_drivers?: string[] | null;
     club_teams?: string[] | null;
@@ -145,7 +142,17 @@ export type SeasonTabKey = "calendar" | "table" | "drivers" | "statistics" | "ma
 export function seasonTabs(page: SeasonPage | null | undefined): Array<{ key: SeasonTabKey; label: string }> {
   const kind = seasonKind(page);
   if (kind === "racing") return [{ key: "calendar", label: "Kalender" }, { key: "table", label: "Tabelle" }, { key: "drivers", label: "Fahrer" }, { key: "statistics", label: "Statistik" }];
-  if (kind === "team_league") return [{ key: "matchdays", label: "Spieltage" }, { key: "table", label: "Tabelle" }];
+  if (kind === "team_league") {
+    // Kader und Maps (#1931, #1616) nur, wenn der Server sie schickt.
+    const squad = (page?.team_league?.lineup?.players || []).length > 0;
+    const maps = (page?.team_league?.map_stats || []).length > 0 || (page?.map_pool?.modes || []).some((group) => (group?.maps || []).length);
+    return [
+      { key: "matchdays", label: "Spieltage" },
+      { key: "table", label: "Tabelle" },
+      ...(squad ? [{ key: "squad" as const, label: "Kader" }] : []),
+      ...(maps ? [{ key: "maps" as const, label: "Maps" }] : []),
+    ];
+  }
   return [{ key: "calendar", label: "Termine" }, { key: "table", label: "Tabelle" }];
 }
 
@@ -435,55 +442,11 @@ export function driverCards(page: SeasonPage | null | undefined): DriverCard[] {
 
 // ---------------------------------------------------------------- Team-Liga
 
-export const OUTCOMES: Record<string, { letter: string; word: string }> = {
-  win: { letter: "S", word: "Sieg" },
-  draw: { letter: "U", word: "Unentschieden" },
-  loss: { letter: "N", word: "Niederlage" },
-};
-
-/** Spieltage ohne abgesagte, davon gespielt, und der nächste offene Termin. */
+/** Spieltage ohne abgesagte, davon gespielt (Spieltag-Karten und Tabelle: lib/teamLeague.ts). */
 export function matchdayProgress(page: SeasonPage | null | undefined) {
   const list = page?.team_league?.matchdays || [];
   const live = list.filter((day) => day?.round?.state !== "cancelled");
-  return { total: live.length, played: live.filter((day) => day?.match).length };
-}
-
-export type MatchdayRow = { key: string; code: string; when: string; opponent: string; side: string; score: string; outcome: string; outcomeKey: string; state: string; tone: StateTone; maps: string[] };
-
-/** Die Spieltage der Team-Liga: Gegner, Heim/Auswärts und Ergebnis aus eigener Sicht - offen mit Stand. */
-export function matchdayRows(page: SeasonPage | null | undefined): MatchdayRow[] {
-  // Mehrere eigene Teams (#1926): vor dem Gegner steht, welches eigene Team gespielt hat.
-  const showTeam = (page?.team_league?.own_teams || []).length > 1;
-  return (page?.team_league?.matchdays || []).filter((day) => day?.round?.id).map(({ round, match }) => {
-    const opponent = match?.opponent || round?.opponent || "";
-    const team = showTeam && match?.team ? `${match.team} ` : "";
-    return {
-      key: String(round?.id),
-      code: roundLabel(round),
-      when: roundWhen(round),
-      opponent: opponent ? `${team}gegen ${opponent}` : "",
-      side: match ? (match.home ? "Heim" : "Auswärts") : "",
-      score: match ? `${formatNumber(match.score_for)}:${formatNumber(match.score_against)}` : "",
-      outcome: match ? OUTCOMES[String(match.outcome)]?.word || "" : "",
-      outcomeKey: match ? String(match.outcome || "") : "",
-      state: match ? "" : PUBLIC_STATE_LABELS[String(round?.state)] || "",
-      tone: STATE_TONES[String(round?.state)] || "planned",
-      maps: (match?.maps || []).map((map) => `${map.name || "Map"} ${formatNumber(map.score_for)}:${formatNumber(map.score_against)}`),
-    };
-  });
-}
-
-/** Die Tabelle der Team-Liga: Platz, Team, Spiele, Punkte - das eigene Team markiert. */
-export function leagueTableRows(page: SeasonPage | null | undefined): Array<{ key: string; pos: string; name: string; played: string; points: string; own: boolean; club_member: boolean }> {
-  return (page?.team_league?.table?.rows || []).map((row, index) => ({
-    key: String(row.key || row.team || index),
-    pos: row.rank ? String(row.rank) : "–",
-    name: row.team || "",
-    played: formatNumber(row.played),
-    points: formatNumber(row.points),
-    own: Boolean(row.own),
-    club_member: Boolean(row.own),
-  }));
+  return { total: live.length, played: live.filter((day) => day?.match || (day?.matches || []).length).length };
 }
 
 // ---------------------------------------------------------------- Kopf
