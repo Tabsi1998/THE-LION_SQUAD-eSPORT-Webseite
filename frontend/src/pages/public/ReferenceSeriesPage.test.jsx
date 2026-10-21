@@ -207,3 +207,20 @@ test("Kopf ohne Partner bleibt wie bisher", async () => {
   await screen.findByRole("heading", { level: 1 });
   expect(screen.queryByTestId("series-partners")).toBeNull();
 });
+
+// Map-Pool der Saison (#1616): als Karten mit Bild unter dem Rest der Seite - ohne Pool kein Abschnitt.
+test("der Map-Pool der Saison steht mit seinen Maps auf der Seite", async () => {
+  apiMock.get.mockResolvedValue({ data: { ...BODY, map_pool: { id: "p1", version: 1, origin: "reference_series",
+    modes: [{ mode: "snd", label: "Suchen & Zerstören", maps: [{ map_id: "nebel", name: "Nebelwerk", image_url: null }] }] } } });
+  renderAt("/references/series/probe-cup/2026-division-1");
+  const pool = await screen.findByTestId("map-pool");
+  expect(within(pool).getByRole("heading", { level: 2 })).toHaveTextContent("Map-Pool");
+  expect(within(pool).getByText("Nebelwerk")).toBeInTheDocument();
+});
+
+test("ohne Map-Pool kein Abschnitt", async () => {
+  apiMock.get.mockResolvedValue({ data: { ...BODY, map_pool: null } });
+  renderAt("/references/series/probe-cup/2026-division-1");
+  await screen.findByRole("heading", { level: 1 });
+  expect(screen.queryByTestId("map-pool")).not.toBeInTheDocument();
+});
