@@ -439,7 +439,7 @@ function FastLapDownloads({ challenge, activeTrack, accessToken, user, board, ch
         className="sm:hidden w-full flex items-center justify-between gap-3 px-4 py-3 text-xs font-bold uppercase tracking-widest text-white/70"
       >
         Downloads
-        <ChevronDown className={`w-4 h-4 transition-transform duration-[var(--tls-motion-fast)] ${open ? "rotate-180" : ""}`} aria-hidden="true" />
+        <ChevronDown className={`w-4 h-4 transition-transform duration-fast ${open ? "rotate-180" : ""}`} aria-hidden="true" />
       </button>
       <div className="hidden sm:block px-4 pt-3 text-[11px] font-bold uppercase tracking-widest text-white/50">Downloads</div>
       <div id="f1-downloads-list" className={`${open ? "flex" : "hidden"} sm:flex flex-wrap gap-2 px-4 pb-4 pt-1 sm:pt-3`}>
