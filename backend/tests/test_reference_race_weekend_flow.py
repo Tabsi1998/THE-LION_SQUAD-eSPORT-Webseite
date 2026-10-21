@@ -126,6 +126,15 @@ async def test_a_new_qualifying_does_not_count_unless_told(flow):
     assert too_long.status_code == 422
 
 
+@pytest.mark.asyncio
+async def test_a_new_qualifying_with_points_in_the_template_counts(flow):
+    _, series = await _series(flow, {"formats": [{"sessions": [{"label": "Qualifying", "points": [2]},
+                                                               {"label": "Rennen", "offset": 30}]}]})
+    created = await flow.post(f"{ADMIN}/series/{series['id']}/rounds",
+                              json={"code": "R1", "session": "Qualifying", "day": "2026-03-08"})
+    assert created.json()["counts"] is True
+
+
 def _people(count=4):
     return [f"Probe Fahrer {number}" for number in range(1, count + 1)]
 

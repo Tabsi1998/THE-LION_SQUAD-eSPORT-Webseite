@@ -10,9 +10,12 @@ ab Runde X wechselnd), Kürzel-Varianten beim Einfügen, Punkte je Lauf, Pole un
   zählen mit, archivierte nicht - das ist die „Runde X“ der Vorgaben.
 - **Läufe je Runde** (Serie ``weekend``): ``{"formats": [{"from_round": 1, "sessions": [...]}, …]}`` - je Abschnitt
   (``round_phases``, „ab Runde X“) die Läufe mit Name, Uhrzeit-Versatz in Minuten (``offset``), Wertung (``counts``),
-  Punkten (``points``: ``series`` = Schema der Saison, ``none`` oder eine eigene Liste je Platz) und der Quelle des
-  Startplatzes (``grid``: ``manual`` = Eingabe, ``qualifying`` = Qualifying desselben Wochenendes,
-  ``reverse_standings`` = umgekehrte Reihenfolge der Fahrerwertung vor dem Wochenende).
+  Punkten (``points``: ``series`` = Schema der Saison wie das Rennen, ``none`` oder eine eigene Liste je Platz), Punkte
+  trotz DNF (``dnf``: ``series``, ``place`` = nach Platz, ``none`` = 0), Bonus für die schnellste Runde
+  (``fastest_lap``: ``None`` = wie die Saison, sonst die Punkte) und der Quelle des Startplatzes (``grid``: ``manual`` =
+  Eingabe, ``qualifying`` = Qualifying desselben Wochenendes, ``reverse_standings`` = umgekehrte Reihenfolge der
+  Fahrerwertung vor dem Wochenende). Ein Qualifying zählt nicht - außer es hat eine eigene Liste (etwa P1 = 2 Punkte)
+  oder ``counts`` sagt es ausdrücklich.
 - **Einfügen:** „R1S“, „R1 S“, „R1-Sprint“, „R1 Sprint“ → Kürzel R1, Lauf Sprint (``take_code``); eine Zeile ohne Lauf
   legt alle Läufe der Vorgabe an (``race_weekend_paste.expand_paste``), eine Zeile mit Lauf nur diesen.
 - **Rechnen** (``standings``): je Lauf das eigene Punkteschema; ein leerer Startplatz kommt aus dem Qualifying bzw. der
@@ -32,16 +35,19 @@ MAX_SESSION = 30
 MAX_SESSIONS = 6
 MAX_POINTS = 100
 OFFSET_RANGE = (-24 * 60, 7 * 24 * 60)
-SESSION_CHOICES = ("Qualifying", "Sprint", "Rennen", "Hauptrennen", "Lauf 1", "Lauf 2")
+SESSION_CHOICES = ("Qualifying", "Shootout", "Sprint", "Rennen", "Hauptrennen", "Lauf 1", "Lauf 2")
+# Allgemeine Namen eines Laufs: beim Einfügen gilt der Lauf derselben Art aus der Vorgabe („R1 Feature“ → Hauptrennen).
+GENERIC_LABELS = ("Qualifying", "Sprint", "Rennen")
 KINDS = ("qualifying", "sprint", "race")
 GRID_SOURCES = ("manual", "qualifying", "reverse_standings")
 DEFAULT_GRID = {"qualifying": "manual", "sprint": "manual", "race": "qualifying"}
 POINT_CHOICES = ("series", "none")
+DNF_CHOICES = ("series", "place", "none")  # Punkte trotz DNF: wie die Saison, ja (nach Platz), nein (0)
 
 # Kürzel-Varianten beim Einfügen (#1930): Wort nach dem Kürzel → Lauf.
 SESSION_WORDS = {
     "q": "Qualifying", "quali": "Qualifying", "qualy": "Qualifying", "qualifying": "Qualifying",
-    "qualifikation": "Qualifying",
+    "qualifikation": "Qualifying", "shootout": "Shootout",
     "s": "Sprint", "sprint": "Sprint", "sprintrennen": "Sprint",
     "rennen": "Rennen", "race": "Rennen", "feature": "Rennen", "hauptrennen": "Rennen",
 }
@@ -70,6 +76,12 @@ def session_kind(label) -> str:
     if "sprint" in key or key == "s":
         return "sprint"
     return "race"
+
+
+def is_main_qualifying(label) -> bool:
+    """Das Qualifying fürs Rennen - nicht das Sprint-Qualifying (Shootout): nur hier gibt es die Pole."""
+    key = "".join(str(label or "").split()).casefold()
+    return session_kind(label) == "qualifying" and "shootout" not in key and "sprint" not in key
 
 
 # ---------------------------------------------------------------- Kürzel beim Einfügen
@@ -215,11 +227,26 @@ def _session(raw, field: str) -> dict:
     grid = raw.get("grid") or DEFAULT_GRID[kind]
     if grid not in GRID_SOURCES:
         raise ValueError(f"{field}: unbekannte Quelle des Startplatzes.")
+    points = _points(raw.get("points"), kind, f"{field}: Punkte")
+    dnf = raw.get("dnf") or "series"
+    if dnf not in DNF_CHOICES:
+        raise ValueError(f"{field}: Punkte trotz DNF unbekannt.")
+    lap = raw.get("fastest_lap")
+    if lap is not None and lap != "":
+        if isinstance(lap, bool) or not isinstance(lap, (int, float)) or not math.isfinite(lap) or not 0 <= lap <= 1000:
+            raise ValueError(f"{field}: Bonus für die schnellste Runde als Zahl ab 0.")
+        lap = int(lap) if float(lap).is_integer() else lap
+    else:
+        lap = None
+    # Ein Qualifying mit eigener Liste (etwa P1 = 2) zählt - sonst nicht, außer es steht ausdrücklich da.
+    default_counts = kind != "qualifying" or isinstance(points, list)
     return {
         "label": label,
         "offset": _whole(raw.get("offset"), f"{field}: Versatz in Minuten", *OFFSET_RANGE, 0),
-        "counts": kind != "qualifying" if counts is None else bool(counts),
-        "points": _points(raw.get("points"), kind, f"{field}: Punkte"),
+        "counts": default_counts if counts is None else bool(counts),
+        "points": points,
+        "dnf": dnf,
+        "fastest_lap": lap,
         "grid": grid,
     }
 
@@ -250,7 +277,8 @@ def normalize_weekend(raw) -> dict | None:
 def default_session(label) -> dict:
     kind = session_kind(label)
     return {"label": clean_session(label), "offset": 0, "counts": kind != "qualifying",
-            "points": "none" if kind == "qualifying" else "series", "grid": DEFAULT_GRID[kind]}
+            "points": "none" if kind == "qualifying" else "series", "dnf": "series", "fastest_lap": None,
+            "grid": DEFAULT_GRID[kind]}
 
 
 def session_config(weekend: dict | None, number: int | None, label) -> dict:
@@ -265,6 +293,15 @@ def session_config(weekend: dict | None, number: int | None, label) -> dict:
     return {**(hit or default_session(label)), "kind": kind}
 
 
+def planned_config(weekend: dict | None, rounds: list[dict], code, label) -> dict:
+    """Die Vorgabe für einen neuen Termin mit Kürzel ``code`` und Lauf ``label``: in der Runde dieses Kürzels, sonst in
+    der nächsten neuen Runde."""
+    key = "".join(str(code or "").split()).casefold() or None
+    groups = weekend_groups(rounds)
+    number = next((group["number"] for group in groups if key and group["key"] == key), len(groups) + 1)
+    return session_config(weekend, number, label)
+
+
 def round_plan(rounds: list[dict], weekend: dict | None) -> dict[str, dict]:
     """Je Termin (ohne archivierte) die Runde und die Vorgabe seines Laufs."""
     plan = {}
@@ -276,11 +313,22 @@ def round_plan(rounds: list[dict], weekend: dict | None) -> dict[str, dict]:
 
 
 def round_rules(rules: dict, config: dict) -> dict:
-    """Regeln eines Laufs: das Punkteschema der Vorgabe statt dem der Saison (``rules`` normalisiert)."""
+    """Regeln eines Laufs: Punkteschema, Punkte trotz DNF und Bonus für die schnellste Runde der Vorgabe statt der Saison
+    (``rules`` normalisiert). Ohne Abweichung kommt ``rules`` selbst zurück."""
+    changes: dict = {}
     points = config.get("points", "series")
-    if points == "series":
-        return rules
-    return {**rules, "points_by_place": [] if points == "none" else list(points)}
+    if points != "series":
+        changes["points_by_place"] = [] if points == "none" else list(points)
+    dnf = config.get("dnf", "series")
+    if dnf == "place":
+        changes["dnf_points"] = None
+    elif dnf == "none":
+        changes["dnf_points"] = 0
+    lap = config.get("fastest_lap")
+    if lap is not None:
+        bonuses = rules["bonuses"]
+        changes["bonuses"] = {**bonuses, "fastest_lap": {**bonuses["fastest_lap"], "points": lap}}
+    return {**rules, **changes} if changes else rules
 
 
 def rules_for_round(series: dict, rounds: list[dict], round_doc: dict) -> dict:
@@ -341,7 +389,10 @@ def with_qualifying(rounds: list[dict], sheets: dict, plan: dict) -> dict:
             sheet = out[rnd["id"]]
             rows = sheet.get("rows") or []
             pole = None
-            if source.get("counts") is False and source["id"] not in poled:
+            # Die Pole kommt nur aus dem Qualifying fürs Rennen (nicht aus dem Shootout) und wandert nur, wenn das
+            # Qualifying selbst nicht zählt - sonst steht sie schon dort.
+            main = is_main_qualifying(source.get("session"))
+            if main and source.get("counts") is False and source["id"] not in poled:
                 poled.add(source["id"])
                 if not any("pole" in (row.get("marks") or []) for row in rows):
                     pole = _pole_of(out[source["id"]])
@@ -399,8 +450,8 @@ def standings(*, rules: dict, rounds: list[dict], sheets: dict, participants: li
     ersten Durchgang."""
     plan = round_plan(rounds, weekend)
     base = normalize_rules(rules)
-    per_round = {rid: round_rules(base, entry["config"]) for rid, entry in plan.items()
-                 if entry["config"]["points"] != "series"}
+    per_round = {rid: own for rid, entry in plan.items()
+                 if (own := round_rules(base, entry["config"])) is not base}
     enriched = with_qualifying(rounds, sheets, plan)
     common = {"rules": rules, "rounds": rounds, "participants": participants, "own_teams": own_teams,
               "round_rules": per_round}

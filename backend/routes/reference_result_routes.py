@@ -312,8 +312,10 @@ async def _prepare(db, access: SeriesAccess, round_doc: dict, body: ResultSheetI
     resolution = series_results.resolve(body.model_dump(), participants, rules)
     series_results.check(resolution, rules, round_doc, club_today(), own_teams(access.series))
     if race_weekend.session_kind(round_doc.get("session")) == "qualifying":
-        # Qualifying (#1930): die Pole setzt sich selbst, und dass es nicht zur Wertung zählt, ist gewollt.
-        race_weekend.mark_pole(resolution.rows)
+        # Qualifying (#1930): dass es nicht zur Wertung zählt, ist gewollt; die Pole setzt sich im Qualifying fürs
+        # Rennen selbst (nicht im Shootout).
+        if race_weekend.is_main_qualifying(round_doc.get("session")):
+            race_weekend.mark_pole(resolution.rows)
         resolution.warnings[:] = [item for item in resolution.warnings if item["code"] != "round_not_counted"]
     if not resolution.errors:
         # Zur Sicherheit wie beim Rechnen - die Prüfung oben fängt dieselben Fälle schon mit Zeilenangabe ab.

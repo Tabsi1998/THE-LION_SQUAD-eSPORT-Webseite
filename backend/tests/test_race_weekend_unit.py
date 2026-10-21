@@ -162,6 +162,14 @@ def test_a_line_with_a_session_creates_only_that_one_and_never_twice():
     assert again["rows"] == [] and again["errors"][0]["message"] == "R1 Hauptrennen gibt es schon."
 
 
+def test_a_shootout_keeps_its_name_even_if_the_template_has_another_qualifying():
+    weekend = race_weekend.normalize_weekend(F2)
+    parsed = parse_round_lines("R1 Shootout · 05.03.2026 18:00", season="2026", today="2026-01-01",
+                               default_weekday=None, default_time="20:00")
+    sessions = race_weekend_paste.expand_paste(parsed, weekend, [])["rows"][0]["sessions"]
+    assert [(item["session"], item["counts"]) for item in sessions] == [("Shootout", False)]
+
+
 def test_without_a_template_a_line_stays_one_round():
     parsed = parse_round_lines("R1 · 05.03.2026 · Probering\nR1 · 12.03.2026", season="2026", today="2026-01-01",
                                default_weekday=None, default_time=None)

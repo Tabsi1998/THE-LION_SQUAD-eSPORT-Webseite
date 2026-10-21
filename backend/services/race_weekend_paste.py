@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from datetime import date, datetime, timedelta
 
-from services.race_weekend import label_key, session_config, weekend_groups
+from services.race_weekend import GENERIC_LABELS, label_key, session_config, weekend_groups
 from services.reference_calendar import ClockError, clock_gap_message, vienna_start
 from services.round_phases import phase_for
 
@@ -43,7 +43,11 @@ def expand_paste(parsed: dict, weekend: dict | None, rounds: list[dict]) -> dict
                 numbers[key] = number
         if row.get("session"):
             config = session_config(weekend, number, row["session"])
-            plan = [{**config, "label": config["label"] or row["session"], "offset": 0}]
+            # Ein allgemeiner Name („R1 Feature“ → Rennen) nimmt den Lauf derselben Art aus der Vorgabe (etwa
+            # Hauptrennen); ein eigener („R1 Shootout“, „R1 Lauf 2“) bleibt, wie er ist.
+            own = label_key(config["label"]) == label_key(row["session"])
+            label = config["label"] if config["label"] and (own or row["session"] in GENERIC_LABELS) else row["session"]
+            plan = [{**config, "label": label, "offset": 0}]
         else:
             phase = phase_for((weekend or {}).get("formats"), number)
             # In zeitlicher Reihenfolge anlegen (nach Versatz) - so stimmt die Reihenfolge im Kalender.

@@ -256,8 +256,12 @@ async def create_round(series_id: str, body: RoundCreateBody, me: dict = Depends
     else:
         when = _when_from_instant(body.starts_at)
     first = await _claim(db, series_id, body.expected_version, orders=1)
-    # Ein Qualifying zählt ohne ausdrückliche Angabe nicht zur Wertung (#1930).
-    counts = body.counts if "counts" in body.model_fields_set else race_weekend.default_session(body.session)["counts"]
+    # Ohne ausdrückliche Angabe gilt die Vorgabe des Laufs (#1930): ein Qualifying zählt nicht - außer es hat Punkte.
+    if "counts" in body.model_fields_set:
+        counts = body.counts
+    else:
+        existing = await db.reference_rounds.find({"series_id": series_id}, {"_id": 0}).to_list(None)
+        counts = race_weekend.planned_config(series.get("weekend"), existing, body.code, body.session)["counts"]
     # Die Nummer vergibt immer die Folge - ein mitgeschicktes ``order`` zählt nicht (Reihenfolge nur über Ordnen).
     doc = _new_round(series_id, me, order=first, code=_text(body.code), session=body.session,
                      title=_text(body.title), venue=_text(body.venue), **when, kind=body.kind, counts=counts,
