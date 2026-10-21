@@ -3,6 +3,7 @@ import { seriesAddress } from "@/lib/referenceSeries";
 import { KIND_LABELS, leaguePath } from "@/lib/referencesOverview";
 import { SectionHead } from "@/components/tls/references/overviewParts";
 import { SEASON_NOTE_TONES } from "@/lib/seriesTiers";
+import { PartnerHostBadge } from "@/components/tls/references/PartnerHostBadge";
 
 // Serien & Ligen (#1878): je Spur eine Karte mit ihrem Liga-Weg - jede sichtbare Saison mit Stufe, unserem Platz und dem
 // Vermerk (Aufstieg, Abstieg, Meister, Klassenerhalt, läuft - zuerst das „Ergebnis der Saison“, #1898). Die laufende Saison ist hervorgehoben, die Karte führt zur Serienseite (laufende,
@@ -31,6 +32,8 @@ function LineageCard({ item }) {
       <div className="flex flex-col gap-1 min-w-0">
         <div className="text-[11px] md:text-xs font-bold uppercase tracking-[0.14em] md:tracking-[0.16em] text-quiet break-words">{kind}</div>
         <div className="font-heading font-extrabold uppercase leading-[1.2] text-lg md:text-xl break-words [overflow-wrap:anywhere]" data-testid="references-lineage-title">{lineage.title}</div>
+        {/* #1934: veranstaltender Partner des Vereins */}
+        <PartnerHostBadge partner={lineage.organizers?.[0]} className="mt-1" />
       </div>
       <ol className="list-none m-0 p-0 grid grid-cols-3 gap-2 md:gap-2.5" aria-label="Liga-Weg">
         {path.steps.map((step) => <Step key={step.season_slug || `${step.season}-${step.tier}`} step={step} kind={lineage.kind} />)}

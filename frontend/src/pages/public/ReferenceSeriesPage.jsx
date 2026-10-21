@@ -13,6 +13,7 @@ import { TeamLeagueSections } from "@/components/tls/series/TeamLeague";
 import { RacingLeague } from "@/components/tls/series/RacingLeague";
 import { VenueWithFlag } from "@/components/tls/CountryFlag";
 import { NotFoundPage } from "@/pages/ErrorPages";
+import { SeriesPartners } from "@/components/tls/series/SeriesPartners";
 
 // Seite einer Serie unter /references/series/<spur>/<saison> (Entscheidung 5 zu #1741), Turnierserie (#1745): Kopf,
 // Rundenfortschritt, Regeln, Gesamtwertung mit Streichergebnissen und Finalgrenze, Finalrechner (Richtwert), das
@@ -105,6 +106,7 @@ export default function ReferenceSeriesPage() {
           <>
             <p className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">{eyebrow || "Serie"}</p>
             <h1 className="font-heading text-4xl md:text-5xl font-black uppercase mt-2">{title}</h1>
+            <SeriesPartners partners={data.partners} />
             {data.lineage?.kind === "team_league" && <TeamLeagueSections data={data} />}
             {data.racing && <RacingLeague data={data} />}
             {data.lineage?.kind !== "team_league" && !data.racing && (<>

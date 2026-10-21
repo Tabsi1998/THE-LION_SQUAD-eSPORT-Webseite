@@ -227,7 +227,9 @@ async def proposed_reference(db, series: dict, lineage: dict) -> dict:
         "organizer": lineage.get("organizer") or None, "league": series.get("tier") or None,
         "season": series.get("season") or None, "format": lineage.get("label") or None,
         "game_id": lineage.get("game_id") or None, "game_name": lineage.get("game_name") or None,
-        "partner_ids": list(lineage.get("partner_ids") or []), "start_date": start, "end_date": end,
+        # #1934: Partner der Spur und eigene der Saison.
+        "partner_ids": list(dict.fromkeys([*(lineage.get("partner_ids") or []), *(series.get("partner_ids") or [])])),
+        "start_date": start, "end_date": end,
         "external_url": series.get("external_url") or lineage.get("external_url") or None,
         "result_url": series.get("official_table_url") or None,
         "visibility": _visibility(lineage.get("visibility"), series.get("visibility")),

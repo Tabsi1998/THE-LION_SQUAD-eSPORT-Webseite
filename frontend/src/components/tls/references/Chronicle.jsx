@@ -5,6 +5,8 @@ import { bestPlacement, displayTitle, formatDate, gameTitle, memberEntryOf, refe
 import { Chevron, Mark, PlaceRing, SectionHead } from "@/components/tls/references/overviewParts";
 import { viennaDate } from "@/lib/vienna";
 import { referenceHref } from "@/lib/seasonClose";
+import { chronicleHost } from "@/lib/seriesPartners";
+import { PartnerHostBadge } from "@/components/tls/references/PartnerHostBadge";
 
 // Chronik (#1878, ersetzt „Jahr für Jahr“): alle Teilnahmen als Liste je Jahr mit Medaillen-Zusammenfassung. Jede Zeile
 // zeigt Platz-Ring, Titel (kurz wie im Mitgliederprofil, #1944) und Veranstalter, Spiel- und Format-Marke, unsere Starter (jeder Name nur einmal) und das
@@ -94,13 +96,16 @@ function ChronicleRow({ item, link, memberId }) {
   const title = shortTitle(item, link);
   const full = displayTitle(item);
   const composed = title !== full;
+  // #1934: veranstaltet ein Partner des Vereins, steht sein Abzeichen statt des Veranstalter-Textes da.
+  const host = chronicleHost(item, link);
   return (
     <li className="border-b border-white/[0.07]">
       <Link to={referenceHref(item, link)} data-testid={`reference-card-${item.id}`} className="tls-ref-row flex items-start sm:items-center sm:flex-wrap gap-3 sm:gap-x-5 sm:gap-y-2.5 py-3.5 sm:py-4 sm:px-2 text-white no-underline">
         <PlaceRing placement={placement} />
         <span className="flex-1 sm:flex-[1_1_280px] min-w-0 flex flex-col gap-1 sm:gap-0.5">
           <span className="font-bold text-base sm:text-[17px] leading-[1.3] break-words [overflow-wrap:anywhere]" title={composed ? full : undefined} data-testid="reference-row-title">{title}</span>
-          {item.organizer && !composed && <span className="hidden sm:block text-sm text-zinc-400 break-words" data-testid="reference-row-organizer">{item.organizer}</span>}
+          {host ? <PartnerHostBadge partner={host} className="mt-0.5" />
+            : item.organizer && !composed && <span className="hidden sm:block text-sm text-zinc-400 break-words" data-testid="reference-row-organizer">{item.organizer}</span>}
           <span className="sm:hidden text-[13px] text-zinc-400 break-words">{[game, format, shortDate].filter(Boolean).join(" · ")}</span>
           {starters && <span className="sm:hidden text-[13px] text-zinc-300 break-words [overflow-wrap:anywhere]" data-testid="reference-row-starters-phone">{starters}</span>}
         </span>

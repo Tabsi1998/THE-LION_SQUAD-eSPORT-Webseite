@@ -216,7 +216,14 @@ je Stufe) und eine **Mappe als PDF** zum Hochladen. Interessierte sehen auf der 
 - **Tools & Projekte:** Seiten des Partners; **Auf der Partnerseite einbetten** zeigt sie direkt, wenn die Seite des Partners
   das zulässt – sonst bleibt der Link.
 - Partner können Referenzen und News mit ihrem Namen verknüpfen; sie erscheinen auf der Partnerseite unter „Gemeinsam“.
+- **Ligen und Serien mit uns:** Ist ein Partner an einer Spur oder Saison eingetragen (3.9, „Partner an Spur und Saison“),
+  zeigt seine Seite die Spur mit ihren Saisons – neueste zuerst, mit Spiel, unserem Stand bzw. Endplatz und „Läuft
+  gerade“; jede Saison führt zu ihrer Serienseite. Interne Spuren und Saisons erscheinen dort nie.
+- **Nur aktive Partner** erscheinen auf Serienseiten, in der Übersicht und in der Auswahl. Wird ein Partner inaktiv,
+  verschwindet er überall, ohne dass ihr Spuren oder Saisons anfassen müsst.
 - Mit Dolibarr kommen Name und Art von dort.
+
+<img src="../assets/serien/serien-partner-partnerseite.png" alt="Partnerseite: Bereich Ligen und Serien mit uns mit einer Spur, zwei Saisons, Stand, Endplatz und Läuft gerade" width="420">
 
 ### 3.8 Referenzen
 
@@ -354,6 +361,27 @@ monatliche **Turnierserien**, **Rennligen** mit Fahrer- und Teamwertung und **Te
   eine ältere Saison hat ihr bisheriges „Eigenes Team“ als erstes Team.
 
 <img src="../assets/serien/serien-eigene-teams.png" alt="Saison bearbeiten: Liste Eigene Teams mit drei Teams und ihren Schreibweisen" width="420">
+
+**Partner an Spur und Saison:** Im Blatt der Spur steht unter **Partner** je aktivem Partner ein Haken; ein gewählter
+Partner bekommt eine Rolle – **Veranstalter** oder **Mitwirkender** (Vorgabe). Wird ein Partner Veranstalter und ist das
+Feld **Veranstalter** noch leer, steht sein Name dort als Vorschlag. Jede Saison erbt die Partner ihrer Spur („Von der
+Spur: …“) und kann eigene ergänzen, etwa einen Sponsor nur dieser Season.
+
+- **Serienseite:** oben „Veranstaltet von“ mit dem Logo des Partners im Original und seinem Namen, beides führt zur
+  Partnerseite; mitwirkende Partner stehen in einer Zeile darunter.
+- **Übersicht Erfolge & Referenzen:** „Läuft gerade“, Serien & Ligen und die Chronik tragen ein kleines Partner-Abzeichen,
+  wenn ein Partner veranstaltet. In der Chronik gilt das auch für eine Referenz, deren Veranstalter genau wie ein
+  verknüpfter Partner heißt.
+- **Partnerseite:** „Ligen und Serien mit uns“ (3.7).
+
+<table>
+<tr>
+<td><img src="../assets/serien/serien-partner-spur.png" alt="Spur bearbeiten: Partner mit Haken und Rolle Veranstalter oder Mitwirkender" width="420"></td>
+<td><img src="../assets/serien/serien-partner-kopf.png" alt="Serienseite: Veranstaltet von mit Partner-Logo, darunter die Mitwirkenden" width="420"></td>
+</tr>
+</table>
+
+<img src="../assets/serien/serien-partner-chronik.png" alt="Chronik: Zeile mit kleinem Partner-Abzeichen des Veranstalters" width="560">
 
 <table>
 <tr>

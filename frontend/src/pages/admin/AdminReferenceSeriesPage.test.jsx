@@ -181,3 +181,61 @@ test("Spur: Reihenfolge der Stufen - Vorgabe aus der Zahl, Verschieben legt sie 
   fireEvent.submit(screen.getByTestId("lineage-sheet"));
   await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/reference-series/admin/lineages/spur-2", expect.objectContaining({ tier_order: null })));
 });
+
+
+// ---------------------------------------------------------------- Partner (#1934)
+const PARTNERS = [{ id: "p-ananas", slug: "probe-ananas", name: "Probe Ananas" }, { id: "p-kokos", slug: "probe-kokos", name: "Probe Kokos" }];
+
+function withPartners(lineageExtra = {}) {
+  const overview = { ...OVERVIEW, lineages: [{ ...OVERVIEW.lineages[0], ...lineageExtra }, OVERVIEW.lineages[1]] };
+  apiMock.get.mockImplementation(async (url) => {
+    if (url === "/reference-series/admin") return { data: overview };
+    if (url === "/partners") return { data: PARTNERS };
+    return { data: [{ id: "g-f1", name: "F1 26" }] };
+  });
+}
+
+test("Spur: Partner mit Rolle - der Veranstalter füllt das leere Feld „Veranstalter“ als Vorschlag", async () => {
+  withPartners();
+  renderPage();
+  await screen.findByText("Probe Racing F1");
+  fireEvent.click(screen.getByTestId("lineage-new"));
+  fireEvent.change(screen.getByTestId("lineage-title"), { target: { value: "Probe Ananas Liga" } });
+  expect(screen.queryByTestId("lineage-partner-p-ananas-role")).toBeNull();
+  fireEvent.click(screen.getByTestId("lineage-partner-p-ananas"));
+  fireEvent.click(screen.getByTestId("lineage-partner-p-kokos"));
+  expect(screen.getByTestId("lineage-partner-p-kokos-role")).toHaveValue("contributor");
+  fireEvent.change(screen.getByTestId("lineage-partner-p-ananas-role"), { target: { value: "organizer" } });
+  expect(screen.getByTestId("lineage-organizer")).toHaveValue("Probe Ananas");
+  fireEvent.submit(screen.getByTestId("lineage-sheet"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/reference-series/admin/lineages", expect.objectContaining({
+    organizer: "Probe Ananas", partner_ids: ["p-ananas", "p-kokos"],
+    partner_roles: { "p-ananas": "organizer", "p-kokos": "contributor" },
+  })));
+});
+
+test("Spur: ein eingetragener Veranstalter-Text bleibt, wenn ein Partner Veranstalter wird", async () => {
+  withPartners();
+  renderPage();
+  await screen.findByText("Probe Racing F1");
+  fireEvent.click(screen.getByTestId("lineage-edit-spur-1"));
+  expect(screen.getByTestId("lineage-organizer")).toHaveValue("Probe Liga");
+  fireEvent.click(screen.getByTestId("lineage-partner-p-kokos"));
+  fireEvent.change(screen.getByTestId("lineage-partner-p-kokos-role"), { target: { value: "organizer" } });
+  expect(screen.getByTestId("lineage-organizer")).toHaveValue("Probe Liga");
+});
+
+test("Saison: erbt die Partner der Spur und ergänzt eigene", async () => {
+  withPartners({ partner_ids: ["p-ananas"], partner_roles: { "p-ananas": "organizer" } });
+  renderPage();
+  await screen.findByText("Probe Racing F1");
+  fireEvent.click(screen.getByTestId("series-edit-serie-1"));
+  expect(screen.getByTestId("series-partner-inherited")).toHaveTextContent("Von der Spur: Probe Ananas (Veranstalter)");
+  // Ein geerbter Partner steht nicht noch einmal zur Wahl.
+  expect(screen.queryByTestId("series-partner-p-ananas")).toBeNull();
+  fireEvent.click(screen.getByTestId("series-partner-p-kokos"));
+  fireEvent.submit(screen.getByTestId("series-sheet"));
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/reference-series/admin/series/serie-1", expect.objectContaining({
+    partner_ids: ["p-kokos"], partner_roles: { "p-kokos": "contributor" },
+  })));
+});

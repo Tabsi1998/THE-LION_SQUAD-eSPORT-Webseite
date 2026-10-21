@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 
 // Partnerseite (#469): Kopf mit Art, „seit“, Live-Pille und Kanal-Symbolen; Twitch-Stream nur live
@@ -102,4 +102,41 @@ test("channelDetail: Live-Zuschauer, offline, Online-Zahl, Hostname", () => {
   expect(channelDetail({ key: "twitch", handle: "x" }, { configured: true, live: false }, null).text).toBe("gerade offline");
   expect(channelDetail({ key: "discord", url: "https://discord.gg/a" }, null, { enabled: true, online: 3 }).text).toBe("3 gerade online");
   expect(channelDetail({ key: "youtube", url: "https://www.youtube.com/@pine" }, null, null).text).toBe("youtube.com");
+});
+
+
+// ---------------------------------------------------------------- Ligen und Serien mit uns (#1934)
+const SERIES = [{
+  lineage: { title: "Probe Ananas Liga", slug: "probe-ananas-liga", kind: "racing", label: "F1", game_name: "Probespiel" },
+  role: "organizer", running: true,
+  seasons: [
+    { season: "2026", tier: null, title: null, season_slug: "2026", status: "active", running: true, club: { rank: 4, of: 12 } },
+    { season: "2025", tier: "Liga 1", title: null, season_slug: "2025-liga-1", status: "completed", running: false, club: { rank: 2, of: 10 } },
+    { season: "2024", tier: null, title: null, season_slug: "2024", status: "completed", running: false, club: null },
+  ],
+}];
+
+test("Ligen und Serien mit uns: Spur mit Rolle, Saisons mit Stand bzw. Endplatz und läuft gerade", async () => {
+  apiMock.get.mockResolvedValue({ data: { ...PARTNER, shared: { ...PARTNER.shared, series: SERIES } } });
+  renderAt("/partners/pineapps-tft");
+  const section = await screen.findByTestId("partner-series");
+  expect(section).toHaveTextContent("Ligen und Serien mit uns");
+  const card = screen.getByTestId("partner-series-probe-ananas-liga");
+  expect(card).toHaveTextContent("Veranstalter: PineApps TFT · Rennliga · Probespiel");
+  const running = screen.getByTestId("partner-season-probe-ananas-liga-2026");
+  expect(running).toHaveAttribute("href", "/references/series/probe-ananas-liga/2026");
+  expect(running).toHaveTextContent("Läuft gerade");
+  expect(running).toHaveTextContent("Stand: 4. von 12");
+  const done = screen.getByTestId("partner-season-probe-ananas-liga-2025-liga-1");
+  expect(done).toHaveTextContent("2025 · Liga 1");
+  expect(done).toHaveTextContent("Endplatz 2. von 10");
+  expect(within(done).queryByTestId("partner-season-running")).toBeNull();
+  expect(within(screen.getByTestId("partner-season-probe-ananas-liga-2024")).queryByTestId("partner-season-place")).toBeNull();
+});
+
+test("ohne Ligen und Serien kein Bereich", async () => {
+  apiMock.get.mockResolvedValue({ data: PARTNER });
+  renderAt("/partners/pineapps-tft");
+  await screen.findByRole("heading", { level: 1 });
+  expect(screen.queryByTestId("partner-series")).toBeNull();
 });

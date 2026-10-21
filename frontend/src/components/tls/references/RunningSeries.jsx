@@ -5,6 +5,7 @@ import { GameMark } from "@/components/tls/references/referenceParts";
 import { SectionHead } from "@/components/tls/references/overviewParts";
 import { CountryFlag } from "@/components/tls/CountryFlag";
 import { SessionChips } from "@/components/tls/series/SessionChips";
+import { PartnerHostBadge } from "@/components/tls/references/PartnerHostBadge";
 
 // „Läuft gerade“ (#1748, neu gestaltet #1878): laufende Serien-Saisons mit Spur, Art, Saison/Stufe, Fortschritt in
 // Segmenten, nächstem Termin und unserem Platz als große Zahl. Was heute ansteht, kommt zuerst (Server) und trägt den
@@ -52,6 +53,8 @@ function RunningCard({ item }) {
         <div className="flex-1 min-w-0 flex flex-col gap-0.5">
           <div className="text-[11px] md:text-xs font-bold uppercase tracking-[0.14em] md:tracking-[0.16em] text-quiet">{KIND_LABELS[kind] || "Serie"}</div>
           <div className="font-semibold text-[15px] md:text-base text-zinc-200 break-words [overflow-wrap:anywhere]" data-testid="running-title">{lineage.title}</div>
+          {/* #1934: veranstaltender Partner des Vereins */}
+          <PartnerHostBadge partner={item.organizers?.[0]} className="mt-1" />
         </div>
         {item.today && (
           <span className="shrink-0 inline-flex items-center gap-1.5 md:gap-[7px] px-2 md:px-2.5 py-1 rounded-full bg-honor/[0.12] border border-honor/45 text-honor text-[11px] md:text-xs font-bold uppercase tracking-[0.1em] md:tracking-[0.12em]" data-testid="running-today-badge">

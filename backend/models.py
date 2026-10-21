@@ -1584,6 +1584,8 @@ ReferenceStandingScope = Literal["drivers", "teams", "table"]
 ReferenceAliasTarget = Literal["member", "guest"]
 ReferenceAliasSource = Literal["manual", "game_id", "suggestion", "import"]
 ReferenceStaffRole = Literal["captain"]
+# #1934: Rolle eines Partners an Spur bzw. Saison - Veranstalter oder Mitwirkender (services/series_partners.py).
+ReferencePartnerRole = Literal["organizer", "contributor"]
 
 _CLOCK_RE = re.compile(r"^([01]\d|2[0-3]):[0-5]\d$")
 
@@ -1629,6 +1631,7 @@ class ReferenceLineageCreate(BaseModel):
     game_id: Optional[str] = None
     game_name: Optional[str] = Field(default=None, max_length=120)
     partner_ids: List[str] = Field(default_factory=list)
+    partner_roles: Dict[str, ReferencePartnerRole] = Field(default_factory=dict)  # #1934, ohne Eintrag: Mitwirkender
     external_url: Optional[str] = Field(default=None, max_length=500)
     description: Optional[str] = Field(default=None, max_length=4000)
     visibility: ReferenceVisibility = "public"
@@ -1656,6 +1659,7 @@ class ReferenceLineageUpdate(BaseModel):
     game_id: Optional[str] = None
     game_name: Optional[str] = Field(default=None, max_length=120)
     partner_ids: Optional[List[str]] = None
+    partner_roles: Optional[Dict[str, ReferencePartnerRole]] = None  # #1934
     external_url: Optional[str] = Field(default=None, max_length=500)
     description: Optional[str] = Field(default=None, max_length=4000)
     visibility: Optional[ReferenceVisibility] = None
@@ -1709,6 +1713,9 @@ class ReferenceSeriesCreate(BaseModel):
     reference_id: Optional[str] = None  # Stufe 2: Saisonende als Referenz (#1750)
     order_index: int = 0
     season_result: Optional[ReferenceSeasonResult] = None  # #1898: Vermerk statt Ableitung aus dem Stufennamen
+    # #1934: Partner nur dieser Saison (etwa ein Sponsor) - die Partner der Spur erbt sie ohnehin.
+    partner_ids: List[str] = Field(default_factory=list)
+    partner_roles: Dict[str, ReferencePartnerRole] = Field(default_factory=dict)
     result_image_template: Optional[str] = Field(default=None, max_length=60)  # #1756: Vorlage für Ergebnis-Bilder
     weekend: Optional[Dict[str, Any]] = None  # #1930: Ablauf je Runde, auch ab Runde X wechselnd
 
@@ -1752,6 +1759,8 @@ class ReferenceSeriesUpdate(BaseModel):
     reference_id: Optional[str] = None
     order_index: Optional[int] = None
     season_result: Optional[ReferenceSeasonResult] = None
+    partner_ids: Optional[List[str]] = None  # #1934
+    partner_roles: Optional[Dict[str, ReferencePartnerRole]] = None
     result_image_template: Optional[str] = Field(default=None, max_length=60)  # #1756: Vorlage für Ergebnis-Bilder
     weekend: Optional[Dict[str, Any]] = None
 

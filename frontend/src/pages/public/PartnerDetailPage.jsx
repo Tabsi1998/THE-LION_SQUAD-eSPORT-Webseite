@@ -16,6 +16,7 @@ import { useCanonicalSlugRedirect } from "@/hooks/useCanonicalSlugRedirect";
 import { seoTextPreview } from "@/lib/textPreview";
 import { asInstant, viennaDate } from "@/lib/vienna";
 import { PublicLoadingState } from "@/components/tls/PublicLoadingState";
+import { PartnerSeries } from "@/components/tls/PartnerSeries";
 
 // Partnerseite (#469 Teil 1): Kopf mit Logo, Art, „Partner seit“ und Kanal-Symbolen; links der
 // laufende Twitch-Stream (nur wenn live), der Text über den Partner, seine Tools und Projekte
@@ -100,7 +101,8 @@ export default function PartnerDetailPage() {
   const sharedEvents = Array.isArray(shared.events) ? shared.events : [];
   const sharedTournaments = Array.isArray(shared.tournaments) ? shared.tournaments : [];
   const sharedReferences = Array.isArray(shared.references) ? shared.references : [];
-  const hasMain = live || Boolean(partner.about) || tools.length > 0 || news.length > 0 || sharedEvents.length > 0 || sharedTournaments.length > 0 || sharedReferences.length > 0;
+  const sharedSeries = Array.isArray(shared.series) ? shared.series : [];
+  const hasMain = live || Boolean(partner.about) || tools.length > 0 || news.length > 0 || sharedEvents.length > 0 || sharedTournaments.length > 0 || sharedReferences.length > 0 || sharedSeries.length > 0;
 
   return (
     <PublicLayout>
@@ -171,6 +173,8 @@ export default function PartnerDetailPage() {
                 {embeddedTool && <ToolEmbed tool={embeddedTool} hasConsent={hasConsent} onClose={() => setOpenTool(null)} />}
               </section>
             )}
+
+            <PartnerSeries items={sharedSeries} partnerName={partner.name} Title={SectionTitle} />
 
             {(sharedEvents.length > 0 || sharedTournaments.length > 0 || sharedReferences.length > 0) && (
               <section data-testid="partner-shared">

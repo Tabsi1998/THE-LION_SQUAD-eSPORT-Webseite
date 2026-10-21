@@ -26,18 +26,22 @@ export function seasonLabel(series) {
 export default function AdminReferenceSeriesPage() {
   const [overview, setOverview] = useState({ lineages: [], points_schemes: [], default_rules: {} });
   const [games, setGames] = useState([]);
+  const [partners, setPartners] = useState([]);
   const [showArchived, setShowArchived] = useState(false);
   const [editingLineage, setEditingLineage] = useState(null);
   const [editingSeries, setEditingSeries] = useState(null);
   const confirm = useConfirm();
 
   const load = useCallback(async () => {
-    const [{ data }, gameRows] = await Promise.all([
+    const [{ data }, gameRows, partnerRows] = await Promise.all([
       api.get("/reference-series/admin"),
       api.get("/games").then((result) => (Array.isArray(result?.data) ? result.data : [])).catch(() => []),
+      // #1934: aktive Partner für die Auswahl an Spur und Saison.
+      api.get("/partners").then((result) => (Array.isArray(result?.data) ? result.data : [])).catch(() => []),
     ]);
     setOverview({ lineages: data?.lineages || [], points_schemes: data?.points_schemes || [], default_rules: data?.default_rules || {} });
     setGames(gameRows);
+    setPartners(partnerRows);
   }, []);
 
   useEffect(() => { load(); }, [load]);
@@ -143,9 +147,9 @@ export default function AdminReferenceSeriesPage() {
         )}
       </div>
 
-      {editingLineage && <LineageForm lineage={editingLineage} games={games} onClose={() => setEditingLineage(null)} onSaved={() => { setEditingLineage(null); load(); }} />}
+      {editingLineage && <LineageForm lineage={editingLineage} games={games} partners={partners} onClose={() => setEditingLineage(null)} onSaved={() => { setEditingLineage(null); load(); }} />}
       {editingSeries && (
-        <SeriesForm series={editingSeries.series} lineage={editingSeries.lineage} schemes={overview.points_schemes} defaultRules={overview.default_rules}
+        <SeriesForm series={editingSeries.series} lineage={editingSeries.lineage} partners={partners} schemes={overview.points_schemes} defaultRules={overview.default_rules}
           onClose={() => setEditingSeries(null)} onSaved={() => { setEditingSeries(null); load(); }} />
       )}
     </AdminLayout>
