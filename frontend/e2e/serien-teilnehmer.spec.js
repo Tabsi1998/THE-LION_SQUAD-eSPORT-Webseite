@@ -86,7 +86,14 @@ for (const [width, height] of [[390, 844], [1440, 900]]) {
     await section.scrollIntoViewIfNeeded();
     await shot(section, "auswahl", width);
 
+    // Ein Klick und eine Rückfrage für alle 17.
     await section.getByTestId("participants-bulk-external").click();
+    const question = page.getByTestId("confirm-dialog");
+    await expect(question).toContainText("17 Teilnehmer auf Extern?");
+    await expect(question).toContainText("Zuordnung gilt dann in keiner Saison mehr");
+    expect(state.bulk).toHaveLength(0);
+    await shot(question, "rueckfrage", width);
+    await question.getByTestId("confirm-dialog-confirm").click();
     await expect(section.getByTestId("series-participants-counts")).toHaveText("0 Mitglieder · 3 Gäste · 17 Extern · 0 offen");
     expect(state.bulk).toHaveLength(1);
     expect(state.bulk[0]).toEqual({ participant_ids: NAMES.slice(3).map((_, index) => `t${index + 4}`), link: "external" });

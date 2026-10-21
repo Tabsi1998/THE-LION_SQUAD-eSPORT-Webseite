@@ -8,8 +8,8 @@ import { Trash2 } from "lucide-react";
 
 // Teilnehmer bearbeiten (#1929): Name wie beim Veranstalter, Startnummer, Standard-Team und die Zuordnung (Mitglied mit
 // Profil, Gast, Extern). Geschickt wird nur, was sich geändert hat – Name, Nummer und Team über PATCH, die Zuordnung
-// über „assign“ (wie im Dialog „Unbekannte Namen“). Wird ein Mitglied extern, fragt die Seite nach: Der Alias geht
-// dann auch in anderen Saisons. Entfernen gibt es nur ohne Ergebnis, sonst führt der Weg übers Zusammenführen.
+// über „assign“ (wie im Dialog „Unbekannte Namen“). Wird ein Mitglied oder Gast extern, fragt die Seite nach: Der Alias
+// geht dann auch in anderen Saisons. Entfernen gibt es nur ohne Ergebnis, sonst führt der Weg übers Zusammenführen.
 
 export const LINK_HINT = "Mitglied zählt für Verein und Profil. Gast fährt für ein Vereinsteam, ist aber kein Mitglied. Extern sind alle anderen.";
 export const ALIAS_HINT = "Mitglied und Gast gelten als Alias in allen Saisons, Extern nimmt den Alias zurück.";
@@ -68,9 +68,10 @@ export function ParticipantEditSheet({ series, row, profiles = [], onClose, onSa
       onClose();
       return;
     }
-    if (link?.link === "external" && currentLink(row) === "member" && !await confirm({
+    const was = currentLink(row);
+    if (link?.link === "external" && (was === "member" || was === "guest") && !await confirm({
       title: `${row.name} als Extern?`,
-      description: "Der Name zählt dann nicht mehr für Verein und Profil. Der Alias wird zurückgenommen – auch in anderen Saisons, in denen er so zugeordnet wurde.",
+      description: `Die Zuordnung als ${was === "member" ? "Mitglied" : "Gast"} gilt dann in keiner Saison mehr – der Alias wird überall zurückgenommen.${was === "member" ? " Der Name zählt nicht mehr für Verein und Profil." : ""}`,
       confirmLabel: "Als Extern speichern",
     })) return;
     setSaving(true);

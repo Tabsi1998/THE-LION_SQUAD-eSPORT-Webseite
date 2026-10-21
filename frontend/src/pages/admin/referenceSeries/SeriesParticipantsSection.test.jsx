@@ -199,9 +199,44 @@ test("Mehrfachauswahl: zwei wählen und als Extern markieren – ein Aufruf für
   expect(screen.getByTestId("participants-bulk-count")).toHaveTextContent("2 ausgewählt");
   fireEvent.click(screen.getByTestId("participants-bulk-external"));
   await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith(`${URL}/bulk-assign`, { participant_ids: ["t2", "t3"], link: "external" }));
-  expect(confirmMock).not.toHaveBeenCalled();
+  // Ein Gast ist dabei: eine einzige Rückfrage für alle, mit der Anzahl.
+  expect(confirmMock).toHaveBeenCalledTimes(1);
+  expect(confirmMock.mock.calls[0][0].title).toBe("2 Teilnehmer auf Extern?");
+  expect(confirmMock.mock.calls[0][0].description).toContain("Zuordnung gilt dann in keiner Saison mehr");
   await waitFor(() => expect(toastMock.success).toHaveBeenCalledWith("1 als Extern markiert · 1 war es schon"));
   await waitFor(() => expect(screen.queryByTestId("participants-bulk-count")).toBeNull());
+});
+
+test("Als Extern: viele Gäste und ein Mitglied – ein Klick, eine Rückfrage; abgelehnt ändert nichts", async () => {
+  await rendered();
+  fireEvent.click(screen.getByTestId("participants-select-all"));
+  confirmMock.mockResolvedValueOnce(false);
+  fireEvent.click(screen.getByTestId("participants-bulk-external"));
+  await waitFor(() => expect(confirmMock).toHaveBeenCalledTimes(1));
+  expect(confirmMock.mock.calls[0][0].title).toBe("5 Teilnehmer auf Extern?");
+  expect(confirmMock.mock.calls[0][0].description).toContain("1 Mitglied zählt dann nicht mehr für Verein und Profil");
+  expect(apiMock.post).not.toHaveBeenCalled();
+
+  // Nur Offene und Externe: nichts geht verloren, also keine Rückfrage.
+  confirmMock.mockClear();
+  fireEvent.click(screen.getByTestId("participants-filter-open"));
+  fireEvent.click(screen.getByTestId("participants-bulk-external"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith(`${URL}/bulk-assign`, { participant_ids: ["t4", "t5"], link: "external" }));
+  expect(confirmMock).not.toHaveBeenCalled();
+});
+
+test("Bearbeiten: auch ein Gast wird erst nach Rückfrage extern", async () => {
+  await rendered();
+  fireEvent.click(screen.getByTestId("participant-edit-t2"));
+  fireEvent.change(screen.getByTestId("participant-edit-link"), { target: { value: "external" } });
+  confirmMock.mockResolvedValueOnce(false);
+  fireEvent.click(screen.getByTestId("participant-edit-save"));
+  await waitFor(() => expect(confirmMock).toHaveBeenCalledTimes(1));
+  expect(confirmMock.mock.calls[0][0].title).toBe("Gast Fahrer als Extern?");
+  expect(confirmMock.mock.calls[0][0].description).toContain("in keiner Saison mehr");
+  expect(apiMock.post).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByTestId("participant-edit-save"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith(`${URL}/t2/assign`, { link: "external" }));
 });
 
 test("Alle auswählen nimmt nur die sichtbaren; ist ein Mitglied dabei, fragt die Seite nach", async () => {

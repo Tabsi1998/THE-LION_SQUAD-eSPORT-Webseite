@@ -16,7 +16,8 @@ import { Combine, Pencil, Plus, Search, UserRound, UserSearch, UserX, X } from "
 //
 // Nachträglich bearbeiten (#1929): je Zeile „Bearbeiten“ (Name, Startnummer, Team, Zuordnung, Entfernen ohne
 // Ergebnis), Filter nach Zuordnung und Suche, Mehrfachauswahl mit „Als Gast“ und „Als Extern“ (ein Aufruf, der Server
-// rechnet einmal neu) und – bei genau zwei – „Zusammenführen“. Gewählt zählt nur, was gerade sichtbar ist.
+// rechnet einmal neu; eine Rückfrage für alle, wenn dabei eine Zuordnung verloren geht) und – bei genau zwei –
+// „Zusammenführen“. Gewählt zählt nur, was gerade sichtbar ist.
 
 const LINK_LABELS = { member: "Mitglied", guest: "Gast", external: "Extern" };
 const FILTERS = [["all", "Alle"], ["member", "Mitglieder"], ["guest", "Gäste"], ["external", "Extern"], ["open", "Offen"]];
@@ -176,15 +177,29 @@ export function SeriesParticipantsSection({ series }) {
   });
   const clearSelection = () => setSelected(new Set());
 
+  // Eine Rückfrage für die ganze Auswahl – nur, wenn dabei eine Zuordnung verloren geht.
+  const bulkQuestion = (link) => {
+    const members = chosen.filter((row) => linkState(row) === "member").length;
+    const membersText = `${members} ${members === 1 ? "Mitglied zählt" : "Mitglieder zählen"} dann nicht mehr für Verein und Profil.`;
+    if (link === "external") {
+      if (!chosen.some((row) => ["member", "guest"].includes(linkState(row)))) return null;
+      return {
+        title: `${chosen.length} Teilnehmer auf Extern?`,
+        description: `Ihre Zuordnung gilt dann in keiner Saison mehr – Mitglied und Gast werden als Alias überall zurückgenommen.${members ? ` ${membersText}` : ""}`,
+        confirmLabel: "Auf Extern setzen",
+      };
+    }
+    if (!members) return null;
+    return {
+      title: `${members} ${members === 1 ? "Mitglied" : "Mitglieder"} als Gast?`,
+      description: `${membersText} Sie zählen nur noch fürs Team.`,
+      confirmLabel: "Als Gast markieren",
+    };
+  };
+
   const bulk = async (link) => {
-    const members = chosen.filter((row) => linkState(row) === "member");
-    if (members.length && !await confirm({
-      title: `${members.length} ${members.length === 1 ? "Mitglied" : "Mitglieder"} als ${BULK_LABELS[link]}?`,
-      description: link === "external"
-        ? "Sie zählen dann nicht mehr für Verein und Profil. Ihr Alias wird zurückgenommen – auch in anderen Saisons."
-        : "Sie zählen dann nicht mehr für Verein und Profil, nur noch fürs Team.",
-      confirmLabel: `Als ${BULK_LABELS[link]} markieren`,
-    })) return;
+    const question = bulkQuestion(link);
+    if (question && !await confirm(question)) return;
     setBusy(true);
     try {
       const { data: result } = await api.post(`/reference-series/admin/series/${series.id}/participants/bulk-assign`,

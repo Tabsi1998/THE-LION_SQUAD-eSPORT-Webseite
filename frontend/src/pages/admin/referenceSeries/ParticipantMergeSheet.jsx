@@ -37,7 +37,7 @@ export function ParticipantMergeSheet({ series, rows, describe, onClose, onSaved
     <AdminSheet title="Zusammenführen" eyebrow={series.lineage?.title} onClose={onClose} onSubmit={save} saving={saving} submitLabel="Zusammenführen" savingLabel="Führe zusammen …" submitTestId="participant-merge-save" testId="participant-merge">
       <p className="text-sm text-white/60 leading-relaxed">
         Für dieselbe Person unter zwei Schreibweisen. Der andere Eintrag geht im behaltenen auf: Seine Ergebnisse wandern mit, auch Entwürfe, danach wird neu gerechnet.
-        Name und Zuordnung des behaltenen bleiben; fehlende Startnummer und fehlendes Team kommen dazu.
+        Name und Zuordnung des behaltenen bleiben und gelten dann auch für die andere Schreibweise, in allen Saisons; fehlende Startnummer und fehlendes Team kommen dazu.
       </p>
       <fieldset className="space-y-2">
         <legend className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Welcher Eintrag bleibt?</legend>
