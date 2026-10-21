@@ -258,6 +258,31 @@ zu nennen, zeigt die Referenz auch auf seiner Seite.
 Die Chronik ordnet jede Teilnahme nach dem Jahr ihres **Startdatums** ein (Wiener Zeit; ohne Start zählt das Enddatum).
 Teilnahmen ganz ohne Datum stehen am Ende unter **Ohne Datum** – tragt also ein Datum ein.
 
+**Kurzer Titel:** Ist das Feld **Liga** gefüllt, steht in der Chronik und im Mitgliederprofil statt des langen
+Veranstalter-Titels kurz „Veranstalter · Liga · Saison“ (bei einer Saison aus 3.9 deren Stufe und Saison). Der lange Titel
+steht im Tooltip und auf der Detailseite. Ohne Liga bleibt der Titel, wie er ist.
+
+**Im Mitgliederprofil** (`/members/…`) stehen die **Vereinsplatzierungen** als Ausschnitt dieser Übersicht – nur mit
+Werten über null:
+
+- **Kopf:** die eigenen Medaillen, die es gibt. Ohne Podest steht dort **Bestes Ergebnis** mit Platz, Liga, Monat und
+  „von N Teams“. Daneben Teilnahmen, Spiele und „seit“.
+- **Liga-Weg:** nur, wenn Teilnahmen zu einer Saison gehören (3.9). Je Spur die Saisons der Person mit ihrem Platz und dem
+  Vermerk der Saison (Aufstieg, läuft …), dazu **Zur Serie**. Am Handy lässt sich die Reihe wischen.
+- **Chronik je Jahr:** eine Zeile je Teilnahme mit dem eigenen Platz, kurzem Titel, Spiel, Team mit „von N Teams“ und
+  Datum. Ein Klick klappt die Details auf: langer Titel, Format und Plattform, die Aufstellung (die Person selbst
+  hervorgehoben), **Saison ansehen** (nur mit Saison) und **Beim Veranstalter** (Turnierseite, sonst Ergebnis oder
+  Bracket). Offen steht immer nur eine Zeile.
+
+**Alle Referenzen** öffnet die Chronik oben mit „Nur …“.
+
+<table>
+<tr>
+<td><img src="../assets/referenzen/referenzen-mitgliederprofil-breit.png" alt="Mitgliederprofil am PC: Bestes Ergebnis, Teilnahmen, Liga-Weg und die Chronik je Jahr mit einer aufgeklappten Zeile" width="560"></td>
+<td><img src="../assets/referenzen/referenzen-mitgliederprofil-handy.png" alt="Mitgliederprofil am Handy: Medaillen, Liga-Weg und kompakte Chronik" width="220"></td>
+</tr>
+</table>
+
 **Welche Teilnahme die Hauptkarte bekommt,** stellt ihr oben auf der Seite unter **Vitrine: Hauptkarte** ein:
 **Automatisch** (Vorgabe) nimmt den höchsten Platz in der höchsten Stufe, bei Gleichstand den neuesten. Die Stufe kommt aus
 der Saison, zu der die Referenz gehört, sonst aus dem Feld **Liga**; es zählt die Zahl nach Liga, Division, Div, Stufe,
