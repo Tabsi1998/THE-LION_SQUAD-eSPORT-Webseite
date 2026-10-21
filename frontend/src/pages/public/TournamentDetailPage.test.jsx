@@ -533,3 +533,49 @@ test("#1888: die Livestream-Karte folgt der öffentlichen Phase - nach dem Ende 
   renderPage();
   expect(await screen.findByTestId("tournament-live-streams-stub")).toBeInTheDocument();
 });
+
+// #1939: Ein verborgenes oder falsches Turnier zeigt eine Meldung statt ewig das Ladeskelett. Was der Server meldet, gilt:
+// 404 (unbekannt oder verborgen) heißt für alle „nicht gefunden“, 403 heißt „nur für Mitglieder bzw. über den QR-Code“.
+const failure = (status) => Object.assign(new Error(`Request failed with status code ${status}`), { response: { status, data: { detail: "x" } } });
+
+function failWith(error) {
+  apiMock.get.mockImplementation((path) => (path === "/tournaments/cup" ? Promise.reject(error) : Promise.resolve({ data: [] })));
+}
+
+test("#1939: Tippfehler oder verborgenes Turnier (404): „Turnier nicht gefunden“ mit Weg zur Turnierliste", async () => {
+  authUser = null;
+  failWith(failure(404));
+  renderPage();
+  expect(await screen.findByRole("heading", { name: "Turnier nicht gefunden" })).toBeInTheDocument();
+  expect(screen.getByRole("link", { name: "Zur Turnierliste" })).toHaveAttribute("href", "/tournaments");
+  expect(screen.queryByTestId("page-loading")).toBeNull();
+  expect(screen.queryByText(/nur für Mitglieder/)).toBeNull();
+});
+
+test("#1939: Gast ohne QR-Code (403): nur für Mitglieder bzw. über den QR-Code, mit Anmelden und Rückweg", async () => {
+  authUser = null;
+  failWith(failure(403));
+  renderPage("/tournaments/cup?access=abc");
+  expect(await screen.findByRole("heading", { name: "Dieses Turnier ist nur für Mitglieder bzw. über den QR-Code vor Ort sichtbar" })).toBeInTheDocument();
+  expect(screen.getByText(/QR-Code am Eingang scannen/)).toBeInTheDocument();
+  expect(screen.getByRole("link", { name: "Anmelden" })).toHaveAttribute("href", `/login?next=${encodeURIComponent("/tournaments/cup?access=abc")}`);
+  expect(screen.getByRole("link", { name: "Zur Turnierliste" })).toHaveAttribute("href", "/tournaments");
+});
+
+test("#1939: angemeldet ohne Freigabe (403): dieselbe Meldung, ohne Anmelden-Knopf", async () => {
+  failWith(failure(403));
+  renderPage();
+  expect(await screen.findByRole("heading", { name: /nur für Mitglieder bzw\. über den QR-Code/ })).toBeInTheDocument();
+  expect(screen.queryByRole("link", { name: "Anmelden" })).toBeNull();
+});
+
+test("#1939: ohne Netz: „Nochmal versuchen“ lädt erneut und zeigt dann das Turnier", async () => {
+  failWith(new Error("Network Error"));
+  renderPage();
+  const retry = await screen.findByTestId("public-error-retry");
+  expect(retry).toHaveTextContent("Nochmal versuchen");
+  mockApi(base);
+  fireEvent.click(retry);
+  expect(await screen.findByTestId("tournament-title")).toHaveTextContent("Herbst-Cup");
+  expect(screen.queryByTestId("public-error-retry")).toBeNull();
+});
