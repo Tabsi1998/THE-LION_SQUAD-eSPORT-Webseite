@@ -884,7 +884,8 @@ function QuickEntry({ entry, index, profiles, suggestions, onChange, onRemove, w
         single={isSolo}
         testIdPrefix={`reference-entry-${index}`}
       />
-      <FormGrid>
+      {/* Platz und „von N“ auch am Handy nebeneinander (#1936): zwei kurze Zahlen, eine Zeile. */}
+      <FormGrid className="grid-cols-2 items-end">
         <TextField label="Platz" type="number" min="1" value={entry.placement} onChange={(v) => onChange({ placement: v })} testId={`reference-entry-${index}-placement`} />
         <TextField label={count === "team_count" ? "von … Teams" : "von … Teilnehmern"} type="number" min="1" value={entry[count]} onChange={(v) => onChange({ [count]: v })} testId={`reference-entry-${index}-count`} />
       </FormGrid>
