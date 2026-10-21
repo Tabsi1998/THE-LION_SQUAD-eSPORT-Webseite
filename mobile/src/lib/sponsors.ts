@@ -25,17 +25,3 @@ export function groupSponsorsByTier<T extends { tier?: string | null }>(items: T
     .map((tier) => ({ tier, items: items.filter((item) => normalizeSponsorTier(item.tier) === tier.key) }))
     .filter((group) => group.items.length > 0);
 }
-
-/** Logo-Daten für die einfarbige Anzeige (#1916, App-Teil von #1321) - vom Server an Sponsoren und Partnern. */
-export type ToneLogo = { logo_url?: string | null; logo_mono_url?: string | null; logo_transparent?: boolean | null };
-
-/**
- * Wie ein Sponsoren- oder Partner-Logo weiß wird - dieselbe Regel wie im Web (SponsorLogo.jsx): "file" (hochgeladene
- * weiße Fassung), "tint" (durchsichtiges Logo, weiß eingefärbt) oder "surface" (Logo mit Kasten oder unbekannt: das
- * Original auf einer ruhigen Fläche, nie ein weißes Rechteck). Am Handy gibt es kein Drüberfahren - es bleibt weiß.
- */
-export function logoToneMode(logo: ToneLogo | null | undefined): "file" | "tint" | "surface" {
-  if (logo?.logo_mono_url) return "file";
-  if (logo?.logo_transparent === true) return "tint";
-  return "surface";
-}

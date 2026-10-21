@@ -117,29 +117,6 @@ test("aus Mehr geöffnet ist der Bereich eine eigene Seite: Titel gesetzt, keine
   expect(screen.queryByTestId("sponsor-banner-s2")).toBeNull();
 });
 
-test("Logos einfarbig (#1916): weiße Fassung, durchsichtig eingefärbt, sonst auf ruhiger Fläche", async () => {
-  const base = mockGet.getMockImplementation() as (path: string) => Promise<unknown>;
-  mockGet.mockImplementation((path: string) => {
-    if (path === "/sponsors") {
-      return Promise.resolve({ data: [
-        { id: "s1", name: "Weiß", tier: "main", logo_url: "/a.png", logo_mono_url: "/a-weiss.png" },
-        { id: "s2", name: "Durchsichtig", tier: "gold", logo_url: "/b.png", logo_transparent: true },
-        { id: "s3", name: "Kasten", tier: "bronze", logo_url: "/c.jpg", logo_transparent: false },
-      ] });
-    }
-    return base(path);
-  });
-  await render(<InfoCenterScreen navigation={navigation} route={routeFor("sponsors")} />);
-  await waitFor(() => expect(screen.getByTestId("sponsor-logo-s1-file")).toBeTruthy());
-  expect(screen.getByTestId("sponsor-logo-s2-tint")).toBeTruthy();
-  expect(screen.getByTestId("sponsor-logo-s3-surface")).toBeTruthy();
-});
-
-test("Partner-Logo ohne Angabe zum Kasten steht auf der ruhigen Fläche (#1916)", async () => {
-  await render(<InfoCenterScreen navigation={navigation} route={routeFor("partners")} />);
-  await waitFor(() => expect(screen.getByTestId("partner-logo-pa-1-surface")).toBeTruthy());
-});
-
 test("Erfolge nur, wenn es welche gibt", () => {
   expect(achievementLine({ achievements_count: 0 })).toBe("");
   expect(achievementLine({ achievements_count: 1 })).toBe("1 Erfolg");

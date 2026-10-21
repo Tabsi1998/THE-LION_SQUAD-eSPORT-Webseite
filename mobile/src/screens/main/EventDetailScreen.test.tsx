@@ -338,21 +338,3 @@ test("Nachladen gescheitert: das Event bleibt, ausdrücklich als letzter Stand (
   await waitFor(() => expect(screen.getByTestId("event-stale")).toBeTruthy());
   expect(screen.getAllByText("Vereinsabend").length).toBeGreaterThan(0);
 });
-
-// Sponsoren-Logos einfarbig (#1916, App-Teil von #1321): weiße Fassung, durchsichtig eingefärbt, sonst ruhige Fläche.
-test("Sponsoren beim Event: Logos einfarbig weiß oder auf ruhiger Fläche", async () => {
-  mockGet.mockResolvedValue({
-    data: {
-      ...EVENT,
-      sponsors: [
-        { id: "sp1", name: "Weiss", logo_url: "/a.png", logo_mono_url: "/a-weiss.png" },
-        { id: "sp2", name: "Klar", logo_url: "/b.png", logo_transparent: true },
-        { id: "sp3", name: "Kasten", logo_url: "/c.jpg", logo_transparent: false },
-      ],
-    },
-  });
-  await render(<EventDetailScreen navigation={navigation} route={route} />);
-  await waitFor(() => expect(screen.getByTestId("event-sponsor-sp1-file")).toBeTruthy());
-  expect(screen.getByTestId("event-sponsor-sp2-tint")).toBeTruthy();
-  expect(screen.getByTestId("event-sponsor-sp3-surface")).toBeTruthy();
-});
