@@ -101,6 +101,7 @@ ist). Ohne etwas freizugeben oder zu verwerfen: 409.
 """
 from __future__ import annotations
 
+import difflib
 import math
 from datetime import date
 from typing import Dict, List, Literal, Optional
@@ -114,13 +115,13 @@ from database import get_db
 from match_rules import RESULT_MAX_SCORE
 from models import ReferencePointsSource, ReferenceResultMark, ReferenceResultStatus, _clock, new_id, now_utc
 from services import (
-    race_weekend, reference_running_cache, reference_series, series_identity, series_results, team_league_maps,
-    tournament_days,
+    race_weekend, reference_running_cache, reference_series, series_adjustments, series_identity, series_results,
+    team_league_maps, tournament_days,
 )
 from services.dolibarr_policy import club_today
 from services.own_teams import own_team_names, own_teams
 from services.reference_series_access import EDIT_PENDING_DRAFT, SeriesAccess, require_series_editor
-from services.scoring_rules import MAX_CUSTOM_BONUSES, MAX_DAY_ROUNDS, result_points, validate_sheet
+from services.scoring_rules import MAX_CUSTOM_BONUSES, MAX_DAY_ROUNDS, is_no_team, result_points, validate_sheet
 from services.series_participants import build_index, new_participant, remove_unused_new
 
 # Jeder schreibende Aufruf leert den Cache der laufenden Saisons (#1753, Startseite).
@@ -385,6 +386,38 @@ async def _kind(db, series: dict) -> str | None:
     return lineage.get("kind")
 
 
+async def _unknown_teams(db, series: dict, round_doc: dict, resolution, participants: list[dict],
+                         rules: dict) -> list[dict]:
+    """Teams einer Zeile, die es in der Saison noch nicht gibt (#1960) - meist ein Tippfehler („Team 2“). Bekannt sind die
+    eigenen Teams, die Standard-Teams der Teilnehmer und die Teams der übrigen Blätter; ein Eintrag „kein Team“
+    (``no_team_names``) ist nie neu. Ohne bekannte Teams (erste Runde) bleibt es still. Nur ein Hinweis."""
+    known = {series_adjustments.team_key(name): name for name in own_team_names(series)}
+    for person in participants:
+        if person.get("default_team"):
+            known.setdefault(series_adjustments.team_key(person["default_team"]), person["default_team"])
+    async for sheet in db.reference_round_results.find(
+            {"series_id": series["id"], "round_id": {"$ne": round_doc["id"]}}, {"_id": 0, "rows.team": 1}):
+        for row in sheet.get("rows") or []:
+            if row.get("team"):
+                known.setdefault(series_adjustments.team_key(row["team"]), row["team"])
+    if not known:
+        return []
+    found: dict[str, list[int]] = {}
+    names: dict[str, str] = {}
+    for row in resolution.rows:
+        key = series_adjustments.team_key(row.get("team"))
+        if key and key not in known and not is_no_team(row["team"], rules):
+            found.setdefault(key, []).append(row["index"])
+            names.setdefault(key, row["team"])
+    out = []
+    for key, rows in found.items():
+        close = difflib.get_close_matches(key, list(known), n=1, cutoff=0.6)
+        hint = f" – meintest du „{known[close[0]]}“?" if close else ""
+        out.append({"code": "team_unknown", "message": f"Team „{names[key]}“ gibt es in dieser Saison noch nicht{hint}",
+                    "rows": rows})
+    return out
+
+
 async def _prepare(db, access: SeriesAccess, round_doc: dict, body: ResultSheetInput):
     """Zuordnen und prüfen. Liefert Regeln, Teilnehmer der Serie und die ``Resolution`` mit Fehlern und Warnungen."""
     rules = await _round_rules(db, access.series, round_doc)
@@ -410,6 +443,7 @@ async def _prepare(db, access: SeriesAccess, round_doc: dict, body: ResultSheetI
             # Rennen mit Haupt-Qualifying in derselben Runde: die Pole hat dessen erster gültiger Platz.
             resolution.warnings.extend(race_weekend.clear_race_pole(
                 resolution.rows, await _quali_pole(db, access.series, round_doc)))
+    resolution.warnings.extend(await _unknown_teams(db, access.series, round_doc, resolution, participants, rules))
     if not resolution.errors:
         # Zur Sicherheit wie beim Rechnen - die Prüfung oben fängt dieselben Fälle schon mit Zeilenangabe ab.
         try:

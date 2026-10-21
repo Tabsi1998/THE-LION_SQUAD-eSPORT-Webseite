@@ -101,7 +101,7 @@ test("Neue Saison: die Vorlage fÃ¼llt die Regeln, gespeichert wird alles vollstÃ
 
   await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/reference-series/admin/series", expect.objectContaining({
     lineage_id: "spur-1", points_scheme_id: "formula_1", season: "2027", status: "planned", publish_mode: "review",
-    rules: expect.objectContaining({ count_mode: "drop_n", count_n: 2, team_scoring: { enabled: true, counting_drivers: null, guests_count: true, mode: "per_race" } }),
+    rules: expect.objectContaining({ count_mode: "drop_n", count_n: 2, team_scoring: { enabled: true, counting_drivers: null, guests_count: true, mode: "per_race", no_team_names: ["Ersatzfahrer"] } }),
   })));
 });
 

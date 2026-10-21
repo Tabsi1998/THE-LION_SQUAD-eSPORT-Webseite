@@ -156,17 +156,25 @@ def test_team_points_with_the_current_lineup_move_with_the_driver():
     rules = _rules(team_scoring={"enabled": True, "mode": "current_lineup"})
     snaps = compute_standings(rules=rules, rounds=rounds, sheets=sheets, participants=PEOPLE)
     teams = _latest(snaps, "teams")
-    # Jetzt im Team: anna und cora (alle Saisonpunkte: 122 + 86) - bert hat die Liga verlassen; Rot: dino und emil.
+    # Aktuelles Team = Team der letzten Fahrt: cora nimmt ihre 86 Saisonpunkte zu den Löwen mit; bert ist zuletzt für
+    # die Löwen gefahren und zählt dort weiter (122 + 86 + 44). Rot: dino und emil.
     assert [(row["team"], row["points"], row["driver_ids"]) for row in teams] == [
-        ("Probe Löwen", 208, ["anna", "cora"]), ("Fremd Rot", 47, ["dino", "emil"])]
+        ("Probe Löwen", 252, ["anna", "cora", "bert"]), ("Fremd Rot", 47, ["dino", "emil"])]
+    # Die Zellen bleiben je Rennen beim gefahrenen Team.
+    lions = {item["round_id"]: item["points"] for item in teams[0]["round_points"]}
+    assert (lions["r1"], lions["r12"], len(lions)) == (14, 16, 13)
     # Vor dem Wechsel gilt die Besetzung von damals.
     assert [(row["team"], row["points"]) for row in _at(snaps, "teams", "r11")] == [
         ("Probe Löwen", 154), ("Fremd Rot", 99)]
-    # Wer ein Rennen auslässt, bleibt im Team, solange niemand seinen Platz übernimmt.
+    # Wer ein Rennen auslässt, bleibt im Team.
     sheets["r13"] = _sheet("cora", "emil", "dino", teams={"cora": "Probe Löwen"})
     teams = _latest(compute_standings(rules=rules, rounds=rounds, sheets=sheets, participants=PEOPLE), "teams")
     assert [(row["team"], row["driver_ids"]) for row in teams] == [
-        ("Probe Löwen", ["anna", "cora"]), ("Fremd Rot", ["dino", "emil"])]
+        ("Probe Löwen", ["anna", "cora", "bert"]), ("Fremd Rot", ["dino", "emil"])]
+    # Hat bert die Liga verlassen, sagt es das Team von Hand am Teilnehmer („kein Team“ wie Ersatzfahrer).
+    people = [{**person, "current_team": "Ersatzfahrer"} if person["id"] == "bert" else person for person in PEOPLE]
+    teams = _latest(compute_standings(rules=rules, rounds=rounds, sheets=sheets, participants=people), "teams")
+    assert [(row["team"], row["driver_ids"]) for row in teams][0] == ("Probe Löwen", ["anna", "cora"])
 
 
 def test_the_team_mode_is_a_season_setting_with_per_race_as_default():

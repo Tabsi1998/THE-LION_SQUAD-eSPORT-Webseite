@@ -68,6 +68,22 @@ export function teamSourceLabel(teams, rounds = []) {
   return `laut Veranstalter${after ? ` (nach ${after})` : ""}`;
 }
 
+const teamKey = (value) => String(value ?? "").split(/\s+/).filter(Boolean).join(" ").toLowerCase();
+
+/** Wofür eine Zeile im Ergebnisblatt in der Teamwertung zählt, wenn es nicht dasteht (#1960): ohne Team das
+ * Stammteam („zählt für: Turbo (Stammteam)“), mit einem Eintrag „kein Team“ für keines. Sonst leer. */
+export function teamFallbackText(row, participants = [], scoring = null) {
+  if (!scoring?.enabled) return "";
+  const team = String(row?.team || "").trim();
+  if (team) return (scoring.no_team_names || []).some((name) => teamKey(name) === teamKey(team)) ? "zählt für kein Team (Ersatz)" : "";
+  const person = (participants || []).find((item) => item.id && item.id === row?.participant_id)
+    || (participants || []).find((item) => teamKey(item.name) && teamKey(item.name) === teamKey(row?.name));
+  return person?.default_team ? `zählt für: ${person.default_team} (Stammteam)` : "";
+}
+
+/** Gesamt im Modus „aktuelle Besetzung“ - wie beim Veranstalter, die Zellen je Rennen zeigen das gefahrene Team. */
+export const LINEUP_TOTAL_TEXT = "Gesamt = Saisonpunkte der aktuellen Fahrer (wie beim Veranstalter). Die Zellen je Rennen zeigen das Team, für das gefahren wurde – Ersatzfahrten für keines.";
+
 /** Ab welchem Rennen ein Fahrer im aktuellen Team ist (nur nach einem Wechsel, vom Server): „im Team seit R12“. */
 export function teamSinceLabel(driver, rounds = []) {
   const name = roundName(driver?.team_since, rounds);

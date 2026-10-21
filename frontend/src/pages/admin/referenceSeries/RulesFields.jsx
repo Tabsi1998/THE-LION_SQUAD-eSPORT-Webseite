@@ -113,6 +113,9 @@ export function RulesFields({ rules, kind, onChange }) {
             {/* #1960: wechselt ein Fahrer das Team, zählen seine Punkte je Rennen fürs gefahrene Team oder ganz fürs neue. */}
             <SelectField label="Teamwertung bei Wechseln" value={rules.team_mode || "per_race"} onChange={(v) => set("team_mode", v)} options={TEAM_MODE_OPTIONS} testId="series-rules-team-mode"
               hint="Gibt es die Teamwertung des Veranstalters, gilt sie – beim Eintragen einfügen." />
+            {/* #1960: „Ersatzfahrer“ & Co. zählen für kein Team - auch nicht fürs Standard-Team des Fahrers. */}
+            <TextField label="Kein Team (Ersatz)" value={rules.team_no_team_names ?? ""} onChange={(v) => set("team_no_team_names", v)} placeholder="Ersatzfahrer" testId="series-rules-no-team-names"
+              hint="Steht so ein Eintrag als Team im Ergebnis, zählt die Fahrt für kein Team. Mehrere mit Komma trennen." />
           </FormGrid>
         )}
       </FormSection>

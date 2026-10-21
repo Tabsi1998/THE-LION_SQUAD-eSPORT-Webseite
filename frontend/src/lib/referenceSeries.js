@@ -86,6 +86,8 @@ export function rulesToForm(rules = {}) {
     team_guests_count: team.guests_count !== false,
     // #1960: Teamwertung je Rennen (Vorgabe) oder nach aktueller Besetzung; Mindestzahl am Start je Termin.
     team_mode: team.mode || "per_race",
+    // Einträge „kein Team“ (Ersatzfahrer) als Text, je Name durch Komma getrennt; ohne Angabe die Vorgabe des Servers.
+    team_no_team_names: Array.isArray(team.no_team_names) ? team.no_team_names.join(", ") : "Ersatzfahrer",
     min_participants: text(rules.min_participants),
     match_win: text(match.win ?? 3),
     match_draw: text(match.draw ?? 1),
@@ -111,7 +113,11 @@ export function formToRules(form) {
     activity_points: { points: number(form.activity_points), from_round: number(form.activity_from_round, 1) },
     final_top_n: optional(form.final_top_n),
     tiebreakers: (form.tiebreakers || []).filter(Boolean),
-    team_scoring: { enabled: Boolean(form.team_enabled), counting_drivers: optional(form.team_counting_drivers), guests_count: Boolean(form.team_guests_count), mode: form.team_mode || "per_race" },
+    team_scoring: {
+      enabled: Boolean(form.team_enabled), counting_drivers: optional(form.team_counting_drivers), guests_count: Boolean(form.team_guests_count),
+      mode: form.team_mode || "per_race",
+      no_team_names: String(form.team_no_team_names ?? "Ersatzfahrer").split(/[,;\n]/).map((name) => name.trim()).filter(Boolean),
+    },
     min_participants: optional(form.min_participants),
     match_points: { win: number(form.match_win), draw: number(form.match_draw), loss: number(form.match_loss) },
     table_tiebreakers: (form.table_tiebreakers || []).filter(Boolean),

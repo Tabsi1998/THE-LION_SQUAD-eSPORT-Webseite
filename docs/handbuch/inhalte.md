@@ -759,10 +759,21 @@ einstellbar, nichts ist für eine Liga fest eingebaut:
   „Ohne Wertung · Zu wenig Fahrer – …“ – anders als **Abgesagt**, das nicht stattgefunden hat. Die Ergebnisseite der
   Runde zeigt den Lauf mit Grund und ohne Punkte, die Statistik der Saison zählt ihn nicht. **Mindestens am Start**
   (Regeln der Saison, Abschnitt „Was zählt“) lässt beim Eintragen einen Hinweis erscheinen, wenn weniger am Start sind.
+- **Ersatzfahrer:** Steht im Ergebnis als Team **Ersatzfahrer** (oder ein anderer Eintrag aus **Kein Team (Ersatz)** in
+  den Regeln der Saison), zählt die Fahrt für kein Team – auch nicht fürs Standard-Team des Fahrers – und die
+  Teamwertung hat keine Zeile „Ersatzfahrer“. Die Fahrerwertung bleibt, wie sie ist. Ein Team in der Zeile geht immer
+  vor; nur ohne Team zählt das Standard-Team, und das Ergebnisblatt sagt es an der Zeile („zählt für: Turbo
+  (Stammteam)“). Die Bild-Erkennung lässt „Ersatzfahrer“ stehen; eine leere Team-Zelle bleibt leer und gelb (oft steht
+  dort ein farbiges Schild, das beim Lesen wegfällt). Ein Team, das es in der Saison noch nicht gibt, bekommt beim
+  Prüfen einen Hinweis („Team „Team 2“ gibt es in dieser Saison noch nicht – meintest du …?“).
 - **Teamwertung bei Wechseln:** **Je Rennen für das gefahrene Team** (Vorgabe) oder **Aktuelle Besetzung: alle
-  Saisonpunkte der Fahrer, die jetzt im Team sind** – wer das Team wechselt, nimmt seine Punkte mit; wer die Liga
-  verlassen hat, zählt nicht mehr, sobald jemand seinen Platz übernimmt. Das Fahrer-Detail nennt nach einem Wechsel
-  **im Team seit R12**.
+  Saisonpunkte der Fahrer, die jetzt im Team sind** – wie beim Veranstalter: Die Zellen je Rennen zeigen das Team, für
+  das gefahren wurde (Ersatzfahrten für keines, „–“ ohne Fahrt). **Gesamt und Platz** sind die Saisonpunkte aller
+  Fahrer, deren aktuelles Team es ist – samt ihrer Ersatzfahrten und Abzüge, plus Team-Anpassungen. Aktuelles Team ist
+  das Team der letzten Fahrt, die kein Ersatz war; wer nie für ein Team gefahren ist, zählt fürs Standard-Team. Wer
+  ohne Fahrt umgesetzt wurde oder die Liga verlassen hat, bekommt am Teilnehmer **Aktuelles Team (von Hand)**
+  („Ersatzfahrer“ heißt: in keinem Team). Abweichungen zwischen Zellensumme und Gesamt sind dann gewollt, die Tabelle
+  sagt es. Das Fahrer-Detail nennt nach einem Wechsel **im Team seit R12**.
 - **Teamwertung laut Veranstalter:** Im Ergebnisblatt eines Rennens (Rennliga mit Teamwertung) steht **Teamwertung laut
   Veranstalter** – Teams mit Punkten eintragen oder mit **Einfügen** aus der Tabelle des Veranstalters übernehmen
   („1. Team A 123“). Ist sie da, gilt sie für Platz und Punkte der Teamwertung; die eigene Rechnung steht nur noch als

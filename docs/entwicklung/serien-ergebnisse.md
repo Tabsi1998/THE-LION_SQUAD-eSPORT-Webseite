@@ -212,11 +212,18 @@ Mehrere Runden an einem Termin (etwa TFT-Lobbys R1–R5), gerechnet in `services
   die schon gelten (mit Termin ab dessen Stand, sonst ab dem letzten gewerteten Termin an oder vor ihrem Tag), in
   `computed_points`; die Zeile trägt `adjustment_points` und `adjustments` (öffentlich Punkte, Grund, Tag, Termin).
   Fahrer-Anpassungen ändern die Teamwertung nicht und umgekehrt; wer nur eine Anpassung hat, steht in der Tabelle.
-- **Teamwertung:** `team_scoring.mode` `per_race` (Vorgabe) oder `current_lineup` (`series_standings._current_lineup`:
-  Team des letzten Rennens, je Team höchstens so viele Fahrer, wie es in einem Rennen am meisten am Start hatte, die
-  zuletzt gefahrenen). `official_team_totals` des letzten Blatts gilt für Platz und Punkte, auch für Teams, die nur dort
-  stehen (Vergleich ohne Groß/klein). Öffentlich `racing.teams.source` (`official`/`computed`) und je Fahrer
-  `team_since` (erstes Rennen der letzten Folge im aktuellen Team, nur nach einem Wechsel).
+- **Teamwertung:** Eine Fahrt zählt für das Team der Zeile, ohne Team für `default_team` des Teilnehmers
+  (`series_standings._ride_team`); ein Name aus `team_scoring.no_team_names` (Vorgabe `["Ersatzfahrer"]`, je Saison
+  einstellbar, Vergleich ohne Groß/klein und Leerraum, `scoring_rules.is_no_team`) zählt für kein Team und bekommt keine
+  Zeile. `team_scoring.mode` `per_race` (Vorgabe: Gesamt = Summe der Zellen) oder `current_lineup` (wie beim
+  Veranstalter: Zellen je Rennen weiter nach Team der Zeile; Gesamt = Saisonpunkte der Fahrerwertung aller Fahrer, deren
+  aktuelles Team es ist, plus Team-Anpassungen; `_current_teams`: Team der letzten Fahrt, die kein Ersatz war, sonst
+  `default_team`; `participant.current_team` von Hand geht vor, ein `no_team_names`-Eintrag dort heißt „kein Team“).
+  `official_team_totals` des letzten Blatts gilt für Platz und Punkte, auch für Teams, die nur dort stehen (Vergleich
+  ohne Groß/klein), nur der Vorstand schreibt es. Öffentlich `racing.teams.source` (`official`/`computed`) und je Fahrer
+  `team_since` (erstes Rennen der letzten Folge im aktuellen Team, nur nach einem Wechsel). Beim Prüfen eines Blatts
+  meldet `team_unknown` ein Team, das es in der Saison noch nicht gibt (eigene Teams, Standard-Teams, andere Blätter),
+  mit Vorschlag „meintest du …?“ bei ähnlichem Namen; still, solange die Saison noch kein Team kennt.
 - **Saison abgebrochen:** Status `cancelled` mit `cancelled_on` (leer = heute) und `cancel_reason`; ein anderer Status
   nimmt beides zurück. `successor_id` (andere, vorhandene Saison). Öffentlich `series.cancelled_on`, `.cancel_reason` und
   `successor` (nur sichtbar und nicht archiviert, mit Adressen); `season_link.cancelled` an Referenzen. Saison
@@ -317,8 +324,10 @@ Dienst) und landet als Zeilen im Blatt – gespeichert wird beim Lesen nichts, a
   beide Lesungen Zeichen für Zeichen gleich und je für sich sicher sind - oder der Abgleich sie sicher einem
   Teilnehmer bzw. bekannten Team zuordnet und beide Lesungen dorthin zeigen (sonst gelb, `read` nennt beide).
   Abgeglichen wird unscharf mit den Teilnehmern der Saison (für den Vorstand auch über deren Aliase), Teams mit den
-  Standard-Teams; jeder Teilnehmer höchstens einmal - die Zeile, die ihn an eine andere verliert, ist gelb. Leere Zellen
-  in sonst gefüllten Spalten sind gelb, ein nie gelesener Platz ebenso.
+  Standard-Teams; jeder Teilnehmer höchstens einmal - die Zeile, die ihn an eine andere verliert, ist gelb. Ein Eintrag
+  aus `team_scoring.no_team_names` („Ersatzfahrer“) bleibt stehen und wird nie auf ein ähnliches Team gezogen. Leere
+  Zellen in sonst gefüllten Spalten sind gelb, ein nie gelesener Platz ebenso; eine leere Team-Zelle bleibt leer (kein
+  Vorschlag mit dem Standard-Team - oft war dort ein farbiges Schild, das die Vorbereitung entfernt).
 - **Kopf:** `track` (oberste Zeile ohne Beschriftung), `session {name, kind}` (Rennen, Sprint, Qualifying - nur ein
   Hinweis, bis es Läufe je Termin gibt, #1930), `pole` und `fastest_lap {name, time}`, `driver_of_the_day`; der Wert
   darf hinter oder unter der Beschriftung stehen. Passt die Strecke zu einem anderen Termin der Saison, nennt die

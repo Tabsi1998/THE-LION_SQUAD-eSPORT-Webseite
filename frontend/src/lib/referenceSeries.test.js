@@ -15,7 +15,7 @@ const RULES = {
   activity_points: { points: 1, from_round: 3 },
   final_top_n: 8,
   tiebreakers: ["countback", "latest_result"],
-  team_scoring: { enabled: true, counting_drivers: 2, guests_count: true, mode: "current_lineup" },
+  team_scoring: { enabled: true, counting_drivers: 2, guests_count: true, mode: "current_lineup", no_team_names: ["Ersatzfahrer", "Reserve"] },
   min_participants: 8,
   match_points: { win: 3, draw: 1, loss: 0 },
   table_tiebreakers: ["score_diff"],

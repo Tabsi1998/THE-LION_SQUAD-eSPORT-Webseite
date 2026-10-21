@@ -85,6 +85,8 @@ test("Teamwertung: Quelle laut Veranstalter, Modus und Prüfhinweis zur eigenen 
   const source = await screen.findByTestId("racing-team-source");
   expect(source).toHaveTextContent("Quelle laut Veranstalter (nach R2) · Modus Aktuelle Besetzung: alle Saisonpunkte der Fahrer, die jetzt im Team sind");
   expect(within(source).getByTestId("racing-team-deviations")).toHaveTextContent("Probe Löwen: laut Veranstalter 30, berechnet 26 (+4)");
+  // Aktuelle Besetzung: Gesamt sind die Saisonpunkte der aktuellen Fahrer - die Zellen zeigen, wofür gefahren wurde.
+  expect(within(source).getByTestId("racing-team-lineup-note")).toHaveTextContent("Gesamt = Saisonpunkte der aktuellen Fahrer (wie beim Veranstalter)");
 });
 
 test("Teamwertung „keine“: kein leerer Teamreiter", async () => {

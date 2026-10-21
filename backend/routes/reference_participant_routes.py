@@ -44,7 +44,7 @@ router = APIRouter(prefix="/api/reference-series", tags=["reference-series"],
 MAX_BATCH = 200
 # Diese Felder ändert nur das Zuordnen - so bleibt jede Verknüpfung bestätigt und im Protokoll.
 LINK_FIELDS = {"link", "profile_id", "guest_name", "is_club_member"}
-PARTICIPANT_NULLABLE = {"start_number", "default_team"}
+PARTICIPANT_NULLABLE = {"start_number", "default_team", "current_team"}  # current_team: #1960
 
 
 class ParticipantBatch(BaseModel):

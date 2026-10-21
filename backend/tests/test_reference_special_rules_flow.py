@@ -483,6 +483,37 @@ async def test_cancelling_and_reinstating_a_season_is_logged_with_reason_and_suc
     assert actions.count("reference_series.cancel") == 1 and actions.count("reference_series.cancel_undo") == 1
 
 
+# ---------------------------------------------------------------- Ersatzfahrer
+@pytest.mark.asyncio
+async def test_substitutes_keep_their_entry_and_new_team_names_are_flagged(flow):
+    """Ein Ersatzfahrer bleibt im Blatt „Ersatzfahrer“ und zählt für kein Team; ein Team, das es in der Saison noch nicht
+    gibt, bekommt beim Prüfen einen Hinweis - mit Vorschlag, wenn ein bekanntes ähnlich heißt."""
+    await _board(flow)
+    lineage = await _lineage(flow)
+    series = await _season(flow, lineage)
+    rounds = await _rounds(flow, series, "R1")
+    await flow.db.reference_participants.insert_many([
+        {"series_id": series["id"], "is_club_member": False, "name_hidden": False, **person} for person in PEOPLE])
+    url = f"{ADMIN}/series/{series['id']}/rounds/{rounds['R1']}/results"
+    rows = [{"participant_id": "p-lion1", "place": 1, "team": "Ersatzfahrer"},
+            {"participant_id": "p-lion2", "place": 2, "team": "Probe Loewen"},
+            {"participant_id": "p-ext1", "place": 3, "team": "Team 2"},
+            {"participant_id": "p-ext2", "place": 4}]
+    preview = await flow.post(f"{url}/preview", json={"rows": rows})
+    assert preview.status_code == 200, preview.text
+    unknown = {tuple(item["rows"]): item["message"] for item in preview.json()["warnings"]
+               if item["code"] == "team_unknown"}
+    assert unknown == {(1,): "Team „Probe Loewen“ gibt es in dieser Saison noch nicht – meintest du „Probe Löwen“?",
+                       (2,): "Team „Team 2“ gibt es in dieser Saison noch nicht"}
+    saved = await flow.put(url, json={"rows": rows, "status": "published", "expected_version": 0})
+    assert saved.status_code == 200, saved.text
+    assert saved.json()["sheet"]["rows"][0]["team"] == "Ersatzfahrer"
+    teams = (await _page(flow, lineage, series))["racing"]["teams"]["rows"]
+    assert "Ersatzfahrer" not in {row["team"] for row in teams}
+    # Lion Eins zählt als Ersatzfahrer nicht für die Löwen, Fremd Zwei ohne Team fürs Stammteam.
+    assert {row["team"]: row["points"] for row in teams} == {"Probe Loewen": 6, "Team 2": 4, "Fremd Rot": 3}
+
+
 # ---------------------------------------------------------------- Termin ohne Wertung
 @pytest.mark.asyncio
 async def test_a_round_without_score_has_a_public_reason_and_too_few_starters_warn(flow):

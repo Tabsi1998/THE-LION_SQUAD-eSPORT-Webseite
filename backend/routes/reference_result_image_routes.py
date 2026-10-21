@@ -56,6 +56,7 @@ from services import result_image_match, result_image_ocr, result_image_template
 from services.image_upload import MAX_BYTES, MAX_IMAGE_UPLOAD_MB
 from services.rate_limit import enforce_rate_limit, keyed_subject
 from services.reference_series_access import SeriesAccess, require_series_editor
+from services.scoring_rules import normalize_rules
 from services.series_identity import normalize_name
 from services.series_participants import series_game_id
 
@@ -120,6 +121,14 @@ async def _body(request: Request) -> bytes:
             raise HTTPException(413, result_image_ocr.TOO_LARGE)
         chunks.append(chunk)
     return b"".join(chunks)
+
+
+def _no_team_names(series: dict) -> list[str]:
+    """Einträge „kein Team“ der Saison (#1960, etwa „Ersatzfahrer“) - sie bleiben beim Lesen stehen."""
+    try:
+        return normalize_rules(series.get("rules") or {})["team_scoring"]["no_team_names"]
+    except ValueError:
+        return normalize_rules({})["team_scoring"]["no_team_names"]
 
 
 async def _aliases(db, series: dict, participants: list[dict]) -> list[dict]:
@@ -248,7 +257,8 @@ async def read_result_image(series_id: str, round_id: str, request: Request,
 
     participants = await db.reference_participants.find({"series_id": series_id}, PARTICIPANT_FIELDS).to_list(None)
     aliases = await _aliases(db, access.series, participants) if access.is_board else []
-    built = result_image_match.build(reading, template, participants, aliases=aliases)
+    built = result_image_match.build(reading, template, participants, aliases=aliases,
+                                     no_team_names=_no_team_names(access.series))
     logger.info("[result-image] read %s rows (%s uncertain) in %.1fs", len(built["rows"]), built["uncertain_rows"],
                 time.monotonic() - started)
     if not built["rows"]:

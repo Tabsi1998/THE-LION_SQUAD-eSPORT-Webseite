@@ -1,8 +1,19 @@
 import { describe, expect, test } from "vitest";
 import {
   adjustmentErrors, adjustmentLine, adjustmentPayload, adjustmentSum, adjustmentText, adjustmentTitle, adjustmentToForm, cancelledText, emptyAdjustment,
-  noScoreText, parseTeamTotals, ruleChangeLines, successorLink, teamDeviationText, teamModeLabel, teamSinceLabel, teamSourceLabel, teamTotalsObject,
+  noScoreText, parseTeamTotals, ruleChangeLines, successorLink, teamDeviationText, teamFallbackText, teamModeLabel, teamSinceLabel, teamSourceLabel,
+  teamTotalsObject,
 } from "@/lib/seriesSpecialRules";
+
+test("Ergebnisblatt: ohne Team zählt die Zeile sichtbar fürs Stammteam, „Ersatzfahrer“ für keines (#1960)", () => {
+  const scoring = { enabled: true, no_team_names: ["Ersatzfahrer"] };
+  const people = [{ id: "p1", name: "Chris Probe", default_team: "Turbo Probe" }];
+  expect(teamFallbackText({ participant_id: "p1", team: "" }, people, scoring)).toBe("zählt für: Turbo Probe (Stammteam)");
+  expect(teamFallbackText({ participant_id: "", name: "chris  probe", team: "" }, people, scoring)).toBe("zählt für: Turbo Probe (Stammteam)");
+  expect(teamFallbackText({ participant_id: "p1", team: " ersatzfahrer " }, people, scoring)).toBe("zählt für kein Team (Ersatz)");
+  expect(teamFallbackText({ participant_id: "p1", team: "Löwen Probe" }, people, scoring)).toBe("");
+  expect(teamFallbackText({ participant_id: "p1", team: "" }, people, { enabled: false })).toBe("");
+});
 
 // Sonderregeln einer Rennliga (#1960) - nur erfundene Namen.
 const ROUNDS = [

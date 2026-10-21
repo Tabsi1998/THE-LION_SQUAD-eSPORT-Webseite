@@ -447,8 +447,10 @@ def _row_marks(row: dict[str, Decision]) -> list[str]:
     return marks
 
 
-def build(reading: Reading, template: dict, participants: list[dict], *, aliases: list[dict] | None = None) -> dict:
-    """Die Antwort für die Oberfläche (siehe ``routes/reference_result_image_routes.py``)."""
+def build(reading: Reading, template: dict, participants: list[dict], *, aliases: list[dict] | None = None,
+          no_team_names: list[str] | None = None) -> dict:
+    """Die Antwort für die Oberfläche (siehe ``routes/reference_result_image_routes.py``). ``no_team_names``: Einträge
+    „kein Team“ der Saison (#1960, etwa „Ersatzfahrer“) - sie bleiben im Team-Feld stehen."""
     columns = {column["field"]: column for column in template["columns"]}
     min_conf = float(template.get("min_confidence", 80))
     name_match = float(template.get("name_match", 0.72))
@@ -488,7 +490,7 @@ def build(reading: Reading, template: dict, participants: list[dict], *, aliases
     out_rows = []
     for index, (row, match, raw) in enumerate(zip(rows, chosen, reading.rows)):
         out_rows.append(_row_out(index, row, match, teams, name_match, name_sure, team_match, raw=raw,
-                                 lost=index in lost))
+                                 lost=index in lost, no_team_names=no_team_names))
         out_rows[-1]["color"] = raw.color
     # Reichte das Zeitbudget nicht für die zweite Lesung einer Spalte, ist dort jede gelesene Zelle ungeprüft - gelb.
     for out, raw in zip(out_rows, reading.rows):
@@ -585,13 +587,18 @@ def _all_reads_say(texts: list[str], known: list[str], team: str, threshold: flo
 
 
 def _team_out(decision: Decision | None, match: dict | None, teams: list[str], team_match: float,
-              name_sure: float, texts: list[str] | None = None) -> tuple[str | None, bool]:
+              name_sure: float, texts: list[str] | None = None,
+              no_team_names: list[str] | None = None) -> tuple[str | None, bool]:
     """Das Team: ein bekanntes (zuerst das des Teilnehmers) ab ``team_match`` - gelb unter ``name_sure`` oder wenn die
     Lesungen (``texts``: Seite, Streifen) auf verschiedene Teams zeigen -, sonst wie gelesen. Teams sind wenige und
-    bekannt, darum reicht weniger Ähnlichkeit als bei Namen."""
+    bekannt, darum reicht weniger Ähnlichkeit als bei Namen. Ein Eintrag „kein Team“ (#1960, ``no_team_names``, etwa
+    „Ersatzfahrer“) bleibt, wie er dasteht - er wird nie aufs Stammteam oder ein ähnliches Team „korrigiert“."""
     if decision is None or not decision.text:
         return None, True
     read = decision.text
+    no_team = next((name for name in no_team_names or () if similarity(read, name) >= name_sure), None)
+    if no_team:
+        return no_team, decision.sure
     preferred = []
     own = match["candidate"].participant.get("default_team") if match else None
     if own:
@@ -608,7 +615,8 @@ def _team_out(decision: Decision | None, match: dict | None, teams: list[str], t
 
 
 def _row_out(index: int, row: dict[str, Decision], match: dict | None, teams: list[str], name_match: float,
-             name_sure: float, team_match: float, *, raw: RowReading | None = None, lost: bool = False) -> dict:
+             name_sure: float, team_match: float, *, raw: RowReading | None = None, lost: bool = False,
+             no_team_names: list[str] | None = None) -> dict:
     uncertain: list[str] = []
     read: dict[str, str] = {}
 
@@ -669,11 +677,12 @@ def _row_out(index: int, row: dict[str, Decision], match: dict | None, teams: li
 
     team_texts = [read_.text for read_ in ((raw.cells.get("team"), raw.strips.get("team")) if raw else ())
                   if read_ and read_.text.strip()]
-    team, team_sure = _team_out(row.get("team"), match, teams, team_match, name_sure, team_texts)
+    team, team_sure = _team_out(row.get("team"), match, teams, team_match, name_sure, team_texts, no_team_names)
     team_cell = row.get("team")
     if team_cell is not None and not team_cell.raw and not team_cell.sure:
-        # Leere Zelle in einer Spalte, die sonst Teams hat: das Team des Teilnehmers vorschlagen - gelb.
-        team = (match["candidate"].participant.get("default_team") if match else None) or None
+        # Leere Zelle in einer Spalte, die sonst Teams hat (#1960): gelb, aber leer - kein Stammteam vorschlagen. Oft
+        # steht dort ein farbiges Schild wie „Ersatzfahrer“, das beim Lesen wegfällt; das Stammteam wäre dann falsch.
+        team = None
         team_sure = False
     out["team"] = team
     if team_cell is not None:

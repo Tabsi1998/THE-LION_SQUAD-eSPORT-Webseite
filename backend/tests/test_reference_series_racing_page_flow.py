@@ -112,7 +112,7 @@ async def test_racing_page_has_the_stored_team_standings_with_drivers_per_race(f
 
     racing = body["racing"]
     assert racing["team_scoring"] == {"enabled": True, "counting_drivers": 2, "guests_count": True,
-                                      "mode": "per_race"}
+                                      "mode": "per_race", "no_team_names": ["Ersatzfahrer"]}
     teams = racing["teams"]
     assert teams["round_id"] == rounds["R2"]
     assert [(row["key"], row["team"], row["rank"], row["points"], row["previous_rank"]) for row in teams["rows"]] == [

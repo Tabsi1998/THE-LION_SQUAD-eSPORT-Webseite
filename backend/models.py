@@ -1897,6 +1897,9 @@ class ReferenceParticipantUpdate(BaseModel):
     name: Optional[str] = Field(default=None, min_length=1, max_length=120)
     start_number: Optional[str] = Field(default=None, max_length=10)
     default_team: Optional[str] = Field(default=None, max_length=120)
+    # #1960: aktuelles Team von Hand (Teamwertung „aktuelle Besetzung“) - geht der letzten Fahrt vor; „Ersatzfahrer“
+    # bzw. ein anderer Eintrag „kein Team“ heißt: in keinem Team.
+    current_team: Optional[str] = Field(default=None, max_length=120)
     kind: Optional[ReferenceParticipantKind] = None
     link: Optional[ReferenceParticipantLink] = None
     profile_id: Optional[str] = None

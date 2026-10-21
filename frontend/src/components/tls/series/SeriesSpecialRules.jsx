@@ -2,8 +2,8 @@ import { Link } from "react-router-dom";
 import { AlertTriangle, ArrowRight } from "lucide-react";
 import { gridWords } from "@/lib/raceWeekend";
 import {
-  adjustmentDetail, adjustmentSum, adjustmentText, adjustmentTitle, cancelledText, noScoreText, ruleChangeLines, successorLink, teamDeviationText, teamModeLabel,
-  teamSourceLabel,
+  LINEUP_TOTAL_TEXT, adjustmentDetail, adjustmentSum, adjustmentText, adjustmentTitle, cancelledText, noScoreText, ruleChangeLines, successorLink,
+  teamDeviationText, teamModeLabel, teamSourceLabel,
 } from "@/lib/seriesSpecialRules";
 
 // Sonderregeln einer Saison (#1960) auf der Serienseite: Hinweis „Saison abgebrochen“ mit Nachfolger, Regeländerungen
@@ -92,6 +92,8 @@ export function TeamSource({ teams, scoring, rounds = [] }) {
         <span className="text-white/45">Quelle </span>{teamSourceLabel(teams, rounds)}
         <span className="text-white/45"> · Modus </span>{teamModeLabel(scoring)}
       </p>
+      {/* Aktuelle Besetzung (#1960): Gesamt und Zellensumme weichen gewollt voneinander ab - so sagt es die Tabelle. */}
+      {scoring?.mode === "current_lineup" && <p className="mt-1 text-[12px] text-white/55" data-testid="racing-team-lineup-note">{LINEUP_TOTAL_TEXT}</p>}
       {deviations.length > 0 && (
         <details className="mt-1 text-white/55" data-testid="racing-team-deviations">
           <summary className="cursor-pointer text-[12px] hover:text-white">{`Eigene Rechnung weicht bei ${deviations.length === 1 ? "einem Team" : `${deviations.length} Teams`} ab`}</summary>
