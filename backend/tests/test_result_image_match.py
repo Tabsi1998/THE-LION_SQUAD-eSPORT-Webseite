@@ -30,7 +30,7 @@ def row(place="", number="", name="", team="", grid="", time="", gap="", *, stri
         ("gap", gap), ("points", points)) if value}
     out = RowReading(cells=cells, strips={key: r(value) if isinstance(value, str) else value
                                           for key, value in (strips or {}).items()})
-    out.alts = {key: r(value) for key, value in (alts or {}).items()}
+    out.alts = {key: r(value) if isinstance(value, str) else value for key, value in (alts or {}).items()}
     return out
 
 
@@ -332,6 +332,32 @@ def test_a_check_confirms_only_the_one_reading_it_supports():
     place = build(reading(row("1"), row("2"), row("5", strips={"place": "5"}, alts={"place": "3"}), row("4")),
                   TEMPLATE, [])
     assert (place["rows"][2]["place"], place["rows"][2]["uncertain"]) == (3, [])
+
+
+def test_a_reading_of_another_kind_is_a_contradiction():
+    """Codex zu #1981: Seite und Streifen lesen Platz 2, die dritte Lesung „DNF“ - die Reihenfolge stützt zwar die 2,
+    aber die Ausfall-Marke widerspricht: gelb. Ebenso in der ersten Zeile (Platz 1 aus der Reihenfolge) und bei „DNF“
+    statt einer Zeit oder „+1 Runde“ statt eines Abstands."""
+    place = build(reading(row("1"), row("2", strips={"place": "2"}, alts={"place": "DNF"}), row("3"), row("4")),
+                  TEMPLATE, [])
+    assert (place["rows"][1]["place"], place["rows"][1]["uncertain"]) == (2, ["place"])
+    first = build(reading(row("1", strips={"place": "1"}, alts={"place": "DNF"}), row("2"), row("3"), row("4")),
+                  TEMPLATE, [])
+    assert (first["rows"][0]["place"], first["rows"][0]["uncertain"]) == (1, ["place"])
+    for alts, field in (({"time": "DNF"}, "time"), ({"gap": "+1 Runde"}, "gap")):
+        second = row("2", time="1:32,134", gap="+0,364", strips={"time": "1:32,134", "gap": "+0,364"}, alts=alts)
+        out = build(reading(row("1", time="1:31,770"), second, row("3", time="1:32,754", gap="+0,984")), TEMPLATE, [])
+        assert field in out["rows"][1]["uncertain"], alts
+
+
+def test_an_unsure_third_reading_does_not_contradict():
+    """Codex zu #1981: Die dritte Lesung widerspricht nur, wenn sie sicher genug ist (``min_confidence``). Eine
+    unsichere „33“ neben zweimal „35“ ist Rauschen - grün; eine sichere „33“ bleibt ein Widerspruch (3/5) - gelb."""
+    assert decide("number", r("35"), r("35"), 80, alt=r("33", 50)).sure is True
+    assert decide("number", r("35"), r("35"), 80, alt=r("33", 80)).sure is False
+    noisy = row("1", "35", "Neu Name", strips={"start_number": "35"}, alts={"start_number": r("33", 50)})
+    unsure = build(reading(noisy, row("2"), row("3")), TEMPLATE, [])
+    assert unsure["rows"][0]["uncertain"] == []
 
 
 def test_lines_and_unlabelled_points_never_become_points():

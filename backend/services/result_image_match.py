@@ -131,12 +131,15 @@ def _exact(text: str) -> str:
 def decide(kind: str, page: Read | None, strip: Read | None, min_conf: float, *, fmt: TimeFormat | None = None,
            alt: Read | None = None) -> Decision:
     """Ein Wert aus Seiten- und Streifenlesung (siehe Modultext). Ziffern haben eine dritte Lesung ``alt`` (anders
-    vorbereitet): sagt sie etwas anderes - etwa 5 statt 3 -, ist die Zelle gelb, nie still falsch."""
+    vorbereitet): sagt sie sicher genug (``min_conf``) etwas anderes - etwa 5 statt 3 -, ist die Zelle gelb, nie still
+    falsch. Eine unsichere dritte Lesung ist Rauschen und zählt nicht."""
     decision = _decide_two(kind, page, strip, min_conf, fmt)
     if kind not in DIGIT_KINDS:
         return decision
     for read, is_page in ((page, True), (strip, False), (alt, False)):
         if read is None or not read.text.strip() or is_noise(read.text):
+            continue
+        if read is alt and read.conf < min_conf:
             continue
         parsed = _parse(kind, read, page=is_page, fmt=fmt)
         if parsed is not None and all(_display(parsed) != _display(item) for item in decision.options):
@@ -156,9 +159,10 @@ def _take(decision: Decision, parsed) -> None:
 
 def _settle(decision: Decision, kind: str, fits) -> None:
     """Gegenprobe für eine Zelle: stützt sie genau eine ihrer Lesungen, gilt diese - grün; stützt sie keine oder mehrere
-    (die Lesungen widersprechen sich und die Probe entscheidet nicht), ist die Zelle gelb."""
+    (die Lesungen widersprechen sich und die Probe entscheidet nicht), ist die Zelle gelb. Sagt eine Lesung etwas ganz
+    anderes (ein „DNF“ statt eines Platzes, „+1 Runde“ statt einer Zeit), bleibt das ein Widerspruch - gelb."""
     matching = [item for item in _options(decision, kind) if fits(item[1])]
-    if len(matching) == 1:
+    if len(matching) == 1 and not _foreign(decision, kind):
         _take(decision, matching[0])
         decision.sure = True
     else:
@@ -167,6 +171,11 @@ def _settle(decision: Decision, kind: str, fits) -> None:
 
 def _options(decision: Decision | None, kind: str) -> list:
     return [item for item in decision.options if item[0] == kind] if decision is not None else []
+
+
+def _foreign(decision: Decision | None, kind: str) -> bool:
+    """Liest eine der Lesungen einen Wert anderer Art (Marke, Runden, Platzhalter) als die Probe prüft?"""
+    return decision is not None and any(item[0] != kind for item in decision.options)
 
 
 def _confirm(decision: Decision | None) -> None:
@@ -299,7 +308,7 @@ def _check_places(rows: list[dict[str, Decision]]) -> None:
         index = off[0]
         place = ranked[index]
         taken = place.value in {item.value for item in ranked if item is not place}
-        if index == 0 and start == 1:
+        if index == 0 and start == 1 and not _foreign(place, "place"):  # liest eine Lesung „DNF“, bleibt es gelb
             place.value, place.text, place.mark, place.sure = 1, "1", None, True
         elif place.value is None or taken:
             place.value, place.text, place.mark, place.sure = start + index, str(start + index), None, False
@@ -366,10 +375,13 @@ def _check_times(rows: list[dict[str, Decision]]) -> None:
         gap_seconds = gap.value[1] if gap and isinstance(gap.value, tuple) else None
         if gap_seconds is not None:
             # Zeit = Zeit des Siegers + Abstand. Widersprechen sich Lesungen (etwa 3/5), bestätigt die Probe nur ein
-            # Paar, das als einziges passt - sonst bleiben Zeit und Abstand gelb.
+            # Paar, das als einziges passt - sonst bleiben Zeit und Abstand gelb. Liest eine Lesung etwas anderer Art
+            # („DNF“, „+1 Runde“, ein Platzhalter), ist das ein Widerspruch, den die Probe nicht auflöst.
             pairs = [(one, two) for one in _options(time, "time") for two in _options(gap, "gap")
                      if two[1][1] is not None and abs(leader + two[1][1] - one[1][0]) <= TIME_TOLERANCE]
-            if len(pairs) == 1:
+            other_kind = _foreign(time, "time") or _foreign(gap, "gap") or any(
+                item[1][1] is None for item in _options(gap, "gap"))
+            if len(pairs) == 1 and not other_kind:
                 _take(time, pairs[0][0])
                 _take(gap, pairs[0][1])
                 time.sure = gap.sure = True
