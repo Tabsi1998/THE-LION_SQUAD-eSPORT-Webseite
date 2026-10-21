@@ -10,7 +10,7 @@ from services.permissions import is_confirmed_admin_role
 from services.visibility import user_can_see, filter_visible
 from services.content_embed_service import resolve_content_embeds
 from services.news_cards import attach_result_winners, event_signups, tournament_signups
-from services.sponsor_utils import dedupe_public_sponsors, public_sponsor_view
+from services.sponsor_utils import dedupe_public_sponsors, drop_legacy_logo_fields, public_sponsor_view
 from services import partner_pages, sponsor_images
 from services.notification_preferences import enqueue_newsletter_for_item
 from services.user_notifications import create_user_notification
@@ -810,6 +810,7 @@ async def admin_list_sponsors(me: dict = Depends(require_area("content"))):
     sp = await db.sponsors.find({}, {"_id": 0}).to_list(500)
     for s in sp:
         _sponsor_defaults(s)
+        drop_legacy_logo_fields(s)
         # Bilder aus Dolibarr (#880): welche Fassungen da sind und was die Website zeigt - der Upload bleibt der Rückfall.
         s["dolibarr_image_summary"] = sponsor_images.admin_summary(s)
     sp.sort(key=lambda s: (_TIER_ORDER.get(s["tier"], 99), s.get("order_index") or 0, s.get("name") or ""))
@@ -1365,6 +1366,7 @@ async def admin_list_partners(me: dict = Depends(require_area("content"))):
     partners.sort(key=lambda p: (p.get("order_index") or 0, p.get("name") or ""))
     rows = [await _ensure_partner_slug(db, p) for p in partners]
     for row in rows:
+        drop_legacy_logo_fields(row)
         row["dolibarr_image_summary"] = sponsor_images.admin_summary(row)
     return rows
 

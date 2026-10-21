@@ -16,7 +16,17 @@ def sponsor_public_key(sponsor: dict) -> str:
 PRIVATE_SPONSOR_FIELDS = frozenset({
     "contact_name", "contact_email", "contact_phone", "internal_notes", "dolibarr_id", "dolibarr_seen_at",
     "dolibarr_gone_at", "contract_start", "contract_end", "contract_status", "created_at", "updated_at",
+    # Weiße Logo-Fassung (#1321) ist zurückgenommen: alte Felder in der Datenbank gehen nicht mehr hinaus.
+    "logo_mono_url", "logo_transparent",
 })
+LEGACY_LOGO_FIELDS = ("logo_mono_url", "logo_transparent")
+
+
+def drop_legacy_logo_fields(doc: dict) -> dict:
+    """Alte Felder der weißen Logo-Fassung (#1321) aus einer Antwort nehmen."""
+    for key in LEGACY_LOGO_FIELDS:
+        doc.pop(key, None)
+    return doc
 
 
 def public_sponsor_view(sponsor: dict) -> dict:
