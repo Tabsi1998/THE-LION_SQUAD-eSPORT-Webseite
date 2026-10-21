@@ -57,9 +57,10 @@ und `driver_of_the_day` – nur, wo angegeben.
 - Mehrere eigene Teams am selben Spieltag: jedes Spiel eines eigenen Teams zählt (Karte, Bilanz, Form, Einsätze);
   `matchdays[].matches` listet sie, `match` bleibt das erste.
 - Mit `official_table` gilt sie für Teams und Plätze: Teams aus den Spielen in anderer Schreibweise zählen für ihre
-  Zeile (wörtlich, gleiche Normalform oder eindeutiger Anfang, `services/team_names.py`), ohne passende Zeile bekommen
-  sie keine eigene (Warnung `table_team_unknown`); offizielle Plätze werden nie neu gerechnet, Teams ohne Platz stehen
-  dahinter nach Punkten.
+  Zeile (wörtlich, gleiche Normalform oder – eindeutig – dieselben ganzen Wörter plus Zusätze wie „e.V.“, „eSports“,
+  „Gaming“ oder ein Kürzel in Klammern, in beide Richtungen; „Team A“ ist nicht „Team Alpha“, `services/team_names.py`),
+  ohne passende Zeile bekommen sie keine eigene (Warnung `table_team_unknown`); offizielle Plätze werden nie neu
+  gerechnet, Teams ohne Platz stehen dahinter nach Punkten.
 - GET liefert dazu `series.own_team_list` (eigene Teams samt Schreibweisen) und `series.map_names` (schon verwendete
   Map-Namen der Saison, häufigste zuerst). Der Kader eines eigenen Teams sind die Teilnehmer mit diesem `default_team`
   (`participants/batch` mit `team`).

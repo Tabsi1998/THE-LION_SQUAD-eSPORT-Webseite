@@ -61,6 +61,20 @@ def test_alignment_maps_only_clear_spellings():
     assert unclear == ["Gegner", "Fremd Team"]
 
 
+def test_a_longer_name_fits_only_over_whole_words_and_known_additions():
+    """Codex Runde 2 (#1931): der Anfang endet an einer Wortgrenze, der Rest sind nur Zusätze wie Rechtsform,
+    „eSports“, „Gaming“ oder ein Kürzel in Klammern - in beide Richtungen. „Team A“ ist nicht „Team Alpha“."""
+    mapping, unclear = align_to_table(["Team A", "Probe Löwen (TLS)", "Probe Wölfe eSports", "Probe Eulen Gaming e. V.",
+                                       "Gegner B", "Probe Adler Nord"],
+                                      ["Team Alpha", "Probe Löwen", "Probe Wölfe", "Probe Eulen", "Gegner B e.V.",
+                                       "Probe Adler"])
+    assert mapping == {"Probe Löwen (TLS)": "Probe Löwen", "Probe Wölfe eSports": "Probe Wölfe",
+                       "Probe Eulen Gaming e. V.": "Probe Eulen", "Gegner B": "Gegner B e.V."}
+    assert unclear == ["Team A", "Probe Adler Nord"]
+    # Passt der Name über Zusätze zu zwei Zeilen, ist er unklar.
+    assert align_to_table(["Gegner B"], ["Gegner B e.V.", "Gegner B Gaming"]) == ({}, ["Gegner B"])
+
+
 def test_the_sheet_check_names_teams_that_fit_no_table_row():
     rules = normalize_rules({"points_mode": "organizer"})
     out = resolve({"matches": [
