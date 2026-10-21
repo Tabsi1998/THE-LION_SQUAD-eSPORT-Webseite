@@ -84,6 +84,14 @@ test("Pole aus dem Kopf des Bilds wird Marke an der Zeile; unsicherer Fahrer mac
   ]);
 });
 
+test("in einem Lauf ohne Punkte gehen gelesene Punkte nie ins Blatt (#1981)", () => {
+  const read = { ...RESULT, rows: [{ ...RESULT.rows[0], points: 1, uncertain: ["points"] }, { ...RESULT.rows[1], points: 1, uncertain: [] }] };
+  const rows = imageToRows(read, PARTICIPANTS, { points: false });
+  expect(rows.map((row) => row.points)).toEqual(["", ""]);
+  expect(rows[0].ocr).toBeNull();
+  expect(imageToRows(read, PARTICIPANTS).map((row) => row.points)).toEqual(["1", "1"]);
+});
+
 test("ein nicht gelesener Platz ist immer gelb – die Reihenfolge, die das Blatt einsetzt, ist nur geschätzt", () => {
   const rows = imageToRows({ ...RESULT, rows: [
     { ...RESULT.rows[0], place: null, uncertain: [] },

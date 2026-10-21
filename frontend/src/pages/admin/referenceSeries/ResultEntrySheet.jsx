@@ -358,6 +358,10 @@ export function ResultEntrySheet({ series, round, onClose, onSaved }) {
   const organizerMode = rules.points_mode === "organizer";
   // Qualifying (#1930): Zeit statt Punkte, ohne schnellste Runde und Fahrer des Tages.
   const qualifying = kind === "racing" && roundKind(data?.round || round) === "qualifying";
+  // Ein Lauf ohne Punkte (#1981): zählt nicht zur Wertung oder sein Schema vergibt keine - gelesene Punkte aus einem Bild
+  // gehen dort nie ins Blatt (sonst „passen nicht zum Schlüssel“ in jeder Zeile).
+  const noPoints = data?.round?.counts === false
+    || (rules.points_mode !== "organizer" && !(rules.points_by_place || []).some((value) => Number(value) > 0));
   const access = data?.access || {};
   const board = access.role === "board";
   const participants = useMemo(() => data?.participants || [], [data]);
@@ -370,7 +374,7 @@ export function ResultEntrySheet({ series, round, onClose, onSaved }) {
     onRead: (result) => {
       // Schnellste Runde und Fahrer des Tages gehen in die Felder des Rennens (#1927); was das Bild nicht ersetzt,
       // bleibt – mit seiner gelben Markierung.
-      setForm((current) => ({ ...current, ...imageFormFields(result, current.raceOcr), rows: imageToRows(result, participants) }));
+      setForm((current) => ({ ...current, ...imageFormFields(result, current.raceOcr), rows: imageToRows(result, participants, { points: !noPoints }) }));
       setPasting(false);
       setCheckImage(true);
       // Teamfarben aus dem Bild (#1950): nur ein Vorschlag, übernommen wird er bei den Teamfarben der Saison.

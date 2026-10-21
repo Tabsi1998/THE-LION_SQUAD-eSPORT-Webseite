@@ -57,16 +57,17 @@ function sameDriver(head, row) {
 /**
  * Die gelesenen Zeilen als Formularzeilen. Die Pole wird Marke an der Zeile ihres Fahrers; schnellste Runde und Fahrer
  * des Tages sind Felder des Rennens (`imageFormFields`). Ein Ausfall ohne Platz bleibt ohne Platz. Zeiten wie im Blatt
- * angezeigt (Komma, #1981).
+ * angezeigt (Komma, #1981). `points: false` - ein Lauf ohne Punkte (Qualifying ohne Wertung, Schema ohne Punkte):
+ * gelesene Punkte gehen nie ins Blatt (#1981).
  */
-export function imageToRows(result, participants = []) {
+export function imageToRows(result, participants = [], { points: withPoints = true } = {}) {
   const pole = result?.pole;
   return (result?.rows || []).map((row) => {
     const known = row.participant_id
       ? participants.find((person) => person.id === row.participant_id) || null
       : matchParticipant(row.name, participants);
     const marks = [...(row.marks || [])];
-    const uncertain = (row.uncertain || []).filter((field) => SHOWN_FIELDS.includes(field));
+    const uncertain = (row.uncertain || []).filter((field) => SHOWN_FIELDS.includes(field) && (withPoints || field !== "points"));
     // Ohne gelesenen Platz setzt das Blatt die Reihenfolge ein – das ist geschätzt und bleibt gelb, bis jemand prüft.
     // Ein Ausfall (DNF, DNS, DSQ) hat keinen Platz.
     if (!row.place && !marks.some((mark) => OUT_MARKS.includes(mark)) && !uncertain.includes("place")) uncertain.push("place");
@@ -85,7 +86,7 @@ export function imageToRows(result, participants = []) {
       marks,
       start_number: row.start_number || "",
       // Punkte aus dem Bild gelten als „laut Veranstalter“ und werden gegen den Schlüssel geprüft.
-      points: row.points === null || row.points === undefined ? "" : String(row.points),
+      points: !withPoints || row.points === null || row.points === undefined ? "" : String(row.points),
       grid: row.grid === null || row.grid === undefined ? "" : String(row.grid),
       time: formatRaceTime(row.time),
       gap: formatRaceTime(row.gap),

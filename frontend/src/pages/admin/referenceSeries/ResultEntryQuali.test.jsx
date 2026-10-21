@@ -50,3 +50,23 @@ test("Qualifying: Zeit statt Punkte, keine Rennzusätze, Quali-Liste mit Time un
   expect(within(sheet).getAllByTestId("result-row-quali-time")[2]).toHaveValue("1:22,5");
 });
 
+test("Qualifying ohne Punkte (#1981): gelesene Punkte aus einem Bild gehen nicht ins Blatt", async () => {
+  apiMock.get.mockImplementation(async (url) => ({ data: url.endsWith("/image")
+    ? { template: { id: "rennliga-dunkel", name: "Rennliga-Ergebnis (dunkel)" }, available: true, max_mb: 50, formats: ["image/png"] }
+    : { round: ROUND, series: { id: "serie-1", kind: "racing", rules: { points_mode: "scheme", points_by_place: [] } },
+      access: { role: "board", can_publish: true }, version: 0, sheet: null, target: "sheet", participants: [] } }));
+  const read = {
+    template: { id: "rennliga-dunkel", name: "Rennliga-Ergebnis (dunkel)" }, uncertain_rows: 0, warnings: [],
+    rows: [1, 2].map((place) => ({ index: place - 1, place, dnf: false, marks: [], start_number: String(place), name: `Probe ${place}`,
+      participant_id: null, team: null, grid: null, time: `1:2${place}.000`, gap: place > 1 ? "+1.000" : null, points: 1, uncertain: [], read: {} })),
+  };
+  apiMock.post.mockImplementation(async (url) => ({ data: url.endsWith("/image") ? read
+    : { version: 0, target: "sheet", can_save: true, errors: [], warnings: [], rows: [], unknown_names: [], standings: null, final: null, latest: null } }));
+  render(<ResultEntrySheet series={SERIES} round={ROUND} onClose={() => {}} onSaved={() => {}} />);
+  const sheet = await screen.findByTestId("result-sheet");
+  fireEvent.change(await within(sheet).findByTestId("result-image-file"), { target: { files: [new File(["x"], "q.png", { type: "image/png" })] } });
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith(expect.stringContaining("/preview"), expect.anything()));
+  const body = apiMock.post.mock.calls.find(([url]) => url.endsWith("/preview"))[1];
+  expect(body.rows.map((row) => [row.time, row.points])).toEqual([["1:21.000", null], ["1:22.000", null]]);
+  expect(within(sheet).getAllByTestId("result-row-quali-time").map((input) => input.value)).toEqual(["1:21,000", "1:22,000"]);
+});
