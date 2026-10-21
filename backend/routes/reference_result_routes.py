@@ -29,8 +29,10 @@ Captains bekommen keine ``*_by``-Kennungen.
 **POST …/results/preview** - ändert nichts. Body (``ResultSheetInput``)::
 
     {rows: [{participant_id? | name?, start_number?, place?, team?, points?, points_source: "scheme"|"organizer"|
-             "manual", marks: ["dnf"|"dns"|"dsq"|"fastest_lap"|"pole"], penalty_points: 0, official_total?, note?,
-             grid?, time?, gap?, dnf?, penalty_seconds?}],
+             "manual", marks: ["dnf"|"dns"|"dsq"|"fastest_lap"|"pole"|"left"], penalty_points: 0, official_total?,
+             note?, grid?, time?, gap?, dnf?, penalty_seconds?, day_rounds?: [{place?, points?, lobby?} | null],
+             day_points?, partner?: {participant_id? | name?}, bonus_keys?: ["<Kennung>"]}],
+     double_up?: false,
      fastest_lap?: {participant_id? | name?, start_number?, time?}, driver_of_the_day?: "Name" | {participant_id? | name?},
      matches: [{home, away, home_score, away_score, maps: [{name, map_id?, role?, by?, home_score?, away_score?,
                                                             lineup?}],
@@ -43,7 +45,8 @@ Antwort::
 
     {round, access, version, sheet_status, has_pending_draft, target, can_save, errors: [Problem], warnings: [Problem],
      rows: [{index, participant_id, match, name, is_new, is_club_member*, place, team, marks, points, points_source,
-             scored: {points, base, bonus, penalty, source, participated}}],
+             scored: {points, base, bonus, penalty, source, participated}, partner_id, bonus_keys, bonus,
+             day_rounds: [{place?, points, lobby?} | null] | null, day_points}],
      matches, unknown_names: [{participant_id, name, start_number, team, rows, matches, auto_assigned*, alias*,
                                suggestions*}],
      club_members*: [{participant_id, name, profile_name}],
@@ -110,11 +113,13 @@ from pymongo.errors import DuplicateKeyError
 from database import get_db
 from match_rules import RESULT_MAX_SCORE
 from models import ReferencePointsSource, ReferenceResultMark, ReferenceResultStatus, _clock, new_id, now_utc
-from services import race_weekend, reference_running_cache, reference_series, series_identity, series_results
+from services import (
+    race_weekend, reference_running_cache, reference_series, series_identity, series_results, tournament_days,
+)
 from services.dolibarr_policy import club_today
 from services.own_teams import own_team_names, own_teams
 from services.reference_series_access import EDIT_PENDING_DRAFT, SeriesAccess, require_series_editor
-from services.scoring_rules import result_points, validate_sheet
+from services.scoring_rules import MAX_CUSTOM_BONUSES, MAX_DAY_ROUNDS, result_points, validate_sheet
 from services.series_participants import build_index, new_participant, remove_unused_new
 
 # Jeder schreibende Aufruf leert den Cache der laufenden Saisons (#1753, Startseite).
@@ -147,6 +152,14 @@ class ResultParticipantRef(BaseModel):
     start_number: Optional[str] = Field(default=None, max_length=10)
 
 
+class ResultDayRound(BaseModel):
+    """Eine Runde des Termins (#1961): Platz in der Lobby samt Bots, Punkte wie gelesen (gelten vor dem Platz) und
+    optional die Lobby."""
+    place: Optional[int] = Field(default=None, ge=1, le=100)
+    points: Optional[float] = Field(default=None, ge=-1000, le=1000, allow_inf_nan=False)
+    lobby: Optional[str] = Field(default=None, max_length=20)
+
+
 class ResultEntryRow(ResultParticipantRef):
     """Eine Zeile: Platz, Team in diesem Rennen, Punkte, Marken, Strafpunkte und der offizielle Gesamtstand nach der
     Runde (optional). Punkte bei „Punkte nach Schlüssel“: nur ``points_source`` „manual“ überschreibt den Schlüssel;
@@ -167,6 +180,18 @@ class ResultEntryRow(ResultParticipantRef):
     dnf: Optional[bool] = None
     # Zeitstrafe in Sekunden (#1950) - nur Anzeige in der Ergebnistabelle, ändert keine Punkte.
     penalty_seconds: Optional[float] = Field(default=None, ge=0, le=3600, allow_inf_nan=False)
+    # Turniertag (#1961): Runden des Termins, GES P laut Veranstalter, Partner im Double Up, Sonderboni.
+    day_rounds: List[Optional[ResultDayRound]] = Field(default_factory=list, max_length=MAX_DAY_ROUNDS)
+    day_points: Optional[float] = Field(default=None, ge=-10000, le=10000, allow_inf_nan=False)
+    partner: Optional[ResultParticipantRef] = None
+    bonus_keys: List[str] = Field(default_factory=list, max_length=MAX_CUSTOM_BONUSES)
+
+    @field_validator("bonus_keys")
+    @classmethod
+    def _bonus_keys(cls, value):
+        if any(len(str(key)) > 40 for key in value):
+            raise ValueError("Bonus-Kennung höchstens 40 Zeichen.")
+        return value
 
 
 class ResultFastestLap(ResultParticipantRef):
@@ -241,6 +266,7 @@ class ResultSheetInput(BaseModel):
     note: Optional[str] = Field(default=None, max_length=1000)
     fastest_lap: Optional[ResultFastestLap] = None  # #1927
     driver_of_the_day: Optional[ResultParticipantRef] = None  # #1927, auch nur als Name
+    double_up: bool = False  # #1961: Zweierteams teilen Platz und Punkte
 
     @field_validator("driver_of_the_day", mode="before")
     @classmethod
@@ -515,12 +541,16 @@ async def preview_results(series_id: str, round_id: str, body: ResultSheetInput,
         resolution.warnings.extend(official)
     rows = []
     for row in resolution.rows:
+        bonus, _ = tournament_days.bonus_points(row, rules)
         rows.append({
             **{key: row[key] for key in ("index", "participant_id", "match", "name", "place", "team", "marks",
-                                         "points", "points_source")},
+                                         "points", "points_source", "partner_id", "bonus_keys")},
             "is_new": series_results.is_new(row["participant_id"]),
             **({"is_club_member": row["participant_id"] in club} if club is not None else {}),
             "scored": result_points(row, rules) if row["participant_id"] else None,
+            # Turniertag (#1961): Punkte je Runde, Tagessumme und Sonderboni, wie sie zählen.
+            "day_rounds": tournament_days.rounds_with_points(row, rules) or None,
+            "day_points": tournament_days.day_total(row, rules), "bonus": bonus,
         })
     out = {
         "round": _round_view(round_doc), "access": access.summary(), "version": _version(existing),

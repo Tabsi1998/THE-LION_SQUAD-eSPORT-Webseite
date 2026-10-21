@@ -1579,7 +1579,7 @@ def _tier_order(value):
 ReferenceRoundKind = Literal["regular", "final"]
 ReferenceParticipantKind = Literal["person", "team"]
 ReferenceParticipantLink = Literal["member", "guest", "external"]
-ReferenceResultMark = Literal["dnf", "dns", "dsq", "fastest_lap", "pole"]
+ReferenceResultMark = Literal["dnf", "dns", "dsq", "fastest_lap", "pole", "left"]  # left: ausgestiegen (#1961)
 ReferencePointsSource = Literal["scheme", "organizer", "manual"]
 ReferenceResultStatus = Literal["draft", "published"]
 ReferenceStandingScope = Literal["drivers", "teams", "table"]
@@ -1720,6 +1720,7 @@ class ReferenceSeriesCreate(BaseModel):
     partner_roles: Dict[str, ReferencePartnerRole] = Field(default_factory=dict)
     result_image_template: Optional[str] = Field(default=None, max_length=60)  # #1756: Vorlage für Ergebnis-Bilder
     weekend: Optional[Dict[str, Any]] = None  # #1930: Ablauf je Runde, auch ab Runde X wechselnd
+    hide_name_tags: bool = False  # #1961: Namen öffentlich ohne Tag der Spielkennung („Name#TLS“ → „Name“)
 
     @field_validator("rules")
     @classmethod
@@ -1765,6 +1766,7 @@ class ReferenceSeriesUpdate(BaseModel):
     partner_roles: Optional[Dict[str, ReferencePartnerRole]] = None
     result_image_template: Optional[str] = Field(default=None, max_length=60)  # #1756: Vorlage für Ergebnis-Bilder
     weekend: Optional[Dict[str, Any]] = None
+    hide_name_tags: Optional[bool] = None  # #1961
 
     @field_validator("rules")
     @classmethod

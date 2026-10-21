@@ -27,6 +27,11 @@ Finalgrenze. Laden, Speichern und das Neurechnen der Stände machen die Routen (
   „eigenes Team fehlt“ kommt nur, wenn es in keinem Spiel spielt. Maps mit Rolle im Veto (Bann, Wahl, Decider,
   gespielt), wer, späterer Map-Kennung und Aufstellung je Map sowie der Termin des Spiels:
   ``services/team_league_sheet.py``. Der Abgleich Maps ↔ Ergebnis zählt nur gespielte Maps.
+- **Turniertag** (#1961, ``services/tournament_days.py``): je Zeile optional die Runden des Termins (``day_rounds``:
+  Platz in der Lobby samt Bots, Punkte wie gelesen, Lobby), die Tagessumme des Veranstalters (``day_points``, GES P),
+  der Partner im Double Up (``partner``: wer, muss in der Liste stehen - die Gegenseite bekommt ihn mit) und Sonderboni
+  (``bonus_keys``). Ohne Platz bestimmt die Tagessumme den Platz. Gleichstand (zweimal „4.“, danach „6.“) und Paare im
+  Double Up teilen ihren Platz ohne Meldung. Das Blatt merkt sich ``double_up``.
 
 Meldungen werden nur aus den Eingaben gebaut, nie aus Ausnahmen.
 """
@@ -35,16 +40,18 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass, field
 
-from services import series_identity, team_league_sheet, team_names
+from services import series_identity, team_league_sheet, team_names, tournament_days
 from services.own_teams import Matcher
 from services.scoring_rules import result_points
 
 NEW_PREFIX = "neu:"
 CONTENT_FIELDS = ("rows", "matches", "official_totals", "official_team_totals", "official_table", "note",
-                  "fastest_lap", "driver_of_the_day")
+                  "fastest_lap", "driver_of_the_day", "double_up")
 ROW_FIELDS = ("participant_id", "place", "team", "points", "points_source", "marks", "penalty_points", "note")
 # Angaben aus Veranstalter-Grafiken (#1927): nur gespeichert, wenn eingetragen. Strafsekunden (#1950) nur zur Anzeige.
 RACE_FIELDS = ("start_number", "grid", "time", "gap", "penalty_seconds")
+# Turniertag (#1961): nur gespeichert, wenn eingetragen.
+DAY_FIELDS = ("day_rounds", "day_points", "partner_id", "bonus_keys")
 TABLE_NUMBERS = ("played", "won", "drawn", "lost", "score_for", "score_against", "score_diff", "points")
 
 
@@ -126,6 +133,7 @@ class Resolution:
     note: str | None = None
     fastest_lap: dict | None = None  # {participant_id, time} (#1927)
     driver_of_the_day: str | None = None
+    double_up: bool = False  # #1961: Zweierteams teilen Platz und Punkte
     new_people: dict[str, dict] = field(default_factory=dict)  # Schlüssel → Name, Startnummer, Team, Zeilen
     errors: list[dict] = field(default_factory=list)
     warnings: list[dict] = field(default_factory=list)
@@ -133,14 +141,18 @@ class Resolution:
     def content(self) -> dict:
         """Das Blatt zum Speichern und Rechnen (Kennungen neuer Namen noch als ``neu:…``)."""
         rows = [{**{key: row[key] for key in ROW_FIELDS},
-                 **{key: row[key] for key in RACE_FIELDS if row.get(key) is not None}}
+                 **{key: row[key] for key in RACE_FIELDS if row.get(key) is not None},
+                 **{key: row[key] for key in DAY_FIELDS if row.get(key) not in (None, [], "")}}
                 for row in self.rows if row["participant_id"]]
-        return {"rows": rows, "matches": [dict(match) for match in self.matches],
-                "official_totals": dict(self.official_totals),
-                "official_team_totals": dict(self.official_team_totals),
-                "official_table": [dict(row) for row in self.official_table], "note": self.note,
-                "fastest_lap": dict(self.fastest_lap) if self.fastest_lap else None,
-                "driver_of_the_day": self.driver_of_the_day}
+        out = {"rows": rows, "matches": [dict(match) for match in self.matches],
+               "official_totals": dict(self.official_totals),
+               "official_team_totals": dict(self.official_team_totals),
+               "official_table": [dict(row) for row in self.official_table], "note": self.note,
+               "fastest_lap": dict(self.fastest_lap) if self.fastest_lap else None,
+               "driver_of_the_day": self.driver_of_the_day}
+        if self.double_up:
+            out["double_up"] = True
+        return out
 
 
 def _locate(ref: dict, lookup: _Lookup, where: str) -> Located:
@@ -237,7 +249,8 @@ def resolve(entry: dict, participants: list[dict], rules: dict) -> Resolution:
                "note": clean(raw.get("note"))[:300] or None,
                "start_number": clean(raw.get("start_number"))[:10] or None, "grid": raw.get("grid") or None,
                "time": lap_text(raw.get("time")), "gap": lap_text(raw.get("gap")),
-               "penalty_seconds": number(float(raw["penalty_seconds"])) if raw.get("penalty_seconds") else None}
+               "penalty_seconds": number(float(raw["penalty_seconds"])) if raw.get("penalty_seconds") else None,
+               **_day_fields(raw, rules, out, index)}
         out.rows.append(row)
         if located.participant_id:
             seen.setdefault(located.participant_id, []).append(index)
@@ -250,6 +263,10 @@ def resolve(entry: dict, participants: list[dict], rules: dict) -> Resolution:
             name = next(row["name"] for row in out.rows if row["participant_id"] == pid)
             out.errors.append(_problem("duplicate_participant",
                                        f"„{name}“ steht mehrfach im Blatt ({_rows_text(indices)}).", indices))
+    out.double_up = bool(entry.get("double_up"))
+    _partners(out, entry, lookup, seen)
+    # Ohne eingetragenen Platz bestimmt die Tagessumme den Platz (#1961).
+    tournament_days.derive_places(out.rows, rules)
     _race_extras(out, entry, lookup, seen)
 
     for index, raw in enumerate(entry.get("matches") or []):
@@ -301,6 +318,57 @@ def _lineup_ids(out: Resolution, refs, lookup: _Lookup, index: int, where: str) 
         if located.participant_id not in lineup:
             lineup.append(located.participant_id)
     return lineup
+
+
+def _day_fields(raw: dict, rules: dict, out: Resolution, index: int) -> dict:
+    """Turniertag einer Zeile (#1961): Runden, Tagessumme des Veranstalters und Sonderboni - nur, was angegeben ist.
+    Unbekannte Boni fallen mit Warnung weg."""
+    rounds = tournament_days.clean_rounds(raw.get("day_rounds"))
+    given = raw.get("day_points")
+    known = {bonus["key"] for bonus in rules["custom_bonuses"]}
+    wanted = list(dict.fromkeys(str(key) for key in raw.get("bonus_keys") or []))
+    unknown = [key for key in wanted if key not in known]
+    if unknown:
+        out.warnings.append(_problem("bonus_unknown", f"Zeile {index + 1}: Bonus „{', '.join(unknown)}“ gibt es in "
+                                     "der Saison nicht - er fällt weg.", [index]))
+    return {"day_rounds": rounds or None, "day_points": None if given is None else number(float(given)),
+            "partner_id": None, "bonus_keys": [key for key in wanted if key in known] or None}
+
+
+def _partners(out: Resolution, entry: dict, lookup: _Lookup, seen: dict) -> None:
+    """Partner im Double Up (#1961): wer gemeint ist, muss in der Liste stehen und darf nicht man selbst sein. Nennt nur
+    eine Seite den Partner, bekommt die andere ihn mit; nennen beide jemand anderen, ist das ein Fehler."""
+    raws = entry.get("rows") or []
+    for row in out.rows:
+        ref = raws[row["index"]].get("partner") if row["index"] < len(raws) else None
+        if not _named(ref) or not row["participant_id"]:
+            continue
+        where = f"Zeile {row['index'] + 1}, Partner"
+        located = _locate(ref, lookup, where)
+        if located.problem:
+            out.errors.append({**located.problem, "rows": [row["index"]]})
+            continue
+        # Auch ein neuer Name muss eine Zeile sein - er hat dort dieselbe Kennung ``neu:…``.
+        pid = located.participant_id
+        if pid not in seen:
+            out.errors.append(_problem("partner_not_in_list", f"{where}: „{located.name or clean(ref.get('name'))}“ "
+                                       "steht nicht in der Ergebnisliste.", [row["index"]]))
+            continue
+        if pid == row["participant_id"]:
+            out.errors.append(_problem("partner_self", f"{where}: Die Zeile kann nicht ihr eigener Partner sein.",
+                                       [row["index"]]))
+            continue
+        row["partner_id"] = pid
+    by_pid = {row["participant_id"]: row for row in out.rows if row["participant_id"]}
+    for row in out.rows:
+        other = by_pid.get(row["partner_id"]) if row["partner_id"] else None
+        if other is None:
+            continue
+        if other["partner_id"] in (None, row["participant_id"]):
+            other["partner_id"] = row["participant_id"]
+            continue
+        out.errors.append(_problem("partner_conflict", f"Zeile {row['index'] + 1}: „{other['name']}“ hat schon einen "
+                                   "anderen Partner.", [row["index"], other["index"]]))
 
 
 def _named(ref) -> bool:
@@ -363,7 +431,9 @@ def replace_new_ids(content: dict, created: dict[str, str]) -> dict:
         return created.get(pid[len(NEW_PREFIX):], pid) if is_new(pid) else pid
 
     out = dict(content)
-    out["rows"] = [{**row, "participant_id": real(row["participant_id"])} for row in content.get("rows") or []]
+    out["rows"] = [{**row, "participant_id": real(row["participant_id"]),
+                    **({"partner_id": real(row["partner_id"])} if row.get("partner_id") else {})}
+                   for row in content.get("rows") or []]
     out["matches"] = [{**match, "lineup": [real(pid) for pid in match.get("lineup") or []],
                        "maps": [{**item, "lineup": [real(pid) for pid in item["lineup"]]} if item.get("lineup")
                                 else item for item in match.get("maps") or []]}
@@ -378,27 +448,45 @@ def replace_new_ids(content: dict, created: dict[str, str]) -> dict:
 
 
 # ---------------------------------------------------------------- Plausibilität
-def _places(resolution: Resolution) -> list[dict]:
+def _places(resolution: Resolution, rules: dict) -> list[dict]:
+    """Platz fehlt, Nichtstart mit Platz, Platz doppelt und Lücken. Ein Gleichstand (zweimal „4.“ mit gleicher
+    Tagessumme oder mit „6.“ danach) und ein Paar im Double Up teilen ihren Platz ohne Meldung (#1961)."""
     problems = []
-    by_place: dict[int, list[int]] = {}
     for row in resolution.rows:
         place = row["place"]
-        if place:
-            by_place.setdefault(place, []).append(row["index"])
-        elif not row["marks"] and row["participant_id"]:
+        if not place and not row["marks"] and row["participant_id"]:
             problems.append(_problem("place_missing", f"Zeile {row['index'] + 1}: Platz fehlt.", [row["index"]]))
         if place and "dns" in row["marks"]:
             problems.append(_problem("dns_with_place", f"Zeile {row['index'] + 1}: Nichtstart, aber Platz {place}.",
                                      [row["index"]]))
-    for place, indices in sorted(by_place.items()):
-        if len(indices) > 1:
-            problems.append(_problem("place_twice", f"Platz {place} steht mehrfach ({_rows_text(indices)}).", indices))
-    if by_place:
-        missing = [place for place in range(1, max(by_place) + 1) if place not in by_place]
-        if missing:
-            shown = ", ".join(str(place) for place in missing[:10]) + (" …" if len(missing) > 10 else "")
-            text = f"Platz {shown} fehlt" if len(missing) == 1 else f"Plätze {shown} fehlen"
-            problems.append(_problem("place_gap", f"{text} in der Reihenfolge.", places=missing))
+    twice, missing = tournament_days.shared_place_problems(resolution.rows, rules)
+    for place, indices in twice:
+        problems.append(_problem("place_twice", f"Platz {place} steht mehrfach ({_rows_text(indices)}).", indices))
+    if missing:
+        shown = ", ".join(str(place) for place in missing[:10]) + (" …" if len(missing) > 10 else "")
+        text = f"Platz {shown} fehlt" if len(missing) == 1 else f"Plätze {shown} fehlen"
+        problems.append(_problem("place_gap", f"{text} in der Reihenfolge.", places=missing))
+    return problems
+
+
+def _day(resolution: Resolution, rules: dict) -> list[dict]:
+    """Turniertag (#1961): GES P des Veranstalters gegen die Summe der Runden; im Double Up Zeilen ohne Partner und
+    Partner mit verschiedenem Platz."""
+    problems = []
+    by_pid = {row["participant_id"]: row for row in resolution.rows if row["participant_id"]}
+    for row in resolution.rows:
+        given, summed = row.get("day_points"), tournament_days.rounds_total(row, rules)
+        if given is not None and summed is not None and number(given) != summed:
+            problems.append(_problem("day_points_differ", f"Zeile {row['index'] + 1}: GES P {number(given)} passt "
+                                     f"nicht zur Summe der Runden ({summed}) - es gilt GES P.", [row["index"]]))
+        partner = by_pid.get(row.get("partner_id"))
+        if resolution.double_up and row["participant_id"] and not partner and "dns" not in row["marks"]:
+            problems.append(_problem("partner_missing", f"Zeile {row['index'] + 1}: Double Up, aber ohne Partner.",
+                                     [row["index"]]))
+        if partner and row["index"] < partner["index"] and row["place"] != partner["place"]:
+            problems.append(_problem("partner_place_differs", f"Zeilen {row['index'] + 1} und {partner['index'] + 1}:"
+                                     " Partner im Double Up haben verschiedene Plätze.",
+                                     [row["index"], partner["index"]]))
     return problems
 
 
@@ -518,7 +606,8 @@ def check(resolution: Resolution, rules: dict, round_doc: dict, today: str, own_
         warnings.append(_problem("round_in_future", "Der Termin liegt in der Zukunft."))
     if round_doc.get("counts") is False:
         warnings.append(_problem("round_not_counted", "Der Termin zählt nicht zur Wertung."))
-    warnings.extend(_places(resolution))
+    warnings.extend(_places(resolution, rules))
+    warnings.extend(_day(resolution, rules))
     fastest = [row["index"] for row in resolution.rows if row["participant_id"] and "fastest_lap" in row["marks"]]
     if len(fastest) > 1:
         warnings.append(_problem("fastest_lap_twice", f"Die schnellste Runde ist mehrfach markiert "

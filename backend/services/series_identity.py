@@ -6,6 +6,8 @@ gespeicherten **Alias** (``reference_aliases``, mit Quelle und wer wann bestäti
 
 - **Vergleichbar** macht ``normalize_name``: Groß/Klein, Leerzeichen, Satz- und Sonderzeichen, Akzente und Breiten
   zählen nicht. Clan-Tags in Klammern („[TLS] Name“, „Name (TLS)“) sind optional - ein Treffer ohne Tag sagt es dazu.
+  Ebenso der Tag einer Spielkennung wie bei Riot („Name#TLS“, #1961: 3 bis 5 Buchstaben oder Ziffern nach „#“) -
+  „Name#TLS“ und „Name“ sind dieselbe Person. ``without_game_tag`` zeigt einen Namen ohne diesen Tag.
 - **Vorschläge** kommen nur bei *gleichem* Schlüssel, nie bei bloß ähnlichen Namen. Reihenfolge der Gründe: bestätigter
   Alias, Spiel-ID im Konto (Reiter „Gaming“ - je Spiel und die Plattform-Kennungen), Name im Profil; die Startnummer
   aus einer früheren Saison derselben Spur ist nur ein Hinweis und wird nie von selbst übernommen.
@@ -27,11 +29,26 @@ VIENNA = ZoneInfo("Europe/Vienna")
 _TAG_OPEN = "[({<"
 _TAG_CLOSE = "])}>"
 _TAG_MAX = 12
+# Tag einer Spielkennung am Ende („Name#TLS“, Riot-ID): 3 bis 5 Buchstaben oder Ziffern nach dem letzten „#“.
+_GAME_TAG_LENGTH = (3, 5)
+
+
+def without_game_tag(value) -> str:
+    """Der Name ohne den Tag einer Spielkennung am Ende („TheLostFriday#TLS“ → „TheLostFriday“, #1961). Ein Leerzeichen
+    vor „#“ ist erlaubt; bliebe nichts übrig oder passt der Tag nicht, kommt der Name ohne Leerraum außen zurück."""
+    text = str(value or "").strip()
+    at = text.rfind("#")
+    tag = text[at + 1:] if at > 0 else ""
+    low, high = _GAME_TAG_LENGTH
+    if not low <= len(tag) <= high or not all(char.isascii() and char.isalnum() for char in tag):
+        return text
+    name = text[:at].rstrip()
+    return name if normalize_name(name) else text
 
 
 def _without_clan_tags(value) -> str:
-    """Der Text ohne Clan-Tags am Anfang und Ende und ohne Leerraum außen."""
-    text = str(value or "").strip()
+    """Der Text ohne Tag einer Spielkennung, ohne Clan-Tags am Anfang und Ende und ohne Leerraum außen."""
+    text = without_game_tag(value)
     while text and text[0] in _TAG_OPEN:
         end = next((i for i in range(1, min(len(text), _TAG_MAX + 2)) if text[i] in _TAG_CLOSE), -1)
         if end < 2:
