@@ -16,6 +16,8 @@ import "./roundResults.css";
 // Bausteine der Ergebnisseite einer Runde (#1950): Kopf mit Flagge und Pfeilen, Zusammenfassung, Reiter je Lauf, die
 // Tabelle am PC und die Liste am Handy. Zeiten und Abstände zählen beim Öffnen und bei jedem Reiterwechsel hoch
 // (CountUp, je Zeile 25 ms versetzt); am Ende leuchten Pole und schnellste Runde einmal auf, Vereinszeilen glänzen kurz.
+// Hier zählt CountUp ab dem Öffnen, nicht erst beim Sichtbarwerden (`whenVisible={false}`) - sonst leuchteten die
+// Abzeichen, deren Zeitpunkt das CSS ab dem Öffnen rechnet, vor dem Ende des Zählens auf.
 
 const MAX_STAGGER_ROWS = 24;
 const GLOW = new Map([["pole", "pole"], ["fastest_lap", "fastest"]]);
@@ -92,7 +94,7 @@ export function RoundSummary({ cards, playKey }) {
           </span>
           {(card.count || card.sub) && (
             <span className="tls-round-fact__sub">
-              {card.count ? <CountUp value={card.count} playKey={playKey} /> : card.sub}
+              {card.count ? <CountUp value={card.count} playKey={playKey} whenVisible={false} /> : card.sub}
               {card.count && card.sub ? ` · ${card.sub}` : ""}
             </span>
           )}
@@ -227,8 +229,8 @@ export function ResultTable({ session, playKey }) {
                     );
                     case "team": return <td key={key}><span className="tls-round-team" style={teamStyle(row)}>{row.team || ""}</span></td>;
                     case "grid": return <td key={key} className="whitespace-nowrap text-white/80">{row.grid || "–"}<Move row={row} /></td>;
-                    case "time": return <td key={key} className="whitespace-nowrap"><CountUp value={timeText(row)} playKey={playKey} delay={delay} /></td>;
-                    case "gap": return <td key={key} className="whitespace-nowrap text-white/65"><CountUp value={gapText(row)} playKey={playKey} delay={delay} /></td>;
+                    case "time": return <td key={key} className="whitespace-nowrap"><CountUp value={timeText(row)} playKey={playKey} delay={delay} whenVisible={false} /></td>;
+                    case "gap": return <td key={key} className="whitespace-nowrap text-white/65"><CountUp value={gapText(row)} playKey={playKey} delay={delay} whenVisible={false} /></td>;
                     case "penalty": return <td key={key} className="tls-round-penalty whitespace-nowrap">{penaltyLabel(row.penalty_seconds)}</td>;
                     case "points": return <td key={key} className="tls-round-points">{row.points === null || row.points === undefined ? "" : formatNumber(row.points)}</td>;
                     default: return null;
@@ -267,7 +269,7 @@ export function ResultList({ session, playKey }) {
             </span>
             <span className="flex flex-col items-end shrink-0 tabular-nums">
               {timed ? (
-                <span className="tls-round-item__main"><CountUp value={mobileMain(row)} playKey={playKey} delay={delay} /></span>
+                <span className="tls-round-item__main"><CountUp value={mobileMain(row)} playKey={playKey} delay={delay} whenVisible={false} /></span>
               ) : columns.has("points") && row.points !== null && row.points !== undefined ? (
                 <span className="tls-round-item__main">{formatNumber(row.points)} P</span>
               ) : null}
