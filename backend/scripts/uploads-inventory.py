@@ -17,8 +17,8 @@ import os
 import sys
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT / "backend"))
+BACKEND_DIR = Path(__file__).resolve().parents[1]  # backend/ im Repo, /app im Container
+sys.path.insert(0, str(BACKEND_DIR))
 
 from services.uploads_inventory import inventory, render_markdown  # noqa: E402
 

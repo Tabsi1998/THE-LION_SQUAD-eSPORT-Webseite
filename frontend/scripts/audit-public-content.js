@@ -1,6 +1,14 @@
 const { chromium } = require("@playwright/test");
 
-const baseUrl = (process.env.PUBLIC_AUDIT_BASE_URL || "https://lionsquad.at").replace(/\/+$/, "");
+const { resolveAuditBaseUrl, assertNotProduction, fetchChecked } = require("./audit-base-url");
+
+let baseUrl;
+try {
+  baseUrl = resolveAuditBaseUrl(process.env);
+} catch (error) {
+  console.error(error.message);
+  process.exit(2);
+}
 const limit = Math.max(1, Number(process.env.PUBLIC_AUDIT_LIMIT || 250));
 const concurrency = Math.max(1, Math.min(8, Number(process.env.PUBLIC_AUDIT_CONCURRENCY || 5)));
 const resourceConcurrency = Math.max(1, Math.min(2, Number(process.env.PUBLIC_AUDIT_RESOURCE_CONCURRENCY || 1)));
@@ -48,6 +56,7 @@ async function checkResourceLink(link) {
 
     let response;
     try {
+      assertNotProduction(current, process.env);
       response = await fetch(current, {
         redirect: "manual",
         headers: { "user-agent": "Lionsquad-Public-Audit/1.0" },
@@ -193,7 +202,7 @@ async function auditPage(context, path) {
 }
 
 async function main() {
-  const sitemap = await fetch(`${baseUrl}/sitemap.xml`).then((response) => {
+  const sitemap = await fetchChecked(`${baseUrl}/sitemap.xml`, {}, process.env).then((response) => {
     if (!response.ok) throw new Error(`Sitemap returned ${response.status}`);
     return response.text();
   });
@@ -210,7 +219,17 @@ async function main() {
   const linkSources = new Map();
   const resourceLinks = new Map();
   const browser = await chromium.launch({ headless: true });
-  const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
+  const context = await browser.newContext({ viewport: { width: 1440, height: 1000 }, serviceWorkers: "block" });
+  // Jede Anfrage des Browsers (auch nach Weiterleitungen) prüfen: nie ohne Freigabe zur echten Seite.
+  await context.route("**/*", async (route) => {
+    try {
+      assertNotProduction(route.request().url(), process.env);
+    } catch (error) {
+      console.error(error.message);
+      process.exit(2);
+    }
+    await route.continue();
+  });
   const findings = [];
   let cursor = 0;
 
