@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useParams, Link, useSearchParams } from "react-router-dom";
 import { API, api, formatRequestError } from "@/lib/api";
-import { placementMessage } from "@/lib/tournamentFillIn";
+import { checkinStatusText, placementMessage } from "@/lib/tournamentFillIn";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { StatusBadge } from "@/components/tls/StatusBadge";
 import { BracketTree } from "@/components/tls/BracketTree";
@@ -205,7 +205,8 @@ export default function AdminTournamentEditPage() {
   const setRegCheckinStatus = async (rid, status) => {
     try {
       const { data } = await api.post(`/tournaments/${id}/registrations/${rid}/checkin`, { status });
-      toast.success(status === "checked_in" ? "Check-in gesetzt." : status === "no_show" ? "Nicht erschienen gesetzt." : "Check-in zurückgenommen.");
+      // Mit Nachrücker von der Warteliste (#1941): die Meldung nennt ihn.
+      toast.success(checkinStatusText(status, data, regs));
       showPlacement(data?.placement);
       load();
     } catch (e) {
