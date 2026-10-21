@@ -445,7 +445,9 @@ Referenz schon, gibt es nur diese. Erneut abschließen – etwa nach einer Korre
 Referenz: Platz und Feldgröße kommen aus der Saison, soweit sie sie hat; Titel, Texte, eigene Bezeichnungen, von Hand
 eingetragene Namen und Zahlen bleiben. Die Spieler aus der Saison folgen ihr – wer inzwischen ausgeblendet, Gast oder nicht
 mehr dabei ist, verschwindet aus der Referenz; von Hand dazugenommene Spieler und Einträge bleiben. Die Referenz wird nie
-offener als Saison und Spur. So zählt die Vitrine jede Saison genau einmal. Danach steht im Kopf der Saison **Referenz: Platz 6 von 8 ·
+offener als Saison und Spur. Stellst du Saison oder Spur später strenger (etwa „Öffentlich“ → „Nur Mitglieder“), folgen
+ihre Referenzen sofort; das Adminprotokoll nennt, wie viele angepasst wurden. Lockern öffnet keine Referenz – das machst du
+bei Bedarf in der Referenz selbst. So zählt die Vitrine jede Saison genau einmal. Danach steht im Kopf der Saison **Referenz: Platz 6 von 8 ·
 ansehen**. Jahreswertungs-Punkte gibt es dafür keine, nur Abzeichen ([Erfolge](erfolge.md) 3.6). Eine abgebrochene Saison
 bekommt keine Platzierung (der Status „abgebrochen“ kommt mit einem eigenen Paket).
 
