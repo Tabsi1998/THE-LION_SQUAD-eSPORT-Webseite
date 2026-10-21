@@ -1,26 +1,24 @@
 # Changelog
 
-## [1.22.0](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/compare/v1.21.0...v1.22.0) (2026-10-21)
-
+## 1.22.0 (21.10.2026)
 
 ### Neu
 
-* Referenzen – „Wie letztes Mal“ übernimmt Spiel, Veranstalter und Team ([#1936](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1936)) ([d34d1bd](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/d34d1bda567c2f74abc577ebb341217136954a61))
-* Referenzen – Fahrer-Detail mit Poles, Ø Start und Quali-Duell ([#1930](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1930)) ([7da3d8e](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/7da3d8e6824650040dee783881c279ed50ac36b9))
-* Referenzen – Lauf-Chips in Kalender, Verwaltung, „Läuft gerade“ und „Heute im Einsatz“, Kopf je Runde im Rennraster ([#1930](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1930)) ([7da3d8e](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/7da3d8e6824650040dee783881c279ed50ac36b9))
-* Referenzen – Punkte je Lauf mit Vorschau, Qualifying mit Punkten, Punkte trotz DNF und Bonus je Lauf ([#1930](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1930)) ([7da3d8e](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/7da3d8e6824650040dee783881c279ed50ac36b9))
-* Referenzen – Runde mit Läufen: Qualifying, Shootout, Sprint und Rennen je Runde mit „Ablauf je Runde“, auch ab Runde X wechselnd ([#1930](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1930)) ([7da3d8e](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/7da3d8e6824650040dee783881c279ed50ac36b9))
-* Referenzen – Schnell-Eintrag für Tagesturniere, Rest unter „Weitere Angaben“ ([#1936](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1936)) ([d34d1bd](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/d34d1bda567c2f74abc577ebb341217136954a61))
-* Referenzen – Startplatz und Pole aus dem Qualifying, Sprint aus dem Shootout, umgekehrte WM-Reihenfolge vor der Runde oder nach dem Lauf davor ([#1930](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1930)) ([7da3d8e](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/7da3d8e6824650040dee783881c279ed50ac36b9))
-* Referenzen – Terminliste erkennt Lauf-Kürzel (R1S, R1 Sprint, R1 Q …) und legt je Zeile alle Läufe an ([#1930](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1930)) ([7da3d8e](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/7da3d8e6824650040dee783881c279ed50ac36b9))
-* Referenzen – Wertung je Lauf: Gesamt · Rennen · Sprint · Quali ([#1930](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1930)) ([7da3d8e](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/7da3d8e6824650040dee783881c279ed50ac36b9))
-
+* Referenzen – „Wie letztes Mal“ übernimmt Spiel, Veranstalter und Team (#1936)
+* Referenzen – Fahrer-Detail mit Poles, Ø Start und Quali-Duell (#1930)
+* Referenzen – Lauf-Chips in Kalender, Verwaltung, „Läuft gerade“ und „Heute im Einsatz“, Kopf je Runde im Rennraster (#1930)
+* Referenzen – Punkte je Lauf mit Vorschau, Qualifying mit Punkten, Punkte trotz DNF und Bonus je Lauf (#1930)
+* Referenzen – Runde mit Läufen: Qualifying, Shootout, Sprint und Rennen je Runde mit „Ablauf je Runde“, auch ab Runde X wechselnd (#1930)
+* Referenzen – Schnell-Eintrag für Tagesturniere, Rest unter „Weitere Angaben“ (#1936)
+* Referenzen – Startplatz und Pole aus dem Qualifying, Sprint aus dem Shootout, umgekehrte WM-Reihenfolge vor der Runde oder nach dem Lauf davor (#1930)
+* Referenzen – Terminliste erkennt Lauf-Kürzel (R1S, R1 Sprint, R1 Q …) und legt je Zeile alle Läufe an (#1930)
+* Referenzen – Wertung je Lauf: Gesamt · Rennen · Sprint · Quali (#1930)
 
 ### Fehlerbehebungen
 
-* Referenz-Detailseite – nur ausgefüllte Angaben, ein Tag steht einmal ([#1936](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1936)) ([d34d1bd](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/d34d1bda567c2f74abc577ebb341217136954a61))
-* Referenzen – Fahrer-Detail schiebt die Seite am Handy nicht mehr seitlich hinaus ([#1930](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1930)) ([7da3d8e](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/7da3d8e6824650040dee783881c279ed50ac36b9))
-* Referenzen – Streichergebnisse und Aktivitätspunkte zählen je Runde, Pole nur für den ersten gültigen Platz ([#1930](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1930)) ([7da3d8e](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/7da3d8e6824650040dee783881c279ed50ac36b9))
+* Referenz-Detailseite – nur ausgefüllte Angaben, ein Tag steht einmal (#1936)
+* Referenzen – Fahrer-Detail schiebt die Seite am Handy nicht mehr seitlich hinaus (#1930)
+* Referenzen – Streichergebnisse und Aktivitätspunkte zählen je Runde, Pole nur für den ersten gültigen Platz (#1930)
 
 ## 1.21.0 (21.10.2026)
 
