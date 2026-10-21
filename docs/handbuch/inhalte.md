@@ -623,6 +623,51 @@ stehen Karten statt der Tabellen.
 </tr>
 </table>
 
+**Ergebnis je Runde:** Jede Runde einer Rennliga hat eine eigene Seite zum Teilen, etwa
+`/references/series/<spur>/<saison>/runde/3`. Hin kommt man über die **Kalenderzeile**, einen **Lauf-Chip** oder die
+**Flagge bzw. das Kürzel** über einer Spalte im Rennraster (das Kürzel eines Laufs, etwa S, öffnet gleich dessen Reiter).
+
+- **Kopf:** Flagge, Land, Strecke, „Runde 3 von 24“ mit Tag und Pfeile zur vorigen und nächsten Runde.
+- **Zusammenfassung:** Sieger (mit Startplatz), Pole und schnellste Runde mit Zeit, Fahrer des Tages und – je Reiter – der
+  beste Vereinsfahrer mit Platz und Punkten. Mit Namen stehen dort nur Vereinsmitglieder mit sichtbarem Profil; bei allen
+  anderen steht das Team (wie im Rennkalender – fremde Namen nur in der Tabelle).
+- **Reiter je Lauf** („Qualifying · Sprint · Rennen“): Ohne Angabe öffnet das Hauptrennen, der gewählte Reiter steht in der
+  Adresse (`?lauf=qualifying`), so lässt er sich teilen.
+- **Tabelle wie beim Veranstalter:** Platz 1 bis 3 in Gold, Silber und Bronze, Startnummer und Team in der **Teamfarbe**,
+  Name, Start → Ziel mit Pfeil, Zeit, Abstand, Strafe und Punkte. Abzeichen an der Zeile: **Pole**, **Schnellste
+  Runde**, **Fahrer des Tages**, **Ausfall** und Strafsekunden. Vereinsfahrer und eigene Teams haben einen Cyan-Grund.
+  Fehlen Zeiten, bleiben nur Pos, Name, Team und Punkte – leere Spalten fallen weg.
+- **Am Handy** eine Liste: rechts groß die gefahrene Zeit, darunter klein Abstand und Punkte; die Abzeichen ausgeschrieben.
+- Beim Öffnen und bei jedem Reiterwechsel **zählen die Zeiten kurz hoch**, am Ende leuchten Pole und schnellste Runde
+  einmal auf. Wer „Bewegung reduzieren“ eingestellt hat, sieht sie sofort.
+- **Startplatz** kommt aus dem Blatt, sonst aus dem Qualifying derselben Runde (bzw. der umgekehrten Wertung), so wie
+  gerechnet wird. **Strafsekunden** trägt ihr im Ergebnisblatt unter **Mehr** ein (nur Anzeige, sie ändern keine Punkte).
+
+<table>
+<tr>
+<td><img src="../assets/serien/serien-runde-ergebnis.png" alt="Ergebnisseite einer Runde: Flagge, Zusammenfassung mit Sieger, Pole, schnellster Runde und Fahrer des Tages, Reiter Qualifying und Rennen und die Tabelle mit Teamfarben" width="560"></td>
+<td rowspan="2"><img src="../assets/serien/serien-runde-handy.png" alt="Dieselbe Runde am Handy: Liste mit der Zeit rechts, darunter Abstand und Punkte" width="220"></td>
+</tr>
+<tr>
+<td><img src="../assets/serien/serien-runde-kalender.png" alt="Rennkalender: Kalenderzeile und Lauf-Chips führen zur Ergebnisseite der Runde" width="560"></td>
+</tr>
+</table>
+
+**Teamfarben:** In der Saison (Verwaltung → Saison, nur Rennliga, nur Vorstand) steht der Kasten **Teamfarben** mit allen
+Teams der Saison. Je Team eine Farbe wählen oder als `#rrggbb` eintragen, leer heißt neutral, dann **Teamfarben
+speichern**. Liest jemand ein Ergebnis-Bild aus, merkt sich die Saison die Schriftfarben als **Vorschlag** – ein Klick auf
+das Farbfeld daneben bzw. **Vorschläge aus dem Bild** übernimmt sie; gespeichert wird erst mit dem Knopf.
+
+<img src="../assets/serien/serien-teamfarben.png" alt="Kasten Teamfarben mit Farbe je Team, Vorschlägen aus dem Bild und Vereins-Marke" width="560">
+
+**Statistik:** Die Seite einer Rennliga hat oben die Reiter **Saison · Statistik** (`?ansicht=statistik`). Die Statistik
+zeigt je Fahrer bzw. Team Siege, Podien, Poles, schnellste Runden, Fahrer des Tages, Ausfälle, Ø Startplatz, Ø Zielplatz
+und gutgemachte Plätze – nur Kennzahlen, die in der Saison vorkommen. Oben je Kennzahl die Spitze („Meiste Poles“), ein
+Klick darauf oder auf den Spaltenkopf sortiert die Tabelle danach; Vereinsfahrer und eigene Teams sind hervorgehoben.
+Gezählt werden die gewerteten Läufe (Rennen und Sprint), die Pole je Runde einmal aus dem Haupt-Qualifying.
+
+<img src="../assets/serien/serien-statistik.png" alt="Reiter Statistik: Karten mit der Spitze je Kennzahl und die Tabelle je Fahrer" width="560">
+
 **Läuft gerade:** Sobald eine Saison den Status **Läuft** hat (und sichtbar, nicht archiviert ist), erscheint sie oben
 auf der Seite **Erfolge & Referenzen** (`/references`), noch vor der Vitrine. Jede Karte zeigt den Fortschritt in
 Segmenten („6 von 10 Rennen gewertet“, „3 von 7 Spieltagen gespielt“, „2 von 5 Turnieren gewertet“), den **nächsten
@@ -727,7 +772,8 @@ einem gewerteten Termin **Ergebnis ändern**. Das öffnet das Blatt des Termins.
   **laut Veranstalter** und werden gegen den Schlüssel geprüft; bei einer Saison „Punkte laut Veranstalter“ zählen sie
   direkt.
 - **Mehr** (Regler-Symbol) zeigt die Marken **DNF**, **DNS**, **DSQ**, **Schnellste Runde** und **Pole**, dazu
-  **Strafpunkte**, **Startnummer**, **Startplatz**, **Zeit**, **Abstand**, den **Gesamtstand laut Veranstalter** (wird mit
+  **Strafpunkte**, **Startnummer**, **Startplatz**, **Zeit**, **Abstand**, **Strafsekunden** (nur Anzeige in der
+  Ergebnistabelle der Runde), den **Gesamtstand laut Veranstalter** (wird mit
   der eigenen Rechnung verglichen) und **Punkte zählen statt Schlüssel**, wenn ein Wert bewusst vom Schlüssel abweicht.
   Zugeklappt stehen Startnummer, Startplatz, Zeit und Abstand kurz unter der Zeile.
 - **Rennliga:** unter der Liste je Rennen die **Schnellste Runde** (Name aus der Liste und Rundenzeit) und der **Fahrer

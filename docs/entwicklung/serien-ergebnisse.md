@@ -39,7 +39,24 @@ Text oder wie eine Zeile). Schnellste Runde und Fahrer des Tages müssen in der 
 Bonus zählt), eine Zeit ohne Namen gehört zur markierten Zeile, zwei Markierungen ergeben die Warnung
 `fastest_lap_twice`. Gespeichert wird im Blatt `fastest_lap: {participant_id, time}` und `driver_of_the_day`
 (Kennung); in den Ständen tragen die Ergebnisse je Rennen `start_number`, `grid`, `time`, `gap`, `fastest_lap_time`
-und `driver_of_the_day` – nur, wo angegeben.
+und `driver_of_the_day` – nur, wo angegeben. Dazu je Zeile `penalty_seconds` (Zeitstrafe 0–3600 s, #1950) – nur zur
+Anzeige in der Ergebnistabelle der Runde, es ändert keine Punkte.
+
+**Ergebnistabelle je Runde (#1950):** `GET /api/reference-series/public/<spur>/<saison>/rounds/<nr>` (nur Rennliga,
+Sichtbarkeit wie die Serienseite, `routes/reference_round_page_routes.py`, Aufbau in `services/round_page.py`) liefert
+`round` (Nummer, Gesamtzahl, Kürzel, Ort, Land, Tag), `previous`/`next`, `sessions` (je Lauf `key` für `?lauf=`,
+`label`, `kind`, `state`, `columns` – nur Spalten mit Werten –, `rows`, `pole`, `best_club`, `original` = Platz für
+#1933), `main` (Hauptrennen), `summary` (`winner`, `pole`, `fastest_lap`, `driver_of_the_day` als Kennung) und
+`club_drivers` (wer außerhalb der Tabelle mit Namen stehen darf). Eine Zeile: `key`, `place`, `status`
+(`finished`/`dnf`/`dns`/`dsq`), Name nach den Regeln der Serienseite (ausgeblendet ohne Startnummer), `team`,
+`team_color`, `own`, `grid` (aus dem Blatt, sonst wie gerechnet aus Qualifying bzw. umgekehrter Wertung), `gained`,
+`time`, `gap`, `penalty_seconds`, `points` (aus dem Stand, nur bei zählenden Läufen), `marks`, `fastest_lap(_time)`,
+`driver_of_the_day`. `GET …/statistics` zählt je Fahrer und Team Siege, Podien, Poles (je Runde einmal), schnellste
+Runden, Fahrer des Tages, Ausfälle, Ø Start, Ø Ziel und gutgemachte Plätze (`services/season_statistics.py`);
+`metrics` nennt nur Kennzahlen, die vorkommen. **Teamfarben:** `GET/PUT /api/reference-series/admin/series/<id>/team-colors`
+(Vorstand; `{colors: {Team: "#rrggbb" | null}}`, gespeichert als `reference_series.team_colors`) und
+`POST …/team-colors/suggestions` (Vorstand und Captains; der Vorschlag aus dem Ergebnis-Bild,
+`team_color_suggestions`).
 
 **Eigene Teams (#1926):** Die Serie hat `own_teams` (`[{name, aliases}]`, `team_name` = das erste). Ein Team aus der
 Liste, aus `matches` oder der Tabelle zählt als eigenes, wenn Name oder Alias ohne Groß/klein, Leer- und Satzzeichen
@@ -192,8 +209,9 @@ Dienst) und landet als Zeilen im Blatt – gespeichert wird beim Lesen nichts, a
   Warnung `other_track` ihn (`suggested_round`).
 - **Antwort:** `rows` mit `place`, `dnf`, `marks`, `start_number`, `name`, `participant_id`, `team`, `grid`, `time`,
   `gap`, `points`, `color` (Schriftfarbe von Startnummer oder Team), `uncertain` (Felder) und `read` (was im Bild
-  stand, wenn es abweicht); dazu der Kopf, `team_colors {Team: "#rrggbb"}` (Vorschlag für Teamfarben, #1950 - nur in
-  der Antwort), `uncertain_rows` und `warnings`.
+  stand, wenn es abweicht); dazu der Kopf, `team_colors {Team: "#rrggbb"}` (Vorschlag für Teamfarben, #1950 - das
+  Blatt schickt ihn nach dem Lesen an `…/team-colors/suggestions`, übernommen wird er in der Verwaltung),
+  `uncertain_rows` und `warnings`.
 - **Im Blatt:** die Zeilen ersetzen die Liste, die Vorschau prüft gleich. Startnummer, Startplatz, Zeit und Abstand
   gehen in die Zeile (#1927; „Mehr“ steht offen, wenn eines davon gelb ist), die Pole wird Marke; schnellste Runde
   (Fahrer, Zeit) und Fahrer des Tages füllen die Felder des Rennens (`imageFormFields`, gelbe davon in `raceOcr`).
