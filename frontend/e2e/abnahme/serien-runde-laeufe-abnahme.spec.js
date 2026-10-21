@@ -176,7 +176,7 @@ test.describe("Abnahme #1930: Runde mit Läufen - Ablauf je Runde", () => {
       await second.getByTestId("weekend-session-remove").first().click();
       await second.getByTestId("weekend-session-offset").first().fill("45");
       await second.getByTestId("weekend-session-offset").nth(1).fill("0");
-      for (const select of await second.getByTestId("weekend-session-grid").all()) await select.selectOption("reverse_standings");
+      for (const select of await second.getByTestId("weekend-session-grid").all()) await select.selectOption("reverse_standings_before_round");
       // Hoch genug, dass der ganze Abschnitt im Blatt steht (sonst liegt der Kopf des Blatts darüber).
       await admin.setViewportSize({ width: 1440, height: 2800 });
       await admin.getByTestId("series-weekend").scrollIntoViewIfNeeded();
