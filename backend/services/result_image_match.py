@@ -204,6 +204,10 @@ def _same(left, right) -> bool:
     return _display(left) == _display(right)
 
 
+def _exact(text: str) -> str:
+    return " ".join(clean_text(text).split())
+
+
 def decide(kind: str, page: Read | None, strip: Read | None, min_conf: float) -> Decision:
     """Ein Wert aus Seiten- und Streifenlesung (siehe Modultext)."""
     reads = [(read, _parse(kind, read, page=is_page)) for read, is_page in ((page, True), (strip, False)) if read]
@@ -217,6 +221,12 @@ def decide(kind: str, page: Read | None, strip: Read | None, min_conf: float) ->
         if kind in ("time", "gap") and not any(char.isdigit() for char in text):
             text = ""  # Zeiten haben Ziffern - verlesene Platzhalter („+--:--,---“) nicht ins Feld, nur gelb
         return Decision(value=None, text=text, sure=False, raw=best.text, conf=best.conf)
+    if kind == "text" and len(parsed_reads) == 2 and _same(parsed_reads[0][1], parsed_reads[1][1]):
+        # Namen und Teams sind frei - Tesseract verliest sie oft zweimal fast gleich (ein Leerzeichen mehr, l statt I).
+        # Sicher nur, wenn beide Lesungen Zeichen für Zeichen gleich sind und jede für sich über der Schwelle liegt.
+        read, parsed = max(parsed_reads, key=lambda item: item[0].conf)
+        exact = _exact(parsed_reads[0][0].text) == _exact(parsed_reads[1][0].text)
+        return _decision(parsed, read, sure=exact and all(item[0].conf >= min_conf for item in parsed_reads))
     if len(parsed_reads) == 2 and _same(parsed_reads[0][1], parsed_reads[1][1]):
         # Zwei unabhängige Lesungen sagen dasselbe - dafür reicht weniger Sicherheit je Wort.
         read, parsed = max(parsed_reads, key=lambda item: item[0].conf)

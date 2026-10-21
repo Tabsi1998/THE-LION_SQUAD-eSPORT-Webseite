@@ -74,6 +74,17 @@ def test_two_reads_decide_the_value():
     assert decide("place", r("ONF"), r("DNF"), 80).mark == "dnf"
 
 
+def test_names_need_two_exact_and_confident_reads():
+    """Namen und Teams (Text): sicher nur, wenn beide Lesungen genau gleich sind (Leerzeichen, Groß/klein) und jede für
+    sich über der Schwelle liegt - sonst gelb. So bleiben Verwechsler wie „PPLotta Probe“ nicht still."""
+    assert decide("text", r("Lotta Probe", 95), r("Lotta Probe", 90), 80).sure is True
+    assert decide("text", r("PPLotta Probe", 90), r("PP Lotta Probe", 87), 80).sure is False
+    assert decide("text", r("bertii_bolzt7", 83), r("bertii_bolzt7", 64), 80).sure is False
+    assert decide("text", r("Carl_KurvOl", 77), r("Carl_Kurvol", 64), 80).sure is False
+    # Zahlen dürfen weiter mit weniger Sicherheit übereinstimmen.
+    assert decide("number", r("12", 64), r("12", 30), 80).sure is True
+
+
 def test_similarity_ignores_case_tags_and_lookalikes():
     assert similarity("anna probe", "Anna Probe") == 1.0
     assert similarity("[TLS] Anna Probe", "Anna Probe") == 1.0
