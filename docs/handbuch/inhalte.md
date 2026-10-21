@@ -271,8 +271,8 @@ Werten über null:
   Vermerk der Saison (Aufstieg, läuft …), dazu **Zur Serie**. Am Handy lässt sich die Reihe wischen.
 - **Chronik je Jahr:** eine Zeile je Teilnahme mit dem eigenen Platz, kurzem Titel, Spiel, Team mit „von N Teams“ und
   Datum. Ein Klick klappt die Details auf: langer Titel, Format und Plattform, die Aufstellung (die Person selbst
-  hervorgehoben), **Saison ansehen** (nur mit Saison) und **Beim Veranstalter** (Turnierseite, sonst Ergebnis oder
-  Bracket). Offen steht immer nur eine Zeile.
+  hervorgehoben), **Saison ansehen** (nur mit Saison), **Details** (die Seite der Referenz mit Bericht, Partnern und Ort)
+  und **Beim Veranstalter** (Turnierseite, sonst Ergebnis oder Bracket). Offen steht immer nur eine Zeile.
 
 **Alle Referenzen** öffnet die Chronik oben mit „Nur …“.
 
