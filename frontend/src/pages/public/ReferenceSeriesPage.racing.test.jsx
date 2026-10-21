@@ -163,6 +163,17 @@ test("Teamwertung: Balken und Raster, Vereinsteams hervorgehoben, Gäste markier
   expect(within(rows[0]).getAllByTestId("racing-team-cell").map((cell) => cell.textContent)).toEqual(["32", "18"]);
 });
 
+test("drei eigene Teams (#1926): alle drei in Garage und Teamwertung hervorgehoben, auch eines ohne Rennen", async () => {
+  const racing = { ...BODY.racing, club_teams: ["Probe Löwen", "Probe Löwen B", "Probe Löwen C"] };
+  renderAt("/references/series/probe-racing/2026-f1", { ...BODY, racing });
+  const garage = await screen.findByTestId("racing-garage");
+  const cards = within(garage).getAllByTestId("racing-garage-team");
+  expect(cards.map((card) => within(card).getByRole("heading", { level: 3 }).textContent)).toEqual(["Probe Löwen", "Probe Löwen B", "Probe Löwen C"]);
+  expect(cards[2]).toHaveTextContent("Noch kein Rennen gefahren.");
+  const rows = within(within(screen.getByTestId("racing-teams")).getByTestId("series-table")).getAllByTestId("series-row");
+  expect(rows.map((item) => item.dataset.club || "")).toEqual(["", "true", "true"]);
+});
+
 // Wie BODY, nur zählen Gäste nicht fürs Team: der Server meldet für den Gast keinen Beitrag (driver_points).
 const GUESTS_NOT_COUNTING = {
   ...BODY,

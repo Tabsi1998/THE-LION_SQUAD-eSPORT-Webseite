@@ -52,6 +52,23 @@ test("eine neue Serie nennt Spur und Vorlage, eine bestehende nicht", () => {
   expect(edited).toMatchObject({ default_weekday: null, default_time: null });
 });
 
+test("Eigene Teams (#1926): die Liste kommt ins Formular, das alte Feld wird das erste Team", () => {
+  const listed = seriesToForm({ own_teams: [{ name: "Probe Löwen", aliases: [] }, { name: "Probe-DarkFriday", aliases: ["PDF Racing", "PDF"] }], team_name: "Probe Löwen", rules: RULES });
+  expect(listed.own_teams.map(({ name, aliases }) => ({ name, aliases }))).toEqual([
+    { name: "Probe Löwen", aliases: "" }, { name: "Probe-DarkFriday", aliases: "PDF Racing, PDF" }]);
+  expect(new Set(listed.own_teams.map((team) => team.key)).size).toBe(2);
+  expect(seriesToForm({ team_name: "Probe Alt", rules: RULES }).own_teams.map((team) => team.name)).toEqual(["Probe Alt"]);
+  expect(seriesToForm({ rules: RULES }).own_teams.map((team) => team.name)).toEqual([""]);
+
+  const payload = seriesPayload({ ...listed, own_teams: [...listed.own_teams, { key: "x", name: "  ", aliases: "egal" }, { key: "y", name: " Probe Löwen C ", aliases: " TLS C ;; tls-c\nC-Team " }] });
+  expect(payload.own_teams).toEqual([
+    { name: "Probe Löwen", aliases: [] },
+    { name: "Probe-DarkFriday", aliases: ["PDF Racing", "PDF"] },
+    { name: "Probe Löwen C", aliases: ["TLS C", "tls-c", "C-Team"] },
+  ]);
+  expect(payload).not.toHaveProperty("team_name");
+});
+
 test("Adresse der Serie: /references/series/<spur>/<saison>", () => {
   expect(seriesAddress({ slug: "probe-racing-f1" }, { season_slug: "2026-division-1" })).toBe("/references/series/probe-racing-f1/2026-division-1");
 });

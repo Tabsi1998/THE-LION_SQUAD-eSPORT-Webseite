@@ -336,7 +336,8 @@ export function ResultEntrySheet({ series, round, onClose, onSaved }) {
   const access = data?.access || {};
   const board = access.role === "board";
   const participants = useMemo(() => data?.participants || [], [data]);
-  const teams = useMemo(() => [...new Set(participants.map((person) => person.default_team).filter(Boolean))], [participants]);
+  // Vorschläge fürs Team: zuerst die eigenen Teams der Saison (#1926), dann die Standard-Teams der Teilnehmer.
+  const teams = useMemo(() => [...new Set([...(data?.series?.own_teams || []), ...participants.map((person) => person.default_team)].filter(Boolean))], [data, participants]);
 
   const built = useMemo(() => (form ? formToPayload(form) : null), [form]);
   const stamp = built ? formStamp(built.payload) : "";

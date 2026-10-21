@@ -144,7 +144,8 @@ function Maps({ maps }) {
   );
 }
 
-function Schedule({ matchdays }) {
+// `showTeam`: mehrere eigene Teams in der Saison (#1926) - dann steht vor dem Gegner, welches eigene Team gespielt hat.
+function Schedule({ matchdays, showTeam = false }) {
   return (
     <section className="mt-12" aria-labelledby="team-league-schedule" data-testid="team-league-schedule">
       <SectionTitle id="team-league-schedule">Spielplan</SectionTitle>
@@ -161,6 +162,7 @@ function Schedule({ matchdays }) {
                   <span className={`block text-sm tabular-nums ${round.state === "cancelled" ? "text-white/45" : "text-white/70"}`}>{roundWhen(round)}</span>
                   {opponent && (
                     <span className="block text-[15px] text-white font-semibold">
+                      {showTeam && match?.team && <span className="text-[#29B6E8]" data-testid="team-league-own-team">{match.team} </span>}
                       <span className="text-white/45 font-normal">gegen </span>{opponent}
                       {match && <span className="ml-2 text-[10px] font-bold uppercase tracking-widest text-white/40">{match.home ? "Heim" : "Auswärts"}</span>}
                     </span>
@@ -306,7 +308,7 @@ export function TeamLeagueSections({ data }) {
     <div data-testid="team-league">
       <MatchdayProgress matchdays={matchdays} />
       <LeagueTable league={league} rounds={rounds} />
-      <Schedule matchdays={matchdays} />
+      <Schedule matchdays={matchdays} showTeam={(league.own_teams || []).length > 1} />
       <Lineup lineup={league.lineup} rounds={rounds} />
       <LeaguePath path={league.path} lineageSlug={data.lineage?.slug} tierOrder={data.lineage?.tier_order} />
     </div>
