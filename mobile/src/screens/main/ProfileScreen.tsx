@@ -275,17 +275,26 @@ function OwnProfile() {
       <Card style={profileStyles.card}>
         <Heading>Meine Referenzen</Heading>
         <Muted>Persönliche Turnier- und Fast-Lap-Historie aus deinem Konto.</Muted>
-        <View style={profileStyles.statGrid}>
-          <Stat label="Gesamt" value={String(references.stats.total)} />
-          <Stat label="Podien" value={String(references.stats.podiums)} tone="gold" />
-          <Stat label="Siege" value={String(references.stats.wins)} />
-        </View>
+        {/* Nur Kennzahlen über null (#1916, wie #1268 im Web). */}
+        {Number(references.stats.total) > 0 || Number(references.stats.podiums) > 0 || Number(references.stats.wins) > 0 ? (
+          <View style={profileStyles.statGrid} testID="profile-reference-stats">
+            {Number(references.stats.total) > 0 ? <Stat label="Gesamt" value={String(references.stats.total)} /> : null}
+            {Number(references.stats.podiums) > 0 ? <Stat label="Podien" value={String(references.stats.podiums)} tone="gold" /> : null}
+            {Number(references.stats.wins) > 0 ? <Stat label="Siege" value={String(references.stats.wins)} /> : null}
+          </View>
+        ) : null}
       </Card>
       {/* Turnierweg (#1193): jedes Turnier lässt sich aufklappen - mit „Bild teilen“ (#1194). */}
       {references.items.length ? references.items.map((item) => <ReferenceWithPath key={item.id} item={item} username={user?.username} own onOpen={openReference} />) : notLoaded.references && problem ? (
         <ErrorState problem={problem} title="Referenzen nicht geladen" onRetry={() => { void refresh(); }} testID="profile-references-error" />
       ) : (
-        <EmptyState icon="ribbon-outline" title="Noch keine Referenzen" detail="Sobald du Turniere spielst oder Fast-Lap-Zeiten eingetragen werden, erscheint deine Historie hier." />
+        <EmptyState
+          icon="ribbon-outline"
+          title="Noch keine Referenzen"
+          detail="Sobald du Turniere spielst oder Fast-Lap-Zeiten eingetragen werden, erscheint deine Historie hier."
+          action={{ label: "Turniere entdecken", onPress: () => { openTab("TournamentList", { filter: "tournaments" }); }, testID: "profile-references-discover" }}
+          testID="profile-references-empty"
+        />
       )}
     </View>
   );
