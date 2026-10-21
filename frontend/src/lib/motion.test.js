@@ -43,13 +43,14 @@ test("Mikro-Bewegung (#1969): Hochzählen, Aufleuchten und Staffelung stehen in 
   expect(rule).toContain("--tls-stagger-step: 0ms;");
 });
 
-test("Dauern über die Tailwind-Namen (duration-fast …), nie als duration-[var(…)] - das warnt beim Bau (#1969)", () => {
+test("Dauern über die Tailwind-Namen (duration-fast …), nie als beliebiger Wert mit var() in eckigen Klammern - das warnt beim Bau (#1969)", () => {
   const offenders = [];
   const walk = (dir) => {
     for (const entry of readdirSync(dir, { withFileTypes: true })) {
       const full = path.join(dir, entry.name);
       if (entry.isDirectory()) walk(full);
-      else if (/\.(js|jsx)$/.test(entry.name) && !entry.name.includes(".test.") && readFileSync(full, "utf8").includes("duration-[var(")) offenders.push(entry.name);
+      // Zusammengesetzt, damit Tailwind die Klasse nicht in diesem Test findet und selbst warnt.
+      else if (/\.(js|jsx)$/.test(entry.name) && !entry.name.includes(".test.") && readFileSync(full, "utf8").includes(["duration-", "[var("].join(""))) offenders.push(entry.name);
     }
   };
   walk(path.join(root, "src"));
