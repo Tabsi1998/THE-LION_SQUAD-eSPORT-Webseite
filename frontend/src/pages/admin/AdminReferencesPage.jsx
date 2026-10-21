@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Link } from "react-router-dom";
 import { api, formatApiError } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { AdminSheet } from "@/components/tls/AdminSheet";
@@ -12,16 +13,20 @@ import { gameOptionLabel } from "@/lib/gameLabels";
 import { checkKey, warningSummary, warningsByField } from "@/lib/referenceChecks";
 import { AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
-import { ExternalLink, Medal, Pencil, Plus, Save, Trash2, User, Users } from "lucide-react";
+import { ExternalLink, Flag, Medal, Pencil, Plus, Save, Trash2, User, Users } from "lucide-react";
 import { viennaDate } from "@/lib/vienna";
 import { podiumItems, yearOf } from "@/lib/referencesOverview";
 import { bestPlacement } from "@/components/tls/references/referenceParts";
+import { seasonOf, seasonOptions } from "@/lib/seasonClose";
 
 // Referenzen (#409): eine Referenz ist eine Turnierteilnahme des Vereins mit Einträgen - entweder
 // ein Team (Spieler treten gemeinsam an, eine Platzierung) oder mehrere Einzelstarter mit je
 // eigener Platzierung. Plattform, Format, Liga und Saison sind Felder, nicht mehr Teil des Titels
 // (`[PS] HC | Liga X | Cup`); alte Einträge zeigt der Server mit aus dem Titel abgeleiteten
 // Feldern, beim ersten Speichern werden sie fest.
+// Saisons (#1750): Einzelne Turniere und Cups stehen hier; Ligen und Saisons laufen unter „Serien“, ihre Referenz
+// entsteht beim Abschluss der Saison. „Gehört zur Saison“ verknüpft eine (alte) Referenz mit ihrer Saison - dann zeigt
+// die Liste „aus Saison …“, und die Karte auf der Website führt zur Saison-Seite.
 
 const VISIBILITY_OPTIONS = [["public", "Öffentlich"], ["community", "Community"], ["members", "Vereinsmitglieder"], ["internal", "Intern"]];
 const MODE_OPTIONS = [["online", "Online"], ["offline", "Vor Ort"], ["hybrid", "Hybrid"]];
@@ -56,6 +61,7 @@ const emptyReference = {
   status: "completed",
   is_active: true,
   order_index: 0,
+  series_id: "",
 };
 
 let entryCounter = 0;
@@ -114,6 +120,7 @@ export function referenceToForm(item) {
     location: item.location || "",
     description: item.description || "",
     highlights: item.highlights || "",
+    series_id: item.series_id || "",
   };
 }
 
@@ -204,20 +211,24 @@ export default function AdminReferencesPage() {
   const [partners, setPartners] = useState([]);
   const [memberProfiles, setMemberProfiles] = useState([]);
   const [helperSettings, setHelperSettings] = useState(null);
+  const [lineages, setLineages] = useState([]);
   const [editing, setEditing] = useState(null);
   const confirm = useConfirm();
   const suggestions = useMemo(() => buildReferenceSuggestions(items, helperSettings), [items, helperSettings]);
 
   const load = useCallback(async () => {
-    const [{ data: refs }, { data: gameRows }, { data: profileRows }, { data: helpers }, partnerRows] = await Promise.all([
+    const [{ data: refs }, { data: gameRows }, { data: profileRows }, { data: helpers }, partnerRows, seasonRows] = await Promise.all([
       api.get("/references/admin"),
       api.get("/games"),
       api.get("/membership/profiles/admin/all"),
       api.get("/references/admin/helpers"),
       // Partner II (#469): Haken je Partner an der Referenz; ohne Partner bleibt das Feld weg.
       api.get("/partners").then((result) => (Array.isArray(result?.data) ? result.data : [])).catch(() => []),
+      // Saisons (#1750) für „aus Saison …“ und „Gehört zur Saison“; ohne Serien bleibt beides weg.
+      api.get("/reference-series/admin").then((result) => (Array.isArray(result?.data?.lineages) ? result.data.lineages : [])).catch(() => []),
     ]);
     setPartners(partnerRows || []);
+    setLineages(seasonRows || []);
     setItems(refs.items || []);
     setSummary(refs.summary || {});
     setGames(gameRows || []);
@@ -242,6 +253,9 @@ export default function AdminReferencesPage() {
           <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">Verein</span>
           <h1 className="font-heading text-3xl md:text-4xl font-black uppercase mt-1">Referenzen</h1>
           <p className="mt-2 text-white/60 text-sm max-w-xl">Turnierteilnahmen des Vereins: je Teilnahme ein Team oder mehrere Einzelstarter mit eigener Platzierung. Plattform, Format, Liga und Saison sind Felder – nicht mehr Teil des Titels.</p>
+          <p className="mt-3 border border-[#29B6E8]/30 bg-[#29B6E8]/5 rounded-sm px-4 py-3 text-sm text-white/75 max-w-xl" data-testid="reference-hint">
+            Einzelne Turniere und Cups hier – Ligen und Saisons unter <Link to="/admin/reference-series" className="text-[#29B6E8] font-semibold underline-offset-2 hover:underline">Serien</Link>, deren Referenz entsteht beim Abschluss automatisch.
+          </p>
         </div>
         <button onClick={() => setEditing({})} data-testid="reference-new" className="px-5 py-2.5 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm inline-flex items-center gap-2">
           <Plus className="w-4 h-4" /> Neue Referenz
@@ -281,6 +295,7 @@ export default function AdminReferencesPage() {
                   {item.league && <Chip>{item.league}</Chip>}
                   {item.season && <Chip>{item.season}</Chip>}
                   {item.organizer && <Chip muted>{item.organizer}</Chip>}
+                  <SeasonBadge item={item} lineages={lineages} />
                 </div>
                 <ul className="mt-2 space-y-1 text-sm text-white/65">
                   {(item.entries || []).map((entry) => (
@@ -310,7 +325,7 @@ export default function AdminReferencesPage() {
         {items.length === 0 && <div className="text-center py-16 border border-dashed border-white/15 rounded-sm text-white/40 font-display tracking-widest">NOCH KEINE REFERENZEN</div>}
       </div>
 
-      {editing && <ReferenceForm reference={editing} games={games} memberProfiles={memberProfiles} partners={partners} suggestions={suggestions} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); load(); }} />}
+      {editing && <ReferenceForm reference={editing} games={games} memberProfiles={memberProfiles} partners={partners} lineages={lineages} suggestions={suggestions} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); load(); }} />}
     </AdminLayout>
   );
 }
@@ -322,6 +337,17 @@ function Stat({ label, value, tone }) {
       <div className="text-[10px] uppercase tracking-widest text-white/45 font-bold">{label}</div>
       <div className={`mt-1 font-display text-3xl font-black ${color}`}>{value}</div>
     </div>
+  );
+}
+
+// „aus Saison …“ (#1750): die Referenz gehört zu einer Saison - der Link führt zu ihr in der Verwaltung.
+function SeasonBadge({ item, lineages }) {
+  const season = seasonOf(item, lineages);
+  if (!season) return null;
+  return (
+    <Link to={`/admin/reference-series/${season.seriesId}`} data-testid={`reference-season-${item.id}`} className="inline-flex items-center gap-1 px-2 py-0.5 border border-[#29B6E8]/30 bg-[#29B6E8]/10 hover:bg-[#29B6E8]/20 rounded-sm text-[10px] uppercase tracking-widest font-bold text-[#29B6E8]">
+      <Flag className="w-3 h-3" aria-hidden="true" /> aus Saison {season.label}
+    </Link>
   );
 }
 
@@ -577,6 +603,7 @@ function formToPayload(form) {
     status: form.status,
     is_active: form.is_active !== false,
     order_index: Number(form.order_index) || 0,
+    series_id: form.series_id || null,
   };
 }
 
@@ -618,9 +645,11 @@ function FieldWarnings({ messages, testId }) {
   );
 }
 
-function ReferenceForm({ reference, games, memberProfiles, partners = [], suggestions, onClose, onSaved }) {
+function ReferenceForm({ reference, games, memberProfiles, partners = [], lineages = [], suggestions, onClose, onSaved }) {
   const isNew = !reference.id;
-  const [form, setForm] = useState(() => referenceToForm(reference));
+  // Eine Referenz des Saisonabschlusses kennt ihre Saison auch ohne eigenes `series_id` (#1750).
+  const [form, setForm] = useState(() => ({ ...referenceToForm(reference), series_id: reference.series_id || seasonOf(reference, lineages)?.seriesId || "" }));
+  const season = seasonOf({ id: reference.id, series_id: form.series_id }, lineages);
   const [saving, setSaving] = useState(false);
   const [platformInput, setPlatformInput] = useState("");
   const set = (key, value) => setForm((current) => ({ ...current, [key]: value }));
@@ -683,6 +712,13 @@ function ReferenceForm({ reference, games, memberProfiles, partners = [], sugges
           <TextField label="Liga" value={form.league} onChange={(v) => set("league", v)} suggestions={suggestions.leagues} testId="reference-league" placeholder="z.B. Liga A" />
           <TextField label="Saison" value={form.season} onChange={(v) => set("season", v)} suggestions={suggestions.seasons} testId="reference-season" placeholder="z.B. Season 3 oder 2026" />
         </FormGrid>
+        <SelectField label="Gehört zur Saison" value={form.series_id} onChange={(v) => set("series_id", v)} options={seasonOptions(lineages, form.series_id)} testId="reference-series"
+          hint="Für eine Liga oder Serie: Die Karte führt dann zur Saison-Seite, und beim Abschluss der Saison wird diese Referenz aktualisiert statt doppelt angelegt." />
+        {season?.seasonEnd && (
+          <p className="border border-[#29B6E8]/30 bg-[#29B6E8]/5 rounded-sm px-3 py-2 text-sm text-white/75" data-testid="reference-season-end">
+            Referenz des Saisonabschlusses: Ihr Endplatz wird in der Saison gepflegt – <Link to={`/admin/reference-series/${season.seriesId}`} className="text-[#29B6E8] font-semibold underline-offset-2 hover:underline">zur Saison</Link>, dort „Saison abschließen“.
+          </p>
+        )}
         <PartnerPicker partners={partners} value={form.partner_ids} onChange={(v) => set("partner_ids", v)} testPrefix="reference-partner" hint="Der Partner zeigt die Referenz auf seiner Seite unter „Gemeinsam“. Steht ein Partner als Veranstalter, gehört sie ihm auch ohne Haken." />
         <FormGrid cols={3}>
           <TextField label="Format" value={form.format} onChange={(v) => set("format", v)} suggestions={suggestions.formats} testId="reference-format" placeholder="z.B. HC, CORE, S&D 4vs4" />
