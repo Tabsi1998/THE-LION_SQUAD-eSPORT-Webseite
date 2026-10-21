@@ -305,7 +305,8 @@ Gehört die Hauptkarte zu einer Saison, führt sie zur Seite der Saison, sonst z
 monatliche **Turnierserien**, **Rennligen** mit Fahrer- und Teamwertung und **Team-Ligen**. Der Aufbau hat zwei Stufen:
 
 - Eine **Spur** ist die Klammer, etwa „Lion Racing F1“: Titel, Art, Bezeichnung (F1, 4vs4 …), Veranstalter, Spiel und
-  Sichtbarkeit. **Neue Spur** öffnet das Blatt.
+  Sichtbarkeit, bei Rennligen dazu die **Vorlage für Ergebnis-Bilder** (siehe „Bild auslesen“ unten). **Neue Spur**
+  öffnet das Blatt.
 - Darunter je **Saison und Stufe** eine Serie: an der Spur **Saison**. Saison und Stufe (etwa „2026“ und „Division 1“)
   ergeben die Adresse. Dazu Status, Standard-Wochentag und -Uhrzeit (Wiener Zeit), die eigenen Teams, Links und wie
   Einträge eines Captains erscheinen – Standard: als Entwurf, den der Vorstand freigibt.
@@ -609,9 +610,26 @@ einem gewerteten Termin **Ergebnis ändern**. Das öffnet das Blatt des Termins.
   **Abstand** (Gap, Rückstand) und **Beste Runde** werden mitgelesen – die schnellste beste Runde wird die schnellste
   Runde des Rennens. Ohne Kopfzeile gilt eine Zelle mit „:“ als Zeit und eine mit „+“ als Abstand. Zeilen wie
   `Schnellste Runde: Name 1:31.456` und `Fahrer des Tages: Name` füllen die Felder des Rennens.
+- **Bild auslesen** (Rennligen): den Ergebnis-Screenshot des Veranstalters mit **Strg+V** ins Blatt einfügen oder über
+  **Bild auslesen** wählen – am Handy geht auch die Kamera. Der eigene Server liest das Bild (kein fremder Dienst, das
+  Bild wird nicht gespeichert) und füllt die Liste: Platz, Startnummer, Name, Team, DNF und die schnellste Runde als
+  Marke; die Vorschau prüft gleich. Darüber steht **Aus dem Bild gelesen** mit dem Bild zum Vergleichen (antippen
+  vergrößert), Strecke, schnellster Rennrunde und Fahrer des Tages. **Gelbe Felder** sind unsicher, darunter steht, was
+  im Bild stand. Ändern nimmt die Markierung weg, **Passt so** bestätigt die ganze Zeile. Übernehmen geht erst, wenn
+  nichts mehr gelb ist – bis dahin heißt der Knopf **Gelbe Zeilen prüfen** und springt zur ersten. Wie das Bild
+  aufgebaut ist, sagt die **Vorlage für Ergebnis-Bilder** an der Spur (eine Saison kann abweichen): Standard für
+  Rennligen ist „Rennliga-Ergebnis (dunkel)“, **Aus** schaltet das Auslesen ab.
 - **Team-Liga:** statt der Liste das **Spiel** – eigenes Team und Gegner (aus dem Termin vorbefüllt), Ergebnis, die
   **Maps** und die **Aufstellung** (wer gespielt hat). Darunter die **Tabelle laut Veranstalter**: einfügen, etwa
   `1. Team 10 7 1 2 22` oder mit Kopfzeile (Pl, Team, Sp, S, U, N, Maps, Pkt).
+
+<table>
+<tr>
+<td><img src="../assets/serien/serien-ergebnis-bild.png" alt="Ergebnis-Blatt nach Bild auslesen: Übersicht Aus dem Bild gelesen mit Strecke, schnellster Rennrunde und Fahrer des Tages, darunter gelbe Felder mit dem Gelesenen und Passt so" width="420"></td>
+<td><img src="../assets/serien/serien-ergebnis-bild-handy.png" alt="Dasselbe am Handy mit vergrößertem Bild zum Vergleichen" width="200"></td>
+<td><img src="../assets/serien/serien-spur-vorlage-bild.png" alt="Spur bearbeiten mit dem Feld Vorlage für Ergebnis-Bilder" width="200"></td>
+</tr>
+</table>
 
 **Vorschau** lässt den Server prüfen und rechnen, gespeichert wird dabei nichts. Fehler (rot) und Hinweise (gelb)
 stehen direkt an der Zeile, dazu die Punkte je Zeile, die erkannten **Vereinsleute**, **unbekannte Namen** und der
@@ -666,6 +684,9 @@ aktuellen Stand, eure Eingaben bleiben stehen, und die Vorschau prüft neu. Jede
 | Captain-Änderung ist nicht öffentlich | Das Ergebnis war veröffentlicht – die Änderung ist ein Entwurf daneben | Vorstand: im Blatt **Freigeben** |
 | Rennliga ohne Vereins-Garage | Kein Teilnehmer ist als Mitglied zugeordnet, und die Saison hat kein eigenes Team | **Unbekannte Namen** → **Bestätigen**, oder das eigene Team der Saison eintragen |
 | Rennliga ohne Teamwertung | Teamwertung in den Regeln der Saison aus | Saison bearbeiten → Teamwertung einschalten |
+| Kein Knopf **Bild auslesen** | Für die Art gibt es keine Vorlage (Team-Liga, Turnierserie) oder sie steht auf **Aus** | Spur oder Saison bearbeiten → **Vorlage für Ergebnis-Bilder** |
+| „Texterkennung gerade nicht verfügbar“ | Dem Server fehlt Tesseract (altes Image) | Server mit `update.sh` aktualisieren; bis dahin **Liste einfügen** |
+| Viele Zeilen gelb | Bild unscharf, klein oder abfotografiert | Screenshot statt Foto, ganzes Ergebnis ohne Zoom; sonst gelbe Felder nach dem Bild korrigieren |
 
 ---
 
