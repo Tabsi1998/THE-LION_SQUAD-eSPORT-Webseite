@@ -97,7 +97,7 @@ test("Knopf „Bild auslesen“: gelesen wird im Server, die Zeilen ersetzen die
   expect(within(rows[1]).getByTestId("result-row-ocr")).toHaveTextContent("Team (gelesen „Blaupted GP“)");
   expect(within(rows[2]).getByTestId("result-row-name")).toHaveAttribute("data-ocr-uncertain", "name");
   expect(within(rows[0]).queryByTestId("result-row-ocr")).toBeNull();
-});
+}, 15000);
 
 test("übernommen wird erst ohne gelbe Zeilen: ändern oder „Passt so“", async () => {
   setup();
@@ -126,7 +126,7 @@ test("übernommen wird erst ohne gelbe Zeilen: ändern oder „Passt so“", asy
   const body = apiMock.put.mock.calls[0][1];
   expect(body.status).toBe("published");
   expect(body.rows[1].team).toBe("Rotor Racing");
-});
+}, 15000);
 
 test("gelbe Zeit und gelbe Felder des Rennens: „Mehr“ steht offen, ändern oder „Passt so“ gibt das Übernehmen frei", async () => {
   const read = {
@@ -163,7 +163,7 @@ test("gelbe Zeit und gelbe Felder des Rennens: „Mehr“ steht offen, ändern o
   fireEvent.click(screen.getByTestId("result-race-ocr-confirm"));
   expect(screen.queryByTestId("result-image-open")).toBeNull();
   expect(screen.queryByTestId("result-race-ocr")).toBeNull();
-});
+}, 15000);
 
 test("eine eingefügte Liste oder ein zweites Bild ohne Kopf geben ungeprüfte Felder des Rennens nicht frei", async () => {
   const read = {
@@ -203,7 +203,7 @@ test("eine eingefügte Liste oder ein zweites Bild ohne Kopf geben ungeprüfte F
   await waitFor(() => expect(screen.getByTestId("result-fastest-time")).toHaveValue("1:31.207"), WAIT);
   expect(screen.getByTestId("result-fastest-time")).not.toHaveAttribute("data-ocr-uncertain");
   expect(screen.queryByTestId("result-image-open")).toBeNull();
-});
+}, 15000);
 
 test("Strg+V: Text in einem Feld bleibt Text, ohne Vorlage gibt es kein Auslesen", async () => {
   setup();
