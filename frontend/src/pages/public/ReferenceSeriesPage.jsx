@@ -54,7 +54,7 @@ function Calendar({ rounds }) {
         <ol className="mt-4 divide-y divide-white/5 border-y border-white/10">
           {rounds.map((round) => (
             <li key={round.id} className="py-3 flex items-start gap-3" data-testid="series-page-round" data-state={round.state}>
-              <span className={`w-12 shrink-0 font-black tabular-nums ${round.kind === "final" ? "text-[var(--tls-honor)]" : "text-white/80"}`}>{roundLabel(round)}</span>
+              <span className={`min-w-12 shrink-0 whitespace-nowrap font-black tabular-nums ${round.kind === "final" ? "text-[var(--tls-honor)]" : "text-white/80"}`}>{roundLabel(round)}</span>
               <span className="min-w-0 flex-1">
                 <span className={`block text-sm tabular-nums ${round.state === "cancelled" ? "text-white/45" : "text-white"}`}>{roundWhen(round)}</span>
                 {(round.title || round.venue || round.country_code || round.opponent) && (

@@ -172,7 +172,7 @@ export function SeriesCalendarSection({ series }) {
         <ol className="mt-3 divide-y divide-white/5" data-testid="calendar-rounds">
           {rounds.map((round, index) => (
             <li key={round.id} data-testid="calendar-round" data-state={round.state} className={`py-2.5 flex items-start gap-3 ${hintIds.has(round.id) ? "bg-amber-400/[0.04]" : ""}`}>
-              <div className="w-12 shrink-0 pt-0.5 text-sm font-black tabular-nums text-white/80">{roundLabel(round)}</div>
+              <div className="min-w-12 shrink-0 whitespace-nowrap pt-0.5 text-sm font-black tabular-nums text-white/80">{roundLabel(round)}</div>
               <div className="min-w-0 flex-1">
                 <div className={`text-sm ${round.state === "cancelled" ? "text-white/45" : "text-white"}`}>
                   <span className="tabular-nums">{roundWhen(round)}</span>
@@ -195,7 +195,7 @@ export function SeriesCalendarSection({ series }) {
           {weekends.map((weekend) => (
             <li key={weekend.key} className="py-2.5" data-testid="calendar-weekend" data-state={weekend.state}>
               <div className="flex items-start gap-3">
-                <div className="w-12 shrink-0 pt-0.5 text-sm font-black tabular-nums text-white/80">{roundLabel(weekend.lead)}</div>
+                <div className="min-w-12 shrink-0 whitespace-nowrap pt-0.5 text-sm font-black tabular-nums text-white/80">{roundLabel(weekend.lead)}</div>
                 <div className={`min-w-0 flex-1 text-sm ${weekend.state === "cancelled" ? "text-white/45" : "text-white"}`}>
                   <span className="tabular-nums">{dayLabel(weekend.lead.club_day) || "Termin offen"}</span>
                   {(weekend.venue || weekend.title || weekend.country_code) && <span className="text-white/60"> · <VenueWithFlag round={weekend} /></span>}

@@ -84,6 +84,17 @@ test("je Termin „Ergebnis eintragen“, abgesagte Termine fehlen", async () =>
   expect(within(items[1]).getByTestId("results-open")).toHaveTextContent("Ergebnis ändern");
 });
 
+test("Termin ohne Kürzel (#1969): „Termin 2“ bricht nicht in der schmalen Spalte um", async () => {
+  apiMock.get.mockImplementation(async (url) => (url.endsWith("/calendar")
+    ? { data: { ...CALENDAR, rounds: [{ ...CALENDAR.rounds[0], code: "", position: 2 }] } }
+    : { data: resultData() }));
+  render(<SeriesResultsSection series={BOARD} onChanged={vi.fn()} />);
+  const [item] = await screen.findAllByTestId("results-round");
+  const label = within(item).getByText("Termin 2");
+  expect(label).toHaveClass("whitespace-nowrap", "min-w-12");
+  expect(label).not.toHaveClass("w-12");
+});
+
 test("dynamische Liste: Zeilen hinzufügen und entfernen, Platz aus der Reihenfolge, Team aus dem Teilnehmer", async () => {
   setup();
   await openRound();

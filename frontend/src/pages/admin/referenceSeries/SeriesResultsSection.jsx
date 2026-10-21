@@ -58,7 +58,7 @@ export function SeriesResultsSection({ series, onChanged }) {
           <ol className="mt-2 divide-y divide-white/5" data-testid="results-weekends">
             {weekends.map((weekend) => (
               <li key={weekend.key} className="py-2.5 flex items-start gap-3" data-testid="results-weekend" data-state={weekend.state}>
-                <div className="w-12 shrink-0 pt-0.5 text-sm font-black tabular-nums text-white/80">{roundLabel(weekend.lead)}</div>
+                <div className="min-w-12 shrink-0 whitespace-nowrap pt-0.5 text-sm font-black tabular-nums text-white/80">{roundLabel(weekend.lead)}</div>
                 <div className="min-w-0 flex-1 text-sm">
                   <span className="tabular-nums text-white">{dayLabel(weekend.lead.club_day) || "Termin offen"}</span>
                   {(weekend.title || weekend.venue || weekend.country_code) && <span className="text-white/60"> · <VenueWithFlag round={weekend} /></span>}
@@ -75,7 +75,7 @@ export function SeriesResultsSection({ series, onChanged }) {
             const scored = round.state === "scored";
             return (
               <li key={round.id} className="py-2.5 flex items-center gap-3 flex-wrap sm:flex-nowrap" data-testid="results-round" data-state={round.state}>
-                <div className="w-12 shrink-0 text-sm font-black tabular-nums text-white/80">{roundLabel(round)}</div>
+                <div className="min-w-12 shrink-0 whitespace-nowrap text-sm font-black tabular-nums text-white/80">{roundLabel(round)}</div>
                 <div className="min-w-0 flex-1 text-sm">
                   <span className="tabular-nums text-white">{roundWhen(round)}</span>
                   {(round.title || round.venue || round.country_code) && <span className="text-white/60"> · <VenueWithFlag round={round} /></span>}

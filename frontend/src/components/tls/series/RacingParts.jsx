@@ -183,7 +183,7 @@ export function RacingCalendar({ rounds, rows, onSelect, publicKeys, hrefFor, ro
             const href = roundHref?.(round);
             const head = (
               <>
-                <span className={`w-12 shrink-0 font-black tabular-nums ${weekend.kind === "final" ? "text-[var(--tls-honor)]" : "text-white/80"}`}>{roundLabel(round)}</span>
+                <span className={`min-w-12 shrink-0 whitespace-nowrap font-black tabular-nums ${weekend.kind === "final" ? "text-[var(--tls-honor)]" : "text-white/80"}`}>{roundLabel(round)}</span>
                 <div className="min-w-0 flex-1">
                   <span className={`block text-sm tabular-nums ${weekend.state === "cancelled" ? "text-white/45" : "text-white"}`}>{weekend.multi ? roundWhen({ ...round, time: null }) : roundWhen(round)}</span>
                   {(weekend.title || weekend.venue || weekend.country_code) && (
