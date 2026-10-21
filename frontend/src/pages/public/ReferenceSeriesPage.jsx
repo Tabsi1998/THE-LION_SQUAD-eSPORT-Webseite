@@ -12,6 +12,7 @@ import { FinalCalculator, SeriesFinal, SeriesProgress, SeriesRules } from "@/com
 import { TeamLeagueSections } from "@/components/tls/series/TeamLeague";
 import { RacingLeague } from "@/components/tls/series/RacingLeague";
 import { VenueWithFlag } from "@/components/tls/CountryFlag";
+import { MapPoolView } from "@/components/tls/maps/MapPoolView";
 import { NotFoundPage } from "@/pages/ErrorPages";
 import { SeriesPartners } from "@/components/tls/series/SeriesPartners";
 
@@ -120,6 +121,8 @@ export default function ReferenceSeriesPage() {
             <SeriesFinal final={data.final} />
             <Calendar rounds={rounds} />
             </>)}
+            {/* Map-Pool der Saison (#1616) als Snapshot - bei jeder Art, ohne Pool erscheint nichts. */}
+            <MapPoolView pool={data.map_pool} hint="Die Maps dieser Saison, je Modus." headingId="series-page-maps" />
           </>
         )}
       </article>

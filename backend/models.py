@@ -298,10 +298,12 @@ def _game_key(value) -> str:
 
 class GameMatchMode(BaseModel):
     """Ein Spielmodus mit Dauer (#1554): „Grand Prix 4 Rennen“ 12 Min. je Spiel, oder 4 Min. je Einzelspiel (``per_game``),
-    dann zählt Best-of als Erwartungswert (siehe ``services/match_duration.py``)."""
+    dann zählt Best-of als Erwartungswert (siehe ``services/match_duration.py``). Die Minuten sind freiwillig (#1616):
+    ein Modus nur für Maps hat keine Dauer, dann plant das Turnier mit der nächsten Ebene. Die Kennung ``mode`` bleibt
+    beim Umbenennen gleich - Maps und Map-Pools zeigen auf sie."""
     mode: Optional[str] = None
     label: str = Field(min_length=1, max_length=60)
-    minutes: int = Field(ge=1, le=600)
+    minutes: Optional[int] = Field(default=None, ge=1, le=600)
     per_game: bool = False
 
     @field_validator("label", mode="before")

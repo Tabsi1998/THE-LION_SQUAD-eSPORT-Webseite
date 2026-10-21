@@ -13,6 +13,7 @@ import { SeriesRosterSection } from "./referenceSeries/SeriesRosterSection";
 import { SeriesStaffSection } from "./referenceSeries/SeriesStaffSection";
 import { SeriesTeamColorsSection } from "./referenceSeries/SeriesTeamColorsSection";
 import { SeasonCloseSheet } from "./referenceSeries/SeasonCloseSheet";
+import { SeriesMapPoolSection } from "./referenceSeries/SeriesMapPoolSection";
 import { seasonLabel } from "./AdminReferenceSeriesPage";
 import { dayLabel, publishText } from "@/lib/referenceSeriesStaff";
 import { referenceLine, seasonName } from "@/lib/seasonClose";
@@ -157,6 +158,8 @@ export default function AdminReferenceSeriesDetailPage() {
             <SeriesResultsSection series={series} onChanged={load} />
             {/* Teamfarben für die Ergebnistabelle je Runde (#1950) - nur Rennliga, nur Vorstand. */}
             {board && lineage.kind === "racing" && <SeriesTeamColorsSection series={series} />}
+            {/* Map-Pool der Saison (#1616): mit Spiel der Spur, bei der Team-Liga auch ohne (Hinweis auf den Freitext). */}
+            {board && (lineage.game_id || lineage.kind === "team_league") && <SeriesMapPoolSection series={series} />}
             {board && <SeriesStaffSection series={series} />}
           </div>
           {board && editing && <SeriesForm series={series} lineage={lineage} onClose={() => setEditing(false)} onSaved={() => { setEditing(false); load(); }} />}

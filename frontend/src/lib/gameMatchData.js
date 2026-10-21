@@ -78,8 +78,10 @@ export function gameMatchDataProblem(form) {
   for (const [index, mode] of modes.entries()) {
     const label = String(mode.label || "").trim();
     if (!label) return `Modus ${index + 1}: bitte einen Namen eintragen.`;
+    // Minuten freiwillig (#1616): ein Modus nur für Maps hat keine Dauer, dann plant das Turnier mit der nächsten Ebene.
+    if (String(mode.minutes ?? "").trim() === "") continue;
     const minutes = numberOrNull(mode.minutes);
-    if (minutes === null || minutes < 1 || minutes > 600) return `Modus „${label}“: bitte Minuten eintragen (1 bis 600).`;
+    if (minutes === null || minutes < 1 || minutes > 600) return `Modus „${label}“: Minuten von 1 bis 600 – oder leer lassen.`;
   }
   const points = parsePointsTable(form?.points_table);
   return points.error ? `Punktetabelle: ${points.error}` : "";

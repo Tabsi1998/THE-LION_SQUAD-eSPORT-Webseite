@@ -8,8 +8,9 @@ Der Weg eines Turniers aus Sicht der Turnierleitung: anlegen, Anmeldung, Check-i
 - **Admin → eSports → Turniere** (`/admin/tournaments`) – Liste aller Turniere mit Suche, Status-Filter und CSV-Export
 - **Admin → eSports → Turniere → Neues Turnier** (`/admin/tournaments/new`) – anlegen
 - **Admin → eSports → Turniere → Turnier öffnen** (`/admin/tournaments/<Turnier>`) – Reiter **Teilnehmer**,
-  **Turnierbaum**, **Matchplan** (Zeitleiste je Station, siehe 3.8), **Spiele**, **Gruppen** (nur beim Format Gruppenphase), **Team**, **Rückmeldungen** (erst nach
+  **Turnierbaum**, **Matchplan** (Zeitleiste je Station, siehe 3.8), **Spiele**, **Gruppen** (nur beim Format Gruppenphase), **Maps** (nur mit Spiel, siehe 3.14), **Team**, **Rückmeldungen** (erst nach
   dem Ende), **Bearbeiten**
+- **Admin → eSports → Spiele → Maps** (`/admin/games/<Spiel>/maps`) – Map-Bibliothek eines Spiels mit Bildern und Modi
 - **Admin → eSports → Turnier-Leitfaden** (`/admin/tournament-guide`) – welches Format wofür, mit „Voreinstellung übernehmen“
 - **Admin → eSports → Stationen** (`/admin/stations`) – Geräte und Plätze in der Halle, Spiele zuweisen
 - **Admin → eSports → Gewinne**, **Strafen**, **Jahreswertung** – was nach dem Turnier daraus wird
@@ -47,6 +48,7 @@ Turniere. **Ohne 2FA** erscheint stattdessen der Hinweis **2FA einrichten**, sie
 | **Ergebnisse** | Spieler melden, oder die Turnierleitung trägt im **Ergebnis-Fenster** ein, danach 10 Sekunden **Rückgängig** | Matchplan, Stationen, Turnierleitung am Handy |
 | **Dispute** | Streitfall entscheiden mit einem Tipp | Turnierleitung am Handy |
 | **Stationen** | Spiele Geräten zuweisen, Aufruf auf dem TV | Admin → eSports → Stationen |
+| **Maps** | Map-Bibliothek je Spiel mit Bild und Modi; je Turnier und Phase ein eigener Map-Pool | Spiele → Maps, Reiter Maps |
 | **TV** | Turnierbaum, Aufrufe, Stationen auf Fernseher und Beamer | [TV und Beamer](tv.md) |
 | **Abschluss** | Beendet, Ergebnisse veröffentlicht, Punkte, Erfolge, Gewinne | Statusauswahl im Turnier |
 
@@ -566,7 +568,7 @@ freiwillig:
 
 | Feld | Wofür |
 | --- | --- |
-| **Dauer je Modus** | Name und Minuten je Modus, z. B. „Grand Prix 4 Rennen“ 12 Min. Der erste Modus ist die Vorgabe; im Turnier wählt **Spielmodus** einen anderen. **Minuten je Einzelspiel** heißt: die Minuten gelten pro Spiel, Best-of zählt mit. |
+| **Modi und Dauer** | Name und Minuten je Modus, z. B. „Grand Prix 4 Rennen“ 12 Min. Der erste Modus ist die Vorgabe; im Turnier wählt **Spielmodus** einen anderen. **Minuten je Einzelspiel** heißt: die Minuten gelten pro Spiel, Best-of zählt mit. Die Minuten sind freiwillig: ein Modus nur für Maps (etwa „Stellung“ oder „Suchen & Zerstören“) bleibt ohne Dauer. Umbenennen behält die Zuordnung der Maps (siehe 3.14). |
 | **Spieler je Lauf vor Ort / online** | Wie viele gleichzeitig an einer Station bzw. in einer Lobby spielen. Füllt bei Mehrspieler-Bäumen die **Spielgröße** vor. |
 | **Best-of-Vorgabe** | Füllt **Best of** vor, wenn im Turnier das Spiel gewählt wird. |
 | **Aufbau- und Wechselzeit** | Minuten je Spiel an der Station; kommt zur Dauer aus dem Modus dazu (nicht zu einer Dauer am Turnier). |
@@ -616,6 +618,38 @@ Fällt am Event Netz oder Server aus, läuft das Turnier auf Papier weiter. Daru
 <td><img src="../assets/druckansicht/spielplan.png" alt="Druckansicht des Spielplans mit Zeit, Station, Spiel, Teilnehmern und leeren Ergebnisfeldern" width="300"></td>
 </tr>
 </table>
+
+### 3.14 Maps und Map-Pools
+
+**Map-Bibliothek je Spiel:** **Admin → eSports → Spiele**, in der Zeile des Spiels das Karten-Symbol (**Maps**). Jedes
+Spiel und jede Spielversion hat seine eigenen Maps – eine neue Version erbt keine, und gleiche Namen in zwei Spielen
+sind zwei verschiedene Maps. Eingebaut ist keine Map; ihr legt alle selbst an. **Map hinzufügen** öffnet das Blatt:
+
+- **Name** und **Slug** (eindeutig im Spiel; bleibt beim Umbenennen gleich), **Bild** im Format 16 : 9 über
+  **Hochladen** oder **Medien wählen** (nur eigene Uploads), **Notiz** und **Externe Kennung** (freiwillig).
+- **Modi:** dieselben Modi wie bei der Spieldauer (siehe 3.12) – kein zweites Modussystem. Eine Map kann in mehreren
+  Modi freigegeben sein und in anderen nicht; nur dort lässt sie sich in einen Pool wählen. Hat das Spiel keine Modi,
+  gilt die Map für jeden Pool.
+- Die Pfeile ändern die **Reihenfolge**, das Archiv-Symbol **archiviert** (und holt zurück). **Löschen** geht nur, solange
+  die Map in keinem gespeicherten Pool stand – sonst archivieren. Die Karte sagt, in wie vielen Pools sie steht.
+
+<img src="../assets/turniere/maps-bibliothek.png" alt="Map-Bibliothek eines Spiels: Karten mit Bild, Slug, Modi und wie viele Pools die Map nutzen" width="560">
+
+**Map-Pool im Turnier:** Reiter **Maps** (nur bei Turnieren mit Spiel, für Turnierleitung und Strukturrollen). Je Modus
+die Maps an- und abhaken, mit den Pfeilen sortieren; **Vorgabe des Spiels** übernimmt alle freigegebenen, aktiven Maps,
+**Alle abwählen** leert die Auswahl, **Speichern** legt den Pool an. Darunter die **Phasen**: eine Phase übernimmt den
+Pool des Turniers oder bekommt mit **Eigenen Pool festlegen** einen eigenen (etwa ein Finale mit anderen Maps,
+**Übernehmen von … Pool des Turniers** als Startpunkt). **Pool entfernen** an der Phase lässt wieder den des Turniers
+gelten. Die Turnierseite zeigt den Pool als Karten mit Bild, je Phase mit eigenem Pool einen weiteren Abschnitt.
+
+<img src="../assets/turniere/maps-turnier-pool.png" alt="Reiter Maps: Map-Pool des Turniers je Modus und das Finale mit eigenem Pool" width="560">
+
+**Was gespeichert bleibt:** Jedes Speichern ist eine neue **Version** mit Namen und Bildern von diesem Moment.
+Umbenennen, ein neues Bild oder Archivieren in der Bibliothek ändert keinen gespeicherten Pool und keine alten Spiele;
+der Editor nennt die geänderten Maps („Seit dem Speichern in der Bibliothek geändert“), erst ein neues Speichern
+übernimmt den neuen Stand. Zwei Turniere desselben Spiels haben getrennte Pools. Wechselt das Turnier das Spiel, gilt
+der alte Pool nicht mehr und muss neu gewählt werden. Ein Turnier ohne Maps (etwa ein Solo-Cup) braucht nichts davon:
+ohne Spiel gibt es keinen Reiter **Maps**, ohne Pool keinen Abschnitt auf der Turnierseite.
 
 ---
 

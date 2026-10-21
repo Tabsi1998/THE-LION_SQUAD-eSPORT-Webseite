@@ -27,6 +27,7 @@ import { ParticipantRemovalActions } from "./tournament/ParticipantRemovalAction
 import { ActionGroup, EmptyBracketNotice, TournamentEditForm } from "./tournament/TournamentEditForm";
 import { OPERATIONAL_STATUS_VALUES, TOURNAMENT_STATUS_OPTIONS, normalizeSearch, primaryTournamentAction } from "./tournament/shared";
 import { MatchPlanPanel } from "./tournament/matchplan/MatchPlanPanel";
+import { MapPoolPanel } from "./tournament/MapPoolPanel";
 
 export default function AdminTournamentEditPage() {
   // Globale Aktionen nur für die Turnierleitung mit Zwei-Faktor (#1028), Helfer sehen die ihres Einsatzes.
@@ -410,6 +411,8 @@ export default function AdminTournamentEditPage() {
     ["matchplan", "Matchplan"],
     ["stages", "Spiele"],
     ...(t.format === "groups" ? [["groups", "Gruppen"]] : []),
+    // Map-Pool (#1616): nur mit Spiel und für Strukturrollen - ein maploser Cup bekommt keinen Reiter.
+    ...(t.game_id && t.can_manage_structure ? [["maps", "Maps"]] : []),
     ...(isTournamentLead ? [["staff", "Team"]] : []),
     // Rückmeldungen (#1196): erst, wenn das Turnier vorbei ist - ohne Namen.
     ...(["completed", "results_published", "archived"].includes(t.status) ? [["feedback", "Rückmeldungen"]] : []),
@@ -744,6 +747,7 @@ export default function AdminTournamentEditPage() {
           onChanged={loadSafely}
         />
       )}
+      {activeTab === "maps" && <MapPoolPanel tournamentId={t.id} canEdit={Boolean(t.can_manage_structure)} />}
       {activeTab === "edit" && isTournamentLead && (
         <TournamentEditForm
           key={t.updated_at || t.id}

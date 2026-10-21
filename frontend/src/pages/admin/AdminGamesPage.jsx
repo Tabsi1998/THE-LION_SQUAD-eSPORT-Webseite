@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { api, formatRequestError } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { AdminSheet } from "@/components/tls/AdminSheet";
@@ -12,7 +13,7 @@ import { gameLabel } from "@/lib/gameLabels";
 import { gameMatchDataPayload, gameMatchDataProblem, gameMatchDataToForm } from "@/lib/gameMatchData";
 import { GameMatchDataFields } from "./GameMatchDataFields";
 import { toast } from "sonner";
-import { Pencil, Plus, Trash2 } from "lucide-react";
+import { Map as MapIcon, Pencil, Plus, Trash2 } from "lucide-react";
 
 const slugFrom = (txt) => (txt || "")
   .normalize("NFD")
@@ -164,6 +165,10 @@ export default function AdminGamesPage() {
                   <td className="px-4 py-3 text-white/60">{g.identity_source_game?.display_name || g.identity_source_game?.name || (g.inherit_player_ids !== false && (g.parent_game?.display_name || g.parent_game?.name)) || "Eigene IDs"}</td>
                   <td className="px-4 py-3 text-right">
                     <div className="inline-flex items-center gap-2">
+                      {/* Map-Bibliothek (#1616): Maps mit Bild und Modi für Pools in Turnieren und Saisons. */}
+                      <Link to={`/admin/games/${g.id}/maps`} className="p-1 text-white/40 hover:text-[#29B6E8]" title="Maps des Spiels" aria-label={`Maps von ${gameLabel(g)}`} data-testid={`game-maps-${g.slug}`}>
+                        <MapIcon className="w-4 h-4" />
+                      </Link>
                       <button onClick={() => setEditing(toForm(g))} className="p-1 text-white/40 hover:text-[#29B6E8]" title="Spiel bearbeiten" data-testid={`game-edit-${g.slug}`}>
                         <Pencil className="w-4 h-4" />
                       </button>

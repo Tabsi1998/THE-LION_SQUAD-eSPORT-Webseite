@@ -103,9 +103,11 @@ describe("Prüfung vor dem Speichern", () => {
     const { gameMatchDataProblem } = await import("./gameMatchData");
     const base = gameMatchDataToForm({});
     expect(gameMatchDataProblem(base)).toBe("");
-    expect(gameMatchDataProblem({ ...base, match_modes: [{ mode: "", label: "Grand Prix", minutes: "", per_game: false }] })).toBe("Modus „Grand Prix“: bitte Minuten eintragen (1 bis 600).");
+    // Minuten sind freiwillig (#1616): ein Modus nur für Maps hat keine Dauer.
+    expect(gameMatchDataProblem({ ...base, match_modes: [{ mode: "", label: "Grand Prix", minutes: "", per_game: false }] })).toBe("");
     expect(gameMatchDataProblem({ ...base, match_modes: [{ mode: "", label: "", minutes: "12", per_game: false }] })).toBe("Modus 1: bitte einen Namen eintragen.");
-    expect(gameMatchDataProblem({ ...base, match_modes: [{ mode: "", label: "A", minutes: "601", per_game: false }] })).toBe("Modus „A“: bitte Minuten eintragen (1 bis 600).");
+    expect(gameMatchDataProblem({ ...base, match_modes: [{ mode: "", label: "A", minutes: "601", per_game: false }] })).toBe("Modus „A“: Minuten von 1 bis 600 – oder leer lassen.");
+    expect(gameMatchDataProblem({ ...base, match_modes: [{ mode: "", label: "A", minutes: "0", per_game: false }] })).toBe("Modus „A“: Minuten von 1 bis 600 – oder leer lassen.");
     expect(gameMatchDataProblem({ ...base, points_table: "1, x" })).toBe("Punktetabelle: „x“ ist keine ganze Zahl.");
   });
 });

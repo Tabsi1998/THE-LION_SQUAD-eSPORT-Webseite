@@ -50,6 +50,17 @@ test("Kopf mit Spur, Saison, Status und Regeln samt Version und Hinweis", async 
   expect(screen.getByTestId("series-detail-rules")).toHaveTextContent("Version 3");
   expect(screen.getByTestId("series-detail-rules")).toHaveTextContent("Beste acht zählen");
   expect(screen.getByTestId("series-detail-back")).toHaveAttribute("href", "/admin/reference-series");
+  // Rennliga ohne Spiel: kein Map-Pool (#1616).
+  expect(apiMock.get).not.toHaveBeenCalledWith("/map-pools/reference-series/serie-1");
+});
+
+test("mit Spiel der Spur wählt der Vorstand den Map-Pool der Saison (#1616)", async () => {
+  apiMock.get.mockImplementation((url) => Promise.resolve(String(url).startsWith("/map-pools/")
+    ? { data: { game: { id: "g1", name: "Probe Shooter", modes: [] }, library: [], pool: null, previous: null } }
+    : { data: { ...SERIES, lineage: { ...SERIES.lineage, kind: "team_league", game_id: "g1" } } }));
+  renderAt();
+  expect(await screen.findByTestId("series-map-pool")).toHaveTextContent("Map-Pool der Saison");
+  expect(apiMock.get).toHaveBeenCalledWith("/map-pools/reference-series/serie-1");
 });
 
 test("Bearbeiten öffnet das Seitenblatt der Saison, Archivieren archiviert", async () => {
