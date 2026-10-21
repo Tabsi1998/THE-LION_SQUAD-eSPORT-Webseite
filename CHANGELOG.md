@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.15.0 (21.10.2026)
+
+### Neu
+
+* Liga-Weg der Team-Liga zeigt den Vermerk der Saison (#1898)
+* Liga-Weg, Ehrentafel und Vitrine nutzen zuerst den Vermerk der Saison und die Reihenfolge der Stufen (#1898)
+* Referenzen prüfen beim Speichern Datum und Platzierung, Hinweise am Feld und Liste der Auffälligkeiten (#1755)
+* Saison mit Ergebnis-Vermerk (Aufstieg, Abstieg, Klassenerhalt, Meister) und Spur mit eigener Reihenfolge der Stufen (#1898)
+* Saison-Deko-Schalter für Gäste am Handy unten im Menü (#1239)
+
+### Fehlerbehebungen
+
+* Kopfzeile zwischen 1024 und 1439 px mit Löwenkopf, Login-Symbol und „Beitreten“ – nichts bricht um (#1234)
+* Saison-Mütze sitzt auch auf dem Löwenkopf der kompakten Kopfzeile (#1234)
+* Untermenüs öffnen sich am Tablet per Antippen und mit der Tastatur (#1233)
+
 ## 1.14.0 (21.10.2026)
 
 ### Neu
