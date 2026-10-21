@@ -153,14 +153,20 @@ test("ohne Zeiten nur Pos, Name, Team und Punkte - auch am Handy ohne leere Feld
 
 test("Zeiten zählen beim Öffnen hoch und stehen am Ende genau da", async () => {
   vi.useFakeTimers({ toFake: ["requestAnimationFrame", "cancelAnimationFrame", "performance"] });
-  renderAt("/references/series/probe-rennliga/2026/runde/1");
-  await act(async () => { await Promise.resolve(); });
-  const table = screen.getByTestId("round-table");
-  const first = within(table).getAllByTestId("round-row")[0];
-  expect(first.querySelector("[data-counting='true']")).not.toBeNull();
-  act(() => { vi.advanceTimersByTime(2000); });
-  expect(first).toHaveTextContent("31:55,056");
-  expect(first.querySelector("[data-counting='true']")).toBeNull();
+  // Gezählt wird nur, wenn der Browser zu „Bewegung reduzieren“ Auskunft gibt (#1969) - hier: keine Einschränkung.
+  window.matchMedia = () => ({ matches: false, addEventListener() {}, removeEventListener() {} });
+  try {
+    renderAt("/references/series/probe-rennliga/2026/runde/1");
+    await act(async () => { await Promise.resolve(); });
+    const table = screen.getByTestId("round-table");
+    const first = within(table).getAllByTestId("round-row")[0];
+    expect(first.querySelector("[data-counting='true']")).not.toBeNull();
+    act(() => { vi.advanceTimersByTime(2000); });
+    expect(first).toHaveTextContent("31:55,056");
+    expect(first.querySelector("[data-counting='true']")).toBeNull();
+  } finally {
+    delete window.matchMedia;
+  }
 });
 
 test("eine Runde, die es nicht gibt, ist 404", async () => {

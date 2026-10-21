@@ -13,8 +13,11 @@ import { COUNT_UP_MS, countFrame, countShape, countStart } from "@/lib/countUp";
 // - Während des Zählens liest ein Screenreader nur den Endwert. `onDone` meldet das Ende (etwa für ein Aufleuchten).
 // Die Zwischenstände schreibt der Baustein direkt in den Text (ohne React-Durchlauf je Bild) - 60 Zeilen bleiben flüssig.
 
+// Gezählt wird nur, wenn der Browser Auskunft über „Bewegung reduzieren“ gibt (matchMedia) - ohne sie (Tests, sehr alte
+// Browser) steht der Wert sofort da, wie früher bei den Kennzahlen (#425).
 function canAnimate() {
-  return typeof window !== "undefined" && typeof window.requestAnimationFrame === "function" && motionAllowed();
+  return typeof window !== "undefined" && typeof window.requestAnimationFrame === "function"
+    && typeof window.matchMedia === "function" && motionAllowed();
 }
 
 function useVisible(ref, wanted) {

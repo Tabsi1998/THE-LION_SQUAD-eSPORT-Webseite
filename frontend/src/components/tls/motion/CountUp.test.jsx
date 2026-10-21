@@ -7,8 +7,21 @@ import { COUNT_UP_MS } from "@/lib/countUp";
 
 const TIMERS = { toFake: ["requestAnimationFrame", "cancelAnimationFrame", "performance", "setTimeout", "clearTimeout"] };
 
+// Gezählt wird nur, wenn der Browser zu „Bewegung reduzieren“ Auskunft gibt (#1969) - hier: keine Einschränkung.
+beforeEach(() => {
+  window.matchMedia = () => ({ matches: false, addEventListener() {}, removeEventListener() {} });
+});
+
 afterEach(() => {
   vi.useRealTimers();
+  delete window.matchMedia;
+});
+
+test("ohne Auskunft des Browsers (kein matchMedia) steht der Wert sofort", () => {
+  delete window.matchMedia;
+  render(<CountUp value="31:55,056" data-testid="zeit" />);
+  expect(screen.getByTestId("zeit")).toHaveTextContent("31:55,056");
+  expect(screen.getByTestId("zeit")).not.toHaveAttribute("data-counting");
 });
 
 function shown(id) {

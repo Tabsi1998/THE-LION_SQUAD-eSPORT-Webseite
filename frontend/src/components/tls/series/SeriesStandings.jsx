@@ -5,6 +5,7 @@ import { formatNumber, rankMove } from "@/lib/standingsTable";
 import { roundLabel } from "@/lib/referenceCalendar";
 import { groupWeekends, sessionAbbr, sessionLabel } from "@/lib/raceWeekend";
 import { CountryFlag } from "@/components/tls/CountryFlag";
+import { CountUp } from "@/components/tls/motion/CountUp";
 import { AdjustmentMark } from "@/components/tls/series/SeriesSpecialRules";
 import {
   cutlineAfter, mobileRows, nameOf, resultIn, resultLabel, roundColumns, tiebreakHint, visibleRows,
@@ -56,7 +57,8 @@ export function Points({ row, topN }) {
   return (
     <>
       <span title={hint || undefined} className={hint ? "underline decoration-dotted decoration-white/30 underline-offset-4" : undefined}>
-        {formatNumber(row.points)}
+        {/* Punkte zählen beim ersten Sichtbarwerden hoch; beim Nachladen leuchtet nur eine Änderung kurz auf (#1969). */}
+        <CountUp value={formatNumber(row.points)} />
         {hint && <span className="sr-only"> ({hint})</span>}
       </span>
       {/* Anpassung (#1960): „−5“ mit Grund im Tooltip - etwa für Nichtteilnahme nach Anmeldung. */}

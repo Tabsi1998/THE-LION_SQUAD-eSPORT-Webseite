@@ -9,9 +9,15 @@ function shown(cell) {
   return cell.querySelector("[aria-hidden='true']")?.textContent ?? cell.textContent;
 }
 
+// Gezählt wird nur, wenn der Browser zu „Bewegung reduzieren“ Auskunft gibt (#1969) - hier: keine Einschränkung.
+beforeEach(() => {
+  window.matchMedia = () => ({ matches: false, addEventListener() {}, removeEventListener() {} });
+});
+
 afterEach(() => {
   vi.useRealTimers();
   vi.restoreAllMocks();
+  delete window.matchMedia;
 });
 
 test("parseLap liest Minuten, Sekunden und Bruchteile; Unsinn ergibt null", () => {

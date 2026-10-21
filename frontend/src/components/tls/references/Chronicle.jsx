@@ -7,6 +7,8 @@ import { viennaDate } from "@/lib/vienna";
 import { referenceHref } from "@/lib/seasonClose";
 import { chronicleHost } from "@/lib/seriesPartners";
 import { PartnerHostBadge } from "@/components/tls/references/PartnerHostBadge";
+import { Glow } from "@/components/tls/motion/Glow";
+import { StaggerIn } from "@/components/tls/motion/StaggerIn";
 
 // Chronik (#1878, ersetzt „Jahr für Jahr“): alle Teilnahmen als Liste je Jahr mit Medaillen-Zusammenfassung. Jede Zeile
 // zeigt Platz-Ring, Titel (kurz wie im Mitgliederprofil, #1944) und Veranstalter, Spiel- und Format-Marke, unsere Starter (jeder Name nur einmal) und das
@@ -25,7 +27,7 @@ export const Chronicle = forwardRef(function Chronicle({ items, linked, memberId
   const groups = timelineGroups(shown);
   return (
     <section ref={ref} id="chronik" aria-labelledby="references-timeline-title" className="tls-ref-anchor tls-ref-rise max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-12 md:pt-[88px]" style={{ "--tls-ref-i": index }} data-testid="references-timeline">
-      <SectionHead id="references-timeline-title" eyebrow="Alle Teilnahmen" title="Chronik" hint={items.length ? <span data-testid="references-count">{chronicleCount(shown.length, items.length)}</span> : null} />
+      <SectionHead id="references-timeline-title" eyebrow="Alle Teilnahmen" title="Chronik" hint={items.length ? <Glow trigger={shown.length} data-testid="references-count">{chronicleCount(shown.length, items.length)}</Glow> : null} />
       {items.length > 0 && (
         <div className="tls-ref-scroll -mx-4 px-4 sm:mx-0 sm:px-0 flex sm:flex-wrap items-center gap-2 tls-swipe sm:overflow-visible pt-1 pb-4 md:pt-3 md:pb-[18px] border-b border-white/[0.08]" role="group" aria-label="Filter der Chronik" data-testid="references-filters">
           {memberId && (
@@ -77,9 +79,10 @@ function YearGroup({ group, linked, memberId }) {
         </div>
         <span className="text-[13px] md:text-sm text-zinc-400 text-right" data-testid="references-year-medals">{medals || <span className="md:hidden">{count}</span>}</span>
       </div>
-      <ul className="list-none m-0 p-0">
+      {/* Die Zeilen eines Jahres steigen beim ersten Sichtbarwerden gestaffelt auf (#1969). */}
+      <StaggerIn as="ul" className="list-none m-0 p-0">
         {group.items.map((item) => <ChronicleRow key={item.id} item={item} link={linked?.get(item.id)} memberId={memberId} />)}
-      </ul>
+      </StaggerIn>
     </div>
   );
 }
