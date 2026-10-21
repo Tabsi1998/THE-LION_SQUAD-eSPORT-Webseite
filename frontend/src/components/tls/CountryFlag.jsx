@@ -5,7 +5,8 @@ import "./countryFlag.css";
 // Landesname. Fester Kasten, damit beim Laden nichts springt: gleiche Höhe je Größe, Breite nach dem echten
 // Seitenverhältnis der Flagge bis höchstens 2:1 (breitere wie Katar passen sich ein). Ohne bekanntes Land gibt es nichts.
 
-const HEIGHTS = { xs: 10, sm: 12, md: 14, lg: 16 };
+// xl: Kopf der Ergebnisseite einer Runde (#1950).
+const HEIGHTS = { xs: 10, sm: 12, md: 14, lg: 16, xl: 36 };
 const MAX_RATIO = 2;
 
 export function CountryFlag({ code, size = "md", className = "" }) {

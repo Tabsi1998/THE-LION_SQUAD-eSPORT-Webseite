@@ -168,6 +168,8 @@ const ReferencesPage = lazy(() => import("@/pages/public/ReferencesPage"));
 const ReferenceDetailPage = lazy(() => import("@/pages/public/ReferencesPage").then((m) => ({ default: m.ReferenceDetailPage })));
 // Externe Serien (#1741): Seite einer Saison - die Adresse steht, die Seite kommt mit #1745 ff.
 const ReferenceSeriesPage = lazy(() => import("@/pages/public/ReferenceSeriesPage"));
+// Ergebnistabelle je Runde einer Rennliga (#1950), Reiter je Lauf als ?lauf=…
+const ReferenceRoundPage = lazy(() => import("@/pages/public/ReferenceRoundPage"));
 const PlayersPage = lazy(() => import("@/pages/public/PlayersPage"));
 const AchievementsShowcasePage = lazy(() => import("@/pages/public/AchievementsShowcasePage"));
 const AchievementSharePage = lazy(() => import("@/pages/public/AchievementSharePage"));
@@ -264,6 +266,7 @@ function App() {
           <Route path="/references" element={<ReferencesPage />} />
           <Route path="/references/:id" element={<ReferenceDetailPage />} />
           <Route path="/references/series/:lineageSlug/:seasonSlug" element={<ReferenceSeriesPage />} />
+          <Route path="/references/series/:lineageSlug/:seasonSlug/runde/:roundNumber" element={<ReferenceRoundPage />} />
           <Route path="/community" element={<CommunityPage />} />
           <Route path="/servers" element={<ServersPage />} />
           <Route path="/players" element={<PlayersPage />} />

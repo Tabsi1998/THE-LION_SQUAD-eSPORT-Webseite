@@ -1,0 +1,170 @@
+/* Ergebnistabelle je Runde (#1950): Kopf mit Flagge und Pfeilen, Zusammenfassung, Reiter je Lauf und die Tabelle wie in
+   den Grafiken des Veranstalters - Platz 1 bis 3 in Gold, Silber, Bronze (Farb-Rollen), Startnummer und Team in der
+   Teamfarbe, Vereinsfahrer mit Cyan-Grund und Cyan-Kante. Pole und schnellste Runde in den Farben der Rennserien
+   (Pink und Violett, nur hier). Bewegung über die Bewegungs-Regeln: der Reiter blendet kurz ein, am Ende des
+   Hochzählens leuchten Pole und schnellste Runde einmal auf, Vereinszeilen bekommen einen leisen Glanz. Mit „Bewegung
+   reduzieren“ steht alles sofort. */
+.tls-round {
+  --tls-round-pole-rgb: 232 121 249;
+  --tls-round-fastest-rgb: 192 132 252;
+}
+
+/* Kopf: Flagge groß, darunter am Handy kleiner. */
+.tls-round-flag .tls-flag { height: 36px; width: auto; border-radius: 4px; }
+@media (max-width: 639px) {
+  .tls-round-flag .tls-flag { height: 22px; border-radius: 3px; }
+}
+.tls-round-nav { align-items: center; gap: 0.35rem; min-height: 44px; padding: 0 0.85rem; border-radius: 6px; font-size: 14px; font-weight: 600; text-decoration: none; }
+.tls-round-nav[aria-disabled="true"] { color: rgb(255 255 255 / 0.3); box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.1); }
+@media (max-width: 639px) {
+  .tls-round-nav { width: 44px; justify-content: center; padding: 0; border-radius: 8px; }
+}
+
+/* Zusammenfassung: am PC ein Raster, am Handy eine Wischleiste. */
+.tls-round-facts { display: flex; gap: 8px; margin-inline: -1rem; padding-inline: 1rem; }
+.tls-round-fact {
+  flex: 0 0 auto; min-width: 9.5rem; max-width: 16rem; display: flex; flex-direction: column; gap: 2px;
+  padding: 0.5rem 0.75rem; border-radius: 10px; background: var(--tls-surface-1); border: 1px solid rgb(255 255 255 / 0.09);
+}
+.tls-round-fact[data-tone="honor"][data-key="winner"] { border-color: rgb(var(--tls-honor-rgb) / 0.35); }
+.tls-round-fact[data-key="best_club"] { border-color: rgb(var(--tls-brand-rgb) / 0.4); }
+.tls-round-fact__label { font-size: 10px; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase; }
+.tls-round-fact[data-tone="honor"] .tls-round-fact__label { color: var(--tls-honor); }
+.tls-round-fact[data-tone="pole"] .tls-round-fact__label { color: rgb(var(--tls-round-pole-rgb)); }
+.tls-round-fact[data-tone="fastest"] .tls-round-fact__label { color: rgb(var(--tls-round-fastest-rgb)); }
+.tls-round-fact[data-tone="brand"] .tls-round-fact__label { color: var(--tls-brand); }
+.tls-round-fact__value { font-weight: 700; font-size: 14px; line-height: 1.3; overflow-wrap: anywhere; }
+.tls-round-fact__sub { font-size: 12px; color: var(--tls-text-muted); font-variant-numeric: tabular-nums; }
+@media (min-width: 768px) {
+  .tls-round-facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 12.5rem), 1fr)); gap: 12px; margin-inline: 0; padding-inline: 0; }
+  .tls-round-fact { max-width: none; padding: 0.875rem 1rem; }
+  .tls-round-fact__label { font-size: 11px; letter-spacing: 0.18em; }
+  .tls-round-fact__value { font-size: 17px; }
+  .tls-round-fact__sub { font-size: 13px; }
+}
+
+/* Reiter je Lauf: eine Leiste, die gewählte Linie in Cyan. Wenige Reiter teilen sich die Breite, viele wischen. */
+.tls-round-tabs.tls-swipe { display: flex; gap: 4px; border-bottom: 1px solid rgb(255 255 255 / 0.1); padding-bottom: 0; }
+.tls-round-tab {
+  flex: 1 0 auto; display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; min-height: 48px;
+  padding: 0 1.25rem; border-bottom: 3px solid transparent; font-size: 15px; font-weight: 700; white-space: nowrap;
+  color: rgb(255 255 255 / 0.58);
+  transition: color var(--tls-motion-fast) var(--tls-ease), border-color var(--tls-motion-mid) var(--tls-ease);
+}
+.tls-round-tab[aria-selected="true"] { color: #fff; border-bottom-color: var(--tls-brand); }
+.tls-round-tab:focus-visible { outline: 2px solid var(--tls-brand); outline-offset: -2px; border-radius: 4px 4px 0 0; }
+.tls-round-tab__time { font-size: 13px; font-weight: 500; color: var(--tls-quiet); font-variant-numeric: tabular-nums; }
+@media (hover: hover) and (pointer: fine) {
+  .tls-round-tab:not([aria-selected="true"]):hover { color: #fff; }
+}
+@media (min-width: 768px) {
+  .tls-round-tab { flex: 0 0 auto; }
+}
+
+/* Der Lauf blendet beim Wechsel kurz ein. */
+.tls-round-panel { animation: tls-round-in var(--tls-motion-slow) var(--tls-ease) both; }
+@keyframes tls-round-in { from { opacity: 0; transform: translateY(calc(6px * var(--tls-motion-on))); } }
+
+/* Tabelle am PC. */
+/* `relative`: was absolut liegt (Text nur für Screenreader), bleibt in der Wischfläche und verbreitert nie die Seite. */
+.tls-round-table { position: relative; border: 1px solid rgb(255 255 255 / 0.08); border-radius: 10px; }
+.tls-round-table.tls-swipe { padding-bottom: 0; }
+.tls-round-table table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+.tls-round-table thead th {
+  padding: 0.75rem; text-align: left; font-size: 12px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase;
+  color: var(--tls-quiet); background: rgb(255 255 255 / 0.02);
+}
+.tls-round-table thead th[data-align="right"] { text-align: right; }
+.tls-round-table td { padding: 0.625rem 0.75rem; vertical-align: middle; }
+.tls-round-row { border-top: 1px solid rgb(255 255 255 / 0.06); transition: background-color var(--tls-motion-fast) var(--tls-ease); }
+@media (hover: hover) and (pointer: fine) {
+  .tls-round-row:hover { background-color: rgb(255 255 255 / 0.035); }
+}
+.tls-round-row[data-own="true"] { background-color: rgb(var(--tls-brand-rgb) / 0.06); box-shadow: inset 3px 0 0 var(--tls-brand); }
+.tls-round-row[data-out="true"] { opacity: 0.6; }
+
+/* Platz: Gold, Silber, Bronze mit dunkler Schrift, sonst ein ruhiges Feld. */
+.tls-round-pos {
+  display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 4px;
+  font-family: 'Rajdhani', 'Bahnschrift Condensed', sans-serif; font-size: 17px; font-weight: 700; line-height: 1;
+  background: var(--tls-surface-3); color: #fff;
+}
+.tls-round-pos[data-medal="gold"] { background: var(--tls-honor); color: var(--tls-surface-0); }
+.tls-round-pos[data-medal="silver"] { background: var(--tls-silver); color: var(--tls-surface-0); }
+.tls-round-pos[data-medal="bronze"] { background: var(--tls-bronze); color: var(--tls-surface-0); }
+.tls-round-pos[data-out="true"] { background: transparent; color: var(--tls-quiet); font-size: 13px; letter-spacing: 0.04em; }
+.tls-round-number { font-family: 'Rajdhani', 'Bahnschrift Condensed', sans-serif; font-weight: 700; font-size: 20px; line-height: 1; color: var(--tls-text-muted); }
+.tls-round-team { font-style: italic; color: var(--tls-text-muted); }
+.tls-round-points { font-family: 'Rajdhani', 'Bahnschrift Condensed', sans-serif; font-size: 18px; font-weight: 700; text-align: right; }
+.tls-round-move { display: inline-flex; align-items: center; gap: 1px; margin-left: 0.35rem; font-size: 13px; font-weight: 600; }
+.tls-round-move[data-dir="up"] { color: var(--tls-brand); }
+.tls-round-move[data-dir="down"] { color: var(--tls-quiet); }
+
+/* Abzeichen: Pole, schnellste Runde, Fahrer des Tages, Ausfall, Strafsekunden - ausgeschrieben. */
+.tls-round-badge {
+  display: inline-flex; align-items: center; gap: 0.25rem; padding: 1px 7px; border-radius: 4px; white-space: nowrap;
+  font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; line-height: 1.5;
+  color: var(--tls-surface-0); --glow: var(--tls-brand-rgb);
+}
+.tls-round-badge svg { width: 11px; height: 11px; }
+.tls-round-badge[data-badge="pole"] { background: rgb(var(--tls-round-pole-rgb)); --glow: var(--tls-round-pole-rgb); }
+.tls-round-badge[data-badge="fastest_lap"] { background: rgb(var(--tls-round-fastest-rgb)); --glow: var(--tls-round-fastest-rgb); }
+.tls-round-badge[data-badge="driver_of_the_day"] { background: var(--tls-honor); }
+.tls-round-badge[data-badge="dnf"],
+.tls-round-badge[data-badge="dsq"] { color: var(--tls-text-muted); background: transparent; box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.22); }
+.tls-round-badge[data-badge="penalty"] { color: var(--tls-warn); background: rgb(var(--tls-warn-rgb) / 0.12); }
+.tls-round-penalty { color: var(--tls-warn); font-size: 14px; }
+
+/* Detail-Runde: am Ende des Hochzählens leuchten Pole und schnellste Runde einmal auf, Vereinszeilen glänzen leise. */
+.tls-round-badge[data-glow="true"] {
+  animation: tls-round-glow calc(var(--tls-motion-slow) * 2) var(--tls-ease) both;
+  animation-delay: var(--tls-glow-delay, 0ms);
+}
+@keyframes tls-round-glow {
+  0% { box-shadow: 0 0 0 0 rgb(var(--glow) / 0); }
+  35% { box-shadow: 0 0 0 3px rgb(var(--glow) / 0.3), 0 2px 14px 1px rgb(var(--glow) / 0.45); }
+  100% { box-shadow: 0 0 0 0 rgb(var(--glow) / 0); }
+}
+.tls-round-row[data-own="true"][data-shine="true"],
+.tls-round-item[data-own="true"][data-shine="true"] {
+  animation: tls-round-shine calc(var(--tls-motion-slow) * 2) var(--tls-ease) both;
+  animation-delay: var(--tls-glow-delay, 0ms);
+}
+@keyframes tls-round-shine {
+  0%, 100% { background-color: rgb(var(--tls-brand-rgb) / 0.06); }
+  40% { background-color: rgb(var(--tls-brand-rgb) / 0.16); }
+}
+
+/* Handy: eine Liste - rechts groß die gefahrene Zeit, darunter klein Abstand und Punkte. */
+.tls-round-item {
+  display: flex; align-items: center; gap: 10px; padding: 9px 6px; border-bottom: 1px solid rgb(255 255 255 / 0.06);
+}
+.tls-round-item[data-own="true"] { background-color: rgb(var(--tls-brand-rgb) / 0.06); box-shadow: inset 3px 0 0 var(--tls-brand); }
+.tls-round-item[data-out="true"] { opacity: 0.6; }
+.tls-round-item .tls-round-pos { width: 30px; height: 30px; flex: 0 0 30px; font-size: 15px; }
+.tls-round-item .tls-round-number { flex: 0 0 28px; font-size: 17px; }
+.tls-round-item .tls-round-badge { padding: 0 5px; font-size: 10px; border-radius: 3px; }
+.tls-round-item__main { font-family: 'Rajdhani', 'Bahnschrift Condensed', sans-serif; font-weight: 700; font-size: 16px; line-height: 1.2; }
+.tls-round-item__sub { font-size: 12px; color: var(--tls-text-muted); }
+
+/* Statistik der Saison (#1950): Karten mit der Spitze je Kennzahl, die gewählte mit Cyan-Rahmen; die Tabelle hält am
+   Handy den Namen fest, der Rest wischt seitlich. */
+.tls-stats-leader { min-width: 11rem; }
+.tls-stats-leader[data-active="true"] { border-color: rgb(var(--tls-brand-rgb) / 0.55); }
+.tls-stats-leader__pick { text-align: left; border-radius: 3px; min-height: 24px; }
+.tls-stats-leader__pick:focus-visible { outline: 2px solid var(--tls-brand); outline-offset: 2px; }
+.tls-stats-sort {
+  color: inherit; font: inherit; letter-spacing: inherit; text-transform: inherit; border-radius: 2px; min-height: 28px;
+  transition: color var(--tls-motion-fast) var(--tls-ease);
+}
+.tls-stats-sort[aria-pressed="true"] { color: var(--tls-brand); }
+.tls-stats-sort:focus-visible { outline: 2px solid var(--tls-brand); outline-offset: 2px; }
+@media (hover: hover) and (pointer: fine) {
+  .tls-stats-sort:hover { color: #fff; }
+}
+.tls-stats-sticky { position: sticky; left: 0; z-index: 1; background: var(--tls-surface-0); min-width: 10rem; }
+.tls-round-row[data-own="true"] .tls-stats-sticky { background: linear-gradient(rgb(var(--tls-brand-rgb) / 0.06), rgb(var(--tls-brand-rgb) / 0.06)), var(--tls-surface-0); }
+
+@media (prefers-reduced-motion: reduce) {
+  .tls-round-panel, .tls-round-badge[data-glow="true"], .tls-round-row[data-shine="true"], .tls-round-item[data-shine="true"] { animation: none; }
+}
