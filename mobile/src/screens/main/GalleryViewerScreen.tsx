@@ -22,7 +22,13 @@ type Props = NativeStackScreenProps<MoreStackParamList, "GalleryViewer">;
 
 export function GalleryViewerScreen({ navigation, route }: Props) {
   const { albumId, index: startIndex } = route.params;
-  const { width, height } = useWindowDimensions();
+  const window = useWindowDimensions();
+  // Freier Bereich (#1910): Der Bildschirm sitzt schon zwischen Kopf und Reiterleiste (samt Safe-Area); davon geht der
+  // Platz für Bildtext und Knopf ab. Früher war der Rahmen so hoch wie das ganze Fenster und reichte darunter.
+  const [area, setArea] = useState<{ width: number; height: number } | null>(null);
+  const [chromeHeight, setChromeHeight] = useState(0);
+  const width = area?.width ?? window.width;
+  const height = viewerFrameHeight(area?.height ?? window.height, chromeHeight);
   const [album, setAlbum] = useState<GalleryAlbum | null>(null);
   const [error, setError] = useState("");
   const [index, setIndex] = useState(startIndex);
@@ -69,7 +75,14 @@ export function GalleryViewerScreen({ navigation, route }: Props) {
   if (!album) return <Screen><SkeletonList count={1} hasImage /></Screen>;
 
   return (
-    <View style={styles.root} testID="gallery-viewer">
+    <View
+      style={styles.root}
+      testID="gallery-viewer"
+      onLayout={(event) => {
+        const { width: w, height: h } = event.nativeEvent.layout;
+        setArea((prev) => (prev && prev.width === w && prev.height === h ? prev : { width: w, height: h }));
+      }}
+    >
       <FlatList
         ref={list}
         data={items}
@@ -98,7 +111,13 @@ export function GalleryViewerScreen({ navigation, route }: Props) {
         )}
       />
       {chrome ? (
-        <View style={styles.chrome} pointerEvents="box-none">
+        <View
+          style={styles.chrome}
+          pointerEvents="box-none"
+          testID="gallery-chrome"
+          // Ausgeblendet bleibt der Rahmen stehen (zuletzt gemessene Höhe), sonst springen Bild und Zoom bei jedem Tipp.
+          onLayout={(event) => setChromeHeight(Math.ceil(event.nativeEvent.layout.height))}
+        >
           {current?.caption ? <Body style={styles.caption}>{current.caption}</Body> : null}
           {/* Eingesandt (#1186): „Foto: Name“, wenn die Person das wollte. */}
           {photoCredit(current) ? <Muted style={styles.caption} testID="gallery-credit">{photoCredit(current)}</Muted> : null}
@@ -112,6 +131,11 @@ export function GalleryViewerScreen({ navigation, route }: Props) {
       ) : null}
     </View>
   );
+}
+
+/** Höhe des Bildrahmens (#1910): freier Bereich abzüglich Bildtext und Knopf, nie kleiner als ein Drittel davon. */
+export function viewerFrameHeight(areaHeight: number, chromeHeight: number): number {
+  return Math.max(Math.round(areaHeight / 3), Math.round(areaHeight - Math.max(0, chromeHeight)));
 }
 
 type SlideProps = { item: GalleryItem; width: number; height: number; active: boolean; onTap: () => void; onZoomChange: (zoomed: boolean) => void };
@@ -131,7 +155,7 @@ function Slide({ item, width, height, active, onTap, onZoomChange }: SlideProps)
     );
   }
   return (
-    <View style={[styles.slide, { width, height }]}>
+    <View style={[styles.slide, { width, height }]} testID={`gallery-slide-${item.id}`}>
       <ZoomableImage
         uri={resolveMediaUrl(sizedUpload(mediaUrl(item), 1600))}
         width={width}

@@ -113,17 +113,42 @@ export type PublicProfilePayload = {
 // Erfolge II (#619): Vergaben, Gruppen, die Angehefteten, die gefundenen Geheimen - oder „privat“.
 type AchievementPayload = PublicAchievementData;
 
-/** Die Reiter (#1149): eigenes und fremdes Profil haben dieselben, in derselben Reihenfolge - Mitglieder zusätzlich
- * „Ehrungen“. Referenzen (Turniere, Fast Laps, Jahreswertung) und Auszeichnungen (Banner, Trophäen) bleiben getrennt. */
-export function profileTabs(member: boolean): Array<{ key: ProfileTabKey; label: string }> {
-  return [
-    { key: "overview", label: "Übersicht" },
-    { key: "achievements", label: "Erfolge" },
-    { key: "awards", label: "Auszeichnungen" },
-    { key: "references", label: "Referenzen" },
-    { key: "teams", label: "Teams" },
-    ...(member ? [{ key: "honours" as const, label: "Ehrungen" }] : []),
+export type ProfileTabCounts = {
+  /** Eigenes Profil (ohne „So sehen dich andere“): alle Reiter, leere sagen, was man tun kann. */
+  own: boolean;
+  clubMember?: boolean;
+  achievements?: number;
+  awards?: number;
+  references?: number;
+  teams?: number;
+  honours?: number;
+};
+
+/** Die Reiter (#1149): eigenes und fremdes Profil in derselben Reihenfolge, Referenzen (Turniere, Fast Laps,
+ * Jahreswertung) und Auszeichnungen (Banner, Trophäen) getrennt. Profile ohne Nullen (#1916, wie #1268 im Web): andere
+ * sehen nur Reiter mit Inhalt; das eigene Profil behält alle (Ehrungen für Mitglieder) mit einem Satz und Weg. */
+export function profileTabs({ own, clubMember = false, achievements = 0, awards = 0, references = 0, teams = 0, honours = 0 }: ProfileTabCounts): Array<{ key: ProfileTabKey; label: string }> {
+  const tabs: Array<{ key: ProfileTabKey; label: string; shown: boolean }> = [
+    { key: "overview", label: "Übersicht", shown: true },
+    { key: "achievements", label: "Erfolge", shown: own || achievements > 0 },
+    { key: "awards", label: "Auszeichnungen", shown: own || awards > 0 },
+    { key: "references", label: "Referenzen", shown: own || references > 0 },
+    { key: "teams", label: "Teams", shown: own || teams > 0 },
+    { key: "honours", label: "Ehrungen", shown: honours > 0 || (own && clubMember) },
   ];
+  return tabs.filter((tab) => tab.shown).map(({ key, label }) => ({ key, label }));
+}
+
+/** Die Zahlenleiste im Profilkopf (#1149) - nur Kennzahlen über null (#1916, wie #1268 im Web). */
+export function profileStats(profile: Pick<PublicProfilePayload, "stats" | "achievement_level" | "tournaments" | "f1_bests">): Array<{ key: string; label: string; value: number; tone?: "gold" }> {
+  const stats = profile.stats || {};
+  return [
+    { key: "points", label: "Punkte", value: Number(stats.points ?? profile.achievement_level?.points ?? 0), tone: "gold" as const },
+    { key: "wins", label: "Siege", value: Number(stats.wins ?? 0) },
+    { key: "top3", label: "Podium", value: Number(stats.top3 ?? 0) },
+    { key: "tournaments", label: "Turniere", value: Number(stats.tournaments ?? profile.tournaments?.length ?? 0) },
+    { key: "fastlaps", label: "Fast Laps", value: Number(stats.fast_laps ?? profile.f1_bests?.length ?? 0) },
+  ].filter((stat) => stat.value > 0);
 }
 
 /** Was nur das eigene Profil zeigt (#1149) - ohne „So sehen dich andere“. */
@@ -263,9 +288,21 @@ export function ProfileView({ username, navigation, own, header, scrollRef }: { 
     )) || null;
   }, [liveStreams, shown]);
   const stats = shown?.stats || {};
+  const headerStats = shown ? profileStats(shown) : [];
   const display = shown?.display_name || shown?.username || "Spieler";
   const member = Boolean(shown?.is_club_member);
-  const tabs = profileTabs(member);
+  // Wie im Web: ein privates Profil zeigt anderen weder Referenzen noch Teams (der Server antwortet ohnehin mit 404).
+  const hiddenForOthers = !ownMode && shown?.privacy_public_profile === false;
+  const referenceCount = hiddenForOthers ? 0 : (Array.isArray(shown?.references?.items) ? shown?.references?.items?.length || 0 : 0) + (shown?.tournaments?.length || 0) + (shown?.f1_bests?.length || 0);
+  const tabs = profileTabs({
+    own: ownMode,
+    clubMember: member,
+    achievements: achievements.awards?.length || 0,
+    awards: shown?.awards?.length || 0,
+    references: referenceCount,
+    teams: hiddenForOthers ? 0 : shown?.teams?.length || 0,
+    honours: shown?.honours?.length || 0,
+  });
   const activeTab = tabs.some((item) => item.key === tab) ? tab : "overview";
   const refresh = () => {
     setRefreshing(true);
@@ -391,14 +428,14 @@ export function ProfileView({ username, navigation, own, header, scrollRef }: { 
           </View>
         </View>
 
-        {/* Die Zahlenleiste (#1149): dieselben Zahlen im eigenen und im fremden Profil. */}
-        <View style={styles.statBar} testID="profile-stats">
-          <BarStat label="Punkte" value={Number(stats.points ?? shown.achievement_level?.points ?? 0).toLocaleString("de-DE")} tone="gold" />
-          <BarStat label="Siege" value={stats.wins ?? 0} />
-          <BarStat label="Podium" value={stats.top3 ?? 0} />
-          <BarStat label="Turniere" value={stats.tournaments ?? shown.tournaments?.length ?? 0} />
-          <BarStat label="Fast Laps" value={stats.fast_laps ?? shown.f1_bests?.length ?? 0} />
-        </View>
+        {/* Die Zahlenleiste (#1149): dieselben Zahlen im eigenen und im fremden Profil - nur, was über null ist (#1916). */}
+        {headerStats.length ? (
+          <View style={styles.statBar} testID="profile-stats">
+            {headerStats.map((stat) => (
+              <BarStat key={stat.key} label={stat.label} value={stat.value.toLocaleString("de-DE")} tone={stat.tone} testID={`profile-stat-${stat.key}`} />
+            ))}
+          </View>
+        ) : null}
 
         {ownSwitch}
 
@@ -607,9 +644,9 @@ function InfoGrid({ title, rows }: { title: string; rows: Array<[string, unknown
 }
 
 /** Eine Zahl der Zahlenleiste im Profilkopf (#1149). */
-function BarStat({ label, value, tone }: { label: string; value: unknown; tone?: "gold" }) {
+function BarStat({ label, value, tone, testID }: { label: string; value: unknown; tone?: "gold"; testID?: string }) {
   return (
-    <View style={styles.barStat}>
+    <View style={styles.barStat} testID={testID}>
       <Body style={[styles.barValue, tone === "gold" && styles.gold]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>{String(value ?? 0)}</Body>
       <Muted style={styles.barLabel} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>{label}</Muted>
     </View>

@@ -20,7 +20,7 @@ jest.mock("../../seasons/anchors", () => ({ SeasonPerch: () => null }));
 const navigation = { navigate: jest.fn() } as never;
 const route = { key: "news", name: "NewsList" } as never;
 
-const posts = Array.from({ length: 10 }, (_, index) => ({ id: `n${index}`, slug: `beitrag-${index}`, title: `Beitrag ${index}`, published_at: "2030-01-01T10:00:00Z" }));
+const posts = Array.from({ length: 10 }, (_, index) => ({ id: `n${index}`, slug: `beitrag-${index}`, title: `Beitrag ${index}`, banner_url: `/b${index}.jpg`, published_at: "2030-01-01T10:00:00Z" }));
 
 let timing: jest.SpyInstance;
 

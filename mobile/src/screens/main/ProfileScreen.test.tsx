@@ -2,7 +2,7 @@ import React from "react";
 import { NavigationContext } from "@react-navigation/native";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react-native";
 import { ProfileScreen } from "./ProfileScreen";
-import { PublicProfileScreen, profileTabs } from "./PublicProfileScreen";
+import { PublicProfileScreen, profileStats, profileTabs } from "./PublicProfileScreen";
 import { expectLateAnswerDiscarded } from "./lateAnswer.testkit";
 
 // Ein Profil, ein Aufbau (#1149): eigenes und fremdes Profil haben dieselben Reiter in derselben Reihenfolge. Was nur dich
@@ -59,7 +59,7 @@ function answer(path: string, config?: { params?: Record<string, string> }) {
     "/account/documents": { available: true, reason: null, documents: [{ id: "dolibarr-22", title: "Beitrittsbestätigung", personal: true, created_at: "2026-03-02T10:00:00+00:00" }] },
     "/teams/my": [{ id: "t-1", name: "Lions Rocket", tag: "LR" }],
     "/streams/live": [],
-    "/achievements/user/u-neon": { awards: [], groups: [], pinned: [] },
+    "/achievements/user/u-neon": { awards: [{ id: "aw-1" }], groups: [], pinned: [] },
     "/achievements/user/u-kiwi": { awards: [], groups: [], pinned: [] },
   };
   if (path === "/users/public/neonfalke") return mockPublic.private ? Promise.reject(notFound()) : Promise.resolve({ data: config?.params?.view_as === "public" ? asOthers : publicNeon });
@@ -91,8 +91,26 @@ beforeEach(() => {
 });
 
 test("dieselben Reiter in derselben Reihenfolge - Mitglieder zusätzlich Ehrungen", () => {
-  expect(profileTabs(false).map((tab) => tab.label)).toEqual(["Übersicht", "Erfolge", "Auszeichnungen", "Referenzen", "Teams"]);
-  expect(profileTabs(true).map((tab) => tab.label)).toEqual(["Übersicht", "Erfolge", "Auszeichnungen", "Referenzen", "Teams", "Ehrungen"]);
+  expect(profileTabs({ own: true }).map((tab) => tab.label)).toEqual(["Übersicht", "Erfolge", "Auszeichnungen", "Referenzen", "Teams"]);
+  expect(profileTabs({ own: true, clubMember: true }).map((tab) => tab.label)).toEqual(["Übersicht", "Erfolge", "Auszeichnungen", "Referenzen", "Teams", "Ehrungen"]);
+  const full = { achievements: 3, awards: 1, references: 2, teams: 1, honours: 1 };
+  expect(profileTabs({ own: false, ...full }).map((tab) => tab.label)).toEqual(["Übersicht", "Erfolge", "Auszeichnungen", "Referenzen", "Teams", "Ehrungen"]);
+});
+
+// Profile ohne Nullen (#1916, App-Teil von #1268): Kennzahlen nur über null, leere Reiter sehen andere nicht.
+test("leere Reiter sehen andere nicht - kein Reiter trägt eine Null", () => {
+  expect(profileTabs({ own: false }).map((tab) => tab.key)).toEqual(["overview"]);
+  expect(profileTabs({ own: false, clubMember: true, teams: 2 }).map((tab) => tab.key)).toEqual(["overview", "teams"]);
+  expect(profileTabs({ own: false, references: 1, honours: 0 }).map((tab) => tab.key)).toEqual(["overview", "references"]);
+  for (const tab of profileTabs({ own: true, clubMember: true })) expect(tab.label).not.toMatch(/\d/);
+});
+
+test("Zahlenleiste: nur Kennzahlen über null", () => {
+  expect(profileStats({ stats: { points: 0, wins: 2, top3: 0, tournaments: 0, fast_laps: 0 } }).map((stat) => stat.key)).toEqual(["wins"]);
+  expect(profileStats({ stats: {} })).toEqual([]);
+  expect(profileStats({ stats: { top3: 3 }, achievement_level: { points: 120 }, tournaments: [{}], f1_bests: [] }).map((stat) => [stat.key, stat.value])).toEqual([
+    ["points", 120], ["top3", 3], ["tournaments", 1],
+  ]);
 });
 
 test("eigenes Profil: Kopf mit Zahlen, Kasten „Nur für dich“, Zahnrad - Tipps führen zu Rechnungen, Gewinnen, Bearbeiten", async () => {
@@ -153,15 +171,30 @@ test("privates Profil: du siehst deins mit dem Kasten; „So sehen dich andere�
   expect(screen.queryByTestId("profile-private-box")).toBeNull();
 });
 
-test("fremdes Profil: dieselben Reiter, kein Kasten, kein Schalter - Nachricht schreiben öffnet den Chat", async () => {
+test("fremdes Profil: nur Reiter mit Inhalt und Zahlen über null, kein Kasten, kein Schalter - Nachricht öffnet den Chat", async () => {
   await render(<PublicProfileScreen navigation={navigation} route={{ key: "p", name: "PublicProfile", params: { username: "kiwikomet" } } as never} />);
   await waitFor(() => expect(screen.getByText("KiwiKomet")).toBeTruthy());
-  for (const label of ["Übersicht", "Erfolge", "Auszeichnungen", "Referenzen", "Teams"]) expect(screen.getByText(label)).toBeTruthy();
-  expect(screen.queryByText("Ehrungen")).toBeNull();
+  expect(screen.getByText("Übersicht")).toBeTruthy();
+  // Kiwi hat nichts in Erfolgen, Auszeichnungen, Referenzen, Teams und Ehrungen (#1916): diese Reiter fehlen.
+  for (const label of ["Erfolge", "Auszeichnungen", "Referenzen", "Teams", "Ehrungen"]) expect(screen.queryByText(label)).toBeNull();
+  // Zahlenleiste ohne Nullen: nur die zwei Siege.
+  expect(screen.getByTestId("profile-stat-wins")).toHaveTextContent(/^2\s*Siege$/);
+  for (const key of ["points", "top3", "tournaments", "fastlaps"]) expect(screen.queryByTestId(`profile-stat-${key}`)).toBeNull();
   expect(screen.queryByTestId("profile-private-box")).toBeNull();
   expect(screen.queryByTestId("profile-as-others")).toBeNull();
   await fireEvent.press(screen.getByText("Nachricht"));
   expect(navigate).toHaveBeenLastCalledWith("DirectThread", { userId: "u-kiwi", title: "KiwiKomet" });
+});
+
+test("eigenes Profil ohne Referenzen: Satz mit Weg zu den Turnieren, keine Null-Zahlen (#1916)", async () => {
+  const { openTab } = require("../../navigation/rootNavigation");
+  await renderOwn();
+  await waitFor(() => expect(screen.getByTestId("profile-private-box")).toBeTruthy());
+  await fireEvent.press(screen.getByText("Referenzen"));
+  await waitFor(() => expect(screen.getByTestId("profile-references-empty")).toBeTruthy());
+  expect(screen.queryByTestId("profile-reference-stats")).toBeNull();
+  await fireEvent.press(screen.getByTestId("profile-references-discover"));
+  expect(openTab).toHaveBeenLastCalledWith("TournamentList", { filter: "tournaments" });
 });
 
 test("fremdes privates Profil: nur der Hinweis", async () => {
