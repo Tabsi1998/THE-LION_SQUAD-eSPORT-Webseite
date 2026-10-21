@@ -466,12 +466,14 @@ Ablauf je Runde hat – eine alte Saison mit zweimal „R1“ behält zwei Runde
   der Ablauf** gibt ihn an die Vorgabe zurück. Jeder Lauf lässt sich einzeln verschieben, absagen und archivieren.
 - **Ergebnis eines Qualifyings:** Platz, Startnummer, Name, Team, **Zeit** und Abstand. Ohne Zeit (`--:--.---`) geht
   auch. Die **Pole** bekommt von selbst der erste gültige Platz – ist Platz 1 disqualifiziert oder nicht gestartet, der
-  nächste; überall gilt dieselbe Regel. Im Shootout gibt es keine Pole, er setzt nur den Startplatz des Sprints. Das
-  Einfügen liest die Quali-Liste mit Time und Gap.
+  nächste; überall gilt dieselbe Regel. Eine Pole-Marke von Hand auf einer anderen Zeile fällt weg, die Prüfung sagt
+  es an der Zeile („Pole hat Platz 1 – Marke entfernt“). Im Shootout gibt es keine Pole, er setzt nur den Startplatz
+  des Sprints. Das Einfügen liest die Quali-Liste mit Time und Gap.
 - **Startplatz:** Ist er im Lauf leer, kommt er nach der Vorgabe: das Rennen aus dem Qualifying derselben Runde, der
   Sprint aus dem Shootout, wenn es einen gibt (sonst aus dem Qualifying), oder aus der umgekehrten Fahrerwertung. Ein
   eingetragener Startplatz, etwa nach einer Strafe, bleibt. Die Pole zählt am Rennen, das seinen Startplatz aus dem
-  Qualifying nimmt, samt Pole-Bonus der Saison.
+  Qualifying nimmt, samt Pole-Bonus der Saison; eine Pole-Marke im Rennen auf einem anderen Fahrer fällt dann weg
+  („Pole hat Platz 1 im Qualifying – Marke entfernt“). Ein Rennen ohne Qualifying behält seine Pole-Marke.
 - **Ergebnisse eintragen:** je Runde eine Zeile, jeder Lauf ein Chip in der Farbe seines Status – ein Tipp öffnet sein
   Blatt.
 

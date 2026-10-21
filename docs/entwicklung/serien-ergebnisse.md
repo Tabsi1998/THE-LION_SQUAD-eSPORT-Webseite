@@ -99,12 +99,18 @@ Runde X“ allgemein in `round_phases.py` (wiederverwendbar, etwa für Regeländ
   Aktivitätspunkte und `rounds_played` je Runde: gestrichen wird eine ganze Runde (Summe ihrer Läufe), `counted` und
   `dropped` nennen weiter Termine. Ein leerer Startplatz kommt aus dem Hauptqualifying derselben Runde (der Sprint aus
   dem Shootout, wenn es einen gibt) bzw. aus der umgekehrten Fahrerwertung nach `grid` (wer dort fehlt, bekommt
-  keinen). Die Pole (`race_weekend.pole_holder`: eine gültige Marke `pole`, sonst der erste gültige Platz ohne DSQ/DNS)
-  zählt am ersten Rennen der Runde, das seinen Startplatz aus dem Hauptqualifying nimmt (sonst am Sprint) – nur, wenn
-  das Qualifying nicht selbst zählt. Gespeichert wird davon nichts im Blatt; es steht nur im gerechneten Stand.
+  keinen). Die Pole (`race_weekend.pole_holder`: der erste gültige Platz des Hauptqualifyings ohne DSQ/DNS – eine
+  Marke `pole` auf einer anderen Zeile zählt nicht) zählt am ersten Rennen der Runde, das seinen Startplatz aus dem
+  Hauptqualifying nimmt (sonst am Sprint) – nur, wenn das Qualifying nicht selbst zählt. In jedem Lauf mit Startplatz
+  aus dem Hauptqualifying fällt eine Pole-Marke auf einer anderen Zeile weg. Gespeichert wird davon nichts im Blatt; es
+  steht nur im gerechneten Stand. Ein Rennen ohne Qualifying behält seine Marke von Hand (Bestand #1927).
 - **Blatt eines Qualifyings:** `round.session_kind` im Ausgangsstand; beim Prüfen setzt `race_weekend.mark_pole` die
-  Marke `pole` nach derselben Regel (eine ungültige Marke fällt weg), die Warnung `round_not_counted` entfällt. Der
-  Ausgangsstand liefert die Regeln des Laufs (`series.rules` mit seinem Punkteschema).
+  Marke `pole` nach derselben Regel, eine Marke auf einer anderen Zeile fällt weg – mit der Warnung `pole_moved` an
+  dieser Zeile („Pole hat Platz 1 – Marke entfernt“); die Warnung `round_not_counted` entfällt. Der Ausgangsstand
+  liefert die Regeln des Laufs (`series.rules` mit seinem Punkteschema).
+- **Blatt eines Rennens:** Nimmt es Startplatz und Pole aus einem veröffentlichten Hauptqualifying derselben Runde
+  (`race_weekend.quali_pole`), fällt beim Prüfen eine Pole-Marke auf einem anderen Fahrer weg (`clear_race_pole`,
+  Warnung `pole_moved`: „Pole hat Platz 1 im Qualifying – Marke entfernt“).
 - **Serienseite (Rennliga):** `progress` zählt Runden (gewertet, wenn alle zählenden Läufe gewertet sind),
   `series.weekend` für „Punkte je Lauf“, `racing.qualifying` = je veröffentlichtem Qualifying fürs Rennen die Plätze der
   Fahrer der Fahrerwertung (nur Kennungen) und `pole` (`pole_holder`) für Poles und Quali-Duell; „Ø Start“ nur in
