@@ -87,6 +87,18 @@ export function imageToRows(result, participants = []) {
   });
 }
 
+/**
+ * Kopf des Bilds als Felder des Blatts: `fastestLap {name, time}` und `driverOfTheDay` (Name) – so heißen sie im
+ * Formular mit #1927. Ohne Angabe im Bild bleibt, was im Blatt steht.
+ */
+export function imageFormFields(result) {
+  const out = {};
+  const lap = result?.fastest_lap;
+  if (lap?.name || lap?.time) out.fastestLap = { name: lap.name || "", time: lap.time || "" };
+  if (result?.driver_of_the_day?.name) out.driverOfTheDay = result.driver_of_the_day.name;
+  return out;
+}
+
 /** Wie viele Zeilen noch gelb sind. */
 export function openImageRows(rows = []) {
   return rows.filter((row) => row.ocr?.uncertain?.length).length;

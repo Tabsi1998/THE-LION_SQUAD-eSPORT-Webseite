@@ -1,4 +1,4 @@
-import { afterEdit, checkImageFile, confirmRow, imageFromClipboard, imageHeader, imageToRows, isUncertain, openImageRows, uncertainText } from "@/lib/resultImage";
+import { afterEdit, checkImageFile, confirmRow, imageFormFields, imageFromClipboard, imageHeader, imageToRows, isUncertain, openImageRows, uncertainText } from "@/lib/resultImage";
 import { formToPayload } from "@/lib/referenceResults";
 import { resultImageOptions } from "@/lib/referenceSeries";
 
@@ -68,6 +68,11 @@ test("ändern nimmt die gelbe Markierung vom Feld, „Passt so“ von der Zeile"
   expect(afterEdit(plain, ["name"])).toBe(plain);
   expect(uncertainText(bert)).toBe("Startnummer (gelesen „18“)");
   expect(uncertainText(dora)).toBe("Name (gelesen „Dora Nev“)");
+});
+
+test("Kopf des Bilds als Felder des Blatts (schnellste Runde, Fahrer des Tages)", () => {
+  expect(imageFormFields(RESULT)).toEqual({ fastestLap: { name: "Bert Bolzt", time: "1:31.207" }, driverOfTheDay: "Anna Probe" });
+  expect(imageFormFields({ rows: [], fastest_lap: null, driver_of_the_day: null })).toEqual({});
 });
 
 test("Kopf des Bilds für die Übersicht", () => {

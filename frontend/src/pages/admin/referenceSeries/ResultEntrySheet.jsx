@@ -11,7 +11,7 @@ import {
 import { ResultPreview } from "./ResultPreview";
 import { VenueWithFlag } from "@/components/tls/CountryFlag";
 import { ResultImageButton, ResultImageRowNote, ResultImageSummary, ocrMark, useResultImage } from "./ResultImageImport";
-import { afterEdit, confirmRow, imageToRows, isUncertain, openImageRows } from "@/lib/resultImage";
+import { afterEdit, confirmRow, imageFormFields, imageToRows, isUncertain, openImageRows } from "@/lib/resultImage";
 import { toast } from "sonner";
 import { ClipboardList, Plus, RefreshCw, SlidersHorizontal, Trash2, X } from "lucide-react";
 
@@ -396,7 +396,8 @@ export function ResultEntrySheet({ series, round, onClose, onSaved }) {
   const image = useResultImage({
     base,
     onRead: (result) => {
-      setForm((current) => ({ ...current, rows: imageToRows(result, participants) }));
+      // Schnellste Runde und Fahrer des Tages gehen als Felder des Blatts mit, sobald es sie hat (#1927).
+      setForm((current) => ({ ...current, ...imageFormFields(result), rows: imageToRows(result, participants) }));
       setPasting(false);
       setCheckImage(true);
     },
