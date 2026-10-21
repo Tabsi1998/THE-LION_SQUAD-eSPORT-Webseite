@@ -636,7 +636,8 @@ immer als **Entwurf**. Veröffentlicht wird wie gewohnt vom Vorstand. Nur in ein
   Unterschiede je Person (Platz, Tagespunkte, Runden, Ausgestiegen, wer neu dazukommt oder wegfällt).
 - **Übernehmen:** Vorgewählt ist nur, was nichts Vorhandenes ersetzt (neue Ergebnisse, neue Termine). Ein Turnier mit
   **Abweichungen** hakt ihr selbst an. Ein veröffentlichtes Ergebnis wird nie überschrieben: es bekommt einen Entwurf
-  daneben, den ihr im Ergebnisblatt freigebt. Sonderboni (etwa Bingo), Notizen und Punkte von Hand bleiben erhalten.
+  daneben, den ihr im Ergebnisblatt freigebt. Sonderboni (etwa Bingo), Notizen, Punkte von Hand, Marken wie DSQ oder
+  DNS und der offizielle Gesamtstand bleiben erhalten – nur „Ausgestiegen“ kommt vom Partner.
   Danach öffnet sich **Unbekannte Namen** zum Zuordnen; Spieler stehen mit Riot-ID (Name#TAG), Gäste des Partners nur
   mit Namen.
 - **Was übernommen wird:** Tagesplatz in der Reihenfolge des Veranstalters, Punkte je Runde **wie beim Partner** (ein

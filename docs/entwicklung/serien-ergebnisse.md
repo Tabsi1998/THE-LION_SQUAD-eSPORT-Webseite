@@ -283,7 +283,9 @@ dem Partner abgesprochen, nur lesend). Route `routes/reference_partner_routes.py
   `new_round`, `link`, `waiting`, `error`), die Abweichungen und unbekannte Namen. Übernehmen verlangt `fingerprint`,
   `round_id` und `expected_version` aus der Vorschau (sonst `conflict`, nichts geschrieben). Ein neues Blatt ist ein
   Entwurf, ein vorhandener Entwurf wird mit Revision ersetzt, neben einem veröffentlichten Blatt entsteht ein Entwurf
-  daneben (Freigabe wie gewohnt). Sonderboni, Notizen, Strafpunkte und Punkte von Hand bleiben.
+  daneben (Freigabe wie gewohnt). Sonderboni, Notizen, Strafpunkte, Punkte von Hand, Marken außer `left` (DSQ, DNS …)
+  und der offizielle Gesamtstand bleiben; `left` meldet die Quelle selbst. Unbrauchbare Zahlen (außerhalb der Grenzen)
+  oder zu tief verschachteltes JSON sind „unerwartete Form“ (502 bzw. Fehlerzeile), nie ein 500.
 - **Grenzen:** Zeitlimit je Schritt und gesamt, Größenlimit, keine Weiterleitung, Zwischenspeicher zehn Minuten nur
   für das eingedampfte Ergebnis, höchstens 30 Abrufe je Konto in zehn Minuten. Fehler: 502 mit fester Meldung (steht
   im Betriebsprotokoll); ein kaputtes Turnier nur in seiner Zeile. Zeitgesteuert holt die Website (noch) nicht.
