@@ -124,6 +124,8 @@ Dienst) und landet als Zeilen im Blatt – gespeichert wird beim Lesen nichts, a
   jemand sie ändert oder die Zeile mit „Passt so“ bestätigt; übernommen wird erst ohne gelbe Zeilen.
 - **Sicherheit:** Rechte wie beim Eintragen; Größe am Kopf der Anfrage, Pixel am Kopf der Bilddatei; das Bild kommt als
   Body (keine Zwischendatei) und geht über stdin an Tesseract (ohne Shell, leere Umgebung, Zeitlimit); Rate-Limit je
-  Konto; Meldungen sind feste Texte. Einstellungen in [Betrieb](../BETRIEB.md).
+  Konto; Meldungen sind feste Texte. Einstellungen in [Betrieb](../BETRIEB.md). Für das Original am Termin (#1933)
+  liefert `result_image_ocr.encode_original(opened)` das neu kodierte Bild (gedreht, ohne EXIF) - gespeichert wird es
+  erst dort.
 - **Tests:** synthetische Screenshots mit erfundenen Namen (`backend/tests/result_image_fixture.py`). Ohne Tesseract
   werden die Lese-Tests übersprungen; die CI installiert es und setzt `REQUIRE_TESSERACT=1`.

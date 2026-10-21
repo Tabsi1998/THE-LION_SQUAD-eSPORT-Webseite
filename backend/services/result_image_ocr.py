@@ -81,10 +81,12 @@ BROKEN = "Das Bild lässt sich nicht öffnen. Bitte als PNG oder JPG neu speiche
 
 @dataclass
 class Opened:
-    """Ergebnis von ``open_image``: das Bild oder ``status`` (400/413) mit einer festen Meldung."""
+    """Ergebnis von ``open_image``: das Bild (gedreht nach EXIF, RGB) und sein Format - oder ``status`` (400/413) mit
+    einer festen Meldung."""
     image: Image.Image | None = None
     status: int = 200
     message: str = ""
+    format: str = ""  # PNG, JPEG oder WEBP
 
 
 # ---------------------------------------------------------------- Bild prüfen
@@ -103,7 +105,8 @@ def open_image(data: bytes) -> Opened:
         return Opened(status=413, message=TOO_MANY_PIXELS)
     except (UnidentifiedImageError, OSError, ValueError):
         return Opened(status=400, message=NOT_AN_IMAGE)
-    if (img.format or "").upper() not in PIL_IMAGE_FORMATS:
+    detected = (img.format or "").upper()
+    if detected not in PIL_IMAGE_FORMATS:
         return Opened(status=400, message=WRONG_FORMAT)
     width, height = img.size
     if width * height > MAX_IMAGE_PIXELS:
@@ -118,7 +121,21 @@ def open_image(data: bytes) -> Opened:
         return Opened(status=400, message=BROKEN)
     if max(img.size) > MAX_IMAGE_DIMENSION:
         img.thumbnail((MAX_IMAGE_DIMENSION, MAX_IMAGE_DIMENSION), Image.Resampling.LANCZOS)
-    return Opened(image=img)
+    return Opened(image=img, format=detected)
+
+
+def encode_original(opened: Opened) -> tuple[bytes, str]:
+    """Das geöffnete Bild neu kodiert - gedreht nach EXIF, ohne EXIF und andere Metadaten, im Format der Vorlage (JPEG
+    bleibt JPEG, sonst PNG bzw. WebP), höchstens ``MAX_IMAGE_DIMENSION`` lang. Liefert ``(Bytes, Medientyp)``, ohne Bild
+    ``(b"", "")``. Gespeichert wird hier nichts - das Original am Termin kommt mit #1933."""
+    if opened.image is None:
+        return b"", ""
+    fmt = opened.format if opened.format in ("JPEG", "WEBP") else "PNG"
+    options = {"JPEG": {"quality": 88, "optimize": True}, "WEBP": {"quality": 88, "method": 6},
+               "PNG": {"optimize": True}}[fmt]
+    buffer = io.BytesIO()
+    opened.image.save(buffer, format=fmt, **options)
+    return buffer.getvalue(), PIL_IMAGE_FORMATS[fmt][0]
 
 
 # ---------------------------------------------------------------- Vorbereiten

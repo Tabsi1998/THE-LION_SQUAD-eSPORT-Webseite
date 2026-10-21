@@ -138,6 +138,27 @@ def test_only_real_png_jpeg_or_webp_images_are_opened(monkeypatch):
     assert result_image_ocr.open_image(fixture.png_bytes(img)).status == 413
 
 
+def test_reencoded_original_has_no_metadata_and_keeps_the_format():
+    """Für #1933 (Original am Termin): das gelesene Bild neu kodiert - gedreht nach EXIF, ohne EXIF, im Format der
+    Vorlage (Foto JPEG, Screenshot PNG). Gespeichert wird es hier nicht."""
+    photo = Image.new("RGB", (300, 120), (20, 20, 30))
+    exif = Image.Exif()
+    exif[0x0112] = 6  # um 90 Grad gedreht aufgenommen
+    exif[0x010F] = "Probe-Kamera"
+    buffer = io.BytesIO()
+    photo.save(buffer, format="JPEG", exif=exif.tobytes())
+    opened = result_image_ocr.open_image(buffer.getvalue())
+    data, content_type = result_image_ocr.encode_original(opened)
+    again = Image.open(io.BytesIO(data))
+    assert (content_type, again.format, again.size) == ("image/jpeg", "JPEG", (120, 300))
+    assert dict(again.getexif()) == {}
+    screenshot = result_image_ocr.open_image(fixture.png_bytes(fixture.render()))
+    data, content_type = result_image_ocr.encode_original(screenshot)
+    reopened = Image.open(io.BytesIO(data))
+    assert (content_type, reopened.format) == ("image/png", "PNG")
+    assert result_image_ocr.encode_original(result_image_ocr.open_image(b"")) == (b"", "")
+
+
 def test_large_images_are_shrunk_for_reading():
     big = Image.new("RGB", (result_image_ocr.MAX_IMAGE_DIMENSION + 400, 300), (20, 20, 30))
     opened = result_image_ocr.open_image(fixture.png_bytes(big))
