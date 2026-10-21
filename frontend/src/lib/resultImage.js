@@ -94,15 +94,35 @@ export function imageToRows(result, participants = []) {
   });
 }
 
+// Welche gelben Felder des Rennens ein neuer Wert ersetzt (#1927): schnellste Runde (Fahrer und Zeit), Fahrer des Tages.
+export const RACE_FIELD_GROUPS = {
+  fastestLap: ["fastest_lap_name", "fastest_lap_time"],
+  driverOfTheDay: ["driver_of_the_day"],
+};
+
+/**
+ * Gelbe Felder des Rennens, wenn neue Werte kommen (ein Bild, eine eingefügte Liste): Markierungen der ersetzten
+ * Felder (`replaced`, Schlüssel aus RACE_FIELDS) fallen weg, `fresh` kommt dazu, alle übrigen bleiben – ein Wert,
+ * der stehen bleibt, ist so ungeprüft wie vorher.
+ */
+export function replaceRaceMarks(current, replaced = [], fresh = null) {
+  const kept = afterEdit({ ocr: current || null }, replaced).ocr;
+  const uncertain = [...new Set([...(kept?.uncertain || []), ...(fresh?.uncertain || [])])];
+  if (!uncertain.length) return null;
+  const keptRead = Object.fromEntries(Object.entries(kept?.read || {}).filter(([field]) => kept.uncertain.includes(field)));
+  return { uncertain, read: { ...keptRead, ...(fresh?.read || {}) } };
+}
+
 /**
  * Kopf des Bilds als Felder des Rennens (#1927): `fastestLap {name, time}` und `driverOfTheDay` (Name), dazu `raceOcr`
- * mit den gelben Feldern daraus (wie `ocr` an einer Zeile, Schlüssel aus RACE_FIELDS). Ohne Angabe im Bild bleibt, was
- * im Blatt steht.
+ * mit den gelben Feldern (wie `ocr` an einer Zeile, Schlüssel aus RACE_FIELDS). Ohne Angabe im Bild bleibt, was im
+ * Blatt steht – und mit ihm seine gelbe Markierung aus `current` (dem bisherigen `raceOcr`).
  */
-export function imageFormFields(result) {
+export function imageFormFields(result, current = null) {
   const out = {};
   const uncertain = [];
   const read = {};
+  const replaced = [];
   const flag = (field, head, part) => {
     if (!head?.uncertain?.includes(part)) return;
     uncertain.push(field);
@@ -111,15 +131,17 @@ export function imageFormFields(result) {
   const lap = result?.fastest_lap;
   if (lap?.name || lap?.time) {
     out.fastestLap = { name: lap.name || "", time: lap.time || "" };
+    replaced.push(...RACE_FIELD_GROUPS.fastestLap);
     flag("fastest_lap_name", lap, "name");
     flag("fastest_lap_time", lap, "time");
   }
   const dotd = result?.driver_of_the_day;
   if (dotd?.name) {
     out.driverOfTheDay = dotd.name;
+    replaced.push(...RACE_FIELD_GROUPS.driverOfTheDay);
     flag("driver_of_the_day", dotd, "name");
   }
-  out.raceOcr = uncertain.length ? { uncertain, read } : null;
+  out.raceOcr = replaceRaceMarks(current, replaced, uncertain.length ? { uncertain, read } : null);
   return out;
 }
 

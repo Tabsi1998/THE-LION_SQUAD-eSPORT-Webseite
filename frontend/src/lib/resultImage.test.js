@@ -1,4 +1,4 @@
-import { afterEdit, checkImageFile, confirmRow, imageFormFields, imageFromClipboard, imageHeader, imageToRows, isUncertain, openImageItems, openImageRows, uncertainText } from "@/lib/resultImage";
+import { afterEdit, checkImageFile, confirmRow, imageFormFields, imageFromClipboard, imageHeader, imageToRows, isUncertain, openImageItems, openImageRows, replaceRaceMarks, uncertainText } from "@/lib/resultImage";
 import { formToPayload } from "@/lib/referenceResults";
 import { resultImageOptions } from "@/lib/referenceSeries";
 
@@ -116,6 +116,21 @@ test("Kopf des Bilds als Felder des Blatts (schnellste Runde, Fahrer des Tages)"
     raceOcr: { uncertain: ["driver_of_the_day"], read: {} },
   });
   expect(imageFormFields({ rows: [], fastest_lap: null, driver_of_the_day: null })).toEqual({ raceOcr: null });
+});
+
+test("ein zweites Bild ohne Kopf lässt stehende Werte gelb – ersetzt werden nur die Markierungen ersetzter Felder", () => {
+  const first = imageFormFields({ ...RESULT, fastest_lap: { name: "Bert Bolzt", participant_id: "p2", time: "4:31.207", uncertain: ["time"], read: "Bert Bolzt 431,207" } });
+  expect(first.raceOcr.uncertain).toEqual(["fastest_lap_time", "driver_of_the_day"]);
+  // Bild ohne Kopf: schnellste Runde und Fahrer des Tages bleiben stehen – und gelb.
+  const second = imageFormFields({ rows: [], fastest_lap: null, driver_of_the_day: null }, first.raceOcr);
+  expect(second).toEqual({ raceOcr: first.raceOcr });
+  // Bild mit sicherer schnellster Runde: deren Markierung fällt weg, der Fahrer des Tages bleibt gelb.
+  const third = imageFormFields({ rows: [], fastest_lap: { name: "Bert Bolzt", time: "1:31.207", uncertain: [] } }, first.raceOcr);
+  expect(third.raceOcr).toEqual({ uncertain: ["driver_of_the_day"], read: {} });
+  // Eine eingefügte Liste ersetzt nur, was sie mitbringt.
+  expect(replaceRaceMarks(first.raceOcr, [])).toEqual(first.raceOcr);
+  expect(replaceRaceMarks(first.raceOcr, ["driver_of_the_day"])).toEqual({ uncertain: ["fastest_lap_time"], read: { fastest_lap_time: "Bert Bolzt 431,207" } });
+  expect(replaceRaceMarks(null, ["driver_of_the_day"])).toBeNull();
 });
 
 test("Kopf des Bilds für die Übersicht", () => {

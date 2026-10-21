@@ -165,6 +165,46 @@ test("gelbe Zeit und gelbe Felder des Rennens: „Mehr“ steht offen, ändern o
   expect(screen.queryByTestId("result-race-ocr")).toBeNull();
 });
 
+test("eine eingefügte Liste oder ein zweites Bild ohne Kopf geben ungeprüfte Felder des Rennens nicht frei", async () => {
+  const read = {
+    ...READ,
+    rows: READ.rows.map((row) => ({ ...row, uncertain: [] })),
+    fastest_lap: { name: "Bert Bolzt", participant_id: "p2", time: "1:37.207", uncertain: ["time"], read: "Bert Bolzt 137,207" },
+  };
+  setup();
+  apiMock.post.mockImplementation(async (url) => ({ data: url.endsWith("/image") ? read : PREVIEW }));
+  await screen.findByTestId("result-image-pick");
+  pasteImage(png());
+  await waitFor(() => expect(screen.getByTestId("result-fastest-time")).toHaveAttribute("data-ocr-uncertain", "fastest_lap_time"), WAIT);
+  expect(screen.getByTestId("result-image-open")).toHaveTextContent("Eine Zeile aus dem Bild ist noch gelb");
+
+  // Liste ohne schnellste Runde: die Zeilen sind neu, die gelesene Rundenzeit steht noch da - und bleibt gelb.
+  fireEvent.click(screen.getByTestId("result-paste-toggle"));
+  fireEvent.change(screen.getByTestId("result-paste-text"), { target: { value: "1. Anna Probe\n2. Bert Bolzt" } });
+  fireEvent.click(screen.getByTestId("result-paste-apply"));
+  await waitFor(() => expect(screen.getAllByTestId("result-row")).toHaveLength(2), WAIT);
+  expect(screen.getByTestId("result-fastest-time")).toHaveValue("1:37.207");
+  expect(screen.getByTestId("result-fastest-time")).toHaveAttribute("data-ocr-uncertain", "fastest_lap_time");
+  expect(screen.getByTestId("result-image-open")).toHaveTextContent("Eine Zeile aus dem Bild ist noch gelb");
+
+  // Zweites Bild ohne Kopf: ebenso.
+  apiMock.post.mockImplementation(async (url) => ({ data: url.endsWith("/image") ? { ...read, fastest_lap: null, driver_of_the_day: null } : PREVIEW }));
+  pasteImage(png("zweites.png"));
+  await waitFor(() => expect(screen.getAllByTestId("result-row")).toHaveLength(3), WAIT);
+  expect(screen.getByTestId("result-fastest-time")).toHaveAttribute("data-ocr-uncertain", "fastest_lap_time");
+  await waitFor(() => expect(screen.getByTestId("result-submit")).toHaveTextContent("Gelbe Zeilen prüfen"), WAIT);
+  fireEvent.click(screen.getByTestId("result-submit"));
+  expect(apiMock.put).not.toHaveBeenCalled();
+
+  // Eine Liste mit eigener schnellster Runde ersetzt den Wert - dann ist er geprüft.
+  fireEvent.click(screen.getByTestId("result-paste-toggle"));
+  fireEvent.change(screen.getByTestId("result-paste-text"), { target: { value: "1. Anna Probe\n2. Bert Bolzt\nSchnellste Runde: Bert Bolzt 1:31.207" } });
+  fireEvent.click(screen.getByTestId("result-paste-apply"));
+  await waitFor(() => expect(screen.getByTestId("result-fastest-time")).toHaveValue("1:31.207"), WAIT);
+  expect(screen.getByTestId("result-fastest-time")).not.toHaveAttribute("data-ocr-uncertain");
+  expect(screen.queryByTestId("result-image-open")).toBeNull();
+});
+
 test("Strg+V: Text in einem Feld bleibt Text, ohne Vorlage gibt es kein Auslesen", async () => {
   setup();
   await screen.findByTestId("result-image-pick");

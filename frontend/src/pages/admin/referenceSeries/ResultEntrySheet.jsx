@@ -11,7 +11,7 @@ import {
 import { ResultPreview } from "./ResultPreview";
 import { VenueWithFlag } from "@/components/tls/CountryFlag";
 import { ResultImageButton, ResultImageRowNote, ResultImageSummary, ocrMark, useResultImage } from "./ResultImageImport";
-import { afterEdit, confirmRow, imageFormFields, imageToRows, isUncertain, openImageItems } from "@/lib/resultImage";
+import { RACE_FIELD_GROUPS, afterEdit, confirmRow, imageFormFields, imageToRows, isUncertain, openImageItems, replaceRaceMarks } from "@/lib/resultImage";
 import { toast } from "sonner";
 import { ClipboardList, Plus, RefreshCw, SlidersHorizontal, Trash2, X } from "lucide-react";
 
@@ -406,8 +406,9 @@ export function ResultEntrySheet({ series, round, onClose, onSaved }) {
   const image = useResultImage({
     base,
     onRead: (result) => {
-      // Schnellste Runde und Fahrer des Tages gehen als Felder des Blatts mit, sobald es sie hat (#1927).
-      setForm((current) => ({ ...current, ...imageFormFields(result), rows: imageToRows(result, participants) }));
+      // Schnellste Runde und Fahrer des Tages gehen in die Felder des Rennens (#1927); was das Bild nicht ersetzt,
+      // bleibt – mit seiner gelben Markierung.
+      setForm((current) => ({ ...current, ...imageFormFields(result, current.raceOcr), rows: imageToRows(result, participants) }));
       setPasting(false);
       setCheckImage(true);
     },
@@ -472,11 +473,15 @@ export function ResultEntrySheet({ series, round, onClose, onSaved }) {
     if (result.rows.length) {
       const rows = pastedToRows(result.rows, participants);
       const next = {
-        // Eine eingefügte Liste ersetzt auch die gelben Felder eines vorher gelesenen Bilds.
-        ...form, rows, raceOcr: null,
-        // Schnellste Runde und Fahrer des Tages aus der Liste (#1927) - sonst bleibt, was schon eingetragen ist.
+        ...form, rows,
+        // Schnellste Runde und Fahrer des Tages aus der Liste (#1927) - sonst bleibt, was schon eingetragen ist. Gelb
+        // aus einem Bild verlieren nur die Felder, die die Liste ersetzt; was stehen bleibt, ist weiter ungeprüft.
         ...(result.fastest_lap ? { fastestLap: { name: result.fastest_lap.name || "", time: result.fastest_lap.time || "" } } : {}),
         ...(result.driver_of_the_day ? { driverOfTheDay: result.driver_of_the_day.name || "" } : {}),
+        raceOcr: replaceRaceMarks(form.raceOcr, [
+          ...(result.fastest_lap ? RACE_FIELD_GROUPS.fastestLap : []),
+          ...(result.driver_of_the_day ? RACE_FIELD_GROUPS.driverOfTheDay : []),
+        ]),
       };
       setForm(next);
       setPasting(result.errors.length > 0);
