@@ -52,6 +52,8 @@ def test_bracket_additions_and_title_after_venue():
     # Im Titel zählen nur Länder- und Streckennamen …
     ("GP von Belgien", "BE"), ("Rennen in Monza", "IT"), ("Spa-Francorchamps Klassiker", "BE"), ("Lauf am COTA", "US"),
     ("Mexico City Grand Prix", "MX"),
+    # Eindeutige Streckennamen gelten im Titel, auch wenn sie nach Personen heißen.
+    ("Circuit Gilles Villeneuve", "CA"), ("Autódromo Hermanos Rodríguez", "MX"), ("Paul Ricard 6h", "FR"),
     # … keine bloßen Städte und keine Wörter, die auch Vor- oder Nachnamen sind.
     ("Austin Powers Gedächtnisrennen", None), ("Las Vegas Nacht", None), ("Spa-Abend", None), ("Holland Cup", None),
     ("Monaco Franze Pokal", None), ("Spielberg Spezial", None), ("Saisonfinale Abu Dhabi", None),

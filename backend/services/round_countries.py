@@ -83,13 +83,14 @@ _ALIASES: tuple[tuple[str, str], ...] = tuple(sorted(
      if _words(alias)},
     key=lambda item: (-len(item[0]), item[0])))
 
-# Nur im Ort bzw. in der Strecke: bloße Städte und Wörter, die auch Vor- oder Nachnamen sind („Austin Powers …“,
-# „Spielberg“, „Holland“, „Monaco“). Im freien Titel zählen nur Länder- und Streckennamen.
+# Nur im Ort bzw. in der Strecke: bloße Städte und mehrdeutige Wörter, die auch Vor- oder Nachnamen sind („Austin
+# Powers …“, „Spielberg“, „Holland“, „Monaco“). Eindeutige Streckennamen gehören nicht hierher, auch wenn sie nach
+# Personen heißen („Gilles Villeneuve“, „Hermanos Rodriguez“, „Paul Ricard“) - im Titel zählen Länder und Strecken.
 VENUE_ONLY = frozenset(_words(alias) for alias in (
     "Abu Dhabi", "Dubai", "Buenos Aires", "Spielberg", "Melbourne", "Adelaide", "Bathurst", "Baku", "Spa",
-    "Sao Paulo", "Montreal", "Gilles Villeneuve", "Shanghai", "Zhuhai", "Brno", "Brünn", "Barcelona", "Madrid",
-    "Valencia", "Jerez", "Paul Ricard", "Budapest", "India", "Fuji", "Marrakesch", "Marrakech", "Monaco",
-    "Monte Carlo", "Monte-Carlo", "Mexico City", "Mexiko-Stadt", "Hermanos Rodriguez", "Holland", "Poznan", "Sochi",
+    "Sao Paulo", "Montreal", "Shanghai", "Zhuhai", "Brno", "Brünn", "Barcelona", "Madrid", "Valencia", "Jerez",
+    "Budapest", "India", "Fuji", "Marrakesch", "Marrakech", "Monaco", "Monte Carlo", "Monte-Carlo", "Mexico City",
+    "Mexiko-Stadt", "Holland", "Poznan", "Sochi",
     "Sotschi", "Jeddah", "Dschidda", "Istanbul", "Austin", "Miami", "Las Vegas", "Indianapolis", "Indy", "Long Beach",
     "Daytona", "Hanoi",
 ))
