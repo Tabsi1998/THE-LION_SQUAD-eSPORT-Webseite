@@ -422,7 +422,8 @@ def _clear_pole(rows: list[dict], holder: str | None) -> list[int]:
     return sorted(index for index in moved if index is not None)
 
 
-# Ein Qualifying, in dem kein Platz gültig ist (alle DNS/DSQ), hat keine Pole - eine Marke fällt trotzdem nicht still weg.
+# Ein Qualifying, in dem kein Platz gültig ist (alle DNS/DSQ), hat keine Pole - eine Marke fällt trotzdem
+# nicht still weg.
 NO_POLE = "Kein gültiger Platz im Qualifying – Pole-Marke entfernt"
 
 
