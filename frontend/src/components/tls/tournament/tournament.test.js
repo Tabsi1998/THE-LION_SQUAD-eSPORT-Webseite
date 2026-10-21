@@ -1,4 +1,4 @@
-import { countdownText, stepCountdown, timelineSteps } from "./TournamentTimeline";
+import { countdownText, stepCountdown, timelineHeadline, timelineSteps } from "./TournamentTimeline";
 import { paymentLine } from "./MyStandCard";
 import { tournamentTabs } from "./TournamentTabs";
 
@@ -12,6 +12,52 @@ test("timelineSteps sortiert die Termine, markiert vergangene und genau den näc
   expect(steps.map((s) => s.past)).toEqual([true, false, false]);
   expect(steps.map((s) => s.next)).toEqual([false, true, false]);
   expect(timelineSteps({}, NOW)).toEqual([]);
+});
+
+// Zeitleiste nach Status und Phase (#1938): Vergangenes abgehakt, Laufendes „läuft“, ein Countdown nur für Kommendes.
+const LIVE = Date.parse("2026-10-21T08:50:00+00:00");
+const at = (minutes) => new Date(LIVE + minutes * 60000).toISOString();
+const view = (steps) => steps.map((s) => `${s.key}:${s.running ? "läuft" : s.past ? "vorbei" : s.next ? "nächster" : "kommt"}`);
+
+test("Generalprobe 3: Check-in von Hand, Start vor der Planzeit - nichts lädt mehr zum Check-in ein", () => {
+  const t = {
+    status: "live", public_phase: { state: "live" }, registration_open_from: at(-75), check_in_from: at(6),
+    check_in_until: at(-2), check_in_closed_at: at(-1), start_date: at(10), end_date: at(400),
+  };
+  const steps = timelineSteps(t, LIVE);
+  expect(view(steps)).toEqual(["registration_open:vorbei", "checkin_close:vorbei", "start:läuft", "end:nächster"]);
+  expect(steps.find((s) => s.running).label).toBe("Turnier läuft");
+  expect(timelineHeadline(steps, LIVE)).toBe("Ende heute 17:30");
+});
+
+test("Check-in läuft (vor der Planzeit geöffnet): Öffnung „läuft“, das Ende ist der nächste Termin", () => {
+  const t = { status: "check_in", public_phase: { state: "check_in" }, check_in_from: at(-1), check_in_until: at(10), start_date: at(20) };
+  const steps = timelineSteps(t, LIVE);
+  expect(view(steps)).toEqual(["checkin_open:läuft", "checkin_close:nächster", "start:kommt"]);
+  expect(steps[0].label).toBe("Check-in läuft");
+  expect(timelineHeadline(steps, LIVE)).toBe("Check-in endet in 10 Minuten");
+});
+
+test("Check-in beendet, Baum steht: Check-in abgehakt, der Start kommt", () => {
+  const t = { status: "check_in", public_phase: { state: "registration_closed" }, check_in_from: at(-30), check_in_until: at(-1), check_in_closed_at: at(-1), start_date: at(40) };
+  expect(view(timelineSteps(t, LIVE))).toEqual(["checkin_open:vorbei", "checkin_close:vorbei", "start:nächster"]);
+});
+
+test("von Hand beendet: alles abgehakt, auch ein Ende, das noch vor uns lag", () => {
+  const t = { status: "completed", public_phase: { state: "completed" }, start_date: at(-120), end_date: at(60) };
+  const steps = timelineSteps(t, LIVE);
+  expect(view(steps)).toEqual(["start:vorbei", "end:vorbei"]);
+  expect(timelineHeadline(steps, LIVE)).toBe("Alle Termine vorbei");
+});
+
+test("Anmeldung offen: „läuft“, Countdown bis zum Ende der Anmeldung; ohne Ende sagt der Kopf „läuft“", () => {
+  const t = { status: "registration_open", public_phase: { state: "registration_open" }, registration_open_from: at(-600), registration_open_until: at(3 * 1440), start_date: at(4 * 1440) };
+  const steps = timelineSteps(t, LIVE);
+  expect(view(steps)).toEqual(["registration_open:läuft", "registration_close:nächster", "start:kommt"]);
+  expect(steps[0].label).toBe("Anmeldung läuft");
+  const live = timelineSteps({ status: "live", public_phase: { state: "live" }, start_date: at(-5) }, LIVE);
+  expect(view(live)).toEqual(["start:läuft"]);
+  expect(timelineHeadline(live, LIVE)).toBe("Turnier läuft");
 });
 
 test("countdownText folgt der einen Regel (#1264): ohne Abkürzungen, weit weg Datum oder Monat", () => {
