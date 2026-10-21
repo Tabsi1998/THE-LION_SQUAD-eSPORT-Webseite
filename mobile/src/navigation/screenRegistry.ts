@@ -29,6 +29,7 @@ import { NotificationsScreen } from "../screens/main/NotificationsScreen";
 import { ProfileEditScreen } from "../screens/main/ProfileEditScreen";
 import { ProfileScreen } from "../screens/main/ProfileScreen";
 import { PublicProfileScreen } from "../screens/main/PublicProfileScreen";
+import { ReferenceSeasonScreen } from "../screens/main/ReferenceSeasonScreen";
 import { SearchScreen } from "../screens/main/SearchScreen";
 import { SeasonPassScreen } from "../screens/main/SeasonPassScreen";
 import { SettingsScreen } from "../screens/main/SettingsScreen";
@@ -88,6 +89,7 @@ export const DETAIL_SCREENS: Record<DetailScreenName, Screen> = {
   MemberCard: MemberCardScreen,
   Admission: AdmissionScreen,
   InfoCenter: InfoCenterScreen,
+  ReferenceSeason: ReferenceSeasonScreen,
   ClubAbout: ClubAboutScreen,
   YearReview: YearReviewScreen,
   Settings: SettingsScreen,

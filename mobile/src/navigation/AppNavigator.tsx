@@ -242,6 +242,7 @@ export const DETAIL_OPTIONS: Record<DetailScreenName, NativeStackNavigationOptio
   MemberCard: { title: "Mitgliedskarte", ...gold },
   Admission: { title: "Einlass" },
   InfoCenter: { title: "Verein" },
+  ReferenceSeason: { title: "Saison" },
   ClubAbout: { title: "Über uns" },
   YearReview: { title: "Dein Jahr", ...gold },
   Settings: { title: "Einstellungen" },
@@ -255,8 +256,10 @@ export const DETAIL_OPTIONS: Record<DetailScreenName, NativeStackNavigationOptio
  * keine zweite Seite. Gilt für jeden Detail-Screen, dessen Parameter eine Kennung tragen.
  */
 export function detailRouteId(_name: DetailScreenName, params?: object): string | undefined {
-  const values = (params || {}) as { id?: unknown; username?: unknown; userId?: unknown; albumId?: unknown };
-  const id = values.id ?? values.username ?? values.userId ?? values.albumId;
+  const values = (params || {}) as { id?: unknown; username?: unknown; userId?: unknown; albumId?: unknown; lineage?: unknown; season?: unknown };
+  // Saison einer Serie (#1945): Spur und Saison zusammen.
+  const season = typeof values.lineage === "string" && typeof values.season === "string" ? `${values.lineage}/${values.season}` : undefined;
+  const id = values.id ?? values.username ?? values.userId ?? values.albumId ?? season;
   return typeof id === "string" || typeof id === "number" ? String(id) : undefined;
 }
 
