@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api, formatApiError } from "@/lib/api";
-import { checkImageFile, imageFromClipboard, imageHeader, isUncertain, openImageRows, uncertainText } from "@/lib/resultImage";
+import { checkImageFile, imageFromClipboard, imageHeader, isUncertain, openImageItems, uncertainText } from "@/lib/resultImage";
 import { toast } from "sonner";
 import { Check, Maximize2, Minimize2, ScanText, X } from "lucide-react";
 
@@ -119,7 +119,7 @@ function Picture({ src, large, reading }) {
 }
 
 /** Lesestand und danach die Übersicht: Vorlage, Kopf des Bilds, wie viele Zeilen gelb sind, Hinweise. */
-export function ResultImageSummary({ image, rows }) {
+export function ResultImageSummary({ image, rows, raceOcr = null }) {
   const [large, setLarge] = useState(false);
   if (image.busy) {
     return (
@@ -131,7 +131,7 @@ export function ResultImageSummary({ image, rows }) {
   }
   const result = image.result;
   if (!result) return null;
-  const open = openImageRows(rows);
+  const open = openImageItems({ rows, raceOcr });
   const header = imageHeader(result);
   return (
     <section className={`border rounded-sm p-3 space-y-3 ${open ? "border-amber-400/40 bg-amber-400/[0.06]" : "border-[#29B6E8]/30 bg-[#29B6E8]/5"}`} data-testid="result-image-summary" aria-live="polite">
@@ -188,12 +188,12 @@ export function ResultImageSummary({ image, rows }) {
 }
 
 /** Unter einer gelben Zeile: was unsicher ist, was im Bild stand, und „Passt so“. */
-export function ResultImageRowNote({ row, onConfirm }) {
+export function ResultImageRowNote({ row, onConfirm, testId = "result-row-ocr" }) {
   if (!row.ocr?.uncertain?.length) return null;
   return (
-    <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-amber-200" data-testid="result-row-ocr">
+    <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-amber-200" data-testid={testId}>
       <span className="min-w-0">Aus dem Bild unsicher: {uncertainText(row)}</span>
-      <button type="button" onClick={onConfirm} data-testid="result-row-ocr-confirm"
+      <button type="button" onClick={onConfirm} data-testid={`${testId}-confirm`}
         className="tls-btn tls-btn--quiet px-2 py-1 rounded-sm text-[10px] font-bold uppercase tracking-wider inline-flex items-center gap-1">
         <Check className="w-3 h-3" /> Passt so
       </button>

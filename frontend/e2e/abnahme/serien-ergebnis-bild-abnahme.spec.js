@@ -68,6 +68,15 @@ const EXPECTED = {
   name: (row) => row.name,
   team: (row) => row.team,
   start_number: (row) => row.number,
+  grid: (row) => String(row.grid),
+  time: (row) => (row.time === "DNF" ? "" : row.time),
+  gap: (row) => row.gap,
+};
+// Felder des Rennens aus dem Kopf des Bilds (#1927): gelbe Markierung → Eingabefeld und richtiger Wert.
+const RACE = {
+  fastest_lap_name: ["result-fastest-name", (sheet) => sheet.fastest_name],
+  fastest_lap_time: ["result-fastest-time", (sheet) => sheet.fastest_time],
+  driver_of_the_day: ["result-dotd", (sheet) => sheet.driver_of_the_day],
 };
 
 test.describe("Abnahme #1756: Ergebnis-Bild auslesen - einfügen, Vorschau, korrigieren, übernehmen", () => {
@@ -148,22 +157,37 @@ test.describe("Abnahme #1756: Ergebnis-Bild auslesen - einfügen, Vorschau, korr
         }
         if (await row.getByTestId("result-row-ocr-confirm").count()) await row.getByTestId("result-row-ocr-confirm").click();
       }
+      // Schnellste Runde und Fahrer des Tages stehen in den Feldern des Rennens - gelbe ebenso korrigieren.
+      const race = sheet.getByTestId("result-race");
+      await expect(race.getByTestId("result-fastest-name")).not.toHaveValue("");
+      const raceFields = await race.locator("[data-ocr-uncertain]").evaluateAll((items) => items.map((item) => item.getAttribute("data-ocr-uncertain")));
+      for (const field of raceFields) {
+        const [testId, value] = RACE[field];
+        await race.getByTestId(testId).fill(value(images.sheet));
+      }
+      if (await race.getByTestId("result-race-ocr-confirm").count()) await race.getByTestId("result-race-ocr-confirm").click();
       await expect(sheet.getByTestId("result-row-ocr")).toHaveCount(0);
+      await expect(sheet.getByTestId("result-race-ocr")).toHaveCount(0);
       await expect(sheet.getByTestId("result-image-open")).toHaveCount(0);
       await sheet.getByTestId("result-submit").click();
       await expect(sheet.getByTestId("result-submit")).toHaveText("Veröffentlichen");
       await sheet.getByTestId("result-submit").click();
       await expect(sheet).toHaveCount(0);
 
-      // Gespeichert ist das Blatt aus dem Bild: Reihenfolge, Plätze, Ausfall, schnellste Runde.
+      // Gespeichert ist das Blatt aus dem Bild: Reihenfolge, Plätze, Ausfall, Startplatz, Zeit, Abstand, schnellste
+      // Runde und Fahrer des Tages.
       const stored = await ok(await admin.request.get(results));
       expect(stored.sheet.status).toBe("published");
       expect(stored.sheet.rows.map((row) => row.participant_id)).toEqual(images.sheet.rows.map((row) => ids[row.name]));
       expect(stored.sheet.rows.map((row) => row.place)).toEqual(images.sheet.rows.map((row) => row.place));
       expect(stored.sheet.rows.map((row) => row.team)).toEqual(images.sheet.rows.map((row) => row.team));
+      expect(stored.sheet.rows.map((row) => [row.grid, row.time || "", row.gap || ""]))
+        .toEqual(images.sheet.rows.map((row) => [row.grid, EXPECTED.time(row), row.gap]));
       const marks = Object.fromEntries(stored.sheet.rows.map((row) => [row.participant_id, row.marks]));
       expect(marks[ids[images.sheet.fastest_name]]).toContain("fastest_lap");
       expect(marks[ids[images.sheet.rows.at(-1).name]]).toContain("dnf");
+      expect(stored.sheet.fastest_lap).toEqual({ participant_id: ids[images.sheet.fastest_name], time: images.sheet.fastest_time });
+      expect(stored.sheet.driver_of_the_day).toBe(ids[images.sheet.driver_of_the_day]);
 
       // 3. „Bild auslesen“ mit einem sauberen Screenshot - nichts gelb, nichts gespeichert; danach am Handy (390 px).
       await noToasts(admin);

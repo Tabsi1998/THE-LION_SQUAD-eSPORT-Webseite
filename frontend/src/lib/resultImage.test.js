@@ -1,4 +1,4 @@
-import { afterEdit, checkImageFile, confirmRow, imageFormFields, imageFromClipboard, imageHeader, imageToRows, isUncertain, openImageRows, uncertainText } from "@/lib/resultImage";
+import { afterEdit, checkImageFile, confirmRow, imageFormFields, imageFromClipboard, imageHeader, imageToRows, isUncertain, openImageItems, openImageRows, uncertainText } from "@/lib/resultImage";
 import { formToPayload } from "@/lib/referenceResults";
 import { resultImageOptions } from "@/lib/referenceSeries";
 
@@ -30,30 +30,36 @@ test("die gelesenen Zeilen werden Zeilen des Blatts – mit Kennung, Marken, Aus
     ["p2", "Bert Bolzt", "2", "Blaupfeil GP", "12"],
     ["", "Dora Neu", "", "Kometen Team", "31"],
   ]);
-  // Schnellste Runde wird zur Marke, der Fahrer des Tages zum Feld; Startplatz, Zeit und Abstand gehen mit (#1927).
-  expect(rows[1].marks).toEqual(["fastest_lap"]);
-  expect(rows.map((row) => row.driver_of_the_day)).toEqual([true, false, false]);
+  // Startplatz, Zeit und Abstand gehen in die Zeile (#1927); die schnellste Runde ist ein Feld des Rennens, keine Marke.
+  expect(rows[1].marks).toEqual([]);
   expect([rows[1].grid, rows[1].time, rows[1].gap]).toEqual(["1", "1:32:17.456", "+2.333"]);
   expect([rows[2].marks, rows[2].no_place]).toEqual([["dnf"], true]);
-  // Gelb sind nur Felder, die das Blatt zeigt.
-  expect(rows.map((row) => row.ocr?.uncertain || [])).toEqual([[], ["start_number"], ["name"]]);
+  // Gelb sind die Felder, die das Blatt zeigt – auch Startplatz, Zeit und Abstand.
+  expect(rows.map((row) => row.ocr?.uncertain || [])).toEqual([[], ["start_number", "time"], ["name"]]);
   expect(openImageRows(rows)).toBe(2);
-  // Im Body an den Server: Ausfall ohne Platz, Kennungen, keine Felder aus dem Bild, die das Blatt nicht kennt.
-  const { payload } = formToPayload({ rows, matches: [], table: [], teamTotals: {}, note: "" });
+  // Im Body an den Server: Ausfall ohne Platz, Kennungen, Rennfelder; keine Felder aus dem Bild, die das Blatt nicht kennt.
+  const { payload } = formToPayload({ rows, matches: [], table: [], teamTotals: {}, note: "", ...imageFormFields(RESULT) });
   expect(payload.rows.map((row) => [row.participant_id || row.name, row.place, row.marks])).toEqual([
-    ["p1", 1, []], ["p2", 2, ["fastest_lap"]], ["Dora Neu", null, ["dnf"]],
+    ["p1", 1, []], ["p2", 2, []], ["Dora Neu", null, ["dnf"]],
   ]);
+  expect([payload.rows[1].grid, payload.rows[1].time, payload.rows[1].gap]).toEqual([1, "1:32:17.456", "+2.333"]);
+  expect(payload.fastest_lap).toEqual({ participant_id: "p2", time: "1:31.207" });
+  expect(payload.driver_of_the_day).toEqual({ participant_id: "p1" });
   expect(payload.rows[0]).not.toHaveProperty("ocr");
+  expect(payload.rows[0]).not.toHaveProperty("color");
 });
 
-test("ist die schnellste Runde unsicher, sind die Marken der Zeile gelb; ohne Kennung zählt der Name", () => {
-  const rows = imageToRows({ ...RESULT, fastest_lap: { name: "dora neu", participant_id: null, time: null, uncertain: ["name", "time"] } }, PARTICIPANTS);
-  expect(rows[2].marks).toEqual(["dnf", "fastest_lap"]);
-  expect(rows[2].ocr.uncertain).toEqual(["name", "marks"]);
-  expect(rows[1].marks).toEqual([]);
-  // Nur die Zeit unsicher: die Marke sitzt beim richtigen Fahrer, nichts wird gelb.
-  const timeOnly = imageToRows({ ...RESULT, fastest_lap: { ...RESULT.fastest_lap, time: "4:31.207", uncertain: ["time"] } }, PARTICIPANTS);
-  expect([timeOnly[1].marks, timeOnly[1].ocr.uncertain]).toEqual([["fastest_lap"], ["start_number"]]);
+test("unsichere schnellste Runde oder Fahrer des Tages sind gelbe Felder des Rennens und halten das Übernehmen auf", () => {
+  const fields = imageFormFields({ ...RESULT, fastest_lap: { name: "Bert Bolzt", participant_id: "p2", time: "4:31.207", uncertain: ["time"], read: "Bert Bolzt 431,207" } });
+  expect(fields.fastestLap).toEqual({ name: "Bert Bolzt", time: "4:31.207" });
+  expect(fields.raceOcr).toEqual({ uncertain: ["fastest_lap_time", "driver_of_the_day"], read: { fastest_lap_time: "Bert Bolzt 431,207" } });
+  const rows = imageToRows(RESULT, PARTICIPANTS);
+  expect(openImageItems({ rows, ...fields })).toBe(3);
+  expect(uncertainText({ ocr: fields.raceOcr })).toBe("Rundenzeit (gelesen „Bert Bolzt 431,207“), Fahrer des Tages");
+  // Ändern nimmt die Markierung vom Feld; ohne gelbe Felder zählt das Rennen nicht mehr mit.
+  const after = afterEdit({ ocr: fields.raceOcr }, ["fastest_lap_time", "driver_of_the_day"]).ocr;
+  expect(after).toBeNull();
+  expect(openImageItems({ rows, raceOcr: after })).toBe(2);
 });
 
 test("Punkte aus dem Bild gehen als Punkte laut Veranstalter mit; die Art der Sitzung steht im Kopf", () => {
@@ -92,20 +98,24 @@ test("ein nicht gelesener Platz ist immer gelb – die Reihenfolge, die das Blat
 test("ändern nimmt die gelbe Markierung vom Feld, „Passt so“ von der Zeile", () => {
   const [, bert, dora] = imageToRows(RESULT, PARTICIPANTS);
   expect(isUncertain(bert, "start_number")).toBe(true);
-  expect(afterEdit(bert, ["team"]).ocr.uncertain).toEqual(["start_number"]);
-  expect(afterEdit(bert, ["start_number"]).ocr).toBeNull();
+  expect(afterEdit(bert, ["team"]).ocr.uncertain).toEqual(["start_number", "time"]);
+  expect(afterEdit(bert, ["start_number"]).ocr.uncertain).toEqual(["time"]);
+  expect(afterEdit(bert, ["start_number", "time"]).ocr).toBeNull();
   // Ein anderer Teilnehmer (nur die Kennung wechselt) gilt als geprüfter Name.
   expect(afterEdit(dora, ["participant_id"]).ocr).toBeNull();
   expect(confirmRow(bert).ocr).toBeNull();
   const plain = { key: "x", name: "Ohne Bild", ocr: null };
   expect(afterEdit(plain, ["name"])).toBe(plain);
-  expect(uncertainText(bert)).toBe("Startnummer (gelesen „18“)");
+  expect(uncertainText(bert)).toBe("Startnummer (gelesen „18“), Zeit");
   expect(uncertainText(dora)).toBe("Name (gelesen „Dora Nev“)");
 });
 
 test("Kopf des Bilds als Felder des Blatts (schnellste Runde, Fahrer des Tages)", () => {
-  expect(imageFormFields(RESULT)).toEqual({ fastestLap: { name: "Bert Bolzt", time: "1:31.207" }, driverOfTheDay: "Anna Probe" });
-  expect(imageFormFields({ rows: [], fastest_lap: null, driver_of_the_day: null })).toEqual({});
+  expect(imageFormFields(RESULT)).toEqual({
+    fastestLap: { name: "Bert Bolzt", time: "1:31.207" }, driverOfTheDay: "Anna Probe",
+    raceOcr: { uncertain: ["driver_of_the_day"], read: {} },
+  });
+  expect(imageFormFields({ rows: [], fastest_lap: null, driver_of_the_day: null })).toEqual({ raceOcr: null });
 });
 
 test("Kopf des Bilds für die Übersicht", () => {

@@ -10,14 +10,14 @@ import { emptyRow, matchParticipant } from "@/lib/referenceResults";
 import { cleanText } from "@/lib/resultPaste";
 
 export const IMAGE_TYPES = ["image/png", "image/jpeg", "image/webp"];
-// Felder, die das Blatt zeigt – nur sie können gelb werden.
-export const SHOWN_FIELDS = ["place", "start_number", "name", "team", "points", "marks"];
-// Startplatz, Zeit und Abstand liest der Server mit und sie gehen schon in die Zeile (`grid`, `time`, `gap`). Sobald das
-// Blatt sie zeigt (#1927/#1949), kommen sie in SHOWN_FIELDS – und ihre Eingabefelder bekommen `ocrMark` wie die übrigen.
-export const PENDING_FIELDS = ["grid", "time", "gap"];
+// Felder, die das Blatt zeigt – nur sie können gelb werden. Startplatz, Zeit und Abstand stehen unter „Mehr“ (#1927).
+export const SHOWN_FIELDS = ["place", "start_number", "name", "team", "points", "grid", "time", "gap", "marks"];
+// Felder des Rennens aus dem Kopf des Bilds (#1927): schnellste Runde (Fahrer, Zeit) und Fahrer des Tages.
+export const RACE_FIELDS = ["fastest_lap_name", "fastest_lap_time", "driver_of_the_day"];
 export const FIELD_LABELS = {
   place: "Platz", start_number: "Startnummer", name: "Name", team: "Team", points: "Punkte", marks: "Marken",
-  grid: "Startplatz", time: "Zeit", gap: "Abstand",
+  grid: "Startplatz", time: "Zeit", gap: "Abstand", fastest_lap_name: "Schnellste Runde", fastest_lap_time: "Rundenzeit",
+  driver_of_the_day: "Fahrer des Tages",
 };
 const OUT_MARKS = ["dnf", "dns", "dsq"];
 
@@ -54,13 +54,11 @@ function sameDriver(head, row) {
 }
 
 /**
- * Die gelesenen Zeilen als Formularzeilen. Schnellste Runde und Pole werden Marken an der Zeile ihres Fahrers, der
- * Fahrer des Tages zum Feld `driver_of_the_day`. Ein Ausfall ohne Platz bleibt ohne Platz.
+ * Die gelesenen Zeilen als Formularzeilen. Die Pole wird Marke an der Zeile ihres Fahrers; schnellste Runde und Fahrer
+ * des Tages sind Felder des Rennens (`imageFormFields`). Ein Ausfall ohne Platz bleibt ohne Platz.
  */
 export function imageToRows(result, participants = []) {
-  const fastest = result?.fastest_lap;
   const pole = result?.pole;
-  const dotd = result?.driver_of_the_day;
   return (result?.rows || []).map((row) => {
     const known = row.participant_id
       ? participants.find((person) => person.id === row.participant_id) || null
@@ -70,12 +68,11 @@ export function imageToRows(result, participants = []) {
     // Ohne gelesenen Platz setzt das Blatt die Reihenfolge ein – das ist geschätzt und bleibt gelb, bis jemand prüft.
     // Ein Ausfall (DNF, DNS, DSQ) hat keinen Platz.
     if (!row.place && !marks.some((mark) => OUT_MARKS.includes(mark)) && !uncertain.includes("place")) uncertain.push("place");
-    // Schnellste Runde und Pole werden Marken an der Zeile ihres Fahrers. Gelb nur, wenn unsicher ist, WER sie fuhr –
-    // eine unsichere Zeit ändert die Marke nicht.
-    for (const [head, mark] of [[fastest, "fastest_lap"], [pole, "pole"]]) {
-      if (!sameDriver(head, row)) continue;
-      if (!marks.includes(mark)) marks.push(mark);
-      if (head.uncertain?.includes("name")) uncertain.push("marks");
+    // Die Pole wird Marke an der Zeile ihres Fahrers. Gelb nur, wenn unsicher ist, WER sie fuhr – eine unsichere Zeit
+    // ändert die Marke nicht.
+    if (sameDriver(pole, row)) {
+      if (!marks.includes("pole")) marks.push("pole");
+      if (pole.uncertain?.includes("name")) uncertain.push("marks");
     }
     return emptyRow({
       participant_id: known?.id || "",
@@ -91,7 +88,6 @@ export function imageToRows(result, participants = []) {
       time: row.time || "",
       gap: row.gap || "",
       color: row.color || "",
-      driver_of_the_day: sameDriver(dotd, row),
       from_image: true,
       ocr: uncertain.length ? { uncertain: [...new Set(uncertain)], read: row.read || {} } : null,
     });
@@ -99,20 +95,42 @@ export function imageToRows(result, participants = []) {
 }
 
 /**
- * Kopf des Bilds als Felder des Blatts: `fastestLap {name, time}` und `driverOfTheDay` (Name) – so heißen sie im
- * Formular mit #1927. Ohne Angabe im Bild bleibt, was im Blatt steht.
+ * Kopf des Bilds als Felder des Rennens (#1927): `fastestLap {name, time}` und `driverOfTheDay` (Name), dazu `raceOcr`
+ * mit den gelben Feldern daraus (wie `ocr` an einer Zeile, Schlüssel aus RACE_FIELDS). Ohne Angabe im Bild bleibt, was
+ * im Blatt steht.
  */
 export function imageFormFields(result) {
   const out = {};
+  const uncertain = [];
+  const read = {};
+  const flag = (field, head, part) => {
+    if (!head?.uncertain?.includes(part)) return;
+    uncertain.push(field);
+    if (head.read) read[field] = head.read;
+  };
   const lap = result?.fastest_lap;
-  if (lap?.name || lap?.time) out.fastestLap = { name: lap.name || "", time: lap.time || "" };
-  if (result?.driver_of_the_day?.name) out.driverOfTheDay = result.driver_of_the_day.name;
+  if (lap?.name || lap?.time) {
+    out.fastestLap = { name: lap.name || "", time: lap.time || "" };
+    flag("fastest_lap_name", lap, "name");
+    flag("fastest_lap_time", lap, "time");
+  }
+  const dotd = result?.driver_of_the_day;
+  if (dotd?.name) {
+    out.driverOfTheDay = dotd.name;
+    flag("driver_of_the_day", dotd, "name");
+  }
+  out.raceOcr = uncertain.length ? { uncertain, read } : null;
   return out;
 }
 
 /** Wie viele Zeilen noch gelb sind. */
 export function openImageRows(rows = []) {
   return rows.filter((row) => row.ocr?.uncertain?.length).length;
+}
+
+/** Was vor dem Übernehmen noch gelb ist: die Zeilen und – als eine weitere – die Felder des Rennens. */
+export function openImageItems(form) {
+  return openImageRows(form?.rows || []) + (form?.raceOcr?.uncertain?.length ? 1 : 0);
 }
 
 /** Ist dieses Feld der Zeile gelb? */

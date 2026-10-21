@@ -612,13 +612,15 @@ einem gewerteten Termin **Ergebnis ändern**. Das öffnet das Blatt des Termins.
   `Schnellste Runde: Name 1:31.456` und `Fahrer des Tages: Name` füllen die Felder des Rennens.
 - **Bild auslesen** (Rennligen): den Ergebnis-Screenshot des Veranstalters mit **Strg+V** ins Blatt einfügen oder über
   **Bild auslesen** wählen – am Handy geht auch die Kamera. Der eigene Server liest das Bild (kein fremder Dienst, das
-  Bild wird nicht gespeichert) und füllt die Liste: Platz, Startnummer, Name, Team, Punkte (falls im Bild), DNF bzw.
-  OUT und die schnellste Runde und Pole als Marken; die Vorschau prüft gleich. Darüber steht **Aus dem Bild gelesen**
-  mit dem Bild zum Vergleichen (antippen vergrößert), Strecke, Art (Rennen oder Qualifying – nur als Hinweis),
-  schnellster Rennrunde, Pole und Fahrer des Tages. Passt die Strecke zu einem anderen Termin der Saison, sagt ein
-  Hinweis, zu welchem. **Gelbe Felder** sind unsicher, darunter steht, was
-  im Bild stand. Ändern nimmt die Markierung weg, **Passt so** bestätigt die ganze Zeile. Übernehmen geht erst, wenn
-  nichts mehr gelb ist – bis dahin heißt der Knopf **Gelbe Zeilen prüfen** und springt zur ersten. Wie das Bild
+  Bild wird nicht gespeichert) und füllt die Liste: Platz, Startnummer, Name, Team, Punkte (falls im Bild), Startplatz,
+  Zeit, Abstand, DNF bzw. OUT und die Pole als Marke; dazu die **Schnellste Runde** und den **Fahrer des Tages** des
+  Rennens. Die Vorschau prüft gleich. Darüber steht **Aus dem Bild gelesen** mit dem Bild zum Vergleichen (antippen
+  vergrößert), Strecke, Art (Rennen oder Qualifying – nur als Hinweis), schnellster Rennrunde, Pole und Fahrer des
+  Tages. Passt die Strecke zu einem anderen Termin der Saison, sagt ein Hinweis, zu welchem. **Gelbe Felder** sind
+  unsicher, darunter steht, was im Bild stand; ist Startplatz, Zeit oder Abstand gelb, steht **Mehr** gleich offen.
+  Ändern nimmt die Markierung weg, **Passt so** bestätigt die ganze Zeile (beim Rennen: schnellste Runde und Fahrer des
+  Tages). Übernehmen geht erst, wenn nichts mehr gelb ist – bis dahin heißt der Knopf **Gelbe Zeilen prüfen** und
+  springt zur ersten. Wie das Bild
   aufgebaut ist, sagt die **Vorlage für Ergebnis-Bilder** an der Spur (eine Saison kann abweichen): Standard für
   Rennligen ist „Rennliga-Ergebnis (dunkel)“, **Aus** schaltet das Auslesen ab.
 - **Team-Liga:** statt der Liste das **Spiel** – eigenes Team und Gegner (aus dem Termin vorbefüllt), Ergebnis, die

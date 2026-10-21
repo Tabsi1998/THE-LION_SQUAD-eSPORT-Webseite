@@ -72,12 +72,18 @@ test("Knopf „Bild auslesen“: gelesen wird im Server, die Zeilen ersetzen die
   await waitFor(() => expect(screen.getAllByTestId("result-row")).toHaveLength(3), WAIT);
   expect(apiMock.post).toHaveBeenCalledWith(`${BASE}/image`, file, { headers: { "Content-Type": "image/png" } });
   expect(screen.getAllByTestId("result-row-name").map((input) => input.value)).toEqual(["Anna Probe", "Bert Bolzt", "Dora Nev"]);
-  // Gleich danach die Vorschau – mit Ausfall ohne Platz und der schnellsten Runde als Marke.
+  // Gleich danach die Vorschau – mit Ausfall ohne Platz, Startplatz, Zeit und Abstand, schnellster Runde und Fahrer
+  // des Tages als Felder des Rennens (#1927).
   await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith(`${BASE}/preview`, expect.anything()));
   const body = apiMock.post.mock.calls.find(([url]) => url.endsWith("/preview"))[1];
   expect(body.rows.map((row) => [row.participant_id || row.name, row.place, row.marks])).toEqual([
-    ["p1", 1, []], ["p2", 2, ["fastest_lap"]], ["Dora Nev", null, ["dnf"]],
+    ["p1", 1, []], ["p2", 2, []], ["Dora Nev", null, ["dnf"]],
   ]);
+  expect([body.rows[1].grid, body.rows[1].time, body.rows[1].gap]).toEqual([1, "1:32:17.456", "+2.333"]);
+  expect([body.fastest_lap, body.driver_of_the_day]).toEqual([{ participant_id: "p2", time: "1:31.207" }, { participant_id: "p1" }]);
+  expect([screen.getByTestId("result-fastest-name").value, screen.getByTestId("result-fastest-time").value, screen.getByTestId("result-dotd").value])
+    .toEqual(["Bert Bolzt", "1:31.207", "Anna Probe"]);
+  expect(screen.queryByTestId("result-race-ocr")).toBeNull();
   // Übersicht: Vorlage, Kopf, Hinweis, wie viele Zeilen gelb sind.
   const summary = screen.getByTestId("result-image-summary");
   expect(within(summary).getByTestId("result-image-counts")).toHaveTextContent("3 Zeilen in die Liste übernommen · Vorlage Rennliga-Ergebnis (dunkel)");
@@ -120,6 +126,43 @@ test("übernommen wird erst ohne gelbe Zeilen: ändern oder „Passt so“", asy
   const body = apiMock.put.mock.calls[0][1];
   expect(body.status).toBe("published");
   expect(body.rows[1].team).toBe("Rotor Racing");
+});
+
+test("gelbe Zeit und gelbe Felder des Rennens: „Mehr“ steht offen, ändern oder „Passt so“ gibt das Übernehmen frei", async () => {
+  const read = {
+    ...READ,
+    rows: [{ ...READ.rows[0], uncertain: ["time"], read: { time: "1:32:15.l23" } }, { ...READ.rows[1], uncertain: [] }, { ...READ.rows[2], uncertain: [] }],
+    fastest_lap: { name: "Bert Bolzt", participant_id: "p2", time: "1:37.207", uncertain: ["time"], read: "Bert Bolzt 137,207" },
+    driver_of_the_day: { name: "Anna Prob3", participant_id: null, uncertain: ["name"], read: "Anna Prob3" },
+  };
+  setup();
+  apiMock.post.mockImplementation(async (url) => ({ data: url.endsWith("/image") ? read : PREVIEW }));
+  await screen.findByTestId("result-image-pick");
+  pasteImage(png());
+  await waitFor(() => expect(screen.getAllByTestId("result-row")).toHaveLength(3), WAIT);
+  await waitFor(() => expect(screen.getByTestId("result-submit")).toHaveTextContent("Gelbe Zeilen prüfen"), WAIT);
+  expect(screen.getByTestId("result-image-open")).toHaveTextContent("2 Zeilen aus dem Bild sind noch gelb");
+  // Die gelbe Zeit steht unter „Mehr“ – das ist dafür schon offen.
+  const first = screen.getAllByTestId("result-row")[0];
+  expect(within(first).getByTestId("result-row-more")).toHaveAttribute("aria-expanded", "true");
+  expect(within(first).getByTestId("result-row-time")).toHaveAttribute("data-ocr-uncertain", "time");
+  expect(within(first).getByTestId("result-row-ocr")).toHaveTextContent("Zeit (gelesen „1:32:15.l23“)");
+  // Felder des Rennens: gelb mit dem, was im Bild stand.
+  expect(screen.getByTestId("result-fastest-time")).toHaveAttribute("data-ocr-uncertain", "fastest_lap_time");
+  expect(screen.getByTestId("result-fastest-name")).not.toHaveAttribute("data-ocr-uncertain");
+  expect(screen.getByTestId("result-dotd")).toHaveAttribute("data-ocr-uncertain", "driver_of_the_day");
+  expect(screen.getByTestId("result-race-ocr")).toHaveTextContent("Rundenzeit (gelesen „Bert Bolzt 137,207“), Fahrer des Tages (gelesen „Anna Prob3“)");
+  // Zeit korrigiert (das Feld bleibt offen), Rundenzeit korrigiert, der Rest des Rennens mit „Passt so“.
+  fireEvent.change(within(first).getByTestId("result-row-time"), { target: { value: "1:32:15.124" } });
+  expect(within(first).getByTestId("result-row-time")).not.toHaveAttribute("data-ocr-uncertain");
+  expect(within(first).getByTestId("result-row-more")).toHaveAttribute("aria-expanded", "true");
+  fireEvent.change(screen.getByTestId("result-fastest-time"), { target: { value: "1:31.207" } });
+  expect(screen.getByTestId("result-fastest-time")).not.toHaveAttribute("data-ocr-uncertain");
+  expect(screen.getByTestId("result-dotd")).toHaveAttribute("data-ocr-uncertain", "driver_of_the_day");
+  expect(screen.getByTestId("result-image-open")).toHaveTextContent("Eine Zeile aus dem Bild ist noch gelb");
+  fireEvent.click(screen.getByTestId("result-race-ocr-confirm"));
+  expect(screen.queryByTestId("result-image-open")).toBeNull();
+  expect(screen.queryByTestId("result-race-ocr")).toBeNull();
 });
 
 test("Strg+V: Text in einem Feld bleibt Text, ohne Vorlage gibt es kein Auslesen", async () => {

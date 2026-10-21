@@ -135,10 +135,13 @@ Dienst) und landet als Zeilen im Blatt – gespeichert wird beim Lesen nichts, a
 - **Antwort:** `rows` mit `place`, `dnf`, `marks`, `start_number`, `name`, `participant_id`, `team`, `grid`, `time`,
   `gap`, `points`, `color` (Schriftfarbe von Startnummer oder Team), `uncertain` (Felder) und `read` (was im Bild
   stand, wenn es abweicht); dazu der Kopf, `team_colors {Team: "#rrggbb"}` (Vorschlag für Teamfarben, #1950 - nur in
-  der Antwort), `uncertain_rows` und `warnings`. Felder, die das Blatt (noch) nicht zeigt (`grid`, `time`, `gap`, siehe
-  `PENDING_FIELDS` in `lib/resultImage.js`), gehen in die Zeile, werden aber nicht gelb angezeigt.
-- **Im Blatt:** die Zeilen ersetzen die Liste, die Vorschau prüft gleich. Gelbe Felder verlieren die Markierung, wenn
-  jemand sie ändert oder die Zeile mit „Passt so“ bestätigt; übernommen wird erst ohne gelbe Zeilen.
+  der Antwort), `uncertain_rows` und `warnings`.
+- **Im Blatt:** die Zeilen ersetzen die Liste, die Vorschau prüft gleich. Startnummer, Startplatz, Zeit und Abstand
+  gehen in die Zeile (#1927; „Mehr“ steht offen, wenn eines davon gelb ist), die Pole wird Marke; schnellste Runde
+  (Fahrer, Zeit) und Fahrer des Tages füllen die Felder des Rennens (`imageFormFields`, gelbe davon in `raceOcr`).
+  Gelbe Felder verlieren die Markierung, wenn jemand sie ändert oder die Zeile bzw. das Rennen mit „Passt so“
+  bestätigt; übernommen wird erst, wenn nichts mehr gelb ist (`openImageItems`). Welche Felder gelb werden können,
+  steht in `SHOWN_FIELDS` und `RACE_FIELDS` (`lib/resultImage.js`).
 - **Sicherheit:** Rechte wie beim Eintragen; Größe am Kopf der Anfrage, Pixel am Kopf der Bilddatei; das Bild kommt als
   Body (keine Zwischendatei) und geht über stdin an Tesseract (ohne Shell, leere Umgebung, Zeitlimit); Rate-Limit je
   Konto; Meldungen sind feste Texte. Einstellungen in [Betrieb](../BETRIEB.md). Für das Original am Termin (#1933)
