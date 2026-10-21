@@ -1,5 +1,40 @@
 # Changelog
 
+## [1.23.0](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/compare/v1.22.0...v1.23.0) (2026-10-21)
+
+
+### Neu
+
+* Mitgliederprofil – „Aufstellung · 5 von 7 Spielen“ aus der verknüpften Saison ([#1931](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1931)) ([057f0c0](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/057f0c0acc22fad001caed317060e404890b7f71))
+* Partnerseite – Ligen und Serien mit uns ([#1934](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1934)) ([a285d0c](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/a285d0c0d1d1ef69e3b32833a54077e359a4dc3e))
+* Referenzen – Ergebnisseite je Runde mit Reitern je Lauf, Zusammenfassung und hochzählenden Zeiten ([#1950](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1950)) ([ab502c2](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/ab502c29f125a63d020f5d25ddd225b5a0872063))
+* Referenzen – Kalender, Lauf-Chips und Rennraster führen zur Ergebnisseite der Runde ([#1950](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1950)) ([ab502c2](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/ab502c29f125a63d020f5d25ddd225b5a0872063))
+* Referenzen – Map-Pool je Saison, Serienseite zeigt die Maps mit Bild ([#1616](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1616)) ([ad25d38](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/ad25d38070cac4b6029102c294f3e63b7e5641d0))
+* Referenzen – Reiter „Statistik“ auf der Seite einer Rennliga ([#1950](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1950)) ([ab502c2](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/ab502c29f125a63d020f5d25ddd225b5a0872063))
+* Referenzen – Strafsekunden je Zeile im Ergebnisblatt ([#1950](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1950)) ([ab502c2](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/ab502c29f125a63d020f5d25ddd225b5a0872063))
+* Referenzen – Teamfarben je Saison mit Vorschlag aus dem Ergebnis-Bild ([#1950](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1950)) ([ab502c2](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/ab502c29f125a63d020f5d25ddd225b5a0872063))
+* Referenzen – Teilen-Karte der Runde mit Runde, Ort und Läufen ([#1950](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1950)) ([ab502c2](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/ab502c29f125a63d020f5d25ddd225b5a0872063))
+* Referenzen-Übersicht – Partner-Abzeichen bei Chronik, Läuft gerade und Serien & Ligen ([#1934](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1934)) ([a285d0c](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/a285d0c0d1d1ef69e3b32833a54077e359a4dc3e))
+* Referenzen-Übersicht und Startseite – nächster Spieltag mit Gegner ([#1931](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1931)) ([057f0c0](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/057f0c0acc22fad001caed317060e404890b7f71))
+* Saison abschließen übernimmt auch die Partner der Saison ([#1934](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1934)) ([a285d0c](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/a285d0c0d1d1ef69e3b32833a54077e359a4dc3e))
+* Serienseite – Veranstaltet von mit Partner-Logo, Mitwirkende darunter ([#1934](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1934)) ([a285d0c](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/a285d0c0d1d1ef69e3b32833a54077e359a4dc3e))
+* Spiele – Map-Bibliothek mit Bild, Modi, Reihenfolge und Archiv ([#1616](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1616)) ([ad25d38](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/ad25d38070cac4b6029102c294f3e63b7e5641d0))
+* Spiele – Modus ohne Dauer für Maps ([#1616](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1616)) ([ad25d38](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/ad25d38070cac4b6029102c294f3e63b7e5641d0))
+* Team-Liga – „Spieltag einfügen“ erkennt die eigenen Spiele und übernimmt die übrigen Spiele des Spieltags ([#1931](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1931)) ([057f0c0](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/057f0c0acc22fad001caed317060e404890b7f71))
+* Team-Liga – Kader je eigenem Team, Aufstellung als Ankreuzliste, je Map oder von der Match-Seite eingefügt ([#1931](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1931)) ([057f0c0](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/057f0c0acc22fad001caed317060e404890b7f71))
+* Team-Liga – Maps im Veto mit Wahl, Bann und Decider, die Spieltag-Karte zeigt das ganze Veto ([#1931](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1931)) ([057f0c0](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/057f0c0acc22fad001caed317060e404890b7f71))
+* Team-Liga – Serienseite mit Bilanz, Spieltagen als Karten und Kader mit Einsätzen ([#1931](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1931)) ([057f0c0](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/057f0c0acc22fad001caed317060e404890b7f71))
+* Team-Liga – Terminliste mit Gegner („vs“/„@“), Heim/Auswärts und Spieltag-Zeitraum ([#1931](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1931)) ([057f0c0](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/057f0c0acc22fad001caed317060e404890b7f71))
+* Turniere – Map-Pool je Turnier und Phase, Turnierseite zeigt die Maps ([#1616](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1616)) ([ad25d38](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/ad25d38070cac4b6029102c294f3e63b7e5641d0))
+* Verwaltung Serien – Partner mit Rolle (Veranstalter/Mitwirkender) an Spur und Saison wählen ([#1934](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1934)) ([a285d0c](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/a285d0c0d1d1ef69e3b32833a54077e359a4dc3e))
+
+
+### Fehlerbehebungen
+
+* Referenzen – Sichtbarkeit verknüpfter Referenzen folgt einer strengeren Saison ([#1970](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1970)) ([c494a6e](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/c494a6e450662a5b65d9afae50ab4771178e61e9))
+* Team-Liga – Map ohne Ergebnis wird nicht mehr still 0:0 ([#1931](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1931)) ([057f0c0](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/057f0c0acc22fad001caed317060e404890b7f71))
+* Team-Liga – Tabelle laut Veranstalter bleibt maßgeblich, andere Schreibweisen nur über ganze Wörter ([#1931](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1931)) ([057f0c0](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/057f0c0acc22fad001caed317060e404890b7f71))
+
 ## 1.22.0 (21.10.2026)
 
 ### Neu
