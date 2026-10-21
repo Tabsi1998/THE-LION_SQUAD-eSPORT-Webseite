@@ -6,7 +6,9 @@ import { formatDiff, formatNumber } from "@/lib/standingsTable";
 import { PUBLIC_STATE_LABELS, STATE_TONES, dayLabel, roundLabel, roundWhen } from "@/lib/referenceCalendar";
 import { nameOf } from "@/lib/referenceSeriesTable";
 import { raceCell, raceCellLabel, raceSummary } from "@/lib/racingLeague";
+import { chipLabel, groupWeekends, roundKind } from "@/lib/raceWeekend";
 import { VenueWithFlag } from "@/components/tls/CountryFlag";
+import { SessionChips } from "@/components/tls/series/SessionChips";
 import "./racingLeague.css";
 
 // Bausteine der Rennliga (#1746): Umschalter der Saisons, Zellen des Rennrasters, Namen (nur Vereinsfahrer öffnen ihr
@@ -133,9 +135,36 @@ function WhoLine({ label, tone, row, cell, onSelect, testId, showClub = false })
   );
 }
 
-/** Rennkalender: alle Termine mit Status, bei gewerteten Rennen der Sieger (nur ein öffentlicher Vereinsfahrer - ein
- * fremder Name steht nur in der Tabelle), sonst der beste öffentliche Vereinsfahrer mit Platz. */
-export function RacingCalendar({ rounds, rows, onSelect, publicKeys }) {
+/** Sieger und bester Vereinsfahrer eines gewerteten Laufs; `session` hängt bei mehreren Läufen den Lauf an („Sieg ·
+ * Sprint“). Ein Qualifying zählt nicht und hat hier keine Zeile. */
+function RoundSummary({ round, rows, publicKeys, onSelect, session = "" }) {
+  if (round.state !== "scored" || round.counts === false || roundKind(round) === "qualifying") return null;
+  const summary = raceSummary(rows, round.id, publicKeys);
+  const best = summary?.bestClub && summary.bestClub.row !== summary.winner ? summary.bestClub : null;
+  if (!summary?.winner && !best) return null;
+  const suffix = session ? ` · ${session}` : "";
+  return (
+    <>
+      {summary.winner && <WhoLine label={`Sieg${suffix}`} tone="text-[var(--tls-honor)]" row={summary.winner} onSelect={onSelect} testId="racing-round-winner" showClub />}
+      {best && <WhoLine label={`Bester Vereinsfahrer${suffix}`} tone="text-[#29B6E8]" row={best.row} cell={best.cell} onSelect={onSelect} testId="racing-round-club" />}
+    </>
+  );
+}
+
+function StateBadge({ state }) {
+  return (
+    <span className={`inline-flex items-center px-2 py-0.5 border rounded-sm text-[10px] font-bold uppercase tracking-widest whitespace-nowrap ${STATE_TONES[state] || STATE_TONES.planned}`}>
+      {PUBLIC_STATE_LABELS[state] || state}
+    </span>
+  );
+}
+
+/** Rennkalender: je Runde eine Zeile - Kürzel, Tag, Ort mit Flagge und, bei einem Rennwochenende (#1930), die
+ * Lauf-Chips „Quali · Sprint · Rennen“ mit Uhrzeit und Status. Bei gewerteten Rennen der Sieger (nur ein öffentlicher
+ * Vereinsfahrer - ein fremder Name steht nur in der Tabelle), sonst der beste öffentliche Vereinsfahrer mit Platz.
+ * `hrefFor(lauf)` macht die Chips zu Links (Ergebnis je Lauf, #1950). */
+export function RacingCalendar({ rounds, rows, onSelect, publicKeys, hrefFor }) {
+  const weekends = groupWeekends(rounds);
   return (
     <section className="mt-12" aria-labelledby="racing-calendar-title" data-testid="racing-calendar">
       <h2 id="racing-calendar-title" className="font-heading text-2xl font-black uppercase">Rennkalender</h2>
@@ -143,28 +172,30 @@ export function RacingCalendar({ rounds, rows, onSelect, publicKeys }) {
         <p className="mt-3 text-sm text-white/55">Noch keine Termine.</p>
       ) : (
         <ol className="mt-4 divide-y divide-white/5 border-y border-white/10">
-          {rounds.map((round) => {
-            const summary = round.state === "scored" ? raceSummary(rows, round.id, publicKeys) : null;
-            const best = summary?.bestClub && summary.bestClub.row !== summary.winner ? summary.bestClub : null;
+          {weekends.map((weekend) => {
+            const round = weekend.lead;
+            const races = weekend.rounds.filter((item) => item.counts !== false && roundKind(item) !== "qualifying");
+            const scoredCount = races.filter((item) => item.state === "scored").length;
+            const original = weekend.rounds.find((item) => item.original_club_day)?.original_club_day;
             return (
-              <li key={round.id} className="py-3 flex items-start gap-3" data-testid="racing-round" data-state={round.state}>
-                <span className={`w-12 shrink-0 font-black tabular-nums ${round.kind === "final" ? "text-[var(--tls-honor)]" : "text-white/80"}`}>{roundLabel(round)}</span>
+              <li key={weekend.key} className="py-3 flex items-start gap-3" data-testid="racing-round" data-state={weekend.state} data-sessions={weekend.multi ? weekend.rounds.length : undefined}>
+                <span className={`w-12 shrink-0 font-black tabular-nums ${weekend.kind === "final" ? "text-[var(--tls-honor)]" : "text-white/80"}`}>{roundLabel(round)}</span>
                 <div className="min-w-0 flex-1">
-                  <span className={`block text-sm tabular-nums ${round.state === "cancelled" ? "text-white/45" : "text-white"}`}>{roundWhen(round)}</span>
-                  {(round.title || round.venue || round.country_code) && (
-                    <span className="block text-sm text-white/60" data-testid="racing-round-venue"><VenueWithFlag round={round} /></span>
+                  <span className={`block text-sm tabular-nums ${weekend.state === "cancelled" ? "text-white/45" : "text-white"}`}>{weekend.multi ? roundWhen({ ...round, time: null }) : roundWhen(round)}</span>
+                  {(weekend.title || weekend.venue || weekend.country_code) && (
+                    <span className="block text-sm text-white/60" data-testid="racing-round-venue"><VenueWithFlag round={weekend} /></span>
                   )}
-                  {round.original_club_day && <span className="block text-[11px] text-white/45">ursprünglich {dayLabel(round.original_club_day)}</span>}
-                  {(summary?.winner || best) && (
+                  {original && <span className="block text-[11px] text-white/45">ursprünglich {dayLabel(original)}</span>}
+                  {weekend.multi && <SessionChips rounds={weekend.rounds} showTime hrefFor={hrefFor} className="mt-2" />}
+                  {scoredCount > 0 && (
                     <div className="mt-2 space-y-1">
-                      {summary.winner && <WhoLine label="Sieg" tone="text-[var(--tls-honor)]" row={summary.winner} onSelect={onSelect} testId="racing-round-winner" showClub />}
-                      {best && <WhoLine label="Bester Vereinsfahrer" tone="text-[#29B6E8]" row={best.row} cell={best.cell} onSelect={onSelect} testId="racing-round-club" />}
+                      {weekend.rounds.map((item) => (
+                        <RoundSummary key={item.id} round={item} rows={rows} publicKeys={publicKeys} onSelect={onSelect} session={races.length > 1 ? chipLabel(item) : ""} />
+                      ))}
                     </div>
                   )}
                 </div>
-                <span className={`inline-flex items-center px-2 py-0.5 border rounded-sm text-[10px] font-bold uppercase tracking-widest whitespace-nowrap ${STATE_TONES[round.state] || STATE_TONES.planned}`}>
-                  {PUBLIC_STATE_LABELS[round.state] || round.state}
-                </span>
+                <StateBadge state={weekend.state} />
               </li>
             );
           })}

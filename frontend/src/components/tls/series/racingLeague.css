@@ -128,6 +128,8 @@
 .tls-racing-race[data-medal] .tls-racing-race__place { color: var(--tls-race-medal); }
 .tls-racing-race__code { font-size: 10px; line-height: 1; letter-spacing: 0.04em; color: rgb(255 255 255 / 0.38); white-space: nowrap; }
 .tls-racing-race[data-state="cancelled"] .tls-racing-race__code { text-decoration: line-through; }
+/* Lauf unter dem Kürzel (#1930): S, R, HR - leise, mit fester Höhe. */
+.tls-racing-race__session { height: 10px; font-size: 9px; font-weight: 700; line-height: 1; letter-spacing: 0.08em; color: rgb(255 255 255 / 0.4); }
 /* Startplatz → Ziel (#1927): gutgemachte Plätze wie die Bewegung der Tabellen - nach oben in Cyan, nach unten leise.
    Feste Höhe, damit Rennen ohne Startplatz in der Reihe bleiben. Hebt sich kurz nach seinem Balken an. */
 .tls-racing-race__gain {

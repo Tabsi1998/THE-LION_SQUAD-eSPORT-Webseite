@@ -22,3 +22,8 @@ test("Runde je Art, Uhrzeit, gemeldete Vereinsleute", () => {
   expect(todayFacts(item({ lineage: { kind: "racing" }, club_count: 1 }))).toEqual(["Rennen Q2", "20:00 Uhr", "1 Vereinsfahrer"]);
   expect(todayFacts(item({ lineage: { kind: "team_league" }, next: { title: "Spieltag gegen Probe", state: "today" }, club_count: 0 }))).toEqual(["Spieltag gegen Probe"]);
 });
+
+test("Rennwochenende (#1930): der heutige Lauf statt des Worts „Rennen“", () => {
+  const next = { code: "R3", session: "Qualifying", club_day: "2026-11-09", state: "today", time: "20:00" };
+  expect(todayFacts(item({ lineage: { kind: "racing" }, next, club_count: 2 }))).toEqual(["R3 · Qualifying", "20:00 Uhr", "2 Vereinsfahrer"]);
+});

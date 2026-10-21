@@ -4,11 +4,13 @@ import { KIND_LABELS, nextTitle, nextValue, placeTitle, progressText } from "@/l
 import { GameMark } from "@/components/tls/references/referenceParts";
 import { SectionHead } from "@/components/tls/references/overviewParts";
 import { CountryFlag } from "@/components/tls/CountryFlag";
+import { SessionChips } from "@/components/tls/series/SessionChips";
 
 // „Läuft gerade“ (#1748, neu gestaltet #1878): laufende Serien-Saisons mit Spur, Art, Saison/Stufe, Fortschritt in
 // Segmenten, nächstem Termin und unserem Platz als große Zahl. Was heute ansteht, kommt zuerst (Server) und trägt den
 // goldenen Chip „Heute“ mit dezentem Puls. Am Handy wischt man waagrecht von Karte zu Karte. Die Daten lädt die Seite
 // (schlanker Endpunkt, nur sichtbare aktive Saisons, keine Namen); ohne laufende Saison erscheint der Bereich nicht.
+// Rennwochenende (#1930): der nächste Termin nennt seinen Lauf, darunter die Lauf-Chips der Runde mit Uhrzeit.
 
 // Bis zu so vielen Terminen zeigt der Balken Segmente, darüber einen durchgehenden Balken.
 const MAX_SEGMENTS = 30;
@@ -71,6 +73,7 @@ function RunningCard({ item }) {
             <CountryFlag code={next?.country_code} size="sm" className="mr-1.5" />
             {nextValue(next)}
           </div>
+          {next?.sessions?.length > 1 && <SessionChips rounds={next.sessions.map((entry, position) => ({ ...entry, id: `${position}` }))} showTime className="mt-1.5" testId="running-sessions" />}
         </div>
         <div className="min-w-0 flex flex-col items-end gap-0.5 text-right" data-testid="running-place">
           <div className="text-[11px] md:text-xs font-bold uppercase tracking-[0.14em] md:tracking-[0.16em] text-quiet">{placeTitle(kind)}</div>
