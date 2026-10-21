@@ -13,7 +13,7 @@ import { LeagueTable, Matchdays, SeasonMaps, Squad } from "../../components/refe
 import { TournamentDays } from "../../components/references/season/TournamentDays";
 import { MapPoolView } from "../../components/references/MapCards";
 import { poolGroups } from "../../lib/teamLeague";
-import { SeasonNotice } from "../../components/references/seriesParts";
+import { SeasonNotice, SeriesPartners } from "../../components/references/seriesParts";
 import { Screen } from "../../components/Screen";
 import { Body, Muted } from "../../components/Text";
 import { api } from "../../lib/api";
@@ -118,6 +118,8 @@ export function ReferenceSeasonScreen({ navigation, route }: Props) {
         <FadeIn style={styles.head}>
           <Muted style={styles.eyebrow}>{seasonEyebrow(page)}</Muted>
           <Body style={styles.title} accessibilityRole="header">{seasonTitle(page) || "Saison"}</Body>
+          {/* „Veranstaltet von“ mit Logo (#1934). */}
+          <SeriesPartners partners={page.partners} />
           {figures.length ? (
             <View style={styles.figures} testID="season-figures">
               {figures.map((figure) => (

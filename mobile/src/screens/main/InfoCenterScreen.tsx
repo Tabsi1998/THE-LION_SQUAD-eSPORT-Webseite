@@ -22,7 +22,8 @@ import { formatDate, formatMembershipStatus, formatMembershipType, formatRole, p
 import { groupSponsorsByTier } from "../../lib/sponsors";
 import type { MoreStackParamList } from "../../navigation/types";
 import { colors, radius } from "../../theme";
-import type { ClubReference, ReferenceSummaryData, Showcase } from "../../lib/references";
+import type { ClubReference, LineageItem, ReferenceSummaryData, SeasonTarget, Showcase } from "../../lib/references";
+import { partnerSeries } from "../../lib/seriesPartners";
 
 // Partnerseiten (#469) liegen im Web; die App zeigt je Partner die Kanäle und den Weg dorthin.
 const WEB_BASE_URL = API_BASE_URL.replace(/\/api\/?$/, "");
@@ -158,7 +159,7 @@ export function InfoCenterScreen({ navigation, route }: Props) {
             {/* Nachladen gescheitert (#1001): der Bereich zeigt seinen letzten Stand - ausdrücklich so gekennzeichnet. */}
             {failed[section] ? <PartialLoadNotice problem={failed[section]} onRetry={() => { void loadLive(); }} testID="info-center-partial-load" /> : null}
             {section === "sponsors" ? <Sponsors items={sponsors} /> : null}
-            {section === "partners" ? <Partners items={partners} /> : null}
+            {section === "partners" ? <Partners items={partners} onOpenSeason={(target) => navigation.navigate("ReferenceSeason", target)} /> : null}
             {section === "events" ? <Events items={events} onOpen={(event) => navigation.navigate("EventDetail", { id: event.slug || event.id })} /> : null}
             {section === "benefits" ? <Benefits isMember={Boolean(user?.is_club_member)} membership={user?.membership || null} items={benefits} /> : null}
             {section === "references" ? (
@@ -222,7 +223,21 @@ function Sponsors({ items }: { items: any[] }) {
   );
 }
 
-function Partners({ items }: { items: any[] }) {
+/** Spuren mit ihren Veranstaltern (#1934) für „Ligen und Serien mit uns“ - ein älterer Server ohne sie zeigt nichts davon. */
+function usePartnerLineages(): LineageItem[] {
+  const [lineages, setLineages] = useState<LineageItem[]>([]);
+  useEffect(() => {
+    let alive = true;
+    api.get<{ items?: LineageItem[] }>("/reference-series/public/lineages")
+      .then(({ data }) => { if (alive) setLineages(Array.isArray(data?.items) ? data.items : []); })
+      .catch(() => { if (alive) setLineages([]); });
+    return () => { alive = false; };
+  }, []);
+  return lineages;
+}
+
+function Partners({ items, onOpenSeason }: { items: any[]; onOpenSeason: (target: SeasonTarget) => void }) {
+  const lineages = usePartnerLineages();
   if (!items.length) return <EmptyState title="Keine Partner" detail="Kooperationen und Community-Partner werden hier gesammelt." />;
   return (
     <>
@@ -259,6 +274,7 @@ function Partners({ items }: { items: any[] }) {
                     ))}
                   </View>
                 ) : null}
+                <PartnerSeriesList partner={partner} lineages={lineages} onOpenSeason={onOpenSeason} />
                 {partner.slug || partner.id ? (
                   <Pressable accessibilityRole="link" onPress={() => openLink(`${WEB_BASE_URL}/partners/${partner.slug || partner.id}`)} testID={`partner-page-${partner.id}`}>
                     <Muted style={styles.link}>Partnerseite öffnen</Muted>
@@ -270,6 +286,37 @@ function Partners({ items }: { items: any[] }) {
         </LinkedCard>
       ))}
     </>
+  );
+}
+
+/** „Ligen und Serien mit uns“ (#1934): je Spur, die der Partner veranstaltet, die Saison mit „Läuft gerade“ und unserem
+ * Stand - tippen öffnet die Saison in der App. Ohne solche Spuren nichts. */
+function PartnerSeriesList({ partner, lineages, onOpenSeason }: { partner: any; lineages: LineageItem[]; onOpenSeason: (target: SeasonTarget) => void }) {
+  const series = partnerSeries(partner, lineages);
+  if (!series.length) return null;
+  return (
+    <View style={styles.partnerSeries} testID={`partner-series-${partner.id}`}>
+      <Muted style={styles.partnerSeriesHead}>Ligen und Serien mit uns</Muted>
+      {series.map((item) => (
+        <Pressable
+          key={item.key}
+          onPress={item.target ? () => onOpenSeason(item.target as SeasonTarget) : undefined}
+          disabled={!item.target}
+          accessibilityRole="button"
+          accessibilityLabel={[item.eyebrow, item.title, item.season, item.running ? "läuft gerade" : "", item.club].filter(Boolean).join(", ")}
+          style={({ pressed }) => [styles.partnerSeason, pressed && styles.pressed]}
+          testID={`partner-series-${partner.id}-${item.key}`}
+        >
+          <View style={styles.partnerSeasonText}>
+            <Muted style={styles.partnerSeasonEyebrow}>{item.eyebrow}</Muted>
+            <Body style={styles.partnerSeasonTitle}>{item.title}</Body>
+            <Muted style={styles.partnerSeasonMeta}>{[item.season, item.club].filter(Boolean).join(" · ")}</Muted>
+          </View>
+          {item.running ? <Muted style={styles.partnerRunning}>Läuft gerade</Muted> : null}
+          <Ionicons name="chevron-forward" size={16} color={colors.cyan} />
+        </Pressable>
+      ))}
+    </View>
   );
 }
 
@@ -416,6 +463,15 @@ const styles = StyleSheet.create({
   card: {
     gap: 10,
   },
+  // „Ligen und Serien mit uns“ (#1934).
+  partnerSeries: { borderTopColor: colors.border, borderTopWidth: 1, gap: 6, marginTop: 10, paddingTop: 10 },
+  partnerSeriesHead: { color: colors.muted, fontSize: 11, fontWeight: "800", letterSpacing: 1.6, textTransform: "uppercase" },
+  partnerSeason: { alignItems: "center", flexDirection: "row", gap: 8, minHeight: 44, paddingVertical: 4 },
+  partnerSeasonText: { flex: 1, minWidth: 0 },
+  partnerSeasonEyebrow: { color: colors.muted, fontSize: 11 },
+  partnerSeasonTitle: { color: colors.white, fontSize: 14, fontWeight: "700" },
+  partnerSeasonMeta: { color: colors.muted, fontSize: 12 },
+  partnerRunning: { backgroundColor: "rgba(41,182,232,0.14)", borderRadius: 4, color: colors.cyan, fontSize: 10, fontWeight: "800", overflow: "hidden", paddingHorizontal: 6, paddingVertical: 1, textTransform: "uppercase" },
   channelRow: {
     flexDirection: "row",
     flexWrap: "wrap",

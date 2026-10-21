@@ -153,6 +153,26 @@ test("Partner (#469): Kanäle als Chips und der Weg zur Partnerseite im Web", as
   open.mockRestore();
 });
 
+test("Partner (#1934): „Ligen und Serien mit uns“ aus den Veranstaltern der Spuren - tippen öffnet die Saison", async () => {
+  const base = mockGet.getMockImplementation() as (path: string) => Promise<unknown>;
+  mockGet.mockImplementation((path: string) => (path === "/reference-series/public/lineages"
+    ? Promise.resolve({ data: { items: [
+      { lineage: { slug: "pine-tft", title: "PineApps TFT Masters", kind: "series", game_name: "Teamfight Tactics", organizers: [{ id: "pa-1", slug: "pineapps-esports", name: "PineApps eSports" }] },
+        seasons: [{ season: "2025", season_slug: "2025", status: "completed" }, { season: "2026", season_slug: "2026", status: "active", club: { rank: 3, of: 12 } }] },
+      { lineage: { slug: "andere", title: "Andere Liga", kind: "team_league" }, seasons: [{ season: "S1", season_slug: "s1", status: "active" }] },
+    ] } })
+    : base(path)));
+  await render(<InfoCenterScreen navigation={navigation} route={routeFor("partners")} />);
+  await waitFor(() => expect(screen.getByTestId("partner-series-pa-1")).toBeTruthy());
+  expect(screen.getByText("Ligen und Serien mit uns")).toBeTruthy();
+  expect(screen.getByText("Veranstalter: PineApps eSports · Turnierserie · Teamfight Tactics")).toBeTruthy();
+  expect(screen.getByText("2026 · Stand: 3. von 12")).toBeTruthy();
+  expect(screen.getByText("Läuft gerade")).toBeTruthy();
+  expect(screen.queryByText("Andere Liga")).toBeNull();
+  await fireEvent.press(screen.getByTestId("partner-series-pa-1-pine-tft"));
+  expect((navigation as unknown as { navigate: jest.Mock }).navigate).toHaveBeenCalledWith("ReferenceSeason", { lineage: "pine-tft", season: "2026" });
+});
+
 // Ladefehler oder wirklich leer (#1001): leer heißt nur leer, wenn der Abruf geklappt hat.
 const httpError = (status: number) => Object.assign(new Error(`HTTP ${status}`), { isAxiosError: true, response: { status, data: {} } });
 const networkError = () => Object.assign(new Error("Network Error"), { isAxiosError: true });

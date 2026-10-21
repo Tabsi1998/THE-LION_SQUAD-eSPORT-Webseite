@@ -285,6 +285,21 @@ test("Turnierserie (#1961): Reiter Turniertage mit R1…Rn, GES P, Double Up, Lo
   expect(within(screen.getByTestId("season-lobby-A")).getByText("Lobby A")).toBeTruthy();
 });
 
+test("Partner (#1934): „Veranstaltet von“ mit Name im Kopf, Mitwirkende darunter, tippen öffnet die Partnerseite", async () => {
+  mockGet.mockResolvedValue({ data: { ...RACING, partners: {
+    organizers: [{ id: "p1", slug: "probe-ananas", name: "Probe Ananas", logo_url: null, role: "organizer" }],
+    contributors: [{ id: "p2", slug: "probe-kokos", name: "Probe Kokos", logo_url: null, role: "contributor" }],
+  } } });
+  const open = jest.spyOn(Linking, "openURL").mockResolvedValue(true);
+  await render(<ReferenceSeasonScreen navigation={navigation} route={routeFor("prl", "2026")} />);
+  await waitFor(() => expect(screen.getByTestId("series-partners")).toBeTruthy());
+  expect(screen.getByText("Veranstaltet von")).toBeTruthy();
+  expect(screen.getByTestId("series-contributors")).toBeTruthy();
+  await fireEvent.press(screen.getByTestId("series-organizer-probe-ananas"));
+  expect(open).toHaveBeenCalledWith(expect.stringMatching(/\/partners\/probe-ananas$/));
+  open.mockRestore();
+});
+
 test("„Im Web öffnen“ führt zur Serienseite im Web", async () => {
   mockGet.mockResolvedValue({ data: RACING });
   const open = jest.spyOn(Linking, "openURL").mockResolvedValue(true);
