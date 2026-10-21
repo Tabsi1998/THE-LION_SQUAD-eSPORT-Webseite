@@ -1,5 +1,24 @@
 # Changelog
 
+## [1.25.0](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/compare/v1.24.0...v1.25.0) (2026-10-21)
+
+
+### Neu
+
+* Rennzeiten überall mit Komma wie beim Veranstalter ([#1981](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1981)) ([447fc6c](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/447fc6c2f8bbd487bc4a344c97d4d12f45d0a7e2))
+* Spiele – weitere Schreibweisen je Map ([#1616](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1616)) ([358c097](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/358c09725b7abf328015e5fc406c5e7094dbb3b1))
+* Team-Liga – Maps im Ergebnisblatt aus dem Map-Pool mit Bild, unbekannte Namen gelb markiert ([#1616](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1616)) ([358c097](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/358c09725b7abf328015e5fc406c5e7094dbb3b1))
+* Team-Liga – Statistik je Map: gespielt, Siege, Wahl und Bann ([#1616](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1616)) ([358c097](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/358c09725b7abf328015e5fc406c5e7094dbb3b1))
+* Team-Liga – Veto als Karten mit Bild, gewonnene Map markiert ([#1616](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1616)) ([358c097](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/358c09725b7abf328015e5fc406c5e7094dbb3b1))
+
+
+### Fehlerbehebungen
+
+* Ergebnis-Bild – 3/5-Verwechsler werden gelb statt still falsch ([#1981](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1981)) ([447fc6c](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/447fc6c2f8bbd487bc4a344c97d4d12f45d0a7e2))
+* Ergebnis-Bild – keine falschen Punkte aus dem Tabellenrand; Läufe ohne Punkte übernehmen keine ([#1981](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1981)) ([447fc6c](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/447fc6c2f8bbd487bc4a344c97d4d12f45d0a7e2))
+* Ergebnis-Bild – Platz 1 im farbigen Kasten nicht mehr gelb, kein Abstand beim Ersten ([#1981](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1981)) ([447fc6c](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/447fc6c2f8bbd487bc4a344c97d4d12f45d0a7e2))
+* Ergebnis-Bild – Zeiten mit verlesenem Trennzeichen richtig; Quali-Bilder nicht mehr als „keine Zeiten“ abgelehnt ([#1981](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1981)) ([447fc6c](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/447fc6c2f8bbd487bc4a344c97d4d12f45d0a7e2))
+
 ## 1.24.0 (21.10.2026)
 
 ### Neu
