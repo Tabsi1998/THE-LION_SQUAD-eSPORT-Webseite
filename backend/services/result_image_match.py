@@ -324,6 +324,7 @@ def build(reading: Reading, template: dict, participants: list[dict], *, aliases
     min_conf = float(template.get("min_confidence", 80))
     name_match = float(template.get("name_match", 0.72))
     name_sure = float(template.get("name_sure", 0.9))
+    team_match = float(template.get("team_match", 0.6))
     rows = [_row_decisions(row, columns, min_conf) for row in reading.rows]
     # Ein Ausfall in „Pos“ bestätigt „DNF“ in „Zeit“ und umgekehrt.
     for row in rows:
@@ -340,7 +341,7 @@ def build(reading: Reading, template: dict, participants: list[dict], *, aliases
 
     out_rows = []
     for index, (row, match) in enumerate(zip(rows, chosen)):
-        out_rows.append(_row_out(index, row, match, teams, name_match, name_sure))
+        out_rows.append(_row_out(index, row, match, teams, name_match, name_sure, team_match))
     header = _header_out(reading, pool, min_conf, name_match, name_sure)
     uncertain_rows = sum(1 for row in out_rows if row["uncertain"])
     return {"rows": out_rows, **header, "uncertain_rows": uncertain_rows}
@@ -379,8 +380,10 @@ def _match_people(reading: Reading, rows: list[dict[str, Decision]], pool: list[
     return proposals
 
 
-def _team_out(decision: Decision | None, match: dict | None, teams: list[str], name_match: float,
+def _team_out(decision: Decision | None, match: dict | None, teams: list[str], team_match: float,
               name_sure: float) -> tuple[str | None, bool]:
+    """Das Team: ein bekanntes (zuerst das des Teilnehmers) ab ``team_match`` - gelb unter ``name_sure`` -, sonst wie
+    gelesen. Teams sind wenige und bekannt, darum reicht weniger Ähnlichkeit als bei Namen."""
     if decision is None or not decision.text:
         return None, True
     read = decision.text
@@ -394,13 +397,13 @@ def _team_out(decision: Decision | None, match: dict | None, teams: list[str], n
         score, team = max(scored, key=lambda item: item[0])
         if score >= name_sure:
             return team, True
-        if score >= name_match:
+        if score >= team_match:
             return team, False
     return read, decision.sure
 
 
 def _row_out(index: int, row: dict[str, Decision], match: dict | None, teams: list[str], name_match: float,
-             name_sure: float) -> dict:
+             name_sure: float, team_match: float) -> dict:
     uncertain: list[str] = []
     read: dict[str, str] = {}
 
@@ -453,7 +456,7 @@ def _row_out(index: int, row: dict[str, Decision], match: dict | None, teams: li
             out["start_number"] = number.text or None
             flag("start_number", number, out["start_number"])
 
-    team, team_sure = _team_out(row.get("team"), match, teams, name_match, name_sure)
+    team, team_sure = _team_out(row.get("team"), match, teams, team_match, name_sure)
     out["team"] = team
     if row.get("team"):
         if not team_sure:

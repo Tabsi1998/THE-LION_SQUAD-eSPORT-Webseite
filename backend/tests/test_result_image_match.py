@@ -176,6 +176,9 @@ def test_grid_positions_are_unique_and_teams_snap():
     assert anna["read"]["team"] == "Rotor Racmg"
     assert (bert["team"], bert["uncertain"]) == ("Blaupfeil GP", ["grid"])
     assert (dora["team"], dora["uncertain"]) == ("Neues Team", [])
+    # Teams sind wenige und bekannt: auch ein stark verlesenes wird vorgeschlagen - gelb.
+    rough = build(reading(row("1", name="Bert Bolzt", team="Baupted GP")), TEMPLATE, PEOPLE)["rows"][0]
+    assert (rough["team"], rough["uncertain"], rough["read"]) == ("Blaupfeil GP", ["team"], {"team": "Baupted GP"})
 
 
 def test_header_fields():
