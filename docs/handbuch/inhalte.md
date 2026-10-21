@@ -499,15 +499,18 @@ für ein Vereinsteam, ist aber kein Mitglied, **Extern** sind alle anderen. Übe
 **Mitglieder**, **Gäste**, **Extern** oder **Offen** und sucht nach Name, Startnummer, Team oder Profil.
 
 - **Bearbeiten** (Stift am Ende der Zeile): Name wie beim Veranstalter, Startnummer, Standard-Team und die Zuordnung
-  (Mitglied mit Profil, Gast oder Extern). Wird ein Mitglied extern, fragt die Seite nach – der Alias wird dann auch in
-  anderen Saisons zurückgenommen. Gibt es den neuen Namen in der Saison schon, sagt die Seite das: dann zusammenführen.
+  (Mitglied mit Profil, Gast oder Extern). Wird ein Mitglied oder Gast extern, fragt die Seite nach – jeder Alias des
+  Teilnehmers wird dann in allen Saisons zurückgenommen. Gibt es den neuen Namen in der Saison schon, sagt die Seite
+  das: dann zusammenführen.
 - **Mehrere auf einmal:** Haken setzen – **Alle auswählen** nimmt nur, was Filter und Suche gerade zeigen – und
-  **Als Gast** oder **Als Extern**. Die Saison wird danach einmal neu gerechnet, andere Saisons mit demselben Alias
-  ziehen mit. Beispiel: alle Fremden versehentlich als Gast angelegt – Filter **Gäste**, **Alle auswählen**, die echten
-  Gäste wieder abwählen, **Als Extern**.
+  **Als Gast** oder **Als Extern**. Geht dabei eine Zuordnung verloren, fragt die Seite einmal für alle nach. Die
+  Saison wird danach einmal neu gerechnet, andere Saisons mit demselben Alias ziehen mit. Beispiel: alle Fremden
+  versehentlich als Gast angelegt – Filter **Gäste**, **Alle auswählen**, die echten Gäste wieder abwählen,
+  **Als Extern**, bestätigen.
 - **Zusammenführen:** Genau zwei auswählen (dieselbe Person unter zwei Schreibweisen) und festlegen, welcher Eintrag
-  bleibt. Die Ergebnisse des anderen wandern mit, auch Entwürfe, danach wird neu gerechnet. Stehen beide im selben
-  Ergebnis, geht es nicht – dort erst eine der beiden Zeilen entfernen.
+  bleibt. Die Ergebnisse des anderen wandern mit, auch Entwürfe, danach wird neu gerechnet; jedes geänderte Ergebnis
+  behält seinen alten Stand als Revision. Die Zuordnung des behaltenen gilt danach auch für die andere Schreibweise, in
+  allen Saisons. Stehen beide im selben Ergebnis, geht es nicht – dort erst eine der beiden Zeilen entfernen.
 - **Entfernen** steht im Blatt „Teilnehmer bearbeiten“ nur bei Namen ohne Ergebnis; sonst führt der Weg übers
   Zusammenführen.
 

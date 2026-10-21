@@ -58,7 +58,7 @@ nach der Runde). Team-Liga: `matches` mit `home`, `away`, Ergebnis, `maps` und `
   alles, was Stände rechnet oder die Saison schließt, läuft also nacheinander.
 - **Zuordnung in anderen Saisons:** Zieht ein Alias andere Saisons mit, ändert die Zuordnung dort erst nach Freigabe
   der eigenen Sperre etwas – je Saison unter deren Sperre, Teilnehmer folgen und Neurechnen zusammen
-  (`reference_series.follow_alias_elsewhere`), nie zwei Sperren ineinander. Ist eine Saison gerade besetzt, bleibt die
+  (`reference_series.follow_aliases_elsewhere`), nie zwei Sperren ineinander. Ist eine Saison gerade besetzt, bleibt die
   eigene Zuordnung gültig, die andere Saison bleibt ganz unverändert und merkt sich den Nachtrag (`alias_followups`);
   der nächste Vorgang unter ihrer Sperre zieht ihn nach. Die Antwort nennt das (`other_series: {updated, pending}`,
   `notice`), das Protokoll ebenso (`also_assigned_in`, `pending_series`).
@@ -67,9 +67,14 @@ nach der Runde). Team-Liga: `matches` mit `home`, `away`, Ergebnis, `maps` und `
   Saison schon gibt, bekommt 409 (zusammenführen). `POST …/participants/bulk-assign` (`participant_ids`, `link` „guest“
   oder „external“) ordnet alle unter einer Sperre zu und rechnet einmal neu; andere Saisons ziehen danach je einmal
   nach (`reference_series.follow_aliases_elsewhere`). `POST …/participants/{id}/merge` (`duplicate_id`) schreibt die
-  Kennung in Blättern, Entwürfen daneben und offiziellen Werten um (Version +1 je Blatt) und rechnet neu – nennt ein
-  Inhalt beide, 409 und nichts geändert. `DELETE …/participants/{id}` nur ohne Ergebnis (sonst 409). Protokoll:
-  `.participant_bulk_assign`, `.participant_merge`, `.participant_delete`.
+  Kennung in Blättern, Entwürfen daneben und offiziellen Werten um (je Blatt eine Revision mit Grund `merge` und
+  Version +1) und rechnet neu – nennt ein Inhalt beide, 409 und nichts geändert. Die Aliase der anderen Schreibweise
+  ziehen zum behaltenen um (`extra_alias_ids`) und folgen seiner Zuordnung, auch in anderen Saisons.
+  `DELETE …/participants/{id}` nur ohne Ergebnis (sonst 409). Protokoll: `.participant_bulk_assign`,
+  `.participant_merge`, `.participant_delete`.
+- **Alle Aliase eines Teilnehmers:** der seiner Zuordnung (`alias_id`), der seines Namens und weitere aus
+  Zusammenführen oder einem früheren Namen (`extra_alias_ids`). Zuordnen gleicht alle an: „Extern“ nimmt alle zurück,
+  Mitglied und Gast lassen alle auf dieselbe Person zeigen – je Saison unter ihrer Sperre.
 - `expected_version` ist Pflicht (0 ohne Blatt); ein veralteter Stand der Seite bekommt 409. Zwei gleichzeitige
   Übernahmen auf denselben Stand: eine gewinnt, die andere bekommt 409.
 - Ist das Blatt veröffentlicht und die Person darf nicht veröffentlichen (`target: "pending_draft"`), landet die
