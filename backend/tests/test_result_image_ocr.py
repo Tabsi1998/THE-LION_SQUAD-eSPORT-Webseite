@@ -191,3 +191,28 @@ def test_tesseract_runs_without_shell_network_or_files(monkeypatch):
     assert kwargs["timeout"] == result_image_ocr.TIMEOUT_SECONDS
     assert "shell" not in kwargs
     assert set(kwargs["env"]) <= {"OMP_THREAD_LIMIT", "LC_ALL", "PATH", "TESSDATA_PREFIX"}
+
+
+def test_too_many_rows_stop_before_the_column_reads(monkeypatch):
+    """Mehr Ergebniszeilen als das Blatt nimmt: abbrechen, bevor die Spalten einzeln gelesen werden - die Antwort bleibt
+    klein, der Server rechnet nicht weiter."""
+    calls = []
+
+    def fake_tesseract(img, *, psm, whitelist=None):
+        calls.append(whitelist)
+        words = []
+        for index in range(12):
+            top = 40 + index * 40
+            line = ("1", "1", str(index))
+            words += [result_image_ocr.Word(str(index + 1), 95, 20, top, 20, 20, line),
+                      result_image_ocr.Word(f"Probe{index}", 95, 200, top, 120, 20, line),
+                      result_image_ocr.Word("1:32.123", 95, 900, top, 100, 20, line)]
+        return words
+
+    monkeypatch.setattr(result_image_ocr, "tesseract", fake_tesseract)
+    image = Image.new("RGB", (1200, 600), (20, 20, 30))
+    full = result_image_ocr.read(image, TEMPLATE, max_rows=12)
+    assert (full.too_many_rows, len(full.rows)) == (False, 12)
+    calls.clear()
+    cut = result_image_ocr.read(image, TEMPLATE, max_rows=11)
+    assert (cut.too_many_rows, cut.rows, calls) == (True, [], [None])

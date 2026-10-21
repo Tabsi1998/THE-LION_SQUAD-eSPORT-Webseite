@@ -480,6 +480,7 @@ class Reading:
     text_height: float = 0.0
     scale: float = 1.0
     mean_conf: float = 0.0
+    too_many_rows: bool = False  # mehr Ergebniszeilen als ``max_rows`` - dann ohne Zeilen und ohne Kopf
 
 
 def _read(words: list[Word], *, joiner: str = " ") -> Read:
@@ -561,8 +562,9 @@ def _is_result_line(line: Line, min_cells: int) -> bool:
     return len(cells_of(line)) >= min_cells and any(char.isdigit() for char in line.text)
 
 
-def read(img: Image.Image, template: dict) -> Reading:
-    """Das Bild nach der Vorlage lesen - ohne Abgleich mit Teilnehmern (``result_image_match``)."""
+def read(img: Image.Image, template: dict, *, max_rows: int | None = None) -> Reading:
+    """Das Bild nach der Vorlage lesen - ohne Abgleich mit Teilnehmern (``result_image_match``). Stehen mehr als
+    ``max_rows`` Ergebniszeilen im Bild, bricht es vor dem Lesen der Spalten ab (``too_many_rows``)."""
     prepared = prepare(img, template)
     columns = template["columns"]
     lines = lines_of(tesseract(prepared.image, psm=6))
@@ -578,6 +580,9 @@ def read(img: Image.Image, template: dict) -> Reading:
         start = next((index for index, line in enumerate(lines) if _is_result_line(line, 3)), len(lines))
         above, below = lines[:start], lines[start:]
     data_lines = [line for line in below if _is_result_line(line, 2)]
+    if max_rows is not None and len(data_lines) > max_rows:
+        reading.too_many_rows = True
+        return reading
     anchors = column_anchors(columns, labels, data_lines)
     reading.header = _header_fields(above, template)
 

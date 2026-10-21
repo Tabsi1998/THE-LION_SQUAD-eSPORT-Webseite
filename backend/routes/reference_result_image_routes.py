@@ -41,6 +41,7 @@ import time
 from fastapi import APIRouter, Depends, HTTPException, Request
 
 from database import get_db
+from routes.reference_result_routes import MAX_ROWS
 from services import result_image_match, result_image_ocr, result_image_templates
 from services.image_upload import MAX_BYTES, MAX_IMAGE_UPLOAD_MB
 from services.rate_limit import enforce_rate_limit, keyed_subject
@@ -76,6 +77,8 @@ BUSY = "Gerade wird schon ein Bild gelesen. Bitte gleich noch einmal versuchen."
 TOO_MANY = "Zu viele Bilder in kurzer Zeit. Bitte warte noch {wait}."
 NO_TABLE = ("Im Bild wurde keine Ergebnistabelle gefunden. Passt die Vorlage zum Bild? Sonst die Liste einfügen oder "
             "abtippen.")
+TOO_MANY_ROWS = (f"Im Bild stehen mehr als {MAX_ROWS} Ergebniszeilen - so viele nimmt ein Ergebnis-Blatt nicht. Bitte "
+                 "nur das Ergebnis dieses Termins einfügen.")
 BLURRY = "Das Bild ist unscharf oder sehr klein - bitte die gelben Felder genau prüfen."
 NO_HEADER = "Die Kopfzeile der Tabelle wurde nicht erkannt - die Spalten sind nach der Vorlage geschätzt."
 PARTICIPANT_FIELDS = {"_id": 0, "id": 1, "name": 1, "start_number": 1, "default_team": 1, "link": 1, "profile_id": 1,
@@ -175,12 +178,15 @@ async def read_result_image(series_id: str, round_id: str, request: Request,
         raise HTTPException(503, BUSY) from None
     started = time.monotonic()
     try:
-        reading = await asyncio.to_thread(result_image_ocr.read, opened.image, template)
+        # Höchstens so viele Zeilen wie die Vorschau des Blatts nimmt - dieselbe Grenze (``MAX_ROWS``).
+        reading = await asyncio.to_thread(result_image_ocr.read, opened.image, template, max_rows=MAX_ROWS)
     except result_image_ocr.OcrUnavailable:
         raise HTTPException(503, UNAVAILABLE) from None
     finally:
         _gate.release()
     opened.image = None  # das Bild wird nicht mehr gebraucht
+    if reading.too_many_rows:
+        raise HTTPException(422, TOO_MANY_ROWS)
 
     participants = await db.reference_participants.find({"series_id": series_id}, PARTICIPANT_FIELDS).to_list(None)
     aliases = await _aliases(db, access.series, participants) if access.is_board else []

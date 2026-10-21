@@ -14,7 +14,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 
 import result_image_fixture as fixture  # noqa: E402
 from flow_harness import make_flow  # noqa: E402
-from routes import reference_result_image_routes as image_routes  # noqa: E402
+from routes import reference_result_image_routes as image_routes, reference_result_routes  # noqa: E402
 from services import migrations, result_image_ocr  # noqa: E402
 from services.dolibarr_policy import club_today  # noqa: E402
 from services.result_image_ocr import Read, Reading, RowReading  # noqa: E402
@@ -86,9 +86,11 @@ def fake_ocr(monkeypatch):
     class Fake:
         reading = _fake_reading(("Anna Probe", "7"), ("Bert Bolzt", "12"))
         calls = 0
+        max_rows = None
 
-    def read(image, template):
+    def read(image, template, *, max_rows=None):
         Fake.calls += 1
+        Fake.max_rows = max_rows
         assert image.mode == "RGB" and template["id"] == "rennliga-dunkel"
         return Fake.reading
 
@@ -213,7 +215,7 @@ async def test_limits_and_fixed_messages(flow, fake_ocr, monkeypatch):
     assert fake_ocr.calls == 0
 
     # Tesseract antwortet nicht: feste Meldung, nie der Text einer Ausnahme.
-    def broken(image, template):
+    def broken(image, template, **_):
         raise result_image_ocr.OcrUnavailable()
     monkeypatch.setattr(result_image_ocr, "read", broken)
     failed = await flow.post(ctx["url"], content=_png(), headers=PNG)
@@ -223,9 +225,21 @@ async def test_limits_and_fixed_messages(flow, fake_ocr, monkeypatch):
 
     # Nichts lesbar: 422 mit Hinweis.
     monkeypatch.setattr(result_image_ocr, "available", lambda: True)
-    monkeypatch.setattr(result_image_ocr, "read", lambda image, template: Reading(template_id="rennliga-dunkel"))
+    monkeypatch.setattr(result_image_ocr, "read", lambda image, template, **_: Reading(template_id="rennliga-dunkel"))
     empty = await flow.post(ctx["url"], content=_png(), headers=PNG)
     assert (empty.status_code, empty.json()["detail"]) == (422, image_routes.NO_TABLE)
+
+
+@pytest.mark.asyncio
+async def test_row_limit_is_the_one_of_the_sheet(flow, fake_ocr):
+    """Höchstens so viele Zeilen wie die Vorschau des Blatts nimmt (``MAX_ROWS``), sonst 422 mit fester Meldung."""
+    ctx = await _setup(flow)
+    assert (await flow.post(ctx["url"], content=_png(), headers=PNG)).status_code == 200
+    assert fake_ocr.max_rows == reference_result_routes.MAX_ROWS == 500
+    fake_ocr.reading = Reading(template_id="rennliga-dunkel", too_many_rows=True)
+    answer = await flow.post(ctx["url"], content=_png(), headers=PNG)
+    assert (answer.status_code, answer.json()["detail"]) == (422, image_routes.TOO_MANY_ROWS)
+    assert "500" in image_routes.TOO_MANY_ROWS
 
 
 @pytest.mark.asyncio
