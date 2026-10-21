@@ -52,7 +52,19 @@ const OFFSETS = [-14, -7, 0, 7, 14, 21, 28, 35];
 
 async function noOverflow(page) {
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
-  expect(overflow).toBeLessThanOrEqual(0);
+  // Bei einem Fehler: welche Elemente rechts hinausragen.
+  const wide = overflow > 0 ? await page.evaluate(() => [...document.querySelectorAll("body *")]
+    .filter((node) => node.getBoundingClientRect().right > window.innerWidth + 1)
+    .filter((node) => {
+      // Was in einer eigenen Scroll-Fläche liegt, verschiebt die Seite nicht.
+      for (let up = node.parentElement; up && up !== document.body; up = up.parentElement) {
+        if (["auto", "scroll", "hidden", "clip"].includes(getComputedStyle(up).overflowX)) return false;
+      }
+      return true;
+    })
+    .slice(0, 10)
+    .map((node) => `${node.tagName.toLowerCase()} ${node.dataset.testid || ""} ${String(node.className).slice(0, 80)} → ${Math.round(node.getBoundingClientRect().right)}`)) : [];
+  expect(overflow, wide.join("\n")).toBeLessThanOrEqual(0);
 }
 
 test.describe("Abnahme #1930: Rennwochenende mit Läufen", () => {
@@ -257,10 +269,11 @@ test.describe("Abnahme #1930: Rennwochenende mit Läufen", () => {
       await expect(table.getByTestId("series-weekend-head")).toHaveCount(8);
       await expect(table.getByTestId("series-session-head").first()).toHaveText("S");
       const detail = anon.getByTestId("racing-driver");
-      await expect(detail.getByRole("heading", { level: 3 })).toHaveText(lena);
+      // Max führt (60 zu 58 Punkten) - sein Detail steht oben: Pole in R2, Quali-Duell 1:1 gegen Lena.
+      await expect(detail.getByRole("heading", { level: 3 })).toHaveText(max);
       await expect(detail.getByTestId("racing-driver-stats")).toContainText("1 Pole");
       await expect(detail.getByTestId("racing-driver-stats")).toContainText("Ø Start");
-      await expect(detail.getByTestId("racing-driver-stats")).toContainText(`Quali-Duell 1:1 gegen ${max}`);
+      await expect(detail.getByTestId("racing-driver-stats")).toContainText(`Quali-Duell 1:1 gegen ${lena}`);
       await shot(anon, "nachher-seite-1440", { fullPage: true });
       await shot(anon.getByTestId("racing-drivers"), "nachher-rennraster-1440");
       await shot(cal, "nachher-rennkalender-1440");

@@ -186,8 +186,10 @@ export const RacingDriverDetail = forwardRef(function RacingDriverDetail({ row, 
         <p className="mt-1 text-sm text-white/65 tabular-nums" data-testid="racing-driver-stats">{stats.join(" · ")}</p>
       </div>
       {season.perRace.length > 0 && (
+        // `relative`: die Texte für Screenreader (sr-only, absolut) bleiben in der Scroll-Fläche - sonst schieben sie bei vielen
+        // Läufen (#1930) am Handy die ganze Seite seitlich hinaus.
         // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- eine scrollbare Fläche muss per Tastatur erreichbar sein (axe: scrollable-region-focusable)
-        <div role="region" aria-label="Punkte je Rennen" tabIndex={0} className="mt-4 -mx-1 px-1 pb-1 overflow-x-auto overscroll-x-contain focus:outline-none focus-visible:ring-2 focus-visible:ring-[#29B6E8] rounded">
+        <div role="region" aria-label="Punkte je Rennen" tabIndex={0} className="relative mt-4 -mx-1 px-1 pb-1 overflow-x-auto overscroll-x-contain focus:outline-none focus-visible:ring-2 focus-visible:ring-[#29B6E8] rounded">
           <ol className="tls-racing-races">
             {season.perRace.map((item, index) => {
               const metal = item.cell?.medal ? METALS[item.cell.medal] : null;
