@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.20.0 (21.10.2026)
+
+### Neu
+
+* Aus dem Bild auch Startplatz, Zeit, Abstand, Punkte, Pole, schnellste Runde und Fahrer des Tages übernehmen (#1756)
+* Ergebnis-Screenshot einer Rennliga im Ergebnis-Blatt auslesen – Strg+V oder Bild wählen, unsichere Felder gelb (#1756)
+* Termin zur Strecke im Bild vorschlagen, Saisontabellen und Kalender ablehnen (#1756)
+* Vorlage für Ergebnis-Bilder je Spur und Saison wählen (#1756)
+
 ## 1.19.0 (21.10.2026)
 
 ### Neu
