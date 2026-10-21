@@ -15,6 +15,8 @@ import { VenueWithFlag } from "@/components/tls/CountryFlag";
 import { MapPoolView } from "@/components/tls/maps/MapPoolView";
 import { NotFoundPage } from "@/pages/ErrorPages";
 import { SeriesPartners } from "@/components/tls/series/SeriesPartners";
+import { TournamentDays } from "@/components/tls/series/TournamentDays";
+import { formatNumber } from "@/lib/standingsTable";
 
 // Seite einer Serie unter /references/series/<spur>/<saison> (Entscheidung 5 zu #1741), Turnierserie (#1745): Kopf,
 // Rundenfortschritt, Regeln, Gesamtwertung mit Streichergebnissen und Finalgrenze, Finalrechner (Richtwert), das
@@ -23,6 +25,18 @@ import { SeriesPartners } from "@/components/tls/series/SeriesPartners";
 // sichtbare Serie ist wie jede unbekannte Adresse 404. Eine alte Adresse führt zur aktuellen.
 // Team-Liga (#1747): statt Gesamtwertung, Finale und Terminen Tabelle, Spielplan, Aufstellung und Liga-Weg.
 // Eine Rennliga (#1746, Block `racing` vom Server) zeigt unter demselben Kopf ihre eigene Ansicht (RacingLeague).
+// Turniertage (#1961): unter der Gesamtwertung die Tagesansicht R1…Rn mit Summe, Lobbys und das Spieler-Detail; die
+// Gesamtwertung zeigt Sonderboni in einer eigenen Spalte.
+
+// Sonderboni (#1961) stehen getrennt neben den Punkten - nur, wenn die Saison welche führt.
+function bonusColumn(rules) {
+  if (!(rules?.custom_bonuses || []).length) return null;
+  const names = rules.custom_bonuses.map((bonus) => bonus.label).join(", ");
+  return {
+    header: "Boni", title: `Sonderboni (${names}) – in den Punkten enthalten, nie gestrichen`,
+    cell: (row) => (row.bonus_points ? `+${formatNumber(row.bonus_points)}` : "–"),
+  };
+}
 
 function seriesTitle(data) {
   const series = data?.series || {};
@@ -115,9 +129,10 @@ export default function ReferenceSeriesPage() {
             <section className="mt-10" aria-labelledby="series-page-table">
               <h2 id="series-page-table" className="font-heading text-2xl font-black uppercase">Gesamtwertung</h2>
               <SeriesRules rules={data.rules} />
-              <SeriesStandings standings={data.standings} rounds={rounds} rules={data.rules} />
+              <SeriesStandings standings={data.standings} rounds={rounds} rules={data.rules} extraColumn={bonusColumn(data.rules)} />
               <FinalCalculator standings={data.standings} rules={data.rules} progress={data.progress} />
             </section>
+            <TournamentDays standings={data.standings} rounds={rounds} rules={data.rules} />
             <SeriesFinal final={data.final} />
             <Calendar rounds={rounds} />
             </>)}

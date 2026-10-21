@@ -9,6 +9,8 @@ export const MOBILE_TOP = 10;
 
 const TIEBREAK_WORDS = {
   wins: "mehr Siege",
+  // #1961: N steht in den Regeln (`tiebreak_top_n`).
+  top_n: "mehr Plätze unter den besten N",
   podiums: "mehr Podestplätze",
   countback: "bessere Platzierungen (mehr Siege, dann mehr zweite Plätze …)",
   best_place: "beste Einzelplatzierung",
@@ -78,13 +80,35 @@ export function countLabel(rules) {
   return "Alle Runden zählen";
 }
 
+function tiebreakWord(name, topN) {
+  const word = TIEBREAK_WORDS[name];
+  return word && name === "top_n" ? word.replace("N", String(Number(topN) || 4)) : word;
+}
+
 /** Vorrang bei Gleichstand, in Worten. */
 export function tiebreakLabel(rules) {
-  const words = (rules?.tiebreakers || []).map((name) => TIEBREAK_WORDS[name]).filter(Boolean);
+  const words = (rules?.tiebreakers || []).map((name) => tiebreakWord(name, rules?.tiebreak_top_n)).filter(Boolean);
   return words.length ? words.join(", dann ") : "Gleichstand teilt den Platz";
 }
 
 /** Hinweis an einer Zeile, die bei gleichen Punkten wegen eines Kriteriums hinter der darüber steht. */
-export function tiebreakHint(name) {
-  return TIEBREAK_WORDS[name] ? `Gleich viele Punkte – dahinter wegen: ${TIEBREAK_WORDS[name]}` : "";
+export function tiebreakHint(name, topN) {
+  const word = tiebreakWord(name, topN);
+  return word ? `Gleich viele Punkte – dahinter wegen: ${word}` : "";
+}
+
+/** Turniertag (#1961): „5 Runden je Turniertag, Platz 1 bis 8: 8 · 7 · …“ - leer ohne Runden. */
+export function dayRoundsLabel(rules) {
+  const count = Number(rules?.day_rounds?.count) || 0;
+  if (!count) return "";
+  const scheme = (rules.day_rounds.points_by_place || []).map(formatNumber);
+  const runden = count === 1 ? "1 Runde" : `${count} Runden`;
+  return `${runden} je Turniertag${scheme.length ? `, Platz 1 bis ${scheme.length}: ${scheme.join(" · ")}` : ""} – die Summe ergibt den Tagesplatz`;
+}
+
+/** Sonderboni (#1961): „Bingo +3 · Joker +2 – zählen zusätzlich, nie gestrichen“ - leer ohne. */
+export function bonusRulesLabel(rules) {
+  const bonuses = rules?.custom_bonuses || [];
+  if (!bonuses.length) return "";
+  return `${bonuses.map((bonus) => `${bonus.label} +${formatNumber(bonus.points)}`).join(" · ")} – zählen zusätzlich, nie gestrichen`;
 }

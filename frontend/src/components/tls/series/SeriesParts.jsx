@@ -4,7 +4,7 @@ import { formatNumber } from "@/lib/standingsTable";
 import { roundLabel, roundWhen } from "@/lib/referenceCalendar";
 import { finalNeeds, maxRoundPoints } from "@/lib/finalCalc";
 import { VenueWithFlag } from "@/components/tls/CountryFlag";
-import { countLabel, nameOf, roundColumns, schemeLabel, tiebreakLabel } from "@/lib/referenceSeriesTable";
+import { bonusRulesLabel, countLabel, dayRoundsLabel, nameOf, roundColumns, schemeLabel, tiebreakLabel } from "@/lib/referenceSeriesTable";
 import { groupWeekends, sessionLabel } from "@/lib/raceWeekend";
 import "./referenceSeries.css";
 
@@ -61,6 +61,9 @@ export function SeriesRules({ rules }) {
     ["Wertung", countLabel(rules)],
     ["Gleichstand", tiebreakLabel(rules)],
   ];
+  // Turniertage (#1961): Runden je Termin mit ihren Punkten und die Sonderboni der Saison.
+  if (dayRoundsLabel(rules)) items.splice(1, 0, ["Turniertag", dayRoundsLabel(rules)]);
+  if (bonusRulesLabel(rules)) items.push(["Boni", bonusRulesLabel(rules)]);
   if (rules?.final_top_n) items.push(["Finale", `Die besten ${rules.final_top_n} der Gesamtwertung`]);
   return (
     <dl className="mt-6 grid gap-x-6 gap-y-2 sm:grid-cols-2 text-sm" data-testid="series-rules">
