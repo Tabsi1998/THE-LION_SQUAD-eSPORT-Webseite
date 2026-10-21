@@ -22,6 +22,9 @@ füllt fehlende Werte mit Standards und weist Unsinn ab; alle anderen Funktionen
   0 = aus, und ihr Punkteschema, Vorgabe 8…1), ``custom_bonuses`` - eigene Sonderboni je Saison (Name und Punkte, etwa
   „Bingo 3P“), ``tiebreak_top_n`` - das N der Gleichstand-Regel ``top_n`` („mehr Plätze unter den besten N“).
   Gerechnet wird damit in ``services/tournament_days.py``.
+- **Teamwertung einer Rennliga** (#1960): ``team_scoring.mode`` - ``per_race`` (je Rennen für das gefahrene Team) oder
+  ``current_lineup`` (aktuelle Besetzung: alle Saisonpunkte der Fahrer, die jetzt im Team sind). ``min_participants``:
+  Mindestzahl am Start je Termin - darunter warnt das Eintragen.
 """
 from __future__ import annotations
 
@@ -44,6 +47,8 @@ MAX_CUSTOM_BONUSES = 10
 MAX_BONUS_LABEL = 40
 MAX_BONUS_KEY = 30
 MAX_TOP_N = 64  # N der Gleichstand-Regel „Top N“ (#1961): 1 bis 64
+# Teamwertung (#1960): je Rennen für das gefahrene Team (Vorgabe) oder die aktuelle Besetzung mit allen Saisonpunkten.
+TEAM_MODES = ("per_race", "current_lineup")
 
 DEFAULT_RULES: dict = {
     "points_mode": "scheme",
@@ -57,7 +62,9 @@ DEFAULT_RULES: dict = {
     "activity_points": {"points": 0, "from_round": 1},
     "final_top_n": None,
     "tiebreakers": ["countback", "latest_result"],
-    "team_scoring": {"enabled": False, "counting_drivers": None, "guests_count": True},
+    "team_scoring": {"enabled": False, "counting_drivers": None, "guests_count": True, "mode": "per_race"},
+    # Mindestzahl Teilnehmer je Termin (#1960): darunter warnt das Eintragen - der Termin bleibt dann ohne Wertung.
+    "min_participants": None,
     "match_points": {"win": 3, "draw": 1, "loss": 0},
     "table_tiebreakers": ["score_diff", "score_for"],
     # Turniertage (#1961): aus, bis eine Saison Runden je Termin führt; Rundenpunkte Vorgabe 8…1.
@@ -153,7 +160,9 @@ def normalize_rules(raw: dict | None) -> dict:
         "counting_drivers": _whole(team.get("counting_drivers"), "team_scoring.counting_drivers",
                                    allow_none=True, minimum=1),
         "guests_count": bool(team.get("guests_count")),
+        "mode": _choice(team.get("mode") or "per_race", "team_scoring.mode", TEAM_MODES),
     }
+    rules["min_participants"] = _whole(rules["min_participants"], "min_participants", allow_none=True, minimum=1)
     points = {**DEFAULT_RULES["match_points"], **(raw.get("match_points") or {})}
     rules["match_points"] = {key: _number(points.get(key), f"match_points.{key}") for key in ("win", "draw", "loss")}
     rules["table_tiebreakers"] = _criteria(rules["table_tiebreakers"], "table_tiebreakers", TABLE_TIEBREAKERS)

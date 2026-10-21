@@ -35,6 +35,7 @@ from services.series_standings import compute_standings, ordered_rounds
 
 MAX_SESSION = 30
 MAX_SESSIONS = 6
+MAX_NOTE = 200  # Hinweis zur Regeländerung je Abschnitt (#1960)
 MAX_POINTS = 100
 OFFSET_RANGE = (-24 * 60, 7 * 24 * 60)
 SESSION_CHOICES = ("Qualifying", "Shootout", "Sprint", "Rennen", "Hauptrennen", "Lauf 1", "Lauf 2")
@@ -291,7 +292,11 @@ def _format(raw: dict, where: str) -> dict:
     keys = [label_key(item["label"]) for item in out]
     if len(set(keys)) != len(keys):
         raise ValueError(f"{where}: Jeder Lauf nur einmal.")
-    return {"sessions": out}
+    # Hinweis zur Regeländerung (#1960): steht ab dieser Runde auf der Serienseite („Ab R5 kein Qualifying …“).
+    note = " ".join(str(raw.get("note") or "").split())
+    if len(note) > MAX_NOTE:
+        raise ValueError(f"{where}: Hinweis höchstens {MAX_NOTE} Zeichen.")
+    return {"sessions": out, **({"note": note} if note else {})}
 
 
 def normalize_weekend(raw) -> dict | None:
@@ -572,7 +577,7 @@ def with_reverse_grid(rounds: list[dict], sheets: dict, plan: dict, snapshots: l
 
 
 def standings(*, rules: dict, rounds: list[dict], sheets: dict, participants: list[dict], own_teams=(),
-              weekend: dict | None = None) -> list[dict]:
+              weekend: dict | None = None, adjustments=None) -> list[dict]:
     """Die Stände wie ``compute_standings``, mit Punkten je Lauf, Startplatz und Pole aus dem Qualifying und der
     umgekehrten Wertung als Startplatz. Mit Läufen zählt eine Runde als Einheit (``units``): Aktivitätspunkte, gefahrene
     Runden und Streichergebnisse je Runde, nicht je Lauf. Der Startplatz ändert keine Punkte - die umgekehrte Wertung
@@ -584,7 +589,7 @@ def standings(*, rules: dict, rounds: list[dict], sheets: dict, participants: li
     units = {rid: entry["unit"] for rid, entry in plan.items()} if by_code(rounds, weekend) else None
     enriched = with_qualifying(rounds, sheets, plan, weekend)
     common = {"rules": rules, "rounds": rounds, "participants": participants, "own_teams": own_teams,
-              "round_rules": per_round, "units": units}
+              "round_rules": per_round, "units": units, "adjustments": adjustments}
     snapshots = compute_standings(sheets=enriched, **common)
     reversed_grid = with_reverse_grid(rounds, enriched, plan, snapshots, weekend)
     if reversed_grid is not enriched:

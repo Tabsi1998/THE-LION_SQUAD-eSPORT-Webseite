@@ -7,8 +7,10 @@ gewerteter Runde einen Stand je Wertung (``scope``):
   (``tiebreak`` nennt das Kriterium, das gegen die Zeile darüber entschieden hat) und der offizielle Wert des
   Veranstalters (``official_totals`` im Blatt der Runde) mit Abweichung zur eigenen Summe.
 - ``teams``: Teamwertung, wenn eingeschaltet - je Rennen die besten ``counting_drivers`` eines Teams (Team je Rennen
-  aus der Zeile, sonst das Standard-Team); ein Gast zählt fürs Team, wenn ``guests_count`` an ist. Ohne ein einziges
-  Team gibt es keinen (leeren) Teamstand.
+  aus der Zeile, sonst das Standard-Team; mit ``team_scoring.mode = current_lineup`` das Team, in dem der Fahrer jetzt
+  fährt, #1960); ein Gast zählt fürs Team, wenn ``guests_count`` an ist. Die Teamwertung laut Veranstalter
+  (``official_team_totals``) gilt für Platz und Punkte. Ohne ein einziges Team gibt es keinen (leeren) Teamstand.
+- Anpassungen (#1960, ``series_adjustments``): ±Punkte ohne Rennergebnis je Fahrer bzw. Team, ab ihrem Stand.
 - ``table``: Tabelle einer Team-Liga aus den eingetragenen Spielen; hat das Blatt die Tabelle des Veranstalters
   (``official_table``), gilt sie für Teams und Plätze: Teams aus den Spielen in anderer Schreibweise zählen für ihre
   Zeile (``team_names.align_to_table``), ohne passende Zeile bekommen sie keine eigene, und offizielle Plätze werden nie
@@ -28,7 +30,7 @@ from __future__ import annotations
 
 import math
 
-from services import tournament_days
+from services import series_adjustments, tournament_days
 from services.own_teams import Matcher
 from services.scoring_rules import (
     counted_results, league_table, normalize_rules, rank_with_ties, result_points, validate_sheet,
@@ -175,12 +177,20 @@ def _per_unit(results: list[dict], unit_of: dict, unit_seq: dict) -> list[dict]:
 
 def _driver_rows(rules: dict, upto: list[dict], sheets: dict, seq_of: dict, total_rounds: int,
                  people: dict, round_rules: dict | None = None, unit_of: dict | None = None,
-                 unit_seq: dict | None = None) -> list[dict]:
+                 unit_seq: dict | None = None, adjustments=()) -> list[dict]:
     activity = rules["activity_points"]
     official = sheets[upto[-1]["id"]].get("official_totals") or {}
     unit_of, unit_seq = unit_of or {}, unit_seq or {}
+    # Anpassungen (#1960): ±Punkte ohne Rennergebnis - wer nur eine Anpassung hat, steht trotzdem in der Tabelle.
+    adjusted: dict[str, list[dict]] = {}
+    for item in adjustments or ():
+        if item.get("kind", "participant") == "participant" and item.get("participant_id"):
+            adjusted.setdefault(item["participant_id"], []).append(item)
+    found = _results_by_participant(rules, upto, sheets, seq_of, round_rules)
+    for pid in adjusted:
+        found.setdefault(pid, [])
     rows = []
-    for pid, results in _results_by_participant(rules, upto, sheets, seq_of, round_rules).items():
+    for pid, results in found.items():
         # Gezählt, gestrichen, Aktivitätspunkte und gefahrene Runden je Einheit - mit Läufen je Runde (#1930).
         units = _per_unit(results, unit_of, unit_seq)
         kept, gone = counted_results(units, rules, total_rounds)
@@ -192,9 +202,12 @@ def _driver_rows(rules: dict, upto: list[dict], sheets: dict, seq_of: dict, tota
         # Sonderboni (#1961): getrennt wie Aktivitätspunkte, nie gestrichen.
         extra = sum(item.get("bonus") or 0 for item in results)
         stats = _stats(results)
+        # Anpassungen (#1960): getrennt von Sonderboni und Aktivitätspunkten ausgewiesen - jede zählt genau einmal.
+        adjust = sum(item["points"] for item in adjusted.get(pid, []))
         row = {
-            "participant_id": pid, "computed_points": _number(counted_points + bonus + extra),
-            "activity_points": _number(bonus), "bonus_points": _number(extra),
+            "participant_id": pid, "computed_points": _number(counted_points + bonus + extra + adjust),
+            "activity_points": _number(bonus), "bonus_points": _number(extra), "adjustment_points": _number(adjust),
+            "adjustments": [series_adjustments.public(item) for item in adjusted.get(pid, [])],
             "counted_round_ids": counted, "dropped_round_ids": dropped,
             "results": [{**{key: item[key] for key in RESULT_FIELDS},
                          **{key: item[key] for key in (*RACE_DETAILS, *DAY_DETAILS) if key in item}}
@@ -213,10 +226,49 @@ def _driver_rows(rules: dict, upto: list[dict], sheets: dict, seq_of: dict, tota
 
 
 # ---------------------------------------------------------------- Teams
+def _current_lineup(rules: dict, upto: list[dict], sheets: dict, seq_of: dict, people: dict,
+                    round_rules: dict | None = None) -> dict[str, str]:
+    """Aktuelle Besetzung (#1960): je Fahrer das Team, für das er zuletzt gefahren ist (Team der Zeile, sonst das
+    Standard-Team). Je Team höchstens so viele Fahrer, wie es in einem Rennen am meisten am Start hatte - die zuletzt
+    gefahrenen, bei Gleichstand die mit mehr Punkten. So zählt ein Fahrer, der die Liga verlassen hat, nicht mehr, sobald
+    jemand seinen Platz übernommen hat; wer nur ein Rennen auslässt, bleibt im Team."""
+    latest: dict[str, tuple[int, str]] = {}
+    totals: dict[str, float] = {}
+    fielded: dict[str, int] = {}
+    for index, item in enumerate(upto):
+        per_team: dict[str, int] = {}
+        for pid, results in _results_by_participant(rules, [item], sheets, seq_of, round_rules).items():
+            result = results[0]
+            totals[pid] = totals.get(pid, 0) + result["points"]
+            team = result["team"] or (people.get(pid) or {}).get("default_team")
+            if team:
+                latest[pid] = (index, team)
+                per_team[team] = per_team.get(team, 0) + 1
+        for team, count in per_team.items():
+            fielded[team] = max(fielded.get(team, 0), count)
+    candidates: dict[str, list[str]] = {}
+    for pid, (_index, team) in latest.items():
+        candidates.setdefault(team, []).append(pid)
+    current: dict[str, str] = {}
+    for team, pids in candidates.items():
+        pids.sort(key=lambda pid: (-latest[pid][0], -totals.get(pid, 0), pid))
+        for pid in pids[: fielded.get(team) or len(pids)]:
+            current[pid] = team
+    return current
+
+
 def _team_rows(rules: dict, upto: list[dict], sheets: dict, seq_of: dict, people: dict,
-               round_rules: dict | None = None) -> list[dict]:
+               round_rules: dict | None = None, adjustments=()) -> list[dict]:
+    """Teamwertung je Rennen: die besten ``counting_drivers`` eines Teams. Modus ``per_race`` (Vorgabe) zählt einen
+    Fahrer für das Team, für das er in diesem Rennen gefahren ist; ``current_lineup`` (#1960) zählt alle Saisonpunkte
+    der Fahrer für das Team, in dem sie jetzt fahren (``_current_lineup``). Dazu Team-Anpassungen und die Teamwertung
+    laut Veranstalter (``official_team_totals`` des letzten Blatts) - sie gilt für Platz und Punkte, auch für ein Team,
+    das nur dort steht."""
     config = rules["team_scoring"]
-    official = sheets[upto[-1]["id"]].get("official_team_totals") or {}
+    official = {series_adjustments.team_key(team): value
+                for team, value in (sheets[upto[-1]["id"]].get("official_team_totals") or {}).items()}
+    current = (_current_lineup(rules, upto, sheets, seq_of, people, round_rules)
+               if config.get("mode") == "current_lineup" else None)
     teams: dict[str, dict] = {}
     for item in upto:
         per_team: dict[str, list[dict]] = {}
@@ -225,7 +277,7 @@ def _team_rows(rules: dict, upto: list[dict], sheets: dict, seq_of: dict, people
             if person.get("link") == "guest" and not config["guests_count"]:
                 continue
             result = results[0]
-            team = result["team"] or person.get("default_team")
+            team = current.get(pid) if current is not None else (result["team"] or person.get("default_team"))
             if team:
                 per_team.setdefault(team, []).append({**result, "participant_id": pid})
         for team, drivers in per_team.items():
@@ -238,13 +290,31 @@ def _team_rows(rules: dict, upto: list[dict], sheets: dict, seq_of: dict, people
             for driver in counting:
                 pid = driver["participant_id"]
                 entry["_by_driver"][pid] = entry["_by_driver"].get(pid, 0) + driver["points"]
+    by_key = {series_adjustments.team_key(name): entry for name, entry in teams.items()}
+
+    def entry_for(name: str) -> dict:
+        key = series_adjustments.team_key(name)
+        if key not in by_key:
+            by_key[key] = teams.setdefault(name, {"team": name, "round_points": [], "_results": [],
+                                                  "_by_driver": {}})
+        return by_key[key]
+
+    for item in adjustments or ():
+        if item.get("kind") == "team" and item.get("team"):
+            entry_for(item["team"]).setdefault("_adjust", []).append(item)
+    for name in sheets[upto[-1]["id"]].get("official_team_totals") or {}:
+        entry_for(name)
     rows = []
     for entry in teams.values():
         by_driver = entry.pop("_by_driver")
+        adjusted = entry.pop("_adjust", [])
+        extra = sum(item["points"] for item in adjusted)
         entry["driver_ids"] = sorted(by_driver, key=lambda pid: (-by_driver[pid], pid))
-        entry["computed_points"] = _number(sum(item["points"] for item in entry["round_points"]))
+        entry["computed_points"] = _number(sum(item["points"] for item in entry["round_points"]) + extra)
+        entry["adjustment_points"] = _number(extra)
+        entry["adjustments"] = [series_adjustments.public(item) for item in adjusted]
         entry["_stats"] = _stats(entry.pop("_results"))
-        _official(entry, official.get(entry["team"]))
+        _official(entry, official.get(series_adjustments.team_key(entry["team"])))
         rows.append(entry)
     _rank(rows, rules["tiebreakers"], upto, lambda row: (row["team"].casefold(), row["team"]),
           rules["tiebreak_top_n"])
@@ -338,12 +408,15 @@ def _own_spelling(sheet: dict, matcher: Matcher) -> dict:
 
 # ---------------------------------------------------------------- Alles zusammen
 def compute_standings(*, rules: dict, rounds: list[dict], sheets: dict[str, dict], participants: list[dict],
-                      own_teams=(), round_rules: dict | None = None, units: dict | None = None) -> list[dict]:
+                      own_teams=(), round_rules: dict | None = None, units: dict | None = None,
+                      adjustments=None) -> list[dict]:
     """Je gewerteter Runde und Wertung ein Stand: ``{"round_id", "round_seq", "scope", "rows"}`` in
     Kalender-Reihenfolge. ``own_teams``: die eigenen Teams (Namen oder ``{name, aliases}``, #1926) - ihre
     Schreibweisen zählen als ein Team. ``round_rules``: normalisierte Regeln je Termin, die für die Punkte einer Zeile
     statt ``rules`` gelten (Punkte je Lauf, #1930, ``services/race_weekend.py``). ``units``: Termin → Runde - dann zählen
-    Aktivitätspunkte, gefahrene Runden und Streichergebnisse je Runde (Summe ihrer Läufe) statt je Termin."""
+    Aktivitätspunkte, gefahrene Runden und Streichergebnisse je Runde (Summe ihrer Läufe) statt je Termin.
+    ``adjustments``: Anpassungen der Saison (#1960, ``services/series_adjustments.py``) - je Stand die, die schon
+    gelten, in Fahrer- bzw. Teamwertung (``adjustment_points``, ``adjustments`` an der Zeile)."""
     rules = normalize_rules(rules)
     matcher = Matcher(own_teams)
     if matcher:
@@ -363,6 +436,11 @@ def compute_standings(*, rules: dict, rounds: list[dict], sheets: dict[str, dict
         validate_sheet(sheets[item["id"]], item["id"])
     people = {person["id"]: person for person in participants if person.get("id")}
     own = set(matcher.names)
+    calendar = [item for item in ordered_rounds(rounds) if not item.get("archived_at")]
+    if matcher:
+        adjustments = [{**item, "team": matcher.canonical(item["team"])} if item.get("team") else item
+                       for item in adjustments or []]
+    active = series_adjustments.active_per_snapshot(adjustments, calendar, scored)
     snapshots: list[dict] = []
     previous: dict[str, dict] = {}
     for index, item in enumerate(scored):
@@ -370,9 +448,9 @@ def compute_standings(*, rules: dict, rounds: list[dict], sheets: dict[str, dict
         scopes = []
         if any(sheets[done["id"]].get("rows") for done in upto):
             drivers = _driver_rows(rules, upto, sheets, seq_of, total_rounds, people, round_rules, unit_of,
-                                   unit_seq)
+                                   unit_seq, active[index])
             scopes.append(("drivers", "participant_id", drivers))
-            teams = (_team_rows(rules, upto, sheets, seq_of, people, round_rules)
+            teams = (_team_rows(rules, upto, sheets, seq_of, people, round_rules, active[index])
                      if rules["team_scoring"]["enabled"] else [])
             if teams:
                 scopes.append(("teams", "team", teams))

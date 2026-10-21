@@ -616,6 +616,13 @@ def check(resolution: Resolution, rules: dict, round_doc: dict, today: str, own_
         warnings.append(_problem("round_in_future", "Der Termin liegt in der Zukunft."))
     if round_doc.get("counts") is False:
         warnings.append(_problem("round_not_counted", "Der Termin zählt nicht zur Wertung."))
+    # Mindestzahl am Start (#1960): darunter bleibt ein Termin laut Regeln ohne Wertung - das setzt der Vorstand am
+    # Termin („ohne Wertung“, Grund „zu wenig Fahrer“), hier nur der Hinweis.
+    minimum = rules.get("min_participants")
+    started = sum(1 for row in resolution.rows if row["participant_id"] and "dns" not in row["marks"])
+    if minimum and resolution.rows and started < minimum and round_doc.get("counts") is not False:
+        warnings.append(_problem("too_few_participants", f"Nur {started} am Start - die Saison verlangt mindestens "
+                                 f"{minimum}. Termin ohne Wertung setzen (Grund: zu wenig Fahrer)?"))
     warnings.extend(_places(resolution, rules))
     warnings.extend(_day(resolution, rules))
     fastest = [row["index"] for row in resolution.rows if row["participant_id"] and "fastest_lap" in row["marks"]]
