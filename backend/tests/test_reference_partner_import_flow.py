@@ -38,6 +38,7 @@ class Source:
     def __init__(self):
         self.calls = []
         self.answers = {path: _fixture(name) for path, name in PATHS.items()}
+        self.raw = {}
         self.fail = None
 
     def __call__(self, request):
@@ -45,6 +46,8 @@ class Source:
         assert request.url.host == "tft.pineapps.at" and request.method == "GET"
         if self.fail:
             return self.fail(request)
+        if request.url.path in self.raw:
+            return httpx.Response(200, content=self.raw[request.url.path])
         if request.url.path not in self.answers:
             return httpx.Response(404)
         return httpx.Response(200, json=self.answers[request.url.path])
@@ -380,6 +383,23 @@ async def test_a_broken_tournament_marks_only_its_own_line(flow):
     items = _items((await flow.post(_url(series, "/preview"))).json())
     assert items["901"]["state"] == "new"
     assert (items["902"]["state"], items["902"]["error"]) == ("error", partner_platforms.FORMAT_MESSAGE)
+
+
+@pytest.mark.asyncio
+async def test_absurd_numbers_or_nesting_from_the_source_are_502_or_an_error_line_never_500(flow):
+    """Prüfer zu #1964: eine riesige Zahl im Turniertag ist ein Fehler dieser Zeile, zu tief verschachteltes JSON in der
+    Turnierliste ein 502 mit fester Meldung - nie ein 500."""
+    _, _, _, series = await _setup(flow)
+    broken = _fixture("tournament_902.json")
+    broken["rounds"][0]["lobbies"][0]["players"][0]["points"] = int("9" * 400)
+    flow.source.answers["/api/tournaments/902"] = broken
+    items = _items((await flow.post(_url(series, "/preview"))).json())
+    assert (items["901"]["state"], items["902"]["state"]) == ("new", "error")
+    assert items["902"]["error"] == partner_platforms.FORMAT_MESSAGE
+    partner_platforms.clear_cache()
+    flow.source.raw["/api/series/7"] = b"[" * 100000 + b"]" * 100000
+    nested = await flow.post(_url(series, "/preview"))
+    assert (nested.status_code, nested.json()["detail"]) == (502, partner_platforms.FORMAT_MESSAGE)
 
 
 @pytest.mark.asyncio

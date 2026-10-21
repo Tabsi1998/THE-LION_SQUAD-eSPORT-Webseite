@@ -37,6 +37,10 @@ MAX_REF_LENGTH = 12
 MAX_ROUNDS = 20  # wie ``scoring_rules.MAX_DAY_ROUNDS``
 MAX_NAME = 100
 MAX_TITLE = 160
+MAX_NUMBER = 1_000_000  # Kennungen, Zähler, Rundennummern - alles darüber ist unbrauchbar
+MAX_POINTS = 1000  # Punkte je Runde (wie ``ResultDayRound``)
+MAX_PLACE = 100  # Platz in einer Lobby
+MAX_TOTAL = 10_000  # Tagessumme (wie ``ResultEntryRow.day_points``)
 GUEST_PREFIX = "guest_"
 GUEST_TAG = "GUEST"
 
@@ -62,39 +66,49 @@ def _clean(value, limit: int) -> str:
     return " ".join(str(value or "").split())[:limit]
 
 
-def _int(value) -> int | None:
-    if value is None or isinstance(value, bool):
+def _number(value, limit: float):
+    """Eine Zahl der Antwort innerhalb von ±``limit`` - sonst ``None``. Nie eine Ausnahme: riesige Ganzzahlen
+    (``OverflowError`` bei ``float``) und Text sind einfach unbrauchbar."""
+    if value is None or isinstance(value, bool) or value == "":
         return None
     try:
         number = float(value)
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, OverflowError):
         return None
-    return int(number) if math.isfinite(number) and number.is_integer() else None
-
-
-def _points(value):
-    if value is None or isinstance(value, bool):
-        return None
-    try:
-        number = float(value)
-    except (TypeError, ValueError):
-        return None
-    if not math.isfinite(number) or abs(number) > 1000:
+    if not math.isfinite(number) or abs(number) > limit:
         return None
     return int(number) if number.is_integer() else number
 
 
+def _int(value, limit: int = MAX_NUMBER) -> int | None:
+    number = _number(value, limit)
+    return number if isinstance(number, int) else None
+
+
+def _given(value, parsed):
+    """Steht ein Wert in der Antwort, muss er brauchbar sein - sonst ist die Antwort in unerwarteter Form (nie still
+    ein anderer Wert)."""
+    if parsed is None and value is not None and value != "":
+        raise SourceFormatError()
+    return parsed
+
+
+def _points(value):
+    return _given(value, _number(value, MAX_POINTS))
+
+
 def club_day(value) -> str | None:
-    """Wiener Tag eines Zeitpunkts des Partners („2026-09-24T22:00:00.000Z“ → „2026-09-25“)."""
+    """Wiener Tag eines Zeitpunkts des Partners („2026-09-24T22:00:00.000Z“ → „2026-09-25“). Ein Zeitpunkt am Rand des
+    Kalenders (Jahr 1 bzw. 9999 mit Zeitzone) hat keinen Tag."""
     if not isinstance(value, str) or not value.strip():
         return None
     try:
         moment = datetime.fromisoformat(value.strip().replace("Z", "+00:00"))
-    except ValueError:
+        if moment.tzinfo is None:
+            moment = moment.replace(tzinfo=VIENNA)
+        return moment.astimezone(VIENNA).date().isoformat()
+    except (ValueError, OverflowError):
         return None
-    if moment.tzinfo is None:
-        moment = moment.replace(tzinfo=VIENNA)
-    return moment.astimezone(VIENNA).date().isoformat()
 
 
 def _is_guest(player: dict) -> bool:
@@ -162,10 +176,16 @@ def series_tournaments(data) -> list[dict]:
     return out
 
 
+def _total(value):
+    return _given(value, _number(value, MAX_TOTAL))
+
+
 def _entry(player: dict, lobby: str) -> dict | None:
     item = {}
-    place = _int(player.get("placement"))
-    if place is not None and 1 <= place <= 100:
+    place = _given(player.get("placement"), _int(player.get("placement"), MAX_PLACE))
+    if place is not None and place < 0:
+        raise SourceFormatError()
+    if place:  # 0 heißt: kein Platz
         item["place"] = place
     points = _points(player.get("points"))
     if points is not None:
@@ -226,13 +246,13 @@ def tournament(data) -> dict:
                        for key, name in (("player1_puuid", "p1_name"), ("player2_puuid", "p2_name"))]
             names = [riot_name(member) for member in members]
             entries = day_rounds(by_team.get(str(team.get("id")), {}))
-            total = _int(team.get("total_points"))
+            total = _total(team.get("total_points"))
             for index, member in enumerate(members):
                 if not names[index]:
                     continue
                 placed.add(_person_key(member))
                 row = {"name": names[index], "place": place, "day_rounds": list(entries),
-                       "day_points": total if total is not None else _int(member.get("total_points")),
+                       "day_points": total if total is not None else _total(member.get("total_points")),
                        "marks": ["left"] if member.get("dropped_out") else []}
                 if names[1 - index]:
                     row["partner"] = {"name": names[1 - index]}
@@ -245,7 +265,7 @@ def tournament(data) -> dict:
             continue
         place += 1
         rows.append({"name": name, "place": place, "day_rounds": day_rounds(by_person.get(key, {})),
-                     "day_points": _int(person.get("total_points")),
+                     "day_points": _total(person.get("total_points")),
                      "marks": ["left"] if person.get("dropped_out") else []})
     return {
         "ref": str(data["id"]), "name": _clean(data.get("name"), MAX_TITLE), "club_day": club_day(data.get("date")),

@@ -157,7 +157,9 @@ async def _fetch(url: str, parse: Callable[[Any], Any]) -> Any:
         raise SourceError(UNREACHABLE_MESSAGE) from None
     try:
         return parse(json.loads(body))
-    except ValueError:  # kein JSON oder unerwartete Form (``SourceFormatError`` ist ein ValueError)
+    except (ValueError, TypeError, KeyError, ArithmeticError, RecursionError):
+        # Kein JSON, unerwartete Form (``SourceFormatError`` ist ein ValueError), riesige Zahlen (OverflowError) oder zu
+        # tief verschachtelt (RecursionError): immer dieselbe feste Meldung - nie ein Absturz der Route.
         raise SourceError(FORMAT_MESSAGE) from None
 
 

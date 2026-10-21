@@ -111,6 +111,38 @@ def test_a_failing_source_raises_a_fixed_message_and_is_not_kept(monkeypatch, ha
     assert len(calls) == 2  # ein Fehler bleibt nicht im Zwischenspeicher
 
 
+HUGE = "9" * 400
+UNUSABLE = {
+    "riesige Punkte": ('{"id":1,"rounds":[{"round_number":1,"lobbies":[{"lobby_number":1,"players":[{"puuid":"a",'
+                       '"game_name":"A","tag_line":"EUW","placement":1,"points":%s}]}]}],"participants":[{"puuid":"a",'
+                       '"game_name":"A","tag_line":"EUW"}]}' % HUGE).encode(),
+    "riesiger Platz": ('{"id":1,"rounds":[{"round_number":1,"lobbies":[{"lobby_number":1,"players":[{"puuid":"a",'
+                       '"game_name":"A","placement":%s,"points":8}]}]}],"participants":[]}' % HUGE).encode(),
+    "riesige Rundennummer": ('{"id":1,"rounds":[{"round_number":%s}]}' % HUGE).encode(),
+    "riesige Tagessumme": ('{"id":1,"rounds":[],"participants":[{"puuid":"a","game_name":"A","total_points":%s}]}'
+                           % HUGE).encode(),
+    "tief verschachtelt": b"[" * 100000 + b"]" * 100000,
+    "kein Text": b"\xff\xfe Unsinn",
+}
+
+
+@pytest.mark.parametrize("label", list(UNUSABLE))
+def test_unusable_numbers_or_structures_are_a_format_error_never_a_crash(monkeypatch, label):
+    """Prüfer zu #1964: riesige Zahlen (OverflowError) und tief verschachteltes JSON (RecursionError) dürfen den Abruf
+    nicht mit 500 abbrechen - sie sind eine Antwort in unerwarteter Form (502 in der Route)."""
+    _mock(monkeypatch, lambda request: httpx.Response(200, content=UNUSABLE[label]))
+    with pytest.raises(partner_platforms.SourceError) as caught:
+        asyncio.run(partner_platforms.tournament("tft_dashboard", BASE, "1"))
+    assert str(caught.value) == partner_platforms.FORMAT_MESSAGE
+
+
+@pytest.mark.parametrize("date", ["0001-01-01T00:00:00+14:00", "9999-12-31T23:59:59-00:00"])
+def test_a_date_at_the_edge_of_the_calendar_has_no_day_instead_of_a_crash(monkeypatch, date):
+    body = json.dumps({"id": 1, "date": date, "rounds": []}).encode()
+    _mock(monkeypatch, lambda request: httpx.Response(200, content=body))
+    assert asyncio.run(partner_platforms.tournament("tft_dashboard", BASE, "1"))["club_day"] is None
+
+
 def test_an_answer_over_the_size_limit_is_refused(monkeypatch):
     monkeypatch.setattr(partner_platforms, "MAX_BYTES", 1000)
     _mock(monkeypatch, lambda request: httpx.Response(200, content=_fixture("tournament_901.json")))
