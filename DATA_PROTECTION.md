@@ -25,6 +25,14 @@
   setzt der Server ein technisch notwendiges, HttpOnly-Cookie `tls_onsite` nur unter `/api`: Turnier-Kennung, Ablauf und
   Signatur, ohne Angaben zur Person, höchstens 12 Stunden und nie über das Turnierende hinaus. Eine Anmeldung darüber
   trägt `registered_via: "onsite"`.
+- Partner-Plattform einer Turnierserie (#1964): Der Vorstand holt öffentliche Turniertage von der Plattform eines
+  Partners (feste Adressliste, mit dem Partner abgesprochen, nur lesend). Übernommen werden nur Name wie beim
+  Veranstalter (Riot-ID `Name#TAG`, Gäste ohne Tag), Platz, Punkte je Runde, Lobby, Partner im Double Up und
+  „Ausgestiegen“ – als Entwurf, nie direkt veröffentlicht. Riot-Kennungen (PUUID), Avatare, Rang und Liga-Punkte und
+  die Rohantwort werden nicht gespeichert; der Zwischenspeicher hält nur das eingedampfte Ergebnis zehn Minuten im
+  Speicher des Servers. Neue Namen werden wie beim Eintragen offene Teilnehmer der Saison (`reference_participants`,
+  Dialog „Unbekannte Namen“); Fremde bleiben extern. Protokoll: `reference_series.partner_source`,
+  `reference_partner.import`, je Blatt `reference_result.save` bzw. `.pending_draft` mit `source: "partner"`.
 
 ## Konto löschen: was mit welchen Daten passiert
 

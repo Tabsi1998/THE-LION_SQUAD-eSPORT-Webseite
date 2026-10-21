@@ -242,6 +242,7 @@ je Saison Captains eintragen, die nur für diese eine Saison Ergebnisse und Scor
 | Ergebnisse eintragen (Entwurf, #1744) | ja | ja | nein |
 | Ergebnisse veröffentlichen | ja | nur wenn die Saison auf „Captain veröffentlicht direkt“ steht oder der Captain das Recht „Darf veröffentlichen“ hat | nein |
 | Entwurf eines Captains freigeben oder verwerfen (#1744) | ja | nein | nein |
+| Partner-Plattform einstellen, Turniertage holen und als Entwurf übernehmen (#1964) | ja | nein | nein |
 
 - **Zwei-Faktor ist Pflicht** – für den Vorstand wie für Captains (Entscheidung 7 des Obmanns). Ohne bestätigte
   Zwei-Faktor-Anmeldung antwortet der Server mit dem Hinweis darauf; das Web führt zur Einrichtung.

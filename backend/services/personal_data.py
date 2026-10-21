@@ -143,6 +143,9 @@ PERSONAL: dict[str, Entry] = {
     # Externe Serien (#1741): Teilnahmen und Aliase hängen an Vereinsprofilen. In der Auskunft steht, was an einem eigenen
     # Profil hängt. Geht das selbst angelegte Profil mit dem Konto, wird die Teilnahme extern (Name ausgeblendet) und der
     # Alias gelöscht; an einem Eintrag des Vereins (Mitgliederverwaltung, Redaktion) bleiben beide.
+    # Partner-Plattform (#1964): Namen von dort landen hier wie eingetragene (offen, Dialog „Unbekannte Namen“) - nur der
+    # Name wie beim Veranstalter, keine Riot-Kennung, kein Avatar; der Abruf selbst speichert nichts in der Datenbank
+    # (Zwischenspeicher nur im Speicher, ``services/partner_platforms.py``). Keine neue Sammlung.
     "reference_participants": Entry(DETACHED, ("reference_participations",),
                                     "Teilnahme an einer externen Serie über ein eigenes Vereinsprofil; Ergebnis und Tabelle "
                                     "bleiben, die Verknüpfung zum selbst angelegten Profil wird gelöst und der Name ausgeblendet"),
