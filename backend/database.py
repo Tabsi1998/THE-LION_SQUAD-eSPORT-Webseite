@@ -61,6 +61,10 @@ async def init_indexes():
     await db.map_pools.create_index([("scope", 1), ("scope_id", 1), ("version", -1)], unique=True)
     await db.map_pools.create_index([("tournament_id", 1), ("scope", 1)])
     await db.map_pools.create_index("game_id")
+    # Maps in Ergebnisblättern der Team-Liga (#1616): nur fürs Löschen einer Map gefragt (``game_maps.in_results``).
+    await db.reference_round_results.create_index("matches.maps.map_id", sparse=True)
+    await db.reference_round_results.create_index("pending_draft.matches.maps.map_id", sparse=True)
+    await db.reference_round_result_revisions.create_index("content.matches.maps.map_id", sparse=True)
     # Game servers
     await db.game_servers.create_index("id", unique=True)
     await db.game_servers.create_index("slug", unique=True)

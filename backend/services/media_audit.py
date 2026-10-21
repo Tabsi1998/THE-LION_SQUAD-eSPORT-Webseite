@@ -59,9 +59,10 @@ USAGE_TARGETS: list[tuple[str, list[str]]] = [
     ("game_servers", ["server_icon_url"]),
     # Map-Pools (#1616): der Snapshot zeigt das Bild von damals, auch wenn die Map inzwischen ein neues hat.
     ("map_pools", ["modes.maps.image_url"]),
-    # Maps im Ergebnisblatt der Team-Liga: das Bild beim Speichern, auch im Entwurf daneben und in alten Ständen.
-    ("reference_round_results", ["matches.maps.image_url", "pending_draft.matches.maps.image_url"]),
-    ("reference_round_result_revisions", ["content.matches.maps.image_url"]),
+    # Frühere Bilder einer Map: ein gespeichertes Spiel der Team-Liga zeigt das Bild von damals. Ein Bild im
+    # Ergebnisblatt kommt immer aus einem Pool-Snapshot oder der Bibliothek - darum zählen diese beiden, die Blätter
+    # selbst muss die Mediathek nicht durchsuchen. Eine Map aus einem Spiel lässt sich nicht löschen (``in_results``).
+    ("game_maps", ["image_history"]),
     # Bilder aus der Mitgliederverwaltung je Hintergrund (``services.sponsor_images``).
     *((collection, [f"dolibarr_images.{kind}.{variant}.url" for kind in ("logo", "banner") for variant in ("dark", "light")])
       for collection in ("sponsors", "partners")),
@@ -79,7 +80,6 @@ COLLECTION_LABELS = {
     "gallery_albums": "Galerie-Album", "gallery_photos": "Galerie-Foto", "member_benefits": "Mitgliedervorteil",
     "club_member_profiles": "Vereinsprofil", "advent_doors": "Adventkalender", "stickers": "Sticker",
     "game_servers": "Spielserver", "game_maps": "Map", "map_pools": "Map-Pool",
-    "reference_round_results": "Ergebnisblatt", "reference_round_result_revisions": "Ergebnisblatt (alter Stand)",
 }
 FIELD_LABELS = {
     "logo_url": "Logo", "logo_light_url": "Logo hell", "logo_dark_url": "Logo dunkel",
@@ -91,8 +91,7 @@ FIELD_LABELS = {
     **{f"award_images.{place}": f"Gewinnerbild Platz {place}" for place in ("1", "2", "3")},
     "tools.image_url": "Bild eines Werkzeugs", "media_url": "Bild oder Video", "url": "Bild",
     "original_url": "Original", "server_icon_url": "Server-Symbol", "modes.maps.image_url": "Bild einer Map",
-    "matches.maps.image_url": "Bild einer Map", "pending_draft.matches.maps.image_url": "Bild einer Map (Entwurf)",
-    "content.matches.maps.image_url": "Bild einer Map",
+    "image_history": "früheres Bild",
     **{f"dolibarr_images.{kind}.{variant}.url":
        f"{kind.capitalize()} aus der Mitgliederverwaltung ({'dunkler' if variant == 'dark' else 'heller'} Hintergrund)"
        for kind in ("logo", "banner") for variant in ("dark", "light")},

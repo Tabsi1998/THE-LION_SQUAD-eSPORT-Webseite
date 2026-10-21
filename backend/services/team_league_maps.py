@@ -4,12 +4,13 @@
   Saison (``map_pools``), steht er je Modus mit Name und Bild aus seinem Snapshot da; sonst die Vorgabe des Spiels (alle
   aktiven Maps je Modus aus der Bibliothek). Dazu je Map die weiteren Schreibweisen (``aliases``), über die das Blatt
   einen eingetippten oder eingefügten Namen zuordnet. Ohne Spiel ``None`` - dann bleibt der Freitext.
-- **Snapshot** (``attach``): Eine Map im Blatt mit ``map_id`` muss zur Bibliothek des Spiels der Spur gehören - sonst
-  das Problem ``map_unknown`` an der Map (wie die übrigen Prüfungen, mit ``match``, ``map``, ``map_field``). Das Bild
-  wird beim Speichern ins Blatt geschrieben (``image_url``): aus dem Pool der Saison (Snapshot), sonst aus der
-  Bibliothek.
-  Der Name bleibt, wie er eingetragen wurde. So zeigt ein altes Spiel die Map wie damals - auch nach Umbenennen, neuem
-  Bild oder Archivieren. Ein Bild, das der Browser schickt, übernimmt der Server nie (``team_league_sheet.map_entry``).
+- **Snapshot** (``attach``): Eine Map mit ``map_id`` kommt nur aus der Auswahl, die heute gilt - aus dem Map-Pool der
+  Saison (mit ``mode`` genau aus diesem Modus, sonst aus irgendeinem), ohne Pool aus den aktiven Maps des Spiels (mit
+  ``mode`` nur, wenn sie dafür freigegeben ist). Sonst das Problem ``map_unknown`` an der Map (wie die übrigen
+  Prüfungen, mit ``match``, ``map``, ``map_field``). Name und Bild kommen nie aus der Eingabe, sondern aus dem Pool
+  (Snapshot) bzw. der Bibliothek und werden beim Speichern ins Blatt geschrieben. Ausnahme: Steht die Map schon im
+  gespeicherten Blatt dieses Termins (auch im Entwurf daneben), behält sie Name und Bild von damals - auch wenn sie
+  inzwischen aus dem Pool gefallen, umbenannt oder archiviert ist. So zeigt ein altes Spiel die Map wie damals.
 - **Statistik** (``map_stats``): je Map aus den eigenen Spielen der Saison (Veto aus ``team_league_page``): gebannt und
   gewählt (von uns, vom Gegner, ohne Angabe), Decider, gespielt, Siege, Unentschieden, Niederlagen. Maps mit Kennung
   zählen über die Kennung, Freitext über den Namen (ohne Groß/klein).
@@ -60,30 +61,72 @@ async def choices(db, series: dict) -> dict | None:
     return {"source": "library", "game": map_pools.game_summary(game), "pool_version": None, "modes": modes}
 
 
-async def attach(db, series: dict, resolution) -> None:
-    """Kennungen der Maps prüfen und den Bild-Snapshot anhängen (siehe Modulkopf). Ändert ``resolution`` in place."""
+def saved_maps(sheet: dict | None) -> dict[str, dict]:
+    """Die Maps mit Kennung, die im gespeicherten Blatt eines Termins stehen (auch im Entwurf daneben) - je Kennung der
+    gespeicherte Snapshot (Name, Bild)."""
+    out: dict[str, dict] = {}
+    for content in (sheet or {}, (sheet or {}).get("pending_draft") or {}):
+        for match in content.get("matches") or []:
+            for item in match.get("maps") or []:
+                if item.get("map_id") and item["map_id"] not in out:
+                    out[item["map_id"]] = {"name": item.get("name"), "image_url": item.get("image_url")}
+    return out
+
+
+def _allowed(game: dict, pool: dict | None, rows: dict[str, dict], map_id: str, mode: str | None) -> tuple:
+    """``(Snapshot, Grund)``: woher Name und Bild kommen - oder warum die Map nicht in die Auswahl passt."""
+    modes = {item["mode"]: item["label"] for item in game_maps.game_modes(game)}
+    label = modes.get(mode or "") or mode
+    if pool:
+        for group in pool.get("modes") or []:
+            if mode and modes and group.get("mode") != mode:
+                continue
+            for item in group.get("maps") or []:
+                if item.get("map_id") == map_id:
+                    return {"name": item.get("name"), "image_url": item.get("image_url")}, None
+        return None, (f"steht im Map-Pool der Saison nicht unter {label}" if mode and modes
+                      else "steht nicht im Map-Pool der Saison")
+    row = rows.get(map_id)
+    if not row or row.get("game_id") != game["id"]:
+        return None, "gehört nicht zu den Maps des Spiels dieser Serie"
+    if row.get("status") != "active":
+        return None, "ist archiviert"
+    if mode and modes and mode not in (row.get("modes") or []):
+        return None, f"ist für {label} nicht freigegeben"
+    return {"name": row.get("name"), "image_url": row.get("image_url")}, None
+
+
+async def attach(db, series: dict, resolution, sheet: dict | None = None) -> None:
+    """Maps mit Kennung prüfen und Name und Bild als Snapshot setzen (siehe Modulkopf). ``sheet``: das gespeicherte
+    Blatt dieses Termins - seine Maps behalten ihren Snapshot. Ändert ``resolution`` in place."""
     wanted = sorted({item["map_id"] for match in resolution.matches for item in match.get("maps") or []
                      if item.get("map_id")})
     if not wanted:
         return
     _lineage, game = await series_game(db, series)
+    kept = saved_maps(sheet)
     rows = {row["id"]: row for row in await db.game_maps.find({"id": {"$in": wanted}}, {"_id": 0}).to_list(None)}
-    snapshots = await map_pools.map_lookup(db, "reference_series", series["id"])
+    pool = map_pools.valid_for(await map_pools.current(db, "reference_series", series["id"]), (game or {}).get("id"))
     for match_index, match in enumerate(resolution.matches):
         for map_index, item in enumerate(match.get("maps") or []):
             map_id = item.get("map_id")
             if not map_id:
                 continue
-            row = rows.get(map_id)
-            if not game or not row or row.get("game_id") != game["id"]:
+            snapshot, reason = kept.get(map_id), None
+            if not snapshot:
+                snapshot, reason = _allowed(game, pool, rows, map_id, item.get("mode")) if game else (
+                    None, "gehört zu keinem Spiel dieser Serie")
+            if not snapshot:
                 resolution.errors.append({
                     "code": "map_unknown", "rows": [], "match": match_index, "map": map_index, "map_field": "name",
-                    "message": f"Spiel {match_index + 1}, Map {map_index + 1}: „{item.get('name')}“ gehört nicht zu "
-                               "den Maps des Spiels dieser Serie - bitte aus der Auswahl wählen oder als Freitext."})
+                    "message": f"Spiel {match_index + 1}, Map {map_index + 1}: „{item.get('name')}“ {reason} - bitte "
+                               "aus der Auswahl wählen oder als Freitext."})
                 continue
-            image = (snapshots.get(map_id) or {}).get("image_url") or row.get("image_url")
-            if image:
-                item["image_url"] = image
+            item["name"] = snapshot.get("name") or item.get("name")
+            if snapshot.get("image_url"):
+                item["image_url"] = snapshot["image_url"]
+            else:
+                item.pop("image_url", None)
 
 
 def _key(step: dict) -> str:

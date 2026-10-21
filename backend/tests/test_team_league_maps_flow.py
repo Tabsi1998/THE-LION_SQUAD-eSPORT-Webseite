@@ -175,16 +175,105 @@ async def test_the_team_league_page_counts_bans_picks_plays_and_results_per_map_
     assert stats[0]["name"] == "Hafenkante"  # meistgespielte zuerst
 
 
+async def _second_round(flow, series, code="ST2", day="2026-05-20"):
+    return (await flow.post(f"{ADMIN}/series/{series['id']}/rounds", json={
+        "code": code, "day": day, "opponent": "Probe Wölfe", "at_home": True})).json()
+
+
+def _one_map(item):
+    return {"matches": [{"home": OWN, "away": "Probe Wölfe", "home_score": 1, "away_score": 0,
+                         "maps": [{"role": "picked", "by": "own", "home_score": 6, "away_score": 2, **item}]}]}
+
+
+async def _codes(flow, series, round_doc, sheet):
+    preview = await flow.post(f"{_base(series, round_doc)}/preview", json=sheet)
+    assert preview.status_code == 200, preview.text
+    return [item["code"] for item in preview.json()["errors"]]
+
+
+# ---------------------------------------------------------------- Befund 1: nur aus dem geltenden Pool
 @pytest.mark.asyncio
-async def test_a_map_image_in_a_saved_match_counts_as_used(flow):
+async def test_a_new_entry_takes_only_maps_of_the_current_season_pool(flow):
+    game, maps, _lineage, series, round_doc = await _setup(flow)
+    # Glutsenke gehört zum Spiel, steht aber nicht im Pool der Saison.
+    assert "map_unknown" in await _codes(flow, series, round_doc, _one_map(
+        {"name": "Glutsenke", "map_id": maps["Glutsenke"]["id"]}))
+    # Sturmdeck stand im alten Pool, im neuen nicht mehr.
+    await flow.put(f"/api/map-pools/reference-series/{series['id']}", json={"modes": [
+        {"mode": "snd", "map_ids": [maps["Nebelwerk"]["id"], maps["Hafenkante"]["id"]]}]})
+    assert "map_unknown" in await _codes(flow, series, round_doc, _one_map(
+        {"name": "Sturmdeck", "map_id": maps["Sturmdeck"]["id"]}))
+    # Je Modus: Hafenkante steht im Pool nur unter S&D.
+    assert "map_unknown" in await _codes(flow, series, round_doc, _one_map(
+        {"name": "Hafenkante", "map_id": maps["Hafenkante"]["id"], "mode": "stellung"}))
+    assert await _codes(flow, series, round_doc, _one_map(
+        {"name": "Hafenkante", "map_id": maps["Hafenkante"]["id"], "mode": "snd"})) == []
+
+
+@pytest.mark.asyncio
+async def test_without_season_pool_only_active_maps_of_the_game_are_taken(flow):
+    game, maps, _lineage, series, round_doc = await _setup(flow, with_pool=False)
+    await flow.patch(f"/api/games/{game['id']}/maps/{maps['Glutsenke']['id']}", json={"status": "archived"})
+    assert "map_unknown" in await _codes(flow, series, round_doc, _one_map(
+        {"name": "Glutsenke", "map_id": maps["Glutsenke"]["id"]}))
+    assert "map_unknown" in await _codes(flow, series, round_doc, _one_map(
+        {"name": "Nebelwerk", "map_id": maps["Nebelwerk"]["id"], "mode": "stellung"}))
+    assert await _codes(flow, series, round_doc, _one_map({"name": "Nebelwerk", "map_id": maps["Nebelwerk"]["id"]})) == []
+
+
+@pytest.mark.asyncio
+async def test_a_saved_match_keeps_its_old_map_when_saved_again(flow):
+    game, maps, _lineage, series, round_doc = await _setup(flow)
+    sturm = maps["Sturmdeck"]["id"]
+    first = await flow.put(_base(series, round_doc), json={
+        **_one_map({"name": "Sturmdeck", "map_id": sturm}), "status": "published", "expected_version": 0})
+    assert first.status_code == 200, first.text
+    # Danach fliegt Sturmdeck aus dem Pool, wird umbenannt und archiviert.
+    await flow.put(f"/api/map-pools/reference-series/{series['id']}", json={"modes": [
+        {"mode": "snd", "map_ids": [maps["Nebelwerk"]["id"]]}]})
+    await flow.patch(f"/api/games/{game['id']}/maps/{sturm}", json={"name": "Sturmdeck Neu", "status": "archived",
+                                                                    "image_url": "/api/static/uploads/sturm-neu.webp"})
+    again = await flow.put(_base(series, round_doc), json={
+        **_one_map({"name": "Sturmdeck Neu", "map_id": sturm}), "status": "published", "expected_version": 1})
+    assert again.status_code == 200, again.text
+    stored = again.json()["sheet"]["matches"][0]["maps"][0]
+    assert (stored["name"], stored["image_url"]) == ("Sturmdeck", "/api/static/uploads/sturmdeck.webp")
+    # Ein neues Spiel nimmt die Map nicht mehr.
+    second = await _second_round(flow, series)
+    assert "map_unknown" in await _codes(flow, series, second, _one_map({"name": "Sturmdeck", "map_id": sturm}))
+
+
+# ---------------------------------------------------------------- Befund 2: Name und Bild nie aus der Eingabe
+@pytest.mark.asyncio
+async def test_name_and_image_of_a_library_map_never_come_from_the_input(flow):
+    _game, maps, _lineage, series, round_doc = await _setup(flow)
+    saved = await flow.put(_base(series, round_doc), json={**_one_map({
+        "name": "Ganz anderer Name", "map_id": maps["Hafenkante"]["id"], "image_url": "https://example.org/fremd.png"}),
+        "status": "published", "expected_version": 0})
+    assert saved.status_code == 200, saved.text
+    stored = saved.json()["sheet"]["matches"][0]["maps"][0]
+    assert (stored["name"], stored["image_url"]) == ("Hafenkante", "/api/static/uploads/hafenkante.webp")
+
+
+# ---------------------------------------------------------------- Befund 4: Mediathek ohne Vollscan der Blätter
+@pytest.mark.asyncio
+async def test_map_images_of_saved_matches_stay_used_without_scanning_result_sheets(flow):
     from services import media_audit
 
-    _game, maps, _lineage, series, round_doc = await _setup(flow)
-    await flow.put(_base(series, round_doc), json={**_sheet(maps), "status": "published", "expected_version": 0})
+    game, maps, _lineage, series, round_doc = await _setup(flow, with_pool=False)
+    await flow.put(_base(series, round_doc), json={
+        **_one_map({"name": "Glutsenke", "map_id": maps["Glutsenke"]["id"]}), "status": "published",
+        "expected_version": 0})
+    # Ein neues Bild in der Bibliothek: das alte (im Blatt gespeicherte) bleibt über die Bibliothek verwendet.
+    await flow.patch(f"/api/games/{game['id']}/maps/{maps['Glutsenke']['id']}",
+                     json={"image_url": "/api/static/uploads/glut-neu.webp"})
     places = {(collection, field) async for collection, _doc, field, _name, _text
-              in media_audit.iter_usages(flow.db, {"sturmdeck.webp"})}
-    assert ("reference_round_results", "matches.maps.image_url") in places
-    assert media_audit.place_label("reference_round_results", "matches.maps.image_url") == "Ergebnisblatt · Bild einer Map"
+              in media_audit.iter_usages(flow.db, {"glutsenke.webp"})}
+    assert places == {("game_maps", "image_history")}
+    assert not any(collection.startswith("reference_round_result") for collection, _f, _t in media_audit.usage_places())
+    # Gelöscht wird eine Map aus einem gespeicherten Spiel nie - archivieren.
+    refused = await flow.delete(f"/api/games/{game['id']}/maps/{maps['Glutsenke']['id']}")
+    assert refused.status_code == 409
 
 
 # ---------------------------------------------------------------- Bibliothek: Schreibweisen
@@ -199,3 +288,40 @@ async def test_a_map_keeps_other_spellings_for_matching(flow):
     assert created.json()["aliases"] == ["Harbour Edge"]
     changed = await flow.patch(f"/api/games/{game['id']}/maps/{created.json()['id']}", json={"aliases": ["Hafen"]})
     assert changed.json()["aliases"] == ["Hafen"]
+
+
+# ---------------------------------------------------------------- Befund 3: Schreibweisen prüfen statt kürzen
+@pytest.mark.asyncio
+async def test_too_many_or_too_long_spellings_are_refused_not_cut(flow):
+    admin = await flow.add_user(role="superadmin", name="admin")
+    flow.act_as(admin)
+    game = (await flow.post("/api/games", json=SHOOTER)).json()
+    many = await flow.post(f"/api/games/{game['id']}/maps", json={"name": "Hafenkante",
+                                                                   "aliases": [f"Hafen {index}" for index in range(11)]})
+    assert many.status_code == 422
+    assert "10" in many.text
+    long = await flow.post(f"/api/games/{game['id']}/maps", json={"name": "Hafenkante", "aliases": ["H" * 81]})
+    assert long.status_code == 422
+    assert "80" in long.text
+
+
+@pytest.mark.asyncio
+async def test_a_spelling_may_not_point_to_another_map_of_the_game(flow):
+    admin = await flow.add_user(role="superadmin", name="admin")
+    flow.act_as(admin)
+    game = (await flow.post("/api/games", json=SHOOTER)).json()
+    base = f"/api/games/{game['id']}/maps"
+    nebel = (await flow.post(base, json={"name": "Nebelwerk", "slug": "nebel-werk", "aliases": ["Fog Works"]})).json()
+    for alias in ("nebelwerk", "Nebel-Werk", "fog works"):
+        clash = await flow.post(base, json={"name": "Hafenkante", "aliases": [alias]})
+        assert clash.status_code == 409, alias
+        assert "Nebelwerk" in clash.json()["detail"]
+    # Auch umgekehrt: ein Name, der schon Schreibweise einer anderen Map ist.
+    named = await flow.post(base, json={"name": "Fog Works"})
+    assert named.status_code == 409
+    hafen = (await flow.post(base, json={"name": "Hafenkante"})).json()
+    changed = await flow.patch(f"{base}/{hafen['id']}", json={"aliases": ["Fog-Works"]})
+    assert changed.status_code == 409
+    # Die eigene Map stört sich nicht an sich selbst.
+    own = await flow.patch(f"{base}/{nebel['id']}", json={"aliases": ["Fog Works", "Nebel"]})
+    assert own.status_code == 200, own.text

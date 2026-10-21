@@ -13,6 +13,7 @@ sind zwei verschiedene Maps.
 from __future__ import annotations
 
 import re
+import unicodedata
 from typing import List, Literal, Optional
 
 from pydantic import BaseModel, Field, field_validator
@@ -48,15 +49,27 @@ def _optional_text(value):
 
 
 def clean_aliases(values, name: str | None = None) -> list[str]:
-    """Schreibweisen ohne Leerraum am Rand, jede einmal (ohne Groß/klein), ohne den Namen selbst."""
+    """Schreibweisen ohne Leerraum am Rand, jede einmal (ohne Groß/klein), ohne den Namen selbst. Zu lang oder zu
+    viele: ``MapProblem`` (422) - gekürzt wird nie still."""
     out: list[str] = []
     seen = {_text(name).casefold()} if name else set()
     for value in values or []:
-        text = _text(value)[:NAME_MAX]
+        text = _text(value)
+        if len(text) > NAME_MAX:
+            raise MapProblem(f"Eine weitere Schreibweise hat höchstens {NAME_MAX} Zeichen: „{text[:30]}…“.")
         if text and text.casefold() not in seen:
             seen.add(text.casefold())
             out.append(text)
-    return out[:ALIASES_MAX]
+    if len(out) > ALIASES_MAX:
+        raise MapProblem(f"Höchstens {ALIASES_MAX} weitere Schreibweisen je Map.")
+    return out
+
+
+def loose_key(value) -> str:
+    """Schlüssel wie im Ergebnisblatt (``teamKey``): ohne Akzente, klein, nur Buchstaben und Ziffern - „Nebel-Werk“,
+    „nebel werk“ und „nebelwerk“ sind gleich."""
+    text = unicodedata.normalize("NFKD", _text(value))
+    return "".join(char.lower() for char in text if not unicodedata.combining(char) and char.isalnum())
 
 
 class GameMapCreate(BaseModel):
@@ -169,13 +182,25 @@ async def usage_counts(db, game_id: str) -> dict[str, int]:
 
 
 async def _check_unique(db, game_id: str, *, name: str | None = None, slug: str | None = None,
-                        current_id: str | None = None) -> None:
-    others = [row for row in await db.game_maps.find({"game_id": game_id}, {"_id": 0, "id": 1, "name": 1, "slug": 1})
-              .to_list(MAPS_PER_GAME_MAX + 50) if row.get("id") != current_id]
+                        aliases: list[str] | None = None, current_id: str | None = None) -> None:
+    others = [row for row in await db.game_maps.find(
+        {"game_id": game_id}, {"_id": 0, "id": 1, "name": 1, "slug": 1, "aliases": 1})
+        .to_list(MAPS_PER_GAME_MAX + 50) if row.get("id") != current_id]
     if name is not None and any(name_key(row.get("name")) == name_key(name) for row in others):
         raise MapProblem(f"Die Map „{name}“ gibt es in diesem Spiel schon.", 409)
     if slug is not None and any(row.get("slug") == slug for row in others):
         raise MapProblem(SLUG_TAKEN.format(slug=slug), 409)
+    # Name und weitere Schreibweisen führen je Spiel zu genau einer Map - so, wie das Ergebnisblatt sie zuordnet
+    # (``loose_key``): auch nicht über Name, Slug oder Schreibweise einer anderen Map.
+    taken: dict[str, str] = {}
+    for row in others:
+        for text in (row.get("name"), row.get("slug"), *(row.get("aliases") or [])):
+            if loose_key(text):
+                taken.setdefault(loose_key(text), row.get("name") or "")
+    for text in ([name] if name else []) + list(aliases or []):
+        owner = taken.get(loose_key(text))
+        if owner:
+            raise MapProblem(f"„{text}“ führt schon zur Map „{owner}“ - jede Schreibweise nur einmal je Spiel.", 409)
 
 
 async def create(db, game: dict, body: GameMapCreate, user: dict, new_id: str) -> dict:
@@ -183,12 +208,13 @@ async def create(db, game: dict, body: GameMapCreate, user: dict, new_id: str) -
     if count >= MAPS_PER_GAME_MAX:
         raise MapProblem(f"Höchstens {MAPS_PER_GAME_MAX} Maps je Spiel - archivierte zählen mit.")
     slug = slugify(body.slug or body.name, fallback="map", max_length=SLUG_MAX)
-    await _check_unique(db, game["id"], name=body.name, slug=slug)
+    aliases = clean_aliases(body.aliases, body.name)
+    await _check_unique(db, game["id"], name=body.name, slug=slug, aliases=aliases)
     last = await db.game_maps.find_one({"game_id": game["id"]}, {"_id": 0, "order": 1}, sort=[("order", -1)])
     now = now_utc().isoformat()
     doc = {
         "id": new_id, "game_id": game["id"], "slug": slug, "name": body.name,
-        "aliases": clean_aliases(body.aliases, body.name), "image_url": clean_image(body.image_url), "note": body.note,
+        "aliases": aliases, "image_url": clean_image(body.image_url), "note": body.note,
         "external_ref": body.external_ref, "modes": clean_modes(game, body.modes),
         "order": int((last or {}).get("order") or 0) + 1, "status": "active", "archived_at": None,
         "created_at": now, "created_by": user["id"], "updated_at": now, "updated_by": user["id"],
@@ -214,6 +240,10 @@ async def update(db, game: dict, current: dict, body: GameMapUpdate, user: dict)
             updates["slug"] = slug
     if "image_url" in raw:
         updates["image_url"] = clean_image(raw["image_url"])
+        old = current.get("image_url")
+        if old and old != updates["image_url"]:
+            # Frühere Bilder bleiben verwendet (Mediathek): gespeicherte Spiele zeigen die Map wie damals.
+            updates["image_history"] = list(dict.fromkeys([*(current.get("image_history") or []), old]))
     for key in ("note", "external_ref"):
         if key in raw:
             updates[key] = raw[key]
@@ -221,6 +251,7 @@ async def update(db, game: dict, current: dict, body: GameMapUpdate, user: dict)
         updates["modes"] = clean_modes(game, raw["modes"])
     if raw.get("aliases") is not None:
         updates["aliases"] = clean_aliases(raw["aliases"], updates.get("name") or current.get("name"))
+        await _check_unique(db, game["id"], aliases=updates["aliases"], current_id=current["id"])
     status = raw.get("status")
     if status and status != current.get("status"):
         updates["status"] = status
@@ -248,8 +279,19 @@ async def reorder(db, game: dict, ids: list[str], user: dict) -> list[dict]:
     return [public_map(row) for row in await maps_of(db, game["id"])]
 
 
+async def in_results(db, map_id: str) -> bool:
+    """Steht die Map in einem gespeicherten Ergebnisblatt der Team-Liga (Blatt, Entwurf daneben oder alter Stand)?
+    Über die Indizes aus database.py - nur beim Löschen gefragt."""
+    query = {"$or": [{"matches.maps.map_id": map_id}, {"pending_draft.matches.maps.map_id": map_id}]}
+    if await db.reference_round_results.find_one(query, {"_id": 1}):
+        return True
+    return bool(await db.reference_round_result_revisions.find_one({"content.matches.maps.map_id": map_id}, {"_id": 1}))
+
+
 async def delete(db, game: dict, current: dict) -> None:
     used = (await usage_counts(db, game["id"])).get(current["id"], 0)
     if used:
         raise MapProblem("Diese Map steht in einem gespeicherten Map-Pool - bitte archivieren statt löschen.", 409)
+    if await in_results(db, current["id"]):
+        raise MapProblem("Diese Map steht in einem gespeicherten Spiel - bitte archivieren statt löschen.", 409)
     await db.game_maps.delete_one({"id": current["id"]})
