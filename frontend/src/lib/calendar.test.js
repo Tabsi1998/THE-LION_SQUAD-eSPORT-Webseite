@@ -32,6 +32,19 @@ test("ein mehrtägiger Termin steht an jedem Tag, offene Enden werden gekappt", 
   expect(dayKey(new Date(2026, 0, 5))).toBe("2026-01-05");
 });
 
+test("die Termine eines Tages stehen nach Zeitpunkt, nicht nach Text (#1567)", () => {
+  const map = itemsByDay([
+    // 09:00 UTC steht der Schreibweise nach vorn, ist aber später als 10:00+02:00 (= 08:00 UTC).
+    { id: "spaet", kind: "event", title: "B", start: "2026-07-03T09:00:00Z" },
+    { id: "frueh", kind: "event", title: "A", start: "2026-07-03T10:00:00+02:00" },
+    // Winterzeit: 10:30+01:00 ist 09:30 UTC, also vor 10:00 UTC.
+    { id: "winter-spaet", kind: "event", title: "D", start: "2026-12-03T10:00:00Z" },
+    { id: "winter-frueh", kind: "event", title: "C", start: "2026-12-03T10:30:00+01:00" },
+  ]);
+  expect(map.get("2026-07-03")?.map((item) => item.id)).toEqual(["frueh", "spaet"]);
+  expect(map.get("2026-12-03")?.map((item) => item.id)).toEqual(["winter-frueh", "winter-spaet"]);
+});
+
 test("ein Termin steht am Wiener Tag und der Tag heißt, wie er im Raster steht", () => {
   const map = itemsByDay([
     { id: "nacht", kind: "event", title: "Nachtcup", start: "2026-10-04T00:30:00+02:00" },

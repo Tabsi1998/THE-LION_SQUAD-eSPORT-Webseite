@@ -44,6 +44,8 @@ from services.image_upload import (  # noqa: F401 - umgezogen (#1420), hier weit
     _resize_for_storage,
     _encode_image_bytes,
     _detect_video_upload,
+    SVG_REFUSED_MESSAGE,
+    looks_like_svg,
 )
 from services.image_variants import schedule_variants
 from services.permissions import MFA_MESSAGE, admin_role_without_second_factor, is_confirmed_admin_role
@@ -332,6 +334,8 @@ async def _upload_image_impl(
     declared_content_type = file.content_type or ""
     suffix = pathlib.Path(file.filename or "").suffix.lower()
     filename_hint = file.filename or "upload"
+    if looks_like_svg(suffix, declared_content_type):
+        raise HTTPException(status_code=400, detail=SVG_REFUSED_MESSAGE)
     if declared_content_type and declared_content_type not in ALLOWED_IMAGE and suffix not in IMAGE_MIME_BY_EXT:
         raise HTTPException(
             status_code=400,
@@ -629,6 +633,8 @@ async def upload_media(
             result = await _upload_video_impl(file, me, media_scope=scope_for_log)
         elif kind == "file":
             result = await _upload_original_file_impl(file, me, media_scope=scope_for_log)
+        elif looks_like_svg(pathlib.Path(file.filename or "").suffix, file.content_type or ""):
+            raise HTTPException(status_code=400, detail=SVG_REFUSED_MESSAGE)
         else:
             raise HTTPException(status_code=400, detail=f"Nur PNG/JPG/WebP, {SUPPORTED_VIDEO_LABEL} oder Originaldateien ({ORIGINAL_MEDIA_LABEL}) erlaubt.")
     except HTTPException as exc:
@@ -881,6 +887,8 @@ async def upload_document(request: Request, file: UploadFile = File(...), me: di
                 with Image.open(BytesIO(data)) as img:
                     img.verify()
             except UnidentifiedImageError:
+                if looks_like_svg(pathlib.Path(file.filename or "").suffix, "", data):
+                    raise HTTPException(status_code=400, detail=SVG_REFUSED_MESSAGE)
                 raise HTTPException(status_code=400, detail="Ungültige Bilddatei")
         # Extension by mime, fallback to original name extension
         ext = _EXT_BY_MIME.get(file.content_type)

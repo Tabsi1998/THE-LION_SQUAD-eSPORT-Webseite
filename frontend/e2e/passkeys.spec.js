@@ -139,3 +139,17 @@ test("a passkey created after the password login is discoverable and signs in wi
   expect(signedIn[0].credential.response.userHandle).toBe(userHandle);
   await session.send("WebAuthn.removeVirtualAuthenticator", { authenticatorId });
 });
+
+// #1242: scheitert der stille Vorschlag im E-Mail-Feld (hier: die Optionen kommen nicht an), steht keine rote Meldung
+// auf der Seite - der Knopf „Mit Passkey anmelden“ bleibt da.
+test("a failing silent passkey suggestion shows no error message", async ({ page, context, browserName, baseURL }) => {
+  test.skip(browserName !== "chromium", "The virtual WebAuthn authenticator requires Chromium CDP.");
+  const { session, authenticatorId, identifier } = await virtualPasskey(page, context);
+  await mockApi(page, identifier, []);
+  await page.route("**/api/auth/passkeys/login/options", (route) => route.fulfill({ status: 500, contentType: "application/json", body: '{"detail":"kaputt"}' }));
+  await openLogin(page, baseURL);
+  await expect(page.getByTestId("login-passkey")).toBeVisible();
+  await page.waitForTimeout(500);
+  await expect(page.locator("#login-error")).toHaveCount(0);
+  await session.send("WebAuthn.removeVirtualAuthenticator", { authenticatorId });
+});

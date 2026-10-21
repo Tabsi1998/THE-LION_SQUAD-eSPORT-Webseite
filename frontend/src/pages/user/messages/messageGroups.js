@@ -37,7 +37,7 @@ export function buildTimeline(messages, meId, now = new Date()) {
       lastDay = day;
       previous = null;
     }
-    const previousStamp = previous ? new Date(previous.created_at || 0).getTime() : null;
+    const previousStamp = previous ? asInstant(previous.created_at || 0).getTime() : null;
     const sameSender = previous && previous.sender_id === message.sender_id;
     const closeInTime = previousStamp !== null && stamp - previousStamp <= GROUP_WINDOW_MS;
     items.push({
@@ -52,10 +52,17 @@ export function buildTimeline(messages, meId, now = new Date()) {
   return items;
 }
 
+// Der Zeitpunkt einer Nachricht (#1049): wie bei Kopf und Uhrzeit mit asInstant gelesen, nie als Text verglichen.
+// Ungültige oder fehlende Werte stehen ganz vorn.
+function instantOf(row) {
+  const time = asInstant(row?.created_at || 0).getTime();
+  return Number.isNaN(time) ? -Infinity : time;
+}
+
 function sortByTime(rows) {
   return [...rows].sort((a, b) => {
-    const at = String(a.created_at || "");
-    const bt = String(b.created_at || "");
+    const at = instantOf(a);
+    const bt = instantOf(b);
     if (at !== bt) return at < bt ? -1 : 1;
     return String(a.id).localeCompare(String(b.id));
   });
@@ -67,10 +74,10 @@ function sortByTime(rows) {
 export function mergeMessages(existing, incoming) {
   const known = new Map((existing || []).map((row) => [row.id, row]));
   let appended = 0;
-  const lastKnownStamp = existing && existing.length ? String(existing[existing.length - 1].created_at || "") : "";
+  const lastKnownStamp = existing && existing.length ? instantOf(existing[existing.length - 1]) : null;
   for (const row of incoming || []) {
     if (!known.has(row.id)) {
-      if (String(row.created_at || "") > lastKnownStamp || !lastKnownStamp) appended += 1;
+      if (lastKnownStamp === null || instantOf(row) > lastKnownStamp) appended += 1;
     }
     known.set(row.id, row);
   }

@@ -6,9 +6,12 @@ from types import SimpleNamespace
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 
+import pytest
+from fastapi import HTTPException
 from PIL import Image
 
 from routes import upload_routes
+from services import image_upload
 
 
 class FakeUpload:
@@ -160,3 +163,59 @@ def test_original_tiff_upload_is_converted_to_webp(monkeypatch, tmp_path):
     with Image.open(tmp_path / result["filename"]) as img:
         assert img.format == "WEBP"
         assert img.size == (32, 18)
+
+
+SVG_BODY = b'<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"><rect width="10" height="10"/></svg>'
+
+
+def _refusal(upload):
+    with pytest.raises(HTTPException) as caught:
+        asyncio.run(upload_routes._upload_image_impl(upload, {"id": "admin-1", "role": "admin"}))
+    assert caught.value.status_code == 400
+    return caught.value.detail
+
+
+def test_svg_upload_gets_a_clear_message_by_suffix_type_and_content():
+    # Endung und Typ, Endung allein, Typ allein, nur der Inhalt (Browser meldet PNG) - überall dieselbe Meldung (#1419).
+    for upload in (
+        FakeUpload("logo.svg", "image/svg+xml", SVG_BODY),
+        FakeUpload("logo.svg", "image/png", SVG_BODY),
+        FakeUpload("logo", "image/svg+xml", SVG_BODY),
+        FakeUpload("logo.png", "image/png", SVG_BODY),
+        FakeUpload("logo.png", "image/png", b"\xef\xbb\xbf  <?xml version=\"1.0\"?><svg/>"),
+    ):
+        assert _refusal(upload) == image_upload.SVG_REFUSED_MESSAGE
+    assert "SVG" in image_upload.SVG_REFUSED_MESSAGE and "PNG" in image_upload.SVG_REFUSED_MESSAGE
+
+
+def test_other_broken_images_keep_their_old_message_and_real_images_still_pass():
+    assert _refusal(FakeUpload("kaputt.png", "image/png", b"das ist kein bild")) == "Ungültige Bilddatei"
+    assert image_upload.looks_like_svg(".png", "image/png", b"\x89PNG\r\n") is False
+    for ext, fmt in ((".png", "PNG"), (".jpg", "JPEG"), (".webp", "WEBP")):
+        source = BytesIO()
+        Image.new("RGB", (8, 8), "#29B6E8").save(source, format=fmt)
+        encoded = image_upload._encode_image_bytes(source.getvalue(), "", ext, "bild" + ext)
+        assert encoded["data"]
+
+
+def test_disguised_svg_is_found_after_comment_doctype_long_prelude_prefix_and_bom():
+    body = b'<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"><rect width="10" height="10"/></svg>'
+    disguised = {
+        "Kommentar": b"<!-- von Hand gemacht -->" + body,
+        "XML und Kommentar": b'<?xml version="1.0"?>\n<!-- c -->\n' + body,
+        "DOCTYPE": b'<?xml version="1.0"?><!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">' + body,
+        "langes Vorspiel": b"<!-- " + b"x" * 3000 + b" -->" + body,
+        "Namensraum-Praefix": b'<svg:svg xmlns:svg="http://www.w3.org/2000/svg" width="10"></svg:svg>',
+        "Grossbuchstaben": b"<SVG width=\"10\"></SVG>",
+        "BOM": b"\xef\xbb\xbf" + body,
+        "BOM und Kommentar": b"\xef\xbb\xbf  <!-- c -->" + body,
+        "Text vor dem Element": b"<html><body>" + body + b"</body></html>",
+    }
+    for name, data in disguised.items():
+        assert _refusal(FakeUpload("logo.png", "image/png", data)) == image_upload.SVG_REFUSED_MESSAGE, name
+    # Kein SVG: Rasterformate und anderer Text bleiben bei der alten Meldung.
+    assert image_upload.looks_like_svg(".png", "image/png", b"\x89PNG\r\n\x1a\n<svg") is False
+    assert image_upload.looks_like_svg(".jpg", "image/jpeg", b"\xff\xd8\xff\xe0<svg") is False
+    assert image_upload.looks_like_svg(".png", "image/png", b"<html><body>hallo</body></html>") is False
+    assert image_upload.looks_like_svg(".png", "image/png", b"<!-- offen") is False
+    assert _refusal(FakeUpload("kaputt.png", "image/png", b"<html></html>")) == "Ungültige Bilddatei"

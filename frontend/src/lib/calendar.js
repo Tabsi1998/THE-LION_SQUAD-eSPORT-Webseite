@@ -94,7 +94,7 @@ export function itemsByDay(items) {
       map.set(key, list);
     }
   }
-  for (const list of map.values()) list.sort((a, b) => a.start.localeCompare(b.start));
+  for (const list of map.values()) list.sort(byStart);
   return map;
 }
 

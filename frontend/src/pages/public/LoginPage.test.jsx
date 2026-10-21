@@ -249,17 +249,19 @@ test("endet der Vorschlag von selbst, verschwindet der Hinweis am Feld; der Knop
   expect(screen.getByTestId("login-passkey")).toBeInTheDocument();
 });
 
-test("nach einer Server-Ablehnung startet der Vorschlag erst wieder beim Fokus aufs Feld – höchstens einmal", async () => {
+test("nach einer Server-Ablehnung des stillen Vorschlags steht keine Meldung; er startet erst beim Fokus wieder – höchstens einmal (#1242)", async () => {
   autofillStarted();
   const user = userEvent.setup();
   renderPage();
   await waitFor(() => expect(passkeys.startPasskeyAutofill).toHaveBeenCalledTimes(1));
   act(() => {
-    autofillArgs().onError(new Error("Diesen Passkey kennt der Server nicht."));
+    autofillArgs().onError?.(new Error("Diesen Passkey kennt der Server nicht."));
     autofillArgs().onEnd();
   });
   expect(await screen.findByTestId("login-passkey")).toBeInTheDocument();
-  expect(screen.getByText("Diesen Passkey kennt der Server nicht.")).toBeInTheDocument();
+  // Der stille Vorschlag zeigt nie eine Meldung (#1242); Fehler gibt es nur nach einem Klick auf den Knopf.
+  expect(screen.queryByText("Diesen Passkey kennt der Server nicht.")).not.toBeInTheDocument();
+  expect(screen.queryByTestId("login-error")).not.toBeInTheDocument();
   expect(passkeys.startPasskeyAutofill).toHaveBeenCalledTimes(1);
 
   await user.click(screen.getByTestId("login-email"));
@@ -310,4 +312,39 @@ test("ein fremdes Ziel führt nach dem Anmelden zum Dashboard", async () => {
   expect(screen.queryByTestId("login-purpose")).toBeNull();
   await fillAndSubmit(user);
   await waitFor(() => expect(screen.getByText("dashboard")).toBeInTheDocument());
+});
+
+// „← Zurück zur Website“ (#1242): zur Seite, von der man kam, sonst zur Startseite.
+test("„Zurück zur Website“ führt ohne Vorseite zur Startseite", async () => {
+  render(
+    <MemoryRouter initialEntries={["/login"]}>
+      <Routes>
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/" element={<div>startseite</div>} />
+      </Routes>
+    </MemoryRouter>
+  );
+  await userEvent.setup().click(screen.getByTestId("login-back"));
+  expect(await screen.findByText("startseite")).toBeInTheDocument();
+});
+
+test("„Zurück zur Website“ führt zur Seite, von der man kam", async () => {
+  render(
+    <MemoryRouter initialEntries={["/news", "/login"]} initialIndex={1}>
+      <Routes>
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/news" element={<div>newsseite</div>} />
+        <Route path="/" element={<div>startseite</div>} />
+      </Routes>
+    </MemoryRouter>
+  );
+  await userEvent.setup().click(screen.getByTestId("login-back"));
+  expect(await screen.findByText("newsseite")).toBeInTheDocument();
+});
+
+// Überall „Anmelden“ (#1242): Überschrift, Knopf und der Weg über Google.
+test("Überschrift, Knopf und Google-Weg heißen Anmelden", async () => {
+  renderPage();
+  expect(await screen.findByRole("heading", { level: 1, name: "Anmelden" })).toBeInTheDocument();
+  expect(screen.getByTestId("login-submit")).toHaveTextContent("Anmelden");
 });

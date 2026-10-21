@@ -78,7 +78,7 @@ test("MFA supports recovery-code letters and clean restart after expired challen
   await code.fill("ABCD-EFGH");
   await page.getByTestId("login-mfa-submit").click();
   await expect(page.locator("#login-error")).toContainText("abgelaufen");
-  await page.getByRole("button", { name: "Zurück zum Login" }).click();
+  await page.getByRole("button", { name: "Zurück zur Anmeldung" }).click();
   await expect(page.getByTestId("login-email")).toBeVisible();
   await expect(page.locator("#login-error")).toHaveCount(0);
   expect(await page.evaluate(() => sessionStorage.getItem("tls.mfa.ticket"))).toBeNull();
