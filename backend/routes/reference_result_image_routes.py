@@ -46,8 +46,9 @@ warnings}`` (``services/result_image_table.py``).
   (``hint`` „wie in Saison X“). Ebenso die Teams: bekannt sind die eigenen Teams, die Standard-Teams der Teilnehmer
   und die Teams der Blätter dieser Saison; Teams anderer Saisons der Spur nur mit Hinweis. Gelernte Schreibweisen
   (``read_aliases`` am Teilnehmer, ``read_team_aliases`` an der Saison, beim Übernehmen gelernt) zählen wie Namen.
-- **Datenschutz:** Aliase der Mitglieder und der Kader anderer Saisons helfen beim Wiedererkennen nur, wenn der Vorstand
-  liest (wie in #1743); Captains bekommen nur, was sie im Blatt ohnehin sehen (Name und Kennung der Teilnehmer).
+- **Datenschutz:** Aliase der Mitglieder und der Kader anderer Saisons (Teilnehmer, Teams, gelernte Schreibweisen)
+  helfen beim Wiedererkennen nur, wenn der Vorstand liest (wie in #1743); Captains bekommen nur, was sie im Blatt
+  ohnehin sehen (Name und Kennung der Teilnehmer, Teams ihrer Saison).
 - Meldungen sind feste Texte, nie aus einer Ausnahme gebaut. Lesen und Abgleich: ``services/result_image_ocr.py`` und
   ``services/result_image_match.py``, Vorlagen: ``services/result_image_templates.py``.
 """
@@ -462,7 +463,9 @@ async def read_result_image(series_id: str, round_id: str, request: Request,
     track = await _track(db, seasons) if access.is_board else []
     # Ein Alias zeigt zuerst auf den Teilnehmer dieser Saison (die spätere Zuordnung gewinnt in ``_aliases``).
     aliases = await _aliases(db, access.series, [*track, *participants]) if access.is_board else []
-    teams, track_teams, team_aliases = await _known_teams(db, access.series, seasons)
+    # Teams und gelernte Schreibweisen anderer Saisons ebenso nur für den Vorstand (Prüfer zu #2012) - Captains
+    # bekommen nur die ihrer Saison.
+    teams, track_teams, team_aliases = await _known_teams(db, access.series, seasons if access.is_board else [])
     built = result_image_match.build(reading, template, participants, aliases=aliases,
                                      no_team_names=_no_team_names(access.series), track=track, teams=teams,
                                      track_teams=track_teams, team_aliases=team_aliases)

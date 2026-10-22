@@ -210,8 +210,9 @@ async def test_aliases_help_only_the_board(flow, fake_ocr):
 async def test_roster_of_the_whole_lineage_helps_but_stays_yellow(flow, fake_ocr):
     """Kader der ganzen Spur (#2012): Namen und Teams aus einer anderen Saison derselben Spur werden vorgeschlagen -
     ohne Kennung, gelb, mit „wie in Saison …“. Wer in dieser Saison steht, zählt zuerst; ausgeblendete Namen helfen nie.
-    Der Kader anderer Saisons hilft nur dem Vorstand (wie Aliase), Teams auch Captains. Gelernte Schreibweisen am
-    Teilnehmer bzw. an der Saison zählen wie Namen."""
+    Der Kader anderer Saisons hilft nur dem Vorstand (wie Aliase) - auch die Teams anderer Saisons (Prüfer zu #2012:
+    Captains sehen sonst Teams fremder Saisons). Gelernte Schreibweisen am Teilnehmer bzw. an der Saison zählen wie
+    Namen."""
     ctx = await _setup(flow)
     other_id = ctx["other"]["id"]
 
@@ -233,8 +234,9 @@ async def test_roster_of_the_whole_lineage_helps_but_stays_yellow(flow, fake_ocr
     assert (hidden["name"], hidden["participant_id"], hidden["hint"].get("name")) == ("Geheim Name", None, None)
     assert (bert["participant_id"], bert["uncertain"]) == (ctx["ids"]["Bert Bolzt"], [])
     flow.act_as(ctx["captain"])
+    fake_ocr.reading.rows[0].cells["team"] = Read("Altes Tem", 95, [("Altes", 95), ("Tem", 95)])
     emil = (await flow.post(ctx["url"], content=_png(), headers=PNG)).json()["rows"][0]
-    assert (emil["name"], emil["hint"]) == ("Emil Ek", {"team": "wie in Saison 2027"})
+    assert (emil["name"], emil["team"], emil["hint"]) == ("Emil Ek", "Altes Tem", {})  # nur, was im Bild stand
 
 
 @pytest.mark.asyncio
