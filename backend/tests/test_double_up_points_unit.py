@@ -177,4 +177,5 @@ def test_the_organizers_season_table_comes_out_with_the_same_totals_and_places()
     # Bingo zählt getrennt; Aktivität erst ab Turnier 7.
     assert by_id["s06"]["bonus_points"] == 3 and all(row["activity_points"] == 0 for row in rows)
     # 20 Punkte: zweimal Team-Platz 3 (Top 4) vor einem Einzelplatz 5; 17 Punkte: Team-Platz 6 vor Platz 10.
-    assert (by_id["s16"]["tiebreak"], by_id["s18"]["tiebreak"], by_id["s21"]["tiebreak"]) == (None, "top_n", "countback")
+    tiebreaks = (by_id["s16"]["tiebreak"], by_id["s18"]["tiebreak"], by_id["s21"]["tiebreak"])
+    assert tiebreaks == (None, "top_n", "countback")

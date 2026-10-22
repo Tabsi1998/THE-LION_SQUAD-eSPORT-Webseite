@@ -52,8 +52,8 @@ async def _calendar(flow, series):
 
 async def _paste(flow, series, text, apply=True):
     calendar = await _calendar(flow, series)
-    response = await flow.post(f"{_rounds(series)}/paste", json={"text": text, "apply": apply,
-                                                                  "expected_version": calendar["version"]})
+    body = {"text": text, "apply": apply, "expected_version": calendar["version"]}
+    response = await flow.post(f"{_rounds(series)}/paste", json=body)
     assert response.status_code == 200, response.text
     return response.json()
 

@@ -66,8 +66,8 @@ async def test_old_double_up_seasons_keep_team_place_and_their_table(flow):
     old = await _season(db, "alt", _sheet("alt", DOUBLE))
     await _season(db, "einzel", {"rows": [{"participant_id": "einzel-a", "place": 1, "marks": []}]})
     await _season(db, "leer", None)
-    await _season(db, "gewaehlt", _sheet("gewaehlt", DOUBLE), {"points_by_place": SCHEME,
-                                                                  "double_up_points": "best_player_place"})
+    chosen = {"points_by_place": SCHEME, "double_up_points": "best_player_place"}
+    await _season(db, "gewaehlt", _sheet("gewaehlt", DOUBLE), chosen)
     draft = _sheet("entwurf", DOUBLE)
     await _season(db, "entwurf", {"rows": [], "pending_draft": {**draft, "double_up": True}})
 
