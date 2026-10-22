@@ -5,6 +5,7 @@ import { SelectField, TextField } from "@/components/tls/FormFields";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { toast } from "sonner";
 import { Trash2 } from "lucide-react";
+import { LearnedSpellings } from "./LearnedSpellings";
 
 // Teilnehmer bearbeiten (#1929): Name wie beim Veranstalter, Startnummer, Standard-Team und die Zuordnung (Mitglied mit
 // Profil, Gast, Extern). Geschickt wird nur, was sich geändert hat – Name, Nummer und Team über PATCH, die Zuordnung
@@ -27,7 +28,14 @@ export function fieldChanges(row, form) {
     const next = value.trim() || null;
     if (next !== (row[key] || null)) out[key] = next;
   }
+  // Gelernte Schreibweisen aus Bildern (#2012): nur entfernen - es gehen die bleibenden mit.
+  const learned = learnedNames(row);
+  if (form.read_aliases && form.read_aliases.length !== learned.length) out.read_aliases = form.read_aliases;
   return out;
+}
+
+function learnedNames(row) {
+  return (row.read_aliases || []).map((item) => item?.name).filter(Boolean);
 }
 
 /** Die neue Zuordnung oder `null`, wenn sie bleibt. Mitglied ohne Profil ist noch keine. */
@@ -44,7 +52,7 @@ export function ParticipantEditSheet({ series, row, profiles = [], onClose, onSa
   const confirm = useConfirm();
   const [form, setForm] = useState(() => ({
     name: row.name || "", start_number: row.start_number || "", default_team: row.default_team || "", current_team: row.current_team || "",
-    link: currentLink(row), profile_id: row.profile_id || "",
+    link: currentLink(row), profile_id: row.profile_id || "", read_aliases: learnedNames(row),
   }));
   const [saving, setSaving] = useState(false);
   const set = (key) => (value) => setForm((previous) => ({ ...previous, [key]: value }));
@@ -130,6 +138,10 @@ export function ParticipantEditSheet({ series, row, profiles = [], onClose, onSa
         )}
         <p className="text-xs text-white/55 leading-relaxed">{LINK_HINT} {ALIAS_HINT}</p>
       </div>
+      <LearnedSpellings items={form.read_aliases.map((name) => ({ key: name, label: name }))}
+        removed={learnedNames(row).length - form.read_aliases.length} testId="participant-edit-read-aliases"
+        onRemove={(name) => set("read_aliases")(form.read_aliases.filter((item) => item !== name))}
+        hint="So stand der Name in Ergebnis-Bildern, bevor ihr ihn im Blatt korrigiert habt – die Bild-Erkennung erkennt ihn daran wieder." />
       {row.in_results && (
         <p className="text-xs text-white/55 leading-relaxed" data-testid="participant-edit-in-results">
           Steht in Ergebnissen dieser Saison und lässt sich deshalb nicht entfernen. Doppelt angelegt? Wählt beide in der Liste aus und führt sie zusammen.
