@@ -19,6 +19,8 @@ Bündeln und Zurücknehmen laufen nacheinander (eine Sperre für alle Bündelung
 """
 from __future__ import annotations
 
+import hashlib
+import json
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -43,10 +45,23 @@ LINK_CHANGED = "Eine Referenz wurde gerade einer Saison zugeordnet. Bitte den Vo
 ALREADY_UNDONE = "Diese Bündelung ist schon zurückgenommen."
 NOT_FOUND = "Bündelung nicht gefunden."
 LIST_LIMIT = 50
-# Was eine Saison enthält, wenn sie seit der Bündelung jemand befüllt hat - dann bleibt sie beim Zurücknehmen stehen.
+
+
 def _season_data(db) -> tuple:
-    return (db.reference_rounds, db.reference_participants, db.reference_round_results, db.reference_standings,
-            db.reference_series_staff)
+    """Sammlungen mit ``series_id``, in die jemand eine Saison seit der Bündelung befüllt haben kann - Termine,
+    Teilnehmer, Ergebnisblätter samt Entwürfen und Revisionen, Stände, Captains, Original-Bilder, Aliase. Steht dort
+    etwas, bleibt die Saison beim Zurücknehmen stehen."""
+    return (db.reference_rounds, db.reference_participants, db.reference_round_results,
+            db.reference_round_result_revisions, db.reference_standings, db.reference_series_staff,
+            db.reference_round_originals, db.reference_aliases)
+
+
+def fingerprint(doc: dict) -> str:
+    """Fingerabdruck eines Dokuments, wie die Bündelung es angelegt hat: alle Felder (ohne ``_id``). Schreibt seither
+    jemand etwas hinein - auch ohne ``updated_at`` (Partner-Quelle, Teamfarben, Anpassungen, Partner der Saison) -,
+    stimmt er nicht mehr."""
+    clean = {key: value for key, value in doc.items() if key != "_id"}
+    return hashlib.sha256(json.dumps(clean, sort_keys=True, default=str).encode("utf-8")).hexdigest()
 
 
 class ReferenceBundleCreate(BaseModel):
@@ -90,7 +105,8 @@ async def create_bundle(body: ReferenceBundleCreate, me: dict = Depends(require_
     return await _locked(db, lambda: _bundle(db, body, me))
 
 
-async def _create_lineage(db, view: dict, body: ReferenceBundleCreate, me: dict, bundle_id: str) -> dict:
+async def _create_lineage(db, view: dict, body: ReferenceBundleCreate, me: dict, bundle_id: str,
+                          lineage_id: str) -> dict:
     title = reference_bundles.text(body.lineage_title) or view["title"] or "Serie"
     game_id = view.get("game_id")
     if game_id and not await db.games.find_one({"id": game_id}, {"_id": 1}):
@@ -102,14 +118,14 @@ async def _create_lineage(db, view: dict, body: ReferenceBundleCreate, me: dict,
     await series_partners.clean(db, doc)
     doc["slug"] = await unique_slug(db.reference_lineages, title, fallback=SLUG_FALLBACK)
     now = now_utc().isoformat()
-    doc.update({"id": new_id(), "slug_history": [], "is_archived": False, "archived_at": None, "created_at": now,
+    doc.update({"id": lineage_id, "slug_history": [], "is_archived": False, "archived_at": None, "created_at": now,
                 "created_by": me["id"], **_stamp(me), "bundle_id": bundle_id})
     await db.reference_lineages.insert_one(doc)
     doc.pop("_id", None)
     return doc
 
 
-async def _create_season(db, lineage_id: str, season: dict, me: dict, bundle_id: str) -> dict:
+async def _create_season(db, lineage_id: str, season: dict, me: dict, bundle_id: str, series_id: str) -> dict:
     """Neue Saison - leer: Standard-Regeln, keine Termine, keine Ergebnisse; nur Status, Sichtbarkeit und eigene Teams
     aus den Referenzen. Mit genau einer Referenz ist sie deren Saison-Referenz."""
     refs = season["reference_ids"]
@@ -122,7 +138,7 @@ async def _create_season(db, lineage_id: str, season: dict, me: dict, bundle_id:
     doc.update(_teams(doc.get("own_teams"), doc.get("team_name")))
     now = now_utc().isoformat()
     doc.update({
-        "id": new_id(), "lineage_id": lineage_id,
+        "id": series_id, "lineage_id": lineage_id,
         "season_slug": await _season_slug(db, lineage_id, doc["season"], doc.get("tier")), "season_slug_history": [],
         "rules_version": 1, "rules_note": None, "rules_changed_at": None, "rules_changed_by": None, "rules_history": [],
         "archived_at": None, "archived_from": None, "created_at": now, "created_by": me["id"], **_stamp(me),
@@ -140,42 +156,47 @@ async def _bundle(db, body: ReferenceBundleCreate, me: dict) -> dict:
         raise HTTPException(409, GROUP_GONE)
     bundle_id = new_id()
     view = group["lineage"]
-    created_lineage = None if view["id"] else await _create_lineage(db, view, body, me, bundle_id)
-    lineage_id = view["id"] or created_lineage["id"]
-    created: list[dict] = []
-    targets: dict[str, str] = {}
-    for season in group["seasons"]:
-        series_id = season["id"]
-        if not series_id:
-            doc = await _create_season(db, lineage_id, season, me, bundle_id)
-            created.append({"id": doc["id"], "updated_at": doc["updated_at"]})
-            series_id = doc["id"]
-        for rid in season["reference_ids"]:
-            targets[rid] = series_id
-    before = {item["id"]: item.get("visibility") or "public"
-              async for item in db.references.find({"id": {"$in": list(targets)}}, {"_id": 0, "id": 1, "visibility": 1})}
-    now = now_utc().isoformat()
+    lineage_id = view["id"] or new_id()
+    # Kennungen neuer Saisons vorab: erst alle Sperren holen, dann anlegen - ist eine Saison besetzt (409), ist noch
+    # nichts geschrieben.
+    plan = [(season, season["id"] or new_id()) for season in group["seasons"]]
+    targets = {rid: series_id for season, series_id in plan for rid in season["reference_ids"]}
     lock_ids = sorted(set(targets.values()))
+    created_lineage = None
+    created: list[dict] = []
     linked: list[str] = []
     tightened: list[str] = []
+    before: dict[str, str] = {}
+    now = now_utc().isoformat()
     async with reference_series.series_write_all(db, lock_ids):
-        for rid, series_id in targets.items():
-            written = await db.references.update_one({"id": rid, "series_id": {"$in": [None, ""]}},
-                                                     {"$set": {"series_id": series_id, "updated_at": now}})
-            if not written.modified_count:
-                break
-            linked.append(rid)
-        if len(linked) != len(targets):
-            # Inzwischen anders zugeordnet: alles zurück, nichts halb gebündelt.
+        try:
+            if not view["id"]:
+                created_lineage = await _create_lineage(db, view, body, me, bundle_id, lineage_id)
+            for season, series_id in plan:
+                if not season["id"]:
+                    doc = await _create_season(db, lineage_id, season, me, bundle_id, series_id)
+                    created.append({"id": series_id, "updated_at": doc["updated_at"], "fingerprint": fingerprint(doc)})
+            before = {item["id"]: item.get("visibility") or "public" async for item in db.references.find(
+                {"id": {"$in": list(targets)}}, {"_id": 0, "id": 1, "visibility": 1})}
+            for rid, series_id in targets.items():
+                written = await db.references.update_one({"id": rid, "series_id": {"$in": [None, ""]}},
+                                                         {"$set": {"series_id": series_id, "updated_at": now}})
+                if not written.modified_count:
+                    raise HTTPException(409, LINK_CHANGED)  # inzwischen anders zugeordnet
+                linked.append(rid)
+            for series_id in lock_ids:
+                _, ids = await season_close.tighten_references(db, series_id)
+                tightened += [rid for rid in ids if rid not in tightened]
+        except BaseException:
+            # Nichts halb gebündelt: Zuordnung und Sichtbarkeit zurück, Angelegtes wieder weg.
             for rid in linked:
-                await db.references.update_one({"id": rid, "series_id": targets[rid]}, {"$set": {"series_id": None}})
-            await db.reference_series.delete_many({"id": {"$in": [item["id"] for item in created]}})
+                await db.references.update_one({"id": rid, "series_id": targets[rid]}, {"$set": {
+                    "series_id": None, "visibility": before.get(rid, "public")}})
+            if created:
+                await db.reference_series.delete_many({"id": {"$in": [item["id"] for item in created]}})
             if created_lineage:
-                await db.reference_lineages.delete_one({"id": created_lineage["id"]})
-            raise HTTPException(409, LINK_CHANGED)
-        for series_id in lock_ids:
-            _, ids = await season_close.tighten_references(db, series_id)
-            tightened += [rid for rid in ids if rid not in tightened]
+                await db.reference_lineages.delete_one({"id": lineage_id})
+            raise
     after = {item["id"]: item.get("visibility") or "public"
              async for item in db.references.find({"id": {"$in": linked}}, {"_id": 0, "id": 1, "visibility": 1})}
     links = [{"reference_id": rid, "series_id": targets[rid], "visibility_before": before.get(rid),
@@ -183,7 +204,9 @@ async def _bundle(db, body: ReferenceBundleCreate, me: dict) -> dict:
     doc = {
         "id": bundle_id, "status": "active", "group_key": body.group_key, "lineage_id": lineage_id,
         "lineage_title": (created_lineage or view).get("title"), "lineage_created": bool(created_lineage),
-        "lineage_updated_at": (created_lineage or {}).get("updated_at"), "series_created": created, "links": links,
+        "lineage_updated_at": (created_lineage or {}).get("updated_at"),
+        "lineage_fingerprint": fingerprint(created_lineage) if created_lineage else None,
+        "series_created": created, "links": links,
         "linked": len(links), "tightened": tightened, "created_at": now, "created_by": me["id"],
         "undone_at": None, "undone_by": None, "result": None,
     }
@@ -206,15 +229,28 @@ async def undo_bundle(bundle_id: str, me: dict = Depends(require_area("content")
     return await _locked(db, lambda: _undo(db, bundle_id, me))
 
 
-async def _untouched(db, item: dict, bundled: set[str]) -> bool:
-    """Neu angelegte Saison seit der Bündelung unverändert und leer: gleicher Stand, keine Termine, Teilnehmer,
-    Ergebnisse, Stände oder Captains, keine andere Referenz."""
+async def _touched_elsewhere(db, target_id: str, since: str | None) -> bool:
+    """Hat seit der Bündelung jemand etwas an Saison bzw. Spur protokolliert (Partner-Quelle, Map-Pool, Anpassung …)?"""
+    return bool(await db.audit_logs.count_documents(
+        {"target_id": target_id, "created_at": {"$gte": since or ""}}, limit=1))
+
+
+async def _untouched(db, item: dict, bundled: set[str], since: str | None) -> bool:
+    """Neu angelegte Saison seit der Bündelung unverändert und leer - im Zweifel nicht: derselbe Fingerabdruck (kein
+    Feld dazu oder geändert), nichts in den Sammlungen der Saison, kein Map-Pool, kein Nachfolger-Verweis, kein Eintrag
+    im Protokoll, keine andere Referenz."""
     series = await db.reference_series.find_one({"id": item["id"]}, {"_id": 0})
-    if not series or series.get("updated_at") != item.get("updated_at"):
+    if not series or not item.get("fingerprint") or fingerprint(series) != item["fingerprint"]:
         return False
     for collection in _season_data(db):
         if await collection.count_documents({"series_id": item["id"]}, limit=1):
             return False
+    if await db.map_pools.count_documents({"scope": "reference_series", "scope_id": item["id"]}, limit=1):
+        return False
+    if await db.reference_series.count_documents({"successor_id": item["id"]}, limit=1):
+        return False
+    if await _touched_elsewhere(db, item["id"], since):
+        return False
     others = await db.references.count_documents({"series_id": item["id"], "id": {"$nin": list(bundled)}}, limit=1)
     owned = series.get("reference_id")
     return not others and (not owned or owned in bundled)
@@ -247,7 +283,7 @@ async def _undo(db, bundle_id: str, me: dict) -> dict:
     removed, kept, unlinked, stricter = [], [], [], []
     async with reference_series.series_write_all(db, lock_ids):
         for item in created:
-            if await _untouched(db, item, bundled):
+            if await _untouched(db, item, bundled, bundle.get("created_at")):
                 await db.reference_series.delete_one({"id": item["id"]})
                 removed.append(item["id"])
             elif await db.reference_series.find_one({"id": item["id"]}, {"_id": 1}):
@@ -270,9 +306,11 @@ async def _undo(db, bundle_id: str, me: dict) -> dict:
                 stricter.append(notice)
     lineage_removed = False
     if bundle.get("lineage_created"):
-        lineage = await db.reference_lineages.find_one({"id": bundle["lineage_id"]}, {"_id": 0, "updated_at": 1})
-        if lineage and lineage.get("updated_at") == bundle.get("lineage_updated_at") and \
-                not await db.reference_series.count_documents({"lineage_id": bundle["lineage_id"]}, limit=1):
+        lineage = await db.reference_lineages.find_one({"id": bundle["lineage_id"]}, {"_id": 0})
+        if lineage and bundle.get("lineage_fingerprint") and fingerprint(lineage) == bundle["lineage_fingerprint"] \
+                and not await db.reference_series.count_documents({"lineage_id": bundle["lineage_id"]}, limit=1) \
+                and not await db.reference_aliases.count_documents({"lineage_id": bundle["lineage_id"]}, limit=1) \
+                and not await _touched_elsewhere(db, bundle["lineage_id"], bundle.get("created_at")):
             await db.reference_lineages.delete_one({"id": bundle["lineage_id"]})
             lineage_removed = True
     result = {"unlinked": len(unlinked), "series_removed": len(removed), "series_kept": kept,

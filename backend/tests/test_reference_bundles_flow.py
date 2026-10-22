@@ -16,6 +16,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 from flow_harness import make_flow  # noqa: E402
 from services import migrations  # noqa: E402
 from services.dolibarr_policy import club_today  # noqa: E402
+from services.mutation_lock import mutation_lock, series_write_resource  # noqa: E402
 
 ADMIN = "/api/reference-series/admin"
 BUNDLES = f"{ADMIN}/bundles"
@@ -24,6 +25,7 @@ BUNDLES = f"{ADMIN}/bundles"
 @pytest_asyncio.fixture
 async def flow():
     instance, shutdown = make_flow()
+    await instance.db.mutation_locks.create_index("resource", unique=True)  # Sperren wie im Betrieb
     try:
         yield instance
     finally:
@@ -325,3 +327,46 @@ async def test_bundled_references_keep_their_address_and_seo(flow):
     for key in ("canonical", "url", "title", "description", "robots"):
         assert after_meta.get(key) == before_meta.get(key), key
     assert after_meta["canonical"].endswith("/references/ref-s1")
+
+
+# ---------------------------------------------------------------- Prüfer-Befunde: nichts mit Inhalt löschen, nichts halb
+@pytest.mark.asyncio
+async def test_undo_never_removes_a_season_filled_without_a_stamp(flow):
+    """Partner-Quelle (schreibt ohne ``updated_at``) und Map-Pool (eigene Sammlung) an den neuen Saisons: Rückgängig
+    löst nur die Zuordnung, die Saisons und ihre Spur bleiben stehen."""
+    await _board(flow)
+    await _legacy(flow)
+    group = _group(await _proposals(flow), "ref-s1", "ref-s2")
+    bundle = (await flow.post(BUNDLES, json={"group_key": group["key"], "reference_ids": ["ref-s1", "ref-s2"]})).json()
+    first, second = bundle["series_created"]
+    await flow.db.reference_series.update_one({"id": first}, {"$set": {"partner_source": {
+        "platform": "probe", "base_url": "https://example.test", "series_ref": "x1"}}})
+    await flow.db.map_pools.insert_one({"id": "pool-probe", "scope": "reference_series", "scope_id": second,
+                                        "version": 1, "maps": []})
+    result = (await flow.post(f"{BUNDLES}/{bundle['id']}/undo")).json()
+    assert (result["unlinked"], result["series_removed"], result["lineage_removed"]) == (2, 0, False)
+    assert sorted(result["series_kept"]) == sorted([first, second])
+    assert await flow.db.reference_series.count_documents({"id": {"$in": [first, second]}}) == 2
+    assert await flow.db.references.count_documents({"series_id": {"$in": [first, second]}}) == 0
+
+
+@pytest.mark.asyncio
+async def test_a_busy_season_leaves_no_new_lineage_or_season_behind(flow):
+    await _board(flow)
+    await _legacy(flow)
+    lineage = (await flow.post(f"{ADMIN}/lineages", json={
+        "title": "Probe Liga 4vs4", "kind": "team_league", "organizer": "Probe Verband", "label": "4vs4",
+        "game_name": "Probespiel"})).json()
+    season = (await flow.post(f"{ADMIN}/series", json={
+        "lineage_id": lineage["id"], "season": "Season 2", "tier": "Division 2"})).json()
+    group = _group(await _proposals(flow), "ref-s1", "ref-s2")
+    async with mutation_lock(flow.db, series_write_resource(season["id"]), wait_seconds=0.5):
+        busy = await flow.post(BUNDLES, json={"group_key": group["key"], "reference_ids": ["ref-s1", "ref-s2"]})
+    assert busy.status_code == 409
+    assert [item["id"] async for item in flow.db.reference_series.find({}, {"_id": 0, "id": 1})] == [season["id"]]
+    assert await flow.db.reference_lineages.count_documents({}) == 1
+    assert await flow.db.references.count_documents({"series_id": {"$nin": [None, "alte-saison"]}}) == 0
+    assert await flow.db.reference_bundles.count_documents({}) == 0
+    # Danach geht es ganz normal.
+    again = await flow.post(BUNDLES, json={"group_key": group["key"], "reference_ids": ["ref-s1", "ref-s2"]})
+    assert again.status_code == 200, again.text
