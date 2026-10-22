@@ -532,8 +532,10 @@ gilt hier nicht. Web: `SeasonTableSection.jsx`, `OfficialTeamTotals.jsx` (`image
   außer die Abweichung ist erklärt (`_sum_explainer` mit `season_table.explain_total`: Streichresultate nach den Regeln,
   Aktivitätspunkte, Anpassungen des Fahrers). Die Teamtabelle (`table=teams`, auch erkannt an der Spalte „Team“)
   rechnet „Punkte“ oft als aktuelle Besetzung (#1960): nur der Hinweis.
-- **Namen** (`match_names`): unscharf (`result_image_match.similarity`) gegen die Teilnehmer samt Aliase (Fahrer) bzw.
-  die Teams der Saison (`known_teams`: eigene, Standard-Teams, Teams der Blätter und der Teamwertung).
+- **Namen** (`match_names`): unscharf (`result_image_match.similarity`) gegen die Teilnehmer samt Aliase und gelernter
+  Schreibweisen (Fahrer) bzw. die Teams der Saison samt gelernter Team-Schreibweisen (`known_teams`: eigene,
+  Standard-Teams, Teams der Blätter und der Teamwertung). Wie bei Ergebnis-Bildern (#2012) grün nur eindeutig
+  (`name_sure` und `name_margin`), ein unbekannter Name immer gelb - auch ohne bekannte Namen.
 - **Teamwertung laut Veranstalter** (`routes/reference_season_table_routes.py`): `POST …/team-totals/preview`
   (`{round_id?, totals, mode}`; ohne Runde die letzte gewertete mit Ergebnis) rechnet die Teamwertung nach der Runde mit
   den Werten danach und nennt je Team bisher, laut Bild, danach und `state` (`new`, `changed`, `same`, `kept`,

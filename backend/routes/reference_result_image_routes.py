@@ -392,13 +392,22 @@ async def read_season_table_image(series_id: str, request: Request,
     table = "teams" if reading.detected == "teams" else table
     if table == "teams":
         known = {name: name for name in await known_teams(db, access.series, participants)}
+        # Gelernte Team-Schreibweisen aus Ergebnis-Bildern (#2012) führen zum Team.
+        for item in access.series.get("read_team_aliases") or []:
+            if isinstance(item, dict) and item.get("read") and item.get("team") in known:
+                known.setdefault(item["read"], item["team"])
     else:
-        # Teilnehmer der Saison; Aliase der Mitglieder (nur Vorstand, wie #1743) führen zum Namen des Teilnehmers.
+        # Teilnehmer der Saison; Aliase der Mitglieder (nur Vorstand, wie #1743) und gelernte Schreibweisen aus
+        # Ergebnis-Bildern (#2012) führen zum Namen des Teilnehmers.
         by_id = {row["id"]: row.get("name") for row in participants if row.get("name")}
         known = {name: name for name in by_id.values()}
         for alias in await _aliases(db, access.series, participants):
             if by_id.get(alias["participant_id"]):
                 known.setdefault(alias["name"], by_id[alias["participant_id"]])
+        for row in participants:
+            for spelling in result_image_match.own_names(row)[1:]:
+                if row.get("name"):
+                    known.setdefault(spelling, row["name"])
     result_image_table.match_names(reading, known)
     if table == "teams":
         # „Punkte“ einer Teamtabelle ist oft die aktuelle Besetzung (#1960), die Zellen sind je Rennen - nur Hinweis.
