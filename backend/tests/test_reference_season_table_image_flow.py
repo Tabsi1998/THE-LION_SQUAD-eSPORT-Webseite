@@ -240,3 +240,41 @@ async def test_a_draft_beside_the_sheet_gets_the_same_team_totals(flow):
     sheet = await flow.db.reference_round_results.find_one({"round_id": rounds[0]["id"]}, {"_id": 0})
     assert sheet["pending_draft"]["official_team_totals"] == {"Probe Rot": 1}
     assert (await flow.post(f"{url}/preview", json={"totals": {}, "round_id": rounds[2]["id"]})).status_code == 409
+
+
+@pytest.mark.asyncio
+async def test_team_totals_from_an_image_add_to_what_is_there_unless_replaced(flow):
+    _, series, rounds = await _season(flow)
+    first = await _sheet(flow, series, rounds[0], ROWS)
+    url = f"{ADMIN}/series/{series['id']}/team-totals"
+    by_hand = {f"Probe Team {index:02d}": 100 - index for index in range(1, 11)}  # 10 Teams von Hand
+    saved = await flow.put(url, json={"totals": by_hand, "round_id": rounds[0]["id"], "mode": "replace",
+                                      "expected_version": first["version"]})
+    assert saved.status_code == 200, saved.text
+    version = saved.json()["version"]
+    # Das Bild hat nur 9 Teams, eines davon anders geschrieben und mit neuem Wert.
+    image = {f"Probe Team {index:02d}": 100 - index for index in range(1, 9)}
+    image["probe team 09"] = 50
+    preview = (await flow.post(f"{url}/preview", json={"totals": image, "round_id": rounds[0]["id"]})).json()
+    states = {item["team"]: (item["state"], item["previous"], item["final"]) for item in preview["changes"]}
+    assert preview["mode"] == "merge"
+    assert states["Probe Team 10"] == ("kept", 90, 90)  # nicht im Bild - bleibt stehen
+    assert states["probe team 09"] == ("changed", 91, 50)
+    assert states["Probe Team 01"] == ("same", 99, 99)
+    replace = (await flow.post(f"{url}/preview", json={"totals": image, "round_id": rounds[0]["id"],
+                                                       "mode": "replace"})).json()
+    assert {item["team"]: item["state"] for item in replace["changes"]}["Probe Team 10"] == "removed"
+    # Übernehmen mit Vorgabe „ergänzen“: das 10. Team bleibt, Team 09 in neuer Schreibweise und neuem Wert.
+    merged = await flow.put(url, json={"totals": image, "round_id": rounds[0]["id"], "expected_version": version})
+    assert merged.status_code == 200, merged.text
+    sheet = await flow.db.reference_round_results.find_one({"round_id": rounds[0]["id"]}, {"_id": 0})
+    assert len(sheet["official_team_totals"]) == 10
+    assert sheet["official_team_totals"]["Probe Team 10"] == 90 and sheet["official_team_totals"]["probe team 09"] == 50
+    assert "Probe Team 09" not in sheet["official_team_totals"]
+    # Hat sich das Ergebnis seit der Vorschau geändert, schreibt der Server nichts (409).
+    stale = await flow.put(url, json={"totals": image, "round_id": rounds[0]["id"], "mode": "replace",
+                                      "expected_version": version})
+    assert stale.status_code == 409
+    replaced = await flow.put(url, json={"totals": image, "round_id": rounds[0]["id"], "mode": "replace",
+                                         "expected_version": merged.json()["version"]})
+    assert replaced.status_code == 200 and "Probe Team 10" not in replaced.json()["totals"]

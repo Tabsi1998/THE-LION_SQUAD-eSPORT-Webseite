@@ -214,30 +214,67 @@ test("Team-Tabelle per Bild: Teamwertung laut Veranstalter mit Runde, Vergleich 
   imageGet();
   const teamPreview = {
     round: ROUNDS[1], rounds: ROUNDS.map((round) => ({ ...round, sheet_status: "published" })), expected_version: 3,
-    sheet_status: "published", team_scoring: true, unknown_teams: [], previous: {},
+    sheet_status: "published", team_scoring: true, unknown_teams: [], previous: {}, mode: "merge",
     rows: [{ team: "Probe Rot", rank: 1, official_points: 46, computed_points: 46, deviation: 0 },
       { team: "Probe Blau", rank: 2, official_points: 18, computed_points: 20, deviation: -2 }],
+    changes: [{ team: "Probe Rot", previous: null, image: 46, final: 46, state: "new", computed_points: 46, deviation: 0 },
+      { team: "Probe Blau", previous: null, image: 18, final: 18, state: "new", computed_points: 20, deviation: -2 }],
   };
   apiMock.post.mockImplementation((url) => Promise.resolve({ data: url.endsWith("/image") ? IMAGE_TEAMS : teamPreview }));
   apiMock.put.mockResolvedValue({ data: { version: 4 } });
   const file = await readImage();
   const panel = await screen.findByTestId("season-table-team-totals");
   await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/reference-series/admin/series/serie-1/team-totals/preview",
-    { totals: { "Probe Rot": 46, "Probe Blau": 18 }, round_id: null }, { skipInvalidation: true }));
+    { totals: { "Probe Rot": 46, "Probe Blau": 18 }, round_id: null, mode: "merge" }, { skipInvalidation: true }));
   expect(await within(panel).findByTestId("season-table-team-round")).toHaveValue("r2");
-  expect(within(panel).getByTestId("season-table-team-compare")).toHaveTextContent("Probe Blau1820−2");
+  expect(within(panel).getByTestId("season-table-team-compare")).toHaveTextContent("Probe Blauneu–1820−2");
+  expect(within(panel).queryByTestId("season-table-team-mode")).toBeNull();  // ohne vorhandene Teamwertung keine Wahl
   expect(within(panel).getByTestId("season-table-team-save")).toBeDisabled();  // Punkte von Probe Blau sind gelb
   expect(within(panel).getByTestId("season-table-team-original")).toHaveTextContent("an R2");
   fireEvent.click(within(panel).getByTestId("result-team-total-confirm"));
   fireEvent.click(within(panel).getByTestId("season-table-team-save"));
   await waitFor(() => expect(apiMock.put).toHaveBeenCalledWith("/reference-series/admin/series/serie-1/team-totals",
-    { totals: { "Probe Rot": 46, "Probe Blau": 18 }, round_id: "r2", expected_version: 3 }));
+    { totals: { "Probe Rot": 46, "Probe Blau": 18 }, round_id: "r2", mode: "merge", expected_version: 3 }));
   // Übernommen: das Bild hängt als Original „Tabelle“ an der gewählten Runde (#1933).
   await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/reference-series/admin/series/serie-1/rounds/r2/originals", file,
     { params: { kind: "table", origin: "reading" }, headers: { "Content-Type": "image/png" } }));
   expect(toastMock.success).toHaveBeenCalledWith(expect.stringContaining("Teamwertung laut Veranstalter für R2"));
   expect(toastMock.success).toHaveBeenCalledWith(expect.stringContaining("Original-Bild angehängt."));
   expect(screen.queryByTestId("season-table-column")).toBeNull();
+});
+
+test("vorhandene Teamwertung: Vorgabe ergänzen – fehlende Teams bleiben, „Ersetzen“ zeigt, was entfernt wird", async () => {
+  imageGet();
+  const base = {
+    round: ROUNDS[1], rounds: ROUNDS.map((round) => ({ ...round, sheet_status: "published" })), expected_version: 5,
+    sheet_status: "published", team_scoring: true, unknown_teams: [], rows: [],
+    previous: { "Probe Rot": 40, "Probe Blau": 18, "Probe Lila": 7 },
+  };
+  const merged = { ...base, mode: "merge", changes: [
+    { team: "Probe Rot", previous: 40, image: 46, final: 46, state: "changed", computed_points: 46, deviation: 0 },
+    { team: "Probe Blau", previous: 18, image: 18, final: 18, state: "same", computed_points: 20, deviation: -2 },
+    { team: "Probe Lila", previous: 7, image: null, final: 7, state: "kept", computed_points: 7, deviation: 0 }] };
+  const replaced = { ...base, mode: "replace", changes: [...merged.changes.slice(0, 2),
+    { team: "Probe Lila", previous: 7, image: null, final: null, state: "removed", computed_points: 7, deviation: null }] };
+  apiMock.post.mockImplementation((url, body) => Promise.resolve({ data: url.endsWith("/image") ? IMAGE_TEAMS : body.mode === "replace" ? replaced : merged }));
+  apiMock.put.mockResolvedValue({ data: { version: 6 } });
+  await readImage();
+  const panel = await screen.findByTestId("season-table-team-totals");
+  expect(await within(panel).findByTestId("season-table-team-mode-merge")).toBeChecked();
+  const kept = within(panel).getAllByTestId("season-table-team-change").find((row) => row.dataset.state === "kept");
+  expect(kept).toHaveTextContent("Probe Lilableibt – nicht im Bild77");
+  expect(within(panel).getByTestId("season-table-team-mode-note")).toHaveTextContent("1 Team bleibt stehen");
+  fireEvent.click(within(panel).getByTestId("season-table-team-mode-replace"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenLastCalledWith("/reference-series/admin/series/serie-1/team-totals/preview",
+    expect.objectContaining({ mode: "replace" }), { skipInvalidation: true }));
+  expect(await within(panel).findByText("wird entfernt – nicht im Bild")).toBeInTheDocument();
+  expect(within(panel).getByTestId("season-table-team-mode-note")).toHaveTextContent("1 Team wird entfernt");
+  fireEvent.click(within(panel).getByTestId("season-table-team-mode-merge"));
+  fireEvent.click(within(panel).getByTestId("result-team-total-confirm"));
+  fireEvent.click(within(panel).getByTestId("season-table-team-original-drop"));
+  fireEvent.click(within(panel).getByTestId("season-table-team-save"));
+  await waitFor(() => expect(apiMock.put).toHaveBeenCalledWith("/reference-series/admin/series/serie-1/team-totals",
+    expect.objectContaining({ mode: "merge", expected_version: 5 })));
 });
 
 test("ein Fehler der Vorschau steht im Abschnitt", async () => {

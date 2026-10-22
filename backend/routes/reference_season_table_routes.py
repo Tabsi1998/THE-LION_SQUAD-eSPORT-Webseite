@@ -369,9 +369,12 @@ NO_ROUND = "Es gibt noch keine Runde mit Ergebnis."
 
 
 class TeamTotalsBody(BaseModel):
-    """Teamwertung laut Veranstalter (``official_team_totals``) für eine Runde - ohne Runde die letzte gewertete."""
+    """Teamwertung laut Veranstalter (``official_team_totals``) für eine Runde - ohne Runde die letzte gewertete.
+    ``mode``: ``merge`` (Vorgabe) ergänzt bzw. aktualisiert - Teams, die im Bild fehlen, bleiben stehen; ``replace``
+    ersetzt die ganze Teamwertung."""
     round_id: Optional[str] = Field(default=None, max_length=80)
     totals: dict[str, float] = Field(default_factory=dict)
+    mode: Literal["merge", "replace"] = "merge"
 
     @field_validator("totals")
     @classmethod
@@ -401,6 +404,41 @@ async def known_teams(db, series: dict, participants: list[dict]) -> list[str]:
         names += [row.get("team") for row in sheet.get("rows") or [] if row.get("team")]
         names += list((sheet.get("official_team_totals") or {}).keys())
     return list(dict.fromkeys(name for name in names if name))
+
+
+def merged_totals(previous: dict, new: dict, mode: str) -> dict:
+    """Die Teamwertung nach dem Übernehmen: ``replace`` nur die neuen Werte; ``merge`` die vorhandenen, darüber die
+    neuen - gleiches Team (Groß/klein und Leerraum egal) in der neuen Schreibweise."""
+    if mode == "replace":
+        return dict(new)
+    keys = {series_adjustments.team_key(team) for team in new}
+    out = {team: value for team, value in (previous or {}).items() if series_adjustments.team_key(team) not in keys}
+    out.update(new)
+    return out
+
+
+def team_changes(previous: dict, new: dict, mode: str, rows: list[dict]) -> list[dict]:
+    """Je Team: bisher, laut Bild, danach und was passiert (``new``, ``changed``, ``same``, ``kept`` - nicht im Bild,
+    bleibt; ``removed`` - nicht im Bild, wird entfernt) - dazu die eigene Rechnung nach der Runde."""
+    key = series_adjustments.team_key
+    before = {key(team): (team, value) for team, value in (previous or {}).items()}
+    image = {key(team): (team, value) for team, value in new.items()}
+    computed = {key(row["team"]): row for row in rows}
+    out = []
+    for team_key in [*image, *(item for item in before if item not in image)]:
+        name, value = image.get(team_key) or before[team_key]
+        old = before.get(team_key, (None, None))[1]
+        if team_key not in image:
+            state, final = ("kept", old) if mode == "merge" else ("removed", None)
+        else:
+            final = value
+            state = "new" if team_key not in before else "same" if old == value else "changed"
+        own = computed.get(team_key) or {}
+        out.append({"team": name, "previous": old, "image": image.get(team_key, (None, None))[1], "final": final,
+                    "state": state, "computed_points": own.get("computed_points"),
+                    "deviation": None if final is None or own.get("computed_points") is None
+                    else series_results.number(final - own["computed_points"])})
+    return out
 
 
 def _team_choice(rounds: list[dict], sheets: dict[str, dict], wanted: str | None) -> dict | None:
@@ -440,7 +478,9 @@ async def preview_team_totals(series_id: str, body: TeamTotalsBody,
     if round_doc is None:
         raise HTTPException(409, NO_SHEET if body.round_id else NO_ROUND)
     existing = sheets[round_doc["id"]]
-    rows, enabled = await _team_rows(db, access, round_doc, existing, body.totals)
+    previous = dict((results.draft_base(existing) or {}).get("official_team_totals") or {})
+    final = merged_totals(previous, body.totals, body.mode)
+    rows, enabled = await _team_rows(db, access, round_doc, existing, final)
     participants = await results._participants(db, series_id)
     known = {series_adjustments.team_key(name) for name in await known_teams(db, access.series, participants)}
     positions = _positions(rounds, access.series.get("weekend"))
@@ -449,9 +489,9 @@ async def preview_team_totals(series_id: str, body: TeamTotalsBody,
             "sheet_status": existing.get("status"), "team_scoring": enabled,
             "rounds": [{**_round_view(item, positions), "sheet_status": sheets[item["id"]].get("status")}
                        for item in choices],
-            "rows": rows,
-            "unknown_teams": [team for team in body.totals if series_adjustments.team_key(team) not in known],
-            "previous": dict(existing.get("official_team_totals") or {})}
+            "rows": rows, "mode": body.mode, "previous": previous, "final": final,
+            "changes": team_changes(previous, body.totals, body.mode, rows),
+            "unknown_teams": [team for team in body.totals if series_adjustments.team_key(team) not in known]}
 
 
 @router.put(TEAM_BASE)
@@ -467,19 +507,24 @@ async def save_team_totals(series_id: str, body: TeamTotalsSave, access: SeriesA
         if existing is None:
             raise HTTPException(409, NO_SHEET)
         results._require_version(existing, body.expected_version)
-        update = {"official_team_totals": body.totals, **results._stamp(access)}
+        # Ergänzen geht vom selben Stand aus wie die Vorschau - die Version oben stellt sicher, dass er sich nicht
+        # geändert hat (sonst 409).
+        previous = dict((results.draft_base(existing) or {}).get("official_team_totals") or {})
+        final = merged_totals(previous, body.totals, body.mode)
+        update = {"official_team_totals": final, **results._stamp(access)}
         if existing.get("pending_draft"):
-            update["pending_draft"] = {**existing["pending_draft"], "official_team_totals": body.totals}
+            update["pending_draft"] = {**existing["pending_draft"], "official_team_totals": final}
         saved = await results._update_if_current(db, existing["id"], body.expected_version, {"$set": update})
         if saved is None:
             raise HTTPException(409, results.STALE)
         revision_id = await results._revision(db, existing, kind="sheet", reason="team_totals", access=access)
         await results._log(db, "reference_result.team_totals", access, saved, {
             "version": saved["version"], "previous_version": results._version(existing), "revision_id": revision_id,
-            "teams": len(body.totals), "source": "season_table"})
+            "teams": len(final), "mode": body.mode, "source": "season_table"})
         if existing.get("status") == "published":
             await results._recompute(db, access)
-    return {"version": saved["version"], "round_id": body.round_id, "recomputed": existing.get("status") == "published"}
+    return {"version": saved["version"], "round_id": body.round_id, "totals": final,
+            "recomputed": existing.get("status") == "published"}
 
 
 @router.post(BASE + "/apply")

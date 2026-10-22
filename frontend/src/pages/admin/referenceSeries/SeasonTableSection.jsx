@@ -206,6 +206,9 @@ function ImageMarks({ marks, onConfirm, onConfirmAll }) {
   );
 }
 
+// Was mit einem Team der vorhandenen Teamwertung passiert (#1999).
+const TEAM_STATES = { new: "neu", changed: "geändert", kept: "bleibt – nicht im Bild", removed: "wird entfernt – nicht im Bild" };
+
 function originalsUrl(series, round) {
   return `/reference-series/admin/series/${series.id}/rounds/${round.id}/originals`;
 }
@@ -247,19 +250,20 @@ function TeamTotalsPanel({ series, result, file = null, onClose, onChanged }) {
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const [attach, setAttach] = useState(Boolean(file));
+  const [mode, setMode] = useState("merge");
 
   useEffect(() => {
     let alive = true;
-    api.post(`${url}/preview`, { totals, round_id: roundId }, { skipInvalidation: true })
+    api.post(`${url}/preview`, { totals, round_id: roundId, mode }, { skipInvalidation: true })
       .then(({ data }) => { if (alive) { setPreview(data); setError(""); } })
       .catch((err) => { if (alive) { setPreview(null); setError(formatApiError(err.response?.data?.detail) || "Die Vorschau ist nicht möglich."); } });
     return () => { alive = false; };
-  }, [url, totals, roundId]);
+  }, [url, totals, roundId, mode]);
 
   const save = async () => {
     setSaving(true);
     try {
-      await api.put(url, { totals, round_id: preview.round.id, expected_version: preview.expected_version });
+      await api.put(url, { totals, round_id: preview.round.id, mode, expected_version: preview.expected_version });
       // Übernommen: jetzt hängt das Bild als Original „Tabelle“ an der gewählten Runde (#1933).
       const attached = attach && file ? await attachTable(series, preview.round, file) : "";
       toast.success(`Teamwertung laut Veranstalter für ${roundOption(preview.round)} übernommen.${attached}`);
@@ -272,8 +276,9 @@ function TeamTotalsPanel({ series, result, file = null, onClose, onChanged }) {
     }
   };
 
-  const official = new Set(Object.keys(totals));
-  const rows = (preview?.rows || []).filter((row) => official.has(row.team) || row.official_points !== null);
+  const rows = preview?.changes || [];
+  const removed = rows.filter((row) => row.state === "removed").length;
+  const kept = rows.filter((row) => row.state === "kept").length;
   return (
     <section className="border border-[#29B6E8]/30 bg-[#29B6E8]/5 rounded-sm p-3 space-y-3" data-testid="season-table-team-totals">
       <div className="flex items-start justify-between gap-2">
@@ -293,6 +298,19 @@ function TeamTotalsPanel({ series, result, file = null, onClose, onChanged }) {
       )}
       {error && <p className="text-sm text-amber-200" role="alert" data-testid="season-table-team-error">{error}</p>}
       {preview && !preview.team_scoring && <p className="text-xs text-amber-200">Die Saison führt keine Teamwertung – die Werte stehen dann nur im Ergebnis.</p>}
+      {preview && Object.keys(preview.previous || {}).length > 0 && (
+        <fieldset className="space-y-1" data-testid="season-table-team-mode">
+          <legend className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1">Vorhandene Teamwertung dieser Runde</legend>
+          {[["merge", "Ergänzen bzw. aktualisieren", "Teams, die im Bild fehlen, bleiben stehen."],
+            ["replace", "Ersetzen", "Teams, die im Bild fehlen, werden entfernt."]].map(([value, label, hint]) => (
+            <label key={value} className="flex items-start gap-2 text-sm text-white/80">
+              <input type="radio" name={`team-mode-${series.id}`} value={value} checked={mode === value} onChange={() => setMode(value)}
+                data-testid={`season-table-team-mode-${value}`} style={{ accentColor: "#29B6E8" }} className="mt-1 shrink-0" />
+              <span>{label}<span className="block text-xs text-white/45">{hint}</span></span>
+            </label>
+          ))}
+        </fieldset>
+      )}
       <OfficialTeamTotals totals={totals} initialRows={initialRows} onChange={setTotals} onOpenChange={setOpen} teams={(preview?.rows || []).map((row) => row.team)} />
       {(preview?.unknown_teams || []).length > 0 && (
         <p className="text-xs text-amber-200" data-testid="season-table-team-unknown">Neu in der Saison: {preview.unknown_teams.join(", ")} – Schreibweise prüfen.</p>
@@ -304,16 +322,21 @@ function TeamTotalsPanel({ series, result, file = null, onClose, onChanged }) {
               <tr className="text-left text-[11px] uppercase tracking-widest text-white/50">
                 <th scope="col" className="py-1.5 pr-3 font-bold">Team</th>
                 {/* Am Handy kurze Köpfe - die Zahlen bleiben lesbar, die Namen brechen nicht mitten im Wort. */}
-                <th scope="col" className="py-1.5 pr-3 font-bold text-right whitespace-nowrap"><span className="sm:hidden">Bild</span><span className="hidden sm:inline">Laut Bild</span></th>
+                <th scope="col" className="py-1.5 pr-3 font-bold text-right whitespace-nowrap">Bisher</th>
+                <th scope="col" className="py-1.5 pr-3 font-bold text-right whitespace-nowrap"><span className="sm:hidden">Neu</span><span className="hidden sm:inline">Danach</span></th>
                 <th scope="col" className="py-1.5 pr-3 font-bold text-right whitespace-nowrap"><span className="sm:hidden">Eigene</span><span className="hidden sm:inline">Eigene Rechnung</span></th>
                 <th scope="col" className="py-1.5 font-bold text-right whitespace-nowrap"><span className="sm:hidden">Abw.</span><span className="hidden sm:inline">Abweichung</span></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-white/5">
               {rows.map((row) => (
-                <tr key={row.team}>
-                  <td className="py-1.5 pr-3 text-white break-words">{row.team}</td>
-                  <td className="py-1.5 pr-3 text-right tabular-nums text-white">{row.official_points ?? "–"}</td>
+                <tr key={row.team} data-testid="season-table-team-change" data-state={row.state}>
+                  <td className="py-1.5 pr-3 text-white break-words">
+                    {row.team}
+                    {TEAM_STATES[row.state] && <span className={`block text-[11px] ${row.state === "removed" ? "text-amber-200" : "text-white/45"}`}>{TEAM_STATES[row.state]}</span>}
+                  </td>
+                  <td className="py-1.5 pr-3 text-right tabular-nums text-white/60">{row.previous ?? "–"}</td>
+                  <td className={`py-1.5 pr-3 text-right tabular-nums ${row.state === "removed" ? "text-white/35 line-through" : "text-white"}`}>{row.final ?? row.previous ?? "–"}</td>
                   <td className="py-1.5 pr-3 text-right tabular-nums text-white/70">{row.computed_points ?? "–"}</td>
                   <td className={`py-1.5 text-right tabular-nums ${row.deviation ? "text-amber-200" : "text-white/45"}`}>{row.deviation ? (row.deviation > 0 ? `+${row.deviation}` : `−${Math.abs(row.deviation)}`) : "–"}</td>
                 </tr>
@@ -321,6 +344,11 @@ function TeamTotalsPanel({ series, result, file = null, onClose, onChanged }) {
             </tbody>
           </table>
         </div>
+      )}
+      {(removed > 0 || kept > 0) && (
+        <p className={`text-xs ${removed ? "text-amber-200" : "text-white/55"}`} data-testid="season-table-team-mode-note">
+          {removed ? `${removed} ${removed === 1 ? "Team wird" : "Teams werden"} entfernt – sie fehlen im Bild.` : `${kept} ${kept === 1 ? "Team bleibt" : "Teams bleiben"} stehen – nicht im Bild.`}
+        </p>
       )}
       {attach && file && preview && <PendingOriginal target={preview.round} onDrop={() => setAttach(false)} testId="season-table-team-original" />}
       <div className="flex flex-wrap items-center gap-3">
