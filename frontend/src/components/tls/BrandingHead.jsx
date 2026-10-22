@@ -2,6 +2,7 @@ import { useCallback, useEffect } from "react";
 import { api, resolveMediaUrl } from "@/lib/api";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { onBrandingUpdated, setCachedBranding } from "@/lib/brandingEvents";
+import { rasterLogoUrl } from "@/lib/svgLogo";
 
 const DEFAULT_TITLE = "THE LION SQUAD - eSPORTS";
 const DEFAULT_SHARE_IMAGE = "/assets/brand/og-default.png";
@@ -21,16 +22,17 @@ function upsertMeta(selector, attrs) {
   });
 }
 
+// Favicon, Symbol auf dem Home-Bildschirm und Teilen-Bild sind Rasterbilder: ein SVG-Logo kommt als PNG-Fassung (#1952).
 function pickFavicon(data) {
   const custom = data?.favicon_url || data?.favicon_light_url || data?.favicon_dark_url || "";
-  return resolveMediaUrl(custom || DEFAULT_FAVICON);
+  return resolveMediaUrl(rasterLogoUrl(custom || DEFAULT_FAVICON));
 }
 
 function pickThemedFavicons(data) {
   const fallback = pickFavicon(data);
   return {
-    light: data?.favicon_light_url ? resolveMediaUrl(data.favicon_light_url) : resolveMediaUrl(DEFAULT_FAVICON_LIGHT),
-    dark: data?.favicon_dark_url ? resolveMediaUrl(data.favicon_dark_url) : resolveMediaUrl(DEFAULT_FAVICON_DARK),
+    light: resolveMediaUrl(rasterLogoUrl(data?.favicon_light_url || DEFAULT_FAVICON_LIGHT)),
+    dark: resolveMediaUrl(rasterLogoUrl(data?.favicon_dark_url || DEFAULT_FAVICON_DARK)),
     fallback,
   };
 }
@@ -120,7 +122,7 @@ function applyBranding(data) {
   const siteTitle = data.site_title || DEFAULT_TITLE;
   const description = data.site_description || "Gaming und eSports Verein aus Tirol mit Community, Turnieren, Fast-Lap-Challenges, Events, Mitgliedschaft und Vereinsleben.";
   const themeColor = data.primary_color || "#29B6E8";
-  const image = resolveMediaUrl(data.share_banner_url || data.logo_url || data.logo_light_url || data.logo_dark_url || data.mascot_url || DEFAULT_SHARE_IMAGE);
+  const image = resolveMediaUrl(rasterLogoUrl(data.share_banner_url || data.logo_url || data.logo_light_url || data.logo_dark_url || data.mascot_url || DEFAULT_SHARE_IMAGE));
   const origin = data.domain || (typeof window !== "undefined" ? window.location.origin : "");
 
   if (!document.title || document.title === DEFAULT_TITLE || /React App|Vereinsplattform/i.test(document.title)) {
