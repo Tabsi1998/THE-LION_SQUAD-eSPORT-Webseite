@@ -5,7 +5,7 @@ import { FormGrid } from "@/components/tls/AdminForm";
 import { CheckField, SelectField, TextAreaField, TextField } from "@/components/tls/FormFields";
 import { ROUND_KIND_OPTIONS, dayLabel, opponentText, roundLabel, roundPayload, roundToForm } from "@/lib/referenceCalendar";
 import { COUNTRY_OPTIONS, countryName } from "@/lib/countryFlags";
-import { MAX_SESSION, SESSION_CHOICES, plannedSession, sessionLabel } from "@/lib/raceWeekend";
+import { MAX_SESSION, SESSION_CHOICES, plannedSession, sessionLabel, weekendPasteHint } from "@/lib/raceWeekend";
 import { CountryFlag, VenueWithFlag } from "@/components/tls/CountryFlag";
 import { NO_SCORE_OPTIONS } from "@/lib/seriesSpecialRules";
 import { toast } from "sonner";
@@ -198,12 +198,14 @@ export function PasteSheet({ series, lineage, version, onClose, onSaved, onStale
   const placeholder = teamLeague
     ? "ST1 · 13.05.2026 20:30 · vs Team A\nST2 · 20.05.–24.05. · @ Team B\nST3 · 27.05. · vs Team C"
     : "R1 · 05.11. · Strecke\nR2 · 12.11. 20:00 · Strecke\nR3 Strecke";
+  // Ablauf der Saison (#2007): welche Läufe eine Zeile ohne Lauf anlegt - ohne Ablauf der bisherige Text.
+  const weekendHint = lineage?.kind === "racing" ? weekendPasteHint(series.weekend, series.default_time) : "";
   const teamHint = teamLeague ? " Team-Liga: „vs Team“ heißt Heimspiel, „@ Team“ auswärts; „13.05.–17.05.“ ist ein Spieltag mit Zeitraum." : "";
   return (
     <AdminSheet title="Terminliste einfügen" eyebrow={lineage?.title} size="lg" onClose={onClose} onSubmit={submit} saving={saving}
       submitLabel={ready ? `${total} Termine übernehmen` : "Vorschau"} savingLabel={ready ? "Übernehme …" : "Prüfe …"} submitTestId="paste-submit" testId="paste-sheet">
       <TextAreaField label="Je Zeile ein Termin" value={text} onChange={edit} rows={8} testId="paste-text" placeholder={placeholder}
-        hint={`Kürzel, Datum (TT.MM. oder TT.MM.JJJJ), optional Uhrzeit und Ort – aus dem Ort kommt die Flagge. Ohne Datum: der nächste Standard-Wochentag nach der Zeile davor. Ohne Uhrzeit: ${defaults || "ohne Uhrzeit"}.${lineage?.kind === "racing" ? " Rennliga: Eine Zeile je Runde legt alle Läufe an, die die Saison vorgibt (Ablauf je Runde); „R1 Sprint“, „R1S“ oder „R1 Q“ nur diesen Lauf." : ""}${teamHint}`} />
+        hint={`Kürzel, Datum (TT.MM. oder TT.MM.JJJJ), optional Uhrzeit und Ort – aus dem Ort kommt die Flagge. Ohne Datum: der nächste Standard-Wochentag nach der Zeile davor. Ohne Uhrzeit: ${defaults || "ohne Uhrzeit"}.${lineage?.kind === "racing" ? " Rennliga: Eine Zeile je Runde legt alle Läufe an, die die Saison vorgibt (Ablauf je Runde); „R1 Sprint“, „R1S“ oder „R1 Q“ nur diesen Lauf." : ""}${weekendHint ? ` ${weekendHint}.` : ""}${teamHint}`} />
       {preview && preview.errors.length > 0 && (
         <div className="border border-red-400/40 bg-red-400/10 rounded-sm p-3 text-sm text-red-200 space-y-1" data-testid="paste-errors" role="alert">
           <div className="font-bold">Die Liste hat Fehler – übernommen wird erst eine fehlerfreie Liste.</div>

@@ -264,6 +264,32 @@ export function formatSummary(sessions) {
     .join(" + ");
 }
 
+function minutes(value) {
+  const sign = value < 0 ? "−" : "+";
+  return `${sign}${Math.abs(value)} min`;
+}
+
+/** Der Ablauf je Runde für die Hilfe der Terminliste (#2007): „Je Runde: Qualifying 20:30, Rennen +30 min“ - der
+ * erste Lauf mit der Standard-Uhrzeit, die weiteren mit Versatz dazu; ändert er sich ab einer Runde, „; ab Runde 5:
+ * …“. Leer ohne Vorgabe. */
+export function weekendPasteHint(weekend, defaultTime) {
+  const parts = (weekend?.formats || []).map((format, index) => {
+    const sessions = [...(format.sessions || [])]
+      .filter((session) => String(session?.label || "").trim())
+      .sort((a, b) => (Number(a.offset) || 0) - (Number(b.offset) || 0));
+    if (!sessions.length) return "";
+    const start = Number(sessions[0].offset) || 0;
+    const list = sessions.map((session, position) => {
+      if (position === 0) return defaultTime ? `${session.label} ${defaultTime}` : session.label;
+      const gap = (Number(session.offset) || 0) - start;
+      return gap ? `${session.label} ${minutes(gap)}` : session.label;
+    }).join(", ");
+    const from = index === 0 || (Number(format.from_round) || 1) <= 1 ? "Je Runde" : `ab Runde ${format.from_round}`;
+    return `${from}: ${list}`;
+  }).filter(Boolean);
+  return parts.join("; ");
+}
+
 /** Ein Format („ab Runde X“) im Formular - neu mit Qualifying und Rennen (+30 Minuten). */
 export function emptyFormat(values = {}) {
   return {
