@@ -234,4 +234,20 @@ async def recompute_standings(db, series: dict) -> int:
     async for stale in db.reference_standings.find({"series_id": sid}, {"_id": 0, "id": 1, "round_id": 1, "scope": 1}):
         if (stale.get("round_id"), stale.get("scope")) not in kept:
             await db.reference_standings.delete_one({"id": stale["id"]})
+    # #2000: für die Verwaltung je Fahrer-Anpassung mit Haken, für welches Team sie im letzten Stand zählt bzw. warum
+    # für keines - geschrieben nur, wenn es sich ändert.
+    credit = adjustment_credit(snapshots)
+    if credit != (series.get("adjustment_teams") or {}):
+        await db.reference_series.update_one({"id": sid}, {"$set": {"adjustment_teams": credit}})
     return len(snapshots)
+
+
+def adjustment_credit(snapshots: list[dict]) -> dict:
+    """Je Fahrer-Anpassung mit Haken „zählt auch fürs Team“ (#2000) ``{team, note}`` aus dem letzten Fahrerstand."""
+    drivers = [item for item in snapshots if item["scope"] == "drivers"]
+    out = {}
+    for row in drivers[-1]["rows"] if drivers else []:
+        for item in row.get("adjustments") or []:
+            if item.get("counts_for_team") and item.get("id"):
+                out[item["id"]] = {"team": item.get("credited_team"), "note": item.get("team_note")}
+    return out

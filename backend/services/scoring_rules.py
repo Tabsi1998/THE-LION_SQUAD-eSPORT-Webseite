@@ -24,7 +24,8 @@ füllt fehlende Werte mit Standards und weist Unsinn ab; alle anderen Funktionen
   Gerechnet wird damit in ``services/tournament_days.py``.
 - **Teamwertung einer Rennliga** (#1960): ``team_scoring.mode`` - ``per_race`` (je Rennen für das gefahrene Team) oder
   ``current_lineup`` (aktuelle Besetzung: alle Saisonpunkte der Fahrer, die jetzt im Team sind); ``no_team_names``
-  (Vorgabe „Ersatzfahrer“): Teamnamen, die für kein Team zählen. ``min_participants``:
+  (Vorgabe „Ersatzfahrer“): Teamnamen, die für kein Team zählen; ``adjustments_count_for_team`` (#2000, Vorgabe aus):
+  Vorgabe des Hakens „zählt auch für die Teamwertung“ an neuen Fahrer-Anpassungen. ``min_participants``:
   Mindestzahl am Start je Termin - darunter warnt das Eintragen.
 """
 from __future__ import annotations
@@ -65,8 +66,10 @@ DEFAULT_RULES: dict = {
     "tiebreakers": ["countback", "latest_result"],
     # #1960: ``no_team_names`` - Team-Bezeichnungen, die „kein Team bzw. Ersatz“ heißen: so eine Fahrt zählt für kein
     # Team (auch nicht fürs Stammteam) und steht nicht als eigene Zeile in der Teamwertung.
+    # #2000: ``adjustments_count_for_team`` - Vorgabe des Hakens „zählt auch für die Teamwertung“ an neuen
+    # Fahrer-Anpassungen.
     "team_scoring": {"enabled": False, "counting_drivers": None, "guests_count": True, "mode": "per_race",
-                     "no_team_names": ["Ersatzfahrer"]},
+                     "no_team_names": ["Ersatzfahrer"], "adjustments_count_for_team": False},
     # Mindestzahl Teilnehmer je Termin (#1960): darunter warnt das Eintragen - der Termin bleibt dann ohne Wertung.
     "min_participants": None,
     "match_points": {"win": 3, "draw": 1, "loss": 0},
@@ -195,6 +198,7 @@ def normalize_rules(raw: dict | None) -> dict:
         "guests_count": bool(team.get("guests_count")),
         "mode": _choice(team.get("mode") or "per_race", "team_scoring.mode", TEAM_MODES),
         "no_team_names": _team_names(team.get("no_team_names"), "team_scoring.no_team_names"),
+        "adjustments_count_for_team": bool(team.get("adjustments_count_for_team")),
     }
     rules["min_participants"] = _whole(rules["min_participants"], "min_participants", allow_none=True, minimum=1)
     points = {**DEFAULT_RULES["match_points"], **(raw.get("match_points") or {})}
