@@ -1,5 +1,26 @@
 # Changelog
 
+## [1.33.0](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/compare/v1.32.0...v1.33.0) (2026-10-22)
+
+
+### Neu
+
+* Betrieb warnt, wenn der zweite Leser der Bild-Erkennung fehlt ([#2018](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2018)) ([4a31dd8](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/4a31dd8f0de39eb9970ac613ffadcab8077c523b))
+* Bild-Erkennung – Strecke im Kopf wird mit dem Kalender der Saison abgeglichen ([#2018](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2018)) ([4a31dd8](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/4a31dd8f0de39eb9970ac613ffadcab8077c523b))
+* Bild-Erkennung mit zweitem Leser – was beide gleich lesen, ist auch ohne Kader grün ([#2018](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2018)) ([4a31dd8](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/4a31dd8f0de39eb9970ac613ffadcab8077c523b))
+* Bild-Erkennung nutzt den Kader der ganzen Spur und zeigt „wie in Saison …“ ([#2012](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2012)) ([4a31dd8](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/4a31dd8f0de39eb9970ac613ffadcab8077c523b))
+* Knopf „Alle Namen bestätigen“ für vorbelegte gelbe Namen und Teams aus dem Bild, mit Rückgängig ([#2018](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2018)) ([4a31dd8](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/4a31dd8f0de39eb9970ac613ffadcab8077c523b))
+* Korrekturen aus Ergebnis-Bildern als Schreibweise lernen, sichtbar und entfernbar bei Teilnehmer und Saison ([#2012](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2012)) ([4a31dd8](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/4a31dd8f0de39eb9970ac613ffadcab8077c523b))
+
+
+### Fehlerbehebungen
+
+* Bild-Erkennung – ungelesene Startplätze sind gelb statt leer und grün ([#2018](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2018)) ([4a31dd8](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/4a31dd8f0de39eb9970ac613ffadcab8077c523b))
+* Bild-Erkennung liest dunkelgraue Startnummern und Teams ([#2012](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2012)) ([4a31dd8](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/4a31dd8f0de39eb9970ac613ffadcab8077c523b))
+* Bild-Erkennung rät Namen und Teams nie grün – nur eindeutige Treffer, typische Verwechslungen erkannt ([#2012](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2012)) ([4a31dd8](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/4a31dd8f0de39eb9970ac613ffadcab8077c523b))
+* Saison- und Teamtabelle per Bild raten Namen nie grün ([#2012](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2012)) ([4a31dd8](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/4a31dd8f0de39eb9970ac613ffadcab8077c523b))
+* Startplätze, Abstände und Kopf aus Ergebnis-Bildern seltener unnötig gelb ([#2012](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2012)) ([4a31dd8](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/4a31dd8f0de39eb9970ac613ffadcab8077c523b))
+
 ## 1.32.0 (22.10.2026)
 
 ### Neu
