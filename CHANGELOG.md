@@ -1,31 +1,29 @@
 # Changelog
 
-## [1.27.0](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/compare/v1.26.0...v1.27.0) (2026-10-22)
-
+## 1.27.0 (22.10.2026)
 
 ### Neu
 
-* Filter-Chips der Chronik geben beim Drücken leicht nach ([#1969](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1969)) ([c5562fa](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/c5562faaf999218b40401a806a914bd8888b8391))
-* Mikro-Animationen auf Referenzen, Serien, Turnieren, Profil und Startseite ([#1969](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1969)) ([c5562fa](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/c5562faaf999218b40401a806a914bd8888b8391))
-* Partner-Plattform – neue Termine bekommen ein Kürzel T1, T2 … ([#1964](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1964)) ([6a6c3ed](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/6a6c3ed41d0c233aa3d0fc30c2ab2e348b3bb080))
-* Pole- und Bestzeit-Farben als Rollen im Design-System ([#1969](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1969)) ([c5562fa](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/c5562faaf999218b40401a806a914bd8888b8391))
-* Puls in Gold, Cyan, Rot und Grün ([#1969](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1969)) ([c5562fa](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/c5562faaf999218b40401a806a914bd8888b8391))
-* Saison-Verwaltung – Vorschau „Jetzt holen“ mit Termin, Abweichungen und unbekannten Namen ([#1964](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1964)) ([6a6c3ed](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/6a6c3ed41d0c233aa3d0fc30c2ab2e348b3bb080))
-* Seite und Seiten-Scrollleiste im dunklen Stil ([#1969](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1969)) ([c5562fa](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/c5562faaf999218b40401a806a914bd8888b8391))
-* Serienseite – Hinweis „Daten von …“ mit Link zum Partner ([#1964](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1964)) ([6a6c3ed](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/6a6c3ed41d0c233aa3d0fc30c2ab2e348b3bb080))
-* Turnierserie – Partner-Plattform je Saison einstellen, Turniertage holen und als Entwurf übernehmen ([#1964](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1964)) ([6a6c3ed](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/6a6c3ed41d0c233aa3d0fc30c2ab2e348b3bb080))
-* Wischleisten im Vereinsstil in Web und Verwaltung, nie versteckt, mit Verlauf ([#1969](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1969)) ([c5562fa](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/c5562faaf999218b40401a806a914bd8888b8391))
-* Zahlen und Zeiten zählen überall gleich hoch, Listen erscheinen gestaffelt, neue Werte leuchten kurz auf ([#1969](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1969)) ([c5562fa](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/c5562faaf999218b40401a806a914bd8888b8391))
-
+* Filter-Chips der Chronik geben beim Drücken leicht nach (#1969)
+* Mikro-Animationen auf Referenzen, Serien, Turnieren, Profil und Startseite (#1969)
+* Partner-Plattform – neue Termine bekommen ein Kürzel T1, T2 … (#1964)
+* Pole- und Bestzeit-Farben als Rollen im Design-System (#1969)
+* Puls in Gold, Cyan, Rot und Grün (#1969)
+* Saison-Verwaltung – Vorschau „Jetzt holen“ mit Termin, Abweichungen und unbekannten Namen (#1964)
+* Seite und Seiten-Scrollleiste im dunklen Stil (#1969)
+* Serienseite – Hinweis „Daten von …“ mit Link zum Partner (#1964)
+* Turnierserie – Partner-Plattform je Saison einstellen, Turniertage holen und als Entwurf übernehmen (#1964)
+* Wischleisten im Vereinsstil in Web und Verwaltung, nie versteckt, mit Verlauf (#1969)
+* Zahlen und Zeiten zählen überall gleich hoch, Listen erscheinen gestaffelt, neue Werte leuchten kurz auf (#1969)
 
 ### Fehlerbehebungen
 
-* Ergebnisblatt zeigt das Team-Feld nur, wenn die Saison Teams führt ([#1969](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1969)) ([c5562fa](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/c5562faaf999218b40401a806a914bd8888b8391))
-* Fast Lap zeigt Zeiten und Abstände mit Komma ([#1969](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1969)) ([c5562fa](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/c5562faaf999218b40401a806a914bd8888b8391))
-* Rundentabelle: Pole und Bestzeit leuchten erst am Ende des Hochzählens auf ([#1969](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1969)) ([c5562fa](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/c5562faaf999218b40401a806a914bd8888b8391))
-* Screenreader-Text in Wischflächen macht die Seite nicht mehr breiter ([#1969](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1969)) ([c5562fa](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/c5562faaf999218b40401a806a914bd8888b8391))
-* Tailwind-Warnung beim Bau der Fast-Lap-Seite behoben ([#1969](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1969)) ([c5562fa](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/c5562faaf999218b40401a806a914bd8888b8391))
-* Termine ohne Kürzel brechen in Kalender und Ergebnissen nicht mehr um ([#1969](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1969)) ([c5562fa](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/c5562faaf999218b40401a806a914bd8888b8391))
+* Ergebnisblatt zeigt das Team-Feld nur, wenn die Saison Teams führt (#1969)
+* Fast Lap zeigt Zeiten und Abstände mit Komma (#1969)
+* Rundentabelle: Pole und Bestzeit leuchten erst am Ende des Hochzählens auf (#1969)
+* Screenreader-Text in Wischflächen macht die Seite nicht mehr breiter (#1969)
+* Tailwind-Warnung beim Bau der Fast-Lap-Seite behoben (#1969)
+* Termine ohne Kürzel brechen in Kalender und Ergebnissen nicht mehr um (#1969)
 
 ## 1.26.0 (21.10.2026)
 
