@@ -1,10 +1,12 @@
 """Logos als SVG (#1952) über die echten Routen:
-- SVG geht nur in Logo-Feldern (``/uploads/logo``, ``/uploads/sponsor-logo``, ``/uploads/image?allow_svg=true``); Fotos,
-  Avatare und die Mediathek bleiben ohne SVG;
+- SVG geht nur über die Logo-Routen mit Rechteprüfung (``/uploads/logo``, ``/uploads/sponsor-logo``,
+  ``/uploads/team-logo`` für die Leitung des Teams); ``/uploads/image``, Fotos, Avatare und die Mediathek bleiben ohne
+  SVG, und eine SVG-Adresse lässt sich nur in Logo-Feldern speichern;
 - gespeichert wird die bereinigte Fassung und daneben die PNG-Fassung;
 - ausgeliefert mit strengen Kopfzeilen;
-- die App (kein Browser) bekommt in Antworten die PNG-Adresse, der Browser das SVG; speichert die App die PNG zurück,
+- nur die App bekommt in GET-Antworten die PNG-Adresse, alle anderen das SVG; speichert ein Formular die PNG zurück,
   bleibt das SVG;
+- ein zu aufwendiges SVG bekommt 422, SVG-Uploads sind je Konto begrenzt;
 - Mediathek, Löschen und Bildprüfung nehmen die PNG-Fassung mit."""
 import pathlib
 import sys
@@ -23,6 +25,7 @@ from services import account_erasure, image_upload, image_variants, media_scan, 
 LOGO = (b'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 200" onload="alert(1)">'
         b'<script>alert(2)</script><rect x="100" y="50" width="200" height="100" fill="#29B6E8"/></svg>')
 BROWSER = {"Sec-Fetch-Mode": "cors", "Sec-Fetch-Site": "same-origin"}
+APP = {"User-Agent": "okhttp/4.12.0"}
 
 
 @pytest_asyncio.fixture
@@ -80,8 +83,10 @@ async def test_logo_upload_stores_the_clean_svg_and_a_png_next_to_it(flow, tmp_p
     # Zugeschnitten wie ein Raster-Logo: die viewBox liegt um das Rechteck.
     x, y, w, h = (float(v) for v in stored.split('viewBox="', 1)[1].split('"', 1)[0].split())
     assert 80 < x < 100 and 30 < y < 50 and 200 < w < 240 and 100 < h < 140
+    # Die PNG ist der Ausschnitt aus dem einen Bild mit RASTER_PX an der längeren Seite.
     with Image.open(public / result["filename"].replace(".svg", ".png")) as png:
-        assert png.format == "PNG" and max(png.size) == svg_logo.RASTER_PX
+        assert png.format == "PNG" and svg_logo.RASTER_PX // 2 < max(png.size) <= svg_logo.RASTER_PX
+        assert abs(png.width / png.height - w / h) < 0.02
     row = await flow.db.media_uploads.find_one({"url": result["url"]}, {"_id": 0})
     assert row["mime"] == "image/svg+xml" and row["media_type"] == "image" and row["raster_url"] == result["raster_url"]
     assert row["media_scope"] == "branding"
@@ -93,11 +98,22 @@ async def test_logo_upload_stores_the_clean_svg_and_a_png_next_to_it(flow, tmp_p
 @pytest.mark.asyncio
 async def test_svg_only_where_a_logo_belongs(flow):
     user = await flow.add_user(name="kapitaen")
+    stranger = await flow.add_user(name="fremd")
+    await flow.db.teams.insert_one({"id": "team-kiwi", "name": "Kiwi", "tag": "KIW", "leader_id": user["id"],
+                                    "member_ids": [user["id"]]})
     flow.act_as(user)
-    # Teamlogo (Mitglied): mit dem Schalter ja, ohne (Profilbild, Banner) wie bisher nein.
-    team_logo = await web(flow, "post", "/api/uploads/image?allow_svg=true", files=svg_file())
+    # Ein Schalter des Aufrufers öffnet nichts mehr: /uploads/image bleibt ohne SVG.
+    switch = await web(flow, "post", "/api/uploads/image?allow_svg=true", files=svg_file())
+    assert switch.status_code == 400 and switch.json()["detail"] == image_upload.SVG_REFUSED_MESSAGE
+    # Teamlogo: nur die Leitung des Teams.
+    team_logo = await web(flow, "post", "/api/uploads/team-logo?team_id=team-kiwi", files=svg_file())
     assert team_logo.status_code == 200, team_logo.text
-    assert team_logo.json()["media_scope"] == "user"
+    assert team_logo.json()["media_scope"] == "user" and team_logo.json()["url"].endswith(".svg")
+    assert (await web(flow, "post", "/api/uploads/team-logo?team_id=fehlt", files=svg_file())).status_code == 404
+    flow.act_as(stranger)
+    foreign = await web(flow, "post", "/api/uploads/team-logo?team_id=team-kiwi", files=svg_file())
+    assert foreign.status_code == 403
+    flow.act_as(user)
     avatar = await web(flow, "post", "/api/uploads/image", files=svg_file())
     assert avatar.status_code == 400 and avatar.json()["detail"] == image_upload.SVG_REFUSED_MESSAGE
     disguised = await web(flow, "post", "/api/uploads/image", files=svg_file("logo.png", mime="image/png"))
@@ -143,20 +159,32 @@ async def test_the_app_gets_the_png_and_keeps_the_svg_when_saving_it_back(flow):
     await admin(flow)
     url = (await web(flow, "post", "/api/uploads/logo", files=svg_file())).json()["url"]
     png_url = url[:-4] + ".png"
+    # Antworten auf Änderungen bleiben unverändert - auch für die App.
     created = await flow.post("/api/games", json={"name": "Probe Kiwi", "slug": "probe-kiwi", "logo_url": url},
-                              headers=BROWSER)
+                              headers=APP)
     assert created.status_code in (200, 201), created.text
+    assert created.json()["logo_url"] == url
     browser = (await flow.get("/api/games", headers=BROWSER)).json()
-    app = (await flow.get("/api/games")).json()
+    other = (await flow.get("/api/games")).json()
+    app = (await flow.get("/api/games", headers=APP)).json()
     assert [game["logo_url"] for game in browser if game["slug"] == "probe-kiwi"] == [url]
+    assert [game["logo_url"] for game in other if game["slug"] == "probe-kiwi"] == [url]
     assert [game["logo_url"] for game in app if game["slug"] == "probe-kiwi"] == [png_url]
+    assert [game["logo_url"] for game in (await flow.get("/api/games", headers={"X-LionsApp": "1.8.0"})).json()
+            if game["slug"] == "probe-kiwi"] == [png_url]
+
+    # Branding: die App liest die PNG, schickt das Formular zurück - gespeichert bleibt das SVG.
+    saved = await flow.put("/api/settings/branding", json={"logo_url": png_url, "favicon_url": url}, headers=APP)
+    assert saved.status_code == 200, saved.text
+    branding = await flow.db.settings.find_one({"id": "branding"})
+    assert branding["logo_url"] == url and branding["favicon_url"] == url
 
     leader = await flow.add_user(name="kapitaen")
     team = {"id": "team-kiwi", "name": "Kiwi", "tag": "KIW", "leader_id": leader["id"], "member_ids": [leader["id"]],
             "logo_url": url}
     await flow.db.teams.insert_one(dict(team))
     flow.act_as(leader)
-    saved = await flow.put("/api/teams/team-kiwi", json={"name": "Kiwi", "logo_url": png_url})
+    saved = await flow.put("/api/teams/team-kiwi", json={"name": "Kiwi", "logo_url": png_url}, headers=APP)
     assert saved.status_code == 200, saved.text
     assert (await flow.db.teams.find_one({"id": "team-kiwi"}))["logo_url"] == url
     other = await flow.put("/api/teams/team-kiwi", json={"logo_url": "/api/static/uploads/anderes.png"})
@@ -205,3 +233,39 @@ async def test_app_icons_and_series_logo_take_the_svg_and_point_to_the_png(flow)
     assert {icon["type"] for icon in manifest["icons"] if icon["src"] == url[:-4] + ".png"} == {"image/png"}
     from services import series_logo
     assert series_logo.clean(url) == url
+
+
+@pytest.mark.asyncio
+async def test_an_svg_address_is_refused_outside_logo_fields(flow):
+    await admin(flow)
+    url = (await web(flow, "post", "/api/uploads/logo", files=svg_file())).json()["url"]
+    user = await flow.add_user(name="kapitaen")
+    await flow.db.teams.insert_one({"id": "team-kiwi", "name": "Kiwi", "tag": "KIW", "leader_id": user["id"],
+                                    "member_ids": [user["id"]]})
+    flow.act_as(user)
+    for body in ({"avatar_url": url}, {"banner_url": f"https://lionsquad.example{url}"}):
+        refused = await flow.put("/api/users/me", json=body)
+        assert refused.status_code == 422 and refused.json()["detail"] == svg_logo.FIELD_REFUSED, body
+    assert (await flow.db.users.find_one({"id": user["id"]})).get("avatar_url") in (None, "")
+    raster = await flow.put("/api/users/me", json={"avatar_url": url[:-4] + ".png"})
+    assert raster.status_code == 200, raster.text
+    assert (await flow.put("/api/teams/team-kiwi", json={"banner_url": url})).status_code == 422
+    assert (await flow.put("/api/teams/team-kiwi", json={"logo_url": url})).status_code == 200
+    await admin(flow)
+    assert (await flow.put("/api/settings/branding", json={"share_banner_url": url})).status_code == 422
+    assert (await flow.put("/api/settings/branding", json={"mascot_url": url})).status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_too_expensive_svg_gets_422_and_svg_uploads_are_limited_per_account(flow, monkeypatch):
+    await admin(flow)
+    monkeypatch.setattr(svg_logo, "RASTER_TIMEOUT_SECONDS", 1.5)
+    heavy = ('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1000">'
+             + "".join(f'<rect width="1000" height="1000" fill="#{i % 9}{i % 7}{i % 5}" opacity="0.5"/>'
+                       for i in range(3900)) + "</svg>").encode()
+    response = await web(flow, "post", "/api/uploads/logo", files=svg_file(body=heavy))
+    assert response.status_code == 422 and response.json()["detail"] == svg_logo.TOO_COMPLEX
+    assert await flow.db.media_uploads.count_documents({}) == 0
+    monkeypatch.setattr(svg_logo, "SVG_UPLOAD_RATE_LIMIT", 2)
+    statuses = [(await web(flow, "post", "/api/uploads/logo", files=svg_file())).status_code for _ in range(2)]
+    assert statuses == [200, 429]

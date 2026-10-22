@@ -232,6 +232,9 @@ async def request_validation_error(_request: Request, exc: RequestValidationErro
     return JSONResponse(status_code=422, content={"detail": _json_safe(jsonable_encoder(exc.errors()))})
 
 
+# Logos als SVG (#1952): ein SVG nur in Logo-Feldern, die PNG-Fassung eines SVG-Logos bleibt beim Speichern das SVG.
+app.add_middleware(svg_logo.SvgFieldGate)
+
 app.add_middleware(
     TrustedHostMiddleware,
     allowed_hosts=list(trusted_http_hosts()),
@@ -551,12 +554,13 @@ async def security_headers(request, call_next):
 
 @app.middleware("http")
 async def raster_logos_for_apps(request, call_next):
-    """Logos als SVG (#1952): Die App kann noch kein SVG - wer kein Browser ist (``svg_logo.client_needs_raster``),
-    bekommt in JSON-Antworten der API die PNG-Fassung eines hochgeladenen SVG statt des SVG."""
+    """Logos als SVG (#1952): Die App kann noch kein SVG. Nur sie (``svg_logo.client_is_app``) und nur bei GET bekommt
+    in JSON-Antworten die PNG-Fassung eines hochgeladenen SVG; Antworten auf Änderungen und alle anderen Abrufer
+    bekommen die gespeicherte Adresse. Die PNG-Fassung liegt immer neben dem SVG (``<name>.png``)."""
     response = await call_next(request)
     path = request.url.path
-    if (not path.startswith("/api/") or path.startswith("/api/static/")
-            or not svg_logo.client_needs_raster(request.headers)
+    if (request.method != "GET" or not path.startswith("/api/") or path.startswith("/api/static/")
+            or not svg_logo.client_is_app(request.headers)
             or not response.headers.get("content-type", "").startswith("application/json")):
         return response
     body = b"".join([chunk async for chunk in response.body_iterator])

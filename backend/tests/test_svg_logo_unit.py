@@ -2,8 +2,11 @@
 ohne SVG. Das Testkorpus unten enthält bösartige Dateien; jede wird bereinigt oder abgelehnt. Ein harmloses Logo bleibt
 optisch gleich (Vergleich der Rasterbilder)."""
 import io
+import json
 import pathlib
 import sys
+import threading
+import time
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 
@@ -29,6 +32,12 @@ def clean_text(data: bytes, **kwargs) -> str:
 def rejected(data: bytes) -> str:
     with pytest.raises(svg_logo.SvgRejected) as caught:
         svg_logo.sanitize(data)
+    return str(caught.value)
+
+
+def rejected_drawing(data: bytes) -> str:
+    with pytest.raises(svg_logo.SvgRejected) as caught:
+        svg_logo.prepare(data, trim=False)
     return str(caught.value)
 
 
@@ -163,9 +172,9 @@ def test_viewbox_comes_from_width_and_height_or_the_file_is_refused():
 
 
 def test_nothing_visible_after_cleaning_is_refused():
-    assert "nichts Sichtbares" in rejected(svg("<script>alert(1)</script>"))
+    assert "nichts Sichtbares" in rejected_drawing(svg("<script>alert(1)</script>"))
     image_only = svg('<image href="https://boese.example/logo.png" width="100" height="60"/>')
-    assert "nichts Sichtbares" in rejected(image_only)
+    assert "nichts Sichtbares" in rejected_drawing(image_only)
 
 
 # ---------------------------------------------------------------- Harmloses Logo bleibt gleich
@@ -201,17 +210,20 @@ def test_harmless_logo_looks_the_same_after_cleaning():
 
 def test_trim_moves_the_viewbox_to_the_drawing():
     data = svg('<rect x="400" y="300" width="200" height="100" fill="#29B6E8"/>', attrs='viewBox="0 0 1000 1000"')
-    trimmed = svg_logo.sanitize(data, trim=True)
+    trimmed, png = svg_logo.prepare(data, trim=True)
     x, y, w, h = trimmed.view_box
     assert 370 < x < 400 and 270 < y < 300
     assert 200 < w < 260 and 100 < h < 160
+    # Die PNG ist derselbe Ausschnitt aus dem einen gezeichneten Bild.
+    with Image.open(io.BytesIO(png)) as image:
+        assert abs(image.width / image.height - w / h) < 0.02
     # Ohne Rand (füllt das Bild) bleibt die viewBox stehen.
-    full = svg_logo.sanitize(svg('<rect width="100" height="60"/>'), trim=True)
+    full, _png = svg_logo.prepare(svg('<rect width="100" height="60"/>'), trim=True)
     assert full.view_box == (0.0, 0.0, 100.0, 60.0)
 
 
 def test_png_has_the_raster_size_and_transparency():
-    png = svg_logo.raster_png(svg_logo.sanitize(svg(RECT)).data)
+    _clean, png = svg_logo.prepare(svg(RECT), trim=False)
     with Image.open(io.BytesIO(png)) as image:
         assert image.format == "PNG" and image.mode == "RGBA"
         assert image.size == (svg_logo.RASTER_PX, round(svg_logo.RASTER_PX * 60 / 100))
@@ -242,23 +254,45 @@ def test_raster_url_points_to_the_png_next_to_an_svg(tmp_path, monkeypatch):
     assert svg_logo.raster_path(tmp_path / "foto.webp") == tmp_path / "foto.webp"
 
 
-def test_only_browsers_get_svg_in_api_answers():
-    assert svg_logo.client_needs_raster({}) is True  # App, Abrufe ohne Browser
-    assert svg_logo.client_needs_raster({"user-agent": "okhttp/4.12.0"}) is True
-    assert svg_logo.client_needs_raster({"sec-fetch-mode": "cors"}) is False
-    assert svg_logo.client_needs_raster({"Sec-Fetch-Mode": "navigate"}) is False
+def test_only_the_app_gets_png_answers():
+    # Nur ein ausdrückliches Merkmal der App zählt - kein Raten aus fehlenden Browser-Kopfzeilen.
+    assert svg_logo.client_is_app({"user-agent": "okhttp/4.12.0"}) is True
+    assert svg_logo.client_is_app({"X-LionsApp": "1.8.0"}) is True
+    assert svg_logo.client_is_app({}) is False
+    assert svg_logo.client_is_app({"user-agent": "curl/8.0"}) is False
+    assert svg_logo.client_is_app({"User-Agent": "Mozilla/5.0", "Sec-Fetch-Mode": "cors"}) is False
 
 
-def test_an_app_save_of_the_png_keeps_the_svg(tmp_path, monkeypatch):
+def test_a_saved_png_of_an_svg_logo_stays_the_svg(tmp_path, monkeypatch):
     monkeypatch.setattr(svg_logo, "PUBLIC_UPLOAD_DIR", tmp_path)
     (tmp_path / "abc123.svg").write_bytes(b"<svg/>")
     (tmp_path / "abc123.png").write_bytes(b"png")
-    old = "/api/static/uploads/abc123.svg"
-    assert svg_logo.keep_vector("/api/static/uploads/abc123.png", old) == old
-    assert svg_logo.keep_vector("/api/static/uploads/neu.png", old) == "/api/static/uploads/neu.png"
-    assert svg_logo.keep_vector(None, old) is None
-    assert svg_logo.keep_vector("/api/static/uploads/abc123.png", "/api/static/uploads/x.png") == \
-        "/api/static/uploads/abc123.png"
+    assert svg_logo.vector_url("/api/static/uploads/abc123.png") == "/api/static/uploads/abc123.svg"
+    assert svg_logo.vector_url("https://x.example/api/static/uploads/abc123.png?v=1") == \
+        "https://x.example/api/static/uploads/abc123.svg?v=1"
+    assert svg_logo.vector_url("/api/static/uploads/neu.png") == "/api/static/uploads/neu.png"
+    body = b'{"logo_url": "/api/static/uploads/abc123.png", "banner_url": "/api/static/uploads/abc123.png"}'
+    changed = json.loads(svg_logo.gate_json_body(body))
+    assert changed == {"logo_url": "/api/static/uploads/abc123.svg", "banner_url": "/api/static/uploads/abc123.png"}
+    assert svg_logo.gate_json_body(b'{"logo_url": "/api/static/uploads/neu.png"}') is None
+
+
+def test_svg_only_in_logo_fields():
+    allowed = b'{"logo_url": "/api/static/uploads/a.svg", "brand": {"favicon_dark_url": "/api/static/uploads/b.svg"}}'
+    assert svg_logo.gate_json_body(allowed) is None
+    for refused in (
+        b'{"avatar_url": "/api/static/uploads/a.svg"}',
+        b'{"banner_url": "https://lionsquad.example/api/static/uploads/a.SVG?x=1"}',
+        b'{"tools": [{"image_url": "/uploads/a.svg"}]}',
+        b'{"award_images": {"1": "/api/static/uploads/a.svg"}}',
+        b'{"content": "Text ![x](/api/static/uploads/a.svg) mehr"}',
+        b'{"cover_url": "data:image/svg+xml;base64,PHN2Zz48L3N2Zz4="}',
+        b'[{"photo_url": "/api/static/uploads/a.svg"}]',
+    ):
+        with pytest.raises(svg_logo.FieldRefused):
+            svg_logo.gate_json_body(refused)
+    assert svg_logo.gate_json_body(b'{"avatar_url": "/api/static/uploads/a.png"}') is None
+    assert svg_logo.gate_json_body(b"kein json mit svg") is None
 
 
 def test_nginx_serves_uploaded_svg_with_the_strict_policy():
@@ -277,4 +311,49 @@ def test_render_heavy_features_are_limited():
     assert "dash" not in dashed and 'stroke="#29B6E8"' in dashed
     mask = '<mask id="m{}"><rect width="10" height="10" fill="#fff"/></mask>'
     masks = "".join(mask.format(i) for i in range(svg_logo.MAX_LAYERS + 1))
-    assert "Elemente" in rejected(svg(f"<defs>{masks}</defs>{RECT}"))
+    assert svg_logo.MAX_LAYERS <= 8
+    assert "aufwendig" in rejected(svg(f"<defs>{masks}</defs>{RECT}"))
+    # Viele Zahlen in Pfaden - auch erst über use vervielfacht.
+    long_path = "M0 0 " + "L1 1 " * (svg_logo.MAX_PATH_NUMBERS // 2 + 1)
+    assert "aufwendig" in rejected(svg(f'<path d="{long_path}" stroke="#000"/>'))
+    part = "M0 0 " + "L1 1 " * (svg_logo.MAX_PATH_NUMBERS // 6)
+    uses = "".join(f'<use href="#teil" x="{i}"/>' for i in range(4))
+    assert "aufwendig" in rejected(svg(f'<defs><path id="teil" d="{part}" stroke="#000"/></defs>{uses}'))
+
+
+# ---------------------------------------------------------------- Zeichnen: eigener Prozess, Grenzen, einmal
+
+EXPENSIVE = svg("".join(f'<rect width="1000" height="1000" fill="#{i % 9}{i % 7}{i % 5}" opacity="0.5"/>'
+                        for i in range(3900)), attrs='viewBox="0 0 1000 1000"')
+
+
+def test_an_expensive_drawing_is_stopped_by_the_time_limit(monkeypatch):
+    monkeypatch.setattr(svg_logo, "RASTER_TIMEOUT_SECONDS", 1.5)
+    started = time.perf_counter()
+    assert "aufwendig" in rejected_drawing(EXPENSIVE)
+    assert time.perf_counter() - started < 5
+    # Ein gewöhnliches Logo bleibt in der Zeit.
+    clean, png = svg_logo.prepare(HARMLESS, trim=False)
+    assert png.startswith(b"\x89PNG")
+
+
+def test_one_drawing_per_upload(monkeypatch):
+    calls = []
+    original = svg_logo._render
+
+    def counting(data, width):
+        calls.append(width)
+        return original(data, width)
+
+    monkeypatch.setattr(svg_logo, "_render", counting)
+    padded = svg('<rect x="400" y="300" width="200" height="100"/>', attrs='viewBox="0 0 1000 1000"')
+    svg_logo.prepare(padded, trim=True)
+    assert calls == [svg_logo.RASTER_PX]
+
+
+def test_busy_when_every_drawing_slot_is_taken(monkeypatch):
+    slots = threading.BoundedSemaphore(1)
+    slots.acquire()
+    monkeypatch.setattr(svg_logo, "_RASTER_SLOTS", slots)
+    monkeypatch.setattr(svg_logo, "RASTER_WAIT_SECONDS", 0.05)
+    assert "gleich noch einmal" in rejected_drawing(svg(RECT))

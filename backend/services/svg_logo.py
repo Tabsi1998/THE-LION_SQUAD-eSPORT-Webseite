@@ -20,10 +20,14 @@ bereinigten Fassung. Mails, PDF, Teilen-Bilder, Discord, Favicons und die App be
 from __future__ import annotations
 
 import io
+import json
 import logging
 import math
 import os
 import re
+import subprocess
+import sys
+import threading
 import uuid
 from dataclasses import dataclass
 from pathlib import Path
@@ -51,13 +55,25 @@ MAX_SVG_BYTES = MAX_SVG_UPLOAD_MB * 1024 * 1024
 MAX_ELEMENTS = _int_env("SVG_MAX_ELEMENTS", 4000, 100, 20000)
 MAX_INPUT_ELEMENTS = MAX_ELEMENTS * 10
 # Jede Ebene (Gruppe mit Deckkraft, Maske, Beschneidung) kann beim Zeichnen eine eigene Bildfläche brauchen - darum
-# begrenzt: Tiefe und Zahl der Masken und Beschneidungspfade. Logos kommen mit wenigen aus.
+# begrenzt: Tiefe und Zahl der Masken und Beschneidungspfade. Logos kommen mit wenigen aus. Dazu die Menge an Zahlen in
+# Pfaden und Polygonen (auch über ``use`` vervielfacht) - sie bestimmt, wie lange das Zeichnen dauert.
 MAX_DEPTH = 24
-MAX_LAYERS = 32
+MAX_LAYERS = 8
+MAX_PATH_NUMBERS = _int_env("SVG_MAX_PATH_NUMBERS", 100_000, 1_000, 1_000_000)
 RASTER_PX = _int_env("SVG_RASTER_PX", 2000, 256, 4096)
 INTRINSIC_PX = 1024
-TRIM_PX = 512
 MAX_COORD = 1e7
+# Gezeichnet wird in einem eigenen Prozess mit Zeit- und Speichergrenze, höchstens ``RASTER_CONCURRENCY`` zugleich;
+# wer länger als ``RASTER_WAIT_SECONDS`` auf einen Platz wartet, bekommt „bitte gleich noch einmal“.
+RASTER_TIMEOUT_SECONDS = float(_int_env("SVG_RASTER_TIMEOUT_SECONDS", 5, 1, 60))
+RASTER_MEMORY_MB = _int_env("SVG_RASTER_MEMORY_MB", 512, 128, 4096)
+RASTER_CONCURRENCY = _int_env("SVG_RASTER_CONCURRENCY", 1, 1, 8)
+RASTER_WAIT_SECONDS = 20.0
+WORKER = Path(__file__).with_name("svg_raster_worker.py")
+_RASTER_SLOTS = threading.BoundedSemaphore(RASTER_CONCURRENCY)
+# SVG-Uploads je Konto und Zeitfenster (zusätzlich zur Grenze für Bilder).
+SVG_UPLOAD_RATE_LIMIT = _int_env("SVG_UPLOAD_RATE_LIMIT", 20, 1, 1000)
+SVG_UPLOAD_RATE_WINDOW_SECONDS = _int_env("SVG_UPLOAD_RATE_WINDOW_SECONDS", 3600, 60, 86400)
 
 # Kopfzeilen beim Ausliefern (Backend und nginx): kein Raten des Typs, und wird die Datei direkt geöffnet, darf darin
 # nichts laden oder laufen - nur Zeichnen und Stil.
@@ -80,12 +96,17 @@ NO_SIZE = "Dem SVG fehlt die Größe (viewBox oder Breite und Höhe). Bitte mit 
 NOTHING = ("Nach der Bereinigung bleibt nichts Sichtbares übrig. Bitte als einfaches SVG mit Pfaden und Formen "
            "exportieren oder als PNG hochladen.")
 NO_DRAW = "Das SVG lässt sich nicht zeichnen. Bitte neu exportieren oder als PNG hochladen."
+TOO_COMPLEX = "Das SVG ist zu aufwendig zum Zeichnen. Bitte vereinfachen oder als PNG hochladen."
+BUSY = "Gerade werden andere Logos verarbeitet. Bitte gleich noch einmal versuchen."
+FIELD_REFUSED = "SVG geht nur in Logo-Feldern. Für Fotos, Banner und Profilbilder bitte PNG, JPG oder WebP."
 
 
 MESSAGES = {
     "too_big": TOO_BIG, "dtd": NO_DTD, "not_svg": NOT_SVG, "too_many": TOO_MANY, "too_deep": TOO_DEEP,
-    "no_size": NO_SIZE, "nothing": NOTHING, "no_draw": NO_DRAW,
+    "no_size": NO_SIZE, "nothing": NOTHING, "no_draw": NO_DRAW, "too_complex": TOO_COMPLEX, "busy": BUSY,
 }
+# Antwort-Status je Grund: zu groß 413, zu aufwendig 422, ausgelastet 429, sonst 400.
+STATUS = {"too_big": 413, "too_complex": 422, "busy": 429}
 
 
 class SvgRejected(ValueError):
@@ -402,9 +423,24 @@ def _subtree_size(element: ET.Element) -> int:
     return sum(1 for _ in element.iter())
 
 
+def _digit_runs(text: str | None) -> int:
+    """Wie viele Zahlen in Pfaddaten stehen (grob: zusammenhängende Ziffernfolgen) - ohne Regex."""
+    count, inside = 0, False
+    for ch in text or "":
+        digit = "0" <= ch <= "9"
+        if digit and not inside:
+            count += 1
+        inside = digit
+    return count
+
+
+def _path_numbers(element: ET.Element) -> int:
+    return sum(_digit_runs(node.get("d")) + _digit_runs(node.get("points")) for node in element.iter())
+
+
 def _resolve_references(root: ET.Element) -> None:
     """``use`` nur auf vorhandene Ziele ohne eigenes ``use`` und nie auf sich selbst; Verläufe nur auf Verläufe ohne
-    Kreis. Vervielfachte Elemente zählen gegen die Grenze."""
+    Kreis. Vervielfachte Elemente und Pfadzahlen zählen gegen die Grenzen."""
     ids: dict[str, ET.Element] = {}
     parents: dict[ET.Element, ET.Element] = {}
     for parent in root.iter():
@@ -415,8 +451,9 @@ def _resolve_references(root: ET.Element) -> None:
             ids[element_id] = parent
     use_tag = "use"
     if sum(1 for node in root.iter() if node.tag in ("mask", "clipPath")) > MAX_LAYERS:
-        raise SvgRejected("too_many")
+        raise SvgRejected("too_complex")
     expanded = _subtree_size(root)
+    numbers = _path_numbers(root)
     for element in list(root.iter()):
         local = element.tag.split("}", 1)[-1]
         ref = element.get("href")
@@ -433,8 +470,11 @@ def _resolve_references(root: ET.Element) -> None:
                 parents[element].remove(element)
                 continue
             expanded += _subtree_size(target)
+            numbers += _path_numbers(target)
             if expanded > MAX_ELEMENTS:
                 raise SvgRejected("too_many")
+            if numbers > MAX_PATH_NUMBERS:
+                raise SvgRejected("too_complex")
         elif local in GRADIENTS:
             seen, node = {element}, target
             while node is not None and node.tag.split("}", 1)[-1] in GRADIENTS and node not in seen:
@@ -445,6 +485,8 @@ def _resolve_references(root: ET.Element) -> None:
                 del element.attrib["href"]
     if expanded > MAX_ELEMENTS:
         raise SvgRejected("too_many")
+    if numbers > MAX_PATH_NUMBERS:
+        raise SvgRejected("too_complex")
 
 
 @dataclass
@@ -471,14 +513,28 @@ def _serialize(root: ET.Element, view_box: tuple[float, float, float, float]) ->
     return CleanSvg(data=data, width=width, height=height, view_box=view_box)
 
 
-def _render(data: bytes, long_side: int) -> bytes:
-    import resvg_py
-
+def _render(data: bytes, width: int) -> bytes:
+    """Ein bereinigtes SVG als PNG - in einem eigenen Prozess (``svg_raster_worker.py``) mit harter Zeitgrenze und
+    Speichergrenze, höchstens ``RASTER_CONCURRENCY`` zugleich. Ein zu aufwendiges Bild bricht ab, statt den Server zu
+    binden."""
+    if not _RASTER_SLOTS.acquire(timeout=RASTER_WAIT_SECONDS):
+        raise SvgRejected("busy")
     try:
-        return bytes(resvg_py.svg_to_bytes(svg_string=data.decode("utf-8"), width=long_side))
-    except Exception as exc:  # noqa: BLE001 - resvg meldet Fehler als ValueError/RuntimeError
-        logger.info("[svg] zeichnen gescheitert: %s", type(exc).__name__)
-        raise SvgRejected("no_draw") from None
+        result = subprocess.run(
+            [sys.executable, "-I", str(WORKER), str(int(width)), str(RASTER_MEMORY_MB),
+             str(math.ceil(RASTER_TIMEOUT_SECONDS) + 1)],
+            input=data, capture_output=True, timeout=RASTER_TIMEOUT_SECONDS, check=False,
+        )
+    except subprocess.TimeoutExpired:
+        logger.info("[svg] zeichnen dauerte zu lange - abgebrochen")
+        raise SvgRejected("too_complex") from None
+    finally:
+        _RASTER_SLOTS.release()
+    if result.returncode == 0 and result.stdout.startswith(b"\x89PNG"):
+        return result.stdout
+    logger.info("[svg] zeichnen gescheitert (Rückgabe %s)", result.returncode)
+    # 3: resvg konnte das Dokument nicht lesen; alles andere (Speicher, Rechenzeit, Abbruch) heißt zu aufwendig.
+    raise SvgRejected("no_draw" if result.returncode == 3 else "too_complex")
 
 
 def _render_rgba(data: bytes, view_box, long_side: int):
@@ -488,12 +544,16 @@ def _render_rgba(data: bytes, view_box, long_side: int):
     # resvg skaliert nach der Breite; für ein hohes Bild wird die Breite so gewählt, dass die Höhe passt.
     width = long_side if w >= h else max(1, round(long_side * w / h))
     with Image.open(io.BytesIO(_render(data, width))) as image:
-        return image.convert("RGBA")
+        image = image.convert("RGBA")
+    wanted = (long_side, max(1, round(long_side * h / w))) if w >= h else (max(1, round(long_side * w / h)), long_side)
+    if image.size != wanted:
+        image = image.resize(wanted, Image.Resampling.LANCZOS)
+    return image
 
 
-def _trimmed(view_box, image) -> tuple[float, float, float, float] | None:
-    """Die viewBox nur um den sichtbaren Teil (wie das Zuschneiden der Raster-Logos: deutlich kleiner als das Bild,
-    mit etwas Rand) - sonst ``None``."""
+def _trim_box(image) -> tuple[int, int, int, int] | None:
+    """Der sichtbare Teil mit etwas Rand, wenn er deutlich kleiner ist als das Bild (wie beim Zuschneiden der
+    Raster-Logos) - sonst ``None``."""
     bbox = image.getchannel("A").point(lambda p: 255 if p > 8 else 0).getbbox()
     if not bbox:
         return None
@@ -502,15 +562,16 @@ def _trimmed(view_box, image) -> tuple[float, float, float, float] | None:
     if width * height >= image.width * image.height * 0.92:
         return None
     pad = max(4, int(max(width, height) * 0.06))
-    left, top = max(0, left - pad), max(0, top - pad)
-    right, bottom = min(image.width, right + pad), min(image.height, bottom + pad)
-    x, y, w, h = view_box
-    sx, sy = w / image.width, h / image.height
-    return (x + left * sx, y + top * sy, (right - left) * sx, (bottom - top) * sy)
+    return max(0, left - pad), max(0, top - pad), min(image.width, right + pad), min(image.height, bottom + pad)
 
 
-def sanitize(data: bytes, *, trim: bool = False) -> CleanSvg:
-    """Das hochgeladene SVG, neu geschrieben aus der Positivliste - oder ``SvgRejected`` mit einer Meldung."""
+def _png_bytes(image) -> bytes:
+    out = io.BytesIO()
+    image.save(out, format="PNG", compress_level=6)
+    return out.getvalue()
+
+
+def _clean_tree(data: bytes) -> tuple[ET.Element, tuple[float, float, float, float]]:
     if len(data) > MAX_SVG_BYTES:
         raise SvgRejected("too_big")
     try:
@@ -527,38 +588,45 @@ def sanitize(data: bytes, *, trim: bool = False) -> CleanSvg:
     view_box = _view_box(source)
     root = _Copier(svg_default).copy(source, "svg", 0)
     _resolve_references(root)
+    return root, view_box
+
+
+def sanitize(data: bytes) -> CleanSvg:
+    """Das hochgeladene SVG, neu geschrieben aus der Positivliste - oder ``SvgRejected`` mit einer Meldung. Zeichnet
+    nichts; das macht ``prepare``."""
+    root, view_box = _clean_tree(data)
+    return _serialize(root, view_box)
+
+
+def prepare(data: bytes, *, trim: bool) -> tuple[CleanSvg, bytes]:
+    """Bereinigen und **einmal** zeichnen: Aus dem einen Bild mit ``RASTER_PX`` an der längeren Seite kommen die Prüfung
+    auf Sichtbares, der Zuschnitt (neue viewBox) und die PNG-Fassung."""
+    root, view_box = _clean_tree(data)
     clean = _serialize(root, view_box)
-    preview = _render_rgba(clean.data, view_box, TRIM_PX)
-    if preview.getchannel("A").getbbox() is None:
+    image = _render_rgba(clean.data, view_box, RASTER_PX)
+    if image.getchannel("A").getbbox() is None:
         raise SvgRejected("nothing")
     if trim:
-        smaller = _trimmed(view_box, preview)
-        if smaller:
-            clean = _serialize(root, smaller)
-    return clean
+        box = _trim_box(image)
+        if box:
+            left, top, right, bottom = box
+            x, y, w, h = view_box
+            sx, sy = w / image.width, h / image.height
+            clean = _serialize(root, (x + left * sx, y + top * sy, (right - left) * sx, (bottom - top) * sy))
+            image = image.crop(box)
+    return clean, _png_bytes(image)
 
 
 def raster_png(data: bytes, long_side: int | None = None) -> bytes:
     """Die PNG-Fassung eines bereinigten SVG, die längere Seite ``long_side`` (Vorgabe ``RASTER_PX``) Pixel."""
-    from PIL import Image
-
-    side = long_side or RASTER_PX
     root = parse_xml(data, forbid_dtd=True, forbid_entities=True, forbid_external=True)
     view_box = tuple(float(value) for value in root.get("viewBox").split())
-    image = _render_rgba(data, view_box, side)
-    _x, _y, w, h = view_box
-    wanted = (side, max(1, round(side * h / w))) if w >= h else (max(1, round(side * w / h)), side)
-    if image.size != wanted:
-        image = image.resize(wanted, Image.Resampling.LANCZOS)
-    out = io.BytesIO()
-    image.save(out, format="PNG", optimize=True)
-    return out.getvalue()
+    return _png_bytes(_render_rgba(data, view_box, long_side or RASTER_PX))
 
 
 def store(data: bytes, *, trim: bool, directory: Path | None = None) -> dict:
-    """Bereinigen, rastern und beides ablegen: ``<zufall>.svg`` und daneben ``<zufall>.png``."""
-    clean = sanitize(data, trim=trim)
-    png = raster_png(clean.data)
+    """Bereinigen, einmal zeichnen und beides ablegen: ``<zufall>.svg`` und daneben ``<zufall>.png``."""
+    clean, png = prepare(data, trim=trim)
     folder = directory or PUBLIC_UPLOAD_DIR
     ensure_directory(folder)
     stem = uuid.uuid4().hex
@@ -575,6 +643,8 @@ def store(data: bytes, *, trim: bool, directory: Path | None = None) -> dict:
 
 _UPLOAD_SVG = re.compile(r"/api/static/uploads/([A-Za-z0-9][A-Za-z0-9_-]{0,150})\.svg(?![A-Za-z0-9_])")
 _UPLOAD_SVG_BYTES = re.compile(rb"/api/static/uploads/([A-Za-z0-9][A-Za-z0-9_-]{0,150})\.svg(?![A-Za-z0-9_])")
+_UPLOAD_PNG = re.compile(r"/api/static/uploads/([A-Za-z0-9][A-Za-z0-9_-]{0,150})\.png")
+_ANY_UPLOAD_SVG = re.compile(r"/uploads/[A-Za-z0-9][A-Za-z0-9_.-]{0,150}\.svg(?![A-Za-z0-9_])", re.IGNORECASE)
 
 
 def _has_raster(stem: str) -> bool:
@@ -614,17 +684,118 @@ def raster_path(path: Path | None) -> Path | None:
     return sibling if sibling.is_file() else None
 
 
-def client_needs_raster(headers) -> bool:
-    """Browser schicken bei jedem Abruf ``Sec-Fetch-Mode`` und zeigen SVG im ``<img>``. Wer es nicht schickt (die App,
-    Programme), bekommt in Antworten der API die PNG-Fassung - die App kann noch kein SVG."""
-    return not any(str(key).lower() == "sec-fetch-mode" for key in headers.keys())
+def client_is_app(headers) -> bool:
+    """Die LionsAPP (bis sie SVG kann): Kopfzeile ``X-LionsApp`` (künftige Fassungen) oder die Kennung ihres
+    Netzwerk-Bausteins (``User-Agent: okhttp/…``, so meldet sich die Android-App heute). Nur sie bekommt in Antworten
+    auf GET-Abrufe die PNG-Fassung; Browser und alle anderen bekommen die gespeicherte Adresse."""
+    lowered = {str(key).lower(): str(value) for key, value in headers.items()}
+    return "x-lionsapp" in lowered or lowered.get("user-agent", "").lower().startswith("okhttp/")
 
 
-def keep_vector(new, old):
-    """Speichert die App die PNG-Fassung zurück, die sie bekommen hat, bleibt das SVG."""
-    if not isinstance(new, str) or not isinstance(old, str):
-        return new
-    old_match = _UPLOAD_SVG.fullmatch(urlparse(old).path)
-    if old_match and urlparse(new).path == f"/api/static/uploads/{old_match.group(1)}.png":
-        return old
-    return new
+# ---------------------------------------------------------------- SVG nur in Logo-Feldern
+
+# Die Felder, in denen ein SVG-Logo stehen darf - überall gleich benannt: Branding, Sponsoren, Partner, Spiele, Teams,
+# Spur und Saison einer Serie.
+LOGO_FIELDS = frozenset({
+    "logo_url", "logo_dark_url", "logo_light_url", "mascot_url", "qr_logo_url",
+    "favicon_url", "favicon_light_url", "favicon_dark_url",
+})
+
+
+def _holds_svg(value: str) -> bool:
+    lowered = value.lower()
+    return "data:image/svg" in lowered or (".svg" in lowered and _ANY_UPLOAD_SVG.search(value) is not None)
+
+
+def vector_url(value: str) -> str:
+    """Ist ``value`` die PNG-Fassung eines gespeicherten SVG-Logos (gleicher Name daneben), die Adresse des SVG -
+    sonst ``value``. So bleibt das SVG, wenn ein Formular (etwa die App) die PNG zurückschickt."""
+    path = urlparse(value).path
+    match = _UPLOAD_PNG.fullmatch(path)
+    if not match or not (PUBLIC_UPLOAD_DIR / f"{match.group(1)}.svg").is_file():
+        return value
+    return value.replace(path, f"{path[:-4]}.svg", 1)
+
+
+class FieldRefused(ValueError):
+    """Ein SVG in einem Feld, das kein Logo-Feld ist."""
+
+
+def _gate_value(value, key, state):
+    if isinstance(value, dict):
+        return {name: _gate_value(inner, name, state) for name, inner in value.items()}
+    if isinstance(value, list):
+        return [_gate_value(inner, key, state) for inner in value]
+    if not isinstance(value, str):
+        return value
+    if key in LOGO_FIELDS:
+        kept = vector_url(value) if ".png" in value else value
+        if kept != value:
+            state["changed"] = True
+        return kept
+    if _holds_svg(value):
+        raise FieldRefused(key)
+    return value
+
+
+def gate_json_body(body: bytes) -> bytes | None:
+    """Prüft einen JSON-Körper vor dem Speichern: ein SVG (hochgeladen oder als data-URI) nur in ``LOGO_FIELDS``, sonst
+    ``FieldRefused``; die PNG-Fassung eines SVG-Logos in einem Logo-Feld wird wieder das SVG. Liefert den geänderten
+    Körper oder ``None``, wenn nichts zu ändern ist (auch bei ungültigem JSON - das meldet die Route selbst)."""
+    if b"svg" not in body.lower() and b".png" not in body:
+        return None
+    try:
+        payload = json.loads(body)
+    except ValueError:
+        return None
+    state = {"changed": False}
+    result = _gate_value(payload, None, state)
+    return json.dumps(result, ensure_ascii=False).encode("utf-8") if state["changed"] else None
+
+
+class SvgFieldGate:
+    """ASGI-Baustein vor allen Routen: jeder JSON-Körper von POST, PUT und PATCH unter ``/api/`` geht durch
+    ``gate_json_body`` - ein SVG außerhalb eines Logo-Felds bekommt 422, bevor eine Route etwas speichert."""
+
+    METHODS = frozenset({"POST", "PUT", "PATCH"})
+
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if (scope.get("type") != "http" or scope.get("method") not in self.METHODS
+                or not str(scope.get("path") or "").startswith("/api/")):
+            return await self.app(scope, receive, send)
+        headers = scope.get("headers") or []
+        content_type = next((value for key, value in headers if key.lower() == b"content-type"), b"")
+        if b"json" not in content_type.lower():
+            return await self.app(scope, receive, send)
+        chunks = []
+        while True:
+            message = await receive()
+            if message.get("type") != "http.request":
+                return None  # Verbindung weg
+            chunks.append(message.get("body", b""))
+            if not message.get("more_body"):
+                break
+        body = b"".join(chunks)
+        try:
+            changed = gate_json_body(body)
+        except FieldRefused:
+            from starlette.responses import JSONResponse
+
+            return await JSONResponse({"detail": FIELD_REFUSED}, status_code=422)(scope, receive, send)
+        if changed is not None:
+            body = changed
+            scope = {**scope, "headers": [(key, value) for key, value in headers if key.lower() != b"content-length"]
+                     + [(b"content-length", str(len(body)).encode("ascii"))]}
+        delivered = False
+
+        async def replay():
+            nonlocal delivered
+            if not delivered:
+                delivered = True
+                return {"type": "http.request", "body": body, "more_body": False}
+            return await receive()
+
+        return await self.app(scope, replay, send)

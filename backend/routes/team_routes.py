@@ -13,7 +13,7 @@ from services.notification_preferences import send_user_template
 from services.user_notifications import build_public_url, create_user_notification
 from services.chat_attachments import MAX_ATTACHMENTS_PER_MESSAGE, chat_message_preview, claim_attachments, register_chat_access
 from services.query_filters import safe_regex
-from services import svg_logo, word_filter
+from services import word_filter
 from services.log_safe import log_safe
 from services.private_fields import private_projection
 from services.permissions import MFA_MESSAGE, admin_role_without_second_factor, is_confirmed_admin_role
@@ -703,9 +703,6 @@ async def update_team(team_id: str, body: TeamUpdate, me: dict = Depends(get_cur
     nullable_fields = {"description", "logo_url", "banner_url", "discord_link", "social_links"}
     raw = body.model_dump(exclude_unset=True)
     updates = {k: v for k, v in raw.items() if v is not None or k in nullable_fields}
-    if "logo_url" in updates:
-        # Die App bekommt ein SVG-Logo als PNG (#1952) - speichert sie es zurück, bleibt das SVG.
-        updates["logo_url"] = svg_logo.keep_vector(updates["logo_url"], team.get("logo_url"))
     if updates.get("name") or updates.get("tag"):
         await word_filter.screen_field(db, f"{updates.get('name') or ''} {updates.get('tag') or ''}", kind="team_name", user_id=me["id"], ref_id=team_id)
     updates["updated_at"] = now_utc().isoformat()
