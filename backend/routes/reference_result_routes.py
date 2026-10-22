@@ -900,7 +900,8 @@ async def _learn_spellings(db, access: SeriesAccess, body, resolution, participa
                            content: dict) -> dict:
     """Korrekturen aus dem Bild lernen (#2012, ``services/read_spellings``): Hat der Vorstand einen gelesenen Namen auf
     einen Teilnehmer der Saison geändert (``read_name``) oder ein gelesenes Team auf ein Team (``read_team``), merkt
-    sich die Saison die gelesene Schreibweise - nur eindeutige, nur der Vorstand. Unter der Sperre der Saison."""
+    sich die Saison die gelesene Schreibweise - nur eindeutige, nur der Vorstand. War dieselbe Lesung bei einem anderen
+    Teilnehmer bzw. Team gelernt, wird sie dort vergessen. Unter der Sperre der Saison."""
     if not access.is_board:
         return {}
     known = {row["id"] for row in participants}
@@ -919,10 +920,12 @@ async def _learn_spellings(db, access: SeriesAccess, body, resolution, participa
     async for sheet in db.reference_round_results.find({"series_id": access.series_id}, {"_id": 0, "rows.team": 1}):
         season_teams += [row["team"] for row in sheet.get("rows") or [] if row.get("team")]
     series = await db.reference_series.find_one({"id": access.series_id}, {"_id": 0, "read_team_aliases": 1}) or {}
-    learn_names = read_spellings.name_spellings(names, participants)
-    learn_teams = read_spellings.team_spellings(teams, season_teams, series.get("read_team_aliases") or [])
-    await read_spellings.learn(db, access.series_id, learn_names, learn_teams)
-    return {key: value for key, value in (("names", learn_names), ("teams", learn_teams)) if value}
+    learn_names, forget_names = read_spellings.name_spellings(names, participants)
+    learn_teams, forget_teams = read_spellings.team_spellings(teams, season_teams, series.get("read_team_aliases") or [])
+    # Widerspricht die Korrektur einer gelernten Schreibweise, wird diese vergessen (Prüfer zu #2012) - im Protokoll.
+    await read_spellings.learn(db, access.series_id, learn_names, learn_teams, forget_names, forget_teams)
+    return {key: value for key, value in (("names", learn_names), ("teams", learn_teams),
+                                          ("forgotten_names", forget_names), ("forgotten_teams", forget_teams)) if value}
 
 
 # ---------------------------------------------------------------- Freigabe

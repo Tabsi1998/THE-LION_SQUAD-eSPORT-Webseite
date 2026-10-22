@@ -743,9 +743,14 @@ def team_pool(participants: list[dict], teams: list[str] | None = None, track_te
         add(team, None)
     for item in track_teams or []:
         add(item.get("team"), str(item.get("season") or ""))
+    # Eine Schreibweise zeigt auf höchstens ein Team: es gilt die erste (die eigene Saison kommt zuerst) - eine in einer
+    # anderen Saison anders gelernte widerspricht ihr nicht (Prüfer zu #2012).
+    assigned: set[str] = set()
     for alias in team_aliases or []:
         target = keys.get(series_identity.normalize_name(alias.get("team")))
-        if target and alias.get("read"):
+        read_key = series_identity.normalize_name(alias.get("read"))
+        if target and read_key and read_key not in assigned:
+            assigned.add(read_key)
             pool.spellings[target].append(alias["read"])
     return pool
 

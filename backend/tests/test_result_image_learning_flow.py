@@ -148,6 +148,30 @@ async def test_learned_spellings_are_recognised_shown_and_removable(flow, monkey
 
 
 @pytest.mark.asyncio
+async def test_a_contradicting_correction_forgets_the_old_spelling(flow):
+    """Prüfer zu #2012: „Carl Kurue“ war bei Carl gelernt; der Vorstand ordnet dieselbe Lesung jetzt Anna zu. Carl
+    vergisst die Schreibweise (mit Protokoll) - sie macht ihn nie wieder grün. Ebenso ein gelerntes Team."""
+    ctx = await _setup(flow)
+    ids = ctx["ids"]
+    await flow.db.reference_participants.update_one({"id": ids["Carl Kurve"]},
+                                                    {"$set": {"read_aliases": [{"name": "Carl Kurue", "at": "x"}]}})
+    await flow.db.reference_series.update_one({"id": ctx["series"]["id"]}, {"$set": {"read_team_aliases": [
+        {"read": "Rotr Rcng", "team": "Blaupfeil GP", "at": "x"}]}})
+    saved = await flow.put(_url(ctx, 0), json={"rows": [
+        {"participant_id": ids["Anna Probe"], "place": 1, "team": "Rotor Racing", "read_name": "Carl Kurue",
+         "read_team": "Rotr Rcng"}], "status": "published", "expected_version": 0})
+    assert saved.status_code == 200, saved.text
+    assert not (await _participant(flow, ids["Carl Kurve"])).get("read_aliases")
+    series = await flow.db.reference_series.find_one({"id": ctx["series"]["id"]}, {"_id": 0})
+    assert [(item["read"], item["team"]) for item in series["read_team_aliases"]] == [("Rotr Rcng", "Rotor Racing")]
+    learned = saved.json()["learned"]
+    assert learned["forgotten_names"] == [{"participant_id": ids["Carl Kurve"], "name": "Carl Kurue"}]
+    assert learned["forgotten_teams"] == [{"read": "Rotr Rcng", "team": "Blaupfeil GP"}]
+    log = await flow.db.audit_logs.find_one({"action": "reference_result.save"}, {"_id": 0})
+    assert log["data"]["learned"] == learned
+
+
+@pytest.mark.asyncio
 async def test_learned_spellings_follow_a_merge(flow):
     """Zwei Schreibweisen derselben Person zusammengeführt (#1929): die gelernten Schreibweisen gehen mit."""
     ctx = await _setup(flow)
