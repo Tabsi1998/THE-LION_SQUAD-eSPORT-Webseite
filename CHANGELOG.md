@@ -1,5 +1,29 @@
 # Changelog
 
+## [1.30.0](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/compare/v1.29.0...v1.30.0) (2026-10-22)
+
+
+### Neu
+
+* Bündelung rückgängig machen – Zuordnung lösen, unveränderte leere Saisons und Spuren entfernen; strengere Sichtbarkeit bleibt mit Hinweis und Link zur Referenz ([#1751](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1751)) ([5fc680b](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/5fc680bbc9bc664d6063e5fb145b2f15139e8575))
+* Hilfe der Terminliste zeigt den Ablauf der Saison ([#2007](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2007)) ([9e0dc0a](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/9e0dc0ac2a1770a8fd871f7fe6b1aa4383ff0cc9))
+* Liga-Weg zeigt ohne eingetragene Ergebnisse den Platz der Referenz ([#1751](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1751)) ([5fc680b](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/5fc680bbc9bc664d6063e5fb145b2f15139e8575))
+* Referenzen bündeln – der Assistent schlägt aus alten Referenzen Spur und Saisons vor, mit Hinweisen aus den Altdaten ([#1751](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1751)) ([5fc680b](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/5fc680bbc9bc664d6063e5fb145b2f15139e8575))
+* Saison- und Teamtabelle per Bild auslesen – das Bild hängt beim Übernehmen als Original „Tabelle“ am Termin ([#1999](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1999)) ([312fdc2](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/312fdc2decc78d2fe781bdbe08349a085d660961))
+* Saisontabelle des Veranstalters einlesen – vergangene Runden als Entwürfe nachtragen, Platz aus den Punkten, Abgleich mit „Gesamt“ ([#1928](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1928)) ([312fdc2](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/312fdc2decc78d2fe781bdbe08349a085d660961))
+* Teamwertung laut Veranstalter für eine gewählte Runde übernehmen, ergänzen oder ersetzen, auch per Bild im Ergebnisblatt ([#1999](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1999)) ([312fdc2](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/312fdc2decc78d2fe781bdbe08349a085d660961))
+
+
+### Fehlerbehebungen
+
+* Terminliste nennt bei doppeltem Lauf Zeile und Grund ([#2007](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2007)) ([9e0dc0a](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/9e0dc0ac2a1770a8fd871f7fe6b1aa4383ff0cc9))
+
+
+### Dokumentation
+
+* Druckfassung des Helfer-Spickzettels auf zwei A4-Seiten ([#1686](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1686)) ([4a6b54d](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/4a6b54da022ddd0070f00e0415ad4c11a32d4def))
+* Helfer-Spickzettel für den Event-Tag ([#1686](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1686)) ([4a6b54d](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/4a6b54da022ddd0070f00e0415ad4c11a32d4def))
+
 ## 1.29.0 (22.10.2026)
 
 ### Neu
