@@ -68,6 +68,7 @@ async def _setup(flow, *, kind: str = "racing", people=None):
     stranger = await flow.add_user(name="fremd-fritz")
     url = f"{ADMIN}/series/{series['id']}/rounds/{round_doc['id']}/results/image"
     return {"board": board, "captain": captain, "stranger": stranger, "lineage": lineage, "series": series,
+            "other": other,
             "round": round_doc, "foreign_url": f"{ADMIN}/series/{series['id']}/rounds/{foreign['id']}/results/image",
             "url": url, "ids": ids}
 
@@ -177,10 +178,11 @@ async def test_reading_matches_participants_and_stores_nothing(flow, fake_ocr):
     anna, bert, dora = data["rows"]
     assert (anna["participant_id"], anna["name"], anna["uncertain"]) == (ctx["ids"]["Anna Probe"], "Anna Probe", [])
     assert anna["read"] == {"name": "Anna Prob3"}
-    assert (bert["participant_id"], bert["start_number"], bert["uncertain"]) == (
-        ctx["ids"]["Bert Bolzt"], "12", ["start_number"])
-    assert (dora["participant_id"], dora["name"]) == (None, "Dora Neu")
-    assert data["uncertain_rows"] == 1
+    # Sicher eine andere Nummer, die sonst keiner hat: die aus dem Bild, gelb, mit der bisherigen als Hinweis (#2012).
+    assert (bert["participant_id"], bert["start_number"], bert["uncertain"], bert["hint"]) == (
+        ctx["ids"]["Bert Bolzt"], "99", ["start_number"], {"start_number": "bisher 12"})
+    assert (dora["participant_id"], dora["name"], dora["uncertain"]) == (None, "Dora Neu", ["name"])  # neu: gelb
+    assert data["uncertain_rows"] == 2
     assert data["template"]["id"] == "rennliga-dunkel"
     assert data["track"] == {"name": "Probering Nord", "uncertain": []}
     assert data["warnings"] == []
@@ -202,6 +204,37 @@ async def test_aliases_help_only_the_board(flow, fake_ocr):
     flow.act_as(ctx["captain"])
     captain = (await flow.post(ctx["url"], content=_png(), headers=PNG)).json()["rows"][0]
     assert (captain["participant_id"], captain["name"]) == (None, "Alter Tag")
+
+
+@pytest.mark.asyncio
+async def test_roster_of_the_whole_lineage_helps_but_stays_yellow(flow, fake_ocr):
+    """Kader der ganzen Spur (#2012): Namen und Teams aus einer anderen Saison derselben Spur werden vorgeschlagen -
+    ohne Kennung, gelb, mit „wie in Saison …“. Wer in dieser Saison steht, zählt zuerst; ausgeblendete Namen helfen nie.
+    Der Kader anderer Saisons hilft nur dem Vorstand (wie Aliase), Teams auch Captains. Gelernte Schreibweisen am
+    Teilnehmer bzw. an der Saison zählen wie Namen."""
+    ctx = await _setup(flow)
+    other_id = ctx["other"]["id"]
+
+    for name, team in (("Emil Eck", "Altes Team"), ("Anna Probe", "Rotor Racing"), ("Geheim Name", None)):
+        added = await flow.post(f"{ADMIN}/series/{other_id}/participants", json={"name": name, "default_team": team})
+        assert added.status_code == 200, added.text
+    await flow.db.reference_participants.update_one({"series_id": other_id, "name": "Geheim Name"},
+                                                    {"$set": {"name_hidden": True}})
+    await flow.db.reference_participants.update_one({"id": ctx["ids"]["Bert Bolzt"]},
+                                                    {"$set": {"read_aliases": [{"name": "B3rt Boltz"}]}})
+    fake_ocr.reading = _fake_reading(("Emil Ek", ""), ("Anna Probe", "7"), ("Geheim Name", ""), ("B3rt Boltz", ""))
+    for index, team in enumerate(("Altes Team", "Rotor Racing", "Altes Team", "Blaupfeil GP")):
+        fake_ocr.reading.rows[index].cells["team"] = Read(team, 95, [(team, 95)])
+    emil, anna, hidden, bert = (await flow.post(ctx["url"], content=_png(), headers=PNG)).json()["rows"]
+    assert (emil["name"], emil["participant_id"], emil["team"]) == ("Emil Eck", None, "Altes Team")
+    assert {"name", "team"} <= set(emil["uncertain"])
+    assert emil["hint"] == {"name": "wie in Saison 2027", "team": "wie in Saison 2027"}
+    assert (anna["participant_id"], anna["uncertain"], anna["hint"]) == (ctx["ids"]["Anna Probe"], [], {})
+    assert (hidden["name"], hidden["participant_id"], hidden["hint"].get("name")) == ("Geheim Name", None, None)
+    assert (bert["participant_id"], bert["uncertain"]) == (ctx["ids"]["Bert Bolzt"], [])
+    flow.act_as(ctx["captain"])
+    emil = (await flow.post(ctx["url"], content=_png(), headers=PNG)).json()["rows"][0]
+    assert (emil["name"], emil["hint"]) == ("Emil Ek", {"team": "wie in Saison 2027"})
 
 
 @pytest.mark.asyncio

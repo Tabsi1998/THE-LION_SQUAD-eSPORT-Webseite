@@ -17,7 +17,8 @@ Server fehlt.
 Inhalt). Antwort::
 
     {template, rows: [{index, place, dnf, marks, start_number, name, participant_id, team, grid, time, gap, points,
-                       color, uncertain: [Feld], read: {Feld: gelesen}}],
+                       color, uncertain: [Feld], read: {Feld: gelesen}, hint: {Feld: Hinweis},
+                       image: {name, team}}],
      track: {name, uncertain} | null, session: {name, kind: race|sprint|qualifying} | null,
      fastest_lap | pole: {name, participant_id, time, uncertain, read} | null,
      driver_of_the_day: {name, participant_id, uncertain, read} | null, uncertain_rows,
@@ -40,8 +41,13 @@ warnings}`` (``services/result_image_table.py``).
   (Standard 1). Dekodiert wird erst mit einem freien Platz - wer wartet, hält nur die Datei, kein entpacktes Bild.
 - **Zeitbudget** je Bild (``RESULT_IMAGE_OCR_BUDGET_SECONDS``, Standard 60): reicht es nicht für die Seite, kommt 422;
   reicht es nur nicht für die zweiten Lesungen, ist der Rest gelb (Warnung ``out_of_time``).
-- **Datenschutz:** Aliase der Mitglieder helfen beim Wiedererkennen nur, wenn der Vorstand liest (wie in #1743);
-  Captains bekommen nur, was sie im Blatt ohnehin sehen (Name und Kennung der Teilnehmer).
+- **Kader der Spur (#2012):** Zusätzlich zu den Teilnehmern der Saison zählen die Teilnehmer anderer Saisons derselben
+  Spur (die neueste zuerst, ohne ausgeblendete Namen) - ein Treffer nur dort wird vorgeschlagen, bleibt aber gelb
+  (``hint`` „wie in Saison X“). Ebenso die Teams: bekannt sind die eigenen Teams, die Standard-Teams der Teilnehmer
+  und die Teams der Blätter dieser Saison; Teams anderer Saisons der Spur nur mit Hinweis. Gelernte Schreibweisen
+  (``read_aliases`` am Teilnehmer, ``read_team_aliases`` an der Saison, beim Übernehmen gelernt) zählen wie Namen.
+- **Datenschutz:** Aliase der Mitglieder und der Kader anderer Saisons helfen beim Wiedererkennen nur, wenn der Vorstand
+  liest (wie in #1743); Captains bekommen nur, was sie im Blatt ohnehin sehen (Name und Kennung der Teilnehmer).
 - Meldungen sind feste Texte, nie aus einer Ausnahme gebaut. Lesen und Abgleich: ``services/result_image_ocr.py`` und
   ``services/result_image_match.py``, Vorlagen: ``services/result_image_templates.py``.
 """
@@ -61,6 +67,7 @@ from routes.reference_result_routes import MAX_ROWS
 from routes.reference_season_table_routes import known_teams
 from services import result_image_match, result_image_ocr, result_image_table, result_image_templates, season_table
 from services.image_upload import MAX_BYTES, MAX_IMAGE_UPLOAD_MB
+from services.own_teams import own_teams
 from services.rate_limit import enforce_rate_limit, keyed_subject
 from services.reference_series_access import SeriesAccess, require_series_editor
 from services.scoring_rules import counted_results, normalize_rules
@@ -107,7 +114,7 @@ TOO_MANY_ROWS = (f"Im Bild stehen mehr als {MAX_ROWS} Ergebniszeilen - so viele 
 BLURRY = "Das Bild ist unscharf oder sehr klein - bitte die gelben Felder genau prüfen."
 NO_HEADER = "Die Kopfzeile der Tabelle wurde nicht erkannt - die Spalten sind nach der Vorlage geschätzt."
 PARTICIPANT_FIELDS = {"_id": 0, "id": 1, "name": 1, "start_number": 1, "default_team": 1, "link": 1, "profile_id": 1,
-                      "guest_name": 1}
+                      "guest_name": 1, "read_aliases": 1}
 
 
 async def _template(db, series: dict) -> dict | None:
@@ -162,6 +169,61 @@ async def _aliases(db, series: dict, participants: list[dict]) -> list[dict]:
         if pid:
             out.append({"name": alias["name"], "participant_id": pid})
     return out
+
+
+def season_label(series: dict) -> str:
+    """„2/2025“ bzw. „2/2025 Division 1“ - so heißt die Saison im Hinweis „wie in Saison …“."""
+    return " ".join(str(part).strip() for part in (series.get("season"), series.get("tier")) if part) or "?"
+
+
+async def _other_seasons(db, series: dict) -> list[dict]:
+    """Die anderen Saisons derselben Spur, die neueste zuerst (#2012)."""
+    rows = await db.reference_series.find(
+        {"lineage_id": series.get("lineage_id"), "id": {"$ne": series["id"]}},
+        {"_id": 0, "id": 1, "season": 1, "tier": 1, "created_at": 1, "read_team_aliases": 1}).to_list(None)
+    return sorted(rows, key=lambda row: str(row.get("created_at") or ""), reverse=True)
+
+
+async def _track(db, seasons: list[dict]) -> list[dict]:
+    """Teilnehmer der anderen Saisons der Spur (ohne ausgeblendete Namen), je mit der Bezeichnung ihrer Saison - die
+    neueste Saison zuerst."""
+    if not seasons:
+        return []
+    order = {row["id"]: index for index, row in enumerate(seasons)}
+    labels = {row["id"]: season_label(row) for row in seasons}
+    people = await db.reference_participants.find(
+        {"series_id": {"$in": list(order)}, "name_hidden": {"$ne": True}},
+        {**PARTICIPANT_FIELDS, "series_id": 1}).to_list(None)
+    people.sort(key=lambda row: (order.get(row.get("series_id"), 0), str(row.get("name") or "").casefold()))
+    return [{**row, "season": labels.get(row.get("series_id"), "?")} for row in people]
+
+
+async def _known_teams(db, series: dict, seasons: list[dict]) -> tuple[list[str], list[dict], list[dict]]:
+    """Teams dieser Saison (eigene Teams, Teams in ihren Blättern), Teams anderer Saisons der Spur (Standard-Teams der
+    Teilnehmer und Teams der Blätter, je mit der neuesten Saison) und gelernte Schreibweisen - die eigenen Teams
+    bringen ihre Schreibweisen mit (#1926)."""
+    own = own_teams(series)
+    teams = [team["name"] for team in own]
+    aliases = [{"read": alias, "team": team["name"]} for team in own for alias in team.get("aliases") or []]
+    ids = [series["id"], *(row["id"] for row in seasons)]
+    by_season: dict[str, list[str]] = {}
+    async for sheet in db.reference_round_results.find({"series_id": {"$in": ids}},
+                                                       {"_id": 0, "series_id": 1, "rows.team": 1}):
+        by_season.setdefault(sheet["series_id"], []).extend(row.get("team") for row in sheet.get("rows") or [])
+    teams.extend(team for team in by_season.get(series["id"], []) if team)
+    track_teams = []
+    if seasons:
+        defaults = await db.reference_participants.find(
+            {"series_id": {"$in": [row["id"] for row in seasons]}, "default_team": {"$nin": [None, ""]}},
+            {"_id": 0, "series_id": 1, "default_team": 1}).to_list(None)
+        for row in defaults:
+            by_season.setdefault(row["series_id"], []).append(row["default_team"])
+        for season in seasons:  # die neueste zuerst - ihr Name steht im Hinweis
+            track_teams.extend({"team": team, "season": season_label(season)}
+                               for team in by_season.get(season["id"], []) if team)
+    for row in [series, *seasons]:
+        aliases.extend(item for item in row.get("read_team_aliases") or [] if isinstance(item, dict))
+    return teams, track_teams, aliases
 
 
 async def _suggested_round(db, series_id: str, round_doc: dict, track: str) -> dict | None:
@@ -387,9 +449,14 @@ async def read_result_image(series_id: str, round_id: str, request: Request,
         raise HTTPException(422, TOO_MANY_ROWS)
 
     participants = await db.reference_participants.find({"series_id": series_id}, PARTICIPANT_FIELDS).to_list(None)
-    aliases = await _aliases(db, access.series, participants) if access.is_board else []
+    seasons = await _other_seasons(db, access.series)
+    track = await _track(db, seasons) if access.is_board else []
+    # Ein Alias zeigt zuerst auf den Teilnehmer dieser Saison (die spätere Zuordnung gewinnt in ``_aliases``).
+    aliases = await _aliases(db, access.series, [*track, *participants]) if access.is_board else []
+    teams, track_teams, team_aliases = await _known_teams(db, access.series, seasons)
     built = result_image_match.build(reading, template, participants, aliases=aliases,
-                                     no_team_names=_no_team_names(access.series))
+                                     no_team_names=_no_team_names(access.series), track=track, teams=teams,
+                                     track_teams=track_teams, team_aliases=team_aliases)
     logger.info("[result-image] read %s rows (%s uncertain) in %.1fs", len(built["rows"]), built["uncertain_rows"],
                 time.monotonic() - started)
     if not built["rows"]:
