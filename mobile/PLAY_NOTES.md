@@ -12,6 +12,17 @@ Regeln:
 - Höchstens 500 Zeichen inklusive Zeilenumbrüchen (Grenze von Google Play).
 - Kurz und für Mitglieder verständlich: was sie in der App merken, keine Issue-Nummern, keine Technik.
 
+## 1.7.6
+
+Neu in 1.7.6:
+• Rennligen: Runden mit Quali, Sprint und Rennen
+• Ergebnis je Runde mit hochzählenden Zeiten
+• Statistik der Saison
+• Team-Ligen mit Map-Veto, Kader und Map-Statistik
+• Turnierserien mit Turniertagen, Lobbys und Boni
+• Sonderregeln wie Punktabzug und abgebrochene Saison
+• Veranstalter-Partner und Map-Pools bei Turnieren
+
 ## 1.7.5
 
 Neu in 1.7.5:

@@ -1,12 +1,13 @@
 {
-  "version": "1.7.5",
-  "build": 99,
-  "date": "2026-10-21",
+  "version": "1.7.6",
+  "build": 100,
+  "date": "2026-10-22",
   "items": [
-    "Verein › Erfolge neu: Ehrentafel ohne Nullen, Läuft gerade, Vitrine, Serien und Ligen mit Liga-Weg und eine Chronik mit Spiel-Filter.",
-    "Neue Saison-Ansicht für Rennligen und Team-Ligen: Kalender mit Flaggen, Tabelle, Fahrer und Spieltage.",
-    "Profil › Referenzen: bestes Ergebnis, Liga-Weg und Chronik je Jahr mit Aufstellung zum Aufklappen.",
-    "News: Kategorien mit Anzahl, Suche als Symbol, keine gleichen Bilder direkt hintereinander.",
-    "Turniere: Die Check-in-Zeiten zeigen, was wirklich gilt; bei vollem Cup nennt die Anmeldung deinen Platz auf der Warteliste."
+    "Rennligen: eine Runde mit ihren Läufen (Qualifying, Sprint, Rennen), Tabelle umschaltbar Gesamt · Rennen · Sprint · Quali, Fahrer mit Poles, Ø Start und Quali-Duell.",
+    "Neu: Ergebnis je Runde mit Reitern je Lauf und hochzählenden Zeiten, dazu die Statistik der Saison.",
+    "Team-Ligen: Spieltage mit Map-Veto als Karten mit Bild, Kader mit Einsätzen und Statistik je Map.",
+    "Turnierserien: Turniertage mit Runden, Lobbys, Double Up und Boni.",
+    "Sonderregeln: Punktabzug mit Grund, abgebrochene Saison mit Nachfolger, Termine ohne Wertung, Teamwertung wie beim Veranstalter.",
+    "„Veranstaltet von“ mit Partner-Logo, Map-Pool bei Turnieren, Rennzeiten mit Komma."
   ]
 }
