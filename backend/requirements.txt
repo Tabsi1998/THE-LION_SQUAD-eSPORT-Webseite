@@ -27,6 +27,8 @@ rawpy==0.27.1
 reportlab==4.5.1
 requests==2.34.2
 resend==2.49.1
+# SVG-Logos (#1952): PNG-Fassung ohne Systembibliothek (resvg-py MIT, resvg Apache-2.0 OR MIT)
+resvg-py==0.5.0
 starlette==1.8.0
 uvicorn==0.54.0
 webauthn==3.0.1
