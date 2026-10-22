@@ -446,16 +446,23 @@ Dienst) und landet als Zeilen im Blatt – gespeichert wird beim Lesen nichts, a
   Zellen in sonst gefüllten Spalten werden allein aus dem Originalbild nachgelesen (Kontrast nur der Zelle gestreckt,
   zwei Größen - etwa dunkelgraue Schrift, #2012, `_retry_empty_cells`); bleiben sie leer, sind sie gelb, ein nie
   gelesener Platz ebenso; eine leere Team-Zelle bleibt leer (kein Vorschlag mit dem Standard-Team - oft war dort ein
-  farbiges Schild, das die Vorbereitung entfernt). Startplätze sind eine Permutation 1…N (`_settle_grid`), ein Abstand
-  „47,441“ kann ein als 4 gelesenes Plus sein (die Probe Zeit = Erster + Abstand entscheidet).
-- **Nie grün geraten (#2012):** Ein Name ist nur grün, wenn er eindeutig zu einem Teilnehmer passt: Ähnlichkeit ab
-  `name_sure` und Abstand `name_margin` zum Zweitbesten (oder ab `name_match` mit passender Startnummer). Verwechslungen
-  der Schrift (l/1/I, 0/O, 2/Z, rn/m, ii/ü) gelten als gleich, aber nur mit 0,98 - der genau passende Name gewinnt, zwei
-  so ähnliche Teilnehmer sind nie eindeutig. Unbekannte Namen und Teams sind immer gelb. **Kader der Spur:** die
-  Teilnehmer anderer Saisons derselben Spur (nur Vorstand, ohne ausgeblendete) und deren Teams werden vorgeschlagen -
-  ohne Kennung, gelb, `hint` „wie in Saison X“. **Gelernte Schreibweisen** (`services/read_spellings.py`): das Blatt
-  schickt bei geänderten Zeilen aus dem Bild `read_name`/`read_team` mit; beim Übernehmen speichert der Server (nur
-  Vorstand, nur eindeutig, Protokoll `learned`) `read_aliases` am Teilnehmer bzw. `read_team_aliases` an der Saison.
+  farbiges Schild, das die Vorbereitung entfernt). Startplätze sind eine Permutation 1…N (`_settle_grid`) - ergänzt
+  wird nur, wenn das Bild nachweislich das ganze Feld zeigt (`_whole_field`: so viele Zeilen wie Teilnehmer der Saison,
+  Plätze sicher 1…N, keine Lesung über N); ein Abstand „47,441“ kann ein als 4 gelesenes Plus sein (die Probe Zeit =
+  Erster + Abstand entscheidet).
+- **Nie grün geraten (#2012):** Ein Name ist nur grün, wenn er eindeutig zu einem Teilnehmer passt: **genau so
+  gelesen** (gleicher Schlüssel aus Name, Alias oder gelernter Schreibweise, `EXACT_SCORE`) und Abstand `name_margin`
+  zum Zweitbesten - oder ab `name_match` mit **bestätigender Startnummer** (Seite und Streifen lesen dieselbe, und kein
+  anderer Teilnehmer passt beim Namen gleich gut oder besser; sonst `hint` „Name passt auch zu …“). Verwechslungen der
+  Schrift (l/1/I, 0/O, 2/Z, rn/m, ii/ü) gelten als gleich, aber nur mit 0,98: der Teilnehmer wird vorgeschlagen, bleibt
+  ohne Bestätigung aber gelb („Amie“ ist nicht „Arnie“) - ebenso im Kopf, bei Teams und in Tabellen-Bildern. Unbekannte
+  Namen und Teams sind immer gelb. **Kader der Spur:** die Teilnehmer anderer Saisons derselben Spur und deren Teams
+  (nur Vorstand, ohne ausgeblendete) werden vorgeschlagen - ohne Kennung, gelb, `hint` „wie in Saison X“. **Gelernte
+  Schreibweisen** (`services/read_spellings.py`): das Blatt schickt bei geänderten Zeilen aus dem Bild
+  `read_name`/`read_team` mit; beim Übernehmen speichert der Server (nur Vorstand, nur eindeutig, Protokoll `learned`)
+  `read_aliases` am Teilnehmer bzw. `read_team_aliases` an der Saison. Widerspricht die Korrektur einer gelernten
+  Schreibweise (dieselbe Lesung bei einem anderen Teilnehmer bzw. Team), wird diese vergessen (`forgotten_names`,
+  `forgotten_teams`); eine Team-Schreibweise zeigt im Abgleich auf höchstens ein Team (die eigene Saison zuerst).
   Entfernen per `PATCH` (Liste der bleibenden).
 - **Kopf:** `track` (oberste Zeile ohne Beschriftung), `session {name, kind}` (Rennen, Sprint, Qualifying - nur ein
   Hinweis, bis es Läufe je Termin gibt, #1930), `pole` und `fastest_lap {name, time}`, `driver_of_the_day`; der Wert

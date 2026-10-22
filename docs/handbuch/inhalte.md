@@ -800,8 +800,9 @@ das Bild wird nicht gespeichert.
 - **Fahrer-Tabelle:** Die Tabelle landet als Text im Feld und geht in dieselbe Vorschau wie eingefügter Text. Die
   Rundenspalten heißen „Runde 1“, „Runde 2“ … (Flaggen sind Bilder, keine Schrift) und werden über die Reihenfolge den
   Terminen zugeordnet – in der Vorschau korrigierbar. Namen werden mit den Teilnehmern der Saison abgeglichen; grün ist
-  ein Name nur, wenn er eindeutig ein Teilnehmer (bzw. bei der Teamtabelle ein Team der Saison) ist – ein unbekannter
-  ist immer gelb, wie bei Ergebnis-Bildern.
+  ein Name nur, wenn er genau so ein Teilnehmer (bzw. bei der Teamtabelle ein Team der Saison) ist – nur über eine
+  Verwechslung der Schrift erkannt ist er vorgeschlagen, aber gelb; ein unbekannter ist immer gelb, wie bei
+  Ergebnis-Bildern.
 - **Gelb = unsicher:** Wo die Lesungen nicht übereinstimmen, steht die Zelle unter **Aus dem Bild unsicher** – mit dem,
   was sonst gelesen wurde. Gelb wird auch, was genauso aussieht wie eine Zelle mit anderem Wert (dieselbe Zahl sieht in
   einer Tabelle immer gleich aus), und „Punkte“ und „Dif.“, wenn sie nicht zusammenpassen. Ergibt die Summe der Runden
@@ -1259,15 +1260,18 @@ einem gewerteten Termin **Ergebnis ändern**. Das öffnet das Blatt des Termins.
   vergrößert), Strecke, Art (Rennen oder Qualifying – nur als Hinweis), schnellster Rennrunde, Pole und Fahrer des
   Tages. Passt die Strecke zu einem anderen Termin der Saison, sagt ein Hinweis, zu welchem. **Gelbe Felder** sind
   unsicher, darunter steht, was im Bild stand; ist Startplatz, Zeit oder Abstand gelb, steht **Mehr** gleich offen.
-  **Namen und Teams** sind nur grün, wenn sie eindeutig zu einem Teilnehmer bzw. Team der Saison passen – auch über
-  typische Verwechslungen der Schrift (l/1/I, 0/O, rn/m, ii/ü, „__“/„_“). Ein unbekannter Name oder ein unbekanntes
-  Team ist immer gelb, auch wenn das Bild klar ist. Kennt eine andere Saison derselben Spur den Namen oder das Team,
+  **Namen und Teams** sind nur grün, wenn sie genau so im Bild stehen wie bei einem Teilnehmer bzw. Team der Saison
+  (Groß/klein und Satzzeichen egal). Liest das Bild den Namen nur über eine typische Verwechslung der Schrift (l/1/I,
+  0/O, rn/m, ii/ü), ist der Teilnehmer vorgeschlagen, aber gelb – außer die Startnummer bestätigt ihn. Passt die
+  Startnummer zu einem, der Name aber genauso gut zu einem anderen, bleibt es gelb mit **Name passt auch zu …**. Ein
+  unbekannter Name oder ein unbekanntes Team ist immer gelb, auch wenn das Bild klar ist. Kennt eine andere Saison derselben Spur den Namen oder das Team,
   steht es so vorbelegt da – gelb, mit **wie in Saison …**; beim Übernehmen entsteht der Teilnehmer in dieser Saison
   (ein bestätigter Alias ordnet ihn gleich derselben Person zu). Steht im Bild eine andere Startnummer als beim
   Teilnehmer, zeigt die Zeile die aus dem Bild (gelb, **bisher …**). **Korrekturen lernen:** Ändert der Vorstand einen
   gelesenen Namen auf einen Teilnehmer der Saison oder ein gelesenes Team, merkt sich die Saison beim Übernehmen die
   gelesene Schreibweise (nur eindeutige, im Protokoll) und erkennt sie beim nächsten Bild – zu sehen und zu entfernen
-  unter **Aus Bildern gelernt** in „Teilnehmer bearbeiten“ bzw. „Saison bearbeiten“.
+  unter **Aus Bildern gelernt** in „Teilnehmer bearbeiten“ bzw. „Saison bearbeiten“. Ordnet der Vorstand eine schon
+  gelernte Schreibweise später jemand anderem zu, vergisst die Saison die alte Zuordnung.
   Ändern nimmt die Markierung weg, **Passt so** bestätigt die ganze Zeile (beim Rennen: schnellste Runde und Fahrer des
   Tages). Übernehmen geht erst, wenn nichts mehr gelb ist – bis dahin heißt der Knopf **Gelbe Zeilen prüfen** und
   springt zur ersten. Platz 1 im farbigen Kasten und der fehlende Abstand beim Ersten sind kein Fall für Gelb; ein Lauf
