@@ -1283,6 +1283,11 @@ einem gewerteten Termin **Ergebnis ändern**. Das öffnet das Blatt des Termins.
 <td><img src="../assets/serien/serien-ergebnis-bild-handy.png" alt="Dasselbe am Handy mit vergrößertem Bild zum Vergleichen" width="200"></td>
 <td><img src="../assets/serien/serien-spur-vorlage-bild.png" alt="Spur bearbeiten mit dem Feld Vorlage für Ergebnis-Bilder" width="200"></td>
 </tr>
+<tr>
+<td><img src="../assets/serien/serien-bild-wie-in-saison.png" alt="Gelbe Zeilen aus dem Bild: Name und Team mit dem Hinweis wie in Saison 1/2025, eine Startnummer mit bisher 15" width="200"></td>
+<td><img src="../assets/serien/serien-bild-gelernt.png" alt="Teilnehmer bearbeiten am Handy: unter der Zuordnung Aus Bildern gelernt mit zwei Schreibweisen zum Entfernen" width="200"></td>
+<td></td>
+</tr>
 </table>
 
 **Vorschau** lässt den Server prüfen und rechnen, gespeichert wird dabei nichts. Fehler (rot) und Hinweise (gelb)
