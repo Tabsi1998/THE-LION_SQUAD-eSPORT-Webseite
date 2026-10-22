@@ -526,10 +526,10 @@ def _whole_field(rows: list[dict[str, Decision]], participants: list[dict]) -> b
 
 
 def _settle_grid(grids: list[Decision], whole_field: bool = False) -> None:
-    """Startplätze sind 1…N, jeder einmal (#2012) - aber nur, wenn das Bild das ganze Feld zeigt (``_whole_field``). Fehlen
-    den sicheren genau die Zahlen, die die unsicheren als je einzige passende Lesung haben (jede Zahl genau einmal),
-    gelten diese - grün. Liest eine Lesung eine Zahl über N, fehlt doch ein Teil des Felds. Sonst bleibt alles, wie es
-    ist."""
+    """Startplätze sind 1…N, jeder einmal (#2012) - aber nur, wenn das Bild das ganze Feld zeigt (``_whole_field``).
+    Fehlen den sicheren genau die Zahlen, die die unsicheren als je einzige passende Lesung haben (jede Zahl genau
+    einmal), gelten diese - grün. Liest eine Lesung eine Zahl über N, fehlt doch ein Teil des Felds. Sonst bleibt alles,
+    wie es ist."""
     sure = [_grid_number(cell.value) for cell in grids if cell.sure and cell.value is not None]
     unsure = [cell for cell in grids if not cell.sure]
     if not whole_field or not unsure or None in sure or len(set(sure)) != len(sure):

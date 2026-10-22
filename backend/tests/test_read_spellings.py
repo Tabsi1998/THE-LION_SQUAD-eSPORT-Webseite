@@ -14,7 +14,8 @@ from test_result_image_match import TEMPLATE, reading, row  # noqa: E402
 def test_a_correction_against_a_learned_name_replaces_it():
     """Prüfer zu #2012: „Jonsa“ war bei Jonas gelernt; der Vorstand ordnet dieselbe Lesung jetzt Jonsaxx zu. Die alte
     Schreibweise wird bei Jonas vergessen und bei Jonsaxx gelernt - sie macht Jonas nie wieder grün."""
-    parts = [{"id": "a", "name": "Jonas", "read_aliases": [{"name": "Jonsa", "at": "x"}]}, {"id": "b", "name": "Jonsaxx"}]
+    parts = [{"id": "a", "name": "Jonas", "read_aliases": [{"name": "Jonsa", "at": "x"}]},
+             {"id": "b", "name": "Jonsaxx"}]
     learn, forget = read_spellings.name_spellings([("b", "Jonsa")], parts)
     assert learn == [{"participant_id": "b", "name": "Jonsa"}]
     assert forget == [{"participant_id": "a", "name": "Jonsa"}]

@@ -705,7 +705,8 @@ def test_grid_positions_settle_as_a_permutation():
 def test_grid_permutation_only_for_the_whole_field():
     """Prüfer zu #2012: Startplätze sind nur dann 1…N, wenn das Bild das ganze Feld zeigt. Ein Ausschnitt (die ersten
     drei von sechs) ergänzt keine Startplätze - der echte Startplatz 5 wird nie still zur 3. Ohne Kader ist das ganze
-    Feld nicht nachgewiesen, ebenso, wenn die Zahl der Zeilen nicht zur Saison passt oder die Plätze nicht 1…N laufen."""
+    Feld nicht nachgewiesen, ebenso, wenn die Zahl der Zeilen nicht zur Saison passt oder die Plätze nicht 1…N
+    laufen."""
     part = [row("1", grid="1"), row("2", grid="2"), row("3", grid="5", strips={"grid": "3"})]
     six = [{"id": f"p{index}", "name": f"Probe {index}"} for index in range(6)]
     for people in ([], six):
