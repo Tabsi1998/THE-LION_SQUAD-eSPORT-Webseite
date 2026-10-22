@@ -128,7 +128,9 @@ def test_noise_after_a_header_label_does_not_hide_the_value_below():
                                     word("ER", 1400, 100, conf=10)]),
              result_image_ocr.Line([word("Mia_Motorhaube", 100, 150), word("Lena_Lenkrad", 700, 150),
                                     word("Otto_Ostwind", 1000, 150)]),
-             result_image_ocr.Line([word("1:31,207", 100, 200), word("1:30,111", 700, 200)])]
+             # Unter dem Fahrer des Tages steht keine Zeit - nur ein Rest aus dem Farbverlauf („a“, unsicher).
+             result_image_ocr.Line([word("1:31,207", 100, 200), word("1:30,111", 700, 200),
+                                    word("a", 1050, 200, conf=20)])]
     out = result_image_ocr._header_fields(lines, TEMPLATE)
     assert out["driver_of_the_day"].text == "Otto_Ostwind"
     assert out["fastest_lap"].text == "Mia_Motorhaube 1:31,207"

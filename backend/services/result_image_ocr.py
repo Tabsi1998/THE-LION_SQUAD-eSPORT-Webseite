@@ -760,7 +760,9 @@ def _header_fields(lines: list[Line], template: dict) -> dict[str, Read]:
                     if below >= len(rows) or spans[below]:
                         break
                     picked = [word for word in rows[below] if left <= word.left < right
-                              and any(char.isalnum() for char in word.text)]  # keine Reste von Linien
+                              and any(char.isalnum() for char in word.text)  # keine Reste von Linien
+                              # In der zweiten Zeile (Zeit) kein Rauschen - etwa unter dem Fahrer des Tages (#2012).
+                              and (below == line_index + 1 or word.conf >= HEADER_NOISE)]
                     if picked:
                         groups.append(picked)
                         used.add(below)
