@@ -20,6 +20,7 @@ import { originalsOf, type OriginalItem, type OriginalsByRound } from "./referen
 import { KIND_LABELS, type LineageInfo } from "./references";
 import { dayRounds } from "./seriesDays";
 import { HIDDEN_NAME, dayLabel, formatNumber, nameOf, number, roundLabel } from "./seriesFormat";
+import type { DataSource } from "./seriesDataSource";
 import type { SeasonPartners } from "./seriesPartners";
 import type { MapPool, TeamLeaguePart } from "./teamLeague";
 import { adjustmentDetail, adjustmentText, noScoreText, teamSinceLabel, type AdjustedRow, type RuleChange, type Successor } from "./seriesSpecialRules";
@@ -104,6 +105,8 @@ export type SeasonPage = {
   map_pool?: MapPool;
   /** Original-Bilder des Veranstalters je Termin (#1933): Kennung des Termins → öffentliche Bilder. */
   originals?: OriginalsByRound;
+  /** „Daten von …“ (#1964): Plattform des Partners, von der die Saison ihre Turniertage holt. */
+  data_source?: DataSource;
   racing?: {
     club_drivers?: string[] | null;
     club_teams?: string[] | null;
