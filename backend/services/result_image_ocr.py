@@ -37,6 +37,7 @@ from functools import lru_cache
 
 from PIL import Image, ImageChops, ImageDraw, ImageFilter, ImageOps
 
+from services import result_image_second as second_reader
 from services import result_image_values as image_values
 from services.image_upload import (
     MAX_BYTES, MAX_IMAGE_DIMENSION, MAX_IMAGE_PIXELS, MAX_IMAGE_UPLOAD_MB, PIL_IMAGE_FORMATS,
@@ -666,10 +667,13 @@ def assign(cells: list[Cell], columns: list[dict], anchors: list[float]) -> dict
 # ---------------------------------------------------------------- Lesen
 @dataclass
 class Read:
-    """Eine Lesung einer Zelle: Text, Sicherheit (0-100, das unsicherste Wort) und die Wörter mit ihrer Sicherheit."""
+    """Eine Lesung einer Zelle: Text, Sicherheit (0-100, das unsicherste Wort) und die Wörter mit ihrer Sicherheit.
+    ``boxes``: Lage der Zeilen des Texts im vorbereiteten Bild (links, oben, rechts, unten) - der zweite Leser liest
+    dort im Originalbild nach (#2018)."""
     text: str
     conf: float
     parts: list[tuple[str, float]] = field(default_factory=list)
+    boxes: list[tuple[int, int, int, int]] = field(default_factory=list)
 
 
 @dataclass
@@ -678,6 +682,7 @@ class RowReading:
     strips: dict[str, Read] = field(default_factory=dict)  # Streifen (Zahlen mit Whitelist)
     alts: dict[str, Read] = field(default_factory=dict)  # dritte Lesung der Ziffern, anders vorbereitet (#1981)
     color: str | None = None  # Schriftfarbe von Startnummer bzw. Team als „#rrggbb“ (Vorschlag für die Teamfarbe)
+    second: dict[str, Read] = field(default_factory=dict)  # zweiter Leser (#2018), Sicherheit 0-100
 
 
 @dataclass
@@ -693,12 +698,21 @@ class Reading:
     out_of_time: bool = False  # Zeitbudget aufgebraucht - nicht alles zweimal gelesen
     unchecked: set[str] = field(default_factory=set)  # Felder ohne zweite Lesung (Streifen) - sie werden gelb
     labelled: set[str] | None = None  # Spalten, deren Überschrift im Bild steht (``None``: nicht bekannt)
+    header_second: dict[str, Read] = field(default_factory=dict)  # Kopf, gelesen vom zweiten Leser (#2018)
+    # Wie der zweite Leser lief (``result_image_second.Result.status``): ok, off, missing, failed, out_of_time - leer,
+    # wenn er nicht gefragt wurde.
+    second: str = ""
+
+
+def _box(words: list[Word]) -> tuple[int, int, int, int]:
+    return (min(word.left for word in words), min(word.top for word in words), max(word.right for word in words),
+            max(word.bottom for word in words))
 
 
 def _read(words: list[Word], *, joiner: str = " ") -> Read:
     ordered = sorted(words, key=lambda word: word.left)
     return Read(joiner.join(word.text for word in ordered).strip(), min((word.conf for word in ordered), default=0.0),
-                [(word.text, word.conf) for word in ordered])
+                [(word.text, word.conf) for word in ordered], [_box(ordered)] if ordered else [])
 
 
 def _label_spans(words: list[Word], spec: dict) -> list[tuple[str, int, int]]:
@@ -729,7 +743,7 @@ def _read_lines(groups: list[list[Word]]) -> Read:
     """Eine Lesung aus mehreren Zeilen (etwa Name, darunter die Zeit) - Zeile für Zeile, je Zeile von links."""
     words = [word for group in groups for word in sorted(group, key=lambda item: item.left)]
     return Read(" ".join(word.text for word in words).strip(), min((word.conf for word in words), default=0.0),
-                [(word.text, word.conf) for word in words])
+                [(word.text, word.conf) for word in words], [_box(group) for group in groups if group])
 
 
 def _header_fields(lines: list[Line], template: dict) -> dict[str, Read]:
@@ -924,6 +938,7 @@ def _read_in_budget(img: Image.Image, template: dict, max_rows: int | None) -> R
             _retry_empty_cells(img, prepared, columns, assigned, data_lines, reading)
         except OutOfTime:
             reading.out_of_time = True  # nicht gelesene Plätze und Zellen bleiben gelb
+    _second_reads(img, prepared, columns, assigned, data_lines, reading)
     fields = [column["field"] for column in columns]
     for row, cells in zip(reading.rows, assigned):
         for wanted in ("start_number", "team"):
@@ -1044,6 +1059,85 @@ def _cell_reads(img: Image.Image, box: tuple[int, int, int, int], kind: str) -> 
 
 # Spalten, die in jeder Zeile etwas haben (wie ``result_image_match._check_gaps_in_columns``).
 RETRY_FIELDS = ("start_number", "team", "grid")
+# Zweiter Leser (#2018): Namen und Teams, dazu die Ziffern als weitere Lesung - und der Kopf (ohne die Art).
+SECOND_FIELDS = ("start_number", "name", "team", "grid", "time", "gap")
+SECOND_HEADER = ("track", "pole", "fastest_lap", "driver_of_the_day")
+
+
+def original_box(prepared: Prepared, left: float, top: float, right: float, bottom: float,
+                 img: Image.Image) -> tuple[int, int, int, int] | None:
+    """Eine Lage im vorbereiteten Bild als Ausschnitt des Originalbilds - ``None``, wenn nichts übrig bleibt."""
+    box = (max(0, int(left / prepared.scale)), max(0, int(top / prepared.scale)),
+           min(img.width, int(right / prepared.scale)), min(img.height, int(bottom / prepared.scale)))
+    return box if box[2] - box[0] >= 4 and box[3] - box[1] >= 4 else None
+
+
+def read_second(img: Image.Image, jobs: list[tuple[dict, str, list[tuple[int, int, int, int]]]]) -> str:
+    """Zellen vom zweiten Leser lesen lassen (#2018): je Auftrag (Ziel, Schlüssel, Ausschnitte im Originalbild) landet
+    die Lesung als ``Read`` in ``Ziel[Schlüssel]`` - mehrere Ausschnitte (Name, darunter die Zeit) mit Leerzeichen
+    verbunden, Sicherheit die kleinste. Im Zeitbudget des Bilds; liefert, wie es lief."""
+    if not second_reader.enabled():
+        return "off"
+    if not second_reader.available():
+        return second_reader.status()["status"]
+    if not jobs:
+        return "ok"
+    images, owners = [], []
+    for job_index, (_, _, boxes) in enumerate(jobs):
+        for box in boxes:
+            images.append(second_reader.cell_image(img, box))
+            owners.append(job_index)
+    result = second_reader.recognize(images, _DEADLINE.get())
+    found: dict[int, list] = {}
+    for owner, item in zip(owners, result.reads):
+        found.setdefault(owner, []).append(item)
+    for job_index, (target, key, _) in enumerate(jobs):
+        items = found.get(job_index) or []
+        if not items or any(item is None for item in items):
+            continue  # nicht (ganz) gelesen - ohne Lesung gilt, was ohne zweiten Leser gilt
+        text = " ".join(item.text for item in items if item.text).strip()
+        conf = min(item.score for item in items) * 100
+        target[key] = Read(text, conf, [(item.text, item.score * 100) for item in items])
+    return result.status
+
+
+def _second_reads(img: Image.Image, prepared: Prepared, columns: list[dict], assigned: list[dict[int, Cell]],
+                  data_lines: list[Line], reading: Reading) -> None:
+    """Der zweite Leser (#2018) liest jede Zelle der Spalten ``SECOND_FIELDS`` und den Kopf noch einmal - die Zelle aus
+    dem Originalbild, wie sie Tesseract gefunden hat (fehlt sie in einer sonst gefüllten Spalte, die Breite der
+    Spalte), in der Höhe der Schrift um die Mitte der Zeile. Ist das Zeitbudget schon aufgebraucht, liest er nichts."""
+    if reading.out_of_time:
+        reading.second = "out_of_time" if second_reader.enabled() else "off"
+        return
+    jobs = []
+    if data_lines:
+        height = statistics.median(line.height for line in data_lines)
+        for index, column in enumerate(columns):
+            if column["field"] not in SECOND_FIELDS:
+                continue
+            present = [row[index] for row in assigned if row.get(index)]
+            if not present:
+                continue
+            low, high = min(cell.left for cell in present), max(cell.right for cell in present)
+            for row_index, row in enumerate(assigned):
+                cell = row.get(index)
+                if cell is None and len(present) * 2 < len(assigned):
+                    continue
+                center = statistics.median(word.cy for word in data_lines[row_index].words)
+                box = original_box(prepared, (cell.left if cell else low) - height * 0.3, center - height * 0.8,
+                                   (cell.right if cell else high) + height * 0.3, center + height * 0.8, img)
+                if box:
+                    jobs.append((reading.rows[row_index].second, column["field"], [box]))
+    for key in SECOND_HEADER:
+        read = reading.header.get(key)
+        if read is None or not read.boxes:
+            continue
+        pad = max(2.0, statistics.median(bottom - top for _, top, _, bottom in read.boxes) * 0.3)
+        boxes = [original_box(prepared, left - pad, top - pad, right + pad, bottom + pad, img)
+                 for left, top, right, bottom in read.boxes]
+        if all(boxes):
+            jobs.append((reading.header_second, key, boxes))
+    reading.second = read_second(img, jobs)
 
 
 def _retry_empty_cells(img: Image.Image, prepared: Prepared, columns: list[dict], assigned: list[dict[int, Cell]],
