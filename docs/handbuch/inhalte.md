@@ -386,6 +386,30 @@ Spur: …“) und kann eigene ergänzen, etwa einen Sponsor nur dieser Season.
 
 <img src="../assets/serien/serien-partner-chronik.png" alt="Chronik: Zeile mit kleinem Partner-Abzeichen des Veranstalters" width="560">
 
+**Logo der Spur und der Saison:** Im Blatt der Spur steht das Feld **Logo**: **Hochladen** (PNG, JPG oder WebP, am
+besten PNG mit durchsichtigem Hintergrund – leere Ränder schneidet der Upload ab), **Medien wählen** aus der Mediathek
+oder **Entfernen**. Darunter zeigt die Vorschau das Logo auf **hellem und dunklem Grund**. Eine Adresse von außen lässt
+sich nicht eintragen. Jede Saison erbt das Logo ihrer Spur; im Blatt der Saison lässt sich ein **eigenes Logo** setzen,
+etwa ein Saison-Logo „Season 2“ – das geht dann vor. Das Logo steht wie hochgeladen, nie eingefärbt:
+
+- im Kopf der **Serienseite** und der **Rundenseite**,
+- auf der Übersicht bei **Läuft gerade** (statt des Spiel-Logos), bei **Serien & Ligen** und in der **Chronik**,
+- im **Mitgliederprofil** (Vereinsplatzierungen) und auf der **Partnerseite** („Ligen und Serien mit uns“),
+- als Bild beim **Teilen** von Serie und Runde,
+- in der Liste der Spuren unter Admin → Verein → Serien.
+
+Ohne Logo bleibt alles wie bisher: Spiel-Logo bzw. Partner-Abzeichen. Die Mediathek zählt das Logo als verwendet,
+solange eine Spur oder Saison es trägt – auch eine archivierte.
+
+<table>
+<tr>
+<td><img src="../assets/serien/serien-logo-saison.png" alt="Saison bearbeiten: Feld Logo mit Vorschau auf hellem und dunklem Grund" width="420"></td>
+<td><img src="../assets/serien/serien-logo-serienseite.png" alt="Serienseite am Handy mit dem Saison-Logo im Kopf" width="200"></td>
+</tr>
+</table>
+
+<img src="../assets/serien/serien-logo-uebersicht.png" alt="Serien und Ligen: Karte der Spur mit ihrem Logo, daneben eine Spur ohne Logo" width="560">
+
 <table>
 <tr>
 <td><img src="../assets/serien/serien-liste.png" alt="Serien: eine Spur mit ihrer Saison, Status, Freigabe und Regel-Version" width="420"></td>
