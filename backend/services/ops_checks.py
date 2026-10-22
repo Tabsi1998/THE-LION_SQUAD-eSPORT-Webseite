@@ -407,6 +407,32 @@ async def check_scheduler() -> dict:
     return result("scheduler", label, "ok" if running else "crit", f"{jobs} Jobs" if running else "steht", "läuft" if running else "kein Scheduler aktiv")
 
 
+async def check_image_reading() -> dict:
+    """Bild-Erkennung für Ergebnis- und Tabellen-Bilder (#1756, #2018): Tesseract und der zweite Leser. Fehlt der zweite
+    Leser, liest der Server weiter, aber Namen und Teams sind dann nur mit bekannten Teilnehmern grün - eine Warnung.
+    Geprüft wird, ohne das Modell zu laden."""
+    label = "Bild-Erkennung"
+    try:
+        from services import result_image_ocr, result_image_second
+
+        tesseract = await asyncio.to_thread(result_image_ocr.available)
+        second = result_image_second.presence()
+    except Exception as exc:  # noqa: BLE001
+        return failed("image_reading", label, exc)
+    if not tesseract:
+        return result("image_reading", label, "warn", "Tesseract fehlt",
+                      "Ergebnis- und Tabellen-Bilder lassen sich nicht lesen - Backend-Image prüfen (backend/Dockerfile).")
+    if second["status"] == "ok":
+        return result("image_reading", label, "ok", f"Tesseract und zweiter Leser ({second['model']})",
+                      "Namen und Teams lesen zwei Leser")
+    if second["status"] == "off":
+        return result("image_reading", label, "ok", "zweiter Leser abgeschaltet",
+                      "RESULT_IMAGE_SECOND_READER=off - Namen und Teams sind nur mit bekannten Teilnehmern grün")
+    return result("image_reading", label, "warn", f"zweiter Leser fehlt ({second['reason']})",
+                  "Bilder werden weiter gelesen, aber Namen und Teams sind nur mit bekannten Teilnehmern grün. Das "
+                  "Backend-Image neu bauen - backend/Dockerfile lädt das Modell (docs/BETRIEB.md, „Bild-Erkennung“).")
+
+
 async def check_client_ip(db) -> dict:
     label = "Besucher-Adresse"
     try:
@@ -481,6 +507,7 @@ def default_checks(db) -> list[tuple[str, str, Callable[[], Awaitable[dict]]]]:
         ("client_ip", "Besucher-Adresse", lambda: check_client_ip(db)),
         ("unique_indexes", "Eindeutige Indizes", lambda: check_unique_indexes(db)),
         ("file_cleanups", "Datei-Nacharbeit", lambda: check_file_cleanups(db)),
+        ("image_reading", "Bild-Erkennung", check_image_reading),
     ]
 
 
