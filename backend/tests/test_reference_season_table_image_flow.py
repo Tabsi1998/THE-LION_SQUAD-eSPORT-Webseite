@@ -58,9 +58,10 @@ def fake_table(monkeypatch):
         reading = _reading([("Probe Rotr", 25, 18), ("Probe Blau", 18, 15)])
         calls = 0
 
-    def read(image, template, *, max_rows=None):
+    def read(image, template, *, max_rows=None, sums=True):
         Fake.calls += 1
         assert image.mode == "RGB" and template["id"] == "saisontabelle" and max_rows == 300
+        assert sums is False  # die Summenprobe macht die Route - je nach Fahrer- oder Teamtabelle
         return Fake.reading
 
     monkeypatch.setattr(result_image_ocr, "available", lambda: True)
@@ -72,7 +73,7 @@ def _png() -> bytes:
     return fixture.png_bytes(fixture.render())
 
 
-async def _season(flow, *, kind="racing", team_scoring=True):
+async def _season(flow, *, kind="racing", team_scoring=True, rules=None):
     await migrations.migrate_points_scheme_templates(flow.db)
     board = await flow.add_user(role="club_admin", name="vorstand-vera")
     flow.act_as(board)
@@ -80,7 +81,8 @@ async def _season(flow, *, kind="racing", team_scoring=True):
     series = (await flow.post(f"{ADMIN}/series", json={
         "lineage_id": lineage["id"], "season": "2026", "status": "active",
         "rules": {"points_mode": "scheme", "points_by_place": F1, "tiebreakers": ["countback"],
-                  "team_scoring": {"enabled": team_scoring, "counting_drivers": 2, "guests_count": True}}})).json()
+                  "team_scoring": {"enabled": team_scoring, "counting_drivers": 2, "guests_count": True},
+                  **(rules or {})}})).json()
     start = date.fromisoformat(club_today()) - timedelta(days=40)
     lines = [f"R{index} · {(start + timedelta(days=7 * index)).strftime('%d.%m.%Y')} · Probe Strecke {index}"
              for index in range(1, 4)]
@@ -156,6 +158,35 @@ async def test_no_table_unavailable_and_team_league_are_refused(flow, fake_table
     monkeypatch.setattr(result_image_ocr, "available", lambda: True)
     assert (await flow.post(f"{ADMIN}/series/{league['id']}/season-table/image", content=_png(),
                             headers=PNG)).status_code == 409
+
+
+def _with_totals(reading, totals):
+    for row, total in zip(reading.rows, totals):
+        row[4] = TableCell(text=str(total), value=total)
+    return reading
+
+
+@pytest.mark.asyncio
+async def test_a_different_sum_is_a_hint_for_teams_and_explained_for_drivers(flow, fake_table):
+    _, series, _ = await _season(flow, rules={"count_mode": "best_n", "count_n": 1})
+    url = f"{ADMIN}/series/{series['id']}/season-table/image"
+    # Teamtabelle: „Punkte“ als aktuelle Besetzung (#1960) weicht von den Zellen ab - nur ein Hinweis.
+    fake_table.reading = _with_totals(_reading([("Probe Rot", 25, 18), ("Probe Blau", 18, 15)]), [40, 33])
+    teams = (await flow.post(f"{url}?table=teams", content=_png(), headers=PNG)).json()
+    assert teams["rows"][0]["uncertain"] == [1] and teams["rows"][0]["notes"] == ["Summe der Runden 43 ≠ Punkte 40"]
+    # Fahrertabelle mit „beste 1“: 25 statt 43 ist das Streichresultat - erklärt, nichts gelb.
+    fake_table.reading = _with_totals(_reading([("Ada Ausgedacht", 25, 18), ("Bruno Beispiel", 18, 15)], "Fahrer"),
+                                      [25, 30])
+    drivers = (await flow.post(f"{url}?table=drivers", content=_png(), headers=PNG)).json()
+    assert drivers["rows"][0]["notes"] == ["Summe der Runden 43, Punkte 25 – erklärt: Streichresultate −18"]
+    assert 2 not in drivers["rows"][0]["uncertain"] and 3 not in drivers["rows"][0]["uncertain"]
+    # 33 statt 30 erklärt nichts - die Zahlenzellen der Zeile werden gelb.
+    assert {2, 3} <= set(drivers["rows"][1]["uncertain"])
+    # Eine Team-Tabelle bleibt eine, auch ohne ?table=teams.
+    fake_table.reading = _with_totals(_reading([("Probe Rot", 25, 18), ("Probe Blau", 18, 15)]), [40, 33])
+    fake_table.reading.detected = "teams"
+    detected = (await flow.post(url, content=_png(), headers=PNG)).json()
+    assert detected["kind"] == "teams" and detected["rows"][0]["uncertain"] == [1]
 
 
 # ---------------------------------------------------------------- Teamwertung laut Veranstalter

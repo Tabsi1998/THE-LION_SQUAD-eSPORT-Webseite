@@ -48,6 +48,7 @@ warnings}`` (``services/result_image_table.py``).
 from __future__ import annotations
 
 import asyncio
+import functools
 import logging
 import os
 import time
@@ -62,7 +63,7 @@ from services import result_image_match, result_image_ocr, result_image_table, r
 from services.image_upload import MAX_BYTES, MAX_IMAGE_UPLOAD_MB
 from services.rate_limit import enforce_rate_limit, keyed_subject
 from services.reference_series_access import SeriesAccess, require_series_editor
-from services.scoring_rules import normalize_rules
+from services.scoring_rules import counted_results, normalize_rules
 from services.series_identity import normalize_name
 from services.series_participants import series_game_id
 
@@ -241,6 +242,40 @@ def _table_template() -> dict:
     return {"id": result_image_table.TEMPLATE["id"], "name": result_image_table.TEMPLATE["name"]}
 
 
+async def _sum_explainer(db, series: dict, participants: list[dict], rounds_in_table: int):
+    """Erklärt eine Abweichung „Summe der Runden ≠ Punkte“ einer Fahrertabelle wie beim Text-Einfügen
+    (``season_table.explain_total``): Streichresultate nach den Regeln der Saison, Aktivitätspunkte und Anpassungen
+    (#1960) des Fahrers. ``None``, wenn die Regeln sich nicht anwenden lassen."""
+    try:
+        rules = normalize_rules(series.get("rules") or {})
+    except ValueError:
+        return None
+    calendar = await db.reference_rounds.count_documents(
+        {"series_id": series["id"], "archived_at": None, "status": {"$ne": "cancelled"}})
+    total_rounds = max(calendar, rounds_in_table)
+    by_name = {row.get("name"): row["id"] for row in participants if row.get("name")}
+    adjusted: dict[str, float] = {}
+    for item in series.get("adjustments") or []:
+        if item.get("kind", "participant") == "participant" and item.get("participant_id"):
+            adjusted[item["participant_id"]] = adjusted.get(item["participant_id"], 0) + (item.get("points") or 0)
+    activity = rules["activity_points"]
+
+    def explain(name: str, values: list, summed, total) -> str | None:
+        results = [{"round_id": str(index), "seq": index + 1, "points": value}
+                   for index, value in enumerate(values) if value is not None]
+        _, gone = counted_results(results, rules, total_rounds)
+        dropped = sum(item["points"] for item in results if item["round_id"] in set(gone))
+        bonus = activity["points"] * sum(1 for item in results if item["seq"] >= activity["from_round"])
+        parts = {"dropped": -dropped, "activity": bonus, "adjustment": adjusted.get(by_name.get(name), 0)}
+        out = season_table.explain_total(summed, total, parts)
+        if out["state"] != "explained":
+            return None
+        return " · ".join(f"{item['text']} {'+' if item['points'] > 0 else '−'}{abs(item['points'])}"
+                          for item in out["explains"])
+
+    return explain
+
+
 def _table_warnings(reading) -> list[dict]:
     out = []
     if not reading.header_found:
@@ -280,8 +315,10 @@ async def read_season_table_image(series_id: str, request: Request,
         raise HTTPException(429, BUSY_ACCOUNT)
     _reading_accounts.add(account)
     try:
-        reading, started = await _read_in_turn(await _body(request), result_image_table.TEMPLATE,
-                                               reader=result_image_table.read_table, max_rows=season_table.MAX_ROWS)
+        # Die Summenprobe hängt an der Art der Tabelle - sie kommt erst nach dem Abgleich der Namen.
+        reader = functools.partial(result_image_table.read_table, sums=False)
+        reading, started = await _read_in_turn(await _body(request), result_image_table.TEMPLATE, reader=reader,
+                                               max_rows=season_table.MAX_ROWS)
     finally:
         _reading_accounts.discard(account)
     if reading.too_many_rows:
@@ -289,6 +326,8 @@ async def read_season_table_image(series_id: str, request: Request,
     if not reading.rows or "name" not in reading.kinds:
         raise HTTPException(422, NO_SEASON_TABLE)
     participants = await db.reference_participants.find({"series_id": series_id}, PARTICIPANT_FIELDS).to_list(None)
+    # Eine Team-Tabelle bleibt eine, auch wenn sie in „Saisontabelle einlesen“ landet (die Namensspalte heißt „Team“).
+    table = "teams" if reading.detected == "teams" else table
     if table == "teams":
         known = {name: name for name in await known_teams(db, access.series, participants)}
     else:
@@ -299,6 +338,13 @@ async def read_season_table_image(series_id: str, request: Request,
             if by_id.get(alias["participant_id"]):
                 known.setdefault(alias["name"], by_id[alias["participant_id"]])
     result_image_table.match_names(reading, known)
+    if table == "teams":
+        # „Punkte“ einer Teamtabelle ist oft die aktuelle Besetzung (#1960), die Zellen sind je Rennen - nur Hinweis.
+        result_image_table.check_sums(reading, strict=False)
+    else:
+        rounds = reading.kinds.count("round")
+        result_image_table.check_sums(reading, strict=True,
+                                      explain=await _sum_explainer(db, access.series, participants, rounds))
     payload = result_image_table.to_payload(reading, kind=table)
     logger.info("[result-image] table %s rows (%s uncertain cells) in %.1fs", len(payload["rows"]),
                 payload["uncertain_cells"], time.monotonic() - started)

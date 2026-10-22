@@ -14,17 +14,21 @@ Rundenspalten ist offen; ihre Köpfe sind oft Flaggen (Bilder, keine Schrift), d
 - **Zellen** (``_cell``): je Zelle die Seitenlesung, ein Streifen mit Ziffern-Whitelist und eine dritte, anders
   vorbereitete Lesung. Zahl oder „--“ (nicht angetreten). Gelb, wenn sich die Lesungen widersprechen, die Sicherheit
   zu niedrig ist oder nichts gelesen wurde - nie still falsch.
-- **Gegenproben:** „Dif.“ = Punkte - Punkte des Ersten bestätigt beide oder macht beide gelb; die Summe der Runden =
-  Punkte bestätigt die ganze Zeile. Passt sie nicht (Strafe, Teamwertung mit eigener Rechnung - oder eine verlesene
-  Zelle), steht das als Hinweis an der Zeile; die Vorschau der Saisontabelle gleicht jede Summe mit „Gesamt“ ab, eine
-  verlesene Zelle fällt dort als Abweichung auf. Plätze laufen mit den Punkten.
-- **Namen** (``_names``): wie bei Ergebnis-Bildern unscharf gegen die bekannten Namen (Teilnehmer der Saison bzw. ihre
-  Teams); unter ``name_sure`` gelb.
+- **Gegenproben:** „Dif.“ = Punkte - Punkte des Ersten bestätigt beide oder macht beide gelb; Plätze laufen mit den
+  Punkten. **Schriftbild** (``_glyph_check``): dieselbe Zahl sieht in einer Tabelle gleich aus - gleicht eine Zelle
+  einer mit anderem Wert, ist eine verlesen (3/5 bei manchen Schriften), beide werden gelb. **Summe** (``check_sums``):
+  Summe der Runden = Punkte bestätigt die Zeile; sonst ein Hinweis an der Summe. Nur eine Fahrertabelle (``strict``)
+  macht dann ihre Zahlenzellen gelb, außer die Saison erklärt die Abweichung (Streichresultate, Anpassungen,
+  Aktivitätspunkte); eine Teamtabelle rechnet „Punkte“ oft als aktuelle Besetzung (#1960) - dort nur der Hinweis.
+- **Namen** (``match_names``): wie bei Ergebnis-Bildern unscharf gegen die bekannten Namen (Teilnehmer der Saison bzw.
+  ihre Teams); unter ``name_sure`` gelb.
 """
 from __future__ import annotations
 
 import statistics
 from dataclasses import dataclass, field
+
+from PIL import Image
 
 from services import result_image_ocr as ocr
 from services.result_image_match import clean_text, similarity
@@ -60,6 +64,7 @@ class TableCell:
     sure: bool = True
     read: str = ""  # gelesen, wenn es vom Wert abweicht
     options: list = field(default_factory=list)
+    glyph: list[int] | None = None  # die Schrift der Zelle, auf feste Größe gebracht (``_glyph``) - nur zum Vergleichen
 
 
 @dataclass
@@ -235,18 +240,20 @@ def _classify(groups: list[tuple[int, int]], members: list[list[ocr.Cell]], labe
 
 # ---------------------------------------------------------------- Lesen
 def read_table(img, template: dict | None = None, *, max_rows: int | None = None,
-               budget_seconds: float | None = None) -> TableReading:
-    """Die Tabelle im Bild lesen - ohne Abgleich mit Namen (``match_names``). Wirft ``result_image_ocr.OutOfTime``,
-    wenn das Zeitbudget nicht einmal für die Seite reicht, und ``OcrUnavailable`` ohne Tesseract."""
+               budget_seconds: float | None = None, sums: bool = True) -> TableReading:
+    """Die Tabelle im Bild lesen - ohne Abgleich mit Namen (``match_names``). ``sums``: gleich die Summenprobe streng
+    (``check_sums``); die Route macht sie selbst, je nach Fahrer- oder Teamtabelle. Wirft
+    ``result_image_ocr.OutOfTime``, wenn das Zeitbudget nicht einmal für die Seite reicht, und ``OcrUnavailable`` ohne
+    Tesseract."""
     template = template or TEMPLATE
     token = ocr._DEADLINE.set(ocr._clock() + (budget_seconds or ocr.BUDGET_SECONDS))
     try:
-        return _read(img, template, max_rows)
+        return _read(img, template, max_rows, sums)
     finally:
         ocr._DEADLINE.reset(token)
 
 
-def _read(img, template: dict, max_rows: int | None) -> TableReading:
+def _read(img, template: dict, max_rows: int | None, sums: bool) -> TableReading:
     prepared = ocr.prepare(img, template)
     lines, timed_out = ocr._page_lines(prepared)
     reading = TableReading(out_of_time=timed_out, text_height=prepared.text_height)
@@ -308,7 +315,14 @@ def _read(img, template: dict, max_rows: int | None) -> TableReading:
                 row.append(_text_cell(page, strip, min_conf))
         reading.rows.append(row)
         reading.notes.append(notes)
+    for (row_index, column), cell in by_cell.items():
+        target = reading.rows[row_index][column]
+        if reading.kinds[column] in GLYPH_KINDS and target.value is not None:
+            target.glyph = _glyph(prepared.image, cell, target.text)
     _check(reading)
+    _glyph_check(reading)
+    if sums:
+        check_sums(reading, strict=True)
     return reading
 
 
@@ -354,7 +368,6 @@ def _column(reading: TableReading, kind: str) -> int | None:
 def _check(reading: TableReading) -> None:
     """Gegenproben über die ganze Tabelle (siehe Modultext) - an Ort und Stelle."""
     total_at, gap_at, rank_at = _column(reading, "total"), _column(reading, "gap"), _column(reading, "rank")
-    rounds = [index for index, kind in enumerate(reading.kinds) if kind == "round"]
     if total_at is not None and gap_at is not None and reading.rows:
         leader = next((row for row in reading.rows if row[gap_at].absent and row[total_at].value is not None), None)
         if leader is not None:
@@ -377,23 +390,6 @@ def _check(reading: TableReading) -> None:
                     total.sure = gap.sure = True
                 elif total.value is not None or gap.value is not None:
                     total.sure = gap.sure = False
-    if total_at is not None and rounds:
-        for row, notes in zip(reading.rows, reading.notes):
-            values = [row[index] for index in rounds]
-            if any(cell.text == "" for cell in values) or row[total_at].value is None:
-                continue
-            summed = sum(cell.value or 0 for cell in values)
-            if summed == row[total_at].value:
-                for cell in values:
-                    cell.sure = True
-                row[total_at].sure = True
-            else:
-                # Strafe, eigene Teamrechnung - oder eine verlesene Zelle: welche, lässt sich nicht sagen, darum wird
-                # jede Zelle mit Zahl gelb („--“ entsteht nie aus einer Ziffer). Nie still falsch.
-                notes.append(f"Summe der Runden {summed} ≠ Punkte {row[total_at].value}")
-                for cell in values:
-                    if not cell.absent:
-                        cell.sure = False
     if rank_at is not None:
         previous = None
         for position, row in enumerate(reading.rows, start=1):
@@ -412,6 +408,90 @@ def _check(reading: TableReading) -> None:
         if first is not None and rest and all(row[rank_at].sure and row[rank_at].value == position
                                               for position, row in enumerate(rest, start=2)):
             first.text, first.value, first.sure = "1", 1, True
+
+
+def check_sums(reading: TableReading, *, strict: bool, explain=None) -> None:
+    """Summe der Runden gegen „Punkte“ je Zeile. Gleich: die ganze Zeile ist bestätigt. Sonst ein Hinweis an der
+    Summe - und nur ``strict`` (Fahrertabelle: Zellen und Gesamt müssen zusammenpassen) macht die Zahlenzellen gelb,
+    welche falsch ist, lässt sich nicht sagen. Ausnahme: ``explain(Name, Werte je Runde, Summe, Punkte)`` erklärt die
+    Abweichung (Streichresultate, Anpassungen, Aktivitätspunkte) - dann bleibt es beim Hinweis. Eine Teamtabelle
+    (``strict=False``) rechnet „Punkte“ oft anders als die Zellen (aktuelle Besetzung, #1960): nur der Hinweis."""
+    total_at, name_at = _column(reading, "total"), _column(reading, "name")
+    rounds = [index for index, kind in enumerate(reading.kinds) if kind == "round"]
+    if total_at is None or not rounds:
+        return
+    for row, notes in zip(reading.rows, reading.notes):
+        values = [row[index] for index in rounds]
+        total = row[total_at].value
+        if any(cell.text == "" for cell in values) or total is None:
+            continue
+        summed = sum(cell.value or 0 for cell in values)
+        if summed == total:
+            for cell in values:
+                cell.sure = True
+            row[total_at].sure = True
+            continue
+        reason = explain(row[name_at].text if name_at is not None else "", [cell.value for cell in values], summed,
+                         total) if explain and strict else None
+        if reason:
+            notes.append(f"Summe der Runden {summed}, Punkte {total} – erklärt: {reason}")
+            continue
+        notes.append(f"Summe der Runden {summed} ≠ Punkte {total}")
+        if strict:
+            for cell in values:
+                if not cell.absent:
+                    cell.sure = False
+
+
+# ---------------------------------------------------------------- Schriftbild
+GLYPH_KINDS = ("round", "total", "gap")
+GLYPH_WIDTH = 9  # Pixel je Zeichen
+GLYPH_HEIGHT = 16
+# Mittlerer Abstand (0-1), unter dem zwei Zellen dieselbe Zahl zeigen: dieselbe Zahl liegt in einer Tabelle bei 0 bis
+# etwa 0,03, verschiedene Ziffern (15/16, 50/40) ab etwa 0,06 (gemessen am PRL-Layout).
+GLYPH_CLOSE = 0.05
+
+
+def _glyph(image, cell: ocr.Cell, text: str) -> list[int] | None:
+    """Die Schrift einer Zelle aus dem vorbereiteten Bild: Tinte freigestellt und auf ``GLYPH_WIDTH`` je Zeichen mal
+    ``GLYPH_HEIGHT`` gebracht. Dieselbe Zahl sieht in derselben Tabelle immer gleich aus."""
+    top = min(word.top for word in cell.words) - 2
+    bottom = max(word.bottom for word in cell.words) + 2
+    box = (max(0, cell.left - 2), max(0, top), min(image.width, cell.right + 2), min(image.height, bottom))
+    if box[2] - box[0] < 3 or box[3] - box[1] < 3 or not text:
+        return None
+    crop = image.crop(box)
+    level = ocr._otsu(crop.histogram())
+    ink = crop.point(lambda value: 255 if value <= level else 0)
+    bbox = ink.getbbox()
+    if not bbox:
+        return None
+    ink = ink.crop(bbox).resize((GLYPH_WIDTH * len(text), GLYPH_HEIGHT), Image.Resampling.BILINEAR)
+    return list(ink.tobytes())
+
+
+def _distance(left: list[float], right: list[float]) -> float:
+    return sum(abs(a - b) for a, b in zip(left, right)) / (255 * max(1, len(left)))
+
+
+def _glyph_check(reading: TableReading) -> None:
+    """Schriftbild-Probe: dieselbe Zahl sieht in derselben Tabelle gleich aus. Gleicht eine Zelle einer Zelle mit
+    anderem Wert (Abstand unter ``GLYPH_CLOSE``), ist eine von beiden verlesen - etwa eine „23“, die alle Lesungen
+    als „25“ nahmen: beide werden gelb, mit dem anderen Wert als Lesung. Bestätigt wird hier nichts."""
+    cells = [row[column] for row in reading.rows for column, kind in enumerate(reading.kinds)
+             if kind in GLYPH_KINDS and row[column].glyph and row[column].value is not None]
+    by_length: dict[int, list[TableCell]] = {}
+    for cell in cells:
+        by_length.setdefault(len(cell.text), []).append(cell)
+    for group in by_length.values():
+        for index, cell in enumerate(group):
+            for other in group[index + 1:]:
+                if other.text == cell.text or _distance(cell.glyph, other.glyph) >= GLYPH_CLOSE:
+                    continue
+                for mine, theirs in ((cell, other), (other, cell)):
+                    mine.sure = False
+                    if theirs.text not in mine.read.split(" / "):
+                        mine.read = theirs.text if not mine.read else f"{mine.read} / {theirs.text}"
 
 
 # ---------------------------------------------------------------- Namen

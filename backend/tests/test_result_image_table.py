@@ -68,6 +68,7 @@ def test_gap_and_sum_confirm_or_mark_the_totals():
     reading = _reading([[1, "Probe Rot", 30, 20, 50, "--"], [2, "Probe Blau", 20, 10, 30, -20],
                         [3, "Probe Gelb", 10, 15, 26, -25]])
     table._check(reading)
+    table.check_sums(reading, strict=True)
     rows = reading.rows
     # Erster und Zweiter: Dif. passt, Summe passt - alles grün.
     assert [cell.sure for cell in rows[0][2:5]] == [True, True, True]
@@ -78,6 +79,48 @@ def test_gap_and_sum_confirm_or_mark_the_totals():
     assert reading.notes[2] == ["Summe der Runden 25 ≠ Punkte 26"]
     # Plätze 1 … n laufen mit den Punkten - grün.
     assert [row[0].sure for row in rows] == [True, True, True]
+
+
+def test_a_team_table_only_notes_a_different_sum_and_drivers_explain_it():
+    rows = [[1, "Probe Rot", 30, 20, 45, "--"], [2, "Probe Blau", 20, 10, 30, -15]]
+    # Teamtabelle: „Punkte“ ist die aktuelle Besetzung (#1960) - nur ein Hinweis, die Zellen bleiben wie gelesen.
+    teams = _reading(rows)
+    for row in teams.rows:
+        for cell in row[2:4]:
+            cell.sure = True
+    table.check_sums(teams, strict=False)
+    assert [cell.sure for cell in teams.rows[0][2:4]] == [True, True]
+    assert teams.notes[0] == ["Summe der Runden 50 ≠ Punkte 45"]
+    # Fahrertabelle: eine erklärte Abweichung (Anpassung -5) macht nichts gelb, eine unerklärte schon.
+    drivers = _reading(rows)
+    for row in drivers.rows:
+        for cell in row[2:4]:
+            cell.sure = True
+    seen = []
+
+    def explain(name, values, summed, total):
+        seen.append((name, values, summed, total))
+        return "Anpassungen −5" if name == "Probe Rot" else None
+
+    table.check_sums(drivers, strict=True, explain=explain)
+    assert seen == [("Probe Rot", [30, 20], 50, 45)]
+    assert [cell.sure for cell in drivers.rows[0][2:4]] == [True, True]
+    assert drivers.notes[0] == ["Summe der Runden 50, Punkte 45 – erklärt: Anpassungen −5"]
+    assert drivers.rows[1][4].sure is True  # 20 + 10 = 30: bestätigt
+
+
+def test_the_same_figures_look_the_same_in_one_table():
+    reading = _reading([[1, "Probe Rot", 23, 25, 48, "--"], [2, "Probe Blau", 25, 16, 41, -7]])
+    three, five = [0] * 50 + [255] * 50, [255] * 50 + [0] * 50
+    cells = {(0, 2): three, (0, 3): five, (1, 2): three, (1, 3): [128] * 100}
+    for (row, column), glyph in cells.items():
+        reading.rows[row][column].glyph = glyph
+        reading.rows[row][column].sure = True
+    table._glyph_check(reading)
+    # Die „25“ in Zeile 2 sieht aus wie die „23“ in Zeile 1: beide gelb, mit der anderen Lesung.
+    first, second = reading.rows[0][2], reading.rows[1][2]
+    assert (first.sure, first.read, second.sure, second.read) == (False, "25", False, "23")
+    assert reading.rows[0][3].sure is True and reading.rows[1][3].sure is True
 
 
 def test_a_lost_minus_in_the_gap_is_set_again():
@@ -134,8 +177,9 @@ def _measure(reading, truth):
 @needs_tesseract
 def test_a_team_table_in_the_prl_layout_is_right_or_yellow():
     rows = fixture.sample_rows()
-    reading = table.read_table(fixture.render(rows), budget_seconds=120)
+    reading = table.read_table(fixture.render(rows), budget_seconds=120, sums=False)
     table.match_names(reading, {row.name: row.name for row in rows})
+    table.check_sums(reading, strict=False)  # Teamtabelle: „Punkte“ darf anders rechnen als die Zellen
     assert reading.header_found and reading.detected == "teams"
     assert reading.kinds == ["rank", "name", *["round"] * 17, "total", "gap"]
     assert len(reading.rows) == 12
@@ -146,6 +190,10 @@ def test_a_team_table_in_the_prl_layout_is_right_or_yellow():
     assert all(cell.text == expected[19] or not cell.sure for cell, expected in zip(totals, truth))
     assert sum(cell.sure for cell in totals) >= 9
     assert [row[1].text for row in reading.rows] == [row.name for row in rows]
+    # Nicht unnötig gelb: richtig Gelesenes wird nur gelb, wenn die eigene Lesung oder das Schriftbild zweifelt.
+    unnecessary = sum(1 for row, expected in zip(reading.rows, truth) for column, cell in enumerate(row)
+                      if not cell.sure and cell.text == expected[column])
+    assert unnecessary <= 30
 
 
 @needs_tesseract
