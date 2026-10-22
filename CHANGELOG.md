@@ -1,5 +1,24 @@
 # Changelog
 
+## [1.32.0](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/compare/v1.31.0...v1.32.0) (2026-10-22)
+
+
+### Neu
+
+* Bestehende Double-Up-Saisons behalten die Punkte nach Team-Platz ([#2015](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2015)) ([5881aaf](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/5881aafc584c11b4d1780ed7f31575bef1c03117))
+* Double-Up-Punkte wie bei PineApps – Team-Platz k zählt wie Einzelplatz 2k−1, einstellbar je Saison ([#2015](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2015)) ([5881aaf](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/5881aafc584c11b4d1780ed7f31575bef1c03117))
+* Kalender – „Fehlende Termine anlegen“ bis zur geplanten Zahl ([#2015](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2015)) ([5881aaf](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/5881aafc584c11b4d1780ed7f31575bef1c03117))
+* Nachgetragenes Datum sortiert einen offenen Termin richtig ein ([#2015](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2015)) ([5881aaf](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/5881aafc584c11b4d1780ed7f31575bef1c03117))
+* PineApps-Import teilt den Team-Platz bei gleicher Tagessumme im Double Up ([#2015](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2015)) ([5881aaf](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/5881aafc584c11b4d1780ed7f31575bef1c03117))
+* Saison-Feld „geplante Termine“ – Fortschritt „3 von 9“ und Streichergebnisse mit der geplanten Zahl ([#2015](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2015)) ([5881aaf](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/5881aafc584c11b4d1780ed7f31575bef1c03117))
+* Serienseite zeigt Double-Up-Regel und Team-Platz mit Punkten im Turniertag ([#2015](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2015)) ([5881aaf](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/5881aafc584c11b4d1780ed7f31575bef1c03117))
+* Terminliste versteht „offen“, „?“ und „tbd“ als Termin ohne Datum ([#2015](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2015)) ([5881aaf](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/5881aafc584c11b4d1780ed7f31575bef1c03117))
+
+
+### Fehlerbehebungen
+
+* Kalender am Handy – Knöpfe unter dem Termin statt über dem Status ([#2015](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2015)) ([5881aaf](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/5881aafc584c11b4d1780ed7f31575bef1c03117))
+
 ## 1.31.0 (22.10.2026)
 
 ### Neu
