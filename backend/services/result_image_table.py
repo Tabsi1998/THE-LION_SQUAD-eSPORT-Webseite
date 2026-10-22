@@ -21,8 +21,8 @@ Rundenspalten ist offen; ihre Köpfe sind oft Flaggen (Bilder, keine Schrift), d
   macht dann ihre Zahlenzellen gelb, außer die Saison erklärt die Abweichung (Streichresultate, Anpassungen,
   Aktivitätspunkte); eine Teamtabelle rechnet „Punkte“ oft als aktuelle Besetzung (#1960) - dort nur der Hinweis.
 - **Namen** (``match_names``): wie bei Ergebnis-Bildern unscharf gegen die bekannten Namen (Teilnehmer der Saison samt
-  gelernter Schreibweisen bzw. ihre Teams); unter ``name_sure`` oder ohne klaren Abstand zum Zweitbesten gelb, ein
-  unbekannter Name immer (#2012).
+  gelernter Schreibweisen bzw. ihre Teams); grün nur genau so gelesen und mit klarem Abstand zum Zweitbesten - ein
+  Treffer über Verwechslungen oder bloße Ähnlichkeit und ein unbekannter Name sind gelb (#2012).
 """
 from __future__ import annotations
 
@@ -32,7 +32,7 @@ from dataclasses import dataclass, field
 from PIL import Image, ImageChops
 
 from services import result_image_ocr as ocr
-from services.result_image_match import clean_text, similarity
+from services.result_image_match import EXACT_SCORE, clean_text, similarity
 from services.result_image_values import DIGIT_FIX, compact, is_noise
 
 TEMPLATE: dict = {
@@ -544,9 +544,10 @@ def _glyph_check(reading: TableReading, deadline: float | None = None) -> None:
 # ---------------------------------------------------------------- Namen
 def match_names(reading: TableReading, known: dict[str, str], template: dict | None = None) -> None:
     """Namen unscharf gegen ``known`` (Schreibweise → Name: Teilnehmer samt Aliase und gelernter Schreibweisen bzw.
-    Teams der Saison): ab ``name_sure`` und mit Abstand ``name_margin`` zum Zweitbesten grün mit dem bekannten Namen, ab
-    ``name_match`` der bekannte Name gelb, sonst wie gelesen - und gelb (#2012: ein unbekannter Name ist nie grün, wie
-    sicher die Erkennung auch ist; ohne bekannte Namen ist jeder gelb). Jeder bekannte Name höchstens einmal."""
+    Teams der Saison): genau so gelesen und mit Abstand ``name_margin`` zum Zweitbesten grün mit dem bekannten Namen,
+    ab ``name_match`` der bekannte Name gelb (auch über Verwechslungen), sonst wie gelesen - und gelb (#2012: ein
+    unbekannter Name ist nie grün, wie sicher die Erkennung auch ist; ohne bekannte Namen ist jeder gelb). Jeder
+    bekannte Name höchstens einmal."""
     template = template or TEMPLATE
     margin = float(template.get("name_margin", 0.1))
     at = _column(reading, "name")
@@ -574,7 +575,8 @@ def match_names(reading: TableReading, known: dict[str, str], template: dict | N
         if name != cell.text:
             cell.read = cell.text if not cell.read else f"{cell.text} / {cell.read}"
         cell.text = name
-        cell.sure = score >= template["name_sure"] and score - second >= margin and (cell.sure or score >= 0.99)
+        # Grün nur genau so gelesen (Prüfer zu #2012): ein Treffer über Verwechslungen kann ein anderer Name sein.
+        cell.sure = score >= max(template["name_sure"], EXACT_SCORE) and score - second >= margin
 
 
 def to_payload(reading: TableReading, *, kind: str) -> dict:

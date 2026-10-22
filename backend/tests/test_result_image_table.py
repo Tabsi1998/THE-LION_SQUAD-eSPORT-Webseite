@@ -202,6 +202,16 @@ def test_a_table_name_is_green_only_when_it_clearly_is_a_known_one():
     assert plain.rows[0][1].sure is False
 
 
+def test_a_table_name_known_only_through_a_lookalike_stays_yellow():
+    """Prüfer zu #2012 auch in Tabellen-Bildern: „Amie“ ist nicht „Arnie“ - ein Treffer nur über Verwechslungen wird
+    vorgeschlagen, bleibt aber gelb, auch wenn beide Lesungen sicher sind."""
+    reading = _reading([[1, "Amie", 30, 20, 50, "--"], [2, "Kim", 20, 10, 30, -20]])
+    assert all(row[1].sure for row in reading.rows)
+    table.match_names(reading, {"Arnie": "Arnie", "Kirn": "Kirn"})
+    assert [(row[1].text, row[1].sure, row[1].read) for row in reading.rows] == [
+        ("Arnie", False, "Amie"), ("Kirn", False, "Kim")]
+
+
 def _cell(text, left, right):
     return Cell([Word(text, 95, left, 0, right - left, 20)])
 
