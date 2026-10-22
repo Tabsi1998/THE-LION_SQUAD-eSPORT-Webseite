@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.31.0](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/compare/v1.30.0...v1.31.0) (2026-10-22)
+
+
+### Neu
+
+* Mitgliederprofil – Logo der Liga bzw. Serie bei den Vereinsplatzierungen ([#2014](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2014)) ([a79ef2a](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/a79ef2a4615d5c112d386a3a7ce3b703482d52dd))
+* Partnerseite – Logo bei „Ligen und Serien mit uns“ ([#2014](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2014)) ([a79ef2a](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/a79ef2a4615d5c112d386a3a7ce3b703482d52dd))
+* Referenzen – Logo der Liga bzw. Serie im Kopf von Serienseite und Rundenseite ([#2014](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2014)) ([a79ef2a](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/a79ef2a4615d5c112d386a3a7ce3b703482d52dd))
+* Referenzen – Logo der Liga bzw. Serie in Läuft gerade, Serien & Ligen und Chronik ([#2014](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2014)) ([a79ef2a](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/a79ef2a4615d5c112d386a3a7ce3b703482d52dd))
+* Startseite – „Heute im Einsatz“ zeigt das Logo der Liga bzw. Serie ([#2014](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2014)) ([a79ef2a](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/a79ef2a4615d5c112d386a3a7ce3b703482d52dd))
+* Teilen – Serie und Runde zeigen das Logo der Liga bzw. Serie als Bild ([#2014](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2014)) ([a79ef2a](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/a79ef2a4615d5c112d386a3a7ce3b703482d52dd))
+* Verwaltung – Logo für Spur und Saison hochladen oder aus der Mediathek wählen, Vorschau hell und dunkel ([#2014](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2014)) ([a79ef2a](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/a79ef2a4615d5c112d386a3a7ce3b703482d52dd))
+
 ## 1.30.0 (22.10.2026)
 
 ### Neu
