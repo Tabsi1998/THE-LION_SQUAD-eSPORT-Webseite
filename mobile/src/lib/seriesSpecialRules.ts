@@ -1,12 +1,18 @@
 import { sessionLabel, type WeekendRound } from "./raceWeekend";
-import { formatNumber, number, shortDay } from "./seriesFormat";
+import { formatNumber, nameOf, number, shortDay } from "./seriesFormat";
 
 // Sonderregeln einer Rennliga in der App (#1960, #1974): Anpassungen („−5“ mit Grund), abgebrochene Saison mit
 // Nachfolger, Termin ohne Wertung, Regeländerungen ab Runde X und Quelle und Modus der Teamwertung. Dieselben Texte wie
 // im Web (frontend/src/lib/seriesSpecialRules.js). Gerechnet wird im Server - hier wird nur beschriftet. Ein älterer
 // Server schickt die Felder nicht: dann bleibt alles leer.
 
-export type Adjustment = { points?: number | null; reason?: string | null; day?: string | null; round_id?: string | null };
+export type Adjustment = {
+  points?: number | null; reason?: string | null; day?: string | null; round_id?: string | null;
+  /** #2000 (nur wo gesetzt): zählt eine Fahrer-Anpassung auch fürs Team, für welches bzw. warum für keines. */
+  counts_for_team?: boolean | null; credited_team?: string | null; team_note?: string | null;
+};
+/** Fahrer-Anpassung an der Teamzeile (#2000): der Fahrer als Kennung wie in der Fahrerwertung. */
+export type DriverAdjustment = Adjustment & { driver?: string | null };
 export type AdjustedRow = { adjustment_points?: number | null; adjustments?: Adjustment[] | null };
 
 /** Punkte einer Anpassung als Zeichen: „−5“, „+2,5“ (echtes Minus wie in den Tabellen). */
@@ -41,6 +47,45 @@ export function adjustmentTitle(row: AdjustedRow | null | undefined, rounds: Wee
 export function adjustmentMark(row: AdjustedRow | null | undefined): string {
   const sum = adjustmentSum(row);
   return sum && (row?.adjustments || []).length ? adjustmentText(sum) : "";
+}
+
+// ---------------------------------------------------------------- Fahrer-Anpassung in der Teamwertung (#2000)
+
+const TEAM_NOTES: Record<string, string> = {
+  substitute: "im Termin als Ersatz gefahren",
+  no_team: "ohne Team gefahren",
+  no_ride: "bis dahin keine Fahrt mit Team",
+  guest: "Gäste zählen nicht fürs Team",
+};
+
+/** Ob eine Fahrer-Anpassung auch fürs Team zählt (vom Server): „zählt auch fürs Team · Team Adler“, „zählt für kein
+ * Team – im Termin als Ersatz gefahren“ - leer ohne Haken (und bei einem älteren Server). */
+export function adjustmentTeamText(item: Adjustment | null | undefined): string {
+  if (!item?.counts_for_team) return "";
+  if (item.credited_team) return `zählt auch fürs Team · ${item.credited_team}`;
+  const note = TEAM_NOTES[String(item.team_note)];
+  return note ? `zählt für kein Team – ${note}` : "zählt auch fürs Team";
+}
+
+export type DriverAdjustmentMark = { key: string; negative: boolean; text: string; title: string };
+
+/** Die Fahrer-Anpassungen bei der Teamsumme: „−5 (Anna Probe)“, in Worten mit Grund und Termin. Der Name kommt aus der
+ * Fahrerwertung (`rows`) nach den Regeln des Servers - ausgeblendet bleibt ausgeblendet, unbekannt ebenso. */
+export function driverAdjustmentMarks(
+  row: { driver_adjustments?: DriverAdjustment[] | null } | null | undefined,
+  rows: Array<{ key?: string | null; name?: string | null; name_hidden?: boolean | null }> | null | undefined = [],
+  rounds: WeekendRound[] | null | undefined = [],
+): DriverAdjustmentMark[] {
+  return (row?.driver_adjustments || []).filter(Boolean).map((item, index) => {
+    const name = nameOf((rows || []).find((entry) => entry?.key && entry.key === item.driver));
+    const line = [adjustmentText(item.points), adjustmentDetail(item, rounds)].filter(Boolean).join(" · ");
+    return {
+      key: `${item.driver}-${index}`,
+      negative: number(item.points) < 0,
+      text: `${adjustmentText(item.points)} (${name})`,
+      title: `Anpassung ${line} – ${name}, zählt auch fürs Team`,
+    };
+  });
 }
 
 // ---------------------------------------------------------------- Teamwertung

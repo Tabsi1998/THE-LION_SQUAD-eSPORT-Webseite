@@ -159,7 +159,7 @@ test("Fahrer-Detail (#1930, #1960): Poles je Runde, Ø Start, Quali-Duell, „im
   const [mira, kai] = driverCards(WEEKEND);
   expect(mira.meta).toBe("TLS-Lions · im Team seit R3 · Sprint · 25 Punkte");
   expect(mira.stats).toBe("2 Rennen · 2 Podien · 1 Pole · 1 schnellste Runde · 1 Platz gutgemacht · Ø Start 2,5 · Quali-Duell 1:0 gegen Kai Funke");
-  expect(mira.adjustments).toEqual([{ key: "mira-0", points: "−5", negative: true, text: "Nichtteilnahme nach Anmeldung · R3 · Rennen · 02.11.2026" }]);
+  expect(mira.adjustments).toEqual([{ key: "mira-0", points: "−5", negative: true, text: "Nichtteilnahme nach Anmeldung · R3 · Rennen · 02.11.2026", team: "" }]);
   expect(kai.stats).toBe("2 Rennen · 1 Podium · 1 Ausfall · 2 Plätze verloren · Ø Start 3,5 · Quali-Duell 0:1 gegen Mira Stahl");
   expect(kai.meta).toBe("TLS-Lions · 21 Punkte");
 });
