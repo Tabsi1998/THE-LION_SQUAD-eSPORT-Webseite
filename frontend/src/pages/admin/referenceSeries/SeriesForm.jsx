@@ -7,6 +7,7 @@ import { PUBLISH_OPTIONS, STATUS_OPTIONS, VISIBILITY_OPTIONS, WEEKDAY_OPTIONS, p
 import { SEASON_RESULT_OPTIONS } from "@/lib/seriesTiers";
 import { RulesFields } from "./RulesFields";
 import { OwnTeamsField } from "./OwnTeamsField";
+import { LearnedSpellings } from "./LearnedSpellings";
 import { WeekendFormatsField } from "./WeekendFormatsField";
 import { weekendPayload, weekendToForm } from "@/lib/raceWeekend";
 import { SeriesPartnersField } from "./SeriesPartnersField";
@@ -25,6 +26,9 @@ export function SeriesForm({ series, lineage, schemes = [], defaultRules = {}, p
   const [form, setForm] = useState(() => seriesToForm({ ...(series || {}), lineage_id: lineage.id }, isNew ? defaultRules : series.rules));
   const [saving, setSaving] = useState(false);
   const [weekend, setWeekend] = useState(() => weekendToForm(series?.weekend));
+  // Gelernte Team-Schreibweisen aus Bildern (#2012): nur entfernen - es gehen die bleibenden mit.
+  const learnedTeams = (series?.read_team_aliases || []).filter((item) => item?.read);
+  const [keptTeams, setKeptTeams] = useState(() => learnedTeams);
   const racing = lineage.kind === "racing";
   const set = (key, value) => setForm((current) => ({ ...current, [key]: value }));
   const chooseScheme = (id) => {
@@ -62,6 +66,7 @@ export function SeriesForm({ series, lineage, schemes = [], defaultRules = {}, p
     try {
       const payload = seriesPayload(form, { isNew, archived });
       if (racing) payload.weekend = weekendPayload(weekend);
+      if (keptTeams.length !== learnedTeams.length) payload.read_team_aliases = keptTeams.map((item) => item.read);
       if (isNew) await api.post("/reference-series/admin/series", payload);
       else await api.patch(`/reference-series/admin/series/${series.id}`, payload);
       toast.success("Gespeichert.");
@@ -117,6 +122,10 @@ export function SeriesForm({ series, lineage, schemes = [], defaultRules = {}, p
       <SeriesLogoField value={form.logo_url} onChange={(v) => set("logo_url", v)} testId="series-logo" inherited={lineage.logo_url || ""}
         hint={`Nur, wenn diese Saison ein eigenes Logo hat. ${inheritedLogoHint(lineage)}`} />
       <OwnTeamsField teams={form.own_teams} onChange={(teams) => set("own_teams", teams)} />
+      <LearnedSpellings items={keptTeams.map((item) => ({ key: item.read, label: `„${item.read}“ → ${item.team}` }))}
+        removed={learnedTeams.length - keptTeams.length} testId="series-read-team-aliases"
+        onRemove={(read) => setKeptTeams((current) => current.filter((item) => item.read !== read))}
+        hint="So standen Teams in Ergebnis-Bildern, bevor ihr sie im Blatt korrigiert habt – die Bild-Erkennung erkennt sie daran wieder." />
       {/* #1934: die Saison erbt die Partner der Spur und kann eigene ergänzen, etwa einen Sponsor dieser Season. */}
       <SeriesPartnersField partners={partners} value={form} onChange={(next) => setForm((current) => ({ ...current, ...next }))}
         inherited={inheritedPartners(lineage, partners)} testPrefix="series-partner"
