@@ -93,7 +93,7 @@ def test_names_need_two_exact_and_confident_reads():
 def test_similarity_ignores_case_tags_and_lookalikes():
     assert similarity("anna probe", "Anna Probe") == 1.0
     assert similarity("[TLS] Anna Probe", "Anna Probe") == 1.0
-    assert similarity("Anna Pr0be", "Anna Probe") == 1.0  # 0 statt o
+    assert similarity("Anna Pr0be", "Anna Probe") == 0.98  # 0 statt o: gleich erst mit den Verwechslungen (#2012)
     assert 0.72 <= similarity("Carl Kurue", "Carl Kurve") < 0.95
     assert similarity("Dora Neu", "Anna Probe") < 0.5
 
@@ -109,7 +109,8 @@ def test_clean_reading_is_sure_and_snaps_to_participants():
     first, second, third = out["rows"]
     assert first == {"index": 0, "place": 1, "dnf": False, "marks": [], "start_number": "7", "name": "Anna Probe",
                      "participant_id": "anna", "team": "Rotor Racing", "grid": 2, "time": "1:32:15.123", "gap": None,
-                     "points": None, "uncertain": [], "read": {}, "color": None}
+                     "points": None, "uncertain": [], "read": {}, "color": None, "hint": {},
+                     "image": {"name": "Anna Probe", "team": "Rotor Racing"}}
     assert (second["gap"], second["participant_id"]) == ("+2.333", "bert")
     assert (third["place"], third["dnf"], third["marks"], third["time"]) == (None, True, ["dnf"], None)
 
@@ -141,7 +142,7 @@ def test_fuzzy_names_and_new_names():
     assert (carl["participant_id"], carl["name"], carl["uncertain"]) == ("carl", "Carl Kurve", ["name"])
     assert carl["read"] == {"name": "Carl Kurue"}
     assert (anna["participant_id"], anna["uncertain"]) == ("anna", [])
-    assert (dora["participant_id"], dora["name"], dora["uncertain"]) == (None, "Dora Neu", [])
+    assert (dora["participant_id"], dora["name"], dora["uncertain"]) == (None, "Dora Neu", ["name"])  # neu: gelb
     assert again["participant_id"] is None
     # Ohne Teilnehmer bleibt alles, wie es gelesen wurde.
     plain = build(reading(row("1", "7", "Carl Kurue")), TEMPLATE, [])
@@ -188,7 +189,7 @@ def test_places_run_without_gaps():
         row("1", name="Anna Probe"), row("2", name="Bert Bolzt"), row("4", name="Carl Kurve"),
         row("DNF", name="Dora Neu"),
     ), TEMPLATE, PEOPLE)
-    assert [item["uncertain"] for item in out["rows"]] == [[], [], ["place"], []]
+    assert [item["uncertain"] for item in out["rows"]] == [[], [], ["place"], ["name"]]  # Dora ist neu
     # Ein Widerspruch der Lesungen, den die Reihenfolge bestätigt, ist sicher.
     agreed = build(reading(row("1", name="Anna Probe"), row("3", name="Bert Bolzt", strips={"place": "2"})),
                    TEMPLATE, PEOPLE)
@@ -213,7 +214,7 @@ def test_one_misread_place_or_leader_time_does_not_poison_the_rest():
     Reihenfolge und Zeit des Siegers ergeben sich aus der Mehrheit der Zeilen."""
     places = build(reading(row("1", name="Anna Probe"), row("2", name="Bert Bolzt"), row("9", name="Carl Kurve"),
                            row("4", name="Dora Neu")), TEMPLATE, PEOPLE)
-    assert [item["uncertain"] for item in places["rows"]] == [[], [], ["place"], []]
+    assert [item["uncertain"] for item in places["rows"]] == [[], [], ["place"], ["name"]]  # Dora ist neu
     times = build(reading(
         row("1", name="Anna Probe", time="30:26.500"),  # richtig wäre 30:26.300
         row("2", name="Bert Bolzt", time="30:27.043", gap="+0.743"),
@@ -230,7 +231,7 @@ def test_place_one_in_the_box_comes_from_the_order():
         out = build(reading(row(first, name="Anna Probe"), row("2", name="Bert Bolzt"), row("3", name="Carl Kurve"),
                             row("4", name="Dora Neu")), TEMPLATE, PEOPLE)
         assert [(item["place"], item["uncertain"]) for item in out["rows"]] == [
-            (1, []), (2, []), (3, []), (4, [])], first
+            (1, []), (2, []), (3, []), (4, ["name"])], first  # Dora ist neu
     gap_below = build(reading(row("1"), row("2"), row("3"), row("5")), TEMPLATE, [])
     assert [item["uncertain"] for item in gap_below["rows"]] == [[], [], [], ["place"]]
     two_off = build(reading(row(""), row("2"), row("7"), row("4")), TEMPLATE, [])
@@ -307,10 +308,10 @@ def test_a_third_reading_that_disagrees_makes_digits_yellow():
     """3 und 5 (#1981): Seite und Streifen sagen „35“, die dritte Lesung (größer, eigene Schwelle) „33“ - gelb, nie
     still falsch. Sagt sie dasselbe, bleibt es sicher."""
     agree = build(reading(row("1", "35", "Neu Name", alts={"start_number": "35"}), row("2"), row("3")), TEMPLATE, [])
-    assert agree["rows"][0]["uncertain"] == []
+    assert "start_number" not in agree["rows"][0]["uncertain"]
     differ = build(reading(row("1", "35", "Neu Name", strips={"start_number": "35"}, alts={"start_number": "33"}),
                            row("2"), row("3")), TEMPLATE, [])
-    assert differ["rows"][0]["uncertain"] == ["start_number"]
+    assert "start_number" in differ["rows"][0]["uncertain"]
     # Zeit = Zeit des Ersten + Abstand bestätigt, wenn sie genau ein Paar der Lesungen stützt.
     second = row("2", time="1:32,134", gap="+0,364", alts={"time": "1:32,154", "gap": "+0,564"})
     times = build(reading(row("1", time="1:31,770"), second, row("3", time="1:32,754", gap="+0,984")), TEMPLATE, [])
@@ -357,7 +358,7 @@ def test_an_unsure_third_reading_does_not_contradict():
     assert decide("number", r("35"), r("35"), 80, alt=r("33", 80)).sure is False
     noisy = row("1", "35", "Neu Name", strips={"start_number": "35"}, alts={"start_number": r("33", 50)})
     unsure = build(reading(noisy, row("2"), row("3")), TEMPLATE, [])
-    assert unsure["rows"][0]["uncertain"] == []
+    assert "start_number" not in unsure["rows"][0]["uncertain"]
 
 
 def _leader_and_third():
@@ -521,7 +522,7 @@ def test_time_equals_leader_plus_gap():
     rows = out["rows"]
     assert rows[1]["uncertain"] == []
     assert {"time", "gap"} <= set(rows[2]["uncertain"])
-    assert (rows[3]["gap"], rows[3]["uncertain"]) == ("+1 Runde", [])
+    assert (rows[3]["gap"], rows[3]["uncertain"]) == ("+1 Runde", ["name"])  # Dora ist neu
 
 
 def test_grid_positions_are_unique_and_teams_snap():
@@ -534,10 +535,95 @@ def test_grid_positions_are_unique_and_teams_snap():
     assert (anna["team"], anna["uncertain"]) == ("Rotor Racing", ["team", "grid"])
     assert anna["read"]["team"] == "Rotor Racmg"
     assert (bert["team"], bert["uncertain"]) == ("Blaupfeil GP", ["grid"])
-    assert (dora["team"], dora["uncertain"]) == ("Neues Team", [])
+    assert (dora["team"], dora["uncertain"]) == ("Neues Team", ["name", "team"])  # neu und unbekannt: gelb (#2012)
     # Teams sind wenige und bekannt: auch ein stark verlesenes wird vorgeschlagen - gelb.
     rough = build(reading(row("1", name="Bert Bolzt", team="Baupted GP")), TEMPLATE, PEOPLE)["rows"][0]
     assert (rough["team"], rough["uncertain"], rough["read"]) == ("Blaupfeil GP", ["team"], {"team": "Baupted GP"})
+
+
+# ---------------------------------------------------------------- Namen nie grün raten (#2012)
+def test_unknown_names_and_teams_are_yellow_however_sure_the_reading():
+    """#2012: Grün nur, wenn der gelesene Name eindeutig zu einem Teilnehmer passt. Ein unbekannter Name ist gelb, auch
+    wenn beide Lesungen ihn sicher und gleich lesen - mit und ohne Kader. Ebenso ein unbekanntes Team und ein
+    unbekannter Name im Kopf des Bilds."""
+    clear = row("1", "7", "Dora Neu", "Neues Team", strips={"name": "Dora Neu", "team": "Neues Team"}, conf=99)
+    for people in (PEOPLE, []):
+        out = build(reading(clear), TEMPLATE, people)["rows"][0]
+        assert (out["name"], out["participant_id"], out["team"]) == ("Dora Neu", None, "Neues Team")
+        assert {"name", "team"} <= set(out["uncertain"]), people
+    known = build(reading(row("1", "7", "Anna Probe", "Rotor Racing",
+                              strips={"name": "Anna Probe", "team": "Rotor Racing"})), TEMPLATE, PEOPLE)["rows"][0]
+    assert (known["participant_id"], known["uncertain"]) == ("anna", [])
+    head = build(reading(row("1", name="Anna Probe"), header={"driver_of_the_day": r("Dora Neu", 99),
+                                                              "pole": r("Bert Bolzt 1:31.207", 99)}),
+                 TEMPLATE, PEOPLE)
+    assert (head["driver_of_the_day"]["name"], head["driver_of_the_day"]["uncertain"]) == ("Dora Neu", ["name"])
+    assert head["pole"]["uncertain"] == []
+
+
+def test_a_name_is_green_only_with_a_clear_lead():
+    """Zwei Teilnehmer, die sich nur in l/1 unterscheiden: der gelesene Name passt zu beiden fast gleich gut - der genau
+    passende wird vorgeschlagen, bleibt aber gelb. Ebenso bei Teams."""
+    people = [{"id": "w1", "name": "Probe_Wolf1", "default_team": "Team 1"},
+              {"id": "wl", "name": "Probe_Wolfl", "default_team": "Team l"}, *PEOPLE]
+    out = build(reading(row("1", "", "Probe_Wolf1", "Team 1", strips={"name": "Probe_Wolf1", "team": "Team 1"})),
+                TEMPLATE, people)["rows"][0]
+    assert (out["participant_id"], out["team"]) == ("w1", "Team 1")
+    assert {"name", "team"} <= set(out["uncertain"])
+
+
+def test_lookalikes_find_the_participant():
+    """Typische Verwechslungen der Bildschirmschrift (#2012): l/1/I, 0/O, rn/m, ii/ü, __/_ und Groß/klein - der Abgleich
+    findet den Teilnehmer und zeigt seinen Namen; grün, weil kein anderer auch nur annähernd passt."""
+    people = [{"id": "h", "name": "Hasel1803"}, {"id": "k", "name": "Kiste_05"}, {"id": "m", "name": "Probe__F1"},
+              {"id": "c", "name": "Chriizzlo"}, {"id": "r", "name": "Marnie_X"}, *PEOPLE]
+    reads = [("Hasell803", "h"), ("HaseI1803", "h"), ("Kiste_O5", "k"), ("Probe_Fl", "m"), ("Chrüzzlo", "c"),
+             ("Mamie_X", "r"), ("hasel1803", "h")]
+    for text, pid in reads:
+        out = build(reading(row("1", "", text, strips={"name": text})), TEMPLATE, people)["rows"][0]
+        assert (out["participant_id"], out["uncertain"]) == (pid, []), text
+        assert out["read"] == {"name": text}
+    assert similarity("Hasell803", "Hasel1803") < similarity("Hasel1803", "Hasel1803") == 1.0
+
+
+def test_a_name_known_only_from_another_season_is_prefilled_but_yellow():
+    """Kader der ganzen Spur (#2012): Ein Name, den es nur in einer anderen Saison derselben Spur gibt, wird mit dem
+    dortigen Namen vorbelegt - ohne Kennung (der Teilnehmer entsteht erst beim Übernehmen), gelb, mit Hinweis. Wer in
+    dieser Saison steht, zählt zuerst; verschiedene Tags sind nie dieselbe Person."""
+    track = [{"id": "t-emil", "name": "Emil Eck", "season": "1/2025", "start_number": "44",
+              "default_team": "Altes Team"},
+             {"id": "t-anna", "name": "Anna Probe", "season": "1/2025", "start_number": "8"}]
+    out = build(reading(row("1", "44", "Emil Ek", "Altes Team", strips={"name": "Emil Ek", "team": "Altes Team"}),
+                        row("2", "7", "Anna Probe", "Rotor Racing")),
+                TEMPLATE, PEOPLE, track=track, track_teams=[{"team": "Altes Team", "season": "1/2025"}])
+    emil, anna = out["rows"]
+    assert (emil["name"], emil["participant_id"], emil["team"]) == ("Emil Eck", None, "Altes Team")
+    assert {"name", "team"} <= set(emil["uncertain"])
+    assert emil["hint"] == {"name": "wie in Saison 1/2025", "team": "wie in Saison 1/2025"}
+    assert emil["read"]["name"] == "Emil Ek"
+    assert (anna["participant_id"], anna["uncertain"], anna["hint"]) == ("anna", [], {})
+    tagged = build(reading(row("1", "", "Max#BBB")), TEMPLATE, [],
+                   track=[{"id": "t-max", "name": "Max#AAA", "season": "1/2025"}])["rows"][0]
+    assert (tagged["name"], tagged["participant_id"], tagged["hint"]) == ("Max#BBB", None, {})
+
+
+def test_learned_spellings_count_like_names():
+    """Korrekturen gelernt (#2012): eine gelesene Schreibweise, die der Vorstand einem Teilnehmer bzw. Team zugeordnet
+    hat, gilt wie dessen Name - eindeutig, also grün."""
+    people = [{**PEOPLE[0], "read_aliases": [{"name": "Anna Prxbq"}]}, *PEOPLE[1:]]
+    out = build(reading(row("1", "", "Anna Prxbq", "Rotr Rcng", strips={"name": "Anna Prxbq", "team": "Rotr Rcng"})),
+                TEMPLATE, people, team_aliases=[{"read": "Rotr Rcng", "team": "Rotor Racing"}])["rows"][0]
+    assert (out["participant_id"], out["name"], out["team"], out["uncertain"]) == (
+        "anna", "Anna Probe", "Rotor Racing", [])
+
+
+def test_a_clearly_read_other_start_number_is_shown_but_yellow():
+    """Startnummer gewechselt: steht im Bild sicher eine andere Nummer, die keinem anderen Teilnehmer gehört, zeigt die
+    Zeile sie (gelb, mit der bisherigen Nummer als Hinweis) - statt still die alte."""
+    out = build(reading(row("1", "16", "Anna Probe", strips={"start_number": "16"}, alts={"start_number": "16"})),
+                TEMPLATE, PEOPLE)["rows"][0]
+    assert (out["participant_id"], out["start_number"], out["uncertain"]) == ("anna", "16", ["start_number"])
+    assert out["hint"] == {"start_number": "bisher 7"}
 
 
 def test_header_fields():

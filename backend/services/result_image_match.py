@@ -11,13 +11,22 @@ Widersprechen sie sich, ist sie unsicher - außer eine Gegenprobe bestätigt den
 - **Startnummer als Anker:** Gehören gelesene Startnummer und gelesener Name zum selben Teilnehmer, sind beide sicher.
   Zeigen sie auf verschiedene Teilnehmer, wird der Name genommen und die Startnummer gelb.
 - **Namen unscharf:** Ähnlichkeit (``difflib``) über den Schlüssel aus ``series_identity`` und eine Fassung, in der
-  leicht verwechselte Zeichen gleich sind (0/O, 1/l/I, 5/S, 8/B). Ab ``name_match`` wird der Teilnehmer
-  vorgeschlagen, ab ``name_sure`` ohne Markierung. Aliase der Mitglieder (nur für den Vorstand, wie in #1743) zählen
-  wie Namen. Jeder Teilnehmer höchstens einmal.
-- **Team:** gegen die Standard-Teams der Teilnehmer, zuerst das des erkannten Teilnehmers.
+  leicht verwechselte Zeichen gleich sind (0/O, 1/l/I, 5/S, 8/B, 2/Z, rn/m, ii/ü; Groß/klein und Satzzeichen wie
+  „__“/„_“ zählen ohnehin nicht). Ab ``name_match`` wird der Teilnehmer vorgeschlagen, ab ``name_sure`` ohne
+  Markierung - aber nur mit klarem Abstand (``name_margin``) zum Zweitbesten. Aliase der Mitglieder (nur für den
+  Vorstand, wie in #1743) und gelernte Schreibweisen aus Bildern (``read_aliases``, #2012) zählen wie Namen. Jeder
+  Teilnehmer höchstens einmal.
+- **Nie grün geraten (#2012):** Ein unbekannter Name ist immer gelb, wie sicher die Erkennung auch ist. Teilnehmer
+  anderer Saisons derselben Spur (``track``) werden mit ihrem Namen vorgeschlagen - ohne Kennung, gelb, mit Hinweis
+  „wie in Saison X“ (``hint``); den Teilnehmer legt erst das Übernehmen an.
+- **Team:** gegen die bekannten Teams der Saison (``teams``, dazu die Standard-Teams der Teilnehmer), zuerst das des
+  erkannten Teilnehmers. Ein Team nur aus einer anderen Saison (``track_teams``) ist gelb mit Hinweis, ein unbekanntes
+  gelb.
 
 Unsichere Felder stehen je Zeile in ``uncertain`` (die Oberfläche färbt sie gelb), das Gelesene in ``read``, wenn es
-vom Wert abweicht. Gespeichert wird hier nichts - erst, wenn jemand das Blatt prüft und übernimmt.
+vom Wert abweicht, ein Hinweis zum Wert in ``hint``, und was im Bild stand in ``image`` (Name, Team - damit das Blatt
+beim Übernehmen eine Korrektur als Schreibweise lernen kann, #2012). Gespeichert wird hier nichts - erst, wenn jemand
+das Blatt prüft und übernimmt.
 """
 from __future__ import annotations
 
@@ -34,6 +43,15 @@ from services.result_image_values import (
 
 # Leicht verwechselte Zeichen - nur für den Vergleich von Namen, nie für den angezeigten Wert.
 _LOOKALIKE = str.maketrans({"0": "o", "1": "l", "i": "l", "5": "s", "8": "b", "6": "b", "2": "z"})
+# Zeichenfolgen, die in Bildschirmschrift wie ein Zeichen aussehen (#2012): „rn“ wie „m“, „ii“ wie „ü“ (ohne Punkte
+# bleibt „u“ - ``normalize_name`` nimmt die Akzente weg).
+_FOLDS = (("rn", "m"), ("ii", "u"))
+# Ähnlichkeit, wenn zwei Namen erst mit den Verwechslungen gleich sind - knapp unter einem genauen Treffer, damit der
+# genau passende Name gewinnt und zwei so ähnliche Teilnehmer nie eindeutig sind (``name_margin``).
+LOOKALIKE_SCORE = 0.98
+# Ab dieser Ähnlichkeit zum Teilnehmer lernt das Blatt eine gelesene Schreibweise (#2012, ``learnable``) - ganz andere
+# Namen sind keine Verlesung, sondern eine andere Zeile.
+LEARN_SIMILARITY = 0.5
 TIME_TOLERANCE = 0.0015
 AGREEMENT_BONUS = 20
 # Ein Platz (oder „DNF“) steht in jeder Zeile - ist er nicht gelesen, ist die Zelle unsicher. Leer sein darf etwa der
@@ -234,39 +252,88 @@ def _decision(parsed, read: Read, *, sure: bool) -> Decision:
 
 
 # ---------------------------------------------------------------- Namen
-def _name_forms(name: str) -> set[str]:
-    keys = set(series_identity.name_keys(name))
-    return keys | {key.translate(_LOOKALIKE) for key in keys}
+def _loose(key: str) -> set[str]:
+    """Fassungen eines Schlüssels, in denen leicht verwechselte Zeichen gleich sind - mit und ohne die Folgen
+    (``_FOLDS``), denn „ii“ kann ebenso als „ll“ ankommen."""
+    folded = key
+    for old, new in _FOLDS:
+        folded = folded.replace(old, new)
+    return {key.translate(_LOOKALIKE), folded.translate(_LOOKALIKE)}
 
 
 def similarity(read: str, known: str) -> float:
-    """Ähnlichkeit 0-1 zweier Namen, unempfindlich gegen Groß/klein, Leerzeichen, Clan-Tags und Verwechsler. Zwei
-    verschiedene Tags einer Spielkennung („Name#AAA“, „Name#BBB“, #1961) sind verschiedene Personen: 0."""
+    """Ähnlichkeit 0-1 zweier Namen, unempfindlich gegen Groß/klein, Leerzeichen, Satzzeichen und Clan-Tags. Gleich erst
+    mit den Verwechslungen (l/1/I, 0/O, rn/m, ii/ü …): ``LOOKALIKE_SCORE``. Zwei verschiedene Tags einer Spielkennung
+    („Name#AAA“, „Name#BBB“, #1961) sind verschiedene Personen: 0."""
     if series_identity.tags_conflict(read, known):
         return 0.0
-    best = 0.0
-    for left in _name_forms(read):
-        for right in _name_forms(known):
-            if left == right:
-                return 1.0
-            best = max(best, SequenceMatcher(None, left, right).ratio())
-    return best
+    left_keys, right_keys = set(series_identity.name_keys(read)), set(series_identity.name_keys(known))
+    if left_keys & right_keys:
+        return 1.0
+    left_loose = {form for key in left_keys for form in _loose(key)}
+    right_loose = {form for key in right_keys for form in _loose(key)}
+    if left_loose & right_loose:
+        return LOOKALIKE_SCORE
+    return max((SequenceMatcher(None, left, right).ratio() for left in left_keys | left_loose
+                for right in right_keys | right_loose), default=0.0)
 
 
 @dataclass
 class Candidate:
     participant: dict
-    names: list[str] = field(default_factory=list)  # eigener Name und Aliase
+    names: list[str] = field(default_factory=list)  # eigener Name, Aliase und gelernte Schreibweisen
+    season: str | None = None  # nur aus einer anderen Saison der Spur (``track``): deren Bezeichnung
+
+    @property
+    def foreign(self) -> bool:
+        return self.season is not None
 
 
-def candidates(participants: list[dict], aliases: list[dict] | None = None) -> list[Candidate]:
-    """Teilnehmer der Saison mit ihren Namen; ``aliases`` (nur Vorstand) als ``{"name", "participant_id"}``."""
-    out = {row["id"]: Candidate(row, [row.get("name") or ""]) for row in participants if row.get("id")}
-    for alias in aliases or []:
-        target = out.get(alias.get("participant_id"))
-        if target and alias.get("name"):
-            target.names.append(alias["name"])
-    return list(out.values())
+def _own_names(row: dict) -> list[str]:
+    """Name und gelernte Schreibweisen aus Bildern (#2012) eines Teilnehmers."""
+    learned = [item.get("name") for item in row.get("read_aliases") or [] if isinstance(item, dict)]
+    return [row.get("name") or "", *(name for name in learned if name)]
+
+
+def candidates(participants: list[dict], aliases: list[dict] | None = None,
+               track: list[dict] | None = None) -> list[Candidate]:
+    """Teilnehmer der Saison mit ihren Namen; ``aliases`` (nur Vorstand) als ``{"name", "participant_id"}``.
+
+    ``track`` (#2012): Teilnehmer anderer Saisons derselben Spur, je mit ``season`` (Bezeichnung) - die neueste zuerst.
+    Wer in dieser Saison schon steht (gleicher Name oder Alias, dasselbe Profil, derselbe Gast), fällt weg; je Name
+    zählt die erste Saison."""
+    def add_aliases(pool: dict[str, Candidate]) -> None:
+        for alias in aliases or []:
+            target = pool.get(alias.get("participant_id"))
+            if target and alias.get("name"):
+                target.names.append(alias["name"])
+
+    out = {row["id"]: Candidate(row, _own_names(row)) for row in participants if row.get("id")}
+    add_aliases(out)
+    taken = {key for candidate in out.values() for name in candidate.names for key in series_identity.name_keys(name)}
+    profiles = {row.get("profile_id") for row in participants if row.get("link") == "member" and row.get("profile_id")}
+    guests = {series_identity.normalize_name(row.get("guest_name")) for row in participants
+              if row.get("link") == "guest" and row.get("guest_name")}
+    others: dict[str, Candidate] = {}
+    for row in track or []:
+        keys = set(series_identity.name_keys(row.get("name")))
+        same_person = ((row.get("link") == "member" and row.get("profile_id") in profiles)
+                       or (row.get("link") == "guest"
+                           and series_identity.normalize_name(row.get("guest_name")) in guests))
+        if not row.get("id") or not keys or keys & taken or same_person or row["id"] in out:
+            continue
+        taken |= keys
+        others[row["id"]] = Candidate(row, _own_names(row), season=str(row.get("season") or ""))
+    add_aliases(others)
+    return [*out.values(), *others.values()]
+
+
+def learnable(read: str, name: str) -> bool:
+    """Taugt eine gelesene Schreibweise als gelernter Alias für ``name`` (#2012)? Nutzbar, nicht schon derselbe Name,
+    kein anderer Tag einer Spielkennung und ähnlich genug, um eine Verlesung zu sein."""
+    keys = set(series_identity.name_keys(read))
+    return (bool(keys) and not keys & set(series_identity.name_keys(name))
+            and similarity(read, name) >= LEARN_SIMILARITY)
 
 
 def best_name(texts: list[str], pool: list[Candidate]) -> list[tuple[float, Candidate]]:
@@ -448,13 +515,20 @@ def _row_marks(row: dict[str, Decision]) -> list[str]:
 
 
 def build(reading: Reading, template: dict, participants: list[dict], *, aliases: list[dict] | None = None,
-          no_team_names: list[str] | None = None) -> dict:
+          no_team_names: list[str] | None = None, track: list[dict] | None = None, teams: list[str] | None = None,
+          track_teams: list[dict] | None = None, team_aliases: list[dict] | None = None) -> dict:
     """Die Antwort für die Oberfläche (siehe ``routes/reference_result_image_routes.py``). ``no_team_names``: Einträge
-    „kein Team“ der Saison (#1960, etwa „Ersatzfahrer“) - sie bleiben im Team-Feld stehen."""
+    „kein Team“ der Saison (#1960, etwa „Ersatzfahrer“) - sie bleiben im Team-Feld stehen.
+
+    Kader der Spur (#2012): ``track`` sind Teilnehmer anderer Saisons derselben Spur (mit ``season``), ``teams`` die
+    bekannten Teams dieser Saison (eigene Teams, Teams der Blätter - dazu kommen immer die Standard-Teams der
+    Teilnehmer), ``track_teams`` Teams anderer Saisons (``{"team", "season"}``) und ``team_aliases`` gelernte
+    Schreibweisen (``{"read", "team"}``)."""
     columns = {column["field"]: column for column in template["columns"]}
     min_conf = float(template.get("min_confidence", 80))
     name_match = float(template.get("name_match", 0.72))
     name_sure = float(template.get("name_sure", 0.9))
+    margin = float(template.get("name_margin", 0.1))
     team_match = float(template.get("team_match", 0.6))
     fmt = time_format(template.get("time_format"))
     rows = [_row_decisions(row, columns, min_conf, fmt) for row in reading.rows]
@@ -483,21 +557,23 @@ def build(reading: Reading, template: dict, participants: list[dict], *, aliases
     _check_grid(rows)
     _check_gaps_in_columns(rows)
 
-    pool = candidates(participants, aliases)
-    teams = sorted({str(row.get("default_team")) for row in participants if row.get("default_team")})
+    pool = candidates(participants, aliases, track)
+    known_teams = team_pool(participants, teams, track_teams, team_aliases)
+    numbers = {str(row.get("start_number") or "").strip(): row.get("id") for row in participants
+               if str(row.get("start_number") or "").strip()}
     chosen, lost = _match_people(reading, rows, pool, name_match, name_sure)
 
     out_rows = []
     for index, (row, match, raw) in enumerate(zip(rows, chosen, reading.rows)):
-        out_rows.append(_row_out(index, row, match, teams, name_match, name_sure, team_match, raw=raw,
-                                 lost=index in lost, no_team_names=no_team_names))
+        out_rows.append(_row_out(index, row, match, known_teams, name_match, name_sure, team_match, raw=raw,
+                                 lost=index in lost, no_team_names=no_team_names, margin=margin, numbers=numbers))
         out_rows[-1]["color"] = raw.color
     # Reichte das Zeitbudget nicht für die zweite Lesung einer Spalte, ist dort jede gelesene Zelle ungeprüft - gelb.
     for out, raw in zip(out_rows, reading.rows):
         unchecked = {name for name in reading.unchecked if name in FIELDS and name in raw.cells and name not in dropped}
         if unchecked - set(out["uncertain"]):
             out["uncertain"] = [name for name in FIELDS if name in out["uncertain"] or name in unchecked]
-    header = _header_out(reading, pool, min_conf, name_match, name_sure, fmt)
+    header = _header_out(reading, pool, min_conf, name_match, name_sure, fmt, margin)
     uncertain_rows = sum(1 for row in out_rows if row["uncertain"])
     return {"rows": out_rows, **header, "uncertain_rows": uncertain_rows, "team_colors": team_colors(out_rows),
             "is_result": _looks_like_result(rows, template)}
@@ -538,7 +614,8 @@ def _match_people(reading: Reading, rows: list[dict[str, Decision]], pool: list[
             if parsed:
                 numbers.add(parsed[1])
         best = None
-        for score, candidate in best_name(texts, pool)[:8]:
+        ranked = best_name(texts, pool)
+        for score, candidate in ranked[:8]:
             own = str(candidate.participant.get("start_number") or "").strip()
             number_hit = bool(own) and own in numbers
             if score < name_match and not (number_hit and score >= 0.4):
@@ -554,6 +631,9 @@ def _match_people(reading: Reading, rows: list[dict[str, Decision]], pool: list[
             best["agree"] = all(max((similarity(text, name) for name in names), default=0.0) >= name_match
                                 for text in texts)
             best["texts"] = texts
+            # Eindeutig nur mit Abstand zum Zweitbesten (#2012) - auch einem aus einer anderen Saison der Spur.
+            best["second"] = max((score for score, candidate in ranked if candidate is not best["candidate"]),
+                                 default=0.0)
         proposals.append(best)
     taken: dict[str, dict] = {}
     lost: set[int] = set()
@@ -577,48 +657,99 @@ def _reads_text(texts: list[str]) -> str:
     return " / ".join(seen)
 
 
-def _all_reads_say(texts: list[str], known: list[str], team: str, threshold: float) -> bool:
+@dataclass
+class TeamPool:
+    """Bekannte Teams (#2012): je Team seine Schreibweisen (der Name, gelernte aus Bildern); ``seasons`` nennt die
+    Teams, die nur eine andere Saison der Spur kennt, mit deren Bezeichnung."""
+    spellings: dict[str, list[str]] = field(default_factory=dict)
+    seasons: dict[str, str] = field(default_factory=dict)
+
+
+def team_pool(participants: list[dict], teams: list[str] | None = None, track_teams: list[dict] | None = None,
+              team_aliases: list[dict] | None = None) -> TeamPool:
+    """Die bekannten Teams: die dieser Saison (Standard-Teams der Teilnehmer und ``teams``), dann die anderer Saisons
+    der Spur, die es hier nicht gibt. Gelernte Schreibweisen hängen am Team, auf das sie zeigen."""
+    pool = TeamPool()
+    keys: dict[str, str] = {}
+
+    def add(team, season: str | None) -> None:
+        name = " ".join(str(team or "").split())
+        key = series_identity.normalize_name(name)
+        if not key or key in keys:
+            return
+        keys[key] = name
+        pool.spellings[name] = [name]
+        if season is not None:
+            pool.seasons[name] = season
+
+    for team in sorted({str(row.get("default_team")) for row in participants if row.get("default_team")}):
+        add(team, None)
+    for team in teams or []:
+        add(team, None)
+    for item in track_teams or []:
+        add(item.get("team"), str(item.get("season") or ""))
+    for alias in team_aliases or []:
+        target = keys.get(series_identity.normalize_name(alias.get("team")))
+        if target and alias.get("read"):
+            pool.spellings[target].append(alias["read"])
+    return pool
+
+
+def _rank_teams(text: str, pool: TeamPool, own: str | None) -> list[tuple[float, str]]:
+    """Alle bekannten Teams mit ihrer besten Ähnlichkeit zu ``text``, das ähnlichste zuerst - bei Gleichstand das des
+    Teilnehmers (``own``), dann in der Reihenfolge des Pools."""
+    order = sorted(pool.spellings, key=lambda team: team != own)
+    scored = [(max(similarity(text, spelling) for spelling in pool.spellings[team]), team) for team in order]
+    return sorted(scored, key=lambda item: -item[0])
+
+
+def _all_reads_say(texts: list[str], pool: TeamPool, team: str, threshold: float, own: str | None) -> bool:
     """Zeigt jede Lesung (Seite, Streifen) auf dasselbe bekannte Team, jeweils ab ``threshold``?"""
     for text in texts:
-        score, best = max(((similarity(text, item), item) for item in known), key=lambda pair: pair[0])
-        if best != team or score < threshold:
+        ranked = _rank_teams(text, pool, own)
+        if not ranked or ranked[0][1] != team or ranked[0][0] < threshold:
             return False
     return True
 
 
-def _team_out(decision: Decision | None, match: dict | None, teams: list[str], team_match: float,
-              name_sure: float, texts: list[str] | None = None,
-              no_team_names: list[str] | None = None) -> tuple[str | None, bool]:
-    """Das Team: ein bekanntes (zuerst das des Teilnehmers) ab ``team_match`` - gelb unter ``name_sure`` oder wenn die
-    Lesungen (``texts``: Seite, Streifen) auf verschiedene Teams zeigen -, sonst wie gelesen. Teams sind wenige und
-    bekannt, darum reicht weniger Ähnlichkeit als bei Namen. Ein Eintrag „kein Team“ (#1960, ``no_team_names``, etwa
-    „Ersatzfahrer“) bleibt, wie er dasteht - er wird nie aufs Stammteam oder ein ähnliches Team „korrigiert“."""
+def _team_out(decision: Decision | None, match: dict | None, pool: TeamPool, team_match: float,
+              name_sure: float, texts: list[str] | None = None, no_team_names: list[str] | None = None,
+              margin: float = 0.1) -> tuple[str | None, bool, str | None]:
+    """Das Team: ein bekanntes (zuerst das des Teilnehmers) ab ``team_match`` - gelb unter ``name_sure``, ohne klaren
+    Abstand zum Zweitbesten, wenn die Lesungen (``texts``: Seite, Streifen) auf verschiedene Teams zeigen oder wenn
+    nur eine andere Saison der Spur das Team kennt (dann mit Hinweis) -, sonst wie gelesen und gelb (#2012: ein
+    unbekanntes Team ist nie grün). Teams sind wenige und bekannt, darum reicht weniger Ähnlichkeit als bei Namen. Ein
+    Eintrag „kein Team“ (#1960, ``no_team_names``, etwa „Ersatzfahrer“) bleibt, wie er dasteht - er wird nie aufs
+    Stammteam oder ein ähnliches Team „korrigiert“. Liefert (Team, sicher, Hinweis)."""
     if decision is None or not decision.text:
-        return None, True
+        return None, True, None
     read = decision.text
     no_team = next((name for name in no_team_names or () if similarity(read, name) >= name_sure), None)
     if no_team:
-        return no_team, decision.sure
-    preferred = []
-    own = match["candidate"].participant.get("default_team") if match else None
-    if own:
-        preferred.append(own)
-    preferred.extend(team for team in teams if team != own)
-    scored = [(similarity(read, team), team) for team in preferred]
-    if scored:
-        score, team = max(scored, key=lambda item: item[0])
+        return no_team, decision.sure, None
+    candidate = match["candidate"] if match else None
+    own = candidate.participant.get("default_team") if candidate and not candidate.foreign else None
+    ranked = _rank_teams(read, pool, own)
+    if ranked:
+        score, team = ranked[0]
+        second = ranked[1][0] if len(ranked) > 1 else 0.0
+        hint = f"wie in Saison {pool.seasons[team]}" if team in pool.seasons else None
         if score >= name_sure:
-            return team, _all_reads_say(texts or [read], preferred, team, name_sure)
+            sure = (team not in pool.seasons and score - second >= margin
+                    and _all_reads_say(texts or [read], pool, team, name_sure, own))
+            return team, sure, hint
         if score >= team_match:
-            return team, False
-    return read, decision.sure
+            return team, False, hint
+    return read, False, None
 
 
-def _row_out(index: int, row: dict[str, Decision], match: dict | None, teams: list[str], name_match: float,
+def _row_out(index: int, row: dict[str, Decision], match: dict | None, teams: TeamPool, name_match: float,
              name_sure: float, team_match: float, *, raw: RowReading | None = None, lost: bool = False,
-             no_team_names: list[str] | None = None) -> dict:
+             no_team_names: list[str] | None = None, margin: float = 0.1,
+             numbers: dict[str, str] | None = None) -> dict:
     uncertain: list[str] = []
     read: dict[str, str] = {}
+    hint: dict[str, str] = {}
 
     def flag(name: str, decision: Decision | None, value_text: str | None) -> None:
         if decision is None:
@@ -638,12 +769,15 @@ def _row_out(index: int, row: dict[str, Decision], match: dict | None, teams: li
 
     number = row.get("start_number")
     name = row.get("name")
-    if match:
-        person = match["candidate"].participant
+    candidate = match["candidate"] if match else None
+    if candidate and not candidate.foreign:
+        person = candidate.participant
         out["participant_id"] = person["id"]
         out["name"] = person.get("name") or ""
         own_number = str(person.get("start_number") or "").strip()
-        name_ok = match["score"] >= name_sure or (match["score"] >= name_match and match["number_hit"])
+        # Eindeutig (#2012): sehr ähnlich und klar vor dem Zweitbesten - oder ähnlich und die Startnummer passt.
+        name_ok = ((match["score"] >= name_sure and match["score"] - match.get("second", 0.0) >= margin)
+                   or (match["score"] >= name_match and match["number_hit"]))
         if name and not (name_ok and match.get("agree", True)):
             uncertain.append("name")
         if name and not match.get("agree", True):
@@ -652,23 +786,42 @@ def _row_out(index: int, row: dict[str, Decision], match: dict | None, teams: li
             read["name"] = clean_text(name.raw)
         if own_number:
             # Die Startnummer des Teilnehmers gilt. Gelb nur, wenn im Bild eine andere stand - ohne gelesene Nummer
-            # kommt sie aus der Saison, nicht aus dem Bild.
+            # kommt sie aus der Saison, nicht aus dem Bild. Steht dort sicher eine Nummer, die keinem anderen gehört,
+            # hat er gewechselt: die aus dem Bild, mit der bisherigen als Hinweis (#2012).
             out["start_number"] = own_number
             if number and number.raw and not match["number_hit"]:
                 uncertain.append("start_number")
-            if number and number.raw and clean_text(number.raw) != own_number:
+                owner = (numbers or {}).get(number.text)
+                if number.sure and number.text and owner in (None, person["id"]):
+                    out["start_number"] = number.text
+                    hint["start_number"] = f"bisher {own_number}"
+            if number and number.raw and clean_text(number.raw) != out["start_number"]:
                 read["start_number"] = clean_text(number.raw)
         elif number:
+            out["start_number"] = number.text or None
+            flag("start_number", number, out["start_number"])
+    elif candidate:
+        # Nur aus einer anderen Saison der Spur (#2012): deren Name als Vorschlag, ohne Kennung - immer gelb.
+        out["name"] = candidate.participant.get("name") or ""
+        uncertain.append("name")
+        hint["name"] = f"wie in Saison {candidate.season}"
+        if name and not match.get("agree", True):
+            read["name"] = _reads_text(match.get("texts") or [name.raw])
+        elif name and name.raw and clean_text(name.raw) != out["name"]:
+            read["name"] = clean_text(name.raw)
+        if number:
             out["start_number"] = number.text or None
             flag("start_number", number, out["start_number"])
     else:
         if name:
             out["name"] = name.text
             flag("name", name, out["name"])
-            if lost and "name" not in uncertain:
-                # Der Name passte zu einem Teilnehmer, den eine andere Zeile besser trifft - doppelt oder verlesen.
+            if out["name"] and "name" not in uncertain:
+                # Unbekannt (#2012) - oder er passte zu einem Teilnehmer, den eine andere Zeile besser trifft (doppelt
+                # oder verlesen): nie grün, wie sicher die Erkennung auch ist.
                 uncertain.append("name")
-                read.setdefault("name", clean_text(name.raw))
+                if lost:
+                    read.setdefault("name", clean_text(name.raw))
         else:
             uncertain.append("name")
         if number:
@@ -677,7 +830,10 @@ def _row_out(index: int, row: dict[str, Decision], match: dict | None, teams: li
 
     team_texts = [read_.text for read_ in ((raw.cells.get("team"), raw.strips.get("team")) if raw else ())
                   if read_ and read_.text.strip()]
-    team, team_sure = _team_out(row.get("team"), match, teams, team_match, name_sure, team_texts, no_team_names)
+    team, team_sure, team_hint = _team_out(row.get("team"), match, teams, team_match, name_sure, team_texts,
+                                           no_team_names, margin)
+    if team_hint:
+        hint["team"] = team_hint
     team_cell = row.get("team")
     if team_cell is not None and not team_cell.raw and not team_cell.sure:
         # Leere Zelle in einer Spalte, die sonst Teams hat (#1960): gelb, aber leer - kein Stammteam vorschlagen. Oft
@@ -710,20 +866,31 @@ def _row_out(index: int, row: dict[str, Decision], match: dict | None, teams: li
         if isinstance(out[key], str):
             out[key] = out[key][:limit].strip() or ("" if key == "name" else None)
     out["read"] = {key: value[:TEXT_LIMIT] for key, value in read.items()}
+    out["hint"] = hint
+    # Was im Bild stand (#2012): ändert der Vorstand Name oder Team, lernt das Blatt diese Schreibweise beim Übernehmen.
+    image = {key: clean_text(row[key].raw)[:TEXT_LIMIT] for key in ("name", "team")
+             if row.get(key) is not None and clean_text(row[key].raw)}
+    out["image"] = image
     return out
 
 
-def _person(text: str, pool: list[Candidate], name_match: float, name_sure: float) -> tuple[str, str | None, bool]:
-    """Ein Name aus dem Kopf: Teilnehmer (Name, Kennung, sicher?) oder der gelesene Text."""
+def _person(text: str, pool: list[Candidate], name_match: float, name_sure: float,
+            margin: float = 0.1) -> tuple[str, str | None, bool]:
+    """Ein Name aus dem Kopf: Teilnehmer (Name, Kennung, sicher?) oder der gelesene Text. Sicher nur eindeutig und nur
+    ein Teilnehmer dieser Saison (#2012); einer aus einer anderen Saison der Spur wird nur vorgeschlagen."""
     scored = best_name([text], pool)
     if scored and scored[0][0] >= name_match:
         score, candidate = scored[0]
-        return candidate.participant.get("name") or "", candidate.participant["id"], score >= name_sure
+        second = scored[1][0] if len(scored) > 1 else 0.0
+        if candidate.foreign:
+            return candidate.participant.get("name") or "", None, False
+        return (candidate.participant.get("name") or "", candidate.participant["id"],
+                score >= name_sure and score - second >= margin)
     return clean_text(text), None, False
 
 
 def _header_out(reading: Reading, pool: list[Candidate], min_conf: float, name_match: float,
-                name_sure: float, fmt: TimeFormat | None = None) -> dict:
+                name_sure: float, fmt: TimeFormat | None = None, margin: float = 0.1) -> dict:
     out: dict = {"track": None, "session": None, "fastest_lap": None, "pole": None, "driver_of_the_day": None}
     track = reading.header.get("track")
     if track and clean_text(track.text):
@@ -741,16 +908,16 @@ def _header_out(reading: Reading, pool: list[Candidate], min_conf: float, name_m
         if not lap or not lap.text.strip():
             continue
         name_words, time_text, exact = _split_lap(clean_text(lap.text).split(), fmt)
-        name, pid, sure = _person(" ".join(name_words), pool, name_match, name_sure)
-        uncertain = [] if sure or (not pid and lap.conf >= min_conf) else ["name"]
+        name, pid, sure = _person(" ".join(name_words), pool, name_match, name_sure, margin)
+        uncertain = [] if sure else ["name"]  # ein unbekannter Name ist nie grün (#2012)
         if not exact or not _time_word_sure(lap, min_conf, fmt):
             uncertain.append("time")
         out[key] = {"name": name[:TEXT_LIMIT], "participant_id": pid, "time": time_text, "uncertain": uncertain,
                     "read": clean_text(lap.text)[:TEXT_LIMIT]}
     dotd = reading.header.get("driver_of_the_day")
     if dotd and dotd.text.strip():
-        name, pid, sure = _person(dotd.text, pool, name_match, name_sure)
-        uncertain = [] if sure or (not pid and dotd.conf >= min_conf) else ["name"]
+        name, pid, sure = _person(dotd.text, pool, name_match, name_sure, margin)
+        uncertain = [] if sure else ["name"]
         out["driver_of_the_day"] = {"name": name[:TEXT_LIMIT], "participant_id": pid, "uncertain": uncertain,
                                     "read": clean_text(dotd.text)[:TEXT_LIMIT]}
     return out
