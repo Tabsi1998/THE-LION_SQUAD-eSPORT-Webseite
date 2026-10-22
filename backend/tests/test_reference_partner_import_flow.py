@@ -223,7 +223,8 @@ async def test_taking_over_creates_rounds_and_drafts_but_never_publishes(flow):
              for row in double["rows"]}
     assert pairs["Ada Ausgedacht#AAA"] == (1, "Gina Gedacht#TLS") and pairs["Gina Gedacht#TLS"][1] == (
         "Ada Ausgedacht#AAA")
-    assert pairs["Ella Erfunden"] == (4, "Finn Fiktiv#EUW")
+    # Gleiche Tagessumme wie Dario und Hugo (12): geteilter Team-Platz 3 (#2015).
+    assert pairs["Ella Erfunden"] == (3, "Finn Fiktiv#EUW")
     assert await _sheet(flow, by_ref["903"]["id"]) is None
 
     # Nichts ist veröffentlicht: kein Stand, Termine nicht gewertet.

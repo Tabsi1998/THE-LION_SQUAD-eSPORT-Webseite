@@ -4,7 +4,7 @@ import { formatNumber } from "@/lib/standingsTable";
 import { roundLabel, roundWhen } from "@/lib/referenceCalendar";
 import { finalNeeds, maxRoundPoints } from "@/lib/finalCalc";
 import { VenueWithFlag } from "@/components/tls/CountryFlag";
-import { bonusRulesLabel, countLabel, dayRoundsLabel, nameOf, roundColumns, schemeLabel, tiebreakLabel } from "@/lib/referenceSeriesTable";
+import { bonusRulesLabel, countLabel, dayRoundsLabel, doubleUpLabel, nameOf, roundColumns, schemeLabel, tiebreakLabel } from "@/lib/referenceSeriesTable";
 import { groupWeekends, sessionLabel } from "@/lib/raceWeekend";
 import "./referenceSeries.css";
 
@@ -26,6 +26,8 @@ export function SeriesProgress({ progress, rounds, words = PROGRESS_WORDS.series
     : columns;
   const final = (rounds || []).find((round) => round.kind === "final");
   const next = progress?.next;
+  // Geplante Termine (#2015): stehen noch nicht alle im Kalender, zeigen leere Felder den Rest („3 von 9“).
+  const planned = Math.max((progress?.total || 0) - steps.filter((round) => round.state !== "cancelled").length, 0);
   return (
     <section className="mt-8" aria-labelledby="series-progress" data-testid="series-progress">
       <div className="flex items-baseline justify-between gap-3 flex-wrap">
@@ -36,9 +38,10 @@ export function SeriesProgress({ progress, rounds, words = PROGRESS_WORDS.series
           {progress?.cancelled > 0 && <span className="text-white/40"> · {progress.cancelled} abgesagt</span>}
         </p>
       </div>
-      {(steps.length > 0 || final) && (
+      {(steps.length > 0 || final || planned > 0) && (
         <div className="mt-3 flex gap-1" aria-hidden="true">
           {steps.map((round) => <span key={round.id} className="tls-series-step" data-state={round.state} title={`${roundLabel(round)} · ${roundWhen(round)}`} />)}
+          {Array.from({ length: planned }, (_, index) => <span key={`planned-${index}`} className="tls-series-step" data-state="planned" title="Geplant, noch nicht im Kalender" data-testid="series-step-planned" />)}
           {final && <span className="tls-series-step" data-kind="final" data-state={final.state} title={`Finale · ${roundWhen(final)}`} />}
         </div>
       )}
@@ -63,6 +66,8 @@ export function SeriesRules({ rules }) {
   ];
   // Turniertage (#1961): Runden je Termin mit ihren Punkten und die Sonderboni der Saison.
   if (dayRoundsLabel(rules)) items.splice(1, 0, ["Turniertag", dayRoundsLabel(rules)]);
+  // Double-Up-Punkte (#2015): wie die Saison ein Team wertet.
+  if (doubleUpLabel(rules)) items.splice(2, 0, ["Double Up", doubleUpLabel(rules)]);
   if (bonusRulesLabel(rules)) items.push(["Boni", bonusRulesLabel(rules)]);
   if (rules?.final_top_n) items.push(["Finale", `Die besten ${rules.final_top_n} der Gesamtwertung`]);
   return (

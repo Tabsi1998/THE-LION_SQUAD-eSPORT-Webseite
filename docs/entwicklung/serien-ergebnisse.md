@@ -188,6 +188,15 @@ Mehrere Runden an einem Termin (etwa TFT-Lobbys R1–R5), gerechnet in `services
 - **Platz:** Ohne Platz bestimmt die Tagessumme ihn – Wettbewerbsrang (4, 4, 6), ein Paar ist eine Einheit (1, 1, 2, 2).
   Zweimal „4.“ mit gleicher Tagessumme oder mit „6.“ danach und Paare im Double Up geben keine Warnung `place_twice`,
   der übersprungene Platz keine `place_gap`. Die Saisonpunkte kommen wie bisher aus dem Platz (oder laut Veranstalter).
+- **Double-Up-Punkte (#2015):** Regel `double_up_points` – `best_player_place` (Vorgabe, wie PineApps: eine Zeile mit
+  `partner_id` auf Team-Platz k zählt wie Einzelplatz 2k−1, `scoring_rules.points_place`) oder `team_place` (Platz k).
+  Der gespeicherte Platz bleibt der Team-Platz (Siege, Vorrang). Migration 11 setzt `team_place` in Saisons, die vor
+  #2015 schon ein Double-Up-Blatt hatten. Der PineApps-Import teilt den Team-Platz bei gleicher Team-GES-P.
+- **Geplante Termine (#2015):** Saison-Feld `planned_rounds` – `compute_standings(planned_rounds=…)` zählt für
+  `drop_n` mindestens so viele Runden, der Fortschritt (`progress.total`) ebenso. Terminliste: `offen`/`?`/`tbd` statt
+  Datum → Zeile `open: true`, Termin ohne `club_day`/`starts_at` mit `open_time`. `POST …/rounds/fill-planned`
+  (`apply`, `expected_version`) legt bis `planned_rounds` offene Termine an (`reference_calendar.missing_codes`); der
+  Kalender trägt `planned: {planned, count, missing}`.
 - **Stand:** Ergebnisse tragen `day_rounds` (mit den Punkten, die zählen), `day_points`, `partner_id`, `bonus`,
   `bonus_keys`; die Zeile `bonus_points`. Sonderboni zählen wie Aktivitätspunkte getrennt und nie gestrichen.
 - **Vorschau:** je Zeile `day_rounds`, `day_points` (Tagessumme), `bonus`, `partner_id`, `bonus_keys`.

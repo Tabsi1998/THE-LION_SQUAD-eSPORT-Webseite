@@ -71,16 +71,32 @@ def test_a_player_who_left_has_no_further_rounds_and_the_mark_left():
 def test_double_up_rows_share_the_place_of_their_team_and_name_the_partner():
     day = tft_dashboard.tournament(_load("tournament_902.json"))
     assert day["double_up"] is True and day["club_day"] == "2026-10-16"
+    # Teams mit gleicher Tagessumme teilen den Team-Platz (#2015): 16, 16, 12, 12 → 1, 1, 3, 3.
     assert [(row["name"], row["place"], row["day_points"], row["partner"]["name"]) for row in day["rows"]] == [
         ("Ada Ausgedacht#AAA", 1, 16, "Gina Gedacht#TLS"), ("Gina Gedacht#TLS", 1, 16, "Ada Ausgedacht#AAA"),
-        ("Bruno Beispiel#EUW", 2, 16, "Cleo Muster#TLS"), ("Cleo Muster#TLS", 2, 16, "Bruno Beispiel#EUW"),
+        ("Bruno Beispiel#EUW", 1, 16, "Cleo Muster#TLS"), ("Cleo Muster#TLS", 1, 16, "Bruno Beispiel#EUW"),
         ("Dario Demo#1234", 3, 12, "Hugo Probe#EUW"), ("Hugo Probe#EUW", 3, 12, "Dario Demo#1234"),
-        ("Ella Erfunden", 4, 12, "Finn Fiktiv#EUW"), ("Finn Fiktiv#EUW", 4, 12, "Ella Erfunden")]
+        ("Ella Erfunden", 3, 12, "Finn Fiktiv#EUW"), ("Finn Fiktiv#EUW", 3, 12, "Ella Erfunden")]
     # Rundenpunkte des Teams gelten für beide - wie geliefert (Platz 2 im Double Up bringt auch 8).
     assert day["rows"][0]["day_rounds"] == [{"place": 1, "points": 8, "lobby": "1"},
                                             {"place": 2, "points": 8, "lobby": "1"}]
     assert day["rows"][1]["day_rounds"] == day["rows"][0]["day_rounds"]
     assert (day["rounds"], day["lobbies"], day["bots"]) == (2, 2, 0)
+
+
+def test_an_imported_double_up_scores_like_pineapps_two_k_minus_one():
+    # #2015: Import → Ergebnisblatt → Punkte. Geteilter Team-Platz 1 → Einzelplatz 1 (35) für alle vier, geteilter
+    # Team-Platz 3 → Einzelplatz 5 (20). Nach Team-Platz (k) wären es 35 und 26.
+    from services.scoring_rules import normalize_rules, result_points
+    from services.series_results import resolve
+
+    day = tft_dashboard.tournament(_load("tournament_902.json"))
+    scheme = [35, 30, 26, 23, 20, 18, 16, 14, 12, 10]
+    for mode, expected in (("best_player_place", [35] * 4 + [20] * 4), ("team_place", [35] * 4 + [26] * 4)):
+        rules = normalize_rules({"points_by_place": scheme, "day_rounds": {"count": 2}, "double_up_points": mode})
+        sheet = resolve({"double_up": True, "rows": day["rows"]}, [], rules)
+        assert sheet.errors == []
+        assert [result_points(row, rules)["points"] for row in sheet.rows] == expected
 
 
 def test_no_riot_identifier_avatar_or_rank_reaches_the_result():

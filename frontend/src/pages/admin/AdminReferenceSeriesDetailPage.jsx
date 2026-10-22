@@ -21,7 +21,7 @@ import { SeasonTableSection } from "./referenceSeries/SeasonTableSection";
 import { seasonLabel } from "./AdminReferenceSeriesPage";
 import { dayLabel, publishText } from "@/lib/referenceSeriesStaff";
 import { referenceLine, seasonName } from "@/lib/seasonClose";
-import { bonusRulesLabel, dayRoundsLabel } from "@/lib/referenceSeriesTable";
+import { bonusRulesLabel, dayRoundsLabel, doubleUpLabel } from "@/lib/referenceSeriesTable";
 import { toast } from "sonner";
 import { Archive, ArchiveRestore, ArrowLeft, Flag, Pencil } from "lucide-react";
 
@@ -55,6 +55,8 @@ function RulesSummary({ series }) {
       <div className="text-[11px] font-bold uppercase tracking-widest text-[#29B6E8]">Regeln · Version {series.rules_version || 1}</div>
       <div>{points}</div>
       {days && <div data-testid="series-detail-days">{days}</div>}
+      {doubleUpLabel(rules) && <div data-testid="series-detail-double-up">Double Up: {doubleUpLabel(rules)}</div>}
+      {series.planned_rounds ? <div data-testid="series-detail-planned">Geplante Termine: {series.planned_rounds}</div> : null}
       {bonuses && <div data-testid="series-detail-bonuses">Sonderboni: {bonuses}</div>}
       <div>{countText(rules)}{rules.final_top_n ? ` · Finale: die besten ${rules.final_top_n}` : ""}</div>
       {tiebreak && <div>Vorrang: {tiebreak}</div>}

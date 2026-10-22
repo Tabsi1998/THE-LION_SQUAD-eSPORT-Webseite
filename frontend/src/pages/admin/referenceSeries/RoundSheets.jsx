@@ -205,7 +205,7 @@ export function PasteSheet({ series, lineage, version, onClose, onSaved, onStale
     <AdminSheet title="Terminliste einfügen" eyebrow={lineage?.title} size="lg" onClose={onClose} onSubmit={submit} saving={saving}
       submitLabel={ready ? `${total} Termine übernehmen` : "Vorschau"} savingLabel={ready ? "Übernehme …" : "Prüfe …"} submitTestId="paste-submit" testId="paste-sheet">
       <TextAreaField label="Je Zeile ein Termin" value={text} onChange={edit} rows={8} testId="paste-text" placeholder={placeholder}
-        hint={`Kürzel, Datum (TT.MM. oder TT.MM.JJJJ), optional Uhrzeit und Ort – aus dem Ort kommt die Flagge. Ohne Datum: der nächste Standard-Wochentag nach der Zeile davor. Ohne Uhrzeit: ${defaults || "ohne Uhrzeit"}.${lineage?.kind === "racing" ? " Rennliga: Eine Zeile je Runde legt alle Läufe an, die die Saison vorgibt (Ablauf je Runde); „R1 Sprint“, „R1S“ oder „R1 Q“ nur diesen Lauf." : ""}${weekendHint ? ` ${weekendHint}.` : ""}${teamHint}`} />
+        hint={`Kürzel, Datum (TT.MM. oder TT.MM.JJJJ), optional Uhrzeit und Ort – aus dem Ort kommt die Flagge. Ohne Datum: der nächste Standard-Wochentag nach der Zeile davor. „offen“, „?“ oder „tbd“ statt des Datums: Termin ohne Datum („T5 · offen“), das Datum trägst du später nach. Ohne Uhrzeit: ${defaults || "ohne Uhrzeit"}.${lineage?.kind === "racing" ? " Rennliga: Eine Zeile je Runde legt alle Läufe an, die die Saison vorgibt (Ablauf je Runde); „R1 Sprint“, „R1S“ oder „R1 Q“ nur diesen Lauf." : ""}${weekendHint ? ` ${weekendHint}.` : ""}${teamHint}`} />
       {preview && preview.errors.length > 0 && (
         <div className="border border-red-400/40 bg-red-400/10 rounded-sm p-3 text-sm text-red-200 space-y-1" data-testid="paste-errors" role="alert">
           <div className="font-bold">Die Liste hat Fehler – übernommen wird erst eine fehlerfreie Liste.</div>
@@ -233,7 +233,7 @@ export function PasteSheet({ series, lineage, version, onClose, onSaved, onStale
                   <tr key={row.line} className="border-t border-white/5 align-top">
                     <td className="py-1.5 pr-3 font-bold">{row.code || "–"}</td>
                     <td className="py-1.5 pr-3 whitespace-nowrap">
-                      {dayLabel(row.day)}
+                      {row.open ? <span className="text-white/60" data-testid="paste-open">Termin offen</span> : dayLabel(row.day)}
                       {row.day_end && <span className="block text-[11px] text-white/60" data-testid="paste-day-end">bis {dayLabel(row.day_end)}</span>}
                       {row.derived_day && <span className="block text-[11px] text-white/45">aus dem Wochentag</span>}
                       {row.warning && <span className="block text-[11px] text-amber-300">{row.warning}</span>}
@@ -244,7 +244,7 @@ export function PasteSheet({ series, lineage, version, onClose, onSaved, onStale
                           {(row.sessions || []).map((item, index) => (
                             <li key={index} className="whitespace-nowrap">
                               <span className="font-semibold">{item.session || "Rennen"}</span>
-                              <span className="text-white/55 tabular-nums">{` ${item.day !== row.day ? `${dayLabel(item.day)} ` : ""}${item.time || ""}`}</span>
+                              <span className="text-white/55 tabular-nums">{` ${item.day && item.day !== row.day ? `${dayLabel(item.day)} ` : ""}${item.time || ""}`}</span>
                               {item.counts === false && <span className="text-[11px] text-white/45"> · zählt nicht</span>}
                             </li>
                           ))}

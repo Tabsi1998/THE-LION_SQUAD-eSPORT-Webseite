@@ -106,6 +106,14 @@ export function dayRoundsLabel(rules) {
   return `${runden} je Turniertag${scheme.length ? `, Platz 1 bis ${scheme.length}: ${scheme.join(" · ")}` : ""} – die Summe ergibt den Tagesplatz`;
 }
 
+/** Double Up (#2015) in Worten - nur bei Saisons mit Turniertagen (dort gibt es Double Up), sonst leer. */
+export function doubleUpLabel(rules) {
+  if (!(Number(rules?.day_rounds?.count) > 0)) return "";
+  return rules?.double_up_points === "team_place"
+    ? "Team-Platz k zählt wie Platz k – für beide Spieler"
+    : "Team-Platz k zählt wie Einzelplatz 2k−1 (Team 2 → Platz 3) – für beide Spieler";
+}
+
 /** Sonderboni (#1961): „Bingo +3 · Joker +2 – zählen zusätzlich, nie gestrichen“ - leer ohne. */
 export function bonusRulesLabel(rules) {
   const bonuses = rules?.custom_bonuses || [];

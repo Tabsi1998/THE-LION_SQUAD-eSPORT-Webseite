@@ -278,6 +278,68 @@ async def migrate_result_row_teams(db) -> str:
     return f"{rows} result rows filled, {recomputed} series recomputed, {checked} series checked"
 
 
+DOUBLE_UP_SHEETS = ({"double_up": True}, {"pending_draft.double_up": True},
+                    {"rows.partner_id": {"$exists": True, "$nin": [None, ""]}})
+
+
+DOUBLE_UP_REASON = "#2015 Double Up bleibt nach Team-Platz"
+
+
+async def _double_up_series(db, series_id: str, now: str) -> bool:
+    """Eine Saison unter ihrer Sperre: hat sie ein Double-Up-Blatt und noch keine Regel, erst die Stände mit
+    ``team_place`` neu rechnen, dann die Regel speichern und protokollieren. So bleibt nach einem Abbruch nie eine
+    Saison mit Regel, aber 2k−1-Ständen stehen - der nächste Lauf macht sie fertig. Liefert, ob sie geändert wurde."""
+    from services import reference_series
+
+    async with reference_series.series_write(db, series_id):
+        series = await db.reference_series.find_one({"id": series_id}, {"_id": 0})
+        rules = (series or {}).get("rules")
+        if not series or not isinstance(rules, dict) or rules.get("double_up_points"):
+            return False
+        sheet = await db.reference_round_results.find_one({"series_id": series_id, "$or": list(DOUBLE_UP_SHEETS)},
+                                                          {"_id": 1})
+        if sheet is None:
+            return False
+        kept = {**rules, "double_up_points": "team_place"}
+        await reference_series.recompute_standings(db, {**series, "rules": kept})
+        result = await db.reference_series.update_one(
+            {"id": series_id, "rules.double_up_points": {"$exists": False}}, {"$set": {"rules": kept}})
+        if getattr(result, "matched_count", 0) != 1:
+            raise RuntimeError(f"Saison {series_id} hat sich beim Setzen der Regel geändert")
+        await db.audit_logs.insert_one({
+            "id": new_id(), "action": "reference_series.double_up_points", "actor_id": "migration",
+            "target_id": series_id, "created_at": now,
+            "data": {"double_up_points": "team_place", "reason": DOUBLE_UP_REASON}})
+        return True
+
+
+async def migrate_double_up_points(db) -> str:
+    """Double-Up-Punkte (#2015): neue Saisons rechnen ein Team auf Platz k wie Einzelplatz 2k−1 (wie PineApps). Damit
+    sich bestehende Tabellen nicht still ändern, bekommen Saisons, die schon ein Double-Up-Blatt haben (veröffentlicht
+    oder Entwurf), ausdrücklich die bisherige Rechnung ``team_place`` in ihre Regeln - ohne neue Regel-Version, aber
+    neu gerechnet (falls schon ein Stand mit der neuen Vorgabe gespeichert wurde) und protokolliert. Umstellen auf 2k−1
+    ist danach eine Regeländerung in der Verwaltung. Eine Saison, die die Regel schon trägt, bleibt.
+
+    Wie Migration 10: je Saison unter ihrer Sperre, eine Saison mit Fehler hält die anderen nicht auf; am Ende wirft die
+    Migration ``MigrationIncomplete``, und der nächste Start holt die fehlenden nach. Die Sperre des Laufs wird vor
+    jeder Saison verlängert."""
+    now = datetime.now(timezone.utc).isoformat()
+    series_ids = [item["id"] async for item in db.reference_series.find(
+        {"rules.double_up_points": {"$exists": False}}, {"_id": 0, "id": 1}) if item.get("id")]
+    kept, failed = 0, []
+    for series_id in series_ids:
+        if not await extend_migration_lease(db):
+            raise MigrationIncomplete("lease lost - the next start continues")
+        try:
+            kept += int(await _double_up_series(db, series_id, now))
+        except Exception:
+            logger.exception("Migration 11: Saison %s nicht fertig - der nächste Start versucht es erneut", series_id)
+            failed.append(series_id)
+    if failed:
+        raise MigrationIncomplete(f"{len(failed)} series not finished: {', '.join(failed[:20])}")
+    return f"{kept} series keep double up points by team place"
+
+
 MIGRATIONS = (
     (1, "encrypt_legacy_integration_credentials", migrate_plaintext_secrets),
     (2, "team_leader_role_to_player", migrate_team_leader_role),
@@ -290,6 +352,7 @@ MIGRATIONS = (
     (8, "reference_series_own_teams", migrate_series_own_teams),
     (9, "game_map_spelling_keys", migrate_game_map_keys),  # #1616
     (10, "reference_result_row_teams", migrate_result_row_teams),  # #1960: leeres Team heißt kein Team
+    (11, "reference_double_up_points", migrate_double_up_points),  # #2015: bestehende Double-Up-Saisons bleiben bei k
 )
 
 

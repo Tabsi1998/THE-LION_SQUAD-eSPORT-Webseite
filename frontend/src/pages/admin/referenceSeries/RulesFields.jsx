@@ -1,6 +1,6 @@
 import { FormGrid, FormSection } from "@/components/tls/AdminForm";
 import { CheckField, SelectField, TextField } from "@/components/tls/FormFields";
-import { COUNT_MODE_OPTIONS, POINTS_MODE_OPTIONS, TABLE_TIEBREAKER_OPTIONS, TIEBREAKER_OPTIONS, emptyBonus } from "@/lib/referenceSeries";
+import { COUNT_MODE_OPTIONS, DOUBLE_UP_OPTIONS, POINTS_MODE_OPTIONS, TABLE_TIEBREAKER_OPTIONS, TIEBREAKER_OPTIONS, emptyBonus } from "@/lib/referenceSeries";
 import { TEAM_MODE_OPTIONS } from "@/lib/seriesSpecialRules";
 import { Plus, X } from "lucide-react";
 
@@ -17,6 +17,9 @@ function TournamentDayFields({ rules, set }) {
       <FormGrid cols={3}>
         <TextField label="Runden je Turniertag" type="number" min="0" max="20" value={rules.day_rounds_count} onChange={(v) => set("day_rounds_count", v)} hint="Leer oder 0: keine Runden." testId="series-rules-day-rounds" />
         {on && <TextField label="Rundenpunkte je Platz" value={rules.day_rounds_points} onChange={(v) => set("day_rounds_points", v)} placeholder="8, 7, 6, 5, 4, 3, 2, 1" hint="Platz in der Lobby samt Bots, Platz 1 zuerst." testId="series-rules-day-points" />}
+        {/* #2015: wie PineApps bekommt ein Team auf Platz k die Punkte von Einzelplatz 2k−1 (Team 2 → Platz 3). */}
+        <SelectField label="Double-Up-Punkte" value={rules.double_up_points || "best_player_place"} onChange={(v) => set("double_up_points", v)} options={DOUBLE_UP_OPTIONS}
+          hint="Team-Platz k: beide Spieler bekommen die Punkte von Platz 2k−1 (Team 2 → Platz 3) oder die von Platz k." testId="series-rules-double-up" />
       </FormGrid>
       <div className="space-y-2" data-testid="series-rules-bonuses">
         {bonuses.map((bonus, index) => (

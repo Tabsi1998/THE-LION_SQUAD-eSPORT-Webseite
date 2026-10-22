@@ -227,4 +227,4 @@ async def test_the_lease_is_extended_only_for_its_own_run(flow, monkeypatch):
 
 def test_the_backfill_is_migration_ten():
     assert (10, "reference_result_row_teams", migrations.migrate_result_row_teams) in migrations.MIGRATIONS
-    assert [version for version, _, _ in migrations.MIGRATIONS] == list(range(1, 11))
+    assert [version for version, _, _ in migrations.MIGRATIONS] == list(range(1, len(migrations.MIGRATIONS) + 1))

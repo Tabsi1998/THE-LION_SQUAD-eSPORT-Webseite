@@ -21,6 +21,12 @@ export const TIEBREAKER_OPTIONS = [
   ["latest_result", "Besseres letztes Ergebnis"],
 ];
 export const TABLE_TIEBREAKER_OPTIONS = [["", "—"], ["score_diff", "Differenz"], ["score_for", "Erzielte Punkte"], ["wins", "Siege"]];
+// Double-Up-Punkte (#2015): ein Team auf Platz k bekommt die Punkte von Einzelplatz 2k−1 (wie PineApps, Vorgabe) oder
+// die von Platz k.
+export const DOUBLE_UP_OPTIONS = [
+  ["best_player_place", "Wie Einzelplatz des besseren Spielers (2k−1)"],
+  ["team_place", "Nach Team-Platz (k)"],
+];
 // Vorlagen für Ergebnis-Bilder (#1756) - dieselben Kennungen wie backend/services/result_image_templates.py. Ohne Wahl
 // gilt die Standard-Vorlage der Art, „none“ schaltet das Auslesen ab.
 export const RESULT_IMAGE_TEMPLATES = [{ id: "rennliga-dunkel", name: "Rennliga-Ergebnis (dunkel)", kinds: ["racing"] }];
@@ -66,6 +72,7 @@ export function rulesToForm(rules = {}) {
     day_rounds_points: (day.points_by_place || [8, 7, 6, 5, 4, 3, 2, 1]).join(", "),
     custom_bonuses: (rules.custom_bonuses || []).map((bonus) => emptyBonus({ key: bonus.key, label: bonus.label, points: text(bonus.points) })),
     tiebreak_top_n: text(rules.tiebreak_top_n ?? 4),
+    double_up_points: rules.double_up_points || "best_player_place",
     points_mode: rules.points_mode || "scheme",
     points_by_place: (rules.points_by_place || []).join(", "),
     fastest_lap_points: text(bonuses.fastest_lap?.points ?? 0),
@@ -129,6 +136,7 @@ export function formToRules(form) {
       .filter((bonus) => String(bonus.label || "").trim())
       .map((bonus) => ({ ...(bonus.key ? { key: bonus.key } : {}), label: String(bonus.label).trim(), points: number(bonus.points) })),
     tiebreak_top_n: number(form.tiebreak_top_n, 4),
+    double_up_points: form.double_up_points || "best_player_place",
   };
 }
 
@@ -202,6 +210,8 @@ export function seriesToForm(series = {}, rules = series.rules) {
     publish_mode: series.publish_mode || "review",
     default_weekday: series.default_weekday === null || series.default_weekday === undefined ? "" : String(series.default_weekday),
     default_time: series.default_time || "",
+    // #2015: geplante Termine (etwa 9 Turniere) – leer heißt keine Zahl.
+    planned_rounds: series.planned_rounds ? String(series.planned_rounds) : "",
     official_table_url: series.official_table_url || "",
     external_url: series.external_url || "",
     visibility: series.visibility || "public",
@@ -233,6 +243,7 @@ export function seriesPayload(form, { isNew = false, archived = false } = {}) {
     publish_mode: form.publish_mode,
     default_weekday: form.default_weekday === "" || form.default_weekday === null || form.default_weekday === undefined ? null : Number(form.default_weekday),
     default_time: blank(form.default_time),
+    planned_rounds: optional(form.planned_rounds),
     // #1926: alle eigenen Teams - das erste gilt beim Server auch als „Eigenes Team“ (team_name) älterer Leser.
     own_teams: ownTeamsPayload(form.own_teams),
     official_table_url: blank(form.official_table_url),

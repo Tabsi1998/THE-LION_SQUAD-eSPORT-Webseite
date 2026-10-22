@@ -488,7 +488,8 @@ async def _snapshots(db, series: dict, rules: dict, round_doc: dict, content: di
     try:
         return race_weekend.standings(rules=series.get("rules") or {}, rounds=rounds, sheets=sheets,
                                       participants=people, own_teams=own_teams(series),
-                                      weekend=series.get("weekend"), adjustments=series.get("adjustments"))
+                                      weekend=series.get("weekend"), adjustments=series.get("adjustments"),
+                                      planned_rounds=series.get("planned_rounds"))  # #2015
     except ValueError:
         raise HTTPException(422, BROKEN_SHEETS) from None
 

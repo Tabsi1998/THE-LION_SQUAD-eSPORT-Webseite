@@ -123,7 +123,8 @@ def expand_paste(parsed: dict, weekend: dict | None, rounds: list[dict]) -> dict
         for config in plan:
             label = config["label"] if config else None
             offset = config["offset"] if config else 0
-            day, clock = _shifted(row["day"], row.get("time"), offset)
+            # Termin offen (#2015): ohne Tag auch ohne Zeitpunkt - die Uhrzeit bleibt als Vorgabe für später.
+            day, clock = _shifted(row["day"], row.get("time"), offset) if row.get("day") else (None, row.get("time"))
             try:
                 starts_at = vienna_start(day, clock)
             except ClockError:

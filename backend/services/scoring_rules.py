@@ -22,6 +22,10 @@ füllt fehlende Werte mit Standards und weist Unsinn ab; alle anderen Funktionen
   0 = aus, und ihr Punkteschema, Vorgabe 8…1), ``custom_bonuses`` - eigene Sonderboni je Saison (Name und Punkte, etwa
   „Bingo 3P“), ``tiebreak_top_n`` - das N der Gleichstand-Regel ``top_n`` („mehr Plätze unter den besten N“).
   Gerechnet wird damit in ``services/tournament_days.py``.
+- **Double-Up-Punkte (#2015):** ``double_up_points`` - ein Team auf Platz k (Zeile mit ``partner_id``) bekommt für
+  beide Spieler die Punkte von Einzelplatz 2k−1 (``best_player_place``, Vorgabe, so rechnet PineApps: Team 1 → P1,
+  Team 2 → P3, geteilter Team-Platz 6 → P11) oder die von Platz k (``team_place``, so rechneten Saisons vor #2015 -
+  Migration 11 hält sie dabei). Der Platz selbst bleibt der Team-Platz; Siege und Vorrang zählen ihn.
 - **Teamwertung einer Rennliga** (#1960): ``team_scoring.mode`` - ``per_race`` (je Rennen für das gefahrene Team) oder
   ``current_lineup`` (aktuelle Besetzung: alle Saisonpunkte der Fahrer, die jetzt im Team sind); ``no_team_names``
   (Vorgabe „Ersatzfahrer“): Teamnamen, die für kein Team zählen; ``adjustments_count_for_team`` (#2000, Vorgabe aus):
@@ -51,6 +55,8 @@ MAX_BONUS_KEY = 30
 MAX_TOP_N = 64  # N der Gleichstand-Regel „Top N“ (#1961): 1 bis 64
 # Teamwertung (#1960): je Rennen für das gefahrene Team (Vorgabe) oder die aktuelle Besetzung mit allen Saisonpunkten.
 TEAM_MODES = ("per_race", "current_lineup")
+# Double-Up-Punkte (#2015): wie Einzelplatz des besseren Spielers (2k−1, Vorgabe wie PineApps) oder nach Team-Platz (k).
+DOUBLE_UP_MODES = ("best_player_place", "team_place")
 
 DEFAULT_RULES: dict = {
     "points_mode": "scheme",
@@ -78,6 +84,7 @@ DEFAULT_RULES: dict = {
     "day_rounds": {"count": 0, "points_by_place": [8, 7, 6, 5, 4, 3, 2, 1]},
     "custom_bonuses": [],
     "tiebreak_top_n": 4,
+    "double_up_points": "best_player_place",
 }
 
 
@@ -209,6 +216,8 @@ def normalize_rules(raw: dict | None) -> dict:
     rules["tiebreak_top_n"] = _whole(rules["tiebreak_top_n"], "tiebreak_top_n", minimum=1)
     if rules["tiebreak_top_n"] > MAX_TOP_N:
         raise ValueError(f"tiebreak_top_n: höchstens {MAX_TOP_N}.")
+    rules["double_up_points"] = _choice(rules["double_up_points"] or DEFAULT_RULES["double_up_points"],
+                                        "double_up_points", DOUBLE_UP_MODES)
     return rules
 
 
@@ -324,6 +333,14 @@ def validate_sheet(sheet: dict, round_id: str) -> None:
             raise ValueError(f"Runde {round_id}: Strafpunkte dürfen nicht negativ sein ({row.get('participant_id')}).")
 
 
+def points_place(row: dict, place: int | None, rules: dict) -> int | None:
+    """Der Platz, nach dem eine Zeile Punkte bekommt (#2015): im Double Up (Zeile mit Partner) und mit
+    ``double_up_points = best_player_place`` der Einzelplatz 2k−1 des Team-Platzes k, sonst der Platz selbst."""
+    if place and row.get("partner_id") and rules.get("double_up_points", "best_player_place") == "best_player_place":
+        return 2 * place - 1
+    return place
+
+
 def result_points(row: dict, rules: dict) -> dict:
     """Punkte einer Zeile mit Herkunft: ``points`` = ``base`` + ``bonus`` - ``penalty``.
 
@@ -344,7 +361,7 @@ def result_points(row: dict, rules: dict) -> dict:
     if "dnf" in marks and rules["dnf_points"] is not None:
         base = rules["dnf_points"]
     else:
-        base = place_points(place, rules["points_by_place"])
+        base = place_points(points_place(row, place, rules), rules["points_by_place"])
     bonus = 0
     for mark in BONUS_MARKS:
         config = rules["bonuses"][mark]

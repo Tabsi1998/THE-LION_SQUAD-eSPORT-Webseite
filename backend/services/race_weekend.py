@@ -709,7 +709,7 @@ def pole_at_qualifying(rounds: list[dict], sheets: dict, plan: dict, rules: dict
 
 
 def standings(*, rules: dict, rounds: list[dict], sheets: dict, participants: list[dict], own_teams=(),
-              weekend: dict | None = None, adjustments=None) -> list[dict]:
+              weekend: dict | None = None, adjustments=None, planned_rounds: int | None = None) -> list[dict]:
     """Die Stände wie ``compute_standings``, mit Punkten je Lauf, Startplatz und Pole aus dem Qualifying und der
     umgekehrten Wertung als Startplatz. Mit Läufen zählt eine Runde als Einheit (``units``): Aktivitätspunkte, gefahrene
     Runden und Streichergebnisse je Runde, nicht je Lauf. Der Startplatz ändert keine Punkte - die umgekehrte Wertung
@@ -731,7 +731,7 @@ def standings(*, rules: dict, rounds: list[dict], sheets: dict, participants: li
             enriched = {**enriched, quali_id: {"rows": [{"participant_id": holder, "place": None, "marks": ["pole"]}]}}
             per_round[quali_id] = {**base, "points_by_place": [], "bonuses": bonus}
     common = {"rules": rules, "rounds": rounds, "participants": participants, "own_teams": own_teams,
-              "round_rules": per_round, "units": units, "adjustments": adjustments}
+              "round_rules": per_round, "units": units, "adjustments": adjustments, "planned_rounds": planned_rounds}
     snapshots = compute_standings(sheets=enriched, **common)
     reversed_grid = with_reverse_grid(rounds, enriched, plan, snapshots, weekend)
     if reversed_grid is not enriched:

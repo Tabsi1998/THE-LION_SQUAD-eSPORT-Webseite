@@ -527,7 +527,11 @@ Feld **Liga**. Eine Gruppe erscheint ab zwei Referenzen oder wenn es die Spur sc
 - **Liste einfügen:** je Zeile ein Termin, etwa `R1 · 05.11. · Strecke` – Kürzel, Datum (TT.MM. oder TT.MM.JJJJ),
   optional Uhrzeit und Ort; trennen mit Leerzeichen, `·`, `|` oder `;`. Ohne Jahr gilt das erste Jahr der Saison, über
   Neujahr zählt es weiter. Eine Zeile ohne Datum bekommt den nächsten **Standard-Wochentag** nach der Zeile davor,
-  ohne Uhrzeit gilt die **Standard-Uhrzeit**. **Vorschau** zeigt, was daraus wird; hat eine Zeile einen Fehler, steht
+  ohne Uhrzeit gilt die **Standard-Uhrzeit**. Stehen die Tage noch nicht fest, schreibt ihr **offen**, **?** oder
+  **tbd** an Stelle des Datums – etwa `T5 · offen` oder `T6 · ? · 20:30 · Halle Nord`: Der Termin steht als **Termin
+  offen** im Kalender (ohne Eintrag in einem Kalender-Abo), hinter den Terminen mit Datum. Das Datum tragt ihr später
+  am Termin nach (Bearbeiten); die Uhrzeit bleibt bis dahin gemerkt, und der Termin rückt dann vor die noch offenen.
+  **Vorschau** zeigt, was daraus wird; hat eine Zeile einen Fehler, steht
   er mit Zeilennummer da, und übernommen wird erst eine fehlerfreie Liste. Aus dem Ort kommt die **Flagge**, etwa
   `R1 · 18.06.2026 · Aserbaidschan`. **Team-Liga:** `vs Team` heißt Heimspiel, `@ Team` auswärts, `gegen Team` lässt
   die Seite offen; `13.05.–17.05.` (auch `13.–17.05.`) ist ein Spieltag mit Zeitraum – etwa
@@ -547,8 +551,15 @@ Feld **Liga**. Eine Gruppe erscheint ab zwei Referenzen oder wenn es die Spur sc
   ihr noch einmal verschiebt.
 - **Absagen** (Verbotszeichen): ein abgesagter Termin fehlt nie und zählt nicht zur Rundenzahl der Wertung;
   **Wieder ansetzen** nimmt es zurück.
+- **Geplante Termine** (Saison bearbeiten): die Zahl der Termine der Saison, auch wenn die Daten noch offen sind –
+  etwa 9 Turniere. Die Serienseite und „Läuft gerade“ zeigen dann „3 von 9“, und Streichergebnisse („Runden minus N“)
+  rechnen mit 9, solange erst weniger Termine im Kalender stehen. Steht die Zahl höher als der Kalender, legt
+  **Fehlende Termine anlegen** im Kalender die übrigen als **Termin offen** mit den nächsten Kürzeln an (nach T4 also
+  T5 … T9).
 - **Reihenfolge:** mit den Pfeilen oder **Nach Datum ordnen**. **Archivieren** nimmt einen Termin aus dem Kalender,
   unter **Archiviert** lässt er sich zurückholen. Gewertete Termine lassen sich weder absagen noch archivieren.
+
+<img src="../assets/serien/serien-termine-offen.png" alt="Kalender einer TFT-Saison: T1 bis T4 gewertet, T5 bis T9 als Termin offen mit 19:00 nach Fehlende Termine anlegen" width="560">
 
 Hat ein Termin kein Ergebnis, obwohl danach schon gewertet ist, steht oben der Hinweis **Lücke im Kalender** – meist
 fehlt das Ergebnis, oder der Termin wurde abgesagt.
@@ -654,12 +665,18 @@ Saisonpunkte nach dem Punkteschlüssel der Saison.
   Rundenpunkten, die Punkte stehen blass im Feld. GES P leer heißt Summe der Runden; trägt ihr den Wert des Veranstalters
   ein, gilt er (weicht er ab, sagt es die Vorschau). Ohne eingetragenen Platz **bestimmt GES P den Platz** –
   gleiche Summe heißt **Gleichstand** (zweimal Platz 4, danach Platz 6) ohne Warnung. **Double Up** oben im Blatt
-  schaltet Zweierteams ein: je Zeile **mit …** den Partner wählen, beide bekommen denselben Platz und dieselben Punkte.
+  schaltet Zweierteams ein: je Zeile **mit …** den Partner wählen, beide bekommen denselben Platz (den **Team-Platz**)
+  und dieselben Punkte. Welche Punkte, sagt **Double-Up-Punkte** im Bereich Turniertage der Saison: **Wie Einzelplatz
+  des besseren Spielers (2k−1)** (Vorgabe, so rechnet PineApps – Team 1 bekommt die Punkte von Platz 1, Team 2 die von
+  Platz 3, Team 3 die von Platz 5; teilen sich zwei Teams Platz 6, bekommen alle vier die Punkte von Platz 11) oder
+  **Nach Team-Platz (k)** (Team 2 → Platz 2). Siege und Vorrang zählen den Team-Platz. Saisons, die vor dieser Wahl
+  schon Double Up hatten, rechnen weiter nach Team-Platz – umstellen ist eine Regeländerung mit neuer Version.
   Sonderboni stehen als Chip an der Zeile („Bingo +3“), die Marke **Ausgestiegen** zählt die restlichen Runden mit 0.
 - **Liste einfügen:** eine Tabelle mit Kopfzeile aus Excel oder von der Seite des Veranstalters – Name, **R 1 … R 5**,
   **GES P**, gern mit Platz und je Sonderbonus einer Spalte mit seinem Namen (x, ja oder ✓ heißt abgehakt).
 - **Serienseite:** Unter der Gesamtwertung (mit eigener Spalte **Boni**) stehen die **Turniertage**: je Termin die
-  Runden mit Platzfarben (Gold, Silber, Bronze, Top 4 grün), GES P und die Saisonpunkte; im Double Up mit Partner.
+  Runden mit Platzfarben (Gold, Silber, Bronze, Top 4 grün), GES P und die Saisonpunkte; im Double Up mit Partner,
+  Team-Platz und dem Hinweis, wie die Punkte zählen („Punkte wie Einzelplatz 2k−1“).
   **Lobbys** zeigt je Runde die Lobbys wie beim Veranstalter, wenn sie eingetragen sind. Ein Name öffnet das
   **Spieler-Detail** mit Tagesplatz, Runden, Tages- und Saisonpunkten je Turniertag; am Handy stehen die Runden unter dem
   Termin.
@@ -676,6 +693,13 @@ Saisonpunkte nach dem Punkteschlüssel der Saison.
 </table>
 
 <img src="../assets/serien/serien-turniertage-lobbys.png" alt="Lobby-Ansicht einer Runde mit zwei Lobbys und Platzfarben" width="560">
+
+<table>
+<tr>
+<td><img src="../assets/serien/serien-double-up-tag.png" alt="Turniertag T3 im Double Up: Team-Platz 1, 2, 3, 4 und zweimal 6 mit 35, 26, 20, 16 und 9 Punkten" width="560"></td>
+<td><img src="../assets/serien/serien-double-up-punkte.png" alt="Saison bearbeiten am Handy: Double-Up-Punkte wie Einzelplatz des besseren Spielers (2k−1)" width="220"></td>
+</tr>
+</table>
 
 **Turniertage von der Partner-Plattform holen:** Führt der Veranstalter seine Turniere auf einer eigenen Plattform
 (etwa das TFT-Dashboard von PineApps), holt die Website Turniertage, Runden, Lobbys und Punkte von dort – nur lesend und
@@ -698,7 +722,8 @@ immer als **Entwurf**. Veröffentlicht wird wie gewohnt vom Vorstand. Nur in ein
   Danach öffnet sich **Unbekannte Namen** zum Zuordnen; Spieler stehen mit Riot-ID (Name#TAG), Gäste des Partners nur
   mit Namen.
 - **Was übernommen wird:** Tagesplatz in der Reihenfolge des Veranstalters, Punkte je Runde **wie beim Partner** (ein
-  Bot ist kein Teilnehmer, verschiebt aber die Punkte), Lobby, GES P, im Double Up der Partner. Nicht übernommen werden
+  Bot ist kein Teilnehmer, verschiebt aber die Punkte), Lobby, GES P, im Double Up der Partner und der Team-Platz (zwei
+  Teams mit gleicher GES P teilen ihn; die Punkte rechnet die Saison nach **Double-Up-Punkte**). Nicht übernommen werden
   Riot-Kennungen, Avatare und Ränge. Ein zweites „Jetzt holen“ legt nichts doppelt an – Übernommenes steht als
   **Übernommen**, offene Turniere als **Noch offen**. Hat sich beim Partner zwischen Vorschau und Übernehmen etwas
   geändert, wird nichts übernommen – einfach neu holen. Ist die Plattform nicht erreichbar, steht das im Abschnitt; die
