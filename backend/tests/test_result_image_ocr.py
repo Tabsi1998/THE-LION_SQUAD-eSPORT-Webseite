@@ -101,6 +101,22 @@ def test_clean_screenshot_without_known_participants_reads_every_value():
 
 
 @needs_tesseract
+def test_dark_grey_number_and_team_are_read_from_the_cell_alone():
+    """Echter Fall (#2012): Startnummer und Team in dunkelgrauer Schrift auf dunklem Grund (ein Team ohne eigene Farbe)
+    las die Seite gar nicht - leer und gelb. Die leere Zelle einer gefüllten Spalte wird allein aus dem Originalbild
+    gelesen (Kontrast nur dieser Zelle gestreckt) - richtig und mit bekanntem Team grün."""
+    sheet = fixture.sample_sheet()
+    for index in (3, 7):
+        row = sheet.rows[index]
+        sheet.rows[index] = fixture.Row(row.place, row.number, row.name, "Schatten Team", row.grid, row.time, row.gap)
+    out = _read(fixture.png_bytes(fixture.render(sheet)), _people(sheet))
+    for index in (3, 7):
+        got = out["rows"][index]
+        assert (got["start_number"], got["team"]) == (sheet.rows[index].number, "Schatten Team"), index
+        assert not {"start_number", "team"} & set(got["uncertain"]), index
+
+
+@needs_tesseract
 def test_blurry_screenshot_marks_every_wrong_cell():
     sheet = fixture.sample_sheet()
     out = _read(fixture.jpeg_bytes(fixture.blurry(fixture.render(sheet)), quality=90), _people(sheet))

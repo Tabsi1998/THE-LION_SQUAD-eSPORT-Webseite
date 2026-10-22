@@ -913,8 +913,9 @@ def _read_in_budget(img: Image.Image, template: dict, max_rows: int | None) -> R
     if not reading.out_of_time:
         try:
             _retry_places(prepared, columns, assigned, data_lines, reading, img)
+            _retry_empty_cells(img, prepared, columns, assigned, data_lines, reading)
         except OutOfTime:
-            reading.out_of_time = True  # nicht gelesene Plätze bleiben gelb
+            reading.out_of_time = True  # nicht gelesene Plätze und Zellen bleiben gelb
     fields = [column["field"] for column in columns]
     for row, cells in zip(reading.rows, assigned):
         for wanted in ("start_number", "team"):
@@ -1002,6 +1003,75 @@ def _box_read(img: Image.Image, center: tuple[float, float], height: float, scal
     canvas = Image.new("L", (cell.width + 40, cell.height + 40), 255)
     canvas.paste(cell, (20, 20))
     return _ocr(canvas, psm=10, whitelist=WHITELISTS["place"])
+
+
+def _padded(cell: Image.Image) -> Image.Image:
+    """Eine Zelle auf ``BOX_HEIGHT`` Pixel Höhe, mit weißem Rand - so liest Tesseract sie wie eine Zeile."""
+    factor = BOX_HEIGHT / max(cell.height, 1)
+    cell = cell.resize((max(1, round(cell.width * factor)), BOX_HEIGHT), Image.Resampling.LANCZOS)
+    canvas = Image.new("L", (cell.width + 40, cell.height + 40), 255)
+    canvas.paste(cell, (20, 20))
+    return canvas
+
+
+def _cell_reads(img: Image.Image, box: tuple[int, int, int, int], kind: str) -> list[list[Word]]:
+    """Eine Zelle allein aus dem Originalbild (#2012): hellster Farbkanal, Kontrast nur dieser Zelle gestreckt (so wird
+    dunkelgraue Schrift auf dunklem Grund kräftig), dunkle Schrift auf hellem Grund - einmal so und einmal schwarz-weiß
+    nach eigener Schwelle. Zahlen mit Whitelist, ein einzelnes Zeichen notfalls als Zeichen gelesen."""
+    red, green, blue = img.crop(box).split()
+    cell = ImageOps.autocontrast(ImageChops.lighter(ImageChops.lighter(red, green), blue), cutoff=1)
+    pixels = cell.tobytes()
+    if sum(1 for value in pixels if value > 127) * 2 < len(pixels):
+        cell = ImageOps.invert(cell)
+    level = _otsu(cell.histogram())
+    out = []
+    for picture in (cell, cell.point(lambda value: 255 if value > level else 0)):
+        canvas = _padded(picture)
+        words = _ocr(canvas, psm=7, whitelist=WHITELISTS.get(kind))
+        if not words and kind != "text":
+            words = _ocr(canvas, psm=10, whitelist=WHITELISTS.get(kind))
+        out.append(words)
+    return out
+
+
+# Spalten, die in jeder Zeile etwas haben (wie ``result_image_match._check_gaps_in_columns``).
+RETRY_FIELDS = ("start_number", "team", "grid")
+
+
+def _retry_empty_cells(img: Image.Image, prepared: Prepared, columns: list[dict], assigned: list[dict[int, Cell]],
+                       data_lines: list[Line], reading: Reading) -> None:
+    """Leere Zellen in Spalten, die sonst in mindestens der Hälfte der Zeilen etwas haben (#2012): etwa Startnummer und
+    Team in dunkelgrauer Schrift auf dunklem Grund, die die Seite nicht sieht. Die Zelle (Breite der Spalte, Höhe der
+    Schrift um die Mitte der Zeile) wird allein aus dem Originalbild gelesen (``_cell_reads``) - die beiden Lesungen
+    stehen als Seite und Streifen der Zelle; was daraus wird, entscheidet ``result_image_match`` wie sonst."""
+    if not data_lines:
+        return
+    height = statistics.median(line.height for line in data_lines)
+    for index, column in enumerate(columns):
+        if column["field"] not in RETRY_FIELDS:
+            continue
+        found = [row[index] for row in assigned if row.get(index)]
+        if not found or len(found) * 2 < len(assigned):
+            continue
+        left = min(cell.left for cell in found) - height * 0.3
+        right = max(cell.right for cell in found) + height * 0.3
+        for row_index, row in enumerate(reading.rows):
+            field_name = column["field"]
+            if assigned[row_index].get(index) or row.strips.get(field_name):
+                continue
+            # Mitte der Zeile aus ihren Wörtern (ein Rest einer Trennlinie verschiebt sie so nicht), Höhe wie die Schrift.
+            center = statistics.median(word.cy for word in data_lines[row_index].words)
+            box = (max(0, int(left / prepared.scale)), max(0, int((center - height * 0.8) / prepared.scale)),
+                   min(img.width, int(right / prepared.scale)),
+                   min(img.height, int((center + height * 0.8) / prepared.scale)))
+            if box[2] - box[0] < 4 or box[3] - box[1] < 4:
+                continue
+            plain, binary = _cell_reads(img, box, column["kind"])
+            joiner = " " if column["kind"] == "text" else ""
+            if plain:
+                row.cells[field_name] = _read(plain, joiner=joiner)
+            if binary:
+                row.strips[field_name] = _read(binary, joiner=joiner)
 
 
 def _retry_places(prepared: Prepared, columns: list[dict], assigned: list[dict[int, Cell]], data_lines: list[Line],
