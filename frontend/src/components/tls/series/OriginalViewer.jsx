@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { ChevronLeft, ChevronRight, ExternalLink, Images, X } from "lucide-react";
 import { useModalBehavior } from "@/hooks/useModalBehavior";
 import { motionAllowed } from "@/lib/motion";
@@ -77,7 +78,7 @@ export function OriginalViewer({ items, start = 0, title = "", onClose }) {
   const source = sourceLink(item);
   return (
     <div ref={container} role="dialog" aria-modal="true" aria-label={title ? `Original-Bilder: ${title}` : "Original-Bilder"}
-      className="tls-lightbox tls-original-viewer fixed inset-0 z-50 flex flex-col bg-black/95" data-testid="original-viewer">
+      className="tls-lightbox tls-original-viewer fixed inset-0 z-50 flex flex-col bg-black/[0.97]" data-testid="original-viewer">
       <div className="absolute inset-0" onClick={onClose} aria-hidden="true" data-testid="original-viewer-backdrop" />
       <header className="relative z-10 flex items-center gap-3 px-4 pt-[max(12px,env(safe-area-inset-top))] pb-2 sm:px-6">
         <div className="min-w-0 flex-1">
@@ -150,7 +151,8 @@ export function OriginalsButton({ items, title = "", className = "", testId = "o
         Original ansehen
         {many && <span className="tabular-nums text-white/55" aria-hidden="true">{items.length}</span>}
       </button>
-      {open && <OriginalViewer items={items} title={title} onClose={() => setOpen(false)} />}
+      {/* Ins <body>: Karten und Zeilen mit Bewegung (transform) wären sonst der Rahmen des Vollbilds. */}
+      {open && createPortal(<OriginalViewer items={items} title={title} onClose={() => setOpen(false)} />, document.body)}
     </>
   );
 }

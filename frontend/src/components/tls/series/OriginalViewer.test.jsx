@@ -33,6 +33,8 @@ test("Vollbild mit allen Bildern: Zähler, Pfeiltasten blättern rundum, Escape 
   expect(button).toHaveAccessibleName("Original ansehen, 3 Bilder");
   const dialog = screen.getByRole("dialog");
   expect(dialog).toHaveAttribute("aria-modal", "true");
+  // Direkt im <body>: eine bewegte Karte (transform) wäre sonst der Rahmen des Vollbilds.
+  expect(dialog.parentElement).toBe(document.body);
   expect(dialog).toHaveAccessibleName("Original-Bilder: R3 · Probering");
   expect(screen.getByTestId("original-viewer-label")).toHaveTextContent("Qualifying");
   expect(screen.getByTestId("original-viewer-count")).toHaveTextContent("1 / 3");
