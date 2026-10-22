@@ -181,11 +181,15 @@ PROXY_UPLOAD_LIMIT_MB=1700
 PUBLIC_UPLOAD_BACKEND_URL=https://upload.lionsquad.at
 ```
 
-**SVG-Logos (#1952):** Logo-Felder nehmen SVG an. Das Backend bereinigt die Datei beim Hochladen (Positivliste,
-`defusedxml`) und legt daneben eine PNG-Fassung ab (`resvg-py`, ohne Systembibliothek); ausgeliefert wird das SVG mit
-eigener, strenger Content-Security-Policy (`frontend/nginx.conf` und Backend). Grenzen: höchstens 1 MB und 4000
-Elemente, PNG 2000 px an der längeren Seite. Wer sie ändern muss, setzt `MAX_SVG_UPLOAD_MB`, `SVG_MAX_ELEMENTS` bzw.
-`SVG_RASTER_PX` für das Backend (z. B. in `docker-compose.override.yml`); der Datei-Dialog prüft vorab 1 MB
+**SVG-Logos (#1952):** Logo-Felder nehmen SVG an – nur über die Logo-Uploads (`/api/uploads/logo`, `/sponsor-logo`,
+`/team-logo` für die Leitung eines Teams). Das Backend bereinigt die Datei beim Hochladen (Positivliste, `defusedxml`)
+und zeichnet sie **einmal** zur PNG-Fassung daneben (`resvg-py`, ohne Systembibliothek) – in einem eigenen Prozess mit
+Zeit- und Speichergrenze, höchstens ein Bild zugleich. Eine SVG-Adresse lässt sich nur in Logo-Feldern speichern.
+Ausgeliefert wird das SVG mit eigener, strenger Content-Security-Policy (`frontend/nginx.conf` und Backend); die App
+(erkannt an ihrer Kennung) bekommt bei Abrufen die PNG-Fassung. Grenzen und Stellschrauben (Backend, z. B. in
+`docker-compose.override.yml`): `MAX_SVG_UPLOAD_MB` (1), `SVG_MAX_ELEMENTS` (4000), `SVG_MAX_PATH_NUMBERS` (100000),
+`SVG_RASTER_PX` (2000), `SVG_RASTER_TIMEOUT_SECONDS` (5), `SVG_RASTER_MEMORY_MB` (512), `SVG_RASTER_CONCURRENCY` (1),
+`SVG_UPLOAD_RATE_LIMIT` (20 je `SVG_UPLOAD_RATE_WINDOW_SECONDS` = 3600). Der Datei-Dialog prüft vorab 1 MB
 (`VITE_MAX_SVG_UPLOAD_MB` beim Bau).
 
 Cloudflare lässt je Anfrage höchstens 100 MB durch. Große Uploads laufen deshalb über eine Subdomain

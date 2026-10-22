@@ -82,11 +82,14 @@ Für eine neue Website in dieser Reihenfolge:
 
 **Logos am besten als SVG**, sonst als PNG mit durchsichtigem Hintergrund. Ein SVG ist in jeder Größe scharf – ihr müsst
 nicht über Pixel nachdenken. Das gilt für alle Logo-Felder: Standard-Logo, die beiden Logo-Fassungen, Maskottchen,
-QR-Logo und die Favicons, dazu Sponsoren, Partner, Spiele, Teams, das Logo je Spur und Saison und das Kopfbild eines
-Events. Fotos, Banner, Profilbilder und die Galerie bleiben bei PNG, JPG und WebP.
+QR-Logo und die Favicons, dazu Sponsoren, Partner, Spiele, das Logo je Spur und Saison und Teams. Ein Teamlogo als SVG
+lädt die Leitung des Teams beim **Bearbeiten** hoch; ein neues Team startet mit einem Bild. Fotos, Banner, Profilbilder,
+das Kopfbild eines Events und die Galerie bleiben bei PNG, JPG und WebP – eine SVG-Adresse lässt sich dort auch nicht
+eintragen.
 
 - **Beim Hochladen** prüft die Website das SVG und speichert nur eine bereinigte Fassung: nur Formen, Pfade, Text und
-  Verläufe, nichts, was nachlädt oder ausführt. Leere Ränder schneidet sie ab. Ein SVG darf höchstens 1 MB groß sein.
+  Verläufe, nichts, was nachlädt oder ausführt. Leere Ränder schneidet sie ab. Ein SVG darf höchstens 1 MB groß sein;
+  ein sehr aufwendiges SVG lehnt sie ab („zu aufwendig zum Zeichnen“) – dann vereinfachen oder als PNG hochladen.
 - **Unter dem Feld** steht das Logo auf hellem und dunklem Grund – so seht ihr gleich, ob es auf beiden trägt.
 - **Wo kein SVG geht** (E-Mails, PDF und Druck, das Bild beim Teilen, Discord, Favicon und App), nimmt die Website
   automatisch eine PNG-Fassung, die sie beim Hochladen mit anlegt.
