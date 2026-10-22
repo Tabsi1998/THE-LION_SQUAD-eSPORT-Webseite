@@ -92,7 +92,11 @@ export function imageToRows(result, participants = [], { points: withPoints = tr
       gap: formatRaceTime(row.gap),
       color: row.color || "",
       from_image: true,
-      ocr: uncertain.length ? { uncertain: [...new Set(uncertain)], read: row.read || {} } : null,
+      // Was im Bild stand und was das Bild vorschlug (#2012): ändert jemand Name oder Team, geht die Lesung beim
+      // Übernehmen mit und der Server lernt die Schreibweise (`formToPayload`).
+      image_read: row.image || null,
+      image_pick: { participant_id: known?.id || "", team: row.team || "" },
+      ocr: uncertain.length ? { uncertain: [...new Set(uncertain)], read: row.read || {}, hint: row.hint || {} } : null,
     });
   });
 }
@@ -177,11 +181,15 @@ export function confirmRow(row) {
   return { ...row, ocr: null };
 }
 
-/** Kurztext der gelben Felder einer Zeile mit dem, was im Bild stand: „Name (gelesen „Anna Prob3“), Team“. */
+/**
+ * Kurztext der gelben Felder einer Zeile mit dem, was im Bild stand, und dem Hinweis des Servers (#2012):
+ * „Name (gelesen „Emil Ek“, wie in Saison 1/2025), Team“.
+ */
 export function uncertainText(row) {
   return (row?.ocr?.uncertain || []).map((field) => {
     const read = row.ocr.read?.[field];
-    return read ? `${FIELD_LABELS[field] || field} (gelesen „${read}“)` : FIELD_LABELS[field] || field;
+    const extra = [read ? `gelesen „${read}“` : "", row.ocr.hint?.[field] || ""].filter(Boolean).join(", ");
+    return extra ? `${FIELD_LABELS[field] || field} (${extra})` : FIELD_LABELS[field] || field;
   }).join(", ");
 }
 
