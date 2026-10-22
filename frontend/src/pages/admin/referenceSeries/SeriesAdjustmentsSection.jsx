@@ -2,12 +2,13 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { api, formatApiError } from "@/lib/api";
 import { AdminSheet } from "@/components/tls/AdminSheet";
 import { FormGrid } from "@/components/tls/AdminForm";
-import { SelectField, TextField } from "@/components/tls/FormFields";
+import { CheckField, SelectField, TextField } from "@/components/tls/FormFields";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { sessionLabel } from "@/lib/raceWeekend";
 import { todayDay } from "@/lib/referenceSeriesStaff";
 import {
-  adjustmentDetail, adjustmentErrors, adjustmentPayload, adjustmentTarget, adjustmentText, adjustmentToForm, emptyAdjustment,
+  adjustmentDefaultTeam, adjustmentDetail, adjustmentErrors, adjustmentPayload, adjustmentTarget, adjustmentTeamText, adjustmentText, adjustmentToForm,
+  emptyAdjustment,
 } from "@/lib/seriesSpecialRules";
 import { toast } from "sonner";
 import { Pencil, Plus, Trash2 } from "lucide-react";
@@ -19,9 +20,25 @@ import { Pencil, Plus, Trash2 } from "lucide-react";
 
 const KIND_OPTIONS = [["participant", "Teilnehmer (Fahrerwertung)"], ["team", "Team (Teamwertung)"]];
 
+// #2000: was der Haken „zählt auch für die Teamwertung“ im Modus der Saison heißt.
+const TEAM_HINTS = {
+  per_race: "Zählt für das Team, für das der Fahrer im Termin gefahren ist – ohne Termin für das Team seiner letzten Fahrt bis zum Tag. Als Ersatz gefahren: für keines.",
+  current_lineup: "Bleibt in den Saisonpunkten des Fahrers und zählt so für sein aktuelles Team. Ohne Haken wird sie aus der Teamsumme herausgerechnet.",
+};
+
+/** Für welches Team eine Fahrer-Anpassung mit Haken zählt bzw. warum für keines - vom Server (`adjustment_teams`). */
+function teamNote(item, series, scoring) {
+  if (!scoring?.enabled || (item.kind || "participant") !== "participant") return null;
+  const flagged = typeof item.counts_for_team === "boolean" ? item.counts_for_team : scoring.mode === "current_lineup";
+  if (!flagged) return null;
+  const credit = series.adjustment_teams?.[item.id];
+  return { text: adjustmentTeamText({ counts_for_team: true, credited_team: credit?.team, team_note: credit?.note }), warn: Boolean(credit?.note) };
+}
+
 function AdjustmentSheet({ series, item, participants, rounds, teams, onClose, onSaved }) {
   const isNew = !item?.id;
-  const [form, setForm] = useState(() => (item ? adjustmentToForm(item) : emptyAdjustment({ day: todayDay() })));
+  const scoring = series.rules?.team_scoring;
+  const [form, setForm] = useState(() => (item ? adjustmentToForm(item, scoring) : emptyAdjustment({ day: todayDay(), counts_for_team: adjustmentDefaultTeam(scoring) })));
   const [saving, setSaving] = useState(false);
   const [touched, setTouched] = useState(false);
   const set = (key, value) => setForm((current) => ({ ...current, [key]: value }));
@@ -71,6 +88,11 @@ function AdjustmentSheet({ series, item, participants, rounds, teams, onClose, o
         hint="Öffentlich: steht als „−5“ mit diesem Grund bei den Punkten." />
       <SelectField label="Termin (optional)" value={form.round_id} onChange={(value) => set("round_id", value)} options={roundOptions} testId="adjustment-round"
         hint="Zählt ab dem Stand dieses Termins." />
+      {/* #2000: nur für Fahrer und nur mit Teamwertung - Vorgabe aus den Regeln der Saison. */}
+      {form.kind !== "team" && form.counts_for_team !== null && (
+        <CheckField label="Zählt auch für die Teamwertung" checked={form.counts_for_team} onChange={(value) => set("counts_for_team", value)} testId="adjustment-counts-for-team"
+          hint={TEAM_HINTS[scoring?.mode] || TEAM_HINTS.per_race} />
+      )}
     </AdminSheet>
   );
 }
@@ -81,6 +103,7 @@ export function SeriesAdjustmentsSection({ series, onChanged }) {
   const [sheet, setSheet] = useState(null);
   const confirm = useConfirm();
   const items = useMemo(() => series.adjustments || [], [series.adjustments]);
+  const teamNotes = useMemo(() => Object.fromEntries(items.map((item) => [item.id, teamNote(item, series, series.rules?.team_scoring)])), [items, series]);
 
   const load = useCallback(async () => {
     try {
@@ -136,6 +159,12 @@ export function SeriesAdjustmentsSection({ series, onChanged }) {
                   <span className="ml-2 text-[10px] font-bold uppercase tracking-widest text-white/45">{item.kind === "team" ? "Team" : "Fahrer"}</span>
                 </span>
                 <span className="block text-sm text-white/60 [overflow-wrap:anywhere]">{adjustmentDetail(item, rounds)}</span>
+                {/* #2000: für welches Team - bzw. als Ersatz gefahren: für keines (Hinweis). */}
+                {teamNotes[item.id] && (
+                  <span className={`block text-xs [overflow-wrap:anywhere] ${teamNotes[item.id].warn ? "text-amber-200/90" : "text-[#29B6E8]/90"}`} data-tone={teamNotes[item.id].warn ? "warn" : "info"} data-testid="adjustment-team-note">
+                    {teamNotes[item.id].text}
+                  </span>
+                )}
               </span>
               <button type="button" onClick={() => setSheet({ item })} aria-label={`Anpassung ${adjustmentText(item.points)} bearbeiten`} title="Bearbeiten" data-testid="adjustment-edit" className="tls-hit p-2 text-white/50 hover:text-white">
                 <Pencil className="w-4 h-4" />
