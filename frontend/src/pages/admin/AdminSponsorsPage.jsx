@@ -334,7 +334,7 @@ function SponsorForm({ sponsor, events = [], locked = new Set(), onClose, onSave
           <TextField label="Name" value={form.name} onChange={(v) => set("name", v)} required testId="sponsor-name" {...lock("name")} />
           <TextField label="Link (URL)" value={form.link} onChange={(v) => set("link", v)} testId="sponsor-link" placeholder="https://…" />
         </FormGrid>
-        <ImageUpload value={form.logo_url} onChange={(v) => set("logo_url", v)} label="Logo" testId="sponsor-logo" variant="square" endpoint="/uploads/sponsor-logo" allowLibrary />
+        <ImageUpload value={form.logo_url} onChange={(v) => set("logo_url", v)} label="Logo" testId="sponsor-logo" variant="square" endpoint="/uploads/sponsor-logo" allowLibrary logo />
         {imageSourceText(sponsor?.dolibarr_image_summary) && (
           <p className="text-xs text-white/60 border border-white/10 rounded-sm px-3 py-2" data-testid="sponsor-images-hint">
             {imageSourceText(sponsor.dolibarr_image_summary)}. Die Website und die App zeigen die Fassung für dunklen Hintergrund, Mails und PDFs die helle;

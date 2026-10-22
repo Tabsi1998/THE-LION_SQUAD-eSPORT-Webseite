@@ -35,10 +35,11 @@ test("SVG bekommt die klare Meldung, andere Dateien die alte", () => {
   expect(SVG_REFUSED_MESSAGE).toContain("PNG");
 });
 
-test("Das Feld bietet nur PNG, JPG und WebP an und sagt, dass SVG nicht geht", async () => {
+// Seit #1952 nehmen Logo-Felder auch SVG (ImageUpload.svg.test.jsx); jedes andere Feld bleibt bei PNG, JPG und WebP.
+test("Ein Feld ohne Logo bietet nur PNG, JPG und WebP an und sagt, dass SVG nicht geht", async () => {
   const { readFileSync } = await import("node:fs");
   const path = await import("node:path");
   const source = readFileSync(path.join(process.cwd(), "src/components/tls/ImageUpload.jsx"), "utf8");
-  expect(source).toContain('accept="image/png,image/jpeg,image/webp"');
+  expect(source).toContain(': "image/png,image/jpeg,image/webp"}');
   expect(source).toContain("SVG geht nicht.");
 });
