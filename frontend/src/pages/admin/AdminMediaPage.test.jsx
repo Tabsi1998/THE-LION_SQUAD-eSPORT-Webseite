@@ -70,3 +70,14 @@ test("eine verwendete Datei wird nur nach Warnung gelöscht, eine unbenutzte ohn
   await waitFor(() => expect(apiMock.delete).toHaveBeenCalledWith("/admin/media/frei.png"));
   expect(confirmMock.mock.calls.at(-1)[0].title).toBe("Datei endgültig löschen?");
 });
+
+test("Original-Bilder der Serien (#1933) zählt die Mediathek mit - privat, ohne Kachel", async () => {
+  apiMock.get.mockImplementation(async (url) => {
+    if (url.startsWith("/admin/media?")) return { data: [ITEM] };
+    if (url === "/admin/media/audit") return { data: { summary: {}, reference_originals: { count: 5, bytes: 2.5 * 1024 * 1024 } } };
+    return { data: [] };
+  });
+  render(<MemoryRouter><AdminMediaPage /></MemoryRouter>);
+  expect(await screen.findByTestId("media-reference-originals")).toHaveTextContent("5 Original-Bilder der Serien · 2.50 MB");
+  expect(screen.queryByTestId("media-tile-reference")).toBeNull();
+});
