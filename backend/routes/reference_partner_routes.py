@@ -49,7 +49,6 @@ from services import (
 )
 from services.rate_limit import enforce_rate_limit, keyed_subject
 from services.reference_series_access import SeriesAccess, require_series_editor
-from services.series_participants import remove_unused_new
 from services.series_standings import ordered_rounds
 
 router = APIRouter(prefix="/api/reference-series", tags=["reference-series"],
@@ -134,17 +133,9 @@ def _sheet_input(detail: dict) -> results.ResultSheetInput:
         raise partner_platforms.SourceError(partner_platforms.FORMAT_MESSAGE) from None
 
 
-def _base_content(existing: dict | None) -> dict | None:
-    """Womit die Übernahme verglichen wird: ein Entwurf daneben, sonst das Blatt."""
-    if not existing:
-        return None
-    return existing.get("pending_draft") or existing
-
-
-def _target(existing: dict | None) -> str:
-    if not existing:
-        return "sheet"
-    return "pending_draft" if existing.get("status") == "published" else "draft"
+# Womit die Übernahme verglichen wird und wohin sie schreibt - gemeinsam mit der Saisontabelle (#1928).
+_base_content = results.draft_base
+_target = results.draft_target
 
 
 async def _tournaments(source: dict) -> list[dict]:
@@ -334,29 +325,9 @@ async def _link_round(db, access: SeriesAccess, round_doc: dict, ref: dict) -> d
 async def _write(db, access: SeriesAccess, round_doc: dict, existing: dict | None, resolution, content: dict,
                  expected: int, ref: dict) -> dict:
     """Den Entwurf schreiben - wie ``save_results``, nur nie veröffentlicht und nie aufs veröffentlichte Blatt."""
-    created = await results._create_people(db, access, resolution)
-    own = [doc["id"] for doc in created.values()]
-    content = series_results.replace_new_ids(content, {key: doc["id"] for key, doc in created.items()})
-    target = _target(existing)
-    if target == "pending_draft":
-        saved = await results._write_pending(db, access, existing, content, expected, own)
-    else:
-        saved = await results._write_sheet(db, access, round_doc, existing, content, "draft", expected)
-    if saved is None:
-        await remove_unused_new(db, access.series_id, own)
-        return {"status": "conflict", "message": CHANGED}
-    revision_id = None
-    if target == "pending_draft" and existing.get("pending_draft"):
-        revision_id = await results._revision(db, existing, kind="pending_draft", reason="replace", access=access)
-    elif existing:
-        revision_id = await results._revision(db, existing, kind="sheet", reason="save", access=access)
-    await results._log(db, "reference_result.pending_draft" if target == "pending_draft" else "reference_result.save",
-                       access, saved, {"version": saved["version"], "previous_version": results._version(existing),
-                                       "status": "draft", "previous_status": (existing or {}).get("status"),
-                                       "revision_id": revision_id, **results._counts(content),
-                                       "created_participants": own, "source": "partner", "partner_ref": ref})
-    return {"status": "saved", "target": target, "version": saved["version"],
-            "created_participants": [{"id": doc["id"], "name": doc.get("name")} for doc in created.values()]}
+    written = await results.write_draft(db, access, round_doc, existing, resolution, content, expected,
+                                        {"source": "partner", "partner_ref": ref})
+    return {**written, "message": CHANGED} if written["status"] == "conflict" else written
 
 
 async def _apply_item(db, access: SeriesAccess, series: dict, platform: str, wish: PartnerApplyItem, day: dict | None,
