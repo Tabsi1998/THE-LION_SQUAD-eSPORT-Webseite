@@ -98,9 +98,10 @@ async def test_checks_run_and_the_club_admin_sees_the_traffic_light(flow):
     assert {check["key"] for check in run["checks"]} == {
         "database", "disk", "uploads", "mail_queue", "change_stream", "image_variants", "error_groups", "scheduler",
         "twitch_poll", "dolibarr_sync", "dolibarr_webhook", "client_ip", "unique_indexes", "file_cleanups",
+        "image_reading",
     }
     assert run["status"] in {"ok", "warn", "crit"}
-    assert run["counts"]["ok"] + run["counts"]["warn"] + run["counts"]["crit"] == 14
+    assert run["counts"]["ok"] + run["counts"]["warn"] + run["counts"]["crit"] == 15
     assert {check["key"]: check for check in run["checks"]}["twitch_poll"]["value"] == "noch kein Lauf"
     by_key = {check["key"]: check for check in run["checks"]}
     assert by_key["database"]["status"] == "ok"
@@ -113,13 +114,13 @@ async def test_checks_run_and_the_club_admin_sees_the_traffic_light(flow):
     overview = await flow.get("/api/admin/ops/checks")
     assert overview.status_code == 200, overview.text
     data = overview.json()
-    assert len(data["latest"]["checks"]) == 14
+    assert len(data["latest"]["checks"]) == 15
     assert data["history"][0]["runs"] == 1
     assert data["interval_minutes"] == 5
 
     again = await flow.post("/api/admin/ops/checks/run")
     assert again.status_code == 200, again.text
-    assert len(again.json()["checks"]) == 14
+    assert len(again.json()["checks"]) == 15
     assert await flow.db.ops_check_runs.count_documents({}) == 2
 
     summary = await flow.get("/api/admin/ops/summary")
@@ -129,6 +130,35 @@ async def test_checks_run_and_the_club_admin_sees_the_traffic_light(flow):
     flow.act_as(player)
     assert (await flow.get("/api/admin/ops/checks")).status_code == 403
     assert (await flow.post("/api/admin/ops/checks/run")).status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_the_image_reading_check_warns_without_the_second_reader(monkeypatch):
+    """#2018: Fehlt der zweite Leser der Bild-Erkennung (Modell oder Paket), warnt der Betrieb - geprüft wird, ohne das
+    Modell zu laden. Abgeschaltet ist gewollt; ohne Tesseract liest der Server gar keine Bilder."""
+    from services import result_image_ocr, result_image_second
+
+    monkeypatch.setattr(result_image_ocr, "available", lambda: True)
+    states = {"ok": ("ok", "Tesseract und zweiter Leser"), "off": ("ok", "zweiter Leser abgeschaltet"),
+              "missing": ("warn", "zweiter Leser fehlt (Modelldatei fehlt)")}
+    for status, (light, value) in states.items():
+        monkeypatch.setattr(result_image_second, "presence", lambda status=status: {
+            "status": status, "reason": "Modelldatei fehlt" if status == "missing" else "", "model": "PP-OCRv6 small"})
+        check = await ops_checks.check_image_reading()
+        assert (check["key"], check["status"]) == ("image_reading", light), status
+        assert check["value"].startswith(value), status
+    monkeypatch.setattr(result_image_ocr, "available", lambda: False)
+    assert (await ops_checks.check_image_reading())["value"] == "Tesseract fehlt"
+    # Ohne Modelldatei: kein Laden, kein Fehler.
+    monkeypatch.undo()
+    monkeypatch.setattr(result_image_second, "MODE", "on")
+    monkeypatch.setattr(result_image_second, "MODEL_PATH", str(pathlib.Path(__file__).parent / "fehlt.onnx"))
+    result_image_second.reset()
+    try:
+        assert result_image_second.presence()["status"] == "missing"
+        assert result_image_second._engine is None
+    finally:
+        result_image_second.reset()
 
 
 @pytest.mark.asyncio

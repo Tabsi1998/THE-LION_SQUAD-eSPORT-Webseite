@@ -140,6 +140,29 @@ test("übernommen wird erst ohne gelbe Zeilen: ändern oder „Passt so“", asy
   expect(body.rows[1].team).toBe("Rotor Racing");
 }, 15000);
 
+test("„Alle Namen bestätigen“: vorbelegte gelbe Namen und Teams auf einmal, mit Zähler und Rückgängig (#2018)", async () => {
+  setup();
+  await screen.findByTestId("result-image-pick");
+  await pasteUntilRead(png());
+  await waitFor(() => expect(screen.getAllByTestId("result-row")).toHaveLength(3), WAIT);
+  const bar = await screen.findByTestId("result-confirm-names");
+  expect(bar).toHaveTextContent("2 Namen bzw. Teams aus dem Bild vorbelegt, aber gelb");
+  fireEvent.click(within(bar).getByTestId("result-confirm-names-all"));
+  let rows = screen.getAllByTestId("result-row");
+  expect(within(rows[1]).getByTestId("result-row-team")).not.toHaveAttribute("data-ocr-uncertain");
+  expect(within(rows[2]).getByTestId("result-row-name")).not.toHaveAttribute("data-ocr-uncertain");
+  expect(screen.queryByTestId("result-image-open")).toBeNull();
+  expect(screen.getByTestId("result-confirm-names-done")).toHaveTextContent("2 Namen bzw. Teams aus dem Bild bestätigt");
+  // Rückgängig: wieder gelb, mit dem Hinweis, was im Bild stand.
+  fireEvent.click(screen.getByTestId("result-confirm-names-undo"));
+  rows = screen.getAllByTestId("result-row");
+  expect(within(rows[1]).getByTestId("result-row-team")).toHaveAttribute("data-ocr-uncertain", "team");
+  expect(within(rows[1]).getByTestId("result-row-ocr")).toHaveTextContent("Team (gelesen „Blaupted GP“)");
+  expect(within(rows[2]).getByTestId("result-row-name")).toHaveAttribute("data-ocr-uncertain", "name");
+  expect(screen.getByTestId("result-image-open")).toHaveTextContent("2 Zeilen aus dem Bild sind noch gelb");
+  expect(screen.getByTestId("result-confirm-names")).toBeInTheDocument();
+}, 15000);
+
 test("gelbe Zeit und gelbe Felder des Rennens: „Mehr“ steht offen, ändern oder „Passt so“ gibt das Übernehmen frei", async () => {
   const read = {
     ...READ,

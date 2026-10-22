@@ -443,15 +443,65 @@ Dienst) und landet als Zeilen im Blatt – gespeichert wird beim Lesen nichts, a
   Abgeglichen wird unscharf mit den Teilnehmern der Saison (für den Vorstand auch über deren Aliase), Teams mit den
   Standard-Teams; jeder Teilnehmer höchstens einmal - die Zeile, die ihn an eine andere verliert, ist gelb. Ein Eintrag
   aus `team_scoring.no_team_names` („Ersatzfahrer“) bleibt stehen und wird nie auf ein ähnliches Team gezogen. Leere
-  Zellen in sonst gefüllten Spalten sind gelb, ein nie gelesener Platz ebenso; eine leere Team-Zelle bleibt leer (kein
-  Vorschlag mit dem Standard-Team - oft war dort ein farbiges Schild, das die Vorbereitung entfernt).
+  Zellen in sonst gefüllten Spalten werden allein aus dem Originalbild nachgelesen (Kontrast nur der Zelle gestreckt,
+  zwei Größen - etwa dunkelgraue Schrift, #2012, `_retry_empty_cells`); bleiben sie leer, sind sie gelb, ein nie
+  gelesener Platz ebenso; eine leere Team-Zelle bleibt leer (kein Vorschlag mit dem Standard-Team - oft war dort ein
+  farbiges Schild, das die Vorbereitung entfernt). Startplätze sind eine Permutation 1…N (`_settle_grid`) - ergänzt
+  wird nur, wenn das Bild nachweislich das ganze Feld zeigt (`_whole_field`: so viele Zeilen wie Teilnehmer der Saison,
+  Plätze sicher 1…N, keine Lesung über N). Ein ungelesener Startplatz ist nie grün (`_check_unread_grid`): hat die
+  Spalte Lesungen, ist jede leere Zelle gelb; hat sie keine, ist sie gelb, wenn „Grid“ in der Kopfzeile steht oder die
+  Kopfzeile nicht ganz gelesen ist (Zeit oder Abstand ohne Überschrift, etwa ein abgeschnittenes Bild) - nur im
+  Qualifying (Kopfzeile ganz da, ohne „Grid“) bleibt sie leer. Ein Abstand „47,441“ kann ein als 4 gelesenes Plus sein
+  (die Probe Zeit = Erster + Abstand entscheidet).
+- **Nie grün geraten (#2012):** Ein Name ist nur grün, wenn er eindeutig zu einem Teilnehmer passt: **genau so
+  gelesen** (gleicher Schlüssel aus Name, Alias oder gelernter Schreibweise, `EXACT_SCORE`) und Abstand `name_margin`
+  zum Zweitbesten - oder ab `name_match` mit **bestätigender Startnummer** (Seite und Streifen lesen dieselbe, und kein
+  anderer Teilnehmer passt beim Namen gleich gut oder besser; sonst `hint` „Name passt auch zu …“). Verwechslungen der
+  Schrift (l/1/I, 0/O, 2/Z, rn/m, ii/ü) gelten als gleich, aber nur mit 0,98: der Teilnehmer wird vorgeschlagen, bleibt
+  ohne Bestätigung aber gelb („Amie“ ist nicht „Arnie“) - ebenso im Kopf, bei Teams und in Tabellen-Bildern. Unbekannte
+  Namen und Teams sind immer gelb. **Kader der Spur:** die Teilnehmer anderer Saisons derselben Spur und deren Teams
+  (nur Vorstand, ohne ausgeblendete) werden vorgeschlagen - ohne Kennung, gelb, `hint` „wie in Saison X“. **Gelernte
+  Schreibweisen** (`services/read_spellings.py`): das Blatt schickt bei geänderten Zeilen aus dem Bild
+  `read_name`/`read_team` mit; beim Übernehmen speichert der Server (nur Vorstand, nur eindeutig, Protokoll `learned`)
+  `read_aliases` am Teilnehmer bzw. `read_team_aliases` an der Saison. Widerspricht die Korrektur einer gelernten
+  Schreibweise (dieselbe Lesung bei einem anderen Teilnehmer bzw. Team), wird diese vergessen (`forgotten_names`,
+  `forgotten_teams`); eine Team-Schreibweise zeigt im Abgleich auf höchstens ein Team (die eigene Saison zuerst).
+  Entfernen per `PATCH` (Liste der bleibenden).
+- **Zweiter Leser (#2018, `services/result_image_second.py`):** RapidOCR 3.10.0 mit PP-OCRv6 small (ONNX, Modell fest im
+  Image, nie zur Laufzeit geladen) erkennt jede Zelle von Startnummer, Name, Team, Startplatz, Zeit und Abstand sowie
+  den Kopf noch einmal - ausgeschnitten aus dem Originalbild, wo Tesseract die Zelle fand (`_second_reads`,
+  `read_second`; Lesungen in `RowReading.second`, `Reading.header_second`, Status in `Reading.second`). Im Zeitbudget
+  des Bilds, je Zelle ein Aufruf, ein Bild zur Zeit je Prozess. Regeln (`result_image_match`): **Übereinstimmung**
+  (`agreed`: der zweite Leser liest Zeichen für Zeichen, was Seite oder Streifen lesen, Sicherheit ab
+  `SECOND_MIN_CONF`) ist sicher - auch ein unbekannter Name, ein unbekanntes Team, einer „wie in Saison X“ und ein Name
+  im Kopf. Ausnahmen nur mit Kader grün: leicht verwechselte Zeichen im Text (`confusable`: l/I/1, auch ein „l“ am
+  Wortanfang vor einem Kleinbuchstaben wie in „lan“ für „Ian“, 0/O, 2/Z, Z/S/B/G/O zwischen Großbuchstaben) und eine Tesseract-Lesung, die dasselbe nur über eine Verwechslung, mit anderem Tag oder
+  anders vielen „_“ liest (`_contradicts`; Groß/klein, Leerzeichen und andere Fehler stören nicht). **Widerspruch** ist
+  gelb, vorbelegt mit der Lesung des zweiten Lesers (bei Namen der stärkere), `read` nennt beide. Im Kader zählt seine
+  Lesung wie eine weitere: liest er einen Teilnehmer genau, ist auch ein Verwechslungs-Treffer von Tesseract grün; zeigt
+  er auf jemand anderen, ist es gelb. **Ziffern:** eine weitere Lesung in `decide` - liest er denselben Wert wie
+  mindestens zwei Lesungen von Tesseract (höchstens eine widerspricht) bzw. wie alle übrigen, gilt der Wert; sonst
+  widerspricht er (gelb). **Strecke** im Kopf: gegen die Strecken des Kalenders (`venues`, Ort und Titel der Termine) -
+  genau eine ist grün und steht wie im Kalender da, eine ähnliche wird vorgeschlagen, sonst gelb (nur ein Hinweis).
+  **Ausfall** (Modell fehlt, Fehler, Zeitbudget): es gelten die Regeln ohne ihn, Warnung `second_reader` bzw.
+  `out_of_time`; `RESULT_IMAGE_SECOND_READER=off` schaltet ab (keine Warnung). Tabellen-Bilder (#1999): der zweite Leser
+  liest die Namens- bzw. Teamspalte (`result_image_table._second_reads`, `match_names`); die Zahlen prüfen dort schon
+  Streifen, dritte Lesung, Schriftbild und Summen. Betrieb: Check `image_reading` (`ops_checks`, ohne das Modell zu
+  laden, `result_image_second.presence`).
+- **„Alle Namen bestätigen“ (#2018):** im Ergebnisblatt (`ConfirmNamesBar`, `confirmNames`/`undoConfirmNames` in
+  `lib/resultImage.js`: gelbe, vorbelegte Namen und Teams der Zeilen, dazu schnellste Runde und Fahrer des Tages), in
+  der Fahrer-Tabelle der Saisontabelle (`confirmTableNames`/`undoTableNames` in `lib/seasonTable.js`, nur die
+  Namensspalte) und in der Teamwertung laut Veranstalter (`OfficialTeamTotals`, nur das Team; `imageTeamRows` liefert
+  `ocr.fields`). Andere gelbe Felder bleiben gelb; „Rückgängig“ holt die Markierungen zurück, wo seitdem niemand den
+  Wert geändert hat. Sichtbar für alle, die das Blatt bearbeiten (Vorstand, Captains der Saison).
 - **Kopf:** `track` (oberste Zeile ohne Beschriftung), `session {name, kind}` (Rennen, Sprint, Qualifying - nur ein
   Hinweis, bis es Läufe je Termin gibt, #1930), `pole` und `fastest_lap {name, time}`, `driver_of_the_day`; der Wert
   darf hinter oder unter der Beschriftung stehen. Passt die Strecke zu einem anderen Termin der Saison, nennt die
   Warnung `other_track` ihn (`suggested_round`).
 - **Antwort:** `rows` mit `place`, `dnf`, `marks`, `start_number`, `name`, `participant_id`, `team`, `grid`, `time`,
-  `gap`, `points`, `color` (Schriftfarbe von Startnummer oder Team), `uncertain` (Felder) und `read` (was im Bild
-  stand, wenn es abweicht); dazu der Kopf, `team_colors {Team: "#rrggbb"}` (Vorschlag für Teamfarben, #1950 - das
+  `gap`, `points`, `color` (Schriftfarbe von Startnummer oder Team), `uncertain` (Felder), `read` (was im Bild
+  stand, wenn es abweicht), `hint` (Hinweis je Feld, etwa „wie in Saison 1/2025“, „bisher 15“) und `image` (Name und
+  Team, wie im Bild gelesen - zum Lernen); dazu der Kopf, `team_colors {Team: "#rrggbb"}` (Vorschlag für Teamfarben, #1950 - das
   Blatt schickt ihn nach dem Lesen an `…/team-colors/suggestions`, übernommen wird er in der Verwaltung),
   `uncertain_rows` und `warnings`.
 - **Im Blatt:** die Zeilen ersetzen die Liste, die Vorschau prüft gleich. Startnummer, Startplatz, Zeit und Abstand
@@ -528,8 +578,10 @@ gilt hier nicht. Web: `SeasonTableSection.jsx`, `OfficialTeamTotals.jsx` (`image
   außer die Abweichung ist erklärt (`_sum_explainer` mit `season_table.explain_total`: Streichresultate nach den Regeln,
   Aktivitätspunkte, Anpassungen des Fahrers). Die Teamtabelle (`table=teams`, auch erkannt an der Spalte „Team“)
   rechnet „Punkte“ oft als aktuelle Besetzung (#1960): nur der Hinweis.
-- **Namen** (`match_names`): unscharf (`result_image_match.similarity`) gegen die Teilnehmer samt Aliase (Fahrer) bzw.
-  die Teams der Saison (`known_teams`: eigene, Standard-Teams, Teams der Blätter und der Teamwertung).
+- **Namen** (`match_names`): unscharf (`result_image_match.similarity`) gegen die Teilnehmer samt Aliase und gelernter
+  Schreibweisen (Fahrer) bzw. die Teams der Saison samt gelernter Team-Schreibweisen (`known_teams`: eigene,
+  Standard-Teams, Teams der Blätter und der Teamwertung). Wie bei Ergebnis-Bildern (#2012) grün nur eindeutig
+  (`name_sure` und `name_margin`), ein unbekannter Name immer gelb - auch ohne bekannte Namen.
 - **Teamwertung laut Veranstalter** (`routes/reference_season_table_routes.py`): `POST …/team-totals/preview`
   (`{round_id?, totals, mode}`; ohne Runde die letzte gewertete mit Ergebnis) rechnet die Teamwertung nach der Runde mit
   den Werten danach und nennt je Team bisher, laut Bild, danach und `state` (`new`, `changed`, `same`, `kept`,

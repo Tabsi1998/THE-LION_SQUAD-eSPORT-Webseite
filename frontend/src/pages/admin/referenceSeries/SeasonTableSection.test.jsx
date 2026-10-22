@@ -197,6 +197,25 @@ test("Fahrer-Tabelle per Bild: als Text ins Feld, Vorschau wie beim Einfügen, g
   expect(screen.queryByTestId("season-table-original")).toBeNull();
 });
 
+test("Fahrer-Tabelle per Bild: „Alle Namen bestätigen“ nimmt nur die gelben Namen, mit Rückgängig (#2018)", async () => {
+  imageGet();
+  const image = { ...IMAGE_DRIVERS, rows: [
+    { cells: ["1", "Ada Ausgedacht", "25", "21", "46", "--"], uncertain: [1], read: { 1: "Ada Ausgedcht" }, notes: [] },
+    { cells: ["2", "Bruno Beispiel", "18", "--", "18", "-28"], uncertain: [1, 2], read: { 2: "16" }, notes: [] },
+  ] };
+  apiMock.post.mockImplementation((url) => Promise.resolve({ data: url.endsWith("/image") ? image : preview({ decided: true }) }));
+  await readImage();
+  await screen.findAllByTestId("season-table-column");
+  const bar = screen.getByTestId("season-table-confirm-names");
+  expect(bar).toHaveTextContent("2 Namen aus dem Bild vorbelegt, aber gelb");
+  fireEvent.click(within(bar).getByTestId("season-table-confirm-names-all"));
+  const marks = screen.getByTestId("season-table-image-marks");
+  expect(marks).toHaveTextContent("Aus dem Bild unsicher: 1 Zelle in 1 Zeile");
+  expect(screen.getByTestId("season-table-confirm-names-done")).toHaveTextContent("2 Namen aus dem Bild bestätigt");
+  fireEvent.click(screen.getByTestId("season-table-confirm-names-undo"));
+  expect(screen.getByTestId("season-table-image-marks")).toHaveTextContent("Aus dem Bild unsicher: 3 Zellen in 2 Zeilen");
+});
+
 test("„Nicht anhängen“ lässt das Bild weg", async () => {
   imageGet();
   apiMock.post.mockImplementation((url) => Promise.resolve({ data: url.endsWith("/image") ? IMAGE_DRIVERS

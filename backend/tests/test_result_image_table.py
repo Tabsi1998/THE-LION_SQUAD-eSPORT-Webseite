@@ -187,6 +187,57 @@ def test_names_match_the_season_and_unknown_ones_stay_yellow():
     assert 1 in payload["rows"][0]["uncertain"] and payload["rows"][0]["read"]["1"] == "Probe Rotr"
 
 
+def test_a_table_name_is_green_only_when_it_clearly_is_a_known_one():
+    """#2012 auch in Tabellen-Bildern: grün nur, wenn der Name eindeutig ein bekannter ist. Ein unbekannter bleibt gelb,
+    wie sicher die Erkennung auch ist; zwei bekannte, die sich nur in l/1 unterscheiden, sind nie eindeutig; ohne
+    bekannte Namen ist jeder gelb."""
+    reading = _reading([[1, "Probe Rot", 30, 20, 50, "--"], [2, "Neu Team", 20, 10, 30, -20],
+                        [3, "Probe Wolf1", 10, 5, 15, -35]])
+    assert all(row[1].sure for row in reading.rows)  # die Erkennung ist sich sicher
+    table.match_names(reading, {"Probe Rot": "Probe Rot", "Probe Wolf1": "Probe Wolf1", "Probe Wolfl": "Probe Wolfl"})
+    assert [(row[1].text, row[1].sure) for row in reading.rows] == [
+        ("Probe Rot", True), ("Neu Team", False), ("Probe Wolf1", False)]
+    plain = _reading([[1, "Probe Rot", 30, 20, 50, "--"]])
+    table.match_names(plain, {})
+    assert plain.rows[0][1].sure is False
+
+
+def test_a_second_reader_makes_agreed_table_names_green():
+    """#2018 in Tabellen-Bildern: Lesen Tesseract und der zweite Leser einen unbekannten Namen gleich, ist er grün; bei
+    Widerspruch gelb, vorbelegt mit der Lesung des zweiten Lesers; ein bekannter Name braucht keinen Widerspruch."""
+    reading = _reading([[1, "Neu Team", 30, 20, 50, "--"], [2, "Dora Nev", 20, 10, 30, -20],
+                        [3, "Probe Rot", 10, 5, 15, -35], [4, "Probe Wolf1", 5, 5, 10, -40]])
+    for row, second in zip(reading.rows, ("Neu Team", "Dora Neu", "Probe Blau", "Probe Wolf1")):
+        row[1].reads = [row[1].text]
+        row[1].second = Read(second, 99)
+    table.match_names(reading, {"Probe Rot": "Probe Rot", "Probe Blau": "Probe Blau"})
+    cells = [row[1] for row in reading.rows]
+    assert [(cell.text, cell.sure) for cell in (cells[0], cells[1], cells[3])] == [
+        ("Neu Team", True), ("Dora Neu", False), ("Probe Wolf1", False)]  # l/1: nur mit Kader
+    assert cells[1].read == "Dora Nev"
+    # Die Leser zeigen auf zwei verschiedene bekannte Namen: gelb, der andere im Hinweis.
+    assert cells[2].sure is False and {cells[2].text, cells[2].read} == {"Probe Rot", "Probe Blau"}
+
+
+def test_a_small_l_at_the_start_of_a_table_name_needs_the_roster():
+    """Prüfer zu #2018: „lan lorio“ lesen beide Leser gleich - im Bild stand vielleicht „Ian Iorio“: gelb."""
+    reading = _reading([[1, "lan lorio", 30, 20, 50, "--"]])
+    cell = reading.rows[0][1]
+    cell.reads, cell.second = ["lan lorio"], Read("lan lorio", 96)
+    table.match_names(reading, {"Probe Rot": "Probe Rot"})
+    assert (cell.text, cell.sure) == ("lan lorio", False)
+
+
+def test_a_table_name_known_only_through_a_lookalike_stays_yellow():
+    """Prüfer zu #2012 auch in Tabellen-Bildern: „Amie“ ist nicht „Arnie“ - ein Treffer nur über Verwechslungen wird
+    vorgeschlagen, bleibt aber gelb, auch wenn beide Lesungen sicher sind."""
+    reading = _reading([[1, "Amie", 30, 20, 50, "--"], [2, "Kim", 20, 10, 30, -20]])
+    assert all(row[1].sure for row in reading.rows)
+    table.match_names(reading, {"Arnie": "Arnie", "Kirn": "Kirn"})
+    assert [(row[1].text, row[1].sure, row[1].read) for row in reading.rows] == [
+        ("Arnie", False, "Amie"), ("Kirn", False, "Kim")]
+
+
 def _cell(text, left, right):
     return Cell([Word(text, 95, left, 0, right - left, 20)])
 

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { api, formatApiError } from "@/lib/api";
 import { checkImageFile, imageFromClipboard, imageHeader, isUncertain, openImageItems, uncertainText } from "@/lib/resultImage";
 import { toast } from "sonner";
-import { Check, Maximize2, Minimize2, ScanText, X } from "lucide-react";
+import { Check, Maximize2, Minimize2, ScanText, Undo2, X } from "lucide-react";
 
 // Ergebnis-Bild auslesen (#1756) im Ergebnis-Blatt: Knopf „Bild auslesen“ (am Handy Datei oder Kamera), Strg+V mit einem
 // Bild in der Zwischenablage, der Lesestand mit dem Bild und danach die Übersicht „Aus dem Bild gelesen“. Die Zeilen
@@ -202,6 +202,35 @@ export function ResultImageRowNote({ row, onConfirm, testId = "result-row-ocr" }
       <button type="button" onClick={onConfirm} data-testid={`${testId}-confirm`}
         className="tls-btn tls-btn--quiet px-2 py-1 rounded-sm text-[10px] font-bold uppercase tracking-wider inline-flex items-center gap-1">
         <Check className="w-3 h-3" /> Passt so
+      </button>
+    </div>
+  );
+}
+
+/**
+ * „Alle Namen bestätigen“ (#2018): vorbelegte gelbe Namen bzw. Teams aus dem Bild (etwa „wie in Saison …“) auf einmal
+ * bestätigen – mit Zähler; danach steht da, wie viele bestätigt sind, mit „Rückgängig“. `count`: wie viele offen sind,
+ * `confirmed`: wie viele zuletzt bestätigt wurden (dann gibt es „Rückgängig“). Wer das Blatt sieht, darf eintragen.
+ */
+export function ConfirmNamesBar({ count, confirmed = 0, onConfirm, onUndo, what = "Namen bzw. Teams", testId = "result-confirm-names" }) {
+  if (confirmed) {
+    return (
+      <div className="flex flex-wrap items-center gap-2 border border-[#29B6E8]/30 bg-[#29B6E8]/5 rounded-sm px-3 py-2 text-xs text-white/75" role="status" data-testid={`${testId}-done`}>
+        <span className="flex-1 min-w-[12rem] tabular-nums">{confirmed} {what} aus dem Bild bestätigt.</span>
+        <button type="button" onClick={onUndo} data-testid={`${testId}-undo`}
+          className="tls-btn tls-btn--quiet px-2.5 py-1.5 rounded-sm text-[10px] font-bold uppercase tracking-wider inline-flex items-center gap-1">
+          <Undo2 className="w-3 h-3" aria-hidden="true" /> Rückgängig
+        </button>
+      </div>
+    );
+  }
+  if (!count) return null;
+  return (
+    <div className="flex flex-wrap items-center gap-2 border border-amber-400/40 bg-amber-400/10 rounded-sm px-3 py-2 text-xs text-amber-100" data-testid={testId}>
+      <span className="flex-1 min-w-[12rem] tabular-nums">{count} {what} aus dem Bild vorbelegt, aber gelb – mit dem Bild vergleichen.</span>
+      <button type="button" onClick={onConfirm} data-testid={`${testId}-all`}
+        className="tls-btn tls-btn--quiet px-2.5 py-1.5 rounded-sm text-[10px] font-bold uppercase tracking-wider inline-flex items-center gap-1">
+        <Check className="w-3 h-3" aria-hidden="true" /> Alle Namen bestätigen ({count})
       </button>
     </div>
   );

@@ -1805,6 +1805,8 @@ class ReferenceSeriesUpdate(BaseModel):
     cancel_reason: Optional[str] = Field(default=None, max_length=300)
     successor_id: Optional[str] = Field(default=None, max_length=80)
     logo_url: Optional[str] = Field(default=None, max_length=300)  # #2014
+    # #2012: gelernte Team-Schreibweisen aus Bildern, die bleiben sollen (gelesene Schreibweise) - nur entfernen.
+    read_team_aliases: Optional[List[str]] = Field(default=None, max_length=200)
 
     @field_validator("logo_url")
     @classmethod
@@ -1942,6 +1944,8 @@ class ReferenceParticipantUpdate(BaseModel):
     guest_name: Optional[str] = Field(default=None, max_length=120)
     is_club_member: Optional[bool] = None
     name_hidden: Optional[bool] = None
+    # #2012: gelernte Schreibweisen aus Bildern, die bleiben sollen - entfernen, nie hinzufügen (``read_spellings``).
+    read_aliases: Optional[List[str]] = Field(default=None, max_length=50)
 
 
 class ReferenceResultRow(BaseModel):

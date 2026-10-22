@@ -14,8 +14,8 @@ import { TeamLeagueEntry } from "./TeamLeagueEntry";
 import { OfficialTeamTotals } from "./OfficialTeamTotals";
 import { teamCountHint } from "@/lib/seriesSpecialRules";
 import { VenueWithFlag } from "@/components/tls/CountryFlag";
-import { ResultImageButton, ResultImageRowNote, ResultImageSummary, ocrMark, useResultImage } from "./ResultImageImport";
-import { RACE_FIELD_GROUPS, afterEdit, confirmRow, imageFormFields, imageToRows, isUncertain, openImageItems, replaceRaceMarks } from "@/lib/resultImage";
+import { ConfirmNamesBar, ResultImageButton, ResultImageRowNote, ResultImageSummary, ocrMark, useResultImage } from "./ResultImageImport";
+import { RACE_FIELD_GROUPS, afterEdit, confirmNames, confirmRow, imageFormFields, imageToRows, isUncertain, openImageItems, prefilledNames, replaceRaceMarks, undoConfirmNames } from "@/lib/resultImage";
 import { DAY_MARK_OPTIONS, roundCount, schemeOf, usesDayRounds } from "@/lib/tournamentDays";
 import { BonusChips, DayRoundsDetails, DayRoundsLine, DoubleUpToggle } from "./DayRoundsFields";
 import { formatRaceTime } from "@/lib/raceTime";
@@ -367,6 +367,7 @@ export function ResultEntrySheet({ series, round, onClose, onSaved }) {
   const [mine, setMine] = useState(null);
   const [pasting, setPasting] = useState(false);
   const [teamTotalsOpen, setTeamTotalsOpen] = useState(0);
+  const [namesUndo, setNamesUndo] = useState(null); // „Alle Namen bestätigen“ (#2018): was „Rückgängig“ braucht
 
   const load = useCallback(async () => {
     try {
@@ -419,6 +420,7 @@ export function ResultEntrySheet({ series, round, onClose, onSaved }) {
       // Schnellste Runde und Fahrer des Tages gehen in die Felder des Rennens (#1927); was das Bild nicht ersetzt,
       // bleibt – mit seiner gelben Markierung.
       setForm((current) => ({ ...current, ...imageFormFields(result, current.raceOcr), rows: imageToRows(result, participants, { points: !noPoints }) }));
+      setNamesUndo(null); // neue Zeilen: nichts mehr rückgängig zu machen
       setPasting(false);
       setCheckImage(true);
       // Teamfarben aus dem Bild (#1950): nur ein Vorschlag, übernommen wird er bei den Teamfarben der Saison.
@@ -472,6 +474,18 @@ export function ResultEntrySheet({ series, round, onClose, onSaved }) {
     }),
   }));
   const confirmImageRow = (key) => setForm((current) => ({ ...current, rows: current.rows.map((row) => (row.key === key ? confirmRow(row) : row)) }));
+  // „Alle Namen bestätigen“ (#2018): vorbelegte gelbe Namen und Teams auf einmal – „Rückgängig“ holt die Markierungen
+  // zurück, solange niemand den Wert geändert hat.
+  const namesOpen = form ? prefilledNames(form).count : 0;
+  const confirmAllNames = () => {
+    const { form: next, undo } = confirmNames(form);
+    setForm(next);
+    setNamesUndo(undo.count ? undo : null);
+  };
+  const undoAllNames = () => {
+    setForm((current) => undoConfirmNames(current, namesUndo));
+    setNamesUndo(null);
+  };
   // Gelbe Zeilen der Teamwertung aus dem Bild (#1999) halten das Übernehmen genauso auf.
   const imageOpen = (form ? openImageItems(form) : 0) + teamTotalsOpen;
   const hinted = form ? form.rows.filter((row) => row.points_hint).length : 0;
@@ -513,6 +527,7 @@ export function ResultEntrySheet({ series, round, onClose, onSaved }) {
         ]),
       };
       setForm(next);
+      setNamesUndo(null);
       setPasting(result.errors.length > 0);
       // Danach gleich prüfen lassen – so stehen Fehler und Punkte sofort an den Zeilen.
       const pasted = formToPayload(next, rules);
@@ -713,6 +728,7 @@ export function ResultEntrySheet({ series, round, onClose, onSaved }) {
                 </div>
               </div>
               <ResultImageSummary image={image} rows={form.rows} raceOcr={form.raceOcr} />
+              <ConfirmNamesBar count={namesOpen} confirmed={namesUndo?.count || 0} onConfirm={confirmAllNames} onUndo={undoAllNames} />
               {hinted > 1 && (
                 <div className="flex flex-wrap items-center gap-2 border border-amber-400/40 bg-amber-400/10 rounded-sm px-3 py-2 text-xs text-amber-100" data-testid="result-hints">
                   <span className="flex-1 min-w-[12rem]">{hinted} Zeilen enden auf eine Zahl – Teil des Namens oder Punkte?</span>

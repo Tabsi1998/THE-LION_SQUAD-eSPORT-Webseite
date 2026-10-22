@@ -15,6 +15,8 @@ Ablauf (``read``):
 4. **Zuordnen**: die Kopfzeile der Tabelle (Überschriften der Vorlage) gibt die Lage der Spalten, die Zeilen darüber
    den Kopf (Strecke, schnellste Rennrunde, Fahrer des Tages), die darunter die Ergebniszeilen. Fehlt die Kopfzeile,
    gelten die Anteile ``at`` der Vorlage über der Breite der Tabelle.
+5. **Zweiter Leser** (#2018, ``result_image_second``): jede Zelle von ``SECOND_FIELDS`` und der Kopf noch einmal, aus
+   dem Originalbild ausgeschnitten - im selben Zeitbudget (``_second_reads``).
 
 **Ohne Netz:** Tesseract läuft als eigener Prozess ohne Shell, mit festen Argumenten, leerer Umgebung (kein Proxy),
 einem Thread und Zeitlimit. Das Bild kommt über stdin, das Ergebnis über stdout - es entsteht keine Datei, und die
@@ -37,6 +39,7 @@ from functools import lru_cache
 
 from PIL import Image, ImageChops, ImageDraw, ImageFilter, ImageOps
 
+from services import result_image_second as second_reader
 from services import result_image_values as image_values
 from services.image_upload import (
     MAX_BYTES, MAX_IMAGE_DIMENSION, MAX_IMAGE_PIXELS, MAX_IMAGE_UPLOAD_MB, PIL_IMAGE_FORMATS,
@@ -71,6 +74,10 @@ MIN_SIDE = 40
 ALT_SCALE = 1.5
 ALT_KINDS = ("place", "number", "time", "gap")
 BOX_HEIGHT = 64  # Pixel: so hoch wird eine einzelne Platz-Zelle (etwa Platz 1 im farbigen Kasten) gelesen
+# Zweite Lesung einer Zelle allein (#2012): größer - eine andere Skalierung liest manche Ziffer anders.
+CELL_HEIGHTS = (BOX_HEIGHT, 96)
+# Wörter hinter einer Beschriftung im Kopf, die alle unsicherer sind als das, sind Rauschen (#2012).
+HEADER_NOISE = 40
 
 WHITELISTS = {
     "place": "0123456789DNFSQOUT",
@@ -662,10 +669,13 @@ def assign(cells: list[Cell], columns: list[dict], anchors: list[float]) -> dict
 # ---------------------------------------------------------------- Lesen
 @dataclass
 class Read:
-    """Eine Lesung einer Zelle: Text, Sicherheit (0-100, das unsicherste Wort) und die Wörter mit ihrer Sicherheit."""
+    """Eine Lesung einer Zelle: Text, Sicherheit (0-100, das unsicherste Wort) und die Wörter mit ihrer Sicherheit.
+    ``boxes``: Lage der Zeilen des Texts im vorbereiteten Bild (links, oben, rechts, unten) - der zweite Leser liest
+    dort im Originalbild nach (#2018)."""
     text: str
     conf: float
     parts: list[tuple[str, float]] = field(default_factory=list)
+    boxes: list[tuple[int, int, int, int]] = field(default_factory=list)
 
 
 @dataclass
@@ -674,6 +684,7 @@ class RowReading:
     strips: dict[str, Read] = field(default_factory=dict)  # Streifen (Zahlen mit Whitelist)
     alts: dict[str, Read] = field(default_factory=dict)  # dritte Lesung der Ziffern, anders vorbereitet (#1981)
     color: str | None = None  # Schriftfarbe von Startnummer bzw. Team als „#rrggbb“ (Vorschlag für die Teamfarbe)
+    second: dict[str, Read] = field(default_factory=dict)  # zweiter Leser (#2018), Sicherheit 0-100
 
 
 @dataclass
@@ -689,12 +700,21 @@ class Reading:
     out_of_time: bool = False  # Zeitbudget aufgebraucht - nicht alles zweimal gelesen
     unchecked: set[str] = field(default_factory=set)  # Felder ohne zweite Lesung (Streifen) - sie werden gelb
     labelled: set[str] | None = None  # Spalten, deren Überschrift im Bild steht (``None``: nicht bekannt)
+    header_second: dict[str, Read] = field(default_factory=dict)  # Kopf, gelesen vom zweiten Leser (#2018)
+    # Wie der zweite Leser lief (``result_image_second.Result.status``): ok, off, missing, failed, out_of_time - leer,
+    # wenn er nicht gefragt wurde.
+    second: str = ""
+
+
+def _box(words: list[Word]) -> tuple[int, int, int, int]:
+    return (min(word.left for word in words), min(word.top for word in words), max(word.right for word in words),
+            max(word.bottom for word in words))
 
 
 def _read(words: list[Word], *, joiner: str = " ") -> Read:
     ordered = sorted(words, key=lambda word: word.left)
     return Read(joiner.join(word.text for word in ordered).strip(), min((word.conf for word in ordered), default=0.0),
-                [(word.text, word.conf) for word in ordered])
+                [(word.text, word.conf) for word in ordered], [_box(ordered)] if ordered else [])
 
 
 def _label_spans(words: list[Word], spec: dict) -> list[tuple[str, int, int]]:
@@ -725,7 +745,7 @@ def _read_lines(groups: list[list[Word]]) -> Read:
     """Eine Lesung aus mehreren Zeilen (etwa Name, darunter die Zeit) - Zeile für Zeile, je Zeile von links."""
     words = [word for group in groups for word in sorted(group, key=lambda item: item.left)]
     return Read(" ".join(word.text for word in words).strip(), min((word.conf for word in words), default=0.0),
-                [(word.text, word.conf) for word in words])
+                [(word.text, word.conf) for word in words], [_box(group) for group in groups if group])
 
 
 def _header_fields(lines: list[Line], template: dict) -> dict[str, Read]:
@@ -746,6 +766,8 @@ def _header_fields(lines: list[Line], template: dict) -> dict[str, Read]:
         for number, (key, start, end) in enumerate(spans[line_index]):
             following = spans[line_index][number + 1] if number + 1 < len(spans[line_index]) else None
             same = words[end:following[1] if following else len(words)]
+            if same and all(word.conf < HEADER_NOISE for word in same):
+                same = []  # nur Rauschen hinter der Beschriftung (etwa im Farbverlauf, #2012) - der Wert steht darunter
             groups = [same] if same else []
             if not same:
                 left = words[start].left - height
@@ -754,7 +776,9 @@ def _header_fields(lines: list[Line], template: dict) -> dict[str, Read]:
                     if below >= len(rows) or spans[below]:
                         break
                     picked = [word for word in rows[below] if left <= word.left < right
-                              and any(char.isalnum() for char in word.text)]  # keine Reste von Linien
+                              and any(char.isalnum() for char in word.text)  # keine Reste von Linien
+                              # In der zweiten Zeile (Zeit) kein Rauschen - etwa unter dem Fahrer des Tages (#2012).
+                              and (below == line_index + 1 or word.conf >= HEADER_NOISE)]
                     if picked:
                         groups.append(picked)
                         used.add(below)
@@ -913,8 +937,10 @@ def _read_in_budget(img: Image.Image, template: dict, max_rows: int | None) -> R
     if not reading.out_of_time:
         try:
             _retry_places(prepared, columns, assigned, data_lines, reading, img)
+            _retry_empty_cells(img, prepared, columns, assigned, data_lines, reading)
         except OutOfTime:
-            reading.out_of_time = True  # nicht gelesene Plätze bleiben gelb
+            reading.out_of_time = True  # nicht gelesene Plätze und Zellen bleiben gelb
+    _second_reads(img, prepared, columns, assigned, data_lines, reading)
     fields = [column["field"] for column in columns]
     for row, cells in zip(reading.rows, assigned):
         for wanted in ("start_number", "team"):
@@ -1002,6 +1028,154 @@ def _box_read(img: Image.Image, center: tuple[float, float], height: float, scal
     canvas = Image.new("L", (cell.width + 40, cell.height + 40), 255)
     canvas.paste(cell, (20, 20))
     return _ocr(canvas, psm=10, whitelist=WHITELISTS["place"])
+
+
+def _padded(cell: Image.Image, height: int = BOX_HEIGHT) -> Image.Image:
+    """Eine Zelle auf ``height`` Pixel Höhe, mit weißem Rand - so liest Tesseract sie wie eine Zeile."""
+    factor = height / max(cell.height, 1)
+    cell = cell.resize((max(1, round(cell.width * factor)), height), Image.Resampling.LANCZOS)
+    canvas = Image.new("L", (cell.width + 40, cell.height + 40), 255)
+    canvas.paste(cell, (20, 20))
+    return canvas
+
+
+def _cell_reads(img: Image.Image, box: tuple[int, int, int, int], kind: str) -> list[list[Word]]:
+    """Eine Zelle allein aus dem Originalbild (#2012): hellster Farbkanal, Kontrast nur dieser Zelle gestreckt (so wird
+    dunkelgraue Schrift auf dunklem Grund kräftig), dunkle Schrift auf hellem Grund - in zwei Größen gelesen
+    (``CELL_HEIGHTS``; schwarz-weiß las die kursive Schrift schlechter). Zahlen mit Whitelist, eine einzelne Ziffer
+    notfalls als rohe Zeile (psm 13)."""
+    red, green, blue = img.crop(box).split()
+    cell = ImageOps.autocontrast(ImageChops.lighter(ImageChops.lighter(red, green), blue), cutoff=1)
+    pixels = cell.tobytes()
+    if sum(1 for value in pixels if value > 127) * 2 < len(pixels):
+        cell = ImageOps.invert(cell)
+    out = []
+    for height in CELL_HEIGHTS:
+        canvas = _padded(cell, height)
+        words = _ocr(canvas, psm=7, whitelist=WHITELISTS.get(kind))
+        if not words and kind != "text":
+            words = _ocr(canvas, psm=13, whitelist=WHITELISTS.get(kind))
+        out.append(words)
+    return out
+
+
+# Spalten, die in jeder Zeile etwas haben (wie ``result_image_match._check_gaps_in_columns``).
+RETRY_FIELDS = ("start_number", "team", "grid")
+# Zweiter Leser (#2018): Namen und Teams, dazu die Ziffern als weitere Lesung - und der Kopf (ohne die Art).
+SECOND_FIELDS = ("start_number", "name", "team", "grid", "time", "gap")
+SECOND_HEADER = ("track", "pole", "fastest_lap", "driver_of_the_day")
+
+
+def original_box(prepared: Prepared, left: float, top: float, right: float, bottom: float,
+                 img: Image.Image) -> tuple[int, int, int, int] | None:
+    """Eine Lage im vorbereiteten Bild als Ausschnitt des Originalbilds - ``None``, wenn nichts übrig bleibt."""
+    box = (max(0, int(left / prepared.scale)), max(0, int(top / prepared.scale)),
+           min(img.width, int(right / prepared.scale)), min(img.height, int(bottom / prepared.scale)))
+    return box if box[2] - box[0] >= 4 and box[3] - box[1] >= 4 else None
+
+
+def read_second(img: Image.Image, jobs: list[tuple[dict, str, list[tuple[int, int, int, int]]]]) -> str:
+    """Zellen vom zweiten Leser lesen lassen (#2018): je Auftrag (Ziel, Schlüssel, Ausschnitte im Originalbild) landet
+    die Lesung als ``Read`` in ``Ziel[Schlüssel]`` - mehrere Ausschnitte (Name, darunter die Zeit) mit Leerzeichen
+    verbunden, Sicherheit die kleinste. Im Zeitbudget des Bilds; liefert, wie es lief."""
+    if not second_reader.enabled():
+        return "off"
+    if not second_reader.available():
+        return second_reader.status()["status"]
+    if not jobs:
+        return "ok"
+    images, owners = [], []
+    for job_index, (_, _, boxes) in enumerate(jobs):
+        for box in boxes:
+            images.append(second_reader.cell_image(img, box))
+            owners.append(job_index)
+    result = second_reader.recognize(images, _DEADLINE.get())
+    found: dict[int, list] = {}
+    for owner, item in zip(owners, result.reads):
+        found.setdefault(owner, []).append(item)
+    for job_index, (target, key, _) in enumerate(jobs):
+        items = found.get(job_index) or []
+        if not items or any(item is None for item in items):
+            continue  # nicht (ganz) gelesen - ohne Lesung gilt, was ohne zweiten Leser gilt
+        text = " ".join(item.text for item in items if item.text).strip()
+        conf = min(item.score for item in items) * 100
+        target[key] = Read(text, conf, [(item.text, item.score * 100) for item in items])
+    return result.status
+
+
+def _second_reads(img: Image.Image, prepared: Prepared, columns: list[dict], assigned: list[dict[int, Cell]],
+                  data_lines: list[Line], reading: Reading) -> None:
+    """Der zweite Leser (#2018) liest jede Zelle der Spalten ``SECOND_FIELDS`` und den Kopf noch einmal - die Zelle aus
+    dem Originalbild, wie sie Tesseract gefunden hat (fehlt sie in einer sonst gefüllten Spalte, die Breite der
+    Spalte), in der Höhe der Schrift um die Mitte der Zeile. Ist das Zeitbudget schon aufgebraucht, liest er nichts."""
+    if reading.out_of_time:
+        reading.second = "out_of_time" if second_reader.enabled() else "off"
+        return
+    jobs = []
+    if data_lines:
+        height = statistics.median(line.height for line in data_lines)
+        for index, column in enumerate(columns):
+            if column["field"] not in SECOND_FIELDS:
+                continue
+            present = [row[index] for row in assigned if row.get(index)]
+            if not present:
+                continue
+            low, high = min(cell.left for cell in present), max(cell.right for cell in present)
+            for row_index, row in enumerate(assigned):
+                cell = row.get(index)
+                if cell is None and len(present) * 2 < len(assigned):
+                    continue
+                center = statistics.median(word.cy for word in data_lines[row_index].words)
+                box = original_box(prepared, (cell.left if cell else low) - height * 0.3, center - height * 0.8,
+                                   (cell.right if cell else high) + height * 0.3, center + height * 0.8, img)
+                if box:
+                    jobs.append((reading.rows[row_index].second, column["field"], [box]))
+    for key in SECOND_HEADER:
+        read = reading.header.get(key)
+        if read is None or not read.boxes:
+            continue
+        pad = max(2.0, statistics.median(bottom - top for _, top, _, bottom in read.boxes) * 0.3)
+        boxes = [original_box(prepared, left - pad, top - pad, right + pad, bottom + pad, img)
+                 for left, top, right, bottom in read.boxes]
+        if all(boxes):
+            jobs.append((reading.header_second, key, boxes))
+    reading.second = read_second(img, jobs)
+
+
+def _retry_empty_cells(img: Image.Image, prepared: Prepared, columns: list[dict], assigned: list[dict[int, Cell]],
+                       data_lines: list[Line], reading: Reading) -> None:
+    """Leere Zellen in Spalten, die sonst in mindestens der Hälfte der Zeilen etwas haben (#2012): etwa Startnummer und
+    Team in dunkelgrauer Schrift auf dunklem Grund, die die Seite nicht sieht. Die Zelle (Breite der Spalte, Höhe der
+    Schrift um die Mitte der Zeile) wird allein aus dem Originalbild gelesen (``_cell_reads``) - die beiden Lesungen
+    stehen als Seite und Streifen der Zelle; was daraus wird, entscheidet ``result_image_match`` wie sonst."""
+    if not data_lines:
+        return
+    height = statistics.median(line.height for line in data_lines)
+    for index, column in enumerate(columns):
+        if column["field"] not in RETRY_FIELDS:
+            continue
+        found = [row[index] for row in assigned if row.get(index)]
+        if not found or len(found) * 2 < len(assigned):
+            continue
+        left = min(cell.left for cell in found) - height * 0.3
+        right = max(cell.right for cell in found) + height * 0.3
+        for row_index, row in enumerate(reading.rows):
+            field_name = column["field"]
+            if assigned[row_index].get(index) or row.strips.get(field_name):
+                continue
+            # Mitte der Zeile aus ihren Wörtern (ein Rest einer Trennlinie verschiebt sie so nicht), Höhe wie die Schrift.
+            center = statistics.median(word.cy for word in data_lines[row_index].words)
+            box = (max(0, int(left / prepared.scale)), max(0, int((center - height * 0.8) / prepared.scale)),
+                   min(img.width, int(right / prepared.scale)),
+                   min(img.height, int((center + height * 0.8) / prepared.scale)))
+            if box[2] - box[0] < 4 or box[3] - box[1] < 4:
+                continue
+            first, second = _cell_reads(img, box, column["kind"])
+            joiner = " " if column["kind"] == "text" else ""
+            if first:
+                row.cells[field_name] = _read(first, joiner=joiner)
+            if second:
+                row.strips[field_name] = _read(second, joiner=joiner)
 
 
 def _retry_places(prepared: Prepared, columns: list[dict], assigned: list[dict[int, Cell]], data_lines: list[Line],

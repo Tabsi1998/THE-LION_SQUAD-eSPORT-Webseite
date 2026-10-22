@@ -61,3 +61,24 @@ test("ändern ist prüfen: die gelbe Markierung fällt weg; ohne Pfad gibt es ke
   expect(onOpenChange).toHaveBeenLastCalledWith(0);
   unmount();
 });
+
+test("„Alle Namen bestätigen“: vorbelegte gelbe Teams auf einmal, gelbe Punkte bleiben – mit Rückgängig (#2018)", () => {
+  const onOpenChange = vi.fn();
+  render(<OfficialTeamTotals totals={{}} onChange={vi.fn()} onOpenChange={onOpenChange} initialRows={[
+    { team: "Probe Rot", points: "555", ocr: { read: "Probe Rt", fields: ["team"] } },
+    { team: "Probe Blau", points: "543", ocr: { read: "548", fields: ["team", "points"] } },
+    { team: "Probe Gelb", points: "500", ocr: { read: "508", fields: ["points"] } },
+  ]} />);
+  const bar = screen.getByTestId("result-team-totals-confirm-names");
+  expect(bar).toHaveTextContent("2 Teams aus dem Bild vorbelegt, aber gelb");
+  fireEvent.click(within(bar).getByTestId("result-team-totals-confirm-names-all"));
+  const rows = screen.getAllByTestId("result-team-total");
+  expect(rows[0]).not.toHaveAttribute("data-ocr-uncertain");
+  expect(within(rows[1]).getByTestId("result-team-total-team").className).not.toContain("amber");
+  expect(within(rows[1]).getByTestId("result-team-total-points").className).toContain("amber");
+  expect(onOpenChange).toHaveBeenLastCalledWith(2);
+  expect(screen.getByTestId("result-team-totals-confirm-names-done")).toHaveTextContent("2 Teams aus dem Bild bestätigt");
+  fireEvent.click(screen.getByTestId("result-team-totals-confirm-names-undo"));
+  expect(onOpenChange).toHaveBeenLastCalledWith(3);
+  expect(within(screen.getAllByTestId("result-team-total")[0]).getByTestId("result-team-total-team").className).toContain("amber");
+});

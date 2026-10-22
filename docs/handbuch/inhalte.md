@@ -362,6 +362,8 @@ monatliche **Turnierserien**, **Rennligen** mit Fahrer- und Teamwertung und **Te
   Leer- und Bindestriche erkennt die Seite selbst: „TLS-DarkFriday“ und „TLS DarkFriday“ sind dasselbe Team. **+ Team**
   fügt eines an, das **×** nimmt es weg. Garage, Teamwertung, „Unser Platz“ und Liga-Weg zählen alle Teams der Liste;
   eine ältere Saison hat ihr bisheriges „Eigenes Team“ als erstes Team.
+- **Aus Bildern gelernt** (Rennligen): Team-Schreibweisen, die die Bild-Erkennung aus euren Korrekturen gelernt hat
+  („Rotr Racng“ → Rotor Racing, siehe „Bild auslesen“). Das **×** entfernt eine, gespeichert wird mit dem Formular.
 
 <img src="../assets/serien/serien-eigene-teams.png" alt="Saison bearbeiten: Liste Eigene Teams mit drei Teams und ihren Schreibweisen" width="420">
 
@@ -797,7 +799,11 @@ das Bild wird nicht gespeichert.
 
 - **Fahrer-Tabelle:** Die Tabelle landet als Text im Feld und geht in dieselbe Vorschau wie eingefügter Text. Die
   Rundenspalten heißen „Runde 1“, „Runde 2“ … (Flaggen sind Bilder, keine Schrift) und werden über die Reihenfolge den
-  Terminen zugeordnet – in der Vorschau korrigierbar. Namen werden mit den Teilnehmern der Saison abgeglichen.
+  Terminen zugeordnet – in der Vorschau korrigierbar. Namen werden mit den Teilnehmern der Saison abgeglichen; grün ist
+  ein Name, wenn er genau so ein Teilnehmer (bzw. bei der Teamtabelle ein Team der Saison) ist oder wenn beide Leser
+  ihn gleich lesen – nur über eine Verwechslung der Schrift erkannt ist er vorgeschlagen, aber gelb, wie bei
+  Ergebnis-Bildern. **Alle Namen bestätigen** nimmt die gelben, vorbelegten Namen auf einmal (gelbe Zahlen bleiben),
+  mit **Rückgängig**; in der Teamwertung laut Veranstalter ebenso die Teams.
 - **Gelb = unsicher:** Wo die Lesungen nicht übereinstimmen, steht die Zelle unter **Aus dem Bild unsicher** – mit dem,
   was sonst gelesen wurde. Gelb wird auch, was genauso aussieht wie eine Zelle mit anderem Wert (dieselbe Zahl sieht in
   einer Tabelle immer gleich aus), und „Punkte“ und „Dif.“, wenn sie nicht zusammenpassen. Ergibt die Summe der Runden
@@ -1181,7 +1187,9 @@ für ein Vereinsteam, ist aber kein Mitglied, **Extern** sind alle anderen. Übe
 - **Bearbeiten** (Stift am Ende der Zeile): Name wie beim Veranstalter, Startnummer, Standard-Team (Vorschlag für neue
   Ergebniszeilen) und die Zuordnung (Mitglied mit Profil, Gast oder Extern). Wird ein Mitglied oder Gast extern, fragt die Seite nach – jeder Alias des
   Teilnehmers wird dann in allen Saisons zurückgenommen. Gibt es den neuen Namen in der Saison schon, sagt die Seite
-  das: dann zusammenführen.
+  das: dann zusammenführen. Unter der Zuordnung steht **Aus Bildern gelernt**: so wurde der Name in Ergebnis-Bildern
+  gelesen, bevor ihr ihn im Blatt korrigiert habt – die Bild-Erkennung erkennt ihn daran wieder. Das **×** entfernt
+  eine Schreibweise (gilt beim Speichern).
 - **Mehrere auf einmal:** Haken setzen – **Alle auswählen** nimmt nur, was Filter und Suche gerade zeigen – und
   **Als Gast** oder **Als Extern**. Geht dabei eine Zuordnung verloren, fragt die Seite einmal für alle nach. Die
   Saison wird danach einmal neu gerechnet, andere Saisons mit demselben Alias ziehen mit. Beispiel: alle Fremden
@@ -1253,6 +1261,26 @@ einem gewerteten Termin **Ergebnis ändern**. Das öffnet das Blatt des Termins.
   vergrößert), Strecke, Art (Rennen oder Qualifying – nur als Hinweis), schnellster Rennrunde, Pole und Fahrer des
   Tages. Passt die Strecke zu einem anderen Termin der Saison, sagt ein Hinweis, zu welchem. **Gelbe Felder** sind
   unsicher, darunter steht, was im Bild stand; ist Startplatz, Zeit oder Abstand gelb, steht **Mehr** gleich offen.
+  **Zwei Leser:** Namen, Teams, den Kopf und die Zahlen liest der Server zweimal mit verschiedenen Verfahren. Lesen
+  beide einen Namen oder ein Team Zeichen für Zeichen gleich, ist er grün – auch wenn die Saison ihn noch nicht kennt.
+  Widersprechen sie sich, ist das Feld gelb, vorbelegt mit der besseren Lesung, darunter stehen beide. Stehen im Namen
+  leicht verwechselte Zeichen (l/1/I, 0/O, 2/Z, „__“/„_“), ist er nur grün, wenn er genau zu einem Teilnehmer bzw. Team
+  der Saison passt. Ein Teilnehmer der Saison ist grün, wenn ein Leser ihn genau so liest (Groß/klein und Satzzeichen
+  egal) und der andere nicht widerspricht; nur über eine Verwechslung erkannt ist er vorgeschlagen, aber gelb – außer
+  die Startnummer bestätigt ihn. Passt die Startnummer zu einem, der Name aber genauso gut zu einem anderen, bleibt es
+  gelb mit **Name passt auch zu …**. Die **Strecke** wird mit dem Kalender der Saison abgeglichen und so geschrieben wie
+  dort. Fehlt der zweite Leser auf dem Server, sagt das ein Hinweis – dann sind unbekannte Namen und Teams gelb.
+  **Alle Namen bestätigen:** Stehen vorbelegte Namen oder Teams gelb da (etwa **wie in Saison …**), bestätigt der Knopf
+  über der Liste sie alle auf einmal – andere gelbe Felder bleiben gelb. Danach steht da, wie viele bestätigt sind, mit
+  **Rückgängig**.
+  <img src="../assets/serien/serien-ergebnis-namen-bestaetigen.png" alt="Ergebnisblatt nach Bild auslesen: Leiste „3 Namen bzw. Teams aus dem Bild vorbelegt, aber gelb“ mit dem Knopf „Alle Namen bestätigen (3)“" width="560"> Kennt eine andere Saison derselben Spur den Namen oder das Team,
+  steht es so vorbelegt da – gelb, mit **wie in Saison …**; beim Übernehmen entsteht der Teilnehmer in dieser Saison
+  (ein bestätigter Alias ordnet ihn gleich derselben Person zu). Steht im Bild eine andere Startnummer als beim
+  Teilnehmer, zeigt die Zeile die aus dem Bild (gelb, **bisher …**). **Korrekturen lernen:** Ändert der Vorstand einen
+  gelesenen Namen auf einen Teilnehmer der Saison oder ein gelesenes Team, merkt sich die Saison beim Übernehmen die
+  gelesene Schreibweise (nur eindeutige, im Protokoll) und erkennt sie beim nächsten Bild – zu sehen und zu entfernen
+  unter **Aus Bildern gelernt** in „Teilnehmer bearbeiten“ bzw. „Saison bearbeiten“. Ordnet der Vorstand eine schon
+  gelernte Schreibweise später jemand anderem zu, vergisst die Saison die alte Zuordnung.
   Ändern nimmt die Markierung weg, **Passt so** bestätigt die ganze Zeile (beim Rennen: schnellste Runde und Fahrer des
   Tages). Übernehmen geht erst, wenn nichts mehr gelb ist – bis dahin heißt der Knopf **Gelbe Zeilen prüfen** und
   springt zur ersten. Platz 1 im farbigen Kasten und der fehlende Abstand beim Ersten sind kein Fall für Gelb; ein Lauf
@@ -1318,6 +1346,11 @@ einem gewerteten Termin **Ergebnis ändern**. Das öffnet das Blatt des Termins.
 <td><img src="../assets/serien/serien-ergebnis-bild.png" alt="Ergebnis-Blatt nach Bild auslesen: Übersicht Aus dem Bild gelesen mit Strecke, schnellster Rennrunde und Fahrer des Tages, darunter gelbe Felder mit dem Gelesenen und Passt so" width="420"></td>
 <td><img src="../assets/serien/serien-ergebnis-bild-handy.png" alt="Dasselbe am Handy mit vergrößertem Bild zum Vergleichen" width="200"></td>
 <td><img src="../assets/serien/serien-spur-vorlage-bild.png" alt="Spur bearbeiten mit dem Feld Vorlage für Ergebnis-Bilder" width="200"></td>
+</tr>
+<tr>
+<td><img src="../assets/serien/serien-bild-wie-in-saison.png" alt="Gelbe Zeilen aus dem Bild: Name und Team mit dem Hinweis wie in Saison 1/2025, eine Startnummer mit bisher 15" width="200"></td>
+<td><img src="../assets/serien/serien-bild-gelernt.png" alt="Teilnehmer bearbeiten am Handy: unter der Zuordnung Aus Bildern gelernt mit zwei Schreibweisen zum Entfernen" width="200"></td>
+<td></td>
 </tr>
 </table>
 

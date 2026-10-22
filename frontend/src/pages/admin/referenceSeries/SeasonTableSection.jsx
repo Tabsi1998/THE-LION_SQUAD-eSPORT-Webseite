@@ -6,13 +6,13 @@ import { changeLines } from "@/lib/partnerSource";
 import { parseNumber } from "@/lib/resultPaste";
 import {
   HOW_TEXT, KIND_OPTIONS, POINT_MODES, SEASON_STATES, UNCLEAR_TEXT, applyBody, applySummary, buildBody, cellKey,
-  decisionFor, decisionValue, imageTable, imageTeamRows, isSelectable, lastTableRound, markText, mergeDecisions, organizerDecisions,
-  proposalDecisions, rememberCandidates, roundColumns, roundOption, tableText, targetText, totalText, totalsSummary,
-  unclearCells,
+  confirmTableNames, decisionFor, decisionValue, imageTable, imageTeamRows, isSelectable, lastTableRound, markText, mergeDecisions,
+  organizerDecisions, prefilledTableNames, proposalDecisions, rememberCandidates, roundColumns, roundOption, tableText, targetText,
+  totalText, totalsSummary, unclearCells, undoTableNames,
 } from "@/lib/seasonTable";
 import { OfficialTeamTotals } from "./OfficialTeamTotals";
 import { attachOriginal } from "./OriginalsSection";
-import { ResultImageButton, useResultImage } from "./ResultImageImport";
+import { ConfirmNamesBar, ResultImageButton, useResultImage } from "./ResultImageImport";
 import { UnknownNamesSheet } from "./UnknownNamesSheet";
 import { toast } from "sonner";
 import { Check, ImagePlus, TableProperties, X } from "lucide-react";
@@ -172,10 +172,14 @@ function UnclearList({ cells, decisions, onDecide, onProposals, onOrganizer, bus
   );
 }
 
-/** Gelbe Zellen aus dem Bild: je Zeile, was unsicher ist - „Passt so“ oder im Feld korrigieren und neu einlesen. */
-function ImageMarks({ marks, onConfirm, onConfirmAll }) {
-  if (!marks.length) return null;
+/** Gelbe Zellen aus dem Bild: je Zeile, was unsicher ist - „Passt so“ oder im Feld korrigieren und neu einlesen. Dazu
+ * „Alle Namen bestätigen“ (#2018) für die vorbelegten gelben Namen, mit Rückgängig (`namesUndo`). */
+function ImageMarks({ marks, onConfirm, onConfirmAll, namesUndo, onConfirmNames, onUndoNames }) {
+  if (!marks.length && !namesUndo) return null;
   const cells = marks.reduce((sum, mark) => sum + mark.cells.length, 0);
+  const bar = <ConfirmNamesBar count={prefilledTableNames(marks)} confirmed={namesUndo?.count || 0} what="Namen" testId="season-table-confirm-names"
+    onConfirm={onConfirmNames} onUndo={onUndoNames} />;
+  if (!marks.length) return bar;
   return (
     <section className="border border-amber-400/40 bg-amber-400/[0.06] rounded-sm p-3 space-y-2" data-testid="season-table-image-marks" aria-live="polite">
       <div className="flex flex-wrap items-start justify-between gap-2">
@@ -188,6 +192,7 @@ function ImageMarks({ marks, onConfirm, onConfirmAll }) {
           <Check className="w-3.5 h-3.5" /> Alle geprüft
         </button>
       </div>
+      {bar}
       <ul className="divide-y divide-amber-200/10">
         {marks.map((mark) => (
           <li key={mark.row} className="py-1.5 flex flex-wrap items-start justify-between gap-2 text-xs" data-testid="season-table-image-mark">
@@ -445,6 +450,7 @@ export function SeasonTableSection({ series, onChanged }) {
   const request = useRef(0);
   const pasteRef = useRef(null);
   const [imageMarks, setImageMarks] = useState([]);
+  const [namesUndo, setNamesUndo] = useState(null); // „Alle Namen bestätigen“ (#2018): was „Rückgängig“ braucht
   const [teamImage, setTeamImage] = useState(null);
   const [tableFile, setTableFile] = useState(null);
 
@@ -495,6 +501,7 @@ export function SeasonTableSection({ series, onChanged }) {
       const table = imageTable(result);
       setText(tableText(table.parsed));
       setImageMarks(table.marks);
+      setNamesUndo(null);
       setTeamImage(null);
       startWith(table.parsed);
     },
@@ -508,6 +515,7 @@ export function SeasonTableSection({ series, onChanged }) {
     }
     // Neu eingelesen gilt der Text im Feld - was aus dem Bild gelb war, hat jemand geprüft oder korrigiert.
     setImageMarks([]);
+    setNamesUndo(null);
     startWith(parseSeasonTablePaste(text));
   };
 
@@ -600,7 +608,14 @@ export function SeasonTableSection({ series, onChanged }) {
             {busy === "preview" && <span className="text-xs text-white/50" role="status">Rechnet die Vorschau …</span>}
           </div>
           {teamImage && <TeamTotalsPanel series={series} result={teamImage.result} file={teamImage.file} onClose={() => setTeamImage(null)} onChanged={onChanged} />}
-          <ImageMarks marks={imageMarks} onConfirm={(row) => setImageMarks((current) => current.filter((mark) => mark.row !== row))} onConfirmAll={() => setImageMarks([])} />
+          <ImageMarks marks={imageMarks} onConfirm={(row) => setImageMarks((current) => current.filter((mark) => mark.row !== row))}
+            onConfirmAll={() => { setImageMarks([]); setNamesUndo(null); }} namesUndo={namesUndo}
+            onConfirmNames={() => {
+              const { marks, undo } = confirmTableNames(imageMarks);
+              setImageMarks(marks);
+              setNamesUndo(undo.count ? undo : null);
+            }}
+            onUndoNames={() => { setImageMarks((current) => undoTableNames(current, namesUndo)); setNamesUndo(null); }} />
           {parseErrors.length > 0 && (
             <ul className="text-sm text-amber-200 space-y-0.5" data-testid="season-table-parse-errors">
               {parseErrors.map((item, index) => <li key={index}>{item.line ? `Zeile ${item.line}: ` : ""}{item.message}</li>)}

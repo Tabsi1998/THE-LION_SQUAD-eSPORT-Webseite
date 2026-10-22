@@ -284,6 +284,22 @@ export function autoPlaces(rows, { scheme = [], doubleUp = false } = {}) {
 }
 
 /**
+ * Bild-Erkennung (#2012): Hat jemand in einer Zeile aus dem Bild den Teilnehmer gewechselt oder das Team geändert,
+ * geht mit, was im Bild stand (`read_name`, `read_team`) – der Server lernt daraus beim Übernehmen die Schreibweise
+ * (nur der Vorstand, nur eindeutige). Ins Blatt kommt sie nicht.
+ */
+function imageCorrection(row) {
+  const seen = row.from_image ? row.image_read : null;
+  if (!seen) return {};
+  const out = {};
+  const pick = row.image_pick || {};
+  if (seen.name && row.participant_id && row.participant_id !== (pick.participant_id || "")) out.read_name = text(seen.name).slice(0, 120);
+  const team = text(row.team).trim();
+  if (seen.team && team && team !== text(pick.team).trim()) out.read_team = text(seen.team).slice(0, 120);
+  return out;
+}
+
+/**
  * Das Formular als Body für Vorschau und Übernehmen. Leere Zeilen fallen weg; ohne eingetragenen Platz zählt die
  * Reihenfolge (Nichtstart ohne Platz). Punkte: leer = nach Schlüssel; eingetragen = laut Veranstalter (geprüft gegen den
  * Schlüssel) oder – mit „überschreiben“ – als Wert, der zählt. `rowKeys[i]` ist die Formularzeile zu Zeile `i` im Body.
@@ -311,6 +327,7 @@ export function formToPayload(form, rules = {}) {
       official_total: number(row.official_total),
       note: text(row.note).trim() || null,
       ...dayRowPayload(row, { doubleUp, reference: (name) => rowReference(name, form.rows) }),
+      ...imageCorrection(row),
     };
     rowKeys.push(row.key);
     rows.push(out);

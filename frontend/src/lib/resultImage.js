@@ -92,7 +92,11 @@ export function imageToRows(result, participants = [], { points: withPoints = tr
       gap: formatRaceTime(row.gap),
       color: row.color || "",
       from_image: true,
-      ocr: uncertain.length ? { uncertain: [...new Set(uncertain)], read: row.read || {} } : null,
+      // Was im Bild stand und was das Bild vorschlug (#2012): ändert jemand Name oder Team, geht die Lesung beim
+      // Übernehmen mit und der Server lernt die Schreibweise (`formToPayload`).
+      image_read: row.image || null,
+      image_pick: { participant_id: known?.id || "", team: row.team || "" },
+      ocr: uncertain.length ? { uncertain: [...new Set(uncertain)], read: row.read || {}, hint: row.hint || {} } : null,
     });
   });
 }
@@ -177,11 +181,78 @@ export function confirmRow(row) {
   return { ...row, ocr: null };
 }
 
-/** Kurztext der gelben Felder einer Zeile mit dem, was im Bild stand: „Name (gelesen „Anna Prob3“), Team“. */
+// „Alle Namen bestätigen“ (#2018): vorbelegte gelbe Namen und Teams aus dem Bild (etwa „wie in Saison …“) auf einmal
+// bestätigen – mit Rückgängig. Andere gelbe Felder (Platz, Zeit …) bleiben gelb.
+export const NAME_FIELDS = ["name", "team"];
+export const RACE_NAME_FIELDS = ["fastest_lap_name", "driver_of_the_day"];
+
+const raceName = (form, field) => (field === "fastest_lap_name" ? form?.fastestLap?.name : form?.driverOfTheDay) || "";
+const filled = (value) => String(value || "").trim() !== "";
+
+/** Vorbelegte gelbe Namen bzw. Teams: je Zeile die Felder (`rows`: [Schlüssel, Felder]), die des Rennens (`race`) und
+ * wie viele es zusammen sind (`count`). Nur Felder mit Wert – ein leeres gelbes Feld muss jemand ausfüllen. */
+export function prefilledNames(form) {
+  const rows = (form?.rows || [])
+    .map((row) => [row.key, NAME_FIELDS.filter((field) => isUncertain(row, field) && filled(row[field]))])
+    .filter(([, fields]) => fields.length);
+  const race = RACE_NAME_FIELDS.filter((field) => form?.raceOcr?.uncertain?.includes(field) && filled(raceName(form, field)));
+  return { rows, race, count: rows.reduce((sum, [, fields]) => sum + fields.length, 0) + race.length };
+}
+
+/** Alle vorbelegten gelben Namen und Teams bestätigen. Liefert das Formular und was „Rückgängig“ braucht (`undo`):
+ * je Zeile die Markierung und die Werte von vorher. */
+export function confirmNames(form) {
+  const found = prefilledNames(form);
+  const byKey = Object.fromEntries(found.rows);
+  const undo = { count: found.count, rows: {}, race: null };
+  const rows = (form?.rows || []).map((row) => {
+    const fields = byKey[row.key];
+    if (!fields) return row;
+    undo.rows[row.key] = { ocr: row.ocr, values: Object.fromEntries(fields.map((field) => [field, row[field]])) };
+    return afterEdit(row, fields);
+  });
+  let raceOcr = form?.raceOcr || null;
+  if (found.race.length) {
+    undo.race = { ocr: raceOcr, values: Object.fromEntries(found.race.map((field) => [field, raceName(form, field)])) };
+    raceOcr = afterEdit({ ocr: raceOcr }, found.race).ocr;
+  }
+  return { form: { ...form, rows, raceOcr }, undo };
+}
+
+function restoreMarks(current, before, fields) {
+  if (!fields.length) return current;
+  const uncertain = [...new Set([...(current?.uncertain || []), ...fields])];
+  const order = before?.uncertain || [];
+  uncertain.sort((left, right) => (order.indexOf(left) + 1 || 99) - (order.indexOf(right) + 1 || 99));
+  return { ...(before || {}), ...(current || {}), uncertain };
+}
+
+/** „Rückgängig“: die bestätigten Namen und Teams sind wieder gelb – nur, wo seitdem niemand den Wert geändert hat. */
+export function undoConfirmNames(form, undo) {
+  if (!undo) return form;
+  const rows = (form?.rows || []).map((row) => {
+    const entry = undo.rows[row.key];
+    if (!entry) return row;
+    const fields = Object.entries(entry.values).filter(([field, value]) => row[field] === value).map(([field]) => field);
+    return fields.length ? { ...row, ocr: restoreMarks(row.ocr, entry.ocr, fields) } : row;
+  });
+  let raceOcr = form?.raceOcr || null;
+  if (undo.race) {
+    const fields = Object.entries(undo.race.values).filter(([field, value]) => raceName(form, field) === value).map(([field]) => field);
+    raceOcr = restoreMarks(raceOcr, undo.race.ocr, fields);
+  }
+  return { ...form, rows, raceOcr };
+}
+
+/**
+ * Kurztext der gelben Felder einer Zeile mit dem, was im Bild stand, und dem Hinweis des Servers (#2012):
+ * „Name (gelesen „Emil Ek“, wie in Saison 1/2025), Team“.
+ */
 export function uncertainText(row) {
   return (row?.ocr?.uncertain || []).map((field) => {
     const read = row.ocr.read?.[field];
-    return read ? `${FIELD_LABELS[field] || field} (gelesen „${read}“)` : FIELD_LABELS[field] || field;
+    const extra = [read ? `gelesen „${read}“` : "", row.ocr.hint?.[field] || ""].filter(Boolean).join(", ");
+    return extra ? `${FIELD_LABELS[field] || field} (${extra})` : FIELD_LABELS[field] || field;
   }).join(", ");
 }
 

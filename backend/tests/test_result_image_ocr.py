@@ -42,7 +42,9 @@ def _expected(row: fixture.Row) -> dict:
 def _read(data: bytes, people: list[dict]) -> dict:
     opened = result_image_ocr.open_image(data)
     assert opened.image is not None, opened.message
-    return result_image_match.build(result_image_ocr.read(opened.image, TEMPLATE), TEMPLATE, people)
+    # Der Kalender der Saison kennt die Strecke (#2018: gegen ihn wird die Strecke im Kopf abgeglichen).
+    return result_image_match.build(result_image_ocr.read(opened.image, TEMPLATE), TEMPLATE, people,
+                                    venues=["Probering Nord"])
 
 
 def _compare(out: dict, sheet: fixture.Sheet) -> tuple[list[str], list[str]]:
@@ -89,6 +91,27 @@ def test_quali_layout_without_grid_is_a_result():
     assert got == [(row.place, row.number, row.name, row.team, row.time, row.gap or None, None) for row in sheet.rows]
     assert not any({"time", "gap", "points"} & set(row["uncertain"]) for row in out["rows"])
     assert "place" not in out["rows"][0]["uncertain"]  # Platz 1 im Kasten grün
+    # Kein Grid im Qualifying: die leere Spalte ist kein Fall für Gelb (#2018).
+    assert not any("grid" in row["uncertain"] for row in out["rows"])
+
+
+@needs_tesseract
+def test_a_narrow_screenshot_never_leaves_start_positions_empty_and_green():
+    """Prüfer zu #2018: Ein Bild, 700 Pixel breit, rechts abgeschnitten (Grid, Zeit und Abstand fehlen) - die
+    Startplätze waren leer und grün. Jetzt sind sie gelb (die Kopfzeile ist nicht ganz da); ein Ergebnis ist das Bild
+    ohne Zeiten ohnehin nicht. Verkleinert statt abgeschnitten steht jeder Startplatz richtig da oder ist gelb."""
+    sheet = fixture.sample_sheet()
+    expected = {row.name: row.grid for row in sheet.rows}
+    cut = _read(fixture.png_bytes(fixture.render(sheet, width=700)), _people(sheet))
+    assert cut["is_result"] is False
+    assert cut["rows"] and all("grid" in row["uncertain"] for row in cut["rows"])
+    full = fixture.render(sheet)
+    small = full.resize((700, round(full.height * 700 / full.width)), Image.Resampling.LANCZOS)
+    out = _read(fixture.png_bytes(small), _people(sheet))
+    checked = [row for row in out["rows"] if row["name"] in expected]
+    assert len(checked) >= len(sheet.rows) - 2
+    for row in checked:
+        assert row["grid"] == expected[row["name"]] or "grid" in row["uncertain"], row["name"]
 
 
 @needs_tesseract
@@ -98,6 +121,43 @@ def test_clean_screenshot_without_known_participants_reads_every_value():
     flagged, silent = _compare(out, sheet)
     assert (flagged, silent) == ([], [])
     assert all(row["participant_id"] is None for row in out["rows"])
+
+
+@needs_tesseract
+def test_dark_grey_number_and_team_are_read_from_the_cell_alone():
+    """Echter Fall (#2012): Startnummer und Team in dunkelgrauer Schrift auf dunklem Grund (ein Team ohne eigene Farbe)
+    las die Seite gar nicht - leer und gelb. Die leere Zelle einer gefüllten Spalte wird allein aus dem Originalbild
+    gelesen (Kontrast nur dieser Zelle gestreckt) - richtig und mit bekanntem Team grün."""
+    sheet = fixture.sample_sheet()
+    for index in (3, 7):
+        row = sheet.rows[index]
+        sheet.rows[index] = fixture.Row(row.place, row.number, row.name, "Schatten Team", row.grid, row.time, row.gap)
+    out = _read(fixture.png_bytes(fixture.render(sheet)), _people(sheet))
+    for index in (3, 7):
+        got = out["rows"][index]
+        assert (got["start_number"], got["team"]) == (sheet.rows[index].number, "Schatten Team"), index
+        assert not {"start_number", "team"} & set(got["uncertain"]), index
+
+
+def test_noise_after_a_header_label_does_not_hide_the_value_below():
+    """Echter Fall (#2012): hinter „Fahrer des Tages:“ las die Erkennung im Farbverlauf des Kopfs „ER“ (Sicherheit 10)
+    - und nahm das statt des Namens darunter. Ganz unsichere Reste hinter einer Beschriftung zählen nicht."""
+    def word(text, left, top, conf=95):
+        return result_image_ocr.Word(text, conf, left, top, 12 * len(text), 30)
+
+    lines = [result_image_ocr.Line([word("Probering", 100, 40)]),
+             result_image_ocr.Line([word("Schnellste", 100, 100), word("Rennrunde:", 260, 100), word("Pole:", 700, 100),
+                                    word("Fahrer", 1000, 100), word("des", 1090, 100), word("Tages:", 1140, 100),
+                                    word("ER", 1400, 100, conf=10)]),
+             result_image_ocr.Line([word("Mia_Motorhaube", 100, 150), word("Lena_Lenkrad", 700, 150),
+                                    word("Otto_Ostwind", 1000, 150)]),
+             # Unter dem Fahrer des Tages steht keine Zeit - nur ein Rest aus dem Farbverlauf („a“, unsicher).
+             result_image_ocr.Line([word("1:31,207", 100, 200), word("1:30,111", 700, 200),
+                                    word("a", 1050, 200, conf=20)])]
+    out = result_image_ocr._header_fields(lines, TEMPLATE)
+    assert out["driver_of_the_day"].text == "Otto_Ostwind"
+    assert out["fastest_lap"].text == "Mia_Motorhaube 1:31,207"
+    assert out["pole"].text == "Lena_Lenkrad 1:30,111"
 
 
 @needs_tesseract

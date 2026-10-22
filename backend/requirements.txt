@@ -23,6 +23,17 @@ PyJWT==2.15.1
 pymongo==4.19.0
 python-dotenv==1.2.4
 python-multipart==0.0.32
+# Zweiter Leser für Ergebnis-Bilder (#2018): RapidOCR (Apache-2.0) über onnxruntime, das Modell PP-OCRv6 small
+# (Apache-2.0) lädt das Dockerfile. Abhängigkeiten von RapidOCR fest: omegaconf, shapely (BSD-3-Clause), pyclipper,
+# colorlog, six, PyYAML (MIT), tqdm (MPL-2.0/MIT).
+rapidocr==3.10.0
+omegaconf==2.4.0
+shapely==2.2.0
+pyclipper==1.4.0
+colorlog==6.12.0
+six==1.17.0
+PyYAML==6.0.3
+tqdm==4.70.1
 rawpy==0.27.1
 reportlab==4.5.1
 requests==2.34.2

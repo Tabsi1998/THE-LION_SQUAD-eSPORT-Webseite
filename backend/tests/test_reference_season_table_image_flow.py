@@ -146,6 +146,23 @@ async def test_names_are_matched_against_the_season(flow, fake_table):
 
 
 @pytest.mark.asyncio
+async def test_learned_spellings_count_and_unknown_names_are_yellow(flow, fake_table):
+    """#2012 auch für Tabellen-Bilder: eine aus Ergebnis-Bildern gelernte Schreibweise zählt wie der Name (grün), ein
+    unbekannter Name ist gelb, wie sicher die Erkennung auch ist."""
+    _, series, rounds = await _season(flow)
+    await _sheet(flow, series, rounds[0], ROWS)
+    await flow.db.reference_participants.update_one({"series_id": series["id"], "name": "Ada Ausgedacht"},
+                                                    {"$set": {"read_aliases": [{"name": "Ada Ausgdcht"}]}})
+    fake_table.reading = _reading([("Ada Ausgdcht", 25, 18), ("Neu Name", 18, 15)], "Fahrer")
+    for row in fake_table.reading.rows:
+        row[1].sure = True  # die Erkennung ist sich sicher
+    drivers = (await flow.post(f"{ADMIN}/series/{series['id']}/season-table/image?table=drivers", content=_png(),
+                               headers=PNG)).json()
+    assert [row["cells"][1] for row in drivers["rows"]] == ["Ada Ausgedacht", "Neu Name"]
+    assert 1 not in drivers["rows"][0]["uncertain"] and 1 in drivers["rows"][1]["uncertain"]
+
+
+@pytest.mark.asyncio
 async def test_no_table_unavailable_and_team_league_are_refused(flow, fake_table, monkeypatch):
     board, series, _ = await _season(flow)
     url = f"{ADMIN}/series/{series['id']}/season-table/image"
