@@ -33,7 +33,9 @@ from fastapi import APIRouter, Depends, Request
 from auth import get_optional_user
 from database import get_db
 from routes.reference_round_routes import PUBLIC_FIELDS, _calendar, visible_series
-from services import map_pools, race_weekend, reference_running_cache, series_identity, series_partners
+from services import (
+    map_pools, partner_platforms, race_weekend, reference_running_cache, series_identity, series_partners,
+)
 from services.dolibarr_policy import club_today
 from services.own_teams import Matcher, own_teams
 from services.rate_limit import enforce_rate_limit
@@ -491,11 +493,15 @@ async def public_series(lineage_slug: str, season_slug: str, user: dict | None =
     if not lineage_out.get("game_name") and lineage.get("game_id"):
         game = await db.games.find_one({"id": lineage["game_id"]}, {"_id": 0, "name": 1}) or {}
         lineage_out["game_name"] = game.get("name")
+    partners = await series_partners.for_series_page(db, lineage, series)
     return {
         "lineage": lineage_out,
         "series": {key: series.get(key) for key in SERIES_FIELDS},
         # #1934: „Veranstaltet von“ und Mitwirkende - nur aktive Partner.
-        "partners": await series_partners.for_series_page(db, lineage, series),
+        "partners": partners,
+        # #1964: „Daten von …“, wenn die Saison ihre Turniertage von einer Partner-Plattform holt - nur der Name, die
+        # Adresse der Plattform und der Partner der Saison; abgefragt wird hier nichts.
+        "data_source": partner_platforms.public_hint(series.get("partner_source"), partners),
         "rules": _rules(series),
         "successor": await _successor(db, user, series),
         "rule_changes": rule_changes(series, rounds),

@@ -262,6 +262,34 @@ Mehrere Runden an einem Termin (etwa TFT-Lobbys R1–R5), gerechnet in `services
   und nie aus einem umgekehrten Lauf. Ein Lauf ohne Wertung zählt in der Statistik nicht; die Punkte je Lauf kommen ohne
   Anpassungen. Der Kopf beider Seiten trägt `series.cancelled_on` und `.cancel_reason`.
 
+## Partner-Plattform (#1964)
+
+Eine Turnierserie kann ihre Turniertage von der Plattform eines Partners holen (TFT-Dashboard, öffentliches JSON, mit
+dem Partner abgesprochen, nur lesend). Route `routes/reference_partner_routes.py` (nur Vorstand), Adapter
+`services/tft_dashboard.py`, Abruf und Positivliste `services/partner_platforms.py`, Zuordnen und Abweichungen
+`services/partner_import.py`, Web `pages/admin/referenceSeries/SeriesPartnerSourceSection.jsx`.
+
+- **Quelle je Saison** (`reference_series.partner_source`): `platform`, `base_url` (nur aus `PLATFORMS`, `https` ohne
+  Port, Pfad oder Zugangsdaten), `series_ref` (nur Ziffern), `series_name`, `partner_id` (ein Partner der Saison, #1934,
+  für „Daten von …“ auf der Serienseite - `data_source` in der öffentlichen Antwort). Pfade: `GET`/`PUT
+  …/partner-source`, `GET …/partner-source/series`, `POST …/partner-source/preview`, `POST …/partner-source/apply`.
+- **Abbilden:** je Spieler eine Zeile wie beim Eintragen - `name` als Riot-ID `Name#TAG` (Gäste ohne Tag), `place` aus
+  der Reihenfolge des Veranstalters (im Double Up der Platz des Teams für beide, `partner`), `day_rounds` mit `place`,
+  `points` wie geliefert und `lobby`, `day_points` (GES P), Marke `left` bei „ausgestiegen“. Bots sind nie eine Zeile,
+  verschieben aber die Punkte. Nur fertige Turniere (`completed`) bringen ein Blatt, offene nur den Termin.
+- **Termin:** verknüpft (`reference_rounds.partner_ref = {platform, ref}`), sonst einer am selben Wiener Tag ohne
+  Verknüpfung, sonst neu (`source: "partner"`, Titel wie beim Partner). Ein zweiter Abruf legt nichts doppelt an.
+- **Nie still überschreiben:** Die Vorschau schreibt nichts und nennt je Turnier `state` (`new`, `changed`, `same`,
+  `new_round`, `link`, `waiting`, `error`), die Abweichungen und unbekannte Namen. Übernehmen verlangt `fingerprint`,
+  `round_id` und `expected_version` aus der Vorschau (sonst `conflict`, nichts geschrieben). Ein neues Blatt ist ein
+  Entwurf, ein vorhandener Entwurf wird mit Revision ersetzt, neben einem veröffentlichten Blatt entsteht ein Entwurf
+  daneben (Freigabe wie gewohnt). Sonderboni, Notizen, Strafpunkte, Punkte von Hand, Marken außer `left` (DSQ, DNS …)
+  und der offizielle Gesamtstand bleiben; `left` meldet die Quelle selbst. Unbrauchbare Zahlen (außerhalb der Grenzen)
+  oder zu tief verschachteltes JSON sind „unerwartete Form“ (502 bzw. Fehlerzeile), nie ein 500.
+- **Grenzen:** Zeitlimit je Schritt und gesamt, Größenlimit, keine Weiterleitung, Zwischenspeicher zehn Minuten nur
+  für das eingedampfte Ergebnis, höchstens 30 Abrufe je Konto in zehn Minuten. Fehler: 502 mit fester Meldung (steht
+  im Betriebsprotokoll); ein kaputtes Turnier nur in seiner Zeile. Zeitgesteuert holt die Website (noch) nicht.
+
 ## Version, Entwurf daneben und Protokoll
 
 - **Nacheinander je Saison:** Ergebnis speichern, freigeben, verwerfen und zurücknehmen sowie alle Kalender-Änderungen

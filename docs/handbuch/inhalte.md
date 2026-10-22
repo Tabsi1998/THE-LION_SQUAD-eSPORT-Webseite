@@ -620,6 +620,47 @@ Saisonpunkte nach dem Punkteschlüssel der Saison.
 
 <img src="../assets/serien/serien-turniertage-lobbys.png" alt="Lobby-Ansicht einer Runde mit zwei Lobbys und Platzfarben" width="560">
 
+**Turniertage von der Partner-Plattform holen:** Führt der Veranstalter seine Turniere auf einer eigenen Plattform
+(etwa das TFT-Dashboard von PineApps), holt die Website Turniertage, Runden, Lobbys und Punkte von dort – nur lesend und
+immer als **Entwurf**. Veröffentlicht wird wie gewohnt vom Vorstand. Nur in einer Turnierserie, nur für den Vorstand.
+
+- **Einrichten** (Seite der Saison, Abschnitt **Partner-Plattform**): **Plattform** wählen, die **Adresse** kommt aus
+  einer festen Liste (frei eintippen lässt sich keine). Unter **Serie beim Partner** stehen die Serien der Plattform zur
+  Wahl. **Hinweis „Daten von …“ verlinkt** wählt den Partner der Saison, auf dessen Seite der Hinweis auf der
+  Serienseite führt – vorgewählt ist der Veranstalter; ohne Partner führt er zur Plattform. **Quelle speichern**. In der
+  Saison müssen die **Runden je Turniertag** eingestellt sein, sonst meldet die Vorschau einen Fehler.
+- **Jetzt holen** zeigt je Turnier, was passieren würde – gespeichert wird dabei nichts: der **Termin** (schon
+  verknüpft, ein Termin am selben Tag oder **Neuer Termin** mit Kürzel T1, T2 …), was mit dem Ergebnis geschieht
+  (**Ergebnis als Entwurf**, **Entwurf wird ersetzt** oder **Entwurf neben dem veröffentlichten Ergebnis**), Spieler,
+  Runden, Lobbys, Bots, Gäste und **unbekannte Namen**. Steht schon ein Ergebnis da, öffnet **Abweichungen ansehen** die
+  Unterschiede je Person (Platz, Tagespunkte, Runden, Ausgestiegen, wer neu dazukommt oder wegfällt).
+- **Übernehmen:** Vorgewählt ist nur, was nichts Vorhandenes ersetzt (neue Ergebnisse, neue Termine). Ein Turnier mit
+  **Abweichungen** hakt ihr selbst an. Ein veröffentlichtes Ergebnis wird nie überschrieben: es bekommt einen Entwurf
+  daneben, den ihr im Ergebnisblatt freigebt. Sonderboni (etwa Bingo), Notizen, Punkte von Hand, Marken wie DSQ oder
+  DNS und der offizielle Gesamtstand bleiben erhalten – nur „Ausgestiegen“ kommt vom Partner.
+  Danach öffnet sich **Unbekannte Namen** zum Zuordnen; Spieler stehen mit Riot-ID (Name#TAG), Gäste des Partners nur
+  mit Namen.
+- **Was übernommen wird:** Tagesplatz in der Reihenfolge des Veranstalters, Punkte je Runde **wie beim Partner** (ein
+  Bot ist kein Teilnehmer, verschiebt aber die Punkte), Lobby, GES P, im Double Up der Partner. Nicht übernommen werden
+  Riot-Kennungen, Avatare und Ränge. Ein zweites „Jetzt holen“ legt nichts doppelt an – Übernommenes steht als
+  **Übernommen**, offene Turniere als **Noch offen**. Hat sich beim Partner zwischen Vorschau und Übernehmen etwas
+  geändert, wird nichts übernommen – einfach neu holen. Ist die Plattform nicht erreichbar, steht das im Abschnitt; die
+  Seite bleibt bedienbar.
+- **Serienseite:** unter den Partnern der Hinweis **Daten von …** mit Link zum Partner.
+
+<table>
+<tr>
+<td><img src="../assets/serien/serien-partner-plattform-vorschau.png" alt="Partner-Plattform: Vorschau mit drei Turnieren, Abweichungen aufgeklappt, Übernehmen mit drei Haken" width="560"></td>
+<td><img src="../assets/serien/serien-partner-plattform-handy.png" alt="Dieselbe Vorschau am Handy" width="220"></td>
+</tr>
+<tr>
+<td><img src="../assets/serien/serien-partner-plattform-einrichten.png" alt="Quelle einrichten: Plattform, Adresse aus der festen Liste, Serie beim Partner und Partner für den Hinweis" width="560"></td>
+<td><img src="../assets/serien/serien-partner-plattform-hinweis.png" alt="Serienseite: unter Veranstaltet von der Hinweis Daten von mit Link zum Partner" width="220"></td>
+</tr>
+</table>
+
+<img src="../assets/serien/serien-partner-plattform-uebernommen.png" alt="Nach dem Übernehmen: zwei Turniere übernommen, eines noch offen" width="560">
+
 **Seite Team-Liga:** Bei einer Spur vom Typ Team-Liga zeigt dieselbe Adresse statt der Gesamtwertung die Liga aus
 Sicht der eigenen Teams (Liste **Eigene Teams** der Saison; spielen mehrere, steht im Spielplan, welches gespielt
 hat). Oben die **Spieltage** (ein Feld je Spieltag – Sieg cyan, Niederlage grau) und der nächste Spieltag mit Gegner

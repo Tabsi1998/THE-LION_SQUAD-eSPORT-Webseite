@@ -16,6 +16,7 @@ import { MapPoolView } from "@/components/tls/maps/MapPoolView";
 import { NoScoreNote, RuleChanges, SeasonNotice } from "@/components/tls/series/SeriesSpecialRules";
 import { NotFoundPage } from "@/pages/ErrorPages";
 import { SeriesPartners } from "@/components/tls/series/SeriesPartners";
+import { SeriesDataSource } from "@/components/tls/series/SeriesDataSource";
 import { TournamentDays } from "@/components/tls/series/TournamentDays";
 import { formatNumber } from "@/lib/standingsTable";
 
@@ -27,7 +28,8 @@ import { formatNumber } from "@/lib/standingsTable";
 // Team-Liga (#1747): statt Gesamtwertung, Finale und Terminen Tabelle, Spielplan, Aufstellung und Liga-Weg.
 // Eine Rennliga (#1746, Block `racing` vom Server) zeigt unter demselben Kopf ihre eigene Ansicht (RacingLeague).
 // Turniertage (#1961): unter der Gesamtwertung die Tagesansicht R1…Rn mit Summe, Lobbys und das Spieler-Detail; die
-// Gesamtwertung zeigt Sonderboni in einer eigenen Spalte.
+// Gesamtwertung zeigt Sonderboni in einer eigenen Spalte. Holt die Saison ihre Turniertage von einer Partner-Plattform
+// (#1964), nennt der Kopf die Quelle („Daten von …“).
 
 // Sonderboni (#1961) stehen getrennt neben den Punkten - nur, wenn die Saison welche führt.
 function bonusColumn(rules) {
@@ -127,6 +129,7 @@ export default function ReferenceSeriesPage() {
             <SeriesPartners partners={data.partners} />
             {/* Saison abgebrochen (#1960): Hinweis mit Grund und Nachfolger - die gefahrenen Ergebnisse bleiben. */}
             <SeasonNotice series={data.series} successor={data.successor} />
+            <SeriesDataSource source={data.data_source} />
             {data.lineage?.kind === "team_league" && <TeamLeagueSections data={data} />}
             {data.racing && <RacingLeague data={data} />}
             {data.lineage?.kind !== "team_league" && !data.racing && (<>

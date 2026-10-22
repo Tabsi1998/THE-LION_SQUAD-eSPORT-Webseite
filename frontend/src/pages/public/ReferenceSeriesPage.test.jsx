@@ -206,6 +206,26 @@ test("Kopf ohne Partner bleibt wie bisher", async () => {
   renderAt("/references/series/probe-cup/2026-division-1");
   await screen.findByRole("heading", { level: 1 });
   expect(screen.queryByTestId("series-partners")).toBeNull();
+  expect(screen.queryByTestId("series-data-source")).toBeNull();
+});
+
+// Partner-Plattform (#1964): „Daten von …“ mit Link zur Partnerseite, ohne gewählten Partner zur Plattform.
+test("Hinweis „Daten von …“: mit Partner zur Partnerseite, sonst zur Plattform in neuem Tab", async () => {
+  apiMock.get.mockResolvedValue({ data: { ...BODY, data_source: { provider: "PineApps", url: "https://tft.pineapps.at",
+    partner: { id: "p-ananas", slug: "probe-ananas", name: "Probe Ananas" } } } });
+  const { unmount } = renderAt("/references/series/probe-cup/2026-division-1");
+  const hint = await screen.findByTestId("series-data-source");
+  expect(hint).toHaveTextContent("Daten von Probe Ananas");
+  expect(within(hint).getByRole("link", { name: "Probe Ananas" })).toHaveAttribute("href", "/partners/probe-ananas");
+  unmount();
+  apiMock.get.mockResolvedValue({ data: { ...BODY, data_source: { provider: "PineApps", url: "https://tft.pineapps.at", partner: null } } });
+  renderAt("/references/series/probe-cup/2026-division-1");
+  const plain = await screen.findByTestId("series-data-source");
+  expect(plain).toHaveTextContent("Daten von PineApps");
+  const link = within(plain).getByRole("link", { name: /PineApps/ });
+  expect(link).toHaveAttribute("href", "https://tft.pineapps.at");
+  expect(link).toHaveAttribute("target", "_blank");
+  expect(link).toHaveAttribute("rel", "noopener noreferrer");
 });
 
 // Map-Pool der Saison (#1616): als Karten mit Bild unter dem Rest der Seite - ohne Pool kein Abschnitt.
