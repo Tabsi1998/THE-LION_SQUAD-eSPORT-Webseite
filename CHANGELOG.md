@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.28.0 (22.10.2026)
+
+### Neu
+
+* Ergebnisblatt – Original-Bilder hinzufügen, ziehen oder einfügen; gelesenes Bild wird beim Übernehmen angehängt (#1933)
+* Mediathek und Upload-Inventar zählen die Original-Bilder der Serien (#1933)
+* Referenzen – „Original ansehen“ im Vollbild auf Serien- und Rundenseite (#1933)
+* Referenzen – Original-Bilder des Veranstalters je Termin mit Art, Quelle und „öffentlich / nur Verwaltung“ (#1933)
+
 ## 1.27.0 (22.10.2026)
 
 ### Neu
