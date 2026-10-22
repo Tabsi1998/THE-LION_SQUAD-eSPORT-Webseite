@@ -87,12 +87,13 @@ export function unsupportedImageMessage(file) {
 }
 
 function ImagePreviewBox({ value, previewClass, onClear, testId }) {
-  const [state, setState] = useState(value ? "loading" : "empty");
   const src = value ? resolveMediaUrl(value) : "";
-
-  useEffect(() => {
-    setState(value ? "loading" : "empty");
-  }, [value]);
+  // Der Stand gehört zur Adresse: ein neues Bild beginnt wieder bei „Lade Vorschau“. Kein Zurücksetzen im Effekt - ein
+  // Bild aus dem Zwischenspeicher (etwa dasselbe Logo in der Vorschau hell/dunkel, #1952) ist sonst schon geladen,
+  // bevor der Effekt läuft, und die Vorschau bliebe bei „Lade Vorschau“ stehen.
+  const [status, setStatus] = useState({ src: "", state: "loading" });
+  const state = !value ? "empty" : status.src === src ? status.state : "loading";
+  const setState = (next) => setStatus({ src, state: next });
 
   return (
     <div className={`${previewClass} bg-[#0A0A0A] border ${value ? "border-white/10" : "border-dashed border-white/20"} rounded-sm overflow-hidden shrink-0 relative group`} data-testid={`${testId}-preview`}>

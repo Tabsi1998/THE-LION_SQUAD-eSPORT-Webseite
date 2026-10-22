@@ -86,3 +86,13 @@ test("die Mediathek zeigt SVG nur in Logo-Feldern", async () => {
   await act(async () => fireEvent.click(screen.getByTestId("brand-logo-library")));
   await waitFor(() => expect(screen.getByTitle("kiwi.svg")).toBeInTheDocument());
 });
+
+test("die Vorschau zeigt ein geladenes Logo und lädt ein neues wieder", () => {
+  const { rerender } = render(<ImageUpload value="/api/static/uploads/kiwi.svg" onChange={vi.fn()} testId="brand-logo" logo />);
+  const preview = screen.getByTestId("brand-logo-preview");
+  fireEvent.load(preview.querySelector("img"));
+  expect(preview).not.toHaveTextContent("Lade Vorschau");
+  expect(preview.querySelector("img").className).toContain("opacity-100");
+  rerender(<ImageUpload value="/api/static/uploads/ananas.svg" onChange={vi.fn()} testId="brand-logo" logo />);
+  expect(screen.getByTestId("brand-logo-preview")).toHaveTextContent("Lade Vorschau");
+});
