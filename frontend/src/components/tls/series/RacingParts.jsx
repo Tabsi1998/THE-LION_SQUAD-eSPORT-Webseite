@@ -10,6 +10,8 @@ import { chipLabel, groupWeekends, roundKind } from "@/lib/raceWeekend";
 import { VenueWithFlag } from "@/components/tls/CountryFlag";
 import { SessionChips } from "@/components/tls/series/SessionChips";
 import { NoScoreNote } from "@/components/tls/series/SeriesSpecialRules";
+import { OriginalsButton } from "@/components/tls/series/OriginalViewer";
+import { originalsOf } from "@/lib/referenceOriginals";
 import "./racingLeague.css";
 
 // Bausteine der Rennliga (#1746): Umschalter der Saisons, Zellen des Rennrasters, Namen (nur Vereinsfahrer öffnen ihr
@@ -166,7 +168,7 @@ function StateBadge({ state }) {
  * Vereinsfahrer - ein fremder Name steht nur in der Tabelle), sonst der beste öffentliche Vereinsfahrer mit Platz.
  * `hrefFor(lauf)` macht die Chips zu Links (Ergebnis je Lauf, #1950), `roundHref(lauf)` Kürzel, Tag und Ort zum Link auf
  * die Ergebnisseite der Runde. */
-export function RacingCalendar({ rounds, rows, onSelect, publicKeys, hrefFor, roundHref }) {
+export function RacingCalendar({ rounds, rows, onSelect, publicKeys, hrefFor, roundHref, originals = null }) {
   const weekends = groupWeekends(rounds);
   return (
     <section className="mt-12" aria-labelledby="racing-calendar-title" data-testid="racing-calendar">
@@ -181,6 +183,8 @@ export function RacingCalendar({ rounds, rows, onSelect, publicKeys, hrefFor, ro
             const scoredCount = races.filter((item) => item.state === "scored").length;
             const original = weekend.rounds.find((item) => item.original_club_day)?.original_club_day;
             const href = roundHref?.(round);
+            // Original-Bilder des Veranstalters (#1933): alle Läufe der Runde in einem Vollbild, mit Lauf davor.
+            const pictures = originalsOf(originals, weekend.rounds, { withSession: weekend.multi });
             const head = (
               <>
                 <span className={`min-w-12 shrink-0 whitespace-nowrap font-black tabular-nums ${weekend.kind === "final" ? "text-[var(--tls-honor)]" : "text-white/80"}`}>{roundLabel(round)}</span>
@@ -202,7 +206,7 @@ export function RacingCalendar({ rounds, rows, onSelect, publicKeys, hrefFor, ro
                 ) : head}
                 <StateBadge state={weekend.state} />
                 {/* Chips und Sieger in voller Breite unter Tag und Ort - am Handy passen so zwei Chips in eine Zeile. */}
-                {(weekend.multi || scoredCount > 0) && (
+                {(weekend.multi || scoredCount > 0 || pictures.length > 0) && (
                   <div className="basis-full min-w-0 pl-[3.75rem]">
                     {weekend.multi && <SessionChips rounds={weekend.rounds} showTime hrefFor={hrefFor} className="mt-2" />}
                     {scoredCount > 0 && (
@@ -212,6 +216,7 @@ export function RacingCalendar({ rounds, rows, onSelect, publicKeys, hrefFor, ro
                         ))}
                       </div>
                     )}
+                    <OriginalsButton items={pictures} title={[roundLabel(round), weekend.venue || weekend.title].filter(Boolean).join(" · ")} className="mt-2" testId="racing-round-originals" />
                   </div>
                 )}
               </li>

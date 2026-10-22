@@ -244,3 +244,15 @@ test("ohne Map-Pool kein Abschnitt", async () => {
   await screen.findByRole("heading", { level: 1 });
   expect(screen.queryByTestId("map-pool")).not.toBeInTheDocument();
 });
+
+test("Original-Bilder des Veranstalters (#1933): „Original ansehen“ am Termin mit öffentlichen Bildern", async () => {
+  const picture = { id: "o1", kind: "table", url: "/api/reference-series/public/probe-cup/2026-division-1/originals/o1", width: 1200, height: 800 };
+  apiMock.get.mockResolvedValue({ data: { ...BODY, originals: { r2: [picture] } } });
+  renderAt("/references/series/probe-cup/2026-division-1");
+  const calendar = await screen.findAllByTestId("series-page-round");
+  expect(within(calendar[0]).queryByTestId("series-page-round-originals")).toBeNull();
+  const button = within(calendar[1]).getByTestId("series-page-round-originals");
+  fireEvent.click(button);
+  expect(screen.getByRole("dialog")).toHaveAccessibleName("Original-Bilder: Q2");
+  expect(screen.getByTestId("original-viewer-label")).toHaveTextContent("Tabelle");
+});

@@ -19,6 +19,8 @@ import { SeriesPartners } from "@/components/tls/series/SeriesPartners";
 import { SeriesDataSource } from "@/components/tls/series/SeriesDataSource";
 import { TournamentDays } from "@/components/tls/series/TournamentDays";
 import { formatNumber } from "@/lib/standingsTable";
+import { OriginalsButton } from "@/components/tls/series/OriginalViewer";
+import { originalsOf } from "@/lib/referenceOriginals";
 
 // Seite einer Serie unter /references/series/<spur>/<saison> (Entscheidung 5 zu #1741), Turnierserie (#1745): Kopf,
 // Rundenfortschritt, Regeln, Gesamtwertung mit Streichergebnissen und Finalgrenze, Finalrechner (Richtwert), das
@@ -46,7 +48,7 @@ function seriesTitle(data) {
   return series.title || [data?.lineage?.title, [series.season, series.tier].filter(Boolean).join(" · ")].filter(Boolean).join(" ");
 }
 
-function Calendar({ rounds }) {
+function Calendar({ rounds, originals }) {
   return (
     <section className="mt-12" aria-labelledby="series-page-calendar" data-testid="series-page-calendar">
       <h2 id="series-page-calendar" className="font-heading text-2xl font-black uppercase">Termine</h2>
@@ -67,7 +69,8 @@ function Calendar({ rounds }) {
                 )}
                 {round.original_club_day && <span className="block text-[11px] text-white/45">ursprünglich {dayLabel(round.original_club_day)}</span>}
                 <NoScoreNote round={round} />
-
+                {/* Original-Bilder des Veranstalters (#1933). */}
+                <OriginalsButton items={originalsOf(originals, [round])} title={[roundLabel(round), round.venue || round.title].filter(Boolean).join(" · ")} className="mt-2" testId="series-page-round-originals" />
               </span>
               <span className={`inline-flex items-center px-2 py-0.5 border rounded-sm text-[10px] font-bold uppercase tracking-widest whitespace-nowrap ${STATE_TONES[round.state] || STATE_TONES.planned}`}>
                 {PUBLIC_STATE_LABELS[round.state] || round.state}
@@ -144,7 +147,7 @@ export default function ReferenceSeriesPage() {
             </section>
             <TournamentDays standings={data.standings} rounds={rounds} rules={data.rules} />
             <SeriesFinal final={data.final} />
-            <Calendar rounds={rounds} />
+            <Calendar rounds={rounds} originals={data.originals} />
             </>)}
             {/* Map-Pool der Saison (#1616) als Snapshot - bei jeder Art, ohne Pool erscheint nichts. */}
             <MapPoolView pool={data.map_pool} hint="Die Maps dieser Saison, je Modus." headingId="series-page-maps" />

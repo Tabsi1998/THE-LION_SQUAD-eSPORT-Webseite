@@ -10,6 +10,7 @@ import { emptyText, pickSession, roundHeading, roundPath, SESSION_PARAM, summary
 import { RoundHead, RoundSummary, ResultList, ResultTable, SessionTabs } from "@/components/tls/series/RoundResults";
 import { SeasonNotice, SessionRuleNotes } from "@/components/tls/series/SeriesSpecialRules";
 import { NotFoundPage } from "@/pages/ErrorPages";
+import { OriginalsButton } from "@/components/tls/series/OriginalViewer";
 
 // Ergebnisseite einer Runde der Rennliga (#1950) unter /references/series/<spur>/<saison>/runde/<nr>: eigene Adresse
 // zum Teilen, der Reiter steht als ?lauf=… darin (ohne: das Hauptrennen). Kopf mit Flagge und Pfeilen, Zusammenfassung,
@@ -112,10 +113,8 @@ export default function ReferenceRoundPage() {
               {current.own_teams?.length > 0 && session?.rows?.some((row) => row.own) && (
                 <span data-testid="round-own-teams">Vereinsteams hervorgehoben: {current.own_teams.join(", ")}</span>
               )}
-              {/* Original-Bild des Veranstalters (#1933): erscheint, sobald der Server es mitliefert. */}
-              {session?.original?.url && (
-                <a href={session.original.url} target="_blank" rel="noreferrer" className="font-semibold text-[#29B6E8] hover:text-white" data-testid="round-original">Original ansehen</a>
-              )}
+              {/* Original-Bilder des Veranstalters zu diesem Lauf (#1933) im Vollbild. */}
+              <OriginalsButton items={session?.originals || []} title={[roundName, session?.label].filter(Boolean).join(" · ")} className="ml-auto" testId="round-original" />
             </footer>
           </>
         )}

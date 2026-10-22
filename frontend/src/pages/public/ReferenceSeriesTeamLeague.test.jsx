@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 
 // Serienseite einer Team-Liga (#1747): Spieltage mit nächstem Gegner, Tabelle über die Rangliste der Turniere (eigenes
@@ -278,4 +278,17 @@ test("Die Tabelle der Team-Liga bricht Namen um statt zu kürzen (eigener Rahmen
   renderPage();
   const wrap = await screen.findByTestId("team-league-table-wrap");
   expect(wrap).toHaveClass("tls-tl-table");
+});
+
+test("Original-Bilder (#1933): Scoreboard und Tabelle am Spieltag, „Original ansehen“ am Ende der Karte", async () => {
+  const url = "/api/reference-series/public/probe-liga/2026-division-1/originals";
+  renderPage({ ...BODY, originals: { r1: [
+    { id: "m1", kind: "scoreboard", map: 1, url: `${url}/m1`, width: 1600, height: 900 },
+    { id: "t1", kind: "table", url: `${url}/t1`, width: 1200, height: 900 },
+  ] } });
+  const days = await screen.findAllByTestId("team-league-matchday");
+  expect(within(days[1]).queryByTestId("team-league-originals")).toBeNull();
+  fireEvent.click(within(days[0]).getByTestId("team-league-originals"));
+  expect(screen.getByRole("dialog")).toHaveAccessibleName("Original-Bilder: ST1 · gegen Fremd Füchse");
+  expect(screen.getByTestId("original-viewer-label")).toHaveTextContent("Scoreboard · Map 1");
 });

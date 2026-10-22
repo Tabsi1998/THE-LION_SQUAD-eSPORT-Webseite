@@ -184,3 +184,20 @@ test("ein Lauf ohne Ergebnis sagt, wann es kommt", async () => {
   renderAt("/references/series/probe-rennliga/2026/runde/1", { ...PAGE, sessions: [QUALI, planned], summary: {} });
   expect(await screen.findByTestId("round-empty")).toHaveTextContent("Noch kein Ergebnis – Rennen am Do., 22.10.2026, 20:30 Uhr.");
 });
+
+test("Original-Bilder des Laufs (#1933): „Original ansehen“ öffnet das Vollbild, je Reiter die eigenen", async () => {
+  const pictures = [
+    { id: "o1", kind: "race", url: "/api/reference-series/public/probe-rennliga/2026/originals/o1", width: 1600, height: 900 },
+    { id: "o2", kind: "table", url: "/api/reference-series/public/probe-rennliga/2026/originals/o2", width: 1200, height: 900 },
+  ];
+  renderAt("/references/series/probe-rennliga/2026/runde/1", { ...PAGE, sessions: [{ ...QUALI, originals: [] }, { ...RACE, originals: pictures }] });
+  const button = await screen.findByTestId("round-original");
+  expect(button).toHaveAccessibleName("Original ansehen, 2 Bilder");
+  fireEvent.click(button);
+  const viewer = screen.getByRole("dialog");
+  expect(viewer).toHaveAccessibleName("Original-Bilder: R1 Aserbaidschan · Rennen");
+  expect(within(viewer).getByTestId("original-viewer-label")).toHaveTextContent("Rennen");
+  fireEvent.click(within(viewer).getByTestId("original-viewer-close"));
+  fireEvent.click(screen.getByTestId("round-tab-qualifying"));
+  expect(screen.queryByTestId("round-original")).toBeNull();
+});

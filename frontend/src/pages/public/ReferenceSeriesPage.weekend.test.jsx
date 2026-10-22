@@ -209,3 +209,21 @@ test("Reiter Statistik: je Kennzahl die Spitze und die Tabelle, nur Kennzahlen, 
   fireEvent.click(within(stats).getByTestId("season-stats-teams"));
   expect(within(within(stats).getByTestId("season-stats-table")).getAllByTestId("season-stats-row")[0]).toHaveTextContent("Probe Löwen");
 });
+
+test("Original-Bilder (#1933): je Runde ein „Original ansehen“ mit den Bildern aller Läufe, Lauf davor", async () => {
+  const url = "/api/reference-series/public/probe-rennliga/2026-f2/originals";
+  renderPage({ ...BODY, originals: {
+    q1: [{ id: "a", kind: "qualifying", url: `${url}/a`, width: 1600, height: 900 }],
+    s1: [{ id: "b", kind: "sprint", url: `${url}/b`, width: 1600, height: 900 }],
+    f1: [{ id: "c", kind: "race", url: `${url}/c`, width: 1600, height: 900 }, { id: "d", kind: "table", url: `${url}/d`, width: 1200, height: 900 }],
+  } });
+  const weekends = await screen.findAllByTestId("racing-round");
+  expect(within(weekends[1]).queryByTestId("racing-round-originals")).toBeNull();
+  const button = within(weekends[0]).getByTestId("racing-round-originals");
+  expect(button).toHaveAccessibleName("Original ansehen, 4 Bilder");
+  fireEvent.click(button);
+  expect(screen.getByRole("dialog")).toHaveAccessibleName("Original-Bilder: R1 · Probering");
+  expect(screen.getAllByTestId("original-viewer-thumb").map((thumb) => thumb.getAttribute("aria-label"))).toEqual([
+    "Bild 1: Qualifying", "Bild 2: Sprint", "Bild 3: Hauptrennen · Rennen", "Bild 4: Hauptrennen · Tabelle",
+  ]);
+});
