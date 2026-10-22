@@ -1,5 +1,26 @@
 # Changelog
 
+## 1.30.0 (22.10.2026)
+
+### Neu
+
+* Bündelung rückgängig machen – Zuordnung lösen, unveränderte leere Saisons und Spuren entfernen; strengere Sichtbarkeit bleibt mit Hinweis und Link zur Referenz (#1751)
+* Hilfe der Terminliste zeigt den Ablauf der Saison (#2007)
+* Liga-Weg zeigt ohne eingetragene Ergebnisse den Platz der Referenz (#1751)
+* Referenzen bündeln – der Assistent schlägt aus alten Referenzen Spur und Saisons vor, mit Hinweisen aus den Altdaten (#1751)
+* Saison- und Teamtabelle per Bild auslesen – das Bild hängt beim Übernehmen als Original „Tabelle“ am Termin (#1999)
+* Saisontabelle des Veranstalters einlesen – vergangene Runden als Entwürfe nachtragen, Platz aus den Punkten, Abgleich mit „Gesamt“ (#1928)
+* Teamwertung laut Veranstalter für eine gewählte Runde übernehmen, ergänzen oder ersetzen, auch per Bild im Ergebnisblatt (#1999)
+
+### Fehlerbehebungen
+
+* Terminliste nennt bei doppeltem Lauf Zeile und Grund (#2007)
+
+### Dokumentation
+
+* Druckfassung des Helfer-Spickzettels auf zwei A4-Seiten (#1686)
+* Helfer-Spickzettel für den Event-Tag (#1686)
+
 ## 1.29.0 (22.10.2026)
 
 ### Neu
