@@ -102,6 +102,8 @@ async def test_a_season_with_19_rounds_and_36_drivers_is_filled_in_one_step(flow
     unique = [item for item in data["totals"]
               if sum(1 for other in rows if other["total"] == item["table_total"]) == 1]
     assert unique and all(item["rank"] == item["table_rank"] for item in unique)
+    # Gleiche Summe heißt ohne Spalte „Platz“ nur gleich gut - der Vorrang der Saison entscheidet ohne Meldung.
+    assert not [item for item in data["totals"] if item["rank_differs"]]
     # Plätze je Runde aus den Punkten zurückgerechnet - wo eindeutig (Punkteränge 1-10).
     first = {cell["row"]: cell for cell in data["columns"][0]["cells"]}
     for name, place in places[0].items():

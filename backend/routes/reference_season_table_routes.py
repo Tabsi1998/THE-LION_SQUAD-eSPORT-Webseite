@@ -278,6 +278,7 @@ async def _totals(db, access: SeriesAccess, body: SeasonTableInput, columns: lis
     standing = {row["participant_id"]: row for row in (drivers[-1]["rows"] if drivers else [])}
     pids = _row_pids(columns, len(body.rows))
     names = {person["id"]: person.get("name") or "" for person in people}
+    from_column = any(row.rank is not None for row in body.rows)
     ranks = season_table.table_ranks([row.rank for row in body.rows], [row.total for row in body.rows])
     taken = [item.content is not None for item in columns]
     out = []
@@ -294,7 +295,7 @@ async def _totals(db, access: SeriesAccess, body: SeasonTableInput, columns: lis
         out.append({"row": index, "name": row.name, "participant_id": pid, "known_as": names.get(pid) or None,
                     "is_new": series_results.is_new(pid), "table_total": series_results.number(row.total),
                     "cell_sum": cell_sum, "computed": computed, "table_rank": ranks[index], "rank": rank,
-                    "rank_differs": bool(rank and ranks[index] and rank != ranks[index]), **explained})
+                    "rank_differs": season_table.rank_differs(ranks[index], rank, ranks, from_column), **explained})
     return out, None
 
 

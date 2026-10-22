@@ -418,6 +418,15 @@ def table_ranks(ranks: list, totals: list) -> list:
             for total in totals]
 
 
+def rank_differs(table_rank, rank, ranks: list, from_column: bool) -> bool:
+    """Weicht der eigene Platz vom Platz laut Tabelle ab? Ohne Spalte „Platz“ heißt gleiche Summe nur „gleich gut“:
+    bei 2, 2 passt der eigene Platz 2 oder 3 (dort entscheidet der Vorrang der Saison)."""
+    if not table_rank or not rank:
+        return False
+    span = 1 if from_column else max(1, sum(1 for item in ranks if item == table_rank))
+    return not table_rank <= rank < table_rank + span
+
+
 def explain_total(table_total, computed, components: dict) -> dict:
     """Gerechnet gegen „Gesamt“ der Tabelle. ``components``: was die eigene Rechnung von der Summe der Zellen trennt
     (``ignored``, ``sheet``, ``dropped``, ``activity``, ``adjustment``, ``other``) - je mit Vorzeichen.

@@ -199,3 +199,9 @@ def test_the_parts_between_cells_and_the_own_total_add_up():
 def test_the_place_in_the_table_comes_from_the_column_or_the_totals():
     assert season_table.table_ranks([3, 1, 2], [10, 30, 20]) == [3, 1, 2]
     assert season_table.table_ranks([None] * 4, [30, 20, 20, None]) == [1, 2, 2, None]
+    # Ohne Spalte „Platz“ sind 2, 2 gleich gut - der eigene Vorrang darf 2 oder 3 daraus machen; mit Spalte nicht.
+    ranks = [1, 2, 2, None]
+    assert [season_table.rank_differs(table, own, ranks, False) for table, own in ((2, 3), (2, 2), (2, 4), (1, 2))] == [
+        False, False, True, True]
+    assert season_table.rank_differs(2, 3, [1, 2, 3], True) is True
+    assert season_table.rank_differs(None, 3, [], True) is False
