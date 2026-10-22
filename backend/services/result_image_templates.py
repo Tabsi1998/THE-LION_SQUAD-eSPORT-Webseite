@@ -22,6 +22,8 @@ Eine Vorlage ist reine Beschreibung - gelesen wird in ``result_image_ocr``, abge
 - ``min_confidence``: darunter (0-100, Sicherheit der Texterkennung je Wort) gilt eine Zelle als unsicher.
 - ``name_match``/``name_sure``: ab welcher Ähnlichkeit (0-1) ein gelesener Name einem bekannten Teilnehmer zugeordnet
   wird und ab wann ohne gelbe Markierung; ``team_match`` dasselbe für Teams (wenige und bekannt, darum niedriger).
+  ``name_margin``: so viel ähnlicher als der Zweitbeste muss ein Name bzw. Team sein, damit er grün ist (#2012) - zwei
+  Teilnehmer, die sich nur in l/1 unterscheiden, sind so nie eindeutig.
 
 Welche Vorlage gilt, legt der Vorstand je Spur (``reference_lineages.result_image_template``) und - abweichend - je
 Saison (``reference_series.result_image_template``) fest. Ohne Festlegung gilt die Standard-Vorlage der Art (Rennliga:
@@ -71,6 +73,7 @@ TEMPLATES: tuple[dict, ...] = (
         "min_confidence": 80,
         "name_match": 0.72,
         "name_sure": 0.9,
+        "name_margin": 0.1,
         "team_match": 0.6,
     },
 )
