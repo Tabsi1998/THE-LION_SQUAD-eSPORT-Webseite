@@ -302,13 +302,30 @@ def _team_rows(rules: dict, upto: list[dict], sheets: dict, seq_of: dict, people
     lineup = config.get("mode") == "current_lineup"
     members: dict[str, dict[str, float]] = {}
     if lineup:
-        points = {pid: value for pid, value in (driver_points or {}).items()
+        # Fahrer-Anpassungen (#2000) stecken in den Saisonpunkten: mit Haken bleiben sie drin und stehen beim Team, ohne
+        # werden sie für die Teamsumme herausgerechnet - nie doppelt.
+        outside: dict[str, float] = {}
+        flagged: dict[str, list[dict]] = {}
+        for item in adjustments or ():
+            pid = item.get("participant_id")
+            if item.get("kind", "participant") != "participant" or not pid:
+                continue
+            if item.get("counts_for_team"):
+                flagged.setdefault(pid, []).append(item)
+            else:
+                outside[pid] = outside.get(pid, 0) + item["points"]
+        points = {pid: value - outside.get(pid, 0) for pid, value in (driver_points or {}).items()
                   if not ((people.get(pid) or {}).get("link") == "guest" and not config["guests_count"])}
         for pid, team in _current_teams(rules, upto, sheets, seq_of, people, points, round_rules).items():
-            members.setdefault(series_adjustments.team_key(entry_for(team)["team"]), {})[pid] = points[pid]
+            entry = entry_for(team)
+            members.setdefault(series_adjustments.team_key(entry["team"]), {})[pid] = points[pid]
+            entry.setdefault("_driver_adjust", []).extend(flagged.get(pid, []))
     for item in adjustments or ():
         if item.get("kind") == "team" and item.get("team") and not is_no_team(item["team"], rules):
             entry_for(item["team"]).setdefault("_adjust", []).append(item)
+        elif not lineup and item.get("counts_for_team") and item.get("credited_team"):
+            # Je Rennen (#2000): für das Team, für das der Fahrer im Termin gefahren ist (``_credit_team``).
+            entry_for(item["credited_team"]).setdefault("_driver_adjust", []).append(item)
     for name in sheets[upto[-1]["id"]].get("official_team_totals") or {}:
         if not is_no_team(name, rules):
             entry_for(name)
@@ -317,21 +334,101 @@ def _team_rows(rules: dict, upto: list[dict], sheets: dict, seq_of: dict, people
         by_driver = entry.pop("_by_driver")
         adjusted = entry.pop("_adjust", [])
         extra = sum(item["points"] for item in adjusted)
+        from_drivers = entry.pop("_driver_adjust", [])
+        driver_extra = sum(item["points"] for item in from_drivers)
         if lineup:
             current = members.get(series_adjustments.team_key(entry["team"]), {})
             entry["driver_ids"] = sorted(current, key=lambda pid: (-current[pid], pid))
+            # Die Fahrer-Anpassungen mit Haken stecken schon in ``current`` - nicht noch einmal dazu.
             entry["computed_points"] = _number(sum(current.values()) + extra)
         else:
             entry["driver_ids"] = sorted(by_driver, key=lambda pid: (-by_driver[pid], pid))
-            entry["computed_points"] = _number(sum(item["points"] for item in entry["round_points"]) + extra)
+            entry["computed_points"] = _number(sum(item["points"] for item in entry["round_points"]) + extra +
+                                               driver_extra)
         entry["adjustment_points"] = _number(extra)
         entry["adjustments"] = [series_adjustments.public(item) for item in adjusted]
+        # #2000: Fahrer-Anpassungen, die fürs Team zählen - getrennt von den Team-Anpassungen, mit Fahrer-Kennung.
+        entry["driver_adjustment_points"] = _number(driver_extra)
+        entry["driver_adjustments"] = [{**series_adjustments.public(item), "credited_team": entry["team"],
+                                        "participant_id": item["participant_id"]} for item in from_drivers]
         entry["_stats"] = _stats(entry.pop("_results"))
         _official(entry, official.get(series_adjustments.team_key(entry["team"])))
         rows.append(entry)
     _rank(rows, rules["tiebreakers"], upto, lambda row: (row["team"].casefold(), row["team"]),
           rules["tiebreak_top_n"])
     return rows
+
+
+# ---------------------------------------------------------------- Fahrer-Anpassungen in der Teamwertung (#2000)
+def _credit_team(item: dict, rules: dict, scored: list[dict], sheets: dict, people: dict,
+                 position: dict[str, int]) -> tuple[str | None, str | None]:
+    """Für welches Team eine Fahrer-Anpassung im Modus ``per_race`` zählt - ``(Team, None)`` oder ``(None, Hinweis)``.
+    Mit Termin, in dem der Fahrer gefahren ist: das Team dieser Fahrt (Ersatz-Einsatz ``substitute``, leer
+    ``no_team``). Sonst die letzte Fahrt mit Team bis zum Termin bzw. - ohne Termin - bis zum Tag der Anpassung
+    (keine: ``no_ride``). Ein Gast zählt nur mit ``guests_count`` (sonst ``guest``). Fahrten danach ändern nichts."""
+    pid = item.get("participant_id")
+    if (people.get(pid) or {}).get("link") == "guest" and not rules["team_scoring"]["guests_count"]:
+        return None, "guest"
+
+    def ride(round_id: str) -> dict | None:
+        return next((row for row in sheets[round_id].get("rows") or [] if row.get("participant_id") == pid), None)
+
+    round_id = item.get("round_id")
+    if round_id in {entry["id"] for entry in scored}:
+        row = ride(round_id)
+        if row is not None:
+            team = _ride_team({"team": row.get("team")}, rules)
+            if team:
+                return team, None
+            return None, "substitute" if str(row.get("team") or "").strip() else "no_team"
+    if round_id in position:
+        before = [entry for entry in scored if position.get(entry["id"], -1) <= position[round_id]]
+    else:
+        day = str(item.get("day") or "")
+        before = [entry for entry in scored if str(entry.get("club_day") or "") and str(entry["club_day"]) <= day]
+    for entry in reversed(before):
+        row = ride(entry["id"])
+        team = _ride_team({"team": row.get("team")}, rules) if row else None
+        if team:
+            return team, None
+    return None, "no_ride"
+
+
+def _with_team_credit(adjustments, rules: dict, scored: list[dict], sheets: dict, people: dict,
+                      calendar: list[dict]) -> list[dict]:
+    """Die Anpassungen zum Rechnen: jede Fahrer-Anpassung mit dem gelesenen Haken (``counts_for_team``, Altdaten nach
+    Modus) und - je Rennen - dem Team, für das sie zählt (``credited_team``) bzw. dem Hinweis (``team_note``)."""
+    position = {item["id"]: index for index, item in enumerate(calendar)}
+    per_race = rules["team_scoring"]["mode"] != "current_lineup"
+    out = []
+    for item in adjustments or []:
+        if not isinstance(item, dict) or item.get("kind", "participant") != "participant":
+            out.append(item)
+            continue
+        flagged = series_adjustments.counts_for_team(item, rules)
+        team, note = (_credit_team(item, rules, scored, sheets, people, position) if flagged and per_race
+                      else (None, None))
+        out.append({**item, "counts_for_team": flagged, "credited_team": team, "team_note": note})
+    return out
+
+
+def _mark_credit(drivers: list[dict], teams: list[dict], rules: dict, people: dict) -> None:
+    """Fahrer-Detail (#2000): an jeder Anpassung mit Haken das Team, bei dem sie in diesem Stand steht - in der
+    aktuellen Besetzung das aktuelle Team des Fahrers -, sonst warum für keines (Gast bzw. ohne Team)."""
+    credited = {item["id"]: row["team"] for row in teams for item in row.get("driver_adjustments") or []
+                if item.get("id")}
+    for row in drivers:
+        for item in row.get("adjustments") or []:
+            if not item.get("counts_for_team"):
+                continue
+            if item.get("id") in credited:
+                item["credited_team"] = credited[item["id"]]
+                item.pop("team_note", None)
+            elif not item.get("team_note"):
+                item.pop("credited_team", None)
+                guest = ((people.get(row["participant_id"]) or {}).get("link") == "guest" and
+                         not rules["team_scoring"]["guests_count"])
+                item["team_note"] = "guest" if guest else "no_team"
 
 
 # ---------------------------------------------------------------- Tabelle der Team-Liga
@@ -454,6 +551,7 @@ def compute_standings(*, rules: dict, rounds: list[dict], sheets: dict[str, dict
     if matcher:
         adjustments = [{**item, "team": matcher.canonical(item["team"])} if item.get("team") else item
                        for item in adjustments or []]
+    adjustments = _with_team_credit(adjustments, rules, scored, sheets, people, calendar)
     active = series_adjustments.active_per_snapshot(adjustments, calendar, scored)
     snapshots: list[dict] = []
     previous: dict[str, dict] = {}
@@ -467,6 +565,7 @@ def compute_standings(*, rules: dict, rounds: list[dict], sheets: dict[str, dict
             teams = (_team_rows(rules, upto, sheets, seq_of, people, round_rules, active[index],
                                 {row["participant_id"]: row["points"] for row in drivers})
                      if rules["team_scoring"]["enabled"] else [])
+            _mark_credit(drivers, teams, rules, people)
             if teams:
                 scopes.append(("teams", "team", teams))
         if any(sheets[done["id"]].get("matches") or sheets[done["id"]].get("official_table") for done in upto):

@@ -61,6 +61,67 @@ test("Anlegen: Pflichtfelder, echtes Minus, Termin - dann rechnet der Server neu
   await waitFor(() => expect(onChanged).toHaveBeenCalled());
 });
 
+// #2000: Haken „zählt auch für die Teamwertung“ - Vorgabe der Saison, Hinweis, für welches Team bzw. warum für keines.
+const TEAM_SERIES = {
+  ...SERIES,
+  rules: { team_scoring: { enabled: true, mode: "per_race", adjustments_count_for_team: true } },
+  adjustments: [
+    { ...ADJUSTMENTS[0], counts_for_team: true },
+    { id: "a3", kind: "participant", participant_id: "p2", points: -3, reason: "Video fehlt", day: "2026-11-01", round_id: null, counts_for_team: true },
+    { id: "a4", kind: "participant", participant_id: "p2", points: 1, reason: "Nachtrag", day: "2026-11-01", round_id: null, counts_for_team: false },
+  ],
+  adjustment_teams: { a1: { team: null, note: "substitute" }, a3: { team: "Fremd Rot", note: null } },
+};
+
+test("Teamwertung: die Liste sagt, für welches Team eine Anpassung zählt - als Ersatz gefahren für keines", async () => {
+  render(<SeriesAdjustmentsSection series={TEAM_SERIES} onChanged={vi.fn()} />);
+  await waitFor(() => expect(screen.getAllByTestId("adjustment-row")[0]).toHaveTextContent("Probe Lion Eins"));
+  const notes = screen.getAllByTestId("adjustment-team-note");
+  expect(notes.map((node) => node.textContent)).toEqual([
+    "zählt für kein Team – im Termin als Ersatz gefahren", "zählt auch fürs Team · Fremd Rot"]);
+  expect(notes[0]).toHaveAttribute("data-tone", "warn");
+});
+
+test("Teamwertung: neuer Haken mit der Vorgabe der Saison, abwählbar, nur für Fahrer", async () => {
+  render(<SeriesAdjustmentsSection series={TEAM_SERIES} onChanged={vi.fn()} />);
+  await screen.findAllByTestId("adjustment-row");
+  fireEvent.click(screen.getByTestId("adjustment-new"));
+  const sheet = await screen.findByTestId("adjustment-sheet");
+  const box = within(sheet).getByTestId("adjustment-counts-for-team");
+  expect(box).toBeChecked();
+  expect(sheet).toHaveTextContent("für das der Fahrer im Termin gefahren ist");
+  await waitFor(() => expect(within(sheet).getByTestId("adjustment-participant").querySelectorAll("option").length).toBe(3));
+  fireEvent.change(within(sheet).getByTestId("adjustment-participant"), { target: { value: "p1" } });
+  fireEvent.change(within(sheet).getByTestId("adjustment-reason"), { target: { value: "Video fehlt" } });
+  fireEvent.click(box);
+  fireEvent.click(screen.getByTestId("adjustment-save"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/reference-series/admin/series/serie-1/adjustments",
+    expect.objectContaining({ kind: "participant", participant_id: "p1", counts_for_team: false })));
+  fireEvent.click(screen.getByTestId("adjustment-new"));
+  const again = await screen.findByTestId("adjustment-sheet");
+  fireEvent.change(within(again).getByTestId("adjustment-kind"), { target: { value: "team" } });
+  expect(within(again).queryByTestId("adjustment-counts-for-team")).toBeNull();
+});
+
+test("Teamwertung: Altdaten ohne Haken zeigen ihn so, wie gerechnet wird (aktuelle Besetzung: an)", async () => {
+  const series = { ...SERIES, rules: { team_scoring: { enabled: true, mode: "current_lineup" } } };
+  render(<SeriesAdjustmentsSection series={series} onChanged={vi.fn()} />);
+  await screen.findAllByTestId("adjustment-row");
+  fireEvent.click(screen.getAllByTestId("adjustment-edit")[0]);
+  const sheet = await screen.findByTestId("adjustment-sheet");
+  expect(within(sheet).getByTestId("adjustment-counts-for-team")).toBeChecked();
+  expect(sheet).toHaveTextContent("aus der Teamsumme herausgerechnet");
+});
+
+test("Ohne Teamwertung gibt es keinen Haken", async () => {
+  render(<SeriesAdjustmentsSection series={SERIES} onChanged={vi.fn()} />);
+  await screen.findAllByTestId("adjustment-row");
+  fireEvent.click(screen.getByTestId("adjustment-new"));
+  const sheet = await screen.findByTestId("adjustment-sheet");
+  expect(within(sheet).queryByTestId("adjustment-counts-for-team")).toBeNull();
+  expect(screen.queryByTestId("adjustment-team-note")).toBeNull();
+});
+
 test("Bearbeiten und Entfernen gehen an genau diese Anpassung", async () => {
   render(<SeriesAdjustmentsSection series={SERIES} onChanged={vi.fn()} />);
   await screen.findAllByTestId("adjustment-row");

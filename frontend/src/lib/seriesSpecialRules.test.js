@@ -1,6 +1,7 @@
 import { describe, expect, test } from "vitest";
 import {
-  adjustmentErrors, adjustmentLine, adjustmentPayload, adjustmentSum, adjustmentText, adjustmentTitle, adjustmentToForm, cancelledText, emptyAdjustment,
+  adjustmentDefaultTeam, adjustmentErrors, adjustmentLine, adjustmentPayload, adjustmentSum, adjustmentTeamText, adjustmentText, adjustmentTitle, adjustmentToForm,
+  cancelledText, driverAdjustmentMarks, emptyAdjustment,
   noScoreText, parseTeamTotals, ruleChangeLines, successorLink, teamCountHint, teamDeviationText, teamModeLabel, teamSinceLabel, teamSourceLabel,
   teamTotalsObject,
 } from "@/lib/seriesSpecialRules";
@@ -47,6 +48,52 @@ describe("Anpassungen", () => {
     expect(Object.keys(adjustmentErrors({ ...form, points: "0", reason: " ", day: "", participant_id: "" })).sort()).toEqual(["day", "points", "reason", "who"]);
     expect(adjustmentToForm({ id: "a1", kind: "team", team: "Fremd Rot", points: -4, reason: "Regel", day: "2026-03-01", round_id: null }))
       .toMatchObject({ id: "a1", kind: "team", team: "Fremd Rot", points: "-4", reason: "Regel", round_id: "" });
+  });
+});
+
+describe("Fahrer-Anpassung in der Teamwertung (#2000)", () => {
+  const ON = { enabled: true, mode: "per_race", adjustments_count_for_team: true };
+  const LINEUP = { enabled: true, mode: "current_lineup" };
+  const item = { id: "a1", kind: "participant", participant_id: "p1", points: -5, reason: "Video fehlt", day: "2026-03-04", round_id: null };
+
+  test("Formular: der Haken nur mit Teamwertung - Altdaten wie bisher (aktuelle Besetzung ja, je Rennen nein)", () => {
+    expect(adjustmentToForm(item, ON).counts_for_team).toBe(false);
+    expect(adjustmentToForm(item, LINEUP).counts_for_team).toBe(true);
+    expect(adjustmentToForm({ ...item, counts_for_team: false }, LINEUP).counts_for_team).toBe(false);
+    expect(adjustmentToForm({ ...item, counts_for_team: true }, ON).counts_for_team).toBe(true);
+    expect(adjustmentToForm({ ...item, counts_for_team: true }, { enabled: false }).counts_for_team).toBeNull();
+    const form = emptyAdjustment({ participant_id: "p1", points: "-5", reason: "Video", day: "2026-03-04", counts_for_team: true });
+    expect(adjustmentPayload(form)).toMatchObject({ kind: "participant", counts_for_team: true });
+    expect(adjustmentPayload({ ...form, counts_for_team: false }).counts_for_team).toBe(false);
+    expect(adjustmentPayload({ ...form, counts_for_team: null })).not.toHaveProperty("counts_for_team");
+    expect(adjustmentPayload({ ...form, kind: "team", team: "Team Adler" })).not.toHaveProperty("counts_for_team");
+    expect(adjustmentDefaultTeam(ON)).toBe(true);
+    expect(adjustmentDefaultTeam({ enabled: true })).toBe(false);
+    expect(adjustmentDefaultTeam({ enabled: false, adjustments_count_for_team: true })).toBeNull();
+  });
+
+  test("Fahrer-Detail und Verwaltung: für welches Team bzw. warum für keines", () => {
+    expect(adjustmentTeamText({ counts_for_team: true, credited_team: "Team Adler" })).toBe("zählt auch fürs Team · Team Adler");
+    expect(adjustmentTeamText({ counts_for_team: true, team_note: "substitute" })).toBe("zählt für kein Team – im Termin als Ersatz gefahren");
+    expect(adjustmentTeamText({ counts_for_team: true, team_note: "no_team" })).toBe("zählt für kein Team – ohne Team gefahren");
+    expect(adjustmentTeamText({ counts_for_team: true, team_note: "no_ride" })).toBe("zählt für kein Team – bis dahin keine Fahrt mit Team");
+    expect(adjustmentTeamText({ counts_for_team: true, team_note: "guest" })).toBe("zählt für kein Team – Gäste zählen nicht fürs Team");
+    expect(adjustmentTeamText({ counts_for_team: true })).toBe("zählt auch fürs Team");
+    expect(adjustmentTeamText({ points: -5 })).toBe("");
+    expect(adjustmentTeamText(null)).toBe("");
+  });
+
+  test("Teamtabelle: „−5 (Fahrer)“ mit Grund - ausgeblendete Namen bleiben ausgeblendet", () => {
+    const rows = [{ key: "p1", name: "Anna Probe" }, { key: "p2", name: "Geheim", name_hidden: true }];
+    const team = { driver_adjustments: [
+      { points: -5, reason: "Video fehlt", day: "2026-03-04", round_id: "r4", driver: "p1" },
+      { points: 2, reason: "Korrektur", day: "2026-03-05", round_id: null, driver: "p2" },
+    ] };
+    expect(driverAdjustmentMarks(team, rows, ROUNDS)).toEqual([
+      { key: "p1-0", negative: true, text: "−5 (Anna Probe)", title: "Anpassung −5 · Video fehlt · R4 · 04.03.2026 – Anna Probe, zählt auch fürs Team" },
+      { key: "p2-1", negative: false, text: "+2 (Name ausgeblendet)", title: "Anpassung +2 · Korrektur · 05.03.2026 – Name ausgeblendet, zählt auch fürs Team" },
+    ]);
+    expect(driverAdjustmentMarks({}, rows, ROUNDS)).toEqual([]);
   });
 });
 

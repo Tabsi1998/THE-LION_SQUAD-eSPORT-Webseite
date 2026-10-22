@@ -31,8 +31,18 @@ from services.scoring_rules import normalize_rules
 from services.team_league_page import PATH_FIELDS as SEASON_FIELDS, visible_seasons
 
 TEAM_ROW_FIELDS = ("rank", "tiebreak", "points", "computed_points", "official_points", "deviation",
-                   "adjustment_points")
+                   "adjustment_points", "driver_adjustment_points")
+# Anpassungen (#1960) gehen mit Punkten, Grund, Tag und Termin hinaus - öffentlich als „−5“ mit Grund.
 ADJUSTMENT_FIELDS = ("points", "reason", "day", "round_id")
+# #2000: nur, wo gesetzt - zählt auch fürs Team, für welches bzw. warum für keines.
+ADJUSTMENT_TEAM_FIELDS = ("counts_for_team", "credited_team", "team_note")
+
+
+def adjustment_view(item: dict) -> dict:
+    """Eine Anpassung, wie die Serienseite sie zeigt: Punkte, Grund, Tag, Termin - und, nur wo gesetzt, ob sie auch
+    fürs Team zählt (#2000). Keine Kennung."""
+    return {**{key: item.get(key) for key in ADJUSTMENT_FIELDS},
+            **{key: item[key] for key in ADJUSTMENT_TEAM_FIELDS if item.get(key)}}
 
 
 def _text(value) -> str:
@@ -112,7 +122,11 @@ def team_rows(rows: list[dict], results: dict | None = None) -> list[dict]:
             "key": row.get("team"), "team": row.get("team"),
             **{field: row.get(field) for field in TEAM_ROW_FIELDS},
             "previous_rank": None if change is None or rank is None else rank + change,
-            "adjustments": [{key: item.get(key) for key in ADJUSTMENT_FIELDS} for item in row.get("adjustments") or []],
+            "adjustments": [adjustment_view(item) for item in row.get("adjustments") or []],
+            # #2000: Fahrer-Anpassungen, die fürs Team zählen - der Fahrer als Kennung wie in ``drivers``; den Namen
+            # nimmt die Seite aus der Fahrerwertung (ausgeblendete Namen bleiben ausgeblendet).
+            "driver_adjustments": [{**adjustment_view(item), "driver": item.get("participant_id")}
+                                   for item in row.get("driver_adjustments") or []],
             "drivers": list(row.get("driver_ids") or []),
             "driver_points": {pid: _number(points) for pid, points in contribution.items()},
             "results": [{"round_id": item.get("round_id"), "points": item.get("points"),

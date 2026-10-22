@@ -5,7 +5,10 @@ fehlendes Video - oder eine Korrektur der Teamwertung. Gespeichert wird je Saiso
 Feld ``adjustments``); der Rechenkern (``series_standings.compute_standings``) zählt sie dazu.
 
 - **Wer:** ein Teilnehmer (``kind = participant``) für die Fahrerwertung oder ein Team (``kind = team``) für die
-  Teamwertung - eine Fahrer-Anpassung ändert die Teamwertung nicht, eine Team-Anpassung nicht die Fahrer.
+  Teamwertung - eine Team-Anpassung ändert die Fahrer nie. Eine Fahrer-Anpassung zählt mit dem Haken
+  ``counts_for_team`` (#2000, Vorgabe je Saison ``team_scoring.adjustments_count_for_team``) auch für die Teamwertung:
+  je Rennen für das Team, für das der Fahrer im Termin gefahren ist, in der aktuellen Besetzung bleibt sie in seinen
+  Saisonpunkten (ohne Haken wird sie dort herausgerechnet). Altdaten ohne Haken: ``counts_for_team``.
 - **Was:** Punkte (±, nie 0), Grund (öffentlich, kurz), Tag (Wiener Tag) und optional der Termin, um den es geht.
 - **Ab wann:** mit Termin ab dem Stand dieses Termins (ist er nicht gewertet, ab dem nächsten gewerteten; gibt es
   keinen, im letzten Stand). Ohne Termin ab dem Stand, der an ihrem Tag galt (der letzte gewertete Termin an oder vor
@@ -21,6 +24,10 @@ MAX_POINTS = 1000
 MAX_REASON = 200
 MAX_ADJUSTMENTS = 500
 PUBLIC_FIELDS = ("id", "points", "reason", "day", "round_id")
+# #2000: zählt auch fürs Team (``counts_for_team``), für welches (``credited_team``) bzw. warum für keines
+# (``team_note``: ``substitute`` Ersatz-Einsatz, ``no_team`` ohne Team, ``no_ride`` keine Fahrt mit Team bis dahin,
+# ``guest`` Gäste zählen nicht fürs Team).
+TEAM_FIELDS = ("counts_for_team", "credited_team", "team_note")
 
 
 def _text(value) -> str:
@@ -74,7 +81,22 @@ def normalize(raw: dict) -> dict:
         "reason": reason,
         "day": _day(raw.get("day")),
         "round_id": _text(raw.get("round_id")) or None,
+        # #2000: zählt eine Fahrer-Anpassung auch für die Teamwertung? ``None``: nicht gesetzt (Altdaten, Team).
+        "counts_for_team": (bool(raw["counts_for_team"]) if kind == "participant" and
+                            raw.get("counts_for_team") is not None else None),
     }
+
+
+def counts_for_team(adjustment: dict, rules: dict) -> bool:
+    """Zählt eine Fahrer-Anpassung auch für die Teamwertung (#2000)? Der Haken, wo gesetzt. Altdaten ohne Haken rechnen
+    wie vor #2000: im Modus ``current_lineup`` steckt sie in den Saisonpunkten des Fahrers (also ja), je Rennen nicht.
+    Ohne Teamwertung und für Team-Anpassungen immer nein."""
+    if adjustment.get("kind", "participant") != "participant" or not rules["team_scoring"]["enabled"]:
+        return False
+    value = adjustment.get("counts_for_team")
+    if isinstance(value, bool):
+        return value
+    return rules["team_scoring"]["mode"] == "current_lineup"
 
 
 def team_key(name) -> str:
@@ -107,5 +129,7 @@ def active_per_snapshot(adjustments, calendar: list[dict], scored: list[dict]) -
 
 
 def public(adjustment: dict) -> dict:
-    """Was ein Stand von einer Anpassung trägt (und die Serienseite zeigt): Punkte, Grund, Tag, Termin."""
-    return {key: adjustment.get(key) for key in PUBLIC_FIELDS}
+    """Was ein Stand von einer Anpassung trägt (und die Serienseite zeigt): Punkte, Grund, Tag, Termin - und nur, wo
+    gesetzt, ob sie auch fürs Team zählt, für welches bzw. warum für keines (#2000, ``TEAM_FIELDS``)."""
+    return {**{key: adjustment.get(key) for key in PUBLIC_FIELDS},
+            **{key: adjustment[key] for key in TEAM_FIELDS if adjustment.get(key)}}

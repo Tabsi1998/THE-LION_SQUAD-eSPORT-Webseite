@@ -42,7 +42,7 @@ from services.own_teams import Matcher, own_teams
 from services.rate_limit import enforce_rate_limit
 from services.reference_calendar import calendar_view, vienna_clock
 from services.scoring_rules import normalize_rules
-from services.series_racing import racing_block
+from services.series_racing import adjustment_view, racing_block
 from services.series_rule_changes import rule_changes
 from services.series_standings import RACE_DETAILS
 from services.team_league_page import team_league_view
@@ -60,8 +60,8 @@ RULE_FIELDS = ("points_mode", "points_by_place", "bonuses", "dnf_points", "dns_p
                "day_rounds", "custom_bonuses", "tiebreak_top_n")
 ROW_FIELDS = ("rank", "points", "computed_points", "official_points", "deviation", "activity_points", "tiebreak",
               "wins", "podiums", "rounds_played", "bonus_points", "adjustment_points")
-# Anpassungen (#1960) gehen mit Punkten, Grund, Tag und Termin hinaus - öffentlich als „−5“ mit Grund.
-ADJUSTMENT_FIELDS = ("points", "reason", "day", "round_id")
+# Anpassungen (#1960) gehen mit Punkten, Grund, Tag und Termin hinaus (``series_racing.adjustment_view``, mit #2000
+# auch „zählt fürs Team“) - öffentlich als „−5“ mit Grund.
 SUCCESSOR_FIELDS = ("season", "tier", "title", "season_slug", "status")
 # Noch offen ist jede Wertungsrunde, die nicht gewertet ist (auch „Ergebnis folgt“); kommend sind nur diese:
 UPCOMING_STATES = ("planned", "today", "postponed")
@@ -124,7 +124,7 @@ def _standing_row(row: dict, people: dict) -> dict:
         "key": row.get("participant_id"),
         **(people.get(row.get("participant_id")) or HIDDEN_PERSON),
         **{field: row.get(field) for field in ROW_FIELDS},
-        "adjustments": [{key: item.get(key) for key in ADJUSTMENT_FIELDS} for item in row.get("adjustments") or []],
+        "adjustments": [adjustment_view(item) for item in row.get("adjustments") or []],
         "previous_rank": None if change is None or rank is None else rank + change,
         "results": [{
             "round_id": item.get("round_id"), "place": item.get("place"), "points": item.get("points"),

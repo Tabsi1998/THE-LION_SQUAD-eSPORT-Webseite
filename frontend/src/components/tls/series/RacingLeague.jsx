@@ -15,7 +15,7 @@ import {
 import { RacingDriverDetail, RacingGarageTeams } from "@/components/tls/series/RacingGarage";
 import { SeasonStatistics } from "@/components/tls/series/SeasonStatistics";
 import { roundPath, sessionKey } from "@/lib/roundResults";
-import { RuleChanges, TeamSource } from "@/components/tls/series/SeriesSpecialRules";
+import { DriverAdjustmentMarks, RuleChanges, TeamSource } from "@/components/tls/series/SeriesSpecialRules";
 import "./racingLeague.css";
 
 // Seite einer Rennliga (#1746) unter /references/series/<spur>/<saison>: Umschalter der Saisons, Fortschritt in
@@ -224,7 +224,13 @@ export function RacingLeague({ data }) {
             filterLabel={null}
             renderName={(row, index) => <TeamCell row={row} index={index} rows={rows} drivers={drivers} lead={teamLead} />}
             renderResult={(result, name) => <TeamResult result={result} name={name} rows={rows} />}
-            renderPoints={(row) => <RacingPoints row={row} />}
+            renderPoints={(row) => (
+              // Fahrer-Anpassungen, die fürs Team zählen (#2000): „−5 (Fahrer)“ klein unter der Teamsumme.
+              <span className="inline-flex flex-col items-end">
+                <RacingPoints row={row} />
+                <DriverAdjustmentMarks row={row} rows={rows} rounds={rounds} />
+              </span>
+            )}
             extraColumn={{ header: "Abstand", title: "Abstand zur Spitze in Punkten", cell: (row) => <span data-testid="racing-gap">{gapLabel(row, teamRows)}</span> }}
             weekends={weekends}
             roundHref={roundHref}

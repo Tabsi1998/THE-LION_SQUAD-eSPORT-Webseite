@@ -6,6 +6,7 @@ import { dayLabel as staffDay } from "@/lib/referenceSeriesStaff";
 import { formatNumber } from "@/lib/standingsTable";
 import { sessionLabel } from "@/lib/raceWeekend";
 import { parseNumber } from "@/lib/resultPaste";
+import { nameOf } from "@/lib/referenceSeriesTable";
 
 // Ein echtes Minus (−5, wie die Tabellen es zeigen) zählt wie ein Bindestrich.
 const signed = (value) => String(value ?? "").trim().replace("−", "-");
@@ -47,6 +48,37 @@ export function adjustmentLine(item, rounds = []) {
 /** Tooltip und Screenreader der Marke an den Punkten: „Anpassung −5: Video fehlt; Anpassung +2: …“. */
 export function adjustmentTitle(row, rounds = []) {
   return (row?.adjustments || []).map((item) => `Anpassung ${adjustmentLine(item, rounds)}`).join("; ");
+}
+
+// ---------------------------------------------------------------- Fahrer-Anpassung in der Teamwertung (#2000)
+const TEAM_NOTES = {
+  substitute: "im Termin als Ersatz gefahren",
+  no_team: "ohne Team gefahren",
+  no_ride: "bis dahin keine Fahrt mit Team",
+  guest: "Gäste zählen nicht fürs Team",
+};
+
+/** Ob eine Fahrer-Anpassung auch fürs Team zählt (vom Server): „zählt auch fürs Team · Team Adler“, „zählt für kein
+ * Team – im Termin als Ersatz gefahren“ - leer ohne Haken. */
+export function adjustmentTeamText(item) {
+  if (!item?.counts_for_team) return "";
+  if (item.credited_team) return `zählt auch fürs Team · ${item.credited_team}`;
+  const note = TEAM_NOTES[item.team_note];
+  return note ? `zählt für kein Team – ${note}` : "zählt auch fürs Team";
+}
+
+/** Die Fahrer-Anpassungen bei der Teamsumme: „−5 (Anna Probe)“, Grund und Termin im Tooltip. Der Name kommt aus der
+ * Fahrerwertung (`rows`) - ausgeblendet bleibt ausgeblendet. */
+export function driverAdjustmentMarks(row, rows = [], rounds = []) {
+  return (row?.driver_adjustments || []).map((item, index) => {
+    const name = nameOf((rows || []).find((entry) => entry.key === item.driver));
+    return {
+      key: `${item.driver}-${index}`,
+      negative: number(item.points) < 0,
+      text: `${adjustmentText(item.points)} (${name})`,
+      title: `Anpassung ${adjustmentLine(item, rounds)} – ${name}, zählt auch fürs Team`,
+    };
+  });
 }
 
 // ---------------------------------------------------------------- Teamwertung
@@ -151,17 +183,33 @@ export function ruleChangeLines(changes) {
 // ---------------------------------------------------------------- Anpassungen (Verwaltung)
 let formKey = 0;
 
-/** Eine Anpassung im Formular - neu für einen Teilnehmer, heute, ohne Termin. */
+/** Eine Anpassung im Formular - neu für einen Teilnehmer, heute, ohne Termin. `counts_for_team` (#2000): `null`
+ * ohne Teamwertung (dann geht der Haken nicht an den Server). */
 export function emptyAdjustment(values = {}) {
   formKey += 1;
-  return { key: `anpassung-${formKey}`, kind: "participant", participant_id: "", team: "", points: "-5", reason: "", day: "", round_id: "", ...values };
+  return { key: `anpassung-${formKey}`, kind: "participant", participant_id: "", team: "", points: "-5", reason: "", day: "", round_id: "", counts_for_team: null, ...values };
 }
 
-/** Gespeicherte Anpassung → Formular. */
-export function adjustmentToForm(item) {
+/** Vorgabe des Hakens „zählt auch für die Teamwertung“ einer neuen Anpassung (#2000) - `null` ohne Teamwertung. */
+export function adjustmentDefaultTeam(scoring) {
+  if (!scoring?.enabled) return null;
+  return Boolean(scoring.adjustments_count_for_team);
+}
+
+/** Der Haken einer gespeicherten Anpassung, wie der Server ihn liest: gesetzt - oder bei Altdaten wie bisher (in der
+ * aktuellen Besetzung zählt sie mit, je Rennen nicht). `null` ohne Teamwertung. */
+function storedTeamFlag(item, scoring) {
+  if (!scoring?.enabled) return null;
+  if (typeof item?.counts_for_team === "boolean") return item.counts_for_team;
+  return scoring.mode === "current_lineup";
+}
+
+/** Gespeicherte Anpassung → Formular; `scoring`: Teamwertung der Saison (für den Haken, #2000). */
+export function adjustmentToForm(item, scoring = null) {
   return emptyAdjustment({
     id: item.id, kind: item.kind || "participant", participant_id: item.participant_id || "", team: item.team || "",
     points: String(item.points ?? ""), reason: item.reason || "", day: item.day || "", round_id: item.round_id || "",
+    counts_for_team: storedTeamFlag(item, scoring),
   });
 }
 
@@ -187,6 +235,8 @@ export function adjustmentPayload(form) {
     reason: String(form.reason || "").split(/\s+/).filter(Boolean).join(" "),
     day: form.day,
     round_id: form.round_id || null,
+    // #2000: nur für einen Fahrer und nur mit Teamwertung - sonst entscheidet der Server (Vorgabe bzw. bisheriger Wert).
+    ...(team || form.counts_for_team === null || form.counts_for_team === undefined ? {} : { counts_for_team: Boolean(form.counts_for_team) }),
   };
 }
 

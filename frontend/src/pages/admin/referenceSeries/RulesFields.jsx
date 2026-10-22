@@ -116,6 +116,9 @@ export function RulesFields({ rules, kind, onChange }) {
             {/* #1960: „Ersatzfahrer“ & Co. zählen für kein Team - auch nicht fürs Standard-Team des Fahrers. */}
             <TextField label="Kein Team (Ersatz)" value={rules.team_no_team_names ?? ""} onChange={(v) => set("team_no_team_names", v)} placeholder="Ersatzfahrer" testId="series-rules-no-team-names"
               hint="Steht so ein Eintrag als Team im Ergebnis, zählt die Fahrt für kein Team. Mehrere mit Komma trennen." />
+            {/* #2000: Vorgabe für neue Fahrer-Anpassungen - je Anpassung änderbar. */}
+            <CheckField label="Fahrer-Anpassungen zählen auch für die Teamwertung" checked={rules.team_adjustments_count} onChange={(v) => set("team_adjustments_count", v)} testId="series-rules-team-adjustments"
+              hint="Vorgabe für neue Anpassungen, etwa wenn der Veranstalter Abzüge auch dem Team abzieht. Je Anpassung änderbar." />
           </FormGrid>
         )}
       </FormSection>

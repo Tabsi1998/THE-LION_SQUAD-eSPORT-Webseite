@@ -7,6 +7,9 @@ Adminprotokoll und rechnet die Stände neu. Öffentlich erscheinen Punkte und Gr
 
 - ``POST   /api/reference-series/admin/series/<id>/adjustments``: anlegen
 - ``PATCH  /api/reference-series/admin/series/<id>/adjustments/<kennung>``: ändern (alle Felder wie beim Anlegen)
+
+Eine Fahrer-Anpassung trägt den Haken ``counts_for_team`` (#2000): zählt auch für die Teamwertung. Ohne Angabe gilt
+beim Anlegen die Vorgabe der Saison, beim Ändern bleibt der bisherige Wert (Altdaten ohne Haken bleiben ohne).
 - ``DELETE /api/reference-series/admin/series/<id>/adjustments/<kennung>``: entfernen
 Alle antworten mit der Liste der Anpassungen der Saison.
 """
@@ -21,6 +24,7 @@ from auth import require_area
 from database import get_db
 from models import new_id, now_utc
 from services import reference_running_cache, reference_series, series_adjustments
+from services.scoring_rules import normalize_rules
 
 router = APIRouter(prefix="/api/reference-series", tags=["reference-series"],
                    dependencies=[Depends(reference_running_cache.reset_after_write)])
@@ -38,6 +42,17 @@ class AdjustmentBody(BaseModel):
     reason: str = Field(min_length=1, max_length=series_adjustments.MAX_REASON)
     day: str = Field(min_length=10, max_length=10)
     round_id: Optional[str] = Field(default=None, max_length=80)
+    # #2000: zählt die Fahrer-Anpassung auch für die Teamwertung? Fehlt er, gilt beim Anlegen die Vorgabe der Saison
+    # (``team_scoring.adjustments_count_for_team``), beim Ändern der bisherige Wert.
+    counts_for_team: Optional[bool] = None
+
+
+def _team_default(series: dict) -> bool:
+    """Vorgabe des Hakens „zählt auch für die Teamwertung“ der Saison (#2000) - aus bei unlesbaren Regeln."""
+    try:
+        return normalize_rules(series.get("rules") or {})["team_scoring"]["adjustments_count_for_team"]
+    except ValueError:
+        return False
 
 
 async def _series(db, series_id: str) -> dict:
@@ -47,9 +62,12 @@ async def _series(db, series_id: str) -> dict:
     return found
 
 
-async def _clean(db, series_id: str, body: AdjustmentBody) -> dict:
+async def _clean(db, series_id: str, body: AdjustmentBody, team_default: Optional[bool]) -> dict:
+    raw = body.model_dump()
+    if raw["counts_for_team"] is None:
+        raw["counts_for_team"] = team_default
     try:
-        clean = series_adjustments.normalize(body.model_dump())
+        clean = series_adjustments.normalize(raw)
     except ValueError as exc:
         raise HTTPException(422, f"Anpassung: {exc}") from exc
     if clean["participant_id"] and not await db.reference_participants.find_one(
@@ -79,7 +97,8 @@ async def create_adjustment(series_id: str, body: AdjustmentBody, me: dict = Dep
     if len(series.get("adjustments") or []) >= series_adjustments.MAX_ADJUSTMENTS:
         raise HTTPException(422, TOO_MANY)
     now = now_utc().isoformat()
-    doc = {"id": new_id(), **await _clean(db, series_id, body), "created_at": now, "created_by": me["id"],
+    doc = {"id": new_id(), **await _clean(db, series_id, body, _team_default(series)), "created_at": now,
+           "created_by": me["id"],
            "updated_at": now, "updated_by": me["id"]}
     await db.reference_series.update_one({"id": series_id}, {"$push": {"adjustments": doc}})
     return await _finish(db, me, series_id, "create", {"adjustment": series_adjustments.public(doc),
@@ -98,7 +117,10 @@ async def update_adjustment(series_id: str, adjustment_id: str, body: Adjustment
     if index is None:
         raise HTTPException(404, "Anpassung nicht gefunden.")
     before = items[index]
-    items[index] = {**before, **await _clean(db, series_id, body), "updated_at": now_utc().isoformat(),
+    keep = (before.get("counts_for_team") if before.get("kind", "participant") == "participant"
+            else _team_default(series))
+    items[index] = {**before, **await _clean(db, series_id, body, keep),
+                    "updated_at": now_utc().isoformat(),
                     "updated_by": me["id"]}
     await db.reference_series.update_one({"id": series_id}, {"$set": {"adjustments": items}})
     return await _finish(db, me, series_id, "update", {"before": series_adjustments.public(before),
