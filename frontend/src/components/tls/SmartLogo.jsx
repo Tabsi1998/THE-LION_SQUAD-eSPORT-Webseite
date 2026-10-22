@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { sizedUpload, variantWidthFor } from "@/lib/imageVariants";
+import { isSvgUpload } from "@/lib/svgLogo";
 
 const MAX_SAMPLE_SIDE = 520;
 const MAX_CANVAS_SIDE = 1200;
@@ -85,9 +86,10 @@ export function SmartLogo({ src, alt = "", className = "", fallbackClassName = "
   const canvasRef = useRef(null);
   const [fallback, setFallback] = useState(false);
   const [loadedSrc, setLoadedSrc] = useState(src);
+  const svg = isSvgUpload(src);
 
   useEffect(() => {
-    if (!src) return undefined;
+    if (!src || svg) return undefined;
     let cancelled = false;
     setFallback(false);
     // Logos von Sponsoren und Partnern kamen in voller Größe, oft mehrere tausend Pixel breit, für einen Kasten von
@@ -122,9 +124,12 @@ export function SmartLogo({ src, alt = "", className = "", fallbackClassName = "
     return () => {
       cancelled = true;
     };
-  }, [src]);
+  }, [src, svg]);
 
   if (!src) return null;
+  // SVG-Logo (#1952): als Bild, in jeder Größe scharf - die leeren Ränder schneidet schon der Server beim Hochladen ab.
+  // Nie auf eine Leinwand mit fester Pixelzahl und nie in die Seite geschrieben.
+  if (svg) return <img src={src} alt={alt} loading="lazy" decoding="async" className={`block ${className}`} />;
   if (fallback) {
     return <img src={loadedSrc || src} alt={alt} loading="lazy" decoding="async" className={fallbackClassName || className} />;
   }
