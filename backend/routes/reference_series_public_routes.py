@@ -34,8 +34,8 @@ from auth import get_optional_user
 from database import get_db
 from routes.reference_round_routes import PUBLIC_FIELDS, _calendar, visible_series
 from services import (
-    map_pools, partner_platforms, race_weekend, reference_originals, reference_running_cache, series_identity,
-    series_partners,
+    map_pools, partner_platforms, race_weekend, reference_bundles, reference_originals, reference_running_cache,
+    series_identity, series_partners,
 )
 from services.dolibarr_policy import club_today
 from services.own_teams import Matcher, own_teams
@@ -428,12 +428,15 @@ async def public_lineages(request: Request, user: dict | None = Depends(get_opti
     owner_of = {series["reference_id"]: series["id"] for _, seasons in shown for series in seasons
                 if series.get("reference_id")}
     references_by: dict = {sid: [] for sid in ids}
+    placed_by: dict = {sid: [] for sid in ids}
     async for item in db.references.find(
             {"is_active": {"$ne": False}, "$or": [{"series_id": {"$in": ids}}, {"id": {"$in": list(owner_of)}}]},
-            {"_id": 0, "id": 1, "series_id": 1, "visibility": 1}):
+            {"_id": 0, "id": 1, "series_id": 1, "visibility": 1, "title": 1, "entries": 1, "placement": 1,
+             "placement_label": 1, "team_count": 1, "participant_count": 1}):
         owner = item.get("series_id") if item.get("series_id") in references_by else owner_of.get(item["id"])
         if owner and await visible(item.get("visibility")) and item["id"] not in references_by[owner]:
             references_by[owner].append(item["id"])
+            placed_by[owner].append(item)
     game_ids = list({lineage["game_id"] for lineage, _ in shown if lineage.get("game_id")})
     games = {item["id"]: item async for item in db.games.find(
         {"id": {"$in": game_ids}}, {"_id": 0, "id": 1, "name": 1, "short_name": 1, "logo_url": 1})} if game_ids else {}
@@ -455,7 +458,9 @@ async def public_lineages(request: Request, user: dict | None = Depends(get_opti
             "game": {key: game.get(key) for key in ("name", "short_name", "logo_url")} if game else None,
             "seasons": [{**{key: series.get(key) for key in PATH_SEASON_FIELDS},
                          "organizers": hosts[(lineage["id"], series["id"])],
-                         "club": _club_place(lineage, series, snapshots, club_ids),
+                         # #1751: ohne gespeicherten Stand (etwa eine gebündelte Saison) der Platz ihrer Referenz.
+                         "club": _club_place(lineage, series, snapshots, club_ids)
+                         or reference_bundles.best_place(placed_by[series["id"]]),
                          "reference_ids": references_by[series["id"]]} for series in seasons],
         })
     return {"items": items}
