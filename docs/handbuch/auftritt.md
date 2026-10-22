@@ -91,7 +91,7 @@ Events. Fotos, Banner, Profilbilder und die Galerie bleiben bei PNG, JPG und Web
 - **Wo kein SVG geht** (E-Mails, PDF und Druck, das Bild beim Teilen, Discord, Favicon und App), nimmt die Website
   automatisch eine PNG-Fassung, die sie beim Hochladen mit anlegt.
 - **Tipp zum Export:** „SVG 1.1“ bzw. „Präsentationsattribute“ wählen und Schrift in Pfade umwandeln. Eingebettete
-  Bilder, Filter (etwa Schatten) und Schriftdateien fallen beim Bereinigen weg.
+  Bilder, Filter (etwa Schatten), gestrichelte Linien und Schriftdateien fallen beim Bereinigen weg.
 
 <img src="../assets/verwaltung/logo-feld-svg.png" alt="Logo-Feld mit SVG-Logo: Hinweis am besten SVG, darunter das Logo auf hellem und dunklem Grund" width="560">
 

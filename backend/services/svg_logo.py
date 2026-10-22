@@ -50,7 +50,10 @@ MAX_SVG_UPLOAD_MB = _int_env("MAX_SVG_UPLOAD_MB", 1, 1, 10)
 MAX_SVG_BYTES = MAX_SVG_UPLOAD_MB * 1024 * 1024
 MAX_ELEMENTS = _int_env("SVG_MAX_ELEMENTS", 4000, 100, 20000)
 MAX_INPUT_ELEMENTS = MAX_ELEMENTS * 10
-MAX_DEPTH = 48
+# Jede Ebene (Gruppe mit Deckkraft, Maske, Beschneidung) kann beim Zeichnen eine eigene Bildfläche brauchen - darum
+# begrenzt: Tiefe und Zahl der Masken und Beschneidungspfade. Logos kommen mit wenigen aus.
+MAX_DEPTH = 24
+MAX_LAYERS = 32
 RASTER_PX = _int_env("SVG_RASTER_PX", 2000, 256, 4096)
 INTRINSIC_PX = 1024
 TRIM_PX = 512
@@ -111,9 +114,10 @@ MIXED_CONTENT = frozenset({"text", "tspan"})
 HREF_ELEMENTS = frozenset({"use", "linearGradient", "radialGradient"})
 GRADIENTS = frozenset({"linearGradient", "radialGradient"})
 
+# Ohne Strichelung (stroke-dasharray): winzige Striche auf einer langen Linie lassen das Zeichnen ausufern.
 PRESENTATION = frozenset({
     "fill", "fill-opacity", "fill-rule", "stroke", "stroke-width", "stroke-opacity", "stroke-linecap",
-    "stroke-linejoin", "stroke-miterlimit", "stroke-dasharray", "stroke-dashoffset", "opacity", "color", "display",
+    "stroke-linejoin", "stroke-miterlimit", "opacity", "color", "display",
     "visibility", "overflow", "clip-path", "clip-rule", "mask", "stop-color", "stop-opacity", "font-family",
     "font-size", "font-weight", "font-style", "font-variant", "font-stretch", "text-anchor", "dominant-baseline",
     "alignment-baseline", "baseline-shift", "letter-spacing", "word-spacing", "text-decoration", "writing-mode",
@@ -410,6 +414,8 @@ def _resolve_references(root: ET.Element) -> None:
         if element_id and element_id not in ids:
             ids[element_id] = parent
     use_tag = "use"
+    if sum(1 for node in root.iter() if node.tag in ("mask", "clipPath")) > MAX_LAYERS:
+        raise SvgRejected("too_many")
     expanded = _subtree_size(root)
     for element in list(root.iter()):
         local = element.tag.split("}", 1)[-1]

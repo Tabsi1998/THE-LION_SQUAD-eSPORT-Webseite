@@ -181,7 +181,7 @@ HARMLESS = svg(
     '<ellipse class="cls-2" cx="100" cy="70" rx="40" ry="20"/>'
     '<polygon points="90,40 110,40 100,25" style="fill:#FF3B30;fill-opacity:.9"/>'
     '<polyline points="30,110 60,90 90,110" fill="none" stroke="#29B6E8" stroke-width="3" stroke-linecap="round"/>'
-    '<line x1="10" y1="5" x2="190" y2="5" stroke="#fff" stroke-dasharray="4 2"/>'
+    '<line x1="10" y1="5" x2="190" y2="5" stroke="#fff" stroke-width="2"/>'
     '</g><use href="#zacke" x="0" y="0"/><defs><rect id="zacke" x="150" y="10" width="30" height="10" rx="3"/></defs>',
     attrs='width="200" height="120" viewBox="0 0 200 120"',
 )
@@ -268,3 +268,13 @@ def test_nginx_serves_uploaded_svg_with_the_strict_policy():
     assert f'add_header Content-Security-Policy "{svg_logo.SERVE_CSP}" always;' in svg_block
     assert 'add_header X-Content-Type-Options "nosniff" always;' in svg_block
     assert "types { image/svg+xml svg; }" in svg_block and "$tls_content_security_policy" not in svg_block
+
+
+def test_render_heavy_features_are_limited():
+    # Strichelung fällt weg; viele Masken bzw. Beschneidungen lehnt die Prüfung ab - beides ließe das Zeichnen ausufern.
+    dashed = clean_text(svg('<circle cx="50" cy="30" r="20" stroke="#29B6E8" stroke-dasharray="0.001" '
+                            'style="stroke-dashoffset:1;stroke-width:2" fill="none"/>' + RECT))
+    assert "dash" not in dashed and 'stroke="#29B6E8"' in dashed
+    mask = '<mask id="m{}"><rect width="10" height="10" fill="#fff"/></mask>'
+    masks = "".join(mask.format(i) for i in range(svg_logo.MAX_LAYERS + 1))
+    assert "Elemente" in rejected(svg(f"<defs>{masks}</defs>{RECT}"))
