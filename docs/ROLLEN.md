@@ -246,6 +246,7 @@ je Saison Captains eintragen, die nur für diese eine Saison Ergebnisse und Scor
 | Original-Bild einzeln freigeben oder löschen (#1933, Löschen im Adminprotokoll) | ja | nein | nein |
 | Partner-Plattform einstellen, Turniertage holen und als Entwurf übernehmen (#1964) | ja | nein | nein |
 | Saisontabelle einlesen, vergangene Runden als Entwurf nachtragen (#1928) | ja | nein | nein |
+| Saison- und Teamtabelle per Bild lesen, Teamwertung laut Veranstalter übernehmen (#1999) | ja | nein | nein |
 
 - **Zwei-Faktor ist Pflicht** – für den Vorstand wie für Captains (Entscheidung 7 des Obmanns). Ohne bestätigte
   Zwei-Faktor-Anmeldung antwortet der Server mit dem Hinweis darauf; das Web führt zur Einrichtung.

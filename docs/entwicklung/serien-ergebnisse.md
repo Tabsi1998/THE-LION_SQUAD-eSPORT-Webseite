@@ -487,3 +487,33 @@ in `services/reference_originals.py`, Routen in `routes/reference_original_route
 - **Bleibt:** Die Bilder hängen an der Kennung des Termins (Verschieben nimmt sie mit), Archivieren löscht nichts.
 - **Zählen:** `GET /api/admin/media/audit` → `reference_originals: {count, bytes}` aus der Datenbank; das
   Upload-Inventar zeigt den Ordner `reference-originals` als eigenen Bereich.
+
+## Saison- und Teamtabelle per Bild (#1999)
+
+Die Gesamttabelle des Veranstalters als Bild (etwa PRL: Pos · Team bzw. Fahrer · Flagge je Rennen · Punkte · Dif.).
+Lesen: `services/result_image_table.py` (Bausteine aus `result_image_ocr`), Route `GET`/`POST
+…/season-table/image?table=drivers|teams` in `routes/reference_result_image_routes.py` (nur Vorstand, nicht Team-Liga;
+dieselben Grenzen, dasselbe Rate-Limit `result_image` und dieselbe Warteschlange wie Ergebnis-Bilder). `NOT_A_RESULT`
+gilt hier nicht. Web: `SeasonTableSection.jsx`, `OfficialTeamTotals.jsx` (`imageBase`), `lib/seasonTable.js`
+(`imageTable`, `imageTeamRows`).
+
+- **Spalten aus den Daten:** `column_groups` über die Datenzeilen; die Überschriften (`TEMPLATE.labels`: Pos, Team bzw.
+  Fahrer, Punkte, Dif.) geben die Art, sonst Inhalt und Lage (Text = Name, Zahlen davor = Platz, negative Zahlen =
+  Abstand, letzte Zahlenspalte = Punkte, dazwischen Runden „Runde 1“ …). `detected`: `teams`, wenn die Namensspalte
+  „Team“ heißt, `drivers` bei „Fahrer“/„Name“.
+- **Zellen:** Seitenlesung, Streifen mit Whitelist `points` (`0123456789-`) und dritte Lesung; „--“ (auch als „=“
+  gelesen) heißt nicht angetreten und ist sicher, sobald keine Lesung eine Zahl sieht. Widerspruch oder zu wenig
+  Sicherheit: gelb (`uncertain` je Zeile, `read` das andere Gelesene).
+- **Gegenproben** (`_check`): `Dif. = Punkte - Punkte des Ersten` bestätigt beide (ein verlorenes Minus wird gesetzt)
+  oder macht beide gelb; `Summe der Runden = Punkte` bestätigt die Zeile, sonst werden ihre Zahlenzellen gelb und die
+  Zeile bekommt einen Hinweis (`notes`) - nie still falsch. Plätze laufen mit den Punkten; Platz 1 im Kasten ergibt sich
+  aus 2 … n.
+- **Namen** (`match_names`): unscharf (`result_image_match.similarity`) gegen die Teilnehmer samt Aliase (Fahrer) bzw.
+  die Teams der Saison (`known_teams`: eigene, Standard-Teams, Teams der Blätter und der Teamwertung).
+- **Teamwertung laut Veranstalter** (`routes/reference_season_table_routes.py`): `POST …/team-totals/preview`
+  (`{round_id?, totals}`; ohne Runde die letzte gewertete mit Ergebnis) rechnet die Teamwertung nach der Runde mit den
+  neuen Werten (`official_points`, `computed_points`, `deviation`) und nennt neue Teams; `PUT …/team-totals`
+  (`{round_id, totals, expected_version}`) schreibt `official_team_totals` ins Blatt (Entwurf daneben bekommt dieselben
+  Werte), Revision `team_totals`, Protokoll `reference_result.team_totals`, bei veröffentlichtem Blatt neu rechnen.
+- **Tests:** `backend/tests/season_table_image_fixture.py` zeichnet die Tabelle im PRL-Layout mit erfundenen Teams (12 ×
+  17 Runden, eine Strafe); `test_result_image_table.py` prüft „stimmt oder gelb“ für jede Zelle.

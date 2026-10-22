@@ -708,6 +708,34 @@ Zuerst den **Kalender** der Saison anlegen (etwa mit **Termine einfügen**), dam
 
 <img src="../assets/serien/serien-saisontabelle-abgleich.png" alt="Abgleich mit Gesamt: 34 stimmen, eine erklärt, eine weicht ab" width="560">
 
+**Saison- und Teamtabelle per Bild:** Statt Text geht auch ein Screenshot der Tabelle (etwa die PRL-Tabelle mit Flaggen
+über den Rennen) – **Bild auslesen** im selben Abschnitt. Gelesen wird auf dem eigenen Server wie bei Ergebnis-Bildern;
+das Bild wird nicht gespeichert.
+
+- **Fahrer-Tabelle:** Die Tabelle landet als Text im Feld und geht in dieselbe Vorschau wie eingefügter Text. Die
+  Rundenspalten heißen „Runde 1“, „Runde 2“ … (Flaggen sind Bilder, keine Schrift) und werden über die Reihenfolge den
+  Terminen zugeordnet – in der Vorschau korrigierbar. Namen werden mit den Teilnehmern der Saison abgeglichen.
+- **Gelb = unsicher:** Wo die Lesungen nicht übereinstimmen, steht die Zelle unter **Aus dem Bild unsicher** – mit dem,
+  was sonst gelesen wurde. Passen „Punkte“ und „Dif.“ nicht zusammen oder ergibt die Summe der Runden nicht die Punkte,
+  wird die ganze Zeile gelb (welche Zelle falsch ist, lässt sich nicht sagen). Falsches im Feld korrigieren und **Neu
+  einlesen** – sonst **Passt so** bzw. **Alle geprüft**. Übernommen wird erst danach.
+- **Team-Tabelle:** Heißt die Namensspalte „Team“, wird daraus die **Teamwertung laut Veranstalter**. Vorgewählt ist die
+  letzte gewertete Runde, jede andere Runde mit Ergebnis geht auch. Die Liste zeigt Team und Punkte (gelbe Zeilen mit
+  **Passt so** bestätigen), darunter der Vergleich **Laut Bild** gegen die **Eigene Rechnung** – sie bleibt als
+  Prüfhinweis. **Teamwertung übernehmen** schreibt sie ins Ergebnis der Runde (bei einem veröffentlichten Ergebnis wird
+  neu gerechnet; ein Entwurf daneben bekommt dieselben Werte).
+- **Im Ergebnisblatt** einer Runde hat **Teamwertung laut Veranstalter** denselben Knopf **Bild auslesen**; gelbe
+  Zeilen halten dort das Übernehmen auf wie gelbe Zeilen aus einem Ergebnis-Bild.
+
+<table>
+<tr>
+<td><img src="../assets/serien/serien-saisontabelle-bild-unsicher.png" alt="Aus dem Bild unsicher: je Zeile die gelben Zellen mit dem, was sonst gelesen wurde, und Passt so" width="560"></td>
+<td><img src="../assets/serien/serien-saisontabelle-bild-team-handy.png" alt="Team-Tabelle am Handy: Runde, Team und Punkte, Vergleich mit der eigenen Rechnung" width="220"></td>
+</tr>
+</table>
+
+<img src="../assets/serien/serien-saisontabelle-bild-team.png" alt="Team-Tabelle erkannt: Teamwertung laut Veranstalter nach Runde 3, eine gelbe Zeile, Vergleich laut Bild und eigene Rechnung" width="560">
+
 **Seite Team-Liga:** Bei einer Spur vom Typ Team-Liga zeigt dieselbe Adresse statt der Gesamtwertung die Liga aus
 Sicht der eigenen Teams (Liste **Eigene Teams** der Saison; spielen mehrere, steht im Spielplan, welches gespielt
 hat). Oben die **Spieltage** (ein Feld je Spieltag – Sieg cyan, Niederlage grau) und der nächste Spieltag mit Gegner
