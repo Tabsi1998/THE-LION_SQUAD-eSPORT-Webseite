@@ -11,6 +11,7 @@ const mockGet = jest.fn();
 jest.mock("../../lib/api", () => ({
   api: { get: (...args: unknown[]) => mockGet(...args) },
   errorMessage: (_error: unknown, fallback: string) => fallback,
+  resolveMediaUrl: (url: string) => url,
 }));
 jest.mock("@expo/vector-icons", () => ({ Ionicons: () => null }));
 // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -154,4 +155,26 @@ test("alter Server ohne Rundenseite oder ohne Felder: Hinweis bzw. leerer Lauf, 
   expect(screen.getByRole("header", { name: "Runde 3" })).toBeTruthy();
   expect(screen.queryByTestId("round-summary")).toBeNull();
   expect(screen.queryByTestId("round-tabs")).toBeNull();
+});
+
+test("Original-Bilder (#1933): „Original ansehen“ am Lauf mit Bildern, öffnet das Vollbild - ohne Bilder kein Knopf", async () => {
+  jest.spyOn(reanimated, "useReducedMotion").mockReturnValue(true);
+  const originals = [
+    { id: "o1", kind: "race", url: "/api/reference-series/public/prl/2026/originals/o1", width: 1200, height: 800 },
+    { id: "o2", kind: "scoreboard", map: 1, url: "/api/reference-series/public/prl/2026/originals/o2", width: 1200, height: 800 },
+  ];
+  const sessions = PAGE.sessions.map((item) => (item.key === "rennen" ? { ...item, originals } : item));
+  mockGet.mockResolvedValue({ data: { ...PAGE, sessions } });
+  await render(<ReferenceRoundScreen navigation={navigation as never} route={routeFor({ lineage: "prl", season: "2026", round: 3 })} />);
+  await waitFor(() => expect(screen.getByTestId("round-original")).toBeTruthy());
+  expect(screen.getByTestId("round-original").props.accessibilityLabel).toBe("Original ansehen, 2 Bilder");
+  await fireEvent.press(screen.getByTestId("round-original"));
+  expect(screen.getByTestId("original-viewer")).toBeTruthy();
+  expect(screen.getByTestId("original-viewer-label")).toHaveTextContent("Rennen");
+  expect(screen.getByText("Aserbaidschan · Rennen")).toBeTruthy();
+  await fireEvent.press(screen.getByTestId("original-viewer-close"));
+
+  // Der Sprint hat keine Bilder - und ein älterer Server schickt das Feld gar nicht.
+  await fireEvent.press(screen.getByTestId("round-tab-sprint"));
+  expect(screen.queryByTestId("round-original")).toBeNull();
 });

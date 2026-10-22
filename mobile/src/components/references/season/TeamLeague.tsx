@@ -4,6 +4,8 @@ import { ListItemFadeIn, useListEntrance, useReduceMotion } from "../../FadeIn";
 import { Body, Muted } from "../../Text";
 import { Chevron, Reveal, ink } from "../parts";
 import { MapImage, MapPoolView } from "../MapCards";
+import { OriginalsButton } from "../OriginalViewer";
+import { originalsOf, type OriginalItem } from "../../../lib/referenceOriginals";
 import { Glow } from "../../motion";
 import { StateChip } from "../seriesParts";
 import { motionEasing } from "../../../lib/motion";
@@ -32,14 +34,14 @@ export function Matchdays({ page }: { page: SeasonPage }) {
     <View style={styles.cards}>
       {cards.map((card, index) => (
         <ListItemFadeIn key={card.key} entrance={entrance} id={`matchday-${card.key}`} index={index}>
-          <MatchdayCardView card={card} />
+          <MatchdayCardView card={card} originals={originalsOf(page.originals, [{ id: card.key }])} />
         </ListItemFadeIn>
       ))}
     </View>
   );
 }
 
-function MatchdayCardView({ card }: { card: MatchdayCard }) {
+function MatchdayCardView({ card, originals }: { card: MatchdayCard; originals: OriginalItem[] }) {
   const single = card.matches.length === 1 ? card.matches[0] : null;
   const look = single ? OUTCOME_LOOK[single.outcomeKey] : null;
   return (
@@ -70,6 +72,8 @@ function MatchdayCardView({ card }: { card: MatchdayCard }) {
         </View>
       ))}
       {card.others.length ? <OtherMatches card={card} /> : null}
+      {/* Original-Bilder des Veranstalters zum Spieltag (#1933). */}
+      <OriginalsButton items={originals} title={[card.code, (single || card.matches[0])?.opponent || card.opponent].filter(Boolean).join(" · ")} testID={`season-matchday-originals-${card.key}`} />
     </View>
   );
 }

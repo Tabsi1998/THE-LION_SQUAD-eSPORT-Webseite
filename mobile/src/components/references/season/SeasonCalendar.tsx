@@ -4,6 +4,7 @@ import { Pressable, StyleSheet, View } from "react-native";
 import { ListItemFadeIn, useListEntrance } from "../../FadeIn";
 import { Body, Muted } from "../../Text";
 import { CountryFlag } from "../CountryFlag";
+import { OriginalsButton } from "../OriginalViewer";
 import { ink } from "../parts";
 import { SessionChips, StateChip } from "../seriesParts";
 import { roundRows, type SeasonPage, type SeasonRound } from "../../../lib/referenceSeason";
@@ -56,19 +57,23 @@ export function SeasonCalendar({ page, onOpenRound }: { page: SeasonPage; onOpen
         );
         return (
           <ListItemFadeIn key={row.key} entrance={entrance} id={`round-${row.key}`} index={index}>
-            {open ? (
-              <Pressable
-                onPress={open}
-                accessibilityRole="button"
-                accessibilityLabel={[row.code, row.place, row.state, row.when, "Ergebnis ansehen"].filter(Boolean).join(", ")}
-                style={({ pressed }) => [styles.round, pressed && styles.pressed]}
-                testID={`season-round-${row.key}`}
-              >
-                {body}
-              </Pressable>
-            ) : (
-              <View style={styles.round} testID={`season-round-${row.key}`}>{body}</View>
-            )}
+            <View style={styles.round}>
+              {open ? (
+                <Pressable
+                  onPress={open}
+                  accessibilityRole="button"
+                  accessibilityLabel={[row.code, row.place, row.state, row.when, "Ergebnis ansehen"].filter(Boolean).join(", ")}
+                  style={({ pressed }) => [styles.roundMain, pressed && styles.pressed]}
+                  testID={`season-round-${row.key}`}
+                >
+                  {body}
+                </Pressable>
+              ) : (
+                <View style={styles.roundMain} testID={`season-round-${row.key}`}>{body}</View>
+              )}
+              {/* Original-Bilder des Veranstalters (#1933) - neben der Zeile, damit der Vorleser den Knopf einzeln findet. */}
+              <OriginalsButton items={row.originals} title={row.originalsTitle} style={styles.originals} testID={`season-round-originals-${row.key}`} />
+            </View>
           </ListItemFadeIn>
         );
       })}
@@ -78,7 +83,10 @@ export function SeasonCalendar({ page, onOpenRound }: { page: SeasonPage; onOpen
 
 const styles = StyleSheet.create({
   empty: { color: ink.muted, paddingVertical: 14 },
-  round: { alignItems: "flex-start", borderBottomColor: ink.rowLine, borderBottomWidth: 1, flexDirection: "row", gap: 12, paddingVertical: 14 },
+  round: { borderBottomColor: ink.rowLine, borderBottomWidth: 1, paddingVertical: 14 },
+  roundMain: { alignItems: "flex-start", flexDirection: "row", gap: 12 },
+  // Unter dem Text der Zeile: Kürzel (44) und Abstand (12) daneben.
+  originals: { marginLeft: 56, marginTop: 8 },
   code: { color: ink.muted, fontSize: 18, fontVariant: ["tabular-nums"], fontWeight: "800", width: 44 },
   roundBody: { flex: 1, gap: 6, minWidth: 0 },
   roundTop: { alignItems: "center", flexDirection: "row", flexWrap: "wrap", gap: 8 },

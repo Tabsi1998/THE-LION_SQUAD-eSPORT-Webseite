@@ -1,5 +1,6 @@
 import { countryName } from "./countryFlags";
 import { formatRaceTime } from "./raceTime";
+import type { OriginalItem } from "./referenceOriginals";
 import { dayLabel, formatNumber, nameOf } from "./seriesFormat";
 
 // Ergebnisseite einer Runde in der App (#1950, #1974): was der Screen aus
@@ -51,6 +52,8 @@ export type RoundSession = {
   no_score_note?: string | null;
   grid_source?: string | null;
   reverse_top?: number | null;
+  /** Original-Bilder des Veranstalters zu diesem Lauf (#1933) - ein älterer Server schickt keine. */
+  originals?: OriginalItem[] | null;
 };
 
 export type RoundInfo = {

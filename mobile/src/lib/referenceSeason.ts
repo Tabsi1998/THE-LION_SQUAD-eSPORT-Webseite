@@ -16,6 +16,7 @@ import {
   type WeekendRound,
   type WeekendSettings,
 } from "./raceWeekend";
+import { originalsOf, type OriginalItem, type OriginalsByRound } from "./referenceOriginals";
 import { KIND_LABELS, type LineageInfo } from "./references";
 import { dayRounds } from "./seriesDays";
 import { HIDDEN_NAME, dayLabel, formatNumber, nameOf, number, roundLabel } from "./seriesFormat";
@@ -101,6 +102,8 @@ export type SeasonPage = {
   team_league?: TeamLeaguePart;
   /** Map-Pool der Saison (#1616). */
   map_pool?: MapPool;
+  /** Original-Bilder des Veranstalters je Termin (#1933): Kennung des Termins → öffentliche Bilder. */
+  originals?: OriginalsByRound;
   racing?: {
     club_drivers?: string[] | null;
     club_teams?: string[] | null;
@@ -261,6 +264,10 @@ export type RoundRow = {
   moved: string;
   /** Nummer der Runde für ihre Ergebnisseite (#1950) - nur Rennliga und nur, wenn der Server sie schickt. */
   number: number | null;
+  /** Original-Bilder des Veranstalters aller Läufe der Runde (#1933), bei mehreren Läufen mit Lauf beschriftet. */
+  originals: OriginalItem[];
+  /** Überschrift im Vollbild: „R3 · Baku City Circuit“. */
+  originalsTitle: string;
 };
 
 /** Der Kalender als Zeilen - je Runde eine (#1930): Kürzel, Ort, Land (Code für die Flagge, #1925), Stand der Runde und
@@ -306,6 +313,8 @@ export function roundRows(page: SeasonPage | null | undefined): RoundRow[] {
       }).filter(Boolean),
       moved: lead.original_club_day && lead.original_club_day !== lead.club_day ? `ursprünglich ${dayLabel(lead.original_club_day)}` : "",
       number: racing ? group.number : null,
+      originals: originalsOf(page?.originals, group.rounds, { withSession: group.multi }),
+      originalsTitle: [roundLabel(lead), group.venue || group.title].filter(Boolean).join(" · "),
     };
   });
 }
