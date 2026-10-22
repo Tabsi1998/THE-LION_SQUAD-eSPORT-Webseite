@@ -21,6 +21,9 @@ RULES = {
     "tiebreakers": ["wins", "top_n", "countback"], "tiebreak_top_n": 4,
     "day_rounds": {"count": 5, "points_by_place": [8, 7, 6, 5, 4, 3, 2, 1]},
     "custom_bonuses": [{"label": "Bingo", "points": 3}],
+    # Der Abnahmefall aus #1961 rechnet Double Up nach Team-Platz (k) - seit #2015 eine Wahl der Saison, Vorgabe ist
+    # „wie Einzelplatz 2k−1“ (tests/test_double_up_points_unit.py).
+    "double_up_points": "team_place",
 }
 NAMES = {"a": "Ada Ausgedacht", "b": "Bruno Beispiel", "c": "Cleo Muster", "d": "Dario Demo", "e": "Ella Erfunden",
          "f": "Finn Fiktiv", "g": "Gina Gedacht", "h": "Hugo Probe"}
