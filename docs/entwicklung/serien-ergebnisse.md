@@ -211,9 +211,29 @@ Mehrere Runden an einem Termin (etwa TFT-Lobbys R1–R5), gerechnet in `services
   `reference_series.adjustment_create|update|delete`, danach Neurechnen. Der Rechenkern zählt je Stand die Anpassungen,
   die schon gelten (mit Termin ab dessen Stand, sonst ab dem letzten gewerteten Termin an oder vor ihrem Tag), in
   `computed_points`; die Zeile trägt `adjustment_points` und `adjustments` (öffentlich Punkte, Grund, Tag, Termin).
-  Fahrer-Anpassungen ändern die Teamwertung je Rennen nicht (in der aktuellen Besetzung über die Saisonpunkte des
-  Fahrers), Team-Anpassungen die Fahrerwertung nie; wer nur eine Anpassung hat, steht in der Tabelle. Sonderboni
+  Team-Anpassungen ändern die Fahrerwertung nie; wer nur eine Anpassung hat, steht in der Tabelle. Sonderboni
   (#1961, `bonus_points`) und Anpassungen zählen je genau einmal und stehen getrennt an der Zeile.
+- **Fahrer-Anpassung in der Teamwertung (#2000):** Haken `counts_for_team` an jeder Fahrer-Anpassung (`null` bei
+  Team-Anpassungen); beim Anlegen ohne Angabe die Vorgabe `team_scoring.adjustments_count_for_team` (Vorgabe `false`),
+  beim Ändern ohne Angabe der bisherige Wert. Gelesen wird er mit `series_adjustments.counts_for_team`: ohne Teamwertung
+  nie; **Altdaten ohne Haken** im Modus `current_lineup` ja, in `per_race` nein - genau so rechneten beide Modi vorher,
+  bestehende Tabellen ändern sich nicht. `per_race`: `series_standings._credit_team` - mit Termin und Fahrt dort das
+  Team dieser Fahrt (`_ride_team`; Ersatz `team_note = substitute`, leer `no_team`), sonst die letzte Fahrt mit Team
+  bis zum Termin (Kalender-Reihenfolge) bzw. ohne Termin bis zum Tag (`club_day`), keine: `no_ride`; ein Gast ohne
+  `guests_count`: `guest`. Spätere Fahrten ändern nichts. Das Team bekommt die Punkte zu `computed_points`.
+  `current_lineup`: die Anpassung steckt in den Saisonpunkten (`driver_points`); ohne Haken wird sie für die Teamsumme
+  abgezogen, mit Haken bleibt sie drin und gehört zum aktuellen Team des Fahrers - nie doppelt. **Achtung:** neue
+  Anpassungen ohne Haken (Vorgabe aus) rechnen hier anders als vor #2000 (herausgerechnet statt in der Teamsumme);
+  ist `official_totals` des Fahrers gesetzt, wird vom offiziellen Wert abgezogen. Die Teamzeile trägt getrennt von den
+  Team-Anpassungen `driver_adjustment_points` und `driver_adjustments` (`public` + `credited_team` + `participant_id`),
+  die Fahrerzeile an jeder Anpassung mit Haken `counts_for_team`, `credited_team` bzw. `team_note`
+  (`series_adjustments.TEAM_FIELDS`, nur wo gesetzt; `_mark_credit`). `official_team_totals` geht weiter vor;
+  `deviation` vergleicht mit `computed_points` samt Anpassung. Öffentlich (`series_racing.adjustment_view`): die
+  Anpassungen der Fahrer- und Teamzeile mit diesen Feldern, die Teamzeile `driver_adjustment_points` und
+  `driver_adjustments` mit `driver` (Kennung wie `drivers`; den Namen nimmt die Seite aus der Fahrerwertung, ausgeblendet
+  bleibt ausgeblendet). Für die Verwaltung schreibt `reference_series.recompute_standings` `series.adjustment_teams =
+  {kennung: {team, note}}` aus dem letzten Fahrerstand (nur bei Änderung). Rundenseite und Statistik bleiben ohne
+  Anpassungen (nur Gesamtwertung).
 - **Team der Zeile - was im Feld steht, zählt:** Eine Fahrt zählt für das Team der Zeile; leer (auch nur Leerraum)
   heißt kein Team, ohne Rückfall auf `default_team` (`series_standings._ride_team`, ebenso `round_page`,
   `season_statistics` und `series_racing.driver_teams` je Rennen). Das Web belegt neue Zeilen sichtbar vor: bekannter

@@ -776,6 +776,26 @@ einstellbar, nichts ist für eine Liga fest eingebaut:
   sie ab dessen Stand, sonst ab dem Stand an ihrem Tag. Öffentlich steht sie als kleines **−5** an den Punkten (der
   Grund im Tooltip) und im Fahrer-Detail mit Grund, Termin und Tag – der Grund ist also für alle lesbar. So erklärt sich
   eine Abweichung zur offiziellen Tabelle: Stimmen die Anpassungen, verschwindet die goldene Abweichung.
+- **Fahrer-Anpassung auch fürs Team:** Mit Teamwertung hat jede Fahrer-Anpassung den Haken **Zählt auch für die
+  Teamwertung** – etwa wenn der Veranstalter einen WM-Abzug auch dem Team abzieht. Die Vorgabe für neue Anpassungen
+  steht in den Regeln der Saison unter **Fahrer-Anpassungen zählen auch für die Teamwertung** (Vorgabe aus). **Je
+  Rennen:** Sie zählt für das Team, für das der Fahrer im Termin der Anpassung gefahren ist – ohne Termin für das Team
+  seiner letzten Fahrt bis zum Tag; ein späterer Teamwechsel ändert nichts. Fuhr er dort als Ersatz oder ohne Team,
+  zählt sie für keines; die Liste der Anpassungen sagt es gelb („zählt für kein Team – im Termin als Ersatz
+  gefahren“), sonst „zählt auch fürs Team · Team A“. **Aktuelle Besetzung:** Die Anpassung steckt in den Saisonpunkten
+  des Fahrers und zählt so für sein aktuelles Team; ohne Haken wird sie aus der Teamsumme herausgerechnet – nie doppelt.
+  Öffentlich steht bei der Teamsumme klein **−5 (Fahrer)** mit Grund im Tooltip, im Fahrer-Detail „zählt auch fürs
+  Team“. Ältere Anpassungen ohne Haken rechnen wie bisher (je Rennen nur für den Fahrer, in der aktuellen Besetzung
+  mit). Die Teamwertung laut Veranstalter geht weiter vor; der Prüfhinweis vergleicht mit der eigenen Rechnung samt
+  Anpassung.
+
+  <table>
+  <tr>
+  <td><img src="../assets/serien/serien-anpassung-team-teamwertung.png" alt="Teamwertung: bei der Teamsumme der Probe Löwen klein −5 (Probe Lion Eins)" width="560"></td>
+  <td><img src="../assets/serien/serien-anpassung-team-haken.png" alt="Neue Anpassung am Handy mit dem Haken Zählt auch für die Teamwertung und Hinweis" width="220"></td>
+  </tr>
+  </table>
+
 - **Saison abgebrochen:** Saison bearbeiten → Status **Abgebrochen**, dazu **Abgebrochen am** (leer: heute) und der
   **Grund**. Die gefahrenen Ergebnisse bleiben sichtbar, es gibt keinen Meister und keine Platzierung; die Serienseite
   sagt es oben. **Nachfolger** verweist auf die neue Saison der Spur, etwa den Neustart mit anderem Auto – die
@@ -816,7 +836,8 @@ einstellbar, nichts ist für eine Liga fest eingebaut:
 - **Teamwertung bei Wechseln:** **Je Rennen für das gefahrene Team** (Vorgabe) oder **Aktuelle Besetzung: alle
   Saisonpunkte der Fahrer, die jetzt im Team sind** – wie beim Veranstalter: Die Zellen je Rennen zeigen das Team, für
   das gefahren wurde (Ersatzfahrten für keines, „–“ ohne Fahrt). **Gesamt und Platz** sind die Saisonpunkte aller
-  Fahrer, deren aktuelles Team es ist – samt ihrer Ersatzfahrten und Abzüge, plus Team-Anpassungen. Aktuelles Team ist
+  Fahrer, deren aktuelles Team es ist – samt ihrer Ersatzfahrten und der Abzüge, die auch fürs Team zählen, plus
+  Team-Anpassungen. Aktuelles Team ist
   das Team der letzten Fahrt, die kein Ersatz war; wer nie für ein Team gefahren ist, zählt fürs Standard-Team. Wer
   ohne Fahrt umgesetzt wurde oder die Liga verlassen hat, bekommt am Teilnehmer **Aktuelles Team (von Hand)**
   („Ersatzfahrer“ heißt: in keinem Team). Abweichungen zwischen Zellensumme und Gesamt sind dann gewollt, die Tabelle
