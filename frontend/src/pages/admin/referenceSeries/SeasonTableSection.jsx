@@ -490,7 +490,12 @@ export function SeasonTableSection({ series, onChanged }) {
     setKnown({});
   };
   const rounds = roundColumns(kinds);
-  const changeRound = (column, value) => setRoundIds((current) => ({ ...current, [rounds[column]]: value === "__skip" ? "" : value }));
+  const changeRound = (column, value) => {
+    setRoundIds((current) => ({ ...current, [rounds[column]]: value === "__skip" ? "" : value }));
+    // Anderer Termin, anderes Schema: Klärungen dieser Spalte gelten nicht mehr (der Server prüft sie ohnehin).
+    setDecisions((current) => current.filter((item) => item.column !== column));
+    setKnown((current) => Object.fromEntries(Object.entries(current).filter(([key]) => !key.startsWith(`${column}:`))));
+  };
   const decide = (cell, value) => setDecisions((current) => mergeDecisions(current, [[cell.id, decisionFor(cell, value)]]));
 
   const columns = preview?.columns || [];

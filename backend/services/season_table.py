@@ -271,6 +271,17 @@ def _narrow(pending: dict[int, list[dict]], decided: dict[int, int]) -> None:
                 changed = True
 
 
+def decision_fits(value, decision: dict, rules: dict) -> bool:
+    """Passt eine Entscheidung zur Zelle? „Punkte laut Veranstalter“ immer, ein Platz nur, wenn er (samt Boni) zu den
+    Vorschlägen nach den Regeln dieses Termins gehört - eine Klärung für einen anderen Termin (anderes Schema) gilt
+    nicht, die Zelle bleibt gelb."""
+    if decision.get("choice") == "organizer":
+        return True
+    wanted = (decision.get("place"), sorted(decision.get("bonus_keys") or []), sorted(decision.get("marks") or []))
+    return any((item["place"], sorted(item["bonus_keys"]), sorted(item["marks"])) == wanted
+               for item in place_candidates(value, rules))
+
+
 def _decided_row(value, decision: dict, rules: dict, own_source: str) -> dict:
     if decision.get("choice") == "organizer":
         return {"place": None, "points": value, "points_source": own_source, "marks": [], "bonus_keys": []}
@@ -314,7 +325,7 @@ def build_column(cells: list, rules: dict, *, names: list[str], teams: list, org
             continue
         value = cell["value"]
         decision = decisions.get(row)
-        if decision and (back or decision.get("choice") == "organizer"):
+        if decision and (back or decision.get("choice") == "organizer") and decision_fits(value, decision, rules):
             entries[row] = _decided_row(value, decision, rules, own_source)
             if entries[row]["place"]:
                 decided[row] = entries[row]["place"]

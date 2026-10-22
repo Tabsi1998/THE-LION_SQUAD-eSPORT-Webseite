@@ -92,6 +92,12 @@ test("eine gelbe Zelle klären und einen Termin selbst wählen schickt eine neue
   fireEvent.change(within(rows[0]).getByTestId("season-table-round"), { target: { value: "__skip" } });
   await waitFor(() => expect(apiMock.post).toHaveBeenLastCalledWith(`${URL}/preview`, expect.objectContaining({
     columns: [{ label: "R1", round_id: "" }, { label: "R2" }] }), { skipInvalidation: true }));
+  // Ein anderer Termin für eine Spalte verwirft deren Klärungen - die Klärung der anderen Spalte bleibt.
+  expect(apiMock.post).toHaveBeenLastCalledWith(`${URL}/preview`, expect.objectContaining({
+    decisions: [{ column: 1, row: 0, choice: "place", place: 6, bonus_keys: ["bingo"], marks: [] }] }), { skipInvalidation: true });
+  fireEvent.change(within(rows[1]).getByTestId("season-table-round"), { target: { value: "r1" } });
+  await waitFor(() => expect(apiMock.post).toHaveBeenLastCalledWith(`${URL}/preview`, expect.objectContaining({
+    columns: [{ label: "R1", round_id: "" }, { label: "R2", round_id: "r1" }], decisions: [] }), { skipInvalidation: true }));
 });
 
 test("Übernehmen schickt die gewählten Runden mit Version, meldet das Ergebnis und öffnet „Unbekannte Namen“", async () => {

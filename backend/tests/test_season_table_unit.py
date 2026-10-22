@@ -143,6 +143,18 @@ def test_decisions_settle_yellow_cells():
     assert cells[2]["code"] == "decided" and cells[5]["code"] == "decided"
 
 
+def test_a_decision_counts_only_when_it_fits_the_scheme_of_this_round():
+    decisions = {5: {"choice": "place", "place": 6, "bonus_keys": ["bingo"], "marks": []}}
+    tft = _by_row(_column(["35", "30", "29", "23", "20", "21", "16", "14"], rules=TFT, decisions=decisions))
+    assert tft[5]["code"] == "decided"
+    # Dieselbe Spalte einem Termin mit anderem Schema zugeordnet: die Klärung passt nicht mehr - wieder gelb.
+    racing = _by_row(_column(["25", "18", "15", "12", "10", "21"], decisions=decisions))
+    assert (racing[5]["state"], racing[5]["code"]) == ("unclear", "outside")
+    # „Punkte laut Veranstalter“ passt immer, ein Platz ohne den Bonus nicht.
+    assert season_table.decision_fits(21, {"choice": "organizer"}, RACING)
+    assert not season_table.decision_fits(21, {"choice": "place", "place": 6}, TFT)
+
+
 def test_points_outside_the_scheme_and_two_drivers_on_one_place_are_yellow():
     cells = _by_row(_column(["17", "25", "25"]))
     assert (cells[0]["state"], cells[0]["code"], cells[0]["candidates"]) == ("unclear", "outside", [])
