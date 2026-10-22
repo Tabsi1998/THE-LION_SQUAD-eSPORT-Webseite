@@ -181,7 +181,9 @@ function signed(value) {
 export function totalText(item) {
   const reasons = (list) => list.map((reason) => `${reason.text} ${signed(reason.points)}`).join(" · ");
   if (item.state === "ok") return item.reasons?.length ? `stimmt (${reasons(item.reasons)})` : "stimmt";
-  if (item.state === "explained") return `${signed(item.deviation)}: ${reasons(item.explains)}`;
+  if (item.state === "explained") {
+    return item.explains.length === 1 ? `erklärt: ${reasons(item.explains)}` : `erklärt (${signed(item.deviation)}): ${reasons(item.explains)}`;
+  }
   if (item.state === "differs") return `weicht ${signed(item.deviation)} ab${item.reasons?.length ? ` – bekannt: ${reasons(item.reasons)}` : ""}`;
   return "keine Spalte „Gesamt“";
 }
@@ -201,7 +203,7 @@ const TARGETS = {
 /** Was mit dem Ergebnis der Runde passiert. */
 export function targetText(column) {
   if (!column.round) return column.state === "skip" ? "Spalte wird nicht übernommen" : "Bitte einen Termin wählen";
-  if (column.state === "same") return "schon übernommen";
+  if (column.state === "same") return "Ergebnis stimmt mit der Tabelle überein";
   if (column.state === "empty") return "niemand mit Punkten in dieser Spalte";
   return TARGETS[column.target] || TARGETS.sheet;
 }

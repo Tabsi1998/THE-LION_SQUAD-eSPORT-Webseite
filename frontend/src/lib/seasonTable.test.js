@@ -70,10 +70,12 @@ test("Texte: Termin, Ziel, Abgleich und Rückmeldung", () => {
   expect(roundOption({ code: "R2", session: "Sprint", venue: "Probe Ring", club_day: "2026-03-08" })).toBe("R2 · Sprint · Probe Ring · So., 08.03.2026");
   expect(targetText(COLUMNS[1])).toBe("Entwurf neben dem veröffentlichten Ergebnis – du gibst ihn frei");
   expect(targetText(COLUMNS[3])).toBe("Spalte wird nicht übernommen");
+  expect(targetText({ ...COLUMNS[0], state: "same" })).toBe("Ergebnis stimmt mit der Tabelle überein");
   expect(targetText({ round: null, state: "unmatched" })).toBe("Bitte einen Termin wählen");
   expect(totalText({ state: "ok", reasons: [] })).toBe("stimmt");
   expect(totalText({ state: "explained", deviation: -16, explains: [{ text: "Streichresultate", points: -20 }, { text: "Aktivitätspunkte", points: 4 }] }))
-    .toBe("−16: Streichresultate −20 · Aktivitätspunkte +4");
+    .toBe("erklärt (−16): Streichresultate −20 · Aktivitätspunkte +4");
+  expect(totalText({ state: "explained", deviation: -5, explains: [{ text: "Anpassungen", points: -5 }] })).toBe("erklärt: Anpassungen −5");
   expect(totalText({ state: "differs", deviation: 3, reasons: [] })).toBe("weicht +3 ab");
   expect(totalsSummary([{ state: "ok" }, { state: "differs", rank_differs: true }, { state: "no_total" }])).toEqual({ ok: 1, explained: 0, differs: 1, none: 1, ranks: 1 });
   expect(applySummary([{ status: "saved" }, { status: "saved" }, { status: "unclear" }])).toEqual({ ok: false, text: "2 Runden als Entwurf übernommen · 1 mit offenen gelben Zellen." });

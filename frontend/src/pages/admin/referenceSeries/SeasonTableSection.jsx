@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, formatApiError } from "@/lib/api";
-import { CheckField, INPUT_CLASS, TextAreaField } from "@/components/tls/FormFields";
+import { CheckField, INPUT_CLASS } from "@/components/tls/FormFields";
 import { parseSeasonTablePaste } from "@/lib/resultPaste";
 import { changeLines } from "@/lib/partnerSource";
 import {
@@ -18,6 +18,10 @@ import { TableProperties } from "lucide-react";
 // der Vorstand, der Abgleich prüft jede Summe gegen „Gesamt“. Geschrieben wird erst mit „Übernehmen“, immer als Entwurf.
 
 const SELECT_CLASS = `${INPUT_CLASS} text-sm py-1.5`;
+// Wie die übrigen Felder, nur ohne volle Breite - im Raster bestimmt die Spalte die Breite.
+const ROUND_SELECT_CLASS = `${INPUT_CLASS.replace("w-full ", "")} min-w-0 text-sm py-1.5`;
+// Tabellen-Text: feste Zeichenbreite und kein Umbruch, damit Spalten erkennbar bleiben.
+const PASTE_CLASS = `${INPUT_CLASS} font-mono text-xs leading-relaxed [tab-size:12]`;
 const PLACEHOLDER = "Pos\tFahrer\tTeam\tR1\tR2\tR3\tGesamt\n1\tAda Ausgedacht\tProbe Rot\t25\t18\tOUT\t43\n2\tBruno Beispiel\tProbe Blau\t--\t25\t18\t43";
 
 function Badge({ state }) {
@@ -50,7 +54,10 @@ function ColumnKinds({ parsed, kinds, onKind }) {
 }
 
 function ColumnItem({ column, rounds, roundId, picked, onPick, onRound }) {
-  const lines = changeLines(column.changes, { removed: "fehlt in der Tabelle – fällt weg" });
+  // Wer neu dazukommt, steht gesammelt in einer Zeile - einzeln nur, was sich bei Vorhandenen ändert.
+  const added = (column.changes || []).filter((change) => change.kind === "added");
+  const lines = changeLines((column.changes || []).filter((change) => change.kind !== "added"), { removed: "fehlt in der Tabelle – fällt weg" });
+  const total = lines.length + added.length;
   const problems = (column.errors || []).map((problem) => problem.message);
   const warnings = (column.warnings || []).map((problem) => problem.message);
   const selectable = isSelectable(column);
@@ -65,19 +72,20 @@ function ColumnItem({ column, rounds, roundId, picked, onPick, onRound }) {
         )}
       </span>
       <div className="min-w-0 flex-1 space-y-1.5">
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
-          <span className="min-w-[3rem] text-sm font-bold text-white break-words [overflow-wrap:anywhere]">{column.label}</span>
+        <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1.5 sm:grid-cols-[4.5rem_minmax(0,26rem)_auto]">
+          <span className="text-sm font-bold text-white break-words [overflow-wrap:anywhere]" title="Kopf der Spalte in der Tabelle">{column.label}</span>
           <select value={roundId ?? column.round?.id ?? ""} onChange={(event) => onRound(event.target.value)} aria-label={`Termin für Spalte ${column.label}`}
-            data-testid="season-table-round" className={`${SELECT_CLASS} w-auto max-w-full sm:min-w-[16rem]`}>
+            data-testid="season-table-round" className={`${ROUND_SELECT_CLASS} col-span-2 row-start-2 sm:col-span-1 sm:row-start-auto`}>
             {!column.round && column.state !== "skip" && <option value="">Termin wählen …</option>}
             <option value="__skip">Nicht übernehmen</option>
             {rounds.map((round) => <option key={round.id} value={round.id}>{roundOption(round)}</option>)}
           </select>
-          <Badge state={column.state} />
-          {column.unclear > 0 && <span className="text-xs font-semibold text-amber-200 tabular-nums">{column.unclear} gelb</span>}
+          <span className="flex items-center justify-end gap-2 sm:justify-start">
+            <Badge state={column.state} />
+            {column.unclear > 0 && <span className="text-xs font-semibold text-amber-200 tabular-nums">{column.unclear} gelb</span>}
+          </span>
         </div>
-        <div className="text-xs text-white/60">{[targetText(column), how].filter(Boolean).join(" · ")}</div>
-        {counts && <div className="text-xs text-white/45 tabular-nums">{counts}</div>}
+        <div className="text-xs text-white/60">{[targetText(column), how, counts].filter(Boolean).join(" · ")}</div>
         {problems.length > 0 && (
           <ul className="text-xs text-red-200 space-y-0.5" data-testid="season-table-problems">
             {problems.map((text, index) => <li key={index}>{text}</li>)}
@@ -88,11 +96,14 @@ function ColumnItem({ column, rounds, roundId, picked, onPick, onRound }) {
             {warnings.map((text, index) => <li key={index}>{text}</li>)}
           </ul>
         )}
-        {lines.length > 0 && (
+        {total > 0 && (
           <details className="text-xs text-white/70" data-testid="season-table-changes">
-            <summary className="cursor-pointer text-white/60 hover:text-white">Abweichungen ansehen ({lines.length})</summary>
+            <summary className="cursor-pointer text-white/60 hover:text-white">Abweichungen ansehen ({total})</summary>
             <ul className="mt-1.5 space-y-1 border-l border-white/10 pl-3">
               {lines.map((line) => <li key={line.key}><span className="font-semibold text-white">{line.name}</span>: {line.text}</li>)}
+              {added.length > 0 && (
+                <li><span className="font-semibold text-white">{added.length === 1 ? "Kommt neu dazu" : `${added.length} kommen neu dazu`}</span>: {added.map((change) => change.name).join(", ")}</li>
+              )}
             </ul>
           </details>
         )}
@@ -184,24 +195,28 @@ function TotalsTable({ totals, error }) {
         <p className="text-sm text-emerald-200/90" data-testid="season-table-totals-fine">Alle Summen und Plätze stimmen mit der Tabelle.</p>
       ) : (
         <div className="tls-swipe">
-          <table className="w-full min-w-[34rem] text-sm">
+          <table className="w-full text-sm">
             <thead>
               <tr className="text-left text-[11px] uppercase tracking-widest text-white/50">
                 <th scope="col" className="py-1.5 pr-3 font-bold">Fahrer</th>
                 <th scope="col" className="py-1.5 pr-3 font-bold text-right">Tabelle</th>
                 <th scope="col" className="py-1.5 pr-3 font-bold text-right">Gerechnet</th>
                 <th scope="col" className="py-1.5 pr-3 font-bold text-right">Platz</th>
-                <th scope="col" className="py-1.5 font-bold">Hinweis</th>
+                <th scope="col" className="hidden sm:table-cell py-1.5 font-bold">Hinweis</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-white/5">
               {shown.map((item) => (
-                <tr key={item.row} data-testid="season-table-total" data-state={item.state}>
-                  <td className="py-1.5 pr-3 text-white break-words [overflow-wrap:anywhere]">{item.name}{item.is_new && <span className="ml-1.5 text-[10px] font-bold uppercase tracking-widest text-[#29B6E8]">neu</span>}</td>
+                <tr key={item.row} data-testid="season-table-total" data-state={item.state} className="align-top">
+                  <td className="py-1.5 pr-3 text-white break-words [overflow-wrap:anywhere]">
+                    {item.name}{item.is_new && <span className="ml-1.5 text-[10px] font-bold uppercase tracking-widest text-[#29B6E8]">neu</span>}
+                    {/* Am Handy steht der Hinweis unter dem Namen statt in einer eigenen Spalte. */}
+                    <span className={`block sm:hidden text-xs ${TOTAL_TONES[item.state] || "text-white/60"}`}>{totalText(item)}</span>
+                  </td>
                   <td className="py-1.5 pr-3 text-right tabular-nums text-white/80">{item.table_total ?? "–"}</td>
                   <td className="py-1.5 pr-3 text-right tabular-nums text-white">{item.computed}</td>
                   <td className={`py-1.5 pr-3 text-right tabular-nums ${item.rank_differs ? "text-amber-200" : "text-white/70"}`}>{rankText(item)}</td>
-                  <td className={`py-1.5 text-xs ${TOTAL_TONES[item.state] || "text-white/60"}`}>{totalText(item)}</td>
+                  <td className={`hidden sm:table-cell py-1.5 text-xs ${TOTAL_TONES[item.state] || "text-white/60"}`}>{totalText(item)}</td>
                 </tr>
               ))}
             </tbody>
@@ -229,6 +244,7 @@ export function SeasonTableSection({ series, onChanged }) {
   const [error, setError] = useState("");
   const [unknownOpen, setUnknownOpen] = useState(false);
   const request = useRef(0);
+  const pasteRef = useRef(null);
 
   const body = useMemo(() => (parsed && kinds.includes("name") ? buildBody(parsed, kinds, roundIds, points, decisions) : null),
     [parsed, kinds, roundIds, points, decisions]);
@@ -257,6 +273,11 @@ export function SeasonTableSection({ series, onChanged }) {
   }, [body, runPreview]);
 
   const read = () => {
+    // Nach dem Einfügen steht das Feld am Ende - zum Prüfen wieder an den Anfang der Tabelle.
+    if (pasteRef.current) {
+      pasteRef.current.scrollTop = 0;
+      pasteRef.current.scrollLeft = 0;
+    }
     const result = parseSeasonTablePaste(text);
     setParsed(result);
     setKinds(result.columns.map((column) => column.kind));
@@ -315,8 +336,12 @@ export function SeasonTableSection({ series, onChanged }) {
       </div>
       {open && (
         <div className="mt-4 space-y-4">
-          <TextAreaField label="Tabelle des Veranstalters" value={text} onChange={setText} rows={7} testId="season-table-text" placeholder={PLACEHOLDER}
-            hint="Aus der Tabellenkalkulation oder einer Webseite kopieren: Fahrer (auch Name#TAG), optional Team, je Runde Punkte, optional Gesamt. OUT oder DNF = Ausfall, -- oder leer = nicht angetreten, DSQ, DNS." />
+          <label className="block min-w-0">
+            <span className="block text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Tabelle des Veranstalters</span>
+            <textarea ref={pasteRef} rows={8} wrap="off" spellCheck={false} value={text} onChange={(event) => setText(event.target.value)}
+              placeholder={PLACEHOLDER} data-testid="season-table-text" className={PASTE_CLASS} />
+            <span className="mt-1 block text-xs text-white/45">Aus der Tabellenkalkulation oder einer Webseite kopieren: Fahrer (auch Name#TAG), optional Team, je Runde Punkte, optional Gesamt. OUT oder DNF = Ausfall, -- oder leer = nicht angetreten, DSQ, DNS.</span>
+          </label>
           <fieldset className="space-y-1.5" disabled={byOrganizer}>
             <legend className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Punkte</legend>
             {POINT_MODES.map(([value, label]) => (
