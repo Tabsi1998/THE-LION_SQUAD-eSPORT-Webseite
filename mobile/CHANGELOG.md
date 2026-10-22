@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.7.7 - 2026-10-22
+
+- Mobile: Original-Bilder des Veranstalters im Vollbild – wischen und zoomen, an Runde, Kalender und Spieltag. (#1933)
+- Mobile: Die Saison zeigt, von welcher Plattform die Daten kommen. (#1964)
+- Mobile: Teamwertung zeigt Fahrer-Anpassungen wie „−5 (Fahrer)“. (#2000)
+- Mobile: Zahlen und Zeiten zählen ruhig hoch, neue Bestzeit leuchtet in Gold auf. (#1969)
+- Mobile: Fast-Lap-Zeiten mit Komma wie im Web. (#1969)
+- Mobile: Saison-Reiter lassen sich wischen, „Bewegung reduzieren“ wirkt sofort. (#1969)
+
 ## 1.7.6 - 2026-10-22
 
 - Mobile: Rennligen: eine Runde mit ihren Läufen (Qualifying, Sprint, Rennen), Tabelle umschaltbar Gesamt · Rennen · Sprint · Quali, Fahrer mit Poles, Ø Start und Quali-Duell. (#1974, #1930)

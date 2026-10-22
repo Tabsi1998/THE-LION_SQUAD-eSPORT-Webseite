@@ -1,13 +1,13 @@
 {
-  "version": "1.7.6",
-  "build": 100,
+  "version": "1.7.7",
+  "build": 101,
   "date": "2026-10-22",
   "items": [
-    "Rennligen: eine Runde mit ihren Läufen (Qualifying, Sprint, Rennen), Tabelle umschaltbar Gesamt · Rennen · Sprint · Quali, Fahrer mit Poles, Ø Start und Quali-Duell.",
-    "Neu: Ergebnis je Runde mit Reitern je Lauf und hochzählenden Zeiten, dazu die Statistik der Saison.",
-    "Team-Ligen: Spieltage mit Map-Veto als Karten mit Bild, Kader mit Einsätzen und Statistik je Map.",
-    "Turnierserien: Turniertage mit Runden, Lobbys, Double Up und Boni.",
-    "Sonderregeln: Punktabzug mit Grund, abgebrochene Saison mit Nachfolger, Termine ohne Wertung, Teamwertung wie beim Veranstalter.",
-    "„Veranstaltet von“ mit Partner-Logo, Map-Pool bei Turnieren, Rennzeiten mit Komma."
+    "Original-Bilder des Veranstalters im Vollbild – wischen und zoomen, an Runde, Kalender und Spieltag.",
+    "Die Saison zeigt, von welcher Plattform die Daten kommen.",
+    "Teamwertung zeigt Fahrer-Anpassungen wie „−5 (Fahrer)“.",
+    "Zahlen und Zeiten zählen ruhig hoch, neue Bestzeit leuchtet in Gold auf.",
+    "Fast-Lap-Zeiten mit Komma wie im Web.",
+    "Saison-Reiter lassen sich wischen, „Bewegung reduzieren“ wirkt sofort."
   ]
 }

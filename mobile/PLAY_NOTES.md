@@ -12,6 +12,16 @@ Regeln:
 - Höchstens 500 Zeichen inklusive Zeilenumbrüchen (Grenze von Google Play).
 - Kurz und für Mitglieder verständlich: was sie in der App merken, keine Issue-Nummern, keine Technik.
 
+## 1.7.7
+
+Neu in 1.7.7:
+• Original-Bilder des Veranstalters im Vollbild – wischen und zoomen
+• Saison zeigt, von welcher Plattform die Daten kommen
+• Teamwertung zeigt Fahrer-Anpassungen
+• Zeiten und Punkte zählen hoch, Fast-Lap-Zeiten mit Komma
+• Wischbare Reiter mit weichem Rand
+• „Bewegung reduzieren“ wirkt sofort
+
 ## 1.7.6
 
 Neu in 1.7.6:
