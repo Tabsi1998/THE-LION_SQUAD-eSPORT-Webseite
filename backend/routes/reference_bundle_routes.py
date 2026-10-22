@@ -44,8 +44,9 @@ ALREADY_UNDONE = "Diese Bündelung ist schon zurückgenommen."
 NOT_FOUND = "Bündelung nicht gefunden."
 LIST_LIMIT = 50
 # Was eine Saison enthält, wenn sie seit der Bündelung jemand befüllt hat - dann bleibt sie beim Zurücknehmen stehen.
-SEASON_DATA = ("reference_rounds", "reference_participants", "reference_round_results", "reference_standings",
-               "reference_series_staff")
+def _season_data(db) -> tuple:
+    return (db.reference_rounds, db.reference_participants, db.reference_round_results, db.reference_standings,
+            db.reference_series_staff)
 
 
 class ReferenceBundleCreate(BaseModel):
@@ -211,8 +212,8 @@ async def _untouched(db, item: dict, bundled: set[str]) -> bool:
     series = await db.reference_series.find_one({"id": item["id"]}, {"_id": 0})
     if not series or series.get("updated_at") != item.get("updated_at"):
         return False
-    for name in SEASON_DATA:
-        if await db[name].count_documents({"series_id": item["id"]}, limit=1):
+    for collection in _season_data(db):
+        if await collection.count_documents({"series_id": item["id"]}, limit=1):
             return False
     others = await db.references.count_documents({"series_id": item["id"], "id": {"$nin": list(bundled)}}, limit=1)
     owned = series.get("reference_id")

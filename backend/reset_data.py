@@ -27,6 +27,7 @@ RESET_COLLECTIONS = [
     "reference_lineages", "reference_series", "reference_rounds", "reference_participants",
     "reference_round_results", "reference_round_result_revisions", "reference_standings",
     "reference_aliases", "reference_series_staff", "reference_round_originals",
+    "reference_bundles",  # #1751: Bündelungen zum Zurücknehmen
 ]
 
 
