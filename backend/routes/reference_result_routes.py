@@ -782,6 +782,50 @@ async def _write_pending(db, access: SeriesAccess, existing: dict, content: dict
     return await _update_if_current(db, existing["id"], expected, {"$set": {"pending_draft": draft}})
 
 
+def draft_base(existing: dict | None) -> dict | None:
+    """Womit eine Übernahme als Entwurf verglichen wird: ein Entwurf daneben, sonst das Blatt (#1964, #1928)."""
+    if not existing:
+        return None
+    return existing.get("pending_draft") or existing
+
+
+def draft_target(existing: dict | None) -> str:
+    """Wohin eine Übernahme als Entwurf schreibt: neues Blatt, Entwurf ersetzen oder Entwurf daneben."""
+    if not existing:
+        return "sheet"
+    return "pending_draft" if existing.get("status") == "published" else "draft"
+
+
+async def write_draft(db, access: SeriesAccess, round_doc: dict, existing: dict | None, resolution, content: dict,
+                      expected: int, log_data: dict) -> dict:
+    """Eine Übernahme als Entwurf schreiben (Partner-Plattform #1964, Saisontabelle #1928) - wie ``save_results``, nur
+    nie veröffentlicht und nie aufs veröffentlichte Blatt. ``log_data`` sagt im Protokoll, woher es kommt. Läuft unter
+    der Sperre der Saison; ``{"status": "conflict"}``, wenn das Blatt inzwischen eine andere Version hat."""
+    created = await _create_people(db, access, resolution)
+    own = [doc["id"] for doc in created.values()]
+    content = series_results.replace_new_ids(content, {key: doc["id"] for key, doc in created.items()})
+    target = draft_target(existing)
+    if target == "pending_draft":
+        saved = await _write_pending(db, access, existing, content, expected, own)
+    else:
+        saved = await _write_sheet(db, access, round_doc, existing, content, "draft", expected)
+    if saved is None:
+        await remove_unused_new(db, access.series_id, own)
+        return {"status": "conflict", "message": STALE}
+    revision_id = None
+    if target == "pending_draft" and existing.get("pending_draft"):
+        revision_id = await _revision(db, existing, kind="pending_draft", reason="replace", access=access)
+    elif existing:
+        revision_id = await _revision(db, existing, kind="sheet", reason="save", access=access)
+    await _log(db, "reference_result.pending_draft" if target == "pending_draft" else "reference_result.save",
+               access, saved, {"version": saved["version"], "previous_version": _version(existing),
+                               "status": "draft", "previous_status": (existing or {}).get("status"),
+                               "revision_id": revision_id, **_counts(content), "created_participants": own,
+                               **log_data})
+    return {"status": "saved", "target": target, "version": saved["version"],
+            "created_participants": [{"id": doc["id"], "name": doc.get("name")} for doc in created.values()]}
+
+
 @router.put(BASE)
 async def save_results(series_id: str, round_id: str, body: ResultSave,
                        access: SeriesAccess = Depends(require_series_editor)):

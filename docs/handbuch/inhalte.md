@@ -661,6 +661,91 @@ immer als **Entwurf**. Veröffentlicht wird wie gewohnt vom Vorstand. Nur in ein
 
 <img src="../assets/serien/serien-partner-plattform-uebernommen.png" alt="Nach dem Übernehmen: zwei Turniere übernommen, eines noch offen" width="560">
 
+**Saisontabelle einlesen (vergangene Runden nachtragen):** Legt ihr eine laufende Saison erst später an, müsst ihr
+nicht jede vergangene Runde einzeln eintragen. Die Gesamttabelle des Veranstalters reicht – je Runde entsteht ein
+**Entwurf**, veröffentlicht wird nichts. Nur für den Vorstand, in Rennligen und Turnierserien (nicht in der Team-Liga).
+Zuerst den **Kalender** der Saison anlegen (etwa mit **Termine einfügen**), damit es die Runden schon gibt.
+
+- **Einfügen** (Seite der Saison, Abschnitt **Saisontabelle einlesen**, **Tabelle einfügen**): die Tabelle aus der
+  Tabellenkalkulation oder von der Seite des Veranstalters kopieren – Platz, **Fahrer** (auch Name#TAG), optional
+  **Team**, je Runde die **Punkte**, optional **Gesamt** (auch „Punkte“) und Abstand. In den Zellen heißt **OUT** oder
+  **DNF** Ausfall, **--** oder leer **nicht angetreten**, dazu **DSQ** und **DNS**. **Einlesen** zeigt die Vorschau –
+  gespeichert wird dabei nichts. Unter **Erkannt: … – Spalten ändern** lässt sich jede Spalte anders zuordnen.
+- **Punkte:** **Platz aus den Punkten zurückrechnen** (Vorgabe) sucht über das Punkteschema der Runde den Platz – bei
+  einer Runde mit Läufen das Schema des Laufs. **Punkte laut Veranstalter übernehmen** übernimmt jeden Wert ohne Platz,
+  etwa wenn Boni schon im Wert stecken (21 = 18 + 3 Bingo); liegt ein Wert nicht im Schema, steht ein Hinweis dabei.
+- **Runden:** Jede Spalte bekommt ihren Termin – über das **Kürzel** (R1, auch „R1 Sprint“ für den Lauf), die
+  **Strecke**, die **Flagge** bzw. das Land oder die **Reihenfolge** im Kalender. Stimmt die Zuordnung nicht, wählt ihr
+  den Termin in der Auswahl oder **Nicht übernehmen**. Je Runde steht, was passiert (**Ergebnis als Entwurf**,
+  **Entwurf wird ersetzt** oder **Entwurf neben dem veröffentlichten Ergebnis**) und **Abweichungen ansehen** zeigt,
+  was sich gegenüber einem vorhandenen Ergebnis ändert.
+- **Gelb zum Klären:** Wo der Platz aus den Punkten nicht eindeutig ist – mehrere Plätze möglich, ein Bonus im Wert
+  (schnellste Runde, Pole, Sonderbonus), Punkte außerhalb des Schemas oder derselbe Platz zweimal –, wählt ihr den
+  Vorschlag („Platz 1 + schnellste Runde“) oder **Punkte laut Veranstalter**. Wählt ihr danach für die Spalte einen anderen
+  Termin, gelten ihre Klärungen nicht mehr (anderes Punkteschema) – die Zellen sind wieder gelb. **Eindeutige Vorschläge übernehmen** und
+  **Offene: Punkte laut Veranstalter** erledigen alle auf einmal. Eine Runde mit offenen gelben Zellen wird nicht
+  übernommen. 0 Punkte heißt hinter den Punkterängen – ohne Platz, ohne Meldung.
+- **Abgleich mit „Gesamt“:** Je Fahrer die eigene Rechnung nach allen Runden gegen „Gesamt“ und den Platz der Tabelle –
+  mit Streichresultaten, Anpassungen, Aktivitätspunkten und Boni der Saison. **stimmt**, **erklärt** (etwa
+  „erklärt: Anpassungen −5“, wenn der Veranstalter eure Anpassung nicht kennt) oder **weicht ab** (dann lohnt ein Blick
+  in die Tabelle). **Nur Auffällige zeigen** blendet die stimmigen aus.
+- **Übernehmen:** Vorgewählt sind neue Runden; eine Runde mit **Abweichungen** hakt ihr selbst an. Ein veröffentlichtes
+  Ergebnis wird nie überschrieben – es bekommt einen Entwurf daneben. Notizen, Startnummern, Zeiten und Runden eines
+  Turniertags aus einem vorhandenen Ergebnis bleiben. Danach öffnet sich **Unbekannte Namen** zum Zuordnen; die
+  Entwürfe gebt ihr im Ergebnisblatt der Runde frei. Ein zweites Einlesen derselben Tabelle zeigt **Schon übernommen**.
+
+<table>
+<tr>
+<td><img src="../assets/serien/serien-saisontabelle-vorschau.png" alt="Saisontabelle: erkannte Spalten, Runden mit Termin aus der Flagge, eine Runde mit Abweichungen aufgeklappt, eine Runde zum Klären" width="560"></td>
+<td><img src="../assets/serien/serien-saisontabelle-handy.png" alt="Eine Runde mit Abweichungen am Handy" width="220"></td>
+</tr>
+<tr>
+<td><img src="../assets/serien/serien-saisontabelle-klaeren.png" alt="Drei gelbe Zellen zum Klären mit Vorschlägen und Punkte laut Veranstalter" width="560"></td>
+<td><img src="../assets/serien/serien-saisontabelle-abgleich-handy.png" alt="Abgleich mit Gesamt am Handy: eine Abweichung, eine erklärt durch Anpassungen" width="220"></td>
+</tr>
+</table>
+
+<img src="../assets/serien/serien-saisontabelle-einfuegen.png" alt="Tabelle des Veranstalters eingefügt, Wahl der Punkte" width="560">
+
+<img src="../assets/serien/serien-saisontabelle-abgleich.png" alt="Abgleich mit Gesamt: 34 stimmen, eine erklärt, eine weicht ab" width="560">
+
+**Saison- und Teamtabelle per Bild:** Statt Text geht auch ein Screenshot der Tabelle (etwa die PRL-Tabelle mit Flaggen
+über den Rennen) – **Bild auslesen** im selben Abschnitt. Gelesen wird auf dem eigenen Server wie bei Ergebnis-Bildern;
+das Bild wird nicht gespeichert.
+
+- **Fahrer-Tabelle:** Die Tabelle landet als Text im Feld und geht in dieselbe Vorschau wie eingefügter Text. Die
+  Rundenspalten heißen „Runde 1“, „Runde 2“ … (Flaggen sind Bilder, keine Schrift) und werden über die Reihenfolge den
+  Terminen zugeordnet – in der Vorschau korrigierbar. Namen werden mit den Teilnehmern der Saison abgeglichen.
+- **Gelb = unsicher:** Wo die Lesungen nicht übereinstimmen, steht die Zelle unter **Aus dem Bild unsicher** – mit dem,
+  was sonst gelesen wurde. Gelb wird auch, was genauso aussieht wie eine Zelle mit anderem Wert (dieselbe Zahl sieht in
+  einer Tabelle immer gleich aus), und „Punkte“ und „Dif.“, wenn sie nicht zusammenpassen. Ergibt die Summe der Runden
+  nicht die Punkte, wird die Zeile gelb – außer die Saison erklärt es (Streichresultate, Anpassungen,
+  Aktivitätspunkte); dann steht nur ein Hinweis da. Falsches im Feld korrigieren und **Neu einlesen** – sonst **Passt
+  so** bzw. **Alle geprüft**. Übernommen wird erst danach.
+- **Original-Bild:** Beim Übernehmen hängt das Bild als Original „Tabelle“ an der letzten Runde der Tabelle (siehe
+  Original-Bilder); **Nicht anhängen** lässt es weg.
+- **Team-Tabelle:** Heißt die Namensspalte „Team“, wird daraus die **Teamwertung laut Veranstalter**. Vorgewählt ist die
+  letzte gewertete Runde, jede andere Runde mit Ergebnis geht auch. Die Liste zeigt Team und Punkte (gelbe Zeilen mit
+  **Passt so** bestätigen), darunter der Vergleich **Laut Bild** gegen die **Eigene Rechnung** – sie bleibt als
+  Prüfhinweis. Dass die Summe der Runden nicht die Punkte ergibt, ist bei Teamtabellen normal (oft zählt die aktuelle
+  Besetzung): es steht nur als Hinweis an der Zeile. Steht in der Runde schon eine Teamwertung, zeigt die Liste je Team
+  **Bisher** und **Danach**: Vorgabe ist **Ergänzen bzw. aktualisieren** – Teams, die im Bild fehlen, bleiben stehen;
+  **Ersetzen** entfernt sie (die Liste sagt, welche). **Teamwertung übernehmen** schreibt sie ins Ergebnis der Runde (bei
+  einem veröffentlichten Ergebnis wird neu gerechnet; ein Entwurf daneben bekommt dieselben Werte) und hängt das Bild als
+  Original „Tabelle“ an diese Runde.
+- **Im Ergebnisblatt** einer Runde hat **Teamwertung laut Veranstalter** denselben Knopf **Bild auslesen**; gelbe
+  Zeilen halten dort das Übernehmen auf wie gelbe Zeilen aus einem Ergebnis-Bild. Das Bild steht danach unter
+  **Original-Bilder** (Art „Tabelle“) und hängt beim Übernehmen am Termin.
+
+<table>
+<tr>
+<td><img src="../assets/serien/serien-saisontabelle-bild-unsicher.png" alt="Aus dem Bild unsicher: je Zeile die gelben Zellen mit dem, was sonst gelesen wurde, und Passt so" width="560"></td>
+<td><img src="../assets/serien/serien-saisontabelle-bild-team-handy.png" alt="Team-Tabelle am Handy: Runde, Team und Punkte, Vergleich mit der eigenen Rechnung" width="220"></td>
+</tr>
+</table>
+
+<img src="../assets/serien/serien-saisontabelle-bild-team.png" alt="Team-Tabelle erkannt: Teamwertung laut Veranstalter nach Runde 3, eine gelbe Zeile, Vergleich laut Bild und eigene Rechnung" width="560">
+
 **Seite Team-Liga:** Bei einer Spur vom Typ Team-Liga zeigt dieselbe Adresse statt der Gesamtwertung die Liga aus
 Sicht der eigenen Teams (Liste **Eigene Teams** der Saison; spielen mehrere, steht im Spielplan, welches gespielt
 hat). Oben die **Spieltage** (ein Feld je Spieltag – Sieg cyan, Niederlage grau) und der nächste Spieltag mit Gegner

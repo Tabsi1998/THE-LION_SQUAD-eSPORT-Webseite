@@ -18,8 +18,10 @@ function pictureUrl(file) {
   }
 }
 
-/** Zustand und Abläufe: was der Server kann, Lesen, Strg+V. `onRead(result)` bekommt die Antwort des Servers. */
-export function useResultImage({ base, onRead }) {
+/** Zustand und Abläufe: was der Server kann, Lesen, Strg+V. `onRead(result)` bekommt die Antwort des Servers. `paste`:
+ * Strg+V auf der ganzen Seite lesen (nur ein Leser je Seite, sonst lesen zwei dasselbe Bild); `query` hängt an den Pfad
+ * (Saisontabelle: `?table=teams`, #1999). */
+export function useResultImage({ base, onRead, paste = true, query = "" }) {
   const [info, setInfo] = useState(null);
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState(null);
@@ -29,6 +31,7 @@ export function useResultImage({ base, onRead }) {
   onReadRef.current = onRead;
 
   useEffect(() => {
+    if (!base) return undefined; // ohne Pfad kein Auslesen
     let alive = true;
     api.get(`${base}/image`).then(({ data }) => { if (alive) setInfo(data || null); }).catch(() => { if (alive) setInfo(null); });
     return () => { alive = false; };
@@ -49,7 +52,7 @@ export function useResultImage({ base, onRead }) {
     setResult(null);
     setPicture(pictureUrl(file));
     try {
-      const { data } = await api.post(`${base}/image`, file, { headers: { "Content-Type": file.type || "application/octet-stream" } });
+      const { data } = await api.post(`${base}/image${query}`, file, { headers: { "Content-Type": file.type || "application/octet-stream" } });
       setResult(data);
       // Die Datei geht mit: beim Übernehmen hängt das Blatt sie als Original an (#1933) - beim Lesen wird nichts gespeichert.
       onReadRef.current?.(data, file);
@@ -60,11 +63,11 @@ export function useResultImage({ base, onRead }) {
       busyRef.current = false;
       setBusy(false);
     }
-  }, [base, info]);
+  }, [base, info, query]);
 
   const available = Boolean(info?.available);
   useEffect(() => {
-    if (!available) return undefined;
+    if (!available || !paste) return undefined;
     const onPaste = (event) => {
       // Schon genommen (etwa im Feld „Original-Bilder“, #1933) - dann nicht auch noch auslesen.
       if (event.defaultPrevented) return;
@@ -79,7 +82,7 @@ export function useResultImage({ base, onRead }) {
     };
     window.addEventListener("paste", onPaste);
     return () => window.removeEventListener("paste", onPaste);
-  }, [available, read]);
+  }, [available, read, paste]);
 
   const dismiss = useCallback(() => {
     setResult(null);
@@ -89,20 +92,20 @@ export function useResultImage({ base, onRead }) {
 }
 
 /** Knopf „Bild auslesen“ mit verstecktem Dateifeld – am Handy bietet das Feld Kamera und Galerie an. */
-export function ResultImageButton({ image }) {
+export function ResultImageButton({ image, pasteHint = true, testId = "result-image-pick", fileTestId = "result-image-file" }) {
   const input = useRef(null);
   if (!image.available) return null;
   return (
     <>
-      <button type="button" onClick={() => input.current?.click()} disabled={image.busy} data-testid="result-image-pick"
-        title="Screenshot des Veranstalters auslesen – oder das Bild mit Strg+V einfügen"
+      <button type="button" onClick={() => input.current?.click()} disabled={image.busy} data-testid={testId}
+        title={pasteHint ? "Screenshot des Veranstalters auslesen – oder das Bild mit Strg+V einfügen" : "Screenshot des Veranstalters auslesen"}
         className="tls-btn tls-btn--quiet px-3 py-1.5 rounded-sm text-[11px] font-bold uppercase tracking-wider inline-flex items-center gap-1.5 disabled:opacity-50">
         <ScanText className="w-3.5 h-3.5" /> {image.busy ? "Liest …" : "Bild auslesen"}
       </button>
-      <span className="hidden sm:inline text-[11px] text-white/40" data-testid="result-image-paste-hint">
+      {pasteHint && <span className="hidden sm:inline text-[11px] text-white/40" data-testid="result-image-paste-hint">
         oder <kbd className="px-1 py-px rounded-[3px] border border-white/15 bg-white/5 font-sans text-[10px] text-white/60">Strg</kbd>+<kbd className="px-1 py-px rounded-[3px] border border-white/15 bg-white/5 font-sans text-[10px] text-white/60">V</kbd>
-      </span>
-      <input ref={input} type="file" accept={ACCEPT} className="sr-only" tabIndex={-1} aria-hidden="true" data-testid="result-image-file"
+      </span>}
+      <input ref={input} type="file" accept={ACCEPT} className="sr-only" tabIndex={-1} aria-hidden="true" data-testid={fileTestId}
         onChange={(event) => {
           const file = event.target.files?.[0];
           event.target.value = "";

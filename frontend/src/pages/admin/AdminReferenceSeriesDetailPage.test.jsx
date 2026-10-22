@@ -118,6 +118,23 @@ test("Turnierserie: der Vorstand sieht die Partner-Plattform, eine Rennliga und 
   expect(apiMock.get.mock.calls.map(([url]) => url).filter((url) => url.includes("partner-source"))).toEqual([]);
 });
 
+// Saisontabelle einlesen (#1928): Rennliga und Turnierserie, nur Vorstand, nie in der Team-Liga.
+test("die Saisontabelle steht beim Vorstand einer Rennliga, nicht in der Team-Liga und nicht bei Captains", async () => {
+  apiMock.get.mockResolvedValue({ data: { ...SERIES, access: { role: "board", can_publish: true } } });
+  const racing = renderAt();
+  expect(await screen.findByTestId("season-table")).toHaveTextContent("Saisontabelle einlesen");
+  racing.unmount();
+  apiMock.get.mockResolvedValue({ data: { ...SERIES, lineage: { ...SERIES.lineage, kind: "team_league" }, access: { role: "board", can_publish: true } } });
+  const league = renderAt();
+  await screen.findByRole("heading", { level: 1 });
+  expect(screen.queryByTestId("season-table")).toBeNull();
+  league.unmount();
+  apiMock.get.mockResolvedValue({ data: { ...SERIES, access: { role: "captain", can_publish: false, valid_until: "2026-12-31" } } });
+  renderAt();
+  await screen.findByTestId("series-detail-captain");
+  expect(screen.queryByTestId("season-table")).toBeNull();
+});
+
 test("Bearbeiten öffnet das Seitenblatt der Saison, Archivieren archiviert", async () => {
   renderAt();
   await screen.findByRole("heading", { level: 1 });

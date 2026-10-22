@@ -310,6 +310,48 @@ dem Partner abgesprochen, nur lesend). Route `routes/reference_partner_routes.py
   für das eingedampfte Ergebnis, höchstens 30 Abrufe je Konto in zehn Minuten. Fehler: 502 mit fester Meldung (steht
   im Betriebsprotokoll); ein kaputtes Turnier nur in seiner Zeile. Zeitgesteuert holt die Website (noch) nicht.
 
+## Saisontabelle einlesen (#1928)
+
+Wer eine laufende Saison später anlegt, liest die Gesamttabelle des Veranstalters ein (Fahrer, Team, Punkte je Runde,
+Gesamt) - je Runde entsteht ein Entwurf, nie veröffentlicht. Nur Vorstand, nicht Team-Liga (409). Route
+`routes/reference_season_table_routes.py`, Logik ohne Datenbank `services/season_table.py`, Text lesen
+`parseSeasonTablePaste` in `lib/resultPaste.js`, Web `lib/seasonTable.js` und
+`pages/admin/referenceSeries/SeasonTableSection.jsx`. Pfade `POST …/season-table/preview` und `…/apply`.
+
+- **Eingabe:** `columns` (je Runden-Spalte `label` und `round_id`: Kennung, `""` = nicht übernehmen, fehlt =
+  selbst zuordnen), `rows` (`name`, `team`, `cells` als Text, `total`, `rank`), `team_column` (ohne Team-Spalte das
+  Stammteam, `series_results.default_teams`), `points` (`scheme` = Platz zurückrechnen, `organizer` = Punkte laut
+  Veranstalter) und `decisions` je gelber Zelle (`column`, `row`, `choice` `place` mit `place`, `bonus_keys`, `marks`
+  oder `organizer`).
+- **Zellen** (`read_cell`): Zahl, `OUT`/`DNF`/`RET` = Marke `dnf`, `DSQ`/`DQ`, `DNS`; `--`, `-`, leer = nicht angetreten
+  (keine Zeile). Anderes ist ein Fehler der Spalte (`unreadable_cell`), die übrigen Runden bleiben übernehmbar.
+- **Spalte → Termin** (`match_columns`): gewählt, dann Kürzel (`race_weekend.take_code`, „R1 Sprint“ nimmt den Lauf,
+  sonst das letzte Rennen der Runde), Strecke bzw. Titel, Flagge oder Land (`header_country`, Regionalbuchstaben und
+  `round_countries`), zuletzt die Reihenfolge der Runden. Abgesagte und archivierte Termine nie; jeder Termin einmal.
+- **Platz aus Punkten** (`place_candidates`, `build_column`): Schema des Termins je Lauf (`race_weekend.rules_for_round`)
+  samt Bonus für schnellste Runde und Pole (mit `max_place`) und Sonderboni (`custom_bonuses`), bis drei Boni je Wert.
+  Mehrere Möglichkeiten werden über die sicheren Plätze derselben Runde eingegrenzt (`_narrow`). Gelb (`unclear`):
+  `ambiguous`, `bonus` (ein Bonus steckt im Wert - auch eindeutig nur als Vorschlag), `outside`, `shared` (zwei Zellen
+  auf einem Platz). Bis zur Klärung zählt der Wert ohne Platz (`points_source: manual`); eine Spalte mit offenen gelben
+  Zellen ist `unclear` und wird beim Übernehmen nicht geschrieben. 0 Punkte: ohne Platz, ohne Meldung. Aus Platz
+  entsteht `points_source: organizer` mit dem Wert ohne Sonderboni (Vergleich mit dem Schlüssel wie beim Eintragen).
+  Eine Klärung gilt nur, wenn ihr Platz samt Boni zu den Vorschlägen nach dem Schema des Termins passt
+  (`decision_fits`); wechselt die Spalte den Termin, verwirft die Oberfläche ihre Klärungen.
+- **Vorhandenes:** verglichen wird mit dem Entwurf daneben bzw. dem Blatt (`draft_base`) in Platz, Punkten wie sie
+  zählen (`with_totals`), Marken, Sonderboni und Team (`partner_import.sheet_diff` mit `SEASON_COMPARED`). Was die
+  Tabelle nicht kennt (Notiz, Startnummer, Zeiten, Startplatz, Runden eines Turniertags, Partner), bleibt
+  (`carry_over` mit `SEASON_KEPT`, ohne Marken von Hand). Schreiben über `reference_result_routes.write_draft` wie bei
+  der Partner-Plattform: Version aus der Vorschau, Revision, Entwurf daneben, Protokoll mit `source: "season_table"`,
+  dazu `reference_season_table.import` je Einlesen. Runden nacheinander unter der Sperre - ein neuer Name der ersten
+  Runde ist in der nächsten schon Teilnehmer.
+- **Abgleich mit „Gesamt“** (`total_parts`, `explain_total`): Stand nach allen Runden, als wären die Entwürfe
+  veröffentlicht (`race_weekend.standings`), gegen „Gesamt“ und Platz laut Tabelle. Gründe mit Vorzeichen, so dass
+  `Summe der Zellen + Gründe = gerechnet`: `ignored` (nicht übernommene Spalten), `sheet` (Blatt anders als die Zelle),
+  `dropped`, `activity`, `adjustment`, `other` (Runden ohne Spalte). `explained`, wenn genau einige Gründe die
+  Abweichung ergeben. Ohne Spalte „Platz“ heißt gleiche Summe gleich gut (`rank_differs`).
+- **Gewollt still:** `place_missing` bei Zeilen ohne Platz mit Absicht, `points_manual` und `team_unknown` (die Teams
+  kommen aus der Tabelle).
+
 ## Version, Entwurf daneben und Protokoll
 
 - **Nacheinander je Saison:** Ergebnis speichern, freigeben, verwerfen und zurücknehmen sowie alle Kalender-Änderungen
@@ -447,3 +489,49 @@ in `services/reference_originals.py`, Routen in `routes/reference_original_route
 - **Bleibt:** Die Bilder hängen an der Kennung des Termins (Verschieben nimmt sie mit), Archivieren löscht nichts.
 - **Zählen:** `GET /api/admin/media/audit` → `reference_originals: {count, bytes}` aus der Datenbank; das
   Upload-Inventar zeigt den Ordner `reference-originals` als eigenen Bereich.
+
+## Saison- und Teamtabelle per Bild (#1999)
+
+Die Gesamttabelle des Veranstalters als Bild (etwa PRL: Pos · Team bzw. Fahrer · Flagge je Rennen · Punkte · Dif.).
+Lesen: `services/result_image_table.py` (Bausteine aus `result_image_ocr`), Route `GET`/`POST
+…/season-table/image?table=drivers|teams` in `routes/reference_result_image_routes.py` (nur Vorstand, nicht Team-Liga;
+dieselben Grenzen, dasselbe Rate-Limit `result_image` und dieselbe Warteschlange wie Ergebnis-Bilder). `NOT_A_RESULT`
+gilt hier nicht. Web: `SeasonTableSection.jsx`, `OfficialTeamTotals.jsx` (`imageBase`), `lib/seasonTable.js`
+(`imageTable`, `imageTeamRows`).
+
+- **Spalten aus den Daten:** `column_groups` über die Datenzeilen; die Überschriften (`TEMPLATE.labels`: Pos, Team bzw.
+  Fahrer, Punkte, Dif.) geben die Art, sonst Inhalt und Lage (Text = Name, Zahlen davor = Platz, negative Zahlen =
+  Abstand, letzte Zahlenspalte = Punkte, dazwischen Runden „Runde 1“ …). `detected`: `teams`, wenn die Namensspalte
+  „Team“ heißt, `drivers` bei „Fahrer“/„Name“.
+- **Zellen:** Seitenlesung, Streifen mit Whitelist `points` (`0123456789-`) und dritte Lesung; „--“ (auch als „=“
+  gelesen) heißt nicht angetreten und ist sicher, sobald keine Lesung eine Zahl sieht. Widerspruch oder zu wenig
+  Sicherheit: gelb (`uncertain` je Zeile, `read` das andere Gelesene).
+- **Gegenproben** (`_check`): `Dif. = Punkte - Punkte des Ersten` bestätigt beide (ein verlorenes Minus wird gesetzt)
+  oder macht beide gelb. Plätze laufen mit den Punkten; Platz 1 im Kasten ergibt sich aus 2 … n.
+- **Schriftbild** (`_glyph_check`): dieselbe Zahl sieht in derselben Tabelle gleich aus. Gleicht die Tinte einer Zelle
+  (freigestellt, auf feste Größe gebracht) einer Zelle mit anderem Wert (`GLYPH_CLOSE`), ist eine verlesen - etwa „23“,
+  die alle Lesungen als „25“ nahmen: beide gelb, mit dem anderen Wert als Lesung. Verglichen wird nur mit wenigen
+  Zellen (`GLYPH_REPRESENTATIVES`) der Werte, die genau eine Ziffer anders haben, in C (`ImageChops`) und im Zeitbudget
+  des Bilds; reicht es nicht, bleibt der Rest gelb (`out_of_time`).
+- **Summe** (`check_sums`, in der Route nach dem Abgleich der Namen): `Summe der Runden = Punkte` bestätigt die Zeile -
+  nur Zellen mit eigener Lesung, eine ungelesene leere Zelle bleibt gelb.
+  Sonst ein Hinweis an der Summe (`notes`). Nur die Fahrertabelle (`table=drivers`) macht dann die Zahlenzellen gelb -
+  außer die Abweichung ist erklärt (`_sum_explainer` mit `season_table.explain_total`: Streichresultate nach den Regeln,
+  Aktivitätspunkte, Anpassungen des Fahrers). Die Teamtabelle (`table=teams`, auch erkannt an der Spalte „Team“)
+  rechnet „Punkte“ oft als aktuelle Besetzung (#1960): nur der Hinweis.
+- **Namen** (`match_names`): unscharf (`result_image_match.similarity`) gegen die Teilnehmer samt Aliase (Fahrer) bzw.
+  die Teams der Saison (`known_teams`: eigene, Standard-Teams, Teams der Blätter und der Teamwertung).
+- **Teamwertung laut Veranstalter** (`routes/reference_season_table_routes.py`): `POST …/team-totals/preview`
+  (`{round_id?, totals, mode}`; ohne Runde die letzte gewertete mit Ergebnis) rechnet die Teamwertung nach der Runde mit
+  den Werten danach und nennt je Team bisher, laut Bild, danach und `state` (`new`, `changed`, `same`, `kept`,
+  `removed`, `team_changes`) sowie neue Teams. `mode`: `merge` (Vorgabe) ergänzt bzw. aktualisiert - Teams, die im Bild
+  fehlen, bleiben; `replace` ersetzt (`merged_totals`). `PUT …/team-totals` (`{round_id, totals, mode,
+  expected_version}`) rechnet dasselbe vom Stand mit der geprüften Version (sonst 409) und schreibt
+  `official_team_totals` ins Blatt (Entwurf daneben bekommt dieselben Werte), Revision `team_totals`, Protokoll
+  `reference_result.team_totals`, bei veröffentlichtem Blatt neu rechnen.
+- **Original** (#1933): Lesen speichert nichts. Die Saisontabelle merkt sich die Datei und hängt sie nach dem
+  Übernehmen mit `kind=table`, `origin=reading` an (`…/rounds/<termin>/originals`): bei der Fahrertabelle an die letzte
+  Runde der Tabelle (`lastTableRound`, nur wenn etwas übernommen wurde), bei der Teamtabelle an die gewählte Runde, im
+  Ergebnisblatt über `OfficialTeamTotals` → `onImage` an den Termin des Blatts. „Nicht anhängen“ lässt es weg.
+- **Tests:** `backend/tests/season_table_image_fixture.py` zeichnet die Tabelle im PRL-Layout mit erfundenen Teams (12 ×
+  17 Runden, eine Strafe); `test_result_image_table.py` prüft „stimmt oder gelb“ für jede Zelle.

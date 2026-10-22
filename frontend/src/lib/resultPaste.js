@@ -650,3 +650,167 @@ export function parseTablePaste(text, { maxRows = 100 } = {}) {
   }
   return { format: lines.length ? separator.format : null, header: Boolean(keys), rows, errors };
 }
+
+// ---------------------------------------------------------------- Saisontabelle (#1928)
+// Gesamttabelle des Veranstalters: Platz, Fahrer (auch „Name#TAG“), optional Team, je Runde Punkte, optional Gesamt und
+// Abstand. Zellen bleiben hier Text – was „OUT“, „--“ oder „DSQ“ heißt und welcher Platz zu den Punkten gehört, rechnet
+// der Server. Hier wird nur die Tabelle gelesen und jede Spalte einer Art zugeordnet (`name`, `team`, `round`, `total`,
+// `rank`, `ignore`); die Oberfläche lässt das korrigieren.
+export const MAX_SEASON_ROWS = 300;
+export const MAX_SEASON_ROUNDS = 60;
+const SEASON_HEADERS = {
+  rank: ["platz", "pl", "pos", "position", "rang", "rank", "#", "p"],
+  name: ["name", "fahrer", "spieler", "driver", "player", "teilnehmer", "pilot", "gamertag"],
+  team: ["team", "rennstall", "clan", "constructor", "mannschaft"],
+  total: ["gesamt", "total", "summe", "punkte", "pkt", "pts", "points", "ges", "ges p", "gesamtpunkte"],
+  ignore: ["dif", "diff", "differenz", "abstand", "gap", "rückstand", "+/-", "nr", "startnummer", "#nr"],
+};
+const SEASON_ABSENT = new Set(["", "-", "--", "---", "–", "—", "/", "n/a"]);
+const SEASON_MARKS = new Set(["dnf", "dns", "dsq"]);
+
+/** Taugt der Text als Zelle einer Runde? Zahl, „OUT“/„DNF“/„DSQ“/„DNS“, „--“ oder leer. */
+export function isSeasonCell(value) {
+  const text = cleanText(value);
+  if (SEASON_ABSENT.has(text.toLowerCase())) return true;
+  return parseNumber(text) !== null || SEASON_MARKS.has(parseMark(text));
+}
+
+function seasonHeaderKind(cell) {
+  let word = cleanText(cell).toLowerCase();
+  if (word.endsWith(".") && word.length > 1) word = word.slice(0, -1);
+  for (const [kind, words] of Object.entries(SEASON_HEADERS)) if (words.includes(word)) return kind;
+  return null;
+}
+
+function seasonLines(lines, separator) {
+  return lines.map((line) => ({ number: line.number, cells: splitCells(line.text, separator) }))
+    .filter((line) => !isRuler(line.cells));
+}
+
+/** Zeilenformat ohne Trenner: „1 Ada Ausgedacht 25 18 -- OUT 43“ – Platz, Name bis zur ersten Zelle, dann die Zellen. */
+function seasonTokens(text, header) {
+  const items = tokenize(text).map((item) => item.text);
+  if (header) return items;
+  const cells = [];
+  let index = 0;
+  if (items.length && parsePlace(items[0]) !== null) cells.push(items[index++]);
+  const name = [];
+  while (index < items.length && (!name.length || !isSeasonCell(items[index]))) name.push(items[index++]);
+  cells.push(name.join(" "));
+  return [...cells, ...items.slice(index)];
+}
+
+function columnValues(rows, index) {
+  return rows.map((row) => row.cells[index] ?? "");
+}
+
+function looksLikeRank(values) {
+  const filled = values.filter((value) => cleanText(value));
+  return filled.length > 0 && filled.every((value) => parsePlace(value) !== null);
+}
+
+function isTotalColumn(rows, index, rounds) {
+  // Letzte Zahlenspalte ohne Kopf: Gesamt, wenn sie bei fast allen Zeilen die Summe der Runden ist.
+  let hits = 0;
+  let filled = 0;
+  for (const row of rows) {
+    const total = parseNumber(row.cells[index]);
+    if (total === null) continue;
+    filled += 1;
+    const sum = rounds.reduce((acc, column) => acc + (parseNumber(row.cells[column]) ?? 0), 0);
+    if (Math.abs(sum - total) < 1e-9) hits += 1;
+  }
+  return filled > 0 && hits / filled >= 0.8;
+}
+
+function guessKinds(header, rows, width) {
+  const kinds = [];
+  for (let index = 0; index < width; index += 1) {
+    const fromHeader = header ? seasonHeaderKind(header[index]) : null;
+    if (fromHeader) {
+      kinds.push(fromHeader);
+      continue;
+    }
+    const values = columnValues(rows, index);
+    if (index === 0 && !header && looksLikeRank(values)) kinds.push("rank");
+    else if (values.every(isSeasonCell)) kinds.push("round");
+    else kinds.push("text");
+  }
+  // Text-Spalten: die erste ist der Name (wenn der Kopf keinen nennt), die nächste das Team, weitere fallen weg.
+  let name = kinds.indexOf("name");
+  let team = kinds.indexOf("team");
+  kinds.forEach((kind, index) => {
+    if (kind !== "text") return;
+    if (name < 0) {
+      name = index;
+      kinds[index] = "name";
+    } else if (team < 0 && index > name) {
+      team = index;
+      kinds[index] = "team";
+    } else kinds[index] = "ignore";
+  });
+  // Doppelte Arten: nur die erste Namens- und Team-Spalte, nur die letzte Gesamt-Spalte zählt.
+  ["name", "team", "rank"].forEach((kind) => {
+    const first = kinds.indexOf(kind);
+    kinds.forEach((value, index) => { if (value === kind && index !== first) kinds[index] = "ignore"; });
+  });
+  const lastTotal = kinds.lastIndexOf("total");
+  kinds.forEach((value, index) => { if (value === "total" && index !== lastTotal) kinds[index] = "ignore"; });
+  if (!header && lastTotal < 0) {
+    const rounds = kinds.map((kind, index) => (kind === "round" ? index : -1)).filter((index) => index >= 0);
+    const last = rounds[rounds.length - 1];
+    if (rounds.length > 1 && isTotalColumn(rows, last, rounds.slice(0, -1))) kinds[last] = "total";
+  }
+  return kinds;
+}
+
+/**
+ * Saisontabelle aus der Zwischenablage (Tab aus der Tabellenkalkulation oder einer Website, „|“, „;“ – sonst
+ * Leerzeichen). Liefert `{format, columns: [{label, kind}], rows: [{line, cells}], errors}`; `cells` sind die Texte
+ * aller Spalten (fehlende am Ende leer). Ohne Kopfzeile heißen die Spalten nach ihrer Nummer.
+ */
+export function parseSeasonTablePaste(text, { maxRows = MAX_SEASON_ROWS } = {}) {
+  const errors = [];
+  // Kopfzeile plus eine Zeile zu viel lesen – zu viele Zeilen meldet die Tabelle selbst (ohne die Kopfzeile).
+  const read = [];
+  const lines = readLines(text, maxRows + 2, read);
+  errors.push(...read.filter((error) => error.line === null));
+  const separator = pickSeparator(lines);
+  let table = separator.char ? seasonLines(lines, separator) : lines.map((line) => ({ number: line.number, cells: null, text: line.text }));
+  const first = table[0];
+  const firstCells = first ? (first.cells || seasonTokens(first.text, true)) : [];
+  // Kopfzeile: keine Zahl und kein Platz darin, mindestens zwei gefüllte Zellen, nicht nur „--“.
+  const header = firstCells.length > 1 && firstCells.every((cell) => parseNumber(cell) === null && parsePlace(cell) === null)
+    && firstCells.filter((cell) => cleanText(cell)).length >= 2 && firstCells.some((cell) => !isSeasonCell(cell))
+    ? firstCells : null;
+  if (header) table = table.slice(1);
+  const rows = table.map((line) => ({ line: line.number, cells: line.cells || seasonTokens(line.text, false) }))
+    .filter((row) => row.cells.some((cell) => cleanText(cell)));
+  if (rows.length > maxRows) {
+    errors.push({ line: rows[maxRows].line, text: "", message: `Höchstens ${maxRows} Zeilen – ab hier wurde nichts übernommen.` });
+    rows.length = maxRows;
+  }
+  const width = Math.max(header ? header.length : 0, ...rows.map((row) => row.cells.length), 0);
+  if (!separator.char && header) {
+    for (const row of rows) {
+      if (row.cells.length !== width) {
+        errors.push({ line: row.line, text: short(row.cells.join(" ")), message: `${row.cells.length} statt ${width} Spalten – bitte die Tabelle mit Tab trennen (aus der Tabellenkalkulation kopieren).` });
+      }
+    }
+  }
+  for (const row of rows) while (row.cells.length < width) row.cells.push("");
+  const kinds = guessKinds(header, rows, width);
+  let roundNumber = 0;
+  const columns = kinds.map((kind, index) => {
+    if (kind === "round") roundNumber += 1;
+    const label = header ? cleanText(header[index]) : "";
+    return { label: label || (kind === "round" ? String(roundNumber) : `Spalte ${index + 1}`), kind };
+  });
+  if (columns.filter((column) => column.kind === "round").length > MAX_SEASON_ROUNDS) {
+    errors.push({ line: null, text: "", message: `Höchstens ${MAX_SEASON_ROUNDS} Runden-Spalten.` });
+  }
+  if (rows.length && !columns.some((column) => column.kind === "name")) {
+    errors.push({ line: null, text: "", message: "Keine Spalte mit Namen erkannt – bitte die Spalte „Fahrer“ wählen." });
+  }
+  return { format: lines.length ? separator.format : null, header: Boolean(header), columns, rows, errors };
+}

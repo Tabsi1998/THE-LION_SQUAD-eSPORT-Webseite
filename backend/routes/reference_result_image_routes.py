@@ -26,7 +26,11 @@ Inhalt). Antwort::
 
 ``session`` und ``suggested_round`` (der Termin, zu dem die Strecke im Bild passt) sind nur Hinweise; ``color`` und
 ``team_colors`` (Schriftfarbe von Startnummer bzw. Team) sind ein Vorschlag für Teamfarben - gespeichert wird nichts.
-Saisontabellen und Kalender (keine Zeiten) lehnt die Route mit 422 ab.
+Saisontabellen und Kalender (keine Zeiten) lehnt die Route mit 422 ab - dafür gibt es
+``GET``/``POST /admin/series/{series_id}/season-table/image?table=drivers|teams`` (#1999, nur Vorstand): die Saison-
+bzw. Teamtabelle des Veranstalters mit denselben Grenzen, demselben Rate-Limit und derselben Warteschlange; Antwort
+``{template, kind, detected, columns: [{label, kind}], rows: [{cells, uncertain, read, notes}], uncertain_cells,
+warnings}`` (``services/result_image_table.py``).
 
 - **Grenzen:** Größe ``MAX_IMAGE_UPLOAD_MB`` (schon am Kopf der Anfrage geprüft), Pixel ``MAX_IMAGE_PIXELS`` (am Kopf
   der Bilddatei, vor dem Dekodieren) - wie bei jedem Bild-Upload (``services/image_upload.py``). Das Bild wird nur im
@@ -44,19 +48,22 @@ Saisontabellen und Kalender (keine Zeiten) lehnt die Route mit 422 ab.
 from __future__ import annotations
 
 import asyncio
+import functools
 import logging
 import os
 import time
+from typing import Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
 from database import get_db
 from routes.reference_result_routes import MAX_ROWS
-from services import result_image_match, result_image_ocr, result_image_templates
+from routes.reference_season_table_routes import known_teams
+from services import result_image_match, result_image_ocr, result_image_table, result_image_templates, season_table
 from services.image_upload import MAX_BYTES, MAX_IMAGE_UPLOAD_MB
 from services.rate_limit import enforce_rate_limit, keyed_subject
 from services.reference_series_access import SeriesAccess, require_series_editor
-from services.scoring_rules import normalize_rules
+from services.scoring_rules import counted_results, normalize_rules
 from services.series_identity import normalize_name
 from services.series_participants import series_game_id
 
@@ -198,8 +205,9 @@ def _warnings(reading: result_image_ocr.Reading, built: dict, round_doc: dict, s
     return out
 
 
-async def _read_in_turn(body: bytes, template: dict) -> tuple[result_image_ocr.Reading, float]:
-    """Mit freiem Platz (``_gate``) dekodieren und lesen - wartende Anfragen halten nur die Datei."""
+async def _read_in_turn(body: bytes, template: dict, reader=None, max_rows: int = MAX_ROWS):
+    """Mit freiem Platz (``_gate``) dekodieren und lesen - wartende Anfragen halten nur die Datei. ``reader``: wie
+    gelesen wird (Ergebnis: ``result_image_ocr.read``, Saisontabelle: ``result_image_table.read_table``)."""
     try:
         await asyncio.wait_for(_gate.acquire(), timeout=QUEUE_SECONDS)
     except asyncio.TimeoutError:
@@ -210,14 +218,137 @@ async def _read_in_turn(body: bytes, template: dict) -> tuple[result_image_ocr.R
         del body
         if opened.image is None:
             raise HTTPException(opened.status, opened.message)
-        # Höchstens so viele Zeilen wie die Vorschau des Blatts nimmt - dieselbe Grenze (``MAX_ROWS``).
-        return await asyncio.to_thread(result_image_ocr.read, opened.image, template, max_rows=MAX_ROWS), started
+        # Höchstens so viele Zeilen wie die Vorschau nimmt - dieselbe Grenze (``MAX_ROWS`` bzw. die der Saisontabelle).
+        return await asyncio.to_thread(reader or result_image_ocr.read, opened.image, template,
+                                       max_rows=max_rows), started
     except result_image_ocr.OcrUnavailable:
         raise HTTPException(503, UNAVAILABLE) from None
     except result_image_ocr.OutOfTime:
         raise HTTPException(422, TOO_SLOW) from None
     finally:
         _gate.release()
+
+
+# ---------------------------------------------------------------- Saison- und Teamtabelle (#1999)
+TABLE_BASE = "/admin/series/{series_id}/season-table/image"
+NO_SEASON_TABLE = ("Im Bild wurde keine Tabelle mit Namen und Punkten gefunden. Bitte nur die Tabelle als Screenshot "
+                   "einfügen - oder den Text einfügen.")
+TOO_MANY_TABLE_ROWS = (f"Im Bild stehen mehr als {season_table.MAX_ROWS} Zeilen - so viele nimmt die Saisontabelle "
+                       "nicht.")
+TEAM_LEAGUE_TABLE = "In der Team-Liga gilt die Tabelle laut Veranstalter im Ergebnisblatt des Spieltags."
+
+
+def _table_template() -> dict:
+    return {"id": result_image_table.TEMPLATE["id"], "name": result_image_table.TEMPLATE["name"]}
+
+
+async def _sum_explainer(db, series: dict, participants: list[dict], rounds_in_table: int):
+    """Erklärt eine Abweichung „Summe der Runden ≠ Punkte“ einer Fahrertabelle wie beim Text-Einfügen
+    (``season_table.explain_total``): Streichresultate nach den Regeln der Saison, Aktivitätspunkte und Anpassungen
+    (#1960) des Fahrers. ``None``, wenn die Regeln sich nicht anwenden lassen."""
+    try:
+        rules = normalize_rules(series.get("rules") or {})
+    except ValueError:
+        return None
+    calendar = await db.reference_rounds.count_documents(
+        {"series_id": series["id"], "archived_at": None, "status": {"$ne": "cancelled"}})
+    total_rounds = max(calendar, rounds_in_table)
+    by_name = {row.get("name"): row["id"] for row in participants if row.get("name")}
+    adjusted: dict[str, float] = {}
+    for item in series.get("adjustments") or []:
+        if item.get("kind", "participant") == "participant" and item.get("participant_id"):
+            adjusted[item["participant_id"]] = adjusted.get(item["participant_id"], 0) + (item.get("points") or 0)
+    activity = rules["activity_points"]
+
+    def explain(name: str, values: list, summed, total) -> str | None:
+        results = [{"round_id": str(index), "seq": index + 1, "points": value}
+                   for index, value in enumerate(values) if value is not None]
+        _, gone = counted_results(results, rules, total_rounds)
+        dropped = sum(item["points"] for item in results if item["round_id"] in set(gone))
+        bonus = activity["points"] * sum(1 for item in results if item["seq"] >= activity["from_round"])
+        parts = {"dropped": -dropped, "activity": bonus, "adjustment": adjusted.get(by_name.get(name), 0)}
+        out = season_table.explain_total(summed, total, parts)
+        if out["state"] != "explained":
+            return None
+        return " · ".join(f"{item['text']} {'+' if item['points'] > 0 else '−'}{abs(item['points'])}"
+                          for item in out["explains"])
+
+    return explain
+
+
+def _table_warnings(reading) -> list[dict]:
+    out = []
+    if not reading.header_found:
+        out.append({"code": "no_header", "message": NO_HEADER})
+    if reading.out_of_time:
+        out.append({"code": "out_of_time", "message": OUT_OF_TIME})
+    if reading.text_height < 8 or reading.mean_conf < 75:
+        out.append({"code": "blurry", "message": BLURRY})
+    return out
+
+
+@router.get(TABLE_BASE)
+async def season_table_image_info(series_id: str, access: SeriesAccess = Depends(require_series_editor)):
+    """Ob der Server eine Saison- bzw. Teamtabelle lesen kann (nur Vorstand)."""
+    access.require_board()
+    return {"template": _table_template(), "available": result_image_ocr.available(),
+            "max_mb": MAX_IMAGE_UPLOAD_MB, "formats": FORMATS}
+
+
+@router.post(TABLE_BASE)
+async def read_season_table_image(series_id: str, request: Request,
+                                  table: Literal["drivers", "teams"] = Query("drivers"),
+                                  access: SeriesAccess = Depends(require_series_editor)):
+    """Saison- bzw. Teamtabelle lesen (#1999) - wie ein Ergebnis-Bild mit Grenzen, Rate-Limit und gelb = unsicher;
+    ``NOT_A_RESULT`` gilt hier nicht (Tabellen haben keine Zeiten). Speichert nichts."""
+    access.require_board()
+    db = get_db()
+    lineage = await db.reference_lineages.find_one({"id": access.series.get("lineage_id")}, {"_id": 0, "kind": 1}) or {}
+    if lineage.get("kind") == "team_league":
+        raise HTTPException(409, TEAM_LEAGUE_TABLE)
+    if not result_image_ocr.available():
+        raise HTTPException(503, UNAVAILABLE)
+    await enforce_rate_limit(request, "result_image", RATE_LIMIT, RATE_WINDOW_SECONDS,
+                             subject=keyed_subject(access.user["id"]), message=TOO_MANY)
+    account = access.user["id"]
+    if account in _reading_accounts:
+        raise HTTPException(429, BUSY_ACCOUNT)
+    _reading_accounts.add(account)
+    try:
+        # Die Summenprobe hängt an der Art der Tabelle - sie kommt erst nach dem Abgleich der Namen.
+        reader = functools.partial(result_image_table.read_table, sums=False)
+        reading, started = await _read_in_turn(await _body(request), result_image_table.TEMPLATE, reader=reader,
+                                               max_rows=season_table.MAX_ROWS)
+    finally:
+        _reading_accounts.discard(account)
+    if reading.too_many_rows:
+        raise HTTPException(422, TOO_MANY_TABLE_ROWS)
+    if not reading.rows or "name" not in reading.kinds:
+        raise HTTPException(422, NO_SEASON_TABLE)
+    participants = await db.reference_participants.find({"series_id": series_id}, PARTICIPANT_FIELDS).to_list(None)
+    # Eine Team-Tabelle bleibt eine, auch wenn sie in „Saisontabelle einlesen“ landet (die Namensspalte heißt „Team“).
+    table = "teams" if reading.detected == "teams" else table
+    if table == "teams":
+        known = {name: name for name in await known_teams(db, access.series, participants)}
+    else:
+        # Teilnehmer der Saison; Aliase der Mitglieder (nur Vorstand, wie #1743) führen zum Namen des Teilnehmers.
+        by_id = {row["id"]: row.get("name") for row in participants if row.get("name")}
+        known = {name: name for name in by_id.values()}
+        for alias in await _aliases(db, access.series, participants):
+            if by_id.get(alias["participant_id"]):
+                known.setdefault(alias["name"], by_id[alias["participant_id"]])
+    result_image_table.match_names(reading, known)
+    if table == "teams":
+        # „Punkte“ einer Teamtabelle ist oft die aktuelle Besetzung (#1960), die Zellen sind je Rennen - nur Hinweis.
+        result_image_table.check_sums(reading, strict=False)
+    else:
+        rounds = reading.kinds.count("round")
+        result_image_table.check_sums(reading, strict=True,
+                                      explain=await _sum_explainer(db, access.series, participants, rounds))
+    payload = result_image_table.to_payload(reading, kind=table)
+    logger.info("[result-image] table %s rows (%s uncertain cells) in %.1fs", len(payload["rows"]),
+                payload["uncertain_cells"], time.monotonic() - started)
+    return {"template": _table_template(), **payload, "warnings": _table_warnings(reading)}
 
 
 @router.get(BASE)

@@ -68,6 +68,7 @@ from routes.reference_adjustment_routes import router as reference_adjustment_ro
 from routes.reference_series_public_routes import router as reference_series_public_router
 from routes.reference_round_page_routes import router as reference_round_page_router
 from routes.reference_partner_routes import router as reference_partner_router
+from routes.reference_season_table_routes import router as reference_season_table_router
 from routes.mobile_routes import router as mobile_router
 from routes.admin_routes import router as admin_router
 from routes.ops_routes import router as ops_router
@@ -340,6 +341,7 @@ app.include_router(reference_adjustment_router)  # Anpassungen ±Punkte je Saiso
 app.include_router(reference_series_public_router)
 app.include_router(reference_round_page_router)  # Ergebnistabelle je Runde, Statistik, Teamfarben (#1950)
 app.include_router(reference_partner_router)  # Partner-Plattform anbinden: Turniertage als Entwurf holen (#1964)
+app.include_router(reference_season_table_router)  # Saisontabelle einlesen: Runden als Entwurf nachtragen (#1928)
 app.include_router(mobile_router)
 app.include_router(admin_router)
 app.include_router(ops_router)

@@ -115,6 +115,17 @@ class _Lookup:
         return [row for row in self.by_id.values() if clean(row.get("start_number")).casefold() == wanted]
 
 
+def default_teams(names: list[str], participants: list[dict]) -> list[str | None]:
+    """Stammteam je Name, wie das Eintragen es sichtbar vorbelegt - nur bei genau einem Treffer (Saisontabelle ohne
+    Team-Spalte, #1928)."""
+    lookup = _Lookup(participants)
+    out = []
+    for name in names:
+        hits, _ = lookup.by_name(clean(name))
+        out.append(hits[0].get("default_team") or None if len(hits) == 1 else None)
+    return out
+
+
 @dataclass
 class Located:
     """Wem eine Angabe gehört: ``participant_id`` (echte Kennung oder ``neu:<Schlüssel>``), wie sie gefunden wurde

@@ -73,15 +73,16 @@ def next_code(rounds: list[dict], taken: set[str] | None = None) -> str:
 
 def _value(row: dict, key: str):
     value = row.get(key)
-    if key == "marks":
+    if key in ("marks", "bonus_keys"):
         return sorted(value or [])
     if key == "day_rounds":
         return list(value) if value else None
     return value
 
 
-def sheet_diff(old: dict | None, new: dict, names: dict[str, str]) -> dict:
-    """Abweichungen von ``old`` (vorhandenes Blatt bzw. Entwurf daneben) zu ``new``."""
+def sheet_diff(old: dict | None, new: dict, names: dict[str, str], compared: tuple[str, ...] = COMPARED) -> dict:
+    """Abweichungen von ``old`` (vorhandenes Blatt bzw. Entwurf daneben) zu ``new`` - je Person in den Feldern
+    ``compared`` (die Saisontabelle, #1928, vergleicht dazu Punkte, Herkunft, Sonderboni und Team)."""
     if old is None:
         return {"state": "new", "changes": []}
     before = {row.get("participant_id"): row for row in old.get("rows") or [] if row.get("participant_id")}
@@ -96,7 +97,7 @@ def sheet_diff(old: dict | None, new: dict, names: dict[str, str]) -> dict:
         if pid not in before:
             changes.append({"participant_id": pid, "name": name, "kind": "added", "fields": {}})
             continue
-        fields = {key: [_value(before[pid], key), _value(row, key)] for key in COMPARED
+        fields = {key: [_value(before[pid], key), _value(row, key)] for key in compared
                   if _value(before[pid], key) != _value(row, key)}
         if fields:
             changes.append({"participant_id": pid, "name": name, "kind": "changed", "fields": fields})
@@ -109,19 +110,21 @@ def sheet_diff(old: dict | None, new: dict, names: dict[str, str]) -> dict:
     return {"state": "changed" if changes else "same", "changes": changes}
 
 
-def carry_over(new: dict, old: dict | None) -> dict:
-    """``new`` mit dem, was der Verein im vorhandenen Blatt von Hand ergänzt hat - als neue Kopie."""
+def carry_over(new: dict, old: dict | None, kept: tuple[str, ...] = KEPT_ROW_FIELDS, keep_marks: bool = True) -> dict:
+    """``new`` mit dem, was der Verein im vorhandenen Blatt von Hand ergänzt hat - als neue Kopie. ``kept``: welche
+    Felder je Zeile bleiben; ``keep_marks``: ob Marken von Hand bleiben (die Saisontabelle, #1928, kennt Punkte und
+    Marken selbst und behält nur, was sie nicht kennt)."""
     if not old:
         return new
     before = {row.get("participant_id"): row for row in old.get("rows") or [] if row.get("participant_id")}
     rows = []
     for row in new.get("rows") or []:
-        kept = before.get(row.get("participant_id")) or {}
-        extra = {key: kept[key] for key in KEPT_ROW_FIELDS if kept.get(key) not in (None, [], "", 0)}
+        before_row = before.get(row.get("participant_id")) or {}
+        extra = {key: before_row[key] for key in kept if before_row.get(key) not in (None, [], "", 0)}
         if extra.get("points_source") == "scheme":
             extra.pop("points_source")
         # Marken: „Ausgestiegen“ meldet die Quelle, jede andere (DSQ, DNS …) hat der Verein gesetzt - sie bleibt.
-        by_hand = {mark for mark in kept.get("marks") or [] if mark not in SOURCE_MARKS}
+        by_hand = {mark for mark in before_row.get("marks") or [] if mark not in SOURCE_MARKS} if keep_marks else set()
         marks = sorted({*(row.get("marks") or []), *by_hand})
         rows.append({**row, **extra, "marks": marks})
     out = {**new, "rows": rows}
