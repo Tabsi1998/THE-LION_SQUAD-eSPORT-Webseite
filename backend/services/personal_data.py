@@ -192,6 +192,9 @@ CLUB_CONTENT = frozenset({
     # und Stände. Teilnehmer und Aliase stehen bei den Daten zur Person.
     "reference_lineages", "reference_round_result_revisions", "reference_round_results", "reference_rounds",
     "reference_series", "reference_standings",
+    # Original-Bilder des Veranstalters je Termin (#1933): Beleg des Ergebnisses wie das Blatt - nur die Kennung, wer
+    # hochgeladen bzw. freigegeben hat. Ein ausgeblendeter Name im Ergebnis hält das Bild aus der Öffentlichkeit.
+    "reference_round_originals",
     # Maps je Spiel und Map-Pools je Wettbewerb (#1616) - nur die Kennung, wer angelegt bzw. gespeichert hat; dazu die
     # belegten Schreibweisen der Maps (ohne Person).
     "game_maps", "map_pools", "game_map_keys",

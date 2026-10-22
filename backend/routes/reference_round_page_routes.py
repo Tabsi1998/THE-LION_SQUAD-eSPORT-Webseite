@@ -33,7 +33,7 @@ from database import get_db
 from models import now_utc
 from routes.reference_round_routes import _calendar, visible_series
 from routes.reference_series_public_routes import _people
-from services import reference_series
+from services import reference_originals, reference_series
 from services.own_teams import own_team_names
 from services.reference_series_access import SeriesAccess, require_series_editor
 from services.round_page import clean, clean_hex, color_key, load_round
@@ -73,6 +73,12 @@ async def public_round(lineage_slug: str, season_slug: str, number: int,
     view = await load_round(db, series, calendar["rounds"], number, people)
     if view is None:
         raise HTTPException(404, NOT_FOUND)
+    # Original-Bilder des Veranstalters je Lauf (#1933) - nur öffentliche, wie auf der Serienseite.
+    shown = {session["id"] for session in view["sessions"]}
+    originals = await reference_originals.public_map(
+        db, series, [item for item in calendar["rounds"] if item["id"] in shown], lineage.get("slug") or lineage_slug)
+    for session in view["sessions"]:
+        session["originals"] = originals.get(session["id"], [])
     return {**_head(lineage, series), "today": calendar["today"], **view}
 
 

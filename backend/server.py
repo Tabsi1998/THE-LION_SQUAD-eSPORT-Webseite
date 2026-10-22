@@ -61,6 +61,7 @@ from routes.reference_round_routes import router as reference_round_router
 from routes.reference_participant_routes import router as reference_participant_router
 from routes.reference_result_routes import router as reference_result_router
 from routes.reference_result_image_routes import router as reference_result_image_router
+from routes.reference_original_routes import router as reference_original_router
 from routes.reference_staff_routes import router as reference_staff_router
 from routes.reference_season_close_routes import router as reference_season_close_router
 from routes.reference_adjustment_routes import router as reference_adjustment_router
@@ -332,6 +333,7 @@ app.include_router(reference_round_router)
 app.include_router(reference_participant_router)
 app.include_router(reference_result_router)
 app.include_router(reference_result_image_router)  # Ergebnis-Bild auslesen (#1756)
+app.include_router(reference_original_router)  # Original-Bilder des Veranstalters je Termin (#1933)
 app.include_router(reference_staff_router)
 app.include_router(reference_season_close_router)  # Saison abschließen (#1750)
 app.include_router(reference_adjustment_router)  # Anpassungen ±Punkte je Saison (#1960)

@@ -28,7 +28,7 @@ from pydantic import BaseModel
 from database import get_db
 from auth import get_current_user, require_area
 from models import new_id, now_utc
-from services import account_erasure, media_audit
+from services import account_erasure, media_audit, reference_originals
 from services.media_formats import PUBLIC_IMAGE_EXTS, PUBLIC_MEDIA_EXTS, PUBLIC_ORIGINAL_EXTS, PUBLIC_VIDEO_EXTS
 
 logger = logging.getLogger(__name__)
@@ -278,6 +278,8 @@ async def admin_media_audit(me: dict = Depends(require_area("content"))):
         "reference_summary": reference_audit.get("summary") or {},
         "reference_examples": reference_audit.get("examples") or {},
         "recent_uploads": sorted(items, key=lambda item: item.get("created_at") or item.get("mtime") or "", reverse=True)[:10],
+        # Original-Bilder der Serien (#1933): privat abgelegt, gezählt aus der Datenbank - ohne Vollscan der Platte.
+        "reference_originals": await reference_originals.media_summary(db),
     }
 
 

@@ -34,7 +34,8 @@ from auth import get_optional_user
 from database import get_db
 from routes.reference_round_routes import PUBLIC_FIELDS, _calendar, visible_series
 from services import (
-    map_pools, partner_platforms, race_weekend, reference_running_cache, series_identity, series_partners,
+    map_pools, partner_platforms, race_weekend, reference_originals, reference_running_cache, series_identity,
+    series_partners,
 )
 from services.dolibarr_policy import club_today
 from services.own_teams import Matcher, own_teams
@@ -520,4 +521,6 @@ async def public_series(lineage_slug: str, season_slug: str, user: dict | None =
         "racing": await racing_block(db, user, lineage, series, people, latest),
         # Map-Pool der Saison (#1616) als Snapshot - ``None`` ohne Pool oder ohne Spiel der Spur.
         "map_pool": await map_pools.series_pool(db, lineage, series),
+        # Original-Bilder des Veranstalters (#1933): Termin → öffentliche Bilder („Original ansehen“).
+        "originals": await reference_originals.public_map(db, series, rounds, lineage.get("slug") or lineage_slug),
     }
