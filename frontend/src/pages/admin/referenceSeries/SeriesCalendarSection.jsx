@@ -125,7 +125,7 @@ export function SeriesCalendarSection({ series }) {
     const count = planned?.missing || 0;
     if (!count) return;
     const description = `${count === 1 ? "Ein Termin kommt" : `${count} Termine kommen`} ohne Datum dazu („Termin offen“), mit den nächsten Kürzeln – bis ${planned.planned} geplante Termine. Das Datum trägst du später am Termin nach.`;
-    if (!await confirm({ title: "Fehlende Termine anlegen?", description, confirmLabel: "Anlegen" })) return;
+    if (!await confirm({ title: "Fehlende Termine anlegen?", description, confirmLabel: "Anlegen", tone: "info" })) return;
     run(() => api.post(`${base}/fill-planned`, { apply: true, expected_version: calendar?.version }), count === 1 ? "1 Termin angelegt." : `${count} Termine angelegt.`);
   };
   const openNew = () => setSheet({
@@ -141,7 +141,7 @@ export function SeriesCalendarSection({ series }) {
           {rounds.length > 0 && (
             <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-white/55" data-testid="series-calendar-counts">
               <span>{rounds.length} Termine</span>
-              {planned && <span data-testid="series-calendar-planned">{planned.planned} geplant</span>}
+              {planned && <span data-testid="series-calendar-planned">{planned.count} von {planned.planned} vorgesehenen angelegt</span>}
               {ORDERED_STATES.filter((state) => counts[state]).map((state) => (
                 <span key={state} className={state === "missing" ? "text-amber-300" : undefined}>{counts[state]} {STATE_LABELS[state].toLowerCase()}</span>
               ))}
@@ -186,7 +186,7 @@ export function SeriesCalendarSection({ series }) {
       {rounds.length > 0 && !weekends && (
         <ol className="mt-3 divide-y divide-white/5" data-testid="calendar-rounds">
           {rounds.map((round, index) => (
-            <li key={round.id} data-testid="calendar-round" data-state={round.state} className={`py-2.5 flex items-start gap-3 ${hintIds.has(round.id) ? "bg-amber-400/[0.04]" : ""}`}>
+            <li key={round.id} data-testid="calendar-round" data-state={round.state} className={`py-2.5 flex flex-wrap sm:flex-nowrap items-start gap-x-3 gap-y-1 ${hintIds.has(round.id) ? "bg-amber-400/[0.04]" : ""}`}>
               <div className="min-w-12 shrink-0 whitespace-nowrap pt-0.5 text-sm font-black tabular-nums text-white/80">{roundLabel(round)}</div>
               <div className="min-w-0 flex-1">
                 <div className={`text-sm ${round.state === "cancelled" ? "text-white/45" : "text-white"}`}>
@@ -197,7 +197,8 @@ export function SeriesCalendarSection({ series }) {
                 <RoundNotes round={round} />
               </div>
               <StateBadge state={round.state} />
-              {board && actions(round, index)}
+              {/* Handy: die Knöpfe unter dem Termin (bis zu sechs) – sonst bleibt für Tag und Uhrzeit kein Platz. */}
+              {board && <div className="w-full sm:w-auto flex justify-end">{actions(round, index)}</div>}
             </li>
           ))}
         </ol>

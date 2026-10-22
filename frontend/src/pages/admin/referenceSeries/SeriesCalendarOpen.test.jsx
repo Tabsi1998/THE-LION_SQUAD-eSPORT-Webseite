@@ -39,7 +39,7 @@ test("fehlende Termine anlegen: legt bis zur geplanten Zahl offene Termine an", 
   const filled = { ...CALENDAR, version: 5, rounds: [...CALENDAR.rounds, ...[5, 6, 7, 8, 9].map(open)], planned: { planned: 9, count: 9, missing: 0 } };
   apiMock.post.mockResolvedValue({ data: { created: 5, codes: ["T5", "T6", "T7", "T8", "T9"], ...filled } });
   await renderSection();
-  expect(screen.getByTestId("series-calendar-planned")).toHaveTextContent("9 geplant");
+  expect(screen.getByTestId("series-calendar-planned")).toHaveTextContent("4 von 9 vorgesehenen angelegt");
   fireEvent.click(screen.getByTestId("calendar-fill-planned"));
   await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/reference-series/admin/series/serie-1/rounds/fill-planned", { apply: true, expected_version: 4 }));
   const items = await screen.findAllByTestId("calendar-round");
