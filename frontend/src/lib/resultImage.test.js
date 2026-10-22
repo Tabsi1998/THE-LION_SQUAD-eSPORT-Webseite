@@ -50,6 +50,28 @@ test("die gelesenen Zeilen werden Zeilen des Blatts – mit Kennung, Marken, Aus
   expect(payload.rows[0]).not.toHaveProperty("color");
 });
 
+test("Hinweis „wie in Saison …“ steht an der gelben Zeile; geändert geht mit, was im Bild stand (#2012)", () => {
+  const result = { ...RESULT, rows: [
+    { ...RESULT.rows[0], participant_id: null, name: "Emil Eck", uncertain: ["name"], read: { name: "Emil Ek" }, hint: { name: "wie in Saison 1/2025" }, image: { name: "Emil Ek", team: "Rotor Racing" } },
+    { ...RESULT.rows[1], image: { name: "Bert Bolzt", team: "Blaupfeil GP" } },
+    { ...RESULT.rows[2], image: { name: "Dora Nev", team: "Kometen Tean" } },
+  ] };
+  const rows = imageToRows(result, PARTICIPANTS);
+  expect(uncertainText(rows[0])).toBe("Name (gelesen „Emil Ek“, wie in Saison 1/2025)");
+  const form = (list) => ({ rows: list, matches: [], table: [], teamTotals: {}, note: "" });
+  // Unverändert übernommen: nichts zu lernen.
+  const plain = formToPayload(form(rows)).payload;
+  expect(plain.rows.some((row) => "read_name" in row || "read_team" in row)).toBe(false);
+  // Der Vorstand wählt für „Dora Nev“ einen Teilnehmer und ändert ein Team: die Lesung aus dem Bild geht mit - der
+  // Server lernt daraus beim Übernehmen die Schreibweise.
+  const changed = [rows[0], { ...rows[1], team: "Rotor Racing" }, { ...rows[2], participant_id: "p1", name: "Anna Probe" }];
+  const { payload } = formToPayload(form(changed));
+  expect(payload.rows[1]).toMatchObject({ team: "Rotor Racing", read_team: "Blaupfeil GP" });
+  expect(payload.rows[1]).not.toHaveProperty("read_name");
+  expect(payload.rows[2]).toMatchObject({ participant_id: "p1", read_name: "Dora Nev" });
+  expect(payload.rows[0]).not.toHaveProperty("read_name");
+});
+
 test("unsichere schnellste Runde oder Fahrer des Tages sind gelbe Felder des Rennens und halten das Übernehmen auf", () => {
   const fields = imageFormFields({ ...RESULT, fastest_lap: { name: "Bert Bolzt", participant_id: "p2", time: "4:31.207", uncertain: ["time"], read: "Bert Bolzt 431,207" } });
   expect(fields.fastestLap).toEqual({ name: "Bert Bolzt", time: "4:31,207" });
