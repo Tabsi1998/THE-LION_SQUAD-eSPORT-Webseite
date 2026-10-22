@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
 
 // Referenzen bündeln (#1751): Vorschau je Gruppe (Spur neu oder vorhanden, Saisons, Liga-Weg, Hinweise), Bündeln schickt
 // nur die gewählten Referenzen samt Titel und Art einer neuen Spur, Rückgängig nimmt eine Bündelung zurück. Nur
@@ -8,7 +9,7 @@ const apiMock = { get: vi.fn(), post: vi.fn() };
 const confirmMock = vi.fn(async () => true);
 vi.mock("@/lib/api", () => ({ api: apiMock, formatApiError: (detail) => detail || "Fehler" }));
 vi.mock("@/components/tls/ConfirmDialog", () => ({ useConfirm: () => confirmMock }));
-vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
+vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn(), info: vi.fn() } }));
 
 const { ReferenceBundleSheet } = await import("./ReferenceBundleSheet");
 
@@ -26,6 +27,10 @@ const GROUP = {
   hints: [{ code: "missing_date", reference_ids: ["ref-s2"], text: "„Probe Liga 4vs4 Season 2“ hat kein Datum." }],
 };
 
+function renderSheet(onDone = () => {}) {
+  return render(<MemoryRouter><ReferenceBundleSheet onClose={() => {}} onDone={onDone} /></MemoryRouter>);
+}
+
 function mockApi({ groups = [GROUP], bundles = [] } = {}) {
   apiMock.get.mockImplementation(async (url) => (url.endsWith("/proposals")
     ? { data: { groups, unlinked: 2 } }
@@ -41,7 +46,7 @@ beforeEach(() => {
 });
 
 test("Vorschau: neue Spur, Saison je Referenz, Liga-Weg und Hinweis", async () => {
-  render(<ReferenceBundleSheet onClose={() => {}} onDone={() => {}} />);
+  renderSheet();
   const group = await screen.findByTestId("bundle-group");
   expect(within(group).getByText("Neue Spur")).toBeInTheDocument();
   expect(within(group).getByTestId("bundle-lineage-title")).toHaveTextContent("Probe Liga");
@@ -56,7 +61,7 @@ test("Vorschau: neue Spur, Saison je Referenz, Liga-Weg und Hinweis", async () =
 
 test("Bündeln schickt nur die gewählten Referenzen mit Titel und Art der neuen Spur", async () => {
   const onDone = vi.fn();
-  render(<ReferenceBundleSheet onClose={() => {}} onDone={onDone} />);
+  renderSheet(onDone);
   await screen.findByTestId("bundle-group");
   fireEvent.click(screen.getByTestId("bundle-pick-ref-s2"));
   expect(screen.queryByTestId("bundle-hint-missing_date")).toBeNull();
@@ -73,7 +78,7 @@ test("Bündeln schickt nur die gewählten Referenzen mit Titel und Art der neuen
 
 test("ohne offene Gruppe sagt das Blatt, warum", async () => {
   mockApi({ groups: [] });
-  render(<ReferenceBundleSheet onClose={() => {}} onDone={() => {}} />);
+  renderSheet();
   expect(await screen.findByTestId("bundle-empty")).toHaveTextContent("2 Referenzen stehen ohne Saison allein");
 });
 
@@ -83,9 +88,23 @@ test("Rückgängig nimmt eine Bündelung zurück; zurückgenommene bieten es nic
     { id: "b0", status: "undone", linked: 1, lineage_title: "Probe Cup", created_at: "2026-10-19T10:00:00+00:00" },
   ] });
   apiMock.post.mockResolvedValue({ data: { unlinked: 2, series_removed: 2, series_kept: [], lineage_removed: true } });
-  render(<ReferenceBundleSheet onClose={() => {}} onDone={() => {}} />);
+  renderSheet();
   expect(await screen.findByTestId("bundle-history-b0")).toHaveTextContent("zurückgenommen");
   expect(screen.queryByTestId("bundle-undo-b0")).toBeNull();
   fireEvent.click(screen.getByTestId("bundle-undo-b1"));
   await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/reference-series/admin/bundles/b1/undo"));
+});
+
+test("nach dem Zurücknehmen bleibt die strengere Sichtbarkeit – mit alter Sichtbarkeit und Weg in die Referenz", async () => {
+  mockApi({ groups: [], bundles: [
+    { id: "b2", status: "undone", linked: 1, lineage_title: "Probe Liga", created_at: "2026-10-20T10:00:00+00:00",
+      result: { unlinked: 1, series_removed: 1, series_kept: [], lineage_removed: false, visibility_kept: [
+        { reference_id: "ref-s1", title: "Probe Liga 4vs4 Season 1", visibility: "members", previous_visibility: "public",
+          text: "Sichtbarkeit war vorher \u201a\u00f6ffentlich\u2018 - bei Bedarf in der Referenz wieder \u00f6ffnen." },
+      ] } },
+  ] });
+  renderSheet();
+  const notice = await screen.findByTestId("bundle-visibility-kept-ref-s1");
+  expect(notice).toHaveTextContent("Probe Liga 4vs4 Season 1: Sichtbarkeit war vorher \u201a\u00f6ffentlich\u2018");
+  expect(screen.getByTestId("bundle-visibility-edit-ref-s1")).toHaveAttribute("href", "/admin/references?edit=ref-s1");
 });

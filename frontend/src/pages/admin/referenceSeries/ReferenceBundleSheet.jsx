@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { api, formatApiError } from "@/lib/api";
 import { AdminSheet } from "@/components/tls/AdminSheet";
 import { CheckField, SelectField, TextField } from "@/components/tls/FormFields";
@@ -10,7 +11,7 @@ import {
   HINT_LABELS, VISIBILITY_LABELS, WARN_HINTS, bundleSummary, initialSelection, previewPath, selectedHints, selectedSeasons,
   seasonText, undoText,
 } from "@/lib/referenceBundles";
-import { AlertTriangle, Info, Undo2 } from "lucide-react";
+import { AlertTriangle, Info, Pencil, Undo2 } from "lucide-react";
 import { toast } from "sonner";
 
 // Referenzen bündeln (#1751): der Assistent schlägt aus Referenzen ohne Saison Gruppen vor (Veranstalter bzw. Partner,
@@ -205,6 +206,27 @@ function PathStep({ step, kind }) {
   );
 }
 
+// Nach dem Zurücknehmen bleibt eine von der Bündelung strenger gestellte Sichtbarkeit (wie #1970: nichts öffnet sich von
+// selbst). Je Referenz die alte Sichtbarkeit und der Weg in die Bearbeitung, um sie bei Bedarf wieder zu öffnen.
+function VisibilityKept({ items }) {
+  if (!items?.length) return null;
+  return (
+    <ul className="mt-2 space-y-1.5" data-testid="bundle-visibility-kept">
+      {items.map((entry) => (
+        <li key={entry.reference_id} className="flex items-start gap-2 text-sm text-white/70" data-testid={`bundle-visibility-kept-${entry.reference_id}`}>
+          <Info className="w-3.5 h-3.5 mt-[3px] shrink-0 text-[#29B6E8]" aria-hidden="true" />
+          <span className="min-w-0 break-words [overflow-wrap:anywhere]">
+            <span className="font-bold text-white">{entry.title}:</span> {entry.text}{" "}
+            <Link to={`/admin/references?edit=${encodeURIComponent(entry.reference_id)}`} className="inline-flex items-center gap-1 font-bold text-[#29B6E8] hover:underline underline-offset-2" data-testid={`bundle-visibility-edit-${entry.reference_id}`}>
+              <Pencil className="w-3 h-3" aria-hidden="true" /> Referenz bearbeiten
+            </Link>
+          </span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 function BundleHistory({ bundles, onDone }) {
   const confirm = useConfirm();
   const [busy, setBusy] = useState("");
@@ -219,6 +241,7 @@ function BundleHistory({ bundles, onDone }) {
     try {
       const { data } = await api.post(`/reference-series/admin/bundles/${item.id}/undo`);
       toast.success(`Zurückgenommen: ${undoText(data)}.`);
+      if (data?.visibility_kept?.length) toast.info(`${data.visibility_kept.length === 1 ? "Eine Referenz bleibt" : `${data.visibility_kept.length} Referenzen bleiben`} strenger als vorher – siehe Hinweis unter „Zuletzt gebündelt“.`);
       onDone();
     } catch (err) {
       toast.error(formatApiError(err.response?.data?.detail));
@@ -232,20 +255,23 @@ function BundleHistory({ bundles, onDone }) {
       <h3 id="bundle-history-title" className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Zuletzt gebündelt</h3>
       <ul className="divide-y divide-white/5 border-y border-white/5">
         {bundles.map((item) => (
-          <li key={item.id} className="py-2 flex items-center justify-between gap-3" data-testid={`bundle-history-${item.id}`}>
-            <span className="min-w-0">
-              <span className="block font-bold text-white break-words [overflow-wrap:anywhere]">{item.lineage_title}</span>
-              <span className="block text-xs text-white/50 tabular-nums">
-                {[`${item.linked} ${item.linked === 1 ? "Referenz" : "Referenzen"}`, item.created_at ? viennaDateTime(item.created_at, { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "",
-                  item.status === "undone" ? "zurückgenommen" : ""].filter(Boolean).join(" · ")}
+          <li key={item.id} className="py-2" data-testid={`bundle-history-${item.id}`}>
+            <div className="flex items-center justify-between gap-3">
+              <span className="min-w-0">
+                <span className="block font-bold text-white break-words [overflow-wrap:anywhere]">{item.lineage_title}</span>
+                <span className="block text-xs text-white/50 tabular-nums">
+                  {[`${item.linked} ${item.linked === 1 ? "Referenz" : "Referenzen"}`, item.created_at ? viennaDateTime(item.created_at, { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "",
+                    item.status === "undone" ? "zurückgenommen" : ""].filter(Boolean).join(" · ")}
+                </span>
               </span>
-            </span>
-            {item.status === "active" && (
-              <button type="button" onClick={() => undo(item)} disabled={busy === item.id} data-testid={`bundle-undo-${item.id}`}
-                className="tls-btn tls-btn--secondary shrink-0 px-3 py-1.5 rounded-sm text-[10px] font-bold uppercase tracking-wider inline-flex items-center gap-1.5 disabled:opacity-50">
-                <Undo2 className="w-3.5 h-3.5" aria-hidden="true" /> {busy === item.id ? "Nehme zurück …" : "Rückgängig"}
-              </button>
-            )}
+              {item.status === "active" && (
+                <button type="button" onClick={() => undo(item)} disabled={busy === item.id} data-testid={`bundle-undo-${item.id}`}
+                  className="tls-btn tls-btn--secondary shrink-0 px-3 py-1.5 rounded-sm text-[10px] font-bold uppercase tracking-wider inline-flex items-center gap-1.5 disabled:opacity-50">
+                  <Undo2 className="w-3.5 h-3.5" aria-hidden="true" /> {busy === item.id ? "Nehme zurück …" : "Rückgängig"}
+                </button>
+              )}
+            </div>
+            <VisibilityKept items={item.result?.visibility_kept} />
           </li>
         ))}
       </ul>

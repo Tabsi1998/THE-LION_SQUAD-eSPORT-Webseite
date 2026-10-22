@@ -480,9 +480,11 @@ Feld **Liga**. Eine Gruppe erscheint ab zwei Referenzen oder wenn es die Spur sc
   Referenz; Ergebnisse trägst du wie gewohnt ein. Geöffnet wird nichts: eine neue Saison ist so streng wie ihre
   strengste Referenz, eine strengere vorhandene Spur oder Saison macht die Referenz strenger. Das Adminprotokoll nennt,
   wie viele Referenzen gebündelt wurden. Eine Referenz lässt sich nur einmal bündeln.
-- **Rückgängig** (unter *Zuletzt gebündelt*) löst die Zuordnung wieder und gibt eine dabei strenger gestellte
-  Sichtbarkeit zurück. Neu angelegte Saisons und die Spur verschwinden nur, wenn sie seitdem unverändert und leer sind;
-  sonst bleiben sie stehen. Auch das steht im Protokoll.
+- **Rückgängig** (unter *Zuletzt gebündelt*) löst die Zuordnung wieder. Neu angelegte Saisons und die Spur verschwinden
+  nur, wenn sie seitdem unverändert und leer sind; sonst bleiben sie stehen. Eine beim Bündeln strenger gestellte
+  Sichtbarkeit bleibt streng – wie beim Lockern einer Saison öffnet sich nichts von selbst. Der Hinweis nennt je Referenz
+  die alte Sichtbarkeit („Sichtbarkeit war vorher ‚öffentlich‘“) mit **Referenz bearbeiten**, um sie bei Bedarf dort
+  wieder zu öffnen. Auch das steht im Protokoll.
 - Die Referenzen bleiben unter ihrer Adresse (`/references/…`) abrufbar, Titel und Vorschau für Suchmaschinen ändern sich
   nicht. Auf der Übersicht erscheinen sie zusätzlich im Liga-Weg der Spur; ohne eingetragene Ergebnisse zeigt der Liga-Weg
   den Platz der Referenz.

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { api, formatApiError } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { AdminSheet } from "@/components/tls/AdminSheet";
@@ -239,6 +239,18 @@ export default function AdminReferencesPage() {
 
   useEffect(() => { load(); }, [load]);
   useApiInvalidation(load, ["references", "games"]);
+
+  // Direkt in die Bearbeitung (#1751, etwa aus „Referenzen bündeln“): ``?edit=<id>`` öffnet die Referenz, sobald sie
+  // geladen ist, und verschwindet dann aus der Adresse.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const editId = searchParams.get("edit");
+  useEffect(() => {
+    if (!editId) return;
+    const found = items.find((item) => item.id === editId);
+    if (!found) return;
+    setEditing(found);
+    setSearchParams((params) => { params.delete("edit"); return params; }, { replace: true });
+  }, [editId, items, setSearchParams]);
 
   const remove = async (id) => {
     if (!await confirm({ title: "Referenz löschen?", description: "Die Turnierteilnahme wird mit allen Einträgen dauerhaft entfernt.", confirmLabel: "Löschen" })) return;

@@ -10,9 +10,9 @@
   Sichtbarkeit (``season_close.tighten_references``), geöffnet wird nichts. Protokoll mit der Zahl.
 - ``GET  /api/reference-series/admin/bundles``: die letzten Bündelungen zum Zurücknehmen.
 - ``POST /api/reference-series/admin/bundles/<id>/undo``: rückgängig. Verknüpfung lösen (nur, wo die Referenz noch auf
-  die Saison der Bündelung zeigt), eine dabei strenger gestellte Sichtbarkeit zurück - nie offener, als verbliebene
-  Saisons verlangen -, und neu angelegte Saisons bzw. die Spur entfernen, wenn sie seitdem unverändert und leer sind.
-  Geänderte bleiben stehen. Protokoll mit der Zahl.
+  die Saison der Bündelung zeigt) und neu angelegte Saisons bzw. die Spur entfernen, wenn sie seitdem unverändert und
+  leer sind; geänderte bleiben stehen. Eine dabei strenger gestellte Sichtbarkeit bleibt (wie #1970: nichts öffnet sich
+  von selbst) - die Antwort nennt je Referenz die alte (``visibility_kept``). Protokoll mit der Zahl.
 
 Bündeln und Zurücknehmen laufen nacheinander (eine Sperre für alle Bündelungen), die Adressen der Referenzen
 (``/references/<id>``) bleiben unverändert.
@@ -220,6 +220,19 @@ async def _untouched(db, item: dict, bundled: set[str]) -> bool:
     return not others and (not owned or owned in bundled)
 
 
+def _visibility_notice(ref: dict, link: dict) -> dict | None:
+    """Hinweis, wenn die Referenz noch strenger ist als vor der Bündelung (weil die Bündelung sie strenger gestellt hat)."""
+    before, now = link.get("visibility_before") or "public", ref.get("visibility") or "public"
+    order = season_close.VISIBILITY_ORDER
+    if before == link.get("visibility_after") or before not in order or now not in order:
+        return None
+    if order.index(now) <= order.index(before):
+        return None
+    label = reference_bundles.VISIBILITY_LABELS.get(before, before)
+    return {"reference_id": ref["id"], "title": ref.get("title"), "visibility": now, "previous_visibility": before,
+            "text": f"Sichtbarkeit war vorher ‚{label}‘ - bei Bedarf in der Referenz wieder öffnen."}
+
+
 async def _undo(db, bundle_id: str, me: dict) -> dict:
     bundle = await db.reference_bundles.find_one({"id": bundle_id}, {"_id": 0})
     if not bundle:
@@ -231,7 +244,7 @@ async def _undo(db, bundle_id: str, me: dict) -> dict:
     bundled = {link["reference_id"] for link in links}
     lock_ids = {link["series_id"] for link in links} | {item["id"] for item in created}
     now = now_utc().isoformat()
-    removed, kept, unlinked = [], [], []
+    removed, kept, unlinked, stricter = [], [], [], []
     async with reference_series.series_write_all(db, lock_ids):
         for item in created:
             if await _untouched(db, item, bundled):
@@ -243,18 +256,18 @@ async def _undo(db, bundle_id: str, me: dict) -> dict:
                                                      {"$set": {"reference_id": None}})
         for link in links:
             rid = link["reference_id"]
-            ref = await db.references.find_one({"id": rid}, {"_id": 0, "id": 1, "series_id": 1, "visibility": 1})
+            ref = await db.references.find_one({"id": rid}, {"_id": 0, "id": 1, "series_id": 1, "visibility": 1,
+                                                             "title": 1})
             if not ref or ref.get("series_id") != link["series_id"]:
                 continue  # seither von Hand anders zugeordnet - bleibt
-            updates = {"series_id": None, "updated_at": now}
-            if link.get("visibility_before") != link.get("visibility_after") and \
-                    ref.get("visibility") == link.get("visibility_after"):
-                # Die Bündelung hatte sie strenger gestellt: zurück - aber nie offener als verbliebene Saisons.
-                required = await season_close.required_visibility(db, await season_close.linked_series_ids(db, rid))
-                updates["visibility"] = season_close.stricter(link.get("visibility_before"), required) if required \
-                    else link.get("visibility_before") or "public"
-            await db.references.update_one({"id": rid, "series_id": link["series_id"]}, {"$set": updates})
+            await db.references.update_one({"id": rid, "series_id": link["series_id"]},
+                                           {"$set": {"series_id": None, "updated_at": now}})
             unlinked.append(rid)
+            # Wie #1970 beim Lockern: nichts öffnet sich von selbst. Hat die Bündelung die Referenz strenger gestellt,
+            # bleibt sie so - die Antwort nennt die alte Sichtbarkeit, geöffnet wird bei Bedarf in der Referenz.
+            notice = _visibility_notice(ref, link)
+            if notice:
+                stricter.append(notice)
     lineage_removed = False
     if bundle.get("lineage_created"):
         lineage = await db.reference_lineages.find_one({"id": bundle["lineage_id"]}, {"_id": 0, "updated_at": 1})
@@ -263,13 +276,14 @@ async def _undo(db, bundle_id: str, me: dict) -> dict:
             await db.reference_lineages.delete_one({"id": bundle["lineage_id"]})
             lineage_removed = True
     result = {"unlinked": len(unlinked), "series_removed": len(removed), "series_kept": kept,
-              "lineage_removed": lineage_removed}
+              "lineage_removed": lineage_removed, "visibility_kept": stricter}
     await db.reference_bundles.update_one({"id": bundle_id}, {"$set": {
         "status": "undone", "undone_at": now, "undone_by": me["id"], "result": result}})
     await db.audit_logs.insert_one({
         "id": new_id(), "action": "reference_series.bundle_undo", "actor_id": me["id"], "target_id": bundle_id,
         "data": {"count": len(unlinked), "reference_ids": unlinked, "series_removed": removed, "series_kept": kept,
-                 "lineage_removed": lineage_removed},
+                 "lineage_removed": lineage_removed,
+                 "visibility_kept": [item["reference_id"] for item in stricter]},
         "created_at": now,
     })
     reference_running_cache.reset()

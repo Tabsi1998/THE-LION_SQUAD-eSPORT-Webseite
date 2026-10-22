@@ -266,7 +266,7 @@ async def test_undo_unlinks_and_removes_the_untouched_lineage_and_seasons(flow):
 
 
 @pytest.mark.asyncio
-async def test_undo_keeps_seasons_changed_since_and_restores_tightened_visibility(flow):
+async def test_undo_keeps_seasons_changed_since(flow):
     await _board(flow)
     await _legacy(flow)
     group = _group(await _proposals(flow), "ref-s1", "ref-s2")
@@ -283,7 +283,7 @@ async def test_undo_keeps_seasons_changed_since_and_restores_tightened_visibilit
 
 
 @pytest.mark.asyncio
-async def test_undo_gives_back_the_visibility_a_bundle_tightened(flow):
+async def test_undo_keeps_the_stricter_visibility_and_names_the_previous_one(flow):
     await _board(flow)
     await _legacy(flow)
     await flow.post(f"{ADMIN}/lineages", json={
@@ -293,8 +293,16 @@ async def test_undo_gives_back_the_visibility_a_bundle_tightened(flow):
     bundle = (await flow.post(BUNDLES, json={"group_key": group["key"], "reference_ids": ["ref-s1", "ref-s2"]})).json()
     result = (await flow.post(f"{BUNDLES}/{bundle['id']}/undo")).json()
     assert result["lineage_removed"] is False  # die Spur gab es schon vorher
+    # Nichts öffnet sich von selbst (#1970): die Referenzen bleiben streng, der Hinweis nennt die alte Sichtbarkeit.
     visibilities = {item["id"]: item["visibility"] async for item in flow.db.references.find({}, {"_id": 0})}
-    assert (visibilities["ref-s1"], visibilities["ref-s2"]) == ("public", "public")
+    assert (visibilities["ref-s1"], visibilities["ref-s2"]) == ("members", "members")
+    kept = {item["reference_id"]: item for item in result["visibility_kept"]}
+    assert sorted(kept) == ["ref-s1", "ref-s2"]
+    assert (kept["ref-s1"]["visibility"], kept["ref-s1"]["previous_visibility"]) == ("members", "public")
+    assert kept["ref-s1"]["text"] == "Sichtbarkeit war vorher ‚öffentlich‘ - bei Bedarf in der Referenz wieder öffnen."
+    assert kept["ref-s1"]["title"] == "Probe Liga 4vs4 Season 1"
+    log = await flow.db.audit_logs.find_one({"action": "reference_series.bundle_undo"}, {"_id": 0})
+    assert sorted(log["data"]["visibility_kept"]) == ["ref-s1", "ref-s2"]
 
 
 # ---------------------------------------------------------------- Adressen bleiben
