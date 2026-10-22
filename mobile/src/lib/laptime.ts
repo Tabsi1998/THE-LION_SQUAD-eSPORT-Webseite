@@ -1,6 +1,9 @@
 // Rundenzeiten als Text (#1584): derselbe Parser wie Website (frontend/src/lib/laptime.js) und Server
 // (backend/services/laptime.py), geprüft mit denselben Fällen (frontend/src/lib/laptime.cases.json). Komma oder Punkt,
-// m:ss.mmm oder ss.mmm, eine nackte Zahl sind Sekunden. Leer heißt keine Zeit (null), Unlesbares gibt NaN.
+// m:ss.mmm oder ss.mmm, eine nackte Zahl sind Sekunden. Leer heißt keine Zeit (null), Unlesbares gibt NaN. Angezeigt
+// wird mit Komma (`showLapTime`, #1969), gespeichert unverändert mit Punkt.
+
+import { formatRaceTime } from "./raceTime";
 
 export const DEFAULT_MIN_PLAUSIBLE_MS = 20000;
 export const DEFAULT_MAX_PLAUSIBLE_MS = 600000;
@@ -28,6 +31,14 @@ export function formatLapTime(ms: number | null | undefined): string {
   return `${minutes}:${String(seconds).padStart(2, "0")}.${String(millis).padStart(3, "0")}`;
 }
 
+/** Zum Anzeigen (#1969): mit Komma wie im Web (`showLapTime`) und bei den Rennserien - „1:24,587“, „+0,412“. Nimmt
+ *  Millisekunden oder einen Text vom Server (time_str, gap_str). Gespeichert, gesendet und verglichen wird weiter mit
+ *  `formatLapTime` (Punkt). */
+export function showLapTime(value: number | string | null | undefined): string {
+  if (value === null || value === undefined || value === "") return "";
+  return formatRaceTime(typeof value === "number" ? formatLapTime(value) : value);
+}
+
 export function plausibleRange(track: PlausibilityTrack): [number, number] {
   const low = track?.min_plausible_ms;
   const high = track?.max_plausible_ms;
@@ -47,6 +58,6 @@ export function plausibilityText(ms: number, track: PlausibilityTrack): string {
   if (!warning) return "";
   const [low, high] = plausibleRange(track);
   return warning === "too_fast"
-    ? `${formatLapTime(ms)} ist schneller als die erwartete Untergrenze ${formatLapTime(low)}. Trotzdem speichern?`
-    : `${formatLapTime(ms)} ist langsamer als die erwartete Obergrenze ${formatLapTime(high)}. Trotzdem speichern?`;
+    ? `${showLapTime(ms)} ist schneller als die erwartete Untergrenze ${showLapTime(low)}. Trotzdem speichern?`
+    : `${showLapTime(ms)} ist langsamer als die erwartete Obergrenze ${showLapTime(high)}. Trotzdem speichern?`;
 }

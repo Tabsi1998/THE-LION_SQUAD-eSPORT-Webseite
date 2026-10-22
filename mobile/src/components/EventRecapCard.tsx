@@ -2,7 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import React, { useEffect, useState } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 import { api } from "../lib/api";
-import { numberTiles, ownResultLine, podiumOrder, type EventRecapData, type PodiumEntry, type RecapItem } from "../lib/eventRecap";
+import { numberTiles, ownResultLine, podiumDetail, podiumOrder, type EventRecapData, type PodiumEntry, type RecapItem } from "../lib/eventRecap";
 import { colors, radius } from "../theme";
 import { Card } from "./Card";
 import { Body, Heading, Muted } from "./Text";
@@ -30,10 +30,11 @@ function MiniPodium({ podium, testID }: { podium: PodiumEntry[]; testID: string 
         const rank = ([2, 1, 3] as const)[index];
         const place = PLACE[rank];
         if (!entry) return <View key={rank} style={styles.step} />;
+        const detail = podiumDetail(entry);
         return (
-          <View key={rank} style={styles.step} accessible accessibilityLabel={`Platz ${rank}: ${entry.name}${entry.detail ? `, ${entry.detail}` : ""}`} testID={`${testID}-${rank}`}>
+          <View key={rank} style={styles.step} accessible accessibilityLabel={`Platz ${rank}: ${entry.name}${detail ? `, ${detail}` : ""}`} testID={`${testID}-${rank}`}>
             <Body style={[styles.stepName, rank === 1 && styles.strong]} numberOfLines={2}>{entry.name}</Body>
-            {entry.detail ? <Muted style={styles.stepDetail} numberOfLines={1}>{entry.detail}</Muted> : null}
+            {detail ? <Muted style={styles.stepDetail} numberOfLines={1}>{detail}</Muted> : null}
             <View style={[styles.stepBar, { height: place.height, backgroundColor: place.fill, borderColor: place.color }]}>
               <Body style={[styles.stepRank, { color: place.color }]}>{rank}</Body>
             </View>

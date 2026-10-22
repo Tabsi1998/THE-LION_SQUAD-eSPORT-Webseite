@@ -1,4 +1,5 @@
 import type { PersonalReferenceItem } from "../types";
+import { showLapTime } from "./laptime";
 import {
   appearancesText,
   displayTitle,
@@ -95,7 +96,7 @@ function personalRow(item: PersonalReferenceItem): ProfileRow {
     source: item.kind || "tournament",
     placement: placementNumber(item.rank),
     title: item.title || "Referenz",
-    sub: [item.subtitle, item.kind === "fastlap" ? item.time_str : "", shortDate(instant)].filter(Boolean).join(" · "),
+    sub: [item.subtitle, item.kind === "fastlap" ? showLapTime(item.time_str) : "", shortDate(instant)].filter(Boolean).join(" · "),
     detail: field,
     field,
     played: "",

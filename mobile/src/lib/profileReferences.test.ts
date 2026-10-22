@@ -44,7 +44,7 @@ test("Zeilen: eigene Turniere und Fast Laps kommen dazu, die Chronik steht je Ja
   });
   expect(rows.map((row) => row.id)).toEqual(["personal:cup", "club:league-a", "personal:lap"]);
   const lap = rows.find((row) => row.id === "personal:lap");
-  expect(lap).toMatchObject({ source: "fastlap", placement: 7, sub: "Monza · 1:21.234 · 01.02.2025", detail: "von 16" });
+  expect(lap).toMatchObject({ source: "fastlap", placement: 7, sub: "Monza · 1:21,234 · 01.02.2025", detail: "von 16" });
   const groups = profileGroups(rows);
   expect(groups.map((group) => [group.label, group.count, group.rows.map((row) => row.id)])).toEqual([
     ["2026", "1 Teilnahme", ["personal:cup"]],

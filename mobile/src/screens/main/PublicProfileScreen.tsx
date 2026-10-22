@@ -24,6 +24,7 @@ import { idSegment } from "../../lib/apiIds";
 import { useKeyedLoad } from "../../lib/useKeyedLoad";
 import { sortAwards, type Award } from "../../lib/awards";
 import { formatDate, formatStatus } from "../../lib/format";
+import { showLapTime } from "../../lib/laptime";
 import { blockUser, listBlocked, unblockUser } from "../../lib/moderation";
 import type { AppStackParamList, ProfileTabKey } from "../../navigation/types";
 import { seasonScrollProps } from "../../seasons/sky/scroll";
@@ -603,7 +604,7 @@ function FastLapTab({ items, onOpen }: { items: any[]; onOpen: (item: any) => vo
                 <Heading>{[item.track?.name, item.track?.country].filter(Boolean).join(" · ") || "Strecke"}</Heading>
                 <Muted>{item.is_leader ? "Pole Position" : "Bestzeit"}</Muted>
               </View>
-              <Body style={[styles.time, item.is_leader && styles.gold]}>{item.time_str || "-"}</Body>
+              <Body style={[styles.time, item.is_leader && styles.gold]}>{showLapTime(item.time_str) || "-"}</Body>
             </View>
           </Card>
         </Pressable>

@@ -127,7 +127,7 @@ test("unplausible Zeit: erst die Rückfrage, gespeichert wird nur mit Bestätigu
   await fireEvent.changeText(screen.getByTestId("fastlap-time-input"), "12");
   await fireEvent.press(screen.getByText("Zeit speichern"));
   await waitFor(() => expect(alert).toHaveBeenCalled());
-  expect(String(alert.mock.calls[0][1])).toContain("0:12.000");
+  expect(String(alert.mock.calls[0][1])).toContain("0:12,000");
   expect(mockPost).not.toHaveBeenCalled();
   const buttons = (alert.mock.calls[0][2] || []) as Array<{ text?: string; onPress?: () => void }>;
   await act(async () => { buttons.find((button) => button.text === "Trotzdem speichern")?.onPress?.(); });
@@ -140,6 +140,25 @@ test("nach der Veröffentlichung keine Eingabe in der App - ein Satz sagt, wo es
   await render(<FastLapDetailScreen route={route} />);
   await waitFor(() => expect(screen.getByTestId("fastlap-locked")).toBeTruthy());
   expect(screen.queryByTestId("fastlap-driver-search")).toBeNull();
+});
+
+// Fast Lap mit Komma (#1969): angezeigt wie im Web und bei den Rennserien, gespeichert bleibt der Punkt.
+test("Bestzeit, Zeiten und Abstände stehen mit Komma da", async () => {
+  mockGet.mockImplementation((path: string) => {
+    if (path === "/f1/challenges/hotlap") return Promise.resolve({ data: CHALLENGE });
+    if (path.endsWith("/leaderboard")) {
+      return Promise.resolve({ data: { track: { id: "tr1", name: "Spielberg" }, entries: [
+        { user_id: "a", display_name: "Lena", rank: 1, time_str: "1:24.587", gap_str: "", attempts: 2 },
+        { user_id: "b", display_name: "Noah", rank: 2, time_str: "1:24.999", gap_str: "+0.412", attempts: 1 },
+      ] } });
+    }
+    return Promise.resolve({ data: [] });
+  });
+  await render(<FastLapDetailScreen route={route} />);
+  await waitFor(() => expect(screen.getAllByText("1:24,587").length).toBeGreaterThan(0));
+  expect(screen.getByText("1:24,999")).toBeTruthy();
+  expect(screen.getByText("+0,412")).toBeTruthy();
+  expect(screen.queryByText("1:24.587")).toBeNull();
 });
 
 // Langer Titel (#1867): bei 360 dp brach Android „Regenbogen-Boulevard“ mitten im Wort um. Umbrochen wird nur

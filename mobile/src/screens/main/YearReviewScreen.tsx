@@ -8,6 +8,7 @@ import { Screen } from "../../components/Screen";
 import { Body, Heading, Muted, Title } from "../../components/Text";
 import { useAuth } from "../../auth/AuthContext";
 import { api } from "../../lib/api";
+import { showLapTime } from "../../lib/laptime";
 import {
   bestResultText,
   comparisonText,
@@ -101,7 +102,7 @@ function PageBody({ page, review, token }: { page: YearReviewPage; review: YearR
       return (
         <View style={styles.page}>
           <Eyebrow tone="cyan">Fast Lap</Eyebrow>
-          <Big tone="cyan">{review.fastlap.best?.time || ""}</Big>
+          <Big tone="cyan">{showLapTime(review.fastlap.best?.time)}</Big>
           <Heading>Deine Bestzeit</Heading>
           <Body style={styles.text}>{fastlapText(review)}</Body>
           {review.fastlap.count > 1 ? <Muted>{`${countWord(review.fastlap.count, "Strecke", "Strecken")} gefahren`}</Muted> : null}

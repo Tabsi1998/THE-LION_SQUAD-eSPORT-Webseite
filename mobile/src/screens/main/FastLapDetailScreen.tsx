@@ -17,7 +17,7 @@ import { getRegistrationState, hasOnlineRegistration } from "../../lib/registrat
 import { colors, radius } from "../../theme";
 import type { F1Challenge, F1LeaderboardEntry, F1LeaderboardPayload } from "../../types";
 import { attemptsText, entryKey } from "../../lib/fastLapAttempts";
-import { parseLapTime, plausibilityText } from "../../lib/laptime";
+import { parseLapTime, plausibilityText, showLapTime } from "../../lib/laptime";
 import { Button } from "../../components/Button";
 import { useShareHeader } from "../../components/HeaderActions";
 import { sharePage } from "../../lib/share";
@@ -374,7 +374,7 @@ export function FastLapDetailScreen({ navigation, route }: Props) {
               ))}
             </View>
             <View style={styles.inputGrid}>
-              <TextInput value={timeInput} onChangeText={setTimeInput} placeholder="Zeit z.B. 1:24.587" placeholderTextColor={colors.muted} style={styles.input} keyboardType="numbers-and-punctuation" testID="fastlap-time-input" />
+              <TextInput value={timeInput} onChangeText={setTimeInput} placeholder="Zeit z.B. 1:24,587" placeholderTextColor={colors.muted} style={styles.input} keyboardType="numbers-and-punctuation" testID="fastlap-time-input" />
               <TextInput value={penaltyInput} onChangeText={setPenaltyInput} placeholder="Strafe Sekunden" placeholderTextColor={colors.muted} style={styles.input} keyboardType="numeric" />
             </View>
             <TextInput value={proofUrl} onChangeText={setProofUrl} placeholder="Proof URL optional" placeholderTextColor={colors.muted} style={styles.input} autoCapitalize="none" />
@@ -396,9 +396,9 @@ export function FastLapDetailScreen({ navigation, route }: Props) {
             </View>
             <View style={styles.bestText}>
               <Muted>Bestzeit</Muted>
-              <Body style={styles.bestTime}>{best.time_str || "-"}</Body>
+              <Body style={styles.bestTime}>{showLapTime(best.time_str) || "-"}</Body>
               <Body style={styles.strong}>{best.display_name || best.username || "Fahrer"}</Body>
-              <Muted>{attemptsText(best.attempts, leaderboard?.max_attempts)} · {best.gap_str || "Führung"}</Muted>
+              <Muted>{attemptsText(best.attempts, leaderboard?.max_attempts)} · {showLapTime(best.gap_str) || "Führung"}</Muted>
             </View>
           </Card>
         ) : null}
@@ -438,8 +438,8 @@ function EntryRow({ entry, maxAttempts, reference = false }: { entry: F1Leaderbo
         <Muted>{entry.is_guest ? "Gast · " : ""}{attemptsText(entry.attempts, maxAttempts)}{entry.penalty_seconds ? ` · +${entry.penalty_seconds}s Penalty` : ""}</Muted>
       </View>
       <View style={styles.timeBox}>
-        <Body style={styles.time}>{entry.time_str || "-"}</Body>
-        <Muted>{entry.gap_str || ""}</Muted>
+        <Body style={styles.time}>{showLapTime(entry.time_str) || "-"}</Body>
+        <Muted>{showLapTime(entry.gap_str)}</Muted>
       </View>
     </Card>
   );

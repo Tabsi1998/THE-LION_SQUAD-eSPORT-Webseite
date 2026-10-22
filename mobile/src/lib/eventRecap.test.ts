@@ -1,4 +1,4 @@
-import { friendPlaces, friendsSentence, friendsSharing, friendsSharingDefault, numberTiles, ownResultLine, podiumOrder } from "./eventRecap";
+import { friendPlaces, friendsSentence, friendsSharing, friendsSharingDefault, numberTiles, ownResultLine, podiumDetail, podiumOrder } from "./eventRecap";
 
 // Rückblick (#1187) und Freunde beim Event (#1188): dieselben Texte und Regeln wie auf der Website.
 
@@ -14,7 +14,14 @@ test("Zahlen: nur Summen, leere fallen weg", () => {
 
 test("eigenes Ergebnis wie im Web", () => {
   expect(ownResultLine({ kind: "tournament", id: "t", title: "Cup", rank: 1, of: 4, team_name: "Lions Rocket" })).toBe("Platz 1 von 4 · mit Lions Rocket");
-  expect(ownResultLine({ kind: "fastlap", id: "f", title: "Fast Lap Spa", best_lap: "1:31.234", rank: 1, of: 5, track: "Spa" })).toBe("Beste Runde 1:31.234 · Platz 1 von 5 · Spa");
+  expect(ownResultLine({ kind: "fastlap", id: "f", title: "Fast Lap Spa", best_lap: "1:31.234", rank: 1, of: 5, track: "Spa" })).toBe("Beste Runde 1:31,234 · Platz 1 von 5 · Spa");
+});
+
+test("Treppchen (#1969): Rundenzeiten mit Komma, Punkte-Texte wie vom Server", () => {
+  expect(podiumDetail({ rank: 1, name: "Lena", time_ms: 91234, detail: "1:31.234" })).toBe("1:31,234");
+  expect(podiumDetail({ rank: 1, name: "Lena", time_ms: 91234 })).toBe("1:31,234");
+  expect(podiumDetail({ rank: 2, name: "Noah", time_ms: null, detail: "12 Punkte" })).toBe("12 Punkte");
+  expect(podiumDetail({ rank: 3, name: "Mia" })).toBe("");
 });
 
 test("Freunde: Satz und Orte", () => {
