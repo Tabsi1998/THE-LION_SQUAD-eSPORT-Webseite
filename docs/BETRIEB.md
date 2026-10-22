@@ -190,7 +190,8 @@ Ausgeliefert wird das SVG mit eigener, strenger Content-Security-Policy (`fronte
 `docker-compose.override.yml`): `MAX_SVG_UPLOAD_MB` (1), `SVG_MAX_ELEMENTS` (4000), `SVG_MAX_PATH_NUMBERS` (100000),
 `SVG_RASTER_PX` (2000), `SVG_RASTER_TIMEOUT_SECONDS` (5), `SVG_RASTER_MEMORY_MB` (512), `SVG_RASTER_CONCURRENCY` (1),
 `SVG_UPLOAD_RATE_LIMIT` (20 je `SVG_UPLOAD_RATE_WINDOW_SECONDS` = 3600). Der Datei-Dialog prüft vorab 1 MB
-(`VITE_MAX_SVG_UPLOAD_MB` beim Bau).
+(`VITE_MAX_SVG_UPLOAD_MB` beim Bau). Die Prüfung der Bildfelder liest JSON-Anfragen vor der Route bis
+`JSON_BODY_MAX_KB` (4096), darüber 413; Webhooks der Integrationen, gestreamte Bilder und Uploads liest sie nicht.
 
 Cloudflare lässt je Anfrage höchstens 100 MB durch. Große Uploads laufen deshalb über eine Subdomain
 **ohne** Cloudflare-Proxy (graue Wolke), z. B. `upload.lionsquad.at`, die im Nginx Proxy Manager auf

@@ -277,22 +277,123 @@ def test_a_saved_png_of_an_svg_logo_stays_the_svg(tmp_path, monkeypatch):
     assert svg_logo.gate_json_body(b'{"logo_url": "/api/static/uploads/neu.png"}') is None
 
 
-def test_svg_only_in_logo_fields():
-    allowed = b'{"logo_url": "/api/static/uploads/a.svg", "brand": {"favicon_dark_url": "/api/static/uploads/b.svg"}}'
-    assert svg_logo.gate_json_body(allowed) is None
+LOGO = "a1b2c3d4e5f60718293a4b5c6d7e8f90"
+
+
+@pytest.fixture
+def uploads(tmp_path, monkeypatch):
+    """Ein SVG-Logo aus dem Logo-Upload (mit PNG daneben) und ein älteres SVG ohne PNG (frühere Bild-Migration)."""
+    monkeypatch.setattr(svg_logo, "PUBLIC_UPLOAD_DIR", tmp_path)
+    (tmp_path / f"{LOGO}.svg").write_bytes(b"<svg/>")
+    (tmp_path / f"{LOGO}.png").write_bytes(b"png")
+    (tmp_path / "alt.svg").write_bytes(b"<svg/>")
+    return tmp_path
+
+
+def _body(value) -> bytes:
+    return json.dumps(value).encode()
+
+
+def test_svg_only_in_logo_fields(uploads):
+    url = f"/api/static/uploads/{LOGO}.svg"
+    assert svg_logo.gate_json_body(_body({"logo_url": url, "brand": {"favicon_dark_url": url}})) is None
     for refused in (
-        b'{"avatar_url": "/api/static/uploads/a.svg"}',
-        b'{"banner_url": "https://lionsquad.example/api/static/uploads/a.SVG?x=1"}',
-        b'{"tools": [{"image_url": "/uploads/a.svg"}]}',
-        b'{"award_images": {"1": "/api/static/uploads/a.svg"}}',
-        b'{"content": "Text ![x](/api/static/uploads/a.svg) mehr"}',
-        b'{"cover_url": "data:image/svg+xml;base64,PHN2Zz48L3N2Zz4="}',
-        b'[{"photo_url": "/api/static/uploads/a.svg"}]',
+        {"avatar_url": url},
+        {"banner_url": f"https://lionsquad.example{url}?x=1#a"},
+        {"tools": [{"image_url": f"/uploads/{LOGO}.svg"}]},
+        {"award_images": {"1": url}},
+        {"cover_url": "data:image/svg+xml;base64,PHN2Zz48L3N2Zz4="},
+        [{"photo_url": url}],
     ):
         with pytest.raises(svg_logo.FieldRefused):
-            svg_logo.gate_json_body(refused)
-    assert svg_logo.gate_json_body(b'{"avatar_url": "/api/static/uploads/a.png"}') is None
+            svg_logo.gate_json_body(_body(refused))
+    assert svg_logo.gate_json_body(_body({"avatar_url": f"/api/static/uploads/{LOGO}.png"})) is None
     assert svg_logo.gate_json_body(b"kein json mit svg") is None
+
+
+def test_encoded_or_disguised_svg_is_still_refused(uploads):
+    for value in (
+        f"/api/static/uploads/{LOGO}%2Esvg",
+        f"/api/static/uploads/{LOGO}%252esvg",
+        f"/api/static/uploads/{LOGO}.%73vg",
+        f"/api/static/uploads/{LOGO.upper()}.SVG",
+        f"  /api/static/uploads/{LOGO}.svg?w=400  ",
+        f"\\api\\static\\uploads\\{LOGO}.svg",
+        f"//lionsquad.example/api/static/uploads/{LOGO}.svg",
+        "data: image/svg+xml;base64,PHN2Zz48L3N2Zz4=",
+        "DATA:IMAGE/SVG+XML,<svg/>",
+        "data:\timage/s\nvg+xml,%3Csvg/%3E",
+        "data%3Aimage%2Fsvg%2Bxml%2C%3Csvg%2F%3E",
+    ):
+        with pytest.raises(svg_logo.FieldRefused):
+            svg_logo.gate_json_body(_body({"avatar_url": value}))
+    # JSON-Escapes ändern nichts.
+    with pytest.raises(svg_logo.FieldRefused):
+        svg_logo.gate_json_body(('{"avatar_url": "/api/static/uploads/' + LOGO + '\\u002e\\u0073vg"}').encode())
+
+
+def test_existing_records_stay_saveable(uploads):
+    # Rich-Text mit einem Bild bleibt speicherbar - auch mit einem SVG-Logo darin; geprüft werden nur ganze Adressen.
+    text = f"Unser Partner ![Icon](/api/static/uploads/alt.svg) und ![Logo](/api/static/uploads/{LOGO}.svg)."
+    html = f"<img src=\"/api/static/uploads/{LOGO}.svg\">"
+    assert svg_logo.gate_json_body(_body({"content": text, "description": html})) is None
+    # Ein älteres SVG ohne PNG-Fassung (frühere Bild-Migration) in einem Bildfeld bleibt, wie es ist.
+    assert svg_logo.gate_json_body(_body({"avatar_url": "/api/static/uploads/alt.svg"})) is None
+    # Eine Adresse von außen ist kein Upload - wie bisher.
+    assert svg_logo.gate_json_body(_body({"avatar_url": "https://fremd.example/bild.svg"})) is None
+
+
+async def _run_gate(path: str, chunks: list[bytes], headers: list[tuple[bytes, bytes]]):
+    """Den Baustein mit einer Attrappe der App aufrufen: was liest die App, was kommt zurück?"""
+    seen = {"app_read": [], "status": None}
+    pending = [{"type": "http.request", "body": chunk, "more_body": index < len(chunks) - 1}
+               for index, chunk in enumerate(chunks)]
+    taken = []
+
+    async def receive():
+        message = pending.pop(0) if pending else {"type": "http.disconnect"}
+        taken.append(message)
+        return message
+
+    async def app(scope, app_receive, send):
+        while True:
+            message = await app_receive()
+            seen["app_read"].append(message.get("body", b""))
+            if not message.get("more_body"):
+                break
+        await send({"type": "http.response.start", "status": 200, "headers": []})
+        await send({"type": "http.response.body", "body": b"ok"})
+
+    async def send(message):
+        if message["type"] == "http.response.start":
+            seen["status"] = message["status"]
+
+    scope = {"type": "http", "method": "POST", "path": path, "headers": headers}
+    await svg_logo.SvgFieldGate(app)(scope, receive, send)
+    seen["gate_read_before_app"] = len(taken) - len(seen["app_read"])
+    return seen
+
+
+def test_gate_keeps_body_limits_of_routes_and_never_buffers_uploads(monkeypatch):
+    import asyncio
+
+    monkeypatch.setattr(svg_logo, "JSON_BODY_MAX_BYTES", 64 * 1024)
+    big = [b"{" + b'"a": "' + b"x" * 40_000 + b'", '] * 2 + [b'"b": 1}']
+    json_header = [(b"content-type", b"application/json")]
+    # Webhook der Integration: der Baustein liest nichts, die Route behält ihre eigene Grenze (gestreamt, ohne Länge).
+    webhook = asyncio.run(_run_gate("/api/integrations/dolibarr/vereine-webhook", big, json_header))
+    assert webhook["status"] == 200 and len(webhook["app_read"]) == 3
+    # Bilder einer Serie werden ebenfalls gestreamt - auch nicht gepuffert.
+    image = asyncio.run(_run_gate("/api/reference-series/admin/series/s1/rounds/r1/results/image", big, json_header))
+    assert len(image["app_read"]) == 3
+    # Jede andere JSON-Route: höchstens JSON_BODY_MAX_BYTES, darüber 413 - auch ohne Längenangabe.
+    other = asyncio.run(_run_gate("/api/users/me", big, json_header))
+    assert other["status"] == 413 and other["app_read"] == []
+    declared = asyncio.run(_run_gate("/api/users/me", [b"{}"], json_header + [(b"content-length", b"99999999")]))
+    assert declared["status"] == 413
+    # Uploads (multipart) reichen unverändert durch, Stück für Stück.
+    upload = asyncio.run(_run_gate("/api/uploads/logo", big, [(b"content-type", b"multipart/form-data; boundary=x")]))
+    assert upload["status"] == 200 and len(upload["app_read"]) == 3
 
 
 def test_nginx_serves_uploaded_svg_with_the_strict_policy():

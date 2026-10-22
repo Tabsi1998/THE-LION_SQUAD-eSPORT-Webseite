@@ -269,3 +269,29 @@ async def test_too_expensive_svg_gets_422_and_svg_uploads_are_limited_per_accoun
     monkeypatch.setattr(svg_logo, "SVG_UPLOAD_RATE_LIMIT", 2)
     statuses = [(await web(flow, "post", "/api/uploads/logo", files=svg_file())).status_code for _ in range(2)]
     assert statuses == [200, 429]
+
+
+@pytest.mark.asyncio
+async def test_existing_records_stay_saveable_and_encoded_svg_is_refused(flow, tmp_path):
+    await admin(flow)
+    url = (await web(flow, "post", "/api/uploads/logo", files=svg_file())).json()["url"]
+    stem = url.rsplit("/", 1)[1][:-4]
+    # Ein älteres SVG ohne PNG-Fassung (frühere Bild-Migration) und ein Rich-Text mit SVG-Bildern bleiben speicherbar.
+    (tmp_path / "public" / "altlast.svg").write_bytes(b"<svg/>")
+    text = f"Partner ![Icon](/api/static/uploads/altlast.svg) und ![Logo]({url})"
+    created = await flow.post("/api/news", json={"title": "Probe", "content": text})
+    assert created.status_code in (200, 201), created.text
+    news_id = created.json()["id"]
+    updated = await flow.put(f"/api/news/{news_id}", json={"title": "Probe 2", "content": text})
+    assert updated.status_code == 200, updated.text
+    user = await flow.add_user(name="altkonto")
+    await flow.db.users.update_one({"id": user["id"]}, {"$set": {"avatar_url": "/api/static/uploads/altlast.svg"}})
+    flow.act_as(user)
+    kept = await flow.put("/api/users/me", json={"avatar_url": "/api/static/uploads/altlast.svg", "bio": "Hallo"})
+    assert kept.status_code == 200, kept.text
+    # Ein SVG-Logo, kodiert oder als data-URI, kommt trotzdem nicht in ein Bildfeld.
+    for value in (f"/api/static/uploads/{stem}%2Esvg", f"/api/static/uploads/{stem}.%73vg?w=1",
+                  "data: image/svg+xml;base64,PHN2Zz48L3N2Zz4="):
+        refused = await flow.put("/api/users/me", json={"avatar_url": value})
+        assert refused.status_code == 422, value
+    assert (await flow.db.users.find_one({"id": user["id"]}))["avatar_url"] == "/api/static/uploads/altlast.svg"

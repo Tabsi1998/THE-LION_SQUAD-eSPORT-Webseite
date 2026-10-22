@@ -31,7 +31,7 @@ import threading
 import uuid
 from dataclasses import dataclass
 from pathlib import Path
-from urllib.parse import urlparse
+from urllib.parse import unquote, urlparse
 from xml.etree import ElementTree as ET
 
 from defusedxml import DefusedXmlException
@@ -644,7 +644,6 @@ def store(data: bytes, *, trim: bool, directory: Path | None = None) -> dict:
 _UPLOAD_SVG = re.compile(r"/api/static/uploads/([A-Za-z0-9][A-Za-z0-9_-]{0,150})\.svg(?![A-Za-z0-9_])")
 _UPLOAD_SVG_BYTES = re.compile(rb"/api/static/uploads/([A-Za-z0-9][A-Za-z0-9_-]{0,150})\.svg(?![A-Za-z0-9_])")
 _UPLOAD_PNG = re.compile(r"/api/static/uploads/([A-Za-z0-9][A-Za-z0-9_-]{0,150})\.png")
-_ANY_UPLOAD_SVG = re.compile(r"/uploads/[A-Za-z0-9][A-Za-z0-9_.-]{0,150}\.svg(?![A-Za-z0-9_])", re.IGNORECASE)
 
 
 def _has_raster(stem: str) -> bool:
@@ -702,9 +701,44 @@ LOGO_FIELDS = frozenset({
 })
 
 
-def _holds_svg(value: str) -> bool:
-    lowered = value.lower()
-    return "data:image/svg" in lowered or (".svg" in lowered and _ANY_UPLOAD_SVG.search(value) is not None)
+def _compact(value: str) -> str:
+    """Für den Vergleich: mehrfach URL-dekodiert (höchstens viermal), ohne Leerraum und Steuerzeichen, klein."""
+    text = value
+    for _ in range(4):
+        decoded = unquote(text)
+        if decoded == text:
+            break
+        text = decoded
+    return "".join(ch for ch in text if not ch.isspace() and ord(ch) >= 32 and ch != "\x7f").lower()
+
+
+def _is_logo_svg_upload(path: str) -> bool:
+    """Zeigt der (schon dekodierte) Pfad auf ein SVG-Logo aus dem Logo-Upload - die Datei liegt bei den Uploads und
+    hat ihre PNG-Fassung daneben? Ältere SVG-Dateien ohne PNG (aus der früheren Bild-Migration) zählen nicht."""
+    if "uploads/" not in path:
+        return False
+    name = path.rsplit("/", 1)[-1]
+    if not name.endswith(".svg") or name.startswith("."):
+        return False
+    return (PUBLIC_UPLOAD_DIR / name).is_file() and (PUBLIC_UPLOAD_DIR / f"{name[:-4]}.png").is_file()
+
+
+def _refused_outside_logo(value: str) -> bool:
+    """Ein Bildfeld außerhalb der Logo-Felder darf kein SVG tragen: weder ein SVG-Logo aus dem Upload (auch kodiert,
+    groß geschrieben, mit Zusatz) noch eine data-URI mit SVG. Geprüft werden nur Werte, die ganz aus einer Adresse
+    bestehen; ein längerer Text (etwa Markdown mit Bild) bleibt, wie er ist - dort steht ein Bild nur über ``<img>``."""
+    stripped = value.strip()
+    # Browser lesen „\“ in Adressen wie „/“.
+    compact = _compact(stripped).replace("\\", "/")
+    if compact.startswith("data:"):
+        return compact.startswith("data:image/svg")
+    if not stripped or any(ch.isspace() for ch in stripped):
+        return False
+    target = compact.split("#", 1)[0].split("?", 1)[0]
+    if "://" in target:
+        target = target.split("://", 1)[1]
+        target = target[target.find("/"):] if "/" in target else ""
+    return _is_logo_svg_upload(target)
 
 
 def vector_url(value: str) -> str:
@@ -733,17 +767,15 @@ def _gate_value(value, key, state):
         if kept != value:
             state["changed"] = True
         return kept
-    if _holds_svg(value):
+    if _refused_outside_logo(value):
         raise FieldRefused(key)
     return value
 
 
 def gate_json_body(body: bytes) -> bytes | None:
-    """Prüft einen JSON-Körper vor dem Speichern: ein SVG (hochgeladen oder als data-URI) nur in ``LOGO_FIELDS``, sonst
+    """Prüft einen JSON-Körper vor dem Speichern: ein SVG-Logo bzw. eine SVG-data-URI nur in ``LOGO_FIELDS``, sonst
     ``FieldRefused``; die PNG-Fassung eines SVG-Logos in einem Logo-Feld wird wieder das SVG. Liefert den geänderten
     Körper oder ``None``, wenn nichts zu ändern ist (auch bei ungültigem JSON - das meldet die Route selbst)."""
-    if b"svg" not in body.lower() and b".png" not in body:
-        return None
     try:
         payload = json.loads(body)
     except ValueError:
@@ -753,38 +785,63 @@ def gate_json_body(body: bytes) -> bytes | None:
     return json.dumps(result, ensure_ascii=False).encode("utf-8") if state["changed"] else None
 
 
+# Wie viel JSON der Baustein vor der Route liest - darüber 413. Routen mit eigener Grenze, die den Körper selbst
+# streamen (Webhooks der Integrationen, Ergebnis- und Original-Bilder einer Serie), lässt er ganz aus; sie speichern
+# keine Bildfelder. Uploads (multipart) liest er nie.
+JSON_BODY_MAX_BYTES = _int_env("JSON_BODY_MAX_KB", 4096, 64, 65536) * 1024
+GATE_SKIPPED = (
+    re.compile(r"/api/integrations/[^?#]*"),
+    re.compile(r"/api/reference-series/admin/series/[^/]+/"
+               r"(?:rounds/[^/]+/(?:results/image|originals)|season-table/image)"),
+)
+TOO_LARGE = "Die Anfrage ist zu groß."
+
+
 class SvgFieldGate:
-    """ASGI-Baustein vor allen Routen: jeder JSON-Körper von POST, PUT und PATCH unter ``/api/`` geht durch
-    ``gate_json_body`` - ein SVG außerhalb eines Logo-Felds bekommt 422, bevor eine Route etwas speichert."""
+    """ASGI-Baustein vor allen Routen: jeder JSON-Körper von POST, PUT und PATCH unter ``/api/`` (bis
+    ``JSON_BODY_MAX_BYTES``) geht durch ``gate_json_body`` - ein SVG außerhalb eines Logo-Felds bekommt 422, bevor eine
+    Route etwas speichert."""
 
     METHODS = frozenset({"POST", "PUT", "PATCH"})
 
     def __init__(self, app):
         self.app = app
 
+    @staticmethod
+    async def _answer(scope, receive, send, status: int, detail: str):
+        from starlette.responses import JSONResponse
+
+        await JSONResponse({"detail": detail}, status_code=status)(scope, receive, send)
+
     async def __call__(self, scope, receive, send):
-        if (scope.get("type") != "http" or scope.get("method") not in self.METHODS
-                or not str(scope.get("path") or "").startswith("/api/")):
+        path = str(scope.get("path") or "")
+        if (scope.get("type") != "http" or scope.get("method") not in self.METHODS or not path.startswith("/api/")
+                or any(pattern.fullmatch(path) for pattern in GATE_SKIPPED)):
             return await self.app(scope, receive, send)
         headers = scope.get("headers") or []
         content_type = next((value for key, value in headers if key.lower() == b"content-type"), b"")
         if b"json" not in content_type.lower():
             return await self.app(scope, receive, send)
-        chunks = []
+        declared = next((value for key, value in headers if key.lower() == b"content-length"), b"")
+        if declared.strip().isdigit() and int(declared) > JSON_BODY_MAX_BYTES:
+            return await self._answer(scope, receive, send, 413, TOO_LARGE)
+        chunks, size = [], 0
         while True:
             message = await receive()
             if message.get("type") != "http.request":
                 return None  # Verbindung weg
-            chunks.append(message.get("body", b""))
+            chunk = message.get("body", b"")
+            size += len(chunk)
+            if size > JSON_BODY_MAX_BYTES:
+                return await self._answer(scope, receive, send, 413, TOO_LARGE)
+            chunks.append(chunk)
             if not message.get("more_body"):
                 break
         body = b"".join(chunks)
         try:
             changed = gate_json_body(body)
         except FieldRefused:
-            from starlette.responses import JSONResponse
-
-            return await JSONResponse({"detail": FIELD_REFUSED}, status_code=422)(scope, receive, send)
+            return await self._answer(scope, receive, send, 422, FIELD_REFUSED)
         if changed is not None:
             body = changed
             scope = {**scope, "headers": [(key, value) for key, value in headers if key.lower() != b"content-length"]
