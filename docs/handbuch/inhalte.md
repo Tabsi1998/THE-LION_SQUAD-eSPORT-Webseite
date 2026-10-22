@@ -559,6 +559,8 @@ Feld **Liga**. Eine Gruppe erscheint ab zwei Referenzen oder wenn es die Spur sc
 - **Reihenfolge:** mit den Pfeilen oder **Nach Datum ordnen**. **Archivieren** nimmt einen Termin aus dem Kalender,
   unter **Archiviert** lässt er sich zurückholen. Gewertete Termine lassen sich weder absagen noch archivieren.
 
+<img src="../assets/serien/serien-termine-offen.png" alt="Kalender einer TFT-Saison: T1 bis T4 gewertet, T5 bis T9 als Termin offen mit 19:00 nach Fehlende Termine anlegen" width="560">
+
 Hat ein Termin kein Ergebnis, obwohl danach schon gewertet ist, steht oben der Hinweis **Lücke im Kalender** – meist
 fehlt das Ergebnis, oder der Termin wurde abgesagt.
 
@@ -691,6 +693,13 @@ Saisonpunkte nach dem Punkteschlüssel der Saison.
 </table>
 
 <img src="../assets/serien/serien-turniertage-lobbys.png" alt="Lobby-Ansicht einer Runde mit zwei Lobbys und Platzfarben" width="560">
+
+<table>
+<tr>
+<td><img src="../assets/serien/serien-double-up-tag.png" alt="Turniertag T3 im Double Up: Team-Platz 1, 2, 3, 4 und zweimal 6 mit 35, 26, 20, 16 und 9 Punkten" width="560"></td>
+<td><img src="../assets/serien/serien-double-up-punkte.png" alt="Saison bearbeiten am Handy: Double-Up-Punkte wie Einzelplatz des besseren Spielers (2k−1)" width="220"></td>
+</tr>
+</table>
 
 **Turniertage von der Partner-Plattform holen:** Führt der Veranstalter seine Turniere auf einer eigenen Plattform
 (etwa das TFT-Dashboard von PineApps), holt die Website Turniertage, Runden, Lobbys und Punkte von dort – nur lesend und
