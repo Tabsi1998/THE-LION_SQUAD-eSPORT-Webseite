@@ -335,6 +335,8 @@ Gesamt) - je Runde entsteht ein Entwurf, nie veröffentlicht. Nur Vorstand, nich
   auf einem Platz). Bis zur Klärung zählt der Wert ohne Platz (`points_source: manual`); eine Spalte mit offenen gelben
   Zellen ist `unclear` und wird beim Übernehmen nicht geschrieben. 0 Punkte: ohne Platz, ohne Meldung. Aus Platz
   entsteht `points_source: organizer` mit dem Wert ohne Sonderboni (Vergleich mit dem Schlüssel wie beim Eintragen).
+  Eine Klärung gilt nur, wenn ihr Platz samt Boni zu den Vorschlägen nach dem Schema des Termins passt
+  (`decision_fits`); wechselt die Spalte den Termin, verwirft die Oberfläche ihre Klärungen.
 - **Vorhandenes:** verglichen wird mit dem Entwurf daneben bzw. dem Blatt (`draft_base`) in Platz, Punkten wie sie
   zählen (`with_totals`), Marken, Sonderboni und Team (`partner_import.sheet_diff` mit `SEASON_COMPARED`). Was die
   Tabelle nicht kennt (Notiz, Startnummer, Zeiten, Startplatz, Runden eines Turniertags, Partner), bleibt
@@ -508,8 +510,11 @@ gilt hier nicht. Web: `SeasonTableSection.jsx`, `OfficialTeamTotals.jsx` (`image
   oder macht beide gelb. Plätze laufen mit den Punkten; Platz 1 im Kasten ergibt sich aus 2 … n.
 - **Schriftbild** (`_glyph_check`): dieselbe Zahl sieht in derselben Tabelle gleich aus. Gleicht die Tinte einer Zelle
   (freigestellt, auf feste Größe gebracht) einer Zelle mit anderem Wert (`GLYPH_CLOSE`), ist eine verlesen - etwa „23“,
-  die alle Lesungen als „25“ nahmen: beide gelb, mit dem anderen Wert als Lesung.
-- **Summe** (`check_sums`, in der Route nach dem Abgleich der Namen): `Summe der Runden = Punkte` bestätigt die Zeile.
+  die alle Lesungen als „25“ nahmen: beide gelb, mit dem anderen Wert als Lesung. Verglichen wird nur mit wenigen
+  Zellen (`GLYPH_REPRESENTATIVES`) der Werte, die genau eine Ziffer anders haben, in C (`ImageChops`) und im Zeitbudget
+  des Bilds; reicht es nicht, bleibt der Rest gelb (`out_of_time`).
+- **Summe** (`check_sums`, in der Route nach dem Abgleich der Namen): `Summe der Runden = Punkte` bestätigt die Zeile -
+  nur Zellen mit eigener Lesung, eine ungelesene leere Zelle bleibt gelb.
   Sonst ein Hinweis an der Summe (`notes`). Nur die Fahrertabelle (`table=drivers`) macht dann die Zahlenzellen gelb -
   außer die Abweichung ist erklärt (`_sum_explainer` mit `season_table.explain_total`: Streichresultate nach den Regeln,
   Aktivitätspunkte, Anpassungen des Fahrers). Die Teamtabelle (`table=teams`, auch erkannt an der Spalte „Team“)
@@ -517,10 +522,13 @@ gilt hier nicht. Web: `SeasonTableSection.jsx`, `OfficialTeamTotals.jsx` (`image
 - **Namen** (`match_names`): unscharf (`result_image_match.similarity`) gegen die Teilnehmer samt Aliase (Fahrer) bzw.
   die Teams der Saison (`known_teams`: eigene, Standard-Teams, Teams der Blätter und der Teamwertung).
 - **Teamwertung laut Veranstalter** (`routes/reference_season_table_routes.py`): `POST …/team-totals/preview`
-  (`{round_id?, totals}`; ohne Runde die letzte gewertete mit Ergebnis) rechnet die Teamwertung nach der Runde mit den
-  neuen Werten (`official_points`, `computed_points`, `deviation`) und nennt neue Teams; `PUT …/team-totals`
-  (`{round_id, totals, expected_version}`) schreibt `official_team_totals` ins Blatt (Entwurf daneben bekommt dieselben
-  Werte), Revision `team_totals`, Protokoll `reference_result.team_totals`, bei veröffentlichtem Blatt neu rechnen.
+  (`{round_id?, totals, mode}`; ohne Runde die letzte gewertete mit Ergebnis) rechnet die Teamwertung nach der Runde mit
+  den Werten danach und nennt je Team bisher, laut Bild, danach und `state` (`new`, `changed`, `same`, `kept`,
+  `removed`, `team_changes`) sowie neue Teams. `mode`: `merge` (Vorgabe) ergänzt bzw. aktualisiert - Teams, die im Bild
+  fehlen, bleiben; `replace` ersetzt (`merged_totals`). `PUT …/team-totals` (`{round_id, totals, mode,
+  expected_version}`) rechnet dasselbe vom Stand mit der geprüften Version (sonst 409) und schreibt
+  `official_team_totals` ins Blatt (Entwurf daneben bekommt dieselben Werte), Revision `team_totals`, Protokoll
+  `reference_result.team_totals`, bei veröffentlichtem Blatt neu rechnen.
 - **Original** (#1933): Lesen speichert nichts. Die Saisontabelle merkt sich die Datei und hängt sie nach dem
   Übernehmen mit `kind=table`, `origin=reading` an (`…/rounds/<termin>/originals`): bei der Fahrertabelle an die letzte
   Runde der Tabelle (`lastTableRound`, nur wenn etwas übernommen wurde), bei der Teamtabelle an die gewählte Runde, im

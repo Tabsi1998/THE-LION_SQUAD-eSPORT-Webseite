@@ -681,7 +681,8 @@ Zuerst den **Kalender** der Saison anlegen (etwa mit **Termine einfügen**), dam
   was sich gegenüber einem vorhandenen Ergebnis ändert.
 - **Gelb zum Klären:** Wo der Platz aus den Punkten nicht eindeutig ist – mehrere Plätze möglich, ein Bonus im Wert
   (schnellste Runde, Pole, Sonderbonus), Punkte außerhalb des Schemas oder derselbe Platz zweimal –, wählt ihr den
-  Vorschlag („Platz 1 + schnellste Runde“) oder **Punkte laut Veranstalter**. **Eindeutige Vorschläge übernehmen** und
+  Vorschlag („Platz 1 + schnellste Runde“) oder **Punkte laut Veranstalter**. Wählt ihr danach für die Spalte einen anderen
+  Termin, gelten ihre Klärungen nicht mehr (anderes Punkteschema) – die Zellen sind wieder gelb. **Eindeutige Vorschläge übernehmen** und
   **Offene: Punkte laut Veranstalter** erledigen alle auf einmal. Eine Runde mit offenen gelben Zellen wird nicht
   übernommen. 0 Punkte heißt hinter den Punkterängen – ohne Platz, ohne Meldung.
 - **Abgleich mit „Gesamt“:** Je Fahrer die eigene Rechnung nach allen Runden gegen „Gesamt“ und den Platz der Tabelle –
@@ -727,7 +728,9 @@ das Bild wird nicht gespeichert.
   letzte gewertete Runde, jede andere Runde mit Ergebnis geht auch. Die Liste zeigt Team und Punkte (gelbe Zeilen mit
   **Passt so** bestätigen), darunter der Vergleich **Laut Bild** gegen die **Eigene Rechnung** – sie bleibt als
   Prüfhinweis. Dass die Summe der Runden nicht die Punkte ergibt, ist bei Teamtabellen normal (oft zählt die aktuelle
-  Besetzung): es steht nur als Hinweis an der Zeile. **Teamwertung übernehmen** schreibt sie ins Ergebnis der Runde (bei
+  Besetzung): es steht nur als Hinweis an der Zeile. Steht in der Runde schon eine Teamwertung, zeigt die Liste je Team
+  **Bisher** und **Danach**: Vorgabe ist **Ergänzen bzw. aktualisieren** – Teams, die im Bild fehlen, bleiben stehen;
+  **Ersetzen** entfernt sie (die Liste sagt, welche). **Teamwertung übernehmen** schreibt sie ins Ergebnis der Runde (bei
   einem veröffentlichten Ergebnis wird neu gerechnet; ein Entwurf daneben bekommt dieselben Werte) und hängt das Bild als
   Original „Tabelle“ an diese Runde.
 - **Im Ergebnisblatt** einer Runde hat **Teamwertung laut Veranstalter** denselben Knopf **Bild auslesen**; gelbe
