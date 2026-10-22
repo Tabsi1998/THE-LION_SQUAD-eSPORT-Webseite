@@ -1,25 +1,7 @@
-import { useEffect, useState } from "react";
 import { Zap } from "lucide-react";
+import { CountUp } from "@/components/tls/motion/CountUp";
 import { motion } from "framer-motion";
 import { rankInfo } from "@/lib/loewenRang";
-
-function useCountUp(target, duration = 950) {
-  const [value, setValue] = useState(0);
-  useEffect(() => {
-    const to = Number(target || 0);
-    let raf;
-    const start = performance.now();
-    const tick = (now) => {
-      const t = Math.min(1, (now - start) / duration);
-      const eased = 1 - Math.pow(1 - t, 3);
-      setValue(Math.round(to * eased));
-      if (t < 1) raf = requestAnimationFrame(tick);
-    };
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
-  }, [target, duration]);
-  return value;
-}
 
 // Löwen-Rang (#1452): der Titel ist der Rang-Name, wie im Backend und am Rahmen. Farben nur Cyan (Rang 1–5) und Gold
 // (ab Rang 6); `key` wählt die bestehenden Karten- und Leuchtklassen, Rang 12 bekommt den Puls.
@@ -63,7 +45,6 @@ export function AccountLevelProgress({ level, points = 0, nextLevelPoints = 100,
   const tier = accountLevelTier(level);
   const pct = Math.max(0, Math.min(100, Number(progress || 0)));
   const lvlNum = Number(level || 1);
-  const shownPoints = useCountUp(points);
   return (
     <div data-testid="account-level-progress">
       {!compact && (
@@ -83,7 +64,7 @@ export function AccountLevelProgress({ level, points = 0, nextLevelPoints = 100,
           <div className="flex-1 min-w-0">
             <div className="flex items-center justify-between text-[10px] uppercase tracking-widest text-white/45 font-bold">
               <span style={{ color: tier.color }} data-testid="account-level-title">{title || tier.title}</span>
-              <span className="tabular-nums">{shownPoints} / {nextLevelPoints} {unit}</span>
+              <span className="tabular-nums"><CountUp value={Number(points) || 0} /> / {nextLevelPoints} {unit}</span>
             </div>
             <div className="mt-2 h-2.5 rounded-sm bg-white/10 overflow-hidden relative">
               <motion.div

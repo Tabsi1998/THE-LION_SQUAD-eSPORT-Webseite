@@ -3,6 +3,8 @@ import { referenceHref } from "@/lib/seasonClose";
 import { formatLabel, pickShowcase, podiumItems, startersOf, yearOf } from "@/lib/referencesOverview";
 import { bestPlacement, displayTitle, entriesOf, gameTitle } from "@/components/tls/references/referenceParts";
 import { Mark, PlaceRing, SectionHead, TrophyMark, medalTone } from "@/components/tls/references/overviewParts";
+import { CountUp } from "@/components/tls/motion/CountUp";
+import { StaggerIn } from "@/components/tls/motion/StaggerIn";
 
 // Vitrine (#1878): der größte Erfolg als Hauptkarte - Oberkante und Pokal in seiner Medaillenfarbe, Titel, Spiel, Art,
 // Saison, Kennzahlen und wer für uns am Start war -, daneben die übrigen Podestplätze als ruhige Kacheln, die neuesten
@@ -28,9 +30,10 @@ export function Showcase({ items, showcase, linked, index = 3 }) {
       <div className="flex flex-wrap gap-3.5 md:gap-5 items-start">
         <MainCard item={main} link={linked?.get(main.id)} pinned={showcase?.mode === "pinned" && showcase.reference_id === main.id} />
         {rest.length > 0 && (
-          <div className="flex-[2_1_560px] min-w-0 grid grid-cols-2 md:grid-cols-[repeat(auto-fill,minmax(min(100%,200px),1fr))] gap-2.5 md:gap-3 content-start">
+          // Die Kacheln steigen beim ersten Sichtbarwerden gestaffelt auf (#1969).
+          <StaggerIn className="flex-[2_1_560px] min-w-0 grid grid-cols-2 md:grid-cols-[repeat(auto-fill,minmax(min(100%,200px),1fr))] gap-2.5 md:gap-3 content-start">
             {rest.map((item) => <TrophyTile key={item.id} item={item} link={linked?.get(item.id)} />)}
-          </div>
+          </StaggerIn>
         )}
       </div>
     </section>
@@ -73,7 +76,7 @@ function MainCard({ item, link, pinned }) {
       <div className={`hidden md:grid gap-3 py-4 border-y border-white/[0.08] ${figures.length === 3 ? "grid-cols-3" : figures.length === 2 ? "grid-cols-2" : "grid-cols-1"}`}>
         {figures.map((figure) => (
           <div key={figure.label} className="min-w-0">
-            <div className={`font-display font-bold text-[32px] leading-none tabular-nums ${figure.tone || "text-white"}`}>{figure.value}</div>
+            <div className={`font-display font-bold text-[32px] leading-none tabular-nums ${figure.tone || "text-white"}`}><CountUp value={figure.value} /></div>
             <div className="text-[13px] text-zinc-400">{figure.label}</div>
           </div>
         ))}

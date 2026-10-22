@@ -10,7 +10,7 @@ export function ProfileNav({ tab, onSelect, onLogout }) {
     <nav
       aria-label="Einstellungen"
       data-testid="settings-nav"
-      className="flex gap-2 overflow-x-auto pb-2 border-b border-white/10 lg:flex-col lg:gap-1 lg:overflow-visible lg:pb-0 lg:border-b-0 lg:border-r lg:pr-6 lg:sticky lg:top-24 lg:self-start"
+      className="flex gap-2 tls-swipe tls-swipe--room pb-2 border-b border-white/10 lg:flex-col lg:gap-1 lg:overflow-visible lg:pb-0 lg:border-b-0 lg:border-r lg:pr-6 lg:sticky lg:top-24 lg:self-start lg:[mask-image:none] lg:[-webkit-mask-image:none]"
     >
       {SETTINGS_GROUPS.map((group) => (
         <div key={group.key} className="contents lg:block lg:mb-3" data-testid={`settings-group-${group.key}`}>

@@ -111,7 +111,7 @@ export default function AdminMembersPage() {
       </div>
 
       {/* Am Handy wischbar statt umbrechend (#1365). */}
-      <div role="tablist" aria-label="Mitglieder" className="flex gap-2 mb-6 border-b border-white/10 overflow-x-auto">
+      <div role="tablist" aria-label="Mitglieder" className="flex gap-2 mb-6 border-b border-white/10 tls-swipe pb-0">
         {[
           { k: "status", l: "Mitgliedschaften" },
           { k: "profiles", l: "Öffentliche Profile" },
@@ -170,7 +170,7 @@ export default function AdminMembersPage() {
       </div>
 
       <div className="border border-white/10 rounded-sm bg-[#121212] overflow-hidden">
-        <div className="overflow-x-auto">
+        <div className="tls-swipe pb-0">
           <table className="w-full text-sm min-w-[800px]">
             <thead className="bg-[#0A0A0A] text-[11px] uppercase tracking-widest text-white/50">
               <tr>

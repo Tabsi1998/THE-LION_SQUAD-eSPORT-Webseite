@@ -25,6 +25,8 @@
   overflow: hidden;
   background: #fff;
   color: #000;
+  /* Die Seite ist dunkel (index.css, #1969) - das Papier bleibt hell, auch für Formularteile darauf. */
+  color-scheme: light;
   font-family: 'Outfit', 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
   font-size: 9pt;
   line-height: 1.25;

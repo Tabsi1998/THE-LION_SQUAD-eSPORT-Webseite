@@ -158,7 +158,7 @@ export default function SeasonPage() {
           <div className="px-4 py-3 border-b border-white/10 flex items-center gap-2">
             <Trophy className="w-4 h-4 text-[#FFD700]"/><h2 className="font-heading font-bold uppercase">Gesamtwertung</h2>
           </div>
-          <div className="hidden md:block overflow-x-auto">
+          <div className="hidden md:block tls-swipe pb-0">
             <table className="w-full text-sm min-w-[900px]">
               <thead className="bg-[#0A0A0A] text-[11px] uppercase tracking-widest text-white/50">
                 <tr><th className="text-left px-4 py-3 w-14">#</th><th className="text-left px-4 py-3">Teilnehmer</th><th className="text-left px-4 py-3">Quellen</th><th className="text-right px-4 py-3">Wertungen</th><th className="text-right px-4 py-3">Erfolge</th><th className="text-right px-4 py-3">Siege</th><th className="text-right px-4 py-3 font-display">Jahrespunkte</th></tr>

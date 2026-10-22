@@ -130,7 +130,7 @@ export default function AdminDocumentsPage() {
           ))}
         </ul>
         <div className="hidden md:block border border-white/10 rounded-sm bg-[#121212] overflow-hidden">
-          <div className="overflow-x-auto">
+          <div className="tls-swipe pb-0">
             <table className="w-full text-sm min-w-[800px]">
               <thead className="bg-[#0A0A0A] text-[11px] uppercase tracking-widest text-white/50">
                 <tr>

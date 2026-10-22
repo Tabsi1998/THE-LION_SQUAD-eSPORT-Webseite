@@ -24,7 +24,7 @@ function seasonName(season) {
 export function SeasonSwitcher({ seasons, lineageSlug }) {
   if (!Array.isArray(seasons) || seasons.length < 2) return null;
   return (
-    <nav aria-label="Saisons und Ligen" className="tls-season-tabs mt-6 -mx-4 px-4 sm:mx-0 sm:px-0 overflow-x-auto" data-testid="racing-seasons">
+    <nav aria-label="Saisons und Ligen" className="tls-season-tabs mt-6 -mx-4 px-4 sm:mx-0 sm:px-0 tls-swipe tls-swipe--room" data-testid="racing-seasons">
       <ul className="flex gap-2 w-max py-1">
         {seasons.map((season) => (
           <li key={season.season_slug}>
@@ -183,7 +183,7 @@ export function RacingCalendar({ rounds, rows, onSelect, publicKeys, hrefFor, ro
             const href = roundHref?.(round);
             const head = (
               <>
-                <span className={`w-12 shrink-0 font-black tabular-nums ${weekend.kind === "final" ? "text-[var(--tls-honor)]" : "text-white/80"}`}>{roundLabel(round)}</span>
+                <span className={`min-w-12 shrink-0 whitespace-nowrap font-black tabular-nums ${weekend.kind === "final" ? "text-[var(--tls-honor)]" : "text-white/80"}`}>{roundLabel(round)}</span>
                 <div className="min-w-0 flex-1">
                   <span className={`block text-sm tabular-nums ${weekend.state === "cancelled" ? "text-white/45" : "text-white"}`}>{weekend.multi ? roundWhen({ ...round, time: null }) : roundWhen(round)}</span>
                   {(weekend.title || weekend.venue || weekend.country_code) && (

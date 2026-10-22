@@ -42,7 +42,7 @@ export function FlowGraph({ graph, itemsById, laneNames = {}, selectedId = null,
 
   return (
     <div className="mp-flow-wrap">
-      <div className="mp-flow-scroll">
+      <div className="mp-flow-scroll tls-swipe">
         <div className="mp-flow" data-testid="mp-flow" style={{ width: `${width}px`, height: `${height}px` }}>
           {Array.from({ length: layout.columns }, (_, depth) => (
             <span key={depth} className="mp-flow__col" aria-hidden="true" style={{ transform: `translate3d(${depth * SIZE.columnWidth}px, 0, 0)` }}>

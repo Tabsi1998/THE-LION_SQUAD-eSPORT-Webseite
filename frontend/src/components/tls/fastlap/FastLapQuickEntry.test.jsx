@@ -46,7 +46,7 @@ test("ein Gast, Zeit am Ziffernblock, Eintragen - mit Vorschau und dem Versuch a
   expect(screen.getByTestId("fl-quick-attempt")).toHaveTextContent("Versuch 2 von 3");
   typeKeys("1", "colon", "2", "4", "comma", "5", "8", "7");
   expect(screen.getByTestId("fl-quick-time")).toHaveValue("1:24,587");
-  expect(screen.getByText("= 1:24.587")).toBeInTheDocument();
+  expect(screen.getByText("= 1:24,587")).toBeInTheDocument();
   fireEvent.click(screen.getByTestId("fl-quick-save"));
   await waitFor(() => expect(apiMock.post).toHaveBeenCalledTimes(1));
   const [url, body] = apiMock.post.mock.calls[0];

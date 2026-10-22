@@ -5,6 +5,7 @@ import { formatNumber, rankMove } from "@/lib/standingsTable";
 import { roundLabel } from "@/lib/referenceCalendar";
 import { groupWeekends, sessionAbbr, sessionLabel } from "@/lib/raceWeekend";
 import { CountryFlag } from "@/components/tls/CountryFlag";
+import { CountUp } from "@/components/tls/motion/CountUp";
 import { AdjustmentMark } from "@/components/tls/series/SeriesSpecialRules";
 import {
   cutlineAfter, mobileRows, nameOf, resultIn, resultLabel, roundColumns, tiebreakHint, visibleRows,
@@ -56,7 +57,8 @@ export function Points({ row, topN }) {
   return (
     <>
       <span title={hint || undefined} className={hint ? "underline decoration-dotted decoration-white/30 underline-offset-4" : undefined}>
-        {formatNumber(row.points)}
+        {/* Punkte zählen beim ersten Sichtbarwerden hoch; beim Nachladen leuchtet nur eine Änderung kurz auf (#1969). */}
+        <CountUp value={formatNumber(row.points)} />
         {hint && <span className="sr-only"> ({hint})</span>}
       </span>
       {/* Anpassung (#1960): „−5“ mit Grund im Tooltip - etwa für Nichtteilnahme nach Anmeldung. */}
@@ -162,7 +164,7 @@ function DesktopTable({ rows, columns, groups, topN, cutAfter, label, view }) {
   const span = columns.length + 3 + (extraColumn ? 1 : 0);
   return (
     // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- eine scrollbare Fläche muss per Tastatur erreichbar sein (axe: scrollable-region-focusable)
-    <div role="region" aria-label={label} tabIndex={0} className="tls-standings hidden md:block border border-white/10 rounded-md bg-[var(--tls-surface-1)] overflow-x-auto overscroll-x-contain focus:outline-none focus-visible:ring-2 focus-visible:ring-[#29B6E8]" data-testid="series-table">
+    <div role="region" aria-label={label} tabIndex={0} className="tls-standings hidden md:block border border-white/10 rounded-md bg-[var(--tls-surface-1)] tls-swipe pb-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#29B6E8]" data-testid="series-table">
       <table className="w-full text-sm tabular-nums">
         {groups ? <WeekendHead groups={groups} columns={columns} label={label} extraColumn={extraColumn} roundHref={view.roundHref} /> : (
         <thead className="text-[11px] uppercase tracking-[0.12em] text-white/50">

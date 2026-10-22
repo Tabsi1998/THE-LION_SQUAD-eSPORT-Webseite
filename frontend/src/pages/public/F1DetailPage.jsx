@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams, Link, useSearchParams } from "react-router-dom";
 import { API, api, formatRequestError, resolveMediaUrl } from "@/lib/api";
-import { parseLapTime, plausibilityText } from "@/lib/laptime";
+import { parseLapTime, plausibilityText, showLapTime } from "@/lib/laptime";
 import { PersonPicker } from "@/components/tls/PersonPicker";
 import { useAuth } from "@/context/AuthContext";
 import { PublicLayout } from "@/components/tls/PublicLayout";
@@ -272,11 +272,11 @@ export default function F1DetailPage() {
                   <div key={marks.bestKey} className="tls-best-flash" role="status" data-testid="f1-best-flash">
                     <span className="tls-best-flash__kicker font-heading">Neue Bestzeit!</span>
                     <span className="min-w-0 truncate font-bold">{marks.best.entry.display_name}</span>
-                    <span className="font-display font-bold tabular-nums text-honor">{marks.best.entry.time_str}</span>
+                    <span className="font-display font-bold tabular-nums text-honor">{showLapTime(marks.best.entry.time_str)}</span>
                     {marks.best.gapMs !== null && <span className="font-display tabular-nums text-white/70">{deltaText(marks.best.gapMs)}</span>}
                   </div>
                 )}
-                <div className="overflow-x-auto">
+                <div className="tls-swipe pb-0">
                 {/* Timing-Board (#1077): beim ersten Erscheinen zählen die Zeiten einmal hoch, Platz 1 bis 3 tragen einen
                     Strich in Gold, Silber und Bronze, beim Drüberfahren läuft ein Lichtstreif durch die Zeile. */}
                 <table ref={boardRef} className="tls-lap-board w-full text-sm" data-intro={introOnce(board?.track?.id ? `fastlap:${challenge.id}:${board.track.id}` : "") ? "1" : undefined} data-testid="f1-board">
@@ -330,7 +330,7 @@ export default function F1DetailPage() {
                           )}
                         </td>
                         <td className="hidden sm:table-cell px-4 py-3 text-right text-white/60 tabular-nums whitespace-nowrap">
-                          {e.gap_str || "—"}
+                          {showLapTime(e.gap_str) || "—"}
                           {/* Abstand als Balken (#1349): wächst beim ersten Auftritt, passt sich bei neuer Bestzeit weich an. */}
                           {largestGap > 0 && e.rank > 1 && (
                             <span className="tls-gap-track" aria-hidden="true"><span className="tls-gap-bar" style={{ transform: `scaleX(${Math.max(0.02, (Number(e.gap_ms) || 0) / largestGap)})` }} /></span>
@@ -439,7 +439,7 @@ function FastLapDownloads({ challenge, activeTrack, accessToken, user, board, ch
         className="sm:hidden w-full flex items-center justify-between gap-3 px-4 py-3 text-xs font-bold uppercase tracking-widest text-white/70"
       >
         Downloads
-        <ChevronDown className={`w-4 h-4 transition-transform duration-[var(--tls-motion-fast)] ${open ? "rotate-180" : ""}`} aria-hidden="true" />
+        <ChevronDown className={`w-4 h-4 transition-transform duration-fast ${open ? "rotate-180" : ""}`} aria-hidden="true" />
       </button>
       <div className="hidden sm:block px-4 pt-3 text-[11px] font-bold uppercase tracking-widest text-white/50">Downloads</div>
       <div id="f1-downloads-list" className={`${open ? "flex" : "hidden"} sm:flex flex-wrap gap-2 px-4 pb-4 pt-1 sm:pt-3`}>
@@ -662,7 +662,7 @@ function InlineFastLapTimeEntry({ challenge, trackId, currentUser, onSaved }) {
                 </div>
               </div>
               <div className="flex items-center gap-2 shrink-0">
-                <span className={`font-display font-bold tabular-nums ${time.is_invalid ? "line-through text-white/40" : "text-white"}`}>{time.time_str}</span>
+                <span className={`font-display font-bold tabular-nums ${time.is_invalid ? "line-through text-white/40" : "text-white"}`}>{showLapTime(time.time_str)}</span>
                 <button
                   type="button"
                   onClick={() => deleteTime(time)}
@@ -698,7 +698,7 @@ function ClubReferenceTimes({ entries }) {
           <div key={participantKey(entry)} className="border border-white/10 bg-[#0A0A0A]/60 rounded-sm px-3 py-2">
             <div className="flex items-center justify-between gap-2">
               <span className="text-[11px] font-display font-bold text-[#FFD700]">#{entry.rank}</span>
-              <span className="font-display font-bold tabular-nums text-white">{entry.time_str}</span>
+              <span className="font-display font-bold tabular-nums text-white">{showLapTime(entry.time_str)}</span>
             </div>
             <div className="mt-1 text-sm font-bold truncate">{entry.display_name}</div>
             <div className="text-[10px] uppercase tracking-widest text-white/40">{entry.attempts} Versuche</div>

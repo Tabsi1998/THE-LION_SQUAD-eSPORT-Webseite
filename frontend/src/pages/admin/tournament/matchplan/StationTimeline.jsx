@@ -183,7 +183,7 @@ export function StationTimeline({ timeline, editable = false, canMoveItem = null
 
   return (
     <div className="mp-timeline" data-testid="mp-timeline" data-dragging={drag ? "true" : undefined} data-instant={instant ? "true" : undefined}>
-      <div className="mp-timeline__scroll" ref={scroller}>
+      <div className="mp-timeline__scroll tls-swipe pb-0" ref={scroller}>
         <div className="mp-timeline__canvas" style={{ width: `calc(var(--mp-label) + ${scale.total}px)` }}>
           <div className="mp-timeline__head" aria-hidden="true">
             <div className="mp-timeline__corner" />

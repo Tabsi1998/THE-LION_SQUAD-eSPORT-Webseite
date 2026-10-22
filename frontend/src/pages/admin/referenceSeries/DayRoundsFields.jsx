@@ -63,7 +63,7 @@ export function DayRoundsLine({ row, number, count, scheme, doubleUp, invalid, o
 export function DayRoundsDetails({ row, number, count, invalid, onChange }) {
   if (!count) return null;
   return (
-    <div className="mt-2 overflow-x-auto" data-testid="result-row-day-details">
+    <div className="mt-2 tls-swipe pb-0" data-testid="result-row-day-details">
       <table className="text-sm">
         <thead>
           <tr className={LABEL}>

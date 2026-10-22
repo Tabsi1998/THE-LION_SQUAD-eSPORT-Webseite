@@ -11,6 +11,7 @@ import { useLowMomentTimer, useSponsorMoments, useTvSponsors } from "@/component
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useLiveRefresh } from "@/hooks/useLiveRefresh";
 import { compareBoards, deltaText, previousHolderText, rowChips } from "@/lib/tvFastLap";
+import { showLapTime } from "@/lib/laptime";
 import { attemptLabel, participantKey } from "@/lib/fastLapEvent";
 import { MOMENT_MS, createMomentQueue } from "@/lib/tvMoments";
 import { sponsorFor, sponsorPlan } from "@/lib/tvSponsors";
@@ -105,7 +106,7 @@ function BestMoment({ best }) {
         <div className="tv-best__before tv-t-info">{previousHolderText(best)}</div>
       </div>
       <div className="tv-best__right">
-        <div className="tv-best__time font-display">{entry.time_str}</div>
+        <div className="tv-best__time font-display">{showLapTime(entry.time_str)}</div>
         {best.gapMs !== null ? <div className="tv-best__gap tv-t-head font-display" data-testid="tv-best-gap">{deltaText(best.gapMs)}</div> : null}
       </div>
     </div>
@@ -359,11 +360,11 @@ function FastLapTv() {
                   P{i + 1}
                 </div>
                 <div className="tv-t-name font-heading font-black uppercase" data-tv-name="1" data-fit={(entry.display_name || "").length > 20 ? "small" : undefined}>{entry.display_name}</div>
-                <div className="tv-t-hero font-display font-bold" style={{ color: medalColors[i] }}>{entry.time_str}</div>
+                <div className="tv-t-hero font-display font-bold" style={{ color: medalColors[i] }}>{showLapTime(entry.time_str)}</div>
                 {chip ? (
                   <div className={`tv-lap-chip ${chip.kind === "best" ? "tv-lap-chip--best" : ""}`} data-testid={`tv-lap-chip-${participantKey(entry)}`}>{chip.text}</div>
                 ) : (
-                  <div className="tv-t-info tv-muted">{entry.gap_str || "Bestzeit"} · {view?.max_attempts ? `${entry.attempts} von ${view.max_attempts} Versuchen` : `${entry.attempts} Versuche`}</div>
+                  <div className="tv-t-info tv-muted">{showLapTime(entry.gap_str) || "Bestzeit"} · {view?.max_attempts ? `${entry.attempts} von ${view.max_attempts} Versuchen` : `${entry.attempts} Versuche`}</div>
                 )}
               </motion.div>
             );
@@ -396,11 +397,11 @@ function FastLapTv() {
                   <TvFace name={entry.display_name} avatar={entry.avatar_url || ""} className="tv-lap-face" />
                   <div className="tv-t-name font-heading font-bold uppercase min-w-0" data-tv-name="1">{entry.display_name}</div>
                 </div>
-                <div className="col-span-2 text-right tv-t-num font-display font-bold">{entry.time_str}</div>
+                <div className="col-span-2 text-right tv-t-num font-display font-bold">{showLapTime(entry.time_str)}</div>
                 <div className="col-span-3 flex justify-end min-w-0">
                   {chip ? (
                     <span className={`tv-lap-chip ${chip.kind === "best" ? "tv-lap-chip--best" : ""}`} data-testid={`tv-lap-chip-${participantKey(entry)}`}>{chip.text}</span>
-                  ) : <span className="tv-t-info tv-muted tabular-nums">{entry.gap_str}</span>}
+                  ) : <span className="tv-t-info tv-muted tabular-nums">{showLapTime(entry.gap_str)}</span>}
                 </div>
               </motion.div>
             );
@@ -417,7 +418,7 @@ function FastLapTv() {
                 <div key={participantKey(entry)} className="tv-card px-[calc(var(--tv-u)*1.2)] py-[calc(var(--tv-u)*0.6)]">
                   <div className="flex items-center justify-between gap-[var(--tv-gap)]">
                     <span className="tv-t-num font-display font-bold tv-gold">#{entry.rank}</span>
-                    <span className="tv-t-num font-display font-bold tabular-nums">{entry.time_str}</span>
+                    <span className="tv-t-num font-display font-bold tabular-nums">{showLapTime(entry.time_str)}</span>
                   </div>
                   <div className="tv-t-name font-heading font-bold uppercase" data-tv-name="1">{entry.display_name}</div>
                 </div>

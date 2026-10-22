@@ -68,9 +68,9 @@
   animation-delay: calc(200ms + var(--tls-ref-seg, 0) * 40ms);
 }
 
-/* Waagrecht wischen (Läuft gerade, Filter am Handy): ohne Balken, mit Einrasten. */
-.tls-ref-scroll { scrollbar-width: none; -webkit-overflow-scrolling: touch; }
-.tls-ref-scroll::-webkit-scrollbar { display: none; }
+/* Waagrecht wischen (Läuft gerade, Filter am Handy): mit Einrasten. Die Leiste kommt vom Baustein tls-swipe (#1969) und
+   bleibt sichtbar - sonst merkt niemand, dass es weitergeht. */
+.tls-ref-scroll { -webkit-overflow-scrolling: touch; }
 .tls-ref-snap { scroll-snap-type: x mandatory; scroll-padding-inline: 1rem; }
 .tls-ref-snap > * { scroll-snap-align: start; }
 @media (min-width: 768px) {

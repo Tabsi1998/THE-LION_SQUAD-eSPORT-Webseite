@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "@/lib/api";
 import { SkeletonLines } from "@/components/tls/Skeleton";
+import { CountUp } from "@/components/tls/motion/CountUp";
+import { StaggerIn } from "@/components/tls/motion/StaggerIn";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { nameOf } from "@/lib/referenceSeriesTable";
 import { METRICS, leaders, metricText, rankBy } from "@/lib/seasonStatistics";
@@ -69,7 +71,8 @@ export function SeasonStatistics({ lineageSlug, seasonSlug }) {
       </div>
 
       {/* Rangliste je Kennzahl: die Spitze, ein Tipp auf eine Karte sortiert die Tabelle danach. */}
-      <ul className="tls-round-facts tls-swipe mt-5" aria-label="Rangliste je Kennzahl" data-testid="season-stats-leaders">
+      {/* Die Karten steigen gestaffelt auf, die Spitzenwerte zählen hoch (#1969). */}
+      <StaggerIn as="ul" className="tls-round-facts tls-swipe mt-5" aria-label="Rangliste je Kennzahl" data-testid="season-stats-leaders">
         {metrics.map((key) => (
           <li key={key} className="tls-round-fact tls-stats-leader" data-active={key === active ? "true" : undefined}>
             <button type="button" className="tls-stats-leader__pick" aria-pressed={key === active} onClick={() => setMetric(key)} data-testid={`season-stats-metric-${key}`}>
@@ -80,13 +83,13 @@ export function SeasonStatistics({ lineageSlug, seasonSlug }) {
                 <li key={row.key} className="flex items-baseline gap-2 text-[13px] min-w-0" data-mine={mine(row) ? "true" : undefined}>
                   <span className="w-4 shrink-0 text-white/45 tabular-nums">{rank}</span>
                   <span className={`min-w-0 flex-1 truncate ${mine(row) ? "text-[#29B6E8] font-semibold" : "text-white/85"}`}>{row.team && row.key === row.team ? row.team : nameOf(row)}</span>
-                  <span className="shrink-0 font-bold tabular-nums">{metricText(row, key)}</span>
+                  <CountUp className="shrink-0 font-bold" value={metricText(row, key)} />
                 </li>
               ))}
             </ol>
           </li>
         ))}
-      </ul>
+      </StaggerIn>
 
       {/* eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- eine scrollbare Fläche muss per Tastatur erreichbar sein (axe: scrollable-region-focusable) */}
       <div className="tls-round-table tls-swipe mt-5 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#29B6E8]" role="region" aria-label={`Statistik je ${label}`} tabIndex={0} data-testid="season-stats-table">

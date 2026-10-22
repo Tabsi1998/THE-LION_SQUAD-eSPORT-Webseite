@@ -28,7 +28,7 @@ export function RunningSeries({ items, index = 2 }) {
   return (
     <section id="einsatz" aria-labelledby="references-running-title" className="tls-ref-anchor tls-ref-rise max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-10 md:pt-[72px]" style={{ "--tls-ref-i": index }} data-testid="references-running">
       <SectionHead id="references-running-title" eyebrow="Gerade im Einsatz" tone={today ? "honor" : "brand"} pulse={today} title="Läuft gerade" hint={`${count} · Stand nach dem letzten gewerteten Termin`} />
-      <div className="tls-ref-scroll tls-ref-snap -mx-4 px-4 pb-1 flex gap-3 overflow-x-auto sm:-mx-6 sm:px-6 md:mx-0 md:px-0 md:pb-0 md:overflow-visible md:grid md:gap-5 md:grid-cols-[repeat(auto-fit,minmax(min(100%,330px),1fr))]" data-testid="references-running-list">
+      <div className="tls-ref-scroll tls-ref-snap -mx-4 px-4 pb-1 flex gap-3 tls-swipe tls-swipe--room sm:-mx-6 sm:px-6 md:mx-0 md:px-0 md:pb-0 md:overflow-visible md:grid md:gap-5 md:grid-cols-[repeat(auto-fit,minmax(min(100%,330px),1fr))] md:[mask-image:none] md:[-webkit-mask-image:none]" data-testid="references-running-list">
         {items.map((item) => <RunningCard key={`${item.lineage.slug}/${item.series.season_slug}`} item={item} />)}
       </div>
       {items.length > 1 && <div className="md:hidden mt-2.5 text-[13px] text-quiet">Wischen für weitere Saisons →</div>}

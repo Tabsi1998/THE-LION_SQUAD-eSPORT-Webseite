@@ -81,6 +81,17 @@ describe("Farb-Rollen (#1305)", () => {
   });
 });
 
+test("Rennserien (#1969): Pole und schnellste Runde sind Rollen in styles/system.css, nicht nur in roundResults.css", () => {
+  const round = readFileSync(path.join(root, "src/components/tls/series/roundResults.css"), "utf8");
+  expect(system).toContain("--tls-pole-rgb: 232 121 249;");
+  expect(system).toContain("--tls-pole: rgb(var(--tls-pole-rgb));");
+  expect(system).toContain("--tls-fastest-rgb: 192 132 252;");
+  expect(system).toContain("--tls-fastest: rgb(var(--tls-fastest-rgb));");
+  expect(round).not.toContain("--tls-round-pole-rgb");
+  expect(round).not.toContain("--tls-round-fastest-rgb");
+  expect(round).toContain("var(--tls-pole-rgb)");
+});
+
 describe("Farben je Art (#1151, #1305)", () => {
   test("Event Violett, Turnier Cyan, Fast Lap Türkis, Verein Gold - eine Stelle im Web, dieselben Werte in der App", () => {
     expect(CALENDAR_COLORS).toBe(KIND_COLORS);

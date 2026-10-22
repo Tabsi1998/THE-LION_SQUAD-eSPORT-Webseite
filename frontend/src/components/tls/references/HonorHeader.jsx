@@ -1,4 +1,5 @@
-import { useCountUp } from "@/hooks/useCountUp";
+import { CountUp } from "@/components/tls/motion/CountUp";
+import { formatCount } from "@/lib/countUp";
 import { MedalMark, medalTone } from "@/components/tls/references/overviewParts";
 
 // Kopf der Referenzen-Übersicht (#1878): Überschrift mit Einleitung und Sprungmarken, rechts die Ehrentafel - Siege,
@@ -20,14 +21,17 @@ export function HonorHeader({ stats, links }) {
         </div>
         <HonorBoard stats={stats} />
         {links.length > 0 && (
-          <nav aria-label="Auf dieser Seite" className="tls-ref-hero__nav tls-ref-rise tls-ref-scroll flex gap-2 overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0 sm:flex-wrap sm:overflow-visible" style={{ "--tls-ref-i": 1 }} data-testid="references-jump">
-            {links.map((link) => (
-              <a key={link.href} href={link.href} className="shrink-0 inline-flex items-center gap-2 min-h-[44px] px-4 rounded-full border border-white/[0.14] text-zinc-200 text-sm font-semibold no-underline hover:border-brand/60 hover:text-white transition-colors duration-fast">
-                {link.pulse && <span className="tls-run-pulse" aria-hidden="true" />}
-                {link.label}
-              </a>
-            ))}
-          </nav>
+          // Die Hülle steigt auf (tls-ref-rise), die Leiste darin wischt (tls-swipe) - zwei Animationen, zwei Elemente.
+          <div className="tls-ref-hero__nav tls-ref-rise min-w-0" style={{ "--tls-ref-i": 1 }}>
+            <nav aria-label="Auf dieser Seite" className="tls-ref-scroll flex gap-2 tls-swipe tls-swipe--room -mx-4 px-4 sm:mx-0 sm:px-0 sm:flex-wrap sm:overflow-visible sm:[mask-image:none] sm:[-webkit-mask-image:none]" data-testid="references-jump">
+              {links.map((link) => (
+                <a key={link.href} href={link.href} className="shrink-0 inline-flex items-center gap-2 min-h-[44px] px-4 rounded-full border border-white/[0.14] text-zinc-200 text-sm font-semibold no-underline hover:border-brand/60 hover:text-white transition-colors duration-fast">
+                  {link.pulse && <span className="tls-run-pulse" aria-hidden="true" />}
+                  {link.label}
+                </a>
+              ))}
+            </nav>
+          </div>
         )}
       </div>
     </section>
@@ -52,7 +56,7 @@ function HonorBoard({ stats }) {
       </div>
       <div className="flex flex-wrap gap-x-4 md:gap-x-[22px] gap-y-1.5 px-3 md:px-0 pt-3 md:pt-3.5 border-t border-white/[0.08] text-sm text-zinc-400">
         {extras.map(([value, label, testId]) => (
-          <span key={testId} data-testid={testId}><b className="font-display font-bold text-[17px] md:text-lg text-white tabular-nums">{value}</b> {label}</span>
+          <span key={testId} data-testid={testId}><b className="font-display font-bold text-[17px] md:text-lg text-white tabular-nums"><CountUp value={value} format={formatCount} /></b> {label}</span>
         ))}
         {stats.since && <span className="md:hidden">seit {stats.since}</span>}
       </div>
@@ -61,12 +65,11 @@ function HonorBoard({ stats }) {
 }
 
 function MedalNumber({ placement, value, label, first, last, testId }) {
-  const [shown, ref] = useCountUp(value);
   const tone = medalTone(placement);
   return (
-    <div ref={ref} data-testid={testId} className={`flex flex-col items-center md:items-start gap-0.5 md:gap-1.5 min-w-0 ${first ? "md:pr-4" : last ? "md:pl-4 border-l border-white/[0.08]" : "md:px-4 border-l border-white/[0.08]"}`}>
+    <div data-testid={testId} className={`flex flex-col items-center md:items-start gap-0.5 md:gap-1.5 min-w-0 ${first ? "md:pr-4" : last ? "md:pl-4 border-l border-white/[0.08]" : "md:px-4 border-l border-white/[0.08]"}`}>
       <MedalMark placement={placement} className="hidden md:block w-[34px] h-[34px]" />
-      <div className={`font-display font-bold leading-[0.9] tabular-nums text-[44px] md:text-[64px] ${tone.text}`}>{shown}</div>
+      <div className={`font-display font-bold leading-[0.9] tabular-nums text-[44px] md:text-[64px] ${tone.text}`}><CountUp value={Number(value) || 0} /></div>
       <div className="text-[11px] md:text-xs font-bold uppercase tracking-[0.16em] md:tracking-[0.18em] text-zinc-300">{label}</div>
     </div>
   );

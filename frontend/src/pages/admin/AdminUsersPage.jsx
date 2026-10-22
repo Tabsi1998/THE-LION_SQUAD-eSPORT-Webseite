@@ -137,7 +137,7 @@ export default function AdminUsersPage() {
       </details>
 
       {/* PC: Tabelle; Tablet und Handy: Karten - beides nur zum Lesen. */}
-      <div className="hidden lg:block border border-white/10 rounded-sm bg-[#121212] overflow-x-auto">
+      <div className="hidden lg:block border border-white/10 rounded-sm bg-[#121212] tls-swipe pb-0">
         <table className="w-full text-sm" data-testid="users-table">
           <thead className="bg-[#0A0A0A] text-[11px] uppercase tracking-widest text-white/50">
             <tr>

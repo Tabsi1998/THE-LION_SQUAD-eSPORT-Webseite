@@ -287,7 +287,7 @@ export default function AchievementsShowcasePage() {
               <Medal className="w-5 h-5 text-[#FFD700]" />
               <h2 className="font-heading text-2xl md:text-3xl font-bold uppercase">Bestenliste</h2>
             </div>
-            <div className="flex max-w-full items-center gap-2 flex-nowrap overflow-x-auto pb-1 sm:flex-wrap sm:overflow-visible sm:pb-0" data-testid="leaderboard-controls">
+            <div className="flex max-w-full items-center gap-2 flex-nowrap tls-swipe tls-swipe--room pb-1 sm:flex-wrap sm:overflow-visible sm:pb-0 sm:[mask-image:none] sm:[-webkit-mask-image:none]" data-testid="leaderboard-controls">
               <Toggle
                 value={board.by}
                 onChange={(by) => setBoard((b) => ({ ...b, by }))}

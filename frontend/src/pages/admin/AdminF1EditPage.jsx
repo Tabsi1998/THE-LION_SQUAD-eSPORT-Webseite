@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { API, api, formatRequestError, resolveMediaUrl } from "@/lib/api";
-import { formatLapTime, parseLapTime, plausibilityText } from "@/lib/laptime";
+import { formatLapTime, parseLapTime, plausibilityText, showLapTime } from "@/lib/laptime";
 import { safeHttpUrl } from "@/lib/safeLink";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { StatusBadge } from "@/components/tls/StatusBadge";
@@ -497,7 +497,7 @@ export default function AdminF1EditPage() {
                       )}
                     </div>
                     <div className="flex items-center gap-3">
-                      <span className={`font-display font-bold text-lg tabular-nums ${t.is_invalid ? "line-through text-white/40" : "text-white"}`}>{t.time_str}</span>
+                      <span className={`font-display font-bold text-lg tabular-nums ${t.is_invalid ? "line-through text-white/40" : "text-white"}`}>{showLapTime(t.time_str)}</span>
                       {(t.score_scope || "official") === "club_reference" && <span className="text-[#FFD700] border border-[#FFD700]/30 bg-[#FFD700]/10 px-2 py-1 text-[10px] font-bold uppercase tracking-widest rounded-sm">Referenz</span>}
                       {t.penalty_seconds > 0 && <span className="text-[#FF3B30] text-xs">+{t.penalty_seconds}s</span>}
                       {t.is_invalid && <span className="text-[#FF3B30] text-[10px] font-bold uppercase tracking-widest">INVALID</span>}

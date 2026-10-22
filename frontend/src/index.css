@@ -48,6 +48,10 @@
   /* Wege über die Fläche (#1561, lib/motion EASE_MOVE): weich an, weich ab - der Flug im Turnierbaum und seine Linie. */
   --tls-ease-move: cubic-bezier(0.77, 0, 0.175, 1);
   --tls-motion-on: 1;
+  /* Mikro-Bewegung (#1969, lib/motion MICRO): Hochzählen, kurzes Aufleuchten, Versatz beim gestaffelten Erscheinen. */
+  --tls-motion-count: 900ms;
+  --tls-motion-glow: 840ms;
+  --tls-stagger-step: 50ms;
 }
 
 * { border-color: rgba(255,255,255,0.1); }
@@ -127,10 +131,14 @@ img, video, canvas, svg {
 /* Selection */
 ::selection { background: var(--tls-cyan); color: #000; }
 
-/* Scrollbar */
+/* Scrollleisten (#1969): die Seite ist dunkel - `color-scheme: dark` gibt Seitenleiste, Formularteile und Systemleisten
+   die dunkle Fassung statt der weißen. Die Seitenleiste selbst: dunkle Spur, grauer Daumen. Waagrechte Wischflächen
+   tragen dazu die dünne Cyan-Leiste (`tls-swipe`). */
+:root { color-scheme: dark; }
+html { scrollbar-color: #2C2C33 var(--tls-surface-0); }
 ::-webkit-scrollbar { width: 10px; height: 10px; }
-::-webkit-scrollbar-track { background: #000; }
-::-webkit-scrollbar-thumb { background: #222; border-radius: 2px; }
+::-webkit-scrollbar-track { background: var(--tls-surface-0); }
+::-webkit-scrollbar-thumb { background: #2C2C33; border-radius: 999px; border: 2px solid var(--tls-surface-0); }
 ::-webkit-scrollbar-thumb:hover { background: var(--tls-cyan); }
 
 /* Neon grid background */
@@ -683,35 +691,111 @@ button.tls-bracket-row:active, .tls-bracket-head:active { transform: scale(calc(
 .tls-hide-scrollbar { scrollbar-width: none; -ms-overflow-style: none; }
 .tls-hide-scrollbar::-webkit-scrollbar { display: none; width: 0; height: 0; }
 
-/* Wischleiste (#1950, für alle Leisten gedacht): seitlich verschiebbar im Vereinsstil - eine dünne Leiste in Cyan statt
-   der weißen Systemleiste, die Ränder laufen weich aus, wo es weitergeht. Wo der Browser Animationen am Scrollen kennt,
-   zeigt der Verlauf genau die Seite, auf der noch etwas liegt (links erst nach dem Wischen, rechts bis zum Ende) und
-   bleibt ganz weg, wenn nichts übersteht; sonst läuft nur der rechte Rand aus. */
+/* Bewegung: Bausteine (#1969, components/tls/motion). Nur Verschieben, Skalieren und Deckkraft; mit „Bewegung
+   reduzieren“ stehen alle Dauern auf 0 und --tls-motion-on auf 0 (Bewegungs-Regeln weiter unten).
+   - Glow: ein Schein hinter Abzeichen oder Wert leuchtet einmal auf (nur seine Deckkraft bewegt sich).
+   - StaggerIn: die ersten zwölf Einträge steigen nacheinander auf, der Rest steht sofort.
+   - Press: Karten heben sich unter der Maus um 2 px und geben beim Drücken leicht nach. */
+.tls-glow { position: relative; --tls-glow-rgb: var(--tls-brand-rgb); }
+.tls-glow[data-tone="honor"] { --tls-glow-rgb: var(--tls-honor-rgb); }
+.tls-glow[data-tone="ok"] { --tls-glow-rgb: var(--tls-ok-rgb); }
+.tls-glow[data-tone="pole"] { --tls-glow-rgb: var(--tls-pole-rgb); }
+.tls-glow[data-tone="fastest"] { --tls-glow-rgb: var(--tls-fastest-rgb); }
+.tls-glow::after {
+  content: ""; position: absolute; inset: -3px; border-radius: var(--tls-glow-radius, 6px); pointer-events: none; opacity: 0;
+  background: rgb(var(--tls-glow-rgb) / 0.1);
+  box-shadow: 0 0 0 2px rgb(var(--tls-glow-rgb) / 0.3), 0 2px 14px 1px rgb(var(--tls-glow-rgb) / 0.45);
+}
+.tls-glow[data-glow="on"]::after { animation: tls-glow-once var(--tls-motion-glow) var(--tls-ease) both; animation-delay: var(--tls-glow-delay, 0ms); }
+/* Jede weitere Änderung wechselt zwischen „on“ und „again“ - ein neuer Name startet das Aufleuchten neu. */
+.tls-glow[data-glow="again"]::after { animation: tls-glow-again var(--tls-motion-glow) var(--tls-ease) both; }
+@keyframes tls-glow-once { 0% { opacity: 0; } 35% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes tls-glow-again { 0% { opacity: 0; } 35% { opacity: 1; } 100% { opacity: 0; } }
+
+@keyframes tls-stagger-in { from { opacity: 0; transform: translateY(calc(8px * var(--tls-motion-on))); } }
+.tls-stagger[data-stagger="wait"] > :nth-child(-n+12) { opacity: 0; }
+.tls-stagger[data-stagger="run"] > :nth-child(-n+12) {
+  animation: tls-stagger-in var(--tls-motion-slow) var(--tls-ease) both;
+  animation-delay: calc(var(--tls-stagger-i, 0) * var(--tls-stagger-step));
+}
+.tls-stagger > :nth-child(2) { --tls-stagger-i: 1; }
+.tls-stagger > :nth-child(3) { --tls-stagger-i: 2; }
+.tls-stagger > :nth-child(4) { --tls-stagger-i: 3; }
+.tls-stagger > :nth-child(5) { --tls-stagger-i: 4; }
+.tls-stagger > :nth-child(6) { --tls-stagger-i: 5; }
+.tls-stagger > :nth-child(7) { --tls-stagger-i: 6; }
+.tls-stagger > :nth-child(8) { --tls-stagger-i: 7; }
+.tls-stagger > :nth-child(9) { --tls-stagger-i: 8; }
+.tls-stagger > :nth-child(10) { --tls-stagger-i: 9; }
+.tls-stagger > :nth-child(11) { --tls-stagger-i: 10; }
+.tls-stagger > :nth-child(12) { --tls-stagger-i: 11; }
+
+.tls-press {
+  transition: transform var(--tls-motion-fast) var(--tls-ease), border-color var(--tls-motion-fast) var(--tls-ease),
+    background-color var(--tls-motion-fast) var(--tls-ease), color var(--tls-motion-fast) var(--tls-ease);
+}
+@media (hover: hover) and (pointer: fine) {
+  .tls-press:not(.tls-press--flat):hover { transform: translateY(calc(-2px * var(--tls-motion-on))); }
+}
+.tls-press:active { transform: scale(calc(1 - 0.03 * var(--tls-motion-on))); }
+
+@media (prefers-reduced-motion: reduce) {
+  .tls-glow[data-glow]::after, .tls-stagger[data-stagger="run"] > * { animation: none; }
+  .tls-stagger[data-stagger="wait"] > * { opacity: 1; }
+}
+@media print {
+  .tls-stagger > * { opacity: 1 !important; animation: none !important; }
+  /* Hochzählen (#1969): auf Papier immer der Endwert - der Zähltext weg, der Endwert (sonst nur für Screenreader) sichtbar. */
+  [data-counting] > [aria-hidden="true"] { display: none !important; }
+  [data-counting] > .sr-only {
+    position: static !important; width: auto !important; height: auto !important; margin: 0 !important;
+    overflow: visible !important; clip: auto !important; white-space: inherit !important;
+  }
+}
+
+/* Wischleiste (#1950, Baustein des Design-Systems #1969): JEDE waagrechte Wischfläche in Web und Verwaltung trägt
+   `tls-swipe` statt `overflow-x-auto` - Karten-Reihen, Reiterleisten, breite Tabellen, Liga-Weg, Chips.
+   - Eine dünne Leiste: Daumen in Cyan, dunkle Spur, abgerundet - nie ganz versteckt, sonst merkt niemand das Wischen.
+   - Wo der Browser Animationen am Scrollen kennt, läuft der Rand weich aus, wo es weitergeht (rechts bis zum Ende,
+     links erst nach dem Wischen); steht nichts über, bleibt der Verlauf ganz weg. Ohne diese Fähigkeit bleibt nur die
+     Leiste - ein fester Verlauf schnitte sonst die letzte Spalte an, auch wenn nichts übersteht.
+   - `position: relative`: was absolut liegt (Text nur für Screenreader), bleibt in der Fläche und macht die Seite nie
+     breiter.
+   - Abstand zur Leiste (8 px), Lage und Scrollen stehen in :where() - Tailwind-Klassen wie `pb-0` oder
+     `sm:overflow-visible` (am PC umbrechen statt wischen) gewinnen immer.
+   - Eigene Animationen am selben Element vertragen sich nicht mit dem Verlauf - dann eine Hülle drumherum legen. */
 @property --tls-swipe-fade-start { syntax: "<length>"; inherits: false; initial-value: 0px; }
 @property --tls-swipe-fade-end { syntax: "<length>"; inherits: false; initial-value: 0px; }
-.tls-swipe {
-  overflow-x: auto; overscroll-behavior-x: contain; padding-bottom: 8px;
-  scrollbar-width: thin; scrollbar-color: var(--tls-cyan) rgb(255 255 255 / 0.06);
-  --tls-swipe-fade-end: 24px;
-  -webkit-mask-image: linear-gradient(90deg, transparent, #000 var(--tls-swipe-fade-start), #000 calc(100% - var(--tls-swipe-fade-end)), transparent);
-  mask-image: linear-gradient(90deg, transparent, #000 var(--tls-swipe-fade-start), #000 calc(100% - var(--tls-swipe-fade-end)), transparent);
+:where(.tls-swipe) { position: relative; overflow-x: auto; padding-bottom: 8px; }
+/* Texte aus der Verwaltung (prose-cms: Code und Tabellen) bekommen dieselbe Leiste, ohne eigene Klasse im Inhalt. */
+.tls-swipe, .prose-cms pre, .prose-cms .prose-cms-table {
+  overscroll-behavior-x: contain;
+  scrollbar-width: thin; scrollbar-color: var(--tls-cyan) rgb(255 255 255 / 0.08);
 }
-.tls-swipe::-webkit-scrollbar { height: 4px; }
-.tls-swipe::-webkit-scrollbar-track { background: rgb(255 255 255 / 0.06); border-radius: 999px; }
-.tls-swipe::-webkit-scrollbar-thumb { background: var(--tls-cyan); border-radius: 999px; }
+:is(.tls-swipe, .prose-cms pre, .prose-cms .prose-cms-table)::-webkit-scrollbar { height: 4px; }
+:is(.tls-swipe, .prose-cms pre, .prose-cms .prose-cms-table)::-webkit-scrollbar-track { background: rgb(255 255 255 / 0.08); border-radius: 999px; }
+:is(.tls-swipe, .prose-cms pre, .prose-cms .prose-cms-table)::-webkit-scrollbar-thumb { background: var(--tls-cyan); border-radius: 999px; }
 @keyframes tls-swipe-edges {
   0% { --tls-swipe-fade-start: 0px; --tls-swipe-fade-end: 24px; }
   8% { --tls-swipe-fade-start: 24px; }
   92% { --tls-swipe-fade-end: 24px; }
   100% { --tls-swipe-fade-start: 24px; --tls-swipe-fade-end: 0px; }
 }
+/* Die Maske steht in :where() - wo die Fläche ab einer Breite umbricht statt wischt (`sm:overflow-visible`), nimmt
+   `sm:[mask-image:none]` sie zurück; sonst schnitte sie dort Anheben, Fokusring und Aufleuchten ab. */
 @supports (animation-timeline: scroll()) {
-  .tls-swipe { --tls-swipe-fade-end: 0px; animation: tls-swipe-edges linear both; animation-timeline: scroll(self inline); }
+  :where(.tls-swipe) {
+    -webkit-mask-image: linear-gradient(90deg, transparent, #000 var(--tls-swipe-fade-start), #000 calc(100% - var(--tls-swipe-fade-end)), transparent);
+    mask-image: linear-gradient(90deg, transparent, #000 var(--tls-swipe-fade-start), #000 calc(100% - var(--tls-swipe-fade-end)), transparent);
+  }
+  .tls-swipe { animation: tls-swipe-edges linear both; animation-timeline: scroll(self inline); }
 }
+/* Luft für Karten und Chips, die sich heben oder einen Fokusring tragen: oben 4 px, seitlich 4 px - in :where(), eigene
+   Abstände (px-4, py-1) gewinnen. */
+:where(.tls-swipe--room) { padding-top: 4px; padding-inline: 4px; }
 
-/* News-Filter (#1249): weiche Knöpfe in einer Zeile zum Wischen. Der rechte Rand läuft weich aus - so sieht man, dass
-   es weitergeht. Drücken gibt kurz nach, das Suchfeld gleitet beim Aufklappen leicht von rechts herein. */
-.tls-news-pills { padding-inline-end: 24px; -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent); }
+/* News-Filter (#1249): weiche Knöpfe in einer Zeile zum Wischen - Leiste und auslaufender Rand kommen vom Baustein
+   tls-swipe (#1969). Drücken gibt kurz nach, das Suchfeld gleitet beim Aufklappen leicht von rechts herein. */
 .tls-news-pill { transition: background-color var(--tls-motion-fast) ease, color var(--tls-motion-fast) ease, transform var(--tls-motion-fast) var(--tls-ease); }
 .tls-news-pill:active { transform: scale(calc(1 - 0.03 * var(--tls-motion-on))); }
 .tls-news-search { transition: opacity 200ms var(--tls-ease), transform 200ms var(--tls-ease); }
@@ -2038,6 +2122,9 @@ input.no-spin::-webkit-outer-spin-button, input.no-spin::-webkit-inner-spin-butt
     --tls-motion-fast: 0.01ms;
     --tls-motion-mid: 0.01ms;
     --tls-motion-slow: 0.01ms;
+    --tls-motion-count: 0.01ms;
+    --tls-motion-glow: 0.01ms;
+    --tls-stagger-step: 0ms;
     --tls-motion-on: 0;
   }
 }
@@ -2474,14 +2561,11 @@ html[data-season-still-cards] .tls-card[data-season-perch="card"]:focus-visible 
 @media (min-width: 1024px) {
   .tls-area-jump { margin-inline: -2rem; padding-inline: 2rem; }
 }
+/* Wischen über den Baustein tls-swipe (#1969) - die Leiste bleibt sichtbar. */
 .tls-area-jump__list {
   display: flex;
   gap: 0.25rem;
-  overflow-x: auto;
-  overscroll-behavior-x: contain;
-  scrollbar-width: none;
 }
-.tls-area-jump__list::-webkit-scrollbar { display: none; }
 .tls-area-jump__item {
   position: relative;
   display: inline-flex;
@@ -3274,7 +3358,7 @@ html[data-season-still-cards] .tls-card[data-season-perch="card"]:focus-visible 
 
 /* Zeitleiste */
 .mp-timeline { --mp-label: 168px; }
-.mp-timeline__scroll { overflow-x: auto; overscroll-behavior-x: contain; scrollbar-color: rgba(255, 255, 255, 0.22) transparent; scrollbar-width: thin; border: 1px solid rgba(255, 255, 255, 0.06); border-radius: 2px; }
+.mp-timeline__scroll { border: 1px solid rgba(255, 255, 255, 0.06); border-radius: 2px; }
 .mp-timeline__canvas { position: relative; min-width: 100%; }
 .mp-timeline__head { display: grid; grid-template-columns: var(--mp-label) 1fr; height: 26px; border-bottom: 1px solid rgba(255, 255, 255, 0.08); }
 .mp-timeline__corner { position: sticky; left: 0; z-index: 3; background: var(--tls-surface-1); }
@@ -3333,7 +3417,7 @@ html[data-season-still-cards] .tls-card[data-season-perch="card"]:focus-visible 
 .mp-hint { font-size: 12px; color: rgba(255, 255, 255, 0.45); max-width: 90ch; }
 
 /* Wer wartet auf wen */
-.mp-flow-scroll { overflow-x: auto; scrollbar-color: rgba(255, 255, 255, 0.22) transparent; scrollbar-width: thin; padding-bottom: 4px; }
+.mp-flow-scroll { padding-bottom: 4px; }
 .mp-flow { position: relative; }
 .mp-flow__col { position: absolute; top: 0; left: 0; font-size: 11px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: rgba(255, 255, 255, 0.4); }
 .mp-flow__edges { position: absolute; inset: 0; overflow: visible; }
@@ -3363,7 +3447,7 @@ html[data-season-still-cards] .tls-card[data-season-perch="card"]:focus-visible 
 .mp-flow__detail { margin-top: 12px; display: grid; gap: 3px; padding: 10px 12px; font-size: 14px; color: rgba(255, 255, 255, 0.8); background: var(--tls-surface-2); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 2px; overflow-wrap: anywhere; }
 
 /* Reihenfolge */
-.mp-order-scroll { position: relative; overflow-x: auto; }
+.mp-order-scroll { position: relative; }
 .mp-order { width: 100%; min-width: 640px; border-collapse: collapse; font-size: 14px; }
 .mp-order th { text-align: left; padding: 8px 10px; font-size: 11px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: rgba(255, 255, 255, 0.5); border-bottom: 1px solid rgba(255, 255, 255, 0.1); white-space: nowrap; }
 .mp-order td { padding: 9px 10px; border-bottom: 1px solid rgba(255, 255, 255, 0.05); vertical-align: middle; }
@@ -3419,7 +3503,6 @@ html[data-season-still-cards] .tls-card[data-season-perch="card"]:focus-visible 
 .mp-remote[data-tone="running"] .mp-remote__state { color: var(--tls-live); }
 .mp-remote[data-tone="open"] .mp-remote__state { color: var(--tls-brand); }
 .mp-remote[data-tone="accepted"] .mp-remote__state { color: var(--tls-ok); }
-.mp-weeks-scroll { overflow-x: auto; scrollbar-color: rgba(255, 255, 255, 0.22) transparent; scrollbar-width: thin; }
 .mp-weeks { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(220px, 1fr); gap: 10px; }
 .mp-week { padding: 12px; border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 2px; background: var(--tls-surface-0); min-width: 0; }
 .mp-week[data-current="true"] { border-color: rgb(var(--tls-brand-rgb) / 0.55); }
@@ -3459,7 +3542,9 @@ html[data-season-still-cards] .tls-card[data-season-perch="card"]:focus-visible 
    einmal, der Puls läuft nur bei „heute“. Bei „Bewegung reduzieren“ steht alles sofort im Endzustand, ohne Puls. */
 @keyframes tls-run-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 @keyframes tls-run-fill { from { transform: scaleX(0); } to { transform: scaleX(1); } }
-@keyframes tls-run-pulse { 0% { box-shadow: 0 0 0 0 rgb(var(--tls-honor-rgb) / 0.55); } 70%, 100% { box-shadow: 0 0 0 7px rgb(var(--tls-honor-rgb) / 0); } }
+/* Puls (#1969): die Farbe kommt aus --tls-pulse-rgb - Vorgabe Gold (Ehre), dazu Varianten über die Farb-Rollen:
+   tls-run-pulse--brand (Cyan), --live (Rot, „läuft gerade“), --ok (Grün). Ring und Punkt nehmen dieselbe Farbe. */
+@keyframes tls-run-pulse { 0% { box-shadow: 0 0 0 0 rgb(var(--tls-pulse-rgb) / 0.55); } 70%, 100% { box-shadow: 0 0 0 7px rgb(var(--tls-pulse-rgb) / 0); } }
 .tls-run-card {
   animation: tls-run-in 0.36s var(--tls-ease) both;
   animation-delay: calc(var(--tls-run-i, 0) * 60ms);
@@ -3467,7 +3552,10 @@ html[data-season-still-cards] .tls-card[data-season-perch="card"]:focus-visible 
 }
 @media (hover: hover) { .tls-run-card:hover { border-color: rgb(41 182 232 / 0.55); transform: translateY(-2px); } }
 .tls-run-fill { transform-origin: left; animation: tls-run-fill 0.7s var(--tls-ease) 0.2s both; }
-.tls-run-pulse { width: 6px; height: 6px; border-radius: 9999px; background: var(--tls-honor); animation: tls-run-pulse 2s ease-out infinite; }
+.tls-run-pulse { --tls-pulse-rgb: var(--tls-honor-rgb); width: 6px; height: 6px; border-radius: 9999px; background: rgb(var(--tls-pulse-rgb)); animation: tls-run-pulse 2s ease-out infinite; }
+.tls-run-pulse--brand { --tls-pulse-rgb: var(--tls-brand-rgb); }
+.tls-run-pulse--live { --tls-pulse-rgb: var(--tls-live-rgb); }
+.tls-run-pulse--ok { --tls-pulse-rgb: var(--tls-ok-rgb); }
 @media (prefers-reduced-motion: reduce) {
   .tls-run-card, .tls-run-fill, .tls-run-pulse { animation: none; }
   .tls-run-card { transition: none; }

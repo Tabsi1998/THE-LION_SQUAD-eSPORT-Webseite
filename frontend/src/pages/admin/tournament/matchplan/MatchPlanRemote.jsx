@@ -111,7 +111,7 @@ export function LeagueWeeks({ tournament, matches, registrations, matchdays, err
         <span className="mp-card__note">Ohne Einigung gilt die Standardzeit. „Ergebnis fehlt“ meldet sich erst nach der Frist der Woche. Der Planer überschreibt vereinbarte Termine nie.</span>
       </div>
       {error && <p className="mp-notice" data-tone="error" role="alert" data-testid="mp-remote-error">Spielwochen konnten nicht geladen werden: {error}</p>}
-      <div className="mp-weeks-scroll">
+      <div className="mp-weeks-scroll tls-swipe">
         <ol className="mp-weeks">
           {weeks.map((week) => (
             <li key={week.number} className="mp-week" data-testid={`mp-week-${week.number}`} data-current={matchdays?.current === week.number ? "true" : undefined}>

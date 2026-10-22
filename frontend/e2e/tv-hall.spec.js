@@ -604,9 +604,9 @@ test.describe("TV III: Ablauf im Raum (Meilenstein 60)", () => {
     await expect(moment).toBeVisible({ timeout: 6000 });
     await expect(moment).toContainText("Neue Bestzeit!");
     await expect(moment).toContainText("DriftDaniel");
-    await expect(moment).toContainText("1:19.400");
-    await expect(moment).toContainText("vorher NeonFalke · 1:20.000");
-    await expect(page.getByTestId("tv-best-gap")).toHaveText("−0.600 s");
+    await expect(moment).toContainText("1:19,400");
+    await expect(moment).toContainText("vorher NeonFalke · 1:20,000");
+    await expect(page.getByTestId("tv-best-gap")).toHaveText("−0,600 s");
     // Während des Moments steht die alte Liste noch: Platz 1 ist noch NeonFalke.
     await expect(page.locator("[data-testid='tv-podium']").first()).toHaveAttribute("data-user", "u1");
     await expect(moment).toHaveCount(0, { timeout: 6000 });

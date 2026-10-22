@@ -162,7 +162,7 @@ export function PreviewTab() {
         {everyMaterial ? (
           <div className="space-y-2" data-testid="preview-matrix">
             {keys.map((key) => (
-              <div key={key} className="flex items-center gap-3 border border-white/10 rounded-sm bg-[#0F0F10] px-3 py-2 overflow-x-auto" data-testid={`preview-matrix-${key}`}>
+              <div key={key} className="flex items-center gap-3 border border-white/10 rounded-sm bg-[#0F0F10] px-3 py-2 tls-swipe" data-testid={`preview-matrix-${key}`}>
                 <button type="button" onClick={() => setFocus(key)} aria-pressed={focus === key} className="w-32 shrink-0 text-left text-[10px] uppercase tracking-widest text-white/55 break-all hover:text-white">{key}</button>
                 {MATERIAL_ORDER.map((m) => <Badge key={m} material={m} rank={MATERIAL_LOOKS[m].rank <= 7 ? rank || MATERIAL_LOOKS[m].rank : 0} art={key} size="sm" animate={false} earned={!locked} percent={locked ? 45 : 0} />)}
               </div>

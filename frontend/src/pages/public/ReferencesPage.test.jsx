@@ -10,7 +10,6 @@ vi.mock("@/lib/api", () => ({ api: apiMock, resolveMediaUrl: (value) => value ||
 vi.mock("@/components/tls/PublicLayout", () => ({ PublicLayout: ({ children }) => <div>{children}</div> }));
 vi.mock("@/hooks/useApiInvalidation", () => ({ useApiInvalidation: () => {} }));
 vi.mock("@/hooks/useDocumentTitle", () => ({ useDocumentTitle: () => {} }));
-vi.mock("@/hooks/useCountUp", () => ({ useCountUp: (value) => [value, { current: null }] }));
 vi.mock("@/hooks/usePublicSiteSettings", () => ({ usePublicSiteSettings: () => siteSettings }));
 
 const { default: ReferencesPage, ReferenceDetailPage, timelineGroups } = await import("./ReferencesPage");

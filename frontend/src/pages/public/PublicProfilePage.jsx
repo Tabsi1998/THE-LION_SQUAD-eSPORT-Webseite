@@ -36,6 +36,9 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { asInstant, viennaDate } from "@/lib/vienna";
+import { showLapTime } from "@/lib/laptime";
+import { CountUp } from "@/components/tls/motion/CountUp";
+import { StaggerIn } from "@/components/tls/motion/StaggerIn";
 
 // Öffentliches Profil, Umbau 24.09.: Banner als echtes Banner mit überlappendem Avatar, eine Zeile
 // mit Level, Rolle und verknüpften Konten, eine Zahlenleiste und dieselben Reiter wie in der App (#1149): Übersicht,
@@ -686,9 +689,10 @@ export default function PublicProfilePage() {
           </div>
 
           {headerStats.length > 0 ? (
-            <div className="mt-6 pb-6 grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-7 gap-2 sm:gap-3" data-testid="profile-stats">
+            // Kennzahlen im Kopf (#1969): die Kacheln steigen gestaffelt auf, die Zahlen zählen hoch.
+            <StaggerIn className="mt-6 pb-6 grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-7 gap-2 sm:gap-3" data-testid="profile-stats">
               {headerStats.map((stat) => <QuickStat key={stat.key} icon={stat.icon} label={stat.label} value={stat.value} color={stat.color} glory={stat.glory} testId={`profile-stat-${stat.key}`} />)}
-            </div>
+            </StaggerIn>
           ) : <div className="pb-6" />}
           {isOwnProfile && (
             <div className="mb-6 flex items-center justify-between gap-4 border border-white/10 bg-[#121212] rounded-sm px-4 py-3 max-w-xl" data-testid="profile-as-others">
@@ -704,7 +708,7 @@ export default function PublicProfilePage() {
 
       {/* Reiter */}
       <div className="border-b border-white/10 sticky top-0 bg-[#0A0A0A]/95 backdrop-blur-sm z-20">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex gap-1 overflow-x-auto">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex gap-1 tls-swipe pb-0">
           {tabs.map(([k, l]) => (
             <button key={k} onClick={() => setTab(k)} data-testid={`profile-tab-${k}`}
               className={`px-4 py-3 text-xs font-bold uppercase tracking-wider whitespace-nowrap transition ${activeTab === k ? "text-[#29B6E8] border-b-2 border-[#29B6E8]" : "text-white/60 hover:text-white"}`}>
@@ -957,7 +961,7 @@ export default function PublicProfilePage() {
                       </div>
                       <div className="flex items-center gap-3 shrink-0">
                         {f.is_leader && <span className="text-[10px] uppercase tracking-widest text-[#FFD700] font-bold">Pole</span>}
-                        <span className="font-display text-xl font-bold tabular-nums">{f.time_str}</span>
+                        <span className="font-display text-xl font-bold tabular-nums">{showLapTime(f.time_str)}</span>
                       </div>
                     </div>
                   ))}
@@ -1098,7 +1102,7 @@ function HighlightCard({ item }) {
           <div className="mt-1 text-xs text-white/50 flex flex-wrap gap-x-2 gap-y-0.5">
             {item.subtitle && <span className="break-words">{item.subtitle}</span>}
             {date && <span>{date}</span>}
-            {item.time_str && <span className="tabular-nums text-white/70">{item.time_str}</span>}
+            {item.time_str && <span className="tabular-nums text-white/70">{showLapTime(item.time_str)}</span>}
           </div>
         </div>
         <div className="font-display font-black text-4xl tabular-nums leading-none shrink-0" style={{ color: tone.color }}>#{item.rank}</div>
@@ -1282,7 +1286,7 @@ function ReferenceRow({ item, expanded = false }) {
           <div className="flex items-center gap-2 flex-wrap">
             <span className={`text-[10px] font-bold uppercase tracking-widest ${isFastlap || isSeason ? "text-[#FFD700]" : "text-[#29B6E8]"}`}>{referenceKindLabel(item.kind)}</span>
             {isSeason && item.points != null && <span className="text-[10px] font-bold uppercase tracking-widest text-[#FFD700] border border-[#FFD700]/35 px-1.5 py-0.5 rounded-sm">{item.points} Jahrespunkte</span>}
-            {item.time_str && <span className="text-[10px] font-bold uppercase tracking-widest text-white/70 border border-white/10 px-1.5 py-0.5 rounded-sm break-all">{item.time_str}</span>}
+            {item.time_str && <span className="text-[10px] font-bold uppercase tracking-widest text-white/70 border border-white/10 px-1.5 py-0.5 rounded-sm break-all">{showLapTime(item.time_str)}</span>}
           </div>
           <div className="mt-1 font-heading text-base font-bold break-words">{item.title || "Referenz"}</div>
           <div className="text-xs text-white/50 mt-0.5 flex items-center gap-x-2 gap-y-1 flex-wrap">
@@ -1315,7 +1319,7 @@ function QuickStat({ icon: Icon, label, value, color = "#FFFFFF", glory = false,
       style={glorious ? { "--glory-c": color } : undefined}
     >
       <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-widest text-white/40 min-w-0"><Icon className="w-3 h-3 shrink-0" /> <span className="truncate">{label}</span></div>
-      <div className="mt-1 font-display font-bold text-xl sm:text-2xl tabular-nums break-words" style={{ color }}>{value}</div>
+      <div className="mt-1 font-display font-bold text-xl sm:text-2xl tabular-nums break-words" style={{ color }}><CountUp value={value} /></div>
     </div>
   );
 }

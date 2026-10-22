@@ -244,7 +244,7 @@ export default function AdminAppReleasesPage() {
           </div>
         </div>
       ) : null}
-      <div className="border border-white/10 bg-[#121212] rounded-sm overflow-x-auto mb-6">
+      <div className="border border-white/10 bg-[#121212] rounded-sm tls-swipe pb-0 mb-6">
         <table className="w-full text-sm" data-testid="app-releases-table">
           <thead>
             <tr className="text-[10px] uppercase tracking-widest text-white/40 border-b border-white/10">

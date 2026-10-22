@@ -5,7 +5,8 @@ import { api } from "@/lib/api";
 import { newsCategoryLabel } from "@/lib/newsCategories";
 import { applyCspNonce } from "@/lib/csp";
 import { boardContacts } from "@/lib/memberArea";
-import { useCountUp } from "@/hooks/useCountUp";
+import { CountUp } from "@/components/tls/motion/CountUp";
+import { formatCount } from "@/lib/countUp";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { PhaseBadge } from "@/components/tls/PhaseBadge";
 import { Reveal } from "@/components/tls/Reveal";
@@ -344,10 +345,9 @@ function ClubNumbers({ numbers, shown }) {
 }
 
 function NumberTile({ id, label, value }) {
-  const [shown, ref] = useCountUp(value);
   return (
-    <div ref={ref} className="tls-hero-enter" data-testid={`home-number-${id}`}>
-      <div className="font-heading text-3xl md:text-4xl font-black text-white tabular-nums" aria-label={`${value.toLocaleString("de-AT")} ${label}`}>{shown.toLocaleString("de-AT")}</div>
+    <div className="tls-hero-enter" data-testid={`home-number-${id}`}>
+      <div className="font-heading text-3xl md:text-4xl font-black text-white tabular-nums" aria-label={`${formatCount(value)} ${label}`}><CountUp value={value} format={formatCount} /></div>
       <div className="text-[10px] uppercase tracking-widest font-bold text-white/45">{label}</div>
     </div>
   );

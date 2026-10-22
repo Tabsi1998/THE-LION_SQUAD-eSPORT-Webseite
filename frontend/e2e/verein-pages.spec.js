@@ -172,6 +172,9 @@ for (const width of [390, 768, 1440, 2560]) {
       await expect(page.getByTestId("references-showcase")).toHaveAttribute("data-reference-id", "r1");
       const rest = REFERENCES.items.filter((item) => item.id !== "r1");
       await expect(page.getByTestId(`reference-trophy-${rest[0].id}`)).toBeVisible();
+      // Die Kacheln steigen beim Sichtbarwerden gestaffelt auf (#1969) - gemessen wird, wenn sie stehen.
+      await page.getByTestId(`reference-trophy-${rest[0].id}`).scrollIntoViewIfNeeded();
+      await expect(page.getByTestId("references-trophies").locator(".tls-stagger")).toHaveAttribute("data-stagger", "done");
       const tops = [];
       for (const item of rest) tops.push(Math.round((await box(page.getByTestId(`reference-trophy-${item.id}`))).y));
       const perRow = tops.filter((top) => Math.abs(top - tops[0]) <= 2).length;

@@ -70,7 +70,7 @@ export function TournamentFlowStepper({ tournament, registrations = [], matchesV
         <span className="text-[10px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">Turnier-Ablauf</span>
         <span className="h-px flex-1 bg-white/10" />
       </div>
-      <div className="flex items-stretch gap-1 overflow-x-auto pb-1">
+      <div className="flex items-stretch gap-1 tls-swipe tls-swipe--room pb-1">
         {steps.map((step, i) => {
           const isDone = done[i];
           const isCurrent = i === current;

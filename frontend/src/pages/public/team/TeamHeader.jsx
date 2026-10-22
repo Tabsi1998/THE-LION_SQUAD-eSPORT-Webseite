@@ -54,7 +54,7 @@ export function TeamFaces({ team, userId }) {
   const faces = orderedFaces(team);
   if (!faces.length) return null;
   return (
-    <div className="w-full overflow-x-auto tls-hide-scrollbar" data-testid="team-faces">
+    <div className="w-full tls-swipe pb-0" data-testid="team-faces">
       <ul className="flex gap-3 sm:gap-4 w-max mx-auto px-2 py-2">
         {faces.map((face) => {
           const name = face.display_name || face.username || "Spieler";

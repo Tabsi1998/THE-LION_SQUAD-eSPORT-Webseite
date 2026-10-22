@@ -1,5 +1,6 @@
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { FORM_LETTERS, formLabel, formatDiff, formatNumber, rankMove } from "@/lib/standingsTable";
+import { CountUp } from "@/components/tls/motion/CountUp";
 
 // Eine Tabelle der Rangliste (#1562, #1179): Liga und Gruppen mit Spielen, Bilanz, Differenz, Form und Punkten; die
 // Pfeile zeigen den Weg seit dem vorigen Spieltag (vom Server), die eigene Zeile ist markiert. Sieg hell in Cyan,
@@ -93,7 +94,7 @@ export function StandingsTable({ rows, kind = "league", changed, registerRow, ce
   return (
     // Bei großer Schrift (200 %) am Handy schiebt sich die Tabelle seitlich, statt die Punkte abzuschneiden.
     // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- eine scrollbare Fläche muss per Tastatur erreichbar sein (axe: scrollable-region-focusable)
-    <div role="region" aria-label={label} tabIndex={0} className="tls-standings border border-white/10 rounded-md bg-[var(--tls-surface-1)] overflow-x-auto overscroll-x-contain focus:outline-none focus-visible:ring-2 focus-visible:ring-[#29B6E8]">
+    <div role="region" aria-label={label} tabIndex={0} className="tls-standings border border-white/10 rounded-md bg-[var(--tls-surface-1)] tls-swipe pb-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#29B6E8]">
       <table className="w-full text-sm tabular-nums" aria-label={label}>
         <thead className="text-[11px] uppercase tracking-[0.12em] text-white/50">
           <tr className="border-b border-white/10">
@@ -134,7 +135,9 @@ export function StandingsTable({ rows, kind = "league", changed, registerRow, ce
                 </td>
                 {columns.map((column) => (
                   <td key={column.key} className={`px-1.5 sm:px-2.5 py-2.5 align-middle ${column.key === "form" ? "text-left" : "text-right"} ${column.wide ? "hidden sm:table-cell" : ""} ${column.strong ? "pr-3 sm:pr-4 font-display text-base font-bold text-white" : "text-white/70"}`}>
-                    {column.key === "form" ? <Form form={row.form} /> : cellValue(column, row)}
+                    {/* Punkte zählen beim ersten Sichtbarwerden hoch (#1969); beim Nachladen steht der neue Wert sofort da -
+                        die Zeile selbst leuchtet schon auf (tls-changed-row), ein zweites Aufleuchten wäre zu viel. */}
+                    {column.key === "form" ? <Form form={row.form} /> : column.strong ? <CountUp value={cellValue(column, row)} flash={false} /> : cellValue(column, row)}
                   </td>
                 ))}
                 {certificateHref && (

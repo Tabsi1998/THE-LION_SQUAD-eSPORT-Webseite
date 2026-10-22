@@ -44,14 +44,14 @@ test.describe("Abnahme: Helfer-Anleitung (Simulator, Fast Lap)", () => {
 
     // 2. Zeit tippen, z. B. 1:24,587.
     await keys(page, "1:24,587");
-    await expect(quick.getByText("= 1:24.587")).toBeVisible();
+    await expect(quick.getByText("= 1:24,587")).toBeVisible();
     await bilder(page, "b2-zeit", [quick.locator("h2"), page.getByTestId("fl-quick-attempt"), page.getByTestId("fl-quick-time"), quick.getByRole("group", { name: "Ziffernblock" })]);
 
     // 3. „Eintragen & nächster Fahrer“ - der Nächste aus der Liste ist dran.
     await bilder(page, "b3-eintragen", [page.getByTestId("fl-quick-save"), page.getByTestId("fl-quick-save-next"), page.getByTestId("fl-quick-invalid")]);
     await page.getByTestId("fl-quick-save-next").click();
     await expect(page.getByTestId("fl-quick-last")).toContainText(GUEST);
-    await expect(page.getByTestId("fl-quick-last")).toContainText("1:24.587");
+    await expect(page.getByTestId("fl-quick-last")).toContainText("1:24,587");
     await expect(page.getByTestId("fl-quick-driver-selected")).toContainText("Lena");
 
     // 4. Runde zählt nicht: „Ungültig“ → Grund wählen.

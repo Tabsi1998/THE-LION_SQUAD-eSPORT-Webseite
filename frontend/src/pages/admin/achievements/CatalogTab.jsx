@@ -185,7 +185,7 @@ export function CatalogTab({ board = false }) {
                   {isOpen && (
                     <div className="px-4 pb-4" data-testid={`group-tiers-${g.code}`}>
                       {hidden && <p className="mb-2 text-[11px] text-[#A855F7]/80">Versteckt: Wer die Gruppe noch nicht hat, sieht nur ein Fragezeichen – Name und Stufen erscheinen erst nach der Freischaltung.</p>}
-                      <div className="overflow-x-auto border border-white/5 rounded-sm">
+                      <div className="tls-swipe pb-0 border border-white/5 rounded-sm">
                         <table className="w-full text-sm min-w-[640px]">
                           <thead className="bg-[#0A0A0A] text-[10px] uppercase tracking-widest text-white/45">
                             <tr>

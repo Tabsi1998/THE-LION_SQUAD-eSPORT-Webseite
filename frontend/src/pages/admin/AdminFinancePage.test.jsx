@@ -274,7 +274,7 @@ test("die Tabellen liegen in einer seitlich scrollbaren, bedienbaren Fläche sta
     expect(region).toHaveAttribute("role", "region");
     expect(region).toHaveAccessibleName(name);
     expect(region).toHaveAttribute("tabindex", "0");
-    expect(region.className).toContain("overflow-x-auto");
+    expect(region.className).toContain("tls-swipe");
     expect(region.className).not.toContain("overflow-hidden");
     expect(within(region).getByTestId(row)).toBeInTheDocument();
     expect(region.querySelector("table").className).toMatch(/min-w-\[/);

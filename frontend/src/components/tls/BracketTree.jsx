@@ -679,7 +679,7 @@ function StageCanvas({ stageId, sections, names, regMap, podiumMap, champion, ha
         <ChevronRight className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />Der Baum ist breiter als das Fenster – seitlich scrollen.
       </p>
     ) : null}
-    <div ref={canvasRef} className="tls-bracket-canvas relative overflow-x-auto pb-4" data-testid="bracket-tree" data-stage={stageId} onPointerOver={onPointerOver} onPointerLeave={onPointerLeave} onScroll={onScroll}>
+    <div ref={canvasRef} className="tls-bracket-canvas relative tls-swipe pb-4" data-testid="bracket-tree" data-stage={stageId} onPointerOver={onPointerOver} onPointerLeave={onPointerLeave} onScroll={onScroll}>
       <svg className="pointer-events-none absolute left-0 top-0" width={geom.w || "100%"} height={geom.h || "100%"} aria-hidden="true" data-testid="bracket-connectors">
         {geom.lines.map((line) => {
           // Gerüst der Schiene: an, solange dein Weg (noch vor der Auslosung) hierher führt - danach leuchtet der echte Weg.

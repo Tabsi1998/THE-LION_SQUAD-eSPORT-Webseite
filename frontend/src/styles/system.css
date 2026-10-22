@@ -12,7 +12,8 @@
    event   Violett die Art „Event“
    text-muted      Nebentext (#1232)
    quiet   Grau    vorbei oder ruhig: beendet, abgesagt, Warteliste
-   silver, bronze  nur für Platz 2 und 3 */
+   silver, bronze  nur für Platz 2 und 3
+   pole, fastest   Pink und Violett nur für Pole und schnellste Runde (Rennserien) */
 :root {
   --tls-brand-rgb: 41 182 232;
   --tls-brand: rgb(var(--tls-brand-rgb));
@@ -34,6 +35,14 @@
   --tls-silver: rgb(var(--tls-silver-rgb));
   --tls-bronze-rgb: 208 138 78;
   --tls-bronze: rgb(var(--tls-bronze-rgb));
+
+  /* Rennserien (#1950, als Rolle #1969): Pole und schnellste Runde in den Farben der Veranstalter-Grafiken - nur für
+     diese beiden Auszeichnungen (Ergebnisse je Runde, Abzeichen, Aufleuchten), nie als Schrift auf dunklem Grund für
+     anderes. */
+  --tls-pole-rgb: 232 121 249;
+  --tls-pole: rgb(var(--tls-pole-rgb));
+  --tls-fastest-rgb: 192 132 252;
+  --tls-fastest: rgb(var(--tls-fastest-rgb));
 
   /* Flächen: Schwarz als Grund, darauf drei Stufen (Karte, gehobene Karte, Kachel). */
   --tls-surface-0: #0A0A0A;

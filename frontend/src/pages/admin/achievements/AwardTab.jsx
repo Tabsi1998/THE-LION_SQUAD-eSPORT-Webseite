@@ -330,7 +330,7 @@ function Protocol({ person, tick }) {
       )}
       testId="award-protocol"
     >
-      <div className="overflow-x-auto">
+      <div className="tls-swipe pb-0">
         <table className="w-full text-xs min-w-[760px]">
           <thead className="text-[10px] uppercase tracking-widest text-white/45">
             <tr>

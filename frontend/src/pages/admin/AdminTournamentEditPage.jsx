@@ -563,7 +563,7 @@ export default function AdminTournamentEditPage() {
         onNavigate={(key) => selectTab(key)}
       />
 
-      <div className="flex gap-2 mb-5 border-b border-white/10 overflow-x-auto">
+      <div className="flex gap-2 mb-5 border-b border-white/10 tls-swipe pb-0">
         {availableTabs.map(([s, label]) => (
           <button
             key={s}
@@ -655,7 +655,7 @@ export default function AdminTournamentEditPage() {
             ))}
             {filteredRegistrations.length === 0 && <div className="text-center py-10 text-white/40">{regs.length === 0 ? "Keine Anmeldungen" : "Keine Anmeldungen für diesen Filter"}</div>}
           </div>
-          <div className="hidden md:block overflow-x-auto">
+          <div className="hidden md:block tls-swipe pb-0">
           <table className="w-full text-sm min-w-[640px]">
             <thead className="bg-[#0A0A0A] text-[11px] uppercase tracking-widest text-white/50">
               <tr>

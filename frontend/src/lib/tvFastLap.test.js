@@ -26,12 +26,12 @@ test("neue Bestzeit: Name, Zeit, Abstand und wer sie vorher hatte", () => {
   const next = lap(board, "u5", 79400);
   const change = compareBoards(board, next);
   expect(change.best).toMatchObject({ userId: "u5", gapMs: -600, ownRecord: false });
-  expect(deltaText(change.best.gapMs)).toBe("−0.600 s");
-  expect(previousHolderText(change.best)).toBe("vorher NeonFalke · 1:20.000");
+  expect(deltaText(change.best.gapMs)).toBe("−0,600 s");
+  expect(previousHolderText(change.best)).toBe("vorher NeonFalke · 1:20,000");
   // Der Spitzenreiter verbessert sich selbst.
   const own = compareBoards(board, lap(board, "u1", 79000));
   expect(own.best).toMatchObject({ userId: "u1", ownRecord: true });
-  expect(previousHolderText(own.best)).toBe("vorher selbst 1:20.000");
+  expect(previousHolderText(own.best)).toBe("vorher selbst 1:20,000");
 });
 
 test("Gleichstand mit der Bestzeit ist keine neue Bestzeit", () => {
@@ -81,7 +81,7 @@ test("Gleichstand (#1584): wer die Bestzeit vorher hatte, sagt der Rang vom Serv
   const next = { track: { id: "t1" }, entries: [{ ...entry("carl", "Carl", 1), time_ms: 79000, time_str: "1:19.000" }, { ...entry("anna", "Anna", 2) }, entry("bert", "Bert", 3)] };
   const change = compareBoards(previous, next);
   expect(change.best).toMatchObject({ userId: "carl" });
-  expect(previousHolderText(change.best)).toBe("vorher Anna · 1:20.000");
+  expect(previousHolderText(change.best)).toBe("vorher Anna · 1:20,000");
 });
 
 test("Gäste ohne Konto (#1585): eigener Schlüssel, eigene Hinweise, auch die Bestzeit", () => {

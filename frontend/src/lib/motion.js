@@ -11,6 +11,15 @@ export const MOTION = Object.freeze({ fast: 150, mid: 240, slow: 420, ease: Obje
 // Nur für Wege auf dem Bildschirm, nicht für Ein- und Ausblenden; dort bleibt MOTION.ease.
 export const EASE_MOVE = Object.freeze([0.77, 0, 0.175, 1]);
 
+// Mikro-Bewegung (#1969): die Bausteine in components/tls/motion (CountUp, StaggerIn, Glow, Press) nehmen nur diese
+// Werte. Dieselben stehen als CSS-Variablen in index.css (--tls-motion-count, --tls-motion-glow, --tls-stagger-step);
+// lib/motion.test.js hält beide gleich.
+//   count         900 ms  Zahlen und Zeiten zählen hoch (ease-out)
+//   countStagger   25 ms  Versatz je Zeile beim Hochzählen in Tabellen
+//   stagger        50 ms  Versatz je Eintrag beim gestaffelten Erscheinen - nur die ersten `staggerMax` Einträge
+//   glow          840 ms  kurzes Aufleuchten eines neuen Werts oder Abzeichens, einmal
+export const MICRO = Object.freeze({ count: 900, countStagger: 25, stagger: 50, staggerMax: 12, glow: 840 });
+
 /** Dauer in Sekunden - so nimmt framer-motion sie. */
 export function motionSeconds(key = "mid") {
   return (MOTION[key] ?? MOTION.mid) / 1000;

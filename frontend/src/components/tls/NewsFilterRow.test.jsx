@@ -21,7 +21,7 @@ test("nur Kategorien mit Artikeln, jede mit Anzahl, Alle mit der Summe", () => {
 test("eine Zeile: die Knöpfe brechen nicht um, die Zeile wischt", () => {
   render(<NewsFilterRow categories={IN_USE} active="club" onSelect={() => {}} query="" onQuery={() => {}} />);
   const row = screen.getByTestId("news-filter-row");
-  expect(row.className).toContain("overflow-x-auto");
+  expect(row.className).toContain("tls-swipe");
   expect(row.className).toContain("flex-nowrap");
   expect(screen.getByTestId("news-filter-club")).toHaveAttribute("aria-pressed", "true");
 });

@@ -115,7 +115,7 @@ test.describe("Abnahme #1585: Fast Lap vor Ort gegen den echten Server", () => {
     await expect(page.getByTestId("fl-quick-driver-selected")).toContainText("DriftDaniel");
     await expect(page.getByTestId("fl-quick-attempt")).toHaveText("Versuch 1 von 3");
     await keys(page, "1", ":", "2", "4", ",", "5", "8", "7");
-    await expect(page.getByText("= 1:24.587")).toBeVisible();
+    await expect(page.getByText("= 1:24,587")).toBeVisible();
     await shot(page, "01-helfer-schnelleingabe-1440");
     await page.getByTestId("fl-quick-save").click();
     await expect(page.getByTestId("fl-quick-attempt")).toHaveText("Versuch 2 von 3");
