@@ -103,11 +103,12 @@ jobs:
           pip install -r backend/requirements.txt
           pip install -r backend/requirements-dev.txt
       - name: Load the second reader model (as in backend/Dockerfile)
-        # Gleiche Adresse und SHA-256 wie das Dockerfile - eine andere Datei bricht hier ab.
+        # Gleiche Vorgabe-Adresse wie das Dockerfile, gleiche feste SHA-256 (backend/ocr-model.sha256).
         timeout-minutes: 5
         run: |
-          url=$(sed -n 's/^ARG OCR_MODEL_URL=//p' backend/Dockerfile)
-          sha=$(sed -n 's/^ARG OCR_MODEL_SHA256=//p' backend/Dockerfile)
+          url=$(sed -n 's/.*OCR_MODEL_URL:-\([^}]*\)}.*/\1/p' backend/Dockerfile)
+          sha=$(cut -d' ' -f1 backend/ocr-model.sha256)
+          test -n "$url" && test -n "$sha"
           mkdir -p /tmp/ocr-models
           curl --fail --silent --show-error --location --retry 3 --output "$RESULT_IMAGE_SECOND_READER_MODEL" "$url"
           echo "$sha  $RESULT_IMAGE_SECOND_READER_MODEL" | sha256sum --check

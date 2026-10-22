@@ -22,7 +22,11 @@ services:
         max-file: "5"
 
   backend:
-    build: ./backend
+    build:
+      context: ./backend
+      args:
+        # Quelle des Modells für den zweiten Leser (#2018) - leer: die Vorgabe im backend/Dockerfile.
+        OCR_MODEL_URL: "${OCR_MODEL_URL:-}"
     container_name: tls-backend
     restart: unless-stopped
     depends_on:

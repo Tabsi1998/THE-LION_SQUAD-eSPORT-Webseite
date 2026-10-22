@@ -226,23 +226,37 @@ gehen weiter. Prüfen: `docker compose exec backend tesseract --list-langs` (mus
 Namen, Teams, den Kopf und die Ziffern liest ein **zweiter Leser** noch einmal: RapidOCR 3.10.0 mit dem
 Erkennungsmodell PP-OCRv6 small (ONNX, über das schon vorhandene onnxruntime) – ebenfalls im Backend-Container, ohne
 externen Dienst. Was beide Leser gleich lesen, ist grün, auch ohne bekannte Teilnehmer. Das Modell lädt das
-`backend/Dockerfile` beim Bau (Adresse und SHA-256 gepinnt, nach `/opt/ocr-models/`); zur Laufzeit wird nie etwas
-geladen. Lizenz: Apache-2.0 (RapidOCR und PP-OCRv6); die Python-Abhängigkeiten stehen mit fester Version in
+`backend/Dockerfile` beim Bau (Vorgabe-Adresse im Dockerfile, SHA-256 fest in `backend/ocr-model.sha256`, nach
+`/opt/ocr-models/`); zur Laufzeit wird nie etwas geladen. Lizenz: Apache-2.0 (RapidOCR und PP-OCRv6); die Python-Abhängigkeiten stehen mit fester Version in
 `backend/requirements.txt` (omegaconf, shapely: BSD-3-Clause; pyclipper, colorlog, six, PyYAML: MIT; tqdm: MPL-2.0/MIT).
 
 ```env
 RESULT_IMAGE_SECOND_READER=on          # off schaltet ab - dann gilt nur Tesseract (Namen nur mit Kader grün)
-RESULT_IMAGE_SECOND_READER_MODEL=/opt/ocr-models/PP-OCRv6_rec_small.onnx
 RESULT_IMAGE_SECOND_READER_THREADS=2   # CPU-Threads des Modells
+OCR_MODEL_URL=                         # nur beim Bau: Quelle des Modells, leer = Vorgabe im Dockerfile (siehe unten)
 ```
 
 Er liest im selben Zeitbudget wie Tesseract (`RESULT_IMAGE_OCR_BUDGET_SECONDS`), ein Bild zur Zeit je Prozess.
 Gemessen an 25 echten Bildern auf 2 CPUs: +0,3 bis 1,2 s je Bild (Tesseract 3 bis 8 s), Speicher des lesenden
-Prozesses bis etwa +210 MB (das Modell bleibt nach dem ersten Bild geladen), Image +120 MB (1,37 → 1,49 GB). Fehlt der zweite Leser oder
-reicht die Zeit nicht, liest der Server weiter – mit der Warnung im Blatt; Namen und Teams sind dann nur mit bekannten
-Teilnehmern grün. Unter **Checks** steht „Bild-Erkennung“ dann auf Gelb (geprüft wird, ohne das Modell zu laden).
-Prüfen: `docker compose exec backend python -c "from services import result_image_second as s; print(s.status())"`
+Prozesses bis etwa +210 MB (das Modell bleibt nach dem ersten Bild geladen), Image +120 MB (1,37 → 1,49 GB). Fehlt
+der zweite Leser oder reicht die Zeit nicht, liest der Server weiter – mit der Warnung im Blatt; Namen und Teams sind
+dann nur mit bekannten Teilnehmern grün. Unter **Checks** steht „Bild-Erkennung“ dann auf Gelb (geprüft wird, ohne das
+Modell zu laden). Prüfen:
+`docker compose exec backend python -c "from services import result_image_second as s; print(s.status())"`
 (muss `'status': 'ok'` nennen); sonst das Backend-Image neu bauen.
+
+**Quelle des Modells umstellen** (etwa auf eine Kopie im GitHub-Release, falls die Vorgabe-Quelle vom Server aus nicht
+erreichbar ist): Die Datei muss genau dieselbe sein – ihre SHA-256 steht fest in `backend/ocr-model.sha256`, eine
+andere Datei bricht den Bau ab.
+
+1. Die Datei `PP-OCRv6_rec_small.onnx` von der Vorgabe-Adresse (im `backend/Dockerfile`) laden und die Prüfsumme
+   vergleichen: `sha256sum PP-OCRv6_rec_small.onnx` muss die Zahl aus `backend/ocr-model.sha256` nennen.
+2. Die Datei als Anhang eines Releases ablegen (das Release legt der Obmann an).
+3. In der Server-`.env` die Adresse eintragen, etwa
+   `OCR_MODEL_URL=https://github.com/<Konto>/<Repo>/releases/download/<Tag>/PP-OCRv6_rec_small.onnx` –
+   `docker-compose.yml` reicht sie als Build-Argument weiter; leer heißt die Vorgabe.
+4. `docker compose build backend` (oder wie gewohnt `update.sh`) und `docker compose up -d backend`, danach wie oben
+   prüfen. Ohne Compose: `docker build --build-arg OCR_MODEL_URL=… backend`.
 
 ## Original-Bilder je Termin (#1933)
 
