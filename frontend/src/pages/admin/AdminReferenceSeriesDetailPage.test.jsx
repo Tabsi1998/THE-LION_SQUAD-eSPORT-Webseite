@@ -102,7 +102,8 @@ test("Turnierserie: der Vorstand sieht die Partner-Plattform, eine Rennliga und 
     : { ...SERIES, lineage: { ...SERIES.lineage, kind: "series" }, access: { role: "board", can_publish: true } } }));
   const { unmount } = renderAt();
   expect(await screen.findByTestId("series-partner-source")).toHaveTextContent("Partner-Plattform");
-  expect(apiMock.get).toHaveBeenCalledWith(partnerUrl);
+  // Der Abschnitt steht schon da, bevor er seine Quelle lädt - unter Last kommt der Aufruf einen Takt später.
+  await waitFor(() => expect(apiMock.get).toHaveBeenCalledWith(partnerUrl));
   unmount();
   apiMock.get.mockReset();
   apiMock.get.mockResolvedValue({ data: SERIES });
