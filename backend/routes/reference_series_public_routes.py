@@ -53,11 +53,14 @@ router = APIRouter(prefix="/api/reference-series", tags=["reference-series"])
 LINEAGE_FIELDS = ("title", "slug", "kind", "label", "organizer", "game_name", "external_url", "tier_order")
 SERIES_FIELDS = ("season", "tier", "title", "season_slug", "status", "default_weekday", "default_time",
                  "external_url", "official_table_url", "rules_version", "season_result", "weekend",
-                 "cancelled_on", "cancel_reason")  # #1960: Saison abgebrochen
+                 "cancelled_on", "cancel_reason",  # #1960: Saison abgebrochen
+                 "planned_rounds")  # #2015: geplante Termine
 RULE_FIELDS = ("points_mode", "points_by_place", "bonuses", "dnf_points", "dns_points", "dsq_points", "count_mode",
                "count_n", "activity_points", "final_top_n", "tiebreakers",
                # Turniertage (#1961): Runden je Termin mit Schema, Sonderboni, N der Regel „Top N“.
-               "day_rounds", "custom_bonuses", "tiebreak_top_n")
+               "day_rounds", "custom_bonuses", "tiebreak_top_n",
+               # Double-Up-Punkte (#2015): Team-Platz k wie Einzelplatz 2k−1 oder nach Team-Platz.
+               "double_up_points")
 ROW_FIELDS = ("rank", "points", "computed_points", "official_points", "deviation", "activity_points", "tiebreak",
               "wins", "podiums", "rounds_played", "bonus_points", "adjustment_points")
 # Anpassungen (#1960) gehen mit Punkten, Grund, Tag und Termin hinaus (``series_racing.adjustment_view``, mit #2000
@@ -157,17 +160,18 @@ def _unit_scored(unit: list[dict]) -> bool:
     return all(item["state"] == "scored" for item in unit if item["state"] != "cancelled")
 
 
-def _counts(rounds: list[dict], by_weekend: bool) -> dict:
-    """Wertungsrunden gesamt, gewertet und abgesagt (eine Runde ist abgesagt, wenn alle ihre Läufe es sind)."""
+def _counts(rounds: list[dict], by_weekend: bool, planned=None) -> dict:
+    """Wertungsrunden gesamt, gewertet und abgesagt (eine Runde ist abgesagt, wenn alle ihre Läufe es sind). Mit
+    geplanten Terminen (#2015) ist gesamt mindestens deren Zahl - „3 von 9“, auch wenn erst vier im Kalender stehen."""
     units = _units(rounds, by_weekend)
     live = [unit for unit in units if any(item["state"] != "cancelled" for item in unit)]
     scored = sum(1 for unit in live if _unit_scored(unit))
-    return {"total": len(live), "scored": scored, "cancelled": len(units) - len(live)}
+    return {"total": max(len(live), int(planned or 0)), "scored": scored, "cancelled": len(units) - len(live)}
 
 
-def _progress(rounds: list[dict], by_weekend: bool = False) -> dict:
+def _progress(rounds: list[dict], by_weekend: bool = False, planned=None) -> dict:
     """Fortschritt der Wertungsrunden (ohne Finale und Runden außerhalb der Wertung), dazu der nächste Termin."""
-    counts = _counts(rounds, by_weekend)
+    counts = _counts(rounds, by_weekend, planned)
     upcoming = next((item for item in rounds if item["state"] in UPCOMING_STATES), None)
     return {**counts, "remaining": counts["total"] - counts["scored"],
             "next": _public_round(upcoming) if upcoming else None}
@@ -193,9 +197,9 @@ async def _final(db, series_id: str, rounds: list[dict], people: dict) -> dict |
 RUNNING_LIMIT = 12
 
 
-def _running_progress(rounds: list[dict], by_weekend: bool = False) -> dict:
+def _running_progress(rounds: list[dict], by_weekend: bool = False, planned=None) -> dict:
     """Wertungsrunden wie ``_progress``: ohne Finale, ohne Runden außerhalb der Wertung, ohne abgesagte."""
-    counts = _counts(rounds, by_weekend)
+    counts = _counts(rounds, by_weekend, planned)
     return {"total": counts["total"], "scored": counts["scored"]}
 
 
@@ -283,7 +287,7 @@ async def _running(user: dict | None, today: str) -> dict:
     all_series = await db.reference_series.find({"status": "active"}, {
         "_id": 0, "id": 1, "lineage_id": 1, "visibility": 1, "season": 1, "tier": 1, "title": 1, "season_slug": 1,
         "team_name": 1, "own_teams": 1, "order_index": 1, "weekend": 1, "partner_ids": 1, "partner_roles": 1,
-        "logo_url": 1}
+        "logo_url": 1, "planned_rounds": 1}
     ).to_list(None)
     lineages = {item["id"]: item async for item in db.reference_lineages.find(
         {"id": {"$in": list({s["lineage_id"] for s in all_series})}},
@@ -355,7 +359,7 @@ async def _running(user: dict | None, today: str) -> dict:
             # #2014: Logo der Saison (sonst der Spur) - steht vor dem Spiel-Logo.
             "series": {**{key: series.get(key) for key in ("season", "tier", "title", "season_slug")},
                        "logo_url": series_logo.effective(lineage, series)},
-            "progress": _running_progress(rounds, racing),
+            "progress": _running_progress(rounds, racing, series.get("planned_rounds")),
             "next": _running_next(rounds, racing),
             "today": any(item["state"] == "today" for item in rounds),
             "club": _club_place(lineage, series, snapshots, club_ids),
@@ -519,7 +523,7 @@ async def public_series(lineage_slug: str, season_slug: str, user: dict | None =
         "successor": await _successor(db, user, series),
         "rule_changes": rule_changes(series, rounds),
         "today": calendar["today"],
-        "progress": _progress(rounds, by_weekend=lineage.get("kind") == "racing"),
+        "progress": _progress(rounds, by_weekend=lineage.get("kind") == "racing", planned=series.get("planned_rounds")),
         "rounds": [_public_round(item) for item in rounds],
         "standings": None if not latest else {
             "round_id": latest.get("round_id"), "round_seq": latest.get("round_seq"),

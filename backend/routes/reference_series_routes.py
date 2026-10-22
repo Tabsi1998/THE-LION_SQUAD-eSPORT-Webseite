@@ -39,7 +39,7 @@ LINEAGE_NULLABLE = {"organizer", "label", "game_id", "game_name", "external_url"
                     "result_image_template", "logo_url"}
 SERIES_NULLABLE = {"tier", "title", "default_weekday", "default_time", "team_name", "official_table_url",
                    "external_url", "description", "reference_id", "season_result", "result_image_template",
-                   "weekend", "cancelled_on", "cancel_reason", "successor_id", "logo_url"}
+                   "weekend", "cancelled_on", "cancel_reason", "successor_id", "logo_url", "planned_rounds"}
 SLUG_FALLBACK = "serie"
 
 
@@ -301,6 +301,8 @@ async def update_series(series_id: str, body: ReferenceSeriesUpdate, me: dict = 
     weekend_changed = "weekend" in updates and updates["weekend"] != existing.get("weekend")
     if "weekend" in updates and not weekend_changed:
         updates.pop("weekend")
+    # Geplante Termine (#2015): Streichergebnisse rechnen damit - eine neue Zahl rechnet die Stände neu.
+    planned_changed = "planned_rounds" in updates and updates["planned_rounds"] != existing.get("planned_rounds")
     if "season" in updates or "tier" in updates:
         season = updates.get("season", existing.get("season"))
         tier = updates.get("tier", existing.get("tier"))
@@ -335,7 +337,7 @@ async def update_series(series_id: str, body: ReferenceSeriesUpdate, me: dict = 
     # Strenger gestellt oder neu verknüpft (#1970): die Referenzen der Saison folgen sofort - Lockern öffnet nichts.
     required, tightened = await season_close.tighten_references(db, series_id)
     await _log_tightened(db, "reference_series.references_tightened", series_id, me, required, tightened)
-    if rules_changed or teams_changed or weekend_changed:
+    if rules_changed or teams_changed or weekend_changed or planned_changed:
         # Andere Schreibweisen eines eigenen Teams zählen erst nach dem Neurechnen als dieses Team (#1926).
         await reference_series.recompute_standings(db, saved)
     return saved

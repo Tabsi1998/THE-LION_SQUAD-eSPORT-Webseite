@@ -1750,6 +1750,10 @@ class ReferenceSeriesCreate(BaseModel):
     def _logo(cls, value):
         return _series_logo(value)
 
+    # #2015: geplante Termine der Saison (etwa 9 Turniere) - Fortschritt und Streichergebnisse, solange der Kalender
+    # kürzer ist; „fehlende Termine anlegen“ füllt bis dahin auf.
+    planned_rounds: Optional[int] = Field(default=None, ge=1, le=200)
+
     @field_validator("rules")
     @classmethod
     def _rules(cls, value):
@@ -1795,6 +1799,7 @@ class ReferenceSeriesUpdate(BaseModel):
     result_image_template: Optional[str] = Field(default=None, max_length=60)  # #1756: Vorlage für Ergebnis-Bilder
     weekend: Optional[Dict[str, Any]] = None
     hide_name_tags: Optional[bool] = None  # #1961
+    planned_rounds: Optional[int] = Field(default=None, ge=1, le=200)  # #2015: null heißt keine geplante Zahl
     # #1960: Saison abgebrochen - Tag (Wiener Tag, leer = heute) und Grund; Nachfolger = die neue Saison (Neustart).
     cancelled_on: Optional[str] = Field(default=None, max_length=10)
     cancel_reason: Optional[str] = Field(default=None, max_length=300)

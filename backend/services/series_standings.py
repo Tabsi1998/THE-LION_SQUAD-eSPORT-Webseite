@@ -519,14 +519,16 @@ def _own_spelling(sheet: dict, matcher: Matcher) -> dict:
 # ---------------------------------------------------------------- Alles zusammen
 def compute_standings(*, rules: dict, rounds: list[dict], sheets: dict[str, dict], participants: list[dict],
                       own_teams=(), round_rules: dict | None = None, units: dict | None = None,
-                      adjustments=None) -> list[dict]:
+                      adjustments=None, planned_rounds: int | None = None) -> list[dict]:
     """Je gewerteter Runde und Wertung ein Stand: ``{"round_id", "round_seq", "scope", "rows"}`` in
     Kalender-Reihenfolge. ``own_teams``: die eigenen Teams (Namen oder ``{name, aliases}``, #1926) - ihre
     Schreibweisen zählen als ein Team. ``round_rules``: normalisierte Regeln je Termin, die für die Punkte einer Zeile
     statt ``rules`` gelten (Punkte je Lauf, #1930, ``services/race_weekend.py``). ``units``: Termin → Runde - dann zählen
     Aktivitätspunkte, gefahrene Runden und Streichergebnisse je Runde (Summe ihrer Läufe) statt je Termin.
     ``adjustments``: Anpassungen der Saison (#1960, ``services/series_adjustments.py``) - je Stand die, die schon
-    gelten, in Fahrer- bzw. Teamwertung (``adjustment_points``, ``adjustments`` an der Zeile)."""
+    gelten, in Fahrer- bzw. Teamwertung (``adjustment_points``, ``adjustments`` an der Zeile).
+    ``planned_rounds`` (#2015): geplante Termine der Saison - solange der Kalender kürzer ist, zählen Streichergebnisse
+    („Runden minus N“) mit dieser Zahl, nie mit weniger."""
     rules = normalize_rules(rules)
     matcher = Matcher(own_teams)
     if matcher:
@@ -541,7 +543,8 @@ def compute_standings(*, rules: dict, rounds: list[dict], sheets: dict[str, dict
     unit_seq: dict = {}
     for item in counting:
         unit_seq.setdefault(unit_of[item["id"]], len(unit_seq) + 1)
-    total_rounds = len({unit_of[item["id"]] for item in counting if item.get("status") != "cancelled"})
+    total_rounds = max(len({unit_of[item["id"]] for item in counting if item.get("status") != "cancelled"}),
+                       int(planned_rounds or 0))
     scored = [item for item in counting if item.get("status") == "scored" and item["id"] in sheets]
     for item in scored:
         validate_sheet(sheets[item["id"]], item["id"])

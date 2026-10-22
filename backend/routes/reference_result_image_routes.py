@@ -252,7 +252,7 @@ async def _sum_explainer(db, series: dict, participants: list[dict], rounds_in_t
         return None
     calendar = await db.reference_rounds.count_documents(
         {"series_id": series["id"], "archived_at": None, "status": {"$ne": "cancelled"}})
-    total_rounds = max(calendar, rounds_in_table)
+    total_rounds = max(calendar, rounds_in_table, int(series.get("planned_rounds") or 0))  # #2015: geplante Termine
     by_name = {row.get("name"): row["id"] for row in participants if row.get("name")}
     adjusted: dict[str, float] = {}
     for item in series.get("adjustments") or []:
