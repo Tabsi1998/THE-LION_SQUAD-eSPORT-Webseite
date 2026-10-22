@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.7.6 - 2026-10-22
+
+- Mobile: Rennligen: eine Runde mit ihren Läufen (Qualifying, Sprint, Rennen), Tabelle umschaltbar Gesamt · Rennen · Sprint · Quali, Fahrer mit Poles, Ø Start und Quali-Duell. (#1974, #1930)
+- Mobile: Neu: Ergebnis je Runde mit Reitern je Lauf und hochzählenden Zeiten, dazu die Statistik der Saison. (#1974, #1950)
+- Mobile: Team-Ligen: Spieltage mit Map-Veto als Karten mit Bild, Kader mit Einsätzen und Statistik je Map. (#1974, #1931, #1616)
+- Mobile: Turnierserien: Turniertage mit Runden, Lobbys, Double Up und Boni. (#1974, #1961)
+- Mobile: Sonderregeln: Punktabzug mit Grund, abgebrochene Saison mit Nachfolger, Termine ohne Wertung, Teamwertung wie beim Veranstalter. (#1974, #1960)
+- Mobile: „Veranstaltet von“ mit Partner-Logo, Map-Pool bei Turnieren, Rennzeiten mit Komma. (#1974, #1934, #1981)
+
 ## 1.7.5 - 2026-10-21
 
 - Mobile: Verein › Erfolge neu: Ehrentafel ohne Nullen, Läuft gerade, Vitrine, Serien und Ligen mit Liga-Weg und eine Chronik mit Spiel-Filter. (#1945)
