@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.31.0 (22.10.2026)
+
+### Neu
+
+* Mitgliederprofil – Logo der Liga bzw. Serie bei den Vereinsplatzierungen (#2014)
+* Partnerseite – Logo bei „Ligen und Serien mit uns“ (#2014)
+* Referenzen – Logo der Liga bzw. Serie im Kopf von Serienseite und Rundenseite (#2014)
+* Referenzen – Logo der Liga bzw. Serie in Läuft gerade, Serien & Ligen und Chronik (#2014)
+* Startseite – „Heute im Einsatz“ zeigt das Logo der Liga bzw. Serie (#2014)
+* Teilen – Serie und Runde zeigen das Logo der Liga bzw. Serie als Bild (#2014)
+* Verwaltung – Logo für Spur und Saison hochladen oder aus der Mediathek wählen, Vorschau hell und dunkel (#2014)
+
 ## 1.30.0 (22.10.2026)
 
 ### Neu
