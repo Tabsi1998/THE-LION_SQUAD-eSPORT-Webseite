@@ -7,6 +7,7 @@ import { todayFacts, todayItems } from "@/lib/homeToday";
 import { seriesAddress } from "@/lib/referenceSeries";
 import { GameMark } from "@/components/tls/references/referenceParts";
 import { SessionChips } from "@/components/tls/series/SessionChips";
+import { markWithLogo, seriesLogo } from "@/lib/seriesLogo";
 
 // „Heute im Einsatz“ (#1753): an Renn- und Spieltagen ein schmaler Streifen über dem Kopf der Startseite - je Saison
 // mit heutigem Termin eine Karte (Serie, Saison, Runde, Uhrzeit, gemeldete Vereinsleute), die zur Serienseite mit der
@@ -59,7 +60,8 @@ function TodayCard({ item, index }) {
         className="tls-run-card flex min-h-11 items-center gap-3 p-3 md:p-3.5 bg-surface-1 border border-honor/40 rounded-[10px] text-white no-underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#29B6E8]"
         data-testid={`home-today-item-${lineage.slug}-${series.season_slug}`}
       >
-        <GameMark game={item.game || (lineage.game_name ? { name: lineage.game_name } : null)} code className="w-10 h-10 !rounded-lg !bg-surface-3 border border-white/10" codeClass="font-display text-[15px] !text-brand" iconClass="w-5 h-5" padded />
+        {/* #2014: das Logo der Saison bzw. Spur steht vor dem Spiel-Logo - wie bei „Läuft gerade“. */}
+        <GameMark game={markWithLogo(item.game || (lineage.game_name ? { name: lineage.game_name } : null), seriesLogo(lineage, series))} code className="w-10 h-10 !rounded-lg !bg-surface-3 border border-white/10" codeClass="font-display text-[15px] !text-brand" iconClass="w-5 h-5" padded />
         <div className="min-w-0 flex-1">
           <div className="font-semibold text-[15px] leading-snug text-zinc-200 break-words [overflow-wrap:anywhere]" data-testid="home-today-title">{lineage.title}</div>
           <div className="mt-0.5 text-[13px] text-zinc-400 break-words [overflow-wrap:anywhere]" data-testid="home-today-facts">

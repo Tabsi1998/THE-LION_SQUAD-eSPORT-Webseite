@@ -3,6 +3,8 @@ import { Trophy } from "lucide-react";
 import { seriesAddress } from "@/lib/referenceSeries";
 import { KIND_LABELS } from "@/lib/referencesOverview";
 import { PARTNER_ROLE_LABELS } from "@/lib/seriesPartners";
+import { seriesLogo } from "@/lib/seriesLogo";
+import { SeriesLogo } from "@/components/tls/references/SeriesLogo";
 
 // Partnerseite (#1934): „Ligen und Serien mit uns“ – je Spur mit diesem Partner ihre Saisons (neueste zuerst) mit Spiel,
 // Saison, Stand bzw. Endplatz des Vereins und „läuft gerade“. Daten aus `shared.series` (nur sichtbare Spuren und
@@ -27,10 +29,16 @@ export function PartnerSeries({ items, partnerName, Title }) {
       <div className="grid gap-3 md:grid-cols-2">
         {items.map((item) => (
           <article key={item.lineage.slug} className="border border-white/10 rounded-sm bg-[#121212] p-3 min-w-0" data-testid={`partner-series-${item.lineage.slug}`}>
-            <div className="text-[10px] uppercase tracking-widest font-bold text-[#29B6E8] break-words">
-              {[item.role === "organizer" ? `${PARTNER_ROLE_LABELS.organizer}: ${partnerName}` : PARTNER_ROLE_LABELS.contributor, KIND_LABELS[item.lineage.kind], item.lineage.game_name].filter(Boolean).join(" · ")}
+            {/* #2014: Logo der Spur (sonst der neuesten Saison) neben dem Titel - ohne Logo wie bisher. */}
+            <div className="flex items-start gap-3 min-w-0">
+              <div className="flex-1 min-w-0">
+                <div className="text-[10px] uppercase tracking-widest font-bold text-[#29B6E8] break-words">
+                  {[item.role === "organizer" ? `${PARTNER_ROLE_LABELS.organizer}: ${partnerName}` : PARTNER_ROLE_LABELS.contributor, KIND_LABELS[item.lineage.kind], item.lineage.game_name].filter(Boolean).join(" · ")}
+                </div>
+                <h3 className="mt-1 font-heading font-bold leading-tight break-words [overflow-wrap:anywhere]">{item.lineage.title}</h3>
+              </div>
+              <SeriesLogo src={seriesLogo(item.lineage, null) || item.seasons?.[0]?.logo_url} size="sm" testId="partner-series-logo" />
             </div>
-            <h3 className="mt-1 font-heading font-bold leading-tight break-words [overflow-wrap:anywhere]">{item.lineage.title}</h3>
             <ul className="mt-2 divide-y divide-white/[0.06] border-t border-white/[0.06]">
               {item.seasons.map((season) => (
                 <li key={season.season_slug}>

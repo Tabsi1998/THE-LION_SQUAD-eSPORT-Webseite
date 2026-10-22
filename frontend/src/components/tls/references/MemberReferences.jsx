@@ -7,6 +7,8 @@ import { Chevron, Mark, MedalMark, PlaceRing, SectionHead, medalTone } from "@/c
 import { linkedSeasons, timelineGroups } from "@/lib/referencesOverview";
 import { bestResult, detailsOf, fieldSize, memberPaths, monthOf, ownEntry, profileFacts, profileMedals } from "@/lib/memberReferences";
 import { SEASON_NOTE_TONES } from "@/lib/seriesTiers";
+import { SeriesLogo } from "@/components/tls/references/SeriesLogo";
+import { seriesLogo } from "@/lib/seriesLogo";
 import "@/components/tls/references/references.css";
 
 // Vereinsplatzierungen im Mitgliederprofil (#859, neu im Referenzen-Design #1944) - ein Ausschnitt der Übersicht
@@ -154,8 +156,12 @@ function MemberPath({ path }) {
   const { lineage, steps } = path;
   return (
     <div className={`tls-ref-rise ${CARD} flex flex-col gap-3.5`} style={{ "--tls-ref-i": 1 }} data-testid={`member-path-${lineage.slug}`}>
-      <div className="flex flex-wrap justify-between items-baseline gap-2">
-        <span className="text-xs font-bold uppercase tracking-[0.22em] text-zinc-400 break-words [overflow-wrap:anywhere]">Liga-Weg · {lineage.title}</span>
+      <div className="flex flex-wrap justify-between items-center gap-2">
+        {/* #2014: Logo der Spur (sonst der Saison, zu der der Weg führt) vor dem Namen - ohne Logo wie bisher. */}
+        <span className="inline-flex items-center gap-2.5 min-w-0">
+          <SeriesLogo src={seriesLogo(lineage, null) || path.target?.logo_url} size="xs" testId="member-path-logo" />
+          <span className="text-xs font-bold uppercase tracking-[0.22em] text-zinc-400 break-words [overflow-wrap:anywhere]">Liga-Weg · {lineage.title}</span>
+        </span>
         {path.address && <Link to={path.address} className="text-sm font-semibold text-brand hover:text-white no-underline transition-colors duration-fast">Zur Serie</Link>}
       </div>
       {/* Am Handy eine Reihe zum Wischen (wie in der App), breit umbrechend mit Pfeilen. */}
@@ -200,6 +206,8 @@ function ChronicleItem({ item, link, profileId, open, onToggle }) {
         <PlaceRing placement={placement} />
         <span className="flex-1 sm:flex-[1_1_300px] min-w-0 flex flex-col gap-0.5">
           <span data-testid="member-reference-title" title={full !== title ? full : undefined} className="font-bold text-base sm:text-[17px] leading-[1.3] break-words [overflow-wrap:anywhere]">{title}</span>
+          {/* #2014: Logo der Saison bzw. Spur wie in der Chronik der Übersicht. */}
+          <SeriesLogo src={seriesLogo(link?.lineage, link?.season)} size="xs" className="mt-0.5" testId="member-reference-logo" />
           <span className="sm:hidden text-[13px] text-zinc-400 break-words">{[game, date].filter(Boolean).join(" · ")}</span>
           <span className="hidden sm:block text-sm text-zinc-400 break-words">{game}</span>
           <span className="sm:hidden text-[13px] text-zinc-300 break-words [overflow-wrap:anywhere]">{[team, size].filter(Boolean).join(" · ")}</span>

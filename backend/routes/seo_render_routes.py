@@ -744,14 +744,24 @@ async def reference_series_meta(db, lineage_slug: str, season_slug: str, base: d
         "canonical": canonical,
         "robots": "noindex, follow",
         "type": "website",
+        **_series_logo_image(lineage, series, origin),
     }
     meta["json_ld"] = webpage_json_ld(meta)
     return add_breadcrumbs(meta, origin, [("Referenzen", "/references")], title)
 
 
+def _series_logo_image(lineage: dict, series: dict, origin: str) -> dict:
+    """Teilen-Karte von Serie und Runde (#2014): das Logo der Saison bzw. Spur als Bild - ohne Logo das der Seite."""
+    from services.series_logo import effective
+
+    logo = effective(lineage, series)
+    return {"image": absolute_url(logo, origin)} if logo else {}
+
+
 async def reference_round_meta(db, lineage_slug: str, season_slug: str, number: str, base: dict, origin: str) -> dict:
     """Runde einer Rennliga (#1950): Kürzel, Ort und Läufe für die Teilen-Karte - nie Namen; nicht indexiert wie die
-    Serienseite. Ein eigenes Teilen-Bild gibt es (wie bei der Serienseite) nicht, es gilt das Bild der Seite."""
+    Serienseite. Als Teilen-Bild gilt (wie bei der Serienseite) das Logo der Saison bzw. Spur (#2014), ohne Logo das
+    Bild der Seite."""
     from routes.reference_round_routes import _calendar, visible_series
     from services.round_page import group_rounds
     try:
@@ -779,6 +789,7 @@ async def reference_round_meta(db, lineage_slug: str, season_slug: str, number: 
         "canonical": canonical,
         "robots": "noindex, follow",
         "type": "website",
+        **_series_logo_image(lineage, series, origin),
     }
     meta["json_ld"] = webpage_json_ld(meta)
     return add_breadcrumbs(meta, origin, [("Referenzen", "/references"), (series_title, series_path)], label)

@@ -6,6 +6,7 @@ import { SectionHead } from "@/components/tls/references/overviewParts";
 import { CountryFlag } from "@/components/tls/CountryFlag";
 import { SessionChips } from "@/components/tls/series/SessionChips";
 import { PartnerHostBadge } from "@/components/tls/references/PartnerHostBadge";
+import { markWithLogo, seriesLogo } from "@/lib/seriesLogo";
 
 // „Läuft gerade“ (#1748, neu gestaltet #1878): laufende Serien-Saisons mit Spur, Art, Saison/Stufe, Fortschritt in
 // Segmenten, nächstem Termin und unserem Platz als große Zahl. Was heute ansteht, kommt zuerst (Server) und trägt den
@@ -49,7 +50,8 @@ function RunningCard({ item }) {
       className={`tls-ref-lift shrink-0 w-[min(300px,calc(100vw-3rem))] md:w-auto min-w-0 flex flex-col gap-3.5 md:gap-[18px] p-[18px] md:p-[22px] bg-surface-1 border rounded-[10px] text-white no-underline ${item.today ? "border-honor/40" : "border-white/[0.08]"}`}
     >
       <div className="flex items-start gap-3 md:gap-3.5">
-        <GameMark game={item.game || (lineage.game_name ? { name: lineage.game_name } : null)} code className="w-10 h-10 md:w-11 md:h-11 !rounded-lg !bg-surface-3 border border-white/10" codeClass="font-display text-[15px] md:text-base !text-brand" iconClass="w-5 h-5" padded />
+        {/* #2014: das Logo der Saison bzw. Spur steht vor dem Spiel-Logo. */}
+        <GameMark game={markWithLogo(item.game || (lineage.game_name ? { name: lineage.game_name } : null), seriesLogo(lineage, series))} code className="w-10 h-10 md:w-11 md:h-11 !rounded-lg !bg-surface-3 border border-white/10" codeClass="font-display text-[15px] md:text-base !text-brand" iconClass="w-5 h-5" padded />
         <div className="flex-1 min-w-0 flex flex-col gap-0.5">
           <div className="text-[11px] md:text-xs font-bold uppercase tracking-[0.14em] md:tracking-[0.16em] text-quiet">{KIND_LABELS[kind] || "Serie"}</div>
           <div className="font-semibold text-[15px] md:text-base text-zinc-200 break-words [overflow-wrap:anywhere]" data-testid="running-title">{lineage.title}</div>

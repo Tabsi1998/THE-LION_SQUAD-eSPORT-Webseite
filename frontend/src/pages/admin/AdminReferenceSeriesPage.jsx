@@ -9,6 +9,7 @@ import { KIND_OPTIONS, STATUS_LABELS, visibleLineages } from "@/lib/referenceSer
 import { LineageForm } from "./referenceSeries/LineageForm";
 import { SeriesForm } from "./referenceSeries/SeriesForm";
 import { ReferenceBundleSheet } from "./referenceSeries/ReferenceBundleSheet";
+import { SeriesLogo } from "@/components/tls/references/SeriesLogo";
 import { toast } from "sonner";
 import { Archive, ArchiveRestore, Layers, ListOrdered, Pencil, Plus } from "lucide-react";
 
@@ -106,7 +107,11 @@ export default function AdminReferenceSeriesPage() {
                   {gameName(lineage.game_id) && <span>{gameName(lineage.game_id)}</span>}
                   {lineage.is_archived && <span className="text-quiet">Archiviert</span>}
                 </div>
-                <h2 className="mt-1 font-heading text-xl font-black uppercase leading-tight">{lineage.title}</h2>
+                <div className="mt-1 flex items-center gap-3 min-w-0">
+                  {/* #2014: Logo der Spur, wie es öffentlich steht. */}
+                  <SeriesLogo src={lineage.logo_url} size="sm" testId={`lineage-logo-${lineage.id}`} />
+                  <h2 className="font-heading text-xl font-black uppercase leading-tight">{lineage.title}</h2>
+                </div>
               </div>
               <div className="flex items-center gap-1 shrink-0">
                 <button type="button" onClick={() => setEditingSeries({ lineage, series: null })} data-testid={`series-new-${lineage.id}`} className="tls-btn tls-btn--secondary px-3 py-1.5 rounded-sm text-[10px] font-bold uppercase tracking-wider inline-flex items-center gap-1.5">

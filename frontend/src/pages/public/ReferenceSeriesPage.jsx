@@ -21,6 +21,8 @@ import { TournamentDays } from "@/components/tls/series/TournamentDays";
 import { formatNumber } from "@/lib/standingsTable";
 import { OriginalsButton } from "@/components/tls/series/OriginalViewer";
 import { originalsOf } from "@/lib/referenceOriginals";
+import { SeriesLogo } from "@/components/tls/references/SeriesLogo";
+import { seriesLogo } from "@/lib/seriesLogo";
 
 // Seite einer Serie unter /references/series/<spur>/<saison> (Entscheidung 5 zu #1741), Turnierserie (#1745): Kopf,
 // Rundenfortschritt, Regeln, Gesamtwertung mit Streichergebnissen und Finalgrenze, Finalrechner (Richtwert), das
@@ -116,19 +118,26 @@ export default function ReferenceSeriesPage() {
   }, [data, loadedFor, lineageSlug, seasonSlug, navigate]);
 
   const title = seriesTitle(data);
-  useDocumentTitle(title || "Serie", undefined, { robots: "noindex, follow" });
+  useDocumentTitle(title || "Serie", undefined, { robots: "noindex, follow", image: data?.series?.logo_url || undefined });
 
   if (missing) return <NotFoundPage />;
   const rounds = data?.rounds || [];
   const eyebrow = [data?.lineage?.label, data?.lineage?.organizer, data?.lineage?.game_name].filter(Boolean).join(" · ");
+  const logo = seriesLogo(data?.lineage, data?.series);
   return (
     <PublicLayout>
       <article className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-12" data-testid="series-page">
         <Breadcrumbs items={[{ label: "Home", to: "/" }, { label: "Referenzen", to: "/references" }, { label: title || "Serie" }]} className="mb-6" />
         {!data ? <SkeletonLines lines={5} /> : (
           <>
-            <p className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">{eyebrow || "Serie"}</p>
-            <h1 className="font-heading text-4xl md:text-5xl font-black uppercase mt-2">{title}</h1>
+            {/* #2014: Logo der Saison bzw. Spur im Kopf - wie hochgeladen; ohne Logo wie bisher nur der Text. */}
+            <div className={logo ? "flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-6" : ""}>
+              <SeriesLogo src={logo} size="lg" testId="series-page-logo" />
+              <div className="min-w-0">
+                <p className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">{eyebrow || "Serie"}</p>
+                <h1 className="font-heading text-4xl md:text-5xl font-black uppercase mt-2">{title}</h1>
+              </div>
+            </div>
             <SeriesPartners partners={data.partners} />
             {/* Saison abgebrochen (#1960): Hinweis mit Grund und Nachfolger - die gefahrenen Ergebnisse bleiben. */}
             <SeasonNotice series={data.series} successor={data.successor} />

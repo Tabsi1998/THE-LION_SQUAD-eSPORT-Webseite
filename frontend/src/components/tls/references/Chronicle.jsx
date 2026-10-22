@@ -7,6 +7,8 @@ import { viennaDate } from "@/lib/vienna";
 import { referenceHref } from "@/lib/seasonClose";
 import { chronicleHost } from "@/lib/seriesPartners";
 import { PartnerHostBadge } from "@/components/tls/references/PartnerHostBadge";
+import { SeriesLogo } from "@/components/tls/references/SeriesLogo";
+import { seriesLogo } from "@/lib/seriesLogo";
 import { Glow } from "@/components/tls/motion/Glow";
 import { StaggerIn } from "@/components/tls/motion/StaggerIn";
 
@@ -103,13 +105,21 @@ function ChronicleRow({ item, link, memberId }) {
   // #1934: veranstaltet ein Partner des Vereins, steht sein Abzeichen statt des Veranstalter-Textes da.
   const host = chronicleHost(item, link);
   const cancelled = Boolean(item.season_link?.cancelled);
+  const logo = seriesLogo(link?.lineage, link?.season);
   return (
     <li className="border-b border-white/[0.07]">
       <Link to={referenceHref(item, link)} data-testid={`reference-card-${item.id}`} className="tls-ref-row flex items-start sm:items-center sm:flex-wrap gap-3 sm:gap-x-5 sm:gap-y-2.5 py-3.5 sm:py-4 sm:px-2 text-white no-underline">
         <PlaceRing placement={placement} />
         <span className="flex-1 sm:flex-[1_1_280px] min-w-0 flex flex-col gap-1 sm:gap-0.5">
           <span className="font-bold text-base sm:text-[17px] leading-[1.3] break-words [overflow-wrap:anywhere]" title={composed ? full : undefined} data-testid="reference-row-title">{title}</span>
-          {host ? <PartnerHostBadge partner={host} className="mt-0.5" />
+          {/* #2014: Logo der Saison bzw. Spur vor dem Veranstalter - ohne Logo wie bisher. */}
+          {logo ? (
+            <span className="flex items-center flex-wrap gap-x-2.5 gap-y-1 mt-0.5 min-w-0">
+              <SeriesLogo src={logo} size="xs" testId="reference-row-logo" />
+              {host ? <PartnerHostBadge partner={host} />
+                : item.organizer && !composed && <span className="hidden sm:block text-sm text-zinc-400 break-words" data-testid="reference-row-organizer">{item.organizer}</span>}
+            </span>
+          ) : host ? <PartnerHostBadge partner={host} className="mt-0.5" />
             : item.organizer && !composed && <span className="hidden sm:block text-sm text-zinc-400 break-words" data-testid="reference-row-organizer">{item.organizer}</span>}
           <span className="sm:hidden text-[13px] text-zinc-400 break-words">{[game, format, cancelled ? "abgebrochen" : "", shortDate].filter(Boolean).join(" · ")}</span>
           {starters && <span className="sm:hidden text-[13px] text-zinc-300 break-words [overflow-wrap:anywhere]" data-testid="reference-row-starters-phone">{starters}</span>}

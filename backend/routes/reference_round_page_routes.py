@@ -33,7 +33,7 @@ from database import get_db
 from models import now_utc
 from routes.reference_round_routes import _calendar, visible_series
 from routes.reference_series_public_routes import _people
-from services import reference_originals, reference_series
+from services import reference_originals, reference_series, series_logo
 from services.own_teams import own_team_names
 from services.reference_series_access import SeriesAccess, require_series_editor
 from services.round_page import clean, clean_hex, color_key, load_round
@@ -54,10 +54,13 @@ async def _racing(db, user: dict | None, lineage_slug: str, season_slug: str) ->
 
 def _head(lineage: dict, series: dict) -> dict:
     return {
-        "lineage": {key: lineage.get(key) for key in ("title", "slug", "kind", "label", "organizer", "game_name")},
+        "lineage": {**{key: lineage.get(key) for key in ("title", "slug", "kind", "label", "organizer", "game_name")},
+                    "logo_url": series_logo.effective(lineage)},
         # #1960: eine abgebrochene Saison sagt es mit Tag und Grund auch auf der Rundenseite.
-        "series": {key: series.get(key) for key in ("season", "tier", "title", "season_slug", "status", "cancelled_on",
-                                                    "cancel_reason")},
+        # #2014: dazu das Logo der Saison, sonst das der Spur.
+        "series": {**{key: series.get(key) for key in ("season", "tier", "title", "season_slug", "status",
+                                                       "cancelled_on", "cancel_reason")},
+                   "logo_url": series_logo.effective(lineage, series)},
         "own_teams": own_team_names(series),
     }
 
