@@ -51,7 +51,8 @@ export function useResultImage({ base, onRead }) {
     try {
       const { data } = await api.post(`${base}/image`, file, { headers: { "Content-Type": file.type || "application/octet-stream" } });
       setResult(data);
-      onReadRef.current?.(data);
+      // Die Datei geht mit: beim Übernehmen hängt das Blatt sie als Original an (#1933) - beim Lesen wird nichts gespeichert.
+      onReadRef.current?.(data, file);
     } catch (err) {
       setPicture(null);
       toast.error(formatApiError(err.response?.data?.detail) || "Das Bild ließ sich nicht lesen.");
@@ -65,6 +66,8 @@ export function useResultImage({ base, onRead }) {
   useEffect(() => {
     if (!available) return undefined;
     const onPaste = (event) => {
+      // Schon genommen (etwa im Feld „Original-Bilder“, #1933) - dann nicht auch noch auslesen.
+      if (event.defaultPrevented) return;
       // Text in ein Feld einfügen bleibt Text – auch wenn die Zwischenablage (etwa aus Excel) zusätzlich ein Bild hat.
       const target = event.target;
       const typing = target && (target.tagName === "TEXTAREA" || target.tagName === "INPUT" || target.isContentEditable);

@@ -34,6 +34,9 @@ const READ = {
   uncertain_rows: 2,
   warnings: [{ code: "blurry", message: "Das Bild ist unscharf oder sehr klein - bitte die gelben Felder genau prüfen." }],
 };
+const ORIGINALS = "/reference-series/admin/series/serie-1/rounds/r1/originals";
+// Alles sicher gelesen - so lässt sich gleich übernehmen.
+const SURE = { ...READ, rows: READ.rows.map((row) => ({ ...row, uncertain: [] })), uncertain_rows: 0, warnings: [] };
 // Unter Last (ganze Suite parallel) braucht der Ablauf länger als die Vorgabe von 1 s.
 const WAIT = { timeout: 5000 };
 const PREVIEW = { version: 0, target: "sheet", can_save: true, errors: [], warnings: [], rows: [], unknown_names: [], standings: null, final: null, latest: null };
@@ -226,15 +229,57 @@ test("Strg+V: Text in einem Feld bleibt Text, ohne Vorlage gibt es kein Auslesen
   expect(apiMock.post).not.toHaveBeenCalled();
 });
 
-test("ohne Vorlage oder Tesseract: kein Knopf, Strg+V tut nichts", async () => {
+test("ohne Vorlage oder Tesseract: kein Knopf, Strg+V liest nichts aus - das Bild wird Original (#1933)", async () => {
   setup({ info: { template: null, available: false, max_mb: 50, formats: [] } });
   await screen.findByTestId("result-rows-section");
   await waitFor(() => expect(apiMock.get).toHaveBeenCalledWith(`${BASE}/image`));
   expect(screen.queryByTestId("result-image-pick")).toBeNull();
-  const event = pasteImage(png());
-  expect(event.defaultPrevented).toBe(false);
-  expect(apiMock.post).not.toHaveBeenCalled();
+  const file = png();
+  await waitFor(() => {
+    if (!apiMock.post.mock.calls.length) pasteImage(file);
+    expect(apiMock.post).toHaveBeenCalledWith(ORIGINALS, file, expect.objectContaining({ params: { kind: "race", origin: "upload" } }));
+  }, WAIT);
+  expect(apiMock.post.mock.calls.some(([url]) => url.endsWith("/image"))).toBe(false);
 });
+
+// Original-Bilder (#1933): das gelesene Bild hängt erst beim Übernehmen am Termin - mit derselben Datei.
+test("ein gelesenes Bild wird beim Übernehmen als Original angehängt, nicht schon beim Lesen", async () => {
+  setup();
+  apiMock.post.mockImplementation(async (url) => ({ data: url.endsWith("/image") ? SURE : url === ORIGINALS ? { id: "o1" } : PREVIEW }));
+  await screen.findByTestId("result-image-pick");
+  const file = png();
+  fireEvent.change(screen.getByTestId("result-image-file"), { target: { files: [file] } });
+  await waitFor(() => expect(screen.getAllByTestId("result-row")).toHaveLength(3), WAIT);
+  // Gelesen - aber noch nichts angehängt; das Bild wartet sichtbar in „Original-Bilder“.
+  expect(apiMock.post.mock.calls.some(([url]) => url === ORIGINALS)).toBe(false);
+  expect(screen.getByTestId("original-pending")).toHaveTextContent("wird beim Übernehmen des Ergebnisses als Original angehängt");
+  await waitFor(() => expect(screen.getByTestId("result-submit")).toHaveTextContent("Veröffentlichen"), WAIT);
+  fireEvent.click(screen.getByTestId("result-submit"));
+  await waitFor(() => expect(apiMock.put).toHaveBeenCalled(), WAIT);
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith(ORIGINALS, file, expect.objectContaining({
+    params: { kind: "race", origin: "reading" } })), WAIT);
+  // Erst gespeichert, dann angehängt.
+  const order = apiMock.put.mock.invocationCallOrder[0];
+  const attached = apiMock.post.mock.calls.findIndex(([url]) => url === ORIGINALS);
+  expect(apiMock.post.mock.invocationCallOrder[attached]).toBeGreaterThan(order);
+  expect(toastMock.success).toHaveBeenCalledWith("Ergebnis veröffentlicht. Original-Bild angehängt.");
+}, 15000);
+
+test("„Nicht anhängen“: das gelesene Bild bleibt nur im Browser", async () => {
+  setup();
+  apiMock.post.mockImplementation(async (url) => ({ data: url.endsWith("/image") ? SURE : PREVIEW }));
+  await screen.findByTestId("result-image-pick");
+  fireEvent.change(screen.getByTestId("result-image-file"), { target: { files: [png()] } });
+  await waitFor(() => expect(screen.getByTestId("original-pending")).toBeInTheDocument(), WAIT);
+  fireEvent.change(within(screen.getByTestId("original-pending")).getByTestId("original-kind"), { target: { value: "table" } });
+  fireEvent.click(screen.getByTestId("original-pending-drop"));
+  expect(screen.queryByTestId("original-pending")).toBeNull();
+  await waitFor(() => expect(screen.getByTestId("result-submit")).toHaveTextContent("Veröffentlichen"), WAIT);
+  fireEvent.click(screen.getByTestId("result-submit"));
+  await waitFor(() => expect(apiMock.put).toHaveBeenCalled(), WAIT);
+  await waitFor(() => expect(toastMock.success).toHaveBeenCalledWith("Ergebnis veröffentlicht."), WAIT);
+  expect(apiMock.post.mock.calls.some(([url]) => url === ORIGINALS)).toBe(false);
+}, 15000);
 
 test("Fehler des Servers: feste Meldung, die Liste bleibt", async () => {
   setup();

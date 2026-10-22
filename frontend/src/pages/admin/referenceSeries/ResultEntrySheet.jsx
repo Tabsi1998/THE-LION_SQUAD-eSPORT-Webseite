@@ -19,6 +19,8 @@ import { RACE_FIELD_GROUPS, afterEdit, confirmRow, imageFormFields, imageToRows,
 import { DAY_MARK_OPTIONS, roundCount, schemeOf, usesDayRounds } from "@/lib/tournamentDays";
 import { BonusChips, DayRoundsDetails, DayRoundsLine, DoubleUpToggle } from "./DayRoundsFields";
 import { formatRaceTime } from "@/lib/raceTime";
+import { defaultOriginalKind } from "@/lib/referenceOriginals";
+import { OriginalsSection, attachOriginal } from "./OriginalsSection";
 import { toast } from "sonner";
 import { ClipboardList, Plus, RefreshCw, SlidersHorizontal, X } from "lucide-react";
 
@@ -33,6 +35,8 @@ import { ClipboardList, Plus, RefreshCw, SlidersHorizontal, X } from "lucide-rea
 // Zeit in der Zeile, keine schnellste Runde und kein Fahrer des Tages; die Pole setzt der Server (Platz 1).
 // Turniertag (#1961, DayRoundsFields): je Zeile R1…Rn und GES P, Platz aus der Tagessumme, Double Up mit Partner,
 // Sonderboni als Chips und die Marke „Ausgestiegen“.
+// Original-Bilder (#1933, OriginalsSection): Screenshots des Veranstalters als Beleg; ein gelesenes Bild wird erst beim
+// Übernehmen angehängt (nach dem Speichern, mit derselben Datei - kein zweites Hochladen von Hand).
 
 const SMALL_INPUT = `${INPUT_CLASS} !py-1.5 text-sm`;
 const LABEL = "text-[10px] font-bold uppercase tracking-widest text-white/45";
@@ -388,11 +392,24 @@ export function ResultEntrySheet({ series, round, onClose, onSaved }) {
   // Das Team-Feld (#1969): nur mit Teamwertung, mit Teams der Saison oder der Teilnehmer - oder wenn schon ein Team
   // eingetragen ist (eingefügte Liste, Bild). Einzel-Serien ohne Teams sparen sich am Handy die zweite Zeile.
   const showTeam = Boolean(rules.team_scoring?.enabled) || teams.length > 0 || Boolean(form?.rows?.some((row) => String(row.team || "").trim()));
+  // Original-Bilder (#1933): Art ohne Wahl ist der Lauf (Rennliga), sonst „Sonstiges“. Ein gelesenes Bild wartet hier,
+  // bis das Blatt übernommen ist - dann hängt es als Original am Termin.
+  const originalsBase = `/reference-series/admin/series/${series.id}/rounds/${round.id}/originals`;
+  const originalKind = defaultOriginalKind(data?.round || round, kind);
+  const [readOriginal, setReadOriginal] = useState(null);
+  useEffect(() => () => {
+    if (readOriginal?.picture && typeof URL.revokeObjectURL === "function") URL.revokeObjectURL(readOriginal.picture);
+  }, [readOriginal?.picture]);
   // Ergebnis-Bild (#1756): die gelesenen Zeilen ersetzen die Liste wie „Liste einfügen“, danach prüft die Vorschau.
   const [checkImage, setCheckImage] = useState(false);
   const image = useResultImage({
     base,
-    onRead: (result) => {
+    onRead: (result, file) => {
+      if (file) {
+        let picture = null;
+        try { picture = typeof URL.createObjectURL === "function" ? URL.createObjectURL(file) : null; } catch { picture = null; }
+        setReadOriginal({ file, picture, kind: originalKind, map: null });
+      }
       // Schnellste Runde und Fahrer des Tages gehen in die Felder des Rennens (#1927); was das Bild nicht ersetzt,
       // bleibt – mit seiner gelben Markierung.
       setForm((current) => ({ ...current, ...imageFormFields(result, current.raceOcr), rows: imageToRows(result, participants, { points: !noPoints }) }));
@@ -536,7 +553,18 @@ export function ResultEntrySheet({ series, round, onClose, onSaved }) {
     try {
       const { data: result } = await api.put(base, { ...built.payload, status, expected_version: data.version });
       const created = result.created_participants || [];
-      toast.success(result.target === "pending_draft" ? "Als Entwurf zur Freigabe gespeichert." : status === "published" ? "Ergebnis veröffentlicht." : "Als Entwurf gespeichert.");
+      // Übernommen: jetzt hängt das gelesene Bild als Original am Termin (#1933). Scheitert das, bleibt das Ergebnis.
+      let attached = "";
+      if (readOriginal?.file) {
+        try {
+          await attachOriginal(originalsBase, readOriginal.file, { kind: readOriginal.kind, map: readOriginal.map, origin: "reading" });
+          attached = " Original-Bild angehängt.";
+        } catch (err) {
+          toast.error(`Das Original-Bild wurde nicht angehängt: ${formatApiError(err.response?.data?.detail) || "bitte unter „Original-Bilder“ neu hinzufügen."}`);
+        }
+        setReadOriginal(null);
+      }
+      toast.success(`${result.target === "pending_draft" ? "Als Entwurf zur Freigabe gespeichert." : status === "published" ? "Ergebnis veröffentlicht." : "Als Entwurf gespeichert."}${attached}`);
       onSaved({ openUnknown: board && created.some((person) => person.link_status === "open") });
     } catch (err) {
       const detail = err.response?.data?.detail;
@@ -719,6 +747,10 @@ export function ResultEntrySheet({ series, round, onClose, onSaved }) {
               <Plus className="w-3.5 h-3.5" /> Einzelwertung (optional)
             </button>
           )}
+
+          {/* Original-Bilder des Veranstalters (#1933) - Strg+V landet hier, wenn die Bild-Erkennung es nicht nimmt. */}
+          <OriginalsSection base={originalsBase} defaultKind={originalKind} board={board} canPublish={Boolean(access.can_publish)}
+            pending={readOriginal} onPending={setReadOriginal} pasteHere={Boolean(image.info) && !image.available} />
 
           <TextAreaField label="Notiz" value={form.note} onChange={(value) => update({ note: value })} rows={2} hint="Optional, etwa „Wertung laut Veranstalter vorläufig“." testId="result-note" />
 
