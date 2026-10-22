@@ -145,6 +145,9 @@ async def init_indexes():
     await db.reference_series.create_index("status")
     await db.reference_series.create_index("reference_id")
     await db.references.create_index("series_id")
+    # Referenzen bündeln (#1751): je Bündelung ein Eintrag zum Zurücknehmen.
+    await db.reference_bundles.create_index("id", unique=True)
+    await db.reference_bundles.create_index("created_at")
     await db.reference_rounds.create_index("id", unique=True)
     await db.reference_rounds.create_index([("series_id", 1), ("order", 1)])
     await db.reference_rounds.create_index([("club_day", 1), ("status", 1)])
