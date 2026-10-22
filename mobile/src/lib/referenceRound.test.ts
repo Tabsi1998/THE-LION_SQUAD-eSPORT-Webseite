@@ -1,9 +1,6 @@
 import { gridWords } from "./raceWeekend";
 import { noScoreText } from "./seriesSpecialRules";
 import {
-  countFrame,
-  countShape,
-  countsUp,
   emptyText,
   leaders,
   metricText,
@@ -122,16 +119,6 @@ test("Sonderregeln am Lauf (#1960): ohne Wertung mit Grund, umgekehrte Startaufs
   expect(gridWords("qualifying")).toBe("");
 });
 
-test("Hochzählen: Form der Zeit, Start bei null, am Ende genau der Text - Wörter zählen nicht", () => {
-  const shape = countShape("31:55,056");
-  expect(shape?.total).toBe(1915056);
-  expect(countFrame(shape, 0)).toBe("00:00,000");
-  expect(countFrame(shape, 1)).toBe("31:55,056");
-  expect(countFrame(countShape("+6,197"), 0)).toBe("+0,000");
-  expect(countFrame(countShape("1:32:15,123"), 0.5)).toMatch(/^\d:\d{2}:\d{2},\d{3}$/);
-  for (const text of ["+2 Runden", "Ausfall", "DNF", "–", "", "0", "+0,000", "1:2", "12 s", "1,2,3"]) expect(countShape(text)).toBeNull();
-});
-
 test("Statistik (#1950): Rang je Kennzahl mit geteiltem Platz, Ø-Werte aufsteigend, „+/−“ mit Zeichen", () => {
   const rows = [
     { key: "a", name: "Anna Probe", wins: 2, avg_grid: 4.5, gained: 3 },
@@ -144,12 +131,4 @@ test("Statistik (#1950): Rang je Kennzahl mit geteiltem Platz, Ø-Werte aufsteig
   expect(metricText(rows[0], "gained")).toBe("+3");
   expect(metricText(rows[1], "gained")).toBe("−2");
   expect(metricText(rows[2], "wins")).toBe("–");
-});
-
-test("nur die ersten 24 Zeilen zählen hoch - große Felder starten keine 60 Animationen", () => {
-  expect(countsUp(0)).toBe(true);
-  expect(countsUp(23)).toBe(true);
-  expect(countsUp(24)).toBe(false);
-  expect(countsUp(59)).toBe(false);
-  expect(countsUp(-1)).toBe(false);
 });

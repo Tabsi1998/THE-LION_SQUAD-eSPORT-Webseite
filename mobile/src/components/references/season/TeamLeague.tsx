@@ -4,7 +4,8 @@ import { ListItemFadeIn, useListEntrance, useReduceMotion } from "../../FadeIn";
 import { Body, Muted } from "../../Text";
 import { Chevron, Reveal, ink } from "../parts";
 import { MapImage, MapPoolView } from "../MapCards";
-import { GlowOnce, StateChip } from "../seriesParts";
+import { Glow } from "../../motion";
+import { StateChip } from "../seriesParts";
 import { motionEasing } from "../../../lib/motion";
 import type { SeasonPage } from "../../../lib/referenceSeason";
 import { leagueTableRows, mapStatCards, matchdayCards, poolGroups, squadGroups, type MapLine, type MatchBlock, type MatchdayCard, type VetoCard } from "../../../lib/teamLeague";
@@ -104,7 +105,7 @@ function VetoGrid({ cards }: { cards: VetoCard[] }) {
           accessibilityLabel={[card.label, card.name, card.score, card.result].filter(Boolean).join(", ")}
           testID={`season-veto-${card.key}`}
         >
-          {card.outcome === "win" ? <GlowOnce delay={260 + index * 70} radius={6} /> : null}
+          {card.outcome === "win" ? <Glow active delay={260 + index * 70} radius={6} /> : null}
           <MapImage uri={card.image} dim={card.banned}>
             <View style={[styles.vetoLabel, card.tone === "own" && styles.vetoLabelOwn, card.tone === "decider" && styles.vetoLabelDecider]}>
               <Muted style={[styles.vetoLabelText, card.tone !== "plain" && styles.vetoLabelTextDark]}>{card.label}</Muted>

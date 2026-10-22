@@ -1,7 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
-import React, { useEffect, useRef } from "react";
-import { Animated, Linking, Pressable, StyleSheet, View, type StyleProp, type ViewStyle } from "react-native";
-import { motionEasing } from "../../lib/motion";
+import React from "react";
+import { Linking, Pressable, StyleSheet, View, type StyleProp, type ViewStyle } from "react-native";
 import { chipLabel, chipWhen, type WeekendRound } from "../../lib/raceWeekend";
 import { PUBLIC_STATE_LABELS, stateTone, type StateTone } from "../../lib/referenceSeason";
 import { adjustmentMark, adjustmentSum, adjustmentTitle, cancelledText, noScoreText, successorLink, type AdjustedRow, type Successor } from "../../lib/seriesSpecialRules";
@@ -9,7 +8,6 @@ import { partnerHead, partnerPath, type PartnerBadge, type SeasonPartners } from
 import { dayLabel } from "../../lib/seriesFormat";
 import { WEB_BASE_URL } from "../../lib/siteUrls";
 import { colors, roles, surfaces } from "../../theme";
-import { useReduceMotion } from "../FadeIn";
 import { MediaImage } from "../MediaImage";
 import { Body, Muted } from "../Text";
 import { ink } from "./parts";
@@ -184,37 +182,6 @@ export function PartnerHostBadge({ partner }: { partner: PartnerBadge | null | u
       <Muted style={styles.badgeName} numberOfLines={1}>{partner.name}</Muted>
       <Muted style={styles.badgeTail}>· Partner</Muted>
     </View>
-  );
-}
-
-/**
- * Einmal aufleuchten (#1974, Detail-Runde): eine Fläche in `color` blendet nach `delay` kurz ein und wieder aus - an
- * Vereinszeilen, nachdem ihre Zeit hochgezählt hat, und an einer gewonnenen Map. `trigger` spielt es erneut ab (neuer
- * Reiter). Mit „Bewegung reduzieren“ nichts.
- */
-export function GlowOnce({ delay = 0, color = colors.cyan, peak = 0.16, trigger, radius = 6 }: { delay?: number; color?: string; peak?: number; trigger?: unknown; radius?: number }) {
-  const reduce = useReduceMotion();
-  const value = useRef(new Animated.Value(0)).current;
-  useEffect(() => {
-    if (reduce) {
-      value.setValue(0);
-      return undefined;
-    }
-    value.setValue(0);
-    const animation = Animated.sequence([
-      Animated.delay(delay),
-      Animated.timing(value, { toValue: 1, duration: 220, easing: motionEasing, useNativeDriver: true }),
-      Animated.timing(value, { toValue: 0, duration: 520, easing: motionEasing, useNativeDriver: true }),
-    ]);
-    animation.start();
-    return () => animation.stop();
-  }, [delay, reduce, trigger, value]);
-  if (reduce) return null;
-  return (
-    <Animated.View
-      pointerEvents="none"
-      style={[StyleSheet.absoluteFill, { backgroundColor: color, borderRadius: radius, opacity: value.interpolate({ inputRange: [0, 1], outputRange: [0, peak] }) }]}
-    />
   );
 }
 
