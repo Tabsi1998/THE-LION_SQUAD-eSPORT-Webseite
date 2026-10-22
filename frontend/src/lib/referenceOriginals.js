@@ -56,7 +56,8 @@ export const HIDDEN_REASONS = {
   draft: "Entwurf – geht mit dem Ergebnis hinaus",
   archived: "Termin archiviert",
   not_published: "Öffentlich, sobald das Ergebnis veröffentlicht ist",
-  hidden_name: "Bleibt intern: im Ergebnis ist ein Name ausgeblendet",
+  // Ergebnis eines Laufs: ein Name in seinem Blatt; Tabelle, Scoreboard, Sonstiges: irgendwo in der Saison.
+  hidden_name: "Bleibt intern: ein ausgeblendeter Name könnte darauf stehen",
 };
 
 export function hiddenReason(item) {

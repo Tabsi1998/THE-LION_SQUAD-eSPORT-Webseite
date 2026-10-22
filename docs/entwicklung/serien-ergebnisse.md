@@ -418,9 +418,10 @@ in `services/reference_originals.py`, Routen in `routes/reference_original_route
   `released_originals` im Protokoll).
 - **Öffentlich:** Die Serienseite trägt `originals` (Termin → Bilder mit `id`, `kind`, `map`, `source_url`, `width`,
   `height`, `url`), die Rundenseite je Lauf `originals`. Ein Bild ist öffentlich, wenn es öffentlich und freigegeben
-  ist, sein Termin im Kalender steht (nicht archiviert), sein Blatt veröffentlicht ist und darin kein ausgeblendeter
-  Name steht; `GET /api/reference-series/public/<spur>/<saison>/originals/<bild>?w=` liefert es nur dann (sonst 404),
-  mit `Cache-Control: private, max-age=300`.
+  ist, sein Termin im Kalender steht (nicht archiviert), sein Blatt veröffentlicht ist und kein ausgeblendeter Name
+  darauf stehen kann – bei `qualifying`, `sprint` und `race` zählt das Blatt des Termins, bei `table`, `scoreboard` und
+  `other` (`SEASON_WIDE_KINDS`) die ganze Saison; `GET /api/reference-series/public/<spur>/<saison>/originals/<bild>?w=`
+  liefert es nur dann (sonst 404), mit `Cache-Control: private, max-age=300`.
 - **Bild-Erkennung:** Lesen speichert nichts. Das Ergebnisblatt merkt sich die gelesene Datei und lädt sie nach dem
   Übernehmen (`PUT …/results`) mit `origin=reading` hoch – „Nicht anhängen“ lässt sie weg.
 - **Bleibt:** Die Bilder hängen an der Kennung des Termins (Verschieben nimmt sie mit), Archivieren löscht nichts.

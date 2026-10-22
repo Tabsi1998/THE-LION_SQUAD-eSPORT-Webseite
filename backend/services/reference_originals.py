@@ -13,8 +13,9 @@ Rennen, Scoreboard mit Map-Nummer, Tabelle, Sonstiges), optional ein Quellen-Lin
   Captains sind Entwürfe (``DRAFT``). Sie werden mit dem Ergebnis freigegeben (Veröffentlichen oder Freigeben des
   Blatts, ``release_round``) oder vom Vorstand einzeln.
 - **Öffentlich** (``public_map``, ``is_public``) ist ein Bild nur, wenn es öffentlich und freigegeben ist, sein Termin
-  nicht archiviert und sein Ergebnis veröffentlicht ist - und kein Name in diesem Ergebnis ausgeblendet ist (das Bild
-  zeigte ihn sonst doch). Die Sichtbarkeit der Saison prüft die Route (``visible_series``).
+  nicht archiviert und sein Ergebnis veröffentlicht ist - und kein ausgeblendeter Name darin stehen kann (das Bild
+  zeigte ihn sonst doch): beim Ergebnis eines Laufs keiner in seinem Blatt, bei Tabelle, Scoreboard und Sonstigem
+  (``SEASON_WIDE_KINDS``) keiner in der ganzen Saison. Die Sichtbarkeit der Saison prüft die Route (``visible_series``).
 - **Bleibt:** Die Bilder hängen an der Kennung des Termins - sie wandern beim Verschieben mit und bleiben beim
   Archivieren liegen (öffentlich dann unsichtbar). Löschen darf nur der Vorstand, mit Protokoll.
 - **Zählen ohne Vollscan:** ``media_summary`` summiert die gespeicherten Größen in der Datenbank (Mediathek).
@@ -238,27 +239,41 @@ def _people_in(sheet: dict) -> set[str]:
     return found
 
 
-async def round_reasons(db, series_id: str, round_ids: list[str]) -> dict[str, str | None]:
-    """Je Termin, warum seine Bilder öffentlich nicht erscheinen: ``not_published`` (kein veröffentlichtes Ergebnis)
-    oder ``hidden_name`` (ein ausgeblendeter Name steht im Ergebnis) - ``None``, wenn nichts dagegen spricht."""
-    if not round_ids:
-        return {}
+# Arten, die mehr zeigen können als das Ergebnis ihres Termins: die Tabelle die ganze Saison, ein Scoreboard Spieler
+# und Kader, „Sonstiges“ ist offen. Sie gehen nur hinaus, wenn in der ganzen Saison kein Name ausgeblendet ist.
+SEASON_WIDE_KINDS = frozenset({"table", "scoreboard", "other"})
+
+
+class Reasons:
+    """Was öffentlich gegen die Bilder einer Saison spricht - einmal gelesen für viele Bilder: die veröffentlichten
+    Blätter der Termine und die ausgeblendeten Teilnehmer der Saison."""
+
+    def __init__(self, sheets: dict[str, dict], hidden: set[str]):
+        self.sheets = sheets
+        self.hidden = hidden
+
+    def of(self, doc: dict) -> str | None:
+        """``not_published`` (kein veröffentlichtes Ergebnis) oder ``hidden_name`` - beim Ergebnis eines Laufs, wenn ein
+        ausgeblendeter Name in seinem Blatt steht; bei ``SEASON_WIDE_KINDS``, wenn irgendwo in der Saison einer ist.
+        ``None``, wenn nichts dagegen spricht."""
+        sheet = self.sheets.get(doc.get("round_id"))
+        if sheet is None:
+            return "not_published"
+        if self.hidden and (doc.get("kind") not in KINDS or doc.get("kind") in SEASON_WIDE_KINDS
+                            or _people_in(sheet) & self.hidden):
+            return "hidden_name"
+        return None
+
+
+async def reasons_for(db, series_id: str, round_ids) -> Reasons:
+    ids = sorted({round_id for round_id in round_ids if round_id})
     sheets = {sheet["round_id"]: sheet async for sheet in db.reference_round_results.find(
-        {"series_id": series_id, "round_id": {"$in": sorted(set(round_ids))}, "status": "published"},
+        {"series_id": series_id, "round_id": {"$in": ids}, "status": "published"},
         {"_id": 0, "round_id": 1, "rows.participant_id": 1, "rows.partner_id": 1, "matches.lineup": 1,
-         "matches.maps.lineup": 1})}
+         "matches.maps.lineup": 1})} if ids else {}
     hidden = {row["id"] async for row in db.reference_participants.find(
         {"series_id": series_id, "name_hidden": True}, {"_id": 0, "id": 1})}
-    out: dict[str, str | None] = {}
-    for round_id in round_ids:
-        sheet = sheets.get(round_id)
-        if sheet is None:
-            out[round_id] = "not_published"
-        elif hidden and _people_in(sheet) & hidden:
-            out[round_id] = "hidden_name"
-        else:
-            out[round_id] = None
-    return out
+    return Reasons(sheets, hidden)
 
 
 def own_reason(doc: dict, round_doc: dict | None) -> str | None:
@@ -277,7 +292,7 @@ async def is_public(db, doc: dict) -> bool:
                                                    {"_id": 0, "id": 1, "archived_at": 1})
     if own_reason(doc, round_doc):
         return False
-    return (await round_reasons(db, doc["series_id"], [doc["round_id"]])).get(doc["round_id"]) is None
+    return (await reasons_for(db, doc["series_id"], [doc["round_id"]])).of(doc) is None
 
 
 def public_url(lineage_slug: str, season_slug: str, image_id: str) -> str:
@@ -299,10 +314,10 @@ async def public_map(db, series: dict, rounds: list[dict], lineage_slug: str) ->
         PROJECTION).to_list(None)
     if not docs:
         return {}
-    reasons = await round_reasons(db, series["id"], sorted({doc["round_id"] for doc in docs}))
+    reasons = await reasons_for(db, series["id"], [doc["round_id"] for doc in docs])
     out: dict[str, list[dict]] = {}
     for doc in sorted(docs, key=order_key):
-        if reasons.get(doc["round_id"]) is None:
+        if reasons.of(doc) is None:
             out.setdefault(doc["round_id"], []).append(public_view(doc, lineage_slug, series.get("season_slug") or ""))
     return out
 
@@ -325,16 +340,16 @@ def admin_view(doc: dict, *, board: bool, user_id: str, reason: str | None) -> d
 async def admin_list(db, series_id: str, round_doc: dict, *, board: bool, user_id: str) -> list[dict]:
     docs = await db.reference_round_originals.find({"series_id": series_id, "round_id": round_doc["id"]},
                                                    PROJECTION).to_list(None)
-    reasons = await round_reasons(db, series_id, [round_doc["id"]]) if docs else {}
+    reasons = await reasons_for(db, series_id, [round_doc["id"]]) if docs else None
     out = []
     for doc in sorted(docs, key=order_key):
-        reason = own_reason(doc, round_doc) or reasons.get(round_doc["id"])
+        reason = own_reason(doc, round_doc) or reasons.of(doc)
         out.append(admin_view(doc, board=board, user_id=user_id, reason=reason))
     return out
 
 
 async def admin_item(db, series_id: str, round_doc: dict, doc: dict, *, board: bool, user_id: str) -> dict:
-    reason = own_reason(doc, round_doc) or (await round_reasons(db, series_id, [round_doc["id"]])).get(round_doc["id"])
+    reason = own_reason(doc, round_doc) or (await reasons_for(db, series_id, [round_doc["id"]])).of(doc)
     return admin_view(doc, board=board, user_id=user_id, reason=reason)
 
 

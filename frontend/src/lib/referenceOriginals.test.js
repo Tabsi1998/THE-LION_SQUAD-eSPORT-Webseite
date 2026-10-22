@@ -38,7 +38,8 @@ test("Quellen-Link nur als https", () => {
 test("warum ein Bild öffentlich nicht erscheint", () => {
   expect(hiddenReason({ shown: true })).toBe("");
   expect(hiddenReason({ shown: false, hidden_reason: "admin_only" })).toBe("Nur Verwaltung");
-  expect(hiddenReason({ shown: false, hidden_reason: "hidden_name" })).toMatch(/Name ausgeblendet/);
+  // Auch Tabelle, Scoreboard und Sonstiges: ein ausgeblendeter Name irgendwo in der Saison (#1933).
+  expect(hiddenReason({ shown: false, hidden_reason: "hidden_name" })).toBe("Bleibt intern: ein ausgeblendeter Name könnte darauf stehen");
 });
 
 test("die Bilder aller Läufe einer Runde in einer Liste, mit Lauf davor", () => {

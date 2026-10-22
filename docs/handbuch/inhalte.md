@@ -1108,7 +1108,9 @@ einem gewerteten Termin **Ergebnis ändern**. Das öffnet das Blatt des Termins.
   **Art** (Qualifying, Sprint, Rennen, Scoreboard mit **Map**-Nummer, Tabelle, Sonstiges), optional die **Quelle beim
   Veranstalter** (nur `https://…`) und **Öffentlich / Nur Verwaltung** (Vorgabe öffentlich). Darunter steht, ob das
   Bild öffentlich zu sehen ist – oder warum nicht: nur Verwaltung, Entwurf, Ergebnis noch nicht veröffentlicht, Termin
-  archiviert oder ein **ausgeblendeter Name** im Ergebnis (das Bild zeigte ihn sonst doch). Gespeichert wird ohne
+  archiviert oder ein **ausgeblendeter Name** (das Bild zeigte ihn sonst doch): beim Ergebnis eines Laufs zählt sein
+  Blatt, bei **Tabelle**, **Scoreboard** und **Sonstiges** die ganze Saison – sie bleiben intern, sobald in der Saison ein
+  Name ausgeblendet ist. Gespeichert wird ohne
   Ortsangaben und Kameradaten. Ein Bild aus **Bild auslesen** steht oben mit „wird beim Übernehmen … angehängt“: erst
   beim Speichern des Ergebnisses kommt es dazu (Art nach dem Lauf, änderbar); **Nicht anhängen** lässt es weg.
   **Captains** dürfen Bilder beitragen – sie sind Entwürfe und gehen mit dem Ergebnis hinaus, wenn es veröffentlicht oder

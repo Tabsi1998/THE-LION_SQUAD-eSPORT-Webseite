@@ -113,8 +113,8 @@ async def _patch(flow, ctx, image_id: str, body: dict):
     return await flow.patch(f"{_url(ctx)}/{image_id}", json=body)
 
 
-async def _results(flow, ctx, *, status="published", round_doc=None, expected=0):
-    rows = [{"place": 1, "name": "Anna Probe"}, {"place": 2, "name": "Bert Bolzt"}]
+async def _results(flow, ctx, *, status="published", round_doc=None, expected=0, names=("Anna Probe", "Bert Bolzt")):
+    rows = [{"place": place, "name": name} for place, name in enumerate(names, start=1)]
     body = {"rows": rows, "status": status, "expected_version": expected}
     saved = await flow.put(_results_url(ctx, round_doc), json=body)
     assert saved.status_code == 200, saved.text
@@ -266,6 +266,35 @@ async def test_a_hidden_name_in_the_result_keeps_the_original_inside(flow):
     flow.act_as(ctx["board"])
     listed = (await flow.get(_url(ctx))).json()["items"]
     assert listed[0]["shown"] is False and listed[0]["hidden_reason"] == "hidden_name"
+
+
+@pytest.mark.asyncio
+async def test_a_hidden_name_anywhere_in_the_season_keeps_season_wide_pictures_inside(flow):
+    """Tabelle, Scoreboard und Sonstiges zeigen mehr als das Ergebnis des Termins (etwa die ganze Saison) - ist irgendwo
+    in der Saison ein Name ausgeblendet, bleiben sie intern. Ein Rennergebnis zählt nur die Namen seines Blatts."""
+    ctx = await _setup(flow)
+    later = ctx["later"]
+    await _results(flow, ctx)  # R1: Anna und Bert
+    await _results(flow, ctx, round_doc=later, names=("Anna Probe",))  # R2: nur Anna
+    race = (await _upload(flow, ctx, png(), round_doc=later, kind="race")).json()
+    pictures = {kind: (await _upload(flow, ctx, png(color=(index, 0, 0)), round_doc=later, **params)).json()
+                for index, (kind, params) in enumerate((("table", {"kind": "table"}), ("other", {"kind": "other"}),
+                                                       ("scoreboard", {"kind": "scoreboard", "map": 1})), start=1)}
+    flow.act_as(None)
+    assert len((await _public_originals(flow, ctx))[later["id"]]) == 4, "vorher ist alles öffentlich"
+
+    # Bert fuhr nur in R1 - sein Name wird ausgeblendet.
+    await flow.db.reference_participants.update_one({"series_id": ctx["series"]["id"], "name": "Bert Bolzt"},
+                                                    {"$set": {"name_hidden": True}})
+    shown = await _public_originals(flow, ctx)
+    assert [item["id"] for item in shown[later["id"]]] == [race["id"]], "nur das Rennergebnis ohne Bert bleibt"
+    for picture in pictures.values():
+        assert await _status(flow, f"{_public(ctx)}/originals/{picture['id']}") == 404
+    assert await _status(flow, f"{_public(ctx)}/originals/{race['id']}") == 200
+    flow.act_as(ctx["board"])
+    listed = {item["id"]: item for item in (await flow.get(_url(ctx, later))).json()["items"]}
+    assert listed[race["id"]]["shown"] is True
+    assert {listed[picture["id"]]["hidden_reason"] for picture in pictures.values()} == {"hidden_name"}
 
 
 # ---------------------------------------------------------------- Captains und Freigabe
