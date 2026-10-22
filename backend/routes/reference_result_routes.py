@@ -118,8 +118,8 @@ from database import get_db
 from match_rules import RESULT_MAX_SCORE
 from models import ReferencePointsSource, ReferenceResultMark, ReferenceResultStatus, _clock, new_id, now_utc
 from services import (
-    race_weekend, reference_originals, reference_running_cache, reference_series, series_adjustments, series_identity,
-    series_results, team_league_maps, tournament_days,
+    race_weekend, read_spellings, reference_originals, reference_running_cache, reference_series, series_adjustments,
+    series_identity, series_results, team_league_maps, tournament_days,
 )
 from services.dolibarr_policy import club_today
 from services.own_teams import Matcher, own_team_names, own_teams
@@ -190,6 +190,10 @@ class ResultEntryRow(ResultParticipantRef):
     day_points: Optional[float] = Field(default=None, ge=-10000, le=10000, allow_inf_nan=False)
     partner: Optional[ResultParticipantRef] = None
     bonus_keys: List[str] = Field(default_factory=list, max_length=MAX_CUSTOM_BONUSES)
+    # Bild-Erkennung (#2012): was im Bild stand, wenn der Vorstand Name bzw. Team geändert hat - nur zum Lernen, nie im
+    # Blatt gespeichert.
+    read_name: Optional[str] = Field(default=None, max_length=120)
+    read_team: Optional[str] = Field(default=None, max_length=120)
 
     @field_validator("bonus_keys")
     @classmethod
@@ -840,7 +844,7 @@ async def save_results(series_id: str, round_id: str, body: ResultSave,
         _require_version(existing, body.expected_version)
         target = access.edit_target(existing)
         body = _board_fields(access, body, existing)
-        _, _, resolution = await _prepare(db, access, round_doc, body)
+        _, participants, resolution = await _prepare(db, access, round_doc, body)
         _refuse(resolution)
 
         created = await _create_people(db, access, resolution)
@@ -867,12 +871,14 @@ async def save_results(series_id: str, round_id: str, body: ResultSave,
         released = 0
         if target != EDIT_PENDING_DRAFT and saved.get("status") == "published":
             released = await reference_originals.release_round(db, series_id, round_id, access.user["id"])
+        learned = await _learn_spellings(db, access, body, resolution, participants, content)
         await _log(db, "reference_result.pending_draft" if target == EDIT_PENDING_DRAFT else "reference_result.save",
                    access, saved, {
                        "version": saved["version"], "previous_version": _version(existing),
                        "status": "draft" if target == EDIT_PENDING_DRAFT else status,
                        "previous_status": (existing or {}).get("status"), "revision_id": revision_id,
-                       **_counts(content), "created_participants": own, "released_originals": released})
+                       **_counts(content), "created_participants": own, "released_originals": released,
+                       **({"learned": learned} if learned else {})})
         recomputed = False
         if target != EDIT_PENDING_DRAFT:
             now_published = saved.get("status") == "published"
@@ -885,7 +891,37 @@ async def save_results(series_id: str, round_id: str, body: ResultSave,
         "created_participants": [{key: doc.get(key) for key in (
             ("id", "name", "link", "link_status") if access.is_board else ("id", "name"))} for doc in created.values()],
         "warnings": resolution.warnings,
+        **({"learned": learned} if learned else {}),
     }
+
+
+async def _learn_spellings(db, access: SeriesAccess, body, resolution, participants: list[dict],
+                           content: dict) -> dict:
+    """Korrekturen aus dem Bild lernen (#2012, ``services/read_spellings``): Hat der Vorstand einen gelesenen Namen auf
+    einen Teilnehmer der Saison geändert (``read_name``) oder ein gelesenes Team auf ein Team (``read_team``), merkt
+    sich die Saison die gelesene Schreibweise - nur eindeutige, nur der Vorstand. Unter der Sperre der Saison."""
+    if not access.is_board:
+        return {}
+    known = {row["id"] for row in participants}
+    names, teams = [], []
+    for row in resolution.rows:
+        sent = body.rows[row["index"]]
+        if sent.read_name and row.get("participant_id") in known:
+            names.append((row["participant_id"], sent.read_name))
+        if sent.read_team and row.get("team"):
+            teams.append((row["team"], sent.read_team))
+    if not names and not teams:
+        return {}
+    season_teams = [team["name"] for team in own_teams(access.series)]
+    season_teams += [row["default_team"] for row in participants if row.get("default_team")]
+    season_teams += [row["team"] for row in content.get("rows") or [] if row.get("team")]
+    async for sheet in db.reference_round_results.find({"series_id": access.series_id}, {"_id": 0, "rows.team": 1}):
+        season_teams += [row["team"] for row in sheet.get("rows") or [] if row.get("team")]
+    series = await db.reference_series.find_one({"id": access.series_id}, {"_id": 0, "read_team_aliases": 1}) or {}
+    learn_names = read_spellings.name_spellings(names, participants)
+    learn_teams = read_spellings.team_spellings(teams, season_teams, series.get("read_team_aliases") or [])
+    await read_spellings.learn(db, access.series_id, learn_names, learn_teams)
+    return {key: value for key, value in (("names", learn_names), ("teams", learn_teams)) if value}
 
 
 # ---------------------------------------------------------------- Freigabe

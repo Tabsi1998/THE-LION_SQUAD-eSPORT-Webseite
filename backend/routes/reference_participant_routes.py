@@ -31,7 +31,9 @@ from pydantic import BaseModel, Field
 from auth import require_area
 from database import get_db
 from models import ReferenceParticipantCreate, ReferenceParticipantUpdate, new_id, now_utc
-from services import reference_calendar, reference_running_cache, reference_series, series_identity, series_results
+from services import (
+    read_spellings, reference_calendar, reference_running_cache, reference_series, series_identity, series_results,
+)
 from services.series_participants import (
     apply_alias, build_index, clean, club_profiles, content_participant_ids, follower_series, move_followers,
     new_participant, open_series, profile_name, series_game_id, sheet_participant_ids, swap_participant,
@@ -243,6 +245,11 @@ async def update_participant(series_id: str, participant_id: str, body: Referenc
                                      "statt umzubenennen.")
     for key in PARTICIPANT_NULLABLE & set(updates):
         updates[key] = clean(updates[key]) or None
+    if "read_aliases" in updates:
+        # Gelernte Schreibweisen aus Bildern (#2012): nur entfernen - es bleiben die genannten.
+        updates["read_aliases"] = read_spellings.keep(before.get("read_aliases"), updates["read_aliases"], "name")
+        if updates["read_aliases"] == (before.get("read_aliases") or []):
+            updates.pop("read_aliases")
     changes = {key: [before.get(key), value] for key, value in updates.items()
                if key != "name_normalized" and before.get(key) != value}
     if not changes:
@@ -254,7 +261,8 @@ async def update_participant(series_id: str, participant_id: str, body: Referenc
         **written, "updated_at": now_utc().isoformat(), "updated_by": me["id"]}})
     await _log(db, "reference_series.participant_update", me, participant_id,
                {"series_id": series_id, "changes": changes})
-    await reference_series.recompute_standings(db, series)
+    if set(changes) - {"read_aliases"}:  # Schreibweisen aus Bildern zählen nirgends in der Wertung
+        await reference_series.recompute_standings(db, series)
     return await _participant(db, series_id, participant_id)
 
 
@@ -352,6 +360,13 @@ async def _merge(db, series_id: str, participant_id: str, duplicate_id: str, me:
     fill = {key: duplicate.get(key) for key in MERGE_TAKES if not kept.get(key) and duplicate.get(key)}
     if duplicate.get("name_hidden") and not kept.get("name_hidden"):
         fill["name_hidden"] = True
+    # Gelernte Schreibweisen aus Bildern (#2012) gehen mit.
+    learned = list(kept.get("read_aliases") or [])
+    names = {series_identity.normalize_name(item.get("name")) for item in learned}
+    learned += [item for item in duplicate.get("read_aliases") or []
+                if series_identity.normalize_name(item.get("name")) not in names]
+    if learned != (kept.get("read_aliases") or []):
+        fill["read_aliases"] = learned[-read_spellings.MAX_NAMES:]
     adopted = kept.get("link_status") == "open" and duplicate.get("link_status") == "decided"
     if adopted:
         fill.update({key: duplicate.get(key) for key in LINK_STATE})

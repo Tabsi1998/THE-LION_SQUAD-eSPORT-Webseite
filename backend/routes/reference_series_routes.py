@@ -23,7 +23,7 @@ from models import (
     new_id,
     now_utc,
 )
-from services import reference_running_cache, reference_series, season_close, series_partners
+from services import read_spellings, reference_running_cache, reference_series, season_close, series_partners
 from services.dolibarr_policy import club_today
 from services.own_teams import clean_teams, own_teams, team_conflicts
 from services.series_identity import normalize_name
@@ -269,6 +269,12 @@ async def update_series(series_id: str, body: ReferenceSeriesUpdate, me: dict = 
     updates = {key: value for key, value in raw.items() if value is not None or key in SERIES_NULLABLE}
     await _check_reference(db, updates.get("reference_id"))
     await series_partners.clean(db, updates, existing)
+    if "read_team_aliases" in updates:
+        # Gelernte Team-Schreibweisen aus Bildern (#2012): nur entfernen - es bleiben die genannten.
+        updates["read_team_aliases"] = read_spellings.keep(existing.get("read_team_aliases"),
+                                                           updates["read_team_aliases"], "read")
+        if updates["read_team_aliases"] == (existing.get("read_team_aliases") or []):
+            updates.pop("read_team_aliases")
     teams_changed = False
     if "own_teams" in updates or "team_name" in updates:
         updates.update(_teams(updates.get("own_teams"), updates.get("team_name"), existing))
@@ -325,6 +331,11 @@ async def update_series(series_id: str, body: ReferenceSeriesUpdate, me: dict = 
             "data": {"previous": existing.get("weekend"), "weekend": saved.get("weekend")},
             "created_at": now_utc().isoformat(),
         })
+    if "read_team_aliases" in updates:
+        await db.audit_logs.insert_one({
+            "id": new_id(), "action": "reference_series.read_team_aliases", "actor_id": me["id"],
+            "target_id": series_id, "created_at": now_utc().isoformat(),
+            "data": {"previous": existing.get("read_team_aliases") or [], "kept": updates["read_team_aliases"]}})
     await _log_cancellation(db, me, series_id, existing, saved)
     # Strenger gestellt oder neu verknüpft (#1970): die Referenzen der Saison folgen sofort - Lockern öffnet nichts.
     required, tightened = await season_close.tighten_references(db, series_id)

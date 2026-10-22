@@ -289,7 +289,7 @@ class Candidate:
         return self.season is not None
 
 
-def _own_names(row: dict) -> list[str]:
+def own_names(row: dict) -> list[str]:
     """Name und gelernte Schreibweisen aus Bildern (#2012) eines Teilnehmers."""
     learned = [item.get("name") for item in row.get("read_aliases") or [] if isinstance(item, dict)]
     return [row.get("name") or "", *(name for name in learned if name)]
@@ -308,7 +308,7 @@ def candidates(participants: list[dict], aliases: list[dict] | None = None,
             if target and alias.get("name"):
                 target.names.append(alias["name"])
 
-    out = {row["id"]: Candidate(row, _own_names(row)) for row in participants if row.get("id")}
+    out = {row["id"]: Candidate(row, own_names(row)) for row in participants if row.get("id")}
     add_aliases(out)
     taken = {key for candidate in out.values() for name in candidate.names for key in series_identity.name_keys(name)}
     profiles = {row.get("profile_id") for row in participants if row.get("link") == "member" and row.get("profile_id")}
@@ -323,7 +323,7 @@ def candidates(participants: list[dict], aliases: list[dict] | None = None,
         if not row.get("id") or not keys or keys & taken or same_person or row["id"] in out:
             continue
         taken |= keys
-        others[row["id"]] = Candidate(row, _own_names(row), season=str(row.get("season") or ""))
+        others[row["id"]] = Candidate(row, own_names(row), season=str(row.get("season") or ""))
     add_aliases(others)
     return [*out.values(), *others.values()]
 

@@ -86,8 +86,10 @@ async def _series_links(db, profile_ids: list[str], now: str) -> None:
     """Externe Serien (#1741) zeigen auf Vereinsprofile, nie auf Konten. Geht das eigene Profil mit dem Konto, wird
     der Teilnehmer extern und sein Name (wie beim Veranstalter) ausgeblendet - Ergebnis und Tabelle bleiben; ein Alias
     auf das Profil hat keinen Zweck mehr. Einträge des Vereins im Verzeichnis bleiben und mit ihnen die Verknüpfung."""
+    # Gelernte Schreibweisen des Namens aus Bildern (#2012) gehen mit dem Namen.
     await db.reference_participants.update_many({"profile_id": {"$in": profile_ids}}, {"$set": {
-        "profile_id": None, "link": "external", "is_club_member": False, "name_hidden": True, "updated_at": now}})
+        "profile_id": None, "link": "external", "is_club_member": False, "name_hidden": True, "read_aliases": [],
+        "updated_at": now}})
     await db.reference_aliases.delete_many({"profile_id": {"$in": profile_ids}})
 
 
