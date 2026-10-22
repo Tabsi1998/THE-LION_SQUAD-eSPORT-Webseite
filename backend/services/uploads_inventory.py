@@ -34,6 +34,7 @@ AREA_LABELS = {
     "app-releases": "App-Versionen",
     "quarantine": "Quarantäne der Bildprüfung",
     "proofs": "Fotos vom Ergebnis (privat)",
+    "reference-originals": "Original-Bilder der Serien (privat, öffentlich nur über die Serienseite)",
     "legacy": "Altlast: direkt unter uploads/ (vor der Trennung public/privat)",
     "other": "sonstige Unterordner",
 }
@@ -43,6 +44,7 @@ ORIGIN_LABELS = {
     "sponsors": "Sponsoren", "partners": "Partner", "gallery_albums": "Galerie-Alben", "gallery_photos": "Galerie-Fotos",
     "games": "Spiele", "member_benefits": "Mitgliedervorteile", "settings": "Einstellungen (Marke)", "documents": "Vereinsdokumente",
     "chat_attachments": "Chat-Anhänge", "match_proof_photos": "Fotos vom Ergebnis", "app_releases": "App-Versionen", "references": "Referenzen", "media_uploads": "Medienverwaltung",
+    "reference_round_originals": "Original-Bilder der Serien",
     "achievements": "Auszeichnungen", "awards": "Auszeichnungen", "stickers": "Sticker",
 }
 
@@ -67,6 +69,9 @@ def area_of(relative: pathlib.PurePosixPath) -> str:
         return "legacy"
     if parts[0] == "public":
         return "variants" if len(parts) >= 3 and parts[1] == VARIANT_DIR else "public"
+    if parts[0] == "reference-originals":
+        # Vorschaubilder der Originale (#1933) zählen beim Original - sie liegen im selben privaten Ordner.
+        return "reference-originals"
     if parts[0] in ("documents", "chat", "app-releases", "quarantine", "proofs"):
         return parts[0]
     return "other"
@@ -144,7 +149,9 @@ async def inventory(db, upload_dir: pathlib.Path, *, sample: int = 40) -> dict:
         own = refs.get(row["name"], [])
         outside = [ref for ref in own if ref["collection"] != "media_uploads"]
         registered = any(ref["collection"] == "media_uploads" for ref in own)
-        variant = VARIANT_RE.match(row["name"]) if row["area"] == "variants" else None
+        # Vorschaubilder liegen unter public/variants und - bei privaten Originalen der Serien - im eigenen Ordner.
+        in_variants = row["area"] == "variants" or pathlib.PurePosixPath(row["path"]).parent.name == VARIANT_DIR
+        variant = VARIANT_RE.match(row["name"]) if in_variants else None
         if variant:
             base = stems.get(variant.group("stem"))
             row["variant_of"] = base
