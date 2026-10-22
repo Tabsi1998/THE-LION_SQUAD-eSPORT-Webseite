@@ -434,15 +434,28 @@ Dienst) und landet als Zeilen im Blatt – gespeichert wird beim Lesen nichts, a
   Abgeglichen wird unscharf mit den Teilnehmern der Saison (für den Vorstand auch über deren Aliase), Teams mit den
   Standard-Teams; jeder Teilnehmer höchstens einmal - die Zeile, die ihn an eine andere verliert, ist gelb. Ein Eintrag
   aus `team_scoring.no_team_names` („Ersatzfahrer“) bleibt stehen und wird nie auf ein ähnliches Team gezogen. Leere
-  Zellen in sonst gefüllten Spalten sind gelb, ein nie gelesener Platz ebenso; eine leere Team-Zelle bleibt leer (kein
-  Vorschlag mit dem Standard-Team - oft war dort ein farbiges Schild, das die Vorbereitung entfernt).
+  Zellen in sonst gefüllten Spalten werden allein aus dem Originalbild nachgelesen (Kontrast nur der Zelle gestreckt,
+  zwei Größen - etwa dunkelgraue Schrift, #2012, `_retry_empty_cells`); bleiben sie leer, sind sie gelb, ein nie
+  gelesener Platz ebenso; eine leere Team-Zelle bleibt leer (kein Vorschlag mit dem Standard-Team - oft war dort ein
+  farbiges Schild, das die Vorbereitung entfernt). Startplätze sind eine Permutation 1…N (`_settle_grid`), ein Abstand
+  „47,441“ kann ein als 4 gelesenes Plus sein (die Probe Zeit = Erster + Abstand entscheidet).
+- **Nie grün geraten (#2012):** Ein Name ist nur grün, wenn er eindeutig zu einem Teilnehmer passt: Ähnlichkeit ab
+  `name_sure` und Abstand `name_margin` zum Zweitbesten (oder ab `name_match` mit passender Startnummer). Verwechslungen
+  der Schrift (l/1/I, 0/O, 2/Z, rn/m, ii/ü) gelten als gleich, aber nur mit 0,98 - der genau passende Name gewinnt, zwei
+  so ähnliche Teilnehmer sind nie eindeutig. Unbekannte Namen und Teams sind immer gelb. **Kader der Spur:** die
+  Teilnehmer anderer Saisons derselben Spur (nur Vorstand, ohne ausgeblendete) und deren Teams werden vorgeschlagen -
+  ohne Kennung, gelb, `hint` „wie in Saison X“. **Gelernte Schreibweisen** (`services/read_spellings.py`): das Blatt
+  schickt bei geänderten Zeilen aus dem Bild `read_name`/`read_team` mit; beim Übernehmen speichert der Server (nur
+  Vorstand, nur eindeutig, Protokoll `learned`) `read_aliases` am Teilnehmer bzw. `read_team_aliases` an der Saison.
+  Entfernen per `PATCH` (Liste der bleibenden).
 - **Kopf:** `track` (oberste Zeile ohne Beschriftung), `session {name, kind}` (Rennen, Sprint, Qualifying - nur ein
   Hinweis, bis es Läufe je Termin gibt, #1930), `pole` und `fastest_lap {name, time}`, `driver_of_the_day`; der Wert
   darf hinter oder unter der Beschriftung stehen. Passt die Strecke zu einem anderen Termin der Saison, nennt die
   Warnung `other_track` ihn (`suggested_round`).
 - **Antwort:** `rows` mit `place`, `dnf`, `marks`, `start_number`, `name`, `participant_id`, `team`, `grid`, `time`,
-  `gap`, `points`, `color` (Schriftfarbe von Startnummer oder Team), `uncertain` (Felder) und `read` (was im Bild
-  stand, wenn es abweicht); dazu der Kopf, `team_colors {Team: "#rrggbb"}` (Vorschlag für Teamfarben, #1950 - das
+  `gap`, `points`, `color` (Schriftfarbe von Startnummer oder Team), `uncertain` (Felder), `read` (was im Bild
+  stand, wenn es abweicht), `hint` (Hinweis je Feld, etwa „wie in Saison 1/2025“, „bisher 15“) und `image` (Name und
+  Team, wie im Bild gelesen - zum Lernen); dazu der Kopf, `team_colors {Team: "#rrggbb"}` (Vorschlag für Teamfarben, #1950 - das
   Blatt schickt ihn nach dem Lesen an `…/team-colors/suggestions`, übernommen wird er in der Verwaltung),
   `uncertain_rows` und `warnings`.
 - **Im Blatt:** die Zeilen ersetzen die Liste, die Vorschau prüft gleich. Startnummer, Startplatz, Zeit und Abstand
