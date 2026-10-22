@@ -195,6 +195,9 @@ CLUB_CONTENT = frozenset({
     # Original-Bilder des Veranstalters je Termin (#1933): Beleg des Ergebnisses wie das Blatt - nur die Kennung, wer
     # hochgeladen bzw. freigegeben hat. Ein ausgeblendeter Name im Ergebnis hält das Bild aus der Öffentlichkeit.
     "reference_round_originals",
+    # Referenzen bündeln (#1751): was eine Bündelung angelegt und verknüpft hat, zum Zurücknehmen - nur die Kennung,
+    # wer gebündelt bzw. zurückgenommen hat.
+    "reference_bundles",
     # Maps je Spiel und Map-Pools je Wettbewerb (#1616) - nur die Kennung, wer angelegt bzw. gespeichert hat; dazu die
     # belegten Schreibweisen der Maps (ohne Person).
     "game_maps", "map_pools", "game_map_keys",

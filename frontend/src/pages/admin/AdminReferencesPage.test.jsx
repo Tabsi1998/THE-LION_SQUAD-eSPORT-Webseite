@@ -390,3 +390,12 @@ test("Bearbeiten: „Weitere Angaben“ offen, wenn dort etwas steht, sonst zu; 
   fireEvent.click(screen.getByTestId("reference-edit-r1"));
   expect(screen.getByTestId("reference-more")).toHaveAttribute("open");
 });
+
+// Referenzen bündeln (#1751): der Hinweis nach dem Zurücknehmen führt mit ``?edit=<id>`` direkt in die Bearbeitung.
+test("?edit=<id> öffnet die Referenz direkt in der Bearbeitung", async () => {
+  mockApi([LEGACY_ITEM]);
+  render(<MemoryRouter initialEntries={["/admin/references?edit=r1"]}><AdminReferencesPage /></MemoryRouter>);
+  const sheet = await screen.findByTestId("reference-sheet");
+  expect(sheet).toBeInTheDocument();
+  expect(screen.getByTestId("reference-title")).toHaveValue("Herbst Cup");
+});
