@@ -219,6 +219,15 @@ def test_a_second_reader_makes_agreed_table_names_green():
     assert cells[2].sure is False and {cells[2].text, cells[2].read} == {"Probe Rot", "Probe Blau"}
 
 
+def test_a_small_l_at_the_start_of_a_table_name_needs_the_roster():
+    """Prüfer zu #2018: „lan lorio“ lesen beide Leser gleich - im Bild stand vielleicht „Ian Iorio“: gelb."""
+    reading = _reading([[1, "lan lorio", 30, 20, 50, "--"]])
+    cell = reading.rows[0][1]
+    cell.reads, cell.second = ["lan lorio"], Read("lan lorio", 96)
+    table.match_names(reading, {"Probe Rot": "Probe Rot"})
+    assert (cell.text, cell.sure) == ("lan lorio", False)
+
+
 def test_a_table_name_known_only_through_a_lookalike_stays_yellow():
     """Prüfer zu #2012 auch in Tabellen-Bildern: „Amie“ ist nicht „Arnie“ - ein Treffer nur über Verwechslungen wird
     vorgeschlagen, bleibt aber gelb, auch wenn beide Lesungen sicher sind."""

@@ -471,8 +471,8 @@ Dienst) und landet als Zeilen im Blatt – gespeichert wird beim Lesen nichts, a
   des Bilds, je Zelle ein Aufruf, ein Bild zur Zeit je Prozess. Regeln (`result_image_match`): **Übereinstimmung**
   (`agreed`: der zweite Leser liest Zeichen für Zeichen, was Seite oder Streifen lesen, Sicherheit ab
   `SECOND_MIN_CONF`) ist sicher - auch ein unbekannter Name, ein unbekanntes Team, einer „wie in Saison X“ und ein Name
-  im Kopf. Ausnahmen nur mit Kader grün: leicht verwechselte Zeichen im Text (`confusable`: l/I/1, 0/O, 2/Z, Z/S/B/G/O
-  zwischen Großbuchstaben) und eine Tesseract-Lesung, die dasselbe nur über eine Verwechslung, mit anderem Tag oder
+  im Kopf. Ausnahmen nur mit Kader grün: leicht verwechselte Zeichen im Text (`confusable`: l/I/1, auch ein „l“ am
+  Wortanfang vor einem Kleinbuchstaben wie in „lan“ für „Ian“, 0/O, 2/Z, Z/S/B/G/O zwischen Großbuchstaben) und eine Tesseract-Lesung, die dasselbe nur über eine Verwechslung, mit anderem Tag oder
   anders vielen „_“ liest (`_contradicts`; Groß/klein, Leerzeichen und andere Fehler stören nicht). **Widerspruch** ist
   gelb, vorbelegt mit der Lesung des zweiten Lesers (bei Namen der stärkere), `read` nennt beide. Im Kader zählt seine
   Lesung wie eine weitere: liest er einen Teilnehmer genau, ist auch ein Verwechslungs-Treffer von Tesseract grün; zeigt

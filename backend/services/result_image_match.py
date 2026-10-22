@@ -334,19 +334,23 @@ _LETTER_LIKE = "ZSBGO"  # Großbuchstaben, die wie Ziffern aussehen (2, 5, 8, 6,
 def confusable(text: str) -> bool:
     """Steht im Text ein Zeichen, das zwei Leser gleich verlesen können, weil es in Bildschirmschrift wie ein anderes
     aussieht und die Nachbarn es nicht klären? Zwei verschiedene aus l/I/1 nebeneinander, großes I neben
-    Kleinbuchstaben oder Ziffern (wie l), kleines l neben Ziffern oder zwischen Großbuchstaben (wie I), eine Ziffer wie
-    1, 0, 2, 5, 6, 8 neben Buchstaben ohne Ziffer daneben (wie l, O, Z, S, G, B), O neben Ziffern, Z/S/B/G/O mitten in
-    Großbuchstaben (wie 2, 5, 8, 6, 0 in „GG2BRAMIGGI“). So ein Text ist auch dann nur mit Kader grün, wenn beide Leser
-    ihn gleich lesen („WastI1803“ statt „Wastl1803“)."""
+    Kleinbuchstaben oder Ziffern (wie l), kleines l neben Ziffern, zwischen Großbuchstaben oder am Wortanfang vor einem
+    Kleinbuchstaben (wie I - „lan lorio“ statt „Ian Iorio“, Prüfer zu #2018), eine Ziffer wie 1, 0, 2, 5, 6, 8 neben
+    Buchstaben ohne Ziffer daneben (wie l, O, Z, S, G, B), O neben Ziffern, Z/S/B/G/O mitten in Großbuchstaben (wie 2,
+    5, 8, 6, 0 in „GG2BRAMIGGI“). So ein Text ist auch dann nur mit Kader grün, wenn beide Leser ihn gleich lesen
+    („WastI1803“ statt „Wastl1803“)."""
     for index, char in enumerate(text):
         near = [text[spot] for spot in (index - 1, index + 1) if 0 <= spot < len(text)]
         digit_near = any(other.isdigit() for other in near)
         letter_near = any(other.isalpha() for other in near)
+        word_start = index == 0 or not text[index - 1].isalnum()
         if char in _ONE_LIKE and any(other in _ONE_LIKE and other != char for other in near):
             return True
         if char == "I" and any(other.islower() or other.isdigit() for other in near):
             return True
         if char == "l" and (digit_near or (len(near) == 2 and all(other.isupper() for other in near))):
+            return True
+        if char == "l" and word_start and index + 1 < len(text) and text[index + 1].islower():
             return True
         if char in _DIGIT_LIKE and letter_near and not digit_near:
             return True

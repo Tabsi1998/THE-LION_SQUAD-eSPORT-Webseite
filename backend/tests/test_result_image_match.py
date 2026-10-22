@@ -836,3 +836,19 @@ def test_the_track_is_matched_against_the_calendar():
     assert track("Aserbaldschan", "Aserbaldschan") == {"name": "Aserbaidschan", "uncertain": ["name"]}
     assert track("Probering Nord", "Wüstenring") == {"name": "Probering Nord", "uncertain": ["name"]}
     assert track("Probering Nord", calendar=[]) == {"name": "Probering Nord", "uncertain": ["name"]}
+
+
+def test_a_small_l_at_the_start_of_a_word_needs_the_roster():
+    """Prüfer zu #2018: Steht im Bild ein großes „I“ am Wortanfang, lesen oft beide Leser ein kleines „l“ („Ian Iorio“
+    als „lan lorio“). Ein „l“ am Wortanfang vor einem Kleinbuchstaben ist darum verwechselbar - ohne Kader gelb, in
+    den Zeilen, im Kopf und in Tabellen-Bildern."""
+    for text in ("lan lorio", "Tim liro", "Probe_lva"):
+        agreed_row = row("1", "", text, strips={"name": text}, second={"name": text})
+        assert build(reading(agreed_row), TEMPLATE, [])["rows"][0]["uncertain"] == ["name"], text
+    head = build(reading(row("1"), header={"driver_of_the_day": r("lan lorio")},
+                         second_head={"driver_of_the_day": "lan lorio"}), TEMPLATE, [])
+    assert head["driver_of_the_day"]["uncertain"] == ["name"]
+    # Ein „l“ mitten im Wort oder vor einem Großbuchstaben bleibt unverdächtig.
+    for text in ("Galaxy_Skull", "Marcel Ruhs", "Wolfgang"):
+        plain = row("1", "", text, strips={"name": text}, second={"name": text})
+        assert build(reading(plain), TEMPLATE, [])["rows"][0]["uncertain"] == [], text
