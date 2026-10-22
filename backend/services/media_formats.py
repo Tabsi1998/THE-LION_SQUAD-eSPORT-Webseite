@@ -12,6 +12,8 @@ PUBLIC_IMAGE_MIME_BY_EXT = {
     ".gif": "image/gif",
     ".avif": "image/avif",
     ".bmp": "image/bmp",
+    # Logos als SVG (#1952): nur die bereinigte Fassung liegt hier, ausgeliefert mit strengen Kopfzeilen.
+    ".svg": "image/svg+xml",
 }
 
 RAW_PHOTO_MIME_BY_EXT = {

@@ -56,6 +56,11 @@ INTRINSIC_PX = 1024
 TRIM_PX = 512
 MAX_COORD = 1e7
 
+# Kopfzeilen beim Ausliefern (Backend und nginx): kein Raten des Typs, und wird die Datei direkt geöffnet, darf darin
+# nichts laden oder laufen - nur Zeichnen und Stil.
+SERVE_CSP = "default-src 'none'; style-src 'unsafe-inline'"
+SERVE_HEADERS = {"Content-Security-Policy": SERVE_CSP, "X-Content-Type-Options": "nosniff"}
+
 SVG_NS = "http://www.w3.org/2000/svg"
 XLINK_NS = "http://www.w3.org/1999/xlink"
 XML_NS = "http://www.w3.org/XML/1998/namespace"

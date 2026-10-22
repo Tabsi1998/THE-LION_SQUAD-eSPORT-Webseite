@@ -268,10 +268,14 @@ async def _remove(db, name: str, scans: list[dict]) -> str | None:
             for width in VARIANT_WIDTHS:
                 _unlink(variant_path(path, width))
             _unlink(path)
+            if path.suffix.lower() == ".svg":
+                _unlink(path.with_suffix(".png"))  # PNG-Fassung eines SVG-Logos (#1952)
         for scan in scans:
             key = media_audit._filename_from_upload_path(str(scan.get("quarantine_key") or ""))
             if key:
                 _unlink(QUARANTINE_DIR / key)
+                if key.lower().endswith(".svg"):
+                    _unlink((QUARANTINE_DIR / key).with_suffix(".png"))
     except OSError as exc:  # die Löschung des Kontos darf an einer gesperrten Datei nicht scheitern
         return safe_error(exc)
     if scans:

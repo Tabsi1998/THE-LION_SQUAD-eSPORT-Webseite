@@ -256,3 +256,12 @@ def test_an_app_save_of_the_png_keeps_the_svg(tmp_path, monkeypatch):
     assert svg_logo.keep_vector(None, old) is None
     assert svg_logo.keep_vector("/api/static/uploads/abc123.png", "/api/static/uploads/x.png") == \
         "/api/static/uploads/abc123.png"
+
+
+def test_nginx_serves_uploaded_svg_with_the_strict_policy():
+    nginx = (pathlib.Path(__file__).resolve().parents[2] / "frontend" / "nginx.conf").read_text(encoding="utf-8")
+    block = nginx.split("location ^~ /api/static/uploads/ {", 1)[1].split("location @tls_upload_backend", 1)[0]
+    svg_block = block.split("location ~* \\.svg$ {", 1)[1]
+    assert f'add_header Content-Security-Policy "{svg_logo.SERVE_CSP}" always;' in svg_block
+    assert 'add_header X-Content-Type-Options "nosniff" always;' in svg_block
+    assert "types { image/svg+xml svg; }" in svg_block and "$tls_content_security_policy" not in svg_block

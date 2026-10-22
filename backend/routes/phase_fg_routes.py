@@ -127,6 +127,9 @@ async def _list_media_items(
         p for p in candidates
         if not p.name.startswith(".") and p.suffix.lower() in PUBLIC_MEDIA_EXTS
     ]
+    # Logos als SVG (#1952): die PNG-Fassung daneben gehört zum SVG und steht nicht als eigene Datei in der Mediathek.
+    svg_stems = {p.stem for p in candidates if p.suffix.lower() == ".svg"}
+    candidates = [p for p in candidates if not (p.suffix.lower() == ".png" and p.stem in svg_stems)]
     requested_type = str(media_type_filter or "").strip().lower()
     if requested_type in {"image", "images"}:
         candidates = [p for p in candidates if p.suffix.lower() in PUBLIC_IMAGE_EXTS]

@@ -123,7 +123,7 @@ from routes.dsgvo_routes import dsgvo_router
 from routes.export_routes import pdf_router
 from routes.audit_routes import audit_router
 from services.image_variants import resolve_variant as resolve_image_variant
-from services import ops_monitor, share_image_cache
+from services import ops_monitor, share_image_cache, svg_logo
 from services.change_events import (
     change_event_stream,
     publish_api_change,
@@ -435,6 +435,9 @@ async def public_upload(filename: str, request: Request, w: int | None = None):
         if path.exists() and path.is_file():
             media_type = PUBLIC_MEDIA_TYPES.get(suffix) or "application/octet-stream"
             headers = {"Accept-Ranges": "bytes", "X-Content-Type-Options": "nosniff"}
+            if suffix == ".svg":
+                # Logos als SVG (#1952): wird die Datei direkt geöffnet, läuft darin nichts - nur Zeichnen und Stil.
+                headers.update(svg_logo.SERVE_HEADERS)
             # Eine Rasterkachel ist rund 400 Pixel breit und bekam bisher das
             # gespeicherte Bild mit bis zu 4096 Pixeln. Die kleinere Fassung
             # entsteht beim ersten Abruf und liegt danach auf der Platte - so
@@ -544,6 +547,24 @@ async def security_headers(request, call_next):
             response.headers["Pragma"] = "no-cache"
             response.headers["Expires"] = "0"
     return response
+
+
+@app.middleware("http")
+async def raster_logos_for_apps(request, call_next):
+    """Logos als SVG (#1952): Die App kann noch kein SVG - wer kein Browser ist (``svg_logo.client_needs_raster``),
+    bekommt in JSON-Antworten der API die PNG-Fassung eines hochgeladenen SVG statt des SVG."""
+    response = await call_next(request)
+    path = request.url.path
+    if (not path.startswith("/api/") or path.startswith("/api/static/")
+            or not svg_logo.client_needs_raster(request.headers)
+            or not response.headers.get("content-type", "").startswith("application/json")):
+        return response
+    body = b"".join([chunk async for chunk in response.body_iterator])
+    changed = svg_logo.raster_urls_in_bytes(body)
+    rebuilt = Response(content=changed, status_code=response.status_code, background=response.background)
+    rebuilt.raw_headers = [(key, value) for key, value in response.raw_headers if key.lower() != b"content-length"]
+    rebuilt.headers["content-length"] = str(len(changed))
+    return rebuilt
 
 
 @app.middleware("http")
