@@ -202,6 +202,23 @@ def test_a_table_name_is_green_only_when_it_clearly_is_a_known_one():
     assert plain.rows[0][1].sure is False
 
 
+def test_a_second_reader_makes_agreed_table_names_green():
+    """#2018 in Tabellen-Bildern: Lesen Tesseract und der zweite Leser einen unbekannten Namen gleich, ist er grün; bei
+    Widerspruch gelb, vorbelegt mit der Lesung des zweiten Lesers; ein bekannter Name braucht keinen Widerspruch."""
+    reading = _reading([[1, "Neu Team", 30, 20, 50, "--"], [2, "Dora Nev", 20, 10, 30, -20],
+                        [3, "Probe Rot", 10, 5, 15, -35], [4, "Probe Wolf1", 5, 5, 10, -40]])
+    for row, second in zip(reading.rows, ("Neu Team", "Dora Neu", "Probe Blau", "Probe Wolf1")):
+        row[1].reads = [row[1].text]
+        row[1].second = Read(second, 99)
+    table.match_names(reading, {"Probe Rot": "Probe Rot", "Probe Blau": "Probe Blau"})
+    cells = [row[1] for row in reading.rows]
+    assert [(cell.text, cell.sure) for cell in (cells[0], cells[1], cells[3])] == [
+        ("Neu Team", True), ("Dora Neu", False), ("Probe Wolf1", False)]  # l/1: nur mit Kader
+    assert cells[1].read == "Dora Nev"
+    # Die Leser zeigen auf zwei verschiedene bekannte Namen: gelb, der andere im Hinweis.
+    assert cells[2].sure is False and {cells[2].text, cells[2].read} == {"Probe Rot", "Probe Blau"}
+
+
 def test_a_table_name_known_only_through_a_lookalike_stays_yellow():
     """Prüfer zu #2012 auch in Tabellen-Bildern: „Amie“ ist nicht „Arnie“ - ein Treffer nur über Verwechslungen wird
     vorgeschlagen, bleibt aber gelb, auch wenn beide Lesungen sicher sind."""

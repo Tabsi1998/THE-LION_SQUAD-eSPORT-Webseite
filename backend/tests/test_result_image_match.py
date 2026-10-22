@@ -24,19 +24,23 @@ def r(text: str, conf: float = 95) -> Read:
 
 
 def row(place="", number="", name="", team="", grid="", time="", gap="", *, strips=None, alts=None, points="",
-        conf=95) -> RowReading:
+        conf=95, second=None) -> RowReading:
     cells = {key: r(value, conf) for key, value in (
         ("place", place), ("start_number", number), ("name", name), ("team", team), ("grid", grid), ("time", time),
         ("gap", gap), ("points", points)) if value}
     out = RowReading(cells=cells, strips={key: r(value) if isinstance(value, str) else value
                                           for key, value in (strips or {}).items()})
     out.alts = {key: r(value) if isinstance(value, str) else value for key, value in (alts or {}).items()}
+    # Zweiter Leser (#2018): je Feld seine Lesung.
+    out.second = {key: r(value, 99) if isinstance(value, str) else value for key, value in (second or {}).items()}
     return out
 
 
-def reading(*rows, header=None, labelled=None) -> Reading:
+def reading(*rows, header=None, labelled=None, second_head=None) -> Reading:
     out = Reading(template_id=TEMPLATE["id"], header=header or {}, rows=list(rows), header_found=True)
     out.labelled = labelled
+    out.header_second = {key: r(value, 99) if isinstance(value, str) else value
+                         for key, value in (second_head or {}).items()}
     return out
 
 
@@ -722,7 +726,7 @@ def test_grid_permutation_only_for_the_whole_field():
 def test_header_fields():
     out = build(reading(row("1", name="Anna Probe"), header={
         "track": r("Probering Nord"), "fastest_lap": r("Bert Bolzt 1:31.207"), "driver_of_the_day": r("Carl Kurve")}),
-        TEMPLATE, PEOPLE)
+        TEMPLATE, PEOPLE, venues=["Probering Nord", "Wüstenring"])
     assert out["track"] == {"name": "Probering Nord", "uncertain": []}
     assert out["fastest_lap"] == {"name": "Bert Bolzt", "participant_id": "bert", "time": "1:31.207", "uncertain": [],
                                   "read": "Bert Bolzt 1:31.207"}
@@ -734,3 +738,101 @@ def test_header_fields():
     assert blurry["fastest_lap"]["name"] == "Bert Bolzt"
     assert blurry["fastest_lap"]["time"] == "1:31.207"
     assert blurry["fastest_lap"]["uncertain"] == ["name", "time"]
+
+
+# ---------------------------------------------------------------- Zweiter Leser (#2018)
+def test_two_readers_agreeing_make_an_unknown_name_and_team_green():
+    """#2018: Lesen Tesseract und der zweite Leser einen Namen bzw. ein Team Zeichen für Zeichen gleich, ist es sicher
+    gelesen - auch ohne Kader grün. Ebenso im Kopf."""
+    clear = row("1", "", "Probe_Wolfgang", "Neues Team", strips={"name": "Probe_Wolfgang", "team": "Neues Team"},
+                second={"name": "Probe_Wolfgang", "team": "Neues Team"})
+    out = build(reading(clear, header={"driver_of_the_day": r("Probe_Wolfgang")}, second_head={
+        "driver_of_the_day": "Probe_Wolfgang"}), TEMPLATE, [])
+    first = out["rows"][0]
+    assert (first["name"], first["team"], first["uncertain"]) == ("Probe_Wolfgang", "Neues Team", [])
+    assert out["driver_of_the_day"]["uncertain"] == []
+    # Eine andere Lesung von Tesseract mit einem ganz anderen Fehler stört nicht; nur Leerzeichen auch nicht.
+    noisy = row("1", "", "Probe Wolfgang", strips={"name": "Probe Wolfgnag"}, second={"name": "Probe Wolfgang"})
+    assert build(reading(noisy), TEMPLATE, [])["rows"][0]["uncertain"] == []
+    spaced = row("1", "", "Probe Wolfgang", strips={"name": "ProbeWolfgang"}, second={"name": "Probe Wolfgang"})
+    assert build(reading(spaced), TEMPLATE, [])["rows"][0]["uncertain"] == []
+    # Aus einer anderen Saison der Spur bekannt und von beiden genau so gelesen: grün.
+    track = [{"id": "t-emil", "name": "Emil Eck", "season": "1/2025"}]
+    known = build(reading(row("1", "", "Emil Eck", strips={"name": "Emil Eck"}, second={"name": "Emil Eck"})),
+                  TEMPLATE, [], track=track)["rows"][0]
+    assert (known["name"], known["participant_id"], known["uncertain"]) == ("Emil Eck", None, [])
+
+
+def test_two_readers_disagreeing_are_yellow_with_both_readings():
+    """#2018: Widersprechen sich die Leser, ist das Feld gelb - vorbelegt mit der Lesung des zweiten Lesers, beide
+    Lesungen stehen im Hinweis."""
+    out = build(reading(row("1", "", "Dora Nev", "Kometen Tean", strips={"name": "Dora Nev", "team": "Kometen Tean"},
+                            second={"name": "Dora Neu", "team": "Kometen Team"})), TEMPLATE, [])["rows"][0]
+    assert (out["name"], out["team"]) == ("Dora Neu", "Kometen Team")
+    assert {"name", "team"} <= set(out["uncertain"])
+    assert out["read"] == {"name": "Dora Nev / Dora Neu", "team": "Kometen Tean / Kometen Team"}
+    # Der zweite Leser zeigt auf jemand ganz anderen als ein genauer Treffer im Kader: gelb, beide Lesungen.
+    other = build(reading(row("1", "7", "Anna Probe", strips={"name": "Anna Probe"},
+                              second={"name": "Bert Bolzt"})), TEMPLATE, PEOPLE)["rows"][0]
+    assert (other["participant_id"], "name" in other["uncertain"]) == ("anna", True)
+    assert other["read"]["name"] == "Anna Probe / Bert Bolzt"
+
+
+def test_lookalikes_tags_and_underscores_need_the_roster():
+    """#2018: Typische Verwechslungen (l/1/I, 0/O, 2/Z, „__“/„_“) und verschiedene Tags werden nur mit Kader grün - auch
+    wenn beide Leser dasselbe lesen."""
+    for text in ("ProbeI1803", "Probe_F1", "Kiste_O5", "PROBE2BX", "GGZBRAMI", "zyyn0x", "Al1ce"):
+        agreed_row = row("1", "", text, strips={"name": text}, second={"name": text})
+        assert build(reading(agreed_row), TEMPLATE, [])["rows"][0]["uncertain"] == ["name"], text
+    for left, right in (("Probe__X", "Probe_X"), ("Wastl1803", "WastI1803"), ("Zoe#AAA", "Zoe#BBB")):
+        clash = row("1", "", left, strips={"name": right}, second={"name": left})
+        assert build(reading(clash), TEMPLATE, [])["rows"][0]["uncertain"] == ["name"], (left, right)
+    # Doppelte Buchstaben und ganz normale Wörter sind keine Verwechslung.
+    for text in ("Galaxy_Skull", "Semi-IX", "VatikaN BLUNT", "Chriizzly18", "Team 1"):
+        plain = row("1", "", text, strips={"name": text}, second={"name": text})
+        assert build(reading(plain), TEMPLATE, [])["rows"][0]["uncertain"] == [], text
+    # Mit Kader: liest der zweite Leser den Teilnehmer genau, ist ein Verwechslungs-Treffer von Tesseract grün.
+    people = [{"id": "h", "name": "Hasel1803"}, *PEOPLE]
+    out = build(reading(row("1", "", "Hasell803", strips={"name": "Hasell803"}, second={"name": "Hasel1803"})),
+                TEMPLATE, people)["rows"][0]
+    assert (out["participant_id"], out["uncertain"]) == ("h", [])
+
+
+def test_without_the_second_reader_the_rules_of_2012_hold():
+    """Fällt der zweite Leser aus (keine Lesungen), ist ein unbekannter Name gelb wie in #2012 - kein Fehler. Eine
+    unsichere Lesung des zweiten Lesers zählt nicht."""
+    clear = row("1", "", "Probe_Wolfgang", strips={"name": "Probe_Wolfgang"})
+    assert build(reading(clear), TEMPLATE, [])["rows"][0]["uncertain"] == ["name"]
+    unsure = row("1", "", "Probe_Wolfgang", strips={"name": "Probe_Wolfgang"}, second={"name": r("Probe_Wolfgang", 40)})
+    assert build(reading(unsure), TEMPLATE, [])["rows"][0]["uncertain"] == ["name"]
+
+
+def test_the_second_reader_is_one_more_reading_of_the_digits():
+    """#2018: Bei Ziffern ist der zweite Leser eine weitere Lesung. Liest er dasselbe wie zwei Lesungen von Tesseract
+    und widerspricht nur eine, gilt der Wert; liest er etwas anderes, ist die Zelle gelb."""
+    noisy_third = row("1", "35", "Neu Name", strips={"start_number": "35"}, alts={"start_number": r("33", 85)},
+                      second={"start_number": "35"})
+    assert "start_number" not in build(reading(noisy_third, row("2"), row("3")), TEMPLATE, [])["rows"][0]["uncertain"]
+    without = row("1", "35", "Neu Name", strips={"start_number": "35"}, alts={"start_number": r("33", 85)})
+    assert "start_number" in build(reading(without, row("2"), row("3")), TEMPLATE, [])["rows"][0]["uncertain"]
+    against = row("1", "35", "Neu Name", strips={"start_number": "35"}, second={"start_number": "38"})
+    assert "start_number" in build(reading(against, row("2"), row("3")), TEMPLATE, [])["rows"][0]["uncertain"]
+    single = row("1", "", "Neu Name", grid="3", conf=70, second={"grid": "3"})  # eine unsichere Lesung, bestätigt
+    assert "grid" not in build(reading(single, row("2", grid="1"), row("3", grid="2")), TEMPLATE, [])["rows"][0][
+        "uncertain"]
+
+
+def test_the_track_is_matched_against_the_calendar():
+    """#2018: Die Strecke im Kopf gegen die Strecken des Kalenders - genau eine davon ist grün und steht wie im Kalender
+    da; eine ähnliche wird vorgeschlagen (gelb); ohne Kalender ist sie nur ein Hinweis und gelb."""
+    venues = ["Aserbaidschan", "Probering Nord"]
+
+    def track(text, second_text=None, calendar=venues):
+        head = reading(row("1"), header={"track": r(text)},
+                       second_head={"track": second_text} if second_text else None)
+        return build(head, TEMPLATE, [], venues=calendar)["track"]
+
+    assert track("PROBERING NORD") == {"name": "Probering Nord", "uncertain": []}
+    assert track("Aserbaldschan", "Aserbaldschan") == {"name": "Aserbaidschan", "uncertain": ["name"]}
+    assert track("Probering Nord", "Wüstenring") == {"name": "Probering Nord", "uncertain": ["name"]}
+    assert track("Probering Nord", calendar=[]) == {"name": "Probering Nord", "uncertain": ["name"]}

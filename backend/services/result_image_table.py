@@ -32,7 +32,7 @@ from dataclasses import dataclass, field
 from PIL import Image, ImageChops
 
 from services import result_image_ocr as ocr
-from services.result_image_match import EXACT_SCORE, clean_text, similarity
+from services.result_image_match import EXACT_SCORE, agreed, clean_text, second_text, similarity
 from services.result_image_values import DIGIT_FIX, compact, is_noise
 
 TEMPLATE: dict = {
@@ -67,6 +67,8 @@ class TableCell:
     read: str = ""  # gelesen, wenn es vom Wert abweicht
     options: list = field(default_factory=list)
     glyph: list[int] | None = None  # die Schrift der Zelle, auf feste Größe gebracht (``_glyph``) - nur zum Vergleichen
+    reads: list[str] = field(default_factory=list)  # Text: die Lesungen von Tesseract (Seite, Streifen)
+    second: ocr.Read | None = None  # Text: die Lesung des zweiten Lesers (#2018)
 
 
 @dataclass
@@ -81,6 +83,7 @@ class TableReading:
     too_many_rows: bool = False
     text_height: float = 0.0
     mean_conf: float = 0.0
+    second: str = ""  # wie der zweite Leser lief (#2018, ``result_image_ocr.Reading.second``)
 
 
 # ---------------------------------------------------------------- Werte
@@ -304,6 +307,7 @@ def _read(img, template: dict, max_rows: int | None, sums: bool) -> TableReading
     confidences = [word.conf for cell in by_cell.values() for word in cell.words]
     reading.mean_conf = statistics.fmean(confidences) if confidences else 0.0
     strips = _strips(prepared, reading, keep, groups, by_cell, data)
+    seconds = _second_reads(img, prepared, reading, by_cell, data)
     min_conf = template["min_confidence"]
     for row_index in range(len(data)):
         row, notes = [], []
@@ -314,7 +318,7 @@ def _read(img, template: dict, max_rows: int | None, sums: bool) -> TableReading
             if kind in NUMBER_KINDS:
                 row.append(_cell([(page, True), (strip, False), (alt, False)], min_conf))
             else:
-                row.append(_text_cell(page, strip, min_conf))
+                row.append(_text_cell(page, strip, min_conf, seconds.get((row_index, column))))
         reading.rows.append(row)
         reading.notes.append(notes)
     for (row_index, column), cell in by_cell.items():
@@ -351,15 +355,39 @@ def _strips(prepared, reading: TableReading, keep: list[int], groups, by_cell, d
     return out
 
 
-def _text_cell(page: ocr.Read | None, strip: ocr.Read | None, min_conf: float) -> TableCell:
+def _second_reads(img, prepared, reading: TableReading, by_cell: dict, data: list) -> dict:
+    """Der zweite Leser (#2018) liest die Namen (bzw. Teams) noch einmal - je Zelle aus dem Originalbild, in der Höhe
+    der Schrift um die Mitte der Zeile. Die Zahlen prüfen schon Streifen, dritte Lesung, Schriftbild und Summen. Liefert
+    je (Zeile, Spalte) die Lesung; im Zeitbudget des Bilds."""
+    if reading.out_of_time:
+        reading.second = "out_of_time" if ocr.second_reader.enabled() else "off"
+        return {}
+    out: dict[tuple[int, int], ocr.Read] = {}
+    jobs = []
+    height = statistics.median(line.height for line in data) if data else 0
+    for (row_index, column), cell in by_cell.items():
+        if reading.kinds[column] not in ("name", "team"):
+            continue
+        center = statistics.median(word.cy for word in data[row_index].words)
+        box = ocr.original_box(prepared, cell.left - height * 0.3, center - height * 0.8, cell.right + height * 0.3,
+                               center + height * 0.8, img)
+        if box:
+            jobs.append((out, (row_index, column), [box]))
+    reading.second = ocr.read_second(img, jobs)
+    return out
+
+
+def _text_cell(page: ocr.Read | None, strip: ocr.Read | None, min_conf: float,
+               second: ocr.Read | None = None) -> TableCell:
     reads = [read for read in (page, strip) if read and clean_text(read.text)]
     if not reads:
-        return TableCell(sure=False)
+        return TableCell(sure=False, second=second)
     best = max(reads, key=lambda read: read.conf)
     texts = {" ".join(clean_text(read.text).split()) for read in reads}
     sure = len(reads) == 2 and len(texts) == 1 and all(read.conf >= min_conf for read in reads)
     other = " / ".join(sorted(texts - {" ".join(clean_text(best.text).split())}))
-    return TableCell(text=" ".join(clean_text(best.text).split())[:120], sure=sure, read=other[:120])
+    return TableCell(text=" ".join(clean_text(best.text).split())[:120], sure=sure, read=other[:120],
+                     reads=[read.text for read in reads], second=second)
 
 
 # ---------------------------------------------------------------- Gegenproben
@@ -556,7 +584,10 @@ def match_names(reading: TableReading, known: dict[str, str], template: dict | N
     taken: set[str] = set()
     for row in reading.rows:
         cell = row[at]
+        other = second_text(cell.second)  # zweiter Leser (#2018): zählt wie eine weitere Lesung
         texts = [text for text in [cell.text, *cell.read.split(" / ")] if text]
+        if other and other not in texts:
+            texts.append(other)
         best: dict[str, float] = {}
         for spelling, name in known.items():
             if name in taken:
@@ -566,17 +597,37 @@ def match_names(reading: TableReading, known: dict[str, str], template: dict | N
         scored = sorted(((score, name) for name, score in best.items()),
                         key=lambda item: (-item[0], item[1].casefold()))
         if not scored or scored[0][0] < template["name_match"]:
-            if cell.text:
-                cell.sure = False
+            _unknown_table_name(cell, other)
             continue
         score, name = scored[0]
         second = scored[1][0] if len(scored) > 1 else 0.0
         taken.add(name)
-        if name != cell.text:
-            cell.read = cell.text if not cell.read else f"{cell.text} / {cell.read}"
+        spellings = [spelling for spelling, target in known.items() if target == name]
+        agree = all(max(similarity(text, spelling) for spelling in spellings) >= template["name_match"]
+                    for text in texts)
+        shown = [text for text in texts if text != name]
+        cell.read = " / ".join(dict.fromkeys(shown))[:120]
         cell.text = name
-        # Grün nur genau so gelesen (Prüfer zu #2012): ein Treffer über Verwechslungen kann ein anderer Name sein.
-        cell.sure = score >= max(template["name_sure"], EXACT_SCORE) and score - second >= margin
+        # Grün nur genau so gelesen (Prüfer zu #2012): ein Treffer über Verwechslungen kann ein anderer Name sein. Der
+        # zweite Leser muss zum selben Namen zeigen (#2018).
+        cell.sure = score >= max(template["name_sure"], EXACT_SCORE) and score - second >= margin and agree
+
+
+def _unknown_table_name(cell: TableCell, other: str) -> None:
+    """Ein Name, den die Saison nicht kennt: grün nur, wenn beide Leser ihn gleich lesen (#2018). Sonst gelb (#2012) -
+    vorbelegt mit der Lesung des zweiten Lesers, was beide lasen im Hinweis."""
+    both = agreed(cell.reads, cell.second)
+    if both:
+        cell.text, cell.sure = both, True
+        cell.read = " / ".join(dict.fromkeys(text for text in (clean_text(item) for item in cell.reads)
+                                             if text and text != both))[:120]
+        return
+    if not cell.text and not other:
+        return
+    seen = [text for text in (clean_text(item) for item in [*cell.reads, other]) if text]
+    cell.text = (other or cell.text)[:120]
+    cell.sure = False
+    cell.read = " / ".join(dict.fromkeys(text for text in seen if text != cell.text))[:120]
 
 
 def to_payload(reading: TableReading, *, kind: str) -> dict:

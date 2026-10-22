@@ -42,7 +42,9 @@ def _expected(row: fixture.Row) -> dict:
 def _read(data: bytes, people: list[dict]) -> dict:
     opened = result_image_ocr.open_image(data)
     assert opened.image is not None, opened.message
-    return result_image_match.build(result_image_ocr.read(opened.image, TEMPLATE), TEMPLATE, people)
+    # Der Kalender der Saison kennt die Strecke (#2018: gegen ihn wird die Strecke im Kopf abgeglichen).
+    return result_image_match.build(result_image_ocr.read(opened.image, TEMPLATE), TEMPLATE, people,
+                                    venues=["Probering Nord"])
 
 
 def _compare(out: dict, sheet: fixture.Sheet) -> tuple[list[str], list[str]]:

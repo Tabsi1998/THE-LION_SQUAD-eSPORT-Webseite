@@ -16,7 +16,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 import result_image_fixture as fixture  # noqa: E402
 from flow_harness import make_flow  # noqa: E402
 from routes import reference_result_image_routes as image_routes, reference_result_routes  # noqa: E402
-from services import migrations, result_image_ocr  # noqa: E402
+from services import migrations, result_image_ocr, result_image_second  # noqa: E402
 from services.dolibarr_policy import club_today  # noqa: E402
 from services.result_image_ocr import Read, Reading, RowReading  # noqa: E402
 from test_result_image_ocr import _png_in_two_blocks, needs_tesseract  # noqa: E402
@@ -361,6 +361,25 @@ async def test_warnings_for_other_track_and_blurry_images(flow, fake_ocr):
 
 
 @pytest.mark.asyncio
+async def test_a_missing_second_reader_warns_and_reading_goes_on(flow, fake_ocr):
+    """#2018: Fehlt der zweite Leser (oder reichte die Zeit nicht), liest der Server weiter - mit einer Warnung, und ein
+    unbekannter Name bleibt gelb wie in #2012. Abgeschaltet ist gewollt und keine Warnung."""
+    ctx = await _setup(flow)
+    fake_ocr.reading = _fake_reading(("Dora Neu", "5"))
+    for status, codes in (("missing", ["second_reader"]), ("failed", ["second_reader"]),
+                          ("out_of_time", ["out_of_time"]), ("off", []), ("ok", [])):
+        fake_ocr.reading.second = status
+        data = (await flow.post(ctx["url"], content=_png(), headers=PNG)).json()
+        assert [item["code"] for item in data["warnings"]] == codes, status
+        assert data["rows"][0]["uncertain"] == ["name"]
+    # Lesen beide Leser denselben Namen, ist er grün - auch für Captains.
+    fake_ocr.reading.rows[0].second = {"name": Read("Dora Neu", 99, [("Dora", 99), ("Neu", 99)])}
+    flow.act_as(ctx["captain"])
+    row = (await flow.post(ctx["url"], content=_png(), headers=PNG)).json()["rows"][0]
+    assert (row["name"], row["uncertain"]) == ("Dora Neu", [])
+
+
+@pytest.mark.asyncio
 async def test_broken_png_is_400_not_500(flow, fake_ocr):
     """Kaputter Chunk mitten in den Bilddaten: Pillow wirft ``SyntaxError`` - die Route antwortet 400 mit fester
     Meldung."""
@@ -438,7 +457,9 @@ async def test_time_budget_leaves_the_rest_yellow_or_refuses(flow, fake_ocr, mon
 # ---------------------------------------------------------------- Ende-zu-Ende
 @needs_tesseract
 @pytest.mark.asyncio
-async def test_clean_screenshot_through_the_route(flow):
+async def test_clean_screenshot_through_the_route(flow, monkeypatch):
+    # Nur Tesseract - den zweiten Leser prüft test_result_image_second.py (ohne Modell gäbe es hier eine Warnung).
+    monkeypatch.setattr(result_image_second, "MODE", "off")
     sheet = fixture.sample_sheet()
     ctx = await _setup(flow, people=[(row.name, row.number, row.team) for row in sheet.rows])
     answer = await flow.post(ctx["url"], content=fixture.png_bytes(fixture.render(sheet)), headers=PNG)

@@ -15,6 +15,8 @@ Ablauf (``read``):
 4. **Zuordnen**: die Kopfzeile der Tabelle (Überschriften der Vorlage) gibt die Lage der Spalten, die Zeilen darüber
    den Kopf (Strecke, schnellste Rennrunde, Fahrer des Tages), die darunter die Ergebniszeilen. Fehlt die Kopfzeile,
    gelten die Anteile ``at`` der Vorlage über der Breite der Tabelle.
+5. **Zweiter Leser** (#2018, ``result_image_second``): jede Zelle von ``SECOND_FIELDS`` und der Kopf noch einmal, aus
+   dem Originalbild ausgeschnitten - im selben Zeitbudget (``_second_reads``).
 
 **Ohne Netz:** Tesseract läuft als eigener Prozess ohne Shell, mit festen Argumenten, leerer Umgebung (kein Proxy),
 einem Thread und Zeitlimit. Das Bild kommt über stdin, das Ergebnis über stdout - es entsteht keine Datei, und die

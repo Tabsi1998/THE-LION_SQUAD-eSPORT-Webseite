@@ -113,6 +113,8 @@ NOT_A_RESULT = ("Das Bild sieht nicht nach einem Rennergebnis aus (keine Zeiten)
 TOO_MANY_ROWS = (f"Im Bild stehen mehr als {MAX_ROWS} Ergebniszeilen - so viele nimmt ein Ergebnis-Blatt nicht. Bitte "
                  "nur das Ergebnis dieses Termins einfügen.")
 BLURRY = "Das Bild ist unscharf oder sehr klein - bitte die gelben Felder genau prüfen."
+SECOND_MISSING = ("Der zweite Leser fehlt gerade auf dem Server - Namen und Teams sind nur mit bekannten Teilnehmern "
+                  "grün. Die gelben Felder bitte genau prüfen.")
 NO_HEADER = "Die Kopfzeile der Tabelle wurde nicht erkannt - die Spalten sind nach der Vorlage geschätzt."
 PARTICIPANT_FIELDS = {"_id": 0, "id": 1, "name": 1, "start_number": 1, "default_team": 1, "link": 1, "profile_id": 1,
                       "guest_name": 1, "read_aliases": 1}
@@ -227,6 +229,15 @@ async def _known_teams(db, series: dict, seasons: list[dict]) -> tuple[list[str]
     return teams, track_teams, aliases
 
 
+async def _venues(db, series_id: str) -> list[str]:
+    """Die Strecken des Kalenders der Saison (Ort und Titel der Termine) - gegen sie wird die Strecke im Kopf eines
+    Ergebnis-Bilds abgeglichen (#2018)."""
+    rounds = await db.reference_rounds.find({"series_id": series_id, "archived_at": None},
+                                            {"_id": 0, "venue": 1, "title": 1}).to_list(500)
+    return [str(item.get(key)).strip() for item in rounds for key in ("venue", "title")
+            if str(item.get(key) or "").strip()]
+
+
 async def _suggested_round(db, series_id: str, round_doc: dict, track: str) -> dict | None:
     """Der Termin der Saison, zu dem die Strecke im Bild passt - wenn es nicht dieser ist. Nur ein Vorschlag."""
     if not track:
@@ -248,12 +259,23 @@ async def _suggested_round(db, series_id: str, round_doc: dict, track: str) -> d
     return {key: best.get(key) for key in ("id", "code", "venue", "club_day")}
 
 
+def _second_warnings(reading) -> list[dict]:
+    """Zweiter Leser (#2018): fehlt er oder reichte die Zeit nicht, gilt nur, was ohne ihn gilt - das sagt eine
+    Warnung. Abgeschaltet (``off``) ist gewollt und keine."""
+    if reading.second in ("missing", "failed"):
+        return [{"code": "second_reader", "message": SECOND_MISSING}]
+    if reading.second == "out_of_time" and not reading.out_of_time:
+        return [{"code": "out_of_time", "message": OUT_OF_TIME}]
+    return []
+
+
 def _warnings(reading: result_image_ocr.Reading, built: dict, round_doc: dict, suggestion: dict | None) -> list[dict]:
     out = []
     if not reading.header_found:
         out.append({"code": "no_header", "message": NO_HEADER})
     if reading.out_of_time:
         out.append({"code": "out_of_time", "message": OUT_OF_TIME})
+    out.extend(_second_warnings(reading))
     if reading.text_height < 8 or reading.mean_conf < 85:
         out.append({"code": "blurry", "message": BLURRY})
     venue = str(round_doc.get("venue") or "").strip()
@@ -345,6 +367,7 @@ def _table_warnings(reading) -> list[dict]:
         out.append({"code": "no_header", "message": NO_HEADER})
     if reading.out_of_time:
         out.append({"code": "out_of_time", "message": OUT_OF_TIME})
+    out.extend(_second_warnings(reading))
     if reading.text_height < 8 or reading.mean_conf < 75:
         out.append({"code": "blurry", "message": BLURRY})
     return out
@@ -468,7 +491,8 @@ async def read_result_image(series_id: str, round_id: str, request: Request,
     teams, track_teams, team_aliases = await _known_teams(db, access.series, seasons if access.is_board else [])
     built = result_image_match.build(reading, template, participants, aliases=aliases,
                                      no_team_names=_no_team_names(access.series), track=track, teams=teams,
-                                     track_teams=track_teams, team_aliases=team_aliases)
+                                     track_teams=track_teams, team_aliases=team_aliases,
+                                     venues=await _venues(db, series_id))
     logger.info("[result-image] read %s rows (%s uncertain) in %.1fs", len(built["rows"]), built["uncertain_rows"],
                 time.monotonic() - started)
     if not built["rows"]:
