@@ -35,6 +35,9 @@ TEAMS = {
     "Kometen Team": (255, 135, 0),
     "Nordlicht F1": (100, 220, 90),
 }
+# Dunkelgrau auf dunklem Grund, wie ein Team ohne eigene Farbe in der Liga (#2012) - kaum Kontrast. Nur in Tests, die
+# es eigens setzen.
+DARK_TEAMS = {"Schatten Team": (58, 58, 64)}
 
 
 @dataclass
@@ -167,7 +170,7 @@ def render(sheet: Sheet | None = None, *, width: int = 1280, winner_box: bool = 
             draw.line((x, top - 4, x, bottom), fill=LINE, width=2)
     for index, row in enumerate(sheet.rows):
         y = top + index * row_h + row_h // 2
-        color = TEAMS.get(row.team, TEXT)
+        color = TEAMS.get(row.team) or DARK_TEAMS.get(row.team) or TEXT
         if winner_box and row.place == 1:
             draw.rectangle((COLUMNS["pos"] - 18, y - 18, COLUMNS["pos"] + 18, y + 18), fill=WINNER_BOX)
             _text(draw, (COLUMNS["pos"], y), "1", size=22, fill=WINNER_DIGIT, bold=True, anchor="mm")
