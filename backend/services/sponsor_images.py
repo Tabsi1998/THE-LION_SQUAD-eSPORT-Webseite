@@ -10,11 +10,13 @@ Welches Bild wo erscheint, hängt am Hintergrund (Entscheidung des Betreibers vo
 - dunkel (Website, App, TV): Dolibarr dunkel → Dolibarr hell → das auf der Website hochgeladene Bild;
 - hell (Mails, PDFs): Dolibarr hell → Upload → Dolibarr dunkel - ein Logo für dunklen Grund ist oft weiß und wäre
   auf weißem Papier unsichtbar.
+- Ein auf der Website hochgeladenes SVG-Logo geht überall vor (#1952, Entscheidung des Obmanns vom 21.10.2026).
 """
 from __future__ import annotations
 
 import hashlib
 import logging
+from urllib.parse import urlparse
 
 from storage import UPLOAD_DIR
 
@@ -31,7 +33,13 @@ UPLOAD_FIELDS = {"logo": "logo_url", "banner": "banner_url"}
 
 
 def pick(doc: dict, kind: str, surface: str = "dark") -> tuple[str | None, str]:
-    """Das Bild für einen Hintergrund und woher es kommt: ``("/api/static/uploads/…", "dolibarr-dark")``."""
+    """Das Bild für einen Hintergrund und woher es kommt: ``("/api/static/uploads/…", "dolibarr-dark")``.
+
+    Ein hochgeladenes SVG-Logo geht vor (#1952): es trägt auf jedem Hintergrund und ist scharf; Stellen ohne SVG
+    (Mail, PDF) bekommen seine PNG-Fassung. Logos aus Dolibarr bleiben, wie sie kommen."""
+    upload = doc.get(UPLOAD_FIELDS[kind])
+    if kind == "logo" and isinstance(upload, str) and urlparse(upload).path.lower().endswith(".svg"):
+        return upload, "upload"
     images = ((doc.get("dolibarr_images") or {}).get(kind) or {}) if isinstance(doc.get("dolibarr_images"), dict) else {}
     for step in SURFACES.get(surface, SURFACES["dark"]):
         if step == "upload":

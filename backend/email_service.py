@@ -14,6 +14,7 @@ from models import new_id
 from services.email_delivery import header_text, html_to_text, html_value
 from services.log_safe import log_safe, mask_addresses
 from services.secret_store import decrypt_secret
+from services.svg_logo import raster_urls_in_text
 
 logger = logging.getLogger("tls-arena.email")
 
@@ -44,6 +45,7 @@ async def send_mail(to: str, subject: str, html: str, template_key: str = "custo
     db = get_db()
     cfg = await _get_email_config()
     subject = header_text(subject)  # der Betreff bleibt eine Zeile - kein Wert hängt eine Kopfzeile an
+    html = raster_urls_in_text(html)  # Mail-Programme zeigen kein SVG: die PNG-Fassung eines Logos (#1952)
     log = {
         "id": new_id(),
         "to": to,

@@ -192,3 +192,16 @@ async def test_image_check_scans_the_png_and_quarantines_both(flow, tmp_path):
     flow.act_as(None)
     placeholder = await flow.get(result["raster_url"])
     assert placeholder.status_code == 200 and placeholder.headers.get("x-tls-placeholder") == "1"
+
+
+@pytest.mark.asyncio
+async def test_app_icons_and_series_logo_take_the_svg_and_point_to_the_png(flow):
+    await admin(flow)
+    url = (await web(flow, "post", "/api/uploads/logo", files=svg_file())).json()["url"]
+    await flow.db.settings.insert_one({"id": "branding", "favicon_url": url, "favicon_light_url": url})
+    manifest = (await flow.get("/api/manifest.webmanifest")).json()
+    sources = {icon["src"] for icon in manifest["icons"]}
+    assert url[:-4] + ".png" in sources and url not in sources
+    assert {icon["type"] for icon in manifest["icons"] if icon["src"] == url[:-4] + ".png"} == {"image/png"}
+    from services import series_logo
+    assert series_logo.clean(url) == url

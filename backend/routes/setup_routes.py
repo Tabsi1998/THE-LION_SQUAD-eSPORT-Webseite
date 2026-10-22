@@ -13,6 +13,7 @@ from models import now_utc, new_id
 from services.password_policy import NewPassword
 from services.public_site_settings import build_public_legal_settings
 from services.secret_store import encrypt_secret
+from services.svg_logo import raster_url
 
 router = APIRouter(prefix="/api/setup", tags=["setup"])
 HEX_COLOR_RE = re.compile(r"^#[0-9a-fA-F]{6}$")
@@ -461,7 +462,9 @@ async def web_manifest():
         ],
     }
     icons = []
-    for src in [branding.get("favicon_light_url") or "/assets/brand/tls-favicon-light.png", branding.get("favicon_dark_url") or "/assets/brand/tls-favicon-dark.png", icon]:
+    # App-Symbole sind Rasterbilder: ein SVG-Favicon kommt als seine PNG-Fassung (#1952).
+    sources = [branding.get("favicon_light_url") or "/assets/brand/tls-favicon-light.png", branding.get("favicon_dark_url") or "/assets/brand/tls-favicon-dark.png", icon]
+    for src in [raster_url(value) for value in sources]:
         if src and src not in [item["src"] for item in icons]:
             icons.extend([
                 {"src": src, "sizes": "192x192", "type": _image_mime_from_url(src), "purpose": "any"},

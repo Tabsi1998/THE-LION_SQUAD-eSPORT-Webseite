@@ -14,8 +14,9 @@ import re
 from fastapi import HTTPException
 
 FIELD = "logo_url"
-LOGO_URL = re.compile(r"/api/static/uploads/[A-Za-z0-9][A-Za-z0-9_-]{0,150}\.(png|webp|jpg|jpeg)")
-LOGO_REFUSED = "Logo bitte über „Hochladen“ oder die Mediathek wählen (PNG, JPG oder WebP)."
+# SVG seit #1952: der Logo-Upload bereinigt es und legt die PNG-Fassung daneben (Teilen-Karte, App).
+LOGO_URL = re.compile(r"/api/static/uploads/[A-Za-z0-9][A-Za-z0-9_-]{0,150}\.(png|webp|jpg|jpeg|svg)")
+LOGO_REFUSED = "Logo bitte über „Hochladen“ oder die Mediathek wählen (SVG, PNG, JPG oder WebP)."
 LOGO_MISSING = "Logo nicht in der Mediathek gefunden - bitte neu hochladen."
 
 

@@ -21,6 +21,7 @@ from urllib.parse import urlparse
 from zoneinfo import ZoneInfo
 
 from models import now_utc
+from services.svg_logo import raster_url
 
 SETTINGS_ID = "discord_design"
 VIENNA = ZoneInfo("Europe/Vienna")
@@ -395,11 +396,12 @@ def tidy(text: str) -> str:
 
 
 def public_url(value: str) -> str | None:
-    """Nur volle http(s)-Adressen - Discord lehnt alles andere ab (und zeigt kein Bild aus dem Heimnetz)."""
+    """Nur volle http(s)-Adressen - Discord lehnt alles andere ab (und zeigt kein Bild aus dem Heimnetz). Ein
+    hochgeladenes SVG-Logo kommt als seine PNG-Fassung (#1952), Discord zeigt kein SVG."""
     text = str(value or "").strip()
     parsed = urlparse(text)
     if parsed.scheme in ("http", "https") and parsed.netloc and " " not in text:
-        return text[:2048]
+        return raster_url(text)[:2048]
     return None
 
 

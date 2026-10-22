@@ -18,7 +18,8 @@ from typing import Optional
 import httpx
 
 from database import get_db
-from services import media_audit
+from services import media_audit, svg_logo
+from services.image_upload import looks_like_svg
 from storage import PUBLIC_UPLOAD_DIR, ensure_directory
 
 logger = logging.getLogger("tls.image_migrate")
@@ -59,6 +60,14 @@ async def _download_to_local(url: str, client: httpx.AsyncClient) -> Optional[st
         if len(resp.content) > 8 * 1024 * 1024:
             logger.warning(f"[image-migrate] skip (too large): {url}")
             return None
+        if ct == "image/svg+xml" or ext == ".svg" or looks_like_svg("", "", resp.content):
+            # SVG (#1952): nie roh ablegen - nur bereinigt, mit PNG-Fassung daneben; was nicht geht, bleibt extern.
+            try:
+                stored = await asyncio.to_thread(svg_logo.store, resp.content, trim=False, directory=PUBLIC_UPLOAD_DIR)
+            except svg_logo.SvgRejected as rejected:
+                logger.warning("[image-migrate] skip (svg %s): %s", rejected.code, url)
+                return None
+            return f"{LOCAL_PREFIX}{stored['filename']}"
         filename = f"{uuid.uuid4().hex}{ext}"
         ensure_directory(PUBLIC_UPLOAD_DIR)
         (PUBLIC_UPLOAD_DIR / filename).write_bytes(resp.content)

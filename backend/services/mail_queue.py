@@ -17,6 +17,7 @@ from database import get_db
 from models import new_id, now_utc
 from services.email_delivery import html_to_text, mailbox_domain
 from services.log_safe import log_safe, mask_addresses, mask_addresses_deep
+from services.svg_logo import raster_urls_in_text
 from services.mail_outbox import enqueue_mail  # noqa: F401 - umgezogen (#1420), hier weiter erreichbar
 
 # Bewusster Wiederexport (#1420): diese Namen holen andere Module und Tests weiterhin von hier.
@@ -545,6 +546,8 @@ async def _resend_send(cfg: dict, to: str, subject: str, html: str) -> str:
 
 
 async def _dispatch(cfg: dict, to: str, subject: str, html: str) -> str:
+    # Mail-Programme zeigen kein SVG: jedes hochgeladene SVG-Logo geht als seine PNG-Fassung raus (#1952).
+    html = raster_urls_in_text(html)
     if cfg["provider"] == "smtp":
         if not cfg["smtp_host"]:
             raise RuntimeError("SMTP host not configured")
