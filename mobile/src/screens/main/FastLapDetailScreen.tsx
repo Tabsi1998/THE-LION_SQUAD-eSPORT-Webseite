@@ -402,7 +402,7 @@ export function FastLapDetailScreen({ navigation, route }: Props) {
             </View>
             <View style={styles.bestText}>
               <Muted>Bestzeit</Muted>
-              <CountUp value={showLapTime(best.time_str) || "-"} playKey={activeTrackId || ""} tone="honor" style={styles.bestTime} testID="fastlap-best-time" />
+              <CountUp value={showLapTime(best.time_str) || "-"} playKey={activeTrackId || ""} flash={false} style={styles.bestTime} testID="fastlap-best-time" />
               <Body style={styles.strong}>{best.display_name || best.username || "Fahrer"}</Body>
               <Muted>{attemptsText(best.attempts, leaderboard?.max_attempts)} · {showLapTime(best.gap_str) || "Führung"}</Muted>
             </View>

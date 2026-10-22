@@ -23,6 +23,13 @@ test("Endwert exakt: jeder Wert steht am Ende genau so da, wie er kam", () => {
   expect(countFrame(countShape(42), 1)).toBe("42");
 });
 
+test("schlichte Zahlen zählen ohne führende Nullen, Uhren halten ihre Stellen", () => {
+  expect(countFrame(countShape("268"), 0)).toBe("0");
+  expect(countFrame(countShape("268"), 0.5)).toMatch(/^[1-9]\d{1,2}$/);
+  expect(countFrame(countShape("+12,5"), 0)).toBe("+0,0");
+  expect(countFrame(countShape("1:24,587"), 0)).toBe("0:00,000");
+});
+
 test("Zahlen als Wert: ganze Schritte, Tausenderpunkt auf Wunsch, Null zählt nicht", () => {
   const shape = countShape(12500, true);
   expect(shape?.text).toBe("12.500");

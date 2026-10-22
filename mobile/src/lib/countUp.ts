@@ -62,7 +62,9 @@ export function countShape(value: unknown, grouped = false): CountShape | null {
   // Ohne Doppelpunkt ist der ganze Teil keine Uhr: 95,5 Sekunden bleiben 95,5.
   const total = (parts.length > 1 ? units : Number(whole)) * scale + Number(fraction || 0);
   if (!total) return null;
-  return { text, sign, separator, widths: parts.map((part) => part.length), fraction: fraction.length, total };
+  // Eine Uhr hält ihre Stellen („00:00,000“); eine schlichte Zahl zählt ohne führende Nullen („0“ … „268“, nicht „000“).
+  const widths = parts.length > 1 ? parts.map((part) => part.length) : [1];
+  return { text, sign, separator, widths, fraction: fraction.length, total };
 }
 
 /** Ein Zwischenstand in derselben Form (gleiche Stellen, gleiches Trennzeichen). */
