@@ -574,16 +574,63 @@ def test_a_name_is_green_only_with_a_clear_lead():
 
 def test_lookalikes_find_the_participant():
     """Typische Verwechslungen der Bildschirmschrift (#2012): l/1/I, 0/O, rn/m, ii/ü, __/_ und Groß/klein - der Abgleich
-    findet den Teilnehmer und zeigt seinen Namen; grün, weil kein anderer auch nur annähernd passt."""
-    people = [{"id": "h", "name": "Hasel1803"}, {"id": "k", "name": "Kiste_05"}, {"id": "m", "name": "Probe__F1"},
-              {"id": "c", "name": "Chriizzlo"}, {"id": "r", "name": "Marnie_X"}, *PEOPLE]
+    findet den Teilnehmer und zeigt seinen Namen. Grün nur, wenn die Startnummer ihn bestätigt (Prüfer zu #2012: eine
+    Verwechslung allein kann auch ein anderer Fahrer sein); Groß/klein und „__“/„_“ zählen ohnehin nicht."""
+    numbers = {"h": "18", "k": "5", "m": "1", "c": "8", "r": "40"}
+    people = [{"id": pid, "name": name, "start_number": numbers[pid]} for pid, name in (
+        ("h", "Hasel1803"), ("k", "Kiste_05"), ("m", "Probe__F1"), ("c", "Chriizzlo"), ("r", "Marnie_X"))] + PEOPLE
     reads = [("Hasell803", "h"), ("HaseI1803", "h"), ("Kiste_O5", "k"), ("Probe_Fl", "m"), ("Chrüzzlo", "c"),
-             ("Mamie_X", "r"), ("hasel1803", "h")]
+             ("Mamie_X", "r")]
     for text, pid in reads:
         out = build(reading(row("1", "", text, strips={"name": text})), TEMPLATE, people)["rows"][0]
-        assert (out["participant_id"], out["uncertain"]) == (pid, []), text
+        assert (out["participant_id"], out["uncertain"]) == (pid, ["name"]), text
         assert out["read"] == {"name": text}
+        number = numbers[pid]
+        sure = build(reading(row("1", number, text, strips={"name": text, "start_number": number})), TEMPLATE,
+                     people)["rows"][0]
+        assert (sure["participant_id"], sure["uncertain"]) == (pid, []), text
+    for text, pid in (("hasel1803", "h"), ("Probe_F1", "m")):
+        out = build(reading(row("1", "", text, strips={"name": text})), TEMPLATE, people)["rows"][0]
+        assert (out["participant_id"], out["uncertain"]) == (pid, []), text
     assert similarity("Hasell803", "Hasel1803") < similarity("Hasel1803", "Hasel1803") == 1.0
+
+
+def test_a_start_number_never_beats_a_better_name():
+    """Prüfer zu #2012: Die Startnummer passt zu „Tim Kunze“ (#7), der Name aber genau zu „Tim Kunz“ (#9) - die Nummer
+    allein macht den Namen nicht grün, wenn ein anderer Teilnehmer beim Namen gleich gut oder besser passt: gelb, mit
+    dem anderen als Hinweis. Lesen Seite und Streifen verschiedene Nummern, bestätigt keine von beiden."""
+    people = [{"id": "kunze", "name": "Tim Kunze", "start_number": "7"},
+              {"id": "kunz", "name": "Tim Kunz", "start_number": "9"}]
+    out = build(reading(row("1", "7", "Tim Kunz", strips={"name": "Tim Kunz", "start_number": "7"})),
+                TEMPLATE, people)["rows"][0]
+    assert (out["participant_id"], out["uncertain"]) == ("kunze", ["name"])
+    assert "Tim Kunz" in out["hint"]["name"]
+    both = build(reading(row("1", "9", "Tim Kunz", strips={"name": "Tim Kunz", "start_number": "7"})),
+                 TEMPLATE, people)["rows"][0]
+    assert "name" in both["uncertain"]
+    # Passt der Name sonst zu keinem besser, bestätigt die Startnummer weiter.
+    alone = build(reading(row("1", "7", "Tim Kunz", strips={"name": "Tim Kunz", "start_number": "7"})),
+                  TEMPLATE, people[:1])["rows"][0]
+    assert (alone["participant_id"], alone["uncertain"]) == ("kunze", [])
+
+
+def test_a_lookalike_alone_never_makes_an_unknown_driver_green():
+    """Prüfer zu #2012: „Amie“ ist nicht „Arnie“ und „Kim“ nicht „Kirn“ - ein Treffer nur über Verwechslungen (rn/m,
+    l/1/I, 0/O …) oder bloße Ähnlichkeit wird vorgeschlagen, bleibt aber gelb, bis die Startnummer ihn bestätigt."""
+    for text, known in (("Amie", "Arnie"), ("Kim", "Kirn"), ("Hasell803", "Hasel1803")):
+        out = build(reading(row("1", "", text, strips={"name": text}, conf=99)), TEMPLATE,
+                    [{"id": "x", "name": known, "start_number": "5"}])["rows"][0]
+        assert (out["participant_id"], out["name"], out["uncertain"]) == ("x", known, ["name"]), text
+        confirmed = build(reading(row("1", "5", text, strips={"name": text, "start_number": "5"}, conf=99)), TEMPLATE,
+                          [{"id": "x", "name": known, "start_number": "5"}])["rows"][0]
+        assert (confirmed["participant_id"], confirmed["uncertain"]) == ("x", []), text
+    head = build(reading(row("1", name="Arnie"), header={"driver_of_the_day": r("Amie", 99)}), TEMPLATE,
+                 [{"id": "x", "name": "Arnie"}])
+    assert head["driver_of_the_day"]["uncertain"] == ["name"]
+    # Teams genauso: „Rotor Rac1ng“ ist nur über die Verwechslung „Rotor Racing“ - gelb.
+    team = build(reading(row("1", "7", "Anna Probe", "Rotor Rac1ng", strips={"team": "Rotor Rac1ng"})), TEMPLATE,
+                 PEOPLE)["rows"][0]
+    assert (team["team"], team["uncertain"]) == ("Rotor Racing", ["team"])
 
 
 def test_a_name_known_only_from_another_season_is_prefilled_but_yellow():

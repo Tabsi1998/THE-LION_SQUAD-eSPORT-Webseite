@@ -49,6 +49,10 @@ _FOLDS = (("rn", "m"), ("ii", "u"))
 # Ähnlichkeit, wenn zwei Namen erst mit den Verwechslungen gleich sind - knapp unter einem genauen Treffer, damit der
 # genau passende Name gewinnt und zwei so ähnliche Teilnehmer nie eindeutig sind (``name_margin``).
 LOOKALIKE_SCORE = 0.98
+# Genau so gelesen (gleicher Schlüssel: Groß/klein, Leerzeichen und Satzzeichen zählen nicht). Nur so ist ein Name oder
+# Team ohne weitere Bestätigung grün - ein Treffer über Verwechslungen oder bloße Ähnlichkeit kann auch ein anderer
+# Fahrer sein („Amie“ ist nicht „Arnie“, Prüfer zu #2012).
+EXACT_SCORE = 1.0
 # Ab dieser Ähnlichkeit zum Teilnehmer lernt das Blatt eine gelesene Schreibweise (#2012, ``learnable``) - ganz andere
 # Namen sind keine Verlesung, sondern eine andere Zeile.
 LEARN_SIMILARITY = 0.5
@@ -687,8 +691,12 @@ def _match_people(reading: Reading, rows: list[dict[str, Decision]], pool: list[
                                 for text in texts)
             best["texts"] = texts
             # Eindeutig nur mit Abstand zum Zweitbesten (#2012) - auch einem aus einer anderen Saison der Spur.
-            best["second"] = max((score for score, candidate in ranked if candidate is not best["candidate"]),
-                                 default=0.0)
+            rival = next(((score, candidate) for score, candidate in ranked if candidate is not best["candidate"]),
+                         None)
+            best["second"] = rival[0] if rival else 0.0
+            best["rival"] = str(rival[1].participant.get("name") or "") if rival else ""
+            # Bestätigen kann die Startnummer nur, wenn Seite und Streifen dieselbe lesen.
+            best["number_unique"] = len(numbers) == 1
         proposals.append(best)
     taken: dict[str, dict] = {}
     lost: set[int] = set()
@@ -795,7 +803,8 @@ def _team_out(decision: Decision | None, match: dict | None, pool: TeamPool, tea
         second = ranked[1][0] if len(ranked) > 1 else 0.0
         hint = f"wie in Saison {pool.seasons[team]}" if team in pool.seasons else None
         if score >= name_sure:
-            sure = (team not in pool.seasons and score - second >= margin
+            # Grün nur genau so gelesen (Prüfer zu #2012: eine Verwechslung allein kann ein anderes Team sein).
+            sure = (team not in pool.seasons and score >= EXACT_SCORE and score - second >= margin
                     and _all_reads_say(texts or [read], pool, team, name_sure, own))
             return team, sure, hint
         if score >= team_match:
@@ -835,11 +844,17 @@ def _row_out(index: int, row: dict[str, Decision], match: dict | None, teams: Te
         out["participant_id"] = person["id"]
         out["name"] = person.get("name") or ""
         own_number = str(person.get("start_number") or "").strip()
-        # Eindeutig (#2012): sehr ähnlich und klar vor dem Zweitbesten - oder ähnlich und die Startnummer passt.
-        name_ok = ((match["score"] >= name_sure and match["score"] - match.get("second", 0.0) >= margin)
-                   or (match["score"] >= name_match and match["number_hit"]))
-        if name and not (name_ok and match.get("agree", True)):
+        score, second = match["score"], match.get("second", 0.0)
+        # Eindeutig (#2012): genau so gelesen (Name, Alias oder gelernte Schreibweise) und klar vor dem Zweitbesten. Ein
+        # Treffer nur über Verwechslungen (l/1/I, 0/O, rn/m …) oder Ähnlichkeit wird erst grün, wenn die Startnummer
+        # ihn bestätigt - eindeutig gelesen, und kein anderer Teilnehmer passt beim Namen gleich gut oder besser.
+        exact = score >= EXACT_SCORE and score - second >= margin
+        by_number = (match["number_hit"] and match.get("number_unique", True) and score >= name_match
+                     and second < score)
+        if name and not ((exact or by_number) and match.get("agree", True)):
             uncertain.append("name")
+            if match["number_hit"] and second >= score and match.get("rival"):
+                hint["name"] = f"Name passt auch zu „{match['rival'][:TEXT_LIMIT]}“"
         if name and not match.get("agree", True):
             read["name"] = _reads_text(match.get("texts") or [name.raw])
         elif name and name.raw and clean_text(name.raw) != out["name"]:
@@ -936,8 +951,9 @@ def _row_out(index: int, row: dict[str, Decision], match: dict | None, teams: Te
 
 def _person(text: str, pool: list[Candidate], name_match: float, name_sure: float,
             margin: float = 0.1) -> tuple[str, str | None, bool]:
-    """Ein Name aus dem Kopf: Teilnehmer (Name, Kennung, sicher?) oder der gelesene Text. Sicher nur eindeutig und nur
-    ein Teilnehmer dieser Saison (#2012); einer aus einer anderen Saison der Spur wird nur vorgeschlagen."""
+    """Ein Name aus dem Kopf: Teilnehmer (Name, Kennung, sicher?) oder der gelesene Text. Sicher nur genau so gelesen,
+    eindeutig und nur ein Teilnehmer dieser Saison (#2012); einer aus einer anderen Saison der Spur wird nur
+    vorgeschlagen, ebenso ein Treffer nur über Verwechslungen (im Kopf steht keine Startnummer, die bestätigt)."""
     scored = best_name([text], pool)
     if scored and scored[0][0] >= name_match:
         score, candidate = scored[0]
@@ -945,7 +961,7 @@ def _person(text: str, pool: list[Candidate], name_match: float, name_sure: floa
         if candidate.foreign:
             return candidate.participant.get("name") or "", None, False
         return (candidate.participant.get("name") or "", candidate.participant["id"],
-                score >= name_sure and score - second >= margin)
+                score >= max(name_sure, EXACT_SCORE) and score - second >= margin)
     return clean_text(text), None, False
 
 
