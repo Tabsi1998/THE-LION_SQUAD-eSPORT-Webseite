@@ -354,12 +354,21 @@ async def process_pending(limit: int = 10, *, only_id: str | None = None) -> dic
     return {"processed": processed}
 
 
+def _raster_of(path: Path) -> Path | None:
+    """Ein SVG-Logo (#1952) prüft und zeigt die Bildprüfung über seine PNG-Fassung daneben (gleicher Name)."""
+    if path.suffix.lower() != ".svg":
+        return path
+    sibling = path.with_suffix(".png")
+    return sibling if sibling.is_file() else None
+
+
 async def process_one(db, doc: dict, settings: dict) -> dict:
     path = Path(doc["path"])
-    if not path.is_file():
+    target = _raster_of(path)
+    if not path.is_file() or target is None:
         return await _finish(db, doc, "failed", error="Datei fehlt")
     try:
-        result = await run_provider(db, settings, path)
+        result = await run_provider(db, settings, target)
     except Exception as exc:  # noqa: BLE001
         message = f"{exc}"[:200]
         logger.warning("[media_scan] %s (%s, Versuch %s): %s", doc["id"], settings["provider"], doc.get("attempts"), message)
@@ -409,6 +418,10 @@ def _quarantine(doc: dict) -> str | None:
     ensure_directory(QUARANTINE_DIR)
     key = f"{doc['id']}{source.suffix.lower()}"
     shutil.move(str(source), str(QUARANTINE_DIR / key))
+    raster = source.with_suffix(".png")
+    if source.suffix.lower() == ".svg" and raster.is_file():
+        # SVG-Logo (#1952): die PNG-Fassung geht mit, sonst bliebe das Logo darüber sichtbar.
+        shutil.move(str(raster), str((QUARANTINE_DIR / key).with_suffix(".png")))
     _variant_cleanup(source)
     return key
 
@@ -424,6 +437,9 @@ def _restore(doc: dict) -> bool:
     target = Path(doc["path"])
     ensure_directory(target.parent)
     shutil.move(str(source), str(target))
+    raster = source.with_suffix(".png")
+    if source.suffix.lower() == ".svg" and raster.is_file():
+        shutil.move(str(raster), str(target.with_suffix(".png")))
     return True
 
 
@@ -455,7 +471,9 @@ def placeholder_png(state: str) -> bytes:
 async def placeholder_for(db, url: str) -> bytes | None:
     """Liegt das Bild hinter dieser Adresse in der Quarantäne (Prüfung nötig oder entfernt), der passende
     Platzhalter - sonst None, dann gilt 404 wie bisher."""
-    doc = await db.media_scans.find_one({"url": url, "kind": "upload", "state": {"$in": ["review", "blocked"]}},
+    # Die PNG-Fassung eines SVG-Logos (#1952) steht für das SVG - geprüft wird beides zusammen.
+    urls = [url, f"{url[:-4]}.svg"] if url.lower().endswith(".png") else [url]
+    doc = await db.media_scans.find_one({"url": {"$in": urls}, "kind": "upload", "state": {"$in": ["review", "blocked"]}},
                                         {"_id": 0, "state": 1}, sort=[("created_at", -1)])
     if not doc:
         return None
@@ -465,9 +483,10 @@ async def placeholder_for(db, url: str) -> bytes | None:
 def preview_path(doc: dict) -> Path | None:
     if doc.get("quarantine_key"):
         path = QUARANTINE_DIR / doc["quarantine_key"]
-        return path if path.is_file() else None
-    path = Path(doc.get("path") or "")
-    return path if path.is_file() else None
+    else:
+        path = Path(doc.get("path") or "")
+    # Ein SVG-Logo (#1952) zeigt die Moderation als seine PNG-Fassung.
+    return _raster_of(path) if path.is_file() else None
 
 
 # Wo der Stand der Prüfung am Bild steht: Chat-Anhang, Foto vom Ergebnis (#1157), eingesandtes Galerie-Foto (#1186)
@@ -640,6 +659,8 @@ async def purge_quarantine(db, *, now=None) -> int:
     for row in rows:
         path = QUARANTINE_DIR / row["quarantine_key"]
         path.unlink(missing_ok=True)
+        if path.suffix.lower() == ".svg":
+            path.with_suffix(".png").unlink(missing_ok=True)
         await db.media_scans.update_one({"id": row["id"]}, {"$set": {"quarantine_key": None, "original_removed_at": now_utc().isoformat()}})
         removed += 1
     return removed

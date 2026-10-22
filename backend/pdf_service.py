@@ -22,6 +22,8 @@ from reportlab.platypus import (
 )
 from PIL import Image
 
+from services.svg_logo import raster_path
+
 CLUB_TZ = ZoneInfo("Europe/Vienna")
 
 
@@ -193,7 +195,8 @@ def _local_upload_path(url: str | None) -> Path | None:
     for base in (PUBLIC_UPLOAD_DIR, UPLOAD_DIR):
         candidate = base / filename
         if candidate.is_file():
-            return candidate
+            # Ein SVG-Logo (#1952) kommt als seine PNG-Fassung ins PDF.
+            return raster_path(candidate)
     return None
 
 

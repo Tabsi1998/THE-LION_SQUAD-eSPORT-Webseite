@@ -3,7 +3,9 @@ import { Check, Crop, RotateCcw, RotateCw, Upload, X, Image as ImageIcon } from 
 import { api, formatApiError, resolveMediaUrl } from "@/lib/api";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { logUploadClientFailure } from "@/lib/uploadDiagnostics";
+import { isSvgFile, isSvgUpload } from "@/lib/svgLogo";
 import { AvatarCropDialog } from "./AvatarCropDialog";
+import { LogoSurfaces } from "./LogoSurfaces";
 import { toast } from "sonner";
 
 const parseUploadMb = (value, fallback) => {
@@ -59,13 +61,18 @@ function endpointWithMediaScope(endpoint, scope) {
   return `${endpoint}${separator}media_scope=${encodeURIComponent(scope)}`;
 }
 
-function fileLooksSupported(file) {
+function fileLooksSupported(file, logo = false) {
   const type = (file.type || "").toLowerCase();
-  return SUPPORTED_IMAGE_TYPES.has(type) || SUPPORTED_IMAGE_EXT_RE.test(file.name || "");
+  return SUPPORTED_IMAGE_TYPES.has(type) || SUPPORTED_IMAGE_EXT_RE.test(file.name || "") || (logo && isSvgFile(file));
 }
 
-// SVG bleibt gesperrt (#1419); die Meldung sagt, was stattdessen geht - derselbe Wortlaut wie am Server.
+// SVG nur in Logo-Feldern (#1952; vorher ganz gesperrt, #1419). Anderswo sagt die Meldung, was stattdessen geht -
+// derselbe Wortlaut wie am Server.
 export const SVG_REFUSED_MESSAGE = "SVG-Dateien gehen hier nicht. Bitte als PNG mit durchsichtigem Hintergrund (z. B. 2000 px breit) oder als WebP exportieren – die Website macht daraus alle Größen.";
+export const LOGO_HINT = "Am besten SVG, sonst PNG mit durchsichtigem Hintergrund.";
+const SVG_MAX_MB = parseUploadMb(import.meta.env.VITE_MAX_SVG_UPLOAD_MB, 1);
+// Derselbe Wortlaut wie am Server (services/svg_logo.py) - ein zu großes SVG geht gar nicht erst los.
+const SVG_TOO_BIG_MESSAGE = `Das SVG ist zu groß (höchstens ${SVG_MAX_MB} MB). Bitte schlanker exportieren oder als PNG hochladen.`;
 
 export function unsupportedImageMessage(file) {
   const type = (file?.type || "").toLowerCase();
@@ -74,12 +81,13 @@ export function unsupportedImageMessage(file) {
 }
 
 function ImagePreviewBox({ value, previewClass, onClear, testId }) {
-  const [state, setState] = useState(value ? "loading" : "empty");
   const src = value ? resolveMediaUrl(value) : "";
-
-  useEffect(() => {
-    setState(value ? "loading" : "empty");
-  }, [value]);
+  // Der Stand gehört zur Adresse: ein neues Bild beginnt wieder bei „Lade Vorschau“. Kein Zurücksetzen im Effekt - ein
+  // Bild aus dem Zwischenspeicher (etwa dasselbe Logo in der Vorschau hell/dunkel, #1952) ist sonst schon geladen,
+  // bevor der Effekt läuft, und die Vorschau bliebe bei „Lade Vorschau“ stehen.
+  const [status, setStatus] = useState({ src: "", state: "loading" });
+  const state = !value ? "empty" : status.src === src ? status.state : "loading";
+  const setState = (next) => setStatus({ src, state: next });
 
   return (
     <div className={`${previewClass} bg-[#0A0A0A] border ${value ? "border-white/10" : "border-dashed border-white/20"} rounded-sm overflow-hidden shrink-0 relative group`} data-testid={`${testId}-preview`}>
@@ -334,10 +342,13 @@ export async function prepareImageForUpload(file, maxSizeMb = DEFAULT_IMAGE_UPLO
  *   variant: "square" | "wide" (visual)
  *   crop: "round" | "square" | "banner" - Zuschnitt wie in der App (#1153): Profilbild rund, Logo quadratisch, Banner 3:1;
  *         "round" öffnet den Profilbild-Zuschnitt (#1459: runde Vorschau, Zoom, Verschieben, quadratisch bis 512 px)
- *   endpoint: "/uploads/image" (default), "/uploads/logo" or "/uploads/sponsor-logo"
+ *   endpoint: "/uploads/image" (default), "/uploads/logo", "/uploads/sponsor-logo" or "/uploads/team-logo?team_id=…"
  *   mediaScope: "user" | "admin" | "sponsor" | "branding" | "gallery"; defaults by route
+ *   logo: Logo-Feld (#1952) - nimmt auch SVG (ohne Zuschnitt, der Server bereinigt es), Hinweis „Am besten SVG“,
+ *         Vorschau auf hellem und dunklem Grund (`logoPreview={false}`, wenn das Feld sie selbst zeigt). SVG nimmt der
+ *         Server nur über die Logo-Routen an (`endpoint` oben, mit Rechteprüfung) - nie über `/uploads/image`.
  */
-export function ImageUpload({ value, onChange, label, testId = "image-upload", variant = "square", crop, endpoint = "/uploads/image", maxSizeMb = DEFAULT_IMAGE_UPLOAD_MB, allowLibrary = false, mediaScope, libraryEndpoint }) {
+export function ImageUpload({ value, onChange, label, testId = "image-upload", variant = "square", crop, endpoint = "/uploads/image", maxSizeMb = DEFAULT_IMAGE_UPLOAD_MB, allowLibrary = false, mediaScope, libraryEndpoint, logo = false, logoPreview = true }) {
   const fileRef = useRef(null);
   const cropBoxRef = useRef(null);
   const previewCanvasRef = useRef(null);
@@ -428,9 +439,20 @@ export function ImageUpload({ value, onChange, label, testId = "image-upload", v
 
   const handleFile = async (file) => {
     if (!file) return;
-    if (!fileLooksSupported(file)) {
+    if (!fileLooksSupported(file, logo)) {
       toast.error(unsupportedImageMessage(file));
       if (fileRef.current) fileRef.current.value = "";
+      return;
+    }
+    // SVG-Logo (#1952): ohne Zuschnitt und ohne Umrechnen im Browser - der Server bereinigt es und schneidet leere
+    // Ränder ab; ein zu großes geht gar nicht erst los.
+    if (logo && isSvgFile(file)) {
+      if (file.size > SVG_MAX_MB * 1024 * 1024) {
+        toast.error(SVG_TOO_BIG_MESSAGE);
+        if (fileRef.current) fileRef.current.value = "";
+        return;
+      }
+      await uploadFile(file, null, { prepared: true });
       return;
     }
     // Profilbild (#1459): eigener Zuschnitt mit runder Vorschau, Zoom und Verschieben - Ergebnis immer quadratisch.
@@ -558,6 +580,8 @@ export function ImageUpload({ value, onChange, label, testId = "image-upload", v
   const previewClass = variant === "wide"
     ? "aspect-[16/9] w-full"
     : "w-20 h-20";
+  // SVG-Logos (#1952) nur in Logo-Feldern - ein Profilbild oder Banner bekommt sie gar nicht erst angeboten.
+  const libraryItems = logo ? library : library.filter((item) => !isSvgUpload(item.url));
   return (
     <div>
       {label && <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">{label}</div>}
@@ -568,7 +592,7 @@ export function ImageUpload({ value, onChange, label, testId = "image-upload", v
           <input
             ref={fileRef}
             type="file"
-            accept="image/png,image/jpeg,image/webp"
+            accept={logo ? "image/png,image/jpeg,image/webp,image/svg+xml,.svg" : "image/png,image/jpeg,image/webp"}
             className="hidden"
             onChange={(e) => handleFile(e.target.files?.[0])}
             data-testid={`${testId}-file`}
@@ -613,9 +637,12 @@ export function ImageUpload({ value, onChange, label, testId = "image-upload", v
               </button>
             </div>
           )}
-          <p className="text-[10px] text-white/40">PNG/JPG/WebP bis {maxSizeMb} MB. SVG geht nicht.</p>
+          <p className="text-[10px] text-white/40" data-testid={`${testId}-hint`}>
+            {logo ? `${LOGO_HINT} SVG bis ${SVG_MAX_MB} MB, Bilder bis ${maxSizeMb} MB.` : `PNG/JPG/WebP bis ${maxSizeMb} MB. SVG geht nicht.`}
+          </p>
         </div>
       </div>
+      {logo && logoPreview && <LogoSurfaces src={value} testId={testId} />}
       {libraryOpen && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm p-4 overflow-y-auto" onClick={() => setLibraryOpen(false)}>
           <div className="max-w-4xl mx-auto bg-[#121212] border border-white/10 rounded-sm p-5" onClick={(e) => e.stopPropagation()}>
@@ -625,11 +652,11 @@ export function ImageUpload({ value, onChange, label, testId = "image-upload", v
             </div>
             {loadingLibrary ? (
               <div className="text-white/40 py-12 text-center">Lade Medien…</div>
-            ) : library.length === 0 ? (
+            ) : libraryItems.length === 0 ? (
               <div className="text-white/40 py-12 text-center">Keine Bilder vorhanden.</div>
             ) : (
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-                {library.map((item) => (
+                {libraryItems.map((item) => (
                   <button
                     key={item.filename}
                     type="button"

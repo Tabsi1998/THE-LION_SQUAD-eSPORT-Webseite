@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { resolveMediaUrl } from "@/lib/api";
 import { getCachedBranding, onBrandingUpdated } from "@/lib/brandingEvents";
+import { rasterLogoUrl } from "@/lib/svgLogo";
 
 const DEFAULT_SITE_TITLE = "THE LION SQUAD - eSPORTS";
 const DEFAULT_SHARE_IMAGE = "/assets/brand/og-default.png";
@@ -77,7 +78,8 @@ export function useDocumentTitle(title, description, options = {}) {
     const base = titleBase(branding);
     const fullTitle = title ? `${title} · ${base}` : base;
     const canonicalHref = options.canonical || `${window.location.origin}${window.location.pathname}`;
-    const image = resolveMediaUrl(options.image || branding?.share_banner_url || branding?.logo_url || branding?.mascot_url || DEFAULT_SHARE_IMAGE);
+    // Teilen-Bilder sind Rasterbilder: ein SVG-Logo kommt als PNG-Fassung (#1952).
+    const image = resolveMediaUrl(rasterLogoUrl(options.image || branding?.share_banner_url || branding?.logo_url || branding?.mascot_url || DEFAULT_SHARE_IMAGE));
     const type = options.type || "website";
     const robots = options.robots || "index, follow";
     const previousTitle = document.title;

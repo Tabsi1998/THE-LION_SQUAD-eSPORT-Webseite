@@ -194,7 +194,7 @@ function PartnerForm({ partner, locked = new Set(), onClose, onSaved }) {
   return (
     <AdminSheet title={isNew ? "Neuer Partner" : "Partner bearbeiten"} eyebrow="Verein" onClose={onClose} onSubmit={save} saving={saving} submitTestId="partner-save" testId="partner-sheet">
       <TextField label="Name" value={form.name} onChange={(v) => set("name", v)} required testId="partner-name" {...lock("name")} />
-      <ImageUpload value={form.logo_url} onChange={(v) => set("logo_url", v)} label="Logo" testId="partner-logo" variant="square" endpoint="/uploads/logo" allowLibrary />
+      <ImageUpload value={form.logo_url} onChange={(v) => set("logo_url", v)} label="Logo" testId="partner-logo" variant="square" endpoint="/uploads/logo" allowLibrary logo />
       {imageSourceText(partner?.dolibarr_image_summary) && (
         <p className="text-xs text-white/60 border border-white/10 rounded-sm px-3 py-2" data-testid="partner-images-hint">
           {imageSourceText(partner.dolibarr_image_summary)}. Die Website zeigt die Fassung für dunklen Hintergrund; das Logo hier springt nur ein, wo

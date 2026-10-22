@@ -15,6 +15,7 @@ from urllib.parse import urlparse
 
 from PIL import Image, ImageDraw
 
+from services.svg_logo import raster_path
 from storage import PUBLIC_UPLOAD_DIR, UPLOAD_DIR, ensure_directory
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -73,7 +74,8 @@ def asset_path(url: str | None) -> Path | None:
     for base in (PUBLIC_UPLOAD_DIR, UPLOAD_DIR):
         candidate = base / name
         if candidate.is_file():
-            return candidate
+            # Ein SVG-Logo (#1952) kommt als seine PNG-Fassung auf den Kreis.
+            return raster_path(candidate)
     return None
 
 

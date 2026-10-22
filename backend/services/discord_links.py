@@ -8,6 +8,7 @@ import os
 from urllib.parse import urlparse
 
 from database import get_db
+from services.svg_logo import raster_url
 
 
 def _normalize_base_url(value: str | None) -> str:
@@ -49,7 +50,7 @@ async def _public_avatar_url(value: str | None) -> str | None:
         return None
     parsed = urlparse(avatar_url)
     if _is_public_http_url(avatar_url):
-        return avatar_url
+        return raster_url(avatar_url)  # SVG-Logo als PNG (#1952) - Discord zeigt kein SVG
     if parsed.scheme:
         return None
     base = await _public_base_url()
@@ -63,7 +64,7 @@ async def _public_avatar_url(value: str | None) -> str | None:
     else:
         path = f"/api/static/uploads/{raw_path}"
     candidate = f"{base}{path}"
-    return candidate if _is_public_http_url(candidate) else None
+    return raster_url(candidate) if _is_public_http_url(candidate) else None
 
 
 async def _public_link_url(value: str | None) -> str | None:

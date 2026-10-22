@@ -1,7 +1,11 @@
+import { isSvgUpload } from "@/lib/svgLogo";
+
 // Logo und Banner der Partner aus dem Vereinsmodul (#880): die Verwaltung zeigt, was die Website zeigt - auf dunklem
-// Grund die dunkle Fassung aus Dolibarr, sonst die helle, sonst das hier hochgeladene Logo.
+// Grund die dunkle Fassung aus Dolibarr, sonst die helle, sonst das hier hochgeladene Logo. Ein hier hochgeladenes
+// SVG-Logo geht vor (#1952, wie services/sponsor_images.pick).
 
 export function shownLogo(entry) {
+  if (isSvgUpload(entry?.logo_url)) return entry.logo_url;
   const logo = entry?.dolibarr_images?.logo || {};
   return logo.dark?.url || logo.light?.url || entry?.logo_url || "";
 }

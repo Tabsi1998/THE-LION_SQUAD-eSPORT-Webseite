@@ -14,6 +14,7 @@ from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from database import get_db
 from services import site_texts
 from services.slug_utils import find_by_slug_or_history
+from services.svg_logo import raster_url
 from services.visibility import user_can_see
 from services.private_fields import private_projection
 
@@ -938,11 +939,13 @@ def public_origin(request: Request, branding: dict) -> str:
 
 
 def absolute_url(value: str | None, origin: str) -> str:
+    """Volle Adresse für Teilen-Karten und strukturierte Daten. Ein hochgeladenes SVG-Logo kommt als seine
+    PNG-Fassung (#1952) - Vorschauen in Messengern und Suchmaschinen zeigen kein SVG."""
     raw = str(value or "").strip()
     if not raw:
         raw = "/assets/brand/tls-mascot.png"
     if raw.startswith(("http://", "https://")):
-        return raw
+        return raster_url(raw)
     if raw.startswith("uploads/"):
         raw = f"/api/static/{raw}"
     elif raw.startswith("static/uploads/"):
@@ -951,7 +954,7 @@ def absolute_url(value: str | None, origin: str) -> str:
         raw = f"/{raw}"
     elif not raw.startswith("/"):
         raw = f"/{raw}"
-    return f"{origin}{raw}"
+    return raster_url(f"{origin}{raw}")
 
 
 def image_mime_type(value: str | None) -> str:

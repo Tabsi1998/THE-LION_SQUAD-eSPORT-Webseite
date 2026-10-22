@@ -388,8 +388,8 @@ Spur: …“) und kann eigene ergänzen, etwa einen Sponsor nur dieser Season.
 
 <img src="../assets/serien/serien-partner-chronik.png" alt="Chronik: Zeile mit kleinem Partner-Abzeichen des Veranstalters" width="560">
 
-**Logo der Spur und der Saison:** Im Blatt der Spur steht das Feld **Logo**: **Hochladen** (PNG, JPG oder WebP, am
-besten PNG mit durchsichtigem Hintergrund – leere Ränder schneidet der Upload ab), **Medien wählen** aus der Mediathek
+**Logo der Spur und der Saison:** Im Blatt der Spur steht das Feld **Logo**: **Hochladen** (am besten SVG, sonst PNG
+mit durchsichtigem Hintergrund – leere Ränder schneidet der Upload ab), **Medien wählen** aus der Mediathek
 oder **Entfernen**. Darunter zeigt die Vorschau das Logo auf **hellem und dunklem Grund**. Eine Adresse von außen lässt
 sich nicht eintragen. Jede Saison erbt das Logo ihrer Spur; im Blatt der Saison lässt sich ein **eigenes Logo** setzen,
 etwa ein Saison-Logo „Season 2“ – das geht dann vor. Das Logo steht wie hochgeladen, nie eingefärbt:

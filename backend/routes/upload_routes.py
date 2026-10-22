@@ -4,6 +4,7 @@ Public media is stored on local disk and served through
 /api/static/uploads/{filename}. A legacy /uploads/{filename} route is also kept
 for older stored URLs.
 """
+import asyncio
 import uuid
 import pathlib
 import logging
@@ -47,6 +48,7 @@ from services.image_upload import (  # noqa: F401 - umgezogen (#1420), hier weit
     SVG_REFUSED_MESSAGE,
     looks_like_svg,
 )
+from services import svg_logo
 from services.image_variants import schedule_variants
 from services.permissions import MFA_MESSAGE, admin_role_without_second_factor, is_confirmed_admin_role
 from services.rate_limit import enforce_rate_limit, get_client_ip
@@ -322,20 +324,101 @@ def _create_original_image_preview(path: pathlib.Path, suffix: str) -> dict | No
     return _image_to_webp_preview(img)
 
 
+async def _enqueue_upload_scan(upload_id: str, me: dict, path: pathlib.Path, url: str, media_scope: str, filename: str) -> None:
+    # Bildprüfung (#415): im Hintergrund; ein entferntes Bild verliert Avatar-, Banner- und Teamlogo-Verweise.
+    try:
+        from services import media_scan
+
+        await media_scan.enqueue(get_db(), kind="upload", ref_id=upload_id, owner_id=me.get("id"), path=path, url=url, context={"media_scope": media_scope})
+    except Exception as exc:  # noqa: BLE001 - der Upload gilt; der Sammler holt die Prüfung nach
+        logger.warning("[uploads] Bildprüfung für %s nicht angestoßen: %s", filename, exc)
+
+
+async def _upload_svg_impl(data: bytes, me: dict, trim_empty_borders: bool, media_scope: str, filename_hint: str,
+                           request: Request | None = None) -> dict:
+    """Logo als SVG (#1952): bereinigt gespeichert, daneben die PNG-Fassung für alles, was kein SVG kann. Je Konto
+    begrenzt (``SVG_UPLOAD_RATE_LIMIT``) - das Zeichnen kostet Rechenzeit."""
+    if request is not None:
+        await enforce_rate_limit(request, "uploads:svg", limit=svg_logo.SVG_UPLOAD_RATE_LIMIT,
+                                 window_seconds=svg_logo.SVG_UPLOAD_RATE_WINDOW_SECONDS, subject=me["id"])
+    try:
+        stored = await asyncio.to_thread(svg_logo.store, data, trim=trim_empty_borders, directory=PUBLIC_UPLOAD_DIR)
+    except svg_logo.SvgRejected as exc:
+        # Feste Meldung zum Grund - nie Text aus der Datei oder einer Ausnahme.
+        raise HTTPException(status_code=svg_logo.STATUS.get(exc.code, 400), detail=svg_logo.MESSAGES[exc.code]) from None
+    except OSError as exc:
+        logger.error("[uploads] failed to write svg logo: %s", type(exc).__name__)
+        raise HTTPException(status_code=500, detail="Upload-Speicher ist nicht beschreibbar. Bitte Docker-Volume/UPLOAD_DIR prüfen.")
+    # Die kleineren Fassungen der PNG gleich mitbauen (#232) - die App und Mails nehmen sie.
+    schedule_variants(stored["raster_path"])
+    filename = stored["filename"]
+    url = f"/api/static/uploads/{filename}"
+    raster_url = f"/api/static/uploads/{stored['raster_filename']}"
+    upload_id = new_id()
+    try:
+        await get_db().media_uploads.insert_one({
+            "id": upload_id,
+            "filename": filename,
+            "url": url,
+            "size": stored["size"],
+            "original_size": len(data),
+            "width": stored["width"],
+            "height": stored["height"],
+            "original_width": stored["width"],
+            "original_height": stored["height"],
+            "original_filename": filename_hint,
+            "mime": "image/svg+xml",
+            "ext": "svg",
+            "media_type": "image",
+            "raster_url": raster_url,
+            "raster_filename": stored["raster_filename"],
+            "owner_id": me.get("id"),
+            "owner_role": me.get("role"),
+            "media_scope": media_scope,
+            "cutout": False,
+            "created_at": now_utc().isoformat(),
+            "updated_at": now_utc().isoformat(),
+        })
+    except Exception as exc:
+        logger.warning("[uploads] media metadata write failed for %s: %s", filename, exc)
+    await _enqueue_upload_scan(upload_id, me, stored["path"], url, media_scope, filename)
+    return {
+        "url": url,
+        "filename": filename,
+        "size": stored["size"],
+        "original_size": len(data),
+        "mime": "image/svg+xml",
+        "media_type": "image",
+        "media_scope": media_scope,
+        "width": stored["width"],
+        "height": stored["height"],
+        "original_width": stored["width"],
+        "original_height": stored["height"],
+        "cutout": False,
+        "raster_url": raster_url,
+    }
+
+
 async def _upload_image_impl(
     file: UploadFile,
     me: dict,
     trim_empty_borders: bool = False,
     media_scope: str = "user",
+    allow_svg: bool = False,
+    request: Request | None = None,
 ):
     """Upload an image. Returns public URL `/api/static/uploads/{filename}`.
-    Accepts PNG/JPEG/WebP and re-encodes before serving."""
+    Accepts PNG/JPEG/WebP and re-encodes before serving. Auch SVG (#1952) - aber nur über die Logo-Routen, die
+    ``allow_svg`` nach ihrer Rechteprüfung setzen; nie über einen Schalter des Aufrufers."""
     media_scope = _clean_media_scope(media_scope, me)
     declared_content_type = file.content_type or ""
     suffix = pathlib.Path(file.filename or "").suffix.lower()
     filename_hint = file.filename or "upload"
     if looks_like_svg(suffix, declared_content_type):
-        raise HTTPException(status_code=400, detail=SVG_REFUSED_MESSAGE)
+        if not allow_svg:
+            raise HTTPException(status_code=400, detail=SVG_REFUSED_MESSAGE)
+        data = await file.read(svg_logo.MAX_SVG_BYTES + 1)
+        return await _upload_svg_impl(data, me, trim_empty_borders, media_scope, filename_hint, request)
     if declared_content_type and declared_content_type not in ALLOWED_IMAGE and suffix not in IMAGE_MIME_BY_EXT:
         raise HTTPException(
             status_code=400,
@@ -343,6 +426,9 @@ async def _upload_image_impl(
         )
     # Read & size check
     data = await _read_upload_limited(file, MAX_BYTES, MAX_IMAGE_UPLOAD_MB)
+    if allow_svg and looks_like_svg("", "", data):
+        # Als PNG benannt, aber ein SVG: im Logo-Feld wie ein SVG behandelt - bereinigt, nie roh.
+        return await _upload_svg_impl(data, me, trim_empty_borders, media_scope, filename_hint, request)
     encoded = _encode_image_bytes(data, declared_content_type, suffix, filename_hint, trim_empty_borders)
     data = encoded["data"]
     content_type, ext = encoded["content_type"], encoded["ext"]
@@ -387,13 +473,7 @@ async def _upload_image_impl(
         })
     except Exception as exc:
         logger.warning("[uploads] media metadata write failed for %s: %s", filename, exc)
-    # Bildprüfung (#415): im Hintergrund; ein entferntes Bild verliert Avatar-, Banner- und Teamlogo-Verweise.
-    try:
-        from services import media_scan
-
-        await media_scan.enqueue(get_db(), kind="upload", ref_id=upload_id, owner_id=me.get("id"), path=path, url=url, context={"media_scope": media_scope})
-    except Exception as exc:  # noqa: BLE001 - der Upload gilt; der Sammler holt die Prüfung nach
-        logger.warning("[uploads] Bildprüfung für %s nicht angestoßen: %s", filename, exc)
+    await _enqueue_upload_scan(upload_id, me, path, url, media_scope, filename)
     return {
         "url": url,
         "filename": filename,
@@ -582,6 +662,7 @@ async def upload_image(
     trim_empty_borders: bool = False,
     media_scope: str = "user",
 ):
+    """Bilder für jedes Feld - ohne SVG; Logos als SVG nur über ``/logo``, ``/sponsor-logo`` und ``/team-logo`` (#1952)."""
     started_at = time.perf_counter()
     scope_for_log = media_scope or "user"
     try:
@@ -710,11 +791,12 @@ async def record_upload_client_failure(
 
 @router.post("/sponsor-logo")
 async def upload_sponsor_logo(request: Request, file: UploadFile = File(...), me: dict = Depends(require_area("content", "tournaments", "club"))):
-    """Admin-only convenience alias for sponsor logos."""
+    """Admin-only convenience alias for sponsor logos. Auch als SVG (#1952)."""
     started_at = time.perf_counter()
     try:
         await _enforce_upload_rate_limit(request, me, "image", "sponsor")
-        result = await _upload_image_impl(file, me, trim_empty_borders=True, media_scope="sponsor")
+        result = await _upload_image_impl(file, me, trim_empty_borders=True, media_scope="sponsor", allow_svg=True,
+                                          request=request)
     except HTTPException as exc:
         await _record_upload_exception(request, me, file, endpoint="/uploads/sponsor-logo", media_scope="sponsor", kind="image", started_at=started_at, exc=exc)
         raise
@@ -739,12 +821,15 @@ async def upload_sponsor_logo(request: Request, file: UploadFile = File(...), me
 
 
 @router.post("/logo")
-async def upload_logo(request: Request, file: UploadFile = File(...), me: dict = Depends(require_area("content", "tournaments", "club"))):
-    """Admin-only logo upload with automatic whitespace trimming."""
+async def upload_logo(request: Request, file: UploadFile = File(...), me: dict = Depends(require_area("content", "tournaments", "club")),
+                      trim_empty_borders: bool = True):
+    """Admin-only logo upload with automatic whitespace trimming. Auch als SVG (#1952) - für Vereinslogo, Maskottchen,
+    Favicons, Partner, Spiele und Serien. ``trim_empty_borders=false`` lässt die Ränder, wie sie sind (Favicons)."""
     started_at = time.perf_counter()
     try:
         await _enforce_upload_rate_limit(request, me, "image", "branding")
-        result = await _upload_image_impl(file, me, trim_empty_borders=True, media_scope="branding")
+        result = await _upload_image_impl(file, me, trim_empty_borders=trim_empty_borders, media_scope="branding",
+                                          allow_svg=True, request=request)
     except HTTPException as exc:
         await _record_upload_exception(request, me, file, endpoint="/uploads/logo", media_scope="branding", kind="image", started_at=started_at, exc=exc)
         raise
@@ -767,6 +852,48 @@ async def upload_logo(request: Request, file: UploadFile = File(...), me: dict =
     )
     return result
 
+
+# Teamlogo als SVG (#1952): Leitung und Co-Leitung des Teams, dazu die Teamverwaltung (wie ``routes.team_routes``).
+TEAM_LOGO_ADMIN_ROLES = ("tournament_admin", "club_admin", "superadmin")
+
+
+@router.post("/team-logo")
+async def upload_team_logo(request: Request, team_id: str, file: UploadFile = File(...), me: dict = Depends(get_current_user)):
+    """Logo eines bestehenden Teams, auch als SVG (#1952). Nur wer das Team führt; ein neues Team bekommt sein Logo
+    zuerst als Bild über ``/image``."""
+    started_at = time.perf_counter()
+    try:
+        team = await get_db().teams.find_one({"id": team_id}, {"_id": 0, "leader_id": 1, "co_leader_ids": 1})
+        if not team:
+            raise HTTPException(status_code=404, detail="Team nicht gefunden")
+        leads = team.get("leader_id") == me.get("id") or me.get("id") in (team.get("co_leader_ids") or [])
+        if not leads and not is_confirmed_admin_role(me, TEAM_LOGO_ADMIN_ROLES):
+            if admin_role_without_second_factor(me, TEAM_LOGO_ADMIN_ROLES):
+                raise HTTPException(status_code=403, detail=MFA_MESSAGE)
+            raise HTTPException(status_code=403, detail="Das Logo kann nur die Leitung des Teams ändern.")
+        await _enforce_upload_rate_limit(request, me, "image", "user")
+        result = await _upload_image_impl(file, me, media_scope="user", allow_svg=True, request=request)
+    except HTTPException as exc:
+        await _record_upload_exception(request, me, file, endpoint="/uploads/team-logo", media_scope="user", kind="image", started_at=started_at, exc=exc)
+        raise
+    except Exception as exc:
+        await _record_upload_exception(request, me, file, endpoint="/uploads/team-logo", media_scope="user", kind="image", started_at=started_at, exc=exc)
+        raise
+    await _record_upload_event(
+        request,
+        me,
+        endpoint="/uploads/team-logo",
+        media_scope="user",
+        filename=file.filename,
+        size=result.get("original_size") or result.get("size") or _upload_declared_size(file),
+        mime=file.content_type,
+        kind="image",
+        status="success",
+        status_code=200,
+        duration_ms=_duration_ms(started_at),
+        result=result,
+    )
+    return result
 
 @router.post("/migrate-external-images")
 async def migrate_external_images(me: dict = Depends(require_area("system"))):

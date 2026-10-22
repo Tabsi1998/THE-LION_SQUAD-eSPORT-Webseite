@@ -24,7 +24,7 @@ Technische Hintergründe für die Entwicklung stehen in den Dateien unter [`docs
 | [TV und Beamer](tv.md) | Turnierbaum, Aufruf-Tafel, Hallen-Tafel, Stations-Ansicht und Fast-Lap-Rangliste auf Fernseher und Beamer – Link mit Schlüssel, Grundwerte, Sponsoren, Ton |
 | [Fast Lap](fastlap.md) | Challenge anlegen, Strecken und Wertung, Zeiten eintragen und prüfen, Fast-Lap-Team, Bestenliste und Bestzeit-Moment |
 | [Erfolge, Level und Jahreswertung](erfolge.md) | Erfolge vergeben und anlegen, Katalog, Level und Löwen-Rang (12 Ränge), XP und Prestige, Jahreswertung und Saisonabschluss, Jahresrückblick „Dein Jahr“ |
-| [Auftritt und Einstellungen](auftritt.md) | Branding (Logo als PNG), Farbe, Rechtliches und Cookies, Jahreszeiten, Adventkalender, Ostereiersuche, Startseite |
+| [Auftritt und Einstellungen](auftritt.md) | Branding (Logo am besten als SVG), Farbe, Rechtliches und Cookies, Jahreszeiten, Adventkalender, Ostereiersuche, Startseite |
 | [Abrechnung](../ABRECHNUNG.md) | Kosten an Events, Startgelder, Rechnungen und PDFs aus Dolibarr |
 | [Dolibarr](../DOLIBARR.md) | Mitgliederverwaltung, Zuordnung von Konten, Vereinsmodul |
 | [Rollen](../ROLLEN.md) | Wer im Admin was darf |
