@@ -278,6 +278,32 @@ async def migrate_result_row_teams(db) -> str:
     return f"{rows} result rows filled, {recomputed} series recomputed, {checked} series checked"
 
 
+DOUBLE_UP_SHEETS = ({"double_up": True}, {"pending_draft.double_up": True},
+                    {"rows.partner_id": {"$exists": True, "$nin": [None, ""]}})
+
+
+async def migrate_double_up_points(db) -> str:
+    """Double-Up-Punkte (#2015): neue Saisons rechnen ein Team auf Platz k wie Einzelplatz 2k−1 (wie PineApps). Damit
+    sich bestehende Tabellen nicht still ändern, bekommen Saisons, die schon ein Double-Up-Blatt haben (veröffentlicht
+    oder Entwurf), ausdrücklich die bisherige Rechnung ``team_place`` in ihre Regeln - ohne neue Regel-Version und ohne
+    Neurechnen, denn es ändert sich nichts. Umstellen auf 2k−1 ist danach eine Regeländerung in der Verwaltung (mit
+    Protokoll und Neurechnen). Eine Saison, die die Regel schon trägt, bleibt."""
+    kept = 0
+    async for series in db.reference_series.find({}, {"_id": 0, "id": 1, "rules": 1}):
+        rules = series.get("rules")
+        if not series.get("id") or not isinstance(rules, dict) or rules.get("double_up_points"):
+            continue
+        sheet = await db.reference_round_results.find_one({"series_id": series["id"], "$or": list(DOUBLE_UP_SHEETS)},
+                                                          {"_id": 1})
+        if sheet is None:
+            continue
+        result = await db.reference_series.update_one(
+            {"id": series["id"], "rules.double_up_points": {"$exists": False}},
+            {"$set": {"rules": {**rules, "double_up_points": "team_place"}}})
+        kept += int(getattr(result, "modified_count", 0) == 1)
+    return f"{kept} series keep double up points by team place"
+
+
 MIGRATIONS = (
     (1, "encrypt_legacy_integration_credentials", migrate_plaintext_secrets),
     (2, "team_leader_role_to_player", migrate_team_leader_role),
@@ -290,6 +316,7 @@ MIGRATIONS = (
     (8, "reference_series_own_teams", migrate_series_own_teams),
     (9, "game_map_spelling_keys", migrate_game_map_keys),  # #1616
     (10, "reference_result_row_teams", migrate_result_row_teams),  # #1960: leeres Team heißt kein Team
+    (11, "reference_double_up_points", migrate_double_up_points),  # #2015: bestehende Double-Up-Saisons bleiben bei k
 )
 
 
