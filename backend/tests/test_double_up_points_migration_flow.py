@@ -77,15 +77,44 @@ async def test_old_double_up_seasons_keep_team_place_and_their_table(flow):
     assert stored["entwurf"]["double_up_points"] == "team_place"
     assert "double_up_points" not in stored["einzel"] and "double_up_points" not in stored["leer"]
     assert stored["gewaehlt"]["double_up_points"] == "best_player_place"
-    # Die übrigen Regeln bleiben, und neu gerechnet ergibt die alte Saison dieselbe Tabelle (35/35/30/30).
+    # Die übrigen Regeln bleiben. Der Stand war schon mit der neuen Vorgabe gerechnet (26) - die Migration rechnet die
+    # Saison neu, danach steht wieder die alte Tabelle (35/35/30/30), ohne neue Regel-Version, mit Protokoll.
     assert {key: value for key, value in stored["alt"].items() if key != "double_up_points"} == {
         key: value for key, value in old["rules"].items()}
-    await reference_series.recompute_standings(db, {**old, "rules": stored["alt"]})
     assert await _points(db, "alt") == {"a": 35, "b": 35, "c": 30, "d": 30}
+    logs = [log["target_id"] async for log in db.audit_logs.find({"action": "reference_series.double_up_points"})]
+    assert sorted(logs) == ["alt", "entwurf"]
     # Eine Saison mit der Vorgabe rechnet wie PineApps: Team 2 → Einzelplatz 3 (26).
     assert await _points(db, "gewaehlt") == {"a": 35, "b": 35, "c": 26, "d": 26}
     # Ein zweiter Lauf ändert nichts.
     assert await migrations.migrate_double_up_points(db) == "0 series keep double up points by team place"
+
+
+@pytest.mark.asyncio
+async def test_a_failing_season_does_not_stop_the_others_and_the_next_run_finishes_it(flow, monkeypatch):
+    db = flow.db
+    await _season(db, "kaputt", _sheet("kaputt", DOUBLE))
+    await _season(db, "gut", _sheet("gut", DOUBLE))
+    assert await _points(db, "kaputt") == {"a": 35, "b": 35, "c": 26, "d": 26}  # schon mit der Vorgabe gerechnet
+    original = reference_series.recompute_standings
+
+    async def failing(db_, series):
+        if series["id"] == "kaputt":
+            raise RuntimeError("Neurechnen gescheitert")
+        return await original(db_, series)
+
+    monkeypatch.setattr(reference_series, "recompute_standings", failing)
+    with pytest.raises(migrations.MigrationIncomplete):
+        await migrations.migrate_double_up_points(db)
+    stored = {item["id"]: item["rules"] async for item in db.reference_series.find({}, {"_id": 0})}
+    # Die gute Saison ist fertig; die kaputte hat weder Regel noch neuen Stand - kein halber Zustand.
+    assert stored["gut"]["double_up_points"] == "team_place" and await _points(db, "gut") == {
+        "a": 35, "b": 35, "c": 30, "d": 30}
+    assert "double_up_points" not in stored["kaputt"]
+    assert await _points(db, "kaputt") == {"a": 35, "b": 35, "c": 26, "d": 26}
+    monkeypatch.setattr(reference_series, "recompute_standings", original)
+    assert await migrations.migrate_double_up_points(db) == "1 series keep double up points by team place"
+    assert await _points(db, "kaputt") == {"a": 35, "b": 35, "c": 30, "d": 30}
 
 
 def test_the_double_up_points_rule_is_migration_eleven():
