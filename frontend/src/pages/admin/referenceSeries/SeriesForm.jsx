@@ -11,6 +11,8 @@ import { WeekendFormatsField } from "./WeekendFormatsField";
 import { weekendPayload, weekendToForm } from "@/lib/raceWeekend";
 import { SeriesPartnersField } from "./SeriesPartnersField";
 import { inheritedPartners } from "@/lib/seriesPartners";
+import { inheritedLogoHint } from "@/lib/seriesLogo";
+import { SeriesLogoField } from "./SeriesLogoField";
 import { toast } from "sonner";
 
 // Saison einer Spur (#1741): Saison und Stufe ergeben die Adresse, die Vorlage füllt die Regeln vor (kopiert, nicht
@@ -108,6 +110,9 @@ export function SeriesForm({ series, lineage, schemes = [], defaultRules = {}, p
             hint="Nur, wenn der Veranstalter in dieser Saison anders aussieht als bei der Spur." />
         )}
       </FormGrid>
+      {/* #2014: eigenes Saison-Logo, etwa „Season 2“ - ohne erbt die Saison das Logo der Spur. */}
+      <SeriesLogoField value={form.logo_url} onChange={(v) => set("logo_url", v)} testId="series-logo" inherited={lineage.logo_url || ""}
+        hint={`Nur, wenn diese Saison ein eigenes Logo hat. ${inheritedLogoHint(lineage)}`} />
       <OwnTeamsField teams={form.own_teams} onChange={(teams) => set("own_teams", teams)} />
       {/* #1934: die Saison erbt die Partner der Spur und kann eigene ergänzen, etwa einen Sponsor dieser Season. */}
       <SeriesPartnersField partners={partners} value={form} onChange={(next) => setForm((current) => ({ ...current, ...next }))}

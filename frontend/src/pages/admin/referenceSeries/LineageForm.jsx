@@ -8,6 +8,7 @@ import { gameOptionLabel } from "@/lib/gameLabels";
 import { moveTier, tierOrderList } from "@/lib/seriesTiers";
 import { organizerSuggestion } from "@/lib/seriesPartners";
 import { SeriesPartnersField } from "./SeriesPartnersField";
+import { SeriesLogoField } from "./SeriesLogoField";
 import { ArrowDown, ArrowUp } from "lucide-react";
 import { toast } from "sonner";
 
@@ -60,6 +61,8 @@ export function LineageForm({ lineage, games = [], partners = [], onClose, onSav
             hint="So liest „Bild auslesen“ den Screenshot des Veranstalters. Eine Saison kann abweichen." />
         )}
       </FormGrid>
+      <SeriesLogoField value={form.logo_url} onChange={(v) => set("logo_url", v)} testId="lineage-logo"
+        hint="Am besten PNG mit durchsichtigem Hintergrund. Steht auf Serienseite, Runden, Referenzen, Profil und Partnerseite – ohne Logo das Spiel-Logo bzw. das Partner-Abzeichen. Jede Saison erbt es, eine Saison kann ein eigenes haben." />
       <SeriesPartnersField partners={partners} value={form} onChange={changePartners}
         hint="Veranstalter stehen mit Logo im Kopf der Serienseite, Mitwirkende darunter. Die Partnerseite zeigt die Spur unter „Ligen und Serien mit uns“." />
       <TextAreaField label="Beschreibung" value={form.description} onChange={(v) => set("description", v)} testId="lineage-description" />

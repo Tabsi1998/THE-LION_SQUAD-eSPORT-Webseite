@@ -139,6 +139,8 @@ export const emptyLineage = {
   tier_order: null,
   // #1756: Vorlage für Ergebnis-Bilder; leer heißt Standard der Art.
   result_image_template: "",
+  // #2014: Logo der Spur, nur aus dem Upload bzw. der Mediathek; leer heißt Spiel-Logo bzw. Partner-Abzeichen.
+  logo_url: "",
 };
 
 export function lineageToForm(lineage = {}) {
@@ -158,6 +160,7 @@ export function lineagePayload(form) {
     description: blank(form.description), visibility: form.visibility, order_index: Number(form.order_index) || 0,
     tier_order: Array.isArray(form.tier_order) && form.tier_order.length ? form.tier_order : null,
     result_image_template: blank(form.result_image_template),
+    logo_url: blank(form.logo_url),
     ...(String(form.slug || "").trim() ? { slug: String(form.slug).trim() } : {}),
   };
 }
@@ -205,6 +208,8 @@ export function seriesToForm(series = {}, rules = series.rules) {
     description: series.description || "",
     season_result: series.season_result || "",
     result_image_template: series.result_image_template || "",
+    // #2014: eigenes Saison-Logo; leer heißt: das Logo der Spur.
+    logo_url: series.logo_url || "",
     // #1934: eigene Partner der Saison – die der Spur erbt sie ohnehin.
     partner_ids: Array.isArray(series.partner_ids) ? series.partner_ids : [],
     partner_roles: series.partner_roles || {},
@@ -238,6 +243,7 @@ export function seriesPayload(form, { isNew = false, archived = false } = {}) {
     season_result: form.season_result || null,
     // #1756: leer heißt „wie bei der Spur“.
     result_image_template: form.result_image_template || null,
+    logo_url: blank(form.logo_url),
     partner_ids: form.partner_ids || [],
     partner_roles: form.partner_roles || {},
     hide_name_tags: Boolean(form.hide_name_tags),
