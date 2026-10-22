@@ -1,4 +1,4 @@
-import { afterEdit, checkImageFile, confirmRow, imageFormFields, imageFromClipboard, imageHeader, imageToRows, isUncertain, openImageItems, openImageRows, replaceRaceMarks, uncertainText } from "@/lib/resultImage";
+import { afterEdit, checkImageFile, confirmNames, confirmRow, imageFormFields, imageFromClipboard, imageHeader, imageToRows, isUncertain, openImageItems, openImageRows, prefilledNames, replaceRaceMarks, uncertainText, undoConfirmNames } from "@/lib/resultImage";
 import { formToPayload } from "@/lib/referenceResults";
 import { resultImageOptions } from "@/lib/referenceSeries";
 
@@ -70,6 +70,30 @@ test("Hinweis „wie in Saison …“ steht an der gelben Zeile; geändert geht 
   expect(payload.rows[1]).not.toHaveProperty("read_name");
   expect(payload.rows[2]).toMatchObject({ participant_id: "p1", read_name: "Dora Nev" });
   expect(payload.rows[0]).not.toHaveProperty("read_name");
+});
+
+test("„Alle Namen bestätigen“: vorbelegte gelbe Namen und Teams auf einmal, andere gelbe Felder bleiben – mit Rückgängig (#2018)", () => {
+  const result = { ...RESULT, rows: [
+    { ...RESULT.rows[0], participant_id: null, name: "Emil Eck", team: "Altes Team", uncertain: ["name", "team", "time"], read: { name: "Emil Ek" }, hint: { name: "wie in Saison 1/2025" } },
+    RESULT.rows[1],
+    { ...RESULT.rows[2], name: "", uncertain: ["name"] },
+  ] };
+  const form = { rows: imageToRows(result, PARTICIPANTS), ...imageFormFields(result) };
+  // Zwei Felder der ersten Zeile und der Fahrer des Tages; ein leerer gelber Name zählt nicht – den muss jemand ausfüllen.
+  expect(prefilledNames(form).count).toBe(3);
+  const { form: done, undo } = confirmNames(form);
+  expect(done.rows.map((row) => row.ocr?.uncertain || [])).toEqual([["time"], ["start_number", "time"], ["name"]]);
+  expect(done.raceOcr).toBeNull();
+  expect(prefilledNames(done).count).toBe(0);
+  expect(undo.count).toBe(3);
+  // Rückgängig: wieder gelb wie vorher – samt Hinweis; ein inzwischen geänderter Name bleibt bestätigt.
+  const changed = { ...done, rows: done.rows.map((row, index) => (index === 0 ? { ...row, team: "Neues Team" } : row)) };
+  const back = undoConfirmNames(changed, undo);
+  expect(back.rows[0].ocr.uncertain).toEqual(["name", "time"]);
+  expect(back.rows[0].ocr.hint).toEqual({ name: "wie in Saison 1/2025" });
+  expect(back.rows[1]).toBe(changed.rows[1]);
+  expect(back.raceOcr.uncertain).toEqual(["driver_of_the_day"]);
+  expect(undoConfirmNames(form, null)).toBe(form);
 });
 
 test("unsichere schnellste Runde oder Fahrer des Tages sind gelbe Felder des Rennens und halten das Übernehmen auf", () => {

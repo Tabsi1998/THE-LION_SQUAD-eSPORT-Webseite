@@ -3,7 +3,7 @@ import { INPUT_CLASS, TextAreaField } from "@/components/tls/FormFields";
 import { parseNumber } from "@/lib/resultPaste";
 import { parseTeamTotals, teamTotalsObject, teamTotalsRows } from "@/lib/seriesSpecialRules";
 import { imageTeamRows } from "@/lib/seasonTable";
-import { ResultImageButton, useResultImage } from "./ResultImageImport";
+import { ConfirmNamesBar, ResultImageButton, useResultImage } from "./ResultImageImport";
 import { toast } from "sonner";
 import { Check, ClipboardList, Plus, X } from "lucide-react";
 
@@ -15,6 +15,14 @@ import { Check, ClipboardList, Plus, X } from "lucide-react";
 // Zeilen sind unsicher, bis jemand sie ändert oder „Passt so“ drückt; `onOpenChange` meldet, wie viele noch gelb sind.
 
 const SMALL_INPUT = `${INPUT_CLASS} !py-1.5 text-sm`;
+const YELLOW = "!border-amber-400/80 !bg-amber-400/10";
+// Welche Felder einer Zeile aus dem Bild gelb sind (#2018: `ocr.fields`; ohne Angabe beide).
+const teamYellow = (row) => Boolean(row.ocr) && (!row.ocr.fields || row.ocr.fields.includes("team"));
+const pointsYellow = (row) => Boolean(row.ocr) && (!row.ocr.fields || row.ocr.fields.includes("points"));
+function withoutTeamMark(row) {
+  const fields = (row.ocr?.fields || ["team", "points"]).filter((field) => field !== "team");
+  return { ...row, ocr: fields.length ? { ...row.ocr, fields } : null };
+}
 const BUTTON = "tls-btn tls-btn--quiet px-3 py-1.5 rounded-sm text-[11px] font-bold uppercase tracking-wider inline-flex items-center gap-1.5";
 let rowKey = 0;
 const keyed = (row) => {
@@ -31,17 +39,34 @@ export function OfficialTeamTotals({ totals, teams = [], onChange, initialRows =
   const [pasting, setPasting] = useState(false);
   const [text, setText] = useState("");
   const [errors, setErrors] = useState([]);
+  const [teamsUndo, setTeamsUndo] = useState(null); // „Alle Namen bestätigen“ (#2018): die Zeilen von vorher
   const open = rows.filter((row) => row.ocr).length;
+  const teamsOpen = rows.filter((row) => teamYellow(row) && row.team.trim()).length;
 
   useEffect(() => { onOpenChange?.(open); }, [open, onOpenChange]);
 
   const publish = (next) => {
     setRows(next);
+    setTeamsUndo(null);
     onChange(teamTotalsObject(next.map((row) => ({ team: row.team, points: parseNumber(row.points) })).filter((row) => row.points !== null)));
   };
   // Was jemand ändert, ist geprüft - die gelbe Markierung aus dem Bild fällt weg.
   const update = (key, values) => publish(rows.map((row) => (row.key === key ? { ...row, ...values, ocr: null } : row)));
   const confirm = (key) => setRows((current) => current.map((row) => (row.key === key ? { ...row, ocr: null } : row)));
+  // Vorbelegte gelbe Teams auf einmal bestätigen - gelbe Punkte bleiben gelb; „Rückgängig“ für Zeilen, die seitdem
+  // niemand geändert hat.
+  const confirmTeams = () => {
+    const before = Object.fromEntries(rows.filter((row) => teamYellow(row) && row.team.trim()).map((row) => [row.key, row]));
+    setRows((current) => current.map((row) => (before[row.key] ? withoutTeamMark(row) : row)));
+    setTeamsUndo(Object.keys(before).length ? before : null);
+  };
+  const undoTeams = () => {
+    setRows((current) => current.map((row) => {
+      const old = teamsUndo?.[row.key];
+      return old && old.team === row.team && old.points === row.points ? old : row;
+    }));
+    setTeamsUndo(null);
+  };
   const apply = () => {
     const result = parseTeamTotals(text);
     setErrors(result.errors);
@@ -85,6 +110,8 @@ export function OfficialTeamTotals({ totals, teams = [], onChange, initialRows =
           {open === 1 ? "Eine Zeile aus dem Bild ist" : `${open} Zeilen aus dem Bild sind`} gelb – mit dem Bild vergleichen, korrigieren oder mit „Passt so“ bestätigen.
         </p>
       )}
+      <ConfirmNamesBar count={teamsOpen} confirmed={teamsUndo ? Object.keys(teamsUndo).length : 0} what="Teams" testId="result-team-totals-confirm-names"
+        onConfirm={confirmTeams} onUndo={undoTeams} />
       {pasting && (
         <div className="space-y-2">
           <TextAreaField label="Teamwertung einfügen" value={text} onChange={(value) => { setText(value); setErrors([]); }} rows={4} placeholder={"1. Team A 123\n2. Team B 98"}
@@ -101,13 +128,12 @@ export function OfficialTeamTotals({ totals, teams = [], onChange, initialRows =
         <ol className="space-y-1.5" data-testid="result-team-totals-rows">
           {rows.map((row, index) => {
             const invalid = String(row.points).trim() !== "" && parseNumber(row.points) === null;
-            const yellow = row.ocr ? "!border-amber-400/80 !bg-amber-400/10" : "";
             return (
               <li key={row.key} className="space-y-1" data-testid="result-team-total" data-ocr-uncertain={row.ocr ? "true" : undefined}>
                 <div className="grid grid-cols-[minmax(0,1fr)_4.5rem_auto] sm:grid-cols-[minmax(0,1fr)_6rem_auto] items-center gap-2">
-                  <input aria-label={`Team ${index + 1}`} value={row.team} list="result-team-total-names" maxLength={120} placeholder="Team" onChange={(event) => update(row.key, { team: event.target.value })} className={`${SMALL_INPUT} ${yellow}`} data-testid="result-team-total-team" />
+                  <input aria-label={`Team ${index + 1}`} value={row.team} list="result-team-total-names" maxLength={120} placeholder="Team" onChange={(event) => update(row.key, { team: event.target.value })} className={`${SMALL_INPUT} ${teamYellow(row) ? YELLOW : ""}`} data-testid="result-team-total-team" />
                   <input aria-label={`Punkte Team ${index + 1}`} value={row.points} placeholder="Pkt" onChange={(event) => update(row.key, { points: event.target.value })} aria-invalid={invalid || undefined}
-                    className={`${SMALL_INPUT} text-right tabular-nums ${invalid ? "!border-red-400/80" : yellow}`} data-testid="result-team-total-points" />
+                    className={`${SMALL_INPUT} text-right tabular-nums ${invalid ? "!border-red-400/80" : pointsYellow(row) ? YELLOW : ""}`} data-testid="result-team-total-points" />
                   <button type="button" onClick={() => publish(rows.filter((item) => item.key !== row.key))} aria-label={`Team ${index + 1} entfernen`} className="p-1.5 rounded-sm text-white/45 hover:text-white hover:bg-white/5"><X className="w-4 h-4" /></button>
                 </div>
                 {row.hint && <p className="text-[11px] text-white/45" data-testid="result-team-total-hint">{row.hint}</p>}

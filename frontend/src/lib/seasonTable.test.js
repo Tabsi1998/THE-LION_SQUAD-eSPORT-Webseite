@@ -1,8 +1,8 @@
 import { parseSeasonTablePaste } from "@/lib/resultPaste";
 import {
-  applyBody, applySummary, buildBody, decisionFor, decisionValue, defaultSelection, imageTable, imageTeamRows, markText,
-  lastTableRound, mergeDecisions, organizerDecisions, proposalDecisions, rememberCandidates, roundOption, tableText, targetText, totalText,
-  totalsSummary, unclearCells,
+  applyBody, applySummary, buildBody, confirmTableNames, decisionFor, decisionValue, defaultSelection, imageTable, imageTeamRows, markText,
+  lastTableRound, mergeDecisions, organizerDecisions, prefilledTableNames, proposalDecisions, rememberCandidates, roundOption, tableText,
+  targetText, totalText, totalsSummary, unclearCells, undoTableNames,
 } from "@/lib/seasonTable";
 
 // Saisontabelle einlesen (#1928): Anfrage aus der eingefügten Tabelle, Auswahl, gelbe Zellen und Texte der Vorschau.
@@ -84,7 +84,7 @@ test("eine Fahrer-Tabelle aus dem Bild wird zur eingefügten Tabelle - mit den g
   expect(parsed.rows[1]).toEqual({ line: 2, cells: ["2", "Bruno Beispiel", "--", "25", "25", "-18"] });
   expect(tableText(parsed).split("\n")[0]).toBe("Pos.\tFahrer\tRunde 1\tRunde 2\tPunkte\tDif.");
   expect(marks).toEqual([{ row: 1, name: "Bruno Beispiel", notes: ["Summe der Runden 25 ≠ Punkte 25"], cells: [
-    { column: 3, label: "Runde 2", value: "25", read: "23" }, { column: 4, label: "Punkte", value: "25", read: "" }] }]);
+    { column: 3, kind: "round", label: "Runde 2", value: "25", read: "23" }, { column: 4, kind: "total", label: "Punkte", value: "25", read: "" }] }]);
   expect(markText(marks[0])).toBe("Runde 2: 25 (gelesen 23) · Punkte: 25");
   const many = { cells: Array.from({ length: 7 }, (_, index) => ({ label: `Runde ${index + 1}`, value: "10", read: index === 5 ? "16" : "" })) };
   expect(markText(many)).toBe("Runde 6: 10 (gelesen 16) · Runde 1: 10 · Runde 2: 10 · Runde 3: 10 · + 3 weitere");
@@ -98,9 +98,27 @@ test("eine Team-Tabelle aus dem Bild wird zur Teamwertung - gelb, wenn Team oder
   expect(imageTeamRows(teams)).toEqual([
     { team: "Ada Ausgedacht", points: "43", ocr: null, hint: "" },
     // Der Hinweis an der Summe geht mit (aktuelle Besetzung, #1960) - er macht nichts gelb.
-    { team: "Bruno Beispiel", points: "25", ocr: { read: "" }, hint: "Summe der Runden 25 ≠ Punkte 25" },
+    { team: "Bruno Beispiel", points: "25", ocr: { read: "", fields: ["points"] }, hint: "Summe der Runden 25 ≠ Punkte 25" },
   ]);
   expect(imageTeamRows({ columns: [{ label: "Team", kind: "name" }], rows: [] })).toEqual([]);
+});
+
+test("„Alle Namen bestätigen“ in der Tabelle aus dem Bild: nur die gelben Namen, mit Rückgängig (#2018)", () => {
+  const image = { ...IMAGE, rows: [
+    { cells: ["1", "Ada Ausgedacht", "25", "18", "43", "--"], uncertain: [1], read: { 1: "Ada Ausgedcht" }, notes: [] },
+    { cells: ["2", "Bruno Beispiel", "--", "25", "25", "-18"], uncertain: [1, 3], read: {}, notes: [] },
+    { cells: ["3", "", "10", "5", "15", "-28"], uncertain: [1], read: {}, notes: [] },
+  ] };
+  const { marks } = imageTable(image);
+  expect(prefilledTableNames(marks)).toBe(2); // ein leerer Name zählt nicht
+  const { marks: done, undo } = confirmTableNames(marks);
+  expect(done.map((mark) => [mark.row, mark.cells.map((cell) => cell.column)])).toEqual([[1, [3]], [2, [1]]]);
+  expect(undo.count).toBe(2);
+  expect(undoTableNames(done, undo)).toEqual(marks);
+  // Zeile 2 inzwischen mit „Passt so“ geprüft: sie bleibt geprüft, Zeile 1 kommt wieder.
+  const back = undoTableNames(done.filter((mark) => mark.row !== 1), undo);
+  expect(back.map((mark) => mark.row)).toEqual([0, 2]);
+  expect(undoTableNames(marks, null)).toBe(marks);
 });
 
 test("das Bild hängt an der letzten Runde der Tabelle - im Kalender die späteste mit Spalte (#1933)", () => {

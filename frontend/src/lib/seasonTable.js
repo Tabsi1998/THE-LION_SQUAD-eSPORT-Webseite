@@ -221,10 +221,42 @@ export function imageTable(result) {
   const rows = (result?.rows || []).map((row, index) => ({ line: index + 1, cells: [...row.cells] }));
   const marks = (result?.rows || []).flatMap((row, index) => (row.uncertain?.length ? [{
     row: index, name: row.cells[nameAt] || `Zeile ${index + 1}`,
-    cells: row.uncertain.map((column) => ({ column, label: columns[column]?.label || "", value: row.cells[column], read: row.read?.[String(column)] || "" })),
+    cells: row.uncertain.map((column) => ({ column, kind: columns[column]?.kind || "", label: columns[column]?.label || "", value: row.cells[column], read: row.read?.[String(column)] || "" })),
     notes: row.notes || [],
   }] : []));
   return { parsed: { format: "image", header: true, columns, rows, errors: [] }, marks };
+}
+
+// „Alle Namen bestätigen“ (#2018): vorbelegte gelbe Namen der Tabelle aus dem Bild auf einmal - mit Rückgängig. Gelbe
+// Zahlen bleiben gelb.
+const isNameCell = (cell) => cell.kind === "name" && String(cell.value || "").trim() !== "";
+
+/** Wie viele gelbe Namen vorbelegt sind. */
+export function prefilledTableNames(marks = []) {
+  return marks.reduce((sum, mark) => sum + mark.cells.filter(isNameCell).length, 0);
+}
+
+/** Die vorbelegten gelben Namen bestätigen; Zeilen ohne weitere gelbe Zelle fallen weg. Liefert die Markierungen und
+ * was „Rückgängig“ braucht. */
+export function confirmTableNames(marks = []) {
+  const removed = marks.map((mark) => ({ mark, names: mark.cells.filter(isNameCell) })).filter((item) => item.names.length);
+  const next = marks.map((mark) => ({ ...mark, cells: mark.cells.filter((cell) => !isNameCell(cell)) })).filter((mark) => mark.cells.length);
+  return { marks: next, undo: { count: prefilledTableNames(marks), removed } };
+}
+
+/** „Rückgängig“: die Namen sind wieder gelb. Eine Zeile, die nach dem Bestätigen noch gelb war und inzwischen mit
+ * „Passt so“ geprüft ist, bleibt geprüft. */
+export function undoTableNames(marks = [], undo = null) {
+  if (!undo) return marks;
+  const out = marks.map((mark) => {
+    const item = undo.removed.find((entry) => entry.mark.row === mark.row);
+    return item ? { ...mark, cells: [...item.names, ...mark.cells].sort((left, right) => left.column - right.column) } : mark;
+  });
+  for (const item of undo.removed) {
+    const onlyNames = item.names.length === item.mark.cells.length;
+    if (onlyNames && !out.some((mark) => mark.row === item.mark.row)) out.push({ ...item.mark, cells: item.names });
+  }
+  return out.sort((left, right) => left.row - right.row);
 }
 
 /** Die Tabelle als Text mit Tab - so lässt sie sich im Feld prüfen und korrigieren. */
@@ -260,7 +292,9 @@ export function imageTeamRows(result) {
   return (result.rows || []).filter((row) => row.cells[nameAt]).map((row) => {
     const uncertain = (row.uncertain || []).filter((column) => column === nameAt || column === totalAt);
     const read = uncertain.map((column) => row.read?.[String(column)]).filter(Boolean).join(" · ");
-    return { team: row.cells[nameAt], points: row.cells[totalAt], ocr: uncertain.length ? { read } : null, hint: (row.notes || []).join(" · ") };
+    // Welche Felder gelb sind (#2018: „Alle Namen bestätigen“ nimmt nur das Team).
+    const fields = uncertain.map((column) => (column === nameAt ? "team" : "points"));
+    return { team: row.cells[nameAt], points: row.cells[totalAt], ocr: uncertain.length ? { read, fields } : null, hint: (row.notes || []).join(" · ") };
   });
 }
 
