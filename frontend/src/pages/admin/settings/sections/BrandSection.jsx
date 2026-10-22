@@ -28,15 +28,15 @@ export function BrandSection({ brand, siteBanners, bannerForm, editingBannerId, 
           <BrandNumberField label={`Countdown ab … Tagen vorher (1–${COUNTDOWN_DAYS_MAX}, leer = ${COUNTDOWN_DAYS_DEFAULT})`} value={brand.countdown_days} min={1} max={COUNTDOWN_DAYS_MAX} placeholder={String(COUNTDOWN_DAYS_DEFAULT)} onChange={(v) => setBrandField("countdown_days", v >= 1 ? Math.min(COUNTDOWN_DAYS_MAX, Math.round(v)) : null)} testId="brand-countdown-days" />
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <ImageUpload value={brand.logo_url} onChange={(v) => setBrandField("logo_url", v)} label="Standard-Logo" testId="brand-logo" variant="square" allowLibrary logo />
-          <ImageUpload value={brand.logo_dark_url} onChange={(v) => setBrandField("logo_dark_url", v)} label="Logo auf dunklem Hintergrund" testId="brand-logo-dark" variant="square" allowLibrary logo />
-          <ImageUpload value={brand.logo_light_url} onChange={(v) => setBrandField("logo_light_url", v)} label="Logo auf hellem Hintergrund" testId="brand-logo-light" variant="square" allowLibrary logo />
+          <ImageUpload value={brand.logo_url} onChange={(v) => setBrandField("logo_url", v)} label="Standard-Logo" testId="brand-logo" variant="square" endpoint="/uploads/logo?trim_empty_borders=false" allowLibrary logo />
+          <ImageUpload value={brand.logo_dark_url} onChange={(v) => setBrandField("logo_dark_url", v)} label="Logo auf dunklem Hintergrund" testId="brand-logo-dark" variant="square" endpoint="/uploads/logo?trim_empty_borders=false" allowLibrary logo />
+          <ImageUpload value={brand.logo_light_url} onChange={(v) => setBrandField("logo_light_url", v)} label="Logo auf hellem Hintergrund" testId="brand-logo-light" variant="square" endpoint="/uploads/logo?trim_empty_borders=false" allowLibrary logo />
           <ImageUpload value={brand.share_banner_url} onChange={(v) => setBrandField("share_banner_url", v)} label="Standard SEO-/Teilen-Banner" testId="brand-share-banner" variant="wide" allowLibrary />
-          <ImageUpload value={brand.mascot_url} onChange={(v) => setBrandField("mascot_url", v)} label="Maskottchen" testId="brand-mascot" variant="square" allowLibrary logo />
-          <ImageUpload value={brand.qr_logo_url} onChange={(v) => setBrandField("qr_logo_url", v)} label="QR-Logo" testId="brand-qr-logo" variant="square" allowLibrary logo />
-          <ImageUpload value={brand.favicon_url} onChange={(v) => setBrandField("favicon_url", v)} label="Standard-Favicon" testId="brand-favicon" variant="square" allowLibrary logo />
-          <ImageUpload value={brand.favicon_light_url} onChange={(v) => setBrandField("favicon_light_url", v)} label="Favicon für hellen Modus" testId="brand-favicon-light" variant="square" allowLibrary logo />
-          <ImageUpload value={brand.favicon_dark_url} onChange={(v) => setBrandField("favicon_dark_url", v)} label="Favicon für dunklen Modus" testId="brand-favicon-dark" variant="square" allowLibrary logo />
+          <ImageUpload value={brand.mascot_url} onChange={(v) => setBrandField("mascot_url", v)} label="Maskottchen" testId="brand-mascot" variant="square" endpoint="/uploads/logo?trim_empty_borders=false" allowLibrary logo />
+          <ImageUpload value={brand.qr_logo_url} onChange={(v) => setBrandField("qr_logo_url", v)} label="QR-Logo" testId="brand-qr-logo" variant="square" endpoint="/uploads/logo?trim_empty_borders=false" allowLibrary logo />
+          <ImageUpload value={brand.favicon_url} onChange={(v) => setBrandField("favicon_url", v)} label="Standard-Favicon" testId="brand-favicon" variant="square" endpoint="/uploads/logo?trim_empty_borders=false" allowLibrary logo />
+          <ImageUpload value={brand.favicon_light_url} onChange={(v) => setBrandField("favicon_light_url", v)} label="Favicon für hellen Modus" testId="brand-favicon-light" variant="square" endpoint="/uploads/logo?trim_empty_borders=false" allowLibrary logo />
+          <ImageUpload value={brand.favicon_dark_url} onChange={(v) => setBrandField("favicon_dark_url", v)} label="Favicon für dunklen Modus" testId="brand-favicon-dark" variant="square" endpoint="/uploads/logo?trim_empty_borders=false" allowLibrary logo />
         </div>
         {/* Play-Store-Link (#425): erst eintragen, wenn der Eintrag öffentlich ist - dann zeigen Footer und Startseite den offiziellen Badge. */}
         <BrandField label="Play-Store-Link (LionsAPP)" value={brand.play_store_url} onChange={(v) => setBrandField("play_store_url", v)} placeholder="https://play.google.com/store/apps/details?id=at.lionsquad.app" hint="leer lassen, bis die App öffentlich ist" testId="brand-play-store-url" />

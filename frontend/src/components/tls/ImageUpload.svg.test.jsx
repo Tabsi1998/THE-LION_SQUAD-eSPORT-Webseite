@@ -30,23 +30,24 @@ async function pick(testId, file) {
 test("ein Logo-Feld bietet SVG an und lädt es ohne Zuschnitt hoch", async () => {
   apiMock.post.mockResolvedValue({ data: { url: "/api/static/uploads/kiwi.svg" } });
   const onChange = vi.fn();
-  render(<ImageUpload value="" onChange={onChange} testId="team-logo" variant="square" crop="square" logo />);
+  render(<ImageUpload value="" onChange={onChange} testId="team-logo" variant="square" crop="square" endpoint="/uploads/team-logo?team_id=t1" logo />);
   expect(screen.getByTestId("team-logo-file").getAttribute("accept")).toContain("image/svg+xml");
   expect(screen.getByTestId("team-logo-hint")).toHaveTextContent(LOGO_HINT);
   await pick("team-logo", SVG_FILE());
   await waitFor(() => expect(onChange).toHaveBeenCalledWith("/api/static/uploads/kiwi.svg"));
   const [endpoint, form] = apiMock.post.mock.calls[0];
-  expect(endpoint).toBe("/uploads/image?allow_svg=true");
+  expect(endpoint).toBe("/uploads/team-logo?team_id=t1");
   expect(form.get("file").name).toBe("logo.svg");
   expect(screen.queryByText("Bild bearbeiten")).not.toBeInTheDocument();
 });
 
-test("der Logo-Upload sagt dem Server, dass SVG hier geht", async () => {
+test("ein SVG geht an die Logo-Route des Felds - nie mit einem eigenen Schalter", async () => {
   apiMock.post.mockResolvedValue({ data: { url: "/api/static/uploads/kiwi.svg" } });
   render(<ImageUpload value="" onChange={vi.fn()} testId="partner-logo" endpoint="/uploads/logo" logo />);
   await pick("partner-logo", SVG_FILE());
   await waitFor(() => expect(apiMock.post).toHaveBeenCalled());
-  expect(apiMock.post.mock.calls[0][0]).toBe("/uploads/logo?allow_svg=true");
+  expect(apiMock.post.mock.calls[0][0]).toBe("/uploads/logo");
+  expect(apiMock.post.mock.calls[0][0]).not.toContain("allow_svg");
 });
 
 test("Fotos, Avatare und Banner bleiben ohne SVG", async () => {

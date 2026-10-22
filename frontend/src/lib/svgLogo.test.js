@@ -1,4 +1,4 @@
-import { isSvgFile, isSvgUpload, rasterLogoUrl } from "./svgLogo";
+import { isSvgFile, isSvgUpload, rasterLogoUrl, teamLogoUpload } from "./svgLogo";
 
 // Logos als SVG (#1952): Favicon, App-Symbol und Teilen-Bild können kein SVG - sie nehmen die PNG-Fassung daneben.
 
@@ -20,4 +20,10 @@ test("SVG erkennen: Upload-Adresse und gewählte Datei", () => {
   expect(isSvgFile({ name: "logo.svg", type: "" })).toBe(true);
   expect(isSvgFile({ name: "logo", type: "image/svg+xml" })).toBe(true);
   expect(isSvgFile({ name: "logo.png", type: "image/png" })).toBe(false);
+});
+
+test("Teamlogo als SVG nur für ein bestehendes Team, über dessen Logo-Route", () => {
+  expect(teamLogoUpload({ id: "t 1" })).toEqual({ logo: true, endpoint: "/uploads/team-logo?team_id=t%201" });
+  expect(teamLogoUpload({})).toEqual({});
+  expect(teamLogoUpload(null)).toEqual({});
 });

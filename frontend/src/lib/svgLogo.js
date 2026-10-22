@@ -11,6 +11,14 @@ export function isSvgFile(file) {
   return (file?.type || "").toLowerCase() === "image/svg+xml" || /\.svg$/i.test(file?.name || "");
 }
 
+/**
+ * Teamlogo: ein bestehendes Team nimmt auch SVG - über den Logo-Upload des Teams, den nur seine Leitung nutzen darf. Ein
+ * neues Team bekommt zuerst ein Bild (PNG, JPG, WebP); das SVG geht danach beim Bearbeiten.
+ */
+export function teamLogoUpload(team) {
+  return team?.id ? { logo: true, endpoint: `/uploads/team-logo?team_id=${encodeURIComponent(team.id)}` } : {};
+}
+
 /** Die PNG-Fassung eines hochgeladenen SVG-Logos - jede andere Adresse bleibt, wie sie ist. */
 export function rasterLogoUrl(url) {
   if (!url) return url;

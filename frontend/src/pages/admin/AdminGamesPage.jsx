@@ -141,7 +141,7 @@ export default function AdminGamesPage() {
           <Input placeholder="Kurzname (z.B. MK8DX)" value={form.short_name} onChange={(v) => set("short_name", v)} testId="game-short" />
           <Input placeholder="Genre" value={form.genre} onChange={(v) => set("genre", v)} testId="game-genre" />
           <Input placeholder="Plattformen (komma-getrennt)" value={form.platforms} onChange={(v) => set("platforms", v)} testId="game-platforms" />
-          <ImageUpload value={form.logo_url} onChange={(v) => set("logo_url", v)} label="Logo" testId="game-logo" variant="square" allowLibrary logo />
+          <ImageUpload value={form.logo_url} onChange={(v) => set("logo_url", v)} label="Logo" testId="game-logo" variant="square" endpoint="/uploads/logo?trim_empty_borders=false" allowLibrary logo />
           <ImageUpload value={form.cover_url} onChange={(v) => set("cover_url", v)} label="Cover" testId="game-cover" variant="wide" allowLibrary />
           <PlayerIdFieldsEditor value={form.player_id_fields} onChange={(v) => set("player_id_fields", v)} />
           <button data-testid="game-submit" className="w-full px-4 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm hover:bg-[#1E95C2] inline-flex items-center justify-center gap-2">
@@ -302,7 +302,7 @@ function EditGameModal({ game, games, servers = [], onClose, onSaved }) {
         </div>
       )}
       <FormGrid>
-        <ImageUpload value={form.logo_url} onChange={(v) => set("logo_url", v)} label="Logo" testId="game-edit-logo" variant="square" allowLibrary logo />
+        <ImageUpload value={form.logo_url} onChange={(v) => set("logo_url", v)} label="Logo" testId="game-edit-logo" variant="square" endpoint="/uploads/logo?trim_empty_borders=false" allowLibrary logo />
         <ImageUpload value={form.cover_url} onChange={(v) => set("cover_url", v)} label="Cover" testId="game-edit-cover" variant="wide" allowLibrary />
       </FormGrid>
       <PlayerIdFieldsEditor value={form.player_id_fields} onChange={(v) => set("player_id_fields", v)} />

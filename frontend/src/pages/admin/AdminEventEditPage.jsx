@@ -322,7 +322,7 @@ function EventForm({ event, meta, partners = [], onDone }) {
           </p>
         ) : null}
         <FieldLabel label="Kopfbild (Banner)">
-          <ImageUpload value={form.banner_url} onChange={(v) => set("banner_url", v)} testId="event-banner" variant="wide" allowLibrary logo logoPreview={false} logoHint="Foto als PNG, JPG oder WebP; ein Logo am besten als SVG." />
+          <ImageUpload value={form.banner_url} onChange={(v) => set("banner_url", v)} testId="event-banner" variant="wide" allowLibrary />
         </FieldLabel>
         <EventBannerFields url={form.banner_url} style={form.banner_style} focusX={form.banner_focus_x} focusY={form.banner_focus_y}
           onChange={(patch) => setForm((current) => ({ ...current, ...patch }))} />
