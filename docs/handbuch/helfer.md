@@ -3,6 +3,9 @@
 Kurz und zum Ausdrucken. Such dir deine Aufgabe – mehr brauchst du nicht. Zu jedem Schritt ein Bild: links am PC,
 rechts am Handy, wo es geht auch in der App.
 
+**Nur das Nötigste für den Event-Tag?** Der [Spickzettel](helfer-eventtag.md) fasst alles auf einer Seite zusammen,
+die [Druckfassung](helfer-eventtag-druck.md) passt auf zwei A4-Seiten.
+
 | Deine Aufgabe | Abschnitt |
 | --- | --- |
 | Spiele an einer **Station** betreuen (Turnier) | [A](#a-station-turnier) |
