@@ -463,6 +463,37 @@ ansehen**. Jahreswertungs-Punkte gibt es dafür keine, nur Abzeichen ([Erfolge](
 </tr>
 </table>
 
+**Referenzen bündeln.** Alte Referenzen einer Liga (etwa eine Referenz je Saison) fasst **Referenzen bündeln** oben auf
+der Seite *Serien* zu einer Spur mit Saisons zusammen (nur Vorstand, Captains sehen den Knopf nicht). Der Assistent
+schlägt Gruppen aus Referenzen vor, die noch zu keiner Saison gehören: gleicher Veranstalter bzw. Partner, gleiches
+Spiel, gleicher Modus (2vs2, 4vs4 … aus Format oder Titel) und gleiche Bezeichnung. Die Saison kommt aus dem Feld
+**Saison**, sonst aus dem Titel („Season 3“, „Saison 3“, „Split 2“), sonst aus dem Jahr des Datums; die Stufe aus dem
+Feld **Liga**. Eine Gruppe erscheint ab zwei Referenzen oder wenn es die Spur schon gibt.
+
+- **Vorschau je Gruppe:** Spur (vorhanden oder neu – bei einer neuen änderst du Titel und Art), je Referenz ihre Saison
+  (vorhanden oder neu) und der **Liga-Weg** mit dem Platz der Referenzen. Ein Haken nimmt eine Referenz aus der Gruppe.
+- **Hinweise aus den Altdaten:** fehlendes Datum, doppelte Referenzen in einer Saison, widersprüchliche Platzierung,
+  eine Referenz strenger als ihre Saison, eine Saison mit schon vorhandener Referenz, und welche Referenz durch eine
+  strengere Spur bzw. Saison strenger wird.
+- **Bündeln** legt Spur und Saisons an bzw. wählt die vorhandenen und ordnet die Referenzen zu („Gehört zur Saison“).
+  Neue Saisons bleiben leer – keine Termine, keine Ergebnisse, nur Status, eigenes Team und Sichtbarkeit aus der
+  Referenz; Ergebnisse trägst du wie gewohnt ein. Geöffnet wird nichts: eine neue Saison ist so streng wie ihre
+  strengste Referenz, eine strengere vorhandene Spur oder Saison macht die Referenz strenger. Das Adminprotokoll nennt,
+  wie viele Referenzen gebündelt wurden. Eine Referenz lässt sich nur einmal bündeln.
+- **Rückgängig** (unter *Zuletzt gebündelt*) löst die Zuordnung wieder und gibt eine dabei strenger gestellte
+  Sichtbarkeit zurück. Neu angelegte Saisons und die Spur verschwinden nur, wenn sie seitdem unverändert und leer sind;
+  sonst bleiben sie stehen. Auch das steht im Protokoll.
+- Die Referenzen bleiben unter ihrer Adresse (`/references/…`) abrufbar, Titel und Vorschau für Suchmaschinen ändern sich
+  nicht. Auf der Übersicht erscheinen sie zusätzlich im Liga-Weg der Spur; ohne eingetragene Ergebnisse zeigt der Liga-Weg
+  den Platz der Referenz.
+
+<table>
+<tr>
+<td><img src="../assets/serien/serien-referenzen-buendeln.png" alt="Blatt Referenzen bündeln am PC: neue Spur Probe Liga mit zwei Referenzen, Saisons, Liga-Weg mit Aufstieg und Hinweisen" width="560"></td>
+<td><img src="../assets/serien/serien-referenzen-buendeln-handy.png" alt="Blatt Referenzen bündeln am Handy mit Vorschau einer Gruppe" width="220"></td>
+</tr>
+</table>
+
 **Kalender der Saison.** Auf der Seite der Saison stehen alle Termine in ihrer Reihenfolge, jeder mit Status:
 **Geplant**, **Heute**, **Ergebnis fehlt** (Tag vorbei, nichts eingetragen), **Verschoben**, **Abgesagt** und
 **Gewertet**. Gezählt wird immer nach dem Wiener Kalendertag.
