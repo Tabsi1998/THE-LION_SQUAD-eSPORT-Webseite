@@ -106,6 +106,17 @@ describe("CountUp", () => {
     expect(timing.mock.calls.some(([, config]) => (config as { duration?: number })?.duration === 900)).toBe(true);
   });
 
+  test("neuer Reiter nach fertigem Zählen: schon das erste Bild steht auf null, kein Aufblitzen des alten Endwerts", async () => {
+    reduceAtStart(false);
+    await render(<CountUp value="1:24,587" playKey="spa" testID="zeit" />);
+    expect(screen.getByTestId("zeit")).toHaveTextContent("1:24,587");
+    // Der neue Lauf kommt nicht ans Ziel - so bleibt stehen, was das erste Bild zeigt.
+    jest.spyOn(reanimated, "withTiming").mockImplementation(() => 0);
+    await screen.rerender(<CountUp value="1:30,000" playKey="monza" testID="zeit" />);
+    const input = screen.getByDisplayValue("0:00,000", { includeHiddenElements: true });
+    expect((input.props.animatedProps as { text: string }).text).toBe("0:00,000");
+  });
+
   test("ein Wert, der erst nach dem Laden kommt, zählt dann", async () => {
     reduceAtStart(false);
     await render(<CountUp value={null} testID="spaeter" />);

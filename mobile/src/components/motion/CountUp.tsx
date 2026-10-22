@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { StyleSheet, TextInput, View, type StyleProp, type TextStyle, type ViewStyle } from "react-native";
-import Animated, { Easing, cancelAnimation, runOnJS, useAnimatedProps, useAnimatedStyle, useSharedValue, withDelay, withTiming } from "react-native-reanimated";
+import Animated, { Easing, cancelAnimation, makeMutable, runOnJS, useAnimatedProps, useAnimatedStyle, useSharedValue, withDelay, withTiming } from "react-native-reanimated";
 import { COUNT_UP_MS, countFrame, countShape, countStart, type CountValue } from "../../lib/countUp";
 import { glowTones } from "../../theme";
 import { textStyles } from "../Text";
@@ -68,7 +68,10 @@ export function CountUp({
   const [doneKey, setDoneKey] = useState<string | null>(() => (shape && !animate ? key : null));
   const counting = animate && doneKey !== key;
   const start = useMemo(() => countStart(shape, from), [shape, from]);
-  const progress = useSharedValue(counting ? 0 : 1);
+  // Je Abspielen ein eigener Zählstand, schon beim Zeichnen auf null: so blitzt beim Reiterwechsel oder nach dem Laden
+  // nicht für ein Bild der Endwert des vorigen Laufs auf, bevor der Effekt startet.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const progress = useMemo(() => makeMutable(animate ? 0 : 1), [key, animate]);
   const live = useRef(onDone);
   live.current = onDone;
 
@@ -83,7 +86,6 @@ export function CountUp({
       if (shape) setDoneKey(key);
       return undefined;
     }
-    progress.value = 0;
     progress.value = withDelay(Math.max(0, delay), withTiming(1, { duration: COUNT_UP_MS, easing: Easing.linear }, (finished) => {
       "worklet";
       if (finished) runOnJS(finish)(key);
