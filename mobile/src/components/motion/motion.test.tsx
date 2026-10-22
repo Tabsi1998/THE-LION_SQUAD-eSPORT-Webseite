@@ -1,8 +1,8 @@
 import React from "react";
-import { AccessibilityInfo, Text } from "react-native";
+import { AccessibilityInfo, Animated as RNAnimated, Text } from "react-native";
 import { act, fireEvent, render, screen } from "@testing-library/react-native";
 import * as Haptics from "expo-haptics";
-import { CountUp, Glow, Press, StaggerIn, staggerInDelay, useReduceMotion } from ".";
+import { CountUp, Glow, Press, Pulse, StaggerIn, staggerInDelay, useReduceMotion } from ".";
 
 // Mikro-Bewegung (#1969): die Bausteine wie im Web. Im Test gibt es keinen UI-Thread - jede Bewegung ist sofort am
 // Ziel (jest.setup.js); geprüft wird, was startet, was am Ende dasteht und was mit „Bewegung reduzieren“ passiert.
@@ -168,6 +168,25 @@ describe("Glow", () => {
     reduceAtStart(true);
     await render(<Glow active testID="schein" />);
     expect(screen.queryByTestId("schein")).toBeNull();
+  });
+});
+
+describe("Pulse", () => {
+  test("Varianten wie im Web: Gold (Vorgabe), Cyan, Rot, Grün", async () => {
+    reduceAtStart(false);
+    await render(<><Pulse testID="p1" /><Pulse tone="brand" testID="p2" /><Pulse tone="live" testID="p3" /><Pulse tone="ok" testID="p4" /></>);
+    expect(screen.getByTestId("p1-dot")).toHaveStyle({ backgroundColor: "#FFD700" });
+    expect(screen.getByTestId("p2-dot")).toHaveStyle({ backgroundColor: "#29B6E8" });
+    expect(screen.getByTestId("p3-dot")).toHaveStyle({ backgroundColor: "#FF3B30" });
+    expect(screen.getByTestId("p4-dot")).toHaveStyle({ backgroundColor: "#1FD08E" });
+  });
+
+  test("„Bewegung reduzieren“: der Punkt steht, kein Ring läuft", async () => {
+    reduceAtStart(true);
+    const loop = jest.spyOn(RNAnimated, "loop");
+    await render(<Pulse tone="live" testID="still" />);
+    expect(loop).not.toHaveBeenCalled();
+    expect(screen.getByTestId("still-dot")).toBeTruthy();
   });
 });
 

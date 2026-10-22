@@ -3,5 +3,6 @@
 export { CountUp } from "./CountUp";
 export { Glow, glowSequence, type GlowTone } from "./Glow";
 export { Press, tapFeedback } from "./Press";
+export { Pulse, type PulseTone } from "./Pulse";
 export { StaggerIn, staggerInDelay } from "./StaggerIn";
 export { useReduceMotion } from "./useReduceMotion";
