@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.29.0 (22.10.2026)
+
+### Neu
+
+* Fahrer-Anpassung wahlweise auch in der Teamwertung gegenrechnen – je Rennen für das gefahrene Team, in der aktuellen Besetzung nie doppelt (#2000)
+* Regeln der Saison – Vorgabe „Fahrer-Anpassungen zählen auch für die Teamwertung“ (#2000)
+* Teamwertung zeigt „−5 (Fahrer)“ bei der Teamsumme, Fahrer-Detail „zählt auch fürs Team“ (#2000)
+* Verwaltung – Haken „zählt auch für die Teamwertung“ an jeder Fahrer-Anpassung mit Hinweis, wenn sie für kein Team zählt (#2000)
+
 ## 1.28.0 (22.10.2026)
 
 ### Neu
