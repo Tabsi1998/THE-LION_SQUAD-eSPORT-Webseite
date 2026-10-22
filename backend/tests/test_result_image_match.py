@@ -626,6 +626,34 @@ def test_a_clearly_read_other_start_number_is_shown_but_yellow():
     assert out["hint"] == {"start_number": "bisher 7"}
 
 
+def test_a_plus_read_as_four_is_settled_by_the_time():
+    """Echter Fall (#2012): „+7,441“ kam auf Seite und Streifen als „47,441“ an (das Plus der Schrift als 4). Zeit =
+    Zeit des Ersten + Abstand entscheidet: genau „+7,441“ passt - grün. Passt keine, bleibt es gelb."""
+    out = build(reading(row("1", time="1:16,212"), row("2", time="1:16,340", gap="+0,128"),
+                        row("3", time="1:23,653", gap="47,441", strips={"gap": "47,441"})), TEMPLATE, [])
+    third = out["rows"][2]
+    assert (third["gap"], "gap" in third["uncertain"], "time" in third["uncertain"]) == ("+7.441", False, False)
+    unclear = build(reading(row("1", time="1:16,212"), row("2", time="1:16,340", gap="+0,128"),
+                            row("3", time="1:23,999", gap="47,441", strips={"gap": "47,441"})), TEMPLATE, [])
+    assert "gap" in unclear["rows"][2]["uncertain"]
+
+
+def test_grid_positions_settle_as_a_permutation():
+    """Startplätze sind 1…N, jeder einmal (#2012): Lesen sich einzelne widersprüchlich („13“ und „1“), ergänzen die
+    übrigen sicheren die fehlenden genau dann, wenn jede unsichere Zelle genau eine fehlende Zahl als Lesung hat - grün.
+    Geht das nicht eindeutig auf, bleibt es gelb."""
+    rows = [row(str(index), grid=str(grid)) for index, grid in enumerate((2, 1, 4, 3), start=1)]
+    rows[2] = row("3", grid="4", strips={"grid": "1"})  # 1 hat schon eine andere Zeile
+    rows[3] = row("4", grid="a", strips={"grid": "3"})  # Seite liest einen Buchstaben
+    out = build(reading(*rows), TEMPLATE, [])
+    assert [(item["grid"], "grid" in item["uncertain"]) for item in out["rows"]] == [
+        (2, False), (1, False), (4, False), (3, False)]
+    clash = [row("1", grid="2"), row("2", grid="1"), row("3", grid="4", strips={"grid": "3"}),
+             row("4", grid="3", strips={"grid": "4"})]
+    out = build(reading(*clash), TEMPLATE, [])
+    assert ["grid" in item["uncertain"] for item in out["rows"]] == [False, False, True, True]
+
+
 def test_header_fields():
     out = build(reading(row("1", name="Anna Probe"), header={
         "track": r("Probering Nord"), "fastest_lap": r("Bert Bolzt 1:31.207"), "driver_of_the_day": r("Carl Kurve")}),
