@@ -1,7 +1,8 @@
 import { parseSeasonTablePaste } from "@/lib/resultPaste";
 import {
-  applyBody, applySummary, buildBody, decisionFor, decisionValue, defaultSelection, mergeDecisions, organizerDecisions,
-  proposalDecisions, rememberCandidates, roundOption, targetText, totalText, totalsSummary, unclearCells,
+  applyBody, applySummary, buildBody, decisionFor, decisionValue, defaultSelection, imageTable, imageTeamRows, markText,
+  mergeDecisions, organizerDecisions, proposalDecisions, rememberCandidates, roundOption, tableText, targetText, totalText,
+  totalsSummary, unclearCells,
 } from "@/lib/seasonTable";
 
 // Saisontabelle einlesen (#1928): Anfrage aus der eingefügten Tabelle, Auswahl, gelbe Zellen und Texte der Vorschau.
@@ -64,6 +65,41 @@ test("gelbe Zellen mit Vorschlägen: eindeutige übernehmen, Rest laut Veranstal
   const decided = [{ ...COLUMNS[2], cells: [{ row: 0, text: "21", state: "ok", code: "decided", place: 6 }] }];
   expect(unclearCells(decided, ROWS, known)).toEqual([expect.objectContaining({ decided: true, code: "bonus", candidates: COLUMNS[2].cells[0].candidates })]);
   expect(unclearCells(decided, ROWS, {})).toEqual([]);
+});
+
+// Bild (#1999): wie die Bild-Erkennung eine Tabelle liefert - Spalten mit Art, Zellen als Text, gelbe Zellen je Zeile.
+const IMAGE = {
+  kind: "drivers", detected: "drivers",
+  columns: [{ label: "Pos.", kind: "rank" }, { label: "Fahrer", kind: "name" }, { label: "Runde 1", kind: "round" },
+    { label: "Runde 2", kind: "round" }, { label: "Punkte", kind: "total" }, { label: "Dif.", kind: "gap" }],
+  rows: [
+    { cells: ["1", "Ada Ausgedacht", "25", "18", "43", "--"], uncertain: [], read: {}, notes: [] },
+    { cells: ["2", "Bruno Beispiel", "--", "25", "25", "-18"], uncertain: [3, 4], read: { 3: "23" }, notes: ["Summe der Runden 25 ≠ Punkte 25"] },
+  ],
+};
+
+test("eine Fahrer-Tabelle aus dem Bild wird zur eingefügten Tabelle - mit den gelben Zellen je Zeile", () => {
+  const { parsed, marks } = imageTable(IMAGE);
+  expect(parsed.columns.map((column) => column.kind)).toEqual(["rank", "name", "round", "round", "total", "ignore"]);
+  expect(parsed.rows[1]).toEqual({ line: 2, cells: ["2", "Bruno Beispiel", "--", "25", "25", "-18"] });
+  expect(tableText(parsed).split("\n")[0]).toBe("Pos.\tFahrer\tRunde 1\tRunde 2\tPunkte\tDif.");
+  expect(marks).toEqual([{ row: 1, name: "Bruno Beispiel", notes: ["Summe der Runden 25 ≠ Punkte 25"], cells: [
+    { column: 3, label: "Runde 2", value: "25", read: "23" }, { column: 4, label: "Punkte", value: "25", read: "" }] }]);
+  expect(markText(marks[0])).toBe("Runde 2: 25 (gelesen 23) · Punkte: 25");
+  const many = { cells: Array.from({ length: 7 }, (_, index) => ({ label: `Runde ${index + 1}`, value: "10", read: index === 5 ? "16" : "" })) };
+  expect(markText(many)).toBe("Runde 6: 10 (gelesen 16) · Runde 1: 10 · Runde 2: 10 · Runde 3: 10 · + 3 weitere");
+  // Dieselbe Tabelle wie eingefügter Text ergibt dieselbe Anfrage.
+  const body = buildBody(parsed, parsed.columns.map((column) => column.kind));
+  expect(body.rows[1]).toEqual({ name: "Bruno Beispiel", team: null, cells: ["--", "25"], total: 25, rank: 2 });
+});
+
+test("eine Team-Tabelle aus dem Bild wird zur Teamwertung - gelb, wenn Team oder Punkte unsicher sind", () => {
+  const teams = { ...IMAGE, kind: "teams", detected: "teams", columns: IMAGE.columns.map((column) => (column.kind === "name" ? { label: "Team", kind: "name" } : column)) };
+  expect(imageTeamRows(teams)).toEqual([
+    { team: "Ada Ausgedacht", points: "43", ocr: null },
+    { team: "Bruno Beispiel", points: "25", ocr: { read: "" } },
+  ]);
+  expect(imageTeamRows({ columns: [{ label: "Team", kind: "name" }], rows: [] })).toEqual([]);
 });
 
 test("Texte: Termin, Ziel, Abgleich und Rückmeldung", () => {

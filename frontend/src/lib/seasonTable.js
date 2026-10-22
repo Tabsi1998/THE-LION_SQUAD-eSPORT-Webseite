@@ -208,6 +208,55 @@ export function targetText(column) {
   return TARGETS[column.target] || TARGETS.sheet;
 }
 
+// ---------------------------------------------------------------- Bild (#1999)
+// Die Bild-Erkennung liefert Spalten mit Art (`rank`, `name`, `team`, `round`, `total`, `gap`) und je Zeile die Zellen
+// als Text samt gelben Zellen. Fahrer-Tabellen werden zur eingefügten Tabelle (derselbe Weg wie Text), Team-Tabellen
+// zur Teamwertung laut Veranstalter.
+const IMAGE_KINDS = { gap: "ignore" };
+
+/** Die gelesene Tabelle wie eingefügter Text (`parseSeasonTablePaste`) - dazu je Zeile die gelben Zellen. */
+export function imageTable(result) {
+  const columns = (result?.columns || []).map((column) => ({ label: column.label, kind: IMAGE_KINDS[column.kind] || column.kind }));
+  const nameAt = columns.findIndex((column) => column.kind === "name");
+  const rows = (result?.rows || []).map((row, index) => ({ line: index + 1, cells: [...row.cells] }));
+  const marks = (result?.rows || []).flatMap((row, index) => (row.uncertain?.length ? [{
+    row: index, name: row.cells[nameAt] || `Zeile ${index + 1}`,
+    cells: row.uncertain.map((column) => ({ column, label: columns[column]?.label || "", value: row.cells[column], read: row.read?.[String(column)] || "" })),
+    notes: row.notes || [],
+  }] : []));
+  return { parsed: { format: "image", header: true, columns, rows, errors: [] }, marks };
+}
+
+/** Die Tabelle als Text mit Tab - so lässt sie sich im Feld prüfen und korrigieren. */
+export function tableText(parsed) {
+  const head = (parsed?.columns || []).map((column) => column.label).join("\t");
+  return [head, ...(parsed?.rows || []).map((row) => row.cells.join("\t"))].join("\n");
+}
+
+const MARKS_SHOWN = 4;
+
+/** Eine gelbe Zeile in Worten: „Runde 3: 50 (gelesen 30) · Punkte: 545“ - Zellen mit anderer Lesung zuerst, höchstens
+ * vier, dann „+ 9 weitere“ (passt die Summe nicht, ist die ganze Zeile gelb). */
+export function markText(mark) {
+  const ordered = [...mark.cells.filter((cell) => cell.read), ...mark.cells.filter((cell) => !cell.read)];
+  const shown = ordered.slice(0, MARKS_SHOWN).map((cell) => `${cell.label}: ${cell.value || "leer"}${cell.read ? ` (gelesen ${cell.read})` : ""}`);
+  const rest = ordered.length - MARKS_SHOWN;
+  return [...shown, ...(rest > 0 ? [`+ ${rest} weitere`] : [])].join(" · ");
+}
+
+/** Team-Tabelle → Zeilen der Teamwertung laut Veranstalter: Team und Punkte, gelb, wenn eins davon unsicher ist. */
+export function imageTeamRows(result) {
+  const kinds = (result?.columns || []).map((column) => column.kind);
+  const nameAt = kinds.indexOf("name");
+  const totalAt = kinds.indexOf("total");
+  if (nameAt < 0 || totalAt < 0) return [];
+  return (result.rows || []).filter((row) => row.cells[nameAt]).map((row) => {
+    const uncertain = (row.uncertain || []).filter((column) => column === nameAt || column === totalAt);
+    const read = uncertain.map((column) => row.read?.[String(column)]).filter(Boolean).join(" · ");
+    return { team: row.cells[nameAt], points: row.cells[totalAt], ocr: uncertain.length ? { read } : null };
+  });
+}
+
 /** Rückmeldung nach dem Übernehmen. */
 export function applySummary(items = []) {
   const count = (status) => items.filter((item) => item.status === status).length;

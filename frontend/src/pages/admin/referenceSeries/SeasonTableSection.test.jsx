@@ -126,6 +126,84 @@ test("„Punkte laut Veranstalter“ geht als Wahl mit; eine Saison laut Veranst
   await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith(`${URL}/preview`, expect.objectContaining({ points: "organizer" }), { skipInvalidation: true }));
 });
 
+// ---------------------------------------------------------------- Bild (#1999)
+const IMAGE_DRIVERS = {
+  kind: "drivers", detected: "drivers", warnings: [],
+  columns: [{ label: "Pos.", kind: "rank" }, { label: "Fahrer", kind: "name" }, { label: "Runde 1", kind: "round" },
+    { label: "Runde 2", kind: "round" }, { label: "Punkte", kind: "total" }, { label: "Dif.", kind: "gap" }],
+  rows: [
+    { cells: ["1", "Ada Ausgedacht", "25", "21", "46", "--"], uncertain: [], read: {}, notes: [] },
+    { cells: ["2", "Bruno Beispiel", "18", "--", "18", "-28"], uncertain: [2], read: { 2: "16" }, notes: [] },
+  ],
+};
+const IMAGE_TEAMS = {
+  ...IMAGE_DRIVERS, kind: "drivers", detected: "teams",
+  columns: IMAGE_DRIVERS.columns.map((column) => (column.kind === "name" ? { label: "Team", kind: "name" } : column)),
+  rows: [{ cells: ["1", "Probe Rot", "25", "21", "46", "--"], uncertain: [], read: {}, notes: [] },
+    { cells: ["2", "Probe Blau", "18", "--", "18", "-28"], uncertain: [4], read: { 4: "16" }, notes: [] }],
+};
+
+function imageGet() {
+  apiMock.get.mockImplementation((url) => {
+    if (url === `${URL}/image`) return Promise.resolve({ data: { available: true, max_mb: 8, formats: ["image/png"] } });
+    if (url.endsWith("/unknown-names")) return Promise.resolve({ data: { items: [], profiles: [] } });
+    return Promise.reject(new Error(url));
+  });
+}
+
+async function readImage() {
+  render(<SeasonTableSection series={series} onChanged={vi.fn()} />);
+  fireEvent.click(screen.getByTestId("season-table-toggle"));
+  const file = new File([new Uint8Array([137, 80, 78, 71])], "tabelle.png", { type: "image/png" });
+  fireEvent.change(await screen.findByTestId("season-table-image-file"), { target: { files: [file] } });
+  return file;
+}
+
+test("Fahrer-Tabelle per Bild: als Text ins Feld, Vorschau wie beim Einfügen, gelbe Zellen halten das Übernehmen auf", async () => {
+  imageGet();
+  apiMock.post.mockImplementation((url) => Promise.resolve({ data: url.endsWith("/image") ? IMAGE_DRIVERS : preview({ decided: true }) }));
+  const file = await readImage();
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith(`${URL}/image`, file, { headers: { "Content-Type": "image/png" } }));
+  await screen.findAllByTestId("season-table-column");
+  expect(screen.getByTestId("season-table-text").value.split("\n")[2]).toBe("2\tBruno Beispiel\t18\t--\t18\t-28");
+  expect(apiMock.post).toHaveBeenCalledWith(`${URL}/preview`, expect.objectContaining({
+    columns: [{ label: "Runde 1" }, { label: "Runde 2" }],
+    rows: [{ name: "Ada Ausgedacht", team: null, cells: ["25", "21"], total: 46, rank: 1 },
+      { name: "Bruno Beispiel", team: null, cells: ["18", "--"], total: 18, rank: 2 }] }), { skipInvalidation: true });
+  const marks = screen.getByTestId("season-table-image-marks");
+  expect(marks).toHaveTextContent("Aus dem Bild unsicher: 1 Zelle in 1 Zeile");
+  expect(marks).toHaveTextContent("Bruno Beispiel · Runde 1: 18 (gelesen 16)");
+  expect(screen.getByTestId("season-table-apply")).toBeDisabled();
+  fireEvent.click(within(marks).getByTestId("season-table-image-confirm"));
+  expect(screen.queryByTestId("season-table-image-marks")).toBeNull();
+  expect(screen.getByTestId("season-table-apply")).toBeEnabled();
+});
+
+test("Team-Tabelle per Bild: Teamwertung laut Veranstalter mit Runde, Vergleich und Übernehmen", async () => {
+  imageGet();
+  const teamPreview = {
+    round: ROUNDS[1], rounds: ROUNDS.map((round) => ({ ...round, sheet_status: "published" })), expected_version: 3,
+    sheet_status: "published", team_scoring: true, unknown_teams: [], previous: {},
+    rows: [{ team: "Probe Rot", rank: 1, official_points: 46, computed_points: 46, deviation: 0 },
+      { team: "Probe Blau", rank: 2, official_points: 18, computed_points: 20, deviation: -2 }],
+  };
+  apiMock.post.mockImplementation((url) => Promise.resolve({ data: url.endsWith("/image") ? IMAGE_TEAMS : teamPreview }));
+  apiMock.put.mockResolvedValue({ data: { version: 4 } });
+  await readImage();
+  const panel = await screen.findByTestId("season-table-team-totals");
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/reference-series/admin/series/serie-1/team-totals/preview",
+    { totals: { "Probe Rot": 46, "Probe Blau": 18 }, round_id: null }, { skipInvalidation: true }));
+  expect(await within(panel).findByTestId("season-table-team-round")).toHaveValue("r2");
+  expect(within(panel).getByTestId("season-table-team-compare")).toHaveTextContent("Probe Blau1820−2");
+  expect(within(panel).getByTestId("season-table-team-save")).toBeDisabled();  // Punkte von Probe Blau sind gelb
+  fireEvent.click(within(panel).getByTestId("result-team-total-confirm"));
+  fireEvent.click(within(panel).getByTestId("season-table-team-save"));
+  await waitFor(() => expect(apiMock.put).toHaveBeenCalledWith("/reference-series/admin/series/serie-1/team-totals",
+    { totals: { "Probe Rot": 46, "Probe Blau": 18 }, round_id: "r2", expected_version: 3 }));
+  expect(toastMock.success).toHaveBeenCalledWith(expect.stringContaining("Teamwertung laut Veranstalter für R2"));
+  expect(screen.queryByTestId("season-table-column")).toBeNull();
+});
+
 test("ein Fehler der Vorschau steht im Abschnitt", async () => {
   apiMock.post.mockRejectedValue({ response: { status: 409, data: { detail: "Eine Saisontabelle mit Punkten je Runde gibt es für Fahrer- und Spielerwertungen." } } });
   await paste().catch(() => {});

@@ -3,19 +3,25 @@ import { api, formatApiError } from "@/lib/api";
 import { CheckField, INPUT_CLASS } from "@/components/tls/FormFields";
 import { parseSeasonTablePaste } from "@/lib/resultPaste";
 import { changeLines } from "@/lib/partnerSource";
+import { parseNumber } from "@/lib/resultPaste";
 import {
   HOW_TEXT, KIND_OPTIONS, POINT_MODES, SEASON_STATES, UNCLEAR_TEXT, applyBody, applySummary, buildBody, cellKey,
-  decisionFor, decisionValue, isSelectable, mergeDecisions, organizerDecisions, proposalDecisions, rememberCandidates,
-  roundColumns, roundOption, targetText, totalText, totalsSummary, unclearCells,
+  decisionFor, decisionValue, imageTable, imageTeamRows, isSelectable, markText, mergeDecisions, organizerDecisions,
+  proposalDecisions, rememberCandidates, roundColumns, roundOption, tableText, targetText, totalText, totalsSummary,
+  unclearCells,
 } from "@/lib/seasonTable";
+import { OfficialTeamTotals } from "./OfficialTeamTotals";
+import { ResultImageButton, useResultImage } from "./ResultImageImport";
 import { UnknownNamesSheet } from "./UnknownNamesSheet";
 import { toast } from "sonner";
-import { TableProperties } from "lucide-react";
+import { Check, TableProperties, X } from "lucide-react";
 
 // Saisontabelle einlesen (#1928, nur Vorstand): Wer eine laufende Saison später anlegt, fügt die Gesamttabelle des
 // Veranstalters ein (Fahrer, Team, Punkte je Runde, Gesamt) statt jede vergangene Runde einzeln einzutragen. Je Spalte
 // zeigt die Vorschau den Termin (korrigierbar), was Übernehmen täte und die Plätze aus den Punkten; gelbe Zellen klärt
 // der Vorstand, der Abgleich prüft jede Summe gegen „Gesamt“. Geschrieben wird erst mit „Übernehmen“, immer als Entwurf.
+// Bild auslesen (#1999): eine Fahrer-Tabelle landet als Text im Feld (gelbe Zellen aus dem Bild prüfen, bevor übernommen
+// wird); eine Team-Tabelle wird zur Teamwertung laut Veranstalter einer Runde (Vorgabe: die letzte gewertete).
 
 const SELECT_CLASS = `${INPUT_CLASS} text-sm py-1.5`;
 // Wie die übrigen Felder, nur ohne volle Breite - im Raster bestimmt die Spalte die Breite.
@@ -163,6 +169,135 @@ function UnclearList({ cells, decisions, onDecide, onProposals, onOrganizer, bus
   );
 }
 
+/** Gelbe Zellen aus dem Bild: je Zeile, was unsicher ist - „Passt so“ oder im Feld korrigieren und neu einlesen. */
+function ImageMarks({ marks, onConfirm, onConfirmAll }) {
+  if (!marks.length) return null;
+  const cells = marks.reduce((sum, mark) => sum + mark.cells.length, 0);
+  return (
+    <section className="border border-amber-400/40 bg-amber-400/[0.06] rounded-sm p-3 space-y-2" data-testid="season-table-image-marks" aria-live="polite">
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div className="min-w-0">
+          <h3 className="text-sm font-bold text-white">Aus dem Bild unsicher: {cells} {cells === 1 ? "Zelle" : "Zellen"} in {marks.length} {marks.length === 1 ? "Zeile" : "Zeilen"}</h3>
+          <p className="text-xs text-amber-100/80">Mit dem Bild vergleichen. Falsches im Feld oben korrigieren und „Neu einlesen“ – sonst „Passt so“. Übernommen wird erst danach.</p>
+        </div>
+        <button type="button" onClick={onConfirmAll} data-testid="season-table-image-confirm-all"
+          className="tls-btn tls-btn--quiet px-3 py-1.5 rounded-sm text-[11px] font-bold uppercase tracking-wider inline-flex items-center gap-1.5">
+          <Check className="w-3.5 h-3.5" /> Alle geprüft
+        </button>
+      </div>
+      <ul className="divide-y divide-amber-200/10">
+        {marks.map((mark) => (
+          <li key={mark.row} className="py-1.5 flex flex-wrap items-start justify-between gap-2 text-xs" data-testid="season-table-image-mark">
+            <span className="min-w-0 text-amber-100">
+              <span className="font-semibold text-white">{mark.name}</span> · {markText(mark)}
+              {mark.notes.length > 0 && <span className="block text-amber-200/70">{mark.notes.join(" · ")}</span>}
+            </span>
+            <button type="button" onClick={() => onConfirm(mark.row)} data-testid="season-table-image-confirm"
+              className="tls-btn tls-btn--quiet px-2 py-1 rounded-sm text-[10px] font-bold uppercase tracking-wider inline-flex items-center gap-1">
+              <Check className="w-3 h-3" /> Passt so
+            </button>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+/** Team-Tabelle aus dem Bild → Teamwertung laut Veranstalter einer Runde: Runde wählen (Vorgabe: die letzte gewertete),
+ * Team und Punkte prüfen, Vergleich mit der eigenen Rechnung, übernehmen. */
+function TeamTotalsPanel({ series, result, onClose, onChanged }) {
+  const url = `/reference-series/admin/series/${series.id}/team-totals`;
+  const [initialRows] = useState(() => imageTeamRows(result));
+  const [totals, setTotals] = useState(() => Object.fromEntries(initialRows.map((row) => [row.team, parseNumber(row.points)]).filter(([, points]) => points !== null)));
+  const [open, setOpen] = useState(0);
+  const [roundId, setRoundId] = useState(null);
+  const [preview, setPreview] = useState(null);
+  const [error, setError] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+    api.post(`${url}/preview`, { totals, round_id: roundId }, { skipInvalidation: true })
+      .then(({ data }) => { if (alive) { setPreview(data); setError(""); } })
+      .catch((err) => { if (alive) { setPreview(null); setError(formatApiError(err.response?.data?.detail) || "Die Vorschau ist nicht möglich."); } });
+    return () => { alive = false; };
+  }, [url, totals, roundId]);
+
+  const save = async () => {
+    setSaving(true);
+    try {
+      await api.put(url, { totals, round_id: preview.round.id, expected_version: preview.expected_version });
+      toast.success(`Teamwertung laut Veranstalter für ${roundOption(preview.round)} übernommen.`);
+      onChanged?.();
+      onClose();
+    } catch (err) {
+      toast.error(formatApiError(err.response?.data?.detail));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const official = new Set(Object.keys(totals));
+  const rows = (preview?.rows || []).filter((row) => official.has(row.team) || row.official_points !== null);
+  return (
+    <section className="border border-[#29B6E8]/30 bg-[#29B6E8]/5 rounded-sm p-3 space-y-3" data-testid="season-table-team-totals">
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <h3 className="text-sm font-bold text-white">Team-Tabelle erkannt – Teamwertung laut Veranstalter</h3>
+          <p className="text-xs text-white/60">Sie gilt nach der gewählten Runde für Platz und Punkte der Teamwertung; die eigene Rechnung bleibt als Prüfhinweis.</p>
+        </div>
+        <button type="button" onClick={onClose} aria-label="Team-Tabelle verwerfen" data-testid="season-table-team-close" className="-m-1 p-1 rounded-sm text-white/45 hover:text-white"><X className="w-4 h-4" /></button>
+      </div>
+      {preview && (
+        <label className="block max-w-md">
+          <span className="block text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Nach Runde</span>
+          <select value={preview.round.id} onChange={(event) => setRoundId(event.target.value)} data-testid="season-table-team-round" className={SELECT_CLASS}>
+            {preview.rounds.map((round) => <option key={round.id} value={round.id}>{roundOption(round)}{round.sheet_status === "published" ? "" : " · Entwurf"}</option>)}
+          </select>
+        </label>
+      )}
+      {error && <p className="text-sm text-amber-200" role="alert" data-testid="season-table-team-error">{error}</p>}
+      {preview && !preview.team_scoring && <p className="text-xs text-amber-200">Die Saison führt keine Teamwertung – die Werte stehen dann nur im Ergebnis.</p>}
+      <OfficialTeamTotals totals={totals} initialRows={initialRows} onChange={setTotals} onOpenChange={setOpen} teams={(preview?.rows || []).map((row) => row.team)} />
+      {(preview?.unknown_teams || []).length > 0 && (
+        <p className="text-xs text-amber-200" data-testid="season-table-team-unknown">Neu in der Saison: {preview.unknown_teams.join(", ")} – Schreibweise prüfen.</p>
+      )}
+      {rows.length > 0 && (
+        <div className="tls-swipe">
+          <table className="w-full text-sm" data-testid="season-table-team-compare">
+            <thead>
+              <tr className="text-left text-[11px] uppercase tracking-widest text-white/50">
+                <th scope="col" className="py-1.5 pr-3 font-bold">Team</th>
+                {/* Am Handy kurze Köpfe - die Zahlen bleiben lesbar, die Namen brechen nicht mitten im Wort. */}
+                <th scope="col" className="py-1.5 pr-3 font-bold text-right whitespace-nowrap"><span className="sm:hidden">Bild</span><span className="hidden sm:inline">Laut Bild</span></th>
+                <th scope="col" className="py-1.5 pr-3 font-bold text-right whitespace-nowrap"><span className="sm:hidden">Eigene</span><span className="hidden sm:inline">Eigene Rechnung</span></th>
+                <th scope="col" className="py-1.5 font-bold text-right whitespace-nowrap"><span className="sm:hidden">Abw.</span><span className="hidden sm:inline">Abweichung</span></th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-white/5">
+              {rows.map((row) => (
+                <tr key={row.team}>
+                  <td className="py-1.5 pr-3 text-white break-words">{row.team}</td>
+                  <td className="py-1.5 pr-3 text-right tabular-nums text-white">{row.official_points ?? "–"}</td>
+                  <td className="py-1.5 pr-3 text-right tabular-nums text-white/70">{row.computed_points ?? "–"}</td>
+                  <td className={`py-1.5 text-right tabular-nums ${row.deviation ? "text-amber-200" : "text-white/45"}`}>{row.deviation ? (row.deviation > 0 ? `+${row.deviation}` : `−${Math.abs(row.deviation)}`) : "–"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+      <div className="flex flex-wrap items-center gap-3">
+        <button type="button" onClick={save} disabled={!preview || open > 0 || saving || !Object.keys(totals).length} data-testid="season-table-team-save"
+          className="tls-btn tls-btn--primary px-4 py-2 rounded-sm text-xs font-bold uppercase tracking-wider disabled:opacity-50">
+          {saving ? "Übernimmt …" : "Teamwertung übernehmen"}
+        </button>
+        {open > 0 && <span className="text-xs text-amber-200">Erst die gelben Zeilen prüfen.</span>}
+      </div>
+    </section>
+  );
+}
+
 function rankText(item) {
   if (!item.rank && !item.table_rank) return "–";
   if (!item.table_rank || item.rank === item.table_rank) return String(item.rank || item.table_rank);
@@ -245,6 +380,8 @@ export function SeasonTableSection({ series, onChanged }) {
   const [unknownOpen, setUnknownOpen] = useState(false);
   const request = useRef(0);
   const pasteRef = useRef(null);
+  const [imageMarks, setImageMarks] = useState([]);
+  const [teamImage, setTeamImage] = useState(null);
 
   const body = useMemo(() => (parsed && kinds.includes("name") ? buildBody(parsed, kinds, roundIds, points, decisions) : null),
     [parsed, kinds, roundIds, points, decisions]);
@@ -272,13 +409,7 @@ export function SeasonTableSection({ series, onChanged }) {
     if (body && body.rows.length && body.columns.length) runPreview(body);
   }, [body, runPreview]);
 
-  const read = () => {
-    // Nach dem Einfügen steht das Feld am Ende - zum Prüfen wieder an den Anfang der Tabelle.
-    if (pasteRef.current) {
-      pasteRef.current.scrollTop = 0;
-      pasteRef.current.scrollLeft = 0;
-    }
-    const result = parseSeasonTablePaste(text);
+  const startWith = (result) => {
     setParsed(result);
     setKinds(result.columns.map((column) => column.kind));
     setRoundIds({});
@@ -286,6 +417,32 @@ export function SeasonTableSection({ series, onChanged }) {
     setKnown({});
     setChoice({});
     setPreview(null);
+  };
+  // Bild (#1999): Fahrer-Tabelle als Text ins Feld und in die Vorschau, Team-Tabelle zur Teamwertung laut Veranstalter.
+  const image = useResultImage({
+    base: url, paste: false,
+    onRead: (result) => {
+      if (result.detected === "teams") {
+        setTeamImage(result);
+        return;
+      }
+      const table = imageTable(result);
+      setText(tableText(table.parsed));
+      setImageMarks(table.marks);
+      setTeamImage(null);
+      startWith(table.parsed);
+    },
+  });
+
+  const read = () => {
+    // Nach dem Einfügen steht das Feld am Ende - zum Prüfen wieder an den Anfang der Tabelle.
+    if (pasteRef.current) {
+      pasteRef.current.scrollTop = 0;
+      pasteRef.current.scrollLeft = 0;
+    }
+    // Neu eingelesen gilt der Text im Feld - was aus dem Bild gelb war, hat jemand geprüft oder korrigiert.
+    setImageMarks([]);
+    startWith(parseSeasonTablePaste(text));
   };
 
   const changeKind = (index, kind) => {
@@ -362,8 +519,12 @@ export function SeasonTableSection({ series, onChanged }) {
               className="tls-btn tls-btn--primary px-4 py-2 rounded-sm text-xs font-bold uppercase tracking-wider disabled:opacity-50">
               {parsed ? "Neu einlesen" : "Einlesen"}
             </button>
+            <ResultImageButton image={image} pasteHint={false} testId="season-table-image" fileTestId="season-table-image-file" />
+            {image.busy && <span className="text-xs text-white/60" role="status" data-testid="season-table-image-reading">Bild wird gelesen – das dauert ein paar Sekunden.</span>}
             {busy === "preview" && <span className="text-xs text-white/50" role="status">Rechnet die Vorschau …</span>}
           </div>
+          {teamImage && <TeamTotalsPanel series={series} result={teamImage} onClose={() => setTeamImage(null)} onChanged={onChanged} />}
+          <ImageMarks marks={imageMarks} onConfirm={(row) => setImageMarks((current) => current.filter((mark) => mark.row !== row))} onConfirmAll={() => setImageMarks([])} />
           {parseErrors.length > 0 && (
             <ul className="text-sm text-amber-200 space-y-0.5" data-testid="season-table-parse-errors">
               {parseErrors.map((item, index) => <li key={index}>{item.line ? `Zeile ${item.line}: ` : ""}{item.message}</li>)}
@@ -395,7 +556,7 @@ export function SeasonTableSection({ series, onChanged }) {
                 </p>
               )}
               <div className="flex flex-wrap items-center gap-3">
-                <button type="button" onClick={apply} disabled={!picked.length || Boolean(busy)} data-testid="season-table-apply"
+                <button type="button" onClick={apply} disabled={!picked.length || Boolean(busy) || imageMarks.length > 0} data-testid="season-table-apply"
                   className="tls-btn tls-btn--primary px-4 py-2 rounded-sm text-xs font-bold uppercase tracking-wider disabled:opacity-50">
                   {busy === "apply" ? "Übernimmt …" : `Übernehmen (${picked.length})`}
                 </button>

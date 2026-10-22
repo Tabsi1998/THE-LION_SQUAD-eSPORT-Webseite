@@ -357,6 +357,7 @@ export function ResultEntrySheet({ series, round, onClose, onSaved }) {
   // Eigene Eingaben, die beim Neuladen nach einem 409 nicht still im neuen Stand landen dürfen.
   const [mine, setMine] = useState(null);
   const [pasting, setPasting] = useState(false);
+  const [teamTotalsOpen, setTeamTotalsOpen] = useState(0);
 
   const load = useCallback(async () => {
     try {
@@ -466,7 +467,8 @@ export function ResultEntrySheet({ series, round, onClose, onSaved }) {
     }),
   }));
   const confirmImageRow = (key) => setForm((current) => ({ ...current, rows: current.rows.map((row) => (row.key === key ? confirmRow(row) : row)) }));
-  const imageOpen = form ? openImageItems(form) : 0;
+  // Gelbe Zeilen der Teamwertung aus dem Bild (#1999) halten das Übernehmen genauso auf.
+  const imageOpen = (form ? openImageItems(form) : 0) + teamTotalsOpen;
   const hinted = form ? form.rows.filter((row) => row.points_hint).length : 0;
   const allHintsToPoints = () => setForm((current) => ({
     ...current,
@@ -739,7 +741,8 @@ export function ResultEntrySheet({ series, round, onClose, onSaved }) {
           {/* Teamwertung laut Veranstalter (#1960): sichtbare Eingabe mit Einfügen - sie gilt dann für Platz und Punkte.
               Nur der Vorstand: was ein Captain schickt, übernimmt der Server nicht. */}
           {board && kind === "racing" && !qualifying && rules.team_scoring?.enabled && (
-            <OfficialTeamTotals key={`${data.version}-${mine ? "mine" : "stand"}`} totals={form.teamTotals} teams={teams} onChange={(teamTotals) => update({ teamTotals })} />
+            <OfficialTeamTotals key={`${data.version}-${mine ? "mine" : "stand"}`} totals={form.teamTotals} teams={teams} onChange={(teamTotals) => update({ teamTotals })}
+              imageBase={`/reference-series/admin/series/${series.id}/season-table`} onOpenChange={setTeamTotalsOpen} />
           )}
 
           {teamLeague && form.rows.length === 0 && (
