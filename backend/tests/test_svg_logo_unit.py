@@ -458,3 +458,15 @@ def test_busy_when_every_drawing_slot_is_taken(monkeypatch):
     monkeypatch.setattr(svg_logo, "_RASTER_SLOTS", slots)
     monkeypatch.setattr(svg_logo, "RASTER_WAIT_SECONDS", 0.05)
     assert "gleich noch einmal" in rejected_drawing(svg(RECT))
+
+
+def test_logo_fields_take_no_embedded_image_data(uploads):
+    # Logos kommen nur über die Upload-Routen: keine data-URI in einem Logo-Feld, auch kodiert oder mit Leerraum.
+    for value in ("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg'%3E%3C/svg%3E",
+                  " DATA: image/svg+xml;base64,PHN2Zz48L3N2Zz4=", "data:image/png;base64,iVBORw0KGgo=",
+                  "data%3Aimage%2Fsvg%2Bxml%2C%3Csvg%2F%3E"):
+        with pytest.raises(svg_logo.FieldRefused) as caught:
+            svg_logo.gate_json_body(_body({"brand": {"logo_url": value}}))
+        assert caught.value.kind == "inline"
+    assert svg_logo.gate_json_body(_body({"logo_url": f"/api/static/uploads/{LOGO}.svg"})) is None
+    assert svg_logo.gate_json_body(_body({"logo_url": "https://partner.example/logo.png"})) is None

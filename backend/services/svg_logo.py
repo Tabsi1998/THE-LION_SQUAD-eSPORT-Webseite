@@ -751,8 +751,18 @@ def vector_url(value: str) -> str:
     return value.replace(path, f"{path[:-4]}.svg", 1)
 
 
+INLINE_REFUSED = ("Logos bitte über „Hochladen“ oder die Mediathek wählen - eingebettete Bilddaten (data:) gehen hier "
+                  "nicht.")
+REFUSED_MESSAGES = {"svg": FIELD_REFUSED, "inline": INLINE_REFUSED}
+
+
 class FieldRefused(ValueError):
-    """Ein SVG in einem Feld, das kein Logo-Feld ist."""
+    """Ein Wert, den ein Feld nicht nehmen darf: ``kind`` „svg“ (SVG außerhalb eines Logo-Felds) oder „inline“
+    (eingebettete Bilddaten in einem Logo-Feld)."""
+
+    def __init__(self, key, kind: str = "svg"):
+        super().__init__(key)
+        self.kind = kind if kind in REFUSED_MESSAGES else "svg"
 
 
 def _gate_value(value, key, state):
@@ -763,6 +773,10 @@ def _gate_value(value, key, state):
     if not isinstance(value, str):
         return value
     if key in LOGO_FIELDS:
+        # Logos kommen nur über die Upload-Routen (bereinigt, mit PNG-Fassung) - nie als eingebettete data-URI. Über
+        # die Oberfläche entsteht so ein Wert nicht; die Felder tragen Upload- oder Web-Adressen.
+        if _compact(value.strip()).startswith("data:"):
+            raise FieldRefused(key, "inline")
         kept = vector_url(value) if ".png" in value else value
         if kept != value:
             state["changed"] = True
@@ -773,8 +787,9 @@ def _gate_value(value, key, state):
 
 
 def gate_json_body(body: bytes) -> bytes | None:
-    """Prüft einen JSON-Körper vor dem Speichern: ein SVG-Logo bzw. eine SVG-data-URI nur in ``LOGO_FIELDS``, sonst
-    ``FieldRefused``; die PNG-Fassung eines SVG-Logos in einem Logo-Feld wird wieder das SVG. Liefert den geänderten
+    """Prüft einen JSON-Körper vor dem Speichern: ein SVG-Logo nur in ``LOGO_FIELDS``, eine SVG-data-URI nirgends und in
+    Logo-Feldern überhaupt keine data-URI, sonst ``FieldRefused``; die PNG-Fassung eines SVG-Logos in einem Logo-Feld
+    wird wieder das SVG. Liefert den geänderten
     Körper oder ``None``, wenn nichts zu ändern ist (auch bei ungültigem JSON - das meldet die Route selbst)."""
     try:
         payload = json.loads(body)
@@ -840,8 +855,8 @@ class SvgFieldGate:
         body = b"".join(chunks)
         try:
             changed = gate_json_body(body)
-        except FieldRefused:
-            return await self._answer(scope, receive, send, 422, FIELD_REFUSED)
+        except FieldRefused as refused:
+            return await self._answer(scope, receive, send, 422, REFUSED_MESSAGES[refused.kind])
         if changed is not None:
             body = changed
             scope = {**scope, "headers": [(key, value) for key, value in headers if key.lower() != b"content-length"]

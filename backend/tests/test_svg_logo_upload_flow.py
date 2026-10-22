@@ -295,3 +295,12 @@ async def test_existing_records_stay_saveable_and_encoded_svg_is_refused(flow, t
         refused = await flow.put("/api/users/me", json={"avatar_url": value})
         assert refused.status_code == 422, value
     assert (await flow.db.users.find_one({"id": user["id"]}))["avatar_url"] == "/api/static/uploads/altlast.svg"
+
+
+@pytest.mark.asyncio
+async def test_branding_logo_takes_no_embedded_svg(flow):
+    await admin(flow)
+    inline = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg'%3E%3Cscript%3E%3C/script%3E%3C/svg%3E"
+    refused = await flow.put("/api/settings/branding", json={"logo_url": inline})
+    assert refused.status_code == 422 and refused.json()["detail"] == svg_logo.INLINE_REFUSED
+    assert ((await flow.db.settings.find_one({"id": "branding"})) or {}).get("logo_url") != inline
