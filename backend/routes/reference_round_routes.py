@@ -40,7 +40,8 @@ from services.dolibarr_policy import club_today
 from services.round_countries import detect_country
 from services.series_standings import ordered_rounds
 from services.reference_calendar import (
-    ClockError, calendar_view, clock_gap_message, club_day_of, parse_round_lines, vienna_clock, vienna_start,
+    ClockError, calendar_view, clock_gap_message, club_day_of, missing_codes, parse_round_lines, planned_status,
+    vienna_clock, vienna_start,
 )
 from services.reference_series_access import SeriesAccess, require_series_editor
 from services.visibility import user_can_see
@@ -128,6 +129,11 @@ class RoundSortBody(_Versioned):
 
 class RoundPasteBody(_Versioned):
     text: str = Field(max_length=20000)
+    apply: bool = False
+
+
+class RoundFillBody(_Versioned):
+    """Fehlende Termine anlegen (#2015): ohne ``apply`` nur, was angelegt würde."""
     apply: bool = False
 
 
@@ -247,13 +253,15 @@ def _new_round(series_id: str, me: dict, **fields) -> dict:
         "no_score_reason": None, "no_score_note": None,
         "source": "manual",
         "archived_at": None, "at_home": None, "club_day_end": None,
+        # #2015: Termin offen - die Uhrzeit, bis das Datum nachgetragen ist (dann gilt ``starts_at``).
+        "open_time": None,
         "created_at": now, "created_by": me["id"], **_stamp(me), **fields,
     }
 
 
 async def _calendar(db, series_id: str) -> dict:
     series = await db.reference_series.find_one(
-        {"id": series_id}, {"_id": 0, "calendar_version": 1, "weekend": 1}) or {}
+        {"id": series_id}, {"_id": 0, "calendar_version": 1, "weekend": 1, "planned_rounds": 1}) or {}
     rounds = await db.reference_rounds.find({"series_id": series_id}, {"_id": 0}).to_list(None)
     published = [row["round_id"] async for row in db.reference_round_results.find(
         {"series_id": series_id, "status": "published"}, {"_id": 0, "round_id": 1})]
@@ -264,8 +272,11 @@ async def _calendar(db, series_id: str) -> dict:
     # Runde und Art des Laufs (#1930): Termine mit gleichem Kürzel sind eine Runde mit Läufen.
     race_weekend.annotate([*view["rounds"], *archived], series.get("weekend"))
     for item in [*view["rounds"], *archived]:
-        item["time"] = vienna_clock(item.get("starts_at"))
-    return {"today": today, "version": int(series.get("calendar_version") or 0), **view, "archived": archived}
+        # Termin offen (#2015): ohne Tag die gemerkte Uhrzeit.
+        item["time"] = vienna_clock(item.get("starts_at")) or (None if item.get("club_day") else item.get("open_time"))
+    return {"today": today, "version": int(series.get("calendar_version") or 0), **view, "archived": archived,
+            # #2015: geplante Termine gegen den Kalender - für „fehlende Termine anlegen“.
+            "planned": planned_status(rounds, series.get("planned_rounds"), series.get("weekend"))}
 
 
 # ---------------------------------------------------------------- Verwaltung
@@ -284,8 +295,8 @@ async def create_round(series_id: str, body: RoundCreateBody, me: dict = Depends
     series = await _series(db, series_id)
     if body.status != "planned":
         raise HTTPException(422, "Ein neuer Termin ist geplant - Absagen und Verschieben gibt es danach.")
+    clock = body.time if "time" in body.model_fields_set else series.get("default_time")
     if body.day:
-        clock = body.time if "time" in body.model_fields_set else series.get("default_time")
         when = _when(body.day, clock)
     else:
         when = _when_from_instant(body.starts_at)
@@ -307,7 +318,7 @@ async def create_round(series_id: str, body: RoundCreateBody, me: dict = Depends
                      counts_manual=manual, no_score_reason=body.no_score_reason,
                      no_score_note=_text(body.no_score_note) if body.no_score_reason else None,
                      opponent=_text(body.opponent), note=_text(body.note), at_home=body.at_home,
-                     club_day_end=window_end,
+                     club_day_end=window_end, open_time=None if when["club_day"] else clock,
                      **_country(body.country_auto, body.country_code, _text(body.venue), _text(body.title)))
     await db.reference_rounds.insert_one(doc)
     await _log(db, "reference_round.create", me, series_id, {"round_id": doc["id"], "after": _brief(doc)})
@@ -350,10 +361,16 @@ async def update_round(series_id: str, round_id: str, body: RoundUpdateBody,
         updates["no_score_note"] = _text(raw["no_score_note"])
     if "day" in raw or "time" in raw:
         day = raw["day"] if "day" in raw else existing.get("club_day")
-        clock = raw["time"] if "time" in raw else vienna_clock(existing.get("starts_at"))
+        clock = raw["time"] if "time" in raw else (vienna_clock(existing.get("starts_at")) or existing.get("open_time"))
         updates.update(_when(day, clock))
+        # Termin offen (#2015): ohne Tag bleibt die Uhrzeit gemerkt, mit Tag gilt der Zeitpunkt.
+        if not day or existing.get("open_time"):
+            updates["open_time"] = None if day else clock
     elif "starts_at" in raw:
         updates.update(_when_from_instant(raw["starts_at"]))
+    # Datum nachgetragen (#2015): ein offener Termin rückt vor den ersten offenen bzw. späteren Termin.
+    reorder = (await _dated_order(db, series_id, round_id, updates["club_day"])
+               if not existing.get("club_day") and updates.get("club_day") else None)
     if "at_home" in raw:
         updates["at_home"] = raw["at_home"]
     if "day_end" in raw or ("club_day" in updates and existing.get("club_day_end")):
@@ -377,8 +394,11 @@ async def update_round(series_id: str, round_id: str, body: RoundUpdateBody,
     updates.update({key: value for key, value in (country or {}).items() if value != current[key]})
     await _claim(db, series_id, body.expected_version)
     await db.reference_rounds.update_one({"id": round_id}, {"$set": {**updates, **_stamp(me)}})
+    if reorder:
+        await _write_order(db, series_id, reorder, me)
     await _log(db, "reference_round.update", me, series_id, {
-        "round_id": round_id, "before": {key: existing.get(key) for key in updates}, "after": updates})
+        "round_id": round_id, "before": {key: existing.get(key) for key in updates}, "after": updates,
+        **({"order": reorder} if reorder else {})})
     await _recompute(db, series_id)
     return await _round(db, series_id, round_id)
 
@@ -404,6 +424,7 @@ async def postpone_round(series_id: str, round_id: str, body: RoundPostponeBody,
         "original_club_day": existing.get("original_club_day") if keep else existing.get("club_day"),
         "status_note": _text(body.note),
         "club_day_end": None,  # verschoben ist ein fester Tag, kein Zeitraum mehr (#1931)
+        "open_time": None,  # mit Tag gilt der Zeitpunkt (#2015)
     }
     await _claim(db, series_id, body.expected_version)
     await db.reference_rounds.update_one({"id": round_id}, {"$set": {**updates, **_stamp(me)}})
@@ -481,6 +502,19 @@ async def restore_round(series_id: str, round_id: str, body: Optional[RoundActio
     return await _set_archived(series_id, round_id, False, me, body)
 
 
+async def _dated_order(db, series_id: str, round_id: str, day: str) -> list[str] | None:
+    """Reihenfolge, wenn ein offener Termin sein Datum bekommt (#2015): er rückt vor den ersten Termin, der offen ist
+    oder später liegt - Termine ohne Datum stehen hinten. ``None``, wenn er schon richtig steht."""
+    rounds = await db.reference_rounds.find({"series_id": series_id, "archived_at": None}, {"_id": 0}).to_list(None)
+    ids = [item["id"] for item in ordered_rounds(rounds)]
+    by_id = {item["id"]: item for item in rounds}
+    rest = [rid for rid in ids if rid != round_id]
+    at = next((index for index, rid in enumerate(rest)
+               if not by_id[rid].get("club_day") or by_id[rid]["club_day"] > day), len(rest))
+    after = [*rest[:at], round_id, *rest[at:]]
+    return after if after != ids else None
+
+
 async def _write_order(db, series_id: str, ids: list[str], me: dict) -> None:
     for index, round_id in enumerate(ids, start=1):
         await db.reference_rounds.update_one({"id": round_id, "series_id": series_id},
@@ -546,17 +580,51 @@ async def paste_rounds(series_id: str, body: RoundPasteBody, me: dict = Depends(
     planned = [(row, item) for row in parsed["rows"] for item in row["sessions"]]
     # Team-Liga (#1931): Gegner, Heim/Auswärts und Spieltag-Zeitraum aus der Zeile - der Zeitraum nur, wenn er nicht
     # vor dem Tag des Laufs endet.
+    # Termin offen (#2015): ohne Tag kein Zeitpunkt - die Uhrzeit bleibt als ``open_time`` für das spätere Datum.
     docs = [_new_round(series_id, me, order=order + offset, code=row["code"], session=item["session"],
                        venue=row["venue"], club_day=item["day"], starts_at=item["starts_at"], counts=item["counts"],
                        source="paste", country_code=row["country_code"], country_auto=True,
                        opponent=row.get("opponent"), at_home=row.get("at_home"),
-                       club_day_end=row["day_end"] if (row.get("day_end") or "") >= item["day"] else None)
+                       club_day_end=row["day_end"] if item["day"] and (row.get("day_end") or "") >= item["day"]
+                       else None,
+                       open_time=None if item["day"] else item.get("time"))
             for offset, (row, item) in enumerate(planned)]
     await db.reference_rounds.insert_many(docs)
     await _log(db, "reference_round.paste", me, series_id, {"count": len(docs), "round_ids": [doc["id"] for doc in docs],
                                                          "codes": [doc["code"] for doc in docs]})
     await _recompute(db, series_id)
     return {"created": len(docs), **await _calendar(db, series_id)}
+
+
+@router.post("/admin/series/{series_id}/rounds/fill-planned")
+@reference_series.series_locked
+async def fill_planned_rounds(series_id: str, body: Optional[RoundFillBody] = None,
+                              me: dict = Depends(require_area("content"))):
+    """Fehlende Termine anlegen (#2015): bis zur Zahl der geplanten Termine (``planned_rounds``) kommen Termine ohne
+    Datum („Termin offen“) mit den nächsten Kürzeln dazu - nach „T4“ also T5 … T9, ohne Kürzel mit Zahl „T“ bzw. bei
+    der Rennliga „R“. Uhrzeit: die Standard-Uhrzeit, bis das Datum nachgetragen ist. Ohne ``apply`` nur die Vorschau."""
+    db = get_db()
+    series = await _series(db, series_id)
+    rounds = await db.reference_rounds.find({"series_id": series_id}, {"_id": 0}).to_list(None)
+    status = planned_status(rounds, series.get("planned_rounds"), series.get("weekend"))
+    if status is None:
+        raise HTTPException(422, "Die Saison hat keine geplante Zahl an Terminen – erst in der Saison eintragen.")
+    lineage = await db.reference_lineages.find_one({"id": series.get("lineage_id")}, {"_id": 0, "kind": 1}) or {}
+    codes = missing_codes(rounds, status["missing"], "R" if lineage.get("kind") == "racing" else "T")
+    if not (body and body.apply):
+        return {**status, "codes": codes}
+    if not codes:
+        return {"created": 0, "codes": [], **await _calendar(db, series_id)}
+    first = await _claim(db, series_id, body.expected_version, orders=len(codes))
+    docs = [_new_round(series_id, me, order=first + offset, code=code, source="planned",
+                       open_time=series.get("default_time"))
+            for offset, code in enumerate(codes)]
+    await db.reference_rounds.insert_many(docs)
+    await _log(db, "reference_round.fill_planned", me, series_id, {
+        "count": len(docs), "round_ids": [doc["id"] for doc in docs], "codes": codes,
+        "planned": status["planned"]})
+    await _recompute(db, series_id)
+    return {"created": len(docs), "codes": codes, **await _calendar(db, series_id)}
 
 
 # ---------------------------------------------------------------- Öffentlich

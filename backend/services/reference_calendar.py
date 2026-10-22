@@ -18,6 +18,10 @@ und der Parser für eingefügte Terminlisten.
   ``race_weekend.expand_paste`` an. Team-Liga (#1931): „vs Team X“ (Heimspiel) bzw. „@ Team X“ (auswärts) wird zum
   Gegner, „13.05.–17.05.“ zum Spieltag-Zeitraum (``day_end``) - beides liest ``services/team_league_calendar.py``
   aus dem, was nach Kürzel und Lauf als Ort bleibt. Mit Zeitraum ist ein Spieltag bis zu seinem letzten Tag „heute“.
+- **Termin offen** (#2015): „offen“, „?“ oder „tbd“ an Stelle des Datums heißt kein Datum (``open``) - optional mit
+  Uhrzeit (sonst die Standard-Uhrzeit, gemerkt als ``time``, bis das Datum nachgetragen wird) und Ort. Eine Zeile
+  danach ohne Datum rechnet vom letzten Datum weiter. ``missing_codes`` nennt die Kürzel für „fehlende Termine
+  anlegen“ (``planned_rounds`` der Saison).
 """
 from __future__ import annotations
 
@@ -25,7 +29,7 @@ import re
 from datetime import date, datetime, timedelta, timezone
 
 from services.dolibarr_policy import CLUB_TZ
-from services.race_weekend import GAP, take_code
+from services.race_weekend import GAP, annotate, take_code
 from services.round_countries import detect_country
 from services.series_standings import ordered_rounds
 from services.team_league_calendar import MAX_OPPONENT, take_opponent, take_window, window_end
@@ -154,6 +158,66 @@ def _clean_venue(text: str) -> str:
     return " · ".join(" ".join(part.split()) for part in parts if part.strip(" ,"))
 
 
+# Wörter, die an Stelle des Datums „Termin offen“ heißen (#2015) - ohne Groß/klein, auch mit Trennzeichen daran.
+OPEN_WORDS = frozenset({"offen", "?", "tbd"})
+_WORD_EDGES = " ,;|·()[]"
+
+
+def _take_open(text: str) -> tuple[str, bool]:
+    """Ein Wort „offen“, „?“ oder „tbd“ aus der Zeile nehmen (ohne regulären Ausdruck) - an seiner Stelle bleibt die
+    Lücke als Trenner wie bei Datum und Uhrzeit."""
+    words = str(text or "").split(" ")
+    found = False
+    for index, word in enumerate(words):
+        if word.strip(_WORD_EDGES).casefold() in OPEN_WORDS and word.strip(_WORD_EDGES):
+            words[index] = f" {GAP} "
+            found = True
+    return " ".join(words), found
+
+
+def _code_parts(code) -> tuple[str, int] | None:
+    """„T7“ → („T“, 7), „Runde 3“ → („Runde “, 3); sonst ``None``."""
+    text = " ".join(str(code or "").split())
+    digits = len(text) - len(text.rstrip("0123456789"))
+    if not digits or digits == len(text) or not text[:-digits].strip():
+        return None
+    return text[:-digits], int(text[-digits:])
+
+
+def missing_codes(rounds: list[dict], count: int, fallback: str = "T") -> list[str]:
+    """Kürzel für ``count`` neue Termine („fehlende Termine anlegen“, #2015): nach dem höchsten Kürzel mit Zahl und
+    dessen Vorsatz („T4“ → T5, T6 …), ohne solche Kürzel ``fallback`` ab der Zahl der Termine plus eins. Nie ein Kürzel,
+    das es in der Saison schon gibt (archivierte zählen mit)."""
+    parts = [(index, found) for index, item in enumerate(ordered_rounds(rounds))
+             if (found := _code_parts(item.get("code")))]
+    if parts:
+        prefix = max(parts, key=lambda pair: (pair[1][1], pair[0]))[1][0]
+        number = max(found[1] for _, found in parts if found[0].casefold() == prefix.casefold())
+    else:
+        prefix, number = fallback, len([item for item in rounds if not item.get("archived_at")])
+    used = {"".join(str(item.get("code") or "").split()).casefold() for item in rounds}
+    out: list[str] = []
+    while len(out) < count:
+        number += 1
+        code = f"{prefix}{number}"
+        if "".join(code.split()).casefold() not in used:
+            out.append(code)
+    return out
+
+
+def planned_status(rounds: list[dict], planned, weekend: dict | None = None) -> dict | None:
+    """Geplante Termine der Saison (#2015) gegen den Kalender: ``{"planned", "count", "missing"}`` - gezählt werden
+    Wertungsrunden wie im Fortschritt der Serienseite (ohne Finale, ohne Termine außerhalb der Wertung, ohne
+    abgesagte, ohne archivierte; Läufe einer Runde zählen einmal). ``None`` ohne geplante Zahl."""
+    if not planned:
+        return None
+    active = annotate([dict(item) for item in rounds if not item.get("archived_at")], weekend)
+    units = {item.get("weekend") or item.get("id") for item in active
+             if item.get("kind") != "final" and item.get("counts", True) is not False
+             and item.get("status") != "cancelled"}
+    return {"planned": int(planned), "count": len(units), "missing": max(int(planned) - len(units), 0)}
+
+
 def parse_round_lines(text: str, *, season: str | None, today: str, default_weekday: int | None,
                       default_time: str | None) -> dict:
     """Eine eingefügte Terminliste als ``{"rows": [...], "errors": [...]}``. Hat eine Zeile einen Fehler, gibt es keine
@@ -169,6 +233,7 @@ def parse_round_lines(text: str, *, season: str | None, today: str, default_week
     previous: date | None = None
     for number, raw in lines:
         rest, window = take_window(raw)
+        rest, marked_open = _take_open(rest)
         day: date | None = None
         day_end: date | None = None
         error = None
@@ -208,14 +273,15 @@ def parse_round_lines(text: str, *, season: str | None, today: str, default_week
         code, session, rest = take_code(rest)
         # Gegner erst nach Kürzel und Lauf (#1931): „vs“/„@“ sind keine Lauf-Wörter, ein Lauf-Wort kein Gegner.
         venue, opponent, at_home = take_opponent(_clean_venue(rest) or None)
-        if not error and day is None:
+        undated = False
+        # Termin offen (#2015): kein Datum, kein vorgeschlagener Tag - und die Zeile rechnet nicht weiter.
+        is_open = marked_open and day is None and not error
+        if not error and day is None and not is_open:
             if previous is None:
-                error = "Datum fehlt (TT.MM.)."
+                error = "Datum fehlt (TT.MM.) – oder „offen“ für einen Termin ohne Datum."
             else:
                 day = _next_weekday(previous, default_weekday)
                 undated = True
-        else:
-            undated = False
         if not error and venue and len(venue) > MAX_VENUE:
             error = f"Ort ist zu lang (höchstens {MAX_VENUE} Zeichen)."
         if not error and code and len(code) > MAX_CODE:
@@ -224,7 +290,7 @@ def parse_round_lines(text: str, *, season: str | None, today: str, default_week
             error = f"Gegner ist zu lang (höchstens {MAX_OPPONENT} Zeichen)."
         clock = clock or default_time
         starts_at = None
-        if not error:
+        if not error and day is not None:
             try:
                 starts_at = vienna_start(day.isoformat(), clock)
             except ClockError:
@@ -232,12 +298,12 @@ def parse_round_lines(text: str, *, season: str | None, today: str, default_week
         if error:
             errors.append({"line": number, "text": raw, "message": error})
             continue
-        previous = day
+        previous = day or previous
         warning = None
-        if default_weekday is not None and not undated and day.weekday() != default_weekday:
+        if default_weekday is not None and day and not undated and day.weekday() != default_weekday:
             warning = "Nicht am Standard-Wochentag."
         rows.append({"line": number, "text": raw, "code": code, "session": session, "venue": venue,
-                     "day": day.isoformat(),
+                     "day": day.isoformat() if day else None, "open": day is None,
                      "time": clock, "starts_at": starts_at, "derived_day": undated,
                      "warning": warning, "country_code": detect_country(venue), "opponent": opponent,
                      "at_home": at_home, "day_end": day_end.isoformat() if day_end else None})

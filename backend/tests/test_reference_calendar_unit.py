@@ -154,7 +154,7 @@ def test_broken_lines_are_named_with_their_number():
     result = _parse("R1 31.02. Nord\nNur ein Ort\nR3 05.11. " + "x" * 200 + "\nR4 07.11. 25:61 Süd")
     assert [(error["line"], error["message"]) for error in result["errors"]] == [
         (1, "Datum 31.02. gibt es nicht."),
-        (2, "Datum fehlt (TT.MM.)."),
+        (2, "Datum fehlt (TT.MM.) – oder „offen“ für einen Termin ohne Datum."),
         (3, "Ort ist zu lang (höchstens 160 Zeichen)."),
         (4, "Uhrzeit 25:61 gibt es nicht."),
     ]
