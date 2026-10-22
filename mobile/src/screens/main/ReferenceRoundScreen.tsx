@@ -11,6 +11,7 @@ import { ink, medalTone } from "../../components/references/parts";
 import { NoScoreNote, SeasonNotice } from "../../components/references/seriesParts";
 import { CountUp, Glow } from "../../components/motion";
 import { Screen } from "../../components/Screen";
+import { FadeScroll } from "../../components/SwipeTabs";
 import { Body, Muted } from "../../components/Text";
 import { api } from "../../lib/api";
 import { gridWords } from "../../lib/raceWeekend";
@@ -167,7 +168,8 @@ export function ReferenceRoundScreen({ navigation, route }: Props) {
         ) : null}
 
         {sessions.length > 1 ? (
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabs} style={styles.tabBar} accessibilityRole="tablist" accessibilityLabel="Läufe dieser Runde" testID="round-tabs">
+          // Laufen die Reiter über (viele Läufe, große Schrift), blendet der Rand weich aus, an dem es weitergeht (#1969).
+          <FadeScroll contentContainerStyle={styles.tabs} style={styles.tabBar} accessibilityRole="tablist" accessibilityLabel="Läufe dieser Runde" testID="round-tabs">
             {sessions.map((item) => {
               const on = item.key === session?.key;
               return (
@@ -185,7 +187,7 @@ export function ReferenceRoundScreen({ navigation, route }: Props) {
                 </Pressable>
               );
             })}
-          </ScrollView>
+          </FadeScroll>
         ) : null}
 
         {/* Der Lauf blendet bei jedem Reiterwechsel neu ein - seine Zeiten zählen dann neu hoch. */}
