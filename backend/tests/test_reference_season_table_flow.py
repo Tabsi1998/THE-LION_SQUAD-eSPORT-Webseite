@@ -152,17 +152,20 @@ async def test_existing_sheets_are_never_overwritten_silently(flow):
         "status": "published", "expected_version": 0})
     assert published.status_code == 200, published.text
     draft = await flow.put(f"{base}/{rounds[1]['id']}/results", json={
-        "rows": [{"name": "Ada Ausgedacht", "place": 2, "note": "von Hand"}, {"name": "Bruno Beispiel", "place": 1}],
+        "rows": [{"name": "Ada Ausgedacht", "place": 2, "note": "von Hand", "team": "Probe Rot"},
+                 {"name": "Bruno Beispiel", "place": 1, "team": "Probe Rot"}],
         "status": "draft", "expected_version": 0})
     assert draft.status_code == 200, draft.text
-    rows = [{"name": "Ada Ausgedacht", "cells": ["18", "25", "25"], "total": 68},
-            {"name": "Bruno Beispiel", "cells": ["25", "18", "--"], "total": 43},
-            {"name": "Cleo Muster", "cells": ["", "OUT", "18"], "total": 18}]
-    body = {"columns": [{"label": "R1"}, {"label": "R2"}, {"label": "R3"}], "rows": rows}
+    rows = [{"name": "Ada Ausgedacht", "team": "Probe Rot", "cells": ["18", "25", "25"], "total": 68},
+            {"name": "Bruno Beispiel", "team": "Probe Rot", "cells": ["25", "18", "--"], "total": 43},
+            {"name": "Cleo Muster", "team": "Probe Blau", "cells": ["", "OUT", "18"], "total": 18}]
+    body = {"columns": [{"label": "R1"}, {"label": "R2"}, {"label": "R3"}], "rows": rows, "team_column": True}
     data = (await flow.post(_url(series, "preview"), json=body)).json()
     columns = data["columns"]
     assert [(item["state"], item["target"]) for item in columns] == [
         ("changed", "pending_draft"), ("changed", "draft"), ("new", "sheet")]
+    # Die Teams kommen aus der Tabelle - ein neues Team ist dort kein Tippfehler.
+    assert not [item for column in columns for item in column["warnings"] if item["code"] == "team_unknown"]
     ada = next(change for change in columns[1]["changes"] if change["name"] == "Ada Ausgedacht")
     assert ada["fields"]["place"] == [2, 1]
     assert any(change["kind"] == "added" and change["name"] == "Cleo Muster" for change in columns[1]["changes"])

@@ -144,11 +144,12 @@ def _decisions(body: SeasonTableInput) -> dict[int, dict[int, dict]]:
 
 def _quiet(resolution, placeless: list[int]) -> None:
     """Meldungen, die hier gewollt sind, fallen weg: „Platz fehlt“ bei Zeilen ohne Platz mit Absicht (Ausfall, 0 Punkte,
-    Punkte laut Veranstalter) und „Punkte von Hand“ bei „Punkte laut Veranstalter übernehmen“."""
+    Punkte laut Veranstalter), „Punkte von Hand“ bei „Punkte laut Veranstalter übernehmen“ und „Team gibt es noch
+    nicht“ - die Teams kommen aus der Tabelle selbst und sind in allen Runden gleich geschrieben."""
     quiet = set(placeless)
     resolution.warnings[:] = [item for item in resolution.warnings
                               if not (item["code"] == "place_missing" and set(item["rows"]) <= quiet)
-                              and item["code"] != "points_manual"]
+                              and item["code"] not in ("points_manual", "team_unknown")]
 
 
 def _names(participants: list[dict], resolution) -> dict[str, str]:
