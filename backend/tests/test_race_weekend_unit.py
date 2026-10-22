@@ -190,7 +190,25 @@ def test_a_duplicate_from_the_same_list_names_the_line_and_the_reason():
     assert out["errors"][0]["line"] == 2
     assert out["errors"][0]["message"] == (
         "R1 Qualifying steht schon in Zeile 1 – ‚R1‘ legt laut Ablauf Qualifying und Rennen an. Entweder nur ‚R1‘ je "
-        "Runde oder jeden Lauf einzeln (‚R1 Q‘, ‚R1 R‘).")
+        "Runde oder jeden Lauf einzeln (‚R1 Q‘, ‚R1 Rennen‘).")
+
+
+def test_every_suggested_line_creates_exactly_that_session():
+    weekend = race_weekend.normalize_weekend({"formats": [{"from_round": 1, "sessions": [
+        {"label": "Blitz-Qualifying", "offset": 0}, {"label": "Shootout", "offset": 10},
+        {"label": "Sprint", "offset": 20}, {"label": "Hauptrennen", "offset": 60},
+        {"label": "Lauf 2", "offset": 90}]}]})
+    for label in ("Blitz-Qualifying", "Shootout", "Sprint", "Hauptrennen", "Lauf 2"):
+        line = race_weekend_paste.suggestion("R1", label, weekend, 1)
+        assert line, label
+        parsed = parse_round_lines(f"{line} · 05.03.2026", season="2026", today="2026-01-01", default_weekday=None,
+                                   default_time="20:00")
+        sessions = race_weekend_paste.expand_paste(parsed, weekend, [])["rows"][0]["sessions"]
+        assert [item["session"] for item in sessions] == [label]
+    # Ein eigener Name, den der Parser nicht als Lauf kennt, bekommt keinen Vorschlag.
+    two_races = race_weekend.normalize_weekend({"formats": [{"from_round": 1, "sessions": [
+        {"label": "Rennen", "offset": 0}, {"label": "Nachtrennen", "offset": 60}]}]})
+    assert race_weekend_paste.suggestion("R1", "Nachtrennen", two_races, 1) is None
 
 
 def test_a_shootout_keeps_its_name_even_if_the_template_has_another_qualifying():
