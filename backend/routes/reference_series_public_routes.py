@@ -35,7 +35,7 @@ from database import get_db
 from routes.reference_round_routes import PUBLIC_FIELDS, _calendar, visible_series
 from services import (
     map_pools, partner_platforms, race_weekend, reference_bundles, reference_originals, reference_running_cache,
-    series_identity, series_partners,
+    series_identity, series_logo, series_partners,
 )
 from services.dolibarr_policy import club_today
 from services.own_teams import Matcher, own_teams
@@ -282,12 +282,13 @@ async def _running(user: dict | None, today: str) -> dict:
     # und Teilnehmer werden danach nur für diese Serien geladen, damit die Last mit der Zahl der Serien nicht wächst.
     all_series = await db.reference_series.find({"status": "active"}, {
         "_id": 0, "id": 1, "lineage_id": 1, "visibility": 1, "season": 1, "tier": 1, "title": 1, "season_slug": 1,
-        "team_name": 1, "own_teams": 1, "order_index": 1, "weekend": 1, "partner_ids": 1, "partner_roles": 1}
+        "team_name": 1, "own_teams": 1, "order_index": 1, "weekend": 1, "partner_ids": 1, "partner_roles": 1,
+        "logo_url": 1}
     ).to_list(None)
     lineages = {item["id"]: item async for item in db.reference_lineages.find(
         {"id": {"$in": list({s["lineage_id"] for s in all_series})}},
         {"_id": 0, "id": 1, "slug": 1, "title": 1, "kind": 1, "label": 1, "game_id": 1, "game_name": 1,
-         "visibility": 1, "is_archived": 1, "partner_ids": 1, "partner_roles": 1})}
+         "visibility": 1, "is_archived": 1, "partner_ids": 1, "partner_roles": 1, "logo_url": 1})}
     visible_pairs = []
     for series in all_series:
         lineage = lineages.get(series.get("lineage_id"))
@@ -348,9 +349,12 @@ async def _running(user: dict | None, today: str) -> dict:
         game = games.get(lineage.get("game_id")) or {}
         items.append({
             "lineage": {"title": lineage.get("title"), "slug": lineage.get("slug"), "kind": lineage.get("kind"),
-                        "label": lineage.get("label"), "game_name": lineage.get("game_name") or game.get("name")},
+                        "label": lineage.get("label"), "game_name": lineage.get("game_name") or game.get("name"),
+                        "logo_url": series_logo.effective(lineage)},
             "game": {key: game.get(key) for key in ("name", "short_name", "logo_url")} if game else None,
-            "series": {key: series.get(key) for key in ("season", "tier", "title", "season_slug")},
+            # #2014: Logo der Saison (sonst der Spur) - steht vor dem Spiel-Logo.
+            "series": {**{key: series.get(key) for key in ("season", "tier", "title", "season_slug")},
+                       "logo_url": series_logo.effective(lineage, series)},
             "progress": _running_progress(rounds, racing),
             "next": _running_next(rounds, racing),
             "today": any(item["state"] == "today" for item in rounds),
@@ -367,7 +371,7 @@ async def _running(user: dict | None, today: str) -> dict:
 
 
 # Reihenfolge der Stufen der Spur und Ergebnis der Saison (#1898): Liga-Weg und Vitrine nutzen sie vor der Ableitung.
-LINEAGE_LIST_FIELDS = ("title", "slug", "kind", "label", "organizer", "game_name", "tier_order")
+LINEAGE_LIST_FIELDS = ("title", "slug", "kind", "label", "organizer", "game_name", "tier_order", "logo_url")
 PATH_SEASON_FIELDS = ("season", "tier", "title", "season_slug", "status", "season_result")
 
 
@@ -414,7 +418,7 @@ async def public_lineages(request: Request, user: dict | None = Depends(get_opti
         async for series in db.reference_series.find(
                 {"lineage_id": {"$in": list(seasons_by)}, "status": {"$ne": "archived"}},
                 {"_id": 0, "id": 1, "lineage_id": 1, "visibility": 1, "team_name": 1, "own_teams": 1,
-                 "reference_id": 1, "partner_ids": 1, "partner_roles": 1,
+                 "reference_id": 1, "partner_ids": 1, "partner_roles": 1, "logo_url": 1,
                  "order_index": 1, **{key: 1 for key in PATH_SEASON_FIELDS}}):
             if await visible(series.get("visibility")):
                 seasons_by[series["lineage_id"]].append(series)
@@ -457,6 +461,7 @@ async def public_lineages(request: Request, user: dict | None = Depends(get_opti
                         "organizers": hosts[(lineage["id"], None)]},
             "game": {key: game.get(key) for key in ("name", "short_name", "logo_url")} if game else None,
             "seasons": [{**{key: series.get(key) for key in PATH_SEASON_FIELDS},
+                         "logo_url": series_logo.effective(lineage, series),  # #2014
                          "organizers": hosts[(lineage["id"], series["id"])],
                          # #1751: ohne gespeicherten Stand (etwa eine gebündelte Saison) der Platz ihrer Referenz.
                          "club": _club_place(lineage, series, snapshots, club_ids)
@@ -499,10 +504,12 @@ async def public_series(lineage_slug: str, season_slug: str, user: dict | None =
     if not lineage_out.get("game_name") and lineage.get("game_id"):
         game = await db.games.find_one({"id": lineage["game_id"]}, {"_id": 0, "name": 1}) or {}
         lineage_out["game_name"] = game.get("name")
+    lineage_out["logo_url"] = series_logo.effective(lineage)
     partners = await series_partners.for_series_page(db, lineage, series)
     return {
         "lineage": lineage_out,
-        "series": {key: series.get(key) for key in SERIES_FIELDS},
+        # #2014: das Logo der Saison, sonst das der Spur - ohne beides ``None`` (Rückfall wie bisher).
+        "series": {**{key: series.get(key) for key in SERIES_FIELDS}, "logo_url": series_logo.effective(lineage, series)},
         # #1934: „Veranstaltet von“ und Mitwirkende - nur aktive Partner.
         "partners": partners,
         # #1964: „Daten von …“, wenn die Saison ihre Turniertage von einer Partner-Plattform holt - nur der Name, die

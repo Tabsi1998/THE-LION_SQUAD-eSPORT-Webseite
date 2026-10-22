@@ -23,7 +23,7 @@ from models import (
     new_id,
     now_utc,
 )
-from services import reference_running_cache, reference_series, season_close, series_partners
+from services import reference_running_cache, reference_series, season_close, series_logo, series_partners
 from services.dolibarr_policy import club_today
 from services.own_teams import clean_teams, own_teams, team_conflicts
 from services.series_identity import normalize_name
@@ -36,10 +36,10 @@ router = APIRouter(prefix="/api/reference-series", tags=["reference-series"],
                    dependencies=[Depends(reference_running_cache.reset_after_write)])
 
 LINEAGE_NULLABLE = {"organizer", "label", "game_id", "game_name", "external_url", "description", "tier_order",
-                    "result_image_template"}
+                    "result_image_template", "logo_url"}
 SERIES_NULLABLE = {"tier", "title", "default_weekday", "default_time", "team_name", "official_table_url",
                    "external_url", "description", "reference_id", "season_result", "result_image_template",
-                   "weekend", "cancelled_on", "cancel_reason", "successor_id"}
+                   "weekend", "cancelled_on", "cancel_reason", "successor_id", "logo_url"}
 SLUG_FALLBACK = "serie"
 
 
@@ -129,6 +129,7 @@ async def create_lineage(body: ReferenceLineageCreate, me: dict = Depends(requir
     db = get_db()
     doc = body.model_dump()
     await _check_game(db, doc.get("game_id"))
+    await series_logo.check(db, doc.get("logo_url"))  # #2014: nur aus der Mediathek
     await series_partners.clean(db, doc)  # #1934: Partner mit Rolle
     doc["slug"] = await unique_slug(db.reference_lineages, doc.get("slug") or doc["title"], fallback=SLUG_FALLBACK)
     now = now_utc().isoformat()
@@ -146,6 +147,8 @@ async def update_lineage(lineage_id: str, body: ReferenceLineageUpdate, me: dict
     raw = body.model_dump(exclude_unset=True)
     updates = {key: value for key, value in raw.items() if value is not None or key in LINEAGE_NULLABLE}
     await _check_game(db, updates.get("game_id"))
+    if updates.get("logo_url") != existing.get("logo_url"):  # ein gespeichertes Logo bleibt, auch wenn es alt ist
+        await series_logo.check(db, updates.get("logo_url"))
     await series_partners.clean(db, updates, existing)
     updates.pop("slug", None)
     source = slug_source_for_update(raw, existing, "title", fallback=SLUG_FALLBACK)
@@ -218,6 +221,7 @@ async def create_series(body: ReferenceSeriesCreate, me: dict = Depends(require_
     doc["rules"] = _rules({**(template.get("rules") or {}), **(doc.get("rules") or {})})
     doc.update(_teams(doc.get("own_teams"), doc.get("team_name")))
     await series_partners.clean(db, doc)  # #1934: eigene Partner der Saison
+    await series_logo.check(db, doc.get("logo_url"))  # #2014: eigenes Saison-Logo
     await _check_reference(db, doc.get("reference_id"))
     now = now_utc().isoformat()
     doc.update({
@@ -268,6 +272,8 @@ async def update_series(series_id: str, body: ReferenceSeriesUpdate, me: dict = 
     note = raw.pop("rules_note", None)
     updates = {key: value for key, value in raw.items() if value is not None or key in SERIES_NULLABLE}
     await _check_reference(db, updates.get("reference_id"))
+    if updates.get("logo_url") != existing.get("logo_url"):
+        await series_logo.check(db, updates.get("logo_url"))
     await series_partners.clean(db, updates, existing)
     teams_changed = False
     if "own_teams" in updates or "team_name" in updates:

@@ -1618,6 +1618,13 @@ def _session(value: Optional[str]) -> Optional[str]:
     return clean_session(value)
 
 
+def _series_logo(value: Optional[str]) -> Optional[str]:
+    """Logo der Spur bzw. Saison (#2014): nur eine eigene Upload-Adresse."""
+    from services.series_logo import clean
+
+    return clean(value)
+
+
 def _clock(value: Optional[str]) -> Optional[str]:
     text = (value or "").strip()
     if not text:
@@ -1644,6 +1651,12 @@ class ReferenceLineageCreate(BaseModel):
     order_index: int = 0
     tier_order: Optional[List[str]] = None  # #1898: eigene Reihenfolge der Stufen, höchste zuerst
     result_image_template: Optional[str] = Field(default=None, max_length=60)  # #1756: Vorlage für Ergebnis-Bilder
+    logo_url: Optional[str] = Field(default=None, max_length=300)  # #2014: nur aus dem eigenen Upload
+
+    @field_validator("logo_url")
+    @classmethod
+    def _logo(cls, value):
+        return _series_logo(value)
 
     @field_validator("tier_order")
     @classmethod
@@ -1672,6 +1685,12 @@ class ReferenceLineageUpdate(BaseModel):
     order_index: Optional[int] = None
     tier_order: Optional[List[str]] = None
     result_image_template: Optional[str] = Field(default=None, max_length=60)  # #1756: Vorlage für Ergebnis-Bilder
+    logo_url: Optional[str] = Field(default=None, max_length=300)  # #2014
+
+    @field_validator("logo_url")
+    @classmethod
+    def _logo(cls, value):
+        return _series_logo(value)
 
     @field_validator("tier_order")
     @classmethod
@@ -1724,6 +1743,12 @@ class ReferenceSeriesCreate(BaseModel):
     result_image_template: Optional[str] = Field(default=None, max_length=60)  # #1756: Vorlage für Ergebnis-Bilder
     weekend: Optional[Dict[str, Any]] = None  # #1930: Ablauf je Runde, auch ab Runde X wechselnd
     hide_name_tags: bool = False  # #1961: Namen öffentlich ohne Tag der Spielkennung („Name#TLS“ → „Name“)
+    logo_url: Optional[str] = Field(default=None, max_length=300)  # #2014: eigenes Saison-Logo, sonst das der Spur
+
+    @field_validator("logo_url")
+    @classmethod
+    def _logo(cls, value):
+        return _series_logo(value)
 
     @field_validator("rules")
     @classmethod
@@ -1774,6 +1799,12 @@ class ReferenceSeriesUpdate(BaseModel):
     cancelled_on: Optional[str] = Field(default=None, max_length=10)
     cancel_reason: Optional[str] = Field(default=None, max_length=300)
     successor_id: Optional[str] = Field(default=None, max_length=80)
+    logo_url: Optional[str] = Field(default=None, max_length=300)  # #2014
+
+    @field_validator("logo_url")
+    @classmethod
+    def _logo(cls, value):
+        return _series_logo(value)
 
     @field_validator("rules")
     @classmethod

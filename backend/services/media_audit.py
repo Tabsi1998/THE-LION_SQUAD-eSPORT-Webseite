@@ -36,6 +36,9 @@ TARGETS: list[tuple[str, list[str]]] = [
     ("gallery_photos", ["image_url", "thumbnail_url", "video_url"]),
     ("member_benefits", ["image_url"]),
     ("club_member_profiles", ["photo_url", "cover_url"]),
+    # Logo je Spur und Saison (#2014): bleibt verwendet, solange eine Spur oder Saison es trägt - auch archivierte.
+    ("reference_lineages", ["logo_url"]),
+    ("reference_series", ["logo_url"]),
 ]
 
 TEXT_TARGETS: list[tuple[str, list[str]]] = [
@@ -80,6 +83,7 @@ COLLECTION_LABELS = {
     "gallery_albums": "Galerie-Album", "gallery_photos": "Galerie-Foto", "member_benefits": "Mitgliedervorteil",
     "club_member_profiles": "Vereinsprofil", "advent_doors": "Adventkalender", "stickers": "Sticker",
     "game_servers": "Spielserver", "game_maps": "Map", "map_pools": "Map-Pool",
+    "reference_lineages": "Spur", "reference_series": "Saison",
 }
 FIELD_LABELS = {
     "logo_url": "Logo", "logo_light_url": "Logo hell", "logo_dark_url": "Logo dunkel",
@@ -124,6 +128,8 @@ SCOPE_TARGETS: list[tuple[str, list[str], str]] = [
     ("seasons", ["banner_url"], "admin"),
     ("member_benefits", ["image_url"], "admin"),
     ("club_member_profiles", ["photo_url", "cover_url"], "admin"),
+    ("reference_lineages", ["logo_url"], "branding"),
+    ("reference_series", ["logo_url"], "branding"),
 ]
 
 TEXT_IMAGE_RE = re.compile(
