@@ -163,6 +163,29 @@ test("Teamwertung: Balken und Raster, Vereinsteams hervorgehoben, Gäste markier
   expect(within(rows[0]).getAllByTestId("racing-team-cell").map((cell) => cell.textContent)).toEqual(["32", "18"]);
 });
 
+test("Fahrer-Anpassung fürs Team (#2000): „−5 (Fahrer)“ bei der Teamsumme, ausgeblendete Namen bleiben ausgeblendet, Detail sagt es", async () => {
+  const minus = { points: -5, reason: "Video fehlt", day: "2026-11-08", round_id: "r2", counts_for_team: true, credited_team: "Probe Löwen" };
+  const body = {
+    ...BODY,
+    standings: { ...BODY.standings, rows: ROWS.map((item) => (item.key === "lion1" ? { ...item, adjustments: [minus], adjustment_points: -5 } : item)) },
+    racing: { ...BODY.racing, teams: { ...BODY.racing.teams, rows: BODY.racing.teams.rows.map((item) => {
+      if (item.team === "Probe Löwen") return { ...item, driver_adjustment_points: -5, driver_adjustments: [{ ...minus, driver: "lion1" }] };
+      if (item.team === "Fremd Rot") return { ...item, driver_adjustment_points: 2, driver_adjustments: [{ points: 2, reason: "Korrektur", day: "2026-11-08", round_id: null, counts_for_team: true, credited_team: "Fremd Rot", driver: "hidden" }] };
+      return item;
+    }) } },
+  };
+  renderAt("/references/series/probe-racing/2026-f1", body);
+  const section = await screen.findByTestId("racing-teams");
+  const rows = within(within(section).getByTestId("series-table")).getAllByTestId("series-row");
+  const lions = within(rows[1]).getByTestId("racing-driver-adjustment");
+  expect(lions).toHaveTextContent("−5 (Probe Lion Eins)");
+  expect(lions).toHaveAttribute("title", "Anpassung −5 · Video fehlt · R2 · 08.11.2026 – Probe Lion Eins, zählt auch fürs Team");
+  expect(within(rows[0]).getByTestId("racing-driver-adjustment")).toHaveTextContent("+2 (Name ausgeblendet)");
+  expect(within(rows[2]).queryByTestId("racing-driver-adjustment")).toBeNull();
+  const detail = screen.getByTestId("racing-driver");
+  expect(within(detail).getByTestId("series-adjustment-team")).toHaveTextContent("zählt auch fürs Team · Probe Löwen");
+});
+
 test("drei eigene Teams (#1926): alle drei in Garage und Teamwertung hervorgehoben, auch eines ohne Rennen", async () => {
   const racing = { ...BODY.racing, club_teams: ["Probe Löwen", "Probe Löwen B", "Probe Löwen C"] };
   renderAt("/references/series/probe-racing/2026-f1", { ...BODY, racing });

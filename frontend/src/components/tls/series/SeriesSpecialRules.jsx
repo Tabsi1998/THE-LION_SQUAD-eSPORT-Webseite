@@ -2,7 +2,8 @@ import { Link } from "react-router-dom";
 import { AlertTriangle, ArrowRight } from "lucide-react";
 import { gridWords } from "@/lib/raceWeekend";
 import {
-  LINEUP_TOTAL_TEXT, adjustmentDetail, adjustmentSum, adjustmentText, adjustmentTitle, cancelledText, noScoreText, ruleChangeLines, successorLink,
+  LINEUP_TOTAL_TEXT, adjustmentDetail, adjustmentSum, adjustmentTeamText, adjustmentText, adjustmentTitle, cancelledText, driverAdjustmentMarks, noScoreText,
+  ruleChangeLines, successorLink,
   teamDeviationText, teamModeLabel, teamSourceLabel,
 } from "@/lib/seriesSpecialRules";
 
@@ -33,10 +34,32 @@ export function AdjustmentList({ row, rounds = [], className = "" }) {
       {items.map((item, index) => (
         <li key={`${item.day}-${index}`} className="flex gap-2 min-w-0">
           <span className={`shrink-0 font-bold tabular-nums ${Number(item.points) < 0 ? "text-red-300" : "text-emerald-300"}`}>{adjustmentText(item.points)}</span>
-          <span className="min-w-0 [overflow-wrap:anywhere]">{adjustmentDetail(item, rounds)}</span>
+          <span className="min-w-0 [overflow-wrap:anywhere]">
+            {adjustmentDetail(item, rounds)}
+            {/* #2000: zählt auch fürs Team - für welches bzw. warum für keines. */}
+            {adjustmentTeamText(item) && <span className="block text-xs text-white/50" data-testid="series-adjustment-team">{adjustmentTeamText(item)}</span>}
+          </span>
         </li>
       ))}
     </ul>
+  );
+}
+
+/** Fahrer-Anpassungen, die fürs Team zählen (#2000), klein bei der Teamsumme: „−5 (Anna Probe)“ mit Grund im Tooltip.
+ * Der Name kommt aus der Fahrerwertung (`rows`) - ausgeblendete Namen bleiben ausgeblendet. */
+export function DriverAdjustmentMarks({ row, rows = [], rounds = [] }) {
+  const marks = driverAdjustmentMarks(row, rows, rounds);
+  if (!marks.length) return null;
+  return (
+    <span className="mt-0.5 flex flex-col items-end gap-0.5">
+      {marks.map((mark) => (
+        <span key={mark.key} className={`text-[11px] font-bold tabular-nums whitespace-nowrap cursor-help underline decoration-dotted underline-offset-[3px] ${mark.negative ? "text-red-300 decoration-red-300/50" : "text-emerald-300 decoration-emerald-300/50"}`}
+          title={mark.title} data-testid="racing-driver-adjustment">
+          <span aria-hidden="true">{mark.text}</span>
+          <span className="sr-only">{` (${mark.title})`}</span>
+        </span>
+      ))}
+    </span>
   );
 }
 
