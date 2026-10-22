@@ -86,11 +86,14 @@ def test_every_mail_carries_the_png(uploads, monkeypatch):
         async def insert_one(self, row):
             return None
 
+    class FakeDb:
+        email_logs = FakeLogs()
+
     async def config():
         return {"enabled": True, "api_key": "re_test", "from_header": "Verein <noreply@example.test>"}
 
     monkeypatch.setattr(email_service, "_get_email_config", config)
-    monkeypatch.setattr(email_service, "get_db", lambda: type("Db", (), {"email_logs": FakeLogs()})())
+    monkeypatch.setattr(email_service, "get_db", FakeDb)
     monkeypatch.setattr(email_service.resend, "Emails", FakeEmails)
     asyncio.run(email_service.send_mail("a@example.test", "Hallo", html))
     assert PNG in captured["html"] and SVG not in captured["html"]

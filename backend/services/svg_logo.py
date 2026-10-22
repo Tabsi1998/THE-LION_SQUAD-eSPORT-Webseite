@@ -647,7 +647,12 @@ _UPLOAD_PNG = re.compile(r"/api/static/uploads/([A-Za-z0-9][A-Za-z0-9_-]{0,150})
 
 
 def _has_raster(stem: str) -> bool:
-    return (PUBLIC_UPLOAD_DIR / f"{stem}.png").is_file()
+    # Der Name kommt aus einer Adresse: nur eine Datei direkt im Upload-Ordner zählt.
+    base = os.path.realpath(PUBLIC_UPLOAD_DIR)
+    candidate = os.path.realpath(os.path.join(base, f"{stem}.png"))
+    if not candidate.startswith(base + os.sep):
+        return False
+    return os.path.isfile(candidate)
 
 
 def raster_url(value):
