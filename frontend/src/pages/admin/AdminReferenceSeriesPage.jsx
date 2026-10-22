@@ -8,8 +8,9 @@ import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { KIND_OPTIONS, STATUS_LABELS, visibleLineages } from "@/lib/referenceSeries";
 import { LineageForm } from "./referenceSeries/LineageForm";
 import { SeriesForm } from "./referenceSeries/SeriesForm";
+import { ReferenceBundleSheet } from "./referenceSeries/ReferenceBundleSheet";
 import { toast } from "sonner";
-import { Archive, ArchiveRestore, ListOrdered, Pencil, Plus } from "lucide-react";
+import { Archive, ArchiveRestore, Layers, ListOrdered, Pencil, Plus } from "lucide-react";
 
 // Serien (#1741): externe Wettbewerbe mit Kalender und Tabelle - eine Spur (etwa eine Rennliga) als Klammer, darunter je
 // Saison und Stufe eine Serie. Gelöscht wird nichts: Spur und Saison werden archiviert und lassen sich zurückholen.
@@ -30,6 +31,7 @@ export default function AdminReferenceSeriesPage() {
   const [showArchived, setShowArchived] = useState(false);
   const [editingLineage, setEditingLineage] = useState(null);
   const [editingSeries, setEditingSeries] = useState(null);
+  const [bundling, setBundling] = useState(false);
   const confirm = useConfirm();
 
   const load = useCallback(async () => {
@@ -79,9 +81,15 @@ export default function AdminReferenceSeriesPage() {
           <h1 className="font-heading text-3xl md:text-4xl font-black uppercase mt-1">Serien</h1>
           <p className="mt-2 text-white/60 text-sm max-w-xl">Externe Wettbewerbe über eine ganze Saison: Turnierserien, Rennligen und Team-Ligen. Eine Spur ist die Klammer, darunter je Saison und Stufe eine Serie mit eigenen Regeln.</p>
         </div>
-        <button type="button" onClick={() => setEditingLineage({})} data-testid="lineage-new" className="tls-btn tls-btn--primary px-5 py-2.5 rounded-sm text-xs font-bold uppercase tracking-wider inline-flex items-center gap-2">
-          <Plus className="w-4 h-4" /> Neue Spur
-        </button>
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* #1751: bestehende Referenzen ohne Saison zu Spur und Saisons bündeln */}
+          <button type="button" onClick={() => setBundling(true)} data-testid="bundle-open" className="tls-btn tls-btn--secondary px-4 py-2.5 rounded-sm text-xs font-bold uppercase tracking-wider inline-flex items-center gap-2">
+            <Layers className="w-4 h-4" aria-hidden="true" /> Referenzen bündeln
+          </button>
+          <button type="button" onClick={() => setEditingLineage({})} data-testid="lineage-new" className="tls-btn tls-btn--primary px-5 py-2.5 rounded-sm text-xs font-bold uppercase tracking-wider inline-flex items-center gap-2">
+            <Plus className="w-4 h-4" /> Neue Spur
+          </button>
+        </div>
       </div>
 
       <CheckField label={`Archivierte zeigen (${archivedCount})`} checked={showArchived} onChange={setShowArchived} testId="series-show-archived" className="mb-4" />
@@ -147,6 +155,7 @@ export default function AdminReferenceSeriesPage() {
         )}
       </div>
 
+      {bundling && <ReferenceBundleSheet onClose={() => setBundling(false)} onDone={load} />}
       {editingLineage && <LineageForm lineage={editingLineage} games={games} partners={partners} onClose={() => setEditingLineage(null)} onSaved={() => { setEditingLineage(null); load(); }} />}
       {editingSeries && (
         <SeriesForm series={editingSeries.series} lineage={editingSeries.lineage} partners={partners} schemes={overview.points_schemes} defaultRules={overview.default_rules}
