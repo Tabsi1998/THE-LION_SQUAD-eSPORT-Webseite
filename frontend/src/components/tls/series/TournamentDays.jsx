@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { formatNumber } from "@/lib/standingsTable";
 import { roundLabel, roundWhen } from "@/lib/referenceCalendar";
 import { nameOf, roundColumns } from "@/lib/referenceSeriesTable";
-import { bonusLabels, dayRounds, dayTable, hasLobbies, isDoubleUp, lobbies, placeTone, playerDays, roundPlace, roundsOfDay } from "@/lib/seriesDays";
+import { bonusLabels, dayRounds, dayTable, doubleUpDayText, hasLobbies, isDoubleUp, lobbies, placeTone, playerDays, roundPlace, roundsOfDay } from "@/lib/seriesDays";
 import "./referenceSeries.css";
 
 // Turniertage einer Turnierserie (#1961): je Termin die Runden R1…Rn mit Platzfarben (Gold, Silber, Bronze, Top 4
@@ -285,6 +285,7 @@ export function TournamentDays({ standings, rounds, rules }) {
       <p className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-white/60" data-testid="series-day-head">
         <span className="tabular-nums">{roundWhen(current)}</span>
         {isDoubleUp(table) && <span className="tls-series-badge tls-day-badge--duo" data-testid="series-day-double-up">Double Up</span>}
+        {isDoubleUp(table) && <span data-testid="series-day-double-up-rule">{doubleUpDayText(rules)}</span>}
         <span>{count ? `${count} ${count === 1 ? "Runde" : "Runden"} · GES P bestimmt den Tagesplatz, daraus die Saisonpunkte` : "GES P bestimmt den Tagesplatz, daraus die Saisonpunkte"}</span>
       </p>
       {showLobbies

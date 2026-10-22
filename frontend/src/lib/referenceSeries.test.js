@@ -23,6 +23,8 @@ const RULES = {
   day_rounds: { count: 5, points_by_place: [8, 7, 6, 5, 4, 3, 2, 1] },
   custom_bonuses: [{ key: "bingo", label: "Bingo", points: 3 }],
   tiebreak_top_n: 4,
+  // Double-Up-Punkte (#2015) - der Server liefert sie immer mit.
+  double_up_points: "team_place",
 };
 
 test("Punkte je Platz lassen sich in jeder üblichen Schreibweise eingeben", () => {

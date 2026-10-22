@@ -68,7 +68,8 @@ export function dayLabel(day) {
  */
 export function roundWhen(round) {
   const day = dayLabel(round?.club_day);
-  if (!day) return "Termin offen";
+  // Termin offen (#2015): eine gemerkte Uhrzeit steht dabei – „Termin offen · 19:00“.
+  if (!day) return round?.time ? `Termin offen · ${round.time}` : "Termin offen";
   const end = round.club_day_end && round.club_day_end !== round.club_day ? dayLabel(round.club_day_end) : "";
   if (end) {
     const sameYear = round.club_day.slice(0, 4) === round.club_day_end.slice(0, 4);

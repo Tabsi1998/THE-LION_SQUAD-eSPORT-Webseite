@@ -100,6 +100,9 @@ export function SeriesForm({ series, lineage, schemes = [], defaultRules = {}, p
         <SelectField label="Einträge eines Captains" value={form.publish_mode} onChange={(v) => set("publish_mode", v)} options={PUBLISH_OPTIONS} testId="series-publish-mode" />
         <SelectField label="Standard-Wochentag" value={form.default_weekday} onChange={(v) => set("default_weekday", v)} options={WEEKDAY_OPTIONS} testId="series-weekday" />
         <TextField label="Standard-Uhrzeit" type="time" value={form.default_time} onChange={(v) => set("default_time", v)} hint="Wiener Zeit." testId="series-time" />
+        {/* #2015: die Zahl der Termine, auch wenn die Daten noch offen sind – Fortschritt „3 von 9“ und Streichergebnisse. */}
+        <TextField label="Geplante Termine" type="number" min="1" max="200" value={form.planned_rounds} onChange={(v) => set("planned_rounds", v)} placeholder="9"
+          hint="Leer: so viele, wie im Kalender stehen. Zählt für Fortschritt und Streichergebnisse, solange der Kalender kürzer ist." testId="series-planned-rounds" />
         <SelectField label="Sichtbarkeit" value={form.visibility} onChange={(v) => set("visibility", v)} options={VISIBILITY_OPTIONS} testId="series-visibility" />
         <SelectField label="Ergebnis der Saison" value={form.season_result} onChange={(v) => set("season_result", v)} options={SEASON_RESULT_OPTIONS} testId="series-season-result"
           hint="Leer: der Liga-Weg leitet Auf- und Abstieg aus den Stufen ab." />

@@ -50,6 +50,13 @@ export function isDoubleUp(table) {
   return (table || []).some((item) => item.partner);
 }
 
+/** Double Up (#2015): was Platz und Punkte im Tag heißen - „Platz = Team-Platz, Punkte wie Einzelplatz 2k−1“. */
+export function doubleUpDayText(rules) {
+  return rules?.double_up_points === "team_place"
+    ? "Platz = Team-Platz, Punkte nach Team-Platz"
+    : "Platz = Team-Platz, Punkte wie Einzelplatz 2k−1";
+}
+
 /** Lobby-Ansicht einer Runde: je Lobby die Spieler nach Platz - `null`, wenn keine Lobby eingetragen ist. */
 export function lobbies(table, index, scheme = []) {
   const groups = new Map();

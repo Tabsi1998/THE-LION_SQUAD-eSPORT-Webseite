@@ -8,7 +8,7 @@ import { PasteSheet, PostponeSheet, RoundSheet } from "./RoundSheets";
 import { VenueWithFlag } from "@/components/tls/CountryFlag";
 import { noScoreText } from "@/lib/seriesSpecialRules";
 import { toast } from "sonner";
-import { AlertTriangle, Archive, ArchiveRestore, ArrowDown, ArrowDownUp, ArrowUp, Ban, CalendarClock, ClipboardList, Pencil, Plus, RotateCcw } from "lucide-react";
+import { AlertTriangle, Archive, ArchiveRestore, ArrowDown, ArrowDownUp, ArrowUp, Ban, CalendarClock, CalendarPlus, ClipboardList, Pencil, Plus, RotateCcw } from "lucide-react";
 
 // Kalender der Saison (#1742): Termine einzeln oder als eingefügte Liste, Standard-Wochentag und -Uhrzeit der Saison als
 // Vorgabe, Bearbeiten, Verschieben (der ursprüngliche Termin bleibt stehen), Absagen (zählt nie als „Ergebnis fehlt“),
@@ -119,6 +119,15 @@ export function SeriesCalendarSection({ series }) {
       )}
     </div>
   );
+  // #2015: bis zur Zahl der geplanten Termine offene Termine anlegen (T5 … T9 als „Termin offen“).
+  const planned = calendar?.planned || null;
+  const fillPlanned = async () => {
+    const count = planned?.missing || 0;
+    if (!count) return;
+    const description = `${count === 1 ? "Ein Termin kommt" : `${count} Termine kommen`} ohne Datum dazu („Termin offen“), mit den nächsten Kürzeln – bis ${planned.planned} geplante Termine. Das Datum trägst du später am Termin nach.`;
+    if (!await confirm({ title: "Fehlende Termine anlegen?", description, confirmLabel: "Anlegen" })) return;
+    run(() => api.post(`${base}/fill-planned`, { apply: true, expected_version: calendar?.version }), count === 1 ? "1 Termin angelegt." : `${count} Termine angelegt.`);
+  };
   const openNew = () => setSheet({
     type: "round",
     suggestion: { day: suggestNextDay(rounds, series.default_weekday, calendar?.today), time: series.default_time || "" },
@@ -132,6 +141,7 @@ export function SeriesCalendarSection({ series }) {
           {rounds.length > 0 && (
             <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-white/55" data-testid="series-calendar-counts">
               <span>{rounds.length} Termine</span>
+              {planned && <span data-testid="series-calendar-planned">{planned.planned} geplant</span>}
               {ORDERED_STATES.filter((state) => counts[state]).map((state) => (
                 <span key={state} className={state === "missing" ? "text-amber-300" : undefined}>{counts[state]} {STATE_LABELS[state].toLowerCase()}</span>
               ))}
@@ -142,6 +152,11 @@ export function SeriesCalendarSection({ series }) {
           {rounds.length > 1 && (
             <button type="button" onClick={() => run(() => api.post(`${base}/sort-by-date`, { expected_version: calendar?.version }), "Nach Datum geordnet.")} disabled={busy} data-testid="calendar-sort" className="tls-btn tls-btn--quiet px-3 py-2 rounded-sm text-xs font-bold uppercase tracking-wider inline-flex items-center gap-2">
               <ArrowDownUp className="w-3.5 h-3.5" /> Nach Datum ordnen
+            </button>
+          )}
+          {planned?.missing > 0 && (
+            <button type="button" onClick={fillPlanned} disabled={busy} data-testid="calendar-fill-planned" className="tls-btn tls-btn--secondary px-3 py-2 rounded-sm text-xs font-bold uppercase tracking-wider inline-flex items-center gap-2">
+              <CalendarPlus className="w-3.5 h-3.5" /> Fehlende Termine anlegen ({planned.missing})
             </button>
           )}
           <button type="button" onClick={() => setSheet({ type: "paste" })} data-testid="calendar-paste" className="tls-btn tls-btn--secondary px-3 py-2 rounded-sm text-xs font-bold uppercase tracking-wider inline-flex items-center gap-2">
