@@ -6,22 +6,25 @@ import { changeLines } from "@/lib/partnerSource";
 import { parseNumber } from "@/lib/resultPaste";
 import {
   HOW_TEXT, KIND_OPTIONS, POINT_MODES, SEASON_STATES, UNCLEAR_TEXT, applyBody, applySummary, buildBody, cellKey,
-  decisionFor, decisionValue, imageTable, imageTeamRows, isSelectable, markText, mergeDecisions, organizerDecisions,
+  decisionFor, decisionValue, imageTable, imageTeamRows, isSelectable, lastTableRound, markText, mergeDecisions, organizerDecisions,
   proposalDecisions, rememberCandidates, roundColumns, roundOption, tableText, targetText, totalText, totalsSummary,
   unclearCells,
 } from "@/lib/seasonTable";
 import { OfficialTeamTotals } from "./OfficialTeamTotals";
+import { attachOriginal } from "./OriginalsSection";
 import { ResultImageButton, useResultImage } from "./ResultImageImport";
 import { UnknownNamesSheet } from "./UnknownNamesSheet";
 import { toast } from "sonner";
-import { Check, TableProperties, X } from "lucide-react";
+import { Check, ImagePlus, TableProperties, X } from "lucide-react";
 
 // Saisontabelle einlesen (#1928, nur Vorstand): Wer eine laufende Saison später anlegt, fügt die Gesamttabelle des
 // Veranstalters ein (Fahrer, Team, Punkte je Runde, Gesamt) statt jede vergangene Runde einzeln einzutragen. Je Spalte
 // zeigt die Vorschau den Termin (korrigierbar), was Übernehmen täte und die Plätze aus den Punkten; gelbe Zellen klärt
 // der Vorstand, der Abgleich prüft jede Summe gegen „Gesamt“. Geschrieben wird erst mit „Übernehmen“, immer als Entwurf.
 // Bild auslesen (#1999): eine Fahrer-Tabelle landet als Text im Feld (gelbe Zellen aus dem Bild prüfen, bevor übernommen
-// wird); eine Team-Tabelle wird zur Teamwertung laut Veranstalter einer Runde (Vorgabe: die letzte gewertete).
+// wird); eine Team-Tabelle wird zur Teamwertung laut Veranstalter einer Runde (Vorgabe: die letzte gewertete). Das Bild
+// hängt erst beim Übernehmen als Original „Tabelle“ am Termin (#1933): bei der Team-Tabelle an der gewählten Runde, bei
+// der Fahrer-Tabelle an der letzten Runde der Tabelle - „Nicht anhängen“ lässt es weg.
 
 const SELECT_CLASS = `${INPUT_CLASS} text-sm py-1.5`;
 // Wie die übrigen Felder, nur ohne volle Breite - im Raster bestimmt die Spalte die Breite.
@@ -203,9 +206,38 @@ function ImageMarks({ marks, onConfirm, onConfirmAll }) {
   );
 }
 
+function originalsUrl(series, round) {
+  return `/reference-series/admin/series/${series.id}/rounds/${round.id}/originals`;
+}
+
+/** Das gelesene Bild hängt beim Übernehmen als Original „Tabelle“ am Termin (#1933) - oder eben nicht. */
+function PendingOriginal({ target, onDrop, testId }) {
+  return (
+    <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-white/60" data-testid={testId}>
+      <ImagePlus className="w-3.5 h-3.5 text-[#29B6E8]" aria-hidden="true" />
+      <span className="min-w-0">Das Bild hängt beim Übernehmen als Original „Tabelle“ an {target ? roundOption(target) : "der Runde"}.</span>
+      <button type="button" onClick={onDrop} data-testid={`${testId}-drop`}
+        className="tls-btn tls-btn--quiet px-2 py-1 rounded-sm text-[10px] font-bold uppercase tracking-wider inline-flex items-center gap-1">
+        <X className="w-3 h-3" aria-hidden="true" /> Nicht anhängen
+      </button>
+    </p>
+  );
+}
+
+/** Original anhängen; scheitert es, bleibt das Übernommene - mit Hinweis. Liefert den Zusatz für die Meldung. */
+async function attachTable(series, round, file) {
+  try {
+    await attachOriginal(originalsUrl(series, round), file, { kind: "table", origin: "reading" });
+    return " Original-Bild angehängt.";
+  } catch (err) {
+    toast.error(`Das Original-Bild wurde nicht angehängt: ${formatApiError(err.response?.data?.detail) || "bitte im Ergebnisblatt unter „Original-Bilder“ neu hinzufügen."}`);
+    return "";
+  }
+}
+
 /** Team-Tabelle aus dem Bild → Teamwertung laut Veranstalter einer Runde: Runde wählen (Vorgabe: die letzte gewertete),
  * Team und Punkte prüfen, Vergleich mit der eigenen Rechnung, übernehmen. */
-function TeamTotalsPanel({ series, result, onClose, onChanged }) {
+function TeamTotalsPanel({ series, result, file = null, onClose, onChanged }) {
   const url = `/reference-series/admin/series/${series.id}/team-totals`;
   const [initialRows] = useState(() => imageTeamRows(result));
   const [totals, setTotals] = useState(() => Object.fromEntries(initialRows.map((row) => [row.team, parseNumber(row.points)]).filter(([, points]) => points !== null)));
@@ -214,6 +246,7 @@ function TeamTotalsPanel({ series, result, onClose, onChanged }) {
   const [preview, setPreview] = useState(null);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
+  const [attach, setAttach] = useState(Boolean(file));
 
   useEffect(() => {
     let alive = true;
@@ -227,7 +260,9 @@ function TeamTotalsPanel({ series, result, onClose, onChanged }) {
     setSaving(true);
     try {
       await api.put(url, { totals, round_id: preview.round.id, expected_version: preview.expected_version });
-      toast.success(`Teamwertung laut Veranstalter für ${roundOption(preview.round)} übernommen.`);
+      // Übernommen: jetzt hängt das Bild als Original „Tabelle“ an der gewählten Runde (#1933).
+      const attached = attach && file ? await attachTable(series, preview.round, file) : "";
+      toast.success(`Teamwertung laut Veranstalter für ${roundOption(preview.round)} übernommen.${attached}`);
       onChanged?.();
       onClose();
     } catch (err) {
@@ -287,6 +322,7 @@ function TeamTotalsPanel({ series, result, onClose, onChanged }) {
           </table>
         </div>
       )}
+      {attach && file && preview && <PendingOriginal target={preview.round} onDrop={() => setAttach(false)} testId="season-table-team-original" />}
       <div className="flex flex-wrap items-center gap-3">
         <button type="button" onClick={save} disabled={!preview || open > 0 || saving || !Object.keys(totals).length} data-testid="season-table-team-save"
           className="tls-btn tls-btn--primary px-4 py-2 rounded-sm text-xs font-bold uppercase tracking-wider disabled:opacity-50">
@@ -382,6 +418,7 @@ export function SeasonTableSection({ series, onChanged }) {
   const pasteRef = useRef(null);
   const [imageMarks, setImageMarks] = useState([]);
   const [teamImage, setTeamImage] = useState(null);
+  const [tableFile, setTableFile] = useState(null);
 
   const body = useMemo(() => (parsed && kinds.includes("name") ? buildBody(parsed, kinds, roundIds, points, decisions) : null),
     [parsed, kinds, roundIds, points, decisions]);
@@ -421,11 +458,12 @@ export function SeasonTableSection({ series, onChanged }) {
   // Bild (#1999): Fahrer-Tabelle als Text ins Feld und in die Vorschau, Team-Tabelle zur Teamwertung laut Veranstalter.
   const image = useResultImage({
     base: url, paste: false,
-    onRead: (result) => {
+    onRead: (result, file) => {
       if (result.detected === "teams") {
-        setTeamImage(result);
+        setTeamImage({ result, file: file || null });
         return;
       }
+      setTableFile(file || null);
       const table = imageTable(result);
       setText(tableText(table.parsed));
       setImageMarks(table.marks);
@@ -466,7 +504,12 @@ export function SeasonTableSection({ series, onChanged }) {
     try {
       const { data } = await api.post(`${url}/apply`, applyBody(body, columns, picked));
       const summary = applySummary(data.items || []);
-      (summary.ok ? toast.success : toast.error)(summary.text);
+      // Übernommen: das gelesene Bild hängt als Original „Tabelle“ an der letzten Runde der Tabelle (#1933).
+      const target = lastTableRound(columns);
+      const saved = (data.items || []).some((item) => item.status === "saved");
+      const attached = tableFile && target && saved ? await attachTable(series, target, tableFile) : "";
+      if (saved) setTableFile(null);
+      (summary.ok ? toast.success : toast.error)(`${summary.text}${attached}`);
       onChanged?.();
       if (data.open_unknown) setUnknownOpen(true);
       setChoice({});
@@ -523,7 +566,7 @@ export function SeasonTableSection({ series, onChanged }) {
             {image.busy && <span className="text-xs text-white/60" role="status" data-testid="season-table-image-reading">Bild wird gelesen – das dauert ein paar Sekunden.</span>}
             {busy === "preview" && <span className="text-xs text-white/50" role="status">Rechnet die Vorschau …</span>}
           </div>
-          {teamImage && <TeamTotalsPanel series={series} result={teamImage} onClose={() => setTeamImage(null)} onChanged={onChanged} />}
+          {teamImage && <TeamTotalsPanel series={series} result={teamImage.result} file={teamImage.file} onClose={() => setTeamImage(null)} onChanged={onChanged} />}
           <ImageMarks marks={imageMarks} onConfirm={(row) => setImageMarks((current) => current.filter((mark) => mark.row !== row))} onConfirmAll={() => setImageMarks([])} />
           {parseErrors.length > 0 && (
             <ul className="text-sm text-amber-200 space-y-0.5" data-testid="season-table-parse-errors">
@@ -560,6 +603,7 @@ export function SeasonTableSection({ series, onChanged }) {
                   className="tls-btn tls-btn--primary px-4 py-2 rounded-sm text-xs font-bold uppercase tracking-wider disabled:opacity-50">
                   {busy === "apply" ? "Übernimmt …" : `Übernehmen (${picked.length})`}
                 </button>
+                {tableFile && <PendingOriginal target={lastTableRound(columns)} onDrop={() => setTableFile(null)} testId="season-table-original" />}
                 <span className="text-xs text-white/50">Ergebnisse kommen als Entwurf. Vorhandenes wird nur ersetzt, wenn du es anhakst – ein veröffentlichtes Ergebnis bekommt einen Entwurf daneben. Runden mit gelben Zellen kommen nach dem Klären dazu.</span>
               </div>
             </div>

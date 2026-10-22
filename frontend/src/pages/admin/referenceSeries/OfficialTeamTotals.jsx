@@ -22,10 +22,11 @@ const keyed = (row) => {
   return {
     key: `teamwert-${rowKey}`, team: row.team || "",
     points: row.points === undefined || row.points === null ? "" : String(row.points).replace(".", ","), ocr: row.ocr || null,
+    hint: row.hint || "",
   };
 };
 
-export function OfficialTeamTotals({ totals, teams = [], onChange, initialRows = null, imageBase = null, onOpenChange = null }) {
+export function OfficialTeamTotals({ totals, teams = [], onChange, initialRows = null, imageBase = null, onOpenChange = null, onImage = null }) {
   const [rows, setRows] = useState(() => (initialRows || teamTotalsRows(totals)).map(keyed));
   const [pasting, setPasting] = useState(false);
   const [text, setText] = useState("");
@@ -52,13 +53,15 @@ export function OfficialTeamTotals({ totals, teams = [], onChange, initialRows =
   };
   const image = useResultImage({
     base: imageBase || "", query: "?table=teams", paste: false,
-    onRead: (result) => {
+    onRead: (result, file) => {
       const read = imageTeamRows(result);
       if (!read.length) {
         toast.error("Im Bild wurde keine Spalte mit Punkten gefunden.");
         return;
       }
       publish(read.map(keyed));
+      // Das Bild geht als Original „Tabelle“ mit - das Blatt hängt es beim Übernehmen an (#1933).
+      if (file) onImage?.(file);
       toast.success(`${read.length} Teams aus dem Bild gelesen.`);
     },
   });
@@ -107,6 +110,7 @@ export function OfficialTeamTotals({ totals, teams = [], onChange, initialRows =
                     className={`${SMALL_INPUT} text-right tabular-nums ${invalid ? "!border-red-400/80" : yellow}`} data-testid="result-team-total-points" />
                   <button type="button" onClick={() => publish(rows.filter((item) => item.key !== row.key))} aria-label={`Team ${index + 1} entfernen`} className="p-1.5 rounded-sm text-white/45 hover:text-white hover:bg-white/5"><X className="w-4 h-4" /></button>
                 </div>
+                {row.hint && <p className="text-[11px] text-white/45" data-testid="result-team-total-hint">{row.hint}</p>}
                 {row.ocr && (
                   <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-amber-200" data-testid="result-team-total-ocr">
                     <span className="min-w-0">Aus dem Bild unsicher{row.ocr.read ? ` – gelesen: ${row.ocr.read}` : ""}</span>

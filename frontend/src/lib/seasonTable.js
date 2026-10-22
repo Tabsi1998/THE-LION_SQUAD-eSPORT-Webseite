@@ -244,7 +244,14 @@ export function markText(mark) {
   return [...shown, ...(rest > 0 ? [`+ ${rest} weitere`] : [])].join(" · ");
 }
 
-/** Team-Tabelle → Zeilen der Teamwertung laut Veranstalter: Team und Punkte, gelb, wenn eins davon unsicher ist. */
+/** Die letzte Runde der Tabelle (#1933: dort hängt das Bild als Original) - im Kalender die späteste mit Spalte. */
+export function lastTableRound(columns = []) {
+  return columns.filter((column) => column.round && column.state !== "skip")
+    .reduce((last, column) => (!last || (column.round.position ?? 0) >= (last.position ?? 0) ? column.round : last), null);
+}
+
+/** Team-Tabelle → Zeilen der Teamwertung laut Veranstalter: Team und Punkte, gelb, wenn eins davon unsicher ist; der
+ * Hinweis an der Summe (etwa „Summe der Runden ≠ Punkte“ bei aktueller Besetzung, #1960) geht als `hint` mit. */
 export function imageTeamRows(result) {
   const kinds = (result?.columns || []).map((column) => column.kind);
   const nameAt = kinds.indexOf("name");
@@ -253,7 +260,7 @@ export function imageTeamRows(result) {
   return (result.rows || []).filter((row) => row.cells[nameAt]).map((row) => {
     const uncertain = (row.uncertain || []).filter((column) => column === nameAt || column === totalAt);
     const read = uncertain.map((column) => row.read?.[String(column)]).filter(Boolean).join(" · ");
-    return { team: row.cells[nameAt], points: row.cells[totalAt], ocr: uncertain.length ? { read } : null };
+    return { team: row.cells[nameAt], points: row.cells[totalAt], ocr: uncertain.length ? { read } : null, hint: (row.notes || []).join(" · ") };
   });
 }
 

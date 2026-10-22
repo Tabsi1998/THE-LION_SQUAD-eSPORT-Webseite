@@ -16,7 +16,7 @@ const RESULT = {
   columns: [{ label: "Pos.", kind: "rank" }, { label: "Team", kind: "name" }, { label: "Runde 1", kind: "round" }, { label: "Punkte", kind: "total" }],
   rows: [
     { cells: ["1", "Probe Rot", "50", "555"], uncertain: [], read: {}, notes: [] },
-    { cells: ["2", "Probe Blau", "--", "543"], uncertain: [3], read: { 3: "548" }, notes: [] },
+    { cells: ["2", "Probe Blau", "--", "543"], uncertain: [3], read: { 3: "548" }, notes: ["Summe der Runden 0 ≠ Punkte 543"] },
   ],
 };
 
@@ -30,15 +30,19 @@ beforeEach(() => {
 test("Bild auslesen füllt Team und Punkte, gelbe Zeilen bis „Passt so“", async () => {
   const onChange = vi.fn();
   const onOpenChange = vi.fn();
-  render(<OfficialTeamTotals totals={{}} onChange={onChange} imageBase={BASE} onOpenChange={onOpenChange} />);
+  const onImage = vi.fn();
+  render(<OfficialTeamTotals totals={{}} onChange={onChange} imageBase={BASE} onOpenChange={onOpenChange} onImage={onImage} />);
   await waitFor(() => expect(apiMock.get).toHaveBeenCalledWith(`${BASE}/image`));
   const file = new File([new Uint8Array([137, 80, 78, 71])], "teams.png", { type: "image/png" });
   fireEvent.change(await screen.findByTestId("result-team-totals-image-file"), { target: { files: [file] } });
   await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith(`${BASE}/image?table=teams`, file, { headers: { "Content-Type": "image/png" } }));
   await waitFor(() => expect(onChange).toHaveBeenLastCalledWith({ "Probe Rot": 555, "Probe Blau": 543 }));
+  // Das Bild geht als Original „Tabelle“ ans Blatt - angehängt wird erst beim Übernehmen (#1933).
+  expect(onImage).toHaveBeenCalledWith(file);
   const rows = screen.getAllByTestId("result-team-total");
   expect(rows[1]).toHaveAttribute("data-ocr-uncertain", "true");
   expect(within(rows[1]).getByTestId("result-team-total-ocr")).toHaveTextContent("gelesen: 548");
+  expect(within(rows[1]).getByTestId("result-team-total-hint")).toHaveTextContent("Summe der Runden 0 ≠ Punkte 543");
   expect(onOpenChange).toHaveBeenLastCalledWith(1);
   expect(screen.getByTestId("result-team-totals-open")).toHaveTextContent("Eine Zeile aus dem Bild ist gelb");
   fireEvent.click(within(rows[1]).getByTestId("result-team-total-confirm"));

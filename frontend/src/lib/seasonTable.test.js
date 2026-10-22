@@ -1,7 +1,7 @@
 import { parseSeasonTablePaste } from "@/lib/resultPaste";
 import {
   applyBody, applySummary, buildBody, decisionFor, decisionValue, defaultSelection, imageTable, imageTeamRows, markText,
-  mergeDecisions, organizerDecisions, proposalDecisions, rememberCandidates, roundOption, tableText, targetText, totalText,
+  lastTableRound, mergeDecisions, organizerDecisions, proposalDecisions, rememberCandidates, roundOption, tableText, targetText, totalText,
   totalsSummary, unclearCells,
 } from "@/lib/seasonTable";
 
@@ -96,10 +96,19 @@ test("eine Fahrer-Tabelle aus dem Bild wird zur eingefügten Tabelle - mit den g
 test("eine Team-Tabelle aus dem Bild wird zur Teamwertung - gelb, wenn Team oder Punkte unsicher sind", () => {
   const teams = { ...IMAGE, kind: "teams", detected: "teams", columns: IMAGE.columns.map((column) => (column.kind === "name" ? { label: "Team", kind: "name" } : column)) };
   expect(imageTeamRows(teams)).toEqual([
-    { team: "Ada Ausgedacht", points: "43", ocr: null },
-    { team: "Bruno Beispiel", points: "25", ocr: { read: "" } },
+    { team: "Ada Ausgedacht", points: "43", ocr: null, hint: "" },
+    // Der Hinweis an der Summe geht mit (aktuelle Besetzung, #1960) - er macht nichts gelb.
+    { team: "Bruno Beispiel", points: "25", ocr: { read: "" }, hint: "Summe der Runden 25 ≠ Punkte 25" },
   ]);
   expect(imageTeamRows({ columns: [{ label: "Team", kind: "name" }], rows: [] })).toEqual([]);
+});
+
+test("das Bild hängt an der letzten Runde der Tabelle - im Kalender die späteste mit Spalte (#1933)", () => {
+  expect(lastTableRound([
+    { round: { id: "r3", position: 3 }, state: "new" }, { round: { id: "r9", position: 9 }, state: "skip" },
+    { round: { id: "r5", position: 5 }, state: "same" }, { round: null, state: "unmatched" },
+  ])).toEqual({ id: "r5", position: 5 });
+  expect(lastTableRound([])).toBeNull();
 });
 
 test("Texte: Termin, Ziel, Abgleich und Rückmeldung", () => {

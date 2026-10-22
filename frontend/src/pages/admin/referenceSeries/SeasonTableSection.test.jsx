@@ -177,6 +177,31 @@ test("Fahrer-Tabelle per Bild: als Text ins Feld, Vorschau wie beim Einfügen, g
   fireEvent.click(within(marks).getByTestId("season-table-image-confirm"));
   expect(screen.queryByTestId("season-table-image-marks")).toBeNull();
   expect(screen.getByTestId("season-table-apply")).toBeEnabled();
+  // Beim Übernehmen hängt das Bild als Original „Tabelle“ an der letzten Runde der Tabelle (#1933).
+  expect(screen.getByTestId("season-table-original")).toHaveTextContent("an R2");
+  apiMock.post.mockImplementation((url) => {
+    if (url.endsWith("/apply")) return Promise.resolve({ data: { items: [{ column: 0, status: "saved" }], created_participants: [], open_unknown: false } });
+    if (url.endsWith("/originals")) return Promise.resolve({ data: { id: "o1" } });
+    return Promise.resolve({ data: preview({ decided: true }) });
+  });
+  fireEvent.click(screen.getByTestId("season-table-apply"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/reference-series/admin/series/serie-1/rounds/r2/originals", file,
+    { params: { kind: "table", origin: "reading" }, headers: { "Content-Type": "image/png" } }));
+  await waitFor(() => expect(toastMock.success).toHaveBeenCalledWith("1 Runde als Entwurf übernommen. Original-Bild angehängt."));
+  expect(screen.queryByTestId("season-table-original")).toBeNull();
+});
+
+test("„Nicht anhängen“ lässt das Bild weg", async () => {
+  imageGet();
+  apiMock.post.mockImplementation((url) => Promise.resolve({ data: url.endsWith("/image") ? IMAGE_DRIVERS
+    : url.endsWith("/apply") ? { items: [{ column: 0, status: "saved" }], created_participants: [], open_unknown: false } : preview({ decided: true }) }));
+  await readImage();
+  await screen.findAllByTestId("season-table-column");
+  fireEvent.click(screen.getByTestId("season-table-image-confirm-all"));
+  fireEvent.click(screen.getByTestId("season-table-original-drop"));
+  fireEvent.click(screen.getByTestId("season-table-apply"));
+  await waitFor(() => expect(toastMock.success).toHaveBeenCalledWith("1 Runde als Entwurf übernommen."));
+  expect(apiMock.post.mock.calls.map(([url]) => url).filter((url) => url.endsWith("/originals"))).toEqual([]);
 });
 
 test("Team-Tabelle per Bild: Teamwertung laut Veranstalter mit Runde, Vergleich und Übernehmen", async () => {
@@ -189,18 +214,23 @@ test("Team-Tabelle per Bild: Teamwertung laut Veranstalter mit Runde, Vergleich 
   };
   apiMock.post.mockImplementation((url) => Promise.resolve({ data: url.endsWith("/image") ? IMAGE_TEAMS : teamPreview }));
   apiMock.put.mockResolvedValue({ data: { version: 4 } });
-  await readImage();
+  const file = await readImage();
   const panel = await screen.findByTestId("season-table-team-totals");
   await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/reference-series/admin/series/serie-1/team-totals/preview",
     { totals: { "Probe Rot": 46, "Probe Blau": 18 }, round_id: null }, { skipInvalidation: true }));
   expect(await within(panel).findByTestId("season-table-team-round")).toHaveValue("r2");
   expect(within(panel).getByTestId("season-table-team-compare")).toHaveTextContent("Probe Blau1820−2");
   expect(within(panel).getByTestId("season-table-team-save")).toBeDisabled();  // Punkte von Probe Blau sind gelb
+  expect(within(panel).getByTestId("season-table-team-original")).toHaveTextContent("an R2");
   fireEvent.click(within(panel).getByTestId("result-team-total-confirm"));
   fireEvent.click(within(panel).getByTestId("season-table-team-save"));
   await waitFor(() => expect(apiMock.put).toHaveBeenCalledWith("/reference-series/admin/series/serie-1/team-totals",
     { totals: { "Probe Rot": 46, "Probe Blau": 18 }, round_id: "r2", expected_version: 3 }));
+  // Übernommen: das Bild hängt als Original „Tabelle“ an der gewählten Runde (#1933).
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/reference-series/admin/series/serie-1/rounds/r2/originals", file,
+    { params: { kind: "table", origin: "reading" }, headers: { "Content-Type": "image/png" } }));
   expect(toastMock.success).toHaveBeenCalledWith(expect.stringContaining("Teamwertung laut Veranstalter für R2"));
+  expect(toastMock.success).toHaveBeenCalledWith(expect.stringContaining("Original-Bild angehängt."));
   expect(screen.queryByTestId("season-table-column")).toBeNull();
 });
 

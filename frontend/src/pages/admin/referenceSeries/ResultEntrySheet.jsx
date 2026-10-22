@@ -39,6 +39,15 @@ import { ClipboardList, Plus, RefreshCw, SlidersHorizontal, X } from "lucide-rea
 // Übernehmen angehängt (nach dem Speichern, mit derselben Datei - kein zweites Hochladen von Hand).
 
 const SMALL_INPUT = `${INPUT_CLASS} !py-1.5 text-sm`;
+
+/** Vorschau eines gelesenen Bilds für „Original-Bilder“ (#1933) - ohne Objekt-URL (Tests, alte Browser) ohne Bild. */
+function originalPicture(file) {
+  try {
+    return typeof URL.createObjectURL === "function" ? URL.createObjectURL(file) : null;
+  } catch {
+    return null;
+  }
+}
 const LABEL = "text-[10px] font-bold uppercase tracking-widest text-white/45";
 const ICON_BUTTON = "p-1.5 rounded-sm text-white/45 hover:text-white hover:bg-white/5 transition active:scale-[0.97]";
 
@@ -406,11 +415,7 @@ export function ResultEntrySheet({ series, round, onClose, onSaved }) {
   const image = useResultImage({
     base,
     onRead: (result, file) => {
-      if (file) {
-        let picture = null;
-        try { picture = typeof URL.createObjectURL === "function" ? URL.createObjectURL(file) : null; } catch { picture = null; }
-        setReadOriginal({ file, picture, kind: originalKind, map: null });
-      }
+      if (file) setReadOriginal({ file, picture: originalPicture(file), kind: originalKind, map: null });
       // Schnellste Runde und Fahrer des Tages gehen in die Felder des Rennens (#1927); was das Bild nicht ersetzt,
       // bleibt – mit seiner gelben Markierung.
       setForm((current) => ({ ...current, ...imageFormFields(result, current.raceOcr), rows: imageToRows(result, participants, { points: !noPoints }) }));
@@ -742,7 +747,8 @@ export function ResultEntrySheet({ series, round, onClose, onSaved }) {
               Nur der Vorstand: was ein Captain schickt, übernimmt der Server nicht. */}
           {board && kind === "racing" && !qualifying && rules.team_scoring?.enabled && (
             <OfficialTeamTotals key={`${data.version}-${mine ? "mine" : "stand"}`} totals={form.teamTotals} teams={teams} onChange={(teamTotals) => update({ teamTotals })}
-              imageBase={`/reference-series/admin/series/${series.id}/season-table`} onOpenChange={setTeamTotalsOpen} />
+              imageBase={`/reference-series/admin/series/${series.id}/season-table`} onOpenChange={setTeamTotalsOpen}
+              onImage={(file) => setReadOriginal({ file, picture: originalPicture(file), kind: "table", map: null })} />
           )}
 
           {teamLeague && form.rows.length === 0 && (
