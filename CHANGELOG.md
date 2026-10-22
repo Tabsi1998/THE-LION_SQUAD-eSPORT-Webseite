@@ -1,5 +1,24 @@
 # Changelog
 
+## 1.33.0 (22.10.2026)
+
+### Neu
+
+* Betrieb warnt, wenn der zweite Leser der Bild-Erkennung fehlt (#2018)
+* Bild-Erkennung – Strecke im Kopf wird mit dem Kalender der Saison abgeglichen (#2018)
+* Bild-Erkennung mit zweitem Leser – was beide gleich lesen, ist auch ohne Kader grün (#2018)
+* Bild-Erkennung nutzt den Kader der ganzen Spur und zeigt „wie in Saison …“ (#2012)
+* Knopf „Alle Namen bestätigen“ für vorbelegte gelbe Namen und Teams aus dem Bild, mit Rückgängig (#2018)
+* Korrekturen aus Ergebnis-Bildern als Schreibweise lernen, sichtbar und entfernbar bei Teilnehmer und Saison (#2012)
+
+### Fehlerbehebungen
+
+* Bild-Erkennung – ungelesene Startplätze sind gelb statt leer und grün (#2018)
+* Bild-Erkennung liest dunkelgraue Startnummern und Teams (#2012)
+* Bild-Erkennung rät Namen und Teams nie grün – nur eindeutige Treffer, typische Verwechslungen erkannt (#2012)
+* Saison- und Teamtabelle per Bild raten Namen nie grün (#2012)
+* Startplätze, Abstände und Kopf aus Ergebnis-Bildern seltener unnötig gelb (#2012)
+
 ## 1.32.0 (22.10.2026)
 
 ### Neu
