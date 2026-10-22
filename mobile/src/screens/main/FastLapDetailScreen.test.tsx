@@ -161,6 +161,36 @@ test("Bestzeit, Zeiten und Abstände stehen mit Komma da", async () => {
   expect(screen.queryByText("1:24.587")).toBeNull();
 });
 
+// Mikro-Bewegung (#1969): Zeiten zählen beim Öffnen hoch; eine neue Bestzeit beim Nachladen zählt nicht neu, die
+// Karte leuchtet einmal in Gold auf.
+test("Zeiten zählen beim Öffnen hoch, eine neue Bestzeit beim Nachladen leuchtet auf", async () => {
+  const reanimated = jest.requireMock("react-native-reanimated");
+  let best = "1:24.587";
+  mockGet.mockImplementation((path: string) => {
+    if (path === "/f1/challenges/hotlap") return Promise.resolve({ data: CHALLENGE });
+    if (path.endsWith("/leaderboard")) {
+      return Promise.resolve({ data: { track: { id: "tr1", name: "Spielberg" }, entries: [{ user_id: "a", display_name: "Lena", rank: 1, time_str: best, gap_str: "", attempts: 2 }] } });
+    }
+    return Promise.resolve({ data: [] });
+  });
+  const timing = jest.spyOn(reanimated, "withTiming");
+  const sequence = jest.spyOn(reanimated, "withSequence");
+  await render(<FastLapDetailScreen route={route} />);
+  await waitFor(() => expect(screen.getByTestId("fastlap-best-time")).toHaveTextContent("1:24,587"));
+  const counted = () => timing.mock.calls.filter(([, config]) => (config as { duration?: number })?.duration === 900).length;
+  expect(counted()).toBeGreaterThan(0);
+  expect(sequence).not.toHaveBeenCalled();
+
+  timing.mockClear();
+  best = "1:23.999";
+  await act(async () => { await screen.getByTestId("fastlap-scroll").props.refreshControl.props.onRefresh(); });
+  await waitFor(() => expect(screen.getByTestId("fastlap-best-time")).toHaveTextContent("1:23,999"));
+  expect(counted()).toBe(0);
+  expect(sequence).toHaveBeenCalled();
+  timing.mockRestore();
+  sequence.mockRestore();
+});
+
 // Langer Titel (#1867): bei 360 dp brach Android „Regenbogen-Boulevard“ mitten im Wort um. Umbrochen wird nur
 // zwischen Wörtern; zerreißt Android doch ein Wort, wird die Schrift schrittweise kleiner, höchstens bis 80 %.
 test("der Titel im Kopf bricht nicht im Wort um und wird höchstens bis 80 % kleiner", async () => {

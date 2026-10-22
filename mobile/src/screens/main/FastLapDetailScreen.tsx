@@ -9,6 +9,8 @@ import { MediaImage } from "../../components/MediaImage";
 import { Screen } from "../../components/Screen";
 import { StatusBadge } from "../../components/StatusBadge";
 import { FitTitle } from "../../components/FitTitle";
+import { CountUp, Glow } from "../../components/motion";
+import { countDelay, countsUp } from "../../lib/countUp";
 import { Body, Heading, Muted } from "../../components/Text";
 import { useAuth } from "../../auth/AuthContext";
 import { api, errorMessage } from "../../lib/api";
@@ -200,6 +202,7 @@ export function FastLapDetailScreen({ navigation, route }: Props) {
   return (
     <Screen padded={false}>
       <ScrollView
+        testID="fastlap-scroll"
         contentContainerStyle={styles.content}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { void refresh(); }} tintColor={colors.cyan} />}
       >
@@ -390,13 +393,16 @@ export function FastLapDetailScreen({ navigation, route }: Props) {
         ) : null}
 
         {best ? (
-          <Card style={styles.bestCard}>
+          <Card key={activeTrackId || "best"} style={styles.bestCard}>
+            {/* Neue Bestzeit beim Nachladen (#1969): die Karte leuchtet einmal in Gold auf - nicht beim Öffnen und nicht
+                beim Streckenwechsel (dann zählt die Zeit neu hoch). */}
+            <Glow trigger={best.time_str} tone="honor" radius={2} testID="fastlap-best-glow" />
             <View style={styles.bestIcon}>
               <Ionicons name="trophy-outline" color={colors.gold} size={22} />
             </View>
             <View style={styles.bestText}>
               <Muted>Bestzeit</Muted>
-              <Body style={styles.bestTime}>{showLapTime(best.time_str) || "-"}</Body>
+              <CountUp value={showLapTime(best.time_str) || "-"} playKey={activeTrackId || ""} tone="honor" style={styles.bestTime} testID="fastlap-best-time" />
               <Body style={styles.strong}>{best.display_name || best.username || "Fahrer"}</Body>
               <Muted>{attemptsText(best.attempts, leaderboard?.max_attempts)} · {showLapTime(best.gap_str) || "Führung"}</Muted>
             </View>
@@ -407,7 +413,7 @@ export function FastLapDetailScreen({ navigation, route }: Props) {
           <Heading>Leaderboard</Heading>
           {error ? <Muted style={styles.error}>{error}</Muted> : null}
           {leaderboard?.entries?.length ? (
-            leaderboard.entries.map((entry) => <EntryRow key={`${entryKey(entry)}-${entry.rank}`} entry={entry} maxAttempts={leaderboard.max_attempts} />)
+            leaderboard.entries.map((entry, index) => <EntryRow key={`${entryKey(entry)}-${entry.rank}`} entry={entry} maxAttempts={leaderboard.max_attempts} index={index} playKey={activeTrackId || ""} />)
           ) : (
             <EmptyState title="Noch keine Zeiten" detail="Sobald Zeiten eingetragen sind, stehen sie hier pro Strecke." />
           )}
@@ -416,7 +422,7 @@ export function FastLapDetailScreen({ navigation, route }: Props) {
         {leaderboard?.club_reference_entries?.length ? (
           <View style={styles.section}>
             <Heading>Vereins-Referenzzeiten</Heading>
-            {leaderboard.club_reference_entries.map((entry) => <EntryRow key={`ref-${entryKey(entry)}-${entry.rank}`} entry={entry} maxAttempts={leaderboard.max_attempts} reference />)}
+            {leaderboard.club_reference_entries.map((entry, index) => <EntryRow key={`ref-${entryKey(entry)}-${entry.rank}`} entry={entry} maxAttempts={leaderboard.max_attempts} index={index} playKey={activeTrackId || ""} reference />)}
           </View>
         ) : null}
       </ScrollView>
@@ -424,7 +430,8 @@ export function FastLapDetailScreen({ navigation, route }: Props) {
   );
 }
 
-function EntryRow({ entry, maxAttempts, reference = false }: { entry: F1LeaderboardEntry; maxAttempts?: number | null; reference?: boolean }) {
+// Zeiten zählen beim Öffnen und bei jedem Streckenwechsel hoch, je Zeile versetzt (#1969); beim Nachladen nicht neu.
+function EntryRow({ entry, maxAttempts, index = 0, playKey = "", reference = false }: { entry: F1LeaderboardEntry; maxAttempts?: number | null; index?: number; playKey?: string; reference?: boolean }) {
   return (
     <Card style={[styles.entry, reference && styles.referenceEntry]}>
       <View style={styles.rankBox}>
@@ -438,8 +445,8 @@ function EntryRow({ entry, maxAttempts, reference = false }: { entry: F1Leaderbo
         <Muted>{entry.is_guest ? "Gast · " : ""}{attemptsText(entry.attempts, maxAttempts)}{entry.penalty_seconds ? ` · +${entry.penalty_seconds}s Penalty` : ""}</Muted>
       </View>
       <View style={styles.timeBox}>
-        <Body style={styles.time}>{showLapTime(entry.time_str) || "-"}</Body>
-        <Muted>{showLapTime(entry.gap_str)}</Muted>
+        <CountUp value={showLapTime(entry.time_str) || "-"} playKey={playKey} delay={countDelay(index)} play={countsUp(index)} style={styles.time} />
+        {entry.gap_str ? <CountUp value={showLapTime(entry.gap_str)} playKey={playKey} delay={countDelay(index)} play={countsUp(index)} variant="muted" /> : null}
       </View>
     </Card>
   );
