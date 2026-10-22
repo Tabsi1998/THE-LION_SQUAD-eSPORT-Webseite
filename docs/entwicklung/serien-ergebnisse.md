@@ -505,9 +505,15 @@ gilt hier nicht. Web: `SeasonTableSection.jsx`, `OfficialTeamTotals.jsx` (`image
   gelesen) heißt nicht angetreten und ist sicher, sobald keine Lesung eine Zahl sieht. Widerspruch oder zu wenig
   Sicherheit: gelb (`uncertain` je Zeile, `read` das andere Gelesene).
 - **Gegenproben** (`_check`): `Dif. = Punkte - Punkte des Ersten` bestätigt beide (ein verlorenes Minus wird gesetzt)
-  oder macht beide gelb; `Summe der Runden = Punkte` bestätigt die Zeile, sonst werden ihre Zahlenzellen gelb und die
-  Zeile bekommt einen Hinweis (`notes`) - nie still falsch. Plätze laufen mit den Punkten; Platz 1 im Kasten ergibt sich
-  aus 2 … n.
+  oder macht beide gelb. Plätze laufen mit den Punkten; Platz 1 im Kasten ergibt sich aus 2 … n.
+- **Schriftbild** (`_glyph_check`): dieselbe Zahl sieht in derselben Tabelle gleich aus. Gleicht die Tinte einer Zelle
+  (freigestellt, auf feste Größe gebracht) einer Zelle mit anderem Wert (`GLYPH_CLOSE`), ist eine verlesen - etwa „23“,
+  die alle Lesungen als „25“ nahmen: beide gelb, mit dem anderen Wert als Lesung.
+- **Summe** (`check_sums`, in der Route nach dem Abgleich der Namen): `Summe der Runden = Punkte` bestätigt die Zeile.
+  Sonst ein Hinweis an der Summe (`notes`). Nur die Fahrertabelle (`table=drivers`) macht dann die Zahlenzellen gelb -
+  außer die Abweichung ist erklärt (`_sum_explainer` mit `season_table.explain_total`: Streichresultate nach den Regeln,
+  Aktivitätspunkte, Anpassungen des Fahrers). Die Teamtabelle (`table=teams`, auch erkannt an der Spalte „Team“)
+  rechnet „Punkte“ oft als aktuelle Besetzung (#1960): nur der Hinweis.
 - **Namen** (`match_names`): unscharf (`result_image_match.similarity`) gegen die Teilnehmer samt Aliase (Fahrer) bzw.
   die Teams der Saison (`known_teams`: eigene, Standard-Teams, Teams der Blätter und der Teamwertung).
 - **Teamwertung laut Veranstalter** (`routes/reference_season_table_routes.py`): `POST …/team-totals/preview`
@@ -515,5 +521,9 @@ gilt hier nicht. Web: `SeasonTableSection.jsx`, `OfficialTeamTotals.jsx` (`image
   neuen Werten (`official_points`, `computed_points`, `deviation`) und nennt neue Teams; `PUT …/team-totals`
   (`{round_id, totals, expected_version}`) schreibt `official_team_totals` ins Blatt (Entwurf daneben bekommt dieselben
   Werte), Revision `team_totals`, Protokoll `reference_result.team_totals`, bei veröffentlichtem Blatt neu rechnen.
+- **Original** (#1933): Lesen speichert nichts. Die Saisontabelle merkt sich die Datei und hängt sie nach dem
+  Übernehmen mit `kind=table`, `origin=reading` an (`…/rounds/<termin>/originals`): bei der Fahrertabelle an die letzte
+  Runde der Tabelle (`lastTableRound`, nur wenn etwas übernommen wurde), bei der Teamtabelle an die gewählte Runde, im
+  Ergebnisblatt über `OfficialTeamTotals` → `onImage` an den Termin des Blatts. „Nicht anhängen“ lässt es weg.
 - **Tests:** `backend/tests/season_table_image_fixture.py` zeichnet die Tabelle im PRL-Layout mit erfundenen Teams (12 ×
   17 Runden, eine Strafe); `test_result_image_table.py` prüft „stimmt oder gelb“ für jede Zelle.

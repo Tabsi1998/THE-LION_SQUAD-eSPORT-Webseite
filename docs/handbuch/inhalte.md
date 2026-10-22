@@ -716,16 +716,23 @@ das Bild wird nicht gespeichert.
   Rundenspalten heißen „Runde 1“, „Runde 2“ … (Flaggen sind Bilder, keine Schrift) und werden über die Reihenfolge den
   Terminen zugeordnet – in der Vorschau korrigierbar. Namen werden mit den Teilnehmern der Saison abgeglichen.
 - **Gelb = unsicher:** Wo die Lesungen nicht übereinstimmen, steht die Zelle unter **Aus dem Bild unsicher** – mit dem,
-  was sonst gelesen wurde. Passen „Punkte“ und „Dif.“ nicht zusammen oder ergibt die Summe der Runden nicht die Punkte,
-  wird die ganze Zeile gelb (welche Zelle falsch ist, lässt sich nicht sagen). Falsches im Feld korrigieren und **Neu
-  einlesen** – sonst **Passt so** bzw. **Alle geprüft**. Übernommen wird erst danach.
+  was sonst gelesen wurde. Gelb wird auch, was genauso aussieht wie eine Zelle mit anderem Wert (dieselbe Zahl sieht in
+  einer Tabelle immer gleich aus), und „Punkte“ und „Dif.“, wenn sie nicht zusammenpassen. Ergibt die Summe der Runden
+  nicht die Punkte, wird die Zeile gelb – außer die Saison erklärt es (Streichresultate, Anpassungen,
+  Aktivitätspunkte); dann steht nur ein Hinweis da. Falsches im Feld korrigieren und **Neu einlesen** – sonst **Passt
+  so** bzw. **Alle geprüft**. Übernommen wird erst danach.
+- **Original-Bild:** Beim Übernehmen hängt das Bild als Original „Tabelle“ an der letzten Runde der Tabelle (siehe
+  Original-Bilder); **Nicht anhängen** lässt es weg.
 - **Team-Tabelle:** Heißt die Namensspalte „Team“, wird daraus die **Teamwertung laut Veranstalter**. Vorgewählt ist die
   letzte gewertete Runde, jede andere Runde mit Ergebnis geht auch. Die Liste zeigt Team und Punkte (gelbe Zeilen mit
   **Passt so** bestätigen), darunter der Vergleich **Laut Bild** gegen die **Eigene Rechnung** – sie bleibt als
-  Prüfhinweis. **Teamwertung übernehmen** schreibt sie ins Ergebnis der Runde (bei einem veröffentlichten Ergebnis wird
-  neu gerechnet; ein Entwurf daneben bekommt dieselben Werte).
+  Prüfhinweis. Dass die Summe der Runden nicht die Punkte ergibt, ist bei Teamtabellen normal (oft zählt die aktuelle
+  Besetzung): es steht nur als Hinweis an der Zeile. **Teamwertung übernehmen** schreibt sie ins Ergebnis der Runde (bei
+  einem veröffentlichten Ergebnis wird neu gerechnet; ein Entwurf daneben bekommt dieselben Werte) und hängt das Bild als
+  Original „Tabelle“ an diese Runde.
 - **Im Ergebnisblatt** einer Runde hat **Teamwertung laut Veranstalter** denselben Knopf **Bild auslesen**; gelbe
-  Zeilen halten dort das Übernehmen auf wie gelbe Zeilen aus einem Ergebnis-Bild.
+  Zeilen halten dort das Übernehmen auf wie gelbe Zeilen aus einem Ergebnis-Bild. Das Bild steht danach unter
+  **Original-Bilder** (Art „Tabelle“) und hängt beim Übernehmen am Termin.
 
 <table>
 <tr>
