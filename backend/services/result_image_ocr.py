@@ -77,6 +77,7 @@ WHITELISTS = {
     "number": "0123456789",
     "time": "0123456789:.,DNFSQ",
     "gap": "0123456789:.,+-RundeLapsDNFSQ",
+    "points": "0123456789-",  # Saison- und Teamtabelle (#1999): Punkte je Runde, Gesamt, Abstand, „--“
 }
 
 

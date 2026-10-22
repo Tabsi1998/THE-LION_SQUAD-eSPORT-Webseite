@@ -26,6 +26,7 @@ werden offene Teilnehmer (Dialog „Unbekannte Namen“, #1743). Geschrieben wir
 """
 from __future__ import annotations
 
+import math
 from typing import List, Literal, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -35,7 +36,7 @@ from database import get_db
 from models import new_id, now_utc
 from routes import reference_result_routes as results
 from services import partner_import, race_weekend, reference_running_cache, reference_series, season_table
-from services import series_results
+from services import series_adjustments, series_results
 from services.own_teams import own_teams
 from services.reference_series_access import SeriesAccess, require_series_editor
 from services.scoring_rules import MAX_CUSTOM_BONUSES
@@ -358,6 +359,127 @@ async def _apply_column(db, access: SeriesAccess, body: SeasonApplyBody, wish: S
     written = await results.write_draft(db, access, round_doc, item.existing, item.resolution, item.content,
                                         wish.expected_version, {"source": "season_table", "column": label})
     return {**out, **written, "message": CHANGED} if written["status"] == "conflict" else {**out, **written}
+
+
+# ---------------------------------------------------------------- Teamwertung laut Veranstalter (#1999)
+TEAM_BASE = "/admin/series/{series_id}/team-totals"
+NO_SHEET = ("Für diesen Termin gibt es noch kein Ergebnis - die Teamwertung laut Veranstalter steht im Ergebnis einer "
+            "Runde. Bitte zuerst die Runde eintragen bzw. die Saisontabelle einlesen.")
+NO_ROUND = "Es gibt noch keine Runde mit Ergebnis."
+
+
+class TeamTotalsBody(BaseModel):
+    """Teamwertung laut Veranstalter (``official_team_totals``) für eine Runde - ohne Runde die letzte gewertete."""
+    round_id: Optional[str] = Field(default=None, max_length=80)
+    totals: dict[str, float] = Field(default_factory=dict)
+
+    @field_validator("totals")
+    @classmethod
+    def _totals(cls, value: dict) -> dict:
+        if len(value) > results.MAX_TABLE:
+            raise ValueError(f"Höchstens {results.MAX_TABLE} Teams.")
+        for team, total in value.items():
+            if not series_results.clean(team) or len(team) > 120:
+                raise ValueError("Teamname fehlt oder ist länger als 120 Zeichen.")
+            if not math.isfinite(total) or abs(total) > results.TOTAL_LIMIT:
+                raise ValueError("Teamwerte als endliche Zahl.")
+        return {series_results.clean(team): series_results.number(total) for team, total in value.items()}
+
+
+class TeamTotalsSave(TeamTotalsBody):
+    round_id: str = Field(min_length=1, max_length=80)
+    expected_version: int = Field(ge=0)
+
+
+async def known_teams(db, series: dict, participants: list[dict]) -> list[str]:
+    """Teams, die die Saison kennt: eigene Teams, Standard-Teams der Teilnehmer, Teams der Blätter und der Teamwertung
+    laut Veranstalter - jede Schreibweise einmal (auch für die Bild-Erkennung, #1999)."""
+    names = [team["name"] for team in own_teams(series) if team.get("name")]
+    names += [row.get("default_team") for row in participants if row.get("default_team")]
+    async for sheet in db.reference_round_results.find({"series_id": series["id"]},
+                                                       {"_id": 0, "rows.team": 1, "official_team_totals": 1}):
+        names += [row.get("team") for row in sheet.get("rows") or [] if row.get("team")]
+        names += list((sheet.get("official_team_totals") or {}).keys())
+    return list(dict.fromkeys(name for name in names if name))
+
+
+def _team_choice(rounds: list[dict], sheets: dict[str, dict], wanted: str | None) -> dict | None:
+    """Der Termin: gewählt, sonst der letzte gewertete mit Ergebnis, sonst der letzte mit Ergebnis."""
+    choices = [item for item in season_table.round_choices(rounds) if item["id"] in sheets]
+    if wanted:
+        return next((item for item in choices if item["id"] == wanted), None)
+    scored = [item for item in choices if item.get("status") == "scored"]
+    return (scored or choices or [None])[-1]
+
+
+async def _team_rows(db, access: SeriesAccess, round_doc: dict, existing: dict, totals: dict) -> tuple[list, bool]:
+    """Die Teamwertung nach diesem Termin mit den neuen Werten - je Team laut Veranstalter, eigene Rechnung und
+    Abweichung. ``False``, wenn die Saison keine Teamwertung führt."""
+    rules = await results._round_rules(db, access.series, round_doc)
+    participants = await results._participants(db, access.series_id)
+    content = {**results._content(existing), "official_team_totals": totals}
+    snapshots = await results._snapshots(db, access.series, rules, round_doc, content, participants)
+    teams = next((item["rows"] for item in snapshots if item["round_id"] == round_doc["id"]
+                  and item["scope"] == "teams"), None)
+    if teams is None:
+        return [], False
+    return [{key: row.get(key) for key in ("team", "rank", "official_points", "computed_points", "deviation")}
+            for row in teams], True
+
+
+@router.post(TEAM_BASE + "/preview")
+async def preview_team_totals(series_id: str, body: TeamTotalsBody,
+                              access: SeriesAccess = Depends(require_series_editor)):
+    """Was die Teamwertung laut Veranstalter in der gewählten Runde ergäbe - speichert nichts."""
+    db = get_db()
+    await _require_kind(db, access)
+    rounds = await db.reference_rounds.find({"series_id": series_id}, {"_id": 0}).to_list(None)
+    found = db.reference_round_results.find({"series_id": series_id}, {"_id": 0})
+    sheets = {row["round_id"]: row async for row in found}
+    round_doc = _team_choice(rounds, sheets, body.round_id)
+    if round_doc is None:
+        raise HTTPException(409, NO_SHEET if body.round_id else NO_ROUND)
+    existing = sheets[round_doc["id"]]
+    rows, enabled = await _team_rows(db, access, round_doc, existing, body.totals)
+    participants = await results._participants(db, series_id)
+    known = {series_adjustments.team_key(name) for name in await known_teams(db, access.series, participants)}
+    positions = _positions(rounds, access.series.get("weekend"))
+    choices = [item for item in season_table.round_choices(rounds) if item["id"] in sheets]
+    return {"round": _round_view(round_doc, positions), "expected_version": results._version(existing),
+            "sheet_status": existing.get("status"), "team_scoring": enabled,
+            "rounds": [{**_round_view(item, positions), "sheet_status": sheets[item["id"]].get("status")}
+                       for item in choices],
+            "rows": rows,
+            "unknown_teams": [team for team in body.totals if series_adjustments.team_key(team) not in known],
+            "previous": dict(existing.get("official_team_totals") or {})}
+
+
+@router.put(TEAM_BASE)
+async def save_team_totals(series_id: str, body: TeamTotalsSave, access: SeriesAccess = Depends(require_series_editor)):
+    """Teamwertung laut Veranstalter in das Ergebnis der Runde schreiben (Revision, Protokoll, bei einem
+    veröffentlichten Ergebnis neu rechnen). Steht ein Entwurf daneben, bekommt er dieselben Werte - sonst gälten beim
+    Freigeben wieder die alten."""
+    db = get_db()
+    await _require_kind(db, access)
+    async with reference_series.series_write(db, series_id):
+        await access.round(body.round_id)
+        existing = await results._sheet(db, series_id, body.round_id)
+        if existing is None:
+            raise HTTPException(409, NO_SHEET)
+        results._require_version(existing, body.expected_version)
+        update = {"official_team_totals": body.totals, **results._stamp(access)}
+        if existing.get("pending_draft"):
+            update["pending_draft"] = {**existing["pending_draft"], "official_team_totals": body.totals}
+        saved = await results._update_if_current(db, existing["id"], body.expected_version, {"$set": update})
+        if saved is None:
+            raise HTTPException(409, results.STALE)
+        revision_id = await results._revision(db, existing, kind="sheet", reason="team_totals", access=access)
+        await results._log(db, "reference_result.team_totals", access, saved, {
+            "version": saved["version"], "previous_version": results._version(existing), "revision_id": revision_id,
+            "teams": len(body.totals), "source": "season_table"})
+        if existing.get("status") == "published":
+            await results._recompute(db, access)
+    return {"version": saved["version"], "round_id": body.round_id, "recomputed": existing.get("status") == "published"}
 
 
 @router.post(BASE + "/apply")
