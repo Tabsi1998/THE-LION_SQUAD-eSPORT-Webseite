@@ -14,7 +14,8 @@ beim Eintragen (``ResultEntryRow``):
   Tag „GUEST“) haben keine Riot-ID - sie stehen nur mit dem Namen da und laufen wie jeder neue Name durch „Unbekannte
   Namen“ (#1743).
 - **Tagesplatz** aus der Reihenfolge des Veranstalters (er löst Gleichstände selbst auf), im Double Up der Platz des
-  Teams für beide Partner (``partner``).
+  Teams für beide Partner (``partner``) - Teams mit gleicher Tagessumme teilen ihn (#2015). Die Punkte daraus rechnet
+  die Saison (``scoring_rules.double_up_points``, Vorgabe wie PineApps: Team-Platz k → Einzelplatz 2k−1).
 - **Runden** je Zeile ``{place, points, lobby}`` - Punkte so, wie die Quelle sie liefert. Bots (``is_filler``) sind nie
   eine Zeile, verschieben aber die Punkte der Menschen dahinter. Eine Runde ohne Eintrag ist ``None`` (nicht gespielt);
   wer ausgestiegen ist (``dropped_out``), trägt die Marke ``left``.
@@ -241,12 +242,18 @@ def tournament(data) -> dict:
     rows: list[dict] = []
     placed: set[str] = set()
     if double_up:
-        for place, team in enumerate(teams, start=1):
+        previous, place = None, 0
+        for index, team in enumerate(teams, start=1):
             members = [people.get("k:" + str(team.get(key) or "").strip()) or {"game_name": team.get(name)}
                        for key, name in (("player1_puuid", "p1_name"), ("player2_puuid", "p2_name"))]
             names = [riot_name(member) for member in members]
             entries = day_rounds(by_team.get(str(team.get("id")), {}))
             total = _total(team.get("total_points"))
+            # Gleichstand zwischen Teams (#2015): gleiche Tagessumme teilt den Team-Platz (Wettbewerbsrang 1, 1, 3) -
+            # so wertet der Veranstalter (zwei Teams auf Platz 6 bekommen beide die Punkte von Einzelplatz 11).
+            if total is None or total != previous:
+                place = index
+            previous = total
             for index, member in enumerate(members):
                 if not names[index]:
                     continue
