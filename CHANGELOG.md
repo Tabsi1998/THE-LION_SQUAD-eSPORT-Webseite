@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.28.0](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/compare/v1.27.0...v1.28.0) (2026-10-22)
+
+
+### Neu
+
+* Ergebnisblatt – Original-Bilder hinzufügen, ziehen oder einfügen; gelesenes Bild wird beim Übernehmen angehängt ([#1933](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1933)) ([36f224b](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/36f224bb1cd94703506b44a0e2f09e76cf7b61e8))
+* Mediathek und Upload-Inventar zählen die Original-Bilder der Serien ([#1933](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1933)) ([36f224b](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/36f224bb1cd94703506b44a0e2f09e76cf7b61e8))
+* Referenzen – „Original ansehen“ im Vollbild auf Serien- und Rundenseite ([#1933](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1933)) ([36f224b](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/36f224bb1cd94703506b44a0e2f09e76cf7b61e8))
+* Referenzen – Original-Bilder des Veranstalters je Termin mit Art, Quelle und „öffentlich / nur Verwaltung“ ([#1933](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1933)) ([36f224b](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/36f224bb1cd94703506b44a0e2f09e76cf7b61e8))
+
 ## 1.27.0 (22.10.2026)
 
 ### Neu
