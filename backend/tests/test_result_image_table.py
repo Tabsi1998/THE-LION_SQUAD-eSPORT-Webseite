@@ -109,10 +109,27 @@ def test_a_team_table_only_notes_a_different_sum_and_drivers_explain_it():
     assert drivers.rows[1][4].sure is True  # 20 + 10 = 30: bestätigt
 
 
+def test_a_matching_sum_never_confirms_an_unread_cell():
+    # Keine Lesung hat etwas gefunden (etwa eine blasse „0“): gelb - und die passende Summe ändert daran nichts.
+    empty = table._cell([(None, True), (None, False), (None, False)], 80)
+    reading = TableReading(kinds=["name", "round", "round", "total"], labels=["Fahrer", "Runde 1", "Runde 2", "Punkte"])
+    reading.rows = [[TableCell(text="Ada"), TableCell(text="25", value=25, sure=False), empty,
+                     TableCell(text="25", value=25)]]
+    reading.notes = [[]]
+    table.check_sums(reading, strict=True)
+    assert (empty.text, empty.sure) == ("--", False)
+    assert reading.rows[0][1].sure is True  # die gelesene 25 bestätigt die Summe
+    assert table.to_payload(reading, kind="drivers")["rows"][0]["uncertain"] == [2]
+
+
+SIZE = table.GLYPH_WIDTH * 2 * table.GLYPH_HEIGHT  # Schriftbild einer zweistelligen Zahl
+
+
 def test_the_same_figures_look_the_same_in_one_table():
     reading = _reading([[1, "Probe Rot", 23, 25, 48, "--"], [2, "Probe Blau", 25, 16, 41, -7]])
-    three, five = [0] * 50 + [255] * 50, [255] * 50 + [0] * 50
-    cells = {(0, 2): three, (0, 3): five, (1, 2): three, (1, 3): [128] * 100}
+    half = SIZE // 2
+    three, five = [0] * half + [255] * (SIZE - half), [255] * half + [0] * (SIZE - half)
+    cells = {(0, 2): three, (0, 3): five, (1, 2): three, (1, 3): [128] * SIZE}
     for (row, column), glyph in cells.items():
         reading.rows[row][column].glyph = glyph
         reading.rows[row][column].sure = True
@@ -121,6 +138,34 @@ def test_the_same_figures_look_the_same_in_one_table():
     first, second = reading.rows[0][2], reading.rows[1][2]
     assert (first.sure, first.read, second.sure, second.read) == (False, "25", False, "23")
     assert reading.rows[0][3].sure is True and reading.rows[1][3].sure is True
+
+
+def _big_reading(rows, columns, seed=1999):
+    import random
+    rng = random.Random(seed)
+    reading = TableReading(kinds=["name"] + ["round"] * columns + ["total"])
+    for _ in range(rows):
+        row = [TableCell(text="x")]
+        for _ in range(columns + 1):
+            value = rng.randint(10, 99)
+            row.append(TableCell(text=str(value), value=value, glyph=[rng.randint(0, 255) for _ in range(SIZE)]))
+        reading.rows.append(row)
+        reading.notes.append([])
+    return reading
+
+
+def test_the_glyph_check_keeps_to_the_time_budget_and_leaves_the_rest_yellow():
+    import time
+    # Große Tabelle (300 Zeilen × 13 Zahlenspalten) in kurzer Zeit - verglichen wird nur mit wenigen Zellen je Wert.
+    reading = _big_reading(300, 12)
+    started = time.monotonic()
+    table._glyph_check(reading, deadline=time.monotonic() + 30)
+    assert time.monotonic() - started < 10 and not reading.out_of_time
+    # Zeitbudget schon aufgebraucht: nichts wird grün gelassen, was nicht verglichen ist.
+    late = _big_reading(50, 12)
+    table._glyph_check(late, deadline=time.monotonic() - 1)
+    assert late.out_of_time is True
+    assert all(not cell.sure for row in late.rows for cell in row[1:])
 
 
 def test_a_lost_minus_in_the_gap_is_set_again():

@@ -28,7 +28,7 @@ from __future__ import annotations
 import statistics
 from dataclasses import dataclass, field
 
-from PIL import Image
+from PIL import Image, ImageChops
 
 from services import result_image_ocr as ocr
 from services.result_image_match import clean_text, similarity
@@ -427,8 +427,11 @@ def check_sums(reading: TableReading, *, strict: bool, explain=None) -> None:
             continue
         summed = sum(cell.value or 0 for cell in values)
         if summed == total:
+            # Bestätigt wird nur, was eine eigene Lesung hat: eine leere, ungelesene Zelle zählt als 0 und passt damit
+            # immer - aus einer blassen „0“ würde sonst still „nicht angetreten“. Sie bleibt, wie sie ist (gelb).
             for cell in values:
-                cell.sure = True
+                if cell.value is not None:
+                    cell.sure = True
             row[total_at].sure = True
             continue
         reason = explain(row[name_at].text if name_at is not None else "", [cell.value for cell in values], summed,
@@ -470,28 +473,70 @@ def _glyph(image, cell: ocr.Cell, text: str) -> list[int] | None:
     return list(ink.tobytes())
 
 
-def _distance(left: list[float], right: list[float]) -> float:
-    return sum(abs(a - b) for a, b in zip(left, right)) / (255 * max(1, len(left)))
+GLYPH_REPRESENTATIVES = 3  # je Wert so viele Zellen zum Vergleich - dieselbe Zahl sieht ohnehin gleich aus
 
 
-def _glyph_check(reading: TableReading) -> None:
+def _glyph_image(glyph: list[int]):
+    return Image.frombytes("L", (len(glyph) // GLYPH_HEIGHT, GLYPH_HEIGHT), bytes(glyph))
+
+
+def _distance(left, right) -> float:
+    """Mittlerer Abstand zweier Schriftbilder (0-1) - ganz in C: Differenz, auf ein Pixel gemittelt."""
+    return ImageChops.difference(left, right).resize((1, 1), Image.Resampling.BOX).getpixel((0, 0)) / 255
+
+
+def _one_apart(left: str, right: str) -> bool:
+    """Gleich lang und genau ein Zeichen anders - so sieht eine verlesene Ziffer aus („23“/„25“, „30“/„50“)."""
+    return len(left) == len(right) and sum(1 for a, b in zip(left, right) if a != b) == 1
+
+
+def _glyph_check(reading: TableReading, deadline: float | None = None) -> None:
     """Schriftbild-Probe: dieselbe Zahl sieht in derselben Tabelle gleich aus. Gleicht eine Zelle einer Zelle mit
     anderem Wert (Abstand unter ``GLYPH_CLOSE``), ist eine von beiden verlesen - etwa eine „23“, die alle Lesungen
-    als „25“ nahmen: beide werden gelb, mit dem anderen Wert als Lesung. Bestätigt wird hier nichts."""
+    als „25“ nahmen: beide werden gelb, mit dem anderen Wert als Lesung. Bestätigt wird hier nichts.
+
+    Verglichen wird jede Zelle nur mit wenigen Zellen (``GLYPH_REPRESENTATIVES``) der Werte, die genau eine Ziffer
+    anders haben - und nur im Zeitbudget des Bilds (``deadline``, sonst das von ``read_table``). Reicht es nicht,
+    werden die ungeprüften Zellen gelb (``out_of_time``), nie grün."""
+    deadline = ocr._DEADLINE.get() if deadline is None else deadline
     cells = [row[column] for row in reading.rows for column, kind in enumerate(reading.kinds)
              if kind in GLYPH_KINDS and row[column].glyph and row[column].value is not None]
-    by_length: dict[int, list[TableCell]] = {}
+    groups: dict[str, list[TableCell]] = {}
     for cell in cells:
-        by_length.setdefault(len(cell.text), []).append(cell)
-    for group in by_length.values():
-        for index, cell in enumerate(group):
-            for other in group[index + 1:]:
-                if other.text == cell.text or _distance(cell.glyph, other.glyph) >= GLYPH_CLOSE:
-                    continue
-                for mine, theirs in ((cell, other), (other, cell)):
-                    mine.sure = False
-                    if theirs.text not in mine.read.split(" / "):
-                        mine.read = theirs.text if not mine.read else f"{mine.read} / {theirs.text}"
+        groups.setdefault(cell.text, []).append(cell)
+    images: dict[int, object] = {}
+
+    def prepared(cell: TableCell):
+        found = images.get(id(cell))
+        if found is None:
+            found = images[id(cell)] = _glyph_image(cell.glyph)
+        return found
+
+    representatives = {}
+    for text, group in groups.items():
+        step = max(1, len(group) // GLYPH_REPRESENTATIVES)
+        representatives[text] = [(other, prepared(other)) for other in group[::step][:GLYPH_REPRESENTATIVES]]
+
+    def mark(mine: TableCell, theirs: str) -> None:
+        mine.sure = False
+        if theirs not in mine.read.split(" / "):
+            mine.read = theirs if not mine.read else f"{mine.read} / {theirs}"
+
+    neighbours = {text: [other for other in groups if _one_apart(text, other)] for text in groups}
+    for position, cell in enumerate(cells):
+        if deadline is not None and ocr._clock() > deadline:
+            # Zeitbudget aufgebraucht: was nicht mehr verglichen wurde, ist ungeprüft - gelb.
+            for rest in cells[position:]:
+                rest.sure = False
+            reading.out_of_time = True
+            return
+        image = prepared(cell)
+        for other_text in neighbours[cell.text]:
+            for other, other_image in representatives[other_text]:
+                if other_image.size == image.size and _distance(image, other_image) < GLYPH_CLOSE:
+                    mark(cell, other_text)
+                    mark(other, cell.text)
+                    break
 
 
 # ---------------------------------------------------------------- Namen
