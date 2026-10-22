@@ -116,6 +116,25 @@ def test_dark_grey_number_and_team_are_read_from_the_cell_alone():
         assert not {"start_number", "team"} & set(got["uncertain"]), index
 
 
+def test_noise_after_a_header_label_does_not_hide_the_value_below():
+    """Echter Fall (#2012): hinter „Fahrer des Tages:“ las die Erkennung im Farbverlauf des Kopfs „ER“ (Sicherheit 10)
+    - und nahm das statt des Namens darunter. Ganz unsichere Reste hinter einer Beschriftung zählen nicht."""
+    def word(text, left, top, conf=95):
+        return result_image_ocr.Word(text, conf, left, top, 12 * len(text), 30)
+
+    lines = [result_image_ocr.Line([word("Probering", 100, 40)]),
+             result_image_ocr.Line([word("Schnellste", 100, 100), word("Rennrunde:", 260, 100), word("Pole:", 700, 100),
+                                    word("Fahrer", 1000, 100), word("des", 1090, 100), word("Tages:", 1140, 100),
+                                    word("ER", 1400, 100, conf=10)]),
+             result_image_ocr.Line([word("Mia_Motorhaube", 100, 150), word("Lena_Lenkrad", 700, 150),
+                                    word("Otto_Ostwind", 1000, 150)]),
+             result_image_ocr.Line([word("1:31,207", 100, 200), word("1:30,111", 700, 200)])]
+    out = result_image_ocr._header_fields(lines, TEMPLATE)
+    assert out["driver_of_the_day"].text == "Otto_Ostwind"
+    assert out["fastest_lap"].text == "Mia_Motorhaube 1:31,207"
+    assert out["pole"].text == "Lena_Lenkrad 1:30,111"
+
+
 @needs_tesseract
 def test_blurry_screenshot_marks_every_wrong_cell():
     sheet = fixture.sample_sheet()

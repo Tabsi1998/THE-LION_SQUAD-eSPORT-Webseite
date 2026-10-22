@@ -71,6 +71,10 @@ MIN_SIDE = 40
 ALT_SCALE = 1.5
 ALT_KINDS = ("place", "number", "time", "gap")
 BOX_HEIGHT = 64  # Pixel: so hoch wird eine einzelne Platz-Zelle (etwa Platz 1 im farbigen Kasten) gelesen
+# Zweite Lesung einer Zelle allein (#2012): größer - eine andere Skalierung liest manche Ziffer anders.
+CELL_HEIGHTS = (BOX_HEIGHT, 96)
+# Wörter hinter einer Beschriftung im Kopf, die alle unsicherer sind als das, sind Rauschen (#2012).
+HEADER_NOISE = 40
 
 WHITELISTS = {
     "place": "0123456789DNFSQOUT",
@@ -746,6 +750,8 @@ def _header_fields(lines: list[Line], template: dict) -> dict[str, Read]:
         for number, (key, start, end) in enumerate(spans[line_index]):
             following = spans[line_index][number + 1] if number + 1 < len(spans[line_index]) else None
             same = words[end:following[1] if following else len(words)]
+            if same and all(word.conf < HEADER_NOISE for word in same):
+                same = []  # nur Rauschen hinter der Beschriftung (etwa im Farbverlauf, #2012) - der Wert steht darunter
             groups = [same] if same else []
             if not same:
                 left = words[start].left - height
@@ -1005,10 +1011,10 @@ def _box_read(img: Image.Image, center: tuple[float, float], height: float, scal
     return _ocr(canvas, psm=10, whitelist=WHITELISTS["place"])
 
 
-def _padded(cell: Image.Image) -> Image.Image:
-    """Eine Zelle auf ``BOX_HEIGHT`` Pixel Höhe, mit weißem Rand - so liest Tesseract sie wie eine Zeile."""
-    factor = BOX_HEIGHT / max(cell.height, 1)
-    cell = cell.resize((max(1, round(cell.width * factor)), BOX_HEIGHT), Image.Resampling.LANCZOS)
+def _padded(cell: Image.Image, height: int = BOX_HEIGHT) -> Image.Image:
+    """Eine Zelle auf ``height`` Pixel Höhe, mit weißem Rand - so liest Tesseract sie wie eine Zeile."""
+    factor = height / max(cell.height, 1)
+    cell = cell.resize((max(1, round(cell.width * factor)), height), Image.Resampling.LANCZOS)
     canvas = Image.new("L", (cell.width + 40, cell.height + 40), 255)
     canvas.paste(cell, (20, 20))
     return canvas
@@ -1016,20 +1022,20 @@ def _padded(cell: Image.Image) -> Image.Image:
 
 def _cell_reads(img: Image.Image, box: tuple[int, int, int, int], kind: str) -> list[list[Word]]:
     """Eine Zelle allein aus dem Originalbild (#2012): hellster Farbkanal, Kontrast nur dieser Zelle gestreckt (so wird
-    dunkelgraue Schrift auf dunklem Grund kräftig), dunkle Schrift auf hellem Grund - einmal so und einmal schwarz-weiß
-    nach eigener Schwelle. Zahlen mit Whitelist, ein einzelnes Zeichen notfalls als Zeichen gelesen."""
+    dunkelgraue Schrift auf dunklem Grund kräftig), dunkle Schrift auf hellem Grund - in zwei Größen gelesen
+    (``CELL_HEIGHTS``; schwarz-weiß las die kursive Schrift schlechter). Zahlen mit Whitelist, eine einzelne Ziffer
+    notfalls als rohe Zeile (psm 13)."""
     red, green, blue = img.crop(box).split()
     cell = ImageOps.autocontrast(ImageChops.lighter(ImageChops.lighter(red, green), blue), cutoff=1)
     pixels = cell.tobytes()
     if sum(1 for value in pixels if value > 127) * 2 < len(pixels):
         cell = ImageOps.invert(cell)
-    level = _otsu(cell.histogram())
     out = []
-    for picture in (cell, cell.point(lambda value: 255 if value > level else 0)):
-        canvas = _padded(picture)
+    for height in CELL_HEIGHTS:
+        canvas = _padded(cell, height)
         words = _ocr(canvas, psm=7, whitelist=WHITELISTS.get(kind))
         if not words and kind != "text":
-            words = _ocr(canvas, psm=10, whitelist=WHITELISTS.get(kind))
+            words = _ocr(canvas, psm=13, whitelist=WHITELISTS.get(kind))
         out.append(words)
     return out
 
@@ -1066,12 +1072,12 @@ def _retry_empty_cells(img: Image.Image, prepared: Prepared, columns: list[dict]
                    min(img.height, int((center + height * 0.8) / prepared.scale)))
             if box[2] - box[0] < 4 or box[3] - box[1] < 4:
                 continue
-            plain, binary = _cell_reads(img, box, column["kind"])
+            first, second = _cell_reads(img, box, column["kind"])
             joiner = " " if column["kind"] == "text" else ""
-            if plain:
-                row.cells[field_name] = _read(plain, joiner=joiner)
-            if binary:
-                row.strips[field_name] = _read(binary, joiner=joiner)
+            if first:
+                row.cells[field_name] = _read(first, joiner=joiner)
+            if second:
+                row.strips[field_name] = _read(second, joiner=joiner)
 
 
 def _retry_places(prepared: Prepared, columns: list[dict], assigned: list[dict[int, Cell]], data_lines: list[Line],
