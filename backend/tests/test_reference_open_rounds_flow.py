@@ -126,6 +126,31 @@ async def test_entering_a_date_later_sorts_the_round_before_the_open_ones(flow):
     assert [item["code"] for item in (await _calendar(flow, series))["rounds"]] == ["T1", "T2", "T5", "T3", "T4"]
 
 
+@pytest.mark.asyncio
+async def test_the_preview_counts_drop_results_with_planned_rounds_like_the_published_table(flow):
+    # „Runden minus 1“ bei 9 geplanten Terminen, aber erst 4 im Kalender: es zählen 8, also alles - in der Vorschau
+    # genauso wie im veröffentlichten Stand (sonst zählte die Vorschau nur 4 − 1 = 3).
+    rules = {"points_by_place": [10, 6, 4], "count_mode": "drop_n", "count_n": 1}
+    _, series = await _setup(flow, planned_rounds=9, rules=rules)
+    await _paste(flow, series, "T1 · 01.10.2026\nT2 · 08.10.2026\nT3 · 15.10.2026\nT4 · 22.10.2026")
+    ids = [item["id"] for item in (await _calendar(flow, series))["rounds"]]
+    rows = [{"name": "Probe Ada", "place": 1}, {"name": "Probe Bruno", "place": 2}]
+    for round_id in ids[:3]:
+        answer = await flow.put(f"{_rounds(series)}/{round_id}/results",
+                                json={"rows": rows, "status": "published", "expected_version": 0})
+        assert answer.status_code == 200, answer.text
+    preview = await flow.post(f"{_rounds(series)}/{ids[3]}/results/preview", json={"rows": rows})
+    assert preview.status_code == 200, preview.text
+    drivers = preview.json()["standings"]["scopes"]["drivers"]
+    assert [(row["computed_points"], row["dropped_round_ids"]) for row in drivers] == [(40, []), (24, [])]
+    saved = await flow.put(f"{_rounds(series)}/{ids[3]}/results",
+                           json={"rows": rows, "status": "published", "expected_version": 0})
+    assert saved.status_code == 200, saved.text
+    stored = await flow.db.reference_standings.find_one({"series_id": series["id"], "round_id": ids[3],
+                                                         "scope": "drivers"})
+    assert [row["computed_points"] for row in stored["rows"]] == [40, 24]
+
+
 # ---------------------------------------------------------------- Fehlende Termine anlegen
 @pytest.mark.asyncio
 async def test_fill_planned_adds_the_missing_rounds_as_open_with_the_next_codes(flow):

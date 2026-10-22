@@ -273,7 +273,8 @@ async def _totals(db, access: SeriesAccess, body: SeasonTableInput, columns: lis
     try:
         snapshots = race_weekend.standings(rules=series.get("rules") or {}, rounds=active, sheets=sheets,
                                            participants=people, own_teams=own_teams(series),
-                                           weekend=series.get("weekend"), adjustments=series.get("adjustments"))
+                                           weekend=series.get("weekend"), adjustments=series.get("adjustments"),
+                                           planned_rounds=series.get("planned_rounds"))  # #2015
     except ValueError:
         return None, BROKEN
     drivers = [item for item in snapshots if item["scope"] == "drivers"]
