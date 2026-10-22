@@ -162,11 +162,23 @@ def decide(kind: str, page: Read | None, strip: Read | None, min_conf: float, *,
         parsed = _parse(kind, read, page=is_page, fmt=fmt)
         if parsed is not None and all(_display(parsed) != _display(item) for item in decision.options):
             decision.options.append(parsed)
+        plus = _plus_as_four(kind, read, is_page, fmt)
+        if plus is not None and all(_display(plus) != _display(item) for item in decision.options):
+            decision.options.append(plus)
     # Die Lesungen widersprechen sich (auch die dritte) - auch, wenn Seite und Streifen nur einen Platzhalter oder
     # nichts lasen, eine Lesung aber einen Wert. Ausfall-Zeilen und der Abstand des Siegers entscheidet ``build`` neu.
     if any(_display(item) != decision.text for item in decision.options):
         decision.sure, decision.disagree = False, True
     return decision
+
+
+def _plus_as_four(kind: str, read: Read, page: bool, fmt: TimeFormat | None):
+    """Ein Abstand ohne Plus, der mit 4 beginnt („47,441“): das Plus kann als 4 gelesen sein (#2012) - auch „+7,441“
+    ist dann eine Lesung. Nur eine weitere Lesung: entscheiden muss die Probe Zeit = Zeit des Ersten + Abstand."""
+    text = compact(read.text)
+    if kind != "gap" or not text.startswith("4") or "+" in text or len(text) < 3:
+        return None
+    return _parse(kind, Read("+" + text[1:], read.conf, read.parts), page=page, fmt=fmt)
 
 
 def _take(decision: Decision, parsed) -> None:
@@ -493,7 +505,34 @@ def _check_gaps_in_columns(rows: list[dict[str, Decision]]) -> None:
                 cell.sure = False
 
 
+def _grid_number(item) -> int | None:
+    value = item[1] if isinstance(item, tuple) else item
+    return int(value) if isinstance(value, str) and value.isdigit() else None
+
+
+def _settle_grid(grids: list[Decision]) -> None:
+    """Startplätze sind 1…N, jeder einmal (#2012). Fehlen den sicheren genau die Zahlen, die die unsicheren als je
+    einzige passende Lesung haben (jede Zahl genau einmal), gelten diese - grün. Sonst bleibt alles, wie es ist."""
+    sure = [_grid_number(cell.value) for cell in grids if cell.sure and cell.value is not None]
+    unsure = [cell for cell in grids if not cell.sure]
+    if not unsure or None in sure or len(set(sure)) != len(sure) or any(value > len(grids) for value in sure):
+        return
+    missing = set(range(1, len(grids) + 1)) - set(sure)
+    picks = []
+    for cell in unsure:
+        fitting = [item for item in _options(cell, "number") if _grid_number(item) in missing]
+        if len(fitting) != 1 or _foreign(cell, "number"):
+            return
+        picks.append(fitting[0])
+    if len(picks) != len(missing) or {_grid_number(item) for item in picks} != missing:
+        return
+    for cell, item in zip(unsure, picks):
+        _take(cell, item)
+        cell.sure = True
+
+
 def _check_grid(rows: list[dict[str, Decision]]) -> None:
+    _settle_grid([row["grid"] for row in rows if row.get("grid") is not None])
     seen: dict[object, list[Decision]] = {}
     for row in rows:
         grid = row.get("grid")
