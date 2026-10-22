@@ -6,7 +6,6 @@
 - die App (kein Browser) bekommt in Antworten die PNG-Adresse, der Browser das SVG; speichert die App die PNG zurück,
   bleibt das SVG;
 - Mediathek, Löschen und Bildprüfung nehmen die PNG-Fassung mit."""
-import io
 import pathlib
 import sys
 
@@ -118,7 +117,8 @@ async def test_refused_svg_says_why(flow):
            b'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1 1"><text>&x;</text></svg>')
     response = await web(flow, "post", "/api/uploads/logo", files=svg_file(body=xxe))
     assert response.status_code == 400 and response.json()["detail"] == svg_logo.NO_DTD
-    big = b'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1 1"><!--' + b"x" * svg_logo.MAX_SVG_BYTES + b"--></svg>"
+    filler = b"x" * svg_logo.MAX_SVG_BYTES
+    big = b'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1 1"><!--' + filler + b"--></svg>"
     response = await web(flow, "post", "/api/uploads/logo", files=svg_file(body=big))
     assert response.status_code == 413 and response.json()["detail"] == svg_logo.TOO_BIG
     assert await flow.db.media_uploads.count_documents({}) == 0

@@ -7,11 +7,11 @@ import sys
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 
-import pytest
-import resvg_py
-from PIL import Image, ImageChops, ImageStat
+import pytest  # noqa: E402
+import resvg_py  # noqa: E402
+from PIL import Image, ImageChops, ImageStat  # noqa: E402
 
-from services import svg_logo
+from services import svg_logo  # noqa: E402
 
 NS = 'xmlns="http://www.w3.org/2000/svg"'
 XLINK = 'xmlns:xlink="http://www.w3.org/1999/xlink"'
@@ -33,7 +33,8 @@ def rejected(data: bytes) -> str:
 
 
 def raster(data: bytes, width: int = 300) -> Image.Image:
-    return Image.open(io.BytesIO(bytes(resvg_py.svg_to_bytes(svg_string=data.decode("utf-8"), width=width)))).convert("RGBA")
+    png = bytes(resvg_py.svg_to_bytes(svg_string=data.decode("utf-8"), width=width))
+    return Image.open(io.BytesIO(png)).convert("RGBA")
 
 
 # ---------------------------------------------------------------- Testkorpus: bereinigt
@@ -76,8 +77,8 @@ CLEANED = {
     "Filter und Muster": svg('<filter id="f"><feImage href="https://boese.example/x.png"/></filter>'
                              '<pattern id="p"><image href="https://boese.example/y.png"/></pattern>'
                              f'<rect width="5" height="5" filter="url(#f)" fill="url(#p)"/>{RECT}'),
-    "Rekursion über use": svg('<g id="a"><use href="#a"/></g><g id="b"><use href="#c"/></g><g id="c"><use href="#b"/></g>'
-                              + RECT),
+    "Rekursion über use": svg('<g id="a"><use href="#a"/></g><g id="b"><use href="#c"/></g>'
+                              '<g id="c"><use href="#b"/></g>' + RECT),
 }
 
 FORBIDDEN = ("script", "onload", "onclick", "onmouseover", "javascript", "boese.example", "foreignobject", "iframe",
@@ -104,9 +105,10 @@ def test_style_block_keeps_safe_rules_and_drops_everything_else():
 
 
 def test_internal_references_survive():
-    data = svg('<defs><linearGradient id="g1"><stop offset="0" stop-color="#29B6E8"/><stop offset="1" stop-color="#fff"/>'
-               '</linearGradient><linearGradient id="g2" xlink:href="#g1" x2="1"/><clipPath id="c"><circle cx="50" cy="30" r="25"/>'
-               '</clipPath><symbol id="s"><rect width="10" height="10"/></symbol></defs>'
+    data = svg('<defs><linearGradient id="g1"><stop offset="0" stop-color="#29B6E8"/>'
+               '<stop offset="1" stop-color="#fff"/></linearGradient><linearGradient id="g2" xlink:href="#g1" x2="1"/>'
+               '<clipPath id="c"><circle cx="50" cy="30" r="25"/></clipPath>'
+               '<symbol id="s"><rect width="10" height="10"/></symbol></defs>'
                '<rect width="100" height="60" fill="url(#g2)" clip-path="url(#c)"/><use href="#s" x="5" y="5"/>'
                '<use xlink:href="#fehlt"/>')
     text = clean_text(data)
@@ -123,8 +125,8 @@ XXE = (b'<?xml version="1.0"?><!DOCTYPE svg [<!ENTITY xxe SYSTEM "file:///etc/pa
 LAUGHS = (b'<?xml version="1.0"?><!DOCTYPE lolz [<!ENTITY lol "lol"><!ENTITY lol2 "&lol;&lol;&lol;&lol;&lol;&lol;">'
           b'<!ENTITY lol3 "&lol2;&lol2;&lol2;&lol2;&lol2;&lol2;">]>'
           b'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><text>&lol3;</text></svg>')
-EXTERNAL_DTD = (b'<?xml version="1.0"?><!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "https://boese.example/svg11.dtd">'
-                + svg(RECT))
+EXTERNAL_DTD = (b'<?xml version="1.0"?><!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" '
+                b'"https://boese.example/svg11.dtd">' + svg(RECT))
 
 
 def test_doctype_entities_and_external_dtds_are_refused():
@@ -162,7 +164,8 @@ def test_viewbox_comes_from_width_and_height_or_the_file_is_refused():
 
 def test_nothing_visible_after_cleaning_is_refused():
     assert "nichts Sichtbares" in rejected(svg("<script>alert(1)</script>"))
-    assert "nichts Sichtbares" in rejected(svg('<image href="https://boese.example/logo.png" width="100" height="60"/>'))
+    image_only = svg('<image href="https://boese.example/logo.png" width="100" height="60"/>')
+    assert "nichts Sichtbares" in rejected(image_only)
 
 
 # ---------------------------------------------------------------- Harmloses Logo bleibt gleich

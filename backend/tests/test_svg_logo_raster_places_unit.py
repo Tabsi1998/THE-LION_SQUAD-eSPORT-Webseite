@@ -8,13 +8,15 @@ import sys
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 
-import pytest
-from PIL import Image
+import pytest  # noqa: E402
+from PIL import Image  # noqa: E402
 
-import email_service
-import pdf_service
-from routes import seo_render_routes
-from services import brand_favicon, discord_design, discord_links, image_migrate, mail_queue, sponsor_images, svg_logo
+import email_service  # noqa: E402
+import pdf_service  # noqa: E402
+from routes import seo_render_routes  # noqa: E402
+from services import (  # noqa: E402
+    brand_favicon, discord_design, discord_links, image_migrate, mail_queue, sponsor_images, svg_logo,
+)
 
 SVG = "/api/static/uploads/kiwi123.svg"
 PNG = "/api/static/uploads/kiwi123.png"
@@ -37,7 +39,8 @@ def test_pdf_and_favicon_read_the_png(uploads):
     assert pdf_service._local_upload_path(SVG) == uploads / "kiwi123.png"
     assert pdf_service._brand_asset_path(f"https://lionsquad.example{SVG}") == uploads / "kiwi123.png"
     assert brand_favicon.asset_path(SVG) == uploads / "kiwi123.png"
-    with Image.open(io.BytesIO(brand_favicon.universal_favicon_png(brand_favicon.asset_path(SVG).read_bytes(), None))) as icon:
+    favicon = brand_favicon.universal_favicon_png(brand_favicon.asset_path(SVG).read_bytes(), None)
+    with Image.open(io.BytesIO(favicon)) as icon:
         assert icon.size == (brand_favicon.SIZE, brand_favicon.SIZE)
 
 
@@ -67,7 +70,8 @@ def test_every_mail_carries_the_png(uploads, monkeypatch):
 
     monkeypatch.setattr(mail_queue, "_smtp_send", smtp)
     html = f'<img src="https://lionsquad.example{SVG}" alt="Kiwi">'
-    asyncio.run(mail_queue._dispatch({"provider": "smtp", "smtp_host": "mail.example"}, "a@example.test", "Hallo", html))
+    smtp_config = {"provider": "smtp", "smtp_host": "mail.example"}
+    asyncio.run(mail_queue._dispatch(smtp_config, "a@example.test", "Hallo", html))
     assert sent == [f'<img src="https://lionsquad.example{PNG}" alt="Kiwi">']
 
     captured = {}
@@ -121,12 +125,12 @@ class FakeClient:
 def test_image_migration_stores_only_a_cleaned_svg(uploads):
     evil = (b'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" onload="alert(1)"><script>alert(2)</script>'
             b'<rect width="40" height="40" fill="#29B6E8"/></svg>')
-    url = asyncio.run(image_migrate._download_to_local("https://fremd.example/logo.svg",
-                                                      FakeClient(FakeResponse(evil, "image/svg+xml"))))
+    client = FakeClient(FakeResponse(evil, "image/svg+xml"))
+    url = asyncio.run(image_migrate._download_to_local("https://fremd.example/logo.svg", client))
     assert url and url.endswith(".svg")
     stored = (uploads / url.rsplit("/", 1)[1]).read_text(encoding="utf-8")
     assert "script" not in stored and "onload" not in stored
     assert (uploads / url.rsplit("/", 1)[1].replace(".svg", ".png")).is_file()
-    nothing = asyncio.run(image_migrate._download_to_local(
-        "https://fremd.example/x.svg", FakeClient(FakeResponse(b"<svg><script>alert(1)</script></svg>", "image/svg+xml"))))
+    empty = FakeClient(FakeResponse(b"<svg><script>alert(1)</script></svg>", "image/svg+xml"))
+    nothing = asyncio.run(image_migrate._download_to_local("https://fremd.example/x.svg", empty))
     assert nothing is None
