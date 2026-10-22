@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.29.0](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/compare/v1.28.0...v1.29.0) (2026-10-22)
+
+
+### Neu
+
+* Fahrer-Anpassung wahlweise auch in der Teamwertung gegenrechnen – je Rennen für das gefahrene Team, in der aktuellen Besetzung nie doppelt ([#2000](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2000)) ([6ecc0c1](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/6ecc0c12c370a655d09d9185e9e278f51e623320))
+* Regeln der Saison – Vorgabe „Fahrer-Anpassungen zählen auch für die Teamwertung“ ([#2000](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2000)) ([6ecc0c1](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/6ecc0c12c370a655d09d9185e9e278f51e623320))
+* Teamwertung zeigt „−5 (Fahrer)“ bei der Teamsumme, Fahrer-Detail „zählt auch fürs Team“ ([#2000](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2000)) ([6ecc0c1](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/6ecc0c12c370a655d09d9185e9e278f51e623320))
+* Verwaltung – Haken „zählt auch für die Teamwertung“ an jeder Fahrer-Anpassung mit Hinweis, wenn sie für kein Team zählt ([#2000](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2000)) ([6ecc0c1](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/6ecc0c12c370a655d09d9185e9e278f51e623320))
+
 ## 1.28.0 (22.10.2026)
 
 ### Neu
