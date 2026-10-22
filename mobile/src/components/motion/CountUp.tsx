@@ -38,6 +38,9 @@ type Props = {
   style?: StyleProp<TextStyle>;
   containerStyle?: StyleProp<ViewStyle>;
   numberOfLines?: number;
+  /** Für schmale Kacheln: der fertige Wert darf kleiner werden (wie bei Text). */
+  adjustsFontSizeToFit?: boolean;
+  minimumFontScale?: number;
   onDone?: () => void;
   testID?: string;
 };
@@ -53,7 +56,7 @@ function rgba(hex: string, alpha: number): string {
 
 export function CountUp({
   value, grouped = false, from, playKey = "", delay = 0, play = true, flash = true, tone = "brand", variant = "body",
-  style, containerStyle, numberOfLines, onDone, testID,
+  style, containerStyle, numberOfLines, adjustsFontSizeToFit, minimumFontScale, onDone, testID,
 }: Props) {
   const reduce = useReduceMotion();
   const shape = useMemo(() => countShape(value, grouped), [value, grouped]);
@@ -108,7 +111,7 @@ export function CountUp({
 
   if (!counting) {
     return (
-      <Animated.Text style={[textStyles[variant], styles.text, style, flashStyle]} numberOfLines={numberOfLines} testID={testID}>
+      <Animated.Text style={[textStyles[variant], styles.text, style, flashStyle]} numberOfLines={numberOfLines} adjustsFontSizeToFit={adjustsFontSizeToFit} minimumFontScale={minimumFontScale} testID={testID}>
         {text}
       </Animated.Text>
     );

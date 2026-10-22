@@ -1,8 +1,11 @@
 import { Ionicons } from "@expo/vector-icons";
-import React, { useState } from "react";
-import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import React, { useEffect, useRef, useState } from "react";
+import { Alert, Animated, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import Svg, { Circle } from "react-native-svg";
 import { Card } from "../../components/Card";
+import { CountUp, useReduceMotion } from "../../components/motion";
+import { COUNT_UP_MS } from "../../lib/countUp";
+import { motionEasing } from "../../lib/motion";
 import { announceLevelChanged } from "../../lib/achievements";
 import { api, errorMessage } from "../../lib/api";
 import { colors, radius } from "../../theme";
@@ -27,6 +30,30 @@ function Bar({ percent, color, height = 6 }: { percent: number; color: string; h
   return (
     <View style={[styles.track, { height, borderRadius: height / 2 }]}>
       <View style={{ width: `${value}%`, height, borderRadius: height / 2, backgroundColor: color }} />
+    </View>
+  );
+}
+
+/**
+ * Der Löwen-Rang-Fortschritt (#1969): füllt sich beim Öffnen in 900 ms von links, wie die XP hochzählen - nur
+ * Skalieren, auf dem UI-Thread. Ein neuer Stand gleitet vom alten aus. „Bewegung reduzieren“: sofort.
+ */
+function FillingBar({ percent, color, height = 8 }: { percent: number; color: string; height?: number }) {
+  const reduce = useReduceMotion();
+  const target = Math.max(0, Math.min(100, Number(percent || 0))) / 100;
+  const fill = useRef(new Animated.Value(reduce ? target : 0)).current;
+  useEffect(() => {
+    if (reduce) {
+      fill.setValue(target);
+      return undefined;
+    }
+    const animation = Animated.timing(fill, { toValue: target, duration: COUNT_UP_MS, easing: motionEasing, useNativeDriver: true });
+    animation.start();
+    return () => animation.stop();
+  }, [fill, reduce, target]);
+  return (
+    <View style={[styles.track, { height, borderRadius: height / 2 }]} testID="achievement-level-bar">
+      <Animated.View style={{ width: "100%", height, borderRadius: height / 2, backgroundColor: color, transformOrigin: "left", transform: [{ scaleX: fill }] }} />
     </View>
   );
 }
@@ -88,11 +115,13 @@ export function LevelHeader({ level, earnedPercent, evaluating, onEvaluate, onLe
         <View style={styles.xpBlock} testID="achievement-level-xp">
           <View style={styles.xpLabels}>
             <Text style={[styles.xpTitle, { color: PURPLE }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>{atMax ? "Höchstes Level" : `Bis Level ${Number(lvl.level) + 1}`}</Text>
-            <Text style={styles.xpCount}>
-              {atMax ? `${xp.toLocaleString("de-DE")} XP` : `${xp.toLocaleString("de-DE")} / ${next.toLocaleString("de-DE")} XP`}
-            </Text>
+            {/* Die XP zählen beim Öffnen hoch (#1969), der Balken füllt sich mit. */}
+            <View style={styles.xpCountRow}>
+              <CountUp value={xp} grouped variant="muted" style={styles.xpCount} />
+              <Text style={styles.xpCount}>{atMax ? " XP" : ` / ${next.toLocaleString("de-DE")} XP`}</Text>
+            </View>
           </View>
-          <Bar percent={Number(lvl.progress || 0)} color={PURPLE} height={8} />
+          <FillingBar percent={Number(lvl.progress || 0)} color={PURPLE} height={8} />
         </View>
       ) : null}
       {onEvaluate && !guest ? (
@@ -449,6 +478,7 @@ const styles = StyleSheet.create({
   xpBlock: { gap: 6 },
   xpLabels: { flexDirection: "row", justifyContent: "space-between", gap: 8 },
   xpTitle: { fontSize: 10, fontWeight: "900", textTransform: "uppercase", letterSpacing: 1.2, flexShrink: 1 },
+  xpCountRow: { alignItems: "baseline", flexDirection: "row" },
   xpCount: { color: colors.muted, fontSize: 11, fontWeight: "700", fontVariant: ["tabular-nums"] },
   track: { backgroundColor: "rgba(255,255,255,0.08)", overflow: "hidden" },
   outlineButton: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, alignSelf: "flex-start", borderWidth: 1, borderColor: "rgba(168,85,247,0.5)", borderRadius: radius.sm, paddingHorizontal: 12, paddingVertical: 8 },
