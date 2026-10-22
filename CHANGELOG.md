@@ -1,5 +1,22 @@
 # Changelog
 
+## 1.32.0 (22.10.2026)
+
+### Neu
+
+* Bestehende Double-Up-Saisons behalten die Punkte nach Team-Platz (#2015)
+* Double-Up-Punkte wie bei PineApps – Team-Platz k zählt wie Einzelplatz 2k−1, einstellbar je Saison (#2015)
+* Kalender – „Fehlende Termine anlegen“ bis zur geplanten Zahl (#2015)
+* Nachgetragenes Datum sortiert einen offenen Termin richtig ein (#2015)
+* PineApps-Import teilt den Team-Platz bei gleicher Tagessumme im Double Up (#2015)
+* Saison-Feld „geplante Termine“ – Fortschritt „3 von 9“ und Streichergebnisse mit der geplanten Zahl (#2015)
+* Serienseite zeigt Double-Up-Regel und Team-Platz mit Punkten im Turniertag (#2015)
+* Terminliste versteht „offen“, „?“ und „tbd“ als Termin ohne Datum (#2015)
+
+### Fehlerbehebungen
+
+* Kalender am Handy – Knöpfe unter dem Termin statt über dem Status (#2015)
+
 ## 1.31.0 (22.10.2026)
 
 ### Neu
