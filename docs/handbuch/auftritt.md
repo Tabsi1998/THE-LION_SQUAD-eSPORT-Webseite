@@ -93,6 +93,8 @@ Events. Fotos, Banner, Profilbilder und die Galerie bleiben bei PNG, JPG und Web
 - **Tipp zum Export:** „SVG 1.1“ bzw. „Präsentationsattribute“ wählen und Schrift in Pfade umwandeln. Eingebettete
   Bilder, Filter (etwa Schatten) und Schriftdateien fallen beim Bereinigen weg.
 
+<img src="../assets/verwaltung/logo-feld-svg.png" alt="Logo-Feld mit SVG-Logo: Hinweis am besten SVG, darunter das Logo auf hellem und dunklem Grund" width="560">
+
 Raster-Bilder (PNG, JPG, WebP) dürfen bis zur Größe unter dem Feld haben; ein Logo als PNG mindestens 512 × 512 Pixel,
 damit es auf dem Handy scharf bleibt. Ein Bild könnt ihr neu hochladen oder aus den schon hochgeladenen Medien wählen
 (Verwaltung unter **Admin → Content → Medien**).
