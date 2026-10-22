@@ -200,7 +200,7 @@ def session_view(item: dict, sheet: dict | None, ctx: _Context, public: set, key
         # #1960: Termin ohne Wertung mit Grund und die Quelle des Startplatzes (umgekehrt: nur die ersten N).
         "no_score_reason": item.get("no_score_reason"), "no_score_note": item.get("no_score_note"),
         "grid_source": grid_source, "reverse_top": (config or {}).get("reverse_top") if reversed_grid else None,
-        "original": None,  # #1933: Original-Bild des Veranstalters
+        "originals": [],  # #1933: Original-Bilder des Veranstalters - setzt die Route (``reference_originals``)
     }
 
 

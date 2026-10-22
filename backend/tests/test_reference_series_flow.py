@@ -312,7 +312,8 @@ def test_the_development_reset_clears_every_series_collection():
     from services import personal_data
 
     series = {name for name in set(personal_data.PERSONAL) | personal_data.CLUB_CONTENT if name.startswith("reference_")}
-    assert len(series) == 9 and not sorted(series - set(RESET_COLLECTIONS))
+    # Zehn seit den Original-Bildern je Termin (#1933, ``reference_round_originals``).
+    assert len(series) == 10 and not sorted(series - set(RESET_COLLECTIONS))
 
 
 def test_series_changes_reach_public_pages_as_their_own_resource():

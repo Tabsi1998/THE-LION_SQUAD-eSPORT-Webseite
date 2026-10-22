@@ -78,6 +78,9 @@ gewertet sind.
   Adminprotokoll (``reference_result.save``) und rechnet die Stände neu, wenn das Blatt veröffentlicht ist oder war.
   Veröffentlichen setzt den Termin auf „gewertet“ (der Status davor bleibt in ``scored_from``), Zurücknehmen stellt ihn
   wieder her.
+- **Original-Bilder (#1933):** Wird das Blatt veröffentlicht (Speichern mit „published“ oder Freigeben), gehen die
+  Entwürfe der Original-Bilder dieses Termins mit hinaus (``reference_originals.release_round``, im Protokoll
+  ``released_originals``).
 - **Entwurf daneben:** Ist das Blatt veröffentlicht und die Person darf nicht veröffentlichen (``access.edit_target``
   = ``EDIT_PENDING_DRAFT``), wird die Änderung als ``pending_draft`` neben dem Blatt gespeichert
   (``reference_result.pending_draft``) - das veröffentlichte Blatt bleibt sichtbar und zählt weiter.
@@ -115,8 +118,8 @@ from database import get_db
 from match_rules import RESULT_MAX_SCORE
 from models import ReferencePointsSource, ReferenceResultMark, ReferenceResultStatus, _clock, new_id, now_utc
 from services import (
-    race_weekend, reference_running_cache, reference_series, series_adjustments, series_identity, series_results,
-    team_league_maps, tournament_days,
+    race_weekend, reference_originals, reference_running_cache, reference_series, series_adjustments, series_identity,
+    series_results, team_league_maps, tournament_days,
 )
 from services.dolibarr_policy import club_today
 from services.own_teams import Matcher, own_team_names, own_teams
@@ -816,12 +819,16 @@ async def save_results(series_id: str, round_id: str, body: ResultSave,
         elif existing:
             revision_id = await _revision(db, existing, kind="sheet", reason="save", access=access)
         was_published = (existing or {}).get("status") == "published"
+        # Original-Bilder (#1933): Entwürfe von Captains werden mit dem veröffentlichten Ergebnis freigegeben.
+        released = 0
+        if target != EDIT_PENDING_DRAFT and saved.get("status") == "published":
+            released = await reference_originals.release_round(db, series_id, round_id, access.user["id"])
         await _log(db, "reference_result.pending_draft" if target == EDIT_PENDING_DRAFT else "reference_result.save",
                    access, saved, {
                        "version": saved["version"], "previous_version": _version(existing),
                        "status": "draft" if target == EDIT_PENDING_DRAFT else status,
                        "previous_status": (existing or {}).get("status"), "revision_id": revision_id,
-                       **_counts(content), "created_participants": own})
+                       **_counts(content), "created_participants": own, "released_originals": released})
         recomputed = False
         if target != EDIT_PENDING_DRAFT:
             now_published = saved.get("status") == "published"
@@ -890,11 +897,14 @@ async def approve_results(series_id: str, round_id: str, body: ResultDecision,
         revision_id = await _revision(db, existing, kind="sheet", reason="approve", access=access)
         # Wen nur ersetzte Entwürfe angelegt haben, geht wie beim Verwerfen - wer im freigegebenen Blatt steht, bleibt.
         removed = await remove_unused_new(db, series_id, (pending or {}).get("created_participant_ids"))
+        # Original-Bilder (#1933): Entwürfe zum Termin gehen mit dem Ergebnis hinaus.
+        released = await reference_originals.release_round(db, series_id, round_id, access.user["id"])
         await _log(db, "reference_result.approve", access, saved, {
             "version": saved["version"], "previous_version": _version(existing),
             "previous_status": existing.get("status"), "from": "pending_draft" if pending else "draft",
             "drafted_by": drafted_by, "revision_id": revision_id, **_counts(content),
-            "removed_participants": [{"id": row["id"], "name": row.get("name")} for row in removed]})
+            "removed_participants": [{"id": row["id"], "name": row.get("name")} for row in removed],
+            "released_originals": released})
         await _sync_round(db, access, round_id, True)
         await _recompute(db, access)
     return {"version": saved["version"], "sheet": _sheet_view(saved, access), "recomputed": True,

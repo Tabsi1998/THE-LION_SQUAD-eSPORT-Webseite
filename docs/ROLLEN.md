@@ -242,6 +242,8 @@ je Saison Captains eintragen, die nur für diese eine Saison Ergebnisse und Scor
 | Ergebnisse eintragen (Entwurf, #1744) | ja | ja | nein |
 | Ergebnisse veröffentlichen | ja | nur wenn die Saison auf „Captain veröffentlicht direkt“ steht oder der Captain das Recht „Darf veröffentlichen“ hat | nein |
 | Entwurf eines Captains freigeben oder verwerfen (#1744) | ja | nein | nein |
+| Original-Bilder je Termin hochladen und einordnen (#1933) | ja | ja – als Entwurf, eigene Entwürfe einordnen; direkt freigegeben mit Recht zum Veröffentlichen | nein |
+| Original-Bild einzeln freigeben oder löschen (#1933, Löschen im Adminprotokoll) | ja | nein | nein |
 | Partner-Plattform einstellen, Turniertage holen und als Entwurf übernehmen (#1964) | ja | nein | nein |
 
 - **Zwei-Faktor ist Pflicht** – für den Vorstand wie für Captains (Entscheidung 7 des Obmanns). Ohne bestätigte

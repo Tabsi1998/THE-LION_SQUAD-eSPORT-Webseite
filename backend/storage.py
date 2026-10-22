@@ -21,6 +21,9 @@ QUARANTINE_DIR = UPLOAD_DIR / "quarantine"
 PROOF_DIR = UPLOAD_DIR / "proofs"
 # Eingesandte Galerie-Fotos (#1186): privat bis zur Freigabe, nur über /api/gallery/submissions/{id}/image.
 GALLERY_SUBMISSION_DIR = UPLOAD_DIR / "gallery-submissions"
+# Original-Bilder des Veranstalters je Termin (#1933): nur über /api/reference-series/…/originals - öffentlich nur, was
+# öffentlich, freigegeben und Teil eines veröffentlichten Termins einer sichtbaren Saison ist.
+REFERENCE_ORIGINAL_DIR = UPLOAD_DIR / "reference-originals"
 
 
 def ensure_directory(path: Path) -> Path:
@@ -29,5 +32,6 @@ def ensure_directory(path: Path) -> Path:
 
 
 def ensure_storage_directories() -> None:
-    for path in (UPLOAD_DIR, PUBLIC_UPLOAD_DIR, PRIVATE_DOC_DIR, PRIVATE_CHAT_DIR, APP_RELEASE_DIR, QUARANTINE_DIR, PROOF_DIR, GALLERY_SUBMISSION_DIR):
+    for path in (UPLOAD_DIR, PUBLIC_UPLOAD_DIR, PRIVATE_DOC_DIR, PRIVATE_CHAT_DIR, APP_RELEASE_DIR, QUARANTINE_DIR, PROOF_DIR,
+                 GALLERY_SUBMISSION_DIR, REFERENCE_ORIGINAL_DIR):
         ensure_directory(path)

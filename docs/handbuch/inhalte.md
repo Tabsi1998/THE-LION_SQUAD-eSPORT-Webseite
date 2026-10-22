@@ -892,6 +892,24 @@ einstellbar, nichts ist für eine Liga fest eingebaut:
 </tr>
 </table>
 
+**Original ansehen:** Hat ein Termin öffentliche Original-Bilder des Veranstalters (Ergebnisblatt → **Original-Bilder**),
+steht ein kleiner Knopf **Original ansehen** (mit Anzahl) im Rennkalender je Runde (alle Läufe zusammen, der Lauf steht
+vor der Art), im Kalender einer Turnierserie, in der Spieltag-Karte einer Team-Liga und auf der Ergebnisseite der Runde
+je Reiter. Er öffnet das **Vollbild**: wischen, die Pfeiltasten oder die Pfeile blättern, die Leiste unten zeigt alle
+Bilder, **Escape** oder **×** schließt. Ist eine Quelle eingetragen, führt **Quelle beim Veranstalter** dorthin.
+Öffentlich sind nur Bilder, die auf „Öffentlich“ stehen und freigegeben sind – und erst, wenn das Ergebnis des Termins
+veröffentlicht und die Saison sichtbar ist.
+
+<table>
+<tr>
+<td><img src="../assets/serien/serien-originale-vollbild.png" alt="Vollbild eines Original-Bilds: Qualifying der Runde 1 mit Zähler 1 von 4, Pfeilen und der Vorschauleiste" width="560"></td>
+<td rowspan="2"><img src="../assets/serien/serien-originale-vollbild-handy.png" alt="Vollbild am Handy mit der Tabelle des Veranstalters, Zähler 4 von 4 und Vorschauleiste" width="220"></td>
+</tr>
+<tr>
+<td><img src="../assets/serien/serien-originale-kalender.png" alt="Rennkalender: unter den Lauf-Chips der Runde der Knopf Original ansehen mit 4 Bildern" width="560"></td>
+</tr>
+</table>
+
 **Teamfarben:** In der Saison (Verwaltung → Saison, nur Rennliga, nur Vorstand) steht der Kasten **Teamfarben** mit allen
 Teams der Saison. Je Team eine Farbe wählen oder als `#rrggbb` eintragen, leer heißt neutral, dann **Teamfarben
 speichern**. Liest jemand ein Ergebnis-Bild aus, merkt sich die Saison die Schriftfarben als **Vorschlag** – ein Klick auf
@@ -1039,8 +1057,9 @@ einem gewerteten Termin **Ergebnis ändern**. Das öffnet das Blatt des Termins.
   Runde des Rennens. Ohne Kopfzeile gilt eine Zelle mit „:“ als Zeit und eine mit „+“ als Abstand. Zeilen wie
   `Schnellste Runde: Name 1:31.456` und `Fahrer des Tages: Name` füllen die Felder des Rennens.
 - **Bild auslesen** (Rennligen): den Ergebnis-Screenshot des Veranstalters mit **Strg+V** ins Blatt einfügen oder über
-  **Bild auslesen** wählen – am Handy geht auch die Kamera. Der eigene Server liest das Bild (kein fremder Dienst, das
-  Bild wird nicht gespeichert) und füllt die Liste: Platz, Startnummer, Name, Team, Punkte (falls im Bild), Startplatz,
+  **Bild auslesen** wählen – am Handy geht auch die Kamera. Der eigene Server liest das Bild (kein fremder Dienst; beim
+  Lesen wird nichts gespeichert – erst beim Übernehmen hängt das Bild als **Original-Bild** am Termin, siehe unten) und
+  füllt die Liste: Platz, Startnummer, Name, Team, Punkte (falls im Bild), Startplatz,
   Zeit, Abstand, DNF bzw. OUT und die Pole als Marke; dazu die **Schnellste Runde** und den **Fahrer des Tages** des
   Rennens. Die Vorschau prüft gleich. Darüber steht **Aus dem Bild gelesen** mit dem Bild zum Vergleichen (antippen
   vergrößert), Strecke, Art (Rennen oder Qualifying – nur als Hinweis), schnellster Rennrunde, Pole und Fahrer des
@@ -1083,6 +1102,28 @@ einem gewerteten Termin **Ergebnis ändern**. Das öffnet das Blatt des Termins.
   `1. Team 10 7 1 2 22` oder mit Kopfzeile (Platz, Team, Spiele, Siege, Unentschieden, Niederlagen, Ergebnis, Punkte –
   auch mit leerer Logo-Spalte). Sie bestimmt Teams und Plätze; passt ein Team aus den Spielen zu keiner ihrer Zeilen,
   weist die Prüfung darauf hin – dann die Schreibweise angleichen.
+- **Original-Bilder:** Unten im Blatt belegen Screenshots oder Fotos des Veranstalters das Ergebnis. **Bild
+  hinzufügen** (am Handy Kamera oder Galerie, mehrere auf einmal), ein Bild in den Kasten **ziehen** oder mit **Strg+V**
+  einfügen, solange der Kasten den Fokus hat (ohne Bild auslesen nimmt der Kasten Strg+V im ganzen Blatt). Je Bild:
+  **Art** (Qualifying, Sprint, Rennen, Scoreboard mit **Map**-Nummer, Tabelle, Sonstiges), optional die **Quelle beim
+  Veranstalter** (nur `https://…`) und **Öffentlich / Nur Verwaltung** (Vorgabe öffentlich). Darunter steht, ob das
+  Bild öffentlich zu sehen ist – oder warum nicht: nur Verwaltung, Entwurf, Ergebnis noch nicht veröffentlicht, Termin
+  archiviert oder ein **ausgeblendeter Name** (das Bild zeigte ihn sonst doch): beim Ergebnis eines Laufs zählt sein
+  Blatt, bei **Tabelle**, **Scoreboard** und **Sonstiges** die ganze Saison – sie bleiben intern, sobald in der Saison ein
+  Name ausgeblendet ist. Gespeichert wird ohne
+  Ortsangaben und Kameradaten. Ein Bild aus **Bild auslesen** steht oben mit „wird beim Übernehmen … angehängt“: erst
+  beim Speichern des Ergebnisses kommt es dazu (Art nach dem Lauf, änderbar); **Nicht anhängen** lässt es weg.
+  **Captains** dürfen Bilder beitragen – sie sind Entwürfe und gehen mit dem Ergebnis hinaus, wenn es veröffentlicht oder
+  freigegeben wird; ein Captain ändert nur eigene Entwürfe. Der **Vorstand** gibt einen Entwurf auch einzeln frei
+  (**Freigeben**) und **löscht** nach Rückfrage (steht im Adminprotokoll). Ein verschobener Termin behält seine Bilder,
+  Archivieren löscht keines. Die **Mediathek** zählt die Bilder unter den Kennzahlen mit.
+
+<table>
+<tr>
+<td><img src="../assets/serien/serien-originale-ergebnisblatt.png" alt="Ergebnisblatt: Kasten Original-Bilder mit einem gelesenen Bild, das beim Übernehmen angehängt wird, und drei Bildern mit Art, Map, Quelle und Öffentlich oder Nur Verwaltung" width="460"></td>
+<td><img src="../assets/serien/serien-originale-ergebnisblatt-handy.png" alt="Dasselbe am Handy" width="220"></td>
+</tr>
+</table>
 
 <table>
 <tr>
@@ -1155,6 +1196,9 @@ aktuellen Stand, eure Eingaben bleiben stehen, und die Vorschau prüft neu. Jede
 | „Texterkennung gerade nicht verfügbar“ | Dem Server fehlt Tesseract (altes Image) | Server mit `update.sh` aktualisieren; bis dahin **Liste einfügen** |
 | Viele Zeilen gelb | Bild unscharf, klein oder abfotografiert | Screenshot statt Foto, ganzes Ergebnis ohne Zoom; sonst gelbe Felder nach dem Bild korrigieren |
 | „Das Bild sieht nicht nach einem Rennergebnis aus“ | Eingefügt wurde die Saisontabelle oder der Kalender (keine Zeiten) | Das Ergebnis dieses Termins einfügen |
+| Original-Bild öffentlich nicht zu sehen | Nur Verwaltung, Entwurf, Ergebnis nicht veröffentlicht oder ein Name im Ergebnis ausgeblendet | Im Ergebnisblatt unter **Original-Bilder** steht der Grund – umstellen, **Freigeben** oder Ergebnis veröffentlichen |
+| Captain-Bild bleibt Entwurf | Das Ergebnis war schon veröffentlicht, das Bild kam danach | Vorstand: im Blatt beim Bild **Freigeben** |
+| Gelesenes Bild fehlt bei den Originalen | **Nicht anhängen** gewählt oder das Anhängen scheiterte (Meldung nach dem Speichern) | Unter **Original-Bilder** neu hinzufügen |
 
 ---
 

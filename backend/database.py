@@ -162,6 +162,10 @@ async def init_indexes():
     await db.reference_round_result_revisions.create_index("id", unique=True)
     await db.reference_round_result_revisions.create_index([("result_id", 1), ("version", -1)])
     await db.reference_round_result_revisions.create_index("series_id")
+    # Original-Bilder je Termin (#1933): je Termin für Blatt und Serienseite, je Saison die öffentlichen.
+    await db.reference_round_originals.create_index("id", unique=True)
+    await db.reference_round_originals.create_index([("round_id", 1), ("created_at", 1)])
+    await db.reference_round_originals.create_index([("series_id", 1), ("public", 1), ("state", 1)])
     await db.reference_standings.create_index([("series_id", 1), ("round_id", 1), ("scope", 1)], unique=True)
     await db.reference_standings.create_index([("series_id", 1), ("scope", 1), ("round_seq", -1)])
     await db.reference_aliases.create_index("id", unique=True)

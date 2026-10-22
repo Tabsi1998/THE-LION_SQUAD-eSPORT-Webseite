@@ -45,8 +45,8 @@ Anzeige in der Ergebnistabelle der Runde, es ändert keine Punkte.
 **Ergebnistabelle je Runde (#1950):** `GET /api/reference-series/public/<spur>/<saison>/rounds/<nr>` (nur Rennliga,
 Sichtbarkeit wie die Serienseite, `routes/reference_round_page_routes.py`, Aufbau in `services/round_page.py`) liefert
 `round` (Nummer, Gesamtzahl, Kürzel, Ort, Land, Tag), `previous`/`next`, `sessions` (je Lauf `key` für `?lauf=`,
-`label`, `kind`, `state`, `columns` – nur Spalten mit Werten –, `rows`, `pole`, `best_club`, `original` = Platz für
-#1933), `main` (Hauptrennen), `summary` (`winner`, `pole`, `fastest_lap`, `driver_of_the_day` als Kennung) und
+`label`, `kind`, `state`, `columns` – nur Spalten mit Werten –, `rows`, `pole`, `best_club`, `originals` – die
+öffentlichen Original-Bilder des Laufs, #1933), `main` (Hauptrennen), `summary` (`winner`, `pole`, `fastest_lap`, `driver_of_the_day` als Kennung) und
 `club_drivers` (wer außerhalb der Tabelle mit Namen stehen darf). Eine Zeile: `key`, `place`, `status`
 (`finished`/`dnf`/`dns`/`dsq`), Name nach den Regeln der Serienseite (ausgeblendet ohne Startnummer), `team`,
 `team_color`, `own`, `grid` (aus dem Blatt, sonst wie gerechnet aus Qualifying bzw. umgekehrter Wertung), `gained`,
@@ -394,7 +394,36 @@ Dienst) und landet als Zeilen im Blatt – gespeichert wird beim Lesen nichts, a
   Zwischendatei) und geht über stdin an Tesseract (ohne Shell, leere Umgebung, Zeitlimit je Aufruf und Zeitbudget je
   Bild - danach bleibt der Rest ungeprüft und gelb, `Reading.unchecked`); Rate-Limit je Konto, je Konto ein Bild zur
   Zeit, dekodiert wird erst mit freiem Platz (`_gate`); Meldungen sind feste Texte. Einstellungen in [Betrieb](../BETRIEB.md). Für das Original am Termin (#1933)
-  liefert `result_image_ocr.encode_original(opened)` das neu kodierte Bild (gedreht, ohne EXIF) - gespeichert wird es
-  erst dort.
+  liefert `result_image_ocr.encode_original(opened)` das neu kodierte Bild (gedreht, WebP, ohne EXIF) - gespeichert
+  wird es erst dort (`services/reference_originals.py`).
 - **Tests:** synthetische Screenshots mit erfundenen Namen (`backend/tests/result_image_fixture.py`). Ohne Tesseract
   werden die Lese-Tests übersprungen; die CI installiert es und setzt `REQUIRE_TESSERACT=1`.
+
+## Original-Bilder je Termin (#1933)
+
+Screenshots oder Fotos des Veranstalters als Beleg, je Termin bzw. Lauf mehrere (`reference_round_originals`, Regeln
+in `services/reference_originals.py`, Routen in `routes/reference_original_routes.py`).
+
+- **Verwaltung** unter `/api/reference-series/admin/series/<id>/rounds/<termin>/originals` (Vorstand und Captains der
+  Saison, wie das Blatt): `GET` – `items` mit `kind` (`qualifying`, `sprint`, `race`, `scoreboard` mit `map` 1–15,
+  `table`, `other`), `source_url` (nur `https`), `public` (Vorgabe wahr), `state` (`draft`/`released`), `origin`
+  (`upload`/`reading`), `shown` und `hidden_reason` (`admin_only`, `draft`, `archived`, `not_published`,
+  `hidden_name`), dazu `max_mb`, `max_per_round`, `default_kind`, `can_delete`. `POST ?kind=&map=&origin=` – Body ist
+  das Bild selbst; geprüft wird der Inhalt (wie beim Lesen, `result_image_ocr.open_image`), gespeichert als WebP ohne
+  EXIF mit Vorschaubildern (`image_variants`). `PATCH …/<bild>` – `{kind?, map?, source_url?, public?, release?}`;
+  ein Captain nur eigene Entwürfe, freigeben nur der Vorstand. `DELETE …/<bild>` – nur der Vorstand, Protokoll
+  `reference_original.delete`. `GET …/<bild>/file?w=` – das Bild bzw. ein Vorschaubild, nie zwischengespeichert.
+- **Freigabe:** Vorstand und Captains mit Recht zum Veröffentlichen laden freigegeben hoch, andere Captains als
+  Entwurf. Veröffentlichen bzw. Freigeben des Blatts gibt die Entwürfe des Termins mit frei (`release_round`,
+  `released_originals` im Protokoll).
+- **Öffentlich:** Die Serienseite trägt `originals` (Termin → Bilder mit `id`, `kind`, `map`, `source_url`, `width`,
+  `height`, `url`), die Rundenseite je Lauf `originals`. Ein Bild ist öffentlich, wenn es öffentlich und freigegeben
+  ist, sein Termin im Kalender steht (nicht archiviert), sein Blatt veröffentlicht ist und kein ausgeblendeter Name
+  darauf stehen kann – bei `qualifying`, `sprint` und `race` zählt das Blatt des Termins, bei `table`, `scoreboard` und
+  `other` (`SEASON_WIDE_KINDS`) die ganze Saison; `GET /api/reference-series/public/<spur>/<saison>/originals/<bild>?w=`
+  liefert es nur dann (sonst 404), mit `Cache-Control: private, max-age=300`.
+- **Bild-Erkennung:** Lesen speichert nichts. Das Ergebnisblatt merkt sich die gelesene Datei und lädt sie nach dem
+  Übernehmen (`PUT …/results`) mit `origin=reading` hoch – „Nicht anhängen“ lässt sie weg.
+- **Bleibt:** Die Bilder hängen an der Kennung des Termins (Verschieben nimmt sie mit), Archivieren löscht nichts.
+- **Zählen:** `GET /api/admin/media/audit` → `reference_originals: {count, bytes}` aus der Datenbank; das
+  Upload-Inventar zeigt den Ordner `reference-originals` als eigenen Bereich.

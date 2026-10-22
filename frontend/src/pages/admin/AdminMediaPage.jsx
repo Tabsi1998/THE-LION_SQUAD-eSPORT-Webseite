@@ -386,6 +386,12 @@ export default function AdminMediaPage() {
           ))}
         </div>
       )}
+      {/* Original-Bilder der Serien (#1933): privat abgelegt, gepflegt im Ergebnisblatt des Termins - hier nur gezählt. */}
+      {mediaAudit?.reference_originals?.count > 0 && (
+        <p className="mt-2 text-xs text-white/50 tabular-nums" data-testid="media-reference-originals">
+          Dazu privat: {mediaAudit.reference_originals.count} Original-Bilder der Serien · {fmtBytes(mediaAudit.reference_originals.bytes)} – sie stehen im Ergebnisblatt ihres Termins, nicht in dieser Liste.
+        </p>
+      )}
 
       {mediaAudit?.by_scope && (
         <details className="mt-4 border border-white/10 bg-[#0A0A0A] rounded-sm p-4 group">

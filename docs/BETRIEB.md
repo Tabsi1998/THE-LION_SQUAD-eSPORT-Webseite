@@ -203,7 +203,8 @@ Keine aggressive Cache-Regel auf `/api/uploads/*`.
 
 Im Ergebnis-Blatt einer Serie liest „Bild auslesen“ (oder Strg+V) einen Screenshot des Veranstalters. Gelesen wird
 **im Backend-Container** mit Tesseract (Englisch und Deutsch, feste Versionen im `backend/Dockerfile`) – ohne externen
-Dienst. Das Bild bleibt im Speicher und wird nicht gespeichert; Tesseract bekommt es über stdin, ohne Shell, mit leerer
+Dienst. Das Bild bleibt beim Lesen im Speicher und wird nicht gespeichert; erst beim Übernehmen des Blatts hängt die
+Oberfläche es als Original-Bild an (siehe unten). Tesseract bekommt es über stdin, ohne Shell, mit leerer
 Umgebung und Zeitlimit. Grenzen wie bei jedem Bild-Upload (`MAX_IMAGE_UPLOAD_MB`, `MAX_IMAGE_PIXELS`), dazu:
 
 ```env
@@ -219,6 +220,21 @@ Datei). Reicht das Zeitbudget nicht für die ganze Seite, kommt eine feste Meldu
 
 Fehlt Tesseract (etwa ein altes Image), sagt das Blatt „Texterkennung gerade nicht verfügbar“ – Einfügen und Abtippen
 gehen weiter. Prüfen: `docker compose exec backend tesseract --list-langs` (muss `deu` und `eng` nennen).
+
+## Original-Bilder je Termin (#1933)
+
+Screenshots des Veranstalters als Beleg eines Ergebnisses liegen **privat** unter `uploads/reference-originals/` (mit
+Vorschaubildern in `variants/`), neu kodiert als WebP ohne EXIF und Ort. Ausgeliefert wird nur über die API: öffentlich,
+wenn das Bild öffentlich und freigegeben ist, sein Ergebnis veröffentlicht ist und die Saison sichtbar ist. Die Dateien
+gehören zur Sicherung wie der übrige Upload-Ordner; das Upload-Inventar (`scripts/uploads-inventory.py`) zeigt sie als
+eigenen Bereich, die Mediathek zählt sie. Grenzen (Größe wie jeder Bild-Upload, `MAX_IMAGE_UPLOAD_MB`) und:
+
+```env
+REFERENCE_ORIGINAL_MAX_PER_ROUND=24        # Bilder je Termin
+REFERENCE_ORIGINAL_RATE_LIMIT=60           # Hochladen je Konto …
+REFERENCE_ORIGINAL_RATE_WINDOW_SECONDS=600 # … in diesem Zeitfenster
+REFERENCE_ORIGINAL_CONCURRENCY=2           # gleichzeitig neu kodierte Bilder (CPU)
+```
 
 ## Suchmaschinen und Search Console
 

@@ -153,18 +153,18 @@ def open_image(data: bytes) -> Opened:
     return Opened(image=img, format=detected)
 
 
+ORIGINAL_QUALITY = 90  # WebP: Schrift in Screenshots bleibt scharf
+
+
 def encode_original(opened: Opened) -> tuple[bytes, str]:
-    """Das geöffnete Bild neu kodiert - gedreht nach EXIF, ohne EXIF und andere Metadaten, im Format der Vorlage (JPEG
-    bleibt JPEG, sonst PNG bzw. WebP), höchstens ``MAX_IMAGE_DIMENSION`` lang. Liefert ``(Bytes, Medientyp)``, ohne Bild
-    ``(b"", "")``. Gespeichert wird hier nichts - das Original am Termin kommt mit #1933."""
+    """Das geöffnete Bild neu kodiert - gedreht nach EXIF, ohne EXIF, Ort und andere Metadaten, immer als WebP,
+    höchstens ``MAX_IMAGE_DIMENSION`` lang. Liefert ``(Bytes, Medientyp)``, ohne Bild ``(b"", "")``. Gespeichert wird
+    hier nichts - das Original am Termin (#1933) legt ``services/reference_originals.py`` ab."""
     if opened.image is None:
         return b"", ""
-    fmt = opened.format if opened.format in ("JPEG", "WEBP") else "PNG"
-    options = {"JPEG": {"quality": 88, "optimize": True}, "WEBP": {"quality": 88, "method": 6},
-               "PNG": {"optimize": True}}[fmt]
     buffer = io.BytesIO()
-    opened.image.save(buffer, format=fmt, **options)
-    return buffer.getvalue(), PIL_IMAGE_FORMATS[fmt][0]
+    opened.image.save(buffer, format="WEBP", quality=ORIGINAL_QUALITY, method=6)
+    return buffer.getvalue(), PIL_IMAGE_FORMATS["WEBP"][0]
 
 
 # ---------------------------------------------------------------- Vorbereiten

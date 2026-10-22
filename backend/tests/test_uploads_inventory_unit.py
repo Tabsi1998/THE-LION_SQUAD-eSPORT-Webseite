@@ -84,3 +84,20 @@ async def test_inventory_tells_used_registered_variant_and_orphan_files_apart(fl
     assert "## Verwaist: 3 Dateien" in text and "`public/niemand.webp`" in text
     assert "Altlast: direkt unter uploads/" in text and "Profile (Avatar, Banner)" in text
     assert "`fehlt.webp` | news_posts" in text and "Nur gelesen, nichts geändert" in text
+
+
+@pytest.mark.asyncio
+async def test_originals_of_series_count_in_their_own_area_with_their_previews(flow, tmp_path):
+    """Original-Bilder der Serien (#1933): eigener privater Bereich; ihre Vorschaubilder sind keine Waisen."""
+    root = tmp_path / "uploads"
+    touch(root / "reference-originals" / "abc.webp", 600)
+    touch(root / "reference-originals" / "variants" / "abc-400.webp", 60)
+    await flow.db.reference_round_originals.insert_one({"id": "o1", "storage_key": "abc.webp", "size": 600})
+
+    report = await uploads_inventory.inventory(flow.db, root, sample=10)
+    state = {row["path"]: row["state"] for row in report["files"]}
+    assert state["reference-originals/abc.webp"] == "referenced"
+    assert state["reference-originals/variants/abc-400.webp"] == "variant"
+    assert report["by_area"]["reference-originals"] == {"count": 2, "bytes": 660}
+    text = uploads_inventory.render_markdown(report)
+    assert "Original-Bilder der Serien (privat" in text and "Original-Bilder der Serien (`reference_round_originals`)" in text

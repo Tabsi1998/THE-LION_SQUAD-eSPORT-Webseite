@@ -233,7 +233,7 @@ export function RacingLeague({ data }) {
       )}
 
       <SeriesFinal final={data.final} />
-      <RacingCalendar rounds={rounds} rows={rows} onSelect={jumpTo} publicKeys={publicKeys} hrefFor={sessionHref} roundHref={roundHref} />
+      <RacingCalendar rounds={rounds} rows={rows} onSelect={jumpTo} publicKeys={publicKeys} hrefFor={sessionHref} roundHref={roundHref} originals={data.originals} />
       </>)}
       </div>
     </>

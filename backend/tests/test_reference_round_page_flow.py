@@ -156,7 +156,7 @@ async def test_a_round_shows_qualifying_and_race_like_the_organizer(flow):
     # Mit Namen außerhalb der Tabelle nur öffentliche Vereinsfahrer.
     assert page["club_drivers"] == [people[_name(1)]]
     assert race["best_club"] == people[_name(1)] and quali["best_club"] == people[_name(1)]
-    assert race["original"] is None
+    assert race["originals"] == [] and quali["originals"] == []
 
 
 @pytest.mark.asyncio

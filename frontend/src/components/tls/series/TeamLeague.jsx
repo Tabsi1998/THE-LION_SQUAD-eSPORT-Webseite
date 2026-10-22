@@ -15,6 +15,8 @@ import { statFigures, vetoLabel } from "@/lib/teamLeagueMaps";
 import { LazyImg } from "@/components/tls/LazyImg";
 import { MapCard } from "@/components/tls/maps/MapPoolView";
 import { Map as MapIcon } from "lucide-react";
+import { OriginalsButton } from "@/components/tls/series/OriginalViewer";
+import { originalsOf } from "@/lib/referenceOriginals";
 import "./referenceSeries.css";
 import "./teamLeague.css";
 
@@ -338,8 +340,10 @@ function OwnMatch({ round, match, showTeam, withScore }) {
 
 // Ein Spieltag als Karte (#1931). `showTeam`: mehrere eigene Teams in der Saison (#1926) - dann steht vor dem Gegner,
 // welches eigene Team gespielt hat; spielen mehrere am selben Spieltag, stehen alle ihre Spiele in der Karte.
-function MatchdayCard({ day, index, showTeam }) {
+function MatchdayCard({ day, index, showTeam, originals }) {
   const { round, match, others } = day;
+  // Original-Bilder des Veranstalters (#1933): Scoreboards je Map, Tabelle - am Ende der Karte.
+  const pictures = originalsOf(originals, [round]);
   const matches = day.matches?.length ? day.matches : match ? [match] : [];
   const single = matches.length <= 1;
   return (
@@ -362,11 +366,13 @@ function MatchdayCard({ day, index, showTeam }) {
         <OwnMatch key={`${item.team || "team"}-${position}`} round={round} match={item} showTeam={showTeam} withScore={!single} />
       )) : <OwnMatch round={round} match={null} showTeam={showTeam} withScore={false} />}
       <OtherMatches others={others} />
+      <OriginalsButton items={pictures} title={[roundLabel(round), match?.opponent || round.opponent ? `gegen ${match?.opponent || round.opponent}` : ""].filter(Boolean).join(" · ")}
+        className="mt-3" testId="team-league-originals" />
     </li>
   );
 }
 
-function Schedule({ matchdays, showTeam = false }) {
+function Schedule({ matchdays, showTeam = false, originals = null }) {
   return (
     <section className="mt-12" aria-labelledby="team-league-schedule" data-testid="team-league-schedule">
       <SectionTitle id="team-league-schedule">Spielplan</SectionTitle>
@@ -374,7 +380,7 @@ function Schedule({ matchdays, showTeam = false }) {
         <p className="mt-3 text-sm text-white/55">Noch keine Spieltage.</p>
       ) : (
         <ol className="mt-4 grid gap-3 sm:grid-cols-2">
-          {matchdays.map((day, index) => <MatchdayCard key={day.round.id} day={day} index={index} showTeam={showTeam} />)}
+          {matchdays.map((day, index) => <MatchdayCard key={day.round.id} day={day} index={index} showTeam={showTeam} originals={originals} />)}
         </ol>
       )}
     </section>
@@ -517,7 +523,7 @@ export function TeamLeagueSections({ data }) {
       <MatchdayProgress matchdays={matchdays} />
       <Record record={league.record} />
       <LeagueTable league={league} rounds={rounds} />
-      <Schedule matchdays={matchdays} showTeam={(league.own_teams || []).length > 1} />
+      <Schedule matchdays={matchdays} showTeam={(league.own_teams || []).length > 1} originals={data.originals} />
       <MapStats stats={league.map_stats} />
       <Lineup lineup={league.lineup} rounds={rounds} ownTeams={league.own_teams || []} />
       <LeaguePath path={league.path} lineageSlug={data.lineage?.slug} tierOrder={data.lineage?.tier_order} />
