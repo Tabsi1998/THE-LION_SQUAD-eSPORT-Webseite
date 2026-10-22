@@ -16,7 +16,7 @@ import { LeagueTable, Matchdays, SeasonMaps, Squad } from "../../components/refe
 import { TournamentDays } from "../../components/references/season/TournamentDays";
 import { MapPoolView } from "../../components/references/MapCards";
 import { poolGroups } from "../../lib/teamLeague";
-import { SeasonNotice, SeriesPartners } from "../../components/references/seriesParts";
+import { SeasonNotice, SeriesDataSource, SeriesPartners } from "../../components/references/seriesParts";
 import { Screen } from "../../components/Screen";
 import { Body, Muted } from "../../components/Text";
 import { api } from "../../lib/api";
@@ -135,6 +135,8 @@ export function ReferenceSeasonScreen({ navigation, route }: Props) {
             </View>
           ) : null}
           <SeasonNotice series={page.series} successor={page.successor} onOpenSuccessor={openSeason} style={styles.notice} />
+          {/* „Daten von …“ (#1964): die Plattform des Partners, von der die Turniertage kommen. */}
+          <SeriesDataSource source={page.data_source} />
         </FadeIn>
 
         {/* Bis vier Reiter teilen sich die Breite; mehr werden wischbar, mit Verlauf am Rand und Snap (#1969). */}

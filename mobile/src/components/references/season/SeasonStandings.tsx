@@ -149,7 +149,7 @@ function TableRows({ rows, idPrefix, page, playKey }: { rows: TableLine[]; idPre
           key={row.key}
           style={[styles.tableRow, row.club && styles.tableRowClub]}
           accessible
-          accessibilityLabel={[`Platz ${row.pos}`, row.name, row.team, `${row.points} Punkte`, row.bonus ? `davon ${row.bonus} Sonderbonus` : "", row.club ? "Verein" : ""].filter(Boolean).join(", ")}
+          accessibilityLabel={[`Platz ${row.pos}`, row.name, row.team, `${row.points} Punkte`, row.bonus ? `davon ${row.bonus} Sonderbonus` : "", ...row.driverMarks.map((mark) => mark.title), row.club ? "Verein" : ""].filter(Boolean).join(", ")}
           testID={`${idPrefix}-${row.key}`}
         >
           <Body style={styles.pos}>{row.pos}</Body>
@@ -163,6 +163,10 @@ function TableRows({ rows, idPrefix, page, playKey }: { rows: TableLine[]; idPre
               <CountUp value={row.points} playKey={playKey} delay={countDelay(index)} play={countsUp(index)} style={styles.points} />
             </View>
             {row.bonus ? <Muted style={styles.bonus} testID="season-table-bonus">{`${row.bonus} Boni`}</Muted> : null}
+            {/* Fahrer-Anpassungen, die fürs Team zählen (#2000): „−5 (Anna Probe)“ klein unter der Teamsumme. */}
+            {row.driverMarks.map((mark) => (
+              <Muted key={mark.key} style={[styles.driverMark, { color: mark.negative ? "#FCA5A5" : "#6EE7B7" }]} testID="season-table-driver-adjustment">{mark.text}</Muted>
+            ))}
           </View>
         </View>
       ))}
@@ -205,6 +209,7 @@ const styles = StyleSheet.create({
   pointsLine: { alignItems: "baseline", flexDirection: "row", gap: 6 },
   points: { color: ink.text, fontSize: 17, fontVariant: ["tabular-nums"], fontWeight: "800", textAlign: "right" },
   bonus: { color: "#FFD700", fontSize: 11, fontVariant: ["tabular-nums"] },
+  driverMark: { fontSize: 11, fontVariant: ["tabular-nums"], fontWeight: "700", textAlign: "right" },
   more: { alignSelf: "flex-start" },
   adjustments: { borderTopColor: ink.line, borderTopWidth: 1, gap: 4, paddingTop: 10 },
   adjustment: { flexDirection: "row", gap: 8 },

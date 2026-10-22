@@ -6,13 +6,16 @@ import { Button } from "../../components/Button";
 import { FadeIn, staggerDelay } from "../../components/FadeIn";
 import { ErrorState, SkeletonList, loadProblem, type LoadProblem } from "../../components/ListState";
 import { CountryFlag } from "../../components/references/CountryFlag";
+import { OriginalsButton } from "../../components/references/OriginalViewer";
 import { ink, medalTone } from "../../components/references/parts";
 import { NoScoreNote, SeasonNotice } from "../../components/references/seriesParts";
 import { CountUp, Glow } from "../../components/motion";
 import { Screen } from "../../components/Screen";
+import { FadeScroll } from "../../components/SwipeTabs";
 import { Body, Muted } from "../../components/Text";
 import { api } from "../../lib/api";
 import { gridWords } from "../../lib/raceWeekend";
+import { cleanOriginals } from "../../lib/referenceOriginals";
 import { COUNT_UP_MS, countDelay, countsUp } from "../../lib/countUp";
 import {
   emptyText,
@@ -165,7 +168,8 @@ export function ReferenceRoundScreen({ navigation, route }: Props) {
         ) : null}
 
         {sessions.length > 1 ? (
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabs} style={styles.tabBar} accessibilityRole="tablist" accessibilityLabel="Läufe dieser Runde" testID="round-tabs">
+          // Laufen die Reiter über (viele Läufe, große Schrift), blendet der Rand weich aus, an dem es weitergeht (#1969).
+          <FadeScroll contentContainerStyle={styles.tabs} style={styles.tabBar} accessibilityRole="tablist" accessibilityLabel="Läufe dieser Runde" testID="round-tabs">
             {sessions.map((item) => {
               const on = item.key === session?.key;
               return (
@@ -183,12 +187,12 @@ export function ReferenceRoundScreen({ navigation, route }: Props) {
                 </Pressable>
               );
             })}
-          </ScrollView>
+          </FadeScroll>
         ) : null}
 
         {/* Der Lauf blendet bei jedem Reiterwechsel neu ein - seine Zeiten zählen dann neu hoch. */}
         <FadeIn key={playKey} trigger={playKey} style={styles.body}>
-          <SessionPanel session={session} playKey={playKey} />
+          <SessionPanel session={session} playKey={playKey} title={[heading, session?.label].filter(Boolean).join(" · ")} />
           {ownTeams.length && hasOwn ? <Muted style={styles.footnote} testID="round-own-teams">{`Vereinsteams hervorgehoben: ${ownTeams.join(", ")}`}</Muted> : null}
         </FadeIn>
         {webButton}
@@ -235,10 +239,12 @@ function FactCard({ card, playKey }: { card: SummaryCard; playKey: string }) {
   );
 }
 
-function SessionPanel({ session, playKey }: { session: RoundSession | null; playKey: string }) {
+function SessionPanel({ session, playKey, title }: { session: RoundSession | null; playKey: string; title: string }) {
   const grid = gridWords(session?.grid_source, session?.reverse_top);
   const rows = (session?.rows || []).filter((row) => row?.key);
   const shows = sessionShows(session);
+  // Original-Bilder des Veranstalters zu diesem Lauf (#1933) - ohne Bilder (oder bei einem älteren Server) kein Knopf.
+  const originals = cleanOriginals(session?.originals);
   return (
     <View testID="round-panel">
       {session && (grid || session.no_score_reason) ? (
@@ -254,6 +260,7 @@ function SessionPanel({ session, playKey }: { session: RoundSession | null; play
       ) : (
         <Muted style={styles.empty} testID="round-empty">{emptyText(session)}</Muted>
       )}
+      <OriginalsButton items={originals} title={title} style={styles.originals} testID="round-original" />
     </View>
   );
 }
@@ -365,6 +372,7 @@ const styles = StyleSheet.create({
   mainOut: { color: ink.muted, fontSize: 13 },
   sub: { color: ink.quiet, fontSize: 12, fontVariant: ["tabular-nums"], textAlign: "right" },
   footnote: { color: ink.quiet, fontSize: 12, paddingTop: 12 },
+  originals: { marginTop: 12 },
   web: { marginHorizontal: 16, marginTop: 12 },
   pressed: { opacity: 0.72 },
 });

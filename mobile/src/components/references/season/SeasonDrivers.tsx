@@ -30,7 +30,11 @@ export function SeasonDrivers({ page }: { page: SeasonPage }) {
                 {card.adjustments.map((item) => (
                   <View key={item.key} style={styles.adjustment}>
                     <Body style={[styles.adjustmentPoints, { color: item.negative ? "#FCA5A5" : "#6EE7B7" }]}>{item.points}</Body>
-                    <Muted style={styles.adjustmentText}>{item.text}</Muted>
+                    <View style={styles.adjustmentBody}>
+                      <Muted style={styles.adjustmentText}>{item.text}</Muted>
+                      {/* #2000: zählt auch fürs Team - für welches bzw. warum für keines. */}
+                      {item.team ? <Muted style={styles.adjustmentTeam} testID="season-driver-adjustment-team">{item.team}</Muted> : null}
+                    </View>
                   </View>
                 ))}
               </View>
@@ -55,5 +59,7 @@ const styles = StyleSheet.create({
   adjustments: { borderTopColor: ink.line, borderTopWidth: 1, gap: 3, marginTop: 4, paddingTop: 8 },
   adjustment: { flexDirection: "row", gap: 8 },
   adjustmentPoints: { fontSize: 13, fontVariant: ["tabular-nums"], fontWeight: "800", minWidth: 28 },
-  adjustmentText: { color: ink.second, flex: 1, fontSize: 13 },
+  adjustmentBody: { flex: 1, minWidth: 0 },
+  adjustmentText: { color: ink.second, fontSize: 13 },
+  adjustmentTeam: { color: ink.quiet, fontSize: 12 },
 });

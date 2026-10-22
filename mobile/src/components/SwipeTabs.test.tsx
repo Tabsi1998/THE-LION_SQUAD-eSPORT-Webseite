@@ -1,6 +1,7 @@
 import React from "react";
+import { Text } from "react-native";
 import { fireEvent, render, screen } from "@testing-library/react-native";
-import { SwipeTabs, swipeEdges, swipeTabWidth } from "./SwipeTabs";
+import { FadeScroll, SwipeTabs, swipeEdges, swipeTabWidth } from "./SwipeTabs";
 
 // Wischbare Reiter (#1969): bis vier teilen sich die Breite, mehr werden wischbar - Snap je Reiter, keine sichtbare
 // Leiste, Verlauf am Rand, an dem es weitergeht.
@@ -47,4 +48,30 @@ test("sechs Reiter: wischbar mit Snap, ohne sichtbare Leiste, Verlauf rechts - T
   expect(screen.queryByTestId("swipe-fade-end")).toBeNull();
   await fireEvent.press(screen.getByRole("tab", { name: "Maps" }));
   expect(onChange).toHaveBeenCalledWith("maps");
+});
+
+// Eigene Leisten mit unterschiedlich breiten Reitern (Läufe einer Runde, Strecken der Fast Lap): Verlauf nur, wenn sie
+// überlaufen - rechts, solange noch etwas folgt, links nach dem Wischen.
+test("FadeScroll: passt alles hinein, kein Verlauf - läuft es über, Verlauf am Rand, an dem es weitergeht", async () => {
+  await render(
+    <FadeScroll accessibilityRole="tablist" accessibilityLabel="Strecken" testID="leiste">
+      <Text>Spa</Text>
+      <Text>Monza</Text>
+    </FadeScroll>,
+  );
+  const scroll = screen.getByTestId("leiste-scroll");
+  expect(scroll.props.horizontal).toBe(true);
+  expect(scroll.props.showsHorizontalScrollIndicator).toBe(false);
+  expect(screen.getByTestId("leiste").props.accessibilityRole).toBe("tablist");
+  await fireEvent(scroll, "layout", { nativeEvent: { layout: { width: 358, height: 48, x: 0, y: 0 } } });
+  await fireEvent(scroll, "contentSizeChange", 300, 48);
+  expect(screen.queryByTestId("swipe-fade-end")).toBeNull();
+  expect(screen.queryByTestId("swipe-fade-start")).toBeNull();
+
+  await fireEvent(scroll, "contentSizeChange", 620, 48);
+  expect(screen.getByTestId("swipe-fade-end")).toBeTruthy();
+  expect(screen.queryByTestId("swipe-fade-start")).toBeNull();
+  await fireEvent(scroll, "scroll", { nativeEvent: { contentOffset: { x: 262, y: 0 }, layoutMeasurement: { width: 358, height: 48 }, contentSize: { width: 620, height: 48 } } });
+  expect(screen.getByTestId("swipe-fade-start")).toBeTruthy();
+  expect(screen.queryByTestId("swipe-fade-end")).toBeNull();
 });

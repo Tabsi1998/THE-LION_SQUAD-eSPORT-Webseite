@@ -4,6 +4,7 @@ import { Linking, Pressable, StyleSheet, View, type StyleProp, type ViewStyle } 
 import { chipLabel, chipWhen, type WeekendRound } from "../../lib/raceWeekend";
 import { PUBLIC_STATE_LABELS, stateTone, type StateTone } from "../../lib/referenceSeason";
 import { adjustmentMark, adjustmentSum, adjustmentTitle, cancelledText, noScoreText, successorLink, type AdjustedRow, type Successor } from "../../lib/seriesSpecialRules";
+import { dataSourceHint, type DataSource } from "../../lib/seriesDataSource";
 import { partnerHead, partnerPath, type PartnerBadge, type SeasonPartners } from "../../lib/seriesPartners";
 import { dayLabel } from "../../lib/seriesFormat";
 import { WEB_BASE_URL } from "../../lib/siteUrls";
@@ -173,6 +174,34 @@ export function SeriesPartners({ partners }: { partners: SeasonPartners }) {
   );
 }
 
+/** „Daten von PineApps“ im Kopf einer Saison (#1964): mit gewähltem Partner zu seiner Seite im Web, sonst zur Plattform
+ * (nur https). Ohne Quelle (oder bei einem älteren Server) nichts. */
+export function SeriesDataSource({ source, style }: { source: DataSource; style?: StyleProp<ViewStyle> }) {
+  const hint = dataSourceHint(source);
+  if (!hint) return null;
+  const open = hint.kind === "partner" ? `${WEB_BASE_URL}${hint.target}` : hint.kind === "platform" ? hint.target : "";
+  return (
+    <View style={[styles.source, style]} testID="series-data-source">
+      <Muted style={styles.sourceText}>Daten von </Muted>
+      {open ? (
+        <Pressable
+          onPress={() => { Linking.openURL(open).catch(() => {}); }}
+          accessibilityRole="link"
+          accessibilityLabel={`Daten von ${hint.name}, ${hint.kind === "partner" ? "Partnerseite öffnen" : "öffnet im Browser"}`}
+          hitSlop={8}
+          style={({ pressed }) => [styles.sourceLink, pressed && styles.pressed]}
+          testID="series-data-source-link"
+        >
+          <Muted style={styles.sourceName}>{hint.name}</Muted>
+          {hint.kind === "platform" ? <Ionicons name="open-outline" size={12} color={ink.second} /> : null}
+        </Pressable>
+      ) : (
+        <Muted style={styles.sourceName}>{hint.name}</Muted>
+      )}
+    </View>
+  );
+}
+
 /** Kleines Abzeichen „Logo Name · Partner“ an einer laufenden Saison oder Spur (#1934) - kein Link, die Karte führt. */
 export function PartnerHostBadge({ partner }: { partner: PartnerBadge | null | undefined }) {
   if (!partner?.name) return null;
@@ -208,6 +237,10 @@ const styles = StyleSheet.create({
   hostLogo: { backgroundColor: "transparent", borderWidth: 0, height: 28, width: 72 },
   hostName: { color: ink.text, fontSize: 14, fontWeight: "700" },
   contributors: { color: ink.quiet, fontSize: 13 },
+  source: { alignItems: "center", flexDirection: "row", flexWrap: "wrap" },
+  sourceText: { color: ink.quiet, fontSize: 12 },
+  sourceLink: { alignItems: "center", flexDirection: "row", gap: 4, minHeight: 24 },
+  sourceName: { color: ink.second, fontSize: 12, textDecorationLine: "underline" },
   contributor: { color: ink.second, fontSize: 13 },
   badge: { alignItems: "center", alignSelf: "flex-start", backgroundColor: "rgba(255,255,255,0.05)", borderColor: "rgba(255,255,255,0.12)", borderRadius: 999, borderWidth: 1, flexDirection: "row", gap: 5, maxWidth: "100%", paddingHorizontal: 8, paddingVertical: 2 },
   badgeLogo: { backgroundColor: "transparent", borderWidth: 0, height: 14, width: 28 },

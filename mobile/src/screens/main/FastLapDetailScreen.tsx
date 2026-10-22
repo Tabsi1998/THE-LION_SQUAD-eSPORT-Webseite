@@ -7,6 +7,7 @@ import { Card } from "../../components/Card";
 import { EmptyState, ErrorState, PartialLoadNotice, SkeletonList, loadProblem, type LoadProblem } from "../../components/ListState";
 import { MediaImage } from "../../components/MediaImage";
 import { Screen } from "../../components/Screen";
+import { FadeScroll } from "../../components/SwipeTabs";
 import { StatusBadge } from "../../components/StatusBadge";
 import { FitTitle } from "../../components/FitTitle";
 import { CountUp, Glow } from "../../components/motion";
@@ -302,17 +303,20 @@ export function FastLapDetailScreen({ navigation, route }: Props) {
         <View style={styles.section}>
           <Heading>Strecken</Heading>
           {tracks.length ? (
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabs}>
+            // Viele Strecken laufen über: der Rand, an dem es weitergeht, blendet weich aus (#1969).
+            <FadeScroll contentContainerStyle={styles.tabs} accessibilityRole="tablist" accessibilityLabel="Strecken" testID="fastlap-tracks">
               {tracks.map((track) => (
                 <Pressable
                   key={track.id}
                   onPress={() => load(track.id)}
+                  accessibilityRole="tab"
+                  accessibilityState={{ selected: activeTrackId === track.id }}
                   style={({ pressed }) => [styles.tab, activeTrackId === track.id && styles.tabActive, pressed && styles.pressed]}
                 >
                   <Muted style={[styles.tabText, activeTrackId === track.id && styles.tabTextActive]}>{track.name || "Strecke"}</Muted>
                 </Pressable>
               ))}
-            </ScrollView>
+            </FadeScroll>
           ) : (
             <Muted>Keine Strecken hinterlegt.</Muted>
           )}

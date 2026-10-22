@@ -1,6 +1,7 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Pressable, StyleSheet, TextInput, type PressableProps, type StyleProp, type TextStyle, type ViewStyle } from "react-native";
 import Animated, { cancelAnimation, Easing, useAnimatedProps, useAnimatedStyle, useSharedValue, withDelay, withSpring, withTiming } from "react-native-reanimated";
+import { countFrame, countShape } from "../../../lib/countUp";
 import { flashStyle } from "./motion";
 
 // Bewegung im Turnierbaum mit Liebe zum Detail (#1563, Fabian 14.10.): federnd wie der Rest der App (Federn der
@@ -13,8 +14,6 @@ import { flashStyle } from "./motion";
 
 const SPRING = { stiffness: 260, damping: 20 };
 const POP_SPRING = { stiffness: 420, damping: 16 };
-// Starke Ease-out-Kurve (animate-expo): das Zählen ist sofort sichtbar und läuft ruhig aus.
-const COUNT_EASE = Easing.bezier(0.23, 1, 0.32, 1);
 
 export function SpringIn({ delay, reduce, style, children }: { delay: number; reduce: boolean; style?: StyleProp<ViewStyle>; children: React.ReactNode }) {
   const progress = useSharedValue(reduce ? 1 : 0);
@@ -53,24 +52,27 @@ export function PopIn({ delay, reduce, children }: { delay: number; reduce: bool
 
 const AnimatedInput = Animated.createAnimatedComponent(TextInput);
 
-/** Ein Spielstand zählt hoch (0 → 3) - nur ganze Zahlen; sonst springt er nur auf. */
+/** Ein Spielstand zählt hoch (0 → 3) - nur ganze Zahlen; sonst springt er nur auf. Gerechnet wird mit der gemeinsamen
+ * Rechnung der App (lib/countUp.ts, #1969): Fortschritt 0 → 1, ease-out, am Ende genau der Text vom Server - kurz wie
+ * bisher im Baum (kleine Stände brauchen keine 900 ms). */
 export function CountUp({ value, delay, reduce, style }: { value: string; delay: number; reduce: boolean; style: StyleProp<TextStyle> }) {
-  const target = /^\d{1,4}$/.test(value) ? Number(value) : NaN;
-  const count = useSharedValue(Number.isFinite(target) && !reduce ? 0 : target || 0);
+  const shape = useMemo(() => (/^\d{1,4}$/.test(value) ? countShape(value) : null), [value]);
+  const animate = Boolean(shape) && !reduce;
+  const progress = useSharedValue(animate ? 0 : 1);
   useEffect(() => {
-    if (!Number.isFinite(target) || reduce) return undefined;
-    count.set(withDelay(delay, withTiming(target, { duration: Math.min(520, 180 + target * 60), easing: COUNT_EASE })));
-    return () => cancelAnimation(count);
+    if (!shape || !animate) return undefined;
+    progress.set(withDelay(delay, withTiming(1, { duration: Math.min(520, 180 + shape.total * 60), easing: Easing.linear })));
+    return () => cancelAnimation(progress);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
-  const animatedProps = useAnimatedProps(() => ({ text: String(Math.round(count.get())), defaultValue: String(Math.round(count.get())) }) as never);
-  if (!Number.isFinite(target) || reduce) return <Animated.Text style={style}>{value}</Animated.Text>;
+  const animatedProps = useAnimatedProps(() => ({ text: countFrame(shape, progress.get()) }) as never);
+  if (!animate) return <Animated.Text style={style}>{value}</Animated.Text>;
   return (
     <AnimatedInput
       editable={false}
       accessible={false}
       importantForAccessibility="no"
       underlineColorAndroid="transparent"
-      defaultValue={value}
+      defaultValue={countFrame(shape, 0)}
       value={undefined}
       style={[style, styles.input]}
       animatedProps={animatedProps}

@@ -41,6 +41,51 @@ function EdgeFade({ side, color }: { side: "start" | "end"; color: string }) {
   );
 }
 
+/**
+ * Eine waagrechte Leiste mit eigenen Reitern oder Chips (unterschiedlich breit, etwa „Rennen 20:30“ oder Streckennamen),
+ * die überlaufen kann: wie bei SwipeTabs ohne sichtbare Scrollleiste, mit weichem Verlauf an dem Rand, an dem es
+ * weitergeht. Passt alles hinein, gibt es keinen Verlauf.
+ */
+export function FadeScroll({ children, background = surfaces.base, style, contentContainerStyle, accessibilityRole, accessibilityLabel, testID }: {
+  children: React.ReactNode;
+  background?: string;
+  style?: StyleProp<ViewStyle>;
+  contentContainerStyle?: StyleProp<ViewStyle>;
+  accessibilityRole?: "tablist";
+  accessibilityLabel?: string;
+  testID?: string;
+}) {
+  const [edges, setEdges] = useState({ start: false, end: false });
+  const size = useRef({ offset: 0, viewport: 0, content: 0 });
+  const update = useCallback(() => {
+    const next = swipeEdges(size.current.offset, size.current.viewport, size.current.content);
+    setEdges((now) => (now.start === next.start && now.end === next.end ? now : next));
+  }, []);
+  const onScroll = useCallback((event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const { contentOffset, layoutMeasurement, contentSize } = event.nativeEvent;
+    size.current = { offset: contentOffset.x, viewport: layoutMeasurement.width, content: contentSize.width };
+    update();
+  }, [update]);
+  return (
+    <View style={style} accessibilityRole={accessibilityRole} accessibilityLabel={accessibilityLabel} testID={testID}>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={contentContainerStyle}
+        onLayout={(event) => { size.current.viewport = event.nativeEvent.layout.width; update(); }}
+        onContentSizeChange={(width) => { size.current.content = width; update(); }}
+        onScroll={onScroll}
+        scrollEventThrottle={32}
+        testID={testID ? `${testID}-scroll` : undefined}
+      >
+        {children}
+      </ScrollView>
+      {edges.start ? <EdgeFade side="start" color={background} /> : null}
+      {edges.end ? <EdgeFade side="end" color={background} /> : null}
+    </View>
+  );
+}
+
 export function SwipeTabs<K extends string>({ items, active, onChange, fit = 4, background = surfaces.base, accessibilityLabel, style, testID }: {
   items: Array<SwipeTab<K>>;
   active: K;

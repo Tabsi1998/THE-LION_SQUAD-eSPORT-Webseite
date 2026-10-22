@@ -16,12 +16,26 @@ import {
   type WeekendRound,
   type WeekendSettings,
 } from "./raceWeekend";
+import { originalsOf, type OriginalItem, type OriginalsByRound } from "./referenceOriginals";
 import { KIND_LABELS, type LineageInfo } from "./references";
 import { dayRounds } from "./seriesDays";
 import { HIDDEN_NAME, dayLabel, formatNumber, nameOf, number, roundLabel } from "./seriesFormat";
+import type { DataSource } from "./seriesDataSource";
 import type { SeasonPartners } from "./seriesPartners";
 import type { MapPool, TeamLeaguePart } from "./teamLeague";
-import { adjustmentDetail, adjustmentText, noScoreText, teamSinceLabel, type AdjustedRow, type RuleChange, type Successor } from "./seriesSpecialRules";
+import {
+  adjustmentDetail,
+  adjustmentTeamText,
+  adjustmentText,
+  driverAdjustmentMarks,
+  noScoreText,
+  teamSinceLabel,
+  type AdjustedRow,
+  type DriverAdjustment,
+  type DriverAdjustmentMark,
+  type RuleChange,
+  type Successor,
+} from "./seriesSpecialRules";
 
 // Saison einer Serie in der App (#1945, nur lesen): was der Screen aus /api/reference-series/public/<spur>/<saison>
 // liest - dieselben Regeln wie die Serienseite im Web (frontend/src/lib/racingLeague.js, teamLeague.js,
@@ -72,6 +86,9 @@ export type StandingRow = AdjustedRow & {
 };
 type TeamStandingRow = AdjustedRow & {
   team?: string | null; rank?: number | null; points?: number | null; official_points?: number | null; computed_points?: number | null; deviation?: number | null;
+  /** #2000: Fahrer-Anpassungen, die fürs Team zählen - Summe und Liste mit dem Fahrer als Kennung. */
+  driver_adjustment_points?: number | null;
+  driver_adjustments?: DriverAdjustment[] | null;
 };
 
 /** Die Antwort der Serienseite - jedes Feld kann fehlen. */
@@ -101,6 +118,10 @@ export type SeasonPage = {
   team_league?: TeamLeaguePart;
   /** Map-Pool der Saison (#1616). */
   map_pool?: MapPool;
+  /** Original-Bilder des Veranstalters je Termin (#1933): Kennung des Termins → öffentliche Bilder. */
+  originals?: OriginalsByRound;
+  /** „Daten von …“ (#1964): Plattform des Partners, von der die Saison ihre Turniertage holt. */
+  data_source?: DataSource;
   racing?: {
     club_drivers?: string[] | null;
     club_teams?: string[] | null;
@@ -261,6 +282,10 @@ export type RoundRow = {
   moved: string;
   /** Nummer der Runde für ihre Ergebnisseite (#1950) - nur Rennliga und nur, wenn der Server sie schickt. */
   number: number | null;
+  /** Original-Bilder des Veranstalters aller Läufe der Runde (#1933), bei mehreren Läufen mit Lauf beschriftet. */
+  originals: OriginalItem[];
+  /** Überschrift im Vollbild: „R3 · Baku City Circuit“. */
+  originalsTitle: string;
 };
 
 /** Der Kalender als Zeilen - je Runde eine (#1930): Kürzel, Ort, Land (Code für die Flagge, #1925), Stand der Runde und
@@ -306,6 +331,8 @@ export function roundRows(page: SeasonPage | null | undefined): RoundRow[] {
       }).filter(Boolean),
       moved: lead.original_club_day && lead.original_club_day !== lead.club_day ? `ursprünglich ${dayLabel(lead.original_club_day)}` : "",
       number: racing ? group.number : null,
+      originals: originalsOf(page?.originals, group.rounds, { withSession: group.multi }),
+      originalsTitle: [roundLabel(lead), group.venue || group.title].filter(Boolean).join(" · "),
     };
   });
 }
@@ -323,6 +350,8 @@ export type TableLine = {
   adjust: AdjustedRow | null;
   /** Sonderboni (#1961): „+3“ - schon in den Punkten. */
   bonus: string;
+  /** Teamwertung (#2000): Fahrer-Anpassungen, die fürs Team zählen - „−5 (Anna Probe)“ unter der Teamsumme. */
+  driverMarks: DriverAdjustmentMark[];
 };
 
 /** Wertung je Lauf (#1930): „Gesamt“ und je Art mit zählenden Läufen „Rennen“, „Sprint“, „Quali“ - erst ab zwei Arten. */
@@ -339,6 +368,7 @@ export function racingTableRows(page: SeasonPage | null | undefined, scope: "dri
       key: String(row.team || index), pos: row.rank ? String(row.rank) : "–", name: row.team || "", team: "",
       points: formatNumber(row.points), club: club.has(String(row.team)), hidden: false, club_member: club.has(String(row.team)),
       adjust: row, bonus: "",
+      driverMarks: driverAdjustmentMarks(row, page?.standings?.rows, page?.rounds),
     }));
   }
   const drivers = page?.racing?.drivers || {};
@@ -349,19 +379,31 @@ export function racingTableRows(page: SeasonPage | null | undefined, scope: "dri
     points: formatNumber(row.points), club: Boolean(row.club_member), hidden: Boolean(row.name_hidden || !row.name), club_member: Boolean(row.club_member),
     adjust: table ? null : row,
     bonus: bonuses && number(row.bonus_points) > 0 ? `+${formatNumber(row.bonus_points)}` : "",
+    driverMarks: [],
   }));
 }
 
-/** Die Anpassungen der Tabelle als Liste (#1960) - am Handy statt eines Tooltips: „−5“ und „Name · Grund · R4 · Tag“. */
+/** Die Anpassungen der Tabelle als Liste (#1960) - am Handy statt eines Tooltips: „−5“ und „Name · Grund · R4 · Tag“.
+ * Bei den Teams dazu die Fahrer-Anpassungen, die fürs Team zählen (#2000): „Team · Fahrer (Fahrer) · Grund · …“ - der
+ * Name nach den Regeln des Servers aus der Fahrerwertung. */
 export function adjustmentLines(page: SeasonPage | null | undefined, scope: "drivers" | "teams"): Array<{ key: string; points: string; negative: boolean; text: string }> {
-  const rows: Array<AdjustedRow & { key?: string | null; team?: string | null; name?: string | null; name_hidden?: boolean | null }> = scope === "teams" ? page?.racing?.teams?.rows || [] : page?.standings?.rows || [];
+  const rows: Array<AdjustedRow & { key?: string | null; team?: string | null; name?: string | null; name_hidden?: boolean | null; driver_adjustments?: DriverAdjustment[] | null }> = scope === "teams" ? page?.racing?.teams?.rows || [] : page?.standings?.rows || [];
   const rounds = page?.rounds || [];
-  return rows.flatMap((row, rowIndex) => (row.adjustments || []).map((item, index) => ({
-    key: `${row.key || row.team || rowIndex}-${index}`,
-    points: adjustmentText(item?.points),
-    negative: number(item?.points) < 0,
-    text: [scope === "teams" ? row.team || "" : nameOf(row), adjustmentDetail(item, rounds)].filter(Boolean).join(" · "),
-  })));
+  const drivers = page?.standings?.rows || [];
+  return rows.flatMap((row, rowIndex) => [
+    ...(row.adjustments || []).map((item, index) => ({
+      key: `${row.key || row.team || rowIndex}-${index}`,
+      points: adjustmentText(item?.points),
+      negative: number(item?.points) < 0,
+      text: [scope === "teams" ? row.team || "" : nameOf(row), adjustmentDetail(item, rounds)].filter(Boolean).join(" · "),
+    })),
+    ...(scope === "teams" ? (row.driver_adjustments || []).filter(Boolean) : []).map((item, index) => ({
+      key: `${row.key || row.team || rowIndex}-driver-${index}`,
+      points: adjustmentText(item.points),
+      negative: number(item.points) < 0,
+      text: [row.team || "", `${nameOf(drivers.find((entry) => entry.key && entry.key === item.driver))} (Fahrer)`, adjustmentDetail(item, rounds)].filter(Boolean).join(" · "),
+    })),
+  ]);
 }
 
 /** Ablauf je Runde in Worten über der Fahrerwertung (#1930, #1960): Punkte je Lauf und umgekehrte Startaufstellung. */
@@ -396,7 +438,11 @@ function mateName(row: StandingRow, publicKeys: string[]): string {
   return row.club_member ? "Vereinsfahrer" : "Gastfahrer";
 }
 
-export type DriverCard = { key: string; name: string; pos: string; meta: string; stats: string; adjustments: Array<{ key: string; points: string; negative: boolean; text: string }> };
+export type DriverCard = {
+  key: string; name: string; pos: string; meta: string; stats: string;
+  /** `team` (#2000): „zählt auch fürs Team · Team Adler“ bzw. warum für keines - leer ohne Haken. */
+  adjustments: Array<{ key: string; points: string; negative: boolean; text: string; team: string }>;
+};
 
 /** Fahrer (Garage): je öffentlichem Vereinsfahrer Platz, Team („im Team seit R2“, #1960), Punkte und seine Saison - nur
  * Zahlen über null; mit Läufen (#1930) Poles je Runde, Ø Start und das Quali-Duell gegen den Teamkollegen mit den
@@ -437,6 +483,7 @@ export function driverCards(page: SeasonPage | null | undefined): DriverCard[] {
       stats,
       adjustments: (row.adjustments || []).map((item, index) => ({
         key: `${key}-${index}`, points: adjustmentText(item?.points), negative: number(item?.points) < 0, text: adjustmentDetail(item, rounds),
+        team: adjustmentTeamText(item),
       })),
     };
   });
