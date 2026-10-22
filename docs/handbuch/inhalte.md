@@ -800,9 +800,10 @@ das Bild wird nicht gespeichert.
 - **Fahrer-Tabelle:** Die Tabelle landet als Text im Feld und geht in dieselbe Vorschau wie eingefügter Text. Die
   Rundenspalten heißen „Runde 1“, „Runde 2“ … (Flaggen sind Bilder, keine Schrift) und werden über die Reihenfolge den
   Terminen zugeordnet – in der Vorschau korrigierbar. Namen werden mit den Teilnehmern der Saison abgeglichen; grün ist
-  ein Name nur, wenn er genau so ein Teilnehmer (bzw. bei der Teamtabelle ein Team der Saison) ist – nur über eine
-  Verwechslung der Schrift erkannt ist er vorgeschlagen, aber gelb; ein unbekannter ist immer gelb, wie bei
-  Ergebnis-Bildern.
+  ein Name, wenn er genau so ein Teilnehmer (bzw. bei der Teamtabelle ein Team der Saison) ist oder wenn beide Leser
+  ihn gleich lesen – nur über eine Verwechslung der Schrift erkannt ist er vorgeschlagen, aber gelb, wie bei
+  Ergebnis-Bildern. **Alle Namen bestätigen** nimmt die gelben, vorbelegten Namen auf einmal (gelbe Zahlen bleiben),
+  mit **Rückgängig**; in der Teamwertung laut Veranstalter ebenso die Teams.
 - **Gelb = unsicher:** Wo die Lesungen nicht übereinstimmen, steht die Zelle unter **Aus dem Bild unsicher** – mit dem,
   was sonst gelesen wurde. Gelb wird auch, was genauso aussieht wie eine Zelle mit anderem Wert (dieselbe Zahl sieht in
   einer Tabelle immer gleich aus), und „Punkte“ und „Dif.“, wenn sie nicht zusammenpassen. Ergibt die Summe der Runden
@@ -1260,11 +1261,19 @@ einem gewerteten Termin **Ergebnis ändern**. Das öffnet das Blatt des Termins.
   vergrößert), Strecke, Art (Rennen oder Qualifying – nur als Hinweis), schnellster Rennrunde, Pole und Fahrer des
   Tages. Passt die Strecke zu einem anderen Termin der Saison, sagt ein Hinweis, zu welchem. **Gelbe Felder** sind
   unsicher, darunter steht, was im Bild stand; ist Startplatz, Zeit oder Abstand gelb, steht **Mehr** gleich offen.
-  **Namen und Teams** sind nur grün, wenn sie genau so im Bild stehen wie bei einem Teilnehmer bzw. Team der Saison
-  (Groß/klein und Satzzeichen egal). Liest das Bild den Namen nur über eine typische Verwechslung der Schrift (l/1/I,
-  0/O, rn/m, ii/ü), ist der Teilnehmer vorgeschlagen, aber gelb – außer die Startnummer bestätigt ihn. Passt die
-  Startnummer zu einem, der Name aber genauso gut zu einem anderen, bleibt es gelb mit **Name passt auch zu …**. Ein
-  unbekannter Name oder ein unbekanntes Team ist immer gelb, auch wenn das Bild klar ist. Kennt eine andere Saison derselben Spur den Namen oder das Team,
+  **Zwei Leser:** Namen, Teams, den Kopf und die Zahlen liest der Server zweimal mit verschiedenen Verfahren. Lesen
+  beide einen Namen oder ein Team Zeichen für Zeichen gleich, ist er grün – auch wenn die Saison ihn noch nicht kennt.
+  Widersprechen sie sich, ist das Feld gelb, vorbelegt mit der besseren Lesung, darunter stehen beide. Stehen im Namen
+  leicht verwechselte Zeichen (l/1/I, 0/O, 2/Z, „__“/„_“), ist er nur grün, wenn er genau zu einem Teilnehmer bzw. Team
+  der Saison passt. Ein Teilnehmer der Saison ist grün, wenn ein Leser ihn genau so liest (Groß/klein und Satzzeichen
+  egal) und der andere nicht widerspricht; nur über eine Verwechslung erkannt ist er vorgeschlagen, aber gelb – außer
+  die Startnummer bestätigt ihn. Passt die Startnummer zu einem, der Name aber genauso gut zu einem anderen, bleibt es
+  gelb mit **Name passt auch zu …**. Die **Strecke** wird mit dem Kalender der Saison abgeglichen und so geschrieben wie
+  dort. Fehlt der zweite Leser auf dem Server, sagt das ein Hinweis – dann sind unbekannte Namen und Teams gelb.
+  **Alle Namen bestätigen:** Stehen vorbelegte Namen oder Teams gelb da (etwa **wie in Saison …**), bestätigt der Knopf
+  über der Liste sie alle auf einmal – andere gelbe Felder bleiben gelb. Danach steht da, wie viele bestätigt sind, mit
+  **Rückgängig**.
+  <img src="../assets/serien/serien-ergebnis-namen-bestaetigen.png" alt="Ergebnisblatt nach Bild auslesen: Leiste „3 Namen bzw. Teams aus dem Bild vorbelegt, aber gelb“ mit dem Knopf „Alle Namen bestätigen (3)“" width="560"> Kennt eine andere Saison derselben Spur den Namen oder das Team,
   steht es so vorbelegt da – gelb, mit **wie in Saison …**; beim Übernehmen entsteht der Teilnehmer in dieser Saison
   (ein bestätigter Alias ordnet ihn gleich derselben Person zu). Steht im Bild eine andere Startnummer als beim
   Teilnehmer, zeigt die Zeile die aus dem Bild (gelb, **bisher …**). **Korrekturen lernen:** Ändert der Vorstand einen

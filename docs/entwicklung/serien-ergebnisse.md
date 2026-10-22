@@ -464,6 +464,33 @@ Dienst) und landet als Zeilen im Blatt – gespeichert wird beim Lesen nichts, a
   Schreibweise (dieselbe Lesung bei einem anderen Teilnehmer bzw. Team), wird diese vergessen (`forgotten_names`,
   `forgotten_teams`); eine Team-Schreibweise zeigt im Abgleich auf höchstens ein Team (die eigene Saison zuerst).
   Entfernen per `PATCH` (Liste der bleibenden).
+- **Zweiter Leser (#2018, `services/result_image_second.py`):** RapidOCR 3.10.0 mit PP-OCRv6 small (ONNX, Modell fest im
+  Image, nie zur Laufzeit geladen) erkennt jede Zelle von Startnummer, Name, Team, Startplatz, Zeit und Abstand sowie
+  den Kopf noch einmal - ausgeschnitten aus dem Originalbild, wo Tesseract die Zelle fand (`_second_reads`,
+  `read_second`; Lesungen in `RowReading.second`, `Reading.header_second`, Status in `Reading.second`). Im Zeitbudget
+  des Bilds, je Zelle ein Aufruf, ein Bild zur Zeit je Prozess. Regeln (`result_image_match`): **Übereinstimmung**
+  (`agreed`: der zweite Leser liest Zeichen für Zeichen, was Seite oder Streifen lesen, Sicherheit ab
+  `SECOND_MIN_CONF`) ist sicher - auch ein unbekannter Name, ein unbekanntes Team, einer „wie in Saison X“ und ein Name
+  im Kopf. Ausnahmen nur mit Kader grün: leicht verwechselte Zeichen im Text (`confusable`: l/I/1, 0/O, 2/Z, Z/S/B/G/O
+  zwischen Großbuchstaben) und eine Tesseract-Lesung, die dasselbe nur über eine Verwechslung, mit anderem Tag oder
+  anders vielen „_“ liest (`_contradicts`; Groß/klein, Leerzeichen und andere Fehler stören nicht). **Widerspruch** ist
+  gelb, vorbelegt mit der Lesung des zweiten Lesers (bei Namen der stärkere), `read` nennt beide. Im Kader zählt seine
+  Lesung wie eine weitere: liest er einen Teilnehmer genau, ist auch ein Verwechslungs-Treffer von Tesseract grün; zeigt
+  er auf jemand anderen, ist es gelb. **Ziffern:** eine weitere Lesung in `decide` - liest er denselben Wert wie
+  mindestens zwei Lesungen von Tesseract (höchstens eine widerspricht) bzw. wie alle übrigen, gilt der Wert; sonst
+  widerspricht er (gelb). **Strecke** im Kopf: gegen die Strecken des Kalenders (`venues`, Ort und Titel der Termine) -
+  genau eine ist grün und steht wie im Kalender da, eine ähnliche wird vorgeschlagen, sonst gelb (nur ein Hinweis).
+  **Ausfall** (Modell fehlt, Fehler, Zeitbudget): es gelten die Regeln ohne ihn, Warnung `second_reader` bzw.
+  `out_of_time`; `RESULT_IMAGE_SECOND_READER=off` schaltet ab (keine Warnung). Tabellen-Bilder (#1999): der zweite Leser
+  liest die Namens- bzw. Teamspalte (`result_image_table._second_reads`, `match_names`); die Zahlen prüfen dort schon
+  Streifen, dritte Lesung, Schriftbild und Summen. Betrieb: Check `image_reading` (`ops_checks`, ohne das Modell zu
+  laden, `result_image_second.presence`).
+- **„Alle Namen bestätigen“ (#2018):** im Ergebnisblatt (`ConfirmNamesBar`, `confirmNames`/`undoConfirmNames` in
+  `lib/resultImage.js`: gelbe, vorbelegte Namen und Teams der Zeilen, dazu schnellste Runde und Fahrer des Tages), in
+  der Fahrer-Tabelle der Saisontabelle (`confirmTableNames`/`undoTableNames` in `lib/seasonTable.js`, nur die
+  Namensspalte) und in der Teamwertung laut Veranstalter (`OfficialTeamTotals`, nur das Team; `imageTeamRows` liefert
+  `ocr.fields`). Andere gelbe Felder bleiben gelb; „Rückgängig“ holt die Markierungen zurück, wo seitdem niemand den
+  Wert geändert hat. Sichtbar für alle, die das Blatt bearbeiten (Vorstand, Captains der Saison).
 - **Kopf:** `track` (oberste Zeile ohne Beschriftung), `session {name, kind}` (Rennen, Sprint, Qualifying - nur ein
   Hinweis, bis es Läufe je Termin gibt, #1930), `pole` und `fastest_lap {name, time}`, `driver_of_the_day`; der Wert
   darf hinter oder unter der Beschriftung stehen. Passt die Strecke zu einem anderen Termin der Saison, nennt die
