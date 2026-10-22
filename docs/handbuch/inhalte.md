@@ -661,6 +661,53 @@ immer als **Entwurf**. Veröffentlicht wird wie gewohnt vom Vorstand. Nur in ein
 
 <img src="../assets/serien/serien-partner-plattform-uebernommen.png" alt="Nach dem Übernehmen: zwei Turniere übernommen, eines noch offen" width="560">
 
+**Saisontabelle einlesen (vergangene Runden nachtragen):** Legt ihr eine laufende Saison erst später an, müsst ihr
+nicht jede vergangene Runde einzeln eintragen. Die Gesamttabelle des Veranstalters reicht – je Runde entsteht ein
+**Entwurf**, veröffentlicht wird nichts. Nur für den Vorstand, in Rennligen und Turnierserien (nicht in der Team-Liga).
+Zuerst den **Kalender** der Saison anlegen (etwa mit **Termine einfügen**), damit es die Runden schon gibt.
+
+- **Einfügen** (Seite der Saison, Abschnitt **Saisontabelle einlesen**, **Tabelle einfügen**): die Tabelle aus der
+  Tabellenkalkulation oder von der Seite des Veranstalters kopieren – Platz, **Fahrer** (auch Name#TAG), optional
+  **Team**, je Runde die **Punkte**, optional **Gesamt** (auch „Punkte“) und Abstand. In den Zellen heißt **OUT** oder
+  **DNF** Ausfall, **--** oder leer **nicht angetreten**, dazu **DSQ** und **DNS**. **Einlesen** zeigt die Vorschau –
+  gespeichert wird dabei nichts. Unter **Erkannt: … – Spalten ändern** lässt sich jede Spalte anders zuordnen.
+- **Punkte:** **Platz aus den Punkten zurückrechnen** (Vorgabe) sucht über das Punkteschema der Runde den Platz – bei
+  einer Runde mit Läufen das Schema des Laufs. **Punkte laut Veranstalter übernehmen** übernimmt jeden Wert ohne Platz,
+  etwa wenn Boni schon im Wert stecken (21 = 18 + 3 Bingo); liegt ein Wert nicht im Schema, steht ein Hinweis dabei.
+- **Runden:** Jede Spalte bekommt ihren Termin – über das **Kürzel** (R1, auch „R1 Sprint“ für den Lauf), die
+  **Strecke**, die **Flagge** bzw. das Land oder die **Reihenfolge** im Kalender. Stimmt die Zuordnung nicht, wählt ihr
+  den Termin in der Auswahl oder **Nicht übernehmen**. Je Runde steht, was passiert (**Ergebnis als Entwurf**,
+  **Entwurf wird ersetzt** oder **Entwurf neben dem veröffentlichten Ergebnis**) und **Abweichungen ansehen** zeigt,
+  was sich gegenüber einem vorhandenen Ergebnis ändert.
+- **Gelb zum Klären:** Wo der Platz aus den Punkten nicht eindeutig ist – mehrere Plätze möglich, ein Bonus im Wert
+  (schnellste Runde, Pole, Sonderbonus), Punkte außerhalb des Schemas oder derselbe Platz zweimal –, wählt ihr den
+  Vorschlag („Platz 1 + schnellste Runde“) oder **Punkte laut Veranstalter**. **Eindeutige Vorschläge übernehmen** und
+  **Offene: Punkte laut Veranstalter** erledigen alle auf einmal. Eine Runde mit offenen gelben Zellen wird nicht
+  übernommen. 0 Punkte heißt hinter den Punkterängen – ohne Platz, ohne Meldung.
+- **Abgleich mit „Gesamt“:** Je Fahrer die eigene Rechnung nach allen Runden gegen „Gesamt“ und den Platz der Tabelle –
+  mit Streichresultaten, Anpassungen, Aktivitätspunkten und Boni der Saison. **stimmt**, **erklärt** (etwa
+  „erklärt: Anpassungen −5“, wenn der Veranstalter eure Anpassung nicht kennt) oder **weicht ab** (dann lohnt ein Blick
+  in die Tabelle). **Nur Auffällige zeigen** blendet die stimmigen aus.
+- **Übernehmen:** Vorgewählt sind neue Runden; eine Runde mit **Abweichungen** hakt ihr selbst an. Ein veröffentlichtes
+  Ergebnis wird nie überschrieben – es bekommt einen Entwurf daneben. Notizen, Startnummern, Zeiten und Runden eines
+  Turniertags aus einem vorhandenen Ergebnis bleiben. Danach öffnet sich **Unbekannte Namen** zum Zuordnen; die
+  Entwürfe gebt ihr im Ergebnisblatt der Runde frei. Ein zweites Einlesen derselben Tabelle zeigt **Schon übernommen**.
+
+<table>
+<tr>
+<td><img src="../assets/serien/serien-saisontabelle-vorschau.png" alt="Saisontabelle: erkannte Spalten, Runden mit Termin aus der Flagge, eine Runde mit Abweichungen aufgeklappt, eine Runde zum Klären" width="560"></td>
+<td><img src="../assets/serien/serien-saisontabelle-handy.png" alt="Eine Runde mit Abweichungen am Handy" width="220"></td>
+</tr>
+<tr>
+<td><img src="../assets/serien/serien-saisontabelle-klaeren.png" alt="Drei gelbe Zellen zum Klären mit Vorschlägen und Punkte laut Veranstalter" width="560"></td>
+<td><img src="../assets/serien/serien-saisontabelle-abgleich-handy.png" alt="Abgleich mit Gesamt am Handy: eine Abweichung, eine erklärt durch Anpassungen" width="220"></td>
+</tr>
+</table>
+
+<img src="../assets/serien/serien-saisontabelle-einfuegen.png" alt="Tabelle des Veranstalters eingefügt, Wahl der Punkte" width="560">
+
+<img src="../assets/serien/serien-saisontabelle-abgleich.png" alt="Abgleich mit Gesamt: 34 stimmen, eine erklärt, eine weicht ab" width="560">
+
 **Seite Team-Liga:** Bei einer Spur vom Typ Team-Liga zeigt dieselbe Adresse statt der Gesamtwertung die Liga aus
 Sicht der eigenen Teams (Liste **Eigene Teams** der Saison; spielen mehrere, steht im Spielplan, welches gespielt
 hat). Oben die **Spieltage** (ein Feld je Spieltag – Sieg cyan, Niederlage grau) und der nächste Spieltag mit Gegner
