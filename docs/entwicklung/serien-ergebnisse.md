@@ -448,8 +448,11 @@ Dienst) und landet als Zeilen im Blatt – gespeichert wird beim Lesen nichts, a
   gelesener Platz ebenso; eine leere Team-Zelle bleibt leer (kein Vorschlag mit dem Standard-Team - oft war dort ein
   farbiges Schild, das die Vorbereitung entfernt). Startplätze sind eine Permutation 1…N (`_settle_grid`) - ergänzt
   wird nur, wenn das Bild nachweislich das ganze Feld zeigt (`_whole_field`: so viele Zeilen wie Teilnehmer der Saison,
-  Plätze sicher 1…N, keine Lesung über N); ein Abstand „47,441“ kann ein als 4 gelesenes Plus sein (die Probe Zeit =
-  Erster + Abstand entscheidet).
+  Plätze sicher 1…N, keine Lesung über N). Ein ungelesener Startplatz ist nie grün (`_check_unread_grid`): hat die
+  Spalte Lesungen, ist jede leere Zelle gelb; hat sie keine, ist sie gelb, wenn „Grid“ in der Kopfzeile steht oder die
+  Kopfzeile nicht ganz gelesen ist (Zeit oder Abstand ohne Überschrift, etwa ein abgeschnittenes Bild) - nur im
+  Qualifying (Kopfzeile ganz da, ohne „Grid“) bleibt sie leer. Ein Abstand „47,441“ kann ein als 4 gelesenes Plus sein
+  (die Probe Zeit = Erster + Abstand entscheidet).
 - **Nie grün geraten (#2012):** Ein Name ist nur grün, wenn er eindeutig zu einem Teilnehmer passt: **genau so
   gelesen** (gleicher Schlüssel aus Name, Alias oder gelernter Schreibweise, `EXACT_SCORE`) und Abstand `name_margin`
   zum Zweitbesten - oder ab `name_match` mit **bestätigender Startnummer** (Seite und Streifen lesen dieselbe, und kein

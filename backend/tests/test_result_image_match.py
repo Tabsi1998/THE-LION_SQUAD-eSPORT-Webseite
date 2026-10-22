@@ -405,13 +405,15 @@ def test_the_gap_of_an_unsure_first_place_is_not_cleared():
 def test_lines_and_unlabelled_points_never_become_points():
     """Echter Fall (#1981): Der Rand der Tabelle („|“) stand in der Punkte-Spalte und wurde zu „1 Punkt“ in jeder
     Zeile. Ein Strich ist keine Ziffer, und Punkte gelten nur, wenn ihre Überschrift im Bild steht."""
+    # Die Kopfzeile steht sonst ganz da (Zeit, Abstand) - ohne „Grid“ wie im Qualifying (#2018: sonst wäre Grid gelb).
     border = build(reading(row("1", points="|"), row("2", points="|"), row("3", points="|"),
-                           labelled={"place", "time"}), TEMPLATE, [])
+                           labelled={"place", "time", "gap"}), TEMPLATE, [])
     assert [(item["points"], item["uncertain"]) for item in border["rows"]] == [(None, [])] * 3
-    no_label = build(reading(row("1", points="25"), row("2", points="18"), labelled={"place"}), TEMPLATE, [])
-    assert [(item["points"], item["uncertain"]) for item in no_label["rows"]] == [(None, []), (None, [])]
-    labelled = build(reading(row("1", points="25"), row("2", points="18"), labelled={"place", "points"}),
+    no_label = build(reading(row("1", points="25"), row("2", points="18"), labelled={"place", "time", "gap"}),
                      TEMPLATE, [])
+    assert [(item["points"], item["uncertain"]) for item in no_label["rows"]] == [(None, []), (None, [])]
+    labelled = build(reading(row("1", points="25"), row("2", points="18"),
+                             labelled={"place", "points", "time", "gap"}), TEMPLATE, [])
     assert [item["points"] for item in labelled["rows"]] == [25, 18]
     assert decide("number", r("|"), None, 80).text == ""
 
@@ -852,3 +854,19 @@ def test_a_small_l_at_the_start_of_a_word_needs_the_roster():
     for text in ("Galaxy_Skull", "Marcel Ruhs", "Wolfgang"):
         plain = row("1", "", text, strips={"name": text}, second={"name": text})
         assert build(reading(plain), TEMPLATE, [])["rows"][0]["uncertain"] == [], text
+
+
+def test_an_unread_grid_column_is_yellow_not_empty_and_green():
+    """Prüfer zu #2018: Liest Tesseract die Grid-Spalte gar nicht (schmales Bild), sind leere Startplätze gelb - nie
+    leer und grün. Im Qualifying gibt es keine Startplätze: steht die Kopfzeile sonst ganz da (Zeit, Abstand), aber
+    ohne „Grid“, bleibt die leere Spalte, wie sie ist."""
+    rows = [row("1", name="Anna Probe", time="1:31,770"), row("2", name="Bert Bolzt", time="1:32,134", gap="+0,364")]
+    for labelled in ({"place", "name", "grid"}, {"place", "name"}, set()):
+        out = build(reading(*rows, labelled=labelled), TEMPLATE, PEOPLE)
+        assert ["grid" in item["uncertain"] for item in out["rows"]] == [True, True], labelled
+    quali = build(reading(*rows, labelled={"place", "name", "time", "gap"}), TEMPLATE, PEOPLE)
+    assert ["grid" in item["uncertain"] for item in quali["rows"]] == [False, False]
+    # Steht ein Teil der Startplätze da, ist jeder fehlende gelb - auch wenn es weniger als die Hälfte sind.
+    some = [row("1", name="Anna Probe", grid="2"), row("2", name="Bert Bolzt"), row("3", name="Carl Kurve")]
+    out = build(reading(*some, labelled={"place", "name", "grid"}), TEMPLATE, PEOPLE)
+    assert ["grid" in item["uncertain"] for item in out["rows"]] == [False, True, True]

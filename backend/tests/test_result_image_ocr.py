@@ -91,6 +91,27 @@ def test_quali_layout_without_grid_is_a_result():
     assert got == [(row.place, row.number, row.name, row.team, row.time, row.gap or None, None) for row in sheet.rows]
     assert not any({"time", "gap", "points"} & set(row["uncertain"]) for row in out["rows"])
     assert "place" not in out["rows"][0]["uncertain"]  # Platz 1 im Kasten grün
+    # Kein Grid im Qualifying: die leere Spalte ist kein Fall für Gelb (#2018).
+    assert not any("grid" in row["uncertain"] for row in out["rows"])
+
+
+@needs_tesseract
+def test_a_narrow_screenshot_never_leaves_start_positions_empty_and_green():
+    """Prüfer zu #2018: Ein Bild, 700 Pixel breit, rechts abgeschnitten (Grid, Zeit und Abstand fehlen) - die
+    Startplätze waren leer und grün. Jetzt sind sie gelb (die Kopfzeile ist nicht ganz da); ein Ergebnis ist das Bild
+    ohne Zeiten ohnehin nicht. Verkleinert statt abgeschnitten steht jeder Startplatz richtig da oder ist gelb."""
+    sheet = fixture.sample_sheet()
+    expected = {row.name: row.grid for row in sheet.rows}
+    cut = _read(fixture.png_bytes(fixture.render(sheet, width=700)), _people(sheet))
+    assert cut["is_result"] is False
+    assert cut["rows"] and all("grid" in row["uncertain"] for row in cut["rows"])
+    full = fixture.render(sheet)
+    small = full.resize((700, round(full.height * 700 / full.width)), Image.Resampling.LANCZOS)
+    out = _read(fixture.png_bytes(small), _people(sheet))
+    checked = [row for row in out["rows"] if row["name"] in expected]
+    assert len(checked) >= len(sheet.rows) - 2
+    for row in checked:
+        assert row["grid"] == expected[row["name"]] or "grid" in row["uncertain"], row["name"]
 
 
 @needs_tesseract

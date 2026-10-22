@@ -606,6 +606,23 @@ def _check_gaps_in_columns(rows: list[dict[str, Decision]]) -> None:
                 cell.sure = False
 
 
+def _check_unread_grid(rows: list[dict[str, Decision]], reading: Reading, columns: dict[str, dict]) -> None:
+    """Startplätze stehen in jeder Zeile eines Rennens (Prüfer zu #2018, wie #1981: ungelesen ist nie grün). Hat die
+    Spalte Lesungen, ist jede leere Zelle gelb. Hat sie keine, ist sie gelb, wenn ihre Überschrift im Bild steht - oder
+    wenn die Kopfzeile nicht ganz gelesen ist (Zeit oder Abstand ohne Überschrift, etwa ein abgeschnittenes Bild): dann
+    ist offen, ob es die Spalte gibt. Im Qualifying steht die Kopfzeile ganz da, ohne „Grid“ - dann bleibt sie leer."""
+    cells = [row["grid"] for row in rows if row.get("grid") is not None]
+    if not cells or reading.labelled is None:
+        return
+    if not any(raw.cells.get("grid") or raw.strips.get("grid") for raw in reading.rows):
+        header_complete = all(field in reading.labelled for field in ("time", "gap") if field in columns)
+        if "grid" not in reading.labelled and header_complete:
+            return
+    for cell in cells:
+        if not cell.raw:
+            cell.sure = False
+
+
 def _grid_number(item) -> int | None:
     value = item[1] if isinstance(item, tuple) else item
     return int(value) if isinstance(value, str) and value.isdigit() else None
@@ -714,6 +731,7 @@ def build(reading: Reading, template: dict, participants: list[dict], *, aliases
     _check_times(rows)
     _check_grid(rows, _whole_field(rows, participants))
     _check_gaps_in_columns(rows)
+    _check_unread_grid(rows, reading, columns)
 
     pool = candidates(participants, aliases, track)
     known_teams = team_pool(participants, teams, track_teams, team_aliases)
