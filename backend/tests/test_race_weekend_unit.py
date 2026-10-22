@@ -178,7 +178,19 @@ def test_a_line_with_a_session_creates_only_that_one_and_never_twice():
     assert [(item["session"], item["time"]) for item in out["rows"][0]["sessions"]] == [("Hauptrennen", "21:00")]
     existing = [{"id": "x", "code": "R1", "session": "Hauptrennen", "order": 1}]
     again = race_weekend_paste.expand_paste(parsed, weekend, existing)
-    assert again["rows"] == [] and again["errors"][0]["message"] == "R1 Hauptrennen gibt es schon."
+    assert again["rows"] == [] and again["errors"][0]["message"] == "R1 Hauptrennen gibt es in dieser Saison schon."
+
+
+def test_a_duplicate_from_the_same_list_names_the_line_and_the_reason():
+    weekend = race_weekend.normalize_weekend({"formats": [{"from_round": 1, "sessions": [
+        {"label": "Qualifying", "offset": 0}, {"label": "Rennen", "offset": 30}]}]})
+    parsed = parse_round_lines("R1 Q · 05.03.2026 · Probering\nR1 · 05.03.2026 · Probering", season="2026",
+                               today="2026-01-01", default_weekday=None, default_time="20:30")
+    out = race_weekend_paste.expand_paste(parsed, weekend, [])
+    assert out["errors"][0]["line"] == 2
+    assert out["errors"][0]["message"] == (
+        "R1 Qualifying steht schon in Zeile 1 – ‚R1‘ legt laut Ablauf Qualifying und Rennen an. Entweder nur ‚R1‘ je "
+        "Runde oder jeden Lauf einzeln (‚R1 Q‘, ‚R1 R‘).")
 
 
 def test_a_shootout_keeps_its_name_even_if_the_template_has_another_qualifying():

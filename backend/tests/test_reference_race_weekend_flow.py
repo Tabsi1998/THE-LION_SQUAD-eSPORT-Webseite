@@ -95,7 +95,7 @@ async def test_eight_lines_make_eight_weekends_with_three_sessions_each(flow):
     again = await flow.post(f"{ADMIN}/series/{series['id']}/rounds/paste",
                             json={"text": "R1 Sprint · 08.03.2026", "apply": True})
     assert again.status_code == 422
-    assert again.json()["detail"]["errors"][0]["message"] == "R1 Sprint gibt es schon."
+    assert again.json()["detail"]["errors"][0]["message"] == "R1 Sprint gibt es in dieser Saison schon."
 
 
 @pytest.mark.asyncio

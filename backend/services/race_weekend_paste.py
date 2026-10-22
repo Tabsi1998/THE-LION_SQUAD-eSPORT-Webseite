@@ -31,6 +31,33 @@ def _own_code(number: int, numbers: dict) -> str:
     return f"Runde {number}"
 
 
+def _plan_labels(row: dict, plan: list) -> list[str] | None:
+    """Die Läufe, die eine Zeile ohne Lauf laut Ablauf anlegt - ``None`` für eine Zeile mit genau einem Lauf."""
+    if row.get("session"):
+        return None
+    labels = [config["label"] for config in plan if config and config.get("label")]
+    return labels if len(labels) > 1 else None
+
+
+def _joined(items: list[str]) -> str:
+    return items[0] if len(items) == 1 else f"{', '.join(items[:-1])} und {items[-1]}"
+
+
+def _duplicate_message(row: dict, label: str, source, plan: list) -> str:
+    """Meldung für einen doppelten Lauf (#2007): aus der Saison, oder aus derselben Liste - dann mit Zeile und Grund."""
+    code = row.get("code")
+    if source is None:
+        return f"{code} {label} gibt es in dieser Saison schon."
+    line, earlier = source
+    text = f"{code} {label} steht schon in Zeile {line}" if line else f"{code} {label} steht schon weiter oben"
+    labels = _plan_labels(row, plan) or earlier
+    if not labels:
+        return f"{text}."
+    singles = ", ".join(f"‚{code} {item[:1].upper()}‘" for item in labels)
+    return (f"{text} – ‚{code}‘ legt laut Ablauf {_joined(labels)} an. Entweder nur ‚{code}‘ je Runde oder jeden Lauf "
+            f"einzeln ({singles}).")
+
+
 def expand_paste(parsed: dict, weekend: dict | None, rounds: list[dict]) -> dict:
     """Eine geprüfte Terminliste (``reference_calendar.parse_round_lines``) mit den Läufen je Zeile (``sessions``):
     eine Zeile mit Lauf („R1 Sprint“) legt genau diesen an, eine ohne Lauf alle Läufe der Vorgabe für ihre Runde - mit
@@ -42,7 +69,8 @@ def expand_paste(parsed: dict, weekend: dict | None, rounds: list[dict]) -> dict
     merge = by_code(rounds, weekend) or any(row.get("session") for row in parsed.get("rows") or [])
     groups = weekend_groups(rounds, weekend, merge=merge)
     numbers = {group["key"]: group["number"] for group in groups if group["key"]}
-    taken = {(group["key"], label_key(rnd.get("session"))) for group in groups if group["key"]
+    # Woher ein Lauf kommt (#2007): ``None`` aus der Saison, sonst (Zeile, Läufe laut Ablauf oder ``None``).
+    taken = {(group["key"], label_key(rnd.get("session"))): None for group in groups if group["key"]
              for rnd in group["rounds"] if rnd.get("session")}
     upcoming = len(groups) + 1
     rows, errors = [], []
@@ -81,9 +109,9 @@ def expand_paste(parsed: dict, weekend: dict | None, rounds: list[dict]) -> dict
                 break
             if label and key:
                 if (key, label_key(label)) in taken:
-                    error = f"{row.get('code')} {label} gibt es schon."
+                    error = _duplicate_message(row, label, taken[(key, label_key(label))], plan)
                     break
-                taken.add((key, label_key(label)))
+                taken[(key, label_key(label))] = (row.get("line"), _plan_labels(row, plan))
             sessions.append({"session": label, "day": day, "time": clock, "starts_at": starts_at,
                              "counts": config["counts"] if config else True, "weekend": number})
         if error:
