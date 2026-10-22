@@ -80,10 +80,22 @@ Für eine neue Website in dieser Reihenfolge:
 | **Standard-Favicon**, **Favicon für hellen Modus**, **Favicon für dunklen Modus** | Das kleine Symbol im Browser-Tab |
 | **Play-Store-Link (LionsAPP)**, **App-Store-Link (LionsAPP, iOS)** | Erst eintragen, wenn die App dort öffentlich ist. Dann zeigen Fußzeile und Startseite die Abzeichen. Ohne Link steht im Fuß „bald im App Store“ |
 
-**Bilder immer als PNG** (oder JPG/WebP) hochladen – **keine SVG**. Der Upload erlaubt nur PNG, JPG und WebP; die
-maximale Größe steht unter dem Feld. Für Logos nehmt ihr am besten PNG mit transparentem Hintergrund, groß genug
-(mindestens 512 × 512 Pixel), damit es auf dem Handy scharf bleibt. Ein Bild könnt ihr neu hochladen oder aus den schon
-hochgeladenen Medien wählen (Verwaltung unter **Admin → Content → Medien**).
+**Logos am besten als SVG**, sonst als PNG mit durchsichtigem Hintergrund. Ein SVG ist in jeder Größe scharf – ihr müsst
+nicht über Pixel nachdenken. Das gilt für alle Logo-Felder: Standard-Logo, die beiden Logo-Fassungen, Maskottchen,
+QR-Logo und die Favicons, dazu Sponsoren, Partner, Spiele, Teams, das Logo je Spur und Saison und das Kopfbild eines
+Events. Fotos, Banner, Profilbilder und die Galerie bleiben bei PNG, JPG und WebP.
+
+- **Beim Hochladen** prüft die Website das SVG und speichert nur eine bereinigte Fassung: nur Formen, Pfade, Text und
+  Verläufe, nichts, was nachlädt oder ausführt. Leere Ränder schneidet sie ab. Ein SVG darf höchstens 1 MB groß sein.
+- **Unter dem Feld** steht das Logo auf hellem und dunklem Grund – so seht ihr gleich, ob es auf beiden trägt.
+- **Wo kein SVG geht** (E-Mails, PDF und Druck, das Bild beim Teilen, Discord, Favicon und App), nimmt die Website
+  automatisch eine PNG-Fassung, die sie beim Hochladen mit anlegt.
+- **Tipp zum Export:** „SVG 1.1“ bzw. „Präsentationsattribute“ wählen und Schrift in Pfade umwandeln. Eingebettete
+  Bilder, Filter (etwa Schatten) und Schriftdateien fallen beim Bereinigen weg.
+
+Raster-Bilder (PNG, JPG, WebP) dürfen bis zur Größe unter dem Feld haben; ein Logo als PNG mindestens 512 × 512 Pixel,
+damit es auf dem Handy scharf bleibt. Ein Bild könnt ihr neu hochladen oder aus den schon hochgeladenen Medien wählen
+(Verwaltung unter **Admin → Content → Medien**).
 
 **Favicon aus dem Logo erzeugen:** Der Knopf **Aus Logo und Akzentfarbe erzeugen** macht ein Standard-Favicon: das weiße
 Logo auf einem Kreis in der Akzentfarbe. Das lohnt sich, wenn ihr nur ein Favicon für dunklen Modus habt, das auf
@@ -319,7 +331,11 @@ Entwickler in [docs/entwicklung/design-system.md](../entwicklung/design-system.m
 | Fehlerbild | Ursache | Lösung |
 | --- | --- | --- |
 | „Nur PNG, JPG oder WebP erlaubt.“ beim Hochladen | Die Datei hat ein anderes Format | Das Logo als PNG exportieren (zum Beispiel 512 × 512 oder größer) |
-| „SVG-Dateien gehen hier nicht.“ beim Hochladen | SVG bleibt aus Sicherheitsgründen gesperrt | Als PNG mit durchsichtigem Hintergrund (zum Beispiel 2000 px breit) oder als WebP exportieren; die Website macht daraus alle Größen |
+| „SVG-Dateien gehen hier nicht.“ beim Hochladen | Das Feld ist kein Logo-Feld (Foto, Banner, Profilbild, Galerie) | Als PNG mit durchsichtigem Hintergrund (zum Beispiel 2000 px breit) oder als WebP exportieren; die Website macht daraus alle Größen |
+| „Das SVG ist zu groß …“ oder „… zu viele Elemente“ | Das SVG ist größer als 1 MB bzw. sehr aufwendig | Im Grafikprogramm vereinfachen (Pfade zusammenfassen) oder als PNG hochladen |
+| „Dem SVG fehlt die Größe …“ | Im SVG steht weder eine viewBox noch Breite und Höhe | Mit viewBox exportieren („SVG 1.1“) |
+| „Nach der Bereinigung bleibt nichts Sichtbares übrig.“ | Das SVG besteht nur aus einem eingebetteten Bild oder aus Teilen, die beim Bereinigen wegfallen | Als echtes Vektor-Logo exportieren (Schrift in Pfade) oder als PNG hochladen |
+| „Das SVG enthält eine DTD …“ | Der Export hat einen DOCTYPE-Kopf | Ohne DOCTYPE exportieren, etwa als „Optimiertes SVG“ |
 | Das Logo ist unscharf oder abgeschnitten | Zu kleine Datei oder falsches Seitenverhältnis | Quadratisches PNG in höherer Auflösung hochladen |
 | Das Favicon ist im Browser nicht zu sehen | Browser-Cache, oder nur die Fassung für dunklen Modus hinterlegt | Seite hart neu laden. Besser **Aus Logo und Akzentfarbe erzeugen** nutzen |
 | Änderungen am Branding sieht man nicht | Browser-Cache | Mit `Strg + F5` neu laden |
@@ -350,8 +366,13 @@ Das Farbschema der Website selbst ist fest.
 **Kann ich die Schriften tauschen?**
 Nein. Die drei Schriften sind fest eingebaut und liegen auf eurem Server.
 
-**Warum kein SVG?**
-Der Upload nimmt nur PNG, JPG und WebP an. Exportiert das Logo als PNG.
+**Geht ein Logo als SVG?**
+Ja, in allen Logo-Feldern – und es ist sogar die beste Wahl, weil es in jeder Größe scharf bleibt. Fotos, Banner und
+Profilbilder bleiben bei PNG, JPG und WebP. Die App zeigt bis auf Weiteres die PNG-Fassung, die beim Hochladen
+automatisch entsteht.
+
+**Ein Sponsor hat ein Logo aus Dolibarr – welches gilt?**
+Logos aus Dolibarr bleiben, wie sie kommen. Ladet ihr auf der Website ein SVG hoch, geht es vor.
 
 **Wie lange gilt die Cookie-Wahl?**
 Sechs Monate. Danach fragt die Seite neu.

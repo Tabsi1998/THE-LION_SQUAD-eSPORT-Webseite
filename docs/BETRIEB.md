@@ -181,6 +181,13 @@ PROXY_UPLOAD_LIMIT_MB=1700
 PUBLIC_UPLOAD_BACKEND_URL=https://upload.lionsquad.at
 ```
 
+**SVG-Logos (#1952):** Logo-Felder nehmen SVG an. Das Backend bereinigt die Datei beim Hochladen (Positivliste,
+`defusedxml`) und legt daneben eine PNG-Fassung ab (`resvg-py`, ohne Systembibliothek); ausgeliefert wird das SVG mit
+eigener, strenger Content-Security-Policy (`frontend/nginx.conf` und Backend). Grenzen: höchstens 1 MB und 4000
+Elemente, PNG 2000 px an der längeren Seite. Wer sie ändern muss, setzt `MAX_SVG_UPLOAD_MB`, `SVG_MAX_ELEMENTS` bzw.
+`SVG_RASTER_PX` für das Backend (z. B. in `docker-compose.override.yml`); der Datei-Dialog prüft vorab 1 MB
+(`VITE_MAX_SVG_UPLOAD_MB` beim Bau).
+
 Cloudflare lässt je Anfrage höchstens 100 MB durch. Große Uploads laufen deshalb über eine Subdomain
 **ohne** Cloudflare-Proxy (graue Wolke), z. B. `upload.lionsquad.at`, die im Nginx Proxy Manager auf
 denselben Upstream zeigt, mit:
