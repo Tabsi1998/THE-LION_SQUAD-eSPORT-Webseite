@@ -191,6 +191,34 @@ test("Zeiten zählen beim Öffnen hoch, eine neue Bestzeit beim Nachladen leucht
   sequence.mockRestore();
 });
 
+test("eine neue Zeit schiebt sich beim Nachladen davor: nur die neue Zeile zählt, die Zeilen darunter nicht neu", async () => {
+  const reanimated = jest.requireMock("react-native-reanimated");
+  const lena = { user_id: "a", display_name: "Lena", time_str: "1:24.587", attempts: 2 };
+  const noah = { user_id: "b", display_name: "Noah", time_str: "1:24.999", attempts: 1 };
+  let entries: Array<Record<string, unknown>> = [{ ...lena, rank: 1, gap_str: "" }, { ...noah, rank: 2, gap_str: "+0.412" }];
+  mockGet.mockImplementation((path: string) => {
+    if (path === "/f1/challenges/hotlap") return Promise.resolve({ data: CHALLENGE });
+    if (path.endsWith("/leaderboard")) return Promise.resolve({ data: { track: { id: "tr1", name: "Spielberg" }, entries } });
+    return Promise.resolve({ data: [] });
+  });
+  await render(<FastLapDetailScreen route={route} />);
+  await waitFor(() => expect(screen.getByText("Noah")).toBeTruthy());
+  const timing = jest.spyOn(reanimated, "withTiming");
+  // Mia schiebt sich vor Noah: Noah rutscht von Platz 2 auf 3.
+  entries = [
+    { ...lena, rank: 1, gap_str: "" },
+    { user_id: "c", display_name: "Mia", rank: 2, time_str: "1:24.700", gap_str: "+0.113", attempts: 1 },
+    { ...noah, rank: 3, gap_str: "+0.412" },
+  ];
+  await act(async () => { await screen.getByTestId("fastlap-scroll").props.refreshControl.props.onRefresh(); });
+  await waitFor(() => expect(screen.getByText("Mia")).toBeTruthy());
+  const counted = timing.mock.calls.filter(([, config]) => (config as { duration?: number })?.duration === 900);
+  // Nur die neue Zeile zählt (Zeit und Abstand) - Noahs Zeile bleibt dieselbe und zählt nicht neu.
+  expect(counted).toHaveLength(2);
+  expect(screen.getByText("1:24,999")).toBeTruthy();
+  timing.mockRestore();
+});
+
 // Langer Titel (#1867): bei 360 dp brach Android „Regenbogen-Boulevard“ mitten im Wort um. Umbrochen wird nur
 // zwischen Wörtern; zerreißt Android doch ein Wort, wird die Schrift schrittweise kleiner, höchstens bis 80 %.
 test("der Titel im Kopf bricht nicht im Wort um und wird höchstens bis 80 % kleiner", async () => {

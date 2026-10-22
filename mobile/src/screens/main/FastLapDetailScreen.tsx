@@ -18,7 +18,7 @@ import { formatDate, formatDateTime } from "../../lib/format";
 import { getRegistrationState, hasOnlineRegistration } from "../../lib/registration";
 import { colors, radius } from "../../theme";
 import type { F1Challenge, F1LeaderboardEntry, F1LeaderboardPayload } from "../../types";
-import { attemptsText, entryKey } from "../../lib/fastLapAttempts";
+import { attemptsText, entryRowKeys } from "../../lib/fastLapAttempts";
 import { parseLapTime, plausibilityText, showLapTime } from "../../lib/laptime";
 import { Button } from "../../components/Button";
 import { useShareHeader } from "../../components/HeaderActions";
@@ -95,6 +95,9 @@ export function FastLapDetailScreen({ navigation, route }: Props) {
   }, [activeTrackId, load]);
 
   const best = useMemo(() => leaderboard?.entries?.[0], [leaderboard]);
+  // Zeilen stabil über die Person (#1969): eine neue Zeit oben lässt die Zeilen darunter nicht neu hochzählen.
+  const rowKeys = useMemo(() => entryRowKeys(leaderboard?.entries || []), [leaderboard]);
+  const refKeys = useMemo(() => entryRowKeys(leaderboard?.club_reference_entries || []), [leaderboard]);
   const registration = useMemo(() => getRegistrationState(challenge, "Einreichung"), [challenge]);
   const showRegistrationInfo = hasOnlineRegistration(challenge) || challenge?.block_club_member_results || challenge?.allow_club_reference_times !== false;
   const participantCount = challenge?.participant_count || leaderboard?.entries.length || 0;
@@ -413,7 +416,7 @@ export function FastLapDetailScreen({ navigation, route }: Props) {
           <Heading>Leaderboard</Heading>
           {error ? <Muted style={styles.error}>{error}</Muted> : null}
           {leaderboard?.entries?.length ? (
-            leaderboard.entries.map((entry, index) => <EntryRow key={`${entryKey(entry)}-${entry.rank}`} entry={entry} maxAttempts={leaderboard.max_attempts} index={index} playKey={activeTrackId || ""} />)
+            leaderboard.entries.map((entry, index) => <EntryRow key={rowKeys[index]} entry={entry} maxAttempts={leaderboard.max_attempts} index={index} playKey={activeTrackId || ""} />)
           ) : (
             <EmptyState title="Noch keine Zeiten" detail="Sobald Zeiten eingetragen sind, stehen sie hier pro Strecke." />
           )}
@@ -422,7 +425,7 @@ export function FastLapDetailScreen({ navigation, route }: Props) {
         {leaderboard?.club_reference_entries?.length ? (
           <View style={styles.section}>
             <Heading>Vereins-Referenzzeiten</Heading>
-            {leaderboard.club_reference_entries.map((entry, index) => <EntryRow key={`ref-${entryKey(entry)}-${entry.rank}`} entry={entry} maxAttempts={leaderboard.max_attempts} index={index} playKey={activeTrackId || ""} reference />)}
+            {leaderboard.club_reference_entries.map((entry, index) => <EntryRow key={`ref-${refKeys[index]}`} entry={entry} maxAttempts={leaderboard.max_attempts} index={index} playKey={activeTrackId || ""} reference />)}
           </View>
         ) : null}
       </ScrollView>
