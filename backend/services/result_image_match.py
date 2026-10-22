@@ -510,12 +510,28 @@ def _grid_number(item) -> int | None:
     return int(value) if isinstance(value, str) and value.isdigit() else None
 
 
-def _settle_grid(grids: list[Decision]) -> None:
-    """Startplätze sind 1…N, jeder einmal (#2012). Fehlen den sicheren genau die Zahlen, die die unsicheren als je
-    einzige passende Lesung haben (jede Zahl genau einmal), gelten diese - grün. Sonst bleibt alles, wie es ist."""
+def _whole_field(rows: list[dict[str, Decision]], participants: list[dict]) -> bool:
+    """Zeigt das Bild nachweislich das ganze Feld (Prüfer zu #2012)? So viele Zeilen wie Teilnehmer der Saison, und
+    die Plätze laufen sicher 1…N (Ausfälle ohne Platz zählen nicht mit). Ein Ausschnitt - etwa die ersten drei - zeigt
+    sonst auch lückenlose Plätze."""
+    if not rows or sum(1 for row in participants if row.get("id")) != len(rows):
+        return False
+    ranked = [row.get("place") for row in rows if not _row_marks(row)]
+    return all(place is not None and place.sure and place.value == index
+               for index, place in enumerate(ranked, start=1))
+
+
+def _settle_grid(grids: list[Decision], whole_field: bool = False) -> None:
+    """Startplätze sind 1…N, jeder einmal (#2012) - aber nur, wenn das Bild das ganze Feld zeigt (``_whole_field``). Fehlen
+    den sicheren genau die Zahlen, die die unsicheren als je einzige passende Lesung haben (jede Zahl genau einmal),
+    gelten diese - grün. Liest eine Lesung eine Zahl über N, fehlt doch ein Teil des Felds. Sonst bleibt alles, wie es
+    ist."""
     sure = [_grid_number(cell.value) for cell in grids if cell.sure and cell.value is not None]
     unsure = [cell for cell in grids if not cell.sure]
-    if not unsure or None in sure or len(set(sure)) != len(sure) or any(value > len(grids) for value in sure):
+    if not whole_field or not unsure or None in sure or len(set(sure)) != len(sure):
+        return
+    read = [_grid_number(item) for cell in grids for item in _options(cell, "number")]
+    if any(value > len(grids) for value in sure) or any(value is not None and value > len(grids) for value in read):
         return
     missing = set(range(1, len(grids) + 1)) - set(sure)
     picks = []
@@ -531,8 +547,8 @@ def _settle_grid(grids: list[Decision]) -> None:
         cell.sure = True
 
 
-def _check_grid(rows: list[dict[str, Decision]]) -> None:
-    _settle_grid([row["grid"] for row in rows if row.get("grid") is not None])
+def _check_grid(rows: list[dict[str, Decision]], whole_field: bool = False) -> None:
+    _settle_grid([row["grid"] for row in rows if row.get("grid") is not None], whole_field)
     seen: dict[object, list[Decision]] = {}
     for row in rows:
         grid = row.get("grid")
@@ -593,7 +609,7 @@ def build(reading: Reading, template: dict, participants: list[dict], *, aliases
     _check_places(rows)
     _check_leader_gap(rows)
     _check_times(rows)
-    _check_grid(rows)
+    _check_grid(rows, _whole_field(rows, participants))
     _check_gaps_in_columns(rows)
 
     pool = candidates(participants, aliases, track)

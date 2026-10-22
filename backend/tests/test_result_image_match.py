@@ -642,16 +642,33 @@ def test_grid_positions_settle_as_a_permutation():
     """Startplätze sind 1…N, jeder einmal (#2012): Lesen sich einzelne widersprüchlich („13“ und „1“), ergänzen die
     übrigen sicheren die fehlenden genau dann, wenn jede unsichere Zelle genau eine fehlende Zahl als Lesung hat - grün.
     Geht das nicht eindeutig auf, bleibt es gelb."""
+    four = [{"id": f"p{index}", "name": f"Probe {index}"} for index in range(4)]  # das ganze Feld: vier Teilnehmer
     rows = [row(str(index), grid=str(grid)) for index, grid in enumerate((2, 1, 4, 3), start=1)]
     rows[2] = row("3", grid="4", strips={"grid": "1"})  # 1 hat schon eine andere Zeile
     rows[3] = row("4", grid="a", strips={"grid": "3"})  # Seite liest einen Buchstaben
-    out = build(reading(*rows), TEMPLATE, [])
+    out = build(reading(*rows), TEMPLATE, four)
     assert [(item["grid"], "grid" in item["uncertain"]) for item in out["rows"]] == [
         (2, False), (1, False), (4, False), (3, False)]
     clash = [row("1", grid="2"), row("2", grid="1"), row("3", grid="4", strips={"grid": "3"}),
              row("4", grid="3", strips={"grid": "4"})]
-    out = build(reading(*clash), TEMPLATE, [])
+    out = build(reading(*clash), TEMPLATE, four)
     assert ["grid" in item["uncertain"] for item in out["rows"]] == [False, False, True, True]
+
+
+def test_grid_permutation_only_for_the_whole_field():
+    """Prüfer zu #2012: Startplätze sind nur dann 1…N, wenn das Bild das ganze Feld zeigt. Ein Ausschnitt (die ersten
+    drei von sechs) ergänzt keine Startplätze - der echte Startplatz 5 wird nie still zur 3. Ohne Kader ist das ganze
+    Feld nicht nachgewiesen, ebenso, wenn die Zahl der Zeilen nicht zur Saison passt oder die Plätze nicht 1…N laufen."""
+    part = [row("1", grid="1"), row("2", grid="2"), row("3", grid="5", strips={"grid": "3"})]
+    six = [{"id": f"p{index}", "name": f"Probe {index}"} for index in range(6)]
+    for people in ([], six):
+        out = build(reading(*part), TEMPLATE, people)
+        assert "grid" in out["rows"][2]["uncertain"], people
+    three = build(reading(*part), TEMPLATE, six[:3])  # drei Teilnehmer, drei Zeilen, Plätze 1…3: das ganze Feld
+    assert "grid" in three["rows"][2]["uncertain"]  # die 5 ist mehr als 3 - dann zeigt es doch nicht alles
+    gap = [row("1", grid="2"), row("2", grid="1"), row("4", grid="4", strips={"grid": "3"})]
+    out = build(reading(*gap), TEMPLATE, six[:3])
+    assert "grid" in out["rows"][2]["uncertain"]
 
 
 def test_header_fields():
