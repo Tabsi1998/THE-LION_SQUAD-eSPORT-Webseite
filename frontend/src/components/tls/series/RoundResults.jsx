@@ -11,6 +11,8 @@ import {
   COLUMN_LABELS, gapText, medalOf, mobileMain, mobileSub, movement, movementLabel, neighbourLabel, penaltyLabel,
   posLabel, roundEyebrow, roundHeading, roundPath, roundSubline, rowBadges, timeText, visibleColumns,
 } from "@/lib/roundResults";
+import { SeriesLogo } from "@/components/tls/references/SeriesLogo";
+import { seriesLogo } from "@/lib/seriesLogo";
 import "./roundResults.css";
 
 // Bausteine der Ergebnisseite einer Runde (#1950): Kopf mit Flagge und Pfeilen, Zusammenfassung, Reiter je Lauf, die
@@ -62,6 +64,8 @@ export function RoundHead({ page, lineageSlug, seasonSlug }) {
   return (
     <header className="flex items-center justify-between gap-3 sm:gap-4 sm:flex-wrap" data-testid="round-head">
       <div className="flex items-center gap-3 sm:gap-[18px] min-w-0 flex-1 sm:flex-initial">
+        {/* #2014: Logo der Saison bzw. Spur vor der Flagge - ohne Logo wie bisher. */}
+        <SeriesLogo src={seriesLogo(page.lineage, page.series)} size="sm" testId="round-logo" />
         {round.country_code && <span className="tls-round-flag flex shrink-0"><CountryFlag code={round.country_code} size="xl" /></span>}
         <div className="flex flex-col min-w-0">
           <span className="hidden sm:block text-xs font-bold uppercase tracking-[0.22em] text-[#29B6E8] tabular-nums" data-testid="round-eyebrow">{roundEyebrow(round)}</span>

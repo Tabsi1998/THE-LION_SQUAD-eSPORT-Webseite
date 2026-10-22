@@ -61,7 +61,7 @@ export default function ReferenceRoundPage() {
   const title = seriesTitle(current);
   const { heading } = roundHeading(current?.round);
   const roundName = current ? [current.round?.code || `Runde ${current.round?.number}`, heading !== current.round?.code ? heading : ""].filter(Boolean).join(" ") : "";
-  useDocumentTitle(current ? `${roundName} · ${title}` : "Runde", undefined, { robots: "noindex, follow" });
+  useDocumentTitle(current ? `${roundName} · ${title}` : "Runde", undefined, { robots: "noindex, follow", image: current?.series?.logo_url || undefined });
 
   const pick = useCallback((key) => {
     setParams((now) => {
