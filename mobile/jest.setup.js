@@ -155,7 +155,11 @@ jest.mock("react-native-reanimated", () => {
     runOnJS: (fn) => fn,
     // Hochzählen der Rennzeiten (#1974): im Test ohne „Bewegung reduzieren“ - Tests stellen es selbst um.
     useReducedMotion: () => false,
-    withTiming: (toValue) => toValue,
+    // Ohne UI-Thread ist jede Bewegung sofort am Ziel - eine Rückmeldung am Ende (Hochzählen fertig, #1969) kommt gleich.
+    withTiming: (toValue, _config, callback) => {
+      if (typeof callback === "function") callback(true);
+      return toValue;
+    },
     withSpring: (toValue) => toValue,
     withSequence: (...steps) => steps[steps.length - 1],
     withDelay: (_ms, value) => value,

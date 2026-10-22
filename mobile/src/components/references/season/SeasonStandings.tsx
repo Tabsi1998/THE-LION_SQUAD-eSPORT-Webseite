@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 import { Button } from "../../Button";
+import { CountUp } from "../../motion";
 import { Body, Muted } from "../../Text";
 import { FilterChip, Reveal, ink } from "../parts";
 import { AdjustmentMark } from "../seriesParts";
@@ -16,6 +17,7 @@ import {
   type TableLine,
 } from "../../../lib/referenceSeason";
 import { ruleChangeLines, LINEUP_TOTAL_TEXT, teamDeviationText, teamModeLabel, teamSourceLabel } from "../../../lib/seriesSpecialRules";
+import { countDelay, countsUp } from "../../../lib/countUp";
 import { colors, surfaces } from "../../../theme";
 
 // Tabelle einer Rennliga bzw. Turnierserie (#1945, #1974): Fahrer- oder Gesamtwertung, umschaltbar auf die Wertung je
@@ -86,7 +88,7 @@ export function SeasonStandings({ page }: { page: SeasonPage }) {
       ) : null}
       {shownScope === "teams" ? <TeamSource page={page} /> : null}
       {shownKind !== "all" ? <Muted style={styles.caption}>{`${kinds.find((item) => item.key === shownKind)?.label}-Wertung`}</Muted> : null}
-      <TableRows rows={shown} idPrefix="season-table" page={page} />
+      <TableRows rows={shown} idPrefix="season-table" page={page} playKey={`${shownScope}:${shownKind}`} />
       {shown.length < all.length ? (
         <Button label={`Ganze Tabelle zeigen (${all.length})`} variant="quiet" compact onPress={() => setExpanded(true)} testID="season-table-all" style={styles.more} />
       ) : null}
@@ -138,10 +140,11 @@ function TeamSource({ page }: { page: SeasonPage }) {
   );
 }
 
-function TableRows({ rows, idPrefix, page }: { rows: TableLine[]; idPrefix: string; page: SeasonPage }) {
+// Punkte zählen beim Öffnen und bei jedem Wechsel von Wertung oder Teams hoch (#1969), je Zeile leicht versetzt.
+function TableRows({ rows, idPrefix, page, playKey }: { rows: TableLine[]; idPrefix: string; page: SeasonPage; playKey: string }) {
   return (
     <View style={styles.table}>
-      {rows.map((row) => (
+      {rows.map((row, index) => (
         <View
           key={row.key}
           style={[styles.tableRow, row.club && styles.tableRowClub]}
@@ -157,7 +160,7 @@ function TableRows({ rows, idPrefix, page }: { rows: TableLine[]; idPrefix: stri
           <View style={styles.pointsBox}>
             <View style={styles.pointsLine}>
               {row.adjust ? <AdjustmentMark row={row.adjust} rounds={page.rounds || []} /> : null}
-              <Body style={styles.points}>{row.points}</Body>
+              <CountUp value={row.points} playKey={playKey} delay={countDelay(index)} play={countsUp(index)} style={styles.points} />
             </View>
             {row.bonus ? <Muted style={styles.bonus} testID="season-table-bonus">{`${row.bonus} Boni`}</Muted> : null}
           </View>

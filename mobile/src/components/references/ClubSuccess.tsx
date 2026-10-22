@@ -26,6 +26,8 @@ import { WEB_BASE_URL } from "../../lib/siteUrls";
 import { colors, roles, surfaces } from "../../theme";
 import { PartnerHostBadge, SessionChips } from "./seriesParts";
 import { FadeIn, staggerDelay } from "../FadeIn";
+import { CountUp, Glow } from "../motion";
+import { COUNT_UP_MS, countDelay } from "../../lib/countUp";
 import { Button } from "../Button";
 import { EmptyState } from "../ListState";
 import { CountryFlag } from "./CountryFlag";
@@ -110,7 +112,8 @@ export function ClubSuccess({ items, summary, showcase, onOpenSeason }: {
             {medals.map(([place, key, label], index) => (
               <View key={key} style={[styles.medal, index > 0 && styles.medalDivider]} accessible accessibilityLabel={`${stats[key]} ${label}`}>
                 <MedalMark placement={place} />
-                <Body style={[styles.medalCount, { color: medalTone(place)?.fg }]}>{String(stats[key])}</Body>
+                {/* Die Ehrentafel zählt beim Öffnen hoch (#1969), Medaille für Medaille leicht versetzt. */}
+                <CountUp value={stats[key]} delay={countDelay(index * 2)} style={[styles.medalCount, { color: medalTone(place)?.fg }]} />
                 <Muted style={styles.medalLabel}>{label}</Muted>
               </View>
             ))}
@@ -246,6 +249,8 @@ function ShowcaseCard({ item, link, onOpenSeason }: { item: ClubReference; link:
       style={({ pressed }) => [styles.card, styles.showcase, tone ? { borderColor: `${tone.ring}59` } : null, pressed && styles.pressed]}
       testID="club-success-showcase"
     >
+      {/* Die Vitrine leuchtet einmal leise in Gold auf, wenn sie erscheint (#1969). */}
+      {view.placement === 1 ? <Glow active tone="honor" delay={COUNT_UP_MS} radius={12} /> : null}
       <View style={styles.showcaseTop}>
         <PlaceRing placement={view.placement} size={56} />
         <View style={styles.flex}>

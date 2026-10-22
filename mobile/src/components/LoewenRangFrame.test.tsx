@@ -74,13 +74,16 @@ test("„Bewegung reduzieren“: kein Glanz, keine Signatur, kein Bild-Takt", as
   expect(screen.getByTestId("loewen-rang-art")).toBeTruthy();
 });
 
-test("solange das Handy nicht geantwortet hat, bewegt sich nichts", async () => {
+test("„Bewegung reduzieren“ gilt sofort (#1969): auch bevor das Handy antwortet, bewegt sich nichts", async () => {
+  const reanimated = jest.requireMock("react-native-reanimated");
+  const startValue = jest.spyOn(reanimated, "useReducedMotion").mockReturnValue(true);
   jest.spyOn(AccessibilityInfo, "isReduceMotionEnabled").mockReturnValue(new Promise<boolean>(() => undefined));
   frameCallbacks.clear();
   await render(<LoewenRangFrame level={9} size="profile" />);
   await settle();
   expect(screen.queryByTestId("loewen-rang-signature")).toBeNull();
   expect(frameCallbacks.size).toBe(0);
+  startValue.mockRestore();
 });
 
 test("Profil mit Bewegung: Signatur auf dem UI-Thread, wenige Teilchen", async () => {

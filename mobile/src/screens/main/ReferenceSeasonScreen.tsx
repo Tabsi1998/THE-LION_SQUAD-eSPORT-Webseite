@@ -1,9 +1,12 @@
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { Linking, Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
+import { Linking, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
 import { Button } from "../../components/Button";
 import { FadeIn } from "../../components/FadeIn";
 import { ErrorState, SkeletonList, loadProblem, type LoadProblem } from "../../components/ListState";
+import { CountUp } from "../../components/motion";
+import { SwipeTabs } from "../../components/SwipeTabs";
+import { countDelay } from "../../lib/countUp";
 import { ink } from "../../components/references/parts";
 import { SeasonCalendar } from "../../components/references/season/SeasonCalendar";
 import { SeasonDrivers } from "../../components/references/season/SeasonDrivers";
@@ -122,9 +125,10 @@ export function ReferenceSeasonScreen({ navigation, route }: Props) {
           <SeriesPartners partners={page.partners} />
           {figures.length ? (
             <View style={styles.figures} testID="season-figures">
-              {figures.map((figure) => (
+              {figures.map((figure, index) => (
                 <View key={figure.key} style={styles.figure} accessible accessibilityLabel={`${figure.value} ${figure.label}`}>
-                  <Body style={styles.figureValue}>{figure.value}</Body>
+                  {/* Die Kennzahlen der Saison zählen beim Öffnen hoch (#1969). */}
+                  <CountUp value={figure.value} delay={countDelay(index * 2)} style={styles.figureValue} />
                   <Muted style={styles.figureLabel}>{figure.label}</Muted>
                 </View>
               ))}
@@ -133,23 +137,8 @@ export function ReferenceSeasonScreen({ navigation, route }: Props) {
           <SeasonNotice series={page.series} successor={page.successor} onOpenSuccessor={openSeason} style={styles.notice} />
         </FadeIn>
 
-        <View style={styles.tabs} accessibilityRole="tablist" accessibilityLabel="Saisonbereiche">
-          {tabs.map((item) => {
-            const on = item.key === active;
-            return (
-              <Pressable
-                key={item.key}
-                onPress={() => setTab(item.key)}
-                accessibilityRole="tab"
-                accessibilityState={{ selected: on }}
-                accessibilityLabel={item.label}
-                style={({ pressed }) => [styles.tab, on && styles.tabOn, pressed && styles.pressed]}
-              >
-                <Body style={[styles.tabText, on && styles.tabTextOn]}>{item.label}</Body>
-              </Pressable>
-            );
-          })}
-        </View>
+        {/* Bis vier Reiter teilen sich die Breite; mehr werden wischbar, mit Verlauf am Rand und Snap (#1969). */}
+        <SwipeTabs items={tabs} active={active} onChange={setTab} accessibilityLabel="Saisonbereiche" style={styles.tabs} testID="season-tabs" />
 
         <View style={styles.body}>
           {active === "calendar" ? <SeasonCalendar page={page} onOpenRound={seasonKind(page) === "racing" ? openRound : undefined} /> : null}
@@ -179,13 +168,8 @@ const styles = StyleSheet.create({
   figureValue: { color: ink.text, fontSize: 24, fontVariant: ["tabular-nums"], fontWeight: "800", lineHeight: 28 },
   figureLabel: { color: ink.muted, fontSize: 12 },
   notice: { marginTop: 4 },
-  tabs: { borderBottomColor: ink.line, borderBottomWidth: 1, flexDirection: "row", paddingHorizontal: 8 },
-  tab: { alignItems: "center", borderBottomColor: "transparent", borderBottomWidth: 2, flex: 1, justifyContent: "center", minHeight: 48, paddingHorizontal: 4 },
-  tabOn: { borderBottomColor: colors.cyan },
-  tabText: { color: ink.quiet, fontSize: 14, fontWeight: "700" },
-  tabTextOn: { color: ink.text },
+  tabs: { borderBottomColor: ink.line, paddingHorizontal: 8 },
   body: { paddingBottom: 20, paddingHorizontal: 16, paddingTop: 12 },
   pool: { marginTop: 20 },
   web: { marginHorizontal: 16, marginTop: 4 },
-  pressed: { opacity: 0.72 },
 });

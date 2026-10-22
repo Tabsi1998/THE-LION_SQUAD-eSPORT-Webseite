@@ -127,7 +127,7 @@ test("unplausible Zeit: erst die Rückfrage, gespeichert wird nur mit Bestätigu
   await fireEvent.changeText(screen.getByTestId("fastlap-time-input"), "12");
   await fireEvent.press(screen.getByText("Zeit speichern"));
   await waitFor(() => expect(alert).toHaveBeenCalled());
-  expect(String(alert.mock.calls[0][1])).toContain("0:12.000");
+  expect(String(alert.mock.calls[0][1])).toContain("0:12,000");
   expect(mockPost).not.toHaveBeenCalled();
   const buttons = (alert.mock.calls[0][2] || []) as Array<{ text?: string; onPress?: () => void }>;
   await act(async () => { buttons.find((button) => button.text === "Trotzdem speichern")?.onPress?.(); });
@@ -140,6 +140,83 @@ test("nach der Veröffentlichung keine Eingabe in der App - ein Satz sagt, wo es
   await render(<FastLapDetailScreen route={route} />);
   await waitFor(() => expect(screen.getByTestId("fastlap-locked")).toBeTruthy());
   expect(screen.queryByTestId("fastlap-driver-search")).toBeNull();
+});
+
+// Fast Lap mit Komma (#1969): angezeigt wie im Web und bei den Rennserien, gespeichert bleibt der Punkt.
+test("Bestzeit, Zeiten und Abstände stehen mit Komma da", async () => {
+  mockGet.mockImplementation((path: string) => {
+    if (path === "/f1/challenges/hotlap") return Promise.resolve({ data: CHALLENGE });
+    if (path.endsWith("/leaderboard")) {
+      return Promise.resolve({ data: { track: { id: "tr1", name: "Spielberg" }, entries: [
+        { user_id: "a", display_name: "Lena", rank: 1, time_str: "1:24.587", gap_str: "", attempts: 2 },
+        { user_id: "b", display_name: "Noah", rank: 2, time_str: "1:24.999", gap_str: "+0.412", attempts: 1 },
+      ] } });
+    }
+    return Promise.resolve({ data: [] });
+  });
+  await render(<FastLapDetailScreen route={route} />);
+  await waitFor(() => expect(screen.getAllByText("1:24,587").length).toBeGreaterThan(0));
+  expect(screen.getByText("1:24,999")).toBeTruthy();
+  expect(screen.getByText("+0,412")).toBeTruthy();
+  expect(screen.queryByText("1:24.587")).toBeNull();
+});
+
+// Mikro-Bewegung (#1969): Zeiten zählen beim Öffnen hoch; eine neue Bestzeit beim Nachladen zählt nicht neu, die
+// Karte leuchtet einmal in Gold auf.
+test("Zeiten zählen beim Öffnen hoch, eine neue Bestzeit beim Nachladen leuchtet auf", async () => {
+  const reanimated = jest.requireMock("react-native-reanimated");
+  let best = "1:24.587";
+  mockGet.mockImplementation((path: string) => {
+    if (path === "/f1/challenges/hotlap") return Promise.resolve({ data: CHALLENGE });
+    if (path.endsWith("/leaderboard")) {
+      return Promise.resolve({ data: { track: { id: "tr1", name: "Spielberg" }, entries: [{ user_id: "a", display_name: "Lena", rank: 1, time_str: best, gap_str: "", attempts: 2 }] } });
+    }
+    return Promise.resolve({ data: [] });
+  });
+  const timing = jest.spyOn(reanimated, "withTiming");
+  const sequence = jest.spyOn(reanimated, "withSequence");
+  await render(<FastLapDetailScreen route={route} />);
+  await waitFor(() => expect(screen.getByTestId("fastlap-best-time")).toHaveTextContent("1:24,587"));
+  const counted = () => timing.mock.calls.filter(([, config]) => (config as { duration?: number })?.duration === 900).length;
+  expect(counted()).toBeGreaterThan(0);
+  expect(sequence).not.toHaveBeenCalled();
+
+  timing.mockClear();
+  best = "1:23.999";
+  await act(async () => { await screen.getByTestId("fastlap-scroll").props.refreshControl.props.onRefresh(); });
+  await waitFor(() => expect(screen.getByTestId("fastlap-best-time")).toHaveTextContent("1:23,999"));
+  expect(counted()).toBe(0);
+  expect(sequence).toHaveBeenCalled();
+  timing.mockRestore();
+  sequence.mockRestore();
+});
+
+test("eine neue Zeit schiebt sich beim Nachladen davor: nur die neue Zeile zählt, die Zeilen darunter nicht neu", async () => {
+  const reanimated = jest.requireMock("react-native-reanimated");
+  const lena = { user_id: "a", display_name: "Lena", time_str: "1:24.587", attempts: 2 };
+  const noah = { user_id: "b", display_name: "Noah", time_str: "1:24.999", attempts: 1 };
+  let entries: Array<Record<string, unknown>> = [{ ...lena, rank: 1, gap_str: "" }, { ...noah, rank: 2, gap_str: "+0.412" }];
+  mockGet.mockImplementation((path: string) => {
+    if (path === "/f1/challenges/hotlap") return Promise.resolve({ data: CHALLENGE });
+    if (path.endsWith("/leaderboard")) return Promise.resolve({ data: { track: { id: "tr1", name: "Spielberg" }, entries } });
+    return Promise.resolve({ data: [] });
+  });
+  await render(<FastLapDetailScreen route={route} />);
+  await waitFor(() => expect(screen.getByText("Noah")).toBeTruthy());
+  const timing = jest.spyOn(reanimated, "withTiming");
+  // Mia schiebt sich vor Noah: Noah rutscht von Platz 2 auf 3.
+  entries = [
+    { ...lena, rank: 1, gap_str: "" },
+    { user_id: "c", display_name: "Mia", rank: 2, time_str: "1:24.700", gap_str: "+0.113", attempts: 1 },
+    { ...noah, rank: 3, gap_str: "+0.412" },
+  ];
+  await act(async () => { await screen.getByTestId("fastlap-scroll").props.refreshControl.props.onRefresh(); });
+  await waitFor(() => expect(screen.getByText("Mia")).toBeTruthy());
+  const counted = timing.mock.calls.filter(([, config]) => (config as { duration?: number })?.duration === 900);
+  // Nur die neue Zeile zählt (Zeit und Abstand) - Noahs Zeile bleibt dieselbe und zählt nicht neu.
+  expect(counted).toHaveLength(2);
+  expect(screen.getByText("1:24,999")).toBeTruthy();
+  timing.mockRestore();
 });
 
 // Langer Titel (#1867): bei 360 dp brach Android „Regenbogen-Boulevard“ mitten im Wort um. Umbrochen wird nur

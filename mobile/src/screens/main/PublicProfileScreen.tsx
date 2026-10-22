@@ -24,6 +24,8 @@ import { idSegment } from "../../lib/apiIds";
 import { useKeyedLoad } from "../../lib/useKeyedLoad";
 import { sortAwards, type Award } from "../../lib/awards";
 import { formatDate, formatStatus } from "../../lib/format";
+import { showLapTime } from "../../lib/laptime";
+import { CountUp } from "../../components/motion";
 import { blockUser, listBlocked, unblockUser } from "../../lib/moderation";
 import type { AppStackParamList, ProfileTabKey } from "../../navigation/types";
 import { seasonScrollProps } from "../../seasons/sky/scroll";
@@ -437,7 +439,7 @@ export function ProfileView({ username, navigation, own, header, scrollRef }: { 
         {headerStats.length ? (
           <View style={styles.statBar} testID="profile-stats">
             {headerStats.map((stat) => (
-              <BarStat key={stat.key} label={stat.label} value={stat.value.toLocaleString("de-DE")} tone={stat.tone} testID={`profile-stat-${stat.key}`} />
+              <BarStat key={stat.key} label={stat.label} value={stat.value} tone={stat.tone} testID={`profile-stat-${stat.key}`} />
             ))}
           </View>
         ) : null}
@@ -603,7 +605,7 @@ function FastLapTab({ items, onOpen }: { items: any[]; onOpen: (item: any) => vo
                 <Heading>{[item.track?.name, item.track?.country].filter(Boolean).join(" · ") || "Strecke"}</Heading>
                 <Muted>{item.is_leader ? "Pole Position" : "Bestzeit"}</Muted>
               </View>
-              <Body style={[styles.time, item.is_leader && styles.gold]}>{item.time_str || "-"}</Body>
+              <Body style={[styles.time, item.is_leader && styles.gold]}>{showLapTime(item.time_str) || "-"}</Body>
             </View>
           </Card>
         </Pressable>
@@ -658,10 +660,11 @@ function InfoGrid({ title, rows }: { title: string; rows: Array<[string, unknown
 }
 
 /** Eine Zahl der Zahlenleiste im Profilkopf (#1149). */
-function BarStat({ label, value, tone, testID }: { label: string; value: unknown; tone?: "gold"; testID?: string }) {
+// Kennzahlen im Kopf zählen beim Öffnen hoch (#1969), mit Tausenderpunkt; beim Nachladen leuchtet ein neuer Wert kurz auf.
+function BarStat({ label, value, tone, testID }: { label: string; value: number; tone?: "gold"; testID?: string }) {
   return (
     <View style={styles.barStat} testID={testID}>
-      <Body style={[styles.barValue, tone === "gold" && styles.gold]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>{String(value ?? 0)}</Body>
+      <CountUp value={value} grouped tone={tone === "gold" ? "honor" : "brand"} style={[styles.barValue, tone === "gold" && styles.gold]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7} />
       <Muted style={styles.barLabel} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>{label}</Muted>
     </View>
   );

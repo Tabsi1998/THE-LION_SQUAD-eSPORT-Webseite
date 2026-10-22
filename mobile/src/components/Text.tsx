@@ -24,22 +24,23 @@ function ProbedText({ style, base, ...props }: Props & { base: object }) {
 }
 
 export function Title(props: Props) {
-  return <ProbedText {...props} base={styles.title} />;
+  return <ProbedText {...props} base={textStyles.title} />;
 }
 
 export function Heading(props: Props) {
-  return <ProbedText {...props} base={styles.heading} />;
+  return <ProbedText {...props} base={textStyles.heading} />;
 }
 
 export function Body(props: Props) {
-  return <ProbedText {...props} base={styles.body} />;
+  return <ProbedText {...props} base={textStyles.body} />;
 }
 
 export function Muted(props: Props) {
-  return <ProbedText {...props} base={styles.muted} />;
+  return <ProbedText {...props} base={textStyles.muted} />;
 }
 
-const styles = StyleSheet.create({
+/** Die Grundschriften, etwa für Bausteine mit eigenem Text (Hochzählen, #1969). */
+export const textStyles = StyleSheet.create({
   title: {
     color: colors.white,
     fontSize: 30,

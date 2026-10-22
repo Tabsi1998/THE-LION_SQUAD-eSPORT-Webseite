@@ -1,5 +1,6 @@
 // Rückblick nach dem Event (#1187) und Freunde beim Event (#1188): dieselben Texte und Regeln wie auf der Website
 // (frontend/src/lib/eventRecap.js). Die Daten rechnet der Server (services/event_recap.py, services/event_friends.py).
+import { showLapTime } from "./laptime";
 import { viennaDay } from "./vienna";
 
 const YOUTH_AGE = 14;
@@ -32,6 +33,12 @@ export function podiumOrder(podium: PodiumEntry[] = []): Array<PodiumEntry | nul
   return [2, 1, 3].map((rank) => byRank.get(rank) || null);
 }
 
+/** Was unter einem Namen am Treppchen steht: eine Rundenzeit (mit `time_ms`) mit Komma (#1969), sonst der Text vom Server. */
+export function podiumDetail(entry: PodiumEntry): string {
+  if (entry.time_ms != null) return showLapTime(entry.detail || entry.time_ms);
+  return entry.detail || "";
+}
+
 /** Die Zahlen als Kacheln - nur Summen. Leere Werte fallen weg, Teilnehmer bleiben immer stehen. */
 export function numberTiles(numbers: EventRecapData["numbers"]): Array<{ key: string; value: number; label: string }> {
   if (!numbers) return [];
@@ -52,7 +59,7 @@ export function ownResultLine(result: OwnResult | null | undefined): string {
   if (!result) return "";
   const place = result.rank ? `Platz ${result.rank}${result.of ? ` von ${result.of}` : ""}` : "";
   if (result.kind === "fastlap") {
-    return [result.best_lap ? `Beste Runde ${result.best_lap}` : "", place, result.track && result.track !== result.title ? result.track : ""].filter(Boolean).join(" · ");
+    return [result.best_lap ? `Beste Runde ${showLapTime(result.best_lap)}` : "", place, result.track && result.track !== result.title ? result.track : ""].filter(Boolean).join(" · ");
   }
   return [place || "Ohne Platzierung", result.team_name ? `mit ${result.team_name}` : ""].filter(Boolean).join(" · ");
 }

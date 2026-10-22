@@ -5,18 +5,16 @@ import { Linking, Pressable, RefreshControl, ScrollView, StyleSheet, View } from
 import { Button } from "../../components/Button";
 import { FadeIn, staggerDelay } from "../../components/FadeIn";
 import { ErrorState, SkeletonList, loadProblem, type LoadProblem } from "../../components/ListState";
-import { CountUpText } from "../../components/references/CountUpText";
 import { CountryFlag } from "../../components/references/CountryFlag";
 import { ink, medalTone } from "../../components/references/parts";
-import { GlowOnce, NoScoreNote, SeasonNotice } from "../../components/references/seriesParts";
+import { NoScoreNote, SeasonNotice } from "../../components/references/seriesParts";
+import { CountUp, Glow } from "../../components/motion";
 import { Screen } from "../../components/Screen";
 import { Body, Muted } from "../../components/Text";
 import { api } from "../../lib/api";
 import { gridWords } from "../../lib/raceWeekend";
+import { COUNT_UP_MS, countDelay, countsUp } from "../../lib/countUp";
 import {
-  COUNT_UP_MS,
-  countDelay,
-  countsUp,
   emptyText,
   mobileMain,
   mobileSub,
@@ -52,10 +50,10 @@ import { colors, roles, surfaces } from "../../theme";
 
 type Props = NativeStackScreenProps<MoreStackParamList, "ReferenceRound">;
 
-const TONES: Record<string, string> = { winner: roles.honor, pole: "#E879F9", fastest_lap: "#C084FC", driver_of_the_day: roles.honor, best_club: colors.cyan };
+const TONES: Record<string, string> = { winner: roles.honor, pole: roles.pole, fastest_lap: roles.fastest, driver_of_the_day: roles.honor, best_club: colors.cyan };
 const BADGE_STYLES: Record<Badge["key"], { fg: string; bg: string; border?: string }> = {
-  pole: { fg: "#1A0620", bg: "#E879F9" },
-  fastest_lap: { fg: "#140A24", bg: "#C084FC" },
+  pole: { fg: "#1A0620", bg: roles.pole },
+  fastest_lap: { fg: "#140A24", bg: roles.fastest },
   driver_of_the_day: { fg: "#1A1400", bg: roles.honor },
   dnf: { fg: ink.muted, bg: "transparent", border: "rgba(255,255,255,0.25)" },
   dsq: { fg: ink.muted, bg: "transparent", border: "rgba(255,255,255,0.25)" },
@@ -229,7 +227,7 @@ function FactCard({ card, playKey }: { card: SummaryCard; playKey: string }) {
       <Body style={[styles.factValue, !card.named && card.color ? { color: card.color } : null]} numberOfLines={2}>{card.value}</Body>
       {card.count || card.sub ? (
         <View style={styles.factSub}>
-          {card.count ? <CountUpText text={card.count} playKey={playKey} style={styles.factSubText} /> : null}
+          {card.count ? <CountUp value={card.count} playKey={playKey} variant="muted" style={styles.factSubText} /> : null}
           {card.sub ? <Muted style={styles.factSubText}>{card.count ? ` · ${card.sub}` : card.sub}</Muted> : null}
         </View>
       ) : null}
@@ -281,7 +279,7 @@ function ResultRow({ row, index, playKey, shows }: { row: RoundRow; index: numbe
   ].filter(Boolean).join(", ");
   return (
     <View style={[styles.row, row.own && styles.rowOwn, !finished && styles.rowOut]} accessible accessibilityLabel={label} testID={`round-row-${row.key}`}>
-      {row.own ? <GlowOnce delay={delay + COUNT_UP_MS} trigger={playKey} radius={6} /> : null}
+      {row.own ? <Glow active delay={delay + COUNT_UP_MS} trigger={playKey} radius={6} /> : null}
       <View style={[styles.pos, tone ? { backgroundColor: tone.ring } : null]}>
         <Body style={[styles.posText, tone ? styles.posTextMedal : null, !finished && styles.posTextOut]}>{posLabel(row)}</Body>
       </View>
@@ -295,8 +293,8 @@ function ResultRow({ row, index, playKey, shows }: { row: RoundRow; index: numbe
       </View>
       {main ? (
         <View style={styles.right}>
-          {shows.times && countsUp(index)
-            ? <CountUpText text={main} playKey={playKey} delay={delay} style={[styles.main, !finished && styles.mainOut]} />
+          {shows.times
+            ? <CountUp value={main} playKey={playKey} delay={delay} play={countsUp(index)} style={[styles.main, !finished && styles.mainOut]} />
             : <Body style={[styles.main, !finished && styles.mainOut]}>{main}</Body>}
           {subText ? <Muted style={styles.sub}>{subText}</Muted> : null}
         </View>
@@ -311,7 +309,7 @@ function RowBadge({ badge, glowDelay, playKey }: { badge: Badge; glowDelay: numb
   const glow = badge.key === "pole" || badge.key === "fastest_lap";
   return (
     <View style={[styles.badge, { backgroundColor: look.bg, borderColor: look.border || look.bg }]} testID={`round-badge-${badge.key}`}>
-      {glow ? <GlowOnce delay={glowDelay} color="#FFFFFF" peak={0.45} trigger={playKey} radius={3} /> : null}
+      {glow ? <Glow active delay={glowDelay} color="#FFFFFF" peak={0.45} trigger={playKey} radius={3} /> : null}
       <Muted style={[styles.badgeText, { color: look.fg }]}>{badge.short}</Muted>
     </View>
   );

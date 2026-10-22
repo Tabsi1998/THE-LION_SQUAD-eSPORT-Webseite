@@ -69,6 +69,19 @@ describe("gestaffelte Listen", () => {
     expect(screen.getByText("zeile-5").parent?.props.style).toEqual({ opacity: 1, transform: [{ translateY: 0 }] });
   });
 
+  test("„Bewegung reduzieren“ gilt sofort beim ersten Zeichnen - auch bevor das Handy antwortet (#1969)", async () => {
+    const reanimated = jest.requireMock("react-native-reanimated");
+    const startValue = jest.spyOn(reanimated, "useReducedMotion").mockReturnValue(true);
+    jest.spyOn(AccessibilityInfo, "isReduceMotionEnabled").mockReturnValue(new Promise<boolean>(() => undefined));
+    await render(<List ids={["a", "b"]} />);
+    expect(timing).not.toHaveBeenCalled();
+    expect(screen.getByText("b").parent?.props.style).toEqual({ opacity: 1, transform: [{ translateY: 0 }] });
+    await render(<FadeIn trigger="x"><Text>Sofort</Text></FadeIn>);
+    expect(timing).not.toHaveBeenCalled();
+    expect(screen.getByText("Sofort").parent?.props.style).toEqual({ opacity: 1, transform: [{ translateY: 0 }] });
+    startValue.mockRestore();
+  });
+
   test("mit „Bewegung reduzieren“ ist alles sofort da, nichts bewegt sich", async () => {
     jest.spyOn(AccessibilityInfo, "isReduceMotionEnabled").mockResolvedValue(true);
     await render(<List ids={[]} />);

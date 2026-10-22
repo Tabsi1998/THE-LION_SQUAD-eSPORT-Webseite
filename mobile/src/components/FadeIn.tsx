@@ -1,27 +1,13 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { AccessibilityInfo, Animated, type StyleProp, type ViewStyle } from "react-native";
+import { Animated, type StyleProp, type ViewStyle } from "react-native";
 import { MOTION, motionEasing, staggerMs } from "../lib/motion";
+import { useReduceMotion } from "./motion/useReduceMotion";
 
 // Sanfte Übergänge (#218): Inhalt blendet kurz ein, statt zu springen. Keine Dauer-Animation,
 // und wer am Handy „Bewegung reduzieren“ / „Animationen entfernen“ eingestellt hat, bekommt
-// den Inhalt sofort.
+// den Inhalt sofort - schon beim ersten Zeichnen (#1969, Reanimated liest die Einstellung synchron).
 
-export function useReduceMotion(): boolean {
-  const [reduce, setReduce] = useState(false);
-  useEffect(() => {
-    let active = true;
-    // Promise.resolve: manche Umgebungen (Tests mit wiederhergestellten Mocks) liefern hier kein Promise.
-    Promise.resolve(AccessibilityInfo.isReduceMotionEnabled())
-      .then((value) => { if (active) setReduce(Boolean(value)); })
-      .catch(() => {});
-    const subscription = AccessibilityInfo.addEventListener("reduceMotionChanged", (value) => setReduce(Boolean(value)));
-    return () => {
-      active = false;
-      subscription?.remove?.();
-    };
-  }, []);
-  return reduce;
-}
+export { useReduceMotion };
 
 // Dauer und Versatz aus den Bewegungs-Regeln (#1085): wie im Web (240 ms, 70 ms je Stelle, höchstens acht Stufen).
 export const FADE_MS = MOTION.mid;

@@ -37,6 +37,9 @@ export const roles = {
   quiet: "#8E8E99",
   silver: "#C9CED6",
   bronze: "#D08A4E",
+  // Pink und Violett nur für Pole und schnellste Runde (Rennserien) - wie --tls-pole/--tls-fastest im Web.
+  pole: "#E879F9",
+  fastest: "#C084FC",
 };
 
 // Flächen (#1305): Schwarz als Grund, darauf drei Stufen - wie --tls-surface-0 bis -3 im Web.
@@ -83,4 +86,35 @@ export const motion = {
   mid: 240,
   slow: 420,
   ease: [0.2, 0.7, 0.2, 1] as const,
+};
+
+// Mikro-Bewegung (#1969) - dieselben Werte wie `MICRO` im Web (frontend/src/lib/motion.js). Die Bausteine in
+// components/motion (CountUp, StaggerIn, Glow, Press) nehmen nur diese Werte; lib/motion.test.ts hält sie fest.
+//   count         900 ms  Zahlen und Zeiten zählen hoch (ease-out)
+//   countStagger   25 ms  Versatz je Zeile beim Hochzählen in Tabellen
+//   stagger        50 ms  Versatz je Eintrag beim gestaffelten Erscheinen - nur die ersten `staggerMax` Einträge
+//   glow          840 ms  kurzes Aufleuchten eines neuen Werts oder Abzeichens, einmal
+export const micro = {
+  count: 900,
+  countStagger: 25,
+  stagger: 50,
+  staggerMax: 12,
+  glow: 840,
+};
+
+// Farben fürs Aufleuchten (#1969) - die Farb-Rollen wie `data-tone` an `.tls-glow` im Web.
+export const glowTones = {
+  brand: roles.brand,
+  honor: roles.honor,
+  ok: roles.ok,
+  pole: roles.pole,
+  fastest: roles.fastest,
+};
+
+// Puls-Varianten (#1969) wie `.tls-run-pulse` im Web: Gold (Ehre, Vorgabe), Cyan (Marke), Rot („läuft gerade“), Grün.
+export const pulseTones = {
+  honor: roles.honor,
+  brand: roles.brand,
+  live: roles.live,
+  ok: roles.ok,
 };

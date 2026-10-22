@@ -2,10 +2,12 @@ import React, { useEffect, useMemo, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { FadeIn, staggerDelay } from "../../FadeIn";
 import { SkeletonList } from "../../ListState";
+import { CountUp } from "../../motion";
 import { Body, Muted } from "../../Text";
 import { FilterChip, ink } from "../parts";
 import { api } from "../../../lib/api";
 import { METRICS, knownMetrics, leaders, metricText, rankBy, type StatRow, type StatisticsPage } from "../../../lib/referenceRound";
+import { countDelay, countsUp } from "../../../lib/countUp";
 import { nameOf } from "../../../lib/seriesFormat";
 import { colors, surfaces } from "../../../theme";
 
@@ -84,7 +86,7 @@ export function SeasonStatistics({ lineage, season }: { lineage: string; season:
       <FadeIn trigger={`${shownScope}-${active}`}>
         <Muted style={styles.caption}>{`Sortiert: ${METRICS[active]?.title || ""}`}</Muted>
         <View style={styles.table} testID="season-statistics-table">
-          {ranked.map(({ row, rank }) => {
+          {ranked.map(({ row, rank }, index) => {
             const others = metrics.filter((key) => key !== active && metricText(row, key) !== "–").map((key) => `${METRICS[key].column} ${metricText(row, key)}`).join(" · ");
             return (
               <View
@@ -99,7 +101,8 @@ export function SeasonStatistics({ lineage, season }: { lineage: string; season:
                   <Body style={[styles.name, mine(row) && styles.mine, row.name_hidden && styles.hidden]}>{label(row)}</Body>
                   {others ? <Muted style={styles.others}>{others}</Muted> : null}
                 </View>
-                <Body style={styles.value}>{metricText(row, active)}</Body>
+                {/* Der Wert zählt beim Öffnen und bei jeder neuen Sortierung hoch (#1969). */}
+                <CountUp value={metricText(row, active)} playKey={`${shownScope}-${active}`} delay={countDelay(index)} play={countsUp(index)} style={styles.value} />
               </View>
             );
           })}

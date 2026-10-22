@@ -1,6 +1,6 @@
 import { Canvas, Picture, Skia, createPicture, useImage, type SkPicture } from "@shopify/react-native-skia";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { AccessibilityInfo, AppState, Image, PixelRatio, StyleSheet, Text, View, useWindowDimensions } from "react-native";
+import { AppState, Image, PixelRatio, StyleSheet, Text, View, useWindowDimensions } from "react-native";
 import Animated, { Easing, runOnJS, useAnimatedStyle, useFrameCallback, useSharedValue, withDelay, withSequence, withTiming, type FrameInfo } from "react-native-reanimated";
 import { ASCENT_TIMING, type AscentMoment, artAroundPhoto, burstDelayMs, popDelayMs } from "../lib/loewenAufstieg";
 import {
@@ -22,6 +22,7 @@ import {
 import { useOverlayOpen, useScreenFocused } from "../seasons/screenFocus";
 import { colors } from "../theme";
 import { frameImage } from "./loewenRangImages";
+import { useReduceMotion } from "./motion/useReduceMotion";
 import { BURST_SECONDS, drawBurst, drawSignature, signatureVisible, type SignatureScene } from "./loewenRangSignature";
 
 // Löwen-Rang in der App (#1457): das Profilbild im Rahmen seines Rangs, wie im Web (LevelAvatarFrame.jsx, #1454).
@@ -67,7 +68,8 @@ export function LoewenRangFrame({ level, prestige, rankName, size = "list", show
   const { width } = useWindowDimensions();
   const area = areaFor(size, width);
   const box = useMemo(() => frameBox(level, area), [level, area]);
-  const reduceMotion = useReduceMotionKnown();
+  // „Bewegung reduzieren“ steht sofort fest (#1969) - bei Menschen, die keine Bewegung wollen, blitzt kein Glanz auf.
+  const reduceMotion = useReduceMotion();
   const still = STILL_VARIANTS.has(size);
   const stars = prestigeCount(prestige);
   const plate = showBadge && !still;
@@ -268,26 +270,6 @@ function AscentBurst({ box, moment }: { box: FrameBox; moment: AscentMoment }) {
       <Picture picture={picture} />
     </Canvas>
   );
-}
-
-/**
- * „Bewegung reduzieren“ - bis das Handy geantwortet hat, gilt ja: so blitzt bei Menschen, die keine Bewegung wollen,
- * nicht einmal kurz ein Glanz auf.
- */
-function useReduceMotionKnown(): boolean {
-  const [reduce, setReduce] = useState<boolean | null>(null);
-  useEffect(() => {
-    let active = true;
-    Promise.resolve(AccessibilityInfo.isReduceMotionEnabled())
-      .then((value) => { if (active) setReduce(Boolean(value)); })
-      .catch(() => { if (active) setReduce(true); });
-    const subscription = AccessibilityInfo.addEventListener("reduceMotionChanged", (value) => setReduce(Boolean(value)));
-    return () => {
-      active = false;
-      subscription?.remove?.();
-    };
-  }, []);
-  return reduce !== false;
 }
 
 /** Die App ist vorne - im Hintergrund steht die Signatur still. */

@@ -1,10 +1,14 @@
 import React from "react";
 import { StyleSheet, Text, View } from "react-native";
+import { countDelay, countsUp } from "../../lib/countUp";
 import type { StandingsTable } from "../../lib/tournamentView";
+import { CountUp } from "../motion";
 import { colors, radius, roles, surfaces } from "../../theme";
 
 // Gruppen, Liga und Swiss als Tabelle statt Baum-Spalten (#1563): je Gruppe eine Tabelle, Platz, Name, Spiele, Siege,
 // Unentschieden, Niederlagen, Differenz (Swiss: Buchholz) und Punkte. „Du“ in Cyan, Ausgeschiedene leise markiert.
+// Die Punkte zählen beim Öffnen hoch, je Zeile leicht versetzt (#1969); beim Live-Nachladen leuchtet nur ein neuer
+// Stand kurz auf.
 
 const COLUMN_HINTS: Record<string, string> = { Sp: "Spiele", S: "Siege", U: "Unentschieden", N: "Niederlagen", Diff: "Differenz", BH: "Buchholz", Pkt: "Punkte" };
 
@@ -22,7 +26,7 @@ export function StandingsTables({ tables, empty }: { tables: StandingsTable[]; e
               <Text key={column} style={[styles.cell, styles.headText, column === "Pkt" && styles.points]} accessibilityLabel={COLUMN_HINTS[column]}>{column}</Text>
             ))}
           </View>
-          {table.rows.map((row) => (
+          {table.rows.map((row, rowIndex) => (
             <View
               key={row.id}
               style={[styles.row, row.mine && styles.mineRow]}
@@ -36,9 +40,11 @@ export function StandingsTables({ tables, empty }: { tables: StandingsTable[]; e
                 {row.mine ? <Text style={styles.du}>Du</Text> : null}
                 {row.out ? <Text style={styles.outTag}>{row.out}</Text> : null}
               </View>
-              {row.cells.map((cell, index) => (
-                <Text key={table.columns[index]} style={[styles.cell, table.columns[index] === "Pkt" && styles.points]} maxFontSizeMultiplier={1.4}>{cell}</Text>
-              ))}
+              {row.cells.map((cell, index) => (table.columns[index] === "Pkt" ? (
+                <CountUp key="Pkt" value={cell} delay={countDelay(rowIndex)} play={countsUp(rowIndex)} style={[styles.cell, styles.points]} containerStyle={styles.pointsBox} />
+              ) : (
+                <Text key={table.columns[index]} style={styles.cell} maxFontSizeMultiplier={1.4}>{cell}</Text>
+              )))}
             </View>
           ))}
         </View>
@@ -67,4 +73,5 @@ const styles = StyleSheet.create({
   outTag: { color: roles.warn, fontSize: 10, fontWeight: "900" },
   cell: { color: roles.muted, fontSize: 12, fontVariant: ["tabular-nums"], textAlign: "right", width: 30 },
   points: { color: colors.white, fontWeight: "900", width: 34 },
+  pointsBox: { width: 34 },
 });

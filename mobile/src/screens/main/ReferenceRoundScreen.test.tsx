@@ -55,6 +55,8 @@ beforeEach(() => {
 });
 
 test("Kopf, Zusammenfassung ohne fremde Namen und das Hauptrennen mit hochzählenden Zeiten", async () => {
+  // Das Zählen kommt im Test nie ans Ziel - so bleibt der Zählstand sichtbar (sonst steht gleich der Endwert da).
+  jest.spyOn(reanimated, "withTiming").mockImplementation(() => 0);
   mockGet.mockResolvedValue({ data: PAGE });
   await render(<ReferenceRoundScreen navigation={navigation as never} route={routeFor({ lineage: "prl", season: "2026", round: 3 })} />);
   await waitFor(() => expect(screen.getByText("Aserbaidschan")).toBeTruthy());
@@ -85,6 +87,14 @@ test("Kopf, Zusammenfassung ohne fremde Namen und das Hauptrennen mit hochzähle
   expect(within(hidden).getByText("+1 Runde")).toBeTruthy();
   expect(within(screen.getByTestId("round-row-out")).getByText("Ausfall")).toBeTruthy();
   expect(screen.getByTestId("round-own-teams").props.children).toBe("Vereinsteams hervorgehoben: Löwen Racing");
+});
+
+test("nach dem Zählen steht jede Zeit exakt als Text da (#1969)", async () => {
+  mockGet.mockResolvedValue({ data: PAGE });
+  await render(<ReferenceRoundScreen navigation={navigation as never} route={routeFor({ lineage: "prl", season: "2026", round: 3 })} />);
+  await waitFor(() => expect(screen.getByText("31:55,056")).toBeTruthy());
+  expect(screen.getByText("+6,197")).toBeTruthy();
+  expect(screen.queryByDisplayValue("00:00,000", { includeHiddenElements: true })).toBeNull();
 });
 
 test("„Bewegung reduzieren“: alle Zeiten stehen sofort da", async () => {
