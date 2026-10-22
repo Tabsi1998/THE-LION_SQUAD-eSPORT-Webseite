@@ -21,8 +21,10 @@ import {
   type SeasonTarget,
   type Showcase,
 } from "../../lib/references";
+import { hostBadge } from "../../lib/seriesPartners";
 import { WEB_BASE_URL } from "../../lib/siteUrls";
 import { colors, roles, surfaces } from "../../theme";
+import { PartnerHostBadge, SessionChips } from "./seriesParts";
 import { FadeIn, staggerDelay } from "../FadeIn";
 import { Button } from "../Button";
 import { EmptyState } from "../ListState";
@@ -206,6 +208,8 @@ function RunningCard({ item, onOpen }: { item: RunningItem; onOpen: (target: Sea
         <View style={styles.flex}>
           <Muted style={styles.kind}>{view.kind}</Muted>
           <Body style={styles.cardTitle}>{view.title}</Body>
+          {/* Veranstalter als Partner-Abzeichen (#1934). */}
+          {view.host ? <View style={styles.host}><PartnerHostBadge partner={view.host} /></View> : null}
         </View>
         {view.today ? (
           <View style={styles.todayChip}>
@@ -222,6 +226,8 @@ function RunningCard({ item, onOpen }: { item: RunningItem; onOpen: (target: Sea
           {view.progress ? <Muted style={styles.progress}>{`${view.progress.scored} / ${view.progress.total}`}</Muted> : null}
         </View>
       ) : null}
+      {/* Die Läufe der nächsten Runde (#1930) - zum Lesen, die Karte öffnet die Saison. */}
+      {view.sessions.length ? <SessionChips rounds={view.sessions} testID={`running-card-sessions-${view.key}`} /> : null}
       {view.progress ? <ProgressFill share={view.progress.share} label={view.progress.text} /> : null}
       <Muted style={styles.place}>{view.place}</Muted>
     </Pressable>
@@ -256,6 +262,8 @@ function LineageCard({ item, onOpen }: { item: LineageItem; onOpen: (target: Sea
   const path = leaguePath(item.seasons, item.lineage.tier_order);
   const tiles = pathSteps(item.seasons, item.lineage.tier_order, undefined, item.lineage.kind);
   const target = item.lineage.slug && path.target?.season_slug ? { lineage: item.lineage.slug, season: path.target.season_slug } : null;
+  // Veranstalter der Spur als Partner-Abzeichen (#1934) - ältere Server schicken keinen.
+  const host = hostBadge(item.lineage.organizers);
   return (
     <Pressable
       onPress={target ? () => onOpen(target) : undefined}
@@ -269,6 +277,7 @@ function LineageCard({ item, onOpen }: { item: LineageItem; onOpen: (target: Sea
         <Body style={[styles.lineageTitle, styles.flex]}>{item.lineage.title}</Body>
         <Muted style={styles.lineageCount}>{path.summary}</Muted>
       </View>
+      {host ? <PartnerHostBadge partner={host} /> : null}
       <PathStrip tiles={tiles} compact />
     </Pressable>
   );
@@ -293,6 +302,7 @@ const styles = StyleSheet.create({
   flex: { flex: 1, minWidth: 0 },
   kind: { color: ink.muted, fontSize: 12 },
   cardTitle: { color: ink.text, fontSize: 16, fontWeight: "700", lineHeight: 20 },
+  host: { marginTop: 6 },
   todayChip: { alignItems: "center", backgroundColor: roles.honor, borderRadius: 4, flexDirection: "row", gap: 6, paddingHorizontal: 8, paddingVertical: 3 },
   todayText: { color: "#06121A", fontSize: 11, fontWeight: "800", letterSpacing: 1.1, textTransform: "uppercase" },
   nextRow: { flexDirection: "row", gap: 8, justifyContent: "space-between" },

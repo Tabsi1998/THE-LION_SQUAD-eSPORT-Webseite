@@ -26,6 +26,7 @@ import { ScheduleList } from "../../components/tournament/ScheduleList";
 import { StandingsTables } from "../../components/tournament/StandingsTables";
 import { getRegistrationState } from "../../lib/registration";
 import { TeamDayCard } from "../../components/tournament/TeamDayCard";
+import { TournamentMapPools } from "../../components/tournament/TournamentMapPools";
 import { ResultShareCard } from "../../components/ResultShareCard";
 import { ownPriceLine, startFeeSummary } from "../../lib/startFee";
 import { isGuestUser } from "../../live";
@@ -505,6 +506,8 @@ export function TournamentDetailScreen({ navigation, route }: Props) {
             </Card>
             {/* Team am Spieltag (#1192): Aufstellung und „Wer ist da“ - nur angemeldete Teams bei Team-Turnieren. */}
             {registered && isTeamTournament && !guest ? <TeamDayCard tournamentId={tournament.id} /> : null}
+            {/* Map-Pool des Turniers und seiner Phasen (#1616) - nur mit Spiel und Pool. */}
+            <TournamentMapPools tournamentId={tournament.slug || tournament.id} gameId={tournament.game_id} />
             {/* Freunde beim Turnier (#1188 Teil 2): nur mit Konto, nur bestätigte Freunde, die es erlauben. */}
             <FriendsAtEventCard
               path={`/tournaments/${tournament.slug || tournament.id}/friends`}

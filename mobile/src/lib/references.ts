@@ -1,4 +1,6 @@
 import { countryCode } from "./countryFlags";
+import { KIND_LABELS } from "./seriesFormat";
+import { hostBadge, type PartnerBadge } from "./seriesPartners";
 import { asInstant, dayNoon, viennaDate, viennaDay } from "./vienna";
 
 /** Ein Datum vom Server als Zeitpunkt - null ohne gültigen Wert. */
@@ -58,12 +60,31 @@ export type ClubReference = {
   member_profile_ids?: string[] | null;
   lineup_members?: LineupMember[] | null;
   entries?: ReferenceEntry[] | null;
+  /** Einsätze der Person in der verknüpften Saison (#1931, nur im Mitgliederprofil) - ältere Server schicken es nicht. */
+  appearances?: Appearances | null;
 };
+
+/** „5 von 7 Spielen“: gespielt, von wie vielen, und ob Spiele, Rennen oder Runden gezählt sind. */
+export type Appearances = { played?: number | null; of?: number | null; unit?: "matches" | "races" | "rounds" | string | null; team?: string | null };
+
+const APPEARANCE_UNITS: Record<string, [string, string]> = { matches: ["Spiel", "Spielen"], races: ["Rennen", "Rennen"], rounds: ["Runde", "Runden"] };
+
+/** Einsätze als Text wie im Web (lib/teamLeagueEntry.js): „5 von 7 Spielen“, „1 von 1 Spiel“ - ohne Angabe leer. */
+export function appearancesText(appearances: Appearances | null | undefined): string {
+  const of = Number(appearances?.of) || 0;
+  if (!of) return "";
+  const [one, many] = APPEARANCE_UNITS[String(appearances?.unit)] || APPEARANCE_UNITS.matches;
+  return `${Number(appearances?.played) || 0} von ${of} ${of === 1 ? one : many}`;
+}
 
 export type ReferenceSummaryData = { total?: number; gold?: number; silver?: number; bronze?: number; games?: number; podiums?: number } | null | undefined;
 export type Showcase = { mode?: "auto" | "pinned" | string; reference_id?: string | null } | null | undefined;
 
-export type LineageInfo = { title?: string | null; slug?: string | null; kind?: string | null; label?: string | null; organizer?: string | null; game_name?: string | null; tier_order?: string[] | null };
+export type LineageInfo = {
+  title?: string | null; slug?: string | null; kind?: string | null; label?: string | null; organizer?: string | null; game_name?: string | null; tier_order?: string[] | null;
+  /** Veranstalter der Spur (#1934, aus /lineages) - ältere Server schicken es nicht. */
+  organizers?: PartnerBadge[] | null;
+};
 export type ClubPlace = { rank?: number | null; of?: number | null } | null;
 export type LineageSeason = {
   season?: string | null;
@@ -74,6 +95,8 @@ export type LineageSeason = {
   season_result?: string | null;
   club?: ClubPlace;
   reference_ids?: string[] | null;
+  /** Veranstalter der Saison (#1934). */
+  organizers?: PartnerBadge[] | null;
 };
 /** Eine Spur mit ihren Saisons aus /api/reference-series/public/lineages. */
 export type LineageItem = { lineage: LineageInfo; game?: GameInfo; seasons?: LineageSeason[] | null };
@@ -86,13 +109,24 @@ export type RunningItem = {
   next?: NextRound | null;
   today?: boolean | null;
   club?: ClubPlace;
+  /** Veranstalter der Saison (#1934) - ältere Server schicken es nicht. */
+  organizers?: PartnerBadge[] | null;
 };
-export type NextRound = { code?: string | null; title?: string | null; club_day?: string | null; state?: string | null; time?: string | null; country_code?: string | null };
+export type NextRound = {
+  code?: string | null; title?: string | null; club_day?: string | null; state?: string | null; time?: string | null; country_code?: string | null;
+  /** Der nächste Lauf der Runde (#1930) und alle Läufe der Runde (nur bei mehreren). */
+  session?: string | null;
+  sessions?: Array<{ session?: string | null; club_day?: string | null; time?: string | null; state?: string | null; next?: boolean | null }> | null;
+  /** Team-Liga (#1931): Gegner, Heim/Auswärts und ein Spieltag über mehrere Tage. */
+  opponent?: string | null;
+  at_home?: boolean | null;
+  club_day_end?: string | null;
+};
 
 export type SeasonTarget = { lineage: string; season: string };
 export type SeasonLink = { lineage: LineageInfo; season: LineageSeason };
 
-export const KIND_LABELS: Record<string, string> = { series: "Turnierserie", racing: "Rennliga", team_league: "Team-Liga" };
+export { KIND_LABELS };
 
 // ---------------------------------------------------------------- Bausteine einer Teilnahme
 
@@ -521,14 +555,30 @@ function dayLabel(value: Date, options: Intl.DateTimeFormatOptions): string {
   return viennaDate(value, options);
 }
 
-/** Der nächste Termin: heute „R7 · 20:30“, sonst „Do 22.10. · 20:00 · ST4“ (Wiener Tag). */
+function shortDay(day: string | null | undefined): string {
+  const noon = day && /^\d{4}-\d{2}-\d{2}$/.test(day) ? dayNoon(day) : null;
+  return noon ? `${dayLabel(noon, { weekday: "short" }).replace(/\.$/, "")} ${dayLabel(noon, { day: "2-digit", month: "2-digit" })}` : "";
+}
+
+/** Gegner eines Spieltags (#1931): „vs X“ daheim, „@ X“ auswärts, sonst „gegen X“. */
+export function opponentText(next: Pick<NextRound, "opponent" | "at_home"> | null | undefined): string {
+  const name = String(next?.opponent || "").trim();
+  if (!name) return "";
+  if (next?.at_home === true) return `vs ${name}`;
+  if (next?.at_home === false) return `@ ${name}`;
+  return `gegen ${name}`;
+}
+
+/** Der nächste Termin wie im Web: heute „R3 · Sprint · 19:50“, sonst „Do 22.10. · 20:00 · R3 · Qualifying“ (Wiener
+ * Tag), mit Gegner; ein Spieltag über mehrere Tage „Mi 21.10.–So 25.10.“ ohne Uhrzeit. */
 export function nextValue(next: NextRound | null | undefined): string {
   if (!next) return "Kein Termin offen";
-  const label = next.code || next.title || "";
-  if (next.state === "today") return [label, next.time].filter(Boolean).join(" · ");
-  const noon = next.club_day && /^\d{4}-\d{2}-\d{2}$/.test(next.club_day) ? dayNoon(next.club_day) : null;
-  const day = noon ? `${dayLabel(noon, { weekday: "short" }).replace(/\.$/, "")} ${dayLabel(noon, { day: "2-digit", month: "2-digit" })}` : "";
-  return [day, next.time, label].filter(Boolean).join(" · ");
+  const label = [next.code || next.title || "", next.session || ""].filter(Boolean).join(" · ");
+  const opponent = opponentText(next);
+  if (next.state === "today") return [label, next.time, opponent].filter(Boolean).join(" · ");
+  const window = Boolean(next.club_day_end && next.club_day_end !== next.club_day);
+  const day = window ? `${shortDay(next.club_day)}–${shortDay(next.club_day_end)}` : shortDay(next.club_day);
+  return [day, window ? "" : next.time, label, opponent].filter(Boolean).join(" · ");
 }
 
 const PLACE_TITLES: Record<string, string> = { racing: "Bester Fahrer", team_league: "Tabelle", series: "Gesamtwertung" };
@@ -564,5 +614,11 @@ export function runningView(item: RunningItem) {
     // Land des nächsten Termins (#1925) - die Karte zeigt seine Flagge vor dem Termin.
     country: countryCode(item.next?.country_code),
     season: lineage.slug && series.season_slug ? { lineage: lineage.slug, season: series.season_slug } : null,
+    // Die Läufe der nächsten Runde als Chips (#1930) - nur bei mehreren.
+    sessions: (item.next?.sessions || []).length > 1
+      ? (item.next?.sessions || []).map((run, index) => ({ id: `s${index}`, code: item.next?.code || null, session: run?.session ?? null, club_day: run?.club_day ?? null, time: run?.time ?? null, state: run?.state ?? null }))
+      : [],
+    // Veranstalter als kleines Partner-Abzeichen (#1934).
+    host: hostBadge(item.organizers),
   };
 }

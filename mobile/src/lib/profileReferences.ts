@@ -1,5 +1,6 @@
 import type { PersonalReferenceItem } from "../types";
 import {
+  appearancesText,
   displayTitle,
   entryPeople,
   fieldLabel,
@@ -36,6 +37,8 @@ export type ProfileRow = {
   /** Aufgeklappt: Team und Feldgröße („Lions · von 8 Teams“). */
   detail: string;
   field: string;
+  /** Einsätze der Person in der Saison (#1931): „5 von 7 Spielen“ - leer ohne Angabe. */
+  played: string;
   year: string;
   time: number;
   game: string;
@@ -74,6 +77,7 @@ function clubRow(item: ClubReference, memberId: string, link: ReturnType<ReturnT
     sub: [game, shortDate(instant)].filter(Boolean).join(" · "),
     detail: [team, field].filter(Boolean).join(" · "),
     field,
+    played: appearancesText(item.appearances),
     year: yearOf(item),
     time: instant?.getTime() || 0,
     game: knownGame,
@@ -94,6 +98,7 @@ function personalRow(item: PersonalReferenceItem): ProfileRow {
     sub: [item.subtitle, item.kind === "fastlap" ? item.time_str : "", shortDate(instant)].filter(Boolean).join(" · "),
     detail: field,
     field,
+    played: "",
     year: instant ? shortDate(instant).slice(-4) : "",
     time: instant?.getTime() || 0,
     game: "",

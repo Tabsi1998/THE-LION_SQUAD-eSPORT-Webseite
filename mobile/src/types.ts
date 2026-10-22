@@ -73,6 +73,8 @@ export type Tournament = {
   can_manage_results?: boolean;
   status?: string;
   game_name?: string;
+  // Spiel des Turniers - mit ihm gibt es einen Map-Pool (#1616).
+  game_id?: string | null;
   game?: {
     name?: string;
     display_name?: string;

@@ -1,17 +1,19 @@
 import {
+  adjustmentLines,
   driverCards,
   gainedWords,
-  leagueTableRows,
-  matchdayRows,
   mobileRows,
   raceCell,
   raceSummary,
+  racingRuleLines,
   racingTableRows,
   roundRows,
   seasonFigures,
   seasonTabs,
   seasonTitle,
   seasonWebPath,
+  tableKinds,
+  teamRuleLabel,
   type SeasonPage,
 } from "./referenceSeason";
 
@@ -54,7 +56,7 @@ const RACING: SeasonPage = {
 test("Kopf und Reiter je Art: Rennliga mit Kalender, Tabelle und Fahrern", () => {
   expect(seasonTitle(RACING)).toBe("Probe Racing League 2026 · Liga 1");
   expect(seasonTitle({ ...RACING, series: { ...RACING.series, title: "PRL 35 · Season 2026" } })).toBe("PRL 35 · Season 2026");
-  expect(seasonTabs(RACING).map((tab) => tab.label)).toEqual(["Kalender", "Tabelle", "Fahrer"]);
+  expect(seasonTabs(RACING).map((tab) => tab.label)).toEqual(["Kalender", "Tabelle", "Fahrer", "Statistik"]);
   expect(seasonTabs({ ...RACING, racing: null, lineage: { kind: "team_league" }, team_league: { matchdays: [] } }).map((tab) => tab.label)).toEqual(["Spieltage", "Tabelle"]);
   expect(seasonTabs({ lineage: { kind: "series" } }).map((tab) => tab.label)).toEqual(["Termine", "Tabelle"]);
   expect(seasonWebPath("prl", "2026")).toBe("/references/series/prl/2026");
@@ -93,21 +95,90 @@ test("Kalender: Kürzel, Ort, Land, Stand, Tag - heute als „Heute“; ohne Lan
   ]);
   expect(rows.map((row) => row.tone)).toEqual(["done", "done", "cancelled", "today", "planned"]);
   // Gewertet: der beste öffentliche Vereinsfahrer - ein fremder Sieger bleibt ohne Namen.
-  expect(rows[0].best).toBe("Mira Stahl · P2");
-  expect(rows[0].winner).toBe("");
-  expect(rows[1].winner).toBe("Mira Stahl");
+  expect(rows[0].results).toEqual([{ key: "r9-best", kind: "best", label: "Bester Vereinsfahrer", text: "Mira Stahl · P2" }]);
   // Gewinnt ein Vereinsfahrer, steht er als Sieger da - wie im Web kein zweiter „bester Vereinsfahrer“.
-  expect(rows[1].best).toBe("");
-  expect(rows[2].best).toBe("");
+  expect(rows[1].results).toEqual([{ key: "r10-winner", kind: "winner", label: "Sieg", text: "Mira Stahl" }]);
+  expect(rows[2].results).toEqual([]);
+  // Ohne Läufe keine Chips; die Ergebnisseite nur mit Rundennummer vom Server (älterer Server: keine).
+  expect(rows.every((row) => row.sessions.length === 0 && row.number === null)).toBe(true);
+});
+
+// ---------------------------------------------------------------- Runde mit Läufen (#1930)
+
+const WEEKEND_ROUNDS = [
+  { id: "q3", position: 5, code: "R3", venue: "Baku", club_day: "2026-10-08", time: "19:30", state: "scored", kind: "regular", counts: false, session: "Qualifying", session_kind: "qualifying", weekend: 3, country_code: "az" },
+  { id: "s3", position: 6, code: "R3", club_day: "2026-10-08", time: "19:50", state: "scored", kind: "regular", counts: true, session: "Sprint", session_kind: "sprint", weekend: 3 },
+  { id: "r3", position: 7, code: "R3", club_day: "2026-10-08", time: "20:30", state: "scored", kind: "regular", counts: true, session: "Rennen", session_kind: "race", weekend: 3 },
+  { id: "q4", position: 8, code: "R4", venue: "Monza", club_day: "2026-10-15", time: "19:30", state: "planned", kind: "regular", counts: false, session: "Qualifying", session_kind: "qualifying", weekend: 4 },
+  { id: "r4", position: 9, code: "R4", club_day: "2026-10-16", time: "20:00", state: "planned", kind: "regular", counts: true, session: "Rennen", session_kind: "race", weekend: 4, no_score_reason: "too_few", no_score_note: "Nur zwei am Start" },
+];
+const WEEKEND_ROWS = [
+  { key: "ext1", rank: 1, points: 33, name: "Fremd Eins", club_member: false, results: [res("s3", 1, 8), res("r3", 1, 25)] },
+  { key: "mira", rank: 2, points: 25, name: "Mira Stahl", club_member: true, results: [{ ...res("s3", 2, 7), grid: 3 }, { ...res("r3", 2, 18, ["fastest_lap"]), grid: 2 }],
+    adjustment_points: -5, adjustments: [{ points: -5, reason: "Nichtteilnahme nach Anmeldung", day: "2026-11-02", round_id: "r3" }] },
+  { key: "kai", rank: 3, points: 21, name: "Kai Funke", club_member: true, results: [{ ...res("s3", 3, 6), grid: 1 }, { ...res("r3", 3, 15, ["dnf"]), grid: 6 }] },
+];
+const WEEKEND: SeasonPage = {
+  ...RACING,
+  rounds: WEEKEND_ROUNDS,
+  standings: { rows: WEEKEND_ROWS },
+  series: { ...RACING.series, weekend: { formats: [{ from_round: 1, sessions: [{ label: "Qualifying", counts: false, points: "none" }, { label: "Sprint", counts: true, points: [8, 7, 6, 5], grid: "reverse_qualifying", reverse_top: 8 }, { label: "Rennen", counts: true, points: "series", grid: "qualifying" }] }] } },
+  racing: {
+    ...RACING.racing,
+    drivers: { mira: { team: "TLS-Lions", team_since: "s3" }, kai: { team: "TLS-Lions" } },
+    qualifying: [{ round_id: "q3", places: { ext1: 3, mira: 1, kai: 2 }, pole: "mira" }],
+  },
+};
+
+test("Kalender je Runde (#1930): Läufe als Chips, Stand der Runde, Sieger je Rennen mit Lauf, ohne Wertung je Lauf", () => {
+  const rows = roundRows(WEEKEND);
+  expect(rows.map((row) => [row.code, row.place, row.state, row.when, row.number])).toEqual([
+    ["R3", "Baku", "Gewertet", "Do., 08.10.2026", 3],
+    ["R4", "Monza", "Geplant", "Do., 15.10.2026", 4],
+  ]);
+  expect(rows[0].sessions.map((round) => round.id)).toEqual(["q3", "s3", "r3"]);
+  expect(rows[0].results.map((line) => `${line.label}: ${line.text}`)).toEqual(["Bester Vereinsfahrer · Sprint: Mira Stahl · P2", "Bester Vereinsfahrer · Rennen: Mira Stahl · P2"]);
+  expect(rows[1].notes).toEqual(["Rennen: Ohne Wertung · Zu wenig Fahrer – Nur zwei am Start"]);
+});
+
+test("Wertung je Lauf (#1930): Gesamt · Rennen · Sprint - Punkte nur aus diesen Läufen, Anpassungen nur in Gesamt", () => {
+  expect(tableKinds(WEEKEND)).toEqual([{ key: "all", label: "Gesamt" }, { key: "race", label: "Rennen" }, { key: "sprint", label: "Sprint" }]);
+  expect(tableKinds(RACING)).toEqual([]);
+  expect(racingTableRows(WEEKEND, "drivers", "sprint").map((row) => [row.pos, row.name, row.points])).toEqual([["1", "Fremd Eins", "8"], ["2", "Mira Stahl", "7"], ["3", "Kai Funke", "6"]]);
+  const all = racingTableRows(WEEKEND, "drivers");
+  expect(all[1].adjust?.adjustment_points).toBe(-5);
+  expect(racingTableRows(WEEKEND, "drivers", "race")[1].adjust).toBeNull();
+  expect(adjustmentLines(WEEKEND, "drivers")).toEqual([{ key: "mira-0", points: "−5", negative: true, text: "Mira Stahl · Nichtteilnahme nach Anmeldung · R3 · Rennen · 02.11.2026" }]);
+  expect(racingRuleLines(WEEKEND)).toEqual([
+    { key: "points", label: "Punkte je Lauf", text: "Sprint: 8 · 7 · 6 · 5" },
+    { key: "grid", label: "Startaufstellung", text: "Sprint: Start in umgekehrter Quali-Reihenfolge (Top 8)" },
+  ]);
+});
+
+test("Fahrer-Detail (#1930, #1960): Poles je Runde, Ø Start, Quali-Duell, „im Team seit“ und Anpassungen", () => {
+  const [mira, kai] = driverCards(WEEKEND);
+  expect(mira.meta).toBe("TLS-Lions · im Team seit R3 · Sprint · 25 Punkte");
+  expect(mira.stats).toBe("2 Rennen · 2 Podien · 1 Pole · 1 schnellste Runde · 1 Platz gutgemacht · Ø Start 2,5 · Quali-Duell 1:0 gegen Kai Funke");
+  expect(mira.adjustments).toEqual([{ key: "mira-0", points: "−5", negative: true, text: "Nichtteilnahme nach Anmeldung · R3 · Rennen · 02.11.2026" }]);
+  expect(kai.stats).toBe("2 Rennen · 1 Podium · 1 Ausfall · 2 Plätze verloren · Ø Start 3,5 · Quali-Duell 0:1 gegen Mira Stahl");
+  expect(kai.meta).toBe("TLS-Lions · 21 Punkte");
+});
+
+test("Teamwertung in Worten (#1960)", () => {
+  expect(teamRuleLabel({ enabled: true, counting_drivers: 2, guests_count: false })).toBe("Je Rennen zählen die besten 2 Fahrer eines Teams. Gäste zählen nicht fürs Team.");
+  expect(teamRuleLabel({ enabled: true, counting_drivers: 1, guests_count: true })).toBe("Je Rennen zählt der beste Fahrer eines Teams. Gäste zählen fürs Team.");
+  expect(teamRuleLabel(null)).toBe("");
 });
 
 test("Rennzelle und Rennen auf einen Blick: nur öffentliche Vereinsfahrer außerhalb der Tabelle", () => {
   expect(raceCell(res("r1", 2, 0, ["dnf"]))).toMatchObject({ text: "DNF", status: "dnf", medal: null });
   expect(raceCell(res("r1", 1, 25, ["fastest_lap"]))).toMatchObject({ text: "1", medal: "gold", fastest: true });
   // Rennergebnis (#1927), wenn eingetragen: Startplatz, gutgemachte Plätze (nur im Ziel), Zeit, Abstand, Startnummer,
-  // schnellste Runde mit Zeit und Fahrer des Tages.
+  // schnellste Runde mit Zeit und Fahrer des Tages. Zeiten mit Komma wie beim Veranstalter (#1981).
   expect(raceCell({ ...res("r1", 2, 18, ["fastest_lap"]), grid: 6, time: "1:32:10.456", gap: "+3.2", start_number: "44", fastest_lap_time: "1:31.456", driver_of_the_day: true }))
-    .toMatchObject({ grid: 6, gained: 4, time: "1:32:10.456", gap: "+3.2", startNumber: "44", fastestTime: "1:31.456", dotd: true });
+    .toMatchObject({ grid: 6, gained: 4, time: "1:32:10,456", gap: "+3,2", startNumber: "44", fastestTime: "1:31,456", dotd: true });
+  // Ein Platzhalter beim Sieger heißt „keine Zeit“.
+  expect(raceCell({ ...res("r1", 1, 25), gap: "+--:--,---" })).toMatchObject({ gap: "" });
   expect(raceCell({ ...res("r1", 3, 0, ["dnf"]), grid: 1 })).toMatchObject({ grid: 1, gained: null });
   expect(raceCell(res("r1", 4, 12))).toMatchObject({ grid: null, gained: null, dotd: false, time: "" });
   expect(gainedWords(3)).toBe("3 Plätze gutgemacht");
@@ -137,8 +208,8 @@ test("Fahrer- und Teamwertung als Zeilen: Name (ausgeblendet als Hinweis), Team,
 
 test("Fahrer (Garage): nur öffentliche Vereinsfahrer, mit Platz, Team, Punkten und ihrer Saison ohne Nullen", () => {
   expect(driverCards(RACING)).toEqual([
-    { key: "mira", name: "Mira Stahl", pos: "P4", meta: "TLS-DarkFriday · 214 Punkte", stats: "2 Rennen · 1 Sieg · 2 Podien · 1 Pole · 1 schnellste Runde" },
-    { key: "kai", name: "Kai Funke", pos: "P6", meta: "TLS-Lions · 176 Punkte", stats: "2 Rennen · 1 Podium" },
+    { key: "mira", name: "Mira Stahl", pos: "P4", meta: "TLS-DarkFriday · 214 Punkte", stats: "2 Rennen · 1 Sieg · 2 Podien · 1 Pole · 1 schnellste Runde", adjustments: [] },
+    { key: "kai", name: "Kai Funke", pos: "P6", meta: "TLS-Lions · 176 Punkte", stats: "2 Rennen · 1 Podium", adjustments: [] },
   ]);
   // Mit Rennergebnis (#1927): Fahrer des Tages und gutgemachte Plätze wie im Fahrer-Detail des Webs.
   const detailed: SeasonPage = { ...RACING, standings: { rows: [{ key: "mira", rank: 4, points: 43, name: "Mira Stahl", club_member: true, results: [{ ...res("r9", 2, 18), grid: 7, driver_of_the_day: true }, { ...res("r10", 1, 25), grid: 2 }] }] } };
@@ -148,31 +219,4 @@ test("Fahrer (Garage): nur öffentliche Vereinsfahrer, mit Platz, Team, Punkten 
 test("Kalender mit Land: Code und Name für die Flagge, auch ohne Ort", () => {
   const rows = roundRows({ rounds: [{ id: "x", code: "R1", state: "planned", country_code: "az" }, { id: "y", code: "R2", state: "planned", country_code: "zz" }] });
   expect(rows.map((row) => [row.country, row.countryName, row.place])).toEqual([["AZ", "Aserbaidschan", "Aserbaidschan"], ["", "", ""]]);
-});
-
-test("Team-Liga: Spieltage mit Gegner, Ergebnis aus eigener Sicht und Tabelle mit eigenem Team", () => {
-  const page: SeasonPage = {
-    lineage: { kind: "team_league" },
-    team_league: {
-      matchdays: [
-        { round: { id: "a", code: "ST1", club_day: "2026-10-01", time: "20:00", state: "scored" }, match: { opponent: "Fremd Adler", home: true, outcome: "win", score_for: 3, score_against: 1, points: 3, maps: [{ name: "Hacienda", score_for: 6, score_against: 2, outcome: "win" }] } },
-        { round: { id: "b", code: "ST2", club_day: "2026-10-08", time: "20:00", state: "planned", opponent: "Fremd Bären" }, match: null },
-      ],
-      table: { rows: [{ key: "Fremd", team: "Fremd Adler", rank: 1, points: 6, played: 2, won: 2, drawn: 0, lost: 0, own: false }, { key: "Lions", team: "Lions Probe", rank: 2, points: 3.5, played: 1, own: true }] },
-    },
-  };
-  const days = matchdayRows(page);
-  expect(days.map((day) => [day.code, day.opponent, day.side, day.score, day.outcome, day.state])).toEqual([
-    ["ST1", "gegen Fremd Adler", "Heim", "3:1", "Sieg", ""],
-    ["ST2", "gegen Fremd Bären", "", "", "", "Geplant"],
-  ]);
-  expect(days[0].maps).toEqual(["Hacienda 6:2"]);
-  // Mehrere eigene Teams (#1926): vor dem Gegner steht, welches eigene Team gespielt hat.
-  const two: SeasonPage = { ...page, team_league: { ...page.team_league, own_teams: ["Lions A", "Lions B"], matchdays: [{ round: { id: "a", code: "ST1", state: "scored" }, match: { team: "Lions B", opponent: "Fremd Adler", home: false, outcome: "loss", score_for: 1, score_against: 3 } }] } };
-  expect(matchdayRows(two)[0].opponent).toBe("Lions B gegen Fremd Adler");
-  expect(days[0].opponent).toBe("gegen Fremd Adler");
-  expect(leagueTableRows(page).map((row) => [row.pos, row.name, row.played, row.points, row.own])).toEqual([["1", "Fremd Adler", "2", "6", false], ["2", "Lions Probe", "1", "3,5", true]]);
-  // Alter Server ohne Team-Liga-Teil: leer, kein Absturz.
-  expect(matchdayRows({ lineage: { kind: "team_league" } })).toEqual([]);
-  expect(leagueTableRows({})).toEqual([]);
 });

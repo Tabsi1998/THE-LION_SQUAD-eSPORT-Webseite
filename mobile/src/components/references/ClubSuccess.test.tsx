@@ -162,3 +162,28 @@ test("ohne Referenzen und ohne laufende Saison: ein leerer Zustand statt leerer 
   await render(<ClubSuccess items={[]} summary={{ total: 0 }} showcase={null} onOpenSeason={jest.fn()} />);
   await waitFor(() => expect(screen.getByText("Noch keine Referenzen")).toBeTruthy());
 });
+
+test("Läuft gerade mit Läufen (#1930) und Veranstalter (#1934): Lauf-Chips, Partner-Abzeichen an Karte und Spur", async () => {
+  mockGet.mockImplementation((path: string) => {
+    if (path === "/reference-series/public/running") return Promise.resolve({ data: { items: [{
+      ...running[0],
+      today: false,
+      next: { code: "R13", session: "Qualifying", state: "planned", time: "19:30", club_day: "2026-10-29", sessions: [
+        { session: "Qualifying", club_day: "2026-10-29", time: "19:30", state: "planned", next: true },
+        { session: "Rennen", club_day: "2026-10-29", time: "20:30", state: "planned", next: false },
+      ] },
+      organizers: [{ id: "p1", slug: "probe-ananas", name: "Probe Ananas", logo_url: null }],
+    }] } });
+    if (path === "/reference-series/public/lineages") return Promise.resolve({ data: { items: [{ ...lineages[0], lineage: { ...lineages[0].lineage, organizers: [{ id: "p2", name: "Probe Kokos" }] } }] } });
+    return Promise.reject(new Error(`unerwartet: ${path}`));
+  });
+  await render(<ClubSuccess items={items} summary={{ total: 3 }} showcase={null} onOpenSeason={jest.fn()} />);
+  await waitFor(() => expect(screen.getByTestId("running-card-prl/2026")).toBeTruthy());
+  const card = screen.getByTestId("running-card-prl/2026");
+  expect(within(card).getByText("Nächstes Rennen · Do 29.10. · 19:30 · R13 · Qualifying")).toBeTruthy();
+  const chips = within(card).getByTestId("running-card-sessions-prl/2026");
+  expect(within(chips).getByText("Quali")).toBeTruthy();
+  expect(within(chips).getByText("20:30")).toBeTruthy();
+  expect(within(card).getByLabelText("Veranstaltet von Probe Ananas, Partner des Vereins")).toBeTruthy();
+  expect(within(screen.getByTestId("club-success-lineage-desbl")).getByLabelText("Veranstaltet von Probe Kokos, Partner des Vereins")).toBeTruthy();
+});

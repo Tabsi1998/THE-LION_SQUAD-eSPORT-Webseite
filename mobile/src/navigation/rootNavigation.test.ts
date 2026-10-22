@@ -117,6 +117,12 @@ const ADDRESSES: Array<[string, unknown]> = [
   ["/references", detail("InfoCenter", { section: "references" })],
   // Saison einer Serie (#1945): die Seite des Webs hat jetzt einen Screen in der App.
   ["/references/series/prl/2026-liga-1", detail("ReferenceSeason", { lineage: "prl", season: "2026-liga-1" })],
+  // Statistik und Ergebnis je Runde (#1950, #1974): der Reiter bzw. die Runde mit dem Lauf aus ?lauf=.
+  ["/references/series/prl/2026-liga-1?ansicht=statistik", detail("ReferenceSeason", { lineage: "prl", season: "2026-liga-1", view: "statistik" })],
+  ["/references/series/prl/2026-liga-1/runde/3", detail("ReferenceRound", { lineage: "prl", season: "2026-liga-1", round: 3 })],
+  ["/references/series/prl/2026-liga-1/runde/3?lauf=sprint", detail("ReferenceRound", { lineage: "prl", season: "2026-liga-1", round: 3, session: "sprint" })],
+  // Keine gültige Nummer: die Saison.
+  ["/references/series/prl/2026-liga-1/runde/abc", detail("ReferenceSeason", { lineage: "prl", season: "2026-liga-1" })],
 ];
 
 test("jede bekannte Adresse hat ihren Ort - Übersichten wechseln den Tab, alles andere legt sich darüber", () => {

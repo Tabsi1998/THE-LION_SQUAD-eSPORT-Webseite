@@ -87,6 +87,34 @@ test("beim Event angemeldet: die Turnieranmeldung ist frei", async () => {
   expect(screen.queryByTestId("tournament-event-first")).toBeNull();
 });
 
+test("Map-Pool (#1616): mit Spiel der Pool des Turniers und einer Phase mit eigenem Pool; ohne Spiel keine Anfrage", async () => {
+  mockGet.mockImplementation((path: string) => {
+    if (path === "/tournaments/cup") return Promise.resolve({ data: { ...TOURNAMENT, event_gate: null, game_id: "bo7" } });
+    if (path === "/map-pools/tournaments/cup") {
+      return Promise.resolve({ data: {
+        game_id: "bo7",
+        tournament: { modes: [{ mode: "snd", label: "Suchen & Zerstören", maps: [{ map_id: "hafen", name: "Hafenkante", image_url: null }] }] },
+        stages: [{ stage_id: "s2", name: "Finale", pool: { origin: "stage", modes: [{ mode: "snd", label: "Suchen & Zerstören", maps: [{ map_id: "glut", name: "Glutsenke" }] }] } }],
+      } });
+    }
+    if (path.endsWith("/bracket")) return Promise.resolve({ data: {} });
+    return Promise.resolve({ data: [] });
+  });
+  await render(<TournamentDetailScreen navigation={navigation} route={route} />);
+  await waitFor(() => expect(screen.getByTestId("tournament-map-pools")).toBeTruthy());
+  expect(screen.getByText("Map-Pool")).toBeTruthy();
+  expect(screen.getByText("Map-Pool · Finale")).toBeTruthy();
+  expect(screen.getByLabelText("Hafenkante")).toBeTruthy();
+  expect(screen.getByLabelText("Glutsenke")).toBeTruthy();
+
+  mockGet.mockClear();
+  answer({ ...TOURNAMENT, event_gate: null });
+  await render(<TournamentDetailScreen navigation={navigation} route={route} />);
+  await waitFor(() => expect(screen.getByText("Zum Turnier anmelden")).toBeTruthy());
+  expect(mockGet).not.toHaveBeenCalledWith("/map-pools/tournaments/cup");
+  expect(screen.queryByTestId("tournament-map-pools")).toBeNull();
+});
+
 test("Teams sehen, wie viele beim Event sein müssen; ohne Schalter kein Hinweis", async () => {
   answer({ ...TOURNAMENT, team_mode: "team", team_size: 5, event_gate: { ...GATE, team_need: 5 } });
   const view = await render(<TournamentDetailScreen navigation={navigation} route={route} />);
