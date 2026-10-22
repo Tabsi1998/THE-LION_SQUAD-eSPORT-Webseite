@@ -17,6 +17,7 @@ import { cancelledText, teamModeLabel } from "@/lib/seriesSpecialRules";
 import { SeasonCloseSheet } from "./referenceSeries/SeasonCloseSheet";
 import { SeriesMapPoolSection } from "./referenceSeries/SeriesMapPoolSection";
 import { SeriesPartnerSourceSection } from "./referenceSeries/SeriesPartnerSourceSection";
+import { SeasonTableSection } from "./referenceSeries/SeasonTableSection";
 import { seasonLabel } from "./AdminReferenceSeriesPage";
 import { dayLabel, publishText } from "@/lib/referenceSeriesStaff";
 import { referenceLine, seasonName } from "@/lib/seasonClose";
@@ -169,6 +170,8 @@ export default function AdminReferenceSeriesDetailPage() {
             {/* Partner-Plattform (#1964): Turniertage samt Runden als Entwurf holen - Turnierserie, nur Vorstand. */}
             {board && lineage.kind === "series" && <SeriesPartnerSourceSection series={series} onChanged={load} />}
             <SeriesResultsSection series={series} onChanged={load} />
+            {/* Saisontabelle einlesen (#1928): vergangene Runden als Entwürfe nachtragen - nur Vorstand, nicht Team-Liga. */}
+            {board && lineage.kind !== "team_league" && <SeasonTableSection series={series} onChanged={load} />}
             {/* Teamfarben für die Ergebnistabelle je Runde (#1950) - nur Rennliga, nur Vorstand. */}
             {board && lineage.kind === "racing" && <SeriesTeamColorsSection series={series} />}
             {/* Map-Pool der Saison (#1616): mit Spiel der Spur, bei der Team-Liga auch ohne (Hinweis auf den Freitext). */}

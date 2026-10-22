@@ -96,16 +96,20 @@ function fieldParts(fields) {
     for (const mark of [...after].sort()) if (!before.has(mark)) parts.push(name(mark));
     for (const mark of [...before].sort()) if (!after.has(mark)) parts.push(`nicht mehr ${name(mark)}`);
   }
+  // Saisontabelle (#1928): Punkte, wie sie zählen, Sonderboni und Team.
+  if (fields.points_total) parts.push(`Punkte ${shown(fields.points_total[0])} → ${shown(fields.points_total[1])}`);
+  if (fields.bonus_keys) parts.push("Sonderboni geändert");
+  if (fields.team) parts.push(`Team ${shown(fields.team[0])} → ${shown(fields.team[1])}`);
   if (fields.partner_id) parts.push("Partner geändert");
   if (fields.double_up) parts.push(`Double Up: ${fields.double_up[0] ? "ja" : "nein"} → ${fields.double_up[1] ? "ja" : "nein"}`);
   return parts;
 }
 
-/** Je Abweichung eine Zeile: wer und was sich ändert. */
-export function changeLines(changes = []) {
+/** Je Abweichung eine Zeile: wer und was sich ändert. `removed`: Text, wenn jemand in der Quelle fehlt. */
+export function changeLines(changes = [], { removed = "fehlt beim Partner – fällt weg" } = {}) {
   return changes.map((change) => {
     if (change.kind === "added") return { key: change.participant_id, name: change.name, text: "kommt neu dazu" };
-    if (change.kind === "removed") return { key: change.participant_id, name: change.name, text: "fehlt beim Partner – fällt weg" };
+    if (change.kind === "removed") return { key: change.participant_id, name: change.name, text: removed };
     if (change.kind === "sheet") return { key: "sheet", name: "Ganzes Blatt", text: fieldParts(change.fields || {}).join(" · ") };
     return { key: change.participant_id, name: change.name, text: fieldParts(change.fields || {}).join(" · ") };
   });
