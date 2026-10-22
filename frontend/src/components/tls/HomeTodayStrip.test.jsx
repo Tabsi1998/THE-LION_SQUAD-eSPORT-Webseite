@@ -47,6 +47,18 @@ test("zeigt nur heutige Termine nacheinander, mit Runde, Uhrzeit, Vereinsleuten 
   expect(strip.querySelector(".tls-run-pulse")).toHaveAttribute("aria-hidden", "true");
 });
 
+test("das Logo der Saison bzw. Spur steht vor dem Spiel-Logo, ohne Logo bleibt das Spiel (#2014)", async () => {
+  const items = running.items.map((item, index) => (index === 0
+    ? { ...item, game: { name: "Probespiel", logo_url: "/api/static/uploads/spiel.png" }, lineage: { ...item.lineage, logo_url: "/api/static/uploads/spur.png" } }
+    : { ...item, game: { name: "Probespiel", logo_url: "/api/static/uploads/spiel.png" } }));
+  apiMock.get.mockResolvedValue({ data: { ...running, items } });
+  renderStrip();
+  await screen.findByTestId("home-today");
+  const marks = screen.getAllByTestId("reference-game-logo");
+  expect(marks[0].querySelector("img")).toHaveAttribute("src", "/api/static/uploads/spur.png");
+  expect(marks[1].querySelector("img")).toHaveAttribute("src", "/api/static/uploads/spiel.png");
+});
+
 test("die Flagge des heutigen Rennens steht vor der Runde (#1925)", async () => {
   const items = running.items.map((item, index) => (index === 0 ? { ...item, next: { ...item.next, country_code: "AZ" } } : item));
   apiMock.get.mockResolvedValue({ data: { ...running, items } });
