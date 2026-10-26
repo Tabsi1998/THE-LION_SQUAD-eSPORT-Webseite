@@ -1,5 +1,37 @@
 # Changelog
 
+## [1.34.0](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/compare/v1.33.0...v1.34.0) (2026-10-26)
+
+
+### Neu
+
+* „Läuft gerade“ zeigt Saisons mit offenen Terminen vor Saisons ohne kommenden Termin ([#2024](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2024)) ([c510ec8](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/c510ec8bede6eef6414e25bde110971030eb4de0))
+* Die Gesamtwertung einer Turnierserie spricht von Turniertagen („seit dem Turniertag davor“) ([#2024](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2024)) ([c510ec8](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/c510ec8bede6eef6414e25bde110971030eb4de0))
+* Die Vorlage „Formel 1“ gibt es nur noch für Rennligen ([#2024](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2024)) ([c510ec8](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/c510ec8bede6eef6414e25bde110971030eb4de0))
+* Ein Ergebnis für einen Termin ohne Datum fragt beim Veröffentlichen nach dem Tag ([#2024](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2024)) ([c510ec8](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/c510ec8bede6eef6414e25bde110971030eb4de0))
+* Ein Termin ohne Datum heißt öffentlich „Termin folgt“, ohne kommenden Termin steht „Noch kein Termin“ ([#2024](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2024)) ([c510ec8](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/c510ec8bede6eef6414e25bde110971030eb4de0))
+* Hochgeladenes SVG-Logo eines Sponsors oder Partners geht vor dem Logo aus Dolibarr ([#1952](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1952)) ([3d83b18](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/3d83b18d7ae9905f71f369344f996a0ff5941fd9))
+* Kalender in der Verwaltung führt Schritt für Schritt: Anzahl eintragen, Termine anlegen, Datum nachtragen ([#2024](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2024)) ([c510ec8](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/c510ec8bede6eef6414e25bde110971030eb4de0))
+* Logo-Felder mit Hinweis „Am besten SVG“ und Vorschau auf hellem und dunklem Grund ([#1952](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1952)) ([3d83b18](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/3d83b18d7ae9905f71f369344f996a0ff5941fd9))
+* Logos auch als SVG hochladen – sicher bereinigt und scharf im Web ([#1952](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1952)) ([3d83b18](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/3d83b18d7ae9905f71f369344f996a0ff5941fd9))
+* Regeln und Ergebnisblatt einer Turnierserie ohne F1-Felder wie schnellste Runde, Pole, Startplatz oder Zeit ([#2024](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2024)) ([c510ec8](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/c510ec8bede6eef6414e25bde110971030eb4de0))
+* Serienseite, „Läuft gerade“ und Startseite sprechen bei Turnierserien von Turniertagen und Spielern ([#2024](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2024)) ([c510ec8](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/c510ec8bede6eef6414e25bde110971030eb4de0))
+* SVG-Logos automatisch als PNG für Mail, PDF, Teilen-Bild, Discord, Favicon und App ([#1952](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1952)) ([3d83b18](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/3d83b18d7ae9905f71f369344f996a0ff5941fd9))
+* Teamlogo als SVG für die Leitung des Teams ([#1952](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1952)) ([3d83b18](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/3d83b18d7ae9905f71f369344f996a0ff5941fd9))
+* Termine ohne Datum sind markiert, lassen sich filtern und bekommen ihr Datum alle auf einmal ([#2024](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2024)) ([c510ec8](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/c510ec8bede6eef6414e25bde110971030eb4de0))
+* Terminliste einfügen: Bei Turnierserien ist eine Zeile ohne Datum ein offener Termin ([#2024](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2024)) ([c510ec8](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/c510ec8bede6eef6414e25bde110971030eb4de0))
+* Turnierserien starten mit einer TFT-Vorlage – Turniertag mit 5 Runden, 8 bis 1 Punkte, Double Up als Schalter ([#2024](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2024)) ([c510ec8](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/c510ec8bede6eef6414e25bde110971030eb4de0))
+* Turnierserien zeigen keinen Ort, keine Strecke und keine Flagge mehr – beim Eintragen, auf der Serienseite und in „Läuft gerade“ ([#2024](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2024)) ([c510ec8](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/c510ec8bede6eef6414e25bde110971030eb4de0))
+
+
+### Fehlerbehebungen
+
+* „Datum nachtragen“ gilt nur für offene Termine – abgesagte oder gewertete werden genannt, nichts ändert sich halb ([#2024](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2024)) ([c510ec8](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/c510ec8bede6eef6414e25bde110971030eb4de0))
+* Bildvorschau im Upload-Feld bleibt nicht bei „Lade Vorschau“ stehen ([#1952](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1952)) ([3d83b18](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/3d83b18d7ae9905f71f369344f996a0ff5941fd9))
+* Eine neue Saison nimmt nur eine Punkteschema-Vorlage, die zur Art der Spur passt ([#2024](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2024)) ([c510ec8](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/c510ec8bede6eef6414e25bde110971030eb4de0))
+* Einfügen von Ergebnissen und Tabellen – ein „|“ im Teamnamen zerlegt keine Tabelle mehr ([#2024](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2024)) ([5fc989c](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/5fc989c381da8320fecb8b47a9aecbef456a135e))
+* Ja/Nein-Felder im Formular behalten ihre Vorgabe auch mit neuem FastAPI – neue App-Version wird wieder aktuell, eingesandte Fotos behalten den Namen ([b850a1d](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/b850a1d5aa3fbe7ff9baadb68ef51131da4df4e7))
+
 ## 1.33.0 (22.10.2026)
 
 ### Neu
