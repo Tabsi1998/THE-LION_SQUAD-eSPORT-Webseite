@@ -721,6 +721,15 @@ def test_ffa_removals_over_many_draws_and_dropout_orders(seeded_draw, mode):
     # Dieselbe Lücke, mit Nachbar: die Folgerunde hätte 7 auf zwei Läufe zu 3 verteilt und einen Teil verloren.
     pytest.param(INSTANT, 21, 3, 2, 15, 15 * 7919 + 21 * 17 + 3, id="sofort-21-15"),
     pytest.param(INSTANT, 34, 3, 2, 5, 5 * 7919 + 34 * 17 + 3, id="sofort-34-5"),
+    # Fester Baum, Suche über alle Größen mit 300 Ausfall-Reihenfolgen (15 rot von 68.400): Finale mit 5 bei
+    # Laufgröße 4 bzw. 4 bei 3, zwei Quellen auf einem Platz (Einträge beim Verteilen verloren), ein spät gefahrener
+    # Lauf ohne Verbliebene neben dem abgekürzten Finale.
+    pytest.param(None, 17, 4, 2, 0, 260, id="fest-17-260"),
+    pytest.param(None, 29, 3, 2, 0, 108, id="fest-29-108"),
+    pytest.param(None, 40, 3, 2, 0, 93, id="fest-40-93"),
+    pytest.param(None, 23, 3, 2, 0, 79, id="fest-23-79"),
+    pytest.param(None, 33, 3, 2, 0, 284, id="fest-33-284"),
+    pytest.param(None, 13, 3, 2, 0, 110, id="fest-13-110"),
 ])
 def test_quota_regrowth_counts_what_the_targets_already_hold(monkeypatch, mode, count, match_size, qualifiers,
                                                              draw_seed, removal_seed):
