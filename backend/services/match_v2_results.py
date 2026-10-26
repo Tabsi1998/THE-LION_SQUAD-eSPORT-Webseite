@@ -1349,6 +1349,10 @@ def _cascade_clear_downstream(
         _cascade_clear_downstream(child_id, by_id, downstream, target_sets, now_iso, visited, reset_log)
 
 
+def _forwards(match: dict) -> list[tuple]:
+    return [(entry.get("to_match_id"), entry.get("to_slot")) for entry in match.get("advancement") or []]
+
+
 def build_v2_result_application(
     match: dict,
     stage_matches: list[dict],
@@ -1380,6 +1384,16 @@ def build_v2_result_application(
     # Plätze rücken auf, wer nicht erschienen ist, nur auf den Verlierer-Weg (#1553, #1823): ``_advancement_paths``.
     loser_path, winner_path = _advancement_paths(match, results, eliminated)
     by_id, by_key = _target_lookup(stage_matches)
+    if match.get("id") in by_id:
+        # Das Spiel selbst ist im Nachschlagen dasselbe Dokument wie ``match`` (Generalprobe, #2033): die Routen lesen
+        # es zweimal. Sofort zufällig biegt ``_rewire_instant`` sonst die Weiterleitung der zweiten Kopie um, und
+        # Platz 2 dieses Laufs zeigte noch auf den eben an Platz 1 vergebenen Platz („Zielslot … ist bereits belegt“).
+        by_id[match["id"]] = match
+        if match.get("match_key") in by_key:
+            by_key[match["match_key"]] = match
+    # Sofort zufällig: tauscht ein Lauf zwei eigene Plätze im selben Zielspiel, meldet ``_rewire_instant`` kein fremdes
+    # Spiel - die eigenen Weiterleitungen müssen trotzdem mit (sonst passt der Graph nicht mehr zu den Plätzen).
+    forwards_before = _forwards(match)
     downstream = _downstream_links(stage_matches)
     target_sets: dict[str, dict] = {}
     overwritten_targets: set[str] = set()
@@ -1522,7 +1536,9 @@ def build_v2_result_application(
         "completed_by": actor_id,
         "updated_at": now_iso,
         # Sofort zufällig (#1590): das Schema folgt dem Los - die eigenen Weiterleitungen zeigen auf die gezogenen Plätze.
-        **({"advancement": match.get("advancement") or []} if match["id"] in target_sets and "advancement" in target_sets[match["id"]] else {}),
+        **({"advancement": match.get("advancement") or []}
+           if (match["id"] in target_sets and "advancement" in target_sets[match["id"]]) or _forwards(match) != forwards_before
+           else {}),
     }
     target_sets.pop(match["id"], None)
     return {
