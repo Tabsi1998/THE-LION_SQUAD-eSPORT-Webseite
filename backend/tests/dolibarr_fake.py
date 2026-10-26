@@ -191,6 +191,9 @@ class FakeDolibarr:
         self.categories: list[dict] = []
         self.thirdparty_categories: dict[int, set[int]] = {}
         self.core_members: dict[int, dict] = {}
+        # Ergänzende Attribute beim Mitglied (#2034): welche angelegt sind, und was die Website geschrieben hat.
+        self.member_extrafields: set[str] = set()
+        self.member_puts: list[tuple[int, dict]] = []
         self.products: dict[int, dict] = {}
         self.core_invoices: dict[int, dict] = {}
         # Rechnungs-PDFs (#840): wie in Dolibarr gibt es die Datei erst, wenn jemand sie erzeugt - die Oberfläche beim
@@ -872,10 +875,30 @@ class FakeDolibarr:
     def categorize(self, thirdparty_id: int, *categories: int) -> None:
         self.thirdparty_categories.setdefault(int(thirdparty_id), set()).update(int(c) for c in categories)
 
-    def add_core_member(self, member_id: int, fk_soc: int | None = None) -> dict:
-        row = {"id": member_id, "fk_soc": fk_soc}
+    def add_core_member(self, member_id: int, fk_soc: int | None = None, *, statut: str = "1", options: dict | None = None) -> dict:
+        """Ein Mitglied in Dolibarrs Mitgliedermodul. ``options``: ergänzende Attribute ohne „options_“ (#2034)."""
+        row = {"id": member_id, "fk_soc": fk_soc, "statut": statut,
+               "array_options": {f"options_{key}": value for key, value in (options or {}).items()}}
         self.core_members[member_id] = row
         return row
+
+    def define_member_extrafield(self, code: str) -> None:
+        """Ergänzendes Attribut beim Mitglied anlegen (Einrichtung → Module → Mitglieder → Ergänzende Attribute)."""
+        self.member_extrafields.add(code)
+        for row in self.core_members.values():
+            row.setdefault("array_options", {}).setdefault(f"options_{code}", None)
+
+    def _core_member_put(self, member_id: int, body: dict) -> httpx.Response:
+        """Wie Dolibarr: nur angelegte ergänzende Attribute werden gespeichert, unbekannte fallen still weg."""
+        row = self.core_members.get(member_id)
+        if row is None:
+            return httpx.Response(404, json={"error": {"code": 404, "message": "member not found"}})
+        self.member_puts.append((member_id, body))
+        options = row.setdefault("array_options", {})
+        for key, value in (body.get("array_options") or {}).items():
+            if key.startswith("options_") and key[8:] in self.member_extrafields:
+                options[key] = value
+        return httpx.Response(200, json=row)
 
     def _core(self, request: httpx.Request, path: str, params: dict) -> httpx.Response | None:
         method = request.method
@@ -912,6 +935,14 @@ class FakeDolibarr:
         if match and method == "GET":
             row = self.core_members.get(int(match.group(1)))
             return httpx.Response(200, json=row) if row else httpx.Response(404, json={"error": {"code": 404, "message": "x"}})
+        if match and method == "PUT":
+            assert request.headers.get("DOLAPIKEY") == self.write_key, "Schreiben nur mit dem Schreib-Schlüssel"
+            return self._core_member_put(int(match.group(1)), body)
+        if path == "/members" and method == "GET":
+            # Wie Dolibarr: Kennungen als Text, seitenweise, 404 auf eine leere Seite.
+            page, limit = int(params.get("page", 0)), int(params.get("limit", 100))
+            rows = [{**r, "id": str(r["id"])} for _id, r in sorted(self.core_members.items())][page * limit:(page + 1) * limit]
+            return httpx.Response(200, json=rows) if rows else httpx.Response(404, json={"error": {"code": 404, "message": "x"}})
         if path == "/products" and method == "GET":
             assert params.get("mode") == "2", "nur Dienstleistungen, keine Waren"
             rows = [r for r in self.products.values() if str(r.get("fk_product_type", 1)) == "1"]

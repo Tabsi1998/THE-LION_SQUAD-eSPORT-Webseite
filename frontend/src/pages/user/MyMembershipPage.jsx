@@ -9,6 +9,7 @@ import { MemberCardPanel } from "@/components/tls/MemberCardPanel";
 import { SkeletonCards, SkeletonDetailHeader } from "@/components/tls/Skeleton";
 import { SwitchRow } from "@/pages/user/profile/SwitchRow";
 import { MemberFileAccountsCard } from "@/pages/user/MemberFileAccountsCard";
+import JerseyNumberCard from "@/pages/user/JerseyNumberCard";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { toast } from "sonner";
 import { Crown, Calendar, Hash, FileText, Eye, EyeOff, ArrowLeft, History, Wallet, Users, ShieldCheck } from "lucide-react";
@@ -93,6 +94,9 @@ export default function MyMembershipPage() {
 
         {/* Mitgliederverzeichnis per Opt-in (#410): der Server sagt, ob die Person eintragen darf */}
         {(m?.member_status === "active" || m?.member_status === "honorary") && <DirectoryCard />}
+
+        {/* Meine Nummer (#2034): einmal wählen, danach nur über den Vorstand; der Server sagt, ob es sie gibt */}
+        <JerseyNumberCard />
 
         {/* Beitrag und Stand aus der Mitgliederverwaltung (#295) */}
         {fee && (

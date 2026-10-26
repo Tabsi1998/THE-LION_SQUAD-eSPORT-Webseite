@@ -117,6 +117,11 @@ PERSONAL: dict[str, Entry] = {
     "board_positions": Entry(DETACHED, ("board_positions",)),
     "meeting_admissions": Entry(DETACHED, ("meeting_admissions", "meeting_admissions_recorded")),
     "dolibarr_links": Entry(OVERWRITTEN, ("dolibarr_links",)),
+    # Wunschnummer (#2034): mit dem Konto sofort frei. Steht sie noch in Dolibarr, bleibt bis zum Löschen dort nur die
+    # Mitglieds-ID ohne Konto, ohne Nummer und ohne Verlauf stehen.
+    "jersey_numbers": Entry(DELETED, ("jersey_number",), "die Nummer ist sofort frei; bis sie in der Mitgliederverwaltung gelöscht "
+                            "ist, bleibt nur die Mitglieds-ID ohne Konto"),
+    "jersey_number_requests": Entry(DELETED, ("jersey_number_requests",)),
     "dolibarr_identities": Entry(DELETED, ("dolibarr_identities",)),
     "dolibarr_honours": Entry(DELETED, ("dolibarr_honours",)),
     "dolibarr_invoice_cache": Entry(DELETED, note="Zwischenspeicher der Rechnungen aus der Mitgliederverwaltung"),
