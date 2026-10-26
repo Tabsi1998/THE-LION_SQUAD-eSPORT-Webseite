@@ -144,8 +144,8 @@ export function SessionRuleNotes({ session }) {
 
 /** „Ohne Wertung · Zu wenig Fahrer – …“ am Termin (unterschieden von „abgesagt“); `label` nennt bei mehreren Läufen
  * den Lauf („Sprint: Ohne Wertung …“). */
-export function NoScoreNote({ round, label = "", className = "" }) {
-  const text = noScoreText(round);
+export function NoScoreNote({ round, label = "", className = "", profile = null }) {
+  const text = noScoreText(round, profile);
   if (!text) return null;
   return <span className={`block text-[11px] text-amber-200/80 [overflow-wrap:anywhere] ${className}`} data-testid="series-no-score">{label ? `${label}: ${text}` : text}</span>;
 }

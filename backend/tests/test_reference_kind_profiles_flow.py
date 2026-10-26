@@ -149,6 +149,35 @@ async def test_the_list_without_a_date_makes_open_tournament_days(flow):
         ("T1", "2026-10-01", None), ("T2", None, None), ("T3", "2026-11-12", None)]
 
 
+# ---------------------------------------------------------------- Datum nachtragen (Sammelansicht)
+@pytest.mark.asyncio
+async def test_dates_for_several_open_rounds_come_in_one_go_and_sort_them_in(flow):
+    _, series = await _season(flow)
+    await _paste(flow, series, "T1 · 01.10.2026\nT2 · offen\nT3 · offen\nT4 · offen")
+    calendar = await _calendar(flow, series)
+    rounds = {item["code"]: item for item in calendar["rounds"]}
+    body = {"expected_version": calendar["version"], "items": [
+        {"id": rounds["T3"]["id"], "day": "2026-10-15", "time": "20:30"},
+        {"id": rounds["T2"]["id"], "day": "2026-10-08"}]}
+    response = await flow.post(f"{_rounds(series)}/dates", json=body)
+    assert response.status_code == 200, response.text
+    after = response.json()
+    assert [(item["code"], item["club_day"], item["time"]) for item in after["rounds"]] == [
+        ("T1", "2026-10-01", "19:00"), ("T2", "2026-10-08", "19:00"), ("T3", "2026-10-15", "20:30"),
+        ("T4", None, "19:00")]
+    log = await flow.db.audit_logs.find_one({"action": "reference_round.dates"}, {"_id": 0})
+    assert len(log["data"]["items"]) == 2
+    # Veralteter Stand: 409, nichts geändert.
+    stale = await flow.post(f"{_rounds(series)}/dates", json={**body, "items": [
+        {"id": rounds["T4"]["id"], "day": "2026-10-22"}]})
+    assert stale.status_code == 409
+    # Ein Termin mit Datum wird hier nicht verschoben - dafür gibt es „Verschieben“.
+    version = (await _calendar(flow, series))["version"]
+    dated = await flow.post(f"{_rounds(series)}/dates", json={"expected_version": version, "items": [
+        {"id": rounds["T1"]["id"], "day": "2026-10-02"}]})
+    assert dated.status_code == 422 and "Verschieben" in dated.json()["detail"]
+
+
 # ---------------------------------------------------------------- Gewertet nur mit Datum
 ROWS = [{"name": "Probe Ada", "place": 1}, {"name": "Probe Bruno", "place": 2}]
 

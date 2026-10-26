@@ -74,7 +74,7 @@ function Calendar({ rounds, originals, profile }) {
                   </span>
                 ) : round.title && <span className="block text-sm text-white/60">{round.title}</span>}
                 {round.original_club_day && <span className="block text-[11px] text-white/45">ursprünglich {dayLabel(round.original_club_day)}</span>}
-                <NoScoreNote round={round} />
+                <NoScoreNote round={round} profile={profile} />
                 {/* Original-Bilder des Veranstalters (#1933). */}
                 <OriginalsButton items={originalsOf(originals, [round])} title={[roundLabel(round), (places && round.venue) || round.title].filter(Boolean).join(" · ")} className="mt-2" testId="series-page-round-originals" />
               </span>

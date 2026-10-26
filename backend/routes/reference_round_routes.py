@@ -132,6 +132,18 @@ class RoundPasteBody(_Versioned):
     apply: bool = False
 
 
+class RoundDateItem(_DayTime):
+    """Ein Termin ohne Datum bekommt seinen Tag (#2024) - ohne Uhrzeit gilt die gemerkte."""
+    id: str = Field(max_length=80)
+    day: str
+    time: Optional[str] = None
+
+
+class RoundDatesBody(_Versioned):
+    """Datum nachtragen für mehrere offene Termine auf einmal (#2024, Sammelansicht)."""
+    items: List[RoundDateItem] = Field(min_length=1, max_length=200)
+
+
 class RoundFillBody(_Versioned):
     """Fehlende Termine anlegen (#2015): ohne ``apply`` nur, was angelegt würde."""
     apply: bool = False
@@ -636,6 +648,47 @@ async def paste_rounds(series_id: str, body: RoundPasteBody, me: dict = Depends(
                                                          "codes": [doc["code"] for doc in docs]})
     await _recompute(db, series_id)
     return {"created": len(docs), **await _calendar(db, series_id)}
+
+
+HAS_DAY = "{code} hat schon ein Datum – einen festen Termin ändert „Verschieben“."
+
+
+@router.post("/admin/series/{series_id}/rounds/dates")
+@reference_series.series_locked
+async def fill_round_dates(series_id: str, body: RoundDatesBody, me: dict = Depends(require_area("content"))):
+    """Datum nachtragen (#2024): mehrere Termine ohne Datum bekommen ihren Tag in einem Vorgang - mit Uhrzeit oder der
+    gemerkten (``open_time``). Jeder rückt vor die offenen bzw. späteren Termine wie beim einzelnen Nachtragen. Nur für
+    Termine ohne Datum - ein fester Termin wird verschoben, nicht hier geändert (422). Ein Stand, ein Protokolleintrag,
+    einmal neu rechnen."""
+    db = get_db()
+    await _series(db, series_id)
+    ids = [item.id for item in body.items]
+    if len(set(ids)) != len(ids):
+        raise HTTPException(422, "Jeder Termin nur einmal.")
+    found = {item["id"]: item async for item in db.reference_rounds.find(
+        {"series_id": series_id, "id": {"$in": ids}, "archived_at": None}, {"_id": 0})}
+    changes = []
+    for item in body.items:
+        existing = found.get(item.id)
+        if not existing:
+            raise HTTPException(404, "Termin nicht gefunden.")
+        if existing.get("club_day"):
+            raise HTTPException(422, HAS_DAY.format(code=existing.get("code") or "Der Termin"))
+        clock = item.time if item.time else existing.get("open_time")
+        changes.append((existing, {**_when(item.day, clock), "open_time": None}))
+    await _claim(db, series_id, body.expected_version)
+    for existing, update in changes:
+        await db.reference_rounds.update_one({"id": existing["id"]}, {"$set": {**update, **_stamp(me)}})
+    # Einsortieren in der Reihenfolge der Tage: so stehen mehrere neue Termine auch untereinander richtig.
+    for existing, update in sorted(changes, key=lambda pair: (pair[1]["club_day"], pair[1]["starts_at"] or "")):
+        order = await _dated_order(db, series_id, existing["id"], update["club_day"])
+        if order:
+            await _write_order(db, series_id, order, me)
+    await _log(db, "reference_round.dates", me, series_id, {"items": [
+        {"round_id": existing["id"], "code": existing.get("code"), "club_day": update["club_day"],
+         "starts_at": update["starts_at"]} for existing, update in changes]})
+    await _recompute(db, series_id)
+    return await _calendar(db, series_id)
 
 
 @router.post("/admin/series/{series_id}/rounds/fill-planned")
