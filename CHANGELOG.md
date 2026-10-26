@@ -1,14 +1,13 @@
 # Changelog
 
-## [1.34.1](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/compare/v1.34.0...v1.34.1) (2026-10-26)
-
+## 1.34.1 (26.10.2026)
 
 ### Fehlerbehebungen
 
-* FFA-Läufe – beim Verteilen auf weniger Läufe als nötig gehen keine Weiterleitungen mehr verloren (zwei Quellen auf einem Platz) ([#2033](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2033)) ([cf00713](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/cf007134ab8ac8205f46208af1e553dc11138cdb))
-* FFA-Läufe – nach Ausfällen und Zusammenlegen bekommt kein Lauf (auch das Finale nicht) mehr Fahrer als die Laufgröße; die Quoten-Kappung zählt, was im Ziel schon sitzt ([#2033](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2033)) ([cf00713](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/cf007134ab8ac8205f46208af1e553dc11138cdb))
-* Lauf-Umbau – aufgerufene und laufende Läufe bleiben bei der Quoten-Kappung unangetastet; droht dort ein Überlauf, wird der Umbau als Konflikt (409) abgelehnt statt still angewendet ([#2033](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2033)) ([cf00713](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/cf007134ab8ac8205f46208af1e553dc11138cdb))
-* Lauf-Umbau – wird der Aufruf zurückgenommen oder der Lauf entschieden, holt die Auswertung den Umbau nach (auch nach aufgegebener Warteschlange, reihum im Minuten-Job); Meldung „Lauf-Umbau wartet“ nennt den Lauf, „Lauf-Umbau nachgeholt“ bestätigt ([#2033](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2033)) ([cf00713](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/cf007134ab8ac8205f46208af1e553dc11138cdb))
+* FFA-Läufe – beim Verteilen auf weniger Läufe als nötig gehen keine Weiterleitungen mehr verloren (zwei Quellen auf einem Platz) (#2033)
+* FFA-Läufe – nach Ausfällen und Zusammenlegen bekommt kein Lauf (auch das Finale nicht) mehr Fahrer als die Laufgröße; die Quoten-Kappung zählt, was im Ziel schon sitzt (#2033)
+* Lauf-Umbau – aufgerufene und laufende Läufe bleiben bei der Quoten-Kappung unangetastet; droht dort ein Überlauf, wird der Umbau als Konflikt (409) abgelehnt statt still angewendet (#2033)
+* Lauf-Umbau – wird der Aufruf zurückgenommen oder der Lauf entschieden, holt die Auswertung den Umbau nach (auch nach aufgegebener Warteschlange, reihum im Minuten-Job); Meldung „Lauf-Umbau wartet“ nennt den Lauf, „Lauf-Umbau nachgeholt“ bestätigt (#2033)
 
 ## 1.34.0 (26.10.2026)
 
