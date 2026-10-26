@@ -322,6 +322,11 @@ class Abend:
                 # Laufgröße: Fahrer im Lauf und noch erwartete Plätze zusammen nie über der Laufgröße.
                 assert len(expected) <= HEAT_SIZE, \
                     f"{where}: Lauf {key} erwartet {len(expected)} Fahrer (> {HEAT_SIZE})"
+                # Was TV, Baum und App zeigen - jeden Platz, ``match_size`` als „N Spieler“ - bleibt die Laufgröße:
+                # ruhende Plätze aus einem Zusammenlegen sind keine Plätze, sondern Merkposten (``dormant_slots``).
+                assert len(match["slots"]) <= HEAT_SIZE, f"{where}: Lauf {key} zeigt {len(match['slots'])} Plätze"
+                assert int((match.get("settings") or {}).get("match_size") or 0) <= HEAT_SIZE, \
+                    f"{where}: Lauf {key} hat Laufgröße {(match.get('settings') or {}).get('match_size')}"
                 # Kein Lauf zum Aufrufen mit nur einem Fahrer, der nichts mehr erwartet.
                 if match["status"] in {"ready", "scheduled", "in_progress"}:
                     assert len(expected) != 1, f"{where}: Lauf {key} wartet mit einem einzigen Fahrer"

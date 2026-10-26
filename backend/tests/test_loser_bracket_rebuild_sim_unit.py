@@ -153,6 +153,11 @@ def check(matches: list[dict], removed: set[str], where: str) -> None:
         assert len(people) == len(set(people)), f"{where}: {key} hat jemanden doppelt"
         if match["status"] not in TERMINAL:
             assert len(expected(match)) <= HEAT_SIZE, f"{where}: {key} erwartet {len(expected(match))} Fahrer"
+            # Sichtbar (TV, Baum, App: jeder Platz, ``match_size`` als „N Spieler“) bleibt die Laufgröße; ruhende
+            # Plätze aus einem Zusammenlegen sind Merkposten (``dormant_slots``), keine Plätze.
+            assert len(match["slots"]) <= HEAT_SIZE, f"{where}: {key} zeigt {len(match['slots'])} Plätze"
+            assert int((match.get("settings") or {}).get("match_size") or 0) <= HEAT_SIZE, \
+                f"{where}: {key} hat Laufgröße {match['settings'].get('match_size')}"
             if match["status"] in OPEN:
                 assert len(expected(match)) != 1, f"{where}: {key} wartet mit einem einzigen Fahrer"
             assert not set(people) & removed, f"{where}: Ausgeschiedene in {key}"
