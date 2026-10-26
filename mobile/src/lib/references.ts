@@ -1,5 +1,6 @@
 import { countryCode } from "./countryFlags";
 import { KIND_LABELS } from "./seriesFormat";
+import { NO_ROUND, OPEN_ROUND, kindShows, kindWord, type KindProfile } from "./seriesKinds";
 import { hostBadge, type PartnerBadge } from "./seriesPartners";
 import { asInstant, dayNoon, viennaDate, viennaDay } from "./vienna";
 
@@ -111,6 +112,8 @@ export type RunningItem = {
   club?: ClubPlace;
   /** Veranstalter der Saison (#1934) - ältere Server schicken es nicht. */
   organizers?: PartnerBadge[] | null;
+  /** Art-Profil (#2024): Begriffe („5 von 9 Turniertagen“) und Felder - ältere Server schicken es nicht. */
+  profile?: KindProfile;
 };
 export type NextRound = {
   code?: string | null; title?: string | null; club_day?: string | null; state?: string | null; time?: string | null; country_code?: string | null;
@@ -537,18 +540,19 @@ const UNITS: Record<string, [string, string, string]> = {
   series: ["Turnier", "Turnieren", "gewertet"],
 };
 
-/** „6 von 10 Rennen gewertet“ - in der Sprache der Art. */
-export function progressText(kind: string | null | undefined, scored: number, total: number): string {
+/** „6 von 10 Rennen gewertet“ - in der Sprache der Art; mit Art-Profil (#2024) dessen Begriffe („Turniertagen“). */
+export function progressText(kind: string | null | undefined, scored: number, total: number, profile: KindProfile = null): string {
   const [one, many, verb] = UNITS[String(kind)] || ["Termin", "Terminen", "gewertet"];
-  return `${scored} von ${total} ${total === 1 ? one : many} ${verb}`;
+  const unit = total === 1 ? kindWord(profile, "round_one", one) : kindWord(profile, "round_dative", many);
+  return `${scored} von ${total} ${unit} ${kindWord(profile, "progress_verb", verb)}`;
 }
 
 const NEXT_TITLES: Record<string, string> = { racing: "Nächstes Rennen", team_league: "Nächster Spieltag", series: "Nächstes Turnier" };
 
-export function nextTitle(kind: string | null | undefined, next: NextRound | null | undefined): string {
+export function nextTitle(kind: string | null | undefined, next: NextRound | null | undefined, profile: KindProfile = null): string {
   if (!next) return "Nächster Termin";
   if (next.state === "today") return "Heute";
-  return NEXT_TITLES[String(kind)] || "Nächster Termin";
+  return kindWord(profile, "next_round", NEXT_TITLES[String(kind)] || "Nächster Termin");
 }
 
 function dayLabel(value: Date, options: Intl.DateTimeFormatOptions): string {
@@ -570,12 +574,14 @@ export function opponentText(next: Pick<NextRound, "opponent" | "at_home"> | nul
 }
 
 /** Der nächste Termin wie im Web: heute „R3 · Sprint · 19:50“, sonst „Do 22.10. · 20:00 · R3 · Qualifying“ (Wiener
- * Tag), mit Gegner; ein Spieltag über mehrere Tage „Mi 21.10.–So 25.10.“ ohne Uhrzeit. */
+ * Tag), mit Gegner; ein Spieltag über mehrere Tage „Mi 21.10.–So 25.10.“ ohne Uhrzeit. Ohne Datum (#2015, #2024)
+ * „T5 · Termin folgt“ mit gemerkter Uhrzeit, ohne kommenden Termin „Noch kein Termin“. */
 export function nextValue(next: NextRound | null | undefined): string {
-  if (!next) return "Kein Termin offen";
+  if (!next) return NO_ROUND;
   const label = [next.code || next.title || "", next.session || ""].filter(Boolean).join(" · ");
   const opponent = opponentText(next);
   if (next.state === "today") return [label, next.time, opponent].filter(Boolean).join(" · ");
+  if (!next.club_day) return [label, OPEN_ROUND, next.time, opponent].filter(Boolean).join(" · ");
   const window = Boolean(next.club_day_end && next.club_day_end !== next.club_day);
   const day = window ? `${shortDay(next.club_day)}–${shortDay(next.club_day_end)}` : shortDay(next.club_day);
   return [day, window ? "" : next.time, label, opponent].filter(Boolean).join(" · ");
@@ -583,8 +589,8 @@ export function nextValue(next: NextRound | null | undefined): string {
 
 const PLACE_TITLES: Record<string, string> = { racing: "Bester Fahrer", team_league: "Tabelle", series: "Gesamtwertung" };
 
-export function placeTitle(kind: string | null | undefined): string {
-  return PLACE_TITLES[String(kind)] || "Unser Platz";
+export function placeTitle(kind: string | null | undefined, profile: KindProfile = null): string {
+  return kindWord(profile, "place_title", PLACE_TITLES[String(kind)] || "Unser Platz");
 }
 
 /** „Bester Vereinsfahrer: P4 von 20“, „Platz 3 von 8“ - ohne Stand „Platz noch offen“. */
@@ -608,11 +614,13 @@ export function runningView(item: RunningItem) {
     kind: [KIND_LABELS[kind] || "Serie", gameName].filter(Boolean).join(" · "),
     title: series.title || [lineage.title, series.season, series.tier].filter(Boolean).join(" · "),
     today: Boolean(item.today),
-    next: item.next ? [nextTitle(kind, item.next), nextValue(item.next)].filter(Boolean).join(" · ") : "",
-    progress: total > 0 ? { scored, total, share: scored / total, text: progressText(kind, scored, total) } : null,
+    // Begriffe aus dem Art-Profil (#2024, „Nächster Turniertag“), ohne Profil wie bisher.
+    next: item.next ? [nextTitle(kind, item.next, item.profile), nextValue(item.next)].filter(Boolean).join(" · ") : "",
+    progress: total > 0 ? { scored, total, share: scored / total, text: progressText(kind, scored, total, item.profile) } : null,
     place: placeLine(kind, item.club),
-    // Land des nächsten Termins (#1925) - die Karte zeigt seine Flagge vor dem Termin.
-    country: countryCode(item.next?.country_code),
+    // Land des nächsten Termins (#1925) - die Karte zeigt seine Flagge vor dem Termin; nur, wo die Art ein Land führt
+    // (#2024, eine Turnierserie hat keines).
+    country: kindShows(item.profile, "country") ? countryCode(item.next?.country_code) : "",
     season: lineage.slug && series.season_slug ? { lineage: lineage.slug, season: series.season_slug } : null,
     // Die Läufe der nächsten Runde als Chips (#1930) - nur bei mehreren.
     sessions: (item.next?.sessions || []).length > 1
