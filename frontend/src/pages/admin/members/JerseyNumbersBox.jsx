@@ -115,7 +115,7 @@ function MemberRow({ row, range, onChanged }) {
     if (!editing || local.value === null || local.error) { setCheck(null); return undefined; }
     const controller = new AbortController();
     const timer = setTimeout(() => {
-      api.get("/admin/jersey-numbers/check", { params: { number: String(local.value), user_id: row.user_id }, signal: controller.signal })
+      api.post("/admin/jersey-numbers/check", { number: local.value, user_id: row.user_id }, { signal: controller.signal })
         .then(({ data }) => setCheck(data)).catch(() => {});
     }, 300);
     return () => { clearTimeout(timer); controller.abort(); };

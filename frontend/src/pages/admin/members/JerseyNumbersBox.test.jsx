@@ -32,11 +32,11 @@ const overview = {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  apiMock.get.mockImplementation(async (url, config) => {
-    if (url === "/admin/jersey-numbers/check") return { data: { number: Number(config.params.number), free: config.params.number !== "10", text: "Diese Nummer hat schon jemand." } };
-    return { data: overview };
+  apiMock.get.mockResolvedValue({ data: overview });
+  apiMock.post.mockImplementation(async (url, body) => {
+    if (url === "/admin/jersey-numbers/check") return { data: { number: body.number, free: body.number !== 10, text: "Diese Nummer hat schon jemand." } };
+    return { data: {} };
   });
-  apiMock.post.mockResolvedValue({ data: {} });
   apiMock.put.mockResolvedValue({ data: {} });
 });
 
@@ -64,6 +64,7 @@ test("Antrag freigeben, Neuwahl erlauben, selbst vergeben mit Prüfung", async (
   await user.click(within(max).getByTestId("jersey-row-edit"));
   await user.type(within(max).getByTestId("jersey-row-input"), "10");
   await waitFor(() => expect(max).toHaveTextContent("Diese Nummer hat schon jemand."));
+  expect(apiMock.post).toHaveBeenCalledWith("/admin/jersey-numbers/check", { number: 10, user_id: "u2" }, expect.anything());
   expect(within(max).getByTestId("jersey-row-save")).toBeDisabled();
   await user.clear(within(max).getByTestId("jersey-row-input"));
   await user.type(within(max).getByTestId("jersey-row-input"), "11");

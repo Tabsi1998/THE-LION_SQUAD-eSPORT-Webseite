@@ -32,7 +32,7 @@ from models import new_id, now_utc
 from pymongo import ReturnDocument
 from pymongo.errors import DuplicateKeyError
 from services import dolibarr_client as erp
-from services.dolibarr_links import verified_link
+from services.dolibarr_links import on_link_change, verified_link
 from services.log_safe import log_safe
 
 logger = logging.getLogger("tls.jersey_numbers")
@@ -45,8 +45,10 @@ FIELD_PATTERN = r"[a-z][a-z0-9_]{0,63}"
 ELIGIBLE_STATUSES = ("active", "honorary", "inactive")
 RELEASE_STATUSES = ("former", "none")
 OPEN = "received"
+DECIDING = "deciding"  # kurz, während der Vorstand entscheidet
 REQUEST_LABELS = {
     "received": "beim Vorstand",
+    "deciding": "beim Vorstand",
     "applied": "übernommen",
     "reopened": "Neuwahl freigegeben",
     "rejected": "abgelehnt",
@@ -55,6 +57,7 @@ DECISIONS = {"approve": "applied", "reopen": "reopened", "reject": "rejected"}
 SCAN_SECONDS = 60.0
 FAILED_SCAN_SECONDS = 15.0
 MAX_SCAN_PAGES = 50
+GRID_MAX = 200  # bis zu so vielen Nummern zeigt die Seite das Raster der freien
 LOG_KEEP = 60
 REASON_MIN, REASON_MAX = 3, 500
 # Ausgetreten (0) und ausgeschlossen (-2) in Dolibarr: deren Nummer zählt nicht mehr.
@@ -293,17 +296,24 @@ async def dolibarr_numbers(db, field: str, *, fresh: bool = False) -> dict:
 
 async def _stale_members(db) -> set[int]:
     """Mitglieder, deren Wert in Dolibarr gerade nicht gilt: die Website hat für sie etwas anderes festgehalten, das
-    noch nicht übertragen ist (etwa eine freigegebene Nummer nach Austritt oder Kontolöschung) - frei ist frei, sofort.
+    noch nicht übertragen ist (etwa eine freigegebene Nummer nach Austritt, Kontolöschung oder einer gelösten
+    Zuordnung) - frei ist frei, sofort.
     """
     rows = await db.jersey_numbers.find(
-        {"dolibarr.state": {"$ne": "ok"}, "dolibarr.member_id": {"$ne": None}},
-        {"_id": 0, "dolibarr.member_id": 1},
+        {
+            "$or": [
+                {"dolibarr.state": {"$ne": "ok"}, "dolibarr.member_id": {"$ne": None}},
+                {"pending_clears.0": {"$exists": True}},
+            ]
+        },
+        {"_id": 0, "dolibarr.member_id": 1, "pending_clears": 1},
     ).to_list(5000)
-    return {
-        int(row["dolibarr"]["member_id"])
-        for row in rows
-        if (row.get("dolibarr") or {}).get("member_id")
-    }
+    stale: set[int] = set()
+    for row in rows:
+        if (row.get("dolibarr") or {}).get("member_id"):
+            stale.add(int(row["dolibarr"]["member_id"]))
+        stale.update(int(m) for m in row.get("pending_clears") or [])
+    return stale
 
 
 async def availability(
@@ -341,41 +351,76 @@ async def availability(
     }
 
 
-async def _push(db, doc: dict, *, scan: dict | None = None) -> str:
-    """Den Stand einer Zeile nach Dolibarr schreiben und nachlesen. Liefert den neuen Zustand; wirft nie."""
+def _rev_filter(doc: dict) -> dict:
+    """Bedingung „der Spiegel steht noch auf dem Stand, den ich gelesen habe“."""
+    if "rev" in doc:
+        return {"id": doc["id"], "rev": doc["rev"]}
+    return {"id": doc["id"], "rev": {"$exists": False}}
+
+
+async def _push(db, doc: dict, *, scan: dict | None = None, _round: int = 0) -> str:
+    """Den aktuellen Stand einer Zeile nach Dolibarr schreiben und nachlesen. Liefert den neuen Zustand; wirft nie.
+
+    Geschrieben wird immer, was **jetzt** im Spiegel steht - nie ein Stand, den der Aufrufer früher gelesen hat. ``ok``
+    gilt nur, wenn sich der Spiegel währenddessen nicht geändert hat (Zähler ``rev``); hat er sich geändert, schreibt
+    die Website gleich noch einmal, damit kein älterer Wert in Dolibarr stehen bleibt. Wechselt oder fällt die
+    Zuordnung weg, wird der Wert beim bisherigen Mitglied gelöscht (``pending_clears``, bis es geklappt hat).
+    """
+    doc = await db.jersey_numbers.find_one({"id": doc["id"]}, {"_id": 0})
+    if doc is None:
+        return "gone"
     settings = await load_settings(db)
     field = settings["dolibarr_field"]
     want = doc.get("number")
     previous = doc.get("dolibarr") or {}
+    clears = {int(m) for m in doc.get("pending_clears") or []}
     state, error = "ok", ""
     member_id = previous.get("member_id") if not doc.get("user_id") else None
     try:
         d_settings, client, reason = await _connection(db)
-        if doc.get("user_id"):
+        if doc.get("user_id") and reason == "off":
+            member_id = previous.get("member_id")  # ohne Anbindung nichts vergessen
+        elif doc.get("user_id"):
             member_id = await member_id_of(db, doc["user_id"], d_settings)
-            # Freigeben ohne Zuordnung (mehr): den alten Wert beim bisherigen Mitglied löschen.
-            if member_id is None and want is None:
-                member_id = previous.get("member_id")
+            old = previous.get("member_id")
+            if old and old != member_id:
+                clears.add(int(old))
+        clears.discard(member_id)
         if reason == "off":
             state = "off"
         elif client is None:
             state, error = "failed", reason
-        elif not member_id:
-            state = "ok" if want is None else "no_member"
-        elif not erp.write_capable(d_settings):
-            state = "read_only"
-        elif (
-            want is not None
-            and scan
-            and scan.get("state") == "ok"
-            and [m for m in scan["numbers"].get(want, []) if m != member_id]
-        ):
-            state = "conflict"
         else:
-            await client.set_member_extrafield(member_id, field, want)
-            row = await client.core_member(member_id)
-            got = _as_number((row.get("array_options") or {}).get(f"options_{field}"))
-            state = "ok" if got == want else "field_missing"
+            writable = erp.write_capable(d_settings)
+            for old in sorted(clears) if writable else []:
+                try:
+                    await client.set_member_extrafield(old, field, None)
+                    clears.discard(old)
+                except erp.DolibarrError as exc:
+                    if exc.kind == "not_found":
+                        clears.discard(old)  # das Mitglied gibt es dort nicht mehr
+                    else:
+                        error = exc.kind
+            if not member_id:
+                state = "ok" if want is None else "no_member"
+            elif not writable:
+                state = "read_only"
+            elif (
+                want is not None
+                and scan
+                and scan.get("state") == "ok"
+                and [m for m in scan["numbers"].get(want, []) if m != member_id]
+            ):
+                state = "conflict"
+            else:
+                await client.set_member_extrafield(member_id, field, want)
+                row = await client.core_member(member_id)
+                got = _as_number(
+                    (row.get("array_options") or {}).get(f"options_{field}")
+                )
+                state = "ok" if got == want else "field_missing"
+            if clears and state == "ok":
+                state = "failed" if writable else "read_only"
     except erp.DolibarrError as exc:
         state, error = "failed", exc.kind
     # Der Abgleich darf nie die Wahl oder eine Löschung scheitern lassen.
@@ -388,23 +433,50 @@ async def _push(db, doc: dict, *, scan: dict | None = None) -> str:
             log_safe(doc.get("user_id") or "gelöscht"),
             state,
         )
-    await db.jersey_numbers.update_one(
-        {"id": doc["id"]},
-        {
-            "$set": {
-                "dolibarr": {
-                    "state": state,
-                    "value": want,
-                    "member_id": member_id,
-                    "error": error,
-                    "field": field,
-                    "at": now_utc().isoformat(),
-                }
-            }
-        },
+    sync = {
+        "state": state,
+        "value": want,
+        "member_id": member_id,
+        "error": error,
+        "field": field,
+        "at": now_utc().isoformat(),
+    }
+    done = await db.jersey_numbers.update_one(
+        _rev_filter(doc), {"$set": {"dolibarr": sync, "pending_clears": sorted(clears)}}
     )
     reset_cache()
-    return state
+    if done.matched_count:
+        return state
+    # Während des Schreibens hat sich der Spiegel geändert: mit dem neuen Stand noch einmal - sonst bleibt der
+    # Nachtrag offen, und der Job holt ihn nach.
+    if clears:
+        await db.jersey_numbers.update_one(
+            {"id": doc["id"]},
+            {"$addToSet": {"pending_clears": {"$each": sorted(clears)}}},
+        )
+    if _round < 2:
+        return await _push(db, doc, scan=scan, _round=_round + 1)
+    await db.jersey_numbers.update_one(
+        {"id": doc["id"]}, {"$set": {"dolibarr.state": "pending"}}
+    )
+    return "pending"
+
+
+async def link_changed(db, user_id: str) -> None:
+    """Die Zuordnung zum Dolibarr-Mitglied wurde bestätigt oder gelöst. Das Konto behält seine Nummer; beim bisherigen
+    Mitglied wird sie gelöscht, beim neuen eingetragen (sofort, sonst über den Nachtrag).
+    """
+    doc = await _doc(db, user_id)
+    if not doc:
+        return
+    await db.jersey_numbers.update_one(
+        {"id": doc["id"]}, {"$inc": {"rev": 1}, "$set": {"dolibarr.state": "pending"}}
+    )
+    await _push(db, doc)
+
+
+# Bei jeder bestätigten oder gelösten Zuordnung nachziehen (ohne Import-Kreis über dolibarr_links).
+on_link_change(link_changed)
 
 
 def sync_view(doc: dict | None, field: str, *, board: bool = False) -> dict:
@@ -504,6 +576,7 @@ async def _claim(
             "dolibarr.state": "pending",
             "dolibarr.value": number,
         },
+        "$inc": {"rev": 1},
         "$setOnInsert": {"id": new_id(), "created_at": now},
         "$push": {
             "log": {
@@ -541,6 +614,7 @@ async def _free(
             "dolibarr.value": None,
         },
         "$unset": {"number_key": ""},
+        "$inc": {"rev": 1},
         "$setOnInsert": {"id": new_id(), "created_at": now},
         "$push": {
             "log": {
@@ -599,6 +673,7 @@ async def _adopt_from_dolibarr(db, user_id: str, settings: dict) -> None:
                         "at": now,
                     },
                 },
+                "$inc": {"rev": 1},
                 "$setOnInsert": {"id": new_id(), "created_at": now},
                 "$push": {
                     "log": _log(
@@ -656,7 +731,9 @@ async def overview(db, user: dict) -> dict:
         .sort("received_at", -1)
         .to_list(10)
     )
-    open_row = next((row for row in rows if row.get("status") == OPEN), None)
+    open_row = next(
+        (row for row in rows if row.get("status") in (OPEN, DECIDING)), None
+    )
     number = (doc or {}).get("number")
     can_choose = bool((doc or {}).get("can_choose", True))
     return {
@@ -665,7 +742,8 @@ async def overview(db, user: dict) -> dict:
         "can_choose": can_choose,
         # Schon einmal gewählt und vom Vorstand freigegeben: „such dir einmal eine neue aus“.
         "again": can_choose and bool((doc or {}).get("log")),
-        "free_count": await _free_count(db, settings) if can_choose else None,
+        # Freie Nummern auch nach dem Festlegen - für den Wunsch im Antrag.
+        **(await _free_view(db, settings)),
         "chosen_at": (doc or {}).get("chosen_at") if number is not None else None,
         "set_by": (doc or {}).get("set_by") if number is not None else None,
         "range": {"min": settings["min"], "max": settings["max"]},
@@ -679,9 +757,10 @@ async def overview(db, user: dict) -> dict:
     }
 
 
-async def _free_count(db, settings: dict) -> int:
-    """Wie viele Nummern im Bereich noch frei sind - damit „alle vergeben“ gleich dasteht,
-    statt dass jemand 100-mal tippt."""
+async def _free_view(db, settings: dict) -> dict:
+    """Welche Nummern im Bereich noch frei sind - als Raster zum Antippen, damit niemand durchprobieren muss und
+    „alle vergeben“ gleich dasteht. Nur Nummern, nie wer eine hat. Bei sehr großen Bereichen nur die Zahl.
+    """
     low, high = settings["min"], settings["max"]
     held = {
         int(row["number_key"])
@@ -696,8 +775,14 @@ async def _free_count(db, settings: dict) -> int:
         for value, members in scan["numbers"].items()
         if any(m not in stale for m in members)
     }
-    blocked = set(settings["reserved"]) | held
-    return max(high - low + 1 - sum(1 for n in blocked if low <= n <= high), 0)
+    blocked = {n for n in set(settings["reserved"]) | held if low <= n <= high}
+    size = high - low + 1
+    free = (
+        [n for n in range(low, high + 1) if n not in blocked]
+        if size <= GRID_MAX
+        else None
+    )
+    return {"free_count": max(size - len(blocked), 0), "free_numbers": free}
 
 
 async def check(db, user: dict, raw) -> dict:
@@ -776,7 +861,9 @@ async def request_change(db, user: dict, wished_raw, reason: str) -> dict:
         "decision_reason": "",
     }
     result = await db.jersey_number_requests.update_one(
-        {"user_id": user_id, "status": OPEN}, {"$setOnInsert": row}, upsert=True
+        {"user_id": user_id, "status": {"$in": [OPEN, DECIDING]}},
+        {"$setOnInsert": row},
+        upsert=True,
     )
     if result.upserted_id is None:
         raise JerseyError(409, "Dein Antrag liegt schon beim Vorstand.")
@@ -898,34 +985,53 @@ async def reopen(
 async def decide(
     db, actor: dict, request_id: str, decision: str, reason: str = ""
 ) -> dict:
-    row = await db.jersey_number_requests.find_one({"id": request_id}, {"_id": 0})
-    if not row:
-        raise JerseyError(404, "Diesen Antrag gibt es nicht.")
-    if row.get("status") != OPEN:
-        raise JerseyError(409, "Über diesen Antrag ist schon entschieden.")
+    """Über einen Antrag entscheiden. Zuerst wird der Antrag atomar beansprucht (offen → in Entscheidung); erst dann
+    ändert sich die Nummer. Eine zweite, gleichzeitige Entscheidung bekommt 409 und ändert nichts.
+    """
     if decision not in DECISIONS:
         raise JerseyError(400, "Freigeben, Neuwahl oder Ablehnen.")
+    claim = new_id()
+    row = await _after(
+        db.jersey_number_requests,
+        {"id": request_id, "status": OPEN},
+        {"$set": {"status": DECIDING, "claim": claim}},
+    )
+    if not row:
+        if not await db.jersey_number_requests.find_one(
+            {"id": request_id}, {"_id": 0, "id": 1}
+        ):
+            raise JerseyError(404, "Diesen Antrag gibt es nicht.")
+        raise JerseyError(409, "Über diesen Antrag ist schon entschieden.")
     text = str(reason or "").strip()[:REASON_MAX]
     if decision == "approve" and row.get("wished") is None:
         decision = "reopen"
-    if decision == "approve":
-        await set_number(
-            db, actor, row["user_id"], row["wished"], note="Antrag freigegeben"
+    try:
+        if decision == "approve":
+            await set_number(
+                db, actor, row["user_id"], row["wished"], note="Antrag freigegeben"
+            )
+        elif decision == "reopen":
+            await reopen(db, actor, row["user_id"], note="Antrag: Neuwahl", tell=False)
+    except BaseException:
+        # Hat es nicht geklappt (etwa: Wunschnummer inzwischen vergeben), bleibt der Antrag offen.
+        await db.jersey_number_requests.update_one(
+            {"id": request_id, "claim": claim},
+            {"$set": {"status": OPEN}, "$unset": {"claim": ""}},
         )
-    elif decision == "reopen":
-        await reopen(db, actor, row["user_id"], note="Antrag: Neuwahl", tell=False)
+        raise
     status = DECISIONS[decision]
     now = now_utc().isoformat()
     done = await _after(
         db.jersey_number_requests,
-        {"id": request_id, "status": OPEN},
+        {"id": request_id, "claim": claim},
         {
             "$set": {
                 "status": status,
                 "decided_at": now,
                 "decided_by": actor["id"],
                 "decision_reason": text,
-            }
+            },
+            "$unset": {"claim": ""},
         },
     )
     if not done:
@@ -1173,9 +1279,10 @@ async def release_for_erasure(db, user_id: str) -> None:
     if not doc:
         return
     sync = doc.get("dolibarr") or {}
-    if not sync.get("member_id") or (
+    clean_in_dolibarr = not sync.get("member_id") or (
         sync.get("value") is None and sync.get("state") == "ok"
-    ):
+    )
+    if clean_in_dolibarr and not doc.get("pending_clears"):
         await db.jersey_numbers.delete_one({"id": doc["id"]})
         return
     orphan = await _after(
@@ -1191,10 +1298,24 @@ async def release_for_erasure(db, user_id: str) -> None:
                 "dolibarr.value": None,
                 "updated_at": now_utc().isoformat(),
             },
+            "$inc": {"rev": 1},
         },
     )
-    if orphan and await _push(db, orphan) == "ok":
-        await db.jersey_numbers.delete_one({"id": doc["id"]})
+    if orphan:
+        await _push(db, orphan)
+        await _drop_cleared_orphan(db, doc["id"])
+
+
+async def _drop_cleared_orphan(db, doc_id: str) -> None:
+    """Eine Zeile ohne Konto verschwindet, sobald in Dolibarr nichts mehr von ihr steht."""
+    await db.jersey_numbers.delete_one(
+        {
+            "id": doc_id,
+            "orphan": True,
+            "dolibarr.state": "ok",
+            "pending_clears.0": {"$exists": False},
+        }
+    )
 
 
 async def sync_pending(db=None, limit: int = 200) -> dict:
@@ -1212,6 +1333,7 @@ async def sync_pending(db=None, limit: int = 200) -> dict:
             "$or": [
                 {"dolibarr.state": {"$ne": "ok"}},
                 {"dolibarr.field": {"$ne": field}},
+                {"pending_clears.0": {"$exists": True}},
             ]
         },
         {"_id": 0},
@@ -1223,6 +1345,6 @@ async def sync_pending(db=None, limit: int = 200) -> dict:
     for doc in rows:
         state = await _push(db, doc, scan=scan)
         counts[state] = counts.get(state, 0) + 1
-        if doc.get("orphan") and state == "ok":
-            await db.jersey_numbers.delete_one({"id": doc["id"]})
+        if doc.get("orphan"):
+            await _drop_cleared_orphan(db, doc["id"])
     return counts
