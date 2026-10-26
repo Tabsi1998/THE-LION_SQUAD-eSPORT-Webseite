@@ -44,6 +44,13 @@ MatchV2ResultError = MatchResultError
 LOCKED_DOWNSTREAM_STATUSES = {"in_progress", "waiting_result", "disputed", "completed", "forfeit"}
 # Ein Spiel in diesem Stand hat ein Ergebnis - es zu ändern ist eine Korrektur.
 DECIDED_STATUSES = {"completed", "forfeit"}
+# Ein Freilos-Platz, dessen Quelle (nach Quote oder Laufgröße, ``heat_rebuild``) diesen Platz nicht mehr beliefert:
+# kein gezogener oder vergebener Platz, auch wenn ``source_result`` die Quelle nennt.
+SOURCE_UNFULFILLABLE = "source_unfulfillable"
+
+
+def _unfulfillable(slot: dict) -> bool:
+    return (slot.get("source_result") or {}).get("reason") == SOURCE_UNFULFILLABLE
 CORRECTION_REASON_MIN_LENGTH = 5
 CORRECTION_REASON_DETAIL = f"Bitte einen Grund für die Korrektur angeben (mindestens {CORRECTION_REASON_MIN_LENGTH} Zeichen)."
 CORRECTION_FORCE_DETAIL = "Dieses Spiel hat schon ein Ergebnis. Zum Korrigieren bitte einen Grund angeben."
@@ -105,6 +112,20 @@ def _filled_slots(match: dict) -> list[dict]:
         slot for slot in match.get("slots") or []
         if slot.get("status") == "filled" and slot.get("registration_id")
     ]
+
+
+def _source_still_open(slot: dict, by_key: dict[str, dict], target_sets: dict[str, dict]) -> bool:
+    """Ein Freilos-Platz „Quelle unerfüllbar“ (``heat_rebuild``), dessen Quelle noch offen ist: sie liefert gerade
+    niemanden, kann aber noch wachsen (Zusammenlegen, Nachzügler) - dann kommt der Platz zurück. Die Quelle steht nach
+    dem Umbau in ``source.was``, im selben Durchgang davor noch in ``source``. Offen heißt: nach dem Stand, der mit
+    diesem Schreibvorgang gilt (``target_sets``) - das gerade eingetragene Spiel ist entschieden."""
+    if slot.get("status") != "bye":
+        return False
+    source = slot.get("source") or {}
+    was = source if source.get("type") == "rank" else (source.get("was") or {})
+    origin = by_key.get(was.get("match_key")) if was else None
+    return (bool(origin) and not origin.get("is_preview")
+            and _effective_status(origin, target_sets) not in DECIDED_OR_VOID)
 
 
 def _slot_participant_map(match: dict) -> dict[str, dict]:
@@ -518,14 +539,19 @@ def _advancement_result_rank(match: dict, advancement: dict) -> int:
     if 1 <= rank <= loser_count:
         return qualifiers + rank
 
-    # Backward compatibility for old schemas that used L:<match>:<absolute rank>.
-    return rank
+    # Alte Schemata mit absolutem Platz (L:<Lauf>:<Platz>) - nur, wenn der Platz hinter den Weiterkommern liegt.
+    # Sonst ist es ein Verlierer-Platz, den es bei dieser Laufgröße nicht gibt (#2045: ein auf 3 Plätze ausgeglichener
+    # Lauf mit Quote 2 hat nur L1); als Platz 2 gelesen träfe L2 den zweiten Weiterkommer.
+    if rank > qualifiers:
+        return rank
+    return qualifiers + rank
 
 
-def _rank_can_be_missing_because_of_bye(match: dict, result_rank: int) -> bool:
+def _rank_can_be_missing_because_of_bye(match: dict, result_rank: int, flow: str | None = None) -> bool:
     settings = match.get("settings") or {}
     match_size = int(settings.get("match_size") or len(match.get("slots") or []) or 0)
-    return 1 <= result_rank <= match_size
+    # Ein Verlierer-Platz hinter der Laufgröße (#2045) kann nicht besetzt sein: Freilos, kein Fehler.
+    return 1 <= result_rank and (result_rank <= match_size or flow == "L")
 
 
 def _downstream_links(stage_matches: list[dict]) -> dict[str, list[tuple[str, int]]]:
@@ -537,7 +563,9 @@ def _downstream_links(stage_matches: list[dict]) -> dict[str, list[tuple[str, in
         for slot in match.get("slots") or []:
             source = slot.get("source_result") or {}
             source_match_id = source.get("from_match_id")
-            if source_match_id:
+            # Ein Platz „Quelle unerfüllbar“ (Lauf-Umbau) nennt seine Quelle, ist aber keine Lieferung ihres
+            # Ergebnisses: eine Korrektur dort räumt ihn nicht ab (#2044).
+            if source_match_id and not _unfulfillable(slot):
                 links[source_match_id].append((match_id, int(slot.get("slot") or 0)))
     return links
 
@@ -650,7 +678,7 @@ def _drawn_slot(targets: list[dict], source_id: str, flow: str | None, ranks: se
         for slot in target.get("slots") or []:
             origin = slot.get("source_result") or {}
             if origin.get("from_match_id") == source_id and origin.get("flow") == flow \
-                    and int(origin.get("rank") or 0) in ranks:
+                    and int(origin.get("rank") or 0) in ranks and not _unfulfillable(slot):
                 return target, slot
     return None
 
@@ -676,7 +704,7 @@ def _drawn_seats_of(targets: list[dict], source_id: str | None, flow: str | None
     seats = [
         (target, slot) for target in targets for slot in target.get("slots") or []
         if (slot.get("source_result") or {}).get("from_match_id") == source_id
-        and (slot.get("source_result") or {}).get("flow") == flow
+        and (slot.get("source_result") or {}).get("flow") == flow and not _unfulfillable(slot)
     ]
     return sorted(seats, key=lambda seat: (int((seat[1].get("source_result") or {}).get("rank") or 0),
                                            not seat[1].get("registration_id")))
@@ -1138,6 +1166,10 @@ def resolve_walkovers(start_ids: list[str], by_id: dict[str, dict], target_sets:
         filled = _filled_slots(match)
         if len(filled) > 1 or not any(slot.get("status") == "bye" for slot in slots):
             continue
+        if not filled and any(_source_still_open(slot, by_key, target_sets) for slot in slots):
+            # Nur Freilose, aber eine Quelle ist noch offen (#2044): der Lauf wartet, statt zu entfallen - legt der
+            # Lauf-Umbau die Vorläufe zusammen, haben sie Verlierer, und die fahren hier (``heat_rebuild``).
+            continue
         winner = filled[0] if filled else None
         # Kampflos nach Disqualifikation oder Austritt (#1553): der Grund und die entfernte Person stehen am Ergebnis.
         marker = _removal_marker(match) if winner else None
@@ -1326,7 +1358,9 @@ def _cascade_clear_downstream(
 
     for child_id, slot_number in downstream.get(source_match_id, []):
         child = by_id.get(child_id)
-        if not child:
+        # Ein abgesagter Lauf (zusammengelegt, abgekürzt, ohne Teilnehmer) bleibt abgesagt - die Kaskade belebt ihn
+        # nicht wieder, auch wenn ein Platz dort noch die alte Quelle nennt (#2044).
+        if not child or _effective_status(child, target_sets) == "cancelled":
             continue
         slots = target_sets.get(child_id, {}).get("slots") or child.get("slots") or []
         slot = _find_slot({"slots": slots}, slot_number)
@@ -1413,7 +1447,7 @@ def build_v2_result_application(
             skip_reason = "eliminated"
         elif result and flow == "W" and result.get("forfeit"):
             skip_reason = "forfeit"
-        if not result and not skip_reason and not _rank_can_be_missing_because_of_bye(match, result_rank):
+        if not result and not skip_reason and not _rank_can_be_missing_because_of_bye(match, result_rank, flow):
             raise MatchV2ResultError(f"Rank {result_rank} fehlt für Advancement")
         if result and not skip_reason:
             if result["registration_id"] in advanced_registration_ids:
@@ -1518,7 +1552,10 @@ def build_v2_result_application(
                 target_sets[target_id].update(_pairing_reset_fields(target, now_iso))
             _cascade_clear_downstream(target_id, by_id, downstream, target_sets, now_iso, reset_log=reset_matches)
 
-    # Freilos-Kette und Reset-Regel erst jetzt - nach Korrektur und Kaskade steht fest, was in den Zielen gilt.
+    # Freilos-Kette und Reset-Regel erst jetzt - nach Korrektur und Kaskade steht fest, was in den Zielen gilt. Das
+    # Spiel selbst gilt dabei als entschieden (der Aufrufer schreibt ``match_set`` erst danach): ein Folgespiel, dessen
+    # Plätze alle Freilose sind, wartet nicht auf dieses Spiel als „offene Quelle“ (#2044).
+    target_sets.setdefault(match["id"], {})["status"] = "completed"
     resolve_walkovers(list(target_sets), by_id, target_sets, now_iso, rng=rng, draws=draws)
     _apply_bracket_reset_rule(match, results, by_id, by_key, target_sets, now_iso)
 
