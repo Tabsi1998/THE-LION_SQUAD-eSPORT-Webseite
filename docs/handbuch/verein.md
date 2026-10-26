@@ -49,6 +49,7 @@ Wer das sieht: der Bereich **Vereinsverwaltung** (auch, wer einen aktiven Vorsta
 | **Helferdienste** | Schichten bei Veranstaltungen, Anfrage und Bestätigung | Dolibarr (Vereinsakte), Mitgliederbereich → Helfen |
 | **Persönliche Unterlagen** | Bestätigungen und Schreiben nur für dich | Profil → „Nur für dich“ → Deine Unterlagen |
 | **Mitgliederverzeichnis** | Öffentliche Profile mit Foto, Spielen, Plattformen | Mitgliederprofile, oder aus Dolibarr per Einwilligung |
+| **Wunschnummer** | Jedes Mitglied sucht sich einmal eine eigene Nummer aus, etwa fürs Trikot | Meine Mitgliedschaft; Admin → Mitglieder → Reiter Nummern |
 
 ---
 
@@ -213,6 +214,31 @@ Nummer und Beginn von dort und lassen sich hier nicht ändern; **interne Notizen
 **Admin → Verein → Kontakt-Inbox:** Nachrichten aus dem Kontaktformular mit Status; **Per E-Mail antworten**; Löschen ist endgültig.
 Dazu die Benachrichtigung „Kontaktanfragen“ in der Kommandozentrale.
 
+### 3.12 Wunschnummer (#2034)
+
+**Für Mitglieder – Meine Mitgliedschaft → Meine Nummer:** Nummer eintippen, die Seite sagt sofort, ob sie frei ist. Mit
+**Nummer festlegen** und der Bestätigung gehört sie dir. Jede Nummer gibt es im Verein nur einmal. Danach änderst du sie nicht
+mehr selbst, sondern stellst mit **Andere Nummer beantragen** einen Antrag – mit kurzer Begründung und, wenn du magst, einer
+Wunschnummer. Öffentlich ist die Nummer nicht: Sie sehen nur du und der Vorstand.
+
+**Für den Vorstand – Admin → Mitglieder → Mitglieder → Reiter Nummern** (`/admin/members?tab=numbers`):
+
+- **Liste:** alle Mitglieder mit Nummer, wer sie gewählt hat, und ob sie schon in Dolibarr steht. **Verlauf** zeigt jede Änderung.
+- **Offene Anträge:** *‹Nummer› freigeben* trägt die Wunschnummer ein, *Neuwahl erlauben* gibt die alte frei und das Mitglied
+  wählt einmal selbst neu, *Ablehnen* lässt alles, wie es ist. Eine Begründung sieht das Mitglied. Neue Anträge melden sich per
+  Mail an den Vorstand und – wenn eingeschaltet – im Vorstandskanal auf Discord („Antrag auf eine andere Nummer“).
+- **Ändern / Vergeben** trägt direkt eine Nummer ein, **Neuwahl** gibt die Nummer frei.
+- **Regeln:** Bereich (Vorgabe 0 bis 99), reservierte Nummern und der Name des Feldes in Dolibarr (Vorgabe `trikotnummer`).
+
+Frei wird eine Nummer **sofort** – beim Austritt, bei der Kontolöschung und bei jedem Wechsel. Eine Sperrfrist gibt es nicht.
+
+**Dolibarr einrichten (einmalig):** In Dolibarr unter *Einrichtung → Module/Anwendungen → Mitglieder* (Zahnrad) den Reiter
+*Ergänzende Attribute (Mitglieder)* öffnen und ein neues Attribut anlegen: Bezeichnung „Trikotnummer“, Code `trikotnummer`
+(genau wie unter Regeln), Typ *Ganzzahl*. Für das Schreiben braucht die Website unter **Dolibarr → Verbindung** die Erlaubnis zu
+schreiben. Fehlt das Feld oder ist Dolibarr nicht erreichbar, bleibt die Nummer auf der Website gesichert; der Abgleich trägt sie
+alle zehn Minuten nach, sofort mit **Nach Dolibarr übertragen**. Steht in Dolibarr schon eine Nummer beim Mitglied, übernimmt die
+Website sie beim ersten Öffnen.
+
 ---
 
 ## 4. Wenn etwas nicht klappt
@@ -232,6 +258,10 @@ Dazu die Benachrichtigung „Kontaktanfragen“ in der Kommandozentrale.
 | Statuten fehlen auf der Vorstandsseite | Nicht freigegeben, oder der Schalter ist aus | Freigabe in Dolibarr oder Dokument „Statuten“ prüfen |
 | Karte zeigt „Prüfcode braucht Netz“ | Kein Netz | Gewollt, der Code braucht Verbindung |
 | Beim Einlass „nicht eingeladen“ oder „kein Vorstand heute“ | Das Vereinsmodul entscheidet das | Einladung und Funktion in Dolibarr prüfen |
+| Nummern: „In Dolibarr fehlt beim Mitglied das ergänzende Attribut …“ | Das Feld ist in Dolibarr nicht angelegt, oder der Code weicht ab | Attribut anlegen (3.12) oder den Feldnamen unter Regeln anpassen, dann **Nach Dolibarr übertragen** |
+| Nummern: „Die Website darf nicht nach Dolibarr schreiben“ | Schreiben ist ausgeschaltet | Dolibarr → Verbindung: Schreiben erlauben |
+| Nummern: „Konto ist keinem Dolibarr-Mitglied zugeordnet“ | Zuordnung fehlt | Dolibarr → Zuordnungen bestätigen; die Nummer wird dann nachgetragen |
+| Nummern: „Nur in Dolibarr“ zeigt Einträge | In Dolibarr steht eine Nummer bei einem Mitglied ohne Website-Konto | Gewollt: die Nummer gilt als vergeben |
 
 ---
 
