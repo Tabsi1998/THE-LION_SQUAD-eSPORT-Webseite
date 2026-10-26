@@ -607,6 +607,25 @@ Seitenverhältnis, nichts wird abgeschnitten.
   bleibt gespeichert und springt ein, wo Dolibarr nichts liefert.
 - Ältere Module (vor 1.9.0) fragt die Website nicht; dort bleibt alles wie bisher.
 
+## Wunschnummer als ergänzendes Attribut (#2034)
+
+Die Wunschnummer eines Mitglieds steht in Dolibarr als **ergänzendes Attribut beim Mitglied**. Die Website liest und
+schreibt es über Dolibarrs eigene Schnittstelle für Mitglieder (`GET /members`, `PUT /members/{id}`), nicht über das
+Vereinsmodul – dessen Änderungswünsche kennen nur Anschrift, Telefon und E-Mail.
+
+- **Anlegen:** *Einrichtung → Module/Anwendungen → Mitglieder* (Zahnrad) → Reiter *Ergänzende Attribute (Mitglieder)* →
+  neues Attribut, Code `trikotnummer`, Typ *Ganzzahl*. Einen anderen Code tragt ihr im Admin unter *Mitglieder → Nummern →
+  Regeln* ein.
+- **Rechte:** Der Website-Benutzer braucht in Dolibarr Lesen und Ändern bei den Mitgliedern, und unter *Dolibarr → Verbindung*
+  muss Schreiben erlaubt sein.
+- **Eindeutig:** Dolibarr selbst prüft das nicht. Vor dem Festlegen sieht die Website alle aktiven Mitglieder in Dolibarr
+  durch (ausgetretene und ausgeschlossene zählen nicht) und dazu ihren eigenen Stand. Wer dieselbe Nummer in Dolibarr bei zwei
+  Mitgliedern einträgt, sieht das im Admin als Warnung.
+- **Nichts geht verloren:** Fehlt das Attribut, ist Schreiben aus oder Dolibarr nicht erreichbar, bleibt die Nummer auf der
+  Website gesichert; der Job `jersey_numbers` trägt sie alle zehn Minuten nach. Austritt und Kontolöschung löschen den Wert in
+  Dolibarr gleich mit.
+- **Schon eingetragen:** Steht beim Mitglied bereits eine Nummer, übernimmt die Website sie, sobald das Mitglied seine Seite öffnet.
+
 ## Was das Modul heute kann – und worauf gewartet wird
 
 Die Seite *Dolibarr* zeigt es unter *Stand*. Die Website setzt nur voraus, was
