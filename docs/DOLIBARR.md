@@ -625,6 +625,11 @@ Vereinsmodul – dessen Änderungswünsche kennen nur Anschrift, Telefon und E-M
   Website gesichert; der Job `jersey_numbers` trägt sie alle zehn Minuten nach. Austritt und Kontolöschung löschen den Wert in
   Dolibarr gleich mit.
 - **Schon eingetragen:** Steht beim Mitglied bereits eine Nummer, übernimmt die Website sie, sobald das Mitglied seine Seite öffnet.
+- **Zuordnung gelöst oder gewechselt:** Die Nummer gehört dem Website-Konto (das Mitglied hat sie gewählt). Beim bisherigen
+  Mitglied löscht die Website den Wert, beim neuen trägt sie ihn ein. Ist Schreiben aus, wartet das Löschen als Nachtrag; bis
+  dahin zählt der alte Wert dort nicht mehr als vergeben.
+- **Kein veralteter Stand:** Jede Zeile hat einen Zähler. Der Nachtrag schreibt immer den aktuellen Stand und meldet „steht in
+  Dolibarr“ nur, wenn sich währenddessen nichts geändert hat - sonst schreibt er gleich noch einmal.
 
 ## Was das Modul heute kann – und worauf gewartet wird
 

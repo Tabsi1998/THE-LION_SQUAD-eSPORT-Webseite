@@ -216,7 +216,8 @@ Dazu die Benachrichtigung „Kontaktanfragen“ in der Kommandozentrale.
 
 ### 3.12 Wunschnummer (#2034)
 
-**Für Mitglieder – Meine Mitgliedschaft → Meine Nummer:** Nummer eintippen, die Seite sagt sofort, ob sie frei ist. Mit
+**Für Mitglieder – Meine Mitgliedschaft → Meine Nummer:** Freie Nummer im Raster antippen oder eintippen; die Seite sagt sofort,
+ob sie frei ist (wer eine Nummer hat, steht nirgends). Mit
 **Nummer festlegen** und der Bestätigung gehört sie dir. Jede Nummer gibt es im Verein nur einmal. Danach änderst du sie nicht
 mehr selbst, sondern stellst mit **Andere Nummer beantragen** einen Antrag – mit kurzer Begründung und, wenn du magst, einer
 Wunschnummer. Öffentlich ist die Nummer nicht: Sie sehen nur du und der Vorstand.
@@ -237,7 +238,8 @@ Frei wird eine Nummer **sofort** – beim Austritt, bei der Kontolöschung und b
 (genau wie unter Regeln), Typ *Ganzzahl*. Für das Schreiben braucht die Website unter **Dolibarr → Verbindung** die Erlaubnis zu
 schreiben. Fehlt das Feld oder ist Dolibarr nicht erreichbar, bleibt die Nummer auf der Website gesichert; der Abgleich trägt sie
 alle zehn Minuten nach, sofort mit **Nach Dolibarr übertragen**. Steht in Dolibarr schon eine Nummer beim Mitglied, übernimmt die
-Website sie beim ersten Öffnen.
+Website sie beim ersten Öffnen. Wird die Zuordnung zu einem Dolibarr-Mitglied gelöst oder gewechselt, behält das Konto seine
+Nummer: beim bisherigen Mitglied wird sie in Dolibarr gelöscht, beim neuen eingetragen.
 
 ---
 
