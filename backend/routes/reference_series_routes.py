@@ -24,7 +24,8 @@ from models import (
     now_utc,
 )
 from services import (
-    read_spellings, reference_running_cache, reference_series, season_close, series_logo, series_partners,
+    read_spellings, reference_running_cache, reference_series, season_close, series_kinds, series_logo,
+    series_partners,
 )
 from services.dolibarr_policy import club_today
 from services.own_teams import clean_teams, own_teams, team_conflicts
@@ -116,8 +117,10 @@ async def admin_overview(me: dict = Depends(require_area("content"))):
         lineage["series"] = sorted(by_lineage.get(lineage["id"], []), key=lambda row: row.get("status") == "archived")
     lineages.sort(key=lambda row: (bool(row.get("is_archived")), row.get("order_index") or 0,
                                    str(row.get("title") or "").casefold()))
+    # #2024: dazu das Art-Profil je Art (Felder, Begriffe, Standardregeln, Vorlagen) - ``default_rules`` bleibt für
+    # ältere Leser die allgemeine Vorgabe.
     return {"lineages": lineages, "points_schemes": await reference_series.complete_schemes(db),
-            "default_rules": normalize_rules({})}
+            "default_rules": normalize_rules({}), "kind_profiles": series_kinds.all_profiles()}
 
 
 @router.get("/admin/points-schemes")
@@ -220,7 +223,9 @@ async def create_series(body: ReferenceSeriesCreate, me: dict = Depends(require_
                          if scheme["id"] == doc["points_scheme_id"]), None)
         if template is None:
             raise HTTPException(404, "Punkteschema-Vorlage nicht gefunden.")
-    doc["rules"] = _rules({**(template.get("rules") or {}), **(doc.get("rules") or {})})
+    # Ohne Vorlage gelten die Standardregeln der Art (#2024) - eine Turnierserie startet als TFT-Turniertag.
+    base = template.get("rules") if template else series_kinds.default_rules(lineage.get("kind"))
+    doc["rules"] = _rules({**(base or {}), **(doc.get("rules") or {})})
     doc.update(_teams(doc.get("own_teams"), doc.get("team_name")))
     await series_partners.clean(db, doc)  # #1934: eigene Partner der Saison
     await series_logo.check(db, doc.get("logo_url"))  # #2014: eigenes Saison-Logo

@@ -24,6 +24,7 @@ oder Saisonpunkte, und keine Sammlung wird mit dem Turnierbereich geteilt.
 """
 from __future__ import annotations
 
+import copy
 import functools
 import inspect
 import logging
@@ -33,7 +34,7 @@ from fastapi import HTTPException
 
 from database import get_db
 from models import new_id, now_utc
-from services import race_weekend, series_participants
+from services import race_weekend, series_kinds, series_participants
 from services.own_teams import own_teams
 from services.mutation_lock import MutationLockBusy, mutation_lock, series_write_resource
 from services.scoring_rules import normalize_rules
@@ -152,7 +153,8 @@ POINTS_SCHEME_TEMPLATES: tuple[dict, ...] = (
         "id": "formula_1",
         "name": "Formel 1 (25-18-15-12-10-8-6-4-2-1)",
         "description": "Punkte für die ersten zehn, Vorrang nach Plätzen, Teamwertung mit allen Fahrern.",
-        "kinds": ["racing", "series"],
+        # #2024: nur noch für die Rennliga - eine Turnierserie hat die TFT-Vorlage.
+        "kinds": ["racing"],
         "rules": {"points_mode": "scheme", "points_by_place": [25, 18, 15, 12, 10, 8, 6, 4, 2, 1],
                   "tiebreakers": ["countback", "latest_result"],
                   "team_scoring": {"enabled": True, "counting_drivers": None, "guests_count": True}},
@@ -166,7 +168,20 @@ POINTS_SCHEME_TEMPLATES: tuple[dict, ...] = (
                   "match_points": {"win": 3, "draw": 1, "loss": 0},
                   "table_tiebreakers": ["score_diff", "score_for"]},
     },
+    {
+        # #2024: Turniertag mit fünf Runden (8…1 je Lobby-Platz), Saisonpunkte je Tagesplatz, Double Up als Schalter,
+        # keine F1-Boni - alles danach in der Saison einstellbar.
+        "id": "tft",
+        "name": "TFT-Turniertag (5 Runden, 8…1)",
+        "description": "Fünf Runden je Turniertag mit 8 bis 1 Punkten je Lobby-Platz; die Summe ergibt den Tagesplatz, "
+                       "daraus kommen die Saisonpunkte (35-30-26 …). Double Up lässt sich einschalten.",
+        "kinds": ["series"],
+        "rules": series_kinds.TFT_RULES,
+    },
 )
+# Alte Vorgabe der Vorlage „Formel 1“: so lange sie unverändert in den Einstellungen steht, zieht Migration 12 sie auf
+# die Rennliga zurück (#2024) - eine bearbeitete Vorlage bleibt, wie sie ist.
+FORMULA_1_OLD_KINDS = ["racing", "series"]
 
 
 async def points_schemes(db) -> list[dict]:
@@ -191,7 +206,7 @@ async def complete_schemes(db) -> list[dict]:
 async def add_missing_templates(db) -> int:
     """Legt fehlende Vorlagen an, ohne vorhandene anzufassen. Liefert die Zahl der neuen."""
     present = {scheme["id"] for scheme in await points_schemes(db)}
-    missing = [dict(template) for template in POINTS_SCHEME_TEMPLATES if template["id"] not in present]
+    missing = [copy.deepcopy(template) for template in POINTS_SCHEME_TEMPLATES if template["id"] not in present]
     if missing:
         await db.settings.update_one(
             {"id": POINTS_SCHEMES_ID},
@@ -199,6 +214,15 @@ async def add_missing_templates(db) -> int:
             upsert=True,
         )
     return len(missing)
+
+
+async def narrow_formula_1(db) -> bool:
+    """#2024: Die Vorlage „Formel 1“ gilt nur noch für die Rennliga - aber nur, solange ihre Arten noch die alte Vorgabe
+    sind. Eine von Hand bearbeitete Vorlage bleibt. Liefert, ob etwas geändert wurde."""
+    result = await db.settings.update_one(
+        {"id": POINTS_SCHEMES_ID, "schemes": {"$elemMatch": {"id": "formula_1", "kinds": FORMULA_1_OLD_KINDS}}},
+        {"$set": {"schemes.$.kinds": ["racing"]}})
+    return bool(result.modified_count)
 
 
 async def recompute_standings(db, series: dict) -> int:

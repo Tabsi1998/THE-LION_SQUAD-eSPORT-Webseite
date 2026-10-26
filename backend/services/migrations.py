@@ -340,6 +340,16 @@ async def migrate_double_up_points(db) -> str:
     return f"{kept} series keep double up points by team place"
 
 
+async def migrate_kind_templates(db) -> str:
+    """Art-Profil (#2024): die neue Vorlage „TFT-Turniertag“ anlegen und „Formel 1“ auf die Rennliga beschränken - nur,
+    solange sie unverändert ist. Bestehende Saisons behalten ihre Regeln; die Vorlage wird nur beim Anlegen kopiert."""
+    from services import reference_series
+
+    added = await reference_series.add_missing_templates(db)
+    narrowed = await reference_series.narrow_formula_1(db)
+    return f"{added} points scheme templates added, formula 1 {'narrowed' if narrowed else 'kept'}"
+
+
 MIGRATIONS = (
     (1, "encrypt_legacy_integration_credentials", migrate_plaintext_secrets),
     (2, "team_leader_role_to_player", migrate_team_leader_role),
@@ -353,6 +363,7 @@ MIGRATIONS = (
     (9, "game_map_spelling_keys", migrate_game_map_keys),  # #1616
     (10, "reference_result_row_teams", migrate_result_row_teams),  # #1960: leeres Team heißt kein Team
     (11, "reference_double_up_points", migrate_double_up_points),  # #2015: bestehende Double-Up-Saisons bleiben bei k
+    (12, "reference_kind_templates", migrate_kind_templates),  # #2024: TFT-Vorlage, „Formel 1“ nur für die Rennliga
 )
 
 

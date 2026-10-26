@@ -29,6 +29,7 @@ from __future__ import annotations
 from fastapi import HTTPException
 
 from models import ReferenceCreate, new_id, now_utc
+from services import series_kinds
 from services.own_teams import Matcher, own_teams
 from services.series_identity import normalize_name
 
@@ -38,8 +39,7 @@ CANCELLED_LABEL = "Saison abgebrochen"
 # Vorgaben für die Bezeichnung eines Eintrags je Wertung - in der Referenz umbenennbar, beim erneuten Abschluss bleibt
 # eine eigene Bezeichnung stehen.
 LABELS = {"table": "Tabelle", "teams": "Teamwertung", "final": "Finale"}
-DRIVER_LABELS = {"racing": "Fahrerwertung"}
-DRIVER_LABEL = "Gesamtwertung"
+# Die Bezeichnung der Einzelwertung („Fahrerwertung“, „Gesamtwertung“) kommt aus dem Art-Profil (#2024).
 VISIBILITY_ORDER = ("public", "community", "members", "internal")
 NOT_OF_SEASON = "Diese Referenz gehört nicht zu dieser Saison - bitte eine Referenz der Saison wählen oder neu anlegen."
 NO_STANDING = ("Noch kein Endstand - erst Ergebnisse eintragen oder die Tabelle des Veranstalters einfügen, dann "
@@ -178,7 +178,7 @@ async def proposed_entries(db, series: dict, lineage: dict) -> list[dict]:
                                source="final"))
         else:
             solo.append(_entry("solo", key=f"solo:{club[pid]['profile_id']}", members=member,
-                               placement=row.get("rank"), label=DRIVER_LABELS.get(kind, DRIVER_LABEL),
+                               placement=row.get("rank"), label=series_kinds.word(kind, "standings_label"),
                                participant_count=len(drivers) or None, source="drivers"))
     seen = set()
     for entry in sorted(solo, key=lambda item: (item["placement"] is None, item["placement"] or 0)):

@@ -13,6 +13,7 @@ Referenz ``series_id`` oder an der Saison ``reference_id``) - nur für sichtbare
 """
 from __future__ import annotations
 
+from services import series_kinds
 from services.own_teams import Matcher, own_teams
 from services.series_standings import ordered_rounds
 from services.team_league_sheet import own_matches
@@ -122,6 +123,9 @@ async def profile_appearances(db, profile_id: str, series_list: list[dict]) -> d
         kind = lineage.get("kind")
         found = (await _team_league(db, series, pids) if kind == "team_league"
                  else await _rounds_played(db, series, pids, UNITS.get(kind, "rounds")))
+        if found and kind != "team_league":
+            # Art-Profil (#2024): „5 von 9 Turniertagen“ - ``unit`` bleibt für ältere Leser (die heutige App).
+            found["unit_words"] = [series_kinds.word(kind, "round_one"), series_kinds.word(kind, "round_dative")]
         if found and (found["played"] or found["of"]):
             out[series["id"]] = found
     return out

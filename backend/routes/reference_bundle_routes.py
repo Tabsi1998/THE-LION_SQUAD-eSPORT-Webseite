@@ -30,7 +30,9 @@ from auth import require_area
 from database import get_db
 from models import ReferenceLineageCreate, ReferenceSeriesCreate, ReferenceSeriesKind, new_id, now_utc
 from routes.reference_series_routes import SLUG_FALLBACK, _rules, _season_slug, _stamp, _teams
-from services import reference_bundles, reference_running_cache, reference_series, season_close, series_partners
+from services import (
+    reference_bundles, reference_running_cache, reference_series, season_close, series_kinds, series_partners,
+)
 from services.mutation_lock import MutationLockBusy, mutation_lock
 from services.slug_utils import unique_slug
 
@@ -134,7 +136,9 @@ async def _create_season(db, lineage_id: str, season: dict, me: dict, bundle_id:
         status=season["status"] if season["status"] in reference_bundles.OPEN_STATUSES else "completed",
         visibility=season["visibility"], own_teams=[{"name": name} for name in season.get("own_teams") or []] or None,
         reference_id=refs[0] if len(refs) == 1 else None).model_dump()
-    doc["rules"] = _rules({})
+    # Standardregeln der Art (#2024) - eine Turnierserie startet als TFT-Turniertag.
+    lineage = await db.reference_lineages.find_one({"id": lineage_id}, {"_id": 0, "kind": 1}) or {}
+    doc["rules"] = _rules(series_kinds.default_rules(lineage.get("kind")))
     doc.update(_teams(doc.get("own_teams"), doc.get("team_name")))
     now = now_utc().isoformat()
     doc.update({

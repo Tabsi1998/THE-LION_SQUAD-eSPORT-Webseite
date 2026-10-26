@@ -37,6 +37,7 @@ from fastapi import Depends, HTTPException
 
 from auth import get_current_user
 from database import get_db
+from services import series_kinds
 from services.dolibarr_policy import club_today
 from services.permissions import MFA_MESSAGE, can_use_area, needs_mfa
 
@@ -155,6 +156,8 @@ class SeriesAccess:
             view = {key: self.series.get(key) for key in CAPTAIN_SERIES_FIELDS}
             view["lineage"] = {key: (lineage or {}).get(key) for key in CAPTAIN_LINEAGE_FIELDS} if lineage else None
         view["access"] = self.summary()
+        # #2024: das Art-Profil (Felder, Begriffe, Standardregeln) - auch Captains tragen danach ein.
+        view["profile"] = series_kinds.profile((lineage or {}).get("kind"))
         return view
 
     def _scoped(self, found: dict | None, missing: str) -> dict:

@@ -85,6 +85,8 @@ DEFAULT_RULES: dict = {
     "custom_bonuses": [],
     "tiebreak_top_n": 4,
     "double_up_points": "best_player_place",
+    # #2024: Double Up als Schalter der Saison - Vorgabe für den Haken „Double Up“ im Ergebnisblatt eines Turniertags.
+    "double_up": False,
 }
 
 
@@ -218,6 +220,7 @@ def normalize_rules(raw: dict | None) -> dict:
         raise ValueError(f"tiebreak_top_n: höchstens {MAX_TOP_N}.")
     rules["double_up_points"] = _choice(rules["double_up_points"] or DEFAULT_RULES["double_up_points"],
                                         "double_up_points", DOUBLE_UP_MODES)
+    rules["double_up"] = bool(rules["double_up"])
     return rules
 
 
