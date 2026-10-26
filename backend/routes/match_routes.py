@@ -1078,10 +1078,10 @@ async def update_match(match_id: str, body: MatchUpdate, me: dict = Depends(get_
         updated = await db.matches_v2.find_one({"id": match_id}, {"_id": 0})
         if "$unset" in change or ("status" in updates and updates["status"] != v2_match.get("status")):
             # Aufruf vorbei oder Stand geändert: der Lauf ist womöglich wieder umbaubar oder entschieden - die
-            # Lauf-Umbau-Auswertung läuft erneut, auch nach aufgegebener Warteschlange (#2033).
-            from services.heat_rebuild import reevaluate_after_release
-            await reevaluate_after_release(db, v2_match.get("tournament_id"), actor_id=me.get("id"),
-                                           trigger="match_update")
+            # Lauf-Umbau-Auswertung läuft erneut, auch nach aufgegebener Warteschlange (#2033). Die Turnier-Sperre
+            # hält schon ``_serialized_match_write``; sie ist nicht wiedereintrittsfähig, also direkt auswerten.
+            from services.heat_rebuild import evaluate_after_write
+            await evaluate_after_write(db, v2_match.get("tournament_id"), actor_id=me.get("id"), trigger="match_update")
         return {**updated, "idempotent_replay": False}
     raise HTTPException(status_code=404, detail="Match nicht gefunden")
 

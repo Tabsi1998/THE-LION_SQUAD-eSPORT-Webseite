@@ -500,12 +500,15 @@ async def clear_station(sid: str, me: dict = Depends(get_current_user)):
                 held = await db.stations.find_one({"id": sid}, {"_id": 0, "current_match_id": 1}) or {}
                 if held.get("current_match_id") != s["current_match_id"]:
                     raise HTTPException(status_code=409, detail="Die Station hält inzwischen ein anderes Spiel. Bitte neu laden.")
-                await db[collection_name].update_one({"id": s["current_match_id"]}, {
-                    "$set": {"station_id": None, "updated_at": now_utc().isoformat()}, "$unset": {"called_at": ""}})
+                before = await db[collection_name].find_one_and_update(
+                    {"id": s["current_match_id"]},
+                    {"$set": {"station_id": None, "updated_at": now_utc().isoformat()}, "$unset": {"called_at": ""}},
+                    projection={"_id": 0, "called_at": 1})
                 await release_station(db, sid, expected_match_id=s["current_match_id"])
-                if match.get("called_at"):
-                    # Aufruf zurückgenommen: der Lauf ist wieder umbaubar - die Lauf-Umbau-Auswertung läuft erneut,
-                    # unter der gehaltenen Sperre, auch nach aufgegebener Warteschlange (#2033).
+                if (before or {}).get("called_at"):
+                    # Aufruf zurückgenommen - nach dem Stand unter der Sperre, der von oben kann älter sein als ein
+                    # Aufruf dazwischen: der Lauf ist wieder umbaubar, die Lauf-Umbau-Auswertung läuft erneut, unter
+                    # der gehaltenen Sperre, auch nach aufgegebener Warteschlange (#2033).
                     await evaluate_after_write(db, match["tournament_id"], actor_id=me.get("id"), trigger="uncall")
             return {"ok": True}
     elif not is_global_tournament_admin(me):

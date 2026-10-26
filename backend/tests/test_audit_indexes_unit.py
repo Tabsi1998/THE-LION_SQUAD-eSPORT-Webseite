@@ -147,3 +147,20 @@ def test_the_whole_index_setup_calls_the_audit_block():
         asyncio.run(scenario(db))
     finally:
         database.get_db = original
+
+
+def test_the_heat_rebuild_queue_fields_are_indexed():
+    """#2033: der Minuten-Job liest fällige Auswertungen (``next_at``) und wartende „überfüllt“-Vermerke (reihum nach
+    ``checked_at``) sortiert - beides mit Index, nur auf Turnieren, die so ein Feld tragen."""
+    async def scenario(index_db):
+        await database.init_indexes()
+        found = await names(index_db, "tournaments")
+        assert "heat_rebuild_pending.next_at_1" in found
+        assert "heat_rebuild_incomplete.reason_1_heat_rebuild_incomplete.checked_at_1" in found
+    db = fresh()
+    original = database.get_db
+    database.get_db = lambda: db
+    try:
+        asyncio.run(scenario(db))
+    finally:
+        database.get_db = original

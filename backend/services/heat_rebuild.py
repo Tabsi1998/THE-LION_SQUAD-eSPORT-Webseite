@@ -740,7 +740,9 @@ async def _mark_incomplete(db, tournament: dict, *, stage_id: str | None, keys: 
                            actor_id: str | None, **extra) -> None:
     """„Umbau unvollständig“: Vermerk am Turnier, Protokoll, Nachricht an die Turnierleitung."""
     tid = tournament["id"]
-    mark = {"at": now_utc().isoformat(), "reason": reason, "stage_id": stage_id, "match_keys": keys, **extra}
+    now_iso = now_utc().isoformat()
+    # ``checked_at``: wann der Minuten-Job zuletzt nachgesehen hat, ob nachgeholt werden kann (#2033) - reihum.
+    mark = {"at": now_iso, "checked_at": now_iso, "reason": reason, "stage_id": stage_id, "match_keys": keys, **extra}
     await db.tournaments.update_one({"id": tid}, {"$set": {"heat_rebuild_incomplete": mark}})
     await _audit(db, "tournament.heats.incomplete", tid, actor_id, {"engine": GRAPH, **mark})
     logger.error("Lauf-Umbau unvollständig tournament=%s reason=%s heats=%s", tid, reason, keys)
@@ -1193,15 +1195,25 @@ def _still_blocking(match: dict) -> bool:
     return _live(match) and not _rebuildable(match)
 
 
+# So viele Turniere sieht sich der Minuten-Job je Takt an - sortiert (Fällige zuerst bzw. reihum), damit bei mehr
+# keines verhungert; die Indizes dazu stehen in database.init_indexes.
+PENDING_BATCH = 200
+RESUME_BATCH = 200
+
+
 async def process_pending_heat_rebuilds(db) -> int:
     """Eingereihte Auswertungen abarbeiten (Minuten-Job im Scheduler): je Turnier unter der Turnier-Schreibsperre;
     ist sie belegt, kommt das Turnier beim nächsten Lauf dran. Liefert, wie viele Turniere ausgewertet wurden.
+    Die am längsten fälligen zuerst (``next_at``).
 
     Dazu die Turniere, bei denen die Warteschlange wegen eines überfüllten aufgerufenen Laufs aufgegeben hat (#2033):
-    ist der Lauf inzwischen frei oder entschieden - auf welchem Weg auch immer -, wird nachgeholt."""
+    ist der Lauf inzwischen frei oder entschieden - auf welchem Weg auch immer -, wird nachgeholt. Reihum: der am
+    längsten nicht geprüfte Vermerk zuerst (``checked_at``), und jeder geprüfte rückt ans Ende - auch einer, dessen
+    Lauf noch aufgerufen ist, sonst hielte er die vorderen Plätze besetzt."""
     now_iso = now_utc().isoformat()
-    rows = await db.tournaments.find({"heat_rebuild_pending": {"$exists": True}},
-                                     {"_id": 0, "id": 1, "heat_rebuild_pending": 1}).to_list(200)
+    rows = await db.tournaments.find(
+        {"heat_rebuild_pending": {"$exists": True}}, {"_id": 0, "id": 1, "heat_rebuild_pending": 1},
+    ).sort("heat_rebuild_pending.next_at", 1).limit(PENDING_BATCH).to_list(PENDING_BATCH)
     processed = 0
     for row in rows:
         pending = row.get("heat_rebuild_pending")
@@ -1216,8 +1228,11 @@ async def process_pending_heat_rebuilds(db) -> int:
             continue
     waiting = await db.tournaments.find(
         {"heat_rebuild_incomplete.reason": OVERFULL, "heat_rebuild_pending": {"$exists": False}},
-        {"_id": 0, "id": 1, "heat_rebuild_incomplete": 1}).to_list(200)
+        {"_id": 0, "id": 1, "heat_rebuild_incomplete": 1},
+    ).sort("heat_rebuild_incomplete.checked_at", 1).limit(RESUME_BATCH).to_list(RESUME_BATCH)
     for row in waiting:
+        await db.tournaments.update_one({"id": row["id"], "heat_rebuild_incomplete.reason": OVERFULL},
+                                        {"$set": {"heat_rebuild_incomplete.checked_at": now_iso}})
         ids = [str(value) for value in (row.get("heat_rebuild_incomplete") or {}).get("match_ids") or []]
         blocking = await db.matches_v2.find(
             {"id": {"$in": ids}}, {"_id": 0, "status": 1, "called_at": 1, "started_at": 1, "is_preview": 1}).to_list(50)

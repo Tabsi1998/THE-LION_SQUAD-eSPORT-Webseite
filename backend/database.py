@@ -85,6 +85,11 @@ async def init_indexes():
     await db.tournaments.create_index("event_id")
     await db.tournaments.create_index("engine_version")
     await db.tournaments.create_index("ruleset_version")
+    # Lauf-Umbau (#2033): der Minuten-Job liest fällige Auswertungen und wartende „überfüllt“-Vermerke sortiert
+    # (services.heat_rebuild.process_pending_heat_rebuilds) - nur die wenigen Turniere, die so ein Feld tragen.
+    await db.tournaments.create_index("heat_rebuild_pending.next_at", sparse=True)
+    await db.tournaments.create_index(
+        [("heat_rebuild_incomplete.reason", 1), ("heat_rebuild_incomplete.checked_at", 1)], sparse=True)
     # Registrations
     await db.tournament_registrations.create_index("id", unique=True)
     await db.tournament_registrations.create_index([("tournament_id", 1), ("user_id", 1)])
