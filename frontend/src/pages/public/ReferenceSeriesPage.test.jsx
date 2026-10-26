@@ -96,6 +96,19 @@ test("Art-Profil (#2024): Turniertage, nächster Turniertag ohne Datum „Termin
   expect(calendar[2]).not.toHaveTextContent("Altort");
 });
 
+test("Art-Profil (#2024): Gesamtwertung einer Turnierserie spricht von Turniertagen", async () => {
+  apiMock.get.mockResolvedValue({ data: { ...BODY, profile: SERIES_PROFILE } });
+  renderAt("/references/series/probe-cup/2026-division-1");
+  const rows = within(await screen.findByTestId("series-table")).getAllByTestId("series-row");
+  expect(within(rows[0]).getByRole("img", { name: "1 Platz hinauf seit dem Turniertag davor" })).toBeInTheDocument();
+});
+
+test("Art-Profil (#2024): ohne Ergebnis „nach dem ersten gewerteten Turniertag“", async () => {
+  apiMock.get.mockResolvedValue({ data: { ...BODY, profile: SERIES_PROFILE, standings: null } });
+  renderAt("/references/series/probe-cup/2026-division-1");
+  expect(await screen.findByTestId("series-no-table")).toHaveTextContent("die Tabelle erscheint nach dem ersten gewerteten Turniertag.");
+});
+
 test("Tabelle: gestrichene Ergebnisse, Bewegung, Finalgrenze; fremde Namen ohne Link", async () => {
   apiMock.get.mockResolvedValue({ data: BODY });
   renderAt("/references/series/probe-cup/2026-division-1");

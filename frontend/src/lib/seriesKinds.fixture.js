@@ -14,7 +14,7 @@ export const RACING_PROFILE = {
   vocab: {
     round_one: "Rennen", round_many: "Rennen", round_dative: "Rennen", progress_verb: "gewertet", next_round: "Nächstes Rennen",
     code_prefix: "R", person_one: "Fahrer", person_many: "Fahrer", club_people: "Vereinsfahrer", place_title: "Bester Fahrer",
-    standings_label: "Fahrerwertung", team_scoring: "Teamwertung", venue_label: "Strecke oder Ort", ...COMMON,
+    standings_label: "Fahrerwertung", team_scoring: "Teamwertung", venue_label: "Strecke oder Ort", since_previous: "seit der Runde davor", after_first: "nach der ersten gewerteten Runde", ...COMMON,
   },
   templates: ["organizer", "formula_1"],
   placeholders: { lineage_title: "Lion Racing F1", lineage_label: "F1", round_code: "R1" },
@@ -32,7 +32,7 @@ export const SERIES_PROFILE = {
   vocab: {
     round_one: "Turniertag", round_many: "Turniertage", round_dative: "Turniertagen", progress_verb: "gewertet",
     next_round: "Nächster Turniertag", code_prefix: "T", person_one: "Spieler", person_many: "Spieler", club_people: "Vereinsspieler",
-    place_title: "Gesamtwertung", standings_label: "Gesamtwertung", team_scoring: "Double Up", venue_label: "", ...COMMON,
+    place_title: "Gesamtwertung", standings_label: "Gesamtwertung", team_scoring: "Double Up", venue_label: "", since_previous: "seit dem Turniertag davor", after_first: "nach dem ersten gewerteten Turniertag", ...COMMON,
   },
   templates: ["organizer", "tft"],
   placeholders: { lineage_title: "TFT Masters", lineage_label: "TFT", round_code: "T1" },

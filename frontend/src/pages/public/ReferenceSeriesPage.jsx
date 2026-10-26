@@ -154,7 +154,7 @@ export default function ReferenceSeriesPage() {
               <h2 id="series-page-table" className="font-heading text-2xl font-black uppercase">Gesamtwertung</h2>
               <SeriesRules rules={data.rules} />
               <RuleChanges changes={data.rule_changes} />
-              <SeriesStandings standings={data.standings} rounds={rounds} rules={data.rules} extraColumn={bonusColumn(data.rules)} />
+              <SeriesStandings standings={data.standings} rounds={rounds} rules={data.rules} extraColumn={bonusColumn(data.rules)} profile={data.profile} />
 
               <FinalCalculator standings={data.standings} rules={data.rules} progress={data.progress} />
             </section>

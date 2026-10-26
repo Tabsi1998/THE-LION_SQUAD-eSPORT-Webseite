@@ -8,7 +8,7 @@ Ein Profil hat vier Teile:
   Teamwertung, Turniertag mit Runden, Double Up, Namen ohne Tag, die Marken im Ergebnisblatt und ob ein gewerteter
   Termin ein Datum braucht.
 - ``vocab``: die Begriffe - Termin (Einzahl, Mehrzahl, „von 9 …“), Person, nächster Termin, Kürzel-Vorsatz,
-  Überschriften.
+  Überschriften, Wendungen der Gesamtwertung („seit dem Turniertag davor“).
 - ``default_rules``: die Regeln, mit denen eine neue Saison ohne Vorlage startet (vollständig, ``normalize_rules``).
   Bestehende Saisons behalten ihre Regeln - ein Profil ändert nie still eine gespeicherte Saison.
 - ``templates``: die Punkteschema-Vorlagen, die zur Art passen (``reference_series.POINTS_SCHEME_TEMPLATES``), dazu
@@ -34,7 +34,7 @@ FIELD_KEYS = ("venue", "country", "session", "opponent", "race_details", "race_e
               "original_kinds")
 VOCAB_KEYS = ("round_one", "round_many", "round_dative", "progress_verb", "next_round", "code_prefix",
               "person_one", "person_many", "club_people", "place_title", "standings_label", "team_scoring",
-              "venue_label", "no_round", "open_round")
+              "venue_label", "no_round", "open_round", "since_previous", "after_first")
 
 # Turnierserie (TFT): Tagesplatz nach der Summe der Runden, Saisonpunkte je Tagesplatz wie im Abnahmefall aus #1961.
 TFT_SEASON_POINTS = [35, 30, 26, 23, 20, 18, 16, 14, 12, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 1, 1, 1, 1, 1]
@@ -59,7 +59,8 @@ PROFILES: dict[str, dict] = {
                   "progress_verb": "gewertet", "next_round": "Nächstes Rennen", "code_prefix": "R",
                   "person_one": "Fahrer", "person_many": "Fahrer", "club_people": "Vereinsfahrer",
                   "place_title": "Bester Fahrer", "standings_label": "Fahrerwertung", "team_scoring": "Teamwertung",
-                  "venue_label": "Strecke oder Ort", **_COMMON_VOCAB},
+                  "venue_label": "Strecke oder Ort", "since_previous": "seit der Runde davor",
+                  "after_first": "nach der ersten gewerteten Runde", **_COMMON_VOCAB},
         "default_rules": {},
         "templates": ["organizer", "formula_1"],
         "placeholders": {"lineage_title": "Lion Racing F1", "lineage_label": "F1", "round_code": "R1"},
@@ -76,7 +77,8 @@ PROFILES: dict[str, dict] = {
                   "progress_verb": "gewertet", "next_round": "Nächster Turniertag", "code_prefix": "T",
                   "person_one": "Spieler", "person_many": "Spieler", "club_people": "Vereinsspieler",
                   "place_title": "Gesamtwertung", "standings_label": "Gesamtwertung", "team_scoring": "Double Up",
-                  "venue_label": "", **_COMMON_VOCAB},
+                  "venue_label": "", "since_previous": "seit dem Turniertag davor",
+                  "after_first": "nach dem ersten gewerteten Turniertag", **_COMMON_VOCAB},
         "default_rules": TFT_RULES,
         "templates": ["organizer", "tft"],
         "placeholders": {"lineage_title": "TFT Masters", "lineage_label": "TFT", "round_code": "T1"},
@@ -94,7 +96,8 @@ PROFILES: dict[str, dict] = {
                   "progress_verb": "gespielt", "next_round": "Nächster Spieltag", "code_prefix": "T",
                   "person_one": "Spieler", "person_many": "Spieler", "club_people": "Vereinsspieler",
                   "place_title": "Tabelle", "standings_label": "Gesamtwertung", "team_scoring": "Tabelle",
-                  "venue_label": "Ort", **_COMMON_VOCAB},
+                  "venue_label": "Ort", "since_previous": "seit dem Spieltag davor",
+                  "after_first": "nach dem ersten gewerteten Spieltag", **_COMMON_VOCAB},
         "default_rules": {},
         "templates": ["organizer", "team_league_3_1_0"],
         "placeholders": {"lineage_title": "Lion Liga", "lineage_label": "4vs4", "round_code": "ST1"},
