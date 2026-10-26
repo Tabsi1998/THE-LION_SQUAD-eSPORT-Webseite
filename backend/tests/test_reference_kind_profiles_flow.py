@@ -108,6 +108,30 @@ async def test_the_tft_template_is_offered_and_formula_1_narrowed_to_racing(flow
     assert schemes["formula_1"]["kinds"] == ["racing", "series", "team_league"]
 
 
+@pytest.mark.asyncio
+async def test_a_template_of_another_kind_is_refused_when_a_season_is_created(flow):
+    lineage, _ = await _season(flow)
+    body = {"lineage_id": lineage["id"], "season": "2027", "points_scheme_id": "formula_1"}
+    refused = await flow.post(f"{ADMIN}/series", json=body)
+    assert refused.status_code == 422
+    assert "Formel 1" in refused.json()["detail"] and "Turnierserie" in refused.json()["detail"]
+    assert await flow.db.reference_series.count_documents({"season": "2027"}) == 0
+    assert (await flow.post(f"{ADMIN}/series", json={**body, "points_scheme_id": "tft"})).status_code == 200
+    # Eine Vorlage für alle Arten geht immer.
+    organizer = await flow.post(f"{ADMIN}/series", json={**body, "season": "2028", "points_scheme_id": "organizer"})
+    assert organizer.status_code == 200, organizer.text
+
+
+@pytest.mark.asyncio
+async def test_a_season_created_from_formula_1_before_stays_editable(flow):
+    # Alter Stand: eine Turnierserie, angelegt aus „Formel 1“ - Bearbeiten prüft die Vorlage nicht noch einmal.
+    _, series = await _season(flow)
+    await flow.db.reference_series.update_one({"id": series["id"]}, {"$set": {"points_scheme_id": "formula_1"}})
+    saved = await flow.patch(f"{ADMIN}/series/{series['id']}", json={"title": "Probe Herbst", "rules": series["rules"]})
+    assert saved.status_code == 200, saved.text
+    assert saved.json()["points_scheme_id"] == "formula_1"
+
+
 # ---------------------------------------------------------------- Kein Ort bei der Turnierserie
 @pytest.mark.asyncio
 async def test_a_tournament_series_takes_no_place_flag_lap_or_opponent(flow):
@@ -176,6 +200,36 @@ async def test_dates_for_several_open_rounds_come_in_one_go_and_sort_them_in(flo
     dated = await flow.post(f"{_rounds(series)}/dates", json={"expected_version": version, "items": [
         {"id": rounds["T1"]["id"], "day": "2026-10-02"}]})
     assert dated.status_code == 422 and "Verschieben" in dated.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_dates_are_only_for_open_rounds_not_cancelled_or_scored_ones_and_nothing_changes_halfway(flow):
+    _, series = await _season(flow)
+    await _paste(flow, series, "T1 · offen\nT2 · offen\nT3 · offen")
+    rounds = {item["code"]: item for item in (await _calendar(flow, series))["rounds"]}
+    version = (await _calendar(flow, series))["version"]
+    assert (await flow.post(f"{_rounds(series)}/{rounds['T2']['id']}/cancel",
+                            json={"expected_version": version})).status_code == 200
+    # Gewertet ohne Datum (alter Stand vor #2024): auch das ist kein offener Termin mehr.
+    await flow.db.reference_rounds.update_one({"id": rounds["T3"]["id"]}, {"$set": {"status": "scored"}})
+    version = (await _calendar(flow, series))["version"]
+    body = {"expected_version": version, "items": [{"id": rounds["T1"]["id"], "day": "2026-10-08"},
+                                                   {"id": rounds["T2"]["id"], "day": "2026-10-15"},
+                                                   {"id": rounds["T3"]["id"], "day": "2026-10-22"}]}
+    refused = await flow.post(f"{_rounds(series)}/dates", json=body)
+    assert refused.status_code == 422
+    assert "T2 ist abgesagt" in refused.json()["detail"] and "T3 ist schon gewertet" in refused.json()["detail"]
+    # Alles oder nichts: auch T1 hat noch kein Datum, der Kalender keinen neuen Stand.
+    stored = {item["code"]: item for item in (await _calendar(flow, series))["rounds"]}
+    assert [stored[code]["club_day"] for code in ("T1", "T2", "T3")] == [None, None, None]
+    assert (await _calendar(flow, series))["version"] == version
+    # Ein Termin einer anderen Saison ist hier unbekannt.
+    _, other = await _season(flow)
+    await _paste(flow, other, "T1 · offen")
+    foreign = (await _calendar(flow, other))["rounds"][0]["id"]
+    unknown = await flow.post(f"{_rounds(series)}/dates", json={"expected_version": version, "items": [
+        {"id": foreign, "day": "2026-10-08"}]})
+    assert unknown.status_code == 404
 
 
 # ---------------------------------------------------------------- Gewertet nur mit Datum

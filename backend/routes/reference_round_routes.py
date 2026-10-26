@@ -651,6 +651,20 @@ async def paste_rounds(series_id: str, body: RoundPasteBody, me: dict = Depends(
 
 
 HAS_DAY = "{code} hat schon ein Datum – einen festen Termin ändert „Verschieben“."
+IS_CANCELLED = "{code} ist abgesagt – erst „Wieder ansetzen“, dann das Datum."
+IS_SCORED = "{code} ist schon gewertet – das Datum kommt mit dem Ergebnis."
+
+
+def _not_open(round_doc: dict, has_result: bool) -> str | None:
+    """Warum ein Termin kein Datum über „Datum nachtragen“ bekommt (#2024) - ``None``, wenn er offen ist."""
+    code = round_doc.get("code") or "Der Termin"
+    if round_doc.get("club_day"):
+        return HAS_DAY.format(code=code)
+    if round_doc.get("status") == "cancelled":
+        return IS_CANCELLED.format(code=code)
+    if has_result or round_doc.get("status") == "scored":
+        return IS_SCORED.format(code=code)
+    return None
 
 
 @router.post("/admin/series/{series_id}/rounds/dates")
@@ -667,13 +681,22 @@ async def fill_round_dates(series_id: str, body: RoundDatesBody, me: dict = Depe
         raise HTTPException(422, "Jeder Termin nur einmal.")
     found = {item["id"]: item async for item in db.reference_rounds.find(
         {"series_id": series_id, "id": {"$in": ids}, "archived_at": None}, {"_id": 0})}
+    if any(rid not in found for rid in ids):
+        raise HTTPException(404, "Termin nicht gefunden.")
+    # Nur offene Termine (#2024): ohne Datum, nicht abgesagt, nicht gewertet (auch kein veröffentlichtes Blatt). Jeder
+    # andere wird mit Kürzel genannt - und dann ändert sich gar nichts (alles oder nichts).
+    published = {row["round_id"] async for row in db.reference_round_results.find(
+        {"series_id": series_id, "round_id": {"$in": ids}, "status": "published"}, {"_id": 0, "round_id": 1})}
+    problems = []
+    for rid in ids:
+        problem = _not_open(found[rid], rid in published)
+        if problem:
+            problems.append(problem)
+    if problems:
+        raise HTTPException(422, " ".join(problems))
     changes = []
     for item in body.items:
-        existing = found.get(item.id)
-        if not existing:
-            raise HTTPException(404, "Termin nicht gefunden.")
-        if existing.get("club_day"):
-            raise HTTPException(422, HAS_DAY.format(code=existing.get("code") or "Der Termin"))
+        existing = found[item.id]
         clock = item.time if item.time else existing.get("open_time")
         changes.append((existing, {**_when(item.day, clock), "open_time": None}))
     await _claim(db, series_id, body.expected_version)
