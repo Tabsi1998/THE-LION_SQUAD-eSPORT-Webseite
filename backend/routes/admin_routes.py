@@ -19,6 +19,7 @@ from services.ops_alerts import ALERT_KINDS, alert_red_checks, load_alert_settin
 from services.ops_checks import checks_overview, run_checks
 from services.ops_vitals import vitals_overview
 from services import github_releases
+from services.form_flags import form_flag
 from services.log_safe import mask_addresses, mask_addresses_deep
 from services.app_releases import delete_release, list_releases, public_release, set_updater_settings, store_release, update_release, updater_settings, upload_token_matches, upload_token_problem, upload_token_status
 
@@ -1050,7 +1051,8 @@ async def admin_app_release_upload(
     build: int = Form(...),
     notes: str = Form(default=""),
     min_build: int | None = Form(default=None),
-    set_current: bool = Form(default=True),
+    # Text statt bool: ohne Feld gilt „ja“ in jeder FastAPI-Version (services/form_flags.py).
+    set_current: str | None = Form(default=None),
     source: str = Depends(_release_uploader),
 ):
 
@@ -1064,7 +1066,7 @@ async def admin_app_release_upload(
     try:
         stored = await store_release(
             get_db(), build=build, version=version, notes=notes, chunks=chunks(),
-            min_build=min_build, set_current=set_current, source=source,
+            min_build=min_build, set_current=form_flag(set_current, default=True), source=source,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
