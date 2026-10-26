@@ -21,6 +21,7 @@ import { KIND_LABELS, type LineageInfo } from "./references";
 import { dayRounds } from "./seriesDays";
 import { HIDDEN_NAME, dayLabel, formatNumber, nameOf, number, roundLabel } from "./seriesFormat";
 import type { DataSource } from "./seriesDataSource";
+import { OPEN_ROUND, kindShows, kindWord, type KindProfile } from "./seriesKinds";
 import type { SeasonPartners } from "./seriesPartners";
 import type { MapPool, TeamLeaguePart } from "./teamLeague";
 import {
@@ -122,6 +123,8 @@ export type SeasonPage = {
   originals?: OriginalsByRound;
   /** „Daten von …“ (#1964): Plattform des Partners, von der die Saison ihre Turniertage holt. */
   data_source?: DataSource;
+  /** Art-Profil (#2024): Felder (Ort, Land …) und Begriffe der Art („Turniertag“) - ältere Server schicken es nicht. */
+  profile?: KindProfile;
   racing?: {
     club_drivers?: string[] | null;
     club_teams?: string[] | null;
@@ -192,11 +195,12 @@ export function stateTone(state: string | null | undefined): StateTone {
   return STATE_TONES[String(state)] || "planned";
 }
 
-/** Tag und Uhrzeit eines Termins; heute „Heute · 20:00“, ohne Tag „Termin offen“. */
-export function roundWhen(round: SeasonRound | null | undefined): string {
+/** Tag und Uhrzeit eines Termins; heute „Heute · 20:00“, ohne Tag „Termin folgt“ (#2024, wie öffentlich im Web) mit
+ * einer gemerkten Uhrzeit dahinter. */
+export function roundWhen(round: SeasonRound | null | undefined, profile: KindProfile = null): string {
   if (round?.state === "today") return ["Heute", round.time].filter(Boolean).join(" · ");
   const day = dayLabel(round?.club_day);
-  if (!day) return "Termin offen";
+  if (!day) return [kindWord(profile, "open_round", OPEN_ROUND), round?.time].filter(Boolean).join(" · ");
   return round?.time ? `${day} · ${round.time}` : day;
 }
 
@@ -295,6 +299,11 @@ export function roundRows(page: SeasonPage | null | undefined): RoundRow[] {
   const rows = page?.standings?.rows || [];
   const publicKeys = page?.racing?.club_drivers || [];
   const racing = Boolean(page?.racing);
+  // Art-Profil (#2024): Ort und Flagge nur, wo die Art sie führt - eine Turnierserie hat keine. Ohne Profil wie bisher.
+  const profile = page?.profile;
+  const places = kindShows(profile, "venue");
+  const flags = kindShows(profile, "country");
+  const roundWord = kindWord(profile, "round_one");
   return groupWeekends(page?.rounds || []).map((group) => {
     const lead = group.lead;
     // Wie im Web: je gewertetem, zählendem Lauf außer dem Qualifying.
@@ -310,29 +319,32 @@ export function roundRows(page: SeasonPage | null | undefined): RoundRow[] {
         if (best) results.push({ key: `${round.id}-best`, kind: "best", label: `Bester Vereinsfahrer${suffix}`, text: `${nameOf(best.row)} · ${best.cell.place ? `P${best.cell.place}` : best.cell.text}` });
       }
     }
-    const country = countryCode(group.country_code);
+    const country = flags ? countryCode(group.country_code) : "";
+    const venue = places ? group.venue : null;
     const state = group.state;
+    // Ohne Ort (Turnierserie): der Titel, sonst „Turniertag T4“ statt des Kürzels allein.
+    const named = [group.title, venue].filter(Boolean).join(" · ") || (places ? countryName(country) : roundWord && `${roundWord} ${roundLabel(lead)}`);
     return {
       key: lead.id,
       code: roundLabel(lead),
       // Ohne Titel und Ort steht der Landesname da - wie VenueWithFlag im Web.
-      place: [[group.title, group.venue].filter(Boolean).join(" · ") || countryName(country), lead.opponent ? `gegen ${lead.opponent}` : ""].filter(Boolean).join(" · "),
+      place: [named, lead.opponent ? `gegen ${lead.opponent}` : ""].filter(Boolean).join(" · "),
       country,
       countryName: countryName(country),
       state: PUBLIC_STATE_LABELS[state] || "",
       tone: STATE_TONES[state] || "planned",
-      when: roundWhen({ ...lead, state, time: group.multi ? null : lead.time }),
+      when: roundWhen({ ...lead, state, time: group.multi ? null : lead.time }, profile),
       final: group.kind === "final",
       results,
       sessions: group.multi ? group.rounds : [],
       notes: group.rounds.map((round) => {
-        const text = noScoreText(round);
+        const text = noScoreText(round, profile);
         return text && group.multi ? `${chipLabel(round)}: ${text}` : text;
       }).filter(Boolean),
       moved: lead.original_club_day && lead.original_club_day !== lead.club_day ? `ursprünglich ${dayLabel(lead.original_club_day)}` : "",
       number: racing ? group.number : null,
       originals: originalsOf(page?.originals, group.rounds, { withSession: group.multi }),
-      originalsTitle: [roundLabel(lead), group.venue || group.title].filter(Boolean).join(" · "),
+      originalsTitle: [roundLabel(lead), venue || group.title].filter(Boolean).join(" · "),
     };
   });
 }
@@ -514,7 +526,9 @@ export function seasonFigures(page: SeasonPage | null | undefined): Array<{ key:
   } else {
     const total = number(page?.progress?.total);
     const scored = Math.min(number(page?.progress?.scored), total);
-    figures.push(total > 0 ? { key: "progress", value: `${scored}/${total}`, label: kind === "racing" ? "Runden" : "Turniere" } : null);
+    // Turnierserie mit Art-Profil (#2024): „Turniertage“; die Rennliga zählt Runden (mit allen Läufen), wie bisher.
+    const unit = kind === "racing" ? "Runden" : kindWord(page?.profile, "round_many", "Turniere");
+    figures.push(total > 0 ? { key: "progress", value: `${scored}/${total}`, label: unit } : null);
     const ranks = (page?.standings?.rows || []).filter((row) => row.club_member && row.rank).map((row) => Number(row.rank));
     figures.push(ranks.length ? { key: "driver", value: `P${Math.min(...ranks)}`, label: kind === "racing" ? "Bester Fahrer" : "Bester im Verein" } : null);
     if (kind === "racing") {

@@ -14,7 +14,8 @@ import { colors, roles } from "../../../theme";
 // Kalender einer Saison (#1945, #1974): je Runde eine Zeile (#1930) - Kürzel, Flagge und Ort, Stand der Runde, Tag, die
 // Läufe als Chips mit Uhrzeit, „Ohne Wertung“ je Lauf (#1960) und je gewertetem Rennen Sieger bzw. bester
 // Vereinsfahrer. Mit Rundennummer vom Server öffnet die Zeile das Ergebnis der Runde, ein Chip die Runde mit diesem
-// Lauf (#1950). Die Zeilen bauen sich beim ersten Zeigen gestaffelt auf.
+// Lauf (#1950). Die Zeilen bauen sich beim ersten Zeigen gestaffelt auf. Ort und Flagge nur, wo die Art sie führt
+// (Art-Profil, #2024 - eine Turnierserie zeigt „Turniertag T4“); das entscheidet `roundRows`.
 
 export function SeasonCalendar({ page, onOpenRound }: { page: SeasonPage; onOpenRound?: (round: number, session?: string) => void }) {
   const rows = roundRows(page);

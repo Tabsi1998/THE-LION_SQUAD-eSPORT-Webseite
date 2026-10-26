@@ -1,5 +1,6 @@
 import { sessionLabel, type WeekendRound } from "./raceWeekend";
 import { formatNumber, nameOf, number, shortDay } from "./seriesFormat";
+import { kindWord, type KindProfile } from "./seriesKinds";
 
 // Sonderregeln einer Rennliga in der App (#1960, #1974): Anpassungen („−5“ mit Grund), abgebrochene Saison mit
 // Nachfolger, Termin ohne Wertung, Regeländerungen ab Runde X und Quelle und Modus der Teamwertung. Dieselben Texte wie
@@ -132,9 +133,12 @@ const NO_SCORE_LABELS: Record<string, string> = {
   other: "Anderer Grund",
 };
 
-/** „Ohne Wertung · Zu wenig Fahrer – Nur zwei am Start“ - leer ohne Grund. */
-export function noScoreText(round: { no_score_reason?: string | null; no_score_note?: string | null } | null | undefined): string {
-  const reason = NO_SCORE_LABELS[String(round?.no_score_reason)];
+/** „Ohne Wertung · Zu wenig Fahrer – Nur zwei am Start“ - leer ohne Grund. Mit Art-Profil (#2024) in dessen Begriffen
+ * („Zu wenig Spieler“), ohne wie bisher. */
+export function noScoreText(round: { no_score_reason?: string | null; no_score_note?: string | null } | null | undefined, profile: KindProfile = null): string {
+  const key = String(round?.no_score_reason);
+  const people = key === "too_few" ? kindWord(profile, "person_many") : "";
+  const reason = people ? `Zu wenig ${people}` : NO_SCORE_LABELS[key];
   if (!reason) return "";
   const note = String(round?.no_score_note || "").trim();
   return `Ohne Wertung · ${reason}${note ? ` – ${note}` : ""}`;
