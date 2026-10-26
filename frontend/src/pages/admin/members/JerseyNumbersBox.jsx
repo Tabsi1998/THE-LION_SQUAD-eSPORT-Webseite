@@ -10,6 +10,8 @@ import { jerseyRequestLine, parseJerseyInput } from "@/lib/jerseyNumber";
 // die Regeln (Bereich, reservierte Nummern, Feldname in Dolibarr). Nur für den Vorstand (Bereich „club“).
 
 const day = (iso) => (iso ? viennaDate(iso, { day: "2-digit", month: "2-digit", year: "numeric" }) : "");
+// Offen - auch „in Entscheidung“: bricht eine Entscheidung ab, entscheidet der Vorstand einfach noch einmal.
+const OPEN_STATES = new Set(["received", "deciding"]);
 const SET_BY = { member: "selbst gewählt", board: "vom Vorstand", dolibarr: "aus Dolibarr" };
 const SYNC_TONE = { ok: "text-ok", off: "text-white/40", pending: "text-white/50" };
 const ACTIONS = {
@@ -235,7 +237,7 @@ export function JerseyNumbersBox() {
   if (!data) return <div className="text-sm text-white/50" data-testid="jersey-loading">Lade Nummern …</div>;
 
   const { counts, settings } = data;
-  const open = data.requests.filter((row) => row.status === "received");
+  const open = data.requests.filter((row) => OPEN_STATES.has(row.status));
   const pending = data.rows.some((row) => row.number !== null && row.dolibarr && !["ok", "off"].includes(row.dolibarr.state));
   const range = { min: settings.min, max: settings.max };
 
@@ -289,11 +291,11 @@ export function JerseyNumbersBox() {
         </section>
       )}
 
-      {data.requests.some((row) => row.status !== "received") && (
+      {data.requests.some((row) => !OPEN_STATES.has(row.status)) && (
         <details className="text-sm text-white/60">
           <summary className="cursor-pointer text-[11px] font-bold uppercase tracking-widest">Entschiedene Anträge</summary>
           <ul className="mt-2 space-y-1">
-            {data.requests.filter((row) => row.status !== "received").map((row) => (
+            {data.requests.filter((row) => !OPEN_STATES.has(row.status)).map((row) => (
               <li key={row.id} className="break-words">{day(row.decided_at)} · {row.name} · {jerseyRequestLine(row)} · {row.status_label}{row.decision_reason ? ` – ${row.decision_reason}` : ""}</li>
             ))}
           </ul>

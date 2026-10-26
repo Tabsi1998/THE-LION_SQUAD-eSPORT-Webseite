@@ -27,6 +27,7 @@ from __future__ import annotations
 import logging
 import re
 import time
+from datetime import timedelta
 
 from models import new_id, now_utc
 from pymongo import ReturnDocument
@@ -46,6 +47,9 @@ ELIGIBLE_STATUSES = ("active", "honorary", "inactive")
 RELEASE_STATUSES = ("former", "none")
 OPEN = "received"
 DECIDING = "deciding"  # kurz, während der Vorstand entscheidet
+DECIDING_STALE_MINUTES = (
+    5  # länger „in Entscheidung“ heißt: abgebrochen, der Antrag ist wieder offen
+)
 REQUEST_LABELS = {
     "received": "beim Vorstand",
     "deciding": "beim Vorstand",
@@ -312,7 +316,7 @@ async def _stale_members(db) -> set[int]:
     for row in rows:
         if (row.get("dolibarr") or {}).get("member_id"):
             stale.add(int(row["dolibarr"]["member_id"]))
-        stale.update(int(m) for m in row.get("pending_clears") or [])
+        stale.update(_clear_map(row.get("pending_clears")))
     return stale
 
 
@@ -351,6 +355,49 @@ async def availability(
     }
 
 
+def _clear_map(raw) -> dict[int, int | None]:
+    """``pending_clears`` als {Mitglieds-ID: Wert, der dort gelöscht werden soll}."""
+    out: dict[int, int | None] = {}
+    for item in raw or []:
+        if isinstance(item, dict) and item.get("member_id"):
+            out[int(item["member_id"])] = item.get("value")
+        elif isinstance(item, int) and not isinstance(item, bool):
+            out[item] = None
+    return out
+
+
+def _clear_list(clears: dict) -> list[dict]:
+    return [
+        {"member_id": member, "value": value}
+        for member, value in sorted(clears.items())
+    ]
+
+
+async def _clear_old(client, field: str, member_id: int, value, notes: list) -> None:
+    """Beim bisherigen Mitglied nur löschen, was die Website dort eingetragen hat. Steht inzwischen etwas anderes da
+    (der Vorstand hat in Dolibarr eine neue Nummer vergeben), bleibt es stehen - mit Eintrag im Verlauf.
+    """
+    row = await client.core_member(member_id)
+    there = _as_number((row.get("array_options") or {}).get(f"options_{field}"))
+    if there is None:
+        return
+    if value is not None and there == value:
+        await client.set_member_extrafield(member_id, field, None)
+        return
+    notes.append(
+        _log(
+            "clear_skipped",
+            "system",
+            value,
+            there,
+            "beim bisherigen Mitglied steht in Dolibarr inzwischen ein anderer Wert - nicht gelöscht",
+        )
+    )
+    logger.info(
+        "[jersey] Beim bisherigen Mitglied steht ein anderer Wert - nicht gelöscht"
+    )
+
+
 def _rev_filter(doc: dict) -> dict:
     """Bedingung „der Spiegel steht noch auf dem Stand, den ich gelesen habe“."""
     if "rev" in doc:
@@ -373,7 +420,8 @@ async def _push(db, doc: dict, *, scan: dict | None = None, _round: int = 0) -> 
     field = settings["dolibarr_field"]
     want = doc.get("number")
     previous = doc.get("dolibarr") or {}
-    clears = {int(m) for m in doc.get("pending_clears") or []}
+    clears = _clear_map(doc.get("pending_clears"))
+    notes: list[dict] = []
     state, error = "ok", ""
     member_id = previous.get("member_id") if not doc.get("user_id") else None
     try:
@@ -383,22 +431,22 @@ async def _push(db, doc: dict, *, scan: dict | None = None, _round: int = 0) -> 
         elif doc.get("user_id"):
             member_id = await member_id_of(db, doc["user_id"], d_settings)
             old = previous.get("member_id")
-            if old and old != member_id:
-                clears.add(int(old))
-        clears.discard(member_id)
+            if old and old != member_id and previous.get("value") is not None:
+                clears.setdefault(int(old), previous.get("value"))
+        clears.pop(member_id, None)
         if reason == "off":
             state = "off"
         elif client is None:
             state, error = "failed", reason
         else:
             writable = erp.write_capable(d_settings)
-            for old in sorted(clears) if writable else []:
+            for old, value in sorted(clears.items()) if writable else []:
                 try:
-                    await client.set_member_extrafield(old, field, None)
-                    clears.discard(old)
+                    await _clear_old(client, field, old, value, notes)
+                    clears.pop(old, None)
                 except erp.DolibarrError as exc:
                     if exc.kind == "not_found":
-                        clears.discard(old)  # das Mitglied gibt es dort nicht mehr
+                        clears.pop(old, None)  # das Mitglied gibt es dort nicht mehr
                     else:
                         error = exc.kind
             if not member_id:
@@ -441,19 +489,20 @@ async def _push(db, doc: dict, *, scan: dict | None = None, _round: int = 0) -> 
         "field": field,
         "at": now_utc().isoformat(),
     }
-    done = await db.jersey_numbers.update_one(
-        _rev_filter(doc), {"$set": {"dolibarr": sync, "pending_clears": sorted(clears)}}
-    )
+    update: dict = {"$set": {"dolibarr": sync, "pending_clears": _clear_list(clears)}}
+    if notes:
+        update["$push"] = {"log": {"$each": notes, "$slice": -LOG_KEEP}}
+    done = await db.jersey_numbers.update_one(_rev_filter(doc), update)
     reset_cache()
     if done.matched_count:
         return state
     # Während des Schreibens hat sich der Spiegel geändert: mit dem neuen Stand noch einmal - sonst bleibt der
     # Nachtrag offen, und der Job holt ihn nach.
-    if clears:
-        await db.jersey_numbers.update_one(
-            {"id": doc["id"]},
-            {"$addToSet": {"pending_clears": {"$each": sorted(clears)}}},
-        )
+    if clears or notes:
+        late: dict = {"$addToSet": {"pending_clears": {"$each": _clear_list(clears)}}}
+        if notes:
+            late["$push"] = {"log": {"$each": notes, "$slice": -LOG_KEEP}}
+        await db.jersey_numbers.update_one({"id": doc["id"]}, late)
     if _round < 2:
         return await _push(db, doc, scan=scan, _round=_round + 1)
     await db.jersey_numbers.update_one(
@@ -991,10 +1040,23 @@ async def decide(
     if decision not in DECISIONS:
         raise JerseyError(400, "Freigeben, Neuwahl oder Ablehnen.")
     claim = new_id()
+    # Offen - oder in Entscheidung, aber verwaist (der Prozess ist dabei abgestürzt): dann darf neu entschieden werden.
     row = await _after(
         db.jersey_number_requests,
-        {"id": request_id, "status": OPEN},
-        {"$set": {"status": DECIDING, "claim": claim}},
+        {
+            "id": request_id,
+            "$or": [
+                {"status": OPEN},
+                {"status": DECIDING, "claimed_at": {"$lt": _stale_cutoff()}},
+            ],
+        },
+        {
+            "$set": {
+                "status": DECIDING,
+                "claim": claim,
+                "claimed_at": now_utc().isoformat(),
+            }
+        },
     )
     if not row:
         if not await db.jersey_number_requests.find_one(
@@ -1016,7 +1078,7 @@ async def decide(
         # Hat es nicht geklappt (etwa: Wunschnummer inzwischen vergeben), bleibt der Antrag offen.
         await db.jersey_number_requests.update_one(
             {"id": request_id, "claim": claim},
-            {"$set": {"status": OPEN}, "$unset": {"claim": ""}},
+            {"$set": {"status": OPEN}, "$unset": {"claim": "", "claimed_at": ""}},
         )
         raise
     status = DECISIONS[decision]
@@ -1031,7 +1093,7 @@ async def decide(
                 "decided_by": actor["id"],
                 "decision_reason": text,
             },
-            "$unset": {"claim": ""},
+            "$unset": {"claim": "", "claimed_at": ""},
         },
     )
     if not done:
@@ -1226,9 +1288,11 @@ async def admin_overview(db) -> dict:
                 else f"Dolibarr war nicht lesbar ({scan.get('error')}) – die Liste zeigt nur den Stand der Website."
             ),
         },
-        "requests": [row for row in request_rows if row["status"] == OPEN]
-        + [row for row in request_rows if row["status"] != OPEN][:50],
-        "open_requests": sum(1 for row in request_rows if row["status"] == OPEN),
+        "requests": [row for row in request_rows if row["status"] in (OPEN, DECIDING)]
+        + [row for row in request_rows if row["status"] not in (OPEN, DECIDING)][:50],
+        "open_requests": sum(
+            1 for row in request_rows if row["status"] in (OPEN, DECIDING)
+        ),
         "counts": {
             "size": size,
             "reserved": len(blocked),
@@ -1318,12 +1382,57 @@ async def _drop_cleared_orphan(db, doc_id: str) -> None:
     )
 
 
+def _stale_cutoff() -> str:
+    return (now_utc() - timedelta(minutes=DECIDING_STALE_MINUTES)).isoformat()
+
+
+async def release_stale_decisions(db) -> int:
+    """Eine Entscheidung, die nach dem Beanspruchen nie fertig wurde (Absturz), gibt den Antrag nach ein paar Minuten
+    wieder frei - mit Eintrag im Verlauf und im Adminprotokoll."""
+    count = 0
+    for row in await db.jersey_number_requests.find(
+        {"status": DECIDING, "claimed_at": {"$lt": _stale_cutoff()}}, {"_id": 0}
+    ).to_list(200):
+        reset = await db.jersey_number_requests.update_one(
+            {"id": row["id"], "status": DECIDING, "claim": row.get("claim")},
+            {"$set": {"status": OPEN}, "$unset": {"claim": "", "claimed_at": ""}},
+        )
+        if not reset.modified_count:
+            continue
+        count += 1
+        note = "Entscheidung des Vorstands nicht abgeschlossen - Antrag wieder offen"
+        await db.jersey_numbers.update_one(
+            {"user_id": row["user_id"]},
+            {
+                "$push": {
+                    "log": {
+                        "$each": [
+                            _log(
+                                "decision_reset",
+                                "system",
+                                row.get("current"),
+                                row.get("current"),
+                                note,
+                            )
+                        ],
+                        "$slice": -LOG_KEEP,
+                    }
+                }
+            },
+        )
+        await _audit(db, "system", "jersey_number.request_reset", row["user_id"])
+        logger.warning("[jersey] Verwaiste Entscheidung zu einem Antrag zurückgesetzt")
+    return count
+
+
 async def sync_pending(db=None, limit: int = 200) -> dict:
-    """Nachtragen, was noch nicht in Dolibarr steht (oder nach einem neuen Feldnamen dort fehlt)."""
+    """Verwaiste Entscheidungen freigeben; nachtragen, was noch nicht in Dolibarr steht (oder nach einem neuen
+    Feldnamen dort fehlt)."""
     if db is None:
         from database import get_db
 
         db = get_db()
+    await release_stale_decisions(db)
     d_settings = await erp.load_settings(db)
     if d_settings.get("mode") != "live":
         return {"skipped": "off"}

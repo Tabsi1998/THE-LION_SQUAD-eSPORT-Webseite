@@ -778,7 +778,7 @@ async def test_number_follows_the_account_when_the_link_changes(flow, fake):
     await close_link(flow.db, link_doc, status="revoked", actor_id=admin["id"])
     doc = await flow.db.jersey_numbers.find_one({"user_id": paula["id"]})
     assert (
-        doc["pending_clears"] == [14]
+        doc["pending_clears"] == [{"member_id": 14, "value": 11}]
         and fake.core_members[14]["array_options"]["options_trikotnummer"] == 11
     )
     await flow.db.settings.update_one(
@@ -819,3 +819,88 @@ async def test_check_takes_the_number_in_the_body_and_the_page_lists_free_number
     flow.act_as(paula)
     view = (await flow.get(URL)).json()
     assert view["free_numbers"] is None and view["free_count"] == 999
+
+
+# ---------------------------------------------------------------- Codex-Nachprüfung (#2034)
+
+
+@pytest.mark.asyncio
+async def test_a_decision_that_never_finished_frees_the_request_again(flow):
+    """Stürzt der Prozess nach dem Beanspruchen ab, bleibt der Antrag nicht für immer „in Entscheidung“."""
+    from datetime import timedelta
+
+    from models import now_utc
+
+    paula = await member(flow, "paula")
+    admin = await board(flow)
+    flow.act_as(paula)
+    await flow.post(URL, json={"number": 7, "confirmed": True})
+    row = (
+        await flow.post(f"{URL}/requests", json={"wished": 8, "reason": "Lieber die 8"})
+    ).json()
+
+    # Frisch beansprucht: eine zweite Entscheidung wartet (409).
+    fresh = (now_utc() - timedelta(minutes=1)).isoformat()
+    await flow.db.jersey_number_requests.update_one(
+        {"id": row["id"]},
+        {"$set": {"status": "deciding", "claim": "x", "claimed_at": fresh}},
+    )
+    with pytest.raises(jersey_numbers.JerseyError) as busy:
+        await jersey_numbers.decide(flow.db, admin, row["id"], "approve")
+    assert busy.value.status == 409
+
+    # Verwaist (älter als fünf Minuten): der Job gibt den Antrag wieder frei - mit Verlauf und Protokoll.
+    old = (now_utc() - timedelta(minutes=6)).isoformat()
+    await flow.db.jersey_number_requests.update_one(
+        {"id": row["id"]}, {"$set": {"claimed_at": old}}
+    )
+    await jersey_numbers.sync_pending(flow.db)
+    reset = await flow.db.jersey_number_requests.find_one({"id": row["id"]})
+    assert reset["status"] == "received" and "claim" not in reset
+    doc = await flow.db.jersey_numbers.find_one({"user_id": paula["id"]})
+    assert doc["log"][-1]["action"] == "decision_reset"
+    assert await flow.db.audit_logs.find_one({"action": "jersey_number.request_reset"})
+
+    # Und auch ohne Job darf der Vorstand eine verwaiste Entscheidung neu treffen.
+    await flow.db.jersey_number_requests.update_one(
+        {"id": row["id"]},
+        {"$set": {"status": "deciding", "claim": "y", "claimed_at": old}},
+    )
+    done = await jersey_numbers.decide(flow.db, admin, row["id"], "approve")
+    assert done["status"] == "applied"
+    assert (await flow.db.jersey_numbers.find_one({"user_id": paula["id"]}))[
+        "number"
+    ] == 8
+
+
+@pytest.mark.asyncio
+async def test_old_member_is_only_cleared_if_our_number_is_still_there(flow, fake):
+    await connect(flow, write=False)
+    paula = await member(flow, "paula")
+    await link(flow, paula, 12)
+    fake.add_core_member(12, options={"trikotnummer": "11"})
+    fake.define_member_extrafield("trikotnummer")
+    flow.act_as(paula)
+    view = (await flow.get(URL)).json()  # übernimmt die 11 aus Dolibarr
+    assert view["number"] == 11
+
+    # Zuordnung gelöst, Schreiben aus: das Löschen beim alten Mitglied wartet.
+    from services.dolibarr_links import close_link
+
+    link_doc = await flow.db.dolibarr_links.find_one(
+        {"user_id": paula["id"]}, {"_id": 0}
+    )
+    await close_link(flow.db, link_doc, status="revoked", actor_id="vorstand")
+    doc = await flow.db.jersey_numbers.find_one({"user_id": paula["id"]})
+    assert doc["pending_clears"] == [{"member_id": 12, "value": 11}]
+
+    # Inzwischen vergibt der Vorstand in Dolibarr dem Mitglied 12 eine andere Nummer: die bleibt stehen.
+    fake.core_members[12]["array_options"]["options_trikotnummer"] = 4
+    await flow.db.settings.update_one(
+        {"id": "dolibarr"}, {"$set": {"write_enabled": True}}
+    )
+    await jersey_numbers.sync_pending(flow.db)
+    assert fake.core_members[12]["array_options"]["options_trikotnummer"] == 4
+    assert fake.member_puts == []
+    doc = await flow.db.jersey_numbers.find_one({"user_id": paula["id"]})
+    assert doc["pending_clears"] == [] and doc["log"][-1]["action"] == "clear_skipped"
