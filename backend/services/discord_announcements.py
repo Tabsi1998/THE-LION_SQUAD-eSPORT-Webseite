@@ -429,6 +429,7 @@ def stream_live_message(tournament: dict, stream: dict) -> dict:
 BOARD_MESSAGES = {
     "membership.application": {"title": "📝 Neuer Mitgliedsantrag", "url": "/admin/membership-applications"},
     "contact.request": {"title": "✉️ Neue Kontaktanfrage", "url": "/admin/contact"},
+    "membership.jersey_number": {"title": "🔢 Antrag auf eine andere Nummer", "url": "/admin/members?tab=numbers"},
 }
 
 
