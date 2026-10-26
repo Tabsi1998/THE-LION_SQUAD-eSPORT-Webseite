@@ -32,10 +32,10 @@ from fastapi import APIRouter, Depends, Request
 
 from auth import get_optional_user
 from database import get_db
-from routes.reference_round_routes import PUBLIC_FIELDS, _calendar, visible_series
+from routes.reference_round_routes import _calendar, public_round, visible_series
 from services import (
     map_pools, partner_platforms, race_weekend, reference_bundles, reference_originals, reference_running_cache,
-    series_identity, series_logo, series_partners,
+    series_identity, series_kinds, series_logo, series_partners,
 )
 from services.dolibarr_policy import club_today
 from services.own_teams import Matcher, own_teams
@@ -140,8 +140,9 @@ def _standing_row(row: dict, people: dict) -> dict:
     }
 
 
-def _public_round(item: dict) -> dict:
-    return {key: item.get(key) for key in PUBLIC_FIELDS}
+def _public_round(item: dict, kind: str | None = "racing") -> dict:
+    """Öffentlicher Termin - ohne die Felder, die die Art nicht kennt (#2024, Turnierserie ohne Ort und Flagge)."""
+    return public_round(item, kind)
 
 
 def _units(rounds: list[dict], by_weekend: bool) -> list[list[dict]]:
@@ -169,15 +170,15 @@ def _counts(rounds: list[dict], by_weekend: bool, planned=None) -> dict:
     return {"total": max(len(live), int(planned or 0)), "scored": scored, "cancelled": len(units) - len(live)}
 
 
-def _progress(rounds: list[dict], by_weekend: bool = False, planned=None) -> dict:
+def _progress(rounds: list[dict], by_weekend: bool = False, planned=None, kind: str | None = "racing") -> dict:
     """Fortschritt der Wertungsrunden (ohne Finale und Runden außerhalb der Wertung), dazu der nächste Termin."""
     counts = _counts(rounds, by_weekend, planned)
     upcoming = next((item for item in rounds if item["state"] in UPCOMING_STATES), None)
     return {**counts, "remaining": counts["total"] - counts["scored"],
-            "next": _public_round(upcoming) if upcoming else None}
+            "next": _public_round(upcoming, kind) if upcoming else None}
 
 
-async def _final(db, series_id: str, rounds: list[dict], people: dict) -> dict | None:
+async def _final(db, series_id: str, rounds: list[dict], people: dict, kind: str | None = "racing") -> dict | None:
     """Das Finale als eigene Runde: Termin und, sobald veröffentlicht, die Endplatzierung aus seinem Ergebnisblatt."""
     final = next((item for item in rounds if item.get("kind") == "final"), None)
     if not final:
@@ -187,7 +188,7 @@ async def _final(db, series_id: str, rounds: list[dict], people: dict) -> dict |
     rows = [row for row in sheet.get("rows") or [] if row.get("participant_id")]
     rows.sort(key=lambda row: (row.get("place") is None, row.get("place") or 0))
     return {
-        "round": _public_round(final),
+        "round": _public_round(final, kind),
         "rows": [{"key": row["participant_id"], **(people.get(row["participant_id"]) or HIDDEN_PERSON),
                   "place": row.get("place"), "points": row.get("points"), "marks": row.get("marks") or []}
                  for row in rows],
@@ -207,13 +208,15 @@ def _running_progress(rounds: list[dict], by_weekend: bool = False, planned=None
 NEXT_FIELDS = ("code", "title", "club_day", "state", "country_code", "session", "opponent", "at_home", "club_day_end")
 
 
-def _running_next(rounds: list[dict], by_weekend: bool = False) -> dict | None:
+def _running_next(rounds: list[dict], by_weekend: bool = False, kind: str | None = "racing") -> dict | None:
     """Der nächste offene Termin mit seinem Lauf - bei der Rennliga dazu alle Läufe seiner Runde (#1930), wenn es
-    mehrere sind (Lauf, Tag, Uhrzeit, Status)."""
+    mehrere sind (Lauf, Tag, Uhrzeit, Status). Ohne Datum (#2015) mit der gemerkten Uhrzeit; Felder, die die Art
+    nicht kennt, sind leer (#2024)."""
     item = next((item for item in rounds if item["state"] in UPCOMING_STATES), None)
     if not item:
         return None
-    out = {**{key: item.get(key) for key in NEXT_FIELDS}, "time": vienna_clock(item.get("starts_at"))}
+    clock = vienna_clock(item.get("starts_at")) or (None if item.get("club_day") else item.get("open_time"))
+    out = {**public_round(item, kind, NEXT_FIELDS), "time": clock}
     sessions = [other for other in rounds if by_weekend and item.get("weekend")
                 and other.get("weekend") == item.get("weekend")]
     if len(sessions) > 1:
@@ -271,6 +274,15 @@ async def public_running(request: Request, user: dict | None = Depends(get_optio
 
 
 VISIBILITY_LEVELS = ("community", "members", "internal")
+# Sortierschlüssel des nächsten Termins (#2024): ein Tag „JJJJ-MM-TT“, offen (ohne Datum) danach, ohne Termin zuletzt.
+OPEN_DAY = "9998"
+NO_DAY = "9999"
+
+
+def _next_key(next_round: dict | None) -> str:
+    if not next_round:
+        return NO_DAY
+    return next_round.get("club_day") or OPEN_DAY
 
 
 async def _running(user: dict | None, today: str) -> dict:
@@ -303,17 +315,20 @@ async def _running(user: dict | None, today: str) -> dict:
         return {"today": today, "items": []}
     # Der nächste offene Termin je Serie in EINER Abfrage: nicht abgesagt, nicht gewertet, nicht archiviert, ab heute -
     # oder ein Spieltag-Zeitraum, der vor heute begann und noch läuft (#1931): er zählt als heute.
+    # Termine ohne Datum (#2024): eine Saison, deren nächster Termin noch offen ist („Termin folgt“), steht nach allen
+    # mit einem Tag, aber vor Saisons ohne kommenden Termin - sie läuft ja und hat etwas vor sich. Ein Datum ist
+    # konkreter als „folgt“, darum nicht davor.
     next_day: dict = {}
     async for item in db.reference_rounds.find(
             {"series_id": {"$in": [series["id"] for _, series in visible_pairs]},
-             "$or": [{"club_day": {"$gte": today}}, {"club_day_end": {"$gte": today}}],
+             "$or": [{"club_day": {"$gte": today}}, {"club_day_end": {"$gte": today}}, {"club_day": None}],
              "status": {"$nin": ["cancelled", "scored"]}, "archived_at": None},
             {"_id": 0, "series_id": 1, "club_day": 1}):
-        day = max(str(item.get("club_day") or today), today)
-        if day < next_day.get(item["series_id"], "9999"):
+        day = max(str(item.get("club_day")), today) if item.get("club_day") else OPEN_DAY
+        if day < next_day.get(item["series_id"], NO_DAY):
             next_day[item["series_id"]] = day
-    # Heute zuerst (der nächste Termin ist dann heute), dann nach nächstem Termin, ohne Termin ans Ende.
-    visible_pairs.sort(key=lambda pair: (next_day.get(pair[1]["id"]) or "9999", pair[1].get("order_index") or 0,
+    # Heute zuerst (der nächste Termin ist dann heute), dann nach nächstem Termin, offene danach, ohne Termin ans Ende.
+    visible_pairs.sort(key=lambda pair: (next_day.get(pair[1]["id"]) or NO_DAY, pair[1].get("order_index") or 0,
                                          str(pair[0].get("title") or "")))
     shown = visible_pairs[:RUNNING_LIMIT]
     ids = [series["id"] for _, series in shown]
@@ -360,14 +375,16 @@ async def _running(user: dict | None, today: str) -> dict:
             "series": {**{key: series.get(key) for key in ("season", "tier", "title", "season_slug")},
                        "logo_url": series_logo.effective(lineage, series)},
             "progress": _running_progress(rounds, racing, series.get("planned_rounds")),
-            "next": _running_next(rounds, racing),
+            "next": _running_next(rounds, racing, lineage.get("kind")),
+            # Art-Profil (#2024): Begriffe („5 von 9 Turniertagen“) und Felder für Karte und Startseite.
+            "profile": series_kinds.public_profile(lineage.get("kind")),
             "today": any(item["state"] == "today" for item in rounds),
             "club": _club_place(lineage, series, snapshots, club_ids),
             "club_count": club_count.get(series["id"], 0),
             "organizers": hosts,
             "_order": (series.get("order_index") or 0),
         })
-    items.sort(key=lambda item: (not item["today"], (item["next"] or {}).get("club_day") or "9999", item["_order"],
+    items.sort(key=lambda item: (not item["today"], _next_key(item["next"]), item["_order"],
                                  str(item["lineage"]["title"] or "")))
     for item in items:
         item.pop("_order")
@@ -498,6 +515,7 @@ async def public_series(lineage_slug: str, season_slug: str, user: dict | None =
     db = get_db()
     lineage, series = await visible_series(db, user, lineage_slug, season_slug)
     sid = series["id"]
+    kind = lineage.get("kind")
     calendar = await _calendar(db, sid)
     rounds = calendar["rounds"]
     people = await _people(db, sid, hide_tags=bool(series.get("hide_name_tags")))
@@ -523,20 +541,23 @@ async def public_series(lineage_slug: str, season_slug: str, user: dict | None =
         "successor": await _successor(db, user, series),
         "rule_changes": rule_changes(series, rounds),
         "today": calendar["today"],
-        "progress": _progress(rounds, by_weekend=lineage.get("kind") == "racing", planned=series.get("planned_rounds")),
-        "rounds": [_public_round(item) for item in rounds],
+        "progress": _progress(rounds, by_weekend=kind == "racing", planned=series.get("planned_rounds"), kind=kind),
+        "rounds": [_public_round(item, kind) for item in rounds],
         "standings": None if not latest else {
             "round_id": latest.get("round_id"), "round_seq": latest.get("round_seq"),
             "computed_at": latest.get("computed_at"),
             "rows": [_standing_row(row, people) for row in latest.get("rows") or []],
         },
-        "final": await _final(db, sid, rounds, people),
+        "final": await _final(db, sid, rounds, people, kind),
         # Team-Liga (#1747): Tabelle, Spielplan, Aufstellung und Liga-Weg - bei anderen Arten ``None``.
-        "team_league": await team_league_view(db, user, lineage, series, [_public_round(item) for item in rounds]),
+        "team_league": await team_league_view(db, user, lineage, series,
+                                              [_public_round(item, kind) for item in rounds]),
         # Rennliga (#1746): Saisons, Teamwertung, Team je Rennen und Vereinsteams - bei anderen Arten ``None``.
         "racing": await racing_block(db, user, lineage, series, people, latest),
         # Map-Pool der Saison (#1616) als Snapshot - ``None`` ohne Pool oder ohne Spiel der Spur.
         "map_pool": await map_pools.series_pool(db, lineage, series),
         # Original-Bilder des Veranstalters (#1933): Termin → öffentliche Bilder („Original ansehen“).
         "originals": await reference_originals.public_map(db, series, rounds, lineage.get("slug") or lineage_slug),
+        # Art-Profil (#2024): Felder und Begriffe der Art - die Seite liest sie statt eigener Weichen.
+        "profile": series_kinds.public_profile(kind),
     }
