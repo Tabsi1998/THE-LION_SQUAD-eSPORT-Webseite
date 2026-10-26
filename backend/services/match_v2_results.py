@@ -122,7 +122,10 @@ def _source_still_open(slot: dict, by_key: dict[str, dict], target_sets: dict[st
     if slot.get("status") != "bye":
         return False
     source = slot.get("source") or {}
-    was = source if source.get("type") == "rank" else (source.get("was") or {})
+    return _origin_open(source if source.get("type") == "rank" else (source.get("was") or {}), by_key, target_sets)
+
+
+def _origin_open(was: dict, by_key: dict[str, dict], target_sets: dict[str, dict]) -> bool:
     origin = by_key.get(was.get("match_key")) if was else None
     return (bool(origin) and not origin.get("is_preview")
             and _effective_status(origin, target_sets) not in DECIDED_OR_VOID)
@@ -1166,9 +1169,12 @@ def resolve_walkovers(start_ids: list[str], by_id: dict[str, dict], target_sets:
         filled = _filled_slots(match)
         if len(filled) > 1 or not any(slot.get("status") == "bye" for slot in slots):
             continue
-        if not filled and any(_source_still_open(slot, by_key, target_sets) for slot in slots):
+        if not filled and (any(_source_still_open(slot, by_key, target_sets) for slot in slots)
+                           or any(_origin_open(item, by_key, target_sets)
+                                  for item in match.get("dormant_slots") or [])):
             # Nur Freilose, aber eine Quelle ist noch offen (#2044): der Lauf wartet, statt zu entfallen - legt der
-            # Lauf-Umbau die Vorläufe zusammen, haben sie Verlierer, und die fahren hier (``heat_rebuild``).
+            # Lauf-Umbau die Vorläufe zusammen, haben sie Verlierer, und die fahren hier (``heat_rebuild``). Ruhende
+            # Plätze aus einem Zusammenlegen stehen als Merkposten in ``dormant_slots``.
             continue
         winner = filled[0] if filled else None
         # Kampflos nach Disqualifikation oder Austritt (#1553): der Grund und die entfernte Person stehen am Ergebnis.
