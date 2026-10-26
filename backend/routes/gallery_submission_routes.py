@@ -12,6 +12,7 @@ from pydantic import BaseModel, Field
 from auth import get_current_user, get_optional_user, require_area
 from database import get_db
 from services import event_photos
+from services.form_flags import form_flag
 from services.image_variants import resolve_variant
 from services.rate_limit import enforce_rate_limit
 
@@ -34,14 +35,16 @@ async def submit_photo(
     album_id: str,
     request: Request,
     file: UploadFile = File(...),
-    consent: bool = Form(False),
-    credit: bool = Form(True),
+    consent: str | None = Form(None),
+    # Text statt bool: ohne Feld gilt die Vorgabe in jeder FastAPI-Version (services/form_flags.py).
+    credit: str | None = Form(None),
     me: dict = Depends(get_current_user),
 ):
     db = get_db()
     album = await event_photos.find_album(db, album_id)
     await enforce_rate_limit(request, "gallery:submission", limit=SUBMIT_RATE_LIMIT, window_seconds=SUBMIT_RATE_WINDOW_SECONDS, subject=me["id"])
-    return await event_photos.store_submission(db, album, me, file, consent=consent, credit=credit)
+    return await event_photos.store_submission(
+        db, album, me, file, consent=form_flag(consent, default=False), credit=form_flag(credit, default=True))
 
 
 @router.get("/gallery/submissions/{submission_id}/image")
