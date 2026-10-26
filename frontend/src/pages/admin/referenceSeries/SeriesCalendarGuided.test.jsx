@@ -84,6 +84,16 @@ test("Datum nachtragen: alle offenen auf einmal, Vorschlag aus dem Standard-Woch
   }));
 });
 
+test("Grenzfall: 30 Turniertage ohne Datum und ohne einen mit Datum - Vorschläge ab heute, je eine Woche", async () => {
+  const { suggestDays } = await import("./CalendarGuide");
+  const rounds = Array.from({ length: 30 }, (_, index) => open(index + 1));
+  const days = suggestDays(rounds, rounds, 3, "2026-11-05");
+  expect(Object.keys(days)).toHaveLength(30);
+  expect([days.t1, days.t2, days.t30]).toEqual(["2026-11-05", "2026-11-12", "2027-05-27"]);
+  // Ohne Wochentag eine Woche nach dem letzten, der erste heute.
+  expect(Object.values(suggestDays(rounds.slice(0, 2), rounds.slice(0, 2), null, "2026-11-05"))).toEqual(["2026-11-05", "2026-11-12"]);
+});
+
 test("Terminliste einer Turnierserie: Beispiel ohne Ort, Zeile ohne Datum heißt offen", async () => {
   await renderSection(MIXED);
   fireEvent.click(screen.getByTestId("calendar-paste"));
