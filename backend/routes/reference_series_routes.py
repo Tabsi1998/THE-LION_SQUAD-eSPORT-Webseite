@@ -223,6 +223,14 @@ async def create_series(body: ReferenceSeriesCreate, me: dict = Depends(require_
                          if scheme["id"] == doc["points_scheme_id"]), None)
         if template is None:
             raise HTTPException(404, "Punkteschema-Vorlage nicht gefunden.")
+        # #2024: die Vorlage muss zur Art der Spur passen (ihre ``kinds``; ohne Angabe passt sie zu allen). Geprüft
+        # wird nur hier: eine Vorlage wird allein beim Anlegen kopiert - bestehende Saisons, die früher aus einer heute
+        # unpassenden Vorlage entstanden sind, bleiben so bearbeitbar wie bisher.
+        kinds = template.get("kinds") or []
+        if kinds and lineage.get("kind") not in kinds:
+            label = series_kinds.profile(lineage.get("kind"))["label"]
+            raise HTTPException(422, f"Die Vorlage „{template.get('name') or template['id']}“ passt nicht zur Art "
+                                     f"„{label}“ dieser Spur - bitte eine passende Vorlage wählen.")
     # Ohne Vorlage gelten die Standardregeln der Art (#2024) - eine Turnierserie startet als TFT-Turniertag.
     base = template.get("rules") if template else series_kinds.default_rules(lineage.get("kind"))
     doc["rules"] = _rules({**(base or {}), **(doc.get("rules") or {})})
