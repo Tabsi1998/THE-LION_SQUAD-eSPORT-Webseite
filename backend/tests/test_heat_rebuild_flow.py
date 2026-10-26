@@ -4,6 +4,7 @@ Bestätigen und Ablehnen mit den Rechten der Turnierleitung, Turnier-Sperre, Pro
 import pathlib
 import sys
 from datetime import datetime, timedelta
+from time import monotonic
 
 import pytest
 import pytest_asyncio
@@ -454,6 +455,220 @@ async def test_incomplete_notification_is_sent_once_per_incident(flow):
     # Derselbe Vorfall bleibt auch nach der Stunde einmalig.
     await heat_rebuild._notify_incomplete(flow.db, tournament, stage_id="s1", keys=["C"], reason="foreign_change")
     assert await flow.db.notifications.count_documents({"user_id": staff["id"], "kind": "tournament_heat_rebuild"}) == 2
+
+
+# -------------------------------------------------------------------------------------------- Überlauf, Aufruf (#2033)
+
+# Das Finale hat fünf Plätze (wie nach einem Zusammenlegen): drei aus den gefahrenen B und C, zwei aus A.
+TWELVE_WIDE_FINAL = """[WB]
+# Runde 1
+A=[1,2,3,4]
+B=[5,6,7,8]
+C=[9,10,11,12]
+# Finale
+F=[W:B:1,W:B:2,W:C:1,W:A:1,W:A:2]
+"""
+
+
+async def wide_final(flow) -> tuple[dict, dict]:
+    tournament, _users, _regs = await flow.with_participants(
+        12, format="ffa_custom_bracket", heat_rebuild_mode="auto", status="registration_open")
+    await flow.db.tournament_stages.insert_one({
+        "id": new_id(), "tournament_id": tournament["id"], "number": 1, "name": "Läufe",
+        "stage_type": "ffa_custom_bracket", "match_type": "ffa", "status": "pending",
+        "settings": {"schema": TWELVE_WIDE_FINAL, "match_size": 4, "qualifiers_per_match": 2, "min_players": 2},
+        "created_at": now_utc().isoformat(), "updated_at": now_utc().isoformat(),
+    })
+    staff = await flow.add_staff()
+    flow.act_as(staff)
+    response = await flow.post(f"/api/tournaments/{tournament['id']}/status", json={"status": "check_in"})
+    assert response.status_code == 200, response.text
+    await flow.db.tournament_registrations.update_many({"tournament_id": tournament["id"]},
+                                                       {"$set": {"status": "checked_in"}})
+    await flow.db.tournaments.update_one({"id": tournament["id"]}, {"$set": {
+        "check_in_until": (now_utc() - timedelta(minutes=1)).isoformat()}})
+    await scheduler._safe_status_transitions()
+    return tournament, staff
+
+
+async def overfull_called_final(flow) -> tuple[dict, dict, dict]:
+    """B und C sind gefahren, das Finale F (fünf Plätze) hat drei Fahrer und ist an einer Station aufgerufen; dann kommt
+    A's zweite Weiterleitung zurück (wie nach einem Zusammenlegen, #2033): F erwartet 5 bei Laufgröße 4. „Neu prüfen“
+    nennt den Konflikt; die Automatik nach einem Ergebnis reiht sich ein und gibt nach fünf Versuchen auf - mit Vermerk
+    und der Meldung „Lauf-Umbau wartet“. Der aufgerufene Lauf bleibt unangetastet."""
+    import services.heat_rebuild as heat_rebuild
+
+    tournament, staff = await wide_final(flow)
+    by_key = await heats(flow, tournament)
+    assert by_key["A"]["settings"]["qualifiers_per_match"] == 1, "beim Baubau kappt der Planer A auf 1"
+    await flow.start(tournament)
+    for key in ("B", "C"):
+        match = by_key[key]
+        ranking = [s["registration_id"] for s in match["slots"] if s["status"] == "filled"]
+        response = await flow.post(f"/api/matches/{match['id']}/result", json={
+            "results": [{"registration_id": reg, "rank": index + 1} for index, reg in enumerate(ranking)]})
+        assert response.status_code == 200, response.text
+    by_key = await heats(flow, tournament)
+    final, first = by_key["F"], by_key["A"]
+    assert len([s for s in final["slots"] if s["status"] == "filled"]) == 3
+    now_iso = now_utc().isoformat()
+    station = {"id": new_id(), "name": "Station 1", "tournament_id": tournament["id"], "status": "reserved",
+               "current_match_id": final["id"], "current_match_type": "matches_v2", "called_at": now_iso,
+               "queue_match_ids": [], "created_at": now_iso, "updated_at": now_iso}
+    await flow.db.stations.insert_one(station)
+    await flow.db.matches_v2.update_one({"id": final["id"]}, {"$set": {
+        "status": "scheduled", "scheduled_at": now_iso, "called_at": now_iso, "station_id": station["id"],
+        "slots.4": {"slot": 5, "source": {"type": "rank", "flow": "W", "match_key": "A", "rank": 2, "raw": "W:A:2"},
+                    "registration_id": None, "user_id": None, "seed": None, "status": "pending",
+                    "source_result": None}}})
+    await flow.db.matches_v2.update_one({"id": first["id"]}, {"$set": {
+        "settings.qualifiers_per_match": 2, "qualifiers_effective": 2,
+        "advancement": [*first["advancement"],
+                        {"flow": "W", "rank": 2, "to_match_key": "F", "to_match_id": final["id"], "to_slot": 5}]}})
+    response = await flow.post(f"/api/tournaments/{tournament['id']}/heat-rebuild/check")
+    assert response.status_code == 409, response.text
+    detail = response.json()["detail"]
+    assert "Lauf F" in detail and "5 Fahrer bei Laufgröße 4" in detail
+    assert await heat_rebuild.evaluate_after_write(flow.db, tournament["id"], actor_id=None, trigger="result") is None
+    for _ in range(5):
+        await flow.db.tournaments.update_one({"id": tournament["id"]},
+                                             {"$set": {"heat_rebuild_pending.next_at": "2000-01-01T00:00:00+00:00"}})
+        assert await heat_rebuild.process_pending_heat_rebuilds(flow.db) == 1
+    doc = await stored(flow, tournament)
+    assert doc.get("heat_rebuild_pending") is None
+    incomplete = doc["heat_rebuild_incomplete"]
+    assert incomplete["reason"] == "overfull" and incomplete["match_keys"] == ["F"]
+    note = await flow.db.notifications.find_one({"user_id": staff["id"], "kind": "tournament_heat_rebuild"}, {"_id": 0})
+    assert note["title"] == "Lauf-Umbau wartet" and "Lauf F" in note["body"] and "zurücknehmen" in note["body"]
+    final = await flow.db.matches_v2.find_one({"id": final["id"]}, {"_id": 0})
+    assert final["called_at"] and final["status"] == "scheduled" and final["slots"][4]["status"] == "pending"
+    assert (await flow.db.matches_v2.find_one({"id": first["id"]}, {"_id": 0}))["settings"]["qualifiers_per_match"] == 2
+    return tournament, staff, station
+
+
+@pytest.mark.asyncio
+async def test_freeing_the_station_catches_up_the_waiting_rebuild(flow):
+    """#2033: Station freigeben nimmt den Aufruf zurück - die Auswertung läuft sofort nach, obwohl die Warteschlange
+    aufgegeben hatte: A auf 1 gekappt, der fünfte Platz „Quelle unerfüllbar“, Vermerk weg, Meldung erledigt (gelesen),
+    „Lauf-Umbau nachgeholt“ dazu, Graph gültig."""
+    import services.heat_rebuild as heat_rebuild
+    from services.competition_graph_validation import validate_competition_graph
+    from services.competition_snapshot import build_structure_snapshot
+
+    tournament, staff, station = await overfull_called_final(flow)
+    response = await flow.post(f"/api/stations/{station['id']}/clear")
+    assert response.status_code == 200, response.text
+    by_key = await heats(flow, tournament)
+    assert not by_key["F"].get("called_at") and by_key["F"]["slots"][4]["status"] == "bye"
+    assert by_key["F"]["slots"][4]["source_result"]["reason"] == "source_unfulfillable"
+    assert by_key["A"]["settings"]["qualifiers_per_match"] == 1
+    doc = await stored(flow, tournament)
+    assert doc.get("heat_rebuild_incomplete") is None and doc.get("heat_rebuild_pending") is None
+    assert (await audit_actions(flow, tournament)).count("tournament.heats.resumed") == 1
+    notes = await flow.db.notifications.find({"user_id": staff["id"], "kind": "tournament_heat_rebuild"},
+                                             {"_id": 0}).to_list(10)
+    assert sorted(note["title"] for note in notes) == ["Lauf-Umbau nachgeholt", "Lauf-Umbau wartet"]
+    assert next(note for note in notes if note["title"] == "Lauf-Umbau wartet")["read"] is True
+    snapshot = build_structure_snapshot(tournament["id"], stage_matches=await flow.matches(tournament))
+    assert validate_competition_graph(snapshot)["valid"], validate_competition_graph(snapshot)["issues"]
+    assert await heat_rebuild.process_pending_heat_rebuilds(flow.db) == 0
+
+
+@pytest.mark.asyncio
+async def test_the_minute_job_catches_up_when_the_heat_is_freed_another_way(flow):
+    """#2033: Der Lauf wird auf einem Weg frei, der keine Auswertung anstößt (hier fällt der Aufruf direkt in der
+    Datenbank weg) - der Minuten-Job sieht den wartenden Vermerk, prüft den Lauf und holt den Umbau nach."""
+    import services.heat_rebuild as heat_rebuild
+
+    tournament, staff, _station = await overfull_called_final(flow)
+    assert await heat_rebuild.process_pending_heat_rebuilds(flow.db) == 0, "solange der Lauf aufgerufen ist, wartet er"
+    final = (await heats(flow, tournament))["F"]
+    await flow.db.matches_v2.update_one({"id": final["id"]}, {"$unset": {"called_at": ""}})
+    assert await heat_rebuild.process_pending_heat_rebuilds(flow.db) == 1
+    by_key = await heats(flow, tournament)
+    assert by_key["A"]["settings"]["qualifiers_per_match"] == 1 and by_key["F"]["slots"][4]["status"] == "bye"
+    doc = await stored(flow, tournament)
+    assert doc.get("heat_rebuild_incomplete") is None
+    assert (await audit_actions(flow, tournament)).count("tournament.heats.resumed") == 1
+    assert await flow.db.notifications.count_documents({"user_id": staff["id"], "title": "Lauf-Umbau nachgeholt"}) == 1
+
+
+@pytest.mark.asyncio
+async def test_a_call_made_after_the_read_still_triggers_the_catch_up_on_clear(flow, monkeypatch):
+    """#2033 (Codex): ``clear_station`` las den Lauf vor der Turnier-Sperre. Wurde er danach aufgerufen und dann
+    freigegeben, fiel der Aufruf weg, die Auswertung aber nicht an. Jetzt entscheidet der Stand unter der Sperre."""
+    import routes.station_routes as station_routes
+
+    tournament, _staff, station = await overfull_called_final(flow)
+    real = station_routes._find_match_for_station
+
+    async def read_before_the_call(db, match_id):
+        collection, match = await real(db, match_id)
+        return collection, ({**match, "called_at": None} if match else match)
+
+    monkeypatch.setattr(station_routes, "_find_match_for_station", read_before_the_call)
+    response = await flow.post(f"/api/stations/{station['id']}/clear")
+    assert response.status_code == 200, response.text
+    by_key = await heats(flow, tournament)
+    assert not by_key["F"].get("called_at") and by_key["A"]["settings"]["qualifiers_per_match"] == 1
+    assert (await stored(flow, tournament)).get("heat_rebuild_incomplete") is None
+
+
+@pytest.mark.asyncio
+async def test_a_match_update_evaluates_under_its_own_lock_without_waiting(flow, monkeypatch):
+    """#2033 (Codex): PATCH /api/matches hält die Turnier-Sperre schon; die Auswertung lief in dieselbe, nicht
+    wiedereintrittsfähige Sperre, wartete 2 s und reihte nur ein. Jetzt wertet sie direkt aus: kein Einreihen, kein
+    Warten - der Umbau ist mit der Antwort nachgeholt."""
+    import services.heat_rebuild as heat_rebuild
+
+    # Erst mit eindeutigem Schlüssel sperrt die Turnier-Sperre auch in mongomock wirklich (wie in den Lock-Tests).
+    await flow.db.mutation_locks.create_index("resource", unique=True)
+    tournament, _staff, _station = await overfull_called_final(flow)
+    queued: list[tuple] = []
+
+    async def never_queue(db, tournament_id, *, trigger):
+        queued.append((tournament_id, trigger))
+
+    monkeypatch.setattr(heat_rebuild, "queue_evaluation", never_queue)
+    final = (await heats(flow, tournament))["F"]
+    started = monotonic()
+    response = await flow.patch(f"/api/matches/{final['id']}", json={"station_id": None})
+    assert response.status_code == 200, response.text
+    assert monotonic() - started < 1.5, "kein Warten auf die eigene Sperre"
+    assert queued == []
+    by_key = await heats(flow, tournament)
+    assert not by_key["F"].get("called_at") and by_key["A"]["settings"]["qualifiers_per_match"] == 1
+    doc = await stored(flow, tournament)
+    assert doc.get("heat_rebuild_incomplete") is None and doc.get("heat_rebuild_pending") is None
+
+
+@pytest.mark.asyncio
+async def test_waiting_overfull_marks_are_checked_in_turn_so_none_starves(flow, monkeypatch):
+    """#2033 (Codex): der Minuten-Job las höchstens 200 „überfüllt“-Vermerke unsortiert - freigewordene Turniere
+    dahinter kamen nie dran. Jetzt kommt der am längsten nicht geprüfte zuerst, und jeder geprüfte rückt ans Ende."""
+    import services.heat_rebuild as heat_rebuild
+
+    seen: list[str] = []
+
+    async def record(db, tournament_id, *, actor_id, trigger):
+        seen.append(tournament_id)
+        return {"ok": True}
+
+    monkeypatch.setattr(heat_rebuild, "evaluate_after_write", record)
+    monkeypatch.setattr(heat_rebuild, "RESUME_BATCH", 2)
+    for tid, checked_at in (("t-mittel", "2026-10-26T11:00:00+00:00"), ("t-neu", "2026-10-26T12:00:00+00:00"),
+                            ("t-alt", "2026-10-26T10:00:00+00:00")):
+        await flow.db.tournaments.insert_one({"id": tid, "title": tid, "heat_rebuild_incomplete": {
+            "at": "2026-10-26T09:00:00+00:00", "checked_at": checked_at, "reason": "overfull",
+            "match_ids": ["gibt-es-nicht"], "match_keys": ["F"]}})
+    assert await heat_rebuild.process_pending_heat_rebuilds(flow.db) == 2
+    assert seen == ["t-alt", "t-mittel"], "der am längsten nicht geprüfte zuerst - nicht die Reihenfolge der Ablage"
+    marks = {row["id"]: row["heat_rebuild_incomplete"] for row in await flow.db.tournaments.find(
+        {"id": {"$in": ["t-alt", "t-mittel", "t-neu"]}}, {"_id": 0}).to_list(3)}
+    assert marks["t-alt"]["checked_at"] > "2026-10-26T12:00:00+00:00"
+    assert marks["t-mittel"]["checked_at"] > marks["t-neu"]["checked_at"]
+    assert await heat_rebuild.process_pending_heat_rebuilds(flow.db) == 2
+    assert seen[2] == "t-neu", "beim nächsten Takt ist der übrige dran"
 
 
 # ---------------------------------------------------------------------------------------------- Spieldauer (#1554)

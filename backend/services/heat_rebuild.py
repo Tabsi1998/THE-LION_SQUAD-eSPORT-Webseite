@@ -13,7 +13,8 @@ Regeln (Issue #1550, Entscheidung E13):
   Vorlauf bzw. Setzplatz, Unterschied höchstens 1, nie ein Lauf mit einem Teilnehmer. Passt alles in einen Lauf, ist das
   der Sammellauf (kleinste ``order``); die anderen werden ``cancelled`` mit ``merged_into``. 2 + 2 wird ein Lauf mit 4.
 - **Quote:** ein umgebauter Lauf mit n Teilnehmern schickt ``heat_quota(n)`` weiter (anteilig, mindestens einer kommt
-  weiter, mindestens einer scheidet aus), die Summe der Gruppe höchstens so viele, wie das Ziel fassen kann. Sie steht
+  weiter, mindestens einer scheidet aus), die Summe der Gruppe höchstens so viele, wie das Ziel noch fassen kann - was
+  dort schon sitzt oder von einem gefahrenen Lauf noch kommt, zählt mit (#2033). Sie steht
   vor dem Start fest in ``settings.qualifiers_per_match`` (TV und App rechnen damit) und in ``qualifiers_effective``.
   Plätze im Folgelauf, die so nicht mehr beliefert werden, sind als „Quelle unerfüllbar“ markiert
   (Freilos-Platz mit ``source_result.reason = source_unfulfillable``; die alte Quelle steht in ``source.was``).
@@ -21,7 +22,10 @@ Regeln (Issue #1550, Entscheidung E13):
   ``advancement``-Eintrag dieses Laufs auf ihn zeigt - das prüft die Graph-Validierung.
 - **Abkürzen:** sind im Sammellauf alle Verbliebenen, ist er das Finale - spätere Runden entfallen (``shortened``).
 - **Nie umbauen:** Läufe, die laufen (``in_progress``) oder aufgerufen sind (``called_at``), und alles, was entschieden
-  ist. Vorschauen ebenso.
+  ist. Vorschauen ebenso. Das gilt auch für die Kappung der Quote: ein Platz in so einem Lauf wird nicht zum Freilos.
+  Bekäme ein aufgerufener oder laufender Lauf dadurch mehr Fahrer als die Laufgröße, lehnt der Planer den ganzen
+  Umbau als Konflikt ab (``HeatRebuildError`` 409, wie die Graph-Prüfung) - nichts wird geschrieben, bis der Aufruf
+  zurückgenommen oder der Lauf entschieden ist (#2033).
 - **Bestätigung:** je Turnier ``heat_rebuild_mode``: ``suggest`` (Vorgabe) - Auffüllen, Freilos und Quote laufen von
   selbst, Zusammenlegen, Ausgleichen und Abkürzen werden als Plan am Turnier gespeichert (``heat_rebuild_plan``) und
   von der Turnierleitung bestätigt oder abgelehnt; ``auto`` - alles sofort. Ein abgelehnter Plan kommt nicht wieder,
@@ -78,10 +82,19 @@ MAX_PASSES = 8
 
 
 class HeatRebuildError(Exception):
-    def __init__(self, detail: str, status_code: int = 409):
+    """Der Umbau geht gerade nicht (409). ``code`` sagt warum - ``overfull`` (#2033): ein aufgerufener oder laufender
+    Lauf bekäme mehr Fahrer als die Laufgröße; dazu die betroffenen Läufe und ihre Phase, damit Warteschlange und
+    Meldung sie nennen und der Minuten-Job weiß, worauf er wartet."""
+
+    def __init__(self, detail: str, status_code: int = 409, *, code: str | None = None,
+                 match_ids: list[str] | None = None, match_keys: list[str] | None = None, stage_id: str | None = None):
         super().__init__(detail)
         self.detail = detail
         self.status_code = status_code
+        self.code = code
+        self.match_ids = list(match_ids or [])
+        self.match_keys = list(match_keys or [])
+        self.stage_id = stage_id
 
 
 def heat_rebuild_mode(tournament: dict | None) -> str:
@@ -471,16 +484,95 @@ def _apply_quota(graph: _Graph, heat: dict, cap: int, quota: int, now_iso: str, 
     graph.invalidate()
 
 
-def _trim_quotas(graph: _Graph, heats: list[dict], capacity: int, now_iso: str) -> None:
-    """Die Summe der Weiterkommer einer Gruppe darf das Ziel nicht überfüllen."""
-    while heats:
-        total = sum(_quota_of(heat) for heat in heats)
-        if total <= capacity:
+def _note_quota(ops: list[dict], heat: dict, count: int, wanted: int, before: int) -> None:
+    """Der Protokoll-Eintrag einer Quoten-Änderung: hat derselbe Durchgang die Quote dieses Laufs gerade erst geändert
+    (``_apply_quota`` hob sie, die Kappung nimmt sie zurück), wird dieser Eintrag fortgeschrieben statt ein zweiter,
+    widersprüchlicher angehängt - und er entfällt, wenn unterm Strich nichts anders ist."""
+    for op in reversed(ops):
+        if op.get("kind") == "quota" and op.get("heats") == [heat.get("match_key")]:
+            if int(op.get("quota_before") or 0) == wanted:
+                ops.remove(op)
+            else:
+                op.update({"size": count, "quota": wanted})
             return
-        heat = max((h for h in heats if _quota_of(h) > 1), key=lambda h: (_quota_of(h), -int(h.get("order") or 0)), default=None)
+    ops.append({"kind": "quota", "round": heat.get("round"), "round_name": heat.get("round_name"),
+                "heats": [heat.get("match_key")], "size": count, "quota": wanted, "quota_before": before})
+
+
+def _top_entry(heat: dict) -> dict | None:
+    """Die Weiterleitung mit dem höchsten Rang - die eine Kappung der Quote streicht."""
+    return max((entry for entry in heat.get("advancement") or [] if entry.get("flow") == "W"),
+               key=lambda entry: int(entry.get("rank") or 0), default=None)
+
+
+def _trim_touches_locked_target(graph: _Graph, heat: dict, wanted: int) -> bool:
+    """Würde die Kappung auf ``wanted`` einen offenen Platz in einem Lauf streichen, der nicht mehr umgebaut wird
+    (aufgerufen, gestartet, entschieden)? Dann bleibt die Quote - dieselbe Sperre wie in ``_apply_quota``."""
+    for entry in heat.get("advancement") or []:
+        if entry.get("flow") != "W" or int(entry.get("rank") or 0) <= wanted:
+            continue
+        target = graph.by_id.get(entry.get("to_match_id"))
+        slot = _find_slot(target, int(entry.get("to_slot") or 0))
+        if target and slot and not _rebuildable(target) and slot.get("status") == "pending":
+            return True
+    return False
+
+
+OVERFULL = "overfull"
+OVERFULL_DETAIL = ("{name} ist schon aufgerufen oder läuft und bekäme {count} Fahrer bei Laufgröße {cap}. Der Umbau "
+                   "wartet, bis der Aufruf zurückgenommen oder der Lauf entschieden ist - bitte den Lauf prüfen.")
+
+
+def _trim_quotas(graph: _Graph, heats: list[dict], targets: list[dict], cap: int, now_iso: str,
+                 ops: list[dict]) -> None:
+    """Die Weiterkommer einer Gruppe dürfen ihre Ziele nicht überfüllen. Gezählt wird die erwartete Belegung der
+    Zielläufe - also auch, was dort schon sitzt oder von außerhalb der Gruppe noch kommt: ein gefahrener Lauf, der
+    seinen Platz im Ziel schon belegt hat, ein aufgerufener Lauf, der nicht mehr umgebaut wird. Nur die Quoten der
+    umbaubaren Läufe zu addieren übersah das (#2033): nach dem Zusammenlegen zweier Zielläufe wuchs die Quote eines
+    Vorlaufs wieder, und das Finale erwartete 5 bei Laufgröße 4.
+
+    Ziele sind die der Gruppe und alle, in die ihre Läufe jetzt weiterleiten (eine gewachsene Quote, ``_revive``, zeigt
+    auch in einen Lauf, den die Gruppe vorher nicht belieferte); entschiedene Ziele zählen nicht mehr. Zielläufe, die
+    die Folgerunde gemeinsam ausgleicht (dieselbe Lauf-Gruppe, umbaubar), zählen zusammen - ungleich verteilt gleicht
+    sie aus; jedes andere Ziel muss für sich passen. Gekappt wird der Lauf, dessen oberste Weiterleitung in ein
+    überfülltes Ziel zeigt - nie einer, dessen gestrichener Platz in einem Lauf liegt, der nicht mehr umgebaut wird
+    (aufgerufen, gestartet; dieselbe Sperre wie in ``_apply_quota``). Bleibt so ein Lauf überfüllt, ist das ein
+    Konflikt (``HeatRebuildError``): der Planer darf ihn weder anfassen noch still überlaufen lassen."""
+    by_id = {target["id"]: target for target in targets}
+    for heat in heats:
+        for entry in heat.get("advancement") or []:
+            target = graph.by_id.get(entry.get("to_match_id"))
+            if target:
+                by_id.setdefault(target["id"], target)
+    targets = [target for target in by_id.values() if _live(target)]
+    while heats and targets:
+        graph.invalidate()
+        classes: dict[tuple, list[dict]] = defaultdict(list)
+        for target in targets:
+            classes[_group_key(target) if _rebuildable(target) else ("", 0, target["id"])].append(target)
+        crowded = {
+            target["id"]
+            for members in classes.values()
+            if sum(len(graph.entries(target)) for target in members) > cap * len(members)
+            for target in members
+        }
+        if not crowded:
+            return
+        heat = max((h for h in heats if _quota_of(h) > 1 and (_top_entry(h) or {}).get("to_match_id") in crowded
+                    and not _trim_touches_locked_target(graph, h, _quota_of(h) - 1)),
+                   key=lambda h: (_quota_of(h), -int(h.get("order") or 0)), default=None)
         if not heat:
+            for target in targets:
+                if target["id"] in crowded and not _rebuildable(target):
+                    where = target.get("round_name") or f"Runde {target.get('round')}"
+                    detail = OVERFULL_DETAIL.format(name=f"Lauf {target.get('match_key')} ({where})",
+                                                    count=len(graph.entries(target)), cap=cap)
+                    raise HeatRebuildError(detail, 409, code=OVERFULL, match_ids=[target["id"]],
+                                           match_keys=[str(target.get("match_key") or "")],
+                                           stage_id=target.get("stage_id"))
             return
-        wanted = _quota_of(heat) - 1
+        current = _quota_of(heat)
+        wanted = current - 1
         for entry in list(heat.get("advancement") or []):
             if entry.get("flow") == "W" and int(entry.get("rank") or 0) > wanted:
                 target = graph.by_id.get(entry.get("to_match_id"))
@@ -492,6 +584,7 @@ def _trim_quotas(graph: _Graph, heats: list[dict], capacity: int, now_iso: str) 
         heat["settings"] = {**(heat.get("settings") or {}), "qualifiers_per_match": wanted}
         heat["qualifiers_effective"] = wanted
         heat["updated_at"] = now_iso
+        _note_quota(ops, heat, len(graph.entries(heat)), wanted, current)
         graph.invalidate()
 
 
@@ -551,7 +644,10 @@ def _pass(graph: _Graph, *, cap: int, quota: int, min_players: int, structural: 
         live_heats = [heat for heat, size in zip(heats, sizes_before) if size > 0]
         empty = [heat for heat, size in zip(heats, sizes_before) if size == 0]
         count = len(entries)
-        wanted = max(1, min(math.ceil(count / cap), count // 2))
+        # Nie mehr Läufe, als die Gruppe hat: passen die Einträge nicht in die vorhandenen Läufe (die Kappung der Runde
+        # davor soll das verhindern, #2033), bleiben sie lieber in zu vollen Läufen sichtbar, als dass ein Teil beim
+        # Verteilen verloren ginge - ``_rebuild_group`` füllt nur so viele Läufe, wie es gibt.
+        wanted = max(1, min(math.ceil(count / cap), count // 2, len(heats)))
         live_sizes = [size for size in sizes_before if size > 0]
         if structural and targets and (wanted < len(live_heats) or max(live_sizes) - min(live_sizes) > 1):
             buckets = _snake_split(entries, wanted)
@@ -576,7 +672,8 @@ def _pass(graph: _Graph, *, cap: int, quota: int, min_players: int, structural: 
         for heat in heats:
             _apply_quota(graph, heat, cap, quota, now_iso, ops)
         if targets:
-            _trim_quotas(graph, heats, cap * len(targets), now_iso)
+            _trim_quotas(graph, heats, [graph.by_id[target_id] for target_id in targets if target_id in graph.by_id],
+                         cap, now_iso, ops)
             if structural and len(heats) == 1:
                 _shorten(graph, heats[0], now_iso, ops)
     live_ids = [match["id"] for match in graph.matches if _live(match)]
@@ -643,7 +740,9 @@ async def _mark_incomplete(db, tournament: dict, *, stage_id: str | None, keys: 
                            actor_id: str | None, **extra) -> None:
     """„Umbau unvollständig“: Vermerk am Turnier, Protokoll, Nachricht an die Turnierleitung."""
     tid = tournament["id"]
-    mark = {"at": now_utc().isoformat(), "reason": reason, "stage_id": stage_id, "match_keys": keys, **extra}
+    now_iso = now_utc().isoformat()
+    # ``checked_at``: wann der Minuten-Job zuletzt nachgesehen hat, ob nachgeholt werden kann (#2033) - reihum.
+    mark = {"at": now_iso, "checked_at": now_iso, "reason": reason, "stage_id": stage_id, "match_keys": keys, **extra}
     await db.tournaments.update_one({"id": tid}, {"$set": {"heat_rebuild_incomplete": mark}})
     await _audit(db, "tournament.heats.incomplete", tid, actor_id, {"engine": GRAPH, **mark})
     logger.error("Lauf-Umbau unvollständig tournament=%s reason=%s heats=%s", tid, reason, keys)
@@ -651,9 +750,17 @@ async def _mark_incomplete(db, tournament: dict, *, stage_id: str | None, keys: 
 
 
 INCOMPLETE_TEXTS = {
-    "foreign_change": "Beim Umbau der Läufe wurde {heats} gleichzeitig von jemand anderem geändert.",
-    "retries_exhausted": "Der Umbau der Läufe ({heats}) ist mehrfach an einer gleichzeitigen Änderung gescheitert und wartet nun.",
+    "foreign_change": "Beim Umbau der Läufe wurde {heats} gleichzeitig von jemand anderem geändert. "
+                      "Bitte den Turnierbaum prüfen.",
+    "retries_exhausted": "Der Umbau der Läufe ({heats}) ist mehrfach an einer gleichzeitigen Änderung gescheitert "
+                         "und wartet nun. Bitte den Turnierbaum prüfen.",
+    # Ein aufgerufener oder laufender Lauf würde überlaufen (#2033): nicht anfassen, warten, dann nachholen.
+    OVERFULL: "Lauf-Umbau wartet: Lauf {heats} ist aufgerufen bzw. läuft und würde überlaufen. "
+              "Aufruf zurücknehmen oder Lauf entscheiden, dann wird nachgeholt.",
 }
+INCOMPLETE_TITLE = "Lauf-Umbau unvollständig"
+INCOMPLETE_TITLES = {OVERFULL: "Lauf-Umbau wartet"}
+RESUMED_TITLE = "Lauf-Umbau nachgeholt"
 # Eine Nachricht je Turnier, Phase und Vorfall - und frühestens nach einer Stunde noch einmal, falls es wieder passiert.
 INCOMPLETE_COOLDOWN_SECONDS = 3600
 
@@ -661,15 +768,37 @@ INCOMPLETE_COOLDOWN_SECONDS = 3600
 async def _notify_incomplete(db, tournament: dict, *, stage_id: str | None, keys: list[str], reason: str) -> int:
     tid = tournament["id"]
     text = INCOMPLETE_TEXTS.get(reason) or INCOMPLETE_TEXTS["foreign_change"]
-    body = f"{tournament.get('title') or 'Turnier'}: {text.format(heats=_join(keys) or 'ein Lauf')} Bitte den Turnierbaum prüfen."
+    body = f"{tournament.get('title') or 'Turnier'}: {text.format(heats=_join(keys) or 'ein Lauf')}"
     sent = 0
     for user_id in sorted(await _structure_staff_user_ids(db, tid)):
         created = await create_user_notification(
-            user_id, "Lauf-Umbau unvollständig", body, f"/admin/tournaments/{tid}?tab=bracket", INCOMPLETE_KIND,
+            user_id, INCOMPLETE_TITLES.get(reason, INCOMPLETE_TITLE), body, f"/admin/tournaments/{tid}?tab=bracket",
+            INCOMPLETE_KIND,
             {"tournament_id": tid, "dedupe_key": f"{INCOMPLETE_KIND}:{tid}:{stage_id or '-'}:{reason}",
              "cooldown_seconds": INCOMPLETE_COOLDOWN_SECONDS})
         sent += 1 if created else 0
     return sent
+
+
+async def _mark_resumed(db, tournament: dict, mark: dict, *, actor_id: str | None, trigger: str) -> None:
+    """Der Umbau ist nachgeholt (#2033): der Vermerk „unvollständig“ fällt weg, die Meldungen dazu gelten als erledigt
+    (gelesen), und die Turnierleitung bekommt einmal je Vorfall „Lauf-Umbau nachgeholt“ ins Postfach."""
+    tid = tournament["id"]
+    await db.tournaments.update_one({"id": tid}, {"$unset": {"heat_rebuild_incomplete": ""}})
+    tournament.pop("heat_rebuild_incomplete", None)
+    await _audit(db, "tournament.heats.resumed", tid, actor_id,
+                 {"engine": GRAPH, "trigger": trigger, "incomplete": mark})
+    await db.notifications.update_many(
+        {"kind": INCOMPLETE_KIND, "meta.tournament_id": tid, "title": {"$ne": RESUMED_TITLE}, "read": {"$ne": True}},
+        {"$set": {"read": True, "meta.resolved_at": now_utc().isoformat()}})
+    heats = _join(list(mark.get("match_keys") or []))
+    which = f" ({heats})" if heats else ""
+    body = f"{tournament.get('title') or 'Turnier'}: Der Umbau der Läufe{which} ist nachgeholt."
+    for user_id in sorted(await _structure_staff_user_ids(db, tid)):
+        await create_user_notification(
+            user_id, RESUMED_TITLE, body, f"/admin/tournaments/{tid}?tab=bracket", INCOMPLETE_KIND,
+            {"tournament_id": tid, "dedupe_key": f"{INCOMPLETE_KIND}:{tid}:resumed:{mark.get('at')}",
+             "in_app_only": True})
 
 
 async def _structure_staff_user_ids(db, tournament_id: str) -> set[str]:
@@ -903,9 +1032,12 @@ async def evaluate_heat_rebuild(db, tournament_id: str, *, actor_id: str | None 
     tournament = await db.tournaments.find_one({"id": tournament_id}, {"_id": 0})
     if not tournament:
         return {"ok": False, "applied": [], "plan": None}
-    if trigger == "manual" and (tournament.get("heat_rebuild_pending") or tournament.get("heat_rebuild_incomplete")):
+    incomplete = tournament.get("heat_rebuild_incomplete")
+    incomplete = incomplete if isinstance(incomplete, dict) else None
+    if trigger == "manual" and (tournament.get("heat_rebuild_pending") or incomplete):
         # „Neu prüfen“ von Hand: Warteschlange und Vermerk zurück - was jetzt gilt, entscheidet diese Prüfung.
-        await db.tournaments.update_one({"id": tournament_id}, {"$unset": {"heat_rebuild_pending": "", "heat_rebuild_incomplete": ""}})
+        await db.tournaments.update_one({"id": tournament_id},
+                                        {"$unset": {"heat_rebuild_pending": "", "heat_rebuild_incomplete": ""}})
         tournament.pop("heat_rebuild_pending", None)
         tournament.pop("heat_rebuild_incomplete", None)
     mode = heat_rebuild_mode(tournament)
@@ -933,6 +1065,9 @@ async def evaluate_heat_rebuild(db, tournament_id: str, *, actor_id: str | None 
         plan = plan or await _store_plan(db, tournament, stage, full["ops"], actor_id=actor_id, trigger=trigger)
     if tournament.get("heat_rebuild_pending"):
         await db.tournaments.update_one({"id": tournament_id}, {"$unset": {"heat_rebuild_pending": ""}})
+    if incomplete:
+        # Zuletzt aufgegeben, jetzt durchgelaufen: nachgeholt (#2033) - Vermerk weg, die Meldung gilt als erledigt.
+        await _mark_resumed(db, tournament, incomplete, actor_id=actor_id, trigger=trigger)
     return {"ok": True, "mode": mode, "applied": applied, "plan": plan}
 
 
@@ -985,16 +1120,19 @@ async def evaluate_after_write(db, tournament_id: str | None, *, actor_id: str |
     Auswertung auslösen."""
     if not tournament_id:
         return None
+    conflict: HeatRebuildError | None = None
     for attempt in (1, 2):
         try:
             return await evaluate_heat_rebuild(db, tournament_id, actor_id=actor_id, trigger=trigger)
         except HeatRebuildError as exc:
             logger.warning("Lauf-Umbau nicht angewendet tournament=%s trigger=%s versuch=%s detail=%s",
                            tournament_id, trigger, attempt, exc.detail)
-            detail = exc.detail
+            conflict = exc
         except Exception as exc:  # noqa: BLE001
-            logger.exception("Lauf-Umbau fehlgeschlagen tournament=%s trigger=%s type=%s", tournament_id, trigger, type(exc).__name__)
+            logger.exception("Lauf-Umbau fehlgeschlagen tournament=%s trigger=%s type=%s",
+                             tournament_id, trigger, type(exc).__name__)
             return None
+    detail = conflict.detail if conflict else None
     current = await db.tournaments.find_one({"id": tournament_id}, {"_id": 0, "heat_rebuild_pending": 1}) or {}
     pending = current.get("heat_rebuild_pending") if isinstance(current.get("heat_rebuild_pending"), dict) else {}
     if trigger == "pending":
@@ -1003,8 +1141,14 @@ async def evaluate_after_write(db, tournament_id: str | None, *, actor_id: str |
         if attempts >= PENDING_MAX_ATTEMPTS:
             tournament = await db.tournaments.find_one({"id": tournament_id}, {"_id": 0}) or {"id": tournament_id}
             await db.tournaments.update_one({"id": tournament_id}, {"$unset": {"heat_rebuild_pending": ""}})
-            await _mark_incomplete(db, tournament, stage_id=None, keys=[], reason="retries_exhausted", actor_id=actor_id,
-                                   attempts=attempts, detail=detail)
+            # Ein überfüllter aufgerufener Lauf (#2033) steht mit Namen im Vermerk und in der Meldung - und der
+            # Minuten-Job holt nach, sobald er frei oder entschieden ist (``process_pending_heat_rebuilds``).
+            overfull = bool(conflict and conflict.code == OVERFULL)
+            await _mark_incomplete(db, tournament, stage_id=conflict.stage_id if overfull else None,
+                                   keys=conflict.match_keys if overfull else [],
+                                   reason=OVERFULL if overfull else "retries_exhausted", actor_id=actor_id,
+                                   attempts=attempts, detail=detail,
+                                   **({"match_ids": conflict.match_ids} if overfull else {}))
             return None
         wait = PENDING_BACKOFF_MINUTES[min(attempts, len(PENDING_BACKOFF_MINUTES)) - 1]
         next_at = (now_utc() + timedelta(minutes=wait)).isoformat()
@@ -1022,19 +1166,81 @@ PENDING_MAX_ATTEMPTS = 5
 PENDING_BACKOFF_MINUTES = (1, 2, 5, 10)
 
 
+async def queue_evaluation(db, tournament_id: str, *, trigger: str) -> None:
+    """Die Auswertung einreihen, ohne sie jetzt zu rechnen (die Turnier-Schreibsperre ist belegt): der Minuten-Job holt
+    sie nach. Eine schon wartende bleibt, wie sie ist."""
+    now_iso = now_utc().isoformat()
+    await db.tournaments.update_one(
+        {"id": tournament_id, "heat_rebuild_pending": {"$exists": False}},
+        {"$set": {"heat_rebuild_pending": {"at": now_iso, "trigger": trigger, "detail": None, "attempts": 0,
+                                           "next_at": now_iso}}})
+
+
+async def reevaluate_after_release(db, tournament_id: str | None, *, actor_id: str | None,
+                                   trigger: str = "uncall") -> None:
+    """Ein Lauf ist wieder umbaubar oder entschieden, ohne dass ein Ergebnis geschrieben wurde (Aufruf zurückgenommen,
+    Station freigegeben, Stand von Hand geändert): die Auswertung läuft erneut - auch wenn die Warteschlange nach ihren
+    Versuchen aufgegeben hatte (#2033). Für Aufrufer ohne Turnier-Schreibsperre; ist sie belegt, wird eingereiht."""
+    if not tournament_id:
+        return
+    try:
+        async with mutation_lock(db, tournament_write_resource(tournament_id)):
+            await evaluate_after_write(db, tournament_id, actor_id=actor_id, trigger=trigger)
+    except MutationLockBusy:
+        await queue_evaluation(db, tournament_id, trigger=trigger)
+
+
+def _still_blocking(match: dict) -> bool:
+    """Der Lauf, der den Umbau aufhielt: aufgerufen oder gestartet und noch nicht entschieden."""
+    return _live(match) and not _rebuildable(match)
+
+
+# So viele Turniere sieht sich der Minuten-Job je Takt an - sortiert (Fällige zuerst bzw. reihum), damit bei mehr
+# keines verhungert; die Indizes dazu stehen in database.init_indexes.
+PENDING_BATCH = 200
+RESUME_BATCH = 200
+
+
 async def process_pending_heat_rebuilds(db) -> int:
     """Eingereihte Auswertungen abarbeiten (Minuten-Job im Scheduler): je Turnier unter der Turnier-Schreibsperre;
-    ist sie belegt, kommt das Turnier beim nächsten Lauf dran. Liefert, wie viele Turniere ausgewertet wurden."""
+    ist sie belegt, kommt das Turnier beim nächsten Lauf dran. Liefert, wie viele Turniere ausgewertet wurden.
+    Die am längsten fälligen zuerst (``next_at``).
+
+    Dazu die Turniere, bei denen die Warteschlange wegen eines überfüllten aufgerufenen Laufs aufgegeben hat (#2033):
+    ist der Lauf inzwischen frei oder entschieden - auf welchem Weg auch immer -, wird nachgeholt. Reihum: der am
+    längsten nicht geprüfte Vermerk zuerst (``checked_at``), und jeder geprüfte rückt ans Ende - auch einer, dessen
+    Lauf noch aufgerufen ist, sonst hielte er die vorderen Plätze besetzt."""
     now_iso = now_utc().isoformat()
-    rows = await db.tournaments.find({"heat_rebuild_pending": {"$exists": True}}, {"_id": 0, "id": 1, "heat_rebuild_pending": 1}).to_list(200)
+    rows = await db.tournaments.find(
+        {"heat_rebuild_pending": {"$exists": True}}, {"_id": 0, "id": 1, "heat_rebuild_pending": 1},
+    ).sort("heat_rebuild_pending.next_at", 1).limit(PENDING_BATCH).to_list(PENDING_BATCH)
     processed = 0
     for row in rows:
-        pending = row.get("heat_rebuild_pending") if isinstance(row.get("heat_rebuild_pending"), dict) else {}
+        pending = row.get("heat_rebuild_pending")
+        pending = pending if isinstance(pending, dict) else {}
         if str(pending.get("next_at") or "") > now_iso:
             continue
         try:
             async with mutation_lock(db, tournament_write_resource(row["id"])):
                 await evaluate_after_write(db, row["id"], actor_id=None, trigger="pending")
+                processed += 1
+        except MutationLockBusy:
+            continue
+    waiting = await db.tournaments.find(
+        {"heat_rebuild_incomplete.reason": OVERFULL, "heat_rebuild_pending": {"$exists": False}},
+        {"_id": 0, "id": 1, "heat_rebuild_incomplete": 1},
+    ).sort("heat_rebuild_incomplete.checked_at", 1).limit(RESUME_BATCH).to_list(RESUME_BATCH)
+    for row in waiting:
+        await db.tournaments.update_one({"id": row["id"], "heat_rebuild_incomplete.reason": OVERFULL},
+                                        {"$set": {"heat_rebuild_incomplete.checked_at": now_iso}})
+        ids = [str(value) for value in (row.get("heat_rebuild_incomplete") or {}).get("match_ids") or []]
+        blocking = await db.matches_v2.find(
+            {"id": {"$in": ids}}, {"_id": 0, "status": 1, "called_at": 1, "started_at": 1, "is_preview": 1}).to_list(50)
+        if any(_still_blocking(match) for match in blocking):
+            continue
+        try:
+            async with mutation_lock(db, tournament_write_resource(row["id"])):
+                await evaluate_after_write(db, row["id"], actor_id=None, trigger="resume")
                 processed += 1
         except MutationLockBusy:
             continue

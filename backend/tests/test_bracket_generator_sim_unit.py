@@ -4,19 +4,23 @@ Jeder Baum wird mit zufälligen Ergebnissen (fester Zufallsstart) bis zum Ende d
 kein Teilnehmer steht in zwei spielbereiten Spielen gleichzeitig, am Ende ist jedes Spiel entschieden (gespielt,
 Freilos oder „nicht nötig“), das Finale ist erreichbar. Dazu je Format die Regeln aus dem Issue.
 
-Gemischt (#1548, „Zufällig mischen“): dieselben Bäume mit Auslosung nach jeder Runde. Die Auslosung nutzt ``secrets``
-(ohne Startwert) - die Prüfungen gelten für jedes Los. Zusätzlich je Schritt: eine Folgerunde ist erst besetzt, wenn
+Gemischt (#1548, „Zufällig mischen“): dieselben Bäume mit Auslosung nach jeder Runde. Im Betrieb lost ``secrets``
+(ohne Startwert); hier lost jeder Testfall mit festem Startwert aus seiner Kennung (``seeded_draw``), damit ein roter
+Lauf nachstellbar ist (#2033) - die Breite über viele Lose und Ausfall-Reihenfolgen liefert
+``test_ffa_removals_over_many_draws_and_dropout_orders``. Zusätzlich je Schritt: eine Folgerunde ist erst besetzt, wenn
 alle Spiele der Runde davor entschieden sind, und jeder Weiterkommer steht genau einmal in der Folgerunde.
 """
 import math
 import pathlib
 import random
 import sys
+import zlib
 
 import pytest
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 
+from services import advancement_draw, custom_bracket, match_v2_results  # noqa: E402
 from services.competition_standings import stage_standings  # noqa: E402
 from services.round_labels import round_label  # noqa: E402
 from services.custom_bracket import (  # noqa: E402
@@ -29,6 +33,27 @@ from services.advancement_draw import group_sources, group_targets  # noqa: E402
 from services.match_v2_results import build_v2_result_application  # noqa: E402
 
 NOW = "2026-10-31T10:00:00+00:00"
+
+
+def seed_draw(monkeypatch, seed: int) -> random.Random:
+    """Das Los (``advancement_draw.DRAW_RNG``, ``secrets.SystemRandom``) an jeder Importstelle durch einen Zufall mit
+    Startwert ersetzen - auch in Modulen, die ``DRAW_RNG`` direkt importiert haben (``custom_bracket``,
+    ``match_v2_results``), sonst losen die weiter ohne Startwert (#2033)."""
+    rng = random.Random(seed)
+    for module in (advancement_draw, custom_bracket, match_v2_results):
+        monkeypatch.setattr(module, "DRAW_RNG", rng)
+    for name, module in list(sys.modules.items()):
+        if name.startswith("services.") and hasattr(module, "DRAW_RNG"):
+            monkeypatch.setattr(module, "DRAW_RNG", rng)
+    return rng
+
+
+@pytest.fixture(autouse=True)
+def seeded_draw(request, monkeypatch) -> random.Random:
+    """Jeder Testfall lost mit festem Startwert aus seiner Kennung: derselbe Fall gibt immer dasselbe Los."""
+    return seed_draw(monkeypatch, zlib.crc32(request.node.nodeid.encode("utf-8")))
+
+
 TERMINAL = {"completed", "forfeit", "cancelled"}
 ACTIVE = {"ready", "scheduled", "in_progress", "waiting_result"}
 SHUFFLE = {"randomize_advancement_rounds": True}
@@ -624,43 +649,119 @@ def test_double_elimination_survives_random_disqualifications(count: int, mode):
             assert gf[1]["status"] == "completed"
 
 
-@pytest.mark.parametrize("mode", FFA_REMOVAL_MODES, ids=FFA_REMOVAL_MODE_IDS)
-@pytest.mark.parametrize("match_size,qualifiers", [(3, 1), (4, 2), (8, 2)])
-@pytest.mark.parametrize("count", range(3, 41))
-def test_ffa_bracket_survives_random_disqualifications(count: int, match_size: int, qualifiers: int, mode):
+def ffa_with_removals(count: int, match_size: int, qualifiers: int, mode,
+                      removal_seed: int) -> tuple[list[dict], set[str]]:
+    """Ein FFA-Baum, mit zufälligen Ausfällen (Startwert ``removal_seed``) zu Ende gespielt; das Los kommt aus
+    ``seeded_draw`` bzw. ``seed_draw``."""
     stage = {"id": "s", "number": 1, "stage_type": "ffa_custom_bracket", "match_type": "ffa",
              "settings": {"match_size": match_size, "qualifiers_per_match": qualifiers, "min_players": 2}}
     base = {"id": "t", "seeding_mode": "manual", "max_participants": count, **mode_fields(mode)}
     matches = build_matches_v2_from_schema(base, stage, registrations(count))
     _rebuild(matches, stage)
-    removed = _play_with_random_removals(matches, random.Random(count * 17 + match_size), stage=stage)
-    # Das Finale: der gefahrene Lauf der letzten Runde ohne Weg weiter. Ein früherer Lauf, dessen Weiterkommer alle
-    # ausgeschieden sind, hat ebenfalls keinen Weg mehr - er ist aber kein Finale.
-    last_round = max(m["round"] for m in matches if m["status"] == "completed")
-    finals = [m for m in matches if m["status"] == "completed" and not m.get("advancement") and m["round"] == last_round]
+    removed = _play_with_random_removals(matches, random.Random(removal_seed), stage=stage)
+    return matches, removed
+
+
+def finals_of(matches: list[dict]) -> list[dict]:
+    """Das Finale: der gefahrene Lauf ohne Weg weiter - das gebaute oder das abgekürzte (#1550). Ein gefahrener Lauf
+    behält seinen Weg, auch wenn seine Weiterkommer danach alle ausgeschieden sind (#1596) - selbst wenn er in einer
+    späteren Runde liegt als das Finale, weil davor abgekürzt wurde (#2033): er ist kein zweites Finale."""
+    return [m for m in matches if m["status"] == "completed" and not m.get("advancement")]
+
+
+def assert_ffa_outcome(matches: list[dict], match_size: int, removed: set[str]) -> None:
+    """Nach dem Durchspielen mit Ausfällen: genau ein Finale, kein gefahrener Lauf über der Laufgröße oder unter 2,
+    kein Ausgeschiedener in einem offenen Lauf."""
+    finals = finals_of(matches)
     assert len(finals) == 1, f"genau ein Finale: {[m['match_key'] for m in finals]}"
-    assert len(finals[0]["results"]) <= match_size
     for match in matches:
         if match["status"] == "completed" and (match.get("result_meta") or {}).get("source") != "auto_bye":
-            assert len(match["results"]) >= 2, f"{match['match_key']} wurde mit {len(match['results'])} gespielt"
+            assert 2 <= len(match["results"]) <= match_size, \
+                f"{match['match_key']} wurde mit {len(match['results'])} gefahren (Laufgröße {match_size})"
         seated = [slot.get("registration_id") for slot in match["slots"] if slot.get("status") == "filled"]
         if match["status"] not in TERMINAL:
             assert not (set(seated) & removed)
+
+
+@pytest.mark.parametrize("mode", FFA_REMOVAL_MODES, ids=FFA_REMOVAL_MODE_IDS)
+@pytest.mark.parametrize("match_size,qualifiers", [(3, 1), (4, 2), (8, 2)])
+@pytest.mark.parametrize("count", range(3, 41))
+def test_ffa_bracket_survives_random_disqualifications(count: int, match_size: int, qualifiers: int, mode):
+    matches, removed = ffa_with_removals(count, match_size, qualifiers, mode, count * 17 + match_size)
+    assert_ffa_outcome(matches, match_size, removed)
+
+
+@pytest.mark.parametrize("mode", FFA_REMOVAL_MODES, ids=FFA_REMOVAL_MODE_IDS)
+def test_ffa_removals_over_many_draws_and_dropout_orders(seeded_draw, mode):
+    """Breite statt Zufall (#2033): ein Raster über Größen, Laufgrößen und Quoten mit je zwei Losen und
+    Ausfall-Reihenfolgen - alle Verstöße auf einmal, damit ein roter Fall mit seinen Startwerten nachstellbar ist."""
+    failures: list[tuple] = []
+    for count in range(3, 41, 2):
+        for match_size, qualifiers in [(3, 1), (3, 2), (4, 1), (4, 2), (8, 1), (8, 2)]:
+            for seed in range(2):
+                draw_seed = seed * 7919 + count * 17 + match_size * 10 + qualifiers
+                seeded_draw.seed(draw_seed)
+                try:
+                    matches, removed = ffa_with_removals(count, match_size, qualifiers, mode, draw_seed + 1)
+                    assert_ffa_outcome(matches, match_size, removed)
+                except AssertionError as exc:
+                    failures.append((count, match_size, qualifiers, draw_seed, str(exc).splitlines()[0]))
+    assert not failures, failures
+
+
+@pytest.mark.parametrize("mode,count,match_size,qualifiers,draw_seed,removal_seed", [
+    # Das Finale erwartete 5 bei Laufgröße 4: 34 Fahrer, Laufgröße 4, Quote 2 - fester Baum (Ausfall-Startwerte aus
+    # der Suche über 3.000) wie sofort zufällig (Los 989, Ausfälle wie im Test).
+    pytest.param(None, 34, 4, 2, 0, 244, id="fest-34-244"),
+    pytest.param(None, 34, 4, 2, 0, 2054, id="fest-34-2054"),
+    pytest.param(INSTANT, 34, 4, 2, 989, 34 * 17 + 4, id="sofort-34-989"),
+    # Die gewachsene Quote zeigte in einen Lauf, den die Gruppe vorher nicht belieferte - der war mit 3 schon voll,
+    # und sein Nachbar in der Folgerunde gleicht ihn nicht aus (anderes Ziel): ein Lauf mit 4 bei Laufgröße 3.
+    pytest.param(None, 25, 3, 2, 8376, 8377, id="fest-25-8377"),
+    # Dieselbe Lücke, mit Nachbar: die Folgerunde hätte 7 auf zwei Läufe zu 3 verteilt und einen Teil verloren.
+    pytest.param(INSTANT, 21, 3, 2, 15, 15 * 7919 + 21 * 17 + 3, id="sofort-21-15"),
+    pytest.param(INSTANT, 34, 3, 2, 5, 5 * 7919 + 34 * 17 + 3, id="sofort-34-5"),
+    # Fester Baum, Suche über alle Größen mit 300 Ausfall-Reihenfolgen (15 rot von 68.400): Finale mit 5 bei
+    # Laufgröße 4 bzw. 4 bei 3, zwei Quellen auf einem Platz (Einträge beim Verteilen verloren), ein spät gefahrener
+    # Lauf ohne Verbliebene neben dem abgekürzten Finale.
+    pytest.param(None, 17, 4, 2, 0, 260, id="fest-17-260"),
+    pytest.param(None, 29, 3, 2, 0, 108, id="fest-29-108"),
+    pytest.param(None, 40, 3, 2, 0, 93, id="fest-40-93"),
+    pytest.param(None, 23, 3, 2, 0, 79, id="fest-23-79"),
+    pytest.param(None, 33, 3, 2, 0, 284, id="fest-33-284"),
+    pytest.param(None, 13, 3, 2, 0, 110, id="fest-13-110"),
+])
+def test_quota_regrowth_counts_what_the_targets_already_hold(monkeypatch, mode, count, match_size, qualifiers,
+                                                             draw_seed, removal_seed):
+    """#2033: ein gefahrener Lauf verliert danach Fahrer und liefert weniger; Zielläufe werden zusammengelegt, damit
+    haben Vorläufe (einer nur noch mit Quote 1) dasselbe Ziel, werden ausgeglichen, und die Quote wächst wieder. Die
+    Kappung der Gruppe zählte nur die Quoten der umbaubaren Läufe - nicht, was im Ziel schon saß oder von einem
+    gefahrenen Lauf noch kam, und nicht das Ziel, in das die gewachsene Quote neu zeigte."""
+    seed_draw(monkeypatch, draw_seed)
+    matches, removed = ffa_with_removals(count, match_size, qualifiers, mode, removal_seed)
+    assert_ffa_outcome(matches, match_size, removed)
+
+
+def test_a_later_driven_heat_whose_drivers_all_left_is_no_second_final(monkeypatch):
+    """#2033, sofort zufällig, Los 728: ein Halbfinale ist gefahren, danach scheiden alle drei Fahrer aus. Die drei
+    Verbliebenen stehen in einem Lauf der Runde davor - er wird zum Finale abgekürzt, die späteren Läufe entfallen. Der
+    gefahrene Lauf behält seinen Weg (#1596), auch wenn der ins Leere führt: genau ein Finale, eine Runde davor."""
+    seed_draw(monkeypatch, 728)
+    matches, removed = ffa_with_removals(34, 4, 2, INSTANT, 34 * 17 + 4)
+    assert_ffa_outcome(matches, 4, removed)
+    final = finals_of(matches)[0]
+    later = [m for m in matches if m["status"] == "completed" and m["round"] > final["round"]]
+    assert final.get("shortened_at") and later
+    assert all(m.get("advancement") for m in later)
+    assert all(row["registration_id"] in removed for m in later for row in m["results"])
 
 
 def test_a_withdrawal_without_replacement_keeps_the_way_of_a_driven_heat():
     """#1596, fester Baum: 31 Fahrer, Laufgröße 3, Quote 1, Ausfälle mit Startwert 11. Der Austritt aus einem schon
     gefahrenen Lauf ohne Nachrücker strich dessen Weiterleitung - am Ende standen zwei gefahrene Läufe ohne Weg weiter
     („Finals“ P und Q). Jetzt verliert ein Lauf seine Weiterleitung nur, wenn er zum Finale abgekürzt wird."""
-    stage = {"id": "s", "number": 1, "stage_type": "ffa_custom_bracket", "match_type": "ffa",
-             "settings": {"match_size": 3, "qualifiers_per_match": 1, "min_players": 2}}
-    base = {"id": "t", "seeding_mode": "manual", "max_participants": 31}
-    matches = build_matches_v2_from_schema(base, stage, registrations(31))
-    _rebuild(matches, stage)
-    _play_with_random_removals(matches, random.Random(11), stage=stage)
-    last_round = max(m["round"] for m in matches if m["status"] == "completed")
-    finals = [m["match_key"] for m in matches if m["status"] == "completed" and not m.get("advancement") and m["round"] == last_round]
-    assert len(finals) == 1, f"genau ein Finale: {finals}"
+    matches, removed = ffa_with_removals(31, 3, 1, None, 11)
+    assert_ffa_outcome(matches, 3, removed)
 
 
 def test_merging_after_a_draw_keeps_one_source_per_slot(monkeypatch):
@@ -669,17 +770,6 @@ def test_merging_after_a_draw_keeps_one_source_per_slot(monkeypatch):
     einem Ausscheiden mit S zusammengelegt wurde, fiel dieser Freilos-Platz weg, die Weiterleitung von O zeigte aber
     weiter auf seine Nummer - die bekam P: zwei Quellen auf einem Platz. Jetzt zieht jeder Freilos-Platz, auf den noch
     eine Weiterleitung zeigt, mit in den Sammellauf."""
-    from services import advancement_draw, custom_bracket, match_v2_results
-
-    draw = random.Random(261461)
-    for module in (advancement_draw, custom_bracket, match_v2_results):
-        monkeypatch.setattr(module, "DRAW_RNG", draw)
-    stage = {"id": "s", "number": 1, "stage_type": "ffa_custom_bracket", "match_type": "ffa",
-             "settings": {"match_size": 4, "qualifiers_per_match": 2, "min_players": 2}}
-    base = {"id": "t", "seeding_mode": "manual", "max_participants": 33, **SHUFFLE}
-    matches = build_matches_v2_from_schema(base, stage, registrations(33))
-    _rebuild(matches, stage)
-    _play_with_random_removals(matches, random.Random(10565), stage=stage)
-    last_round = max(m["round"] for m in matches if m["status"] == "completed")
-    finals = [m["match_key"] for m in matches if m["status"] == "completed" and not m.get("advancement") and m["round"] == last_round]
-    assert len(finals) == 1, f"genau ein Finale: {finals}"
+    seed_draw(monkeypatch, 261461)
+    matches, removed = ffa_with_removals(33, 4, 2, SHUFFLE, 10565)
+    assert_ffa_outcome(matches, 4, removed)

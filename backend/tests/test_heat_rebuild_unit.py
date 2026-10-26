@@ -270,3 +270,120 @@ def test_non_structural_pass_only_adjusts_quota_and_marks_unfulfillable_sources(
     snapshot = build_structure_snapshot("t", stage_matches=matches, stages=[stage])
     assert validate_competition_graph(snapshot)["valid"], validate_competition_graph(snapshot)["issues"]
     assert heats["D"]["status"] == "ready"
+
+
+# -------------------------------------------------------------------------------------------- Ziel schon belegt (#2033)
+
+# Wie der Generator verteilt (Schlangenlinie): O schickt beide Weiterkommer nach R, Q beide nach S, P je einen.
+NINETEEN = """[WB]
+# Runde 1
+X=[1,2,3,4]
+Y=[5,6,7,8]
+Z=[9,10,11,12]
+V=[13,14,15,16]
+P=[17,18,19]
+# Runde 2
+O=[W:X:1,W:Y:1,W:X:2,W:Y:2]
+Q=[W:Z:1,W:V:1,W:Z:2,W:V:2]
+# Halbfinale
+R=[W:O:1,W:O:2,W:P:2]
+S=[W:P:1,W:Q:1,W:Q:2]
+# Finale
+T=[W:R:1,W:S:1,W:R:2,W:S:2]
+"""
+
+
+def remove(matches: list[dict], registration_id: str, kind: str, removed: set[str]) -> None:
+    from services.tournament_events import plan_removal
+    plan_removal(matches, registration_id, kind=kind, now_iso=NOW, eliminated=removed)
+    removed.add(registration_id)
+
+
+def expected_entries(match: dict, heats: dict[str, dict]) -> int:
+    """Belegte Plätze plus offene Plätze, deren Quelle den Rang noch weiterschickt - wie der Planer rechnet."""
+    count = len(filled_ids(match))
+    for slot in match["slots"]:
+        source = slot.get("source") or {}
+        origin = heats.get(source.get("match_key")) if source.get("type") == "rank" else None
+        live = origin and origin["status"] not in {"completed", "forfeit", "cancelled"}
+        quota = origin["settings"]["qualifiers_per_match"] if origin else 0
+        if slot.get("status") == "pending" and live and int(source.get("rank") or 0) <= quota:
+            count += 1
+    return count
+
+
+def test_quota_regrowth_counts_what_a_driven_heat_already_delivered():
+    """#2033, fester Baum: X und Y verlieren je zwei Fahrer und werden zu X mit 4 - O erwartet nur noch 2, Quote 1,
+    schickt also nur noch nach R; Q (voll) schickt nur nach S. P ist gefahren und verliert danach zwei seiner drei
+    Fahrer, liefert nur noch r18 nach S. R und S erwarten zusammen 4 und werden zu R zusammengelegt - damit haben O und
+    Q dasselbe Ziel, werden ausgeglichen (2 + 4 → 3 + 3), und O's Quote wächst wieder auf 2. Die Kappung der Gruppe
+    zählte nur die umbaubaren Läufe O und Q (2 + 2 = 4), nicht den gefahrenen P, der in R schon einen Platz belegt:
+    R erwartete 5 bei Laufgröße 4."""
+    matches, stage = build(19, NINETEEN)
+    heats = by_key(matches)
+    removed: set[str] = set()
+    for registration_id in ("r2", "r3", "r6", "r7"):
+        remove(matches, registration_id, "withdrawn", removed)
+    result = rebuild(matches, stage)
+    assert "merged" in kinds(result) and heats["Y"]["status"] == "cancelled"
+    assert heats["O"]["settings"]["qualifiers_per_match"] == 1
+    assert [entry["to_match_key"] for entry in heats["O"]["advancement"]] == ["R"]
+    apply_result(matches, heats["P"], ["r17", "r18", "r19"])
+    rebuild(matches, stage)
+    remove(matches, "r17", "disqualified", removed)
+    rebuild(matches, stage)
+    remove(matches, "r19", "withdrawn", removed)
+    result = rebuild(matches, stage)
+    assert "merged" in kinds(result) and heats["S"]["status"] == "cancelled"
+    assert filled_ids(heats["R"]) == ["r18"]
+    assert expected_entries(heats["R"], heats) <= 4, f"R erwartet {expected_entries(heats['R'], heats)} bei Laufgröße 4"
+    assert {heats[key]["settings"]["qualifiers_per_match"] for key in ("O", "Q")} == {1, 2}
+    # Die Quote von O wuchs und wurde gleich wieder gekappt: das Protokoll behauptet nicht, dass 2 weiterkommen.
+    assert not [op for op in result["ops"] if op["kind"] == "quota" and op["heats"] == ["O"]], result["ops"]
+    play_through(matches, stage, random.Random(19))
+    assert len(final_of(matches)["results"]) <= 4
+    assert all(len(m["results"]) <= 4 for m in played_heats(matches))
+
+
+# Das Finale hat fünf Plätze (wie nach einem Zusammenlegen): drei aus den gefahrenen B und C, zwei aus A.
+TWELVE_WIDE_FINAL = """[WB]
+# Runde 1
+A=[1,2,3,4]
+B=[5,6,7,8]
+C=[9,10,11,12]
+# Finale
+F=[W:B:1,W:B:2,W:C:1,W:A:1,W:A:2]
+"""
+
+
+def test_a_called_target_is_never_touched_and_the_overflow_is_a_conflict():
+    """#2033 (Codex-Prüfung): B und C sind gefahren, das Finale F hat drei Fahrer und erwartet zwei aus A - fünf bei
+    Laufgröße 4. F ist aufgerufen: der Planer darf es nicht anfassen (keine Plätze, kein Stand), wie bei der Quote
+    (``_apply_quota``). Der Überlauf darf aber nicht still bleiben: der Umbau wird als Konflikt abgelehnt (409), bis
+    jemand den Aufruf zurücknimmt oder der Lauf entschieden ist. Danach kappt der Planer A wie sonst."""
+    from services.heat_rebuild import HeatRebuildError
+
+    matches, stage = build(12, TWELVE_WIDE_FINAL)
+    heats = by_key(matches)
+    apply_result(matches, heats["B"], ["r5", "r6", "r7", "r8"])
+    apply_result(matches, heats["C"], ["r9", "r10", "r11", "r12"])
+    final = heats["F"]
+    assert filled_ids(final) == ["r5", "r6", "r9"]
+    final["status"] = "scheduled"
+    final["scheduled_at"] = NOW
+    final["called_at"] = NOW
+    before = (final["status"], final["called_at"], [dict(slot) for slot in final["slots"]])
+    with pytest.raises(HeatRebuildError) as caught:
+        rebuild(matches, stage)
+    assert caught.value.status_code == 409 and "F" in caught.value.detail and "5" in caught.value.detail
+    assert (final["status"], final["called_at"], [dict(slot) for slot in final["slots"]]) == before
+    assert heats["A"]["settings"]["qualifiers_per_match"] == 2, "ohne Platz im Ziel bleibt auch die Quelle, wie sie ist"
+    # Aufruf zurückgenommen: jetzt kappt der Planer A auf 1, der fünfte Platz wird „Quelle unerfüllbar“.
+    final["called_at"] = None
+    final["status"] = "pending"
+    result = rebuild(matches, stage)
+    assert heats["A"]["settings"]["qualifiers_per_match"] == 1
+    assert [op["kind"] for op in result["ops"]] == ["quota"]
+    fifth = final["slots"][4]
+    assert fifth["status"] == "bye" and fifth["source_result"]["reason"] == "source_unfulfillable"
+    assert rebuild(matches, stage)["ops"] == []
