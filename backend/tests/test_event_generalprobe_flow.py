@@ -19,8 +19,9 @@ zwei Besten weiter) und mit dem Schema des Probelauf-Cups (Winner, Loser Bracket
   keine verwaisten Weiterleitungen, kein hängender Lauf-Umbau, nichts offen bei der Turnierleitung, Protokoll lückenlos,
   Jahreswertung vergeben. Dazu Fast Lap am Simulator.
 
-Nach jedem Schritt prüft ``Abend.check`` die Invarianten. Was dabei als Fehler im System auffiel und nicht klein zu
-beheben war, ist mit ``xfail(strict=True)`` markiert - der Grund steht daneben.
+Nach jedem Schritt prüft ``Abend.check`` die Invarianten. Die Befunde der ersten Probe (#2044: ein Loser-Lauf als
+„ohne Teilnehmer“ abgesagt, bevor das Zusammenlegen ihm Fahrer brachte; #2045: ausgeglichene Läufe lehnten das
+Ergebnis ab) sind unten fest nachgestellt und seit dem Fix grün.
 """
 import asyncio
 import pathlib
@@ -76,16 +77,6 @@ LF=[W:LE:1,W:LE:2,L:G:1,L:G:2]
 FINAL=[W:G:1,W:G:2,W:LF:1,W:LF:2]"""
 
 TREES = {"format": None, "lb": LB_CUP}
-
-LB_ORPHAN = ("Befund Generalprobe: Loser-Bracket-Cup mit 16 Plätzen und 9-10 Eingecheckten - beim Check-in-Ende "
-             "sagt der Lauf-Umbau einen Loser-Lauf als „ohne Teilnehmer“ ab (zwei Läufe mit je 2 Fahrern, beide "
-             "weiter), das Zusammenlegen danach schickt die Verlierer des Sammellaufs aber in genau diesen abgesagten "
-             "Lauf: sie fahren keine zweite Chance (services/heat_rebuild.py, _pass: Absage ist endgültig)")
-LB_RESHAPE = ("Befund Generalprobe: Loser-Bracket-Cup, Baum mit 16 fest, dann treten Fahrer aus - der Lauf-Umbau "
-              "gleicht zwei Läufe auf 3 und 2 Plätze aus (settings.match_size), lässt aber die Weiterleitungen L1/L2 "
-              "stehen; das "
-              "Ergebnis liest sie dann als absolute Plätze (services/match_v2_results.py _advancement_result_rank) und "
-              "lehnt ab: „Teilnehmer darf aus demselben Match nicht mehrfach weitergeleitet werden“ (409)")
 
 
 @pytest_asyncio.fixture
@@ -709,15 +700,8 @@ async def finish_and_publish(abend: Abend, final: dict) -> None:
 
 
 def evening_cases():
-    cases = []
-    for tree in ("format", "lb"):
-        for mode in ("fixed", "instant", "draw_show"):
-            for present in (9, 10):
-                marks = []
-                if tree == "lb" and (mode, present) != ("draw_show", 10):
-                    marks = [pytest.mark.xfail(strict=True, raises=AssertionError, reason=LB_ORPHAN)]
-                cases.append(pytest.param(tree, mode, present, marks=marks, id=f"{tree}-{mode}-{present}"))
-    return cases
+    return [pytest.param(tree, mode, present, id=f"{tree}-{mode}-{present}")
+            for tree in ("format", "lb") for mode in ("fixed", "instant", "draw_show") for present in (9, 10)]
 
 
 @pytest.mark.asyncio
@@ -752,11 +736,8 @@ async def test_abend_16_plaetze_9_oder_10_kommen(flow, seeded_draw, tree, mode, 
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("tree,way", [
-    ("format", "austritt"), ("format", "neu_aufbauen"), ("format", "im_lauf"),
-    ("lb", "neu_aufbauen"), ("lb", "im_lauf"),
-    # ("lb", "austritt") scheitert - je nach Los an LB_RESHAPE oder LB_ORPHAN; fest nachgestellt unten.
-])
+@pytest.mark.parametrize("tree,way", [(tree, way) for tree in ("format", "lb")
+                                      for way in ("austritt", "neu_aufbauen", "im_lauf")])
 async def test_baum_steht_vor_dem_checkin_dann_fehlen_sechs(flow, seeded_draw, tree, way):
     """Der Baum ist schon fest (die Leitung startet, bevor klar ist, wer kommt): 16 Plätze, 6 fehlen. Drei Wege der
     Turnierleitung: je Person „Austritt“ (Umbauplan mit Bestätigung), „Feld neu aufbauen“ vor dem ersten Start, oder
@@ -903,11 +884,10 @@ async def test_fast_lap_am_abend_mit_gaesten_versuchen_und_jahreswertung(flow):
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason=LB_RESHAPE)
 async def test_befund_loser_bracket_ausgleich_nach_austritten_vor_dem_start(flow):
-    """Nachgestellt: Loser-Bracket-Cup, Baum mit 16 fest. Aus Lauf B treten drei aus (einer bleibt): der Umbau gleicht
-    A und B auf 3 und 2 Plätze aus. Das Ergebnis von A muss sich eintragen lassen und die Verlierer kommen ins Loser
-    Bracket."""
+    """Nachgestellt (#2045): Loser-Bracket-Cup, Baum mit 16 fest. Aus Lauf B treten drei aus (einer bleibt): der Umbau
+    gleicht A und B auf 3 und 2 Plätze aus. Das Ergebnis von A muss sich eintragen lassen und die Verlierer kommen ins
+    Loser Bracket."""
     abend = await event_evening(flow, tree="lb", waitlist=0)
     abend.flow.act_as(abend.lead)
     response = await abend.flow.post(f"/api/tournaments/{abend.tid}/status", json={"status": "live", "force": True})
@@ -926,10 +906,10 @@ async def test_befund_loser_bracket_ausgleich_nach_austritten_vor_dem_start(flow
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason=LB_ORPHAN)
 async def test_befund_loser_bracket_verlierer_des_sammellaufs_fahren_keine_zweite_chance(flow):
-    """Nachgestellt: Loser-Bracket-Cup mit 16 Plätzen, es checken 10 ein (Sitzplätze 1-10). Nach dem Check-in-Ende
-    und dem Zusammenlegen von C und D müssen die Verlierer des Sammellaufs C im Loser Bracket weiterfahren."""
+    """Nachgestellt (#2044): Loser-Bracket-Cup mit 16 Plätzen, es checken 10 ein (Sitzplätze 1-10). Nach dem
+    Check-in-Ende und dem Zusammenlegen von C und D müssen die Verlierer des Sammellaufs C im Loser Bracket
+    weiterfahren."""
     abend = await event_evening(flow, tree="lb", waitlist=0)
     abend.flow.act_as(abend.lead)
     opened = await abend.flow.post(f"/api/tournaments/{abend.tid}/status", json={"status": "check_in"})
