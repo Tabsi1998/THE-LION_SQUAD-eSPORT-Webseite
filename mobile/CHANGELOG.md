@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.7.8 - 2026-10-26
+
+- Mobile: Turnierserien wie TFT sprechen von Turniertagen und zeigen keinen Ort und keine Flagge. (#2024)
+- Mobile: Ein Termin ohne Datum zeigt „Termin folgt“, ohne kommenden Termin steht „Noch kein Termin“. (#2024)
+- Mobile: „Läuft gerade“ nennt den nächsten Turniertag, auch wenn sein Datum noch offen ist. (#2024)
+- Mobile: Einsätze im Profil in den Wörtern der Serie, etwa „5 von 9 Turniertagen“. (#2024)
+
 ## 1.7.7 - 2026-10-22
 
 - Mobile: Original-Bilder des Veranstalters im Vollbild – wischen und zoomen, an Runde, Kalender und Spieltag. (#1933)

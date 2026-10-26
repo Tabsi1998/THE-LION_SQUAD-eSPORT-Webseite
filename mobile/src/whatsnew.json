@@ -1,13 +1,11 @@
 {
-  "version": "1.7.7",
-  "build": 101,
-  "date": "2026-10-22",
+  "version": "1.7.8",
+  "build": 102,
+  "date": "2026-10-26",
   "items": [
-    "Original-Bilder des Veranstalters im Vollbild – wischen und zoomen, an Runde, Kalender und Spieltag.",
-    "Die Saison zeigt, von welcher Plattform die Daten kommen.",
-    "Teamwertung zeigt Fahrer-Anpassungen wie „−5 (Fahrer)“.",
-    "Zahlen und Zeiten zählen ruhig hoch, neue Bestzeit leuchtet in Gold auf.",
-    "Fast-Lap-Zeiten mit Komma wie im Web.",
-    "Saison-Reiter lassen sich wischen, „Bewegung reduzieren“ wirkt sofort."
+    "Turnierserien wie TFT sprechen von Turniertagen und zeigen keinen Ort und keine Flagge.",
+    "Ein Termin ohne Datum zeigt „Termin folgt“, ohne kommenden Termin steht „Noch kein Termin“.",
+    "„Läuft gerade“ nennt den nächsten Turniertag, auch wenn sein Datum noch offen ist.",
+    "Einsätze im Profil in den Wörtern der Serie, etwa „5 von 9 Turniertagen“."
   ]
 }
