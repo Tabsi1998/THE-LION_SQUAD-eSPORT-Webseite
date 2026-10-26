@@ -8,7 +8,7 @@ import {
 } from "@/lib/racingLeague";
 import { hasSessions, qualiDuel, sessionGridLines, sessionPointsLines, sessionTables } from "@/lib/raceWeekend";
 import { SeriesStandings } from "@/components/tls/series/SeriesStandings";
-import { PROGRESS_WORDS, SeriesFinal, SeriesProgress, SeriesRules } from "@/components/tls/series/SeriesParts";
+import { PROGRESS_WORDS, SeriesFinal, SeriesProgress, SeriesRules, progressWords } from "@/components/tls/series/SeriesParts";
 import {
   DriverCell, GuestBadge, RaceCell, RacingCalendar, RacingPoints, SeasonSwitcher,
 } from "@/components/tls/series/RacingParts";
@@ -146,7 +146,7 @@ export function RacingLeague({ data }) {
   return (
     <>
       <SeasonSwitcher seasons={racing.seasons} lineageSlug={data.lineage?.slug} />
-      <SeriesProgress progress={data.progress} rounds={rounds} words={PROGRESS_WORDS.racing} weekends={weekends} />
+      <SeriesProgress progress={data.progress} rounds={rounds} words={progressWords(data.profile, PROGRESS_WORDS.racing)} profile={data.profile} weekends={weekends} />
 
       <div role="tablist" aria-label="Bereiche der Saison" className="tls-series-views tls-swipe mt-10" data-testid="racing-views">
         {VIEWS.map(([key, label]) => (

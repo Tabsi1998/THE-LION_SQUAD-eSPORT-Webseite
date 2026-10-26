@@ -195,4 +195,7 @@ test("Einsätze in Worten", () => {
   expect(appearancesText({ played: 2, of: 4, unit: "rounds" })).toBe("2 von 4 Runden");
   expect(appearancesText({ played: 0, of: 0, unit: "matches" })).toBe("");
   expect(appearancesText(null)).toBe("");
+  // Art-Profil (#2024): die Wörter des Servers gehen vor - „5 von 9 Turniertagen“.
+  expect(appearancesText({ played: 5, of: 9, unit: "rounds", unit_words: ["Turniertag", "Turniertagen"] })).toBe("5 von 9 Turniertagen");
+  expect(appearancesText({ played: 1, of: 1, unit: "rounds", unit_words: ["Turniertag", "Turniertagen"] })).toBe("1 von 1 Turniertag");
 });

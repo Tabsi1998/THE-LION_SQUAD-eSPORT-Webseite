@@ -2,6 +2,7 @@ import { bestPlacement, entriesOf, entryPeople, gameKey, gameTitle, hasMember, m
 import { dayNoon, viennaDate, viennaDay } from "@/lib/vienna";
 import { seasonNote, tierRank } from "@/lib/seriesTiers";
 import { opponentText } from "@/lib/referenceCalendar";
+import { NO_ROUND, OPEN_ROUND, kindWord } from "@/lib/seriesKinds";
 
 // Referenzen-Übersicht (#1878): die Logik hinter Ehrentafel, Vitrine, Liga-Weg und Chronik - ohne Oberfläche, damit
 // sie für sich getestet ist. Gerechnet wird nur Anzeige: Platzierungen, Medaillen und Stände kommen vom Server.
@@ -234,18 +235,19 @@ const UNITS = {
   series: ["Turnier", "Turnieren", "gewertet"],
 };
 
-/** „6 von 10 Rennen gewertet“ - in der Sprache der Art. */
-export function progressText(kind, scored, total) {
+/** „6 von 10 Rennen gewertet“ - in der Sprache der Art; mit Art-Profil (#2024) dessen Begriffe („Turniertagen“). */
+export function progressText(kind, scored, total, profile = null) {
   const [one, many, verb] = UNITS[kind] || ["Termin", "Terminen", "gewertet"];
-  return `${scored} von ${total} ${total === 1 ? one : many} ${verb}`;
+  const unit = total === 1 ? kindWord(profile, "round_one", one) : kindWord(profile, "round_dative", many);
+  return `${scored} von ${total} ${unit} ${kindWord(profile, "progress_verb", verb)}`;
 }
 
 const NEXT_TITLES = { racing: "Nächstes Rennen", team_league: "Nächster Spieltag", series: "Nächstes Turnier" };
 
-export function nextTitle(kind, next) {
+export function nextTitle(kind, next, profile = null) {
   if (!next) return "Nächster Termin";
   if (next.state === "today") return "Heute";
-  return NEXT_TITLES[kind] || "Nächster Termin";
+  return kindWord(profile, "next_round", NEXT_TITLES[kind] || "Nächster Termin");
 }
 
 function shortDay(day) {
@@ -259,10 +261,12 @@ function shortDay(day) {
  * statt der Uhrzeit.
  */
 export function nextValue(next) {
-  if (!next) return "Kein Termin offen";
+  if (!next) return NO_ROUND;
   const label = [next.code || next.title || "", next.session || ""].filter(Boolean).join(" · ");
   const opponent = opponentText(next);
   if (next.state === "today") return [label, next.time, opponent].filter(Boolean).join(" · ");
+  // Ohne Datum (#2015, #2024): „T5 · Termin folgt“ statt nur des Kürzels - mit gemerkter Uhrzeit dahinter.
+  if (!next.club_day) return [label, OPEN_ROUND, next.time, opponent].filter(Boolean).join(" · ");
   const window = next.club_day_end && next.club_day_end !== next.club_day;
   const day = window ? `${shortDay(next.club_day)}–${shortDay(next.club_day_end)}` : shortDay(next.club_day);
   return [day, window ? "" : next.time, label, opponent].filter(Boolean).join(" · ");
@@ -270,6 +274,6 @@ export function nextValue(next) {
 
 const PLACE_TITLES = { racing: "Bester Fahrer", team_league: "Tabelle", series: "Gesamtwertung" };
 
-export function placeTitle(kind) {
-  return PLACE_TITLES[kind] || "Unser Platz";
+export function placeTitle(kind, profile = null) {
+  return kindWord(profile, "place_title", PLACE_TITLES[kind] || "Unser Platz");
 }

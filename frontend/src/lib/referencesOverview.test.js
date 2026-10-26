@@ -15,6 +15,7 @@ import {
   tierRank,
   yearOf,
 } from "./referencesOverview";
+import { RACING_PROFILE, SERIES_PROFILE } from "./seriesKinds.fixture";
 
 // Referenzen-Übersicht (#1878): Gruppierung, Filter und die Auswahl der Hauptkarte. Nur erfundene Namen.
 
@@ -312,7 +313,8 @@ test("Läuft gerade: Fortschritt, Termin und Platz in der Sprache der Art", () =
   expect(nextValue({ state: "today", code: "R7", time: "20:30", club_day: "2026-11-09" })).toBe("R7 · 20:30");
   expect(nextValue({ state: "planned", code: "ST4", time: "20:00", club_day: "2026-10-22" })).toBe("Do 22.10. · 20:00 · ST4");
   expect(nextValue({ state: "planned", title: "Finale", time: null, club_day: "2026-10-24" })).toBe("Sa 24.10. · Finale");
-  expect(nextValue(null)).toBe("Kein Termin offen");
+  // #2024: „Noch kein Termin“ - „Termin offen“ heißt ein Termin ohne Datum.
+  expect(nextValue(null)).toBe("Noch kein Termin");
   // Runde mit Läufen (#1930): der nächste Lauf.
   expect(nextValue({ state: "today", code: "R3", session: "Qualifying", time: "20:00", club_day: "2026-11-09" })).toBe("R3 · Qualifying · 20:00");
   // Team-Liga (#1931): der Gegner mit Seite, ein Spieltag mit Zeitraum ohne Uhrzeit.
@@ -322,4 +324,15 @@ test("Läuft gerade: Fortschritt, Termin und Platz in der Sprache der Art", () =
   expect(placeTitle("racing")).toBe("Bester Fahrer");
   expect(placeTitle("team_league")).toBe("Tabelle");
   expect(placeTitle("series")).toBe("Gesamtwertung");
+});
+
+test("Läuft gerade (#2024): Begriffe aus dem Art-Profil, ein offener nächster Termin heißt „Termin folgt“", () => {
+  expect(progressText("series", 3, 9, SERIES_PROFILE)).toBe("3 von 9 Turniertagen gewertet");
+  expect(progressText("series", 0, 1, SERIES_PROFILE)).toBe("0 von 1 Turniertag gewertet");
+  expect(progressText("racing", 6, 10, RACING_PROFILE)).toBe("6 von 10 Rennen gewertet");
+  expect(nextTitle("series", { state: "planned" }, SERIES_PROFILE)).toBe("Nächster Turniertag");
+  expect(placeTitle("series", SERIES_PROFILE)).toBe("Gesamtwertung");
+  expect(placeTitle("racing", RACING_PROFILE)).toBe("Bester Fahrer");
+  expect(nextValue({ state: "planned", code: "T5", club_day: null, time: null })).toBe("T5 · Termin folgt");
+  expect(nextValue({ state: "planned", code: "T5", club_day: null, time: "19:00" })).toBe("T5 · Termin folgt · 19:00");
 });

@@ -15,6 +15,7 @@ vi.mock("@/hooks/useDocumentTitle", () => ({ useDocumentTitle: vi.fn() }));
 vi.mock("@/pages/ErrorPages", () => ({ NotFoundPage: () => <div data-testid="not-found">404</div> }));
 
 const { default: ReferenceSeriesPage } = await import("./ReferenceSeriesPage");
+const { SERIES_PROFILE } = await import("@/lib/seriesKinds.fixture");
 const { useDocumentTitle } = await import("@/hooks/useDocumentTitle");
 
 function row(key, rank, points, extra = {}) {
@@ -77,6 +78,22 @@ test("Kopf, Fortschritt, Regeln und Termine, nicht indexiert", async () => {
   expect(calendar.map((item) => item.dataset.state)).toEqual(["scored", "scored", "cancelled", "planned", "planned"]);
   expect(calendar[4]).toHaveTextContent("ursprünglich Do., 19.11.2026");
   expect(useDocumentTitle).toHaveBeenLastCalledWith("Probe Cup 2026 · Division 1", undefined, { robots: "noindex, follow" });
+});
+
+test("Art-Profil (#2024): Turniertage, nächster Turniertag ohne Datum „Termin folgt“, kein Ort", async () => {
+  const open = { id: "r4", position: 4, code: "T4", club_day: null, time: "19:00", state: "planned", kind: "regular", counts: true, title: "Probe Halle" };
+  apiMock.get.mockResolvedValue({ data: {
+    ...BODY, profile: SERIES_PROFILE,
+    progress: { total: 9, scored: 2, cancelled: 0, remaining: 7, next: open },
+    rounds: [BODY.rounds[0], BODY.rounds[1], { ...open, venue: "Altort" }],
+  } });
+  renderAt("/references/series/probe-cup/2026-division-1");
+  expect(await screen.findByTestId("series-progress")).toHaveTextContent("2 von 9 Turniertagen gewertet");
+  expect(screen.getByTestId("series-next")).toHaveTextContent("Nächster Turniertag: T4 · Termin folgt · 19:00");
+  const calendar = screen.getAllByTestId("series-page-round");
+  expect(calendar[2]).toHaveTextContent("Termin folgt · 19:00");
+  expect(calendar[2]).toHaveTextContent("Probe Halle");
+  expect(calendar[2]).not.toHaveTextContent("Altort");
 });
 
 test("Tabelle: gestrichene Ergebnisse, Bewegung, Finalgrenze; fremde Namen ohne Link", async () => {

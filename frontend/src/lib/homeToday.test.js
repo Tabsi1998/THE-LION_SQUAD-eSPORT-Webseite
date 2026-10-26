@@ -1,4 +1,5 @@
 import { todayFacts, todayItems } from "@/lib/homeToday";
+import { RACING_PROFILE, SERIES_PROFILE } from "@/lib/seriesKinds.fixture";
 
 // „Heute im Einsatz“ auf der Startseite (#1753): nur, was heute ansteht - mit Runde, Uhrzeit und gemeldeten Vereinsleuten.
 
@@ -21,6 +22,11 @@ test("Runde je Art, Uhrzeit, gemeldete Vereinsleute", () => {
   expect(todayFacts(item())).toEqual(["Runde Q2", "20:00 Uhr", "2 Vereinsspieler"]);
   expect(todayFacts(item({ lineage: { kind: "racing" }, club_count: 1 }))).toEqual(["Rennen Q2", "20:00 Uhr", "1 Vereinsfahrer"]);
   expect(todayFacts(item({ lineage: { kind: "team_league" }, next: { title: "Spieltag gegen Probe", state: "today" }, club_count: 0 }))).toEqual(["Spieltag gegen Probe"]);
+});
+
+test("Art-Profil (#2024): Turniertag statt Runde, Vereinsleute aus dem Profil", () => {
+  expect(todayFacts(item({ profile: SERIES_PROFILE }))).toEqual(["Turniertag Q2", "20:00 Uhr", "2 Vereinsspieler"]);
+  expect(todayFacts(item({ lineage: { kind: "racing" }, profile: RACING_PROFILE, club_count: 1 }))).toEqual(["Rennen Q2", "20:00 Uhr", "1 Vereinsfahrer"]);
 });
 
 test("Runde mit Läufen (#1930): der heutige Lauf statt des Worts „Rennen“", () => {
