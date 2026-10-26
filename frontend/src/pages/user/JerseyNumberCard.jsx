@@ -31,7 +31,8 @@ function useNumberCheck(input, range, nonce = 0) {
     setState({ result: null, busy: true, failed: false });
     const controller = new AbortController();
     const timer = setTimeout(() => {
-      api.get("/membership/me/jersey-number/check", { params: { number: String(local.value) }, signal: controller.signal })
+      // Im Körper, nicht in der Adresse: die Nummer gehört nicht ins Zugriffsprotokoll.
+      api.post("/membership/me/jersey-number/check", { number: local.value }, { signal: controller.signal })
         .then(({ data }) => { if (mine === seq.current) setState({ result: data, busy: false, failed: false }); })
         .catch((error) => { if (mine === seq.current && error?.name !== "CanceledError") setState({ result: null, busy: false, failed: true }); });
     }, CHECK_DELAY_MS);
@@ -54,6 +55,42 @@ function CheckChip({ view, testId }) {
       <Icon className={`w-3.5 h-3.5 shrink-0 ${view.tone === "busy" ? "animate-spin motion-reduce:animate-none" : ""}`} aria-hidden="true" />
       <span className="min-w-0 break-words">{view.text}</span>
     </span>
+  );
+}
+
+// Raster der Nummern im Bereich (#2034): frei zum Antippen, vergeben bzw. reserviert ausgegraut - ohne Namen. So muss
+// niemand durchprobieren. Bei sehr großen Bereichen schickt der Server keine Liste, dann bleibt nur das Feld.
+export function FreeGrid({ view, value, onPick, testId }) {
+  if (!Array.isArray(view.free_numbers)) return null;
+  const free = new Set(view.free_numbers);
+  const numbers = [];
+  for (let n = view.range.min; n <= view.range.max; n += 1) numbers.push(n);
+  return (
+    <div className="mt-3" data-testid={testId}>
+      <div className="text-[11px] font-bold uppercase tracking-widest text-white/50 mb-1.5">Frei: {view.free_count} – zum Auswählen antippen</div>
+      <div className="grid grid-cols-6 min-[380px]:grid-cols-8 sm:grid-cols-10 gap-1.5" role="group" aria-label="Nummern im Bereich">
+        {numbers.map((n) => {
+          const open = free.has(n);
+          const picked = open && value === n;
+          return (
+            <button
+              key={n}
+              type="button"
+              disabled={!open}
+              aria-pressed={picked}
+              aria-label={open ? `${n} wählen` : `${n} nicht frei`}
+              onClick={() => onPick(n)}
+              data-testid={`${testId}-${n}`}
+              className={`h-9 min-w-0 rounded-sm border font-heading text-sm font-black tabular-nums transition-colors duration-fast ${
+                picked ? "border-honor bg-honor/15 text-honor" : open ? "border-white/15 text-white/85 hover:border-honor/60 hover:text-honor" : "border-white/5 text-white/20 line-through cursor-not-allowed"
+              }`}
+            >
+              {n}
+            </button>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 
@@ -130,6 +167,7 @@ function ChooseForm({ view, onChosen }) {
           </button>
         </div>
       )}
+      {!noneLeft && <FreeGrid view={view} value={check.local.value} onPick={(n) => setInput(String(n))} testId="jersey-grid" />}
       <p className="mt-3 text-xs text-white/45">Einmal festgelegt, ändert sie nur noch der Vorstand.</p>
     </form>
   );
@@ -177,6 +215,7 @@ function RequestForm({ view, onSent, onCancel }) {
         />
         <div id="jersey-wish-check" className="min-w-0"><CheckChip view={check.view} testId="jersey-wish-check" /></div>
       </div>
+      <FreeGrid view={view} value={check.local.value} onPick={(n) => setWished(String(n))} testId="jersey-wish-grid" />
       <label className="block text-[11px] font-bold uppercase tracking-widest text-white/60">
         Warum eine andere?
         <textarea
