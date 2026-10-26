@@ -8,6 +8,7 @@ import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { KIND_OPTIONS, STATUS_LABELS, visibleLineages } from "@/lib/referenceSeries";
 import { LineageForm } from "./referenceSeries/LineageForm";
 import { SeriesForm } from "./referenceSeries/SeriesForm";
+import { profileOf } from "@/lib/seriesKinds";
 import { ReferenceBundleSheet } from "./referenceSeries/ReferenceBundleSheet";
 import { SeriesLogo } from "@/components/tls/references/SeriesLogo";
 import { toast } from "sonner";
@@ -26,7 +27,7 @@ export function seasonLabel(series) {
 }
 
 export default function AdminReferenceSeriesPage() {
-  const [overview, setOverview] = useState({ lineages: [], points_schemes: [], default_rules: {} });
+  const [overview, setOverview] = useState({ lineages: [], points_schemes: [], default_rules: {}, kind_profiles: null });
   const [games, setGames] = useState([]);
   const [partners, setPartners] = useState([]);
   const [showArchived, setShowArchived] = useState(false);
@@ -42,7 +43,7 @@ export default function AdminReferenceSeriesPage() {
       // #1934: aktive Partner für die Auswahl an Spur und Saison.
       api.get("/partners").then((result) => (Array.isArray(result?.data) ? result.data : [])).catch(() => []),
     ]);
-    setOverview({ lineages: data?.lineages || [], points_schemes: data?.points_schemes || [], default_rules: data?.default_rules || {} });
+    setOverview({ lineages: data?.lineages || [], points_schemes: data?.points_schemes || [], default_rules: data?.default_rules || {}, kind_profiles: data?.kind_profiles || null });
     setGames(gameRows);
     setPartners(partnerRows);
   }, []);
@@ -161,9 +162,9 @@ export default function AdminReferenceSeriesPage() {
       </div>
 
       {bundling && <ReferenceBundleSheet onClose={() => setBundling(false)} onDone={load} />}
-      {editingLineage && <LineageForm lineage={editingLineage} games={games} partners={partners} onClose={() => setEditingLineage(null)} onSaved={() => { setEditingLineage(null); load(); }} />}
+      {editingLineage && <LineageForm lineage={editingLineage} games={games} partners={partners} profiles={overview.kind_profiles} onClose={() => setEditingLineage(null)} onSaved={() => { setEditingLineage(null); load(); }} />}
       {editingSeries && (
-        <SeriesForm series={editingSeries.series} lineage={editingSeries.lineage} partners={partners} schemes={overview.points_schemes} defaultRules={overview.default_rules}
+        <SeriesForm series={editingSeries.series} lineage={editingSeries.lineage} partners={partners} schemes={overview.points_schemes} defaultRules={overview.default_rules} profile={profileOf(overview.kind_profiles, editingSeries.lineage?.kind)}
           onClose={() => setEditingSeries(null)} onSaved={() => { setEditingSeries(null); load(); }} />
       )}
     </AdminLayout>

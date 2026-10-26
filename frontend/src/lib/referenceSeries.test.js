@@ -25,6 +25,8 @@ const RULES = {
   tiebreak_top_n: 4,
   // Double-Up-Punkte (#2015) - der Server liefert sie immer mit.
   double_up_points: "team_place",
+  // Double Up als Schalter der Saison (#2024) - geht ebenso unverändert durch.
+  double_up: true,
 };
 
 test("Punkte je Platz lassen sich in jeder üblichen Schreibweise eingeben", () => {
