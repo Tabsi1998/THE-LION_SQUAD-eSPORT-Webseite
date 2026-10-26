@@ -12,6 +12,7 @@ from services.tournament_permissions import (
 )
 from services.custom_bracket import BracketSchemaError, build_matches_v2_from_schema
 from services.draw_records import record_build_draws
+from services.heat_rebuild import evaluate_after_write
 from services.match_v2_results import apply_deferred_draws
 from services.competition_engine import CLASSIC, GRAPH, EngineSwitchRequired, decide_rebuild_engine
 from services.competition_formats import find_format_capability
@@ -472,6 +473,11 @@ async def rebuild_bracket_from_tournament_format(tid: str, body: TournamentBrack
                 "engine_switched": decision.switched,
             },
         )
+        if not preview:
+            # Unterbesetzte Läufe (#1550): nach jedem Neubau prüfen - wie beim Check-in-Ende und beim Bau einer Phase.
+            # Sonst kommt der Vorschlag „Läufe umbauen“ (und der Spielplaner) erst mit der nächsten Änderung, etwa
+            # einem zurückgenommenen Aufruf, und räumt dann Stationen um, die gerade jemand von Hand verteilt (#2044).
+            await evaluate_after_write(db, tid, actor_id=me.get("id"), trigger="generate")
         return {
             "ok": True,
             "engine": "stages",
