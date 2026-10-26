@@ -13,7 +13,7 @@ import asyncio
 import io
 import pathlib
 import sys
-from datetime import timedelta
+from datetime import datetime, time, timedelta, timezone
 
 import pytest
 import pytest_asyncio
@@ -54,10 +54,17 @@ def iso(delta: timedelta) -> str:
     return (now_utc() + delta).isoformat()
 
 
+def vienna_noon(days: int) -> str:
+    """Mittag in Wien vor bzw. nach `days` Kalendertagen - das Fenster rechnet in Wiener Tagen. Mit „jetzt minus Tage“
+    rutschte das Event-Ende abends über die Zeitumstellung auf den Folgetag (CI am 26.10. um 23 Uhr rot)."""
+    day = event_photos.vienna_today() + timedelta(days=days)
+    return datetime.combine(day, time(12, 0), tzinfo=event_photos.VIENNA).astimezone(timezone.utc).isoformat()
+
+
 async def make_event(flow, *, ended_days_ago: int = 1, status: str = "completed") -> dict:
     event = {
         "id": new_id(), "slug": f"lan-{new_id()[:6]}", "name": "Herbst-LAN", "status": status, "visibility": "public",
-        "start_date": iso(timedelta(days=-ended_days_ago - 1)), "end_date": iso(timedelta(days=-ended_days_ago)),
+        "start_date": vienna_noon(-ended_days_ago - 1), "end_date": vienna_noon(-ended_days_ago),
     }
     await flow.db.events.insert_one(dict(event))
     return event
