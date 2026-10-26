@@ -6,6 +6,7 @@ import { AdminSheet } from "@/components/tls/AdminSheet";
 import { FormGrid } from "@/components/tls/AdminForm";
 import { CheckField, SelectField, TextAreaField, TextField } from "@/components/tls/FormFields";
 import { ClubMemberProfilesAdminContent } from "@/pages/admin/AdminClubMemberProfilesPage";
+import { JerseyNumbersBox } from "@/pages/admin/members/JerseyNumbersBox";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { toast } from "sonner";
 import { Crown, Search } from "lucide-react";
@@ -64,10 +65,10 @@ export default function AdminMembersPage() {
   const [editing, setEditing] = useState(null); // {user, membership}
   // Reiter in der Adresse (#1365): `/admin/members?tab=profiles` öffnet die öffentlichen Profile direkt.
   const [searchParams, setSearchParams] = useSearchParams();
-  const tab = searchParams.get("tab") === "profiles" ? "profiles" : "status";
+  const tab = ["profiles", "numbers"].includes(searchParams.get("tab")) ? searchParams.get("tab") : "status";
   const setTab = (next) => setSearchParams((current) => {
     const params = new URLSearchParams(current);
-    if (next === "profiles") params.set("tab", "profiles");
+    if (next === "profiles" || next === "numbers") params.set("tab", next);
     else params.delete("tab");
     return params;
   }, { replace: true });
@@ -115,6 +116,7 @@ export default function AdminMembersPage() {
         {[
           { k: "status", l: "Mitgliedschaften" },
           { k: "profiles", l: "Öffentliche Profile" },
+          { k: "numbers", l: "Nummern" },
         ].map((item) => (
           <button
             key={item.k}
@@ -136,6 +138,8 @@ export default function AdminMembersPage() {
 
       {tab === "profiles" ? (
         <ClubMemberProfilesAdminContent />
+      ) : tab === "numbers" ? (
+        <JerseyNumbersBox />
       ) : (
         <>
 

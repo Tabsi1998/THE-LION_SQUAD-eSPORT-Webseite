@@ -12,6 +12,7 @@ vi.mock("@/lib/api", () => ({ api: apiMock, formatMemberSince: () => "", formatR
 vi.mock("@/components/tls/AdminLayout", () => ({ AdminLayout: ({ children }) => <div>{children}</div> }));
 vi.mock("@/hooks/useApiInvalidation", () => ({ useApiInvalidation: () => {} }));
 vi.mock("@/pages/admin/AdminClubMemberProfilesPage", () => ({ ClubMemberProfilesAdminContent: () => <div data-testid="profiles-content" /> }));
+vi.mock("@/pages/admin/members/JerseyNumbersBox", () => ({ JerseyNumbersBox: () => <div data-testid="numbers-content" /> }));
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
 const { default: AdminMembersPage } = await import("./AdminMembersPage");
@@ -57,4 +58,12 @@ test("die alte Adresse /admin/member-profiles leitet auf den Reiter", () => {
   const app = readFileSync(path.resolve(__dirname, "../../App.jsx"), "utf8");
   expect(app).toContain('<Route path="/admin/member-profiles" element={<Navigate to="/admin/members?tab=profiles" replace />} />');
   expect(app).not.toContain("AdminClubMemberProfilesPage");
+});
+
+test("Wunschnummern (#2034) haben einen eigenen Reiter, per Adresse ?tab=numbers", async () => {
+  const user = userEvent.setup();
+  renderAt("/admin/members");
+  await user.click(screen.getByTestId("members-main-tab-numbers"));
+  expect(await screen.findByTestId("numbers-content")).toBeInTheDocument();
+  expect(screen.getByTestId("where")).toHaveTextContent("/admin/members?tab=numbers");
 });
