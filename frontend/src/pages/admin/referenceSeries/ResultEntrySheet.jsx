@@ -808,7 +808,7 @@ export function ResultEntrySheet({ series, round, onClose, onSaved }) {
 
           {/* Original-Bilder des Veranstalters (#1933) - Strg+V landet hier, wenn die Bild-Erkennung es nicht nimmt. */}
           <OriginalsSection base={originalsBase} defaultKind={originalKind} board={board} canPublish={Boolean(access.can_publish)}
-            pending={readOriginal} onPending={setReadOriginal} pasteHere={Boolean(image.info) && !image.available} />
+            pending={readOriginal} onPending={setReadOriginal} pasteHere={Boolean(image.info) && !image.available} kinds={kindList(profile, "original_kinds", null)} />
 
           <TextAreaField label="Notiz" value={form.note} onChange={(value) => update({ note: value })} rows={2} hint="Optional, etwa „Wertung laut Veranstalter vorläufig“." testId="result-note" />
 

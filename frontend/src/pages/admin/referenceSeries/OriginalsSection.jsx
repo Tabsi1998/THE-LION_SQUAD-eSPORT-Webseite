@@ -22,13 +22,13 @@ export async function attachOriginal(base, file, { kind, origin = "upload", map 
   return data;
 }
 
-function KindFields({ kind, map, disabled, onChange, idPrefix }) {
+function KindFields({ kind, map, disabled, onChange, idPrefix, kinds = null }) {
   return (
     <div className="flex flex-wrap items-end gap-2">
       <label className="block min-w-[9rem]" htmlFor={`${idPrefix}-kind`}>
         <span className={LABEL}>Art</span>
         <select id={`${idPrefix}-kind`} value={kind} disabled={disabled} onChange={(event) => onChange({ kind: event.target.value })} className={SMALL} data-testid="original-kind">
-          {ORIGINAL_KINDS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+          {/* Art-Profil (#2024): nur die Arten, die zur Spur passen - eine gesetzte bleibt wählbar. */}{ORIGINAL_KINDS.filter(([value]) => !kinds || kinds.includes(value) || value === kind).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
         </select>
       </label>
       {kind === "scoreboard" && (
@@ -85,7 +85,7 @@ function VisibilitySwitch({ value, disabled, onChange }) {
   );
 }
 
-function OriginalRow({ item, board, onChange, onRelease, onDelete, onOpen, busy }) {
+function OriginalRow({ item, board, onChange, onRelease, onDelete, onOpen, busy, kinds = null }) {
   const [confirming, setConfirming] = useState(false);
   const editable = board || (item.mine && item.state === "draft");
   const reason = hiddenReason(item);
@@ -95,7 +95,7 @@ function OriginalRow({ item, board, onChange, onRelease, onDelete, onOpen, busy 
       <Thumb src={originalSrc(item.url, 320)} label={originalLabel(item)} onOpen={onOpen} />
       <div className="min-w-0 flex-1 space-y-2">
         <div className="flex flex-wrap items-end gap-x-3 gap-y-2">
-          <KindFields kind={item.kind} map={item.map} disabled={!editable || busy} idPrefix={id} onChange={(values) => onChange(values)} />
+          <KindFields kind={item.kind} map={item.map} disabled={!editable || busy} idPrefix={id} onChange={(values) => onChange(values)} kinds={kinds} />
           <VisibilitySwitch value={item.public !== false} disabled={!editable || busy} onChange={(value) => onChange({ public: value })} />
         </div>
         <SourceField value={item.source_url} disabled={!editable || busy} idPrefix={id} onSave={(value) => onChange({ source_url: value })} />
@@ -127,12 +127,12 @@ function OriginalRow({ item, board, onChange, onRelease, onDelete, onOpen, busy 
   );
 }
 
-function PendingRow({ pending, onChange, onDrop }) {
+function PendingRow({ pending, onChange, onDrop, kinds = null }) {
   return (
     <li className="flex flex-col gap-3 py-3 sm:flex-row sm:items-start" data-testid="original-pending">
       <Thumb src={pending.picture} label="Gelesenes Bild" />
       <div className="min-w-0 flex-1 space-y-2">
-        <KindFields kind={pending.kind} map={pending.map} idPrefix="original-pending" onChange={onChange} />
+        <KindFields kind={pending.kind} map={pending.map} idPrefix="original-pending" onChange={onChange} kinds={kinds} />
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs">
           <span className="text-[#29B6E8]">Aus dem Bild gelesen – wird beim Übernehmen des Ergebnisses als Original angehängt.</span>
           <button type="button" onClick={onDrop} className="tls-btn tls-btn--quiet ml-auto inline-flex items-center gap-1 rounded-sm px-2 py-1 text-[10px] font-bold uppercase tracking-wider" data-testid="original-pending-drop">
@@ -149,7 +149,7 @@ function PendingRow({ pending, onChange, onDrop }) {
  * `onPending` ändert es (`null` heißt: nicht anhängen). `pasteHere`: Strg+V irgendwo im Blatt fügt hier ein (nur, wenn
  * die Bild-Erkennung das Einfügen nicht selbst nimmt).
  */
-export function OriginalsSection({ base, defaultKind, board, canPublish, pending = null, onPending, pasteHere = false }) {
+export function OriginalsSection({ base, defaultKind, board, canPublish, pending = null, onPending, pasteHere = false, kinds = null }) {
   const [data, setData] = useState(null);
   const [uploading, setUploading] = useState([]);
   const [busy, setBusy] = useState(null);
@@ -271,9 +271,9 @@ export function OriginalsSection({ base, defaultKind, board, canPublish, pending
         </div>
       ) : (
         <ul className="divide-y divide-white/5" data-testid="original-list">
-          {pending && <PendingRow pending={pending} onChange={(values) => onPending?.({ ...pending, ...values })} onDrop={() => onPending?.(null)} />}
+          {pending && <PendingRow pending={pending} kinds={kinds} onChange={(values) => onPending?.({ ...pending, ...values })} onDrop={() => onPending?.(null)} />}
           {items.map((item, index) => (
-            <OriginalRow key={item.id} item={item} board={board} busy={busy === item.id}
+            <OriginalRow key={item.id} item={item} board={board} kinds={kinds} busy={busy === item.id}
               onChange={(values) => change(item, values)} onRelease={() => change(item, { release: true })}
               onDelete={() => remove(item)} onOpen={() => setViewing(index)} />
           ))}

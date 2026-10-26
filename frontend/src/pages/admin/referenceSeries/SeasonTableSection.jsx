@@ -16,6 +16,7 @@ import { ConfirmNamesBar, ResultImageButton, useResultImage } from "./ResultImag
 import { UnknownNamesSheet } from "./UnknownNamesSheet";
 import { toast } from "sonner";
 import { Check, ImagePlus, TableProperties, X } from "lucide-react";
+import { kindShows, kindWord } from "@/lib/seriesKinds";
 
 // Saisontabelle einlesen (#1928, nur Vorstand): Wer eine laufende Saison später anlegt, fügt die Gesamttabelle des
 // Veranstalters ein (Fahrer, Team, Punkte je Runde, Gesamt) statt jede vergangene Runde einzeln einzutragen. Je Spalte
@@ -31,6 +32,7 @@ const SELECT_CLASS = `${INPUT_CLASS} text-sm py-1.5`;
 const ROUND_SELECT_CLASS = `${INPUT_CLASS.replace("w-full ", "")} min-w-0 text-sm py-1.5`;
 // Tabellen-Text: feste Zeichenbreite und kein Umbruch, damit Spalten erkennbar bleiben.
 const PASTE_CLASS = `${INPUT_CLASS} font-mono text-xs leading-relaxed [tab-size:12]`;
+const DAY_PLACEHOLDER = "Pos\tSpieler\tT1\tT2\tT3\tGesamt\n1\tAda Ausgedacht\t35\t30\t--\t65\n2\tBruno Beispiel\t30\t35\t26\t91";
 const PLACEHOLDER = "Pos\tFahrer\tTeam\tR1\tR2\tR3\tGesamt\n1\tAda Ausgedacht\tProbe Rot\t25\t18\tOUT\t43\n2\tBruno Beispiel\tProbe Blau\t--\t25\t18\t43";
 
 function Badge({ state }) {
@@ -62,7 +64,7 @@ function ColumnKinds({ parsed, kinds, onKind }) {
   );
 }
 
-function ColumnItem({ column, rounds, roundId, picked, onPick, onRound }) {
+function ColumnItem({ column, rounds, roundId, picked, onPick, onRound, people = "Fahrer" }) {
   // Wer neu dazukommt, steht gesammelt in einer Zeile - einzeln nur, was sich bei Vorhandenen ändert.
   const added = (column.changes || []).filter((change) => change.kind === "added");
   const lines = changeLines((column.changes || []).filter((change) => change.kind !== "added"), { removed: "fehlt in der Tabelle – fällt weg" });
@@ -70,7 +72,7 @@ function ColumnItem({ column, rounds, roundId, picked, onPick, onRound }) {
   const problems = (column.errors || []).map((problem) => problem.message);
   const warnings = (column.warnings || []).map((problem) => problem.message);
   const selectable = isSelectable(column);
-  const counts = column.counts?.rows ? `${column.counts.rows} Fahrer · ${column.counts.places} mit Platz` : "";
+  const counts = column.counts?.rows ? `${column.counts.rows} ${people} · ${column.counts.places} mit Platz` : "";
   const how = column.round ? HOW_TEXT[column.how] : "";
   return (
     <li className="py-3 flex items-start gap-3" data-testid="season-table-column" data-state={column.state}>
@@ -375,7 +377,7 @@ function rankText(item) {
 
 const TOTAL_TONES = { ok: "text-white/60", explained: "text-[#29B6E8]", differs: "text-amber-200", no_total: "text-white/45" };
 
-function TotalsTable({ totals, error }) {
+function TotalsTable({ totals, error, people = "Fahrer" }) {
   const [onlyIssues, setOnlyIssues] = useState(true);
   if (error) return <p className="text-sm text-amber-200" role="alert" data-testid="season-table-totals-error">{error}</p>;
   if (!totals) return null;
@@ -402,7 +404,7 @@ function TotalsTable({ totals, error }) {
           <table className="w-full text-sm">
             <thead>
               <tr className="text-left text-[11px] uppercase tracking-widest text-white/50">
-                <th scope="col" className="py-1.5 pr-3 font-bold">Fahrer</th>
+                <th scope="col" className="py-1.5 pr-3 font-bold">{people}</th>
                 <th scope="col" className="py-1.5 pr-3 font-bold text-right">Tabelle</th>
                 <th scope="col" className="py-1.5 pr-3 font-bold text-right">Gerechnet</th>
                 <th scope="col" className="py-1.5 pr-3 font-bold text-right">Platz</th>
@@ -434,6 +436,9 @@ function TotalsTable({ totals, error }) {
 export function SeasonTableSection({ series, onChanged }) {
   const url = `/reference-series/admin/series/${series.id}/season-table`;
   const byOrganizer = series.rules?.points_mode === "organizer";
+  // Art-Profil (#2024): Beispiel und Wörter je Art - eine Turnierserie hat Spieler, Turniertage und kein Team.
+  const people = kindWord(series.profile, "person_many", "Fahrer");
+  const placeholder = kindShows(series.profile, "day_rounds", false) ? DAY_PLACEHOLDER : PLACEHOLDER;
   const [open, setOpen] = useState(false);
   const [text, setText] = useState("");
   const [parsed, setParsed] = useState(null);
@@ -580,8 +585,8 @@ export function SeasonTableSection({ series, onChanged }) {
           <label className="block min-w-0">
             <span className="block text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Tabelle des Veranstalters</span>
             <textarea ref={pasteRef} rows={8} wrap="off" spellCheck={false} value={text} onChange={(event) => setText(event.target.value)}
-              placeholder={PLACEHOLDER} data-testid="season-table-text" className={PASTE_CLASS} />
-            <span className="mt-1 block text-xs text-white/45">Aus der Tabellenkalkulation oder einer Webseite kopieren: Fahrer (auch Name#TAG), optional Team, je Runde Punkte, optional Gesamt. OUT oder DNF = Ausfall, -- oder leer = nicht angetreten, DSQ, DNS.</span>
+              placeholder={placeholder} data-testid="season-table-text" className={PASTE_CLASS} />
+            <span className="mt-1 block text-xs text-white/45">Aus der Tabellenkalkulation oder einer Webseite kopieren: {people} (auch Name#TAG), optional Team, je Runde Punkte, optional Gesamt. OUT oder DNF = Ausfall, -- oder leer = nicht angetreten, DSQ, DNS.</span>
           </label>
           <fieldset className="space-y-1.5" disabled={byOrganizer}>
             <legend className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Punkte</legend>
@@ -626,12 +631,12 @@ export function SeasonTableSection({ series, onChanged }) {
           {preview && (
             <div className="space-y-5" data-testid="season-table-preview">
               <p className="text-sm text-white/75 tabular-nums" data-testid="season-table-summary">
-                {preview.summary.rows} Fahrer · {preview.summary.mapped} von {preview.summary.columns} Runden zugeordnet
+                {preview.summary.rows} {people} · {preview.summary.mapped} von {preview.summary.columns} Runden zugeordnet
                 {preview.summary.unclear ? ` · ${preview.summary.unclear} gelb` : ""}{preview.summary.errors ? ` · ${preview.summary.errors} mit Fehler` : ""}
               </p>
               <ol className="divide-y divide-white/5 border-y border-white/10">
                 {columns.map((column) => (
-                  <ColumnItem key={column.index} column={column} rounds={preview.rounds || []} roundId={roundIds[rounds[column.index]] === "" ? "__skip" : roundIds[rounds[column.index]]}
+                  <ColumnItem key={column.index} people={people} column={column} rounds={preview.rounds || []} roundId={roundIds[rounds[column.index]] === "" ? "__skip" : roundIds[rounds[column.index]]}
                     picked={picked.includes(column.index)} onPick={togglePick} onRound={(value) => changeRound(column.index, value)} />
                 ))}
               </ol>
@@ -640,7 +645,7 @@ export function SeasonTableSection({ series, onChanged }) {
                   onProposals={() => setDecisions((current) => mergeDecisions(current, proposalDecisions(cells).map((item) => [cellKey(item), item])))}
                   onOrganizer={() => setDecisions((current) => mergeDecisions(current, organizerDecisions(cells).map((item) => [cellKey(item), item])))} />
               )}
-              <TotalsTable totals={preview.totals} error={preview.totals_error} />
+              <TotalsTable totals={preview.totals} error={preview.totals_error} people={people} />
               {unknown.length > 0 && (
                 <p className="text-sm text-white/70" data-testid="season-table-unknown">
                   {unknown.length} {unknown.length === 1 ? "Name ist" : "Namen sind"} neu in der Saison – beim Übernehmen werden sie offene Teilnehmer, danach ordnest du sie zu.

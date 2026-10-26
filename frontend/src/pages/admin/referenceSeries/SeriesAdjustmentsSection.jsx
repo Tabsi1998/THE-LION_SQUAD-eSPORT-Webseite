@@ -12,6 +12,7 @@ import {
 } from "@/lib/seriesSpecialRules";
 import { toast } from "sonner";
 import { Pencil, Plus, Trash2 } from "lucide-react";
+import { kindShows, kindWord } from "@/lib/seriesKinds";
 
 // Anpassungen der Saison (#1960, nur Vorstand): ±Punkte in der Gesamtwertung ohne Rennergebnis - etwa −5 für
 // Nichtteilnahme nach Anmeldung, verspätete Ab- oder Anmeldung oder ein fehlendes Video, auch als Korrektur der
@@ -19,6 +20,13 @@ import { Pencil, Plus, Trash2 } from "lucide-react";
 // rechnet danach alle Stände neu und protokolliert jede Änderung. Bekommt `series` (mit `adjustments`).
 
 const KIND_OPTIONS = [["participant", "Teilnehmer (Fahrerwertung)"], ["team", "Team (Teamwertung)"]];
+
+/** Für wen eine Anpassung gilt - in den Begriffen der Art (#2024); ohne Teamwertung nur Teilnehmer. */
+function kindOptions(profile, current) {
+  const label = kindWord(profile, "standings_label", "");
+  const options = label ? [["participant", `Teilnehmer (${label})`], KIND_OPTIONS[1]] : KIND_OPTIONS;
+  return kindShows(profile, "team_scoring") || current === "team" ? options : options.slice(0, 1);
+}
 
 // #2000: was der Haken „zählt auch für die Teamwertung“ im Modus der Saison heißt.
 const TEAM_HINTS = {
@@ -65,13 +73,13 @@ function AdjustmentSheet({ series, item, participants, rounds, teams, onClose, o
   const people = [["", "— Teilnehmer wählen —"], ...participants.map((person) => [person.id, person.name])];
   const roundOptions = [["", "— ohne Termin —"], ...rounds.map((round) => [round.id, sessionLabel(round)])];
   return (
-    <AdminSheet title={isNew ? "Neue Anpassung" : "Anpassung bearbeiten"} eyebrow="Punkte ohne Rennergebnis" onClose={onClose} onSubmit={save} saving={saving} submitTestId="adjustment-save" testId="adjustment-sheet">
+    <AdminSheet title={isNew ? "Neue Anpassung" : "Anpassung bearbeiten"} eyebrow={kindShows(series.profile, "race_details") ? "Punkte ohne Rennergebnis" : "Punkte ohne Ergebnis"} onClose={onClose} onSubmit={save} saving={saving} submitTestId="adjustment-save" testId="adjustment-sheet">
       {Object.keys(errors).length > 0 && (
         <ul className="border border-red-400/40 bg-red-400/10 rounded-sm px-3 py-2 text-sm text-red-100 space-y-0.5" role="alert" data-testid="adjustment-errors">
           {Object.values(errors).map((message) => <li key={message}>{message}</li>)}
         </ul>
       )}
-      <SelectField label="Für" value={form.kind} onChange={(value) => set("kind", value)} options={KIND_OPTIONS} testId="adjustment-kind" />
+      <SelectField label="Für" value={form.kind} onChange={(value) => set("kind", value)} options={kindOptions(series.profile, form.kind)} testId="adjustment-kind" />
       {form.kind === "team" ? (
         <TextField label="Team" required value={form.team} onChange={(value) => set("team", value)} suggestions={teams} maxLength={120} testId="adjustment-team"
           hint="Wie in der Teamwertung; Groß- und Kleinschreibung egal." />
@@ -140,14 +148,14 @@ export function SeriesAdjustmentsSection({ series, onChanged }) {
       <div className="flex items-start justify-between gap-3 flex-wrap">
         <div className="min-w-0">
           <h2 id="series-adjustments-title" className="text-[11px] font-bold uppercase tracking-widest text-[#29B6E8]">Anpassungen</h2>
-          <p className="mt-1 text-sm text-white/60">Punkte ohne Rennergebnis – etwa −5 für Nichtteilnahme nach Anmeldung. Öffentlich mit Grund.</p>
+          <p className="mt-1 text-sm text-white/60">{kindShows(series.profile, "race_details") ? "Punkte ohne Rennergebnis" : "Punkte ohne Ergebnis"} – etwa −5 für Nichtteilnahme nach Anmeldung. Öffentlich mit Grund.</p>
         </div>
         <button type="button" onClick={() => setSheet({ item: null })} data-testid="adjustment-new" className="tls-btn tls-btn--secondary px-3 py-2 rounded-sm text-xs font-bold uppercase tracking-wider inline-flex items-center gap-2">
           <Plus className="w-3.5 h-3.5" /> Anpassung
         </button>
       </div>
       {items.length === 0 ? (
-        <p className="mt-3 text-sm text-white/50" data-testid="adjustments-empty">Keine Anpassungen – die Tabelle zählt nur Rennergebnisse.</p>
+        <p className="mt-3 text-sm text-white/50" data-testid="adjustments-empty">Keine Anpassungen – die Tabelle zählt nur {kindShows(series.profile, "race_details") ? "Rennergebnisse" : "Ergebnisse"}.</p>
       ) : (
         <ul className="mt-3 divide-y divide-white/5" data-testid="adjustments-list">
           {items.map((item) => (
@@ -156,7 +164,7 @@ export function SeriesAdjustmentsSection({ series, onChanged }) {
               <span className="min-w-0 flex-1">
                 <span className="block text-sm font-semibold text-white [overflow-wrap:anywhere]">
                   {adjustmentTarget(item, participants)}
-                  <span className="ml-2 text-[10px] font-bold uppercase tracking-widest text-white/45">{item.kind === "team" ? "Team" : "Fahrer"}</span>
+                  <span className="ml-2 text-[10px] font-bold uppercase tracking-widest text-white/45">{item.kind === "team" ? "Team" : kindWord(series.profile, "person_one", "Fahrer")}</span>
                 </span>
                 <span className="block text-sm text-white/60 [overflow-wrap:anywhere]">{adjustmentDetail(item, rounds)}</span>
                 {/* #2000: für welches Team - bzw. als Ersatz gefahren: für keines (Hinweis). */}
