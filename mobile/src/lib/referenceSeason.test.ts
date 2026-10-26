@@ -91,7 +91,7 @@ test("Kalender: Kürzel, Ort, Land, Stand, Tag - heute als „Heute“; ohne Lan
     ["R10", "Spielberg", "", "Gewertet", "Do., 07.05.2026 · 20:00"],
     ["R11", "Budapest", "", "Abgesagt", "Do., 14.05.2026 · 20:00"],
     ["Termin 12", "Zandvoort", "", "Heute", "Heute · 20:00"],
-    ["R13", "Monza", "", "Geplant", "Termin offen"],
+    ["R13", "Monza", "", "Geplant", "Termin folgt"],
   ]);
   expect(rows.map((row) => row.tone)).toEqual(["done", "done", "cancelled", "today", "planned"]);
   // Gewertet: der beste öffentliche Vereinsfahrer - ein fremder Sieger bleibt ohne Namen.
@@ -219,4 +219,42 @@ test("Fahrer (Garage): nur öffentliche Vereinsfahrer, mit Platz, Team, Punkten 
 test("Kalender mit Land: Code und Name für die Flagge, auch ohne Ort", () => {
   const rows = roundRows({ rounds: [{ id: "x", code: "R1", state: "planned", country_code: "az" }, { id: "y", code: "R2", state: "planned", country_code: "zz" }] });
   expect(rows.map((row) => [row.country, row.countryName, row.place])).toEqual([["AZ", "Aserbaidschan", "Aserbaidschan"], ["", "", ""]]);
+});
+
+// ---------------------------------------------------------------- Art-Profil (#2024)
+
+const TFT_PROFILE = {
+  kind: "series",
+  fields: { venue: false, country: false, opponent: false },
+  vocab: { round_one: "Turniertag", round_many: "Turniertage", person_many: "Spieler", open_round: "Termin folgt" },
+};
+const TFT_ROUNDS = [
+  { id: "t4", position: 4, code: "T4", venue: "Alter Ort", country_code: "at", club_day: "2026-10-20", time: "20:00", state: "scored", kind: "regular", counts: true },
+  { id: "t5", position: 5, code: "T5", club_day: null, time: "19:00", state: "planned", kind: "regular", counts: true },
+  { id: "t6", position: 6, code: "T6", title: "Herbstfinale", club_day: "2026-11-10", state: "planned", kind: "regular", counts: true, no_score_reason: "too_few" },
+];
+const TFT: SeasonPage = { lineage: { kind: "series" }, profile: TFT_PROFILE, progress: { total: 9, scored: 4 }, rounds: TFT_ROUNDS };
+
+test("Turnierserie mit Art-Profil (#2024): kein Ort, keine Flagge, „Termin folgt“, Begriffe der Art", () => {
+  const rows = roundRows(TFT);
+  expect(rows.map((row) => [row.place, row.country, row.countryName, row.when])).toEqual([
+    ["Turniertag T4", "", "", "Di., 20.10.2026 · 20:00"],
+    ["Turniertag T5", "", "", "Termin folgt · 19:00"],
+    ["Herbstfinale", "", "", "Di., 10.11.2026"],
+  ]);
+  expect(rows[2].notes).toEqual(["Ohne Wertung · Zu wenig Spieler"]);
+  expect(rows[0].originalsTitle).toBe("T4");
+  expect(seasonFigures(TFT)[0]).toEqual({ key: "progress", value: "4/9", label: "Turniertage" });
+});
+
+test("Ohne Art-Profil (älterer Server): Ort, Flagge und Wörter wie bisher, ohne Datum „Termin folgt“", () => {
+  const old: SeasonPage = { ...TFT, profile: undefined };
+  const rows = roundRows(old);
+  expect(rows.map((row) => [row.place, row.country, row.when])).toEqual([
+    ["Alter Ort", "AT", "Di., 20.10.2026 · 20:00"],
+    ["", "", "Termin folgt · 19:00"],
+    ["Herbstfinale", "", "Di., 10.11.2026"],
+  ]);
+  expect(rows[2].notes).toEqual(["Ohne Wertung · Zu wenig Fahrer"]);
+  expect(seasonFigures(old)[0]).toEqual({ key: "progress", value: "4/9", label: "Turniere" });
 });

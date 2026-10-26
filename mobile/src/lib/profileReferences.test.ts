@@ -69,6 +69,20 @@ test("Einsätze der Person (#1931): „5 von 7 Spielen“, „3 von 5 Rennen“ 
   expect(profileRows({ personal: [personal("cup", "tournament", 2, "2026-03-01T10:00:00Z")] })[0].played).toBe("");
 });
 
+test("Einsätze mit Begriffen der Art (#2024): „5 von 9 Turniertagen“ aus `unit_words`, ungültig wie bisher", () => {
+  const rows = profileRows({
+    club: [
+      club("tft", "2025-06-18T18:00:00Z", 5, ["Mira Stahl"], { appearances: { played: 5, of: 9, unit: "rounds", unit_words: ["Turniertag", "Turniertagen"] } }),
+      club("tft1", "2025-07-18T18:00:00Z", 3, ["Mira Stahl"], { appearances: { played: 1, of: 1, unit: "rounds", unit_words: ["Turniertag", "Turniertagen"] } }),
+      club("kaputt", "2025-08-18T18:00:00Z", 2, ["Mira Stahl"], { appearances: { played: 2, of: 4, unit: "rounds", unit_words: ["Turniertag"] } }),
+    ],
+    memberId: ME,
+    lineages,
+  });
+  const played = Object.fromEntries(rows.map((row) => [row.id, row.played]));
+  expect(played).toEqual({ "club:tft": "5 von 9 Turniertagen", "club:tft1": "1 von 1 Turniertag", "club:kaputt": "2 von 4 Runden" });
+});
+
 test("eine Teilnahme ohne die Person zählt nicht - auch wenn sie am Verein hängt", () => {
   const other = club("andere", "2025-08-20T18:00:00Z", 5, ["Kai Funke"], { member_profile_ids: ["p-Kai"] });
   expect(profileRows({ club: [other], memberId: ME, lineages })).toEqual([]);

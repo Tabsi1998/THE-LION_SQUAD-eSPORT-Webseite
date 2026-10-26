@@ -74,6 +74,31 @@ test("Rennliga: Kopf mit Kennzahlen, Kalender mit Flagge und bestem Vereinsfahre
   expect(within(r12).queryByTestId("season-round-country")).toBeNull();
 });
 
+test("Turnierserie mit Art-Profil (#2024): Turniertage, kein Ort und keine Flagge, ohne Datum „Termin folgt“", async () => {
+  mockGet.mockResolvedValue({ data: {
+    lineage: { title: "Probe TFT", slug: "tft", kind: "series", game_name: "TFT" },
+    series: { season: "2026", title: "Probe TFT 2026", season_slug: "2026" },
+    progress: { total: 9, scored: 4 },
+    rounds: [
+      { id: "t4", code: "T4", venue: "Alter Ort", country_code: "at", club_day: "2026-10-20", time: "20:00", state: "scored", kind: "regular" },
+      { id: "t5", code: "T5", club_day: null, time: "19:00", state: "planned", kind: "regular" },
+    ],
+    standings: { rows: [] },
+    racing: null,
+    team_league: null,
+    profile: { kind: "series", fields: { venue: false, country: false }, vocab: { round_one: "Turniertag", round_many: "Turniertage", open_round: "Termin folgt" } },
+  } });
+  await render(<ReferenceSeasonScreen navigation={navigation} route={routeFor("tft", "2026")} />);
+  await waitFor(() => expect(screen.getByText("Probe TFT 2026")).toBeTruthy());
+  expect(within(screen.getByTestId("season-figures")).getByText("Turniertage")).toBeTruthy();
+  const t4 = screen.getByTestId("season-round-t4");
+  expect(within(t4).getByText("Turniertag T4")).toBeTruthy();
+  expect(within(t4).queryByText("Alter Ort")).toBeNull();
+  expect(within(t4).queryByTestId("season-round-country")).toBeNull();
+  expect(within(screen.getByTestId("season-round-t5")).getByText("Termin folgt · 19:00")).toBeTruthy();
+  expect(fetchMock).not.toHaveBeenCalled();
+});
+
 test("Tabelle: die ersten zehn und Vereinsfahrer dahinter, aufklappbar - Teamwertung umschaltbar", async () => {
   mockGet.mockResolvedValue({ data: RACING });
   await render(<ReferenceSeasonScreen navigation={navigation} route={routeFor("prl", "2026")} />);

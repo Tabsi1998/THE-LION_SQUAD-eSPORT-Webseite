@@ -219,8 +219,43 @@ test("Läuft gerade: Fortschritt, Termin und Platz in der Sprache der Art", () =
   expect(nextTitle("team_league", { state: "planned" })).toBe("Nächster Spieltag");
   expect(nextValue({ state: "today", code: "R7", time: "20:30", club_day: "2026-11-09" })).toBe("R7 · 20:30");
   expect(nextValue({ state: "planned", code: "ST4", time: "20:00", club_day: "2026-10-22" })).toBe("Do 22.10. · 20:00 · ST4");
-  expect(nextValue(null)).toBe("Kein Termin offen");
+  expect(nextValue(null)).toBe("Noch kein Termin");
   expect(placeTitle("racing")).toBe("Bester Fahrer");
+});
+
+const TFT_PROFILE = {
+  kind: "series",
+  fields: { venue: false, country: false },
+  vocab: { round_one: "Turniertag", round_dative: "Turniertagen", progress_verb: "gewertet", next_round: "Nächster Turniertag", place_title: "Gesamtwertung" },
+};
+
+test("Läuft gerade mit Art-Profil (#2024): Turniertage, „Termin folgt“ ohne Datum, keine Flagge", () => {
+  expect(progressText("series", 4, 9, TFT_PROFILE)).toBe("4 von 9 Turniertagen gewertet");
+  expect(progressText("series", 1, 1, TFT_PROFILE)).toBe("1 von 1 Turniertag gewertet");
+  expect(nextTitle("series", { state: "planned" }, TFT_PROFILE)).toBe("Nächster Turniertag");
+  expect(placeTitle("series", TFT_PROFILE)).toBe("Gesamtwertung");
+  // Ohne Datum (#2015): „T5 · Termin folgt“ statt nur des Kürzels, mit gemerkter Uhrzeit.
+  expect(nextValue({ state: "planned", code: "T5", club_day: null, time: "19:00" })).toBe("T5 · Termin folgt · 19:00");
+  expect(nextValue({ state: "planned", code: "T5" })).toBe("T5 · Termin folgt");
+  const view = runningView({
+    lineage: { title: "Probe TFT", slug: "tft", kind: "series", game_name: "TFT" },
+    series: { season_slug: "2026" },
+    progress: { total: 9, scored: 4 },
+    next: { code: "T5", state: "planned", club_day: null, country_code: "at" },
+    profile: TFT_PROFILE,
+  });
+  expect(view).toMatchObject({ next: "Nächster Turniertag · T5 · Termin folgt", country: "", progress: { text: "4 von 9 Turniertagen gewertet" } });
+});
+
+test("Läuft gerade ohne Art-Profil (älterer Server): Wörter und Flagge wie bisher", () => {
+  expect(progressText("series", 4, 9)).toBe("4 von 9 Turnieren gewertet");
+  expect(nextTitle("series", { state: "planned" })).toBe("Nächstes Turnier");
+  const view = runningView({
+    lineage: { slug: "tft", kind: "series" },
+    series: { season_slug: "2026" },
+    next: { code: "T5", state: "planned", club_day: "2026-10-22", time: "20:00", country_code: "at" },
+  });
+  expect(view).toMatchObject({ next: "Nächstes Turnier · Do 22.10. · 20:00 · T5", country: "AT" });
 });
 
 test("Karte „Läuft gerade“: Art und Spiel, Saison, Termin, Fortschritt und unser Platz - ohne Platz „noch offen“", () => {
