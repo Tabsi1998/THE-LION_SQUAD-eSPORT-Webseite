@@ -33,8 +33,19 @@ async def ensure_event_photo_indexes(db) -> None:
     await db.gallery_submission_quota.create_index([("album_id", 1), ("owner_id", 1)], unique=True)
 
 
+async def ensure_jersey_number_indexes(db) -> None:
+    """Wunschnummer je Mitglied (#2034): eine Zeile je Konto, und jede Nummer hält höchstens eine Zeile
+    (``number_key`` steht nur, solange die Nummer vergeben ist). Der eindeutige Index ist die Sperre gegen
+    gleichzeitige Wahl derselben Nummer."""
+    await db.jersey_numbers.create_index("user_id", unique=True, sparse=True)
+    await db.jersey_numbers.create_index("number_key", unique=True, sparse=True)
+    await db.jersey_number_requests.create_index("id", unique=True)
+    await db.jersey_number_requests.create_index([("user_id", 1), ("status", 1)])
+
+
 async def init_indexes():
     db = get_db()
+    await ensure_jersey_number_indexes(db)
     # Users
     await db.users.create_index("email", unique=True)
     await db.users.create_index("username", unique=True)

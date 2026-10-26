@@ -928,6 +928,9 @@ async def update_user_membership(
     await _audit(me["id"], "membership.update", user_id, payload)
     # Endet die Mitgliedschaft, geht ein selbst angelegter Verzeichnis-Eintrag offline (#410).
     await end_self_directory_entry(user_id, m.get("member_status") in ACTIVE_STATUSES)
+    # Austritt: die Wunschnummer ist sofort wieder frei (#2034).
+    from services import jersey_numbers
+    await jersey_numbers.release_for_status(db, user_id, m.get("member_status"))
 
     # Fire emails based on transitions
     new_status = payload.get("member_status")

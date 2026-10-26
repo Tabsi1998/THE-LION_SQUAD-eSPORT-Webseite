@@ -158,6 +158,7 @@ async def apply_summary(db, settings: dict, link: dict, summary: dict) -> str:
         "user_type": "club_member" if is_member else "community_user", "is_club_member": is_member, "updated_at": now,
     }})
     await end_self_directory_entry(user_id, is_member)
+    await _release_jersey_number(db, user_id, update["member_status"])
     if unchanged:
         return "unchanged"
     try:
@@ -515,7 +516,17 @@ async def end_membership_of_gone_member(db, link: dict) -> None:
         })
     await db.users.update_one({"id": link["user_id"]}, {"$set": {"user_type": "community_user", "is_club_member": False, "updated_at": now}})
     await end_self_directory_entry(link["user_id"], False)
+    await _release_jersey_number(db, link["user_id"], "former")
     await close_link(db, link, status="gone", actor_id=ACTOR, note="in Dolibarr nicht mehr vorhanden")
+
+
+async def _release_jersey_number(db, user_id: str, status: str) -> None:
+    """Austritt: die Wunschnummer ist sofort wieder frei (#2034). Darf den Abgleich nie scheitern lassen."""
+    try:
+        from services import jersey_numbers
+        await jersey_numbers.release_for_status(db, user_id, status)
+    except Exception:  # noqa: BLE001
+        logger.warning("[dolibarr] Wunschnummer nach Austritt nicht freigegeben", exc_info=True)
 
 
 # ---------------------------------------------------------------- Stand des Abgleichs
