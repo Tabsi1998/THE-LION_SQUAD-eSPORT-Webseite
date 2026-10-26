@@ -22,7 +22,10 @@ Regeln (Issue #1550, Entscheidung E13):
   ``advancement``-Eintrag dieses Laufs auf ihn zeigt - das prüft die Graph-Validierung.
 - **Abkürzen:** sind im Sammellauf alle Verbliebenen, ist er das Finale - spätere Runden entfallen (``shortened``).
 - **Nie umbauen:** Läufe, die laufen (``in_progress``) oder aufgerufen sind (``called_at``), und alles, was entschieden
-  ist. Vorschauen ebenso.
+  ist. Vorschauen ebenso. Das gilt auch für die Kappung der Quote: ein Platz in so einem Lauf wird nicht zum Freilos.
+  Bekäme ein aufgerufener oder laufender Lauf dadurch mehr Fahrer als die Laufgröße, lehnt der Planer den ganzen
+  Umbau als Konflikt ab (``HeatRebuildError`` 409, wie die Graph-Prüfung) - nichts wird geschrieben, bis der Aufruf
+  zurückgenommen oder der Lauf entschieden ist (#2033).
 - **Bestätigung:** je Turnier ``heat_rebuild_mode``: ``suggest`` (Vorgabe) - Auffüllen, Freilos und Quote laufen von
   selbst, Zusammenlegen, Ausgleichen und Abkürzen werden als Plan am Turnier gespeichert (``heat_rebuild_plan``) und
   von der Turnierleitung bestätigt oder abgelehnt; ``auto`` - alles sofort. Ein abgelehnter Plan kommt nicht wieder,
@@ -493,6 +496,23 @@ def _top_entry(heat: dict) -> dict | None:
                key=lambda entry: int(entry.get("rank") or 0), default=None)
 
 
+def _trim_touches_locked_target(graph: _Graph, heat: dict, wanted: int) -> bool:
+    """Würde die Kappung auf ``wanted`` einen offenen Platz in einem Lauf streichen, der nicht mehr umgebaut wird
+    (aufgerufen, gestartet, entschieden)? Dann bleibt die Quote - dieselbe Sperre wie in ``_apply_quota``."""
+    for entry in heat.get("advancement") or []:
+        if entry.get("flow") != "W" or int(entry.get("rank") or 0) <= wanted:
+            continue
+        target = graph.by_id.get(entry.get("to_match_id"))
+        slot = _find_slot(target, int(entry.get("to_slot") or 0))
+        if target and slot and not _rebuildable(target) and slot.get("status") == "pending":
+            return True
+    return False
+
+
+OVERFULL_DETAIL = ("{name} ist schon aufgerufen oder läuft und bekäme {count} Fahrer bei Laufgröße {cap}. Der Umbau "
+                   "wartet, bis der Aufruf zurückgenommen oder der Lauf entschieden ist - bitte den Lauf prüfen.")
+
+
 def _trim_quotas(graph: _Graph, heats: list[dict], targets: list[dict], cap: int, now_iso: str,
                  ops: list[dict]) -> None:
     """Die Weiterkommer einer Gruppe dürfen ihre Ziele nicht überfüllen. Gezählt wird die erwartete Belegung der
@@ -502,16 +522,19 @@ def _trim_quotas(graph: _Graph, heats: list[dict], targets: list[dict], cap: int
     Vorlaufs wieder, und das Finale erwartete 5 bei Laufgröße 4.
 
     Ziele sind die der Gruppe und alle, in die ihre Läufe jetzt weiterleiten (eine gewachsene Quote, ``_revive``, zeigt
-    auch in einen Lauf, den die Gruppe vorher nicht belieferte). Zielläufe, die die Folgerunde gemeinsam ausgleicht
-    (dieselbe Lauf-Gruppe, umbaubar), zählen zusammen - ungleich verteilt gleicht sie aus; jedes andere Ziel muss für
-    sich passen. Gekappt wird der Lauf, dessen oberste Weiterleitung in ein überfülltes Ziel zeigt."""
+    auch in einen Lauf, den die Gruppe vorher nicht belieferte); entschiedene Ziele zählen nicht mehr. Zielläufe, die
+    die Folgerunde gemeinsam ausgleicht (dieselbe Lauf-Gruppe, umbaubar), zählen zusammen - ungleich verteilt gleicht
+    sie aus; jedes andere Ziel muss für sich passen. Gekappt wird der Lauf, dessen oberste Weiterleitung in ein
+    überfülltes Ziel zeigt - nie einer, dessen gestrichener Platz in einem Lauf liegt, der nicht mehr umgebaut wird
+    (aufgerufen, gestartet; dieselbe Sperre wie in ``_apply_quota``). Bleibt so ein Lauf überfüllt, ist das ein
+    Konflikt (``HeatRebuildError``): der Planer darf ihn weder anfassen noch still überlaufen lassen."""
     by_id = {target["id"]: target for target in targets}
     for heat in heats:
         for entry in heat.get("advancement") or []:
             target = graph.by_id.get(entry.get("to_match_id"))
             if target:
                 by_id.setdefault(target["id"], target)
-    targets = [target for target in by_id.values() if str(target.get("status") or "") != "cancelled"]
+    targets = [target for target in by_id.values() if _live(target)]
     while heats and targets:
         graph.invalidate()
         classes: dict[tuple, list[dict]] = defaultdict(list)
@@ -525,9 +548,16 @@ def _trim_quotas(graph: _Graph, heats: list[dict], targets: list[dict], cap: int
         }
         if not crowded:
             return
-        heat = max((h for h in heats if _quota_of(h) > 1 and (_top_entry(h) or {}).get("to_match_id") in crowded),
+        heat = max((h for h in heats if _quota_of(h) > 1 and (_top_entry(h) or {}).get("to_match_id") in crowded
+                    and not _trim_touches_locked_target(graph, h, _quota_of(h) - 1)),
                    key=lambda h: (_quota_of(h), -int(h.get("order") or 0)), default=None)
         if not heat:
+            for target in targets:
+                if target["id"] in crowded and not _rebuildable(target):
+                    where = target.get("round_name") or f"Runde {target.get('round')}"
+                    detail = OVERFULL_DETAIL.format(name=f"Lauf {target.get('match_key')} ({where})",
+                                                    count=len(graph.entries(target)), cap=cap)
+                    raise HeatRebuildError(detail, 409)
             return
         current = _quota_of(heat)
         wanted = current - 1

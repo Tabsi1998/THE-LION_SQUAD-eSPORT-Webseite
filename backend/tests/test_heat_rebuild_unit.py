@@ -343,3 +343,47 @@ def test_quota_regrowth_counts_what_a_driven_heat_already_delivered():
     play_through(matches, stage, random.Random(19))
     assert len(final_of(matches)["results"]) <= 4
     assert all(len(m["results"]) <= 4 for m in played_heats(matches))
+
+
+# Das Finale hat fünf Plätze (wie nach einem Zusammenlegen): drei aus den gefahrenen B und C, zwei aus A.
+TWELVE_WIDE_FINAL = """[WB]
+# Runde 1
+A=[1,2,3,4]
+B=[5,6,7,8]
+C=[9,10,11,12]
+# Finale
+F=[W:B:1,W:B:2,W:C:1,W:A:1,W:A:2]
+"""
+
+
+def test_a_called_target_is_never_touched_and_the_overflow_is_a_conflict():
+    """#2033 (Codex-Prüfung): B und C sind gefahren, das Finale F hat drei Fahrer und erwartet zwei aus A - fünf bei
+    Laufgröße 4. F ist aufgerufen: der Planer darf es nicht anfassen (keine Plätze, kein Stand), wie bei der Quote
+    (``_apply_quota``). Der Überlauf darf aber nicht still bleiben: der Umbau wird als Konflikt abgelehnt (409), bis
+    jemand den Aufruf zurücknimmt oder der Lauf entschieden ist. Danach kappt der Planer A wie sonst."""
+    from services.heat_rebuild import HeatRebuildError
+
+    matches, stage = build(12, TWELVE_WIDE_FINAL)
+    heats = by_key(matches)
+    apply_result(matches, heats["B"], ["r5", "r6", "r7", "r8"])
+    apply_result(matches, heats["C"], ["r9", "r10", "r11", "r12"])
+    final = heats["F"]
+    assert filled_ids(final) == ["r5", "r6", "r9"]
+    final["status"] = "scheduled"
+    final["scheduled_at"] = NOW
+    final["called_at"] = NOW
+    before = (final["status"], final["called_at"], [dict(slot) for slot in final["slots"]])
+    with pytest.raises(HeatRebuildError) as caught:
+        rebuild(matches, stage)
+    assert caught.value.status_code == 409 and "F" in caught.value.detail and "5" in caught.value.detail
+    assert (final["status"], final["called_at"], [dict(slot) for slot in final["slots"]]) == before
+    assert heats["A"]["settings"]["qualifiers_per_match"] == 2, "ohne Platz im Ziel bleibt auch die Quelle, wie sie ist"
+    # Aufruf zurückgenommen: jetzt kappt der Planer A auf 1, der fünfte Platz wird „Quelle unerfüllbar“.
+    final["called_at"] = None
+    final["status"] = "pending"
+    result = rebuild(matches, stage)
+    assert heats["A"]["settings"]["qualifiers_per_match"] == 1
+    assert [op["kind"] for op in result["ops"]] == ["quota"]
+    fifth = final["slots"][4]
+    assert fifth["status"] == "bye" and fifth["source_result"]["reason"] == "source_unfulfillable"
+    assert rebuild(matches, stage)["ops"] == []
