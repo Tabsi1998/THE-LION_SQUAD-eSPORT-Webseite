@@ -596,3 +596,50 @@ gilt hier nicht. Web: `SeasonTableSection.jsx`, `OfficialTeamTotals.jsx` (`image
   Ergebnisblatt über `OfficialTeamTotals` → `onImage` an den Termin des Blatts. „Nicht anhängen“ lässt es weg.
 - **Tests:** `backend/tests/season_table_image_fixture.py` zeichnet die Tabelle im PRL-Layout mit erfundenen Teams (12 ×
   17 Runden, eine Strafe); `test_result_image_table.py` prüft „stimmt oder gelb“ für jede Zelle.
+
+## Art-Profil (#2024)
+
+Jede Spur-Art hat ein Profil an einer Stelle: `backend/services/series_kinds.py` (`PROFILES`). Web, Verwaltung und
+Server lesen es statt eigener Weichen je Art.
+
+- **Teile:** `fields` (Ort `venue`, Land `country`, Läufe `session`, Gegner `opponent`, Rennergebnis `race_details`,
+  schnellste Runde und Fahrer des Tages `race_extras`, F1-Boni `race_bonuses`, `team_scoring`, `start_number`,
+  Turniertag `day_rounds`, `double_up`, Namen ohne Tag `name_tags`, Marken `marks`, `result_needs_day`,
+  `original_kinds`), `vocab` (Termin `round_one`/`round_many`/`round_dative`, `progress_verb`, `next_round`,
+  `code_prefix`, Person `person_one`/`person_many`/`club_people`, `place_title`, `standings_label`, `team_scoring`,
+  `venue_label`, `no_round` „Noch kein Termin“, `open_round` „Termin folgt“), `default_rules` (vollständig über
+  `normalize_rules`), `templates` (passende Punkteschema-Vorlagen), `placeholders` und `examples` für die Formulare.
+- **Ausgeliefert:** `GET …/admin` → `kind_profiles` (alle Arten), `GET …/admin/series/<id>` → `profile` (auch für
+  Captains), `GET …/results` → `series.profile`, Serienseite → `profile` und „Läuft gerade“ je Eintrag `profile` (beides
+  `public_profile`: Art, Name, Felder, Begriffe). Profil im Mitgliederprofil: `appearances.unit_words`. Nur ergänzt -
+  `unit`, `default_rules` und alle bisherigen Felder bleiben für die heutige App.
+- **Rückfall im Web:** `frontend/src/lib/seriesKinds.js` (`kindWord`, `kindShows`, `kindList`) - fehlt das Profil
+  (ältere Antwort), gibt jede Stelle ihren bisherigen Wert mit.
+- **Turnierserie (TFT):** kein Ort, kein Land, kein Lauf, kein Gegner. Der Server nimmt sie beim Anlegen und Ändern
+  eines Termins nicht an (still übergangen, damit ältere Formulare keinen Fehler sehen), die Terminliste liest sie
+  nicht, und öffentlich (Serienseite, Kalender, „Läuft gerade“) gehen sie leer hinaus (`reference_round_routes.public_round`).
+  Eine Zeile ohne Datum ist ein offener Termin (Rennliga: nächster Wochentag). Neue Saison ohne Vorlage: TFT-Regeln
+  (`TFT_RULES`: 5 Runden 8…1, Saisonpunkte 35-30-26 …, Vorrang Siege/Top 4/Countback, `double_up` aus). Vorlage `tft`;
+  `formula_1` nur noch für die Rennliga (Migration 12, nur wenn die Vorlage unverändert ist).
+- **Double Up als Schalter:** Regel `double_up` (Vorgabe aus) belegt den Haken „Double Up“ eines neuen Blatts vor.
+- **Gewertet nur mit Datum:** `PUT …/results` mit `status: "published"` und `POST …/results/approve` für einen Termin
+  ohne Datum brauchen `round_day` (JJJJ-MM-TT), sonst 422 mit `errors[0].code = "round_without_day"`, bevor etwas
+  geschrieben ist. Der Tag kommt mit der gemerkten Uhrzeit an den Termin, er rückt vor die offenen Termine
+  (Protokoll `reference_round.day_from_result`). Gilt, wo das Profil `result_needs_day` hat (nicht Team-Liga).
+- **Datum nachtragen:** `POST …/rounds/dates` (`{items: [{id, day, time?}], expected_version}`) gibt mehreren Terminen
+  ohne Datum ihren Tag in einem Vorgang (ohne Uhrzeit die gemerkte), sortiert sie ein und rechnet einmal neu
+  (Protokoll `reference_round.dates`). Ein Termin mit Datum → 422 („Verschieben“).
+- **„Läuft gerade“:** Sortiert wird heute → nächster Termin mit Datum → nächster Termin ohne Datum → kein Termin. Eine
+  laufende Saison, die nur offene Termine hat, steht damit nicht hinter Saisons ohne kommenden Termin.
+
+### So kommt ein neues Spiel dazu
+
+1. **Passt es zu einer Art?** Rennen mit Plätzen und Zeiten → `racing`; Turniertage mit Runden und Lobbys → `series`;
+   Spiele Team gegen Team mit Tabelle → `team_league`. Dann reicht im Admin eine neue Spur dieser Art, dazu eine
+   Punkteschema-Vorlage in den Einstellungen (`settings.points_schemes`, Feld `kinds`), falls die Standardregeln nicht
+   passen. Programmiert wird nichts.
+2. **Andere Begriffe oder Felder?** Ein neuer Eintrag in `PROFILES` (und in `reference_series.SERIES_KINDS`, im Modell
+   `ReferenceSeriesKind` und in `KIND_OPTIONS` im Web): Felder als Schalter, Begriffe, Standardregeln, Vorlagen,
+   Platzhalter. Die Tests in `test_series_kinds_unit.py` prüfen, dass jedes Profil vollständig ist.
+3. **Neues Feld oder neue Rechnung?** Erst dann wird programmiert: Feld im Ergebnisblatt bzw. Termin, Schalter in
+   `FIELD_KEYS`, Rechnung in `scoring_rules`/`series_standings`. Die App liest das Profil mit dem App-Nachzug.

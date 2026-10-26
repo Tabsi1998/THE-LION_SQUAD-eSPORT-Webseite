@@ -48,7 +48,9 @@ async def _setup(flow, *, kind: str = "racing", people=None):
     board["areas"] = ["content"]
     flow.act_as(board)
     lineage = (await flow.post(f"{ADMIN}/lineages", json={"title": "Probe Liga", "kind": kind, "label": "F1"})).json()
-    body = {"lineage_id": lineage["id"], "season": "2026", "points_scheme_id": "formula_1"}
+    # #2024: „Formel 1“ passt nur zur Rennliga - andere Arten starten mit ihren Standardregeln.
+    scheme = {"points_scheme_id": "formula_1"} if kind == "racing" else {}
+    body = {"lineage_id": lineage["id"], "season": "2026", **scheme}
     series = (await flow.post(f"{ADMIN}/series", json=body)).json()
     other = (await flow.post(f"{ADMIN}/series", json={"lineage_id": lineage["id"], "season": "2027"})).json()
     round_doc = (await flow.post(f"{ADMIN}/series/{series['id']}/rounds",

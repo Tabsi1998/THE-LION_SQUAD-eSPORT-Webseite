@@ -5,10 +5,12 @@ import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { STATE_LABELS, STATE_TONES, dayLabel, moveIds, opponentText, roundLabel, roundWhen, suggestNextDay } from "@/lib/referenceCalendar";
 import { groupWeekends, hasSessions, sessionLabel } from "@/lib/raceWeekend";
 import { PasteSheet, PostponeSheet, RoundSheet } from "./RoundSheets";
+import { DatesSheet, GuideSteps, guideSteps, undatedRounds } from "./CalendarGuide";
+import { kindShows, kindWord } from "@/lib/seriesKinds";
 import { VenueWithFlag } from "@/components/tls/CountryFlag";
 import { noScoreText } from "@/lib/seriesSpecialRules";
 import { toast } from "sonner";
-import { AlertTriangle, Archive, ArchiveRestore, ArrowDown, ArrowDownUp, ArrowUp, Ban, CalendarClock, CalendarPlus, ClipboardList, Pencil, Plus, RotateCcw } from "lucide-react";
+import { AlertTriangle, Archive, ArchiveRestore, ArrowDown, ArrowDownUp, ArrowUp, Ban, CalendarCheck, CalendarClock, CalendarPlus, ClipboardList, Pencil, Plus, RotateCcw } from "lucide-react";
 
 // Kalender der Saison (#1742): Termine einzeln oder als eingefügte Liste, Standard-Wochentag und -Uhrzeit der Saison als
 // Vorgabe, Bearbeiten, Verschieben (der ursprüngliche Termin bleibt stehen), Absagen (zählt nie als „Ergebnis fehlt“),
@@ -19,12 +21,12 @@ import { AlertTriangle, Archive, ArchiveRestore, ArrowDown, ArrowDownUp, ArrowUp
 const ORDERED_STATES = ["today", "missing", "planned", "postponed", "scored", "cancelled"];
 const ICON_BUTTON = "p-1.5 rounded-sm text-white/50 hover:text-white hover:bg-white/5 disabled:opacity-25 disabled:hover:bg-transparent transition";
 
-function RoundNotes({ round }) {
+function RoundNotes({ round, profile = null }) {
   if (round.kind !== "final" && round.counts !== false && !round.original_club_day && !round.status_note) return null;
   return (
     <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-white/45">
       {round.kind === "final" && <span className="uppercase tracking-widest font-bold text-[#29B6E8]">Finale</span>}
-      {round.counts === false && <span data-testid="round-no-score">{noScoreText(round) || "zählt nicht zur Wertung"}</span>}
+      {round.counts === false && <span data-testid="round-no-score">{noScoreText(round, profile) || "zählt nicht zur Wertung"}</span>}
       {round.original_club_day && <span data-testid="round-original">ursprünglich {dayLabel(round.original_club_day)}</span>}
       {round.status_note && <span>– {round.status_note}</span>}
     </div>
@@ -35,6 +37,15 @@ function StateBadge({ state }) {
   return (
     <span className={`inline-flex items-center px-2 py-0.5 border rounded-sm text-[10px] font-bold uppercase tracking-widest whitespace-nowrap ${STATE_TONES[state] || STATE_TONES.planned}`} data-testid="round-state">
       {STATE_LABELS[state] || state}
+    </span>
+  );
+}
+
+// #2024: eigener Zustand „ohne Datum“ neben dem Status - ein offener Termin ist geplant, aber noch nicht festgelegt.
+function UndatedBadge() {
+  return (
+    <span className="tls-undated-badge inline-flex items-center px-2 py-0.5 border border-dashed border-amber-300/50 rounded-sm text-[10px] font-bold uppercase tracking-widest whitespace-nowrap text-amber-200/90" data-testid="round-undated">
+      ohne Datum
     </span>
   );
 }
@@ -80,12 +91,19 @@ export function SeriesCalendarSection({ series }) {
   };
 
   const saved = () => { setSheet(null); load(); };
-  const rounds = calendar?.rounds || [];
+  const allRounds = calendar?.rounds || [];
+  // Art-Profil (#2024): Ort und Flagge nur, wo die Art sie führt; Begriffe („Turniertage“) aus dem Profil.
+  const profile = series.profile || null;
+  const places = kindShows(profile, "venue");
+  const undated = undatedRounds(allRounds);
+  const [onlyUndated, setOnlyUndated] = useState(false);
+  const filtering = onlyUndated && undated.length > 0;
+  const rounds = filtering ? allRounds.filter((round) => undated.includes(round)) : allRounds;
   const archived = calendar?.archived || [];
   const hints = calendar?.hints || [];
   const counts = calendar?.counts || {};
   const hintIds = new Set(hints.map((hint) => hint.round_id));
-  const weekends = lineage.kind === "racing" && hasSessions(rounds) ? groupWeekends(rounds) : null;
+  const weekends = !filtering && lineage.kind === "racing" && hasSessions(rounds) ? groupWeekends(rounds) : null;
   const nameOf = (round) => (round.session ? sessionLabel(round) : roundLabel(round));
 
   const cancel = async (round) => {
@@ -97,17 +115,19 @@ export function SeriesCalendarSection({ series }) {
     run(() => api.post(`${base}/${round.id}/archive`, { expected_version: calendar?.version }), "Termin archiviert.");
   };
   const move = (index, step) => {
-    const ids = moveIds(rounds, index, step);
+    const ids = moveIds(allRounds, index, step);
     if (ids) run(() => api.post(`${base}/order`, { ids, expected_version: calendar?.version }));
   };
+  // Mit Filter „ohne Datum“ fehlt die ganze Reihenfolge - Ordnen geht dann nicht.
   const actions = (round, index) => (
     <div className="flex items-center shrink-0">
-      <button type="button" className={ICON_BUTTON} disabled={busy || index === 0} onClick={() => move(index, -1)} aria-label={`${nameOf(round)} nach oben`} title="Nach oben"><ArrowUp className="w-3.5 h-3.5" /></button>
-      <button type="button" className={ICON_BUTTON} disabled={busy || index === rounds.length - 1} onClick={() => move(index, 1)} aria-label={`${nameOf(round)} nach unten`} title="Nach unten"><ArrowDown className="w-3.5 h-3.5" /></button>
+      <button type="button" className={ICON_BUTTON} disabled={busy || filtering || index === 0} onClick={() => move(index, -1)} aria-label={`${nameOf(round)} nach oben`} title="Nach oben"><ArrowUp className="w-3.5 h-3.5" /></button>
+      <button type="button" className={ICON_BUTTON} disabled={busy || filtering || index === allRounds.length - 1} onClick={() => move(index, 1)} aria-label={`${nameOf(round)} nach unten`} title="Nach unten"><ArrowDown className="w-3.5 h-3.5" /></button>
       <button type="button" className={ICON_BUTTON} onClick={() => setSheet({ type: "round", round })} aria-label={`${nameOf(round)} bearbeiten`} title="Bearbeiten" data-testid="round-edit"><Pencil className="w-3.5 h-3.5" /></button>
       {round.state !== "scored" && round.status !== "cancelled" && (
         <>
-          <button type="button" className={ICON_BUTTON} onClick={() => setSheet({ type: "postpone", round })} aria-label={`${nameOf(round)} verschieben`} title="Verschieben" data-testid="round-postpone"><CalendarClock className="w-3.5 h-3.5" /></button>
+          {/* #2024: ohne Datum ist „Verschieben“ der falsche Weg - dafür gibt es „Datum nachtragen“. */}
+          {round.club_day && <button type="button" className={ICON_BUTTON} onClick={() => setSheet({ type: "postpone", round })} aria-label={`${nameOf(round)} verschieben`} title="Verschieben" data-testid="round-postpone"><CalendarClock className="w-3.5 h-3.5" /></button>}
           <button type="button" className={ICON_BUTTON} disabled={busy} onClick={() => cancel(round)} aria-label={`${nameOf(round)} absagen`} title="Absagen" data-testid="round-cancel"><Ban className="w-3.5 h-3.5" /></button>
         </>
       )}
@@ -130,7 +150,7 @@ export function SeriesCalendarSection({ series }) {
   };
   const openNew = () => setSheet({
     type: "round",
-    suggestion: { day: suggestNextDay(rounds, series.default_weekday, calendar?.today), time: series.default_time || "" },
+    suggestion: { day: suggestNextDay(allRounds, series.default_weekday, calendar?.today), time: series.default_time || "" },
   });
 
   return (
@@ -138,10 +158,12 @@ export function SeriesCalendarSection({ series }) {
       <div className="flex items-start justify-between gap-3 flex-wrap">
         <div className="min-w-0">
           <h2 id="series-calendar-title" className="text-[11px] font-bold uppercase tracking-widest text-[#29B6E8]">Kalender</h2>
-          {rounds.length > 0 && (
+          {/* „N von M“ auch bei 0 (#2024): mit geplanter Zahl steht der Zähler schon im leeren Kalender. */}
+          {(allRounds.length > 0 || planned) && (
             <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-white/55" data-testid="series-calendar-counts">
-              <span>{rounds.length} Termine</span>
-              {planned && <span data-testid="series-calendar-planned">{planned.count} von {planned.planned} vorgesehenen angelegt</span>}
+              {allRounds.length > 0 && <span>{allRounds.length} {profile ? kindWord(profile, allRounds.length === 1 ? "round_one" : "round_many", "Termine") : "Termine"}</span>}
+              {planned && <span data-testid="series-calendar-planned">{planned.count} von {planned.planned} {profile ? kindWord(profile, "round_dative", "Terminen") : "vorgesehenen"} angelegt</span>}
+              {undated.length > 0 && <span className="text-amber-200/90" data-testid="series-calendar-undated">{undated.length} ohne Datum</span>}
               {ORDERED_STATES.filter((state) => counts[state]).map((state) => (
                 <span key={state} className={state === "missing" ? "text-amber-300" : undefined}>{counts[state]} {STATE_LABELS[state].toLowerCase()}</span>
               ))}
@@ -149,7 +171,12 @@ export function SeriesCalendarSection({ series }) {
           )}
         </div>
         {board && <div className="flex items-center gap-2 flex-wrap">
-          {rounds.length > 1 && (
+          {undated.length > 0 && (
+            <button type="button" onClick={() => setSheet({ type: "dates" })} disabled={busy} data-testid="calendar-dates" className="tls-btn tls-btn--secondary px-3 py-2 rounded-sm text-xs font-bold uppercase tracking-wider inline-flex items-center gap-2">
+              <CalendarCheck className="w-3.5 h-3.5" /> Datum nachtragen ({undated.length})
+            </button>
+          )}
+          {allRounds.length > 1 && (
             <button type="button" onClick={() => run(() => api.post(`${base}/sort-by-date`, { expected_version: calendar?.version }), "Nach Datum geordnet.")} disabled={busy} data-testid="calendar-sort" className="tls-btn tls-btn--quiet px-3 py-2 rounded-sm text-xs font-bold uppercase tracking-wider inline-flex items-center gap-2">
               <ArrowDownUp className="w-3.5 h-3.5" /> Nach Datum ordnen
             </button>
@@ -177,28 +204,42 @@ export function SeriesCalendarSection({ series }) {
         </div>
       )}
 
-      {calendar && rounds.length === 0 && (
+      {calendar && allRounds.length === 0 && (
         <p className="mt-3 text-sm text-white/55" data-testid="calendar-empty">
           {board ? "Noch keine Termine. Einzeln mit „Termin“ oder alle auf einmal mit „Liste einfügen“." : "Noch keine Termine."}
         </p>
       )}
+      {/* Geführter Ablauf (#2024): was noch fehlt, Schritt für Schritt - verschwindet, sobald alles da ist. */}
+      {board && calendar && <GuideSteps steps={guideSteps({ rounds: allRounds, planned, plannedRounds: series.planned_rounds, profile })} />}
+      {undated.length > 0 && allRounds.length > undated.length && (
+        <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
+          <button type="button" aria-pressed={filtering} onClick={() => setOnlyUndated((value) => !value)} data-testid="calendar-filter-undated"
+            className={`px-2.5 py-1 rounded-sm border font-bold uppercase tracking-wider transition-colors active:scale-[0.97] ${filtering ? "border-amber-300/60 bg-amber-300/10 text-amber-200" : "border-white/10 text-white/55 hover:text-white"}`}>
+            Nur ohne Datum ({undated.length})
+          </button>
+        </div>
+      )}
 
       {rounds.length > 0 && !weekends && (
         <ol className="mt-3 divide-y divide-white/5" data-testid="calendar-rounds">
-          {rounds.map((round, index) => (
+          {rounds.map((round) => (
             <li key={round.id} data-testid="calendar-round" data-state={round.state} className={`py-2.5 flex flex-wrap sm:flex-nowrap items-start gap-x-3 gap-y-1 ${hintIds.has(round.id) ? "bg-amber-400/[0.04]" : ""}`}>
-              <div className="min-w-12 shrink-0 whitespace-nowrap pt-0.5 text-sm font-black tabular-nums text-white/80">{roundLabel(round)}</div>
+              <div className="min-w-12 max-w-[40%] shrink-0 pt-0.5 text-sm font-black tabular-nums text-white/80 [overflow-wrap:anywhere]">{roundLabel(round)}</div>
               <div className="min-w-0 flex-1">
                 <div className={`text-sm ${round.state === "cancelled" ? "text-white/45" : "text-white"}`}>
                   <span className="tabular-nums">{roundWhen(round)}</span>
-                  {(round.venue || round.title || round.country_code) && <span className="text-white/60"> · <VenueWithFlag round={round} /></span>}
+                  {places ? (round.venue || round.title || round.country_code) && <span className="text-white/60"> · <VenueWithFlag round={round} /></span>
+                    : round.title && <span className="text-white/60 [overflow-wrap:anywhere]"> · {round.title}</span>}
                   {round.opponent && <span className="text-white/60"> · {opponentText(round)}</span>}
                 </div>
-                <RoundNotes round={round} />
+                <RoundNotes round={round} profile={profile} />
               </div>
-              <StateBadge state={round.state} />
+              <div className="flex flex-wrap items-center justify-end gap-1">
+                {undated.includes(round) && <UndatedBadge />}
+                <StateBadge state={round.state} />
+              </div>
               {/* Handy: die Knöpfe unter dem Termin (bis zu sechs) – sonst bleibt für Tag und Uhrzeit kein Platz. */}
-              {board && <div className="w-full sm:w-auto flex justify-end">{actions(round, index)}</div>}
+              {board && <div className="w-full sm:w-auto flex justify-end">{actions(round, allRounds.indexOf(round))}</div>}
             </li>
           ))}
         </ol>
@@ -227,7 +268,7 @@ export function SeriesCalendarSection({ series }) {
                       <span className={`text-[11px] font-bold uppercase tracking-[0.1em] [overflow-wrap:anywhere] ${round.state === "cancelled" ? "text-white/40 line-through" : "text-white/75"}`} data-testid="calendar-session">{round.session || "Rennen"}</span>
                       <span className="min-w-0">
                         <span className={`block text-sm tabular-nums ${round.state === "cancelled" ? "text-white/45" : "text-white/85"}`}>{round.club_day !== weekend.lead.club_day ? roundWhen(round) : round.time || "ohne Uhrzeit"}</span>
-                        <RoundNotes round={round} />
+                        <RoundNotes round={round} profile={profile} />
                       </span>
                       <StateBadge state={round.state} />
                       {/* Feste Breite ab sm (sechs Knöpfe): so stehen die Status der Läufe untereinander. */}
@@ -257,9 +298,10 @@ export function SeriesCalendarSection({ series }) {
         </details>
       )}
 
-      {sheet?.type === "round" && <RoundSheet series={series} lineage={lineage} round={sheet.round} rounds={rounds} suggestion={sheet.suggestion} version={calendar?.version} onClose={() => setSheet(null)} onSaved={saved} onStale={load} />}
+      {sheet?.type === "round" && <RoundSheet series={series} lineage={lineage} round={sheet.round} rounds={allRounds} suggestion={sheet.suggestion} version={calendar?.version} onClose={() => setSheet(null)} onSaved={saved} onStale={load} />}
       {sheet?.type === "postpone" && <PostponeSheet series={series} round={sheet.round} version={calendar?.version} onClose={() => setSheet(null)} onSaved={saved} onStale={load} />}
       {sheet?.type === "paste" && <PasteSheet series={series} lineage={lineage} version={calendar?.version} onClose={() => setSheet(null)} onSaved={saved} onStale={load} />}
+      {sheet?.type === "dates" && <DatesSheet series={series} rounds={allRounds} today={calendar?.today} version={calendar?.version} profile={profile} onClose={() => setSheet(null)} onSaved={saved} onStale={load} />}
     </section>
   );
 }

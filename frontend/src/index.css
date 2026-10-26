@@ -3575,3 +3575,10 @@ html[data-season-still-cards] .tls-card[data-season-perch="card"]:focus-visible 
 @media (prefers-reduced-motion: reduce) {
   .tls-register-sheet { animation: tls-register-fade var(--tls-motion-fast) ease-out both; }
 }
+
+/* Geführter Termin-Ablauf (#2024): Abzeichen „ohne Datum“ und Zeilen von „Datum nachtragen“ kommen ruhig herein,
+   ein erledigter Schritt hakt sich kurz ab - mit „Bewegung reduzieren“ nur ein Einblenden ohne Weg. */
+.tls-undated-badge { animation: tls-chip-in var(--tls-motion-mid) var(--tls-ease) both; }
+.tls-dates-row { animation: tls-chip-in var(--tls-motion-mid) var(--tls-ease) both; animation-delay: calc(min(var(--tls-row-i, 0), 8) * 30ms); }
+.tls-guide-step { transition: color var(--tls-motion-mid) var(--tls-ease), opacity var(--tls-motion-mid) var(--tls-ease); }
+.tls-guide-step[data-done="true"] .tls-guide-step__mark { animation: tls-chip-in var(--tls-motion-mid) var(--tls-ease) both; }

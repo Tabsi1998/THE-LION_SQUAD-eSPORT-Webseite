@@ -7,6 +7,7 @@ import { KIND_OPTIONS, VISIBILITY_OPTIONS, lineageToForm, lineagePayload, result
 import { gameOptionLabel } from "@/lib/gameLabels";
 import { moveTier, tierOrderList } from "@/lib/seriesTiers";
 import { organizerSuggestion } from "@/lib/seriesPartners";
+import { profileOf } from "@/lib/seriesKinds";
 import { SeriesPartnersField } from "./SeriesPartnersField";
 import { SeriesLogoField } from "./SeriesLogoField";
 import { ArrowDown, ArrowUp } from "lucide-react";
@@ -15,13 +16,15 @@ import { toast } from "sonner";
 // Spur (#1741): die Klammer über den Saisons, etwa eine Rennliga mit der Bezeichnung „F1“. Die Adresse entsteht aus dem
 // Titel; wird er geändert, leitet die alte Adresse weiter.
 
-export function LineageForm({ lineage, games = [], partners = [], onClose, onSaved }) {
+export function LineageForm({ lineage, games = [], partners = [], profiles = null, onClose, onSaved }) {
   const isNew = !lineage?.id;
   const [form, setForm] = useState(() => lineageToForm(lineage || {}));
   const [saving, setSaving] = useState(false);
   const set = (key, value) => setForm((current) => ({ ...current, [key]: value }));
   const gameOptions = [["", "—"], ...games.map((game) => [game.id, gameOptionLabel(game)])];
   const imageOptions = resultImageOptions(form.kind, { value: form.result_image_template });
+  // Art-Profil (#2024): Platzhalter je Art - eine Turnierserie zeigt keine Rennliga-Vorgabe.
+  const placeholders = profileOf(profiles, form.kind)?.placeholders || {};
   // #1934: Partner mit Rolle; ist einer Veranstalter und das Feld „Veranstalter“ leer, steht sein Name als Vorschlag drin.
   const changePartners = (next) => setForm((current) => {
     const suggestion = organizerSuggestion(partners, next, current.organizer);
@@ -46,10 +49,10 @@ export function LineageForm({ lineage, games = [], partners = [], onClose, onSav
 
   return (
     <AdminSheet title={isNew ? "Neue Spur" : "Spur bearbeiten"} eyebrow="Serien" onClose={onClose} onSubmit={save} saving={saving} submitTestId="lineage-save" testId="lineage-sheet">
-      <TextField label="Titel" required value={form.title} onChange={(v) => set("title", v)} placeholder="Lion Racing F1" testId="lineage-title" />
+      <TextField label="Titel" required value={form.title} onChange={(v) => set("title", v)} placeholder={placeholders.lineage_title || "Lion Racing F1"} testId="lineage-title" />
       <FormGrid>
         <SelectField label="Art" value={form.kind} onChange={(v) => set("kind", v)} options={KIND_OPTIONS} testId="lineage-kind" />
-        <TextField label="Bezeichnung" value={form.label} onChange={(v) => set("label", v)} placeholder="F1, 4vs4 …" testId="lineage-label" />
+        <TextField label="Bezeichnung" value={form.label} onChange={(v) => set("label", v)} placeholder={placeholders.lineage_label || "F1, 4vs4 …"} testId="lineage-label" />
         <TextField label="Veranstalter" value={form.organizer} onChange={(v) => set("organizer", v)} testId="lineage-organizer" />
         <SelectField label="Spiel" value={form.game_id} onChange={(v) => set("game_id", v)} options={gameOptions} testId="lineage-game" />
         <TextField label="Seite des Veranstalters" value={form.external_url} onChange={(v) => set("external_url", v)} placeholder="https://…" testId="lineage-external-url" />

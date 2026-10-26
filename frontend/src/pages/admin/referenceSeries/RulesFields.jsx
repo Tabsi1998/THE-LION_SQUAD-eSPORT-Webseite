@@ -2,13 +2,35 @@ import { FormGrid, FormSection } from "@/components/tls/AdminForm";
 import { CheckField, SelectField, TextField } from "@/components/tls/FormFields";
 import { COUNT_MODE_OPTIONS, DOUBLE_UP_OPTIONS, POINTS_MODE_OPTIONS, TABLE_TIEBREAKER_OPTIONS, TIEBREAKER_OPTIONS, emptyBonus } from "@/lib/referenceSeries";
 import { TEAM_MODE_OPTIONS } from "@/lib/seriesSpecialRules";
+import { kindShows, kindWord } from "@/lib/seriesKinds";
 import { Plus, X } from "lucide-react";
 
 // Regeln einer Serie (#1741) - alles einstellbar, nichts fest verdrahtet. Die Felder kommen aus `rulesToForm`, gerechnet
 // wird im Server. Eine Team-Liga braucht nur Sieg/Unentschieden/Niederlage und den Vorrang ihrer Tabelle.
 // Turnierserie (#1961): dazu Runden je Turniertag mit Rundenpunkten und eigene Sonderboni; „Top N“ beim Vorrang.
 
-function TournamentDayFields({ rules, set }) {
+function DoubleUpPoints({ rules, set }) {
+  // #2015: wie PineApps bekommt ein Team auf Platz k die Punkte von Einzelplatz 2k−1 (Team 2 → Platz 3).
+  return (
+    <SelectField label="Double-Up-Punkte" value={rules.double_up_points || "best_player_place"} onChange={(v) => set("double_up_points", v)} options={DOUBLE_UP_OPTIONS}
+      hint="Team-Platz k: beide Spieler bekommen die Punkte von Platz 2k−1 (Team 2 → Platz 3) oder die von Platz k." testId="series-rules-double-up" />
+  );
+}
+
+// Double Up (#2024) statt der Teamwertung einer Rennliga: als Schalter der Saison - eingeschaltet steht der Haken im
+// Ergebnisblatt schon gesetzt; je Turniertag lässt er sich trotzdem ändern.
+function DoubleUpFields({ rules, set }) {
+  return (
+    <FormSection title="Double Up" hint="Zweierteams teilen Platz und Punkte. Eingeschaltet ist „Double Up“ im Ergebnisblatt schon angehakt – je Turniertag änderbar." plain testId="series-rules-double-up-section">
+      <CheckField label="Diese Saison spielt Double Up" checked={Boolean(rules.double_up)} onChange={(v) => set("double_up", v)} testId="series-rules-double-up-on" />
+      <FormGrid>
+        <DoubleUpPoints rules={rules} set={set} />
+      </FormGrid>
+    </FormSection>
+  );
+}
+
+function TournamentDayFields({ rules, set, doubleUpHere }) {
   const on = Number(rules.day_rounds_count) > 0;
   const bonuses = rules.custom_bonuses || [];
   const setBonus = (formKey, values) => set("custom_bonuses", bonuses.map((bonus) => (bonus.formKey === formKey ? { ...bonus, ...values } : bonus)));
@@ -17,9 +39,7 @@ function TournamentDayFields({ rules, set }) {
       <FormGrid cols={3}>
         <TextField label="Runden je Turniertag" type="number" min="0" max="20" value={rules.day_rounds_count} onChange={(v) => set("day_rounds_count", v)} hint="Leer oder 0: keine Runden." testId="series-rules-day-rounds" />
         {on && <TextField label="Rundenpunkte je Platz" value={rules.day_rounds_points} onChange={(v) => set("day_rounds_points", v)} placeholder="8, 7, 6, 5, 4, 3, 2, 1" hint="Platz in der Lobby samt Bots, Platz 1 zuerst." testId="series-rules-day-points" />}
-        {/* #2015: wie PineApps bekommt ein Team auf Platz k die Punkte von Einzelplatz 2k−1 (Team 2 → Platz 3). */}
-        <SelectField label="Double-Up-Punkte" value={rules.double_up_points || "best_player_place"} onChange={(v) => set("double_up_points", v)} options={DOUBLE_UP_OPTIONS}
-          hint="Team-Platz k: beide Spieler bekommen die Punkte von Platz 2k−1 (Team 2 → Platz 3) oder die von Platz k." testId="series-rules-double-up" />
+        {doubleUpHere && <DoubleUpPoints rules={rules} set={set} />}
       </FormGrid>
       <div className="space-y-2" data-testid="series-rules-bonuses">
         {bonuses.map((bonus, index) => (
@@ -41,10 +61,19 @@ function TournamentDayFields({ rules, set }) {
   );
 }
 
-export function RulesFields({ rules, kind, onChange }) {
+export function RulesFields({ rules, kind, profile = null, onChange }) {
   const set = (key, value) => onChange({ ...rules, [key]: value });
   const setAt = (key, index, value) => onChange({ ...rules, [key]: rules[key].map((item, at) => (at === index ? value : item)) });
   const scheme = rules.points_mode === "scheme";
+  // Art-Profil (#2024): F1-Boni und Ausfall nur bei der Rennliga, die Teamwertung („je Rennen, Fahrer, Ersatzfahrer“) nur
+  // dort - eine Turnierserie hat stattdessen Double Up. Ohne Profil wie bisher. Eine eingeschaltete Teamwertung bleibt
+  // sichtbar, damit niemand sie unbemerkt behält.
+  const raceBonuses = kindShows(profile, "race_bonuses");
+  const teamScoring = kindShows(profile, "team_scoring") || Boolean(rules.team_enabled);
+  const doubleUp = kindShows(profile, "double_up", false);
+  const days = kindShows(profile, "day_rounds", kind === "series");
+  const round = kindWord(profile, "round_one", "Runde");
+  const roundsOf = kindWord(profile, "round_many", "Runden");
 
   if (kind === "team_league") {
     return (
@@ -65,12 +94,12 @@ export function RulesFields({ rules, kind, onChange }) {
 
   return (
     <>
-      <FormSection title="Punkte" hint="Punkte je Platz oder wie beim Veranstalter. Boni, Ausfall und Strafen gelten nur bei Punkten je Platz." plain testId="series-rules-points-section">
+      <FormSection title="Punkte" hint={raceBonuses ? "Punkte je Platz oder wie beim Veranstalter. Boni, Ausfall und Strafen gelten nur bei Punkten je Platz." : `Punkte je Platz am ${round} oder wie beim Veranstalter.`} plain testId="series-rules-points-section">
         <FormGrid>
           <SelectField label="Punkte" value={rules.points_mode} onChange={(v) => set("points_mode", v)} options={POINTS_MODE_OPTIONS} testId="series-rules-points-mode" />
-          {scheme && <TextField label="Punkte je Platz" value={rules.points_by_place} onChange={(v) => set("points_by_place", v)} placeholder="25, 18, 15, 12, 10" hint="Platz 1 zuerst, dahinter 0." testId="series-rules-points" />}
+          {scheme && <TextField label="Punkte je Platz" value={rules.points_by_place} onChange={(v) => set("points_by_place", v)} placeholder={raceBonuses ? "25, 18, 15, 12, 10" : "35, 30, 26, 23, 20"} hint="Platz 1 zuerst, dahinter 0." testId="series-rules-points" />}
         </FormGrid>
-        {scheme && (
+        {scheme && raceBonuses && (
           <FormGrid cols={3}>
             <TextField label="Schnellste Runde: Bonus" type="number" step="any" min="0" value={rules.fastest_lap_points} onChange={(v) => set("fastest_lap_points", v)} testId="series-rules-fastest-lap" />
             <TextField label="… nur bis Platz" type="number" min="1" value={rules.fastest_lap_max_place} onChange={(v) => set("fastest_lap_max_place", v)} hint="Leer: auf jedem Platz." testId="series-rules-fastest-lap-place" />
@@ -82,19 +111,20 @@ export function RulesFields({ rules, kind, onChange }) {
         )}
       </FormSection>
 
-      <FormSection title="Was zählt" hint="Bei Streichergebnissen zählen die besten „Runden im Kalender minus N“; wer weniger Ergebnisse hat, dem zählt alles." plain testId="series-rules-count-section">
+      <FormSection title="Was zählt" hint={`Bei Streichergebnissen zählen die besten „${roundsOf} im Kalender minus N“; wer weniger Ergebnisse hat, dem zählt alles.`} plain testId="series-rules-count-section">
         <FormGrid cols={3}>
-          <SelectField label="Wertung" value={rules.count_mode} onChange={(v) => set("count_mode", v)} options={COUNT_MODE_OPTIONS} testId="series-rules-count-mode" />
+          <SelectField label="Wertung" value={rules.count_mode} onChange={(v) => set("count_mode", v)} options={countOptions(profile)} testId="series-rules-count-mode" />
           {rules.count_mode !== "all" && <TextField label="N" type="number" min="0" value={rules.count_n} onChange={(v) => set("count_n", v)} testId="series-rules-count-n" />}
           <TextField label="Finale: die besten" type="number" min="1" value={rules.final_top_n} onChange={(v) => set("final_top_n", v)} hint="Leer: kein Finale." testId="series-rules-final" />
-          <TextField label="Aktivitätspunkte je Runde" type="number" step="any" min="0" value={rules.activity_points} onChange={(v) => set("activity_points", v)} testId="series-rules-activity" />
-          <TextField label="… ab Runde" type="number" min="1" value={rules.activity_from_round} onChange={(v) => set("activity_from_round", v)} testId="series-rules-activity-from" />
+          <TextField label={`Aktivitätspunkte je ${round}`} type="number" step="any" min="0" value={rules.activity_points} onChange={(v) => set("activity_points", v)} testId="series-rules-activity" />
+          <TextField label={`… ab ${round}`} type="number" min="1" value={rules.activity_from_round} onChange={(v) => set("activity_from_round", v)} testId="series-rules-activity-from" />
           {/* #1960: darunter bleibt ein Termin laut Regeln ohne Wertung - das Eintragen weist darauf hin. */}
           <TextField label="Mindestens am Start" type="number" min="1" value={rules.min_participants} onChange={(v) => set("min_participants", v)} hint="Leer: keine Mindestzahl." testId="series-rules-min-participants" />
         </FormGrid>
       </FormSection>
 
-      {kind === "series" && <TournamentDayFields rules={rules} set={set} />}
+      {days && <TournamentDayFields rules={rules} set={set} doubleUpHere={!doubleUp} />}
+      {doubleUp && <DoubleUpFields rules={rules} set={set} />}
 
       <FormSection title="Vorrang bei Gleichstand" hint="Der Reihe nach; entscheidet keines, teilen sich beide den Platz." plain testId="series-rules-tiebreak-section">
         <FormGrid cols={3}>
@@ -107,7 +137,7 @@ export function RulesFields({ rules, kind, onChange }) {
         </FormGrid>
       </FormSection>
 
-      <FormSection title="Teamwertung" hint="Je Rennen zählen die besten Fahrer eines Teams; das Team je Rennen steht im Ergebnis, sonst gilt das Standard-Team." plain testId="series-rules-team-section">
+      {teamScoring && <FormSection title="Teamwertung" hint="Je Rennen zählen die besten Fahrer eines Teams; das Team je Rennen steht im Ergebnis, sonst gilt das Standard-Team." plain testId="series-rules-team-section">
         <CheckField label="Teamwertung führen" checked={rules.team_enabled} onChange={(v) => set("team_enabled", v)} testId="series-rules-team-enabled" />
         {rules.team_enabled && (
           <FormGrid>
@@ -124,7 +154,14 @@ export function RulesFields({ rules, kind, onChange }) {
               hint="Vorgabe für neue Anpassungen, etwa wenn der Veranstalter Abzüge auch dem Team abzieht. Je Anpassung änderbar." />
           </FormGrid>
         )}
-      </FormSection>
+      </FormSection>}
     </>
   );
+}
+
+/** „Alle Runden zählen“ in den Begriffen der Art („Alle Turniertage zählen“). */
+function countOptions(profile) {
+  const many = kindWord(profile, "round_many", "");
+  if (!many) return COUNT_MODE_OPTIONS;
+  return COUNT_MODE_OPTIONS.map(([value, label]) => [value, value === "all" ? `Alle ${many} zählen` : label]);
 }

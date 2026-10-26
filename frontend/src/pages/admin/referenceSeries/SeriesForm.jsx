@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { api, formatApiError } from "@/lib/api";
 import { AdminSheet } from "@/components/tls/AdminSheet";
-import { FormGrid } from "@/components/tls/AdminForm";
+import { FormGrid, FormSection } from "@/components/tls/AdminForm";
+import { kindShows, kindWord } from "@/lib/seriesKinds";
 import { CheckField, SelectField, TextAreaField, TextField } from "@/components/tls/FormFields";
 import { PUBLISH_OPTIONS, STATUS_OPTIONS, VISIBILITY_OPTIONS, WEEKDAY_OPTIONS, parsePointsList, resultImageOptions, rulesToForm, seriesPayload, seriesToForm } from "@/lib/referenceSeries";
 import { SEASON_RESULT_OPTIONS } from "@/lib/seriesTiers";
@@ -20,20 +21,32 @@ import { toast } from "sonner";
 // verknüpft). Ändert sich beim Bearbeiten eine Regel, rechnet der Server alle Stände neu und vermerkt den Hinweis.
 // Rennliga (#1930): dazu „Ablauf je Runde“ - der Ablauf einer Runde mit Läufen, auch ab Runde X wechselnd.
 
-export function SeriesForm({ series, lineage, schemes = [], defaultRules = {}, partners = [], onClose, onSaved }) {
+// Art-Profil (#2024): eine neue Saison startet mit der passenden Vorlage der Art (Turnierserie: TFT-Turniertag) bzw.
+// ihren Standardregeln; Felder, die die Art nicht kennt, stehen nicht da.
+function startScheme(profile, schemes, kind) {
+  const fitting = (profile?.templates || []).filter((id) => id !== "organizer");
+  return schemes.find((scheme) => fitting.includes(scheme.id) && (!scheme.kinds?.length || scheme.kinds.includes(kind))) || null;
+}
+
+export function SeriesForm({ series, lineage, schemes = [], defaultRules = {}, partners = [], profile = null, onClose, onSaved }) {
   const isNew = !series?.id;
   const archived = series?.status === "archived";
-  const [form, setForm] = useState(() => seriesToForm({ ...(series || {}), lineage_id: lineage.id }, isNew ? defaultRules : series.rules));
+  const [form, setForm] = useState(() => {
+    if (!isNew) return seriesToForm({ ...series, lineage_id: lineage.id }, series.rules);
+    const scheme = startScheme(profile, schemes, lineage.kind);
+    return seriesToForm({ lineage_id: lineage.id, points_scheme_id: scheme?.id || "" }, scheme?.rules || profile?.default_rules || defaultRules);
+  });
   const [saving, setSaving] = useState(false);
   const [weekend, setWeekend] = useState(() => weekendToForm(series?.weekend));
   // Gelernte Team-Schreibweisen aus Bildern (#2012): nur entfernen - es gehen die bleibenden mit.
   const learnedTeams = (series?.read_team_aliases || []).filter((item) => item?.read);
   const [keptTeams, setKeptTeams] = useState(() => learnedTeams);
   const racing = lineage.kind === "racing";
-  const set = (key, value) => setForm((current) => ({ ...current, [key]: value }));
+  const roundsWord = kindWord(profile, "round_many", "Termine");
+  const set =(key, value) => setForm((current) => ({ ...current, [key]: value }));
   const chooseScheme = (id) => {
     const scheme = schemes.find((item) => item.id === id);
-    setForm((current) => ({ ...current, points_scheme_id: id, rules: rulesToForm(scheme ? scheme.rules : defaultRules) }));
+    setForm((current) => ({ ...current, points_scheme_id: id, rules: rulesToForm(scheme ? scheme.rules : profile?.default_rules || defaultRules) }));
   };
   // Nachfolger (#1960): eine andere Saison derselben Spur - aus der Übersicht, wenn die Seite die Saisons nicht mitgibt.
   const [seasons, setSeasons] = useState(() => lineage.series || null);
@@ -103,11 +116,6 @@ export function SeriesForm({ series, lineage, schemes = [], defaultRules = {}, p
             hint="Die Saison, die diese ablöst – etwa der Neustart nach einem Abbruch. Die Serienseite verlinkt sie." />
         )}
         <SelectField label="Einträge eines Captains" value={form.publish_mode} onChange={(v) => set("publish_mode", v)} options={PUBLISH_OPTIONS} testId="series-publish-mode" />
-        <SelectField label="Standard-Wochentag" value={form.default_weekday} onChange={(v) => set("default_weekday", v)} options={WEEKDAY_OPTIONS} testId="series-weekday" />
-        <TextField label="Standard-Uhrzeit" type="time" value={form.default_time} onChange={(v) => set("default_time", v)} hint="Wiener Zeit." testId="series-time" />
-        {/* #2015: die Zahl der Termine, auch wenn die Daten noch offen sind – Fortschritt „3 von 9“ und Streichergebnisse. */}
-        <TextField label="Geplante Termine" type="number" min="1" max="200" value={form.planned_rounds} onChange={(v) => set("planned_rounds", v)} placeholder="9"
-          hint="Leer: so viele, wie im Kalender stehen. Zählt für Fortschritt und Streichergebnisse, solange der Kalender kürzer ist." testId="series-planned-rounds" />
         <SelectField label="Sichtbarkeit" value={form.visibility} onChange={(v) => set("visibility", v)} options={VISIBILITY_OPTIONS} testId="series-visibility" />
         <SelectField label="Ergebnis der Saison" value={form.season_result} onChange={(v) => set("season_result", v)} options={SEASON_RESULT_OPTIONS} testId="series-season-result"
           hint="Leer: der Liga-Weg leitet Auf- und Abstieg aus den Stufen ab." />
@@ -118,6 +126,18 @@ export function SeriesForm({ series, lineage, schemes = [], defaultRules = {}, p
             hint="Nur, wenn der Veranstalter in dieser Saison anders aussieht als bei der Spur." />
         )}
       </FormGrid>
+      {/* #2015, #2024: Termine als eigener Block - wie viele es werden und wann sie meist sind. Der Kalender legt die
+          fehlenden danach ohne Datum an; das Datum kommt nach, sobald es feststeht. */}
+      <FormSection title="Termine" plain testId="series-dates"
+        hint={`Steht noch kein Datum fest, reicht die Zahl: Im Kalender legt „Fehlende Termine anlegen“ die ${roundsWord} ohne Datum an, das Datum trägst du später mit „Datum nachtragen“ ein.`}>
+        <FormGrid cols={3}>
+          {/* #2015: die Zahl der Termine, auch wenn die Daten noch offen sind – Fortschritt „3 von 9“ und Streichergebnisse. */}
+          <TextField label={`Geplante ${roundsWord}`} type="number" min="1" max="200" value={form.planned_rounds} onChange={(v) => set("planned_rounds", v)} placeholder="9"
+            hint="Leer: so viele, wie im Kalender stehen. Zählt für Fortschritt und Streichergebnisse, solange der Kalender kürzer ist." testId="series-planned-rounds" />
+          <SelectField label="Standard-Wochentag" value={form.default_weekday} onChange={(v) => set("default_weekday", v)} options={WEEKDAY_OPTIONS} hint="Vorschlag beim Datum nachtragen." testId="series-weekday" />
+          <TextField label="Standard-Uhrzeit" type="time" value={form.default_time} onChange={(v) => set("default_time", v)} hint="Wiener Zeit." testId="series-time" />
+        </FormGrid>
+      </FormSection>
       {/* #2014: eigenes Saison-Logo, etwa „Season 2“ - ohne erbt die Saison das Logo der Spur. */}
       <SeriesLogoField value={form.logo_url} onChange={(v) => set("logo_url", v)} testId="series-logo" inherited={lineage.logo_url || ""}
         hint={`Nur, wenn diese Saison ein eigenes Logo hat. ${inheritedLogoHint(lineage)}`} />
@@ -131,10 +151,13 @@ export function SeriesForm({ series, lineage, schemes = [], defaultRules = {}, p
         inherited={inheritedPartners(lineage, partners)} testPrefix="series-partner"
         hint="Zusätzlich zu den Partnern der Spur, nur für diese Saison – etwa ein Sponsor dieser Season." />
       <TextAreaField label="Beschreibung" value={form.description} onChange={(v) => set("description", v)} testId="series-description" />
-      {/* #1961: „Name#TLS“ und „Name“ sind ohnehin dieselbe Person - öffentlich wahlweise ohne den Tag. */}
-      <CheckField label="Namen ohne Tag der Spielkennung zeigen" checked={form.hide_name_tags} onChange={(v) => set("hide_name_tags", v)} testId="series-hide-tags"
-        hint="Auf der Serienseite steht „TheLostFriday#TLS“ dann als „TheLostFriday“. Die Verwaltung zeigt immer den vollen Namen." />
-      <RulesFields rules={form.rules} kind={lineage.kind} onChange={(rules) => set("rules", rules)} />
+      {/* #1961: „Name#TLS“ und „Name“ sind ohnehin dieselbe Person - öffentlich wahlweise ohne den Tag (#2024: nur, wo
+          die Art Spielkennungen mit Tag kennt; eine gesetzte Wahl bleibt sichtbar). */}
+      {(kindShows(profile, "name_tags") || form.hide_name_tags) && (
+        <CheckField label="Namen ohne Tag der Spielkennung zeigen" checked={form.hide_name_tags} onChange={(v) => set("hide_name_tags", v)} testId="series-hide-tags"
+          hint="Auf der Serienseite steht „TheLostFriday#TLS“ dann als „TheLostFriday“. Die Verwaltung zeigt immer den vollen Namen." />
+      )}
+      <RulesFields rules={form.rules} kind={lineage.kind} profile={profile} onChange={(rules) => set("rules", rules)} />
       {racing && <WeekendFormatsField formats={weekend} onChange={setWeekend} racePoints={form.rules.points_mode === "scheme" ? parsePointsList(form.rules.points_by_place) : null} />}
       {!isNew && (
         <TextField label="Hinweis zur Regeländerung" value={form.rules_note} onChange={(v) => set("rules_note", v)} testId="series-rules-note"

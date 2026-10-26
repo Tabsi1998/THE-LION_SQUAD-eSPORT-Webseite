@@ -115,8 +115,8 @@ export function sheetToForm(content, participants = [], { kind, teamName, oppone
       time: formatRaceTime(content?.fastest_lap?.time),
     },
     driverOfTheDay: participantName(participants, content?.driver_of_the_day),
-    // Turniertag (#1961): Zweierteams teilen Platz und Punkte.
-    doubleUp: Boolean(content?.double_up),
+    // Turniertag (#1961): Zweierteams teilen Platz und Punkte - ein neues Blatt folgt dem Schalter der Saison (#2024).
+    doubleUp: content ? Boolean(content.double_up) : Boolean(rules?.double_up),
   };
 }
 

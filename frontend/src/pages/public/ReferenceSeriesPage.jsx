@@ -23,6 +23,7 @@ import { OriginalsButton } from "@/components/tls/series/OriginalViewer";
 import { originalsOf } from "@/lib/referenceOriginals";
 import { SeriesLogo } from "@/components/tls/references/SeriesLogo";
 import { seriesLogo } from "@/lib/seriesLogo";
+import { OPEN_ROUND, kindShows } from "@/lib/seriesKinds";
 
 // Seite einer Serie unter /references/series/<spur>/<saison> (Entscheidung 5 zu #1741), Turnierserie (#1745): Kopf,
 // Rundenfortschritt, Regeln, Gesamtwertung mit Streichergebnissen und Finalgrenze, Finalrechner (Richtwert), das
@@ -50,7 +51,10 @@ function seriesTitle(data) {
   return series.title || [data?.lineage?.title, [series.season, series.tier].filter(Boolean).join(" · ")].filter(Boolean).join(" ");
 }
 
-function Calendar({ rounds, originals }) {
+// Art-Profil (#2024): Ort und Flagge nur, wo die Art sie führt (eine Turnierserie hat keine); ein Termin ohne Datum
+// heißt öffentlich „Termin folgt“.
+function Calendar({ rounds, originals, profile }) {
+  const places = kindShows(profile, "venue");
   return (
     <section className="mt-12" aria-labelledby="series-page-calendar" data-testid="series-page-calendar">
       <h2 id="series-page-calendar" className="font-heading text-2xl font-black uppercase">Termine</h2>
@@ -62,17 +66,17 @@ function Calendar({ rounds, originals }) {
             <li key={round.id} className="py-3 flex items-start gap-3" data-testid="series-page-round" data-state={round.state}>
               <span className={`min-w-12 shrink-0 whitespace-nowrap font-black tabular-nums ${round.kind === "final" ? "text-[var(--tls-honor)]" : "text-white/80"}`}>{roundLabel(round)}</span>
               <span className="min-w-0 flex-1">
-                <span className={`block text-sm tabular-nums ${round.state === "cancelled" ? "text-white/45" : "text-white"}`}>{roundWhen(round)}</span>
-                {(round.title || round.venue || round.country_code || round.opponent) && (
+                <span className={`block text-sm tabular-nums ${round.state === "cancelled" ? "text-white/45" : "text-white"}`}>{roundWhen(round, { open: OPEN_ROUND })}</span>
+                {places ? (round.title || round.venue || round.country_code || round.opponent) && (
                   <span className="block text-sm text-white/60">
                     <VenueWithFlag round={round} />
                     {round.opponent && `${round.title || round.venue || round.country_code ? " · " : ""}gegen ${round.opponent}`}
                   </span>
-                )}
+                ) : round.title && <span className="block text-sm text-white/60">{round.title}</span>}
                 {round.original_club_day && <span className="block text-[11px] text-white/45">ursprünglich {dayLabel(round.original_club_day)}</span>}
-                <NoScoreNote round={round} />
+                <NoScoreNote round={round} profile={profile} />
                 {/* Original-Bilder des Veranstalters (#1933). */}
-                <OriginalsButton items={originalsOf(originals, [round])} title={[roundLabel(round), round.venue || round.title].filter(Boolean).join(" · ")} className="mt-2" testId="series-page-round-originals" />
+                <OriginalsButton items={originalsOf(originals, [round])} title={[roundLabel(round), (places && round.venue) || round.title].filter(Boolean).join(" · ")} className="mt-2" testId="series-page-round-originals" />
               </span>
               <span className={`inline-flex items-center px-2 py-0.5 border rounded-sm text-[10px] font-bold uppercase tracking-widest whitespace-nowrap ${STATE_TONES[round.state] || STATE_TONES.planned}`}>
                 {PUBLIC_STATE_LABELS[round.state] || round.state}
@@ -145,18 +149,18 @@ export default function ReferenceSeriesPage() {
             {data.lineage?.kind === "team_league" && <TeamLeagueSections data={data} />}
             {data.racing && <RacingLeague data={data} />}
             {data.lineage?.kind !== "team_league" && !data.racing && (<>
-            <SeriesProgress progress={data.progress} rounds={rounds} />
+            <SeriesProgress progress={data.progress} rounds={rounds} profile={data.profile} />
             <section className="mt-10" aria-labelledby="series-page-table">
               <h2 id="series-page-table" className="font-heading text-2xl font-black uppercase">Gesamtwertung</h2>
               <SeriesRules rules={data.rules} />
               <RuleChanges changes={data.rule_changes} />
-              <SeriesStandings standings={data.standings} rounds={rounds} rules={data.rules} extraColumn={bonusColumn(data.rules)} />
+              <SeriesStandings standings={data.standings} rounds={rounds} rules={data.rules} extraColumn={bonusColumn(data.rules)} profile={data.profile} />
 
               <FinalCalculator standings={data.standings} rules={data.rules} progress={data.progress} />
             </section>
             <TournamentDays standings={data.standings} rounds={rounds} rules={data.rules} />
             <SeriesFinal final={data.final} />
-            <Calendar rounds={rounds} originals={data.originals} />
+            <Calendar rounds={rounds} originals={data.originals} profile={data.profile} />
             </>)}
             {/* Map-Pool der Saison (#1616) als Snapshot - bei jeder Art, ohne Pool erscheint nichts. */}
             <MapPoolView pool={data.map_pool} hint="Die Maps dieser Saison, je Modus." headingId="series-page-maps" />

@@ -244,7 +244,9 @@ async def test_the_member_profile_counts_races_of_a_racing_season(flow):
     flow.act_as(None)
     profile = (await flow.get("/api/membership/profiles/fahrer-r")).json()
     reference = next(item for item in profile["references"] if item["id"] == "ref-rennen")
-    assert reference["appearances"] == {"played": 1, "of": 2, "unit": "races", "team": None}
+    # #2024: dazu die Wörter aus dem Art-Profil (Einzahl, „von 2 …“).
+    assert reference["appearances"] == {"played": 1, "of": 2, "unit": "races", "team": None,
+                                        "unit_words": ["Rennen", "Rennen"]}
 
 
 @pytest.mark.asyncio

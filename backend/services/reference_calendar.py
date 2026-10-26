@@ -30,6 +30,7 @@ from datetime import date, datetime, timedelta, timezone
 
 from services.dolibarr_policy import CLUB_TZ
 from services.race_weekend import GAP, annotate, take_code
+from services import series_kinds
 from services.round_countries import detect_country
 from services.series_standings import ordered_rounds
 from services.team_league_calendar import MAX_OPPONENT, take_opponent, take_window, window_end
@@ -219,9 +220,15 @@ def planned_status(rounds: list[dict], planned, weekend: dict | None = None) -> 
 
 
 def parse_round_lines(text: str, *, season: str | None, today: str, default_weekday: int | None,
-                      default_time: str | None) -> dict:
+                      default_time: str | None, kind: str | None = None) -> dict:
     """Eine eingefügte Terminliste als ``{"rows": [...], "errors": [...]}``. Hat eine Zeile einen Fehler, gibt es keine
-    Zeilen - übernommen wird nur eine fehlerfreie Liste. Jede Zeile nennt ihre Nummer (``line``)."""
+    Zeilen - übernommen wird nur eine fehlerfreie Liste. Jede Zeile nennt ihre Nummer (``line``).
+
+    Art-Profil (#2024, ``kind``): Eine Art ohne Ort (Turnierserie) liest keinen Ort, kein Land und keinen Gegner - was
+    nach Kürzel, Datum und Uhrzeit übrig bleibt, fällt weg. Bei ihr ist eine Zeile ohne Datum ein offener Termin wie
+    „offen“ (Entscheidung des Obmanns 26.10.); die Rennliga bekommt weiter den nächsten Wochentag."""
+    places = kind is None or series_kinds.shows(kind, "venue")
+    open_without_day = kind is not None and series_kinds.shows(kind, "day_rounds")
     lines = [(number, raw.strip()) for number, raw in enumerate(str(text or "").splitlines(), start=1)]
     lines = [(number, raw) for number, raw in lines if raw and not raw.startswith("#")]
     if len(lines) > MAX_LINES:
@@ -271,11 +278,13 @@ def parse_round_lines(text: str, *, season: str | None, today: str, default_week
             clock = f"{hours:02d}:{minutes:02d}"
             rest = rest[:found.start()] + f" {GAP} " + rest[found.end():]
         code, session, rest = take_code(rest)
+        if kind is not None and not series_kinds.shows(kind, "session"):
+            session = None  # #2024: eine Art ohne Läufe kennt keinen Lauf am Kürzel
         # Gegner erst nach Kürzel und Lauf (#1931): „vs“/„@“ sind keine Lauf-Wörter, ein Lauf-Wort kein Gegner.
-        venue, opponent, at_home = take_opponent(_clean_venue(rest) or None)
+        venue, opponent, at_home = take_opponent(_clean_venue(rest) or None) if places else (None, None, None)
         undated = False
         # Termin offen (#2015): kein Datum, kein vorgeschlagener Tag - und die Zeile rechnet nicht weiter.
-        is_open = marked_open and day is None and not error
+        is_open = (marked_open or open_without_day) and day is None and not error
         if not error and day is None and not is_open:
             if previous is None:
                 error = "Datum fehlt (TT.MM.) – oder „offen“ für einen Termin ohne Datum."

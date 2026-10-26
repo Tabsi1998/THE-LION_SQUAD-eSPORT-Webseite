@@ -35,7 +35,7 @@ from pymongo import ReturnDocument
 from auth import get_optional_user, require_area
 from database import get_db
 from models import ReferenceRoundCreate, ReferenceRoundUpdate, _clock, new_id, now_utc
-from services import race_weekend, race_weekend_paste, reference_running_cache, reference_series
+from services import race_weekend, race_weekend_paste, reference_running_cache, reference_series, series_kinds
 from services.dolibarr_policy import club_today
 from services.round_countries import detect_country
 from services.series_standings import ordered_rounds
@@ -132,6 +132,18 @@ class RoundPasteBody(_Versioned):
     apply: bool = False
 
 
+class RoundDateItem(_DayTime):
+    """Ein Termin ohne Datum bekommt seinen Tag (#2024) - ohne Uhrzeit gilt die gemerkte."""
+    id: str = Field(max_length=80)
+    day: str
+    time: Optional[str] = None
+
+
+class RoundDatesBody(_Versioned):
+    """Datum nachtragen für mehrere offene Termine auf einmal (#2024, Sammelansicht)."""
+    items: List[RoundDateItem] = Field(min_length=1, max_length=200)
+
+
 class RoundFillBody(_Versioned):
     """Fehlende Termine anlegen (#2015): ohne ``apply`` nur, was angelegt würde."""
     apply: bool = False
@@ -155,6 +167,40 @@ async def _round(db, series_id: str, round_id: str) -> dict:
 
 def _stamp(me: dict) -> dict:
     return {"updated_at": now_utc().isoformat(), "updated_by": me["id"]}
+
+
+async def _kind(db, series: dict) -> str | None:
+    lineage = await db.reference_lineages.find_one({"id": series.get("lineage_id")}, {"_id": 0, "kind": 1}) or {}
+    return lineage.get("kind")
+
+
+# Art-Profil (#2024): Felder eines Termins, die es nur bei manchen Arten gibt - samt ihrem Schalter im Profil.
+KIND_ROUND_FIELDS = (("venue", "venue"), ("country_code", "country"), ("session", "session"),
+                     ("opponent", "opponent"))
+
+
+def _without_kind_fields(kind: str | None, raw: dict) -> dict:
+    """Was die Art nicht kennt, nimmt der Server nicht an (#2024): bei einer Turnierserie kein Ort, kein Land, kein Lauf
+    und kein Gegner. Still übergangen statt 422 - ältere Formulare und die heutige App schicken die Felder noch mit
+    (leer oder mit altem Wert), und dafür soll niemand eine Fehlermeldung sehen. Gespeichert wird so nichts davon."""
+    out = dict(raw)
+    for key, field in KIND_ROUND_FIELDS:
+        if not series_kinds.shows(kind, field):
+            out.pop(key, None)
+            if field == "country":
+                out.pop("country_auto", None)
+    return out
+
+
+def public_round(item: dict, kind: str | None, fields=PUBLIC_FIELDS) -> dict:
+    """Ein Termin für öffentliche Seiten: ``fields`` - was die Art nicht kennt (#2024), ist leer. So zeigt auch eine
+    ältere Oberfläche (die heutige App) bei einer Turnierserie keinen alten Ort und keine Flagge mehr; die Schlüssel
+    bleiben."""
+    out = {key: item.get(key) for key in fields}
+    for key, field in KIND_ROUND_FIELDS:
+        if key in out and not series_kinds.shows(kind, field):
+            out[key] = None
+    return out
 
 
 def _text(value) -> Optional[str]:
@@ -312,14 +358,19 @@ async def create_round(series_id: str, body: RoundCreateBody, me: dict = Depends
     else:
         existing = await db.reference_rounds.find({"series_id": series_id}, {"_id": 0}).to_list(None)
         counts = race_weekend.planned_config(series.get("weekend"), existing, body.code, body.session)["counts"]
+    # Was die Art nicht kennt (#2024), bleibt leer - eine Turnierserie hat weder Ort noch Flagge.
+    kind = await _kind(db, series)
+    given = _without_kind_fields(kind, {"venue": _text(body.venue), "session": body.session,
+                                        "opponent": _text(body.opponent), "country_code": body.country_code})
+    country = (_country(body.country_auto, body.country_code, given.get("venue"), _text(body.title))
+               if "country_code" in given else {"country_code": None, "country_auto": True})
     # Die Nummer vergibt immer die Folge - ein mitgeschicktes ``order`` zählt nicht (Reihenfolge nur über Ordnen).
-    doc = _new_round(series_id, me, order=first, code=_text(body.code), session=body.session,
-                     title=_text(body.title), venue=_text(body.venue), **when, kind=body.kind, counts=counts,
+    doc = _new_round(series_id, me, order=first, code=_text(body.code), session=given.get("session"),
+                     title=_text(body.title), venue=given.get("venue"), **when, kind=body.kind, counts=counts,
                      counts_manual=manual, no_score_reason=body.no_score_reason,
                      no_score_note=_text(body.no_score_note) if body.no_score_reason else None,
-                     opponent=_text(body.opponent), note=_text(body.note), at_home=body.at_home,
-                     club_day_end=window_end, open_time=None if when["club_day"] else clock,
-                     **_country(body.country_auto, body.country_code, _text(body.venue), _text(body.title)))
+                     opponent=given.get("opponent"), note=_text(body.note), at_home=body.at_home,
+                     club_day_end=window_end, open_time=None if when["club_day"] else clock, **country)
     await db.reference_rounds.insert_one(doc)
     await _log(db, "reference_round.create", me, series_id, {"round_id": doc["id"], "after": _brief(doc)})
     await _recompute(db, series_id)
@@ -332,9 +383,10 @@ async def create_round(series_id: str, body: RoundCreateBody, me: dict = Depends
 async def update_round(series_id: str, round_id: str, body: RoundUpdateBody,
                        me: dict = Depends(require_area("content"))):
     db = get_db()
-    await _series(db, series_id)
+    series = await _series(db, series_id)
     existing = await _round(db, series_id, round_id)
-    raw = body.model_dump(exclude_unset=True)
+    kind = await _kind(db, series)
+    raw = _without_kind_fields(kind, body.model_dump(exclude_unset=True))
     if "order" in raw:
         raise HTTPException(422, "Die Reihenfolge ändern „Ordnen“ und „Nach Datum ordnen“.")
     if "status" in raw or "original_starts_at" in raw:
@@ -388,7 +440,8 @@ async def update_round(series_id: str, round_id: str, body: RoundUpdateBody,
             auto = "country_code" not in raw and existing.get("country_auto") is not False
         code = raw["country_code"] if "country_code" in raw else existing.get("country_code")
         country = _country(auto, code, venue, title)
-    elif ("venue" in updates or "title" in updates) and existing.get("country_auto") is not False:
+    elif (("venue" in updates or "title" in updates) and existing.get("country_auto") is not False
+          and series_kinds.shows(kind, "country")):
         country = _country(True, None, venue, title)
     current = {"country_code": existing.get("country_code"), "country_auto": existing.get("country_auto") is not False}
     updates.update({key: value for key, value in (country or {}).items() if value != current[key]})
@@ -565,9 +618,10 @@ async def paste_rounds(series_id: str, body: RoundPasteBody, me: dict = Depends(
     keine Zeile einen Fehler hat (sonst 422 mit den Fehlern je Zeile)."""
     db = get_db()
     series = await _series(db, series_id)
+    # Art-Profil (#2024): bei der Turnierserie ohne Ort, Land und Gegner, eine Zeile ohne Datum ist ein offener Termin.
     parsed = parse_round_lines(body.text, season=series.get("season"), today=club_today(),
                                default_weekday=series.get("default_weekday"),
-                               default_time=series.get("default_time"))
+                               default_time=series.get("default_time"), kind=await _kind(db, series))
     # Ablauf je Runde (#1930): eine Zeile ohne Lauf legt alle Läufe an, die die Saison für ihre Runde vorgibt.
     existing = await db.reference_rounds.find({"series_id": series_id}, {"_id": 0}).to_list(None)
     parsed = race_weekend_paste.expand_paste(parsed, series.get("weekend"), existing)
@@ -596,6 +650,70 @@ async def paste_rounds(series_id: str, body: RoundPasteBody, me: dict = Depends(
     return {"created": len(docs), **await _calendar(db, series_id)}
 
 
+HAS_DAY = "{code} hat schon ein Datum – einen festen Termin ändert „Verschieben“."
+IS_CANCELLED = "{code} ist abgesagt – erst „Wieder ansetzen“, dann das Datum."
+IS_SCORED = "{code} ist schon gewertet – das Datum kommt mit dem Ergebnis."
+
+
+def _not_open(round_doc: dict, has_result: bool) -> str | None:
+    """Warum ein Termin kein Datum über „Datum nachtragen“ bekommt (#2024) - ``None``, wenn er offen ist."""
+    code = round_doc.get("code") or "Der Termin"
+    if round_doc.get("club_day"):
+        return HAS_DAY.format(code=code)
+    if round_doc.get("status") == "cancelled":
+        return IS_CANCELLED.format(code=code)
+    if has_result or round_doc.get("status") == "scored":
+        return IS_SCORED.format(code=code)
+    return None
+
+
+@router.post("/admin/series/{series_id}/rounds/dates")
+@reference_series.series_locked
+async def fill_round_dates(series_id: str, body: RoundDatesBody, me: dict = Depends(require_area("content"))):
+    """Datum nachtragen (#2024): mehrere Termine ohne Datum bekommen ihren Tag in einem Vorgang - mit Uhrzeit oder der
+    gemerkten (``open_time``). Jeder rückt vor die offenen bzw. späteren Termine wie beim einzelnen Nachtragen. Nur für
+    Termine ohne Datum - ein fester Termin wird verschoben, nicht hier geändert (422). Ein Stand, ein Protokolleintrag,
+    einmal neu rechnen."""
+    db = get_db()
+    await _series(db, series_id)
+    ids = [item.id for item in body.items]
+    if len(set(ids)) != len(ids):
+        raise HTTPException(422, "Jeder Termin nur einmal.")
+    found = {item["id"]: item async for item in db.reference_rounds.find(
+        {"series_id": series_id, "id": {"$in": ids}, "archived_at": None}, {"_id": 0})}
+    if any(rid not in found for rid in ids):
+        raise HTTPException(404, "Termin nicht gefunden.")
+    # Nur offene Termine (#2024): ohne Datum, nicht abgesagt, nicht gewertet (auch kein veröffentlichtes Blatt). Jeder
+    # andere wird mit Kürzel genannt - und dann ändert sich gar nichts (alles oder nichts).
+    published = {row["round_id"] async for row in db.reference_round_results.find(
+        {"series_id": series_id, "round_id": {"$in": ids}, "status": "published"}, {"_id": 0, "round_id": 1})}
+    problems = []
+    for rid in ids:
+        problem = _not_open(found[rid], rid in published)
+        if problem:
+            problems.append(problem)
+    if problems:
+        raise HTTPException(422, " ".join(problems))
+    changes = []
+    for item in body.items:
+        existing = found[item.id]
+        clock = item.time if item.time else existing.get("open_time")
+        changes.append((existing, {**_when(item.day, clock), "open_time": None}))
+    await _claim(db, series_id, body.expected_version)
+    for existing, update in changes:
+        await db.reference_rounds.update_one({"id": existing["id"]}, {"$set": {**update, **_stamp(me)}})
+    # Einsortieren in der Reihenfolge der Tage: so stehen mehrere neue Termine auch untereinander richtig.
+    for existing, update in sorted(changes, key=lambda pair: (pair[1]["club_day"], pair[1]["starts_at"] or "")):
+        order = await _dated_order(db, series_id, existing["id"], update["club_day"])
+        if order:
+            await _write_order(db, series_id, order, me)
+    await _log(db, "reference_round.dates", me, series_id, {"items": [
+        {"round_id": existing["id"], "code": existing.get("code"), "club_day": update["club_day"],
+         "starts_at": update["starts_at"]} for existing, update in changes]})
+    await _recompute(db, series_id)
+    return await _calendar(db, series_id)
+
+
 @router.post("/admin/series/{series_id}/rounds/fill-planned")
 @reference_series.series_locked
 async def fill_planned_rounds(series_id: str, body: Optional[RoundFillBody] = None,
@@ -609,8 +727,8 @@ async def fill_planned_rounds(series_id: str, body: Optional[RoundFillBody] = No
     status = planned_status(rounds, series.get("planned_rounds"), series.get("weekend"))
     if status is None:
         raise HTTPException(422, "Die Saison hat keine geplante Zahl an Terminen – erst in der Saison eintragen.")
-    lineage = await db.reference_lineages.find_one({"id": series.get("lineage_id")}, {"_id": 0, "kind": 1}) or {}
-    codes = missing_codes(rounds, status["missing"], "R" if lineage.get("kind") == "racing" else "T")
+    # Vorsatz der Kürzel aus dem Art-Profil (#2024): „R“ bei der Rennliga, sonst „T“.
+    codes = missing_codes(rounds, status["missing"], series_kinds.word(await _kind(db, series), "code_prefix"))
     if not (body and body.apply):
         return {**status, "codes": codes}
     if not codes:
@@ -655,5 +773,5 @@ async def public_calendar(lineage_slug: str, season_slug: str, user: dict | None
                                                     "default_weekday", "default_time")},
         "today": calendar["today"],
         "counts": calendar["counts"],
-        "rounds": [{key: item.get(key) for key in PUBLIC_FIELDS} for item in calendar["rounds"]],
+        "rounds": [public_round(item, lineage.get("kind")) for item in calendar["rounds"]],
     }

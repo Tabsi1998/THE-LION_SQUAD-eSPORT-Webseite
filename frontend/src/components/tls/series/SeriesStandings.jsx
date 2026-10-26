@@ -5,6 +5,7 @@ import { formatNumber, rankMove } from "@/lib/standingsTable";
 import { roundLabel } from "@/lib/referenceCalendar";
 import { groupWeekends, sessionAbbr, sessionLabel } from "@/lib/raceWeekend";
 import { CountryFlag } from "@/components/tls/CountryFlag";
+import { kindWord } from "@/lib/seriesKinds";
 import { CountUp } from "@/components/tls/motion/CountUp";
 import { AdjustmentMark } from "@/components/tls/series/SeriesSpecialRules";
 import {
@@ -24,12 +25,12 @@ function places(by) {
   return `${by} ${by === 1 ? "Platz" : "Plätze"}`;
 }
 
-function Move({ row }) {
+function Move({ row, since = "seit der Runde davor" }) {
   const move = rankMove(row);
   if (!move || move.direction === "same") return null;
   const up = move.direction === "up";
   const Icon = up ? ChevronUp : ChevronDown;
-  const label = `${places(move.by)} ${up ? "hinauf" : "hinunter"} seit der Runde davor`;
+  const label = `${places(move.by)} ${up ? "hinauf" : "hinunter"} ${since}`;
   return (
     <span className="tls-standing-move" data-dir={move.direction} role="img" aria-label={label} title={label} data-testid="series-move">
       <Icon className="h-3 w-3" strokeWidth={3} aria-hidden="true" />
@@ -189,7 +190,7 @@ function DesktopTable({ rows, columns, groups, topN, cutAfter, label, view }) {
                 <td className="pl-4 pr-1 py-2.5 align-middle">
                   <span className="flex items-center gap-1.5">
                     <span className="font-display text-base font-bold text-white w-5 text-right">{row.rank}</span>
-                    <Move row={row} />
+                    <Move row={row} since={view.since} />
                   </span>
                 </td>
                 <th scope="row" className="px-2 py-2.5 align-middle min-w-[10rem] text-left font-normal">{view.renderName(row, index)}</th>
@@ -223,7 +224,7 @@ function MobileCards({ rows, allCount, columns, topN, expanded, onExpand, view }
               <div className="flex items-center gap-3">
                 <span className="flex items-center gap-1 w-12 shrink-0">
                   <span className="font-display text-lg font-bold text-white tabular-nums">{row.rank}</span>
-                  <Move row={row} />
+                  <Move row={row} since={view.since} />
                 </span>
                 <span className="min-w-0 flex-1">{view.renderName(row, index)}</span>
                 <span className="flex flex-col items-end shrink-0">
@@ -271,7 +272,7 @@ function MobileCards({ rows, allCount, columns, topN, expanded, onExpand, view }
  * und Kürzel im Kopf zu Links auf die Ergebnisseite der Runde (#1950), das Kürzel eines Laufs auf seinen Reiter. */
 export function SeriesStandings({
   standings, rounds, rules, label = "Gesamtwertung", filterLabel = "Nur Vereinsspieler",
-  renderName, renderResult, renderPoints, extraColumn = null, weekends = false, roundHref = null,
+  renderName, renderResult, renderPoints, extraColumn = null, weekends = false, roundHref = null, profile = null,
 }) {
   const [clubOnly, setClubOnly] = useState(false);
   const [expanded, setExpanded] = useState(false);
@@ -294,9 +295,11 @@ export function SeriesStandings({
     renderPoints: renderPoints || ((row) => <Points row={row} topN={rules?.tiebreak_top_n} />),
     extraColumn,
     roundHref,
+    // Art-Profil (#2024): „seit dem Turniertag davor“ bei der Turnierserie, ohne Profil wie bisher.
+    since: kindWord(profile, "since_previous", "seit der Runde davor"),
   };
 
-  if (!all.length) return <p className="mt-3 text-sm text-white/55" data-testid="series-no-table">Noch keine Ergebnisse – die Tabelle erscheint nach der ersten gewerteten Runde.</p>;
+  if (!all.length) return <p className="mt-3 text-sm text-white/55" data-testid="series-no-table">Noch keine Ergebnisse – die Tabelle erscheint {kindWord(profile, "after_first", "nach der ersten gewerteten Runde")}.</p>;
   return (
     <div className="mt-4">
       {hasClub && (

@@ -6,6 +6,7 @@ import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { toast } from "sonner";
 import { Trash2 } from "lucide-react";
 import { LearnedSpellings } from "./LearnedSpellings";
+import { kindShows } from "@/lib/seriesKinds";
 
 // Teilnehmer bearbeiten (#1929): Name wie beim Veranstalter, Startnummer, Standard-Team und die Zuordnung (Mitglied mit
 // Profil, Gast, Extern). Geschickt wird nur, was sich geändert hat – Name, Nummer und Team über PATCH, die Zuordnung
@@ -121,8 +122,9 @@ export function ParticipantEditSheet({ series, row, profiles = [], onClose, onSa
     <AdminSheet title="Teilnehmer bearbeiten" eyebrow={series.lineage?.title} onClose={onClose} onSubmit={save} saving={saving} footer={footer} submitTestId="participant-edit-save" testId="participant-edit">
       <TextField label="Name" required maxLength={120} value={form.name} onChange={set("name")} testId="participant-edit-name"
         hint="So, wie der Veranstalter ihn schreibt. Gibt es den Namen in der Saison schon, führt beide zusammen." />
-      <div className="grid grid-cols-1 sm:grid-cols-[10rem_1fr] gap-4">
-        <TextField label="Startnummer" maxLength={10} value={form.start_number} onChange={set("start_number")} testId="participant-edit-number" />
+      {/* Art-Profil (#2024): Startnummern nur, wo die Art sie kennt - eine gesetzte bleibt sichtbar. */}
+      <div className={`grid grid-cols-1 gap-4 ${kindShows(series.profile, "start_number") || form.start_number ? "sm:grid-cols-[10rem_1fr]" : ""}`}>
+        {(kindShows(series.profile, "start_number") || form.start_number) && <TextField label="Startnummer" maxLength={10} value={form.start_number} onChange={set("start_number")} testId="participant-edit-number" />}
         <TextField label="Standard-Team" maxLength={120} value={form.default_team} onChange={set("default_team")} testId="participant-edit-team"
           hint="Gilt, wenn im Ergebnis kein Team steht." />
       </div>

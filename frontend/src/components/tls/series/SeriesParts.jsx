@@ -6,20 +6,33 @@ import { finalNeeds, maxRoundPoints } from "@/lib/finalCalc";
 import { VenueWithFlag } from "@/components/tls/CountryFlag";
 import { bonusRulesLabel, countLabel, dayRoundsLabel, doubleUpLabel, nameOf, roundColumns, schemeLabel, tiebreakLabel } from "@/lib/referenceSeriesTable";
 import { groupWeekends, sessionLabel } from "@/lib/raceWeekend";
+import { OPEN_ROUND, kindShows, kindWord } from "@/lib/seriesKinds";
 import "./referenceSeries.css";
 
 // Bausteine der Serienseite (#1745): Rundenfortschritt mit nächstem Termin, Regeln, Finalrechner (ausdrücklich ein
 // Richtwert) und das Finale als eigene Runde mit Endplatzierung (Podest in den Farben der Pokale).
 
-// Wörter des Fortschritts je Art der Serie: eine Rennliga (#1746) zählt Rennen statt Runden.
+// Wörter des Fortschritts je Art der Serie: eine Rennliga (#1746) zählt Rennen statt Runden. Mit Art-Profil (#2024)
+// kommen sie aus dessen Begriffen („von 9 Turniertagen“); das hier ist der Rückfall für ältere Antworten.
 export const PROGRESS_WORDS = {
   series: { rounds: "Runden", next: "Nächstes Turnier: " },
   racing: { rounds: "Rennen", next: "Nächstes Rennen: " },
 };
 
+/** Fortschritts-Wörter aus dem Art-Profil, sonst `fallback`. */
+export function progressWords(profile, fallback = PROGRESS_WORDS.series) {
+  return {
+    rounds: kindWord(profile, "round_dative", fallback.rounds),
+    next: profile?.vocab?.next_round ? `${profile.vocab.next_round}: ` : fallback.next,
+  };
+}
+
 /** Ein Feld je Wertungsrunde (gewertet in Cyan), das Finale in Gold am Ende; darunter der nächste Termin. Mit
- * `weekends` ist ein Feld eine Runde mit allen ihren Läufen (Runde mit Läufen, #1930) - gewertet, wenn alle es sind. */
-export function SeriesProgress({ progress, rounds, words = PROGRESS_WORDS.series, weekends = false }) {
+ * `weekends` ist ein Feld eine Runde mit allen ihren Läufen (Runde mit Läufen, #1930) - gewertet, wenn alle es sind.
+ * Art-Profil (#2024): Begriffe und ob Ort und Flagge dazugehören; ein Termin ohne Datum heißt „Termin folgt“. */
+export function SeriesProgress({ progress, rounds, words: given, profile = null, weekends = false }) {
+  const words = given || progressWords(profile);
+  const places = kindShows(profile, "venue");
   const columns = roundColumns(rounds);
   const steps = weekends
     ? groupWeekends(columns).map((group) => ({ ...group.lead, id: group.key, state: group.state }))
@@ -49,8 +62,8 @@ export function SeriesProgress({ progress, rounds, words = PROGRESS_WORDS.series
         <p className="mt-3 text-sm text-white/70" data-testid="series-next">
           <span className="text-white/45">{next.kind === "final" ? "Als Nächstes das Finale: " : words.next}</span>
           <span className="text-white font-semibold">{sessionLabel(next)}</span>
-          <span className="tabular-nums"> · {roundWhen(next)}</span>
-          {(next.venue || next.country_code) && <span> · <VenueWithFlag round={{ venue: next.venue, country_code: next.country_code }} /></span>}
+          <span className="tabular-nums"> · {roundWhen(next, { open: OPEN_ROUND })}</span>
+          {places && (next.venue || next.country_code) && <span> · <VenueWithFlag round={{ venue: next.venue, country_code: next.country_code }} /></span>}
         </p>
       )}
     </section>
@@ -134,7 +147,7 @@ export function SeriesFinal({ final }) {
     <section className="mt-12" aria-labelledby="series-final" data-testid="series-final">
       <div className="flex items-baseline justify-between gap-3 flex-wrap">
         <h2 id="series-final" className="font-heading text-2xl font-black uppercase text-[var(--tls-honor)]">Finale</h2>
-        <p className="text-sm text-white/60 tabular-nums">{[roundWhen(round), round.venue].filter(Boolean).join(" · ")}</p>
+        <p className="text-sm text-white/60 tabular-nums">{[roundWhen(round, { open: OPEN_ROUND }), round.venue].filter(Boolean).join(" · ")}</p>
       </div>
       {rows.length === 0 ? (
         <p className="mt-3 text-sm text-white/55">Die Endplatzierung steht hier nach dem Finale.</p>

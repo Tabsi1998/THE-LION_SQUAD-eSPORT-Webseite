@@ -128,7 +128,8 @@ for (const [width, height] of [[1440, 900], [390, 844]]) {
     await shot(days, "double-up-tag", width);
     if (!AFTER) return;
     await expect(progress).toContainText("4 von 9 Runden gewertet");
-    await expect(progress).toContainText("Termin offen");
+    // Öffentlich heißt ein Termin ohne Datum „Termin folgt“ (#2024).
+    await expect(progress).toContainText("Termin folgt");
     await expect(page.getByTestId("series-rules")).toContainText("Team-Platz k zählt wie Einzelplatz 2k−1");
     await expect(days.getByTestId("series-day-double-up-rule")).toContainText("Platz = Team-Platz, Punkte wie Einzelplatz 2k−1");
   });

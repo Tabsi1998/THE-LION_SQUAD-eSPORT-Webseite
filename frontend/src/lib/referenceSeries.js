@@ -73,6 +73,8 @@ export function rulesToForm(rules = {}) {
     custom_bonuses: (rules.custom_bonuses || []).map((bonus) => emptyBonus({ key: bonus.key, label: bonus.label, points: text(bonus.points) })),
     tiebreak_top_n: text(rules.tiebreak_top_n ?? 4),
     double_up_points: rules.double_up_points || "best_player_place",
+    // #2024: Double Up als Schalter der Saison - Vorgabe für den Haken im Ergebnisblatt eines Turniertags.
+    double_up: Boolean(rules.double_up),
     points_mode: rules.points_mode || "scheme",
     points_by_place: (rules.points_by_place || []).join(", "),
     fastest_lap_points: text(bonuses.fastest_lap?.points ?? 0),
@@ -137,6 +139,7 @@ export function formToRules(form) {
       .map((bonus) => ({ ...(bonus.key ? { key: bonus.key } : {}), label: String(bonus.label).trim(), points: number(bonus.points) })),
     tiebreak_top_n: number(form.tiebreak_top_n, 4),
     double_up_points: form.double_up_points || "best_player_place",
+    double_up: Boolean(form.double_up),
   };
 }
 

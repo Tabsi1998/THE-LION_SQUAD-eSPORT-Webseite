@@ -197,10 +197,12 @@ const UNITS = {
   rounds: ["Runde", "Runden"],
 };
 
-/** Einsätze in Worten: „5 von 7 Spielen“ - leer ohne gezählte Spiele. */
+/** Einsätze in Worten: „5 von 7 Spielen“ - leer ohne gezählte Spiele. Mit Art-Profil (#2024) die Wörter des Servers
+ *  (`unit_words`, etwa „Turniertag“, „Turniertagen“). */
 export function appearancesText(appearances) {
   const of = Number(appearances?.of) || 0;
   if (!of) return "";
-  const [one, many] = UNITS[appearances.unit] || UNITS.matches;
+  const words = Array.isArray(appearances.unit_words) && appearances.unit_words.length === 2 ? appearances.unit_words : null;
+  const [one, many] = words || UNITS[appearances.unit] || UNITS.matches;
   return `${Number(appearances.played) || 0} von ${of} ${of === 1 ? one : many}`;
 }

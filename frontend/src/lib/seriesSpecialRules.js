@@ -7,6 +7,7 @@ import { formatNumber } from "@/lib/standingsTable";
 import { sessionLabel } from "@/lib/raceWeekend";
 import { parseNumber } from "@/lib/resultPaste";
 import { nameOf } from "@/lib/referenceSeriesTable";
+import { kindWord } from "@/lib/seriesKinds";
 
 // Ein echtes Minus (−5, wie die Tabellen es zeigen) zählt wie ein Bindestrich.
 const signed = (value) => String(value ?? "").trim().replace("−", "-");
@@ -139,9 +140,15 @@ export const NO_SCORE_OPTIONS = [
 ];
 export const NO_SCORE_LABELS = Object.fromEntries(NO_SCORE_OPTIONS.filter(([value]) => value));
 
+/** Die Gründe in den Begriffen der Art (#2024): bei der Turnierserie „Zu wenig Spieler“. Ohne Profil wie bisher. */
+export function noScoreOptions(profile) {
+  const people = kindWord(profile, "person_many", "");
+  return people ? NO_SCORE_OPTIONS.map(([value, label]) => [value, value === "too_few" ? `Zu wenig ${people}` : label]) : NO_SCORE_OPTIONS;
+}
+
 /** „Ohne Wertung · Zu wenig Fahrer – Nur zwei am Start“ - leer, wenn der Termin keinen Grund trägt. */
-export function noScoreText(round) {
-  const reason = NO_SCORE_LABELS[round?.no_score_reason];
+export function noScoreText(round, profile = null) {
+  const reason = round?.no_score_reason ? Object.fromEntries(noScoreOptions(profile))[round.no_score_reason] : "";
   if (!reason) return "";
   const note = String(round?.no_score_note || "").trim();
   return `Ohne Wertung · ${reason}${note ? ` – ${note}` : ""}`;

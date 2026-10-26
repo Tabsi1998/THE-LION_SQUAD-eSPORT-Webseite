@@ -145,7 +145,8 @@ async def test_a_captain_sees_only_the_fields_to_work_with_the_board_sees_everyt
 
     flow.act_as(captain)
     view = (await flow.get(f"{ADMIN}/series/{own['id']}")).json()
-    assert set(view) == set(reference_series_access.CAPTAIN_SERIES_FIELDS) | {"lineage", "access"}
+    # Das Art-Profil (#2024) sagt, welche Felder und Begriffe das Eintragen hat - nichts Persönliches.
+    assert set(view) == set(reference_series_access.CAPTAIN_SERIES_FIELDS) | {"lineage", "access", "profile"}
     assert set(view["lineage"]) == set(reference_series_access.CAPTAIN_LINEAGE_FIELDS)
     for hidden in ("created_by", "updated_by", "rules_history", "visibility", "partner_ids", "slug_history",
                    "archived_from", "reference_id"):

@@ -66,10 +66,11 @@ export function dayLabel(day) {
  * Tag und Uhrzeit eines Termins: „Do., 05.11.2026 · 20:30“, ohne Uhrzeit nur der Tag, ohne Tag „Termin offen“. Ein
  * Spieltag mit Zeitraum (Team-Liga, #1931) zeigt beide Tage ohne Uhrzeit: „Mi., 13.05. – So., 17.05.2026“.
  */
-export function roundWhen(round) {
+export function roundWhen(round, { open = "Termin offen" } = {}) {
   const day = dayLabel(round?.club_day);
-  // Termin offen (#2015): eine gemerkte Uhrzeit steht dabei – „Termin offen · 19:00“.
-  if (!day) return round?.time ? `Termin offen · ${round.time}` : "Termin offen";
+  // Termin offen (#2015): eine gemerkte Uhrzeit steht dabei – „Termin offen · 19:00“. Öffentliche Seiten sagen dazu
+  // „Termin folgt“ (#2024, `open`).
+  if (!day) return round?.time ? `${open} · ${round.time}` : open;
   const end = round.club_day_end && round.club_day_end !== round.club_day ? dayLabel(round.club_day_end) : "";
   if (end) {
     const sameYear = round.club_day.slice(0, 4) === round.club_day_end.slice(0, 4);

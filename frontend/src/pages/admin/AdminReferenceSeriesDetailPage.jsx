@@ -182,7 +182,7 @@ export default function AdminReferenceSeriesDetailPage() {
             {board && <SeriesAdjustmentsSection series={series} onChanged={load} />}
             {board && <SeriesStaffSection series={series} />}
           </div>
-          {board && editing && <SeriesForm series={series} lineage={lineage} onClose={() => setEditing(false)} onSaved={() => { setEditing(false); load(); }} />}
+          {board && editing && <SeriesForm series={series} lineage={lineage} profile={series.profile} onClose={() => setEditing(false)} onSaved={() => { setEditing(false); load(); }} />}
           {board && closing && (
             <SeasonCloseSheet key={preview ? "bereit" : "laedt"} series={series} label={seasonName(lineage, series)} preview={preview}
               onClose={() => setClosing(false)} onDone={() => { setClosing(false); load(); }} />
