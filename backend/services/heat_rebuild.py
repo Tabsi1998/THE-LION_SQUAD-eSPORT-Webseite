@@ -13,7 +13,8 @@ Regeln (Issue #1550, Entscheidung E13):
   Vorlauf bzw. Setzplatz, Unterschied höchstens 1, nie ein Lauf mit einem Teilnehmer. Passt alles in einen Lauf, ist das
   der Sammellauf (kleinste ``order``); die anderen werden ``cancelled`` mit ``merged_into``. 2 + 2 wird ein Lauf mit 4.
 - **Quote:** ein umgebauter Lauf mit n Teilnehmern schickt ``heat_quota(n)`` weiter (anteilig, mindestens einer kommt
-  weiter, mindestens einer scheidet aus), die Summe der Gruppe höchstens so viele, wie das Ziel fassen kann. Sie steht
+  weiter, mindestens einer scheidet aus), die Summe der Gruppe höchstens so viele, wie das Ziel noch fassen kann - was
+  dort schon sitzt oder von einem gefahrenen Lauf noch kommt, zählt mit (#2033). Sie steht
   vor dem Start fest in ``settings.qualifiers_per_match`` (TV und App rechnen damit) und in ``qualifiers_effective``.
   Plätze im Folgelauf, die so nicht mehr beliefert werden, sind als „Quelle unerfüllbar“ markiert
   (Freilos-Platz mit ``source_result.reason = source_unfulfillable``; die alte Quelle steht in ``source.was``).
@@ -471,16 +472,65 @@ def _apply_quota(graph: _Graph, heat: dict, cap: int, quota: int, now_iso: str, 
     graph.invalidate()
 
 
-def _trim_quotas(graph: _Graph, heats: list[dict], capacity: int, now_iso: str) -> None:
-    """Die Summe der Weiterkommer einer Gruppe darf das Ziel nicht überfüllen."""
-    while heats:
-        total = sum(_quota_of(heat) for heat in heats)
-        if total <= capacity:
+def _note_quota(ops: list[dict], heat: dict, count: int, wanted: int, before: int) -> None:
+    """Der Protokoll-Eintrag einer Quoten-Änderung: hat derselbe Durchgang die Quote dieses Laufs gerade erst geändert
+    (``_apply_quota`` hob sie, die Kappung nimmt sie zurück), wird dieser Eintrag fortgeschrieben statt ein zweiter,
+    widersprüchlicher angehängt - und er entfällt, wenn unterm Strich nichts anders ist."""
+    for op in reversed(ops):
+        if op.get("kind") == "quota" and op.get("heats") == [heat.get("match_key")]:
+            if int(op.get("quota_before") or 0) == wanted:
+                ops.remove(op)
+            else:
+                op.update({"size": count, "quota": wanted})
             return
-        heat = max((h for h in heats if _quota_of(h) > 1), key=lambda h: (_quota_of(h), -int(h.get("order") or 0)), default=None)
+    ops.append({"kind": "quota", "round": heat.get("round"), "round_name": heat.get("round_name"),
+                "heats": [heat.get("match_key")], "size": count, "quota": wanted, "quota_before": before})
+
+
+def _top_entry(heat: dict) -> dict | None:
+    """Die Weiterleitung mit dem höchsten Rang - die eine Kappung der Quote streicht."""
+    return max((entry for entry in heat.get("advancement") or [] if entry.get("flow") == "W"),
+               key=lambda entry: int(entry.get("rank") or 0), default=None)
+
+
+def _trim_quotas(graph: _Graph, heats: list[dict], targets: list[dict], cap: int, now_iso: str,
+                 ops: list[dict]) -> None:
+    """Die Weiterkommer einer Gruppe dürfen ihre Ziele nicht überfüllen. Gezählt wird die erwartete Belegung der
+    Zielläufe - also auch, was dort schon sitzt oder von außerhalb der Gruppe noch kommt: ein gefahrener Lauf, der
+    seinen Platz im Ziel schon belegt hat, ein aufgerufener Lauf, der nicht mehr umgebaut wird. Nur die Quoten der
+    umbaubaren Läufe zu addieren übersah das (#2033): nach dem Zusammenlegen zweier Zielläufe wuchs die Quote eines
+    Vorlaufs wieder, und das Finale erwartete 5 bei Laufgröße 4.
+
+    Ziele sind die der Gruppe und alle, in die ihre Läufe jetzt weiterleiten (eine gewachsene Quote, ``_revive``, zeigt
+    auch in einen Lauf, den die Gruppe vorher nicht belieferte). Zielläufe, die die Folgerunde gemeinsam ausgleicht
+    (dieselbe Lauf-Gruppe, umbaubar), zählen zusammen - ungleich verteilt gleicht sie aus; jedes andere Ziel muss für
+    sich passen. Gekappt wird der Lauf, dessen oberste Weiterleitung in ein überfülltes Ziel zeigt."""
+    by_id = {target["id"]: target for target in targets}
+    for heat in heats:
+        for entry in heat.get("advancement") or []:
+            target = graph.by_id.get(entry.get("to_match_id"))
+            if target:
+                by_id.setdefault(target["id"], target)
+    targets = [target for target in by_id.values() if str(target.get("status") or "") != "cancelled"]
+    while heats and targets:
+        graph.invalidate()
+        classes: dict[tuple, list[dict]] = defaultdict(list)
+        for target in targets:
+            classes[_group_key(target) if _rebuildable(target) else ("", 0, target["id"])].append(target)
+        crowded = {
+            target["id"]
+            for members in classes.values()
+            if sum(len(graph.entries(target)) for target in members) > cap * len(members)
+            for target in members
+        }
+        if not crowded:
+            return
+        heat = max((h for h in heats if _quota_of(h) > 1 and (_top_entry(h) or {}).get("to_match_id") in crowded),
+                   key=lambda h: (_quota_of(h), -int(h.get("order") or 0)), default=None)
         if not heat:
             return
-        wanted = _quota_of(heat) - 1
+        current = _quota_of(heat)
+        wanted = current - 1
         for entry in list(heat.get("advancement") or []):
             if entry.get("flow") == "W" and int(entry.get("rank") or 0) > wanted:
                 target = graph.by_id.get(entry.get("to_match_id"))
@@ -492,6 +542,7 @@ def _trim_quotas(graph: _Graph, heats: list[dict], capacity: int, now_iso: str) 
         heat["settings"] = {**(heat.get("settings") or {}), "qualifiers_per_match": wanted}
         heat["qualifiers_effective"] = wanted
         heat["updated_at"] = now_iso
+        _note_quota(ops, heat, len(graph.entries(heat)), wanted, current)
         graph.invalidate()
 
 
@@ -551,7 +602,10 @@ def _pass(graph: _Graph, *, cap: int, quota: int, min_players: int, structural: 
         live_heats = [heat for heat, size in zip(heats, sizes_before) if size > 0]
         empty = [heat for heat, size in zip(heats, sizes_before) if size == 0]
         count = len(entries)
-        wanted = max(1, min(math.ceil(count / cap), count // 2))
+        # Nie mehr Läufe, als die Gruppe hat: passen die Einträge nicht in die vorhandenen Läufe (die Kappung der Runde
+        # davor soll das verhindern, #2033), bleiben sie lieber in zu vollen Läufen sichtbar, als dass ein Teil beim
+        # Verteilen verloren ginge - ``_rebuild_group`` füllt nur so viele Läufe, wie es gibt.
+        wanted = max(1, min(math.ceil(count / cap), count // 2, len(heats)))
         live_sizes = [size for size in sizes_before if size > 0]
         if structural and targets and (wanted < len(live_heats) or max(live_sizes) - min(live_sizes) > 1):
             buckets = _snake_split(entries, wanted)
@@ -576,7 +630,8 @@ def _pass(graph: _Graph, *, cap: int, quota: int, min_players: int, structural: 
         for heat in heats:
             _apply_quota(graph, heat, cap, quota, now_iso, ops)
         if targets:
-            _trim_quotas(graph, heats, cap * len(targets), now_iso)
+            _trim_quotas(graph, heats, [graph.by_id[target_id] for target_id in targets if target_id in graph.by_id],
+                         cap, now_iso, ops)
             if structural and len(heats) == 1:
                 _shorten(graph, heats[0], now_iso, ops)
     live_ids = [match["id"] for match in graph.matches if _live(match)]
