@@ -17,13 +17,15 @@
 // Ganz ohne reguläre Ausdrücke auf der Eingabe (nur Zeichen für Zeichen), damit auch sehr lange Texte schnell bleiben.
 // Was sich nicht lesen lässt, kommt als Fehler mit Zeilennummer zurück – nichts wird still verschluckt.
 
+import { pickSeparatorChar } from "@/lib/pasteSeparator";
+
 export const MAX_PASTE_ROWS = 500;
 export const MAX_PASTE_CHARS = 200_000;
 const MAX_NAME = 120;
 const NO_NAME = "Kein Name erkannt.";
 const NO_TEAM = "Kein Team erkannt.";
 
-const SEPARATORS = [["\t", "tab"], ["|", "pipe"], [";", "semicolon"]];
+const SEPARATOR_FORMATS = { "\t": "tab", "|": "pipe", ";": "semicolon" };
 
 // „OUT“ schreibt etwa die PRL für einen Ausfall mit 0 Punkten (#1927), auch als „DNF/OUT“.
 const MARK_WORDS = {
@@ -233,10 +235,8 @@ function readLines(text, maxRows, errors) {
 }
 
 function pickSeparator(lines) {
-  for (const [char, format] of SEPARATORS) {
-    if (lines.some((line) => line.text.includes(char))) return { char, format };
-  }
-  return { char: null, format: "lines" };
+  const char = pickSeparatorChar(lines);
+  return char ? { char, format: SEPARATOR_FORMATS[char] } : { char: null, format: "lines" };
 }
 
 function splitCells(text, separator) {
