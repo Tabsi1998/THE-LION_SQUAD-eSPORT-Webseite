@@ -19,6 +19,8 @@ import { RACE_FIELD_GROUPS, afterEdit, confirmNames, confirmRow, imageFormFields
 import { DAY_MARK_OPTIONS, roundCount, schemeOf, usesDayRounds } from "@/lib/tournamentDays";
 import { BonusChips, DayRoundsDetails, DayRoundsLine, DoubleUpToggle } from "./DayRoundsFields";
 import { formatRaceTime } from "@/lib/raceTime";
+import { kindList, kindShows, kindWord } from "@/lib/seriesKinds";
+import { viennaDay } from "@/lib/vienna";
 import { defaultOriginalKind } from "@/lib/referenceOriginals";
 import { OriginalsSection, attachOriginal } from "./OriginalsSection";
 import { toast } from "sonner";
@@ -105,7 +107,16 @@ function FieldErrors({ fields, testId }) {
   );
 }
 
-function ResultRow({ row, index, autoPlace, organizerMode, qualifying = false, day = null, problems, info, invalid, onChange, onHint, onRemove, onConfirmImage, teamHint = null, showTeam = true }) {
+// Marken je Art (#2024): alle bekannten, gefiltert nach dem Profil (Turnierserie: DNS, DSQ, „Ausgestiegen“).
+const ALL_MARKS = [...MARK_OPTIONS, ...DAY_MARK_OPTIONS.filter(([mark]) => !MARK_OPTIONS.some(([known]) => known === mark))];
+
+function markOptionsFor(profile, day) {
+  const allowed = kindList(profile, "marks", null);
+  if (!allowed) return day ? DAY_MARK_OPTIONS : MARK_OPTIONS;
+  return ALL_MARKS.filter(([mark]) => allowed.includes(mark));
+}
+
+function ResultRow({ row, index, autoPlace, organizerMode, qualifying = false, day = null, problems, info, invalid, onChange, onHint, onRemove, onConfirmImage, teamHint = null, showTeam = true, profile = null }) {
   const scored = info?.scored;
   // Offen von selbst nur, wo etwas Ungewöhnliches steht (Strafe, Gesamtstand, „zählen statt Schlüssel“) oder eine Eingabe
   // ungültig ist. Startnummer, Startplatz, Zeit und Abstand (#1927) stehen zugeklappt kurz unter der Zeile - so bleibt
@@ -115,7 +126,10 @@ function ResultRow({ row, index, autoPlace, organizerMode, qualifying = false, d
     || ["start_number", "grid", "time", "gap"].some((field) => isUncertain(row, field))));
   const placeInvalid = Object.keys(invalid || {}).some((field) => field.startsWith("round_place_"));
   const open = opened || Boolean(invalid?.grid || invalid?.penalty_points || invalid?.penalty_seconds || invalid?.official_total || placeInvalid);
-  const markOptions = day ? DAY_MARK_OPTIONS : MARK_OPTIONS;
+  const markOptions = markOptionsFor(profile, day);
+  // Art-Profil (#2024): Startnummer, Startplatz, Zeit, Abstand und Strafsekunden nur bei Arten mit Rennergebnis.
+  const raceDetails = kindShows(profile, "race_details");
+  const startNumber = kindShows(profile, "start_number");
   const raceLine = [row.start_number && `Nr. ${row.start_number}`, row.grid && `Startplatz ${row.grid}`, formatRaceTime(row.time), formatRaceTime(row.gap), row.penalty_seconds && `+${row.penalty_seconds} s Strafe`].filter(Boolean).join(" · ");
   // Zeiten (#1981): Punkt oder Komma eingeben - danach steht Komma da, wie beim Veranstalter.
   const tidy = (field) => () => {
@@ -149,7 +163,7 @@ function ResultRow({ row, index, autoPlace, organizerMode, qualifying = false, d
             title={organizerMode ? "Punkte laut Veranstalter" : "Leer: nach Schlüssel. Eingetragen: laut Veranstalter (wird geprüft)."}
             onChange={(event) => onChange({ points: event.target.value })} data-testid="result-row-points" {...invalidProps(invalid, "points")} {...mark("points").props} className={`${SMALL_INPUT} text-right tabular-nums ${mark("points").className} ${invalid?.points ? INVALID : ""}`} />
         )}
-        <button type="button" className={`${ICON_BUTTON} ${open ? "text-[#29B6E8]" : ""}`} onClick={() => setOpen((value) => !value)} aria-expanded={open} aria-label={`Mehr zu Zeile ${number}`} title="Marken, Strafpunkte, Startnummer, Startplatz, Zeit, Abstand" data-testid="result-row-more">
+        <button type="button" className={`${ICON_BUTTON} ${open ? "text-[#29B6E8]" : ""}`} onClick={() => setOpen((value) => !value)} aria-expanded={open} aria-label={`Mehr zu Zeile ${number}`} title={raceDetails ? "Marken, Strafpunkte, Startnummer, Startplatz, Zeit, Abstand" : "Marken, Strafpunkte, Gesamt laut Veranstalter"} data-testid="result-row-more">
           <SlidersHorizontal className="w-4 h-4" />
         </button>
         <button type="button" className={ICON_BUTTON} onClick={onRemove} aria-label={`Zeile ${number} entfernen`} title="Entfernen" data-testid="result-row-remove">
@@ -176,16 +190,18 @@ function ResultRow({ row, index, autoPlace, organizerMode, qualifying = false, d
         <div className="mt-2 grid grid-cols-2 sm:grid-cols-4 gap-2" data-testid="result-row-details">
           <label className="block"><span className={LABEL}>Strafpunkte</span>
             <input inputMode="decimal" value={row.penalty_points} onChange={(event) => onChange({ penalty_points: event.target.value })} data-testid="result-row-penalty" {...invalidProps(invalid, "penalty_points")} className={`${SMALL_INPUT} ${invalid?.penalty_points ? INVALID : ""}`} /></label>
-          <label className="block"><span className={LABEL}>Startnummer</span>
-            <input value={row.start_number} maxLength={10} onChange={(event) => onChange({ start_number: event.target.value })} data-testid="result-row-start" {...mark("start_number").props} className={`${SMALL_INPUT} ${mark("start_number").className}`} /></label>
-          <label className="block"><span className={LABEL}>Startplatz</span>
-            <input inputMode="numeric" value={row.grid} onChange={(event) => onChange({ grid: event.target.value })} data-testid="result-row-grid" {...invalidProps(invalid, "grid")} {...mark("grid").props} className={`${SMALL_INPUT} tabular-nums ${mark("grid").className} ${invalid?.grid ? INVALID : ""}`} /></label>
-          <label className="block"><span className={LABEL}>Zeit</span>
-            <input value={row.time} maxLength={20} onChange={(event) => onChange({ time: event.target.value })} onBlur={tidy("time")} data-testid="result-row-time" {...mark("time").props} className={`${SMALL_INPUT} tabular-nums ${mark("time").className}`} /></label>
-          <label className="block"><span className={LABEL}>Abstand</span>
-            <input value={row.gap} maxLength={20} onChange={(event) => onChange({ gap: event.target.value })} onBlur={tidy("gap")} data-testid="result-row-gap" {...mark("gap").props} className={`${SMALL_INPUT} tabular-nums ${mark("gap").className}`} /></label>
-          <label className="block"><span className={LABEL}>Strafsekunden</span>
-            <input inputMode="decimal" value={row.penalty_seconds} title="Zeitstrafe in Sekunden – nur Anzeige in der Ergebnistabelle" onChange={(event) => onChange({ penalty_seconds: event.target.value })} data-testid="result-row-penalty-seconds" {...invalidProps(invalid, "penalty_seconds")} className={`${SMALL_INPUT} tabular-nums ${invalid?.penalty_seconds ? INVALID : ""}`} /></label>
+          {(startNumber || row.start_number) && <label className="block"><span className={LABEL}>Startnummer</span>
+            <input value={row.start_number} maxLength={10} onChange={(event) => onChange({ start_number: event.target.value })} data-testid="result-row-start" {...mark("start_number").props} className={`${SMALL_INPUT} ${mark("start_number").className}`} /></label>}
+          {(raceDetails || row.grid || row.time || row.gap || row.penalty_seconds) && <>
+            <label className="block"><span className={LABEL}>Startplatz</span>
+              <input inputMode="numeric" value={row.grid} onChange={(event) => onChange({ grid: event.target.value })} data-testid="result-row-grid" {...invalidProps(invalid, "grid")} {...mark("grid").props} className={`${SMALL_INPUT} tabular-nums ${mark("grid").className} ${invalid?.grid ? INVALID : ""}`} /></label>
+            <label className="block"><span className={LABEL}>Zeit</span>
+              <input value={row.time} maxLength={20} onChange={(event) => onChange({ time: event.target.value })} onBlur={tidy("time")} data-testid="result-row-time" {...mark("time").props} className={`${SMALL_INPUT} tabular-nums ${mark("time").className}`} /></label>
+            <label className="block"><span className={LABEL}>Abstand</span>
+              <input value={row.gap} maxLength={20} onChange={(event) => onChange({ gap: event.target.value })} onBlur={tidy("gap")} data-testid="result-row-gap" {...mark("gap").props} className={`${SMALL_INPUT} tabular-nums ${mark("gap").className}`} /></label>
+            <label className="block"><span className={LABEL}>Strafsekunden</span>
+              <input inputMode="decimal" value={row.penalty_seconds} title="Zeitstrafe in Sekunden – nur Anzeige in der Ergebnistabelle" onChange={(event) => onChange({ penalty_seconds: event.target.value })} data-testid="result-row-penalty-seconds" {...invalidProps(invalid, "penalty_seconds")} className={`${SMALL_INPUT} tabular-nums ${invalid?.penalty_seconds ? INVALID : ""}`} /></label>
+          </>}
           <label className="block"><span className={LABEL}>Gesamt laut Veranst.</span>
             <input inputMode="decimal" value={row.official_total} onChange={(event) => onChange({ official_total: event.target.value })} data-testid="result-row-total" {...invalidProps(invalid, "official_total")} className={`${SMALL_INPUT} ${invalid?.official_total ? INVALID : ""}`} /></label>
           {!organizerMode && (
@@ -387,6 +403,11 @@ export function ResultEntrySheet({ series, round, onClose, onSaved }) {
 
   const rules = useMemo(() => data?.series?.rules || {}, [data]);
   const kind = data?.series?.kind;
+  // Art-Profil (#2024): Felder, Marken und Begriffe des Blatts - ohne Profil (ältere Antwort) wie bisher.
+  const profile = data?.series?.profile || series.profile || null;
+  // Ein gewerteter Termin braucht ein Datum (#2024): ohne Datum fragt das Blatt beim Veröffentlichen nach dem Tag.
+  const needsDay = Boolean(data && !data.round?.club_day && kindShows(profile, "result_needs_day", false));
+  const [roundDay, setRoundDay] = useState(() => viennaDay(new Date()));
   const teamLeague = kind === "team_league";
   const organizerMode = rules.points_mode === "organizer";
   // Qualifying (#1930): Zeit statt Punkte, ohne schnellste Runde und Fahrer des Tages.
@@ -441,9 +462,11 @@ export function ResultEntrySheet({ series, round, onClose, onSaved }) {
 
   // Turniertag (#1961): Runden je Termin, Sonderboni und Double Up - sobald die Saison Runden führt oder das Blatt sie hat.
   const day = useMemo(() => {
-    if (!form || kind === "team_league" || kind === "racing" || !usesDayRounds(rules, form.rows)) return null;
+    // #2024: bei einer Art mit Turniertagen (Turnierserie) immer - auch ohne Runden-Vorgabe gibt es GES P je Zeile.
+    if (!form || kind === "team_league" || kind === "racing") return null;
+    if (!usesDayRounds(rules, form.rows) && !kindShows(profile, "day_rounds", false)) return null;
     return { count: roundCount(rules, form.rows), scheme: schemeOf(rules), doubleUp: Boolean(form.doubleUp), bonuses: rules.custom_bonuses || [] };
-  }, [form, rules, kind]);
+  }, [form, rules, kind, profile]);
   const built = useMemo(() => (form ? formToPayload(form, rules) : null), [form, rules]);
   const stamp = built ? formStamp(built.payload) : "";
   const fresh = Boolean(preview && preview.stamp === stamp);
@@ -573,7 +596,8 @@ export function ResultEntrySheet({ series, round, onClose, onSaved }) {
     }
     setSaving(true);
     try {
-      const { data: result } = await api.put(base, { ...built.payload, status, expected_version: data.version });
+      const withDay = needsDay && status === "published" && roundDay ? { round_day: roundDay } : {};
+      const { data: result } = await api.put(base, { ...built.payload, status, expected_version: data.version, ...withDay });
       const created = result.created_participants || [];
       // Übernommen: jetzt hängt das gelesene Bild als Original am Termin (#1933). Scheitert das, bleibt das Ergebnis.
       let attached = "";
@@ -601,7 +625,8 @@ export function ResultEntrySheet({ series, round, onClose, onSaved }) {
   const decide = async (action) => {
     setSaving(true);
     try {
-      const { data: result } = await api.post(`${base}/${action}`, { expected_version: data.version });
+      const withDay = needsDay && action === "approve" && roundDay ? { round_day: roundDay } : {};
+      const { data: result } = await api.post(`${base}/${action}`, { expected_version: data.version, ...withDay });
       // Offene Namen, die nur der Entwurf angelegt hatte, nimmt der Server wieder mit - kurz sagen, wie viele.
       const removed = (result?.removed_participants || []).length;
       const done = action === "approve" ? "Entwurf freigegeben." : "Entwurf verworfen.";
@@ -663,10 +688,18 @@ export function ResultEntrySheet({ series, round, onClose, onSaved }) {
         <>
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-white/60" data-testid="result-round">
             <span className="tabular-nums">{roundWhen(data.round)}</span>
-            {(data.round.venue || data.round.country_code) && <span>· <VenueWithFlag round={{ venue: data.round.venue, country_code: data.round.country_code }} /></span>}
+            {kindShows(profile, "venue") && (data.round.venue || data.round.country_code) && <span>· <VenueWithFlag round={{ venue: data.round.venue, country_code: data.round.country_code }} /></span>}
             {sheetStatus && <span className="text-[10px] font-bold uppercase tracking-widest text-white/45">{sheetStatus === "published" ? "veröffentlicht" : "Entwurf"} · Stand {data.version}</span>}
             <span className="text-[10px] font-bold uppercase tracking-widest text-white/45" data-testid="result-mode">{qualifying ? qualifyingMode(data.round) : organizerMode ? "Punkte laut Veranstalter" : "Punkte nach Schlüssel"}</span>
           </div>
+
+          {/* #2024: ein gewerteter Termin braucht ein Datum - beim Veröffentlichen geht dieser Tag mit (Vorschlag heute). */}
+          {needsDay && (
+            <label className="tls-undated-badge flex flex-wrap items-center gap-x-3 gap-y-1 border border-dashed border-amber-300/40 bg-amber-300/[0.06] rounded-sm px-3 py-2 text-sm text-amber-100" data-testid="result-round-day-box">
+              <span className="flex-1 min-w-[12rem]">{`${kindWord(profile, "round_one", "Termin")} ${data.round.code || ""}`.trim()} hat noch kein Datum. Beim Veröffentlichen wird dieser Tag eingetragen:</span>
+              <input type="date" required value={roundDay} onChange={(event) => setRoundDay(event.target.value)} aria-label="Tag, an dem gespielt wurde" data-testid="result-round-day" className={`${SMALL_INPUT} w-auto`} />
+            </label>
+          )}
 
           {stale && (
             <div className="border border-amber-400/40 bg-amber-400/10 rounded-sm p-3 text-sm text-amber-100 flex flex-wrap items-center gap-3" role="alert" data-testid="result-stale">
@@ -750,7 +783,7 @@ export function ResultEntrySheet({ series, round, onClose, onSaved }) {
                     onChange={(values) => updateRow(row.key, values)} onHint={() => updateRow(row.key, hintToPoints(row, participants))} onRemove={() => removeRow(row.key)}
                     onConfirmImage={() => confirmImageRow(row.key)}
                     teamHint={kind === "racing" && !qualifying ? teamCountHint(row, participants, rules.team_scoring, infoByKey[row.key]?.participant_id) : null}
-                    showTeam={showTeam} />
+                    showTeam={showTeam} profile={profile} />
                 ))}
               </ol>
               <button type="button" onClick={addRow} data-testid="result-row-add" className="tls-btn tls-btn--secondary px-3 py-2 rounded-sm text-xs font-bold uppercase tracking-wider inline-flex items-center gap-2">
@@ -789,7 +822,7 @@ export function ResultEntrySheet({ series, round, onClose, onSaved }) {
               {imageOpen === 1 ? "Eine Zeile aus dem Bild ist" : `${imageOpen} Zeilen aus dem Bild sind`} noch gelb – prüfen, korrigieren oder mit „Passt so“ bestätigen. Übernommen wird erst danach.
             </p>
           )}
-          {fresh && <ResultPreview preview={preview} general={problems.general} board={board} />}
+          {fresh && <ResultPreview preview={preview} general={problems.general} board={board} profile={profile} />}
           {!fresh && preview && <p className="text-xs text-white/45" data-testid="result-preview-outdated">Geändert – „Vorschau“ prüft neu.</p>}
         </>
       )}

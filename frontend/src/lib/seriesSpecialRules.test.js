@@ -131,6 +131,8 @@ describe("Saison, Termin und Regeländerungen", () => {
     expect(noScoreText({ no_score_reason: "too_few", no_score_note: "Nur zwei am Start" })).toBe("Ohne Wertung · Zu wenig Fahrer – Nur zwei am Start");
     expect(noScoreText({ no_score_reason: "outage" })).toBe("Ohne Wertung · Serverausfall bzw. Nachholung");
     expect(noScoreText({ counts: false })).toBe("");
+    // Art-Profil (#2024): bei der Turnierserie „Zu wenig Spieler“.
+    expect(noScoreText({ no_score_reason: "too_few" }, { vocab: { person_many: "Spieler" } })).toBe("Ohne Wertung · Zu wenig Spieler");
   });
 
   test("Regeländerung ab Runde X mit Tag und Hinweis, Regel-Version mit Hinweis", () => {

@@ -1,5 +1,6 @@
 import { formatPoints } from "@/lib/referenceResults";
 import { AlertTriangle, ArrowDown, ArrowUp, Minus, OctagonAlert, Sparkles, UserPlus } from "lucide-react";
+import { kindShows, kindWord } from "@/lib/seriesKinds";
 
 // Vorschau eines Ergebnisblatts (#1744): was der Server beim Prüfen sagt – Fehler und Warnungen ohne Zeile, erkannte
 // Vereinsmitglieder, unbekannte Namen und der neue Zwischenstand mit Bewegung und Finalgrenze. Die Meldungen je Zeile
@@ -35,12 +36,12 @@ function ProblemList({ items, level, testId }) {
   );
 }
 
-function StandingsScope({ scope, rows, final }) {
+function StandingsScope({ scope, rows, final, profile = null }) {
   const topN = scope === "drivers" ? final?.top_n : null;
   const lastInside = topN ? rows.reduce((last, row, index) => (row.rank && row.rank <= topN ? index : last), -1) : -1;
   return (
     <div data-testid={`preview-standings-${scope}`}>
-      <div className="text-[10px] font-bold uppercase tracking-widest text-white/45 mb-1">{SCOPE_LABELS[scope] || scope}</div>
+      <div className="text-[10px] font-bold uppercase tracking-widest text-white/45 mb-1">{(scope === "drivers" ? kindWord(profile, "person_many", "") : "") || SCOPE_LABELS[scope] || scope}</div>
       <div className="tls-swipe pb-0 max-h-80 overflow-y-auto border border-white/5 rounded-sm">
         <table className="w-full text-sm tabular-nums">
           <thead className="sticky top-0 bg-[#121212]">
@@ -119,7 +120,7 @@ function UnknownNames({ items, board }) {
   );
 }
 
-export function ResultPreview({ preview, general, board }) {
+export function ResultPreview({ preview, general, board, profile = null }) {
   const errors = general.filter((item) => item.level === "error");
   const warnings = general.filter((item) => item.level === "warning");
   const scopes = SCOPE_ORDER.filter((scope) => preview.standings?.scopes?.[scope]?.length);
@@ -138,10 +139,10 @@ export function ResultPreview({ preview, general, board }) {
       {scopes.length > 0 && (
         <div className="space-y-3">
           <div className="text-[11px] font-bold uppercase tracking-widest text-[#29B6E8]">
-            Stand nach diesem Termin{preview.standings?.round_seq ? ` (Runde ${preview.standings.round_seq})` : ""}
+            Stand nach diesem Termin{preview.standings?.round_seq ? ` (${kindShows(profile, "day_rounds", false) ? kindWord(profile, "round_one", "Runde") : "Runde"} ${preview.standings.round_seq})` : ""}
           </div>
           {preview.latest && <p className="text-xs text-white/50">Danach sind schon weitere Termine gewertet – auch deren Stand rechnet die Website neu.</p>}
-          {scopes.map((scope) => <StandingsScope key={scope} scope={scope} rows={preview.standings.scopes[scope]} final={preview.final} />)}
+          {scopes.map((scope) => <StandingsScope key={scope} scope={scope} rows={preview.standings.scopes[scope]} final={preview.final} profile={profile} />)}
           <FinalChanges final={preview.final} rows={preview.standings.scopes.drivers} />
         </div>
       )}
