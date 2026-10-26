@@ -8,5 +8,10 @@
     "module": "braces",
     "expires": "2027-01-02",
     "reason": "braces 3.0.3 is the newest release and still affected (stack exhaustion through deeply nested brace patterns; first flagged by the audit gate on 2026-10-03, re-checked on 2026-10-14: advisory range <=3.0.3); no patched version exists, and micromatch 4.0.8 is the newest release. It is reached only through micromatch from jest 29 (@jest/core, jest-config, jest-haste-map, @jest/transform, jest-message-util) and from metro-file-map (the file watcher of the Metro bundler). braces only parses the glob patterns, which come from the jest and Metro configuration of this repository, never from outside input; file paths are only matched against them. Both are development and build tooling, not part of the app bundle. Jest 30 alone would not remove it, because Metro still uses micromatch. Re-check on expiry."
+  },
+  "GHSA-MRHX-C7XC-M3W5": {
+    "module": "zod",
+    "expires": "2027-01-26",
+    "reason": "zod 3.25.76 is affected (memory exhaustion when validating oversized constrained collections; advisory range <4.6.6, checked on 2026-10-26); the only fix is zod 4.6.6, and the newest @expo/cli (57.0.31) still requires zod ^3.25.76. zod is used only inside @expo/cli on the developer machine: the dev server of `expo start` validates DevTools plugin manifests of installed packages (DevToolsPlugin.schema.js, createMCPDevToolsExtensionSchema.js). Input comes from packages of this repository, not from app users. It is not part of the app bundle. The website frontend dropped zod entirely (#2031). Re-check on expiry or when @expo/cli moves to zod 4."
   }
 }
