@@ -14,6 +14,15 @@ from services.rate_limit import enforce_rate_limit
 router = APIRouter(prefix="/api", tags=["jersey-numbers"])
 
 
+class CheckBody(BaseModel):
+    number: int | str
+
+
+class AdminCheckBody(BaseModel):
+    number: int | str
+    user_id: str | None = Field(default=None, max_length=80)
+
+
 class ChooseBody(BaseModel):
     number: int | str
     confirmed: bool = False
@@ -58,20 +67,22 @@ async def my_jersey_number(user: dict = Depends(get_current_user)):
     return await jersey_numbers.overview(get_db(), user)
 
 
-@router.get("/membership/me/jersey-number/check")
+@router.post("/membership/me/jersey-number/check")
 async def check_jersey_number(
-    number: str, request: Request, user: dict = Depends(get_current_user)
+    body: CheckBody, request: Request, user: dict = Depends(get_current_user)
 ):
-    """Live-Prüfung beim Tippen: frei oder vergeben - ohne zu sagen, wer sie hat."""
+    """Prüfung einer Nummer: frei oder vergeben - nie, wer sie hat. Im Körper statt in der Adresse, damit die Nummer
+    nicht im Zugriffsprotokoll steht; knapp begrenzt, denn die freien Nummern zeigt die Seite ohnehin als Raster.
+    """
     await enforce_rate_limit(
         request,
         "jersey-number:check",
-        limit=240,
+        limit=60,
         window_seconds=600,
         subject=user["id"],
     )
     try:
-        return await jersey_numbers.check(get_db(), user, number)
+        return await jersey_numbers.check(get_db(), user, body.number)
     except jersey_numbers.JerseyError as exc:
         _fail(exc)
 
@@ -120,13 +131,13 @@ async def admin_jersey_numbers(me: dict = Depends(require_area("club"))):
     return await jersey_numbers.admin_overview(get_db())
 
 
-@router.get("/admin/jersey-numbers/check")
+@router.post("/admin/jersey-numbers/check")
 async def admin_check_jersey_number(
-    number: str, user_id: str | None = None, me: dict = Depends(require_area("club"))
+    body: AdminCheckBody, me: dict = Depends(require_area("club"))
 ):
     try:
         return await jersey_numbers.availability(
-            get_db(), jersey_numbers.parse_number(number), user_id=user_id
+            get_db(), jersey_numbers.parse_number(body.number), user_id=body.user_id
         )
     except jersey_numbers.JerseyError as exc:
         _fail(exc)

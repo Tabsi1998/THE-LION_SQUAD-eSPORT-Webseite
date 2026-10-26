@@ -122,13 +122,13 @@ async def test_member_chooses_once_then_only_by_request_and_board(flow):
     assert view["free_count"] == 100 and view["again"] is False
 
     # Live-Prüfung: frei, außerhalb des Bereichs, keine Zahl.
-    assert (await flow.get(f"{URL}/check", params={"number": "7"})).json()[
+    assert (await flow.post(f"{URL}/check", json={"number": "7"})).json()[
         "free"
     ] is True
-    out = (await flow.get(f"{URL}/check", params={"number": "100"})).json()
+    out = (await flow.post(f"{URL}/check", json={"number": "100"})).json()
     assert out["free"] is False and out["text"] == "Nur Nummern von 0 bis 99."
     assert (
-        await flow.get(f"{URL}/check", params={"number": "sieben"})
+        await flow.post(f"{URL}/check", json={"number": "sieben"})
     ).status_code == 400
 
     # Ohne Bestätigung nichts; mit Bestätigung festgelegt - 0 ist eine gültige Nummer.
@@ -150,14 +150,14 @@ async def test_member_chooses_once_then_only_by_request_and_board(flow):
     ] == 0
     locked = await flow.post(URL, json={"number": 8, "confirmed": True})
     assert locked.status_code == 409 and "Antrag" in locked.json()["detail"]
-    assert (await flow.get(f"{URL}/check", params={"number": "0"})).json()[
+    assert (await flow.post(f"{URL}/check", json={"number": "0"})).json()[
         "reason"
     ] == "own"
 
     # Eindeutig im Verein: Max sieht „vergeben“, ohne zu erfahren, wer sie hat.
     max_ = await member(flow, "max")
     flow.act_as(max_)
-    taken = (await flow.get(f"{URL}/check", params={"number": "0"})).json()
+    taken = (await flow.post(f"{URL}/check", json={"number": "0"})).json()
     assert taken == {
         "number": 0,
         "free": False,
@@ -282,7 +282,7 @@ async def test_board_reopens_rejects_and_sets_rules(flow):
 
     flow.act_as(max_)  # ruhend ist auch Mitglied
     assert (await flow.get(URL)).json()["free_count"] == 28
-    assert (await flow.get(f"{URL}/check", params={"number": "13"})).json()[
+    assert (await flow.post(f"{URL}/check", json={"number": "13"})).json()[
         "text"
     ] == "Diese Nummer hält der Verein frei."
     assert (await flow.post(URL, json={"number": 5, "confirmed": True})).json()[
@@ -388,7 +388,7 @@ async def test_board_reopens_rejects_and_sets_rules(flow):
         )
     ).status_code == 200
     assert (
-        await flow.get("/api/admin/jersey-numbers/check", params={"number": "5"})
+        await flow.post("/api/admin/jersey-numbers/check", json={"number": "5"})
     ).json()["free"] is True
     flow.act_as(paula)
 
@@ -472,10 +472,10 @@ async def test_dolibarr_field_is_read_written_and_caught_up(flow, fake):
     fake.define_member_extrafield("trikotnummer")
 
     flow.act_as(paula)
-    assert (await flow.get(f"{URL}/check", params={"number": "10"})).json()[
+    assert (await flow.post(f"{URL}/check", json={"number": "10"})).json()[
         "reason"
     ] == "taken"
-    assert (await flow.get(f"{URL}/check", params={"number": "11"})).json()[
+    assert (await flow.post(f"{URL}/check", json={"number": "11"})).json()[
         "free"
     ] is True
     view = (await flow.post(URL, json={"number": 11, "confirmed": True})).json()
@@ -626,9 +626,196 @@ async def test_exit_and_account_erasure_free_the_number_at_once(flow, fake):
     fake.fail_with = None
     jersey_numbers.reset_cache()
     flow.act_as(tom)
-    assert (await flow.get(f"{URL}/check", params={"number": "9"})).json()[
+    assert (await flow.post(f"{URL}/check", json={"number": "9"})).json()[
         "free"
     ] is True
     await jersey_numbers.sync_pending(flow.db)
     assert await flow.db.jersey_numbers.count_documents({"orphan": True}) == 0
     assert fake.core_members[16]["array_options"]["options_trikotnummer"] is None
+
+
+# ---------------------------------------------------------------- Codex-Prüfung (#2034)
+
+
+@pytest.mark.asyncio
+async def test_two_board_decisions_on_one_request_only_one_acts(flow, monkeypatch):
+    """Zuerst wird der Antrag beansprucht, dann die Nummer geändert: eine zweite, gleichzeitige Entscheidung ändert
+    nichts und bekommt 409."""
+    paula = await member(flow, "paula")
+    admin = await board(flow)
+    flow.act_as(paula)
+    await flow.post(URL, json={"number": 7, "confirmed": True})
+    row = (
+        await flow.post(f"{URL}/requests", json={"wished": 8, "reason": "Lieber die 8"})
+    ).json()
+
+    original = jersey_numbers.set_number
+    inner: list = []
+
+    async def racing_set_number(db, actor, user_id, raw, note=""):
+        try:
+            inner.append(await jersey_numbers.decide(db, actor, row["id"], "reopen"))
+        except jersey_numbers.JerseyError as exc:
+            inner.append(exc)
+        return await original(db, actor, user_id, raw, note)
+
+    monkeypatch.setattr(jersey_numbers, "set_number", racing_set_number)
+    done = await jersey_numbers.decide(flow.db, admin, row["id"], "approve")
+    assert done["status"] == "applied"
+    assert isinstance(inner[0], jersey_numbers.JerseyError) and inner[0].status == 409
+    doc = await flow.db.jersey_numbers.find_one({"user_id": paula["id"]})
+    assert doc["number"] == 8 and doc["can_choose"] is False
+
+    # Scheitert die Freigabe (Wunsch inzwischen vergeben), bleibt der Antrag offen.
+    monkeypatch.setattr(jersey_numbers, "set_number", original)
+    flow.act_as(paula)
+    second = (
+        await flow.post(f"{URL}/requests", json={"wished": 9, "reason": "Doch die 9"})
+    ).json()
+    max_ = await member(flow, "max")
+    flow.act_as(max_)
+    await flow.post(URL, json={"number": 9, "confirmed": True})
+    with pytest.raises(jersey_numbers.JerseyError):
+        await jersey_numbers.decide(flow.db, admin, second["id"], "approve")
+    assert (await flow.db.jersey_number_requests.find_one({"id": second["id"]}))[
+        "status"
+    ] == "received"
+
+
+@pytest.mark.asyncio
+async def test_catch_up_never_writes_an_older_number_to_dolibarr(
+    flow, fake, monkeypatch
+):
+    await connect(flow)
+    paula = await member(flow, "paula")
+    await link(flow, paula, 12)
+    fake.add_core_member(12)
+    fake.define_member_extrafield("trikotnummer")
+    admin = await board(flow)
+
+    # Der Job hat 7 als ausstehend gelesen; inzwischen setzt der Vorstand 8 und schreibt sie.
+    fake.fail_with = 503
+    flow.act_as(paula)
+    await flow.post(URL, json={"number": 7, "confirmed": True})
+    fake.fail_with = None
+    snapshot = await flow.db.jersey_numbers.find_one(
+        {"user_id": paula["id"]}, {"_id": 0}
+    )
+    flow.act_as(admin)
+    await flow.put(
+        f"/api/admin/jersey-numbers/members/{paula['id']}", json={"number": 8}
+    )
+    assert fake.core_members[12]["array_options"]["options_trikotnummer"] == 8
+    assert await jersey_numbers._push(flow.db, snapshot) == "ok"
+    assert fake.core_members[12]["array_options"]["options_trikotnummer"] == 8
+
+    # Ändert sich der Spiegel, während der Job schreibt, landet am Ende trotzdem der neue Wert in Dolibarr.
+    original = dolibarr_client.DolibarrClient.set_member_extrafield
+    calls = {"n": 0}
+
+    async def slow_write(self, member_id, code, value):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            await jersey_numbers.set_number(flow.db, admin, paula["id"], 9)
+        return await original(self, member_id, code, value)
+
+    monkeypatch.setattr(
+        dolibarr_client.DolibarrClient, "set_member_extrafield", slow_write
+    )
+    await flow.db.jersey_numbers.update_one(
+        {"user_id": paula["id"]}, {"$set": {"dolibarr.state": "pending"}}
+    )
+    await jersey_numbers.sync_pending(flow.db)
+    doc = await flow.db.jersey_numbers.find_one({"user_id": paula["id"]})
+    assert (
+        doc["number"] == 9
+        and doc["dolibarr"]["state"] == "ok"
+        and doc["dolibarr"]["value"] == 9
+    )
+    assert fake.core_members[12]["array_options"]["options_trikotnummer"] == 9
+
+
+@pytest.mark.asyncio
+async def test_number_follows_the_account_when_the_link_changes(flow, fake):
+    await connect(flow)
+    paula = await member(flow, "paula")
+    await link(flow, paula, 12)
+    fake.add_core_member(12)
+    fake.add_core_member(14)
+    fake.define_member_extrafield("trikotnummer")
+    flow.act_as(paula)
+    await flow.post(URL, json={"number": 11, "confirmed": True})
+    assert fake.core_members[12]["array_options"]["options_trikotnummer"] == 11
+
+    # Entkoppeln: das Konto behält die 11, beim alten Mitglied ist sie gelöscht.
+    admin = await board(flow)
+    flow.act_as(admin)
+    unlinked = await flow.delete(f"/api/admin/dolibarr/links/{paula['id']}")
+    assert unlinked.status_code == 200
+    assert fake.core_members[12]["array_options"]["options_trikotnummer"] is None
+    doc = await flow.db.jersey_numbers.find_one({"user_id": paula["id"]})
+    assert (
+        doc["number"] == 11
+        and doc["dolibarr"]["state"] == "no_member"
+        and doc["pending_clears"] == []
+    )
+
+    # Neue Zuordnung: die 11 steht beim neuen Mitglied.
+    await link(flow, paula, 14)
+    assert fake.core_members[14]["array_options"]["options_trikotnummer"] == 11
+    doc = await flow.db.jersey_numbers.find_one({"user_id": paula["id"]})
+    assert doc["dolibarr"]["state"] == "ok" and doc["dolibarr"]["member_id"] == 14
+
+    # Schreiben aus: das Löschen beim alten Mitglied wartet als Nachtrag, die Nummer gilt dort trotzdem nicht mehr.
+    await flow.db.settings.update_one(
+        {"id": "dolibarr"}, {"$set": {"write_enabled": False}}
+    )
+    link_doc = await flow.db.dolibarr_links.find_one(
+        {"user_id": paula["id"]}, {"_id": 0}
+    )
+    from services.dolibarr_links import close_link
+
+    await close_link(flow.db, link_doc, status="revoked", actor_id=admin["id"])
+    doc = await flow.db.jersey_numbers.find_one({"user_id": paula["id"]})
+    assert (
+        doc["pending_clears"] == [14]
+        and fake.core_members[14]["array_options"]["options_trikotnummer"] == 11
+    )
+    await flow.db.settings.update_one(
+        {"id": "dolibarr"}, {"$set": {"write_enabled": True}}
+    )
+    await jersey_numbers.sync_pending(flow.db)
+    assert fake.core_members[14]["array_options"]["options_trikotnummer"] is None
+    assert (await flow.db.jersey_numbers.find_one({"user_id": paula["id"]}))[
+        "pending_clears"
+    ] == []
+
+
+@pytest.mark.asyncio
+async def test_check_takes_the_number_in_the_body_and_the_page_lists_free_numbers(flow):
+    paula, max_ = await member(flow, "paula"), await member(flow, "jonas")
+    admin = await board(flow)
+    flow.act_as(admin)
+    await flow.put(
+        "/api/admin/jersey-numbers/settings", json={"min": 1, "max": 6, "reserved": [3]}
+    )
+    flow.act_as(max_)
+    await flow.post(URL, json={"number": 5, "confirmed": True})
+    flow.act_as(paula)
+    # Keine Nummer in der Adresse - also nicht im Zugriffsprotokoll.
+    assert (await flow.get(f"{URL}/check", params={"number": "5"})).status_code == 405
+    assert (await flow.post(f"{URL}/check", json={"number": 5})).json()[
+        "reason"
+    ] == "taken"
+    view = (await flow.get(URL)).json()
+    assert view["free_numbers"] == [1, 2, 4, 6] and view["free_count"] == 4
+    assert "jonas" not in str(view) and max_["id"] not in str(view)
+    # Bei sehr großen Bereichen nur die Zahl.
+    flow.act_as(admin)
+    await flow.put(
+        "/api/admin/jersey-numbers/settings",
+        json={"min": 0, "max": 999, "reserved": []},
+    )
+    flow.act_as(paula)
+    view = (await flow.get(URL)).json()
+    assert view["free_numbers"] is None and view["free_count"] == 999
