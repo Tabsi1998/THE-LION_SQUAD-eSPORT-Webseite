@@ -119,10 +119,12 @@ from match_rules import RESULT_MAX_SCORE
 from models import ReferencePointsSource, ReferenceResultMark, ReferenceResultStatus, _clock, new_id, now_utc
 from services import (
     race_weekend, read_spellings, reference_originals, reference_running_cache, reference_series, series_adjustments,
-    series_identity, series_results, team_league_maps, tournament_days,
+    series_identity, series_kinds, series_results, team_league_maps, tournament_days,
 )
+from routes.reference_round_routes import _dated_order, _write_order
 from services.dolibarr_policy import club_today
 from services.own_teams import Matcher, own_team_names, own_teams
+from services.reference_calendar import ClockError, clock_gap_message, vienna_start
 from services.reference_series_access import EDIT_PENDING_DRAFT, SeriesAccess, require_series_editor
 from services.scoring_rules import MAX_CUSTOM_BONUSES, MAX_DAY_ROUNDS, is_no_team, result_points, validate_sheet
 from services.series_participants import build_index, new_participant, remove_unused_new
@@ -297,13 +299,30 @@ class ResultSheetInput(BaseModel):
         return value
 
 
-class ResultSave(ResultSheetInput):
+class _RoundDay(BaseModel):
+    """``round_day`` (#2024): das Datum für einen Termin ohne Datum, der mit diesem Vorgang gewertet wird - ein
+    gewerteter Termin braucht ein Datum. An einem Termin mit Datum ändert es nichts."""
+    round_day: Optional[str] = None
+
+    @field_validator("round_day")
+    @classmethod
+    def _check_round_day(cls, value):
+        text = (value or "").strip()
+        if not text:
+            return None
+        try:
+            return date.fromisoformat(text).isoformat()
+        except ValueError as exc:
+            raise ValueError("Datum als JJJJ-MM-TT, etwa 2026-11-05.") from exc
+
+
+class ResultSave(_RoundDay, ResultSheetInput):
     """Übernehmen: ``expected_version`` ist der Stand, den die Seite kennt (0 ohne Blatt)."""
     status: ReferenceResultStatus = "draft"
     expected_version: int = Field(ge=0)
 
 
-class ResultDecision(BaseModel):
+class ResultDecision(_RoundDay):
     expected_version: int = Field(ge=0)
 
 
@@ -391,6 +410,46 @@ async def _participants(db, series_id: str) -> list[dict]:
 async def _kind(db, series: dict) -> str | None:
     lineage = await db.reference_lineages.find_one({"id": series.get("lineage_id")}, {"_id": 0, "kind": 1}) or {}
     return lineage.get("kind")
+
+
+ROUND_WITHOUT_DAY = "round_without_day"
+
+
+def _day_update(kind: str | None, round_doc: dict, day: str | None) -> dict | None:
+    """Ein gewerteter Termin braucht ein Datum (#2024, Entscheidung des Obmanns 26.10.): Wird ein Termin ohne Datum
+    gewertet, muss der Vorgang den Tag mitbringen (``round_day``) - sonst 422 mit klarer Meldung, bevor etwas
+    geschrieben ist. Liefert die Änderung am Termin (Tag, mit der gemerkten Uhrzeit der Zeitpunkt) oder ``None``, wenn
+    der Termin schon ein Datum hat bzw. die Art keines verlangt (Team-Liga, unverändert)."""
+    if round_doc.get("club_day") or not series_kinds.shows(kind, "result_needs_day"):
+        return None
+    if not day:
+        label = " ".join(part for part in (series_kinds.word(kind, "round_one"), round_doc.get("code")) if part)
+        message = f"{label} hat noch kein Datum – beim Veröffentlichen bitte den Tag angeben, an dem gespielt wurde."
+        raise HTTPException(422, {"message": message, "warnings": [],
+                                  "errors": [{"code": ROUND_WITHOUT_DAY, "message": message, "rows": []}]})
+    clock = round_doc.get("open_time")
+    try:
+        return {"club_day": day, "starts_at": vienna_start(day, clock), "open_time": None}
+    except ClockError:
+        raise HTTPException(422, clock_gap_message(day, clock)) from None
+
+
+async def _set_round_day(db, access: SeriesAccess, round_doc: dict, update: dict | None) -> None:
+    """Unter der Sperre: den Tag am Termin eintragen, ihn vor die offenen bzw. späteren Termine einsortieren (wie beim
+    Nachtragen im Kalender) und protokollieren. Der Kalender bekommt einen neuen Stand."""
+    if not update:
+        return
+    await db.reference_rounds.update_one({"id": round_doc["id"], "series_id": access.series_id},
+                                         {"$set": {**update, **_stamp(access)}})
+    order = await _dated_order(db, access.series_id, round_doc["id"], update["club_day"])
+    if order:
+        await _write_order(db, access.series_id, order, access.user)
+    await db.reference_series.update_one({"id": access.series_id}, {"$inc": {"calendar_version": 1}})
+    await db.audit_logs.insert_one({
+        "id": new_id(), "action": "reference_round.day_from_result", "actor_id": access.user["id"],
+        "target_id": access.series_id, "created_at": now_utc().isoformat(),
+        "data": {"round_id": round_doc["id"], "club_day": update["club_day"], "starts_at": update["starts_at"],
+                 "role": access.role, **({"order": order} if order else {})}})
 
 
 async def _unknown_teams(db, series: dict, round_doc: dict, resolution, participants: list[dict],
@@ -672,7 +731,9 @@ async def get_results(series_id: str, round_id: str, access: SeriesAccess = Depe
                    "map_names": await _map_names(db, series_id),
                    # Maps zur Auswahl (#1616): Pool der Saison, sonst Vorgabe des Spiels; ohne Spiel None (Freitext).
                    "map_choices": await team_league_maps.choices(db, access.series) if kind == "team_league" else None,
-                   "publish_mode": access.series.get("publish_mode")},
+                   "publish_mode": access.series.get("publish_mode"),
+                   # Art-Profil (#2024): Felder, Marken und Begriffe des Blatts.
+                   "profile": series_kinds.profile(kind)},
         "access": access.summary(), "version": _version(existing), "sheet": _sheet_view(existing, access),
         "target": access.edit_target(existing),
         "participants": [{key: row.get(key) for key in (
@@ -847,6 +908,9 @@ async def save_results(series_id: str, round_id: str, body: ResultSave,
         body = _board_fields(access, body, existing)
         _, participants, resolution = await _prepare(db, access, round_doc, body)
         _refuse(resolution)
+        # Wird der Termin damit gewertet, braucht er ein Datum (#2024) - geprüft, bevor etwas geschrieben ist.
+        publishes = target != EDIT_PENDING_DRAFT and status == "published"
+        day_update = _day_update(await _kind(db, access.series), round_doc, body.round_day) if publishes else None
 
         created = await _create_people(db, access, resolution)
         own = [doc["id"] for doc in created.values()]
@@ -881,6 +945,7 @@ async def save_results(series_id: str, round_id: str, body: ResultSave,
                        **_counts(content), "created_participants": own, "released_originals": released,
                        **({"learned": learned} if learned else {})})
         recomputed = False
+        await _set_round_day(db, access, round_doc, day_update)
         if target != EDIT_PENDING_DRAFT:
             now_published = saved.get("status") == "published"
             await _sync_round(db, access, round_id, now_published)
@@ -972,6 +1037,8 @@ async def approve_results(series_id: str, round_id: str, body: ResultDecision,
         errors = await _approval_errors(db, access, round_doc, content)
         if errors:
             raise HTTPException(422, {"message": "Der Entwurf hat Fehler.", "errors": errors, "warnings": []})
+        # Freigeben wertet den Termin - ohne Datum nur mit Tag (#2024).
+        day_update = _day_update(await _kind(db, access.series), round_doc, body.round_day)
         stamp = _stamp(access)
         drafted_by = source.get("created_by") if pending else source.get("updated_by")
         saved = await _update_if_current(db, existing["id"], body.expected_version, {"$set": {
@@ -991,6 +1058,7 @@ async def approve_results(series_id: str, round_id: str, body: ResultDecision,
             "drafted_by": drafted_by, "revision_id": revision_id, **_counts(content),
             "removed_participants": [{"id": row["id"], "name": row.get("name")} for row in removed],
             "released_originals": released})
+        await _set_round_day(db, access, round_doc, day_update)
         await _sync_round(db, access, round_id, True)
         await _recompute(db, access)
     return {"version": saved["version"], "sheet": _sheet_view(saved, access), "recomputed": True,
