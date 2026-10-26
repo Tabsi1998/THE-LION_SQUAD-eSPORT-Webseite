@@ -298,6 +298,18 @@ async def test_who_may_submit_where_and_until_when(flow, monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_without_the_credit_field_the_photo_keeps_the_name(flow):
+    """Ohne Feld „credit“ gilt die Vorgabe „mit Namen“ - auch mit FastAPI ab 0.161 (fehlendes bool wäre dort „nein“)."""
+    event = await make_event(flow)
+    album = await make_album(flow, event)
+    flow.act_as(await member(flow, "Anna"))
+    sent = await flow.post(f"/api/gallery/{album['slug']}/submissions",
+                           files={"file": ("foto.jpg", jpeg_with_gps(), "image/jpeg")}, data={"consent": "true"})
+    assert sent.status_code == 200, sent.text
+    assert (await flow.db.gallery_submissions.find_one({"id": sent.json()["id"]}))["credit"] is True
+
+
+@pytest.mark.asyncio
 async def test_board_approves_with_credit_and_rejects_with_deletion(flow):
     event = await make_event(flow)
     album = await make_album(flow, event)
