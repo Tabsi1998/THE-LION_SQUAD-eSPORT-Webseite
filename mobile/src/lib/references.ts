@@ -66,15 +66,26 @@ export type ClubReference = {
 };
 
 /** „5 von 7 Spielen“: gespielt, von wie vielen, und ob Spiele, Rennen oder Runden gezählt sind. */
-export type Appearances = { played?: number | null; of?: number | null; unit?: "matches" | "races" | "rounds" | string | null; team?: string | null };
+export type Appearances = {
+  played?: number | null; of?: number | null; unit?: "matches" | "races" | "rounds" | string | null; team?: string | null;
+  /** Art-Profil (#2024): Einzahl und Dativ der Einheit („Turniertag“, „Turniertagen“) - ältere Server schicken es nicht. */
+  unit_words?: Array<string | null> | null;
+};
 
 const APPEARANCE_UNITS: Record<string, [string, string]> = { matches: ["Spiel", "Spielen"], races: ["Rennen", "Rennen"], rounds: ["Runde", "Runden"] };
 
-/** Einsätze als Text wie im Web (lib/teamLeagueEntry.js): „5 von 7 Spielen“, „1 von 1 Spiel“ - ohne Angabe leer. */
+/** Die Wörter vom Server, wenn es genau zwei Texte sind - sonst null (dann gilt `unit`). */
+function unitWords(appearances: Appearances | null | undefined): [string, string] | null {
+  const words = appearances?.unit_words;
+  return Array.isArray(words) && words.length === 2 && words.every((word) => typeof word === "string" && word) ? [String(words[0]), String(words[1])] : null;
+}
+
+/** Einsätze als Text wie im Web (lib/teamLeagueEntry.js): „5 von 7 Spielen“, „1 von 1 Spiel“ - ohne Angabe leer. Mit
+ * Art-Profil (#2024) in dessen Wörtern: „5 von 9 Turniertagen“. */
 export function appearancesText(appearances: Appearances | null | undefined): string {
   const of = Number(appearances?.of) || 0;
   if (!of) return "";
-  const [one, many] = APPEARANCE_UNITS[String(appearances?.unit)] || APPEARANCE_UNITS.matches;
+  const [one, many] = unitWords(appearances) || APPEARANCE_UNITS[String(appearances?.unit)] || APPEARANCE_UNITS.matches;
   return `${Number(appearances?.played) || 0} von ${of} ${of === 1 ? one : many}`;
 }
 
