@@ -60,6 +60,32 @@ test("vom Turnier: Satz, Ziel zum Server und weiter zur Mail-Bestätigung, Login
   expect(await screen.findByTestId("where")).toHaveTextContent("/verify-email?sent=1&email=neonfalke%40lionsquad-test.at&next=%2Ftournaments%2Fmk-cup");
 });
 
+test("Spamschutz (#2067): Token wird geholt und mitgeschickt, das unsichtbare Feld ist da, aber nicht zu sehen", async () => {
+  apiMock.get.mockImplementation(async (url) => (url === "/spam-guard/token"
+    ? { data: { token: "register.1700000000.0123456789abcdef.sig", honeypot: "hp_fax", min_seconds: 0, max_age_seconds: 7200, turnstile: null } }
+    : { data: {} }));
+  const user = userEvent.setup();
+  renderAt("/register");
+  await waitFor(() => expect(apiMock.get).toHaveBeenCalledWith("/spam-guard/token", { params: { form: "register" } }));
+  expect(screen.getByTestId("register-honeypot")).toHaveAttribute("aria-hidden", "true");
+  expect(screen.getByTestId("register-honeypot-input")).toHaveAttribute("tabindex", "-1");
+  expect(screen.queryByRole("textbox", { name: /Fax/ })).toBeNull();
+  await fillAndSubmit(user);
+  await waitFor(() => expect(authState.register).toHaveBeenCalledWith(expect.objectContaining({
+    form_token: "register.1700000000.0123456789abcdef.sig", hp_fax: "", username: "neonfalke",
+  })));
+});
+
+test("Spamschutz (#2067): war die Seite zu lange offen, steht die Meldung des Servers sichtbar da", async () => {
+  const stale = "Die Seite war zu lange offen – bitte neu laden und noch einmal absenden.";
+  authState.register.mockResolvedValue({ ok: false, error: stale, cause: { response: { status: 400, data: { detail: stale } } } });
+  const user = userEvent.setup();
+  renderAt("/register");
+  await fillAndSubmit(user);
+  expect(await screen.findByText(stale)).toBeInTheDocument();
+  expect(screen.queryByTestId("where")).toBeNull();
+});
+
 test("ein fremdes Ziel geht nicht mit", async () => {
   const user = userEvent.setup();
   renderAt("/register?next=%2F%2Ffremd.example");

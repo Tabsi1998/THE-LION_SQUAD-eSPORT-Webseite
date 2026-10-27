@@ -28,6 +28,25 @@ test("bestätigt: „Einloggen und weiter“ mit dem Ziel vom Server", async () 
   expect(apiMock.post).toHaveBeenCalledWith("/auth/verify-email", { token: "abc" });
 });
 
+test("Spamschutz (#2067): „Bestätigungslink anfordern“ holt ein Token und schickt es mit dem unsichtbaren Feld", async () => {
+  const { default: userEvent } = await import("@testing-library/user-event");
+  const { waitFor } = await import("@testing-library/react");
+  apiMock.get = vi.fn(async () => ({ data: { token: "resend_verification.1700000000.0123456789abcdef.sig", honeypot: "hp_fax", min_seconds: 0, max_age_seconds: 7200, turnstile: null } }));
+  apiMock.post.mockResolvedValue({ data: { ok: true } });
+  const user = userEvent.setup();
+  try {
+    renderAt("/verify-email?email=neonfalke%40lionsquad-test.at");
+    await waitFor(() => expect(apiMock.get).toHaveBeenCalledWith("/spam-guard/token", { params: { form: "resend_verification" } }));
+    expect(screen.getByTestId("verify-resend-honeypot")).toHaveAttribute("aria-hidden", "true");
+    await user.click(screen.getByTestId("verify-resend-submit"));
+    await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/auth/resend-verification", {
+      email: "neonfalke@lionsquad-test.at", form_token: "resend_verification.1700000000.0123456789abcdef.sig", hp_fax: "",
+    }));
+  } finally {
+    delete apiMock.get;
+  }
+});
+
 test("das Ziel aus dem Link zählt, ein fremdes nicht", async () => {
   apiMock.post.mockResolvedValue({ data: { ok: true, next: null } });
   const { unmount } = renderAt("/verify-email?token=abc&next=%2Fevents%2Fherbst-lan");

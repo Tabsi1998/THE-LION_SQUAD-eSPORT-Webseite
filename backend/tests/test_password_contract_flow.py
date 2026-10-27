@@ -12,6 +12,7 @@ import pytest_asyncio
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 
 from flow_harness import make_flow, new_id  # noqa: E402
+from spam_forms import form_fields  # noqa: E402
 
 from auth import hash_password, verify_password  # noqa: E402
 
@@ -72,7 +73,7 @@ async def test_registration_outside_the_contract_is_a_clear_validation_error(flo
 @pytest.mark.asyncio
 async def test_registration_stores_the_normalized_form(flow):
     body = registration(DECOMPOSED)
-    response = await flow.post("/api/auth/register", json=body)
+    response = await flow.post("/api/auth/register", json={**body, **form_fields("register")})
     assert response.status_code == 200
     stored = await flow.db.users.find_one({"email": body["email"]})
     assert bcrypt.checkpw(COMPOSED.encode("utf-8"), stored["password_hash"].encode("utf-8"))
@@ -130,7 +131,7 @@ async def stored_doc(flow, user_id: str) -> dict:
 @pytest.mark.asyncio
 async def test_new_accounts_reject_input_with_a_wrong_rest_beyond_72_bytes(flow):
     body = registration("a" * 72)
-    assert (await flow.post("/api/auth/register", json=body)).status_code == 200
+    assert (await flow.post("/api/auth/register", json={**body, **form_fields("register")})).status_code == 200
     stored = await flow.db.users.find_one({"email": body["email"]})
     assert stored["password_contract"] == 2
     await flow.db.users.update_one({"id": stored["id"]}, {"$set": {"email_verified": True}})

@@ -85,7 +85,8 @@ def test_verified_admin_still_requires_mfa(monkeypatch, endpoint):
 ])
 def test_resend_returns_same_truthful_response(monkeypatch, user, send_count):
     monkeypatch.setattr(routes, "get_db", lambda: SimpleNamespace(users=SimpleNamespace(find_one=AsyncMock(return_value=user))))
-    monkeypatch.setattr(routes, "enforce_rate_limit", AsyncMock())
+    # Limits, Honeypot und Token (#2067) prüft der Spamschutz; hier geht es nur um die Antwort.
+    monkeypatch.setattr(routes, "_recovery_is_spam", AsyncMock(return_value=False))
     send = AsyncMock()
     monkeypatch.setattr(routes, "_send_email_verification", send)
     response = asyncio.run(routes.resend_verification(SimpleNamespace(email="existing@example.test"), Mock()))

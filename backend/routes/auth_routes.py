@@ -661,6 +661,29 @@ async def _revoke_refresh(db, token: str):
         await _revoke_refresh_family(db, user_id, family_id, "logout")
 
 
+async def _registration_is_spam(request: Request, body: UserRegister, email: str, username: str, *, client: str) -> bool:
+    """Spamschutz (#2067): sicher ein Bot heißt still verwerfen - die Antwort gleicht einer gelungenen Registrierung.
+
+    Ein nur verdächtiger Benutzername wird angenommen und gezählt: lieber ein Konto zu viel als ein Mensch ausgesperrt.
+    Die App (``client="app"``) schickt noch kein Formular-Token; ein mitgeschicktes wird trotzdem geprüft."""
+    from services import spam_guard
+
+    verdict = await spam_guard.screen(request, "register", token=body.form_token, honeypot=body.hp_fax,
+                                      turnstile_token=body.turnstile_token, email=email, fields={"username": username},
+                                      client=client)
+    return verdict.dropped
+
+
+async def _recovery_is_spam(request: Request, body: ForgotPasswordBody, form: str, email: str) -> bool:
+    """„Passwort vergessen“ und „erneut senden“: Website und App teilen die Adresse, darum ist das Token freiwillig -
+    Limits je IP und E-Mail gelten immer, ein ausgefülltes unsichtbares Feld oder ein falsches Token verwirft still."""
+    from services import spam_guard
+
+    verdict = await spam_guard.screen(request, form, token=body.form_token, honeypot=body.hp_fax, email=email,
+                                      client="shared")
+    return verdict.dropped
+
+
 @router.post("/register")
 async def register(body: UserRegister, request: Request, response: Response):
     db = get_db()
@@ -672,6 +695,8 @@ async def register(body: UserRegister, request: Request, response: Response):
         raise HTTPException(status_code=400, detail="Datenschutz und Nutzungsbedingungen müssen akzeptiert werden.")
     email = body.email.lower().strip()
     username = body.username.strip()
+    if await _registration_is_spam(request, body, email, username, client="web"):
+        return {"verification_required": True, "email": email}
     if await db.users.find_one({"email": email}):
         raise HTTPException(status_code=409, detail="E-Mail bereits registriert")
     if await db.users.find_one({"username": username}):
@@ -969,6 +994,8 @@ async def mobile_register(body: UserRegister, request: Request):
         raise HTTPException(status_code=400, detail="Datenschutz und Nutzungsbedingungen müssen akzeptiert werden.")
     email = body.email.lower().strip()
     username = body.username.strip()
+    if await _registration_is_spam(request, body, email, username, client="app"):
+        return {"verification_required": True, "email": email}
     if await db.users.find_one({"email": email}):
         raise HTTPException(status_code=409, detail="E-Mail bereits registriert")
     if await db.users.find_one({"username": username}):
@@ -1230,9 +1257,9 @@ async def logout_all_sessions(request: Request, user: dict = Depends(get_current
 async def forgot_password(body: ForgotPasswordBody, request: Request):
     db = get_db()
     email = body.email.lower().strip()
-    await enforce_rate_limit(request, "auth:forgot:ip", limit=8, window_seconds=900)
-    await enforce_rate_limit(request, "auth:forgot:email", limit=5, window_seconds=3600, subject=email)
-    user = await db.users.find_one({"email": email})
+    # Limits je IP und E-Mail (Hash statt Adresse), Honeypot und Token (#2067).
+    spam = await _recovery_is_spam(request, body, "forgot_password", email)
+    user = None if spam else await db.users.find_one({"email": email})
     # Always return ok to prevent user enumeration
     if user:
         token = secrets.token_urlsafe(32)
@@ -1260,9 +1287,8 @@ async def forgot_password(body: ForgotPasswordBody, request: Request):
 async def resend_verification(body: ForgotPasswordBody, request: Request):
     db = get_db()
     email = body.email.lower().strip()
-    await enforce_rate_limit(request, "auth:verify-resend:ip", limit=6, window_seconds=3600)
-    await enforce_rate_limit(request, "auth:verify-resend:email", limit=3, window_seconds=3600, subject=email)
-    user = await db.users.find_one({"email": email})
+    spam = await _recovery_is_spam(request, body, "resend_verification", email)
+    user = None if spam else await db.users.find_one({"email": email})
     if user and user.get("email_verified") is False and user.get("is_active") is not False and not user.get("is_banned"):
         await _send_email_verification(db, user)
     return {"ok": True, "message": "Falls eine Bestätigung aussteht, wurde der Versand angefordert. Bitte prüfe in einigen Minuten dein Postfach und den Spam-Ordner."}

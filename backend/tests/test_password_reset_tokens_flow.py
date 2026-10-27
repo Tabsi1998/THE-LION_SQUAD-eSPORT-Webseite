@@ -49,7 +49,9 @@ class _CollectionWith:
 
 
 @pytest_asyncio.fixture
-async def flow():
+async def flow(monkeypatch):
+    # Formular-Token und Zähler des Spamschutzes (#2067) brauchen das Server-Geheimnis.
+    monkeypatch.setenv("JWT_SECRET", "spam-guard-aware-tests-secret-with-32-characters")
     instance, shutdown = make_flow()
     try:
         yield instance

@@ -4,7 +4,7 @@ import { AdminLayout } from "@/components/tls/AdminLayout";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { toast } from "sonner";
-import { Inbox, MailOpen, Trash2, ArrowLeft, AlertCircle } from "lucide-react";
+import { Inbox, MailOpen, Trash2, ArrowLeft, AlertCircle, ShieldCheck } from "lucide-react";
 import { viennaDate, viennaDateTime } from "@/lib/vienna";
 
 const STATUS_LABEL = {
@@ -21,19 +21,73 @@ const TOPIC_LABEL = {
   report_bug: "Bug", abuse: "Missbrauch", other: "Sonstiges",
 };
 
+// Spamschutz (#2067): Gründe, die der Server liefert, falls die Zähler-Antwort keine Beschriftung mitbringt.
+const REASON_FALLBACK = {
+  honeypot: "Verstecktes Feld", token_missing: "Ohne Token", token_too_fast: "Zu schnell", token_expired: "Token abgelaufen",
+  token_forged: "Token gefälscht", random_text: "Zufallszeichen", gmail_dots: "Gmail mit Punkt-Trick", links: "Viele Links",
+  spam_words: "Spam-Wörter", word_filter: "Wortfilter", word_filter_hold: "Wortfilter (zurückhalten)", token_reused: "Token aufgebraucht",
+  turnstile_missing: "Turnstile nicht gelöst", turnstile_invalid: "Turnstile abgelehnt",
+};
+
+function SpamCounter({ stats }) {
+  if (!stats) return null;
+  const labels = { ...REASON_FALLBACK, ...(stats.labels || {}) };
+  const reasons = Object.entries(stats.week?.by_reason || {}).sort((a, b) => b[1] - a[1]);
+  return (
+    <div className="mb-6 border border-white/10 bg-[#121212] rounded-sm p-4 flex flex-wrap items-start gap-x-8 gap-y-3" data-testid="contact-spam-counter">
+      <div className="flex items-center gap-3">
+        <ShieldCheck className="w-5 h-5 text-ok shrink-0" />
+        <div>
+          <div className="text-[10px] font-bold uppercase tracking-widest text-white/50">Spamschutz – abgefangen</div>
+          <div className="text-sm text-white/85">
+            <strong className="text-lg font-black" data-testid="contact-spam-today">{stats.today?.caught || 0}</strong> heute ·{" "}
+            <strong className="text-lg font-black" data-testid="contact-spam-week">{stats.week?.caught || 0}</strong> in 7 Tagen
+            {stats.quote_week != null && <span className="text-white/50"> · Quote {String(stats.quote_week).replace(".", ",")} %</span>}
+          </div>
+        </div>
+      </div>
+      {reasons.length > 0 && (
+        <ul className="flex flex-wrap gap-2 text-xs" aria-label="Gründe der letzten 7 Tage" data-testid="contact-spam-reasons">
+          {reasons.map(([reason, count]) => (
+            <li key={reason} className="px-2 py-1 rounded-sm border border-white/10 text-white/70">{labels[reason] || reason}: {count}</li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 export default function AdminContactPage() {
-  const [list, setList] = useState([]);
+  const [all, setAll] = useState([]);
   const [filter, setFilter] = useState("");
   const [active, setActive] = useState(null);
+  const [spamStats, setSpamStats] = useState(null);
+  const [releasing, setReleasing] = useState(false);
   const confirm = useConfirm();
 
+  // Alle Nachrichten laden und hier filtern: so stimmen die Zähler je Status. Ohne Filter bleibt „Spam“ draußen.
   const load = useCallback(async () => {
-    const url = filter ? `/contact?status=${filter}` : "/contact";
-    const { data } = await api.get(url);
-    setList(data);
-  }, [filter]);
+    const { data } = await api.get("/contact");
+    setAll(Array.isArray(data) ? data : []);
+    api.get("/spam-guard/stats").then(({ data: stats }) => setSpamStats(stats)).catch(() => {});
+  }, []);
   useEffect(() => { load(); }, [load]);
   useApiInvalidation(load, ["contact"]);
+  const list = filter ? all.filter((m) => m.status === filter) : all.filter((m) => m.status !== "spam");
+  // Vom Spamschutz markiert und noch nicht geprüft - der Hinweis steht auch ohne Filter da, damit nichts still liegen bleibt.
+  const suspicious = all.filter((m) => m.status === "spam" && m.spam?.reasons && !m.spam?.cleared_at).length;
+
+  const notSpam = async (id) => {
+    if (releasing) return;
+    setReleasing(true);
+    try {
+      const { data } = await api.post(`/contact/${id}/not-spam`);
+      toast.success("Als „kein Spam“ eingeordnet – die Mails gehen jetzt hinaus.");
+      setActive(data);
+      load();
+    } catch (e) { toast.error(formatApiError(e.response?.data?.detail) || "Fehler"); }
+    finally { setReleasing(false); }
+  };
 
   const setStatus = async (id, status, note) => {
     try {
@@ -54,10 +108,12 @@ export default function AdminContactPage() {
     catch (e) { toast.error(formatApiError(e.response?.data?.detail) || "Fehler"); }
   };
 
-  const counts = list.reduce((a, m) => { a[m.status] = (a[m.status] || 0) + 1; return a; }, {});
+  const counts = all.reduce((a, m) => { a[m.status] = (a[m.status] || 0) + 1; return a; }, {});
 
   if (active) {
     const s = STATUS_LABEL[active.status] || STATUS_LABEL.new;
+    const flagged = active.status === "spam" && active.spam?.reasons && !active.spam?.cleared_at;
+    const reasonLabels = { ...REASON_FALLBACK, ...(spamStats?.labels || {}) };
     return (
       <AdminLayout>
         <button onClick={() => setActive(null)} className="inline-flex items-center gap-2 text-xs uppercase tracking-wider text-white/50 hover:text-[#29B6E8] mb-4">
@@ -78,6 +134,16 @@ export default function AdminContactPage() {
             </div>
           </div>
           <div className="space-y-3">
+            {flagged && (
+              <div className="border border-warn/30 bg-warn/5 rounded-sm p-4" data-testid="contact-spam-box">
+                <div className="text-[11px] font-bold uppercase tracking-widest text-warn mb-2">Vom Spamschutz markiert</div>
+                <p className="text-xs text-white/70 mb-2">Gründe: {active.spam.reasons.map((r) => reasonLabels[r] || r).join(", ")}. Bisher ging keine Mail hinaus – weder an den Absender noch an den Vorstand.</p>
+                <button type="button" onClick={() => notSpam(active.id)} disabled={releasing} data-testid="contact-not-spam"
+                  className="w-full px-4 py-2 border border-ok/40 text-ok font-bold uppercase tracking-wider text-xs rounded-sm hover:bg-ok/10 disabled:opacity-50">
+                  Kein Spam – einordnen und Mails nachholen
+                </button>
+              </div>
+            )}
             <div className="border border-white/10 bg-[#121212] rounded-sm p-4">
               <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-2">Status setzen</div>
               <div className="flex flex-wrap gap-2">
@@ -106,6 +172,14 @@ export default function AdminContactPage() {
     <AdminLayout>
       <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">Verein</span>
       <h1 className="font-heading text-3xl md:text-4xl font-black uppercase mt-1 mb-4">Kontakt-Inbox</h1>
+      <SpamCounter stats={spamStats} />
+      {suspicious > 0 && filter !== "spam" && (
+        <button type="button" onClick={() => setFilter("spam")} data-testid="contact-suspicious-hint"
+          className="mb-6 w-full text-left border border-warn/40 bg-warn/5 rounded-sm px-4 py-3 text-sm text-white/85 hover:bg-warn/10 inline-flex items-center gap-2">
+          <AlertCircle className="w-4 h-4 text-warn shrink-0" />
+          <span><strong>{suspicious === 1 ? "1 verdächtige Nachricht" : `${suspicious} verdächtige Nachrichten`}</strong> im Spam-Ordner – bitte kurz prüfen. Echte Anfragen holt „Kein Spam“ zurück.</span>
+        </button>
+      )}
 
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
         {Object.entries(STATUS_LABEL).map(([k, v]) => (
@@ -156,7 +230,7 @@ export default function AdminContactPage() {
       <div className="mt-6 border border-[#29B6E8]/20 bg-[#29B6E8]/5 rounded-sm p-4 flex items-start gap-3">
         <AlertCircle className="w-5 h-5 text-[#29B6E8] shrink-0 mt-0.5" />
         <div className="text-sm text-white/80">
-          <strong>Hinweis:</strong> Alle Nachrichten lösen automatisch eine Bestätigungsmail an den Absender und eine Benachrichtigung an die Vereins-E-Mail aus (über die Mail-Queue).
+          <strong>Hinweis:</strong> Jede Nachricht löst automatisch eine Bestätigungsmail an den Absender und eine Benachrichtigung an die Vereins-E-Mail aus (über die Mail-Queue). Ausnahme: Nachrichten, die der Spamschutz als „Spam“ markiert – sie stehen unter dem Filter „Spam“, und „Kein Spam“ holt die Mails nach. Sicher erkannte Bots werden gar nicht gespeichert, nur gezählt.
         </div>
       </div>
     </AdminLayout>

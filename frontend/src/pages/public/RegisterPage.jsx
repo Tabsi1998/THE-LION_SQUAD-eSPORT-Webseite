@@ -4,6 +4,8 @@ import { useAuth } from "@/context/AuthContext";
 import { Logo } from "@/components/tls/Logo";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { useSubmissionGuard } from "@/hooks/useSubmissionGuard";
+import { useSpamGuard } from "@/hooks/useSpamGuard";
+import { SpamGuardFields } from "@/components/tls/SpamGuardFields";
 import {
   AuthCheckboxField,
   AuthFormAlert,
@@ -62,6 +64,8 @@ export default function RegisterPage() {
   const [acceptTerms, setAcceptTerms] = useState(false);
   const [newsletter, setNewsletter] = useState(false);
   const { submitting: loading, submitOnce } = useSubmissionGuard();
+  // Spamschutz (#2067): Formular-Token, unsichtbares Feld, ggf. Turnstile.
+  const guard = useSpamGuard("register");
   const [err, setErr] = useState(null);
   const [fieldErrors, setFieldErrors] = useState({});
 
@@ -117,8 +121,9 @@ export default function RegisterPage() {
       newsletter_consent: newsletter,
       ...(next !== DEFAULT_RETURN_PATH ? { next } : {}),
     };
-    const attempt = await submitOnce(() => register(payload));
+    const attempt = await submitOnce(async () => register({ ...payload, ...(await guard.prepare()) }));
     if (!attempt.started) return;
+    guard.afterAttempt(attempt.error || attempt.value?.cause);
     if (attempt.error) {
       setErr("Registrierung konnte nicht abgeschlossen werden. Bitte versuche es erneut.");
       return;
@@ -134,7 +139,7 @@ export default function RegisterPage() {
         nav(next);
       }
     } else {
-      setErr(res.error);
+      setErr(guard.handleError(res.cause) || res.error);
     }
   };
 
@@ -240,6 +245,7 @@ export default function RegisterPage() {
               Newsletter & Vereinsinfos per E-Mail erhalten (optional, jederzeit widerrufbar).
             </AuthCheckboxField>
           </div>
+          <SpamGuardFields guard={guard} idPrefix="register" />
           {err && <AuthFormAlert id="register-error">{err}</AuthFormAlert>}
           <button
             data-testid="register-submit"

@@ -234,4 +234,7 @@ NO_PERSON = frozenset({
     # Claims des Printful-Adapters (#1705) vor dem Anlegen eines Entwurfs und vor dem Bestätigen: external_id,
     # Idempotenzschlüssel, Auftragsnummer, Stand - keine Person.
     "shop_printful_drafts", "shop_printful_confirmations",
+    # Spamschutz (#2067): Zähler je Stunde, Formular, Ergebnis und Grund - ohne Inhalt, Adresse oder IP (90 Tage) - und
+    # der Hash eines benutzten Formular-Tokens mit der Zahl der Versuche (läuft mit dem Token ab).
+    "spam_guard_stats", "spam_guard_tokens",
 })

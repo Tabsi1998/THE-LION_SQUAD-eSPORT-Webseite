@@ -140,7 +140,8 @@ export function AuthProvider({ children }) {
     } catch (e) {
       const msg = formatApiError(e.response?.data?.detail) || e.message;
       setError(msg);
-      return { ok: false, error: msg };
+      // `cause`: der Spamschutz (#2067) erkennt daran, ob Turnstile nachträglich verlangt wird.
+      return { ok: false, error: msg, cause: e };
     }
   };
 

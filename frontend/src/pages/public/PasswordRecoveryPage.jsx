@@ -4,7 +4,9 @@ import { api, formatApiError } from "@/lib/api";
 import { Logo } from "@/components/tls/Logo";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { useSubmissionGuard } from "@/hooks/useSubmissionGuard";
+import { useSpamGuard } from "@/hooks/useSpamGuard";
 import { AuthFormAlert, AuthPasswordField, AuthTextField } from "@/components/tls/AuthFormFields";
+import { SpamGuardFields } from "@/components/tls/SpamGuardFields";
 import { toast } from "sonner";
 import { MIN_PASSWORD_LENGTH, PASSWORD_RULE_HINT, passwordProblem } from "@/lib/passwordRules";
 
@@ -16,6 +18,8 @@ export function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
   const [sent, setSent] = useState(false);
   const { submitting: loading, submitOnce } = useSubmissionGuard();
+  // Spamschutz (#2067): Formular-Token und unsichtbares Feld.
+  const guard = useSpamGuard("forgot_password");
   const [fieldErrors, setFieldErrors] = useState({});
   const [submitError, setSubmitError] = useState("");
 
@@ -40,8 +44,9 @@ export function ForgotPasswordPage() {
     if (!validate()) return;
 
     setSubmitError("");
-    const attempt = await submitOnce(() => api.post("/auth/forgot-password", { email: email.trim() }));
+    const attempt = await submitOnce(async () => api.post("/auth/forgot-password", { email: email.trim(), ...(await guard.prepare()) }));
     if (!attempt.started) return;
+    guard.afterAttempt();
     if (!attempt.error) {
       setSent(true);
       toast.success("Wenn die E-Mail existiert, wurde ein Link gesendet.");
@@ -72,6 +77,7 @@ export function ForgotPasswordPage() {
             error={fieldErrors["forgot-email"]}
             testId="forgot-email"
           />
+          <SpamGuardFields guard={guard} idPrefix="forgot" />
           {submitError && <AuthFormAlert id="forgot-submit-error">{submitError}</AuthFormAlert>}
           <button disabled={loading} data-testid="forgot-submit" className="tls-btn tls-btn--primary w-full py-3 font-bold uppercase tracking-wider rounded-sm disabled:opacity-50">
             {loading ? "Sende ..." : "Link senden"}

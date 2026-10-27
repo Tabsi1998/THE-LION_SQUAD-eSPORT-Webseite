@@ -22,6 +22,7 @@ import { MailQueueSection } from "./settings/sections/MailQueueSection";
 import { BrandSection } from "./settings/sections/BrandSection";
 import { SeoSection } from "./settings/sections/SeoSection";
 import { SystemSection } from "./settings/sections/SystemSection";
+import { SpamGuardSection } from "./settings/sections/SpamGuardSection";
 import { SeasonsSettings } from "./settings/SeasonsSettings";
 
 export default function AdminSettingsPage() {
@@ -588,6 +589,7 @@ export default function AdminSettingsPage() {
 
 
       {tab === "system" && <SystemSection systemStatus={systemStatus} load={load} />}
+      {tab === "spam" && <SpamGuardSection />}
       {tab === "seasons" && <SeasonsSettings />}
 
     </AdminLayout>
