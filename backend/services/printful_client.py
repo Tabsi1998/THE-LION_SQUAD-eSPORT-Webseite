@@ -541,12 +541,17 @@ class PrintfulClient:
         return value
 
     @staticmethod
-    def _where(row: dict) -> str:
-        """Platzierung und Technik einer Zeile für den Grund - nur, wenn sie auf das Muster passen (keine fremden Werte)."""
+    def _readable(row: dict) -> tuple[str | None, str | None]:
+        """Platzierung und Technik einer Zeile - nur, wenn sie auf das Muster passen (keine fremden Werte), sonst None."""
         placement, technique = row.get("placement"), row.get("technique")
-        placement = placement if isinstance(placement, str) and PLACEMENT_RE.fullmatch(placement) else "unbekannte Platzierung"
-        technique = technique if isinstance(technique, str) and TECHNIQUE_RE.fullmatch(technique) else "unbekannte Technik"
-        return f"{placement} ({technique})"
+        return (placement if isinstance(placement, str) and PLACEMENT_RE.fullmatch(placement) else None,
+                technique if isinstance(technique, str) and TECHNIQUE_RE.fullmatch(technique) else None)
+
+    @classmethod
+    def _where(cls, row: dict) -> str:
+        """Platzierung und Technik einer Zeile für den Grund."""
+        placement, technique = cls._readable(row)
+        return f"{placement or 'unbekannte Platzierung'} ({technique or 'unbekannte Technik'})"
 
     @staticmethod
     def _read_row(read, row: dict):
@@ -599,12 +604,18 @@ class PrintfulClient:
         require(product_id, CatalogProductId, "product_id")
         operation = "retrieveMockupStylesByProductId"
         rows = await self._pages(f"/v2/catalog-products/{product_id.value}/mockup-styles", operation=operation)
-        out, reasons = [], []
+        out, reasons, incomplete, unreadable = [], [], set(), 0
         for row in rows:
             try:
                 out.append(self._read_row(self._print_area, row))
             except _RowSkip as skip:
                 reasons.append((self._where(row), skip.text))
+                # Wem die Zeile gehört: ein Paar (Platzierung, Technik) ist damit unvollständig (#2091, Review).
+                placement, technique = self._readable(row)
+                if placement and technique:
+                    incomplete.add((placement, technique))
+                else:
+                    unreadable += 1
         skipped = self._skip_summary("Druckvorgabe", [f"{where}: {text}" for where, text in reasons], len(rows),
                                      operation)
         if rows and not out:
@@ -614,7 +625,7 @@ class PrintfulClient:
             raise FulfillmentPermanent("no_usable_rows", provider_detail=(
                 f"Druckvorgaben (mockup-styles): keine der {len(rows)} Zeilen brauchbar. Häufigster Grund "
                 f"({count} von {len(rows)}, z. B. {example}): {text}"))
-        return Rows(out, skipped)
+        return Rows(out, skipped, incomplete, unreadable)
 
     def _mockup_template(self, row: dict) -> MockupTemplate | None:
         """Eine Zeile aus mockup-templates - ``None`` für Zusatzbilder (``extra``, ``advanced*``), die die Vorschau

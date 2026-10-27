@@ -279,12 +279,20 @@ class MockupTemplate:
 
 class Rows(tuple):
     """Gelesene Zeilen einer Liste vom Anbieter plus kurze Gründe, warum einzelne Zeilen übersprungen wurden (#2091) -
-    ohne Werte aus der Antwort, nur Platzierung, Technik, Feld und erwarteter Typ. Sonst ein gewöhnliches Tupel."""
-    skipped: tuple[str, ...]
+    ohne Werte aus der Antwort, nur Platzierung, Technik, Feld und erwarteter Typ. Sonst ein gewöhnliches Tupel.
 
-    def __new__(cls, items=(), skipped=()):
+    ``incomplete``: Paare (Platzierung, Technik), zu denen mindestens eine Zeile übersprungen wurde - deren gelesene
+    Zeilen sind unvollständig (etwa fehlt die Fläche einer Tassengröße). ``unreadable``: so viele übersprungene Zeilen,
+    deren Platzierung oder Technik nicht lesbar war - sie lassen sich keinem Paar zuordnen."""
+    skipped: tuple[str, ...]
+    incomplete: frozenset[tuple[str, str]]
+    unreadable: int
+
+    def __new__(cls, items=(), skipped=(), incomplete=(), unreadable=0):
         rows = super().__new__(cls, items)
         rows.skipped = tuple(skipped)
+        rows.incomplete = frozenset(incomplete)
+        rows.unreadable = int(unreadable)
         return rows
 
 

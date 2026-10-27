@@ -318,7 +318,8 @@ async def test_one_broken_row_costs_only_that_row_and_names_field_and_type(db, p
                                      ("sleeve_right", "all")]
     assert sizes(stored)[("back", "all")] == (1800, 2400, 150)
     assert stored["skipped"] == [
-        "Druckvorgabe front (dtg): Feld dpi fehlt oder passt nicht (erwartet: ganze Zahl von 72 bis 1200)."]
+        "Druckvorgabe front (dtg): Feld dpi fehlt oder passt nicht (erwartet: ganze Zahl von 72 bis 1200).",
+        "Unvollständig geliefert, nicht übernommen, bis Printful sie vollständig liefert: Vorderseite (dtg)."]
     assert no_values(stored["skipped"], "viel")
     logged = [record.getMessage() for record in caplog.records if "übersprungen" in record.getMessage()]
     assert len(logged) == 1 and "1 von 5 Zeilen" in logged[0] and no_values(logged, "viel")
@@ -417,20 +418,97 @@ async def test_when_no_row_fits_the_fetch_fails_with_the_most_common_reason(db, 
 
 
 @pytest.mark.asyncio
-async def test_same_reasons_are_counted_once_and_templates_failing_keeps_the_areas(db, provider, fake):
+async def test_rows_without_a_readable_placement_or_technique_never_change_the_measures(db, provider, fake):
+    """Review #2091: eine Zeile, die sich keinem Paar zuordnen lässt, könnte die Gruppe irgendeiner Fläche sein."""
     fake.off_contract.add(STYLES)
     for placement in ("sleeve_left", "sleeve_right"):
         row_of(fake.print_areas[SHIRT], placement)["technique"] = "DTG mit Leerzeichen"
-    fake.fail(404, operation=TEMPLATES)
-    result = await templates.refresh(db, SHIRT, provider=provider, actor_id=ACTOR)
-    stored = result["template"]
-    assert result["ok"] is True and sorted(sizes(stored)) == [("back", "all"), ("front", "all"), ("label_inside", "all")]
-    assert stored["previews"] == []
+    fresh = await templates.refresh(db, SHIRT, provider=provider, actor_id=ACTOR)
+    assert fresh["ok"] is False and not fresh["template"].get("entries"), "ohne gespeicherten Stand: nichts übernehmen"
+    assert fresh["detail"] == ("Printful liefert Druckvorgaben ohne lesbare Platzierung oder Technik - neue Maße nicht "
+                               "übernommen.")
+    stored = fresh["template"]
+    assert stored["last_error"]["detail"] == fresh["detail"]
     assert stored["skipped"][0] == ("Druckvorgabe sleeve_left (unbekannte Technik): Feld technique fehlt oder passt "
                                     "nicht (erwartet: Technik-Kennung (a-z, 0-9, -)).")
     assert stored["skipped"][1].startswith("Druckvorgabe sleeve_right (unbekannte Technik)")
-    assert stored["skipped"][2] == "Vorlagenbilder nicht abrufbar (Beim Anbieter nicht gefunden (404)) - Vorschau ohne Bild."
     assert no_values(stored["skipped"], "Leerzeichen")
+    for placement in ("sleeve_left", "sleeve_right"):
+        row_of(fake.print_areas[SHIRT], placement)["technique"] = "dtg"
+    good = (await templates.refresh(db, SHIRT, provider=provider, actor_id=ACTOR))["template"]
+    row_of(fake.print_areas[SHIRT], "back")["placement"] = "Rücken!"
+    kept = await templates.refresh(db, SHIRT, provider=provider, actor_id=ACTOR)
+    assert kept["ok"] is False and kept["detail"].endswith("neue Maße nicht übernommen, der letzte Stand bleibt.")
+    stored = await templates.get(db, SHIRT)
+    assert stored["entries"] == good["entries"] and stored["hash"] == good["hash"]
+    assert stored["skipped"] == ["Druckvorgabe unbekannte Platzierung (dtg): Feld placement fehlt oder passt nicht "
+                                 "(erwartet: Platzierungskennung (a-z, 0-9, _))."]
+
+
+@pytest.mark.asyncio
+async def test_a_partial_answer_keeps_the_stored_area_without_flapping(db, provider, fake):
+    """Review #2091: fällt eine Zeile weg, kein „Entfällt“ und beim nächsten vollständigen Abruf kein „Neu“."""
+    good = (await templates.refresh(db, SHIRT, provider=provider, actor_id=ACTOR))["template"]
+    fake.off_contract.add(STYLES)
+    back = row_of(fake.print_areas[SHIRT], "back")
+    back["dpi"] = "kaputt"
+    partial = await templates.refresh(db, SHIRT, provider=provider, actor_id=ACTOR)
+    assert partial["ok"] is True and partial["changed"] is False and partial["changes"] == []
+    stored = partial["template"]
+    assert stored["hash"] == good["hash"] and stored["entries"] == good["entries"]
+    assert templates.entry_for_variant(stored, "dtg", "back", 4012)["height_px"] == 2400
+    assert stored["skipped"] == [
+        "Druckvorgabe back (dtg): Feld dpi fehlt oder passt nicht (erwartet: ganze Zahl von 72 bis 1200).",
+        "Unvollständig geliefert, es gilt weiter der letzte vollständige Stand: Rückseite (dtg)."]
+    back["dpi"] = 150
+    full = await templates.refresh(db, SHIRT, provider=provider, actor_id=ACTOR)
+    assert full["changed"] is False and full["template"]["hash"] == good["hash"] and full["template"]["skipped"] == []
+    assert await db.audit_logs.count_documents({"action": "shop.print_template.change"}) == 0
+
+
+def mixed_mug(fake) -> dict:
+    """Tasse mit allgemeiner Fläche und einer eigenen für 15 oz - dazu eine zweite Fläche, damit etwas übrig bleibt."""
+    fake.print_areas[MUG] = [row for row in fake.print_areas[MUG]
+                             if row["mockup_styles"][0]["restricted_to_variants"] != [7011]]
+    fake.set_print_area(MUG, "default", 7.5, 3.0833, dpi=300, technique="sublimation")
+    fake.set_print_area(MUG, "back", 3, 3, dpi=300, technique="sublimation")
+    return next(row for row in fake.print_areas[MUG] if row["mockup_styles"][0]["restricted_to_variants"] == [7015])
+
+
+@pytest.mark.asyncio
+async def test_a_missing_variant_group_never_falls_back_to_the_general_area(db, provider, fake):
+    restricted = mixed_mug(fake)
+    fake.off_contract.add(STYLES)
+    restricted["dpi"] = None
+    result = await templates.refresh(db, MUG, provider=provider, actor_id=ACTOR)
+    stored = result["template"]
+    assert result["ok"] is True and sizes(stored) == {("back", "all"): (900, 900, 300)}
+    assert templates.entry_for_variant(stored, "sublimation", "default", 7015) is None, "nie die allgemeine Fläche"
+    assert templates.groups_for(stored, "sublimation", "default", [7011, 7015]) == []
+    assert stored["skipped"][-1] == ("Unvollständig geliefert, nicht übernommen, bis Printful sie vollständig liefert: "
+                                     "Druckfläche (sublimation).")
+
+
+@pytest.mark.asyncio
+async def test_a_missing_variant_group_keeps_the_stored_groups(db, provider, fake):
+    restricted = mixed_mug(fake)
+    good = (await templates.refresh(db, MUG, provider=provider, actor_id=ACTOR))["template"]
+    assert sizes(good)[("default", (7015,))] == (2253, 1084, 300) and sizes(good)[("default", "all")] == (2250, 925, 300)
+    fake.off_contract.add(STYLES)
+    restricted["dpi"] = None
+    stored = (await templates.refresh(db, MUG, provider=provider, actor_id=ACTOR))["template"]
+    assert stored["hash"] == good["hash"] and sizes(stored) == sizes(good)
+    assert templates.entry_for_variant(stored, "sublimation", "default", 7015)["height_px"] == 1084
+    assert await db.audit_logs.count_documents({"action": "shop.print_template.change"}) == 0
+
+
+@pytest.mark.asyncio
+async def test_without_template_images_the_areas_stay(db, provider, fake):
+    fake.fail(404, operation=TEMPLATES)
+    result = await templates.refresh(db, SHIRT, provider=provider, actor_id=ACTOR)
+    stored = result["template"]
+    assert result["ok"] is True and len(stored["entries"]) == 5 and stored["previews"] == []
+    assert stored["skipped"] == ["Vorlagenbilder nicht abrufbar (Beim Anbieter nicht gefunden (404)) - Vorschau ohne Bild."]
 
 
 @pytest.mark.asyncio

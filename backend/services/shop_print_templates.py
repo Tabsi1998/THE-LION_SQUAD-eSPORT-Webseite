@@ -146,24 +146,56 @@ def build(areas: Sequence[PrintArea], templates: Sequence[MockupTemplate]) -> tu
                            f"{MAX_FILE_PIXELS // 1_000_000} Millionen Pixel, nicht übernommen.")
             continue
         variant_ids = sorted(area.variant_ids) if area.variant_ids else None
-        mine = sorted((item for item in previews if item["placement"] == area.placement
-                       and item["technique"] == area.technique
-                       and (variant_ids is None or set(item["variant_ids"]) & set(variant_ids))),
-                      key=lambda item: (_role_rank(item), item["index"]))
-        ratio = area.height_px / area.width_px
-        aspect_ok = all(abs(item["area"]["height"] / item["area"]["width"] - ratio) <= ratio * ASPECT_TOLERANCE
-                        for item in mine)
-        entries.append({
+        entries.append(link_previews({
             "placement": area.placement, "technique": area.technique, "family": family(area.placement),
             "label": placement_label(area.placement, area.display_name), "display_name": area.display_name,
             "width_in": round(area.width_in, 4), "height_in": round(area.height_in, 4), "dpi": area.dpi,
             "width_px": area.width_px, "height_px": area.height_px,
             "width_cm": round(area.width_in * CM_PER_INCH, 2), "height_cm": round(area.height_in * CM_PER_INCH, 2),
             "area_type": area.area_type, "variant_ids": variant_ids, "group": group_key(variant_ids),
-            "preview_indexes": [item["index"] for item in mine], "aspect_ok": aspect_ok,
-        })
+        }, previews))
     entries.sort(key=lambda row: (row["technique"], row["placement"], row["group"]))
     return entries, previews, skipped
+
+
+def link_previews(entry: dict, previews: Sequence[dict]) -> dict:
+    """Welche Vorlagenbilder zu einem Eintrag gehören (``preview_indexes``, die eigentliche Vorlage zuerst) und ob ihr
+    Seitenverhältnis zur Druckfläche passt (``aspect_ok``). Auch für Einträge aus einem älteren Stand (#2091)."""
+    variant_ids = entry.get("variant_ids")
+    mine = sorted((item for item in previews if item["placement"] == entry["placement"]
+                   and item["technique"] == entry["technique"]
+                   and (variant_ids is None or set(item["variant_ids"]) & set(variant_ids))),
+                  key=lambda item: (_role_rank(item), item["index"]))
+    ratio = entry["height_px"] / entry["width_px"]
+    aspect_ok = all(abs(item["area"]["height"] / item["area"]["width"] - ratio) <= ratio * ASPECT_TOLERANCE
+                    for item in mine)
+    return {**entry, "preview_indexes": [item["index"] for item in mine], "aspect_ok": aspect_ok}
+
+
+def _pair_label(pair: tuple[str, str]) -> str:
+    return f"{placement_label(pair[0])} ({pair[1]})"
+
+
+def merge_incomplete(entries: list[dict], old_entries: Sequence[dict],
+                     incomplete: set[tuple[str, str]]) -> tuple[list[dict], list[str]]:
+    """Unvollständig gelesene Paare (Platzierung, Technik) nie halb übernehmen (#2091, Review): sonst fiele eine
+    fehlende Gruppe (etwa die 15-oz-Tasse) still auf die allgemeine Fläche und die Druckdatei hätte die falsche Größe.
+    Mit gespeichertem Stand gelten für diese Paare dessen Einträge weiter (kein „Entfällt“, kein Hin und Her im
+    Protokoll); ohne gespeicherten Stand fehlt das Paar ganz, bis Printful es vollständig liefert."""
+    if not incomplete:
+        return entries, []
+    kept = [row for row in entries if (row["placement"], row["technique"]) not in incomplete]
+    carried = [row for row in old_entries if (row["placement"], row["technique"]) in incomplete]
+    carried_pairs = {(row["placement"], row["technique"]) for row in carried}
+    notes = []
+    if carried_pairs:
+        notes.append("Unvollständig geliefert, es gilt weiter der letzte vollständige Stand: "
+                     + ", ".join(_pair_label(pair) for pair in sorted(carried_pairs)) + ".")
+    missing = incomplete - carried_pairs
+    if missing:
+        notes.append("Unvollständig geliefert, nicht übernommen, bis Printful sie vollständig liefert: "
+                     + ", ".join(_pair_label(pair) for pair in sorted(missing)) + ".")
+    return kept + carried, notes
 
 
 def _spec(entry: dict) -> dict:
@@ -247,8 +279,26 @@ async def refresh(db, printful_product_id: int, *, provider: FulfillmentProvider
             upsert=True)
         return {"ok": False, "changed": False, "changes": [], "detail": detail, "template": await get(db, printful_product_id)}
     read_skipped[:0] = [*getattr(areas, "skipped", ()), *getattr(templates, "skipped", ())]
+    old_entries = (current or {}).get("entries") or []
+    if getattr(areas, "unreadable", 0):
+        # Eine Zeile ohne lesbare Platzierung oder Technik lässt sich keinem Paar zuordnen - sie könnte die Gruppe
+        # irgendeiner Fläche sein. Dann keine neuen Maße übernehmen; der gespeicherte Stand bleibt (#2091, Review).
+        detail = ("Printful liefert Druckvorgaben ohne lesbare Platzierung oder Technik - neue Maße nicht übernommen"
+                  + (", der letzte Stand bleibt." if old_entries else "."))
+        await db.shop_print_templates.update_one(
+            {"printful_product_id": printful_product_id},
+            {"$set": {"printful_product_id": printful_product_id, "last_error": {"at": now, "detail": detail},
+                      "skipped": read_skipped}},
+            upsert=True)
+        return {"ok": False, "changed": False, "changes": [], "detail": detail, "template": await get(db, printful_product_id)}
     entries, previews, skipped = build(areas, templates)
-    skipped = skipped + read_skipped
+    # Zu große Flächen (``MAX_FILE_PIXELS``) fehlen genauso wie übersprungene Zeilen - auch ihr Paar ist unvollständig.
+    incomplete = set(getattr(areas, "incomplete", ())) | {
+        (area.placement, area.technique) for area in areas if area.width_px * area.height_px > MAX_FILE_PIXELS}
+    entries, notes = merge_incomplete(entries, old_entries, incomplete)
+    entries = sorted((link_previews(row, previews) for row in entries),
+                     key=lambda row: (row["technique"], row["placement"], row["group"]))
+    skipped = skipped + read_skipped + notes
     if not entries:
         detail = "Printful liefert für dieses Produkt keine Druckvorgaben (mockup-styles)." + (
             " " + " ".join(skipped) if skipped else "")
