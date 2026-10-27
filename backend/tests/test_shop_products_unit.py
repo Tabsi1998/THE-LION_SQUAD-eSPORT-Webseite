@@ -730,3 +730,44 @@ async def test_without_a_reason_everything_works_except_publishing(db, provider,
     await shop_products.set_status(db, product["id"], "draft", **nothing)
     rows = await db.audit_logs.find({"action": "shop.product.status"}, {"_id": 0}).to_list(10)
     assert [row["data"]["reason"] for row in rows] == ["", "Geht live", ""]
+
+
+# ---------------------------------------------------------------- Nachprüfung (Codex, zweite Runde)
+
+@pytest.mark.asyncio
+async def test_creating_a_product_respects_the_minimum_price(db):
+    with pytest.raises(ShopError, match="Mindestpreis"):
+        await new_product(db, title="Gratis-Kappe", base_price_cents=0)
+    with pytest.raises(ShopError, match="Mindestpreis"):
+        await new_product(db, title="Billig-Kappe", base_price_cents=99)
+    assert (await new_product(db, title="Kappe Test", base_price_cents=100))["base_price_cents"] == 100
+
+
+@pytest.mark.asyncio
+async def test_prices_below_the_minimum_are_not_accepted(db, provider):
+    await db.settings.update_one({"id": "shop"}, {"$set": {"id": "shop", "min_price_cents": 2000}}, upsert=True)
+    product = await configured(db, provider, accept=False)
+    with pytest.raises(ShopError) as refused:
+        await shop_products.accept_prices(db, product["id"], **BY)
+    assert "Selbstkosten 15,00 €" in str(refused.value) and "Mindestpreis 20,00 €" in str(refused.value)
+    assert (await variant_for(db, product["id"], BLACK_M))["price_cents"] is None
+
+
+@pytest.mark.asyncio
+async def test_a_sync_blocks_variants_that_fall_below_the_minimum(db, provider):
+    """Ein veröffentlichtes Produkt verkauft nicht still unter dem Mindestpreis weiter."""
+    product = await configured(db, provider)
+    await publish_unchecked(db, product["id"])
+    await db.settings.update_one({"id": "shop"}, {"$set": {"id": "shop", "min_price_cents": 2000}}, upsert=True)
+    result = await shop_catalog_sync.sync_product(db, product["id"], provider=provider, **BY)
+    assert sorted(result["blocked"]) == ["Black / L", "Black / M", "White / L", "White / M"]
+    medium = await variant_for(db, product["id"], BLACK_M)
+    assert "Mindestpreis" in medium["blocked_reason"]
+    with pytest.raises(ShopError, match="nicht bestellbar"):
+        await shop_orders.place_order(
+            db, user_id="konto-1", idempotency_key="bestellung-0020", buyer_kind="member",
+            lines=[{"variant_id": medium["id"], "quantity": 1, "gamertag": "Testlöwe"}], shipping_estimate_cents=490,
+            billing_address=dict(BILLING), shipping_address=dict(SHIPPING), actor_id="konto-1")
+    await db.settings.update_one({"id": "shop"}, {"$set": {"min_price_cents": 100}})
+    result = await shop_catalog_sync.sync_product(db, product["id"], provider=provider, **BY)
+    assert len(result["unblocked"]) == 4

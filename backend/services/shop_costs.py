@@ -49,3 +49,8 @@ def cost_cents(product: dict, mapping: dict | None) -> int | None:
             return None
         total += extra
     return total
+
+
+def euro(cents: int) -> str:
+    """1500 → „15,00 €“."""
+    return f"{cents // 100},{cents % 100:02d} €"

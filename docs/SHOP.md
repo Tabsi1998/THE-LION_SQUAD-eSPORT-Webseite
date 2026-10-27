@@ -356,7 +356,9 @@ erst nach dem Zurückziehen - nur „Preise übernehmen“ geht auch veröffentl
 `PATCH /variants/{id}`, Printful-Zuordnung von Hand): veröffentlicht oder archiviert nur Titel und Beschreibung (sonst
 409 „erst zurückziehen“); jede andere Änderung setzt „geprüft“ auf „Entwurf“ zurück; bei Printful-Produkten Preise nur
 über „Preise übernehmen“ und Varianten nur über „Farben und Größen“ (400). Kein Verkaufspreis unter dem Mindestpreis -
-auch nicht 0 € (400); `place_order` nimmt ihn ebenfalls nicht.
+auch nicht 0 € (400), beim Anlegen wie beim Ändern; `place_order` nimmt ihn ebenfalls nicht. „Preise übernehmen“ lehnt
+Selbstkosten unter dem Mindestpreis ab („Selbstkosten 15,00 € liegen unter dem Mindestpreis 20,00 € …“) und übernimmt
+dann gar nichts.
 
 **Nacheinander:** Jeder Schritt des Aufbaus hält eine kurze MongoDB-Sperre je Produkt
 (`shop_catalog.product_lock`, `shop:product:<id>`, über alle Prozesse). Jede Admin-Änderung erhöht die `version` des
@@ -367,7 +369,8 @@ Produkts.
 
 - **Fail-closed:** gesperrt (`blocked_reason`) wird, was Printful nicht als „in stock“ meldet, wofür Printful gar
   nichts meldet („Lager bei Printful unbekannt.“), was nicht mehr im Katalog steht und wofür der Einkauf fehlt oder 0 €
-  ist („Preis fehlt bei Printful.“). Nur „in stock“ mit gültigem Preis hebt die Sperre auf. `place_order` prüft bei
+  ist („Preis fehlt bei Printful.“), und deren Selbstkosten unter dem Mindestpreis liegen (ein veröffentlichtes
+  Produkt verkauft nie still darunter weiter). Nur „in stock“ mit gültigem Preis hebt die Sperre auf. `place_order` prüft bei
   Printful-Produkten die Sperre **und** `in_stock is True` der Zuordnung.
 - Preisänderung: neuer Einkauf an der Zuordnung plus `price_warning` (vorher/nachher, seit) - der Preis der Variante
   bleibt, bis die Finanzen übernehmen. Bestehende Bestellungen haben ihre Preise eingefroren.

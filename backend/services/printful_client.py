@@ -220,7 +220,16 @@ class PrintfulClient:
             slot = max(now, sent[-RATE_BUDGET_PER_MINUTE] + RATE_WINDOW_SECONDS)
         sent.append(slot)
         if slot > now:
-            await _sleep(slot - now)
+            try:
+                await _sleep(slot - now)
+            except BaseException:
+                # Abgebrochen (CancelledError) oder gescheitert, bevor der Aufruf hinausging: den reservierten Platz
+                # zurückgeben - sonst bremst er spätere Aufrufe, obwohl nie etwas gesendet wurde.
+                try:
+                    sent.remove(slot)
+                except ValueError:
+                    pass  # schon aus dem Fenster gefallen
+                raise
 
     def __repr__(self) -> str:
         return "PrintfulClient(api_key=***)"

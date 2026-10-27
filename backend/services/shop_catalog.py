@@ -163,6 +163,8 @@ async def create_product(db, fields: dict, *, actor_id: str, reason: str) -> dic
         raise ShopError("title fehlt.")
     if "slug" not in values:
         values["slug"] = _product_value("slug", slugify(values["title"]) or "produkt")
+    if values.get("base_price_cents") is not None:
+        await _check_min_price(db, values["base_price_cents"])
     now = now_utc().isoformat()
     product = {"id": new_id(), "description": None, "status": "draft", "visibility": "hidden", "markup_cents": None,
                "base_price_cents": None, "personalization": "none", "tax_profile": None, "design_key": None, **values,

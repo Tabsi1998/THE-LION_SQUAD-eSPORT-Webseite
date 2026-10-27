@@ -977,3 +977,21 @@ def test_the_fake_refuses_paths_outside_the_contract(fake):
     with pytest.raises(ContractViolation):
         fake._handle(httpx.Request("POST", "https://api.printful.com/orders?confirm=true",
                                    headers={"Authorization": f"Bearer {API_KEY}"}, json={}))
+
+
+@pytest.mark.asyncio
+async def test_a_cancelled_wait_gives_its_reserved_slot_back(monkeypatch):
+    """Wer während des Wartens abgebrochen wird, gibt seinen reservierten Platz im Fenster wieder frei."""
+    clock = {"now": 9000.0}
+
+    async def cancelled(_seconds):
+        raise asyncio.CancelledError
+
+    monkeypatch.setattr(printful_client, "_sleep", cancelled)
+    monkeypatch.setattr(printful_client, "_clock", lambda: clock["now"])
+    client = PrintfulClient(API_KEY, transport=httpx.MockTransport(lambda request: httpx.Response(200, json={})))
+    window = printful_client._RATE_WINDOWS.setdefault(client._window_key, printful_client.deque())
+    window.extend([clock["now"]] * printful_client.RATE_BUDGET_PER_MINUTE)
+    with pytest.raises(asyncio.CancelledError):
+        await client._throttle()
+    assert len(window) == printful_client.RATE_BUDGET_PER_MINUTE, "der abgebrochene Platz ist wieder frei"

@@ -31,7 +31,7 @@ from typing import Any
 from models import now_utc
 from services import shop_catalog, shop_catalog_sync, shop_config, shop_designs
 from services.shop_common import ShopConflict, ShopError, clean_reason, record_admin_action
-from services.shop_costs import cost_cents, included_placement, technique_of
+from services.shop_costs import cost_cents, euro, included_placement, technique_of
 from services.shop_fulfillment import CatalogProductId, FulfillmentError, FulfillmentProvider
 
 PLACEMENT_KINDS = ("design", "gamertag", "member_number")
@@ -410,11 +410,19 @@ async def accept_prices(db, product_id: str, *, actor_id: str, reason: Any) -> d
     offered = await _offered(db, product)
     if not offered:
         raise ShopError("Erst Farben und Größen wählen (Schritt 2).")
-    changes = []
-    for variant, mapping in offered:
+    minimum = (await shop_config.load(db))["min_price_cents"]
+    costs = []
+    for variant, mapping in offered:  # erst alles prüfen, dann schreiben - nie halb übernommen
         cost = cost_cents(product, mapping)
         if cost is None:
             raise ShopError(f"Für {variant['label']} fehlt der Einkaufspreis von Printful - erst abgleichen.")
+        if cost < minimum:
+            raise ShopError(f"{variant['label']}: Selbstkosten {euro(cost)} liegen unter dem Mindestpreis "
+                            f"{euro(minimum)} - Mindestpreis senken (Shop → Einstellungen) oder die Variante nicht "
+                            "anbieten.")
+        costs.append(cost)
+    changes = []
+    for (variant, mapping), cost in zip(offered, costs):
         if variant.get("price_cents") != cost:
             changes.append({"label": variant["label"], "before_cents": variant.get("price_cents"), "after_cents": cost})
             await shop_catalog.set_variant_state(db, variant["id"], {"price_cents": cost}, actor_id=actor_id)
@@ -524,7 +532,7 @@ async def run_check(db, product: dict) -> dict:
     if unpriced:
         problems.append("Preis fehlt oder weicht vom Einkauf ab: " + ", ".join(unpriced))
     if too_cheap:
-        problems.append(f"Unter dem Mindestpreis ({minimum // 100},{minimum % 100:02d} €): " + ", ".join(too_cheap))
+        problems.append(f"Unter dem Mindestpreis ({euro(minimum)}): " + ", ".join(too_cheap))
     items.append(_item("prices", "Preis berechnet und übernommen", bool(offered) and not problems,
                        ". ".join(problems) if problems else
                        "Mitgliederpreis = Einkauf, übernommen." if offered else "Keine Varianten."))

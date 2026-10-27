@@ -3,7 +3,8 @@
 Läuft auf Knopfdruck („Mit Printful abgleichen“ im Admin) und täglich als Job (``scheduler._safe_shop_catalog_sync``).
 
 - **Nicht bestellbar** - fail-closed: Printful meldet nicht „in stock“, meldet gar nichts („Lager unbekannt“), kennt die
-  Variante nicht mehr, oder der Einkauf fehlt bzw. ist 0 € („Preis fehlt“). Die Variante wird gesperrt
+  Variante nicht mehr, der Einkauf fehlt bzw. ist 0 € („Preis fehlt“), oder die Selbstkosten liegen unter dem
+  Mindestpreis (``shop_config.min_price_cents``). Die Variante wird gesperrt
   (``blocked_reason``) - ``place_order`` nimmt sie nicht an. Nur „in stock“ mit gültigem Preis hebt die Sperre auf.
 - **Preisänderung**: der neue Einkauf steht an der Zuordnung, dazu eine Warnung (``price_warning``) für den Admin. Der
   Preis der Variante bleibt, bis die Finanzen „Preise übernehmen“ (``shop_products.accept_prices``). Bestehende
@@ -47,7 +48,7 @@ STOCK_UNKNOWN = "Lager bei Printful unbekannt."
 PRICE_MISSING = "Preis fehlt bei Printful."
 
 
-def _blocked_reason(row, *, active: bool, cost: int | None) -> str | None:
+def _blocked_reason(row, *, active: bool, cost: int | None, minimum: int) -> str | None:
     """Warum diese Variante nicht bestellbar ist - oder ``None``. Unbekannt heißt nicht bestellbar."""
     if row is None:
         return NOT_IN_CATALOG
@@ -57,6 +58,10 @@ def _blocked_reason(row, *, active: bool, cost: int | None) -> str | None:
         return f"Bei Printful nicht lieferbar ({row.availability or 'kein Lagerstand'})."
     if active and cost is None:
         return PRICE_MISSING
+    if active and cost < minimum:
+        # Ein veröffentlichtes Produkt verkauft nie still unter dem Mindestpreis weiter.
+        return (f"Selbstkosten {shop_costs.euro(cost)} unter dem Mindestpreis {shop_costs.euro(minimum)} - "
+                "Mindestpreis senken oder Variante nicht anbieten.")
     return None
 
 
@@ -119,6 +124,7 @@ async def _write(db, product: dict, by_id: dict, priced_ids: set[int], *, now: s
     variants = await shop_catalog.variants_of(db, product_id)
     mappings = await shop_catalog.printful_variants_for(db, [variant["id"] for variant in variants])
     technique = shop_costs.technique_of(product)
+    minimum = (await shop_config.load(db))["min_price_cents"]
     blocked, unblocked, price_changes = [], [], []
     open_warnings = blocked_count = 0
     for variant in variants:
@@ -136,7 +142,7 @@ async def _write(db, product: dict, by_id: dict, priced_ids: set[int], *, now: s
                           placement_costs=dict(row.placement_prices.get(technique) or {}))
         merged = {**mapping, **update}
         cost = shop_costs.cost_cents(product, merged)
-        reason_now = _blocked_reason(row, active=bool(variant.get("active")), cost=cost)
+        reason_now = _blocked_reason(row, active=bool(variant.get("active")), cost=cost, minimum=minimum)
         if reason_now and not variant.get("blocked_reason"):
             await shop_catalog.set_variant_state(db, variant["id"], {"blocked_reason": reason_now, "blocked_at": now},
                                                  actor_id=actor_id)
