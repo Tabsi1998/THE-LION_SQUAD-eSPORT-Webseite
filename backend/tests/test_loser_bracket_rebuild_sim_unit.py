@@ -6,13 +6,15 @@ Probelauf-Cups (16 Plätze, Läufe zu viert, die zwei Besten weiter, Winner und 
 - #2045: gleicht der Umbau Läufe auf 3 oder 2 Plätze aus, passen die Verlierer-Weiterleitungen dazu (bei 3 Plätzen und
   Quote 2 nur L1, bei 2 Plätzen keiner); das Ergebnis lässt sich eintragen, die Verlierer kommen ins Loser Bracket.
 - Breite (wie ``test_bracket_generator_sim_unit``, Los mit Startwert): Feldgrößen 5-16 in den Modi fest, gemischt und
-  sofort, je mit Ausfall-Reihenfolgen (Austritt, Disqualifikation, nicht erschienen) - nach jedem Schritt Graph gültig,
-  niemand zweimal spielbereit, kein Lauf über der Laufgröße, kein spielbereiter Lauf mit einem Fahrer; am Ende alles
+  sofort, je mit Ausfall-Reihenfolgen (Austritt, Disqualifikation, nicht erschienen, Korrektur) und mehreren zugleich
+  aufgerufenen Vorläufen - nach jedem Schritt Graph gültig, niemand zweimal spielbereit, kein Lauf über der Laufgröße
+  (auch nicht in den sichtbaren Plätzen und ``match_size``), kein spielbereiter Lauf mit einem Fahrer; am Ende alles
   entschieden, genau ein Finale, und jede/r Verlierer:in der Winner-Seite hat die zweite Chance bekommen.
 
 Der Umbau läuft hier wie im Betrieb in zwei Schritten: erst die Automatik (Quoten, Freilose, Absagen), dann der
 bestätigte strukturelle Umbau (Zusammenlegen, Ausgleichen, Abkürzen) - #2044 lag genau zwischen den beiden.
 """
+import copy
 import pathlib
 import random
 import sys
@@ -27,8 +29,8 @@ from services import advancement_draw, custom_bracket, match_v2_results  # noqa:
 from services.competition_graph_validation import validate_competition_graph  # noqa: E402
 from services.competition_snapshot import build_structure_snapshot  # noqa: E402
 from services.custom_bracket import build_matches_v2_from_schema  # noqa: E402
-from services.heat_rebuild import rebuild_heats, stage_heat_rules  # noqa: E402
-from services.match_v2_results import build_v2_result_application  # noqa: E402
+from services.heat_rebuild import HeatRebuildError, rebuild_heats, stage_heat_rules  # noqa: E402
+from services.match_v2_results import MatchV2ResultError, build_v2_result_application  # noqa: E402
 from services.tournament_events import plan_removal  # noqa: E402
 
 NOW = "2026-10-31T18:00:00+00:00"
@@ -95,11 +97,37 @@ def build(count: int, mode: dict | None = None) -> tuple[list[dict], dict]:
 
 
 def rebuild(matches: list[dict], stage: dict) -> list[dict]:
-    """Wie ``evaluate_heat_rebuild`` mit Bestätigung: erst die Automatik, dann der strukturelle Umbau."""
+    """Wie ``evaluate_heat_rebuild`` mit Bestätigung: erst die Automatik, dann der strukturelle Umbau - jeder Schritt
+    auf einer Kopie, die nur bei Erfolg übernommen wird (wie ``_persist``). Ein Konflikt (#2033: ein aufgerufener Lauf
+    würde überlaufen) lässt den Stand, wie er ist - der Umbau wird mit dem nächsten Schritt nachgeholt."""
     rules = stage_heat_rules(stage, matches)
-    ops = rebuild_heats(matches, now_iso=NOW, structural=False, **rules)["ops"]
-    ops += rebuild_heats(matches, now_iso=NOW, structural=True, **rules)["ops"]
+    ops: list[dict] = []
+    for structural in (False, True):
+        trial = copy.deepcopy(matches)
+        try:
+            ops += rebuild_heats(trial, now_iso=NOW, structural=structural, **rules)["ops"]
+        except HeatRebuildError:
+            continue
+        for match, fresh in zip(matches, trial):
+            match.clear()
+            match.update(fresh)
     return ops
+
+
+def call(match: dict, station: str) -> None:
+    """Wie die Stationsverwaltung: aufgerufen, Station zugeteilt - der Lauf wird nicht mehr umgebaut."""
+    match["called_at"] = NOW
+    match["station_id"] = station
+
+
+def memory_of(match: dict) -> list[tuple[str, str, int]]:
+    return sorted((item["flow"], item["match_key"], int(item["rank"])) for item in match.get("dormant_slots") or [])
+
+
+def collector_of(matches: list[dict], sources: set[str]) -> dict:
+    """Der Loser-Lauf, der offene Plätze aus allen ``sources`` hat - der Sammellauf nach dem Zusammenlegen."""
+    return next(m for m in matches if m.get("section") == "LB" and m["status"] != "cancelled"
+                and {s["source"].get("match_key") for s in m["slots"] if s.get("status") == "pending"} >= sources)
 
 
 def by_key(matches: list[dict]) -> dict[str, dict]:
@@ -160,10 +188,16 @@ def check(matches: list[dict], removed: set[str], where: str) -> None:
                 f"{where}: {key} hat Laufgröße {match['settings'].get('match_size')}"
             if match["status"] in OPEN:
                 assert len(expected(match)) != 1, f"{where}: {key} wartet mit einem einzigen Fahrer"
-            assert not set(people) & removed, f"{where}: Ausgeschiedene in {key}"
+            # Ausgeschiedene sitzen in keinem Lauf, der noch nicht aufgerufen ist (aufgerufen: die Wertung kommt mit
+            # dem Ergebnis, die Person kommt nicht weiter - wie in der Generalprobe).
+            if not match.get("called_at") and not match.get("started_at"):
+                assert not set(people) & removed, f"{where}: Ausgeschiedene in {key}"
         else:
             assert len(match.get("results") or []) <= HEAT_SIZE, f"{where}: {key} zu groß gewertet"
-        drivers = len(match.get("results") or []) if match["status"] in TERMINAL else len(expected(match))
+        # Wer noch weiterkommen kann: Ausgeschiedene nicht, auf dem Sieger-Weg auch nicht, wer nicht erschienen ist.
+        present = [row for row in match.get("results") or [] if row["registration_id"] not in removed]
+        drivers = len(present) if match["status"] in TERMINAL else len(expected(match))
+        winners = len([row for row in present if not row.get("forfeit")]) if match["status"] in TERMINAL else drivers
         quota = quota_of(match)
         for forward in match.get("advancement") or []:
             target = by_id.get(forward.get("to_match_id"))
@@ -171,7 +205,7 @@ def check(matches: list[dict], removed: set[str], where: str) -> None:
             rank = int(forward.get("rank") or 0)
             if target["status"] == "cancelled":
                 winner = forward.get("flow") == "W"
-                reachable = rank <= min(quota, drivers) if winner else quota + rank <= drivers
+                reachable = rank <= min(quota, winners) if winner else quota + rank <= drivers
                 assert not reachable, \
                     f"{where}: {key} schickt {forward.get('flow')}{rank} in den abgesagten Lauf {target['match_key']}"
                 continue
@@ -184,9 +218,11 @@ def check(matches: list[dict], removed: set[str], where: str) -> None:
     assert report["valid"] and not errors, f"{where}: Graph ungültig: {errors}"
 
 
-def check_end(matches: list[dict], removed: set[str]) -> dict:
+def check_end(matches: list[dict], removed: set[str], *, capped_allowed: bool = True) -> dict:
     """Ende: alles entschieden, genau ein Finale, kein gefahrener Lauf mit einem Fahrer, jede/r Verlierer:in der
-    Winner-Seite sitzt (oder saß, bis zum eigenen Ausscheiden) im Loser Bracket."""
+    Winner-Seite sitzt (oder saß, bis zum eigenen Ausscheiden) im Loser Bracket. Gekappt (``capped_allowed``): ein
+    Verlierer-Platz, den der Umbau strich, weil der Loser-Lauf voll war (#2033: kein Lauf über der Laufgröße) - nur
+    mit Störungen erlaubt, nie in einem Abend ohne Ausfälle."""
     open_rows = [m["match_key"] for m in matches if m["status"] not in TERMINAL]
     assert not open_rows, f"am Ende noch offen: {open_rows}"
     finals = [m for m in matches if m["status"] == "completed" and not m.get("advancement") and not auto_bye(m)]
@@ -212,7 +248,10 @@ def check_end(matches: list[dict], removed: set[str]) -> dict:
             continue
         losers = [row["registration_id"] for row in match["results"]
                   if int(row.get("rank") or 0) > quota and not row.get("forfeit") and not row.get("eliminated")]
-        for loser in losers:
+        places = len([entry for entry in match.get("advancement") or [] if entry.get("flow") == "L"])
+        assert capped_allowed or len(losers) <= places, \
+            f"{match['match_key']}: {len(losers)} Verlierer, aber nur {places} Verlierer-Wege - ohne Störung gekappt"
+        for loser in losers[:places]:
             if loser in removed:
                 continue
             assert (match["id"], loser) in seated_from, \
@@ -227,12 +266,26 @@ def play(matches: list[dict], stage: dict, rng: random.Random, *, removals: bool
     """Spielt durch - mit Störungen nach ``rng``: Austritt, Disqualifikation, nicht erschienen im Lauf und eine
     Korrektur (Platz 2 und 3 getauscht) in einem schon gefahrenen Lauf, dessen Folgeläufe noch offen sind."""
     removed: set[str] = set()
+    # Mehrere Vorläufe zugleich an Stationen aufgerufen - auch schon, bevor der Umbau zum ersten Mal läuft (die
+    # Auswertung war eingereiht, #2033): aufgerufene Läufe werden nicht mehr umgebaut, ihre Weiterleitungen können
+    # auf Plätze zeigen, die es bei ihrer Belegung nicht gibt.
+    if removals and rng.random() < 0.5:
+        for index, match in enumerate(rng.sample([m for m in matches if m["status"] == "ready"], k=min(3, sum(
+                1 for m in matches if m["status"] == "ready")))):
+            call(match, f"st-{index + 1}")
     rebuild(matches, stage)
     check(matches, removed, "Aufbau")
     for step in range(10_000):
         ready = [m for m in matches if m["status"] == "ready"]
         if not ready:
             break
+        waiting = [m for m in ready if not m.get("called_at")]
+        if removals and len(waiting) >= 2 and rng.random() < 0.2:
+            for index, match in enumerate(rng.sample(waiting, k=min(3, len(waiting)))):
+                call(match, f"st-{index + 1}")
+            rebuild(matches, stage)
+            check(matches, removed, f"Schritt {step}: Aufrufe")
+            continue
         alive = sorted({reg for m in matches if m["status"] not in TERMINAL for reg in filled_ids(m)} - removed)
         if removals and len(alive) > 3 and rng.random() < 0.2:
             victim = rng.choice(alive)
@@ -259,9 +312,75 @@ def play(matches: list[dict], stage: dict, rng: random.Random, *, removals: bool
         rng.shuffle(ranking)
         forfeit = {ranking[-1]} if forfeits and len(ranking) >= 3 and rng.random() < 0.2 else set()
         apply_result(matches, match, ranking, forfeit=forfeit, eliminated=removed)
+        match.pop("called_at", None)
         rebuild(matches, stage)
         check(matches, removed, f"Schritt {step}: Ergebnis {match['match_key']}")
     return removed
+
+
+def test_called_heats_with_stale_loser_links_keep_the_collector_at_heat_size():
+    """Die Auswertung war eingereiht (#2033), derweil sind A und B mit je drei Fahrern an Stationen aufgerufen - ihre
+    L2-Weiterleitungen zeigen noch auf Plätze, die es bei drei Fahrern nicht gibt (aufgerufene Läufe werden nicht
+    mehr angepasst). C hat zwei Fahrer, D keinen. Der erste Umbau legt LC und LD, dann LA und LB zusammen: die
+    wartenden Plätze der aufgerufenen Läufe, die nicht mehr hineinpassen, werden Merkposten statt Plätze - der
+    Sammellauf zeigt höchstens vier Plätze, und der Abend läuft bis zum Finale."""
+    matches, stage = build(12)
+    heats = by_key(matches)
+    for key, keep in (("A", 3), ("B", 3), ("C", 2), ("D", 0)):
+        for slot in heats[key]["slots"][keep:]:
+            slot.update({"registration_id": None, "user_id": None, "status": "bye"})
+        heats[key]["status"] = "ready" if keep >= 2 else "pending"
+    call(heats["A"], "st-1")
+    call(heats["B"], "st-2")
+    rebuild(matches, stage)
+    check(matches, set(), "erster Umbau mit aufgerufenen Vorläufen")
+    collector = collector_of(matches, {"A", "B", "C"})
+    assert len(collector["slots"]) <= HEAT_SIZE and collector["settings"]["match_size"] <= HEAT_SIZE
+    stale = [item for item in memory_of(collector) if item[0] == "L" and item[2] == 2]
+    assert stale, "der L2-Platz eines aufgerufenen Vorlaufs, der nicht mehr hineinpasst, ist ein Merkposten"
+    for key in ("A", "B"):
+        assert heats[key].get("called_at") and len(filled_ids(heats[key])) == 3
+    removed = play(matches, stage, random.Random(12), removals=False, forfeits=False)
+    check_end(matches, removed)
+
+
+def test_a_returning_place_never_grows_a_full_collector():
+    """Wie oben, nur A ist aufgerufen; B hat drei Fahrer und ist noch umbaubar - sein L2 ruht nach dem Zusammenlegen
+    als Merkposten im Sammellauf, der mit vier Plätzen voll ist. Kommt B auf vier Fahrer (ein Nachzügler auf dem
+    freien Platz - genauso nach einem „Rückgängig“ oder einer Korrektur, die einen Platz zurückbringt), hätte B wieder
+    zwei Verlierer. Der Sammellauf ist aber voll: der Platz bleibt Merkposten, B wird auf L1 gekappt, der Sammellauf
+    zeigt weiter vier Plätze - kein Lauf über der Laufgröße. Wird dort ein Platz frei (A ist gefahren, sein L2-Platz
+    ein totes Freilos), kommt der Platz zurück."""
+    matches, stage = build(12)
+    heats = by_key(matches)
+    for key, keep in (("A", 3), ("B", 3), ("C", 2), ("D", 0)):
+        for slot in heats[key]["slots"][keep:]:
+            slot.update({"registration_id": None, "user_id": None, "status": "bye"})
+        heats[key]["status"] = "ready" if keep >= 2 else "pending"
+    call(heats["A"], "st-1")
+    rebuild(matches, stage)
+    check(matches, set(), "erster Umbau")
+    collector = collector_of(matches, {"A", "B", "C"})
+    assert len(collector["slots"]) == 4 and ("L", "B", 2) in memory_of(collector)
+    free = next(slot for slot in heats["B"]["slots"] if slot["status"] == "bye")
+    free.update({"registration_id": "r13", "user_id": "u13", "status": "filled"})
+    rebuild(matches, stage)
+    check(matches, set(), "Nachzügler in B")
+    assert len(filled_ids(heats["B"])) == 4
+    assert len(collector["slots"]) == 4 and collector["settings"]["match_size"] == 4
+    assert [e["rank"] for e in heats["B"]["advancement"] if e["flow"] == "L"] == [1], "B wird auf L1 gekappt"
+    assert ("L", "B", 2) in memory_of(collector), "der Platz bleibt Merkposten, bis im Sammellauf etwas frei wird"
+    # A fährt: sein L2-Platz im Sammellauf wird ein Freilos ohne Zukunft - B bekommt seinen L2-Platz dorthin zurück.
+    order = filled_ids(heats["A"])
+    apply_result(matches, heats["A"], order)
+    heats["A"].pop("called_at", None)
+    rebuild(matches, stage)
+    check(matches, set(), "A gefahren")
+    assert len(collector["slots"]) == 4 and collector["settings"]["match_size"] == 4
+    assert [e["rank"] for e in heats["B"]["advancement"] if e["flow"] == "L"] == [1, 2], "L2 von B kommt zurück"
+    assert ("L", "B", 2) not in memory_of(collector)
+    removed = play(matches, stage, random.Random(11), removals=False, forfeits=False)
+    check_end(matches, removed)
 
 
 # ---------------------------------------------------------------------------------------------- #2044, #2045
@@ -347,7 +466,7 @@ def test_loser_bracket_cup_plays_through_for_every_field_size(count: int, mode):
     Winner-Seite bekommt die zweite Chance."""
     matches, stage = build(count, mode)
     removed = play(matches, stage, random.Random(count), removals=False, forfeits=False)
-    check_end(matches, removed)
+    check_end(matches, removed, capped_allowed=False)
 
 
 @pytest.mark.parametrize("mode", MODES, ids=MODE_IDS)
@@ -363,6 +482,6 @@ def test_loser_bracket_cup_over_many_draws_and_dropout_orders(seeded_draw, mode)
                 matches, stage = build(count, mode)
                 removed = play(matches, stage, random.Random(draw_seed + 1), removals=True, forfeits=True)
                 check_end(matches, removed)
-            except AssertionError as exc:
+            except (AssertionError, MatchV2ResultError) as exc:
                 failures.append((count, draw_seed, str(exc).splitlines()[0]))
     assert not failures, failures

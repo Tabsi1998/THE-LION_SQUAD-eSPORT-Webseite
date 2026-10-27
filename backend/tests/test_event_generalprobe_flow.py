@@ -335,7 +335,10 @@ class Abend:
             assert len(people) == len(set(people)), f"{where}: {key} hat jemanden doppelt"
             # Verwaiste Weiterleitungen: jede zeigt auf einen Lauf und Platz, den es gibt; in einen abgesagten Lauf nur,
             # wenn dieser Platz gar nicht vorkommen kann (zwei Fahrer, beide weiter: kein Verlierer-Platz).
-            drivers = len(match.get("results") or []) if match["status"] in DONE else len(expected)
+            # Wer noch weiterkommen kann: Ausgeschiedene nicht, auf dem Sieger-Weg auch nicht, wer nicht erschienen ist.
+            present = [row for row in match.get("results") or [] if row["registration_id"] not in self.removed]
+            drivers = len(present) if match["status"] in DONE else len(expected)
+            winners = len([row for row in present if not row.get("forfeit")]) if match["status"] in DONE else drivers
             settings = match.get("settings") or {}
             quota = int(match.get("qualifiers_effective") or settings.get("qualifiers_per_match") or 0)
             for forward in match.get("advancement") or []:
@@ -344,7 +347,7 @@ class Abend:
                 rank = int(forward.get("rank") or 0)
                 if target["status"] == "cancelled":
                     winner = forward.get("flow") == "W"
-                    reachable = rank <= min(quota, drivers) if winner else quota + rank <= drivers
+                    reachable = rank <= min(quota, winners) if winner else quota + rank <= drivers
                     place, gone = f"{forward.get('flow')}{rank}", target["match_key"]
                     assert not reachable, f"{where}: {key} schickt Platz {place} in den abgesagten Lauf {gone}"
                     continue
