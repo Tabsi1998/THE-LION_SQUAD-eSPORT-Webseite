@@ -33,6 +33,18 @@ test("Bereiche je Rolle wie im Server", () => {
   expect(Object.fromEntries(Object.entries(parsed).map(([role, areas]) => [role, areas.sort()]))).toEqual(web);
 });
 
+test("Shop (#1706): Menüeintrag, Seiten-Schutz und alle Server-Routen verlangen genau den Bereich Finanzen", () => {
+  const shopRoutes = readFileSync(path.join(repo, "backend/routes/shop_admin_routes.py"), "utf8");
+  const guards = [...shopRoutes.matchAll(/Depends\(require_area\(([^)]*)\)\)/g)].map((m) => strings(m[1]).join(","));
+  expect(guards.length).toBeGreaterThan(0);
+  expect([...new Set(guards)]).toEqual(["finance"]);
+
+  const layout = readFileSync(path.join(repo, "frontend/src/components/tls/AdminLayout.jsx"), "utf8");
+  expect(layout).toMatch(/\{ to: "\/admin\/shop", label: "Shop", icon: ShoppingBag, areas: \["finance"\] \}/);
+  const app = readFileSync(path.join(repo, "frontend/src/App.jsx"), "utf8");
+  expect(app).toMatch(/path="\/admin\/shop" element=\{<ProtectedRoute requireArea=\{\["finance"\]\}>/);
+});
+
 test("Startseite der Verwaltung: der Server-Wächter verlangt genau die Verwaltungsbereiche des Webs", () => {
   const guard = block(auth, /def require_dashboard\(\):[\s\S]*?return require_area\(([^)]*)\)/);
   expect(strings(guard).sort()).toEqual([...ADMIN_AREAS].sort());
