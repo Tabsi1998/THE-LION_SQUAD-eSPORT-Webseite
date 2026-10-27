@@ -217,6 +217,16 @@ export function suggestSlug(value) {
   return `${base}-${new Date().getFullYear()}`;
 }
 
+// Kurze Text-Antwort statt JSON (z. B. 400 „Invalid host header“ der Host-Prüfung, Proxy-Meldungen): lieber diesen
+// Text zeigen als „Request failed with status code 400“. HTML-Seiten und lange Texte bleiben draußen.
+function plainTextReason(error) {
+  const data = error?.response?.data;
+  if (typeof data !== "string") return "";
+  const text = data.trim();
+  if (!text || text.length > 200 || text.startsWith("<")) return "";
+  return text;
+}
+
 export function formatRequestError(error, fallback = "Ein Fehler ist aufgetreten.", context = {}) {
   const detail = error?.response?.data?.detail;
   const message = formatApiError(detail);
@@ -225,6 +235,8 @@ export function formatRequestError(error, fallback = "Ein Fehler ist aufgetreten
     return `${message} Vorschlag: ${suggestion}`;
   }
   if (message && message !== "Ein Fehler ist aufgetreten.") return message;
+  const plain = plainTextReason(error);
+  if (plain) return `Der Server hat die Anfrage abgelehnt (${error.response.status}): ${plain}`;
   if (error?.message) return error.message;
   return fallback;
 }
@@ -241,7 +253,7 @@ export function formatUploadError(error, fallback = "Upload fehlgeschlagen.", op
     return `Upload fehlgeschlagen (413): Datei zu groß oder Reverse Proxy blockiert den Upload.${appHint}${proxyHint}`;
   }
   if (status) {
-    const message = detailMessage && detailMessage !== "Ein Fehler ist aufgetreten." ? detailMessage : fallback;
+    const message = detailMessage && detailMessage !== "Ein Fehler ist aufgetreten." ? detailMessage : plainTextReason(error) || fallback;
     return `Upload fehlgeschlagen (${status}): ${message}`;
   }
   if (error?.code === "ERR_CANCELED") return "Upload abgebrochen.";
