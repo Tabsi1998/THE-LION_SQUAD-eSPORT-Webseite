@@ -297,7 +297,7 @@ export function PublicLayout({ children }) {
             <PartnerTicker className="[&:not(:first-child)]:mt-10" />
           </div>
           <div className="mt-10 grid grid-cols-2 md:grid-cols-4 gap-8 min-w-0" data-testid="footer-columns">
-            {footerColumns(branding, { isClubMember }).map((column) => (
+            {footerColumns(branding, { isMember: isClubMember }).map((column) => (
               <nav key={column.key} aria-label={column.title} data-testid={`footer-column-${column.key}`} className="min-w-0">
                 <div className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">{column.title}</div>
                 <ul className="mt-4 space-y-2 text-sm text-white/65">
