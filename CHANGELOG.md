@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.40.0 (27.10.2026)
+
+### Neu
+
+* Shop-Verwaltung: Grund nur noch bei kritischen Schritten Pflicht - sonst optional, das Protokoll nennt trotzdem wer, wann und was
+
+### Fehlerbehebungen
+
+* Shop-Verwaltung: Knöpfe sagen, was fehlt, statt still nichts zu tun - z. B. beim Printful-Schlüssel
+
 ## 1.39.0 (27.10.2026)
 
 ### Neu
