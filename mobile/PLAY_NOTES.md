@@ -12,6 +12,15 @@ Regeln:
 - Höchstens 500 Zeichen inklusive Zeilenumbrüchen (Grenze von Google Play).
 - Kurz und für Mitglieder verständlich: was sie in der App merken, keine Issue-Nummern, keine Technik.
 
+## 1.7.9
+
+Neu in 1.7.9:
+• Wunschnummer unter „Meine Mitgliedschaft“
+• Einmal frei von 0 bis 99 wählen
+• Jede Nummer gibt es im Verein nur einmal
+• Freie Nummern direkt antippen
+• Später ändern per Antrag an den Vorstand
+
 ## 1.7.8
 
 Neu in 1.7.8:

@@ -1,11 +1,10 @@
 {
-  "version": "1.7.8",
-  "build": 102,
-  "date": "2026-10-26",
+  "version": "1.7.9",
+  "build": 103,
+  "date": "2026-10-27",
   "items": [
-    "Turnierserien wie TFT sprechen von Turniertagen und zeigen keinen Ort und keine Flagge.",
-    "Ein Termin ohne Datum zeigt „Termin folgt“, ohne kommenden Termin steht „Noch kein Termin“.",
-    "„Läuft gerade“ nennt den nächsten Turniertag, auch wenn sein Datum noch offen ist.",
-    "Einsätze im Profil in den Wörtern der Serie, etwa „5 von 9 Turniertagen“."
+    "Wunschnummer unter „Meine Mitgliedschaft“: einmal frei von 0 bis 99 wählen, jede Nummer gibt es nur einmal.",
+    "Danach ändert sich die Nummer nur per Antrag an den Vorstand – mit Grund und optionaler Wunschnummer.",
+    "Die gewählte Nummer setzt sich mit ruhiger Bewegung und Vibration."
   ]
 }
