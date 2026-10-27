@@ -745,6 +745,19 @@ function MotifCard({ design, busy, maxExceptions, onColors, onExceptions, onNewF
             <span className={`inline-flex items-center border rounded-sm px-2 py-0.5 text-xs font-bold ${lightState.tone}`} data-state={light.state}>{lightState.label}</span>
             {light.hint && <span className="text-xs text-white/60">{light.hint}</span>}
           </div>
+          {design.pair_stale && design.pair?.outdated && (
+            <div role="status" className="flex flex-col gap-2 border border-warn/40 bg-warn/10 rounded-sm px-3 py-2 text-sm sm:flex-row sm:items-center" data-testid={`shop-motif-${key}-pair-stale`}>
+              <span className="inline-flex items-start gap-2 flex-1">
+                <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0 text-warn" aria-hidden="true" />
+                <span>
+                  Nur eine Fassung wurde ersetzt: die andere ({VARIANT_LABELS[design.pair.outdated]}) ist noch Version {design.pair[`${design.pair.outdated}_version`]} – auch ersetzen?
+                </span>
+              </span>
+              <button type="button" onClick={() => onNewFile(key, design.pair.outdated)} disabled={busy} className={SECONDARY_BUTTON} data-testid={`shop-motif-${key}-pair-stale-replace`}>
+                Auch ersetzen
+              </button>
+            </div>
+          )}
           <div className="flex flex-wrap items-center gap-2 text-sm">
             <span className="text-white/50 text-xs">Feste Shirtfarben:</span>
             {(design.garment_colors || []).length

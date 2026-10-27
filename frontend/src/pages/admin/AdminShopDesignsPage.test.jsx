@@ -382,6 +382,26 @@ test("„Als Paar ersetzen“ an der Karte stellt das Formular auf Paar und Moti
   expect(screen.getByTestId("shop-design-select")).toHaveValue("loewe");
 });
 
+test("ist nur eine Fassung ersetzt, fragt die Karte nach der anderen und belegt den Upload-Kasten vor", async () => {
+  const stale = motif({
+    light_mode: "file", latest: version(3),
+    light: { state: "file", version: 2, hint: "Eigene Datei für helle Shirts.", latest: version(2, { variant: "light", pair_of: 1 }) },
+    pair_stale: true,
+    pair: { stale: true, dark_version: 3, light_version: 2, outdated: "light", hint: "…" },
+  });
+  apiMock.get.mockResolvedValue({ data: view({ designs: [motif({ design_key: "adler", title: "Adler" }), stale] }) });
+  const user = userEvent.setup();
+  show();
+  const hint = await screen.findByTestId("shop-motif-loewe-pair-stale");
+  expect(hint).toHaveTextContent("die andere (für helle Shirts) ist noch Version 2 – auch ersetzen?");
+  expect(screen.queryByTestId("shop-motif-adler-pair-stale")).toBeNull();
+  await user.click(screen.getByTestId("shop-design-variant-dark"));
+  await user.click(within(hint).getByTestId("shop-motif-loewe-pair-stale-replace"));
+  expect(screen.getByTestId("shop-design-shape-single")).toHaveAttribute("aria-checked", "true");
+  expect(screen.getByTestId("shop-design-variant-light")).toHaveAttribute("aria-checked", "true");
+  expect(screen.getByTestId("shop-design-select")).toHaveValue("loewe");
+});
+
 test("Ausnahmen je Shirtfarbe: hinzufügen, wählen, speichern mit optionalem Grund", async () => {
   apiMock.patch.mockResolvedValue({ data: view() });
   const user = userEvent.setup();
