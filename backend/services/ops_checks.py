@@ -488,6 +488,34 @@ async def check_file_cleanups(db) -> dict:
                   f"nach {RETRY_LIMIT} Versuchen gibt er auf. Rechte am Upload-Volume prüfen, dann unten „Erneut versuchen“.")
 
 
+async def check_shop(db) -> dict:
+    """Shop (#1706): Stufe, Notschalter, ob der Printful-Schlüssel hinterlegt und lesbar ist, und die Ursache, wenn der
+    letzte Verbindungstest scheiterte. Rot nur, wenn Bestellungen hinausgehen sollen, ohne dass es gehen kann."""
+    label = "Shop"
+    try:
+        from services import shop_config
+
+        config = await shop_config.load(db)
+    except Exception as exc:  # noqa: BLE001
+        return failed("shop", label, exc)
+    state = shop_config.key_state(config)
+    sending = config["orders_to_printful"]
+    value = " · ".join((shop_config.STAGE_LABELS[shop_config.effective_stage(config)],
+                        "Bestellungen an Printful an" if sending else "Notschalter aus",
+                        {"ok": "Schlüssel hinterlegt", "missing": "kein Schlüssel",
+                         "unreadable": "Schlüssel nicht lesbar"}[state]))
+    where = "Verwaltung → Finanzen → Shop"
+    if state == "unreadable":
+        return result("shop", label, "crit" if sending else "warn", value,
+                      f"Printful-Schlüssel {shop_config.UNREADABLE_KEY} – oder neu hinterlegen ({where}).")
+    if sending and state == "missing":
+        return result("shop", label, "crit", value, f"Bestellungen sollen hinausgehen, aber es fehlt der Schlüssel ({where}).")
+    last = config.get("printful_last_test") or {}
+    if state == "ok" and last and not last.get("ok"):
+        return result("shop", label, "warn", value, f"Letzter Verbindungstest: {last.get('detail') or 'fehlgeschlagen'} ({where})")
+    return result("shop", label, "ok", value, where)
+
+
 CheckRunner = Callable[[Any], Awaitable[dict]]
 
 
@@ -508,6 +536,7 @@ def default_checks(db) -> list[tuple[str, str, Callable[[], Awaitable[dict]]]]:
         ("unique_indexes", "Eindeutige Indizes", lambda: check_unique_indexes(db)),
         ("file_cleanups", "Datei-Nacharbeit", lambda: check_file_cleanups(db)),
         ("image_reading", "Bild-Erkennung", check_image_reading),
+        ("shop", "Shop", lambda: check_shop(db)),
     ]
 
 
