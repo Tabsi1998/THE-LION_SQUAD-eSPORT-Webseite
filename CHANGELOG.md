@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.39.0](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/compare/v1.38.0...v1.39.0) (2026-10-27)
+
+
+### Neu
+
+* Vereinsshop: Gamertag als Druckdatei - feste Größe in Zoll und cm, Verkleinerung bei langen Namen, Wortfilter, Vorschau im Admin ([#1711](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1711)) ([9ff8fed](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/9ff8fed3e936889742047bc2b5da629206997922))
+
 ## 1.38.0 (27.10.2026)
 
 ### Neu
