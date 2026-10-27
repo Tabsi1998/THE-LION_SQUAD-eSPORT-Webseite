@@ -67,7 +67,7 @@ jobs:
     if: needs.changes.outputs.backend == 'true'
     runs-on: ubuntu-24.04
     # Die Suite braucht 10-15 Minuten (5500+ Tests), je nach Runner; 15 riss am 19.10. knapp.
-    timeout-minutes: 25
+    timeout-minutes: 40
     env:
       APP_ENV: test
       MONGO_URL: mongodb://127.0.0.1:27017

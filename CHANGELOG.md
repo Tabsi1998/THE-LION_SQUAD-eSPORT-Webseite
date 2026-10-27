@@ -1,5 +1,31 @@
 # Changelog
 
+## 1.35.0 (27.10.2026)
+
+### Neu
+
+* freie Wunschnummern als Raster zum Antippen, Prüfung ohne Nummer in der Adresse (#2034)
+* Nummern der Mitglieder im Admin – Liste, Anträge, Neuwahl und Regeln (#2034)
+* Vorstand erfährt Anträge auf eine andere Nummer per Mail und Discord (#2034)
+* Wunschnummer in Dolibarr als ergänzendes Attribut, mit Nachtrag wenn das Feld fehlt oder Dolibarr nicht erreichbar ist (#2034)
+* Wunschnummer je Mitglied – einmal selbst wählen, eindeutig im Verein, danach nur per Antrag (#2034)
+
+### Fehlerbehebungen
+
+* „Feld neu aufbauen“ prüft die Läufe sofort - kein Stations-Konflikt beim ersten Aufruf (#2044)
+* abgebrochene Vorstandsentscheidungen geben den Antrag wieder frei; fremde Nummern in Dolibarr bleiben stehen (#2034)
+* Cup mit Loser Bracket: ein Loser-Lauf wartet auf seine Vorläufe statt abgesagt zu werden - die Verlierer des Sammellaufs fahren ihre zweite Chance (#2044)
+* Cup mit Loser Bracket: nach Austritten ausgeglichene Läufe nehmen das Ergebnis an, Verlierer-Wege folgen Belegung und Quote (#2045)
+* gleichzeitige Entscheidungen und Nachträge setzen nie einen veralteten Stand der Wunschnummer (#2034)
+* Läufe bleiben immer in ihrer Laufgröße - auch bei mehreren gleichzeitig aufgerufenen Vorläufen; TV zeigt keine leeren Zusatzplätze (#2044)
+* Sofort zufällig in Läufen - beide Weiterkommer eines Laufs finden ihren Platz, auch nach einer Disqualifikation (#2033)
+* Wartende Verlierer bekommen den nächsten freien Platz, sonst eine Meldung „Kein Platz im Folgelauf“ an die Turnierleitung (#2044)
+* Wunschnummer folgt dem Konto bei gelöster oder gewechselter Dolibarr-Zuordnung (#2034)
+
+### Dokumentation
+
+* Handbuch-Abschnitt zur Wunschnummer (#2034)
+
 ## 1.34.1 (26.10.2026)
 
 ### Fehlerbehebungen
