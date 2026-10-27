@@ -330,6 +330,7 @@ test("Paar: Gelb markiert die Stellen und fragt im Seitenlayout nach, bevor gesp
   await user.click(screen.getByTestId("shop-design-submit"));
   const dialog = screen.getByTestId("shop-pair-confirm");
   expect(dialog).toHaveAttribute("role", "alertdialog");
+  expect(dialog).toHaveFocus();
   expect(dialog).toHaveTextContent("verschwindet auf hellen Shirts");
   expect(callsTo("upload-pair")).toHaveLength(0);
   expect(confirmSpy).not.toHaveBeenCalled();
@@ -361,6 +362,12 @@ test("Paar: Rot sperrt das Speichern; eine Ablehnung des Servers zeigt ihren Ber
   await user.upload(screen.getByTestId("shop-pair-light-file"), new File(["<svg/>"], "boese.svg", { type: "image/svg+xml" }));
   expect(await screen.findByTestId("shop-pair-error")).toHaveTextContent(detail);
   expect(screen.getByTestId("shop-design-submit")).toBeDisabled();
+  // „Erneut prüfen“ (etwa nach „zu viele Versuche“) schickt dieselben Dateien noch einmal.
+  uploadApiMock.post.mockResolvedValueOnce({ data: report() });
+  await user.click(screen.getByTestId("shop-pair-retry"));
+  expect(await screen.findByTestId("shop-pair-report")).toHaveAttribute("data-level", "green");
+  expect(callsTo("pair-check")).toHaveLength(3);
+  expect(screen.getByTestId("shop-design-submit")).toBeEnabled();
 });
 
 test("Paar für ein neues Motiv schickt Platzierung zur Prüfung und Titel beim Speichern", async () => {

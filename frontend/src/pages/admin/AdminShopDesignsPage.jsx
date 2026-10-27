@@ -258,16 +258,19 @@ function PairPreview({ image, mark, shirt, name, testId }) {
   );
 }
 
-function PairReport({ check, onSwap, busy }) {
+function PairReport({ check, onSwap, onRetry, busy }) {
   if (check.status === "checking") {
     return <p className="text-sm text-white/60" role="status" data-testid="shop-pair-checking">Prüft das Paar …</p>;
   }
   const report = check.report;
   if (!report) {
     return check.error ? (
-      <div role="alert" className="flex gap-2 border border-warn/50 bg-warn/10 rounded-sm px-3 py-2 text-sm" data-testid="shop-pair-error">
-        <XOctagon className="w-4 h-4 mt-0.5 shrink-0 text-warn" aria-hidden="true" />
-        <span>{check.error}</span>
+      <div role="alert" className="flex flex-col gap-2 border border-warn/50 bg-warn/10 rounded-sm px-3 py-2 text-sm sm:flex-row sm:items-start" data-testid="shop-pair-error">
+        <span className="inline-flex gap-2 flex-1">
+          <XOctagon className="w-4 h-4 mt-0.5 shrink-0 text-warn" aria-hidden="true" />
+          <span>{check.error}</span>
+        </span>
+        <button type="button" onClick={onRetry} disabled={busy} className={SECONDARY_BUTTON} data-testid="shop-pair-retry">Erneut prüfen</button>
       </div>
     ) : null;
   }
@@ -313,8 +316,10 @@ function PairReport({ check, onSwap, busy }) {
 // Bestätigung bei Gelb - im Seitenlayout statt window.confirm.
 function PairConfirm({ report, busy, onConfirm, onCancel }) {
   const warnings = report.checks.filter((item) => item.level === "yellow");
+  const box = useRef(null);
+  useEffect(() => { box.current?.focus?.(); }, []);
   return (
-    <div role="alertdialog" aria-modal="false" aria-labelledby="shop-pair-confirm-title" className="space-y-3 border border-warn/50 bg-warn/10 rounded-sm p-3" data-testid="shop-pair-confirm">
+    <div ref={box} tabIndex={-1} role="alertdialog" aria-modal="false" aria-labelledby="shop-pair-confirm-title" className="space-y-3 border border-warn/50 bg-warn/10 rounded-sm p-3 outline-none focus-visible:border-brand" data-testid="shop-pair-confirm">
       <p id="shop-pair-confirm-title" className="text-sm font-bold inline-flex items-center gap-2">
         <AlertTriangle className="w-4 h-4 text-warn" aria-hidden="true" /> Trotz Warnung speichern?
       </p>
@@ -443,6 +448,10 @@ function UploadForm({ designs, placements, limits, busy, preset, onUpload, onPai
     if (patch.dark === null || patch.light === null) setCheck({ status: "idle", report: null, error: "" });
   };
   const swap = () => setPair({ dark: pairFiles.light, light: pairFiles.dark });
+  const retry = () => {
+    checked.current = null;
+    setPairFiles((now) => ({ ...now }));
+  };
 
   const resetPair = () => {
     setPairFiles({ dark: null, light: null, auto: false });
@@ -579,7 +588,7 @@ function UploadForm({ designs, placements, limits, busy, preset, onUpload, onPai
         {limits.formats.join(", ")} · PNG/JPG höchstens {limits.max_mb} MB, SVG höchstens {limits.svg_max_mb} MB.
         {spec ? ` ${spec.label}: Druckbreite ${spec.print_width}, für PNG mind. ${spec.min_width_px} px Breite (${spec.min_dpi} DPI).` : ""}
       </p>
-      {pair && <PairReport check={check} onSwap={swap} busy={busy || check.status === "checking"} />}
+      {pair && <PairReport check={check} onSwap={swap} onRetry={retry} busy={busy || check.status === "checking"} />}
       {pair && confirming && check.report && (
         <PairConfirm report={check.report} busy={busy} onConfirm={() => savePair(true)} onCancel={() => setConfirming(false)} />
       )}
