@@ -273,6 +273,132 @@ async def test_when_the_second_file_fails_nothing_is_left_behind(flow, monkeypat
     assert sorted(path.name for path in stored_files(flow)) == files
     assert await flow.db.shop_designs.count_documents({}) == 2
     assert (await flow.db.shop_design_profiles.find_one({"design_key": "loewe"}))["light_pair"]["dark"] == 1
+    assert await flow.db.shop_designs.count_documents({"pending": True}) == 0
+
+
+@pytest.mark.asyncio
+async def test_while_saving_the_old_pair_still_counts_and_half_pairs_never_show(flow, monkeypatch):
+    from services import shop_catalog, shop_motifs
+
+    await finance(flow)
+    assert (await pair(flow, ON_BLACK, ON_WHITE, **MOTIF)).status_code == 200
+    real = shop_catalog.add_design_version
+    seen = []
+
+    async def watched(db, key, **kwargs):
+        if kwargs.get("details", {}).get("variant") == "light":
+            # Die neue Hauptdatei liegt schon - gilt aber noch nicht.
+            black = await shop_motifs.file_for_garment(db, key, color="Black", color_hex="#0c0c0c")
+            white = await shop_motifs.file_for_garment(db, key, color="White", color_hex="#ffffff")
+            view = await shop_motifs.admin_view(db)
+            seen.append((black["version"], white["version"], view["designs"][0]["latest"]["version"],
+                         len(view["designs"][0]["versions"])))
+        return await real(db, key, **kwargs)
+
+    monkeypatch.setattr(shop_catalog, "add_design_version", watched)
+    answer = await pair(flow, lion("#fefefe"), lion("#121212"))
+    assert answer.status_code == 200, answer.text
+    assert seen == [(1, 2, 1, 2)]
+    motif = design(answer, "loewe")
+    assert (motif["latest"]["version"], motif["light"]["version"]) == (3, 4)
+    assert await flow.db.shop_designs.count_documents({"pending": True}) == 0
+
+
+@pytest.mark.asyncio
+async def test_a_version_an_order_points_to_is_never_deleted(flow):
+    from services import shop_motifs
+
+    row = {"id": "halb", "design_key": "loewe", "version": 7, "pending": True,
+           "file_ref": "shop-designs/" + "c" * 32 + ".png"}
+    await flow.db.shop_designs.insert_one(dict(row))
+    await flow.db.shop_order_items.insert_one({"id": "pos-1", "designs": [{"design_key": "loewe", "version": 7}]})
+    await shop_motifs._remove_pending(flow.db, row)
+    assert await flow.db.shop_designs.count_documents({"id": "halb"}) == 1
+    await flow.db.shop_order_items.delete_many({})
+    await shop_motifs._remove_pending(flow.db, row)
+    assert await flow.db.shop_designs.count_documents({"id": "halb"}) == 0
+    # Eine freigeschaltete Version löscht der Rückweg nie.
+    await flow.db.shop_designs.insert_one({**row, "id": "fertig", "pending": False})
+    await shop_motifs._remove_pending(flow.db, {**row, "id": "fertig"})
+    assert await flow.db.shop_designs.count_documents({"id": "fertig"}) == 1
+
+
+@pytest.mark.asyncio
+async def test_one_upload_per_motif_and_one_pair_job_per_process(flow):
+    from services import shop_motifs
+    from services.mutation_lock import mutation_lock
+
+    await finance(flow)
+    await flow.db.mutation_locks.create_index("resource", unique=True)  # wie in Produktion (database.py)
+    async with mutation_lock(flow.db, "shop:motif:loewe", wait_seconds=0.0):
+        busy = await pair(flow, ON_BLACK, ON_WHITE, **MOTIF)
+        single = await flow.post(f"{BASE}/designs/upload", data={"design_key": "loewe", **MOTIF},
+                                 files={"file": ("l.svg", ON_BLACK, "image/svg+xml")})
+    assert busy.status_code == 409 and busy.json()["detail"] == "Für dieses Motiv läuft gerade ein Upload."
+    assert single.status_code == 409 and "läuft gerade ein Upload" in single.json()["detail"]
+    assert await flow.db.shop_designs.count_documents({}) == 0
+
+    async with shop_motifs._PAIR_SLOT:
+        checked = await pair(flow, ON_BLACK, ON_WHITE, route="pair-check", placement="front_right")
+        saved = await pair(flow, ON_BLACK, ON_WHITE, **MOTIF)
+    for answer in (checked, saved):
+        assert answer.status_code == 429 and "bitte gleich noch einmal" in answer.json()["detail"], answer.text
+    assert (await pair(flow, ON_BLACK, ON_WHITE, **MOTIF)).status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_the_check_rasterises_small_and_only_saving_in_full(flow, monkeypatch):
+    from services import svg_safe
+
+    await finance(flow)
+    widths = []
+    real = svg_safe.rasterize
+
+    def spy(data, **kwargs):
+        widths.append(kwargs.get("width_px"))
+        return real(data, **kwargs)
+
+    monkeypatch.setattr(svg_safe, "rasterize", spy)
+    checked = await pair(flow, ON_BLACK, ON_WHITE, route="pair-check", placement="back")
+    assert checked.status_code == 200, checked.text
+    assert widths and max(widths) <= 512, widths
+    # Die Passform folgt aus der viewBox: Druckbreite × DPI.
+    assert checked.json()["files"]["dark"]["width_px"] == 3600 and checks(checked.json())["aspect"]["level"] == "green"
+    widths.clear()
+    assert (await pair(flow, ON_BLACK, ON_WHITE, **MOTIF)).status_code == 200
+    assert max(widths) == 1260, "erst beim Speichern in voller Druckbreite"
+
+
+@pytest.mark.asyncio
+async def test_the_same_pair_comes_back_after_going_automatic(flow):
+    await finance(flow)
+    assert (await pair(flow, ON_BLACK, ON_WHITE, **MOTIF)).status_code == 200
+    back = await flow.post(f"{BASE}/designs/loewe/light-auto", json={"reason": "Doch automatisch"})
+    assert design(back, "loewe")["light"]["state"] == "auto"
+    again = await pair(flow, ON_BLACK, ON_WHITE, reason="Doch das Paar")
+    assert again.status_code == 200, again.text
+    motif = design(again, "loewe")
+    assert motif["light_mode"] == "file" and motif["light"]["version"] == 2 and motif["latest"]["version"] == 1
+    assert again.json()["uploaded_pair"]["dark_version"] == 1
+    assert await flow.db.audit_logs.count_documents({"action": "shop.design.pair"}) == 2
+    twice = await pair(flow, ON_BLACK, ON_WHITE)
+    assert twice.status_code == 409 and "schon die aktuellen Fassungen" in twice.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_without_transparency_the_assignment_is_left_alone_and_flagged(flow):
+    await finance(flow)
+    dim = logo(1260, 1050, mode="RGB", fill=(30, 30, 30))
+    bright = logo(1260, 1050, mode="RGB", fill=(250, 250, 250))
+    answer = await flow.post(f"{BASE}/designs/pair-check", data={"placement": "front_right", "auto_assign": "true"},
+                             files={"file_dark": ("a.png", dim, "image/png"),
+                                    "file_light": ("b.png", bright, "image/png")})
+    assert answer.status_code == 200, answer.text
+    body = answer.json()
+    assert body["swapped"] is False and body["assign_uncertain"] is True
+    assert body["files"]["dark"]["name"] == "a.png"
+    clear = await pair(flow, ON_WHITE, ON_BLACK, route="pair-check", placement="front_right", auto_assign=True)
+    assert clear.json()["swapped"] is True and clear.json()["assign_uncertain"] is False
 
 
 # ---------------------------------------------------------------- Paar veraltet

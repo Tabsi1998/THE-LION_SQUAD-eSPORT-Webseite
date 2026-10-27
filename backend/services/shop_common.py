@@ -45,8 +45,9 @@ MODEL_FIELDS: dict[str, tuple[str, ...]] = {
                      # Motive (#2069, services/shop_motifs.py): Variante für dunkle bzw. helle Shirts, bereinigtes
                      # SVG (nie öffentlich), erkannte Farben, viewBox, Herkunft einer umgefärbten Fassung
                      "variant", "svg_ref", "colors", "view_box", "derived_from", "recolor",
-                     # Paar (#2084): die eigene Datei für helle Shirts nennt die Hauptdatei, mit der sie hochkam
-                     "pair_of"),
+                     # Paar (#2084): die eigene Datei für helle Shirts nennt die Hauptdatei, mit der sie hochkam;
+                     # „pending“: halbes Paar, gilt erst mit der anderen Fassung zusammen
+                     "pair_of", "pending"),
     # Gamertag-Druckdateien (#1711, services/shop_gamertag.py): Herkunft „gamertag“, ohne den Namen als Text - aber
     # das PNG einer Bestelldatei zeigt ihn: die Zeile gehört dann zu Konto, Bestellung und Position.
     "shop_gamertag_files": ("id", "origin", "purpose", "sha256", "file_ref", "public_id", "content_type", "size_bytes",

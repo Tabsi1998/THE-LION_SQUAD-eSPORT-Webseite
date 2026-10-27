@@ -417,8 +417,9 @@ zusammenpassen, und verwendet sie dann automatisch (`light_mode = "file"`).
 
 - **Admin:** im Upload-Kasten „Als Paar (hell + dunkel)“ mit zwei Feldern „Für dunkle Shirts“ und „Für helle Shirts“
   (auf dem Handy untereinander). Beide Dateien auf einmal in ein Feld gezogen (oder zusammen ausgewählt) ordnet der
-  Server zu: die Datei mit mehr heller Fläche gilt für dunkle Shirts (`auto_assign`, Antwort `swapped`). „Tauschen“
-  dreht die Zuordnung und prüft neu. Sind beide da, läuft die Prüfung sofort: Ampel mit Klartext je Prüfung, Vorschau
+  Server zu: die Datei mit mehr heller Fläche gilt für dunkle Shirts (`auto_assign`, Antwort `swapped`). Ohne
+  durchsichtigen Hintergrund (JPG, PNG mit Fläche) tauscht er nicht und meldet `assign_uncertain` („Zuordnung unsicher –
+  bitte prüfen“). „Tauschen“ dreht die Zuordnung und prüft neu; nur die Antwort der neuesten Prüfung zählt. Sind beide da, läuft die Prüfung sofort: Ampel mit Klartext je Prüfung, Vorschau
   beider Fassungen (vom Server gerastert) auf dunklem und hellem Shirt, gelbe Stellen magenta markiert. Rot sperrt
   „Paar speichern“, Gelb fragt im Seitenlayout nach. An der Motiv-Karte „Als Paar ersetzen“.
 - **Paar-Prüfung** (`shop_motifs.pair_check`, beide Fassungen gleich groß gerastert, 512 px an der längeren Seite):
@@ -431,13 +432,21 @@ zusammenpassen, und verwendet sie dann automatisch (`light_mode = "file"`).
   | Kontrast: sehr Helles (Luma ab 225) in der Hell-Fassung bzw. sehr Dunkles (bis 40) in der Dunkel-Fassung, Anteil an der Fläche | Gelb, markiert | `pair_contrast_share`, 0,03 (3 %), 0,001 bis 0,5 |
 
   Ein ungültiges oder gefährliches SVG lehnt schon die Prüfung ab (wie beim einzelnen Upload, mit „Datei für dunkle
-  bzw. helle Shirts (Name): …“).
+  bzw. helle Shirts (Name): …“). Die reine Prüfung (`pair-check`) rastert SVGs nur in 512 px - die Druckgröße folgt aus
+  der viewBox (ein SVG erreicht jede DPI); voll gerastert wird erst beim Speichern. Pixelbilder werden außerhalb der
+  Ereignisschleife gelesen und kodiert.
 - **Speichern** (`upload_pair`): Rot speichert nichts (400 mit Bericht `pair`). Gelb nur mit `confirm_warnings=true`,
-  sonst 409 mit Bericht. Erst die Hauptdatei als neue Version (`variant = "dark"`), dann die eigene Datei für helle
-  Shirts (`variant = "light"`, `pair_of` = Version der Hauptdatei); scheitert die zweite, werden die erste Version und
-  ihre Dateien wieder entfernt (und ein dabei neu angelegtes Motiv samt Farben) - es bleibt nichts liegen. Ist eine Datei
-  schon die aktuelle ihrer Fassung, bleibt deren Version; sind es beide, 409. Protokoll `shop.design.pair` mit beiden
-  Versionen, Ampel, Zuordnung und ob Warnungen bestätigt wurden.
+  sonst 409 mit Bericht. Beide Versionen entstehen zuerst als `pending` (Hauptdatei `variant = "dark"`, dann die eigene
+  Datei für helle Shirts `variant = "light"` mit `pair_of`) - unsichtbar für Bestellungen (`file_for_garment`,
+  `latest_design`), Ansicht und Aufbewahrung. Erst wenn beide liegen, gilt `light_mode = "file"`, und beide werden
+  zusammen freigeschaltet. Scheitert etwas, werden nur die noch nicht freigeschalteten Versionen samt Dateien entfernt
+  (nie eine, auf die eine Bestellung zeigt), ein dabei neu angelegtes Motiv samt Farben ebenso, und das Motiv bekommt
+  seine vorige Einstellung zurück. Ist eine Datei schon die aktuelle ihrer Fassung, bleibt deren Version; sind es beide
+  und gilt genau dieses Paar schon, 409 - sonst (etwa nach „Zurück auf automatisch“) gilt es wieder. Protokoll
+  `shop.design.pair` mit beiden Versionen, Ampel, Zuordnung und ob Warnungen bestätigt wurden.
+- **Gleichzeitig:** je Motiv ein Upload zugleich, einzeln oder als Paar (MongoDB-Sperre `shop:motif:<kennung>`, sonst 409
+  „Für dieses Motiv läuft gerade ein Upload.“); je Prozess eine Paar-Prüfung bzw. ein Paar-Speichern (sonst 429 „bitte
+  gleich noch einmal“) - so bleibt der gemeinsame Rasterplatz für Logos und Druckdateien frei.
 - **Paar veraltet:** am Motiv merkt sich `light_pair` die zuletzt zusammengehörigen Versionen. Wird danach nur eine
   Fassung ersetzt, meldet `admin_view` je Motiv `pair_stale: true` und `pair` mit `dark_version`, `light_version` und
   `outdated`; die Karte fragt „… ist noch Version X – auch ersetzen?“ und belegt den Upload-Kasten vor. Ersetzt man die

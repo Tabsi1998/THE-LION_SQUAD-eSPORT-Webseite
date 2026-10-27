@@ -26,6 +26,7 @@ passende Fassung je Shirtfarbe wählt ``services/shop_motifs.py`` nach Helligkei
 """
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import hmac
 import logging
@@ -602,22 +603,24 @@ async def _latest_of(db, key: str, variant: str) -> dict | None:
     """Die neueste hochgeladene Fassung derselben Variante - gegen sie prüft „dieselbe Datei noch einmal“."""
     if variant != "light":
         return await shop_catalog.latest_design(db, key)
-    rows = await db.shop_designs.find({"design_key": key, "variant": "light", "origin": "upload"},
-                                      {"_id": 0}).sort("version", -1).to_list(1)
+    rows = await db.shop_designs.find({"design_key": key, "variant": "light", "origin": "upload",
+                                       "pending": {"$ne": True}}, {"_id": 0}).sort("version", -1).to_list(1)
     return rows[0] if rows else None
 
 
 async def save_version(db, key: str, *, image: Image.Image, spec: dict, placement: str, source_format: str,
                        variant: str, origin: str, actor_id: str, reason: str, svg_bytes: bytes | None = None,
                        extra: dict | None = None, before_insert=None,
-                       reuse_same: bool = False) -> tuple[dict, dict]:
+                       reuse_same: bool = False, pending: bool = False) -> tuple[dict, dict]:
     """Prüfen gegen den Druckbereich, Druckdatei (und bei SVG das bereinigte SVG) neu ablegen, Version anlegen. Scheitert
     etwas, bleibt keine Datei ohne Version liegen. Dieselbe Datei wie die aktuelle derselben Fassung ist ein 409 - mit
-    ``reuse_same`` (Paar, #2084) bleibt stattdessen die aktuelle, mit ``"reused": True``."""
+    ``reuse_same`` (Paar, #2084) bleibt stattdessen die aktuelle, mit ``"reused": True``. ``pending`` (Paar) legt die
+    Version unsichtbar an; freigeschaltet wird sie mit der anderen Fassung zusammen."""
     fit = check_fit(image.width, image.height, spec)
     if fit["problems"]:
         raise ShopError(fit["text"])
-    payload = png_bytes(image, fit["dpi"])
+    # Eine große Druckdatei zu kodieren dauert - außerhalb der Ereignisschleife (#2084).
+    payload = await asyncio.to_thread(png_bytes, image, fit["dpi"])
     checksum = hashlib.sha256(payload).hexdigest()
     if origin == "upload":
         latest = await _latest_of(db, key, variant)
@@ -634,6 +637,8 @@ async def save_version(db, key: str, *, image: Image.Image, spec: dict, placemen
                    "source_format": source_format, "dpi": fit["dpi"], "print_width_in": fit["print_width_in"],
                    "print_height_in": fit["print_height_in"], "min_dpi": spec["min_dpi"],
                    "area_width_in": spec["area_width_in"], "area_height_in": spec["area_height_in"], **(extra or {})}
+        if pending:
+            details["pending"] = True
         if svg_bytes is not None:
             details["svg_ref"], svg_path = store_svg(svg_bytes)
         if before_insert is not None:
@@ -696,7 +701,8 @@ async def admin_view(db) -> dict:
     ``shop_motifs.admin_view`` (die Routen rufen jene)."""
     specs = await placement_specs(db)
     profiles = await db.shop_design_profiles.find({}, {"_id": 0}).sort("design_key", 1).to_list(500)
-    rows = await db.shop_designs.find({}, {"_id": 0}).sort([("design_key", 1), ("version", -1)]).to_list(5000)
+    rows = await db.shop_designs.find({"pending": {"$ne": True}}, {"_id": 0}).sort(  # #2084: halbe Paare nie
+        [("design_key", 1), ("version", -1)]).to_list(5000)
     names = await _names(db, {row.get("created_by") for row in rows})
     by_key: dict[str, list[dict]] = {}
     for row in rows:
@@ -739,7 +745,8 @@ async def retention_plan(db, *, now: datetime | None = None) -> dict:
     Version ohne Bestellung darf ``PUBLIC_GRACE_DAYS`` Tage nach ihrer Ablösung abgeschaltet werden
     (``public_disabled_at``). Dateien selbst löscht nichts automatisch; die Frist dafür klärt #1731."""
     now = now or now_utc()
-    rows = await db.shop_designs.find({}, {"_id": 0}).sort([("design_key", 1), ("version", 1)]).to_list(None)
+    rows = await db.shop_designs.find({"pending": {"$ne": True}}, {"_id": 0}).sort(
+        [("design_key", 1), ("version", 1)]).to_list(None)
     ordered = set()
     query = {"$or": [{"design": {"$ne": None}}, {"designs.0": {"$exists": True}}]}
     async for item in db.shop_order_items.find(query, {"_id": 0, "design": 1, "designs": 1}):

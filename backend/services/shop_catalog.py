@@ -452,8 +452,9 @@ async def _newest_design_row(db, design_key: str) -> dict | None:
 
 async def latest_design(db, design_key: str) -> dict | None:
     """Die neueste Hauptdatei („für dunkle Shirts“) eines Designs bzw. Motivs. Fassungen für helle Shirts (#2069,
-    ``variant = "light"``) zählen hier nicht - die wählt ``shop_motifs.file_for_garment`` je Shirtfarbe."""
-    rows = await db.shop_designs.find({"design_key": design_key, "variant": {"$ne": "light"}},
+    ``variant = "light"``) zählen hier nicht - die wählt ``shop_motifs.file_for_garment`` je Shirtfarbe. Halbe Paare
+    (#2084, ``pending``) auch nicht: sie gelten erst, wenn beide Fassungen liegen."""
+    rows = await db.shop_designs.find({"design_key": design_key, "variant": {"$ne": "light"}, "pending": {"$ne": True}},
                                       {"_id": 0}).sort("version", -1).to_list(1)
     return rows[0] if rows else None
 

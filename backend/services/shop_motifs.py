@@ -28,6 +28,7 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import contextlib
 import io
 import logging
 import math
@@ -39,6 +40,7 @@ from PIL import Image, ImageChops, ImageFilter, ImageStat
 
 from models import now_utc
 from services import shop_catalog, shop_designs, svg_safe
+from services.mutation_lock import MutationLockBusy, mutation_lock
 from services.shop_common import ShopConflict, ShopError, clean_reason, record_admin_action
 
 logger = logging.getLogger("tls-arena.shop-motifs")
@@ -279,7 +281,9 @@ def light_from_png(image: Image.Image, ink: str) -> tuple[Image.Image | None, st
 # ---------------------------------------------------------------- Welche Fassung gilt?
 
 async def _rows(db, key: str) -> list[dict]:
-    return await db.shop_designs.find({"design_key": key}, {"_id": 0}).sort("version", -1).to_list(2000)
+    # Halbe Paare (#2084, ``pending``) gelten nie - erst wenn beide Fassungen liegen.
+    return await db.shop_designs.find({"design_key": key, "pending": {"$ne": True}},
+                                      {"_id": 0}).sort("version", -1).to_list(2000)
 
 
 def light_state(profile: dict | None, rows: list[dict], settings: dict) -> dict:
@@ -466,7 +470,17 @@ async def upload(db, *, design_key: Any, data: bytes, filename: str, content_typ
     """Eine neue Datei eines Motivs: prüfen, neu kodieren, als neue Version ablegen (#1708). ``variant`` „dark“ ist die
     Hauptdatei (für dunkle Shirts), „light“ die eigene Datei für helle Shirts (hat Vorrang vor der automatischen).
     SVG wird streng bereinigt und gerastert, PNG/JPG neu kodiert. Ein neues Motiv braucht Titel und Platzierung; ein
-    bestehendes behält seine Platzierung. Nach einer neuen Hauptdatei entsteht die automatische Fassung."""
+    bestehendes behält seine Platzierung. Nach einer neuen Hauptdatei entsteht die automatische Fassung. Je Motiv ein
+    Upload zugleich (#2084) - auch gegen ein gleichzeitiges Paar."""
+    key = shop_designs._design_key(design_key)
+    async with _motif_lock(db, key):
+        return await _upload_locked(db, design_key=key, data=data, filename=filename, content_type=content_type,
+                                    actor_id=actor_id, reason=reason, title=title, placement=placement,
+                                    garment_colors=garment_colors, variant=variant)
+
+
+async def _upload_locked(db, *, design_key: str, data: bytes, filename: str, content_type: str, actor_id: str,
+                         reason: Any, title: Any, placement: str | None, garment_colors: Any, variant: str) -> dict:
     reason = clean_reason(reason)
     if variant not in VARIANTS:
         raise ShopError("Fassung: für dunkle Shirts (dark) oder für helle Shirts (light).")
@@ -526,22 +540,50 @@ def _file_warnings(design: dict, fit: dict, source_format: str) -> list[str]:
     return warnings
 
 
-async def prepare_file(data: bytes, filename: str, content_type: str, spec: dict) -> dict:
+def _svg_clean(data: bytes) -> tuple[bytes, dict]:
+    clean = svg_safe.sanitize(data)
+    return clean.data, svg_safe.analyze(clean.data)
+
+
+async def _prepare_svg_preview(data: bytes, spec: dict) -> tuple[Image.Image, bytes, dict, tuple[int, int]]:
+    """Nur für die Prüfung (#2084): streng bereinigen, aber klein rastern (``PAIR_SIDE`` an der längeren Seite) - der
+    gemeinsame Rasterplatz bleibt frei. Die Druckgröße folgt aus der viewBox: ein SVG erreicht jede DPI."""
+    try:
+        clean, info = await asyncio.to_thread(_svg_clean, data)
+        aspect = float(info["aspect_ratio"])
+        width = _pair_size(aspect)[0]
+        payload = await asyncio.to_thread(svg_safe.rasterize, clean, width_px=width)
+    except svg_safe.SvgRejected as rejected:
+        raise SvgRefused(rejected) from None
+    image = _open_png(payload)
+    if image.getchannel("A").getbbox() is None:
+        raise ShopError(svg_safe.NOTHING)
+    print_width = math.ceil(float(spec["print_width_in"]) * print_dpi(spec) - 1e-9)
+    return image, clean, info, (print_width, max(1, round(print_width / aspect)))
+
+
+async def prepare_file(data: bytes, filename: str, content_type: str, spec: dict, *, preview: bool = False) -> dict:
     """Eine hochgeladene Datei prüfen und für die Druckdatei vorbereiten - SVG streng bereinigt und gerastert, PNG/JPG
     neu kodiert. Schreibt nichts. Liefert Bild, bereinigtes SVG (oder ``None``), Format, Seitenverhältnis (bei SVG aus
-    der viewBox) und die Zusatzfelder der Version."""
+    der viewBox), die Größe der Druckdatei (``print_size``) und die Zusatzfelder der Version. Mit ``preview`` (nur
+    prüfen) wird ein SVG nur klein gerastert."""
     if len(data) > shop_designs.MAX_BYTES:
         raise ShopError(f"Datei zu groß (höchstens {shop_designs.MAX_UPLOAD_MB} MB).")
     if not data:
         raise ShopError("Die Datei ist leer.")
     if shop_designs.looks_like_svg(Path(filename or "").suffix.lower(), content_type or "", data[:8192]):
-        image, svg_bytes, info = await prepare_svg(data, spec)
+        if preview:
+            image, svg_bytes, info, size = await _prepare_svg_preview(data, spec)
+        else:
+            image, svg_bytes, info = await prepare_svg(data, spec)
+            size = image.size
         return {"image": image, "svg_bytes": svg_bytes, "source_format": "SVG", "is_vector": True,
-                "aspect": float(info["aspect_ratio"]), "name": filename,
+                "aspect": float(info["aspect_ratio"]), "name": filename, "print_size": size,
                 "extra": {"colors": [item["hex"] for item in info["colors"]][:24], "view_box": info["view_box"]}}
-    image, source_format = shop_designs.prepare(data, filename, content_type)
+    # Große Pixelbilder neu kodieren dauert - außerhalb der Ereignisschleife (#2084).
+    image, source_format = await asyncio.to_thread(shop_designs.prepare, data, filename, content_type)
     return {"image": image, "svg_bytes": None, "source_format": source_format, "is_vector": False,
-            "aspect": image.width / image.height, "name": filename, "extra": {}}
+            "aspect": image.width / image.height, "name": filename, "print_size": image.size, "extra": {}}
 
 
 # ---------------------------------------------------------------- Paar: hell + dunkel in einem Schritt (#2084)
@@ -616,12 +658,15 @@ def _pair_size(aspect: float) -> tuple[int, int]:
     return max(1, round(PAIR_SIDE * aspect)), PAIR_SIDE
 
 
-def assign_pair(first: dict, second: dict) -> tuple[dict, dict, bool]:
-    """Welche Datei für dunkle Shirts ist: die mit mehr heller bzw. weißer Fläche. ``(dunkel, hell, getauscht)`` -
-    getauscht heißt, ``second`` war heller und gilt nun für dunkle Shirts."""
+def assign_pair(first: dict, second: dict) -> tuple[dict, dict, bool, bool]:
+    """Welche Datei für dunkle Shirts ist: die mit mehr heller bzw. weißer Fläche. ``(dunkel, hell, getauscht,
+    unsicher)`` - getauscht heißt, ``second`` war heller und gilt nun für dunkle Shirts. Ohne durchsichtigen
+    Hintergrund (JPG, PNG mit Fläche) zählt der Hintergrund mit: dann bleibt die Zuordnung, ``unsicher`` ist wahr."""
+    if not all(shop_designs.has_transparency(item["image"]) for item in (first, second)):
+        return first, second, False, True
     size = _pair_size(first["aspect"])
     a, b = _mean_luma(_small(first["image"], size)), _mean_luma(_small(second["image"], size))
-    return (second, first, True) if b > a + SWAP_MARGIN else (first, second, False)
+    return (second, first, True, False) if b > a + SWAP_MARGIN else (first, second, False, False)
 
 
 def pair_check(dark: dict, light: dict, settings: dict | None = None) -> dict:
@@ -693,8 +738,9 @@ def pair_check(dark: dict, light: dict, settings: dict | None = None) -> dict:
     # Wirken die Dateien vertauscht? Die Hell-Fassung ist deutlich heller als die Dunkel-Fassung.
     suggest_swap = _mean_luma(small_light) > _mean_luma(small_dark) + SWAP_MARGIN
     files = {side: {"name": item.get("name") or "", "format": item["source_format"], "is_vector": item["is_vector"],
-                    "aspect": round(item["aspect"], 4), "width_px": item["image"].width,
-                    "height_px": item["image"].height}
+                    "aspect": round(item["aspect"], 4),
+                    "width_px": (item.get("print_size") or item["image"].size)[0],
+                    "height_px": (item.get("print_size") or item["image"].size)[1]}
              for side, item in (("dark", dark), ("light", light))}
     return {"level": level, "checks": checks, "suggest_swap": suggest_swap, "files": files,
             "previews": {"dark": _data_url(small_dark), "light": _data_url(small_light)}, "marks": marks,
@@ -731,40 +777,87 @@ async def _pair_target(db, design_key: Any, placement: str | None, *, title: Any
     return key, None, placement
 
 
-async def _prepare_pair(db, placement: str, dark_file: tuple, light_file: tuple, auto_assign: bool) -> tuple:
+async def _prepare_pair(db, placement: str, dark_file: tuple, light_file: tuple, auto_assign: bool, *,
+                        preview: bool) -> tuple:
     spec = (await shop_designs.placement_specs(db))[placement]
     prepared = []
     for side, (data, filename, content_type) in (("dark", dark_file), ("light", light_file)):
         try:
-            item = await prepare_file(data, filename, content_type, spec)
+            item = await prepare_file(data, filename, content_type, spec, preview=preview)
         except ShopError as exc:
             exc.args = (f"{SIDE_LABELS[side]} ({filename or 'ohne Namen'}): {exc}",)
             raise
-        item["fit"] = shop_designs.check_fit(item["image"].width, item["image"].height, spec)
+        item["fit"] = shop_designs.check_fit(*item["print_size"], spec)
         prepared.append(item)
     dark, light = prepared
-    swapped = False
+    swapped = uncertain = False
     if auto_assign:
-        dark, light, swapped = assign_pair(dark, light)
-    return spec, dark, light, swapped
+        dark, light, swapped, uncertain = await asyncio.to_thread(assign_pair, dark, light)
+    return spec, dark, light, swapped, uncertain
+
+
+# Paar prüfen bzw. speichern rastert und rechnet viel: je Prozess eins zugleich, sonst „gleich noch einmal“ (429) -
+# so bleibt der gemeinsame Rasterplatz (svg_safe) für Logos und Druckdateien frei.
+_PAIR_SLOT = asyncio.Semaphore(1)
+PAIR_BUSY = "Gerade wird schon ein Motiv-Paar geprüft oder gespeichert - bitte gleich noch einmal versuchen."
+MOTIF_BUSY = "Für dieses Motiv läuft gerade ein Upload."
+
+
+class PairBusy(ShopError):
+    status = 429
+
+
+@contextlib.asynccontextmanager
+async def _pair_slot():
+    if _PAIR_SLOT.locked():
+        raise PairBusy(PAIR_BUSY)
+    async with _PAIR_SLOT:
+        yield
+
+
+@contextlib.asynccontextmanager
+async def _motif_lock(db, key: str):
+    """Je Motiv ein Upload zugleich (auch über mehrere Prozesse) - sonst könnten zwei Paare gemischt gelten."""
+    try:
+        async with mutation_lock(db, f"shop:motif:{key}", wait_seconds=0.0, lease_seconds=120.0):
+            yield
+    except MutationLockBusy as exc:
+        raise ShopConflict(MOTIF_BUSY) from exc
 
 
 async def check_pair(db, *, dark_file: tuple, light_file: tuple, design_key: Any = None, placement: str | None = None,
                      auto_assign: bool = False) -> dict:
     """Nur prüfen (Vorschau vor dem Speichern): Ampel, Klartext, Vorschau beider Fassungen und Markierungen. Die
-    Platzierung kommt vom bestehenden Motiv bzw. aus dem Formular - sie bestimmt die Druckbreite. Schreibt nichts."""
+    Platzierung kommt vom bestehenden Motiv bzw. aus dem Formular - sie bestimmt die Druckbreite. SVGs werden dafür nur
+    klein gerastert (die Druckgröße folgt aus der viewBox), voll erst beim Speichern. Schreibt nichts."""
     if design_key:
         _key, _profile, placement = await _pair_target(db, design_key, placement)
     elif placement not in shop_catalog.PLACEMENTS:
         raise ShopError("Bitte die Platzierung wählen.")
-    _spec, dark, light, swapped = await _prepare_pair(db, placement, dark_file, light_file, auto_assign)
-    report = pair_check(dark, light, await load_settings(db))
-    return {**report, "swapped": swapped, "summary": _summary(report)}
+    settings = await load_settings(db)
+    async with _pair_slot():
+        _spec, dark, light, swapped, uncertain = await _prepare_pair(db, placement, dark_file, light_file,
+                                                                     auto_assign, preview=True)
+        report = await asyncio.to_thread(pair_check, dark, light, settings)
+    return {**report, "swapped": swapped, "assign_uncertain": uncertain, "summary": _summary(report)}
 
 
-async def _remove_version(db, design: dict) -> None:
-    """Rückweg, wenn die zweite Datei eines Paars scheitert: die eben angelegte Version samt Dateien entfernen."""
-    await db.shop_designs.delete_one({"id": design["id"]})
+async def _in_orders(db, key: str, version: int) -> bool:
+    return bool(await db.shop_order_items.count_documents({"$or": [
+        {"design.design_key": key, "design.version": version},
+        {"designs": {"$elemMatch": {"design_key": key, "version": version}}}]}))
+
+
+async def _remove_pending(db, design: dict) -> None:
+    """Rückweg, wenn ein Paar scheitert: die eben angelegte, noch nicht freigeschaltete Version samt Dateien
+    entfernen - nie eine freigeschaltete und nie eine, auf die eine Bestellung zeigt."""
+    if await _in_orders(db, design["design_key"], design["version"]):
+        logger.error("[shop-motifs] %s v%s steht in einer Bestellung - bleibt liegen", design["design_key"],
+                     design["version"])
+        return
+    result = await db.shop_designs.delete_one({"id": design["id"], "pending": True})
+    if getattr(result, "deleted_count", 0) != 1:
+        return
     for path in (shop_designs._path_of(design.get("file_ref")), shop_designs.svg_path_of(design.get("svg_ref"))):
         if path is not None:
             path.unlink(missing_ok=True)
@@ -775,6 +868,15 @@ async def _remove_profile(db, key: str, placement: str) -> None:
     await db.shop_design_colors.delete_many({"placement": placement, "design_key": key})
 
 
+async def _restore_profile(db, key: str, before: dict) -> None:
+    """Fassung für helle Shirts und gemerktes Paar wie vor dem gescheiterten Paar."""
+    values = {name: before.get(name) for name in ("light_mode", "light_pair")}
+    keep = {name: value for name, value in values.items() if value is not None}
+    drop = {name: "" for name, value in values.items() if value is None}
+    await db.shop_design_profiles.update_one({"design_key": key}, {**({"$set": keep} if keep else {}),
+                                                                   **({"$unset": drop} if drop else {})})
+
+
 async def upload_pair(db, *, design_key: Any, dark_file: tuple, light_file: tuple, actor_id: str, reason: Any,
                       title: Any = None, placement: str | None = None, garment_colors: Any = None,
                       auto_assign: bool = False, confirm_warnings: bool = False) -> dict:
@@ -783,16 +885,33 @@ async def upload_pair(db, *, design_key: Any, dark_file: tuple, light_file: tupl
     - Rot (Format, Seitenverhältnis, Druckbereich): nichts wird gespeichert (``PairRefused``, 400).
     - Gelb (Umrisse, Kontrast): gespeichert nur mit ``confirm_warnings`` - sonst ``PairRefused`` mit 409 und dem
       Prüfbericht, damit die Oberfläche nachfragen kann.
-    - Gespeichert wird die Hauptdatei (für dunkle Shirts) als neue Version, danach die eigene Datei für helle Shirts;
-      ``light_mode`` wird „file“. Scheitert die zweite, verschwindet die erste wieder (samt neuem Motiv). Ist eine
-      Datei schon die aktuelle ihrer Fassung, bleibt deren Version - nur beide gleich ist ein 409.
+    - Beide Versionen entstehen zuerst als ``pending`` - unsichtbar für Bestellungen, Ansicht und „neueste Fassung“.
+      Erst wenn beide liegen, gilt ``light_mode`` „file“ und beide werden zusammen freigeschaltet. Scheitert etwas,
+      verschwinden die noch nicht freigeschalteten Versionen samt Dateien (und ein neu angelegtes Motiv), Einstellungen
+      des Motivs gehen auf den vorigen Stand. Ist eine Datei schon die aktuelle ihrer Fassung, bleibt deren Version;
+      sind es beide und gilt genau dieses Paar schon, 409 - sonst (etwa nach „Zurück auf automatisch“) gilt es wieder.
+    - Je Motiv ein Upload zugleich (``MOTIF_BUSY``, 409), je Prozess eine Paar-Verarbeitung (``PAIR_BUSY``, 429).
     ``dark_file``/``light_file`` sind ``(bytes, dateiname, content_type)``."""
     reason = clean_reason(reason)
+    key = shop_designs._design_key(design_key)
+    async with _motif_lock(db, key):
+        async with _pair_slot():
+            return await _upload_pair_locked(
+                db, design_key=key, dark_file=dark_file, light_file=light_file, actor_id=actor_id, reason=reason,
+                title=title, placement=placement, garment_colors=garment_colors, auto_assign=auto_assign,
+                confirm_warnings=confirm_warnings)
+
+
+async def _upload_pair_locked(db, *, design_key: str, dark_file: tuple, light_file: tuple, actor_id: str, reason: str,
+                              title: Any, placement: str | None, garment_colors: Any, auto_assign: bool,
+                              confirm_warnings: bool) -> dict:
     key, profile, placement = await _pair_target(db, design_key, placement, title=title,
                                                  garment_colors=garment_colors, saving=True)
-    spec, dark, light, swapped = await _prepare_pair(db, placement, dark_file, light_file, auto_assign)
+    spec, dark, light, swapped, uncertain = await _prepare_pair(db, placement, dark_file, light_file, auto_assign,
+                                                                preview=False)
     settings = await load_settings(db)
-    report = {**pair_check(dark, light, settings), "swapped": swapped}
+    report = {**await asyncio.to_thread(pair_check, dark, light, settings), "swapped": swapped,
+              "assign_uncertain": uncertain}
     report["summary"] = _summary(report)
     if report["level"] == "red":
         raise PairRefused(report["summary"], report, 400)
@@ -806,29 +925,42 @@ async def upload_pair(db, *, design_key: Any, dark_file: tuple, light_file: tupl
                                           actor_id=actor_id, reason=reason)
         created.append(key)
 
-    saved_dark: dict | None = None
+    inserted: list[dict] = []
     try:
         saved_dark, fit_dark = await shop_designs.save_version(
             db, key, image=dark["image"], spec=spec, placement=placement, source_format=dark["source_format"],
             variant="dark", origin="upload", actor_id=actor_id, reason=reason, svg_bytes=dark["svg_bytes"],
-            extra=dark["extra"], before_insert=None if profile else create, reuse_same=True)
+            extra=dark["extra"], before_insert=None if profile else create, reuse_same=True, pending=True)
+        if not saved_dark.get("reused"):
+            inserted.append(saved_dark)
         saved_light, fit_light = await shop_designs.save_version(
             db, key, image=light["image"], spec=spec, placement=placement, source_format=light["source_format"],
             variant="light", origin="upload", actor_id=actor_id, reason=reason, svg_bytes=light["svg_bytes"],
-            extra={**light["extra"], "pair_of": saved_dark["version"]}, reuse_same=True)
-        if saved_dark.get("reused") and saved_light.get("reused"):
-            raise ShopConflict(f"Beide Dateien sind schon die aktuellen Fassungen (v{saved_dark['version']} und "
-                               f"v{saved_light['version']}) - keine neuen Versionen nötig.")
+            extra={**light["extra"], "pair_of": saved_dark["version"]}, reuse_same=True, pending=True)
+        if not saved_light.get("reused"):
+            inserted.append(saved_light)
+        pair = {"dark": saved_dark["version"], "light": saved_light["version"]}
+        if not inserted:
+            current = await shop_designs.get_profile(db, key) or {}
+            stored = current.get("light_pair") or {}
+            if current.get("light_mode") == "file" and {name: stored.get(name) for name in pair} == pair:
+                raise ShopConflict(f"Beide Dateien sind schon die aktuellen Fassungen (v{pair['dark']} und "
+                                   f"v{pair['light']}) - keine neuen Versionen nötig.")
+        await set_light_mode(db, key, "file", actor_id=actor_id, reason=reason)
+        await db.shop_design_profiles.update_one({"design_key": key},
+                                                 {"$set": {"light_pair": {**pair, "at": now_utc().isoformat()}}})
+        if inserted:  # beide zugleich freischalten
+            await db.shop_designs.update_many({"id": {"$in": [row["id"] for row in inserted]}, "pending": True},
+                                              {"$unset": {"pending": ""}})
     except BaseException:
-        if saved_dark is not None and not saved_dark.get("reused"):
-            await _remove_version(db, saved_dark)
+        for row in inserted:
+            await _remove_pending(db, row)
         if created:  # nur das Motiv, das dieser Aufruf angelegt hat
             await _remove_profile(db, key, placement)
+        elif profile:
+            await _restore_profile(db, key, profile)
         logger.warning("[shop-motifs] Paar für %s nicht gespeichert - nichts zurückgelassen", key)
         raise
-    await set_light_mode(db, key, "file", actor_id=actor_id, reason=reason)
-    pair = {"dark": saved_dark["version"], "light": saved_light["version"], "at": now_utc().isoformat()}
-    await db.shop_design_profiles.update_one({"design_key": key}, {"$set": {"light_pair": pair}})
     await record_admin_action(db, "shop.design.pair", actor_id=actor_id, target_id=key, reason=reason, data={
         "dark_version": pair["dark"], "light_version": pair["light"], "level": report["level"], "swapped": swapped,
         "confirmed_warnings": report["level"] == "yellow",
@@ -930,7 +1062,8 @@ async def _row_for(db, motif_key: str, variant: str, version: int | None) -> dic
         return row
     if isinstance(version, bool) or not isinstance(version, int):
         raise ValueError("version: ganze Zahl")
-    row = await db.shop_designs.find_one({"design_key": motif_key, "version": version}, {"_id": 0})
+    row = await db.shop_designs.find_one({"design_key": motif_key, "version": version, "pending": {"$ne": True}},
+                                         {"_id": 0})
     if row is None or (variant == "dark" and row.get("variant") == "light"):
         raise LookupError(f"Motiv {motif_key}: Version {version} gibt es {VARIANT_LABELS[variant]} nicht.")
     return row
