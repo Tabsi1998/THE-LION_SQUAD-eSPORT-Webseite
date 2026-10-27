@@ -258,7 +258,7 @@ async def set_offer(db, product_id: str, *, technique: Any, colors: Any, sizes: 
     printful = product.get("printful")
     if not printful:
         raise ShopError("Erst das Printful-Produkt laden (Schritt 1).")
-    if technique not in printful.get("techniques") or []:
+    if technique not in (printful.get("techniques") or []):
         raise ShopError("Diese Drucktechnik bietet das Printful-Produkt nicht an.")
     known_colors = [row["name"] for row in printful.get("colors") or []]
     chosen_colors = list(dict.fromkeys(_canonical(item, known_colors, "Farbe") for item in _list(colors, "Farbe")))
