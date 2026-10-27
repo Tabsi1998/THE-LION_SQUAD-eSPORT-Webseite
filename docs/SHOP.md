@@ -648,9 +648,14 @@ der Rest ist transparent. Abgeglichen mit den offiziellen Vorlagen (Maße in `ma
   bis 1200 sein. Vorlagenbilder mit `role` `extra`/`advanced_template` (oder `template_type` `advanced`) werden still
   ausgelassen, `template`/`primary` für die Vorschau bevorzugt. Ein fehlendes oder nicht-https Vorlagenbild kostet nur
   die Vorschau dieser Zeile (ein schlechter Hintergrund nur den Hintergrund); sind die Vorlagenbilder gar nicht
-  abrufbar (außer vorübergehend), bleiben die Druckflächen wählbar - Vorschau ohne Bild mit Hinweis. Nur wenn
-  mockup-styles **keine einzige** brauchbare Zeile liefert, scheitert der Abruf (`no_usable_rows`) mit dem häufigsten
-  Grund in der Meldung.
+  abrufbar (außer vorübergehend), bleiben die Druckflächen wählbar - mit den bisher gespeicherten Vorlagenbildern,
+  sonst Vorschau ohne Bild mit Hinweis. Nur wenn mockup-styles **keine einzige** brauchbare Zeile liefert, scheitert
+  der Abruf (`no_usable_rows`) mit dem häufigsten Grund in der Meldung.
+- **Nie halb übernehmen (#2091):** Fehlt zu einer Platzierung und Technik eine Zeile (übersprungen oder zu groß),
+  gelten für genau dieses Paar die Einträge des gespeicherten Stands weiter - kein „Entfällt“, kein Hin und Her im
+  Protokoll, Prüfsumme stabil. Ohne gespeicherten Stand fehlt das Paar ganz, bis Printful es vollständig liefert - eine
+  fehlende Gruppe (etwa die 15-oz-Tasse) fällt nie auf die allgemeine Fläche. Ist Platzierung oder Technik einer
+  übersprungenen Zeile nicht lesbar, werden keine neuen Maße übernommen (`last_error`, `skipped`, alter Stand bleibt).
 - Ein Sicherheitsbereich als Zahl steht nicht in v2 (er ist ins Vorlagenbild gezeichnet) - dafür gibt es einen
   einstellbaren **Sicherheitsrand** je Art der Fläche (Vorgabe 0 cm).
 - **Vorlagenbilder über die Website:** `GET /api/admin/shop/print-templates/{printful_product_id}/images/{index}` holt

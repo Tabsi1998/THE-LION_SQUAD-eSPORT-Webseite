@@ -258,6 +258,7 @@ async def refresh(db, printful_product_id: int, *, provider: FulfillmentProvider
     current = await get(db, printful_product_id)
     now = now_utc().isoformat()
     read_skipped: list[str] = []
+    templates_failed = False
     try:
         areas = await provider.print_areas(product_id)
         try:
@@ -267,8 +268,10 @@ async def refresh(db, printful_product_id: int, *, provider: FulfillmentProvider
         except FulfillmentError as exc:
             # Ohne Vorlagenbilder bleiben die Druckflächen wählbar - nur die Vorschau ist ohne Bild (#2091).
             logger.warning("[shop-print-templates] mockup-templates failed: %s", exc.reason)
-            templates = ()
-            read_skipped.append(f"Vorlagenbilder nicht abrufbar ({exc.text}) - Vorschau ohne Bild.")
+            templates, templates_failed = (), True
+            kept = bool((current or {}).get("previews"))
+            read_skipped.append(f"Vorlagenbilder nicht abrufbar ({exc.text}) - "
+                                + ("die bisherigen bleiben." if kept else "Vorschau ohne Bild."))
     except FulfillmentError as exc:
         logger.warning("[shop-print-templates] refresh failed: %s", exc.reason)
         # Bei „keine brauchbare Zeile“ sagt der Zusatz, woran es lag (nur Feld und erwarteter Typ, keine Werte).
@@ -296,6 +299,9 @@ async def refresh(db, printful_product_id: int, *, provider: FulfillmentProvider
     incomplete = set(getattr(areas, "incomplete", ())) | {
         (area.placement, area.technique) for area in areas if area.width_px * area.height_px > MAX_FILE_PIXELS}
     entries, notes = merge_incomplete(entries, old_entries, incomplete)
+    if templates_failed and (current or {}).get("previews"):
+        # Ein dauerhafter Fehler bei den Vorlagenbildern (404, 401, 403) löscht keinen guten Stand (#2091, Review).
+        previews = current["previews"]
     entries = sorted((link_previews(row, previews) for row in entries),
                      key=lambda row: (row["technique"], row["placement"], row["group"]))
     skipped = skipped + read_skipped + notes

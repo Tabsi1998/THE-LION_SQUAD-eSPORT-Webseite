@@ -512,6 +512,20 @@ async def test_without_template_images_the_areas_stay(db, provider, fake):
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("status", [404, 401, 403])
+async def test_a_permanent_template_failure_keeps_the_stored_previews(db, provider, fake, status):
+    """Review #2091: ein dauerhafter Fehler bei mockup-templates schreibt keine leere Vorschau über einen guten Stand."""
+    good = (await templates.refresh(db, SHIRT, provider=provider, actor_id=ACTOR))["template"]
+    assert good["previews"] and entry_of(good, "front")["preview_indexes"]
+    fake.fail(status, operation=TEMPLATES)
+    result = await templates.refresh(db, SHIRT, provider=provider, actor_id=ACTOR)
+    stored = result["template"]
+    assert result["ok"] is True and stored["previews"] == good["previews"]
+    assert [row["preview_indexes"] for row in stored["entries"]] == [row["preview_indexes"] for row in good["entries"]]
+    assert stored["skipped"][-1].endswith("- die bisherigen bleiben.")
+
+
+@pytest.mark.asyncio
 async def test_a_temporary_template_failure_keeps_the_last_state(db, provider, fake):
     good = (await templates.refresh(db, SHIRT, provider=provider, actor_id=ACTOR))["template"]
     fake.fail(503, operation=TEMPLATES, times=10)
