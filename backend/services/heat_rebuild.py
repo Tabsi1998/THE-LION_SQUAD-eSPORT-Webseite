@@ -21,6 +21,14 @@ Regeln (Issue #1550, Entscheidung E13):
   Es gilt durchgehend: ein Platz hat genau dann eine Lauf-Quelle (``source.type = rank``), wenn ein
   ``advancement``-Eintrag dieses Laufs auf ihn zeigt - das prüft die Graph-Validierung.
 - **Abkürzen:** sind im Sammellauf alle Verbliebenen, ist er das Finale - spätere Runden entfallen (``shortened``).
+- **Warten (#2044):** ein Lauf ohne erwartete Belegung, dessen Quelle noch lebt (ein Loser-Lauf, dessen Vorläufe mit je
+  zwei Fahrern beide weiterschicken - noch), wird weder abgesagt noch zusammengelegt: seine Zielplätze ruhen als
+  „Quelle unerfüllbar“, bis jede Quelle entschieden oder entfallen ist. Legt der Umbau die Vorläufe zusammen, hat der
+  Sammellauf Verlierer, und die fahren hier; die ruhenden Plätze kommen zurück (``_revive``).
+- **Verlierer-Wege (#2045):** ``L1`` ist der erste, der nicht weiterkommt (Platz Quote + 1), ``L2`` der nächste. Die
+  Verlierer-Weiterleitungen eines Laufs passen zu Belegung und Quote: bei 3 Fahrern und Quote 2 nur ``L1``, bei 2
+  Fahrern (Quote 1) ebenfalls ``L1``; was darüber hinausgeht, ist „Quelle unerfüllbar“ und kommt zurück, wenn der Lauf
+  wächst. Die Quote folgt auch im Cup mit Loser Bracket der Belegung - niemand kommt kampflos weiter.
 - **Nie umbauen:** Läufe, die laufen (``in_progress``) oder aufgerufen sind (``called_at``), und alles, was entschieden
   ist. Vorschauen ebenso. Das gilt auch für die Kappung der Quote: ein Platz in so einem Lauf wird nicht zum Freilos.
   Bekäme ein aufgerufener oder laufender Lauf dadurch mehr Fahrer als die Laufgröße, lehnt der Planer den ganzen
@@ -56,7 +64,10 @@ from services.competition_snapshot import build_structure_snapshot
 from services.competition_usage import GRAPH, record_write
 from services.competition_versions import persist_competition_versions
 from services.custom_bracket import _snake_split, heat_quota
-from services.match_v2_results import _status_after_slot_fill, group_awaits_draw, resolve_walkovers, run_ready_draws
+from services.match_v2_results import (
+    SOURCE_UNFULFILLABLE, _advancement_paths, _advancement_result_rank, _status_after_slot_fill, group_awaits_draw,
+    resolve_walkovers, run_ready_draws,
+)
 from services.mutation_lock import MutationLockBusy, mutation_lock, tournament_write_resource
 from services.station_runtime import release_station_for_match
 from services.tournament_permissions import STRUCTURE_STAFF_ROLES
@@ -69,7 +80,6 @@ DEFAULT_HEAT_REBUILD_MODE = "suggest"
 REBUILDABLE_STATUSES = {"pending", "ready", "scheduled"}
 DECIDED_STATUSES = {"completed", "forfeit"}
 TERMINAL_STATUSES = {"completed", "forfeit", "cancelled"}
-SOURCE_UNFULFILLABLE = "source_unfulfillable"
 STRUCTURAL_KINDS = {"merged", "rebalanced", "shortened"}
 AUDIT_ACTIONS = {
     "merged": "tournament.heats.merged",
@@ -166,6 +176,12 @@ class _Graph:
         self.by_id = {match["id"]: match for match in matches if match.get("id")}
         self.by_key = {match.get("match_key"): match for match in matches if match.get("match_key")}
         self._entries: dict[str, list[dict]] = {}
+        # Gibt es Verlierer-Wege (Loser Bracket, #2045)? Sonst spart sich der Umbau das Anpassen dieser Weiterleitungen.
+        self.loser_flows = any(
+            entry.get("flow") == "L" for match in matches for entry in match.get("advancement") or []
+        ) or any(
+            _was_source(slot).get("flow") == "L" for match in matches for slot in match.get("slots") or []
+        )
 
     def invalidate(self) -> None:
         self._entries = {}
@@ -334,25 +350,161 @@ def _status_for(match: dict, previous_status: str) -> str:
     return status
 
 
+def _was_source(slot: dict) -> dict:
+    """Die Lauf-Quelle eines Platzes - auch die eines Freilos-Platzes „Quelle unerfüllbar“: nach ``_normalize_sources``
+    steht sie in ``source.was``, im selben Durchgang davor noch in ``source`` selbst."""
+    source = slot.get("source") or {}
+    if source.get("type") == "rank":
+        return source
+    return source.get("was") or {}
+
+
 def _dormant(graph: _Graph, slot: dict) -> bool:
     """Ein Freilos-Platz „Quelle unerfüllbar“, dessen Quelle noch lebt: bleibt stehen, damit die Quote der Quelle
     wieder wachsen kann (2 + 2 werden 4, und der zweite Platz kommt zurück)."""
-    was = (slot.get("source") or {}).get("was") or {}
-    origin = graph.by_key.get(was.get("match_key"))
-    return slot.get("status") == "bye" and bool(origin) and _live(origin)
+    if slot.get("status") != "bye":
+        return False
+    origin = graph.by_key.get(_was_source(slot).get("match_key"))
+    return bool(origin) and _live(origin)
+
+
+def _memory_of(slot: dict) -> dict:
+    """Der Merkposten eines ruhenden Platzes (``dormant_slots``): Quelle, Klartext und Los-Gruppe - genug, um den Platz
+    mit ``_revive`` wieder anzulegen."""
+    source = slot.get("source") or {}
+    was = _was_source(slot)
+    flow, key, rank = was.get("flow"), was.get("match_key"), int(was.get("rank") or 0)
+    return {"flow": flow, "match_key": key, "rank": rank, "raw": source.get("raw") or f"{flow}:{key}:{rank}",
+            **({"draw": source["draw"]} if source.get("draw") else {})}
+
+
+def _free_bye(graph: _Graph, target: dict, slot: dict) -> bool:
+    """Ein toter Freilos-Platz: niemand sitzt dort, keine Weiterleitung zeigt hin, und seine Quelle lebt nicht mehr -
+    ein zurückkehrender Platz (``_revive``) nimmt ihn, statt den Lauf zu vergrößern."""
+    return (slot.get("status") == "bye" and not slot.get("registration_id") and not _dormant(graph, slot)
+            and _feeding_entry(graph, slot, target["id"]) is None)
+
+
+def _stalled(graph: _Graph, slot: dict, heat: dict) -> dict | None:
+    """Ein offener Platz, dessen Quelle gerade nicht liefern kann (sie läuft oder ist aufgerufen und hat Fahrer
+    verloren, #2033: nicht anfassen) - mit der Weiterleitung, die auf ihn zeigt. Beim Zusammenlegen zieht er mit,
+    sonst zeigte die Weiterleitung auf eine Nummer, die jetzt ein anderer Lauf beliefert."""
+    if slot.get("status") != "pending" or (slot.get("source") or {}).get("type") != "rank" or graph.deliverable(slot):
+        return None
+    return _feeding_entry(graph, slot, heat["id"])
+
+
+def _unlink(origin: dict, entry: dict) -> None:
+    origin["advancement"] = [row for row in origin.get("advancement") or [] if row is not entry]
+
+
+def _protected_origins(graph: _Graph, extras: list[tuple[dict, dict]]) -> dict[int, dict]:
+    """Gefahrene Läufe, deren Weiterleitungen alle unter den mitziehenden Plätzen sind: einer davon muss bleiben
+    (#1596: ein gefahrener Lauf behält seinen Weg) - sein Platz hat beim Zusammenlegen Vorrang vor allen anderen
+    Freilos- und wartenden Plätzen. Rückgabe: je Ursprung (``id``) der Lauf."""
+    counted: dict[int, tuple[dict, int]] = {}
+    for slot, _entry in extras:
+        origin = graph.by_key.get((slot.get("source") or {}).get("match_key"))
+        if origin is None or str(origin.get("status") or "") not in DECIDED_STATUSES:
+            continue
+        seen = counted.get(id(origin), (origin, 0))[1]
+        counted[id(origin)] = (origin, seen + 1)
+    return {key: origin for key, (origin, seen) in counted.items() if seen >= len(origin.get("advancement") or [])}
+
+
+def _within_cap(graph: _Graph, extras: list[tuple[dict, dict]], used: int,
+                cap: int) -> tuple[list[tuple[dict, dict]], list[dict]]:
+    """Freilos- und wartende Plätze mit Weiterleitung, die beim Zusammenlegen mitziehen - so viele, wie die Laufgröße
+    lässt (TV, Baum und App zeigen jeden Platz; ``len(slots)`` und ``match_size`` bleiben immer ≤ Laufgröße). Vorrang
+    hat die letzte Weiterleitung eines gefahrenen Laufs (``_protected``), dann die Plätze lebender Quellen (etwa ein
+    aufgerufener Vorlauf, dessen L2 es bei drei Fahrern nicht gibt), dann die entschiedener Quellen (der Platz blieb
+    leer oder wurde durch ein Ausscheiden frei), hohe Ränge zuletzt. Was nicht mehr hineinpasst: bei lebender Quelle
+    ein Merkposten (``dormant_slots`` - ``_revive`` legt ihn wieder an, sobald die Quelle liefert und Platz ist), bei
+    entschiedener Quelle fällt die Weiterleitung weg. Dass die Vorrang-Plätze passen, stellt der Aufrufer sicher
+    (``_pass`` zählt sie zur Laufgröße, ``_rebuild_group`` prüft vorab).
+    Rückgabe: (Plätze, die bleiben), (Merkposten)."""
+    must = _protected_origins(graph, extras)
+    rows = []
+    for slot, entry in extras:
+        origin = graph.by_key.get((slot.get("source") or {}).get("match_key"))
+        rows.append((slot, entry, origin, origin is not None and id(origin) in must))
+    rows.sort(key=lambda row: (not row[3], not (row[2] and _live(row[2])), row[1].get("flow") != "W",
+                               int(row[1].get("rank") or 0)))
+    keep: list[tuple[dict, dict]] = []
+    memory: list[dict] = []
+    unlink: list[tuple[dict, dict]] = []
+    kept_for: set[int] = set()
+    room = max(0, cap - used) if cap else len(rows)
+    for slot, entry, origin, protected in rows:
+        if room > 0 or origin is None or (protected and id(origin) not in kept_for):
+            keep.append((slot, entry))
+            if origin is not None:
+                kept_for.add(id(origin))
+            room -= 1
+            continue
+        unlink.append((origin, entry))
+        if _live(origin):
+            memory.append(_memory_of(slot))
+    for origin, entry in unlink:
+        _unlink(origin, entry)
+    return keep, memory
+
+
+def _protected_count(graph: _Graph, heats: list[dict]) -> int:
+    """Wie viele Vorrang-Plätze (``_protected_origins``) die Läufe einer Gruppe tragen - sie zählen zur Laufgröße,
+    damit der Umbau nie einen Sammellauf plant, in den sie nicht mehr passen. Gezählt werden nur Plätze, die beim
+    Zusammenlegen mitziehen (Freilos nach einem Ausscheiden, Freilos ohne Lieferung des entschiedenen Vorlaufs) -
+    ein Ausfall vor dem Start ohne Vermerk zieht nicht mit (``_rebuild_group``)."""
+    byes = [(slot, entry) for heat in heats for slot in heat.get("slots") or []
+            if slot.get("status") == "bye"
+            and ((slot.get("source_result") or {}).get("removed_registration_id")
+                 or (slot.get("source_result") or {}).get("skipped"))
+            and (entry := _feeding_entry(graph, slot, heat["id"])) is not None]
+    return len(_protected_origins(graph, byes))
+
+
+def _droppable(graph: _Graph, target: dict, slot: dict) -> tuple[dict, dict] | None:
+    """Ein Freilos-Platz, dessen Weiterleitung weichen kann, damit ein zurückkehrender Platz hineinpasst: niemand
+    sitzt dort, die Quelle ist entschieden oder entfallen, und sie behält eine andere Weiterleitung (#1596)."""
+    if slot.get("status") != "bye" or slot.get("registration_id") or _dormant(graph, slot):
+        return None
+    entry = _feeding_entry(graph, slot, target["id"])
+    origin = graph.by_key.get((slot.get("source") or {}).get("match_key")) if entry else None
+    if entry is None or origin is None or _live(origin):
+        return None
+    played = str(origin.get("status") or "") in DECIDED_STATUSES
+    if played and len(origin.get("advancement") or []) <= 1:
+        return None
+    return origin, entry
 
 
 def _rebuild_group(graph: _Graph, heats: list[dict], buckets: list[list[tuple]],
-                   min_players: int, now_iso: str) -> tuple[list[dict], dict[str, dict]]:
+                   min_players: int, now_iso: str, cap: int = 0) -> tuple[list[dict], dict[str, dict]]:
     """Verteilt die Einträge der Gruppe auf die ersten ``len(buckets)`` Läufe (nach ``order``); der Rest entfällt."""
     survivors = heats[: len(buckets)]
-    dormant = [copy.deepcopy(slot) for heat in heats for slot in heat.get("slots") or [] if _dormant(graph, slot)]
+    # Ruhende Plätze („Quelle unerfüllbar“, Quelle lebt noch) werden keine Plätze des Sammellaufs - TV, Baum und App
+    # zählen und zeigen jeden Platz. Sie wandern als Merkposten in ``dormant_slots`` des Sammellaufs; ``_revive`` holt
+    # sie von dort zurück, sobald die Quelle wieder liefert, und nimmt dafür einen freien Freilos-Platz oder hängt
+    # einen an. So bleiben die sichtbaren Plätze die echte Laufgröße.
+    dormant = [_memory_of(slot) for heat in heats for slot in heat.get("slots") or [] if _dormant(graph, slot)]
+    dormant += [item for heat in heats for item in heat.get("dormant_slots") or []]
     # Leere Plätze aus einem Ausscheiden ohne Nachrücker (#1596), auf die noch eine Weiterleitung zeigt: sie ziehen mit
     # in den Sammellauf, samt Weiterleitung - sonst bekäme ein anderer Lauf denselben Platz (zwei Quellen auf einem
     # Platz). Ein Ausfall vor dem Start (ohne `removed_registration_id`) braucht keinen zusätzlichen Freilos-Platz.
     linked_byes = [(copy.deepcopy(slot), entry) for heat in heats for slot in heat.get("slots") or []
                    if slot.get("status") == "bye" and (slot.get("source_result") or {}).get("removed_registration_id")
                    and (entry := _feeding_entry(graph, slot, heat["id"])) is not None]
+    linked_byes += [(copy.deepcopy(slot), entry) for heat in heats for slot in heat.get("slots") or []
+                    if (entry := _stalled(graph, slot, heat)) is not None]
+    # Ein Freilos-Platz eines entfallenden Laufs, für den der entschiedene Vorlauf niemanden geschickt hat (gemischt:
+    # das Los gab ihm weniger Fahrer, als er weiterschicken durfte), zieht ebenfalls samt Weiterleitung mit - wie
+    # ``kept_byes`` beim bleibenden Lauf; sonst zeigte die Weiterleitung in den abgesagten Lauf (#2044).
+    survivor_ids = {heat["id"] for heat in survivors}
+    linked_byes += [(copy.deepcopy(slot), entry) for heat in heats if heat["id"] not in survivor_ids
+                    for slot in heat.get("slots") or []
+                    if slot.get("status") == "bye" and (slot.get("source_result") or {}).get("skipped")
+                    and not (slot.get("source_result") or {}).get("removed_registration_id")
+                    and (entry := _feeding_entry(graph, slot, heat["id"])) is not None]
     linked = {id(entry) for _slot, entry in linked_byes}
     # Ein bleibender Lauf bekommt neue Platznummern. Ein Freilos-Platz, für den der entschiedene Vorlauf niemanden
     # geschickt hat (#1596, gemischt: das Los gab dem Vorlauf weniger Fahrer, als er weiterschicken durfte), behält
@@ -362,6 +514,18 @@ def _rebuild_group(graph: _Graph, heats: list[dict], buckets: list[list[tuple]],
                               if slot.get("status") == "bye" and (slot.get("source_result") or {}).get("skipped")
                               and (entry := _feeding_entry(graph, slot, heat["id"])) is not None and id(entry) not in linked]
                  for heat in survivors}
+    # Vorab, bevor etwas verschoben wird: passen die Vorrang-Plätze (letzte Weiterleitung eines gefahrenen Laufs)
+    # neben den Einträgen in die Laufgröße? Sonst ist das ein Konflikt wie ein überfüllter aufgerufener Lauf (#2033):
+    # nichts wird geschrieben, die Turnierleitung bekommt den Hinweis, der Umbau wird mit der nächsten Änderung
+    # nachgeholt. (``_pass`` zählt die Vorrang-Plätze schon zur Laufgröße - hier bleibt nur der Rest-Fall.)
+    for index, (survivor, bucket) in enumerate(zip(survivors, buckets)):
+        extras = (list(linked_byes) if index == 0 else []) + (kept_byes.get(survivor["id"]) or [])
+        protected = len(_protected_origins(graph, extras))
+        if cap and len(bucket) + protected > cap:
+            where = survivor.get("round_name") or f"Runde {survivor.get('round')}"
+            raise HeatRebuildError(CROWDED_DETAIL.format(name=f"Lauf {survivor.get('match_key')} ({where})", cap=cap),
+                                   409, code=CROWDED, match_ids=[survivor["id"]],
+                                   match_keys=[str(survivor.get("match_key") or "")], stage_id=survivor.get("stage_id"))
     merged: dict[str, dict] = {}
     scheduled = sorted(str(heat.get("scheduled_at")) for heat in heats if heat.get("scheduled_at"))
     received: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))
@@ -378,15 +542,10 @@ def _rebuild_group(graph: _Graph, heats: list[dict], buckets: list[list[tuple]],
             new_slots.append(moved)
             if origin_heat["id"] != survivor["id"]:
                 received[origin_heat["id"]][survivor["id"]] += 1
-        if survivor is survivors[0]:
-            for slot in dormant:
-                slot["slot"] = len(new_slots) + 1
-                new_slots.append(slot)
-            for slot, entry in linked_byes:
-                slot["slot"] = len(new_slots) + 1
-                new_slots.append(slot)
-                entry.update({"to_match_id": survivor["id"], "to_match_key": survivor.get("match_key"), "to_slot": slot["slot"]})
-        for slot, entry in kept_byes.get(survivor["id"]) or []:
+        extras = (list(linked_byes) if survivor is survivors[0] else []) + (kept_byes.get(survivor["id"]) or [])
+        carried, memory = _within_cap(graph, extras, len(new_slots), cap)
+        survivor["dormant_slots"] = (list(dormant) if survivor is survivors[0] else []) + memory
+        for slot, entry in carried:
             slot.pop("moved_to", None)
             slot["slot"] = len(new_slots) + 1
             new_slots.append(slot)
@@ -407,16 +566,60 @@ def _rebuild_group(graph: _Graph, heats: list[dict], buckets: list[list[tuple]],
         into = max(survivors, key=lambda s: (targets.get(s["id"], 0), -int(s.get("order") or 0))) if targets else survivors[0]
         _void_targets(graph, heat, "merged", now_iso)
         _cancel(heat, "merged", now_iso, merged_into=into)
-        # Seine Plätze im Folgelauf gehören jetzt dem Sammellauf - der Pfeil von hier aus wäre falsch.
+        # Seine Plätze im Folgelauf gehören jetzt dem Sammellauf - der Pfeil von hier aus wäre falsch; seine
+        # Merkposten trägt der Sammellauf.
         heat["advancement"] = []
+        heat["dormant_slots"] = []
         merged[heat["id"]] = into
     graph.invalidate()
     return survivors, merged
 
 
-def _revive(graph: _Graph, heat: dict, rank: int, now_iso: str) -> bool:
-    """Der Platz „Quelle unerfüllbar“ für diesen Rang kommt zurück, wenn es ihn in einem umbaubaren Lauf noch gibt."""
-    wanted = {"flow": "W", "match_key": heat.get("match_key"), "rank": rank}
+def _awaits_source(graph: _Graph, heat: dict) -> bool:
+    """Ein Lauf ohne erwartete Belegung, dessen Quelle noch lebt (#2044): etwa ein Loser-Lauf, dessen Vorläufe mit je
+    zwei Fahrern beide weiterschicken - noch. Legt der Umbau die Vorläufe zusammen, hat der Sammellauf Verlierer, und
+    die fahren hier. Darum wird so ein Lauf nicht als „ohne Teilnehmer“ abgesagt, solange eine Quelle offen ist; die
+    Absage fällt, wenn jede Quelle entschieden oder entfallen ist. Zählt auch ein Freilos-Platz „Quelle unerfüllbar“,
+    dessen Quelle noch lebt (``_dormant``)."""
+    for slot in heat.get("slots") or []:
+        source = slot.get("source") or {}
+        if slot.get("status") == "pending" and source.get("type") == "rank":
+            origin = graph.by_key.get(source.get("match_key"))
+            if origin and _live(origin):
+                return True
+        elif _dormant(graph, slot):
+            return True
+    for item in heat.get("dormant_slots") or []:
+        origin = graph.by_key.get(item.get("match_key"))
+        if origin and _live(origin):
+            return True
+    return False
+
+
+def _restore(graph: _Graph, heat: dict, target: dict, slot: dict, wanted: dict, raw: str | None, draw: dict | None,
+             now_iso: str) -> None:
+    """Der Platz ist wieder eine Lauf-Quelle: Platz und Weiterleitung passen zusammen."""
+    raw = raw or f"{wanted['flow']}:{wanted['match_key']}:{wanted['rank']}"
+    slot["source"] = {"type": "rank", **wanted, "raw": raw, **({"draw": draw} if draw else {})}
+    slot["source_result"] = None
+    slot["registration_id"] = None
+    slot["user_id"] = None
+    slot["status"] = "pending"
+    heat.setdefault("advancement", []).append({
+        **wanted, "to_match_key": target.get("match_key"), "to_match_id": target["id"], "to_slot": _slot_no(slot),
+    })
+    target["status"] = _status_after_slot_fill(target, preserve_terminal=False)
+    target["updated_at"] = now_iso
+
+
+def _revive(graph: _Graph, heat: dict, rank: int, now_iso: str, flow: str = "W", cap: int = 0) -> bool:
+    """Der Platz „Quelle unerfüllbar“ für diesen Rang kommt zurück, wenn es ihn in einem umbaubaren Lauf noch gibt -
+    als Platz im Lauf oder als Merkposten (``dormant_slots``, nach einem Zusammenlegen). Ein Merkposten bekommt einen
+    toten Freilos-Platz, sonst einen neuen Platz, solange der Lauf unter der Laufgröße ist, sonst den Platz eines
+    Freiloses, dessen Weiterleitung weichen kann (``_droppable``). Ist der Lauf voll (vier echte Plätze), bleibt der
+    Merkposten liegen und der Aufrufer kappt die Quote bzw. den Verlierer-Weg der Quelle - wie die Kappung einer
+    Gruppe (#2033): kein Lauf über der Laufgröße, auch nicht nach einer Korrektur oder einem „Rückgängig“."""
+    wanted = {"flow": flow, "match_key": heat.get("match_key"), "rank": rank}
     for target in graph.matches:
         if not _rebuildable(target):
             continue
@@ -424,39 +627,216 @@ def _revive(graph: _Graph, heat: dict, rank: int, now_iso: str) -> bool:
             source = slot.get("source") or {}
             if source.get("type") != "bye" or (source.get("was") or {}) != wanted:
                 continue
-            slot["source"] = {"type": "rank", **wanted, "raw": source.get("raw") or f"W:{heat.get('match_key')}:{rank}",
-                              **({"draw": source["draw"]} if source.get("draw") else {})}
-            slot["source_result"] = None
-            slot["registration_id"] = None
-            slot["user_id"] = None
-            slot["status"] = "pending"
-            heat.setdefault("advancement", []).append({
-                "flow": "W", "rank": rank, "to_match_key": target.get("match_key"), "to_match_id": target["id"],
-                "to_slot": _slot_no(slot),
-            })
+            _restore(graph, heat, target, slot, wanted, source.get("raw"), source.get("draw"), now_iso)
+            return True
+    for target in graph.matches:
+        if not _rebuildable(target):
+            continue
+        memory = target.get("dormant_slots") or []
+        item = next((row for row in memory
+                     if {key: row.get(key) for key in ("flow", "match_key", "rank")} == wanted), None)
+        if item is None:
+            continue
+        slot = _place_for(graph, target, cap)
+        if slot is None:
+            # Voll: der Merkposten wartet - die Quelle braucht den Rang, hinter ihm steht später ein echter Fahrer,
+            # der den nächsten freien Platz bekommt (``_settle_memory``).
+            item["waiting"] = True
+            return False
+        target["dormant_slots"] = [row for row in memory if row is not item]
+        _restore(graph, heat, target, slot, wanted, item.get("raw"), item.get("draw"), now_iso)
+        return True
+    return False
+
+
+def _place_for(graph: _Graph, target: dict, cap: int) -> dict | None:
+    """Ein Platz im Lauf für einen zurückkehrenden Merkposten: ein totes Freilos, ein neuer Platz unter der Laufgröße,
+    sonst das Freilos eines Wegs, der weichen kann (``_droppable``) - oder keiner."""
+    slots = target.get("slots") or []
+    slot = next((row for row in slots if _free_bye(graph, target, row)), None)
+    if slot is not None:
+        return slot
+    if not cap or len(slots) < cap:
+        slot = _bye_slot(len(slots) + 1)
+        target.setdefault("slots", []).append(slot)
+        target["settings"] = {**(target.get("settings") or {}), "match_size": len(target["slots"])}
+        return slot
+    for row in slots:
+        found = _droppable(graph, target, row)
+        if found:
+            _unlink(found[0], found[1])
+            return row
+    return None
+
+
+def _unwait(graph: _Graph, heat: dict, flow: str, limit: int) -> None:
+    """Ein Merkposten „wartet auf einen Platz“ (#2044), wenn seine Quelle den Rang gerade braucht, der Ziellauf aber
+    voll ist (``_revive``) - dann steht später ein echter Fahrer dahinter. Fällt der Bedarf weg (die Quote folgt der
+    Belegung: Ränge über ``limit``), ruht er wieder ohne Anspruch."""
+    for target in graph.matches:
+        for item in target.get("dormant_slots") or []:
+            if (item.get("flow") == flow and item.get("match_key") == heat.get("match_key")
+                    and int(item.get("rank") or 0) > limit):
+                item.pop("waiting", None)
+
+
+def _driver_for(origin: dict, item: dict) -> dict | None:
+    """Wer hinter einem wartenden Merkposten steht, wenn die Quelle entschieden ist: der Platz im Ergebnis, gelesen wie
+    beim Eintragen (``_advancement_paths``) - Ausgeschiedene und Nicht-Erschienene nicht."""
+    results = origin.get("results") or []
+    if str(origin.get("status") or "") not in DECIDED_STATUSES or not results:
+        return None
+    gone = {row.get("registration_id") for row in results if row.get("eliminated")}
+    loser_path, winner_path = _advancement_paths(origin, results, gone)
+    row = (winner_path if item.get("flow") == "W" else loser_path).get(_advancement_result_rank(origin, item))
+    if not row or row.get("registration_id") in gone or row.get("forfeit"):
+        return None
+    return row
+
+
+def _seated_anywhere(graph: _Graph, registration_id: str) -> bool:
+    return any(slot.get("registration_id") == registration_id and slot.get("status") == "filled"
+               for match in graph.matches if _live(match) for slot in match.get("slots") or [])
+
+
+def _settle_memory(graph: _Graph, now_iso: str, ops: list[dict], cap: int) -> None:
+    """Merkposten nach jedem Durchgang: solange die Quelle lebt, bleiben sie. Ist sie entschieden, zählt nur noch ein
+    wartender Merkposten mit einem echten Fahrer dahinter (``_driver_for``) - er bekommt den nächsten freien Platz im
+    Ziellauf (``_place_for``), auch nach Korrektur oder Ausscheiden. Alle anderen (leere oder unerfüllbare Quelle,
+    Quelle entfallen) kommen nie zurück und werden entfernt. Ist der Ziellauf nicht mehr umbaubar (aufgerufen,
+    gestartet, entschieden, entfallen), hat der Fahrer keinen Lauf mehr bekommen: das wird gemeldet (``unseated``),
+    nie still."""
+    for match in graph.matches:
+        memory = match.get("dormant_slots")
+        if not memory:
+            continue
+        kept: list[dict] = []
+        for item in memory:
+            origin = graph.by_key.get(item.get("match_key"))
+            if not origin or str(origin.get("status") or "") == "cancelled":
+                continue
+            if _live(origin):
+                kept.append(item)
+                continue
+            row = _driver_for(origin, item) if item.get("waiting") else None
+            if not row or _seated_anywhere(graph, row["registration_id"]):
+                continue
+            if _rebuildable(match):
+                slot = _place_for(graph, match, cap)
+                if slot is None:
+                    kept.append(item)
+                    continue
+                wanted = {"flow": item["flow"], "match_key": origin.get("match_key"), "rank": int(item["rank"])}
+                _restore(graph, origin, match, slot, wanted, item.get("raw"), item.get("draw"), now_iso)
+                slot.update({"registration_id": row["registration_id"], "user_id": row.get("user_id"),
+                             "status": "filled",
+                             "source_result": {"from_match_id": origin["id"], "from_match_key": origin.get("match_key"),
+                                               "rank": int(row.get("rank") or 0), "flow": item["flow"],
+                                               "confirmed_at": now_iso}})
+                match["status"] = _status_after_slot_fill(match, preserve_terminal=False)
+                match["updated_at"] = now_iso
+                continue
+            ops.append({"kind": "unseated", "round": match.get("round"), "round_name": match.get("round_name"),
+                        "heats": [match.get("match_key")], "from": origin.get("match_key"), "flow": item["flow"],
+                        "rank": int(item["rank"]), "result_rank": int(row.get("rank") or 0),
+                        "registration_id": row["registration_id"]})
+        match["dormant_slots"] = kept
+
+
+def _fit_loser_links(graph: _Graph, heat: dict, now_iso: str, cap: int = 0) -> None:
+    """Die Verlierer-Weiterleitungen eines Laufs passen zu Laufgröße und Quote (#2045). ``L1`` ist der erste, der nicht
+    weiterkommt (Platz Quote + 1), ``L2`` der nächste - so liest es der Ergebnis-Anwender. Gleicht der Umbau einen Lauf
+    auf 3 oder 2 Plätze aus, gibt es weniger Verlierer-Plätze: bei 3 Plätzen und Quote 2 nur ``L1``, bei 2 Plätzen
+    keinen. Was darüber hinausgeht, wird gestrichen (der Zielplatz ist „Quelle unerfüllbar“, die alte Quelle steht in
+    ``source.was``); wächst der Lauf wieder, kommen die Plätze zurück (``_revive``). Ein Zielplatz in einem Lauf, der
+    nicht mehr umgebaut wird, bleibt - dieselbe Sperre wie in ``_apply_quota``."""
+    if not graph.loser_flows:
+        return
+    advancement = heat.get("advancement") or []
+    links = [entry for entry in advancement if entry.get("flow") == "L"]
+    count = len(graph.entries(heat))
+    if count == 0:
+        return
+    places = max(0, count - _quota_of(heat))
+    highest = max((int(entry.get("rank") or 0) for entry in links), default=0)
+    revived = 0
+    for rank in range(highest + 1, places + 1):
+        if not _revive(graph, heat, rank, now_iso, flow="L", cap=cap):
+            break
+        revived += 1
+    _unwait(graph, heat, "L", places)
+    dropped = [entry for entry in links if int(entry.get("rank") or 0) > places]
+    for entry in dropped:
+        target = graph.by_id.get(entry.get("to_match_id"))
+        slot = _find_slot(target, int(entry.get("to_slot") or 0))
+        if target and slot and not _rebuildable(target) and slot.get("status") == "pending":
+            dropped = []
+            break
+    for entry in dropped:
+        target = graph.by_id.get(entry.get("to_match_id"))
+        slot = _find_slot(target, int(entry.get("to_slot") or 0))
+        if target and slot and slot.get("status") == "pending":
+            _mark_unfulfillable(slot, heat, int(entry.get("rank") or 0), "L", SOURCE_UNFULFILLABLE, now_iso)
             target["status"] = _status_after_slot_fill(target, preserve_terminal=False)
             target["updated_at"] = now_iso
-            return True
-    return False
+    if dropped:
+        heat["advancement"] = [entry for entry in heat.get("advancement") or [] if entry not in dropped]
+    if dropped or revived:
+        heat["updated_at"] = now_iso
+        graph.invalidate()
+
+
+def _rest(graph: _Graph, heat: dict, now_iso: str) -> None:
+    """Ein wartender Lauf (#2044) liefert vorerst niemanden: seine Zielplätze ruhen als Freilos „Quelle unerfüllbar“
+    und kommen zurück, sobald er Fahrer bekommt (``_apply_quota`` belebt den ersten Platz, ``_revive``). Bliebe die
+    Weiterleitung stehen, zöge das Zusammenlegen der Zielläufe den offenen Platz weg, und sie zeigte auf eine Nummer,
+    die ein anderer Lauf beliefert. Zeigt sie in einen Lauf, der nicht mehr umgebaut wird, bleibt alles stehen."""
+    entries = list(heat.get("advancement") or [])
+    if not entries:
+        return
+    for entry in entries:
+        target = graph.by_id.get(entry.get("to_match_id"))
+        slot = _find_slot(target, int(entry.get("to_slot") or 0))
+        if target and slot and not _rebuildable(target) and slot.get("status") == "pending":
+            return
+    for entry in entries:
+        target = graph.by_id.get(entry.get("to_match_id"))
+        slot = _find_slot(target, int(entry.get("to_slot") or 0))
+        if target and slot and slot.get("status") == "pending":
+            _mark_unfulfillable(slot, heat, int(entry.get("rank") or 0), entry.get("flow"), SOURCE_UNFULFILLABLE,
+                                now_iso)
+            target["status"] = _status_after_slot_fill(target, preserve_terminal=False)
+            target["updated_at"] = now_iso
+    heat["advancement"] = []
+    heat["updated_at"] = now_iso
+    graph.invalidate()
 
 
 def _apply_quota(graph: _Graph, heat: dict, cap: int, quota: int, now_iso: str, ops: list[dict]) -> None:
     """Die Quote eines Laufs folgt seiner Belegung: weniger Teilnehmer, weniger Weiterkommer - die Plätze im Folgelauf
     werden „Quelle unerfüllbar“; wächst der Lauf wieder (Zusammenlegen), kommen sie zurück."""
     advancement = heat.get("advancement") or []
-    if not advancement or any(entry.get("flow") != "W" for entry in advancement):
-        return
     count = len(graph.entries(heat))
     if count == 0:
         return
+    if not any(entry.get("flow") == "W" for entry in advancement):
+        # Kein Sieger-Weg: das Finale - oder ein Lauf, der gewartet hat (#2044) und dessen Zielplätze ruhen. Kommt der
+        # erste Platz zurück, folgt die Quote wieder der Belegung; sonst gibt es nichts zu tun.
+        if not _revive(graph, heat, 1, now_iso, cap=cap):
+            return
+        graph.invalidate()
+    # Verlierer-Wege (Loser Bracket) bleiben hier unberührt; ``_fit_loser_links`` passt sie danach an die neue Quote
+    # an (#2045) - so folgt auch im Cup mit Loser Bracket die Quote der Belegung: zwei Fahrer, einer kommt weiter, der
+    # andere fährt im Loser Bracket statt kampflos mit.
     current = _quota_of(heat)
     wanted = heat_quota(count, cap, quota)
     if wanted > current:
         for rank in range(current + 1, wanted + 1):
-            if not _revive(graph, heat, rank, now_iso):
+            if not _revive(graph, heat, rank, now_iso, cap=cap):
                 wanted = rank - 1
                 break
         graph.invalidate()
+    _unwait(graph, heat, "W", heat_quota(count, cap, quota))
     advancement = heat.get("advancement") or []
     if wanted == current:
         if heat.get("qualifiers_effective") != current and heat.get("rebuilt_at"):
@@ -521,6 +901,10 @@ def _trim_touches_locked_target(graph: _Graph, heat: dict, wanted: int) -> bool:
 OVERFULL = "overfull"
 OVERFULL_DETAIL = ("{name} ist schon aufgerufen oder läuft und bekäme {count} Fahrer bei Laufgröße {cap}. Der Umbau "
                    "wartet, bis der Aufruf zurückgenommen oder der Lauf entschieden ist - bitte den Lauf prüfen.")
+# Ein Sammellauf hätte mehr Plätze als die Laufgröße, weil ein gefahrener Lauf seinen Weg dorthin behält (#1596).
+CROWDED = "crowded"
+CROWDED_DETAIL = ("{name} hätte mehr Plätze als die Laufgröße {cap}: ein gefahrener Lauf behält seinen Weg dorthin. "
+                  "Der Umbau wartet - bitte den Turnierbaum prüfen; mit der nächsten Änderung wird nachgeholt.")
 
 
 def _trim_quotas(graph: _Graph, heats: list[dict], targets: list[dict], cap: int, now_iso: str,
@@ -632,6 +1016,15 @@ def _pass(graph: _Graph, *, cap: int, quota: int, min_players: int, structural: 
             live = graph.entries(heat)
             entries.extend((_entry_key(slot, graph), slot, heat) for slot in heat.get("slots") or [] if slot in live)
         entries.sort(key=lambda item: item[0])
+        # Ein Lauf ohne erwartete Belegung, dessen Quelle noch lebt, wartet (#2044): weder abgesagt noch zusammengelegt,
+        # bis jede Quelle entschieden ist - das Zusammenlegen der Vorläufe kann ihm noch Fahrer bringen.
+        feeding = {id(heat) for _key, _slot, heat in entries}
+        waiting = [heat for heat in heats if id(heat) not in feeding and _awaits_source(graph, heat)]
+        for heat in waiting:
+            _rest(graph, heat, now_iso)
+        heats = [heat for heat in heats if not any(heat is other for other in waiting)]
+        if not heats:
+            continue
         if not entries:
             for heat in heats:
                 _void_targets(graph, heat, "bye", now_iso)
@@ -643,7 +1036,9 @@ def _pass(graph: _Graph, *, cap: int, quota: int, min_players: int, structural: 
         sizes_before = [sum(1 for _k, _s, h in entries if h is heat) for heat in heats]
         live_heats = [heat for heat, size in zip(heats, sizes_before) if size > 0]
         empty = [heat for heat, size in zip(heats, sizes_before) if size == 0]
-        count = len(entries)
+        # Vorrang-Plätze (die letzte Weiterleitung eines gefahrenen Laufs, #1596) brauchen einen Platz im Sammellauf:
+        # sie zählen zur Laufgröße, damit nie ein Sammellauf über der Laufgröße geplant wird.
+        count = len(entries) + _protected_count(graph, heats)
         # Nie mehr Läufe, als die Gruppe hat: passen die Einträge nicht in die vorhandenen Läufe (die Kappung der Runde
         # davor soll das verhindern, #2033), bleiben sie lieber in zu vollen Läufen sichtbar, als dass ein Teil beim
         # Verteilen verloren ginge - ``_rebuild_group`` füllt nur so viele Läufe, wie es gibt.
@@ -651,7 +1046,7 @@ def _pass(graph: _Graph, *, cap: int, quota: int, min_players: int, structural: 
         live_sizes = [size for size in sizes_before if size > 0]
         if structural and targets and (wanted < len(live_heats) or max(live_sizes) - min(live_sizes) > 1):
             buckets = _snake_split(entries, wanted)
-            survivors, merged = _rebuild_group(graph, live_heats + empty, buckets, min_players, now_iso)
+            survivors, merged = _rebuild_group(graph, live_heats + empty, buckets, min_players, now_iso, cap=cap)
             kind = "merged" if merged else "rebalanced"
             ops.append({
                 "kind": kind, "round": round_no, "round_name": heats[0].get("round_name"),
@@ -671,9 +1066,12 @@ def _pass(graph: _Graph, *, cap: int, quota: int, min_players: int, structural: 
             heats = live_heats
         for heat in heats:
             _apply_quota(graph, heat, cap, quota, now_iso, ops)
+            _fit_loser_links(graph, heat, now_iso, cap)
         if targets:
             _trim_quotas(graph, heats, [graph.by_id[target_id] for target_id in targets if target_id in graph.by_id],
                          cap, now_iso, ops)
+            for heat in heats:
+                _fit_loser_links(graph, heat, now_iso, cap)
             if structural and len(heats) == 1:
                 _shorten(graph, heats[0], now_iso, ops)
     live_ids = [match["id"] for match in graph.matches if _live(match)]
@@ -683,6 +1081,7 @@ def _pass(graph: _Graph, *, cap: int, quota: int, min_players: int, structural: 
     if drawn:
         resolve_walkovers(drawn, graph.by_id, {}, now_iso, draws=draws)
     _normalize_sources(graph)
+    _settle_memory(graph, now_iso, ops, cap)
     graph.invalidate()
 
 
@@ -757,10 +1156,28 @@ INCOMPLETE_TEXTS = {
     # Ein aufgerufener oder laufender Lauf würde überlaufen (#2033): nicht anfassen, warten, dann nachholen.
     OVERFULL: "Lauf-Umbau wartet: Lauf {heats} ist aufgerufen bzw. läuft und würde überlaufen. "
               "Aufruf zurücknehmen oder Lauf entscheiden, dann wird nachgeholt.",
+    # Ein Sammellauf hätte mehr Plätze als die Laufgröße, weil ein gefahrener Lauf seinen Weg dorthin behält (#1596).
+    CROWDED: "Lauf-Umbau wartet: Lauf {heats} hätte mehr Plätze als die Laufgröße - ein gefahrener Lauf behält "
+             "seinen Weg dorthin. Bitte den Turnierbaum prüfen; mit der nächsten Änderung wird nachgeholt.",
 }
 INCOMPLETE_TITLE = "Lauf-Umbau unvollständig"
-INCOMPLETE_TITLES = {OVERFULL: "Lauf-Umbau wartet"}
+INCOMPLETE_TITLES = {OVERFULL: "Lauf-Umbau wartet", CROWDED: "Lauf-Umbau wartet"}
 RESUMED_TITLE = "Lauf-Umbau nachgeholt"
+UNSEATED_TITLE = "Kein Platz im Folgelauf"
+
+
+async def _notify_unseated(db, tournament: dict, op: dict) -> int:
+    """Ein Fahrer hat keinen Platz mehr bekommen (#2044): einmal je Fahrer und Lauf an die Turnierleitung."""
+    tid = tournament["id"]
+    body = f"{tournament.get('title') or 'Turnier'}: {op.get('text') or describe_op(op)}"
+    sent = 0
+    for user_id in sorted(await _structure_staff_user_ids(db, tid)):
+        created = await create_user_notification(
+            user_id, UNSEATED_TITLE, body, f"/admin/tournaments/{tid}?tab=bracket", INCOMPLETE_KIND,
+            {"tournament_id": tid, "registration_id": op.get("registration_id"),
+             "dedupe_key": f"{INCOMPLETE_KIND}:{tid}:unseated:{op.get('registration_id')}:{op.get('from')}"})
+        sent += 1 if created else 0
+    return sent
 # Eine Nachricht je Turnier, Phase und Vorfall - und frühestens nach einer Stunde noch einmal, falls es wieder passiert.
 INCOMPLETE_COOLDOWN_SECONDS = 3600
 
@@ -890,6 +1307,10 @@ def describe_op(op: dict) -> str:
         return f"{where}: Lauf {_join(op.get('heats') or [])} hat {op.get('size')} Teilnehmer, {op.get('quota')} kommen weiter (statt {op.get('quota_before')})."
     if kind == "cancelled":
         return f"{where}: {_join(op.get('heats') or [])} entfallen ohne Teilnehmer."
+    if kind == "unseated":
+        who = op.get("driver") or "Ein Fahrer"
+        return (f"{where}: {who} (Platz {op.get('result_rank')} aus {op.get('from')}) hat keinen Platz mehr bekommen - "
+                f"Lauf {_join(op.get('heats') or [])} war voll und wird nicht mehr umgebaut. Bitte entscheiden.")
     return f"{where}: {kind}"
 
 
@@ -967,6 +1388,13 @@ async def _persist(db, tournament: dict, stage: dict, matches: list[dict], origi
             await release_station_for_match(db, before, "matches_v2")
     changed = [match["id"] for match in changed]
     for op in ops:
+        if op.get("kind") == "unseated":
+            # Ein Fahrer ohne Platz (#2044): mit Namen ins Protokoll und als Meldung an die Turnierleitung - nie still.
+            row = await db.tournament_registrations.find_one({"id": op.get("registration_id")},
+                                                             {"_id": 0, "display_name": 1})
+            op["driver"] = (row or {}).get("display_name") or op.get("driver")
+            op["text"] = describe_op(op)
+            await _notify_unseated(db, tournament, op)
         await _audit(db, AUDIT_ACTIONS.get(op.get("kind"), "tournament.heats.adjusted"), tid, actor_id, {
             "engine": GRAPH, "stage_id": stage.get("id"), "trigger": trigger, **({"plan_id": plan_id} if plan_id else {}), **op,
         })
@@ -1143,10 +1571,10 @@ async def evaluate_after_write(db, tournament_id: str | None, *, actor_id: str |
             await db.tournaments.update_one({"id": tournament_id}, {"$unset": {"heat_rebuild_pending": ""}})
             # Ein überfüllter aufgerufener Lauf (#2033) steht mit Namen im Vermerk und in der Meldung - und der
             # Minuten-Job holt nach, sobald er frei oder entschieden ist (``process_pending_heat_rebuilds``).
-            overfull = bool(conflict and conflict.code == OVERFULL)
+            overfull = bool(conflict and conflict.code in (OVERFULL, CROWDED))
             await _mark_incomplete(db, tournament, stage_id=conflict.stage_id if overfull else None,
                                    keys=conflict.match_keys if overfull else [],
-                                   reason=OVERFULL if overfull else "retries_exhausted", actor_id=actor_id,
+                                   reason=conflict.code if overfull else "retries_exhausted", actor_id=actor_id,
                                    attempts=attempts, detail=detail,
                                    **({"match_ids": conflict.match_ids} if overfull else {}))
             return None
