@@ -340,13 +340,62 @@ async def test_a_draft_claim_from_the_future_counts_as_stale(client, fake, db):
     assert fake.calls_to("getOrder"), "erst nachsuchen, dann übernehmen"
 
 
+async def age_draft_claim(db, stamp: str) -> None:
+    await db[printful_client.DRAFTS].update_one({"external_id": "lsw-test-0001"},
+                                                {"$set": {"seen_at": stamp, "claimed_at": stamp}})
+
+
 @pytest.mark.asyncio
-async def test_a_created_claim_whose_order_is_gone_is_taken_over(client, fake, db):
-    """Codex-Befund: DELETE ging durch, der Claim blieb ``created`` liegen - die external_id war dauerhaft blockiert."""
+async def test_not_found_within_the_grace_period_does_not_send(client, fake, db):
+    """Codex-Befund: ein einzelnes not_found (eventual consistency) führte zu einem zweiten Entwurf."""
     await settle(db)
     first = await client.create_draft(db, draft())
     del fake.orders[first.id.value]
     del fake.order_items[first.id.value]
+    with pytest.raises(FulfillmentTransient) as caught:
+        await client.create_draft(db, draft())
+    assert caught.value.reason == "draft_unreadable" and len(fake.calls_to("createOrder")) == 1
+    claim = await db[printful_client.DRAFTS].find_one({"external_id": "lsw-test-0001"})
+    assert claim["state"] == "created" and claim["printful_order_id"] == first.id.value
+
+
+@pytest.mark.parametrize("stamp", ["kaputt", "far_future"])
+@pytest.mark.asyncio
+async def test_a_gone_order_with_an_unusable_time_is_not_taken_over(client, fake, db, stamp):
+    await settle(db)
+    first = await client.create_draft(db, draft())
+    del fake.orders[first.id.value]
+    del fake.order_items[first.id.value]
+    await age_draft_claim(db, far_future() if stamp == "far_future" else stamp)
+    with pytest.raises(FulfillmentTransient) as caught:
+        await client.create_draft(db, draft())
+    assert caught.value.reason == "draft_unreadable" and len(fake.calls_to("createOrder")) == 1
+
+
+@pytest.mark.asyncio
+async def test_a_gone_order_whose_external_id_is_found_comes_back(client, fake, db):
+    """Die gespeicherte Nummer kennt Printful nicht, die Nachsuche über @external_id findet aber einen Auftrag."""
+    await settle(db)
+    await db[printful_client.DRAFTS].insert_one({"external_id": "lsw-test-0001", "state": "created",
+                                                 "printful_order_id": 424242, "claimed_at": just_now(),
+                                                 "seen_at": just_now()})
+    fake._op_createOrder([], {}, printful_client.order_payload(draft()))
+    order = await client.create_draft(db, draft())
+    assert order.external_id == "lsw-test-0001" and order.id.value != 424242
+    assert fake.calls_to("createOrder") == []
+    claim = await db[printful_client.DRAFTS].find_one({"external_id": "lsw-test-0001"})
+    assert claim["state"] == "created" and claim["printful_order_id"] == order.id.value
+
+
+@pytest.mark.asyncio
+async def test_a_created_claim_whose_order_is_gone_is_taken_over(client, fake, db):
+    """Codex-Befund: DELETE ging durch, der Claim blieb ``created`` liegen - die external_id war dauerhaft blockiert.
+    Nach der Schonfrist und mit leerer Nachsuche wird übernommen."""
+    await settle(db)
+    first = await client.create_draft(db, draft())
+    del fake.orders[first.id.value]
+    del fake.order_items[first.id.value]
+    await age_draft_claim(db, stale())
     again = await client.create_draft(db, draft())
     assert again.id != first.id and again.status == "draft"
     assert len(fake.calls_to("createOrder")) == 2

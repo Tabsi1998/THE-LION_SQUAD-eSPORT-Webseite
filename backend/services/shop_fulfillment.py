@@ -280,6 +280,7 @@ ERROR_TEXTS = {
     "estimate_pending": "Die Kostenschätzung ist noch nicht fertig",
     "confirm_in_progress": "Die Bestätigung läuft schon - Ergebnis abwarten",
     "draft_in_progress": "Der Entwurf wird gerade angelegt - Ergebnis abwarten",
+    "draft_unreadable": "Entwurf bei Printful gerade nicht lesbar – bitte gleich noch einmal",
     "confirm_unclear": "Bestätigung unklar – bitte in Printful prüfen",
     "unauthorized": "Der Anbieter lehnt den Schlüssel ab",
     "forbidden": "Dem Schlüssel fehlt ein Recht beim Anbieter",

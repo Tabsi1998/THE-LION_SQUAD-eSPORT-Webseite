@@ -63,6 +63,9 @@ CONFIRM_CLAIM_SECONDS = 300
 DRAFT_CLAIM_SECONDS = 60
 # So weit darf ein Stempel in der Zukunft liegen (Uhren mehrerer Server), bevor er als abgelaufen gilt.
 CLOCK_SKEW_SECONDS = 60
+# Schonfrist: ein angelegter Entwurf, den Printful gerade nicht findet, gilt erst nach so langer Zeit seit dem letzten
+# erfolgreichen Lesen als weg - vorher ist es eher eine Verzögerung bei Printful als ein gelöschter Auftrag.
+DRAFT_GONE_GRACE_SECONDS = 600
 # Nur diese Antworten sind eine eindeutige Ablehnung der Bestätigung - alles andere ist ein unklarer Ausgang.
 CONFIRM_REFUSED = frozenset({400, 409, 422})
 IDEMPOTENCY_KEY_RE = re.compile(r"[A-Za-z0-9:_-]{8,128}")
@@ -462,9 +465,22 @@ class PrintfulClient:
         age = now - claimed
         return -timedelta(seconds=CLOCK_SKEW_SECONDS) <= age < timedelta(seconds=seconds)
 
+    @staticmethod
+    def _older_than(stamp, seconds: int, now: datetime) -> bool:
+        """Liegt ``stamp`` sicher mehr als ``seconds`` zurück? Nur mit gültiger Zeit, die nicht in der Zukunft liegt -
+        sonst ``False`` (lieber warten als doppelt anlegen)."""
+        try:
+            moment = datetime.fromisoformat(str(stamp))
+        except ValueError:
+            return False
+        if moment.tzinfo is None:
+            moment = moment.replace(tzinfo=timezone.utc)
+        return moment <= now and now - moment >= timedelta(seconds=seconds)
+
     async def _draft_claim(self, store, external_id: str):
         """Den Claim für ``external_id`` gewinnen. Liefert ``(claim_id, None)`` - dann sendet dieser Aufruf - oder
-        ``(None, auftrag)``, wenn es den Auftrag schon gibt. Sonst ``FulfillmentTransient("draft_in_progress")``."""
+        ``(None, auftrag)``, wenn es den Auftrag schon gibt. Sonst ``FulfillmentTransient`` (``draft_in_progress``
+        bzw. ``draft_unreadable``)."""
         now = datetime.now(timezone.utc)
         try:
             inserted = await store.insert_one({"external_id": external_id, "state": "sending",
@@ -473,28 +489,40 @@ class PrintfulClient:
             earlier = await store.find_one({"external_id": external_id})
             if earlier is None:
                 raise FulfillmentTransient("draft_in_progress") from None
-            if earlier.get("state") == "created" and type(earlier.get("printful_order_id")) is int:
+            state, old_id = earlier.get("state"), earlier.get("printful_order_id")
+            if state in ("created", "deleting") and type(old_id) is int:
+                # Erst die gespeicherte Nummer lesen. Gibt es den Auftrag, ist er es - auch nach einem abgebrochenen
+                # Löschen, dessen DELETE nicht durchging.
                 try:
-                    return None, await self.get_order(PrintfulOrderId(earlier["printful_order_id"]))
+                    order = await self.get_order(PrintfulOrderId(old_id))
                 except FulfillmentPermanent as exc:
-                    # Den Auftrag gibt es nicht mehr (etwa: DELETE ging durch, der Claim blieb liegen) - unten
-                    # nachsuchen und übernehmen, statt die external_id dauerhaft zu blockieren.
                     if exc.reason != "not_found":
                         raise
-            elif earlier.get("state") == "sending" and self._fresh(earlier.get("claimed_at"), DRAFT_CLAIM_SECONDS, now):
+                    order = None
+                if order is not None:
+                    await store.update_one({"_id": earlier["_id"]},
+                                           {"$set": {"state": "created", "seen_at": now.isoformat()}})
+                    return None, order
+            elif state == "sending" and self._fresh(earlier.get("claimed_at"), DRAFT_CLAIM_SECONDS, now):
                 raise FulfillmentTransient("draft_in_progress") from None
-            # Abgelaufen, abgelehnt, beim Löschen abgebrochen oder verschwunden: erst bei Printful nachsehen, dann per
-            # bedingtem Update (auf Stand, Stempel und Nummer von eben) übernehmen.
+            # Abgelaufen, abgelehnt, beim Löschen abgebrochen oder nicht lesbar: erst über @external_id nachsuchen.
             found = await self._find(external_id)
             if found is not None:
                 await store.update_one({"_id": earlier["_id"]},
-                                       {"$set": {"state": "created", "printful_order_id": found.id.value}})
+                                       {"$set": {"state": "created", "printful_order_id": found.id.value,
+                                                 "seen_at": now.isoformat()}})
                 return None, found
-            taken = await store.update_one({"_id": earlier["_id"], "state": earlier.get("state"),
-                                            "claimed_at": earlier.get("claimed_at"),
-                                            "printful_order_id": earlier.get("printful_order_id")},
+            # Ein „created“-Claim, dessen Auftrag nicht lesbar ist, kann bei Printful nur kurz verzögert sein
+            # (eventual consistency): erst nach der Schonfrist seit dem letzten erfolgreichen Lesen übernehmen. Ein
+            # hängendes „deleting“ (wir haben selbst gelöscht) braucht nur die doppelte Prüfung oben.
+            seen = earlier.get("seen_at") or earlier.get("claimed_at")
+            if state == "created" and not self._older_than(seen, DRAFT_GONE_GRACE_SECONDS, now):
+                raise FulfillmentTransient("draft_unreadable") from None
+            taken = await store.update_one({"_id": earlier["_id"], "state": state,
+                                            "claimed_at": earlier.get("claimed_at"), "printful_order_id": old_id,
+                                            "seen_at": earlier.get("seen_at")},
                                            {"$set": {"state": "sending", "claimed_at": now.isoformat(),
-                                                     "printful_order_id": None}})
+                                                     "printful_order_id": None, "seen_at": None}})
             if taken.modified_count != 1:
                 raise FulfillmentTransient("draft_in_progress") from None
             return earlier["_id"], None
@@ -505,7 +533,8 @@ class PrintfulClient:
             await store.update_one({"_id": claim_id, "state": "sending"}, {"$set": {"state": "failed"}})
             raise
         if found is not None:
-            await store.update_one({"_id": claim_id}, {"$set": {"state": "created", "printful_order_id": found.id.value}})
+            await store.update_one({"_id": claim_id}, {"$set": {"state": "created", "printful_order_id": found.id.value,
+                                                                "seen_at": now.isoformat()}})
             return None, found
         return claim_id, None
 
@@ -534,7 +563,8 @@ class PrintfulClient:
                 await store.update_one({"_id": claim_id, "state": "sending"}, {"$set": {"state": "failed"}})
             raise
         order_id = PrintfulOrderId(data["id"])
-        await store.update_one({"_id": claim_id}, {"$set": {"state": "created", "printful_order_id": order_id.value}})
+        await store.update_one({"_id": claim_id}, {"$set": {"state": "created", "printful_order_id": order_id.value,
+                                                            "seen_at": datetime.now(timezone.utc).isoformat()}})
         return await self.get_order(order_id)
 
     async def delete_draft(self, db, order_id: PrintfulOrderId) -> None:
