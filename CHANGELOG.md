@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.43.0 (27.10.2026)
+
+### Neu
+
+* Vereinsshop: die Shirtfarbe wählt automatisch das helle oder dunkle Motiv, Ausnahmen je Farbe möglich (#2069)
+* Vereinsshop: Motive als echtes Vektor-SVG hochladen - streng geprüft, die Fassung für helle Shirts entsteht automatisch (#2069)
+
+### Fehlerbehebungen
+
+* Shop-Verwaltung: die Gamertag-Seite lädt wieder statt „Network Error“ (#1711)
+* SVG-Logos im Erscheinungsbild laufen durch dieselbe sichere Bereinigung wie der Shop (#2069)
+
 ## 1.42.0 (27.10.2026)
 
 ### Neu
