@@ -1,29 +1,27 @@
 # Changelog
 
-## [1.44.0](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/compare/v1.43.0...v1.44.0) (2026-10-27)
-
+## 1.44.0 (27.10.2026)
 
 ### Neu
 
-* Vereinsshop: die Website erzeugt die Druckdateien je Fläche und Shirtfarbe selbst, scharf aus dem SVG ([#2069](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2069)) ([c9a4e7d](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/c9a4e7d9eaf63ab4d7626c8da4b677aab25943f4))
-* Vereinsshop: Druckflächen je Produkt direkt aus den Printful-Vorlagen - Position und Größe in cm, Live-Vorschau ([#2069](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2069)) ([c9a4e7d](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/c9a4e7d9eaf63ab4d7626c8da4b677aab25943f4))
-* Vereinsshop: Hinweis an der Motiv-Karte, wenn nur eine Fassung ersetzt wurde ([#2084](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2084)) ([17a230b](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/17a230bf7bb03e585c3b02489a8a0517ab908d42))
-* Vereinsshop: Motiv als Paar (hell + dunkel) in einem Schritt hochladen - Zuordnung automatisch, Tauschen möglich ([#2084](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2084)) ([17a230b](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/17a230bf7bb03e585c3b02489a8a0517ab908d42))
-* Vereinsshop: Paar-Prüfung mit Ampel - Format, Umriss, Lage und Kontrast, Problemstellen markiert ([#2084](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2084)) ([17a230b](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/17a230bf7bb03e585c3b02489a8a0517ab908d42))
-* Vereinsshop: Produkte im Printful-Katalog suchen statt Nummer eintippen ([#2069](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2069)) ([c9a4e7d](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/c9a4e7d9eaf63ab4d7626c8da4b677aab25943f4))
-
+* Vereinsshop: die Website erzeugt die Druckdateien je Fläche und Shirtfarbe selbst, scharf aus dem SVG (#2069)
+* Vereinsshop: Druckflächen je Produkt direkt aus den Printful-Vorlagen - Position und Größe in cm, Live-Vorschau (#2069)
+* Vereinsshop: Hinweis an der Motiv-Karte, wenn nur eine Fassung ersetzt wurde (#2084)
+* Vereinsshop: Motiv als Paar (hell + dunkel) in einem Schritt hochladen - Zuordnung automatisch, Tauschen möglich (#2084)
+* Vereinsshop: Paar-Prüfung mit Ampel - Format, Umriss, Lage und Kontrast, Problemstellen markiert (#2084)
+* Vereinsshop: Produkte im Printful-Katalog suchen statt Nummer eintippen (#2069)
 
 ### Fehlerbehebungen
 
-* Betrieb: Auto-Checks stehen je Zustand in den Ereignissen statt alle 5 Minuten ([#2080](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2080)) ([fd1bdfd](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/fd1bdfdc041d022cf9f1366d9cc99000c3698944))
-* Betrieb: Checks Speicher und Bildvarianten sagen, was zu tun ist; Bildvarianten ohne Fehlalarm bei kleinen Bildern ([#2080](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2080)) ([fd1bdfd](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/fd1bdfdc041d022cf9f1366d9cc99000c3698944))
-* Betrieb: roter Check meldet sich beim Wechsel und erinnert bei Dauer-Rot alle 24 Stunden, ohne Alarm-Spam bei Ausfällen ([#2080](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2080)) ([fd1bdfd](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/fd1bdfdc041d022cf9f1366d9cc99000c3698944))
-* Fehlender oder verweigerter Ton bleibt still statt Fehler im App-Log ([#2080](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2080)) ([fd1bdfd](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/fd1bdfdc041d022cf9f1366d9cc99000c3698944))
-* Fehlermeldungen zeigen den Grund des Servers statt „Request failed with status code …“ ([06c3258](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/06c32589a75aa01fd1f63b040acd9bdc51fcc7d4))
-* Nach einem Update lädt ein veralteter Tab einmal neu statt Fehlerseite ([#2080](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2080)) ([fd1bdfd](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/fd1bdfdc041d022cf9f1366d9cc99000c3698944))
-* Uploads über den eigenen Upload-Host (z. B. Shop-Motive) scheitern nicht mehr mit „Network Error“ ([c8588a2](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/c8588a292e71ab6bb6c29abef40d30d8e9564323))
-* Uploads über den eigenen Upload-Host werden nicht mehr mit „Invalid host header“ abgelehnt ([06c3258](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/06c32589a75aa01fd1f63b040acd9bdc51fcc7d4))
-* Vereinsshop: ein Produkt mit unpassender Druckfläche ist gesperrt statt mit fehlendem Druck bestellbar ([#2069](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2069)) ([c9a4e7d](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/c9a4e7d9eaf63ab4d7626c8da4b677aab25943f4))
+* Betrieb: Auto-Checks stehen je Zustand in den Ereignissen statt alle 5 Minuten (#2080)
+* Betrieb: Checks Speicher und Bildvarianten sagen, was zu tun ist; Bildvarianten ohne Fehlalarm bei kleinen Bildern (#2080)
+* Betrieb: roter Check meldet sich beim Wechsel und erinnert bei Dauer-Rot alle 24 Stunden, ohne Alarm-Spam bei Ausfällen (#2080)
+* Fehlender oder verweigerter Ton bleibt still statt Fehler im App-Log (#2080)
+* Fehlermeldungen zeigen den Grund des Servers statt „Request failed with status code …“
+* Nach einem Update lädt ein veralteter Tab einmal neu statt Fehlerseite (#2080)
+* Uploads über den eigenen Upload-Host (z. B. Shop-Motive) scheitern nicht mehr mit „Network Error“
+* Uploads über den eigenen Upload-Host werden nicht mehr mit „Invalid host header“ abgelehnt
+* Vereinsshop: ein Produkt mit unpassender Druckfläche ist gesperrt statt mit fehlendem Druck bestellbar (#2069)
 
 ## 1.43.0 (27.10.2026)
 
