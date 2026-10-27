@@ -39,7 +39,7 @@ die Sammlungen direkt. Jede Katalogänderung ist eine Adminaktion mit Person und
 | `shop_order_events` | Verlauf einer Bestellung, **nur angehängt** | `order_id` + `event_key` |
 | `shop_printful_drafts` | Claim vor dem Anlegen eines Printful-Entwurfs (#1705): `external_id`, Stand (`sending`, `created`, `failed`, `deleting`), Printful-Nummer – keine Person | `external_id` |
 | `shop_printful_confirmations` | Claim vor dem Bestätigen bei Printful (#1705): Idempotenzschlüssel, Auftragsnummer, Stand (`sending`, `confirmed`, `unclear`) – keine Person | `order_id`, `idempotency_key` |
-| `shop_test_drafts` | Testentwurf an Printful (#2062), eigene Art `test_draft` - keine Bestellung: Stand (`preview`, `sending`, `sent`, `deleting`, `deleted`), Produkt und Variante, Druckdateien mit Prüfsumme und Adresse, Vereinsadresse, gesendeter Rumpf (`payload`), Kostenschätzung, Antwort von Printful, Abweichungen, letzter Fehler - nie ein Gamertag als Text | `id`, `external_id` |
+| `shop_test_drafts` | Testentwurf an Printful (#2062), eigene Art `test_draft` - keine Bestellung: Stand (`preview`, `sending`, `unclear`, `sent`, `deleting`, `deleted`), Produkt und Variante, Druckdateien mit Prüfsumme und Adresse, Vereinsadresse, gesendeter Rumpf (`payload`), Kostenschätzung, Antwort von Printful, Abweichungen, letzter Fehler - nie ein Gamertag als Text | `id`, `external_id` |
 
 Sichere Vorgaben: Ein neues Produkt ist `draft` und `hidden`, ohne Steuerprofil. Beträge sind ganze Cent, nie
 negativ, mit Obergrenzen (Preis 1000 €, Aufschlag 100 €, Versand 100 €, Menge 20 je Position, 20 Positionen).
@@ -882,7 +882,7 @@ der richtigen Position, Anschrift, `external_id` und Preise sauber übergeben we
 5. **Vorschau** - erzeugt die Druckdateien über **denselben Weg wie eine Bestellung** (`shop_print_files.freeze_line`: je
    Fläche die geltende Grunddatei, mit Gamertag eine eigene Datei - keine Sonderlogik), baut den Auftrag und fragt Printful
    nach der Kostenschätzung (nur Land und PLZ). Bei Printful wird dabei **nichts angelegt**. Die Seite zeigt genau, was
-   gesendet wird: Position mit Printful-Variante, `external_id` (`lsw-test-<Kennung>`), je Fläche Technik, Art der Datei
+   gesendet wird: Position mit Printful-Variante, `external_id` (`lsw-testentwurf-<Kennung>`), je Fläche Technik, Art der Datei
    (Grunddatei mit Version oder eigene mit Gamertag), Pixel, DPI, SHA-256 und Adresse, die Anschrift, die Kosten (Ware,
    Versand, Steuer, Gesamt), den Vergleich „Preis im Shop“ gegen „Ware laut Printful“ (Ampel; zeigt, ob die Fläche im
    Grundpreis stimmt) und „Mockup folgt (#1710)“. Ist das Produkt nicht bestellbar (etwa veraltete Druckdatei), nennt die
@@ -897,13 +897,18 @@ der richtigen Position, Anschrift, `external_id` und Preise sauber übergeben we
 7. **„Entwurf bei Printful löschen“** - mit Bestätigung in der Seite, über `delete_draft` (nur im Stand Entwurf). Die
    eigenen Druckdateien der Vorschau gehen danach vom Netz; das Protokoll bleibt mit Prüfsummen. Ist der Auftrag in
    Printful schon weg (im Dashboard gelöscht), gilt er als gelöscht. Ist er **kein Entwurf mehr** (jemand hat im Dashboard
-   bestätigt), antwortet die Website mit 409 und löscht oder storniert nichts - dann sofort in Printful prüfen.
+   bestätigt), antwortet die Website mit 409 und löscht oder storniert nichts - dann sofort in Printful prüfen. Löschen geht
+   auch, wenn der Shop inzwischen wieder auf „Aus“ steht - dafür reicht ein lesbarer Schlüssel
+   (`shop_config.require_printful_key`, Adapter `delete_draft(…, test_draft=True)`: nur Aufträge mit external_id
+   `lsw-testentwurf-…`, sonst `not_test_draft`). Für echte Bestellungen bleibt es bei der Stufe. Ein hängendes „wird
+   gelöscht“ übernimmt der nächste Klick nach `SHOP_TEST_DRAFT_DELETING_SECONDS`.
 
 **Regeln:**
 
 - **Kein Bestätigen** aus der Testansicht: keine Funktion, keine Route, unbekannte Felder (etwa `confirm`) lehnt die
-  Route ab. Zusätzlich lehnt `printful_client.confirm_order` jeden Auftrag aus `shop_test_drafts` ab (`test_draft`) -
-  auch über einen späteren Weg (#1718). Bestätigen bleibt hinter dem Notschalter.
+  Route ab. Zusätzlich lehnt `printful_client.confirm_order` jeden Auftrag aus `shop_test_drafts` und jede external_id mit
+  `lsw-testentwurf-` ab (`test_draft`) - auch über einen späteren Weg (#1718) und ohne Protokollzeile. Bestätigen bleibt
+  hinter dem Notschalter.
 - **Zugang:** Bereich Finanzen mit Zwei-Faktor (`require_area("finance")`, Regel 3), Stufe ab „Nur Admins (Test)“ und
   lesbarer Printful-Schlüssel (`shop_config.require_printful_drafts`, sonst 409). Der **Notschalter** spielt keine Rolle:
   Entwürfe gehen auch, wenn er aus ist - sie kosten nichts.
@@ -915,9 +920,15 @@ der richtigen Position, Anschrift, `external_id` und Preise sauber übergeben we
   `shop_print_files` mit `purpose = "order"` und `order_id` = Testentwurf).
 - **Doppelklick und gleichzeitige Klicks:** die Seite schickt je Vorschau einen Idempotenzschlüssel. Derselbe Schlüssel
   noch einmal liefert dasselbe Ergebnis; der Stand wechselt nur bedingt von `preview` auf `sending` - ein zweiter Klick
-  bekommt 409. Scheitert das Senden, steht der Testentwurf wieder auf `preview` (mit Ursache); ein neuer Versuch ist
-  sicher, weil der Claim des Adapters je `external_id` einen schon angelegten Auftrag findet statt einen zweiten
-  anzulegen. Ein hängendes `sending` (Absturz) darf nach `SHOP_TEST_DRAFT_SENDING_SECONDS` erneut senden.
+  bekommt 409. Lehnt Printful eindeutig ab (der Claim des Adapters steht auf „failed“), steht der Testentwurf wieder auf
+  `preview` mit Ursache; die Seite holt den Stand neu und zeigt sie an der Vorschau.
+- **Unklarer Ausgang** (Zeitüberschreitung oder 5xx beim Anlegen, Abbruch beim Nachlesen danach - Printful hat den Entwurf
+  vielleicht angelegt): Stand `unclear` mit `send_attempted_at`. So ein Testentwurf wird **nie verworfen** - weder von einer
+  neuen Vorschau noch vom Ablauf - und blockiert die Obergrenze nicht. „Erneut senden / nachsehen“ schickt denselben,
+  eingefrorenen Rumpf; der Claim des Adapters findet einen schon angelegten Auftrag über die `external_id`, statt einen
+  zweiten anzulegen (nach seiner Schonfrist von 60 s). Ebenso ein hängendes `sending` nach
+  `SHOP_TEST_DRAFT_SENDING_SECONDS`. Verworfen wird eine Vorschau nur, solange sie noch `preview` ist und der Adapter keinen
+  offenen Claim für ihre `external_id` hat - erst die Zeile, dann die Dateien; sonst 409.
 - **Fehlertexte** sind feste Sätze (Ursache aus der Tabelle des Adapters) - nie ein Stacktrace, nie, was Printful intern
   sagt; die gekürzte, maskierte Begründung von Printful steht nur im Protokoll des Testentwurfs (`last_error`).
 - **Öffentliche Adresse:** Printful holt die Druckdateien selbst - die Website braucht eine https-Adresse
@@ -929,7 +940,8 @@ der richtigen Position, Anschrift, `external_id` und Preise sauber übergeben we
 `SHOP_TEST_DRAFT_SEND_LIMIT` (5) Sende- bzw. Löschaufrufe je Konto im Fenster `SHOP_TEST_DRAFT_WINDOW_SECONDS` (60 s),
 darüber 429; `SHOP_TEST_DRAFT_PREVIEW_MINUTES` (60) - so lange darf eine Vorschau gesendet werden;
 `SHOP_TEST_DRAFT_MAX_OPEN` (5) - so viele Testentwürfe dürfen gleichzeitig bei Printful liegen;
-`SHOP_TEST_DRAFT_SENDING_SECONDS` (120); `SHOP_PRINTFUL_DASHBOARD_ORDER_URL` - Vorlage des Dashboard-Links mit
+`SHOP_TEST_DRAFT_SENDING_SECONDS` (120) und `SHOP_TEST_DRAFT_DELETING_SECONDS` (120) - danach gilt ein Senden bzw.
+Löschen als hängend; `SHOP_PRINTFUL_DASHBOARD_ORDER_URL` - Vorlage des Dashboard-Links mit
 `{order_id}`, nur unter `https://www.printful.com/` (Vorgabe: Auftragsliste mit Suche nach der Nummer; bei der Abnahme
 prüfen und bei Bedarf anpassen).
 
@@ -937,7 +949,8 @@ prüfen und bei Bedarf anpassen).
 | --- | --- |
 | `GET /api/admin/shop/test-drafts` | Zugang, Produkte mit Varianten, Vereinsadresse, Regeln des Gamertags, Grenzen, gesendete Testentwürfe |
 | `POST /api/admin/shop/test-drafts/preview` | Vorschau (`product_id`, `variant_id`, `gamertag`, `address`) - Druckdateien und Kostenschätzung, bei Printful nichts angelegt |
-| `POST /api/admin/shop/test-drafts/{id}/send` | Als Entwurf senden (`idempotency_key`) |
+| `GET /api/admin/shop/test-drafts/{id}` | Ein Testentwurf mit Stand, letzter Ursache und Aktionen (`resend`, `delete`) |
+| `POST /api/admin/shop/test-drafts/{id}/send` | Als Entwurf senden (`idempotency_key`) - auch „Erneut senden / nachsehen“ bei `unclear` |
 | `POST /api/admin/shop/test-drafts/{id}/delete` | Entwurf bei Printful löschen (bzw. eine nie gesendete Vorschau verwerfen) |
 
 Tests: `backend/tests/test_shop_test_drafts_unit.py` und `test_shop_test_drafts_flow.py` gegen den Vertrags-Fake (nie
