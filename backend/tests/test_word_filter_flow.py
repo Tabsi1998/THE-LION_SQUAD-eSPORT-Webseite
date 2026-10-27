@@ -11,11 +11,14 @@ import pytest_asyncio
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 
 from flow_harness import make_flow  # noqa: E402
+from spam_forms import form_fields  # noqa: E402
 from services import word_filter  # noqa: E402
 
 
 @pytest_asyncio.fixture
-async def flow():
+async def flow(monkeypatch):
+    # Formular-Token und Zähler des Spamschutzes (#2067) brauchen das Server-Geheimnis.
+    monkeypatch.setenv("JWT_SECRET", "spam-guard-aware-tests-secret-with-32-characters")
     instance, shutdown = make_flow()
     try:
         yield instance
@@ -159,7 +162,7 @@ async def test_team_chat_names_and_bio_are_checked_and_the_list_can_be_exported(
     # Benutzername bei der Registrierung.
     await flow.db.settings.update_one({"id": "auth"}, {"$set": {"id": "auth", "registration_enabled": True}}, upsert=True)
     flow.act_as(None)
-    blocked = await flow.post("/api/auth/register", json={"username": "sch31sse", "email": "neu@lionsquad-test.at", "password": "Passwort-123!", "accept_privacy": True, "accept_terms": True})
+    blocked = await flow.post("/api/auth/register", json={"username": "sch31sse", "email": "neu@lionsquad-test.at", "password": "Passwort-123!", "accept_privacy": True, "accept_terms": True, **form_fields("register")})
     assert blocked.status_code == 400 and "nicht erlaubt" in blocked.json()["detail"], blocked.text
     assert await flow.db.users.count_documents({"username": "sch31sse"}) == 0
 
