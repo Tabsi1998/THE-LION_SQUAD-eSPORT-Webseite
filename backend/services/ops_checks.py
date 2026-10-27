@@ -604,7 +604,37 @@ async def run_checks(db, checks: list[tuple[str, str, Callable[[], Awaitable[dic
     except Exception:  # noqa: BLE001
         logger.warning("[ops] could not store check run", exc_info=True)
     run.pop("_id", None)
+    try:
+        await record_episode(db, run)
+    except Exception:  # noqa: BLE001 - der Lauf zählt, auch wenn die Zusammenfassung hakt
+        logger.warning("[ops] could not store check episode", exc_info=True)
     return run
+
+
+def same_state(episode: dict | None, run: dict) -> bool:
+    """Gleicher Stand heißt: gleiche Ampel und dieselben betroffenen Prüfungen (Reihenfolge egal)."""
+    return bool(episode) and episode.get("status") == run.get("status") and sorted(episode.get("failing") or []) == sorted(run.get("failing") or [])
+
+
+async def record_episode(db, run: dict) -> dict:
+    """Zustände statt Läufe (#2080): Solange Ampel und betroffene Prüfungen gleich bleiben, zählt der jüngste Abschnitt
+    nur hoch („seit … · 92× geprüft · zuletzt …“); erst ein Wechsel beginnt einen neuen. Grüne Abschnitte zählen mit,
+    damit gelb - grün - gelb zwei Einträge ergibt; die Ereignisliste zeigt nur die auffälligen."""
+    at = run.get("at") or now_utc().isoformat()
+    expires_at = now_utc() + timedelta(days=HISTORY_DAYS)
+    # Zweitschlüssel _id: zwei Läufe mit derselben Uhrzeit (grobe Uhr unter Windows) sonst in zufälliger Reihenfolge.
+    latest = await db.ops_check_episodes.find_one({}, {"_id": 0}, sort=[("last_at", -1), ("_id", -1)])
+    if same_state(latest, run):
+        await db.ops_check_episodes.update_one(
+            {"id": latest["id"]},
+            {"$set": {"last_at": at, "counts": run.get("counts") or {}, "expires_at": expires_at}, "$inc": {"runs": 1}},
+        )
+        return {**latest, "last_at": at, "runs": int(latest.get("runs") or 0) + 1, "changed": False}
+    episode = {"id": new_id(), "since": at, "last_at": at, "runs": 1, "status": run.get("status") or "crit",
+               "failing": list(run.get("failing") or []), "counts": run.get("counts") or {}, "expires_at": expires_at}
+    await db.ops_check_episodes.insert_one(dict(episode))
+    episode.pop("_id", None)
+    return {**episode, "changed": True}
 
 
 def _day(value: str) -> str:

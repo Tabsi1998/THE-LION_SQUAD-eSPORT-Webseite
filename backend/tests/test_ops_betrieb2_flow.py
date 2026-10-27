@@ -1,7 +1,7 @@
 """Betrieb II (#265) durch die echte Anwendung: Web Vitals kommen anonym an und
 werden je Route ausgewertet; die Auto-Checks laufen, werden gespeichert und nur
-dem Vereinsadmin gezeigt; ein roter Check und eine neue 5xx-Gruppe melden sich
-genau einmal pro Stunde."""
+dem Vereinsadmin gezeigt; ein Check meldet sich beim Wechsel auf Rot (#2080), eine
+neue 5xx-Gruppe genau einmal pro Stunde."""
 import pathlib
 import sys
 from datetime import timedelta
@@ -178,23 +178,37 @@ async def test_a_broken_check_does_not_stop_the_run(flow):
 # ---------------------------------------------------------------- Alarme
 
 @pytest.mark.asyncio
-async def test_a_red_check_alerts_once_per_hour(flow, discord_recorder):
-    run = {"at": now_utc().isoformat(), "checks": [
-        ops_checks.result("mail_queue", "Mail-Queue", "crit", "0 wartend", "2 hängen im Versand"),
-        ops_checks.result("disk", "Freier Speicher", "warn", "10 GB frei (12 %)"),
-    ]}
-    assert await ops_alerts.alert_red_checks(flow.db, run) == ["check:mail_queue"]
+async def test_a_red_check_alerts_only_when_it_turns_red(flow, discord_recorder):
+    """#2080: Ein Alarm nur beim Wechsel auf Rot - ein Dauer-Rot meldet sich nicht jede Stunde neu; ein Flackern
+    (rot, grün, rot) bremst die Sperrfrist."""
+    def run_with(mail_status):
+        return {"at": now_utc().isoformat(), "checks": [
+            ops_checks.result("mail_queue", "Mail-Queue", mail_status, "0 wartend", "2 hängen im Versand"),
+            ops_checks.result("disk", "Freier Speicher", "warn", "10 GB frei (12 %)"),
+        ]}
+
+    async def cooldown_over():
+        await flow.db.ops_alert_state.update_one(
+            {"key": "check:mail_queue"}, {"$set": {"last_sent_at": (now_utc() - timedelta(hours=2)).isoformat()}}
+        )
+
+    assert await ops_alerts.alert_red_checks(flow.db, run_with("crit")) == ["check:mail_queue"]
     assert len(discord_recorder) == 1
     assert "Mail-Queue ist rot" in discord_recorder[0]["title"]
     assert discord_recorder[0]["event_key"] == "ops_check"
 
-    assert await ops_alerts.alert_red_checks(flow.db, run) == []
-    assert len(discord_recorder) == 1, "innerhalb der Stunde keine zweite Meldung"
+    assert await ops_alerts.alert_red_checks(flow.db, run_with("crit")) == []
+    await cooldown_over()
+    for _ in range(5):
+        assert await ops_alerts.alert_red_checks(flow.db, run_with("crit")) == []
+    assert len(discord_recorder) == 1, "Dauer-Rot ist kein neuer Wechsel - auch nach der Sperrfrist nicht"
 
-    await flow.db.ops_alert_state.update_one(
-        {"key": "check:mail_queue"}, {"$set": {"last_sent_at": (now_utc() - timedelta(hours=2)).isoformat()}}
-    )
-    assert await ops_alerts.alert_red_checks(flow.db, run) == ["check:mail_queue"]
+    assert await ops_alerts.alert_red_checks(flow.db, run_with("ok")) == []
+    assert await ops_alerts.alert_red_checks(flow.db, run_with("crit")) == ["check:mail_queue"], "Wechsel auf Rot nach der Sperrfrist"
+    assert len(discord_recorder) == 2
+
+    assert await ops_alerts.alert_red_checks(flow.db, run_with("warn")) == []
+    assert await ops_alerts.alert_red_checks(flow.db, run_with("crit")) == [], "Flackern innerhalb der Sperrfrist"
     assert len(discord_recorder) == 2
 
 

@@ -28,7 +28,7 @@ LOG_LIMIT = 200
 # Ereignisarten mit Vorgabe: Discord an, E-Mail aus. `email_allowed` False, wo eine Mail-Meldung sich
 # selbst nicht zustellen könnte (Mailversand kaputt).
 ALERT_KINDS = {
-    "check_red": {"label": "Auto-Check rot", "hint": "Eine der Prüfungen (Datenbank, Speicher, Mail-Queue, Twitch, Dolibarr, Fehlergruppen) steht auf rot."},
+    "check_red": {"label": "Auto-Check rot", "hint": "Eine der Prüfungen (Datenbank, Speicher, Mail-Queue, Twitch, Dolibarr, Fehlergruppen) wechselt auf rot - ein Dauer-Rot meldet sich nicht erneut."},
     "error_group": {"label": "Serverfehler (5xx)", "hint": "Eine neue Gruppe unbehandelter Serverfehler oder Antworten mit Status 5xx."},
     "mail_failed": {"label": "Mail nicht zustellbar", "hint": "Eine Mail ist nach allen Versuchen endgültig fehlgeschlagen.", "email_allowed": False},
     "job_failed": {"label": "Hintergrundjob abgebrochen", "hint": "Ein Job des Schedulers (Abgleich, Erinnerungen, Versand …) ist mit einem Fehler abgebrochen."},
@@ -247,12 +247,18 @@ def error_group_message(group: dict) -> dict:
 
 
 async def alert_red_checks(db, run: dict) -> list[str]:
-    """Je roter Prüfung höchstens eine Meldung je Sperrfrist. Gibt die gemeldeten Schlüssel zurück."""
+    """Eine Meldung nur beim Wechsel einer Prüfung auf Rot (#2080) - ein Dauer-Rot meldet sich nicht jede Stunde neu;
+    dazu die Sperrfrist je Prüfung gegen Flackern. Der letzte Stand je Prüfung steht bei ihrem Schlüssel in
+    ``ops_alert_state``. Gibt die gemeldeten Schlüssel zurück."""
     sent: list[str] = []
     for check in run.get("checks") or []:
-        if check.get("status") != "crit":
-            continue
         key = f"check:{check.get('key')}"
+        status = check.get("status")
+        state = await db.ops_alert_state.find_one({"key": key}, {"_id": 0, "check_status": 1}) or {}
+        if state.get("check_status") != status:
+            await db.ops_alert_state.update_one({"key": key}, {"$set": {"key": key, "check_status": status}}, upsert=True)
+        if status != "crit" or state.get("check_status") == "crit":
+            continue
         message = check_red_message(check, run)
         outcome = await notify(db, "check_red", message["title"], message["description"], message["fields"], key=key, event_key="ops_check")
         if outcome.get("sent"):

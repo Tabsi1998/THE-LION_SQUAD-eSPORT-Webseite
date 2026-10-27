@@ -236,6 +236,9 @@ async def init_indexes():
     await db.ops_vitals.create_index("expires_at", expireAfterSeconds=0)
     await db.ops_check_runs.create_index([("at", -1)])
     await db.ops_check_runs.create_index("expires_at", expireAfterSeconds=0)
+    # Zustände der Auto-Checks (#2080): ein Abschnitt je Wechsel, 7 Tage nach dem letzten Lauf weg.
+    await db.ops_check_episodes.create_index([("last_at", -1)])
+    await db.ops_check_episodes.create_index("expires_at", expireAfterSeconds=0)
     await db.ops_alert_state.create_index("key", unique=True)
     # Audit
     await db.audit_logs.create_index("id", unique=True)

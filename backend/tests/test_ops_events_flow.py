@@ -31,7 +31,7 @@ async def test_events_merge_all_sources_and_filters_work_as_json_and_csv(flow):
     db = flow.db
     await db.ops_errors.insert_one({"fingerprint": "f1", "error_type": "KeyError", "route": "/api/teams/{team_id}", "method": "GET", "status_code": 500,
                                     "count": 7, "message": "'team_id'", "actor": "angemeldet", "first_seen_at": old, "last_seen_at": fresh, "resolved_at": None})
-    await db.ops_check_runs.insert_one({"id": "run1", "at": fresh, "status": "crit", "counts": {"ok": 5, "warn": 0, "crit": 1}, "failing": ["mail_queue"], "checks": []})
+    await db.ops_check_episodes.insert_one({"id": "ep1", "since": fresh, "last_at": fresh, "runs": 1, "status": "crit", "counts": {"ok": 5, "warn": 0, "crit": 1}, "failing": ["mail_queue"]})
     await db.ops_alert_log.insert_one({"id": "a1", "kind": "server_error", "key": "k", "title": "Serverfehler: KeyError", "description": "", "channels": ["discord"], "at": fresh})
     await db.mobile_client_logs.insert_one({"id": "c1", "level": "error", "status": "open", "message": "App stürzt beim Öffnen des Chats ab", "source": "chat", "received_at": fresh, "priority_rank": 1})
     await db.email_logs.insert_many([
@@ -85,6 +85,42 @@ async def test_events_merge_all_sources_and_filters_work_as_json_and_csv(flow):
     player = await flow.add_user(role="player")
     flow.act_as(player)
     assert (await flow.get("/api/admin/ops/events")).status_code in (401, 403)
+
+
+@pytest.mark.asyncio
+async def test_equal_check_runs_become_one_event_per_state_change(flow):
+    """#2080: Zehn gleiche Läufe (gelb: image_variants) sind ein Eintrag mit Zähler - „seit … · 10× geprüft · zuletzt …“.
+    Erst ein anderer Stand (dazu disk) ergibt einen neuen Eintrag; grün dazwischen trennt auch, erscheint aber nicht."""
+    from services import ops_checks
+
+    def checks_with(*warn_keys):
+        def make(key):
+            async def runner():
+                return ops_checks.result(key, key, "warn" if key in warn_keys else "ok", "1")
+            return runner
+        return [(key, key, make(key)) for key in ("database", "image_variants", "disk")]
+
+    for _ in range(10):
+        await ops_checks.run_checks(flow.db, checks=checks_with("image_variants"))
+    assert await flow.db.ops_check_runs.count_documents({}) == 10, "die Läufe selbst bleiben für den Verlauf"
+    episodes = await flow.db.ops_check_episodes.find({}, {"_id": 0}).to_list(10)
+    assert len(episodes) == 1 and episodes[0]["runs"] == 10 and episodes[0]["failing"] == ["image_variants"]
+
+    admin = await flow.add_user(role="superadmin")
+    flow.act_as(admin)
+    checks = (await flow.get("/api/admin/ops/events", params={"hours": 0, "source": "checks"})).json()
+    assert len(checks["items"]) == 1
+    item = checks["items"][0]
+    assert item["title"] == "Auto-Checks gelb" and item["subtitle"] == "image_variants"
+    assert "seit " in item["detail"] and "10× geprüft" in item["detail"] and "zuletzt " in item["detail"]
+    assert {row["key"]: row for row in checks["sources"]}["checks"]["problem_count"] == 1
+
+    await ops_checks.run_checks(flow.db, checks=checks_with("image_variants", "disk"))
+    await ops_checks.run_checks(flow.db, checks=checks_with())
+    await ops_checks.run_checks(flow.db, checks=checks_with("image_variants", "disk"))
+    items = (await flow.get("/api/admin/ops/events", params={"hours": 0, "source": "checks"})).json()["items"]
+    assert [item["subtitle"] for item in items] == ["image_variants, disk", "image_variants, disk", "image_variants"]
+    assert "1× geprüft" in items[0]["detail"]
 
 
 @pytest.mark.asyncio

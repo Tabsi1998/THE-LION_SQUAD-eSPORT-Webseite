@@ -228,7 +228,7 @@ NO_PERSON = frozenset({
     "advent_views", "badges", "cms_nav", "cms_pages", "competition_write_usage", "consent_text_versions", "discord_guild_stats",
     "discord_welcomes", "dolibarr_public", "dolibarr_webhook_events", "email_templates", "event_message_gates", "feedback_entries",
     "games", "mastodon_apps",
-    "meeting_admission_counts", "mutation_locks", "ops_alert_log", "ops_alert_state", "ops_check_runs", "ops_errors",
+    "meeting_admission_counts", "mutation_locks", "ops_alert_log", "ops_alert_state", "ops_check_runs", "ops_check_episodes", "ops_errors",
     "ops_slow_requests", "ops_vitals", "partners", "schema_migration_lock", "schema_migrations", "site_banner_stats",
     "sponsors", "sticker_builtin_packs", "user_badges", "youtube_videos",
     # Claims des Printful-Adapters (#1705) vor dem Anlegen eines Entwurfs und vor dem Bestätigen: external_id,
