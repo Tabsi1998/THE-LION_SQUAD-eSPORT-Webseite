@@ -734,15 +734,18 @@ async def backfill_check_episodes(db) -> int:
         HISTORY_DAYS * 24 * 60 // CHECK_INTERVAL_MINUTES + 100)
     episodes = _episodes_from_runs(rows)
     added = 0
+    from pymongo.errors import DuplicateKeyError
+
     for episode in episodes:
         episode.update(id=f"bf-{episode['since']}", backfilled=True, expires_at=_expiry_after(episode["last_at"]))
-        result = await db.ops_check_episodes.update_one({"id": episode["id"]}, {"$setOnInsert": episode}, upsert=True)
+        try:
+            result = await db.ops_check_episodes.update_one({"id": episode["id"]}, {"$setOnInsert": episode}, upsert=True)
+        except DuplicateKeyError:
+            continue  # ein gleichzeitiger Anlauf hat ihn eben geschrieben (``id`` ist eindeutig) - schon da
         added += int(bool(getattr(result, "upserted_id", None)))
     if episodes and not live:
         # Offen nur, wenn es noch keinen Abschnitt eines Laufs gibt; hat inzwischen einer einen offenen angelegt, bleibt
         # der nachgetragene zu (der eindeutige Index lässt nur einen offenen zu).
-        from pymongo.errors import DuplicateKeyError
-
         try:
             await db.ops_check_episodes.update_one({"id": episodes[-1]["id"]}, {"$set": {"open": True}})
         except DuplicateKeyError:

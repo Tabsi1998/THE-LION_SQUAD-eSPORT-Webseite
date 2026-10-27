@@ -243,6 +243,63 @@ async def test_only_one_episode_can_be_open_and_an_old_sparse_index_is_replaced(
 
 
 @pytest.mark.asyncio
+async def test_the_index_start_tidies_up_two_open_episodes_and_never_crashes(flow, monkeypatch):
+    """#2080 (Codex): Stehen schon zwei offene Abschnitte da, schließt der Start alle bis auf den jüngsten, bevor er den
+    eindeutigen Index anlegt. Scheitert Löschen oder Anlegen eines Index (etwa parallel schon weg), gibt es eine Warnung,
+    keinen Absturz. Die Kennung ``id`` ist eindeutig."""
+    import database
+    from pymongo.errors import DuplicateKeyError, OperationFailure
+
+    await flow.db.ops_check_episodes.insert_many([
+        {"id": "alt", "open": True, "since": "2026-10-27T07:00:00+00:00", "last_at": "2026-10-27T08:00:00+00:00"},
+        {"id": "neu", "open": True, "since": "2026-10-27T08:05:00+00:00", "last_at": "2026-10-27T09:00:00+00:00"},
+    ])
+    await database.ensure_ops_check_indexes(flow.db)
+    assert [row["id"] for row in await flow.db.ops_check_episodes.find({"open": True}).to_list(5)] == ["neu"]
+    assert "open" not in (await flow.db.ops_check_episodes.find_one({"id": "alt"}))
+    with pytest.raises(DuplicateKeyError):
+        await flow.db.ops_check_episodes.insert_one({"id": "neu"})
+
+    collection = flow.db.ops_check_episodes
+    await collection.create_index("open", unique=True, sparse=True, name="open_alt")
+
+    async def gone(name):
+        raise OperationFailure("index not found", code=27)
+
+    monkeypatch.setattr(type(collection), "drop_index", lambda self, name: gone(name))
+    await database.ensure_ops_check_indexes(flow.db)  # Doppelter Start, Löschen scheitert: kein Absturz
+    await database.ensure_ops_check_indexes(flow.db)
+
+
+@pytest.mark.asyncio
+async def test_the_backfill_counts_an_episode_written_meanwhile_as_there(flow, monkeypatch):
+    """#2080 (Codex): Schreibt ein zweiter Anlauf denselben nachgetragenen Abschnitt zugleich, scheitert sein Upsert am
+    eindeutigen ``id`` - das heißt „schon da“, kein Abbruch."""
+    from pymongo.errors import DuplicateKeyError
+
+    from services import ops_checks
+
+    now = now_utc()
+    await flow.db.ops_check_runs.insert_many([
+        {"id": "r1", "at": (now - timedelta(hours=2)).isoformat(), "status": "warn", "failing": ["disk"], "counts": {}, "checks": []},
+        {"id": "r2", "at": (now - timedelta(hours=1)).isoformat(), "status": "ok", "failing": [], "counts": {}, "checks": []},
+    ])
+    collection = flow.db.ops_check_episodes
+    original = type(collection).update_one
+    raced = []
+
+    async def racing(self, query, *args, **kwargs):
+        if not raced and str(query.get("id", "")).startswith("bf-"):
+            raced.append(query["id"])
+            raise DuplicateKeyError("E11000 duplicate key")
+        return await original(self, query, *args, **kwargs)
+
+    monkeypatch.setattr(type(collection), "update_one", racing)
+    assert await ops_checks.backfill_check_episodes(flow.db) == 1, "einer neu, einer schon da"
+    assert (await flow.db.settings.find_one({"id": ops_checks.BACKFILL_MARKER}))["state"] == "done"
+
+
+@pytest.mark.asyncio
 async def test_an_orphaned_backfill_marker_is_taken_over_a_fresh_one_is_not(flow):
     """#2080 (Codex): Bricht der Nachtrag ab, bleibt der Merker auf „running“. Nach zehn Minuten gilt er als verwaist und
     wird atomar übernommen; ein frischer bleibt beim anderen Worker."""
