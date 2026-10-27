@@ -225,4 +225,6 @@ NO_PERSON = frozenset({
     "meeting_admission_counts", "mutation_locks", "ops_alert_log", "ops_alert_state", "ops_check_runs", "ops_errors",
     "ops_slow_requests", "ops_vitals", "partners", "schema_migration_lock", "schema_migrations", "site_banner_stats",
     "sponsors", "sticker_builtin_packs", "user_badges", "youtube_videos",
+    # Idempotenzschutz beim Bestätigen eines Printful-Auftrags (#1705): Schlüssel, Auftragsnummer, Stand - keine Person.
+    "shop_printful_confirmations",
 })
