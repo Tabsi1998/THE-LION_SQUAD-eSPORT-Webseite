@@ -59,7 +59,7 @@ def render(report: list[dict], *, way_back: bool, applied: bool) -> str:
             lines.append(f"  {'zurück ' if item.get('applied') else 'würde  '} {name}: {item['placements']} alte "
                          "Platzierungen")
             continue
-        state = "neu    " if item.get("applied") else ("würde  " if item["ready"] else "fehlt  ")
+        state = "neu    " if item.get("applied") else ("würde  " if item["ready"] else "bleibt ")
         lines.append(f"  {state} {name}")
         lines += [f"            {note}" for note in item["notes"]]
     if not applied and report:

@@ -639,7 +639,8 @@ def _template_view(template: dict | None) -> dict | None:
     return {"printful_product_id": template.get("printful_product_id"), "checked_at": template.get("checked_at"),
             "fetched_at": template.get("fetched_at"), "changed_at": template.get("changed_at"),
             "changes": template.get("changes") or [], "last_error": template.get("last_error"),
-            "hash": (template.get("hash") or "")[:12], "loaded": bool(template.get("entries"))}
+            "hash": (template.get("hash") or "")[:12], "loaded": bool(template.get("entries")),
+            "skipped": template.get("skipped") or []}
 
 
 async def admin_view(db, product_id: str) -> dict:
@@ -687,8 +688,8 @@ async def admin_view(db, product_id: str) -> dict:
             "files": [state for state in states if state["placement"] == row["key"]],
         })
     current = product.get("status") or "draft"
-    legacy = bool(product.get("placements")) and not all(shop_print_files.is_layout(row)
-                                                         for row in product.get("placements") or [])
+    conversion = await shop_print_files.layout_conversion(db, product) if printful else {"converted": False,
+                                                                                          "notes": [], "blocked": []}
     return {
         "product": product,
         "labels": {"statuses": shop_catalog.STATUS_LABELS, "visibilities": shop_catalog.VISIBILITY_LABELS,
@@ -697,7 +698,9 @@ async def admin_view(db, product_id: str) -> dict:
                    "anchors": templates.ANCHORS},
         "variants": variant_rows,
         "placements": placement_rows,
-        "layout_converted": legacy,
+        "layout_converted": conversion["converted"],
+        "layout_notes": conversion["notes"],
+        "layout_blocked": conversion["blocked"],
         "available_placements": available,
         "included_placement": included,
         "print_template": _template_view(template),

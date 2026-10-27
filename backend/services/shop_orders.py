@@ -148,6 +148,15 @@ async def _freeze_line(db, line: dict, position: int, buyer_kind: str, config: d
     }
 
 
+async def _discard(db, order_id: str) -> None:
+    """Eine Bestellung kam nicht zustande: ihre Positionen und eigenen Druckdateien weg - mehrfach aufrufbar. Nur
+    solange es keine Bestellzeile gibt (die Positionen gehören dann noch zu niemandem)."""
+    if await db.shop_orders.find_one({"id": order_id}, {"_id": 1}):
+        return
+    await db.shop_order_items.delete_many({"order_id": order_id})
+    await shop_print_files.discard_order_files(db, order_id)
+
+
 async def place_order(db, *, user_id: str, idempotency_key: str, buyer_kind: str, lines: list,
                       shipping_estimate_cents: int | None, billing_address: dict, shipping_address: dict,
                       actor_id: str, payment_rules: dict | None = None) -> tuple[dict, bool]:
@@ -188,12 +197,15 @@ async def place_order(db, *, user_id: str, idempotency_key: str, buyer_kind: str
     shipping_cents = shop_config.shipping_cents(config, estimate)
     shipping_source = "estimate" if estimate is not None else "fallback"
     order_id, now = new_id(), now_utc().isoformat()
+    # Dateien erzeugen und Positionen schreiben gehören zusammen: scheitert eines davon (auch ein abgebrochenes, halb
+    # geschriebenes insert_many), räumt diese Bestellung ihre eigenen Positionen und Dateien wieder weg.
     try:
         items = [await _freeze_line(db, line, index, buyer_kind, config, user_id=user_id, order_id=order_id,
                                     item_id=new_id())
                  for index, line in enumerate(clean_lines, start=1)]
+        await db.shop_order_items.insert_many([{"order_id": order_id, "user_id": user_id, **item} for item in items])
     except BaseException:
-        await shop_print_files.discard_order_files(db, order_id)
+        await _discard(db, order_id)
         raise
     tax_profiles = {item["tax_profile"] for item in items}
     items_cents = sum(item["quantity"] * item["unit_price_cents"] for item in items)
@@ -210,14 +222,12 @@ async def place_order(db, *, user_id: str, idempotency_key: str, buyer_kind: str
         "printful_external_id": f"lsw-{order_id}", "printful_order_id": None,
         "item_count": len(items), "created_at": now, "updated_at": now,
     }
-    # Erst die Positionen, dann die Bestellung: gewinnt eine gleichzeitige Anfrage das Rennen um den Schlüssel, räumt
-    # diese ihre eigenen (noch zu keiner Bestellung gehörenden) Positionen und Druckdateien weg.
-    await db.shop_order_items.insert_many([{"order_id": order_id, "user_id": user_id, **item} for item in items])
+    # Erst die Positionen (oben), dann die Bestellung: gewinnt eine gleichzeitige Anfrage das Rennen um den Schlüssel,
+    # räumt diese ihre eigenen (noch zu keiner Bestellung gehörenden) Positionen und Druckdateien weg.
     try:
         await db.shop_orders.insert_one(dict(order))
     except DuplicateKeyError:
-        await db.shop_order_items.delete_many({"order_id": order_id})
-        await shop_print_files.discard_order_files(db, order_id)
+        await _discard(db, order_id)
         winner = await _existing(db, key)
         if not winner:
             raise

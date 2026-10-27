@@ -395,6 +395,9 @@ export function TemplateStatus({ view, busy, run }) {
         className={SMALL_BTN} data-testid="shop-template-refresh">
         <RefreshCw className={`w-3.5 h-3.5 ${busy === "templates" ? "motion-safe:animate-spin" : ""}`} aria-hidden="true" /> Vorlagen neu laden
       </button>
+      {template?.skipped?.length > 0 && (
+        <ul className="basis-full text-warn space-y-0.5" data-testid="shop-template-skipped">{template.skipped.map((line) => <li key={line}>{line}</li>)}</ul>
+      )}
       {template?.changes?.length > 0 && template?.changed_at && (
         <div className="basis-full border border-honor/40 bg-honor/10 rounded-sm p-2" role="status" data-testid="shop-template-changes">
           <div className="font-bold">Printful hat die Vorlage geändert ({viennaDateTime(template.changed_at)})</div>
@@ -445,6 +448,12 @@ export default function LayoutStep({ view, busy, run, ReasonedButton, ChoiceGrou
     <div className="space-y-4" data-testid="shop-layout">
       <TemplateStatus view={view} busy={busy} run={run} />
       {view.layout_converted && <p className="text-xs text-honor" data-testid="shop-layout-converted">Aus den alten Zoll-Positionen umgerechnet - bitte prüfen und speichern.</p>}
+      {view.layout_blocked?.length > 0 && (
+        <div className="border border-warn/40 bg-warn/10 rounded-sm p-2 text-xs" role="alert" data-testid="shop-layout-blocked">
+          <div className="font-bold">Nicht umgerechnet - gespeichert bleibt die alte Fassung, bis du hier neu speicherst:</div>
+          <ul className="mt-1 space-y-0.5">{view.layout_blocked.map((line) => <li key={line}>{line}</li>)}</ul>
+        </div>
+      )}
       <p className="text-xs text-white/55 max-w-3xl">Je Fläche: Motiv, Position aus der Liste und Größe in cm. Die Website erzeugt die Druckdatei in der exakten Größe von Printful - das Motiv an seiner Stelle, der Rest durchsichtig. Positionen „vom Träger aus“: Brust rechts liegt von vorne gesehen links.</p>
       {colors.length > 0 && (
         <div className="space-y-1">

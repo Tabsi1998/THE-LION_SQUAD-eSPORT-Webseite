@@ -329,3 +329,118 @@ async def test_a_design_without_its_file_is_reported_not_crashed(db, provider, d
     await design(db, "ruecken-weiss", "back", ["Black"], width=3000, height=3000)
     result = await shop_products.generate_print_files(db, product["id"], **BY)
     assert not result["failed"]
+
+# ---------------------------------------------------------------- Befunde aus der Prüfung (Codex)
+
+@pytest.mark.asyncio
+async def test_a_legacy_area_with_only_size_groups_is_migrated_not_dropped(db, provider, fake):
+    """Befund 1: eine Fläche nur mit Gruppen je Größe (wie die Tasse 11/15 oz) wird umgestellt, nicht verworfen."""
+    fake.print_areas[PRINTFUL_PRODUCT], fake.templates[PRINTFUL_PRODUCT] = [], []
+    fake.set_print_area(PRINTFUL_PRODUCT, "front", 12, 16, variants=(4012, 4013))
+    fake.set_print_area(PRINTFUL_PRODUCT, "front", 12, 18, variants=(4014, 4015))
+    fake.set_print_area(PRINTFUL_PRODUCT, "back", 12, 16)
+    product = await legacy_product(db, provider)
+    (item,) = await shop_print_files.migrate(db)
+    assert item["ready"] is True and item["blocked"] == []
+    assert [row["key"] for row in item["rows"]] == ["front", "back"]
+    assert any("je Größe eine eigene Fläche" in note for note in item["notes"])
+    assert (await shop_catalog.get_product(db, product["id"]))["placements"] == LEGACY, "Trockenlauf schreibt nichts"
+    (applied,) = await shop_print_files.migrate(db, apply=True)
+    assert applied["applied"] is True and any("4 erzeugt" in note for note in applied["notes"])
+    rows = await db.shop_print_files.find({"product_id": product["id"], "placement": "front"}, {"_id": 0}).to_list(5)
+    assert {(row["color"], row["height_px"]) for row in rows} == {("Black", 2400), ("White", 2700)}, "je Gruppe"
+    (back,) = await shop_print_files.rollback_migration(db, apply=True)
+    assert back["applied"] is True and (await shop_catalog.get_product(db, product["id"]))["placements"] == LEGACY
+
+
+@pytest.mark.asyncio
+async def test_a_legacy_area_that_cannot_be_mapped_stops_the_migration_loudly(db, provider):
+    """Befund 1: lässt sich eine alte Platzierung nicht abbilden, bleibt das Produkt unverändert - mit Meldung."""
+    product = await legacy_product(db, provider)
+    sleeve = {"key": "sleeve_left", "kind": "design", "printful_placement": "sleeve_left",
+              "position": {"left_in": 0.5, "top_in": 0.5, "width_in": 2, "height_in": 2},
+              "designs": [{"color": "Black", "design_key": "loewe-weiss"}]}
+    await db.shop_products.update_one({"id": product["id"]}, {"$set": {"placements": [*LEGACY, sleeve]}})
+    (item,) = await shop_print_files.migrate(db, apply=True)
+    assert item["ready"] is False and "applied" not in item
+    assert any("Ärmel links" in line and "bleibt unverändert" in line for line in item["blocked"])
+    assert any("angehalten" in note for note in item["notes"])
+    stored = await shop_catalog.get_product(db, product["id"])
+    assert stored["placements"] == [*LEGACY, sleeve] and not stored.get("placements_legacy")
+    view = await shop_products.admin_view(db, product["id"])
+    assert view["layout_converted"] is True and view["layout_blocked"] == item["blocked"]
+    assert await shop_print_files.rollback_migration(db) == [], "nichts zurückzunehmen"
+    sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1] / "scripts"))
+    import shop_print_layout
+
+    out = io.StringIO()
+    await shop_print_layout.main([], db=db, out=out)
+    assert "bleibt" in out.getvalue() and "Ärmel links" in out.getvalue()
+
+
+@pytest.mark.asyncio
+async def test_an_order_that_fails_while_writing_its_lines_leaves_neither_lines_nor_files(db, provider, monkeypatch):
+    """Befund 2: bricht insert_many mittendrin ab, sind Positionen und eigene Dateien der Bestellung wieder weg."""
+    from shop_testdata import publish_unchecked
+    from test_shop_products_unit import BILLING, SHIPPING, variant_for
+
+    from services import shop_orders
+
+    product = await configured(db, provider)
+    await publish_unchecked(db, product["id"])
+    black = await variant_for(db, product["id"], 4012)
+    collection = type(db.shop_order_items)
+    real = collection.insert_many
+
+    async def half_then_broken(self, documents, *args, **kwargs):
+        if self.name == "shop_order_items":
+            await self.insert_one(dict(documents[0]))
+            raise ConnectionError("Verbindung weg (Test)")
+        return await real(self, documents, *args, **kwargs)
+
+    monkeypatch.setattr(collection, "insert_many", half_then_broken)
+    lines = [{"variant_id": black["id"], "quantity": 1, "gamertag": "Testlöwe"},
+             {"variant_id": black["id"], "quantity": 2, "gamertag": "Zweitlöwe"}]
+    with pytest.raises(ConnectionError):
+        await shop_orders.place_order(db, user_id="konto-1", idempotency_key="bestellung-0060", buyer_kind="member",
+                                      lines=lines, shipping_estimate_cents=490, billing_address=dict(BILLING),
+                                      shipping_address=dict(SHIPPING), actor_id="konto-1")
+    assert await db.shop_order_items.count_documents({}) == 0
+    assert await db.shop_print_files.count_documents({"purpose": "order"}) == 0
+    assert await db.shop_gamertag_files.count_documents({"purpose": "order"}) == 0
+    assert await db.shop_orders.count_documents({}) == 0
+
+
+@pytest.mark.asyncio
+async def test_the_preview_never_draws_the_full_print_file(db, provider, monkeypatch):
+    """Befund 4: auch eine riesige Fläche wird direkt im Maßstab der Vorschau gezeichnet."""
+    product = await configured(db, provider, accept=False, generate=False)
+    stored = await templates.get(db, PRINTFUL_PRODUCT)
+    entries = [{**row, "width_px": 8000, "height_px": 9000, "width_in": 53.3333, "height_in": 60.0}
+               if row["placement"] == "front" else row for row in stored["entries"]]
+    await db.shop_print_templates.update_one({"printful_product_id": PRINTFUL_PRODUCT}, {"$set": {"entries": entries}})
+    template_png = BytesIO()
+    Image.new("RGBA", (1000, 1000), (0, 0, 0, 0)).save(template_png, format="PNG")
+    monkeypatch.setattr(templates, "IMAGE_TRANSPORT", httpx.MockTransport(
+        lambda request: httpx.Response(200, content=template_png.getvalue(), headers={"content-type": "image/png"})))
+    sizes = []
+    real_new = Image.new
+
+    def watched(mode, size, *args, **kwargs):
+        sizes.append(size[0] * size[1])
+        return real_new(mode, size, *args, **kwargs)
+
+    monkeypatch.setattr(shop_print_files.Image, "new", watched)
+    payload = await shop_print_files.preview_png(db, await shop_catalog.get_product(db, product["id"]),
+                                                 placement="front", color="Black")
+    assert payload and max(sizes) <= 1_000_000, f"größtes Bild {max(sizes)} Pixel"
+
+
+def test_template_areas_above_the_pixel_limit_are_not_taken_over():
+    """Befund 4: Zoll × DPI über 80 Millionen Pixel wird beim Einlesen gemeldet statt übernommen."""
+    from services.shop_fulfillment import PrintArea
+
+    entries, _previews, skipped = templates.build(
+        [PrintArea("front", "dtg", "Front", 12, 16, 150), PrintArea("back", "dtg", "Back", 400, 400, 300)], [])
+    assert [row["placement"] for row in entries] == ["front"]
+    assert skipped and "120000 × 120000 px" in skipped[0] and "nicht übernommen" in skipped[0]

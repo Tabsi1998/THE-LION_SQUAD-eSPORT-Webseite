@@ -53,7 +53,7 @@ MODES = {"layout": "Motiv und Position", "upload": "Fertige Druckdatei (für Pro
 MAX_LAYERS = 6
 MAX_OFFSET_CM = 300.0
 # 80 Millionen Pixel: das größte Badetuch (11100 × 5700) passt, RGBA braucht dann gut 250 MB.
-MAX_COMPOSE_PIXELS = 80_000_000
+MAX_COMPOSE_PIXELS = templates.MAX_FILE_PIXELS
 PUBLIC_ID = re.compile(r"^[A-Za-z0-9_-]{43}$")
 
 
@@ -253,27 +253,39 @@ def _slug(text: str) -> str:
 
 
 def convert_legacy(product: dict, template: dict | None, presets_doc: dict,
-                   aspects: dict[str, float] | None = None) -> tuple[list[dict], list[str]]:
+                   aspects: dict[str, float] | None = None) -> tuple[list[dict], list[str], list[str]]:
     """Alte Platzierungen (#1707: Schlüssel wie ``front_right``, Position in Zoll, Design je Farbe) als Ebenen je
     Printful-Fläche. Die Position bleibt erhalten: die nächste Vorgabe nach der waagrechten Mitte, die Breite in cm, der
     Rest als Feinjustierung. Gamertag und Vereinsnummer bekommen eine Vorgabe (``text_opposite`` vorne, sonst die erste
-    passende) - die Hinweise sagen, was zu prüfen ist."""
+    passende) - die Hinweise sagen, was zu prüfen ist.
+
+    Hat die Fläche nur Gruppen je Größe (Tasse 11/15 oz, Badetuch), wird an der Gruppe mit den meisten Varianten
+    umgerechnet; die Ebenen gelten für alle Gruppen (geprüft je Gruppe). Lässt sich eine alte Platzierung gar nicht
+    abbilden, steht sie in der dritten Liste (``blocked``) - sie wird nie still verworfen: die Umstellung des Produkts hält
+    dann an und die alten Platzierungen bleiben."""
     aspects = aspects or {}
     presets = presets_doc["presets"]
     rules = presets_doc["rules"]
     technique = product.get("technique") or (product.get("printful") or {}).get("default_technique")
     rows: dict[str, dict] = {}
     notes: list[str] = []
+    blocked: list[str] = []
     for old in product.get("placements") or []:
         if is_layout(old):
             rows[old["key"]] = old
             continue
         printful_placement = old.get("printful_placement") or old.get("key")
-        entry = next((row for row in templates.entries_for(template, technique)
-                      if row["placement"] == printful_placement and not row["variant_ids"]), None)
+        same = [row for row in templates.entries_for(template, technique) if row["placement"] == printful_placement]
+        entry = next((row for row in same if not row["variant_ids"]), None)
         label = shop_designs.PLACEMENT_LABELS.get(old.get("key"), old.get("key"))
+        if entry is None and same:
+            entry = max(same, key=lambda row: (len(row["variant_ids"] or []), row["group"]))
+            notes.append(f"„{label}“: {entry['label']} hat je Größe eine eigene Fläche - umgerechnet an "
+                         f"{entry['width_px']} × {entry['height_px']} px (Varianten "
+                         f"{', '.join(map(str, entry['variant_ids']))}); die anderen Größen bitte in der Vorschau prüfen.")
         if entry is None:
-            notes.append(f"„{label}“ entfällt: die Fläche {printful_placement} hat keine Druckvorgabe bei Printful.")
+            blocked.append(f"„{label}“ bleibt unverändert: die Fläche {printful_placement} hat keine Druckvorgabe bei "
+                           "Printful.")
             continue
         row = rows.setdefault(printful_placement, {"key": printful_placement, "printful_placement": printful_placement,
                                                    "technique": entry["technique"], "mode": "layout", "layers": []})
@@ -308,13 +320,13 @@ def convert_legacy(product: dict, template: dict | None, presets_doc: dict,
             preset = next((item for item in texts if item.get("follow") == "opposite" and has_motif), None) or next(
                 (item for item in texts if not item.get("follow")), None) or (texts[0] if texts else None)
             if preset is None:
-                notes.append(f"„{label}“ entfällt: keine Vorgabe für einen Namen auf {entry['label']}.")
+                blocked.append(f"„{label}“ bleibt unverändert: keine Vorgabe für einen Namen auf {entry['label']}.")
                 continue
             row["layers"].append({"kind": kind, "preset": preset["key"], "offset_x_cm": 0.0, "offset_y_cm": 0.0})
             notes.append(f"„{label}“ ({LAYER_KINDS[kind]}) → Vorgabe „{preset['label']}“ - bitte in der Vorschau prüfen.")
     for row in rows.values():  # Motive zuerst: ein Name folgt dem ersten Motiv
         row["layers"].sort(key=lambda layer: layer["kind"] != "motif")
-    return list(rows.values()), notes
+    return list(rows.values()), notes, blocked
 
 
 async def _aspects(db, product: dict) -> dict[str, float]:
@@ -338,8 +350,19 @@ async def layout_rows(db, product: dict, *, template: dict | None = None,
     if template is None:
         template = await templates.get(db, (product.get("printful") or {}).get("product_id"))
     presets_doc = presets_doc or await templates.load_presets(db)
-    converted, _notes = convert_legacy(product, template, presets_doc, await _aspects(db, product))
+    converted, _notes, _blocked = convert_legacy(product, template, presets_doc, await _aspects(db, product))
     return converted
+
+
+async def layout_conversion(db, product: dict) -> dict:
+    """Für den Admin: was die Umrechnung alter Platzierungen sagt - Hinweise und was sich nicht abbilden lässt."""
+    rows = product.get("placements") or []
+    if all(is_layout(row) for row in rows):
+        return {"converted": False, "notes": [], "blocked": []}
+    template = await templates.get(db, (product.get("printful") or {}).get("product_id"))
+    _rows, notes, blocked = convert_legacy(product, template, await templates.load_presets(db),
+                                           await _aspects(db, product))
+    return {"converted": True, "notes": notes, "blocked": blocked}
 
 
 # ================================================================ Plan je Fläche und Farbe
@@ -903,6 +926,7 @@ async def complete_pending_erasures(db) -> int:
 # ================================================================ Vorschau im Admin
 
 PREVIEW_WIDTH = 900
+PREVIEW_MAX_PIXELS = 30_000_000  # so groß darf ein Vorlagenbild höchstens sein (shop_print_templates)
 SAMPLE_NAME = "GAMERTAG"
 
 
@@ -928,18 +952,43 @@ async def preview_png(db, product: dict, *, placement: str, color: str, sample: 
         raise LookupError("Diese Fläche gibt es beim Produkt nicht.")
     plan = await plan_placement(db, row, entry, color=color, color_hex=context["codes"].get(color),
                                 presets_doc=context["presets"], gamertag_rules=context["gamertag_rules"])
-    rules = context["presets"]["rules"]
-    print_img = None
-    latest = await latest_base(db, product["id"], placement, entry["group"], color) if plan.needs_base else None
+    shirt = _hex_rgb(context["codes"].get(color))
+    preview = templates.preview_for(context["template"], entry)
+    template_img = await templates.template_image_rgba(db, context["template"], preview) if preview else None
+    # Gleich im Maßstab der Vorschau zeichnen - nie die volle Druckdatei im Speicher (die kann 80 Millionen Pixel haben).
+    if preview and template_img is not None:
+        target_w, target_h = max(1, preview["area"]["width"]), max(1, preview["area"]["height"])
+    else:
+        scale = min(1.0, width / entry["width_px"])
+        target_w, target_h = max(1, round(entry["width_px"] * scale)), max(1, round(entry["height_px"] * scale))
+    scale_x, scale_y = target_w / entry["width_px"], target_h / entry["height_px"]
+    if target_w * target_h > PREVIEW_MAX_PIXELS:
+        raise ShopError("Das Vorlagenbild ist für eine Vorschau zu groß.")
+
+    def scaled_box(box: templates.Box) -> tuple[int, int, int, int]:
+        left, top = int(round(box.left * scale_x)), int(round(box.top * scale_y))
+        return (left, top, max(1, int(round(box.right * scale_x)) - left),
+                max(1, int(round(box.bottom * scale_y)) - top))
+
+    print_img = Image.new("RGBA", (target_w, target_h), (0, 0, 0, 0))
+    latest = await latest_base(db, product["id"], placement, entry["group"], color) if plan.mode == "upload" else None
     if latest and _base_valid(latest, plan):
-        print_img = Image.open(shop_designs._path_of(latest["file_ref"])).convert("RGBA")
+        with Image.open(shop_designs._path_of(latest["file_ref"])) as img:  # fertige Datei: höchstens 80 MP (Prüfung)
+            img.draft("RGBA", (target_w, target_h))
+            print_img = img.convert("RGBA").resize((target_w, target_h), Image.Resampling.LANCZOS)
     elif plan.motifs and not plan.problems:
-        try:
-            print_img = Image.open(BytesIO((await _render_base(db, plan, rules)).payload)).convert("RGBA")
-        except ShopError:
-            print_img = None
-    if print_img is None:
-        print_img = Image.new("RGBA", (entry["width_px"], entry["height_px"]), (0, 0, 0, 0))
+        for item in plan.motifs:
+            left, top, box_w, box_h = scaled_box(item.box)
+            try:
+                png = await _motif_png(db, item.source, width_px=box_w, dpi=entry["dpi"])
+            except ShopError:
+                continue
+            with Image.open(BytesIO(png)) as img:
+                img.load()
+                part = img.convert("RGBA")
+            if part.size != (box_w, box_h):
+                part = part.resize((box_w, box_h), Image.Resampling.LANCZOS)
+            print_img.alpha_composite(part, (max(0, left), max(0, top)))
     if sample and plan.texts:
         gamertag_rules = context["gamertag_rules"]
         ink = shop_gamertag.inks_for_garment(gamertag_rules, color)[0]["key"]
@@ -949,23 +998,19 @@ async def preview_png(db, product: dict, *, placement: str, color: str, sample: 
                 img.load()
                 tag = img.convert("RGBA")
             for item in plan.texts:
-                left, top, width_px, height_px = item.box.rounded()
-                if 0 <= left and 0 <= top and left + width_px <= print_img.width and top + height_px <= print_img.height:
-                    print_img.alpha_composite(tag.resize((width_px, height_px), Image.Resampling.LANCZOS), (left, top))
+                left, top, box_w, box_h = scaled_box(item.box)
+                if 0 <= left and 0 <= top and left + box_w <= target_w and top + box_h <= target_h:
+                    print_img.alpha_composite(tag.resize((box_w, box_h), Image.Resampling.LANCZOS), (left, top))
         except ShopError:
             pass
-    shirt = _hex_rgb(context["codes"].get(color))
-    preview = templates.preview_for(context["template"], entry)
-    template_img = await templates.template_image_rgba(db, context["template"], preview) if preview else None
     if preview and template_img is not None:
         canvas = Image.new("RGBA", template_img.size, (*shirt, 255))
         area = preview["area"]
-        scaled = print_img.resize((max(1, area["width"]), max(1, area["height"])), Image.Resampling.LANCZOS)
         if preview["positioning"] == "background":
             canvas.alpha_composite(template_img)
-            canvas.alpha_composite(scaled, (area["left"], area["top"]))
+            canvas.alpha_composite(print_img, (area["left"], area["top"]))
         else:
-            canvas.alpha_composite(scaled, (area["left"], area["top"]))
+            canvas.alpha_composite(print_img, (area["left"], area["top"]))
             canvas.alpha_composite(template_img)
     else:
         canvas = Image.new("RGBA", print_img.size, (*shirt, 255))
@@ -1002,9 +1047,12 @@ async def migration_plan(db) -> list[dict]:
                         "ready": False, "rows": [],
                         "notes": ["Keine Druckvorlage von Printful gespeichert - erst „Mit Printful abgleichen“."]})
             continue
-        rows, notes = convert_legacy(product, template, presets_doc, await _aspects(db, product))
-        out.append({"id": product["id"], "slug": product.get("slug"), "title": product.get("title"), "ready": True,
-                    "rows": rows, "notes": notes})
+        rows, notes, blocked = convert_legacy(product, template, presets_doc, await _aspects(db, product))
+        if blocked:
+            notes = [*blocked, *notes, "Umstellung angehalten - die alten Platzierungen bleiben unverändert, bis die "
+                                       "Flächen bei Printful passen oder Schritt 3 neu gespeichert wird."]
+        out.append({"id": product["id"], "slug": product.get("slug"), "title": product.get("title"),
+                    "ready": not blocked, "rows": rows, "notes": notes, "blocked": blocked})
     return out
 
 

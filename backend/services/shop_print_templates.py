@@ -103,6 +103,9 @@ def measure(px: float, dpi: int) -> str:
 
 GROUP_ALL = "all"
 ASPECT_TOLERANCE = 0.02
+# Größte Druckdatei, die die Website erzeugt: 80 Millionen Pixel (Badetuch 11100 × 5700 passt, RGBA gut 250 MB). Eine
+# Vorgabe darüber (Zoll × DPI) wird beim Einlesen nicht übernommen, sondern gemeldet - nie still ein Riesenbild.
+MAX_FILE_PIXELS = 80_000_000
 
 
 def group_key(variant_ids: Iterable[int] | None) -> str:
@@ -122,12 +125,18 @@ def _preview(index: int, row: MockupTemplate) -> dict:
             "positioning": row.positioning, "orientation": row.orientation}
 
 
-def build(areas: Sequence[PrintArea], templates: Sequence[MockupTemplate]) -> tuple[list[dict], list[dict]]:
-    """Aus den Printful-Daten: Einträge je Platzierung, Technik und Varianten-Gruppe mit exakter Dateigröße - und die
-    Vorlagenbilder (flache Liste, Einträge zeigen über ``preview_indexes`` darauf)."""
+def build(areas: Sequence[PrintArea], templates: Sequence[MockupTemplate]) -> tuple[list[dict], list[dict], list[str]]:
+    """Aus den Printful-Daten: Einträge je Platzierung, Technik und Varianten-Gruppe mit exakter Dateigröße, die
+    Vorlagenbilder (flache Liste, Einträge zeigen über ``preview_indexes`` darauf) und was zu groß war
+    (``MAX_FILE_PIXELS``) - als Sätze."""
     previews = [_preview(index, row) for index, row in enumerate(templates)]
-    entries = []
+    entries, skipped = [], []
     for area in areas:
+        if area.width_px * area.height_px > MAX_FILE_PIXELS:
+            skipped.append(f"{placement_label(area.placement, area.display_name)} ({area.technique}): "
+                           f"{area.width_px} × {area.height_px} px bei {area.dpi} DPI - mehr als "
+                           f"{MAX_FILE_PIXELS // 1_000_000} Millionen Pixel, nicht übernommen.")
+            continue
         variant_ids = sorted(area.variant_ids) if area.variant_ids else None
         mine = [item for item in previews if item["placement"] == area.placement
                 and item["technique"] == area.technique
@@ -145,7 +154,7 @@ def build(areas: Sequence[PrintArea], templates: Sequence[MockupTemplate]) -> tu
             "preview_indexes": [item["index"] for item in mine], "aspect_ok": aspect_ok,
         })
     entries.sort(key=lambda row: (row["technique"], row["placement"], row["group"]))
-    return entries, previews
+    return entries, previews, skipped
 
 
 def _spec(entry: dict) -> dict:
@@ -217,9 +226,10 @@ async def refresh(db, printful_product_id: int, *, provider: FulfillmentProvider
             {"$set": {"printful_product_id": printful_product_id, "last_error": {"at": now, "detail": exc.text}}},
             upsert=True)
         return {"ok": False, "changed": False, "changes": [], "detail": exc.text, "template": await get(db, printful_product_id)}
-    entries, previews = build(areas, templates)
+    entries, previews, skipped = build(areas, templates)
     if not entries:
-        detail = "Printful liefert für dieses Produkt keine Druckvorgaben (mockup-styles)."
+        detail = "Printful liefert für dieses Produkt keine Druckvorgaben (mockup-styles)." + (
+            " " + " ".join(skipped) if skipped else "")
         await db.shop_print_templates.update_one(
             {"printful_product_id": printful_product_id},
             {"$set": {"printful_product_id": printful_product_id, "last_error": {"at": now, "detail": detail}}},
@@ -228,7 +238,7 @@ async def refresh(db, printful_product_id: int, *, provider: FulfillmentProvider
     new_hash = spec_hash(entries)
     changes = diff(current.get("entries") or [], entries) if current and current.get("entries") else []
     update: dict = {"printful_product_id": printful_product_id, "entries": entries, "previews": previews,
-                    "hash": new_hash, "checked_at": now, "last_error": None}
+                    "hash": new_hash, "checked_at": now, "last_error": None, "skipped": skipped}
     if not current or current.get("hash") != new_hash:
         update.update(fetched_at=now, changed_at=now if current and current.get("hash") else None,
                       changes=changes, previous_hash=(current or {}).get("hash"))
