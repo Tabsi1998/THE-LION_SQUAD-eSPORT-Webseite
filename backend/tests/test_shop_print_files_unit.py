@@ -479,3 +479,16 @@ def test_every_group_is_checked_for_motif_and_name_inside_its_area():
     assert "ragt unten" in small_line and "Zoll" in small_line
     # Die große Gruppe hielte die alte Lage auch nicht (die Vorgabe wurde in der kleinen Fläche gekappt) - ebenfalls gemeldet.
     assert any("Varianten 1" in line and "läge um" in line for line in blocked)
+
+@pytest.mark.asyncio
+async def test_every_color_is_checked_with_the_motif_it_really_prints(db, provider):
+    """Codex, dritte Runde: Weiß druckt am Rücken ein anderes, doppelt so hohes Motiv - es ragt hinaus, also blockiert,
+    mit Farbe und Motiv in der Meldung. Schwarz allein hätte gepasst."""
+    product = await legacy_product(db, provider)
+    await design(db, "ruecken-schwarz", "back", ["White"], width=1500, height=3000)
+    (item,) = await shop_print_files.migrate(db, apply=True)
+    assert item["ready"] is False and "applied" not in item
+    line = next(text for text in item["blocked"] if "White" in text)
+    assert "ruecken-schwarz" in line and "ragt unten" in line
+    assert not any("Black" in text for text in item["blocked"]), "Schwarz passt"
+    assert (await shop_catalog.get_product(db, product["id"]))["placements"] == LEGACY

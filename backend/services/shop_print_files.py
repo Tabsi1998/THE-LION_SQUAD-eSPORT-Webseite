@@ -254,7 +254,8 @@ def _slug(text: str) -> str:
 
 def convert_legacy(product: dict, template: dict | None, presets_doc: dict,
                    aspects: dict[str, float] | None = None,
-                   gamertag_rules: dict | None = None) -> tuple[list[dict], list[str], list[str]]:
+                   gamertag_rules: dict | None = None, colors: Sequence[str] = (),
+                   sources: dict | None = None) -> tuple[list[dict], list[str], list[str]]:
     """Alte Platzierungen (#1707: Schlüssel wie ``front_right``, Position in Zoll, Design je Farbe) als Ebenen je
     Printful-Fläche. Die Position bleibt erhalten: die nächste Vorgabe nach der waagrechten Mitte, die Breite in cm, der
     Rest als Feinjustierung. Gamertag und Vereinsnummer bekommen eine Vorgabe (``text_opposite`` vorne, sonst die erste
@@ -265,7 +266,11 @@ def convert_legacy(product: dict, template: dict | None, presets_doc: dict,
     Abweichung) und mit dem Namen (``gamertag_rules``) ganz in der Fläche bleiben. Weicht eine Gruppe ab - etwa weil sie
     schmaler ist und die Vorgabe relativ zur Breite rechnet -, steht das in der dritten Liste (``blocked``). Ebenso eine
     alte Platzierung ohne Fläche. Nie ein stiller Teil-Erfolg: die Umstellung des Produkts hält dann an und die alten
-    Platzierungen bleiben."""
+    Platzierungen bleiben.
+
+    Mit ``colors`` und ``sources`` (je Fläche, Ebene und Farbe das Motiv, das wirklich gedruckt wird: Seitenverhältnis
+    und Titel - ``conversion`` ermittelt sie über ``_motif_source``) wird jede Farbe mit ihrem eigenen Motiv geprüft,
+    der Name an dessen echtem Rahmen."""
     aspects = aspects or {}
     presets = presets_doc["presets"]
     rules = presets_doc["rules"]
@@ -305,7 +310,9 @@ def convert_legacy(product: dict, template: dict | None, presets_doc: dict,
                       / entry["width_in"])
             choices = templates.presets_for(presets, entry["family"], "motif") or [
                 item for item in presets if item["kind"] == "motif"]
-            preset = min(choices, key=lambda item: (abs(item["center_x"] - center), item["key"]))
+            # Alte Positionen zählen von oben: bei gleicher Nähe gewinnt eine oben verankerte Vorgabe - dann liegt ein Motiv
+            # mit anderem Seitenverhältnis (andere Farbe) nicht senkrecht verschoben.
+            preset = min(choices, key=lambda item: (abs(item["center_x"] - center), item["anchor"] != "top", item["key"]))
             planned = templates.place_motif(entry, preset, width_cm=width_cm, aspect=aspect, rules=rules)
             wanted_left = templates.cm_to_px(float(position.get("left_in") or 0) * templates.CM_PER_INCH, entry["dpi"])
             wanted_top = templates.cm_to_px(float(position.get("top_in") or 0) * templates.CM_PER_INCH, entry["dpi"])
@@ -338,7 +345,8 @@ def convert_legacy(product: dict, template: dict | None, presets_doc: dict,
     by_key = {item["key"]: item for item in presets}
     for key, row in rows.items():
         for entry in areas.get(key) or []:
-            found = _check_group(entry, row, targets.get(key) or [], by_key, rules, gamertag_rules)
+            found = _check_group(entry, row, targets.get(key) or [], by_key, rules, gamertag_rules,
+                                 colors=colors, sources=sources or {})
             if found:
                 size = f"{templates.cm(entry['width_cm'])} × {templates.cm(entry['height_cm'])}"
                 group = (f", Varianten {', '.join(map(str, entry['variant_ids']))}" if entry["variant_ids"] else "")
@@ -346,35 +354,46 @@ def convert_legacy(product: dict, template: dict | None, presets_doc: dict,
     return list(rows.values()), notes, blocked
 
 
-def _check_group(entry: dict, row: dict, targets: list, by_key: dict, rules: dict,
-                 gamertag_rules: dict | None) -> list[str]:
-    """Eine Gruppe einer umgerechneten Fläche: liegt jedes Motiv genau an seiner alten Stelle und alles in der Fläche?"""
+def _check_group(entry: dict, row: dict, targets: list, by_key: dict, rules: dict, gamertag_rules: dict | None, *,
+                 colors: Sequence[str] = (), sources: dict | None = None) -> list[str]:
+    """Eine Gruppe einer umgerechneten Fläche: liegt jedes Motiv genau an seiner alten Stelle und alles in der Fläche -
+    für jede Farbe mit dem Motiv, das dort gedruckt wird, und der Name an dessen Rahmen?"""
     dpi = entry["dpi"]
+    sources = sources or {}
     found: list[str] = []
-    boxes = []
-    for layer, left_in, top_in, aspect, label in targets:
-        preset = by_key.get(layer["preset"])
-        box = templates.place_motif(entry, preset, width_cm=layer["width_cm"], aspect=aspect, rules=rules,
-                                    offset_x_cm=layer["offset_x_cm"], offset_y_cm=layer["offset_y_cm"])
-        boxes.append(box)
-        shift_x, shift_y = box.left - left_in * dpi, box.top - top_in * dpi
-        if abs(shift_x) > 1 or abs(shift_y) > 1:
-            found.append(f"„{label}“ läge um {templates.measure(abs(shift_x), dpi)} waagrecht bzw. "
-                         f"{templates.measure(abs(shift_y), dpi)} senkrecht anders.")
-        found += templates.problems(entry, box, f"„{label}“", rules)
-    if gamertag_rules is not None:
-        for layer in row["layers"]:
-            if layer["kind"] not in TEXT_KINDS:
-                continue
-            width, height = text_canvas_px(entry, gamertag_rules)
-            try:
-                box = templates.place_text(entry, by_key[layer["preset"]], width_px=width, height_px=height,
-                                           follow=boxes[0] if boxes else None, rules=rules)
-            except (KeyError, ShopError):
-                found.append(f"{LAYER_KINDS[layer['kind']]}: keine passende Vorgabe.")
-                continue
-            found += templates.problems(entry, box, LAYER_KINDS[layer["kind"]], rules)
-    return found
+    for color in list(colors) or [None]:
+        boxes = []
+        for layer, left_in, top_in, aspect, label in targets:
+            index = next(at for at, item in enumerate(row["layers"]) if item is layer)
+            own = sources.get((row["key"], index, color))
+            if own is not None:
+                aspect = own[0]
+                label = f"{label}, {color}: Motiv „{own[1]}“"
+            elif color is not None:
+                label = f"{label}, {color}"
+            preset = by_key.get(layer["preset"])
+            box = templates.place_motif(entry, preset, width_cm=layer["width_cm"], aspect=aspect, rules=rules,
+                                        offset_x_cm=layer["offset_x_cm"], offset_y_cm=layer["offset_y_cm"])
+            boxes.append(box)
+            shift_x, shift_y = box.left - left_in * dpi, box.top - top_in * dpi
+            if abs(shift_x) > 1 or abs(shift_y) > 1:
+                found.append(f"„{label}“ läge um {templates.measure(abs(shift_x), dpi)} waagrecht bzw. "
+                             f"{templates.measure(abs(shift_y), dpi)} senkrecht anders.")
+            found += templates.problems(entry, box, f"„{label}“", rules)
+        if gamertag_rules is not None:
+            for layer in row["layers"]:
+                if layer["kind"] not in TEXT_KINDS:
+                    continue
+                name = LAYER_KINDS[layer["kind"]] + (f" ({color})" if color else "")
+                width, height = text_canvas_px(entry, gamertag_rules)
+                try:
+                    box = templates.place_text(entry, by_key[layer["preset"]], width_px=width, height_px=height,
+                                               follow=boxes[0] if boxes else None, rules=rules)
+                except (KeyError, ShopError):
+                    found.append(f"{name}: keine passende Vorgabe.")
+                    continue
+                found += templates.problems(entry, box, name, rules)
+    return list(dict.fromkeys(found))
 
 
 async def _aspects(db, product: dict) -> dict[str, float]:
@@ -402,15 +421,43 @@ async def layout_rows(db, product: dict, *, template: dict | None = None,
     return converted
 
 
+async def conversion(db, product: dict, template: dict | None, presets_doc: dict,
+                     gamertag_rules: dict) -> tuple[list[dict], list[str], list[str]]:
+    """Umrechnung mit voller Prüfung: erst umrechnen, dann je Fläche, Ebene und angebotener Farbe das Motiv ermitteln,
+    das wirklich gedruckt wird (``_motif_source`` - auch Ausnahmen je Farbe und die automatische Fassung), und mit
+    diesen Motiven jede Gruppe prüfen."""
+    aspects = await _aspects(db, product)
+    rows, notes, blocked = convert_legacy(product, template, presets_doc, aspects, gamertag_rules=gamertag_rules)
+    printful = product.get("printful") or {}
+    colors = list((product.get("offer") or {}).get("colors") or [])
+    if not colors:
+        return rows, notes, blocked
+    codes = {item["name"]: item.get("code") for item in printful.get("colors") or []}
+    sources, missing = {}, []
+    for row in rows:
+        for index, layer in enumerate(row.get("layers") or []):
+            if layer.get("kind") != "motif" or not (layer.get("motif") or {}).get("key"):
+                continue
+            for color in colors:
+                source = await _motif_source(db, layer["motif"], color, codes.get(color))
+                if source is None:
+                    missing.append(f"{row['key']}, {color}: für diese Farbe gibt es kein Motiv - die Prüfung in Schritt 5 "
+                                 "meldet das.")
+                    continue
+                sources[(row["key"], index, color)] = (source.aspect, source.title)
+    rows, notes, blocked = convert_legacy(product, template, presets_doc, aspects, gamertag_rules=gamertag_rules,
+                                          colors=colors, sources=sources)
+    return rows, notes + missing, blocked
+
+
 async def layout_conversion(db, product: dict) -> dict:
     """Für den Admin: was die Umrechnung alter Platzierungen sagt - Hinweise und was sich nicht abbilden lässt."""
     rows = product.get("placements") or []
     if all(is_layout(row) for row in rows):
         return {"converted": False, "notes": [], "blocked": []}
     template = await templates.get(db, (product.get("printful") or {}).get("product_id"))
-    _rows, notes, blocked = convert_legacy(product, template, await templates.load_presets(db),
-                                           await _aspects(db, product),
-                                           gamertag_rules=await shop_gamertag.load_rules(db))
+    _rows, notes, blocked = await conversion(db, product, template, await templates.load_presets(db),
+                                             await shop_gamertag.load_rules(db))
     return {"converted": True, "notes": notes, "blocked": blocked}
 
 
@@ -1097,8 +1144,7 @@ async def migration_plan(db) -> list[dict]:
                         "ready": False, "rows": [],
                         "notes": ["Keine Druckvorlage von Printful gespeichert - erst „Mit Printful abgleichen“."]})
             continue
-        rows, notes, blocked = convert_legacy(product, template, presets_doc, await _aspects(db, product),
-                                              gamertag_rules=gamertag_rules)
+        rows, notes, blocked = await conversion(db, product, template, presets_doc, gamertag_rules)
         if blocked:
             notes = [*blocked, *notes, "Umstellung angehalten - die alten Platzierungen bleiben unverändert, bis die "
                                        "Flächen bei Printful passen oder Schritt 3 neu gespeichert wird."]
