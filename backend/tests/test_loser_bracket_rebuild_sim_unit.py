@@ -218,9 +218,11 @@ def check(matches: list[dict], removed: set[str], where: str) -> None:
     assert report["valid"] and not errors, f"{where}: Graph ungültig: {errors}"
 
 
-def check_end(matches: list[dict], removed: set[str], *, capped_allowed: bool = True) -> dict:
+def check_end(matches: list[dict], removed: set[str], unseated: set[str] = frozenset(), *,
+              capped_allowed: bool = True) -> dict:
     """Ende: alles entschieden, genau ein Finale, kein gefahrener Lauf mit einem Fahrer, jede/r Verlierer:in der
-    Winner-Seite sitzt (oder saß, bis zum eigenen Ausscheiden) im Loser Bracket. Gekappt (``capped_allowed``): ein
+    Winner-Seite sitzt (oder saß, bis zum eigenen Ausscheiden) im Loser Bracket - oder der Umbau hat sichtbar
+    gemeldet, dass es keinen Platz mehr gab (``unseated``), nie still. Gekappt (``capped_allowed``): ein
     Verlierer-Platz, den der Umbau strich, weil der Loser-Lauf voll war (#2033: kein Lauf über der Laufgröße) - nur
     mit Störungen erlaubt, nie in einem Abend ohne Ausfälle."""
     open_rows = [m["match_key"] for m in matches if m["status"] not in TERMINAL]
@@ -251,21 +253,34 @@ def check_end(matches: list[dict], removed: set[str], *, capped_allowed: bool = 
         places = len([entry for entry in match.get("advancement") or [] if entry.get("flow") == "L"])
         assert capped_allowed or len(losers) <= places, \
             f"{match['match_key']}: {len(losers)} Verlierer, aber nur {places} Verlierer-Wege - ohne Störung gekappt"
-        for loser in losers[:places]:
+        for index, loser in enumerate(losers):
             if loser in removed:
                 continue
-            assert (match["id"], loser) in seated_from, \
-                f"{loser} (Platz > {quota} in {match['match_key']}) hat keine zweite Chance im Loser Bracket bekommen"
+            seated = (match["id"], loser) in seated_from
+            if index < places:
+                assert seated, \
+                    f"{loser} (Platz > {quota} in {match['match_key']}) hat keine zweite Chance im Loser Bracket"
+            else:
+                assert seated or loser in unseated, \
+                    f"{loser} (Platz > {quota} in {match['match_key']}) blieb still ohne Platz im Loser Bracket"
     return finals[0]
 
 
 # ---------------------------------------------------------------------------------------------- Der Abend
 
 
-def play(matches: list[dict], stage: dict, rng: random.Random, *, removals: bool, forfeits: bool) -> set[str]:
+def play(matches: list[dict], stage: dict, rng: random.Random, *, removals: bool,
+         forfeits: bool) -> tuple[set[str], set[str]]:
     """Spielt durch - mit Störungen nach ``rng``: Austritt, Disqualifikation, nicht erschienen im Lauf und eine
-    Korrektur (Platz 2 und 3 getauscht) in einem schon gefahrenen Lauf, dessen Folgeläufe noch offen sind."""
+    Korrektur (Platz 2 und 3 getauscht) in einem schon gefahrenen Lauf, dessen Folgeläufe noch offen sind. Rückgabe:
+    (Ausgeschiedene, Fahrer, für die der Umbau „kein Platz mehr“ gemeldet hat)."""
     removed: set[str] = set()
+    unseated: set[str] = set()
+
+    def rebuild(matches: list[dict], stage: dict) -> list[dict]:
+        ops = globals()["rebuild"](matches, stage)
+        unseated.update(op["registration_id"] for op in ops if op.get("kind") == "unseated")
+        return ops
     # Mehrere Vorläufe zugleich an Stationen aufgerufen - auch schon, bevor der Umbau zum ersten Mal läuft (die
     # Auswertung war eingereiht, #2033): aufgerufene Läufe werden nicht mehr umgebaut, ihre Weiterleitungen können
     # auf Plätze zeigen, die es bei ihrer Belegung nicht gibt.
@@ -315,7 +330,7 @@ def play(matches: list[dict], stage: dict, rng: random.Random, *, removals: bool
         match.pop("called_at", None)
         rebuild(matches, stage)
         check(matches, removed, f"Schritt {step}: Ergebnis {match['match_key']}")
-    return removed
+    return removed, unseated
 
 
 def test_called_heats_with_stale_loser_links_keep_the_collector_at_heat_size():
@@ -340,8 +355,8 @@ def test_called_heats_with_stale_loser_links_keep_the_collector_at_heat_size():
     assert stale, "der L2-Platz eines aufgerufenen Vorlaufs, der nicht mehr hineinpasst, ist ein Merkposten"
     for key in ("A", "B"):
         assert heats[key].get("called_at") and len(filled_ids(heats[key])) == 3
-    removed = play(matches, stage, random.Random(12), removals=False, forfeits=False)
-    check_end(matches, removed)
+    removed, unseated = play(matches, stage, random.Random(12), removals=False, forfeits=False)
+    check_end(matches, removed, unseated)
 
 
 def test_a_returning_place_never_grows_a_full_collector():
@@ -379,8 +394,100 @@ def test_a_returning_place_never_grows_a_full_collector():
     assert len(collector["slots"]) == 4 and collector["settings"]["match_size"] == 4
     assert [e["rank"] for e in heats["B"]["advancement"] if e["flow"] == "L"] == [1, 2], "L2 von B kommt zurück"
     assert ("L", "B", 2) not in memory_of(collector)
-    removed = play(matches, stage, random.Random(11), removals=False, forfeits=False)
-    check_end(matches, removed)
+    removed, unseated = play(matches, stage, random.Random(11), removals=False, forfeits=False)
+    check_end(matches, removed, unseated)
+
+
+def capped_collector() -> tuple[list[dict], dict, dict, dict]:
+    """Wie oben: A aufgerufen, B mit vier Fahrern auf L1 gekappt, der Sammellauf voll - B fährt, und der Vierte aus B
+    hat keinen Platz: sein Merkposten wartet mit ihm dahinter."""
+    matches, stage = build(12)
+    heats = by_key(matches)
+    for key, keep in (("A", 3), ("B", 3), ("C", 2), ("D", 0)):
+        for slot in heats[key]["slots"][keep:]:
+            slot.update({"registration_id": None, "user_id": None, "status": "bye"})
+        heats[key]["status"] = "ready" if keep >= 2 else "pending"
+    call(heats["A"], "st-1")
+    rebuild(matches, stage)
+    free = next(slot for slot in heats["B"]["slots"] if slot["status"] == "bye")
+    free.update({"registration_id": "r13", "user_id": "u13", "status": "filled"})
+    rebuild(matches, stage)
+    collector = collector_of(matches, {"A", "B", "C"})
+    assert [e["rank"] for e in heats["B"]["advancement"] if e["flow"] == "L"] == [1]
+    order = filled_ids(heats["B"])
+    apply_result(matches, heats["B"], order)
+    rebuild(matches, stage)
+    check(matches, set(), "B gefahren")
+    fourth = order[3]
+    assert not any(fourth in filled_ids(m) for m in matches if m["status"] not in TERMINAL), "noch ohne Platz"
+    assert ("L", "B", 2) in memory_of(collector), "der Merkposten bleibt - ein echter Fahrer steht dahinter"
+    return matches, stage, collector, heats["B"]
+
+
+def test_a_waiting_loser_gets_the_next_free_place():
+    """#2044: der Vierte aus B hat keinen Platz bekommen, weil der Sammellauf voll war. Fährt A, wird sein L2-Platz
+    im Sammellauf ein totes Freilos - der Wartende bekommt ihn, mit Herkunft aus B."""
+    matches, stage, collector, heat_b = capped_collector()
+    heats = by_key(matches)
+    fourth = heat_b["results"][3]["registration_id"]
+    apply_result(matches, heats["A"], filled_ids(heats["A"]))
+    heats["A"].pop("called_at", None)
+    rebuild(matches, stage)
+    check(matches, set(), "A gefahren")
+    seat = next((s for s in collector["slots"] if s.get("registration_id") == fourth), None)
+    assert seat, "der Wartende sitzt im Sammellauf"
+    assert seat["source_result"]["from_match_key"] == "B" and seat["source_result"]["flow"] == "L"
+    assert [e["rank"] for e in heat_b["advancement"] if e["flow"] == "L"] == [1, 2]
+    assert ("L", "B", 2) not in memory_of(collector)
+    assert len(collector["slots"]) == 4 and collector["settings"]["match_size"] == 4
+    removed, unseated = play(matches, stage, random.Random(13), removals=False, forfeits=False)
+    check_end(matches, removed, unseated)
+
+
+def test_a_waiting_loser_without_a_place_is_reported_not_silent():
+    """#2044: wird im vollen Sammellauf nie ein Platz frei, bevor er aufgerufen wird, meldet der Umbau sichtbar, dass
+    der Vierte aus B keinen Platz mehr bekommt (``unseated``), statt ihn still zu vergessen."""
+    matches, stage, collector, heat_b = capped_collector()
+    fourth = heat_b["results"][3]["registration_id"]
+    call(collector, "st-2")
+    ops = rebuild(matches, stage)
+    reported = [op for op in ops if op.get("kind") == "unseated"]
+    assert [op["registration_id"] for op in reported] == [fourth]
+    assert reported[0]["from"] == "B" and reported[0]["heats"] == [collector["match_key"]]
+    assert "keinen Platz mehr bekommen" in reported[0]["text"]
+    assert ("L", "B", 2) not in memory_of(collector), "gemeldet ist gemeldet - kein zweites Mal"
+    assert rebuild(matches, stage) == []
+    removed, unseated = play(matches, stage, random.Random(14), removals=False, forfeits=False)
+    check_end(matches, removed, unseated | {fourth})
+
+
+def test_the_last_way_of_a_played_heat_never_grows_the_collector():
+    """#1596 trifft #2044: LB ist kampflos entschieden (nur der eine Verlierer aus C), sein einziger Weg führt zu LD;
+    dieser Fahrer tritt aus, niemand rückt nach - der Freilos-Platz behält die Weiterleitung. Legt der Umbau LC und
+    LD zusammen, hat dieser Platz Vorrang, zählt zur Laufgröße und sprengt sie nie: statt eines Sammellaufs mit fünf
+    Plätzen bleiben zwei Läufe."""
+    matches, stage = build(16)
+    heats = by_key(matches)
+    for key, keep in (("B", 2), ("C", 3), ("D", 0)):
+        for slot in heats[key]["slots"][keep:]:
+            slot.update({"registration_id": None, "user_id": None, "status": "bye"})
+        heats[key]["status"] = "ready" if keep >= 2 else "pending"
+    rebuild(matches, stage)
+    check(matches, set(), "Aufbau")
+    apply_result(matches, heats["C"], filled_ids(heats["C"]))
+    rebuild(matches, stage)
+    assert heats["LB"]["status"] == "completed" and auto_bye(heats["LB"]), "LB: nur der Verlierer aus C, kampflos"
+    loser = heats["LB"]["results"][0]["registration_id"]
+    assert len(heats["LB"]["advancement"]) == 1, "LB hat nur den einen Weg nach LD"
+    remove(matches, loser, "withdrawn", set())
+    rebuild(matches, stage)
+    check(matches, {loser}, "der Verlierer aus C ausgetreten")
+    assert len(heats["LB"]["advancement"]) == 1, "der gefahrene Lauf behält seinen Weg (#1596)"
+    target = next(m for m in matches if m["id"] == heats["LB"]["advancement"][0]["to_match_id"])
+    assert target["status"] != "cancelled" and len(target["slots"]) <= HEAT_SIZE
+    assert target["settings"]["match_size"] <= HEAT_SIZE
+    removed, unseated = play(matches, stage, random.Random(15), removals=False, forfeits=False)
+    check_end(matches, removed | {loser}, unseated)
 
 
 # ---------------------------------------------------------------------------------------------- #2044, #2045
@@ -411,8 +518,8 @@ def test_waiting_loser_heat_gets_the_losers_of_the_merged_heat():
     second_chance = [m for m in matches if m.get("section") == "LB" and m["status"] != "cancelled"
                      and set(order[2:]) <= set(filled_ids(m))]
     assert second_chance, "die Verlierer von C fahren im Loser Bracket weiter"
-    removed = play(matches, stage, random.Random(10), removals=False, forfeits=False)
-    check_end(matches, removed)
+    removed, unseated = play(matches, stage, random.Random(10), removals=False, forfeits=False)
+    check_end(matches, removed, unseated, capped_allowed=False)
 
 
 def test_rebalanced_heats_accept_results_and_send_losers_to_the_loser_bracket():
@@ -441,8 +548,8 @@ def test_rebalanced_heats_accept_results_and_send_losers_to_the_loser_bracket():
         check(matches, removed, f"Ergebnis {heat['match_key']}")
     third = three["results"][2]["registration_id"]
     assert third in filled_ids(heats["LA"]), "der Dritte aus dem Dreier-Lauf sitzt im Loser Bracket"
-    removed |= play(matches, stage, random.Random(16), removals=False, forfeits=False)
-    check_end(matches, removed)
+    more, unseated = play(matches, stage, random.Random(16), removals=False, forfeits=False)
+    check_end(matches, removed | more, unseated, capped_allowed=False)
 
 
 def test_rebuild_is_idempotent_on_the_loser_bracket_cup():
@@ -465,8 +572,9 @@ def test_loser_bracket_cup_plays_through_for_every_field_size(count: int, mode):
     """5-16 Fahrer auf 16 Plätzen ohne Ausfälle: der Abend endet mit genau einem Finale, jede/r Verlierer:in der
     Winner-Seite bekommt die zweite Chance."""
     matches, stage = build(count, mode)
-    removed = play(matches, stage, random.Random(count), removals=False, forfeits=False)
-    check_end(matches, removed, capped_allowed=False)
+    removed, unseated = play(matches, stage, random.Random(count), removals=False, forfeits=False)
+    assert not unseated, "ohne Störung bekommt jeder Verlierer seinen Platz"
+    check_end(matches, removed, unseated, capped_allowed=False)
 
 
 @pytest.mark.parametrize("mode", MODES, ids=MODE_IDS)
@@ -480,8 +588,8 @@ def test_loser_bracket_cup_over_many_draws_and_dropout_orders(seeded_draw, mode)
             seeded_draw.seed(draw_seed)
             try:
                 matches, stage = build(count, mode)
-                removed = play(matches, stage, random.Random(draw_seed + 1), removals=True, forfeits=True)
-                check_end(matches, removed)
+                removed, unseated = play(matches, stage, random.Random(draw_seed + 1), removals=True, forfeits=True)
+                check_end(matches, removed, unseated)
             except (AssertionError, MatchV2ResultError) as exc:
                 failures.append((count, draw_seed, str(exc).splitlines()[0]))
     assert not failures, failures
