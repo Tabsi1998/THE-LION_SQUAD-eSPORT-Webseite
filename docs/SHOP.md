@@ -2,7 +2,8 @@
 
 Stand: Fundament aus #1703 (Datenmodell) und #1704 (Rechte, Protokoll), dazu Stufen, Notschalter und Preise aus
 #1706 (Abschnitt „Einstellungen“ unten), Designs/Druckdateien aus #1708 (Abschnitt „Designs und Druckdateien“) und
-der Printful-Adapter aus #1705 (Abschnitt „Printful-Adapter“), Teil des Epics #1699. Der Shop ist **von außen
+der Printful-Adapter aus #1705 (Abschnitt „Printful-Adapter“), die Produktverwaltung aus #1707 mit dem Katalogabgleich
+aus #1709 (Abschnitt „Produktverwaltung und Katalogabgleich“), Teil des Epics #1699. Der Shop ist **von außen
 unsichtbar**: Es gibt keine Seiten für Mitglieder und nur eine öffentliche Route - die Druckdateien für Printful hinter
 einem Zufallsschlüssel; im Admin steht er unter Finanzen → Shop. Steuer (#1701) und die Shop-Seiten (#1712 ff.) folgen.
 
@@ -19,12 +20,12 @@ die Sammlungen direkt. Jede Katalogänderung ist eine Adminaktion mit Person und
 
 | Sammlung | Inhalt | Eindeutig |
 | --- | --- | --- |
-| `shop_products` | Produkt: Slug, Titel, Beschreibung, Stand (`draft`, `active`, `archived`), Sichtbarkeit (`hidden`, `members`, `public`), Grundpreis und Vereinsaufschlag in Cent, Gamertag erlaubt, Steuerprofil (Referenz), aktuelle Druckdatei (`design_key`), `version` | `slug` |
-| `shop_variants` | Variante eines Produkts: SKU, Bezeichnung, Größe, Farbe, eigener Preis (sonst der des Produkts), aktiv, `version` | `sku` |
+| `shop_products` | Produkt: Slug, Titel, Beschreibung, Stand (`draft` Entwurf, `reviewed` geprüft, `active` veröffentlicht, `archived`), Sichtbarkeit (`hidden` nur intern, `members` nur Mitglieder, `public` öffentlich mit Konto), Personalisierung (`none`, `gamertag`, `member_number`, `both`; daraus `gamertag_allowed`), Grundpreis (ohne Printful, sonst leer) und eigener Aufschlag in Cent (leer = allgemeiner gilt), Steuerprofil (Referenz), ältere Einzel-Druckdatei (`design_key`), `version`; seit #1707 der Aufbau: Printful-Abzug (`printful`), Technik, Angebot (`offer`: Farben, Größen), Platzierungen (`placements`), Fläche im Grundpreis (`included_placement`), Prüfung (`review`), `published_at`, `archived_at` und der Stand des Abgleichs (`catalog_sync`) | `slug` |
+| `shop_variants` | Variante eines Produkts: SKU, Bezeichnung, Größe, Farbe (mit `color_code`), Preis (bei Printful-Produkten der übernommene Selbstkostenpreis), aktiv (= angeboten), Sperre aus dem Abgleich (`blocked_reason`, `blocked_at`), `version` | `sku` |
 | `shop_designs` | Druckdatei des Vereins je Fassung: `design_key`, `version` (zählt hoch), `file_ref`, `sha256`, Druckposition; seit #1708 dazu `public_id` (Zufallsschlüssel der öffentlichen Adresse), Pixel, DPI und Druckmaße in Zoll, mit denen sie geprüft wurde, Transparenz, Ausgangsformat und `public_disabled_at` (Aufbewahrung). Alte Fassungen bleiben | `design_key` + `version`; `public_id` |
 | `shop_design_profiles` | Design (#1708): Titel, Platzierung und die **Shirtfarben**, für die es gilt (`garment_colors`), Notiz, `version` | `design_key` |
 | `shop_design_colors` | Belegung einer Shirtfarbe je Platzierung durch ein Design (#1708): `placement`, `color_key` (kleingeschrieben), `color`, `design_key` - macht „eine Farbe, ein Design“ atomar | `placement` + `color_key` |
-| `shop_printful_variants` | Zuordnung Variante → Printful-Variante und -Produkt (Anbieter `printful`) | `provider` + `variant_id` |
+| `shop_printful_variants` | Zuordnung Variante → Printful-Variante und -Produkt (Anbieter `printful`); seit #1709 Technik, Einkauf (`base_cost_cents`), Aufpreis je Druckfläche (`placement_costs`), Lager (`availability`, `in_stock`), `synced_at` und eine offene Preiswarnung (`price_warning`) | `provider` + `variant_id` |
 | `shop_carts` | Warenkorb je Konto: Variante, Menge, Gamertag – keine Preise | `user_id` |
 | `shop_orders` | Bestellung mit allem Eingefrorenen (unten), Stand, Rechnungs- und Lieferanschrift, `printful_external_id` | `idempotency_key`, `printful_external_id` |
 | `shop_order_items` | Position einer Bestellung, eingefroren | `order_id` + `position` |
@@ -47,6 +48,11 @@ Variante, Druckdatei, Printful-Zuordnung, Profil oder Dolibarr wirkt nie zurück
   Erinnerungstage, Überfälligkeit, Stornoverfahren – ohne Vorgabe, ohne automatisches Storno).
 - je Position: Produkt- und Variantenname, SKU, Menge, Einzelpreis, Aufschlag, Zeilensumme, **Gamertag** (nur
   Mitglieder bei Produkten mit Gamertag), **Druckdatei-Fassung** mit Prüfsumme, **Printful-Nummern**, Steuerprofil.
+  Seit #1707 je Platzierung (`designs`): Platzierung, Art, Printful-Druckfläche, Technik, Position in Zoll und die
+  Fassung des Designs für die Farbe der Variante (`design_key`, `version`, `sha256`) - **alle** Platzierungen, nicht
+  nur eine. Gamertag- und Vereinsnummer-Felder stehen als Platzhalter darin (Datei je Bestellung, #1711); ein Produkt
+  mit Gamertag-Feld verlangt einen Gamertag. `design` bleibt als Kurzform (erstes Design). Gesperrte Varianten und
+  Varianten ohne übernommenen Preis sind nicht bestellbar.
 - `billing_address`: bestätigte Rechnungsanschrift (Name, Firma, Straße, PLZ, Ort, Land, optional die Nummer des
   Dolibarr-Geschäftspartners) mit `source` (`dolibarr`, `account`, `checkout`) und `confirmed_at`.
 - `shipping_address`: Lieferanschrift mit Empfänger, **getrennt** von der Rechnungsanschrift, mit `source` und
@@ -114,10 +120,10 @@ die Rolle, andere über eine Freigabe. Matrix: [docs/ROLLEN.md](ROLLEN.md#shop-1
 
 | Route | Zweck |
 | --- | --- |
-| `GET /api/admin/shop/products` | Produkte lesen |
-| `POST /api/admin/shop/products` | Produkt anlegen (mit Grund) |
-| `GET /api/admin/shop/products/{id}` | Produkt mit Varianten |
-| `PATCH /api/admin/shop/products/{id}` | Produkt ändern (mit Grund) |
+| `GET /api/admin/shop/products` | Produkte lesen, mit Übersicht (Stand, Printful, Sperren, Preiswarnungen) |
+| `POST /api/admin/shop/products` | Produkt anlegen (mit Grund; nur Titel Pflicht, immer Entwurf) |
+| `GET /api/admin/shop/products/{id}` | Produkt mit allem für den Aufbau (#1707, Abschnitt unten) |
+| `PATCH /api/admin/shop/products/{id}` | Grunddaten ändern (mit Grund) - nie den Stand |
 | `POST /api/admin/shop/products/{id}/variants` | Variante anlegen (mit Grund) |
 | `PATCH /api/admin/shop/variants/{id}` | Variante ändern (mit Grund) |
 | `GET /api/admin/shop/orders` | Bestellungen lesen – ohne Anschriften |
@@ -142,13 +148,18 @@ ohne Änderung schreibt nichts.
 | `shop.design.add`, `shop.printful_variant.set` | Druckdatei-Fassung (mit Prüfsumme, Pixeln, DPI - nie mit dem Zufallsschlüssel), Printful-Zuordnung |
 | `shop.design.profile` | Design angelegt bzw. Titel, Shirtfarben (vorher/nachher) oder Notiz geändert (#1708) |
 | `shop.design.placement` | Druckbreite, Druckbereich oder Mindest-DPI einer Platzierung, vorher/nachher (#1708) |
+| `shop.product.catalog`, `shop.product.offer` | Printful-Produkt gewählt (vorher/nachher), Farben und Größen angeboten (#1707) |
+| `shop.product.placements`, `shop.product.designs` | Platzierungen mit Position (vorher/nachher), Design je Platzierung und Farbe (#1707) |
+| `shop.product.status` | Stand vorher/nachher mit Prüfergebnis; auch „zurück auf Entwurf“ nach einer Änderung (#1707) |
+| `shop.catalog.sync` | Abgleich mit Printful: gesperrte, freigegebene Varianten, Preisänderungen - nur wenn sich etwas ändert (#1709) |
 | `shop.order.release`, `shop.order.printful_confirm`, `shop.order.cancel` | vorgesehen für #1718, #1721 |
 | `shop.order.club`, `shop.order.prize` | vorgesehen für #1724, #1726 |
 | `shop.config` | Einstellungen geändert (#1706): Stufe, Freigabe „Steuer geklärt“, Notschalter, Preise, Printful-Schlüssel – mit vorher und nachher, nie mit Schlüssel |
 
 **Menü:** Verwaltung → Finanzen → **Shop** (`/admin/shop`, #1706) - ein Menüeintrag mit Reitern: **Einstellungen**
-(`/admin/shop`) und **Designs** (`/admin/shop/designs`, #1708). Die Produktverwaltung (#1707) und der Testentwurf
-(#2062) kommen als weitere Reiter dazu (`frontend/src/pages/admin/ShopTabs.jsx`), ohne das Menü zu verlängern.
+(`/admin/shop`), **Produkte** (`/admin/shop/products`, #1707) und **Designs** (`/admin/shop/designs`, #1708). Der
+Testentwurf (#2062) kommt als weiterer Reiter dazu (`frontend/src/pages/admin/ShopTabs.jsx`), ohne das Menü zu
+verlängern.
 
 ## Einstellungen, Stufen und Notschalter (#1706)
 
@@ -295,13 +306,81 @@ die Variante ohne Druckdatei.
 Nicht in #1708: der Editor mit Ebenen, Hilfslinien und Drag-and-drop (Teil 2), die Gamertag-Druckdatei (#1711),
 Mockups (#1710) und das Hochladen zu Printful (#1705).
 
+## Produktverwaltung und Katalogabgleich (#1707, #1709)
+
+Code: `backend/services/shop_products.py` (Aufbau, Prüfung, Stand, Ansicht), `shop_catalog_sync.py` (Abgleich),
+Routen `backend/routes/shop_product_routes.py` (Schritte) und `shop_admin_routes.py` (Anlegen, Grunddaten, Lesen),
+Seite `frontend/src/pages/admin/AdminShopProductsPage.jsx` (Verwaltung → Finanzen → Shop → Reiter **Produkte**).
+Beispiel aus #2062: Gildan 5000 schwarz mit Löwe vorne rechts, Gamertag vorne links und Rückenlogo.
+
+**Fünf Schritte** - jeder mit Grund und Protokoll, jede Antwort die volle Ansicht samt Vorab-Prüfung:
+
+1. **Produkt wählen:** Grunddaten (Titel, Beschreibung - bereinigt -, Sichtbarkeit, Personalisierung) und die
+   Printful-Produktnummer. Die Website lädt über den Adapter Produkt und Varianten (Größe, Farbe, Variantennummer,
+   Lager, Druckflächen mit Maßen) und speichert einen Abzug - **ohne Preise**. Eine Textsuche bietet Printful v2 nicht
+   (nur Filter nach Kategorie); die Nummer kommt aus dem Printful-Katalog. Eine Variantennummer als Produktnummer findet
+   Printful nicht - die Meldung sagt das. Ein anderes Printful-Produkt setzt Angebot und Technik zurück; vorhandene
+   Varianten bleiben (Bestellungen zeigen auf sie), werden aber inaktiv.
+2. **Farben und Größen:** Technik, Farben, Größen. Je Farbe × Größe eine Variante (SKU `PF<Printful-Variante>-<Produkt>`)
+   mit Zuordnung zur Printful-Variante; danach holt der Abgleich die Einkaufspreise **nur für diese** (höchstens 80 je
+   Produkt - je Variante ein Preisaufruf).
+3. **Designs je Platzierung:** Platzierungen aus den Druckflächen des Printful-Produkts. Brust links/rechts und
+   „Vorderseite groß“ liegen auf der Printful-Fläche `front`, die Rückseite auf `back` (eigener Aufpreis). Position,
+   Breite und Höhe in Zoll (Anzeige mit cm), von vorne gesehen ab links oben im Druckbereich; die Vorlage kommt aus den
+   Druckbereichen der Designs (#1708), „Brust rechts vom Träger aus“ liegt von vorne gesehen links. Je Platzierung und
+   angebotener Farbe ein Design dieser Platzierung, vorgeschlagen über `design_for_color`. Art **Gamertag** bzw.
+   **Vereinsnummer** ist ein Platzhalter (Datei je Bestellung, #1711) und nur mit passender Personalisierung erlaubt.
+4. **Preise:** Mitgliederpreis = **Selbstkostenpreis**: Einkauf der Variante (Technik) plus Aufpreis jeder weiteren
+   Printful-Druckfläche; eine Fläche steckt im Grundpreis (`included_placement`, Vorgabe `front`). Ohne Aufschlag.
+   Öffentlicher Preis = Einkauf plus Aufschlag als Vorschlag; der eigene Aufschlag des Produkts ersetzt den
+   allgemeinen. „Preise übernehmen“ schreibt die Selbstkosten in die Varianten - nur so kommen Preise von Printful in
+   den Shop. Ob die Fläche im Grundpreis stimmt, zeigt die Kostenschätzung im Testentwurf (#2062).
+5. **Prüfen und veröffentlichen:** Entwurf → **geprüft** → **veröffentlicht** → archiviert.
+
+**Vorab-Prüfung** (`run_check`): Printful-Produkt geladen und nicht eingestellt; Farben und Größen gewählt;
+Sichtbarkeit und Personalisierung passen zu den Platzierungen; mindestens eine Platzierung mit Design; **jede
+angebotene Farbe hat an jeder Design-Platzierung eine gültige, öffentliche Datei** (sonst nennt die Prüfung Platzierung
+und Farbe); alle angebotenen Varianten lieferbar; Preis berechnet und übernommen, ohne offene Preiswarnung. Dazu die
+**Mockup-Prüfung**: bis #1710 „offen“. „Geprüft“ braucht alles außer den Mockups, „veröffentlicht“ alles - bis #1710
+lässt sich also nichts veröffentlichen.
+
+**Regeln:** Den Stand ändert nur `POST …/status` (ein gewöhnliches Speichern lehnt `status` ab). Ein geprüftes Produkt
+fällt bei jeder Änderung des Aufbaus (auch der Personalisierung) zurück auf „Entwurf“; ein veröffentlichtes ändert man
+erst nach dem Zurückziehen - nur „Preise übernehmen“ geht auch veröffentlicht. Archivierte Produkte bleiben lesbar.
+„Öffentlich“ plus Personalisierung lehnt der Server immer ab.
+
+**Abgleich** (`shop_catalog_sync`): auf Knopfdruck („Mit Printful abgleichen“) und täglich um 05:20 Wiener Zeit
+(Scheduler-Job `shop_catalog_sync`, alle nicht archivierten Produkte mit Printful-Produkt, ohne Schlüssel nichts).
+
+- Nicht lieferbar (Printful meldet nicht „in stock“ oder kennt die Variante nicht mehr): Variante gesperrt
+  (`blocked_reason`), `place_order` nimmt sie nicht; wieder lieferbar hebt die Sperre auf.
+- Preisänderung: neuer Einkauf an der Zuordnung plus `price_warning` (vorher/nachher, seit) - der Preis der Variante
+  bleibt, bis die Finanzen übernehmen. Bestehende Bestellungen haben ihre Preise eingefroren.
+- Ausfall: nichts ändert sich; `catalog_sync` merkt Zeitpunkt, Ursache und `last_ok_at` - der Admin zeigt den letzten
+  Stand mit Datum.
+- Rate-Limit: je angebotener Variante ein Preisaufruf; ein Client je Lauf bleibt unter 100 Aufrufen je Minute.
+
+| Route (alle `require_area("finance")`) | Zweck |
+| --- | --- |
+| `POST /api/admin/shop/products/{id}/printful` | Schritt 1: Printful-Produkt laden (`printful_product_id`, Grund) |
+| `PUT /api/admin/shop/products/{id}/offer` | Schritt 2: Technik, Farben, Größen (Grund) - danach Preise |
+| `PUT /api/admin/shop/products/{id}/placements` | Schritt 3: Platzierungen mit Art und Position, Fläche im Grundpreis (Grund) |
+| `PUT /api/admin/shop/products/{id}/designs` | Schritt 3: Design je Platzierung und Farbe, `null` entfernt (Grund) |
+| `POST /api/admin/shop/products/{id}/prices/accept` | Schritt 4: Selbstkosten als Mitgliederpreis übernehmen (Grund) |
+| `POST /api/admin/shop/products/{id}/sync` | Mit Printful abgleichen (Grund freiwillig, Person im Protokoll) |
+| `POST /api/admin/shop/products/{id}/status` | Schritt 5: `reviewed`, `active`, `draft`, `archived` (Grund) |
+
+Offen für spätere Pakete: Mockups und ihre Prüfung (#1710), die Gamertag- bzw. Vereinsnummer-Datei (#1711) - ob
+Printful zwei Ebenen auf `front` annimmt oder Löwe und Gamertag zu einer Front-Datei zusammengesetzt werden müssen,
+klärt der Testentwurf (#2062) -, Fotos, Galerie und Größentabelle, der visuelle Editor (Ergänzung vom 15.10.).
+
 ## Printful-Adapter (#1705)
 
 Code: `backend/services/shop_fulfillment.py` (austauschbare Schnittstelle `FulfillmentProvider`, Typen, Fehlerklassen)
 und `backend/services/printful_client.py` (`PrintfulClient`, die Umsetzung für Printful). Vertrag:
 `backend/tests/contracts/printful/` (Ausschnitt der OpenAPI-Beschreibung plus `manifest.json`), Fake:
-`backend/tests/printful_fake.py`. Noch ruft keine Route außer „Verbindung testen“ den Adapter; die Testansicht kommt mit
-#2062.
+`backend/tests/printful_fake.py`. Den Adapter rufen „Verbindung testen“ und die Produktverwaltung (Katalog und
+Abgleich, #1707/#1709); die Testansicht kommt mit #2062.
 
 **Version: Printful API v2** (`https://api.printful.com/v2/…`, Stand 27.10.2026 „Open Beta“, laut Printful für den
 Betrieb freigegeben). Gründe:
@@ -429,6 +508,8 @@ Geheimnis gehört verschlüsselt in die Shop-Einstellungen (#1720).
 
 `backend/tests/test_printful_client_unit.py` gegen den Fake: Katalog, Schätzung, Entwurf (auch: Anlegen bestätigt
 nie), Bestätigen mit Notschalter und Idempotenz, Dateien, Mockups, Signatur, jede Fehlerklasse, Wiederholen mit
-`Retry-After`, kein Schlüssel in Fehlern und Logs. Es gibt **keine** echten Aufrufe an Printful. Die Abnahme gegen das
+`Retry-After`, kein Schlüssel in Fehlern und Logs, Aufpreis je Druckfläche, Preise nur für gewählte Varianten und das
+Rate-Limit. Produktverwaltung und Abgleich: `test_shop_products_unit.py` und `test_shop_products_flow.py`, ebenfalls
+gegen den Fake. Es gibt **keine** echten Aufrufe an Printful. Die Abnahme gegen das
 echte Printful (Entwurf und Schätzung anlegen, nicht bestätigen) macht der Obmann mit der Testansicht aus #2062.
 

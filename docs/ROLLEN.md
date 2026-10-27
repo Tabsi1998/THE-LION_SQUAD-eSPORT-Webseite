@@ -88,6 +88,9 @@ Anschrift (docs/SHOP.md).
 | Printful-Verbindung testen (nur lesen) | – | – | – | ja | ja | ja |
 | Designs und Druckbereiche lesen (#1708) | – | – | – | ja | ja | ja |
 | Druckdatei hochladen, Shirtfarben, Druckbereich ändern (#1708) | – | – | – | ja, mit Grund | ja, mit Grund | ja, mit Grund |
+| Produkt aufbauen: Printful-Produkt, Farben und Größen, Platzierungen, Designs, Preise übernehmen (#1707) | – | – | – | ja, mit Grund | ja, mit Grund | ja, mit Grund |
+| Prüfen, veröffentlichen (nur nach bestandener Prüfung), zurückziehen, archivieren (#1707) | – | – | – | ja, mit Grund | ja, mit Grund | ja, mit Grund |
+| Mit Printful abgleichen (#1709) | – | – | – | ja | ja | ja |
 | ohne bestätigte Zwei-Faktor-Anmeldung | – | – | – | – | – | – |
 
 Moderator und Vereinsverwaltung (Vorstand) haben keinen Zugriff, solange ihnen Finanzen nicht ausdrücklich
@@ -414,7 +417,7 @@ Finanzen; die Turnierleitung Turniere, Stationen, Strafen und Gewinne; der Admin
 | Übersicht | Dashboard (Turnierleitung, Redaktion, Vereinsverwaltung, Finanzen, System) · Mein Dienst (Helfer mit Einsatz, Captains externer Serien, Moderation ohne Verwaltungsbereich) | Dashboard mit einem dieser Bereiche und Zwei-Faktor (Server: `require_dashboard`, #992, #1353); „Mein Dienst“ (#1352) für Helfer und reine Moderation – im Benutzermenü statt „Admin“, `/admin` führt Helfer nach `/admin/dienst`, Moderation nach `/admin/moderation`, Konten ohne Dienst auf „Kein Zugriff“ mit dem Satz „Die Verwaltung ist für Vereinsdienste …“ |
 | Verein | Vereinsdaten (System) · Über uns, Sponsoren, Partner, Referenzen, Serien (Redaktion) · Vorstand, Kontakt-Inbox (Vereinsverwaltung) | je Eintrag |
 | Mitglieder | Mitglieder (mit dem Reiter Öffentliche Profile), Bewerbungen, Mitgliedervorteile, Dokumente, Alle Benutzer (Vereinsverwaltung) · Dolibarr (Vereinsverwaltung und System) | Vereinsverwaltung |
-| Finanzen | Finanzübersicht · Shop (Reiter Einstellungen: Stufe, Notschalter, Preise, Printful-Zugang, #1706; Reiter Designs: Druckdateien, #1708; die Produktverwaltung folgt mit #1707) | Finanzen |
+| Finanzen | Finanzübersicht · Shop (Reiter Einstellungen: Stufe, Notschalter, Preise, Printful-Zugang, #1706; Reiter Produkte: Aufbau, Prüfung, Abgleich mit Printful, #1707/#1709; Reiter Designs: Druckdateien, #1708) | Finanzen |
 | eSports | Turniere, Fast Lap, Stationen (Turnierleitung, Helfer) · Turnier-Leitfaden, Jahreswertung, Spiele, Gewinne, Strafen (Turnierleitung) · Game-Server (System) | Turnierleitung |
 | Content | Events (Turnierleitung) · News, Galerie, Medien, Navigation, Erfolge, Sticker (Redaktion) · Downloads & QR (Turnierleitung, Redaktion, Vereinsverwaltung, System) | Redaktion |
 | Verbindungen | Alle Verbindungen (Übersicht mit Zustand: aktiv, aus, fehlt, nicht lesbar, Fehler) · je Dienst eine Seite (Google, Resend, SMTP, Discord, Twitch, Steam, …) | System |
