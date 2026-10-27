@@ -32,6 +32,8 @@ EXPECTED = {
     "media_scans": {"state_1", "owner_id_1"},
     "billing_cases": {"order_id_1_status_1", "status_1"},
     "billing_orders": {"booking_key_unique"},
+    # Mail-Warteschlange (#2067): je Schlüssel gegen doppelten Versand höchstens eine Mail; Mails ohne Schlüssel frei.
+    "mail_jobs": {"dedupe_key_unique"},
     "tournament_awards": {"tournament_id_1_registration_id_1", "registration_id_1"},
     "team_squads": {"team_id_1"},
     "chat_attachments": {"owner_id_1", "status_1_created_at_1"},

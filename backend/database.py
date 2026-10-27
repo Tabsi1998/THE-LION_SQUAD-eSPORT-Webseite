@@ -371,7 +371,7 @@ async def init_indexes():
     await db.mail_jobs.create_index("id", unique=True)
     await db.mail_jobs.create_index([("status", 1), ("next_attempt_at", 1)])
     await db.mail_jobs.create_index([("status", 1), ("updated_at", 1)])
-    await db.mail_jobs.create_index("dedupe_key")
+    # dedupe_key: eindeutig, nur für Zeilen mit Schlüssel - siehe AUDIT_UNIQUE_INDEXES (#2067).
     await db.mail_jobs.create_index("created_at")
     # Media ownership for user-facing media pickers
     await db.media_uploads.create_index("id", unique=True)
@@ -505,6 +505,8 @@ FASTLAP_PRIZE_KEY = [("source_type", 1), ("fastlap_challenge_id", 1), ("fastlap_
 # Gewöhnliche Indizes, die ein eindeutiger aus der Vollprüfung ersetzt (gleiche Felder) - beim Start weg damit.
 REPLACED_INDEXES = (
     ("prize_pickups", "_".join(f"{field}_{direction}" for field, direction in FASTLAP_PRIZE_KEY)),
+    # Der frühere gewöhnliche Index auf dedupe_key - jetzt eindeutig (#2067).
+    ("mail_jobs", "dedupe_key_1"),
 )
 
 # Vollprüfung Oktober 2026 (#930): diese Sammlungen werden bei fast jeder Anfrage gelesen und hatten keinen Index;
@@ -530,6 +532,9 @@ AUDIT_UNIQUE_INDEXES: tuple[tuple[str, Any, str, dict], ...] = (
     # Je eingefrorenem Preis höchstens ein Rechnungsauftrag (#1184). Nur Aufträge mit Schlüssel zählen - ältere haben
     # keinen und können den Aufbau nie blockieren; Dubletten ließen ohnehin nur einen gewöhnlichen Index zurück.
     ("billing_orders", "booking_key", "booking_key", {"partialFilterExpression": {"booking_key": {"$exists": True}}}),
+    # Mail-Warteschlange (#2067): je Schlüssel gegen doppelten Versand höchstens eine Mail - Grundlage für das
+    # Einreihen per Upsert (services/mail_outbox.py). Mails ohne Schlüssel (dedupe_key fehlt oder null) zählen nicht.
+    ("mail_jobs", "dedupe_key", "dedupe_key", {"partialFilterExpression": {"dedupe_key": {"$type": "string"}}}),
     # Je Konto, Mitglied, Zweck, Entscheidung und Fassung höchstens ein offener Einwilligungsauftrag (#1537): zwei
     # gleichzeitige Klicks schicken dieselbe Kennung an Dolibarr. Abgeschlossene Aufträge bleiben außen vor.
     ("consent_decisions", [("user_id", 1), ("member_id", 1), ("code", 1), ("decision", 1), ("version", 1)], "open_decision",
