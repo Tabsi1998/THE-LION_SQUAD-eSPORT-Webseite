@@ -372,6 +372,31 @@ async def test_extra_images_are_ignored_and_the_real_template_is_preferred(db, p
 
 
 @pytest.mark.asyncio
+async def test_unexpected_types_cost_only_their_row_never_a_500(db, provider, fake):
+    """Review #2091: ``role`` als Liste ist nicht hashbar - das durfte den Abgleich nicht mit TypeError abbrechen."""
+    fake.off_contract.update({STYLES, TEMPLATES})
+    row_of(fake.templates[SHIRT], "front").update(role=["x"], template_type={"a": 1})
+    row_of(fake.templates[SHIRT], "back")["catalog_variant_ids"] = "alle"
+    row_of(fake.print_areas[SHIRT], "label_inside")["mockup_styles"] = [{"restricted_to_variants": [[1], {"a": 1}]}]
+    result = await templates.refresh(db, SHIRT, provider=provider, actor_id=ACTOR)
+    stored = result["template"]
+    assert result["ok"] is True and ("label_inside", "all") in sizes(stored)
+    front = templates.preview_for(stored, entry_of(stored, "front"))
+    assert front is not None and front["role"] is None, "role ohne Text: Vorlage bleibt, nur ohne Rolle"
+    assert templates.preview_for(stored, entry_of(stored, "back"))["variant_ids"] == []
+    assert stored["skipped"] == []
+
+    def broken(_row):
+        raise TypeError("unerwartet")
+
+    from services.printful_client import _RowSkip
+
+    with pytest.raises(_RowSkip) as skip:
+        provider._read_row(broken, {})
+    assert skip.value.text == "Feld unbekannt fehlt oder passt nicht (erwartet: Felder mit den Typen laut Printful-Schema)."
+
+
+@pytest.mark.asyncio
 async def test_when_no_row_fits_the_fetch_fails_with_the_most_common_reason(db, provider, fake):
     fake.off_contract.add(STYLES)
     for row in fake.print_areas[SHIRT]:

@@ -549,6 +549,17 @@ class PrintfulClient:
         return f"{placement} ({technique})"
 
     @staticmethod
+    def _read_row(read, row: dict):
+        """Eine Zeile lesen. Scheitert sie an einem Typ, den keine Prüfung erwartet hat (Liste statt Text …), gilt sie
+        ebenfalls als übersprungen - eine Zeile darf nie den ganzen Abruf mit einem Fehler 500 abbrechen."""
+        try:
+            return read(row)
+        except _RowSkip:
+            raise
+        except (TypeError, ValueError, KeyError, AttributeError, OverflowError) as exc:
+            raise _RowSkip("unbekannt", "Felder mit den Typen laut Printful-Schema") from exc
+
+    @staticmethod
     def _skip_summary(kind: str, reasons: list[str], total: int, operation: str) -> tuple[str, ...]:
         """Gleiche Gründe zusammengefasst (mit Anzahl), höchstens ``MAX_SKIP_REASONS`` - und ein Log-Eintrag je Abruf."""
         if not reasons:
@@ -591,7 +602,7 @@ class PrintfulClient:
         out, reasons = [], []
         for row in rows:
             try:
-                out.append(self._print_area(row))
+                out.append(self._read_row(self._print_area, row))
             except _RowSkip as skip:
                 reasons.append((self._where(row), skip.text))
         skipped = self._skip_summary("Druckvorgabe", [f"{where}: {text}" for where, text in reasons], len(rows),
@@ -610,6 +621,8 @@ class PrintfulClient:
         nicht braucht. Fehlt das Bild oder ist es nicht https, taugt die Zeile nicht für die Vorschau (die Druckfläche
         selbst kommt aus mockup-styles)."""
         role, kind = row.get("role"), row.get("template_type")
+        role = role if isinstance(role, str) else None
+        kind = kind if isinstance(kind, str) else None
         if role in IGNORED_TEMPLATE_ROLES or (isinstance(role, str) and role.startswith("advanced")) or kind == "advanced":
             return None
         placement = self._row_key(row.get("placement"), PLACEMENT_RE, "placement", "Platzierungskennung (a-z, 0-9, _)")
@@ -657,7 +670,7 @@ class PrintfulClient:
         out, reasons = [], []
         for row in rows:
             try:
-                template = self._mockup_template(row)
+                template = self._read_row(self._mockup_template, row)
             except _RowSkip as skip:
                 reasons.append(f"{self._where(row)}: {skip.text}")
                 continue
