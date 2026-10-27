@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.43.0](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/compare/v1.42.0...v1.43.0) (2026-10-27)
+
+
+### Neu
+
+* Vereinsshop: die Shirtfarbe wählt automatisch das helle oder dunkle Motiv, Ausnahmen je Farbe möglich ([#2069](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2069)) ([5762de5](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/5762de5f66718beb2debe2bb7cbbfaa9e9f2d1d2))
+* Vereinsshop: Motive als echtes Vektor-SVG hochladen - streng geprüft, die Fassung für helle Shirts entsteht automatisch ([#2069](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2069)) ([5762de5](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/5762de5f66718beb2debe2bb7cbbfaa9e9f2d1d2))
+
+
+### Fehlerbehebungen
+
+* Shop-Verwaltung: die Gamertag-Seite lädt wieder statt „Network Error“ ([#1711](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1711)) ([ee7002f](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/ee7002f5185ee79ea5630dfd2ad26201da75cf93))
+* SVG-Logos im Erscheinungsbild laufen durch dieselbe sichere Bereinigung wie der Shop ([#2069](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2069)) ([5762de5](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/5762de5f66718beb2debe2bb7cbbfaa9e9f2d1d2))
+
 ## 1.42.0 (27.10.2026)
 
 ### Neu
