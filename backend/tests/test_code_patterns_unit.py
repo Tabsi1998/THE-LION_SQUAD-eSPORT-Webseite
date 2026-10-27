@@ -120,9 +120,55 @@ def test_shop_routes_need_the_finance_area_and_none_are_public(tmp_path):
 
 
 def test_the_real_shop_routes_are_guarded():
-    # Regel 3 gilt hart: jede Shop-Route der Anwendung hängt an „Finanzen“, keine ist öffentlich (#1704).
+    # Regel 3 gilt hart: jede Shop-Route der Anwendung hängt an „Finanzen“ (#1704) - außer den einzeln freigegebenen.
     assert patterns.shop_route_guards(ROOT) == []
-    assert patterns.shop_routes(ROOT), "die Suche findet die Shop-Routen"
+    routes = patterns.shop_routes(ROOT)
+    assert routes, "die Suche findet die Shop-Routen"
+    public = {(route.method, route.url, route.path) for route in routes
+              if not route.url.startswith(patterns.SHOP_ADMIN_PREFIX + "/")}
+    assert public == set(patterns.PUBLIC_SHOP_ROUTES), "jede Ausnahme gibt es wirklich, und es gibt keine weitere"
+
+
+PRINT_FILE_ROUTES = '''from fastapi import APIRouter
+
+router = APIRouter(prefix="/api/shop/print-files", tags=["shop"])
+
+
+@router.get("/{public_id}/{filename}")
+async def print_file(public_id: str, filename: str):
+    return {}
+
+
+@router.get("/{public_id}")
+async def listing(public_id: str):
+    return {}
+
+
+@router.post("/{public_id}/{filename}")
+async def replace(public_id: str, filename: str):
+    return {}
+'''
+
+
+def test_the_print_file_exception_holds_only_for_its_method_path_and_file(tmp_path):
+    # Die öffentliche Adresse für Printful (#1708) ist bewusst erlaubt - aber nur genau diese eine Route in genau dieser
+    # Datei. Eine Liste daneben, ein Schreibzugriff oder dieselbe Route in einer anderen Datei bleiben Fehler.
+    reason = patterns.PUBLIC_SHOP_ROUTES[("GET", "/api/shop/print-files/{public_id}/{filename}",
+                                          "backend/routes/shop_print_file_routes.py")]
+    assert "Printful" in reason and "Zufallsschlüssel" in reason
+    routes = tmp_path / "backend" / "routes"
+    routes.mkdir(parents=True)
+    (routes / "shop_print_file_routes.py").write_text(PRINT_FILE_ROUTES, encoding="utf-8")
+    (routes / "shop_copy_routes.py").write_text(PRINT_FILE_ROUTES, encoding="utf-8")
+    found = sorted((item.path.rsplit("/", 1)[1], item.name) for item in patterns.shop_route_guards(tmp_path))
+    base = "/api/shop/print-files/{public_id}"
+    assert found == [
+        ("shop_copy_routes.py", f"GET {base} ist öffentlich"),
+        ("shop_copy_routes.py", f"GET {base}/{{filename}} ist öffentlich"),
+        ("shop_copy_routes.py", f"POST {base}/{{filename}} ist öffentlich"),
+        ("shop_print_file_routes.py", f"GET {base} ist öffentlich"),
+        ("shop_print_file_routes.py", f"POST {base}/{{filename}} ist öffentlich"),
+    ]
 
 
 def test_only_unused_names_a_change_brings_in_count(tmp_path):

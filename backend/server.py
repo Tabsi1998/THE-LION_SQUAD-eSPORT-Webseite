@@ -80,6 +80,7 @@ from routes.member_card_routes import router as member_card_router
 from routes.finance_routes import router as finance_router
 from routes.shop_admin_routes import router as shop_admin_router
 from routes.shop_design_routes import router as shop_design_router
+from routes.shop_print_file_routes import router as shop_print_file_router
 from routes.platform_link_routes import router as platform_link_router
 from routes.discord_bot_routes import router as discord_bot_router
 from routes.discord_forward_routes import router as discord_forward_router
@@ -362,6 +363,7 @@ app.include_router(member_card_router)
 app.include_router(finance_router)
 app.include_router(shop_admin_router)  # Shop (#1704): nur Finanzen
 app.include_router(shop_design_router)  # Designs und Druckdateien (#1708): nur Finanzen
+app.include_router(shop_print_file_router)  # Druckdateien für Printful (#1708): bewusst öffentlich, Regel 3
 app.include_router(platform_link_router)
 app.include_router(discord_bot_router)
 app.include_router(discord_guild_router)

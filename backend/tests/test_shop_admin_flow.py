@@ -158,12 +158,14 @@ async def requests_anonymous(flow, product_id: str, order_id: str) -> dict:
 
 
 @pytest.mark.asyncio
-async def test_the_shop_has_no_public_routes(flow):
+async def test_the_only_public_shop_route_is_the_print_file_for_printful(flow):
     from server import app
 
     paths = sorted({getattr(route, "path", "") for route in _routes(app.routes)})
     shop = [path for path in paths if "shop" in path]
-    assert shop and all(path.startswith(f"{BASE}/") or path == BASE for path in shop), shop
+    public = [path for path in shop if not (path.startswith(f"{BASE}/") or path == BASE)]
+    # Bewusst öffentlich (#1708, Regel 3 in scripts/check-code-patterns.py): Printful holt die Druckdateien.
+    assert shop and public == ["/api/shop/print-files/{public_id}/{filename}"], shop
 
 
 def _routes(routes):
