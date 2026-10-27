@@ -101,6 +101,7 @@ export default function AdminShopPage() {
   const [stage, setStage] = useState(null);
   const [markup, setMarkup] = useState("");
   const [fallback, setFallback] = useState("");
+  const [minPrice, setMinPrice] = useState("");
   const [apiKey, setApiKey] = useState("");
 
   const take = useCallback((next) => {
@@ -108,6 +109,7 @@ export default function AdminShopPage() {
     setStage(next.config.stage);
     setMarkup(centsToInput(next.config.public_markup_cents));
     setFallback(centsToInput(next.config.fallback_shipping_cents));
+    setMinPrice(centsToInput(next.config.min_price_cents));
   }, []);
 
   useEffect(() => {
@@ -140,9 +142,12 @@ export default function AdminShopPage() {
   const lastTest = config.printful_last_test;
   const markupCents = centsFromInput(markup);
   const fallbackCents = centsFromInput(fallback);
+  const minPriceCents = centsFromInput(minPrice);
+  const minPriceChanged = minPriceCents !== config.min_price_cents;
   const pricesValid = Number.isInteger(markupCents) && markupCents <= data.limits.public_markup_cents
-    && (fallbackCents === null || (Number.isInteger(fallbackCents) && fallbackCents >= 1 && fallbackCents <= data.limits.fallback_shipping_cents));
-  const pricesChanged = markupCents !== config.public_markup_cents || fallbackCents !== config.fallback_shipping_cents;
+    && (fallbackCents === null || (Number.isInteger(fallbackCents) && fallbackCents >= 1 && fallbackCents <= data.limits.fallback_shipping_cents))
+    && Number.isInteger(minPriceCents) && minPriceCents >= 1 && minPriceCents <= data.limits.min_price_cents;
+  const pricesChanged = markupCents !== config.public_markup_cents || fallbackCents !== config.fallback_shipping_cents || minPriceChanged;
   const stageOf = (value) => stages.find((item) => item.key === value);
 
   return (
@@ -232,7 +237,7 @@ export default function AdminShopPage() {
               <span className="text-white/70">Öffentlicher Aufschlag je Artikel (€)</span>
               <input value={markup} onChange={(event) => setMarkup(event.target.value)} inputMode="decimal" placeholder="0,00"
                 className="mt-1 w-full min-h-10 bg-black/40 border border-white/15 rounded-sm px-3 tabular-nums focus:border-brand outline-none" data-testid="shop-markup" />
-              <span className="block text-xs text-white/45 mt-1">Nur bei öffentlichen Käufen, zusätzlich zu einem eigenen Aufschlag des Produkts.</span>
+              <span className="block text-xs text-white/45 mt-1">Nur bei öffentlichen Käufen. Hat ein Produkt einen eigenen Aufschlag, ersetzt der diesen.</span>
             </label>
             <label className="block text-sm">
               <span className="text-white/70">Ersatzpauschale Versand (€)</span>
@@ -240,11 +245,17 @@ export default function AdminShopPage() {
                 className="mt-1 w-full min-h-10 bg-black/40 border border-white/15 rounded-sm px-3 tabular-nums focus:border-brand outline-none" data-testid="shop-fallback" />
               <span className="block text-xs text-white/45 mt-1">Gilt, wenn Printful den Versand nicht schätzen kann. Leer: dann wird nicht bestellt.</span>
             </label>
+            <label className="block text-sm">
+              <span className="text-white/70">Mindestpreis je Artikel (€)</span>
+              <input value={minPrice} onChange={(event) => setMinPrice(event.target.value)} inputMode="decimal" placeholder="1,00"
+                className="mt-1 w-full min-h-10 bg-black/40 border border-white/15 rounded-sm px-3 tabular-nums focus:border-brand outline-none" data-testid="shop-min-price" />
+              <span className="block text-xs text-white/45 mt-1">Kein Verkaufspreis darunter – auch nicht 0 €. Die Prüfung vor dem Veröffentlichen hält sich daran.</span>
+            </label>
           </div>
-          {!pricesValid && <p className="text-xs text-warn" data-testid="shop-prices-invalid">Beträge in Euro, z. B. 3,50 – Aufschlag bis {formatCents(data.limits.public_markup_cents)}, Pauschale 0,01 bis {formatCents(data.limits.fallback_shipping_cents)}.</p>}
+          {!pricesValid && <p className="text-xs text-warn" data-testid="shop-prices-invalid">Beträge in Euro, z. B. 3,50 – Aufschlag bis {formatCents(data.limits.public_markup_cents)}, Pauschale 0,01 bis {formatCents(data.limits.fallback_shipping_cents)}, Mindestpreis 0,01 bis {formatCents(data.limits.min_price_cents)}.</p>}
           <ReasonedButton id="shop-prices-save" label="Preise speichern" busy={busy === "prices"} disabled={!pricesValid || !pricesChanged}
             blockedHint={!pricesValid ? "Erst gültige Beträge eintragen (0 bis 100 €)." : "Es hat sich noch nichts geändert."}
-            onSubmit={(reason) => run("prices", () => api.patch(BASE, { public_markup_cents: markupCents, fallback_shipping_cents: fallbackCents, reason }), "Preise gespeichert.")} />
+            onSubmit={(reason) => run("prices", () => api.patch(BASE, { public_markup_cents: markupCents, fallback_shipping_cents: fallbackCents, ...(minPriceChanged ? { min_price_cents: minPriceCents } : {}), reason }), "Preise gespeichert.")} />
         </Section>
 
         <Section title="Printful-Zugang" icon={KeyRound} testId="shop-access">

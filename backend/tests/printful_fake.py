@@ -119,11 +119,16 @@ def _error(status: int, message: str = "x") -> httpx.Response:
     return httpx.Response(status, json={"code": status, "result": message, "error": {"reason": "x", "message": message}})
 
 
-def product(product_id: int, *, name: str = "Unisex Staple T-Shirt | Bella + Canvas 3001", variant_count: int = 2) -> dict:
+COLOR_CODES = {"Black": "#0c0c0c", "White": "#ffffff", "Navy": "#1d2335", "Sport Grey": "#9b969c"}
+
+
+def product(product_id: int, *, name: str = "Unisex Staple T-Shirt | Bella + Canvas 3001", variant_count: int = 2,
+            sizes=("M", "L"), colors=("Black",)) -> dict:
     return {
         "id": product_id, "main_category_id": 24, "type": "T-SHIRT", "name": name, "brand": "Bella + Canvas", "model": "3001",
         "image": f"https://files.example.test/products/{product_id}.png", "variant_count": variant_count, "is_discontinued": False,
-        "description": "Testprodukt", "sizes": ["M", "L"], "colors": [{"name": "Black", "value": "#0c0c0c"}],
+        "description": "Testprodukt", "sizes": list(sizes),
+        "colors": [{"name": color, "value": COLOR_CODES.get(color, "#777777")} for color in colors],
         "techniques": [{"key": "dtg", "display_name": "DTG printing", "is_default": True}],
         "placements": [
             {"placement": "front", "technique": "dtg", "layers": [], "print_area_width": 12, "print_area_height": 16,
@@ -148,6 +153,8 @@ class FakePrintful:
         self.products: dict[int, dict] = {}
         self.variants: dict[int, dict] = {}
         self.prices: dict[int, Decimal] = {}
+        # Aufpreis je Druckfläche (Printful: ``product.placements`` in der Preisantwort), je Produkt.
+        self.placement_prices: dict[int, dict[str, Decimal]] = {}
         self.stock: dict[int, str] = {}
         self.orders: dict[int, dict] = {}
         self.order_items: dict[int, list[dict]] = {}
@@ -167,10 +174,19 @@ class FakePrintful:
 
     # ------------------------------------------------ Testdaten
     def add_product(self, product_id: int = 71, variants=((4012, "M"), (4013, "L")), *, price: str = "12.50",
-                    stock: str = "in stock") -> dict:
-        self.products[product_id] = product(product_id, variant_count=len(variants))
-        for variant_id, size in variants:
-            self.variants[variant_id] = variant(variant_id, product_id, size=size)
+                    stock: str = "in stock", placement_prices: dict[str, str] | None = None,
+                    name: str | None = None) -> dict:
+        """Varianten als ``(nummer, größe)`` oder ``(nummer, größe, farbe)``; Farben und Größen des Produkts folgen
+        daraus. ``placement_prices`` ist der Aufpreis je Druckfläche (etwa ``{"back": "5.25"}``)."""
+        rows = [(row[0], row[1], row[2] if len(row) > 2 else "Black") for row in variants]
+        sizes = tuple(dict.fromkeys(size for _id, size, _color in rows))
+        colors = tuple(dict.fromkeys(color for _id, _size, color in rows))
+        extra = {"name": name} if name else {}
+        self.products[product_id] = product(product_id, variant_count=len(rows), sizes=sizes, colors=colors, **extra)
+        self.placement_prices[product_id] = {key: Decimal(value) for key, value in (placement_prices or {}).items()}
+        for variant_id, size, color in rows:
+            self.variants[variant_id] = variant(variant_id, product_id, size=size, color=color,
+                                                color_code=COLOR_CODES.get(color, "#777777"))
             self.prices[variant_id] = Decimal(price)
             self.stock[variant_id] = stock
         return self.products[product_id]
@@ -276,8 +292,12 @@ class FakePrintful:
         if variant_id not in self.variants:
             return 404, "Variant not found"
         price = self.prices[variant_id]
+        product_id = self.variants[variant_id]["catalog_product_id"]
+        surcharges = [{"id": key, "title": f"{key} print", "type": "printfile", "technique_key": "dtg",
+                       "price": _money(value), "discounted_price": _money(value), "placement_options": [], "layers": []}
+                      for key, value in (self.placement_prices.get(product_id) or {}).items()]
         return 200, {"data": {"currency": params.get("currency") or "USD",
-                              "product": {"id": self.variants[variant_id]["catalog_product_id"], "placements": []},
+                              "product": {"id": product_id, "placements": surcharges},
                               "variant": {"id": variant_id, "techniques": [
                                   {"technique_key": "dtg", "technique_display_name": "DTG printing",
                                    "price": _money(price + Decimal("1.00")), "discounted_price": _money(price)}]}},

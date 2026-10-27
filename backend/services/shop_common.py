@@ -30,9 +30,13 @@ class ShopConflict(ShopError):
 MODEL_FIELDS: dict[str, tuple[str, ...]] = {
     "shop_products": ("id", "slug", "title", "description", "status", "visibility", "base_price_cents", "markup_cents",
                       "currency", "gamertag_allowed", "tax_profile", "design_key", "version", "created_at",
-                      "created_by", "updated_at", "updated_by"),
+                      "created_by", "updated_at", "updated_by",
+                      # Produktverwaltung (#1707, services/shop_products.py) und Abgleich (#1709)
+                      "personalization", "printful", "technique", "offer", "placements", "included_placement",
+                      "review", "published_at", "archived_at", "catalog_sync"),
     "shop_variants": ("id", "product_id", "sku", "label", "size", "color", "price_cents", "active", "version",
-                      "created_at", "created_by", "updated_at", "updated_by"),
+                      "created_at", "created_by", "updated_at", "updated_by",
+                      "color_code", "blocked_reason", "blocked_at"),
     "shop_designs": ("id", "design_key", "version", "file_ref", "sha256", "placement", "created_at", "created_by",
                      # Druckdatei (#1708, services/shop_designs.py): Maße, Prüfung und öffentlicher Zufallsschlüssel
                      "public_id", "public_disabled_at", "content_type", "size_bytes", "width_px", "height_px",
@@ -50,14 +54,19 @@ MODEL_FIELDS: dict[str, tuple[str, ...]] = {
                              "created_by", "updated_at", "updated_by"),
     "shop_design_colors": ("placement", "color_key", "color", "design_key", "claimed_at"),
     "shop_printful_variants": ("provider", "variant_id", "printful_variant_id", "printful_product_id", "updated_at",
-                               "updated_by"),
+                               "updated_by",
+                               # Einkauf und Lager aus dem Abgleich (#1709)
+                               "technique", "currency", "base_cost_cents", "placement_costs", "availability",
+                               "in_stock", "synced_at", "price_warning"),
     "shop_carts": ("user_id", "items", "updated_at"),
     "shop_orders": ("id", "user_id", "idempotency_key", "request_hash", "status", "frozen", "billing_address",
                     "shipping_address", "printful_external_id", "printful_order_id", "item_count", "created_at",
                     "updated_at", "anonymized_at"),
     "shop_order_items": ("id", "order_id", "user_id", "position", "product_id", "variant_id", "product_title",
                          "variant_label", "sku", "quantity", "unit_price_cents", "markup_cents", "line_total_cents",
-                         "gamertag", "design", "printful", "tax_profile"),
+                         "gamertag", "design", "printful", "tax_profile",
+                         # je Platzierung die Druckdatei-Fassung, Druckfläche und Position (#1707)
+                         "designs"),
     "shop_order_events": ("id", "order_id", "event_key", "kind", "at", "actor_id", "data"),
 }
 FORBIDDEN_FIELD_PARTS = ("iban", "bic", "bank", "account_number", "card", "cvv", "password", "passwort", "secret",
@@ -169,6 +178,12 @@ ADMIN_ACTIONS: dict[str, str] = {
     "shop.gamertag.rules": "Regeln der Gamertag-Druckdatei geändert",
     "shop.gamertag.file": "Gamertag-Testdatei erzeugt",
     "shop.printful_variant.set": "Printful-Variante zugeordnet",
+    "shop.product.catalog": "Printful-Produkt gewählt",
+    "shop.product.offer": "Farben und Größen gewählt",
+    "shop.product.placements": "Platzierungen und Positionen geändert",
+    "shop.product.designs": "Designs je Platzierung und Farbe zugeordnet",
+    "shop.product.status": "Stand eines Produkts geändert (Prüfen, Veröffentlichen, Archivieren)",
+    "shop.catalog.sync": "Mit Printful abgeglichen (gesperrt, freigegeben, Preiswarnung)",
     "shop.order.release": "Bestellung freigegeben",
     "shop.order.printful_confirm": "Bei Printful bestätigt",
     "shop.order.cancel": "Bestellung storniert",
@@ -198,6 +213,7 @@ async def record_admin_action(db, action: str, *, actor_id: str, target_id: str,
     payload = dict(data or {})
     assert_no_address(payload, where="Protokoll")
     entry = {"id": new_id(), "action": action, "actor_id": actor_id, "target_id": target_id,
-             "data": {**payload, "reason": clean_reason(reason)}, "created_at": now_utc().isoformat()}
+             # Ob ein Grund Pflicht ist, prüft der Schritt selbst; das Protokoll nimmt auch einen leeren.
+             "data": {**payload, "reason": clean_reason(reason, required=False)}, "created_at": now_utc().isoformat()}
     await db.audit_logs.insert_one(dict(entry))
     return entry

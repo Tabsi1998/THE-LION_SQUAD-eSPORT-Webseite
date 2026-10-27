@@ -25,13 +25,13 @@ function view({ config = {}, rights = {}, stages = STAGES } = {}) {
   return {
     config: {
       stage: "off", stage_label: "Aus", effective_stage: "off", orders_to_printful: false,
-      public_markup_cents: 0, member_markup_cents: 0, fallback_shipping_cents: null, shipping_countries: ["AT"],
+      public_markup_cents: 0, member_markup_cents: 0, fallback_shipping_cents: null, min_price_cents: 100, shipping_countries: ["AT"],
       tax_cleared: null, printful_key: { state: "missing", saved_at: null, saved_by: null, detail: null },
       printful_last_test: null, updated_at: null, ...config,
     },
     stages,
     rights: { can_set_public: false, can_set_tax: false, can_edit_access: false, ...rights },
-    limits: { public_markup_cents: 10000, fallback_shipping_cents: 10000 },
+    limits: { public_markup_cents: 10000, fallback_shipping_cents: 10000, min_price_cents: 10000 },
   };
 }
 
@@ -107,6 +107,24 @@ test("Preise in Euro werden als Cent gespeichert, leere Pauschale heißt keine",
   await user.click(screen.getByTestId("shop-prices-save-submit"));
   expect(apiMock.patch).toHaveBeenCalledWith("/admin/shop/config", {
     public_markup_cents: 350, fallback_shipping_cents: 690, reason: "Vorstandsbeschluss",
+  });
+});
+
+test("der Mindestpreis je Artikel ist einstellbar und 0 € geht nicht", async () => {
+  apiMock.patch.mockResolvedValue({ data: view({ config: { min_price_cents: 500 } }) });
+  const user = userEvent.setup();
+  render(<AdminShopPage />);
+  const minimum = await screen.findByTestId("shop-min-price");
+  expect(minimum).toHaveValue("1,00");
+  await user.clear(minimum);
+  await user.type(minimum, "0");
+  expect(screen.getByTestId("shop-prices-invalid")).toBeInTheDocument();
+  await user.clear(minimum);
+  await user.type(minimum, "5");
+  await user.type(screen.getByTestId("shop-prices-save-reason"), "Mindestens 5 Euro");
+  await user.click(screen.getByTestId("shop-prices-save-submit"));
+  expect(apiMock.patch).toHaveBeenCalledWith("/admin/shop/config", {
+    public_markup_cents: 0, fallback_shipping_cents: null, min_price_cents: 500, reason: "Mindestens 5 Euro",
   });
 });
 

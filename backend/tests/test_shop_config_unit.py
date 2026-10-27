@@ -2,12 +2,18 @@
 Ersatzpauschale.
 
 Gegen mongomock. Printful wird nie angerufen: der Fake-Adapter unten zählt, was er schreiben würde. Erfundene Daten."""
+import pathlib
+import sys
+
 import pytest
 from mongomock_motor import AsyncMongoMockClient
 
-from services import shop_catalog, shop_config, shop_orders, shop_schema
-from services.secret_store import encrypt_secret
-from services.shop_common import ShopConflict, ShopError
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+
+from services import shop_catalog, shop_config, shop_orders, shop_schema  # noqa: E402
+from services.secret_store import encrypt_secret  # noqa: E402
+from services.shop_common import ShopConflict, ShopError  # noqa: E402
+from shop_testdata import publish_unchecked  # noqa: E402
 
 FAKE_KEY = "pf-testschluessel-nicht-echt-0123456789"
 
@@ -150,12 +156,14 @@ async def test_switching_on_while_the_key_is_removed_in_between_never_ends_with_
 
 # ---------------------------------------------------------------- Preise und Versand
 
-async def catalog(db, *, markup_cents=0):
+async def catalog(db, *, markup_cents=None):
     await shop_schema.apply(db)
-    product = await shop_catalog.create_product(db, {"slug": "loewen-shirt", "title": "Löwen-Shirt",
-                                                     "base_price_cents": 1890, "markup_cents": markup_cents}, **BY)
+    fields = {"slug": "loewen-shirt", "title": "Löwen-Shirt", "base_price_cents": 1890}
+    if markup_cents is not None:
+        fields["markup_cents"] = markup_cents
+    product = await shop_catalog.create_product(db, fields, **BY)
     variant = await shop_catalog.create_variant(db, product["id"], {"sku": "SHIRT-M", "label": "M"}, **BY)
-    await shop_catalog.update_product(db, product["id"], {"status": "active"}, **BY)
+    await publish_unchecked(db, product["id"])
     return variant
 
 
@@ -217,13 +225,31 @@ async def test_members_pay_cost_price_and_the_public_markup_applies_per_article_
 
 
 @pytest.mark.asyncio
-async def test_a_product_markup_comes_on_top_of_the_shop_markup_for_public_buyers(db):
+async def test_a_product_markup_replaces_the_shop_markup_for_public_buyers(db):
+    """Entscheidung zu #1707: ein gesetzter Produkt-Aufschlag ersetzt den allgemeinen - er kommt nicht dazu."""
     variant = await catalog(db, markup_cents=200)
     await settle(db, public_markup_cents=300)
     member = await place(db, variant, buyer_kind="member", key="mitglied-0002")
     public = await place(db, variant, buyer_kind="public", key="oeffentlich-0002")
     assert member["frozen"]["markup_cents"] == 0
-    assert public["frozen"]["markup_cents"] == 2 * 500
+    assert public["frozen"]["markup_cents"] == 2 * 200
+
+
+@pytest.mark.asyncio
+async def test_a_product_markup_of_zero_is_set_and_means_no_markup(db):
+    """0 ist eine Entscheidung („ohne Aufschlag“), leer heißt „der allgemeine gilt“."""
+    variant = await catalog(db, markup_cents=0)
+    await settle(db, public_markup_cents=300)
+    public = await place(db, variant, buyer_kind="public", key="oeffentlich-0003")
+    assert public["frozen"]["markup_cents"] == 0
+
+
+def test_the_markup_rule_reads_unset_as_the_shop_markup():
+    config = {"public_markup_cents": 300}
+    assert shop_config.markup_cents(config, "public", {"markup_cents": None}) == 300
+    assert shop_config.markup_cents(config, "public", {}) == 300
+    assert shop_config.markup_cents(config, "public", {"markup_cents": 450}) == 450
+    assert shop_config.markup_cents(config, "member", {"markup_cents": 450}) == 0
 
 
 @pytest.mark.asyncio
