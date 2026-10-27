@@ -39,7 +39,7 @@ from PIL import Image
 from pymongo.errors import DuplicateKeyError
 
 from models import new_id, now_utc
-from services import shop_catalog, shop_designs, shop_gamertag, shop_print_templates as templates
+from services import shop_catalog, shop_designs, shop_gamertag, shop_motifs, shop_print_templates as templates
 from services.mutation_lock import MutationLockBusy, mutation_lock
 from services.shop_common import ShopConflict, ShopError, clean_reason, record_admin_action
 
@@ -57,16 +57,16 @@ MAX_COMPOSE_PIXELS = templates.MAX_FILE_PIXELS
 PUBLIC_ID = re.compile(r"^[A-Za-z0-9_-]{43}$")
 
 
-# ================================================================ Motive (die eine Stelle für #2069 Teil A)
+# ================================================================ Motive (die eine Stelle, verdrahtet mit #2069 Teil A)
 #
-# Bis Teil A gemergt ist, kommen Motive aus den Design-Fassungen (#1708): ``motif.key`` ist ein ``design_key``, die
-# bisherige Zuordnung je Shirtfarbe gilt (``shop_designs.design_for_color`` für die Platzierung des Designs), eine
-# Ausnahme je Farbe steht in ``motif.by_color``. Mit Teil A wird nur dieser Abschnitt umgestellt:
-#   - ``_motif_source``: ``variant = by_color.get(color) or motifs.variant_for_garment(color_hex)``, Seitenverhältnis
-#     aus der Motiv-Bibliothek, ``ref = {"source": "motif", "motif_key": …, "variant": …, "sha256": …}``;
-#   - ``_motif_png``: ``return await motifs.render_motif_png(db, key, variant, width_px=width_px, dpi=dpi)``;
-#   - ``motif_options``: die Motive der Bibliothek.
-# Tests ersetzen ``_motif_source``/``_motif_png`` durch einen Fake (``monkeypatch``).
+# Ein Motiv ist ein Design der Motiv-Bibliothek (``services/shop_motifs.py``) mit zwei Fassungen: die Hauptdatei für
+# dunkle Shirts und die Fassung für helle Shirts (eigene Datei oder automatisch umgefärbt). Welche Fassung zu einer
+# Shirtfarbe gehört, entscheidet ``shop_motifs.file_for_garment`` (Helligkeit des Printful-Farbwerts, Ausnahme je Farbe
+# am Motiv); ``motif.by_color`` am Produkt kann für eine Farbe ein ganz anderes Motiv nehmen. Gerastert wird mit
+# ``shop_motifs.render_motif_png`` in genau der Breite des Rahmens - aus dem SVG scharf, ein altes PNG wie bisher
+# skaliert. Die Fassung samt Version steht in ``MotifSource.ref``: sie geht in den ``layout_hash`` ein (neue Version =
+# neue Druckdatei) und wird mit der Bestellung eingefroren. Tests ersetzen ``_motif_source``/``_motif_png`` durch
+# einen Fake (``monkeypatch``).
 
 @dataclass(frozen=True)
 class MotifSource:
@@ -78,74 +78,71 @@ class MotifSource:
     title: str
     vector: bool = False
     file_ref: str | None = None
+    image_path: str | None = None
 
     @property
     def aspect(self) -> float:
         return self.height_px / self.width_px
 
 
-async def _design_for(db, motif: dict, color: str) -> str | None:
-    key = (motif.get("by_color") or {}).get(color)
-    if key:
-        return key
-    base = motif.get("key")
-    if not base:
-        return None
-    profile = await shop_designs.get_profile(db, base)
-    own = {item.casefold() for item in (profile or {}).get("garment_colors") or []}
-    # Bisherige Zuordnung (#1708): gilt das gewählte Design für bestimmte Shirtfarben, aber nicht für diese, nimmt die
-    # Farbe das Design, das ihr an derselben Platzierung zugeordnet ist (Löwe weiß ↔ Löwe schwarz). Ein Design ohne
-    # Farbliste gilt für alle Farben.
-    if profile and own and _color_key(color) not in own:
-        found = await shop_designs.design_for_color(db, profile["placement"], color)
-        if found:
-            return found["profile"]["design_key"]
-    return base
+def _design_key_for(motif: dict, color: str) -> str | None:
+    return (motif.get("by_color") or {}).get(color) or motif.get("key") or None
 
 
 async def _motif_source(db, motif: dict, color: str, color_hex: str | None) -> MotifSource | None:
-    """Das Motiv einer Ebene für eine Shirtfarbe - oder ``None``, wenn es dafür keins gibt."""
-    key = await _design_for(db, motif or {}, color)
-    latest = await shop_catalog.latest_design(db, key) if key else None
-    if not latest or not latest.get("width_px") or not latest.get("height_px"):
+    """Das Motiv einer Ebene für eine Shirtfarbe (Fassung hell oder dunkel samt Version) - oder ``None``, wenn es
+    dafür keine Fassung gibt (etwa ein PNG, das sich nicht für helle Shirts umfärben ließ)."""
+    key = _design_key_for(motif or {}, color)
+    row = await shop_motifs.file_for_garment(db, key, color=color, color_hex=color_hex) if key else None
+    if not row:
         return None
+    view_box = row.get("view_box")
+    if view_box and len(view_box) == 4 and view_box[2] and view_box[3]:
+        width, height = float(view_box[2]), float(view_box[3])
+    else:
+        width, height = float(row.get("width_px") or 0), float(row.get("height_px") or 0)
+    if not width or not height:
+        return None
+    vector = bool(row.get("svg_ref"))
+    # Seitenverhältnis aus der viewBox (SVG) bzw. den Pixeln; die DPI-Prüfung braucht die echten Pixel eines Rasters.
+    scale = 1000.0 / width if vector else 1.0
+    variant = row.get("variant") or "dark"
     profile = await shop_designs.get_profile(db, key) or {}
-    return MotifSource(ref={"source": "design", "design_key": key, "version": latest["version"],
-                            "sha256": latest["sha256"]},
-                       width_px=int(latest["width_px"]), height_px=int(latest["height_px"]),
-                       title=profile.get("title") or key, file_ref=latest.get("file_ref"))
-
-
-def _scaled(data: bytes, width_px: int) -> bytes:
-    with Image.open(BytesIO(data)) as img:
-        img.load()
-        rgba = img.convert("RGBA")
-    height = max(1, int(round(width_px * rgba.height / rgba.width)))
-    out = BytesIO()
-    rgba.resize((width_px, height), Image.Resampling.LANCZOS).save(out, format="PNG", compress_level=1)
-    return out.getvalue()
+    public = bool(row.get("public_id")) and not row.get("public_disabled_at")
+    title = (profile.get("title") or key) + (" (für helle Shirts)" if variant == "light" else "")
+    return MotifSource(ref={"source": "motif", "design_key": key, "variant": variant, "version": row["version"],
+                            "sha256": row["sha256"]},
+                       width_px=max(1, int(round(width * scale))), height_px=max(1, int(round(height * scale))),
+                       title=title, vector=vector, file_ref=row.get("file_ref"),
+                       image_path=shop_designs.public_path(row) if public else None)
 
 
 async def _motif_png(db, source: MotifSource, *, width_px: int, dpi: int) -> bytes:
-    """Das Motiv als PNG in ``width_px`` Breite (transparent). Teil A: ``render_motif_png``."""
-    path = shop_designs._path_of(source.file_ref)
-    if path is None or not path.is_file():
-        raise ShopError(f"Die Datei des Motivs „{source.title}“ fehlt auf dem Server - bitte neu hochladen.")
-    return await asyncio.to_thread(_scaled, path.read_bytes(), width_px)
+    """Das Motiv als PNG in genau ``width_px`` Breite (transparent) - die eingefrorene Fassung samt Version."""
+    ref = source.ref
+    try:
+        return await shop_motifs.render_motif_png(db, ref["design_key"], ref.get("variant") or "dark",
+                                                  width_px=width_px, dpi=dpi, version=ref.get("version"))
+    except LookupError as exc:
+        raise ShopError(f"Die Datei des Motivs „{source.title}“ fehlt auf dem Server - bitte neu hochladen.") from exc
 
 
 async def motif_options(db) -> list[dict]:
-    """Die Motive zur Auswahl im Admin (bis Teil A: die Designs mit ihrer neuesten Fassung)."""
+    """Die Motive zur Auswahl im Admin: die Motiv-Bibliothek mit Hauptdatei (Vorschaubild, Seitenverhältnis)."""
     out = []
     async for profile in db.shop_design_profiles.find({}, {"_id": 0}).sort("design_key", 1):
         latest = await shop_catalog.latest_design(db, profile["design_key"])
         if not latest:
             continue
         public = bool(latest.get("public_id")) and not latest.get("public_disabled_at")
+        view_box = latest.get("view_box")
+        width, height = latest.get("width_px"), latest.get("height_px")
+        if view_box and len(view_box) == 4 and view_box[2] and view_box[3]:
+            width, height = int(round(1000)), int(round(1000 * float(view_box[3]) / float(view_box[2])))
         out.append({"key": profile["design_key"], "title": profile.get("title") or profile["design_key"],
-                    "version": latest["version"], "width_px": latest.get("width_px"),
-                    "height_px": latest.get("height_px"), "has_alpha": latest.get("has_alpha"),
-                    "garment_colors": profile.get("garment_colors") or [],
+                    "version": latest["version"], "width_px": width, "height_px": height,
+                    "has_alpha": latest.get("has_alpha"), "is_vector": bool(latest.get("svg_ref")),
+                    "light_mode": profile.get("light_mode"),
                     "image_path": shop_designs.public_path(latest) if public else None})
     return out
 
@@ -558,7 +555,10 @@ def plan_view(plan: Plan) -> dict:
     return {"placement": plan.entry["placement"], "group": plan.entry["group"], "color": plan.color,
             "problems": plan.problems, "layout_hash": plan.layout_hash,
             "layers": [{"index": item.index, "kind": item.kind, "label": item.label, **item.box.as_dict(dpi),
-                        "source": item.source.ref if item.source else None} for item in plan.layers]}
+                        "source": item.source.ref if item.source else None,
+                        # das Bild genau der Fassung, die gedruckt wird - für die Vorschau in Schritt 3
+                        "image_path": item.source.image_path if item.source else None,
+                        "aspect": round(item.source.aspect, 6) if item.source else None} for item in plan.layers]}
 
 
 # ================================================================ Ablage der Druckdateien
@@ -892,6 +892,9 @@ async def freeze_line(db, product: dict, variant: dict, *, gamertag: str | None,
 
     Liefert (Druckdateien, Motiv-Fassungen). Fehlt etwas: ``ShopError`` - die Position ist dann nicht bestellbar."""
     context = await _context(db, product)
+    if product.get("placements") and not context["rows"]:
+        raise ShopError(f"Position {position}: die Druckflächen sind noch nicht auf die Druckvorlagen umgestellt - "
+                        "nicht bestellbar.")
     color = " ".join(str(variant.get("color") or "").split())
     color_hex = context["codes"].get(color) or variant.get("color_code")
     files, sources = [], []

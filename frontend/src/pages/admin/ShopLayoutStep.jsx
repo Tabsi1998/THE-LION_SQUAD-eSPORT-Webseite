@@ -45,14 +45,20 @@ function cleanLayer(layer) {
   return out;
 }
 
-// Welches Motiv der Server für eine Farbe nimmt (bisherige Zuordnung je Shirtfarbe, #1708) - aus den Plänen der zuletzt
-// gespeicherten Fassung, solange die Ebene dasselbe Motiv hat.
+// Welche Fassung der Server für eine Farbe druckt (hell oder dunkel samt Version, #2069 Teil A) - aus den Plänen der
+// zuletzt gespeicherten Fassung, solange die Ebene dasselbe Motiv und dieselbe Ausnahme hat. So zeigt die Vorschau
+// genau das Bild, das in die Druckdatei kommt.
 function savedSources(view) {
   const out = {};
   for (const row of view.placements || []) {
     for (const state of row.files || []) {
       for (const layer of state.plan?.layers || []) {
-        if (layer.source?.design_key) out[`${row.key}|${layer.index}|${state.color}`] = { key: layer.source.design_key, base: (row.layers || [])[layer.index]?.motif?.key };
+        if (!layer.source?.design_key) continue;
+        const saved = (row.layers || [])[layer.index]?.motif || {};
+        out[`${row.key}|${layer.index}|${state.color}`] = {
+          key: layer.source.design_key, variant: layer.source.variant, base: saved.key, exception: saved.by_color?.[state.color] || "",
+          image_path: layer.image_path, aspect: layer.aspect,
+        };
       }
     }
   }
@@ -61,7 +67,7 @@ function savedSources(view) {
 
 // ---------------------------------------------------------------- Vorschau mit Vorlagenbild, Ziehen und Pfeiltasten
 
-function LayoutPreview({ area, preview, layers, resolved, colorCode, motifsByKey, motifKeyFor, selected, onSelect, onNudge, editable, testId }) {
+function LayoutPreview({ area, preview, layers, resolved, colorCode, motifFor, selected, onSelect, onNudge, editable, testId }) {
   const areaRef = useRef(null);
   const drag = useRef(null);
   const templateW = preview?.template_width || area.width_px;
@@ -113,7 +119,7 @@ function LayoutPreview({ area, preview, layers, resolved, colorCode, motifsByKey
         {resolved.map((item) => {
           if (!item.box) return null;
           const layer = layers[item.index];
-          const motif = item.kind === "motif" ? motifsByKey[motifKeyFor(layer, item.index)] : null;
+          const motif = item.kind === "motif" ? motifFor(layer, item.index) : null;
           const bad = item.outside?.length > 0;
           const isSelected = selected === item.index;
           const label = item.kind === "motif" ? `Motiv ${motif?.title || ""}` : item.kind === "gamertag" ? "Gamertag" : "Vereinsnummer";
@@ -283,16 +289,21 @@ function PlacementCard({ view, available, state, savedRow, used, onToggle, onCha
   const [selected, setSelected] = useState(null);
   const layers = state?.layers || [];
   const mode = state?.mode || "layout";
-  const motifKeyFor = (layer, index) => {
-    const exception = layer.motif?.by_color?.[previewColor];
-    if (exception) return exception;
+  // Das Motiv dieser Ebene für die Vorschau-Farbe: die gespeicherte Fassung (hell/dunkel, Version) samt Bild, solange
+  // Motiv und Ausnahme unverändert sind - sonst die Hauptdatei des gewählten Motivs.
+  const motifFor = (layer, index) => {
+    const exception = layer.motif?.by_color?.[previewColor] || "";
     const saved = sources[`${available.key}|${index}|${previewColor}`];
-    return saved && saved.base === layer.motif?.key ? saved.key : layer.motif?.key;
+    if (saved && saved.base === layer.motif?.key && saved.exception === exception && saved.aspect) {
+      const base = motifsByKey[saved.key] || {};
+      return { ...base, key: saved.key, width_px: 1000, height_px: 1000 * saved.aspect, image_path: saved.image_path || base.image_path, variant: saved.variant };
+    }
+    return motifsByKey[exception || layer.motif?.key];
   };
   // Für Profis (fertige Datei) zählen nur die Platzhalter - die Motive bleiben gespeichert, falls es zurückgeht.
   const visible = mode === "upload" ? layers.map((layer) => (layer.kind === "motif" ? null : layer)) : layers;
   const resolved = resolveLayers(area, visible, {
-    presets, motifFor: (layer, index) => motifsByKey[motifKeyFor(layer, index)], gamertagCanvas: view.gamertag_canvas, rules,
+    presets, motifFor, gamertagCanvas: view.gamertag_canvas, rules,
   });
   const update = (index, patch) => onChange({ ...state, layers: layers.map((layer, at) => (at === index ? { ...layer, ...patch } : layer)) });
   const nudge = (index, dx, dy) => {
@@ -334,7 +345,7 @@ function PlacementCard({ view, available, state, savedRow, used, onToggle, onCha
           <div className="grid gap-4 lg:grid-cols-[minmax(0,18rem)_minmax(0,1fr)]">
             <div className="space-y-1">
               <LayoutPreview area={{ ...area, safe_margin_cm: available.safe_margin_cm }} preview={available.preview} layers={visible}
-                resolved={resolved} colorCode={codes[previewColor]} motifsByKey={motifsByKey} motifKeyFor={motifKeyFor} selected={selected} onSelect={setSelected}
+                resolved={resolved} colorCode={codes[previewColor]} motifFor={motifFor} selected={selected} onSelect={setSelected}
                 onNudge={nudge}
                 editable={editable} testId={`shop-preview-${available.key}`} />
               <p className="text-xs text-white/45 inline-flex items-center gap-1"><Move className="w-3 h-3" aria-hidden="true" /> Ziehen oder Pfeiltasten zum Feinjustieren.</p>

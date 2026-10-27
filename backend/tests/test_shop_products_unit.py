@@ -88,6 +88,10 @@ async def design(db, key: str, placement: str, colors: list[str], *, width: int 
 
 async def club_designs(db, *, white_back: bool = True):
     await design(db, "loewe-weiss", "front_right", ["Black"])
+    # Teil A (#2069): die Fassung für helle Shirts entsteht automatisch (Weiß wird dunkel umgefärbt).
+    from services import shop_motifs
+
+    await shop_motifs.refresh_auto_light(db, "loewe-weiss", **BY)
     await design(db, "loewe-schwarz", "front_right", ["White"], height=1300)
     await design(db, "ruecken-weiss", "back", ["Black"], width=3000, height=3000)
     if white_back:
@@ -276,10 +280,14 @@ async def test_the_layout_takes_a_motif_a_preset_and_a_size_in_cm(db, provider):
     lion = black["plan"]["layers"][0]
     assert (lion["width_px"], lion["height_px"], lion["width_cm"]) == (526, 526, 8.91)
     assert black["state"] == "missing", "noch nicht erzeugt"
-    # Die bisherige Zuordnung je Shirtfarbe gilt (#1708): auf Weiß der schwarze Löwe - ohne Farbliste im Produkt.
+    # Die Fassung je Shirtfarbe kommt automatisch (Teil A): Schwarz die Hauptdatei, Weiß die Fassung für helle Shirts.
+    assert lion["source"] == {"source": "motif", "design_key": "loewe-weiss", "variant": "dark", "version": 1,
+                              "sha256": lion["source"]["sha256"]}
     white = next(state for state in front["files"] if state["color"] == "White")
-    assert white["plan"]["layers"][0]["source"]["design_key"] == "loewe-schwarz"
-    assert white["plan"]["layers"][0]["height_px"] == 570, "Seitenverhältnis des schwarzen Löwen (1200 × 1300)"
+    assert white["plan"]["layers"][0]["source"]["design_key"] == "loewe-weiss"
+    assert (white["plan"]["layers"][0]["source"]["variant"], white["plan"]["layers"][0]["source"]["version"]) == (
+        "light", 2)
+    assert white["plan"]["layers"][0]["height_px"] == 526, "dieselbe Form, nur umgefärbt"
 
 
 @pytest.mark.asyncio
@@ -613,15 +621,15 @@ async def test_an_order_freezes_one_print_file_per_area_and_its_own_file_with_th
     with Image.open(shop_designs._path_of(personal["file_ref"])) as mine, \
             Image.open(shop_designs._path_of(base_front["file_ref"])) as base:
         assert mine.size == (1800, 2400) and tuple(map(round, mine.info["dpi"])) == (150, 150)
-        lion_center = (223 + 263, 295 + 285)  # schwarzer Löwe 1200 × 1300 bei 8,9 cm
+        lion_center = (223 + 263, 295 + 263)  # Löwe für helle Shirts, 8,9 cm
         assert mine.getpixel(lion_center) == base.getpixel(lion_center)
         band = [mine.getpixel((x, lion_center[1]))[3] for x in range(1800 - 486 - 200, 1800 - 486 + 200)]
         assert max(band) == 255, "Gamertag auf der Höhe der Löwenmitte"
         assert max(base.getpixel((x, lion_center[1]))[3] for x in range(1800 - 486 - 200, 1800 - 486 + 200)) == 0
     # Die Motiv-Fassungen stehen an der Position (für die Aufbewahrung der Design-Adressen).
-    sources = {(row["placement"], row["design_key"], row["version"]) for row in item["designs"]}
-    assert sources == {("front", "loewe-schwarz", 1), ("back", "ruecken-schwarz", 1)}
-    assert item["design"]["design_key"] == "loewe-schwarz", "das erste Design bleibt als Kurzform"
+    sources = {(row["placement"], row["design_key"], row["variant"], row["version"]) for row in item["designs"]}
+    assert sources == {("front", "loewe-weiss", "light", 2), ("back", "ruecken-weiss", "dark", 1)}
+    assert item["design"]["design_key"] == "loewe-weiss", "das erste Design bleibt als Kurzform"
     assert item["printful"] == {"variant_id": WHITE_M, "product_id": PRINTFUL_PRODUCT}
     # Ein zweites Mitglied mit demselben Gamertag bekommt eine eigene Datei mit eigener Adresse.
     other, _ = await shop_orders.place_order(
@@ -640,11 +648,11 @@ async def test_an_order_freezes_one_print_file_per_area_and_its_own_file_with_th
     assert created is False and again["id"] == order["id"]
     assert await db.shop_print_files.count_documents({"purpose": "order"}) == 2
     # Eine neue Design-Version danach ändert die Bestellung nicht; die Fassung bleibt öffentlich.
-    await design(db, "ruecken-schwarz", "back", ["White"], width=3100, height=3100)
+    await design(db, "ruecken-weiss", "back", ["Black"], width=3100, height=3100)
     (unchanged,) = await shop_orders.items_for(db, order["id"])
     assert next(row for row in unchanged["print_files"] if row["placement"] == "back")["version"] == 1
     later = await shop_designs.retention_plan(db, now=now_utc() + timedelta(days=365))
-    assert ("ruecken-schwarz", 1) not in {(row["design_key"], row["version"]) for row in later["public_off"]}
+    assert ("ruecken-weiss", 1) not in {(row["design_key"], row["version"]) for row in later["public_off"]}
 
 
 @pytest.mark.asyncio

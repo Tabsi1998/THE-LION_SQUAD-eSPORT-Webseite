@@ -80,9 +80,9 @@ function view(overrides = {}) {
         ],
         files: [
           { placement: "front", color: "Black", group: "all", state: "ok", detail: "", file: { id: "f1", version: 1, warnings: [] },
-            plan: { layers: [{ index: 0, kind: "motif", source: { design_key: "loewe-weiss" } }] } },
+            plan: { layers: [{ index: 0, kind: "motif", source: { design_key: "loewe-weiss", variant: "dark", version: 1 }, image_path: "/api/shop/print-files/k1/loewe-weiss-v1.png", aspect: 1 }] } },
           { placement: "front", color: "White", group: "all", state: "outdated", detail: "Aufbau, Motiv oder Vorlage geändert - neu erzeugen.", file: { id: "f2", version: 1, warnings: [] },
-            plan: { layers: [{ index: 0, kind: "motif", source: { design_key: "loewe-schwarz" } }] } },
+            plan: { layers: [{ index: 0, kind: "motif", source: { design_key: "loewe-weiss", variant: "light", version: 2 }, image_path: "/api/shop/print-files/k3/loewe-weiss-v2.png", aspect: 1 }] } },
         ] },
     ],
     available_placements: [
@@ -277,9 +277,13 @@ test("Feinjustieren mit Pfeiltasten; was aus der Fläche ragt, sagt die Vorschau
   expect(screen.getByTestId("shop-layer-front-0-outside")).toHaveTextContent("Ragt links aus der Fläche");
   await user.click(screen.getByTestId("shop-layer-front-0-reset"));
   expect(screen.queryByTestId("shop-layer-front-0-outside")).not.toBeInTheDocument();
-  // Die Vorschau zeigt je Farbe das Motiv, das der Server nimmt (bisherige Zuordnung): auf Weiß der schwarze Löwe.
+  // Die Vorschau zeigt je Farbe die Fassung, die gedruckt wird (#2069 Teil A): auf Weiß die Fassung für helle Shirts.
   await user.click(screen.getByTestId("shop-preview-color-White"));
   expect(screen.getByTestId("shop-preview-front").style.backgroundColor).toBe("rgb(255, 255, 255)");
+  expect(screen.getByTestId("shop-preview-front-layer-0").querySelector("img").getAttribute("src")).toContain("loewe-weiss-v2");
+  // Eine Ausnahme je Farbe zeigt sofort das gewählte Motiv.
+  await user.click(screen.getByTestId("shop-layer-front-0-exceptions-toggle"));
+  await user.selectOptions(screen.getByTestId("shop-layer-front-0-exception-White"), "loewe-schwarz");
   expect(screen.getByTestId("shop-preview-front-layer-0").querySelector("img").getAttribute("src")).toContain("loewe-schwarz");
 });
 

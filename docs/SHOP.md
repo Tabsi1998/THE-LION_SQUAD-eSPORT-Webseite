@@ -610,9 +610,9 @@ kleinste Breite eines Motivs (Vorgabe 1 cm). Routen: `GET`/`PUT /api/admin/shop/
 Position; `upload` - fertige Datei für Profis) und `layers`:
 
 - `motif`: Vorgabe, Breite in cm (der Regler endet an der Fläche), Versatz in cm, Motiv (`motif.key`) und - nur wenn
-  nötig - eine **Ausnahme je Farbe** (`motif.by_color`). Ohne Ausnahme gilt je Shirtfarbe automatisch die passende
-  Fassung (bis Teil A die bisherige Zuordnung aus #1708: gilt das gewählte Design für bestimmte Shirtfarben, aber nicht
-  für diese, nimmt die Farbe das Design, das ihr an derselben Platzierung zugeordnet ist).
+  nötig - eine **Ausnahme je Farbe** (`motif.by_color`: für diese Farbe ein anderes Motiv). Sonst gilt je Shirtfarbe
+  automatisch die passende Fassung des Motivs (Abschnitt „Motive“: Hauptdatei für dunkle, Fassung für helle Shirts nach
+  dem Farbwert von Printful; eine Ausnahme am Motiv geht vor).
 - `gamertag`, `member_number`: Platzhalter mit Vorgabe (etwa „Brust gegenüber dem Motiv“); ihre Datei entsteht je
   Bestellung. Höchstens einer je Fläche, nur mit passender Personalisierung. Die Größe ist die Leinwand der
   Gamertag-Datei (`shop_gamertag.canvas`), ihr Anker (`anchor_y_in`) liegt auf der halben Höhe.
@@ -641,10 +641,12 @@ Prüfsumme). Abgelehnt wird mit Zahlen in px, cm und Zoll: ein Motiv außerhalb 
 Rastermotiv mit zu wenig DPI bei der gewählten Größe (mit der nötigen Pixelbreite), mehr als 80 Millionen Pixel, eine
 Grunddatei in anderer Größe. Unter der Warnschwelle gibt es einen Hinweis.
 
-**Motive an einer Stelle:** `shop_print_files._motif_source` (welche Fassung für welche Farbe, Seitenverhältnis,
-Quellpixel) und `_motif_png` (Raster in der gewünschten Breite). Bis die Motiv-Bibliothek aus #2069 Teil A da ist,
-rastern sie die Design-Fassungen aus `shop_designs`; mit Teil A ruft `_motif_png` `render_motif_png(db, key, variant,
-width_px=…, dpi=…)` und `_motif_source` `variant_for_garment(color_hex)`. Tests ersetzen beide durch einen Fake.
+**Motive an einer Stelle:** `shop_print_files._motif_source` nimmt für die Shirtfarbe die Fassung über
+`shop_motifs.file_for_garment` (hell oder dunkel samt Version; Seitenverhältnis aus der viewBox bzw. den Pixeln; bei SVG
+keine DPI-Grenze), `_motif_png` rastert genau diese Fassung mit `shop_motifs.render_motif_png(…, version=…)` in der
+Breite des Rahmens - SVG scharf, ein altes PNG wie bisher skaliert. Die Fassung samt Version steckt im `layout_hash`
+(neue Version = neue Druckdatei), Schritt 3 zeigt in der Vorschau das Bild genau dieser Fassung, und die Bestellung
+friert sie ein (`designs` mit `variant` und `version`). Tests ersetzen beide Funktionen durch einen Fake.
 
 **„Druckdateien erzeugen“** (`POST /api/admin/shop/products/{id}/print-files`) erzeugt je Fläche, Farbe und Gruppe nur,
 was fehlt oder veraltet ist (`layout_hash`: Maße der Vorlage, Rahmen, Motiv-Fassung, Generator-Version). Dieselben
