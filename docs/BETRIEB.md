@@ -12,7 +12,7 @@ Was die Website über sich selbst festhält, wo es steht und wann sie sich melde
 | System → Betrieb & Logs → **Checks** | Auto-Checks alle fünf Minuten: Datenbank, Speicher, Mail-Queue, Twitch, Dolibarr, Fehlergruppen, Besucher-Adresse, eindeutige Indizes, Datei-Nacharbeit, Bild-Erkennung (Tesseract und zweiter Leser, #2018), Shop (Stufe, Notschalter, Printful-Schlüssel, Fehler des letzten Verbindungstests, #1706); darunter die Dateien, deren Löschung scheiterte, mit „Erneut versuchen“ | `ops_check_runs`, `ops_check_episodes`, `pending_file_cleanups` |
 | System → Betrieb & Logs → **Alarme** | Wer bei welchem Ereignis eine Meldung bekommt, Sperrfrist, Testalarm, Aufbewahrung, letzte Alarme | `settings/ops_alerts`, `ops_alert_log` |
 | System → Betrieb & Logs → **Überblick** | Je Quelle Zähler und Auffälligkeiten, die neuesten Probleme der letzten sieben Tage | Sammelsicht |
-| System → Betrieb & Logs → **Ereignisse** | Alle Quellen in einer Liste: Serverfehler, Auto-Checks, Alarme, App-Logs, E-Mail-Versand, Mail-Queue, Adminaktionen, Uploads, Dolibarr-Abgleich, Discord-Bot – Filter nach Quelle, Schwere, Zeitraum, Text; „Als CSV“. Auto-Checks stehen je **Zustand** darin, nicht je Lauf: ein Eintrag je Wechsel von Ampel oder betroffenen Prüfungen, mit „seit … · 92× geprüft · zuletzt …“ (#2080) | `GET /api/admin/ops/events` |
+| System → Betrieb & Logs → **Ereignisse** | Alle Quellen in einer Liste: Serverfehler, Auto-Checks, Alarme, App-Logs, E-Mail-Versand, Mail-Queue, Adminaktionen, Uploads, Dolibarr-Abgleich, Discord-Bot – Filter nach Quelle, Schwere, Zeitraum, Text; „Als CSV“. Auto-Checks stehen je **Zustand** darin, nicht je Lauf: ein Eintrag je Wechsel von Ampel oder betroffenen Prüfungen, mit „seit … · 92× geprüft · zuletzt …“ (#2080). Beim ersten Start nach diesem Update trägt der Server die gespeicherten Läufe der letzten 7 Tage einmal nach (Merker `settings/ops_check_episodes_backfill`; Rückweg: `ops_check_episodes` leeren und den Merker löschen) | `GET /api/admin/ops/events` |
 | System → Betrieb & Logs → **App-Logs** | Fehler und Meldungen der LionsAPP und der Website (Gerät, Version, Stufe) mit Status und Notiz; die Suche findet auch die Kennung, die Admins auf der Fehlerseite der Website sehen (#1230) | `mobile_client_logs`, 90 Tage |
 | E-Mail → Mail-Queue | Wartende und fehlgeschlagene Sendungen, neu einreihen | `mail_jobs` |
 
@@ -121,7 +121,7 @@ und/oder per **E-Mail** an die eingetragenen Empfänger geht.
 
 | Ereignis | Wann |
 |---|---|
-| Auto-Check rot | eine der Prüfungen wechselt auf rot – ein Dauer-Rot meldet sich nicht erneut, erst nach einem Wechsel auf gelb oder grün wieder (#2080) |
+| Auto-Check rot | eine der Prüfungen wechselt auf rot; bleibt sie rot, erinnert sie nach der eingestellten Frist („weiterhin rot seit …“, Vorgabe 24 h, 0 = aus). Als gemeldet gilt Rot erst, wenn die Meldung raus ist – scheitert der Versand, versucht es der nächste rote Lauf nach der Sperrfrist erneut (#2080) |
 | Serverfehler (5xx) | eine neue Fehlergruppe |
 | Mail nicht zustellbar | eine Mail ist nach allen Versuchen endgültig fehlgeschlagen – nur per Discord, eine Mail darüber käme ja nicht an |
 | Hintergrundjob abgebrochen | ein Job des Schedulers (Abgleich, Erinnerungen, Versand …) bricht mit einem Fehler ab |
@@ -131,7 +131,8 @@ und/oder per **E-Mail** an die eingetragenen Empfänger geht.
 
 Vorgabe: Discord an, E-Mail aus. **Sperrfrist:** je Schlüssel (eine Prüfung, eine Fehlergruppe, ein Job,
 ein App-Fingerabdruck) meldet die Website höchstens einmal je Frist (Vorgabe 60 Minuten) – ein
-Dauerfehler flutet keinen Kanal. Der **Testalarm** geht alle Wege, die irgendeine Regel nutzt, ohne
+Dauerfehler flutet keinen Kanal. **Erinnerung bei Dauer-Rot** (Stunden, Vorgabe 24, 0 = aus): so lange
+wartet ein roter Auto-Check, bis er sich mit „weiterhin rot seit …“ wieder meldet (#2080). Der **Testalarm** geht alle Wege, die irgendeine Regel nutzt, ohne
 Sperrfrist. Jede Meldung steht unter „Letzte Alarme“, auch wenn kein Weg eingerichtet war.
 
 Alarme tragen nie Nutzdaten: keine Namen, keine vollständigen E-Mail-Adressen, keine Tokens – nur

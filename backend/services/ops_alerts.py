@@ -21,6 +21,9 @@ from models import new_id, now_utc
 logger = logging.getLogger(__name__)
 
 ALERT_WINDOW_SECONDS = 3600
+# Dauer-Rot (#2080): ein roter Check erinnert nach so vielen Stunden erneut; 0 = aus. Einstellbar unter Betrieb → Alarme.
+DEFAULT_RED_REMINDER_HOURS = 24
+MAX_RED_REMINDER_HOURS = 720
 RED = 0xFF3B30
 SETTINGS_ID = "ops_alerts"
 LOG_LIMIT = 200
@@ -28,7 +31,7 @@ LOG_LIMIT = 200
 # Ereignisarten mit Vorgabe: Discord an, E-Mail aus. `email_allowed` False, wo eine Mail-Meldung sich
 # selbst nicht zustellen könnte (Mailversand kaputt).
 ALERT_KINDS = {
-    "check_red": {"label": "Auto-Check rot", "hint": "Eine der Prüfungen (Datenbank, Speicher, Mail-Queue, Twitch, Dolibarr, Fehlergruppen) wechselt auf rot - ein Dauer-Rot meldet sich nicht erneut."},
+    "check_red": {"label": "Auto-Check rot", "hint": "Eine der Prüfungen (Datenbank, Speicher, Mail-Queue, Twitch, Dolibarr, Fehlergruppen) wechselt auf rot; bleibt sie rot, erinnert sie nach der eingestellten Frist."},
     "error_group": {"label": "Serverfehler (5xx)", "hint": "Eine neue Gruppe unbehandelter Serverfehler oder Antworten mit Status 5xx."},
     "mail_failed": {"label": "Mail nicht zustellbar", "hint": "Eine Mail ist nach allen Versuchen endgültig fehlgeschlagen.", "email_allowed": False},
     "job_failed": {"label": "Hintergrundjob abgebrochen", "hint": "Ein Job des Schedulers (Abgleich, Erinnerungen, Versand …) ist mit einem Fehler abgebrochen."},
@@ -91,9 +94,11 @@ def merge_settings(stored: dict | None) -> dict:
             row["email"] = False
         rules[kind] = row
     retention = {**DEFAULT_RETENTION, **{k: int(v) for k, v in (stored.get("retention_days") or {}).items() if k in DEFAULT_RETENTION}}
+    reminder = stored.get("red_reminder_hours")
     return {
         "emails": list(stored.get("emails") or []),
         "cooldown_minutes": int(stored.get("cooldown_minutes") or ALERT_WINDOW_SECONDS // 60),
+        "red_reminder_hours": DEFAULT_RED_REMINDER_HOURS if reminder is None else int(reminder),
         "rules": rules,
         "retention_days": retention,
     }
@@ -114,6 +119,11 @@ async def save_alert_settings(db, patch: dict) -> dict:
         if not 5 <= minutes <= 1440:
             raise ValueError("Die Sperrfrist liegt zwischen 5 Minuten und einem Tag.")
         update["cooldown_minutes"] = minutes
+    if "red_reminder_hours" in patch:
+        hours = int(patch["red_reminder_hours"] or 0)
+        if not 0 <= hours <= MAX_RED_REMINDER_HOURS:
+            raise ValueError("Die Erinnerung bei Dauer-Rot liegt zwischen 0 (aus) und 720 Stunden.")
+        update["red_reminder_hours"] = hours
     if "rules" in patch:
         rules = dict(current["rules"])
         for kind, row in (patch["rules"] or {}).items():
@@ -232,10 +242,28 @@ async def send_test_alert(db) -> dict:
 
 # ---------------------------------------------------------------- Bestehende Anlässe (#265)
 
-def check_red_message(check: dict, run: dict) -> dict:
-    """Titel, Text und Felder eines roten Auto-Checks - auch die Vorschau (#583) baut sie hiermit."""
+def _vienna_time(value) -> str:
+    from zoneinfo import ZoneInfo
+
+    try:
+        moment = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except ValueError:
+        return str(value or "")
+    if moment.tzinfo is None:
+        moment = moment.replace(tzinfo=timezone.utc)
+    return moment.astimezone(ZoneInfo("Europe/Vienna")).strftime("%d.%m.%Y %H:%M")
+
+
+def check_red_message(check: dict, run: dict, *, still_red_since: str | None = None) -> dict:
+    """Titel, Text und Felder eines roten Auto-Checks - auch die Vorschau (#583) baut sie hiermit. Mit
+    ``still_red_since`` die Erinnerung bei Dauer-Rot (#2080): „weiterhin rot seit …“."""
+    text = f"{check.get('value') or ''}\n{check.get('detail') or ''}".strip()
+    if still_red_since:
+        return {"title": f"Betrieb: {check.get('label')} ist weiterhin rot",
+                "description": f"Weiterhin rot seit {_vienna_time(still_red_since)}.\n{text}".strip(),
+                "fields": [{"name": "Prüfung", "value": check.get("key") or "-", "inline": True}, {"name": "Lauf", "value": run.get("at") or "-", "inline": True}]}
     return {"title": f"Betrieb: {check.get('label')} ist rot",
-            "description": f"{check.get('value') or ''}\n{check.get('detail') or ''}".strip(),
+            "description": text,
             "fields": [{"name": "Prüfung", "value": check.get("key") or "-", "inline": True}, {"name": "Lauf", "value": run.get("at") or "-", "inline": True}]}
 
 
@@ -247,21 +275,41 @@ def error_group_message(group: dict) -> dict:
 
 
 async def alert_red_checks(db, run: dict) -> list[str]:
-    """Eine Meldung nur beim Wechsel einer Prüfung auf Rot (#2080) - ein Dauer-Rot meldet sich nicht jede Stunde neu;
-    dazu die Sperrfrist je Prüfung gegen Flackern. Der letzte Stand je Prüfung steht bei ihrem Schlüssel in
-    ``ops_alert_state``. Gibt die gemeldeten Schlüssel zurück."""
+    """Eine Meldung beim Wechsel einer Prüfung auf Rot (#2080) - ein Dauer-Rot meldet sich nicht jede Stunde neu,
+    sondern erinnert nach ``red_reminder_hours`` (Vorgabe 24 h, 0 = aus) mit „weiterhin rot seit …“. Dazu die Sperrfrist
+    je Prüfung gegen Flackern.
+
+    Der Stand je Prüfung steht bei ihrem Schlüssel in ``ops_alert_state``: ``check_status`` (crit erst, wenn die Meldung
+    wirklich raus ist - scheitert der Versand, versucht es der nächste rote Lauf nach der Sperrfrist erneut), ``red_since``
+    und ``red_alerted_at``. Gibt die gemeldeten Schlüssel zurück."""
+    settings = await load_alert_settings(db)
+    reminder_seconds = int(settings.get("red_reminder_hours") or 0) * 3600
     sent: list[str] = []
     for check in run.get("checks") or []:
         key = f"check:{check.get('key')}"
         status = check.get("status")
-        state = await db.ops_alert_state.find_one({"key": key}, {"_id": 0, "check_status": 1}) or {}
-        if state.get("check_status") != status:
-            await db.ops_alert_state.update_one({"key": key}, {"$set": {"key": key, "check_status": status}}, upsert=True)
-        if status != "crit" or state.get("check_status") == "crit":
+        state = await db.ops_alert_state.find_one({"key": key}, {"_id": 0}) or {}
+        if status != "crit":
+            if state.get("check_status") != status or state.get("red_since"):
+                await db.ops_alert_state.update_one({"key": key}, {"$set": {"key": key, "check_status": status},
+                                                                   "$unset": {"red_since": "", "red_alerted_at": ""}}, upsert=True)
             continue
-        message = check_red_message(check, run)
-        outcome = await notify(db, "check_red", message["title"], message["description"], message["fields"], key=key, event_key="ops_check")
+        red_since = state.get("red_since") or run.get("at") or now_utc().isoformat()
+        if state.get("check_status") == "crit":
+            if not reminder_seconds or not alert_due(state.get("red_alerted_at"), window_seconds=reminder_seconds):
+                continue
+            message = check_red_message(check, run, still_red_since=red_since)
+        else:
+            if not state.get("red_since"):
+                await db.ops_alert_state.update_one({"key": key}, {"$set": {"key": key, "red_since": red_since}}, upsert=True)
+            message = check_red_message(check, run)
+        try:
+            outcome = await notify(db, "check_red", message["title"], message["description"], message["fields"], key=key, event_key="ops_check")
+        except Exception:  # noqa: BLE001 - ein Alarm darf den Lauf nicht abbrechen; der nächste versucht es erneut
+            logger.warning("[ops] Alarm %s nicht gemeldet", key, exc_info=True)
+            continue
         if outcome.get("sent"):
+            await db.ops_alert_state.update_one({"key": key}, {"$set": {"check_status": "crit", "red_alerted_at": now_utc().isoformat()}})
             sent.append(key)
     return sent
 

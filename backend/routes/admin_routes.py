@@ -387,6 +387,7 @@ async def ops_file_cleanups_retry(me: dict = Depends(require_club_admin())):
 class OpsAlertSettingsBody(BaseModel):
     emails: list[str] | str | None = None
     cooldown_minutes: int | None = None
+    red_reminder_hours: int | None = None
     rules: dict[str, dict[str, bool]] | None = None
     retention_days: dict[str, int] | None = None
 

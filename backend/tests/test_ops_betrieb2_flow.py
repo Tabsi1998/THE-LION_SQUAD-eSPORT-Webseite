@@ -248,6 +248,65 @@ async def test_a_red_check_alerts_only_when_it_turns_red(flow, discord_recorder)
     assert len(discord_recorder) == 2
 
 
+def _mail_queue_run(status):
+    return {"at": now_utc().isoformat(), "checks": [ops_checks.result("mail_queue", "Mail-Queue", status, "0 wartend", "2 hängen im Versand")]}
+
+
+async def _shift_alert_state(db, hours, *fields):
+    past = (now_utc() - timedelta(hours=hours)).isoformat()
+    await db.ops_alert_state.update_one({"key": "check:mail_queue"}, {"$set": {field: past for field in fields}})
+
+
+@pytest.mark.asyncio
+async def test_a_red_alert_that_could_not_be_sent_is_tried_again(flow, monkeypatch):
+    """#2080 (Codex): Scheitert der Versand, gilt Rot nicht als gemeldet - der nächste rote Lauf nach der Sperrfrist
+    versucht es erneut."""
+    import discord_service
+
+    calls = []
+
+    async def flaky(title, description="", **kwargs):
+        calls.append(title)
+        if len(calls) == 1:
+            raise RuntimeError("Discord nicht erreichbar")
+        return {"ok": True, "status_code": 204}
+
+    monkeypatch.setattr(discord_service, "send_ops_discord", flaky)
+    assert await ops_alerts.alert_red_checks(flow.db, _mail_queue_run("crit")) == []
+    state = await flow.db.ops_alert_state.find_one({"key": "check:mail_queue"})
+    assert state.get("check_status") != "crit", "nicht als gemeldet vermerkt"
+    assert await ops_alerts.alert_red_checks(flow.db, _mail_queue_run("crit")) == [], "Sperrfrist gilt weiter"
+    await _shift_alert_state(flow.db, 2, "last_sent_at")
+    assert await ops_alerts.alert_red_checks(flow.db, _mail_queue_run("crit")) == ["check:mail_queue"]
+    assert len(calls) == 2 and "Mail-Queue ist rot" in calls[1]
+
+
+@pytest.mark.asyncio
+async def test_a_check_that_stays_red_reminds_once_a_day(flow, discord_recorder):
+    """#2080 (Codex): Ein dauerhaft roter Check erinnert alle 24 h („weiterhin rot seit …“); einstellbar unter
+    Betrieb → Alarme, 0 schaltet die Erinnerung ab."""
+    settings = await ops_alerts.load_alert_settings(flow.db)
+    assert settings["red_reminder_hours"] == 24
+
+    assert await ops_alerts.alert_red_checks(flow.db, _mail_queue_run("crit")) == ["check:mail_queue"]
+    await _shift_alert_state(flow.db, 23, "last_sent_at", "red_alerted_at")
+    assert await ops_alerts.alert_red_checks(flow.db, _mail_queue_run("crit")) == [], "noch keine 24 h"
+    await _shift_alert_state(flow.db, 25, "last_sent_at", "red_alerted_at", "red_since")
+    assert await ops_alerts.alert_red_checks(flow.db, _mail_queue_run("crit")) == ["check:mail_queue"]
+    assert "weiterhin rot" in discord_recorder[-1]["title"] and "seit" in discord_recorder[-1]["description"]
+    assert await ops_alerts.alert_red_checks(flow.db, _mail_queue_run("crit")) == [], "gerade erinnert"
+    assert len(discord_recorder) == 2
+
+    await ops_alerts.save_alert_settings(flow.db, {"red_reminder_hours": 0})
+    await _shift_alert_state(flow.db, 50, "last_sent_at", "red_alerted_at")
+    assert await ops_alerts.alert_red_checks(flow.db, _mail_queue_run("crit")) == [], "0 = aus"
+    with pytest.raises(ValueError):
+        await ops_alerts.save_alert_settings(flow.db, {"red_reminder_hours": -1})
+    with pytest.raises(ValueError):
+        await ops_alerts.save_alert_settings(flow.db, {"red_reminder_hours": 24 * 31})
+    assert (await ops_alerts.save_alert_settings(flow.db, {"red_reminder_hours": 12}))["red_reminder_hours"] == 12
+
+
 @pytest.mark.asyncio
 async def test_a_new_5xx_group_alerts_once_and_4xx_never(flow, discord_recorder):
     group = {"fingerprint": "abc123", "status_code": 500, "error_type": "KeyError", "method": "GET", "route": "/api/teams/{team_id}", "message": "'team_id'", "count": 1}

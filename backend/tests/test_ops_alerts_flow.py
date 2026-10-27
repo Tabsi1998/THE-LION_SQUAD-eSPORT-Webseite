@@ -68,6 +68,10 @@ async def test_rules_have_defaults_and_are_saved_with_checks(flow):
     assert (await flow.put("/api/admin/ops/alerts", json={"cooldown_minutes": 2})).status_code == 400
     assert (await flow.put("/api/admin/ops/alerts", json={"retention_days": {"email_logs": 3}})).status_code == 400
     assert (await flow.put("/api/admin/ops/alerts", json={"rules": {"unbekannt": {"discord": True}}})).status_code == 400
+    # Erinnerung bei Dauer-Rot (#2080): Vorgabe 24 h, 0 = aus, über die Seite einstellbar.
+    assert view["settings"]["red_reminder_hours"] == 24
+    assert (await flow.put("/api/admin/ops/alerts", json={"red_reminder_hours": 0})).json()["red_reminder_hours"] == 0
+    assert (await flow.put("/api/admin/ops/alerts", json={"red_reminder_hours": 9999})).status_code == 400
 
 
 @pytest.mark.asyncio
