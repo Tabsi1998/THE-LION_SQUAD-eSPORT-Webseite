@@ -5,7 +5,6 @@ Aufruf. Erfundene Testdaten, keine echten Personen.
 Abgedeckt: Rechte je Rolle und Zwei-Faktor, „öffentlich + Personalisierung“ abgelehnt, Pflicht-Grund, der Weg vom
 Printful-Produkt bis „geprüft“, Veröffentlichen scheitert an der offenen Mockup-Prüfung, „Mit Printful abgleichen“
 sperrt eine nicht lieferbare Variante, und das Protokoll nennt Person und Grund."""
-import hashlib
 import inspect
 import pathlib
 import sys
@@ -23,8 +22,20 @@ BASE = "/api/admin/shop/products"
 BY = {"actor_id": "test", "reason": "Testdaten"}
 NEW = {"title": "Vereinsshirt Test", "visibility": "members", "personalization": "gamertag",
        "reason": "Testshirt für #2062 anlegen"}
-PLACEMENTS = [{"key": "front_right", "kind": "design"}, {"key": "front_left", "kind": "gamertag"},
-              {"key": "back", "kind": "design"}]
+LION = {"kind": "motif", "preset": "chest_right", "width_cm": 8.9, "motif": {"key": "loewe-weiss"}}
+PLACEMENTS = [{"key": "front", "layers": [LION, {"kind": "gamertag", "preset": "text_opposite"}]},
+              {"key": "back", "layers": [{"kind": "motif", "preset": "back_large", "width_cm": 28.0,
+                                          "motif": {"key": "ruecken-weiss"}}]}]
+
+
+@pytest.fixture(autouse=True)
+def design_dir(monkeypatch, tmp_path):
+    """Echte Dateien für den Druckdatei-Generator (#2069) - in einem eigenen Ordner je Test."""
+    import storage
+
+    monkeypatch.setattr(storage, "SHOP_DESIGN_DIR", tmp_path / "shop-designs")
+    monkeypatch.setattr(storage, "UPLOAD_DIR", tmp_path)
+    return tmp_path
 
 
 @pytest_asyncio.fixture
@@ -65,18 +76,13 @@ async def with_key(flow) -> None:
 
 
 async def club_designs(flow) -> None:
-    from services import shop_catalog, shop_designs
+    from shop_testdata import stored_design
 
     for key, placement, color, width in (("loewe-weiss", "front_right", "Black", 1200),
                                          ("loewe-schwarz", "front_right", "White", 1200),
                                          ("ruecken-weiss", "back", "Black", 3000),
                                          ("ruecken-schwarz", "back", "White", 3000)):
-        await shop_designs.create_profile(flow.db, key, title=key, placement=placement, garment_colors=[color], **BY)
-        digest = hashlib.sha256(key.encode()).hexdigest()
-        await shop_catalog.add_design_version(flow.db, key, file_ref=f"shop-designs/{digest[:32]}.png", sha256=digest,
-                                              placement=placement, details={"public_id": (digest * 2)[:43],
-                                                                            "width_px": width, "height_px": width},
-                                              **BY)
+        await stored_design(flow.db, key, placement, [color], width=width, height=width, **BY)
 
 
 async def build(flow) -> str:
@@ -88,16 +94,14 @@ async def build(flow) -> str:
         ("post", f"{BASE}/{product_id}/printful", {"printful_product_id": 71, "reason": "Gildan 5000 gewählt"}),
         ("put", f"{BASE}/{product_id}/offer", {"technique": "dtg", "colors": ["Black", "White"], "sizes": ["M", "L"],
                                                "reason": "Schwarz und Weiß in M und L"}),
-        ("put", f"{BASE}/{product_id}/placements", {"placements": PLACEMENTS, "included_placement": "front",
-                                                    "reason": "Löwe, Gamertag, Rückenlogo"}),
+        ("put", f"{BASE}/{product_id}/layout", {"placements": PLACEMENTS, "included_placement": "front",
+                                                "reason": "Löwe, Gamertag, Rückenlogo"}),
+        ("post", f"{BASE}/{product_id}/print-files", {"reason": "Druckdateien erzeugt"}),
     ]
     for method, url, body in steps:
         answer = await getattr(flow, method)(url, json=body)
         assert answer.status_code == 200, (url, answer.text)
-    view = answer.json()
-    designs = await flow.put(f"{BASE}/{product_id}/designs",
-                             json={"assignments": view["design_suggestions"], "reason": "Vorschläge übernommen"})
-    assert designs.status_code == 200, designs.text
+    assert len(answer.json()["result"]["created"]) == 4, answer.json()["result"]
     prices = await flow.post(f"{BASE}/{product_id}/prices/accept", json={"reason": "Selbstkosten geprüft"})
     assert prices.status_code == 200, prices.text
     return product_id
@@ -107,10 +111,17 @@ def new_routes(product_id: str) -> list[tuple[str, str, dict]]:
     return [
         ("post", f"{BASE}/{product_id}/printful", {"printful_product_id": 71, "reason": "Test"}),
         ("put", f"{BASE}/{product_id}/offer", {"technique": "dtg", "colors": ["Black"], "sizes": ["M"], "reason": "Test"}),
-        ("put", f"{BASE}/{product_id}/placements", {"placements": PLACEMENTS, "included_placement": None,
-                                                    "reason": "Test"}),
-        ("put", f"{BASE}/{product_id}/designs", {"assignments": [{"placement": "back", "color": "Black",
-                                                                  "design_key": None}], "reason": "Test"}),
+        ("put", f"{BASE}/{product_id}/layout", {"placements": PLACEMENTS, "included_placement": None,
+                                                "reason": "Test"}),
+        ("post", f"{BASE}/{product_id}/print-files", {"reason": "Test"}),
+        ("post", f"{BASE}/{product_id}/layout/preview", {"placements": PLACEMENTS}),
+        ("post", f"{BASE}/{product_id}/print-templates/refresh", {"reason": "Test"}),
+        ("get", f"{BASE}/{product_id}/preview?placement=front&color=Black", None),
+        ("get", f"{BASE}/{product_id}/print-files/x", None),
+        ("get", "/api/admin/shop/print-presets", None),
+        ("put", "/api/admin/shop/print-presets", {"rules": {"min_width_cm": 2.0}, "reason": "Test"}),
+        ("get", "/api/admin/shop/print-templates/71/images/0", None),
+        ("get", "/api/admin/shop/printful-catalog?q=gildan", None),
         ("post", f"{BASE}/{product_id}/prices/accept", {"reason": "Test"}),
         ("post", f"{BASE}/{product_id}/sync", {}),
         ("post", f"{BASE}/{product_id}/status", {"status": "reviewed", "reason": "Test"}),
@@ -130,12 +141,12 @@ async def test_only_finance_with_second_factor_reaches_the_product_routes(flow, 
     for name in REFUSED:
         flow.act_as(who[name])
         for method, url, body in new_routes(product["id"]):
-            answer = await getattr(flow, method)(url, json=body)
+            answer = await getattr(flow, method)(url, **({"json": body} if body is not None else {}))
             assert answer.status_code == 403, (name, url, answer.text)
     for name in ALLOWED:
         flow.act_as(without_second_factor(who[name]))
         for method, url, body in new_routes(product["id"]):
-            answer = await getattr(flow, method)(url, json=body)
+            answer = await getattr(flow, method)(url, **({"json": body} if body is not None else {}))
             assert answer.status_code == 403 and "Zwei-Faktor" in answer.json()["detail"], (name, url)
     assert await flow.db.audit_logs.count_documents({}) == logged
     for name in ALLOWED:
@@ -164,15 +175,14 @@ async def test_the_reason_is_optional_but_publishing_needs_one(flow, fake, monke
     steps = [
         ("post", f"{BASE}/{product_id}/printful", {"printful_product_id": 71}),
         ("put", f"{BASE}/{product_id}/offer", {"technique": "dtg", "colors": ["Black", "White"], "sizes": ["M", "L"]}),
-        ("put", f"{BASE}/{product_id}/placements", {"placements": PLACEMENTS, "included_placement": "front",
-                                                    "reason": ""}),
+        ("put", f"{BASE}/{product_id}/layout", {"placements": PLACEMENTS, "included_placement": "front",
+                                                "reason": ""}),
     ]
     for method, url, body in steps:
         answer = await getattr(flow, method)(url, json=body)
         assert answer.status_code == 200, (url, answer.text)
-    view = answer.json()
     for method, url, body in (
-            ("put", f"{BASE}/{product_id}/designs", {"assignments": view["design_suggestions"]}),
+            ("post", f"{BASE}/{product_id}/print-files", {}),
             ("post", f"{BASE}/{product_id}/prices/accept", {}),
             ("post", f"{BASE}/{product_id}/status", {"status": "reviewed"})):
         answer = await getattr(flow, method)(url, json=body)
@@ -254,7 +264,8 @@ async def test_the_guided_way_ends_at_reviewed_and_publishing_waits_for_the_mock
     assert all(entry["actor_id"] == who["finanzen"]["id"] for entry in rows)
     reasons = {entry["action"]: entry["data"]["reason"] for entry in rows}
     assert reasons["shop.product.catalog"] == "Gildan 5000 gewählt"
-    assert reasons["shop.product.designs"] == "Vorschläge übernommen"
+    assert reasons["shop.product.layout"] == "Löwe, Gamertag, Rückenlogo"
+    assert reasons["shop.print_file.add"] == "Druckdateien erzeugt"
     assert reasons["shop.product.status"] == "Alles geprüft"
 
 
@@ -342,3 +353,101 @@ async def test_a_second_sync_while_one_runs_answers_409(flow, fake):
     async with mutation_lock(flow.db, shop_catalog_sync.SYNC_RESOURCE, wait_seconds=0, lease_seconds=30):
         answer = await flow.post(f"{BASE}/{product_id}/sync", json={})
     assert answer.status_code == 409 and "läuft gerade" in answer.json()["detail"]
+
+# ---------------------------------------------------------------- Druckvorlagen und Druckdateien (#2069)
+
+@pytest.mark.asyncio
+async def test_print_files_preview_presets_template_images_and_upload_through_the_routes(flow, fake, monkeypatch):
+    from io import BytesIO
+
+    import httpx
+    from PIL import Image
+
+    from services import shop_print_templates
+
+    def png(width: int, height: int) -> bytes:
+        out = BytesIO()
+        Image.new("RGBA", (width, height), (0, 0, 0, 0)).save(out, format="PNG")
+        return out.getvalue()
+
+    monkeypatch.setattr(shop_print_templates, "IMAGE_TRANSPORT", httpx.MockTransport(
+        lambda request: httpx.Response(200, content=png(1000, 1000), headers={"content-type": "image/png"})))
+    await with_key(flow)
+    await club_designs(flow)
+    who = await people(flow)
+    flow.act_as(who["finanzen"])
+    product_id = await build(flow)
+    view = (await flow.get(f"{BASE}/{product_id}")).json()
+    front = next(row for row in view["placements"] if row["key"] == "front")
+    black = next(state for state in front["files"] if state["color"] == "Black")
+    assert black["state"] == "ok" and black["file"]["width_px"] == 1800
+    # Die erzeugte Datei: für Printful öffentlich hinter dem Zufallsschlüssel, im Admin über die Produkt-Route.
+    flow.act_as(None)
+    from services import shop_print_files
+
+    row = await flow.db.shop_print_files.find_one({"id": black["file"]["id"]}, {"_id": 0})
+    public = await flow.get(shop_print_files.public_path(row))
+    assert public.status_code == 200 and public.headers["content-type"] == "image/png"
+    assert public.headers["cache-control"] == "no-store"
+    flow.act_as(who["finanzen"])
+    own = await flow.get(f"{BASE}/{product_id}/print-files/{black['file']['id']}")
+    assert own.status_code == 200 and own.content == public.content
+    # Vorschau über dem Vorlagenbild, das Vorlagenbild selbst über die Website.
+    preview = await flow.get(f"{BASE}/{product_id}/preview", params={"placement": "front", "color": "White"})
+    assert preview.status_code == 200 and preview.headers["content-type"] == "image/png"
+    with Image.open(BytesIO(preview.content)) as img:
+        assert img.size == (900, 900)
+    image = await flow.get(view["available_placements"][0]["preview"]["image_path"])
+    assert image.status_code == 200 and image.headers["x-content-type-options"] == "nosniff"
+    assert (await flow.get("/api/admin/shop/print-templates/71/images/99")).status_code == 404
+    # Vorgaben sind einstellbar (Grund optional, Protokoll).
+    presets = (await flow.get("/api/admin/shop/print-presets")).json()
+    assert presets["is_default"] is True and presets["labels"]["families"]["front"] == "Vorderseite"
+    changed = await flow.put("/api/admin/shop/print-presets", json={"rules": {"min_width_cm": 2.0}})
+    assert changed.status_code == 200 and changed.json()["rules"]["min_width_cm"] == 2.0
+    refused = await flow.put("/api/admin/shop/print-presets", json={"presets": [{"key": "!"}]})
+    assert refused.status_code == 400
+    # Für Profis: fertige Datei - die falsche Größe verständlich abgelehnt, die richtige angenommen.
+    layout = {"placements": [PLACEMENTS[0], {"key": "back", "mode": "upload", "layers": []}],
+              "included_placement": "front"}
+    assert (await flow.put(f"{BASE}/{product_id}/layout", json=layout)).status_code == 200
+    form = {"product_id": product_id, "placement": "back", "color": "Black", "reason": "Fertige Datei"}
+    wrong = await flow.post("/api/admin/shop/print-files/upload", data=form,
+                            files={"file": ("ruecken.png", png(1000, 1000), "image/png")})
+    assert wrong.status_code == 400 and "1800 × 2400 px" in wrong.json()["detail"]
+    right = await flow.post("/api/admin/shop/print-files/upload", data=form,
+                            files={"file": ("ruecken.png", png(1800, 2400), "image/png")})
+    assert right.status_code == 200, right.text
+    assert right.json()["uploaded"]["width_px"] == 1800
+
+@pytest.mark.asyncio
+async def test_the_product_search_finds_the_printful_number_without_typing_it(flow, fake):
+    who = await people(flow)
+    flow.act_as(who["finanzen"])
+    without_key = await flow.get("/api/admin/shop/printful-catalog", params={"q": "gildan"})
+    assert without_key.status_code == 409 and "Schlüssel" in without_key.json()["detail"]
+    await with_key(flow)
+    found = await flow.get("/api/admin/shop/printful-catalog", params={"q": "Gildan 5000"})
+    assert found.status_code == 200, found.text
+    body = found.json()
+    assert [row["id"] for row in body["results"]] == [71] and body["products_total"] == 1
+    assert body["categories"] and body["fetched_at"] and body["stale"] is False
+    link = "https://www.printful.com/dashboard/custom/mens/shirts/unisex-testshirt-gildan-5000?technique=DTFILM&color=Black"
+    by_link = (await flow.get("/api/admin/shop/printful-catalog", params={"link": link})).json()
+    assert by_link["link"]["ok"] is True and by_link["results"][0]["id"] == 71
+    assert len(fake.calls_to("getProducts")) == 1, "zwischengespeichert"
+
+@pytest.mark.asyncio
+async def test_the_draft_preview_is_rate_limited_per_account(flow, monkeypatch):
+    """Codex, fünfte Runde: höchstens 60 Vorschauen je Minute und Konto (einstellbar), das 61. Mal 429."""
+    monkeypatch.setenv("SHOP_LAYOUT_PREVIEW_WINDOW_SECONDS", "3600")  # ein Fenster für den ganzen Test
+    who = await people(flow)
+    flow.act_as(who["finanzen"])
+    body = {"placements": PLACEMENTS}
+    for _ in range(60):
+        answer = await flow.post(f"{BASE}/gibt-es-nicht/layout/preview", json=body)
+        assert answer.status_code == 404, answer.text
+    limited = await flow.post(f"{BASE}/gibt-es-nicht/layout/preview", json=body)
+    assert limited.status_code == 429 and "Zu viele Vorschau-Anfragen" in limited.json()["detail"]
+    flow.act_as(who["club-admin"])
+    assert (await flow.post(f"{BASE}/gibt-es-nicht/layout/preview", json=body)).status_code == 404, "je Konto"

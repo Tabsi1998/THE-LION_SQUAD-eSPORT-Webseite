@@ -18,6 +18,8 @@ Läuft auf Knopfdruck („Mit Printful abgleichen“ im Admin) und täglich als 
   gerade“. Zusammen mit dem gemeinsamen Rate-Limit des Adapters (``printful_client``, je Schlüssel im Prozess; das
   Backend läuft mit einem Uvicorn-Worker) bleibt der Shop unter 120 Aufrufen je Minute.
 - **Alle Produkte**: der Tagesjob geht seitenweise (``PAGE_SIZE``) über alle nicht archivierten Printful-Produkte.
+- **Druckvorlagen** (#2069): je Produkt holt der Abgleich auch die Maße der Druckflächen und die Vorlagenbilder neu
+  (``shop_print_templates.refresh``); eine Abweichung steht im Protokoll (``shop.print_template.change``).
 
 Protokoll: ``shop.catalog.sync`` mit gesperrten, freigegebenen Varianten und Preisänderungen - nur, wenn sich etwas
 ändert (der tägliche Job schreibt sonst nichts).
@@ -28,7 +30,7 @@ import logging
 from typing import Any
 
 from models import now_utc
-from services import shop_catalog, shop_config, shop_costs
+from services import shop_catalog, shop_config, shop_costs, shop_print_templates
 from services.mutation_lock import MutationLockBusy, mutation_lock
 from services.shop_common import ShopConflict, ShopError, clean_reason, record_admin_action
 from services.shop_fulfillment import CatalogProductId, CatalogVariantId, FulfillmentError, FulfillmentProvider
@@ -105,16 +107,23 @@ async def _sync_product_unlocked(db, product_id: str, *, provider: FulfillmentPr
         logger.warning("[shop-sync] product failed: %s", exc.reason)
         return await _failed(db, product_id, previous, now, exc.text)
     by_id = {row.id.value: row for row in rows}
+    # Druckvorlagen (#2069): Maße je Fläche und Vorlagenbilder gleich mit - eine Abweichung steht im Protokoll und macht
+    # erzeugte Druckdateien ungültig (die Prüfung zeigt „veraltet“). Scheitert das, bleibt der letzte Stand.
+    template = await shop_print_templates.refresh(db, printful["product_id"], provider=provider, actor_id=actor_id,
+                                                  reason=reason)
+    template_state = {key: template[key] for key in ("ok", "changed", "changes", "detail")}
     try:
         async with shop_catalog.product_lock(db, product_id, wait_seconds=5.0):
             current = await shop_catalog.get_product(db, product_id)
             if not current or current.get("version", 1) != read_version:
                 logger.info("[shop-sync] product changed during the sync - result discarded")
-                return await _failed(db, product_id, previous, now, SKIPPED, skipped=True)
-            return await _write(db, current, by_id, set(item.value for item in price_for), now=now,
-                                actor_id=actor_id, reason=reason)
+                return {**await _failed(db, product_id, previous, now, SKIPPED, skipped=True),
+                        "template": template_state}
+            result = await _write(db, current, by_id, set(item.value for item in price_for), now=now,
+                                  actor_id=actor_id, reason=reason)
+            return {**result, "template": template_state}
     except ShopConflict:
-        return await _failed(db, product_id, previous, now, SKIPPED, skipped=True)
+        return {**await _failed(db, product_id, previous, now, SKIPPED, skipped=True), "template": template_state}
 
 
 async def _write(db, product: dict, by_id: dict, priced_ids: set[int], *, now: str, actor_id: str,

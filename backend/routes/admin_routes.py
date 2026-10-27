@@ -387,6 +387,7 @@ async def ops_file_cleanups_retry(me: dict = Depends(require_club_admin())):
 class OpsAlertSettingsBody(BaseModel):
     emails: list[str] | str | None = None
     cooldown_minutes: int | None = None
+    red_reminder_hours: int | None = None
     rules: dict[str, dict[str, bool]] | None = None
     retention_days: dict[str, int] | None = None
 
@@ -440,6 +441,30 @@ def _discord_log_line(row: dict, names: dict[str, str]) -> str:
     if row.get("crossref"):
         parts.append("Querverweis")
     return " · ".join(parts)
+
+
+def _vienna_short(value) -> str:
+    """„27.10. 07:39“ in Wiener Zeit - für Texte, die auch in der CSV stehen."""
+    from datetime import datetime, timezone
+    from zoneinfo import ZoneInfo
+
+    try:
+        moment = value if isinstance(value, datetime) else datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except ValueError:
+        return str(value or "")
+    if moment.tzinfo is None:
+        moment = moment.replace(tzinfo=timezone.utc)
+    return moment.astimezone(ZoneInfo("Europe/Vienna")).strftime("%d.%m. %H:%M")
+
+
+def _episode_detail(row: dict) -> str:
+    """Ein Zustand der Auto-Checks (#2080): seit wann, wie oft geprüft, zuletzt wann, und die Ampel-Zähler des letzten Laufs."""
+    since, last = _vienna_short(row.get("since")), _vienna_short(row.get("last_at"))
+    if since[:6] == last[:6]:
+        last = last[7:]
+    counts = row.get("counts") or {}
+    return (f"seit {since} · {int(row.get('runs') or 1)}× geprüft · zuletzt {last}\n"
+            f"{counts.get('crit', 0)} rot · {counts.get('warn', 0)} gelb · {counts.get('ok', 0)} grün")
 
 
 def _since_iso_hours(hours: int) -> str:
@@ -518,13 +543,15 @@ async def _log_sources(db, safe_limit: int, *, since_iso: str = "") -> list[dict
         for row in error_rows
     ]
 
-    check_rows = await db.ops_check_runs.find({**since("at"), "status": {"$ne": "ok"}}, {"_id": 0, "checks": 0}).sort("at", -1).limit(safe_limit).to_list(safe_limit)
+    # Auto-Checks (#2080): ein Eintrag je Zustand statt je Lauf - „seit … · 92× geprüft · zuletzt …“; ein laufender
+    # Zustand zählt, solange sein letzter Lauf im Zeitraum liegt.
+    check_rows = await db.ops_check_episodes.find({**since("last_at"), "status": {"$ne": "ok"}}, {"_id": 0, "expires_at": 0}).sort([("since", -1), ("_id", -1)]).limit(safe_limit).to_list(safe_limit)
     check_items = [
         _log_item("checks", "Auto-Checks", HREFS["checks"], row, severity="error" if row.get("status") == "crit" else "warn", status=row.get("status") or "",
                   title="Auto-Checks rot" if row.get("status") == "crit" else "Auto-Checks gelb",
                   subtitle=", ".join(row.get("failing") or []),
-                  detail=f"{(row.get('counts') or {}).get('crit', 0)} rot · {(row.get('counts') or {}).get('warn', 0)} gelb · {(row.get('counts') or {}).get('ok', 0)} grün",
-                  time_keys=("at",))
+                  detail=_episode_detail(row),
+                  time_keys=("since", "last_at"))
         for row in check_rows
     ]
 
@@ -565,7 +592,7 @@ async def _log_sources(db, safe_limit: int, *, since_iso: str = "") -> list[dict
 
     return [
         _source_summary("server", "Serverfehler", HREFS["server"], total=await db.ops_errors.count_documents({}), problem_count=await db.ops_errors.count_documents({"resolved_at": None}), items=server_items, tone="danger"),
-        _source_summary("checks", "Auto-Checks", HREFS["checks"], total=await db.ops_check_runs.count_documents({}), problem_count=await db.ops_check_runs.count_documents({"status": {"$ne": "ok"}}), items=check_items, tone="danger"),
+        _source_summary("checks", "Auto-Checks", HREFS["checks"], total=await db.ops_check_episodes.count_documents({}), problem_count=await db.ops_check_episodes.count_documents({"status": {"$ne": "ok"}}), items=check_items, tone="danger"),
         _source_summary("alerts", "Alarme", HREFS["alerts"], total=await db.ops_alert_log.count_documents({}), problem_count=0, items=alert_items, tone="warn"),
         _source_summary("client", "App-Logs", HREFS["client"], total=await db.mobile_client_logs.count_documents({}), problem_count=await db.mobile_client_logs.count_documents({"status": "open"}), items=client_items, tone="danger"),
         _source_summary("email", "E-Mail-Versand", HREFS["email"], total=await db.email_logs.count_documents({}), problem_count=await db.email_logs.count_documents({"status": {"$in": ["failed", "skipped"]}}), items=email_items, tone="warn"),

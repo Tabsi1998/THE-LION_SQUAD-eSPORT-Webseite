@@ -31,7 +31,7 @@ async def test_events_merge_all_sources_and_filters_work_as_json_and_csv(flow):
     db = flow.db
     await db.ops_errors.insert_one({"fingerprint": "f1", "error_type": "KeyError", "route": "/api/teams/{team_id}", "method": "GET", "status_code": 500,
                                     "count": 7, "message": "'team_id'", "actor": "angemeldet", "first_seen_at": old, "last_seen_at": fresh, "resolved_at": None})
-    await db.ops_check_runs.insert_one({"id": "run1", "at": fresh, "status": "crit", "counts": {"ok": 5, "warn": 0, "crit": 1}, "failing": ["mail_queue"], "checks": []})
+    await db.ops_check_episodes.insert_one({"id": "ep1", "since": fresh, "last_at": fresh, "runs": 1, "status": "crit", "counts": {"ok": 5, "warn": 0, "crit": 1}, "failing": ["mail_queue"]})
     await db.ops_alert_log.insert_one({"id": "a1", "kind": "server_error", "key": "k", "title": "Serverfehler: KeyError", "description": "", "channels": ["discord"], "at": fresh})
     await db.mobile_client_logs.insert_one({"id": "c1", "level": "error", "status": "open", "message": "App stürzt beim Öffnen des Chats ab", "source": "chat", "received_at": fresh, "priority_rank": 1})
     await db.email_logs.insert_many([
@@ -85,6 +85,248 @@ async def test_events_merge_all_sources_and_filters_work_as_json_and_csv(flow):
     player = await flow.add_user(role="player")
     flow.act_as(player)
     assert (await flow.get("/api/admin/ops/events")).status_code in (401, 403)
+
+
+@pytest.mark.asyncio
+async def test_equal_check_runs_become_one_event_per_state_change(flow):
+    """#2080: Zehn gleiche Läufe (gelb: image_variants) sind ein Eintrag mit Zähler - „seit … · 10× geprüft · zuletzt …“.
+    Erst ein anderer Stand (dazu disk) ergibt einen neuen Eintrag; grün dazwischen trennt auch, erscheint aber nicht."""
+    from services import ops_checks
+
+    def checks_with(*warn_keys):
+        def make(key):
+            async def runner():
+                return ops_checks.result(key, key, "warn" if key in warn_keys else "ok", "1")
+            return runner
+        return [(key, key, make(key)) for key in ("database", "image_variants", "disk")]
+
+    for _ in range(10):
+        await ops_checks.run_checks(flow.db, checks=checks_with("image_variants"))
+    assert await flow.db.ops_check_runs.count_documents({}) == 10, "die Läufe selbst bleiben für den Verlauf"
+    episodes = await flow.db.ops_check_episodes.find({}, {"_id": 0}).to_list(10)
+    assert len(episodes) == 1 and episodes[0]["runs"] == 10 and episodes[0]["failing"] == ["image_variants"]
+
+    admin = await flow.add_user(role="superadmin")
+    flow.act_as(admin)
+    checks = (await flow.get("/api/admin/ops/events", params={"hours": 0, "source": "checks"})).json()
+    assert len(checks["items"]) == 1
+    item = checks["items"][0]
+    assert item["title"] == "Auto-Checks gelb" and item["subtitle"] == "image_variants"
+    assert "seit " in item["detail"] and "10× geprüft" in item["detail"] and "zuletzt " in item["detail"]
+    assert {row["key"]: row for row in checks["sources"]}["checks"]["problem_count"] == 1
+
+    await ops_checks.run_checks(flow.db, checks=checks_with("image_variants", "disk"))
+    await ops_checks.run_checks(flow.db, checks=checks_with())
+    await ops_checks.run_checks(flow.db, checks=checks_with("image_variants", "disk"))
+    items = (await flow.get("/api/admin/ops/events", params={"hours": 0, "source": "checks"})).json()["items"]
+    assert [item["subtitle"] for item in items] == ["image_variants, disk", "image_variants, disk", "image_variants"]
+    assert "1× geprüft" in items[0]["detail"]
+
+
+class _BothSeeTheOldState:
+    """Zwei Läufe zugleich nach einem Wechsel (#2080, Codex): beide lesen den alten Stand, bevor einer schreibt -
+    so wie zwei Worker auf echtem MongoDB. mongomock antwortet sonst sofort und alles liefe nacheinander."""
+
+    def __init__(self, db):
+        import asyncio
+
+        self._db = db
+        self.barrier = asyncio.Barrier(2)
+        self.gated = 0
+
+    def __getattr__(self, name):
+        target = getattr(self._db, name)
+        return _GatedEpisodes(target, self) if name == "ops_check_episodes" else target
+
+
+class _GatedEpisodes:
+    def __init__(self, collection, gate):
+        self._collection = collection
+        self._gate = gate
+
+    def __getattr__(self, name):
+        return getattr(self._collection, name)
+
+    async def find_one_and_update(self, *args, **kwargs):
+        import asyncio
+
+        found = await self._collection.find_one_and_update(*args, **kwargs)
+        if self._gate.gated < 2:
+            self._gate.gated += 1
+            await asyncio.wait_for(self._gate.barrier.wait(), 1)
+        return found
+
+    async def find_one(self, *args, **kwargs):
+        import asyncio
+
+        found = await self._collection.find_one(*args, **kwargs)
+        if self._gate.gated < 2:
+            self._gate.gated += 1
+            await asyncio.wait_for(self._gate.barrier.wait(), 1)
+        return found
+
+
+@pytest.mark.asyncio
+async def test_two_runs_at_once_after_a_change_share_one_open_episode(flow):
+    """#2080 (Codex): Zusammenfassen ist atomar - zwei gleichzeitige gelbe Läufe nach Grün ergeben genau einen offenen
+    Abschnitt mit zwei Läufen, kein Duplikat."""
+    import asyncio
+
+    import database
+    from services import ops_checks
+
+    await database.ensure_ops_check_indexes(flow.db)
+    now = now_utc()
+    await ops_checks.record_episode(flow.db, {"at": (now - timedelta(minutes=5)).isoformat(), "status": "ok", "failing": [], "counts": {"ok": 3}})
+    yellow = {"status": "warn", "failing": ["image_variants"], "counts": {"ok": 2, "warn": 1}}
+    gate = _BothSeeTheOldState(flow.db)
+    await asyncio.gather(
+        ops_checks.record_episode(gate, {**yellow, "at": now.isoformat()}),
+        ops_checks.record_episode(gate, {**yellow, "at": (now + timedelta(seconds=1)).isoformat()}),
+    )
+    open_episodes = await flow.db.ops_check_episodes.find({"open": True}, {"_id": 0}).to_list(5)
+    assert len(open_episodes) == 1
+    assert open_episodes[0]["runs"] == 2 and open_episodes[0]["failing"] == ["image_variants"]
+    assert await flow.db.ops_check_episodes.count_documents({}) == 2, "der grüne ist zu, der gelbe offen"
+
+
+@pytest.mark.asyncio
+async def test_the_first_start_fills_the_episodes_from_the_stored_runs(flow):
+    """#2080 (Codex): Beim ersten Start nach dem Update baut ein einmaliger Nachtrag die Abschnitte aus den gespeicherten
+    Läufen (bis 7 Tage) - die Ereignisliste verliert nichts. Ein Merker sorgt dafür, dass er nur einmal läuft."""
+    from services import ops_checks
+
+    start = now_utc() - timedelta(hours=3)
+
+    def run(minutes, status, failing):
+        return {"id": f"r{minutes}", "at": (start + timedelta(minutes=minutes)).isoformat(), "status": status, "failing": failing,
+                "counts": {"ok": 2, "warn": int(status == "warn"), "crit": int(status == "crit")}, "checks": []}
+
+    await flow.db.ops_check_runs.insert_many([
+        run(0, "warn", ["image_variants"]), run(5, "warn", ["image_variants"]), run(10, "warn", ["image_variants"]),
+        run(15, "ok", []), run(20, "crit", ["mail_queue"]), run(25, "crit", ["mail_queue"]),
+    ])
+    assert await ops_checks.backfill_check_episodes(flow.db) == 3
+    episodes = await flow.db.ops_check_episodes.find({}, {"_id": 0}).sort("since", 1).to_list(10)
+    assert [(e["status"], e["runs"], bool(e.get("open"))) for e in episodes] == [("warn", 3, False), ("ok", 1, False), ("crit", 2, True)]
+    assert episodes[0]["since"] == run(0, "warn", [])["at"] and episodes[0]["last_at"] == run(10, "warn", [])["at"]
+
+    assert await ops_checks.backfill_check_episodes(flow.db) == 0, "nur einmal"
+    await ops_checks.run_checks(flow.db, checks=[("mail_queue", "Mail-Queue", lambda: _crit_mail()), ("disk", "Speicher", lambda: _ok_disk())])
+    assert await flow.db.ops_check_episodes.count_documents({}) == 3
+    assert (await flow.db.ops_check_episodes.find_one({"open": True}))["runs"] == 3
+
+    admin = await flow.add_user(role="superadmin")
+    flow.act_as(admin)
+    items = (await flow.get("/api/admin/ops/events", params={"hours": 0, "source": "checks"})).json()["items"]
+    assert [item["subtitle"] for item in items] == ["mail_queue", "image_variants"]
+
+
+@pytest.mark.asyncio
+async def test_only_one_episode_can_be_open_and_an_old_sparse_index_is_replaced(flow):
+    """#2080 (Codex): Der eindeutige Index gilt nur für ``open: true`` (partiell) - beliebig viele geschlossene Abschnitte,
+    auch mit ``open: false``, stören nicht. Ein früher angelegter lückenhafter Index wird beim Start ersetzt."""
+    import database
+    from pymongo.errors import DuplicateKeyError
+
+    await flow.db.ops_check_episodes.create_index("open", unique=True, sparse=True)
+    await database.ensure_ops_check_indexes(flow.db)
+    await database.ensure_ops_check_indexes(flow.db)  # zweiter Start: nichts doppelt, nichts kaputt
+    info = await flow.db.ops_check_episodes.index_information()
+    on_open = {name: spec for name, spec in info.items() if spec.get("key") == [("open", 1)]}
+    assert list(on_open) == [database.OPS_EPISODE_OPEN_INDEX]
+    spec = on_open[database.OPS_EPISODE_OPEN_INDEX]
+    assert spec.get("unique") and spec.get("partialFilterExpression") == {"open": True}
+    await flow.db.ops_check_episodes.insert_many([{"id": "a", "open": False}, {"id": "b", "open": False}, {"id": "c"}, {"id": "d", "open": True}])
+    with pytest.raises(DuplicateKeyError):
+        await flow.db.ops_check_episodes.insert_one({"id": "e", "open": True})
+
+
+@pytest.mark.asyncio
+async def test_the_index_start_tidies_up_two_open_episodes_and_never_crashes(flow, monkeypatch):
+    """#2080 (Codex): Stehen schon zwei offene Abschnitte da, schließt der Start alle bis auf den jüngsten, bevor er den
+    eindeutigen Index anlegt. Scheitert Löschen oder Anlegen eines Index (etwa parallel schon weg), gibt es eine Warnung,
+    keinen Absturz. Die Kennung ``id`` ist eindeutig."""
+    import database
+    from pymongo.errors import DuplicateKeyError, OperationFailure
+
+    await flow.db.ops_check_episodes.insert_many([
+        {"id": "alt", "open": True, "since": "2026-10-27T07:00:00+00:00", "last_at": "2026-10-27T08:00:00+00:00"},
+        {"id": "neu", "open": True, "since": "2026-10-27T08:05:00+00:00", "last_at": "2026-10-27T09:00:00+00:00"},
+    ])
+    await database.ensure_ops_check_indexes(flow.db)
+    assert [row["id"] for row in await flow.db.ops_check_episodes.find({"open": True}).to_list(5)] == ["neu"]
+    assert "open" not in (await flow.db.ops_check_episodes.find_one({"id": "alt"}))
+    with pytest.raises(DuplicateKeyError):
+        await flow.db.ops_check_episodes.insert_one({"id": "neu"})
+
+    collection = flow.db.ops_check_episodes
+    await collection.create_index("open", unique=True, sparse=True, name="open_alt")
+
+    async def gone(name):
+        raise OperationFailure("index not found", code=27)
+
+    monkeypatch.setattr(type(collection), "drop_index", lambda self, name: gone(name))
+    await database.ensure_ops_check_indexes(flow.db)  # Doppelter Start, Löschen scheitert: kein Absturz
+    await database.ensure_ops_check_indexes(flow.db)
+
+
+@pytest.mark.asyncio
+async def test_the_backfill_counts_an_episode_written_meanwhile_as_there(flow, monkeypatch):
+    """#2080 (Codex): Schreibt ein zweiter Anlauf denselben nachgetragenen Abschnitt zugleich, scheitert sein Upsert am
+    eindeutigen ``id`` - das heißt „schon da“, kein Abbruch."""
+    from pymongo.errors import DuplicateKeyError
+
+    from services import ops_checks
+
+    now = now_utc()
+    await flow.db.ops_check_runs.insert_many([
+        {"id": "r1", "at": (now - timedelta(hours=2)).isoformat(), "status": "warn", "failing": ["disk"], "counts": {}, "checks": []},
+        {"id": "r2", "at": (now - timedelta(hours=1)).isoformat(), "status": "ok", "failing": [], "counts": {}, "checks": []},
+    ])
+    collection = flow.db.ops_check_episodes
+    original = type(collection).update_one
+    raced = []
+
+    async def racing(self, query, *args, **kwargs):
+        if not raced and str(query.get("id", "")).startswith("bf-"):
+            raced.append(query["id"])
+            raise DuplicateKeyError("E11000 duplicate key")
+        return await original(self, query, *args, **kwargs)
+
+    monkeypatch.setattr(type(collection), "update_one", racing)
+    assert await ops_checks.backfill_check_episodes(flow.db) == 1, "einer neu, einer schon da"
+    assert (await flow.db.settings.find_one({"id": ops_checks.BACKFILL_MARKER}))["state"] == "done"
+
+
+@pytest.mark.asyncio
+async def test_an_orphaned_backfill_marker_is_taken_over_a_fresh_one_is_not(flow):
+    """#2080 (Codex): Bricht der Nachtrag ab, bleibt der Merker auf „running“. Nach zehn Minuten gilt er als verwaist und
+    wird atomar übernommen; ein frischer bleibt beim anderen Worker."""
+    from services import ops_checks
+
+    now = now_utc()
+    await flow.db.ops_check_runs.insert_one({"id": "r1", "at": (now - timedelta(hours=1)).isoformat(), "status": "warn",
+                                             "failing": ["disk"], "counts": {"warn": 1}, "checks": []})
+    marker = ops_checks.BACKFILL_MARKER
+    await flow.db.settings.insert_one({"id": marker, "state": "running", "started_at": (now - timedelta(minutes=1)).isoformat()})
+    assert await ops_checks.backfill_check_episodes(flow.db) == 0, "ein anderer Worker ist dran"
+    await flow.db.settings.update_one({"id": marker}, {"$set": {"started_at": (now - timedelta(minutes=20)).isoformat()}})
+    assert await ops_checks.backfill_check_episodes(flow.db) == 1
+    assert (await flow.db.settings.find_one({"id": marker}))["state"] == "done"
+    assert await ops_checks.backfill_check_episodes(flow.db) == 0
+
+
+async def _crit_mail():
+    from services import ops_checks
+
+    return ops_checks.result("mail_queue", "Mail-Queue", "crit", "2 hängen")
+
+
+async def _ok_disk():
+    from services import ops_checks
+
+    return ops_checks.result("disk", "Speicher", "ok", "50 %")
 
 
 @pytest.mark.asyncio

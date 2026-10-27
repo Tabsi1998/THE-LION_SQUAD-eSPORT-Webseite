@@ -33,7 +33,9 @@ MODEL_FIELDS: dict[str, tuple[str, ...]] = {
                       "created_by", "updated_at", "updated_by",
                       # Produktverwaltung (#1707, services/shop_products.py) und Abgleich (#1709)
                       "personalization", "printful", "technique", "offer", "placements", "included_placement",
-                      "review", "published_at", "archived_at", "catalog_sync"),
+                      "review", "published_at", "archived_at", "catalog_sync",
+                      # Druckvorlagen (#2069): die alten Platzierungen nach der Umstellung, für den Rückweg
+                      "placements_legacy"),
     "shop_variants": ("id", "product_id", "sku", "label", "size", "color", "price_cents", "active", "version",
                       "created_at", "created_by", "updated_at", "updated_by",
                       "color_code", "blocked_reason", "blocked_at"),
@@ -56,6 +58,17 @@ MODEL_FIELDS: dict[str, tuple[str, ...]] = {
                             "anchor_x_in", "anchor_y_in", "anchor_y_px", "rules_hash", "user_id", "order_id",
                             "order_item_id", "created_at", "created_by", "last_used_at", "public_disabled_at",
                             "erase_pending_at", "file_deleted_at"),
+    # Druckvorlagen von Printful (#2069, services/shop_print_templates.py): Maße je Fläche, Vorlagenbilder, Abgleich.
+    "shop_print_templates": ("printful_product_id", "entries", "previews", "hash", "previous_hash", "fetched_at",
+                             "checked_at", "changed_at", "changes", "last_error", "skipped"),
+    # Erzeugte bzw. hochgeladene Druckdateien (#2069, services/shop_print_files.py). Bestelldateien mit Gamertag zeigen
+    # den Namen: die Zeile gehört dann zu Konto, Bestellung und Position - nie der Name als Text.
+    "shop_print_files": ("id", "origin", "purpose", "product_id", "placement", "printful_placement", "technique",
+                         "group", "variant_ids", "color", "color_key", "version", "file_name", "sha256", "file_ref",
+                         "public_id", "content_type", "size_bytes", "width_px", "height_px", "dpi", "layout_hash",
+                         "template_hash", "sources", "warnings", "base_file_id", "gamertag_file_id", "user_id",
+                         "order_id", "order_item_id", "created_at", "created_by", "public_disabled_at",
+                         "erase_pending_at", "file_deleted_at"),
     "shop_design_profiles": ("design_key", "title", "placement", "garment_colors", "note", "version", "created_at",
                              "created_by", "updated_at", "updated_by",
                              # Motive (#2069): Hell-Variante automatisch oder eigene Datei, Ausnahmen je Shirtfarbe
@@ -77,7 +90,9 @@ MODEL_FIELDS: dict[str, tuple[str, ...]] = {
                          "variant_label", "sku", "quantity", "unit_price_cents", "markup_cents", "line_total_cents",
                          "gamertag", "design", "printful", "tax_profile",
                          # je Platzierung die Druckdatei-Fassung, Druckfläche und Position (#1707)
-                         "designs"),
+                         "designs",
+                         # je Fläche genau eine Druckdatei (#2069): Grunddatei oder eigene mit Gamertag
+                         "print_files"),
     "shop_order_events": ("id", "order_id", "event_key", "kind", "at", "actor_id", "data"),
 }
 FORBIDDEN_FIELD_PARTS = ("iban", "bic", "bank", "account_number", "card", "cvv", "password", "passwort", "secret",
@@ -90,6 +105,7 @@ PERSONAL_FIELDS: dict[str, tuple[str, ...]] = {
     "shop_order_items": ("user_id", "gamertag"),
     "shop_carts": ("user_id", "items"),
     "shop_gamertag_files": ("user_id",),  # und die Datei selbst (sie zeigt den Gamertag)
+    "shop_print_files": ("user_id",),  # Bestelldateien mit Gamertag (#2069) - und die Datei selbst
 }
 
 
@@ -198,6 +214,11 @@ ADMIN_ACTIONS: dict[str, str] = {
     "shop.product.designs": "Designs je Platzierung und Farbe zugeordnet",
     "shop.product.status": "Stand eines Produkts geändert (Prüfen, Veröffentlichen, Archivieren)",
     "shop.catalog.sync": "Mit Printful abgeglichen (gesperrt, freigegeben, Preiswarnung)",
+    # Druckvorlagen und Druckdateien (#2069)
+    "shop.product.layout": "Aufbau der Druckflächen geändert (Motiv, Vorgabe-Position, Größe, Platzhalter)",
+    "shop.print_template.change": "Druckvorlage bei Printful geändert (Maße einer Fläche)",
+    "shop.print.presets": "Positions-Vorgaben geändert",
+    "shop.print_file.add": "Druckdatei erzeugt oder hochgeladen",
     "shop.order.release": "Bestellung freigegeben",
     "shop.order.printful_confirm": "Bei Printful bestätigt",
     "shop.order.cancel": "Bestellung storniert",

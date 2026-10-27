@@ -48,6 +48,31 @@ test("aus bleibt still: ohne Einschalten entsteht keine Audio-Fläche", () => {
   expect(made).toHaveLength(0);
 });
 
+test("ohne Audiogerät: Einschalten und Aufräumen bleiben still - keine unbehandelte Ablehnung (#2080)", async () => {
+  const deviceError = Object.assign(new Error("Failed to start the audio device"), { name: "NotAllowedError" });
+  const { Ctx } = fakeAudio();
+  class DeviceLess extends Ctx {
+    constructor() {
+      super();
+      this.state = "suspended";
+    }
+    resume() { return Promise.reject(deviceError); }
+    close() { return Promise.reject(deviceError); }
+  }
+  const seen = [];
+  const onRejection = (reason) => seen.push(reason);
+  process.on("unhandledRejection", onRejection);
+  try {
+    const sound = createNewYearSound({ win: window, AudioContextImpl: DeviceLess, enabled: false });
+    expect(() => sound.setOn(true)).not.toThrow();
+    sound.dispose();
+    await new Promise((resolve) => setTimeout(resolve, 20));
+  } finally {
+    process.off("unhandledRejection", onRejection);
+  }
+  expect(seen).toEqual([]);
+});
+
 test("eingeschaltet: Zischen und Knall spielen, höchstens sechs Stimmen gleichzeitig", () => {
   const { Ctx, made } = fakeAudio();
   const sound = createNewYearSound({ win: window, AudioContextImpl: Ctx, enabled: true });

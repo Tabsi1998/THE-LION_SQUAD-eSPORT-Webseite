@@ -57,4 +57,31 @@ describe("ceremony sounds", () => {
     expect(nodes.length).toBe(0);
     expect(playCeremonySound({ material: "gold" }, { win: {}, nav: {} })).toBe(false);
   });
+
+  it("ohne Audiogerät bleibt es still: keine Ausnahme, keine unbehandelte Ablehnung (#2080)", async () => {
+    const deviceError = Object.assign(new Error("Failed to start the audio device"), { name: "NotAllowedError" });
+    const nav = { userActivation: { hasBeenActive: true } };
+    class Refused {
+      constructor() { throw deviceError; }
+    }
+    expect(() => playCeremonySound({ material: "gold" }, { win: { AudioContext: Refused }, nav })).not.toThrow();
+    expect(playCeremonySound({ material: "gold" }, { win: { AudioContext: Refused }, nav })).toBe(false);
+
+    const { AC } = fakeAudio();
+    class Suspended extends AC {
+      constructor() { super(); this.state = "suspended"; }
+      resume() { return Promise.reject(deviceError); }
+    }
+    const seen = [];
+    const onRejection = (reason) => seen.push(reason);
+    process.on("unhandledRejection", onRejection);
+    try {
+      resetAudioContext();
+      playCeremonySound({ material: "gold" }, { win: { AudioContext: Suspended }, nav });
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    } finally {
+      process.off("unhandledRejection", onRejection);
+    }
+    expect(seen).toEqual([]);
+  });
 });

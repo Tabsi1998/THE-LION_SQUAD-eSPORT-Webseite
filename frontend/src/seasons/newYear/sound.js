@@ -3,6 +3,7 @@
 // gemerkt je Gerät. Ferne Raketen sind leiser und ihr Knall kommt später; höchstens wenige Klänge gleichzeitig, kein
 // Übersteuern (Begrenzer am Ausgang). Pausiert, wenn der Tab unsichtbar ist.
 
+import { attemptAudio, noteAudioProblem } from "@/lib/audioSafe";
 import { soundDelay } from "./fireworks";
 
 export const NEW_YEAR_SOUND_KEY = "tls-newyear-sound";
@@ -93,7 +94,8 @@ export function createNewYearSound({ win = typeof window === "undefined" ? null 
       master.gain.value = MASTER_LEVEL;
       master.connect(limiter);
       limiter.connect(ctx.destination);
-    } catch {
+    } catch (error) {
+      noteAudioProblem(error);
       ctx = null;
     }
     return ctx;
@@ -122,7 +124,8 @@ export function createNewYearSound({ win = typeof window === "undefined" ? null 
     isOn: () => on,
     setOn(next) {
       on = Boolean(next);
-      if (on && ensure() && ctx.state === "suspended") ctx.resume?.();
+      // Ohne Audiogerät lehnt resume() ab (#2080) - dann eben still.
+      if (on && ensure() && ctx.state === "suspended") attemptAudio(() => ctx.resume?.());
     },
     /** Das Zischen der aufsteigenden Rakete: gefiltertes Rauschen, das in der Tonhöhe steigt - kleine zischen leiser. */
     whistle(distance = 0.5, rise = 1.4, caliber = "large") {
@@ -181,11 +184,8 @@ export function createNewYearSound({ win = typeof window === "undefined" ? null 
       }, delay + shape.seconds + 0.9);
     },
     dispose() {
-      try {
-        ctx?.close?.();
-      } catch {
-        // nichts mehr zu tun
-      }
+      const closing = ctx;
+      attemptAudio(() => closing?.close?.());
       ctx = null;
       master = null;
     },

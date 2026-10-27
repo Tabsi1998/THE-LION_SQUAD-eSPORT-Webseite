@@ -9,9 +9,11 @@ import { api, formatRequestError } from "@/lib/api";
 import { formatCents, parseEuro } from "@/lib/billing";
 import { viennaDateTime } from "@/lib/vienna";
 import ShopTabs from "./ShopTabs";
+import LayoutStep from "./ShopLayoutStep";
+import ProductSearch from "./ShopProductSearch";
 
 // Produktverwaltung (#1707) mit Katalogabgleich (#1709) - Verwaltung → Finanzen → Shop → Produkte. Geführt in fünf
-// Schritten: Produkt wählen, Farben und Größen, Designs je Platzierung, Preise, Prüfen und veröffentlichen. Jede Änderung
+// Schritten: Produkt wählen, Farben und Größen, Druckflächen (#2069), Preise, Prüfen und veröffentlichen. Jede Änderung
 // steht mit Person und Zeit im Protokoll; der Grund ist optional, nur beim Veröffentlichen Pflicht (Entscheidung Obmann
 // 27.10.2026). Was erlaubt ist, entscheidet der Server - die Seite zeigt seine Prüfung und seine
 // Texte. Maße immer in Zoll und cm; Printful rechnet in Zoll.
@@ -35,7 +37,7 @@ const STATUS_TONES = {
 const STEPS = [
   { key: "product", label: "Produkt wählen", checks: ["printful"] },
   { key: "offer", label: "Farben und Größen", checks: ["offer", "stock"] },
-  { key: "designs", label: "Designs je Platzierung", checks: ["placements", "files", "personalization"] },
+  { key: "designs", label: "Druckflächen", checks: ["template", "layout", "placements", "files", "personalization"] },
   { key: "prices", label: "Preise", checks: ["prices"] },
   { key: "publish", label: "Prüfen und veröffentlichen", checks: ["mockup"] },
 ];
@@ -47,11 +49,6 @@ function number(value, digits) {
 export function inches(value) {
   if (value === null || value === undefined || !Number.isFinite(Number(value))) return "–";
   return `${number(value, 2)} Zoll (${number(value * CM_PER_INCH, 1)} cm)`;
-}
-
-function parseNumber(text) {
-  const value = Number(String(text ?? "").trim().replace(",", "."));
-  return String(text ?? "").trim() && Number.isFinite(value) ? value : Number.NaN;
 }
 
 function money(cents) {
@@ -231,7 +228,7 @@ function ProductList() {
   return (
     <Shell>
       <p className="text-sm text-white/60 max-w-2xl">
-        Ein Produkt entsteht in fünf Schritten: Printful-Produkt wählen, Farben und Größen, Designs je Platzierung, Preise, Prüfen und Veröffentlichen. Mitglieder zahlen den Selbstkostenpreis.
+        Ein Produkt entsteht in fünf Schritten: Printful-Produkt wählen, Farben und Größen, Druckflächen, Preise, Prüfen und Veröffentlichen. Mitglieder zahlen den Selbstkostenpreis.
       </p>
       <Section title="Produkte" icon={Package} testId="shop-products">
         {data.overview.length === 0 ? (
@@ -317,7 +314,8 @@ function PrintfulStep({ view, busy, run }) {
   const parsed = /^\d{1,8}$/.test(numberText.trim()) ? Number(numberText.trim()) : null;
   return (
     <div className="space-y-3" data-testid="shop-step-printful">
-      <Field label="Printful-Produktnummer" hint="Die Nummer des Katalogprodukts (nicht einer Variante). Printful bietet in seiner Schnittstelle keine Textsuche – die Nummer steht im Printful-Katalog beim Produkt.">
+      <ProductSearch disabled={!view.editable} current={parsed} onPick={(id) => setNumberText(String(id))} />
+      <Field label="Printful-Produktnummer" hint="Füllt die Suche oben aus. Von Hand nur im Notfall: die Nummer des Katalogprodukts (nicht einer Variante).">
         <input value={numberText} onChange={(event) => setNumberText(event.target.value.replace(/[^\d]/g, ""))} inputMode="numeric" maxLength={8} className={`${INPUT} tabular-nums max-w-xs`} data-testid="shop-printful-number" />
       </Field>
       <ReasonedButton id="shop-printful" label={printful ? "Neu laden" : "Bei Printful laden"} busy={busy === "printful"} disabled={!parsed || !view.editable}
@@ -416,161 +414,7 @@ function OfferStep({ view, busy, run }) {
   );
 }
 
-// ---------------------------------------------------------------- Schritt 3: Platzierungen und Designs
-
-function placementDraft(view) {
-  const stored = Object.fromEntries(view.placements.map((row) => [row.key, row]));
-  return Object.fromEntries(view.available_placements.map((row) => {
-    const current = stored[row.key];
-    const position = current?.position || row.default_position;
-    return [row.key, {
-      use: !!current, kind: current?.kind || "design",
-      position: Object.fromEntries(Object.entries(position).map(([name, value]) => [name, number(value, 3)])),
-    }];
-  }));
-}
-
-function PlacementsForm({ view, busy, run }) {
-  const { product, labels } = view;
-  const [draft, setDraft] = useState(() => placementDraft(view));
-  const [included, setIncluded] = useState(view.included_placement || "");
-  useEffect(() => { setDraft(placementDraft(view)); setIncluded(view.included_placement || ""); }, [view]);
-  const personalization = product.personalization || "none";
-  const kinds = ["design", ...(["gamertag", "both"].includes(personalization) ? ["gamertag"] : []), ...(["member_number", "both"].includes(personalization) ? ["member_number"] : [])];
-  const used = view.available_placements.filter((row) => draft[row.key]?.use);
-  const printfulUsed = [...new Set(used.map((row) => row.printful_placement))];
-  const payload = used.map((row) => ({
-    key: row.key, kind: draft[row.key].kind,
-    position: Object.fromEntries(Object.entries(draft[row.key].position).map(([name, value]) => [name, parseNumber(value)])),
-  }));
-  const valid = payload.length > 0 && payload.every((row) => Object.values(row.position).every((value) => Number.isFinite(value) && value >= 0));
-  const update = (key, patch) => setDraft((now) => ({ ...now, [key]: { ...now[key], ...patch } }));
-  const includedValue = printfulUsed.includes(included) ? included : (printfulUsed.includes("front") ? "front" : printfulUsed[0] || null);
-  return (
-    <div className="space-y-3" data-testid="shop-placements-form">
-      <p className="text-xs text-white/55">Positionen sind eine Vorlage im Druckbereich, von vorne gesehen, gemessen von links oben. „Brust rechts vom Träger aus“ liegt von vorne gesehen links. Breite und Höhe sind der Rahmen; das Motiv behält sein Seitenverhältnis.</p>
-      <ul className="space-y-3">
-        {view.available_placements.map((row) => {
-          const state = draft[row.key];
-          return (
-            <li key={row.key} className="border border-white/10 rounded-sm p-3 bg-black/20" data-testid={`shop-placement-row-${row.key}`}>
-              <div className="flex flex-wrap items-center gap-3">
-                <label className="inline-flex items-center gap-2 text-sm font-bold min-h-10 cursor-pointer">
-                  <input type="checkbox" checked={state.use} onChange={(event) => update(row.key, { use: event.target.checked })} className="w-4 h-4 accent-brand" data-testid={`shop-placement-use-${row.key}`} />
-                  {row.label}
-                </label>
-                <span className="text-xs text-white/50">Printful: {row.printful_placement} · Bereich {row.area_text.width_in || "–"} × {row.area_text.height_in || "–"}</span>
-              </div>
-              {state.use && (
-                <div className="mt-2 space-y-2">
-                  <ChoiceGroup label={`Art von ${row.label}`} testId={`shop-placement-kind-${row.key}`} value={state.kind} onChange={(kind) => update(row.key, { kind })}
-                    options={kinds.map((kind) => ({ value: kind, label: labels.kinds[kind] }))} />
-                  <div className="grid gap-2 grid-cols-2 sm:grid-cols-4">
-                    {[["left_in", "Links"], ["top_in", "Oben"], ["width_in", "Breite"], ["height_in", "Höhe"]].map(([name, label]) => {
-                      const value = parseNumber(state.position[name]);
-                      return (
-                        <Field key={name} label={`${label} (Zoll)`} hint={Number.isFinite(value) ? `= ${number(value * CM_PER_INCH, 1)} cm` : "Zahl in Zoll"}>
-                          <input value={state.position[name]} inputMode="decimal" className={`${INPUT} tabular-nums`}
-                            onChange={(event) => update(row.key, { position: { ...state.position, [name]: event.target.value } })}
-                            data-testid={`shop-placement-${row.key}-${name}`} />
-                        </Field>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-            </li>
-          );
-        })}
-      </ul>
-      {printfulUsed.length > 1 && (
-        <div className="space-y-1">
-          <div className="text-sm text-white/70">Im Grundpreis von Printful enthalten</div>
-          <ChoiceGroup label="Im Grundpreis enthalten" testId="shop-placement-included" value={includedValue} onChange={setIncluded}
-            options={printfulUsed.map((key) => ({ value: key, label: key }))} />
-          <p className="text-xs text-white/45">Jede weitere Druckfläche kostet ihren Aufpreis (etwa die Rückseite). Mit der Kostenschätzung im Testentwurf (#2062) gegenprüfen.</p>
-        </div>
-      )}
-      <ReasonedButton id="shop-placements" label="Platzierungen speichern" busy={busy === "placements"} disabled={!valid || !view.editable}
-        blockedHint={!view.editable ? "Erst zurückziehen (Schritt 5), dann die Platzierungen ändern." : "Mindestens eine Platzierung wählen; Positionen als Zahlen in Zoll."}
-        onSubmit={(reason) => run("placements", () => api.put(`${BASE}/${product.id}/placements`, { placements: payload, included_placement: includedValue, reason }), "Platzierungen gespeichert.")} />
-    </div>
-  );
-}
-
-const LEVEL_TEXT = { good: "gut", snug: "knapp", too_low: "reicht nicht", missing: "fehlt", unknown: "ohne Maße" };
-
-function DesignMatrix({ view, busy, run }) {
-  const { product } = view;
-  const colors = product.offer?.colors || [];
-  const rows = view.placements.filter((row) => row.kind === "design");
-  const initial = () => Object.fromEntries(rows.flatMap((row) => colors.map((color) => [`${row.key}|${color}`, row.designs[color]?.design_key || ""])));
-  const [choice, setChoice] = useState(initial);
-  useEffect(() => { setChoice(initial()); }, [view]); // eslint-disable-line react-hooks/exhaustive-deps
-  if (!rows.length || !colors.length) {
-    return <p className="text-sm text-white/55" data-testid="shop-designs-matrix">Erst Farben (Schritt 2) und Platzierungen mit Design wählen.</p>;
-  }
-  const changes = rows.flatMap((row) => colors.map((color) => {
-    const now = choice[`${row.key}|${color}`] || null;
-    const before = row.designs[color]?.design_key || null;
-    return now === before ? null : { placement: row.key, color, design_key: now };
-  })).filter(Boolean);
-  const takeSuggestions = () => setChoice((now) => {
-    const next = { ...now };
-    for (const item of view.design_suggestions) if (!next[`${item.placement}|${item.color}`]) next[`${item.placement}|${item.color}`] = item.design_key;
-    return next;
-  });
-  return (
-    <div className="space-y-3" data-testid="shop-designs-matrix">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-xs text-white/55">Je Platzierung und Farbe ein Design aus dem Reiter „Designs“. Ohne gültige Datei für eine angebotene Farbe lässt sich nichts veröffentlichen.</p>
-        <button type="button" onClick={takeSuggestions} className="tls-btn tls-btn--secondary min-h-9 px-3 text-xs font-bold uppercase tracking-wider rounded-sm" data-testid="shop-designs-suggest">Vorschläge übernehmen</button>
-      </div>
-      <div className="tls-swipe">
-        <table className="w-full text-sm">
-          <thead><tr className="text-left text-xs text-white/50"><th className="py-1 pr-3 font-normal">Platzierung</th>{colors.map((color) => <th key={color} className="py-1 pr-3 font-normal">{color}</th>)}</tr></thead>
-          <tbody>
-            {rows.map((row) => (
-              <tr key={row.key} className="border-t border-white/10 align-top">
-                <td className="py-2 pr-3">
-                  <div className="font-bold">{row.label}</div>
-                  <div className="text-xs text-white/50">{row.position_text.width} breit{row.included ? "" : ` · Aufpreis ${money(row.surcharge_cents)}`}</div>
-                </td>
-                {colors.map((color) => {
-                  const key = `${row.key}|${color}`;
-                  const cell = row.designs[color];
-                  const suggestion = row.suggestions[color];
-                  const options = view.design_options[row.key] || [];
-                  return (
-                    <td key={color} className="py-2 pr-3 min-w-[11rem]">
-                      <label className="sr-only" htmlFor={`shop-design-${key}`}>{row.label}, {color}</label>
-                      <select id={`shop-design-${key}`} value={choice[key] || ""} onChange={(event) => setChoice((now) => ({ ...now, [key]: event.target.value }))}
-                        className={`${INPUT} mt-0`} data-testid={`shop-design-cell-${row.key}-${color}`}>
-                        <option value="">– kein Design –</option>
-                        {options.map((option) => <option key={option.design_key} value={option.design_key}>{option.title}{option.design_key === suggestion ? " (Vorschlag)" : ""}</option>)}
-                      </select>
-                      {cell && (choice[key] || "") === cell.design_key && (
-                        <div className={`text-xs mt-1 ${["good", "snug"].includes(cell.level) ? "text-ok" : "text-warn"}`} title={cell.text}>v{cell.version ?? "–"} · {LEVEL_TEXT[cell.level] || cell.level}</div>
-                      )}
-                    </td>
-                  );
-                })}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-      {view.placements.some((row) => row.kind !== "design") && (
-        <p className="text-xs text-white/55" data-testid="shop-designs-placeholders">
-          {view.placements.filter((row) => row.kind !== "design").map((row) => `${row.label}: ${row.kind_label}`).join(" · ")}
-        </p>
-      )}
-      <ReasonedButton id="shop-designs" label="Designs speichern" busy={busy === "designs"} disabled={!changes.length || !view.editable}
-        blockedHint={!view.editable ? "Erst zurückziehen (Schritt 5), dann die Designs ändern." : "Noch keine Zuordnung geändert."}
-        onSubmit={(reason) => run("designs", () => api.put(`${BASE}/${product.id}/designs`, { assignments: changes, reason }), "Designs gespeichert.")} />
-    </div>
-  );
-}
+// Schritt 3: Druckflächen (#2069) - ShopLayoutStep.jsx
 
 // ---------------------------------------------------------------- Schritt 4: Preise
 
@@ -774,10 +618,7 @@ function ProductEditor({ productId }) {
       {step === "offer" && <Section title="Farben und Größen" testId="shop-section-offer"><OfferStep view={view} busy={busy} run={run} /></Section>}
       {step === "designs" && (
         <>
-          <Section title="Platzierungen" testId="shop-section-placements">
-            {view.available_placements.length ? <PlacementsForm view={view} busy={busy} run={run} /> : <p className="text-sm text-white/55">Zuerst in Schritt 1 das Printful-Produkt laden.</p>}
-          </Section>
-          <Section title="Designs je Platzierung und Farbe" testId="shop-section-designs"><DesignMatrix view={view} busy={busy} run={run} /></Section>
+          <Section title="Druckflächen" testId="shop-section-layout"><LayoutStep view={view} busy={busy} run={run} ReasonedButton={ReasonedButton} ChoiceGroup={ChoiceGroup} /></Section>
         </>
       )}
       {step === "prices" && <Section title="Preise" testId="shop-section-prices"><PricesStep view={view} busy={busy} run={run} /></Section>}

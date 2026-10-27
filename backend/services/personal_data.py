@@ -142,6 +142,12 @@ PERSONAL: dict[str, Entry] = {
                                  "ops_retention); die Zeile bleibt ohne Konto mit Prüfsumme und Maßen"),
     "shop_order_events": Entry(KEPT, note="Verlauf einer Bestellung als Nachweis; nur Kennungen, Beträge und Stände, nie "
                                "eine Anschrift"),
+    # Druckdateien (#2069): Grunddateien gehören zum Katalog (kein Konto); eine Bestelldatei mit Gamertag zeigt den Namen.
+    "shop_print_files": Entry(OVERWRITTEN, ("shop_print_files",),
+                              "Druckdatei einer Bestellung mit Gamertag: Adresse abgeschaltet und Datei gelöscht - "
+                              "braucht ein offener Printful-Auftrag sie noch, nur für ihn bis zum Abschluss (Job "
+                              "ops_retention); die Zeile bleibt ohne Konto mit Prüfsumme und Maßen. Grunddateien des "
+                              "Katalogs haben kein Konto"),
     # Teams, Turniere, Events, F1, Saison
     "teams": Entry(KEPT, ("teams",), "gehört dem Team; das Konto heißt in der Liste „Gelöschter User“"),
     "team_members": Entry(KEPT, ("team_memberships",), "Teamhistorie und Aufstellungen; das Konto heißt „Gelöschter User“"),
@@ -222,18 +228,22 @@ CLUB_CONTENT = frozenset({
     # Kennung, wer angelegt bzw. geändert hat.
     "shop_products", "shop_variants", "shop_designs", "shop_design_profiles", "shop_design_colors",
     "shop_printful_variants",
+    # Druckvorlagen von Printful (#2069): Maße und Vorlagenbilder je Printful-Produkt - ohne Person.
+    "shop_print_templates",
 })
 
 NO_PERSON = frozenset({
     "advent_views", "badges", "cms_nav", "cms_pages", "competition_write_usage", "consent_text_versions", "discord_guild_stats",
     "discord_welcomes", "dolibarr_public", "dolibarr_webhook_events", "email_templates", "event_message_gates", "feedback_entries",
     "games", "mastodon_apps",
-    "meeting_admission_counts", "mutation_locks", "ops_alert_log", "ops_alert_state", "ops_check_runs", "ops_errors",
+    "meeting_admission_counts", "mutation_locks", "ops_alert_log", "ops_alert_state", "ops_check_runs", "ops_check_episodes", "ops_errors",
     "ops_slow_requests", "ops_vitals", "partners", "schema_migration_lock", "schema_migrations", "site_banner_stats",
     "sponsors", "sticker_builtin_packs", "user_badges", "youtube_videos",
     # Claims des Printful-Adapters (#1705) vor dem Anlegen eines Entwurfs und vor dem Bestätigen: external_id,
     # Idempotenzschlüssel, Auftragsnummer, Stand - keine Person.
     "shop_printful_drafts", "shop_printful_confirmations",
+    # Zwischenstand des Printful-Katalogs für die Produktsuche (#2069): Namen, Marken, Kategorien - keine Person.
+    "shop_printful_catalog",
     # Spamschutz (#2067): Zähler je Stunde, Formular, Ergebnis und Grund - ohne Inhalt, Adresse oder IP (90 Tage) - und
     # der Hash eines benutzten Formular-Tokens mit der Zahl der Versuche (läuft mit dem Token ab).
     "spam_guard_stats", "spam_guard_tokens",

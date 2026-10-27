@@ -299,6 +299,7 @@ def test_personal_fields_are_marked_for_export_and_erasure():
         "shop_order_items": ("user_id", "gamertag"),
         "shop_carts": ("user_id", "items"),
         "shop_gamertag_files": ("user_id",),
+        "shop_print_files": ("user_id",),
     }
 
 

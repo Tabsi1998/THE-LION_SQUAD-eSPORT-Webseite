@@ -176,6 +176,60 @@ test("Engine: Töne aus stellt den Regler auf null, Musik aus stoppt sie, an sta
   engine.dispose();
 });
 
+/** Was in `run` als unbehandelte Ablehnung liegen bleibt - das landete im Browser als „Fehler“ in den App-Logs. */
+async function unhandledDuring(run) {
+  const seen = [];
+  const onRejection = (reason) => seen.push(reason);
+  process.on("unhandledRejection", onRejection);
+  try {
+    await run();
+    await new Promise((resolve) => setTimeout(resolve, 20));
+  } finally {
+    process.off("unhandledRejection", onRejection);
+  }
+  return seen;
+}
+
+test("Engine: ohne Audiogerät bleibt es still - keine Ausnahme, keine unbehandelte Ablehnung, kein Log (#2080)", async () => {
+  const deviceError = Object.assign(new Error("Failed to start the audio device"), { name: "NotAllowedError" });
+  class DeviceLessContext {
+    constructor() {
+      const ctx = fakeAudioContext();
+      ctx.state = "suspended";
+      ctx.resume = () => Promise.reject(deviceError);
+      ctx.suspend = () => Promise.reject(deviceError);
+      ctx.close = () => Promise.reject(deviceError);
+      return ctx;
+    }
+  }
+  const debug = vi.spyOn(console, "debug").mockImplementation(() => {});
+  const seen = await unhandledDuring(() => {
+    const win = fakeWindow();
+    const visibility = {};
+    const doc = { hidden: false, addEventListener: (name, fn) => { visibility[name] = fn; }, removeEventListener: vi.fn() };
+    const engine = createSoundEngine({ win, doc, AudioContextClass: DeviceLessContext });
+    engine.setPalette({ instruments: { ping: () => {} }, music: () => ({ stop: vi.fn() }) });
+    win.fire("pointerdown");
+    doc.hidden = true;
+    visibility.visibilitychange();
+    doc.hidden = false;
+    visibility.visibilitychange();
+    engine.dispose();
+  });
+  expect(seen).toEqual([]);
+  expect(debug.mock.calls.length).toBeLessThanOrEqual(1);
+
+  class NoContext {
+    constructor() {
+      throw deviceError;
+    }
+  }
+  const engine = createSoundEngine({ win: fakeWindow(), doc: null, AudioContextClass: NoContext });
+  expect(() => engine.unlock()).not.toThrow();
+  expect(engine.unlocked).toBe(false);
+  debug.mockRestore();
+});
+
 test("Bus und aktive Engine: emitSound schickt das Ereignis, ohne Fenster nichts", () => {
   const win = fakeWindow();
   expect(emitSound("ping", { x: 1 }, win)).toBe(true);

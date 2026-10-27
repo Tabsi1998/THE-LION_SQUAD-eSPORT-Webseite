@@ -43,6 +43,17 @@ TWITCH_STALE_MINUTES = 15.0
 DOLIBARR_STALE_MINUTES = 60.0
 VARIANTS_WARN_MISSING = 50
 VARIANT_SCAN_LIMIT = 5000
+VARIANT_PROBE_WIDTH = 400
+# Handlungsanweisungen (#2080): Was gelb bzw. rot heißt und was hilft - so, wie es in docs/BETRIEB.md steht.
+DISK_ACTION = ("Platz schaffen am Server: alte Docker-Images und Build-Cache löschen (docker image prune -a und docker builder prune "
+               "- entfernt nur, was kein Container nutzt), alte Backups und Logs prüfen; verwaiste Uploads zeigt "
+               "docker compose exec backend python3 scripts/uploads-inventory.py (liest nur), große Dateien Admin → Medien. "
+               "Nie docker compose down -v.")
+DISK_ACTION_CRIT = "Sofort handeln: unter 5 % frei scheitern Uploads, Backups und Datenbank."
+VARIANTS_ACTION = ("Breite Bilder ohne 400er-Fassung. Die Website baut eine fehlende Fassung beim ersten Aufruf des Bildes selbst; "
+                   "ein Knopf zum Nacherzeugen fehlt noch. Bleibt die Zahl hoch: die Checks Upload-Volume (beschreibbar?) und "
+                   "Freier Speicher ansehen und im Backend-Log nach [media] suchen; Überblick mit "
+                   "docker compose exec backend python3 scripts/media-report.py (liest nur).")
 UPLOAD_SCAN_LIMIT = 200_000
 # Besucher-Adresse (#941): unter so vielen Sitzungen am Tag sagt eine gemeinsame Adresse nichts.
 CLIENT_IP_MIN_SESSIONS = 5
@@ -202,7 +213,13 @@ async def check_disk() -> dict:
         return failed("disk", label, exc)
     free_pct = (free / total * 100) if total else None
     value = f"{free / 1e9:.1f} GB frei" + (f" ({free_pct:.0f} %)" if free_pct is not None else "")
-    return result("disk", label, rate_disk(free_pct), value, f"Datenträger von {UPLOAD_DIR}")
+    status = rate_disk(free_pct)
+    detail = f"Datenträger von {UPLOAD_DIR}"
+    if status == "crit":
+        detail = f"{DISK_ACTION_CRIT} {DISK_ACTION}"
+    elif status == "warn":
+        detail = DISK_ACTION
+    return result("disk", label, status, value, detail)
 
 
 def _walk_size(path: Path, limit: int = UPLOAD_SCAN_LIMIT) -> tuple[int, int, bool]:
@@ -367,9 +384,23 @@ def _missing_variants(path: Path, limit: int = VARIANT_SCAN_LIMIT) -> tuple[int,
             truncated = True
             scanned -= 1
             break
-        if not (variants / f"{entry.stem}-400.webp").exists():
+        if not (variants / f"{entry.stem}-{VARIANT_PROBE_WIDTH}.webp").exists() and _wants_variant(entry):
             missing += 1
     return scanned, missing, truncated
+
+
+def _wants_variant(path: Path) -> bool:
+    """Bekäme das Bild eine 400er-Fassung? Nicht, wenn es höchstens so breit ist oder animiert (#2080) - dann wird
+    das Original ausgeliefert, und es fehlt nichts. Gelesen wird nur der Kopf der Datei."""
+    from PIL import Image
+
+    try:
+        with Image.open(path) as image:
+            # EXIF-Ausrichtung 5 bis 8 dreht um 90 Grad - die Fassung misst die aufgerichtete Breite.
+            width = image.height if image.getexif().get(0x0112, 1) in (5, 6, 7, 8) else image.width
+            return width > VARIANT_PROBE_WIDTH and not getattr(image, "is_animated", False)
+    except Exception:  # noqa: BLE001 - unlesbar bekommt auch keine Fassung
+        return False
 
 
 async def check_image_variants() -> dict:
@@ -379,7 +410,8 @@ async def check_image_variants() -> dict:
     except Exception as exc:  # noqa: BLE001
         return failed("image_variants", label, exc)
     value = f"{missing} von {scanned}{' +' if truncated else ''} ohne kleine Fassung"
-    return result("image_variants", label, rate_variants(missing), value, "Bilder unter uploads/public, geprüft auf die 400er-Fassung")
+    status = rate_variants(missing)
+    return result("image_variants", label, status, value, VARIANTS_ACTION if status != "ok" else "Bilder unter uploads/public, geprüft auf die 400er-Fassung")
 
 
 async def check_error_groups(db) -> dict:
@@ -604,7 +636,156 @@ async def run_checks(db, checks: list[tuple[str, str, Callable[[], Awaitable[dic
     except Exception:  # noqa: BLE001
         logger.warning("[ops] could not store check run", exc_info=True)
     run.pop("_id", None)
+    try:
+        await record_episode(db, run)
+    except Exception:  # noqa: BLE001 - der Lauf zählt, auch wenn die Zusammenfassung hakt
+        logger.warning("[ops] could not store check episode", exc_info=True)
     return run
+
+
+def episode_signature(status: str | None, failing: list[str] | None) -> str:
+    """Gleicher Stand heißt: gleiche Ampel und dieselben betroffenen Prüfungen (Reihenfolge egal)."""
+    return f"{status or 'crit'}:{','.join(sorted(failing or []))}"
+
+
+EPISODE_ATTEMPTS = 3
+BACKFILL_MARKER = "ops_check_episodes_backfill"
+
+
+async def record_episode(db, run: dict) -> dict | None:
+    """Zustände statt Läufe (#2080): Solange Ampel und betroffene Prüfungen gleich bleiben, zählt der offene Abschnitt
+    nur hoch („seit … · 92× geprüft · zuletzt …“); erst ein Wechsel schließt ihn und beginnt einen neuen. Grüne
+    Abschnitte zählen mit, damit gelb - grün - gelb zwei Einträge ergibt; die Ereignisliste zeigt nur die auffälligen.
+
+    Atomar auch bei zwei Läufen zugleich (Codex): Hochzählen ist ein bedingtes ``find_one_and_update`` auf den offenen
+    Abschnitt mit derselben Signatur. Höchstens ein Abschnitt trägt ``open: true`` (eindeutiger, lückenhafter Index,
+    ``database.ensure_ops_check_indexes``); legen zwei Läufe zugleich einen neuen an, scheitert der zweite am Index und
+    zählt beim nächsten Versuch beim ersten mit."""
+    from pymongo import ReturnDocument
+    from pymongo.errors import DuplicateKeyError
+
+    at = run.get("at") or now_utc().isoformat()
+    status = run.get("status") or "crit"
+    signature = episode_signature(status, run.get("failing"))
+    expires_at = now_utc() + timedelta(days=HISTORY_DAYS)
+    counts = run.get("counts") or {}
+    for _attempt in range(EPISODE_ATTEMPTS):
+        extended = await db.ops_check_episodes.find_one_and_update(
+            {"open": True, "signature": signature},
+            {"$max": {"last_at": at}, "$set": {"counts": counts, "expires_at": expires_at}, "$inc": {"runs": 1}},
+            projection={"_id": 0}, return_document=ReturnDocument.AFTER,
+        )
+        if extended:
+            return {**extended, "changed": False}
+        # Ein anderer Stand war offen: zu - nur, solange er noch offen ist und nicht dieser Stand ist.
+        await db.ops_check_episodes.update_many({"open": True, "signature": {"$ne": signature}},
+                                                {"$unset": {"open": ""}, "$set": {"closed_at": at}})
+        episode = {"id": new_id(), "since": at, "last_at": at, "runs": 1, "status": status, "signature": signature, "open": True,
+                   "failing": list(run.get("failing") or []), "counts": counts, "expires_at": expires_at}
+        try:
+            await db.ops_check_episodes.insert_one(dict(episode))
+        except DuplicateKeyError:
+            continue  # ein gleichzeitiger Lauf war schneller - beim nächsten Versuch bei ihm mitzählen
+        return {**episode, "changed": True}
+    logger.warning("[ops] check episode not recorded after %s attempts", EPISODE_ATTEMPTS)
+    return None
+
+
+def _episodes_from_runs(rows: list[dict]) -> list[dict]:
+    """Aufeinanderfolgende gleiche Läufe (älteste zuerst) als Abschnitte."""
+    episodes: list[dict] = []
+    for row in rows:
+        signature = episode_signature(row.get("status"), row.get("failing"))
+        at = str(row.get("at") or "")
+        if episodes and episodes[-1]["signature"] == signature:
+            episodes[-1].update(last_at=at, runs=episodes[-1]["runs"] + 1, counts=row.get("counts") or {})
+            continue
+        episodes.append({"id": new_id(), "since": at, "last_at": at, "runs": 1, "status": row.get("status") or "crit",
+                         "signature": signature, "failing": list(row.get("failing") or []), "counts": row.get("counts") or {}})
+    return episodes
+
+
+def _expiry_after(last_at: str) -> datetime:
+    try:
+        moment = datetime.fromisoformat(str(last_at).replace("Z", "+00:00"))
+    except ValueError:
+        moment = now_utc()
+    if moment.tzinfo is None:
+        moment = moment.replace(tzinfo=timezone.utc)
+    return moment + timedelta(days=HISTORY_DAYS)
+
+
+async def backfill_check_episodes(db) -> int:
+    """Einmaliger Nachtrag beim Start nach dem Update (#2080, Codex): die gespeicherten Läufe (bis 7 Tage) als Abschnitte,
+    damit die Ereignisliste nichts verliert. Nur Läufe vor dem ältesten schon vorhandenen Abschnitt zählen, der Nachtrag
+    ist also wiederholbar; der Merker in ``settings`` (``ops_check_episodes_backfill``) lässt ihn nur einmal laufen.
+    Der jüngste nachgetragene Abschnitt bleibt offen, wenn es noch keinen offenen gibt. Rückweg: die Sammlung
+    ``ops_check_episodes`` leeren und den Merker löschen. Gibt die Zahl der angelegten Abschnitte zurück.
+
+    Der Merker ist zugleich eine Sperre mit Frist (Codex): ``running`` mit ``started_at``. Bricht ein Worker mitten im
+    Nachtrag ab, gilt der Merker nach ``BACKFILL_LEASE_MINUTES`` als verwaist und wird atomar übernommen. Nachgetragene
+    Abschnitte haben eine feste Kennung je Beginn (``bf-…``) und werden per Upsert geschrieben - ein zweiter Anlauf
+    legt nichts doppelt an."""
+    if not await _claim_backfill(db):
+        return 0
+    live = await db.ops_check_episodes.find_one({"backfilled": {"$ne": True}}, {"_id": 0, "since": 1}, sort=[("since", 1)])
+    query = {"at": {"$lt": live["since"]}} if live and live.get("since") else {}
+    rows = await db.ops_check_runs.find(query, {"_id": 0, "at": 1, "status": 1, "failing": 1, "counts": 1}).sort("at", 1).to_list(
+        HISTORY_DAYS * 24 * 60 // CHECK_INTERVAL_MINUTES + 100)
+    episodes = _episodes_from_runs(rows)
+    added = 0
+    from pymongo.errors import DuplicateKeyError
+
+    for episode in episodes:
+        episode.update(id=f"bf-{episode['since']}", backfilled=True, expires_at=_expiry_after(episode["last_at"]))
+        try:
+            result = await db.ops_check_episodes.update_one({"id": episode["id"]}, {"$setOnInsert": episode}, upsert=True)
+        except DuplicateKeyError:
+            continue  # ein gleichzeitiger Anlauf hat ihn eben geschrieben (``id`` ist eindeutig) - schon da
+        added += int(bool(getattr(result, "upserted_id", None)))
+    if episodes and not live:
+        # Offen nur, wenn es noch keinen Abschnitt eines Laufs gibt; hat inzwischen einer einen offenen angelegt, bleibt
+        # der nachgetragene zu (der eindeutige Index lässt nur einen offenen zu).
+        try:
+            await db.ops_check_episodes.update_one({"id": episodes[-1]["id"]}, {"$set": {"open": True}})
+        except DuplicateKeyError:
+            pass
+    await db.settings.update_one({"id": BACKFILL_MARKER},
+                                 {"$set": {"state": "done", "episodes": len(episodes), "at": now_utc().isoformat()}})
+    return added
+
+
+BACKFILL_LEASE_MINUTES = 10
+
+
+async def _claim_backfill(db) -> bool:
+    """Den Nachtrag für diesen Worker holen: neu anlegen oder einen verwaisten ``running``-Merker übernehmen."""
+    from pymongo.errors import DuplicateKeyError
+
+    now = now_utc()
+    if not await db.settings.find_one({"id": BACKFILL_MARKER}, {"_id": 1}):
+        try:
+            # ``settings.id`` ist eindeutig: legen zwei Worker zugleich an, bekommt nur einer den Merker.
+            await db.settings.insert_one({"id": BACKFILL_MARKER, "state": "running", "started_at": now.isoformat()})
+            return True
+        except DuplicateKeyError:
+            return False
+    stale = (now - timedelta(minutes=BACKFILL_LEASE_MINUTES)).isoformat()
+    taken = await db.settings.find_one_and_update(
+        {"id": BACKFILL_MARKER, "state": "running", "$or": [{"started_at": {"$lt": stale}}, {"started_at": {"$exists": False}}]},
+        {"$set": {"started_at": now.isoformat(), "taken_over": True}},
+    )
+    return taken is not None
+
+
+async def safe_backfill_check_episodes(db) -> None:
+    """Für den Start: ein Fehler im Nachtrag hält den Server nicht auf."""
+    try:
+        added = await backfill_check_episodes(db)
+        if added:
+            logger.info("[ops] %s check episodes backfilled from stored runs", added)
+    except Exception:  # noqa: BLE001
+        logger.warning("[ops] check episode backfill failed", exc_info=True)
 
 
 def _day(value: str) -> str:

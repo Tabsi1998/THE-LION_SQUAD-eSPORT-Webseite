@@ -1,4 +1,5 @@
 import asyncio
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
@@ -104,6 +105,37 @@ def test_trusted_hosts_derive_from_public_urls_and_reject_production_wildcard():
 
     with pytest.raises(RuntimeError, match="not allowed in production"):
         trusted_http_hosts({**environment, "TRUSTED_HOSTS": "*"})
+
+
+def test_upload_host_is_trusted_without_extra_setting():
+    """Uploads laufen über PUBLIC_UPLOAD_BACKEND_URL (eigener Host an Cloudflare vorbei). Fehlte er in der Liste, kam
+    jeder Upload mit 400 „Invalid host header“ zurück - ohne dass TRUSTED_HOSTS gepflegt werden muss."""
+    environment = {
+        "APP_ENV": "production",
+        "FRONTEND_URL": "https://lionsquad.at",
+        "CORS_ORIGINS": "https://lionsquad.at",
+        "PUBLIC_UPLOAD_BACKEND_URL": "https://upload.lionsquad.at/",
+    }
+    hosts = trusted_http_hosts(environment)
+    assert hosts.count("upload.lionsquad.at") == 1
+    assert trusted_http_hosts({**environment, "PUBLIC_UPLOAD_BACKEND_URL": ""}).count("upload.lionsquad.at") == 0
+
+    app = FastAPI()
+    app.add_middleware(TrustedHostMiddleware, allowed_hosts=list(hosts), www_redirect=False)
+
+    @app.post("/api/upload")
+    async def upload():
+        return {"ok": True}
+
+    client = TestClient(app)
+    assert client.post("/api/upload", headers={"host": "upload.lionsquad.at"}).status_code == 200
+    assert client.post("/api/upload", headers={"host": "attacker.example"}).status_code == 400
+
+
+def test_compose_passes_the_upload_host_to_the_backend():
+    compose = (Path(__file__).resolve().parents[2] / "docker-compose.yml").read_text(encoding="utf-8")
+    backend = compose.split("\n  backend:", 1)[1].split("\n  frontend:", 1)[0]
+    assert 'PUBLIC_UPLOAD_BACKEND_URL: "${PUBLIC_UPLOAD_BACKEND_URL:-}"' in backend
 
 
 def test_trusted_host_middleware_rejects_injected_public_host():

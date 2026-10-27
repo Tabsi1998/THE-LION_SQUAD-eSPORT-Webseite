@@ -33,6 +33,46 @@ async def ensure_event_photo_indexes(db) -> None:
     await db.gallery_submission_quota.create_index([("album_id", 1), ("owner_id", 1)], unique=True)
 
 
+OPS_EPISODE_OPEN_INDEX = "open_true_unique"
+
+
+async def ensure_ops_check_indexes(db) -> None:
+    """Zustände der Auto-Checks (#2080): ein Abschnitt je Wechsel, 7 Tage nach dem letzten Lauf weg. Höchstens einer
+    ist offen - eindeutiger Index nur über ``open: true`` (partiell), geschlossene Abschnitte zählen nie mit, auch nicht
+    mit ``open: false``. Die Sperre gegen zwei gleichzeitige Läufe. ``id`` ist eindeutig (der Nachtrag schreibt feste
+    Kennungen ``bf-…``).
+
+    Robust beim Start (Codex): Stehen schon mehrere offene Abschnitte da, bleibt nur der jüngste offen. Ein früherer
+    Index auf ``open`` (lückenhaft, nur aus lokalen Ständen dieses Branches) wird ersetzt. Scheitert Löschen oder
+    Anlegen eines Index, gibt es eine Warnung, keinen Absturz - die Auto-Checks laufen dann ohne die Sperre weiter."""
+    episodes = db.ops_check_episodes
+    await episodes.create_index([("since", -1)])
+    await episodes.create_index([("last_at", -1)])
+    await episodes.create_index("expires_at", expireAfterSeconds=0)
+    await _index_or_warn(episodes, "id", unique=True, name="id_unique")
+    newest = await episodes.find_one({"open": True}, {"_id": 1}, sort=[("last_at", -1), ("_id", -1)])
+    if newest:
+        await episodes.update_many({"open": True, "_id": {"$ne": newest["_id"]}}, {"$unset": {"open": ""}})
+    for name, spec in (await episodes.index_information()).items():
+        if name != OPS_EPISODE_OPEN_INDEX and list(spec.get("key") or []) == [("open", 1)]:
+            try:
+                await episodes.drop_index(name)
+            except OperationFailure as exc:
+                logger.warning("[indexes] ops_check_episodes: Index %s nicht gelöscht (Fehlercode %s)", name, getattr(exc, "code", None))
+    await _index_or_warn(episodes, "open", unique=True, partialFilterExpression={"open": True}, name=OPS_EPISODE_OPEN_INDEX)
+
+
+async def _index_or_warn(collection, keys, **options) -> bool:
+    """Einen Index anlegen; scheitert es, eine Warnung statt eines abgebrochenen Starts."""
+    try:
+        await collection.create_index(keys, **options)
+        return True
+    except OperationFailure as exc:
+        logger.warning("[indexes] %s: Index %s nicht angelegt (Fehlercode %s)", collection.name, options.get("name") or keys,
+                       getattr(exc, "code", None))
+        return False
+
+
 async def ensure_jersey_number_indexes(db) -> None:
     """Wunschnummer je Mitglied (#2034): eine Zeile je Konto, und jede Nummer hält höchstens eine Zeile
     (``number_key`` steht nur, solange die Nummer vergeben ist). Der eindeutige Index ist die Sperre gegen
@@ -236,6 +276,7 @@ async def init_indexes():
     await db.ops_vitals.create_index("expires_at", expireAfterSeconds=0)
     await db.ops_check_runs.create_index([("at", -1)])
     await db.ops_check_runs.create_index("expires_at", expireAfterSeconds=0)
+    await ensure_ops_check_indexes(db)
     await db.ops_alert_state.create_index("key", unique=True)
     # Audit
     await db.audit_logs.create_index("id", unique=True)
@@ -571,6 +612,12 @@ AUDIT_UNIQUE_INDEXES: tuple[tuple[str, Any, str, dict], ...] = (
     ("shop_printful_drafts", "external_id", "external_id", {}),
     ("shop_printful_confirmations", "order_id", "order", {}),
     ("shop_printful_confirmations", "idempotency_key", "idempotency_key", {}),
+    # Druckvorlagen und Druckdateien (#2069): je Printful-Produkt eine Vorlage; je Druckdatei ein eigener
+    # Zufallsschlüssel; je Produkt, Fläche, Gruppe und Farbe zählt die Version der Grunddatei eindeutig hoch.
+    ("shop_print_templates", "printful_product_id", "printful_product", {}),
+    ("shop_print_files", "public_id", "public_id", {}),
+    ("shop_print_files", [("product_id", 1), ("placement", 1), ("group", 1), ("color_key", 1), ("version", 1)],
+     "base_version", {"partialFilterExpression": {"purpose": "base"}}),
 )
 AUDIT_INDEXES: tuple[tuple[str, Any], ...] = (
     ("platform_links", "user_id"),
@@ -618,6 +665,8 @@ AUDIT_INDEXES: tuple[tuple[str, Any], ...] = (
     ("shop_orders", "id"),
     ("shop_orders", "user_id"),
     ("shop_gamertag_files", "user_id"),  # Kontolöschung und Auskunft (#1711)
+    ("shop_print_files", "user_id"),  # Bestelldateien mit Gamertag: Kontolöschung und Auskunft (#2069)
+    ("shop_print_files", "order_id"),
     ("shop_orders", [("status", 1), ("created_at", -1)]),
     ("shop_order_items", "user_id"),
     ("shop_order_events", [("order_id", 1), ("at", 1)]),

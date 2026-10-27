@@ -14,5 +14,38 @@
     "webhooks": "Webhooks einrichten (#1720)",
     "catalog": "kein eigener Scope",
     "mockups": "kein eigener Scope in der Liste - beim ersten echten Test mit GET /v2/oauth-scopes prüfen"
+  },
+  "print_templates": {
+    "issue": "#2069",
+    "retrieved": "2026-10-27",
+    "file_size": {
+      "path": "GET /v2/catalog-products/{id}/mockup-styles",
+      "operation": "retrieveMockupStylesByProductId",
+      "fields": "placement, technique, print_area_width/print_area_height (Zoll), dpi, mockup_styles[].restricted_to_variants",
+      "rule": "Druckdatei = round(print_area_width × dpi) × round(print_area_height × dpi) Pixel, die ganze Fläche, Rest transparent"
+    },
+    "preview": {
+      "path": "GET /v2/catalog-products/{id}/mockup-templates",
+      "operation": "getMockupTemplatesByProductId",
+      "fields": "catalog_variant_ids, placement, technique, image_url, background_url, background_color, template_width/height, print_area_left/top/width/height (Pixel des Vorlagenbilds), template_positioning, orientation"
+    },
+    "checked_against_official_templates": {
+      "Gildan 5000 vorne/hinten": "1800 × 2400 px bei 150 DPI (12 × 16 Zoll)",
+      "Gildan 5000 Ärmel": "600 × 525 px bei 150 DPI",
+      "Gildan 5000 Innenetikett": "450 × 450 px bei 150 DPI",
+      "Trikot Allover vorne/hinten": "4950 × 6750 px bei 150 DPI",
+      "Trikot Allover Ärmel": "4950 × 2250 px bei 150 DPI",
+      "Snapback vorne (DTF)": "1350 × 705 px bei 300 DPI - die Produktseite nennt 13,97 × 6,35 cm, die API ist die Quelle",
+      "Tasse 11 oz / 15 oz": "2250 × 925 bzw. 2253 × 1084 px bei 300 DPI",
+      "Badetuch 30×60 / 36×72": "9300 × 4800 bzw. 11100 × 5700 px bei 150 DPI, quer oder hoch"
+    },
+    "not_in_api": "Ein Sicherheitsbereich als Zahl steht nicht in v2 - er ist im Vorlagenbild eingezeichnet; der Shop hat dafür einen einstellbaren Rand je Fläche"
+  },
+  "product_search": {
+    "issue": "#2069",
+    "list": "GET /v2/catalog-products (getProducts) - seitenweise je 100, selling_region_name=europe",
+    "categories": "GET /v2/catalog-categories (getCategories)",
+    "text_filter": "keiner in v2 (nur category_ids, colors, placements, techniques, new) - gesucht wird lokal über Name, Marke und Modell",
+    "dashboard_link": "kein Slug in der API; der letzte Teil der Dashboard-Adresse (unisex-classic-tee-gildan-5000) wird mit dem Namen in Kleinbuchstaben und Bindestrichen verglichen - nur ein eindeutiger Treffer zählt"
   }
 }

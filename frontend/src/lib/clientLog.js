@@ -1,4 +1,6 @@
 import { api } from "./api";
+import { isAudioProblem } from "./audioSafe";
+import { chunkReloadPending, isChunkLoadError } from "./chunkReload";
 
 const DEDUPE_MS = 30000;
 const MAX_LOGS_PER_MINUTE = 12;
@@ -70,15 +72,29 @@ function sendClientLog(payload) {
   return reportId;
 }
 
+/** Veralteter Baustein nach einem Deploy (#2080): kein Fehler der Website. Lädt die Seite schon neu, wird gar nichts
+ *  gemeldet; sonst (zweiter Fehlschlag gleich nach dem Neuladen) höchstens ein Hinweis - die Originalmeldung steht im
+ *  Stack. Alles andere bleibt, wie es ist. */
+function reportPayload(error, fallbackMessage, fallbackName, stack) {
+  // Kein Ton auf dem Gerät oder vom Browser verweigert (#2080): harmlos, die Klang-Stellen bleiben dann still.
+  if (isAudioProblem(error)) return null;
+  if (isChunkLoadError(error)) {
+    if (chunkReloadPending()) return null;
+    return {
+      level: "info",
+      message: "Veralteter Stand nach Update – automatisches Neuladen half nicht, Hinweis zum Neuladen gezeigt",
+      error_name: error?.name || fallbackName,
+      stack: `${error?.message || error}\n${stack}`,
+    };
+  }
+  return { level: "error", message: error?.message || fallbackMessage, error_name: error?.name || fallbackName, stack };
+}
+
 /** Ein Fehler, den eine Fehlergrenze gefangen hat (#944) - der Browser meldet ihn nicht mehr von selbst.
  *  Liefert die Kennung der Meldung (#1230), damit Admins sie auf der Fehlerseite sehen und weitergeben können. */
 export function reportCaughtError(error, componentStack = "") {
-  return sendClientLog({
-    level: "error",
-    message: error?.message || "Seite konnte nicht angezeigt werden",
-    error_name: error?.name || "Error",
-    stack: `${error?.stack || ""}\n${componentStack || ""}`,
-  });
+  const payload = reportPayload(error, "Seite konnte nicht angezeigt werden", "Error", `${error?.stack || ""}\n${componentStack || ""}`);
+  return payload ? sendClientLog(payload) : Promise.resolve(null);
 }
 
 export function startWebClientLogging() {
@@ -86,6 +102,7 @@ export function startWebClientLogging() {
   window.__tlsWebClientLoggingStarted = true;
 
   window.addEventListener("error", (event) => {
+    if (isAudioProblem(event.error || event.message)) return;
     sendClientLog({
       level: "error",
       message: event.message || event.error?.message || "Web runtime error",
@@ -96,11 +113,7 @@ export function startWebClientLogging() {
 
   window.addEventListener("unhandledrejection", (event) => {
     const reason = event.reason;
-    sendClientLog({
-      level: "error",
-      message: reason?.message || String(reason || "Unhandled promise rejection"),
-      error_name: reason?.name || "UnhandledRejection",
-      stack: reason?.stack || "",
-    });
+    const payload = reportPayload(reason, String(reason || "Unhandled promise rejection"), "UnhandledRejection", reason?.stack || "");
+    if (payload) sendClientLog(payload);
   });
 }
