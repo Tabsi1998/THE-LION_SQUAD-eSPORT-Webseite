@@ -23,6 +23,7 @@ die Sammlungen direkt. Jede Katalogänderung ist eine Adminaktion mit Person und
 | `shop_variants` | Variante eines Produkts: SKU, Bezeichnung, Größe, Farbe, eigener Preis (sonst der des Produkts), aktiv, `version` | `sku` |
 | `shop_designs` | Druckdatei des Vereins je Fassung: `design_key`, `version` (zählt hoch), `file_ref`, `sha256`, Druckposition; seit #1708 dazu `public_id` (Zufallsschlüssel der öffentlichen Adresse), Pixel, DPI und Druckmaße in Zoll, mit denen sie geprüft wurde, Transparenz, Ausgangsformat und `public_disabled_at` (Aufbewahrung). Alte Fassungen bleiben | `design_key` + `version`; `public_id` |
 | `shop_design_profiles` | Design (#1708): Titel, Platzierung und die **Shirtfarben**, für die es gilt (`garment_colors`), Notiz, `version` | `design_key` |
+| `shop_gamertag_files` | Gamertag-Druckdatei (#1711): Herkunft `gamertag`, Zweck (`test`, `order`), `sha256`, `file_ref`, `public_id`, Maße, Anker, Farbe, `rules_hash` - nie der Name | `sha256`; `public_id` |
 | `shop_design_colors` | Belegung einer Shirtfarbe je Platzierung durch ein Design (#1708): `placement`, `color_key` (kleingeschrieben), `color`, `design_key` - macht „eine Farbe, ein Design“ atomar | `placement` + `color_key` |
 | `shop_printful_variants` | Zuordnung Variante → Printful-Variante und -Produkt (Anbieter `printful`) | `provider` + `variant_id` |
 | `shop_carts` | Warenkorb je Konto: Variante, Menge, Gamertag – keine Preise | `user_id` |
@@ -142,12 +143,13 @@ ohne Änderung schreibt nichts.
 | `shop.design.add`, `shop.printful_variant.set` | Druckdatei-Fassung (mit Prüfsumme, Pixeln, DPI - nie mit dem Zufallsschlüssel), Printful-Zuordnung |
 | `shop.design.profile` | Design angelegt bzw. Titel, Shirtfarben (vorher/nachher) oder Notiz geändert (#1708) |
 | `shop.design.placement` | Druckbreite, Druckbereich oder Mindest-DPI einer Platzierung, vorher/nachher (#1708) |
+| `shop.gamertag.rules`, `shop.gamertag.file` | Regeln der Gamertag-Druckdatei (vorher/nachher) bzw. Testdatei mit Prüfsumme und Maßen - nie mit dem Namen (#1711) |
 | `shop.order.release`, `shop.order.printful_confirm`, `shop.order.cancel` | vorgesehen für #1718, #1721 |
 | `shop.order.club`, `shop.order.prize` | vorgesehen für #1724, #1726 |
 | `shop.config` | Einstellungen geändert (#1706): Stufe, Freigabe „Steuer geklärt“, Notschalter, Preise, Printful-Schlüssel – mit vorher und nachher, nie mit Schlüssel |
 
 **Menü:** Verwaltung → Finanzen → **Shop** (`/admin/shop`, #1706) - ein Menüeintrag mit Reitern: **Einstellungen**
-(`/admin/shop`) und **Designs** (`/admin/shop/designs`, #1708). Die Produktverwaltung (#1707) und der Testentwurf
+(`/admin/shop`), **Designs** (`/admin/shop/designs`, #1708) und **Gamertag** (`/admin/shop/gamertag`, #1711). Die Produktverwaltung (#1707) und der Testentwurf
 (#2062) kommen als weitere Reiter dazu (`frontend/src/pages/admin/ShopTabs.jsx`), ohne das Menü zu verlängern.
 
 ## Einstellungen, Stufen und Notschalter (#1706)
@@ -292,6 +294,82 @@ die Variante ohne Druckdatei.
 
 Nicht in #1708: der Editor mit Ebenen, Hilfslinien und Drag-and-drop (Teil 2), die Gamertag-Druckdatei (#1711),
 Mockups (#1710) und das Hochladen zu Printful (#1705).
+
+## Gamertag-Druckdatei (#1711)
+
+Code: `backend/services/shop_gamertag.py`, Routen `backend/routes/shop_gamertag_routes.py`, Seite
+`frontend/src/pages/admin/AdminShopGamertagPage.jsx` (Verwaltung → Finanzen → Shop → Reiter **Gamertag**). Teil 1:
+Renderer, Regeln, Testdatei und Vorbelegung. Der Käufer-Ablauf folgt mit #1712/#1713, Mockups mit #1710, der
+Testentwurf an Printful mit #2062.
+
+**Schrift.** Fest eingebunden unter `backend/static/fonts` - dieselben Dateien wie die Website
+(`frontend/public/fonts`, lateinischer Zeichensatz mit Umlauten und ß), alle unter der **SIL Open Font License 1.1**
+(Lizenztexte `OFL-Rajdhani.txt`, `OFL-Outfit.txt`, `OFL-Unbounded.txt` daneben). Zur Wahl: Rajdhani Bold (Vorgabe,
+schmal - passt zum Richtwert „7 Zeichen ≈ 2,4 Zoll“), Outfit Bold/ExtraBold, Unbounded ExtraBold. Die Rajdhani-Datei
+hat gleich breite Ziffern (eigene Ableitung, `scripts/build_web_fonts.py`; die Lizenz erlaubt das).
+
+**Renderer** (Pillow, ohne Netz und ohne Dateizugriff - die Schrift wird einmal in den Speicher gelesen):
+
+- PNG mit Transparenz, Farbe überall und Deckkraft aus der Schrift (keine dunklen Ränder), im PNG nur die DPI.
+- **Texthöhe** 0,5 Zoll (1,3 cm), gemessen an der Höhe der Großbuchstaben (umschaltbar auf „Schriftgröße“).
+  **Höchstbreite** 3,5 Zoll (8,9 cm). Passt ein Name nicht, wird er bis **0,4 Zoll** (1 cm) verkleinert (Hinweis im
+  Admin); passt er dann immer noch nicht, lehnt der Server mit Begründung in Zoll und cm ab.
+- **300 DPI** wie die Löwen-Datei (einstellbar 300 bis 600).
+- **Gleiche Leinwand für jeden Namen:** Höchstbreite × feste Höhe (aus Ober- und Unterlängen bei voller Texthöhe),
+  der Name je nach Regel mittig, links oder rechts. Die **senkrechte Mitte der Großbuchstaben liegt genau auf der
+  halben Höhe** - das ist der Anker (`anchor_y_in`), den die Produktverwaltung (#1707) auf die Mitte des Löwen legt.
+  Damit braucht jede Variante nur eine Platzierung, egal wie lang der Name ist.
+- **Deterministisch:** gleicher Text, gleiche Farbe und gleiche Regeln ergeben Byte für Byte dieselbe Datei und
+  dieselbe Prüfsumme. `rules_hash` hält fest, was die Pixel bestimmt (Regeln, Prüfsumme der Schriftdatei,
+  `RENDERER_VERSION`).
+
+**Regeln** (Dokument `settings` mit `id = "shop_gamertag"`, nur Finanzen, mit Grund, Protokoll
+`shop.gamertag.rules` mit vorher/nachher): Schrift, Bezug der Texthöhe, Texthöhe, Mindesthöhe, Höchstbreite (höchstens
+so breit wie der Druckbereich der Platzierung „Brust links – Namensfeld“, #1708), DPI, Ausrichtung, Mindest- und
+Höchstlänge (Vorgabe 2 bis 16), zusätzlich erlaubte Zeichen (Vorgabe Leerzeichen, `_ - .`, Umlaute und ß; Buchstaben
+A–Z und Ziffern gehen immer; nur lateinische Zeichen, die die Schrift kennt), Wortfilter und **Farben**: je Farbe
+Kennung, Bezeichnung, Farbwert und Shirtfarben. Mehrere Farben je Shirtfarbe sind erlaubt (etwa Weiß und Vereinsblau
+auf Schwarz, die erste ist die Vorgabe, `inks_for_garment`); Vorgabefarbe Vereinsblau `#29B6E8` (Rolle `brand`).
+
+**Prüfung des Namens:** Unicode zusammengesetzt (NFC; Vollbreite und Ähnliches werden nicht still umgedeutet), Rand
+getrimmt, innen ein Leerzeichen; abgelehnt mit Begründung: leer, zu kurz, zu lang, **Emojis und Symbole**,
+Steuerzeichen (Tabulator, unsichtbare Zeichen, Richtungswechsel), nicht erlaubte Zeichen (die Begründung nennt nur
+diese Zeichen, nie den ganzen Namen). Danach der **Wortfilter der Moderation** (`services/word_filter.py`):
+„zurückhalten“ lehnt immer ab, „markieren“ nach Vorgabe ebenfalls (ein Druck lässt sich nicht zurücknehmen; in den
+Regeln abschaltbar, dann nur ein Hinweis). Der Admin-Test legt keinen Fund in der Moderation an.
+
+**Kein Name im Log:** Der Gamertag steht nie im Log, nie im Protokoll der Adminaktionen und nie an der Datei-Zeile -
+nur in der Datei selbst und (später) an der Bestellposition. Tests prüfen das mit einem Testnamen.
+
+**Ablage** in `shop_gamertag_files` (Herkunft `origin = "gamertag"`; hochgeladene Designs tragen seit #1711
+`origin = "upload"`): Datei im Speicher der Designs (`UPLOAD_DIR/shop-designs/<zufällig>.png`), SHA-256, eigener
+Zufallsschlüssel (256 Bit), Maße, Anker, Farbe, `rules_hash`, `purpose` (`test` oder `order`), `last_used_at`. Eindeutig
+sind `sha256` und `public_id`: dieselbe Datei gibt es einmal, sie behält ihre Adresse. Öffentlich wie die Designs:
+`GET /api/shop/print-files/<public_id>/gamertag-<prüfsumme16>.png` (Name ohne Gamertag). Bei Testdateien steht die
+Kennung der Finanzen an der Zeile, bei Bestelldateien kein Konto.
+
+**Einfrieren (für #1712/#1713):** `store(db, name, purpose="order", color_key=…)` prüft, rendert und legt ab;
+`frozen_for_order(row, name)` liefert, was die Position einfriert: den bestätigten Namen und Datei-Kennung,
+Prüfsumme, `rules_hash`, Maße, Anker, Farbe, Platzierung. Spätere Regeln erzeugen neue Dateien; die eingefrorene bleibt
+liegen. Eine Testdatei, die eine Bestellung braucht, wird zur Bestelldatei (nie umgekehrt). `render` allein prüft den
+Wortfilter nicht und ist nicht für Aufrufe von außen gedacht. Wer ein Gamertag-Feld sehen darf (nur Mitglieder,
+Produkte mit Gamertag), prüft die Bestellung selbst (#1712).
+
+**Vorbelegung aus der Mitgliederakte:** `prefill_from_member_file(db, user)` liest den Gamertag aus dem
+Website-Profil (Feld laut Zuordnung Dolibarr → Funktionen, `directory_field_map`) - nur mit bestätigter Zuordnung
+bzw. Bindung. Antwortet Dolibarr nicht, kommt der zuletzt vom Abgleich übernommene Stand aus `club_member_profiles`
+mit Datum (`source = "last_known"`, Hinweis für den Käufer). Ergebnis mit `valid`/`problem` nach den Regeln. Der
+Shop **schreibt nie nach Dolibarr** zurück; eine Änderung gilt nur für die eine Bestellung.
+
+**Aufbewahrung (nur Bericht):** `shop_gamertag.retention_plan(db)` nennt Testdateien, die 30 Tage niemand benutzt hat
+und die keine Bestellung braucht - sie dürften weg. Gelöscht wird nichts; Fristen für Bestelldateien regelt #1731.
+
+| Route (alle `require_area("finance")`) | Zweck |
+| --- | --- |
+| `GET /api/admin/shop/gamertag` | Regeln, Schriften mit Lizenz, Leinwand und Anker, letzte Testdateien |
+| `POST /api/admin/shop/gamertag/preview` | Vorschau (`text`, `color`): geprüft und gerendert, nichts abgelegt |
+| `POST /api/admin/shop/gamertag/test-files` | Testdatei mit Prüfsumme und Adresse (mit Grund, Protokoll `shop.gamertag.file`) |
+| `PUT /api/admin/shop/gamertag/rules` | Regeln und Maße (mit Grund) |
 
 ## Printful-Adapter (#1705)
 
