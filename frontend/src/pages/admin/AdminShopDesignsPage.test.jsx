@@ -336,6 +336,7 @@ test("Paar: Gelb markiert die Stellen und fragt im Seitenlayout nach, bevor gesp
   expect(confirmSpy).not.toHaveBeenCalled();
   await user.click(screen.getByTestId("shop-pair-confirm-no"));
   expect(screen.queryByTestId("shop-pair-confirm")).toBeNull();
+  expect(screen.getByTestId("shop-design-submit")).toHaveFocus();
 
   await user.click(screen.getByTestId("shop-design-submit"));
   await user.click(screen.getByTestId("shop-pair-confirm-yes"));
@@ -385,6 +386,47 @@ test("Paar für ein neues Motiv schickt Platzierung zur Prüfung und Titel beim 
   await user.click(screen.getByTestId("shop-design-submit"));
   const [[, form]] = callsTo("upload-pair");
   expect([form.get("design_key"), form.get("title"), form.get("placement")]).toEqual(["neu", "Neues Logo", "front_right"]);
+});
+
+test("Paar: eine Kennung tippen, während die Prüfung läuft, lässt sie nicht hängen", async () => {
+  apiMock.get.mockResolvedValue({ data: view({ designs: [] }) });
+  let answer;
+  uploadApiMock.post.mockImplementationOnce(() => new Promise((resolve) => { answer = resolve; }));
+  const user = userEvent.setup();
+  show();
+  await pairMode(user);
+  fireEvent.drop(screen.getByTestId("shop-pair-dark-dropzone"), { dataTransfer: { files: [ON_BLACK(), ON_WHITE()] } });
+  expect(await screen.findByTestId("shop-pair-checking")).toBeInTheDocument();
+  await user.type(screen.getByTestId("shop-design-key"), "neu");
+  answer({ data: report() });
+  expect(await screen.findByTestId("shop-pair-report")).toHaveAttribute("data-level", "green");
+  expect(callsTo("pair-check")).toHaveLength(1);
+});
+
+test("Paar: ein Fehler beim Speichern bringt den Fokus zurück auf „Paar speichern“", async () => {
+  uploadApiMock.post.mockImplementation(async (url) => {
+    if (url.endsWith("/pair-check")) return { data: report() };
+    throw { response: { status: 409, data: { detail: "Für dieses Motiv läuft gerade ein Upload." } } };
+  });
+  const user = userEvent.setup();
+  show();
+  await pairMode(user);
+  await user.upload(screen.getByTestId("shop-pair-dark-file"), ON_BLACK());
+  await user.upload(screen.getByTestId("shop-pair-light-file"), ON_WHITE());
+  await screen.findByTestId("shop-pair-report");
+  await user.click(screen.getByTestId("shop-design-submit"));
+  expect(await screen.findByTestId("shop-design-upload-error")).toHaveTextContent("läuft gerade ein Upload");
+  expect(screen.getByTestId("shop-design-submit")).toHaveFocus();
+});
+
+test("Paar: ohne durchsichtigen Hintergrund sagt die Prüfung, dass die Zuordnung unsicher ist", async () => {
+  uploadApiMock.post.mockResolvedValue({ data: report("green", { assign_uncertain: true, suggest_swap: true }) });
+  const user = userEvent.setup();
+  show();
+  await pairMode(user);
+  fireEvent.drop(screen.getByTestId("shop-pair-light-dropzone"), { dataTransfer: { files: [ON_BLACK(), ON_WHITE()] } });
+  expect(await screen.findByTestId("shop-pair-uncertain")).toHaveTextContent("Zuordnung unsicher – bitte prüfen");
+  expect(screen.getByTestId("shop-pair-assignment")).not.toHaveTextContent("wirken vertauscht");
 });
 
 test("„Als Paar ersetzen“ an der Karte stellt das Formular auf Paar und Motiv", async () => {

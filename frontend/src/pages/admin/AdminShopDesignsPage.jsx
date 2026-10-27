@@ -299,8 +299,13 @@ function PairReport({ check, onSwap, onRetry, busy }) {
       <div className="flex flex-wrap items-center gap-2 text-xs text-white/70" data-testid="shop-pair-assignment">
         <span>
           {report.swapped ? "Automatisch zugeordnet: die hellere Datei gilt für dunkle Shirts." : "Zuordnung wie gewählt."}
-          {!report.swapped && report.suggest_swap ? " Die Dateien wirken vertauscht – die hellere gehört zu den dunklen Shirts." : ""}
+          {!report.swapped && report.suggest_swap && !report.assign_uncertain ? " Die Dateien wirken vertauscht – die hellere gehört zu den dunklen Shirts." : ""}
         </span>
+        {report.assign_uncertain && (
+          <span className="inline-flex items-center gap-1.5 border border-warn/40 rounded-sm px-2 py-0.5 font-bold text-warn" data-testid="shop-pair-uncertain">
+            <AlertTriangle className="w-3.5 h-3.5" aria-hidden="true" /> Zuordnung unsicher – bitte prüfen
+          </span>
+        )}
         <button type="button" onClick={onSwap} disabled={busy} className={`${SECONDARY_BUTTON} inline-flex items-center gap-1.5`} data-testid="shop-pair-swap">
           <ArrowLeftRight className="w-3.5 h-3.5" aria-hidden="true" /> Tauschen
         </button>
@@ -372,6 +377,9 @@ function UploadForm({ designs, placements, limits, busy, preset, onUpload, onPai
   const [check, setCheck] = useState({ status: "idle", report: null, error: "" });
   const [confirming, setConfirming] = useState(false);
   const checked = useRef(null);
+  const requestNo = useRef(0);
+  const refocus = useRef(false);
+  const submitButton = useRef(null);
 
   useEffect(() => {
     if (preset?.key) {
@@ -411,12 +419,16 @@ function UploadForm({ designs, placements, limits, busy, preset, onUpload, onPai
     && !!pairLevel && pairLevel !== "red";
 
   // Sind beide Dateien da, prüft der Server sofort - nur prüfen, gespeichert wird erst mit „Paar speichern“.
+  // Die Signatur umfasst alles, was die Anfrage bestimmt; nur die Antwort der neuesten Anfrage zählt (Nummer in
+  // ``requestNo``) - eine ältere wird verworfen, ohne dass die Prüfung hängen bleibt.
   useEffect(() => {
-    if (!pair || !pairFiles.dark || !pairFiles.light || !targetPlacement) return undefined;
+    if (!pair || !pairFiles.dark || !pairFiles.light || !targetPlacement) return;
+    const signature = { dark: pairFiles.dark, light: pairFiles.light, placement: targetPlacement, key: isNew ? null : key };
     const done = checked.current;
-    if (done && done.dark === pairFiles.dark && done.light === pairFiles.light && done.placement === targetPlacement) return undefined;
-    checked.current = { dark: pairFiles.dark, light: pairFiles.light, placement: targetPlacement };
-    let live = true;
+    if (done && Object.keys(signature).every((name) => done[name] === signature[name])) return;
+    checked.current = signature;
+    requestNo.current += 1;
+    const ticket = requestNo.current;
     const form = new FormData();
     form.append("file_dark", pairFiles.dark);
     form.append("file_light", pairFiles.light);
@@ -426,20 +438,31 @@ function UploadForm({ designs, placements, limits, busy, preset, onUpload, onPai
     setConfirming(false);
     setCheck({ status: "checking", report: null, error: "" });
     uploadApi.post(`${BASE}/pair-check`, form).then(({ data: report }) => {
-      if (!live) return;
+      if (ticket !== requestNo.current) return;
       if (report.swapped) {
         // Der Server hat getauscht: die Felder zeigen jetzt seine Zuordnung - ohne zweite Prüfung.
-        checked.current = { dark: pairFiles.light, light: pairFiles.dark, placement: targetPlacement };
-        setPairFiles({ dark: pairFiles.light, light: pairFiles.dark, auto: false });
+        checked.current = { ...signature, dark: signature.light, light: signature.dark };
+        setPairFiles({ dark: signature.light, light: signature.dark, auto: false });
       }
       setCheck({ status: "done", report, error: "" });
     }).catch((failure) => {
-      if (!live) return;
+      if (ticket !== requestNo.current) return;
       const report = failure?.response?.data?.pair || null;
       setCheck({ status: "done", report, error: formatRequestError(failure, "Die Prüfung hat nicht geklappt.") });
     });
-    return () => { live = false; };
   }, [pair, pairFiles, targetPlacement, isNew, key]);
+
+  // Nach „Abbrechen“ in der Nachfrage oder einem Fehler beim Speichern: Fokus zurück auf „Paar speichern“.
+  useEffect(() => {
+    if (!confirming && refocus.current) {
+      refocus.current = false;
+      submitButton.current?.focus?.();
+    }
+  }, [confirming, problem]);
+  const closeConfirm = () => {
+    refocus.current = true;
+    setConfirming(false);
+  };
 
   const setPair = (patch) => {
     setPairFiles((now) => ({ ...now, auto: false, ...patch }));
@@ -482,7 +505,7 @@ function UploadForm({ designs, placements, limits, busy, preset, onUpload, onPai
       setIsNew(false);
     } else if (typeof result === "string") {
       setProblem(result);
-      setConfirming(false);
+      closeConfirm();
     }
   };
 
@@ -590,7 +613,7 @@ function UploadForm({ designs, placements, limits, busy, preset, onUpload, onPai
       </p>
       {pair && <PairReport check={check} onSwap={swap} onRetry={retry} busy={busy || check.status === "checking"} />}
       {pair && confirming && check.report && (
-        <PairConfirm report={check.report} busy={busy} onConfirm={() => savePair(true)} onCancel={() => setConfirming(false)} />
+        <PairConfirm report={check.report} busy={busy} onConfirm={() => savePair(true)} onCancel={closeConfirm} />
       )}
       {pair && pairLevel === "red" && (
         <p className="text-xs text-warn" data-testid="shop-pair-blocked">Speichern gesperrt – bitte die Dateien korrigieren und neu wählen.</p>
@@ -613,7 +636,7 @@ function UploadForm({ designs, placements, limits, busy, preset, onUpload, onPai
       )}
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
         <ReasonInput id="shop-design-reason" value={reason} onChange={setReason} disabled={busy} />
-        <button type="submit" disabled={pair ? !pairReady || confirming : !ready} className="tls-btn tls-btn--primary min-h-10 px-4 text-xs font-bold uppercase tracking-wider rounded-sm disabled:opacity-40 inline-flex items-center gap-2" data-testid="shop-design-submit">
+        <button ref={submitButton} type="submit" disabled={pair ? !pairReady || confirming : !ready} className="tls-btn tls-btn--primary min-h-10 px-4 text-xs font-bold uppercase tracking-wider rounded-sm disabled:opacity-40 inline-flex items-center gap-2" data-testid="shop-design-submit">
           <Upload className="w-3.5 h-3.5" aria-hidden="true" /> {busy ? "Lädt hoch …" : pair ? "Paar speichern" : "Hochladen und prüfen"}
         </button>
       </div>
