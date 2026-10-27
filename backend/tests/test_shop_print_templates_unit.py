@@ -503,6 +503,32 @@ async def test_a_missing_variant_group_keeps_the_stored_groups(db, provider, fak
 
 
 @pytest.mark.asyncio
+async def test_an_area_grown_too_large_is_dropped_not_carried_over(db, provider, fake):
+    """Review #2091: eine gültige, aber zu große Fläche übernimmt nie den alten Stand - sonst falsche Dateigröße."""
+    good = (await templates.refresh(db, SHIRT, provider=provider, actor_id=ACTOR))["template"]
+    fake.set_print_area(SHIRT, "back", 100, 100, display_name="Back print")  # 15000 × 15000 px = 225 Millionen Pixel
+    result = await templates.refresh(db, SHIRT, provider=provider, actor_id=ACTOR)
+    stored = result["template"]
+    assert result["ok"] is True and result["changed"] is True
+    assert result["changes"] == ["Entfällt: Rückseite (dtg) (bisher 1800 × 2400 px bei 150 DPI)."]
+    assert ("back", "all") not in sizes(stored) and stored["hash"] != good["hash"]
+    assert templates.entry_for_variant(stored, "dtg", "back", 4012) is None
+    assert stored["skipped"][-1] == "Zu groß für eine Druckdatei, ganze Fläche nicht übernommen: Rückseite (dtg)."
+    assert not stored.get("carried")
+    assert await db.audit_logs.count_documents({"action": "shop.print_template.change"}) == 1
+
+
+@pytest.mark.asyncio
+async def test_a_too_large_variant_group_takes_its_whole_pair_with_it(db, provider, fake):
+    restricted = mixed_mug(fake)
+    await templates.refresh(db, MUG, provider=provider, actor_id=ACTOR)
+    restricted["print_area_width"] = 300  # nur die 15-oz-Gruppe wird riesig
+    stored = (await templates.refresh(db, MUG, provider=provider, actor_id=ACTOR))["template"]
+    assert sizes(stored) == {("back", "all"): (900, 900, 300)}, "nie die 15 oz auf der allgemeinen Fläche"
+    assert templates.entry_for_variant(stored, "sublimation", "default", 7015) is None
+
+
+@pytest.mark.asyncio
 async def test_without_template_images_the_areas_stay(db, provider, fake):
     fake.fail(404, operation=TEMPLATES)
     result = await templates.refresh(db, SHIRT, provider=provider, actor_id=ACTOR)

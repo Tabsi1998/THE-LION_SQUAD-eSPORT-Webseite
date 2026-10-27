@@ -295,10 +295,16 @@ async def refresh(db, printful_product_id: int, *, provider: FulfillmentProvider
             upsert=True)
         return {"ok": False, "changed": False, "changes": [], "detail": detail, "template": await get(db, printful_product_id)}
     entries, previews, skipped = build(areas, templates)
-    # Zu große Flächen (``MAX_FILE_PIXELS``) fehlen genauso wie übersprungene Zeilen - auch ihr Paar ist unvollständig.
-    incomplete = set(getattr(areas, "incomplete", ())) | {
-        (area.placement, area.technique) for area in areas if area.width_px * area.height_px > MAX_FILE_PIXELS}
+    # Zu große Flächen (``MAX_FILE_PIXELS``): die Zeile ist gültig, Printful hat die Fläche wirklich so groß gemacht. Das
+    # ganze Paar fällt weg (sonst fiele eine Gruppe auf „all“) und wird nie aus dem alten Stand übernommen - die
+    # Druckdateien liefen sonst dauerhaft in der falschen Größe. „Entfällt“, Protokoll und Sperre greifen (#2091, Review).
+    oversize = {(area.placement, area.technique) for area in areas if area.width_px * area.height_px > MAX_FILE_PIXELS}
+    entries = [row for row in entries if (row["placement"], row["technique"]) not in oversize]
+    incomplete = set(getattr(areas, "incomplete", ())) - oversize
     entries, notes = merge_incomplete(entries, old_entries, incomplete)
+    if oversize:
+        notes.append("Zu groß für eine Druckdatei, ganze Fläche nicht übernommen: "
+                     + ", ".join(_pair_label(pair) for pair in sorted(oversize)) + ".")
     if templates_failed and (current or {}).get("previews"):
         # Ein dauerhafter Fehler bei den Vorlagenbildern (404, 401, 403) löscht keinen guten Stand (#2091, Review).
         previews = current["previews"]

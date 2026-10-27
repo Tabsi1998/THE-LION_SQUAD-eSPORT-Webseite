@@ -651,11 +651,13 @@ der Rest ist transparent. Abgeglichen mit den offiziellen Vorlagen (Maße in `ma
   abrufbar (außer vorübergehend), bleiben die Druckflächen wählbar - mit den bisher gespeicherten Vorlagenbildern,
   sonst Vorschau ohne Bild mit Hinweis. Nur wenn mockup-styles **keine einzige** brauchbare Zeile liefert, scheitert
   der Abruf (`no_usable_rows`) mit dem häufigsten Grund in der Meldung.
-- **Nie halb übernehmen (#2091):** Fehlt zu einer Platzierung und Technik eine Zeile (übersprungen oder zu groß),
-  gelten für genau dieses Paar die Einträge des gespeicherten Stands weiter - kein „Entfällt“, kein Hin und Her im
-  Protokoll, Prüfsumme stabil. Ohne gespeicherten Stand fehlt das Paar ganz, bis Printful es vollständig liefert - eine
-  fehlende Gruppe (etwa die 15-oz-Tasse) fällt nie auf die allgemeine Fläche. Ist Platzierung oder Technik einer
-  übersprungenen Zeile nicht lesbar, werden keine neuen Maße übernommen (`last_error`, `skipped`, alter Stand bleibt).
+- **Nie halb übernehmen (#2091):** Fehlt zu einer Platzierung und Technik eine übersprungene Zeile, gelten für genau
+  dieses Paar die Einträge des gespeicherten Stands weiter - kein „Entfällt“, kein Hin und Her im Protokoll, Prüfsumme
+  stabil. Ohne gespeicherten Stand fehlt das Paar ganz, bis Printful es vollständig liefert - eine fehlende Gruppe
+  (etwa die 15-oz-Tasse) fällt nie auf die allgemeine Fläche. Ist Platzierung oder Technik einer übersprungenen Zeile
+  nicht lesbar, werden keine neuen Maße übernommen (`last_error`, `skipped`, alter Stand bleibt).
+- **Zu große Flächen** (über `MAX_FILE_PIXELS`) sind gültige Zeilen: das ganze Paar fällt weg und wird **nie** aus dem
+  alten Stand übernommen - „Entfällt“ im Protokoll, betroffene Varianten gesperrt, statt Druckdateien in falscher Größe.
 - Ein Sicherheitsbereich als Zahl steht nicht in v2 (er ist ins Vorlagenbild gezeichnet) - dafür gibt es einen
   einstellbaren **Sicherheitsrand** je Art der Fläche (Vorgabe 0 cm).
 - **Vorlagenbilder über die Website:** `GET /api/admin/shop/print-templates/{printful_product_id}/images/{index}` holt
