@@ -380,6 +380,11 @@ immer eine **Variante** (`catalog_variant_id`), nie ein Produkt.
 - Nur `https://api.printful.com`, keine Weiterleitungen (3xx ist ein Fehler), Zeitgrenze 15 s. Jede Methode baut ihren
   festen Weg; Nummern nur als Typ, `external_id` nur aus Buchstaben, Ziffern, `-` und `_`. Dateien und Druckflächen
   nur mit https-Adressen.
+- **Rate-Limit:** Printful erlaubt 120 Aufrufe je Minute und Store. Jeder Client bleibt mit Luft darunter
+  (`RATE_BUDGET_PER_MINUTE = 100` in jedem gleitenden 60-Sekunden-Fenster) und wartet sonst, statt in 429 zu laufen.
+  `catalog_variants` braucht je Variante einen Preisaufruf; mit `price_for=(…)` holt es Preise nur für die angebotenen
+  Varianten (`()` = keine) - ein Gildan 5000 hat Hunderte. Die Preisantwort liefert neben dem Preis je Technik den
+  **Aufpreis je Druckfläche** (`placement_prices`, etwa Rückseite 5,25 €).
 - Wiederholt wird nur Lesen: höchstens zweimal nach Zeitüberschreitung, Netzfehler, 429 oder 5xx (Pausen 1 s und 3 s).
   Bei 429 gilt `Retry-After` (Sekunden oder Datum); länger als 30 s wartet der Client nicht, sondern gibt den Wert im
   Fehler zurück (`retry_after`). Schreiben wird nie still wiederholt.

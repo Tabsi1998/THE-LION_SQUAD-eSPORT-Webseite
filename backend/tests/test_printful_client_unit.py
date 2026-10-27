@@ -167,6 +167,68 @@ async def test_catalog_variants_carry_size_color_number_price_and_stock(client, 
     assert {call["params"]["currency"] for call in price_calls} == {"EUR"}
 
 
+@pytest.mark.asyncio
+async def test_catalog_variants_carry_the_surcharge_of_each_placement(client, fake):
+    """#1709: Einkaufspreis je Technik **und** Druckfläche - die Rückseite kostet extra (Testshirt: 5,25 €)."""
+    fake.add_product(72, ((5001, "M"),), price="9.75", placement_prices={"front": "5.25", "back": "5.25"})
+    (medium,) = await client.catalog_variants(CatalogProductId(72))
+    assert medium.prices == {"dtg": 975}
+    assert medium.placement_prices == {"dtg": {"front": 525, "back": 525}}
+    assert medium.placement_price_cents("dtg", "back") == 525
+    assert medium.placement_price_cents("embroidery", "back") is None
+    assert medium.priced is True
+
+
+@pytest.mark.asyncio
+async def test_catalog_variants_fetch_prices_only_for_the_chosen_variants(client, fake):
+    """Ein Produkt wie das Gildan 5000 hat Hunderte Varianten - Preise nur für die angebotenen (je ein Aufruf)."""
+    variants = await client.catalog_variants(PRODUCT, price_for=(SHIRT_M,))
+    by_size = {row.size: row for row in variants}
+    assert by_size["M"].priced is True and by_size["M"].prices == {"dtg": 1250}
+    assert by_size["L"].priced is False and by_size["L"].prices == {}
+    assert by_size["L"].in_stock is True, "Lager kommt ohne Preisaufruf mit"
+    assert [call["path"] for call in fake.calls_to("getVariantPricesById")] == ["/v2/catalog-variants/4012/prices"]
+    fake.calls.clear()
+    await client.catalog_variants(PRODUCT, price_for=())
+    assert fake.calls_to("getVariantPricesById") == []
+    with pytest.raises(TypeError):
+        await client.catalog_variants(PRODUCT, price_for=(4012,))
+    with pytest.raises(TypeError):
+        await client.catalog_variants(PRODUCT, price_for=(PRODUCT,))
+
+
+@pytest.mark.asyncio
+async def test_a_long_run_of_calls_stays_under_printfuls_rate_limit(fake, monkeypatch):
+    """Printful erlaubt 120 Aufrufe je Minute; der Client bleibt mit Luft darunter und wartet sonst."""
+    fake.add_product(73, tuple((6000 + index, f"S{index}") for index in range(250)))
+    clock = {"now": 1000.0}
+    waited: list[float] = []
+
+    async def wait(seconds):
+        waited.append(seconds)
+        clock["now"] += seconds
+
+    def tick():
+        return clock["now"]
+
+    monkeypatch.setattr(printful_client, "_sleep", wait)
+    monkeypatch.setattr(printful_client, "_clock", tick)
+    stamps: list[float] = []
+    real_handle = fake._handle
+
+    def counting(request):
+        stamps.append(clock["now"])
+        clock["now"] += 0.01
+        return real_handle(request)
+
+    client = PrintfulClient(API_KEY, transport=httpx.MockTransport(counting))
+    variants = await client.catalog_variants(CatalogProductId(73))
+    assert len(variants) == 250 and waited, "ohne Warten wären es über 250 Aufrufe in Sekunden"
+    for index, stamp in enumerate(stamps):
+        in_window = [other for other in stamps[index:] if other - stamp < 60]
+        assert len(in_window) <= printful_client.RATE_BUDGET_PER_MINUTE < printful_client.RATE_LIMIT_PER_MINUTE
+
+
 # ---------------------------------------------------------------- Kostenschätzung
 
 @pytest.mark.asyncio

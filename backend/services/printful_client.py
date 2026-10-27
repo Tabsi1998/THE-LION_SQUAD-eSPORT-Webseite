@@ -30,6 +30,8 @@ import hashlib
 import hmac
 import logging
 import re
+import time
+from collections import deque
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal, InvalidOperation
 from urllib.parse import quote
@@ -73,9 +75,16 @@ FILENAME_RE = re.compile(r"[A-Za-z0-9._-]{1,100}")
 CURRENCY_RE = re.compile(r"[A-Z]{3}")
 REGION_RE = re.compile(r"[a-z_]{2,32}")
 
-# Nur Tests setzen einen Transport (Fake) und ersetzen das Warten.
+# Printful erlaubt 120 Aufrufe je Minute und Store (manifest.json). Ein Client bleibt mit Luft darunter - für andere
+# Aufrufe desselben Stores - und wartet, statt in 429 zu laufen. Gezählt wird je Client (ein Abgleich, ein Admin-Klick).
+RATE_LIMIT_PER_MINUTE = 120
+RATE_BUDGET_PER_MINUTE = 100
+RATE_WINDOW_SECONDS = 60.0
+
+# Nur Tests setzen einen Transport (Fake) und ersetzen Warten und Uhr.
 TRANSPORT: httpx.AsyncBaseTransport | None = None
 _sleep = asyncio.sleep
+_clock = time.monotonic
 
 STATUS_ERRORS = {
     400: (FulfillmentInvalid, "bad_request"), 409: (FulfillmentInvalid, "conflict"),
@@ -190,6 +199,21 @@ class PrintfulClient:
         if store_id is not None and (type(store_id) is not int or store_id < 1):
             raise ValueError("Store-Nummer als ganze Zahl ab 1")
         self._store_id = store_id
+        self._sent: deque[float] = deque()
+
+    async def _throttle(self) -> None:
+        """Höchstens ``RATE_BUDGET_PER_MINUTE`` Aufrufe in jedem gleitenden Fenster von 60 Sekunden."""
+        now = _clock()
+        while self._sent and now - self._sent[0] >= RATE_WINDOW_SECONDS:
+            self._sent.popleft()
+        if len(self._sent) >= RATE_BUDGET_PER_MINUTE:
+            await _sleep(max(0.0, RATE_WINDOW_SECONDS - (now - self._sent[0])))
+            now = _clock()
+            while self._sent and now - self._sent[0] >= RATE_WINDOW_SECONDS:
+                self._sent.popleft()
+            while len(self._sent) >= RATE_BUDGET_PER_MINUTE:  # gewartet ist - nicht ein zweites Mal
+                self._sent.popleft()
+        self._sent.append(now)
 
     def __repr__(self) -> str:
         return "PrintfulClient(api_key=***)"
@@ -245,6 +269,7 @@ class PrintfulClient:
             headers["X-PF-Store-Id"] = str(self._store_id)
         error: FulfillmentError = FulfillmentTransient("network")
         for attempt in range(attempts):
+            await self._throttle()
             try:
                 async with httpx.AsyncClient(base_url=API_BASE, timeout=TIMEOUT_SECONDS, follow_redirects=False,
                                              transport=self._transport or TRANSPORT) as client:
@@ -329,13 +354,18 @@ class PrintfulClient:
             colors=tuple((str(row.get("name")), str(row.get("value"))) for row in data.get("colors") or []
                          if isinstance(row, dict)))
 
-    async def catalog_variants(self, product_id: CatalogProductId, *, currency: str = "EUR",
-                               region: str = "europe") -> tuple[CatalogVariant, ...]:
-        """Alle Varianten eines Produkts mit Größe, Farbe, Nummer, Einkaufspreis je Technik und Lager in ``region``.
-        Je Variante ein Preisaufruf - für ein Produkt mit wenigen Größen gut innerhalb von 120 Aufrufen je Minute."""
+    async def catalog_variants(self, product_id: CatalogProductId, *, currency: str = "EUR", region: str = "europe",
+                               price_for: tuple[CatalogVariantId, ...] | None = None) -> tuple[CatalogVariant, ...]:
+        """Alle Varianten eines Produkts mit Größe, Farbe, Nummer und Lager in ``region``; dazu Einkaufspreis je
+        Technik und Aufpreis je Druckfläche (#1709). Je Variante ein Preisaufruf - darum mit ``price_for`` nur für die
+        angebotenen Varianten (``()`` = keine Preise, ``None`` = alle). Der Client bleibt dabei unter 120 Aufrufen je
+        Minute (``RATE_BUDGET_PER_MINUTE``) und wartet sonst."""
         require(product_id, CatalogProductId, "product_id")
         if not CURRENCY_RE.fullmatch(str(currency)) or not REGION_RE.fullmatch(str(region)):
             raise ValueError("Währung (EUR) oder Region (europe) ungültig")
+        wanted: set[int] | None = None
+        if price_for is not None:
+            wanted = {require(item, CatalogVariantId, "price_for").value for item in tuple(price_for)}
         rows = await self._pages(f"/v2/catalog-products/{product_id.value}/catalog-variants",
                                  operation="getProductVariantsById")
         stock_rows = await self._pages(f"/v2/catalog-products/{product_id.value}/availability",
@@ -354,18 +384,29 @@ class PrintfulClient:
             if row.get("catalog_product_id") != product_id.value or type(row.get("id")) is not int:
                 raise FulfillmentPermanent("invalid_response")
             variant_id = CatalogVariantId(row["id"])
+            availability = stock.get(variant_id.value)
+            common = {"id": variant_id, "product_id": product_id, "name": str(row.get("name") or ""),
+                      "size": str(row.get("size") or ""), "color": row.get("color"), "color_code": row.get("color_code"),
+                      "in_stock": None if availability is None else availability == "in stock",
+                      "availability": availability}
+            if wanted is not None and variant_id.value not in wanted:
+                variants.append(CatalogVariant(**common, currency=currency, priced=False))
+                continue
             price_body = await self._get(f"/v2/catalog-variants/{variant_id.value}/prices",
                                          operation="getVariantPricesById",
                                          params={"currency": currency, "selling_region_name": region})
             prices_data = _data(price_body)
             prices = {str(item.get("technique_key")): _cents(item.get("discounted_price") or item.get("price"))
                       for item in _dig(prices_data, "variant", "techniques") or [] if isinstance(item, dict)}
-            availability = stock.get(variant_id.value)
-            variants.append(CatalogVariant(
-                id=variant_id, product_id=product_id, name=str(row.get("name") or ""), size=str(row.get("size") or ""),
-                color=row.get("color"), color_code=row.get("color_code"),
-                currency=str(prices_data.get("currency") or currency), prices=prices,
-                in_stock=None if availability is None else availability == "in stock", availability=availability))
+            surcharges: dict[str, dict[str, int]] = {}
+            for item in _dig(prices_data, "product", "placements") or []:
+                if not isinstance(item, dict) or not item.get("id") or not item.get("technique_key"):
+                    continue
+                amount = _cents(item.get("discounted_price") or item.get("price"))
+                if amount is not None:
+                    surcharges.setdefault(str(item["technique_key"]), {})[str(item["id"])] = amount
+            variants.append(CatalogVariant(**common, currency=str(prices_data.get("currency") or currency),
+                                           prices=prices, placement_prices=surcharges))
         return tuple(variants)
 
     # ------------------------------------------------ Kosten

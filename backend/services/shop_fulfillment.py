@@ -195,9 +195,17 @@ class CatalogVariant:
     # Lager in der gewählten Verkaufsregion: True nur bei „in stock“; None, wenn Printful nichts meldet.
     in_stock: bool | None = None
     availability: str | None = None
+    # Aufpreis je Technik und Druckfläche in Cent (Printful: ``product.placements`` der Preisantwort, #1709) - etwa
+    # ``{"dtg": {"front": 525, "back": 525}}``. Welche Fläche im Grundpreis steckt, entscheidet der Shop.
+    placement_prices: dict[str, dict[str, int]] = field(default_factory=dict)
+    # Ob für diese Variante Preise abgefragt wurden (``catalog_variants(price_for=…)``) - sonst sind beide leer.
+    priced: bool = True
 
     def price_cents(self, technique: str) -> int | None:
         return self.prices.get(technique)
+
+    def placement_price_cents(self, technique: str, placement: str) -> int | None:
+        return (self.placement_prices.get(technique) or {}).get(placement)
 
 
 @dataclass(frozen=True, slots=True)
@@ -344,7 +352,8 @@ class FulfillmentProvider(Protocol):
     async def catalog_product(self, product_id: CatalogProductId) -> CatalogProduct: ...
 
     async def catalog_variants(self, product_id: CatalogProductId, *, currency: str = "EUR",
-                               region: str = "europe") -> tuple[CatalogVariant, ...]: ...
+                               region: str = "europe",
+                               price_for: tuple[CatalogVariantId, ...] | None = None) -> tuple[CatalogVariant, ...]: ...
 
     async def estimate_costs(self, lines: tuple[DraftLine, ...], *, country_code: str, zip_code: str,
                              state_code: str = "") -> Costs: ...
