@@ -147,6 +147,7 @@ from runtime_config import (
 )
 from services.log_safe import SecretPathFilter
 from services import shop_designs
+from services import shop_gamertag
 from services.body_limits import BodySizeLimit
 from storage import PUBLIC_UPLOAD_DIR, UPLOAD_DIR, ensure_storage_directories
 
@@ -243,6 +244,8 @@ async def request_validation_error(_request: Request, exc: RequestValidationErro
 app.add_middleware(svg_logo.SvgFieldGate)
 # Druckdateien (#1708): das Limit greift am Eingang, bevor FastAPI das Formular in eine Zwischendatei liest.
 app.add_middleware(BodySizeLimit, limits={"/api/admin/shop/designs/upload": shop_designs.upload_body_limit})
+# Gamertag-Druckdatei (#1711): Vorschau, Testdatei und Regeln nehmen nur kleine Anfragen an.
+app.add_middleware(BodySizeLimit, limits=shop_gamertag.body_limits())
 
 app.add_middleware(
     TrustedHostMiddleware,

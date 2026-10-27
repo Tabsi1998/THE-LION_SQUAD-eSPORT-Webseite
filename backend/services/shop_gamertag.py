@@ -495,49 +495,59 @@ FILE_FIELDS = ("width_px", "height_px", "dpi", "print_width_in", "print_height_i
                "rules_hash")
 
 
-async def _reuse(db, row: dict, purpose: str) -> dict:
-    """Dieselbe Datei gibt es schon: zuletzt benutzt vermerken; eine Bestellung macht aus einer Testdatei eine
-    Bestelldatei (nie umgekehrt)."""
-    update: dict[str, Any] = {"last_used_at": now_utc().isoformat()}
-    if purpose == "order":
-        update["purpose"] = "order"
-    await db.shop_gamertag_files.update_one({"sha256": row["sha256"]}, {"$set": update})
-    return {**row, **update}
+async def _reuse_test_file(db, sha256: str) -> dict | None:
+    """Dieselbe Testdatei gibt es schon: zuletzt benutzt vermerken und sie liefern. Nur Testdateien werden geteilt -
+    nie mit einer Bestelldatei."""
+    row = await db.shop_gamertag_files.find_one({"purpose": "test", "sha256": sha256}, {"_id": 0})
+    if row is None:
+        return None
+    used = now_utc().isoformat()
+    await db.shop_gamertag_files.update_one({"id": row["id"]}, {"$set": {"last_used_at": used}})
+    return {**row, "last_used_at": used}
 
 
 async def store(db, raw: Any, *, purpose: str, color_key: str | None = None, actor_id: str | None = None,
-                reason: Any = None) -> dict:
-    """Prüfen, rendern, ablegen - oder die vorhandene Datei mit derselben Prüfsumme liefern. ``purpose``: ``test``
-    (Admin, mit Person und Grund im Protokoll) oder ``order`` (für #1712/#1713, ohne Konto an der Datei)."""
+                reason: Any = None, user_id: str | None = None, order_id: str | None = None,
+                order_item_id: str | None = None) -> dict:
+    """Prüfen, rendern, ablegen. ``purpose``:
+
+    - ``test``: Admin, mit Person und Grund im Protokoll. Gleiche Testdatei = dieselbe Zeile und Adresse.
+    - ``order`` (für #1712/#1713): **immer eine eigene Datei mit eigener Adresse**, auch bei gleichem Namen - nie
+      geteilt, weder mit einer anderen Bestellung noch mit einer Testdatei. Sie gehört zu einem Konto (``user_id``)
+      und, sobald bekannt, zu Bestellung und Position; das PNG zeigt den Namen, die Zeile ist personenbezogen."""
     if purpose not in PURPOSES:
         raise ShopError("Unbekannter Zweck der Druckdatei.")
     if purpose == "test":
         reason = clean_reason(reason)
         if not actor_id:
             raise ShopError("Ohne Person keine Testdatei.")
+    elif not user_id:
+        raise ShopError("Eine Bestelldatei gehört zu einem Konto.")
     rendered, warnings, rules = await _rendered(db, raw, color_key)
     problem = await _placement_problem(db, rules)
     if problem:
         raise ShopError(problem)
-    row = await db.shop_gamertag_files.find_one({"sha256": rendered.sha256}, {"_id": 0})
+    row = await _reuse_test_file(db, rendered.sha256) if purpose == "test" else None
     created = row is None
-    if row is not None:
-        row = await _reuse(db, row, purpose)
-    else:
+    if row is None:
         file_ref, path = shop_designs._store(rendered.payload)
         now = now_utc().isoformat()
         row = {"id": new_id(), "origin": "gamertag", "purpose": purpose, "sha256": rendered.sha256,
                "file_ref": file_ref, "public_id": secrets.token_urlsafe(32), "content_type": "image/png",
                "size_bytes": len(rendered.payload), "placement": rules["placement"],
                **{name: rendered.meta[name] for name in FILE_FIELDS},
+               "user_id": user_id if purpose == "order" else None,
+               "order_id": order_id if purpose == "order" else None,
+               "order_item_id": order_item_id if purpose == "order" else None,
                "created_at": now, "created_by": actor_id if purpose == "test" else None, "last_used_at": now}
         try:
             await db.shop_gamertag_files.insert_one(dict(row))
-        except DuplicateKeyError:  # gleichzeitig dieselbe Datei - die andere gilt
+        except DuplicateKeyError:  # gleichzeitig dieselbe Testdatei - die andere gilt
             path.unlink(missing_ok=True)
+            if purpose != "test":
+                raise
             created = False
-            row = await _reuse(db, await db.shop_gamertag_files.find_one({"sha256": rendered.sha256}, {"_id": 0}),
-                               purpose)
+            row = await _reuse_test_file(db, rendered.sha256)
         except BaseException:
             path.unlink(missing_ok=True)  # keine Datei ohne Zeile
             raise
@@ -615,6 +625,82 @@ async def retention_plan(db, *, now: datetime | None = None) -> dict:
         else:
             kept += 1
     return {"may_delete": may_delete, "kept": kept, "grace_days": TEST_GRACE_DAYS}
+
+
+# ---------------------------------------------------------------- Kontolöschung: Bestelldateien zeigen den Namen
+
+# Stände, in denen Printful nichts mehr produziert. Die Statusmaschine (#1716) liefert die endgültige Liste; bis dahin
+# gilt eine Bestellung mit Printful-Auftrag und einem anderen Stand als offen.
+CLOSED_ORDER_STATES = ("cancelled", "canceled", "shipped", "delivered", "fulfilled", "completed", "archived")
+
+
+async def _needed_for_production(db, row: dict) -> bool:
+    if not row.get("order_id"):
+        return False
+    order = await db.shop_orders.find_one({"id": row["order_id"]}, {"_id": 0, "printful_order_id": 1, "status": 1})
+    return bool(order and order.get("printful_order_id") and order.get("status") not in CLOSED_ORDER_STATES)
+
+
+async def _take_off_line(db, row: dict, now: str) -> None:
+    """Adresse abschalten (404) und die Datei löschen; die Zeile bleibt als Nachweis ohne Konto."""
+    path = shop_designs._path_of(row.get("file_ref"))
+    if path is not None:
+        path.unlink(missing_ok=True)
+    await db.shop_gamertag_files.update_one(
+        {"id": row["id"]},
+        {"$set": {"public_disabled_at": now, "file_deleted_at": now, "user_id": None},
+         "$unset": {"erase_pending_at": ""}})
+
+
+async def erase_for_user(db, user_id: str) -> dict:
+    """Kontolöschung (``dsgvo_routes._anonymize_user_data``): jede Bestelldatei des Kontos verliert die Verknüpfung.
+    Braucht ein offener Printful-Auftrag sie nicht (mehr), ist die Adresse sofort aus und die Datei gelöscht. Sonst
+    bleibt sie nur für diesen Auftrag abrufbar (``erase_pending_at``), bis ``complete_pending_erasures`` sie nach dem
+    Abschluss abschaltet und löscht. Testdateien der Finanzen haben kein Konto und bleiben."""
+    now = now_utc().isoformat()
+    removed = pending = 0
+    rows = await db.shop_gamertag_files.find({"user_id": user_id, "purpose": "order"}, {"_id": 0}).to_list(None)
+    for row in rows:
+        if await _needed_for_production(db, row):
+            await db.shop_gamertag_files.update_one({"id": row["id"]},
+                                                    {"$set": {"erase_pending_at": now, "user_id": None}})
+            pending += 1
+        else:
+            await _take_off_line(db, row, now)
+            removed += 1
+    return {"removed": removed, "pending": pending}
+
+
+async def complete_pending_erasures(db) -> int:
+    """Für den täglichen Job ``ops_retention``: vorgemerkte Bestelldateien abschalten und löschen, sobald kein offener
+    Printful-Auftrag sie mehr braucht. Liefert die Zahl."""
+    now = now_utc().isoformat()
+    done = 0
+    rows = await db.shop_gamertag_files.find({"erase_pending_at": {"$exists": True}}, {"_id": 0}).to_list(None)
+    for row in rows:
+        if not await _needed_for_production(db, row):
+            await _take_off_line(db, row, now)
+            done += 1
+    return done
+
+
+# ---------------------------------------------------------------- Größenlimit am Eingang
+
+BODY_LIMIT_BYTES = 8 * 1024        # Vorschau und Testdatei: ein Name, eine Farbe, ein Grund
+RULES_BODY_LIMIT_BYTES = 32 * 1024  # Regeln: bis zu zehn Farben mit ihren Shirtfarben
+
+
+def body_limits() -> dict:
+    """Für ``services/body_limits.BodySizeLimit``: die Gamertag-Routen nehmen nur kleine Anfragen an - vor dem Einlesen.
+    nginx begrenzt dieselben Pfade zusätzlich (``frontend/nginx.conf``)."""
+    def small() -> tuple[int, str]:
+        return BODY_LIMIT_BYTES, "Anfrage zu groß (höchstens 8 KB)."
+
+    def rules() -> tuple[int, str]:
+        return RULES_BODY_LIMIT_BYTES, "Anfrage zu groß (höchstens 32 KB)."
+
+    return {"/api/admin/shop/gamertag/preview": small, "/api/admin/shop/gamertag/test-files": small,
+            "/api/admin/shop/gamertag/rules": rules}
 
 
 # ---------------------------------------------------------------- Vorbelegung aus der Mitgliederakte

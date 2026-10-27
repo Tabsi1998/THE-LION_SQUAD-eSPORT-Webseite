@@ -22,7 +22,7 @@ def test_the_shop_indexes_are_part_of_the_audit_lists_and_known_to_the_checks():
             "shop_designs.design_version", "shop_designs.public_id", "shop_design_profiles.design_key",
             "shop_design_colors.placement_color", "shop_printful_variants.provider_variant", "shop_carts.user",
             "shop_printful_drafts.external_id", "shop_printful_confirmations.order",
-            "shop_printful_confirmations.idempotency_key", "shop_gamertag_files.sha256",
+            "shop_printful_confirmations.idempotency_key", "shop_gamertag_files.test_sha256",
             "shop_gamertag_files.public_id"} == unique
     assert unique <= set(unique_duplicates.known_indexes())
     # Claims belegen, dass etwas an Printful ging: auch sie bereinigt nie das Werkzeug.

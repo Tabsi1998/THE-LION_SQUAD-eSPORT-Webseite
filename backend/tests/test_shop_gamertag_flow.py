@@ -135,20 +135,54 @@ async def test_an_order_can_freeze_file_and_name(flow):
     from services import shop_gamertag
 
     await finance(flow)
-    rendered = await shop_gamertag.store(flow.db, "Testname", purpose="order")
+    rendered = await shop_gamertag.store(flow.db, "Testname", purpose="order", user_id="buyer-1", order_id="o1",
+                                         order_item_id="i1")
     frozen = shop_gamertag.frozen_for_order(rendered["row"], rendered["text"])
     assert frozen["gamertag"] == "Testname"
     assert frozen["gamertag_file"]["sha256"] == rendered["row"]["sha256"]
     assert set(frozen["gamertag_file"]) >= {"file_id", "sha256", "rules_hash", "anchor_y_in", "color_key"}
+    row = await flow.db.shop_gamertag_files.find_one({"id": rendered["row"]["id"]}, {"_id": 0})
+    assert (row["user_id"], row["order_id"], row["order_item_id"], row["created_by"]) == ("buyer-1", "o1", "i1", None)
     # Neue Regeln ändern die eingefrorene Datei nicht: dieselbe Zeile bleibt mit ihrer Prüfsumme liegen.
     await flow.put(BASE + "/rules", json={"dpi": 360, "reason": "Feiner drucken"})
-    newer = await shop_gamertag.store(flow.db, "Testname", purpose="order")
+    newer = await shop_gamertag.store(flow.db, "Testname", purpose="order", user_id="buyer-1")
     assert newer["row"]["sha256"] != rendered["row"]["sha256"]
     assert await flow.db.shop_gamertag_files.find_one({"sha256": rendered["row"]["sha256"]})
-    # Eine Testdatei, die eine Bestellung braucht, ist keine Testdatei mehr.
-    await flow.post(f"{BASE}/test-files", json={"text": "Testname", "reason": "Test"})
-    row = await flow.db.shop_gamertag_files.find_one({"sha256": newer["row"]["sha256"]}, {"_id": 0})
-    assert row["purpose"] == "order"
+
+
+@pytest.mark.asyncio
+async def test_an_order_file_needs_an_account(flow):
+    from services import shop_gamertag
+    from services.shop_common import ShopError
+
+    with pytest.raises(ShopError):
+        await shop_gamertag.store(flow.db, "Testname", purpose="order")
+    assert stored_files(flow) == []
+
+
+@pytest.mark.asyncio
+async def test_test_files_and_order_files_never_share_a_file_or_an_address(flow):
+    """Ein Admin, der denselben Namen als Testdatei speichert, bekommt nie die Datei (und Adresse) eines Kunden - und
+    jede Bestellung bekommt ihre eigene Datei, auch bei gleichem Namen."""
+    from services import shop_gamertag
+
+    await finance(flow)
+    first = await shop_gamertag.store(flow.db, "Testname", purpose="order", user_id="buyer-1")
+    second = await shop_gamertag.store(flow.db, "Testname", purpose="order", user_id="buyer-2")
+    test = (await flow.post(f"{BASE}/test-files", json={"text": "Testname", "reason": "Test"})).json()["file"]
+    again = (await flow.post(f"{BASE}/test-files", json={"text": "Testname", "reason": "Nochmal"})).json()["file"]
+
+    order_ids = {first["row"]["public_id"], second["row"]["public_id"]}
+    assert len(order_ids) == 2 and first["row"]["id"] != second["row"]["id"]
+    assert first["row"]["sha256"] == second["row"]["sha256"] == test["sha256"]  # gleiche Pixel, getrennte Dateien
+    test_row = await flow.db.shop_gamertag_files.find_one({"id": test["id"]}, {"_id": 0})
+    assert test_row["purpose"] == "test" and test_row["public_id"] not in order_ids
+    assert again["id"] == test["id"] and again["public_path"] == test["public_path"]  # Testdateien bleiben geteilt
+    assert first["row"]["file_ref"] != second["row"]["file_ref"] != test_row["file_ref"]
+    assert len(stored_files(flow)) == 3
+    rows = await flow.db.shop_gamertag_files.find({}, {"_id": 0}).to_list(10)
+    assert sorted(row["purpose"] for row in rows) == ["order", "order", "test"]
+    assert [item["id"] for item in (await flow.get(BASE)).json()["test_files"]] == [test["id"]]
 
 
 @pytest.mark.asyncio
@@ -160,7 +194,7 @@ async def test_retention_only_reports_unused_test_files(flow):
 
     await finance(flow)
     await flow.post(f"{BASE}/test-files", json={"text": "Testname", "reason": "Test"})
-    await shop_gamertag.store(flow.db, "Testspieler", purpose="order")
+    await shop_gamertag.store(flow.db, "Testspieler", purpose="order", user_id="buyer-1")
     plan = await shop_gamertag.retention_plan(flow.db, now=now_utc() + timedelta(days=31))
     assert plan["may_delete"] and all(item["purpose"] == "test" for item in plan["may_delete"])
     assert len(plan["may_delete"]) == 1 and plan["kept"] == 1
@@ -195,7 +229,11 @@ async def test_the_name_never_appears_in_the_log_or_the_audit_trail(flow, caplog
     await flow.post(f"{BASE}/preview", json={"text": SECRET_NAME})
     await flow.post(f"{BASE}/test-files", json={"text": SECRET_NAME, "reason": "Test"})
     await flow.post(f"{BASE}/preview", json={"text": SECRET_NAME + "$"})
-    await shop_gamertag.store(flow.db, SECRET_NAME, purpose="order")
+    await shop_gamertag.store(flow.db, SECRET_NAME, purpose="order", user_id="buyer-1")
+    with pytest.raises(Exception):
+        await shop_gamertag.store(flow.db, SECRET_NAME + "\U0001F981", purpose="order", user_id="buyer-1")
+    refused = await flow.post(f"{BASE}/test-files", json={"text": SECRET_NAME + "#", "reason": "Test"})
+    assert refused.status_code == 400 and "„#“" in refused.json()["detail"]  # nur die Zeichen, nicht der Name
     assert SECRET_NAME not in caplog.text
     audit = await flow.db.audit_logs.find({}, {"_id": 0}).to_list(50)
     assert audit and SECRET_NAME not in str(audit)
@@ -358,3 +396,92 @@ async def test_without_confirmed_link_there_is_no_prefill(flow, fake):
     assert prefill == {"gamertag": None, "source": "none", "as_of": None, "valid": False, "problem": None,
                        "text": prefill["text"]}
     assert "verbunden" in prefill["text"]
+
+
+# ---------------------------------------------------------------- Größenlimit am Eingang
+
+@pytest.mark.asyncio
+async def test_oversized_requests_are_refused_before_the_body_is_read(flow, monkeypatch):
+    """Vorschau, Testdatei und Regeln nehmen nur kleine Anfragen: das Limit greift am Eingang (Content-Length bzw.
+    beim Mitzählen), nicht erst nach dem Einlesen durch Pydantic."""
+    from services import shop_gamertag
+
+    def never(*_args, **_kwargs):
+        raise AssertionError("die Route hätte die Anfrage nie bekommen dürfen")
+
+    await finance(flow)
+    monkeypatch.setattr(shop_gamertag, "preview", never)
+    monkeypatch.setattr(shop_gamertag, "store", never)
+    monkeypatch.setattr(shop_gamertag, "save_rules", never)
+    big = b'{"text": "' + b"x" * 40_000 + b'", "reason": "Zu gross"}'
+    for path, method in (("preview", flow.post), ("test-files", flow.post), ("rules", flow.put)):
+        declared = await method(f"{BASE}/{path}", content=big, headers={"content-type": "application/json"})
+        assert declared.status_code == 413 and "zu groß" in declared.json()["detail"], (path, declared.text)
+
+        async def chunks():  # ohne Content-Length: gezählt wird beim Lesen
+            for start in range(0, len(big), 4096):
+                yield big[start:start + 4096]
+
+        streamed = await method(f"{BASE}/{path}", content=chunks(), headers={"content-type": "application/json"})
+        assert streamed.status_code == 413, (path, streamed.text)
+    assert stored_files(flow) == [] and await flow.db.audit_logs.count_documents({}) == 0
+
+
+def test_nginx_caps_the_gamertag_routes_small():
+    import re
+
+    nginx = (pathlib.Path(__file__).resolve().parents[2] / "frontend" / "nginx.conf").read_text(encoding="utf-8")
+    start = nginx.index("location /api/admin/shop/gamertag/ {")
+    block = nginx[start:nginx.index("}", start)]
+    limit = re.search(r"client_max_body_size (\d+)k;", block)
+    assert limit and int(limit.group(1)) <= 64
+    assert "proxy_pass http://backend:8001;" in block
+
+
+# ---------------------------------------------------------------- Bestelldateien sind personenbezogen
+
+async def _order(flow, order_id: str, user_id: str, **fields) -> None:
+    await flow.db.shop_orders.insert_one({"id": order_id, "user_id": user_id, "status": "placed",
+                                          "idempotency_key": f"{user_id}:{order_id}",
+                                          "printful_external_id": f"lsw-{order_id}", **fields})
+
+
+@pytest.mark.asyncio
+async def test_erasing_an_account_takes_its_order_files_off_line_and_deletes_them(flow):
+    from routes import dsgvo_routes
+    from services import shop_gamertag
+
+    staff = await finance(flow)
+    buyer = await flow.add_user(role="player", name="kaeufer")
+    await _order(flow, "o-done", buyer["id"])
+    await _order(flow, "o-open", buyer["id"], printful_order_id=4711)
+    done = (await shop_gamertag.store(flow.db, "Testname", purpose="order", user_id=buyer["id"], order_id="o-done"))["row"]
+    running = (await shop_gamertag.store(flow.db, "Testspieler", purpose="order", user_id=buyer["id"],
+                                         order_id="o-open"))["row"]
+    test = (await flow.post(f"{BASE}/test-files", json={"text": "Testname", "reason": "Test"})).json()["file"]
+    assert len(stored_files(flow)) == 3
+
+    export = await dsgvo_routes._user_data_export(flow.db, buyer["id"])
+    listed = export["shop_gamertag_files"]
+    assert sorted(item["order_id"] for item in listed) == ["o-done", "o-open"]
+    assert all("public_id" not in item and "file_ref" not in item for item in listed)
+
+    await dsgvo_routes._anonymize_user_data(flow.db, buyer["id"], staff["id"], "user.admin_anonymize")
+    flow.act_as(None)
+    gone = await flow.db.shop_gamertag_files.find_one({"id": done["id"]}, {"_id": 0})
+    assert gone["public_disabled_at"] and gone["user_id"] is None and gone["file_deleted_at"]
+    assert (await flow.get(shop_gamertag.file_view(done)["public_path"])).status_code == 404
+    # Ein offener Printful-Auftrag braucht seine Datei noch: bis zum Abschluss bleibt sie für ihn abrufbar.
+    pending = await flow.db.shop_gamertag_files.find_one({"id": running["id"]}, {"_id": 0})
+    assert pending["erase_pending_at"] and pending["user_id"] is None and not pending.get("public_disabled_at")
+    assert (await flow.get(shop_gamertag.file_view(running)["public_path"])).status_code == 200
+    assert len(stored_files(flow)) == 2
+    assert await shop_gamertag.complete_pending_erasures(flow.db) == 0  # Auftrag läuft noch
+
+    await flow.db.shop_orders.update_one({"id": "o-open"}, {"$set": {"status": "shipped"}})
+    assert await shop_gamertag.complete_pending_erasures(flow.db) == 1
+    assert (await flow.get(shop_gamertag.file_view(running)["public_path"])).status_code == 404
+    assert len(stored_files(flow)) == 1  # nur die Testdatei der Finanzen bleibt
+    assert (await flow.get(test["public_path"])).status_code == 200
+    assert await dsgvo_routes._user_data_export(flow.db, buyer["id"]) and not await flow.db.shop_gamertag_files.count_documents(
+        {"user_id": buyer["id"]})
