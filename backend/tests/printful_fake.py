@@ -197,6 +197,9 @@ class FakePrintful:
             {"id": 42, "parent_id": None, "title": "Hats", "image_url": "https://files.cdn.printful.com/c/42.png", "_links": {}},
             {"id": 112, "parent_id": None, "title": "Home & living", "image_url": "https://files.cdn.printful.com/c/112.png", "_links": {}},
         ]
+        # Operationen, deren Antwort bewusst vom Vertrag abweicht (#2091): echte Antworten tun das gelegentlich - so
+        # prüfen Tests, dass der Adapter einzelne kaputte Zeilen überspringt statt alles zu verwerfen.
+        self.off_contract: set[str] = set()
         self.calls: list[dict] = []
         self.confirmations: list[int] = []
         self.faults: list[dict] = []
@@ -264,7 +267,7 @@ class FakePrintful:
             templates.append({
                 "catalog_variant_ids": ids, "placement": placement, "technique": technique,
                 "image_url": f"https://{TEMPLATE_HOST}/upload/product-templates/{product_id}-{placement}-{len(templates)}.png",
-                "background_url": None, "background_color": None, **template_box(width_in, height_in),
+                "background_url": None, "background_color": 0xFFFFFF, **template_box(width_in, height_in),
                 "template_positioning": "overlay", "orientation": "any", "template_type": "native", "role": "template"})
 
     def fail(self, what, *, operation: str | None = None, times: int = 1, retry_after: str | None = None) -> None:
@@ -313,7 +316,8 @@ class FakePrintful:
             return self._inject(fault, request)
         status, payload = getattr(self, f"_op_{name}")(args, params, body)
         if status == 200:
-            validate(payload, operation["responses"]["200"]["content"]["application/json"]["schema"], f"{name} → 200")
+            if name not in self.off_contract:
+                validate(payload, operation["responses"]["200"]["content"]["application/json"]["schema"], f"{name} → 200")
             return httpx.Response(200, json=payload)
         if status == 204:
             assert "204" in operation["responses"], f"{name}: 204 steht nicht im Vertrag"

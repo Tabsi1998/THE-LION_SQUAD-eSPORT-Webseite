@@ -541,3 +541,19 @@ test("nicht abbildbare alte Platzierungen: rote Meldung, Produkt nicht bestellba
   expect(box).toHaveTextContent("Ärmel links");
   expect(box.className).toContain("text-live");
 });
+
+test("ohne Vorlagenbild bleibt die Fläche wählbar, mit Hinweis; übersprungene Zeilen stehen darüber (#2091)", async () => {
+  const skipped = "Vorlagenbild back (dtg): Feld image_url fehlt oder passt nicht (erwartet: https-Adresse des Vorlagenbilds; ohne sie bleibt die Vorschau ohne Bild).";
+  const base = view();
+  apiMock.get.mockResolvedValue({ data: view({ extra: { print_template: { ...base.print_template, skipped: [skipped] } } }) });
+  const user = userEvent.setup();
+  show("/admin/shop/products/p1");
+  await user.click(await screen.findByTestId("shop-step-designs"));
+  expect(screen.getByTestId("shop-layout-technique")).toHaveTextContent("Flächen für DTG-Direktdruck");
+  expect(screen.getByTestId("shop-template-skipped")).toHaveTextContent("Feld image_url");
+  expect(screen.queryByTestId("shop-preview-front-no-image")).toBeNull();
+  await user.click(screen.getByTestId("shop-area-use-back"));
+  expect(screen.getByTestId("shop-preview-back")).toBeInTheDocument();
+  expect(screen.getByTestId("shop-preview-back-no-image")).toHaveTextContent("Kein Vorlagenbild von Printful");
+  expect(screen.getByTestId("shop-area-add-motif-back")).toBeEnabled();
+});

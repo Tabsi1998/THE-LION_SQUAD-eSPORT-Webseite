@@ -27,7 +27,7 @@ die Sammlungen direkt. Jede Katalogänderung ist eine Adminaktion mit Person und
 | `shop_designs` | Druckdatei des Vereins je Fassung: `design_key`, `version` (zählt hoch), `file_ref`, `sha256`, Druckposition; seit #1708 dazu `public_id` (Zufallsschlüssel der öffentlichen Adresse), Pixel, DPI und Druckmaße in Zoll, mit denen sie geprüft wurde, Transparenz, Ausgangsformat und `public_disabled_at` (Aufbewahrung); seit #2069 die Fassung (`variant`: `dark` für dunkle, `light` für helle Shirts), Herkunft (`origin`: `upload` oder `auto_light`), bei SVG das bereinigte SVG (`svg_ref`, nie öffentlich), erkannte Farben (`colors`) und `view_box`, bei einer umgefärbten Fassung `derived_from` und `recolor`. Alte Fassungen bleiben | `design_key` + `version`; `public_id` |
 | `shop_design_profiles` | Design bzw. Motiv (#1708, #2069): Titel, Platzierung, feste **Shirtfarben** (`garment_colors`, freiwillig), Notiz, `version`; seit #2069 `light_mode` (`auto` oder `file`), `light_auto` (Stand der automatischen Fassung) und Ausnahmen je Shirtfarbe (`color_variants`) | `design_key` |
 | `shop_gamertag_files` | Gamertag-Druckdatei (#1711): Herkunft `gamertag`, Zweck (`test`, `order`), `sha256`, `file_ref`, `public_id`, Maße, Anker, Farbe, `rules_hash`; bei Bestelldateien Konto, Bestellung und Position (personenbezogen: das PNG zeigt den Namen) - nie der Name als Text | `purpose` + `sha256` (nur Testdateien); `public_id` |
-| `shop_print_templates` | Druckvorlage je Printful-Produkt (#2069): Maße je Fläche, Technik und Gruppe (`entries`), Vorlagenbilder (`previews`), `hash` der Maße, `changes` mit `changed_at`, `checked_at`, `last_error` | `printful_product_id` |
+| `shop_print_templates` | Druckvorlage je Printful-Produkt (#2069): Maße je Fläche, Technik und Gruppe (`entries`), Vorlagenbilder (`previews`), `hash` der Maße, `changes` mit `changed_at`, `checked_at`, `last_error`, übersprungene Zeilen mit Grund (`skipped`, #2091) | `printful_product_id` |
 | `shop_print_files` | Druckdatei je Produkt, Fläche, Farbe und Gruppe (#2069): Herkunft (`composed`, `upload`), Zweck (`base` mit `version`, `order` je Bestellposition), `sha256`, `file_ref`, `public_id`, Maße, `layout_hash`, `template_hash`, Quellen; bei Bestelldateien Konto, Bestellung und Position (personenbezogen) | `public_id`; Produkt + Fläche + Gruppe + Farbe + Version (nur `base`) |
 | `shop_printful_catalog` | Zwischenstand des Printful-Katalogs für die Produktsuche (#2069): Produkte, Kategorien, `fetched_at` - keine Person | `id` |
 | `shop_design_colors` | Belegung einer Shirtfarbe je Platzierung durch ein Design (#1708): `placement`, `color_key` (kleingeschrieben), `color`, `design_key` - macht „eine Farbe, ein Design“ atomar | `placement` + `color_key` |
@@ -641,6 +641,16 @@ der Rest ist transparent. Abgeglichen mit den offiziellen Vorlagen (Maße in `ma
   abgleichen“, im täglichen Abgleich und mit „Vorlagen neu laden“. Die Prüfsumme (`hash`) deckt nur die Maße ab. Ändert
   Printful eine Fläche, stehen die Sätze in `changes` und im Protokoll (`shop.print_template.change`), und alle Dateien
   dieser Fläche gelten als **veraltet**. Scheitert Printful, bleibt der letzte Stand (`last_error`).
+- **Zeilenweise gelesen (#2091):** Eine Zeile, die nicht passt, wird übersprungen statt die ganze Antwort zu verwerfen.
+  Der Grund nennt nur Platzierung und Technik (wenn lesbar), Feldname und erwarteten Typ - **keine Werte, keine
+  Adressen** - und steht unter „übersprungen“ (`skipped`, gleiche Gründe zusammengefasst) und einmal je Abruf im Log.
+  Großzügig, wo es sicher ist: Zahlen als int, float oder Zahl-Text, Pixel gerundet; DPI muss eine ganze Zahl von 72
+  bis 1200 sein. Vorlagenbilder mit `role` `extra`/`advanced_template` (oder `template_type` `advanced`) werden still
+  ausgelassen, `template`/`primary` für die Vorschau bevorzugt. Ein fehlendes oder nicht-https Vorlagenbild kostet nur
+  die Vorschau dieser Zeile (ein schlechter Hintergrund nur den Hintergrund); sind die Vorlagenbilder gar nicht
+  abrufbar (außer vorübergehend), bleiben die Druckflächen wählbar - Vorschau ohne Bild mit Hinweis. Nur wenn
+  mockup-styles **keine einzige** brauchbare Zeile liefert, scheitert der Abruf (`no_usable_rows`) mit dem häufigsten
+  Grund in der Meldung.
 - Ein Sicherheitsbereich als Zahl steht nicht in v2 (er ist ins Vorlagenbild gezeichnet) - dafür gibt es einen
   einstellbaren **Sicherheitsrand** je Art der Fläche (Vorgabe 0 cm).
 - **Vorlagenbilder über die Website:** `GET /api/admin/shop/print-templates/{printful_product_id}/images/{index}` holt

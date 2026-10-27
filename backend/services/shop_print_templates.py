@@ -40,7 +40,7 @@ import storage
 from models import now_utc
 from services.shop_common import ShopError, clean_reason, record_admin_action
 from services.shop_fulfillment import (
-    CatalogProductId, FulfillmentError, FulfillmentProvider, MockupTemplate, PrintArea)
+    CatalogProductId, FulfillmentError, FulfillmentProvider, FulfillmentTransient, MockupTemplate, PrintArea)
 
 logger = logging.getLogger("tls-arena.shop-print-templates")
 
@@ -122,7 +122,15 @@ def _preview(index: int, row: MockupTemplate) -> dict:
             "background_color": row.background_color, "template_width": row.template_width,
             "template_height": row.template_height,
             "area": {"left": row.area_left, "top": row.area_top, "width": row.area_width, "height": row.area_height},
-            "positioning": row.positioning, "orientation": row.orientation}
+            "positioning": row.positioning, "orientation": row.orientation, "role": row.role}
+
+
+# Für die Vorschau zuerst die eigentliche Vorlage (#2091) - ``template``/``primary`` vor ``unknown``.
+ROLE_RANK = {"template": 0, "primary": 1}
+
+
+def _role_rank(item: dict) -> int:
+    return ROLE_RANK.get(item.get("role") or "", 2)
 
 
 def build(areas: Sequence[PrintArea], templates: Sequence[MockupTemplate]) -> tuple[list[dict], list[dict], list[str]]:
@@ -138,9 +146,10 @@ def build(areas: Sequence[PrintArea], templates: Sequence[MockupTemplate]) -> tu
                            f"{MAX_FILE_PIXELS // 1_000_000} Millionen Pixel, nicht übernommen.")
             continue
         variant_ids = sorted(area.variant_ids) if area.variant_ids else None
-        mine = [item for item in previews if item["placement"] == area.placement
-                and item["technique"] == area.technique
-                and (variant_ids is None or set(item["variant_ids"]) & set(variant_ids))]
+        mine = sorted((item for item in previews if item["placement"] == area.placement
+                       and item["technique"] == area.technique
+                       and (variant_ids is None or set(item["variant_ids"]) & set(variant_ids))),
+                      key=lambda item: (_role_rank(item), item["index"]))
         ratio = area.height_px / area.width_px
         aspect_ok = all(abs(item["area"]["height"] / item["area"]["width"] - ratio) <= ratio * ASPECT_TOLERANCE
                         for item in mine)
@@ -216,17 +225,30 @@ async def refresh(db, printful_product_id: int, *, provider: FulfillmentProvider
     product_id = CatalogProductId(printful_product_id)
     current = await get(db, printful_product_id)
     now = now_utc().isoformat()
+    read_skipped: list[str] = []
     try:
         areas = await provider.print_areas(product_id)
-        templates = await provider.mockup_templates(product_id)
+        try:
+            templates = await provider.mockup_templates(product_id)
+        except FulfillmentTransient:
+            raise
+        except FulfillmentError as exc:
+            # Ohne Vorlagenbilder bleiben die Druckflächen wählbar - nur die Vorschau ist ohne Bild (#2091).
+            logger.warning("[shop-print-templates] mockup-templates failed: %s", exc.reason)
+            templates = ()
+            read_skipped.append(f"Vorlagenbilder nicht abrufbar ({exc.text}) - Vorschau ohne Bild.")
     except FulfillmentError as exc:
         logger.warning("[shop-print-templates] refresh failed: %s", exc.reason)
+        # Bei „keine brauchbare Zeile“ sagt der Zusatz, woran es lag (nur Feld und erwarteter Typ, keine Werte).
+        detail = exc.text + (f". {exc.provider_detail}" if exc.reason == "no_usable_rows" and exc.provider_detail else "")
         await db.shop_print_templates.update_one(
             {"printful_product_id": printful_product_id},
-            {"$set": {"printful_product_id": printful_product_id, "last_error": {"at": now, "detail": exc.text}}},
+            {"$set": {"printful_product_id": printful_product_id, "last_error": {"at": now, "detail": detail}}},
             upsert=True)
-        return {"ok": False, "changed": False, "changes": [], "detail": exc.text, "template": await get(db, printful_product_id)}
+        return {"ok": False, "changed": False, "changes": [], "detail": detail, "template": await get(db, printful_product_id)}
+    read_skipped[:0] = [*getattr(areas, "skipped", ()), *getattr(templates, "skipped", ())]
     entries, previews, skipped = build(areas, templates)
+    skipped = skipped + read_skipped
     if not entries:
         detail = "Printful liefert für dieses Produkt keine Druckvorgaben (mockup-styles)." + (
             " " + " ".join(skipped) if skipped else "")

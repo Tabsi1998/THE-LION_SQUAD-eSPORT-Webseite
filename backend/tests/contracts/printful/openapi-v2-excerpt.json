@@ -303,14 +303,14 @@
           "placement": {"type": "string"}, "technique": {"type": "string"},
           "image_url": {"type": "string", "description": "halbdurchsichtiges Vorlagenbild"},
           "background_url": {"type": "string", "nullable": true},
-          "background_color": {"nullable": true, "description": "laut Printful ein HEX-Farbcode, im Schema als integer beschrieben - beides wird angenommen"},
+          "background_color": {"type": "integer", "nullable": true, "description": "im offiziellen Schema integer|null; im Text als HEX-Farbcode beschrieben - der Adapter nimmt beides (#2091)"},
           "template_width": {"type": "integer"}, "template_height": {"type": "integer"},
           "print_area_width": {"type": "integer"}, "print_area_height": {"type": "integer"},
           "print_area_top": {"type": "integer"}, "print_area_left": {"type": "integer"},
           "template_positioning": {"type": "string", "enum": ["overlay", "background"]},
           "orientation": {"type": "string", "enum": ["horizontal", "vertical", "any"]},
           "template_type": {"type": "string", "nullable": true, "enum": ["custom", "native", "color_group", "advanced"]},
-          "role": {"type": "string", "enum": ["primary", "template", "extra", "unknown", "advanced_template"]}
+          "role": {"type": "string", "enum": ["primary", "template", "extra", "unknown", "advanced_template"], "description": "Vorschau: template/primary bevorzugt, extra/advanced_template ignoriert (#2091)"}
         }
       },
       "GetCatalogProductMockupsTemplates": {

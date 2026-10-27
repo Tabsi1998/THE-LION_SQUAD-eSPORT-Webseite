@@ -350,6 +350,7 @@ function PlacementCard({ view, available, state, savedRow, used, onToggle, onCha
                 resolved={resolved} colorCode={codes[previewColor]} motifFor={motifFor} selected={selected} onSelect={setSelected}
                 onNudge={nudge}
                 editable={editable} testId={`shop-preview-${available.key}`} />
+              {!available.preview?.image_path && <p className="text-xs text-honor" data-testid={`shop-preview-${available.key}-no-image`}>Kein Vorlagenbild von Printful - die Vorschau zeigt nur die Druckfläche, Maße und Druckdatei stimmen trotzdem.</p>}
               <p className="text-xs text-white/45 inline-flex items-center gap-1"><Move className="w-3 h-3" aria-hidden="true" /> Ziehen oder Pfeiltasten zum Feinjustieren.</p>
             </div>
             <div className="space-y-3">

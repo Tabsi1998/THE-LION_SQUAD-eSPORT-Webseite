@@ -289,17 +289,138 @@ def test_the_contract_describes_the_new_paths():
     assert MANIFEST["print_templates"]["file_size"]["operation"] == "retrieveMockupStylesByProductId"
 
 
-def test_the_client_refuses_answers_that_do_not_fit(fake, provider):
+# ---------------------------------------------------------------- Zeilenweise lesen (#2091)
+# Echte Antworten weichen gelegentlich vom Vertrag ab - der Fake liefert sie hier bewusst so (``off_contract``).
+
+STYLES, TEMPLATES = "retrieveMockupStylesByProductId", "getMockupTemplatesByProductId"
+
+
+def row_of(rows: list[dict], placement: str) -> dict:
+    return next(row for row in rows if row["placement"] == placement)
+
+
+def no_values(lines, *values) -> bool:
+    """Kein Wert aus der Antwort in den Gründen - weder Text noch Adresse."""
+    return all(line.count(value) == 0 for line in lines for value in values)
+
+
+@pytest.mark.asyncio
+async def test_one_broken_row_costs_only_that_row_and_names_field_and_type(db, provider, fake, caplog):
+    fake.off_contract.update({STYLES, TEMPLATES})
+    row_of(fake.print_areas[SHIRT], "front")["dpi"] = "viel"
+    row_of(fake.print_areas[SHIRT], "back")["print_area_width"] = "12"  # Zahl als Text geht
+    row_of(fake.print_areas[SHIRT], "sleeve_left")["dpi"] = 150.0  # ganzzahliger float geht
+    with caplog.at_level("WARNING", logger="tls.printful"):
+        result = await templates.refresh(db, SHIRT, provider=provider, actor_id=ACTOR)
+    assert result["ok"] is True
+    stored = result["template"]
+    assert sorted(sizes(stored)) == [("back", "all"), ("label_inside", "all"), ("sleeve_left", "all"),
+                                     ("sleeve_right", "all")]
+    assert sizes(stored)[("back", "all")] == (1800, 2400, 150)
+    assert stored["skipped"] == [
+        "Druckvorgabe front (dtg): Feld dpi fehlt oder passt nicht (erwartet: ganze Zahl von 72 bis 1200)."]
+    assert no_values(stored["skipped"], "viel")
+    logged = [record.getMessage() for record in caplog.records if "übersprungen" in record.getMessage()]
+    assert len(logged) == 1 and "1 von 5 Zeilen" in logged[0] and no_values(logged, "viel")
+
+
+@pytest.mark.asyncio
+async def test_float_pixels_are_rounded_and_the_background_colour_comes_as_int(db, provider, fake):
+    fake.off_contract.add(TEMPLATES)
+    front = row_of(fake.templates[SHIRT], "front")
+    front.update(template_width=1000.0, template_height=1000.0, print_area_left=199.6, print_area_top="200",
+                 background_color=0x0C0C0C)
+    stored = (await templates.refresh(db, SHIRT, provider=provider, actor_id=ACTOR))["template"]
+    preview = templates.preview_for(stored, entry_of(stored, "front"))
+    assert (preview["template_width"], preview["area"]["left"], preview["area"]["top"]) == (1000, 200, 200)
+    assert preview["background_color"] == "#0c0c0c"
+    assert stored["skipped"] == []
+
+
+@pytest.mark.asyncio
+async def test_without_an_image_the_area_stays_selectable_and_only_the_preview_is_missing(db, provider, fake):
+    fake.off_contract.add(TEMPLATES)
+    del row_of(fake.templates[SHIRT], "front")["image_url"]
+    row_of(fake.templates[SHIRT], "back")["image_url"] = f"http://{TEMPLATE_HOST}/ohne-tls.png"
+    row_of(fake.templates[SHIRT], "sleeve_left")["background_url"] = ""  # nur der Hintergrund fehlt
+    result = await templates.refresh(db, SHIRT, provider=provider, actor_id=ACTOR)
+    stored = result["template"]
+    assert result["ok"] is True and ("front", "all") in sizes(stored) and ("back", "all") in sizes(stored)
+    assert templates.preview_for(stored, entry_of(stored, "front")) is None
+    assert templates.preview_for(stored, entry_of(stored, "back")) is None
+    assert templates.preview_for(stored, entry_of(stored, "sleeve_left"))["background_url"] is None
+    assert len(stored["skipped"]) == 2
+    assert all("Feld image_url" in line and "Vorschau ohne Bild" in line for line in stored["skipped"])
+    assert no_values(stored["skipped"], TEMPLATE_HOST, "ohne-tls")
+
+
+@pytest.mark.asyncio
+async def test_extra_images_are_ignored_and_the_real_template_is_preferred(db, provider, fake):
+    fake.off_contract.add(TEMPLATES)
+    back = row_of(fake.templates[SHIRT], "back")
+    fake.templates[SHIRT][:0] = [
+        {**back, "role": "unknown", "image_url": f"https://{TEMPLATE_HOST}/upload/unknown.png"},
+        {"placement": "back", "technique": "dtg", "role": "extra", "template_type": "custom"},  # unvollständig, egal
+        {**back, "role": "advanced_template", "template_type": "advanced"},
+    ]
+    stored = (await templates.refresh(db, SHIRT, provider=provider, actor_id=ACTOR))["template"]
+    assert stored["skipped"] == [], "Zusatzbilder sind kein Fehler"
+    assert [row["role"] for row in stored["previews"]].count("unknown") == 1
+    assert len(stored["previews"]) == len(fake.templates[SHIRT]) - 2
+    preview = templates.preview_for(stored, entry_of(stored, "back"))
+    assert preview["role"] == "template" and preview["image_url"] == back["image_url"]
+
+
+@pytest.mark.asyncio
+async def test_when_no_row_fits_the_fetch_fails_with_the_most_common_reason(db, provider, fake):
+    fake.off_contract.add(STYLES)
+    for row in fake.print_areas[SHIRT]:
+        row["dpi"] = 0
+    row_of(fake.print_areas[SHIRT], "label_inside").update(dpi=150, print_area_height=None)
+    result = await templates.refresh(db, SHIRT, provider=provider, actor_id=ACTOR)
+    assert result["ok"] is False
+    detail = result["detail"]
+    assert detail == ("Der Anbieter liefert keine einzige brauchbare Zeile. Druckvorgaben (mockup-styles): keine der 5 "
+                      "Zeilen brauchbar. Häufigster Grund (4 von 5, z. B. front (dtg)): Feld dpi fehlt oder passt nicht "
+                      "(erwartet: ganze Zahl von 72 bis 1200).")
+    assert (await templates.get(db, SHIRT))["last_error"]["detail"] == detail
     from services.shop_fulfillment import FulfillmentPermanent
 
-    fake.print_areas[SHIRT][0]["dpi"] = 0
     with pytest.raises(FulfillmentPermanent) as refused:
-        asyncio.run(provider.print_areas(CatalogProductId(SHIRT)))
-    assert refused.value.reason == "invalid_response"
-    fake.print_areas[SHIRT][0]["dpi"] = 150
-    fake.templates[SHIRT][0]["image_url"] = "http://files.cdn.printful.com/ohne-tls.png"
-    with pytest.raises(FulfillmentPermanent):
-        asyncio.run(provider.mockup_templates(CatalogProductId(SHIRT)))
+        await provider.print_areas(CatalogProductId(SHIRT))
+    assert refused.value.reason == "no_usable_rows"
+
+
+@pytest.mark.asyncio
+async def test_same_reasons_are_counted_once_and_templates_failing_keeps_the_areas(db, provider, fake):
+    fake.off_contract.add(STYLES)
+    for placement in ("sleeve_left", "sleeve_right"):
+        row_of(fake.print_areas[SHIRT], placement)["technique"] = "DTG mit Leerzeichen"
+    fake.fail(404, operation=TEMPLATES)
+    result = await templates.refresh(db, SHIRT, provider=provider, actor_id=ACTOR)
+    stored = result["template"]
+    assert result["ok"] is True and sorted(sizes(stored)) == [("back", "all"), ("front", "all"), ("label_inside", "all")]
+    assert stored["previews"] == []
+    assert stored["skipped"][0] == ("Druckvorgabe sleeve_left (unbekannte Technik): Feld technique fehlt oder passt "
+                                    "nicht (erwartet: Technik-Kennung (a-z, 0-9, -)).")
+    assert stored["skipped"][1].startswith("Druckvorgabe sleeve_right (unbekannte Technik)")
+    assert stored["skipped"][2] == "Vorlagenbilder nicht abrufbar (Beim Anbieter nicht gefunden (404)) - Vorschau ohne Bild."
+    assert no_values(stored["skipped"], "Leerzeichen")
+
+
+@pytest.mark.asyncio
+async def test_a_temporary_template_failure_keeps_the_last_state(db, provider, fake):
+    good = (await templates.refresh(db, SHIRT, provider=provider, actor_id=ACTOR))["template"]
+    fake.fail(503, operation=TEMPLATES, times=10)
+    failed = await templates.refresh(db, SHIRT, provider=provider, actor_id=ACTOR)
+    assert failed["ok"] is False
+    assert (await templates.get(db, SHIRT))["previews"] == good["previews"]
+
+
+def test_the_client_still_refuses_a_response_without_a_list(fake, provider):
+    fake.off_contract.add(STYLES)
+    fake.print_areas[SHIRT] = []
+    assert asyncio.run(provider.print_areas(CatalogProductId(SHIRT))) == ()
 
 
 def test_without_a_chosen_technique_direct_print_comes_first():
