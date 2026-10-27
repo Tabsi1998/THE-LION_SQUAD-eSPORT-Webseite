@@ -202,6 +202,19 @@ async def require_printful_drafts(db) -> None:
                                     "hinterlegtem Schlüssel.")
 
 
+class PrintfulKeyMissing(PrintfulDraftsBlocked):
+    """Kein lesbarer Printful-Schlüssel - auch Aufräumen bei Printful geht dann nicht."""
+
+
+async def require_printful_key(db) -> None:
+    """Nur fürs **Aufräumen von Testentwürfen** (#2062): einen offenen Testentwurf löschen geht auch, wenn der Shop
+    wieder auf „Aus“ steht - sonst bliebe er bei Printful liegen. Dafür reicht ein lesbarer Schlüssel. Alles, was einen
+    Entwurf anlegt, und jede echte Bestellung bleiben bei ``require_printful_drafts`` bzw.
+    ``require_printful_writes``."""
+    if key_state(await load(db)) != "ok":
+        raise PrintfulKeyMissing("Kein lesbarer Printful-Schlüssel hinterlegt.")
+
+
 # ---------------------------------------------------------------- Schreiben (immer mit Grund und Protokoll)
 
 KEY_PRESENT = {"printful_api_key": {"$exists": True, "$nin": ["", None]}}

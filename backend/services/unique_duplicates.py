@@ -63,6 +63,10 @@ MANUAL = {
                         "überzähligen Claim von Hand entfernen (docs/SHOP.md, Printful-Adapter)."
        for index in ("printful_drafts.external_id", "printful_confirmations.order",
                      "printful_confirmations.idempotency_key")},
+    # Testentwürfe an Printful (#2062): das Protokoll belegt, was an Printful ging - nie automatisch löschen.
+    **{f"shop_test_drafts.{index}": "Doppeltes Protokoll eines Testentwurfs - in Printful nachsehen, welcher Entwurf "
+                                    "gilt, und die überzählige Zeile von Hand entfernen (docs/SHOP.md, Testentwurf)."
+       for index in ("id", "external_id")},
 }
 # Index -> Reihenfolge, deren erste Zeile bleibt (sonst die älteste).
 KEEP_ORDER = {

@@ -26,11 +26,14 @@ def test_the_shop_indexes_are_part_of_the_audit_lists_and_known_to_the_checks():
             "shop_gamertag_files.public_id",
             # Druckvorlagen und Druckdateien (#2069)
             "shop_print_templates.printful_product", "shop_print_files.public_id",
-            "shop_print_files.base_version"} == unique
+            "shop_print_files.base_version",
+            # Testentwürfe an Printful (#2062)
+            "shop_test_drafts.id", "shop_test_drafts.external_id"} == unique
     assert unique <= set(unique_duplicates.known_indexes())
-    # Claims belegen, dass etwas an Printful ging: auch sie bereinigt nie das Werkzeug.
+    # Claims und Testentwurf-Protokolle belegen, dass etwas an Printful ging: auch sie bereinigt nie das Werkzeug.
     for index in ("shop_printful_drafts.external_id", "shop_printful_confirmations.order",
-                  "shop_printful_confirmations.idempotency_key"):
+                  "shop_printful_confirmations.idempotency_key", "shop_test_drafts.id",
+                  "shop_test_drafts.external_id"):
         assert index in unique_duplicates.MANUAL
     # Bestellungen, Positionen und Ereignisse sind Nachweise: Dubletten bereinigt nie das Werkzeug.
     for index in ("shop_orders.idempotency_key", "shop_orders.printful_external_id", "shop_order_events.order_event",

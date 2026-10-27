@@ -68,6 +68,8 @@ EXPECTED = {
     # Printful-Adapter (#1705): Claims vor dem Anlegen und Bestätigen.
     "shop_printful_drafts": {"external_id_unique"},
     "shop_printful_confirmations": {"order_unique", "idempotency_key_unique"},
+    # Testentwürfe an Printful (#2062): je Kennung und je external_id ein Protokoll.
+    "shop_test_drafts": {"id_unique", "external_id_unique"},
 }
 
 
