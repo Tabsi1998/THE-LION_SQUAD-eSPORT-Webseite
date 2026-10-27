@@ -225,6 +225,40 @@ test("Farben und Größen wählen zählt die Varianten und schickt Technik, Farb
   expect(screen.getByTestId("shop-variant-PF1")).toHaveTextContent("lieferbar");
 });
 
+test("ohne gespeichertes Angebot lassen sich Farben und Größen wählen (#2091)", async () => {
+  const fresh = view({ product: { offer: null, technique: null }, variants: [] });
+  apiMock.get.mockImplementation((url) => Promise.resolve({ data: url === "/admin/shop/products" ? LIST : fresh }));
+  const user = userEvent.setup();
+  show("/admin/shop/products/p1");
+  await user.click(await screen.findByTestId("shop-step-offer"));
+  expect(screen.getByTestId("shop-offer-count")).toHaveTextContent("0 Varianten");
+  expect(screen.getByTestId("shop-offer-submit")).toHaveAttribute("aria-disabled", "true");
+  await user.click(screen.getByTestId("shop-offer-color-Black"));
+  await user.click(screen.getByTestId("shop-offer-size-M"));
+  expect(screen.getByTestId("shop-offer-color-Black")).toHaveAttribute("aria-pressed", "true");
+  expect(screen.getByTestId("shop-offer-size-M")).toHaveAttribute("aria-pressed", "true");
+  expect(screen.getByTestId("shop-offer-count")).toHaveTextContent("1 Varianten");
+  expect(screen.getByTestId("shop-offer-submit")).toHaveAttribute("aria-disabled", "false");
+});
+
+test("ein gespeichertes Angebot bleibt vorbelegt und übernimmt den neuen Stand nach dem Speichern (#2091)", async () => {
+  const saved = view({ product: { offer: { colors: ["Navy"], sizes: ["XL"] } } });
+  apiMock.put.mockResolvedValue({ data: saved });
+  const user = userEvent.setup();
+  show("/admin/shop/products/p1");
+  await user.click(await screen.findByTestId("shop-step-offer"));
+  expect(screen.getByTestId("shop-offer-color-Black")).toHaveAttribute("aria-pressed", "true");
+  expect(screen.getByTestId("shop-offer-size-M")).toHaveAttribute("aria-pressed", "true");
+  expect(screen.getByTestId("shop-offer-color-Navy")).toHaveAttribute("aria-pressed", "false");
+  await user.click(screen.getByTestId("shop-offer-color-Navy"));
+  expect(screen.getByTestId("shop-offer-color-Navy")).toHaveAttribute("aria-pressed", "true");
+  await user.click(screen.getByTestId("shop-offer-submit"));
+  await waitFor(() => expect(screen.getByTestId("shop-offer-color-Black")).toHaveAttribute("aria-pressed", "false"));
+  expect(screen.getByTestId("shop-offer-color-Navy")).toHaveAttribute("aria-pressed", "true");
+  expect(screen.getByTestId("shop-offer-size-XL")).toHaveAttribute("aria-pressed", "true");
+  expect(screen.getByTestId("shop-offer-count")).toHaveTextContent("1 Varianten");
+});
+
 test("Druckflächen: exakte Größe von Printful, Vorlagenbild, Motiv mit Vorgabe und Größe in cm und Zoll", async () => {
   apiMock.put.mockResolvedValue({ data: view() });
   const user = userEvent.setup();

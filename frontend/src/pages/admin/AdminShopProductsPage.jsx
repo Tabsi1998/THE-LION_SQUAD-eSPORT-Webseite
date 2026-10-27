@@ -341,14 +341,20 @@ function PrintfulStep({ view, busy, run }) {
 
 // ---------------------------------------------------------------- Schritt 2: Farben und Größen
 
+// Der gespeicherte Stand von Schritt 2 als Schlüssel (#2091): ändert er sich (Speichern, Neuladen, anderes
+// Printful-Produkt), beginnt der Schritt neu mit diesen Werten. Ein frisches Objekt je Rendern (Produkt ohne Angebot)
+// darf die Auswahl nicht zurücksetzen - deshalb Text statt Objekt-Identität.
+function offerKey(product) {
+  return JSON.stringify([product.id, product.printful?.product_id ?? null, product.technique ?? null,
+    product.offer?.colors ?? [], product.offer?.sizes ?? []]);
+}
+
 function OfferStep({ view, busy, run }) {
   const { product } = view;
   const printful = product.printful;
-  const offer = product.offer || { colors: [], sizes: [] };
-  const [colors, setColors] = useState(offer.colors);
-  const [sizes, setSizes] = useState(offer.sizes);
+  const [colors, setColors] = useState(() => product.offer?.colors ?? []);
+  const [sizes, setSizes] = useState(() => product.offer?.sizes ?? []);
   const [technique, setTechnique] = useState(product.technique || printful?.default_technique || printful?.techniques?.[0] || "");
-  useEffect(() => { setColors(offer.colors); setSizes(offer.sizes); }, [offer.colors, offer.sizes]);
   if (!printful) return <p className="text-sm text-white/55" data-testid="shop-step-offer">Zuerst in Schritt 1 das Printful-Produkt laden.</p>;
   const toggle = (list, setList, value) => setList(list.includes(value) ? list.filter((item) => item !== value) : [...list, value]);
   const count = printful.variants.filter((row) => colors.includes(row.color) && sizes.includes(row.size)).length;
@@ -615,7 +621,7 @@ function ProductEditor({ productId }) {
           <Section title="Printful-Produkt" icon={ShoppingBag} testId="shop-section-printful"><PrintfulStep view={view} busy={busy} run={run} /></Section>
         </>
       )}
-      {step === "offer" && <Section title="Farben und Größen" testId="shop-section-offer"><OfferStep view={view} busy={busy} run={run} /></Section>}
+      {step === "offer" && <Section title="Farben und Größen" testId="shop-section-offer"><OfferStep key={offerKey(product)} view={view} busy={busy} run={run} /></Section>}
       {step === "designs" && (
         <>
           <Section title="Druckflächen" testId="shop-section-layout"><LayoutStep view={view} busy={busy} run={run} ReasonedButton={ReasonedButton} ChoiceGroup={ChoiceGroup} /></Section>
