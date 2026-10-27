@@ -27,6 +27,11 @@ Ergebnis (``Verdict``): ``drop`` (sicher Spam - still verwerfen, die Antwort sie
 (nur der Inhalt ist verdächtig - annehmen, markieren, keine Mail an den Vorstand) oder ``accept``. Gespeichert wird je
 Ergebnis nur ein Zähler mit Grund und Stunde (``spam_guard_stats``), nie Inhalt, Adresse oder IP.
 
+Echte Menschen gehen nie still verloren: Fehlt beim Kontaktformular das Token (etwa ein Tab mit dem Frontend von vor
+einem Deploy), gilt die Nachricht nur als Verdacht. Bei der Registrierung der Website antworten fehlendes oder
+abgelaufenes Token sichtbar mit 400 (``STALE_PAGE``) - neu laden, noch einmal senden. Gefälschte Token und das
+unsichtbare Feld bleiben still.
+
 Die App schickt (noch) kein Token: Für ``client="app"`` und für die beiden geteilten Adressen ohne Token gelten
 Limits und Inhalt, aber kein Token-Zwang (Übergangsregel). Schickt ein Client ein Token mit, wird es immer geprüft.
 """
@@ -67,6 +72,10 @@ FORM_LABELS = {
 # Kontaktformular. „Passwort vergessen“ und „Bestätigung erneut senden“ teilen sich die Adresse mit der App.
 WEB_ONLY_FORMS = ("contact", "register")
 TURNSTILE_FORMS = WEB_ONLY_FORMS
+# Registrierung der Website: fehlt das Token oder ist es abgelaufen, war die Seite meist zu lange offen (oder stammt
+# von vor einem Deploy). Dann eine sichtbare Meldung statt eines stillen Abbruchs - echte Menschen gehen nie verloren.
+STALE_PAGE_FORMS = ("register",)
+STALE_PAGE = "Die Seite war zu lange offen – bitte neu laden und noch einmal absenden."
 LIMIT_BUCKETS = {"contact": "contact:submit", "forgot_password": "auth:forgot", "resend_verification": "auth:verify-resend"}
 
 HONEYPOT_FIELD = "hp_fax"
@@ -669,7 +678,7 @@ def _vienna_midnight_utc(now: datetime) -> datetime:
 
 
 def _summary(rows: list[dict]) -> dict:
-    out = {"dropped": 0, "suspect": 0, "accepted": 0, "limited": 0, "challenged": 0, "by_reason": {}}
+    out = {"dropped": 0, "suspect": 0, "accepted": 0, "limited": 0, "challenged": 0, "refused": 0, "by_reason": {}}
     for row in rows:
         count = int(row.get("count") or 0)
         outcome = row.get("outcome")
@@ -752,20 +761,29 @@ async def screen(request: Request, form: str, *, token: Any = None, honeypot: An
     if str(honeypot or "").strip():
         return await _drop(db, form, "honeypot")
     token_value = str(token or "")
+    marked: list[str] = []
     if token_value:
         ok, why = verify_token(config, token_value, form)
         if not ok:
+            if why == "expired" and form in STALE_PAGE_FORMS:
+                await record(db, form, "refused", "token_expired")
+                raise HTTPException(400, STALE_PAGE)
             return await _drop(db, form, f"token_{why}")
         if not await _token_use_allowed(db, config, token_value):
             return await _drop(db, form, "token_reused")
+    elif client == "web" and form in STALE_PAGE_FORMS:
+        # Registrierung ohne Token: eher eine alte Seite als ein Bot - sichtbar sagen statt still verwerfen.
+        await record(db, form, "refused", "token_missing")
+        raise HTTPException(400, STALE_PAGE)
     elif client == "web" and form in WEB_ONLY_FORMS:
-        return await _drop(db, form, "token_missing")
+        # Kontakt ohne Token (etwa ein Tab von vor einem Deploy): nie verlieren, nur als Verdacht markieren.
+        marked.append("token_missing")
     # Website heißt: ein gültiges Token ist da. Ohne Token (App, ältere Clients) gibt es kein Turnstile.
     turnstile = turnstile_applies(config, form) if client == "web" and token_value else False
     mode = config["turnstile"]["mode"]
 
     content = score_content(config, fields, email=email)
-    reasons, score = list(content["reasons"]), content["score"]
+    reasons, score = [*marked, *content["reasons"]], content["score"]
     joined = "\n".join(str(value) for value in (fields or {}).values() if isinstance(value, str))
     if joined.strip():
         from services import word_filter
@@ -774,7 +792,7 @@ async def screen(request: Request, form: str, *, token: Any = None, honeypot: An
         if points:
             reasons.append("word_filter")
             score += points
-    forced = False
+    forced = bool(marked)
     if turnstile and mode == "always":
         result = await check_turnstile(db, config, form, turnstile_token)
         if result == "invalid":

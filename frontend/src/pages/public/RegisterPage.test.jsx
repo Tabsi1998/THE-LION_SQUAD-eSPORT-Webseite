@@ -76,6 +76,16 @@ test("Spamschutz (#2067): Token wird geholt und mitgeschickt, das unsichtbare Fe
   })));
 });
 
+test("Spamschutz (#2067): war die Seite zu lange offen, steht die Meldung des Servers sichtbar da", async () => {
+  const stale = "Die Seite war zu lange offen – bitte neu laden und noch einmal absenden.";
+  authState.register.mockResolvedValue({ ok: false, error: stale, cause: { response: { status: 400, data: { detail: stale } } } });
+  const user = userEvent.setup();
+  renderAt("/register");
+  await fillAndSubmit(user);
+  expect(await screen.findByText(stale)).toBeInTheDocument();
+  expect(screen.queryByTestId("where")).toBeNull();
+});
+
 test("ein fremdes Ziel geht nicht mit", async () => {
   const user = userEvent.setup();
   renderAt("/register?next=%2F%2Ffremd.example");

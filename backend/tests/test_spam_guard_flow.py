@@ -96,12 +96,36 @@ async def test_real_person_gets_through_with_mails(flow):
     assert flow.board_hints == ["contact.request"]
 
 
+# ---------------------------------------------------------------- Kontakt: Token fehlt
+
+
+@pytest.mark.asyncio
+async def test_missing_token_is_kept_as_suspect_not_dropped(flow):
+    """Etwa ein Tab mit dem Frontend von vor einem Deploy: die Nachricht geht nie verloren, sie landet als „Spam“
+    in der Inbox - ohne Mails - und „kein Spam“ holt sie ein."""
+    response = await contact(flow, HUMAN)
+    assert response.status_code == 200
+    stored = await flow.db.contact_messages.find_one({"id": response.json()["id"]}, {"_id": 0})
+    assert stored["status"] == "spam" and stored["spam"]["reasons"][0] == "token_missing"
+    assert stored["message"] == HUMAN["message"]
+    assert await flow.db.mail_jobs.count_documents({}) == 0 and flow.board_hints == []
+    flow.act_as(await flow.add_staff())
+    assert (await flow.post(f"/api/contact/{stored['id']}/not-spam")).status_code == 200
+    assert len(await board_mails(flow)) == 1
+
+
+@pytest.mark.asyncio
+async def test_missing_token_with_honeypot_is_still_dropped(flow):
+    response = await contact(flow, HUMAN, **{spam_guard.HONEYPOT_FIELD: "x"})
+    assert response.status_code == 200
+    assert await flow.db.contact_messages.count_documents({}) == 0
+
+
 # ---------------------------------------------------------------- Kontakt: sicher Spam
 
 
 @pytest.mark.parametrize("case,reason", [
     ("honeypot", "honeypot"),
-    ("no_token", "token_missing"),
     ("forged", "token_forged"),
     ("too_fast", "token_too_fast"),
     ("expired", "token_expired"),
@@ -112,8 +136,6 @@ async def test_sure_spam_is_dropped_silently(flow, case, reason):
     fields = form_fields("contact")
     if case == "honeypot":
         fields[spam_guard.HONEYPOT_FIELD] = "+43 512 123456"
-    elif case == "no_token":
-        fields = {}
     elif case == "forged":
         fields[spam_guard.TOKEN_FIELD] = fields[spam_guard.TOKEN_FIELD][:-3] + "abc"
     elif case == "too_fast":
@@ -234,14 +256,34 @@ REGISTRATION = {"username": "neonfalke", "email": "neonfalke@lionsquad-test.at",
 
 @pytest.mark.asyncio
 async def test_web_registration_needs_the_token(flow):
-    dropped = await flow.post("/api/auth/register", json=REGISTRATION)
-    assert dropped.status_code == 200
-    assert dropped.json() == {"verification_required": True, "email": REGISTRATION["email"]}
+    # Fehlt das Token (alte Seite, z. B. offen über einen Deploy), sagt das die Antwort - kein stiller Abbruch.
+    refused = await flow.post("/api/auth/register", json=REGISTRATION)
+    assert refused.status_code == 400
+    assert refused.json()["detail"] == spam_guard.STALE_PAGE
     assert await flow.db.users.count_documents({"email": REGISTRATION["email"]}) == 0
     assert await flow.db.mail_jobs.count_documents({}) == 0
     created = await flow.post("/api/auth/register", json={**REGISTRATION, **form_fields("register")})
     assert created.status_code == 200, created.text
     assert await flow.db.users.count_documents({"email": REGISTRATION["email"]}) == 1
+
+
+@pytest.mark.asyncio
+async def test_web_registration_with_expired_token_asks_to_reload(flow):
+    expired = {**form_fields("register"), spam_guard.TOKEN_FIELD: spam_guard.issue_token("register", now=time.time() - 3 * 3600)}
+    response = await flow.post("/api/auth/register", json={**REGISTRATION, **expired})
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Die Seite war zu lange offen – bitte neu laden und noch einmal absenden."
+    assert await flow.db.users.count_documents({}) == 0
+
+
+@pytest.mark.asyncio
+async def test_web_registration_with_forged_token_is_dropped_silently(flow):
+    fields = form_fields("register")
+    fields[spam_guard.TOKEN_FIELD] = fields[spam_guard.TOKEN_FIELD][:-3] + "abc"
+    response = await flow.post("/api/auth/register", json={**REGISTRATION, **fields})
+    assert response.status_code == 200
+    assert response.json() == {"verification_required": True, "email": REGISTRATION["email"]}
+    assert await flow.db.users.count_documents({}) == 0
 
 
 @pytest.mark.asyncio
