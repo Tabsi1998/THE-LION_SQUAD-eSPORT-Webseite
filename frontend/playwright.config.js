@@ -17,6 +17,8 @@ module.exports = defineConfig({
         ["line"],
         ["html", { open: "never" }],
         ["junit", { outputFile: "test-results/e2e-junit.xml" }],
+        // Dauern je Test: daraus verteilt scripts/e2e-shards.mjs die CI-Teile (e2e/shard-durations.json, #2054).
+        ["json", { outputFile: "test-results/e2e-report.json" }],
       ]
     : "list",
   use: {

@@ -4,6 +4,14 @@ from datetime import datetime
 
 import pytest
 import requests
+import shard_plan
+
+# Parallel mit pytest-xdist (#2054): Jeder Worker ist ein eigener Prozess mit eigener Datenbank im Speicher
+# (mongomock, siehe flow_harness), teilt sich aber das Dateisystem. Darum bekommt jeder Worker einen eigenen
+# Upload-Ordner unter UPLOAD_DIR - gesetzt, bevor ein Test die Anwendung importiert und den Pfad liest.
+_XDIST_WORKER = os.environ.get("PYTEST_XDIST_WORKER")
+if _XDIST_WORKER and os.environ.get("UPLOAD_DIR"):
+    os.environ["UPLOAD_DIR"] = os.path.join(os.environ["UPLOAD_DIR"], _XDIST_WORKER)
 
 LIVE_TEST_FILES = {
     "test_iter20_bug_hunt.py",
@@ -35,6 +43,11 @@ DEMO_EMAIL = os.environ.get("TEST_DEMO_EMAIL", "")
 DEMO_PASSWORD = os.environ.get("TEST_DEMO_PASSWORD", "")
 
 
+def pytest_configure(config):
+    # CI in Teilen (TEST_SHARD=n/gesamt, #2054); ohne die Variable läuft die ganze Suite.
+    shard_plan.configure(config)
+
+
 def pytest_collection_modifyitems(config, items):
     live_enabled = bool(
         os.environ.get("REACT_APP_BACKEND_URL")
@@ -49,6 +62,30 @@ def pytest_collection_modifyitems(config, items):
             item.add_marker(pytest.mark.live)
             if not live_enabled:
                 item.add_marker(skip_live)
+
+
+@pytest.fixture(autouse=True, scope="session")
+def mongodb_answers_fast():
+    """Ohne MongoDB-Server scheitert der echte Client nach einer halben Sekunde statt nach 30 (#2054).
+
+    Die Tests ersetzen die Datenbank (mongomock, Fakes). Ruft Code nebenbei doch ``database.get_db()`` auf, etwa für
+    eine Mitteilung, wartete pymongo bisher 30 Sekunden je Abfrage auf einen Server, den es nicht gibt - der Fehler
+    landete trotzdem nur im Log. Ob das passierte, hing an der Reihenfolge der Tests: ein früherer Test hatte die
+    Datenbank manchmal schon ersetzt. Mit parallelen Prozessen kostete das bis zu einer Minute je Test. Das Ergebnis
+    bleibt dasselbe, nur ohne die Wartezeit. Läufe gegen einen echten Server (Live-Tests) bleiben unberührt.
+    """
+    if os.environ.get("REACT_APP_BACKEND_URL") or not os.environ.get("MONGO_URL"):
+        yield
+        return
+    try:
+        import database
+        from motor.motor_asyncio import AsyncIOMotorClient
+    except ImportError:
+        yield
+        return
+    if database._client is None:
+        database._client = AsyncIOMotorClient(os.environ["MONGO_URL"], serverSelectionTimeoutMS=500)
+    yield
 
 
 # Ein ruhiger Tag ohne Saison: Dienstag, 15. September 2026, zu Mittag (Wien).

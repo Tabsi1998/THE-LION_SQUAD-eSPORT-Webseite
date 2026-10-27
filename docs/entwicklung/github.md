@@ -29,6 +29,43 @@ Alle Workflows laufen fest auf `ubuntu-24.04`, nicht auf `ubuntu-latest` (#1739)
 am 19.10.2026 auf Ubuntu 26 um. Der Umstieg kommt bewusst in einem eigenen PR, wenn Browser-Installation,
 Docker und Playwright dort geprüft sind.
 
+## CI in Teilen: unter 15 Minuten
+
+Die CI soll von Push bis „CI-Ergebnis“ höchstens 15 Minuten brauchen (#2054). Dafür laufen die langen Suiten in
+Teilen auf mehreren Rechnern gleichzeitig – mit denselben Tests und denselben Schwellen wie in einem Job:
+
+| Job | Was |
+| --- | --- |
+| Backend-Prüfungen | Kompilieren, Doku-Links, Shell-Skripte, flake8, pip-audit |
+| Backend-Tests (1/3 … 3/3) | je ein Drittel der Testdateien, darin vier Prozesse (`pytest-xdist`, `--numprocesses=auto`) |
+| Backend-Coverage | prüft, dass jede Testdatei in genau einem Teil lief, legt die Coverage aller Teile zusammen und verlangt wie bisher **35 % über das ganze Backend** |
+| Frontend | Compose- und Nginx-Konfiguration, Routen-Vertrag, Audit, ESLint, Build |
+| Frontend-Unit-Tests (1/2, 2/2) | je die Hälfte der Vitest-Dateien (`--shard`), mit Blob-Bericht samt Coverage |
+| Frontend-Coverage | legt beide Berichte zum Gesamtbericht zusammen (`--merge-reports`), wie vorher aus einem Lauf |
+| Browser-Tests (1/6 … 6/6) | je ein Sechstel der Browser-Tests (Desktop und Handy) |
+
+Verteilt wird nach **gemessener Dauer**, nicht nach Zahl der Tests: die längsten Gruppen zuerst auf den Teil mit
+der wenigsten Arbeit. Eine Gruppe ist im Backend eine Testdatei
+([`shard_plan.py`](../../backend/tests/shard_plan.py), Variable `TEST_SHARD=n/gesamt`), bei den Browser-Tests eine
+Testdatei je Projekt ([`e2e-shards.mjs`](../../frontend/scripts/e2e-shards.mjs)); eine Gruppe bleibt beisammen
+und läuft wie bisher in ihrer Reihenfolge. Jeder Teil rechnet denselben Plan; die Browser-Teile prüfen ihre
+Testliste vorab mit Playwright, der Coverage-Job die Backend-Teile hinterher. Neue Dateien ohne Messwert zählen
+mit der mittleren Dauer je Test.
+
+**Dauern auffrischen**, wenn ein Teil deutlich länger braucht als die anderen – aus den Artefakten eines
+grünen CI-Laufs (sie bleiben sieben Tage):
+
+```bash
+gh run download <lauf-id> -p "backend-test-results-*" -D ci-zeiten/backend
+gh run download <lauf-id> -p "frontend-e2e-timings-*" -D ci-zeiten/browser
+python scripts/test-shards.py durations ci-zeiten/backend/*/backend-junit-*.xml > backend/tests/shard-durations.json
+cd frontend && node scripts/e2e-shards.mjs durations ../ci-zeiten/browser/*/e2e-durations-*.json > e2e/shard-durations.json
+```
+
+Lokal ändert sich nichts: `python -m pytest -m "not live"` und `yarn test:e2e` laufen wie bisher ganz.
+Schneller geht das Backend lokal mit `-n auto` (pytest-xdist); jeder Prozess bekommt dabei einen eigenen
+Upload-Ordner unter `UPLOAD_DIR`, die Datenbank im Speicher (mongomock) hat ohnehin jeder für sich.
+
 ## PR-Titel und Commits
 
 Gemergt wird mit „Squash and merge“: Der PR-Titel wird zur Commit-Nachricht auf `main`, und daraus schreibt
