@@ -676,20 +676,53 @@ async def test_app_registration_has_a_global_limit(flow, monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_suspect_mode_also_asks_a_random_share(flow):
+async def test_suspect_mode_also_asks_a_random_share(flow, monkeypatch):
     await enable_turnstile(flow, mode="suspect")
     spam_guard.TRANSPORT = cloudflare(GOOD)
-    await flow.db.settings.update_one({"id": spam_guard.SETTINGS_ID}, {"$set": {"turnstile.sample_percent": 100}})
+    monkeypatch.setattr(spam_guard, "_sampled", lambda _config: True)
     asked = await contact(flow, HUMAN, **form_fields("contact"))
     assert asked.status_code == 428
-    await flow.db.settings.update_one({"id": spam_guard.SETTINGS_ID}, {"$set": {"turnstile.sample_percent": 0}})
+    monkeypatch.setattr(spam_guard, "_sampled", lambda _config: False)
     assert (await contact(flow, HUMAN, **form_fields("contact"))).status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_after_a_challenge_the_same_contact_is_never_blocked_again(flow, monkeypatch):
+    """Lädt Turnstile nicht (Werbeblocker), kommt dieselbe Anfrage ohne Antwort wieder: dann nicht noch einmal 428,
+    sondern als Verdacht in die Inbox - das Kontaktformular blockiert nie dauerhaft (Codex-Befund)."""
+    await enable_turnstile(flow, mode="suspect")
+    spam_guard.TRANSPORT = cloudflare(GOOD)
+    monkeypatch.setattr(spam_guard, "_sampled", lambda _config: True)
+    fields = form_fields("contact")
+    assert (await contact(flow, HUMAN, **fields)).status_code == 428
+    again = await contact(flow, HUMAN, **fields)
+    assert again.status_code == 200
+    stored = await flow.db.contact_messages.find_one({"id": again.json()["id"]}, {"_id": 0})
+    assert stored["status"] == "spam" and "turnstile_missing" in stored["spam"]["reasons"]
+    assert await flow.db.mail_jobs.count_documents({}) == 0
+
+
+@pytest.mark.asyncio
+async def test_after_a_challenge_registration_says_the_check_did_not_load(flow, monkeypatch):
+    await enable_turnstile(flow, mode="suspect")
+    spam_guard.TRANSPORT = cloudflare({**GOOD, "action": "register"})
+    monkeypatch.setattr(spam_guard, "_sampled", lambda _config: True)
+    fields = form_fields("register")
+    assert (await flow.post("/api/auth/register", json={**REGISTRATION, **fields})).status_code == 428
+    again = await flow.post("/api/auth/register", json={**REGISTRATION, **fields})
+    assert again.status_code == 400
+    assert again.json()["detail"] == spam_guard.TURNSTILE_NOT_LOADED
+    assert await flow.db.users.count_documents({"email": REGISTRATION["email"]}) == 0
+    # Mit Antwort geht es durch.
+    solved = await flow.post("/api/auth/register", json={**REGISTRATION, **fields, "turnstile_token": "cf-token"})
+    assert solved.status_code == 200, solved.text
+    assert await flow.db.users.count_documents({"email": REGISTRATION["email"]}) == 1
 
 
 @pytest.mark.asyncio
 async def test_sample_percent_is_set_with_reason(flow):
     flow.act_as(await flow.add_staff())
-    assert (await flow.put("/api/spam-guard/turnstile", json={"sample_percent": 101, "reason": "mehr prüfen"})).status_code == 400
+    assert (await flow.put("/api/spam-guard/turnstile", json={"sample_percent": 51, "reason": "mehr prüfen"})).status_code == 400
     saved = await flow.put("/api/spam-guard/turnstile", json={"sample_percent": 25, "reason": "mehr prüfen"})
     assert saved.status_code == 200 and saved.json()["turnstile"]["sample_percent"] == 25
 
@@ -726,3 +759,32 @@ async def test_not_spam_can_be_retried_after_a_crash(flow, monkeypatch):
     assert await flow.db.mail_jobs.count_documents({"to": BOT["email"]}) == 1
     assert len(await board_mails(flow)) == 1
     assert (await flow.post(f"/api/contact/{cid}/not-spam")).status_code == 409
+
+
+@pytest.mark.asyncio
+async def test_not_spam_retry_after_the_board_hint_does_not_repeat_it(flow, monkeypatch):
+    """Absturz nach dem Discord-Hinweis, aber vor „released“: der Neuversuch schickt den Hinweis nicht noch einmal."""
+    response = await contact(flow, BOT, **form_fields("contact"))
+    cid = response.json()["id"]
+    flow.act_as(await flow.add_staff())
+    from routes import contact_board_routes
+    from services import discord_announcements
+
+    async def posted_then_crashed(event, text, **_kwargs):
+        # Der Hinweis ist im Kanal - dann bricht der Prozess ab, bevor „released“ geschrieben wird.
+        flow.board_hints.append(event)
+        monkeypatch.setattr(discord_announcements, "notify_board", fine)
+        raise RuntimeError("Absturz nach dem Discord-Hinweis")
+
+    async def fine(event, text, **_kwargs):
+        flow.board_hints.append(event)
+
+    monkeypatch.setattr(discord_announcements, "notify_board", posted_then_crashed)
+    with pytest.raises(RuntimeError):
+        await flow.post(f"/api/contact/{cid}/not-spam")
+    assert flow.board_hints == ["contact.request"]
+    await flow.db.contact_messages.update_one({"id": cid}, {"$set": {"spam.release.started_at": "2000-01-01T00:00:00+00:00"}})
+    assert (await flow.post(f"/api/contact/{cid}/not-spam")).status_code == 200
+    assert flow.board_hints == ["contact.request"]
+    assert len(await board_mails(flow)) == 1
+    assert contact_board_routes.RELEASE_STALE_MINUTES == 5

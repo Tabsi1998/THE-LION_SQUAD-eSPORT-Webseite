@@ -109,7 +109,7 @@ async def submit_contact(body: ContactSubmit, request: Request, me=Depends(get_c
     return {"ok": True, "id": doc["id"]}
 
 
-async def _notify_contact(db, doc: dict) -> None:
+async def _notify_contact(db, doc: dict, *, claim_board_hint: bool = False) -> None:
     """Bestätigung an den Absender, Mail an die Vereinsadresse und Hinweis im Vorstands-Kanal.
 
     Die Mails tragen einen Schlüssel je Nachricht und Mail-Art (``dedupe_key``): ein zweiter Durchlauf - etwa ein
@@ -164,6 +164,14 @@ async def _notify_contact(db, doc: dict) -> None:
             meta={"contact_id": doc["id"]},
             dedupe_key=f"contact:{doc['id']}:admin",
         )
+    # Bei „Kein Spam“ ist der Hinweis per bedingtem Update vorgemerkt - nur wer ihn vormerkt, sendet ihn. Ein
+    # Neuversuch nach einem Absturz schickt ihn so nicht doppelt (lieber einmal zu wenig als doppelt).
+    if claim_board_hint:
+        claimed = await db.contact_messages.update_one(
+            {"id": doc["id"], "spam.release.discord_at": {"$exists": False}},
+            {"$set": {"spam.release.discord_at": now_utc().isoformat()}})
+        if claimed.modified_count != 1:
+            return
     # Vorstands-Kanal (#300): Thema ja, Absender und Text nein - die stehen in der Kontakt-Inbox.
     from services.discord_announcements import notify_board
     await notify_board("contact.request", f"Thema: {TOPIC_LABELS.get(topic, topic)}")
@@ -225,7 +233,8 @@ async def mark_contact_not_spam(cid: str, me: dict = Depends(require_area("club"
         {"id": cid, "status": "spam", "spam.reasons": {"$exists": True},
          "$or": [{"spam.release": {"$exists": False}},
                  {"spam.release.state": "releasing", "spam.release.started_at": {"$lt": stale}}]},
-        {"$set": {"spam.release": {"state": "releasing", "started_at": now.isoformat(), "by": me["id"]}}},
+        # Einzelne Felder statt des ganzen Unterdokuments: eine Vormerkung des Discord-Hinweises bleibt erhalten.
+        {"$set": {"spam.release.state": "releasing", "spam.release.started_at": now.isoformat(), "spam.release.by": me["id"]}},
         return_document=ReturnDocument.AFTER)
     if not doc:
         current = await db.contact_messages.find_one({"id": cid}, {"_id": 0, "status": 1, "spam": 1})
@@ -235,7 +244,7 @@ async def mark_contact_not_spam(cid: str, me: dict = Depends(require_area("club"
             raise HTTPException(423, "Die Freigabe läuft gerade - bitte in ein paar Minuten noch einmal versuchen.")
         raise HTTPException(409, "Diese Nachricht ist nicht als Spam markiert oder wurde schon freigegeben.")
     doc.pop("_id", None)
-    await _notify_contact(db, doc)
+    await _notify_contact(db, doc, claim_board_hint=True)
     done = now_utc().isoformat()
     await db.contact_messages.update_one({"id": cid}, {"$set": {
         "status": "new", "spam.cleared_at": done, "spam.cleared_by": me["id"], "spam.release.state": "released",
