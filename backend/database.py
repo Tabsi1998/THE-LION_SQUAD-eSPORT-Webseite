@@ -271,6 +271,10 @@ async def init_indexes():
     await db.rate_limits.create_index("key")
     await db.rate_limits.create_index("created_at", expireAfterSeconds=86400)
     await db.rate_limits.create_index("expires_at", expireAfterSeconds=0)
+    # Spamschutz (#2067): Zähler je Stunde ohne Inhalt (90 Tage) und benutzte Formular-Token (bis kurz nach Ablauf).
+    await db.spam_guard_stats.create_index("hour")
+    await db.spam_guard_stats.create_index("expires_at", expireAfterSeconds=0)
+    await db.spam_guard_tokens.create_index("expires_at", expireAfterSeconds=0)
     await db.access_links.create_index("id", unique=True)
     await db.access_links.create_index("token_hash", unique=True)
     await db.access_links.create_index([("target_type", 1), ("target_id", 1), ("is_active", 1)])

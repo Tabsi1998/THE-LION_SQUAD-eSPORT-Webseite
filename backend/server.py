@@ -118,6 +118,7 @@ from services import discord_embeds
 from routes.prize_routes import router as prize_router
 from routes.setup_routes import router as setup_router, sitemap_router
 from routes.contact_board_routes import contact_router, board_router
+from routes.spam_guard_routes import router as spam_guard_router
 from routes.sponsoring_routes import router as sponsoring_router
 from routes.search_routes import router as search_router
 from routes.settings_routes import settings_router
@@ -413,6 +414,7 @@ app.include_router(prize_router)
 app.include_router(setup_router)
 app.include_router(sitemap_router)
 app.include_router(contact_router)
+app.include_router(spam_guard_router)  # Spamschutz öffentlicher Formulare (#2067)
 app.include_router(board_router)
 app.include_router(sponsoring_router)
 app.include_router(search_router)
