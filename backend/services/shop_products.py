@@ -29,7 +29,7 @@ import math
 from typing import Any
 
 from models import now_utc
-from services import shop_catalog, shop_catalog_sync, shop_config, shop_designs
+from services import shop_catalog, shop_catalog_sync, shop_config, shop_designs, shop_motifs
 from services.shop_common import ShopConflict, ShopError, clean_reason, record_admin_action
 from services.shop_costs import cost_cents, euro, included_placement, technique_of
 from services.shop_fulfillment import CatalogProductId, FulfillmentError, FulfillmentProvider
@@ -446,11 +446,16 @@ def _item(key: str, label: str, ok: bool, detail: str, *, for_review: bool = Tru
             "for_review": for_review}
 
 
-async def _design_cell(db, design_key: str, specs: dict) -> dict:
+async def _design_cell(db, design_key: str, specs: dict, *, color: str | None = None,
+                       color_hex: str | None = None) -> dict:
     profile = await shop_designs.get_profile(db, design_key)
-    latest = await shop_catalog.latest_design(db, design_key)
+    # Die Fassung für die Shirtfarbe (#2069) - dieselbe, die eine Bestellung einfriert.
+    latest = await shop_motifs.file_for_garment(db, design_key, color=color, color_hex=color_hex)
     cell = {"design_key": design_key, "title": (profile or {}).get("title") or design_key,
-            "version": (latest or {}).get("version"), "level": "missing", "text": "Keine Datei", "public_path": None}
+            "version": (latest or {}).get("version"), "variant": (latest or {}).get("variant") or "dark",
+            "level": "missing", "public_path": None,
+            "text": "Keine Datei" if latest or await shop_catalog.latest_design(db, design_key) is None
+            else "Keine Fassung für helle Shirts - im Reiter Motive eigene Datei hochladen."}
     if not latest:
         return cell
     public = bool(latest.get("public_id")) and not latest.get("public_disabled_at")
@@ -500,13 +505,14 @@ async def run_check(db, product: dict) -> dict:
                        f"{len(product.get('placements') or [])} Platzierungen, davon {len(design_rows)} mit Design."
                        if design_rows else "Mindestens eine Platzierung mit einem Design des Vereins."))
     specs = await shop_designs.placement_specs(db)
+    hexes = {variant.get("color"): variant.get("color_code") for variant, _mapping in offered}
     missing = []
     for row in design_rows:
         cells = {cell["color"]: cell["design_key"] for cell in row.get("designs") or []}
         bad = []
         for color in offer.get("colors") or []:
             key = cells.get(color)
-            cell = await _design_cell(db, key, specs) if key else None
+            cell = await _design_cell(db, key, specs, color=color, color_hex=hexes.get(color)) if key else None
             if not cell or cell["level"] in ("missing", "too_low", "unknown"):
                 bad.append(color)
         if bad:
@@ -640,11 +646,13 @@ async def admin_view(db, product_id: str) -> dict:
     sample = next((mappings.get(variant["id"]) for variant in variants
                    if variant.get("active") and mappings.get(variant["id"])), None) or {}
     suggestions = await design_suggestions(db, product)
+    hexes = {variant.get("color"): variant.get("color_code") for variant in variants if variant.get("color_code")}
     placement_rows = []
     for row in product.get("placements") or []:
         cells = {}
         for cell in row.get("designs") or []:
-            cells[cell["color"]] = await _design_cell(db, cell["design_key"], specs)
+            cells[cell["color"]] = await _design_cell(db, cell["design_key"], specs, color=cell["color"],
+                                                      color_hex=hexes.get(cell["color"]))
         placement_rows.append({
             "key": row["key"], "label": shop_designs.PLACEMENT_LABELS.get(row["key"], row["key"]), "kind": row["kind"],
             "kind_label": KIND_LABELS[row["kind"]], "printful_placement": row["printful_placement"],

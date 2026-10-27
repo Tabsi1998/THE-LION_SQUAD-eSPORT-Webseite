@@ -16,6 +16,7 @@ from pymongo.errors import DuplicateKeyError
 
 from models import new_id
 from services.secret_migration import migrate_plaintext_secrets
+from services.shop_motifs import migrate_motif_variants
 from services.shop_schema import migrate_shop_data_model
 
 logger = logging.getLogger("tls.migrations")
@@ -367,6 +368,9 @@ MIGRATIONS = (
     (12, "reference_kind_templates", migrate_kind_templates),  # #2024: TFT-Vorlage, „Formel 1“ nur für die Rennliga
     # #1703: Shop-Datenmodell; Trockenlauf und Rückweg in services/shop_schema.py bzw. backend/scripts/shop_schema.py
     (13, "shop_data_model", migrate_shop_data_model),
+    # #2069: Designs werden Motive (Fassung für dunkle bzw. helle Shirts); Trockenlauf und Rückweg in
+    # services/shop_motifs.py bzw. backend/scripts/shop_motifs.py
+    (14, "shop_motif_variants", migrate_motif_variants),
 )
 
 

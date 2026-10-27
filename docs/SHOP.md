@@ -8,7 +8,8 @@ unsichtbar**: Es gibt keine Seiten für Mitglieder und nur eine öffentliche Rou
 einem Zufallsschlüssel; im Admin steht er unter Finanzen → Shop. Steuer (#1701) und die Shop-Seiten (#1712 ff.) folgen.
 
 Code: `backend/services/shop_common.py` (Fehler, Anschriften, Protokoll, personenbezogene Felder),
-`shop_catalog.py` (Katalog), `shop_designs.py` (Druckdateien, #1708), `shop_orders.py` (Bestellungen, Ereignisse,
+`shop_catalog.py` (Katalog), `shop_designs.py` (Druckdateien, #1708), `shop_motifs.py` (Motive mit Fassung für dunkle
+und helle Shirts, #2069; SVG über den gemeinsamen Baustein `svg_safe.py`), `shop_orders.py` (Bestellungen, Ereignisse,
 Warenkorb), `shop_schema.py` (Indizes, Migration 13), `backend/routes/shop_admin_routes.py` und
 `shop_design_routes.py` (Adminbereich), `shop_print_file_routes.py` (Druckdateien für Printful),
 `backend/scripts/shop_schema.py` (Werkzeug).
@@ -22,8 +23,8 @@ die Sammlungen direkt. Jede Katalogänderung ist eine Adminaktion mit Person und
 | --- | --- | --- |
 | `shop_products` | Produkt: Slug, Titel, Beschreibung, Stand (`draft` Entwurf, `reviewed` geprüft, `active` veröffentlicht, `archived`), Sichtbarkeit (`hidden` nur intern, `members` nur Mitglieder, `public` öffentlich mit Konto), Personalisierung (`none`, `gamertag`, `member_number`, `both`; daraus `gamertag_allowed`), Grundpreis (ohne Printful, sonst leer) und eigener Aufschlag in Cent (leer = allgemeiner gilt), Steuerprofil (Referenz), ältere Einzel-Druckdatei (`design_key`), `version`; seit #1707 der Aufbau: Printful-Abzug (`printful`), Technik, Angebot (`offer`: Farben, Größen), Platzierungen (`placements`), Fläche im Grundpreis (`included_placement`), Prüfung (`review`), `published_at`, `archived_at` und der Stand des Abgleichs (`catalog_sync`) | `slug` |
 | `shop_variants` | Variante eines Produkts: SKU, Bezeichnung, Größe, Farbe (mit `color_code`), Preis (bei Printful-Produkten der übernommene Selbstkostenpreis), aktiv (= angeboten), Sperre aus dem Abgleich (`blocked_reason`, `blocked_at`), `version` | `sku` |
-| `shop_designs` | Druckdatei des Vereins je Fassung: `design_key`, `version` (zählt hoch), `file_ref`, `sha256`, Druckposition; seit #1708 dazu `public_id` (Zufallsschlüssel der öffentlichen Adresse), Pixel, DPI und Druckmaße in Zoll, mit denen sie geprüft wurde, Transparenz, Ausgangsformat und `public_disabled_at` (Aufbewahrung). Alte Fassungen bleiben | `design_key` + `version`; `public_id` |
-| `shop_design_profiles` | Design (#1708): Titel, Platzierung und die **Shirtfarben**, für die es gilt (`garment_colors`), Notiz, `version` | `design_key` |
+| `shop_designs` | Druckdatei des Vereins je Fassung: `design_key`, `version` (zählt hoch), `file_ref`, `sha256`, Druckposition; seit #1708 dazu `public_id` (Zufallsschlüssel der öffentlichen Adresse), Pixel, DPI und Druckmaße in Zoll, mit denen sie geprüft wurde, Transparenz, Ausgangsformat und `public_disabled_at` (Aufbewahrung); seit #2069 die Fassung (`variant`: `dark` für dunkle, `light` für helle Shirts), Herkunft (`origin`: `upload` oder `auto_light`), bei SVG das bereinigte SVG (`svg_ref`, nie öffentlich), erkannte Farben (`colors`) und `view_box`, bei einer umgefärbten Fassung `derived_from` und `recolor`. Alte Fassungen bleiben | `design_key` + `version`; `public_id` |
+| `shop_design_profiles` | Design bzw. Motiv (#1708, #2069): Titel, Platzierung, feste **Shirtfarben** (`garment_colors`, freiwillig), Notiz, `version`; seit #2069 `light_mode` (`auto` oder `file`), `light_auto` (Stand der automatischen Fassung) und Ausnahmen je Shirtfarbe (`color_variants`) | `design_key` |
 | `shop_gamertag_files` | Gamertag-Druckdatei (#1711): Herkunft `gamertag`, Zweck (`test`, `order`), `sha256`, `file_ref`, `public_id`, Maße, Anker, Farbe, `rules_hash`; bei Bestelldateien Konto, Bestellung und Position (personenbezogen: das PNG zeigt den Namen) - nie der Name als Text | `purpose` + `sha256` (nur Testdateien); `public_id` |
 | `shop_design_colors` | Belegung einer Shirtfarbe je Platzierung durch ein Design (#1708): `placement`, `color_key` (kleingeschrieben), `color`, `design_key` - macht „eine Farbe, ein Design“ atomar | `placement` + `color_key` |
 | `shop_printful_variants` | Zuordnung Variante → Printful-Variante und -Produkt (Anbieter `printful`); seit #1709 Technik, Einkauf (`base_cost_cents`), Aufpreis je Druckfläche (`placement_costs`), Lager (`availability`, `in_stock`), `synced_at` und eine offene Preiswarnung (`price_warning`) | `provider` + `variant_id` |
@@ -86,7 +87,9 @@ Prüfung „Eindeutige Indizes“ unter **Betrieb → Checks** meldet einen fehl
 bereinigt `scripts/unique_index_duplicates.py` nie selbst (Regel `MANUAL`): Bestellungen, Positionen und Ereignisse
 sind Nachweise, der Katalog ist eine Entscheidung der Finanzen. Nur doppelte Warenkörbe räumt es auf (der älteste bleibt).
 
-Migration 13 `shop_data_model` legt die Shop-Indizes einmal an und steht danach in `schema_migrations`.
+Migration 13 `shop_data_model` legt die Shop-Indizes einmal an und steht danach in `schema_migrations`. Migration 14
+`shop_motif_variants` (#2069) macht aus Designs Motive - Trockenlauf und Rückweg im Abschnitt
+[Motive](#motive-2069).
 
 ```bash
 docker compose exec backend python scripts/shop_schema.py                       # Trockenlauf: was fehlt, wie viele Zeilen
@@ -147,7 +150,8 @@ ohne Änderung schreibt nichts.
 | `shop.product.visibility` | Sichtbarkeit |
 | `shop.variant.create`, `shop.variant.update` | Variante angelegt bzw. geändert |
 | `shop.design.add`, `shop.printful_variant.set` | Druckdatei-Fassung (mit Prüfsumme, Pixeln, DPI - nie mit dem Zufallsschlüssel), Printful-Zuordnung |
-| `shop.design.profile` | Design angelegt bzw. Titel, Shirtfarben (vorher/nachher) oder Notiz geändert (#1708) |
+| `shop.design.profile` | Design angelegt bzw. Titel, Shirtfarben (vorher/nachher), Ausnahmen je Shirtfarbe (vorher/nachher, #2069) oder Notiz geändert (#1708) |
+| `shop.design.light`, `shop.motif.settings` | Fassung für helle Shirts auf eigene Datei bzw. zurück auf automatisch; Ersatzfarbe oder Helligkeits-Schwelle, vorher/nachher (#2069) |
 | `shop.design.placement` | Druckbreite, Druckbereich oder Mindest-DPI einer Platzierung, vorher/nachher (#1708) |
 | `shop.product.catalog`, `shop.product.offer` | Printful-Produkt gewählt (vorher/nachher), Farben und Größen angeboten (#1707) |
 | `shop.product.placements`, `shop.product.designs` | Platzierungen mit Position (vorher/nachher), Design je Platzierung und Farbe (#1707) |
@@ -159,7 +163,7 @@ ohne Änderung schreibt nichts.
 | `shop.config` | Einstellungen geändert (#1706): Stufe, Freigabe „Steuer geklärt“, Notschalter, Preise, Printful-Schlüssel – mit vorher und nachher, nie mit Schlüssel |
 
 **Menü:** Verwaltung → Finanzen → **Shop** (`/admin/shop`, #1706) - ein Menüeintrag mit Reitern: **Einstellungen**
-(`/admin/shop`), **Produkte** (`/admin/shop/products`, #1707), **Designs** (`/admin/shop/designs`, #1708) und **Gamertag** (`/admin/shop/gamertag`, #1711). Der
+(`/admin/shop`), **Produkte** (`/admin/shop/products`, #1707), **Motive** (`/admin/shop/designs`, #1708, seit #2069 „Motive“ statt „Designs“) und **Gamertag** (`/admin/shop/gamertag`, #1711). Der
 Testentwurf (#2062) kommt als weiterer Reiter dazu (`frontend/src/pages/admin/ShopTabs.jsx`), ohne das Menü zu
 verlängern.
 
@@ -223,13 +227,15 @@ Abschnitt „Zahlungsbedingungen für den Shop“ (Dolibarr-Zahlungsbedingungen,
 
 Code: `backend/services/shop_designs.py`, Routen `backend/routes/shop_design_routes.py` (Admin) und
 `shop_print_file_routes.py` (öffentlich für Printful), Seite `frontend/src/pages/admin/AdminShopDesignsPage.jsx`
-(Verwaltung → Finanzen → Shop → Reiter **Designs**). Käufer laden nie etwas hoch; Druckdateien kommen nur von den
-Finanzen.
+(Verwaltung → Finanzen → Shop → Reiter **Motive**). Käufer laden nie etwas hoch; Druckdateien kommen nur von den
+Finanzen. Seit #2069 ist ein Design ein **Motiv** mit Fassungen für dunkle und helle Shirts, SVG bevorzugt - Abschnitt
+[Motive](#motive-2069).
 
 **Upload** (nur Finanzen mit Zwei-Faktor, mit Grund, Protokoll `shop.design.add`):
 
-- Nur **PNG oder JPG**, höchstens 50 MB (`SHOP_DESIGN_MAX_MB`) und 40 Millionen Pixel. SVG (auch als `.png`
-  getarnt), WebP, GIF, PDF, animierte PNG und 16-Bit-Graustufen werden mit Text abgelehnt.
+- **PNG oder JPG**, höchstens 50 MB (`SHOP_DESIGN_MAX_MB`) und 40 Millionen Pixel, seit #2069 auch **SVG** (bis 2 MB,
+  streng bereinigt, auch als `.png` getarnt wird es als SVG geprüft). WebP, GIF, PDF, animierte PNG und
+  16-Bit-Graustufen werden mit Text abgelehnt.
 - **Limit am Eingang:** `services/body_limits.py` lehnt die Upload-Route mit 413 ab, sobald `Content-Length` mehr als
   50 MB plus 256 KB Formular sagt - oder beim Mitzählen, wenn die Angabe fehlt -, bevor FastAPI etwas in eine
   Zwischendatei schreibt. nginx begrenzt genau diese Route auf 51 MB (global sind 1700 MB für Videos erlaubt).
@@ -296,17 +302,140 @@ Groß-/Kleinschreibung egal) - etwa `loewe-weiss` für Schwarz und Navy, `loewe-
 Platzierung gehört eine Farbe zu höchstens einem Design (sonst 409) - atomar über `shop_design_colors` mit eindeutigem
 Index, auch bei zwei gleichzeitigen Änderungen. Die Produktverwaltung (#1707) fragt
 `shop_designs.design_for_color(db, platzierung, farbe)` und bekommt Design und neueste Version - oder `None`, dann ist
-die Variante ohne Druckdatei.
+die Variante ohne Druckdatei. **Seit #2069 ist die Liste freiwillig:** die Fassung je Shirtfarbe wählt die Helligkeit
+(Abschnitt [Motive](#motive-2069)); eine Farbe in `garment_colors` druckt wie bisher immer die Hauptdatei.
 
 | Route (alle `require_area("finance")`) | Zweck |
 | --- | --- |
-| `GET /api/admin/shop/designs` | Designs mit Versionen, Ampel, Adressen; Druckbereiche je Platzierung |
-| `POST /api/admin/shop/designs/upload` | Datei hochladen (Formular: `file`, `design_key`, `reason`; neues Design dazu `title`, `placement`, `garment_colors`) |
-| `PATCH /api/admin/shop/designs/{design_key}` | Titel, Shirtfarben, Notiz (mit Grund) |
-| `PUT /api/admin/shop/designs/placements/{placement}` | Druckbreite, Druckbereich, Mindest-DPI in Zoll (mit Grund) |
+| `GET /api/admin/shop/designs` | Motive mit Versionen, Ampel, Adressen, Zustand für helle Shirts; Druckbereiche je Platzierung; Ersatzfarbe und Schwelle |
+| `POST /api/admin/shop/designs/upload` | Datei hochladen (Formular: `file`, `design_key`, `reason`, `variant` `dark`/`light`; neues Motiv dazu `title`, `placement`, freiwillig `garment_colors`) |
+| `PATCH /api/admin/shop/designs/{design_key}` | Titel, feste Shirtfarben, Ausnahmen je Shirtfarbe (`color_variants`), Notiz (Grund optional) |
+| `POST /api/admin/shop/designs/{design_key}/light-auto` | Fassung für helle Shirts zurück auf automatisch bzw. jetzt erzeugen (#2069) |
+| `PUT /api/admin/shop/designs/motif-settings` | Ersatzfarbe `light_ink` und Helligkeits-Schwelle `threshold` (#2069) |
+| `PUT /api/admin/shop/designs/placements/{placement}` | Druckbreite, Druckbereich, Mindest-DPI in Zoll (Grund optional) |
 
 Nicht in #1708: der Editor mit Ebenen, Hilfslinien und Drag-and-drop (Teil 2), die Gamertag-Druckdatei (#1711),
 Mockups (#1710) und das Hochladen zu Printful (#1705).
+
+## Motive (#2069)
+
+Code: `backend/services/svg_safe.py` (gemeinsamer SVG-Baustein, auch für das Branding), `backend/services/shop_motifs.py`
+(Fassungen, Shirtfarbe → Fassung, Upload und Ansicht für den Admin, Schnittstelle für Druckdateien, Migration 14) auf
+den Bausteinen in `shop_designs.py` (Ablage, Prüfung, Versionen), Seite `AdminShopDesignsPage.jsx` (Reiter **Motive**). Ziel des Obmanns (27.10.2026): die
+Vereinslogos als echte Vektor-SVGs einmal hochladen, die Fassung für helle Shirts entsteht automatisch. Mitglieder und
+Benutzer laden weiter nur PNG/JPG (Bild-Uploads ohne SVG, [BETRIEB.md](BETRIEB.md)).
+
+**Ein Motiv, zwei Fassungen.**
+
+- **Für dunkle Shirts** (`variant = "dark"`) ist die Hauptdatei: SVG bevorzugt, PNG/JPG wie bisher.
+- **Für helle Shirts** (`variant = "light"`) gilt die eigene Datei, wenn es eine gibt (`light_mode = "file"`, hat
+  Vorrang), sonst die automatische Fassung (`light_mode = "auto"`, Vorgabe): Weiß (`#ffffff`) wird durch die
+  **Ersatzfarbe** ersetzt (Vorgabe `#111111`, einstellbar), alle anderen Farben - etwa das Vereinsblau `#27aae1` -
+  bleiben. Bei SVG über `svg_safe.recolor`; bei PNG nur, wenn es sauber geht: durchsichtiger Hintergrund und keine
+  Grautöne (sonst der Hinweis „bitte eigene Datei für helle Shirts“). Enthält ein Motiv kein Weiß, gilt die Hauptdatei
+  auch für helle Shirts.
+- Jede Fassung ist eine eigene **Version** (`origin`: `upload` oder `auto_light`, bei automatischen `derived_from`
+  und `recolor`) mit Prüfsumme, Datei und Zufallsadresse wie in #1708; die Nummer zählt über beide Fassungen.
+  `shop_catalog.latest_design` liefert nur die Hauptdatei. Eine neue Hauptdatei oder Ersatzfarbe erzeugt eine neue
+  automatische Fassung; Bestellungen behalten ihre Version. Die Aufbewahrung rechnet je Fassung.
+- Ein SVG wird für die Druckdatei mit der Druckbreite der Platzierung und mindestens 300 DPI (bzw. 120 % der Mindest-DPI)
+  gerastert; das bereinigte SVG liegt daneben (`UPLOAD_DIR/shop-designs/<zufällig>.svg`) und wird **nie** ausgeliefert -
+  die Adresse für Printful liefert nur `*.png`.
+
+**SVG: strenge Bereinigung** (`svg_safe.sanitize`, Vorgabe `strict=True`).
+
+- Gelesen mit `defusedxml`: DOCTYPE, Entities (XXE, „Billion Laughs“) und externe DTDs lehnt der Leser ab.
+- Positivliste der Elemente: `svg`, `g`, `defs`, `symbol`, `title`, `desc`, `path`, `rect`, `circle`, `ellipse`,
+  `line`, `polyline`, `polygon`, `linearGradient`, `radialGradient`, `stop`, `clipPath`, `mask`, `use` (nur `#id`) und
+  `style` (Regel für Regel neu gebaut), dazu die üblichen Darstellungsattribute; Werte werden nach ihrer Art geprüft,
+  `url()` und `href` nur auf `#id`. Unbekanntes Harmloses (Metadaten von Inkscape oder Illustrator) fällt still weg.
+- **Abgelehnt mit Fund** (feste Wörter, nie Text aus der Datei): eingebettetes Pixelbild (`<image>`, „Kein echtes
+  Vektor-SVG – enthält ein Pixelbild.“), Skript (`<script>`, `javascript:`), Ereignis-Attribute (`on…`),
+  eingebettetes HTML (`foreignObject`, `iframe`), Verweise nach außen (`href`, `xml:base`, XInclude,
+  Stylesheet-Anweisung), eingebettete Daten (`data:`), Stylesheet mit `@import`, `@font-face`, `url()` nach außen oder
+  Ausdrücken, und Schrift als Text (für den Druck in Pfade umwandeln - so zeichnet jeder Rechner gleich).
+- Grenzen: 2 MB (`MAX_SVG_UPLOAD_MB`, zu groß: 413), 4000 Elemente (auch über `use` vervielfacht), Tiefe, Masken,
+  Pfadzahlen; Zeichnen in eigenem Prozess mit Zeit- und Speichergrenze ([BETRIEB.md](BETRIEB.md)).
+- Gespeichert wird nur die neu geschriebene Fassung. Das Branding nutzt denselben Baustein **nachsichtig**
+  (`strict=False`: Gefährliches fällt still weg) - bis der Umbau der Logo-Felder (#2073) auf streng umstellt.
+
+**Umfärben, Analyse, Rastern** (`svg_safe`):
+
+- `recolor(svg, {"#ffffff": "#111111"})` ersetzt in `fill`, `stroke`, `stop-color` und `color` - als Attribut, im
+  `style`-Attribut und im `<style>`-Block, nie in Selektoren, Kennungen oder `url(#…)`. `#fff`, `#FFFFFF`, `white` und
+  `rgb(255,255,255)` gelten als dieselbe Farbe; Alpha bleibt.
+- `analyze(svg)`: angenommen ja/nein mit Funden, echtes Vektor-SVG ja/nein, viewBox, Seitenverhältnis, Farben
+  (häufigste zuerst; Formen ohne Füllangabe zeichnet ein SVG schwarz, die stehen nicht in der Liste).
+- `rasterize(svg, width_px=…)` bzw. `height_px=…`, `dpi=…`: PNG in genau dieser Größe, Seitenverhältnis erhalten,
+  Hintergrund durchsichtig, im PNG nur die DPI, ohne Systemschriften; gleiche Eingabe, gleiche Bytes.
+
+**Shirtfarbe → Fassung.** `shop_motifs.variant_for_garment(farbwert, color=…, threshold=…, exceptions=…)` liefert
+`dark` oder `light`: eine **Ausnahme** mit demselben Farbnamen geht vor (am Motiv, `color_variants`, danach die festen
+Shirtfarben `garment_colors` mit der Hauptdatei), sonst die **relative Luminanz** des Printful-Farbwerts
+(`color_code`) gegen die Schwelle (Vorgabe 0,18 - darunter Schwarz, Navy, Rot, Royal; darüber Weiß, Grau meliert,
+Gelb). Ohne Farbwert und ohne Ausnahme gilt die Hauptdatei wie vor #2069. `file_for_garment(db, motiv, color=…,
+color_hex=…)` liefert die Version - die Bestellung (`shop_orders`, mit Platzierungen wie über die ältere
+Einzel-Druckdatei `design_key`) friert genau diese ein, die Vorab-Prüfung der Produktverwaltung prüft genau diese.
+Wurde für ein Motiv noch nie eine Fassung für helle Shirts erzeugt (Designs von vor #2069), druckt es wie bisher die
+Hauptdatei; sonst ist eine Farbe ohne passende Fassung nicht bestellbar.
+
+**Einstellungen** (Dokument `settings` mit `id = "shop_motifs"`, Protokoll `shop.motif.settings` mit
+vorher/nachher): Ersatzfarbe `light_ink` (`#rrggbb`, nicht Weiß) und Schwelle `threshold` (0,02 bis 0,9). Eine neue
+Ersatzfarbe erzeugt die automatischen Fassungen aller Motive neu.
+
+**Schnittstelle für die Druckdateien (Teil B):**
+
+```python
+png = await shop_motifs.render_motif_png(db, "loewe", "light", width_px=1800, dpi=150)          # geltende Fassung
+png = await shop_motifs.render_motif_png(db, "loewe", "light", width_px=1800, dpi=150, version=7)  # eingefroren
+info = await shop_motifs.motif_info(db, "loewe", "light")  # Version, Format, is_vector, Pixel, Seitenverhältnis
+variant = shop_motifs.variant_for_garment("#0c0c0c", color="Black", threshold=..., exceptions=...)
+```
+
+- Transparentes PNG in genau `width_px` Breite, Seitenverhältnis erhalten, im PNG nur `dpi`; deterministisch (gleiche
+  Version und Größe, gleiche Bytes). SVG-Fassungen werden aus dem bereinigten SVG neu gerastert (scharf in jeder
+  Größe), PNG-Fassungen skaliert - wie fein das ist, sagt `motif_info` (Pixel der gespeicherten Datei).
+- `variant`: `dark` oder `light` (eigene Datei, automatische Fassung oder - ohne Weiß - die Hauptdatei).
+- `LookupError`, wenn es die Fassung nicht gibt (etwa „für helle Shirts“ bei einem PNG, das sich nicht umfärben
+  ließ); `ValueError` bei unsinnigen Eingaben (Variante, Breite 1 bis 20000, DPI 1 bis 2400). Asynchron; gerastert
+  wird in einem eigenen Prozess (`svg_raster_worker.py`).
+
+**Admin, Reiter Motive.** Je Motiv nebeneinander die Vorschau auf dunklem Shirt (Schwarz) und hellem Shirt (Hellgrau),
+dazu Format („echtes Vektor-SVG“ oder PNG/JPG), erkannte Farben, Maße, Ampel, Zustand für helle Shirts (eigene Datei,
+automatisch, Hauptdatei, fehlt, noch nicht erzeugt) und der Versionsverlauf mit Fassung und Herkunft. Upload per Ziehen
+und Loslassen oder Klicken, mit Wahl der Fassung; ein abgelehntes SVG zeigt am Formular, was gefunden wurde. Knöpfe
+„Eigene Datei für helle Shirts“, „Hell-Variante erzeugen“ bzw. „Zurück auf automatisch“, Ausnahmen je Shirtfarbe und
+die Einstellungen mit Beispiel-Shirtfarben. Der Grund ist überall optional.
+
+**Migration 14 `shop_motif_variants`** (läuft beim Start einmal; seit #2065 können in Produktion Designs liegen):
+
+- Zuerst bekommen Designs „Hell-Variante automatisch“, und die bisherigen festen Zuordnungen - die Farbliste eines
+  Designs und jede Zelle „Farbe → Design“ in den Produkten - werden **Ausnahmen „Hauptdatei“**: jede bisher zugeordnete
+  Farbe druckt weiter die Datei, die sie hatte, auch eine helle Farbe. Erst danach werden Fassungen ohne Variante „für
+  dunkle Shirts“. Vor und während der Migration druckt ein Design ohne erzeugte Hell-Fassung ohnehin die Hauptdatei -
+  eine Bestellung im Zwischenstand scheitert nicht.
+- Übernommen wird jede Zuordnung, **nie gekappt**. Im Admin sind je Motiv bis zu 200 Ausnahmen speicherbar (ein Produkt
+  hat höchstens 80 Varianten); hat ein Motiv aus mehreren Produkten mehr, nennt der Trockenlauf es mit „ACHTUNG“.
+- Neue automatische Fassungen entstehen nicht von selbst; „Hell-Variante erzeugen“ am Motiv.
+- Mehrfach aufrufbar. Werkzeug mit Trockenlauf und Rückweg:
+
+```bash
+docker compose exec backend python scripts/shop_motifs.py                       # Trockenlauf: was sich ändert
+docker compose exec backend python scripts/shop_motifs.py --anwenden            # anwenden (wie der Start)
+docker compose exec backend python scripts/shop_motifs.py --abbauen             # Rückweg ansehen
+docker compose exec backend python scripts/shop_motifs.py --abbauen --anwenden  # Rückweg ausführen
+```
+
+Der Rückweg entfernt Varianten, Einstellungen und Ausnahmen und trägt Migration 14 aus - nur, solange es **keine
+Fassung für helle Shirts** gibt (die ältere Version würde sie als neueste Hauptdatei nehmen); sonst verweigert er
+(Rückgabe 1). Farblisten und Dateien bleiben. Danach die ältere Version einspielen; sonst wendet der nächste Start die
+Migration wieder an.
+
+**Rechte:** wie alle Shop-Routen nur Finanzen mit Zwei-Faktor (Regel 3); das Branding bleibt bei seinen Rechten.
+
+Offen für Teil B: Druckvorlagen je Produkt aus der Printful-API, Positions-Vorgaben und der Generator, der
+`render_motif_png` in die Druckfläche setzt (dann wählt die Produktverwaltung je Platzierung nur noch das Motiv).
+Offen für #2073: die Logo-Felder des Brandings auf `svg_safe` streng umstellen und die Hell-Variante dort nutzen.
 
 ## Produktverwaltung und Katalogabgleich (#1707, #1709)
 

@@ -1,11 +1,12 @@
 import { NavLink } from "react-router-dom";
 
 // Reiter des Shops unter Verwaltung → Finanzen → Shop (#1708): ein Menüeintrag, darin Einstellungen, Produkte (#1707)
-// und Designs. Weitere Reiter (Testentwurf #2062) kommen hier dazu, ohne das Menü zu verlängern.
+// und Motive (#2069, vorher „Designs“; die Adresse bleibt). Weitere Reiter (Testentwurf #2062) kommen hier dazu, ohne
+// das Menü zu verlängern.
 const TABS = [
   { to: "/admin/shop", label: "Einstellungen", end: true },
   { to: "/admin/shop/products", label: "Produkte" },
-  { to: "/admin/shop/designs", label: "Designs" },
+  { to: "/admin/shop/designs", label: "Motive" },
   { to: "/admin/shop/gamertag", label: "Gamertag" },
 ];
 

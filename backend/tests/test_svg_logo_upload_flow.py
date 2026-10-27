@@ -20,7 +20,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 
 from flow_harness import make_flow  # noqa: E402
 from routes import phase_fg_routes, upload_routes  # noqa: E402
-from services import account_erasure, image_upload, image_variants, media_scan, svg_logo  # noqa: E402
+from services import account_erasure, image_upload, image_variants, media_scan, svg_logo, svg_safe  # noqa: E402
 
 LOGO = (b'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 200" onload="alert(1)">'
         b'<script>alert(2)</script><rect x="100" y="50" width="200" height="100" fill="#29B6E8"/></svg>')
@@ -259,7 +259,7 @@ async def test_an_svg_address_is_refused_outside_logo_fields(flow):
 @pytest.mark.asyncio
 async def test_too_expensive_svg_gets_422_and_svg_uploads_are_limited_per_account(flow, monkeypatch):
     await admin(flow)
-    monkeypatch.setattr(svg_logo, "RASTER_TIMEOUT_SECONDS", 1.5)
+    monkeypatch.setattr(svg_safe, "RASTER_TIMEOUT_SECONDS", 1.5)
     heavy = ('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1000">'
              + "".join(f'<rect width="1000" height="1000" fill="#{i % 9}{i % 7}{i % 5}" opacity="0.5"/>'
                        for i in range(3900)) + "</svg>").encode()

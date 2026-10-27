@@ -14,7 +14,7 @@ import pytest  # noqa: E402
 import resvg_py  # noqa: E402
 from PIL import Image, ImageChops, ImageStat  # noqa: E402
 
-from services import svg_logo  # noqa: E402
+from services import svg_logo, svg_safe  # noqa: E402
 
 NS = 'xmlns="http://www.w3.org/2000/svg"'
 XLINK = 'xmlns:xlink="http://www.w3.org/1999/xlink"'
@@ -145,7 +145,7 @@ def test_doctype_entities_and_external_dtds_are_refused():
 
 def test_too_big_too_many_elements_too_deep_or_not_svg_is_refused():
     huge = svg("<!--" + "x" * svg_logo.MAX_SVG_BYTES + "-->" + RECT)
-    assert "1 MB" in rejected(huge)
+    assert f"{svg_logo.MAX_SVG_UPLOAD_MB} MB" in rejected(huge)
     many = svg(RECT * (svg_logo.MAX_ELEMENTS + 1))
     assert "Elemente" in rejected(many)
     deep = svg("<g>" * (svg_logo.MAX_DEPTH + 2) + RECT + "</g>" * (svg_logo.MAX_DEPTH + 2))
@@ -429,7 +429,7 @@ EXPENSIVE = svg("".join(f'<rect width="1000" height="1000" fill="#{i % 9}{i % 7}
 
 
 def test_an_expensive_drawing_is_stopped_by_the_time_limit(monkeypatch):
-    monkeypatch.setattr(svg_logo, "RASTER_TIMEOUT_SECONDS", 1.5)
+    monkeypatch.setattr(svg_safe, "RASTER_TIMEOUT_SECONDS", 1.5)
     started = time.perf_counter()
     assert "aufwendig" in rejected_drawing(EXPENSIVE)
     assert time.perf_counter() - started < 5
@@ -440,13 +440,13 @@ def test_an_expensive_drawing_is_stopped_by_the_time_limit(monkeypatch):
 
 def test_one_drawing_per_upload(monkeypatch):
     calls = []
-    original = svg_logo._render
+    original = svg_safe._render
 
-    def counting(data, width):
+    def counting(data, width, **kwargs):
         calls.append(width)
-        return original(data, width)
+        return original(data, width, **kwargs)
 
-    monkeypatch.setattr(svg_logo, "_render", counting)
+    monkeypatch.setattr(svg_safe, "_render", counting)
     padded = svg('<rect x="400" y="300" width="200" height="100"/>', attrs='viewBox="0 0 1000 1000"')
     svg_logo.prepare(padded, trim=True)
     assert calls == [svg_logo.RASTER_PX]
@@ -455,8 +455,8 @@ def test_one_drawing_per_upload(monkeypatch):
 def test_busy_when_every_drawing_slot_is_taken(monkeypatch):
     slots = threading.BoundedSemaphore(1)
     slots.acquire()
-    monkeypatch.setattr(svg_logo, "_RASTER_SLOTS", slots)
-    monkeypatch.setattr(svg_logo, "RASTER_WAIT_SECONDS", 0.05)
+    monkeypatch.setattr(svg_safe, "_RASTER_SLOTS", slots)
+    monkeypatch.setattr(svg_safe, "RASTER_WAIT_SECONDS", 0.05)
     assert "gleich noch einmal" in rejected_drawing(svg(RECT))
 
 

@@ -70,7 +70,7 @@ function fileLooksSupported(file, logo = false) {
 // derselbe Wortlaut wie am Server.
 export const SVG_REFUSED_MESSAGE = "SVG-Dateien gehen hier nicht. Bitte als PNG mit durchsichtigem Hintergrund (z. B. 2000 px breit) oder als WebP exportieren – die Website macht daraus alle Größen.";
 export const LOGO_HINT = "Am besten SVG, sonst PNG mit durchsichtigem Hintergrund.";
-const SVG_MAX_MB = parseUploadMb(import.meta.env.VITE_MAX_SVG_UPLOAD_MB, 1);
+const SVG_MAX_MB = parseUploadMb(import.meta.env.VITE_MAX_SVG_UPLOAD_MB, 2); // wie MAX_SVG_UPLOAD_MB im Backend (services/svg_safe.py)
 // Derselbe Wortlaut wie am Server (services/svg_logo.py) - ein zu großes SVG geht gar nicht erst los.
 const SVG_TOO_BIG_MESSAGE = `Das SVG ist zu groß (höchstens ${SVG_MAX_MB} MB). Bitte schlanker exportieren oder als PNG hochladen.`;
 
