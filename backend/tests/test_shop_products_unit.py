@@ -707,3 +707,26 @@ async def test_a_sales_price_needs_the_minimum_price(db, provider):
     view = await shop_products.admin_view(db, product["id"])
     prices = check_item(view, "prices")
     assert prices["ok"] is False and "Mindestpreis" in prices["detail"]
+
+
+# ---------------------------------------------------------------- Grund optional (Entscheidung Obmann 27.10.2026)
+
+@pytest.mark.asyncio
+async def test_without_a_reason_everything_works_except_publishing(db, provider, monkeypatch):
+    async def mockups_ok(_db, _product):
+        return {"ok": True, "state": "passed", "detail": "Test: Mockups geprüft"}
+
+    monkeypatch.setattr(shop_products, "mockup_check", mockups_ok)
+    product = await configured(db, provider)
+    nothing = {"actor_id": ACTOR, "reason": None}
+    await shop_products.set_placements(db, product["id"], PLACEMENTS, included_placement="front", **nothing)
+    await shop_products.set_status(db, product["id"], "reviewed", **nothing)
+    await shop_catalog_sync.sync_product(db, product["id"], provider=provider, **nothing)
+    for blank in (None, "", "  ", "ok"):
+        with pytest.raises(ShopError, match="Grund"):
+            await shop_products.set_status(db, product["id"], "active", actor_id=ACTOR, reason=blank)
+    published = await shop_products.set_status(db, product["id"], "active", actor_id=ACTOR, reason="Geht live")
+    assert published["status"] == "active"
+    await shop_products.set_status(db, product["id"], "draft", **nothing)
+    rows = await db.audit_logs.find({"action": "shop.product.status"}, {"_id": 0}).to_list(10)
+    assert [row["data"]["reason"] for row in rows] == ["", "Geht live", ""]

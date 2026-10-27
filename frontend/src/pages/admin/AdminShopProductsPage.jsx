@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
 import {
@@ -12,7 +12,8 @@ import ShopTabs from "./ShopTabs";
 
 // Produktverwaltung (#1707) mit Katalogabgleich (#1709) - Verwaltung → Finanzen → Shop → Produkte. Geführt in fünf
 // Schritten: Produkt wählen, Farben und Größen, Designs je Platzierung, Preise, Prüfen und veröffentlichen. Jede Änderung
-// braucht einen Grund (Protokoll). Was erlaubt ist, entscheidet der Server - die Seite zeigt seine Prüfung und seine
+// steht mit Person und Zeit im Protokoll; der Grund ist optional, nur beim Veröffentlichen Pflicht (Entscheidung Obmann
+// 27.10.2026). Was erlaubt ist, entscheidet der Server - die Seite zeigt seine Prüfung und seine
 // Texte. Maße immer in Zoll und cm; Printful rechnet in Zoll.
 
 const BASE = "/admin/shop/products";
@@ -83,25 +84,45 @@ function Field({ label, hint, children }) {
   );
 }
 
-// Grund und Knopf gehören zusammen: ohne Grund (mind. 3 Zeichen) bleibt der Knopf gesperrt.
-function ReasonedButton({ id, label, busy, disabled, onSubmit, variant = "primary", hint }) {
+const REASON_HINT = "Bitte kurz einen Grund angeben – er kommt ins Protokoll.";
+
+// Grund und Knopf gehören zusammen - wie `ReasonedButton` in AdminShopPage.jsx (#2072). Der Grund ist optional
+// (Entscheidung Obmann 27.10.2026); Pflicht (`required`) nur beim Veröffentlichen, weil es dann live geht. Der Knopf
+// bleibt klickbar und sagt, was fehlt (`blockedHint`), statt still nichts zu tun.
+function ReasonedButton({ id, label, busy, disabled, blockedHint, onSubmit, required = false, variant = "primary", hint }) {
   const [reason, setReason] = useState("");
-  const ready = reason.trim().length >= 3 && !disabled && !busy;
+  const [message, setMessage] = useState("");
+  const input = useRef(null);
+  const complete = (!required || reason.trim().length >= 3) && !disabled;
   return (
-    <form className="space-y-1" data-testid={`${id}-form`} onSubmit={async (event) => {
+    <form className="space-y-1" data-testid={`${id}-form`} noValidate onSubmit={async (event) => {
       event.preventDefault();
-      if (!ready) return;
+      if (busy) return;
+      if (disabled) {
+        setMessage(blockedHint || "Oben fehlt noch etwas.");
+        return;
+      }
+      if (required && reason.trim().length < 3) {
+        setMessage(REASON_HINT);
+        input.current?.focus();
+        return;
+      }
+      setMessage("");
       if (await onSubmit(reason.trim())) setReason("");
     }}>
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-        <label className="sr-only" htmlFor={`${id}-reason`}>Grund</label>
-        <input id={`${id}-reason`} value={reason} onChange={(event) => setReason(event.target.value)} maxLength={500}
-          placeholder="Grund (kommt ins Protokoll)" disabled={busy} className={`${INPUT} mt-0 flex-1`} data-testid={`${id}-reason`} />
-        <button type="submit" disabled={!ready} data-testid={`${id}-submit`}
-          className={`tls-btn tls-btn--${variant} min-h-10 px-4 text-xs font-bold uppercase tracking-wider rounded-sm disabled:opacity-40 whitespace-nowrap`}>
+        <label className="sr-only" htmlFor={`${id}-reason`}>{required ? "Grund (Pflicht)" : "Grund (optional)"}</label>
+        <input id={`${id}-reason`} ref={input} value={reason} maxLength={500} required={required} aria-required={required ? "true" : undefined}
+          aria-invalid={message === REASON_HINT ? "true" : undefined} aria-describedby={message ? `${id}-hint` : undefined}
+          onChange={(event) => { setReason(event.target.value); if (message) setMessage(""); }}
+          placeholder={required ? "Grund (Pflicht, kommt ins Protokoll)" : "Grund (optional, kommt ins Protokoll)"} disabled={busy}
+          className={`${INPUT} mt-0 flex-1 ${message === REASON_HINT ? "border-warn" : ""}`} data-testid={`${id}-reason`} />
+        <button type="submit" disabled={!!busy} aria-disabled={!complete} data-testid={`${id}-submit`}
+          className={`tls-btn tls-btn--${variant} min-h-10 px-4 text-xs font-bold uppercase tracking-wider rounded-sm whitespace-nowrap transition-opacity ${complete ? "" : "opacity-60"}`}>
           {busy ? "Läuft …" : label}
         </button>
       </div>
+      {message ? <p id={`${id}-hint`} role="alert" className="text-xs text-warn" data-testid={`${id}-hint`}>{message}</p> : null}
       {hint && <p className="text-xs text-white/50">{hint}</p>}
     </form>
   );
@@ -178,7 +199,7 @@ function NewProductForm({ labels, onCreated }) {
           options={["none", "gamertag", "member_number", "both"].map((key) => ({ value: key, label: labels.personalizations[key] }))} />
         {isPublic && <p className="text-xs text-white/50" data-testid="shop-new-public-hint">Öffentliche Produkte haben keine Personalisierung.</p>}
       </div>
-      <ReasonedButton id="shop-new" label="Produkt anlegen" busy={busy} disabled={!title.trim()} onSubmit={async (reason) => {
+      <ReasonedButton id="shop-new" label="Produkt anlegen" busy={busy} disabled={!title.trim()} blockedHint="Bitte zuerst einen Titel eingeben." onSubmit={async (reason) => {
         setBusy(true);
         try {
           const { data } = await api.post(BASE, { title: title.trim(), visibility, personalization, reason });
@@ -283,6 +304,7 @@ function BasicsForm({ view, busy, run }) {
       </div>
       {conflict && <p className="text-xs text-warn" data-testid="shop-basics-conflict">Öffentlich und Personalisierung schließen sich aus – der Server lehnt das ab.</p>}
       <ReasonedButton id="shop-basics" label="Grunddaten speichern" busy={busy === "basics"} disabled={!Object.keys(changes).length || !title.trim()}
+        blockedHint={!title.trim() ? "Der Titel darf nicht leer sein." : "Noch nichts geändert."}
         onSubmit={(reason) => run("basics", () => api.patch(`${BASE}/${product.id}`, { ...changes, reason }), "Grunddaten gespeichert.", { reload: true })} />
     </div>
   );
@@ -299,6 +321,7 @@ function PrintfulStep({ view, busy, run }) {
         <input value={numberText} onChange={(event) => setNumberText(event.target.value.replace(/[^\d]/g, ""))} inputMode="numeric" maxLength={8} className={`${INPUT} tabular-nums max-w-xs`} data-testid="shop-printful-number" />
       </Field>
       <ReasonedButton id="shop-printful" label={printful ? "Neu laden" : "Bei Printful laden"} busy={busy === "printful"} disabled={!parsed || !view.editable}
+        blockedHint={!view.editable ? "Erst zurückziehen (Schritt 5), dann das Printful-Produkt ändern." : "Bitte die Printful-Produktnummer eingeben (nur Ziffern)."}
         hint={printful && parsed && parsed !== printful.product_id ? "Ein anderes Printful-Produkt setzt Farben und Größen zurück." : null}
         onSubmit={(reason) => run("printful", () => api.post(`${BASE}/${product.id}/printful`, { printful_product_id: parsed, reason }), "Printful-Produkt geladen.")} />
       {printful && (
@@ -368,6 +391,7 @@ function OfferStep({ view, busy, run }) {
         {count} Varianten{tooMany ? ` – höchstens ${view.limits.max_variants}` : ""}. Einkaufspreise holt die Website nur für diese – je Variante ein Aufruf bei Printful (höchstens 120 pro Minute).
       </p>
       <ReasonedButton id="shop-offer" label="Speichern und Preise laden" busy={busy === "offer"} disabled={!count || tooMany || !technique || !view.editable}
+        blockedHint={!view.editable ? "Erst zurückziehen (Schritt 5), dann das Angebot ändern." : tooMany ? `Höchstens ${view.limits.max_variants} Varianten - bitte weniger Farben oder Größen.` : "Bitte mindestens eine Farbe und eine Größe wählen."}
         onSubmit={(reason) => run("offer", () => api.put(`${BASE}/${product.id}/offer`, { technique, colors, sizes, reason }), "Farben und Größen gespeichert, Preise geladen.")} />
       {offered.length > 0 && (
         <div className="overflow-x-auto">
@@ -468,6 +492,7 @@ function PlacementsForm({ view, busy, run }) {
         </div>
       )}
       <ReasonedButton id="shop-placements" label="Platzierungen speichern" busy={busy === "placements"} disabled={!valid || !view.editable}
+        blockedHint={!view.editable ? "Erst zurückziehen (Schritt 5), dann die Platzierungen ändern." : "Mindestens eine Platzierung wählen; Positionen als Zahlen in Zoll."}
         onSubmit={(reason) => run("placements", () => api.put(`${BASE}/${product.id}/placements`, { placements: payload, included_placement: includedValue, reason }), "Platzierungen gespeichert.")} />
     </div>
   );
@@ -541,6 +566,7 @@ function DesignMatrix({ view, busy, run }) {
         </p>
       )}
       <ReasonedButton id="shop-designs" label="Designs speichern" busy={busy === "designs"} disabled={!changes.length || !view.editable}
+        blockedHint={!view.editable ? "Erst zurückziehen (Schritt 5), dann die Designs ändern." : "Noch keine Zuordnung geändert."}
         onSubmit={(reason) => run("designs", () => api.put(`${BASE}/${product.id}/designs`, { assignments: changes, reason }), "Designs gespeichert.")} />
     </div>
   );
@@ -567,6 +593,7 @@ function MarkupForm({ view, busy, run }) {
       )}
       {!view.editable && <p className="text-xs text-white/50" data-testid="shop-markup-locked">Veröffentlicht oder archiviert: den Aufschlag erst nach dem Zurückziehen ändern.</p>}
       <ReasonedButton id="shop-markup" label="Aufschlag speichern" busy={busy === "markup"} disabled={!valid || !changed || !view.editable}
+        blockedHint={!view.editable ? "Erst zurückziehen (Schritt 5), dann den Aufschlag ändern." : !valid ? "Betrag in Euro bis 100 €, z. B. 2,50." : "Noch nichts geändert."}
         onSubmit={(reason) => run("markup", () => api.patch(`${BASE}/${product.id}`, { markup_cents: cents, reason }), "Aufschlag gespeichert.", { reload: true })} />
     </div>
   );
@@ -607,7 +634,7 @@ function PricesStep({ view, busy, run }) {
           </tbody>
         </table>
       </div>
-      <ReasonedButton id="shop-prices" label="Preise übernehmen" busy={busy === "prices"} disabled={view.product.status === "archived"}
+      <ReasonedButton id="shop-prices" label="Preise übernehmen" busy={busy === "prices"} disabled={view.product.status === "archived"} blockedHint="Archiviert: erst wieder als Entwurf öffnen."
         hint="Übernimmt die Selbstkosten als Mitgliederpreis und beendet Preiswarnungen."
         onSubmit={(reason) => run("prices", () => api.post(`${BASE}/${view.product.id}/prices/accept`, { reason }), "Preise übernommen.")} />
       <MarkupForm key={`${view.pricing.source}-${view.pricing.product_markup_cents}`} view={view} busy={busy} run={run} />
@@ -644,7 +671,9 @@ function PublishStep({ view, busy, run }) {
           return (
             <div key={status} data-testid={`shop-status-${status}`}>
               <ReasonedButton id={`shop-status-${status}`} label={label} variant={action.variant} busy={busy === `status-${status}`} disabled={blocked}
-                hint={blocked ? (status === "active" ? "Erst wenn alle Punkte bestanden sind – auch die Mockup-Prüfung (#1710)." : "Erst wenn alle Punkte außer den Mockups bestanden sind.") : null}
+                required={status === "active"}
+                blockedHint={status === "active" ? "Noch nicht veröffentlichbar: erst wenn alle Punkte bestanden sind – auch die Mockup-Prüfung (#1710)." : "Noch nicht geprüft: erst wenn alle Punkte außer den Mockups bestanden sind."}
+                hint={blocked ? (status === "active" ? "Erst wenn alle Punkte bestanden sind – auch die Mockup-Prüfung (#1710)." : "Erst wenn alle Punkte außer den Mockups bestanden sind.") : status === "active" ? "Veröffentlichen geht live – dafür ist der Grund Pflicht." : null}
                 onSubmit={(reason) => run(`status-${status}`, () => api.post(`${BASE}/${product.id}/status`, { status, reason }), `Stand: ${view.labels.statuses[status]}.`)} />
             </div>
           );

@@ -88,8 +88,9 @@ Anschrift (docs/SHOP.md).
 | Printful-Verbindung testen (nur lesen) | – | – | – | ja | ja | ja |
 | Designs und Druckbereiche lesen (#1708) | – | – | – | ja | ja | ja |
 | Druckdatei hochladen, Shirtfarben, Druckbereich ändern (#1708) | – | – | – | ja, mit Grund | ja, mit Grund | ja, mit Grund |
-| Produkt aufbauen: Printful-Produkt, Farben und Größen, Platzierungen, Designs, Preise übernehmen (#1707) | – | – | – | ja, mit Grund | ja, mit Grund | ja, mit Grund |
-| Prüfen, veröffentlichen (nur nach bestandener Prüfung), zurückziehen, archivieren (#1707) | – | – | – | ja, mit Grund | ja, mit Grund | ja, mit Grund |
+| Produkt aufbauen: Printful-Produkt, Farben und Größen, Platzierungen, Designs, Preise übernehmen (#1707) | – | – | – | ja | ja | ja |
+| Prüfen, zurückziehen, archivieren (#1707) | – | – | – | ja | ja | ja |
+| Veröffentlichen (nur nach bestandener Prüfung, #1707) | – | – | – | ja, mit Grund | ja, mit Grund | ja, mit Grund |
 | Mit Printful abgleichen (#1709) | – | – | – | ja | ja | ja |
 | ohne bestätigte Zwei-Faktor-Anmeldung | – | – | – | – | – | – |
 

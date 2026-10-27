@@ -183,10 +183,13 @@ ADMIN_ACTIONS: dict[str, str] = {
 MAX_REASON = 500
 
 
-def clean_reason(reason: Any) -> str:
-    """Der Grund einer Adminaktion: Pflicht, eine Zeile, Mail-Adressen gekürzt."""
+def clean_reason(reason: Any, *, required: bool = True) -> str:
+    """Der Grund einer Adminaktion: eine Zeile, Mail-Adressen gekürzt. Optional mit ``required=False`` - wer, wann und
+    was steht ohnehin im Protokoll (Entscheidung Obmann 27.10.2026). Pflicht nur bei kritischen Schritten (Steuer
+    freigeben, „Öffentlich“, Notschalter einschalten, Schlüssel entfernen, Produkt veröffentlichen). Die Vorgabe hier
+    bleibt bis #2072 „Pflicht“; #2072 stellt sie auf optional - Aufrufer der Produktverwaltung sagen es ausdrücklich."""
     text = log_safe(mask_addresses(" ".join(str(reason or "").split())), MAX_REASON)
-    if len(text) < 3:
+    if required and len(text) < 3:
         raise ShopError("Bitte einen Grund angeben.")
     return text
 
@@ -200,6 +203,7 @@ async def record_admin_action(db, action: str, *, actor_id: str, target_id: str,
     payload = dict(data or {})
     assert_no_address(payload, where="Protokoll")
     entry = {"id": new_id(), "action": action, "actor_id": actor_id, "target_id": target_id,
-             "data": {**payload, "reason": clean_reason(reason)}, "created_at": now_utc().isoformat()}
+             # Ob ein Grund Pflicht ist, prüft der Schritt selbst; das Protokoll nimmt auch einen leeren.
+             "data": {**payload, "reason": clean_reason(reason, required=False)}, "created_at": now_utc().isoformat()}
     await db.audit_logs.insert_one(dict(entry))
     return entry

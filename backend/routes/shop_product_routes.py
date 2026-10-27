@@ -1,8 +1,8 @@
 """Produktverwaltung im Shop-Admin (#1707) und Katalogabgleich (#1709) - Verwaltung → Finanzen → Shop → Produkte.
 
 Wie alle Shop-Adminrouten nur der Bereich „Finanzen“ mit Zwei-Faktor (``require_area("finance")``, Regel 3 in
-``scripts/check-code-patterns.py``). Jede Änderung braucht einen Grund und steht im Protokoll; Lesen ist keine
-Adminaktion. Anlegen, Lesen und Grunddaten (Titel, Sichtbarkeit, Personalisierung, Aufschlag) bleiben in
+``scripts/check-code-patterns.py``). Jede Änderung steht mit Person und Zeit im Protokoll; der Grund ist optional und
+nur beim Veröffentlichen Pflicht (Entscheidung Obmann 27.10.2026). Lesen ist keine Adminaktion. Anlegen, Lesen und Grunddaten (Titel, Sichtbarkeit, Personalisierung, Aufschlag) bleiben in
 ``routes/shop_admin_routes.py``; hier stehen die Schritte des Aufbaus, die Prüfung und der Abgleich. Jede Antwort ist die
 volle Ansicht des Produkts (``shop_products.admin_view``). Printful wird nur über den Adapter gerufen
 (``services/printful_client.py``).
@@ -30,7 +30,8 @@ MANUAL_SYNC_REASON = "Mit Printful abgleichen (von Hand)"
 class Reasoned(BaseModel):
     model_config = {"extra": "forbid"}
 
-    reason: str = Field(..., min_length=3, max_length=500, pattern=r"\S.*\S|\S{3,}")
+    # Grund optional (Entscheidung Obmann 27.10.2026) - Pflicht nur beim Veröffentlichen, das prüft der Service.
+    reason: str = Field("", max_length=500)
 
 
 class PrintfulChoice(Reasoned):

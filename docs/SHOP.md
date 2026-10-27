@@ -121,11 +121,11 @@ die Rolle, andere über eine Freigabe. Matrix: [docs/ROLLEN.md](ROLLEN.md#shop-1
 | Route | Zweck |
 | --- | --- |
 | `GET /api/admin/shop/products` | Produkte lesen, mit Übersicht (Stand, Printful, Sperren, Preiswarnungen) |
-| `POST /api/admin/shop/products` | Produkt anlegen (mit Grund; nur Titel Pflicht, immer Entwurf) |
+| `POST /api/admin/shop/products` | Produkt anlegen (nur Titel Pflicht, immer Entwurf; Grund optional) |
 | `GET /api/admin/shop/products/{id}` | Produkt mit allem für den Aufbau (#1707, Abschnitt unten) |
-| `PATCH /api/admin/shop/products/{id}` | Grunddaten ändern (mit Grund) - nie den Stand |
-| `POST /api/admin/shop/products/{id}/variants` | Variante anlegen (mit Grund) |
-| `PATCH /api/admin/shop/variants/{id}` | Variante ändern (mit Grund) |
+| `PATCH /api/admin/shop/products/{id}` | Grunddaten ändern (Grund optional) - nie den Stand |
+| `POST /api/admin/shop/products/{id}/variants` | Variante anlegen (Grund optional) |
+| `PATCH /api/admin/shop/variants/{id}` | Variante ändern (Grund optional) |
 | `GET /api/admin/shop/orders` | Bestellungen lesen – ohne Anschriften |
 | `GET /api/admin/shop/orders/{id}` | Bestellung mit Positionen, Anschriften und Verlauf |
 
@@ -314,7 +314,8 @@ Routen `backend/routes/shop_product_routes.py` (Schritte) und `shop_admin_routes
 Seite `frontend/src/pages/admin/AdminShopProductsPage.jsx` (Verwaltung → Finanzen → Shop → Reiter **Produkte**).
 Beispiel aus #2062: Gildan 5000 schwarz mit Löwe vorne rechts, Gamertag vorne links und Rückenlogo.
 
-**Fünf Schritte** - jeder mit Grund und Protokoll, jede Antwort die volle Ansicht samt Vorab-Prüfung:
+**Fünf Schritte** - jeder im Protokoll (Person, Zeit, was), jede Antwort die volle Ansicht samt Vorab-Prüfung. Der
+Grund ist optional, **Pflicht nur beim Veröffentlichen** - dann geht das Produkt live (Entscheidung Obmann 27.10.2026):
 
 1. **Produkt wählen:** Grunddaten (Titel, Beschreibung - bereinigt -, Sichtbarkeit, Personalisierung) und die
    Printful-Produktnummer. Die Website lädt über den Adapter Produkt und Varianten (Größe, Farbe, Variantennummer,
@@ -381,13 +382,13 @@ Produkts.
 
 | Route (alle `require_area("finance")`) | Zweck |
 | --- | --- |
-| `POST /api/admin/shop/products/{id}/printful` | Schritt 1: Printful-Produkt laden (`printful_product_id`, Grund) |
-| `PUT /api/admin/shop/products/{id}/offer` | Schritt 2: Technik, Farben, Größen (Grund) - danach Preise |
-| `PUT /api/admin/shop/products/{id}/placements` | Schritt 3: Platzierungen mit Art und Position, Fläche im Grundpreis (Grund) |
-| `PUT /api/admin/shop/products/{id}/designs` | Schritt 3: Design je Platzierung und Farbe, `null` entfernt (Grund) |
-| `POST /api/admin/shop/products/{id}/prices/accept` | Schritt 4: Selbstkosten als Mitgliederpreis übernehmen (Grund) |
-| `POST /api/admin/shop/products/{id}/sync` | Mit Printful abgleichen (Grund freiwillig, Person im Protokoll) |
-| `POST /api/admin/shop/products/{id}/status` | Schritt 5: `reviewed`, `active`, `draft`, `archived` (Grund) |
+| `POST /api/admin/shop/products/{id}/printful` | Schritt 1: Printful-Produkt laden (`printful_product_id`) |
+| `PUT /api/admin/shop/products/{id}/offer` | Schritt 2: Technik, Farben, Größen - danach Preise |
+| `PUT /api/admin/shop/products/{id}/placements` | Schritt 3: Platzierungen mit Art und Position, Fläche im Grundpreis |
+| `PUT /api/admin/shop/products/{id}/designs` | Schritt 3: Design je Platzierung und Farbe, `null` entfernt |
+| `POST /api/admin/shop/products/{id}/prices/accept` | Schritt 4: Selbstkosten als Mitgliederpreis übernehmen |
+| `POST /api/admin/shop/products/{id}/sync` | Mit Printful abgleichen (Person im Protokoll) |
+| `POST /api/admin/shop/products/{id}/status` | Schritt 5: `reviewed`, `active` (Grund Pflicht), `draft`, `archived` |
 
 Offen für spätere Pakete: Mockups und ihre Prüfung (#1710), die Gamertag- bzw. Vereinsnummer-Datei (#1711) - ob
 Printful zwei Ebenen auf `front` annimmt oder Löwe und Gamertag zu einer Front-Datei zusammengesetzt werden müssen,

@@ -145,18 +145,48 @@ async def test_only_finance_with_second_factor_reaches_the_product_routes(flow, 
 
 
 @pytest.mark.asyncio
-async def test_every_change_needs_a_reason(flow, fake):
-    from services import shop_catalog
+async def test_the_reason_is_optional_but_publishing_needs_one(flow, fake, monkeypatch):
+    """Entscheidung Obmann 27.10.2026: Grund optional - Pflicht nur bei kritischen Schritten, und „Veröffentlichen“
+    ist kritisch (es geht live). Wer, wann und was stehen trotzdem im Protokoll."""
+    from services import shop_products
 
+    async def mockups_ok(_db, _product):
+        return {"ok": True, "state": "passed", "detail": "Test: Mockups geprüft"}
+
+    monkeypatch.setattr(shop_products, "mockup_check", mockups_ok)
     await with_key(flow)
+    await club_designs(flow)
     who = await people(flow)
     flow.act_as(who["finanzen"])
-    product = await shop_catalog.create_product(flow.db, {"title": "Grund-Test"}, **BY)
-    for method, url, body in new_routes(product["id"]):
-        if "reason" not in body:
-            continue
-        answer = await getattr(flow, method)(url, json={**body, "reason": "  "})
-        assert answer.status_code == 422, (url, answer.text)
+    created = await flow.post(BASE, json={key: value for key, value in NEW.items() if key != "reason"})
+    assert created.status_code == 200, created.text
+    product_id = created.json()["product"]["id"]
+    steps = [
+        ("post", f"{BASE}/{product_id}/printful", {"printful_product_id": 71}),
+        ("put", f"{BASE}/{product_id}/offer", {"technique": "dtg", "colors": ["Black", "White"], "sizes": ["M", "L"]}),
+        ("put", f"{BASE}/{product_id}/placements", {"placements": PLACEMENTS, "included_placement": "front",
+                                                    "reason": ""}),
+    ]
+    for method, url, body in steps:
+        answer = await getattr(flow, method)(url, json=body)
+        assert answer.status_code == 200, (url, answer.text)
+    view = answer.json()
+    for method, url, body in (
+            ("put", f"{BASE}/{product_id}/designs", {"assignments": view["design_suggestions"]}),
+            ("post", f"{BASE}/{product_id}/prices/accept", {}),
+            ("post", f"{BASE}/{product_id}/status", {"status": "reviewed"})):
+        answer = await getattr(flow, method)(url, json=body)
+        assert answer.status_code == 200, (url, answer.text)
+    live = await flow.post(f"{BASE}/{product_id}/status", json={"status": "active", "reason": "  "})
+    assert live.status_code == 400 and "Grund" in live.json()["detail"]
+    live = await flow.post(f"{BASE}/{product_id}/status", json={"status": "active", "reason": "Testshirt geht live"})
+    assert live.status_code == 200 and live.json()["product"]["status"] == "active"
+    rows = await flow.db.audit_logs.find({"target_id": product_id}, {"_id": 0}).to_list(50)
+    assert {row["actor_id"] for row in rows} == {who["finanzen"]["id"]}
+    assert {row["data"]["reason"] for row in rows if row["action"] != "shop.product.status"} == {""}
+    published = [row for row in rows
+                 if row["action"] == "shop.product.status" and row["data"]["after"] == {"status": "active"}]
+    assert published[0]["data"]["reason"] == "Testshirt geht live"
 
 
 # ---------------------------------------------------------------- Regeln

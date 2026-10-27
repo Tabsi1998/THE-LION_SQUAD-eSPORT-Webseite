@@ -63,7 +63,7 @@ def _blocked_reason(row, *, active: bool, cost: int | None) -> str | None:
 async def sync_product(db, product_id: str, *, provider: FulfillmentProvider, actor_id: str, reason: Any,
                        wait_seconds: float = 0.0) -> dict:
     """Ein Produkt abgleichen. Läuft schon ein Abgleich, ``ShopConflict`` („läuft gerade“)."""
-    reason = clean_reason(reason)
+    reason = clean_reason(reason, required=False)
     try:
         async with mutation_lock(db, SYNC_RESOURCE, wait_seconds=wait_seconds, lease_seconds=SYNC_LEASE_SECONDS):
             return await _sync_product_unlocked(db, product_id, provider=provider, actor_id=actor_id, reason=reason)

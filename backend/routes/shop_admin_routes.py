@@ -41,7 +41,15 @@ class Reasoned(BaseModel):
         return value.strip()
 
 
-class ProductFields(Reasoned):
+class Noted(BaseModel):
+    """Produkte und Varianten (#1707): Grund optional (Entscheidung Obmann 27.10.2026) - wer, wann und was stehen
+    trotzdem im Protokoll. Unbekannte Felder werden weiter abgelehnt."""
+    model_config = {"extra": "forbid"}
+
+    reason: str = Field("", max_length=500)
+
+
+class ProductFields(Noted):
     """Den Stand gibt es hier nicht: ihn ändert nur die Prüfung (``POST /products/{id}/status``, #1707).
     ``markup_cents: null`` heißt „der allgemeine öffentliche Aufschlag gilt“; ein Wert (auch 0) ersetzt ihn."""
     title: str | None = Field(None, min_length=1, max_length=120)
@@ -63,7 +71,7 @@ class ProductUpdate(ProductFields):
     slug: str | None = Field(None, min_length=1, max_length=80)
 
 
-class VariantFields(Reasoned):
+class VariantFields(Noted):
     label: str | None = Field(None, min_length=1, max_length=80)
     size: str | None = Field(None, max_length=40)
     color: str | None = Field(None, max_length=40)

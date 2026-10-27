@@ -125,7 +125,7 @@ test("die Liste zeigt Stand, Printful und Warnungen; der Reiter Produkte ist akt
   expect(screen.getByTestId("shop-tab-produkte")).toHaveAttribute("aria-current", "page");
 });
 
-test("ein neues Produkt braucht Titel und Grund; öffentlich sperrt die Personalisierung", async () => {
+test("ein neues Produkt braucht einen Titel, der Grund ist optional; öffentlich sperrt die Personalisierung", async () => {
   apiMock.post.mockResolvedValue({ data: { product: { id: "p2" } } });
   const user = userEvent.setup();
   show();
@@ -138,8 +138,13 @@ test("ein neues Produkt braucht Titel und Grund; öffentlich sperrt die Personal
   await user.click(screen.getByTestId("shop-new-visibility-members"));
   await user.click(screen.getByTestId("shop-new-personalization-gamertag"));
   const submit = screen.getByTestId("shop-new-submit");
+  expect(screen.getByTestId("shop-new-reason")).toHaveAttribute("placeholder", "Grund (optional, kommt ins Protokoll)");
+  // Der Knopf bleibt klickbar und sagt, was fehlt.
+  expect(submit).toHaveAttribute("aria-disabled", "true");
+  await user.click(submit);
+  expect(screen.getByTestId("shop-new-hint")).toHaveTextContent("Titel");
+  expect(apiMock.post).not.toHaveBeenCalled();
   await user.type(screen.getByTestId("shop-new-reason"), "Testshirt");
-  expect(submit).toBeDisabled();
   await user.type(screen.getByTestId("shop-new-title"), "Vereinsshirt schwarz");
   await user.click(submit);
   expect(apiMock.post).toHaveBeenCalledWith("/admin/shop/products", {
@@ -219,13 +224,14 @@ test("Vorschläge übernehmen füllt leere Felder; gespeichert wird nur, was sic
   await user.click(await screen.findByTestId("shop-step-designs"));
   expect(screen.getByTestId("shop-design-cell-front_right-White")).toHaveValue("");
   expect(screen.getByTestId("shop-designs-placeholders")).toHaveTextContent("Gamertag (Datei je Bestellung, #1711)");
-  expect(screen.getByTestId("shop-designs-submit")).toBeDisabled();
+  await user.click(screen.getByTestId("shop-designs-submit"));
+  expect(screen.getByTestId("shop-designs-hint")).toHaveTextContent("Noch keine Zuordnung geändert.");
   await user.click(screen.getByTestId("shop-designs-suggest"));
   expect(screen.getByTestId("shop-design-cell-front_right-White")).toHaveValue("loewe-schwarz");
-  await user.type(screen.getByTestId("shop-designs-reason"), "Vorschläge passen");
+  // Ohne Grund geht es (Entscheidung Obmann 27.10.2026).
   await user.click(screen.getByTestId("shop-designs-submit"));
   expect(apiMock.put).toHaveBeenCalledWith("/admin/shop/products/p1/designs", {
-    assignments: [{ placement: "front_right", color: "White", design_key: "loewe-schwarz" }], reason: "Vorschläge passen",
+    assignments: [{ placement: "front_right", color: "White", design_key: "loewe-schwarz" }], reason: "",
   });
 });
 
@@ -258,8 +264,10 @@ test("Veröffentlichen bleibt gesperrt, solange die Mockup-Prüfung offen ist; p
   expect(screen.getByTestId("shop-check-mockup")).toHaveAttribute("data-state", "open");
   expect(screen.getByTestId("shop-check-mockup")).toHaveTextContent("#1710");
   await user.type(screen.getByTestId("shop-status-active-reason"), "Live schalten");
-  expect(screen.getByTestId("shop-status-active-submit")).toBeDisabled();
-  expect(screen.getByTestId("shop-status-active")).toHaveTextContent("Mockup-Prüfung");
+  expect(screen.getByTestId("shop-status-active-submit")).toHaveAttribute("aria-disabled", "true");
+  await user.click(screen.getByTestId("shop-status-active-submit"));
+  expect(screen.getByTestId("shop-status-active-hint")).toHaveTextContent("Mockup-Prüfung");
+  expect(apiMock.post).not.toHaveBeenCalled();
   await user.type(screen.getByTestId("shop-status-draft-reason"), "Noch ändern");
   await user.click(screen.getByTestId("shop-status-draft-submit"));
   expect(apiMock.post).toHaveBeenCalledWith("/admin/shop/products/p1/status", { status: "draft", reason: "Noch ändern" });
@@ -287,7 +295,7 @@ test("eine fehlende Datei für eine Farbe sperrt „geprüft“ und nennt die Fa
   expect(await screen.findByTestId("shop-step-designs")).toHaveAttribute("data-state", "failed");
   await user.click(screen.getByTestId("shop-step-publish"));
   expect(screen.getByTestId("shop-check-files")).toHaveTextContent("Rücken: White");
-  expect(screen.getByTestId("shop-status-reviewed-submit")).toBeDisabled();
+  expect(screen.getByTestId("shop-status-reviewed-submit")).toHaveAttribute("aria-disabled", "true");
 });
 
 test("„Mit Printful abgleichen“ zeigt bei Ausfall den letzten Stand mit Datum", async () => {
@@ -299,4 +307,23 @@ test("„Mit Printful abgleichen“ zeigt bei Ausfall den letzten Stand mit Datu
   expect(screen.getByTestId("shop-sync")).toHaveTextContent("Abgleich gescheitert");
   expect(screen.getByTestId("shop-sync")).toHaveTextContent("Stand vom");
   expect(toastMock.success).toHaveBeenCalledWith("Printful nicht erreichbar – letzter Stand bleibt.");
+});
+
+test("Veröffentlichen geht live: dafür ist der Grund Pflicht, der Knopf sagt es", async () => {
+  const items = checkItems().map((item) => (item.key === "mockup" ? { ...item, ok: true, state: "ok" } : item));
+  apiMock.get.mockResolvedValue({ data: view({ items, product: { status: "reviewed" }, extra: { transitions: ["active", "draft", "archived"] } }) });
+  apiMock.post.mockResolvedValue({ data: view({ items, product: { status: "active" } }) });
+  const user = userEvent.setup();
+  show("/admin/shop/products/p1");
+  await user.click(await screen.findByTestId("shop-step-publish"));
+  const reason = screen.getByTestId("shop-status-active-reason");
+  expect(reason).toHaveAttribute("placeholder", "Grund (Pflicht, kommt ins Protokoll)");
+  expect(screen.getByTestId("shop-status-draft-reason")).toHaveAttribute("placeholder", "Grund (optional, kommt ins Protokoll)");
+  await user.click(screen.getByTestId("shop-status-active-submit"));
+  expect(screen.getByTestId("shop-status-active-hint")).toHaveTextContent("Grund");
+  expect(reason).toHaveFocus();
+  expect(apiMock.post).not.toHaveBeenCalled();
+  await user.type(reason, "Testshirt geht live");
+  await user.click(screen.getByTestId("shop-status-active-submit"));
+  expect(apiMock.post).toHaveBeenCalledWith("/admin/shop/products/p1/status", { status: "active", reason: "Testshirt geht live" });
 });

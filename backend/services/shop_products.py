@@ -172,7 +172,7 @@ async def load_printful_product(db, product_id: str, printful_product_id: Any, *
     """Schritt 1: das Katalogprodukt bei Printful laden und als Abzug speichern (ohne Preise - die holt Schritt 2 nur
     für die angebotenen Varianten)."""
     number = _printful_number(printful_product_id)
-    reason = clean_reason(reason)
+    reason = clean_reason(reason, required=False)
     product = await _product(db, product_id)
     _editable(product)
     catalog_id = CatalogProductId(number)
@@ -224,7 +224,7 @@ async def set_offer(db, product_id: str, *, technique: Any, colors: Any, sizes: 
                     actor_id: str, reason: Any) -> dict:
     """Schritt 2: welche Farben und Größen angeboten werden. Legt die Varianten an und holt danach die Einkaufspreise.
     Läuft gerade ein anderer Abgleich, bleiben die Preise offen (Prüfung „Preis“) - „Mit Printful abgleichen“ holt sie."""
-    reason = clean_reason(reason)
+    reason = clean_reason(reason, required=False)
     async with shop_catalog.product_lock(db, product_id):
         saved = await _save_offer(db, product_id, technique=technique, colors=colors, sizes=sizes, actor_id=actor_id,
                                   reason=reason)
@@ -300,7 +300,7 @@ async def set_placements(db, product_id: str, placements: Any, *, included_place
                          reason: Any) -> dict:
     """Platzierungen mit Art (Design, Gamertag, Vereinsnummer) und Position in Zoll. Designs bleiben bei Platzierungen,
     die es weiter gibt."""
-    reason = clean_reason(reason)
+    reason = clean_reason(reason, required=False)
     product = await _product(db, product_id)
     _editable(product)
     if not product.get("printful"):
@@ -349,7 +349,7 @@ async def set_placements(db, product_id: str, placements: Any, *, included_place
 @_locked
 async def set_designs(db, product_id: str, assignments: Any, *, actor_id: str, reason: Any) -> dict:
     """Je Platzierung und Farbe ein Design aus #1708 (``design_key`` oder ``None`` zum Entfernen)."""
-    reason = clean_reason(reason)
+    reason = clean_reason(reason, required=False)
     product = await _product(db, product_id)
     _editable(product)
     if not isinstance(assignments, (list, tuple)) or not assignments:
@@ -403,7 +403,7 @@ async def _offered(db, product: dict) -> list[tuple[dict, dict | None]]:
 async def accept_prices(db, product_id: str, *, actor_id: str, reason: Any) -> dict:
     """Die Einkaufspreise als Mitgliederpreis übernehmen (Selbstkostenpreis) - nur so kommen Preise von Printful in
     den Shop. Beendet offene Preiswarnungen des Abgleichs."""
-    reason = clean_reason(reason)
+    reason = clean_reason(reason, required=False)
     product = await _product(db, product_id)
     if product.get("status") == "archived":
         raise ShopConflict(NOT_EDITABLE_ARCHIVED)
@@ -549,9 +549,10 @@ TRANSITIONS = {
 async def set_status(db, product_id: str, status: str, *, actor_id: str, reason: Any) -> dict:
     """Entwurf → geprüft (Prüfung ohne Mockups bestanden) → veröffentlicht (alles bestanden, auch Mockups) →
     archiviert. Zurück auf „Entwurf“ geht immer (Zurückziehen, wieder öffnen)."""
-    reason = clean_reason(reason)
     if status not in shop_catalog.STATUSES:
         raise ShopError("Unbekannter Stand.")
+    # Grund optional (Entscheidung Obmann 27.10.2026) - Pflicht nur beim Veröffentlichen: dann geht es live.
+    reason = clean_reason(reason, required=status == "active")
     product = await _product(db, product_id)
     current = product.get("status") or "draft"
     if status == current:
