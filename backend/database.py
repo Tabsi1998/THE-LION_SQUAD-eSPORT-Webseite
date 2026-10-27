@@ -33,6 +33,15 @@ async def ensure_event_photo_indexes(db) -> None:
     await db.gallery_submission_quota.create_index([("album_id", 1), ("owner_id", 1)], unique=True)
 
 
+async def ensure_ops_check_indexes(db) -> None:
+    """Zustände der Auto-Checks (#2080): ein Abschnitt je Wechsel, 7 Tage nach dem letzten Lauf weg. Höchstens einer
+    ist offen (``open: true``, eindeutig und lückenhaft) - die Sperre gegen zwei gleichzeitige Läufe."""
+    await db.ops_check_episodes.create_index([("since", -1)])
+    await db.ops_check_episodes.create_index([("last_at", -1)])
+    await db.ops_check_episodes.create_index("expires_at", expireAfterSeconds=0)
+    await db.ops_check_episodes.create_index("open", unique=True, sparse=True)
+
+
 async def ensure_jersey_number_indexes(db) -> None:
     """Wunschnummer je Mitglied (#2034): eine Zeile je Konto, und jede Nummer hält höchstens eine Zeile
     (``number_key`` steht nur, solange die Nummer vergeben ist). Der eindeutige Index ist die Sperre gegen
@@ -236,9 +245,7 @@ async def init_indexes():
     await db.ops_vitals.create_index("expires_at", expireAfterSeconds=0)
     await db.ops_check_runs.create_index([("at", -1)])
     await db.ops_check_runs.create_index("expires_at", expireAfterSeconds=0)
-    # Zustände der Auto-Checks (#2080): ein Abschnitt je Wechsel, 7 Tage nach dem letzten Lauf weg.
-    await db.ops_check_episodes.create_index([("last_at", -1)])
-    await db.ops_check_episodes.create_index("expires_at", expireAfterSeconds=0)
+    await ensure_ops_check_indexes(db)
     await db.ops_alert_state.create_index("key", unique=True)
     # Audit
     await db.audit_logs.create_index("id", unique=True)

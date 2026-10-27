@@ -643,30 +643,125 @@ async def run_checks(db, checks: list[tuple[str, str, Callable[[], Awaitable[dic
     return run
 
 
-def same_state(episode: dict | None, run: dict) -> bool:
+def episode_signature(status: str | None, failing: list[str] | None) -> str:
     """Gleicher Stand heißt: gleiche Ampel und dieselben betroffenen Prüfungen (Reihenfolge egal)."""
-    return bool(episode) and episode.get("status") == run.get("status") and sorted(episode.get("failing") or []) == sorted(run.get("failing") or [])
+    return f"{status or 'crit'}:{','.join(sorted(failing or []))}"
 
 
-async def record_episode(db, run: dict) -> dict:
-    """Zustände statt Läufe (#2080): Solange Ampel und betroffene Prüfungen gleich bleiben, zählt der jüngste Abschnitt
-    nur hoch („seit … · 92× geprüft · zuletzt …“); erst ein Wechsel beginnt einen neuen. Grüne Abschnitte zählen mit,
-    damit gelb - grün - gelb zwei Einträge ergibt; die Ereignisliste zeigt nur die auffälligen."""
+EPISODE_ATTEMPTS = 3
+BACKFILL_MARKER = "ops_check_episodes_backfill"
+
+
+async def record_episode(db, run: dict) -> dict | None:
+    """Zustände statt Läufe (#2080): Solange Ampel und betroffene Prüfungen gleich bleiben, zählt der offene Abschnitt
+    nur hoch („seit … · 92× geprüft · zuletzt …“); erst ein Wechsel schließt ihn und beginnt einen neuen. Grüne
+    Abschnitte zählen mit, damit gelb - grün - gelb zwei Einträge ergibt; die Ereignisliste zeigt nur die auffälligen.
+
+    Atomar auch bei zwei Läufen zugleich (Codex): Hochzählen ist ein bedingtes ``find_one_and_update`` auf den offenen
+    Abschnitt mit derselben Signatur. Höchstens ein Abschnitt trägt ``open: true`` (eindeutiger, lückenhafter Index,
+    ``database.ensure_ops_check_indexes``); legen zwei Läufe zugleich einen neuen an, scheitert der zweite am Index und
+    zählt beim nächsten Versuch beim ersten mit."""
+    from pymongo import ReturnDocument
+    from pymongo.errors import DuplicateKeyError
+
     at = run.get("at") or now_utc().isoformat()
+    status = run.get("status") or "crit"
+    signature = episode_signature(status, run.get("failing"))
     expires_at = now_utc() + timedelta(days=HISTORY_DAYS)
-    # Zweitschlüssel _id: zwei Läufe mit derselben Uhrzeit (grobe Uhr unter Windows) sonst in zufälliger Reihenfolge.
-    latest = await db.ops_check_episodes.find_one({}, {"_id": 0}, sort=[("last_at", -1), ("_id", -1)])
-    if same_state(latest, run):
-        await db.ops_check_episodes.update_one(
-            {"id": latest["id"]},
-            {"$set": {"last_at": at, "counts": run.get("counts") or {}, "expires_at": expires_at}, "$inc": {"runs": 1}},
+    counts = run.get("counts") or {}
+    for _attempt in range(EPISODE_ATTEMPTS):
+        extended = await db.ops_check_episodes.find_one_and_update(
+            {"open": True, "signature": signature},
+            {"$max": {"last_at": at}, "$set": {"counts": counts, "expires_at": expires_at}, "$inc": {"runs": 1}},
+            projection={"_id": 0}, return_document=ReturnDocument.AFTER,
         )
-        return {**latest, "last_at": at, "runs": int(latest.get("runs") or 0) + 1, "changed": False}
-    episode = {"id": new_id(), "since": at, "last_at": at, "runs": 1, "status": run.get("status") or "crit",
-               "failing": list(run.get("failing") or []), "counts": run.get("counts") or {}, "expires_at": expires_at}
-    await db.ops_check_episodes.insert_one(dict(episode))
-    episode.pop("_id", None)
-    return {**episode, "changed": True}
+        if extended:
+            return {**extended, "changed": False}
+        # Ein anderer Stand war offen: zu - nur, solange er noch offen ist und nicht dieser Stand ist.
+        await db.ops_check_episodes.update_many({"open": True, "signature": {"$ne": signature}},
+                                                {"$unset": {"open": ""}, "$set": {"closed_at": at}})
+        episode = {"id": new_id(), "since": at, "last_at": at, "runs": 1, "status": status, "signature": signature, "open": True,
+                   "failing": list(run.get("failing") or []), "counts": counts, "expires_at": expires_at}
+        try:
+            await db.ops_check_episodes.insert_one(dict(episode))
+        except DuplicateKeyError:
+            continue  # ein gleichzeitiger Lauf war schneller - beim nächsten Versuch bei ihm mitzählen
+        return {**episode, "changed": True}
+    logger.warning("[ops] check episode not recorded after %s attempts", EPISODE_ATTEMPTS)
+    return None
+
+
+def _episodes_from_runs(rows: list[dict]) -> list[dict]:
+    """Aufeinanderfolgende gleiche Läufe (älteste zuerst) als Abschnitte."""
+    episodes: list[dict] = []
+    for row in rows:
+        signature = episode_signature(row.get("status"), row.get("failing"))
+        at = str(row.get("at") or "")
+        if episodes and episodes[-1]["signature"] == signature:
+            episodes[-1].update(last_at=at, runs=episodes[-1]["runs"] + 1, counts=row.get("counts") or {})
+            continue
+        episodes.append({"id": new_id(), "since": at, "last_at": at, "runs": 1, "status": row.get("status") or "crit",
+                         "signature": signature, "failing": list(row.get("failing") or []), "counts": row.get("counts") or {}})
+    return episodes
+
+
+def _expiry_after(last_at: str) -> datetime:
+    try:
+        moment = datetime.fromisoformat(str(last_at).replace("Z", "+00:00"))
+    except ValueError:
+        moment = now_utc()
+    if moment.tzinfo is None:
+        moment = moment.replace(tzinfo=timezone.utc)
+    return moment + timedelta(days=HISTORY_DAYS)
+
+
+async def backfill_check_episodes(db) -> int:
+    """Einmaliger Nachtrag beim Start nach dem Update (#2080, Codex): die gespeicherten Läufe (bis 7 Tage) als Abschnitte,
+    damit die Ereignisliste nichts verliert. Nur Läufe vor dem ältesten schon vorhandenen Abschnitt zählen, der Nachtrag
+    ist also wiederholbar; der Merker in ``settings`` (``ops_check_episodes_backfill``) lässt ihn nur einmal laufen.
+    Der jüngste nachgetragene Abschnitt bleibt offen, wenn es noch keinen offenen gibt. Rückweg: die Sammlung
+    ``ops_check_episodes`` leeren und den Merker löschen. Gibt die Zahl der angelegten Abschnitte zurück."""
+    from pymongo.errors import DuplicateKeyError
+
+    # Der Merker ist zugleich die Sperre: ``settings.id`` ist eindeutig, nur ein Worker bekommt ihn.
+    if await db.settings.find_one({"id": BACKFILL_MARKER}, {"_id": 1}):
+        return 0
+    try:
+        await db.settings.insert_one({"id": BACKFILL_MARKER, "state": "running", "at": now_utc().isoformat()})
+    except DuplicateKeyError:
+        return 0
+    oldest = await db.ops_check_episodes.find_one({}, {"_id": 0, "since": 1}, sort=[("since", 1)])
+    query = {"at": {"$lt": oldest["since"]}} if oldest and oldest.get("since") else {}
+    rows = await db.ops_check_runs.find(query, {"_id": 0, "at": 1, "status": 1, "failing": 1, "counts": 1}).sort("at", 1).to_list(
+        HISTORY_DAYS * 24 * 60 // CHECK_INTERVAL_MINUTES + 100)
+    episodes = _episodes_from_runs(rows)
+    for episode in episodes:
+        episode["expires_at"] = _expiry_after(episode["last_at"])
+    closed, newest = episodes[:-1], episodes[-1:]
+    if closed:
+        await db.ops_check_episodes.insert_many([dict(episode) for episode in closed])
+    for episode in newest:
+        # Offen nur, wenn es noch keinen Abschnitt gibt; hat ein Lauf inzwischen einen offenen angelegt, bleibt er zu.
+        if not oldest:
+            try:
+                await db.ops_check_episodes.insert_one({**episode, "open": True})
+                continue
+            except DuplicateKeyError:
+                pass
+        await db.ops_check_episodes.insert_one(dict(episode))
+    await db.settings.update_one({"id": BACKFILL_MARKER},
+                                 {"$set": {"state": "done", "episodes": len(episodes), "at": now_utc().isoformat()}})
+    return len(episodes)
+
+
+async def safe_backfill_check_episodes(db) -> None:
+    """Für den Start: ein Fehler im Nachtrag hält den Server nicht auf."""
+    try:
+        added = await backfill_check_episodes(db)
+        if added:
+            logger.info("[ops] %s check episodes backfilled from stored runs", added)
+    except Exception:  # noqa: BLE001
+        logger.warning("[ops] check episode backfill failed", exc_info=True)
 
 
 def _day(value: str) -> str:

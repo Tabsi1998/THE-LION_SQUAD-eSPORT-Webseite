@@ -123,6 +123,117 @@ async def test_equal_check_runs_become_one_event_per_state_change(flow):
     assert "1× geprüft" in items[0]["detail"]
 
 
+class _BothSeeTheOldState:
+    """Zwei Läufe zugleich nach einem Wechsel (#2080, Codex): beide lesen den alten Stand, bevor einer schreibt -
+    so wie zwei Worker auf echtem MongoDB. mongomock antwortet sonst sofort und alles liefe nacheinander."""
+
+    def __init__(self, db):
+        import asyncio
+
+        self._db = db
+        self.barrier = asyncio.Barrier(2)
+        self.gated = 0
+
+    def __getattr__(self, name):
+        target = getattr(self._db, name)
+        return _GatedEpisodes(target, self) if name == "ops_check_episodes" else target
+
+
+class _GatedEpisodes:
+    def __init__(self, collection, gate):
+        self._collection = collection
+        self._gate = gate
+
+    def __getattr__(self, name):
+        return getattr(self._collection, name)
+
+    async def find_one_and_update(self, *args, **kwargs):
+        import asyncio
+
+        found = await self._collection.find_one_and_update(*args, **kwargs)
+        if self._gate.gated < 2:
+            self._gate.gated += 1
+            await asyncio.wait_for(self._gate.barrier.wait(), 1)
+        return found
+
+    async def find_one(self, *args, **kwargs):
+        import asyncio
+
+        found = await self._collection.find_one(*args, **kwargs)
+        if self._gate.gated < 2:
+            self._gate.gated += 1
+            await asyncio.wait_for(self._gate.barrier.wait(), 1)
+        return found
+
+
+@pytest.mark.asyncio
+async def test_two_runs_at_once_after_a_change_share_one_open_episode(flow):
+    """#2080 (Codex): Zusammenfassen ist atomar - zwei gleichzeitige gelbe Läufe nach Grün ergeben genau einen offenen
+    Abschnitt mit zwei Läufen, kein Duplikat."""
+    import asyncio
+
+    import database
+    from services import ops_checks
+
+    await database.ensure_ops_check_indexes(flow.db)
+    now = now_utc()
+    await ops_checks.record_episode(flow.db, {"at": (now - timedelta(minutes=5)).isoformat(), "status": "ok", "failing": [], "counts": {"ok": 3}})
+    yellow = {"status": "warn", "failing": ["image_variants"], "counts": {"ok": 2, "warn": 1}}
+    gate = _BothSeeTheOldState(flow.db)
+    await asyncio.gather(
+        ops_checks.record_episode(gate, {**yellow, "at": now.isoformat()}),
+        ops_checks.record_episode(gate, {**yellow, "at": (now + timedelta(seconds=1)).isoformat()}),
+    )
+    open_episodes = await flow.db.ops_check_episodes.find({"open": True}, {"_id": 0}).to_list(5)
+    assert len(open_episodes) == 1
+    assert open_episodes[0]["runs"] == 2 and open_episodes[0]["failing"] == ["image_variants"]
+    assert await flow.db.ops_check_episodes.count_documents({}) == 2, "der grüne ist zu, der gelbe offen"
+
+
+@pytest.mark.asyncio
+async def test_the_first_start_fills_the_episodes_from_the_stored_runs(flow):
+    """#2080 (Codex): Beim ersten Start nach dem Update baut ein einmaliger Nachtrag die Abschnitte aus den gespeicherten
+    Läufen (bis 7 Tage) - die Ereignisliste verliert nichts. Ein Merker sorgt dafür, dass er nur einmal läuft."""
+    from services import ops_checks
+
+    start = now_utc() - timedelta(hours=3)
+
+    def run(minutes, status, failing):
+        return {"id": f"r{minutes}", "at": (start + timedelta(minutes=minutes)).isoformat(), "status": status, "failing": failing,
+                "counts": {"ok": 2, "warn": int(status == "warn"), "crit": int(status == "crit")}, "checks": []}
+
+    await flow.db.ops_check_runs.insert_many([
+        run(0, "warn", ["image_variants"]), run(5, "warn", ["image_variants"]), run(10, "warn", ["image_variants"]),
+        run(15, "ok", []), run(20, "crit", ["mail_queue"]), run(25, "crit", ["mail_queue"]),
+    ])
+    assert await ops_checks.backfill_check_episodes(flow.db) == 3
+    episodes = await flow.db.ops_check_episodes.find({}, {"_id": 0}).sort("since", 1).to_list(10)
+    assert [(e["status"], e["runs"], bool(e.get("open"))) for e in episodes] == [("warn", 3, False), ("ok", 1, False), ("crit", 2, True)]
+    assert episodes[0]["since"] == run(0, "warn", [])["at"] and episodes[0]["last_at"] == run(10, "warn", [])["at"]
+
+    assert await ops_checks.backfill_check_episodes(flow.db) == 0, "nur einmal"
+    await ops_checks.run_checks(flow.db, checks=[("mail_queue", "Mail-Queue", lambda: _crit_mail()), ("disk", "Speicher", lambda: _ok_disk())])
+    assert await flow.db.ops_check_episodes.count_documents({}) == 3
+    assert (await flow.db.ops_check_episodes.find_one({"open": True}))["runs"] == 3
+
+    admin = await flow.add_user(role="superadmin")
+    flow.act_as(admin)
+    items = (await flow.get("/api/admin/ops/events", params={"hours": 0, "source": "checks"})).json()["items"]
+    assert [item["subtitle"] for item in items] == ["mail_queue", "image_variants"]
+
+
+async def _crit_mail():
+    from services import ops_checks
+
+    return ops_checks.result("mail_queue", "Mail-Queue", "crit", "2 hängen")
+
+
+async def _ok_disk():
+    from services import ops_checks
+
+    return ops_checks.result("disk", "Speicher", "ok", "50 %")
+
+
 @pytest.mark.asyncio
 async def test_events_never_carry_a_full_address_in_json_csv_or_search(flow):
     """#1505: wie die Mail-Warteschlange (#1418) - keine ganze Adresse in Liste, CSV und Suche, auch nicht in Betreff,
