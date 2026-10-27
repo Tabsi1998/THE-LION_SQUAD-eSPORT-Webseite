@@ -153,6 +153,13 @@ Benötigte Python-Pakete stehen in `backend/requirements.txt` und
 `backend/requirements-dev.txt`. Schreibende Live-Tests laufen ausschließlich auf
 einem dafür vorbereiteten Teststack.
 
+Seit dem Spamschutz (#2067) brauchen Registrierung und Kontaktformular der Website ein
+Formular-Token (`GET /api/spam-guard/token?form=…`, frühestens nach der Mindestzeit
+absenden). Die älteren Live-Tests (`test_phase_*`, `test_iter*`, `test_tls_arena_api`)
+schicken keines mit: gegen einen echten Server antwortet `/api/auth/register` dann mit
+400, und Kontaktnachrichten landen als „Spam“ in der Inbox. Die Flow-Tests holen das
+Token über `backend/tests/spam_forms.py`.
+
 **Lokal zuerst, GitHub bestätigt.** Die [CI-Workflows](.github/workflows/ci.yml)
 enthalten die verbindlichen automatischen Prüfungen. Sie laufen vor dem Push auf dem
 Entwicklungsrechner. Auf GitHub startet die CI für Pull Requests, die kein Entwurf
