@@ -1,0 +1,442 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "Printful API v2 - Ausschnitt für den Vereinsshop (#1705)",
+    "version": "2.0.0-beta",
+    "description": "Nur die Wege und Felder, die backend/services/printful_client.py benutzt. Abgeschrieben aus https://developers.printful.com/docs/v2-beta/openapi.json (Stand 27.10.2026). Anfragen sind enger beschrieben als bei Printful (additionalProperties: false): der Fake lehnt jedes Feld ab, das die Website nicht senden soll - etwa ein confirm beim Anlegen."
+  },
+  "servers": [{"url": "https://api.printful.com"}],
+  "paths": {
+    "/v2/stores": {
+      "get": {
+        "operationId": "getStores",
+        "responses": {"200": {"content": {"application/json": {"schema": {"$ref": "#/components/schemas/GetStores"}}}}}
+      }
+    },
+    "/v2/catalog-products/{id}": {
+      "get": {
+        "operationId": "getProductById",
+        "responses": {"200": {"content": {"application/json": {"schema": {"$ref": "#/components/schemas/GetProductById"}}}}}
+      }
+    },
+    "/v2/catalog-products/{id}/catalog-variants": {
+      "get": {
+        "operationId": "getProductVariantsById",
+        "parameters": [
+          {"name": "limit", "in": "query", "schema": {"type": "integer", "minimum": 1, "maximum": 100}},
+          {"name": "offset", "in": "query", "schema": {"type": "integer", "minimum": 0}}
+        ],
+        "responses": {"200": {"content": {"application/json": {"schema": {"$ref": "#/components/schemas/GetProductVariantsById"}}}}}
+      }
+    },
+    "/v2/catalog-variants/{id}/prices": {
+      "get": {
+        "operationId": "getVariantPricesById",
+        "parameters": [
+          {"name": "currency", "in": "query", "schema": {"type": "string", "pattern": "^[A-Z]{3}$"}},
+          {"name": "selling_region_name", "in": "query", "schema": {"type": "string"}}
+        ],
+        "responses": {"200": {"content": {"application/json": {"schema": {"$ref": "#/components/schemas/GetVariantPricesById"}}}}}
+      }
+    },
+    "/v2/catalog-products/{id}/availability": {
+      "get": {
+        "operationId": "getProductStockAvailabilityById",
+        "parameters": [
+          {"name": "limit", "in": "query", "schema": {"type": "integer", "minimum": 1, "maximum": 100}},
+          {"name": "offset", "in": "query", "schema": {"type": "integer", "minimum": 0}}
+        ],
+        "responses": {"200": {"content": {"application/json": {"schema": {"$ref": "#/components/schemas/GetProductStockAvailabilityById"}}}}}
+      }
+    },
+    "/v2/order-estimation-tasks": {
+      "post": {
+        "operationId": "createOrderEstimationTask",
+        "requestBody": {"content": {"application/json": {"schema": {"$ref": "#/components/schemas/CreateOrderEstimationTaskInput"}}}},
+        "responses": {"200": {"content": {"application/json": {"schema": {"$ref": "#/components/schemas/OrderEstimationTaskAnswer"}}}}}
+      },
+      "get": {
+        "operationId": "getOrderEstimationTask",
+        "parameters": [{"name": "id", "in": "query", "required": true, "schema": {"type": "string", "pattern": "^[A-Za-z0-9_-]{1,64}$"}}],
+        "responses": {"200": {"content": {"application/json": {"schema": {"$ref": "#/components/schemas/OrderEstimationTaskAnswer"}}}}}
+      }
+    },
+    "/v2/orders": {
+      "post": {
+        "operationId": "createOrder",
+        "description": "Legt immer einen Entwurf an (Status draft) - nie bezahlt, nie produziert. Bestätigt wird nur über /v2/orders/{order_id}/confirmation.",
+        "requestBody": {"content": {"application/json": {"schema": {"$ref": "#/components/schemas/OrderInput"}}}},
+        "responses": {"200": {"content": {"application/json": {"schema": {"$ref": "#/components/schemas/GetOrderById"}}}}}
+      }
+    },
+    "/v2/orders/{order_id}": {
+      "get": {
+        "operationId": "getOrder",
+        "description": "order_id ist die Nummer bei Printful oder @ plus external_id.",
+        "responses": {"200": {"content": {"application/json": {"schema": {"$ref": "#/components/schemas/GetOrderById"}}}}}
+      },
+      "delete": {
+        "operationId": "deleteOrder",
+        "responses": {"204": {"description": "gelöscht"}}
+      }
+    },
+    "/v2/orders/{order_id}/order-items": {
+      "get": {
+        "operationId": "getItemsByOrderId",
+        "parameters": [
+          {"name": "limit", "in": "query", "schema": {"type": "integer", "minimum": 1, "maximum": 100}},
+          {"name": "offset", "in": "query", "schema": {"type": "integer", "minimum": 0}}
+        ],
+        "responses": {"200": {"content": {"application/json": {"schema": {"$ref": "#/components/schemas/GetItemsByOrderId"}}}}}
+      }
+    },
+    "/v2/orders/{order_id}/confirmation": {
+      "post": {
+        "operationId": "confirmOrder",
+        "responses": {"200": {"content": {"application/json": {"schema": {"$ref": "#/components/schemas/ConfirmOrderById"}}}}}
+      }
+    },
+    "/v2/files": {
+      "post": {
+        "operationId": "addFile",
+        "requestBody": {"content": {"application/json": {"schema": {"$ref": "#/components/schemas/AddFile"}}}},
+        "responses": {"200": {"content": {"application/json": {"schema": {"$ref": "#/components/schemas/FileAnswer"}}}}}
+      }
+    },
+    "/v2/files/{id}": {
+      "get": {
+        "operationId": "getFileById",
+        "responses": {"200": {"content": {"application/json": {"schema": {"$ref": "#/components/schemas/FileAnswer"}}}}}
+      }
+    },
+    "/v2/mockup-tasks": {
+      "post": {
+        "operationId": "createMockupGeneratorTasks",
+        "requestBody": {"content": {"application/json": {"schema": {"$ref": "#/components/schemas/MockupTaskCreation"}}}},
+        "responses": {"200": {"content": {"application/json": {"schema": {"$ref": "#/components/schemas/MockupTaskList"}}}}}
+      },
+      "get": {
+        "operationId": "getMockupGeneratorTasks",
+        "parameters": [{"name": "id", "in": "query", "required": true, "schema": {"type": "string", "pattern": "^[0-9]{1,18}$"}}],
+        "responses": {"200": {"content": {"application/json": {"schema": {"$ref": "#/components/schemas/MockupTaskList"}}}}}
+      }
+    }
+  },
+  "x-webhooks": {
+    "signature": {
+      "header": "x-pf-webhook-signature",
+      "algorithm": "HMAC-SHA256 über den unveränderten Rumpf der Anfrage",
+      "digest": "hex",
+      "secret": "secret_key aus POST /v2/webhooks, als Hex-Text - vor dem Rechnen zu Bytes dekodieren"
+    },
+    "event": {"required": ["type", "occurred_at", "retries", "store_id", "data"]}
+  },
+  "components": {
+    "schemas": {
+      "Link": {"type": "object", "properties": {"href": {"type": "string"}}},
+      "Paging": {
+        "type": "object", "required": ["total", "offset", "limit"],
+        "properties": {"total": {"type": "integer"}, "offset": {"type": "integer"}, "limit": {"type": "integer"}}
+      },
+      "StoreSchema": {
+        "type": "object", "required": ["id", "type", "name"],
+        "properties": {"id": {"type": "integer"}, "type": {"type": "string"}, "name": {"type": "string"}}
+      },
+      "GetStores": {
+        "type": "object", "required": ["data"],
+        "properties": {"data": {"type": "array", "items": {"$ref": "#/components/schemas/StoreSchema"}}, "paging": {"$ref": "#/components/schemas/Paging"}, "_links": {"type": "object"}}
+      },
+      "Technique": {
+        "type": "object", "required": ["key", "display_name", "is_default"],
+        "properties": {"key": {"type": "string"}, "display_name": {"type": "string"}, "is_default": {"type": "boolean"}}
+      },
+      "ProductPlacement": {
+        "type": "object", "required": ["placement", "technique", "layers", "print_area_width", "print_area_height", "placement_options", "conflicting_placements"],
+        "properties": {
+          "placement": {"type": "string"}, "technique": {"type": "string"},
+          "layers": {"type": "array", "items": {"type": "object"}},
+          "print_area_width": {"type": "number"}, "print_area_height": {"type": "number"},
+          "placement_options": {"type": "array", "items": {"type": "object"}},
+          "conflicting_placements": {"type": "array", "items": {"type": "string"}}
+        }
+      },
+      "Product": {
+        "type": "object",
+        "required": ["id", "main_category_id", "type", "name", "brand", "model", "image", "variant_count", "is_discontinued", "description", "sizes", "colors", "techniques", "placements", "product_options", "_links"],
+        "properties": {
+          "id": {"type": "integer"}, "main_category_id": {"type": "integer"}, "type": {"type": "string"}, "name": {"type": "string"},
+          "brand": {"type": "string", "nullable": true}, "model": {"type": "string", "nullable": true}, "image": {"type": "string"},
+          "variant_count": {"type": "integer"}, "is_discontinued": {"type": "boolean"}, "description": {"type": "string"},
+          "sizes": {"type": "array", "items": {"type": "string"}},
+          "colors": {"type": "array", "items": {"type": "object", "required": ["name", "value"], "properties": {"name": {"type": "string"}, "value": {"type": "string"}}}},
+          "techniques": {"type": "array", "items": {"$ref": "#/components/schemas/Technique"}},
+          "placements": {"type": "array", "items": {"$ref": "#/components/schemas/ProductPlacement"}},
+          "product_options": {"type": "array", "items": {"type": "object"}},
+          "_links": {"type": "object"}
+        }
+      },
+      "GetProductById": {"type": "object", "required": ["data"], "properties": {"data": {"$ref": "#/components/schemas/Product"}}},
+      "Variant": {
+        "type": "object", "required": ["id", "catalog_product_id", "name", "size", "color", "color_code", "color_code2", "image", "_links"],
+        "properties": {
+          "id": {"type": "integer"}, "catalog_product_id": {"type": "integer"}, "name": {"type": "string"}, "size": {"type": "string"},
+          "color": {"type": "string", "nullable": true}, "color_code": {"type": "string", "nullable": true}, "color_code2": {"type": "string", "nullable": true},
+          "placement_dimensions": {"type": "array", "items": {"type": "object"}},
+          "image": {"type": "string"}, "_links": {"type": "object"}
+        }
+      },
+      "GetProductVariantsById": {
+        "type": "object", "required": ["data", "paging", "_links"],
+        "properties": {"data": {"type": "array", "items": {"$ref": "#/components/schemas/Variant"}}, "paging": {"$ref": "#/components/schemas/Paging"}, "_links": {"type": "object"}}
+      },
+      "VariantTechniquePrice": {
+        "type": "object", "required": ["technique_key", "technique_display_name", "price", "discounted_price"],
+        "properties": {"technique_key": {"type": "string"}, "technique_display_name": {"type": "string"}, "price": {"type": "string", "pattern": "^[0-9]+(\\.[0-9]{1,2})?$"}, "discounted_price": {"type": "string", "pattern": "^[0-9]+(\\.[0-9]{1,2})?$"}}
+      },
+      "AdditionalPlacement": {
+        "type": "object",
+        "properties": {"id": {"type": "string"}, "title": {"type": "string"}, "type": {"type": "string"}, "technique_key": {"type": "string"}, "price": {"type": "string"}, "discounted_price": {"type": "string"}, "placement_options": {"type": "array"}, "layers": {"type": "array"}}
+      },
+      "VariantPrices": {
+        "type": "object", "required": ["currency", "product", "variant"],
+        "properties": {
+          "currency": {"type": "string"},
+          "product": {"type": "object", "properties": {"id": {"type": "integer"}, "placements": {"type": "array", "items": {"$ref": "#/components/schemas/AdditionalPlacement"}}}},
+          "variant": {"type": "object", "required": ["id", "techniques"], "properties": {"id": {"type": "integer"}, "techniques": {"type": "array", "items": {"$ref": "#/components/schemas/VariantTechniquePrice"}}}}
+        }
+      },
+      "GetVariantPricesById": {
+        "type": "object", "required": ["data", "_links"],
+        "properties": {"data": {"$ref": "#/components/schemas/VariantPrices"}, "_links": {"type": "object"}}
+      },
+      "SellingRegionStockAvailability": {
+        "type": "object", "required": ["name", "availability"],
+        "properties": {"name": {"type": "string"}, "availability": {"type": "string"}, "placement_option_availability": {"type": "array"}}
+      },
+      "TechniqueStockAvailability": {
+        "type": "object", "required": ["technique", "selling_regions"],
+        "properties": {"technique": {"type": "string"}, "selling_regions": {"type": "array", "items": {"$ref": "#/components/schemas/SellingRegionStockAvailability"}}}
+      },
+      "VariantStockAvailability": {
+        "type": "object", "required": ["catalog_variant_id", "techniques", "_links"],
+        "properties": {"catalog_variant_id": {"type": "integer"}, "techniques": {"type": "array", "items": {"$ref": "#/components/schemas/TechniqueStockAvailability"}}, "_links": {"type": "object"}}
+      },
+      "GetProductStockAvailabilityById": {
+        "type": "object", "required": ["data", "paging", "filter_settings", "_links"],
+        "properties": {"data": {"type": "array", "items": {"$ref": "#/components/schemas/VariantStockAvailability"}}, "paging": {"$ref": "#/components/schemas/Paging"}, "filter_settings": {"type": "array"}, "_links": {"type": "object"}}
+      },
+      "LayerInput": {
+        "type": "object", "required": ["type", "url"], "additionalProperties": false,
+        "properties": {"type": {"type": "string", "enum": ["file"]}, "url": {"type": "string", "pattern": "^https://[^\\s]+$"}}
+      },
+      "PlacementInput": {
+        "type": "object", "required": ["placement", "technique", "layers"], "additionalProperties": false,
+        "properties": {"placement": {"type": "string", "pattern": "^[a-z0-9_]{1,64}$"}, "technique": {"type": "string", "pattern": "^[a-z0-9-]{1,32}$"}, "layers": {"type": "array", "items": {"$ref": "#/components/schemas/LayerInput"}}}
+      },
+      "CatalogItemInput": {
+        "type": "object", "required": ["source", "catalog_variant_id", "quantity", "placements"], "additionalProperties": false,
+        "properties": {
+          "source": {"type": "string", "enum": ["catalog"]},
+          "catalog_variant_id": {"type": "integer", "minimum": 1},
+          "quantity": {"type": "integer", "minimum": 1, "maximum": 20},
+          "external_id": {"type": "string", "pattern": "^[A-Za-z0-9_-]{1,64}$"},
+          "name": {"type": "string"},
+          "placements": {"type": "array", "items": {"$ref": "#/components/schemas/PlacementInput"}}
+        }
+      },
+      "Address": {
+        "type": "object", "required": ["name", "address1", "city", "country_code", "zip"], "additionalProperties": false,
+        "properties": {
+          "name": {"type": "string"}, "company": {"type": "string"}, "address1": {"type": "string"}, "address2": {"type": "string"},
+          "city": {"type": "string"}, "state_code": {"type": "string"}, "country_code": {"type": "string", "pattern": "^[A-Z]{2}$"},
+          "zip": {"type": "string"}, "phone": {"type": "string"}, "email": {"type": "string"}
+        }
+      },
+      "EstimationAddress": {
+        "type": "object", "required": ["country_code", "zip"], "additionalProperties": false,
+        "properties": {"state_code": {"type": "string"}, "country_code": {"type": "string", "pattern": "^[A-Z]{2}$"}, "zip": {"type": "string"}}
+      },
+      "OrderInput": {
+        "type": "object", "required": ["external_id", "recipient", "order_items"], "additionalProperties": false,
+        "properties": {
+          "external_id": {"type": "string", "pattern": "^[A-Za-z0-9_-]{1,64}$"},
+          "shipping": {"type": "string", "pattern": "^[A-Z_]{1,32}$"},
+          "recipient": {"$ref": "#/components/schemas/Address"},
+          "order_items": {"type": "array", "items": {"$ref": "#/components/schemas/CatalogItemInput"}}
+        }
+      },
+      "CreateOrderEstimationTaskInput": {
+        "type": "object", "required": ["recipient", "order_items"], "additionalProperties": false,
+        "properties": {
+          "recipient": {"$ref": "#/components/schemas/EstimationAddress"},
+          "order_items": {"type": "array", "items": {"$ref": "#/components/schemas/CatalogItemInput"}}
+        }
+      },
+      "Costs": {
+        "type": "object",
+        "required": ["calculation_status", "currency", "subtotal", "discount", "shipping", "digitization", "additional_fee", "fulfillment_fee", "retail_delivery_fee", "vat", "tax", "total"],
+        "properties": {
+          "calculation_status": {"type": "string", "enum": ["done", "calculating", "failed"]},
+          "currency": {"type": "string", "nullable": true},
+          "subtotal": {"type": "string", "nullable": true}, "discount": {"type": "string", "nullable": true},
+          "shipping": {"type": "string", "nullable": true}, "digitization": {"type": "string", "nullable": true},
+          "additional_fee": {"type": "string", "nullable": true}, "fulfillment_fee": {"type": "string", "nullable": true},
+          "retail_delivery_fee": {"type": "string", "nullable": true}, "vat": {"type": "string", "nullable": true},
+          "tax": {"type": "string", "nullable": true}, "total": {"type": "string", "nullable": true}
+        }
+      },
+      "AddressReadonly": {
+        "type": "object",
+        "required": ["name", "company", "address1", "address2", "city", "state_code", "state_name", "country_code", "country_name", "zip", "phone", "email", "tax_number"],
+        "properties": {
+          "name": {"type": "string", "nullable": true}, "company": {"type": "string", "nullable": true}, "address1": {"type": "string", "nullable": true},
+          "address2": {"type": "string", "nullable": true}, "city": {"type": "string", "nullable": true}, "state_code": {"type": "string", "nullable": true},
+          "state_name": {"type": "string", "nullable": true}, "country_code": {"type": "string", "nullable": true}, "country_name": {"type": "string", "nullable": true},
+          "zip": {"type": "string", "nullable": true}, "phone": {"type": "string", "nullable": true}, "email": {"type": "string", "nullable": true},
+          "tax_number": {"type": "string", "nullable": true}
+        }
+      },
+      "CatalogItemSummary": {
+        "type": "object",
+        "required": ["id", "type", "source", "catalog_variant_id", "external_id", "quantity", "price", "retail_price", "currency", "retail_currency", "_links"],
+        "properties": {
+          "id": {"type": "integer"}, "type": {"type": "string", "enum": ["order_item", "branding_item"]}, "source": {"type": "string", "enum": ["catalog"]},
+          "catalog_variant_id": {"type": "integer"}, "external_id": {"type": "string", "nullable": true}, "name": {"type": "string"},
+          "quantity": {"type": "integer"}, "price": {"type": "string", "nullable": true}, "retail_price": {"type": "string", "nullable": true},
+          "currency": {"type": "string", "nullable": true}, "retail_currency": {"type": "string", "nullable": true}, "_links": {"type": "object"}
+        }
+      },
+      "Order": {
+        "type": "object",
+        "required": ["id", "external_id", "store_id", "shipping", "status", "created_at", "updated_at", "recipient", "costs", "retail_costs", "order_items", "_links"],
+        "properties": {
+          "id": {"type": "integer"}, "external_id": {"type": "string", "nullable": true}, "store_id": {"type": "integer"},
+          "shipping": {"type": "string"},
+          "status": {"type": "string", "enum": ["draft", "failed", "inreview", "pending", "canceled", "onhold", "inprocess", "partial", "fulfilled"]},
+          "created_at": {"type": "string"}, "updated_at": {"type": "string"},
+          "recipient": {"$ref": "#/components/schemas/AddressReadonly"},
+          "costs": {"$ref": "#/components/schemas/Costs"},
+          "retail_costs": {"type": "object", "nullable": true},
+          "order_items": {"type": "array", "items": {"$ref": "#/components/schemas/CatalogItemSummary"}},
+          "customization": {"type": "object", "nullable": true},
+          "_links": {"type": "object"}
+        }
+      },
+      "GetOrderById": {"type": "object", "required": ["data"], "properties": {"data": {"$ref": "#/components/schemas/Order"}}},
+      "ConfirmOrderById": {"type": "object", "required": ["data", "_links"], "properties": {"data": {"$ref": "#/components/schemas/Order"}, "_links": {"type": "object"}}},
+      "LayerReadonly": {
+        "type": "object", "required": ["type", "url"],
+        "properties": {"type": {"type": "string"}, "url": {"type": "string"}, "layer_options": {"type": "array"}, "position": {"type": "object"}}
+      },
+      "PlacementReadonly": {
+        "type": "object", "required": ["placement", "technique", "layers", "status", "status_explanation"],
+        "properties": {
+          "placement": {"type": "string"}, "technique": {"type": "string"}, "print_area_type": {"type": "string", "enum": ["simple", "advanced"]},
+          "layers": {"type": "array", "items": {"$ref": "#/components/schemas/LayerReadonly"}}, "placement_options": {"type": "array"},
+          "status": {"type": "string", "enum": ["ok", "failed"]}, "status_explanation": {"type": "string", "nullable": true}
+        }
+      },
+      "CatalogItemReadonly": {
+        "type": "object",
+        "required": ["placements", "catalog_variant_id", "source", "id", "external_id", "quantity", "retail_price", "name", "product_options", "_links"],
+        "properties": {
+          "source": {"type": "string", "enum": ["catalog"]}, "catalog_variant_id": {"type": "integer"}, "id": {"type": "integer"},
+          "external_id": {"type": "string", "nullable": true}, "quantity": {"type": "integer"}, "retail_price": {"type": "string", "nullable": true},
+          "name": {"type": "string"}, "placements": {"type": "array", "items": {"$ref": "#/components/schemas/PlacementReadonly"}},
+          "product_options": {"type": "array"}, "_links": {"type": "object"}
+        }
+      },
+      "GetItemsByOrderId": {
+        "type": "object", "required": ["data", "paging", "_links"],
+        "properties": {"data": {"type": "array", "items": {"$ref": "#/components/schemas/CatalogItemReadonly"}}, "paging": {"$ref": "#/components/schemas/Paging"}, "_links": {"type": "object"}}
+      },
+      "TaskSummary": {
+        "type": "object", "required": ["id", "status", "costs", "retail_costs", "failure_reasons"],
+        "properties": {
+          "id": {"type": "string"}, "status": {"type": "string", "enum": ["pending", "failed", "completed"]},
+          "costs": {"$ref": "#/components/schemas/CostsOrNull"},
+          "retail_costs": {"type": "object", "nullable": true},
+          "failure_reasons": {"type": "array", "items": {"type": "string"}}
+        }
+      },
+      "CostsOrNull": {
+        "type": "object", "nullable": true,
+        "required": ["calculation_status", "currency", "subtotal", "shipping", "vat", "tax", "total"],
+        "properties": {
+          "calculation_status": {"type": "string", "enum": ["done", "calculating", "failed"]},
+          "currency": {"type": "string", "nullable": true}, "subtotal": {"type": "string", "nullable": true},
+          "discount": {"type": "string", "nullable": true}, "shipping": {"type": "string", "nullable": true},
+          "digitization": {"type": "string", "nullable": true}, "additional_fee": {"type": "string", "nullable": true},
+          "fulfillment_fee": {"type": "string", "nullable": true}, "retail_delivery_fee": {"type": "string", "nullable": true},
+          "vat": {"type": "string", "nullable": true}, "tax": {"type": "string", "nullable": true}, "total": {"type": "string", "nullable": true}
+        }
+      },
+      "OrderEstimationTaskAnswer": {"type": "object", "required": ["data"], "properties": {"data": {"$ref": "#/components/schemas/TaskSummary"}}},
+      "AddFile": {
+        "type": "object", "required": ["url"], "additionalProperties": false,
+        "properties": {
+          "role": {"type": "string", "enum": ["printfile", "label", "preview"]},
+          "url": {"type": "string", "pattern": "^https://[^\\s]+$"},
+          "filename": {"type": "string", "pattern": "^[A-Za-z0-9._-]{1,100}$"},
+          "visible": {"type": "boolean"}
+        }
+      },
+      "File": {
+        "type": "object",
+        "required": ["id", "url", "hash", "filename", "mime_type", "size", "width", "height", "dpi", "status", "created", "thumbnail_url", "preview_url", "visible", "is_temporary", "_links"],
+        "properties": {
+          "id": {"type": "integer"}, "url": {"type": "string"}, "hash": {"type": "string", "nullable": true},
+          "filename": {"type": "string", "nullable": true}, "mime_type": {"type": "string", "nullable": true},
+          "size": {"type": "integer"}, "width": {"type": "integer", "nullable": true}, "height": {"type": "integer", "nullable": true},
+          "dpi": {"type": "integer", "nullable": true}, "status": {"type": "string", "enum": ["waiting", "ok", "failed", "deleted"]},
+          "created": {"type": "string"}, "thumbnail_url": {"type": "string", "nullable": true}, "preview_url": {"type": "string", "nullable": true},
+          "visible": {"type": "boolean"}, "is_temporary": {"type": "boolean"}, "_links": {"type": "object"}
+        }
+      },
+      "FileAnswer": {"type": "object", "required": ["data"], "properties": {"data": {"$ref": "#/components/schemas/File"}}},
+      "MockupPlacementInput": {
+        "type": "object", "required": ["placement", "technique", "layers"], "additionalProperties": false,
+        "properties": {"placement": {"type": "string", "pattern": "^[a-z0-9_]{1,64}$"}, "technique": {"type": "string", "pattern": "^[a-z0-9-]{1,32}$"}, "layers": {"type": "array", "items": {"$ref": "#/components/schemas/LayerInput"}}}
+      },
+      "CatalogMockupProduct": {
+        "type": "object", "required": ["source", "catalog_product_id", "placements"], "additionalProperties": false,
+        "properties": {
+          "source": {"type": "string", "enum": ["catalog"]},
+          "catalog_product_id": {"type": "integer", "minimum": 1},
+          "catalog_variant_ids": {"type": "array", "items": {"type": "integer", "minimum": 1}},
+          "mockup_style_ids": {"type": "array", "items": {"type": "integer", "minimum": 1}},
+          "placements": {"type": "array", "items": {"$ref": "#/components/schemas/MockupPlacementInput"}}
+        }
+      },
+      "MockupTaskCreation": {
+        "type": "object", "required": ["products"], "additionalProperties": false,
+        "properties": {
+          "format": {"type": "string", "enum": ["jpg", "png"]},
+          "mockup_width_px": {"type": "integer", "minimum": 50, "maximum": 4000},
+          "products": {"type": "array", "items": {"$ref": "#/components/schemas/CatalogMockupProduct"}}
+        }
+      },
+      "Mockup": {
+        "type": "object", "required": ["placement", "mockup_url"],
+        "properties": {"placement": {"type": "string"}, "display_name": {"type": "string"}, "technique": {"type": "string"}, "style_id": {"type": "integer"}, "mockup_url": {"type": "string"}}
+      },
+      "MockupFailure": {
+        "type": "object",
+        "properties": {"type": {"type": "string"}, "detail": {"type": "string"}, "source": {"type": "object"}, "valid_values": {"type": "array"}}
+      },
+      "MockupGeneratorTask": {
+        "type": "object", "required": ["id", "status", "catalog_variant_mockups", "failure_reasons", "_links"],
+        "properties": {
+          "id": {"type": "integer"}, "status": {"type": "string", "enum": ["completed", "pending", "failed"]},
+          "catalog_variant_mockups": {"type": "array", "items": {"type": "object", "required": ["catalog_variant_id", "mockups"], "properties": {"catalog_variant_id": {"type": "integer"}, "mockups": {"type": "array", "items": {"$ref": "#/components/schemas/Mockup"}}}}},
+          "failure_reasons": {"type": "array", "items": {"$ref": "#/components/schemas/MockupFailure"}},
+          "_links": {"type": "object"}
+        }
+      },
+      "MockupTaskList": {
+        "type": "object", "required": ["data"],
+        "properties": {"data": {"type": "array", "items": {"$ref": "#/components/schemas/MockupGeneratorTask"}}, "paging": {"$ref": "#/components/schemas/Paging"}, "_links": {"type": "object"}}
+      }
+    }
+  }
+}
