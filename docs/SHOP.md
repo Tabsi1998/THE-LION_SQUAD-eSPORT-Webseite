@@ -24,7 +24,8 @@ die Sammlungen direkt. Jede Katalogänderung ist eine Adminaktion mit Person und
 | `shop_orders` | Bestellung mit allem Eingefrorenen (unten), Stand, Rechnungs- und Lieferanschrift, `printful_external_id` | `idempotency_key`, `printful_external_id` |
 | `shop_order_items` | Position einer Bestellung, eingefroren | `order_id` + `position` |
 | `shop_order_events` | Verlauf einer Bestellung, **nur angehängt** | `order_id` + `event_key` |
-| `shop_printful_confirmations` | Idempotenzschutz beim Bestätigen bei Printful (#1705): Schlüssel, Auftragsnummer, Stand – keine Person | `_id` = Schlüssel |
+| `shop_printful_drafts` | Claim vor dem Anlegen eines Printful-Entwurfs (#1705): `external_id`, Stand (`sending`, `created`, `failed`), Printful-Nummer – keine Person | `external_id` |
+| `shop_printful_confirmations` | Claim vor dem Bestätigen bei Printful (#1705): Idempotenzschlüssel, Auftragsnummer, Stand (`sending`, `confirmed`, `unclear`) – keine Person | `order_id`, `idempotency_key` |
 
 Sichere Vorgaben: Ein neues Produkt ist `draft` und `hidden`, ohne Steuerprofil. Beträge sind ganze Cent, nie
 negativ, mit Obergrenzen (Preis 1000 €, Aufschlag 100 €, Versand 100 €, Menge 20 je Position, 20 Positionen).
@@ -235,12 +236,26 @@ bei ausgeschaltetem Notschalter – ein Entwurf wird nie produziert und nie beza
 Rumpf (`order_payload`) besteht aus genau `external_id`, `shipping`, `recipient`, `order_items`, und die Anfrageschicht
 verweigert den Weg `…/confirmation` außer aus `confirm_order`. Der Vertrag lehnt ein Feld `confirm` ab.
 
-**Idempotenz:** `create_draft` sucht zuerst über die `external_id` (`lsw-<Bestellung>` aus `shop_orders`, bei
-Testentwürfen eine eigene) – gibt es den Auftrag, kommt er zurück, es entsteht kein zweiter. `confirm_order` braucht
-einen Idempotenzschlüssel (8–128 Zeichen); er gehört zu genau einem Auftrag (`shop_printful_confirmations`, `_id` =
-Schlüssel). Derselbe Schlüssel sendet nie ein zweites Mal; ist der Auftrag kein Entwurf mehr, wird gar nicht gesendet.
-Lehnt Printful ab, ist der Schlüssel wieder frei; bei unbekanntem Ausgang (Zeitüberschreitung) bleibt er fünf Minuten
-belegt, danach entscheidet der Stand bei Printful.
+**Idempotenz beim Anlegen:** Vor dem Senden legt `create_draft` einen Claim in `shop_printful_drafts` an (eindeutiger
+Index auf `external_id` = `lsw-<Bestellung>` aus `shop_orders`, bei Testentwürfen eine eigene). Nur wer den Insert
+gewinnt, sucht über `@external_id` nach und sendet; ein zweiter Aufruf bekommt den Auftrag (Claim `created`) oder
+`FulfillmentTransient` „läuft schon“ (`draft_in_progress`). Lehnt Printful mit 4xx ab, wird der Claim `failed` und die
+`external_id` ist wieder frei. Ein Claim `sending` mit offenem Ausgang (Zeitüberschreitung, 5xx) wird nach 60 Sekunden
+**erst nach einer Nachsuche** über `@external_id` und per bedingtem Update übernommen – gibt es den Auftrag, kommt er
+zurück. `delete_draft` gibt die `external_id` wieder frei.
+
+**Idempotenz beim Bestätigen:** Printful v2 kennt keinen Idempotenzschlüssel. `confirm_order` braucht einen eigenen
+(8–128 Zeichen) und legt vor dem Senden einen Claim in `shop_printful_confirmations` an – eindeutig je Auftrag und je
+Schlüssel; ein Schlüssel gehört zu genau einem Auftrag. Nur wer den Claim gewinnt, sendet, und nur, solange der
+Auftrag ein Entwurf ist.
+
+- **Eindeutige Ablehnung** (400, 409, 422): Claim frei, ein neuer Versuch darf senden.
+- **Unklarer Ausgang** (Zeitüberschreitung, Netz, 5xx, 429, jede andere Antwort; ebenso ein Claim `sending`, der
+  älter als fünf Minuten ist): Claim `unclear`, **kein automatisches erneutes Bestätigen**. Jeder weitere Aufruf liest
+  nur nach: kein Entwurf mehr → bestätigt (Claim `confirmed`); weiter Entwurf → `FulfillmentPermanent`
+  `confirm_unclear` („Bestätigung unklar – bitte in Printful prüfen“). Erneut senden nur ausdrücklich mit
+  `force_after_review=True`, nachdem jemand in Printful nachgesehen hat – und nur einer übernimmt (bedingtes Update).
+- Scheitert das Nachlesen vor dem Senden, ist nichts gesendet worden: der Claim wird wieder frei.
 
 **Gegen Verwechslungen:** Produkt-, Varianten- und Auftragsnummer sind eigene Typen (`CatalogProductId`,
 `CatalogVariantId`, `PrintfulOrderId`); eine bloße Zahl oder die falsche Nummer ist ein `TypeError`. Bestellt wird
@@ -265,8 +280,8 @@ immer eine **Variante** (`catalog_variant_id`), nie ein Produkt.
 
 | Klasse | Wann | Was tun |
 | --- | --- | --- |
-| `FulfillmentTransient` | Zeitüberschreitung, Netz, 429, 5xx, Schätzung noch nicht fertig, Bestätigung läuft | später erneut versuchen (`retry_after`) |
-| `FulfillmentPermanent` | 401, 403, 404, Weiterleitung, unerwartete Antwort, kein Schlüssel | Admin informieren |
+| `FulfillmentTransient` | Zeitüberschreitung, Netz, 429, 5xx, Schätzung noch nicht fertig, Entwurf oder Bestätigung läuft schon | später erneut versuchen (`retry_after`) |
+| `FulfillmentPermanent` | 401, 403, 404, Weiterleitung, unerwartete Antwort, kein Schlüssel, Bestätigung unklar (`confirm_unclear`) | Admin informieren |
 | `FulfillmentInvalid` | 400, 409, 422, gescheiterte Schätzung, kein Entwurf mehr, Schlüssel gehört zu anderem Auftrag | Bestellung blockieren |
 
 Alle erben von `FulfillmentError` mit `kind`, `reason`, `status`, `retry_after` und `provider_detail`.
