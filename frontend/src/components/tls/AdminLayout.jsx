@@ -205,7 +205,7 @@ const ADMIN_SEARCH_TERMS = {
   "/admin/dolibarr?tab=links": ["zuordnungen", "konto mitglied", "verknuepfung", "verknüpfung", "loesen", "lösen"],
   "/admin/dolibarr?tab=policy": ["bereiche", "bereich", "vorstand rechte", "freigabe", "vereinsverwaltung", "obmann", "kassier"],
   "/admin/dolibarr?tab=features": ["funktionen", "schalter", "aus dolibarr", "vereinsdaten aus dolibarr", "kanaele aus dolibarr", "sponsoren aus dolibarr", "beitrittsantraege", "verzeichnis", "einwilligung", "schreibzugriff"],
-  "/admin/shop": ["shop", "vereinsshop", "printful", "merch", "notschalter", "aufschlag", "shirt"],
+  "/admin/shop": ["shop", "vereinsshop", "printful", "merch", "notschalter", "aufschlag", "shirt", "design", "druckdatei", "logo", "dpi"],
   "/admin/finance": ["finanzen", "rechnungen", "belege", "zahlungen", "prueffaelle", "erstattung", "auftraege"],
   "/admin/dolibarr": ["dolibarr", "erp", "anbindung", "mitgliederverwaltung", "schreibzugriff", "konditionen", "steuersaetze", "abgleich"],
 };
