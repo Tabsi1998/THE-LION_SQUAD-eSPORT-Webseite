@@ -394,31 +394,54 @@ def _stalled(graph: _Graph, slot: dict, heat: dict) -> dict | None:
     return _feeding_entry(graph, slot, heat["id"])
 
 
-def _within_cap(graph: _Graph, extras: list[tuple[dict, dict]], used: int, cap: int) -> list[tuple[dict, dict]]:
+def _unlink(origin: dict, entry: dict) -> None:
+    origin["advancement"] = [row for row in origin.get("advancement") or [] if row is not entry]
+
+
+def _within_cap(graph: _Graph, extras: list[tuple[dict, dict]], used: int,
+                cap: int) -> tuple[list[tuple[dict, dict]], list[dict]]:
     """Freilos- und wartende Plätze mit Weiterleitung, die beim Zusammenlegen mitziehen - so viele, wie die Laufgröße
-    lässt (TV, Baum und App zeigen jeden Platz). Ein Platz, dessen Quelle noch lebt, bleibt immer: sie kann noch
-    liefern. Die übrigen (die Quelle ist entschieden; der Platz blieb leer oder wurde durch ein Ausscheiden frei)
-    fallen über der Laufgröße weg - samt ihrer Weiterleitung, hohe Ränge zuerst, nie die letzte Weiterleitung eines
-    gefahrenen Laufs (#1596: er behält seinen Weg)."""
-    keep: list[tuple[dict, dict]] = []
-    rest: list[tuple[dict, dict, dict | None]] = []
+    lässt (TV, Baum und App zeigen jeden Platz; ``len(slots)`` und ``match_size`` bleiben immer ≤ Laufgröße). Zuerst
+    die Plätze lebender Quellen (etwa ein aufgerufener Vorlauf, dessen L2 es bei drei Fahrern nicht gibt), dann die
+    entschiedener Quellen (der Platz blieb leer oder wurde durch ein Ausscheiden frei), hohe Ränge zuletzt. Was nicht
+    mehr hineinpasst: bei lebender Quelle ein Merkposten (``dormant_slots`` - ``_revive`` legt ihn wieder an, sobald
+    die Quelle liefert und Platz ist), bei entschiedener Quelle fällt die Weiterleitung weg - nie die letzte eines
+    gefahrenen Laufs (#1596: er behält seinen Weg; der eine Platz darüber bleibt dann stehen).
+    Rückgabe: (Plätze, die bleiben), (Merkposten)."""
+    rows = []
     for slot, entry in extras:
         origin = graph.by_key.get((slot.get("source") or {}).get("match_key"))
-        if origin and _live(origin):
-            keep.append((slot, entry))
-        else:
-            rest.append((slot, entry, origin))
-    rest.sort(key=lambda row: (row[1].get("flow") != "W", int(row[1].get("rank") or 0)))
-    room = max(0, cap - used - len(keep)) if cap else len(rest)
-    for slot, entry, origin in rest:
+        rows.append((slot, entry, origin))
+    rows.sort(key=lambda row: (not (row[2] and _live(row[2])), row[1].get("flow") != "W", int(row[1].get("rank") or 0)))
+    keep: list[tuple[dict, dict]] = []
+    memory: list[dict] = []
+    room = max(0, cap - used) if cap else len(rows)
+    for slot, entry, origin in rows:
         links = (origin or {}).get("advancement") or []
         played = origin is not None and str(origin.get("status") or "") in DECIDED_STATUSES
         if room > 0 or origin is None or (played and len(links) <= 1):
             keep.append((slot, entry))
             room -= 1
             continue
-        origin["advancement"] = [row for row in links if row is not entry]
-    return keep
+        _unlink(origin, entry)
+        if _live(origin):
+            memory.append(_memory_of(slot))
+    return keep, memory
+
+
+def _droppable(graph: _Graph, target: dict, slot: dict) -> tuple[dict, dict] | None:
+    """Ein Freilos-Platz, dessen Weiterleitung weichen kann, damit ein zurückkehrender Platz hineinpasst: niemand
+    sitzt dort, die Quelle ist entschieden oder entfallen, und sie behält eine andere Weiterleitung (#1596)."""
+    if slot.get("status") != "bye" or slot.get("registration_id") or _dormant(graph, slot):
+        return None
+    entry = _feeding_entry(graph, slot, target["id"])
+    origin = graph.by_key.get((slot.get("source") or {}).get("match_key")) if entry else None
+    if entry is None or origin is None or _live(origin):
+        return None
+    played = str(origin.get("status") or "") in DECIDED_STATUSES
+    if played and len(origin.get("advancement") or []) <= 1:
+        return None
+    return origin, entry
 
 
 def _rebuild_group(graph: _Graph, heats: list[dict], buckets: list[list[tuple]],
@@ -473,9 +496,10 @@ def _rebuild_group(graph: _Graph, heats: list[dict], buckets: list[list[tuple]],
             new_slots.append(moved)
             if origin_heat["id"] != survivor["id"]:
                 received[origin_heat["id"]][survivor["id"]] += 1
-        survivor["dormant_slots"] = list(dormant) if survivor is survivors[0] else []
         extras = (list(linked_byes) if survivor is survivors[0] else []) + (kept_byes.get(survivor["id"]) or [])
-        for slot, entry in _within_cap(graph, extras, len(new_slots), cap):
+        carried, memory = _within_cap(graph, extras, len(new_slots), cap)
+        survivor["dormant_slots"] = (list(dormant) if survivor is survivors[0] else []) + memory
+        for slot, entry in carried:
             slot.pop("moved_to", None)
             slot["slot"] = len(new_slots) + 1
             new_slots.append(slot)
@@ -540,10 +564,13 @@ def _restore(graph: _Graph, heat: dict, target: dict, slot: dict, wanted: dict, 
     target["updated_at"] = now_iso
 
 
-def _revive(graph: _Graph, heat: dict, rank: int, now_iso: str, flow: str = "W") -> bool:
+def _revive(graph: _Graph, heat: dict, rank: int, now_iso: str, flow: str = "W", cap: int = 0) -> bool:
     """Der Platz „Quelle unerfüllbar“ für diesen Rang kommt zurück, wenn es ihn in einem umbaubaren Lauf noch gibt -
-    als Platz im Lauf oder als Merkposten (``dormant_slots``, nach einem Zusammenlegen): dann bekommt er einen toten
-    Freilos-Platz oder, wenn es keinen gibt, einen neuen Platz am Ende."""
+    als Platz im Lauf oder als Merkposten (``dormant_slots``, nach einem Zusammenlegen). Ein Merkposten bekommt einen
+    toten Freilos-Platz, sonst einen neuen Platz, solange der Lauf unter der Laufgröße ist, sonst den Platz eines
+    Freiloses, dessen Weiterleitung weichen kann (``_droppable``). Ist der Lauf voll (vier echte Plätze), bleibt der
+    Merkposten liegen und der Aufrufer kappt die Quote bzw. den Verlierer-Weg der Quelle - wie die Kappung einer
+    Gruppe (#2033): kein Lauf über der Laufgröße, auch nicht nach einer Korrektur oder einem „Rückgängig“."""
     wanted = {"flow": flow, "match_key": heat.get("match_key"), "rank": rank}
     for target in graph.matches:
         if not _rebuildable(target):
@@ -562,18 +589,38 @@ def _revive(graph: _Graph, heat: dict, rank: int, now_iso: str, flow: str = "W")
                      if {key: row.get(key) for key in ("flow", "match_key", "rank")} == wanted), None)
         if item is None:
             continue
-        target["dormant_slots"] = [row for row in memory if row is not item]
-        slot = next((row for row in target.get("slots") or [] if _free_bye(graph, target, row)), None)
-        if slot is None:
-            slot = _bye_slot(len(target.get("slots") or []) + 1)
+        slots = target.get("slots") or []
+        slot = next((row for row in slots if _free_bye(graph, target, row)), None)
+        if slot is None and (not cap or len(slots) < cap):
+            slot = _bye_slot(len(slots) + 1)
             target.setdefault("slots", []).append(slot)
             target["settings"] = {**(target.get("settings") or {}), "match_size": len(target["slots"])}
+        if slot is None:
+            for row in slots:
+                found = _droppable(graph, target, row)
+                if found:
+                    _unlink(found[0], found[1])
+                    slot = row
+                    break
+        if slot is None:
+            return False
+        target["dormant_slots"] = [row for row in memory if row is not item]
         _restore(graph, heat, target, slot, wanted, item.get("raw"), item.get("draw"), now_iso)
         return True
     return False
 
 
-def _fit_loser_links(graph: _Graph, heat: dict, now_iso: str) -> None:
+def _prune_memory(graph: _Graph) -> None:
+    """Merkposten, deren Quelle entschieden oder entfallen ist, kommen nie zurück - weg damit."""
+    for match in graph.matches:
+        memory = match.get("dormant_slots")
+        if not memory:
+            continue
+        match["dormant_slots"] = [item for item in memory
+                                  if (origin := graph.by_key.get(item.get("match_key"))) and _live(origin)]
+
+
+def _fit_loser_links(graph: _Graph, heat: dict, now_iso: str, cap: int = 0) -> None:
     """Die Verlierer-Weiterleitungen eines Laufs passen zu Laufgröße und Quote (#2045). ``L1`` ist der erste, der nicht
     weiterkommt (Platz Quote + 1), ``L2`` der nächste - so liest es der Ergebnis-Anwender. Gleicht der Umbau einen Lauf
     auf 3 oder 2 Plätze aus, gibt es weniger Verlierer-Plätze: bei 3 Plätzen und Quote 2 nur ``L1``, bei 2 Plätzen
@@ -591,7 +638,7 @@ def _fit_loser_links(graph: _Graph, heat: dict, now_iso: str) -> None:
     highest = max((int(entry.get("rank") or 0) for entry in links), default=0)
     revived = 0
     for rank in range(highest + 1, places + 1):
-        if not _revive(graph, heat, rank, now_iso, flow="L"):
+        if not _revive(graph, heat, rank, now_iso, flow="L", cap=cap):
             break
         revived += 1
     dropped = [entry for entry in links if int(entry.get("rank") or 0) > places]
@@ -651,7 +698,7 @@ def _apply_quota(graph: _Graph, heat: dict, cap: int, quota: int, now_iso: str, 
     if not any(entry.get("flow") == "W" for entry in advancement):
         # Kein Sieger-Weg: das Finale - oder ein Lauf, der gewartet hat (#2044) und dessen Zielplätze ruhen. Kommt der
         # erste Platz zurück, folgt die Quote wieder der Belegung; sonst gibt es nichts zu tun.
-        if not _revive(graph, heat, 1, now_iso):
+        if not _revive(graph, heat, 1, now_iso, cap=cap):
             return
         graph.invalidate()
     # Verlierer-Wege (Loser Bracket) bleiben hier unberührt; ``_fit_loser_links`` passt sie danach an die neue Quote
@@ -661,7 +708,7 @@ def _apply_quota(graph: _Graph, heat: dict, cap: int, quota: int, now_iso: str, 
     wanted = heat_quota(count, cap, quota)
     if wanted > current:
         for rank in range(current + 1, wanted + 1):
-            if not _revive(graph, heat, rank, now_iso):
+            if not _revive(graph, heat, rank, now_iso, cap=cap):
                 wanted = rank - 1
                 break
         graph.invalidate()
@@ -888,12 +935,12 @@ def _pass(graph: _Graph, *, cap: int, quota: int, min_players: int, structural: 
             heats = live_heats
         for heat in heats:
             _apply_quota(graph, heat, cap, quota, now_iso, ops)
-            _fit_loser_links(graph, heat, now_iso)
+            _fit_loser_links(graph, heat, now_iso, cap)
         if targets:
             _trim_quotas(graph, heats, [graph.by_id[target_id] for target_id in targets if target_id in graph.by_id],
                          cap, now_iso, ops)
             for heat in heats:
-                _fit_loser_links(graph, heat, now_iso)
+                _fit_loser_links(graph, heat, now_iso, cap)
             if structural and len(heats) == 1:
                 _shorten(graph, heats[0], now_iso, ops)
     live_ids = [match["id"] for match in graph.matches if _live(match)]
@@ -903,6 +950,7 @@ def _pass(graph: _Graph, *, cap: int, quota: int, min_players: int, structural: 
     if drawn:
         resolve_walkovers(drawn, graph.by_id, {}, now_iso, draws=draws)
     _normalize_sources(graph)
+    _prune_memory(graph)
     graph.invalidate()
 
 

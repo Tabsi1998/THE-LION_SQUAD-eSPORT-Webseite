@@ -675,11 +675,16 @@ def _draw_started(target: dict) -> bool:
     )
 
 
-def _drawn_slot(targets: list[dict], source_id: str, flow: str | None, ranks: set[int]) -> tuple[dict, dict] | None:
-    """Der ausgeloste Platz eines Weiterkommers (Quelle, Weg, Platz) - für Korrekturen nach der Auslosung."""
+def _drawn_slot(targets: list[dict], source_id: str, flow: str | None, ranks: set[int],
+                taken: set[int] | frozenset = frozenset()) -> tuple[dict, dict] | None:
+    """Der ausgeloste Platz eines Weiterkommers (Quelle, Weg, Platz) - für Korrekturen nach der Auslosung. ``taken``:
+    Plätze, die dieser Eintrag gerade schon vergeben hat (nach ``id``) - sie gehören einem anderen Weg; sonst träfe
+    bei einem Ausgeschiedenen vor den Weiterkommern der Platz im Ergebnis den Platz eines anderen Wegs."""
     for target in targets:
         for slot in target.get("slots") or []:
             origin = slot.get("source_result") or {}
+            if id(slot) in taken:
+                continue
             if origin.get("from_match_id") == source_id and origin.get("flow") == flow \
                     and int(origin.get("rank") or 0) in ranks and not _unfulfillable(slot):
                 return target, slot
@@ -729,12 +734,14 @@ def _entry_seat(advancement: dict, source: dict, targets: list[dict]) -> tuple[d
     return seats[ranks.index(rank)]
 
 
-def _own_drawn_seat(advancement: dict, target: dict, source_id: str) -> tuple[dict, dict] | None:
+def _own_drawn_seat(advancement: dict, target: dict, source_id: str,
+                    taken: set[int] | frozenset = frozenset()) -> tuple[dict, dict] | None:
     """Sofort zufällig (#1590): das Schema folgt dem Los - der Platz aus dem Eintrag ist der gezogene, solange er noch
     von dieser Quelle auf diesem Weg stammt. Nach einem Aufrücken (#1839) steht dort der Rang des Nachrückers."""
     slot = _find_slot(target, int(advancement.get("to_slot") or 0))
     origin = (slot or {}).get("source_result") or {}
-    if slot and origin.get("from_match_id") == source_id and origin.get("flow") == advancement.get("flow"):
+    if slot and id(slot) not in taken and origin.get("from_match_id") == source_id \
+            and origin.get("flow") == advancement.get("flow"):
         return target, slot
     return None
 
@@ -818,7 +825,8 @@ def moved_up_seating(source: dict, by_id: dict[str, dict], gone: set[str], resul
 
 
 def _locate_target_slot(advancement: dict, target: dict, by_id: dict[str, dict], source_id: str,
-                        result_rank: int, rng=None, rewired: list[dict] | None = None) -> tuple[dict, dict | None, tuple | None]:
+                        result_rank: int, rng=None, rewired: list[dict] | None = None,
+                        taken: set[int] | None = None) -> tuple[dict, dict | None, tuple | None]:
     """Wohin ein Weiterkommer geht: fester Baum - der Platz aus dem Schema; gemischt - vor der Auslosung noch nirgends
     (Rückgabe mit Phase und Gruppe), danach sein ausgeloster Platz. Sofort zufällig (#1590): sein schon gezogener
     Platz (Korrektur: der Platz bleibt, die Person wechselt), sonst gleich ein zufälliger freier Platz der Gruppe -
@@ -831,8 +839,10 @@ def _locate_target_slot(advancement: dict, target: dict, by_id: dict[str, dict],
     source = by_id.get(source_id) or {}
     # Korrektur nach der Auslosung: zuerst der Platz genau dieser Weiterleitung (nach einem Aufrücken steht dort der
     # Rang des Nachrückers, #1839), dann wie bisher nach Rang, sonst ein freier Platz.
+    taken = taken if taken is not None else set()
     if _is_instant(target):
-        found = (_own_drawn_seat(advancement, target, source_id) or _drawn_slot(targets, source_id, advancement.get("flow"), ranks)
+        found = (_own_drawn_seat(advancement, target, source_id, taken)
+                 or _drawn_slot(targets, source_id, advancement.get("flow"), ranks, taken)
                  or _free_draw_slot(targets, rng))
         if not found:
             return target, None, None
@@ -842,7 +852,8 @@ def _locate_target_slot(advancement: dict, target: dict, by_id: dict[str, dict],
         return found[0], found[1], None
     if not _group_is_drawn(targets):
         return target, None, (target.get("stage_id"), group)
-    found = (_entry_seat(advancement, source, targets) or _drawn_slot(targets, source_id, advancement.get("flow"), ranks)
+    found = (_entry_seat(advancement, source, targets)
+             or _drawn_slot(targets, source_id, advancement.get("flow"), ranks, taken)
              or _free_draw_slot(targets, rng))
     if not found:
         return target, None, None
@@ -1440,6 +1451,9 @@ def build_v2_result_application(
     advanced_registration_ids: set[str] = set()
     waiting_groups: list[tuple] = []
     draws: list[dict] = []
+    # Plätze, die dieses Ergebnis schon vergeben hat: ein zweiter Weg desselben Laufs nimmt sie nicht (sofort zufällig
+    # nach einem Ausscheiden: der Platz im Ergebnis des einen fiel mit dem Rang des anderen Wegs zusammen).
+    taken: set[int] = set()
 
     for advancement in match.get("advancement") or []:
         target = by_id.get(advancement.get("to_match_id")) or by_key.get(advancement.get("to_match_key"))
@@ -1463,7 +1477,8 @@ def build_v2_result_application(
                 )
             advanced_registration_ids.add(result["registration_id"])
         rewired: list[dict] = []
-        target, target_slot, waiting = _locate_target_slot(advancement, target, by_id, match["id"], result_rank, rng, rewired)
+        target, target_slot, waiting = _locate_target_slot(advancement, target, by_id, match["id"], result_rank, rng,
+                                                           rewired, taken)
         _record_rewired(match, rewired, target_sets, now_iso)
         if waiting:
             # Gemischt (#1548): noch nicht ausgelost - der Platz ergibt sich, wenn die ganze Runde fertig ist.
@@ -1472,6 +1487,7 @@ def build_v2_result_application(
             continue
         if not target_slot:
             raise MatchV2ResultError(f"Zielslot {advancement.get('to_slot')} in {target.get('match_key')} nicht gefunden")
+        taken.add(id(target_slot))
         draw_id = (target_slot.get("source_result") or {}).get("draw_id")
         if skip_reason:
             existing_reg = target_slot.get("registration_id")
