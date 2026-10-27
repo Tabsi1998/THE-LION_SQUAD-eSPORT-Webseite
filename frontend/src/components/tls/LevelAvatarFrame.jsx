@@ -1,5 +1,6 @@
-import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "@/lib/api";
+import { lazyPage } from "@/lib/chunkReload";
 import { useReducedMotion } from "@/hooks/useLiveChanges";
 import { FRAME_SIZES, PROFILE_SMALL, frameFit, frameLayout, framePadding, frameSources, rankInfo, ringOf } from "@/lib/loewenRang";
 import { ASCENT_TIMING, burstDelay } from "@/lib/loewenAufstieg";
@@ -7,7 +8,7 @@ import { ASCENT_TIMING, burstDelay } from "@/lib/loewenAufstieg";
 const TLS_BLUE = "#29B6E8";
 const MAX_PRESTIGE = 5;
 // Signatur des Rangs (#1455): Partikel-Canvas nur im Profilkopf, erst bei Bedarf geladen.
-const LoewenRangSignature = lazy(() => import("./LoewenRangSignature"));
+const LoewenRangSignature = lazyPage(() => import("./LoewenRangSignature"));
 
 /* Löwen-Rang (#1454): 12 gezeichnete Rahmen statt der 30 Code-Looks. Jede Größe hat eine feste Fläche für Rahmen und
    Foto; das Foto wird je Rang so groß, dass die ganze Grafik hineinpasst, und der Rahmen so skaliert und verschoben,

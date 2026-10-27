@@ -3,6 +3,8 @@
 // Grundwerten gongt. Browser spielen Ton erst nach einem Klick auf die Seite - bis dahin sagt der TV einmal klein
 // „Für Ton einmal klicken“. Den Klang-Baukasten legt der TV erst nach diesem Klick an, vorher bleibt alles still.
 
+import { noteAudioProblem } from "./audioSafe";
+
 // Der Gong aus der TV-Vorschau: C5 mit zwei leisen Obertönen, klingt in gut 2,5 Sekunden aus.
 export const GONG_PARTIALS = Object.freeze([[1, 0.16], [2.01, 0.05], [2.76, 0.028]]);
 export const GONG_NOTE = 523.25;
@@ -27,7 +29,9 @@ export function createGong({ win = typeof window === "undefined" ? null : window
     try {
       if (!context) context = new AudioContextClass();
       if (context.state === "suspended" && typeof context.resume === "function") await context.resume();
-    } catch {
+    } catch (error) {
+      // Ohne Audiogerät oder ohne Erlaubnis bleibt der TV still (#2080) - kein Fehler.
+      noteAudioProblem(error);
       return false;
     }
     return running();

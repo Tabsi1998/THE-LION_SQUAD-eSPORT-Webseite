@@ -39,7 +39,7 @@ export function OpsAlertsPanel() {
     if (busy) return;
     setBusy("save");
     try {
-      const payload = { emails: form.emails, cooldown_minutes: Number(form.cooldown_minutes), rules: form.rules, retention_days: Object.fromEntries(Object.entries(form.retention_days).map(([k, v]) => [k, Number(v)])) };
+      const payload = { emails: form.emails, cooldown_minutes: Number(form.cooldown_minutes), red_reminder_hours: Number(form.red_reminder_hours ?? 24), rules: form.rules, retention_days: Object.fromEntries(Object.entries(form.retention_days).map(([k, v]) => [k, Number(v)])) };
       const { data: saved } = await api.put("/admin/ops/alerts", payload);
       setForm({ ...saved, emails: (saved.emails || []).join(", ") });
       setData((current) => ({ ...current, settings: saved }));
@@ -108,6 +108,11 @@ export function OpsAlertsPanel() {
           <label className="block">
             <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Sperrfrist je Schlüssel (Minuten)</div>
             <input type="number" min={5} max={1440} value={form.cooldown_minutes} onChange={(e) => setForm((c) => ({ ...c, cooldown_minutes: e.target.value }))} data-testid="ops-alert-cooldown" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
+          </label>
+          {/* Dauer-Rot (#2080): ein roter Check meldet sich beim Wechsel und erinnert danach in diesem Abstand. */}
+          <label className="block">
+            <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Erinnerung bei Dauer-Rot (Stunden, 0 = aus)</div>
+            <input type="number" min={0} max={720} value={form.red_reminder_hours ?? 24} onChange={(e) => setForm((c) => ({ ...c, red_reminder_hours: e.target.value }))} data-testid="ops-alert-red-reminder" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
           </label>
           {Object.entries(RETENTION_LABELS).map(([key, label]) => (
             <label key={key} className="block">

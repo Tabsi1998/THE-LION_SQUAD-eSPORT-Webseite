@@ -12,7 +12,7 @@ const EXEMPT = new Set(["/admin"]);
 
 function pageFiles() {
   const app = read("App.jsx");
-  const imports = Object.fromEntries([...app.matchAll(/const (\w+) = lazy\(\(\) => import\("@\/([^"]+)"\)/g)].map((m) => [m[1], m[2]]));
+  const imports = Object.fromEntries([...app.matchAll(/const (\w+) = lazyPage\(\(\) => import\("@\/([^"]+)"\)/g)].map((m) => [m[1], m[2]]));
   const routes = [...app.matchAll(/path="(\/admin[^"]*)" element=\{<ProtectedRoute[^>]*><(\w+)/g)];
   return Object.fromEntries(routes.map((m) => [m[1], imports[m[2]]]).filter(([, file]) => file));
 }

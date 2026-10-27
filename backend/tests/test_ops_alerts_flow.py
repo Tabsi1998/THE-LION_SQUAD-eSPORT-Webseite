@@ -68,6 +68,10 @@ async def test_rules_have_defaults_and_are_saved_with_checks(flow):
     assert (await flow.put("/api/admin/ops/alerts", json={"cooldown_minutes": 2})).status_code == 400
     assert (await flow.put("/api/admin/ops/alerts", json={"retention_days": {"email_logs": 3}})).status_code == 400
     assert (await flow.put("/api/admin/ops/alerts", json={"rules": {"unbekannt": {"discord": True}}})).status_code == 400
+    # Erinnerung bei Dauer-Rot (#2080): Vorgabe 24 h, 0 = aus, über die Seite einstellbar.
+    assert view["settings"]["red_reminder_hours"] == 24
+    assert (await flow.put("/api/admin/ops/alerts", json={"red_reminder_hours": 0})).json()["red_reminder_hours"] == 0
+    assert (await flow.put("/api/admin/ops/alerts", json={"red_reminder_hours": 9999})).status_code == 400
 
 
 @pytest.mark.asyncio
@@ -88,9 +92,9 @@ async def test_notify_goes_the_configured_ways_and_respects_the_cooldown(flow, d
     await flow.db.ops_alert_state.update_one({"key": "error:abc"}, {"$set": {"last_sent_at": (now_utc() - timedelta(minutes=11)).isoformat()}})
     assert (await ops_alerts.notify(flow.db, "error_group", "Serverfehler: X", key="error:abc"))["sent"] is True
 
-    # Regel aus: nichts geht raus, aber die Meldung steht im Verlauf.
+    # Regel aus: nichts geht raus (kein Weg eingerichtet, #2080), aber die Meldung steht im Verlauf.
     await ops_alerts.save_alert_settings(flow.db, {"rules": {"check_red": {"discord": False, "email": False}}})
-    assert (await ops_alerts.notify(flow.db, "check_red", "Check rot", key="check:db")) == {"sent": False, "channels": []}
+    assert (await ops_alerts.notify(flow.db, "check_red", "Check rot", key="check:db")) == {"sent": False, "channels": [], "reason": "undeliverable"}
     recent = await ops_alerts.recent_alerts(flow.db)
     assert [row["kind"] for row in recent][:2] == ["check_red", "error_group"] and recent[0]["channels"] == []
 

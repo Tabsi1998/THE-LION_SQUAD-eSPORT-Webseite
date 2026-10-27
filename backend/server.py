@@ -179,6 +179,9 @@ async def lifespan(app: FastAPI):
     applied_migrations = await run_pending_migrations(get_db())
     for migration in applied_migrations:
         logger.info("[migration] Applied %s: %s", migration["version"], migration["name"])
+    # Auto-Checks je Zustand (#2080): einmaliger Nachtrag aus den gespeicherten Läufen, mit Merker.
+    from services.ops_checks import safe_backfill_check_episodes
+    await safe_backfill_check_episodes(get_db())
     logger.info("[THE LION SQUAD] Seeding badge catalog...")
     await seed_badges()
     logger.info("[THE LION SQUAD] Seeding CMS pages + email templates...")

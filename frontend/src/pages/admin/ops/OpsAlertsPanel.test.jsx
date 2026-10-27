@@ -44,6 +44,20 @@ test("zeigt Regeln, Empfänger und Verlauf; Speichern schickt alles, Mail bei Ve
   expect(screen.getByTestId("ops-alert-emails")).toHaveValue("vorstand@example.test, kassier@example.test");
 });
 
+// #2080: ein dauerhaft roter Check erinnert nach so vielen Stunden erneut - Vorgabe 24, 0 = aus.
+test("die Erinnerung bei Dauer-Rot ist einstellbar und wird mitgespeichert", async () => {
+  apiMock.get.mockResolvedValue({ data: { ...VIEW, settings: { ...VIEW.settings, red_reminder_hours: 24 } } });
+  apiMock.put.mockResolvedValue({ data: { ...VIEW.settings, red_reminder_hours: 0 } });
+  const user = userEvent.setup();
+  render(<OpsAlertsPanel />);
+  const field = await screen.findByTestId("ops-alert-red-reminder");
+  expect(field).toHaveValue(24);
+  await user.clear(field);
+  await user.type(field, "0");
+  await user.click(screen.getByTestId("ops-alert-save"));
+  await waitFor(() => expect(apiMock.put).toHaveBeenCalledWith("/admin/ops/alerts", expect.objectContaining({ red_reminder_hours: 0 })));
+});
+
 test("der Testalarm nennt die Wege - und sagt, wenn keiner eingerichtet ist", async () => {
   apiMock.post.mockResolvedValueOnce({ data: { sent: true, channels: ["discord", "email"], emails: ["vorstand@example.test"] } });
   const user = userEvent.setup();
