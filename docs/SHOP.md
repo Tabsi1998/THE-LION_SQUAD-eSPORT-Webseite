@@ -242,9 +242,14 @@ gewinnt, sucht über `@external_id` nach und sendet; ein zweiter Aufruf bekommt 
 `FulfillmentTransient` „läuft schon“ (`draft_in_progress`). Lehnt Printful mit 4xx ab, wird der Claim `failed` und die
 `external_id` ist wieder frei. Ein Claim `sending` mit offenem Ausgang (Zeitüberschreitung, 5xx) wird nach 60 Sekunden
 **erst nach einer Nachsuche** über `@external_id` und per bedingtem Update übernommen – gibt es den Auftrag, kommt er
-zurück. Ebenso ein Claim `created`, dessen gespeicherte Nummer Printful nicht mehr kennt (404), und ein hängender
-Claim `deleting`. `delete_draft` setzt den Claim erst auf `deleting`, löscht dann bei Printful und entfernt danach den
-Claim – die `external_id` ist wieder frei; lehnt Printful das Löschen ab, bleibt er `created`.
+zurück. Ein Claim `created`, dessen gespeicherte Nummer Printful nicht findet (404), wird nur übernommen, wenn
+**alles** zutrifft: Abruf der Nummer `not_found`, Nachsuche über `@external_id` leer, und das letzte erfolgreiche
+Lesen (`seen_at`) liegt mit gültiger Zeit, nicht in der Zukunft, mehr als **10 Minuten** zurück. Sonst
+`FulfillmentTransient` `draft_unreadable` („Entwurf bei Printful gerade nicht lesbar – bitte gleich noch einmal“) –
+ein kurz nicht lesbarer Auftrag (eventual consistency) führt so nie zu einem zweiten Entwurf. `delete_draft` setzt den
+Claim erst auf `deleting`, löscht dann bei Printful und entfernt danach den Claim – die `external_id` ist sofort wieder
+frei; lehnt Printful das Löschen ab, bleibt er `created`. Ein durch Abbruch hängender `deleting`-Claim braucht dieselbe
+doppelte Prüfung (Nummer und `@external_id`), aber keine Schonfrist.
 
 **Uhrzeiten:** Ein Claim gilt nur als „läuft noch“, solange sein Stempel jünger als die Frist ist **und** höchstens
 60 Sekunden in der Zukunft liegt. Ein Stempel weiter in der Zukunft (vorgehende Uhr) gilt wie ein abgelaufener: beim
