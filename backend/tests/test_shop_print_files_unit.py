@@ -567,7 +567,8 @@ async def test_a_missing_template_area_keeps_internals_from_customers(db, provid
             billing_address=dict(BILLING), shipping_address=dict(SHIPPING), actor_id="konto-1")
     assert str(refused.value) == "Position 1: Dieses Produkt ist gerade nicht bestellbar."
     assert "back" not in str(refused.value) and "Printful" not in str(refused.value)
-    assert "no template" in caplog.text
+    assert "no template" in caplog.text and product["id"] in caplog.text and black["id"] in caplog.text
+    assert "area=back" in caplog.text and "color=Black" in caplog.text
     assert await db.shop_orders.count_documents({}) == 0
     view = await shop_products.admin_view(db, product["id"])
     files = next(item for item in view["check"]["items"] if item["key"] == "files")
@@ -628,8 +629,9 @@ async def test_customers_read_one_fixed_sentence_and_the_reason_goes_to_the_log(
     caplog.clear()
     with caplog.at_level(logging.WARNING, logger="tls-arena.shop-print-files"), pytest.raises(ShopError) as refused:
         await order()
-    assert str(refused.value) == "Dieses Produkt ist gerade nicht bestellbar."
-    assert "gamertag file missing" in caplog.text
+    assert str(refused.value) == "Position 1: Dieses Produkt ist gerade nicht bestellbar."
+    assert "gamertag file missing" in caplog.text and black["id"] in caplog.text and "area=front" in caplog.text
+    assert "Testlöwe" not in caplog.text, "nie der Gamertag im Log"
     assert await db.shop_gamertag_files.count_documents({"purpose": "order"}) == 0
     assert await db.shop_print_files.count_documents({"purpose": "order"}) == 0
     assert await db.shop_order_items.count_documents({}) == 0
@@ -663,3 +665,47 @@ async def test_a_blocked_legacy_layout_is_logged_with_product_and_area(db, provi
             billing_address=dict(BILLING), shipping_address=dict(SHIPPING), actor_id="konto-1")
     assert str(refused.value) == "Position 1: Dieses Produkt ist gerade nicht bestellbar."
     assert product["id"] in caplog.text and "Ärmel links" in caplog.text and "layout not convertible" in caplog.text
+
+
+@pytest.mark.asyncio
+async def test_refusals_log_product_variant_area_and_reason_with_masked_free_text(db, provider, caplog):
+    """Codex, letzte Runde: Produkt, Variante, Farbe, Fläche und konkreter Grund im Log; ein frei gewählter Motivtitel
+    mit Mail-Adresse wird gekürzt."""
+    import logging
+
+    from shop_testdata import publish_unchecked
+    from test_shop_products_unit import BILLING, SHIPPING, variant_for
+
+    from services import shop_orders
+
+    product = await configured(db, provider)
+    await publish_unchecked(db, product["id"])
+    black = await variant_for(db, product["id"], 4012)
+    counter = iter(range(400, 500))
+
+    async def refused():
+        caplog.clear()
+        with caplog.at_level(logging.WARNING, logger="tls-arena.shop-print-files"), pytest.raises(ShopError) as error:
+            await shop_orders.place_order(
+                db, user_id="konto-1", idempotency_key=f"bestellung-0{next(counter)}", buyer_kind="member",
+                lines=[{"variant_id": black["id"], "quantity": 1, "gamertag": "Testlöwe"}], shipping_estimate_cents=490,
+                billing_address=dict(BILLING), shipping_address=dict(SHIPPING), actor_id="konto-1")
+        assert str(error.value) == "Position 1: Dieses Produkt ist gerade nicht bestellbar."
+        assert product["id"] in caplog.text and black["id"] in caplog.text and "color=Black" in caplog.text
+        return caplog.text
+
+    # Veraltete Druckdatei: neuer Löwe nach dem Erzeugen.
+    await design(db, "loewe-weiss", "front_right", ["Black"], width=1250, height=1250)
+    log = await refused()
+    assert "area=front" in log and "print file outdated" in log
+    # Aufbau passt nicht (gespeichert, bevor die Fläche kleiner wurde) - mit Mail-Adresse im Motivtitel.
+    await db.shop_design_profiles.update_one({"design_key": "loewe-weiss"},
+                                             {"$set": {"title": "Löwe von kontakt@verein.example"}})
+    stored = await shop_catalog.get_product(db, product["id"])
+    placements = [dict(row) for row in stored["placements"]]
+    placements[0] = {**placements[0], "layers": [{**placements[0]["layers"][0], "offset_x_cm": -30.0},
+                                                 *placements[0]["layers"][1:]]}
+    await db.shop_products.update_one({"id": product["id"]}, {"$set": {"placements": placements}})
+    log = await refused()
+    assert "area=front" in log and "layout does not fit" in log and "ragt links" in log
+    assert "kontakt@verein.example" not in log and "Löwe von" in log

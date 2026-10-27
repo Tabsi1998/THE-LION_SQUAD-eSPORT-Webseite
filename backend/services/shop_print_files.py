@@ -40,7 +40,7 @@ from pymongo.errors import DuplicateKeyError
 
 from models import new_id, now_utc
 from services import shop_catalog, shop_designs, shop_gamertag, shop_motifs, shop_print_templates as templates
-from services.log_safe import log_safe
+from services.log_safe import log_safe, mask_addresses
 from services.mutation_lock import MutationLockBusy, mutation_lock
 from services.shop_common import ShopConflict, ShopError, clean_reason, record_admin_action
 
@@ -900,9 +900,8 @@ async def freeze_line(db, product: dict, variant: dict, *, gamertag: str | None,
         blocked = [] if context["rows"] and all(is_layout(row) for row in product["placements"]) else (
             await layout_conversion(db, product))["blocked"]
         if not context["rows"] or blocked:
-            logger.warning("[shop-print-files] order refused: product=%s layout not convertible: %s",
-                           log_safe(product.get("id")), log_safe(" ".join(blocked) or "keine Fläche abbildbar", 500))
-            raise ShopError(f"Position {position}: {NOT_ORDERABLE}")
+            _refuse(position, product, variant, area="-", reason="layout not convertible: "
+                    + (" ".join(blocked) or "keine Fläche abbildbar"))
     color = " ".join(str(variant.get("color") or "").split())
     color_hex = context["codes"].get(color) or variant.get("color_code")
     files, sources = [], []
@@ -911,19 +910,17 @@ async def freeze_line(db, product: dict, variant: dict, *, gamertag: str | None,
         if entry is None:
             # Die Kundschaft liest nur den festen Satz; Fläche und Grund stehen im Log und rot in der Vorab-Prüfung
             # („Druckdateien je Farbe“: Fläche fehlt).
-            logger.warning("[shop-print-files] order refused: no template for an area of a product")
-            raise ShopError(f"Position {position}: {NOT_ORDERABLE}")
+            _refuse(position, product, variant, area=row["key"], reason="no template for this area and variant")
         plan = await plan_placement(db, row, entry, color=color, color_hex=color_hex, presets_doc=context["presets"],
                                     gamertag_rules=context["gamertag_rules"])
         if plan.problems:
-            logger.warning("[shop-print-files] order refused: layout does not fit an area")
-            raise ShopError(f"Position {position}: {NOT_ORDERABLE}")
+            _refuse(position, product, variant, area=row["key"], reason="layout does not fit: " + " ".join(plan.problems))
         base_row = None
         if plan.needs_base:
             base_row = await latest_base(db, product["id"], row["key"], entry["group"], color)
             if not _base_valid(base_row, plan):
-                logger.warning("[shop-print-files] order refused: print file missing or outdated")
-                raise ShopError(f"Position {position}: {NOT_ORDERABLE}")
+                _refuse(position, product, variant, area=row["key"],
+                        reason="print file missing" if base_row is None else "print file outdated or not on disk")
             sources += [{"placement": row["key"], **item.source.ref} for item in plan.motifs]
         gamertag_layers = [item for item in plan.texts if item.kind == "gamertag"]
         if gamertag_layers and not gamertag:
@@ -933,7 +930,8 @@ async def freeze_line(db, product: dict, variant: dict, *, gamertag: str | None,
                   "dpi": entry["dpi"]}
         if gamertag_layers:
             personal = await _personal_file(db, product, plan, base_row, gamertag=gamertag, color=color,
-                                            user_id=user_id, order_id=order_id, item_id=item_id)
+                                            user_id=user_id, order_id=order_id, item_id=item_id,
+                                            variant=variant, position=position)
             files.append({**frozen, "kind": "personal", "file_id": personal["id"], "version": None,
                           "sha256": personal["sha256"], "gamertag_file_id": personal["gamertag_file_id"]})
         elif base_row is not None:
@@ -944,7 +942,8 @@ async def freeze_line(db, product: dict, variant: dict, *, gamertag: str | None,
 
 
 async def _personal_file(db, product: dict, plan: Plan, base_row: dict | None, *, gamertag: str, color: str,
-                         user_id: str, order_id: str, item_id: str) -> dict:
+                         user_id: str, order_id: str, item_id: str, variant: dict | None = None,
+                         position: int = 1) -> dict:
     rules = await shop_gamertag.load_rules(db)
     ink = shop_gamertag.inks_for_garment(rules, color)[0]["key"]
     stored = await shop_gamertag.store(db, gamertag, purpose="order", color_key=ink, user_id=user_id,
@@ -952,9 +951,8 @@ async def _personal_file(db, product: dict, plan: Plan, base_row: dict | None, *
     tag_row = stored["row"]
     tag_path = shop_designs._path_of(tag_row["file_ref"])
     if tag_path is None or not tag_path.is_file():
-        logger.warning("[shop-print-files] order refused: product=%s gamertag file missing on disk",
-                       log_safe(product.get("id")))
-        raise ShopError(NOT_ORDERABLE)
+        # Nie der Gamertag selbst im Log - nur Produkt, Variante, Farbe und Fläche.
+        _refuse(position, product, variant, area=plan.entry["placement"], reason="gamertag file missing on disk")
     tag_png = tag_path.read_bytes()
     entry = plan.entry
     layers = []
@@ -980,6 +978,16 @@ async def _personal_file(db, product: dict, plan: Plan, base_row: dict | None, *
         "created_by": None, "file_name": None})
     row["file_name"] = file_name(row)
     return row
+
+
+def _refuse(position: int, product: dict, variant: dict | None, *, area: str, reason: str):
+    """Nicht bestellbar: die Kundschaft liest nur ``NOT_ORDERABLE``; ins Log kommen Produkt, Variante, Farbe, Fläche und
+    der Grund - frei gewählte Texte darin (Motivtitel) mit gekürzten Mail-Adressen, in einer Zeile, nie ein Gamertag."""
+    logger.warning("[shop-print-files] order refused: product=%s variant=%s color=%s area=%s reason=%s",
+                   log_safe((product or {}).get("id")), log_safe((variant or {}).get("id")),
+                   log_safe(mask_addresses(str((variant or {}).get("color") or ""))), log_safe(area),
+                   log_safe(mask_addresses(reason), 500))
+    raise ShopError(f"Position {position}: {NOT_ORDERABLE}")
 
 
 async def discard_order_files(db, order_id: str) -> int:
