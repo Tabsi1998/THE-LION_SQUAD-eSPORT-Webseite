@@ -39,6 +39,9 @@ Teilen auf mehreren Rechnern gleichzeitig – mit denselben Tests und denselben 
 | Backend-Prüfungen | Kompilieren, Doku-Links, Shell-Skripte, flake8, pip-audit |
 | Backend-Tests (1/3 … 3/3) | je ein Drittel der Testdateien, darin vier Prozesse (`pytest-xdist`, `--numprocesses=auto`) |
 | Backend-Coverage | prüft, dass jede Testdatei in genau einem Teil lief, legt die Coverage aller Teile zusammen und verlangt wie bisher **35 % über das ganze Backend** |
+| Frontend | Compose- und Nginx-Konfiguration, Routen-Vertrag, Audit, ESLint, Build |
+| Frontend-Unit-Tests (1/2, 2/2) | je die Hälfte der Vitest-Dateien (`--shard`), mit Blob-Bericht samt Coverage |
+| Frontend-Coverage | legt beide Berichte zum Gesamtbericht zusammen (`--merge-reports`), wie vorher aus einem Lauf |
 | Browser-Tests (1/6 … 6/6) | je ein Sechstel der Browser-Tests (Desktop und Handy) |
 
 Verteilt wird nach **gemessener Dauer**, nicht nach Zahl der Tests: die längsten Gruppen zuerst auf den Teil mit

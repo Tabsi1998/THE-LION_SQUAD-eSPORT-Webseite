@@ -215,8 +215,8 @@ jobs:
     needs: changes
     if: needs.changes.outputs.frontend == 'true'
     runs-on: ubuntu-24.04
-    # Prüfen, Bauen und Unit-Tests; die Browser-Tests laufen parallel im Job darunter.
-    timeout-minutes: 20
+    # Prüfen und Bauen; Unit- und Browser-Tests laufen parallel in den Jobs darunter.
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
       - name: Validate reverse-proxy deployment config
@@ -260,18 +260,77 @@ jobs:
       - name: Build frontend
         working-directory: frontend
         run: yarn build
-      - name: Run frontend unit smoke
+
+  frontend-unit:
+    # Die Unit-Tests (Vitest, 650+ Dateien) brauchten im Frontend-Job knapp acht Minuten. Zwei Teile gleichzeitig
+    # (#2054); jeder schreibt einen Blob-Bericht samt Coverage, "Frontend-Coverage" legt sie zum Gesamtbericht zusammen.
+    name: Frontend-Unit-Tests (${{ matrix.shard }}/2)
+    needs: changes
+    if: needs.changes.outputs.frontend == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+          cache: yarn
+          cache-dependency-path: frontend/yarn.lock
+      - name: Install frontend dependencies
         working-directory: frontend
-        run: yarn test:coverage
+        run: yarn install --frozen-lockfile
+      - name: Run frontend unit smoke (part ${{ matrix.shard }} of 2)
+        working-directory: frontend
+        run: >-
+          yarn test:coverage --shard=${{ matrix.shard }}/2
+          --reporter=default --reporter=github-actions --reporter=blob
+          --outputFile.blob=vitest-blob/blob-${{ matrix.shard }}.json
+      - name: Upload unit test report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: frontend-unit-blob-${{ matrix.shard }}
+          path: frontend/vitest-blob/
+          if-no-files-found: error
+          retention-days: 7
       - name: Upload frontend test diagnostics
         if: failure()
         uses: actions/upload-artifact@v7
         with:
-          name: frontend-test-results
+          name: frontend-test-results-${{ matrix.shard }}
           path: |
             frontend/coverage/
           if-no-files-found: ignore
           retention-days: 7
+
+  frontend-coverage:
+    name: Frontend-Coverage
+    needs: frontend-unit
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+          cache: yarn
+          cache-dependency-path: frontend/yarn.lock
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: yarn install --frozen-lockfile
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: frontend-unit-blob-*
+          path: frontend/vitest-blob
+          merge-multiple: true
+      - name: Merge unit test reports and coverage of both parts
+        # Derselbe Gesamtbericht wie vorher aus einem Lauf: alle Testdateien, Coverage über das ganze Frontend.
+        working-directory: frontend
+        run: yarn test --merge-reports=vitest-blob --coverage --reporter=default
 
   frontend-e2e:
     # Die Browser-Tests (Desktop und Handy) brauchten in einem Job gut 30 Minuten. Sechs Teile auf sechs Rechnern
@@ -472,7 +531,8 @@ jobs:
   # "failure", sobald einer seiner Teile rot ist.
   ci-result:
     name: CI-Ergebnis
-    needs: [changes, backend-checks, backend, backend-coverage, frontend, frontend-e2e, mobile, container-smoke]
+    needs: [changes, backend-checks, backend, backend-coverage, frontend, frontend-unit, frontend-coverage, frontend-e2e, mobile,
+      container-smoke]
     if: always()
     runs-on: ubuntu-24.04
     timeout-minutes: 5
@@ -482,6 +542,8 @@ jobs:
           RESULTS: ${{ join(needs.*.result, ' ') }}
           BACKEND: ${{ needs.backend.result }}
           BACKEND_COVERAGE: ${{ needs.backend-coverage.result }}
+          FRONTEND_UNIT: ${{ needs.frontend-unit.result }}
+          FRONTEND_COVERAGE: ${{ needs.frontend-coverage.result }}
         run: |
           echo "Ergebnisse: $RESULTS"
           for result in $RESULTS; do
@@ -493,5 +555,9 @@ jobs:
           # Liefen die Backend-Tests, muss auch die Coverage-Schwelle geprüft sein - übersprungen zählt dann nicht.
           if [ "$BACKEND" = "success" ] && [ "$BACKEND_COVERAGE" != "success" ]; then
             echo "Die Backend-Tests liefen, die Coverage-Schwelle wurde aber nicht geprüft ($BACKEND_COVERAGE)."
+            exit 1
+          fi
+          if [ "$FRONTEND_UNIT" = "success" ] && [ "$FRONTEND_COVERAGE" != "success" ]; then
+            echo "Die Frontend-Unit-Tests liefen, ihr Gesamtbericht fehlt aber ($FRONTEND_COVERAGE)."
             exit 1
           fi
