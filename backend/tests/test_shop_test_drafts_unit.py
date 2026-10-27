@@ -317,9 +317,7 @@ async def test_a_timeout_after_creating_keeps_the_draft_traceable_and_deletable(
     assert await db.shop_test_drafts.count_documents({"id": shown["id"]}) == 1
     assert await db.shop_print_files.count_documents({"order_id": shown["id"]}) == 1, "die Datei mit Gamertag bleibt"
     (listed,) = [row for row in await shop_test_drafts.list_drafts(db) if row["id"] == shown["id"]]
-    assert listed["actions"] == {"resend": True, "delete": False}
-    with pytest.raises(ShopConflict, match="Erneut senden"):
-        await shop_test_drafts.delete(db, shown["id"], actor_id=ACTOR, provider=provider)
+    assert listed["actions"] == {"resend": True, "delete": True}
     # „Erneut senden / nachsehen“: derselbe Rumpf, der Claim findet den Auftrag über die external_id - kein zweiter.
     await age_claim(db, shown["external_id"])
     again = await shop_test_drafts.send(db, shown["id"], idempotency_key="klick-0021", actor_id=ACTOR, provider=provider)
@@ -490,3 +488,77 @@ def test_the_preview_payload_round_trips_and_a_changed_one_is_refused():
     assert printful_client.order_payload(shop_test_drafts.draft_from_payload(payload)) == payload
     with pytest.raises(ShopError, match="beschädigt"):
         shop_test_drafts.draft_from_payload({**payload, "confirm": True})
+
+
+# ---------------------------------------------------------------- Nachprüfung: offenen Ausgang aufräumen (N1, N2)
+
+async def unclear_draft(db, provider, fake) -> dict:
+    """Ein Testentwurf mit offenem Ausgang, den Printful trotzdem angelegt hat."""
+    from services.shop_fulfillment import FulfillmentTransient
+
+    product, variant = await prepared(db, provider)
+    shown = await preview(db, provider, product, variant)
+    timeout_after_creating(fake)
+    with pytest.raises(FulfillmentTransient):
+        await shop_test_drafts.send(db, shown["id"], idempotency_key="klick-0030", actor_id=ACTOR, provider=provider)
+    assert (await db.shop_test_drafts.find_one({"id": shown["id"]}))["state"] == "unclear"
+    return shown
+
+
+@pytest.mark.asyncio
+async def test_an_unclear_draft_is_cleaned_up_with_the_shop_off(db, provider, fake):
+    shown = await unclear_draft(db, provider, fake)
+    (order_id,) = fake.orders
+    await shop_ready(db, stage="off")
+    with pytest.raises(PrintfulDraftsBlocked):  # erneut senden braucht die Stufe ...
+        await shop_test_drafts.send(db, shown["id"], idempotency_key="klick-0031", actor_id=ACTOR, provider=provider)
+    gone = await shop_test_drafts.delete(db, shown["id"], actor_id=ACTOR, provider=provider)  # ... aufräumen nicht
+    assert gone["state"] == "deleted" and gone["printful_order_id"] == order_id and fake.orders == {}
+    assert any(call["path"].endswith(f"/@{shown['external_id']}") for call in fake.calls_to("getOrder"))
+    assert len(fake.calls_to("deleteOrder")) == 1 and len(fake.calls_to("createOrder")) == 1
+    assert await db.shop_print_files.count_documents({"order_id": shown["id"]}) == 0
+    log = await db.audit_logs.find_one({"action": "shop.test_draft.delete"}, {"_id": 0})
+    assert log["data"]["printful_order_id"] == order_id
+
+
+@pytest.mark.asyncio
+async def test_an_unclear_draft_with_a_file_taken_off_line_can_still_be_deleted(db, provider, fake):
+    shown = await unclear_draft(db, provider, fake)
+    personal = next(row for row in shown["files"] if row["kind"] == "personal")
+    await db.shop_print_files.update_one({"id": personal["file_id"]}, {"$set": {"public_disabled_at": "2026-10-27"}})
+    with pytest.raises(ShopError, match="nicht mehr da"):
+        await shop_test_drafts.send(db, shown["id"], idempotency_key="klick-0032", actor_id=ACTOR, provider=provider)
+    gone = await shop_test_drafts.delete(db, shown["id"], actor_id=ACTOR, provider=provider)
+    assert gone["state"] == "deleted" and fake.orders == {}
+
+
+@pytest.mark.asyncio
+async def test_an_unclear_draft_printful_never_shows_waits_for_the_grace_time_then_counts_as_deleted(db, provider,
+                                                                                                    fake):
+    from models import now_utc
+
+    shown = await unclear_draft(db, provider, fake)
+    fake.orders.clear()  # Printful kennt den Auftrag nicht (nie angelegt oder schon weg)
+    fake.order_items.clear()
+    with pytest.raises(ShopConflict, match="noch nicht"):
+        await shop_test_drafts.delete(db, shown["id"], actor_id=ACTOR, provider=provider)
+    record = await db.shop_test_drafts.find_one({"id": shown["id"]}, {"_id": 0})
+    assert record["state"] == "unclear" and await db.shop_print_files.count_documents({"order_id": shown["id"]}) == 1
+    old = (now_utc() - timedelta(minutes=11)).isoformat()
+    await db.shop_printful_drafts.update_one({"external_id": shown["external_id"]}, {"$set": {"claimed_at": old}})
+    await db.shop_test_drafts.update_one({"id": shown["id"]}, {"$set": {"send_attempted_at": old, "sending_at": old}})
+    gone = await shop_test_drafts.delete(db, shown["id"], actor_id=ACTOR, provider=provider)
+    assert gone["state"] == "deleted" and gone.get("printful_order_id") is None and "nicht angelegt" in gone["delete_note"]
+    assert await db.shop_print_files.count_documents({"order_id": shown["id"]}) == 0
+    assert await db.shop_printful_drafts.count_documents({"external_id": shown["external_id"]}) == 0
+    assert fake.calls_to("deleteOrder") == []
+
+
+@pytest.mark.asyncio
+async def test_a_failed_lookup_puts_the_draft_back_to_unclear(db, provider, fake):
+    shown = await unclear_draft(db, provider, fake)
+    fake.fail(503, operation="getOrder", times=3)
+    with pytest.raises(Exception):
+        await shop_test_drafts.delete(db, shown["id"], actor_id=ACTOR, provider=provider)
+    record = await db.shop_test_drafts.find_one({"id": shown["id"]}, {"_id": 0})
+    assert record["state"] == "unclear" and record["last_error"]["reason"] == "server" and len(fake.orders) == 1

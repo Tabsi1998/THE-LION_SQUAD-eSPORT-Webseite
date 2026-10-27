@@ -929,6 +929,12 @@ der richtigen Position, Anschrift, `external_id` und Preise sauber übergeben we
   zweiten anzulegen (nach seiner Schonfrist von 60 s). Ebenso ein hängendes `sending` nach
   `SHOP_TEST_DRAFT_SENDING_SECONDS`. Verworfen wird eine Vorschau nur, solange sie noch `preview` ist und der Adapter keinen
   offenen Claim für ihre `external_id` hat - erst die Zeile, dann die Dateien; sonst 409.
+- **Offenen Ausgang aufräumen:** „Löschen“ geht auch bei `unclear` (und hängendem Senden) - ohne erneutes Senden, also
+  auch bei Stufe „Aus“ oder wenn eine Druckdatei schon vom Netz ist; es reicht ein lesbarer Schlüssel. Der Server sieht über
+  `@external_id` bei Printful nach: gefunden, kommt die Nummer ins Protokoll und der Entwurf wird als Testentwurf gelöscht;
+  nicht gefunden und der letzte Versuch liegt länger als `SHOP_TEST_DRAFT_UNCLEAR_GRACE_SECONDS` (Vorgabe 600) zurück,
+  gilt er als nie angelegt (gelöscht vermerkt, Dateien und Merkposten des Adapters weg); ist der Versuch frischer, 409
+  („Printful zeigt diesen Entwurf noch nicht …“). Scheitert das Nachsehen, bleibt er `unclear`.
 - **Fehlertexte** sind feste Sätze (Ursache aus der Tabelle des Adapters) - nie ein Stacktrace, nie, was Printful intern
   sagt; die gekürzte, maskierte Begründung von Printful steht nur im Protokoll des Testentwurfs (`last_error`).
 - **Öffentliche Adresse:** Printful holt die Druckdateien selbst - die Website braucht eine https-Adresse

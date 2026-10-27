@@ -106,7 +106,12 @@ function ConfirmDelete({ draft, onDeleted, testId }) {
   }
   return (
     <div className="tls-reveal border border-warn/40 bg-warn/10 rounded-sm p-3 space-y-2" role="alertdialog" aria-label="Entwurf löschen" data-testid={`${testId}-confirm`}>
-      <p className="text-sm">Den Entwurf {draft.printful_order_id} bei Printful wirklich löschen? Das Protokoll bleibt, die Testdateien gehen vom Netz.</p>
+      <p className="text-sm">
+        {draft.printful_order_id
+          ? `Den Entwurf ${draft.printful_order_id} bei Printful wirklich löschen?`
+          : "Bei Printful nachsehen und den Entwurf - falls er angelegt wurde - löschen?"}
+        {" "}Das Protokoll bleibt, die Testdateien gehen vom Netz.
+      </p>
       <div className="flex flex-wrap gap-2">
         <button type="button" onClick={remove} disabled={busy} data-testid={`${testId}-confirm-yes`}
           className="tls-btn tls-btn--primary min-h-10 px-3 text-xs font-bold uppercase tracking-wider rounded-sm disabled:opacity-40">

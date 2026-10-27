@@ -78,7 +78,9 @@ def limits() -> dict:
     - ``SHOP_TEST_DRAFT_MAX_OPEN`` (5): so viele Testentwürfe dürfen gleichzeitig bei Printful liegen,
     - ``SHOP_TEST_DRAFT_SENDING_SECONDS`` (120): ein hängendes „wird gesendet“ darf danach erneut senden (der Claim des
       Adapters findet einen schon angelegten Auftrag über die ``external_id``),
-    - ``SHOP_TEST_DRAFT_DELETING_SECONDS`` (120): ein hängendes „wird gelöscht“ darf danach erneut löschen."""
+    - ``SHOP_TEST_DRAFT_DELETING_SECONDS`` (120): ein hängendes „wird gelöscht“ darf danach erneut löschen,
+    - ``SHOP_TEST_DRAFT_UNCLEAR_GRACE_SECONDS`` (600): findet Printful einen Testentwurf mit offenem Ausgang nicht, gilt
+      er erst so lange nach dem letzten Versuch als nie angelegt."""
     return {
         "preview_limit": _env_int("SHOP_TEST_DRAFT_PREVIEW_LIMIT", 20, 1, 1000),
         "send_limit": _env_int("SHOP_TEST_DRAFT_SEND_LIMIT", 5, 1, 1000),
@@ -87,6 +89,7 @@ def limits() -> dict:
         "max_open": _env_int("SHOP_TEST_DRAFT_MAX_OPEN", 5, 1, 100),
         "sending_seconds": _env_int("SHOP_TEST_DRAFT_SENDING_SECONDS", 120, 30, 3600),
         "deleting_seconds": _env_int("SHOP_TEST_DRAFT_DELETING_SECONDS", 120, 30, 3600),
+        "unclear_grace_seconds": _env_int("SHOP_TEST_DRAFT_UNCLEAR_GRACE_SECONDS", 600, 30, 86_400),
     }
 
 
@@ -580,8 +583,9 @@ async def delete(db, draft_id: str, *, actor_id: str, provider: FulfillmentProvi
 
     Aufräumen geht auch, wenn der Shop inzwischen wieder auf „Aus“ steht - es reicht ein lesbarer Schlüssel
     (``shop_config.require_printful_key``); der Adapter löscht dann nur Aufträge mit external_id
-    ``lsw-testentwurf-…``. Ein
-    hängendes „wird gelöscht“ darf nach ``SHOP_TEST_DRAFT_DELETING_SECONDS`` übernommen werden."""
+    ``lsw-testentwurf-…``. Ein hängendes „wird gelöscht“ darf nach ``SHOP_TEST_DRAFT_DELETING_SECONDS`` übernommen
+    werden. Ein offener Ausgang (``unclear``, hängendes Senden) wird über ``_delete_unclear`` aufgeräumt - ohne erneutes
+    Senden, also auch bei Stufe „Aus“ oder wenn eine Druckdatei schon weg ist."""
     await shop_config.require_printful_key(db)
     record = await _get(db, draft_id)
     if record["state"] == "deleted":
@@ -590,8 +594,9 @@ async def delete(db, draft_id: str, *, actor_id: str, provider: FulfillmentProvi
         if not await _discard(db, record):
             raise ShopConflict("Der Testentwurf wird gerade gesendet - Ergebnis abwarten.")
         return {**view(record), "state": "deleted", "state_label": STATE_LABELS["deleted"], "discarded": True}
-    if record["state"] in ("sending", "unclear"):
-        raise ShopConflict("Der Ausgang des Sendens ist noch offen - erst „Erneut senden / nachsehen“, dann löschen.")
+    open_delete = record["state"] == "deleting" and not record.get("printful_order_id")
+    if record["state"] in ("sending", "unclear") or open_delete:
+        return await _delete_unclear(db, record, actor_id=actor_id, provider=provider)
     if record["state"] not in ("sent", "deleting") or not record.get("printful_order_id"):
         raise ShopConflict("Der Testentwurf wird gerade gelöscht - Ergebnis abwarten.")
     stuck = (_now() - timedelta(seconds=limits()["deleting_seconds"])).isoformat()
@@ -600,6 +605,85 @@ async def delete(db, draft_id: str, *, actor_id: str, provider: FulfillmentProvi
         {"$set": {"state": "deleting", "deleting_at": _now().isoformat()}})
     if claimed.modified_count != 1:
         raise ShopConflict("Der Testentwurf wird gerade gelöscht - Ergebnis abwarten.")
+    return await _delete_at_printful(db, record, actor_id=actor_id, provider=provider)
+
+
+def _latest(*stamps) -> datetime | None:
+    moments = [moment for moment in (_parse(stamp) for stamp in stamps if stamp) if moment is not None]
+    return max(moments) if moments else None
+
+
+async def _claim_fresh(db, record: dict) -> bool:
+    """Ist der letzte Sendeversuch (Claim des Adapters, Versuch, Senden) jünger als
+    ``SHOP_TEST_DRAFT_UNCLEAR_GRACE_SECONDS``? Dann kann Printful einen eben angelegten Entwurf noch nicht zeigen."""
+    claim = await db[DRAFT_CLAIMS].find_one({"external_id": record["external_id"]}, {"_id": 0}) or {}
+    latest = _latest(claim.get("claimed_at"), claim.get("seen_at"), record.get("send_attempted_at"),
+                     record.get("sending_at"))
+    return latest is not None and _now() - latest < timedelta(seconds=limits()["unclear_grace_seconds"])
+
+
+async def _delete_unclear(db, record: dict, *, actor_id: str, provider: FulfillmentProvider) -> dict:
+    """Aufräumen eines Testentwurfs mit offenem Ausgang (``unclear``, hängendes Senden oder ein abgebrochenes Löschen
+    davon) - auch bei Stufe „Aus“ und wenn eine Druckdatei schon weg ist, also ohne erneutes Senden:
+
+    1. bei Printful über ``@external_id`` nachsehen;
+    2. gefunden: Nummer ins Protokoll und als Testentwurf löschen (``delete_draft(..., test_draft=True)``);
+    3. nicht gefunden und der letzte Versuch liegt länger als die Schonfrist zurück: als gelöscht vermerken, Dateien
+       weg;
+    4. nicht gefunden, aber der Versuch ist frisch: 409 - Printful zeigt einen eben angelegten Entwurf oft erst kurz
+       später."""
+    now = _now()
+    settings = limits()
+    stuck_send = (now - timedelta(seconds=settings["sending_seconds"])).isoformat()
+    stuck_delete = (now - timedelta(seconds=settings["deleting_seconds"])).isoformat()
+    claimed = await _collection(db).update_one(
+        {"id": record["id"], "$or": [{"state": "unclear"}, {"state": "sending", "sending_at": {"$lt": stuck_send}},
+                                     {"state": "deleting", "printful_order_id": None,
+                                      "deleting_at": {"$lt": stuck_delete}}]},
+        {"$set": {"state": "deleting", "deleting_at": now.isoformat(), "deleting_from": "unclear"}})
+    if claimed.modified_count != 1:
+        raise ShopConflict("Der Testentwurf wird gerade gesendet oder gelöscht - Ergebnis abwarten.")
+    try:
+        order = await provider.get_order(record["external_id"])
+    except FulfillmentPermanent as exc:
+        if exc.reason != "not_found":
+            await _back_to_unclear(db, record, exc)
+            raise
+        order = None
+    except BaseException as exc:
+        await _back_to_unclear(db, record, exc if isinstance(exc, FulfillmentError) else None)
+        raise
+    if order is not None:
+        await _collection(db).update_one({"id": record["id"], "state": "deleting"}, {"$set": {
+            "printful_order_id": order.id.value, "printful_status": order.status}})
+        return await _delete_at_printful(db, {**record, "printful_order_id": order.id.value}, actor_id=actor_id,
+                                         provider=provider)
+    if await _claim_fresh(db, record):
+        await _back_to_unclear(db, record, None)
+        raise ShopConflict("Printful zeigt diesen Entwurf noch nicht - das dauert nach dem Senden manchmal ein paar "
+                           "Minuten. Bitte später noch einmal löschen.")
+    await shop_print_files.discard_order_files(db, record["id"])
+    # Den Merkposten des Adapters gibt es nur für diese (einmalige) external_id - ohne Auftrag ist er erledigt.
+    await db[DRAFT_CLAIMS].delete_one({"external_id": record["external_id"]})
+    note = "Bei Printful nicht angelegt bzw. nicht mehr vorhanden."
+    await _collection(db).update_one({"id": record["id"]}, {"$set": {
+        "state": "deleted", "deleted_at": _now().isoformat(), "deleted_by": actor_id, "delete_note": note}})
+    await record_admin_action(db, "shop.test_draft.delete", actor_id=actor_id, target_id=record["id"], reason="",
+                              data={"external_id": record["external_id"], "printful_order_id": None,
+                                    "gone_already": True})
+    return view(await _get(db, record["id"]))
+
+
+async def _back_to_unclear(db, record: dict, exc: FulfillmentError | None) -> None:
+    update: dict = {"state": "unclear"}
+    if exc is not None:
+        update["last_error"] = _error_view(exc)
+    await _collection(db).update_one({"id": record["id"], "state": "deleting"}, {"$set": update})
+
+
+async def _delete_at_printful(db, record: dict, *, actor_id: str, provider: FulfillmentProvider) -> dict:
+    """Der Testentwurf steht auf „wird gelöscht“ und hat eine Printful-Nummer: dort löschen, Dateien weg."""
+    draft_id = record["id"]
     note = None
     try:
         await provider.delete_draft(db, PrintfulOrderId(int(record["printful_order_id"])), test_draft=True)
@@ -661,8 +745,10 @@ def actions(record: dict, now: datetime | None = None) -> dict:
         sending_at is None or now - sending_at >= timedelta(seconds=settings["sending_seconds"]))
     stuck_deleting = state == "deleting" and (
         deleting_at is None or now - deleting_at >= timedelta(seconds=settings["deleting_seconds"]))
-    return {"resend": state == "unclear" or stuck_sending,
-            "delete": bool(record.get("printful_order_id")) and (state == "sent" or stuck_deleting)}
+    open_outcome = state == "unclear" or stuck_sending
+    return {"resend": open_outcome,
+            # Auch ein offener Ausgang lässt sich aufräumen: der Server sieht bei Printful nach (#2062, N1/N2).
+            "delete": open_outcome or stuck_deleting or (state == "sent" and bool(record.get("printful_order_id")))}
 
 
 async def get_view(db, draft_id: str) -> dict:

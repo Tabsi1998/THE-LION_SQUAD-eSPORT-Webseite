@@ -177,9 +177,9 @@ test("nach abgelehntem Senden holt die Seite den Stand neu und zeigt die Ursache
   expect(toastMock.error).toHaveBeenCalledWith(expect.stringContaining("lehnt die Daten ab"));
 });
 
-test("unklarer Ausgang: Ergebnis mit „Erneut senden / nachsehen“ - derselbe Entwurf, kein Löschen davor", async () => {
+test("unklarer Ausgang: Ergebnis mit „Erneut senden / nachsehen“ und „Löschen“ (Server sieht nach)", async () => {
   const UNCLEAR = { ...PREVIEW, state: "unclear", state_label: "Ausgang unklar - erneut senden", printful_order_id: null,
-    last_error: { reason: "timeout", text: "Der Anbieter antwortet nicht (Zeitüberschreitung)" }, actions: { resend: true, delete: false } };
+    last_error: { reason: "timeout", text: "Der Anbieter antwortet nicht (Zeitüberschreitung)" }, actions: { resend: true, delete: true } };
   let sends = 0;
   apiMock.post.mockImplementation(async (url) => {
     if (url.endsWith("/preview")) return { data: PREVIEW };
@@ -195,7 +195,10 @@ test("unklarer Ausgang: Ergebnis mit „Erneut senden / nachsehen“ - derselbe 
   const result = await screen.findByTestId("shop-test-draft-result");
   expect(result).toHaveTextContent("Ausgang unklar");
   expect(within(result).getByTestId("shop-test-draft-result-last-error")).toHaveTextContent("Zeitüberschreitung");
-  expect(within(result).queryByTestId("shop-test-draft-result-delete")).toBeNull();
+  // Löschen geht auch ohne erneutes Senden (etwa bei Stufe „Aus“): der Server sieht bei Printful nach.
+  await userEvent.click(within(result).getByTestId("shop-test-draft-result-delete"));
+  expect(within(result).getByTestId("shop-test-draft-result-confirm")).toHaveTextContent("Bei Printful nachsehen und den Entwurf");
+  await userEvent.click(within(result).getByRole("button", { name: "Abbrechen" }));
   await userEvent.click(within(result).getByTestId("shop-test-draft-result-resend"));
   await waitFor(() => expect(within(screen.getByTestId("shop-test-draft-result")).getByTestId("shop-test-draft-result-order-id")).toHaveTextContent("9001"));
   const keys = apiMock.post.mock.calls.filter(([path]) => path.endsWith("/send")).map(([, body]) => body.idempotency_key);
