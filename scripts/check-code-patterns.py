@@ -11,6 +11,9 @@ Regel 2 - unbenutzte Importe und Variablen (flake8 F401/F841), nur in Python-Dat
 geändert oder neu sind, und nur, was dort neu dazukommt: was eine Datei schon vorher hatte, hält niemanden auf.
 Ohne flake8 oder ohne origin/main (flacher Checkout) wird Regel 2 übersprungen.
 
+Regel 3 - Shop-Routen (#1704): jede Route mit „shop“ als Pfadteil liegt unter /api/admin/shop und hängt an
+require_area("finance"). Öffentliche Shop-Routen gibt es noch nicht (#1706, #1712) - die Regel hält das fest.
+
     python scripts/check-code-patterns.py [--python PFAD-ZU-PYTHON-MIT-FLAKE8] [--base origin/main]
 """
 from __future__ import annotations
@@ -19,6 +22,7 @@ import argparse
 import ast
 import collections
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -91,6 +95,83 @@ def side_effect_asserts(root: Path = ROOT) -> list[Finding]:
             if effect:
                 found.append(Finding(name, node.lineno, effect))
     return sorted(found, key=lambda item: (item.path, item.line))
+
+
+HTTP_METHODS = {"get", "post", "put", "patch", "delete"}
+SHOP_ADMIN_PREFIX = "/api/admin/shop"
+SHOP_SEGMENT = re.compile(r"(^|/)shop(/|$)")
+
+
+class Route(NamedTuple):
+    path: str
+    line: int
+    method: str
+    url: str
+    areas: tuple[tuple[str, ...], ...]  # je Depends(require_area(...)) die Bereiche
+
+
+def _router_prefixes(tree: ast.Module) -> dict[str, str]:
+    """``name = APIRouter(prefix="...")`` auf Modulebene - Name -> Präfix; ``app`` ohne Präfix."""
+    prefixes = {"app": ""}
+    for node in tree.body:
+        if (isinstance(node, ast.Assign) and len(node.targets) == 1 and isinstance(node.targets[0], ast.Name)
+                and isinstance(node.value, ast.Call) and getattr(node.value.func, "id", None) == "APIRouter"):
+            prefix = next((keyword.value.value for keyword in node.value.keywords
+                           if keyword.arg == "prefix" and isinstance(keyword.value, ast.Constant)), "")
+            prefixes[node.targets[0].id] = str(prefix)
+    return prefixes
+
+
+def _required_areas(function: ast.AST) -> tuple[tuple[str, ...], ...]:
+    """Die Bereiche jedes ``Depends(require_area(...))`` unter den Vorgaben der Parameter."""
+    found = []
+    arguments = function.args
+    for default in [*arguments.defaults, *[value for value in arguments.kw_defaults if value is not None]]:
+        inner = default.args[0] if isinstance(default, ast.Call) and default.args else None
+        if (getattr(getattr(default, "func", None), "id", None) == "Depends" and isinstance(inner, ast.Call)
+                and getattr(inner.func, "id", None) == "require_area"):
+            found.append(tuple(arg.value for arg in inner.args if isinstance(arg, ast.Constant)))
+    return tuple(found)
+
+
+def shop_routes(root: Path = ROOT) -> list[Route]:
+    """Alle Routen mit „shop“ als Pfadteil in ``backend/routes`` und ``backend/server.py``."""
+    files = [path for path in python_files(root, "backend/routes")] if (root / "backend" / "routes").is_dir() else []
+    if (root / "backend" / "server.py").is_file():
+        files.append(root / "backend" / "server.py")
+    found = []
+    for path in files:
+        name = path.relative_to(root).as_posix()
+        tree = ast.parse(path.read_bytes(), filename=name)
+        prefixes = _router_prefixes(tree)
+        for node in ast.walk(tree):
+            if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                continue
+            for decorator in node.decorator_list:
+                call = decorator if isinstance(decorator, ast.Call) else None
+                func = getattr(call, "func", None)
+                if (not isinstance(func, ast.Attribute) or func.attr not in HTTP_METHODS
+                        or not isinstance(func.value, ast.Name) or func.value.id not in prefixes or not call.args
+                        or not isinstance(call.args[0], ast.Constant)):
+                    continue
+                url = prefixes[func.value.id] + str(call.args[0].value)
+                if SHOP_SEGMENT.search(url):
+                    found.append(Route(name, decorator.lineno, func.attr.upper(), url, _required_areas(node)))
+    return sorted(found, key=lambda item: (item.path, item.line))
+
+
+def shop_route_guards(root: Path = ROOT) -> list[Finding]:
+    """Regel 3 (#1704): jede Shop-Route liegt unter /api/admin/shop und hängt an ``require_area("finance")`` - nur
+    Finanzen, kein weiterer Bereich. Eine öffentliche Shop-Route gibt es erst mit Betriebsarten und Shop-Seiten
+    (#1706, #1712); dann wird diese Regel bewusst erweitert."""
+    findings = []
+    for route in shop_routes(root):
+        if not (route.url == SHOP_ADMIN_PREFIX or route.url.startswith(SHOP_ADMIN_PREFIX + "/")):
+            findings.append(Finding(route.path, route.line, f"{route.method} {route.url} ist öffentlich"))
+        elif ("finance",) not in route.areas:
+            missing = f"{route.method} {route.url} ohne require_area(\"finance\")"
+            findings.append(Finding(route.path, route.line, missing))
+    return findings
 
 
 def git(root: Path, *arguments: str) -> subprocess.CompletedProcess | None:
@@ -190,6 +271,7 @@ def main(argv: list[str] | None = None) -> int:
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
     asserts = side_effect_asserts(root)
+    guards = shop_route_guards(root)
     if arguments.skip_lint:
         unused, checked = [], "Regel 2 übersprungen"
     else:
@@ -202,10 +284,14 @@ def main(argv: list[str] | None = None) -> int:
               "assert antwort.status_code == 200. Python lässt assert mit -O weg, der Aufruf fiele mit weg.")
     for path, line, code, text in unused:
         print(f"{path}:{line}: {LINT_RULES.get(code, code)} ({code}: {text})")
-    if asserts or unused:
-        print(f"Code-Muster: {len(asserts)} assert mit Wirkung, {len(unused)} neue unbenutzte Namen ({checked}).")
+    for item in guards:
+        print(f"{item.path}:{item.line}: Shop-Route {item.name} - nur Finanzen unter /api/admin/shop (#1704)")
+    if asserts or unused or guards:
+        print(f"Code-Muster: {len(asserts)} assert mit Wirkung, {len(unused)} neue unbenutzte Namen, "
+              f"{len(guards)} ungeschützte Shop-Routen ({checked}).")
         return 1
-    print(f"Code-Muster: kein assert mit Wirkung im Backend, keine neuen unbenutzten Namen ({checked}).")
+    print(f"Code-Muster: kein assert mit Wirkung im Backend, keine neuen unbenutzten Namen, Shop-Routen nur für "
+          f"Finanzen ({checked}).")
     return 0
 
 

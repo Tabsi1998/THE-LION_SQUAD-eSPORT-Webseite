@@ -16,6 +16,7 @@ from pymongo.errors import DuplicateKeyError
 
 from models import new_id
 from services.secret_migration import migrate_plaintext_secrets
+from services.shop_schema import migrate_shop_data_model
 
 logger = logging.getLogger("tls.migrations")
 # So lange gilt die Sperre eines Migrationslaufs ab dem Holen bzw. ab der letzten Verlängerung.
@@ -364,6 +365,8 @@ MIGRATIONS = (
     (10, "reference_result_row_teams", migrate_result_row_teams),  # #1960: leeres Team heißt kein Team
     (11, "reference_double_up_points", migrate_double_up_points),  # #2015: bestehende Double-Up-Saisons bleiben bei k
     (12, "reference_kind_templates", migrate_kind_templates),  # #2024: TFT-Vorlage, „Formel 1“ nur für die Rennliga
+    # #1703: Shop-Datenmodell; Trockenlauf und Rückweg in services/shop_schema.py bzw. backend/scripts/shop_schema.py
+    (13, "shop_data_model", migrate_shop_data_model),
 )
 
 

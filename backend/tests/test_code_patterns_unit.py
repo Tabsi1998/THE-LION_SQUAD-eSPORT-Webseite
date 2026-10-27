@@ -72,6 +72,59 @@ def test_the_backend_has_no_assert_with_an_effect():
     assert patterns.side_effect_asserts(ROOT) == []
 
 
+SHOP_ROUTES = '''from fastapi import APIRouter, Depends
+
+from auth import get_current_user, require_area
+
+router = APIRouter(prefix="/api/admin/shop", tags=["shop"])
+public = APIRouter(prefix="/api", tags=["shop"])
+
+
+@router.get("/products")
+async def guarded(me: dict = Depends(require_area("finance"))):
+    return {}
+
+
+@router.post("/products")
+async def wrong_area(me: dict = Depends(require_area("finance", "content"))):
+    return {}
+
+
+@router.get("/orders")
+async def unguarded():
+    return {}
+
+
+@public.get("/shop/products")
+async def visible(me: dict = Depends(get_current_user)):
+    return {}
+
+
+@public.get("/workshops")
+async def not_the_shop():
+    return {}
+'''
+
+
+def test_shop_routes_need_the_finance_area_and_none_are_public(tmp_path):
+    path = tmp_path / "backend" / "routes" / "shop_test_routes.py"
+    path.parent.mkdir(parents=True)
+    path.write_text(SHOP_ROUTES, encoding="utf-8")
+    found = [(item.path, item.line, item.name) for item in patterns.shop_route_guards(tmp_path)]
+    assert found == [
+        ("backend/routes/shop_test_routes.py", 14, "POST /api/admin/shop/products ohne require_area(\"finance\")"),
+        ("backend/routes/shop_test_routes.py", 19, "GET /api/admin/shop/orders ohne require_area(\"finance\")"),
+        ("backend/routes/shop_test_routes.py", 24, "GET /api/shop/products ist öffentlich"),
+    ]
+    assert patterns.main(["--root", str(tmp_path), "--skip-lint"]) == 1
+
+
+def test_the_real_shop_routes_are_guarded():
+    # Regel 3 gilt hart: jede Shop-Route der Anwendung hängt an „Finanzen“, keine ist öffentlich (#1704).
+    assert patterns.shop_route_guards(ROOT) == []
+    assert patterns.shop_routes(ROOT), "die Suche findet die Shop-Routen"
+
+
 def test_only_unused_names_a_change_brings_in_count(tmp_path):
     before, now = tmp_path / "vorher", tmp_path / "jetzt"
     for folder, text in ((before, "import os\n\n\ndef f():\n    wert = 1\n"),

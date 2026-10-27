@@ -256,6 +256,11 @@ async def _user_data_sections(db, user_id: str) -> list[tuple[str, tuple]]:
         ("jersey_number_requests", _rows(db.jersey_number_requests, me, lambda row: _clean(row, "decided_by"))),
         ("billing_orders", _rows(db.billing_orders, me)),
         ("billing_customers", _rows(db.billing_customers, me)),
+        # Shop (#1703): Bestellungen mit Anschriften und Beträgen, Positionen mit Gamertag, der Warenkorb - ohne die
+        # internen Schlüssel gegen Doppelbestellungen.
+        ("shop_orders", _rows(db.shop_orders, me, lambda row: _clean(row, "idempotency_key", "request_hash"))),
+        ("shop_order_items", _rows(db.shop_order_items, me)),
+        ("shop_cart", _rows(db.shop_carts, me)),
         ("match_reports", _rows(db.match_reports_v2, {"reporter_user_id": user_id})),
         ("schedule_proposals", _rows(db.match_schedule_proposals, {"actor_user_id": user_id}, _pick(*PROPOSAL))),
         ("match_proof_photos", _rows(db.match_proof_photos, {"owner_id": user_id}, _pick(*PROOF_PHOTO))),
@@ -371,6 +376,9 @@ async def _anonymize_user_data(db, user_id: str, actor_id: str, action: str) -> 
     # Abrechnung (#322): Belege bleiben in Dolibarr; der Auftrag hier behält Betrag und Nummer, verliert Name und E-Mail.
     from services.billing_orders import anonymize_user as anonymize_billing
     await anonymize_billing(db, user_id)
+    # Shop (#1703): Beträge bleiben, Anschriften und Gamertag gehen, der Warenkorb wird gelöscht.
+    from services.shop_orders import anonymize_user as anonymize_shop
+    await anonymize_shop(db, user_id)
     # Alles außerhalb des Kontos (#928): Verzeichnis, Anträge, Anmeldungen, XP, Zugänge und die eigenen Bilder.
     erased = await account_erasure.erase_related(db, user, now)
     # Kontaktanfragen ohne Konto mit derselben Adresse bleiben unberührt (nicht sicher zuzuordnen) - die Zahl steht hier,

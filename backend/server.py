@@ -78,6 +78,7 @@ from routes.admission_routes import router as admission_router
 from routes.invoice_routes import router as invoice_router
 from routes.member_card_routes import router as member_card_router
 from routes.finance_routes import router as finance_router
+from routes.shop_admin_routes import router as shop_admin_router
 from routes.platform_link_routes import router as platform_link_router
 from routes.discord_bot_routes import router as discord_bot_router
 from routes.discord_forward_routes import router as discord_forward_router
@@ -358,6 +359,7 @@ app.include_router(admission_router)
 app.include_router(invoice_router)
 app.include_router(member_card_router)
 app.include_router(finance_router)
+app.include_router(shop_admin_router)  # Shop (#1704): nur Finanzen, keine öffentlichen Routen
 app.include_router(platform_link_router)
 app.include_router(discord_bot_router)
 app.include_router(discord_guild_router)

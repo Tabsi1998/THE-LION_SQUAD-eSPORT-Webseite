@@ -12,6 +12,10 @@ Jetzt hängen Rechte an **Bereichen**:
                     CMS-Seiten, Navigation, Sticker, Achievements
 - ``club``        – Mitglieder, Anträge, Dokumente, Vorteile, Vorstand,
                     Kontakt-Inbox, Benutzerliste, Discord-Zähler
+- ``finance``     – Kosten an Angeboten, Rechnungsaufträge, Freigaben,
+                    Prüffälle, Rechnungsangaben (#322, #1358) und der
+                    Vereinsshop: Produkte, Preise, Varianten, Bestellungen
+                    (#1704, docs/SHOP.md)
 - ``system``      – Einstellungen, Game-Server, Betrieb, Logs, Audit,
                     App-Versionen
 - ``moderation``  – Chats, Meldungen, Strafen
@@ -29,8 +33,8 @@ from __future__ import annotations
 
 from database import get_db
 
-# „finance“ (#322): Kosten an Angeboten pflegen, Rechnungsaufträge sehen und freigeben. Kein
-# Admin hat das pauschal - Club-Admin und Superadmin bringen es mit, andere per Freigabe.
+# „finance“ (#322): Kosten an Angeboten pflegen, Rechnungsaufträge sehen und freigeben, den Vereinsshop
+# verwalten (#1704). Kein Admin hat das pauschal - Club-Admin und Superadmin bringen es mit, andere per Freigabe.
 AREAS: tuple[str, ...] = ("tournaments", "content", "club", "finance", "system", "moderation")
 GRANTABLE_AREAS: tuple[str, ...] = ("tournaments", "content", "club", "finance")
 MFA_AREAS: frozenset[str] = frozenset({"tournaments", "content", "club", "finance", "system"})
