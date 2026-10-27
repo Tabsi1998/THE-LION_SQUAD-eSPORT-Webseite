@@ -634,7 +634,7 @@ docker compose exec backend python scripts/shop_print_layout.py --abbauen --anwe
 
 Ein Produkt ohne gespeicherte Vorlage überspringt das Werkzeug (erst abgleichen). Der Stand eines Produkts bleibt.
 Lässt sich auch nur **eine** alte Platzierung nicht abbilden, ist das ganze Produkt **nicht bestellbar** (fail-closed):
-`place_order` sagt nur „Dieses Produkt ist gerade nicht bestellbar.“ (ebenso bei fehlender Druckvorlage, unpassendem Aufbau oder veralteter Druckdatei - die Einzelheiten stehen nur im Log und in der Vorab-Prüfung), die Vorab-Prüfung zeigt den Punkt „Druckflächen
+`place_order` sagt nur „Dieses Produkt ist gerade nicht bestellbar.“ (ebenso bei allem, was die Kundschaft nicht selbst lösen kann: Produkt nicht aktiv oder gesperrt, nicht lieferbar, kein Preis, unter dem Mindestpreis, fehlende Druckvorlage oder Druckdatei, unpassender Aufbau, fehlende Gamertag-Datei - der Grund steht mit Produkt und Variante als Warnung im Log und, wo er zum Aufbau gehört, in der Vorab-Prüfung; ein fehlender Gamertag oder ein Gamertag ohne Mitgliedschaft bleiben eigene Meldungen), die Vorab-Prüfung zeigt den Punkt „Druckflächen
 umgestellt“ rot mit Fläche und Grund, bis Schritt 3 neu gespeichert ist.
 
 ### Generator und Ablage

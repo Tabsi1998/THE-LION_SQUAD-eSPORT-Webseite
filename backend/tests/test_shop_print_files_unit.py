@@ -572,3 +572,94 @@ async def test_a_missing_template_area_keeps_internals_from_customers(db, provid
     view = await shop_products.admin_view(db, product["id"])
     files = next(item for item in view["check"]["items"] if item["key"] == "files")
     assert files["ok"] is False and files["state"] == "failed" and "back / Black: Fläche fehlt" in files["detail"]
+
+@pytest.mark.asyncio
+async def test_customers_read_one_fixed_sentence_and_the_reason_goes_to_the_log(db, provider, fake, caplog,
+                                                                                 monkeypatch):
+    """Codex, sechste Runde: jeder Grund, den die Kundschaft nicht selbst lösen kann, ergibt denselben Satz; der Grund
+    steht mit Produkt und Variante im Log. Ein fehlender Gamertag bleibt eine eigene Meldung."""
+    import logging
+
+    from shop_testdata import publish_unchecked
+    from test_shop_products_unit import BILLING, SHIPPING, variant_for
+
+    from services import shop_gamertag, shop_orders
+
+    product = await configured(db, provider)
+    await publish_unchecked(db, product["id"])
+    black = await variant_for(db, product["id"], 4012)
+    counter = iter(range(100, 200))
+
+    async def order(**line):
+        return await shop_orders.place_order(
+            db, user_id="konto-1", idempotency_key=f"bestellung-0{next(counter)}", buyer_kind="member",
+            lines=[{"variant_id": black["id"], "quantity": 1, "gamertag": "Testlöwe", **line}],
+            shipping_estimate_cents=490, billing_address=dict(BILLING), shipping_address=dict(SHIPPING),
+            actor_id="konto-1")
+
+    fixed = "Position 1: Dieses Produkt ist gerade nicht bestellbar."
+    cases = [
+        ("Mindestpreis", lambda: db.settings.update_one({"id": "shop"}, {"$set": {"id": "shop", "min_price_cents": 5000}},
+                                                        upsert=True),
+         lambda: db.settings.update_one({"id": "shop"}, {"$set": {"min_price_cents": 100}})),
+        ("kein Preis", lambda: db.shop_variants.update_one({"id": black["id"]}, {"$set": {"price_cents": None}}),
+         lambda: db.shop_variants.update_one({"id": black["id"]}, {"$set": {"price_cents": 1500}})),
+        ("lieferbar", lambda: db.shop_printful_variants.update_one({"variant_id": black["id"]},
+                                                                   {"$set": {"in_stock": False}}),
+         lambda: db.shop_printful_variants.update_one({"variant_id": black["id"]}, {"$set": {"in_stock": True}})),
+    ]
+    for reason, spoil, repair in cases:
+        await spoil()
+        caplog.clear()
+        with caplog.at_level(logging.WARNING, logger="tls-arena.shop-orders"), pytest.raises(ShopError) as refused:
+            await order()
+        assert str(refused.value) == fixed, reason
+        assert reason in caplog.text and product["id"] in caplog.text and black["id"] in caplog.text, caplog.text
+        await repair()
+    # Die Gamertag-Datei verschwindet beim Ablegen: fester Satz, Grund im Log, keine Datei bleibt liegen.
+    real_store = shop_gamertag.store
+
+    async def lost(*args, **kwargs):
+        stored = await real_store(*args, **kwargs)
+        shop_designs._path_of(stored["row"]["file_ref"]).unlink()
+        return stored
+
+    monkeypatch.setattr(shop_gamertag, "store", lost)
+    caplog.clear()
+    with caplog.at_level(logging.WARNING, logger="tls-arena.shop-print-files"), pytest.raises(ShopError) as refused:
+        await order()
+    assert str(refused.value) == "Dieses Produkt ist gerade nicht bestellbar."
+    assert "gamertag file missing" in caplog.text
+    assert await db.shop_gamertag_files.count_documents({"purpose": "order"}) == 0
+    assert await db.shop_print_files.count_documents({"purpose": "order"}) == 0
+    assert await db.shop_order_items.count_documents({}) == 0
+    # Gamertag fehlt: das kann die Kundschaft selbst lösen - eigene Meldung.
+    monkeypatch.setattr(shop_gamertag, "store", real_store)
+    with pytest.raises(ShopError, match="fehlt der Gamertag"):
+        await order(gamertag=None)
+
+
+@pytest.mark.asyncio
+async def test_a_blocked_legacy_layout_is_logged_with_product_and_area(db, provider, caplog):
+    import logging
+
+    from shop_testdata import publish_unchecked
+    from test_shop_products_unit import BILLING, SHIPPING, variant_for
+
+    from services import shop_orders
+
+    product = await legacy_product(db, provider)
+    await shop_products.accept_prices(db, product["id"], **BY)
+    sleeve = {"key": "sleeve_left", "kind": "design", "printful_placement": "sleeve_left",
+              "position": {"left_in": 0.5, "top_in": 0.5, "width_in": 2, "height_in": 2},
+              "designs": [{"color": "Black", "design_key": "loewe-weiss"}]}
+    await db.shop_products.update_one({"id": product["id"]}, {"$set": {"placements": [*LEGACY, sleeve]}})
+    await publish_unchecked(db, product["id"])
+    black = await variant_for(db, product["id"], 4012)
+    with caplog.at_level(logging.WARNING, logger="tls-arena.shop-print-files"), pytest.raises(ShopError) as refused:
+        await shop_orders.place_order(
+            db, user_id="konto-1", idempotency_key="bestellung-0300", buyer_kind="member",
+            lines=[{"variant_id": black["id"], "quantity": 1, "gamertag": "Testlöwe"}], shipping_estimate_cents=490,
+            billing_address=dict(BILLING), shipping_address=dict(SHIPPING), actor_id="konto-1")
+    assert str(refused.value) == "Position 1: Dieses Produkt ist gerade nicht bestellbar."
+    assert product["id"] in caplog.text and "Ärmel links" in caplog.text and "layout not convertible" in caplog.text

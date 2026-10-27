@@ -20,15 +20,19 @@ Ereignisse und Protokoll tragen nie eine Anschrift.
 from __future__ import annotations
 
 import hashlib
+import logging
 import json
 import re
-from typing import Any
+from typing import Any, NoReturn
 
 from pymongo.errors import DuplicateKeyError
 
 from models import new_id, now_utc
 from services import shop_catalog, shop_common, shop_config, shop_motifs, shop_print_files
+from services.log_safe import log_safe
 from services.shop_common import ShopConflict, ShopError, assert_no_address
+
+logger = logging.getLogger("tls-arena.shop-orders")
 
 BUYER_KINDS = ("member", "public")
 STATUS_LABELS = {"placed": "bestellt"}  # die Statusmaschine folgt mit #1716
@@ -88,6 +92,14 @@ async def _same_order(db, order: dict, request_hash: str) -> tuple[dict, bool]:
     return order, False
 
 
+def _not_orderable(position: int, product: dict | None, variant: dict | None, reason: str) -> NoReturn:
+    """Die Kundschaft liest nur den festen Satz (``NOT_ORDERABLE``); der Grund steht mit Produkt und Variante im Log -
+    und, wo er zum Aufbau gehört, in der Vorab-Prüfung der Produktverwaltung."""
+    logger.warning("[shop-orders] position not orderable: product=%s variant=%s reason=%s",
+                   log_safe((product or {}).get("id")), log_safe((variant or {}).get("id")), log_safe(reason))
+    raise ShopError(f"Position {position}: {shop_print_files.NOT_ORDERABLE}")
+
+
 async def _freeze_legacy_designs(db, product: dict, variant: dict, line: dict, position: int) -> list[dict]:
     """Produkte ohne Printful-Vorlage mit Platzierungen aus #1707 (Design je Farbe, Position in Zoll): je Platzierung die
     Fassung des Motivs für die Shirtfarbe (#2069 Teil A) - wie vor den Druckvorlagen."""
@@ -103,7 +115,7 @@ async def _freeze_legacy_designs(db, product: dict, variant: dict, line: dict, p
             latest = await shop_motifs.file_for_garment(db, key, color=variant.get("color"),
                                                         color_hex=variant.get("color_code")) if key else None
             if not latest:
-                raise ShopError(f"Position {position}: für diese Farbe fehlt eine Druckdatei.")
+                _not_orderable(position, product, variant, "keine Druckdatei-Fassung für die Shirtfarbe")
             entry.update(design_key=latest["design_key"], version=latest["version"], sha256=latest["sha256"],
                          variant=latest.get("variant") or "dark")
         elif entry["kind"] == "gamertag" and not line["gamertag"]:
@@ -139,24 +151,24 @@ async def _freeze_line(db, line: dict, position: int, buyer_kind: str, config: d
     product = await shop_catalog.get_product(db, variant["product_id"]) if variant else None
     if (not variant or not product or not variant.get("active") or variant.get("blocked_reason")
             or product.get("status") != "active"):
-        raise ShopError(f"Position {position}: dieser Artikel ist nicht bestellbar.")
+        _not_orderable(position, product, variant, "nicht aktiv, gesperrt oder nicht veröffentlicht")
     if line["gamertag"] and not (buyer_kind == "member" and shop_catalog.allows_gamertag(product)):
         raise ShopError(f"Position {position}: ein Gamertag geht nur für Mitglieder bei Produkten mit Gamertag.")
     mapping = await shop_catalog.printful_variant_for(db, variant["id"])
     if product.get("printful") and (not mapping or mapping.get("in_stock") is not True):
         # Fail-closed (#1709): nur, was Printful zuletzt ausdrücklich als lieferbar gemeldet hat.
-        raise ShopError(f"Position {position}: dieser Artikel ist nicht bestellbar.")
+        _not_orderable(position, product, variant, "bei Printful nicht als lieferbar gemeldet")
     unit = variant["price_cents"] if variant.get("price_cents") is not None else product.get("base_price_cents")
     if unit is None:
-        raise ShopError(f"Position {position}: für diesen Artikel ist noch kein Preis übernommen.")
+        _not_orderable(position, product, variant, "kein Preis übernommen")
     if unit < config["min_price_cents"]:
-        raise ShopError(f"Position {position}: dieser Artikel ist nicht bestellbar (Preis unter dem Mindestpreis).")
+        _not_orderable(position, product, variant, "Preis unter dem Mindestpreis")
     if not product.get("placements") and product.get("design_key"):
         # Auch hier die Fassung für die Shirtfarbe (#2069 Teil A) - nicht immer die Hauptdatei.
         latest = await shop_motifs.file_for_garment(db, product["design_key"], color=variant.get("color"),
                                                     color_hex=variant.get("color_code"))
         if not latest:
-            raise ShopError(f"Position {position}: zur Druckdatei gibt es noch keine Fassung.")
+            _not_orderable(position, product, variant, "keine Fassung des Einzel-Designs")
         design = {"design_key": latest["design_key"], "version": latest["version"], "sha256": latest["sha256"]}
         print_files, designs = [], []
     else:

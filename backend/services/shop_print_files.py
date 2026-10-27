@@ -40,6 +40,7 @@ from pymongo.errors import DuplicateKeyError
 
 from models import new_id, now_utc
 from services import shop_catalog, shop_designs, shop_gamertag, shop_motifs, shop_print_templates as templates
+from services.log_safe import log_safe
 from services.mutation_lock import MutationLockBusy, mutation_lock
 from services.shop_common import ShopConflict, ShopError, clean_reason, record_admin_action
 
@@ -895,8 +896,13 @@ async def freeze_line(db, product: dict, variant: dict, *, gamertag: str | None,
     context = await _context(db, product)
     # Fail-closed: lässt sich auch nur eine alte Platzierung nicht abbilden, ist das ganze Produkt nicht bestellbar -
     # nie eine Bestellung, in der eine Fläche still fehlt. Die Kundschaft liest nur den festen Satz, keine Interna.
-    if product.get("placements") and (not context["rows"] or (await layout_conversion(db, product))["blocked"]):
-        raise ShopError(f"Position {position}: {NOT_ORDERABLE}")
+    if product.get("placements"):
+        blocked = [] if context["rows"] and all(is_layout(row) for row in product["placements"]) else (
+            await layout_conversion(db, product))["blocked"]
+        if not context["rows"] or blocked:
+            logger.warning("[shop-print-files] order refused: product=%s layout not convertible: %s",
+                           log_safe(product.get("id")), log_safe(" ".join(blocked) or "keine Fläche abbildbar", 500))
+            raise ShopError(f"Position {position}: {NOT_ORDERABLE}")
     color = " ".join(str(variant.get("color") or "").split())
     color_hex = context["codes"].get(color) or variant.get("color_code")
     files, sources = [], []
@@ -946,7 +952,9 @@ async def _personal_file(db, product: dict, plan: Plan, base_row: dict | None, *
     tag_row = stored["row"]
     tag_path = shop_designs._path_of(tag_row["file_ref"])
     if tag_path is None or not tag_path.is_file():
-        raise ShopError("Die Gamertag-Datei fehlt auf dem Server.")
+        logger.warning("[shop-print-files] order refused: product=%s gamertag file missing on disk",
+                       log_safe(product.get("id")))
+        raise ShopError(NOT_ORDERABLE)
     tag_png = tag_path.read_bytes()
     entry = plan.entry
     layers = []
