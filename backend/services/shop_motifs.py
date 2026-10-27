@@ -133,7 +133,7 @@ def _valid_threshold(value: Any) -> float | None:
 # heller bzw. sehr dunkler Fläche, darüber Gelb; Lage: größte Verschiebung einer Kante des Logo-Rahmens, darüber Gelb.
 PAIR_SETTINGS = {
     "pair_aspect_tolerance": (0.02, 0.005, 0.2, "Erlaubte Abweichung des Seitenverhältnisses"),
-    "pair_min_overlap": (0.9, 0.5, 0.99, "Mindest-Überdeckung der Umrisse"),
+    "pair_min_overlap": (0.85, 0.5, 0.99, "Mindest-Überdeckung der Umrisse"),
     "pair_contrast_share": (0.03, 0.001, 0.5, "Höchstanteil sehr heller bzw. sehr dunkler Fläche"),
     "pair_position_tolerance": (0.03, 0.005, 0.3, "Erlaubte Verschiebung des Logos in der Zeichenfläche"),
 }

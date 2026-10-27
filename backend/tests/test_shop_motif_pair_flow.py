@@ -103,7 +103,7 @@ async def test_the_check_alone_stores_nothing_and_brings_previews(flow):
     assert body["previews"]["dark"].startswith("data:image/png;base64,")
     assert body["marks"] == {"dark": None, "light": None}
     assert body["files"]["dark"]["name"] == "loewe-auf-schwarz.svg" and body["files"]["light"]["is_vector"] is True
-    assert body["thresholds"] == {"pair_aspect_tolerance": 0.02, "pair_min_overlap": 0.9,
+    assert body["thresholds"] == {"pair_aspect_tolerance": 0.02, "pair_min_overlap": 0.85,
                                   "pair_contrast_share": 0.03, "pair_position_tolerance": 0.03}
     assert stored_files(flow) == [] and await flow.db.shop_designs.count_documents({}) == 0
     assert await flow.db.audit_logs.count_documents({}) == 0
@@ -171,7 +171,7 @@ async def test_two_different_logos_are_yellow_and_need_a_confirmation(flow):
     body = answer.json()
     assert body["pair"]["level"] == "yellow" and body["detail"].startswith("Bitte bestätigen:")
     assert "wirklich zwei Fassungen desselben Logos" in body["detail"]
-    assert checks(body)["overlap"]["value"] < 0.9 and body["pair"]["previews"]["light"].startswith("data:")
+    assert checks(body)["overlap"]["value"] < 0.85 and body["pair"]["previews"]["light"].startswith("data:")
     assert await flow.db.shop_designs.count_documents({}) == 0 and stored_files(flow) == []
 
     confirmed = await pair(flow, ON_BLACK, other, confirm_warnings=True, **MOTIF)
@@ -211,7 +211,7 @@ async def test_the_thresholds_are_settings(flow):
     assert answer.status_code == 200, answer.text
     assert sorted(answer.json()["changed"]) == ["pair_aspect_tolerance", "pair_min_overlap"]
     settings = answer.json()["motif_settings"]
-    assert settings["pair_aspect_tolerance"] == 0.15 and settings["defaults"]["pair_min_overlap"] == 0.9
+    assert settings["pair_aspect_tolerance"] == 0.15 and settings["defaults"]["pair_min_overlap"] == 0.85
     assert settings["limits"]["pair_contrast_share_max"] == 0.5 and settings["is_default"] is False
     checked = await pair(flow, narrow, wide, route="pair-check", placement="front_right")
     assert checks(checked.json())["aspect"]["level"] == "green"

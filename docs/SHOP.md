@@ -430,7 +430,7 @@ zusammenpassen, und verwendet sie dann automatisch (`light_mode = "file"`).
   | --- | --- | --- |
   | Format: beide SVG oder beide Pixelbild (PNG/JPG); jede Datei reicht für den Druckbereich | Rot | - |
   | Seitenverhältnis (bei SVG aus der viewBox): „unterschiedliche Formate: 1,20 zu 1,35 – bitte gleiche Zeichenfläche verwenden“ | Rot | `pair_aspect_tolerance`, 0,02 (2 %), 0,005 bis 0,2 |
-  | Umrisse: die gefüllten Außenumrisse (Silhouette: sichtbare Fläche ab 50 % Deckkraft, Closing um 21 px, Löcher von außen gefüllt) überdecken sich (IoU) - „Die Umrisse der beiden Fassungen weichen ab (x % gemeinsam) – sind das wirklich zwei Fassungen desselben Logos?“ | Gelb | `pair_min_overlap`, 0,9, 0,5 bis 0,99 |
+  | Umrisse: die gefüllten Außenumrisse (Silhouette: sichtbare Fläche ab 50 % Deckkraft, Closing um 21 px, Löcher von außen gefüllt) überdecken sich (IoU) - „Die Umrisse der beiden Fassungen weichen ab (x % gemeinsam) – sind das wirklich zwei Fassungen desselben Logos?“ | Gelb | `pair_min_overlap`, 0,85, 0,5 bis 0,99 |
   | Lage: der Rahmen der sichtbaren Fläche sitzt in beiden Dateien gleich (größte Kantenverschiebung je Breite bzw. Höhe) - „Logo sitzt in den Dateien unterschiedlich – Rand oder Position prüfen“ | Gelb | `pair_position_tolerance`, 0,03 (3 %), 0,005 bis 0,3 |
   | Kontrast: sehr Helles (Luma ab 225) in der Hell-Fassung bzw. sehr Dunkles (bis 40) in der Dunkel-Fassung, Anteil an der Fläche | Gelb, markiert | `pair_contrast_share`, 0,03 (3 %), 0,001 bis 0,5 |
 
@@ -442,7 +442,8 @@ zusammenpassen, und verwendet sie dann automatisch (`light_mode = "file"`).
 
   Warum Silhouette statt Tinte: die Fassung „auf Weiß“ der Vereinslogos ist zeichnerisch ein Negativ - ihre schwarzen
   Linien liegen in den Lücken der Fassung „auf Schwarz“. Über die Tinte deckte sich das echte Löwen-Paar nur zu 19 %,
-  über die Silhouette zu 93 % (Lage 0,6 %); ein anderes Motiv auf derselben Zeichenfläche liegt bei 44 bis 58 %.
+  über die Silhouette zu 93 % (Lage 0,6 %), das Logo „hoch“ zu 96 %; ein anderes Motiv auf derselben Zeichenfläche
+  liegt bei 44 bis 58 %. Die Vorgabe 85 % lässt Puffer für andere Vereinslogos.
 - **Speichern** (`upload_pair`): Rot speichert nichts (400 mit Bericht `pair`). Gelb nur mit `confirm_warnings=true`,
   sonst 409 mit Bericht. Beide Versionen entstehen zuerst als `pending` (Hauptdatei `variant = "dark"`, dann die eigene
   Datei für helle Shirts `variant = "light"` mit `pair_of`) - unsichtbar für Bestellungen (`file_for_garment`,
