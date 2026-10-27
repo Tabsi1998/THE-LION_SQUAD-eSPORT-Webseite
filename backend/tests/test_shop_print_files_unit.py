@@ -444,3 +444,38 @@ def test_template_areas_above_the_pixel_limit_are_not_taken_over():
         [PrintArea("front", "dtg", "Front", 12, 16, 150), PrintArea("back", "dtg", "Back", 400, 400, 300)], [])
     assert [row["placement"] for row in entries] == ["front"]
     assert skipped and "120000 × 120000 px" in skipped[0] and "nicht übernommen" in skipped[0]
+
+@pytest.mark.asyncio
+async def test_size_groups_with_other_geometry_keep_the_old_position_or_block(db, provider, fake):
+    """Codex, zweite Runde: jede Gruppe einzeln geprüft. Eine schmalere Größe würde den Löwen mit festen cm verschieben
+    - die Umstellung hält an statt still eine falsche Lage zu speichern."""
+    fake.print_areas[PRINTFUL_PRODUCT], fake.templates[PRINTFUL_PRODUCT] = [], []
+    fake.set_print_area(PRINTFUL_PRODUCT, "front", 12, 16, variants=(4012, 4013))
+    fake.set_print_area(PRINTFUL_PRODUCT, "front", 8, 8, variants=(4014, 4015))
+    fake.set_print_area(PRINTFUL_PRODUCT, "back", 12, 16)
+    product = await legacy_product(db, provider)
+    (item,) = await shop_print_files.migrate(db, apply=True)
+    assert item["ready"] is False and "applied" not in item
+    big = [line for line in item["blocked"] if "Varianten 4012, 4013" in line]
+    assert big and "läge um" in big[0] and "bleibt unverändert" in big[0], item["blocked"]
+    assert not [line for line in item["blocked"] if "Varianten 4014, 4015" in line], "an der kleinsten umgerechnet"
+    stored = await shop_catalog.get_product(db, product["id"])
+    assert stored["placements"] == LEGACY and not stored.get("placements_legacy"), "nie ein stiller Teil-Erfolg"
+    view = await shop_products.admin_view(db, product["id"])
+    assert view["layout_blocked"] == item["blocked"]
+
+
+def test_every_group_is_checked_for_motif_and_name_inside_its_area():
+    presets_doc = {"presets": templates.clean_presets(templates.DEFAULT_PRESETS), "rules": templates.clean_rules({})}
+    small = {"placement": "front", "technique": "dtg", "family": "front", "label": "Vorderseite", "dpi": 150,
+             "width_px": 1800, "height_px": 600, "width_in": 12, "height_in": 4, "width_cm": 30.48, "height_cm": 10.16,
+             "variant_ids": [2], "group": "v2", "preview_indexes": []}
+    large = {**small, "height_px": 2400, "height_in": 16, "height_cm": 40.64, "variant_ids": [1], "group": "v1"}
+    product = {"technique": "dtg", "placements": [LEGACY[0]]}
+    template = {"entries": [large, small]}
+    _rows, _notes, blocked = shop_print_files.convert_legacy(product, template, presets_doc, {"loewe-weiss": 1.0})
+    # 4 Zoll hoch: der Löwe (1 Zoll von oben, 3,5 Zoll hoch) ragt unten hinaus - in dieser Gruppe blockiert.
+    small_line = next(line for line in blocked if "Varianten 2" in line)
+    assert "ragt unten" in small_line and "Zoll" in small_line
+    # Die große Gruppe hielte die alte Lage auch nicht (die Vorgabe wurde in der kleinen Fläche gekappt) - ebenfalls gemeldet.
+    assert any("Varianten 1" in line and "läge um" in line for line in blocked)

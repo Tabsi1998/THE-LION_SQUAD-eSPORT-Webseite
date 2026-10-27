@@ -125,7 +125,8 @@ async def test_a_dashboard_link_finds_the_product_only_when_it_is_unique(db, pro
                   "https://www.printful.com/dashboard/custom/unisex-classic-tee-gildan-5000",
                   "http://www.printful.com/dashboard/custom/mens/unisex-classic-tee-gildan-5000",
                   "https://files.printful.com/dashboard/custom/mens/unisex-classic-tee-gildan-5000",
-                  "https://user@www.printful.com/dashboard/custom/mens/unisex-classic-tee-gildan-5000"):
+                  "https://user@www.printful.com/dashboard/custom/mens/unisex-classic-tee-gildan-5000",
+                  "https://printful.com:abc/dashboard/custom/mens/shirts/unisex-classic-tee-gildan-5000"):
         assert shop_catalog_search.search(catalog, link=wrong)["results"] == [], wrong
     # Zwei Produkte mit demselben Namen: kein Raten.
     fake.products[1000]["name"] = "Black Glossy Mug"
@@ -133,3 +134,9 @@ async def test_a_dashboard_link_finds_the_product_only_when_it_is_unique(db, pro
     result = shop_catalog_search.search(twice, link="https://www.printful.com/dashboard/custom/home/black-glossy-mug")
     assert result["results"] == [] and "mehrere" in result["link"]["detail"]
     assert shop_catalog_search.slug("Unisex Classic Tee | Gildan 5000") == "unisex-classic-tee-gildan-5000"
+
+
+def test_a_link_with_an_invalid_port_is_no_dashboard_link():
+    assert shop_catalog_search.dashboard_slug("https://printful.com:abc/dashboard/custom/mens/shirts/x-y") is None
+    assert shop_catalog_search.dashboard_slug("printful.com:99999/dashboard/custom/mens/shirts/x-y") is None
+    assert shop_catalog_search.dashboard_slug("https://printful.com:443/dashboard/custom/mens/shirts/x-y") == "x-y"

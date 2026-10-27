@@ -143,8 +143,12 @@ def dashboard_slug(link: Any) -> str | None:
     text = str(link or "").strip()
     if not text or len(text) > 500:
         return None
-    parsed = urlparse(text if "://" in text else f"https://{text}")
-    if parsed.scheme != "https" or (parsed.hostname or "").lower() not in DASHBOARD_HOSTS or parsed.port not in (None, 443):
+    try:
+        parsed = urlparse(text if "://" in text else f"https://{text}")
+        port = parsed.port  # ein ungültiger Port („:abc“) wirft ValueError - dann ist es kein Dashboard-Link
+    except ValueError:
+        return None
+    if parsed.scheme != "https" or (parsed.hostname or "").lower() not in DASHBOARD_HOSTS or port not in (None, 443):
         return None
     if parsed.username or parsed.password:
         return None
