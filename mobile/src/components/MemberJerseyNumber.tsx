@@ -1,8 +1,11 @@
 import { Ionicons } from "@expo/vector-icons";
+import * as Haptics from "expo-haptics";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Alert, Pressable, StyleSheet, TextInput, View } from "react-native";
+import Animated, { Easing, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 import { Button } from "./Button";
 import { Card } from "./Card";
+import { Glow, useReduceMotion } from "./motion";
 import { Body, Heading, Muted } from "./Text";
 import { api, errorMessage } from "../lib/api";
 import { formatDate } from "../lib/format";
@@ -18,7 +21,7 @@ import {
   type JerseyRange,
   type JerseyView,
 } from "../lib/jerseyNumber";
-import { colors, radius, roles } from "../theme";
+import { colors, motion, radius, roles } from "../theme";
 
 // Meine Nummer in der App (#2050, wie die Karte im Web aus #2034): einmal selbst wählen - mit Live-Prüfung und
 // Bestätigung -, danach nur über einen Antrag an den Vorstand, wie die Vereinsdaten. Nicht öffentlich: die Nummer sehen
@@ -26,6 +29,20 @@ import { colors, radius, roles } from "../theme";
 // frontend/src/pages/user/JerseyNumberCard.jsx.
 
 const TAKEN_TEXT = "Diese Nummer hat schon jemand.";
+// Die Nummer setzt sich (#2050): leicht anheben und einblenden, einmal, nach dem Festlegen. Mit „Bewegung reduzieren“
+// nur das Einblenden.
+const SETTLE_LIFT = 10;
+const SETTLE_SCALE = 0.96;
+const settleEase = Easing.bezier(motion.ease[0], motion.ease[1], motion.ease[2], motion.ease[3]);
+
+/** Erfolg beim Festlegen spüren - im selben Moment, in dem die Nummer erscheint; ohne Motor bleibt es still. */
+function settleFeedback() {
+  try {
+    void Promise.resolve(Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)).catch(() => {});
+  } catch {
+    // ohne Vibration weiter
+  }
+}
 
 function isCanceled(error: unknown): boolean {
   const name = (error as { name?: string } | null)?.name;
@@ -247,13 +264,30 @@ function RequestForm({ view, onSent, onCancel }: { view: JerseyView; onSent: () 
   );
 }
 
-/** Die große Nummer. */
-function SettledNumber({ number }: { number: number }) {
+/** Die große Nummer. Frisch festgelegt setzt sie sich: hebt sich leicht, blendet ein und leuchtet einmal in Gold. */
+function SettledNumber({ number, fresh }: { number: number; fresh: boolean }) {
+  const reduce = useReduceMotion();
+  const settle = useSharedValue(fresh ? 0 : 1);
+  useEffect(() => {
+    if (!fresh) return;
+    settle.set(0);
+    settle.set(withTiming(1, { duration: reduce ? motion.mid : motion.slow, easing: settleEase }));
+    // Nur beim Festlegen - nicht bei jedem Nachladen.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fresh]);
+  const style = useAnimatedStyle(() => {
+    const t = settle.get();
+    if (reduce) return { opacity: t };
+    return { opacity: t, transform: [{ translateY: (1 - t) * SETTLE_LIFT }, { scale: SETTLE_SCALE + (1 - SETTLE_SCALE) * t }] };
+  });
   return (
     <View style={styles.numberWrap}>
-      <Body style={styles.number} testID="jersey-number" accessibilityLabel={`Deine Nummer: ${number}`}>
-        {number}
-      </Body>
+      <Animated.View style={style}>
+        <Body style={styles.number} testID="jersey-number" data-fresh={fresh ? "1" : undefined} accessibilityLabel={`Deine Nummer: ${number}`}>
+          {number}
+        </Body>
+      </Animated.View>
+      <Glow active={fresh} tone="honor" delay={fresh ? motion.mid : 0} radius={radius.lg} testID="jersey-glow" />
     </View>
   );
 }
@@ -261,6 +295,7 @@ function SettledNumber({ number }: { number: number }) {
 export function MemberJerseyNumber() {
   const [view, setView] = useState<JerseyView | null>(null);
   const [asking, setAsking] = useState(false);
+  const [fresh, setFresh] = useState(false);
   const [notice, setNotice] = useState("");
 
   const load = useCallback(async () => {
@@ -292,7 +327,11 @@ export function MemberJerseyNumber() {
 
   const chosen = (data: JerseyView) => {
     setView(data);
-    if (data?.number !== null && data?.number !== undefined) setNotice(`Die ${data.number} gehört jetzt dir.`);
+    setFresh(true);
+    if (data?.number !== null && data?.number !== undefined) {
+      setNotice(`Die ${data.number} gehört jetzt dir.`);
+      settleFeedback();
+    }
   };
   const sync = syncNote(view.dolibarr);
   const requests = view.requests || [];
@@ -309,7 +348,7 @@ export function MemberJerseyNumber() {
       ) : (
         <View style={styles.block}>
           <View style={styles.numberRow}>
-            <SettledNumber number={view.number as number} />
+            <SettledNumber number={view.number as number} fresh={fresh} />
             <Muted style={styles.setBy} testID="jersey-set-by">
               {setByLine(view.set_by)}
               {view.chosen_at ? ` am ${formatDate(view.chosen_at)}` : ""}
@@ -327,6 +366,7 @@ export function MemberJerseyNumber() {
               onCancel={() => setAsking(false)}
               onSent={() => {
                 setAsking(false);
+                setFresh(false);
                 setNotice("Antrag gesendet – der Vorstand meldet sich.");
                 void load();
               }}

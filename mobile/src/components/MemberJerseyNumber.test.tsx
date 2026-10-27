@@ -1,5 +1,7 @@
 import React from "react";
-import { Alert, type AlertButton } from "react-native";
+import { AccessibilityInfo, Alert, type AlertButton } from "react-native";
+import * as Haptics from "expo-haptics";
+import * as reanimated from "react-native-reanimated";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react-native";
 import { MemberJerseyNumber } from "./MemberJerseyNumber";
 
@@ -33,7 +35,7 @@ beforeEach(() => {
   jest.clearAllMocks();
   alertSpy = jest.spyOn(Alert, "alert").mockImplementation(() => {});
 });
-afterEach(() => alertSpy.mockRestore());
+afterEach(() => jest.restoreAllMocks());
 
 /** Drückt im zuletzt gezeigten Bestätigungs-Dialog den Knopf mit diesem Text. */
 async function answer(text: string) {
@@ -62,7 +64,7 @@ test("ohne Antwort vom Server (älterer Stand, kein Netz) gibt es keine Karte", 
   expect(screen.queryByTestId("jersey-card")).toBeNull();
 });
 
-test("wählen: Raster oder Feld, Live-Prüfung per POST, Bestätigung, dann steht die Nummer groß da", async () => {
+test("wählen: Raster oder Feld, Live-Prüfung per POST, Bestätigung, dann setzt sich die Nummer mit Haptik", async () => {
   mockGet.mockResolvedValue({ data: open });
   mockPost.mockImplementation(async (url: string, body: { number: number }) => (url.endsWith("/check") ? checkReply(body) : { data: fixed }));
   await render(<MemberJerseyNumber />);
@@ -86,6 +88,7 @@ test("wählen: Raster oder Feld, Live-Prüfung per POST, Bestätigung, dann steh
   expect(input.props.value).toBe("7");
   expect(screen.getByTestId("jersey-grid-7").props.accessibilityState).toEqual(expect.objectContaining({ selected: true }));
   await waitFor(() => expect(screen.getByTestId("jersey-check")).toHaveTextContent("Frei"));
+  expect(Haptics.notificationAsync).not.toHaveBeenCalled();
 
   await fireEvent.press(screen.getByTestId("jersey-choose"));
   expect(alertSpy).toHaveBeenCalledWith(
@@ -97,8 +100,26 @@ test("wählen: Raster oder Feld, Live-Prüfung per POST, Bestätigung, dann steh
   await waitFor(() => expect(mockPost).toHaveBeenCalledWith("/membership/me/jersey-number", { number: 7, confirmed: true }));
   const shown = await screen.findByTestId("jersey-number");
   expect(shown).toHaveTextContent("7");
+  expect(shown.props["data-fresh"]).toBe("1");
+  expect(screen.getByTestId("jersey-glow")).toBeTruthy();
   expect(screen.getByTestId("jersey-notice")).toHaveTextContent("Die 7 gehört jetzt dir.");
+  expect(Haptics.notificationAsync).toHaveBeenCalledWith(Haptics.NotificationFeedbackType.Success);
   expect(screen.queryByTestId("jersey-input")).toBeNull();
+});
+
+test("„Bewegung reduzieren“: die Nummer blendet nur ein - kein Anheben, kein Aufleuchten; die Vibration bleibt", async () => {
+  jest.spyOn(reanimated, "useReducedMotion").mockReturnValue(true);
+  jest.spyOn(AccessibilityInfo, "isReduceMotionEnabled").mockReturnValue(new Promise<boolean>(() => undefined));
+  mockGet.mockResolvedValue({ data: open });
+  mockPost.mockImplementation(async (url: string, body: { number: number }) => (url.endsWith("/check") ? checkReply(body) : { data: fixed }));
+  await render(<MemberJerseyNumber />);
+  await fireEvent.press(await screen.findByTestId("jersey-grid-7"));
+  await waitFor(() => expect(screen.getByTestId("jersey-choose")).toBeEnabled());
+  await fireEvent.press(screen.getByTestId("jersey-choose"));
+  await answer("Festlegen");
+  expect(await screen.findByTestId("jersey-number")).toHaveTextContent("7");
+  expect(screen.queryByTestId("jersey-glow")).toBeNull();
+  expect(Haptics.notificationAsync).toHaveBeenCalledTimes(1);
 });
 
 test("abgebrochene Bestätigung schickt nichts", async () => {
@@ -131,6 +152,7 @@ test("409 beim Festlegen: „vergeben“, neu geprüft, der Knopf bleibt zu", as
   await waitFor(() => expect(screen.getByTestId("jersey-check")).toHaveTextContent("Diese Nummer hat schon jemand."));
   expect(screen.getByTestId("jersey-choose")).toBeDisabled();
   expect(screen.queryByTestId("jersey-number")).toBeNull();
+  expect(Haptics.notificationAsync).not.toHaveBeenCalled();
 });
 
 test("409 ohne Satz vom Server: es heißt „vergeben“", async () => {
@@ -176,6 +198,7 @@ test("festgelegt: Nummer groß, Feld fehlt in Dolibarr als ruhiger Satz, Antrag 
   });
   await render(<MemberJerseyNumber />);
   expect(await screen.findByTestId("jersey-number")).toHaveTextContent("7");
+  expect(screen.getByTestId("jersey-number").props["data-fresh"]).toBeUndefined();
   expect(screen.getByTestId("jersey-set-by")).toHaveTextContent(/Von dir gewählt am 26\.10\.2026/);
   expect(screen.getByTestId("jersey-sync")).toHaveTextContent(/gesichert/);
   expect(screen.getByTestId("jersey-requests")).toHaveTextContent(/Statt 5: Wunsch 7/);
