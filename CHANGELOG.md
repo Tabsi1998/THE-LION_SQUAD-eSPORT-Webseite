@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.41.0 (27.10.2026)
+
+### Neu
+
+* Vereinsshop: Mindestpreis einstellbar, der Produkt-Aufschlag ersetzt den allgemeinen (#1707)
+* Vereinsshop: Produktverwaltung in 5 Schritten - Printful-Produkt, Farben und Größen, Designs je Platzierung, Selbstkostenpreis, Prüfen und Veröffentlichen (#1707)
+* Vereinsshop: täglicher Abgleich mit Printful - nicht lieferbare oder preislose Varianten gesperrt, Preisänderungen gemeldet (#1709)
+
 ## 1.40.0 (27.10.2026)
 
 ### Neu
