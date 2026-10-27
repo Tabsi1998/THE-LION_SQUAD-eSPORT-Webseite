@@ -4,6 +4,14 @@ from datetime import datetime
 
 import pytest
 import requests
+import shard_plan
+
+# Parallel mit pytest-xdist (#2054): Jeder Worker ist ein eigener Prozess mit eigener Datenbank im Speicher
+# (mongomock, siehe flow_harness), teilt sich aber das Dateisystem. Darum bekommt jeder Worker einen eigenen
+# Upload-Ordner unter UPLOAD_DIR - gesetzt, bevor ein Test die Anwendung importiert und den Pfad liest.
+_XDIST_WORKER = os.environ.get("PYTEST_XDIST_WORKER")
+if _XDIST_WORKER and os.environ.get("UPLOAD_DIR"):
+    os.environ["UPLOAD_DIR"] = os.path.join(os.environ["UPLOAD_DIR"], _XDIST_WORKER)
 
 LIVE_TEST_FILES = {
     "test_iter20_bug_hunt.py",
@@ -33,6 +41,11 @@ ADMIN_EMAIL = os.environ.get("TEST_ADMIN_EMAIL", "")
 ADMIN_PASSWORD = os.environ.get("TEST_ADMIN_PASSWORD", "")
 DEMO_EMAIL = os.environ.get("TEST_DEMO_EMAIL", "")
 DEMO_PASSWORD = os.environ.get("TEST_DEMO_PASSWORD", "")
+
+
+def pytest_configure(config):
+    # CI in Teilen (TEST_SHARD=n/gesamt, #2054); ohne die Variable läuft die ganze Suite.
+    shard_plan.configure(config)
 
 
 def pytest_collection_modifyitems(config, items):
