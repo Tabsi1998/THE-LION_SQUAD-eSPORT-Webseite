@@ -394,7 +394,7 @@ function OfferStep({ view, busy, run }) {
         blockedHint={!view.editable ? "Erst zurückziehen (Schritt 5), dann das Angebot ändern." : tooMany ? `Höchstens ${view.limits.max_variants} Varianten - bitte weniger Farben oder Größen.` : "Bitte mindestens eine Farbe und eine Größe wählen."}
         onSubmit={(reason) => run("offer", () => api.put(`${BASE}/${product.id}/offer`, { technique, colors, sizes, reason }), "Farben und Größen gespeichert, Preise geladen.")} />
       {offered.length > 0 && (
-        <div className="overflow-x-auto">
+        <div className="tls-swipe">
           <table className="w-full text-sm" data-testid="shop-offer-variants">
             <thead><tr className="text-left text-xs text-white/50"><th className="py-1 pr-3 font-normal">Variante</th><th className="py-1 pr-3 font-normal">Printful-Variante</th><th className="py-1 pr-3 font-normal">Lager</th><th className="py-1 font-normal text-right">Einkauf</th></tr></thead>
             <tbody>
@@ -526,7 +526,7 @@ function DesignMatrix({ view, busy, run }) {
         <p className="text-xs text-white/55">Je Platzierung und Farbe ein Design aus dem Reiter „Designs“. Ohne gültige Datei für eine angebotene Farbe lässt sich nichts veröffentlichen.</p>
         <button type="button" onClick={takeSuggestions} className="tls-btn tls-btn--secondary min-h-9 px-3 text-xs font-bold uppercase tracking-wider rounded-sm" data-testid="shop-designs-suggest">Vorschläge übernehmen</button>
       </div>
-      <div className="overflow-x-auto">
+      <div className="tls-swipe">
         <table className="w-full text-sm">
           <thead><tr className="text-left text-xs text-white/50"><th className="py-1 pr-3 font-normal">Platzierung</th>{colors.map((color) => <th key={color} className="py-1 pr-3 font-normal">{color}</th>)}</tr></thead>
           <tbody>
@@ -615,7 +615,7 @@ function PricesStep({ view, busy, run }) {
           <p className="text-xs text-white/60 mt-1">Bestehende Bestellungen bleiben unverändert. Neue Preise gelten erst nach „Preise übernehmen“.</p>
         </div>
       )}
-      <div className="overflow-x-auto">
+      <div className="tls-swipe">
         <table className="w-full text-sm tabular-nums" data-testid="shop-prices-table">
           <thead><tr className="text-left text-xs text-white/50">
             <th className="py-1 pr-3 font-normal">Variante</th><th className="py-1 pr-3 font-normal text-right">Einkauf</th><th className="py-1 pr-3 font-normal text-right">Selbstkosten</th>
