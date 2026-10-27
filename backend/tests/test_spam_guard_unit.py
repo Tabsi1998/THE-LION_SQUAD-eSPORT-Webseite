@@ -204,10 +204,12 @@ def test_csp_allows_turnstile_only_for_script_and_frame():
     nginx = (pathlib.Path(__file__).resolve().parents[2] / "frontend" / "nginx.conf").read_text(encoding="utf-8")
     policy = next(line for line in nginx.splitlines() if line.strip().startswith('default "default-src'))
     directives = {part.split()[0]: part for part in policy.strip().strip('default "').split(";") if part.strip()}
-    directives = {key.strip(): value for key, value in directives.items()}
-    assert "https://challenges.cloudflare.com" in directives["script-src"]
-    assert "https://challenges.cloudflare.com" in directives["frame-src"]
-    assert "https://challenges.cloudflare.com" not in directives["connect-src"]
+    # Quellen als Liste vergleichen (genaue Einträge), nicht als Teilstring.
+    sources = {key.strip(): value.split()[1:] for key, value in directives.items()}
+    turnstile = "https://challenges.cloudflare.com"
+    assert turnstile in sources["script-src"]
+    assert turnstile in sources["frame-src"]
+    assert turnstile not in sources["connect-src"]
 
 
 # ---------------------------------------------------------------- Einstellungen
