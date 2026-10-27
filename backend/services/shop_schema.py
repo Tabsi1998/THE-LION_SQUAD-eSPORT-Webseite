@@ -23,8 +23,8 @@ import database
 
 MIGRATION_VERSION = 13
 MIGRATION_NAME = "shop_data_model"
-COLLECTIONS = ("shop_products", "shop_variants", "shop_designs", "shop_printful_variants", "shop_carts", "shop_orders",
-               "shop_order_items", "shop_order_events")
+COLLECTIONS = ("shop_products", "shop_variants", "shop_designs", "shop_design_profiles", "shop_printful_variants",
+               "shop_carts", "shop_orders", "shop_order_items", "shop_order_events")
 
 
 def unique_indexes() -> list[tuple[str, Any, str, dict]]:

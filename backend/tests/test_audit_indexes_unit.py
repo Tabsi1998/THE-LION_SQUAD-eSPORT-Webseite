@@ -55,7 +55,8 @@ EXPECTED = {
     "shop_order_events": {"order_event_unique", "order_id_1_at_1"},
     "shop_products": {"slug_unique", "id_1"},
     "shop_variants": {"sku_unique", "id_1", "product_id_1"},
-    "shop_designs": {"design_version_unique"},
+    "shop_designs": {"design_version_unique", "public_id_unique"},
+    "shop_design_profiles": {"design_key_unique"},
     "shop_printful_variants": {"provider_variant_unique"},
     "shop_carts": {"user_unique"},
 }

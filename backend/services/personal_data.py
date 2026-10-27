@@ -213,9 +213,9 @@ CLUB_CONTENT = frozenset({
     # Maps je Spiel und Map-Pools je Wettbewerb (#1616) - nur die Kennung, wer angelegt bzw. gespeichert hat; dazu die
     # belegten Schreibweisen der Maps (ohne Person).
     "game_maps", "map_pools", "game_map_keys",
-    # Shop-Katalog (#1703): Produkte, Varianten, Druckdateien und die Printful-Zuordnung - nur die Kennung, wer angelegt
-    # bzw. geändert hat.
-    "shop_products", "shop_variants", "shop_designs", "shop_printful_variants",
+    # Shop-Katalog (#1703): Produkte, Varianten, Druckdateien, Designs (#1708) und die Printful-Zuordnung - nur die
+    # Kennung, wer angelegt bzw. geändert hat.
+    "shop_products", "shop_variants", "shop_designs", "shop_design_profiles", "shop_printful_variants",
 })
 
 NO_PERSON = frozenset({

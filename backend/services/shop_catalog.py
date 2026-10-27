@@ -17,7 +17,7 @@ from pymongo.errors import DuplicateKeyError
 
 from models import new_id, now_utc
 from services.pricing import TAX_PROFILES
-from services.shop_common import ShopConflict, ShopError, record_admin_action
+from services.shop_common import MODEL_FIELDS, ShopConflict, ShopError, record_admin_action
 
 STATUSES = ("draft", "active", "archived")
 VISIBILITIES = ("hidden", "members", "public")
@@ -247,28 +247,38 @@ async def update_variant(db, variant_id: str, fields: dict, *, actor_id: str, re
 
 # ---------------------------------------------------------------- Druckdateien und Printful-Zuordnung
 
+DESIGN_CORE = ("id", "design_key", "version", "file_ref", "sha256", "placement", "created_at", "created_by")
+
+
 async def add_design_version(db, design_key: str, *, file_ref: str, sha256: str, placement: str, actor_id: str,
-                             reason: str) -> dict:
+                             reason: str, details: dict | None = None) -> dict:
     """Neue Fassung einer Druckdatei: Version zählt hoch, Prüfsumme ist Pflicht. Alte Fassungen bleiben - eine
-    Bestellung zeigt auf die Fassung, die beim Bestellen galt. Die Datei selbst liegt im Speicher (#1708)."""
+    Bestellung zeigt auf die Fassung, die beim Bestellen galt. Die Datei selbst liegt im Speicher (#1708,
+    ``services/shop_designs.py``); ``details`` trägt deren Maße und öffentlichen Schlüssel - nur Felder des Modells."""
     if not DESIGN_KEY.match(str(design_key or "")):
         raise ShopError("Design: nur Kleinbuchstaben, Ziffern und Bindestriche.")
     if not SHA256.match(str(sha256 or "")):
         raise ShopError("Prüfsumme: SHA-256 als 64 Hex-Zeichen.")
     if placement not in PLACEMENTS:
         raise ShopError("Unbekannte Druckposition.")
+    extra = dict(details or {})
+    unknown = sorted(set(extra) - set(MODEL_FIELDS["shop_designs"]) | set(extra) & set(DESIGN_CORE))
+    if unknown:
+        raise ShopError(f"Unbekannte Felder der Druckdatei: {', '.join(unknown)}.")
     ref = _text(file_ref, "Datei", 300, required=True)
     for _attempt in range(3):
         latest = await latest_design(db, design_key)
-        design = {"id": new_id(), "design_key": design_key, "version": (latest or {}).get("version", 0) + 1,
-                  "file_ref": ref, "sha256": sha256, "placement": placement, "created_at": now_utc().isoformat(),
-                  "created_by": actor_id}
+        design = {**extra, "id": new_id(), "design_key": design_key,
+                  "version": (latest or {}).get("version", 0) + 1, "file_ref": ref, "sha256": sha256,
+                  "placement": placement, "created_at": now_utc().isoformat(), "created_by": actor_id}
         try:
             await db.shop_designs.insert_one(dict(design))
         except DuplicateKeyError:
             continue  # gleichzeitig eine Fassung angelegt - die nächste Nummer nehmen
         await record_admin_action(db, "shop.design.add", actor_id=actor_id, target_id=design_key, reason=reason,
-                                  data={"version": design["version"], "sha256": sha256, "placement": placement})
+                                  data={"version": design["version"], "sha256": sha256, "placement": placement,
+                                        **{name: extra[name] for name in ("width_px", "height_px", "dpi")
+                                           if name in extra}})
         return design
     raise ShopConflict("Die Druckdatei wurde gerade mehrfach geändert - bitte erneut versuchen.")
 
