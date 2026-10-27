@@ -60,6 +60,9 @@ EXPECTED = {
     "shop_design_colors": {"placement_color_unique"},
     "shop_printful_variants": {"provider_variant_unique"},
     "shop_carts": {"user_unique"},
+    # Printful-Adapter (#1705): Claims vor dem Anlegen und Bestätigen.
+    "shop_printful_drafts": {"external_id_unique"},
+    "shop_printful_confirmations": {"order_unique", "idempotency_key_unique"},
 }
 
 

@@ -9,8 +9,9 @@ Stufen statt „Aus/Vorschau/Live“ (Entscheidung des Obmanns vom 27.10.2026, K
 - ``public`` Öffentlich - alle. Einschalten nur Superadmin und nur mit der Freigabe „Steuer geklärt“ (#1701).
 
 Wer den Shop sehen darf, entscheidet ``services/shop_access.py``. Der Notschalter „Bestellungen an Printful senden“
-(Vorgabe aus) hängt nicht an der Stufe: jeder schreibende Aufruf bei Printful fragt vorher ``require_printful_writes``
-(der Adapter aus #1705).
+(Vorgabe aus) hängt nicht an der Stufe: jeder Aufruf bei Printful, der Geld kostet (Bestätigen), fragt vorher
+``require_printful_writes``. Entwürfe kosten nichts und fragen ``require_printful_drafts`` (Stufe ab „Nur Admins“ und
+Schlüssel) - so der Adapter aus #1705 (``services/printful_client.py``).
 
 Sicher bei Unsinn in der Datenbank: eine unbekannte Stufe gilt als „Aus“, „Öffentlich“ ohne Freigabe ebenso, der
 Notschalter ist nur bei genau ``True`` an, ungültige Beträge fallen auf die Vorgabe. Der Printful-Schlüssel liegt mit
@@ -53,7 +54,11 @@ class ShopForbidden(ShopError):
 
 
 class PrintfulWritesBlocked(ShopError):
-    """Der Notschalter „Bestellungen an Printful senden“ ist aus - nichts geht schreibend zu Printful."""
+    """Der Notschalter „Bestellungen an Printful senden“ ist aus - nichts, was Geld kostet, geht zu Printful."""
+
+
+class PrintfulDraftsBlocked(ShopError):
+    """Entwürfe an Printful sind gesperrt: Shop steht auf „Aus“ oder kein lesbarer Schlüssel."""
 
 
 def _cents(value: Any, *, maximum: int, minimum: int = 0) -> int | None:
@@ -157,10 +162,28 @@ async def printful_writes_allowed(db) -> bool:
 
 
 async def require_printful_writes(db) -> None:
-    """Pflicht vor jedem schreibenden Aufruf bei Printful (Entwurf, Bestätigung, Storno): ist der Notschalter aus oder
-    fehlt ein lesbarer Schlüssel, geht nichts hinaus - unabhängig von der Stufe."""
+    """Pflicht vor jedem Aufruf bei Printful, der Geld kostet (Bestätigung, Storno einer bestätigten Bestellung): ist
+    der Notschalter aus oder fehlt ein lesbarer Schlüssel, geht nichts hinaus - unabhängig von der Stufe."""
     if not await printful_writes_allowed(db):
         raise PrintfulWritesBlocked("Bestellungen an Printful senden ist ausgeschaltet.")
+
+
+# Entwürfe (#1705, #2062): ein Entwurf bei Printful wird nie produziert und nie bezahlt. Darum gehen Entwurf anlegen,
+# Entwurf löschen und Druckdateien hinterlegen auch bei ausgeschaltetem Notschalter - aber nur, wenn der Shop
+# mindestens in der Stufe „Nur Admins (Test)“ steht und ein lesbarer Schlüssel da ist.
+DRAFT_STAGES = ("admins", "members", "public")
+
+
+async def printful_drafts_allowed(db) -> bool:
+    config = await load(db)
+    return effective_stage(config) in DRAFT_STAGES and key_state(config) == "ok"
+
+
+async def require_printful_drafts(db) -> None:
+    """Pflicht vor jedem Entwurfs-Aufruf bei Printful. Der Notschalter spielt hier keine Rolle (siehe oben)."""
+    if not await printful_drafts_allowed(db):
+        raise PrintfulDraftsBlocked("Entwürfe an Printful erst ab der Stufe „Nur Admins (Test)“ und mit "
+                                    "hinterlegtem Schlüssel.")
 
 
 # ---------------------------------------------------------------- Schreiben (immer mit Grund und Protokoll)

@@ -552,6 +552,11 @@ AUDIT_UNIQUE_INDEXES: tuple[tuple[str, Any, str, dict], ...] = (
     ("shop_design_colors", [("placement", 1), ("color_key", 1)], "placement_color", {}),
     ("shop_printful_variants", [("provider", 1), ("variant_id", 1)], "provider_variant", {}),
     ("shop_carts", "user_id", "user", {}),
+    # Printful-Adapter (#1705): je external_id ein Claim vor dem Anlegen eines Entwurfs, je Auftrag und je
+    # Idempotenzschlüssel ein Claim vor dem Bestätigen - nur wer den Insert gewinnt, sendet.
+    ("shop_printful_drafts", "external_id", "external_id", {}),
+    ("shop_printful_confirmations", "order_id", "order", {}),
+    ("shop_printful_confirmations", "idempotency_key", "idempotency_key", {}),
 )
 AUDIT_INDEXES: tuple[tuple[str, Any], ...] = (
     ("platform_links", "user_id"),
