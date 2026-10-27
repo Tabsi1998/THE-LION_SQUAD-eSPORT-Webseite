@@ -452,9 +452,14 @@ def _within_cap(graph: _Graph, extras: list[tuple[dict, dict]], used: int,
 
 def _protected_count(graph: _Graph, heats: list[dict]) -> int:
     """Wie viele Vorrang-Plätze (``_protected_origins``) die Läufe einer Gruppe tragen - sie zählen zur Laufgröße,
-    damit der Umbau nie einen Sammellauf plant, in den sie nicht mehr passen."""
+    damit der Umbau nie einen Sammellauf plant, in den sie nicht mehr passen. Gezählt werden nur Plätze, die beim
+    Zusammenlegen mitziehen (Freilos nach einem Ausscheiden, Freilos ohne Lieferung des entschiedenen Vorlaufs) -
+    ein Ausfall vor dem Start ohne Vermerk zieht nicht mit (``_rebuild_group``)."""
     byes = [(slot, entry) for heat in heats for slot in heat.get("slots") or []
-            if slot.get("status") == "bye" and (entry := _feeding_entry(graph, slot, heat["id"])) is not None]
+            if slot.get("status") == "bye"
+            and ((slot.get("source_result") or {}).get("removed_registration_id")
+                 or (slot.get("source_result") or {}).get("skipped"))
+            and (entry := _feeding_entry(graph, slot, heat["id"])) is not None]
     return len(_protected_origins(graph, byes))
 
 
