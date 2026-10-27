@@ -65,6 +65,8 @@ ESTIMATE_POLLS = 10
 ESTIMATE_PAUSE = 1.0
 CONFIRMATIONS = "shop_printful_confirmations"
 DRAFTS = "shop_printful_drafts"
+# Testentwürfe aus dem Admin (#2062, services/shop_test_drafts.py): ihre Aufträge bestätigt confirm_order nie.
+TEST_DRAFTS = "shop_test_drafts"
 # So lange gilt ein Claim im Zustand „sending“ als „läuft noch“; danach: Entwurf erst nachsuchen, Bestätigung unklar.
 CONFIRM_CLAIM_SECONDS = 300
 DRAFT_CLAIM_SECONDS = 60
@@ -841,6 +843,9 @@ class PrintfulClient:
         if type(force_after_review) is not bool:
             raise TypeError("force_after_review ist True oder False")
         await shop_config.require_printful_writes(db)
+        # Ein Testentwurf (#2062) wird nie bestätigt - auch nicht über einen anderen Weg als die Testansicht.
+        if await db[TEST_DRAFTS].find_one({"printful_order_id": order_id.value}, {"_id": 1}):
+            raise FulfillmentInvalid("test_draft")
         store = db[CONFIRMATIONS]
         try:
             inserted = await store.insert_one({"idempotency_key": idempotency_key, "order_id": order_id.value,

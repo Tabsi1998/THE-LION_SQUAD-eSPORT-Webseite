@@ -10,7 +10,8 @@ Fehlerklassen - was der Aufrufer tut:
 
 - ``FulfillmentTransient`` (Zeitüberschreitung, Netz, 429, 5xx): später erneut versuchen; ``retry_after`` sagt, wann.
 - ``FulfillmentPermanent`` (401, 403, 404, Weiterleitung, unerwartete Antwort, kein Schlüssel): Admin informieren.
-- ``FulfillmentInvalid`` (400, 409, 422, gescheiterte Schätzung, kein Entwurf mehr): diese Bestellung blockieren.
+- ``FulfillmentInvalid`` (400, 409, 422, gescheiterte Schätzung, kein Entwurf mehr, Testentwurf bestätigen): diese
+  Bestellung blockieren.
 
 Die Meldung (``str``) ist ein fester deutscher Satz; was der Anbieter dazu sagt, steht gekürzt und maskiert in
 ``provider_detail`` (Mail-Adressen gekürzt, nie der Schlüssel).
@@ -370,6 +371,7 @@ ERROR_TEXTS = {
     "estimate_failed": "Die Kostenschätzung ist gescheitert",
     "not_draft": "Der Auftrag ist kein Entwurf mehr",
     "idempotency_conflict": "Dieser Schlüssel gehört schon zu einem anderen Auftrag",
+    "test_draft": "Ein Testentwurf wird nie bestätigt - nur angesehen und gelöscht",
 }
 
 
