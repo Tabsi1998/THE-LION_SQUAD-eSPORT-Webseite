@@ -145,6 +145,8 @@ from runtime_config import (
     validate_runtime_environment,
 )
 from services.log_safe import SecretPathFilter
+from services import shop_designs
+from services.body_limits import BodySizeLimit
 from storage import PUBLIC_UPLOAD_DIR, UPLOAD_DIR, ensure_storage_directories
 
 
@@ -238,6 +240,8 @@ async def request_validation_error(_request: Request, exc: RequestValidationErro
 
 # Logos als SVG (#1952): ein SVG nur in Logo-Feldern, die PNG-Fassung eines SVG-Logos bleibt beim Speichern das SVG.
 app.add_middleware(svg_logo.SvgFieldGate)
+# Druckdateien (#1708): das Limit greift am Eingang, bevor FastAPI das Formular in eine Zwischendatei liest.
+app.add_middleware(BodySizeLimit, limits={"/api/admin/shop/designs/upload": shop_designs.upload_body_limit})
 
 app.add_middleware(
     TrustedHostMiddleware,

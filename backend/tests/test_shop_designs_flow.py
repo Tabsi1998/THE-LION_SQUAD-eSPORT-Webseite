@@ -202,6 +202,45 @@ async def test_animated_and_oversized_uploads_are_refused(flow, monkeypatch):
     assert stored_files(flow) == []
 
 
+def multipart(data: bytes, fields: dict) -> tuple[bytes, str]:
+    boundary = "grenze1708"
+    parts = [f'--{boundary}\r\nContent-Disposition: form-data; name="{name}"\r\n\r\n{value}\r\n'.encode()
+             for name, value in fields.items()]
+    parts.append(f'--{boundary}\r\nContent-Disposition: form-data; name="file"; filename="loewe.png"\r\n'
+                 "Content-Type: image/png\r\n\r\n".encode() + data + b"\r\n")
+    parts.append(f"--{boundary}--\r\n".encode())
+    return b"".join(parts), f"multipart/form-data; boundary={boundary}"
+
+
+@pytest.mark.asyncio
+async def test_an_oversized_upload_is_refused_before_the_form_is_read(flow, monkeypatch):
+    """Das Limit greift am Eingang (Content-Length bzw. beim Mitzählen), nicht erst nach dem Einlesen in den
+    Zwischenspeicher - die Route kommt gar nicht dran."""
+    from routes import shop_design_routes
+    from services import shop_designs
+
+    def never(*_args, **_kwargs):
+        raise AssertionError("die Route hätte die Datei nie bekommen dürfen")
+
+    await finance(flow)
+    monkeypatch.setattr(shop_designs, "MAX_BYTES", 1024)
+    monkeypatch.setattr(shop_designs, "MAX_UPLOAD_MB", 1)
+    monkeypatch.setattr(shop_design_routes, "_read_upload_limited", never)
+    body, content_type = multipart(logo(1200, 1200) + b"\0" * 300_000,
+                                   {"design_key": "loewe-weiss", "reason": "Zu groß", **NEW})
+
+    declared = await flow.post(f"{BASE}/designs/upload", content=body, headers={"content-type": content_type})
+    assert declared.status_code == 413 and "zu groß" in declared.json()["detail"]
+
+    async def chunks():  # ohne Content-Length: gezählt wird beim Lesen
+        for start in range(0, len(body), 16_384):
+            yield body[start:start + 16_384]
+
+    streamed = await flow.post(f"{BASE}/designs/upload", content=chunks(), headers={"content-type": content_type})
+    assert streamed.status_code == 413 and "zu groß" in streamed.json()["detail"]
+    assert stored_files(flow) == [] and await flow.db.shop_designs.count_documents({}) == 0
+
+
 # ---------------------------------------------------------------- Versionen
 
 @pytest.mark.asyncio

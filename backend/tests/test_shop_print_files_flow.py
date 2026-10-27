@@ -42,6 +42,51 @@ async def test_a_new_file_is_a_new_version_with_a_new_address_and_the_old_one_st
         assert hashlib.sha256(answer.content).hexdigest() == item["sha256"]
 
 
+def test_the_key_never_reaches_the_access_log_of_uvicorn():
+    import logging
+
+    from services import log_safe
+
+    key = "A" * 43
+    path = f"/api/shop/print-files/{key}/loewe-weiss-v1.png"
+    redacted = "GET /api/shop/print-files/***/loewe-weiss-v1.png HTTP/1.1"
+    assert log_safe.redact_secret_paths(f"GET {path} HTTP/1.1") == redacted
+    record = logging.LogRecord("uvicorn.access", logging.INFO, __file__, 1, '%s - "%s %s HTTP/%s" %d',
+                               ("10.0.0.1:5000", "GET", path, "1.1", 200), None)
+    log_safe.SecretPathFilter().filter(record)
+    assert key not in record.getMessage() and "/api/shop/print-files/***/loewe-weiss-v1.png" in record.getMessage()
+
+
+NGINX = pathlib.Path(__file__).resolve().parents[2] / "frontend" / "nginx.conf"
+
+
+def _block(nginx: str, opener: str) -> str:
+    start = nginx.index(opener)
+    return nginx[start:nginx.index("}", start)]
+
+
+def test_nginx_logs_the_print_file_address_only_redacted_and_sends_no_referrer():
+    nginx = NGINX.read_text(encoding="utf-8")
+    # Eigenes Format: statt des Schlüssels steht „***“ im Zugriffsprotokoll; die Map greift nur für diesen Pfad.
+    assert "log_format tls_redacted " in nginx and '"$tls_redacted_request"' in nginx
+    redaction = _block(nginx, "map $request $tls_redacted_request")
+    assert "/api/shop/print-files/" in redaction and "***" in redaction
+    block = _block(nginx, "location ~ ^/api/shop/print-files/")
+    assert "access_log /var/log/nginx/access.log tls_redacted;" in block
+    assert "error_log /var/log/nginx/error.log crit;" in block  # Fehlerzeilen nennen die volle Anfrage
+    assert 'add_header Referrer-Policy "no-referrer" always;' in block
+    assert "proxy_pass http://backend:8001;" in block
+
+
+def test_nginx_caps_the_design_upload_just_above_the_service_limit():
+    from services import shop_designs
+
+    block = _block(NGINX.read_text(encoding="utf-8"), "location = /api/admin/shop/designs/upload")
+    limit = re.search(r"client_max_body_size (\d+)m;", block)
+    assert limit and shop_designs.MAX_UPLOAD_MB < int(limit.group(1)) <= shop_designs.MAX_UPLOAD_MB + 2
+    assert "proxy_pass http://backend:8001;" in block
+
+
 @pytest.mark.asyncio
 async def test_the_public_address_is_not_guessable_and_nothing_can_be_listed(flow):
     await finance(flow)

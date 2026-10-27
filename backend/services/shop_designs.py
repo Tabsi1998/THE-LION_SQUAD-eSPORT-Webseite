@@ -195,6 +195,14 @@ def _mb_from_env(name: str, default: int) -> int:
 
 MAX_UPLOAD_MB = _mb_from_env("SHOP_DESIGN_MAX_MB", 50)
 MAX_BYTES = MAX_UPLOAD_MB * 1024 * 1024
+FORM_OVERHEAD_BYTES = 256 * 1024  # Grund, Titel, Farben und die Trennzeilen des Formulars
+
+
+def upload_body_limit() -> tuple[int, str]:
+    """Für ``services/body_limits.BodySizeLimit``: höchstens so viel nimmt die Upload-Route am Eingang an."""
+    return MAX_BYTES + FORM_OVERHEAD_BYTES, f"Datei zu groß (höchstens {MAX_UPLOAD_MB} MB)."
+
+
 # 12 × 16 Zoll bei 300 DPI sind gut 17 Millionen; 40 Millionen lassen Luft und halten den Speicher beim Neukodieren
 # (RGBA: 4 Byte je Pixel, zwei Bilder gleichzeitig) unter etwa 350 MB.
 MAX_PIXELS = 40_000_000
