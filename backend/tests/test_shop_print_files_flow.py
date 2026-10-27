@@ -11,6 +11,7 @@ import pytest
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 
+from shop_testdata import publish_unchecked  # noqa: E402
 from test_shop_designs_flow import NEW, design, finance, logo, stored_files, upload  # noqa: E402
 from test_shop_designs_flow import flow as designs_flow  # noqa: E402
 
@@ -125,10 +126,11 @@ async def test_an_order_keeps_its_version_after_a_new_upload(flow):
     assert (await upload(flow, logo(1200, 1200), **NEW)).status_code == 200
     by = {"actor_id": "test", "reason": "Testdaten"}
     product = await shop_catalog.create_product(
-        flow.db, {"slug": "loewe", "title": "Löwen-Shirt", "base_price_cents": 2000, "status": "active",
-                  "design_key": "loewe-weiss"}, **by)
+        flow.db, {"slug": "loewe", "title": "Löwen-Shirt", "base_price_cents": 2000, "design_key": "loewe-weiss"},
+        **by)
     variant = await shop_catalog.create_variant(flow.db, product["id"], {"sku": "L-SCHWARZ-M", "label": "M",
                                                                          "color": "Schwarz"}, **by)
+    await publish_unchecked(flow.db, product["id"])
     address = {"street": "Probegasse 1", "zip": "1010", "city": "Wien", "country": "AT"}
     order, _ = await shop_orders.place_order(
         flow.db, user_id="konto-test", idempotency_key="design-0001", buyer_kind="member",

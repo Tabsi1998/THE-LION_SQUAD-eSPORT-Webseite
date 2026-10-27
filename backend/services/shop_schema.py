@@ -25,7 +25,7 @@ MIGRATION_VERSION = 13
 MIGRATION_NAME = "shop_data_model"
 COLLECTIONS = ("shop_products", "shop_variants", "shop_designs", "shop_design_profiles", "shop_design_colors",
                "shop_printful_variants", "shop_carts", "shop_orders", "shop_order_items", "shop_order_events",
-               "shop_printful_drafts", "shop_printful_confirmations")
+               "shop_printful_drafts", "shop_printful_confirmations", "shop_gamertag_files")
 
 
 def unique_indexes() -> list[tuple[str, Any, str, dict]]:

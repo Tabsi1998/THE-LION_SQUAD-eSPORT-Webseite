@@ -20,7 +20,7 @@ from pydantic import BaseModel, Field, field_validator
 
 from auth import require_area
 from database import get_db
-from services import printful_client, shop_catalog, shop_config, shop_orders
+from services import printful_client, shop_catalog, shop_config, shop_orders, shop_products
 from services.permissions import can_use_area, is_superadmin
 from services.shop_common import ShopConflict, ShopError
 
@@ -28,42 +28,49 @@ router = APIRouter(prefix="/api/admin/shop", tags=["shop"])
 
 
 class Reasoned(BaseModel):
-    """Jede Änderung mit Grund; unbekannte Felder (etwa ein Preis an falscher Stelle) werden abgelehnt."""
+    """Grund optional - Pflicht nur bei kritischen Schritten, das prüfen die Services (Entscheidung Obmann 27.10.2026).
+    Unbekannte Felder (etwa ein Preis an falscher Stelle) werden abgelehnt."""
     model_config = {"extra": "forbid"}
 
-    reason: str = Field(..., min_length=3, max_length=500)
+    reason: str = Field("", max_length=500)
 
     @field_validator("reason")
     @classmethod
-    def _reason_has_text(cls, value: str) -> str:
-        if len(value.strip()) < 3:
-            raise ValueError("Bitte einen Grund angeben.")
+    def _reason_trimmed(cls, value: str) -> str:
         return value.strip()
 
 
-class ProductFields(Reasoned):
+class Noted(BaseModel):
+    """Produkte und Varianten (#1707): Grund optional (Entscheidung Obmann 27.10.2026) - wer, wann und was stehen
+    trotzdem im Protokoll. Unbekannte Felder werden weiter abgelehnt."""
+    model_config = {"extra": "forbid"}
+
+    reason: str = Field("", max_length=500)
+
+
+class ProductFields(Noted):
+    """Den Stand gibt es hier nicht: ihn ändert nur die Prüfung (``POST /products/{id}/status``, #1707).
+    ``markup_cents: null`` heißt „der allgemeine öffentliche Aufschlag gilt“; ein Wert (auch 0) ersetzt ihn."""
     title: str | None = Field(None, min_length=1, max_length=120)
     description: str | None = Field(None, max_length=2000)
-    status: Literal["draft", "active", "archived"] | None = None
     visibility: Literal["hidden", "members", "public"] | None = None
+    personalization: Literal["none", "gamertag", "member_number", "both"] | None = None
     base_price_cents: int | None = Field(None, ge=0, le=shop_catalog.MAX_PRICE_CENTS)
     markup_cents: int | None = Field(None, ge=0, le=shop_catalog.MAX_MARKUP_CENTS)
-    gamertag_allowed: bool | None = None
     tax_profile: str | None = Field(None, max_length=20)
     design_key: str | None = Field(None, max_length=80)
 
 
 class ProductCreate(ProductFields):
-    slug: str = Field(..., min_length=1, max_length=80)
+    slug: str | None = Field(None, min_length=1, max_length=80)
     title: str = Field(..., min_length=1, max_length=120)
-    base_price_cents: int = Field(..., ge=0, le=shop_catalog.MAX_PRICE_CENTS)
 
 
 class ProductUpdate(ProductFields):
     slug: str | None = Field(None, min_length=1, max_length=80)
 
 
-class VariantFields(Reasoned):
+class VariantFields(Noted):
     label: str | None = Field(None, min_length=1, max_length=80)
     size: str | None = Field(None, max_length=40)
     color: str | None = Field(None, max_length=40)
@@ -95,8 +102,11 @@ def _refused(exc: Exception) -> HTTPException:
 
 @router.get("/products")
 async def list_products(me: dict = Depends(require_area("finance"))):
-    return {"products": await shop_catalog.list_products(get_db()), "statuses": shop_catalog.STATUSES,
-            "visibilities": shop_catalog.VISIBILITIES}
+    db = get_db()
+    return {"products": await shop_catalog.list_products(db), "overview": await shop_products.list_view(db),
+            "statuses": shop_catalog.STATUSES, "visibilities": shop_catalog.VISIBILITIES,
+            "labels": {"statuses": shop_catalog.STATUS_LABELS, "visibilities": shop_catalog.VISIBILITY_LABELS,
+                       "personalizations": shop_catalog.PERSONALIZATION_LABELS}}
 
 
 @router.post("/products")
@@ -110,11 +120,12 @@ async def create_product(body: ProductCreate, me: dict = Depends(require_area("f
 
 @router.get("/products/{product_id}")
 async def product_detail(product_id: str, me: dict = Depends(require_area("finance"))):
-    db = get_db()
-    product = await shop_catalog.get_product(db, product_id)
-    if not product:
-        raise HTTPException(404, "Produkt nicht gefunden.")
-    return {"product": product, "variants": await shop_catalog.variants_of(db, product_id)}
+    """Das Produkt mit allem für den geführten Aufbau (#1707): Varianten mit Einkauf und Preisen, Platzierungen,
+    Designs je Farbe, Vorab-Prüfung und Stand des Abgleichs."""
+    try:
+        return await shop_products.admin_view(get_db(), product_id)
+    except LookupError as exc:
+        raise HTTPException(404, "Produkt nicht gefunden.") from exc
 
 
 @router.patch("/products/{product_id}")
@@ -154,6 +165,7 @@ class ConfigUpdate(Reasoned):
     orders_to_printful: bool | None = Field(None, strict=True)
     public_markup_cents: int | None = Field(None, ge=0, le=shop_config.MAX_PUBLIC_MARKUP_CENTS)
     fallback_shipping_cents: int | None = Field(None, ge=1, le=shop_config.MAX_FALLBACK_SHIPPING_CENTS)
+    min_price_cents: int | None = Field(None, ge=1, le=shop_config.MAX_MIN_PRICE_CENTS)
 
 
 class TaxClearance(Reasoned):

@@ -66,9 +66,9 @@ const INPUT = "mt-1 w-full min-h-10 bg-black/40 border border-white/15 rounded-s
 function ReasonInput({ id, value, onChange, disabled }) {
   return (
     <>
-      <label className="sr-only" htmlFor={id}>Grund</label>
+      <label className="sr-only" htmlFor={id}>Grund (optional)</label>
       <input id={id} value={value} onChange={(event) => onChange(event.target.value)} maxLength={500} disabled={disabled}
-        placeholder="Grund (kommt ins Protokoll)" className={`${INPUT} mt-0 flex-1`} data-testid={id} />
+        placeholder="Grund (optional, kommt ins Protokoll)" className={`${INPUT} mt-0 flex-1`} data-testid={id} />
     </>
   );
 }
@@ -106,7 +106,7 @@ function PlacementRow({ spec, busy, onSave }) {
   };
   const parsed = Object.fromEntries(Object.entries(values).map(([key, value]) => [key, Number(String(value).replace(",", "."))]));
   const valid = open && Object.values(parsed).every((value) => Number.isFinite(value) && value > 0) && parsed.print_width_in <= parsed.area_width_in;
-  const ready = valid && reason.trim().length >= 3 && !busy;
+  const ready = valid && !busy;
   const field = (key, label, step) => (
     <Field label={label} hint={key === "min_dpi" ? `nötig: ${Math.ceil((parsed.print_width_in || 0) * (parsed.min_dpi || 0))} px Breite` : Number.isFinite(parsed[key]) ? `= ${number(parsed[key] * CM_PER_INCH, 1)} cm` : ""}>
       <input value={values[key] ?? ""} onChange={(event) => setValues((now) => ({ ...now, [key]: event.target.value }))}
@@ -190,7 +190,7 @@ function UploadForm({ designs, placements, limits, busy, preset, onUpload }) {
   const spec = placements.find((item) => item.key === targetPlacement);
   const dpi = pixels && spec ? pixels.width / spec.print_width_in : null;
   const keyValid = /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(key) && key.length <= 60;
-  const ready = !busy && !!file && reason.trim().length >= 3 && keyValid && (!isNew || title.trim().length > 0);
+  const ready = !busy && !!file && keyValid && (!isNew || title.trim().length > 0);
 
   const submit = async (event) => {
     event.preventDefault();
@@ -280,7 +280,7 @@ function ColorEditor({ design, busy, onSave }) {
       </button>
     );
   }
-  const ready = reason.trim().length >= 3 && !busy;
+  const ready = !busy;
   return (
     <form className="w-full space-y-2" onSubmit={async (event) => {
       event.preventDefault();

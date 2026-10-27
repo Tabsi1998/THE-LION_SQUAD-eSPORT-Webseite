@@ -30,26 +30,43 @@ class ShopConflict(ShopError):
 MODEL_FIELDS: dict[str, tuple[str, ...]] = {
     "shop_products": ("id", "slug", "title", "description", "status", "visibility", "base_price_cents", "markup_cents",
                       "currency", "gamertag_allowed", "tax_profile", "design_key", "version", "created_at",
-                      "created_by", "updated_at", "updated_by"),
+                      "created_by", "updated_at", "updated_by",
+                      # Produktverwaltung (#1707, services/shop_products.py) und Abgleich (#1709)
+                      "personalization", "printful", "technique", "offer", "placements", "included_placement",
+                      "review", "published_at", "archived_at", "catalog_sync"),
     "shop_variants": ("id", "product_id", "sku", "label", "size", "color", "price_cents", "active", "version",
-                      "created_at", "created_by", "updated_at", "updated_by"),
+                      "created_at", "created_by", "updated_at", "updated_by",
+                      "color_code", "blocked_reason", "blocked_at"),
     "shop_designs": ("id", "design_key", "version", "file_ref", "sha256", "placement", "created_at", "created_by",
                      # Druckdatei (#1708, services/shop_designs.py): Maße, Prüfung und öffentlicher Zufallsschlüssel
                      "public_id", "public_disabled_at", "content_type", "size_bytes", "width_px", "height_px",
                      "has_alpha", "source_format", "dpi", "print_width_in", "print_height_in", "min_dpi",
-                     "area_width_in", "area_height_in"),
+                     "area_width_in", "area_height_in", "origin"),
+    # Gamertag-Druckdateien (#1711, services/shop_gamertag.py): Herkunft „gamertag“, ohne den Namen als Text - aber
+    # das PNG einer Bestelldatei zeigt ihn: die Zeile gehört dann zu Konto, Bestellung und Position.
+    "shop_gamertag_files": ("id", "origin", "purpose", "sha256", "file_ref", "public_id", "content_type", "size_bytes",
+                            "placement", "width_px", "height_px", "dpi", "print_width_in", "print_height_in",
+                            "text_height_in", "text_width_in", "scaled", "font", "align", "color_key", "color_hex",
+                            "anchor_x_in", "anchor_y_in", "anchor_y_px", "rules_hash", "user_id", "order_id",
+                            "order_item_id", "created_at", "created_by", "last_used_at", "public_disabled_at",
+                            "erase_pending_at", "file_deleted_at"),
     "shop_design_profiles": ("design_key", "title", "placement", "garment_colors", "note", "version", "created_at",
                              "created_by", "updated_at", "updated_by"),
     "shop_design_colors": ("placement", "color_key", "color", "design_key", "claimed_at"),
     "shop_printful_variants": ("provider", "variant_id", "printful_variant_id", "printful_product_id", "updated_at",
-                               "updated_by"),
+                               "updated_by",
+                               # Einkauf und Lager aus dem Abgleich (#1709)
+                               "technique", "currency", "base_cost_cents", "placement_costs", "availability",
+                               "in_stock", "synced_at", "price_warning"),
     "shop_carts": ("user_id", "items", "updated_at"),
     "shop_orders": ("id", "user_id", "idempotency_key", "request_hash", "status", "frozen", "billing_address",
                     "shipping_address", "printful_external_id", "printful_order_id", "item_count", "created_at",
                     "updated_at", "anonymized_at"),
     "shop_order_items": ("id", "order_id", "user_id", "position", "product_id", "variant_id", "product_title",
                          "variant_label", "sku", "quantity", "unit_price_cents", "markup_cents", "line_total_cents",
-                         "gamertag", "design", "printful", "tax_profile"),
+                         "gamertag", "design", "printful", "tax_profile",
+                         # je Platzierung die Druckdatei-Fassung, Druckfläche und Position (#1707)
+                         "designs"),
     "shop_order_events": ("id", "order_id", "event_key", "kind", "at", "actor_id", "data"),
 }
 FORBIDDEN_FIELD_PARTS = ("iban", "bic", "bank", "account_number", "card", "cvv", "password", "passwort", "secret",
@@ -61,6 +78,7 @@ PERSONAL_FIELDS: dict[str, tuple[str, ...]] = {
     "shop_orders": ("user_id", "billing_address", "shipping_address"),
     "shop_order_items": ("user_id", "gamertag"),
     "shop_carts": ("user_id", "items"),
+    "shop_gamertag_files": ("user_id",),  # und die Datei selbst (sie zeigt den Gamertag)
 }
 
 
@@ -157,7 +175,15 @@ ADMIN_ACTIONS: dict[str, str] = {
     "shop.design.add": "Druckdatei-Fassung angelegt",
     "shop.design.profile": "Design angelegt oder geändert (Titel, Shirtfarben)",
     "shop.design.placement": "Druckbereich einer Platzierung geändert",
+    "shop.gamertag.rules": "Regeln der Gamertag-Druckdatei geändert",
+    "shop.gamertag.file": "Gamertag-Testdatei erzeugt",
     "shop.printful_variant.set": "Printful-Variante zugeordnet",
+    "shop.product.catalog": "Printful-Produkt gewählt",
+    "shop.product.offer": "Farben und Größen gewählt",
+    "shop.product.placements": "Platzierungen und Positionen geändert",
+    "shop.product.designs": "Designs je Platzierung und Farbe zugeordnet",
+    "shop.product.status": "Stand eines Produkts geändert (Prüfen, Veröffentlichen, Archivieren)",
+    "shop.catalog.sync": "Mit Printful abgeglichen (gesperrt, freigegeben, Preiswarnung)",
     "shop.order.release": "Bestellung freigegeben",
     "shop.order.printful_confirm": "Bei Printful bestätigt",
     "shop.order.cancel": "Bestellung storniert",
@@ -168,10 +194,12 @@ ADMIN_ACTIONS: dict[str, str] = {
 MAX_REASON = 500
 
 
-def clean_reason(reason: Any) -> str:
-    """Der Grund einer Adminaktion: Pflicht, eine Zeile, Mail-Adressen gekürzt."""
+def clean_reason(reason: Any, *, required: bool = False) -> str:
+    """Der Grund einer Adminaktion: eine Zeile, Mail-Adressen gekürzt. Optional - wer, wann und was steht ohnehin im
+    Protokoll (Entscheidung Obmann 27.10.2026). Pflicht (``required``) nur bei kritischen Schritten: Steuer freigeben,
+    „Öffentlich“, Notschalter einschalten, Schlüssel entfernen."""
     text = log_safe(mask_addresses(" ".join(str(reason or "").split())), MAX_REASON)
-    if len(text) < 3:
+    if required and len(text) < 3:
         raise ShopError("Bitte einen Grund angeben.")
     return text
 
@@ -185,6 +213,7 @@ async def record_admin_action(db, action: str, *, actor_id: str, target_id: str,
     payload = dict(data or {})
     assert_no_address(payload, where="Protokoll")
     entry = {"id": new_id(), "action": action, "actor_id": actor_id, "target_id": target_id,
-             "data": {**payload, "reason": clean_reason(reason)}, "created_at": now_utc().isoformat()}
+             # Ob ein Grund Pflicht ist, prüft der Schritt selbst; das Protokoll nimmt auch einen leeren.
+             "data": {**payload, "reason": clean_reason(reason, required=False)}, "created_at": now_utc().isoformat()}
     await db.audit_logs.insert_one(dict(entry))
     return entry

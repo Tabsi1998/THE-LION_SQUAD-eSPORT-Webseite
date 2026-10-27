@@ -557,6 +557,11 @@ AUDIT_UNIQUE_INDEXES: tuple[tuple[str, Any, str, dict], ...] = (
     # Druckdateien (#1708): der öffentliche Zufallsschlüssel je Version (ältere Zeilen ohne Schlüssel: sparse).
     ("shop_designs", "public_id", "public_id", {"sparse": True}),
     ("shop_design_profiles", "design_key", "design_key", {}),
+    # Gamertag-Druckdateien (#1711): je Prüfsumme eine Testdatei (nur Testdateien werden geteilt - Bestelldateien
+    # bekommen je Bestellung eine eigene Zeile), je Zeile ein eigener Zufallsschlüssel für die öffentliche Adresse.
+    ("shop_gamertag_files", [("purpose", 1), ("sha256", 1)], "test_sha256",
+     {"partialFilterExpression": {"purpose": "test"}}),
+    ("shop_gamertag_files", "public_id", "public_id", {}),
     # Je Platzierung gehört eine Shirtfarbe zu höchstens einem Design - atomar über diesen Index (#1708).
     ("shop_design_colors", [("placement", 1), ("color_key", 1)], "placement_color", {}),
     ("shop_printful_variants", [("provider", 1), ("variant_id", 1)], "provider_variant", {}),
@@ -612,6 +617,7 @@ AUDIT_INDEXES: tuple[tuple[str, Any], ...] = (
     # Bestellung, Varianten je Produkt.
     ("shop_orders", "id"),
     ("shop_orders", "user_id"),
+    ("shop_gamertag_files", "user_id"),  # Kontolöschung und Auskunft (#1711)
     ("shop_orders", [("status", 1), ("created_at", -1)]),
     ("shop_order_items", "user_id"),
     ("shop_order_events", [("order_id", 1), ("at", 1)]),

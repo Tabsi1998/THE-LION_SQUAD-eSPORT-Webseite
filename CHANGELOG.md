@@ -1,5 +1,33 @@
 # Changelog
 
+## 1.40.0 (27.10.2026)
+
+### Neu
+
+* Shop-Verwaltung: Grund nur noch bei kritischen Schritten Pflicht - sonst optional, das Protokoll nennt trotzdem wer, wann und was
+
+### Fehlerbehebungen
+
+* Shop-Verwaltung: Knöpfe sagen, was fehlt, statt still nichts zu tun - z. B. beim Printful-Schlüssel
+
+## 1.39.0 (27.10.2026)
+
+### Neu
+
+* Vereinsshop: Gamertag als Druckdatei - feste Größe in Zoll und cm, Verkleinerung bei langen Namen, Wortfilter, Vorschau im Admin (#1711)
+
+## 1.38.0 (27.10.2026)
+
+### Neu
+
+* Vereinsshop: Designs und Druckdateien hochladen - neu kodiert, DPI geprüft in Zoll und cm, versioniert, je Shirtfarbe (#1708)
+* Vereinsshop: geschützte Adresse der Druckdateien für Printful, nicht erratbar und aus den Logs gekürzt (#1708)
+* Vereinsshop: Printful-Anschluss (API v2) - Entwürfe kostenlos anlegen, Kosten schätzen, Bestätigen nur mit Notschalter und ohne Doppelbestellung (#1705)
+
+### Fehlerbehebungen
+
+* Sicherheits-Header überschreiben eine strengere Referrer-Policy einzelner Seiten nicht mehr
+
 ## 1.37.0 (27.10.2026)
 
 ### Neu

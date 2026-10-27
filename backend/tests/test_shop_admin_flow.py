@@ -13,12 +13,13 @@ import pytest_asyncio
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 
 from flow_harness import make_flow  # noqa: E402
+from shop_testdata import publish_unchecked  # noqa: E402
 
 BASE = "/api/admin/shop"
 BY = {"actor_id": "test", "reason": "Testdaten"}
 SHOP_ACTIONS = {"action": {"$regex": "^shop\\."}}
 PRODUCT = {"slug": "loewen-shirt", "title": "Löwen-Shirt", "base_price_cents": 2490, "markup_cents": 500,
-           "gamertag_allowed": True, "reason": "Erstes Vereinsshirt anlegen"}
+           "personalization": "gamertag", "reason": "Erstes Vereinsshirt anlegen"}
 BILLING = {"name": "Testperson Eins", "street": "Probegasse 1", "zip": "1010", "city": "Wien", "country": "AT",
            "source": "dolibarr"}
 SHIPPING = {"recipient": "Testperson Zwei", "street": "Musterweg 2", "zip": "8010", "city": "Graz", "country": "AT",
@@ -63,9 +64,10 @@ REFUSED = ("spieler", "mitglied", "turnierleitung")
 async def seeded_order(flow) -> dict:
     from services import shop_catalog, shop_orders
 
-    fields = {"slug": "bestellt", "title": "Bestellt", "base_price_cents": 2000, "status": "active"}
+    fields = {"slug": "bestellt", "title": "Bestellt", "base_price_cents": 2000}
     product = await shop_catalog.create_product(flow.db, fields, **BY)
     variant = await shop_catalog.create_variant(flow.db, product["id"], {"sku": "B-1", "label": "M"}, **BY)
+    await publish_unchecked(flow.db, product["id"])
     order, _ = await shop_orders.place_order(
         flow.db, user_id="konto-test", idempotency_key="flow-0001", buyer_kind="member",
         lines=[{"variant_id": variant["id"], "quantity": 1}], shipping_estimate_cents=590,
@@ -211,17 +213,20 @@ async def test_creating_and_changing_a_product_is_logged_with_person_and_reason(
 
 
 @pytest.mark.asyncio
-async def test_a_write_without_reason_or_with_unknown_fields_is_refused(flow):
+async def test_unknown_fields_are_refused_and_the_reason_for_products_is_optional(flow):
+    # Grund optional (Entscheidung Obmann 27.10.2026): wer, wann und was stehen trotzdem im Protokoll.
     who = await people(flow)
     flow.act_as(who["finanzen"])
-    no_reason = await flow.post(f"{BASE}/products",
-                                json={key: value for key, value in PRODUCT.items() if key != "reason"})
-    blank = await flow.post(f"{BASE}/products", json={**PRODUCT, "reason": "   "})
     unknown = await flow.post(f"{BASE}/products", json={**PRODUCT, "iban": "AT00 0000"})
     negative = await flow.post(f"{BASE}/products", json={**PRODUCT, "base_price_cents": -1})
-    assert [no_reason.status_code, blank.status_code, unknown.status_code, negative.status_code] == [422, 422, 422, 422]
+    assert [unknown.status_code, negative.status_code] == [422, 422]
     assert await flow.db.shop_products.count_documents({}) == 0
     assert await flow.db.audit_logs.count_documents({}) == 0
+    no_reason = await flow.post(f"{BASE}/products",
+                                json={key: value for key, value in PRODUCT.items() if key != "reason"})
+    assert no_reason.status_code == 200, no_reason.text
+    entry = await flow.db.audit_logs.find_one({"action": "shop.product.create"}, {"_id": 0})
+    assert entry["actor_id"] == who["finanzen"]["id"] and entry["data"]["reason"] == "" and entry["created_at"]
 
 
 @pytest.mark.asyncio
@@ -290,8 +295,12 @@ async def test_no_log_entry_of_the_shop_carries_an_address(flow):
                                               reason="Storno auf Wunsch", data={"shipping_address": SHIPPING})
     with pytest.raises(shop_common.ShopError):
         await shop_common.record_admin_action(flow.db, "shop.erfunden", actor_id="a", target_id="o", reason="Test")
+    # Ohne Person nie; der Grund ist optional (Entscheidung Obmann 27.10.2026), Pflicht nur bei kritischen Schritten.
     with pytest.raises(shop_common.ShopError):
-        await shop_common.record_admin_action(flow.db, "shop.config", actor_id="a", target_id="shop", reason=" ")
+        await shop_common.record_admin_action(flow.db, "shop.config", actor_id="", target_id="shop", reason="Test")
+    with pytest.raises(shop_common.ShopError):
+        shop_common.clean_reason(" ", required=True)
+    assert shop_common.clean_reason(" ", required=False) == ""
     entry = await shop_common.record_admin_action(flow.db, "shop.config", actor_id="a", target_id="shop",
                                                   reason="Rückfrage an test@example.test\nzweite Zeile")
     assert "\n" not in entry["data"]["reason"] and "test@example.test" not in entry["data"]["reason"]

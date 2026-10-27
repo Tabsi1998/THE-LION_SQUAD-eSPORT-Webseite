@@ -1,5 +1,6 @@
 """Shared pytest fixtures for TLS Arena backend tests."""
 import os
+import sys
 from datetime import datetime
 
 import pytest
@@ -110,6 +111,16 @@ def season_clock(monkeypatch):
     fixed = real(datetime.fromisoformat(SEASON_TEST_NOW))
     monkeypatch.setattr(seasons, "to_vienna", lambda now=None: real(now if now is not None else fixed))
     yield fixed
+
+
+@pytest.fixture(autouse=True)
+def printful_rate_window():
+    """Das Rate-Limit des Printful-Adapters (#1709) gilt prozessweit je Schlüssel. Jeder Test beginnt mit leerem
+    Fenster - sonst würden die Aufrufe früherer Tests (alle mit demselben Testschlüssel) ihn bremsen."""
+    module = sys.modules.get("services.printful_client")
+    if module is not None:
+        module._RATE_WINDOWS.clear()
+    yield
 
 
 @pytest.fixture(scope="session")

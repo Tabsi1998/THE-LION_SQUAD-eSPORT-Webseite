@@ -41,12 +41,15 @@ SHIPPING_COUNTRIES = ("AT",)
 MEMBER_MARKUP_CENTS = 0
 MAX_PUBLIC_MARKUP_CENTS = 10_000
 MAX_FALLBACK_SHIPPING_CENTS = 10_000
+# Kein Artikel unter diesem Verkaufspreis (#1707): 0 € oder ein Tippfehler im Cent-Bereich wird nie veröffentlicht.
+DEFAULT_MIN_PRICE_CENTS = 100
+MAX_MIN_PRICE_CENTS = 10_000
 MIN_KEY_LENGTH = 20
 MAX_KEY_LENGTH = 300
 UNREADABLE_KEY = "gespeichert, aber nicht lesbar – SETTINGS_ENCRYPTION_KEY in der .env prüfen"
 NO_TAX_CLEARANCE = "Erst wenn die Steuer geklärt ist (#1701) – die Freigabe setzt der Superadmin."
 ONLY_SUPERADMIN = "„Öffentlich“ schaltet nur der Superadmin ein."
-UPDATE_FIELDS = ("stage", "orders_to_printful", "public_markup_cents", "fallback_shipping_cents")
+UPDATE_FIELDS = ("stage", "orders_to_printful", "public_markup_cents", "fallback_shipping_cents", "min_price_cents")
 
 
 class ShopForbidden(ShopError):
@@ -83,6 +86,8 @@ def normalized(raw: dict | None) -> dict:
         "public_markup_cents": _cents(raw.get("public_markup_cents"), maximum=MAX_PUBLIC_MARKUP_CENTS) or 0,
         "fallback_shipping_cents": _cents(raw.get("fallback_shipping_cents"), minimum=1,
                                           maximum=MAX_FALLBACK_SHIPPING_CENTS),
+        "min_price_cents": _cents(raw.get("min_price_cents"), minimum=1, maximum=MAX_MIN_PRICE_CENTS)
+        or DEFAULT_MIN_PRICE_CENTS,
         "tax_cleared": _tax_cleared(raw.get("tax_cleared")),
         "printful_api_key": raw.get("printful_api_key") or "",
         "printful_key_saved_at": raw.get("printful_key_saved_at"),
@@ -129,11 +134,22 @@ async def printful_api_key(db) -> str | None:
 # ---------------------------------------------------------------- Preise und Versand
 
 def markup_cents(config: dict, buyer_kind: str, product: dict) -> int:
-    """Aufschlag je Artikel: Mitglieder zahlen den Selbstkostenpreis (0). Öffentlich der Aufschlag des Shops plus ein
-    eigener Aufschlag des Produkts, falls die Finanzen einem Produkt einen geben."""
+    """Aufschlag je Artikel: Mitglieder zahlen den Selbstkostenpreis (0). Öffentlich gilt der eigene Aufschlag des
+    Produkts, **falls gesetzt** - er ersetzt den allgemeinen Aufschlag des Shops (Entscheidung zu #1707), auch wenn er
+    0 ist. Nicht gesetzt (``None``) heißt: der allgemeine gilt."""
     if buyer_kind != "public":
         return MEMBER_MARKUP_CENTS
-    return int(config.get("public_markup_cents") or 0) + int(product.get("markup_cents") or 0)
+    own = product.get("markup_cents")
+    if isinstance(own, int) and not isinstance(own, bool):
+        return own
+    return int(config.get("public_markup_cents") or 0)
+
+
+def check_min_price(config: dict, cents: int | None, label: str = "Preis") -> None:
+    """Verkaufspreise unter dem Mindestpreis (Vorgabe 1 €) gibt es nicht - auch nicht 0 €."""
+    if cents is not None and cents < config["min_price_cents"]:
+        minimum = config["min_price_cents"]
+        raise ShopError(f"{label} unter dem Mindestpreis ({minimum // 100},{minimum % 100:02d} €).")
 
 
 def check_shipping_country(country: str) -> None:
@@ -207,7 +223,6 @@ async def update(db, changes: dict, *, actor: dict, is_superadmin: bool, reason:
     unknown = sorted(set(changes) - set(UPDATE_FIELDS))
     if unknown:
         raise ShopError(f"Unbekannte Einstellungen ({', '.join(unknown)}).")
-    shop_common.clean_reason(reason)
     current = await load(db)
     after: dict = {}
     for field, value in changes.items():
@@ -220,6 +235,8 @@ async def update(db, changes: dict, *, actor: dict, is_superadmin: bool, reason:
         if field == "fallback_shipping_cents" and value is not None and _cents(
                 value, minimum=1, maximum=MAX_FALLBACK_SHIPPING_CENTS) is None:
             raise ShopError("Ersatzpauschale: ganze Cent, 0,01 bis 100 € - oder leer für keine.")
+        if field == "min_price_cents" and _cents(value, minimum=1, maximum=MAX_MIN_PRICE_CENTS) is None:
+            raise ShopError("Mindestpreis: ganze Cent, 0,01 bis 100 €.")
         if current[field] != value:
             after[field] = value
     if not after:
@@ -230,6 +247,8 @@ async def update(db, changes: dict, *, actor: dict, is_superadmin: bool, reason:
         if not current["tax_cleared"]:
             raise ShopConflict("„Öffentlich“ ist gesperrt, bis die Steuer geklärt ist (#1701).")
     switching_on = after.get("orders_to_printful") is True
+    # Kritisch und deshalb mit Pflicht-Grund: „Öffentlich“ und Notschalter einschalten.
+    shop_common.clean_reason(reason, required=after.get("stage") == "public" or switching_on)
     if switching_on and key_state(current) != "ok":
         raise ShopConflict(NO_KEY)
     # Einschalten nur, solange der Schlüssel noch da ist - als ein bedingtes Update, damit ein gleichzeitiges
@@ -245,7 +264,7 @@ async def update(db, changes: dict, *, actor: dict, is_superadmin: bool, reason:
 async def set_tax_clearance(db, cleared: bool, *, actor: dict, reason: Any) -> dict:
     """Freigabe „Steuer geklärt“ (#1701) - nur Superadmin (prüft die Route), Pflicht-Grund. Zurücknehmen geht nur, wenn
     der Shop nicht öffentlich ist."""
-    text = shop_common.clean_reason(reason)
+    text = shop_common.clean_reason(reason, required=True)
     current = await load(db)
     if bool(current["tax_cleared"]) == cleared:
         return current
@@ -269,7 +288,6 @@ def clean_key(raw: Any) -> str:
 async def set_printful_key(db, raw_key: Any, *, actor: dict, reason: Any) -> dict:
     """Schlüssel verschlüsselt speichern. Ins Protokoll kommt nur „hinterlegt“, nie der Wert."""
     key = clean_key(raw_key)
-    shop_common.clean_reason(reason)
     current = await load(db)
     before = "hinterlegt" if key_state(current) != "missing" else "fehlt"
     await shop_common.record_admin_action(db, "shop.config", actor_id=actor["id"], target_id=SETTINGS_ID,
@@ -282,7 +300,7 @@ async def set_printful_key(db, raw_key: Any, *, actor: dict, reason: Any) -> dic
 
 async def remove_printful_key(db, *, actor: dict, reason: Any) -> dict:
     """Schlüssel entfernen - der Notschalter geht dabei mit aus: ohne Schlüssel kann nichts gesendet werden."""
-    shop_common.clean_reason(reason)
+    shop_common.clean_reason(reason, required=True)
     current = await load(db)
     if key_state(current) == "missing":
         return current
@@ -336,6 +354,7 @@ async def admin_view(db, config: dict, *, is_superadmin: bool, can_edit_access: 
             "orders_to_printful": config["orders_to_printful"],
             "public_markup_cents": config["public_markup_cents"], "member_markup_cents": MEMBER_MARKUP_CENTS,
             "fallback_shipping_cents": config["fallback_shipping_cents"],
+            "min_price_cents": config["min_price_cents"],
             "shipping_countries": list(SHIPPING_COUNTRIES),
             "tax_cleared": ({"at": tax["at"], "by": names.get(tax.get("by"), "unbekannt"), "reason": tax.get("reason")}
                             if tax else None),
@@ -349,5 +368,6 @@ async def admin_view(db, config: dict, *, is_superadmin: bool, can_edit_access: 
         "stages": stages,
         "rights": {"can_set_public": bool(is_superadmin and tax), "can_set_tax": is_superadmin,
                    "can_edit_access": can_edit_access},
-        "limits": {"public_markup_cents": MAX_PUBLIC_MARKUP_CENTS, "fallback_shipping_cents": MAX_FALLBACK_SHIPPING_CENTS},
+        "limits": {"public_markup_cents": MAX_PUBLIC_MARKUP_CENTS, "fallback_shipping_cents": MAX_FALLBACK_SHIPPING_CENTS,
+                   "min_price_cents": MAX_MIN_PRICE_CENTS},
     }

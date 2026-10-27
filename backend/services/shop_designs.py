@@ -326,7 +326,10 @@ def _store(payload: bytes) -> tuple[str, Path]:
 
 
 def file_name(row: dict) -> str:
-    """Der Name, unter dem Printful die Version holt - die Version steckt drin, sonst lädt Printful nicht neu."""
+    """Der Name, unter dem Printful die Version holt - die Version steckt drin, sonst lädt Printful nicht neu. Eine
+    Gamertag-Datei (#1711) trägt den Anfang ihrer Prüfsumme - nie den Namen."""
+    if row.get("origin") == "gamertag":
+        return f"gamertag-{row['sha256'][:16]}.png"
     return f"{row['design_key']}-v{row['version']}.png"
 
 
@@ -351,6 +354,8 @@ async def public_file(db, public_id: str, filename: str) -> Path | None:
     if not PUBLIC_ID.fullmatch(str(public_id or "")):
         return None
     row = await db.shop_designs.find_one({"public_id": public_id}, {"_id": 0})
+    if row is None:  # Gamertag-Druckdateien (#1711) liegen im selben Speicher
+        row = await db.shop_gamertag_files.find_one({"public_id": public_id}, {"_id": 0})
     if not row or row.get("public_disabled_at"):
         return None
     if not hmac.compare_digest(str(filename or "").encode(), file_name(row).encode()):
@@ -568,7 +573,8 @@ async def upload(db, *, design_key: Any, data: bytes, filename: str, content_typ
             await create_profile(db, key, title=title, placement=placement, garment_colors=garment_colors,
                                  actor_id=actor_id, reason=reason)
         alpha = has_transparency(img)
-        details = {"public_id": secrets.token_urlsafe(32), "content_type": "image/png", "size_bytes": len(payload),
+        details = {"origin": "upload", "public_id": secrets.token_urlsafe(32), "content_type": "image/png",
+                   "size_bytes": len(payload),
                    "width_px": img.width, "height_px": img.height, "has_alpha": alpha, "source_format": source_format,
                    "dpi": fit["dpi"], "print_width_in": fit["print_width_in"],
                    "print_height_in": fit["print_height_in"], "min_dpi": spec["min_dpi"],
@@ -662,9 +668,12 @@ async def retention_plan(db, *, now: datetime | None = None) -> dict:
     now = now or now_utc()
     rows = await db.shop_designs.find({}, {"_id": 0}).sort([("design_key", 1), ("version", 1)]).to_list(None)
     ordered = set()
-    async for item in db.shop_order_items.find({"design": {"$ne": None}}, {"_id": 0, "design": 1}):
-        design = item.get("design") or {}
-        ordered.add((design.get("design_key"), design.get("version")))
+    query = {"$or": [{"design": {"$ne": None}}, {"designs.0": {"$exists": True}}]}
+    async for item in db.shop_order_items.find(query, {"_id": 0, "design": 1, "designs": 1}):
+        # Seit #1707 je Platzierung eine Fassung (``designs``); ``design`` ist die Kurzform bzw. ältere Bestellungen.
+        for design in [item.get("design") or {}, *(item.get("designs") or [])]:
+            if design.get("design_key"):
+                ordered.add((design.get("design_key"), design.get("version")))
     by_key: dict[str, list[dict]] = {}
     for row in rows:
         by_key.setdefault(row["design_key"], []).append(row)
