@@ -107,6 +107,26 @@ test("wählen: Raster oder Feld, Live-Prüfung per POST, Bestätigung, dann setz
   expect(screen.queryByTestId("jersey-input")).toBeNull();
 });
 
+test("Doppel-Tipp auf „Festlegen“ sendet nur einmal", async () => {
+  mockGet.mockResolvedValue({ data: open });
+  let release: (value: { data: typeof fixed }) => void = () => undefined;
+  mockPost.mockImplementation((url: string, body: { number: number }) =>
+    url.endsWith("/check") ? Promise.resolve(checkReply(body)) : new Promise((resolve) => { release = resolve; }));
+  await render(<MemberJerseyNumber />);
+  await fireEvent.press(await screen.findByTestId("jersey-grid-7"));
+  await waitFor(() => expect(screen.getByTestId("jersey-choose")).toBeEnabled());
+  await fireEvent.press(screen.getByTestId("jersey-choose"));
+  const buttons = (alertSpy.mock.calls.at(-1)?.[2] || []) as AlertButton[];
+  const confirm = buttons.find((entry) => entry.text === "Festlegen");
+  await act(async () => {
+    confirm?.onPress?.();
+    confirm?.onPress?.();
+  });
+  expect(mockPost.mock.calls.filter(([url]) => url === "/membership/me/jersey-number")).toHaveLength(1);
+  await act(async () => release({ data: fixed }));
+  expect(await screen.findByTestId("jersey-number")).toHaveTextContent("7");
+});
+
 test("„Bewegung reduzieren“: die Nummer blendet nur ein - kein Anheben, kein Aufleuchten; die Vibration bleibt", async () => {
   jest.spyOn(reanimated, "useReducedMotion").mockReturnValue(true);
   jest.spyOn(AccessibilityInfo, "isReduceMotionEnabled").mockReturnValue(new Promise<boolean>(() => undefined));

@@ -156,8 +156,12 @@ function ChooseForm({ view, onChosen }: { view: JerseyView; onChosen: (data: Jer
   const ready = check.view.tone === "ok" && Boolean(check.result?.free) && !busy;
   const noneLeft = view.free_count === 0;
   const range = view.range || { min: 0, max: 99 };
+  // Sperrt sofort - `busy` greift erst nach dem nächsten Rendern, ein Doppel-Tipp sendet sonst zweimal.
+  const sending = useRef(false);
 
   const send = async (number: number) => {
+    if (sending.current) return;
+    sending.current = true;
     setBusy(true);
     setError("");
     try {
@@ -168,6 +172,7 @@ function ChooseForm({ view, onChosen }: { view: JerseyView; onChosen: (data: Jer
       setError(errorMessage(problem, statusOf(problem) === 409 ? TAKEN_TEXT : "Das hat nicht geklappt."));
       setNonce((n) => n + 1);
     } finally {
+      sending.current = false;
       setBusy(false);
     }
   };
@@ -219,9 +224,11 @@ function RequestForm({ view, onSent, onCancel }: { view: JerseyView; onSent: () 
   const check = useNumberCheck(wished, view.range);
   const wishBlocked = wished.trim() !== "" && check.view.tone !== "ok";
   const ready = reason.trim().length >= 3 && !wishBlocked && !busy;
+  const sending = useRef(false);
 
   const submit = async () => {
-    if (!ready) return;
+    if (!ready || sending.current) return;
+    sending.current = true;
     setBusy(true);
     setError("");
     try {
@@ -230,6 +237,7 @@ function RequestForm({ view, onSent, onCancel }: { view: JerseyView; onSent: () 
     } catch (problem) {
       setError(errorMessage(problem, statusOf(problem) === 409 ? TAKEN_TEXT : "Das hat nicht geklappt."));
     } finally {
+      sending.current = false;
       setBusy(false);
     }
   };
@@ -298,13 +306,22 @@ export function MemberJerseyNumber() {
   const [fresh, setFresh] = useState(false);
   const [notice, setNotice] = useState("");
 
+  // Eine späte Antwort nach dem Wegnavigieren bzw. Abmelden setzt nichts mehr.
+  const mounted = useRef(true);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
+
   const load = useCallback(async () => {
     try {
       const { data } = await api.get<JerseyView>("/membership/me/jersey-number");
-      setView(data && typeof data === "object" ? data : null);
+      if (mounted.current) setView(data && typeof data === "object" ? data : null);
     } catch {
       // Ohne Antwort (älterer Server, kein Netz) keine Karte - kein Fehler im Mitgliederbereich.
-      setView(null);
+      if (mounted.current) setView(null);
     }
   }, []);
 
