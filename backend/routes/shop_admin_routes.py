@@ -4,7 +4,12 @@ bringen ihn mit, andere bekommen ihn als Freigabe. Kein eigener Bereich.
 Dieses Fundament liest Produkte und Bestellungen und legt Produkte und Varianten an bzw. ändert sie. Jede Änderung
 braucht einen Grund und steht im Protokoll der Adminaktionen (``services/shop_catalog``); Lesen ist keine
 Adminaktion. Die Bestellliste zeigt keine Anschriften. Öffentliche Shop-Routen gibt es nicht - der Shop bleibt von
-außen unsichtbar, bis Konfiguration und Betriebsarten (#1706) und die Shop-Seiten (#1712) stehen.
+außen unsichtbar, bis die Shop-Seiten (#1712) stehen; die fragen dann ``services/shop_access``.
+
+Einstellungen (#1706, ``services/shop_config``): Stufe, Notschalter, Preise, Printful-Zugang. Jede Änderung mit Grund
+als Aktion ``shop.config``. „Öffentlich“ und die Freigabe „Steuer geklärt“ nur Superadmin; den Printful-Zugang
+hinterlegt nur, wer zusätzlich den Bereich System hat. Alle Routen hängen trotzdem an ``require_area("finance")``
+(Regel 3 in ``scripts/check-code-patterns.py``); die strengeren Rechte prüft die Route selbst.
 """
 from __future__ import annotations
 
@@ -15,7 +20,8 @@ from pydantic import BaseModel, Field, field_validator
 
 from auth import require_area
 from database import get_db
-from services import shop_catalog, shop_orders
+from services import shop_catalog, shop_config, shop_orders, shop_printful_probe
+from services.permissions import can_use_area, is_superadmin
 from services.shop_common import ShopConflict, ShopError
 
 router = APIRouter(prefix="/api/admin/shop", tags=["shop"])
@@ -140,6 +146,110 @@ async def update_variant(variant_id: str, body: VariantUpdate, me: dict = Depend
         raise _refused(exc) from exc
     return {"variant": variant, "changed": changed}
 
+
+# ---------------------------------------------------------------- Einstellungen (#1706)
+
+class ConfigUpdate(Reasoned):
+    stage: Literal["off", "admins", "members", "public"] | None = None
+    orders_to_printful: bool | None = Field(None, strict=True)
+    public_markup_cents: int | None = Field(None, ge=0, le=shop_config.MAX_PUBLIC_MARKUP_CENTS)
+    fallback_shipping_cents: int | None = Field(None, ge=1, le=shop_config.MAX_FALLBACK_SHIPPING_CENTS)
+
+
+class TaxClearance(Reasoned):
+    cleared: bool = Field(..., strict=True)
+
+
+class PrintfulKey(Reasoned):
+    api_key: str = Field(..., min_length=shop_config.MIN_KEY_LENGTH, max_length=shop_config.MAX_KEY_LENGTH + 20)
+
+
+ACCESS_NEEDS_SYSTEM = "Den Printful-Zugang hinterlegt, wer den Bereich „System“ hat (Club-Admin, Superadmin)."
+ONLY_SUPERADMIN_TAX = "Die Freigabe „Steuer geklärt“ setzt nur der Superadmin."
+
+
+async def _config_answer(me: dict, config: dict | None = None, **extra) -> dict:
+    db = get_db()
+    view = await shop_config.admin_view(db, config if config is not None else await shop_config.load(db),
+                                        is_superadmin=is_superadmin(me),
+                                        can_edit_access=await can_use_area(me, "system", db=db))
+    return {**view, **extra}
+
+
+def _config_refused(exc: Exception) -> HTTPException:
+    if isinstance(exc, shop_config.ShopForbidden):
+        return HTTPException(403, str(exc))
+    return _refused(exc)
+
+
+@router.get("/config")
+async def read_config(me: dict = Depends(require_area("finance"))):
+    """Stufe, Notschalter, Preise, Zugang und Status - ohne Schlüssel. Lesen ist keine Adminaktion."""
+    return await _config_answer(me)
+
+
+@router.patch("/config")
+async def update_config(body: ConfigUpdate, me: dict = Depends(require_area("finance"))):
+    """Stufe, Notschalter, öffentlicher Aufschlag, Ersatzpauschale. „Öffentlich“ nur Superadmin und nur mit Freigabe."""
+    try:
+        config, changed = await shop_config.update(get_db(), _fields(body), actor=me, is_superadmin=is_superadmin(me),
+                                                   reason=body.reason)
+    except ShopError as exc:
+        raise _config_refused(exc) from exc
+    return await _config_answer(me, config, changed=changed)
+
+
+@router.put("/config/tax-clearance")
+async def set_tax_clearance(body: TaxClearance, me: dict = Depends(require_area("finance"))):
+    """Freigabe „Steuer geklärt“ (#1701) - nur Superadmin, mit Grund."""
+    if not is_superadmin(me):
+        raise HTTPException(403, ONLY_SUPERADMIN_TAX)
+    try:
+        config = await shop_config.set_tax_clearance(get_db(), body.cleared, actor=me, reason=body.reason)
+    except ShopError as exc:
+        raise _config_refused(exc) from exc
+    return await _config_answer(me, config)
+
+
+async def _require_system(me: dict) -> None:
+    if not await can_use_area(me, "system", db=get_db()):
+        raise HTTPException(403, ACCESS_NEEDS_SYSTEM)
+
+
+@router.put("/config/printful-key")
+async def set_printful_key(body: PrintfulKey, me: dict = Depends(require_area("finance"))):
+    """Schlüssel verschlüsselt speichern; er kommt nie zurück - nur „hinterlegt seit …“."""
+    await _require_system(me)
+    try:
+        config = await shop_config.set_printful_key(get_db(), body.api_key, actor=me, reason=body.reason)
+    except ShopError as exc:
+        raise _config_refused(exc) from exc
+    return await _config_answer(me, config)
+
+
+@router.post("/config/printful-key/remove")
+async def remove_printful_key(body: Reasoned, me: dict = Depends(require_area("finance"))):
+    await _require_system(me)
+    try:
+        config = await shop_config.remove_printful_key(get_db(), actor=me, reason=body.reason)
+    except ShopError as exc:
+        raise _config_refused(exc) from exc
+    return await _config_answer(me, config)
+
+
+@router.post("/config/printful-test")
+async def test_printful(me: dict = Depends(require_area("finance"))):
+    """Verbindung testen: ein lesender Aufruf bei Printful. Schreibt nichts dort und braucht keinen Notschalter."""
+    db = get_db()
+    key = await shop_config.printful_api_key(db)
+    if not key:
+        raise HTTPException(409, "Kein lesbarer Printful-Schlüssel hinterlegt.")
+    result = await shop_printful_probe.probe(key)
+    await shop_config.record_test(db, result)
+    return await _config_answer(me, result=result)
+
+
+# ---------------------------------------------------------------- Bestellungen
 
 @router.get("/orders")
 async def list_orders(status: str | None = Query(None, max_length=40), me: dict = Depends(require_area("finance"))):
