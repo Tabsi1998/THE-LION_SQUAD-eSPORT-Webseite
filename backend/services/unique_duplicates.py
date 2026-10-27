@@ -46,7 +46,8 @@ MANUAL = {
     **{f"shop_{index}": "Doppelter Eintrag im Shop-Katalog - die Finanzen entscheiden, welcher gilt, und benennen den "
                         "anderen um (docs/SHOP.md)."
        for index in ("products.slug", "variants.sku", "designs.design_version", "designs.public_id",
-                     "design_profiles.design_key", "printful_variants.provider_variant")},
+                     "design_profiles.design_key", "design_colors.placement_color",
+                     "printful_variants.provider_variant")},
 }
 # Index -> Reihenfolge, deren erste Zeile bleibt (sonst die älteste).
 KEEP_ORDER = {

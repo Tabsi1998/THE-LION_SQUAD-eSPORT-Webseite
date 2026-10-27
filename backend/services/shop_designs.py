@@ -404,20 +404,52 @@ async def _check_colors_free(db, design_key: str, placement: str, colors: list[s
                                    f"Design {other['design_key']}. Dort zuerst entfernen.")
 
 
+async def _release_colors(db, design_key: str, placement: str, keys: list[str] | set[str]) -> None:
+    if keys:
+        await db.shop_design_colors.delete_many({"placement": placement, "design_key": design_key,
+                                                 "color_key": {"$in": sorted(keys)}})
+
+
+async def _claim_colors(db, design_key: str, placement: str, colors: list[str]) -> list[str]:
+    """Belegt die Farben atomar: je Platzierung und Farbe eine Zeile in ``shop_design_colors`` mit eindeutigem Index
+    (``placement`` + ``color_key``). Wer zuerst schreibt, hat sie; der andere bekommt 409 und gibt alles wieder frei,
+    was er in diesem Aufruf belegt hat. Liefert die neu belegten Schlüssel (schon eigene zählen nicht)."""
+    claimed: list[str] = []
+    for color in colors:
+        color_key = color.casefold()
+        row = {"placement": placement, "color_key": color_key, "color": color, "design_key": design_key,
+               "claimed_at": now_utc().isoformat()}
+        try:
+            await db.shop_design_colors.insert_one(dict(row))
+            claimed.append(color_key)
+        except DuplicateKeyError:
+            owner = await db.shop_design_colors.find_one({"placement": placement, "color_key": color_key}, {"_id": 0})
+            if owner and owner.get("design_key") == design_key:
+                continue
+            await _release_colors(db, design_key, placement, claimed)
+            other = (owner or {}).get("design_key", "einem anderen Design")
+            raise ShopConflict(f"„{color}“ hat an „{PLACEMENT_LABELS[placement]}“ schon das Design {other}. "
+                               "Dort zuerst entfernen.")
+    return claimed
+
+
 async def create_profile(db, design_key: str, *, title: Any, placement: str, garment_colors: Any, actor_id: str,
                          reason: Any) -> dict:
     key = _design_key(design_key)
     if placement not in shop_catalog.PLACEMENTS:
         raise ShopError("Bitte die Platzierung wählen.")
     colors = clean_colors(garment_colors)
-    await _check_colors_free(db, key, placement, colors)
     now = now_utc().isoformat()
     profile = {"design_key": key, "title": _line(title, "Titel", 120, required=True), "placement": placement,
                "garment_colors": colors, "note": None, "version": 1, "created_at": now, "created_by": actor_id,
                "updated_at": now, "updated_by": actor_id}
+    if await get_profile(db, key):
+        raise ShopConflict("Dieses Design wurde gerade angelegt - bitte neu laden.")
+    claimed = await _claim_colors(db, key, placement, colors)
     try:
         await db.shop_design_profiles.insert_one(dict(profile))
     except DuplicateKeyError:
+        await _release_colors(db, key, placement, claimed)
         raise ShopConflict("Dieses Design wurde gerade angelegt - bitte neu laden.")
     await record_admin_action(db, "shop.design.profile", actor_id=actor_id, target_id=key, reason=reason,
                               data={"created": True, "placement": placement, "garment_colors": colors})
@@ -443,16 +475,27 @@ async def update_profile(db, design_key: str, fields: dict, *, actor_id: str, re
         values["note"] = _line(fields["note"], "Notiz", 500)
     if "garment_colors" in fields:
         values["garment_colors"] = clean_colors(fields["garment_colors"])
-        await _check_colors_free(db, design_key, profile["placement"], values["garment_colors"])
     changed = sorted(name for name, value in values.items() if profile.get(name) != value)
     if not changed:
         return profile, []
+    placement = profile["placement"]
+    claimed: list[str] = []
+    if "garment_colors" in changed:
+        claimed = await _claim_colors(db, design_key, placement, values["garment_colors"])
     result = await db.shop_design_profiles.update_one(
         {"design_key": design_key, "version": profile.get("version", 1)},
         {"$set": {**{name: values[name] for name in changed}, "updated_at": now_utc().isoformat(),
                   "updated_by": actor_id}, "$inc": {"version": 1}})
     if getattr(result, "matched_count", 0) != 1:
+        # Nur freigeben, was das inzwischen gespeicherte Design nicht selbst trägt.
+        current = await get_profile(db, design_key) or {}
+        own = {color.casefold() for color in current.get("garment_colors") or []}
+        await _release_colors(db, design_key, placement, set(claimed) - own)
         raise ShopConflict("Das Design wurde gerade geändert - bitte neu laden.")
+    if "garment_colors" in changed:
+        kept = {color.casefold() for color in values["garment_colors"]}
+        dropped = {color.casefold() for color in profile.get("garment_colors") or []} - kept
+        await _release_colors(db, design_key, placement, dropped)
     data: dict[str, Any] = {"fields": changed}
     if "garment_colors" in changed:
         data["before"] = {"garment_colors": profile.get("garment_colors") or []}
@@ -468,11 +511,12 @@ async def design_for_color(db, placement: str, color: str) -> dict | None:
     wanted = " ".join(str(color or "").split()).casefold()
     if not wanted:
         return None
-    async for profile in db.shop_design_profiles.find({"placement": placement}, {"_id": 0}):
-        if wanted in {item.casefold() for item in profile.get("garment_colors") or []}:
-            latest = await shop_catalog.latest_design(db, profile["design_key"])
-            return {"profile": profile, "latest": latest} if latest else None
-    return None
+    claim = await db.shop_design_colors.find_one({"placement": placement, "color_key": wanted}, {"_id": 0})
+    profile = await get_profile(db, claim["design_key"]) if claim else None
+    if not profile:
+        return None
+    latest = await shop_catalog.latest_design(db, profile["design_key"])
+    return {"profile": profile, "latest": latest} if latest else None
 
 
 # ---------------------------------------------------------------- Upload

@@ -40,6 +40,7 @@ MODEL_FIELDS: dict[str, tuple[str, ...]] = {
                      "area_width_in", "area_height_in"),
     "shop_design_profiles": ("design_key", "title", "placement", "garment_colors", "note", "version", "created_at",
                              "created_by", "updated_at", "updated_by"),
+    "shop_design_colors": ("placement", "color_key", "color", "design_key", "claimed_at"),
     "shop_printful_variants": ("provider", "variant_id", "printful_variant_id", "printful_product_id", "updated_at",
                                "updated_by"),
     "shop_carts": ("user_id", "items", "updated_at"),

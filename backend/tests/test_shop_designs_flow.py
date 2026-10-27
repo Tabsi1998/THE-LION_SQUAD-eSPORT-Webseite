@@ -248,6 +248,39 @@ async def test_each_shirt_colour_has_one_design_per_placement(flow):
     assert taken.status_code == 409
     missing = await flow.patch(f"{BASE}/designs/gibt-es-nicht", json={"title": "x", "reason": "Test"})
     assert missing.status_code == 404
+    # Freigegebene Farben sind wieder frei: Navy kann jetzt ein anderes Design bekommen.
+    navy = await flow.patch(f"{BASE}/designs/loewe-schwarz",
+                            json={"garment_colors": ["Weiß", "Navy"], "reason": "Navy hell bedrucken"})
+    assert navy.status_code == 200, navy.text
+
+
+@pytest.mark.asyncio
+async def test_two_designs_cannot_claim_the_same_colour_at_the_same_time(flow):
+    """Zwei gleichzeitige Änderungen lesen beide „Navy ist frei“ - die Zuordnung entscheidet atomar, eine gewinnt."""
+    import asyncio
+
+    from flow_harness import InterleavedReads
+    from services import shop_designs
+    from services.shop_common import ShopConflict
+
+    staff = await finance(flow)
+    by = {"actor_id": staff["id"], "reason": "Testdaten"}
+    for key, colour in (("loewe-weiss", "Schwarz"), ("loewe-schwarz", "Weiß")):
+        await shop_designs.create_profile(flow.db, key, title=key, placement="front_right", garment_colors=[colour],
+                                          **by)
+    gate = InterleavedReads(flow.db, "shop_design_profiles")
+    results = await asyncio.gather(
+        shop_designs.update_profile(gate, "loewe-weiss", {"garment_colors": ["Schwarz", "Navy"]}, **by),
+        shop_designs.update_profile(gate, "loewe-schwarz", {"garment_colors": ["Weiß", "navy"]}, **by),
+        return_exceptions=True)
+    assert sorted(type(item).__name__ for item in results) == sorted(["ShopConflict", "tuple"]), results
+    assert any(isinstance(item, ShopConflict) for item in results)
+    owners = [profile["design_key"] async for profile in flow.db.shop_design_profiles.find(
+        {"garment_colors": {"$in": ["Navy", "navy"]}})]
+    assert len(owners) == 1
+    claims = await flow.db.shop_design_colors.find({"placement": "front_right"}, {"_id": 0}).to_list(10)
+    assert sorted((claim["color_key"], claim["design_key"]) for claim in claims) == sorted(
+        [("schwarz", "loewe-weiss"), ("weiss", "loewe-schwarz"), ("navy", owners[0])])
 
 
 # ---------------------------------------------------------------- Rechte und Protokoll
