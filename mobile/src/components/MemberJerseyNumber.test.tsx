@@ -49,12 +49,12 @@ async function answer(text: string) {
   });
 }
 
-test("ohne Mitgliedschaft bzw. Funktion aus: nur ein ruhiger Satz, kein Feld", async () => {
+test("ohne Mitgliedschaft bzw. Funktion aus: keine Karte, wie im Web", async () => {
   mockGet.mockResolvedValue({ data: { available: false, reason: "not_member", text: "Eine eigene Nummer gibt es für Vereinsmitglieder." } });
   await render(<MemberJerseyNumber />);
-  expect(await screen.findByTestId("jersey-off")).toHaveTextContent("Eine eigene Nummer gibt es für Vereinsmitglieder.");
-  expect(screen.queryByTestId("jersey-input")).toBeNull();
-  expect(screen.queryByTestId("jersey-error")).toBeNull();
+  await waitFor(() => expect(mockGet).toHaveBeenCalledWith("/membership/me/jersey-number"));
+  expect(screen.queryByTestId("jersey-card")).toBeNull();
+  expect(screen.queryByText("Eine eigene Nummer gibt es für Vereinsmitglieder.")).toBeNull();
 });
 
 test("ohne Antwort vom Server (älterer Stand, kein Netz) gibt es keine Karte", async () => {

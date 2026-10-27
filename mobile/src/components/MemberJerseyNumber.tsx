@@ -312,18 +312,8 @@ export function MemberJerseyNumber() {
     void load();
   }, [load]);
 
-  if (!view) return null;
-
-  // Funktion aus bzw. kein Mitglied: ein ruhiger Satz vom Server, keine Fehlermeldung.
-  if (view.available !== true) {
-    if (!view.text) return null;
-    return (
-      <Card style={styles.card} testID="jersey-card">
-        <JerseyHeading />
-        <Muted testID="jersey-off">{view.text}</Muted>
-      </Card>
-    );
-  }
+  // Funktion aus bzw. kein Mitglied: keine Karte, wie im Web.
+  if (!view || view.available !== true) return null;
 
   const chosen = (data: JerseyView) => {
     setView(data);
