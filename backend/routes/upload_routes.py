@@ -345,7 +345,7 @@ async def _upload_svg_impl(data: bytes, me: dict, trim_empty_borders: bool, medi
         stored = await asyncio.to_thread(svg_logo.store, data, trim=trim_empty_borders, directory=PUBLIC_UPLOAD_DIR)
     except svg_logo.SvgRejected as exc:
         # Feste Meldung zum Grund - nie Text aus der Datei oder einer Ausnahme.
-        raise HTTPException(status_code=svg_logo.STATUS.get(exc.code, 400), detail=svg_logo.MESSAGES[exc.code]) from None
+        raise HTTPException(status_code=svg_logo.STATUS.get(exc.code, 400), detail=exc.message) from None
     except OSError as exc:
         logger.error("[uploads] failed to write svg logo: %s", type(exc).__name__)
         raise HTTPException(status_code=500, detail="Upload-Speicher ist nicht beschreibbar. Bitte Docker-Volume/UPLOAD_DIR prüfen.")
