@@ -543,3 +543,32 @@ async def test_the_draft_layout_preview_shows_the_version_the_server_would_print
     moved = await shop_products.plan_layout(db, product["id"], [{"key": "front", "layers": [{**LION, "offset_x_cm": -20}]}])
     state = moved["placements"][0]["files"][0]
     assert state["state"] == "invalid" and "ragt links" in state["detail"]
+
+@pytest.mark.asyncio
+async def test_a_missing_template_area_keeps_internals_from_customers(db, provider, fake, caplog):
+    """Codex, fünfte Runde: Printful nimmt eine Fläche weg - die Bestellung scheitert mit dem festen Satz, Fläche und
+    Grund stehen nur im Log und rot in der Vorab-Prüfung."""
+    import logging
+
+    from shop_testdata import publish_unchecked
+    from test_shop_products_unit import BILLING, SHIPPING, variant_for
+
+    from services import shop_orders
+
+    product = await configured(db, provider)
+    await publish_unchecked(db, product["id"])
+    fake.print_areas[PRINTFUL_PRODUCT] = [row for row in fake.print_areas[PRINTFUL_PRODUCT] if row["placement"] != "back"]
+    await templates.refresh(db, PRINTFUL_PRODUCT, provider=provider, actor_id=BY["actor_id"])
+    black = await variant_for(db, product["id"], 4012)
+    with caplog.at_level(logging.WARNING, logger="tls-arena.shop-print-files"), pytest.raises(ShopError) as refused:
+        await shop_orders.place_order(
+            db, user_id="konto-1", idempotency_key="bestellung-0090", buyer_kind="member",
+            lines=[{"variant_id": black["id"], "quantity": 1, "gamertag": "Testlöwe"}], shipping_estimate_cents=490,
+            billing_address=dict(BILLING), shipping_address=dict(SHIPPING), actor_id="konto-1")
+    assert str(refused.value) == "Position 1: Dieses Produkt ist gerade nicht bestellbar."
+    assert "back" not in str(refused.value) and "Printful" not in str(refused.value)
+    assert "no template" in caplog.text
+    assert await db.shop_orders.count_documents({}) == 0
+    view = await shop_products.admin_view(db, product["id"])
+    files = next(item for item in view["check"]["items"] if item["key"] == "files")
+    assert files["ok"] is False and files["state"] == "failed" and "back / Black: Fläche fehlt" in files["detail"]

@@ -903,18 +903,21 @@ async def freeze_line(db, product: dict, variant: dict, *, gamertag: str | None,
     for row in context["rows"]:
         entry = templates.entry_for_variant(context["template"], context["technique"], row["key"], printful_variant_id)
         if entry is None:
-            raise ShopError(f"Position {position}: für die Fläche {row['key']} fehlt die Druckvorlage von Printful - "
-                            "nicht bestellbar.")
+            # Die Kundschaft liest nur den festen Satz; Fläche und Grund stehen im Log und rot in der Vorab-Prüfung
+            # („Druckdateien je Farbe“: Fläche fehlt).
+            logger.warning("[shop-print-files] order refused: no template for an area of a product")
+            raise ShopError(f"Position {position}: {NOT_ORDERABLE}")
         plan = await plan_placement(db, row, entry, color=color, color_hex=color_hex, presets_doc=context["presets"],
                                     gamertag_rules=context["gamertag_rules"])
         if plan.problems:
-            raise ShopError(f"Position {position}: der Aufbau von {entry['label']} passt nicht - nicht bestellbar.")
+            logger.warning("[shop-print-files] order refused: layout does not fit an area")
+            raise ShopError(f"Position {position}: {NOT_ORDERABLE}")
         base_row = None
         if plan.needs_base:
             base_row = await latest_base(db, product["id"], row["key"], entry["group"], color)
             if not _base_valid(base_row, plan):
-                raise ShopError(f"Position {position}: die Druckdatei für {entry['label']} in {color} fehlt oder ist "
-                                "veraltet - nicht bestellbar.")
+                logger.warning("[shop-print-files] order refused: print file missing or outdated")
+                raise ShopError(f"Position {position}: {NOT_ORDERABLE}")
             sources += [{"placement": row["key"], **item.source.ref} for item in plan.motifs]
         gamertag_layers = [item for item in plan.texts if item.kind == "gamertag"]
         if gamertag_layers and not gamertag:

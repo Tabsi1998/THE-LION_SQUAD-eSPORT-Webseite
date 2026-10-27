@@ -662,7 +662,7 @@ async def test_an_order_without_current_print_files_is_refused_and_leaves_no_fil
     black = await variant_for(db, product["id"], BLACK_M)
     # Ein neuer Löwe nach dem Erzeugen: die Grunddatei vorne ist veraltet - bestellen geht erst nach „erzeugen“.
     await design(db, "loewe-weiss", "front_right", ["Black"], width=1250, height=1250)
-    with pytest.raises(ShopError, match="veraltet"):
+    with pytest.raises(ShopError, match="^Position 1: Dieses Produkt ist gerade nicht bestellbar\\.$"):
         await shop_orders.place_order(
             db, user_id="konto-1", idempotency_key="bestellung-0030", buyer_kind="member",
             lines=[{"variant_id": black["id"], "quantity": 1, "gamertag": "Testlöwe"}], shipping_estimate_cents=490,

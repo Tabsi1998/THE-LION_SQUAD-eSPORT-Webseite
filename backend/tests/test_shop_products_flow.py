@@ -436,3 +436,18 @@ async def test_the_product_search_finds_the_printful_number_without_typing_it(fl
     by_link = (await flow.get("/api/admin/shop/printful-catalog", params={"link": link})).json()
     assert by_link["link"]["ok"] is True and by_link["results"][0]["id"] == 71
     assert len(fake.calls_to("getProducts")) == 1, "zwischengespeichert"
+
+@pytest.mark.asyncio
+async def test_the_draft_preview_is_rate_limited_per_account(flow, monkeypatch):
+    """Codex, fünfte Runde: höchstens 60 Vorschauen je Minute und Konto (einstellbar), das 61. Mal 429."""
+    monkeypatch.setenv("SHOP_LAYOUT_PREVIEW_WINDOW_SECONDS", "3600")  # ein Fenster für den ganzen Test
+    who = await people(flow)
+    flow.act_as(who["finanzen"])
+    body = {"placements": PLACEMENTS}
+    for _ in range(60):
+        answer = await flow.post(f"{BASE}/gibt-es-nicht/layout/preview", json=body)
+        assert answer.status_code == 404, answer.text
+    limited = await flow.post(f"{BASE}/gibt-es-nicht/layout/preview", json=body)
+    assert limited.status_code == 429 and "Zu viele Vorschau-Anfragen" in limited.json()["detail"]
+    flow.act_as(who["club-admin"])
+    assert (await flow.post(f"{BASE}/gibt-es-nicht/layout/preview", json=body)).status_code == 404, "je Konto"

@@ -11,7 +11,9 @@ from __future__ import annotations
 
 from typing import Literal
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
+import os
+
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, UploadFile
 from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel, Field, StrictInt
 
@@ -20,6 +22,7 @@ from database import get_db
 from services import shop_catalog_search, shop_catalog_sync, shop_designs, shop_print_files, shop_products
 from services import shop_print_templates as print_templates
 from services.image_upload import _read_upload_limited
+from services.rate_limit import enforce_rate_limit
 from services.printful_client import PrintfulClient
 from services.shop_common import ShopConflict, ShopError
 from services.shop_fulfillment import FulfillmentError
@@ -177,10 +180,32 @@ async def set_layout(product_id: str, body: Layout, me: dict = Depends(require_a
     return await _view(product_id)
 
 
+def _env_int(name: str, default: int, low: int, high: int) -> int:
+    try:
+        value = int(os.environ.get(name, str(default)))
+    except (TypeError, ValueError):
+        return default
+    return value if low <= value <= high else default
+
+
+def preview_limit() -> tuple[int, int]:
+    """Wie oft die Vorschau für einen ungespeicherten Aufbau je Konto gerechnet wird: Aufrufe je Zeitfenster (Sekunden).
+    ``SHOP_LAYOUT_PREVIEW_LIMIT`` (Vorgabe 60) und ``SHOP_LAYOUT_PREVIEW_WINDOW_SECONDS`` (Vorgabe 60)."""
+    return (_env_int("SHOP_LAYOUT_PREVIEW_LIMIT", 60, 1, 10_000),
+            _env_int("SHOP_LAYOUT_PREVIEW_WINDOW_SECONDS", 60, 1, 86_400))
+
+
+PREVIEW_BUSY = "Zu viele Vorschau-Anfragen. Bitte warte noch {wait}."
+
+
 @router.post("/products/{product_id}/layout/preview")
-async def preview_layout(product_id: str, body: Layout, me: dict = Depends(require_area("finance"))):
+async def preview_layout(product_id: str, body: Layout, request: Request, me: dict = Depends(require_area("finance"))):
     """Pläne für den ungespeicherten Aufbau aus Schritt 3 - die Vorschau zeigt so genau die Fassung, die der Server je
-    Shirtfarbe drucken würde. Speichert nichts, schreibt nichts ins Protokoll."""
+    Shirtfarbe drucken würde. Speichert nichts, schreibt nichts ins Protokoll. Je Konto gedrosselt (``preview_limit``),
+    darüber 429."""
+    limit, window = preview_limit()
+    await enforce_rate_limit(request, "shop:layout-preview", limit=limit, window_seconds=window, subject=me["id"],
+                             message=PREVIEW_BUSY)
     placements = []
     for item in body.placements:
         row = item.model_dump(exclude_none=True)

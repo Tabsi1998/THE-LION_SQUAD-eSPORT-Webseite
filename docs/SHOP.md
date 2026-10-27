@@ -526,7 +526,7 @@ Produkts.
 | `PUT /api/admin/shop/products/{id}/offer` | Schritt 2: Technik, Farben, Größen - danach Preise |
 | `GET /api/admin/shop/printful-catalog` | Schritt 1: Produktsuche (`q`, `category_id`, `link`, `refresh`, #2069) |
 | `PUT /api/admin/shop/products/{id}/layout` | Schritt 3: Druckflächen mit Motiv, Vorgabe, Größe und Platzhaltern, Fläche im Grundpreis (#2069) |
-| `POST /api/admin/shop/products/{id}/layout/preview` | Schritt 3: Pläne für den ungespeicherten Aufbau (Fassung je Farbe, Bild, Rahmen) - speichert nichts (#2069) |
+| `POST /api/admin/shop/products/{id}/layout/preview` | Schritt 3: Pläne für den ungespeicherten Aufbau (Fassung je Farbe, Bild, Rahmen) - speichert nichts; je Konto höchstens `SHOP_LAYOUT_PREVIEW_LIMIT` Aufrufe (Vorgabe 60) je `SHOP_LAYOUT_PREVIEW_WINDOW_SECONDS` (Vorgabe 60 s), darüber 429 (#2069) |
 | `POST /api/admin/shop/products/{id}/print-files` | Schritt 3: Druckdateien erzeugen (#2069) |
 | `POST /api/admin/shop/products/{id}/print-templates/refresh` | Druckvorlagen neu von Printful (#2069) |
 | `GET /api/admin/shop/products/{id}/preview` | Vorschau einer Fläche je Farbe als PNG (#2069) |
@@ -634,7 +634,7 @@ docker compose exec backend python scripts/shop_print_layout.py --abbauen --anwe
 
 Ein Produkt ohne gespeicherte Vorlage überspringt das Werkzeug (erst abgleichen). Der Stand eines Produkts bleibt.
 Lässt sich auch nur **eine** alte Platzierung nicht abbilden, ist das ganze Produkt **nicht bestellbar** (fail-closed):
-`place_order` sagt nur „Dieses Produkt ist gerade nicht bestellbar.“, die Vorab-Prüfung zeigt den Punkt „Druckflächen
+`place_order` sagt nur „Dieses Produkt ist gerade nicht bestellbar.“ (ebenso bei fehlender Druckvorlage, unpassendem Aufbau oder veralteter Druckdatei - die Einzelheiten stehen nur im Log und in der Vorab-Prüfung), die Vorab-Prüfung zeigt den Punkt „Druckflächen
 umgestellt“ rot mit Fläche und Grund, bis Schritt 3 neu gespeichert ist.
 
 ### Generator und Ablage
