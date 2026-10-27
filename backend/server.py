@@ -525,7 +525,10 @@ async def security_headers(request, call_next):
     response = await call_next(request)
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "SAMEORIGIN"
-    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    # Strengere Regel einer Route bleibt stehen: Adressen mit Schlüssel im Pfad (Kalender-Link #1189, Druckdateien
+    # #1708) sagen „no-referrer“, sonst ginge der Schlüssel als Referer weiter.
+    if "referrer-policy" not in response.headers:
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
     response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
     if request.url.scheme == "https":
         response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"

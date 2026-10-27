@@ -37,6 +37,8 @@ async def test_a_new_file_is_a_new_version_with_a_new_address_and_the_old_one_st
         assert answer.status_code == 200
         assert answer.headers["content-type"] == "image/png"
         assert answer.headers["x-content-type-options"] == "nosniff"
+        # Die Adresse ist das Geheimnis: sie darf nie als Referer weitergehen - die Middleware lässt das stehen.
+        assert answer.headers.get_list("referrer-policy") == ["no-referrer"]
         assert hashlib.sha256(answer.content).hexdigest() == item["sha256"]
 
 
