@@ -1,5 +1,28 @@
 # Changelog
 
+## 1.44.0 (27.10.2026)
+
+### Neu
+
+* Vereinsshop: die Website erzeugt die Druckdateien je Fläche und Shirtfarbe selbst, scharf aus dem SVG (#2069)
+* Vereinsshop: Druckflächen je Produkt direkt aus den Printful-Vorlagen - Position und Größe in cm, Live-Vorschau (#2069)
+* Vereinsshop: Hinweis an der Motiv-Karte, wenn nur eine Fassung ersetzt wurde (#2084)
+* Vereinsshop: Motiv als Paar (hell + dunkel) in einem Schritt hochladen - Zuordnung automatisch, Tauschen möglich (#2084)
+* Vereinsshop: Paar-Prüfung mit Ampel - Format, Umriss, Lage und Kontrast, Problemstellen markiert (#2084)
+* Vereinsshop: Produkte im Printful-Katalog suchen statt Nummer eintippen (#2069)
+
+### Fehlerbehebungen
+
+* Betrieb: Auto-Checks stehen je Zustand in den Ereignissen statt alle 5 Minuten (#2080)
+* Betrieb: Checks Speicher und Bildvarianten sagen, was zu tun ist; Bildvarianten ohne Fehlalarm bei kleinen Bildern (#2080)
+* Betrieb: roter Check meldet sich beim Wechsel und erinnert bei Dauer-Rot alle 24 Stunden, ohne Alarm-Spam bei Ausfällen (#2080)
+* Fehlender oder verweigerter Ton bleibt still statt Fehler im App-Log (#2080)
+* Fehlermeldungen zeigen den Grund des Servers statt „Request failed with status code …“
+* Nach einem Update lädt ein veralteter Tab einmal neu statt Fehlerseite (#2080)
+* Uploads über den eigenen Upload-Host (z. B. Shop-Motive) scheitern nicht mehr mit „Network Error“
+* Uploads über den eigenen Upload-Host werden nicht mehr mit „Invalid host header“ abgelehnt
+* Vereinsshop: ein Produkt mit unpassender Druckfläche ist gesperrt statt mit fehlendem Druck bestellbar (#2069)
+
 ## 1.43.0 (27.10.2026)
 
 ### Neu
