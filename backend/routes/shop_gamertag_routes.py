@@ -27,7 +27,7 @@ class NameBody(BaseModel):
 
 
 class TestFileBody(NameBody):
-    reason: str = Field(..., min_length=3, max_length=500)
+    reason: str = Field("", max_length=500)  # optional (Entscheidung Obmann 27.10.2026)
 
 
 class ColorBody(BaseModel):
@@ -42,7 +42,7 @@ class ColorBody(BaseModel):
 class RulesUpdate(BaseModel):
     model_config = {"extra": "forbid"}
 
-    reason: str = Field(..., min_length=3, max_length=500)
+    reason: str = Field("", max_length=500)  # optional (Entscheidung Obmann 27.10.2026)
     font: str | None = Field(None, max_length=40)
     height_mode: str | None = Field(None, max_length=10)
     text_height_in: float | None = None

@@ -59,9 +59,9 @@ function Field({ label, hint, children }) {
 function ReasonInput({ id, value, onChange, disabled }) {
   return (
     <>
-      <label className="sr-only" htmlFor={id}>Grund</label>
+      <label className="sr-only" htmlFor={id}>Grund (optional)</label>
       <input id={id} value={value} onChange={(event) => onChange(event.target.value)} maxLength={500} disabled={disabled}
-        placeholder="Grund (kommt ins Protokoll)" className={`${INPUT} mt-0 flex-1`} data-testid={id} />
+        placeholder="Grund (optional, kommt ins Protokoll)" className={`${INPUT} mt-0 flex-1`} data-testid={id} />
     </>
   );
 }
@@ -134,7 +134,7 @@ function TestName({ data, onStored }) {
     return () => clearTimeout(timer);
   }, [text, color, data.rules]);
 
-  const ready = !!result && reason.trim().length >= 3 && !saving;
+  const ready = !!result && !saving;
   const save = async (event) => {
     event.preventDefault();
     if (!ready) return;
@@ -239,7 +239,7 @@ function RulesForm({ data, busy, onSave }) {
   const set = (key, value) => setValues((now) => ({ ...now, [key]: value }));
   const payload = toPayload(values);
   const numbersValid = NUMBER_FIELDS.every((field) => Number.isFinite(payload[field.key]) && payload[field.key] > 0);
-  const ready = numbersValid && reason.trim().length >= 3 && !busy;
+  const ready = numbersValid && !busy;
   const select = (key, label, options) => (
     <Field label={label}>
       <select value={values[key]} onChange={(event) => set(key, event.target.value)} className={INPUT} data-testid={`shop-gamertag-rule-${key}`}>
