@@ -7,6 +7,7 @@ from database import get_db
 from services.permissions import is_confirmed_admin_role, is_confirmed_tournament_lead
 from models import now_utc
 from services.public_phase import derive_public_phase
+from services.league_scope import league_label
 from services.visibility import user_can_see
 from services.visibility import lead_can_see
 from services.query_filters import safe_regex
@@ -52,7 +53,8 @@ async def _search_tournaments(db, pattern: str, user: dict | None, limit: int) -
     }
     rows = await db.tournaments.find(
         query,
-        {"_id": 0, "id": 1, "title": 1, "slug": 1, "description": 1, "status": 1, "visibility": 1, "is_public": 1, "start_date": 1, "banner_url": 1},
+        {"_id": 0, "id": 1, "title": 1, "slug": 1, "description": 1, "status": 1, "visibility": 1, "is_public": 1, "start_date": 1, "banner_url": 1,
+         "league_context": 1},
     ).sort("created_at", -1).to_list(limit * 3)
     out = []
     is_staff = is_confirmed_tournament_lead(user)
@@ -62,11 +64,14 @@ async def _search_tournaments(db, pattern: str, user: dict | None, limit: int) -
         if not await lead_can_see(user, row.get("visibility") or "public"):
             continue
         phase = derive_public_phase(row, "tournament")
+        status_label = phase.get("label") or row.get("status")
+        # Liga (docs/LIGA.md): eine Staffel gekennzeichnet - „Liga · Staffel A · Läuft“.
+        label = league_label(row)
         out.append(_result(
             "tournament",
             row.get("title") or "Turnier",
             f"/tournaments/{row.get('slug') or row.get('id')}",
-            subtitle=phase.get("label") or row.get("status"),
+            subtitle=" · ".join(part for part in (label, status_label) if part) or None,
             date=row.get("start_date"),
             image=row.get("banner_url"),
         ))

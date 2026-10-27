@@ -394,8 +394,9 @@ async def _latest_news(user: dict | None) -> list[dict]:
 async def _public_upcoming(user: dict | None) -> dict:
     db = get_db()
     now = now_utc()
+    # Liga-Staffeln (docs/LIGA.md, Abschnitt 7) nicht unter „Demnächst“; wer mitspielt, sieht sie unter „Meine“.
     tournaments = await db.tournaments.find(
-        {"status": {"$nin": list(HIDDEN_PUBLIC_STATUSES)}, "is_public": {"$ne": False}},
+        {"status": {"$nin": list(HIDDEN_PUBLIC_STATUSES)}, "is_public": {"$ne": False}, "league_context": None},
         {"_id": 0},
     ).sort("start_date", 1).to_list(80)
     events = await db.events.find(

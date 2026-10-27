@@ -21,6 +21,7 @@ from services.competition_versions import persist_competition_versions
 from services.tv_display import ROUND_SPONSOR_MAX, pause_until_value, round_sponsor_rows
 from models import now_utc
 from services.log_safe import log_safe
+from services.league_scope import is_league_staffel
 from services.change_events import reset_scope_cache
 from services.public_phase import parse_dt
 from routes.tournament_common import (
@@ -435,8 +436,11 @@ async def set_status(tid: str, body: dict, me: dict = Depends(get_current_user),
             # Source type by season weight: <=1.5 mini, <=2.5 normal, else major
             weight = float(t.get("season_weight") or 2.0)
             source_type = "mini" if weight < 1.5 else ("major" if weight >= 2.5 else "tournament")
+            # Liga-Staffeln (docs/LIGA.md, Abschnitt 7) zählen nicht für die Jahreswertung - ausdrücklich, nicht über
+            # season_weight=0 (``or 2.0`` machte daraus sonst wieder 2).
+            league_staffel = is_league_staffel(t)
             for p in placements:
-                if not (p.get("user_id") or p.get("team_id")):
+                if league_staffel or not (p.get("user_id") or p.get("team_id")):
                     continue
                 await award_points(
                     user_id=p.get("user_id"),
@@ -450,6 +454,8 @@ async def set_status(tid: str, body: dict, me: dict = Depends(get_current_user),
                 )
             # Participation points for everyone else
             for r in regs:
+                if league_staffel:
+                    break
                 if r.get("id") not in placed_reg_ids and (r.get("user_id") or r.get("team_id")):
                     await award_points(
                         user_id=r.get("user_id"), team_id=r.get("team_id"), source_type=source_type, source_id=tid,
