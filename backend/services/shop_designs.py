@@ -494,7 +494,9 @@ async def create_profile(db, design_key: str, *, title: Any, placement: str, gar
 PROFILE_FIELDS = ("title", "garment_colors", "note", "color_variants")
 # Fassungen eines Motivs (#2069): für dunkle Shirts (Hauptdatei) und für helle Shirts. Mehr dazu in shop_motifs.py.
 VARIANTS = ("dark", "light")
-MAX_EXCEPTIONS = 40
+# Deckt jede Farbe eines Produkts (höchstens 80 angebotene Varianten, shop_products.MAX_OFFERED_VARIANTS) und die
+# bisherigen Zuordnungen mehrerer Produkte zu einem Motiv; Migration 14 kappt nie.
+MAX_EXCEPTIONS = 200
 
 
 def clean_exceptions(raw: Any) -> list[dict]:

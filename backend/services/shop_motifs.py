@@ -285,13 +285,24 @@ async def resolve(db, motif_key: str, variant: str) -> dict | None:
 
 async def file_for_garment(db, motif_key: str, *, color: Any, color_hex: Any) -> dict | None:
     """Die Druckdatei-Fassung eines Motivs für eine Shirtfarbe (Bestellung, Vorab-Prüfung der Produktverwaltung):
-    Ausnahme des Motivs, sonst Helligkeit; ohne Farbwert die Hauptdatei wie vor #2069. ``None``, wenn die passende
-    Fassung fehlt - dann ist die Farbe nicht bestellbar."""
+    Ausnahme des Motivs, sonst Helligkeit; ohne Farbwert die Hauptdatei wie vor #2069.
+
+    Wurde für ein Motiv **noch nie** eine Fassung für helle Shirts erzeugt (Designs aus der Zeit vor #2069, auch bevor
+    Migration 14 fertig ist), druckt es wie bisher die Hauptdatei - statt die Bestellung scheitern zu lassen. Sonst
+    ``None``, wenn die passende Fassung fehlt (etwa ein PNG, das sich nicht umfärben ließ) - dann ist die Farbe nicht
+    bestellbar."""
     profile = await shop_designs.get_profile(db, motif_key)
     settings = await load_settings(db)
     variant = variant_for_garment(color_hex, color=color, threshold=settings["threshold"],
                                   exceptions=exceptions_of(profile)) or "dark"
+    if variant == "light" and _never_had_light(profile):
+        variant = "dark"
     return await resolve(db, motif_key, variant)
+
+
+def _never_had_light(profile: dict | None) -> bool:
+    profile = profile or {}
+    return profile.get("light_mode") != "file" and not profile.get("light_auto")
 
 
 def exceptions_of(profile: dict | None) -> list[dict]:
@@ -607,34 +618,47 @@ async def plan(db) -> dict:
     legacy = await _legacy_exceptions(db)
     pending = [profile["design_key"] async for profile in db.shop_design_profiles.find(
         {"light_mode": {"$exists": False}}, {"_id": 0, "design_key": 1})]
+    exceptions = {key: legacy[key] for key in sorted(pending) if legacy.get(key)}
     return {
         "versions_without_variant": await db.shop_designs.count_documents({"variant": {"$exists": False}}),
         "motifs_without_mode": len(pending),
-        "exceptions": {key: legacy[key] for key in sorted(pending) if legacy.get(key)},
+        "exceptions": exceptions,
+        # Mehr Ausnahmen, als der Admin je Motiv speichern kann: die Migration übernimmt trotzdem alle (sie kappt nie),
+        # aber der Bericht nennt das Motiv - dort zuerst aufräumen, bevor jemand die Ausnahmen ändert.
+        "over_limit": {key: len(colors) for key, colors in exceptions.items() if len(colors) > MAX_EXCEPTIONS},
         "light_versions": await db.shop_designs.count_documents({"variant": "light"}),
         "svg_versions": await db.shop_designs.count_documents({"source_format": "SVG"}),
     }
 
 
 async def apply(db) -> str:
-    """Bestehende Fassungen sind Hauptdateien („für dunkle Shirts“); bestehende Designs bekommen „Hell-Variante
-    automatisch“ und ihre festen Farben als Ausnahme „dunkel“ - so druckt jede bisher zugeordnete Farbe weiter die
-    Datei, die sie bisher hatte. Mehrfach aufrufbar; nur, was noch fehlt."""
-    marked = await db.shop_designs.update_many({"variant": {"$exists": False}}, {"$set": {"variant": "dark"}})
+    """Bestehende Designs bekommen „Hell-Variante automatisch“ und ihre festen Farben als Ausnahme „dunkel“ - so
+    druckt jede bisher zugeordnete Farbe weiter die Datei, die sie bisher hatte. **Erst danach** werden bestehende
+    Fassungen als Hauptdateien („für dunkle Shirts“) markiert. Dazwischen und davor druckt ein Motiv ohne erzeugte
+    Hell-Fassung ohnehin die Hauptdatei (``file_for_garment``). Übernommen wird jede Zuordnung, nie gekappt.
+    Mehrfach aufrufbar; nur, was noch fehlt."""
     legacy = await _legacy_exceptions(db)
     motifs = exceptions = 0
+    over: list[str] = []
     async for profile in db.shop_design_profiles.find({"light_mode": {"$exists": False}}, {"_id": 0}):
         taken = list(profile.get("color_variants") or [])
         names = {_color_key(item.get("color")) for item in taken}
         for color in legacy.get(profile["design_key"], []):
-            if _color_key(color) not in names and len(taken) < MAX_EXCEPTIONS:
+            if _color_key(color) not in names:
+                names.add(_color_key(color))
                 taken.append({"color": color, "variant": "dark"})
                 exceptions += 1
+        if len(taken) > MAX_EXCEPTIONS:
+            over.append(profile["design_key"])
+            logger.warning("[shop-motifs] Migration 14: %s hat %s Ausnahmen (Grenze im Admin %s) - alle übernommen",
+                           profile["design_key"], len(taken), MAX_EXCEPTIONS)
         await db.shop_design_profiles.update_one({"design_key": profile["design_key"]},
                                                  {"$set": {"light_mode": "auto", "color_variants": taken}})
         motifs += 1
-    return (f"{getattr(marked, 'modified_count', 0)} versions marked dark, {motifs} motifs prepared, "
-            f"{exceptions} colour exceptions kept")
+    marked = await db.shop_designs.update_many({"variant": {"$exists": False}}, {"$set": {"variant": "dark"}})
+    result = (f"{getattr(marked, 'modified_count', 0)} versions marked dark, {motifs} motifs prepared, "
+              f"{exceptions} colour exceptions kept")
+    return result + (f", over the admin limit: {', '.join(over)}" if over else "")
 
 
 async def rollback(db, *, apply: bool = False) -> dict:
@@ -667,6 +691,9 @@ def render_text(report: dict, *, way_back: dict | None = None) -> str:
     lines.append(f"  offen   {report['motifs_without_mode']} Designs ohne Einstellung „Hell-Variante“")
     for key, colors in report["exceptions"].items():
         lines.append(f"  Ausnahme {key}: {', '.join(colors)} → Hauptdatei (wie bisher)")
+    for key, count in report.get("over_limit", {}).items():
+        lines.append(f"  ACHTUNG {key}: {count} Ausnahmen, im Admin sind höchstens {MAX_EXCEPTIONS} speicherbar - "
+                     "die Migration übernimmt alle; vor dem nächsten Ändern dort aufräumen")
     lines.append(f"  Daten   {report['light_versions']} Fassungen für helle Shirts, {report['svg_versions']} aus SVG")
     if way_back is not None:
         if way_back["blocked_by"]:

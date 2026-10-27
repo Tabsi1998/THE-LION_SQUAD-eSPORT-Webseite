@@ -374,8 +374,10 @@ Benutzer laden weiter nur PNG/JPG (Bild-Uploads ohne SVG, [BETRIEB.md](BETRIEB.m
 Shirtfarben `garment_colors` mit der Hauptdatei), sonst die **relative Luminanz** des Printful-Farbwerts
 (`color_code`) gegen die Schwelle (Vorgabe 0,18 - darunter Schwarz, Navy, Rot, Royal; darüber Weiß, Grau meliert,
 Gelb). Ohne Farbwert und ohne Ausnahme gilt die Hauptdatei wie vor #2069. `file_for_garment(db, motiv, color=…,
-color_hex=…)` liefert die Version - die Bestellung (`shop_orders`) friert genau diese ein, die Vorab-Prüfung der
-Produktverwaltung prüft genau diese; fehlt sie, ist die Farbe nicht bestellbar.
+color_hex=…)` liefert die Version - die Bestellung (`shop_orders`, mit Platzierungen wie über die ältere
+Einzel-Druckdatei `design_key`) friert genau diese ein, die Vorab-Prüfung der Produktverwaltung prüft genau diese.
+Wurde für ein Motiv noch nie eine Fassung für helle Shirts erzeugt (Designs von vor #2069), druckt es wie bisher die
+Hauptdatei; sonst ist eine Farbe ohne passende Fassung nicht bestellbar.
 
 **Einstellungen** (Dokument `settings` mit `id = "shop_motifs"`, Protokoll `shop.motif.settings` mit
 vorher/nachher): Ersatzfarbe `light_ink` (`#rrggbb`, nicht Weiß) und Schwelle `threshold` (0,02 bis 0,9). Eine neue
@@ -407,10 +409,14 @@ die Einstellungen mit Beispiel-Shirtfarben. Der Grund ist überall optional.
 
 **Migration 14 `shop_motif_variants`** (läuft beim Start einmal; seit #2065 können in Produktion Designs liegen):
 
-- Fassungen ohne Variante werden „für dunkle Shirts“; Designs bekommen „Hell-Variante automatisch“.
-- Die bisherigen festen Zuordnungen - die Farbliste eines Designs und jede Zelle „Farbe → Design“ in den Produkten -
-  werden **Ausnahmen „Hauptdatei“**: jede bisher zugeordnete Farbe druckt weiter die Datei, die sie hatte, auch eine
-  helle Farbe. Neue automatische Fassungen entstehen nicht von selbst; „Hell-Variante erzeugen“ am Motiv.
+- Zuerst bekommen Designs „Hell-Variante automatisch“, und die bisherigen festen Zuordnungen - die Farbliste eines
+  Designs und jede Zelle „Farbe → Design“ in den Produkten - werden **Ausnahmen „Hauptdatei“**: jede bisher zugeordnete
+  Farbe druckt weiter die Datei, die sie hatte, auch eine helle Farbe. Erst danach werden Fassungen ohne Variante „für
+  dunkle Shirts“. Vor und während der Migration druckt ein Design ohne erzeugte Hell-Fassung ohnehin die Hauptdatei -
+  eine Bestellung im Zwischenstand scheitert nicht.
+- Übernommen wird jede Zuordnung, **nie gekappt**. Im Admin sind je Motiv bis zu 200 Ausnahmen speicherbar (ein Produkt
+  hat höchstens 80 Varianten); hat ein Motiv aus mehreren Produkten mehr, nennt der Trockenlauf es mit „ACHTUNG“.
+- Neue automatische Fassungen entstehen nicht von selbst; „Hell-Variante erzeugen“ am Motiv.
 - Mehrfach aufrufbar. Werkzeug mit Trockenlauf und Rückweg:
 
 ```bash

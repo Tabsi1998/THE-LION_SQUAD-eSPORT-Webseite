@@ -126,7 +126,9 @@ async def _freeze_line(db, line: dict, position: int, buyer_kind: str, config: d
     design = next(({key: row[key] for key in ("design_key", "version", "sha256")} for row in designs
                    if row["design_key"]), None)
     if not product.get("placements") and product.get("design_key"):
-        latest = await shop_catalog.latest_design(db, product["design_key"])
+        # Auch hier die Fassung für die Shirtfarbe (#2069) - nicht immer die Hauptdatei.
+        latest = await shop_motifs.file_for_garment(db, product["design_key"], color=variant.get("color"),
+                                                    color_hex=variant.get("color_code"))
         if not latest:
             raise ShopError(f"Position {position}: zur Druckdatei gibt es noch keine Fassung.")
         design = {"design_key": latest["design_key"], "version": latest["version"], "sha256": latest["sha256"]}

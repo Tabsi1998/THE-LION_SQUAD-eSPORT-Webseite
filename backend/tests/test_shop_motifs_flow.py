@@ -431,3 +431,91 @@ async def test_the_way_back_refuses_while_light_versions_exist_and_the_tool_read
     assert "Fassungen für helle Shirts" in capsys.readouterr().out
     assert await cli.main(["--abbauen", "--anwenden"], db=flow.db) == 1
     assert "Rückweg verweigert" in capsys.readouterr().out
+
+
+# ---------------------------------------------------------------- Bestellungen: dieselbe Fassung, auch im Zwischenstand
+
+ADDRESS = {"street": "Probegasse 1", "zip": "1010", "city": "Wien", "country": "AT"}
+
+
+async def order_for(db, variant: dict, key: str) -> dict:
+    from services import shop_orders
+
+    order, _ = await shop_orders.place_order(
+        db, user_id="konto-test", idempotency_key=key, buyer_kind="member",
+        lines=[{"variant_id": variant["id"], "quantity": 1}], shipping_estimate_cents=590,
+        billing_address={"name": "Testperson", "source": "dolibarr", **ADDRESS},
+        shipping_address={"recipient": "Testperson", "source": "checkout", **ADDRESS}, actor_id="konto-test")
+    [item] = await shop_orders.items_for(db, order["id"])
+    return item
+
+
+async def shirt(db, slug: str, colours: list[tuple[str, str]], **fields) -> list[dict]:
+    from services import shop_catalog
+    from shop_testdata import publish_unchecked
+
+    by = {"actor_id": "test", "reason": "Testdaten"}
+    product = await shop_catalog.create_product(db, {"slug": slug, "title": slug, "base_price_cents": 2000, **fields},
+                                                **by)
+    variants = []
+    for colour, hex_value in colours:
+        variant = await shop_catalog.create_variant(db, product["id"], {
+            "sku": f"{slug}-{colour}".upper(), "label": colour, "color": colour}, **by)
+        # Der Farbwert kommt sonst aus dem Printful-Katalog (#1707).
+        await db.shop_variants.update_one({"id": variant["id"]}, {"$set": {"color_code": hex_value}})
+        variants.append({**variant, "color_code": hex_value})
+    await publish_unchecked(db, product["id"])
+    return variants
+
+
+@pytest.mark.asyncio
+async def test_a_product_without_placements_freezes_the_version_for_the_shirt_colour(flow):
+    await finance(flow)
+    assert (await upload_svg(flow, **MOTIF)).status_code == 200
+    black, white = await shirt(flow.db, "loewe", [("Black", "#0c0c0c"), ("White", "#ffffff")], design_key="loewe")
+    assert (await order_for(flow.db, black, "motiv-0001"))["design"]["version"] == 1
+    on_white = (await order_for(flow.db, white, "motiv-0002"))["design"]
+    light = await flow.db.shop_designs.find_one({"design_key": "loewe", "version": 2}, {"_id": 0})
+    assert light["variant"] == "light" and (on_white["version"], on_white["sha256"]) == (2, light["sha256"])
+
+
+@pytest.mark.asyncio
+async def test_orders_keep_printing_the_main_file_before_and_during_migration_14(flow):
+    """Ein Design aus #1708, einer hellen Farbe zugeordnet, die nicht in seiner Farbliste steht: vor, während und nach
+    Migration 14 druckt die Bestellung die Hauptdatei - nie ein Fehler „keine Fassung“."""
+    from services import shop_motifs
+
+    db = flow.db
+    await legacy(db)
+    [sand] = await shirt(db, "sand-shirt", [("Sand", "#e0d6c0")])
+    await db.shop_products.update_one({"slug": "sand-shirt"}, {"$set": {"placements": [
+        {"key": "front_right", "kind": "design", "printful_placement": "front", "position": {},
+         "designs": [{"color": "Sand", "design_key": "loewe-schwarz"}]}]}})
+
+    before = await order_for(db, sand, "zwischen-0001")
+    assert before["designs"][0]["version"] == 1 and before["designs"][0]["sha256"] == "b" * 64
+    # Zwischenstand: die Ausnahmen stehen, die Fassungen tragen noch keine Variante.
+    await db.shop_design_profiles.update_many({}, {"$set": {"light_mode": "auto"}})
+    assert (await order_for(db, sand, "zwischen-0002"))["designs"][0]["version"] == 1
+    await shop_motifs.apply(db)
+    assert (await order_for(db, sand, "zwischen-0003"))["designs"][0]["version"] == 1
+
+
+@pytest.mark.asyncio
+async def test_migration_never_cuts_old_colour_assignments(flow):
+    from services import shop_motifs
+
+    db = flow.db
+    await legacy(db)
+    many = [{"color": f"Farbe {index}", "design_key": "loewe-weiss"} for index in range(shop_motifs.MAX_EXCEPTIONS + 5)]
+    await db.shop_products.insert_one({"id": "p2", "slug": "bunt", "title": "Bunt", "placements": [
+        {"key": "front_right", "kind": "design", "designs": many}]})
+    assert shop_motifs.MAX_EXCEPTIONS >= 80, "jede Farbe eines Produkts (höchstens 80 Varianten) passt"
+    report = await shop_motifs.plan(db)
+    expected = 3 + len(many)  # Schwarz, Navy, Black aus legacy() plus die vielen
+    assert report["over_limit"] == {"loewe-weiss": expected}
+    assert "ACHTUNG loewe-weiss" in shop_motifs.render_text(report)
+    result = await shop_motifs.apply(db)
+    assert "over the admin limit: loewe-weiss" in result
+    profile = await db.shop_design_profiles.find_one({"design_key": "loewe-weiss"}, {"_id": 0})
+    assert len(profile["color_variants"]) == expected, "nichts gekappt"
