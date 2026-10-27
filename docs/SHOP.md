@@ -23,6 +23,7 @@ die Sammlungen direkt. Jede Katalogänderung ist eine Adminaktion mit Person und
 | `shop_variants` | Variante eines Produkts: SKU, Bezeichnung, Größe, Farbe, eigener Preis (sonst der des Produkts), aktiv, `version` | `sku` |
 | `shop_designs` | Druckdatei des Vereins je Fassung: `design_key`, `version` (zählt hoch), `file_ref`, `sha256`, Druckposition; seit #1708 dazu `public_id` (Zufallsschlüssel der öffentlichen Adresse), Pixel, DPI und Druckmaße in Zoll, mit denen sie geprüft wurde, Transparenz, Ausgangsformat und `public_disabled_at` (Aufbewahrung). Alte Fassungen bleiben | `design_key` + `version`; `public_id` |
 | `shop_design_profiles` | Design (#1708): Titel, Platzierung und die **Shirtfarben**, für die es gilt (`garment_colors`), Notiz, `version` | `design_key` |
+| `shop_design_colors` | Belegung einer Shirtfarbe je Platzierung durch ein Design (#1708): `placement`, `color_key` (kleingeschrieben), `color`, `design_key` - macht „eine Farbe, ein Design“ atomar | `placement` + `color_key` |
 | `shop_printful_variants` | Zuordnung Variante → Printful-Variante und -Produkt (Anbieter `printful`) | `provider` + `variant_id` |
 | `shop_carts` | Warenkorb je Konto: Variante, Menge, Gamertag – keine Preise | `user_id` |
 | `shop_orders` | Bestellung mit allem Eingefrorenen (unten), Stand, Rechnungs- und Lieferanschrift, `printful_external_id` | `idempotency_key`, `printful_external_id` |
@@ -208,6 +209,9 @@ Finanzen.
 
 - Nur **PNG oder JPG**, höchstens 50 MB (`SHOP_DESIGN_MAX_MB`) und 40 Millionen Pixel. SVG (auch als `.png`
   getarnt), WebP, GIF, PDF, animierte PNG und 16-Bit-Graustufen werden mit Text abgelehnt.
+- **Limit am Eingang:** `services/body_limits.py` lehnt die Upload-Route mit 413 ab, sobald `Content-Length` mehr als
+  50 MB plus 256 KB Formular sagt - oder beim Mitzählen, wenn die Angabe fehlt -, bevor FastAPI etwas in eine
+  Zwischendatei schreibt. nginx begrenzt genau diese Route auf 51 MB (global sind 1700 MB für Videos erlaubt).
 - **Neu kodiert:** Pillow liest die Pixel, ein eingebettetes Farbprofil wird nach sRGB umgerechnet, dann entsteht aus
   den nackten Pixeln ein neues PNG. EXIF, GPS, Texte, Profile und Anhänge der Originaldatei kommen nicht mit; das
   Original wird nicht gespeichert. **Transparenz bleibt** (RGBA). Ein JPG wird zum PNG ohne Transparenz - die Seite
@@ -246,7 +250,11 @@ Platzierung; für eine andere Platzierung gibt es ein eigenes Design.
 - Schlüssel **und** Name müssen genau passen; sonst - auch bei abgeschalteter Version - dieselbe 404. Keine Liste,
   kein Verzeichnis, keine Aufzählung; der Schlüssel steht nicht im Protokoll.
 - Ausgeliefert wird nur die fertige Druckdatei als `image/png` mit `nosniff`, `no-store`, `noindex` und
-  `Content-Security-Policy: default-src 'none'; sandbox`.
+  `Content-Security-Policy: default-src 'none'; sandbox` und `Referrer-Policy: no-referrer` (die globale Middleware
+  überschreibt eine strengere Regel einer Route nicht mehr).
+- **Nicht in den Protokollen:** Uvicorns Zugriffsprotokoll kürzt den Pfad zu `/api/shop/print-files/***/…`
+  (`log_safe.SecretPathFilter`). nginx schreibt für diesen Pfad das Format `tls_redacted` (wie `main`, mit gekürzter
+  Anfragezeile) und Fehlerzeilen nur ab `crit`, weil nginx-Fehlerzeilen die volle Anfrage nennen.
 - Unabhängig von Stufe und Notschalter: Printful braucht die Dateien auch für Testentwürfe (#2062) und bestehende
   Bestellungen. Im Admin kopiert „Adresse für Printful“ die volle Adresse (`PUBLIC_BACKEND_URL`, `PUBLIC_BASE_URL`
   oder `FRONTEND_URL` davor). Hochladen zu Printful übernimmt der Adapter (#1705) über diese Adresse.
@@ -264,7 +272,8 @@ Platzierung; für eine andere Platzierung gibt es ein eigenes Design.
 
 **Shirtfarben.** Ein Design gilt für eine Liste von Shirtfarben (`garment_colors`, Schreibweise wie an den Varianten,
 Groß-/Kleinschreibung egal) - etwa `loewe-weiss` für Schwarz und Navy, `loewe-schwarz` für Weiß und Hellgrau. Je
-Platzierung gehört eine Farbe zu höchstens einem Design (sonst 409). Die Produktverwaltung (#1707) fragt
+Platzierung gehört eine Farbe zu höchstens einem Design (sonst 409) - atomar über `shop_design_colors` mit eindeutigem
+Index, auch bei zwei gleichzeitigen Änderungen. Die Produktverwaltung (#1707) fragt
 `shop_designs.design_for_color(db, platzierung, farbe)` und bekommt Design und neueste Version - oder `None`, dann ist
 die Variante ohne Druckdatei.
 
