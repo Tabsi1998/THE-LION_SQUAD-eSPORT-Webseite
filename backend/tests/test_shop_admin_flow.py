@@ -68,7 +68,7 @@ async def seeded_order(flow) -> dict:
     variant = await shop_catalog.create_variant(flow.db, product["id"], {"sku": "B-1", "label": "M"}, **BY)
     order, _ = await shop_orders.place_order(
         flow.db, user_id="konto-test", idempotency_key="flow-0001", buyer_kind="member",
-        lines=[{"variant_id": variant["id"], "quantity": 1}], shipping_cents=590,
+        lines=[{"variant_id": variant["id"], "quantity": 1}], shipping_estimate_cents=590,
         billing_address=dict(BILLING), shipping_address=dict(SHIPPING), actor_id="konto-test")
     return order
 

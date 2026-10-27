@@ -123,12 +123,45 @@ async def catalog(db, *, markup_cents=0):
     return variant
 
 
-async def place(db, variant, *, buyer_kind, key="bestellung-0001", shipping=None):
+async def place(db, variant, *, buyer_kind, key="bestellung-0001", shipping=None, estimate=590):
     order, _ = await shop_orders.place_order(
         db, user_id="konto-1", idempotency_key=key, buyer_kind=buyer_kind,
-        lines=[{"variant_id": variant["id"], "quantity": 2}], shipping_cents=590,
+        lines=[{"variant_id": variant["id"], "quantity": 2}], shipping_estimate_cents=estimate,
         billing_address=dict(BILLING), shipping_address=shipping or dict(SHIPPING), actor_id="konto-1")
     return order
+
+
+@pytest.mark.asyncio
+async def test_without_an_estimate_the_order_takes_the_fallback_and_freezes_it(db):
+    variant = await catalog(db)
+    await settle(db, fallback_shipping_cents=690)
+    order = await place(db, variant, buyer_kind="member", estimate=None)
+    assert order["frozen"]["shipping_cents"] == 690 and order["frozen"]["shipping_source"] == "fallback"
+    assert order["frozen"]["total_cents"] == 2 * 1890 + 690
+    # Eine spätere Pauschale wirkt nicht zurück.
+    await settle(db, fallback_shipping_cents=990)
+    assert (await shop_orders.get_order(db, order["id"]))["frozen"]["shipping_cents"] == 690
+
+
+@pytest.mark.asyncio
+async def test_without_an_estimate_and_without_a_fallback_there_is_no_order(db):
+    variant = await catalog(db)
+    with pytest.raises(ShopError, match="Versand"):
+        await place(db, variant, buyer_kind="member", estimate=None)
+    assert await db.shop_orders.count_documents({}) == 0
+    assert await db.shop_order_items.count_documents({}) == 0
+
+
+@pytest.mark.asyncio
+async def test_free_shipping_only_when_the_estimate_says_zero(db):
+    variant = await catalog(db)
+    await settle(db, fallback_shipping_cents=690)
+    order = await place(db, variant, buyer_kind="member", estimate=0)
+    assert order["frozen"]["shipping_cents"] == 0 and order["frozen"]["shipping_source"] == "estimate"
+    for junk in (-1, True, "590", 10_001):
+        with pytest.raises(ShopError, match="Versand"):
+            await place(db, variant, buyer_kind="member", key=f"falsch-{junk}-01", estimate=junk)
+
 
 
 @pytest.mark.asyncio

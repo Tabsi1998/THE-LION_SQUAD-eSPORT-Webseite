@@ -166,8 +166,10 @@ Shop), `shop_printful_probe.py` (Verbindungstest). Entscheidung des Obmanns vom 
   öffentliche Aufschlag ist ein fester Betrag je Artikel (Vorgabe 0, höchstens 100 €) und greift nur bei der Kaufart
   `public`; trägt ein Produkt einen eigenen Aufschlag, kommt der dazu. `place_order` friert den Betrag ein.
 - **Versand:** nur nach Österreich (`SHIPPING_COUNTRIES = ("AT",)`, `place_order` lehnt andere Lieferländer ab).
-  `shipping_cents(config, schätzung)` nimmt die Schätzung von Printful, sonst die **Ersatzpauschale**; fehlt auch die
-  (Vorgabe: keine), wird nicht bestellt – kein Versand zum Nulltarif.
+  Den Versand bestimmt `place_order` selbst: der Aufrufer gibt nur `shipping_estimate_cents` (die Schätzung von
+  Printful oder `None`), `shipping_cents(config, schätzung)` nimmt die Schätzung, sonst die **Ersatzpauschale**; fehlt
+  auch die (Vorgabe: keine), wird nicht bestellt – kein Versand zum Nulltarif. 0 € nur, wenn die Schätzung
+  ausdrücklich 0 ist. Eingefroren werden Betrag und Herkunft (`frozen.shipping_source`: `estimate` oder `fallback`).
 - **Printful-Zugang:** Schlüssel verschlüsselt mit `SETTINGS_ENCRYPTION_KEY` (`secret_store`), nie wieder angezeigt –
   nur „hinterlegt seit … von …“. Hinterlegen und Entfernen braucht zusätzlich den Bereich System. „Verbindung testen“
   ruft genau einmal lesend `GET https://api.printful.com/stores` auf und merkt sich Zeitpunkt, ja/nein und Ursache. Der

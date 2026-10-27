@@ -115,19 +115,24 @@ async def _freeze_line(db, line: dict, position: int, buyer_kind: str, config: d
     }
 
 
-async def place_order(db, *, user_id: str, idempotency_key: str, buyer_kind: str, lines: list, shipping_cents: int,
-                      billing_address: dict, shipping_address: dict, actor_id: str,
-                      payment_rules: dict | None = None) -> tuple[dict, bool]:
-    """Eine Bestellung anlegen und alles einfrieren. Liefert (Bestellung, neu angelegt)."""
+async def place_order(db, *, user_id: str, idempotency_key: str, buyer_kind: str, lines: list,
+                      shipping_estimate_cents: int | None, billing_address: dict, shipping_address: dict,
+                      actor_id: str, payment_rules: dict | None = None) -> tuple[dict, bool]:
+    """Eine Bestellung anlegen und alles einfrieren. Liefert (Bestellung, neu angelegt).
+
+    Den Versand bestimmt die Bestellung selbst (``shop_config.shipping_cents``): der Aufrufer gibt nur die Schätzung
+    von Printful oder ``None``. Ohne Schätzung gilt die Ersatzpauschale, fehlt auch die, wird nicht bestellt. 0 € Versand
+    nur, wenn die Schätzung ausdrücklich 0 ist."""
     if not user_id:
         raise ShopError("Ohne Konto keine Bestellung.")
     if not KEY.match(str(idempotency_key or "")):
         raise ShopError("Bestellschlüssel: 8 bis 128 Zeichen aus Buchstaben, Ziffern und _.:-")
     if buyer_kind not in BUYER_KINDS:
         raise ShopError("Unbekannte Art des Kaufs.")
-    if (isinstance(shipping_cents, bool) or not isinstance(shipping_cents, int)
-            or not 0 <= shipping_cents <= MAX_SHIPPING_CENTS):
-        raise ShopError("Versand: ganze Cent, nicht negativ.")
+    estimate = shipping_estimate_cents
+    if estimate is not None and (isinstance(estimate, bool) or not isinstance(estimate, int)
+                                 or not 0 <= estimate <= MAX_SHIPPING_CENTS):
+        raise ShopError("Versand: die Schätzung in ganzen Cent, nicht negativ - oder keine.")
     clean_lines = _lines(lines)
     billing = shop_common.billing_address(billing_address)
     shipping = shop_common.shipping_address(shipping_address)
@@ -135,14 +140,17 @@ async def place_order(db, *, user_id: str, idempotency_key: str, buyer_kind: str
     rules = _payment_rules(payment_rules)
     key = f"{user_id}:{idempotency_key}"
     request_hash = _request_hash({"user_id": user_id, "buyer_kind": buyer_kind, "lines": clean_lines,
-                                  "shipping_cents": shipping_cents, "billing": _without_stamp(billing),
+                                  "shipping_estimate_cents": estimate, "billing": _without_stamp(billing),
                                   "shipping": _without_stamp(shipping), "payment_rules": rules})
     existing = await _existing(db, key)
     if existing:
         return await _same_order(db, existing, request_hash)
 
-    # Die Einstellungen (Aufschlag) einmal lesen und mit einfrieren - eine spätere Änderung wirkt nicht zurück.
+    # Die Einstellungen (Aufschlag, Ersatzpauschale) einmal lesen und mit einfrieren - eine spätere Änderung wirkt nicht
+    # zurück.
     config = await shop_config.load(db)
+    shipping_cents = shop_config.shipping_cents(config, estimate)
+    shipping_source = "estimate" if estimate is not None else "fallback"
     items = [await _freeze_line(db, line, index, buyer_kind, config)
              for index, line in enumerate(clean_lines, start=1)]
     tax_profiles = {item["tax_profile"] for item in items}
@@ -152,7 +160,8 @@ async def place_order(db, *, user_id: str, idempotency_key: str, buyer_kind: str
     order = {
         "id": order_id, "user_id": user_id, "idempotency_key": key, "request_hash": request_hash, "status": "placed",
         "frozen": {"currency": "EUR", "items_cents": items_cents, "markup_cents": markup_cents,
-                   "shipping_cents": shipping_cents, "total_cents": items_cents + markup_cents + shipping_cents,
+                   "shipping_cents": shipping_cents, "shipping_source": shipping_source,
+                   "total_cents": items_cents + markup_cents + shipping_cents,
                    # Ein Steuerprofil je Bestellung; mischen Positionen verschiedene, bleibt es offen (#1701).
                    "tax_profile": next(iter(tax_profiles)) if len(tax_profiles) == 1 else None,
                    "buyer_kind": buyer_kind, "payment_rules": rules},
