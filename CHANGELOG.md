@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.39.0 (27.10.2026)
+
+### Neu
+
+* Vereinsshop: Gamertag als Druckdatei - feste Größe in Zoll und cm, Verkleinerung bei langen Namen, Wortfilter, Vorschau im Admin (#1711)
+
 ## 1.38.0 (27.10.2026)
 
 ### Neu
