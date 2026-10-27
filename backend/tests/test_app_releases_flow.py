@@ -4,6 +4,7 @@ sie mit Prüfsumme; alle anderen kommen nicht heran."""
 import hashlib
 import pathlib
 import sys
+from datetime import datetime, timezone
 
 import pytest
 import pytest_asyncio
@@ -206,8 +207,25 @@ async def test_guests_see_only_public_release_fields_with_short_public_cache(flo
     assert set((await flow.get("/api/mobile/app-version?build=62")).json()["current"]) == set(current)
 
 
+@pytest.fixture
+def frozen_rate_limit_clock(monkeypatch):
+    """Das Zählfenster (60 Sekunden, an der Uhr ausgerichtet) bleibt während des Tests dasselbe.
+
+    Sonst wurde der Test rot, wenn die 61 Abrufe über eine volle Minute liefen: im neuen Fenster zählt der Zähler
+    von vorn (#2054, in der CI mit parallelen Testprozessen gesehen).
+    """
+    import services.rate_limit as rate_limit
+
+    class FrozenClock(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return datetime(2026, 10, 27, 12, 0, 5, tzinfo=timezone.utc)
+
+    monkeypatch.setattr(rate_limit, "datetime", FrozenClock)
+
+
 @pytest.mark.asyncio
-async def test_app_version_is_rate_limited_per_address(flow):
+async def test_app_version_is_rate_limited_per_address(flow, frozen_rate_limit_clock):
     flow.act_as(None)
     answers = [await flow.get("/api/mobile/app-version?build=62") for _ in range(61)]
     assert [answer.status_code for answer in answers[:60]] == [200] * 60
