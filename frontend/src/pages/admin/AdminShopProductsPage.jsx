@@ -542,7 +542,7 @@ function PublishStep({ view, busy, run }) {
 
 function stepState(step, view) {
   const items = view.check.items.filter((item) => step.checks.includes(item.key));
-  if (items.every((item) => item.ok)) return "ok";
+  if (items.every((item) => item.ok)) return items.some((item) => item.state === "warn") ? "warn" : "ok";
   return items.some((item) => item.state === "open") && items.every((item) => item.ok || item.state === "open") ? "open" : "failed";
 }
 
