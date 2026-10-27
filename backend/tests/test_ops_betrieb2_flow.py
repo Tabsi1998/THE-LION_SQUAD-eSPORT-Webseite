@@ -259,8 +259,8 @@ async def _shift_alert_state(db, hours, *fields):
 
 @pytest.mark.asyncio
 async def test_a_red_alert_that_could_not_be_sent_is_tried_again(flow, monkeypatch):
-    """#2080 (Codex): Scheitert der Versand, gilt Rot nicht als gemeldet und der Claim der Sperrfrist wird
-    zurückgegeben - der nächste rote Lauf versucht es gleich erneut."""
+    """#2080 (Codex): Scheitert der Versand, gilt Rot nicht als gemeldet - der Claim der Sperrfrist wird zurückgegeben,
+    ein neuer Versuch kommt nach dem Mindestabstand (``retry_after``, 5 Minuten)."""
     import discord_service
 
     calls = []
@@ -276,8 +276,13 @@ async def test_a_red_alert_that_could_not_be_sent_is_tried_again(flow, monkeypat
     state = await flow.db.ops_alert_state.find_one({"key": "check:mail_queue"})
     assert state.get("check_status") != "crit", "nicht als gemeldet vermerkt"
     assert not state.get("last_sent_at"), "der Claim ist zurückgegeben"
+    assert state.get("retry_after"), "aber erst nach dem Mindestabstand wieder"
+    assert await ops_alerts.alert_red_checks(flow.db, _mail_queue_run("crit")) == []
+    await _shift_alert_state(flow.db, 1, "retry_after")
     assert await ops_alerts.alert_red_checks(flow.db, _mail_queue_run("crit")) == ["check:mail_queue"]
     assert len(calls) == 2 and "Mail-Queue ist rot" in calls[1]
+    state = await flow.db.ops_alert_state.find_one({"key": "check:mail_queue"})
+    assert not state.get("retry_after") and not state.get("failures"), "nach Erfolg beginnt der Abstand von vorn"
 
 
 @pytest.mark.asyncio
@@ -365,6 +370,80 @@ async def test_two_runs_at_once_send_a_red_alert_only_once(flow, discord_recorde
     await asyncio.gather(ops_alerts.alert_red_checks(race, _mail_queue_run("crit")),
                          ops_alerts.alert_red_checks(race, _mail_queue_run("crit")))
     assert len(discord_recorder) == 2, "eine Erinnerung, nicht zwei"
+
+
+@pytest.mark.asyncio
+async def test_a_broken_last_sent_value_does_not_block_the_claim(flow):
+    """#2080 (Codex): Ein kaputter oder anders getippter ``last_sent_at`` (Text, Zahl) sperrt den Schlüssel nicht für
+    immer - er gilt als „nie gesendet“."""
+    for junk in ("kaputt", 12345, {"am": "gestern"}):
+        await flow.db.ops_alert_state.delete_many({})
+        await flow.db.ops_alert_state.insert_one({"key": "error:x", "last_sent_at": junk})
+        claim = await ops_alerts.claim_alert(flow.db, "error:x")
+        assert claim is not None, junk
+        assert await ops_alerts.claim_alert(flow.db, "error:x") is None, "danach gilt die Sperrfrist wieder"
+
+
+@pytest.mark.asyncio
+async def test_a_failing_way_backs_off_instead_of_retrying_every_tick(flow, monkeypatch):
+    """#2080 (Codex): Scheitert ein eingerichteter Weg, kommt der nächste Versuch frühestens nach 5 Minuten, dann nach
+    10, 20 … bis zur Sperrfrist - für jede Alarmart. Drei Takte in zwei Minuten sind ein Versuch und ein Log-Eintrag."""
+    import discord_service
+
+    calls = []
+
+    async def broken(title, description="", **kwargs):
+        calls.append(title)
+        raise RuntimeError("Discord nicht erreichbar")
+
+    monkeypatch.setattr(discord_service, "send_ops_discord", broken)
+    for _ in range(3):
+        await ops_alerts.notify(flow.db, "job_failed", "Job X abgebrochen", key="job:x")
+    assert len(calls) == 1
+    assert await flow.db.ops_alert_log.count_documents({"key": "job:x"}) == 1
+
+    def minutes_until_retry(state):
+        from datetime import datetime
+
+        return (datetime.fromisoformat(state["retry_after"]) - now_utc()).total_seconds() / 60
+
+    state = await flow.db.ops_alert_state.find_one({"key": "job:x"})
+    assert 4 < minutes_until_retry(state) <= 5
+    await flow.db.ops_alert_state.update_one({"key": "job:x"}, {"$set": {"retry_after": (now_utc() - timedelta(seconds=1)).isoformat()}})
+    await ops_alerts.notify(flow.db, "job_failed", "Job X abgebrochen", key="job:x")
+    assert len(calls) == 2
+    state = await flow.db.ops_alert_state.find_one({"key": "job:x"})
+    assert 9 < minutes_until_retry(state) <= 10, "der Abstand wächst"
+    for _ in range(5):
+        await flow.db.ops_alert_state.update_one({"key": "job:x"}, {"$set": {"retry_after": (now_utc() - timedelta(seconds=1)).isoformat()}})
+        await ops_alerts.notify(flow.db, "job_failed", "Job X abgebrochen", key="job:x")
+    state = await flow.db.ops_alert_state.find_one({"key": "job:x"})
+    assert minutes_until_retry(state) <= 60, "höchstens die Sperrfrist"
+
+
+@pytest.mark.asyncio
+async def test_two_failed_attempts_at_once_log_only_once(flow, monkeypatch):
+    """#2080 (Codex): Der Merker „Fehlversuch schon im Log“ wird atomar vor dem Eintrag geholt - zwei Versuche zugleich,
+    die beide scheitern, schreiben einen Eintrag."""
+    import asyncio
+
+    import discord_service
+
+    barrier = asyncio.Barrier(2)
+
+    async def not_set_up(title, description="", **kwargs):
+        await asyncio.wait_for(barrier.wait(), 1)
+        return {"ok": False, "reason": "disabled"}
+
+    monkeypatch.setattr(discord_service, "send_ops_discord", not_set_up)
+
+    def gate():
+        return ops_alerts.claim_failure_log(flow.db, "check:db")
+
+    results = await asyncio.gather(*(ops_alerts.notify(flow.db, "check_red", "Datenbank ist rot", key="check:db", force=True, log_gate=gate)
+                                     for _ in range(2)))
+    assert [result["reason"] for result in results] == ["undeliverable", "undeliverable"]
+    assert await flow.db.ops_alert_log.count_documents({"key": "check:db"}) == 1
 
 
 @pytest.mark.asyncio

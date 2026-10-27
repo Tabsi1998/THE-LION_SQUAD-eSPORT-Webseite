@@ -133,8 +133,10 @@ Vorgabe: Discord an, E-Mail aus. **Sperrfrist:** je Schlüssel (eine Prüfung, e
 ein App-Fingerabdruck) meldet die Website höchstens einmal je Frist (Vorgabe 60 Minuten) – ein
 Dauerfehler flutet keinen Kanal. **Erinnerung bei Dauer-Rot** (Stunden, Vorgabe 24, 0 = aus): so lange
 wartet ein roter Auto-Check, bis er sich mit „weiterhin rot seit …“ wieder meldet (#2080). Die Sperrfrist wird
-atomar geholt – zwei Läufe zugleich melden nie doppelt; scheitert ein eingerichteter Weg, gibt der Lauf sie zurück, und
-der nächste Anlass versucht es gleich. Der **Testalarm** geht alle Wege, die irgendeine Regel nutzt, ohne
+atomar geholt – zwei Läufe zugleich melden nie doppelt; ein unlesbarer Zeitstempel gilt als „nie gesendet“. Scheitert
+ein eingerichteter Weg, gilt die Sperrfrist nicht als verbraucht, der nächste Versuch kommt aber frühestens nach
+5 Minuten, dann nach 10, 20 … bis zur Sperrfrist (`retry_after`) – auch ein Job, der jede Minute scheitert, meldet
+nicht jede Minute. Der **Testalarm** geht alle Wege, die irgendeine Regel nutzt, ohne
 Sperrfrist. Jede Meldung steht unter „Letzte Alarme“, auch wenn kein Weg eingerichtet war – bei einem roten Auto-Check
 ohne Weg (oder mit gescheitertem Versand) aber nur einmal je Rot-Phase; danach bleibt es still, bis die Prüfung wechselt
 oder ein Weg trägt.
