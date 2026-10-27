@@ -245,9 +245,13 @@ async def test_the_name_never_appears_in_the_log_or_the_audit_trail(flow, caplog
 @pytest.mark.asyncio
 async def test_rules_are_settings_with_reason_and_protocol(flow):
     staff = await finance(flow)
-    no_reason = await flow.put(f"{BASE}/rules", json={"max_length": 12})
-    blank = await flow.put(f"{BASE}/rules", json={"max_length": 12, "reason": "   "})
-    assert (no_reason.status_code, blank.status_code) == (422, 400)
+    # Grund optional (Entscheidung Obmann 27.10.2026): ohne Grund geht es, das Protokoll nennt trotzdem die Person.
+    no_reason = await flow.put(f"{BASE}/rules", json={"max_length": 13})
+    assert no_reason.status_code == 200, no_reason.text
+    quiet = await flow.db.audit_logs.find_one({"action": "shop.gamertag.rules"}, {"_id": 0})
+    assert quiet["actor_id"] == staff["id"] and quiet["data"]["reason"] == ""
+    assert (await flow.put(f"{BASE}/rules", json={"max_length": 16})).status_code == 200  # zurück auf die Vorgabe
+    await flow.db.audit_logs.delete_many({})
 
     changed = await flow.put(f"{BASE}/rules", json={"max_length": 12, "min_text_height_in": 0.45,
                                                      "reason": "Obmann bestätigt"})

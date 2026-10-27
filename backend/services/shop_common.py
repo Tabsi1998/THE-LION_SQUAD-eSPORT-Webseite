@@ -179,10 +179,12 @@ ADMIN_ACTIONS: dict[str, str] = {
 MAX_REASON = 500
 
 
-def clean_reason(reason: Any) -> str:
-    """Der Grund einer Adminaktion: Pflicht, eine Zeile, Mail-Adressen gekürzt."""
+def clean_reason(reason: Any, *, required: bool = False) -> str:
+    """Der Grund einer Adminaktion: eine Zeile, Mail-Adressen gekürzt. Optional - wer, wann und was steht ohnehin im
+    Protokoll (Entscheidung Obmann 27.10.2026). Pflicht (``required``) nur bei kritischen Schritten: Steuer freigeben,
+    „Öffentlich“, Notschalter einschalten, Schlüssel entfernen."""
     text = log_safe(mask_addresses(" ".join(str(reason or "").split())), MAX_REASON)
-    if len(text) < 3:
+    if required and len(text) < 3:
         raise ShopError("Bitte einen Grund angeben.")
     return text
 

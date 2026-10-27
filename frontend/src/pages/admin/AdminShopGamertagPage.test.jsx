@@ -104,7 +104,7 @@ test("zeigt den Hinweis bei Verkleinerung und die Begründung bei Ablehnung", as
   expect(screen.getByTestId("shop-gamertag-save-file")).toBeDisabled();
 });
 
-test("eine Testdatei braucht einen Grund und liefert die Adresse für Printful", async () => {
+test("eine Testdatei liefert die Adresse für Printful - der Grund ist optional", async () => {
   apiMock.post.mockImplementation(async (url) => {
     if (url.endsWith("/preview")) return { data: preview() };
     return { data: { ...view({ test_files: [{ sha256: SHA, sha256_short: SHA.slice(0, 12), color_hex: "#29B6E8", width_px: 1050, height_px: 296, dpi: 300, scaled: false,
@@ -115,7 +115,7 @@ test("eine Testdatei braucht einen Grund und liefert die Adresse für Printful",
   await userEvent.type(await screen.findByTestId("shop-gamertag-text"), "Testname");
   await screen.findByTestId("shop-gamertag-measures");
   const save = screen.getByTestId("shop-gamertag-save-file");
-  expect(save).toBeDisabled();
+  expect(save).toBeEnabled();
   await userEvent.type(screen.getByTestId("shop-gamertag-file-reason"), "Testentwurf vorbereiten");
   await userEvent.click(save);
   await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/admin/shop/gamertag/test-files", { text: "Testname", color: "vereinsblau", reason: "Testentwurf vorbereiten" }));
@@ -123,11 +123,11 @@ test("eine Testdatei braucht einen Grund und liefert die Adresse für Printful",
   expect(toastMock.success).toHaveBeenCalledWith("Testdatei gespeichert.");
 });
 
-test("Regeln speichern nur mit Grund - Zahlen aus dem Formular, Farben je Shirtfarbe", async () => {
+test("Regeln speichern - Zahlen aus dem Formular, Farben je Shirtfarbe, Grund optional", async () => {
   apiMock.put.mockResolvedValue({ data: { ...view(), changed: ["max_length"] } });
   show();
   const save = await screen.findByTestId("shop-gamertag-rules-save");
-  expect(save).toBeDisabled();
+  expect(save).toBeEnabled();
   const length = screen.getByTestId("shop-gamertag-rule-max_length");
   await userEvent.clear(length);
   await userEvent.type(length, "12");

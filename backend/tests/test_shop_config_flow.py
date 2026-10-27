@@ -109,12 +109,10 @@ async def test_finance_switches_between_off_admins_and_members_and_each_change_i
 
 
 @pytest.mark.asyncio
-async def test_a_change_needs_a_reason_and_unknown_values_are_refused(flow):
+async def test_unknown_values_are_refused_and_only_critical_changes_need_a_reason(flow):
     who = await people(flow)
     flow.act_as(who["finanzen"])
-    answers = [await flow.patch(CONFIG, json={"stage": "admins"}),
-               await flow.patch(CONFIG, json={"stage": "admins", "reason": "  "}),
-               await flow.patch(CONFIG, json={"stage": "live", "reason": "Test"}),
+    answers = [await flow.patch(CONFIG, json={"stage": "live", "reason": "Test"}),
                await flow.patch(CONFIG, json={"public_markup_cents": -1, "reason": "Test"}),
                await flow.patch(CONFIG, json={"public_markup_cents": 10_001, "reason": "Test"}),
                await flow.patch(CONFIG, json={"fallback_shipping_cents": 0, "reason": "Test"}),
@@ -123,6 +121,13 @@ async def test_a_change_needs_a_reason_and_unknown_values_are_refused(flow):
                await flow.patch(CONFIG, json={"orders_to_printful": "ja", "reason": "Test"})]
     assert [answer.status_code for answer in answers] == [422] * len(answers)
     assert await config_log(flow) == []
+    # Grund optional (Entscheidung Obmann 27.10.2026) - Pflicht nur beim Einschalten des Notschalters und bei „Öffentlich“.
+    switch_on = await flow.patch(CONFIG, json={"orders_to_printful": True})
+    assert switch_on.status_code == 400 and "Grund" in switch_on.json()["detail"]
+    stage = await flow.patch(CONFIG, json={"stage": "admins"})
+    assert stage.status_code == 200, stage.text
+    rows = await config_log(flow)
+    assert len(rows) == 1 and rows[0]["actor_id"] == who["finanzen"]["id"] and rows[0]["data"]["reason"] == ""
 
 
 @pytest.mark.asyncio
@@ -181,8 +186,8 @@ async def test_only_the_superadmin_sets_the_tax_clearance_and_never_without_reas
         answer = await flow.put(f"{CONFIG}/tax-clearance", json={"cleared": True, "reason": "Passt schon"})
         assert answer.status_code == 403, (name, answer.text)
     flow.act_as(who["superadmin"])
-    assert (await flow.put(f"{CONFIG}/tax-clearance", json={"cleared": True})).status_code == 422
-    assert (await flow.put(f"{CONFIG}/tax-clearance", json={"cleared": True, "reason": " "})).status_code == 422
+    assert (await flow.put(f"{CONFIG}/tax-clearance", json={"cleared": True})).status_code == 400
+    assert (await flow.put(f"{CONFIG}/tax-clearance", json={"cleared": True, "reason": " "})).status_code == 400
     assert await config_log(flow) == []
 
 

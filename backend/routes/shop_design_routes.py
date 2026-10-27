@@ -22,7 +22,7 @@ router = APIRouter(prefix="/api/admin/shop", tags=["shop"])
 class Reasoned(BaseModel):
     model_config = {"extra": "forbid"}
 
-    reason: str = Field(..., min_length=3, max_length=500)
+    reason: str = Field("", max_length=500)  # optional (Entscheidung Obmann 27.10.2026)
 
 
 class ProfileUpdate(Reasoned):
@@ -58,7 +58,7 @@ async def list_designs(me: dict = Depends(require_area("finance"))):
 
 @router.post("/designs/upload")
 async def upload_design(file: UploadFile = File(...), design_key: str = Form(..., max_length=60),
-                        reason: str = Form(..., max_length=500), title: str | None = Form(None, max_length=120),
+                        reason: str = Form("", max_length=500), title: str | None = Form(None, max_length=120),
                         placement: str | None = Form(None, max_length=40),
                         garment_colors: str | None = Form(None, max_length=1000),
                         me: dict = Depends(require_area("finance"))):
