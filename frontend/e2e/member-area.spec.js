@@ -183,11 +183,11 @@ for (const width of [390, 768, 1440, 2560]) {
         expect(overlaps(title, more), `${section}: Titel und Verweis überlappen`).toBe(false);
       }
 
-      // Gold nur an Karte und Strich: Verweise sind Cyan.
-      for (const testId of ["member-area-board-more", "member-area-my-membership"]) {
-        const color = await page.getByTestId(testId).evaluate((element) => getComputedStyle(element).color);
-        expect(color, testId).toBe("rgb(41, 182, 232)");
-      }
+      // Gold nur an Karte und Strich: Verweise sind Cyan, „Meine Mitgliedschaft“ ist ein cyaner Button (#2059).
+      const moreColor = await page.getByTestId("member-area-board-more").evaluate((element) => getComputedStyle(element).color);
+      expect(moreColor).toBe("rgb(41, 182, 232)");
+      const membershipFill = await page.getByTestId("member-area-my-membership").evaluate((element) => getComputedStyle(element).backgroundColor);
+      expect(membershipFill).toBe("rgb(41, 182, 232)");
 
       const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
       expect(overflow).toBeLessThanOrEqual(0);
