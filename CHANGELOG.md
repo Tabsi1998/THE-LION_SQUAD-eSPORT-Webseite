@@ -1,13 +1,12 @@
 # Changelog
 
-## [1.41.0](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/compare/v1.40.0...v1.41.0) (2026-10-27)
-
+## 1.41.0 (27.10.2026)
 
 ### Neu
 
-* Vereinsshop: Mindestpreis einstellbar, der Produkt-Aufschlag ersetzt den allgemeinen ([#1707](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1707)) ([7c03282](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/7c0328287a1c24ddbe62543b3897130e08b34913))
-* Vereinsshop: Produktverwaltung in 5 Schritten - Printful-Produkt, Farben und Größen, Designs je Platzierung, Selbstkostenpreis, Prüfen und Veröffentlichen ([#1707](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1707)) ([7c03282](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/7c0328287a1c24ddbe62543b3897130e08b34913))
-* Vereinsshop: täglicher Abgleich mit Printful - nicht lieferbare oder preislose Varianten gesperrt, Preisänderungen gemeldet ([#1709](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1709)) ([7c03282](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/7c0328287a1c24ddbe62543b3897130e08b34913))
+* Vereinsshop: Mindestpreis einstellbar, der Produkt-Aufschlag ersetzt den allgemeinen (#1707)
+* Vereinsshop: Produktverwaltung in 5 Schritten - Printful-Produkt, Farben und Größen, Designs je Platzierung, Selbstkostenpreis, Prüfen und Veröffentlichen (#1707)
+* Vereinsshop: täglicher Abgleich mit Printful - nicht lieferbare oder preislose Varianten gesperrt, Preisänderungen gemeldet (#1709)
 
 ## 1.40.0 (27.10.2026)
 
