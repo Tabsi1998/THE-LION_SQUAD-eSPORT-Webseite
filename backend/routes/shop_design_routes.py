@@ -56,6 +56,8 @@ class MotifSettings(Reasoned):
     pair_min_overlap: float | None = Field(None, ge=_PAIR["pair_min_overlap"][1], le=_PAIR["pair_min_overlap"][2])
     pair_contrast_share: float | None = Field(None, ge=_PAIR["pair_contrast_share"][1],
                                               le=_PAIR["pair_contrast_share"][2])
+    pair_position_tolerance: float | None = Field(None, ge=_PAIR["pair_position_tolerance"][1],
+                                                  le=_PAIR["pair_position_tolerance"][2])
 
 
 class PlacementUpdate(Reasoned):

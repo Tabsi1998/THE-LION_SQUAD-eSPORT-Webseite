@@ -33,10 +33,12 @@ import io
 import logging
 import math
 import re
+import weakref
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 
-from PIL import Image, ImageChops, ImageFilter, ImageStat
+from PIL import Image, ImageChops, ImageDraw, ImageFilter, ImageStat
 
 from models import now_utc
 from services import shop_catalog, shop_designs, svg_safe
@@ -127,12 +129,13 @@ def _valid_threshold(value: Any) -> float | None:
 
 
 # Paar-Prüfung (#2084): Vorgabe, kleinster und größter Wert. Seitenverhältnis: erlaubte Abweichung (0,02 = 2 %);
-# Überdeckung: Anteil der gemeinsamen sichtbaren Fläche (IoU), darunter Gelb; Kontrast: Anteil sehr heller bzw. sehr
-# dunkler Fläche, darüber Gelb.
+# Überdeckung: Anteil der gemeinsamen Silhouette (IoU der gefüllten Umrisse), darunter Gelb; Kontrast: Anteil sehr
+# heller bzw. sehr dunkler Fläche, darüber Gelb; Lage: größte Verschiebung einer Kante des Logo-Rahmens, darüber Gelb.
 PAIR_SETTINGS = {
     "pair_aspect_tolerance": (0.02, 0.005, 0.2, "Erlaubte Abweichung des Seitenverhältnisses"),
     "pair_min_overlap": (0.9, 0.5, 0.99, "Mindest-Überdeckung der Umrisse"),
     "pair_contrast_share": (0.03, 0.001, 0.5, "Höchstanteil sehr heller bzw. sehr dunkler Fläche"),
+    "pair_position_tolerance": (0.03, 0.005, 0.3, "Erlaubte Verschiebung des Logos in der Zeichenfläche"),
 }
 SETTING_NAMES = ("light_ink", "threshold", *PAIR_SETTINGS)
 
@@ -574,16 +577,26 @@ async def prepare_file(data: bytes, filename: str, content_type: str, spec: dict
     if shop_designs.looks_like_svg(Path(filename or "").suffix.lower(), content_type or "", data[:8192]):
         if preview:
             image, svg_bytes, info, size = await _prepare_svg_preview(data, spec)
+            check = image
         else:
             image, svg_bytes, info = await prepare_svg(data, spec)
             size = image.size
-        return {"image": image, "svg_bytes": svg_bytes, "source_format": "SVG", "is_vector": True,
-                "aspect": float(info["aspect_ratio"]), "name": filename, "print_size": size,
+            # Die Ampel beim Speichern rechnet mit demselben kleinen Raster wie die Prüfung - sonst könnte ein Paar
+            # knapp an der Schwelle dort Grün und hier Gelb sein (#2084).
+            try:
+                small = await asyncio.to_thread(svg_safe.rasterize, svg_bytes,
+                                                width_px=_pair_size(float(info["aspect_ratio"]))[0])
+            except svg_safe.SvgRejected as rejected:
+                raise SvgRefused(rejected) from None
+            check = _open_png(small)
+        return {"image": image, "check_image": check, "svg_bytes": svg_bytes, "source_format": "SVG",
+                "is_vector": True, "aspect": float(info["aspect_ratio"]), "name": filename, "print_size": size,
                 "extra": {"colors": [item["hex"] for item in info["colors"]][:24], "view_box": info["view_box"]}}
     # Große Pixelbilder neu kodieren dauert - außerhalb der Ereignisschleife (#2084).
     image, source_format = await asyncio.to_thread(shop_designs.prepare, data, filename, content_type)
-    return {"image": image, "svg_bytes": None, "source_format": source_format, "is_vector": False,
-            "aspect": image.width / image.height, "name": filename, "print_size": image.size, "extra": {}}
+    return {"image": image, "check_image": image, "svg_bytes": None, "source_format": source_format,
+            "is_vector": False, "aspect": image.width / image.height, "name": filename, "print_size": image.size,
+            "extra": {}}
 
 
 # ---------------------------------------------------------------- Paar: hell + dunkel in einem Schritt (#2084)
@@ -652,6 +665,43 @@ def _mark(mask: Image.Image) -> str:
     return _data_url(overlay)
 
 
+# „Closing“ bei 512 px um etwa 4 % (zehnmal 3 × 3 = 21 px): feine Linienkunst bekommt eine geschlossene Kontur, und
+# Kerben zwischen Strähnen, die nur eine Fassung offen lässt, zählen nicht als anderer Umriss. Gemessen am echten
+# Löwen-Paar des Vereins (Positiv gegen Negativ): 5 px ergab 88 %, 21 px 93 % gemeinsam.
+CLOSE_STEPS = 10
+
+
+def _check_image(item: dict) -> Image.Image:
+    """Das Bild für die Ampel - bei Prüfen und Speichern dasselbe kleine Raster."""
+    return item.get("check_image") or item["image"]
+
+
+def _silhouette(mask: Image.Image) -> Image.Image:
+    """Der gefüllte Außenumriss einer Maske (0/255): erst ein kleines Closing, dann alles, was von außen nicht
+    erreichbar ist, gilt als innen - Löcher und Lücken zwischen Linien werden Fläche."""
+    # Mit Rand, damit das Closing am Bildrand nichts abschneidet und das Füllen von außen überall herumkommt.
+    pad = CLOSE_STEPS + 1
+    padded = Image.new("L", (mask.width + 2 * pad, mask.height + 2 * pad), 0)
+    padded.paste(mask, (pad, pad))
+    for _ in range(CLOSE_STEPS):
+        padded = padded.filter(ImageFilter.MaxFilter(3))
+    for _ in range(CLOSE_STEPS):
+        padded = padded.filter(ImageFilter.MinFilter(3))
+    ImageDraw.floodfill(padded, (0, 0), 128, thresh=0)
+    outside = padded.crop((pad, pad, mask.width + pad, mask.height + pad))
+    return outside.point(lambda v: 0 if v == 128 else 255)
+
+
+def _box_shift(first: Image.Image, second: Image.Image) -> float | None:
+    """Wie weit die Rahmen der sichtbaren Flächen auseinanderliegen - größte Kante, als Anteil von Breite bzw. Höhe."""
+    a, b = first.getbbox(), second.getbbox()
+    if a is None or b is None:
+        return None
+    width, height = first.size
+    return max(abs(a[0] - b[0]) / width, abs(a[2] - b[2]) / width, abs(a[1] - b[1]) / height,
+               abs(a[3] - b[3]) / height)
+
+
 def _pair_size(aspect: float) -> tuple[int, int]:
     if aspect >= 1:
         return PAIR_SIDE, max(1, round(PAIR_SIDE / aspect))
@@ -665,7 +715,7 @@ def assign_pair(first: dict, second: dict) -> tuple[dict, dict, bool, bool]:
     if not all(shop_designs.has_transparency(item["image"]) for item in (first, second)):
         return first, second, False, True
     size = _pair_size(first["aspect"])
-    a, b = _mean_luma(_small(first["image"], size)), _mean_luma(_small(second["image"], size))
+    a, b = _mean_luma(_small(_check_image(first), size)), _mean_luma(_small(_check_image(second), size))
     return (second, first, True, False) if b > a + SWAP_MARGIN else (first, second, False, False)
 
 
@@ -674,8 +724,10 @@ def pair_check(dark: dict, light: dict, settings: dict | None = None) -> dict:
 
     - **Format** (Rot): beide SVG (am besten) oder beide Pixelbild; Seitenverhältnis (bei SVG aus der viewBox) weicht
       um mehr als ``pair_aspect_tolerance`` ab; eine Datei reicht nicht für den Druckbereich.
-    - **Umrisse** (Gelb): beide gleich groß gerastert, sichtbare Flächen verglichen (IoU) - unter
-      ``pair_min_overlap``.
+    - **Umrisse** (Gelb): beide gleich groß gerastert (``PAIR_SIDE``), die gefüllten Außenumrisse verglichen (IoU der
+      Silhouetten, nicht der Tinte - eine Fassung darf ein Negativ der anderen sein) - unter ``pair_min_overlap``.
+    - **Lage** (Gelb): der Rahmen der sichtbaren Fläche liegt in beiden Dateien gleich - eine Kante weicht um mehr als
+      ``pair_position_tolerance`` der Breite bzw. Höhe ab.
     - **Kontrast** (Gelb): sehr Helles in der Hell-Fassung bzw. sehr Dunkles in der Dunkel-Fassung über
       ``pair_contrast_share`` der Fläche - die Stellen kommen als Markierung (PNG) für die Vorschau mit.
 
@@ -683,6 +735,7 @@ def pair_check(dark: dict, light: dict, settings: dict | None = None) -> dict:
     settings = settings or {name: spec[0] for name, spec in PAIR_SETTINGS.items()}
     tolerance, min_overlap = settings["pair_aspect_tolerance"], settings["pair_min_overlap"]
     max_share = settings["pair_contrast_share"]
+    max_shift = settings.get("pair_position_tolerance", PAIR_SETTINGS["pair_position_tolerance"][0])
     checks: list[dict] = []
 
     if dark["is_vector"] != light["is_vector"]:
@@ -703,16 +756,26 @@ def pair_check(dark: dict, light: dict, settings: dict | None = None) -> dict:
                             "bitte gleiche Zeichenfläche verwenden.")})
 
     size = _pair_size(a_dark)
-    small_dark, small_light = _small(dark["image"], size), _small(light["image"], size)
+    small_dark, small_light = _small(_check_image(dark), size), _small(_check_image(light), size)
     seen_dark, seen_light = _visible(small_dark), _visible(small_light)
     if aspect_ok:
-        union = _count(ImageChops.lighter(seen_dark, seen_light))
-        overlap = _count(ImageChops.darker(seen_dark, seen_light)) / union if union else 1.0
+        # Silhouette statt Tinte: die Fassung „auf Weiß“ ist oft zeichnerisch ein Negativ - ihre Linien liegen in den
+        # Lücken der Fassung „auf Schwarz“. Verglichen werden die gefüllten Außenumrisse.
+        shape_dark, shape_light = _silhouette(seen_dark), _silhouette(seen_light)
+        union = _count(ImageChops.lighter(shape_dark, shape_light))
+        overlap = _count(ImageChops.darker(shape_dark, shape_light)) / union if union else 1.0
         good = overlap >= min_overlap
         checks.append({"key": "overlap", "level": "green" if good else "yellow", "value": round(overlap, 4),
-                       "text": (f"Die Umrisse passen (Überdeckung {_percent(overlap)})." if good else
-                                f"Die Umrisse decken sich nur zu {_percent(overlap)} – sind das wirklich zwei "
-                                "Fassungen desselben Logos?")})
+                       "text": (f"Die Umrisse passen ({_percent(overlap)} gemeinsam)." if good else
+                                f"Die Umrisse der beiden Fassungen weichen ab ({_percent(overlap)} gemeinsam) – sind "
+                                "das wirklich zwei Fassungen desselben Logos?")})
+        shift = _box_shift(seen_dark, seen_light)
+        if shift is not None:
+            placed = shift <= max_shift + 1e-9
+            checks.append({"key": "position", "level": "green" if placed else "yellow", "value": round(shift, 4),
+                           "text": ("Das Logo sitzt in beiden Dateien gleich." if placed else
+                                    f"Das Logo sitzt in den Dateien unterschiedlich (bis {_percent(shift)} der "
+                                    "Zeichenfläche verschoben) – Rand oder Position prüfen.")})
 
     marks: dict[str, str | None] = {"dark": None, "light": None}
     for side, small, seen, pale in (("light", small_light, seen_light, True), ("dark", small_dark, seen_dark, False)):
@@ -796,23 +859,38 @@ async def _prepare_pair(db, placement: str, dark_file: tuple, light_file: tuple,
     return spec, dark, light, swapped, uncertain
 
 
-# Paar prüfen bzw. speichern rastert und rechnet viel: je Prozess eins zugleich, sonst „gleich noch einmal“ (429) -
-# so bleibt der gemeinsame Rasterplatz (svg_safe) für Logos und Druckdateien frei.
-_PAIR_SLOT = asyncio.Semaphore(1)
+# Paar prüfen bzw. speichern rastert und rechnet viel: je Prozess eins zugleich - wer kurz wartet, kommt dran, sonst
+# „gleich noch einmal“ (429). So bleibt der gemeinsame Rasterplatz (svg_safe) für Logos und Druckdateien frei.
+PAIR_WAIT_SECONDS = 3.0
 PAIR_BUSY = "Gerade wird schon ein Motiv-Paar geprüft oder gespeichert - bitte gleich noch einmal versuchen."
 MOTIF_BUSY = "Für dieses Motiv läuft gerade ein Upload."
+_PAIR_SLOTS: "weakref.WeakKeyDictionary[asyncio.AbstractEventLoop, asyncio.Semaphore]" = weakref.WeakKeyDictionary()
 
 
 class PairBusy(ShopError):
     status = 429
 
 
+def pair_semaphore() -> asyncio.Semaphore:
+    """Der Platz für die Paar-Verarbeitung - je Ereignisschleife einer (ein Semaphor gehört zu genau einer)."""
+    loop = asyncio.get_running_loop()
+    slot = _PAIR_SLOTS.get(loop)
+    if slot is None:
+        slot = _PAIR_SLOTS[loop] = asyncio.Semaphore(1)
+    return slot
+
+
 @contextlib.asynccontextmanager
 async def _pair_slot():
-    if _PAIR_SLOT.locked():
-        raise PairBusy(PAIR_BUSY)
-    async with _PAIR_SLOT:
+    slot = pair_semaphore()
+    try:
+        await asyncio.wait_for(slot.acquire(), timeout=PAIR_WAIT_SECONDS)
+    except asyncio.TimeoutError:
+        raise PairBusy(PAIR_BUSY) from None
+    try:
         yield
+    finally:
+        slot.release()
 
 
 @contextlib.asynccontextmanager
@@ -848,19 +926,21 @@ async def _in_orders(db, key: str, version: int) -> bool:
         {"designs": {"$elemMatch": {"design_key": key, "version": version}}}]}))
 
 
-async def _remove_pending(db, design: dict) -> None:
+async def _remove_pending(db, design: dict) -> str:
     """Rückweg, wenn ein Paar scheitert: die eben angelegte, noch nicht freigeschaltete Version samt Dateien
-    entfernen - nie eine freigeschaltete und nie eine, auf die eine Bestellung zeigt."""
+    entfernen - nie eine freigeschaltete und nie eine, auf die eine Bestellung zeigt. ``removed``, ``orders`` (bleibt
+    wegen einer Bestellung) oder ``none`` (nicht mehr da bzw. schon freigeschaltet)."""
     if await _in_orders(db, design["design_key"], design["version"]):
         logger.error("[shop-motifs] %s v%s steht in einer Bestellung - bleibt liegen", design["design_key"],
                      design["version"])
-        return
+        return "orders"
     result = await db.shop_designs.delete_one({"id": design["id"], "pending": True})
     if getattr(result, "deleted_count", 0) != 1:
-        return
+        return "none"
     for path in (shop_designs._path_of(design.get("file_ref")), shop_designs.svg_path_of(design.get("svg_ref"))):
         if path is not None:
             path.unlink(missing_ok=True)
+    return "removed"
 
 
 async def _remove_profile(db, key: str, placement: str) -> None:
@@ -869,12 +949,97 @@ async def _remove_profile(db, key: str, placement: str) -> None:
 
 
 async def _restore_profile(db, key: str, before: dict) -> None:
-    """Fassung für helle Shirts und gemerktes Paar wie vor dem gescheiterten Paar."""
+    """Fassung für helle Shirts und gemerktes Paar wie vor dem gescheiterten Paar; die Markierung fällt weg."""
     values = {name: before.get(name) for name in ("light_mode", "light_pair")}
     keep = {name: value for name, value in values.items() if value is not None}
     drop = {name: "" for name, value in values.items() if value is None}
+    drop["pair_pending"] = ""
     await db.shop_design_profiles.update_one({"design_key": key}, {**({"$set": keep} if keep else {}),
-                                                                   **({"$unset": drop} if drop else {})})
+                                                                   "$unset": drop})
+
+
+async def _mark_pair_pending(db, key: str, before: dict | None, *, created: bool) -> None:
+    """Am Motiv vermerken, dass ein Paar gerade gespeichert wird - mit dem Stand davor. Stürzt der Prozess mitten im
+    Speichern ab, stellt ``sweep_pending`` damit den alten Stand wieder her."""
+    before = before or {}
+    await db.shop_design_profiles.update_one({"design_key": key}, {"$set": {"pair_pending": {
+        "at": now_utc().isoformat(), "created": created,
+        "before": {"light_mode": before.get("light_mode") or "auto", "light_pair": before.get("light_pair")}}}})
+
+
+# ---------------------------------------------------------------- Aufräumen nach einem Absturz (#2084)
+
+PENDING_MAX_AGE = timedelta(minutes=15)  # deutlich länger als die Sperre je Motiv (120 s, laufend erneuert)
+
+
+def _older(value: Any, cutoff: datetime) -> bool:
+    try:
+        stamp = datetime.fromisoformat(str(value))
+    except ValueError:
+        return True  # ohne lesbare Zeit: alt genug
+    return stamp <= cutoff
+
+
+async def sweep_pending(db, *, now: datetime | None = None) -> dict:
+    """Halbe Paare nach einem Absturz aufräumen (Zeitplan, alle 15 Minuten): ``pending``-Versionen älter als
+    ``PENDING_MAX_AGE`` samt Dateien entfernen - nie eine, auf die eine Bestellung zeigt -, das Motiv auf den Stand vor
+    dem Paar zurücksetzen (aus ``pair_pending``), ein dabei neu angelegtes, nun leeres Motiv entfernen. Ist der alte
+    Stand nicht bekannt und zeigt ``light_pair`` auf eine entfernte Version, gilt wieder „automatisch“ - das ist für
+    helle Shirts besser als „fehlt“. Motive, an denen gerade jemand hochlädt, bleiben unberührt."""
+    cutoff = (now or now_utc()) - PENDING_MAX_AGE
+    rows: dict[str, list[dict]] = {}
+    async for row in db.shop_designs.find({"pending": True}, {"_id": 0}):
+        if _older(row.get("created_at"), cutoff):
+            rows.setdefault(row["design_key"], []).append(row)
+    marked = {profile["design_key"]: profile async for profile in db.shop_design_profiles.find(
+        {"pair_pending": {"$exists": True}}, {"_id": 0}) if _older(profile["pair_pending"].get("at"), cutoff)}
+    report = {"removed": 0, "kept_for_orders": 0, "motifs": []}
+    for key in sorted(set(rows) | set(marked)):
+        try:
+            async with _motif_lock(db, key):
+                gone = []
+                for row in rows.get(key, []):
+                    outcome = await _remove_pending(db, row)
+                    if outcome == "removed":
+                        gone.append(row["version"])
+                    elif outcome == "orders":
+                        report["kept_for_orders"] += 1
+                report["removed"] += len(gone)
+                await _settle_profile(db, key, gone)
+                report["motifs"].append(key)
+        except ShopConflict:
+            continue  # dort läuft gerade ein Upload - beim nächsten Lauf
+    if report["motifs"]:
+        logger.warning("[shop-motifs] halbe Paare aufgeräumt: %s", report)
+    return report
+
+
+async def _settle_profile(db, key: str, gone: list[int]) -> None:
+    profile = await shop_designs.get_profile(db, key)
+    if not profile:
+        return
+    marker = profile.get("pair_pending") or {}
+    if marker.get("created") and not await db.shop_designs.count_documents({"design_key": key}):
+        await _remove_profile(db, key, profile["placement"])
+        return
+    pair = profile.get("light_pair") or {}
+    if marker:
+        live = await db.shop_designs.count_documents({"design_key": key, "pending": {"$ne": True},
+                                                     "version": {"$in": [pair.get("dark"), pair.get("light")]}})
+        if not gone and live == 2:  # das Paar war schon freigeschaltet - nur die Markierung blieb
+            await db.shop_design_profiles.update_one({"design_key": key}, {"$unset": {"pair_pending": ""}})
+        else:
+            await _restore_profile(db, key, marker.get("before") or {})
+        return
+    if gone and (pair.get("dark") in gone or pair.get("light") in gone):
+        await db.shop_design_profiles.update_one({"design_key": key}, {"$set": {"light_mode": "auto"},
+                                                                       "$unset": {"light_pair": ""}})
+    else:
+        return
+    try:
+        await refresh_auto_light(db, key, actor_id="system", reason="Halbes Paar aufgeräumt")
+    except ShopError as exc:
+        logger.warning("[shop-motifs] Hell-Variante für %s nicht erzeugt: %s", key, exc)
 
 
 async def upload_pair(db, *, design_key: Any, dark_file: tuple, light_file: tuple, actor_id: str, reason: Any,
@@ -924,9 +1089,12 @@ async def _upload_pair_locked(db, *, design_key: str, dark_file: tuple, light_fi
         await shop_designs.create_profile(db, key, title=title, placement=placement, garment_colors=garment_colors,
                                           actor_id=actor_id, reason=reason)
         created.append(key)
+        await _mark_pair_pending(db, key, None, created=True)
 
     inserted: list[dict] = []
     try:
+        if profile:
+            await _mark_pair_pending(db, key, profile, created=False)
         saved_dark, fit_dark = await shop_designs.save_version(
             db, key, image=dark["image"], spec=spec, placement=placement, source_format=dark["source_format"],
             variant="dark", origin="upload", actor_id=actor_id, reason=reason, svg_bytes=dark["svg_bytes"],
@@ -952,6 +1120,7 @@ async def _upload_pair_locked(db, *, design_key: str, dark_file: tuple, light_fi
         if inserted:  # beide zugleich freischalten
             await db.shop_designs.update_many({"id": {"$in": [row["id"] for row in inserted]}, "pending": True},
                                               {"$unset": {"pending": ""}})
+        await db.shop_design_profiles.update_one({"design_key": key}, {"$unset": {"pair_pending": ""}})
     except BaseException:
         for row in inserted:
             await _remove_pending(db, row)

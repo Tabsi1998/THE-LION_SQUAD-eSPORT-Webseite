@@ -419,22 +419,30 @@ zusammenpassen, und verwendet sie dann automatisch (`light_mode = "file"`).
   (auf dem Handy untereinander). Beide Dateien auf einmal in ein Feld gezogen (oder zusammen ausgewählt) ordnet der
   Server zu: die Datei mit mehr heller Fläche gilt für dunkle Shirts (`auto_assign`, Antwort `swapped`). Ohne
   durchsichtigen Hintergrund (JPG, PNG mit Fläche) tauscht er nicht und meldet `assign_uncertain` („Zuordnung unsicher –
-  bitte prüfen“). „Tauschen“ dreht die Zuordnung und prüft neu; nur die Antwort der neuesten Prüfung zählt. Sind beide da, läuft die Prüfung sofort: Ampel mit Klartext je Prüfung, Vorschau
-  beider Fassungen (vom Server gerastert) auf dunklem und hellem Shirt, gelbe Stellen magenta markiert. Rot sperrt
-  „Paar speichern“, Gelb fragt im Seitenlayout nach. An der Motiv-Karte „Als Paar ersetzen“.
+  bitte prüfen“). „Tauschen“ dreht die Zuordnung und prüft neu; nur die Antwort der neuesten Prüfung zählt, eine ältere
+  wird abgebrochen. Sind beide da, läuft die Prüfung sofort: Ampel mit Klartext je Prüfung, Vorschau beider Fassungen
+  (vom Server gerastert) auf dunklem und hellem Shirt, gelbe Stellen magenta markiert. Rot sperrt „Paar speichern“, Gelb
+  fragt im Seitenlayout nach - auch, wenn erst der Server beim Speichern Gelb meldet (409 mit Bericht). An der
+  Motiv-Karte „Als Paar ersetzen“.
 - **Paar-Prüfung** (`shop_motifs.pair_check`, beide Fassungen gleich groß gerastert, 512 px an der längeren Seite):
 
   | Prüfung | Ampel | Schwelle (Einstellung, Vorgabe, Bereich) |
   | --- | --- | --- |
   | Format: beide SVG oder beide Pixelbild (PNG/JPG); jede Datei reicht für den Druckbereich | Rot | - |
   | Seitenverhältnis (bei SVG aus der viewBox): „unterschiedliche Formate: 1,20 zu 1,35 – bitte gleiche Zeichenfläche verwenden“ | Rot | `pair_aspect_tolerance`, 0,02 (2 %), 0,005 bis 0,2 |
-  | Umrisse: sichtbare Flächen (Deckkraft ab 50 %) überdecken sich (IoU) - „Sind das wirklich zwei Fassungen desselben Logos?“ | Gelb | `pair_min_overlap`, 0,9, 0,5 bis 0,99 |
+  | Umrisse: die gefüllten Außenumrisse (Silhouette: sichtbare Fläche ab 50 % Deckkraft, Closing um 21 px, Löcher von außen gefüllt) überdecken sich (IoU) - „Die Umrisse der beiden Fassungen weichen ab (x % gemeinsam) – sind das wirklich zwei Fassungen desselben Logos?“ | Gelb | `pair_min_overlap`, 0,9, 0,5 bis 0,99 |
+  | Lage: der Rahmen der sichtbaren Fläche sitzt in beiden Dateien gleich (größte Kantenverschiebung je Breite bzw. Höhe) - „Logo sitzt in den Dateien unterschiedlich – Rand oder Position prüfen“ | Gelb | `pair_position_tolerance`, 0,03 (3 %), 0,005 bis 0,3 |
   | Kontrast: sehr Helles (Luma ab 225) in der Hell-Fassung bzw. sehr Dunkles (bis 40) in der Dunkel-Fassung, Anteil an der Fläche | Gelb, markiert | `pair_contrast_share`, 0,03 (3 %), 0,001 bis 0,5 |
 
   Ein ungültiges oder gefährliches SVG lehnt schon die Prüfung ab (wie beim einzelnen Upload, mit „Datei für dunkle
   bzw. helle Shirts (Name): …“). Die reine Prüfung (`pair-check`) rastert SVGs nur in 512 px - die Druckgröße folgt aus
-  der viewBox (ein SVG erreicht jede DPI); voll gerastert wird erst beim Speichern. Pixelbilder werden außerhalb der
-  Ereignisschleife gelesen und kodiert.
+  der viewBox (ein SVG erreicht jede DPI); voll gerastert wird erst beim Speichern, und nur für die Druckdatei - die
+  Ampel rechnet dort mit demselben 512-px-Raster wie die Prüfung, damit beide dasselbe ergeben. Pixelbilder werden
+  außerhalb der Ereignisschleife gelesen und kodiert.
+
+  Warum Silhouette statt Tinte: die Fassung „auf Weiß“ der Vereinslogos ist zeichnerisch ein Negativ - ihre schwarzen
+  Linien liegen in den Lücken der Fassung „auf Schwarz“. Über die Tinte deckte sich das echte Löwen-Paar nur zu 19 %,
+  über die Silhouette zu 93 % (Lage 0,6 %); ein anderes Motiv auf derselben Zeichenfläche liegt bei 44 bis 58 %.
 - **Speichern** (`upload_pair`): Rot speichert nichts (400 mit Bericht `pair`). Gelb nur mit `confirm_warnings=true`,
   sonst 409 mit Bericht. Beide Versionen entstehen zuerst als `pending` (Hauptdatei `variant = "dark"`, dann die eigene
   Datei für helle Shirts `variant = "light"` mit `pair_of`) - unsichtbar für Bestellungen (`file_for_garment`,
@@ -444,9 +452,16 @@ zusammenpassen, und verwendet sie dann automatisch (`light_mode = "file"`).
   seine vorige Einstellung zurück. Ist eine Datei schon die aktuelle ihrer Fassung, bleibt deren Version; sind es beide
   und gilt genau dieses Paar schon, 409 - sonst (etwa nach „Zurück auf automatisch“) gilt es wieder. Protokoll
   `shop.design.pair` mit beiden Versionen, Ampel, Zuordnung und ob Warnungen bestätigt wurden.
+- **Nach einem Absturz** mitten im Speichern: am Motiv steht `pair_pending` mit dem Stand davor. Der Zeitplan-Job
+  `shop_pair_sweep` (kurz nach dem Start, dann alle 15 Minuten, `shop_motifs.sweep_pending`) entfernt `pending`-Versionen,
+  die älter als 15 Minuten sind, samt Dateien - nie eine, auf die eine Bestellung zeigt -, setzt `light_mode` und
+  `light_pair` zurück und entfernt ein dabei neu angelegtes, leeres Motiv. Ist der Stand davor nicht bekannt und zeigt
+  `light_pair` auf eine entfernte Version, gilt wieder „automatisch“ (besser als „fehlt“). Motive, an denen gerade
+  jemand hochlädt, bleiben bis zum nächsten Lauf unberührt.
 - **Gleichzeitig:** je Motiv ein Upload zugleich, einzeln oder als Paar (MongoDB-Sperre `shop:motif:<kennung>`, sonst 409
-  „Für dieses Motiv läuft gerade ein Upload.“); je Prozess eine Paar-Prüfung bzw. ein Paar-Speichern (sonst 429 „bitte
-  gleich noch einmal“) - so bleibt der gemeinsame Rasterplatz für Logos und Druckdateien frei.
+  „Für dieses Motiv läuft gerade ein Upload.“); je Prozess eine Paar-Prüfung bzw. ein Paar-Speichern - wer bis zu 3 s
+  wartet, kommt dran, sonst 429 „bitte gleich noch einmal“. So bleibt der gemeinsame Rasterplatz für Logos und
+  Druckdateien frei.
 - **Paar veraltet:** am Motiv merkt sich `light_pair` die zuletzt zusammengehörigen Versionen. Wird danach nur eine
   Fassung ersetzt, meldet `admin_view` je Motiv `pair_stale: true` und `pair` mit `dark_version`, `light_version` und
   `outdated`; die Karte fragt „… ist noch Version X – auch ersetzen?“ und belegt den Upload-Kasten vor. Ersetzt man die

@@ -60,8 +60,9 @@ MODEL_FIELDS: dict[str, tuple[str, ...]] = {
                              "created_by", "updated_at", "updated_by",
                              # Motive (#2069): Hell-Variante automatisch oder eigene Datei, Ausnahmen je Shirtfarbe
                              "light_mode", "light_auto", "color_variants",
-                             # Paar (#2084): die Versionen, die zuletzt zusammengehörten
-                             "light_pair"),
+                             # Paar (#2084): die Versionen, die zuletzt zusammengehörten; „pair_pending“: ein Paar wird
+                             # gerade gespeichert (mit dem Stand davor, fürs Aufräumen nach einem Absturz)
+                             "light_pair", "pair_pending"),
     "shop_design_colors": ("placement", "color_key", "color", "design_key", "claimed_at"),
     "shop_printful_variants": ("provider", "variant_id", "printful_variant_id", "printful_product_id", "updated_at",
                                "updated_by",

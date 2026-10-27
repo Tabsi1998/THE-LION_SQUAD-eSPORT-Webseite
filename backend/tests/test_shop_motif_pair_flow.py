@@ -104,7 +104,7 @@ async def test_the_check_alone_stores_nothing_and_brings_previews(flow):
     assert body["marks"] == {"dark": None, "light": None}
     assert body["files"]["dark"]["name"] == "loewe-auf-schwarz.svg" and body["files"]["light"]["is_vector"] is True
     assert body["thresholds"] == {"pair_aspect_tolerance": 0.02, "pair_min_overlap": 0.9,
-                                  "pair_contrast_share": 0.03}
+                                  "pair_contrast_share": 0.03, "pair_position_tolerance": 0.03}
     assert stored_files(flow) == [] and await flow.db.shop_designs.count_documents({}) == 0
     assert await flow.db.audit_logs.count_documents({}) == 0
     no_place = await pair(flow, ON_BLACK, ON_WHITE, route="pair-check", key="")
@@ -324,11 +324,14 @@ async def test_a_version_an_order_points_to_is_never_deleted(flow):
 
 
 @pytest.mark.asyncio
-async def test_one_upload_per_motif_and_one_pair_job_per_process(flow):
+async def test_one_upload_per_motif_and_one_pair_job_per_process(flow, monkeypatch):
+    import asyncio
+
     from services import shop_motifs
     from services.mutation_lock import mutation_lock
 
     await finance(flow)
+    monkeypatch.setattr(shop_motifs, "PAIR_WAIT_SECONDS", 0.05)
     await flow.db.mutation_locks.create_index("resource", unique=True)  # wie in Produktion (database.py)
     async with mutation_lock(flow.db, "shop:motif:loewe", wait_seconds=0.0):
         busy = await pair(flow, ON_BLACK, ON_WHITE, **MOTIF)
@@ -338,11 +341,21 @@ async def test_one_upload_per_motif_and_one_pair_job_per_process(flow):
     assert single.status_code == 409 and "läuft gerade ein Upload" in single.json()["detail"]
     assert await flow.db.shop_designs.count_documents({}) == 0
 
-    async with shop_motifs._PAIR_SLOT:
+    async with shop_motifs.pair_semaphore():
         checked = await pair(flow, ON_BLACK, ON_WHITE, route="pair-check", placement="front_right")
         saved = await pair(flow, ON_BLACK, ON_WHITE, **MOTIF)
     for answer in (checked, saved):
         assert answer.status_code == 429 and "bitte gleich noch einmal" in answer.json()["detail"], answer.text
+
+    # Wer kurz wartet, kommt dran: der Platz wird innerhalb der Wartezeit frei.
+    monkeypatch.setattr(shop_motifs, "PAIR_WAIT_SECONDS", 3.0)
+    slot = shop_motifs.pair_semaphore()
+    await slot.acquire()
+    waiting = asyncio.ensure_future(pair(flow, ON_BLACK, ON_WHITE, route="pair-check", placement="front_right"))
+    await asyncio.sleep(0.2)
+    assert not waiting.done()
+    slot.release()
+    assert (await waiting).status_code == 200
     assert (await pair(flow, ON_BLACK, ON_WHITE, **MOTIF)).status_code == 200
 
 
@@ -482,3 +495,112 @@ def test_nginx_caps_the_pair_routes_with_their_own_block():
     assert nginx.index("location ^~ /api/ {") < start
     assert nginx.index("location = /api/admin/shop/designs/upload {") < start
     assert not re.search(r"location /api/[^\s]*/ \{", nginx)
+
+
+# ---------------------------------------------------------------- Umriss statt Tinte, Lage, gleiche Ampel, Aufräumen
+
+# Wie die Vereinslogos: „auf Schwarz“ zeichnet weiße Flächen, „auf Weiß“ ist ein Negativ - schwarze Linien genau in
+# den Lücken, dazu die Außenkontur. Die Tinte deckt sich gar nicht, der Umriss ganz.
+POSITIVE = svg('<circle cx="100" cy="100" r="80" fill="none" stroke="#ffffff" stroke-width="20"/>'
+               '<circle cx="100" cy="100" r="50" fill="none" stroke="#ffffff" stroke-width="20"/>'
+               '<circle cx="100" cy="100" r="30" fill="#ffffff"/>', width=200, height=200)
+NEGATIVE = svg('<circle cx="100" cy="100" r="88" fill="none" stroke="#111111" stroke-width="4"/>'
+               '<circle cx="100" cy="100" r="65" fill="none" stroke="#111111" stroke-width="10"/>'
+               '<circle cx="100" cy="100" r="35" fill="none" stroke="#111111" stroke-width="10"/>',
+               width=200, height=200)
+TRIANGLE = svg('<polygon points="100,10 190,190 10,190" fill="#111111"/>', width=200, height=200)
+SHIFTED = svg('<circle cx="125" cy="100" r="70" fill="#111111"/>', width=200, height=200)
+DISC = svg('<circle cx="100" cy="100" r="70" fill="#ffffff"/>', width=200, height=200)
+
+
+@pytest.mark.asyncio
+async def test_a_negative_is_the_same_logo_a_triangle_is_not_and_a_shift_is_flagged(flow):
+    await finance(flow)
+    same = await pair(flow, POSITIVE, NEGATIVE, route="pair-check", placement="front_right")
+    found = checks(same.json())
+    assert same.json()["level"] == "green", same.json()["checks"]
+    assert found["overlap"]["value"] >= 0.95 and found["position"]["level"] == "green"
+
+    other = await pair(flow, POSITIVE, TRIANGLE, route="pair-check", placement="front_right")
+    found = checks(other.json())
+    assert found["overlap"]["level"] == "yellow"
+    assert "Die Umrisse der beiden Fassungen weichen ab" in found["overlap"]["text"]
+    assert "gemeinsam) – sind das wirklich zwei Fassungen desselben Logos?" in found["overlap"]["text"]
+
+    moved = await pair(flow, DISC, SHIFTED, route="pair-check", placement="front_right")
+    found = checks(moved.json())
+    assert found["position"]["level"] == "yellow" and found["position"]["value"] == pytest.approx(0.125, abs=0.01)
+    assert "Rand oder Position prüfen" in found["position"]["text"]
+    # Die Grenze ist eine Einstellung.
+    answer = await flow.put(f"{BASE}/designs/motif-settings", json={"pair_position_tolerance": 0.2})
+    assert answer.status_code == 200 and answer.json()["motif_settings"]["defaults"]["pair_position_tolerance"] == 0.03
+    moved = await pair(flow, DISC, SHIFTED, route="pair-check", placement="front_right")
+    assert checks(moved.json())["position"]["level"] == "green"
+
+
+@pytest.mark.asyncio
+async def test_checking_and_saving_give_the_same_light(flow):
+    await finance(flow)
+    other = lion("#111111", left=40)
+    checked = await pair(flow, ON_BLACK, other, route="pair-check", placement="front_right")
+    saving = await pair(flow, ON_BLACK, other, **MOTIF)
+    assert saving.status_code == 409, saving.text
+    before, after = checks(checked.json()), checks(saving.json())
+    assert checked.json()["level"] == saving.json()["pair"]["level"] == "yellow"
+    assert {key: item["level"] for key, item in before.items()} == {key: item["level"] for key, item in after.items()}
+    assert before["overlap"]["value"] == after["overlap"]["value"]
+    assert saving.json()["pair"]["previews"]["dark"].startswith("data:"), "der Bericht reicht für die Nachfrage"
+
+
+@pytest.mark.asyncio
+async def test_half_pairs_left_by_a_crash_are_swept_up(flow):
+    from datetime import timedelta
+
+    from models import now_utc
+    from services import shop_motifs
+
+    await finance(flow)
+    assert (await pair(flow, ON_BLACK, ON_WHITE, **MOTIF)).status_code == 200
+    assert (await pair(flow, lion("#fefefe"), lion("#121212"))).status_code == 200
+    files = len(stored_files(flow))
+    old = (now_utc() - timedelta(minutes=20)).isoformat()
+    # Wie nach einem Absturz mitten im zweiten Paar: v3 und v4 noch nicht freigeschaltet, das Motiv zeigt schon darauf.
+    await flow.db.shop_designs.update_many({"version": {"$in": [3, 4]}}, {"$set": {"pending": True, "created_at": old}})
+    await flow.db.shop_design_profiles.update_one({"design_key": "loewe"}, {"$set": {"pair_pending": {
+        "at": old, "created": False, "before": {"light_mode": "file", "light_pair": {"dark": 1, "light": 2}}}}})
+
+    # Ein frisches halbes Paar (läuft vielleicht gerade) bleibt.
+    assert (await shop_motifs.sweep_pending(flow.db, now=now_utc() - timedelta(minutes=10)))["removed"] == 0
+    report = await shop_motifs.sweep_pending(flow.db)
+    assert report["removed"] == 2 and report["motifs"] == ["loewe"]
+    assert len(stored_files(flow)) == files - 4
+    profile = await flow.db.shop_design_profiles.find_one({"design_key": "loewe"}, {"_id": 0})
+    assert profile["light_pair"]["dark"] == 1 and profile["light_pair"]["light"] == 2 and "pair_pending" not in profile
+    pick = shop_motifs.file_for_garment
+    assert (await pick(flow.db, "loewe", color="White", color_hex="#ffffff"))["version"] == 2
+
+    # Ohne bekannten Stand davor: zurück auf automatisch - besser als „fehlt“.
+    third = (await pair(flow, lion("#fdfdfd"), lion("#131313"))).json()["uploaded_pair"]
+    versions = [third["dark_version"], third["light_version"]]
+    await flow.db.shop_designs.update_many({"version": {"$in": versions}},
+                                           {"$set": {"pending": True, "created_at": old}})
+    await flow.db.shop_order_items.insert_one({"id": "pos", "design": {"design_key": "loewe", "version": versions[0]}})
+    report = await shop_motifs.sweep_pending(flow.db)
+    assert report["removed"] == 1 and report["kept_for_orders"] == 1, "die Hauptdatei steht in einer Bestellung"
+    profile = await flow.db.shop_design_profiles.find_one({"design_key": "loewe"}, {"_id": 0})
+    assert profile["light_mode"] == "auto" and "light_pair" not in profile
+    assert (await pick(flow.db, "loewe", color="White", color_hex="#ffffff"))["origin"] == "auto_light"
+
+    # Ein dabei neu angelegtes, nun leeres Motiv verschwindet.
+    await flow.db.shop_design_profiles.insert_one({"design_key": "neu", "title": "Neu", "placement": "back",
+                                                   "light_mode": "file", "pair_pending": {"at": old, "created": True}})
+    await shop_motifs.sweep_pending(flow.db)
+    assert await flow.db.shop_design_profiles.count_documents({"design_key": "neu"}) == 0
+
+
+def test_the_sweep_is_a_scheduled_job():
+    import inspect
+
+    from services import scheduler
+
+    assert '"shop_pair_sweep"' in inspect.getsource(scheduler.start_scheduler)
