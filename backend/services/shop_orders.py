@@ -88,27 +88,56 @@ async def _same_order(db, order: dict, request_hash: str) -> tuple[dict, bool]:
     return order, False
 
 
+async def _freeze_designs(db, product: dict, variant: dict, line: dict, position: int) -> list[dict]:
+    """Je Platzierung des Produkts (#1707) die Druckdatei-Fassung für die Farbe der Variante - mit Druckfläche, Technik
+    und Position, damit der Auftrag an Printful (#2062, #1718) genau das sendet, was beim Bestellen galt. Gamertag und
+    Vereinsnummer sind Platzhalter: ihre Datei entsteht je Bestellung (#1711) aus dem eingefrorenen Gamertag."""
+    out = []
+    color = " ".join(str(variant.get("color") or "").split()).casefold()
+    for row in product.get("placements") or []:
+        entry = {"placement": row["key"], "kind": row["kind"], "printful_placement": row["printful_placement"],
+                 "technique": product.get("technique"), "position": dict(row.get("position") or {}),
+                 "design_key": None, "version": None, "sha256": None}
+        if row["kind"] == "design":
+            key = next((cell["design_key"] for cell in row.get("designs") or []
+                        if str(cell.get("color") or "").casefold() == color), None)
+            latest = await shop_catalog.latest_design(db, key) if key else None
+            if not latest:
+                raise ShopError(f"Position {position}: für diese Farbe fehlt eine Druckdatei.")
+            entry.update(design_key=latest["design_key"], version=latest["version"], sha256=latest["sha256"])
+        elif row["kind"] == "gamertag" and not line["gamertag"]:
+            raise ShopError(f"Position {position}: für dieses Produkt fehlt der Gamertag.")
+        out.append(entry)
+    return out
+
+
 async def _freeze_line(db, line: dict, position: int, buyer_kind: str, config: dict) -> dict:
     variant = await shop_catalog.get_variant(db, line["variant_id"])
     product = await shop_catalog.get_product(db, variant["product_id"]) if variant else None
-    if not variant or not product or not variant.get("active") or product.get("status") != "active":
+    if (not variant or not product or not variant.get("active") or variant.get("blocked_reason")
+            or product.get("status") != "active"):
         raise ShopError(f"Position {position}: dieser Artikel ist nicht bestellbar.")
-    if line["gamertag"] and not (buyer_kind == "member" and product.get("gamertag_allowed")):
+    if line["gamertag"] and not (buyer_kind == "member" and shop_catalog.allows_gamertag(product)):
         raise ShopError(f"Position {position}: ein Gamertag geht nur für Mitglieder bei Produkten mit Gamertag.")
-    design = None
-    if product.get("design_key"):
+    designs = await _freeze_designs(db, product, variant, line, position)
+    design = next(({key: row[key] for key in ("design_key", "version", "sha256")} for row in designs
+                   if row["design_key"]), None)
+    if not product.get("placements") and product.get("design_key"):
         latest = await shop_catalog.latest_design(db, product["design_key"])
         if not latest:
             raise ShopError(f"Position {position}: zur Druckdatei gibt es noch keine Fassung.")
         design = {"design_key": latest["design_key"], "version": latest["version"], "sha256": latest["sha256"]}
     mapping = await shop_catalog.printful_variant_for(db, variant["id"])
-    unit = variant["price_cents"] if variant.get("price_cents") is not None else product["base_price_cents"]
+    unit = variant["price_cents"] if variant.get("price_cents") is not None else product.get("base_price_cents")
+    if unit is None:
+        raise ShopError(f"Position {position}: für diesen Artikel ist noch kein Preis übernommen.")
     markup = shop_config.markup_cents(config, buyer_kind, product)
     return {
         "position": position, "product_id": product["id"], "variant_id": variant["id"],
         "product_title": product["title"], "variant_label": variant["label"], "sku": variant["sku"],
         "quantity": line["quantity"], "unit_price_cents": int(unit), "markup_cents": markup,
         "line_total_cents": line["quantity"] * (int(unit) + markup), "gamertag": line["gamertag"], "design": design,
+        "designs": designs,
         "printful": ({"variant_id": mapping["printful_variant_id"], "product_id": mapping.get("printful_product_id")}
                      if mapping else None),
         "tax_profile": product.get("tax_profile"),

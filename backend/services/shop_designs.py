@@ -662,9 +662,12 @@ async def retention_plan(db, *, now: datetime | None = None) -> dict:
     now = now or now_utc()
     rows = await db.shop_designs.find({}, {"_id": 0}).sort([("design_key", 1), ("version", 1)]).to_list(None)
     ordered = set()
-    async for item in db.shop_order_items.find({"design": {"$ne": None}}, {"_id": 0, "design": 1}):
-        design = item.get("design") or {}
-        ordered.add((design.get("design_key"), design.get("version")))
+    query = {"$or": [{"design": {"$ne": None}}, {"designs.0": {"$exists": True}}]}
+    async for item in db.shop_order_items.find(query, {"_id": 0, "design": 1, "designs": 1}):
+        # Seit #1707 je Platzierung eine Fassung (``designs``); ``design`` ist die Kurzform bzw. ältere Bestellungen.
+        for design in [item.get("design") or {}, *(item.get("designs") or [])]:
+            if design.get("design_key"):
+                ordered.add((design.get("design_key"), design.get("version")))
     by_key: dict[str, list[dict]] = {}
     for row in rows:
         by_key.setdefault(row["design_key"], []).append(row)
