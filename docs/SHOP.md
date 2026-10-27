@@ -528,7 +528,11 @@ Grund ist optional, **Pflicht nur beim Veröffentlichen** - dann geht das Produk
    Varianten bleiben (Bestellungen zeigen auf sie), werden aber inaktiv.
 2. **Farben und Größen:** Technik, Farben, Größen. Je Farbe × Größe eine Variante (SKU `PF<Printful-Variante>-<Produkt>`)
    mit Zuordnung zur Printful-Variante; danach holt der Abgleich die Einkaufspreise **nur für diese** (höchstens 80 je
-   Produkt - je Variante ein Preisaufruf).
+   Produkt - je Variante ein Preisaufruf). Techniken heißen im Admin deutsch mit kurzer Erklärung unter der Auswahl
+   (#2091, zentral in `frontend/src/lib/shopTechniques.js`: `dtg` DTG-Direktdruck, `dtfilm` DTF-Transfer (DTFlex),
+   `embroidery` Stickerei …; unbekannte Schlüssel bleiben stehen). Vorgabe: gespeicherte Wahl, sonst der Standard von
+   Printful (`default_technique`), sonst Direktdruck vor Transfer vor Stickerei - im Backend genauso
+   (`shop_print_templates.TECHNIQUE_PREFERENCE`).
 3. **Druckflächen** (seit #2069, Abschnitt „Druckvorlagen und Druckdateien“): je Printful-Fläche aus der Druckvorlage
    Motiv, Vorgabe-Position aus der Liste und Größe in cm; Gamertag bzw. Vereinsnummer als Platzhalter (Datei je
    Bestellung) nur mit passender Personalisierung. „Druckdateien erzeugen“ baut je Farbe die Datei in der exakten

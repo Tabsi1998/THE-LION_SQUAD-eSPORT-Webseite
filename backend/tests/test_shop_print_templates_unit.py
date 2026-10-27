@@ -300,3 +300,15 @@ def test_the_client_refuses_answers_that_do_not_fit(fake, provider):
     fake.templates[SHIRT][0]["image_url"] = "http://files.cdn.printful.com/ohne-tls.png"
     with pytest.raises(FulfillmentPermanent):
         asyncio.run(provider.mockup_templates(CatalogProductId(SHIRT)))
+
+
+def test_without_a_chosen_technique_direct_print_comes_first():
+    """#2091: ohne Technik am Produkt und ohne Standard von Printful nicht die alphabetisch erste (dtfilm)."""
+    entries = [{"technique": key, "placement": "front"} for key in ("dtfilm", "dtg", "embroidery")]
+    template = {"entries": entries}
+    assert {row["technique"] for row in templates.entries_for(template, None)} == {"dtg"}
+    assert {row["technique"] for row in templates.entries_for(template, "embroidery")} == {"embroidery"}
+    assert {row["technique"] for row in templates.entries_for(template, "laser")} == {"dtg"}
+    assert {row["technique"] for row in templates.entries_for({"entries": entries[::2]}, None)} == {"dtfilm"}
+    assert {row["technique"] for row in templates.entries_for({"entries": [{"technique": "uv", "placement": "default"}]},
+                                                              None)} == {"uv"}

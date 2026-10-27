@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link2, Search } from "lucide-react";
 import { api, formatRequestError } from "@/lib/api";
 import { viennaDateTime } from "@/lib/vienna";
+import { techniqueList } from "@/lib/shopTechniques";
 
 // Produktsuche im Printful-Katalog (#2069) für Schritt 1: Die Produktnummer steht im Printful-Dashboard nirgends. Gesucht
 // wird über Name, Marke, Modell und Kategorie - oder über einen Link aus dem Dashboard (nur bei eindeutigem Treffer).
@@ -82,7 +83,7 @@ export default function ProductSearch({ disabled, current, onPick }) {
                 <div className="flex-1 min-w-0">
                   <div className="font-bold text-sm truncate">{row.name}</div>
                   <div className="text-xs text-white/55">
-                    Nr. <span className="tabular-nums">{row.id}</span>{row.techniques.length ? ` · ${row.techniques.join(", ")}` : ""} · {row.colors} Farben · {row.sizes} Größen
+                    Nr. <span className="tabular-nums">{row.id}</span>{row.techniques.length ? ` · ${techniqueList(row.techniques)}` : ""} · {row.colors} Farben · {row.sizes} Größen
                     {row.is_discontinued ? <span className="text-warn"> · eingestellt</span> : null}
                   </div>
                 </div>

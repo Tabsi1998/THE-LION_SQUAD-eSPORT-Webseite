@@ -3,6 +3,7 @@ import { AlertTriangle, CheckCircle2, ExternalLink, Image as ImageIcon, Move, Pl
 import { api, formatRequestError, resolveMediaUrl, uploadApi } from "@/lib/api";
 import { viennaDateTime } from "@/lib/vienna";
 import { cmText, maxWidthCm, resolveLayers } from "@/lib/shopLayout";
+import { techniqueLabel } from "@/lib/shopTechniques";
 
 // Schritt 3 der Produktverwaltung (#2069): Druckflächen direkt aus der Printful-Vorlage. Je Fläche wählt der Admin Motiv,
 // Vorgabe-Position und Größe in cm - die Website erzeugt daraus die Druckdatei in der exakten Pixelgröße von Printful.
@@ -494,6 +495,7 @@ export default function LayoutStep({ view, busy, run, ReasonedButton, ChoiceGrou
           {draftPreview.error && draftPreview.json === payloadJson ? `Vorschau: ${draftPreview.error}` : blocked ? "Vorschau nach dem Speichern." : "Vorschau wird berechnet …"}
         </p>
       )}
+      {available[0]?.technique && <p className="text-xs text-white/55" data-testid="shop-layout-technique">Flächen für {techniqueLabel(available[0].technique)} - die Technik wird in Schritt 2 gewählt.</p>}
       <p className="text-xs text-white/55 max-w-3xl">Je Fläche: Motiv, Position aus der Liste und Größe in cm. Die Website erzeugt die Druckdatei in der exakten Größe von Printful - das Motiv an seiner Stelle, der Rest durchsichtig. Positionen „vom Träger aus“: Brust rechts liegt von vorne gesehen links.</p>
       {colors.length > 0 && (
         <div className="space-y-1">

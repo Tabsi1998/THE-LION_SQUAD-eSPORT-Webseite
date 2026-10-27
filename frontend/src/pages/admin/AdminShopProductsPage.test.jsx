@@ -225,6 +225,26 @@ test("Farben und Größen wählen zählt die Varianten und schickt Technik, Farb
   expect(screen.getByTestId("shop-variant-PF1")).toHaveTextContent("lieferbar");
 });
 
+test("Drucktechniken mit deutschem Namen und Erklärung, Vorgabe Direktdruck (#2091)", async () => {
+  const many = view({ product: {
+    technique: null, offer: null,
+    printful: { ...view().product.printful, techniques: ["embroidery", "dtfilm", "dtg"], default_technique: null,
+      placements: [{ placement: "front", technique: "dtg", width_in: 12, height_in: 16 }] },
+  }, variants: [] });
+  apiMock.get.mockImplementation((url) => Promise.resolve({ data: url === "/admin/shop/products" ? LIST : many }));
+  const user = userEvent.setup();
+  show("/admin/shop/products/p1");
+  expect(await screen.findByTestId("shop-printful-techniques")).toHaveTextContent("Stickerei, DTF-Transfer (DTFlex), DTG-Direktdruck");
+  expect(screen.getByTestId("shop-printful-loaded")).toHaveTextContent("front (DTG-Direktdruck)");
+  await user.click(screen.getByTestId("shop-step-offer"));
+  expect(screen.getByTestId("shop-offer-technique-dtg")).toHaveAttribute("aria-checked", "true");
+  expect(screen.getByTestId("shop-offer-technique-dtfilm")).toHaveTextContent("DTF-Transfer (DTFlex)");
+  expect(screen.getByTestId("shop-offer-technique-hint")).toHaveTextContent("ideal für helle Shirts");
+  await user.click(screen.getByTestId("shop-offer-technique-embroidery"));
+  expect(screen.getByTestId("shop-offer-technique-hint")).toHaveTextContent("nur kleine Flächen");
+  expect(screen.getAllByText(/nur kleine Flächen/)).toHaveLength(1);
+});
+
 test("ohne gespeichertes Angebot lassen sich Farben und Größen wählen (#2091)", async () => {
   const fresh = view({ product: { offer: null, technique: null }, variants: [] });
   apiMock.get.mockImplementation((url) => Promise.resolve({ data: url === "/admin/shop/products" ? LIST : fresh }));
@@ -472,7 +492,7 @@ test("Produktsuche: über den Namen oder einen Dashboard-Link - „Übernehmen�
   await user.click(screen.getByTestId("shop-search-submit"));
   expect(apiMock.get).toHaveBeenCalledWith("/admin/shop/printful-catalog", { params: { q: "Gildan 5000" } });
   const hit = await screen.findByTestId("shop-search-hit-71");
-  expect(hit).toHaveTextContent("dtg, dtfilm · 50 Farben · 8 Größen");
+  expect(hit).toHaveTextContent("DTG-Direktdruck, DTF-Transfer (DTFlex) · 50 Farben · 8 Größen");
   expect(screen.getByTestId("shop-search-pick-71")).toHaveTextContent("Gewählt");
   await user.selectOptions(screen.getByTestId("shop-search-category"), "24");
   await user.click(screen.getByTestId("shop-search-submit"));

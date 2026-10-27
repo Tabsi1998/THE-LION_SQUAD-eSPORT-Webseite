@@ -253,13 +253,19 @@ async def refresh(db, printful_product_id: int, *, provider: FulfillmentProvider
             "template": await get(db, printful_product_id)}
 
 
+# Vorgabe, wenn weder das Produkt noch Printful eine Technik nennt (#2091): Direktdruck vor Transfer vor Stickerei - wie
+# ``frontend/src/lib/shopTechniques.js`` (PREFERRED). Bisher galt die alphabetisch erste (``dtfilm``).
+TECHNIQUE_PREFERENCE = ("dtg", "dtfilm", "dtf", "embroidery")
+
+
 def entries_for(template: dict | None, technique: str | None) -> list[dict]:
-    """Die Einträge für eine Technik (ohne Technik: die erste, die es gibt)."""
+    """Die Einträge für eine Technik (ohne Technik: die bevorzugte aus ``TECHNIQUE_PREFERENCE``, sonst die erste)."""
     entries = list((template or {}).get("entries") or [])
     if not entries:
         return []
     techniques = list(dict.fromkeys(row["technique"] for row in entries))
-    chosen = technique if technique in techniques else techniques[0]
+    chosen = technique if technique in techniques else next(
+        (key for key in TECHNIQUE_PREFERENCE if key in techniques), techniques[0])
     return [row for row in entries if row["technique"] == chosen]
 
 
