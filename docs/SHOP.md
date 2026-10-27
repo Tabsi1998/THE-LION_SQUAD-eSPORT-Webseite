@@ -151,7 +151,8 @@ ohne Änderung schreibt nichts.
 | `shop.variant.create`, `shop.variant.update` | Variante angelegt bzw. geändert |
 | `shop.design.add`, `shop.printful_variant.set` | Druckdatei-Fassung (mit Prüfsumme, Pixeln, DPI - nie mit dem Zufallsschlüssel), Printful-Zuordnung |
 | `shop.design.profile` | Design angelegt bzw. Titel, Shirtfarben (vorher/nachher), Ausnahmen je Shirtfarbe (vorher/nachher, #2069) oder Notiz geändert (#1708) |
-| `shop.design.light`, `shop.motif.settings` | Fassung für helle Shirts auf eigene Datei bzw. zurück auf automatisch; Ersatzfarbe oder Helligkeits-Schwelle, vorher/nachher (#2069) |
+| `shop.design.light`, `shop.motif.settings` | Fassung für helle Shirts auf eigene Datei bzw. zurück auf automatisch; Ersatzfarbe, Helligkeits-Schwelle oder Schwellen der Paar-Prüfung, vorher/nachher (#2069, #2084) |
+| `shop.design.pair` | Motiv als Paar hochgeladen: beide Versionen, Ampel, Zuordnung getauscht ja/nein, Warnungen bestätigt ja/nein (#2084) |
 | `shop.design.placement` | Druckbreite, Druckbereich oder Mindest-DPI einer Platzierung, vorher/nachher (#1708) |
 | `shop.product.catalog`, `shop.product.offer` | Printful-Produkt gewählt (vorher/nachher), Farben und Größen angeboten (#1707) |
 | `shop.product.placements`, `shop.product.designs` | Platzierungen mit Position (vorher/nachher), Design je Platzierung und Farbe (#1707) |
@@ -307,11 +308,13 @@ die Variante ohne Druckdatei. **Seit #2069 ist die Liste freiwillig:** die Fassu
 
 | Route (alle `require_area("finance")`) | Zweck |
 | --- | --- |
-| `GET /api/admin/shop/designs` | Motive mit Versionen, Ampel, Adressen, Zustand für helle Shirts; Druckbereiche je Platzierung; Ersatzfarbe und Schwelle |
+| `GET /api/admin/shop/designs` | Motive mit Versionen, Ampel, Adressen, Zustand für helle Shirts, Paar-Zustand (`pair_stale`); Druckbereiche je Platzierung; Ersatzfarbe, Schwelle und Schwellen der Paar-Prüfung |
 | `POST /api/admin/shop/designs/upload` | Datei hochladen (Formular: `file`, `design_key`, `reason`, `variant` `dark`/`light`; neues Motiv dazu `title`, `placement`, freiwillig `garment_colors`) |
+| `POST /api/admin/shop/designs/pair-check` | Paar nur prüfen, speichert nichts (Formular: `file_dark`, `file_light`, `design_key` bzw. bei neuem Motiv `placement`, `auto_assign`; gebremst) (#2084) |
+| `POST /api/admin/shop/designs/upload-pair` | Beide Fassungen in einem Schritt (Formular wie `upload`, aber `file_dark` und `file_light`, dazu `auto_assign`, `confirm_warnings`) (#2084) |
 | `PATCH /api/admin/shop/designs/{design_key}` | Titel, feste Shirtfarben, Ausnahmen je Shirtfarbe (`color_variants`), Notiz (Grund optional) |
 | `POST /api/admin/shop/designs/{design_key}/light-auto` | Fassung für helle Shirts zurück auf automatisch bzw. jetzt erzeugen (#2069) |
-| `PUT /api/admin/shop/designs/motif-settings` | Ersatzfarbe `light_ink` und Helligkeits-Schwelle `threshold` (#2069) |
+| `PUT /api/admin/shop/designs/motif-settings` | Ersatzfarbe `light_ink` und Helligkeits-Schwelle `threshold` (#2069), Schwellen der Paar-Prüfung (#2084) |
 | `PUT /api/admin/shop/designs/placements/{placement}` | Druckbreite, Druckbereich, Mindest-DPI in Zoll (Grund optional) |
 
 Nicht in #1708: der Editor mit Ebenen, Hilfslinien und Drag-and-drop (Teil 2), die Gamertag-Druckdatei (#1711),
@@ -381,7 +384,8 @@ Hauptdatei; sonst ist eine Farbe ohne passende Fassung nicht bestellbar.
 
 **Einstellungen** (Dokument `settings` mit `id = "shop_motifs"`, Protokoll `shop.motif.settings` mit
 vorher/nachher): Ersatzfarbe `light_ink` (`#rrggbb`, nicht Weiß) und Schwelle `threshold` (0,02 bis 0,9). Eine neue
-Ersatzfarbe erzeugt die automatischen Fassungen aller Motive neu.
+Ersatzfarbe erzeugt die automatischen Fassungen aller Motive neu. Dazu die Schwellen der Paar-Prüfung (#2084, Abschnitt
+unten).
 
 **Schnittstelle für die Druckdateien (Teil B):**
 
@@ -406,6 +410,41 @@ automatisch, Hauptdatei, fehlt, noch nicht erzeugt) und der Versionsverlauf mit 
 und Loslassen oder Klicken, mit Wahl der Fassung; ein abgelehntes SVG zeigt am Formular, was gefunden wurde. Knöpfe
 „Eigene Datei für helle Shirts“, „Hell-Variante erzeugen“ bzw. „Zurück auf automatisch“, Ausnahmen je Shirtfarbe und
 die Einstellungen mit Beispiel-Shirtfarben. Der Grund ist überall optional.
+
+**Motiv als Paar (#2084).** Der Obmann hat jedes Vereinslogo als zwei echte Vektor-SVGs: „auf Schwarz“ (für dunkle
+Shirts, Hauptdatei) und „auf Weiß“ (für helle Shirts). Beide gehen in einem Schritt hoch; die Website prüft, ob sie
+zusammenpassen, und verwendet sie dann automatisch (`light_mode = "file"`).
+
+- **Admin:** im Upload-Kasten „Als Paar (hell + dunkel)“ mit zwei Feldern „Für dunkle Shirts“ und „Für helle Shirts“
+  (auf dem Handy untereinander). Beide Dateien auf einmal in ein Feld gezogen (oder zusammen ausgewählt) ordnet der
+  Server zu: die Datei mit mehr heller Fläche gilt für dunkle Shirts (`auto_assign`, Antwort `swapped`). „Tauschen“
+  dreht die Zuordnung und prüft neu. Sind beide da, läuft die Prüfung sofort: Ampel mit Klartext je Prüfung, Vorschau
+  beider Fassungen (vom Server gerastert) auf dunklem und hellem Shirt, gelbe Stellen magenta markiert. Rot sperrt
+  „Paar speichern“, Gelb fragt im Seitenlayout nach. An der Motiv-Karte „Als Paar ersetzen“.
+- **Paar-Prüfung** (`shop_motifs.pair_check`, beide Fassungen gleich groß gerastert, 512 px an der längeren Seite):
+
+  | Prüfung | Ampel | Schwelle (Einstellung, Vorgabe, Bereich) |
+  | --- | --- | --- |
+  | Format: beide SVG oder beide Pixelbild (PNG/JPG); jede Datei reicht für den Druckbereich | Rot | - |
+  | Seitenverhältnis (bei SVG aus der viewBox): „unterschiedliche Formate: 1,20 zu 1,35 – bitte gleiche Zeichenfläche verwenden“ | Rot | `pair_aspect_tolerance`, 0,02 (2 %), 0,005 bis 0,2 |
+  | Umrisse: sichtbare Flächen (Deckkraft ab 50 %) überdecken sich (IoU) - „Sind das wirklich zwei Fassungen desselben Logos?“ | Gelb | `pair_min_overlap`, 0,9, 0,5 bis 0,99 |
+  | Kontrast: sehr Helles (Luma ab 225) in der Hell-Fassung bzw. sehr Dunkles (bis 40) in der Dunkel-Fassung, Anteil an der Fläche | Gelb, markiert | `pair_contrast_share`, 0,03 (3 %), 0,001 bis 0,5 |
+
+  Ein ungültiges oder gefährliches SVG lehnt schon die Prüfung ab (wie beim einzelnen Upload, mit „Datei für dunkle
+  bzw. helle Shirts (Name): …“).
+- **Speichern** (`upload_pair`): Rot speichert nichts (400 mit Bericht `pair`). Gelb nur mit `confirm_warnings=true`,
+  sonst 409 mit Bericht. Erst die Hauptdatei als neue Version (`variant = "dark"`), dann die eigene Datei für helle
+  Shirts (`variant = "light"`, `pair_of` = Version der Hauptdatei); scheitert die zweite, werden die erste Version und
+  ihre Dateien wieder entfernt (und ein dabei neu angelegtes Motiv samt Farben) - es bleibt nichts liegen. Ist eine Datei
+  schon die aktuelle ihrer Fassung, bleibt deren Version; sind es beide, 409. Protokoll `shop.design.pair` mit beiden
+  Versionen, Ampel, Zuordnung und ob Warnungen bestätigt wurden.
+- **Paar veraltet:** am Motiv merkt sich `light_pair` die zuletzt zusammengehörigen Versionen. Wird danach nur eine
+  Fassung ersetzt, meldet `admin_view` je Motiv `pair_stale: true` und `pair` mit `dark_version`, `light_version` und
+  `outdated`; die Karte fragt „… ist noch Version X – auch ersetzen?“ und belegt den Upload-Kasten vor. Ersetzt man die
+  andere auch, ist das Paar wieder ganz. Bestellungen frieren wie bisher die gedruckte Fassung samt Version ein.
+- **Grenzen:** je Datei wie beim einzelnen Upload (50 MB, SVG 2 MB), am Eingang zwei Dateien (`pair_body_limit`), in
+  nginx ein eigener Block mit 101 MB für genau die beiden Pfade. Prüfen und Hochladen zusammen höchstens 20-mal je
+  Minute und Person (`shop_pair_check`).
 
 **Migration 14 `shop_motif_variants`** (läuft beim Start einmal; seit #2065 können in Produktion Designs liegen):
 
