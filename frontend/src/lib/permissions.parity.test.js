@@ -34,15 +34,20 @@ test("Bereiche je Rolle wie im Server", () => {
 });
 
 test("Shop (#1706): Menüeintrag, Seiten-Schutz und alle Server-Routen verlangen genau den Bereich Finanzen", () => {
-  const shopRoutes = readFileSync(path.join(repo, "backend/routes/shop_admin_routes.py"), "utf8");
-  const guards = [...shopRoutes.matchAll(/Depends\(require_area\(([^)]*)\)\)/g)].map((m) => strings(m[1]).join(","));
-  expect(guards.length).toBeGreaterThan(0);
-  expect([...new Set(guards)]).toEqual(["finance"]);
+  // Einstellungen und Bestellungen (#1704, #1706) und Designs (#1708) - alle Adminrouten nur mit Finanzen.
+  for (const file of ["shop_admin_routes.py", "shop_design_routes.py"]) {
+    const shopRoutes = readFileSync(path.join(repo, "backend/routes", file), "utf8");
+    const guards = [...shopRoutes.matchAll(/Depends\(require_area\(([^)]*)\)\)/g)].map((m) => strings(m[1]).join(","));
+    const routes = [...shopRoutes.matchAll(/^@router\.(get|post|put|patch|delete)\(/gm)];
+    expect(guards.length, file).toBe(routes.length);
+    expect([...new Set(guards)], file).toEqual(["finance"]);
+  }
 
   const layout = readFileSync(path.join(repo, "frontend/src/components/tls/AdminLayout.jsx"), "utf8");
   expect(layout).toMatch(/\{ to: "\/admin\/shop", label: "Shop", icon: ShoppingBag, areas: \["finance"\] \}/);
   const app = readFileSync(path.join(repo, "frontend/src/App.jsx"), "utf8");
   expect(app).toMatch(/path="\/admin\/shop" element=\{<ProtectedRoute requireArea=\{\["finance"\]\}>/);
+  expect(app).toMatch(/path="\/admin\/shop\/designs" element=\{<ProtectedRoute requireArea=\{\["finance"\]\}>/);
 });
 
 test("Startseite der Verwaltung: der Server-Wächter verlangt genau die Verwaltungsbereiche des Webs", () => {

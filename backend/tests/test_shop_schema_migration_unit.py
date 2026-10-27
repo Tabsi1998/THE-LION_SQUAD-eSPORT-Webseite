@@ -19,7 +19,8 @@ def test_the_shop_indexes_are_part_of_the_audit_lists_and_known_to_the_checks():
     unique = {f"{collection}.{name}" for collection, _keys, name, _options in shop_schema.unique_indexes()}
     assert {"shop_orders.idempotency_key", "shop_orders.printful_external_id", "shop_order_events.order_event",
             "shop_order_items.order_position", "shop_products.slug", "shop_variants.sku",
-            "shop_designs.design_version", "shop_printful_variants.provider_variant", "shop_carts.user",
+            "shop_designs.design_version", "shop_designs.public_id", "shop_design_profiles.design_key",
+            "shop_design_colors.placement_color", "shop_printful_variants.provider_variant", "shop_carts.user",
             "shop_printful_drafts.external_id", "shop_printful_confirmations.order",
             "shop_printful_confirmations.idempotency_key"} == unique
     assert unique <= set(unique_duplicates.known_indexes())

@@ -5,6 +5,7 @@ import { AdminLayout } from "@/components/tls/AdminLayout";
 import { api, formatRequestError } from "@/lib/api";
 import { formatCents, parseEuro } from "@/lib/billing";
 import { viennaDateTime } from "@/lib/vienna";
+import ShopTabs from "./ShopTabs";
 
 // Shop (#1706): Stufe, Notschalter, Preise, Printful-Zugang und Status - Verwaltung → Finanzen → Shop. Stufen statt
 // „Aus/Vorschau/Live“ (Entscheidung Obmann 27.10.2026). Jede Änderung braucht einen Grund und steht im Protokoll der
@@ -126,7 +127,8 @@ export default function AdminShopPage() {
     <AdminLayout>
       <div>
         <h1 className="font-heading text-3xl font-black uppercase inline-flex items-center gap-3"><ShoppingBag className="w-7 h-7 text-honor" aria-hidden="true" /> Shop</h1>
-        <p className="mt-2 text-sm text-white/60 max-w-2xl">
+        <ShopTabs />
+        <p className="mt-4 text-sm text-white/60 max-w-2xl">
           Wer den Vereinsshop sieht, ob Bestellungen an Printful gehen, Preise und der Zugang zu Printful. Jede Änderung braucht einen Grund und steht im Protokoll der Adminaktionen.
         </p>
       </div>

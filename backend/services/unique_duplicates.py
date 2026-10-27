@@ -45,7 +45,9 @@ MANUAL = {
                      "order_events.order_event")},
     **{f"shop_{index}": "Doppelter Eintrag im Shop-Katalog - die Finanzen entscheiden, welcher gilt, und benennen den "
                         "anderen um (docs/SHOP.md)."
-       for index in ("products.slug", "variants.sku", "designs.design_version", "printful_variants.provider_variant")},
+       for index in ("products.slug", "variants.sku", "designs.design_version", "designs.public_id",
+                     "design_profiles.design_key", "design_colors.placement_color",
+                     "printful_variants.provider_variant")},
     # Printful-Adapter (#1705): ein Claim belegt, dass etwas an Printful ging oder geht - nie automatisch löschen.
     **{f"shop_{index}": "Doppelter Claim zu einem Printful-Auftrag - in Printful nachsehen, welcher Auftrag gilt, und den "
                         "überzähligen Claim von Hand entfernen (docs/SHOP.md, Printful-Adapter)."
@@ -81,8 +83,13 @@ def rule(index: str) -> str:
 
 async def _groups(db, collection: str, keys: Any, options: dict, order: list) -> list[tuple[dict, list]]:
     """Je Schlüssel mit mehr als einer Zeile: der Schlüssel und die ``_id`` aller Zeilen, die bleibende zuerst. Fehlt ein
-    Feld, zählt es wie ``null`` - so sieht es auch der Index."""
+    Feld, zählt es wie ``null`` - so sieht es auch der Index. Ausnahme: ein ``sparse`` Index kennt Zeilen ohne seine
+    Felder nicht (#1708) - die zählen dann nicht mit; ein ausdrückliches ``null`` schon."""
     match = dict(options.get("partialFilterExpression") or {})
+    if options.get("sparse"):
+        present = [{field: {"$exists": True}} for field in _fields(keys)]
+        needed = present[0] if len(present) == 1 else {"$or": present}
+        match = {"$and": [match, needed]} if match else needed
     pipeline: list[dict] = [{"$match": match}] if match else []
     pipeline += [
         {"$sort": dict(order)},

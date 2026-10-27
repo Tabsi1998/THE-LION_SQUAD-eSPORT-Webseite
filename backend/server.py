@@ -79,6 +79,8 @@ from routes.invoice_routes import router as invoice_router
 from routes.member_card_routes import router as member_card_router
 from routes.finance_routes import router as finance_router
 from routes.shop_admin_routes import router as shop_admin_router
+from routes.shop_design_routes import router as shop_design_router
+from routes.shop_print_file_routes import router as shop_print_file_router
 from routes.platform_link_routes import router as platform_link_router
 from routes.discord_bot_routes import router as discord_bot_router
 from routes.discord_forward_routes import router as discord_forward_router
@@ -143,6 +145,8 @@ from runtime_config import (
     validate_runtime_environment,
 )
 from services.log_safe import SecretPathFilter
+from services import shop_designs
+from services.body_limits import BodySizeLimit
 from storage import PUBLIC_UPLOAD_DIR, UPLOAD_DIR, ensure_storage_directories
 
 
@@ -236,6 +240,8 @@ async def request_validation_error(_request: Request, exc: RequestValidationErro
 
 # Logos als SVG (#1952): ein SVG nur in Logo-Feldern, die PNG-Fassung eines SVG-Logos bleibt beim Speichern das SVG.
 app.add_middleware(svg_logo.SvgFieldGate)
+# Druckdateien (#1708): das Limit greift am Eingang, bevor FastAPI das Formular in eine Zwischendatei liest.
+app.add_middleware(BodySizeLimit, limits={"/api/admin/shop/designs/upload": shop_designs.upload_body_limit})
 
 app.add_middleware(
     TrustedHostMiddleware,
@@ -359,7 +365,9 @@ app.include_router(admission_router)
 app.include_router(invoice_router)
 app.include_router(member_card_router)
 app.include_router(finance_router)
-app.include_router(shop_admin_router)  # Shop (#1704): nur Finanzen, keine öffentlichen Routen
+app.include_router(shop_admin_router)  # Shop (#1704): nur Finanzen
+app.include_router(shop_design_router)  # Designs und Druckdateien (#1708): nur Finanzen
+app.include_router(shop_print_file_router)  # Druckdateien für Printful (#1708): bewusst öffentlich, Regel 3
 app.include_router(platform_link_router)
 app.include_router(discord_bot_router)
 app.include_router(discord_guild_router)
@@ -521,7 +529,10 @@ async def security_headers(request, call_next):
     response = await call_next(request)
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "SAMEORIGIN"
-    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    # Strengere Regel einer Route bleibt stehen: Adressen mit Schlüssel im Pfad (Kalender-Link #1189, Druckdateien
+    # #1708) sagen „no-referrer“, sonst ginge der Schlüssel als Referer weiter.
+    if "referrer-policy" not in response.headers:
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
     response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
     if request.url.scheme == "https":
         response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"

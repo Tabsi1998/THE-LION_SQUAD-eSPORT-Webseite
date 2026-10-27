@@ -24,6 +24,9 @@ GALLERY_SUBMISSION_DIR = UPLOAD_DIR / "gallery-submissions"
 # Original-Bilder des Veranstalters je Termin (#1933): nur über /api/reference-series/…/originals - öffentlich nur, was
 # öffentlich, freigegeben und Teil eines veröffentlichten Termins einer sichtbaren Saison ist.
 REFERENCE_ORIGINAL_DIR = UPLOAD_DIR / "reference-originals"
+# Druckdateien des Vereinsshops (#1708): je Version eine neue Datei, nie überschrieben. Öffentlich nur über
+# /api/shop/print-files/<Zufallsschlüssel>/<design>-v<version>.png - das Verzeichnis selbst wird nie ausgeliefert.
+SHOP_DESIGN_DIR = UPLOAD_DIR / "shop-designs"
 
 
 def ensure_directory(path: Path) -> Path:
@@ -33,5 +36,5 @@ def ensure_directory(path: Path) -> Path:
 
 def ensure_storage_directories() -> None:
     for path in (UPLOAD_DIR, PUBLIC_UPLOAD_DIR, PRIVATE_DOC_DIR, PRIVATE_CHAT_DIR, APP_RELEASE_DIR, QUARANTINE_DIR, PROOF_DIR,
-                 GALLERY_SUBMISSION_DIR, REFERENCE_ORIGINAL_DIR):
+                 GALLERY_SUBMISSION_DIR, REFERENCE_ORIGINAL_DIR, SHOP_DESIGN_DIR):
         ensure_directory(path)

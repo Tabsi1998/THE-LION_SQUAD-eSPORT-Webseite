@@ -9,6 +9,7 @@ const toastMock = { success: vi.fn(), error: vi.fn() };
 vi.mock("@/lib/api", () => ({ api: apiMock, formatRequestError: (_e, fallback) => fallback }));
 vi.mock("@/components/tls/AdminLayout", () => ({ AdminLayout: ({ children }) => <div>{children}</div> }));
 vi.mock("sonner", () => ({ toast: toastMock }));
+vi.mock("./ShopTabs", () => ({ default: () => null })); // Reiter (#1708) stehen in AdminShopDesignsPage.test.jsx
 
 const { default: AdminShopPage } = await import("./AdminShopPage");
 

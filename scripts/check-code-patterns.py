@@ -12,7 +12,8 @@ geändert oder neu sind, und nur, was dort neu dazukommt: was eine Datei schon v
 Ohne flake8 oder ohne origin/main (flacher Checkout) wird Regel 2 übersprungen.
 
 Regel 3 - Shop-Routen (#1704): jede Route mit „shop“ als Pfadteil liegt unter /api/admin/shop und hängt an
-require_area("finance"). Öffentliche Shop-Routen gibt es noch nicht (#1706, #1712) - die Regel hält das fest.
+require_area("finance"). Öffentlich ist nur, was in PUBLIC_SHOP_ROUTES mit Begründung steht - bisher allein die
+Druckdateien für Printful (#1708); die Shop-Seiten (#1712) kommen später dazu.
 
     python scripts/check-code-patterns.py [--python PFAD-ZU-PYTHON-MIT-FLAKE8] [--base origin/main]
 """
@@ -100,6 +101,13 @@ def side_effect_asserts(root: Path = ROOT) -> list[Finding]:
 HTTP_METHODS = {"get", "post", "put", "patch", "delete"}
 SHOP_ADMIN_PREFIX = "/api/admin/shop"
 SHOP_SEGMENT = re.compile(r"(^|/)shop(/|$)")
+# Bewusst öffentliche Shop-Routen - je Methode, genauer Pfad und Datei, mit Begründung. Alles andere mit „shop“ im Pfad
+# bleibt Finanzen unter /api/admin/shop. Eine neue Ausnahme braucht einen Eintrag hier und einen Test.
+PUBLIC_SHOP_ROUTES: dict[tuple[str, str, str], str] = {
+    ("GET", "/api/shop/print-files/{public_id}/{filename}", "backend/routes/shop_print_file_routes.py"):
+        "Druckdateien für Printful (#1708): Printful holt sie ohne Anmeldung. Schutz: 256-Bit-Zufallsschlüssel je "
+        "Version, Name muss genau passen, nur die neu kodierte Druckdatei, keine Liste - alles andere ist 404.",
+}
 
 
 class Route(NamedTuple):
@@ -163,9 +171,12 @@ def shop_routes(root: Path = ROOT) -> list[Route]:
 def shop_route_guards(root: Path = ROOT) -> list[Finding]:
     """Regel 3 (#1704): jede Shop-Route liegt unter /api/admin/shop und hängt an ``require_area("finance")`` - nur
     Finanzen, kein weiterer Bereich. Eine öffentliche Shop-Route gibt es erst mit Betriebsarten und Shop-Seiten
-    (#1706, #1712); dann wird diese Regel bewusst erweitert."""
+    (#1706, #1712); dann wird diese Regel bewusst erweitert. Ausnahmen stehen einzeln in ``PUBLIC_SHOP_ROUTES``
+    (Methode, Pfad und Datei müssen genau passen) - bisher nur die Druckdateien für Printful (#1708)."""
     findings = []
     for route in shop_routes(root):
+        if (route.method, route.url, route.path) in PUBLIC_SHOP_ROUTES:
+            continue
         if not (route.url == SHOP_ADMIN_PREFIX or route.url.startswith(SHOP_ADMIN_PREFIX + "/")):
             findings.append(Finding(route.path, route.line, f"{route.method} {route.url} ist öffentlich"))
         elif ("finance",) not in route.areas:

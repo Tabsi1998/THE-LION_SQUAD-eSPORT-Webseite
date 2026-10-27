@@ -545,6 +545,11 @@ AUDIT_UNIQUE_INDEXES: tuple[tuple[str, Any, str, dict], ...] = (
     ("shop_products", "slug", "slug", {}),
     ("shop_variants", "sku", "sku", {}),
     ("shop_designs", [("design_key", 1), ("version", 1)], "design_version", {}),
+    # Druckdateien (#1708): der öffentliche Zufallsschlüssel je Version (ältere Zeilen ohne Schlüssel: sparse).
+    ("shop_designs", "public_id", "public_id", {"sparse": True}),
+    ("shop_design_profiles", "design_key", "design_key", {}),
+    # Je Platzierung gehört eine Shirtfarbe zu höchstens einem Design - atomar über diesen Index (#1708).
+    ("shop_design_colors", [("placement", 1), ("color_key", 1)], "placement_color", {}),
     ("shop_printful_variants", [("provider", 1), ("variant_id", 1)], "provider_variant", {}),
     ("shop_carts", "user_id", "user", {}),
     # Printful-Adapter (#1705): je external_id ein Claim vor dem Anlegen eines Entwurfs, je Auftrag und je

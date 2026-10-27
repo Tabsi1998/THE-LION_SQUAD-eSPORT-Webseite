@@ -1,13 +1,16 @@
 # Vereinsshop
 
 Stand: Fundament aus #1703 (Datenmodell) und #1704 (Rechte, Protokoll), dazu Stufen, Notschalter und Preise aus
-#1706 (Abschnitt „Einstellungen“ unten) und der Printful-Adapter aus #1705 (Abschnitt „Printful-Adapter“), Teil des
-Epics #1699. Der Shop ist **von außen unsichtbar**: Es gibt keine öffentlichen Routen und keine Seiten für Mitglieder;
-im Admin steht er unter Finanzen → Shop. Steuer (#1701) und die Shop-Seiten (#1712 ff.) folgen.
+#1706 (Abschnitt „Einstellungen“ unten), Designs/Druckdateien aus #1708 (Abschnitt „Designs und Druckdateien“) und
+der Printful-Adapter aus #1705 (Abschnitt „Printful-Adapter“), Teil des Epics #1699. Der Shop ist **von außen
+unsichtbar**: Es gibt keine Seiten für Mitglieder und nur eine öffentliche Route - die Druckdateien für Printful hinter
+einem Zufallsschlüssel; im Admin steht er unter Finanzen → Shop. Steuer (#1701) und die Shop-Seiten (#1712 ff.) folgen.
 
 Code: `backend/services/shop_common.py` (Fehler, Anschriften, Protokoll, personenbezogene Felder),
-`shop_catalog.py` (Katalog), `shop_orders.py` (Bestellungen, Ereignisse, Warenkorb), `shop_schema.py` (Indizes,
-Migration 13), `backend/routes/shop_admin_routes.py` (Adminbereich), `backend/scripts/shop_schema.py` (Werkzeug).
+`shop_catalog.py` (Katalog), `shop_designs.py` (Druckdateien, #1708), `shop_orders.py` (Bestellungen, Ereignisse,
+Warenkorb), `shop_schema.py` (Indizes, Migration 13), `backend/routes/shop_admin_routes.py` und
+`shop_design_routes.py` (Adminbereich), `shop_print_file_routes.py` (Druckdateien für Printful),
+`backend/scripts/shop_schema.py` (Werkzeug).
 
 ## Datenmodell
 
@@ -18,7 +21,9 @@ die Sammlungen direkt. Jede Katalogänderung ist eine Adminaktion mit Person und
 | --- | --- | --- |
 | `shop_products` | Produkt: Slug, Titel, Beschreibung, Stand (`draft`, `active`, `archived`), Sichtbarkeit (`hidden`, `members`, `public`), Grundpreis und Vereinsaufschlag in Cent, Gamertag erlaubt, Steuerprofil (Referenz), aktuelle Druckdatei (`design_key`), `version` | `slug` |
 | `shop_variants` | Variante eines Produkts: SKU, Bezeichnung, Größe, Farbe, eigener Preis (sonst der des Produkts), aktiv, `version` | `sku` |
-| `shop_designs` | Druckdatei des Vereins je Fassung: `design_key`, `version` (zählt hoch), `file_ref`, `sha256`, Druckposition. Alte Fassungen bleiben | `design_key` + `version` |
+| `shop_designs` | Druckdatei des Vereins je Fassung: `design_key`, `version` (zählt hoch), `file_ref`, `sha256`, Druckposition; seit #1708 dazu `public_id` (Zufallsschlüssel der öffentlichen Adresse), Pixel, DPI und Druckmaße in Zoll, mit denen sie geprüft wurde, Transparenz, Ausgangsformat und `public_disabled_at` (Aufbewahrung). Alte Fassungen bleiben | `design_key` + `version`; `public_id` |
+| `shop_design_profiles` | Design (#1708): Titel, Platzierung und die **Shirtfarben**, für die es gilt (`garment_colors`), Notiz, `version` | `design_key` |
+| `shop_design_colors` | Belegung einer Shirtfarbe je Platzierung durch ein Design (#1708): `placement`, `color_key` (kleingeschrieben), `color`, `design_key` - macht „eine Farbe, ein Design“ atomar | `placement` + `color_key` |
 | `shop_printful_variants` | Zuordnung Variante → Printful-Variante und -Produkt (Anbieter `printful`) | `provider` + `variant_id` |
 | `shop_carts` | Warenkorb je Konto: Variante, Menge, Gamertag – keine Preise | `user_id` |
 | `shop_orders` | Bestellung mit allem Eingefrorenen (unten), Stand, Rechnungs- und Lieferanschrift, `printful_external_id` | `idempotency_key`, `printful_external_id` |
@@ -119,8 +124,9 @@ die Rolle, andere über eine Freigabe. Matrix: [docs/ROLLEN.md](ROLLEN.md#shop-1
 | `GET /api/admin/shop/orders/{id}` | Bestellung mit Positionen, Anschriften und Verlauf |
 
 `scripts/check-code-patterns.py` (Regel 3) hält fest: Jede Route mit `shop` im Pfad liegt unter `/api/admin/shop`
-und hängt an `require_area("finance")`; eine öffentliche Shop-Route schlägt fehl, bis sie mit #1706/#1712 bewusst
-freigegeben wird.
+und hängt an `require_area("finance")`. Öffentlich ist nur, was in `PUBLIC_SHOP_ROUTES` mit Methode, genauem Pfad,
+Datei und Begründung steht - bisher allein `GET /api/shop/print-files/{public_id}/{filename}` (#1708). Jede andere
+öffentliche Shop-Route schlägt fehl, bis sie dort bewusst freigegeben wird (Shop-Seiten #1712).
 
 **Protokoll** (Betrieb → Ereignisse, Quelle Adminaktionen): `shop_common.record_admin_action` schreibt jede Aktion
 mit Person (`actor_id`), Ziel und Grund (Pflicht, eine Zeile, Mail-Adressen gekürzt) – nie mit Anschrift. Preis- und
@@ -133,13 +139,16 @@ ohne Änderung schreibt nichts.
 | `shop.product.price` | Preis oder Aufschlag eines Produkts bzw. Preis einer Variante |
 | `shop.product.visibility` | Sichtbarkeit |
 | `shop.variant.create`, `shop.variant.update` | Variante angelegt bzw. geändert |
-| `shop.design.add`, `shop.printful_variant.set` | Druckdatei-Fassung, Printful-Zuordnung |
+| `shop.design.add`, `shop.printful_variant.set` | Druckdatei-Fassung (mit Prüfsumme, Pixeln, DPI - nie mit dem Zufallsschlüssel), Printful-Zuordnung |
+| `shop.design.profile` | Design angelegt bzw. Titel, Shirtfarben (vorher/nachher) oder Notiz geändert (#1708) |
+| `shop.design.placement` | Druckbreite, Druckbereich oder Mindest-DPI einer Platzierung, vorher/nachher (#1708) |
 | `shop.order.release`, `shop.order.printful_confirm`, `shop.order.cancel` | vorgesehen für #1718, #1721 |
 | `shop.order.club`, `shop.order.prize` | vorgesehen für #1724, #1726 |
 | `shop.config` | Einstellungen geändert (#1706): Stufe, Freigabe „Steuer geklärt“, Notschalter, Preise, Printful-Schlüssel – mit vorher und nachher, nie mit Schlüssel |
 
-**Menü:** Verwaltung → Finanzen → **Shop** (`/admin/shop`, #1706). Die Produktverwaltung (#1707) kommt auf dieselbe
-Seite oder daneben.
+**Menü:** Verwaltung → Finanzen → **Shop** (`/admin/shop`, #1706) - ein Menüeintrag mit Reitern: **Einstellungen**
+(`/admin/shop`) und **Designs** (`/admin/shop/designs`, #1708). Die Produktverwaltung (#1707) und der Testentwurf
+(#2062) kommen als weitere Reiter dazu (`frontend/src/pages/admin/ShopTabs.jsx`), ohne das Menü zu verlängern.
 
 ## Einstellungen, Stufen und Notschalter (#1706)
 
@@ -193,6 +202,96 @@ Shop), Verbindungstest über den Printful-Adapter (`printful_client.py`, unten).
 
 Neue Umgebungswerte braucht es nicht: der Schlüssel liegt verschlüsselt in der Datenbank. Offen aus #1706: der
 Abschnitt „Zahlungsbedingungen für den Shop“ (Dolibarr-Zahlungsbedingungen, Erinnerungen) folgt in einem eigenen Paket.
+
+
+## Designs und Druckdateien (#1708)
+
+Code: `backend/services/shop_designs.py`, Routen `backend/routes/shop_design_routes.py` (Admin) und
+`shop_print_file_routes.py` (öffentlich für Printful), Seite `frontend/src/pages/admin/AdminShopDesignsPage.jsx`
+(Verwaltung → Finanzen → Shop → Reiter **Designs**). Käufer laden nie etwas hoch; Druckdateien kommen nur von den
+Finanzen.
+
+**Upload** (nur Finanzen mit Zwei-Faktor, mit Grund, Protokoll `shop.design.add`):
+
+- Nur **PNG oder JPG**, höchstens 50 MB (`SHOP_DESIGN_MAX_MB`) und 40 Millionen Pixel. SVG (auch als `.png`
+  getarnt), WebP, GIF, PDF, animierte PNG und 16-Bit-Graustufen werden mit Text abgelehnt.
+- **Limit am Eingang:** `services/body_limits.py` lehnt die Upload-Route mit 413 ab, sobald `Content-Length` mehr als
+  50 MB plus 256 KB Formular sagt - oder beim Mitzählen, wenn die Angabe fehlt -, bevor FastAPI etwas in eine
+  Zwischendatei schreibt. nginx begrenzt genau diese Route auf 51 MB (global sind 1700 MB für Videos erlaubt).
+- **Neu kodiert:** Pillow liest die Pixel, ein eingebettetes Farbprofil wird nach sRGB umgerechnet, dann entsteht aus
+  den nackten Pixeln ein neues PNG. EXIF, GPS, Texte, Profile und Anhänge der Originaldatei kommen nicht mit; das
+  Original wird nicht gespeichert. **Transparenz bleibt** (RGBA). Ein JPG wird zum PNG ohne Transparenz - die Seite
+  warnt, dass dann der Hintergrund mitgedruckt wird. Im PNG steht nur die DPI bei der Druckbreite.
+- Anders als die übrigen Bild-Uploads wird **nicht verkleinert**: Druckdateien brauchen ihre volle Auflösung.
+
+**Prüfung je Platzierung.** Je Platzierung eine einstellbare Vorgabe (Dokument `settings` mit
+`id = "shop_design_placements"`, Protokoll `shop.design.placement` mit vorher/nachher): Druckbreite, Breite und Höhe
+des Druckbereichs (Zoll) und Mindest-DPI. DPI = Pixelbreite / Druckbreite; die Höhe folgt aus dem Seitenverhältnis.
+
+| Platzierung | Druckbreite | Druckbereich | Mindest-DPI |
+| --- | --- | --- | --- |
+| Brust rechts (vom Träger aus) – Löwe | 3,5 Zoll (8,9 cm) | 5 × 5 Zoll (12,7 × 12,7 cm) | 300 |
+| Brust links (vom Träger aus) – Namensfeld | 3,5 Zoll (8,9 cm) | 5 × 5 Zoll (12,7 × 12,7 cm) | 300 |
+| Rücken, Vorderseite groß | 10 Zoll (25,4 cm) | 12 × 16 Zoll (30,5 × 40,6 cm) | 300 |
+| Ärmel links/rechts | 3 Zoll (7,6 cm) | 3,5 × 3,5 Zoll (8,9 × 8,9 cm) | 300 |
+| Innenetikett | 2,5 Zoll (6,4 cm) | 3 × 3 Zoll (7,6 × 7,6 cm) | 300 |
+
+Die Vorgaben stammen aus dem Testshirt (Löwe 3,5 Zoll); die Druckbereiche sind vorsichtig gewählt und mit Printful zu
+bestätigen (#1700). Printful nimmt ab 150 DPI, der Verein verlangt 300. Zu wenig wird abgelehnt, etwa: „Zu wenig
+Auflösung: bei 3,5 Zoll (8,9 cm) Breite hat die Datei nur 150 DPI, nötig sind 300. Dafür braucht sie mindestens 1050
+Pixel Breite“; ebenso ein Motiv, das bei der Druckbreite höher wird als der Druckbereich. Die **Ampel** im Admin rechnet
+immer mit der geltenden Vorgabe: **Gut** (ab 120 % der Mindest-DPI), **Knapp** (darunter), **Reicht nicht** (zu wenig
+oder zu hoch, etwa nach einer geänderten Vorgabe). Jede Version behält die Maße, mit denen sie geprüft wurde.
+
+**Versionen.** Jede neue Datei ist eine neue Version (`shop_catalog.add_design_version`) mit SHA-256 der gespeicherten
+Datei, eigener Datei auf der Platte (`UPLOAD_DIR/shop-designs/<zufällig>.png`, mit `xb` angelegt - nie überschrieben)
+und eigenem Zufallsschlüssel. Dieselbe Datei wie die aktuelle Version ergibt keine neue (409). Eine Bestellung friert
+`design_key`, `version` und `sha256` ein und behält damit ihre Version samt Adresse. Ein Design behält seine
+Platzierung; für eine andere Platzierung gibt es ein eigenes Design.
+
+**Öffentliche Adresse für Printful:** `GET /api/shop/print-files/<public_id>/<design>-v<version>.png`
+
+- `public_id` = `secrets.token_urlsafe(32)` (256 Bit), je Version neu, unabhängig von Design, Version und Prüfsumme.
+  Die Version steht im Namen, damit Printful eine neue Datei nicht aus dem Zwischenspeicher nimmt.
+- Schlüssel **und** Name müssen genau passen; sonst - auch bei abgeschalteter Version - dieselbe 404. Keine Liste,
+  kein Verzeichnis, keine Aufzählung; der Schlüssel steht nicht im Protokoll.
+- Ausgeliefert wird nur die fertige Druckdatei als `image/png` mit `nosniff`, `no-store`, `noindex` und
+  `Content-Security-Policy: default-src 'none'; sandbox` und `Referrer-Policy: no-referrer` (die globale Middleware
+  überschreibt eine strengere Regel einer Route nicht mehr).
+- **Nicht in den Protokollen:** Uvicorns Zugriffsprotokoll kürzt den Pfad zu `/api/shop/print-files/***/…`
+  (`log_safe.SecretPathFilter`). nginx schreibt für diesen Pfad das Format `tls_redacted` (wie `main`, mit gekürzter
+  Anfragezeile) und Fehlerzeilen nur ab `crit`, weil nginx-Fehlerzeilen die volle Anfrage nennen.
+- Unabhängig von Stufe und Notschalter: Printful braucht die Dateien auch für Testentwürfe (#2062) und bestehende
+  Bestellungen. Im Admin kopiert „Adresse für Printful“ die volle Adresse (`PUBLIC_BACKEND_URL`, `PUBLIC_BASE_URL`
+  oder `FRONTEND_URL` davor). Hochladen zu Printful übernimmt der Adapter (#1705) über diese Adresse.
+- Bewusste Ausnahme in Regel 3 (`scripts/check-code-patterns.py`, `PUBLIC_SHOP_ROUTES`), Tests in
+  `test_code_patterns_unit.py` und `test_shop_print_files_flow.py`.
+
+**Aufbewahrung (vorbereitet, nichts wird automatisch gelöscht).** `shop_designs.retention_plan(db)` ist ein Bericht:
+
+- Die neueste Version eines Designs bleibt öffentlich.
+- Eine ältere Version, auf die eine Bestellung zeigt, bleibt öffentlich - bis die Statusmaschine (#1716)
+  „abgeschlossen“ kennt; dann gilt die Frist ab Abschluss.
+- Eine ältere Version ohne Bestellung darf 90 Tage nach ihrer Ablösung abgeschaltet werden (`public_disabled_at`
+  setzen; die Adresse antwortet dann 404). Die Datei bleibt für den Nachweis liegen.
+- Endgültiges Löschen der Dateien regelt #1731 (Aufbewahrungsfristen). Bis dahin löscht nichts.
+
+**Shirtfarben.** Ein Design gilt für eine Liste von Shirtfarben (`garment_colors`, Schreibweise wie an den Varianten,
+Groß-/Kleinschreibung egal) - etwa `loewe-weiss` für Schwarz und Navy, `loewe-schwarz` für Weiß und Hellgrau. Je
+Platzierung gehört eine Farbe zu höchstens einem Design (sonst 409) - atomar über `shop_design_colors` mit eindeutigem
+Index, auch bei zwei gleichzeitigen Änderungen. Die Produktverwaltung (#1707) fragt
+`shop_designs.design_for_color(db, platzierung, farbe)` und bekommt Design und neueste Version - oder `None`, dann ist
+die Variante ohne Druckdatei.
+
+| Route (alle `require_area("finance")`) | Zweck |
+| --- | --- |
+| `GET /api/admin/shop/designs` | Designs mit Versionen, Ampel, Adressen; Druckbereiche je Platzierung |
+| `POST /api/admin/shop/designs/upload` | Datei hochladen (Formular: `file`, `design_key`, `reason`; neues Design dazu `title`, `placement`, `garment_colors`) |
+| `PATCH /api/admin/shop/designs/{design_key}` | Titel, Shirtfarben, Notiz (mit Grund) |
+| `PUT /api/admin/shop/designs/placements/{placement}` | Druckbreite, Druckbereich, Mindest-DPI in Zoll (mit Grund) |
+
+Nicht in #1708: der Editor mit Ebenen, Hilfslinien und Drag-and-drop (Teil 2), die Gamertag-Druckdatei (#1711),
+Mockups (#1710) und das Hochladen zu Printful (#1705).
 
 ## Printful-Adapter (#1705)
 
@@ -325,3 +424,4 @@ Geheimnis gehört verschlüsselt in die Shop-Einstellungen (#1720).
 nie), Bestätigen mit Notschalter und Idempotenz, Dateien, Mockups, Signatur, jede Fehlerklasse, Wiederholen mit
 `Retry-After`, kein Schlüssel in Fehlern und Logs. Es gibt **keine** echten Aufrufe an Printful. Die Abnahme gegen das
 echte Printful (Entwurf und Schätzung anlegen, nicht bestätigen) macht der Obmann mit der Testansicht aus #2062.
+
