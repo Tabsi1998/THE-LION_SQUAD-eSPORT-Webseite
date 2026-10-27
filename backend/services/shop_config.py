@@ -150,23 +150,33 @@ def shipping_cents(config: dict, estimate: Any) -> int:
 # ---------------------------------------------------------------- Notschalter
 
 async def printful_writes_allowed(db) -> bool:
-    return (await load(db))["orders_to_printful"]
+    """Nur mit Schalter an **und** lesbarem Schlüssel - steht der Schalter (etwa nach einem Rennen mit „Schlüssel
+    entfernen“) ohne Schlüssel an, bleibt alles zu."""
+    config = await load(db)
+    return config["orders_to_printful"] and key_state(config) == "ok"
 
 
 async def require_printful_writes(db) -> None:
-    """Pflicht vor jedem schreibenden Aufruf bei Printful (Entwurf, Bestätigung, Storno): ist der Notschalter aus,
-    geht nichts hinaus - unabhängig von der Stufe."""
+    """Pflicht vor jedem schreibenden Aufruf bei Printful (Entwurf, Bestätigung, Storno): ist der Notschalter aus oder
+    fehlt ein lesbarer Schlüssel, geht nichts hinaus - unabhängig von der Stufe."""
     if not await printful_writes_allowed(db):
         raise PrintfulWritesBlocked("Bestellungen an Printful senden ist ausgeschaltet.")
 
 
 # ---------------------------------------------------------------- Schreiben (immer mit Grund und Protokoll)
 
-async def _save(db, fields: dict, *, actor_id: str) -> None:
+KEY_PRESENT = {"printful_api_key": {"$exists": True, "$nin": ["", None]}}
+NO_KEY = "Erst den Printful-Schlüssel hinterlegen – ohne Schlüssel kann nichts gesendet werden."
+
+
+async def _save(db, fields: dict, *, actor_id: str, only_if: dict | None = None) -> bool:
+    """Ein einziges Update. Mit ``only_if`` bedingt und ohne Anlegen: ``False``, wenn die Bedingung nicht mehr gilt."""
     now = now_utc().isoformat()
-    await db.settings.update_one({"id": SETTINGS_ID},
-                                 {"$set": {"id": SETTINGS_ID, **fields, "updated_at": now, "updated_by": actor_id}},
-                                 upsert=True)
+    result = await db.settings.update_one({"id": SETTINGS_ID, **(only_if or {})},
+                                          {"$set": {"id": SETTINGS_ID, **fields, "updated_at": now,
+                                                    "updated_by": actor_id}},
+                                          upsert=only_if is None)
+    return only_if is None or result.matched_count == 1
 
 
 async def update(db, changes: dict, *, actor: dict, is_superadmin: bool, reason: Any) -> tuple[dict, list[str]]:
@@ -196,12 +206,16 @@ async def update(db, changes: dict, *, actor: dict, is_superadmin: bool, reason:
             raise ShopForbidden(ONLY_SUPERADMIN)
         if not current["tax_cleared"]:
             raise ShopConflict("„Öffentlich“ ist gesperrt, bis die Steuer geklärt ist (#1701).")
-    if after.get("orders_to_printful") is True and key_state(current) != "ok":
-        raise ShopConflict("Erst den Printful-Schlüssel hinterlegen – ohne Schlüssel kann nichts gesendet werden.")
+    switching_on = after.get("orders_to_printful") is True
+    if switching_on and key_state(current) != "ok":
+        raise ShopConflict(NO_KEY)
+    # Einschalten nur, solange der Schlüssel noch da ist - als ein bedingtes Update, damit ein gleichzeitiges
+    # „Schlüssel entfernen“ nie mit Schalter an ohne Schlüssel endet. Erst schreiben, dann protokollieren.
+    if not await _save(db, after, actor_id=actor["id"], only_if=KEY_PRESENT if switching_on else None):
+        raise ShopConflict(NO_KEY)
     await shop_common.record_admin_action(
         db, "shop.config", actor_id=actor["id"], target_id=SETTINGS_ID, reason=reason,
         data={"before": {field: current[field] for field in after}, "after": after})
-    await _save(db, after, actor_id=actor["id"])
     return await load(db), sorted(after)
 
 
@@ -252,10 +266,11 @@ async def remove_printful_key(db, *, actor: dict, reason: Any) -> dict:
     before, after = {"printful_key": "hinterlegt"}, {"printful_key": "entfernt"}
     if current["orders_to_printful"]:
         before["orders_to_printful"], after["orders_to_printful"] = True, False
-    await shop_common.record_admin_action(db, "shop.config", actor_id=actor["id"], target_id=SETTINGS_ID,
-                                          reason=reason, data={"before": before, "after": after})
+    # Schlüssel leer und Schalter aus in einem Update - nie ein Zwischenstand mit Schalter an ohne Schlüssel.
     await _save(db, {"printful_api_key": "", "printful_key_saved_at": None, "printful_key_saved_by": None,
                      "printful_last_test": None, "orders_to_printful": False}, actor_id=actor["id"])
+    await shop_common.record_admin_action(db, "shop.config", actor_id=actor["id"], target_id=SETTINGS_ID,
+                                          reason=reason, data={"before": before, "after": after})
     return await load(db)
 
 

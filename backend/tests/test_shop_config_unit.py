@@ -6,7 +6,10 @@ import pytest
 from mongomock_motor import AsyncMongoMockClient
 
 from services import shop_catalog, shop_config, shop_orders, shop_schema
-from services.shop_common import ShopError
+from services.secret_store import encrypt_secret
+from services.shop_common import ShopConflict, ShopError
+
+FAKE_KEY = "pf-testschluessel-nicht-echt-0123456789"
 
 BY = {"actor_id": "finanzen-test", "reason": "Testdaten anlegen"}
 BILLING = {"name": "Testperson Eins", "street": "Probegasse 1", "zip": "1010", "city": "Wien", "country": "AT",
@@ -63,9 +66,50 @@ async def test_without_settings_and_with_junk_values_the_switch_counts_as_off(db
 @pytest.mark.asyncio
 async def test_switch_on_lets_the_adapter_write_independent_of_the_stage(db):
     fake = FakePrintful(db)
-    await settle(db, stage="off", orders_to_printful=True)
+    await settle(db, stage="off", orders_to_printful=True, printful_api_key=encrypt_secret(FAKE_KEY))
     await fake.confirm_order("lsw-test-2")
     assert fake.sent == ["lsw-test-2"]
+
+
+@pytest.mark.asyncio
+async def test_switch_on_without_a_readable_key_still_blocks_every_write(db):
+    fake = FakePrintful(db)
+    for stored in ("", None, "enc:v1:kaputt"):
+        await settle(db, orders_to_printful=True, printful_api_key=stored)
+        assert await shop_config.printful_writes_allowed(db) is False, stored
+        with pytest.raises(shop_config.PrintfulWritesBlocked):
+            await fake.confirm_order("lsw-test-3")
+    assert fake.sent == []
+
+
+@pytest.mark.asyncio
+async def test_switching_on_while_the_key_is_removed_in_between_never_ends_with_switch_on_and_no_key(db, monkeypatch):
+    """Codex-Befund: „Notschalter an“ liest die Einstellungen (Schlüssel da), dann entfernt jemand den Schlüssel, dann
+    schreibt das Einschalten. Ohne bedingtes Update stünde danach Schalter an ohne Schlüssel."""
+    actor = {"id": "finanzen-test"}
+    await settle(db, orders_to_printful=False, printful_api_key=encrypt_secret(FAKE_KEY))
+    original_load = shop_config.load
+    state = {"interleaved": False}
+
+    async def load_then_remove(database):
+        config = await original_load(database)
+        if not state["interleaved"]:
+            state["interleaved"] = True
+            await shop_config.remove_printful_key(database, actor={"id": "system-test"}, reason="Schlüssel ausgetauscht")
+        return config
+
+    monkeypatch.setattr(shop_config, "load", load_then_remove)
+    with pytest.raises(ShopConflict):
+        await shop_config.update(db, {"orders_to_printful": True}, actor=actor, is_superadmin=False,
+                                 reason="Produktion starten")
+    monkeypatch.setattr(shop_config, "load", original_load)
+    stored = await db.settings.find_one({"id": "shop"}, {"_id": 0})
+    assert stored["orders_to_printful"] is False and not stored["printful_api_key"]
+    with pytest.raises(shop_config.PrintfulWritesBlocked):
+        await FakePrintful(db).confirm_order("lsw-test-4")
+    # Ins Protokoll kommt nur das Entfernen - das gescheiterte Einschalten nicht.
+    rows = await db.audit_logs.find({"action": "shop.config"}, {"_id": 0}).to_list(10)
+    assert [row["data"]["after"] for row in rows] == [{"printful_key": "entfernt"}]
 
 
 # ---------------------------------------------------------------- Preise und Versand
