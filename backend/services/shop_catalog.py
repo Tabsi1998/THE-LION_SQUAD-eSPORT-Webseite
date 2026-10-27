@@ -50,7 +50,7 @@ _UMLAUTS = str.maketrans({"ä": "ae", "ö": "oe", "ü": "ue", "ß": "ss", "Ä": 
 
 
 def slugify(text: str) -> str:
-    """„Löwen-Shirt Größe“ → ``loewen-shirt-groesse``."""
+    """Slug aus dem Titel: Kleinbuchstaben, Ziffern, Bindestriche; Umlaute ausgeschrieben (ä → ae, ß → ss)."""
     plain = str(text or "").translate(_UMLAUTS).lower()
     return "-".join(re.findall(r"[a-z0-9]+", plain))[:80].strip("-")
 

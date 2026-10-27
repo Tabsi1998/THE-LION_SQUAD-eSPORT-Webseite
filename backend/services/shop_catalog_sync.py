@@ -21,7 +21,7 @@ import logging
 from typing import Any
 
 from models import now_utc
-from services import shop_catalog, shop_config, shop_products
+from services import shop_catalog, shop_config, shop_costs
 from services.shop_common import ShopError, clean_reason, record_admin_action
 from services.shop_fulfillment import CatalogProductId, CatalogVariantId, FulfillmentError, FulfillmentProvider
 
@@ -61,7 +61,7 @@ async def sync_product(db, product_id: str, *, provider: FulfillmentProvider, ac
         logger.warning("[shop-sync] product failed: %s", exc.reason)
         return {"ok": False, "detail": exc.text, "at": now, "blocked": [], "unblocked": [], "price_changes": []}
     by_id = {row.id.value: row for row in rows}
-    technique = shop_products.technique_of(product)
+    technique = shop_costs.technique_of(product)
     blocked, unblocked, price_changes = [], [], []
     open_warnings = blocked_count = 0
     for variant, mapping in mapped:
@@ -86,7 +86,7 @@ async def sync_product(db, product_id: str, *, provider: FulfillmentProvider, ac
         warning = mapping.get("price_warning")
         price = variant.get("price_cents")
         if variant.get("active") and row is not None and row.priced and isinstance(price, int):
-            cost = shop_products.cost_cents(product, {**mapping, **update})
+            cost = shop_costs.cost_cents(product, {**mapping, **update})
             if cost is not None and cost != price:
                 if not warning or warning.get("after_cents") != cost:
                     warning = {"before_cents": price, "after_cents": cost, "at": now}

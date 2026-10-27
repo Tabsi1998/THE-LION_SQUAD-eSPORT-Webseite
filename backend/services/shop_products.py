@@ -28,8 +28,9 @@ import math
 from typing import Any
 
 from models import now_utc
-from services import shop_catalog, shop_config, shop_designs
+from services import shop_catalog, shop_catalog_sync, shop_config, shop_designs
 from services.shop_common import ShopConflict, ShopError, clean_reason, record_admin_action
+from services.shop_costs import cost_cents, included_placement, technique_of
 from services.shop_fulfillment import CatalogProductId, FulfillmentError, FulfillmentProvider
 
 PLACEMENT_KINDS = ("design", "gamertag", "member_number")
@@ -91,48 +92,6 @@ def _canonical(value: Any, known: list[str], label: str) -> str:
         if item.casefold() == text.casefold():
             return item
     raise ShopError(f"{label} „{text}“ gibt es bei diesem Printful-Produkt nicht.")
-
-
-def technique_of(product: dict) -> str | None:
-    printful = product.get("printful") or {}
-    return product.get("technique") or printful.get("default_technique")
-
-
-def used_printful_placements(product: dict) -> list[str]:
-    out: list[str] = []
-    for row in product.get("placements") or []:
-        if row.get("printful_placement") and row["printful_placement"] not in out:
-            out.append(row["printful_placement"])
-    return out
-
-
-def included_placement(product: dict) -> str | None:
-    """Die Druckfläche, die im Grundpreis der Variante steckt - die anderen kosten ihren Aufpreis."""
-    used = used_printful_placements(product)
-    chosen = product.get("included_placement")
-    if chosen in used:
-        return chosen
-    if "front" in used:
-        return "front"
-    return used[0] if used else None
-
-
-def cost_cents(product: dict, mapping: dict | None) -> int | None:
-    """Einkauf je Variante: Grundpreis der Technik plus Aufpreis jeder weiteren Druckfläche. ``None``, wenn ein Preis
-    fehlt - dann gibt es keinen Preis, nie einen geratenen."""
-    if not mapping or not isinstance(mapping.get("base_cost_cents"), int):
-        return None
-    total = mapping["base_cost_cents"]
-    included = included_placement(product)
-    costs = mapping.get("placement_costs") or {}
-    for placement in used_printful_placements(product):
-        if placement == included:
-            continue
-        extra = costs.get(placement)
-        if not isinstance(extra, int):
-            return None
-        total += extra
-    return total
 
 
 def _area(product: dict, printful_placement: str) -> dict | None:
@@ -288,8 +247,6 @@ async def set_offer(db, product_id: str, *, technique: Any, colors: Any, sizes: 
     for variant in await shop_catalog.variants_of(db, product_id):
         if variant["id"] not in offered_ids and variant.get("active"):
             await shop_catalog.set_variant_state(db, variant["id"], {"active": False}, actor_id=actor_id)
-    from services import shop_catalog_sync
-
     await shop_catalog_sync.sync_product(db, product_id, provider=provider, actor_id=actor_id, reason=reason)
     return await shop_catalog.get_product(db, product_id) or saved
 
