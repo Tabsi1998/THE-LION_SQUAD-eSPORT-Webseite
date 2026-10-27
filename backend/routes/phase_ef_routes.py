@@ -176,6 +176,11 @@ DEFAULT_EMAIL_TEMPLATES = [
      "subject": "Neue Mitgliedsbewerbung",
      "html": "<p>{{applicant}} hat eine Mitgliedsbewerbung eingereicht. Bitte im Admin-Bereich prüfen.</p>",
      "vars": ["applicant"]},
+    # Wunschnummer (#2034): ein Mitglied möchte eine andere Nummer - die Nummer selbst steht nicht in der Mail.
+    {"key": "jersey_number_request_admin", "name": "Antrag auf eine andere Nummer (Admin-Notify)",
+     "subject": "Antrag auf eine andere Nummer",
+     "html": "<p>{{member}} möchte eine andere Nummer. Du findest den Antrag im Admin unter Mitglieder → Nummern.</p>",
+     "vars": ["member"]},
     # Verwarnungen mit Stufen (#416): was gilt, warum, und der Weg zum Einspruch.
     {"key": "moderation_notice", "name": "Moderation: Hinweis",
      "subject": "Hinweis der Moderation",

@@ -103,6 +103,7 @@ from routes.phase_fg_routes import (
 from routes.seo_render_routes import router as seo_render_router
 from routes.penalty_routes import router as penalty_router, admin_router as penalty_admin_router
 from routes.membership_routes import router as membership_router
+from routes.jersey_number_routes import router as jersey_number_router
 from routes.document_routes import router as document_router, account_router as account_document_router
 from routes.home_routes import router as home_router
 from routes.calendar_routes import router as calendar_router
@@ -388,6 +389,7 @@ app.include_router(admin_nav_router)
 app.include_router(seo_router)
 app.include_router(seo_meta_router)
 app.include_router(seo_render_router)
+app.include_router(jersey_number_router)  # vor membership_router: /api/membership/me/jersey-number (#2034)
 app.include_router(membership_router)
 app.include_router(document_router)
 app.include_router(account_document_router)

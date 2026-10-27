@@ -251,6 +251,9 @@ async def _user_data_sections(db, user_id: str) -> list[tuple[str, tuple]]:
         ("dolibarr_links", _rows(db.dolibarr_links, me, lambda row: _clean(row, "member_key"))),
         ("dolibarr_identities", _rows(db.dolibarr_identities, me)),
         ("dolibarr_honours", _rows(db.dolibarr_honours, me)),
+        # Wunschnummer (#2034) mit Verlauf und Anträgen - ohne die Kennung, wer im Vorstand entschieden hat.
+        ("jersey_number", _rows(db.jersey_numbers, me, lambda row: _clean(row, "number_key"))),
+        ("jersey_number_requests", _rows(db.jersey_number_requests, me, lambda row: _clean(row, "decided_by"))),
         ("billing_orders", _rows(db.billing_orders, me)),
         ("billing_customers", _rows(db.billing_customers, me)),
         ("match_reports", _rows(db.match_reports_v2, {"reporter_user_id": user_id})),

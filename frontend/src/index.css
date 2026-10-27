@@ -711,6 +711,13 @@ button.tls-bracket-row:active, .tls-bracket-head:active { transform: scale(calc(
 .tls-glow[data-glow="again"]::after { animation: tls-glow-again var(--tls-motion-glow) var(--tls-ease) both; }
 @keyframes tls-glow-once { 0% { opacity: 0; } 35% { opacity: 1; } 100% { opacity: 0; } }
 @keyframes tls-glow-again { 0% { opacity: 0; } 35% { opacity: 1; } 100% { opacity: 0; } }
+/* Meine Nummer (#2034): die eben festgelegte Nummer hebt sich sanft hinein und leuchtet einmal auf (tls-glow).
+   Weg und Größe hängen an --tls-motion-on, die Dauer an „Bewegung reduzieren“. */
+.tls-jersey-number { --tls-glow-radius: 4px; padding: 0 6px; margin-left: -6px; }
+.tls-jersey-number[data-fresh="1"] { animation: tls-jersey-land var(--tls-motion-slow) var(--tls-ease) both; }
+@keyframes tls-jersey-land {
+  from { opacity: 0; transform: translateY(calc(8px * var(--tls-motion-on))) scale(calc(1 - 0.06 * var(--tls-motion-on))); }
+}
 
 @keyframes tls-stagger-in { from { opacity: 0; transform: translateY(calc(8px * var(--tls-motion-on))); } }
 .tls-stagger[data-stagger="wait"] > :nth-child(-n+12) { opacity: 0; }

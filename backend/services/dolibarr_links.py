@@ -14,8 +14,12 @@ Mitglied und Geschäftspartner sind nicht dasselbe.
 """
 from __future__ import annotations
 
+import logging
+
 from models import new_id, now_utc
 from services.dolibarr_client import instance_key
+
+logger = logging.getLogger("tls.dolibarr.links")
 
 LINK_STATUSES = ("candidate", "requested", "verified", "conflict", "revoked", "gone")
 OPEN_STATUSES = ("candidate", "requested", "conflict")
@@ -113,6 +117,7 @@ async def verify_link(db, settings: dict, *, user_id: str, member_id: int, membe
             "id": new_id(), "user_id": user_id, "instance": instance_key(settings), "thirdparty_id": None,
             "created_at": now, "history": [_history(actor_id, "verified", source)], **fields,
         })
+    await _notify_link_change(db, user_id)
     return await link_for_user(db, settings, user_id)
 
 
@@ -124,3 +129,26 @@ async def close_link(db, link: dict, *, status: str, actor_id: str | None, note:
          "$unset": {"member_key": ""},
          "$push": {"history": _history(actor_id, status, note)}},
     )
+    await _notify_link_change(db, link.get("user_id"))
+
+
+# Wer erfahren will, dass eine Zuordnung bestätigt oder gelöst wurde (etwa die Wunschnummer, #2034), meldet sich hier an
+# - so muss dieses Modul niemanden importieren, und es entsteht kein Import-Kreis.
+LINK_LISTENERS: list = []
+
+
+def on_link_change(listener) -> None:
+    """``listener(db, user_id)`` läuft nach jeder bestätigten oder gelösten Zuordnung."""
+    if listener not in LINK_LISTENERS:
+        LINK_LISTENERS.append(listener)
+
+
+async def _notify_link_change(db, user_id: str | None) -> None:
+    """Zuordnung geändert: die Angemeldeten benachrichtigen. Ein Fehler dort darf nie die Zuordnung stören."""
+    if not user_id:
+        return
+    for listener in list(LINK_LISTENERS):
+        try:
+            await listener(db, user_id)
+        except Exception:  # noqa: BLE001
+            logger.warning("[dolibarr] Folgeschritt nach geänderter Zuordnung fehlgeschlagen", exc_info=True)

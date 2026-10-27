@@ -450,6 +450,10 @@ async def erase_related(db, user: dict, now: str, erased_at: str | None = None) 
     user_id = user["id"]
     until = erase_after(erased_at or now)
     purged = 0
+    # Wunschnummer (#2034): sofort frei, Anträge und Verlauf weg - auch in Dolibarr, soweit erreichbar.
+    from services import jersey_numbers
+
+    await jersey_numbers.release_for_erasure(db, user_id)
     for name in PURGED:
         purged += (await getattr(db, name).delete_many({"user_id": user_id})).deleted_count
     directory_images = await _directory(db, user_id, now)

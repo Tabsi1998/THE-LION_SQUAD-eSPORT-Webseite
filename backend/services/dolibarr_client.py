@@ -313,6 +313,22 @@ class DolibarrClient:
             raise DolibarrError("invalid_response", 200)
         return data
 
+    async def core_members_page(self, page: int) -> list[dict]:
+        """Eine Seite aller Mitglieder aus Dolibarrs Mitgliedermodul, mit ergänzenden Attributen (#2034).
+        Dolibarr antwortet 404 auf eine leere Seite."""
+        rows = await self._rows("/members", {"sortfield": "t.rowid", "sortorder": "ASC", "limit": PAGE_LIMIT, "page": int(page)})
+        if rows is None:
+            raise DolibarrError("forbidden", 403)
+        return rows
+
+    async def set_member_extrafield(self, member_id: int, code: str, value) -> dict:
+        """Ein ergänzendes Attribut beim Mitglied schreiben (#2034) - fester Pfad, ein festes Feld, ohne Wiederholung.
+        Dolibarr lässt ein nicht angelegtes Attribut still weg; wer sicher sein will, liest danach nach."""
+        if not re.fullmatch(r"[a-z][a-z0-9_]{0,63}", str(code or "")):
+            raise DolibarrError("bad_request", 400)
+        data = await self._send("PUT", f"/members/{int(member_id)}", {"array_options": {f"options_{code}": value}})
+        return data if isinstance(data, dict) else {}
+
     async def product(self, product_id: int) -> dict:
         data = await self._get(f"/products/{int(product_id)}")
         if not isinstance(data, dict) or "id" not in data:

@@ -559,6 +559,17 @@ async def _safe_dolibarr_participations():
         _log_task_failure("dolibarr_participations", exc)
 
 
+async def _safe_jersey_numbers():
+    """Wunschnummer (#2034): nachtragen, was noch nicht in Dolibarr steht (Feld fehlt, nicht erreichbar, keine Zuordnung)."""
+    try:
+        from services.jersey_numbers import sync_pending
+        res = await sync_pending()
+        if any(state not in ("ok", "skipped") for state in res):
+            logger.info(f"[scheduler] jersey_numbers {res}")
+    except Exception as exc:
+        _log_task_failure("jersey_numbers", exc)
+
+
 async def _safe_dolibarr_ballot_watch():
     """Abstimmung live (#844): alle fünf Sekunden nachsehen, ob es Zeit ist - während einer Versammlung alle fünf Sekunden
     in den Feed, sonst jede Minute."""
@@ -1115,6 +1126,8 @@ def start_scheduler() -> AsyncIOScheduler:
                   max_instances=1, coalesce=True)
     sched.add_job(_single_replica("dolibarr_participations", _safe_dolibarr_participations, lease_seconds=300.0), IntervalTrigger(minutes=10),
                   id="dolibarr_participations", max_instances=1, coalesce=True)
+    sched.add_job(_single_replica("jersey_numbers", _safe_jersey_numbers, lease_seconds=300.0), IntervalTrigger(minutes=10),
+                  id="jersey_numbers", max_instances=1, coalesce=True)
     sched.add_job(_single_replica("game_server_sync", _safe_game_server_sync), IntervalTrigger(seconds=60), id="game_server_sync",
                   max_instances=1, coalesce=True)
     sched.add_job(_single_replica("mobile_push_receipts", _safe_mobile_push_receipts), IntervalTrigger(minutes=5), id="mobile_push_receipts",

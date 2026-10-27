@@ -182,6 +182,8 @@ async def sample_catalog(db=None, guild_id: str | None = None) -> list[dict]:
     await add("membership.application", EVENTS["membership.application"]["label"], "board",
               board_message("membership.application", "Ein neuer Antrag wartet auf die Entscheidung des Vorstands."), target="board", source_text=SOURCE_EXAMPLE)
     await add("contact.request", EVENTS["contact.request"]["label"], "board", board_message("contact.request", "Thema: Turniere"), target="board", source_text=SOURCE_EXAMPLE)
+    await add("membership.jersey_number", EVENTS["membership.jersey_number"]["label"], "board",
+              board_message("membership.jersey_number", "Ein Mitglied möchte eine andere Nummer."), target="board", source_text=SOURCE_EXAMPLE)
 
     # Betrieb: roter Auto-Check und Serverfehler, wie Betrieb → Alarme sie schickt.
     check = check_red_message({"key": "mail_queue", "label": "Mail-Queue", "value": "3 Mails hängen", "detail": "Seit 20 Minuten kein Versand."},

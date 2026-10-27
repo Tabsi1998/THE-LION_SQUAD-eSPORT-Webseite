@@ -90,6 +90,8 @@ class FakeDb:
             "match_proof_photos", "f1_staff_assignments", "season_standings", "season_rank_snapshots", "upload_events",
             # Externe Serien (#1741): Captain, Teilnahmen und Aliase über eigene Vereinsprofile
             "reference_series_staff", "reference_participants", "reference_aliases",
+            # Wunschnummer (#2034)
+            "jersey_numbers", "jersey_number_requests",
         ):
             setattr(self, name, FakeCollection())
 

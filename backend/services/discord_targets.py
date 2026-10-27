@@ -35,6 +35,8 @@ EVENTS = {
     "f1.new_leader": {"target": "events", "label": "Fast Lap: neue Bestzeit", "default": True, "game": True},
     "membership.application": {"target": "board", "label": "Neuer Mitgliedsantrag", "default": False},
     "contact.request": {"target": "board", "label": "Neue Kontaktanfrage", "default": False},
+    # Wunschnummer (#2034): ein Mitglied möchte eine andere Nummer - ohne Namen, ohne Nummer.
+    "membership.jersey_number": {"target": "board", "label": "Antrag auf eine andere Nummer", "default": False},
     # Vereinsgeburtstag (#644): einmal im Jahr ab 10:00 am Gründungstag - öffentlich, ohne Personenbezug.
     "club.birthday": {"target": "community", "label": "Vereinsgeburtstag", "default": False},
 }

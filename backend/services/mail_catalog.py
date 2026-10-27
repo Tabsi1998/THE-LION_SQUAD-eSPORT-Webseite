@@ -53,6 +53,7 @@ CATALOG: dict[str, dict[str, str]] = {
     "membership_approve": {"name": "Bewerbung angenommen", "purpose": "Der Vorstand hat die Mitgliedsbewerbung angenommen.", "recipient": "der Bewerber", "category": "membership"},
     "membership_reject": {"name": "Bewerbung abgelehnt", "purpose": "Der Vorstand hat die Mitgliedsbewerbung abgelehnt.", "recipient": "der Bewerber", "category": "membership"},
     "membership_application_admin": {"name": "Neue Bewerbung (an den Vorstand)", "purpose": "Hinweis an Club-Admins, dass eine Bewerbung wartet.", "recipient": "Club-Admins und Superadmins", "category": "membership"},
+    "jersey_number_request_admin": {"name": "Antrag auf eine andere Nummer (an den Vorstand)", "purpose": "Ein Mitglied möchte eine andere Wunschnummer (#2034) – ohne die Nummer selbst; der Antrag steht im Admin unter Mitglieder → Nummern.", "recipient": "Club-Admins und Superadmins", "category": "membership"},
     "invoice_ready": {"name": "Deine Rechnung ist da", "purpose": "Sobald eine Event- oder Turnierrechnung freigegeben ist (#841) – mit Betrag, Zahlungsziel und Link ins Konto, ohne Anhang.", "recipient": "die Person, die angemeldet hat", "category": "billing"},
     "birthday_greeting": {"name": "Geburtstagsgruß", "purpose": "Ein Gruß am Geburtstag, wenn das Datum im Profil steht.", "recipient": "das Konto", "category": "community"},
     "achievement_recap": {"name": "Wochenrückblick Erfolge", "purpose": "Montags 09:00 an alle, die in der Woche XP oder Erfolge gesammelt haben – abbestellbar.", "recipient": "das Konto", "category": "community"},
@@ -72,7 +73,7 @@ CATALOG: dict[str, dict[str, str]] = {
 
 # Beispielwerte je Variablenname - für Vorschau und Testmail.
 SAMPLES: dict[str, str] = {
-    "display_name": "Paula", "name": "Paula", "applicant": "Paula Beispiel", "invited_by": "Vorstand", "sender_name": "Max", "team_name": "Neon Kings",
+    "display_name": "Paula", "name": "Paula", "applicant": "Paula Beispiel", "member": "Paula Beispiel", "invited_by": "Vorstand", "sender_name": "Max", "team_name": "Neon Kings",
     "tournament_title": "Mario Kart Winter Cup", "title": "Winter Clash 2026 – Anmeldung offen", "opponent": "Team Neon Kings", "station": "Station 3",
     "when": "Samstag, 04.10.2026, 18:00", "until": "18:30 Uhr", "deadline": "31.10.2026", "location": "Vereinsheim Innsbruck",
     "reason": "Beispielgrund", "decision": "Das Ergebnis 2:1 bleibt bestehen.", "summary": "Neon Kings gewinnt 2:1.", "place": "1. Platz", "prize_label": "Gutschein 50 €", "member_number": "TLS-2026-0007",
