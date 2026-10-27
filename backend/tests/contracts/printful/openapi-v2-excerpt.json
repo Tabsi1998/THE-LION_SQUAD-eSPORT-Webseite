@@ -49,6 +49,28 @@
         "responses": {"200": {"content": {"application/json": {"schema": {"$ref": "#/components/schemas/GetProductStockAvailabilityById"}}}}}
       }
     },
+    "/v2/catalog-products/{id}/mockup-styles": {
+      "get": {
+        "operationId": "retrieveMockupStylesByProductId",
+        "description": "Druckvorgaben je Platzierung und Technik (#2069): Druckbereich in Zoll und DPI - daraus die exakte Pixelgröße der Druckdatei.",
+        "parameters": [
+          {"name": "limit", "in": "query", "schema": {"type": "integer", "minimum": 1, "maximum": 100}},
+          {"name": "offset", "in": "query", "schema": {"type": "integer", "minimum": 0}}
+        ],
+        "responses": {"200": {"content": {"application/json": {"schema": {"$ref": "#/components/schemas/GetCatalogProductMockupsStyles"}}}}}
+      }
+    },
+    "/v2/catalog-products/{id}/mockup-templates": {
+      "get": {
+        "operationId": "getMockupTemplatesByProductId",
+        "description": "Vorlagenbilder je Platzierung mit der Lage des Druckbereichs in Pixeln des Bilds (#2069) - für die Vorschau im Admin.",
+        "parameters": [
+          {"name": "limit", "in": "query", "schema": {"type": "integer", "minimum": 1, "maximum": 100}},
+          {"name": "offset", "in": "query", "schema": {"type": "integer", "minimum": 0}}
+        ],
+        "responses": {"200": {"content": {"application/json": {"schema": {"$ref": "#/components/schemas/GetCatalogProductMockupsTemplates"}}}}}
+      }
+    },
     "/v2/order-estimation-tasks": {
       "post": {
         "operationId": "createOrderEstimationTask",
@@ -224,6 +246,45 @@
       "GetProductStockAvailabilityById": {
         "type": "object", "required": ["data", "paging", "filter_settings", "_links"],
         "properties": {"data": {"type": "array", "items": {"$ref": "#/components/schemas/VariantStockAvailability"}}, "paging": {"$ref": "#/components/schemas/Paging"}, "filter_settings": {"type": "array"}, "_links": {"type": "object"}}
+      },
+      "MockupStyle": {
+        "type": "object", "required": ["id", "category_name", "view_name", "restricted_to_variants"],
+        "properties": {"id": {"type": "integer"}, "category_name": {"type": "string"}, "view_name": {"type": "string"}, "restricted_to_variants": {"type": "array", "nullable": true, "items": {"type": "integer"}, "description": "null = keine Einschränkung"}}
+      },
+      "MockupStyles": {
+        "type": "object", "required": ["placement", "display_name", "technique", "print_area_width", "print_area_height", "print_area_type", "dpi", "mockup_styles"],
+        "properties": {
+          "placement": {"type": "string"}, "display_name": {"type": "string"}, "technique": {"type": "string"},
+          "print_area_width": {"type": "number", "description": "Zoll"}, "print_area_height": {"type": "number", "description": "Zoll"},
+          "print_area_type": {"type": "string", "nullable": true, "enum": ["simple", "advanced"]},
+          "dpi": {"type": "integer"},
+          "mockup_styles": {"type": "array", "items": {"$ref": "#/components/schemas/MockupStyle"}}
+        }
+      },
+      "GetCatalogProductMockupsStyles": {
+        "type": "object", "required": ["data", "paging", "_links"],
+        "properties": {"data": {"type": "array", "items": {"$ref": "#/components/schemas/MockupStyles"}}, "paging": {"$ref": "#/components/schemas/Paging"}, "_links": {"type": "object"}}
+      },
+      "MockupTemplates": {
+        "type": "object", "required": ["catalog_variant_ids", "placement", "technique", "image_url", "background_url", "background_color", "template_width", "template_height", "print_area_width", "print_area_height", "print_area_top", "print_area_left", "template_positioning", "orientation"],
+        "properties": {
+          "catalog_variant_ids": {"type": "array", "items": {"type": "integer"}},
+          "placement": {"type": "string"}, "technique": {"type": "string"},
+          "image_url": {"type": "string", "description": "halbdurchsichtiges Vorlagenbild"},
+          "background_url": {"type": "string", "nullable": true},
+          "background_color": {"nullable": true, "description": "laut Printful ein HEX-Farbcode, im Schema als integer beschrieben - beides wird angenommen"},
+          "template_width": {"type": "integer"}, "template_height": {"type": "integer"},
+          "print_area_width": {"type": "integer"}, "print_area_height": {"type": "integer"},
+          "print_area_top": {"type": "integer"}, "print_area_left": {"type": "integer"},
+          "template_positioning": {"type": "string", "enum": ["overlay", "background"]},
+          "orientation": {"type": "string", "enum": ["horizontal", "vertical", "any"]},
+          "template_type": {"type": "string", "nullable": true, "enum": ["custom", "native", "color_group", "advanced"]},
+          "role": {"type": "string", "enum": ["primary", "template", "extra", "unknown", "advanced_template"]}
+        }
+      },
+      "GetCatalogProductMockupsTemplates": {
+        "type": "object", "required": ["data", "paging", "_links"],
+        "properties": {"data": {"type": "array", "items": {"$ref": "#/components/schemas/MockupTemplates"}}, "paging": {"$ref": "#/components/schemas/Paging"}, "_links": {"type": "object"}}
       },
       "LayerInput": {
         "type": "object", "required": ["type", "url"], "additionalProperties": false,

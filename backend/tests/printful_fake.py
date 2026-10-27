@@ -121,6 +121,31 @@ def _error(status: int, message: str = "x") -> httpx.Response:
 
 COLOR_CODES = {"Black": "#0c0c0c", "White": "#ffffff", "Navy": "#1d2335", "Sport Grey": "#9b969c"}
 
+# Druckvorgaben echter Produkte (#2069) - Maße aus den offiziellen Printful-Vorlagen, siehe manifest.json
+# („print_templates“): (Platzierung, Technik, Breite Zoll, Höhe Zoll, DPI, Anzeigename). Daraus folgt die Pixelgröße
+# der Druckdatei, etwa Gildan 5000 vorne 12 × 16 Zoll bei 150 DPI = 1800 × 2400 px.
+PROFILES = {
+    # Das Testshirt der bisherigen Tests: nur vorne und hinten.
+    "testshirt": (("front", "dtg", 12, 16, 150, "Front print"), ("back", "dtg", 12, 16, 150, "Back print")),
+    "gildan5000": (("front", "dtg", 12, 16, 150, "Front print"), ("back", "dtg", 12, 16, 150, "Back print"),
+                   ("sleeve_left", "dtg", 4, 3.5, 150, "Left sleeve"), ("sleeve_right", "dtg", 4, 3.5, 150, "Right sleeve"),
+                   ("label_inside", "dtg", 3, 3, 150, "Inside label")),
+    "jersey": (("front", "sublimation", 33, 45, 150, "Front"), ("back", "sublimation", 33, 45, 150, "Back"),
+               ("sleeve_left", "sublimation", 33, 15, 150, "Left sleeve"),
+               ("sleeve_right", "sublimation", 33, 15, 150, "Right sleeve"),
+               ("label_outside", "sublimation", 3, 3, 150, "Outside label")),
+    "snapback": (("front", "dtf", 4.5, 2.35, 300, "Front"),),
+}
+TEMPLATE_HOST = "files.cdn.printful.com"
+
+
+def template_box(width_in: float, height_in: float, size: int = 1000, inner: int = 600) -> dict:
+    """Wo der Druckbereich im (erfundenen) Vorlagenbild liegt - mittig, mit dem Seitenverhältnis der Fläche."""
+    scale = inner / max(width_in, height_in)
+    width, height = int(round(width_in * scale)), int(round(height_in * scale))
+    return {"template_width": size, "template_height": size, "print_area_width": width, "print_area_height": height,
+            "print_area_left": (size - width) // 2, "print_area_top": (size - height) // 2}
+
 
 def product(product_id: int, *, name: str = "Unisex Staple T-Shirt | Bella + Canvas 3001", variant_count: int = 2,
             sizes=("M", "L"), colors=("Black",)) -> dict:
@@ -162,6 +187,9 @@ class FakePrintful:
         self.broken_file_urls: set[str] = set()
         self.estimations: dict[str, dict] = {}
         self.mockups: dict[int, dict] = {}
+        # Druckvorgaben (mockup-styles) und Vorlagenbilder (mockup-templates) je Produkt (#2069).
+        self.print_areas: dict[int, list[dict]] = {}
+        self.templates: dict[int, list[dict]] = {}
         self.calls: list[dict] = []
         self.confirmations: list[int] = []
         self.faults: list[dict] = []
@@ -189,7 +217,48 @@ class FakePrintful:
                                                 color_code=COLOR_CODES.get(color, "#777777"))
             self.prices[variant_id] = Decimal(price)
             self.stock[variant_id] = stock
+        self.use_profile(product_id, "testshirt")
         return self.products[product_id]
+
+    def use_profile(self, product_id: int, profile: str) -> None:
+        """Druckvorgaben und Vorlagenbilder eines echten Produkts (``PROFILES``) - ersetzt die bisherigen."""
+        self.print_areas[product_id] = []
+        self.templates[product_id] = []
+        placements = []
+        for placement, technique, width, height, dpi, name in PROFILES[profile]:
+            self.set_print_area(product_id, placement, width, height, dpi=dpi, technique=technique, display_name=name)
+            placements.append({"placement": placement, "technique": technique, "layers": [], "print_area_width": width,
+                               "print_area_height": height, "placement_options": [], "conflicting_placements": []})
+        techniques = list(dict.fromkeys(row["technique"] for row in placements))
+        self.products[product_id]["placements"] = placements
+        self.products[product_id]["techniques"] = [{"key": key, "display_name": key.upper(), "is_default": index == 0}
+                                                   for index, key in enumerate(techniques)]
+
+    def set_print_area(self, product_id: int, placement: str, width_in: float, height_in: float, *, dpi: int = 150,
+                       technique: str = "dtg", variants: tuple[int, ...] | None = None, display_name: str | None = None,
+                       template: bool = True) -> None:
+        """Eine Druckvorgabe (mockup-styles) setzen - mit ``variants`` nur für diese Varianten (Tassengröße …)."""
+        rows = self.print_areas.setdefault(product_id, [])
+        rows[:] = [row for row in rows if not (row["placement"] == placement and row["technique"] == technique
+                                               and (row["mockup_styles"][0]["restricted_to_variants"] or None)
+                                               == (list(variants) if variants else None))]
+        rows.append({"placement": placement, "display_name": display_name or placement.replace("_", " ").title(),
+                     "technique": technique, "print_area_width": width_in, "print_area_height": height_in,
+                     "print_area_type": "simple", "dpi": dpi,
+                     "mockup_styles": [{"id": 16000 + len(rows), "category_name": "Flat", "view_name": "Front",
+                                        "restricted_to_variants": list(variants) if variants else None}]})
+        if template:
+            ids = list(variants) if variants else [variant_id for variant_id, row in self.variants.items()
+                                                     if row["catalog_product_id"] == product_id]
+            templates = self.templates.setdefault(product_id, [])
+            templates[:] = [row for row in templates if not (row["placement"] == placement
+                                                             and row["technique"] == technique
+                                                             and set(row["catalog_variant_ids"]) & set(ids))]
+            templates.append({
+                "catalog_variant_ids": ids, "placement": placement, "technique": technique,
+                "image_url": f"https://{TEMPLATE_HOST}/upload/product-templates/{product_id}-{placement}-{len(templates)}.png",
+                "background_url": None, "background_color": None, **template_box(width_in, height_in),
+                "template_positioning": "overlay", "orientation": "any", "template_type": "native", "role": "template"})
 
     def fail(self, what, *, operation: str | None = None, times: int = 1, retry_after: str | None = None) -> None:
         """Den nächsten Aufruf(en) einer Operation (oder jeder) scheitern lassen: ``"timeout"``, ``"network"`` oder ein
@@ -315,6 +384,20 @@ class FakePrintful:
                 for variant_id, row in self.variants.items() if row["catalog_product_id"] == product_id]
         rows, paging = self._paged(rows, params)
         return 200, {"data": rows, "paging": paging, "filter_settings": [], "_links": {"self": {}, "product": {}}}
+
+    def _op_retrieveMockupStylesByProductId(self, args, params, body):
+        product_id = int(args[0]) if args[0].isdigit() else 0
+        if product_id not in self.products:
+            return 404, "Product not found"
+        rows, paging = self._paged(list(self.print_areas.get(product_id) or []), params)
+        return 200, {"data": rows, "paging": paging, "_links": {"self": {}}}
+
+    def _op_getMockupTemplatesByProductId(self, args, params, body):
+        product_id = int(args[0]) if args[0].isdigit() else 0
+        if product_id not in self.products:
+            return 404, "Product not found"
+        rows, paging = self._paged(list(self.templates.get(product_id) or []), params)
+        return 200, {"data": rows, "paging": paging, "_links": {"self": {}}}
 
     # ------------------------------------------------ Kosten
     def _costs(self, items: list[dict], *, done: bool = True) -> dict:

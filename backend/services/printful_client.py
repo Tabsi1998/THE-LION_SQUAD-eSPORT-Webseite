@@ -45,8 +45,8 @@ from services.log_safe import log_safe, mask_addresses
 from services.shop_fulfillment import (
     CatalogProduct, CatalogProductId, CatalogVariant, CatalogVariantId, Costs, DraftLine, DraftOrder,
     FulfillmentError, FulfillmentInvalid, FulfillmentOrder, FulfillmentPermanent, FulfillmentTransient, MockupImage,
-    MockupTask, OrderItem, PlacedFile, Placement, PrintFile, PrintfulOrderId, ProductPlacementInfo, check_external_id,
-    check_https_url, require)
+    MockupTask, MockupTemplate, OrderItem, PLACEMENT_RE, PlacedFile, Placement, PrintArea, PrintFile, PrintfulOrderId,
+    ProductPlacementInfo, TECHNIQUE_RE, check_external_id, check_https_url, require)
 
 logger = logging.getLogger("tls.printful")
 
@@ -427,6 +427,97 @@ class PrintfulClient:
             variants.append(CatalogVariant(**common, currency=str(prices_data.get("currency") or currency),
                                            prices=prices, placement_prices=surcharges))
         return tuple(variants)
+
+    # ------------------------------------------------ Druckvorgaben und Vorlagenbilder (#2069)
+    @staticmethod
+    def _inches(value, *, low: float = 0.1, high: float = 400.0) -> float:
+        if isinstance(value, bool) or not isinstance(value, (int, float)) or not low <= float(value) <= high:
+            raise FulfillmentPermanent("invalid_response")
+        return float(value)
+
+    @staticmethod
+    def _pixels(value, *, low: int = 0, high: int = 100_000) -> int:
+        if type(value) is not int or not low <= value <= high:
+            raise FulfillmentPermanent("invalid_response")
+        return value
+
+    @staticmethod
+    def _placement_key(value) -> str:
+        if not isinstance(value, str) or not PLACEMENT_RE.fullmatch(value):
+            raise FulfillmentPermanent("invalid_response")
+        return value
+
+    @staticmethod
+    def _technique_key(value) -> str:
+        if not isinstance(value, str) or not TECHNIQUE_RE.fullmatch(value):
+            raise FulfillmentPermanent("invalid_response")
+        return value
+
+    async def print_areas(self, product_id: CatalogProductId) -> tuple[PrintArea, ...]:
+        """Die Druckvorgaben je Platzierung und Technik: Druckbereich in Zoll und DPI
+        (``GET /v2/catalog-products/{id}/mockup-styles``). Daraus folgt die exakte Pixelgröße der Druckdatei - die
+        offiziellen Vorlagen von Printful sind genau so groß (Gildan 5000 vorne 12 × 16 Zoll bei 150 DPI = 1800 × 2400).
+        Sind alle Ansichten einer Zeile auf Varianten beschränkt (``restricted_to_variants``), gilt die Vorgabe nur für
+        diese - so kommen Größen mit eigener Fläche (Tasse 11 oz und 15 oz) zu ihrer eigenen Druckdatei."""
+        require(product_id, CatalogProductId, "product_id")
+        rows = await self._pages(f"/v2/catalog-products/{product_id.value}/mockup-styles",
+                                 operation="retrieveMockupStylesByProductId")
+        out = []
+        for row in rows:
+            dpi = row.get("dpi")
+            if type(dpi) is not int or not 72 <= dpi <= 1200:
+                raise FulfillmentPermanent("invalid_response")
+            styles = [item for item in row.get("mockup_styles") or [] if isinstance(item, dict)]
+            restricted = [item.get("restricted_to_variants") for item in styles]
+            variant_ids = None
+            if styles and all(isinstance(item, list) and item for item in restricted):
+                variant_ids = tuple(sorted({value for item in restricted for value in item if type(value) is int}))
+            out.append(PrintArea(
+                placement=self._placement_key(row.get("placement")), technique=self._technique_key(row.get("technique")),
+                display_name=str(row.get("display_name") or "")[:80],
+                width_in=self._inches(row.get("print_area_width")), height_in=self._inches(row.get("print_area_height")),
+                dpi=dpi, area_type=row.get("print_area_type") if isinstance(row.get("print_area_type"), str) else None,
+                variant_ids=variant_ids or None))
+        return tuple(out)
+
+    async def mockup_templates(self, product_id: CatalogProductId) -> tuple[MockupTemplate, ...]:
+        """Vorlagenbilder je Platzierung mit der Lage des Druckbereichs darin
+        (``GET /v2/catalog-products/{id}/mockup-templates``) - für die Vorschau im Admin. Bilder nur über https."""
+        require(product_id, CatalogProductId, "product_id")
+        rows = await self._pages(f"/v2/catalog-products/{product_id.value}/mockup-templates",
+                                 operation="getMockupTemplatesByProductId")
+        out = []
+        for row in rows:
+            image = row.get("image_url")
+            background = row.get("background_url")
+            try:
+                check_https_url(image)
+                if background is not None:
+                    check_https_url(background)
+            except ValueError as exc:
+                raise FulfillmentPermanent("invalid_response") from exc
+            color = row.get("background_color")
+            if type(color) is int and 0 <= color <= 0xFFFFFF:
+                color = f"#{color:06x}"
+            elif not (isinstance(color, str) and re.fullmatch(r"#?[0-9A-Fa-f]{6}", color)):
+                color = None
+            elif not color.startswith("#"):
+                color = f"#{color}"
+            variant_ids = tuple(sorted({value for value in row.get("catalog_variant_ids") or [] if type(value) is int}))
+            positioning = row.get("template_positioning")
+            orientation = row.get("orientation")
+            out.append(MockupTemplate(
+                variant_ids=variant_ids, placement=self._placement_key(row.get("placement")),
+                technique=self._technique_key(row.get("technique")), image_url=image, background_url=background,
+                background_color=color, template_width=self._pixels(row.get("template_width"), low=1),
+                template_height=self._pixels(row.get("template_height"), low=1),
+                area_left=self._pixels(row.get("print_area_left"), low=-100_000),
+                area_top=self._pixels(row.get("print_area_top"), low=-100_000),
+                area_width=self._pixels(row.get("print_area_width"), low=1),
+                area_height=self._pixels(row.get("print_area_height"), low=1),
+                positioning=positioning if positioning in ("overlay", "background") else "overlay",
+                orientation=orientation if orientation in ("horizontal", "vertical", "any") else "any"))
+        return tuple(out)
 
     # ------------------------------------------------ Kosten
     @staticmethod
