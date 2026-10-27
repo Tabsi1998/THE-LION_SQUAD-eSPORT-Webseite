@@ -1,5 +1,34 @@
 # Changelog
 
+## [1.35.0](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/compare/v1.34.1...v1.35.0) (2026-10-27)
+
+
+### Neu
+
+* freie Wunschnummern als Raster zum Antippen, Prüfung ohne Nummer in der Adresse ([#2034](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2034)) ([c4eca19](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/c4eca1926ba284e5b3949270514076bc7a996bea))
+* Nummern der Mitglieder im Admin – Liste, Anträge, Neuwahl und Regeln ([#2034](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2034)) ([c4eca19](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/c4eca1926ba284e5b3949270514076bc7a996bea))
+* Vorstand erfährt Anträge auf eine andere Nummer per Mail und Discord ([#2034](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2034)) ([c4eca19](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/c4eca1926ba284e5b3949270514076bc7a996bea))
+* Wunschnummer in Dolibarr als ergänzendes Attribut, mit Nachtrag wenn das Feld fehlt oder Dolibarr nicht erreichbar ist ([#2034](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2034)) ([c4eca19](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/c4eca1926ba284e5b3949270514076bc7a996bea))
+* Wunschnummer je Mitglied – einmal selbst wählen, eindeutig im Verein, danach nur per Antrag ([#2034](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2034)) ([c4eca19](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/c4eca1926ba284e5b3949270514076bc7a996bea))
+
+
+### Fehlerbehebungen
+
+* „Feld neu aufbauen“ prüft die Läufe sofort - kein Stations-Konflikt beim ersten Aufruf ([#2044](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2044)) ([66bcb99](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/66bcb99988e9b0107c25fde1b0a2a3439967e72d))
+* abgebrochene Vorstandsentscheidungen geben den Antrag wieder frei; fremde Nummern in Dolibarr bleiben stehen ([#2034](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2034)) ([c4eca19](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/c4eca1926ba284e5b3949270514076bc7a996bea))
+* Cup mit Loser Bracket: ein Loser-Lauf wartet auf seine Vorläufe statt abgesagt zu werden - die Verlierer des Sammellaufs fahren ihre zweite Chance ([#2044](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2044)) ([66bcb99](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/66bcb99988e9b0107c25fde1b0a2a3439967e72d))
+* Cup mit Loser Bracket: nach Austritten ausgeglichene Läufe nehmen das Ergebnis an, Verlierer-Wege folgen Belegung und Quote ([#2045](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2045)) ([66bcb99](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/66bcb99988e9b0107c25fde1b0a2a3439967e72d))
+* gleichzeitige Entscheidungen und Nachträge setzen nie einen veralteten Stand der Wunschnummer ([#2034](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2034)) ([c4eca19](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/c4eca1926ba284e5b3949270514076bc7a996bea))
+* Läufe bleiben immer in ihrer Laufgröße - auch bei mehreren gleichzeitig aufgerufenen Vorläufen; TV zeigt keine leeren Zusatzplätze ([#2044](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2044)) ([66bcb99](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/66bcb99988e9b0107c25fde1b0a2a3439967e72d))
+* Sofort zufällig in Läufen - beide Weiterkommer eines Laufs finden ihren Platz, auch nach einer Disqualifikation ([#2033](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2033)) ([66bcb99](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/66bcb99988e9b0107c25fde1b0a2a3439967e72d))
+* Wartende Verlierer bekommen den nächsten freien Platz, sonst eine Meldung „Kein Platz im Folgelauf“ an die Turnierleitung ([#2044](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2044)) ([66bcb99](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/66bcb99988e9b0107c25fde1b0a2a3439967e72d))
+* Wunschnummer folgt dem Konto bei gelöster oder gewechselter Dolibarr-Zuordnung ([#2034](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2034)) ([c4eca19](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/c4eca1926ba284e5b3949270514076bc7a996bea))
+
+
+### Dokumentation
+
+* Handbuch-Abschnitt zur Wunschnummer ([#2034](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2034)) ([c4eca19](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/c4eca1926ba284e5b3949270514076bc7a996bea))
+
 ## 1.34.1 (26.10.2026)
 
 ### Fehlerbehebungen
