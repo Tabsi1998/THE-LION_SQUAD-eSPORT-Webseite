@@ -41,3 +41,30 @@ test("reportCaughtError liefert die Kennung der Meldung, ein gleicher Fehler gle
   api.post.mockRejectedValueOnce(new Error("401"));
   await expect(reportCaughtError(new Error("anderer Fehler"))).resolves.toBeNull();
 });
+
+// #2080: ein veralteter Baustein nach einem Deploy ist kein Fehler der Website - höchstens ein Hinweis.
+test("ein veralteter Baustein kommt nur als Hinweis an, nicht als Fehler", async () => {
+  const { api } = await import("./api");
+  const { reportCaughtError } = await import("./clientLog");
+  api.post.mockClear();
+  await reportCaughtError(new TypeError("Failed to fetch dynamically imported module: https://lionsquad.at/assets/ReferenceRoundPage-1.js"), "in Seite");
+  expect(api.post).toHaveBeenCalledTimes(1);
+  const [, body] = api.post.mock.calls[0];
+  expect(body.level).toBe("info");
+  expect(body.message).toMatch(/^Veralteter Stand nach Update/);
+  expect(body.stack).toContain("ReferenceRoundPage");
+});
+
+test("lädt die Seite schon neu, meldet ein veralteter Baustein gar nichts", async () => {
+  const { api } = await import("./api");
+  const { requestChunkReload } = await import("./chunkReload");
+  const storage = { getItem: () => null, setItem: () => {} };
+  expect(requestChunkReload({ reload: vi.fn(), storage })).toBe(true);
+  delete window.__tlsWebClientLoggingStarted;
+  startWebClientLogging();
+  api.post.mockClear();
+  const event = new Event("unhandledrejection");
+  event.reason = new TypeError("Failed to fetch dynamically imported module: https://lionsquad.at/assets/Other-2.js");
+  window.dispatchEvent(event);
+  expect(api.post).not.toHaveBeenCalled();
+});
