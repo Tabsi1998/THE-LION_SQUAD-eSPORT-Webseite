@@ -309,6 +309,7 @@ Mockups (#1710) und das Hochladen zu Printful (#1705).
 ## Produktverwaltung und Katalogabgleich (#1707, #1709)
 
 Code: `backend/services/shop_products.py` (Aufbau, Prüfung, Stand, Ansicht), `shop_catalog_sync.py` (Abgleich),
+`shop_costs.py` (Selbstkosten aus Einkauf und Aufpreisen),
 Routen `backend/routes/shop_product_routes.py` (Schritte) und `shop_admin_routes.py` (Anlegen, Grunddaten, Lesen),
 Seite `frontend/src/pages/admin/AdminShopProductsPage.jsx` (Verwaltung → Finanzen → Shop → Reiter **Produkte**).
 Beispiel aus #2062: Gildan 5000 schwarz mit Löwe vorne rechts, Gamertag vorne links und Rückenlogo.
