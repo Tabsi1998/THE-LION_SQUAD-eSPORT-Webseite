@@ -24,7 +24,7 @@ die Sammlungen direkt. Jede Katalogänderung ist eine Adminaktion mit Person und
 | `shop_orders` | Bestellung mit allem Eingefrorenen (unten), Stand, Rechnungs- und Lieferanschrift, `printful_external_id` | `idempotency_key`, `printful_external_id` |
 | `shop_order_items` | Position einer Bestellung, eingefroren | `order_id` + `position` |
 | `shop_order_events` | Verlauf einer Bestellung, **nur angehängt** | `order_id` + `event_key` |
-| `shop_printful_drafts` | Claim vor dem Anlegen eines Printful-Entwurfs (#1705): `external_id`, Stand (`sending`, `created`, `failed`), Printful-Nummer – keine Person | `external_id` |
+| `shop_printful_drafts` | Claim vor dem Anlegen eines Printful-Entwurfs (#1705): `external_id`, Stand (`sending`, `created`, `failed`, `deleting`), Printful-Nummer – keine Person | `external_id` |
 | `shop_printful_confirmations` | Claim vor dem Bestätigen bei Printful (#1705): Idempotenzschlüssel, Auftragsnummer, Stand (`sending`, `confirmed`, `unclear`) – keine Person | `order_id`, `idempotency_key` |
 
 Sichere Vorgaben: Ein neues Produkt ist `draft` und `hidden`, ohne Steuerprofil. Beträge sind ganze Cent, nie
@@ -242,7 +242,13 @@ gewinnt, sucht über `@external_id` nach und sendet; ein zweiter Aufruf bekommt 
 `FulfillmentTransient` „läuft schon“ (`draft_in_progress`). Lehnt Printful mit 4xx ab, wird der Claim `failed` und die
 `external_id` ist wieder frei. Ein Claim `sending` mit offenem Ausgang (Zeitüberschreitung, 5xx) wird nach 60 Sekunden
 **erst nach einer Nachsuche** über `@external_id` und per bedingtem Update übernommen – gibt es den Auftrag, kommt er
-zurück. `delete_draft` gibt die `external_id` wieder frei.
+zurück. Ebenso ein Claim `created`, dessen gespeicherte Nummer Printful nicht mehr kennt (404), und ein hängender
+Claim `deleting`. `delete_draft` setzt den Claim erst auf `deleting`, löscht dann bei Printful und entfernt danach den
+Claim – die `external_id` ist wieder frei; lehnt Printful das Löschen ab, bleibt er `created`.
+
+**Uhrzeiten:** Ein Claim gilt nur als „läuft noch“, solange sein Stempel jünger als die Frist ist **und** höchstens
+60 Sekunden in der Zukunft liegt. Ein Stempel weiter in der Zukunft (vorgehende Uhr) gilt wie ein abgelaufener: beim
+Anlegen erst nachsuchen, beim Bestätigen `unclear` – nie automatisch senden.
 
 **Idempotenz beim Bestätigen:** Printful v2 kennt keinen Idempotenzschlüssel. `confirm_order` braucht einen eigenen
 (8–128 Zeichen) und legt vor dem Senden einen Claim in `shop_printful_confirmations` an – eindeutig je Auftrag und je
