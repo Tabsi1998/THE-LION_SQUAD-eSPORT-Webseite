@@ -21,7 +21,8 @@ for url in "$@"; do
     echo "csp-connect-origins: ungültige Adresse für connect-src: $url" >&2
     exit 1
   fi
-  if grep -Eq "connect-src 'self'( [^;]*)? $origin( |;)" "$conf"; then
+  # Genau als Eintrag vergleichen (nicht als Muster: ein Punkt im Host passte sonst auf jedes Zeichen).
+  if sed -n "s/.*connect-src \([^;]*\);.*/\1/p" "$conf" | tr ' ' '\n' | grep -Fqx "$origin"; then
     continue
   fi
   sed -i "s#connect-src 'self'#connect-src 'self' $origin#" "$conf"

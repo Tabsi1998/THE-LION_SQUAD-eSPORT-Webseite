@@ -63,6 +63,15 @@ def test_running_twice_adds_nothing_twice(tmp_path):
     assert connect_sources(conf).count("https://upload.lionsquad.at") == 1
 
 
+def test_similar_hosts_are_not_mistaken_for_each_other(tmp_path):
+    """Codex-Befund: der Vergleich lief als Muster - „api-example.com“ galt als schon vorhanden für „api.example.com“."""
+    result, conf = run(tmp_path, "https://api-example.com", "https://api.example.com")
+    assert result.returncode == 0, result.stderr
+    sources = connect_sources(conf)
+    assert "https://api-example.com" in sources
+    assert "https://api.example.com" in sources
+
+
 @pytest.mark.parametrize("bad", ["upload.lionsquad.at", "https://evil.example; script-src *", "javascript:alert(1)",
                                  "https://host_x.example", "https://host x.example", "ftp://upload.example.at"])
 def test_odd_addresses_stop_the_build(tmp_path, bad):
