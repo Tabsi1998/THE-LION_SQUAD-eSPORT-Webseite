@@ -423,13 +423,20 @@ export function TemplateStatus({ view, busy, run }) {
   );
 }
 
+// Der gespeicherte Aufbau von Schritt 3 als Schlüssel (#2091, Review): nur wenn er sich ändert (Speichern, anderes
+// Produkt oder Technik), beginnt der Schritt neu. Ein neuer `view` nach Abgleich, Motiv-Upload oder Erzeugen der
+// Druckdateien lässt ungespeicherte Flächen stehen.
+export function layoutKey(view) {
+  return JSON.stringify([view.product.id, view.product.printful?.product_id ?? null, view.product.technique ?? null,
+    (view.placements || []).map((row) => [row.key, row.mode || "layout", row.layers || []]), view.included_placement || null]);
+}
+
 export default function LayoutStep({ view, busy, run, ReasonedButton, ChoiceGroup }) {
   const { product } = view;
   const [draft, setDraft] = useState(() => draftFrom(view));
   const [included, setIncluded] = useState(view.included_placement || "");
   const colors = useMemo(() => product.offer?.colors || [], [product.offer]);
   const [previewColor, setPreviewColor] = useState(colors[0] || "");
-  useEffect(() => { setDraft(draftFrom(view)); setIncluded(view.included_placement || ""); }, [view]);
   useEffect(() => { if (!colors.includes(previewColor)) setPreviewColor(colors[0] || ""); }, [colors, previewColor]);
   const codes = useMemo(() => Object.fromEntries((product.printful?.colors || []).map((color) => [color.name, color.code])), [product.printful]);
   const motifsByKey = useMemo(() => Object.fromEntries((view.motif_options || []).map((motif) => [motif.key, motif])), [view.motif_options]);

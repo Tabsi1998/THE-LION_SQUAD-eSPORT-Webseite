@@ -10,7 +10,7 @@ import { formatCents, parseEuro } from "@/lib/billing";
 import { viennaDateTime } from "@/lib/vienna";
 import { defaultTechnique, techniqueHint, techniqueLabel, techniqueList } from "@/lib/shopTechniques";
 import ShopTabs from "./ShopTabs";
-import LayoutStep from "./ShopLayoutStep";
+import LayoutStep, { layoutKey } from "./ShopLayoutStep";
 import ProductSearch from "./ShopProductSearch";
 
 // Produktverwaltung (#1707) mit Katalogabgleich (#1709) - Verwaltung → Finanzen → Shop → Produkte. Geführt in fünf
@@ -628,7 +628,7 @@ function ProductEditor({ productId }) {
       {step === "offer" && <Section title="Farben und Größen" testId="shop-section-offer"><OfferStep key={offerKey(product)} view={view} busy={busy} run={run} /></Section>}
       {step === "designs" && (
         <>
-          <Section title="Druckflächen" testId="shop-section-layout"><LayoutStep view={view} busy={busy} run={run} ReasonedButton={ReasonedButton} ChoiceGroup={ChoiceGroup} /></Section>
+          <Section title="Druckflächen" testId="shop-section-layout"><LayoutStep key={layoutKey(view)} view={view} busy={busy} run={run} ReasonedButton={ReasonedButton} ChoiceGroup={ChoiceGroup} /></Section>
         </>
       )}
       {step === "prices" && <Section title="Preise" testId="shop-section-prices"><PricesStep view={view} busy={busy} run={run} /></Section>}

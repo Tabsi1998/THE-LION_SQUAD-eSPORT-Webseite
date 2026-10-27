@@ -245,6 +245,32 @@ test("Drucktechniken mit deutschem Namen und Erklärung, Vorgabe Direktdruck (#2
   expect(screen.getAllByText(/nur kleine Flächen/)).toHaveLength(1);
 });
 
+test("Abgleichen während einer ungespeicherten Auswahl lässt die Auswahl stehen - Schritt 2 (#2091)", async () => {
+  apiMock.post.mockResolvedValue({ data: { ...view(), result: { ok: true } } });
+  const user = userEvent.setup();
+  show("/admin/shop/products/p1");
+  await user.click(await screen.findByTestId("shop-step-offer"));
+  await user.click(screen.getByTestId("shop-offer-color-Navy"));
+  await user.click(screen.getByTestId("shop-sync-run"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/admin/shop/products/p1/sync", {}));
+  await waitFor(() => expect(toastMock.success).toHaveBeenCalled());
+  expect(screen.getByTestId("shop-offer-color-Navy")).toHaveAttribute("aria-pressed", "true");
+  expect(screen.getByTestId("shop-offer-count")).toHaveTextContent("6 Varianten");
+});
+
+test("Abgleichen während einer ungespeicherten Auswahl lässt die Auswahl stehen - Schritt 3 (#2091)", async () => {
+  apiMock.post.mockResolvedValue({ data: { ...view(), result: { ok: true } } });
+  const user = userEvent.setup();
+  show("/admin/shop/products/p1");
+  await user.click(await screen.findByTestId("shop-step-designs"));
+  await user.click(screen.getByTestId("shop-area-use-back"));
+  expect(screen.getByTestId("shop-area-use-back")).toBeChecked();
+  await user.click(screen.getByTestId("shop-sync-run"));
+  await waitFor(() => expect(toastMock.success).toHaveBeenCalled());
+  expect(screen.getByTestId("shop-area-use-back")).toBeChecked();
+  expect(screen.getByTestId("shop-area-add-motif-back")).toBeInTheDocument();
+});
+
 test("ohne gespeichertes Angebot lassen sich Farben und Größen wählen (#2091)", async () => {
   const fresh = view({ product: { offer: null, technique: null }, variants: [] });
   apiMock.get.mockImplementation((url) => Promise.resolve({ data: url === "/admin/shop/products" ? LIST : fresh }));
