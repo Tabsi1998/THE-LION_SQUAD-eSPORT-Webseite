@@ -359,13 +359,16 @@ async def test_only_finance_with_a_second_factor_may_use_the_design_routes(flow)
 
 
 @pytest.mark.asyncio
-async def test_every_change_is_logged_with_person_and_reason_and_needs_one(flow):
+async def test_every_change_is_logged_with_person_and_an_optional_reason(flow):
     staff = await finance(flow)
-    no_reason = await flow.post(f"{BASE}/designs/upload", data={"design_key": "loewe-weiss", **NEW},
+    # Grund optional (Entscheidung Obmann 27.10.2026): ohne Grund geht es, Person und Zeit stehen trotzdem im Protokoll.
+    no_reason = await flow.post(f"{BASE}/designs/upload", data={"design_key": "ohne-grund", **NEW,
+                                                                "garment_colors": "Weiß"},
                                 files={"file": ("loewe.png", logo(1200, 1200), "image/png")})
-    blank = await upload(flow, logo(1200, 1200), reason="   ", **NEW)
-    assert (no_reason.status_code, blank.status_code) == (422, 400)
-    assert await flow.db.audit_logs.count_documents({}) == 0 and stored_files(flow) == []
+    assert no_reason.status_code == 200, no_reason.text
+    quiet = await flow.db.audit_logs.find_one({"action": "shop.design.add", "target_id": "ohne-grund"}, {"_id": 0})
+    assert quiet["actor_id"] == staff["id"] and quiet["data"]["reason"] == ""
+    await flow.db.audit_logs.delete_many({})
 
     assert (await upload(flow, logo(1200, 1200), reason="Druckdatei vom Obmann", **NEW)).status_code == 200
     await flow.patch(f"{BASE}/designs/loewe-weiss", json={"garment_colors": ["Schwarz"], "reason": "Navy raus"})

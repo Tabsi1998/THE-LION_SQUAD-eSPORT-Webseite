@@ -6,6 +6,7 @@ const TABS = [
   { to: "/admin/shop", label: "Einstellungen", end: true },
   { to: "/admin/shop/products", label: "Produkte" },
   { to: "/admin/shop/designs", label: "Designs" },
+  { to: "/admin/shop/gamertag", label: "Gamertag" },
 ];
 
 export default function ShopTabs() {

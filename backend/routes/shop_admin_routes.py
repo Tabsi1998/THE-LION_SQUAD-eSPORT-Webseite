@@ -28,16 +28,15 @@ router = APIRouter(prefix="/api/admin/shop", tags=["shop"])
 
 
 class Reasoned(BaseModel):
-    """Jede Änderung mit Grund; unbekannte Felder (etwa ein Preis an falscher Stelle) werden abgelehnt."""
+    """Grund optional - Pflicht nur bei kritischen Schritten, das prüfen die Services (Entscheidung Obmann 27.10.2026).
+    Unbekannte Felder (etwa ein Preis an falscher Stelle) werden abgelehnt."""
     model_config = {"extra": "forbid"}
 
-    reason: str = Field(..., min_length=3, max_length=500)
+    reason: str = Field("", max_length=500)
 
     @field_validator("reason")
     @classmethod
-    def _reason_has_text(cls, value: str) -> str:
-        if len(value.strip()) < 3:
-            raise ValueError("Bitte einen Grund angeben.")
+    def _reason_trimmed(cls, value: str) -> str:
         return value.strip()
 
 

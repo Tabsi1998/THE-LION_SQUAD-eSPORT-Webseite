@@ -2,6 +2,7 @@
 Banner, den es gibt (von Hand angelegt oder automatisch)."""
 import pathlib
 import sys
+from datetime import datetime, timezone
 
 import pytest
 import pytest_asyncio
@@ -19,6 +20,20 @@ async def flow():
         yield instance
     finally:
         await shutdown()
+
+
+@pytest.fixture
+def frozen_rate_limit_clock(monkeypatch):
+    """Das Zählfenster (60 Sekunden, an der Uhr ausgerichtet) bleibt während des Tests dasselbe - sonst zählt der
+    Zähler nach einer Minutengrenze von vorn, und das erwartete 429 bleibt aus (wie in test_app_releases_flow)."""
+    import services.rate_limit as rate_limit
+
+    class FrozenClock(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return datetime(2026, 10, 27, 12, 0, 5, tzinfo=timezone.utc)
+
+    monkeypatch.setattr(rate_limit, "datetime", FrozenClock)
 
 
 async def banner(flow) -> str:
@@ -67,7 +82,7 @@ async def test_an_automatic_banner_counts_too(flow):
 
 
 @pytest.mark.asyncio
-async def test_the_brake_stops_counting_per_address_and_kind(flow, monkeypatch):
+async def test_the_brake_stops_counting_per_address_and_kind(flow, monkeypatch, frozen_rate_limit_clock):
     monkeypatch.setattr(settings_routes, "BANNER_IMPRESSION_LIMIT", 3)
     monkeypatch.setattr(settings_routes, "BANNER_CLICK_LIMIT", 1)
     banner_id = await banner(flow)

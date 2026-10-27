@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { KeyRound, Lock, Power, ShoppingBag, Truck, Users } from "lucide-react";
 import { AdminLayout } from "@/components/tls/AdminLayout";
@@ -37,27 +37,49 @@ function Section({ title, icon: Icon, children, testId }) {
   );
 }
 
-// Grund und Knopf gehören zusammen: ohne Grund (mind. 3 Zeichen) bleibt der Knopf gesperrt.
-function ReasonedButton({ id, label, busy, disabled, onSubmit, variant = "primary", placeholder = "Grund (kommt ins Protokoll)" }) {
+const REASON_HINT = "Bitte kurz einen Grund angeben – er kommt ins Protokoll.";
+
+// Grund und Knopf gehören zusammen. Der Grund ist optional (Entscheidung Obmann 27.10.2026) - Pflicht (`required`) nur
+// bei kritischen Schritten: Steuer freigeben, „Öffentlich“, Notschalter einschalten, Schlüssel entfernen. Der Knopf
+// bleibt klickbar und sagt, was fehlt - statt still nichts zu tun; fehlt oben etwas, nennt `blockedHint` es.
+function ReasonedButton({ id, label, busy, disabled, blockedHint, onSubmit, required = false, variant = "primary", placeholder }) {
   const [reason, setReason] = useState("");
-  const ready = reason.trim().length >= 3 && !disabled && !busy;
+  const [hint, setHint] = useState("");
+  const input = useRef(null);
+  const complete = (!required || reason.trim().length >= 3) && !disabled;
+  const text = placeholder || (required ? "Grund (Pflicht, kommt ins Protokoll)" : "Grund (optional, kommt ins Protokoll)");
   return (
-    <form className="flex flex-col gap-2 sm:flex-row sm:items-center" data-testid={`${id}-form`}
+    <form className="flex flex-col gap-1.5" data-testid={`${id}-form`} noValidate
       onSubmit={async (event) => {
         event.preventDefault();
-        if (!ready) return;
+        if (busy) return;
+        if (disabled) {
+          setHint(blockedHint || "Oben fehlt noch etwas.");
+          return;
+        }
+        if (required && reason.trim().length < 3) {
+          setHint(REASON_HINT);
+          input.current?.focus();
+          return;
+        }
+        setHint("");
         if (await onSubmit(reason.trim())) setReason("");
       }}>
-      <label className="sr-only" htmlFor={`${id}-reason`}>Grund</label>
-      <input id={`${id}-reason`} value={reason} onChange={(event) => setReason(event.target.value)} maxLength={500}
-        placeholder={placeholder} disabled={disabled || busy}
-        className="min-h-10 flex-1 bg-black/40 border border-white/15 rounded-sm px-3 text-sm placeholder:text-white/35 focus:border-brand outline-none disabled:opacity-50"
-        data-testid={`${id}-reason`} />
-      <button type="submit" disabled={!ready}
-        className={`tls-btn tls-btn--${variant} min-h-10 px-4 text-xs font-bold uppercase tracking-wider rounded-sm disabled:opacity-40`}
-        data-testid={`${id}-submit`}>
-        {busy ? "Speichert …" : label}
-      </button>
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+        <label className="sr-only" htmlFor={`${id}-reason`}>{required ? "Grund (Pflicht)" : "Grund (optional)"}</label>
+        <input id={`${id}-reason`} ref={input} value={reason} maxLength={500} required={required} aria-required={required ? "true" : undefined}
+          aria-invalid={hint === REASON_HINT ? "true" : undefined} aria-describedby={hint ? `${id}-hint` : undefined}
+          onChange={(event) => { setReason(event.target.value); if (hint) setHint(""); }}
+          placeholder={text} disabled={busy}
+          className={`min-h-10 flex-1 bg-black/40 border rounded-sm px-3 text-sm placeholder:text-white/45 focus:border-brand outline-none disabled:opacity-50 ${hint === REASON_HINT ? "border-warn" : "border-white/15"}`}
+          data-testid={`${id}-reason`} />
+        <button type="submit" disabled={!!busy} aria-disabled={!complete}
+          className={`tls-btn tls-btn--${variant} min-h-10 px-4 text-xs font-bold uppercase tracking-wider rounded-sm transition-opacity ${complete ? "" : "opacity-60"}`}
+          data-testid={`${id}-submit`}>
+          {busy ? "Speichert …" : label}
+        </button>
+      </div>
+      {hint ? <p id={`${id}-hint`} role="alert" className="text-xs text-warn" data-testid={`${id}-hint`}>{hint}</p> : null}
     </form>
   );
 }
@@ -169,7 +191,7 @@ export default function AdminShopPage() {
           {stage !== config.stage && (
             <div className="space-y-2" data-testid="shop-stage-change">
               <div className="text-sm text-white/70">Von <b>{stageOf(config.stage)?.label}</b> auf <b>{stageOf(stage)?.label}</b> umstellen:</div>
-              <ReasonedButton id="shop-stage-save" label="Stufe speichern" busy={busy === "stage"}
+              <ReasonedButton id="shop-stage-save" label="Stufe speichern" busy={busy === "stage"} required={stage === "public"}
                 onSubmit={(reason) => run("stage", () => api.patch(BASE, { stage, reason }), (next) => `Stufe jetzt: ${next.config.stage_label}.`)} />
             </div>
           )}
@@ -183,7 +205,7 @@ export default function AdminShopPage() {
           </p>
           {rights.can_set_tax
             ? <ReasonedButton id="shop-tax-toggle" label={config.tax_cleared ? "Freigabe zurücknehmen" : "Steuer als geklärt freigeben"}
-                variant={config.tax_cleared ? "secondary" : "primary"} busy={busy === "tax"}
+                variant={config.tax_cleared ? "secondary" : "primary"} busy={busy === "tax"} required
                 onSubmit={(reason) => run("tax", () => api.put(`${BASE}/tax-clearance`, { cleared: !config.tax_cleared, reason }),
                   config.tax_cleared ? "Freigabe zurückgenommen." : "Steuer als geklärt freigegeben.")} />
             : <p className="text-xs text-white/45">Diese Freigabe setzt nur der Superadmin.</p>}
@@ -198,8 +220,9 @@ export default function AdminShopPage() {
           </p>
           {!config.orders_to_printful && key.state !== "ok" && <p className="text-xs text-warn" data-testid="shop-switch-needs-key">Erst den Printful-Schlüssel hinterlegen.</p>}
           <ReasonedButton id="shop-switch-toggle" label={config.orders_to_printful ? "Ausschalten" : "Einschalten"}
-            variant={config.orders_to_printful ? "danger" : "primary"} busy={busy === "switch"}
+            variant={config.orders_to_printful ? "danger" : "primary"} busy={busy === "switch"} required={!config.orders_to_printful}
             disabled={!config.orders_to_printful && key.state !== "ok"}
+            blockedHint="Erst unten beim Printful-Zugang den Schlüssel hinterlegen."
             onSubmit={(reason) => run("switch", () => api.patch(BASE, { orders_to_printful: !config.orders_to_printful, reason }),
               config.orders_to_printful ? "Notschalter aus: nichts geht an Printful." : "Bestellungen gehen an Printful.")} />
         </Section>
@@ -231,6 +254,7 @@ export default function AdminShopPage() {
           </div>
           {!pricesValid && <p className="text-xs text-warn" data-testid="shop-prices-invalid">Beträge in Euro, z. B. 3,50 – Aufschlag bis {formatCents(data.limits.public_markup_cents)}, Pauschale 0,01 bis {formatCents(data.limits.fallback_shipping_cents)}, Mindestpreis 0,01 bis {formatCents(data.limits.min_price_cents)}.</p>}
           <ReasonedButton id="shop-prices-save" label="Preise speichern" busy={busy === "prices"} disabled={!pricesValid || !pricesChanged}
+            blockedHint={!pricesValid ? "Erst gültige Beträge eintragen (0 bis 100 €)." : "Es hat sich noch nichts geändert."}
             onSubmit={(reason) => run("prices", () => api.patch(BASE, { public_markup_cents: markupCents, fallback_shipping_cents: fallbackCents, ...(minPriceChanged ? { min_price_cents: minPriceCents } : {}), reason }), "Preise gespeichert.")} />
         </Section>
 
@@ -261,13 +285,14 @@ export default function AdminShopPage() {
                   className="mt-1 w-full min-h-10 bg-black/40 border border-white/15 rounded-sm px-3 focus:border-brand outline-none" data-testid="shop-key-input" />
               </label>
               <ReasonedButton id="shop-key-save" label="Schlüssel speichern" busy={busy === "key"} disabled={apiKey.trim().length < 20}
+                blockedHint="Erst den Printful-Token oben ins Schlüssel-Feld einfügen (mindestens 20 Zeichen)."
                 onSubmit={async (reason) => {
                   const done = await run("key", () => api.put(`${BASE}/printful-key`, { api_key: apiKey, reason }), "Schlüssel verschlüsselt gespeichert.");
                   if (done) setApiKey("");
                   return done;
                 }} />
               {key.state !== "missing" && (
-                <ReasonedButton id="shop-key-remove" label="Schlüssel entfernen" variant="danger" busy={busy === "remove"}
+                <ReasonedButton id="shop-key-remove" label="Schlüssel entfernen" variant="danger" busy={busy === "remove"} required
                   onSubmit={(reason) => run("remove", () => api.post(`${BASE}/printful-key/remove`, { reason }), "Schlüssel entfernt – Notschalter ist aus.")} />
               )}
             </div>

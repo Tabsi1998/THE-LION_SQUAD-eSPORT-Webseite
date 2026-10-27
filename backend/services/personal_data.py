@@ -135,6 +135,11 @@ PERSONAL: dict[str, Entry] = {
                          "Rechnung liegt in Dolibarr); Rechnungs- und Lieferanschrift bis auf das Land überschrieben"),
     "shop_order_items": Entry(OVERWRITTEN, ("shop_order_items",), "Position einer Bestellung; der Gamertag wird entfernt"),
     "shop_carts": Entry(DELETED, ("shop_cart",)),
+    # Gamertag-Druckdateien (#1711): das PNG einer Bestellung zeigt den Namen. Testdateien der Finanzen haben kein Konto.
+    "shop_gamertag_files": Entry(OVERWRITTEN, ("shop_gamertag_files",),
+                                 "Druckdatei mit dem Gamertag einer Bestellung: Adresse abgeschaltet und Datei gelöscht - "
+                                 "braucht ein offener Printful-Auftrag sie noch, nur für ihn bis zum Abschluss (Job "
+                                 "ops_retention); die Zeile bleibt ohne Konto mit Prüfsumme und Maßen"),
     "shop_order_events": Entry(KEPT, note="Verlauf einer Bestellung als Nachweis; nur Kennungen, Beträge und Stände, nie "
                                "eine Anschrift"),
     # Teams, Turniere, Events, F1, Saison
