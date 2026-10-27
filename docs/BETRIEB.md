@@ -187,11 +187,14 @@ und zeichnet sie **einmal** zur PNG-Fassung daneben (`resvg-py`, ohne Systembibl
 Zeit- und Speichergrenze, höchstens ein Bild zugleich. Eine SVG-Adresse lässt sich nur in Logo-Feldern speichern.
 Ausgeliefert wird das SVG mit eigener, strenger Content-Security-Policy (`frontend/nginx.conf` und Backend); die App
 (erkannt an ihrer Kennung) bekommt bei Abrufen die PNG-Fassung. Grenzen und Stellschrauben (Backend, z. B. in
-`docker-compose.override.yml`): `MAX_SVG_UPLOAD_MB` (1), `SVG_MAX_ELEMENTS` (4000), `SVG_MAX_PATH_NUMBERS` (100000),
+`docker-compose.override.yml`): `MAX_SVG_UPLOAD_MB` (2), `SVG_MAX_ELEMENTS` (4000), `SVG_MAX_PATH_NUMBERS` (100000),
 `SVG_RASTER_PX` (2000), `SVG_RASTER_TIMEOUT_SECONDS` (5), `SVG_RASTER_MEMORY_MB` (512), `SVG_RASTER_CONCURRENCY` (1),
-`SVG_UPLOAD_RATE_LIMIT` (20 je `SVG_UPLOAD_RATE_WINDOW_SECONDS` = 3600). Der Datei-Dialog prüft vorab 1 MB
+`SVG_UPLOAD_RATE_LIMIT` (20 je `SVG_UPLOAD_RATE_WINDOW_SECONDS` = 3600). Der Datei-Dialog prüft vorab 2 MB
 (`VITE_MAX_SVG_UPLOAD_MB` beim Bau). Die Prüfung der Bildfelder liest JSON-Anfragen vor der Route bis
 `JSON_BODY_MAX_KB` (4096), darüber 413; Webhooks der Integrationen, gestreamte Bilder und Uploads liest sie nicht.
+Bereinigung und Zeichnen sind ein gemeinsamer Baustein mit den Shop-Motiven (`backend/services/svg_safe.py`, #2069;
+Beschreibung in [SHOP.md](SHOP.md#motive-2069)). Für Druckgrößen dort zusätzlich: `SVG_PRINT_TIMEOUT_SECONDS` (30),
+`SVG_PRINT_MEMORY_MB` (1536), `SVG_MAX_RASTER_SIDE` (20000 px), `SVG_MAX_RASTER_MEGAPIXELS` (60).
 
 Cloudflare lässt je Anfrage höchstens 100 MB durch. Große Uploads laufen deshalb über eine Subdomain
 **ohne** Cloudflare-Proxy (graue Wolke), z. B. `upload.lionsquad.at`, die im Nginx Proxy Manager auf
