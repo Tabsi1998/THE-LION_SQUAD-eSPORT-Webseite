@@ -781,6 +781,10 @@ class TournamentCreate(BaseModel):
 
 
 class TournamentUpdate(BaseModel):
+    # Liga (docs/LIGA.md): ``league_context`` und die Liga-Vorgaben einer Staffel (``round_robin_legs``,
+    # ``matchday_blocked_weeks``, ``matchday_weeks_total``, ``scoring_rules``, ``game_mode_order``,
+    # ``lineup_amend_hours``) setzt nur der Liga-Service - wie bei ``TournamentCreate`` bewusst kein Feld hier,
+    # unbekannte Felder verwirft Pydantic.
     title: Optional[str] = None
     slug: Optional[str] = None
     description: Optional[str] = None
@@ -2197,3 +2201,124 @@ class RoleUpdate(BaseModel):
 class AreasUpdate(BaseModel):
     """Freigaben je Bereich (#287): Turnierleitung, Redaktion, Vereinsverwaltung."""
     areas: List[str] = []
+
+
+# ---------- Liga (docs/LIGA.md) ----------
+# Liga (je Spiel) → Season → Liga N → Staffel A/B (ein Turnier mit ``league_context``). Logik und Prüfungen in
+# ``services/league_service.py``; hier nur Form und Grenzen der Eingaben.
+LeagueVisibility = Literal["off", "admins", "members", "public"]
+LeagueSeasonStatus = Literal["draft", "active", "completed", "archived"]
+LeagueStatus = Literal["active", "archived"]
+_CALENDAR_DAY = r"^\d{4}-\d{2}-\d{2}$"
+_CLOCK_TIME = r"^([01]\d|2[0-3]):[0-5]\d$"
+
+
+def _calendar_day(value):
+    """Kalendertag ``YYYY-MM-DD`` (Wiener Kalender) - leer heißt keiner."""
+    if value in (None, ""):
+        return None
+    text = str(value).strip()[:10]
+    try:
+        datetime.strptime(text, "%Y-%m-%d")
+    except ValueError as exc:
+        raise ValueError("Bitte ein Datum im Format JJJJ-MM-TT angeben.") from exc
+    return text
+
+
+class LeagueBlockedPeriod(BaseModel):
+    """Sperrzeit einer Season, z. B. die Weihnachtspause - beide Tage einschließlich."""
+    start_date: str
+    end_date: str
+    label: str = Field(default="", max_length=60)
+
+    _days = field_validator("start_date", "end_date", mode="before")(_calendar_day)
+
+    @model_validator(mode="after")
+    def _ordered(self):
+        if not self.start_date or not self.end_date:
+            raise ValueError("Eine Sperrzeit braucht Beginn und Ende.")
+        if self.end_date < self.start_date:
+            raise ValueError("Eine Sperrzeit endet nicht vor ihrem Beginn.")
+        self.label = " ".join(self.label.split())
+        return self
+
+
+class LeagueCreate(BaseModel):
+    name: str = Field(min_length=2, max_length=80)
+    slug: Optional[str] = Field(default=None, max_length=80)
+    game_id: str
+    participant_kind: Literal["team"] = "team"
+    description: Optional[str] = Field(default=None, max_length=2000)
+    status: LeagueStatus = "active"
+
+
+class LeagueUpdate(BaseModel):
+    name: Optional[str] = Field(default=None, min_length=2, max_length=80)
+    slug: Optional[str] = Field(default=None, max_length=80)
+    game_id: Optional[str] = None
+    description: Optional[str] = Field(default=None, max_length=2000)
+    status: Optional[LeagueStatus] = None
+
+
+class LeagueSeasonFields(BaseModel):
+    """Die Vorgaben einer Season (docs/LIGA.md, Abschnitt 2 und 3) - gemeinsam für Anlegen und Ändern."""
+    name: Optional[str] = Field(default=None, max_length=80)
+    slug: Optional[str] = Field(default=None, max_length=80)
+    start_date: Optional[datetime] = None
+    weeks_total: Optional[int] = Field(default=None, ge=1, le=52)
+    blocked_periods: Optional[List[LeagueBlockedPeriod]] = Field(default=None, max_length=20)
+    matchday_days: Optional[int] = Field(default=None, ge=1, le=31)
+    default_match_weekday: Optional[int] = Field(default=None, ge=0, le=6)
+    default_match_time: Optional[str] = Field(default=None, pattern=_CLOCK_TIME)
+    round_robin_legs: Optional[Literal[1, 2]] = None
+    max_staffel_size: Optional[int] = Field(default=None, ge=2, le=20)
+    best_of: Optional[Literal[1, 3, 5, 7]] = None
+    team_size: Optional[int] = Field(default=None, ge=1, le=20)
+    min_squad_size: Optional[int] = Field(default=None, ge=1, le=40)
+    game_mode_order: Optional[List[str]] = Field(default=None, max_length=7)
+    scoring_rules: Optional[dict] = None
+    result_confirm_hours: Optional[int] = Field(default=None, ge=1, le=336)
+    lineup_amend_hours: Optional[int] = Field(default=None, ge=1, le=336)
+    rules_text: Optional[str] = Field(default=None, max_length=20000)
+    registration_deadline: Optional[str] = None
+    visibility: Optional[LeagueVisibility] = None
+    status: Optional[LeagueSeasonStatus] = None
+
+    _deadline = field_validator("registration_deadline", mode="before")(_calendar_day)
+
+
+class LeagueSeasonCreate(LeagueSeasonFields):
+    number: Optional[int] = Field(default=None, ge=1, le=999)
+    start_date: datetime
+
+
+class LeagueSeasonUpdate(LeagueSeasonFields):
+    number: Optional[int] = Field(default=None, ge=1, le=999)
+
+
+class LeagueDivisionOverrides(BaseModel):
+    """Abweichung einer Liga N von ihrer Season - nur diese Felder (docs/LIGA.md, Abschnitt 2)."""
+    model_config = ConfigDict(extra="forbid")
+    best_of: Optional[Literal[1, 3, 5, 7]] = None
+    team_size: Optional[int] = Field(default=None, ge=1, le=20)
+    min_squad_size: Optional[int] = Field(default=None, ge=1, le=40)
+    max_staffel_size: Optional[int] = Field(default=None, ge=2, le=20)
+    scoring_rules: Optional[dict] = None
+
+
+class LeagueDivisionCreate(BaseModel):
+    level: Optional[int] = Field(default=None, ge=1, le=20)
+    nickname: Optional[str] = Field(default=None, max_length=40)
+    overrides: Optional[LeagueDivisionOverrides] = None
+    status: Literal["active", "archived"] = "active"
+
+
+class LeagueDivisionUpdate(BaseModel):
+    nickname: Optional[str] = Field(default=None, max_length=40)
+    overrides: Optional[LeagueDivisionOverrides] = None
+    status: Optional[Literal["active", "archived"]] = None
+
+
+class LeagueStaffelCreate(BaseModel):
+    """Staffel anlegen: ohne Buchstaben die nächste freie (A, B, …)."""
+    staffel: Optional[str] = Field(default=None, pattern=r"^[A-Za-z]$")
