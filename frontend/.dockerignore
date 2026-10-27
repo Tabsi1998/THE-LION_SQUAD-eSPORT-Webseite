@@ -2,7 +2,7 @@
 # Das Image installiert die Pakete selbst (yarn install --frozen-lockfile); ein lokales
 # node_modules darf sie nicht überschreiben. Bleibt im Kontext: package.json, yarn.lock,
 # src, public, index.html, vite.config.mjs, tailwind.config.js, postcss.config.js,
-# jsconfig.json, nginx.conf.
+# jsconfig.json, nginx.conf, csp-connect-origins.sh.
 # Braucht der Build oder das Image eine Datei, die hier steht, den Eintrag entfernen
 # (siehe docs/BETRIEB.md, Abschnitt "Docker-Build-Kontext").
 

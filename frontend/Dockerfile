@@ -28,6 +28,12 @@ RUN yarn build
 FROM nginx:1.30.4-alpine
 COPY --from=build /app/dist /usr/share/nginx/html
 COPY nginx.conf /etc/nginx/conf.d/default.conf
+# Eigene Backend- bzw. Upload-Adresse in connect-src der CSP - sonst blockiert der Browser die Uploads dorthin.
+ARG VITE_BACKEND_URL
+ARG VITE_UPLOAD_BACKEND_URL
+COPY csp-connect-origins.sh /tmp/csp-connect-origins.sh
+RUN sh /tmp/csp-connect-origins.sh /etc/nginx/conf.d/default.conf "$VITE_BACKEND_URL" "$VITE_UPLOAD_BACKEND_URL" \
+    && rm /tmp/csp-connect-origins.sh
 # Öffentliche Uploads liefert nginx direkt (#232): das Upload-Volume hängt
 # nur lesend unter /srv/uploads, und /srv/static/api/static/uploads zeigt auf
 # dessen Ordner "public", damit try_files mit root arbeiten kann.
