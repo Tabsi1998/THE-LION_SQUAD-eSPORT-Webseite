@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.40.0](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/compare/v1.39.0...v1.40.0) (2026-10-27)
+
+
+### Neu
+
+* Shop-Verwaltung: Grund nur noch bei kritischen Schritten Pflicht - sonst optional, das Protokoll nennt trotzdem wer, wann und was ([2238d98](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/2238d984cec61241d23754ee604d09ac4ef8be39))
+
+
+### Fehlerbehebungen
+
+* Shop-Verwaltung: Knöpfe sagen, was fehlt, statt still nichts zu tun - z. B. beim Printful-Schlüssel ([2238d98](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/2238d984cec61241d23754ee604d09ac4ef8be39))
+
 ## 1.39.0 (27.10.2026)
 
 ### Neu
