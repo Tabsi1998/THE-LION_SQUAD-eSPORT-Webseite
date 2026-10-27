@@ -358,8 +358,12 @@ function AreaHead({ user, me, discordUrl }) {
           </p>
         ) : null}
         {fee ? <FeeBadge badge={fee} /> : null}
-        <div className="mt-4 flex flex-wrap gap-x-5 gap-y-2 text-xs font-bold uppercase tracking-wider">
-          <Link to="/members/membership" data-testid="member-area-my-membership" className="text-[#29B6E8] hover:underline">Meine Mitgliedschaft</Link>
+        <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 text-xs font-bold uppercase tracking-wider">
+          {/* Haupteinstieg für Mitglieder: ein Button, kein kleiner Textlink (#2059). */}
+          <Link to="/members/membership" data-testid="member-area-my-membership" className="inline-flex min-h-11 items-center gap-1.5 px-4 py-2 bg-[#29B6E8] text-black hover:bg-[#29B6E8]/85 rounded-sm transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#29B6E8]">
+            Meine Mitgliedschaft
+            <span className="normal-case font-semibold tracking-normal text-black/70">· Nummer, Daten, Beitrag</span>
+          </Link>
           {discordUrl ? (
             <a href={discordUrl} target="_blank" rel="noreferrer" data-testid="member-area-discord" className="inline-flex items-center gap-1.5 text-[#29B6E8] hover:underline">
               <MessageCircle className="w-3.5 h-3.5" aria-hidden="true" /> Discord

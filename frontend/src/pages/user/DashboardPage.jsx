@@ -170,6 +170,12 @@ export default function DashboardPage() {
               {!isClubMember ? <Link to="/membership/join" data-testid="dashboard-join-cta" className="text-xs font-bold text-[#FFD700] hover:underline">Mitglied werden</Link> : null}
             </div>
           </div>
+          {/* Bis „Mein Bereich“ (#2059) kommt: die Mitgliedschaft (Wunschnummer, Daten ändern) direkt erreichbar. */}
+          {isClubMember ? (
+            <Link to="/members/membership" data-testid="dashboard-membership" aria-label="Meine Mitgliedschaft" title="Meine Mitgliedschaft" className="shrink-0 inline-flex min-h-11 min-w-11 justify-center items-center gap-1.5 px-3 py-2 border border-[#FFD700]/40 text-[#FFD700] hover:bg-[#FFD700]/10 hover:border-[#FFD700]/70 rounded-sm text-[11px] font-bold uppercase tracking-wider transition">
+              <Crown className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Meine Mitgliedschaft</span>
+            </Link>
+          ) : null}
           <Link to="/profile" data-testid="dashboard-edit-profile" aria-label="Profil bearbeiten" title="Profil bearbeiten" className="shrink-0 inline-flex min-h-11 min-w-11 justify-center items-center gap-1.5 px-3 py-2 border border-white/15 text-white/70 hover:text-[#29B6E8] hover:border-[#29B6E8]/40 rounded-sm text-[11px] font-bold uppercase tracking-wider transition">
             <Settings className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Profil bearbeiten</span>
           </Link>
