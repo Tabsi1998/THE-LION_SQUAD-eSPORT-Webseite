@@ -72,7 +72,7 @@ Einsatz – auch für Moderatoren.
 
 Der Vereinsshop hängt am Bereich **Finanzen** – kein eigener Bereich, Zwei-Faktor Pflicht. Der Server prüft jede
 Route mit `require_area("finance")`; `scripts/check-code-patterns.py` (Regel 3) lässt keine Shop-Route ohne diesen
-Wächter und keine öffentliche Shop-Route durch. Jede Änderung steht mit Person und Grund in den Adminaktionen, nie mit
+Wächter und keine öffentliche Shop-Route außer den dort einzeln freigegebenen durch. Jede Änderung steht mit Person und Grund in den Adminaktionen, nie mit
 Anschrift (docs/SHOP.md).
 
 | Shop-Admin (`/api/admin/shop/…`) | Spieler | Mitglied | Turnierleitung | Finanzen (Freigabe) | Club-Admin | Superadmin |
@@ -86,10 +86,14 @@ Anschrift (docs/SHOP.md).
 | Freigabe „Steuer geklärt“ (#1701) | – | – | – | – | – | ja, mit Grund |
 | Printful-Schlüssel hinterlegen, entfernen (braucht zusätzlich System) | – | – | – | – | ja, mit Grund | ja, mit Grund |
 | Printful-Verbindung testen (nur lesen) | – | – | – | ja | ja | ja |
+| Designs und Druckbereiche lesen (#1708) | – | – | – | ja | ja | ja |
+| Druckdatei hochladen, Shirtfarben, Druckbereich ändern (#1708) | – | – | – | ja, mit Grund | ja, mit Grund | ja, mit Grund |
 | ohne bestätigte Zwei-Faktor-Anmeldung | – | – | – | – | – | – |
 
 Moderator und Vereinsverwaltung (Vorstand) haben keinen Zugriff, solange ihnen Finanzen nicht ausdrücklich
-freigegeben ist. Shop-Seiten für Mitglieder und Öffentlichkeit gibt es noch nicht (#1712); wer sie sehen darf,
+freigegeben ist. Einzige öffentliche Shop-Route ist die Druckdatei für Printful
+(`/api/shop/print-files/<Zufallsschlüssel>/<design>-v<version>.png`, #1708) - ohne Anmeldung, aber nur mit dem
+256-Bit-Schlüssel der Version; bewusst in Regel 3 freigegeben. Shop-Seiten für Mitglieder und Öffentlichkeit gibt es noch nicht (#1712); wer sie sehen darf,
 entscheidet dann die Stufe (`services/shop_access.py`):
 
 | Stufe | Gast | Spieler | Mitglied | Turnierleitung | Finanzen | Club-Admin | Superadmin |
@@ -410,7 +414,7 @@ Finanzen; die Turnierleitung Turniere, Stationen, Strafen und Gewinne; der Admin
 | Übersicht | Dashboard (Turnierleitung, Redaktion, Vereinsverwaltung, Finanzen, System) · Mein Dienst (Helfer mit Einsatz, Captains externer Serien, Moderation ohne Verwaltungsbereich) | Dashboard mit einem dieser Bereiche und Zwei-Faktor (Server: `require_dashboard`, #992, #1353); „Mein Dienst“ (#1352) für Helfer und reine Moderation – im Benutzermenü statt „Admin“, `/admin` führt Helfer nach `/admin/dienst`, Moderation nach `/admin/moderation`, Konten ohne Dienst auf „Kein Zugriff“ mit dem Satz „Die Verwaltung ist für Vereinsdienste …“ |
 | Verein | Vereinsdaten (System) · Über uns, Sponsoren, Partner, Referenzen, Serien (Redaktion) · Vorstand, Kontakt-Inbox (Vereinsverwaltung) | je Eintrag |
 | Mitglieder | Mitglieder (mit dem Reiter Öffentliche Profile), Bewerbungen, Mitgliedervorteile, Dokumente, Alle Benutzer (Vereinsverwaltung) · Dolibarr (Vereinsverwaltung und System) | Vereinsverwaltung |
-| Finanzen | Finanzübersicht · Shop (Stufe, Notschalter, Preise, Printful-Zugang, #1706; die Produktverwaltung folgt mit #1707) | Finanzen |
+| Finanzen | Finanzübersicht · Shop (Reiter Einstellungen: Stufe, Notschalter, Preise, Printful-Zugang, #1706; Reiter Designs: Druckdateien, #1708; die Produktverwaltung folgt mit #1707) | Finanzen |
 | eSports | Turniere, Fast Lap, Stationen (Turnierleitung, Helfer) · Turnier-Leitfaden, Jahreswertung, Spiele, Gewinne, Strafen (Turnierleitung) · Game-Server (System) | Turnierleitung |
 | Content | Events (Turnierleitung) · News, Galerie, Medien, Navigation, Erfolge, Sticker (Redaktion) · Downloads & QR (Turnierleitung, Redaktion, Vereinsverwaltung, System) | Redaktion |
 | Verbindungen | Alle Verbindungen (Übersicht mit Zustand: aktiv, aus, fehlt, nicht lesbar, Fehler) · je Dienst eine Seite (Google, Resend, SMTP, Discord, Twitch, Steam, …) | System |
