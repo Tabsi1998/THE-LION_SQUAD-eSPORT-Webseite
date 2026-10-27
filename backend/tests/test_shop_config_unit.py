@@ -83,6 +83,42 @@ async def test_switch_on_without_a_readable_key_still_blocks_every_write(db):
 
 
 @pytest.mark.asyncio
+async def test_drafts_need_stage_admins_or_higher_and_a_readable_key_but_not_the_switch(db):
+    """#1705/#2062: Entwürfe kosten nichts - sie gehen auch bei ausgeschaltetem Notschalter, aber nur ab der Stufe
+    „Nur Admins (Test)“ und mit lesbarem Schlüssel. Bestätigen bleibt hinter dem Notschalter."""
+    key = encrypt_secret(FAKE_KEY)
+    for stage in ("admins", "members"):
+        await settle(db, stage=stage, orders_to_printful=False, printful_api_key=key)
+        await shop_config.require_printful_drafts(db)
+        assert await shop_config.printful_drafts_allowed(db) is True
+        with pytest.raises(shop_config.PrintfulWritesBlocked):
+            await shop_config.require_printful_writes(db)
+    # „Öffentlich“ mit Freigabe zählt als höchste Stufe.
+    await settle(db, stage="public", tax_cleared={"at": "2026-10-27T10:00:00+00:00", "by": "root"},
+                 printful_api_key=key)
+    await shop_config.require_printful_drafts(db)
+
+
+@pytest.mark.asyncio
+async def test_drafts_stay_blocked_when_the_shop_is_off_or_the_key_is_missing(db):
+    key = encrypt_secret(FAKE_KEY)
+    blocked = [{"stage": "off", "printful_api_key": key},
+               {"stage": "kaputt", "printful_api_key": key},
+               # „Öffentlich“ ohne Freigabe gilt als „Aus“.
+               {"stage": "public", "tax_cleared": None, "printful_api_key": key},
+               {"stage": "admins", "printful_api_key": ""},
+               {"stage": "admins", "printful_api_key": "enc:v1:kaputt"},
+               # Der Notschalter allein öffnet keine Entwürfe.
+               {"stage": "off", "orders_to_printful": True, "printful_api_key": key}]
+    for fields in blocked:
+        await db.settings.delete_many({})
+        await settle(db, **fields)
+        assert await shop_config.printful_drafts_allowed(db) is False, fields
+        with pytest.raises(shop_config.PrintfulDraftsBlocked):
+            await shop_config.require_printful_drafts(db)
+
+
+@pytest.mark.asyncio
 async def test_switching_on_while_the_key_is_removed_in_between_never_ends_with_switch_on_and_no_key(db, monkeypatch):
     """Codex-Befund: „Notschalter an“ liest die Einstellungen (Schlüssel da), dann entfernt jemand den Schlüssel, dann
     schreibt das Einschalten. Ohne bedingtes Update stünde danach Schalter an ohne Schlüssel."""
