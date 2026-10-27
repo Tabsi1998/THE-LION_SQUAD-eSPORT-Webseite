@@ -776,6 +776,11 @@ async def _safe_ops_retention():
         closed = await purge_stale_app_sessions(get_db())
         if closed:
             logger.info(f"[scheduler] stale_app_sessions closed={closed}")
+        # Gamertag-Druckdateien gelöschter Konten (#1711): weg, sobald kein offener Printful-Auftrag sie braucht.
+        from services.shop_gamertag import complete_pending_erasures
+        finished = await complete_pending_erasures(get_db())
+        if finished:
+            logger.info(f"[scheduler] gamertag_files erased={finished}")
     except Exception as exc:
         _log_task_failure("ops_retention", exc)
 

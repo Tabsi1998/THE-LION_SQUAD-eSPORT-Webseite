@@ -5,6 +5,7 @@ import { NavLink } from "react-router-dom";
 const TABS = [
   { to: "/admin/shop", label: "Einstellungen", end: true },
   { to: "/admin/shop/designs", label: "Designs" },
+  { to: "/admin/shop/gamertag", label: "Gamertag" },
 ];
 
 export default function ShopTabs() {
