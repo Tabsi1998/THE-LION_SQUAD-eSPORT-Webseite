@@ -44,6 +44,13 @@ def test_mails_without_key_never_collide(db):
     assert asyncio.run(db.mail_jobs.count_documents({})) == 4
 
 
+def test_an_empty_key_means_no_key_and_never_collides(db):
+    enqueue(dedupe_key="")
+    enqueue(dedupe_key="")
+    assert asyncio.run(db.mail_jobs.count_documents({})) == 2
+    assert asyncio.run(db.mail_jobs.count_documents({"dedupe_key": ""})) == 0
+
+
 def test_the_index_refuses_a_second_row_with_the_same_key(db):
     asyncio.run(db.mail_jobs.insert_one({"id": "a", "dedupe_key": "k"}))
     with pytest.raises(DuplicateKeyError):

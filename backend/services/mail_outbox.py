@@ -29,6 +29,9 @@ async def enqueue_mail(
     Index ``mail_jobs.dedupe_key_unique`` (``database.AUDIT_UNIQUE_INDEXES``). Verliert ein gleichzeitiger Aufruf den
     Wettlauf (``DuplicateKeyError``), zählt die Mail als schon eingereiht."""
     db = get_db()
+    # Ein leerer Schlüssel heißt „ohne Schlüssel“ - gespeichert wird dann None, sonst fiele "" unter den eindeutigen
+    # Teil-Index und die zweite solche Mail scheiterte.
+    dedupe_key = dedupe_key or None
     job = {
         "id": new_id(),
         "to": to,
