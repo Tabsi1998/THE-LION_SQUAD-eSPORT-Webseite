@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.37.0](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/compare/v1.36.0...v1.37.0) (2026-10-27)
+
+
+### Neu
+
+* Vereinsshop: Mitglieder zum Selbstkostenpreis, Versand nach Österreich mit Ersatzpauschale ([#1706](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1706)) ([f4c5e5e](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/f4c5e5ec2cd8a14a35f4b6a9651eabd1e8d8b256))
+* Vereinsshop: Notschalter „An Printful senden“ und verschlüsselter Printful-Zugang mit Verbindungstest ([#1706](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1706)) ([f4c5e5e](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/f4c5e5ec2cd8a14a35f4b6a9651eabd1e8d8b256))
+* Vereinsshop: Sichtbarkeit in Stufen - Aus, Nur Admins, Vereinsmitglieder, Öffentlich erst nach Steuerklärung ([#1706](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1706)) ([f4c5e5e](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/f4c5e5ec2cd8a14a35f4b6a9651eabd1e8d8b256))
+* Verwaltung → Finanzen → Shop und Shop-Check im Betrieb ([#1706](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1706)) ([f4c5e5e](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/f4c5e5ec2cd8a14a35f4b6a9651eabd1e8d8b256))
+
 ## 1.36.0 (27.10.2026)
 
 ### Neu
