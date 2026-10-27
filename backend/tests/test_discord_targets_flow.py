@@ -13,6 +13,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 
 import discord_service  # noqa: E402
 from flow_harness import make_flow  # noqa: E402
+from spam_forms import form_fields  # noqa: E402
 from models import now_utc  # noqa: E402
 from services import achievement_queue, discord_announcements, discord_bot  # noqa: E402
 
@@ -25,7 +26,9 @@ TOKEN = "test" * 6 + ".fake." + "token" * 8
 
 
 @pytest_asyncio.fixture
-async def flow():
+async def flow(monkeypatch):
+    # Formular-Token und Zähler des Spamschutzes (#2067) brauchen das Server-Geheimnis.
+    monkeypatch.setenv("JWT_SECRET", "spam-guard-aware-tests-secret-with-32-characters")
     instance, shutdown = make_flow()
     try:
         yield instance
@@ -312,7 +315,8 @@ async def test_board_gets_a_hint_without_names(flow, posted):
     flow.act_as(None)
     sent = await flow.post("/api/contact/submit", json={"name": "Paula Beispiel", "email": "paula@lionsquad-test.at", "topic": "sponsorship",
                                                           "subject": "Sponsoring-Anfrage von Paula",
-                                                          "message": "Ich möchte euch unterstützen, ruft mich an: 0660 1234567", "accept_privacy": True})
+                                                          "message": "Ich möchte euch unterstützen, ruft mich an: 0660 1234567", "accept_privacy": True,
+                                                          **form_fields("contact")})
     assert sent.status_code in (200, 201), sent.text
     message = posted[-1]
     assert message["channel_id"] == BOARD and message["url"].endswith("/admin/contact")

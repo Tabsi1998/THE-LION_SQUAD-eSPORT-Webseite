@@ -14,6 +14,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 
 from dolibarr_fake import API_KEY, BASE_URL, FakeDolibarr  # noqa: E402
 from flow_harness import make_flow  # noqa: E402
+from spam_forms import form_fields  # noqa: E402
 from routes import document_routes, upload_routes  # noqa: E402
 from services import club_facts, dolibarr_client, media_scan, photo_cutout  # noqa: E402
 from services.dolibarr_client import DolibarrClient, load_settings  # noqa: E402
@@ -22,6 +23,8 @@ from services.secret_store import encrypt_secret  # noqa: E402
 
 @pytest_asyncio.fixture
 async def flow(tmp_path, monkeypatch):
+    # Formular-Token und Zähler des Spamschutzes (#2067) brauchen das Server-Geheimnis.
+    monkeypatch.setenv("JWT_SECRET", "spam-guard-aware-tests-secret-with-32-characters")
     public = tmp_path / "public"
     public.mkdir()
     monkeypatch.setattr(upload_routes, "PUBLIC_UPLOAD_DIR", public)
@@ -201,5 +204,6 @@ async def test_contact_form_knows_the_volunteer_topic(flow):
     topics = {row["value"]: row["label"] for row in (await flow.get("/api/contact/topics")).json()}
     assert topics["volunteer"] == "Mitarbeit im Verein"
     sent = await flow.post("/api/contact/submit", json={"name": "Nora Neu", "email": "nora@beispielverein.at", "topic": "volunteer",
-                                                       "subject": "Interesse: Jugendreferentin", "message": "Ich hätte Zeit.", "accept_privacy": True})
+                                                       "subject": "Interesse: Jugendreferentin", "message": "Ich hätte Zeit.", "accept_privacy": True,
+                                                       **form_fields("contact")})
     assert sent.status_code == 200, sent.text

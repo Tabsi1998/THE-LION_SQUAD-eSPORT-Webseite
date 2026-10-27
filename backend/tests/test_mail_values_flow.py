@@ -11,6 +11,7 @@ import pytest_asyncio
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 
 from flow_harness import make_flow  # noqa: E402
+from spam_forms import form_fields  # noqa: E402
 from services.email_delivery import SafeHtml, fill_placeholders, header_text, html_to_text, html_value  # noqa: E402
 from services.mail_catalog import code_templates  # noqa: E402
 
@@ -20,7 +21,9 @@ RAW = ("<b>X</b>", '<a href="https://example.test">')
 
 
 @pytest_asyncio.fixture
-async def flow():
+async def flow(monkeypatch):
+    # Formular-Token und Zähler des Spamschutzes (#2067) brauchen das Server-Geheimnis.
+    monkeypatch.setenv("JWT_SECRET", "spam-guard-aware-tests-secret-with-32-characters")
     instance, shutdown = make_flow()
     try:
         yield instance
@@ -169,7 +172,7 @@ async def test_contact_form_mails_show_the_sender_text_as_text(flow):
     await flow.db.settings.update_one({"id": "branding"}, {"$set": {"id": "branding", "contact_email": "vorstand@example.test"}}, upsert=True)
     sent = await flow.post("/api/contact/submit", json={
         "name": NAME, "email": "absender@lionsquad-test.at", "topic": "general", "subject": "Frage <i>wichtig</i>",
-        "message": "Hallo <img src=https://example.test/p.png> bitte melden", "accept_privacy": True,
+        "message": "Hallo <img src=https://example.test/p.png> bitte melden", "accept_privacy": True, **form_fields("contact"),
     })
     assert sent.status_code == 200, sent.text
     reply = await flow.db.mail_jobs.find_one({"to": "absender@lionsquad-test.at"}, {"_id": 0})

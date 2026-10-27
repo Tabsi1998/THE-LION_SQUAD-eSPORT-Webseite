@@ -7,12 +7,13 @@
 """
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel, EmailStr, Field, field_validator
+from pymongo import ReturnDocument
 from typing import Optional, Literal
 
 from database import get_db
 from auth import get_optional_user as get_current_user_optional, require_area
 from models import now_utc, new_id
-from services.rate_limit import enforce_rate_limit
+from services import spam_guard
 from services.slug_utils import apply_slug_history, slug_source_for_update, slugify, unique_slug
 
 # ---------- Contact ----------
@@ -48,6 +49,10 @@ class ContactSubmit(BaseModel):
     message: str = Field(min_length=5, max_length=4000)
     related_id: Optional[str] = None  # tournament_id / event_id / etc.
     accept_privacy: bool = Field(..., description="Must be explicitly true")
+    # Spamschutz (#2067): Formular-Token, das unsichtbare Feld und - falls eingeschaltet - die Antwort von Turnstile.
+    form_token: Optional[str] = Field(default=None, max_length=300)
+    hp_fax: Optional[str] = Field(default=None, max_length=300)
+    turnstile_token: Optional[str] = Field(default=None, max_length=4096)
 
     @field_validator("name", "subject", "message")
     @classmethod
@@ -63,12 +68,18 @@ class ContactSubmit(BaseModel):
 async def submit_contact(body: ContactSubmit, request: Request, me=Depends(get_current_user_optional)):
     if not body.accept_privacy:
         raise HTTPException(400, "Datenschutz-Zustimmung erforderlich.")
-    await enforce_rate_limit(request, "contact:submit:ip", limit=5, window_seconds=900)
     db = get_db()
     name = body.name.strip()
     email = str(body.email).lower()
     subject = body.subject.strip().replace("\r", " ").replace("\n", " ")
     message = body.message.strip()
+    # Spamschutz (#2067): Limits je IP und E-Mail, Honeypot, Formular-Token, ggf. Turnstile, Inhalt.
+    verdict = await spam_guard.screen(request, "contact", token=body.form_token, honeypot=body.hp_fax,
+                                      turnstile_token=body.turnstile_token, email=email,
+                                      fields={"name": name, "subject": subject, "message": message}, db=db)
+    if verdict.dropped:
+        # Sicher ein Bot: nichts speichern, nichts senden - die Antwort sieht aus wie ein Erfolg.
+        return {"ok": True, "id": new_id()}
     doc = {
         "id": new_id(),
         "name": name,
@@ -84,16 +95,29 @@ async def submit_contact(body: ContactSubmit, request: Request, me=Depends(get_c
         "answered_by": None,
         "internal_note": "",
     }
+    if verdict.suspect:
+        # Nur der Inhalt ist verdächtig: in die Inbox als „Spam“, ohne Mail und ohne Hinweis an den Vorstand.
+        # „Kein Spam“ in der Inbox holt beides nach.
+        doc["status"] = "spam"
+        doc["spam"] = verdict.record()
     await db.contact_messages.insert_one(doc)
+    if not verdict.suspect:
+        await _notify_contact(db, doc)
+    return {"ok": True, "id": doc["id"]}
+
+
+async def _notify_contact(db, doc: dict) -> None:
+    """Hinweis im Vorstands-Kanal, Bestätigung an den Absender und Mail an die Vereinsadresse."""
+    name, email, subject, message, topic = doc["name"], doc["email"], doc["subject"], doc["message"], doc["topic"]
     # Vorstands-Kanal (#300): Thema ja, Absender und Text nein - die stehen in der Kontakt-Inbox.
     from services.discord_announcements import notify_board
-    await notify_board("contact.request", f"Thema: {TOPIC_LABELS.get(body.topic, body.topic)}")
+    await notify_board("contact.request", f"Thema: {TOPIC_LABELS.get(topic, topic)}")
     # Auto-reply via mail queue (uses render_template if admin customised it)
     from email_service import _wrap
     from services.email_delivery import fill_placeholders
     from services.mail_queue import enqueue_mail
     from routes.phase_ef_routes import render_template
-    topic_label = TOPIC_LABELS.get(body.topic, body.topic)
+    topic_label = TOPIC_LABELS.get(topic, topic)
     first_name = name.split()[0] if name else "dort"
     # Werte nur als {{…}}: render_template und fill_placeholders setzen sie als Text ein, im Betreff einzeilig.
     fallback_user_html = _wrap(
@@ -139,7 +163,6 @@ async def submit_contact(body: ContactSubmit, request: Request, me=Depends(get_c
             template_key="contact_admin_notify",
             meta={"contact_id": doc["id"]},
         )
-    return {"ok": True, "id": doc["id"]}
 
 
 @contact_router.get("/topics")
@@ -177,6 +200,28 @@ async def patch_contact_message(cid: str, body: ContactPatch, me: dict = Depends
     if res.matched_count == 0:
         raise HTTPException(404, "Nachricht nicht gefunden.")
     return await db.contact_messages.find_one({"id": cid}, {"_id": 0})
+
+
+@contact_router.post("/{cid}/not-spam")
+async def mark_contact_not_spam(cid: str, me: dict = Depends(require_area("club"))):
+    """„Kein Spam“ (#2067): die Nachricht normal einordnen und die Mails nachholen, die beim Eingang unterblieben.
+
+    Bedingt geschrieben: nur eine Nachricht, die der Spamschutz beim Eingang markiert hat (von Hand auf „Spam“
+    gesetzte hatten ihre Mails schon) und die noch nie freigegeben wurde - zwei Klicks verschicken nichts doppelt."""
+    db = get_db()
+    now = now_utc().isoformat()
+    doc = await db.contact_messages.find_one_and_update(
+        {"id": cid, "status": "spam", "spam.reasons": {"$exists": True}, "spam.cleared_at": {"$exists": False}},
+        {"$set": {"status": "new", "spam.cleared_at": now, "spam.cleared_by": me["id"]}},
+        return_document=ReturnDocument.AFTER)
+    if doc:
+        doc.pop("_id", None)
+    if not doc:
+        if not await db.contact_messages.find_one({"id": cid}, {"_id": 1}):
+            raise HTTPException(404, "Nachricht nicht gefunden.")
+        raise HTTPException(409, "Diese Nachricht ist nicht als Spam markiert oder wurde schon freigegeben.")
+    await _notify_contact(db, doc)
+    return doc
 
 
 @contact_router.delete("/{cid}")
