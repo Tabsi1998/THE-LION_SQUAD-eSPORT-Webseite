@@ -356,6 +356,19 @@ docker compose exec backend python scripts/unique_index_duplicates.py
 
 Alle drei lesen nur (das Dubletten-Skript ohne `--anwenden`).
 
+## Was tun bei gelben Checks (#2080)
+
+Die Checks **Freier Speicher** und **Bildvarianten** schreiben im gelben bzw. roten Zustand selbst hin, was hilft:
+
+- **Freier Speicher** gelb (unter 15 % frei) bzw. rot (unter 5 %): am Server alte Docker-Images und Build-Cache
+  löschen – `docker image prune -a` und `docker builder prune` entfernen nur, was kein Container nutzt –, alte
+  Backups und Logs prüfen. Verwaiste Uploads zeigt `scripts/uploads-inventory.py` (liest nur), große Dateien
+  Admin → Medien. Nie `docker compose down -v`.
+- **Bildvarianten** gelb (mehr als 50 breite Bilder ohne 400er-Fassung): Bilder bis 400 Pixel Breite und animierte
+  zählen nicht, sie bekommen nie eine Fassung. Fehlende baut die Website beim ersten Aufruf eines Bildes selbst; einen
+  Knopf zum Nacherzeugen gibt es noch nicht. Bleibt die Zahl hoch: Checks **Upload-Volume** (beschreibbar?) und
+  **Freier Speicher** ansehen, im Backend-Log nach `[media]` suchen, Überblick mit `scripts/media-report.py`.
+
 ## Externe Überwachung
 
 Ein Uptime-Dienst prüft mindestens jede Minute `https://lionsquad.at/api/health/live`,

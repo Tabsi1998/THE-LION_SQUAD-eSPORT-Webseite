@@ -175,6 +175,42 @@ async def test_a_broken_check_does_not_stop_the_run(flow):
     assert run["status"] == "crit"
 
 
+@pytest.mark.asyncio
+async def test_the_variant_check_counts_only_pictures_that_get_a_small_copy(tmp_path, monkeypatch):
+    """#2080: Ein Bild bis 400 Pixel Breite bekommt nie eine 400er-Fassung - es fehlt ihm nichts. Gezählt werden nur
+    breitere Bilder ohne Fassung; gelb sagt dazu, was zu tun ist."""
+    from PIL import Image
+
+    public = tmp_path / "public"
+    public.mkdir()
+    monkeypatch.setattr(ops_checks, "PUBLIC_UPLOAD_DIR", public)
+    for index in range(60):
+        Image.new("RGB", (120, 80)).save(public / f"klein-{index}.png")
+    check = await ops_checks.check_image_variants()
+    assert check["status"] == "ok" and check["value"].startswith("0 von 60")
+
+    for index in range(55):
+        Image.new("RGB", (600, 300)).save(public / f"gross-{index}.png")
+    check = await ops_checks.check_image_variants()
+    assert check["status"] == "warn" and check["value"].startswith("55 von 115")
+    assert "beim ersten Aufruf" in check["detail"] and "Upload-Volume" in check["detail"] and "media-report.py" in check["detail"]
+
+
+@pytest.mark.asyncio
+async def test_the_disk_check_says_what_to_do_when_space_runs_low(monkeypatch):
+    """#2080: gelb und rot nennen, was Platz schafft - alte Docker-Images, Build-Cache, verwaiste Uploads."""
+    for free, light in ((50, "ok"), (10, "warn"), (3, "crit")):
+        monkeypatch.setattr(ops_checks, "_disk_usage", lambda _path, free=free: (100 * 10**9, free * 10**9))
+        check = await ops_checks.check_disk()
+        assert check["status"] == light, free
+        if light == "ok":
+            assert "docker" not in check["detail"]
+        else:
+            assert "docker image prune" in check["detail"] and "docker builder prune" in check["detail"]
+            assert "uploads-inventory.py" in check["detail"]
+    assert check["detail"].startswith("Sofort handeln"), "rot drängt"
+
+
 # ---------------------------------------------------------------- Alarme
 
 @pytest.mark.asyncio

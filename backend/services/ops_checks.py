@@ -43,6 +43,17 @@ TWITCH_STALE_MINUTES = 15.0
 DOLIBARR_STALE_MINUTES = 60.0
 VARIANTS_WARN_MISSING = 50
 VARIANT_SCAN_LIMIT = 5000
+VARIANT_PROBE_WIDTH = 400
+# Handlungsanweisungen (#2080): Was gelb bzw. rot heißt und was hilft - so, wie es in docs/BETRIEB.md steht.
+DISK_ACTION = ("Platz schaffen am Server: alte Docker-Images und Build-Cache löschen (docker image prune -a und docker builder prune "
+               "- entfernt nur, was kein Container nutzt), alte Backups und Logs prüfen; verwaiste Uploads zeigt "
+               "docker compose exec backend python3 scripts/uploads-inventory.py (liest nur), große Dateien Admin → Medien. "
+               "Nie docker compose down -v.")
+DISK_ACTION_CRIT = "Sofort handeln: unter 5 % frei scheitern Uploads, Backups und Datenbank."
+VARIANTS_ACTION = ("Breite Bilder ohne 400er-Fassung. Die Website baut eine fehlende Fassung beim ersten Aufruf des Bildes selbst; "
+                   "ein Knopf zum Nacherzeugen fehlt noch. Bleibt die Zahl hoch: die Checks Upload-Volume (beschreibbar?) und "
+                   "Freier Speicher ansehen und im Backend-Log nach [media] suchen; Überblick mit "
+                   "docker compose exec backend python3 scripts/media-report.py (liest nur).")
 UPLOAD_SCAN_LIMIT = 200_000
 # Besucher-Adresse (#941): unter so vielen Sitzungen am Tag sagt eine gemeinsame Adresse nichts.
 CLIENT_IP_MIN_SESSIONS = 5
@@ -202,7 +213,13 @@ async def check_disk() -> dict:
         return failed("disk", label, exc)
     free_pct = (free / total * 100) if total else None
     value = f"{free / 1e9:.1f} GB frei" + (f" ({free_pct:.0f} %)" if free_pct is not None else "")
-    return result("disk", label, rate_disk(free_pct), value, f"Datenträger von {UPLOAD_DIR}")
+    status = rate_disk(free_pct)
+    detail = f"Datenträger von {UPLOAD_DIR}"
+    if status == "crit":
+        detail = f"{DISK_ACTION_CRIT} {DISK_ACTION}"
+    elif status == "warn":
+        detail = DISK_ACTION
+    return result("disk", label, status, value, detail)
 
 
 def _walk_size(path: Path, limit: int = UPLOAD_SCAN_LIMIT) -> tuple[int, int, bool]:
@@ -367,9 +384,23 @@ def _missing_variants(path: Path, limit: int = VARIANT_SCAN_LIMIT) -> tuple[int,
             truncated = True
             scanned -= 1
             break
-        if not (variants / f"{entry.stem}-400.webp").exists():
+        if not (variants / f"{entry.stem}-{VARIANT_PROBE_WIDTH}.webp").exists() and _wants_variant(entry):
             missing += 1
     return scanned, missing, truncated
+
+
+def _wants_variant(path: Path) -> bool:
+    """Bekäme das Bild eine 400er-Fassung? Nicht, wenn es höchstens so breit ist oder animiert (#2080) - dann wird
+    das Original ausgeliefert, und es fehlt nichts. Gelesen wird nur der Kopf der Datei."""
+    from PIL import Image
+
+    try:
+        with Image.open(path) as image:
+            # EXIF-Ausrichtung 5 bis 8 dreht um 90 Grad - die Fassung misst die aufgerichtete Breite.
+            width = image.height if image.getexif().get(0x0112, 1) in (5, 6, 7, 8) else image.width
+            return width > VARIANT_PROBE_WIDTH and not getattr(image, "is_animated", False)
+    except Exception:  # noqa: BLE001 - unlesbar bekommt auch keine Fassung
+        return False
 
 
 async def check_image_variants() -> dict:
@@ -379,7 +410,8 @@ async def check_image_variants() -> dict:
     except Exception as exc:  # noqa: BLE001
         return failed("image_variants", label, exc)
     value = f"{missing} von {scanned}{' +' if truncated else ''} ohne kleine Fassung"
-    return result("image_variants", label, rate_variants(missing), value, "Bilder unter uploads/public, geprüft auf die 400er-Fassung")
+    status = rate_variants(missing)
+    return result("image_variants", label, status, value, VARIANTS_ACTION if status != "ok" else "Bilder unter uploads/public, geprüft auf die 400er-Fassung")
 
 
 async def check_error_groups(db) -> dict:
