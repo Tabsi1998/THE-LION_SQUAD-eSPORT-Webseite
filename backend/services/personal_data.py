@@ -130,6 +130,13 @@ PERSONAL: dict[str, Entry] = {
     "billing_orders": Entry(OVERWRITTEN, ("billing_orders",)),
     "billing_customers": Entry(DELETED, ("billing_customers",)),
     "billing_cases": Entry(KEPT, note="Buchhaltungsfall zu einem Auftrag; nur Kennungen - Belege sieben Jahre"),
+    # Shop (#1703, #1731 verfeinert): personenbezogene Felder stehen in services/shop_common.PERSONAL_FIELDS.
+    "shop_orders": Entry(OVERWRITTEN, ("shop_orders",), "Beträge, Positionen und Verlauf bleiben für die Buchhaltung (die "
+                         "Rechnung liegt in Dolibarr); Rechnungs- und Lieferanschrift bis auf das Land überschrieben"),
+    "shop_order_items": Entry(OVERWRITTEN, ("shop_order_items",), "Position einer Bestellung; der Gamertag wird entfernt"),
+    "shop_carts": Entry(DELETED, ("shop_cart",)),
+    "shop_order_events": Entry(KEPT, note="Verlauf einer Bestellung als Nachweis; nur Kennungen, Beträge und Stände, nie "
+                               "eine Anschrift"),
     # Teams, Turniere, Events, F1, Saison
     "teams": Entry(KEPT, ("teams",), "gehört dem Team; das Konto heißt in der Liste „Gelöschter User“"),
     "team_members": Entry(KEPT, ("team_memberships",), "Teamhistorie und Aufstellungen; das Konto heißt „Gelöschter User“"),
@@ -206,6 +213,9 @@ CLUB_CONTENT = frozenset({
     # Maps je Spiel und Map-Pools je Wettbewerb (#1616) - nur die Kennung, wer angelegt bzw. gespeichert hat; dazu die
     # belegten Schreibweisen der Maps (ohne Person).
     "game_maps", "map_pools", "game_map_keys",
+    # Shop-Katalog (#1703): Produkte, Varianten, Druckdateien und die Printful-Zuordnung - nur die Kennung, wer angelegt
+    # bzw. geändert hat.
+    "shop_products", "shop_variants", "shop_designs", "shop_printful_variants",
 })
 
 NO_PERSON = frozenset({

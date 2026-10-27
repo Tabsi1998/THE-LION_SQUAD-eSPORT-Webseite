@@ -38,6 +38,14 @@ MANUAL = {
                                         "prüfen, welcher gilt (ausgegebene nie löschen), die anderen von Hand entfernen.",
     "season_points.fastlap_source_user": "Doppelte Saisonpunkte für dieselbe Fast-Lap-Strecke und Person - in der "
                                          "Jahreswertung prüfen und die überzählige Zeile von Hand entfernen.",
+    # Shop (#1703): Bestellungen, Positionen und Ereignisse sind Nachweise, der Katalog ist eine Entscheidung der Finanzen.
+    **{f"shop_{index}": "Doppelte Shop-Daten - Bestellungen, Positionen und Ereignisse sind Nachweise und werden nie "
+                        "automatisch gelöscht: mit den Finanzen klären, welche Zeile gilt (docs/SHOP.md)."
+       for index in ("orders.idempotency_key", "orders.printful_external_id", "order_items.order_position",
+                     "order_events.order_event")},
+    **{f"shop_{index}": "Doppelter Eintrag im Shop-Katalog - die Finanzen entscheiden, welcher gilt, und benennen den "
+                        "anderen um (docs/SHOP.md)."
+       for index in ("products.slug", "variants.sku", "designs.design_version", "printful_variants.provider_variant")},
 }
 # Index -> Reihenfolge, deren erste Zeile bleibt (sonst die älteste).
 KEEP_ORDER = {

@@ -92,6 +92,8 @@ class FakeDb:
             "reference_series_staff", "reference_participants", "reference_aliases",
             # Wunschnummer (#2034)
             "jersey_numbers", "jersey_number_requests",
+            # Shop (#1703)
+            "shop_orders", "shop_order_items", "shop_carts",
         ):
             setattr(self, name, FakeCollection())
 
