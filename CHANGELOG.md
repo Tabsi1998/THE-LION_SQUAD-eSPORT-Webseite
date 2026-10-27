@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.36.0 (27.10.2026)
+
+### Neu
+
+* „Meine Mitgliedschaft“ als Button im Dashboard und im Mitgliederbereich - Wunschnummer und Daten schneller gefunden (#2059)
+* Vereinsshop-Fundament: Datenmodell mit eingefrorenen Bestellungen und Schutz gegen Doppelbestellungen (#1703)
+* Vereinsshop-Fundament: Verwaltung nur im Bereich Finanzen, jede Änderung im Protokoll (#1704)
+
+### Fehlerbehebungen
+
+* Fußzeile zeigt Mitgliedern den Mitgliederbereich statt „Mitglied werden“ (#2059)
+* Wunschnummer: Fehlt in Dolibarr das Recht zum Bearbeiten von Mitgliedern, sagt die Verwaltung genau das - statt „nicht erreichbar … Modul Vereine“
+
 ## 1.35.0 (27.10.2026)
 
 ### Neu
