@@ -10,6 +10,7 @@ import { formatCents, parseEuro } from "@/lib/billing";
 import { viennaDateTime } from "@/lib/vienna";
 import ShopTabs from "./ShopTabs";
 import LayoutStep from "./ShopLayoutStep";
+import ProductSearch from "./ShopProductSearch";
 
 // Produktverwaltung (#1707) mit Katalogabgleich (#1709) - Verwaltung → Finanzen → Shop → Produkte. Geführt in fünf
 // Schritten: Produkt wählen, Farben und Größen, Druckflächen (#2069), Preise, Prüfen und veröffentlichen. Jede Änderung
@@ -313,7 +314,8 @@ function PrintfulStep({ view, busy, run }) {
   const parsed = /^\d{1,8}$/.test(numberText.trim()) ? Number(numberText.trim()) : null;
   return (
     <div className="space-y-3" data-testid="shop-step-printful">
-      <Field label="Printful-Produktnummer" hint="Die Nummer des Katalogprodukts (nicht einer Variante). Printful bietet in seiner Schnittstelle keine Textsuche – die Nummer steht im Printful-Katalog beim Produkt.">
+      <ProductSearch disabled={!view.editable} current={parsed} onPick={(id) => setNumberText(String(id))} />
+      <Field label="Printful-Produktnummer" hint="Füllt die Suche oben aus. Von Hand nur im Notfall: die Nummer des Katalogprodukts (nicht einer Variante).">
         <input value={numberText} onChange={(event) => setNumberText(event.target.value.replace(/[^\d]/g, ""))} inputMode="numeric" maxLength={8} className={`${INPUT} tabular-nums max-w-xs`} data-testid="shop-printful-number" />
       </Field>
       <ReasonedButton id="shop-printful" label={printful ? "Neu laden" : "Bei Printful laden"} busy={busy === "printful"} disabled={!parsed || !view.editable}

@@ -242,4 +242,6 @@ NO_PERSON = frozenset({
     # Claims des Printful-Adapters (#1705) vor dem Anlegen eines Entwurfs und vor dem Bestätigen: external_id,
     # Idempotenzschlüssel, Auftragsnummer, Stand - keine Person.
     "shop_printful_drafts", "shop_printful_confirmations",
+    # Zwischenstand des Printful-Katalogs für die Produktsuche (#2069): Namen, Marken, Kategorien - keine Person.
+    "shop_printful_catalog",
 })

@@ -120,6 +120,7 @@ def new_routes(product_id: str) -> list[tuple[str, str, dict]]:
         ("get", "/api/admin/shop/print-presets", None),
         ("put", "/api/admin/shop/print-presets", {"rules": {"min_width_cm": 2.0}, "reason": "Test"}),
         ("get", "/api/admin/shop/print-templates/71/images/0", None),
+        ("get", "/api/admin/shop/printful-catalog?q=gildan", None),
         ("post", f"{BASE}/{product_id}/prices/accept", {"reason": "Test"}),
         ("post", f"{BASE}/{product_id}/sync", {}),
         ("post", f"{BASE}/{product_id}/status", {"status": "reviewed", "reason": "Test"}),
@@ -417,3 +418,20 @@ async def test_print_files_preview_presets_template_images_and_upload_through_th
                             files={"file": ("ruecken.png", png(1800, 2400), "image/png")})
     assert right.status_code == 200, right.text
     assert right.json()["uploaded"]["width_px"] == 1800
+
+@pytest.mark.asyncio
+async def test_the_product_search_finds_the_printful_number_without_typing_it(flow, fake):
+    who = await people(flow)
+    flow.act_as(who["finanzen"])
+    without_key = await flow.get("/api/admin/shop/printful-catalog", params={"q": "gildan"})
+    assert without_key.status_code == 409 and "Schlüssel" in without_key.json()["detail"]
+    await with_key(flow)
+    found = await flow.get("/api/admin/shop/printful-catalog", params={"q": "Gildan 5000"})
+    assert found.status_code == 200, found.text
+    body = found.json()
+    assert [row["id"] for row in body["results"]] == [71] and body["products_total"] == 1
+    assert body["categories"] and body["fetched_at"] and body["stale"] is False
+    link = "https://www.printful.com/dashboard/custom/mens/shirts/unisex-testshirt-gildan-5000?technique=DTFILM&color=Black"
+    by_link = (await flow.get("/api/admin/shop/printful-catalog", params={"link": link})).json()
+    assert by_link["link"]["ok"] is True and by_link["results"][0]["id"] == 71
+    assert len(fake.calls_to("getProducts")) == 1, "zwischengespeichert"

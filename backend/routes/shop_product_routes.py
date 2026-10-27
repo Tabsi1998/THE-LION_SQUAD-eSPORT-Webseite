@@ -17,7 +17,7 @@ from pydantic import BaseModel, Field, StrictInt
 
 from auth import require_area
 from database import get_db
-from services import shop_catalog_sync, shop_designs, shop_print_files, shop_products
+from services import shop_catalog_search, shop_catalog_sync, shop_designs, shop_print_files, shop_products
 from services import shop_print_templates as print_templates
 from services.image_upload import _read_upload_limited
 from services.printful_client import PrintfulClient
@@ -110,6 +110,29 @@ async def _view(product_id: str, **extra) -> dict:
         return {**await shop_products.admin_view(get_db(), product_id), **extra}
     except LookupError as exc:
         raise HTTPException(404, str(exc)) from exc
+
+
+@router.get("/printful-catalog")
+async def printful_catalog(q: str = Query("", max_length=120), category_id: int | None = Query(None, ge=1),
+                           link: str | None = Query(None, max_length=500), refresh: bool = False,
+                           me: dict = Depends(require_area("finance"))):
+    """Schritt 1 ohne Nummer (#2069): im Printful-Katalog suchen - nach Name, Marke, Modell, Kategorie oder über einen
+    Link aus dem Printful-Dashboard. Der Katalog wird zwischengespeichert (ein Tag)."""
+    db = get_db()
+    try:
+        provider = await PrintfulClient.from_db(db)
+    except FulfillmentError:
+        provider = None  # ohne Schlüssel: nur der letzte Stand, falls es einen gibt
+    try:
+        catalog = await shop_catalog_search.load(db, provider=provider, refresh=refresh)
+    except ShopConflict as exc:
+        raise HTTPException(409, str(exc)) from exc
+    except ShopError as exc:
+        raise HTTPException(409 if provider is None else 502, NO_KEY if provider is None else str(exc)) from exc
+    found = shop_catalog_search.search(catalog, query=q, category_id=category_id, link=link)
+    return {**found, "categories": shop_catalog_search.category_tree(catalog), "fetched_at": catalog.get("fetched_at"),
+            "stale": catalog.get("stale", False), "error": catalog.get("error"),
+            "products_total": len(catalog.get("products") or [])}
 
 
 @router.post("/products/{product_id}/printful")

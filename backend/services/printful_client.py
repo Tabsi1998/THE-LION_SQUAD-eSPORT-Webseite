@@ -43,7 +43,7 @@ from pymongo.errors import DuplicateKeyError
 from services import shop_config
 from services.log_safe import log_safe, mask_addresses
 from services.shop_fulfillment import (
-    CatalogProduct, CatalogProductId, CatalogVariant, CatalogVariantId, Costs, DraftLine, DraftOrder,
+    CatalogCategory, CatalogEntry, CatalogProduct, CatalogProductId, CatalogVariant, CatalogVariantId, Costs, DraftLine, DraftOrder,
     FulfillmentError, FulfillmentInvalid, FulfillmentOrder, FulfillmentPermanent, FulfillmentTransient, MockupImage,
     MockupTask, MockupTemplate, OrderItem, PLACEMENT_RE, PlacedFile, Placement, PrintArea, PrintFile, PrintfulOrderId,
     ProductPlacementInfo, TECHNIQUE_RE, check_external_id, check_https_url, require)
@@ -322,10 +322,11 @@ class PrintfulClient:
     async def _get(self, path: str, *, operation: str, params: dict | None = None):
         return await self._request("GET", path, operation=operation, params=params)
 
-    async def _pages(self, path: str, *, operation: str) -> list[dict]:
+    async def _pages(self, path: str, *, operation: str, params: dict | None = None) -> list[dict]:
         rows: list[dict] = []
         for page in range(MAX_PAGES):
-            body = await self._get(path, operation=operation, params={"limit": PAGE_LIMIT, "offset": page * PAGE_LIMIT})
+            body = await self._get(path, operation=operation,
+                                   params={**(params or {}), "limit": PAGE_LIMIT, "offset": page * PAGE_LIMIT})
             chunk = _data(body, list)
             rows.extend(row for row in chunk if isinstance(row, dict))
             total = _dig(body, "paging", "total")
@@ -427,6 +428,48 @@ class PrintfulClient:
             variants.append(CatalogVariant(**common, currency=str(prices_data.get("currency") or currency),
                                            prices=prices, placement_prices=surcharges))
         return tuple(variants)
+
+    # ------------------------------------------------ Katalogliste für die Produktsuche (#2069)
+    async def catalog_products(self, *, region: str = "europe") -> tuple[CatalogEntry, ...]:
+        """Alle Katalogprodukte (``GET /v2/catalog-products``, seitenweise je 100) - für die Suche im Admin. Printful v2
+        hat keinen Textfilter; gesucht wird lokal über Name, Marke und Modell (``services/shop_catalog_search.py``).
+        ``region`` beschränkt auf Produkte, die in der Verkaufsregion lieferbar sind (Versand nur nach Österreich)."""
+        if not REGION_RE.fullmatch(str(region)):
+            raise ValueError("Region (europe) ungültig")
+        rows = await self._pages("/v2/catalog-products", operation="getProducts",
+                                 params={"selling_region_name": region})
+        out = []
+        for row in rows:
+            if type(row.get("id")) is not int or row["id"] < 1 or not isinstance(row.get("name"), str):
+                raise FulfillmentPermanent("invalid_response")
+            image = row.get("image")
+            try:
+                image = check_https_url(image) if image else None
+            except ValueError:
+                image = None
+            category = row.get("main_category_id")
+            out.append(CatalogEntry(
+                id=CatalogProductId(row["id"]), name=row["name"][:200],
+                brand=str(row["brand"])[:80] if row.get("brand") else None,
+                model=str(row["model"])[:80] if row.get("model") else None, type=str(row.get("type") or "")[:40],
+                main_category_id=category if type(category) is int else None, image=image,
+                techniques=tuple(str(item.get("key")) for item in row.get("techniques") or []
+                                 if isinstance(item, dict) and item.get("key")),
+                colors=len(row.get("colors") or []), sizes=len(row.get("sizes") or []),
+                is_discontinued=row.get("is_discontinued") is True))
+        return tuple(out)
+
+    async def catalog_categories(self) -> tuple[CatalogCategory, ...]:
+        """Die Kategorien des Katalogs (``GET /v2/catalog-categories``) - Filter der Produktsuche."""
+        body = await self._get("/v2/catalog-categories", operation="getCategories")
+        out = []
+        for row in _data(body, list):
+            if not isinstance(row, dict) or type(row.get("id")) is not int:
+                continue
+            parent = row.get("parent_id")
+            out.append(CatalogCategory(id=row["id"], parent_id=parent if type(parent) is int else None,
+                                       title=str(row.get("title") or "")[:80]))
+        return tuple(out)
 
     # ------------------------------------------------ Druckvorgaben und Vorlagenbilder (#2069)
     @staticmethod

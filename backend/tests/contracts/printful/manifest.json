@@ -40,5 +40,12 @@
       "Badetuch 30×60 / 36×72": "9300 × 4800 bzw. 11100 × 5700 px bei 150 DPI, quer oder hoch"
     },
     "not_in_api": "Ein Sicherheitsbereich als Zahl steht nicht in v2 - er ist im Vorlagenbild eingezeichnet; der Shop hat dafür einen einstellbaren Rand je Fläche"
+  },
+  "product_search": {
+    "issue": "#2069",
+    "list": "GET /v2/catalog-products (getProducts) - seitenweise je 100, selling_region_name=europe",
+    "categories": "GET /v2/catalog-categories (getCategories)",
+    "text_filter": "keiner in v2 (nur category_ids, colors, placements, techniques, new) - gesucht wird lokal über Name, Marke und Modell",
+    "dashboard_link": "kein Slug in der API; der letzte Teil der Dashboard-Adresse (unisex-classic-tee-gildan-5000) wird mit dem Namen in Kleinbuchstaben und Bindestrichen verglichen - nur ein eindeutiger Treffer zählt"
   }
 }

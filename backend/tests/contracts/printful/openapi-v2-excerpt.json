@@ -49,6 +49,25 @@
         "responses": {"200": {"content": {"application/json": {"schema": {"$ref": "#/components/schemas/GetProductStockAvailabilityById"}}}}}
       }
     },
+    "/v2/catalog-products": {
+      "get": {
+        "operationId": "getProducts",
+        "description": "Katalogliste für die Produktsuche im Admin (#2069). Printful v2 kennt keinen Textfilter (nur Kategorie, Farbe, Platzierung, Technik, neu) - gesucht wird lokal über Name, Marke und Modell.",
+        "parameters": [
+          {"name": "limit", "in": "query", "schema": {"type": "integer", "minimum": 1, "maximum": 100}},
+          {"name": "offset", "in": "query", "schema": {"type": "integer", "minimum": 0}},
+          {"name": "selling_region_name", "in": "query", "schema": {"type": "string", "enum": ["worldwide", "north_america", "canada", "europe", "spain", "latvia", "uk", "france", "germany", "australia", "japan", "new_zealand", "italy", "brazil", "southeast_asia", "republic_of_korea", "all"]}}
+        ],
+        "responses": {"200": {"content": {"application/json": {"schema": {"$ref": "#/components/schemas/GetProducts"}}}}}
+      }
+    },
+    "/v2/catalog-categories": {
+      "get": {
+        "operationId": "getCategories",
+        "description": "Kategorien des Katalogs (#2069) - Filter der Produktsuche.",
+        "responses": {"200": {"content": {"application/json": {"schema": {"$ref": "#/components/schemas/GetCategories"}}}}}
+      }
+    },
     "/v2/catalog-products/{id}/mockup-styles": {
       "get": {
         "operationId": "retrieveMockupStylesByProductId",
@@ -246,6 +265,18 @@
       "GetProductStockAvailabilityById": {
         "type": "object", "required": ["data", "paging", "filter_settings", "_links"],
         "properties": {"data": {"type": "array", "items": {"$ref": "#/components/schemas/VariantStockAvailability"}}, "paging": {"$ref": "#/components/schemas/Paging"}, "filter_settings": {"type": "array"}, "_links": {"type": "object"}}
+      },
+      "GetProducts": {
+        "type": "object", "required": ["data", "paging", "_links"],
+        "properties": {"data": {"type": "array", "items": {"$ref": "#/components/schemas/Product"}}, "paging": {"$ref": "#/components/schemas/Paging"}, "_links": {"type": "object"}}
+      },
+      "Category": {
+        "type": "object", "required": ["id", "parent_id", "image_url", "title", "_links"],
+        "properties": {"id": {"type": "integer"}, "parent_id": {"type": "integer", "nullable": true}, "image_url": {"type": "string"}, "title": {"type": "string"}, "_links": {"type": "object"}}
+      },
+      "GetCategories": {
+        "type": "object", "required": ["data"],
+        "properties": {"data": {"type": "array", "items": {"$ref": "#/components/schemas/Category"}}, "_links": {"type": "object"}}
       },
       "MockupStyle": {
         "type": "object", "required": ["id", "category_name", "view_name", "restricted_to_variants"],

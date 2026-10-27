@@ -209,6 +209,29 @@ class CatalogVariant:
 
 
 @dataclass(frozen=True, slots=True)
+class CatalogEntry:
+    """Ein Produkt aus der Katalogliste (#2069, Produktsuche) - ohne Varianten und Preise."""
+    id: CatalogProductId
+    name: str
+    brand: str | None
+    model: str | None
+    type: str
+    main_category_id: int | None
+    image: str | None
+    techniques: tuple[str, ...]
+    colors: int
+    sizes: int
+    is_discontinued: bool
+
+
+@dataclass(frozen=True, slots=True)
+class CatalogCategory:
+    id: int
+    parent_id: int | None
+    title: str
+
+
+@dataclass(frozen=True, slots=True)
 class PrintArea:
     """Die Druckvorgabe einer Platzierung (#2069): Druckbereich in Zoll und die DPI, mit der Printful die Druckdatei
     erwartet - Druckdatei = ``round(width_in × dpi)`` × ``round(height_in × dpi)`` Pixel. ``variant_ids`` ist ``None``,
@@ -398,6 +421,10 @@ class FulfillmentProvider(Protocol):
     async def catalog_variants(self, product_id: CatalogProductId, *, currency: str = "EUR",
                                region: str = "europe",
                                price_for: tuple[CatalogVariantId, ...] | None = None) -> tuple[CatalogVariant, ...]: ...
+
+    async def catalog_products(self, *, region: str = "europe") -> tuple[CatalogEntry, ...]: ...
+
+    async def catalog_categories(self) -> tuple[CatalogCategory, ...]: ...
 
     async def print_areas(self, product_id: CatalogProductId) -> tuple[PrintArea, ...]: ...
 

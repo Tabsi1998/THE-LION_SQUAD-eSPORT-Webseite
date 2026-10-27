@@ -190,6 +190,13 @@ class FakePrintful:
         # Druckvorgaben (mockup-styles) und Vorlagenbilder (mockup-templates) je Produkt (#2069).
         self.print_areas: dict[int, list[dict]] = {}
         self.templates: dict[int, list[dict]] = {}
+        # Kategorien des Katalogs für die Produktsuche (#2069) - erfundene Nummern, Titel wie bei Printful.
+        self.categories: list[dict] = [
+            {"id": 1, "parent_id": None, "title": "Men's clothing", "image_url": "https://files.cdn.printful.com/c/1.png", "_links": {}},
+            {"id": 24, "parent_id": 1, "title": "T-shirts", "image_url": "https://files.cdn.printful.com/c/24.png", "_links": {}},
+            {"id": 42, "parent_id": None, "title": "Hats", "image_url": "https://files.cdn.printful.com/c/42.png", "_links": {}},
+            {"id": 112, "parent_id": None, "title": "Home & living", "image_url": "https://files.cdn.printful.com/c/112.png", "_links": {}},
+        ]
         self.calls: list[dict] = []
         self.confirmations: list[int] = []
         self.faults: list[dict] = []
@@ -384,6 +391,13 @@ class FakePrintful:
                 for variant_id, row in self.variants.items() if row["catalog_product_id"] == product_id]
         rows, paging = self._paged(rows, params)
         return 200, {"data": rows, "paging": paging, "filter_settings": [], "_links": {"self": {}, "product": {}}}
+
+    def _op_getProducts(self, args, params, body):
+        rows, paging = self._paged(sorted(self.products.values(), key=lambda row: row["id"]), params)
+        return 200, {"data": rows, "paging": paging, "_links": {"self": {}}}
+
+    def _op_getCategories(self, args, params, body):
+        return 200, {"data": self.categories, "_links": {"self": {}}}
 
     def _op_retrieveMockupStylesByProductId(self, args, params, body):
         product_id = int(args[0]) if args[0].isdigit() else 0

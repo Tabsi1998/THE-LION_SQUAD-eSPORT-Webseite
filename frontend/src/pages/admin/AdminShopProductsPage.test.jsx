@@ -417,3 +417,33 @@ test("Veröffentlichen geht live: dafür ist der Grund Pflicht, der Knopf sagt e
   await user.click(screen.getByTestId("shop-status-active-submit"));
   expect(apiMock.post).toHaveBeenCalledWith("/admin/shop/products/p1/status", { status: "active", reason: "Testshirt geht live" });
 });
+
+test("Produktsuche: über den Namen oder einen Dashboard-Link - „Übernehmen“ setzt die Nummer", async () => {
+  const CATALOG = {
+    results: [{ id: 71, name: "Unisex Classic Tee | Gildan 5000", techniques: ["dtg", "dtfilm"], colors: 50, sizes: 8, image: "https://files.cdn.printful.com/products/71.jpg", is_discontinued: false }],
+    total: 1, link: null, categories: [{ id: 1, title: "Men's clothing", depth: 0 }, { id: 24, title: "T-shirts", depth: 1 }],
+    fetched_at: "2026-10-27T08:00:00+00:00", stale: false, products_total: 400,
+  };
+  apiMock.get.mockImplementation((url) => Promise.resolve({ data: url === "/admin/shop/printful-catalog" ? CATALOG : view() }));
+  apiMock.post.mockResolvedValue({ data: view() });
+  const user = userEvent.setup();
+  show("/admin/shop/products/p1");
+  const search = await screen.findByTestId("shop-product-search");
+  expect(search).toHaveTextContent("Ein Produkt je Modell – Farben und Größen wählst du im nächsten Schritt.");
+  await user.type(screen.getByTestId("shop-search-query"), "Gildan 5000");
+  await user.click(screen.getByTestId("shop-search-submit"));
+  expect(apiMock.get).toHaveBeenCalledWith("/admin/shop/printful-catalog", { params: { q: "Gildan 5000" } });
+  const hit = await screen.findByTestId("shop-search-hit-71");
+  expect(hit).toHaveTextContent("dtg, dtfilm · 50 Farben · 8 Größen");
+  expect(screen.getByTestId("shop-search-pick-71")).toHaveTextContent("Gewählt");
+  await user.selectOptions(screen.getByTestId("shop-search-category"), "24");
+  await user.click(screen.getByTestId("shop-search-submit"));
+  expect(apiMock.get).toHaveBeenLastCalledWith("/admin/shop/printful-catalog", { params: { q: "Gildan 5000", category_id: 24 } });
+  await user.clear(screen.getByTestId("shop-printful-number"));
+  await user.click(screen.getByTestId("shop-search-pick-71"));
+  expect(screen.getByTestId("shop-printful-number")).toHaveValue("71");
+  const link = "https://www.printful.com/dashboard/custom/mens/shirts/unisex-classic-tee-gildan-5000?technique=DTFILM";
+  await user.type(screen.getByTestId("shop-search-link"), link);
+  await user.click(screen.getByTestId("shop-search-link-submit"));
+  expect(apiMock.get).toHaveBeenLastCalledWith("/admin/shop/printful-catalog", { params: { link } });
+});
