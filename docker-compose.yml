@@ -47,6 +47,8 @@ services:
       TRUST_PROXY_HEADERS: "${TRUST_PROXY_HEADERS:-true}"
       TRUSTED_PROXY_CIDRS: "${TRUSTED_PROXY_CIDRS:-127.0.0.1/32,::1/128,172.16.0.0/12}"
       TRUSTED_HOSTS: "${TRUSTED_HOSTS:-}"
+      # Eigener Upload-Host: kommt automatisch in die Host-Prüfung (runtime_config.trusted_http_hosts).
+      PUBLIC_UPLOAD_BACKEND_URL: "${PUBLIC_UPLOAD_BACKEND_URL:-}"
       SENDER_EMAIL: "${SENDER_EMAIL:-noreply@lionsquad.at}"
       RESEND_API_KEY: "${RESEND_API_KEY:-}"
       # App-Releases (#250): Token, mit dem das Release-Skript die APK ablegt (#305).
