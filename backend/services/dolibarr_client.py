@@ -44,6 +44,7 @@ ERROR_TEXTS = {
     "bad_request": "Dolibarr lehnt die Anfrage ab (400)",
     "unauthorized": "Dolibarr kennt den API-Schlüssel nicht (401)",
     "forbidden": "Dem API-Benutzer fehlt ein Recht im Modul Vereine (403)",
+    "members_forbidden": "Dem API-Benutzer fehlt ein Recht im Modul Mitglieder (403)",
     "not_found": "Nicht gefunden (404)",
     "conflict": "Mehrere Mitglieder passen (409)",
     "module_off": "Das Modul Vereine ist in Dolibarr deaktiviert (501)",
