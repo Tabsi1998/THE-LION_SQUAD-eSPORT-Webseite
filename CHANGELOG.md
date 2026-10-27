@@ -1,19 +1,17 @@
 # Changelog
 
-## [1.36.0](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/compare/v1.35.0...v1.36.0) (2026-10-27)
-
+## 1.36.0 (27.10.2026)
 
 ### Neu
 
-* „Meine Mitgliedschaft“ als Button im Dashboard und im Mitgliederbereich - Wunschnummer und Daten schneller gefunden ([#2059](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2059)) ([da0eb84](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/da0eb84d26d130fc2b194677890422a384de0c9d))
-* Vereinsshop-Fundament: Datenmodell mit eingefrorenen Bestellungen und Schutz gegen Doppelbestellungen ([#1703](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1703)) ([75ecd39](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/75ecd39a9ae1623aa18a376cd94542411c71f93d))
-* Vereinsshop-Fundament: Verwaltung nur im Bereich Finanzen, jede Änderung im Protokoll ([#1704](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1704)) ([75ecd39](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/75ecd39a9ae1623aa18a376cd94542411c71f93d))
-
+* „Meine Mitgliedschaft“ als Button im Dashboard und im Mitgliederbereich - Wunschnummer und Daten schneller gefunden (#2059)
+* Vereinsshop-Fundament: Datenmodell mit eingefrorenen Bestellungen und Schutz gegen Doppelbestellungen (#1703)
+* Vereinsshop-Fundament: Verwaltung nur im Bereich Finanzen, jede Änderung im Protokoll (#1704)
 
 ### Fehlerbehebungen
 
-* Fußzeile zeigt Mitgliedern den Mitgliederbereich statt „Mitglied werden“ ([#2059](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2059)) ([da0eb84](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/da0eb84d26d130fc2b194677890422a384de0c9d))
-* Wunschnummer: Fehlt in Dolibarr das Recht zum Bearbeiten von Mitgliedern, sagt die Verwaltung genau das - statt „nicht erreichbar … Modul Vereine“ ([6f7f40e](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/6f7f40e8fa1739e4759bbc8adf00c6a691249370))
+* Fußzeile zeigt Mitgliedern den Mitgliederbereich statt „Mitglied werden“ (#2059)
+* Wunschnummer: Fehlt in Dolibarr das Recht zum Bearbeiten von Mitgliedern, sagt die Verwaltung genau das - statt „nicht erreichbar … Modul Vereine“
 
 ## 1.35.0 (27.10.2026)
 
