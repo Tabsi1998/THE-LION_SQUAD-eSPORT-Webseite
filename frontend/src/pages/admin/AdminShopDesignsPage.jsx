@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
-import { AlertTriangle, CheckCircle2, Copy, ExternalLink, FileImage, Palette, Plus, Ruler, ShoppingBag, Trash2, Upload, XOctagon } from "lucide-react";
+import { AlertTriangle, ArrowLeftRight, CheckCircle2, Copy, ExternalLink, FileImage, Palette, Plus, Ruler, ShoppingBag, Trash2, Upload, XOctagon } from "lucide-react";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { api, formatRequestError, resolveMediaUrl, uploadApi } from "@/lib/api";
 import { viennaDateTime } from "@/lib/vienna";
@@ -205,8 +205,14 @@ function isSvg(file) {
 }
 
 // Ablagefläche: ziehen und loslassen oder klicken. Das Eingabefeld bleibt ein echtes Dateifeld (Tastatur, Screenreader).
-function DropZone({ file, onFile, accept, disabled }) {
+// Mit ``onFiles`` (Paar, #2084) nimmt sie auch zwei Dateien auf einmal - die Seite ordnet sie dann selbst zu.
+function DropZone({ file, onFile, onFiles, accept, disabled, label, hint, testId = "shop-design" }) {
   const [over, setOver] = useState(false);
+  const take = (list) => {
+    const files = Array.from(list || []);
+    if (onFiles && files.length >= 2) onFiles(files.slice(0, 2));
+    else onFile(files[0] || null);
+  };
   return (
     <label
       onDragOver={(event) => { event.preventDefault(); if (!disabled) setOver(true); }}
@@ -214,24 +220,142 @@ function DropZone({ file, onFile, accept, disabled }) {
       onDrop={(event) => {
         event.preventDefault();
         setOver(false);
-        const dropped = event.dataTransfer?.files?.[0];
-        if (dropped && !disabled) onFile(dropped);
+        if (event.dataTransfer?.files?.length && !disabled) take(event.dataTransfer.files);
       }}
       className={`flex flex-col items-center justify-center gap-1.5 min-h-28 border border-dashed rounded-sm px-4 py-5 text-center cursor-pointer transition-colors duration-150 focus-within:border-brand ${over ? "border-brand bg-brand/10" : "border-white/20 hover:border-white/40"}`}
-      data-over={over ? "true" : "false"} data-testid="shop-design-dropzone">
+      data-over={over ? "true" : "false"} data-testid={`${testId}-dropzone`}>
       <Upload className="w-5 h-5 text-white/50" aria-hidden="true" />
+      {label && <span className="text-xs font-bold uppercase tracking-wider text-white/70">{label}</span>}
       <span className="text-sm">{file ? <b className="break-all">{file.name}</b> : "Datei hierher ziehen oder klicken"}</span>
-      <span className="text-xs text-white/45">SVG (am besten), PNG mit durchsichtigem Hintergrund oder JPG</span>
-      <input type="file" accept={accept} disabled={disabled} onChange={(event) => onFile(event.target.files?.[0] || null)}
-        className="sr-only" data-testid="shop-design-file" />
+      <span className="text-xs text-white/45">{hint || "SVG (am besten), PNG mit durchsichtigem Hintergrund oder JPG"}</span>
+      <input type="file" accept={accept} disabled={disabled} multiple={!!onFiles} onChange={(event) => take(event.target.files)}
+        className="sr-only" data-testid={`${testId}-file`} />
     </label>
   );
 }
 
-function UploadForm({ designs, placements, limits, busy, preset, onUpload }) {
+// Ampel der Paar-Prüfung (#2084) - Rot sperrt das Speichern, Gelb fragt nach.
+const PAIR_LEVELS = {
+  green: { label: "Passt", icon: CheckCircle2, className: "border-ok/40 bg-ok/10 text-ok" },
+  yellow: { label: "Bitte prüfen", icon: AlertTriangle, className: "border-warn/40 text-warn" },
+  red: { label: "Abgelehnt", icon: XOctagon, className: "border-warn bg-warn/15 text-warn" },
+};
+
+// Vorschau einer Fassung auf ihrem Shirt (gerastert vom Server), markierte Stellen darüber.
+function PairPreview({ image, mark, shirt, name, testId }) {
+  const dark = shirt === "dark";
+  return (
+    <figure className="space-y-1 min-w-0">
+      <div className={`relative aspect-square w-full rounded-sm border border-white/10 grid place-items-center overflow-hidden ${dark ? "bg-black" : "bg-silver"}`}
+        data-shirt={shirt} data-testid={testId}>
+        {image && <img src={image} alt={`Vorschau ${VARIANT_LABELS[shirt]}${name ? `: ${name}` : ""}`} className="max-w-full max-h-full object-contain p-3" />}
+        {mark && <img src={mark} alt="" aria-hidden="true" className="absolute inset-0 m-auto max-w-full max-h-full object-contain p-3 motion-safe:animate-pulse" data-testid={`${testId}-mark`} />}
+      </div>
+      <figcaption className="text-xs text-white/60">
+        Auf {dark ? "dunklem" : "hellem"} Shirt{mark ? <span className="text-warn"> · markiert</span> : ""}
+      </figcaption>
+    </figure>
+  );
+}
+
+function PairReport({ check, onSwap, busy }) {
+  if (check.status === "checking") {
+    return <p className="text-sm text-white/60" role="status" data-testid="shop-pair-checking">Prüft das Paar …</p>;
+  }
+  const report = check.report;
+  if (!report) {
+    return check.error ? (
+      <div role="alert" className="flex gap-2 border border-warn/50 bg-warn/10 rounded-sm px-3 py-2 text-sm" data-testid="shop-pair-error">
+        <XOctagon className="w-4 h-4 mt-0.5 shrink-0 text-warn" aria-hidden="true" />
+        <span>{check.error}</span>
+      </div>
+    ) : null;
+  }
+  const level = PAIR_LEVELS[report.level] || PAIR_LEVELS.red;
+  const Icon = level.icon;
+  return (
+    <div className="space-y-3 border border-white/10 rounded-sm p-3" data-testid="shop-pair-report" data-level={report.level}>
+      <div className="flex flex-wrap items-center gap-2">
+        <span className={`inline-flex items-center gap-1.5 border rounded-sm px-2 py-0.5 text-xs font-bold ${level.className}`} data-testid="shop-pair-light">
+          <Icon className="w-3.5 h-3.5" aria-hidden="true" /> {level.label}
+        </span>
+        <span className="text-sm">{report.summary}</span>
+      </div>
+      <ul className="space-y-1" data-testid="shop-pair-checks">
+        {report.checks.map((item) => {
+          const tone = PAIR_LEVELS[item.level] || PAIR_LEVELS.red;
+          const ItemIcon = tone.icon;
+          return (
+            <li key={item.key} className="flex gap-2 text-xs text-white/75" data-level={item.level} data-testid={`shop-pair-check-${item.key}`}>
+              <ItemIcon className={`w-3.5 h-3.5 mt-0.5 shrink-0 ${item.level === "green" ? "text-ok" : "text-warn"}`} aria-hidden="true" />
+              <span>{item.text}</span>
+            </li>
+          );
+        })}
+      </ul>
+      <div className="flex flex-wrap items-center gap-2 text-xs text-white/70" data-testid="shop-pair-assignment">
+        <span>
+          {report.swapped ? "Automatisch zugeordnet: die hellere Datei gilt für dunkle Shirts." : "Zuordnung wie gewählt."}
+          {!report.swapped && report.suggest_swap ? " Die Dateien wirken vertauscht – die hellere gehört zu den dunklen Shirts." : ""}
+        </span>
+        <button type="button" onClick={onSwap} disabled={busy} className={`${SECONDARY_BUTTON} inline-flex items-center gap-1.5`} data-testid="shop-pair-swap">
+          <ArrowLeftRight className="w-3.5 h-3.5" aria-hidden="true" /> Tauschen
+        </button>
+      </div>
+      <div className="grid grid-cols-2 gap-3 max-w-md" data-testid="shop-pair-previews">
+        <PairPreview image={report.previews?.dark} mark={report.marks?.dark} shirt="dark" name={report.files?.dark?.name} testId="shop-pair-on-dark" />
+        <PairPreview image={report.previews?.light} mark={report.marks?.light} shirt="light" name={report.files?.light?.name} testId="shop-pair-on-light" />
+      </div>
+    </div>
+  );
+}
+
+// Bestätigung bei Gelb - im Seitenlayout statt window.confirm.
+function PairConfirm({ report, busy, onConfirm, onCancel }) {
+  const warnings = report.checks.filter((item) => item.level === "yellow");
+  return (
+    <div role="alertdialog" aria-modal="false" aria-labelledby="shop-pair-confirm-title" className="space-y-3 border border-warn/50 bg-warn/10 rounded-sm p-3" data-testid="shop-pair-confirm">
+      <p id="shop-pair-confirm-title" className="text-sm font-bold inline-flex items-center gap-2">
+        <AlertTriangle className="w-4 h-4 text-warn" aria-hidden="true" /> Trotz Warnung speichern?
+      </p>
+      <ul className="list-disc pl-5 space-y-1 text-sm">
+        {warnings.map((item) => <li key={item.key}>{item.text}</li>)}
+      </ul>
+      <div className="flex flex-col gap-2 sm:flex-row">
+        <button type="button" onClick={onConfirm} disabled={busy} className="tls-btn tls-btn--primary min-h-10 px-4 text-xs font-bold uppercase tracking-wider rounded-sm disabled:opacity-40" data-testid="shop-pair-confirm-yes">
+          {busy ? "Speichert …" : "Trotzdem speichern"}
+        </button>
+        <button type="button" onClick={onCancel} disabled={busy} className="tls-btn tls-btn--quiet min-h-10 px-4 text-xs font-bold uppercase tracking-wider rounded-sm" data-testid="shop-pair-confirm-no">
+          Abbrechen
+        </button>
+      </div>
+    </div>
+  );
+}
+
+const ACCEPT = "image/svg+xml,image/png,image/jpeg,.svg,.png,.jpg,.jpeg";
+
+// Paar (#2084): zwei Felder „für dunkle“ und „für helle Shirts“. Sind beide Dateien da, prüft der Server sofort
+// (Ampel, Vorschau, Markierungen); kamen beide auf einmal, ordnet er sie selbst zu. „Tauschen“ dreht die Zuordnung.
+function PairFields({ dark, light, disabled, onDark, onLight, onBoth }) {
+  return (
+    <div className="space-y-2" data-testid="shop-pair-fields">
+      <div className="grid gap-3 sm:grid-cols-2">
+        <DropZone file={dark} onFile={onDark} onFiles={onBoth} accept={ACCEPT} disabled={disabled} label="Für dunkle Shirts"
+          hint="Hauptdatei – meist die Fassung „auf Schwarz“" testId="shop-pair-dark" />
+        <DropZone file={light} onFile={onLight} onFiles={onBoth} accept={ACCEPT} disabled={disabled} label="Für helle Shirts"
+          hint="Die Fassung „auf Weiß“" testId="shop-pair-light" />
+      </div>
+      <p className="text-xs text-white/45">Tipp: beide Dateien auf einmal in ein Feld ziehen oder auswählen – die Website ordnet sie selbst zu. Am besten zwei SVGs mit gleicher Zeichenfläche.</p>
+    </div>
+  );
+}
+
+function UploadForm({ designs, placements, limits, busy, preset, onUpload, onPairUpload }) {
   const [key, setKey] = useState(preset?.key || designs[0]?.design_key || "");
   const [isNew, setIsNew] = useState(designs.length === 0);
   const [variant, setVariant] = useState(preset?.variant || "dark");
+  const [shape, setShape] = useState(preset?.mode === "pair" ? "pair" : "single");
   const [title, setTitle] = useState("");
   const [placement, setPlacement] = useState("front_right");
   const [colors, setColors] = useState("");
@@ -239,9 +363,18 @@ function UploadForm({ designs, placements, limits, busy, preset, onUpload }) {
   const [pixels, setPixels] = useState(null);
   const [reason, setReason] = useState("");
   const [problem, setProblem] = useState("");
+  const [pairFiles, setPairFiles] = useState({ dark: null, light: null, auto: false });
+  const [check, setCheck] = useState({ status: "idle", report: null, error: "" });
+  const [confirming, setConfirming] = useState(false);
+  const checked = useRef(null);
 
   useEffect(() => {
-    if (preset?.key) { setKey(preset.key); setIsNew(false); setVariant(preset.variant || "dark"); }
+    if (preset?.key) {
+      setKey(preset.key);
+      setIsNew(false);
+      setVariant(preset.variant || "dark");
+      setShape(preset.mode === "pair" ? "pair" : "single");
+    }
   }, [preset]);
 
   // Vorschau der Prüfung schon vor dem Hochladen - entscheiden tut der Server. Ein SVG ist scharf in jeder Größe.
@@ -265,10 +398,93 @@ function UploadForm({ designs, placements, limits, busy, preset, onUpload }) {
   const spec = placements.find((item) => item.key === targetPlacement);
   const dpi = pixels && spec ? pixels.width / spec.print_width_in : null;
   const keyValid = /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(key) && key.length <= 60;
+  const pair = shape === "pair";
   const ready = !busy && !!file && keyValid && (!isNew || title.trim().length > 0);
+  const bothFiles = !!pairFiles.dark && !!pairFiles.light;
+  const pairLevel = check.report?.level;
+  const pairReady = !busy && bothFiles && keyValid && (!isNew || title.trim().length > 0) && check.status === "done"
+    && !!pairLevel && pairLevel !== "red";
+
+  // Sind beide Dateien da, prüft der Server sofort - nur prüfen, gespeichert wird erst mit „Paar speichern“.
+  useEffect(() => {
+    if (!pair || !pairFiles.dark || !pairFiles.light || !targetPlacement) return undefined;
+    const done = checked.current;
+    if (done && done.dark === pairFiles.dark && done.light === pairFiles.light && done.placement === targetPlacement) return undefined;
+    checked.current = { dark: pairFiles.dark, light: pairFiles.light, placement: targetPlacement };
+    let live = true;
+    const form = new FormData();
+    form.append("file_dark", pairFiles.dark);
+    form.append("file_light", pairFiles.light);
+    if (isNew) form.append("placement", targetPlacement);
+    else form.append("design_key", key);
+    form.append("auto_assign", pairFiles.auto ? "true" : "false");
+    setConfirming(false);
+    setCheck({ status: "checking", report: null, error: "" });
+    uploadApi.post(`${BASE}/pair-check`, form).then(({ data: report }) => {
+      if (!live) return;
+      if (report.swapped) {
+        // Der Server hat getauscht: die Felder zeigen jetzt seine Zuordnung - ohne zweite Prüfung.
+        checked.current = { dark: pairFiles.light, light: pairFiles.dark, placement: targetPlacement };
+        setPairFiles({ dark: pairFiles.light, light: pairFiles.dark, auto: false });
+      }
+      setCheck({ status: "done", report, error: "" });
+    }).catch((failure) => {
+      if (!live) return;
+      const report = failure?.response?.data?.pair || null;
+      setCheck({ status: "done", report, error: formatRequestError(failure, "Die Prüfung hat nicht geklappt.") });
+    });
+    return () => { live = false; };
+  }, [pair, pairFiles, targetPlacement, isNew, key]);
+
+  const setPair = (patch) => {
+    setPairFiles((now) => ({ ...now, auto: false, ...patch }));
+    setProblem("");
+    setConfirming(false);
+    if (patch.dark === null || patch.light === null) setCheck({ status: "idle", report: null, error: "" });
+  };
+  const swap = () => setPair({ dark: pairFiles.light, light: pairFiles.dark });
+
+  const resetPair = () => {
+    setPairFiles({ dark: null, light: null, auto: false });
+    setCheck({ status: "idle", report: null, error: "" });
+    setConfirming(false);
+    checked.current = null;
+  };
+
+  const savePair = async (confirmed) => {
+    if (!pairReady) return;
+    const form = new FormData();
+    form.append("file_dark", pairFiles.dark);
+    form.append("file_light", pairFiles.light);
+    form.append("design_key", key);
+    form.append("reason", reason.trim());
+    form.append("auto_assign", "false");
+    form.append("confirm_warnings", confirmed ? "true" : "false");
+    if (isNew) {
+      form.append("title", title.trim());
+      form.append("placement", placement);
+      if (colors.trim()) form.append("garment_colors", colors);
+    }
+    setProblem("");
+    const result = await onPairUpload(form);
+    if (result === true) {
+      resetPair();
+      setReason("");
+      setIsNew(false);
+    } else if (typeof result === "string") {
+      setProblem(result);
+      setConfirming(false);
+    }
+  };
 
   const submit = async (event) => {
     event.preventDefault();
+    if (pair) {
+      if (!pairReady) return;
+      if (pairLevel === "yellow") setConfirming(true);
+      else await savePair(false);
+      return;
+    }
     if (!ready) return;
     const form = new FormData();
     form.append("file", file);
@@ -304,6 +520,16 @@ function UploadForm({ designs, placements, limits, busy, preset, onUpload }) {
           </button>
         ))}
       </div>
+      <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Dateien">
+        {[{ value: "single", label: "Eine Datei" }, { value: "pair", label: "Als Paar (hell + dunkel)" }].map((option) => (
+          <button key={option.value} type="button" role="radio" aria-checked={shape === option.value}
+            onClick={() => { setShape(option.value); setProblem(""); setConfirming(false); }}
+            className={`min-h-10 px-3 text-sm border rounded-sm transition-colors duration-150 ${shape === option.value ? "border-brand bg-brand/10" : "border-white/10 hover:border-white/30"}`}
+            data-testid={`shop-design-shape-${option.value}`}>
+            {option.label}
+          </button>
+        ))}
+      </div>
       {isNew ? (
         <div className="grid gap-3 sm:grid-cols-2">
           <Field label="Kennung" hint="Kleinbuchstaben, Ziffern, Bindestriche - steht im Dateinamen für Printful (z. B. loewe-vorne).">
@@ -328,7 +554,7 @@ function UploadForm({ designs, placements, limits, busy, preset, onUpload }) {
               {designs.map((item) => <option key={item.design_key} value={item.design_key}>{item.title} ({item.design_key}) – {item.placement_label}</option>)}
             </select>
           </Field>
-          <div className="text-sm">
+          {!pair && <div className="text-sm">
             <span className="text-white/70">Fassung</span>
             <div className="mt-1 flex flex-wrap gap-2" role="radiogroup" aria-label="Fassung">
               {["dark", "light"].map((value) => (
@@ -339,21 +565,33 @@ function UploadForm({ designs, placements, limits, busy, preset, onUpload }) {
                 </button>
               ))}
             </div>
-          </div>
+          </div>}
         </div>
       )}
-      <DropZone file={file} onFile={(next) => { setFile(next); setProblem(""); }} disabled={busy}
-        accept="image/svg+xml,image/png,image/jpeg,.svg,.png,.jpg,.jpeg" />
+      {pair ? (
+        <PairFields dark={pairFiles.dark} light={pairFiles.light} disabled={busy}
+          onDark={(next) => setPair({ dark: next })} onLight={(next) => setPair({ light: next })}
+          onBoth={([first, second]) => setPair({ dark: first, light: second, auto: true })} />
+      ) : (
+        <DropZone file={file} onFile={(next) => { setFile(next); setProblem(""); }} disabled={busy} accept={ACCEPT} />
+      )}
       <p className="text-xs text-white/45">
         {limits.formats.join(", ")} · PNG/JPG höchstens {limits.max_mb} MB, SVG höchstens {limits.svg_max_mb} MB.
         {spec ? ` ${spec.label}: Druckbreite ${spec.print_width}, für PNG mind. ${spec.min_width_px} px Breite (${spec.min_dpi} DPI).` : ""}
       </p>
-      {isSvg(file) && (
+      {pair && <PairReport check={check} onSwap={swap} busy={busy || check.status === "checking"} />}
+      {pair && confirming && check.report && (
+        <PairConfirm report={check.report} busy={busy} onConfirm={() => savePair(true)} onCancel={() => setConfirming(false)} />
+      )}
+      {pair && pairLevel === "red" && (
+        <p className="text-xs text-warn" data-testid="shop-pair-blocked">Speichern gesperrt – bitte die Dateien korrigieren und neu wählen.</p>
+      )}
+      {!pair && isSvg(file) && (
         <p className="text-xs text-white/70" data-testid="shop-design-precheck">
           SVG: der Server prüft es streng (keine Skripte, keine Pixelbilder, keine Verweise nach außen) und rastert es scharf für den Druck.
         </p>
       )}
-      {pixels && spec && !isSvg(file) && (
+      {!pair && pixels && spec && !isSvg(file) && (
         <p className={`text-xs ${dpi >= spec.min_dpi ? "text-ok" : "text-warn"}`} data-testid="shop-design-precheck">
           {pixels.width} × {pixels.height} px: bei {inches(spec.print_width_in)} Breite {Math.floor(dpi)} DPI – {dpi >= spec.min_dpi ? "reicht" : `zu wenig, nötig sind ${spec.min_dpi}`}.
         </p>
@@ -366,8 +604,8 @@ function UploadForm({ designs, placements, limits, busy, preset, onUpload }) {
       )}
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
         <ReasonInput id="shop-design-reason" value={reason} onChange={setReason} disabled={busy} />
-        <button type="submit" disabled={!ready} className="tls-btn tls-btn--primary min-h-10 px-4 text-xs font-bold uppercase tracking-wider rounded-sm disabled:opacity-40 inline-flex items-center gap-2" data-testid="shop-design-submit">
-          <Upload className="w-3.5 h-3.5" aria-hidden="true" /> {busy ? "Lädt hoch …" : "Hochladen und prüfen"}
+        <button type="submit" disabled={pair ? !pairReady || confirming : !ready} className="tls-btn tls-btn--primary min-h-10 px-4 text-xs font-bold uppercase tracking-wider rounded-sm disabled:opacity-40 inline-flex items-center gap-2" data-testid="shop-design-submit">
+          <Upload className="w-3.5 h-3.5" aria-hidden="true" /> {busy ? "Lädt hoch …" : pair ? "Paar speichern" : "Hochladen und prüfen"}
         </button>
       </div>
     </form>
@@ -523,6 +761,9 @@ function MotifCard({ design, busy, maxExceptions, onColors, onExceptions, onNewF
             <button type="button" onClick={() => onNewFile(key, "light")} disabled={busy || !latest} className={SECONDARY_BUTTON} data-testid={`shop-motif-${key}-new-light`}>
               Eigene Datei für helle Shirts
             </button>
+            <button type="button" onClick={() => onNewFile(key, "dark", "pair")} disabled={busy} className={SECONDARY_BUTTON} data-testid={`shop-motif-${key}-new-pair`}>
+              Als Paar ersetzen
+            </button>
             {latest?.public && (
               <button type="button" onClick={() => copyAddress(latest)} className={`${QUIET_BUTTON} inline-flex items-center gap-1.5`} data-testid={`shop-design-${key}-copy`}>
                 <Copy className="w-3.5 h-3.5" aria-hidden="true" /> Adresse für Printful
@@ -632,7 +873,7 @@ export default function AdminShopDesignsPage() {
       const { data: next } = await request();
       setData(next);
       toast.success(typeof success === "function" ? success(next) : success);
-      for (const warning of next.uploaded?.warnings || []) toast.warning(warning);
+      for (const warning of next.uploaded?.warnings || next.uploaded_pair?.warnings || []) toast.warning(warning);
       return true;
     } catch (failure) {
       const text = formatRequestError(failure, "Das hat nicht geklappt.");
@@ -670,7 +911,7 @@ export default function AdminShopDesignsPage() {
               <ul className="space-y-3">
                 {data.designs.map((design) => (
                   <MotifCard key={design.design_key} design={design} busy={!!busy} maxExceptions={data.limits.max_exceptions || 40}
-                    onNewFile={(key, variant) => { setPreset({ key, variant, at: Date.now() }); document.getElementById("shop-design-upload-section")?.scrollIntoView?.({ behavior: "smooth", block: "start" }); }}
+                    onNewFile={(key, variant, mode = "single") => { setPreset({ key, variant, mode, at: Date.now() }); document.getElementById("shop-design-upload-section")?.scrollIntoView?.({ behavior: "smooth", block: "start" }); }}
                     onColors={(key, colors, reason) => ok("colors", () => api.patch(`${BASE}/${key}`, { garment_colors: colors, reason }), "Feste Farben gespeichert.")}
                     onExceptions={(key, rows, reason) => ok("exceptions", () => api.patch(`${BASE}/${key}`, { color_variants: rows, reason }), "Ausnahmen gespeichert.")}
                     onAutoLight={(key, reason) => ok("auto", () => api.post(`${BASE}/${key}/light-auto`, { reason }), (next) => (next.light?.state === "auto" ? "Fassung für helle Shirts erzeugt." : "Fassung für helle Shirts geprüft."))} />
@@ -682,7 +923,8 @@ export default function AdminShopDesignsPage() {
         <div id="shop-design-upload-section">
           <Section title="Datei hochladen" icon={Upload} testId="shop-design-upload-section">
             <UploadForm designs={data.designs} placements={placements} limits={data.limits} busy={busy === "upload"} preset={preset}
-              onUpload={(form) => run("upload", () => uploadApi.post(`${BASE}/upload`, form), (next) => `Version ${next.uploaded.version} von ${next.uploaded.design_key} gespeichert.`)} />
+              onUpload={(form) => run("upload", () => uploadApi.post(`${BASE}/upload`, form), (next) => `Version ${next.uploaded.version} von ${next.uploaded.design_key} gespeichert.`)}
+              onPairUpload={(form) => run("upload", () => uploadApi.post(`${BASE}/upload-pair`, form), (next) => `Paar von ${next.uploaded_pair.design_key} gespeichert: Version ${next.uploaded_pair.dark_version} für dunkle, Version ${next.uploaded_pair.light_version} für helle Shirts.`)} />
           </Section>
         </div>
 
