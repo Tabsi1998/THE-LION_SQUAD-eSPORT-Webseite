@@ -671,6 +671,20 @@ async def erase_for_user(db, user_id: str) -> dict:
     return {"removed": removed, "pending": pending}
 
 
+async def discard_order_files(db, order_id: str) -> int:
+    """Eine Bestellung kam nicht zustande (#2069: ein gleichzeitiger Aufruf hat gewonnen, eine spätere Position ist
+    nicht bestellbar): ihre Bestelldateien mit Zeile und Datei wieder weg - nie eine Testdatei."""
+    removed = 0
+    rows = await db.shop_gamertag_files.find({"order_id": order_id, "purpose": "order"}, {"_id": 0}).to_list(None)
+    for row in rows:
+        path = shop_designs._path_of(row.get("file_ref"))
+        if path is not None:
+            path.unlink(missing_ok=True)
+        await db.shop_gamertag_files.delete_one({"id": row["id"]})
+        removed += 1
+    return removed
+
+
 async def complete_pending_erasures(db) -> int:
     """Für den täglichen Job ``ops_retention``: vorgemerkte Bestelldateien abschalten und löschen, sobald kein offener
     Printful-Auftrag sie mehr braucht. Liefert die Zahl."""

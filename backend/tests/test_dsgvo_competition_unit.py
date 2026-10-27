@@ -93,7 +93,7 @@ class FakeDb:
             # Wunschnummer (#2034)
             "jersey_numbers", "jersey_number_requests",
             # Shop (#1703)
-            "shop_orders", "shop_order_items", "shop_carts", "shop_gamertag_files",
+            "shop_orders", "shop_order_items", "shop_carts", "shop_gamertag_files", "shop_print_files",
         ):
             setattr(self, name, FakeCollection())
 

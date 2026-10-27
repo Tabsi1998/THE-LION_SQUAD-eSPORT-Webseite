@@ -11,12 +11,15 @@ from __future__ import annotations
 
 from typing import Literal
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
+from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel, Field, StrictInt
 
 from auth import require_area
 from database import get_db
-from services import shop_catalog_sync, shop_products
+from services import shop_catalog_sync, shop_designs, shop_print_files, shop_products
+from services import shop_print_templates as print_templates
+from services.image_upload import _read_upload_limited
 from services.printful_client import PrintfulClient
 from services.shop_common import ShopConflict, ShopError
 from services.shop_fulfillment import FulfillmentError
@@ -44,38 +47,35 @@ class Offer(Reasoned):
     sizes: list[str] = Field(..., min_length=1, max_length=20)
 
 
-class Position(BaseModel):
+class MotifRef(BaseModel):
     model_config = {"extra": "forbid"}
 
-    left_in: float
-    top_in: float
-    width_in: float
-    height_in: float
+    key: str = Field(..., min_length=1, max_length=60)
+    by_color: dict[str, str | None] = Field(default_factory=dict, max_length=40)
 
 
-class PlacementIn(BaseModel):
+class LayerIn(BaseModel):
     model_config = {"extra": "forbid"}
 
-    key: str = Field(..., max_length=32)
-    kind: Literal["design", "gamertag", "member_number"] = "design"
-    position: Position | None = None
+    kind: Literal["motif", "gamertag", "member_number"]
+    preset: str = Field(..., min_length=1, max_length=40)
+    width_cm: float | None = None
+    offset_x_cm: float = 0.0
+    offset_y_cm: float = 0.0
+    motif: MotifRef | None = None
 
 
-class Placements(Reasoned):
-    placements: list[PlacementIn] = Field(..., min_length=1, max_length=shop_products.MAX_PLACEMENTS)
-    included_placement: str | None = Field(None, max_length=32)
-
-
-class Assignment(BaseModel):
+class PlacementLayout(BaseModel):
     model_config = {"extra": "forbid"}
 
-    placement: str = Field(..., max_length=32)
-    color: str = Field(..., max_length=60)
-    design_key: str | None = Field(None, max_length=60)
+    key: str = Field(..., min_length=1, max_length=64)
+    mode: Literal["layout", "upload"] = "layout"
+    layers: list[LayerIn] = Field(default_factory=list, max_length=shop_print_files.MAX_LAYERS)
 
 
-class Designs(Reasoned):
-    assignments: list[Assignment] = Field(..., min_length=1, max_length=200)
+class Layout(Reasoned):
+    placements: list[PlacementLayout] = Field(..., min_length=1, max_length=shop_products.MAX_PLACEMENTS)
+    included_placement: str | None = Field(None, max_length=64)
 
 
 class StatusChange(Reasoned):
@@ -138,28 +138,92 @@ async def set_offer(product_id: str, body: Offer, me: dict = Depends(require_are
     return await _view(product_id)
 
 
-@router.put("/products/{product_id}/placements")
-async def set_placements(product_id: str, body: Placements, me: dict = Depends(require_area("finance"))):
-    """Schritt 3a: Platzierungen mit Art und Position (Zoll)."""
-    placements = [item.model_dump(exclude_none=True) for item in body.placements]
+@router.put("/products/{product_id}/layout")
+async def set_layout(product_id: str, body: Layout, me: dict = Depends(require_area("finance"))):
+    """Schritt 3: je Druckfläche Motiv, Vorgabe-Position und Größe in cm, Platzhalter für Gamertag und Nummer (#2069)."""
+    placements = []
+    for item in body.placements:
+        row = item.model_dump(exclude_none=True)
+        row["layers"] = [layer.model_dump(exclude_none=True) for layer in item.layers]
+        placements.append(row)
     try:
-        await shop_products.set_placements(get_db(), product_id, placements,
-                                           included_placement=body.included_placement, actor_id=me["id"],
+        await shop_products.set_layout(get_db(), product_id, placements, included_placement=body.included_placement,
+                                       actor_id=me["id"], reason=body.reason)
+    except (ShopError, LookupError) as exc:
+        raise _refused(exc) from exc
+    return await _view(product_id)
+
+
+@router.post("/products/{product_id}/print-files")
+async def generate_print_files(product_id: str, body: Reasoned, me: dict = Depends(require_area("finance"))):
+    """„Druckdateien erzeugen“: je Fläche und Farbe exakt in der Pixelgröße von Printful - nur, was fehlt oder
+    veraltet ist (#2069)."""
+    try:
+        result = await shop_products.generate_print_files(get_db(), product_id, actor_id=me["id"], reason=body.reason)
+    except (ShopError, LookupError) as exc:
+        raise _refused(exc) from exc
+    return await _view(product_id, result=result)
+
+
+@router.post("/products/{product_id}/print-templates/refresh")
+async def refresh_print_templates(product_id: str, body: Reasoned, me: dict = Depends(require_area("finance"))):
+    """Druckvorlagen des Printful-Produkts neu holen (Maße, Vorlagenbilder) - Abweichungen stehen in der Antwort."""
+    db = get_db()
+    view = await _view(product_id)
+    printful = view["product"].get("printful") or {}
+    if not printful.get("product_id"):
+        raise HTTPException(400, "Erst das Printful-Produkt laden (Schritt 1).")
+    provider = await _provider(db)
+    result = await print_templates.refresh(db, printful["product_id"], provider=provider, actor_id=me["id"],
                                            reason=body.reason)
-    except (ShopError, LookupError) as exc:
-        raise _refused(exc) from exc
-    return await _view(product_id)
+    return await _view(product_id, template_result={key: result[key] for key in ("ok", "changed", "changes",
+                                                                                 "detail")})
 
 
-@router.put("/products/{product_id}/designs")
-async def set_designs(product_id: str, body: Designs, me: dict = Depends(require_area("finance"))):
-    """Schritt 3b: je Platzierung und Farbe ein Design (``design_key: null`` entfernt die Zuordnung)."""
+PNG_HEADERS = {"X-Content-Type-Options": "nosniff", "Cache-Control": "private, no-store",
+               "Content-Security-Policy": "default-src 'none'; sandbox", "Referrer-Policy": "no-referrer"}
+
+
+@router.get("/products/{product_id}/preview")
+async def preview(product_id: str, placement: str = Query(..., max_length=64), color: str = Query(..., max_length=60),
+                  sample: bool = True, me: dict = Depends(require_area("finance"))):
+    """Vorschau: Druckdatei über dem Printful-Vorlagenbild (Sicherheitslinien) auf der Shirtfarbe - als PNG."""
+    db = get_db()
     try:
-        await shop_products.set_designs(get_db(), product_id, [item.model_dump() for item in body.assignments],
-                                        actor_id=me["id"], reason=body.reason)
+        product = await shop_products._product(db, product_id)
+        payload = await shop_print_files.preview_png(db, product, placement=placement, color=color, sample=sample)
     except (ShopError, LookupError) as exc:
         raise _refused(exc) from exc
-    return await _view(product_id)
+    return Response(payload, media_type="image/png", headers=PNG_HEADERS)
+
+
+@router.get("/products/{product_id}/print-files/{file_id}")
+async def print_file(product_id: str, file_id: str, me: dict = Depends(require_area("finance"))):
+    """Eine erzeugte Grunddatei ansehen oder herunterladen (Bestelldateien mit Namen nicht)."""
+    try:
+        path, name = await shop_print_files.admin_file(get_db(), product_id, file_id)
+    except LookupError as exc:
+        raise HTTPException(404, str(exc)) from exc
+    return FileResponse(path, media_type="image/png",
+                        headers={**PNG_HEADERS, "Content-Disposition": f'inline; filename="{name}"'})
+
+
+@router.post("/print-files/upload")
+async def upload_print_file(file: UploadFile = File(...), product_id: str = Form(..., max_length=64),
+                            placement: str = Form(..., max_length=64), color: str = Form(..., max_length=60),
+                            group: str | None = Form(None, max_length=20), reason: str = Form("", max_length=500),
+                            me: dict = Depends(require_area("finance"))):
+    """Für Profis: eine fertige Druckdatei je Fläche und Farbe - exakt gegen die Vorlage geprüft (Pixel bzw.
+    Seitenverhältnis und DPI). Am Eingang höchstens 50 MB (``services/body_limits.py``, nginx)."""
+    data = await _read_upload_limited(file, shop_designs.MAX_BYTES, shop_designs.MAX_UPLOAD_MB)
+    db = get_db()
+    try:
+        uploaded = await shop_print_files.upload(db, product_id, placement=placement, color=color, data=data,
+                                                 filename=file.filename or "", content_type=file.content_type or "",
+                                                 actor_id=me["id"], reason=reason, group=group or None)
+    except (ShopError, LookupError) as exc:
+        raise _refused(exc) from exc
+    return await _view(product_id, uploaded=uploaded)
 
 
 @router.post("/products/{product_id}/prices/accept")

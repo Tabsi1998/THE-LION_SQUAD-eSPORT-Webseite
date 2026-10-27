@@ -142,6 +142,12 @@ PERSONAL: dict[str, Entry] = {
                                  "ops_retention); die Zeile bleibt ohne Konto mit Prüfsumme und Maßen"),
     "shop_order_events": Entry(KEPT, note="Verlauf einer Bestellung als Nachweis; nur Kennungen, Beträge und Stände, nie "
                                "eine Anschrift"),
+    # Druckdateien (#2069): Grunddateien gehören zum Katalog (kein Konto); eine Bestelldatei mit Gamertag zeigt den Namen.
+    "shop_print_files": Entry(OVERWRITTEN, ("shop_print_files",),
+                              "Druckdatei einer Bestellung mit Gamertag: Adresse abgeschaltet und Datei gelöscht - "
+                              "braucht ein offener Printful-Auftrag sie noch, nur für ihn bis zum Abschluss (Job "
+                              "ops_retention); die Zeile bleibt ohne Konto mit Prüfsumme und Maßen. Grunddateien des "
+                              "Katalogs haben kein Konto"),
     # Teams, Turniere, Events, F1, Saison
     "teams": Entry(KEPT, ("teams",), "gehört dem Team; das Konto heißt in der Liste „Gelöschter User“"),
     "team_members": Entry(KEPT, ("team_memberships",), "Teamhistorie und Aufstellungen; das Konto heißt „Gelöschter User“"),
@@ -222,6 +228,8 @@ CLUB_CONTENT = frozenset({
     # Kennung, wer angelegt bzw. geändert hat.
     "shop_products", "shop_variants", "shop_designs", "shop_design_profiles", "shop_design_colors",
     "shop_printful_variants",
+    # Druckvorlagen von Printful (#2069): Maße und Vorlagenbilder je Printful-Produkt - ohne Person.
+    "shop_print_templates",
 })
 
 NO_PERSON = frozenset({

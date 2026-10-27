@@ -795,6 +795,11 @@ async def _safe_ops_retention():
         finished = await complete_pending_erasures(get_db())
         if finished:
             logger.info(f"[scheduler] gamertag_files erased={finished}")
+        # Druckdateien mit Gamertag (#2069): ebenso.
+        from services.shop_print_files import complete_pending_erasures as complete_print_file_erasures
+        finished = await complete_print_file_erasures(get_db())
+        if finished:
+            logger.info(f"[scheduler] print_files erased={finished}")
     except Exception as exc:
         _log_task_failure("ops_retention", exc)
 

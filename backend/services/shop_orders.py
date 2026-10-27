@@ -27,7 +27,7 @@ from typing import Any
 from pymongo.errors import DuplicateKeyError
 
 from models import new_id, now_utc
-from services import shop_catalog, shop_common, shop_config
+from services import shop_catalog, shop_common, shop_config, shop_print_files
 from services.shop_common import ShopConflict, ShopError, assert_no_address
 
 BUYER_KINDS = ("member", "public")
@@ -88,30 +88,25 @@ async def _same_order(db, order: dict, request_hash: str) -> tuple[dict, bool]:
     return order, False
 
 
-async def _freeze_designs(db, product: dict, variant: dict, line: dict, position: int) -> list[dict]:
-    """Je Platzierung des Produkts (#1707) die Druckdatei-Fassung für die Farbe der Variante - mit Druckfläche, Technik
-    und Position, damit der Auftrag an Printful (#2062, #1718) genau das sendet, was beim Bestellen galt. Gamertag und
-    Vereinsnummer sind Platzhalter: ihre Datei entsteht je Bestellung (#1711) aus dem eingefrorenen Gamertag."""
-    out = []
-    color = " ".join(str(variant.get("color") or "").split()).casefold()
-    for row in product.get("placements") or []:
-        entry = {"placement": row["key"], "kind": row["kind"], "printful_placement": row["printful_placement"],
-                 "technique": product.get("technique"), "position": dict(row.get("position") or {}),
-                 "design_key": None, "version": None, "sha256": None}
-        if row["kind"] == "design":
-            key = next((cell["design_key"] for cell in row.get("designs") or []
-                        if str(cell.get("color") or "").casefold() == color), None)
-            latest = await shop_catalog.latest_design(db, key) if key else None
-            if not latest:
-                raise ShopError(f"Position {position}: für diese Farbe fehlt eine Druckdatei.")
-            entry.update(design_key=latest["design_key"], version=latest["version"], sha256=latest["sha256"])
-        elif row["kind"] == "gamertag" and not line["gamertag"]:
-            raise ShopError(f"Position {position}: für dieses Produkt fehlt der Gamertag.")
-        out.append(entry)
-    return out
+async def _freeze_designs(db, product: dict, variant: dict, line: dict, position: int, *, user_id: str,
+                          order_id: str, item_id: str, mapping: dict | None) -> tuple[list[dict], list[dict]]:
+    """Je Druckfläche des Produkts genau eine Druckdatei (#2069): die Grunddatei der Farbe oder - mit Gamertag - eine
+    eigene, zusammengesetzte Datei für diese Position. Dazu die Motiv-Fassungen darin (``designs``), damit ihre Adressen
+    für die Bestellung erhalten bleiben (``shop_designs.retention_plan``). So sendet der Auftrag an Printful (#2062,
+    #1718) genau, was beim Bestellen galt."""
+    if not product.get("placements"):
+        return [], []
+    files, sources = await shop_print_files.freeze_line(
+        db, product, variant, gamertag=line["gamertag"], position=position, user_id=user_id, order_id=order_id,
+        item_id=item_id, printful_variant_id=(mapping or {}).get("printful_variant_id"))
+    designs = [{"placement": source["placement"], "kind": "design", "design_key": source.get("design_key"),
+                "version": source.get("version"), "sha256": source.get("sha256")}
+               for source in sources if source.get("source") == "design"]
+    return files, designs
 
 
-async def _freeze_line(db, line: dict, position: int, buyer_kind: str, config: dict) -> dict:
+async def _freeze_line(db, line: dict, position: int, buyer_kind: str, config: dict, *, user_id: str, order_id: str,
+                       item_id: str) -> dict:
     variant = await shop_catalog.get_variant(db, line["variant_id"])
     product = await shop_catalog.get_product(db, variant["product_id"]) if variant else None
     if (not variant or not product or not variant.get("active") or variant.get("blocked_reason")
@@ -119,14 +114,6 @@ async def _freeze_line(db, line: dict, position: int, buyer_kind: str, config: d
         raise ShopError(f"Position {position}: dieser Artikel ist nicht bestellbar.")
     if line["gamertag"] and not (buyer_kind == "member" and shop_catalog.allows_gamertag(product)):
         raise ShopError(f"Position {position}: ein Gamertag geht nur für Mitglieder bei Produkten mit Gamertag.")
-    designs = await _freeze_designs(db, product, variant, line, position)
-    design = next(({key: row[key] for key in ("design_key", "version", "sha256")} for row in designs
-                   if row["design_key"]), None)
-    if not product.get("placements") and product.get("design_key"):
-        latest = await shop_catalog.latest_design(db, product["design_key"])
-        if not latest:
-            raise ShopError(f"Position {position}: zur Druckdatei gibt es noch keine Fassung.")
-        design = {"design_key": latest["design_key"], "version": latest["version"], "sha256": latest["sha256"]}
     mapping = await shop_catalog.printful_variant_for(db, variant["id"])
     if product.get("printful") and (not mapping or mapping.get("in_stock") is not True):
         # Fail-closed (#1709): nur, was Printful zuletzt ausdrücklich als lieferbar gemeldet hat.
@@ -136,13 +123,25 @@ async def _freeze_line(db, line: dict, position: int, buyer_kind: str, config: d
         raise ShopError(f"Position {position}: für diesen Artikel ist noch kein Preis übernommen.")
     if unit < config["min_price_cents"]:
         raise ShopError(f"Position {position}: dieser Artikel ist nicht bestellbar (Preis unter dem Mindestpreis).")
+    if not product.get("placements") and product.get("design_key"):
+        latest = await shop_catalog.latest_design(db, product["design_key"])
+        if not latest:
+            raise ShopError(f"Position {position}: zur Druckdatei gibt es noch keine Fassung.")
+        design = {"design_key": latest["design_key"], "version": latest["version"], "sha256": latest["sha256"]}
+        print_files, designs = [], []
+    else:
+        # Zuletzt, weil hier Dateien entstehen können (Gamertag) - alles Billige ist vorher geprüft.
+        print_files, designs = await _freeze_designs(db, product, variant, line, position, user_id=user_id,
+                                                     order_id=order_id, item_id=item_id, mapping=mapping)
+        design = next(({key: row[key] for key in ("design_key", "version", "sha256")} for row in designs
+                       if row["design_key"]), None)
     markup = shop_config.markup_cents(config, buyer_kind, product)
     return {
-        "position": position, "product_id": product["id"], "variant_id": variant["id"],
+        "id": item_id, "position": position, "product_id": product["id"], "variant_id": variant["id"],
         "product_title": product["title"], "variant_label": variant["label"], "sku": variant["sku"],
         "quantity": line["quantity"], "unit_price_cents": int(unit), "markup_cents": markup,
         "line_total_cents": line["quantity"] * (int(unit) + markup), "gamertag": line["gamertag"], "design": design,
-        "designs": designs,
+        "designs": designs, "print_files": print_files,
         "printful": ({"variant_id": mapping["printful_variant_id"], "product_id": mapping.get("printful_product_id")}
                      if mapping else None),
         "tax_profile": product.get("tax_profile"),
@@ -156,7 +155,10 @@ async def place_order(db, *, user_id: str, idempotency_key: str, buyer_kind: str
 
     Den Versand bestimmt die Bestellung selbst (``shop_config.shipping_cents``): der Aufrufer gibt nur die Schätzung
     von Printful oder ``None``. Ohne Schätzung gilt die Ersatzpauschale, fehlt auch die, wird nicht bestellt. 0 € Versand
-    nur, wenn die Schätzung ausdrücklich 0 ist."""
+    nur, wenn die Schätzung ausdrücklich 0 ist.
+
+    Je Position und Druckfläche wird genau eine Druckdatei eingefroren (#2069) - mit Gamertag eine eigene. Kommt die
+    Bestellung nicht zustande, sind diese eigenen Dateien wieder weg (``shop_print_files.discard_order_files``)."""
     if not user_id:
         raise ShopError("Ohne Konto keine Bestellung.")
     if not KEY.match(str(idempotency_key or "")):
@@ -185,10 +187,15 @@ async def place_order(db, *, user_id: str, idempotency_key: str, buyer_kind: str
     config = await shop_config.load(db)
     shipping_cents = shop_config.shipping_cents(config, estimate)
     shipping_source = "estimate" if estimate is not None else "fallback"
-    items = [await _freeze_line(db, line, index, buyer_kind, config)
-             for index, line in enumerate(clean_lines, start=1)]
-    tax_profiles = {item["tax_profile"] for item in items}
     order_id, now = new_id(), now_utc().isoformat()
+    try:
+        items = [await _freeze_line(db, line, index, buyer_kind, config, user_id=user_id, order_id=order_id,
+                                    item_id=new_id())
+                 for index, line in enumerate(clean_lines, start=1)]
+    except BaseException:
+        await shop_print_files.discard_order_files(db, order_id)
+        raise
+    tax_profiles = {item["tax_profile"] for item in items}
     items_cents = sum(item["quantity"] * item["unit_price_cents"] for item in items)
     markup_cents = sum(item["quantity"] * item["markup_cents"] for item in items)
     order = {
@@ -204,13 +211,13 @@ async def place_order(db, *, user_id: str, idempotency_key: str, buyer_kind: str
         "item_count": len(items), "created_at": now, "updated_at": now,
     }
     # Erst die Positionen, dann die Bestellung: gewinnt eine gleichzeitige Anfrage das Rennen um den Schlüssel, räumt
-    # diese ihre eigenen (noch zu keiner Bestellung gehörenden) Positionen weg.
-    await db.shop_order_items.insert_many([{"id": new_id(), "order_id": order_id, "user_id": user_id, **item}
-                                           for item in items])
+    # diese ihre eigenen (noch zu keiner Bestellung gehörenden) Positionen und Druckdateien weg.
+    await db.shop_order_items.insert_many([{"order_id": order_id, "user_id": user_id, **item} for item in items])
     try:
         await db.shop_orders.insert_one(dict(order))
     except DuplicateKeyError:
         await db.shop_order_items.delete_many({"order_id": order_id})
+        await shop_print_files.discard_order_files(db, order_id)
         winner = await _existing(db, key)
         if not winner:
             raise

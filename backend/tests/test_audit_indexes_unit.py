@@ -59,6 +59,8 @@ EXPECTED = {
     "shop_design_profiles": {"design_key_unique"},
     "shop_gamertag_files": {"test_sha256_unique", "public_id_unique", "user_id_1"},
     "shop_design_colors": {"placement_color_unique"},
+    "shop_print_templates": {"printful_product_unique"},
+    "shop_print_files": {"public_id_unique", "base_version_unique", "user_id_1", "order_id_1"},
     "shop_printful_variants": {"provider_variant_unique"},
     "shop_carts": {"user_unique"},
     # Printful-Adapter (#1705): Claims vor dem Anlegen und Bestätigen.
