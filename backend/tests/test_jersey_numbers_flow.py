@@ -531,6 +531,24 @@ async def test_dolibarr_field_is_read_written_and_caught_up(flow, fake):
         20: "ok",
     }
 
+    # 403 beim Schreiben ins Mitglied: Der Vorstand liest, welches Recht im Modul Mitglieder fehlt - nicht „Vereine“.
+    fake.fail_with, fake.fail_paths = 403, {"/members/16"}
+    row = (
+        await flow.put(
+            f"/api/admin/jersey-numbers/members/{lena['id']}",
+            json={"number": 21, "note": "Rechte-Test"},
+        )
+    ).json()
+    assert row["number"] == 21 and row["dolibarr"]["state"] == "failed"
+    assert "Mitglieder erstellen/bearbeiten" in row["dolibarr"]["text"]
+    assert "Vereine" not in row["dolibarr"]["text"]
+    flow.act_as(lena)
+    view = (await flow.get(URL)).json()
+    assert "gesichert" in view["dolibarr"]["text"] and "403" not in view["dolibarr"]["text"]
+    fake.fail_with, fake.fail_paths = None, set()
+    await jersey_numbers.sync_pending(flow.db)
+    assert fake.core_members[16]["array_options"]["options_trikotnummer"] == 21
+
 
 @pytest.mark.asyncio
 async def test_number_already_in_dolibarr_is_taken_over_and_write_switch_is_respected(

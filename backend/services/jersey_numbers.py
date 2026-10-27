@@ -109,6 +109,14 @@ SYNC_TEXTS = {
     ),
 }
 
+# Schreiben bzw. Nachlesen beim Mitglied verweigert: ein Recht im Mitgliedermodul fehlt - nicht im Modul Vereine.
+MEMBERS_FORBIDDEN = "members_forbidden"
+MEMBERS_FORBIDDEN_TEXTS = (
+    "Deine Nummer ist hier gesichert; in die Mitgliederverwaltung trägt sie der Abgleich nach.",
+    "Dem API-Benutzer fehlt in Dolibarr das Recht „Mitglieder erstellen/bearbeiten“ (Modul Mitglieder, 403). Die "
+    "Nummer ist hier gesichert und wird nachgetragen.",
+)
+
 _scan_cache: dict[tuple, tuple[float, dict]] = {}
 
 
@@ -461,8 +469,14 @@ async def _push(db, doc: dict, *, scan: dict | None = None, _round: int = 0) -> 
             ):
                 state = "conflict"
             else:
-                await client.set_member_extrafield(member_id, field, want)
-                row = await client.core_member(member_id)
+                try:
+                    await client.set_member_extrafield(member_id, field, want)
+                    row = await client.core_member(member_id)
+                except erp.DolibarrError as exc:
+                    # 403 kommt hier aus dem Mitgliedermodul, nicht aus dem Modul Vereine.
+                    if exc.kind == "forbidden":
+                        raise erp.DolibarrError(MEMBERS_FORBIDDEN, 403) from exc
+                    raise
                 got = _as_number(
                     (row.get("array_options") or {}).get(f"options_{field}")
                 )
@@ -532,6 +546,8 @@ def sync_view(doc: dict | None, field: str, *, board: bool = False) -> dict:
     sync = (doc or {}).get("dolibarr") or {}
     state = sync.get("state") or "pending"
     texts = SYNC_TEXTS.get(state, SYNC_TEXTS["pending"])
+    if state == "failed" and sync.get("error") == MEMBERS_FORBIDDEN:
+        texts = MEMBERS_FORBIDDEN_TEXTS
     text = texts[1 if board else 0].format(
         field=sync.get("field") or field,
         error=erp.ERROR_TEXTS.get(sync.get("error") or "", "unbekannt"),
