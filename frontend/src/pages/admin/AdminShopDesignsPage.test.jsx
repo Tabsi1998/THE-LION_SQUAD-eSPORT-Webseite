@@ -30,7 +30,13 @@ const PLACEMENTS = [
 ];
 const SETTINGS = {
   light_ink: "#111111", threshold: 0.18, replaced_color: "#ffffff", is_default: true,
-  defaults: { light_ink: "#111111", threshold: 0.18 }, limits: { min_threshold: 0.02, max_threshold: 0.9 },
+  pair_aspect_tolerance: 0.02, pair_min_overlap: 0.9, pair_contrast_share: 0.03,
+  defaults: { light_ink: "#111111", threshold: 0.18, pair_aspect_tolerance: 0.02, pair_min_overlap: 0.9, pair_contrast_share: 0.03 },
+  limits: {
+    min_threshold: 0.02, max_threshold: 0.9,
+    pair_aspect_tolerance_min: 0.005, pair_aspect_tolerance_max: 0.2, pair_min_overlap_min: 0.5, pair_min_overlap_max: 0.99,
+    pair_contrast_share_min: 0.001, pair_contrast_share_max: 0.5,
+  },
 };
 
 function version(number, overrides = {}) {
@@ -449,6 +455,25 @@ test("Ersatzfarbe und Schwelle: Beispiele folgen der Schwelle, Speichern schickt
   await user.type(screen.getByTestId("shop-motif-settings-save-reason"), "Vereins-Dunkelblau");
   await user.click(screen.getByTestId("shop-motif-settings-save-submit"));
   expect(apiMock.put).toHaveBeenCalledWith("/admin/shop/designs/motif-settings", { light_ink: "#0a2540", threshold: 0.5, reason: "Vereins-Dunkelblau" });
+});
+
+test("die Schwellen der Paar-Prüfung stehen in Prozent und gehen als Anteil an den Server - nur geänderte", async () => {
+  apiMock.put.mockResolvedValue({ data: view() });
+  const user = userEvent.setup();
+  show();
+  const overlap = await screen.findByTestId("shop-motif-pair_min_overlap");
+  expect(overlap).toHaveValue("90");
+  expect(screen.getByTestId("shop-motif-pair_aspect_tolerance")).toHaveValue("2");
+  expect(screen.getByTestId("shop-motif-pair-settings")).toHaveTextContent("Vorgabe 3 %, erlaubt 0,1 bis 50 %.");
+  await user.clear(overlap);
+  await user.type(overlap, "100");
+  await user.click(screen.getByTestId("shop-motif-settings-save-submit"));
+  expect(apiMock.put).not.toHaveBeenCalled();
+  expect(screen.getByTestId("shop-motif-settings-save-hint")).toHaveTextContent("von 50 bis 99");
+  await user.clear(overlap);
+  await user.type(overlap, "85,5");
+  await user.click(screen.getByTestId("shop-motif-settings-save-submit"));
+  expect(apiMock.put).toHaveBeenCalledWith("/admin/shop/designs/motif-settings", { light_ink: "#111111", threshold: 0.18, pair_min_overlap: 0.855, reason: "" });
 });
 
 test("Weiß als Ersatzfarbe geht nicht - der Knopf sagt warum", async () => {

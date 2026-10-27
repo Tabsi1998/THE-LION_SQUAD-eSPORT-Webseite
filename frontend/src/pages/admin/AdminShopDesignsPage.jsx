@@ -821,18 +821,39 @@ function MotifCard({ design, busy, maxExceptions, onColors, onExceptions, onNewF
 }
 
 // Ersatzfarbe für helle Shirts und Helligkeits-Schwelle - mit Beispielen, welche Fassung welche Shirtfarbe bekommt.
+// Schwellen der Paar-Prüfung (#2084) - im Server Anteile (0,02), hier in Prozent.
+const PAIR_SETTINGS = [
+  { name: "pair_aspect_tolerance", label: "Seitenverhältnis darf abweichen um (%)", hint: "Mehr Abweichung ist Rot: das Paar wird abgelehnt." },
+  { name: "pair_min_overlap", label: "Umrisse decken sich mindestens zu (%)", hint: "Weniger ist Gelb: „Sind das wirklich zwei Fassungen desselben Logos?“" },
+  { name: "pair_contrast_share", label: "Höchstens sehr helle bzw. dunkle Fläche (%)", hint: "Mehr Weiß in der Hell- bzw. Schwarz in der Dunkel-Fassung ist Gelb." },
+];
+
+function percent(share) {
+  return String(Number((Number(share) * 100).toFixed(1))).replace(".", ",");
+}
+
+function pairInputs(settings) {
+  return Object.fromEntries(PAIR_SETTINGS.filter((item) => settings[item.name] != null).map((item) => [item.name, percent(settings[item.name])]));
+}
+
 function MotifSettings({ settings, busy, onSave }) {
   const [ink, setInk] = useState(settings.light_ink);
   const [threshold, setThreshold] = useState(String(settings.threshold).replace(".", ","));
+  const [pairValues, setPairValues] = useState(() => pairInputs(settings));
   useEffect(() => {
     setInk(settings.light_ink);
     setThreshold(String(settings.threshold).replace(".", ","));
-  }, [settings.light_ink, settings.threshold]);
+    setPairValues(pairInputs(settings));
+  }, [settings]);
   const parsed = Number(String(threshold).replace(",", "."));
   const { min_threshold: low, max_threshold: high } = settings.limits;
   const inkValid = /^#[0-9a-f]{6}$/i.test(ink) && ink.toLowerCase() !== "#ffffff";
   const thresholdValid = Number.isFinite(parsed) && parsed >= low && parsed <= high;
-  const changed = ink.toLowerCase() !== settings.light_ink || parsed !== settings.threshold;
+  const pairShares = Object.fromEntries(Object.entries(pairValues).map(([name, text]) => [name, Number((Number(String(text).replace(",", ".")) / 100).toFixed(4))]));
+  const pairInvalid = PAIR_SETTINGS.find(({ name }) => name in pairShares && !(Number.isFinite(pairShares[name])
+    && pairShares[name] >= settings.limits[`${name}_min`] && pairShares[name] <= settings.limits[`${name}_max`]));
+  const pairChanged = Object.fromEntries(Object.entries(pairShares).filter(([name, value]) => value !== settings[name]));
+  const changed = ink.toLowerCase() !== settings.light_ink || parsed !== settings.threshold || Object.keys(pairChanged).length > 0;
   return (
     <div className="space-y-3" data-testid="shop-motif-settings">
       <p className="text-xs text-white/55">
@@ -861,9 +882,24 @@ function MotifSettings({ settings, busy, onSave }) {
           );
         })}
       </ul>
-      <ReasonedButton id="shop-motif-settings-save" label="Speichern" busy={busy} disabled={!changed || !inkValid || !thresholdValid}
-        blockedHint={!inkValid ? "Ersatzfarbe als #rrggbb, nicht Weiß." : !thresholdValid ? `Schwelle von ${low} bis ${high}.` : "Nichts geändert."}
-        onSubmit={(reason) => onSave({ light_ink: ink.toLowerCase(), threshold: parsed }, reason)} />
+      {Object.keys(pairValues).length > 0 && (
+        <fieldset className="space-y-2 border-t border-white/10 pt-3" data-testid="shop-motif-pair-settings">
+          <legend className="text-xs font-bold uppercase tracking-wider text-white/60">Paar-Prüfung (hell + dunkel)</legend>
+          <div className="grid gap-3 sm:grid-cols-3">
+            {PAIR_SETTINGS.filter(({ name }) => name in pairValues).map(({ name, label, hint }) => (
+              <Field key={name} label={label}
+                hint={`${hint} Vorgabe ${percent(settings.defaults[name])} %, erlaubt ${percent(settings.limits[`${name}_min`])} bis ${percent(settings.limits[`${name}_max`])} %.`}>
+                <input value={pairValues[name]} onChange={(event) => setPairValues((now) => ({ ...now, [name]: event.target.value }))}
+                  inputMode="decimal" className={`${INPUT} tabular-nums`} data-testid={`shop-motif-${name}`} />
+              </Field>
+            ))}
+          </div>
+        </fieldset>
+      )}
+      <ReasonedButton id="shop-motif-settings-save" label="Speichern" busy={busy} disabled={!changed || !inkValid || !thresholdValid || !!pairInvalid}
+        blockedHint={!inkValid ? "Ersatzfarbe als #rrggbb, nicht Weiß." : !thresholdValid ? `Schwelle von ${low} bis ${high}.`
+          : pairInvalid ? `${pairInvalid.label}: von ${percent(settings.limits[`${pairInvalid.name}_min`])} bis ${percent(settings.limits[`${pairInvalid.name}_max`])}.` : "Nichts geändert."}
+        onSubmit={(reason) => onSave({ light_ink: ink.toLowerCase(), threshold: parsed, ...pairChanged }, reason)} />
     </div>
   );
 }
@@ -942,7 +978,7 @@ export default function AdminShopDesignsPage() {
         </div>
 
         {settings && (
-          <Section title="Helle Shirts: Ersatzfarbe und Schwelle" icon={Palette} testId="shop-motif-settings-section">
+          <Section title="Helle Shirts und Paar-Prüfung: Einstellungen" icon={Palette} testId="shop-motif-settings-section">
             <MotifSettings settings={settings} busy={busy === "settings"}
               onSave={(values, reason) => ok("settings", () => api.put(`${BASE}/motif-settings`, { ...values, reason }), "Einstellungen gespeichert.")} />
           </Section>
