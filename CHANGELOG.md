@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.38.0](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/compare/v1.37.0...v1.38.0) (2026-10-27)
+
+
+### Neu
+
+* Vereinsshop: Designs und Druckdateien hochladen - neu kodiert, DPI geprüft in Zoll und cm, versioniert, je Shirtfarbe ([#1708](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1708)) ([ba217aa](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/ba217aa5fb295ab7e857cfd5aec1a986f9238b14))
+* Vereinsshop: geschützte Adresse der Druckdateien für Printful, nicht erratbar und aus den Logs gekürzt ([#1708](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1708)) ([ba217aa](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/ba217aa5fb295ab7e857cfd5aec1a986f9238b14))
+* Vereinsshop: Printful-Anschluss (API v2) - Entwürfe kostenlos anlegen, Kosten schätzen, Bestätigen nur mit Notschalter und ohne Doppelbestellung ([#1705](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1705)) ([b8db0bf](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/b8db0bf61f40faac2488f385d563143e3851b130))
+
+
+### Fehlerbehebungen
+
+* Sicherheits-Header überschreiben eine strengere Referrer-Policy einzelner Seiten nicht mehr ([ba217aa](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/ba217aa5fb295ab7e857cfd5aec1a986f9238b14))
+
 ## 1.37.0 (27.10.2026)
 
 ### Neu
