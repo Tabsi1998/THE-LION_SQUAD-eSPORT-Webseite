@@ -42,6 +42,33 @@ test("reportCaughtError liefert die Kennung der Meldung, ein gleicher Fehler gle
   await expect(reportCaughtError(new Error("anderer Fehler"))).resolves.toBeNull();
 });
 
+// #2080: ein Gerät ohne Ton oder ein Browser, der Ton verweigert, ist kein Fehler der Website - kein Log.
+test("Audio: verweigerter oder fehlender Ton erzeugt keinen Log-Aufruf", async () => {
+  const { api } = await import("./api");
+  const { reportCaughtError } = await import("./clientLog");
+  delete window.__tlsWebClientLoggingStarted;
+  startWebClientLogging();
+  api.post.mockClear();
+  const reasons = [
+    Object.assign(new Error("Failed to start the audio device"), { name: "NotAllowedError" }),
+    Object.assign(new Error("play() failed because the user didn't interact with the document first."), { name: "NotAllowedError" }),
+    Object.assign(new Error("The AudioContext was not allowed to start."), { name: "NotAllowedError" }),
+  ];
+  for (const reason of reasons) {
+    const event = new Event("unhandledrejection");
+    event.reason = reason;
+    window.dispatchEvent(event);
+  }
+  await expect(reportCaughtError(reasons[0])).resolves.toBeNull();
+  expect(api.post).not.toHaveBeenCalled();
+
+  // Andere verweigerte Rechte bleiben sichtbar.
+  const event = new Event("unhandledrejection");
+  event.reason = Object.assign(new Error("Write permission denied."), { name: "NotAllowedError" });
+  window.dispatchEvent(event);
+  expect(api.post).toHaveBeenCalledTimes(1);
+});
+
 // #2080: ein veralteter Baustein nach einem Deploy ist kein Fehler der Website - höchstens ein Hinweis.
 test("ein veralteter Baustein kommt nur als Hinweis an, nicht als Fehler", async () => {
   const { api } = await import("./api");

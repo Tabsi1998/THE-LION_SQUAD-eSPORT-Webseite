@@ -1,4 +1,5 @@
 import { api } from "./api";
+import { isAudioProblem } from "./audioSafe";
 import { chunkReloadPending, isChunkLoadError } from "./chunkReload";
 
 const DEDUPE_MS = 30000;
@@ -75,6 +76,8 @@ function sendClientLog(payload) {
  *  gemeldet; sonst (zweiter Fehlschlag gleich nach dem Neuladen) höchstens ein Hinweis - die Originalmeldung steht im
  *  Stack. Alles andere bleibt, wie es ist. */
 function reportPayload(error, fallbackMessage, fallbackName, stack) {
+  // Kein Ton auf dem Gerät oder vom Browser verweigert (#2080): harmlos, die Klang-Stellen bleiben dann still.
+  if (isAudioProblem(error)) return null;
   if (isChunkLoadError(error)) {
     if (chunkReloadPending()) return null;
     return {
@@ -99,6 +102,7 @@ export function startWebClientLogging() {
   window.__tlsWebClientLoggingStarted = true;
 
   window.addEventListener("error", (event) => {
+    if (isAudioProblem(event.error || event.message)) return;
     sendClientLog({
       level: "error",
       message: event.message || event.error?.message || "Web runtime error",

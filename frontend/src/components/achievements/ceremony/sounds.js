@@ -2,7 +2,8 @@
 // Web Audio API wie bisher in lib/unlockSounds.js - keine Dateien, keine Lizenzfragen. Das Löwenbrüllen
 // ist ebenfalls synthetisch (Rauschen durch Formanten mit fallender Tonhöhe), bis eine freie Datei
 // mit passender Lizenz da ist. Lautstärke und „Ton aus“ kommen aus den Profileinstellungen; ohne
-// Nutzergeste bleibt es still (Autoplay-Regeln).
+// Nutzergeste bleibt es still (Autoplay-Regeln). Ohne Audiogerät auch (#2080): kein Fehler, kein Log.
+import { attemptAudio, noteAudioProblem } from "@/lib/audioSafe";
 
 const MUTE_KEY = "tls_sound_muted";
 const VOLUME_KEY = "tls_ceremony_volume";
@@ -38,9 +39,17 @@ export function getAudioContext(win = typeof window !== "undefined" ? window : n
   if (!win) return null;
   const AC = win.AudioContext || win.webkitAudioContext;
   if (!AC) return null;
-  if (!sharedContext) sharedContext = new AC();
-  if (sharedContext.state === "suspended" && typeof sharedContext.resume === "function") sharedContext.resume().catch?.(() => {});
-  return sharedContext;
+  if (!sharedContext) {
+    try {
+      sharedContext = new AC();
+    } catch (error) {
+      noteAudioProblem(error);
+      return null;
+    }
+  }
+  const ctx = sharedContext;
+  if (ctx.state === "suspended" && typeof ctx.resume === "function") attemptAudio(() => ctx.resume());
+  return ctx;
 }
 
 export function resetAudioContext() { sharedContext = null; }
@@ -146,13 +155,16 @@ export function playCeremonySound({ material, special = null }, { user = null, w
   if (!userHasInteracted(nav)) return false;
   const ctx = getAudioContext(win);
   if (!ctx) return false;
-  const master = ctx.createGain();
-  master.gain.setValueAtTime(Math.max(0, Math.min(1, prefs.volume / 100)) * 0.9, ctx.currentTime);
-  master.connect(ctx.destination);
-  const t0 = ctx.currentTime + 0.02;
   try {
+    const master = ctx.createGain();
+    master.gain.setValueAtTime(Math.max(0, Math.min(1, prefs.volume / 100)) * 0.9, ctx.currentTime);
+    master.connect(ctx.destination);
+    const t0 = ctx.currentTime + 0.02;
     (MATERIAL_SOUNDS[material] || MATERIAL_SOUNDS.bronze)(ctx, master, t0);
     if (special && SPECIAL_SOUNDS[special]) SPECIAL_SOUNDS[special](ctx, master, t0 + (special === "legendary" ? 0.0 : 0.6));
-  } catch { return false; }
+  } catch (error) {
+    noteAudioProblem(error);
+    return false;
+  }
   return true;
 }

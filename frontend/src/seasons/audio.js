@@ -3,6 +3,7 @@
 // Regler für Töne und Musik, spielt Instrumente einer Palette (das Saison-Modul bringt sie mit), begrenzt die Dichte,
 // duckt die Musik unter Geräuschen und pausiert, wenn der Tab unsichtbar ist. Ereignisse kommen über den Bus
 // `tls:season-sound` aus den Saison-Teilen (Fledermaus, Netz, Geist, Katze, Kürbis, Laterne).
+import { attemptAudio, noteAudioProblem } from "@/lib/audioSafe";
 
 export const SOUND_STORAGE_KEY = "tls-season-sound";
 export const SOUND_EVENT = "tls:season-sound";
@@ -107,7 +108,8 @@ export function createSoundEngine({ win = typeof window === "undefined" ? null :
     if (state.unlocked || state.disposed || !Ctx) return false;
     try {
       state.ctx = new Ctx();
-    } catch {
+    } catch (error) {
+      noteAudioProblem(error);
       return false;
     }
     state.unlocked = true;
@@ -120,7 +122,7 @@ export function createSoundEngine({ win = typeof window === "undefined" ? null :
     state.musicGain = state.ctx.createGain();
     state.musicGain.gain.value = MUSIC_LEVEL;
     state.musicGain.connect(state.master);
-    if (state.ctx.state === "suspended" && typeof state.ctx.resume === "function") state.ctx.resume().catch?.(() => {});
+    if (state.ctx.state === "suspended" && typeof state.ctx.resume === "function") attemptAudio(() => state.ctx.resume());
     startMusic();
     return true;
   };
@@ -156,8 +158,10 @@ export function createSoundEngine({ win = typeof window === "undefined" ? null :
   };
   const onVisibility = () => {
     if (!state.ctx) return;
-    if (doc?.hidden) state.ctx.suspend?.();
-    else state.ctx.resume?.();
+    // Zurück im Tab: ohne Audiogerät lehnt resume() ab („Failed to start the audio device“, #2080) - still bleiben.
+    const ctx = state.ctx;
+    if (doc?.hidden) attemptAudio(() => ctx.suspend?.());
+    else attemptAudio(() => ctx.resume?.());
   };
   if (win) {
     GESTURES.forEach((name) => win.addEventListener(name, onGesture, { passive: true }));
@@ -207,11 +211,8 @@ export function createSoundEngine({ win = typeof window === "undefined" ? null :
       }
       doc?.removeEventListener?.("visibilitychange", onVisibility);
       if (state.ctx?.close) {
-        try {
-          state.ctx.close();
-        } catch {
-          // schon zu
-        }
+        const ctx = state.ctx;
+        attemptAudio(() => ctx.close());
       }
       state.ctx = null;
     },
