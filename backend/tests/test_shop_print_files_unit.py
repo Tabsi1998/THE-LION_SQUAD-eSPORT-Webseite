@@ -297,7 +297,7 @@ async def test_the_migration_script_reports_and_applies(db, provider):
     assert await shop_print_layout.main(["--anwenden"], db=db, out=out) == 0
     assert "neu" in out.getvalue()
     out = io.StringIO()
-    assert await shop_print_layout.main(["--zurueck", "--anwenden"], db=db, out=out) == 0
+    assert await shop_print_layout.main(["--abbauen", "--anwenden"], db=db, out=out) == 0
     assert "zurück" in out.getvalue()
     assert (await shop_catalog.get_product(db, product["id"]))["placements"] == LEGACY
 

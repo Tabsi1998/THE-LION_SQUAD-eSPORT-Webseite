@@ -4,8 +4,8 @@
 Ohne Schalter liest das Werkzeug nur (Trockenlauf) und nennt je Produkt, was aus den alten Platzierungen würde: welche
 Vorgabe, welche Breite, was zu prüfen ist. Die Position bleibt erhalten (nächste Vorgabe plus Feinjustierung).
 ``--anwenden`` speichert die neuen Ebenen und bewahrt die alten Platzierungen als ``placements_legacy`` auf - der Stand
-eines Produkts bleibt, seine Druckdateien entstehen danach mit „Druckdateien erzeugen“. ``--zurueck`` zeigt den Rückweg,
-``--zurueck --anwenden`` setzt die aufbewahrten Platzierungen wieder ein.
+eines Produkts bleibt, seine Druckdateien entstehen danach mit „Druckdateien erzeugen“. ``--abbauen`` zeigt den Rückweg,
+``--abbauen --anwenden`` setzt die aufbewahrten Platzierungen wieder ein.
 
 Ein Produkt ohne gespeicherte Druckvorlage wird übersprungen - erst „Mit Printful abgleichen“ (oder der tägliche
 Abgleich), dann noch einmal. Bis zur Umstellung rechnet die Website alte Produkte beim Lesen um; geschrieben wird nur
@@ -14,7 +14,7 @@ hier oder beim nächsten Speichern in Schritt 3.
 Am Server, im Backend-Container (vorher eine Sicherung ziehen, BACKUP_RESTORE.md):
     docker compose exec backend python scripts/shop_print_layout.py
     docker compose exec backend python scripts/shop_print_layout.py --anwenden
-    docker compose exec backend python scripts/shop_print_layout.py --zurueck --anwenden
+    docker compose exec backend python scripts/shop_print_layout.py --abbauen --anwenden
 
 Umgebung: dieselben MONGO_URL und DB_NAME wie das Backend.
 """
@@ -35,7 +35,7 @@ from services import shop_print_files  # noqa: E402
 def parse(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Druckflächen umstellen: Trockenlauf, Anwenden oder Rückweg.")
     parser.add_argument("--anwenden", action="store_true", help="wirklich ausführen (sonst nur Bericht)")
-    parser.add_argument("--zurueck", action="store_true", help="Rückweg: alte Platzierungen wieder einsetzen")
+    parser.add_argument("--abbauen", action="store_true", help="Rückweg: alte Platzierungen wieder einsetzen")
     return parser.parse_args(argv)
 
 
@@ -71,11 +71,11 @@ async def main(argv: list[str] | None = None, *, db=None, out=None) -> int:
     args = parse(sys.argv[1:] if argv is None else argv)
     out = out or sys.stdout
     db = db if db is not None else _connect()
-    if args.zurueck:
+    if args.abbauen:
         report = await shop_print_files.rollback_migration(db, apply=args.anwenden)
     else:
         report = await shop_print_files.migrate(db, apply=args.anwenden)
-    out.write(render(report, way_back=args.zurueck, applied=args.anwenden))
+    out.write(render(report, way_back=args.abbauen, applied=args.anwenden))
     return 0
 
 
