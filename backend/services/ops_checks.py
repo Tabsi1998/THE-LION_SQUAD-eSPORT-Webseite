@@ -720,38 +720,59 @@ async def backfill_check_episodes(db) -> int:
     damit die Ereignisliste nichts verliert. Nur Läufe vor dem ältesten schon vorhandenen Abschnitt zählen, der Nachtrag
     ist also wiederholbar; der Merker in ``settings`` (``ops_check_episodes_backfill``) lässt ihn nur einmal laufen.
     Der jüngste nachgetragene Abschnitt bleibt offen, wenn es noch keinen offenen gibt. Rückweg: die Sammlung
-    ``ops_check_episodes`` leeren und den Merker löschen. Gibt die Zahl der angelegten Abschnitte zurück."""
-    from pymongo.errors import DuplicateKeyError
+    ``ops_check_episodes`` leeren und den Merker löschen. Gibt die Zahl der angelegten Abschnitte zurück.
 
-    # Der Merker ist zugleich die Sperre: ``settings.id`` ist eindeutig, nur ein Worker bekommt ihn.
-    if await db.settings.find_one({"id": BACKFILL_MARKER}, {"_id": 1}):
+    Der Merker ist zugleich eine Sperre mit Frist (Codex): ``running`` mit ``started_at``. Bricht ein Worker mitten im
+    Nachtrag ab, gilt der Merker nach ``BACKFILL_LEASE_MINUTES`` als verwaist und wird atomar übernommen. Nachgetragene
+    Abschnitte haben eine feste Kennung je Beginn (``bf-…``) und werden per Upsert geschrieben - ein zweiter Anlauf
+    legt nichts doppelt an."""
+    if not await _claim_backfill(db):
         return 0
-    try:
-        await db.settings.insert_one({"id": BACKFILL_MARKER, "state": "running", "at": now_utc().isoformat()})
-    except DuplicateKeyError:
-        return 0
-    oldest = await db.ops_check_episodes.find_one({}, {"_id": 0, "since": 1}, sort=[("since", 1)])
-    query = {"at": {"$lt": oldest["since"]}} if oldest and oldest.get("since") else {}
+    live = await db.ops_check_episodes.find_one({"backfilled": {"$ne": True}}, {"_id": 0, "since": 1}, sort=[("since", 1)])
+    query = {"at": {"$lt": live["since"]}} if live and live.get("since") else {}
     rows = await db.ops_check_runs.find(query, {"_id": 0, "at": 1, "status": 1, "failing": 1, "counts": 1}).sort("at", 1).to_list(
         HISTORY_DAYS * 24 * 60 // CHECK_INTERVAL_MINUTES + 100)
     episodes = _episodes_from_runs(rows)
+    added = 0
     for episode in episodes:
-        episode["expires_at"] = _expiry_after(episode["last_at"])
-    closed, newest = episodes[:-1], episodes[-1:]
-    if closed:
-        await db.ops_check_episodes.insert_many([dict(episode) for episode in closed])
-    for episode in newest:
-        # Offen nur, wenn es noch keinen Abschnitt gibt; hat ein Lauf inzwischen einen offenen angelegt, bleibt er zu.
-        if not oldest:
-            try:
-                await db.ops_check_episodes.insert_one({**episode, "open": True})
-                continue
-            except DuplicateKeyError:
-                pass
-        await db.ops_check_episodes.insert_one(dict(episode))
+        episode.update(id=f"bf-{episode['since']}", backfilled=True, expires_at=_expiry_after(episode["last_at"]))
+        result = await db.ops_check_episodes.update_one({"id": episode["id"]}, {"$setOnInsert": episode}, upsert=True)
+        added += int(bool(getattr(result, "upserted_id", None)))
+    if episodes and not live:
+        # Offen nur, wenn es noch keinen Abschnitt eines Laufs gibt; hat inzwischen einer einen offenen angelegt, bleibt
+        # der nachgetragene zu (der eindeutige Index lässt nur einen offenen zu).
+        from pymongo.errors import DuplicateKeyError
+
+        try:
+            await db.ops_check_episodes.update_one({"id": episodes[-1]["id"]}, {"$set": {"open": True}})
+        except DuplicateKeyError:
+            pass
     await db.settings.update_one({"id": BACKFILL_MARKER},
                                  {"$set": {"state": "done", "episodes": len(episodes), "at": now_utc().isoformat()}})
-    return len(episodes)
+    return added
+
+
+BACKFILL_LEASE_MINUTES = 10
+
+
+async def _claim_backfill(db) -> bool:
+    """Den Nachtrag für diesen Worker holen: neu anlegen oder einen verwaisten ``running``-Merker übernehmen."""
+    from pymongo.errors import DuplicateKeyError
+
+    now = now_utc()
+    if not await db.settings.find_one({"id": BACKFILL_MARKER}, {"_id": 1}):
+        try:
+            # ``settings.id`` ist eindeutig: legen zwei Worker zugleich an, bekommt nur einer den Merker.
+            await db.settings.insert_one({"id": BACKFILL_MARKER, "state": "running", "started_at": now.isoformat()})
+            return True
+        except DuplicateKeyError:
+            return False
+    stale = (now - timedelta(minutes=BACKFILL_LEASE_MINUTES)).isoformat()
+    taken = await db.settings.find_one_and_update(
+        {"id": BACKFILL_MARKER, "state": "running", "$or": [{"started_at": {"$lt": stale}}, {"started_at": {"$exists": False}}]},
+        {"$set": {"started_at": now.isoformat(), "taken_over": True}},
+    )
+    return taken is not None
 
 
 async def safe_backfill_check_episodes(db) -> None:

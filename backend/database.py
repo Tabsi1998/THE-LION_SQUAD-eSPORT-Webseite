@@ -33,13 +33,22 @@ async def ensure_event_photo_indexes(db) -> None:
     await db.gallery_submission_quota.create_index([("album_id", 1), ("owner_id", 1)], unique=True)
 
 
+OPS_EPISODE_OPEN_INDEX = "open_true_unique"
+
+
 async def ensure_ops_check_indexes(db) -> None:
     """Zustände der Auto-Checks (#2080): ein Abschnitt je Wechsel, 7 Tage nach dem letzten Lauf weg. Höchstens einer
-    ist offen (``open: true``, eindeutig und lückenhaft) - die Sperre gegen zwei gleichzeitige Läufe."""
-    await db.ops_check_episodes.create_index([("since", -1)])
-    await db.ops_check_episodes.create_index([("last_at", -1)])
-    await db.ops_check_episodes.create_index("expires_at", expireAfterSeconds=0)
-    await db.ops_check_episodes.create_index("open", unique=True, sparse=True)
+    ist offen - eindeutiger Index nur über ``open: true`` (partiell), geschlossene Abschnitte zählen nie mit, auch nicht
+    mit ``open: false``. Die Sperre gegen zwei gleichzeitige Läufe. Ein früherer Index auf ``open`` (lückenhaft, aus der
+    ersten Fassung) wird ersetzt."""
+    episodes = db.ops_check_episodes
+    await episodes.create_index([("since", -1)])
+    await episodes.create_index([("last_at", -1)])
+    await episodes.create_index("expires_at", expireAfterSeconds=0)
+    for name, spec in (await episodes.index_information()).items():
+        if name != OPS_EPISODE_OPEN_INDEX and list(spec.get("key") or []) == [("open", 1)]:
+            await episodes.drop_index(name)
+    await episodes.create_index("open", unique=True, partialFilterExpression={"open": True}, name=OPS_EPISODE_OPEN_INDEX)
 
 
 async def ensure_jersey_number_indexes(db) -> None:

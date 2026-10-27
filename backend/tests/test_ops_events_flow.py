@@ -222,6 +222,44 @@ async def test_the_first_start_fills_the_episodes_from_the_stored_runs(flow):
     assert [item["subtitle"] for item in items] == ["mail_queue", "image_variants"]
 
 
+@pytest.mark.asyncio
+async def test_only_one_episode_can_be_open_and_an_old_sparse_index_is_replaced(flow):
+    """#2080 (Codex): Der eindeutige Index gilt nur für ``open: true`` (partiell) - beliebig viele geschlossene Abschnitte,
+    auch mit ``open: false``, stören nicht. Ein früher angelegter lückenhafter Index wird beim Start ersetzt."""
+    import database
+    from pymongo.errors import DuplicateKeyError
+
+    await flow.db.ops_check_episodes.create_index("open", unique=True, sparse=True)
+    await database.ensure_ops_check_indexes(flow.db)
+    await database.ensure_ops_check_indexes(flow.db)  # zweiter Start: nichts doppelt, nichts kaputt
+    info = await flow.db.ops_check_episodes.index_information()
+    on_open = {name: spec for name, spec in info.items() if spec.get("key") == [("open", 1)]}
+    assert list(on_open) == [database.OPS_EPISODE_OPEN_INDEX]
+    spec = on_open[database.OPS_EPISODE_OPEN_INDEX]
+    assert spec.get("unique") and spec.get("partialFilterExpression") == {"open": True}
+    await flow.db.ops_check_episodes.insert_many([{"id": "a", "open": False}, {"id": "b", "open": False}, {"id": "c"}, {"id": "d", "open": True}])
+    with pytest.raises(DuplicateKeyError):
+        await flow.db.ops_check_episodes.insert_one({"id": "e", "open": True})
+
+
+@pytest.mark.asyncio
+async def test_an_orphaned_backfill_marker_is_taken_over_a_fresh_one_is_not(flow):
+    """#2080 (Codex): Bricht der Nachtrag ab, bleibt der Merker auf „running“. Nach zehn Minuten gilt er als verwaist und
+    wird atomar übernommen; ein frischer bleibt beim anderen Worker."""
+    from services import ops_checks
+
+    now = now_utc()
+    await flow.db.ops_check_runs.insert_one({"id": "r1", "at": (now - timedelta(hours=1)).isoformat(), "status": "warn",
+                                             "failing": ["disk"], "counts": {"warn": 1}, "checks": []})
+    marker = ops_checks.BACKFILL_MARKER
+    await flow.db.settings.insert_one({"id": marker, "state": "running", "started_at": (now - timedelta(minutes=1)).isoformat()})
+    assert await ops_checks.backfill_check_episodes(flow.db) == 0, "ein anderer Worker ist dran"
+    await flow.db.settings.update_one({"id": marker}, {"$set": {"started_at": (now - timedelta(minutes=20)).isoformat()}})
+    assert await ops_checks.backfill_check_episodes(flow.db) == 1
+    assert (await flow.db.settings.find_one({"id": marker}))["state"] == "done"
+    assert await ops_checks.backfill_check_episodes(flow.db) == 0
+
+
 async def _crit_mail():
     from services import ops_checks
 
