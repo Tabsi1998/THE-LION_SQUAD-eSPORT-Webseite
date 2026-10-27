@@ -281,6 +281,7 @@ ERROR_TEXTS = {
     "confirm_in_progress": "Die Bestätigung läuft schon - Ergebnis abwarten",
     "draft_in_progress": "Der Entwurf wird gerade angelegt - Ergebnis abwarten",
     "draft_unreadable": "Entwurf bei Printful gerade nicht lesbar – bitte gleich noch einmal",
+    "draft_claim_broken": "Entwurfs-Merkposten beschädigt – bitte in Printful prüfen",
     "confirm_unclear": "Bestätigung unklar – bitte in Printful prüfen",
     "unauthorized": "Der Anbieter lehnt den Schlüssel ab",
     "forbidden": "Dem Schlüssel fehlt ein Recht beim Anbieter",

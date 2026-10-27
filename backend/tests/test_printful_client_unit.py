@@ -373,6 +373,33 @@ async def test_a_gone_order_with_an_unusable_time_is_not_taken_over(client, fake
 
 
 @pytest.mark.asyncio
+async def test_a_gone_order_without_seen_at_is_not_taken_over_even_with_an_old_claim_time(client, fake, db):
+    """Kein Rückfall auf claimed_at: ohne gültiges seen_at bleibt der Claim stehen."""
+    await settle(db)
+    await db[printful_client.DRAFTS].insert_one({"external_id": "lsw-test-0001", "state": "created",
+                                                 "printful_order_id": 424242, "claimed_at": stale()})
+    with pytest.raises(FulfillmentTransient) as caught:
+        await client.create_draft(db, draft())
+    assert caught.value.reason == "draft_unreadable" and fake.calls_to("createOrder") == []
+
+
+@pytest.mark.parametrize("state", ["created", "deleting"])
+@pytest.mark.parametrize("broken", ["abc", None, 4.5, True, -3])
+@pytest.mark.asyncio
+async def test_a_claim_with_a_broken_order_number_is_never_taken_over(client, fake, db, state, broken):
+    await settle(db)
+    await db[printful_client.DRAFTS].insert_one({"external_id": "lsw-test-0001", "state": state,
+                                                 "printful_order_id": broken, "claimed_at": stale(),
+                                                 "seen_at": stale()})
+    with pytest.raises(FulfillmentPermanent) as caught:
+        await client.create_draft(db, draft())
+    assert caught.value.reason == "draft_claim_broken" and "Printful prüfen" in str(caught.value)
+    assert fake.calls_to("createOrder") == []
+    claim = await db[printful_client.DRAFTS].find_one({"external_id": "lsw-test-0001"})
+    assert claim["state"] == state and claim["printful_order_id"] == broken
+
+
+@pytest.mark.asyncio
 async def test_a_gone_order_whose_external_id_is_found_comes_back(client, fake, db):
     """Die gespeicherte Nummer kennt Printful nicht, die Nachsuche über @external_id findet aber einen Auftrag."""
     await settle(db)

@@ -490,7 +490,10 @@ class PrintfulClient:
             if earlier is None:
                 raise FulfillmentTransient("draft_in_progress") from None
             state, old_id = earlier.get("state"), earlier.get("printful_order_id")
-            if state in ("created", "deleting") and type(old_id) is int:
+            if state in ("created", "deleting") and not (type(old_id) is int and old_id >= 1):
+                # Ein Merkposten ohne brauchbare Nummer: nie übernehmen - ein Mensch sieht in Printful nach.
+                raise FulfillmentPermanent("draft_claim_broken") from None
+            if state in ("created", "deleting"):
                 # Erst die gespeicherte Nummer lesen. Gibt es den Auftrag, ist er es - auch nach einem abgebrochenen
                 # Löschen, dessen DELETE nicht durchging.
                 try:
@@ -515,8 +518,8 @@ class PrintfulClient:
             # Ein „created“-Claim, dessen Auftrag nicht lesbar ist, kann bei Printful nur kurz verzögert sein
             # (eventual consistency): erst nach der Schonfrist seit dem letzten erfolgreichen Lesen übernehmen. Ein
             # hängendes „deleting“ (wir haben selbst gelöscht) braucht nur die doppelte Prüfung oben.
-            seen = earlier.get("seen_at") or earlier.get("claimed_at")
-            if state == "created" and not self._older_than(seen, DRAFT_GONE_GRACE_SECONDS, now):
+            # Nur seen_at zählt (kein Rückfall auf claimed_at): fehlt es oder ist es unbrauchbar, bleibt der Claim stehen.
+            if state == "created" and not self._older_than(earlier.get("seen_at"), DRAFT_GONE_GRACE_SECONDS, now):
                 raise FulfillmentTransient("draft_unreadable") from None
             taken = await store.update_one({"_id": earlier["_id"], "state": state,
                                             "claimed_at": earlier.get("claimed_at"), "printful_order_id": old_id,
