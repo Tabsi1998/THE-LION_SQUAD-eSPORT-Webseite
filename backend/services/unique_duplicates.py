@@ -46,6 +46,11 @@ MANUAL = {
     **{f"shop_{index}": "Doppelter Eintrag im Shop-Katalog - die Finanzen entscheiden, welcher gilt, und benennen den "
                         "anderen um (docs/SHOP.md)."
        for index in ("products.slug", "variants.sku", "designs.design_version", "printful_variants.provider_variant")},
+    # Printful-Adapter (#1705): ein Claim belegt, dass etwas an Printful ging oder geht - nie automatisch löschen.
+    **{f"shop_{index}": "Doppelter Claim zu einem Printful-Auftrag - in Printful nachsehen, welcher Auftrag gilt, und den "
+                        "überzähligen Claim von Hand entfernen (docs/SHOP.md, Printful-Adapter)."
+       for index in ("printful_drafts.external_id", "printful_confirmations.order",
+                     "printful_confirmations.idempotency_key")},
 }
 # Index -> Reihenfolge, deren erste Zeile bleibt (sonst die älteste).
 KEEP_ORDER = {

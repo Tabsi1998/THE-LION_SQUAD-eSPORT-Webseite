@@ -1,0 +1,18 @@
+{
+  "provider": "printful",
+  "api_version": "v2",
+  "spec_version": "2.0.0-beta",
+  "source": "https://developers.printful.com/docs/v2-beta/openapi.json",
+  "docs": "https://developers.printful.com/docs/v2-beta/",
+  "retrieved": "2026-10-27",
+  "base_url": "https://api.printful.com",
+  "auth": {"header": "Authorization", "scheme": "Bearer", "store_header": "X-PF-Store-Id", "store_header_needed": "nur bei Schlüsseln auf Kontoebene"},
+  "rate_limit": {"default": "120 Aufrufe je Minute und Store", "mockup_tasks": "2 bis 10 je Minute", "status": 429, "header": "Retry-After", "unit": "Sekunden"},
+  "scopes": {
+    "orders": "Entwurf anlegen, lesen, löschen, bestätigen",
+    "file_library": "Druckdateien hinterlegen und lesen",
+    "webhooks": "Webhooks einrichten (#1720)",
+    "catalog": "kein eigener Scope",
+    "mockups": "kein eigener Scope in der Liste - beim ersten echten Test mit GET /v2/oauth-scopes prüfen"
+  }
+}

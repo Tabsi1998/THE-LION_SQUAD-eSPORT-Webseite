@@ -280,15 +280,15 @@ async def test_the_emergency_switch_needs_a_key_and_removing_the_key_turns_it_of
 @pytest.mark.asyncio
 async def test_the_connection_test_reads_once_and_never_shows_the_key(flow, monkeypatch, caplog):
     caplog.set_level(logging.DEBUG)
-    from services import shop_printful_probe
+    from services import printful_client
 
     seen: list[httpx.Request] = []
 
     def answer(request: httpx.Request) -> httpx.Response:
         seen.append(request)
-        return httpx.Response(200, json={"code": 200, "result": [{"id": 1, "name": "Teststore"}]})
+        return httpx.Response(200, json={"data": [{"id": 1, "type": "native", "name": "Teststore"}]})
 
-    monkeypatch.setattr(shop_printful_probe, "TRANSPORT", httpx.MockTransport(answer))
+    monkeypatch.setattr(printful_client, "TRANSPORT", httpx.MockTransport(answer))
     who = await people(flow)
     flow.act_as(who["finanzen"])
     missing = await flow.post(f"{CONFIG}/printful-test")
@@ -302,7 +302,7 @@ async def test_the_connection_test_reads_once_and_never_shows_the_key(flow, monk
     result = tested.json()["result"]
     assert result["ok"] is True and "1 Store" in result["detail"]
     assert [request.method for request in seen] == ["GET"]
-    assert str(seen[0].url) == "https://api.printful.com/stores"
+    assert str(seen[0].url) == "https://api.printful.com/v2/stores"
     assert seen[0].headers["authorization"] == f"Bearer {FAKE_KEY}"
     assert FAKE_KEY not in tested.text and FAKE_KEY not in caplog.text
     assert tested.json()["config"]["printful_last_test"]["ok"] is True
@@ -310,9 +310,9 @@ async def test_the_connection_test_reads_once_and_never_shows_the_key(flow, monk
 
 @pytest.mark.asyncio
 async def test_a_refused_key_shows_up_as_the_cause(flow, monkeypatch):
-    from services import shop_printful_probe
+    from services import printful_client
 
-    monkeypatch.setattr(shop_printful_probe, "TRANSPORT",
+    monkeypatch.setattr(printful_client, "TRANSPORT",
                         httpx.MockTransport(lambda request: httpx.Response(401, json={"code": 401})))
     who = await people(flow)
     flow.act_as(who["superadmin"])
