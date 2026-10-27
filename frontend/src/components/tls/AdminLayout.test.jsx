@@ -44,7 +44,7 @@ test("Verein bündelt Vereinsdaten, Über uns, Vorstand, Sponsoren, Partner, Ref
 });
 
 test("Finanzen sind eine eigene Gruppe; Dolibarr liegt bei den Mitgliedern (#512); Downloads & QR bei Content; Rechte bleiben je Eintrag", () => {
-  expect(group("Finanzen").items.filter((item) => !item.searchOnly).map((item) => [item.label, item.to])).toEqual([["Finanzübersicht", "/admin/finance"]]);
+  expect(group("Finanzen").items.filter((item) => !item.searchOnly).map((item) => [item.label, item.to])).toEqual([["Finanzübersicht", "/admin/finance"], ["Shop", "/admin/shop"]]);
   expect(group("Finanzen").items[0].areas).toEqual(["finance"]);
   expect(group("Content").items.some((item) => item.to === "/admin/downloads")).toBe(true);
   expect(group("System").items.some((item) => item.to === "/admin/downloads")).toBe(false);
@@ -194,7 +194,7 @@ const MFA = { mfa_enabled: true, auth_mfa_verified: true };
 const visible = (user) => navGroupsFor(user, "").flatMap((entry) => entry.items).map((item) => item.to);
 
 test.each([
-  ["Kassier (nur Finanzen)", { role: "player", areas: ["finance"], ...MFA }, ["/admin", "/admin/finance"]],
+  ["Kassier (nur Finanzen)", { role: "player", areas: ["finance"], ...MFA }, ["/admin", "/admin/finance", "/admin/shop"]],
   ["Moderator", { role: "moderator" }, ["/admin/dienst", "/admin/moderation"]],
   ["Helfer", { role: "player", has_staff_assignment: true, is_tournament_staff: true }, ["/admin/dienst", "/admin/tournaments", "/admin/f1", "/admin/stations"]],
   // Captain einer Serie (#1749): nur „Mein Dienst“ - keine Turnierseiten, keine Serien-Verwaltung.

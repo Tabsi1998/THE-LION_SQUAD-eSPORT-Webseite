@@ -3,7 +3,7 @@ import { INTEGRATIONS, MENU_INTEGRATIONS } from "@/lib/integrations";
 import { NavLink, useLocation, useNavigate, Link } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { Logo } from "@/components/tls/Logo";
-import { LayoutDashboard, Trophy, Gamepad2, Users as UsersIcon, CalendarDays, Flag, Building2, Newspaper, LogOut, ExternalLink, Menu, X, Code2, Star, Crown, Gift, Image as ImageIcon, Award, Inbox, UserCheck, Medal, FolderOpen, FileText, AlertTriangle, Handshake, BellRing, Search, Server, QrCode, Activity, ListOrdered, MessagesSquare, ChevronDown, Sticker, Smartphone, Link2, Wallet, BookOpen, Mail, Palette, Share2, LogIn, Sparkles, CalendarHeart, Egg, ScanLine, Tv, ShieldCheck, ClipboardList } from "lucide-react";
+import { LayoutDashboard, Trophy, Gamepad2, Users as UsersIcon, CalendarDays, Flag, Building2, Newspaper, LogOut, ExternalLink, Menu, X, Code2, Star, Crown, Gift, Image as ImageIcon, Award, Inbox, UserCheck, Medal, FolderOpen, FileText, AlertTriangle, Handshake, BellRing, Search, Server, QrCode, Activity, ListOrdered, MessagesSquare, ChevronDown, Sticker, Smartphone, Link2, Wallet, BookOpen, Mail, Palette, Share2, LogIn, Sparkles, CalendarHeart, Egg, ScanLine, Tv, ShieldCheck, ClipboardList, ShoppingBag } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePublicSiteSettings } from "@/hooks/usePublicSiteSettings";
 import { OfflineBar } from "@/components/tls/OfflineBar";
@@ -67,6 +67,8 @@ export const ADMIN_GROUPS = [
     label: "Finanzen",
     items: [
       { to: "/admin/finance", label: "Finanzübersicht", icon: Wallet, areas: ["finance"] },
+      // Shop (#1706): Stufe, Notschalter, Preise, Printful-Zugang - der Server prüft dasselbe (require_area("finance")).
+      { to: "/admin/shop", label: "Shop", icon: ShoppingBag, areas: ["finance"] },
     ],
   },
   {
@@ -203,6 +205,7 @@ const ADMIN_SEARCH_TERMS = {
   "/admin/dolibarr?tab=links": ["zuordnungen", "konto mitglied", "verknuepfung", "verknüpfung", "loesen", "lösen"],
   "/admin/dolibarr?tab=policy": ["bereiche", "bereich", "vorstand rechte", "freigabe", "vereinsverwaltung", "obmann", "kassier"],
   "/admin/dolibarr?tab=features": ["funktionen", "schalter", "aus dolibarr", "vereinsdaten aus dolibarr", "kanaele aus dolibarr", "sponsoren aus dolibarr", "beitrittsantraege", "verzeichnis", "einwilligung", "schreibzugriff"],
+  "/admin/shop": ["shop", "vereinsshop", "printful", "merch", "notschalter", "aufschlag", "shirt"],
   "/admin/finance": ["finanzen", "rechnungen", "belege", "zahlungen", "prueffaelle", "erstattung", "auftraege"],
   "/admin/dolibarr": ["dolibarr", "erp", "anbindung", "mitgliederverwaltung", "schreibzugriff", "konditionen", "steuersaetze", "abgleich"],
 };

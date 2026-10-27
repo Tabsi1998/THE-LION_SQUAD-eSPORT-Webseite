@@ -80,10 +80,26 @@ Anschrift (docs/SHOP.md).
 | Produkte und Bestellungen lesen | – | – | – | ja | ja | ja |
 | Produkt anlegen, ändern (Preis, Sichtbarkeit) | – | – | – | ja, mit Grund | ja, mit Grund | ja, mit Grund |
 | Variante anlegen, ändern | – | – | – | ja, mit Grund | ja, mit Grund | ja, mit Grund |
+| Einstellungen lesen (#1706) | – | – | – | ja | ja | ja |
+| Stufe Aus / Nur Admins / Vereinsmitglieder, Notschalter, Preise | – | – | – | ja, mit Grund | ja, mit Grund | ja, mit Grund |
+| Stufe „Öffentlich“ einschalten (nur mit „Steuer geklärt“) | – | – | – | – | – | ja, mit Grund |
+| Freigabe „Steuer geklärt“ (#1701) | – | – | – | – | – | ja, mit Grund |
+| Printful-Schlüssel hinterlegen, entfernen (braucht zusätzlich System) | – | – | – | – | ja, mit Grund | ja, mit Grund |
+| Printful-Verbindung testen (nur lesen) | – | – | – | ja | ja | ja |
 | ohne bestätigte Zwei-Faktor-Anmeldung | – | – | – | – | – | – |
 
 Moderator und Vereinsverwaltung (Vorstand) haben keinen Zugriff, solange ihnen Finanzen nicht ausdrücklich
-freigegeben ist. Öffentliche Shop-Seiten und Bestellungen für Mitglieder gibt es noch nicht (#1706, #1712).
+freigegeben ist. Shop-Seiten für Mitglieder und Öffentlichkeit gibt es noch nicht (#1712); wer sie sehen darf,
+entscheidet dann die Stufe (`services/shop_access.py`):
+
+| Stufe | Gast | Spieler | Mitglied | Turnierleitung | Finanzen | Club-Admin | Superadmin |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Aus (Vorgabe) | – | – | – | – | – | – | – |
+| Nur Admins (Test) | – | – | – | – | ja | ja | ja |
+| Vereinsmitglieder | – | – | ja | – | ja | ja | ja |
+| Öffentlich | ja | ja | ja | ja | ja | ja | ja |
+
+Finanzen, Club-Admin und Superadmin zählen nur mit bestätigter Zwei-Faktor-Anmeldung; als Mitglied geht es ohne.
 
 ## Bannen, Strikes und Chat-Sperren (#1300, #1350)
 
@@ -394,7 +410,7 @@ Finanzen; die Turnierleitung Turniere, Stationen, Strafen und Gewinne; der Admin
 | Übersicht | Dashboard (Turnierleitung, Redaktion, Vereinsverwaltung, Finanzen, System) · Mein Dienst (Helfer mit Einsatz, Captains externer Serien, Moderation ohne Verwaltungsbereich) | Dashboard mit einem dieser Bereiche und Zwei-Faktor (Server: `require_dashboard`, #992, #1353); „Mein Dienst“ (#1352) für Helfer und reine Moderation – im Benutzermenü statt „Admin“, `/admin` führt Helfer nach `/admin/dienst`, Moderation nach `/admin/moderation`, Konten ohne Dienst auf „Kein Zugriff“ mit dem Satz „Die Verwaltung ist für Vereinsdienste …“ |
 | Verein | Vereinsdaten (System) · Über uns, Sponsoren, Partner, Referenzen, Serien (Redaktion) · Vorstand, Kontakt-Inbox (Vereinsverwaltung) | je Eintrag |
 | Mitglieder | Mitglieder (mit dem Reiter Öffentliche Profile), Bewerbungen, Mitgliedervorteile, Dokumente, Alle Benutzer (Vereinsverwaltung) · Dolibarr (Vereinsverwaltung und System) | Vereinsverwaltung |
-| Finanzen | Finanzübersicht (einen Eintrag „Shop“ gibt es erst mit der Produktverwaltung, #1707) | Finanzen |
+| Finanzen | Finanzübersicht · Shop (Stufe, Notschalter, Preise, Printful-Zugang, #1706; die Produktverwaltung folgt mit #1707) | Finanzen |
 | eSports | Turniere, Fast Lap, Stationen (Turnierleitung, Helfer) · Turnier-Leitfaden, Jahreswertung, Spiele, Gewinne, Strafen (Turnierleitung) · Game-Server (System) | Turnierleitung |
 | Content | Events (Turnierleitung) · News, Galerie, Medien, Navigation, Erfolge, Sticker (Redaktion) · Downloads & QR (Turnierleitung, Redaktion, Vereinsverwaltung, System) | Redaktion |
 | Verbindungen | Alle Verbindungen (Übersicht mit Zustand: aktiv, aus, fehlt, nicht lesbar, Fehler) · je Dienst eine Seite (Google, Resend, SMTP, Discord, Twitch, Steam, …) | System |

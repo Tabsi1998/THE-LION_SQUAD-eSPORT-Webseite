@@ -41,7 +41,7 @@ async def place(db, variant, *, key="bestellung-0001", buyer_kind="member", game
     return await shop_orders.place_order(
         db, user_id=user_id, idempotency_key=key, buyer_kind=buyer_kind,
         lines=[{"variant_id": variant["id"], "quantity": quantity, "gamertag": gamertag}],
-        shipping_cents=shipping_cents, billing_address=billing or dict(BILLING),
+        shipping_estimate_cents=shipping_cents, billing_address=billing or dict(BILLING),
         shipping_address=shipping or dict(SHIPPING), actor_id=user_id)
 
 
