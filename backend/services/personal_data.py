@@ -217,6 +217,9 @@ CLUB_CONTENT = frozenset({
     # Kennung, wer angelegt bzw. geändert hat.
     "shop_products", "shop_variants", "shop_designs", "shop_design_profiles", "shop_design_colors",
     "shop_printful_variants",
+    # Gamertag-Druckdateien (#1711): Prüfsumme, Maße, Farbe, bei Testdateien die Kennung der Finanzen - kein Name, kein
+    # Konto. Welcher Bestellung eine Datei gehört, steht an der Position; die Löschfrist der Dateien regelt #1731.
+    "shop_gamertag_files",
 })
 
 NO_PERSON = frozenset({
