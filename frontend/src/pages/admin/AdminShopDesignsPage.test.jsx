@@ -30,12 +30,12 @@ const PLACEMENTS = [
 ];
 const SETTINGS = {
   light_ink: "#111111", threshold: 0.18, replaced_color: "#ffffff", is_default: true,
-  pair_aspect_tolerance: 0.02, pair_min_overlap: 0.9, pair_contrast_share: 0.03,
-  defaults: { light_ink: "#111111", threshold: 0.18, pair_aspect_tolerance: 0.02, pair_min_overlap: 0.9, pair_contrast_share: 0.03 },
+  pair_aspect_tolerance: 0.02, pair_min_overlap: 0.9, pair_contrast_share: 0.03, pair_position_tolerance: 0.03,
+  defaults: { light_ink: "#111111", threshold: 0.18, pair_aspect_tolerance: 0.02, pair_min_overlap: 0.9, pair_contrast_share: 0.03, pair_position_tolerance: 0.03 },
   limits: {
     min_threshold: 0.02, max_threshold: 0.9,
     pair_aspect_tolerance_min: 0.005, pair_aspect_tolerance_max: 0.2, pair_min_overlap_min: 0.5, pair_min_overlap_max: 0.99,
-    pair_contrast_share_min: 0.001, pair_contrast_share_max: 0.5,
+    pair_contrast_share_min: 0.001, pair_contrast_share_max: 0.5, pair_position_tolerance_min: 0.005, pair_position_tolerance_max: 0.3,
   },
 };
 
@@ -417,6 +417,48 @@ test("Paar: ein Fehler beim Speichern bringt den Fokus zurück auf „Paar speic
   await user.click(screen.getByTestId("shop-design-submit"));
   expect(await screen.findByTestId("shop-design-upload-error")).toHaveTextContent("läuft gerade ein Upload");
   expect(screen.getByTestId("shop-design-submit")).toHaveFocus();
+});
+
+test("Paar: sagt erst der Server beim Speichern „Gelb“ (409 mit Bericht), fragt die Seite nach und bestätigt dann", async () => {
+  const yellow = report("yellow");
+  uploadApiMock.post.mockImplementation(async (url, form) => {
+    if (url.endsWith("/pair-check")) return { data: report() };
+    if (form.get("confirm_warnings") !== "true") {
+      throw { response: { status: 409, data: { detail: `Bitte bestätigen: ${yellow.summary}`, pair: yellow } } };
+    }
+    return { data: { ...view(), uploaded_pair: { design_key: "loewe", dark_version: 3, light_version: 4, warnings: [], pair: yellow } } };
+  });
+  const user = userEvent.setup();
+  show();
+  await pairMode(user);
+  await user.upload(screen.getByTestId("shop-pair-dark-file"), ON_BLACK());
+  await user.upload(screen.getByTestId("shop-pair-light-file"), ON_WHITE());
+  expect(await screen.findByTestId("shop-pair-report")).toHaveAttribute("data-level", "green");
+  await user.click(screen.getByTestId("shop-design-submit"));
+  expect(await screen.findByTestId("shop-pair-confirm")).toHaveTextContent("verschwindet auf hellen Shirts");
+  expect(screen.getByTestId("shop-pair-report")).toHaveAttribute("data-level", "yellow");
+  expect(toastMock.error).not.toHaveBeenCalled();
+  expect(screen.queryByTestId("shop-design-upload-error")).toBeNull();
+  await user.click(screen.getByTestId("shop-pair-confirm-yes"));
+  const sent = callsTo("upload-pair").map(([, form]) => form.get("confirm_warnings"));
+  expect(sent).toEqual(["false", "true"]);
+  expect(toastMock.success).toHaveBeenCalledWith("Paar von loewe gespeichert: Version 3 für dunkle, Version 4 für helle Shirts.");
+});
+
+test("Paar: eine neue Datei bricht die laufende Prüfung ab", async () => {
+  uploadApiMock.post.mockImplementationOnce(() => new Promise(() => {})).mockResolvedValueOnce({ data: report() });
+  const user = userEvent.setup();
+  show();
+  await pairMode(user);
+  await user.upload(screen.getByTestId("shop-pair-dark-file"), ON_BLACK());
+  await user.upload(screen.getByTestId("shop-pair-light-file"), ON_WHITE());
+  await screen.findByTestId("shop-pair-checking");
+  const [, , first] = callsTo("pair-check")[0];
+  expect(first.signal.aborted).toBe(false);
+  await user.upload(screen.getByTestId("shop-pair-light-file"), new File(["<svg/>"], "neu.svg", { type: "image/svg+xml" }));
+  expect(first.signal.aborted).toBe(true);
+  expect(await screen.findByTestId("shop-pair-report")).toHaveAttribute("data-level", "green");
+  expect(callsTo("pair-check")[1][2].signal.aborted).toBe(false);
 });
 
 test("Paar: ohne durchsichtigen Hintergrund sagt die Prüfung, dass die Zuordnung unsicher ist", async () => {

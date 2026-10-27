@@ -378,8 +378,11 @@ function UploadForm({ designs, placements, limits, busy, preset, onUpload, onPai
   const [confirming, setConfirming] = useState(false);
   const checked = useRef(null);
   const requestNo = useRef(0);
+  const pending = useRef(null);
   const refocus = useRef(false);
   const submitButton = useRef(null);
+
+  useEffect(() => () => pending.current?.abort(), []);
 
   useEffect(() => {
     if (preset?.key) {
@@ -429,6 +432,10 @@ function UploadForm({ designs, placements, limits, busy, preset, onUpload, onPai
     checked.current = signature;
     requestNo.current += 1;
     const ticket = requestNo.current;
+    // Eine ältere, noch laufende Prüfung abbrechen - sie belegt sonst den Platz im Server.
+    pending.current?.abort();
+    const controller = typeof AbortController === "function" ? new AbortController() : null;
+    pending.current = controller;
     const form = new FormData();
     form.append("file_dark", pairFiles.dark);
     form.append("file_light", pairFiles.light);
@@ -437,8 +444,9 @@ function UploadForm({ designs, placements, limits, busy, preset, onUpload, onPai
     form.append("auto_assign", pairFiles.auto ? "true" : "false");
     setConfirming(false);
     setCheck({ status: "checking", report: null, error: "" });
-    uploadApi.post(`${BASE}/pair-check`, form).then(({ data: report }) => {
+    uploadApi.post(`${BASE}/pair-check`, form, controller ? { signal: controller.signal } : undefined).then(({ data: report }) => {
       if (ticket !== requestNo.current) return;
+      pending.current = null;
       if (report.swapped) {
         // Der Server hat getauscht: die Felder zeigen jetzt seine Zuordnung - ohne zweite Prüfung.
         checked.current = { ...signature, dark: signature.light, light: signature.dark };
@@ -447,6 +455,7 @@ function UploadForm({ designs, placements, limits, busy, preset, onUpload, onPai
       setCheck({ status: "done", report, error: "" });
     }).catch((failure) => {
       if (ticket !== requestNo.current) return;
+      pending.current = null;
       const report = failure?.response?.data?.pair || null;
       setCheck({ status: "done", report, error: formatRequestError(failure, "Die Prüfung hat nicht geklappt.") });
     });
@@ -498,12 +507,19 @@ function UploadForm({ designs, placements, limits, busy, preset, onUpload, onPai
       if (colors.trim()) form.append("garment_colors", colors);
     }
     setProblem("");
-    const result = await onPairUpload(form);
+    // Gelb erst beim Speichern (409 mit Bericht, etwa knapp an einer Schwelle): Bericht übernehmen und nachfragen.
+    const result = await onPairUpload(form, (failure) => {
+      const report = failure?.response?.status === 409 ? failure.response.data?.pair : null;
+      if (!report || confirmed) return false;
+      setCheck({ status: "done", report, error: "" });
+      setConfirming(true);
+      return true;
+    });
     if (result === true) {
       resetPair();
       setReason("");
       setIsNew(false);
-    } else if (typeof result === "string") {
+    } else if (typeof result === "string" && result !== "handled") {
       setProblem(result);
       closeConfirm();
     }
@@ -858,6 +874,7 @@ const PAIR_SETTINGS = [
   { name: "pair_aspect_tolerance", label: "Seitenverhältnis darf abweichen um (%)", hint: "Mehr Abweichung ist Rot: das Paar wird abgelehnt." },
   { name: "pair_min_overlap", label: "Umrisse decken sich mindestens zu (%)", hint: "Weniger ist Gelb: „Sind das wirklich zwei Fassungen desselben Logos?“" },
   { name: "pair_contrast_share", label: "Höchstens sehr helle bzw. dunkle Fläche (%)", hint: "Mehr Weiß in der Hell- bzw. Schwarz in der Dunkel-Fassung ist Gelb." },
+  { name: "pair_position_tolerance", label: "Logo darf verschoben sein um (%)", hint: "Sitzt das Logo in den Dateien weiter auseinander, ist es Gelb: Rand oder Position prüfen." },
 ];
 
 function percent(share) {
@@ -917,7 +934,7 @@ function MotifSettings({ settings, busy, onSave }) {
       {Object.keys(pairValues).length > 0 && (
         <fieldset className="space-y-2 border-t border-white/10 pt-3" data-testid="shop-motif-pair-settings">
           <legend className="text-xs font-bold uppercase tracking-wider text-white/60">Paar-Prüfung (hell + dunkel)</legend>
-          <div className="grid gap-3 sm:grid-cols-3">
+          <div className="grid gap-3 sm:grid-cols-2">
             {PAIR_SETTINGS.filter(({ name }) => name in pairValues).map(({ name, label, hint }) => (
               <Field key={name} label={label}
                 hint={`${hint} Vorgabe ${percent(settings.defaults[name])} %, erlaubt ${percent(settings.limits[`${name}_min`])} bis ${percent(settings.limits[`${name}_max`])} %.`}>
@@ -947,8 +964,9 @@ export default function AdminShopDesignsPage() {
       .catch((failure) => setError(formatRequestError(failure, "Die Motive lassen sich gerade nicht laden.")));
   }, []);
 
-  // Liefert true bei Erfolg, sonst den Text des Servers (für Meldungen am Formular).
-  const run = useCallback(async (key, request, success) => {
+  // Liefert true bei Erfolg, sonst den Text des Servers (für Meldungen am Formular). ``handled`` darf eine Absage
+  // selbst übernehmen (etwa „bitte bestätigen“ beim Paar) - dann ohne Fehlermeldung, Ergebnis „handled“.
+  const run = useCallback(async (key, request, success, handled) => {
     setBusy(key);
     try {
       const { data: next } = await request();
@@ -957,6 +975,7 @@ export default function AdminShopDesignsPage() {
       for (const warning of next.uploaded?.warnings || next.uploaded_pair?.warnings || []) toast.warning(warning);
       return true;
     } catch (failure) {
+      if (handled?.(failure)) return "handled";
       const text = formatRequestError(failure, "Das hat nicht geklappt.");
       toast.error(text);
       return text;
@@ -1005,7 +1024,7 @@ export default function AdminShopDesignsPage() {
           <Section title="Datei hochladen" icon={Upload} testId="shop-design-upload-section">
             <UploadForm designs={data.designs} placements={placements} limits={data.limits} busy={busy === "upload"} preset={preset}
               onUpload={(form) => run("upload", () => uploadApi.post(`${BASE}/upload`, form), (next) => `Version ${next.uploaded.version} von ${next.uploaded.design_key} gespeichert.`)}
-              onPairUpload={(form) => run("upload", () => uploadApi.post(`${BASE}/upload-pair`, form), (next) => `Paar von ${next.uploaded_pair.design_key} gespeichert: Version ${next.uploaded_pair.dark_version} für dunkle, Version ${next.uploaded_pair.light_version} für helle Shirts.`)} />
+              onPairUpload={(form, handled) => run("upload", () => uploadApi.post(`${BASE}/upload-pair`, form), (next) => `Paar von ${next.uploaded_pair.design_key} gespeichert: Version ${next.uploaded_pair.dark_version} für dunkle, Version ${next.uploaded_pair.light_version} für helle Shirts.`, handled)} />
           </Section>
         </div>
 
