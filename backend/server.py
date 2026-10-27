@@ -251,7 +251,10 @@ app.add_middleware(svg_logo.SvgFieldGate)
 # Druckdateien (#1708): das Limit greift am Eingang, bevor FastAPI das Formular in eine Zwischendatei liest.
 app.add_middleware(BodySizeLimit, limits={"/api/admin/shop/designs/upload": shop_designs.upload_body_limit,
                                           # fertige Druckdatei je Fläche (#2069): dieselbe Grenze
-                                          "/api/admin/shop/print-files/upload": shop_designs.upload_body_limit})
+                                          "/api/admin/shop/print-files/upload": shop_designs.upload_body_limit,
+                                          # Motiv als Paar (#2084): zwei Dateien je Anfrage, je Datei dieselbe Grenze
+                                          "/api/admin/shop/designs/upload-pair": shop_designs.pair_body_limit,
+                                          "/api/admin/shop/designs/pair-check": shop_designs.pair_body_limit})
 # Gamertag-Druckdatei (#1711): Vorschau, Testdatei und Regeln nehmen nur kleine Anfragen an.
 app.add_middleware(BodySizeLimit, limits=shop_gamertag.body_limits())
 

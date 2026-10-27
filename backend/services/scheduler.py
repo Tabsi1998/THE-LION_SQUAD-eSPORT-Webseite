@@ -177,6 +177,17 @@ async def _safe_shop_catalog_sync():
         _log_task_failure("shop_catalog_sync", exc)
 
 
+async def _safe_shop_pair_sweep():
+    """Shop (#2084): halbe Motiv-Paare nach einem Absturz aufräumen - alte ``pending``-Versionen samt Dateien, das
+    Motiv zurück auf den Stand davor. Nie etwas, auf das eine Bestellung zeigt."""
+    try:
+        from database import get_db
+        from services.shop_motifs import sweep_pending
+        await sweep_pending(get_db())
+    except Exception as exc:
+        _log_task_failure("shop_pair_sweep", exc)
+
+
 async def _safe_season_rank_snapshots():
     """Erfolge II (#613): täglich der Platz je Person in jeder laufenden Saison - daraus zählt „Aufsteiger“."""
     try:
@@ -1101,6 +1112,10 @@ def start_scheduler() -> AsyncIOScheduler:
     # Shop (#1709): Katalogabgleich mit Printful einmal am Tag - je Variante ein Preisaufruf, unter 120 je Minute.
     sched.add_job(_single_replica("shop_catalog_sync", _safe_shop_catalog_sync, lease_seconds=900.0), CronTrigger(hour=5, minute=20, timezone="Europe/Vienna"),
                   id="shop_catalog_sync", max_instances=1, coalesce=True)
+    # Shop (#2084): halbe Motiv-Paare nach einem Absturz aufräumen - kurz nach dem Start und dann alle 15 Minuten.
+    sched.add_job(_single_replica("shop_pair_sweep", _safe_shop_pair_sweep), IntervalTrigger(minutes=15),
+                  id="shop_pair_sweep", max_instances=1, coalesce=True,
+                  next_run_time=datetime.now(timezone.utc) + timedelta(seconds=45))
     sched.add_job(_single_replica("achievement_of_week", _safe_achievement_of_week), CronTrigger(day_of_week="mon", hour=8, minute=0, timezone="Europe/Vienna"),
                   id="achievement_of_week", replace_existing=True)
     sched.add_job(_single_replica("achievement_recap", _safe_achievement_recap, lease_seconds=900.0), CronTrigger(day_of_week="mon", hour=9, minute=0, timezone="Europe/Vienna"),

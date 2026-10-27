@@ -30,7 +30,13 @@ const PLACEMENTS = [
 ];
 const SETTINGS = {
   light_ink: "#111111", threshold: 0.18, replaced_color: "#ffffff", is_default: true,
-  defaults: { light_ink: "#111111", threshold: 0.18 }, limits: { min_threshold: 0.02, max_threshold: 0.9 },
+  pair_aspect_tolerance: 0.02, pair_min_overlap: 0.85, pair_contrast_share: 0.03, pair_position_tolerance: 0.03,
+  defaults: { light_ink: "#111111", threshold: 0.18, pair_aspect_tolerance: 0.02, pair_min_overlap: 0.85, pair_contrast_share: 0.03, pair_position_tolerance: 0.03 },
+  limits: {
+    min_threshold: 0.02, max_threshold: 0.9,
+    pair_aspect_tolerance_min: 0.005, pair_aspect_tolerance_max: 0.2, pair_min_overlap_min: 0.5, pair_min_overlap_max: 0.99,
+    pair_contrast_share_min: 0.001, pair_contrast_share_max: 0.5, pair_position_tolerance_min: 0.005, pair_position_tolerance_max: 0.3,
+  },
 };
 
 function version(number, overrides = {}) {
@@ -203,6 +209,296 @@ test("ein abgelehntes SVG zeigt den Text des Servers am Formular - was genau gef
   expect(screen.queryByTestId("shop-design-upload-error")).toBeNull();
 });
 
+// ---------------------------------------------------------------- Paar (#2084)
+
+const PREVIEW = "data:image/png;base64,iVBORw0KGgo=";
+
+function report(level = "green", overrides = {}) {
+  const checks = {
+    green: [
+      { key: "aspect", level: "green", text: "Gleiches Format (Seitenverhältnis 1,20)." },
+      { key: "overlap", level: "green", text: "Die Umrisse passen (Überdeckung 99 %)." },
+      { key: "contrast_light", level: "green", text: "Kontrast auf hellen Shirts ok." },
+      { key: "contrast_dark", level: "green", text: "Kontrast auf dunklen Shirts ok." },
+    ],
+    yellow: [
+      { key: "aspect", level: "green", text: "Gleiches Format (Seitenverhältnis 1,20)." },
+      { key: "overlap", level: "green", text: "Die Umrisse passen (Überdeckung 99 %)." },
+      { key: "contrast_light", level: "yellow", text: "Die Fassung für helle Shirts enthält Weiß bzw. sehr Helles (50 % der Fläche) – das verschwindet auf hellen Shirts." },
+    ],
+    red: [
+      { key: "aspect", level: "red", text: "Die beiden Dateien haben unterschiedliche Formate: 1,20 zu 1,35 – bitte gleiche Zeichenfläche verwenden." },
+    ],
+  }[level];
+  const summary = checks.filter((item) => item.level === level).map((item) => item.text).join(" ") || "Das Paar passt.";
+  return {
+    level, checks, summary: level === "green" ? "Das Paar passt." : summary, swapped: false, suggest_swap: false,
+    files: { dark: { name: "auf-schwarz.svg" }, light: { name: "auf-weiss.svg" } },
+    previews: { dark: PREVIEW, light: PREVIEW }, marks: { dark: null, light: level === "yellow" ? PREVIEW : null },
+    ...overrides,
+  };
+}
+
+const ON_BLACK = () => new File(["<svg/>"], "auf-schwarz.svg", { type: "image/svg+xml" });
+const ON_WHITE = () => new File(["<svg/>"], "auf-weiss.svg", { type: "image/svg+xml" });
+
+function callsTo(route) {
+  return uploadApiMock.post.mock.calls.filter(([url]) => url === `/admin/shop/designs/${route}`);
+}
+
+async function pairMode(user) {
+  await user.click(await screen.findByTestId("shop-design-shape-pair"));
+  expect(screen.getByTestId("shop-pair-fields")).toBeInTheDocument();
+  expect(screen.queryByTestId("shop-design-variant-light")).toBeNull();
+}
+
+test("Paar: zwei Felder, die Prüfung läuft von selbst, Ampel grün, Vorschau auf beiden Shirts, Speichern schickt beide", async () => {
+  const saved = { ...view(), uploaded_pair: { design_key: "loewe", dark_version: 3, light_version: 4, warnings: [], pair: report() } };
+  uploadApiMock.post.mockImplementation(async (url) => (url.endsWith("/pair-check") ? { data: report() } : { data: saved }));
+  const user = userEvent.setup();
+  show();
+  await pairMode(user);
+  const submit = screen.getByTestId("shop-design-submit");
+  expect(submit).toHaveTextContent("Paar speichern");
+  expect(submit).toBeDisabled();
+  const dark = ON_BLACK();
+  const light = ON_WHITE();
+  await user.upload(screen.getByTestId("shop-pair-dark-file"), dark);
+  expect(callsTo("pair-check")).toHaveLength(0);
+  await user.upload(screen.getByTestId("shop-pair-light-file"), light);
+
+  expect(await screen.findByTestId("shop-pair-report")).toHaveAttribute("data-level", "green");
+  const [[, check]] = callsTo("pair-check");
+  expect([check.get("file_dark"), check.get("file_light"), check.get("design_key"), check.get("auto_assign"), check.get("placement")])
+    .toEqual([dark, light, "loewe", "false", null]);
+  expect(screen.getByTestId("shop-pair-light")).toHaveTextContent("Passt");
+  expect(screen.getByTestId("shop-pair-on-dark")).toHaveClass("bg-black");
+  expect(screen.getByTestId("shop-pair-on-light")).toHaveClass("bg-silver");
+  expect(within(screen.getByTestId("shop-pair-on-dark")).getByRole("img")).toHaveAttribute("src", PREVIEW);
+
+  await user.type(screen.getByTestId("shop-design-reason"), "Neues Logo");
+  await user.click(submit);
+  const [[, form]] = callsTo("upload-pair");
+  expect([form.get("file_dark"), form.get("file_light"), form.get("design_key"), form.get("confirm_warnings"), form.get("reason")])
+    .toEqual([dark, light, "loewe", "false", "Neues Logo"]);
+  expect(toastMock.success).toHaveBeenCalledWith("Paar von loewe gespeichert: Version 3 für dunkle, Version 4 für helle Shirts.");
+  expect(screen.queryByTestId("shop-pair-report")).toBeNull();
+});
+
+test("Paar: beide Dateien auf einmal - der Server ordnet zu, Tauschen dreht es und prüft neu", async () => {
+  uploadApiMock.post.mockResolvedValueOnce({ data: report("green", { swapped: true }) })
+    .mockResolvedValueOnce({ data: report("yellow", { suggest_swap: true }) });
+  const user = userEvent.setup();
+  show();
+  await pairMode(user);
+  const light = ON_WHITE();
+  const dark = ON_BLACK();
+  fireEvent.drop(screen.getByTestId("shop-pair-dark-dropzone"), { dataTransfer: { files: [light, dark] } });
+
+  expect(await screen.findByTestId("shop-pair-report")).toHaveAttribute("data-level", "green");
+  expect(callsTo("pair-check")[0][1].get("auto_assign")).toBe("true");
+  expect(callsTo("pair-check")[0][1].get("file_dark")).toBe(light);
+  // Die Felder zeigen die Zuordnung des Servers - ohne zweite Prüfung.
+  expect(screen.getByTestId("shop-pair-dark-dropzone")).toHaveTextContent("auf-schwarz.svg");
+  expect(screen.getByTestId("shop-pair-light-dropzone")).toHaveTextContent("auf-weiss.svg");
+  expect(screen.getByTestId("shop-pair-assignment")).toHaveTextContent("Automatisch zugeordnet");
+  expect(callsTo("pair-check")).toHaveLength(1);
+
+  await user.click(screen.getByTestId("shop-pair-swap"));
+  expect(await screen.findByTestId("shop-pair-report")).toHaveAttribute("data-level", "yellow");
+  const [, second] = callsTo("pair-check");
+  expect([second[1].get("file_dark"), second[1].get("file_light"), second[1].get("auto_assign")]).toEqual([light, dark, "false"]);
+  expect(screen.getByTestId("shop-pair-dark-dropzone")).toHaveTextContent("auf-weiss.svg");
+  expect(screen.getByTestId("shop-pair-assignment")).toHaveTextContent("wirken vertauscht");
+});
+
+test("Paar: Gelb markiert die Stellen und fragt im Seitenlayout nach, bevor gespeichert wird", async () => {
+  const confirmSpy = vi.spyOn(window, "confirm");
+  uploadApiMock.post.mockImplementation(async (url) => (url.endsWith("/pair-check")
+    ? { data: report("yellow") }
+    : { data: { ...view(), uploaded_pair: { design_key: "loewe", dark_version: 3, light_version: 4, warnings: ["Weiß verschwindet"], pair: report("yellow") } } }));
+  const user = userEvent.setup();
+  show();
+  await pairMode(user);
+  await user.upload(screen.getByTestId("shop-pair-dark-file"), ON_BLACK());
+  await user.upload(screen.getByTestId("shop-pair-light-file"), ON_WHITE());
+  expect(await screen.findByTestId("shop-pair-light")).toHaveTextContent("Bitte prüfen");
+  expect(screen.getByTestId("shop-pair-check-contrast_light")).toHaveAttribute("data-level", "yellow");
+  expect(screen.getByTestId("shop-pair-on-light-mark")).toHaveAttribute("src", PREVIEW);
+  expect(screen.queryByTestId("shop-pair-on-dark-mark")).toBeNull();
+
+  await user.click(screen.getByTestId("shop-design-submit"));
+  const dialog = screen.getByTestId("shop-pair-confirm");
+  expect(dialog).toHaveAttribute("role", "alertdialog");
+  expect(dialog).toHaveFocus();
+  expect(dialog).toHaveTextContent("verschwindet auf hellen Shirts");
+  expect(callsTo("upload-pair")).toHaveLength(0);
+  expect(confirmSpy).not.toHaveBeenCalled();
+  await user.click(screen.getByTestId("shop-pair-confirm-no"));
+  expect(screen.queryByTestId("shop-pair-confirm")).toBeNull();
+  expect(screen.getByTestId("shop-design-submit")).toHaveFocus();
+
+  await user.click(screen.getByTestId("shop-design-submit"));
+  await user.click(screen.getByTestId("shop-pair-confirm-yes"));
+  const [[, form]] = callsTo("upload-pair");
+  expect(form.get("confirm_warnings")).toBe("true");
+  expect(toastMock.warning).toHaveBeenCalledWith("Weiß verschwindet");
+});
+
+test("Paar: Rot sperrt das Speichern; eine Ablehnung des Servers zeigt ihren Bericht", async () => {
+  uploadApiMock.post.mockResolvedValueOnce({ data: report("red") });
+  const user = userEvent.setup();
+  show();
+  await pairMode(user);
+  await user.upload(screen.getByTestId("shop-pair-dark-file"), ON_BLACK());
+  await user.upload(screen.getByTestId("shop-pair-light-file"), ON_WHITE());
+  expect(await screen.findByTestId("shop-pair-light")).toHaveTextContent("Abgelehnt");
+  expect(screen.getByTestId("shop-pair-report")).toHaveTextContent("1,20 zu 1,35");
+  expect(screen.getByTestId("shop-design-submit")).toBeDisabled();
+  expect(screen.getByTestId("shop-pair-blocked")).toBeInTheDocument();
+
+  // Ein bösartiges SVG lehnt schon die Prüfung ab - mit dem Text des Servers.
+  const detail = "Datei für helle Shirts (boese.svg): Gefunden: Skript.";
+  uploadApiMock.post.mockRejectedValueOnce({ response: { status: 400, data: { detail } } });
+  await user.upload(screen.getByTestId("shop-pair-light-file"), new File(["<svg/>"], "boese.svg", { type: "image/svg+xml" }));
+  expect(await screen.findByTestId("shop-pair-error")).toHaveTextContent(detail);
+  expect(screen.getByTestId("shop-design-submit")).toBeDisabled();
+  // „Erneut prüfen“ (etwa nach „zu viele Versuche“) schickt dieselben Dateien noch einmal.
+  uploadApiMock.post.mockResolvedValueOnce({ data: report() });
+  await user.click(screen.getByTestId("shop-pair-retry"));
+  expect(await screen.findByTestId("shop-pair-report")).toHaveAttribute("data-level", "green");
+  expect(callsTo("pair-check")).toHaveLength(3);
+  expect(screen.getByTestId("shop-design-submit")).toBeEnabled();
+});
+
+test("Paar für ein neues Motiv schickt Platzierung zur Prüfung und Titel beim Speichern", async () => {
+  apiMock.get.mockResolvedValue({ data: view({ designs: [] }) });
+  uploadApiMock.post.mockImplementation(async (url) => (url.endsWith("/pair-check") ? { data: report() } : { data: { ...view(), uploaded_pair: { design_key: "neu", dark_version: 1, light_version: 2, warnings: [], pair: report() } } }));
+  const user = userEvent.setup();
+  show();
+  await pairMode(user);
+  await user.type(screen.getByTestId("shop-design-key"), "neu");
+  await user.type(screen.getByTestId("shop-design-title"), "Neues Logo");
+  fireEvent.drop(screen.getByTestId("shop-pair-light-dropzone"), { dataTransfer: { files: [ON_BLACK(), ON_WHITE()] } });
+  await screen.findByTestId("shop-pair-report");
+  const [[, check]] = callsTo("pair-check");
+  expect([check.get("placement"), check.get("design_key")]).toEqual(["front_right", null]);
+  await user.click(screen.getByTestId("shop-design-submit"));
+  const [[, form]] = callsTo("upload-pair");
+  expect([form.get("design_key"), form.get("title"), form.get("placement")]).toEqual(["neu", "Neues Logo", "front_right"]);
+});
+
+test("Paar: eine Kennung tippen, während die Prüfung läuft, lässt sie nicht hängen", async () => {
+  apiMock.get.mockResolvedValue({ data: view({ designs: [] }) });
+  let answer;
+  uploadApiMock.post.mockImplementationOnce(() => new Promise((resolve) => { answer = resolve; }));
+  const user = userEvent.setup();
+  show();
+  await pairMode(user);
+  fireEvent.drop(screen.getByTestId("shop-pair-dark-dropzone"), { dataTransfer: { files: [ON_BLACK(), ON_WHITE()] } });
+  expect(await screen.findByTestId("shop-pair-checking")).toBeInTheDocument();
+  await user.type(screen.getByTestId("shop-design-key"), "neu");
+  answer({ data: report() });
+  expect(await screen.findByTestId("shop-pair-report")).toHaveAttribute("data-level", "green");
+  expect(callsTo("pair-check")).toHaveLength(1);
+});
+
+test("Paar: ein Fehler beim Speichern bringt den Fokus zurück auf „Paar speichern“", async () => {
+  uploadApiMock.post.mockImplementation(async (url) => {
+    if (url.endsWith("/pair-check")) return { data: report() };
+    throw { response: { status: 409, data: { detail: "Für dieses Motiv läuft gerade ein Upload." } } };
+  });
+  const user = userEvent.setup();
+  show();
+  await pairMode(user);
+  await user.upload(screen.getByTestId("shop-pair-dark-file"), ON_BLACK());
+  await user.upload(screen.getByTestId("shop-pair-light-file"), ON_WHITE());
+  await screen.findByTestId("shop-pair-report");
+  await user.click(screen.getByTestId("shop-design-submit"));
+  expect(await screen.findByTestId("shop-design-upload-error")).toHaveTextContent("läuft gerade ein Upload");
+  expect(screen.getByTestId("shop-design-submit")).toHaveFocus();
+});
+
+test("Paar: sagt erst der Server beim Speichern „Gelb“ (409 mit Bericht), fragt die Seite nach und bestätigt dann", async () => {
+  const yellow = report("yellow");
+  uploadApiMock.post.mockImplementation(async (url, form) => {
+    if (url.endsWith("/pair-check")) return { data: report() };
+    if (form.get("confirm_warnings") !== "true") {
+      throw { response: { status: 409, data: { detail: `Bitte bestätigen: ${yellow.summary}`, pair: yellow } } };
+    }
+    return { data: { ...view(), uploaded_pair: { design_key: "loewe", dark_version: 3, light_version: 4, warnings: [], pair: yellow } } };
+  });
+  const user = userEvent.setup();
+  show();
+  await pairMode(user);
+  await user.upload(screen.getByTestId("shop-pair-dark-file"), ON_BLACK());
+  await user.upload(screen.getByTestId("shop-pair-light-file"), ON_WHITE());
+  expect(await screen.findByTestId("shop-pair-report")).toHaveAttribute("data-level", "green");
+  await user.click(screen.getByTestId("shop-design-submit"));
+  expect(await screen.findByTestId("shop-pair-confirm")).toHaveTextContent("verschwindet auf hellen Shirts");
+  expect(screen.getByTestId("shop-pair-report")).toHaveAttribute("data-level", "yellow");
+  expect(toastMock.error).not.toHaveBeenCalled();
+  expect(screen.queryByTestId("shop-design-upload-error")).toBeNull();
+  await user.click(screen.getByTestId("shop-pair-confirm-yes"));
+  const sent = callsTo("upload-pair").map(([, form]) => form.get("confirm_warnings"));
+  expect(sent).toEqual(["false", "true"]);
+  expect(toastMock.success).toHaveBeenCalledWith("Paar von loewe gespeichert: Version 3 für dunkle, Version 4 für helle Shirts.");
+});
+
+test("Paar: eine neue Datei bricht die laufende Prüfung ab", async () => {
+  uploadApiMock.post.mockImplementationOnce(() => new Promise(() => {})).mockResolvedValueOnce({ data: report() });
+  const user = userEvent.setup();
+  show();
+  await pairMode(user);
+  await user.upload(screen.getByTestId("shop-pair-dark-file"), ON_BLACK());
+  await user.upload(screen.getByTestId("shop-pair-light-file"), ON_WHITE());
+  await screen.findByTestId("shop-pair-checking");
+  const [, , first] = callsTo("pair-check")[0];
+  expect(first.signal.aborted).toBe(false);
+  await user.upload(screen.getByTestId("shop-pair-light-file"), new File(["<svg/>"], "neu.svg", { type: "image/svg+xml" }));
+  expect(first.signal.aborted).toBe(true);
+  expect(await screen.findByTestId("shop-pair-report")).toHaveAttribute("data-level", "green");
+  expect(callsTo("pair-check")[1][2].signal.aborted).toBe(false);
+});
+
+test("Paar: ohne durchsichtigen Hintergrund sagt die Prüfung, dass die Zuordnung unsicher ist", async () => {
+  uploadApiMock.post.mockResolvedValue({ data: report("green", { assign_uncertain: true, suggest_swap: true }) });
+  const user = userEvent.setup();
+  show();
+  await pairMode(user);
+  fireEvent.drop(screen.getByTestId("shop-pair-light-dropzone"), { dataTransfer: { files: [ON_BLACK(), ON_WHITE()] } });
+  expect(await screen.findByTestId("shop-pair-uncertain")).toHaveTextContent("Zuordnung unsicher – bitte prüfen");
+  expect(screen.getByTestId("shop-pair-assignment")).not.toHaveTextContent("wirken vertauscht");
+});
+
+test("„Als Paar ersetzen“ an der Karte stellt das Formular auf Paar und Motiv", async () => {
+  const user = userEvent.setup();
+  show();
+  await user.click(await screen.findByTestId("shop-motif-loewe-new-pair"));
+  expect(screen.getByTestId("shop-design-shape-pair")).toHaveAttribute("aria-checked", "true");
+  expect(screen.getByTestId("shop-design-select")).toHaveValue("loewe");
+});
+
+test("ist nur eine Fassung ersetzt, fragt die Karte nach der anderen und belegt den Upload-Kasten vor", async () => {
+  const stale = motif({
+    light_mode: "file", latest: version(3),
+    light: { state: "file", version: 2, hint: "Eigene Datei für helle Shirts.", latest: version(2, { variant: "light", pair_of: 1 }) },
+    pair_stale: true,
+    pair: { stale: true, dark_version: 3, light_version: 2, outdated: "light", hint: "…" },
+  });
+  apiMock.get.mockResolvedValue({ data: view({ designs: [motif({ design_key: "adler", title: "Adler" }), stale] }) });
+  const user = userEvent.setup();
+  show();
+  const hint = await screen.findByTestId("shop-motif-loewe-pair-stale");
+  expect(hint).toHaveTextContent("die andere (für helle Shirts) ist noch Version 2 – auch ersetzen?");
+  expect(screen.queryByTestId("shop-motif-adler-pair-stale")).toBeNull();
+  await user.click(screen.getByTestId("shop-design-variant-dark"));
+  await user.click(within(hint).getByTestId("shop-motif-loewe-pair-stale-replace"));
+  expect(screen.getByTestId("shop-design-shape-single")).toHaveAttribute("aria-checked", "true");
+  expect(screen.getByTestId("shop-design-variant-light")).toHaveAttribute("aria-checked", "true");
+  expect(screen.getByTestId("shop-design-select")).toHaveValue("loewe");
+});
+
 test("Ausnahmen je Shirtfarbe: hinzufügen, wählen, speichern mit optionalem Grund", async () => {
   apiMock.patch.mockResolvedValue({ data: view() });
   const user = userEvent.setup();
@@ -250,6 +546,25 @@ test("Ersatzfarbe und Schwelle: Beispiele folgen der Schwelle, Speichern schickt
   await user.type(screen.getByTestId("shop-motif-settings-save-reason"), "Vereins-Dunkelblau");
   await user.click(screen.getByTestId("shop-motif-settings-save-submit"));
   expect(apiMock.put).toHaveBeenCalledWith("/admin/shop/designs/motif-settings", { light_ink: "#0a2540", threshold: 0.5, reason: "Vereins-Dunkelblau" });
+});
+
+test("die Schwellen der Paar-Prüfung stehen in Prozent und gehen als Anteil an den Server - nur geänderte", async () => {
+  apiMock.put.mockResolvedValue({ data: view() });
+  const user = userEvent.setup();
+  show();
+  const overlap = await screen.findByTestId("shop-motif-pair_min_overlap");
+  expect(overlap).toHaveValue("85");
+  expect(screen.getByTestId("shop-motif-pair_aspect_tolerance")).toHaveValue("2");
+  expect(screen.getByTestId("shop-motif-pair-settings")).toHaveTextContent("Vorgabe 3 %, erlaubt 0,1 bis 50 %.");
+  await user.clear(overlap);
+  await user.type(overlap, "100");
+  await user.click(screen.getByTestId("shop-motif-settings-save-submit"));
+  expect(apiMock.put).not.toHaveBeenCalled();
+  expect(screen.getByTestId("shop-motif-settings-save-hint")).toHaveTextContent("von 50 bis 99");
+  await user.clear(overlap);
+  await user.type(overlap, "85,5");
+  await user.click(screen.getByTestId("shop-motif-settings-save-submit"));
+  expect(apiMock.put).toHaveBeenCalledWith("/admin/shop/designs/motif-settings", { light_ink: "#111111", threshold: 0.18, pair_min_overlap: 0.855, reason: "" });
 });
 
 test("Weiß als Ersatzfarbe geht nicht - der Knopf sagt warum", async () => {
