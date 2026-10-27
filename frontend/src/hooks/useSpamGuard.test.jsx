@@ -62,6 +62,17 @@ test("ein zu altes Token wird vor dem Senden erneuert", async () => {
   }
 });
 
+test("nach jedem Absenden - Erfolg oder Fehler - kommt ein neues Token", async () => {
+  apiMock.get.mockResolvedValueOnce({ data: token({ token: "erstes" }) }).mockResolvedValue({ data: token({ token: "zweites" }) });
+  const { result } = renderHook(() => useSpamGuard("register"));
+  await waitFor(() => expect(result.current.ready).toBe(true));
+  await act(async () => { result.current.afterAttempt(); });
+  await waitFor(() => expect(apiMock.get).toHaveBeenCalledTimes(2));
+  let fields;
+  await act(async () => { fields = await result.current.prepare(); });
+  expect(fields.form_token).toBe("zweites");
+});
+
 function Form({ form }) {
   const guard = useSpamGuard(form);
   return <form><SpamGuardFields guard={guard} idPrefix="test" /></form>;

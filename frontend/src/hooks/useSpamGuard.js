@@ -109,12 +109,15 @@ export function useSpamGuard(form) {
     return fields;
   }, [honeypotValue, load, showTurnstile, waitForTurnstile]);
 
-  // Nach jedem Versuch: eine Turnstile-Antwort gilt nur einmal - das Widget beginnt neu.
+  // Nach jedem Versuch, ob Erfolg oder Fehler: ein neues Formular-Token (ein Token gilt nur für wenige Versuche) und
+  // ein frisches Widget (eine Turnstile-Antwort gilt nur einmal). `prepare()` wartet beim nächsten Senden die
+  // Mindestzeit ab, falls nötig.
   const afterAttempt = useCallback(() => {
     setTurnstileToken("");
     setTurnstileError(false);
     setWidgetKey((key) => key + 1);
-  }, [setTurnstileError, setTurnstileToken]);
+    load();
+  }, [load, setTurnstileError, setTurnstileToken]);
 
   // „Nur bei Verdacht“: der Server verlangt Turnstile nachträglich (428). Dann zeigt das Formular das Widget.
   const handleError = useCallback((error) => {
@@ -126,13 +129,11 @@ export function useSpamGuard(form) {
     return null;
   }, []);
 
-  // Nach einem erfolgreichen Versand: neues Token für die nächste Nachricht.
+  // Nach einem erfolgreichen Versand: Formular zurück auf Anfang (das neue Token holt schon `afterAttempt`).
   const reset = useCallback(() => {
     setHoneypotValue("");
     setChallenge(null);
-    afterAttempt();
-    load();
-  }, [afterAttempt, load]);
+  }, []);
 
   return {
     form,

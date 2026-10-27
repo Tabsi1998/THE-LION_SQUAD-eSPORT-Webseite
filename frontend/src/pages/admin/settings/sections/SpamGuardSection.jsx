@@ -13,6 +13,10 @@ const NUMBER_FIELDS = [
   ["gmail_dots_min", "Gmail-Punkte ab"],
   ["links_min", "Links ab"],
   ["peak_per_hour", "Spitze ab (je Stunde, Betriebs-Check)"],
+  // Registrierung aus der App: ohne Formular-Token, darum enger begrenzt (je Stunde).
+  ["app_register_ip_per_hour", "App-Registrierungen je IP und Stunde"],
+  ["app_register_global_per_hour", "App-Registrierungen insgesamt je Stunde"],
+  ["app_register_peak_per_hour", "App-Spitze ab (je Stunde, Betriebs-Check)"],
 ];
 const WEIGHT_FIELDS = [
   ["random_text", "Zufallszeichen in allen Feldern"],
@@ -81,7 +85,8 @@ export function SpamGuardSection() {
   const apply = useCallback((data) => {
     setView(data);
     setDraft({ ...data.config, spam_words_text: (data.config.spam_words || []).join("\n") });
-    setTurnstileDraft({ enabled: data.turnstile.enabled, site_key: data.turnstile.site_key || "", mode: data.turnstile.mode, forms: { ...data.turnstile.forms } });
+    setTurnstileDraft({ enabled: data.turnstile.enabled, site_key: data.turnstile.site_key || "", mode: data.turnstile.mode, forms: { ...data.turnstile.forms },
+      sample_percent: data.turnstile.sample_percent ?? 10 });
   }, []);
 
   const load = useCallback(async () => {
@@ -127,6 +132,7 @@ export function SpamGuardSection() {
     if (turnstileDraft.enabled !== current.enabled) out.enabled = turnstileDraft.enabled;
     if (turnstileDraft.site_key.trim() && turnstileDraft.site_key.trim() !== (current.site_key || "")) out.site_key = turnstileDraft.site_key.trim();
     if (turnstileDraft.mode !== current.mode) out.mode = turnstileDraft.mode;
+    if (turnstileDraft.sample_percent !== current.sample_percent) out.sample_percent = turnstileDraft.sample_percent;
     if (JSON.stringify(turnstileDraft.forms) !== JSON.stringify(current.forms)) out.forms = turnstileDraft.forms;
     return out;
   };
@@ -272,7 +278,18 @@ export function SpamGuardSection() {
               {(view.turnstile.modes || []).map((mode) => <option key={mode.key} value={mode.key}>{mode.label}</option>)}
             </select>
             <p className="mt-1 text-xs text-white/50">„Nur bei Verdacht“: das Formular zeigt das Widget erst, wenn der Inhalt verdächtig ist.</p>
+            {turnstileDraft.mode === "suspect" && (
+              <p className="mt-1 text-xs text-warn" data-testid="turnstile-suspect-warning">
+                Achtung: Bots können an der nachträglichen Rückfrage lernen, dass sie aufgefallen sind. Darum fragt der Server zusätzlich einen
+                Zufallsanteil unauffälliger Anfragen. Sicherer ist „Immer“.
+              </p>
+            )}
           </label>
+          {turnstileDraft.mode === "suspect" && (
+            <NumberField label="Zufallsanteil unauffälliger Anfragen (%)" value={turnstileDraft.sample_percent}
+              onChange={(value) => setTurnstileDraft((current) => ({ ...current, sample_percent: value }))}
+              range={view.turnstile.sample_bounds} testId="turnstile-sample-percent" />
+          )}
           <fieldset>
             <legend className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Gilt für</legend>
             {turnstileForms.map((form) => (

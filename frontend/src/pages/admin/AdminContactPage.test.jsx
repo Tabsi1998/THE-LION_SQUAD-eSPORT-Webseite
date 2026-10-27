@@ -37,6 +37,16 @@ test("Zähler zeigt heute, 7 Tage, Quote und Gründe", async () => {
   expect(within(counter).getByTestId("contact-spam-reasons")).toHaveTextContent("Verstecktes Feld ausgefüllt: 3");
 });
 
+test("Hinweis „verdächtige Nachrichten“ steht auch ohne Filter da und führt zum Spam-Ordner", async () => {
+  const user = userEvent.setup();
+  render(<AdminContactPage />);
+  const hint = await screen.findByTestId("contact-suspicious-hint");
+  expect(hint).toHaveTextContent("1 verdächtige Nachricht im Spam-Ordner");
+  await user.click(hint);
+  expect(await screen.findByTestId("contact-row-m2")).toBeInTheDocument();
+  expect(screen.queryByTestId("contact-suspicious-hint")).toBeNull();
+});
+
 test("Spam bleibt aus der Standardansicht, der Filter „Spam“ zeigt ihn", async () => {
   const user = userEvent.setup();
   render(<AdminContactPage />);

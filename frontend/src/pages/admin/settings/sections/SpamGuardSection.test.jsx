@@ -25,7 +25,8 @@ function view(turnstile = {}) {
     forms: [{ key: "contact", label: "Kontaktformular", turnstile: true, limits: true }, { key: "register", label: "Registrierung", turnstile: true, limits: false }],
     turnstile: {
       enabled: false, ready: false, mode: "always", modes: [{ key: "always", label: "Immer" }, { key: "suspect", label: "Nur bei Verdacht" }],
-      site_key: "", forms: { contact: true, register: true }, secret: { state: "missing" }, last_test: null, ...turnstile,
+      site_key: "", forms: { contact: true, register: true }, secret: { state: "missing" }, last_test: null,
+      sample_percent: 10, sample_bounds: { min: 0, max: 100 }, ...turnstile,
     },
   };
 }
@@ -74,4 +75,20 @@ test("Turnstile: Secret Key nie vorbelegt, zuerst gespeichert, dann einschalten;
   await waitFor(() => expect(screen.getByTestId("turnstile-secret")).toHaveValue(""));
   await user.click(screen.getByTestId("turnstile-test"));
   expect(await screen.findByTestId("turnstile-test-result")).toHaveTextContent("Verbindung steht");
+});
+
+test("„Nur bei Verdacht“ warnt und fragt den Zufallsanteil ab", async () => {
+  apiMock.put.mockResolvedValue({ data: view({ mode: "suspect", sample_percent: 20 }) });
+  const user = userEvent.setup();
+  render(<SpamGuardSection />);
+  const mode = await screen.findByTestId("turnstile-mode");
+  expect(screen.queryByTestId("turnstile-suspect-warning")).toBeNull();
+  await user.selectOptions(mode, "suspect");
+  expect(screen.getByTestId("turnstile-suspect-warning")).toHaveTextContent("Bots können");
+  const sample = screen.getByTestId("turnstile-sample-percent");
+  await user.clear(sample);
+  await user.type(sample, "20");
+  await user.type(screen.getByTestId("turnstile-reason"), "weniger Rückfragen");
+  await user.click(screen.getByTestId("turnstile-save"));
+  await waitFor(() => expect(apiMock.put).toHaveBeenCalledWith("/spam-guard/turnstile", { mode: "suspect", sample_percent: 20, reason: "weniger Rückfragen" }));
 });
