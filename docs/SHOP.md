@@ -207,7 +207,7 @@ Shop), Verbindungstest über den Printful-Adapter (`printful_client.py`, unten).
 | Route (alle `require_area("finance")`) | Zweck |
 | --- | --- |
 | `GET /api/admin/shop/config` | Einstellungen, Stufen mit Sperre, Rechte – ohne Schlüssel |
-| `PATCH /api/admin/shop/config` | Stufe, Notschalter, öffentlicher Aufschlag, Ersatzpauschale (mit Grund) |
+| `PATCH /api/admin/shop/config` | Stufe, Notschalter, öffentlicher Aufschlag, Ersatzpauschale, Mindestpreis (mit Grund) |
 | `PUT /api/admin/shop/config/tax-clearance` | „Steuer geklärt“ setzen oder zurücknehmen (nur Superadmin, mit Grund) |
 | `PUT /api/admin/shop/config/printful-key` | Schlüssel hinterlegen (zusätzlich System, mit Grund) |
 | `POST /api/admin/shop/config/printful-key/remove` | Schlüssel entfernen (zusätzlich System, mit Grund) |
@@ -341,7 +341,8 @@ Beispiel aus #2062: Gildan 5000 schwarz mit Löwe vorne rechts, Gamertag vorne l
 **Vorab-Prüfung** (`run_check`): Printful-Produkt geladen und nicht eingestellt; Farben und Größen gewählt;
 Sichtbarkeit und Personalisierung passen zu den Platzierungen; mindestens eine Platzierung mit Design; **jede
 angebotene Farbe hat an jeder Design-Platzierung eine gültige, öffentliche Datei** (sonst nennt die Prüfung Platzierung
-und Farbe); alle angebotenen Varianten lieferbar; Preis berechnet und übernommen, ohne offene Preiswarnung. Dazu die
+und Farbe); alle angebotenen Varianten lieferbar; Preis berechnet und übernommen, ohne offene Preiswarnung und nicht
+unter dem **Mindestpreis** (Einstellung `min_price_cents`, Vorgabe 1 €, unter Shop → Einstellungen → Preise). Dazu die
 **Mockup-Prüfung**: bis #1710 „offen“. „Geprüft“ braucht alles außer den Mockups, „veröffentlicht“ alles - bis #1710
 lässt sich also nichts veröffentlichen.
 
@@ -350,16 +351,33 @@ fällt bei jeder Änderung des Aufbaus (auch der Personalisierung) zurück auf �
 erst nach dem Zurückziehen - nur „Preise übernehmen“ geht auch veröffentlicht. Archivierte Produkte bleiben lesbar.
 „Öffentlich“ plus Personalisierung lehnt der Server immer ab.
 
+**Die alten Wege halten dieselben Regeln** (`PATCH /products/{id}`, `POST /products/{id}/variants`,
+`PATCH /variants/{id}`, Printful-Zuordnung von Hand): veröffentlicht oder archiviert nur Titel und Beschreibung (sonst
+409 „erst zurückziehen“); jede andere Änderung setzt „geprüft“ auf „Entwurf“ zurück; bei Printful-Produkten Preise nur
+über „Preise übernehmen“ und Varianten nur über „Farben und Größen“ (400). Kein Verkaufspreis unter dem Mindestpreis -
+auch nicht 0 € (400); `place_order` nimmt ihn ebenfalls nicht.
+
+**Nacheinander:** Jeder Schritt des Aufbaus hält eine kurze MongoDB-Sperre je Produkt
+(`shop_catalog.product_lock`, `shop:product:<id>`, über alle Prozesse). Jede Admin-Änderung erhöht die `version` des
+Produkts.
+
 **Abgleich** (`shop_catalog_sync`): auf Knopfdruck („Mit Printful abgleichen“) und täglich um 05:20 Wiener Zeit
 (Scheduler-Job `shop_catalog_sync`, alle nicht archivierten Produkte mit Printful-Produkt, ohne Schlüssel nichts).
 
-- Nicht lieferbar (Printful meldet nicht „in stock“ oder kennt die Variante nicht mehr): Variante gesperrt
-  (`blocked_reason`), `place_order` nimmt sie nicht; wieder lieferbar hebt die Sperre auf.
+- **Fail-closed:** gesperrt (`blocked_reason`) wird, was Printful nicht als „in stock“ meldet, wofür Printful gar
+  nichts meldet („Lager bei Printful unbekannt.“), was nicht mehr im Katalog steht und wofür der Einkauf fehlt oder 0 €
+  ist („Preis fehlt bei Printful.“). Nur „in stock“ mit gültigem Preis hebt die Sperre auf. `place_order` prüft bei
+  Printful-Produkten die Sperre **und** `in_stock is True` der Zuordnung.
 - Preisänderung: neuer Einkauf an der Zuordnung plus `price_warning` (vorher/nachher, seit) - der Preis der Variante
   bleibt, bis die Finanzen übernehmen. Bestehende Bestellungen haben ihre Preise eingefroren.
 - Ausfall: nichts ändert sich; `catalog_sync` merkt Zeitpunkt, Ursache und `last_ok_at` - der Admin zeigt den letzten
   Stand mit Datum.
-- Rate-Limit: je angebotener Variante ein Preisaufruf; ein Client je Lauf bleibt unter 100 Aufrufen je Minute.
+- **Kein alter Stand:** Printful wird ohne Sperre gefragt; geschrieben wird danach unter der Produkt-Sperre und nur,
+  wenn die `version` des Produkts noch die gelesene ist. Sonst verwirft der Abgleich sein Ergebnis („Abgleich
+  übersprungen: das Produkt wurde gerade geändert“, `catalog_sync.skipped`).
+- **Einer zur Zeit:** Sperre `shop:catalog-sync` mit Ablauf (900 s, wird erneuert); ein zweiter Abgleich bekommt 409
+  „läuft gerade“, der Tagesjob überspringt. Je angebotener Variante ein Preisaufruf, gemeinsames Rate-Limit (oben).
+- **Alle Produkte:** der Tagesjob geht seitenweise (`PAGE_SIZE = 200`) über alle nicht archivierten Printful-Produkte.
 
 | Route (alle `require_area("finance")`) | Zweck |
 | --- | --- |
@@ -460,8 +478,11 @@ immer eine **Variante** (`catalog_variant_id`), nie ein Produkt.
 - Nur `https://api.printful.com`, keine Weiterleitungen (3xx ist ein Fehler), Zeitgrenze 15 s. Jede Methode baut ihren
   festen Weg; Nummern nur als Typ, `external_id` nur aus Buchstaben, Ziffern, `-` und `_`. Dateien und Druckflächen
   nur mit https-Adressen.
-- **Rate-Limit:** Printful erlaubt 120 Aufrufe je Minute und Store. Jeder Client bleibt mit Luft darunter
+- **Rate-Limit:** Printful erlaubt 120 Aufrufe je Minute und Store. Der Adapter bleibt mit Luft darunter
   (`RATE_BUDGET_PER_MINUTE = 100` in jedem gleitenden 60-Sekunden-Fenster) und wartet sonst, statt in 429 zu laufen.
+  Das Fenster gilt **prozessweit je Schlüssel** (alle Clients teilen es; jeder Aufruf reserviert seinen Platz, bevor er
+  wartet). Das Backend läuft mit einem Uvicorn-Worker (`docker-entrypoint.py`, `--workers 1`); mehrere Abgleiche
+  gleichzeitig verhindert zusätzlich eine MongoDB-Sperre (unten).
   `catalog_variants` braucht je Variante einen Preisaufruf; mit `price_for=(…)` holt es Preise nur für die angebotenen
   Varianten (`()` = keine) - ein Gildan 5000 hat Hunderte. Die Preisantwort liefert neben dem Preis je Technik den
   **Aufpreis je Druckfläche** (`placement_prices`, etwa Rückseite 5,25 €).
