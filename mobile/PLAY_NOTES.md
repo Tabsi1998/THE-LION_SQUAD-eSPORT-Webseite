@@ -15,11 +15,16 @@ Regeln:
 ## 1.7.9
 
 Neu in 1.7.9:
-• Wunschnummer unter „Meine Mitgliedschaft“
-• Einmal frei von 0 bis 99 wählen
-• Jede Nummer gibt es im Verein nur einmal
-• Freie Nummern direkt antippen
-• Später ändern per Antrag an den Vorstand
+• Wunschnummer unter „Meine Mitgliedschaft“ wählen
+• Rennligen: Runden mit Quali, Sprint und Rennen
+• Ergebnis je Runde, Zeiten und Punkte zählen hoch
+• Turnierserien wie TFT mit Turniertagen, ohne Ort und Flagge
+• Termine ohne Datum zeigen „Termin folgt“
+• Statistik der Saison, Sonderregeln wie Punktabzug
+• Original-Bilder im Vollbild – wischen und zoomen
+• Teamwertung zeigt Fahrer-Anpassungen
+• Fast-Lap-Zeiten mit Komma, wischbare Reiter
+• „Bewegung reduzieren“ wirkt sofort
 
 ## 1.7.8
 
