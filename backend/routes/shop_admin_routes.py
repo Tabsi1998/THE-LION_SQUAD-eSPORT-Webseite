@@ -20,7 +20,7 @@ from pydantic import BaseModel, Field, field_validator
 
 from auth import require_area
 from database import get_db
-from services import shop_catalog, shop_config, shop_orders, shop_printful_probe
+from services import printful_client, shop_catalog, shop_config, shop_orders
 from services.permissions import can_use_area, is_superadmin
 from services.shop_common import ShopConflict, ShopError
 
@@ -244,7 +244,7 @@ async def test_printful(me: dict = Depends(require_area("finance"))):
     key = await shop_config.printful_api_key(db)
     if not key:
         raise HTTPException(409, "Kein lesbarer Printful-Schlüssel hinterlegt.")
-    result = await shop_printful_probe.probe(key)
+    result = await printful_client.PrintfulClient(key).check_connection()
     await shop_config.record_test(db, result)
     return await _config_answer(me, result=result)
 
