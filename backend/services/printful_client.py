@@ -30,6 +30,7 @@ import hashlib
 import hmac
 import logging
 import re
+import secrets
 import time
 from collections import deque
 from datetime import datetime, timedelta, timezone
@@ -54,8 +55,10 @@ TIMEOUT_SECONDS = 15.0
 RETRY_PAUSES = (1.0, 3.0)
 # Längere Wartezeiten aus ``Retry-After`` gibt der Client als Fehler zurück, statt eine Anfrage zu blockieren.
 MAX_RETRY_AFTER = 30.0
-# Gemeinsames Fenster für alle Clients im Prozess, je Schlüssel (gekürzter Hash, nie der Schlüssel selbst).
+# Gemeinsames Fenster für alle Clients im Prozess, je Schlüssel. Das Fenster heißt nach einer zufälligen Kennung je
+# Schlüssel (nur im Speicher dieses Prozesses, nie geloggt) - kein Hash des Schlüssels.
 _RATE_WINDOWS: dict[str, deque] = {}
+_WINDOW_IDS: dict[str, str] = {}
 PAGE_LIMIT = 100
 MAX_PAGES = 20
 ESTIMATE_POLLS = 10
@@ -204,7 +207,7 @@ class PrintfulClient:
         # Ein Fenster je Schlüssel (= Store) für den ganzen Prozess: zwei Clients - etwa zwei gleichzeitige Abgleiche -
         # teilen sich die Aufrufe je Minute. Das Backend läuft mit einem Uvicorn-Worker (docker-entrypoint.py); dass nur
         # ein Abgleich zur Zeit läuft, sichert zusätzlich eine MongoDB-Sperre (services/shop_catalog_sync.py).
-        self._window_key = hashlib.sha256(api_key.encode("utf-8")).hexdigest()[:16]
+        self._window_key = _WINDOW_IDS.setdefault(api_key, secrets.token_hex(8))
 
     async def _throttle(self) -> None:
         """Höchstens ``RATE_BUDGET_PER_MINUTE`` Aufrufe je Schlüssel in jedem gleitenden Fenster von 60 Sekunden.
