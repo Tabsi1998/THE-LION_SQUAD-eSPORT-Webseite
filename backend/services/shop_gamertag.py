@@ -89,8 +89,8 @@ DEFAULT_RULES: dict[str, Any] = {
     "block_flagged": True,
     "colors": [
         {"key": "vereinsblau", "label": "Vereinsblau", "hex": "#29B6E8", "garment_colors": []},
-        {"key": "weiss", "label": "Weiß", "hex": "#FFFFFF", "garment_colors": []},
-        {"key": "schwarz", "label": "Schwarz", "hex": "#000000", "garment_colors": []},
+        {"key": "reinweiss", "label": "Weiß", "hex": "#FFFFFF", "garment_colors": []},
+        {"key": "tiefschwarz", "label": "Schwarz", "hex": "#000000", "garment_colors": []},
     ],
     "default_color": "vereinsblau",
 }

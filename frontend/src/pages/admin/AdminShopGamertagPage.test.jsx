@@ -23,7 +23,7 @@ const RULES = {
   align: "center", placement: "front_left", min_length: 2, max_length: 16, allowed_chars: " -._ÄÖÜßäöü", block_flagged: true,
   colors: [
     { key: "vereinsblau", label: "Vereinsblau", hex: "#29B6E8", garment_colors: [] },
-    { key: "weiss", label: "Weiß", hex: "#FFFFFF", garment_colors: ["Schwarz"] },
+    { key: "reinweiss", label: "Weiß", hex: "#FFFFFF", garment_colors: ["Schwarz"] },
   ],
   default_color: "vereinsblau",
 };
@@ -84,9 +84,9 @@ test("Live-Vorschau zeigt die Druckdatei auf dunklem und hellem Shirt mit Maßen
   expect(screen.getByTestId("shop-gamertag-shirt-dark").firstChild).toHaveClass("bg-black");
   expect(screen.getByTestId("shop-gamertag-shirt-light").firstChild).toHaveClass("bg-white");
 
-  await userEvent.click(screen.getByTestId("shop-gamertag-color-weiss"));
-  await waitFor(() => expect(apiMock.post).toHaveBeenLastCalledWith("/admin/shop/gamertag/preview", { text: "Testname", color: "weiss" }));
-  expect(screen.getByTestId("shop-gamertag-color-weiss")).toHaveAttribute("aria-checked", "true");
+  await userEvent.click(screen.getByTestId("shop-gamertag-color-reinweiss"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenLastCalledWith("/admin/shop/gamertag/preview", { text: "Testname", color: "reinweiss" }));
+  expect(screen.getByTestId("shop-gamertag-color-reinweiss")).toHaveAttribute("aria-checked", "true");
 });
 
 test("zeigt den Hinweis bei Verkleinerung und die Begründung bei Ablehnung", async () => {
@@ -140,7 +140,7 @@ test("Regeln speichern nur mit Grund - Zahlen aus dem Formular, Farben je Shirtf
   const [url, body] = apiMock.put.mock.calls[0];
   expect(url).toBe("/admin/shop/gamertag/rules");
   expect(body).toMatchObject({ max_length: 12, min_text_height_in: 0.45, dpi: 300, reason: "Obmann bestätigt" });
-  expect(body.colors[1]).toEqual({ key: "weiss", label: "Weiß", hex: "#FFFFFF", garment_colors: ["Schwarz"] });
+  expect(body.colors[1]).toEqual({ key: "reinweiss", label: "Weiß", hex: "#FFFFFF", garment_colors: ["Schwarz"] });
   expect(toastMock.success).toHaveBeenCalledWith("Regeln gespeichert.");
 });
 

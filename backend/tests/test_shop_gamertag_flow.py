@@ -89,7 +89,7 @@ async def test_the_preview_shows_the_print_file_with_measures_and_stores_nothing
     assert wide.status_code == 400 and "zu breit" in wide.json()["detail"]
     emoji = await flow.post(f"{BASE}/preview", json={"text": "Test\U0001F981"})
     assert emoji.status_code == 400 and "Emojis" in emoji.json()["detail"]
-    white = (await flow.post(f"{BASE}/preview", json={"text": "Testname", "color": "weiss"})).json()
+    white = (await flow.post(f"{BASE}/preview", json={"text": "Testname", "color": "reinweiss"})).json()
     assert white["sha256"] != body["sha256"] and white["meta"]["color_hex"] == "#FFFFFF"
 
     assert await flow.db.shop_gamertag_files.count_documents({}) == 0 and stored_files(flow) == []
@@ -224,7 +224,7 @@ async def test_rules_are_settings_with_reason_and_protocol(flow):
     bad = await flow.put(f"{BASE}/rules", json={"min_text_height_in": 0.9, "reason": "Unsinn"})
     assert bad.status_code == 400 and "Mindesthöhe" in bad.json()["detail"]
 
-    colors = [{"key": "weiss", "label": "Weiß", "hex": "#ffffff", "garment_colors": ["Schwarz"]},
+    colors = [{"key": "reinweiss", "label": "Weiß", "hex": "#ffffff", "garment_colors": ["Schwarz"]},
               {"key": "vereinsblau", "label": "Vereinsblau", "hex": "#29B6E8", "garment_colors": ["Schwarz", "Weiß"]}]
     saved = await flow.put(f"{BASE}/rules", json={"colors": colors, "reason": "Farben je Shirt"})
     assert saved.status_code == 200 and saved.json()["rules"]["colors"][0]["hex"] == "#FFFFFF"

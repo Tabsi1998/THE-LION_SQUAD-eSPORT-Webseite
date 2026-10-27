@@ -125,14 +125,14 @@ def test_rendering_is_deterministic_and_depends_on_text_colour_and_rules():
     first = shop_gamertag.render("Testname", RULES)
     again = shop_gamertag.render("  Testname ", RULES)
     assert first.sha256 == again.sha256 and first.payload == again.payload
-    assert shop_gamertag.render("Testname", RULES, color_key="weiss").sha256 != first.sha256
+    assert shop_gamertag.render("Testname", RULES, color_key="reinweiss").sha256 != first.sha256
     other = shop_gamertag.clean_rules({**RULES, "font": "outfit-800"})
     assert shop_gamertag.render("Testname", other).sha256 != first.sha256
     assert shop_gamertag.rules_hash(other) != shop_gamertag.rules_hash(RULES)
 
 
 def test_the_ink_has_the_chosen_colour_without_dark_fringes():
-    img = png(shop_gamertag.render("Testname", RULES, color_key="weiss"))
+    img = png(shop_gamertag.render("Testname", RULES, color_key="reinweiss"))
     colours = {img.getpixel((x, y))[:3] for x in range(img.width) for y in range(img.height)
                if img.getpixel((x, y))[3] > 0}
     assert colours == {(255, 255, 255)}
@@ -147,7 +147,7 @@ def test_rendering_needs_neither_network_nor_files_once_the_font_is_loaded(monke
     monkeypatch.setattr(builtins, "open", refuse)
     monkeypatch.setattr(socket.socket, "connect", refuse)
     monkeypatch.setattr(socket, "create_connection", refuse)
-    assert shop_gamertag.render("Testname", RULES, color_key="weiss").sha256
+    assert shop_gamertag.render("Testname", RULES, color_key="reinweiss").sha256
 
 
 def test_every_font_is_bundled_with_its_licence():
@@ -194,9 +194,9 @@ def test_default_rules_follow_the_test_shirt():
 
 def test_several_ink_colours_per_shirt_colour_in_their_order():
     rules = shop_gamertag.clean_rules({**RULES, "colors": [
-        {"key": "weiss", "label": "Weiß", "hex": "#FFFFFF", "garment_colors": ["Schwarz", "Navy"]},
+        {"key": "reinweiss", "label": "Weiß", "hex": "#FFFFFF", "garment_colors": ["Schwarz", "Navy"]},
         {"key": "vereinsblau", "label": "Vereinsblau", "hex": "#29B6E8", "garment_colors": ["schwarz", "Weiß"]},
     ]})
-    assert [c["key"] for c in shop_gamertag.inks_for_garment(rules, "SCHWARZ")] == ["weiss", "vereinsblau"]
+    assert [c["key"] for c in shop_gamertag.inks_for_garment(rules, "SCHWARZ")] == ["reinweiss", "vereinsblau"]
     assert [c["key"] for c in shop_gamertag.inks_for_garment(rules, "Weiß")] == ["vereinsblau"]
     assert [c["key"] for c in shop_gamertag.inks_for_garment(rules, "Rot")] == ["vereinsblau"]  # Vorgabefarbe
