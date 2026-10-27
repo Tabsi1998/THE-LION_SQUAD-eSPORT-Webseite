@@ -15,6 +15,11 @@ Ein Motiv ist ein Design aus #1708 (``shop_design_profiles`` mit seinen Fassunge
 - **Welche Fassung zu einer Shirtfarbe gehört**, entscheidet ``variant_for_garment`` nach der Helligkeit des Farbwerts
   (relative Luminanz, Schwelle einstellbar); eine Ausnahme je Farbe und Motiv (``color_variants``) geht vor.
 
+- **Als Paar** (#2084): beide Fassungen in einem Schritt (``upload_pair``) mit Paar-Prüfung (``pair_check``: Format
+  und Seitenverhältnis, Umrisse, Kontrast - Ampel mit Klartext, Schwellen einstellbar) und automatischer Zuordnung
+  (``assign_pair``). Gespeichert werden beide oder keine. Wird danach nur eine Fassung ersetzt, meldet ``pair_state``
+  das Paar als veraltet.
+
 Für den Druckdatei-Generator (#2069 Teil B): ``render_motif_png`` rastert ein Motiv in genau der verlangten Breite.
 Migration 14 (``shop_motif_variants``) mit Trockenlauf und Rückweg: ``backend/scripts/shop_motifs.py``.
 Beschreibung: ``docs/SHOP.md``, Abschnitt „Motive (#2069)“.
@@ -22,6 +27,7 @@ Beschreibung: ``docs/SHOP.md``, Abschnitt „Motive (#2069)“.
 from __future__ import annotations
 
 import asyncio
+import base64
 import io
 import logging
 import math
@@ -29,11 +35,11 @@ import re
 from pathlib import Path
 from typing import Any
 
-from PIL import Image, ImageChops
+from PIL import Image, ImageChops, ImageFilter, ImageStat
 
 from models import now_utc
 from services import shop_catalog, shop_designs, svg_safe
-from services.shop_common import ShopError, clean_reason, record_admin_action
+from services.shop_common import ShopConflict, ShopError, clean_reason, record_admin_action
 
 logger = logging.getLogger("tls-arena.shop-motifs")
 
@@ -108,33 +114,58 @@ def _valid_ink(value: Any) -> str | None:
     return value.lower() if isinstance(value, str) and HEX6.match(value.strip()) and value == value.strip() else None
 
 
-def _valid_threshold(value: Any) -> float | None:
+def _valid_number(value: Any, low: float, high: float) -> float | None:
     if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
         return None
-    return round(float(value), 3) if MIN_THRESHOLD <= value <= MAX_THRESHOLD else None
+    return round(float(value), 3) if low <= value <= high else None
+
+
+def _valid_threshold(value: Any) -> float | None:
+    return _valid_number(value, MIN_THRESHOLD, MAX_THRESHOLD)
+
+
+# Paar-Prüfung (#2084): Vorgabe, kleinster und größter Wert. Seitenverhältnis: erlaubte Abweichung (0,02 = 2 %);
+# Überdeckung: Anteil der gemeinsamen sichtbaren Fläche (IoU), darunter Gelb; Kontrast: Anteil sehr heller bzw. sehr
+# dunkler Fläche, darüber Gelb.
+PAIR_SETTINGS = {
+    "pair_aspect_tolerance": (0.02, 0.005, 0.2, "Erlaubte Abweichung des Seitenverhältnisses"),
+    "pair_min_overlap": (0.9, 0.5, 0.99, "Mindest-Überdeckung der Umrisse"),
+    "pair_contrast_share": (0.03, 0.001, 0.5, "Höchstanteil sehr heller bzw. sehr dunkler Fläche"),
+}
+SETTING_NAMES = ("light_ink", "threshold", *PAIR_SETTINGS)
 
 
 async def load_settings(db) -> dict:
-    """Ersatzfarbe für helle Shirts und Helligkeits-Schwelle - gespeichert oder Vorgabe."""
+    """Ersatzfarbe für helle Shirts, Helligkeits-Schwelle und die Schwellen der Paar-Prüfung - gespeichert oder
+    Vorgabe."""
     doc = await db.settings.find_one({"id": SETTINGS_ID}, {"_id": 0}) or {}
     ink = _valid_ink(doc.get("light_ink")) or DEFAULT_LIGHT_INK
     threshold = _valid_threshold(doc.get("threshold"))
     threshold = DEFAULT_THRESHOLD if threshold is None else threshold
-    return {"light_ink": ink, "threshold": threshold, "replaced_color": REPLACED_COLOR,
-            "is_default": ink == DEFAULT_LIGHT_INK and threshold == DEFAULT_THRESHOLD,
-            "defaults": {"light_ink": DEFAULT_LIGHT_INK, "threshold": DEFAULT_THRESHOLD},
-            "limits": {"min_threshold": MIN_THRESHOLD, "max_threshold": MAX_THRESHOLD}}
+    pair = {}
+    for name, (default, low, high, _label) in PAIR_SETTINGS.items():
+        value = _valid_number(doc.get(name), low, high)
+        pair[name] = default if value is None else value
+    defaults = {"light_ink": DEFAULT_LIGHT_INK, "threshold": DEFAULT_THRESHOLD,
+                **{name: spec[0] for name, spec in PAIR_SETTINGS.items()}}
+    limits = {"min_threshold": MIN_THRESHOLD, "max_threshold": MAX_THRESHOLD,
+              **{f"{name}_min": spec[1] for name, spec in PAIR_SETTINGS.items()},
+              **{f"{name}_max": spec[2] for name, spec in PAIR_SETTINGS.items()}}
+    values = {"light_ink": ink, "threshold": threshold, **pair}
+    return {**values, "replaced_color": REPLACED_COLOR,
+            "is_default": all(values[name] == defaults[name] for name in SETTING_NAMES),
+            "defaults": defaults, "limits": limits}
 
 
 async def set_settings(db, fields: dict, *, actor_id: str, reason: Any) -> tuple[dict, list[str]]:
-    """Ersatzfarbe bzw. Schwelle ändern - mit vorher/nachher im Protokoll. Eine neue Ersatzfarbe erzeugt die
-    automatischen Fassungen neu (neue Versionen; Bestellungen behalten ihre)."""
-    unknown = sorted(set(fields) - {"light_ink", "threshold"})
+    """Ersatzfarbe, Schwelle bzw. Schwellen der Paar-Prüfung ändern - mit vorher/nachher im Protokoll. Eine neue
+    Ersatzfarbe erzeugt die automatischen Fassungen neu (neue Versionen; Bestellungen behalten ihre)."""
+    unknown = sorted(set(fields) - set(SETTING_NAMES))
     if unknown:
         raise ShopError(f"Unbekannte Felder: {', '.join(unknown)}.")
     reason = clean_reason(reason)
     current = await load_settings(db)
-    after = {"light_ink": current["light_ink"], "threshold": current["threshold"]}
+    after = {name: current[name] for name in SETTING_NAMES}
     if "light_ink" in fields:
         ink = _valid_ink(fields["light_ink"])
         if ink is None:
@@ -147,7 +178,13 @@ async def set_settings(db, fields: dict, *, actor_id: str, reason: Any) -> tuple
         if threshold is None:
             raise ShopError(f"Schwelle: Zahl von {MIN_THRESHOLD} bis {MAX_THRESHOLD}.")
         after["threshold"] = threshold
-    changed = [name for name in ("light_ink", "threshold") if after[name] != current[name]]
+    for name, (_default, low, high, label) in PAIR_SETTINGS.items():
+        if name in fields:
+            value = _valid_number(fields[name], low, high)
+            if value is None:
+                raise ShopError(f"{label}: Zahl von {low} bis {high}.")
+            after[name] = value
+    changed = [name for name in SETTING_NAMES if after[name] != current[name]]
     if not changed:
         return current, []
     await db.settings.update_one(
@@ -448,35 +485,19 @@ async def upload(db, *, design_key: Any, data: bytes, filename: str, content_typ
             raise ShopError("Neues Design: bitte die Platzierung wählen.")
         shop_designs._line(title, "Titel", 120, required=True)
         await shop_designs._check_colors_free(db, key, placement, shop_designs.clean_colors(garment_colors))
-    if len(data) > shop_designs.MAX_BYTES:
-        raise ShopError(f"Datei zu groß (höchstens {shop_designs.MAX_UPLOAD_MB} MB).")
-    if not data:
-        raise ShopError("Die Datei ist leer.")
-
     spec = (await shop_designs.placement_specs(db))[placement]
-    extra: dict[str, Any] = {}
-    svg_bytes = None
-    if shop_designs.looks_like_svg(Path(filename or "").suffix.lower(), content_type or "", data[:8192]):
-        image, svg_bytes, info = await prepare_svg(data, spec)
-        source_format = "SVG"
-        extra = {"colors": [item["hex"] for item in info["colors"]][:24], "view_box": info["view_box"]}
-    else:
-        image, source_format = shop_designs.prepare(data, filename, content_type)
+    prepared = await prepare_file(data, filename, content_type, spec)
+    rows_before = await _rows(db, key) if profile else []
 
     async def create() -> None:
         await shop_designs.create_profile(db, key, title=title, placement=placement, garment_colors=garment_colors,
                                           actor_id=actor_id, reason=reason)
 
     design, fit = await shop_designs.save_version(
-        db, key, image=image, spec=spec, placement=placement, source_format=source_format, variant=variant,
-        origin="upload", actor_id=actor_id, reason=reason, svg_bytes=svg_bytes, extra=extra,
-        before_insert=None if profile else create)
-    warnings = []
-    if not design["has_alpha"]:
-        warnings.append("Kein durchsichtiger Hintergrund: die Fläche um das Motiv wird mitgedruckt."
-                        + (" JPG kann keine Transparenz - für Logos besser PNG." if source_format == "JPG" else ""))
-    if fit["level"] == "snug":
-        warnings.append(fit["text"])
+        db, key, image=prepared["image"], spec=spec, placement=placement, source_format=prepared["source_format"],
+        variant=variant, origin="upload", actor_id=actor_id, reason=reason, svg_bytes=prepared["svg_bytes"],
+        extra=prepared["extra"], before_insert=None if profile else create)
+    warnings = _file_warnings(design, fit, prepared["source_format"])
     if variant == "light":
         await set_light_mode(db, key, "file", actor_id=actor_id, reason=reason)
         light = light_state(await shop_designs.get_profile(db, key), await _rows(db, key), await load_settings(db))
@@ -487,21 +508,410 @@ async def upload(db, *, design_key: Any, data: bytes, filename: str, content_typ
             light = {"state": "pending", "version": None, "hint": str(exc)}
         if light["state"] in ("missing", "pending"):
             warnings.append(light["hint"])
-    return {**design, "warnings": warnings, "light": light}
+    if profile:
+        await _note_single_upload(db, key, variant, rows_before)
+    pair = pair_state(await shop_designs.get_profile(db, key), await _rows(db, key))
+    if pair["stale"]:
+        warnings.append(pair["hint"])
+    return {**design, "warnings": warnings, "light": light, "pair": pair}
+
+
+def _file_warnings(design: dict, fit: dict, source_format: str) -> list[str]:
+    warnings = []
+    if not design["has_alpha"]:
+        warnings.append("Kein durchsichtiger Hintergrund: die Fläche um das Motiv wird mitgedruckt."
+                        + (" JPG kann keine Transparenz - für Logos besser PNG." if source_format == "JPG" else ""))
+    if fit["level"] == "snug":
+        warnings.append(fit["text"])
+    return warnings
+
+
+async def prepare_file(data: bytes, filename: str, content_type: str, spec: dict) -> dict:
+    """Eine hochgeladene Datei prüfen und für die Druckdatei vorbereiten - SVG streng bereinigt und gerastert, PNG/JPG
+    neu kodiert. Schreibt nichts. Liefert Bild, bereinigtes SVG (oder ``None``), Format, Seitenverhältnis (bei SVG aus
+    der viewBox) und die Zusatzfelder der Version."""
+    if len(data) > shop_designs.MAX_BYTES:
+        raise ShopError(f"Datei zu groß (höchstens {shop_designs.MAX_UPLOAD_MB} MB).")
+    if not data:
+        raise ShopError("Die Datei ist leer.")
+    if shop_designs.looks_like_svg(Path(filename or "").suffix.lower(), content_type or "", data[:8192]):
+        image, svg_bytes, info = await prepare_svg(data, spec)
+        return {"image": image, "svg_bytes": svg_bytes, "source_format": "SVG", "is_vector": True,
+                "aspect": float(info["aspect_ratio"]), "name": filename,
+                "extra": {"colors": [item["hex"] for item in info["colors"]][:24], "view_box": info["view_box"]}}
+    image, source_format = shop_designs.prepare(data, filename, content_type)
+    return {"image": image, "svg_bytes": None, "source_format": source_format, "is_vector": False,
+            "aspect": image.width / image.height, "name": filename, "extra": {}}
+
+
+# ---------------------------------------------------------------- Paar: hell + dunkel in einem Schritt (#2084)
+
+PAIR_SIDE = 512          # die Prüfung rastert beide Fassungen gleich groß: 512 px an der längeren Seite
+PALE_LUMA = 225          # ab hier (Luma 0-255) ist eine Fläche „sehr hell“ - verschwindet auf hellen Shirts
+DEEP_LUMA = 40           # bis hier „sehr dunkel“ - verschwindet auf dunklen Shirts
+SWAP_MARGIN = 6          # so viel heller (Luma) muss die andere Datei sein, damit die Zuordnung tauscht
+MARK_COLOR = (255, 0, 170, 255)  # Markierung in der Vorschau: grelles Magenta, auf beiden Shirts sichtbar
+SIDE_LABELS = {"dark": "Datei für dunkle Shirts", "light": "Datei für helle Shirts"}
+
+
+class PairRefused(ShopError):
+    """Paar abgelehnt (Rot) bzw. mit Warnungen ohne Bestätigung (Gelb, 409) - mit dem Prüfbericht."""
+
+    def __init__(self, message: str, report: dict, status: int):
+        super().__init__(message)
+        self.status = status
+        self.report = report
+
+
+def _de(value: float, digits: int = 2) -> str:
+    return f"{value:.{digits}f}".replace(".", ",")
+
+
+def _percent(share: float) -> str:
+    return f"{share * 100:.0f} %" if share >= 0.01 or share == 0 else "unter 1 %"
+
+
+def _small(image: Image.Image, size: tuple[int, int]) -> Image.Image:
+    rgba = image.convert("RGBA")
+    return rgba if rgba.size == size else rgba.resize(size, Image.Resampling.BOX)
+
+
+def _visible(image: Image.Image) -> Image.Image:
+    return image.getchannel("A").point(lambda a: 255 if a >= 128 else 0)
+
+
+def _count(mask: Image.Image) -> int:
+    return mask.histogram()[255]
+
+
+def _luma_mask(image: Image.Image, visible: Image.Image, *, pale: bool) -> Image.Image:
+    luma = image.convert("RGB").convert("L")
+    band = luma.point(lambda v: 255 if v >= PALE_LUMA else 0) if pale else luma.point(
+        lambda v: 255 if v <= DEEP_LUMA else 0)
+    return ImageChops.multiply(band, visible)
+
+
+def _mean_luma(image: Image.Image) -> float:
+    visible = _visible(image)
+    if not _count(visible):
+        return 0.0
+    return ImageStat.Stat(image.convert("RGB").convert("L"), visible).mean[0]
+
+
+def _data_url(image: Image.Image) -> str:
+    return "data:image/png;base64," + base64.b64encode(svg_safe.png_bytes(image)).decode("ascii")
+
+
+def _mark(mask: Image.Image) -> str:
+    """Die markierten Stellen als durchsichtiges PNG - etwas verbreitert, damit auch dünne Linien sichtbar sind."""
+    wide = mask.filter(ImageFilter.MaxFilter(5))
+    overlay = Image.new("RGBA", mask.size, (0, 0, 0, 0))
+    overlay.paste(Image.new("RGBA", mask.size, MARK_COLOR), (0, 0), wide)
+    return _data_url(overlay)
+
+
+def _pair_size(aspect: float) -> tuple[int, int]:
+    if aspect >= 1:
+        return PAIR_SIDE, max(1, round(PAIR_SIDE / aspect))
+    return max(1, round(PAIR_SIDE * aspect)), PAIR_SIDE
+
+
+def assign_pair(first: dict, second: dict) -> tuple[dict, dict, bool]:
+    """Welche Datei für dunkle Shirts ist: die mit mehr heller bzw. weißer Fläche. ``(dunkel, hell, getauscht)`` -
+    getauscht heißt, ``second`` war heller und gilt nun für dunkle Shirts."""
+    size = _pair_size(first["aspect"])
+    a, b = _mean_luma(_small(first["image"], size)), _mean_luma(_small(second["image"], size))
+    return (second, first, True) if b > a + SWAP_MARGIN else (first, second, False)
+
+
+def pair_check(dark: dict, light: dict, settings: dict | None = None) -> dict:
+    """Passen die beiden Fassungen zusammen? Ampel mit Klartext je Prüfung:
+
+    - **Format** (Rot): beide SVG (am besten) oder beide Pixelbild; Seitenverhältnis (bei SVG aus der viewBox) weicht
+      um mehr als ``pair_aspect_tolerance`` ab; eine Datei reicht nicht für den Druckbereich.
+    - **Umrisse** (Gelb): beide gleich groß gerastert, sichtbare Flächen verglichen (IoU) - unter
+      ``pair_min_overlap``.
+    - **Kontrast** (Gelb): sehr Helles in der Hell-Fassung bzw. sehr Dunkles in der Dunkel-Fassung über
+      ``pair_contrast_share`` der Fläche - die Stellen kommen als Markierung (PNG) für die Vorschau mit.
+
+    ``dark``/``light`` sind vorbereitete Dateien aus ``prepare_file`` (dazu optional ``fit``). Schreibt nichts."""
+    settings = settings or {name: spec[0] for name, spec in PAIR_SETTINGS.items()}
+    tolerance, min_overlap = settings["pair_aspect_tolerance"], settings["pair_min_overlap"]
+    max_share = settings["pair_contrast_share"]
+    checks: list[dict] = []
+
+    if dark["is_vector"] != light["is_vector"]:
+        checks.append({"key": "format", "level": "red",
+                       "text": "Beide Dateien bitte im selben Format: zwei SVGs (am besten) oder zwei PNG."})
+    for side, item in (("dark", dark), ("light", light)):
+        fit = item.get("fit")
+        if fit and fit["problems"]:
+            checks.append({"key": f"fit_{side}", "level": "red", "text": f"{SIDE_LABELS[side]}: {fit['text']}"})
+
+    a_dark, a_light = dark["aspect"], light["aspect"]
+    deviation = max(a_dark, a_light) / min(a_dark, a_light) - 1
+    aspect_ok = deviation <= tolerance + 1e-9
+    checks.append({"key": "aspect", "level": "green" if aspect_ok else "red", "dark": round(a_dark, 4),
+                   "light": round(a_light, 4), "deviation": round(deviation, 4),
+                   "text": (f"Gleiches Format (Seitenverhältnis {_de(a_dark)})." if aspect_ok else
+                            f"Die beiden Dateien haben unterschiedliche Formate: {_de(a_dark)} zu {_de(a_light)} – "
+                            "bitte gleiche Zeichenfläche verwenden.")})
+
+    size = _pair_size(a_dark)
+    small_dark, small_light = _small(dark["image"], size), _small(light["image"], size)
+    seen_dark, seen_light = _visible(small_dark), _visible(small_light)
+    if aspect_ok:
+        union = _count(ImageChops.lighter(seen_dark, seen_light))
+        overlap = _count(ImageChops.darker(seen_dark, seen_light)) / union if union else 1.0
+        good = overlap >= min_overlap
+        checks.append({"key": "overlap", "level": "green" if good else "yellow", "value": round(overlap, 4),
+                       "text": (f"Die Umrisse passen (Überdeckung {_percent(overlap)})." if good else
+                                f"Die Umrisse decken sich nur zu {_percent(overlap)} – sind das wirklich zwei "
+                                "Fassungen desselben Logos?")})
+
+    marks: dict[str, str | None] = {"dark": None, "light": None}
+    for side, small, seen, pale in (("light", small_light, seen_light, True), ("dark", small_dark, seen_dark, False)):
+        flagged = _luma_mask(small, seen, pale=pale)
+        hits, total = _count(flagged), _count(seen)
+        share = hits / total if total else 0.0
+        if hits:
+            marks[side] = _mark(flagged)
+        good = share <= max_share
+        if pale:
+            text = ("Kontrast auf hellen Shirts ok." if good else
+                    f"Die Fassung für helle Shirts enthält Weiß bzw. sehr Helles ({_percent(share)} der Fläche) – das "
+                    "verschwindet auf hellen Shirts. Die Stellen sind in der Vorschau markiert.")
+        else:
+            text = ("Kontrast auf dunklen Shirts ok." if good else
+                    f"Die Fassung für dunkle Shirts enthält Schwarz bzw. sehr Dunkles ({_percent(share)} der Fläche) – "
+                    "das verschwindet auf dunklen Shirts. Die Stellen sind in der Vorschau markiert.")
+        checks.append({"key": f"contrast_{side}", "level": "green" if good else "yellow", "share": round(share, 4),
+                       "text": text})
+
+    levels = {item["level"] for item in checks}
+    level = "red" if "red" in levels else "yellow" if "yellow" in levels else "green"
+    # Wirken die Dateien vertauscht? Die Hell-Fassung ist deutlich heller als die Dunkel-Fassung.
+    suggest_swap = _mean_luma(small_light) > _mean_luma(small_dark) + SWAP_MARGIN
+    files = {side: {"name": item.get("name") or "", "format": item["source_format"], "is_vector": item["is_vector"],
+                    "aspect": round(item["aspect"], 4), "width_px": item["image"].width,
+                    "height_px": item["image"].height}
+             for side, item in (("dark", dark), ("light", light))}
+    return {"level": level, "checks": checks, "suggest_swap": suggest_swap, "files": files,
+            "previews": {"dark": _data_url(small_dark), "light": _data_url(small_light)}, "marks": marks,
+            "thresholds": {name: settings[name] for name in PAIR_SETTINGS}}
+
+
+def _summary(report: dict) -> str:
+    """Der erste rote bzw. gelbe Befund als Meldung."""
+    for wanted in ("red", "yellow"):
+        texts = [item["text"] for item in report["checks"] if item["level"] == wanted]
+        if texts:
+            return " ".join(texts)
+    return "Das Paar passt."
+
+
+def _without_images(report: dict) -> dict:
+    return {key: value for key, value in report.items() if key not in ("previews", "marks")}
+
+
+async def _pair_target(db, design_key: Any, placement: str | None, *, title: Any = None, garment_colors: Any = None,
+                       saving: bool = False) -> tuple[str, dict | None, str]:
+    key = shop_designs._design_key(design_key)
+    profile = await shop_designs.get_profile(db, key)
+    if profile:
+        if placement and placement != profile["placement"]:
+            raise ShopError(f"Dieses Design gehört zu „{shop_designs.PLACEMENT_LABELS[profile['placement']]}“. Für "
+                            "eine andere Platzierung bitte ein eigenes Design anlegen.")
+        return key, profile, profile["placement"]
+    if placement not in shop_catalog.PLACEMENTS:
+        raise ShopError("Neues Design: bitte die Platzierung wählen.")
+    if saving:
+        shop_designs._line(title, "Titel", 120, required=True)
+        await shop_designs._check_colors_free(db, key, placement, shop_designs.clean_colors(garment_colors))
+    return key, None, placement
+
+
+async def _prepare_pair(db, placement: str, dark_file: tuple, light_file: tuple, auto_assign: bool) -> tuple:
+    spec = (await shop_designs.placement_specs(db))[placement]
+    prepared = []
+    for side, (data, filename, content_type) in (("dark", dark_file), ("light", light_file)):
+        try:
+            item = await prepare_file(data, filename, content_type, spec)
+        except ShopError as exc:
+            exc.args = (f"{SIDE_LABELS[side]} ({filename or 'ohne Namen'}): {exc}",)
+            raise
+        item["fit"] = shop_designs.check_fit(item["image"].width, item["image"].height, spec)
+        prepared.append(item)
+    dark, light = prepared
+    swapped = False
+    if auto_assign:
+        dark, light, swapped = assign_pair(dark, light)
+    return spec, dark, light, swapped
+
+
+async def check_pair(db, *, dark_file: tuple, light_file: tuple, design_key: Any = None, placement: str | None = None,
+                     auto_assign: bool = False) -> dict:
+    """Nur prüfen (Vorschau vor dem Speichern): Ampel, Klartext, Vorschau beider Fassungen und Markierungen. Die
+    Platzierung kommt vom bestehenden Motiv bzw. aus dem Formular - sie bestimmt die Druckbreite. Schreibt nichts."""
+    if design_key:
+        _key, _profile, placement = await _pair_target(db, design_key, placement)
+    elif placement not in shop_catalog.PLACEMENTS:
+        raise ShopError("Bitte die Platzierung wählen.")
+    _spec, dark, light, swapped = await _prepare_pair(db, placement, dark_file, light_file, auto_assign)
+    report = pair_check(dark, light, await load_settings(db))
+    return {**report, "swapped": swapped, "summary": _summary(report)}
+
+
+async def _remove_version(db, design: dict) -> None:
+    """Rückweg, wenn die zweite Datei eines Paars scheitert: die eben angelegte Version samt Dateien entfernen."""
+    await db.shop_designs.delete_one({"id": design["id"]})
+    for path in (shop_designs._path_of(design.get("file_ref")), shop_designs.svg_path_of(design.get("svg_ref"))):
+        if path is not None:
+            path.unlink(missing_ok=True)
+
+
+async def _remove_profile(db, key: str, placement: str) -> None:
+    await db.shop_design_profiles.delete_one({"design_key": key})
+    await db.shop_design_colors.delete_many({"placement": placement, "design_key": key})
+
+
+async def upload_pair(db, *, design_key: Any, dark_file: tuple, light_file: tuple, actor_id: str, reason: Any,
+                      title: Any = None, placement: str | None = None, garment_colors: Any = None,
+                      auto_assign: bool = False, confirm_warnings: bool = False) -> dict:
+    """Beide Fassungen eines Motivs in einem Schritt (#2084): prüfen, Paar-Prüfung, dann **beide oder keine**.
+
+    - Rot (Format, Seitenverhältnis, Druckbereich): nichts wird gespeichert (``PairRefused``, 400).
+    - Gelb (Umrisse, Kontrast): gespeichert nur mit ``confirm_warnings`` - sonst ``PairRefused`` mit 409 und dem
+      Prüfbericht, damit die Oberfläche nachfragen kann.
+    - Gespeichert wird die Hauptdatei (für dunkle Shirts) als neue Version, danach die eigene Datei für helle Shirts;
+      ``light_mode`` wird „file“. Scheitert die zweite, verschwindet die erste wieder (samt neuem Motiv). Ist eine
+      Datei schon die aktuelle ihrer Fassung, bleibt deren Version - nur beide gleich ist ein 409.
+    ``dark_file``/``light_file`` sind ``(bytes, dateiname, content_type)``."""
+    reason = clean_reason(reason)
+    key, profile, placement = await _pair_target(db, design_key, placement, title=title,
+                                                 garment_colors=garment_colors, saving=True)
+    spec, dark, light, swapped = await _prepare_pair(db, placement, dark_file, light_file, auto_assign)
+    settings = await load_settings(db)
+    report = {**pair_check(dark, light, settings), "swapped": swapped}
+    report["summary"] = _summary(report)
+    if report["level"] == "red":
+        raise PairRefused(report["summary"], report, 400)
+    if report["level"] == "yellow" and not confirm_warnings:
+        raise PairRefused("Bitte bestätigen: " + report["summary"], report, 409)
+
+    created = []
+
+    async def create() -> None:
+        await shop_designs.create_profile(db, key, title=title, placement=placement, garment_colors=garment_colors,
+                                          actor_id=actor_id, reason=reason)
+        created.append(key)
+
+    saved_dark: dict | None = None
+    try:
+        saved_dark, fit_dark = await shop_designs.save_version(
+            db, key, image=dark["image"], spec=spec, placement=placement, source_format=dark["source_format"],
+            variant="dark", origin="upload", actor_id=actor_id, reason=reason, svg_bytes=dark["svg_bytes"],
+            extra=dark["extra"], before_insert=None if profile else create, reuse_same=True)
+        saved_light, fit_light = await shop_designs.save_version(
+            db, key, image=light["image"], spec=spec, placement=placement, source_format=light["source_format"],
+            variant="light", origin="upload", actor_id=actor_id, reason=reason, svg_bytes=light["svg_bytes"],
+            extra={**light["extra"], "pair_of": saved_dark["version"]}, reuse_same=True)
+        if saved_dark.get("reused") and saved_light.get("reused"):
+            raise ShopConflict(f"Beide Dateien sind schon die aktuellen Fassungen (v{saved_dark['version']} und "
+                               f"v{saved_light['version']}) - keine neuen Versionen nötig.")
+    except BaseException:
+        if saved_dark is not None and not saved_dark.get("reused"):
+            await _remove_version(db, saved_dark)
+        if created:  # nur das Motiv, das dieser Aufruf angelegt hat
+            await _remove_profile(db, key, placement)
+        logger.warning("[shop-motifs] Paar für %s nicht gespeichert - nichts zurückgelassen", key)
+        raise
+    await set_light_mode(db, key, "file", actor_id=actor_id, reason=reason)
+    pair = {"dark": saved_dark["version"], "light": saved_light["version"], "at": now_utc().isoformat()}
+    await db.shop_design_profiles.update_one({"design_key": key}, {"$set": {"light_pair": pair}})
+    await record_admin_action(db, "shop.design.pair", actor_id=actor_id, target_id=key, reason=reason, data={
+        "dark_version": pair["dark"], "light_version": pair["light"], "level": report["level"], "swapped": swapped,
+        "confirmed_warnings": report["level"] == "yellow",
+        "kept": [side for side, item in (("dark", saved_dark), ("light", saved_light)) if item.get("reused")],
+        "checks": {item["key"]: item["level"] for item in report["checks"]}})
+    warnings = _file_warnings(saved_dark, fit_dark, dark["source_format"])
+    warnings += [f"{SIDE_LABELS['light']}: {text}"
+                 for text in _file_warnings(saved_light, fit_light, light["source_format"])]
+    warnings += [item["text"] for item in report["checks"] if item["level"] == "yellow"]
+    return {"dark": saved_dark, "light": saved_light, "pair": _without_images(report), "warnings": warnings}
+
+
+# ---------------------------------------------------------------- Paar veraltet? (#2084)
+
+def pair_versions(rows: list[dict]) -> dict:
+    """Die geltende Hauptdatei und die neueste eigene Datei für helle Shirts (``rows`` neueste zuerst)."""
+    dark = next((row for row in rows if row.get("variant") != "light"), None)
+    own = next((row for row in rows if row.get("variant") == "light" and row.get("origin") == "upload"), None)
+    return {"dark": dark["version"] if dark else None, "light": own["version"] if own else None}
+
+
+def pair_state(profile: dict | None, rows: list[dict]) -> dict:
+    """Gehören Hauptdatei und eigene Datei für helle Shirts noch zusammen? ``light_pair`` am Motiv merkt sich das
+    letzte zusammengehörige Paar. Wurde danach nur eine Fassung ersetzt, ist das Paar veraltet: ``stale`` mit beiden
+    Versionen und ``outdated`` (die Fassung, die noch die alte ist)."""
+    profile = profile or {}
+    current = pair_versions(rows)
+    out = {"stale": False, "dark_version": current["dark"], "light_version": current["light"], "outdated": None,
+           "hint": None}
+    pair = profile.get("light_pair") or {}
+    if profile.get("light_mode") != "file" or not pair or None in current.values():
+        return out
+    if current["dark"] != pair.get("dark") and current["light"] == pair.get("light"):
+        outdated = "light"
+    elif current["light"] != pair.get("light") and current["dark"] == pair.get("dark"):
+        outdated = "dark"
+    else:
+        return out
+    replaced = "dark" if outdated == "light" else "light"
+    return {**out, "stale": True, "outdated": outdated,
+            "hint": (f"Die {SIDE_LABELS[replaced]} ist neu (Version {current[replaced]}), die andere Fassung ist noch "
+                     f"Version {current[outdated]} – auch ersetzen?")}
+
+
+async def _note_single_upload(db, key: str, variant: str, rows_before: list[dict]) -> None:
+    """Nach einer einzelnen Datei: Paar merken bzw. offen lassen. Ist die andere Fassung seit dem letzten Paar
+    unverändert, bleibt das Paar stehen - es gilt dann als veraltet. Wurde die andere schon vorher allein ersetzt,
+    sind jetzt beide neu: das ist das neue Paar. Ein Motiv ohne gemerktes Paar (vor #2084 oder zwei Einzelschritte)
+    bekommt eins, sobald beide Fassungen da sind."""
+    profile = await shop_designs.get_profile(db, key) or {}
+    if profile.get("light_mode") != "file":
+        return
+    before, after = pair_versions(rows_before), pair_versions(await _rows(db, key))
+    if None in after.values():
+        return
+    stored = profile.get("light_pair") or {}
+    if not stored:
+        known = before if None not in before.values() else after
+    else:
+        other = "light" if variant == "dark" else "dark"
+        known = after if stored.get(other) != after[other] else stored
+    pair = {"dark": known["dark"], "light": known["light"]}
+    if pair != {name: stored.get(name) for name in ("dark", "light")}:
+        await db.shop_design_profiles.update_one({"design_key": key},
+                                                 {"$set": {"light_pair": {**pair, "at": now_utc().isoformat()}}})
 
 
 async def admin_view(db) -> dict:
     """Die Ansicht aus ``shop_designs.admin_view``, ergänzt um den Zustand für helle Shirts je Motiv (mit der Fassung,
-    die gilt) und die Einstellungen."""
+    die gilt), den Paar-Zustand (``pair_stale`` mit beiden Versionen, #2084) und die Einstellungen."""
     view = await shop_designs.admin_view(db)
     settings = await load_settings(db)
     profiles = {profile["design_key"]: profile
                 async for profile in db.shop_design_profiles.find({}, {"_id": 0, "design_key": 1, "light_mode": 1,
-                                                                        "light_auto": 1})}
+                                                                        "light_auto": 1, "light_pair": 1})}
     for design in view["designs"]:
-        light = light_state(profiles.get(design["design_key"]), design["versions"], settings)
+        profile = profiles.get(design["design_key"])
+        light = light_state(profile, design["versions"], settings)
         light["latest"] = next((item for item in design["versions"] if item["version"] == light["version"]), None)
         design["light"] = light
+        pair = pair_state(profile, design["versions"])
+        design["pair"] = pair
+        design["pair_stale"] = pair["stale"]
     return {**view, "motif_settings": settings}
 
 

@@ -245,7 +245,10 @@ async def request_validation_error(_request: Request, exc: RequestValidationErro
 # Logos als SVG (#1952): ein SVG nur in Logo-Feldern, die PNG-Fassung eines SVG-Logos bleibt beim Speichern das SVG.
 app.add_middleware(svg_logo.SvgFieldGate)
 # Druckdateien (#1708): das Limit greift am Eingang, bevor FastAPI das Formular in eine Zwischendatei liest.
-app.add_middleware(BodySizeLimit, limits={"/api/admin/shop/designs/upload": shop_designs.upload_body_limit})
+# Motiv als Paar (#2084): zwei Dateien je Anfrage, je Datei dieselbe Grenze.
+app.add_middleware(BodySizeLimit, limits={"/api/admin/shop/designs/upload": shop_designs.upload_body_limit,
+                                          "/api/admin/shop/designs/upload-pair": shop_designs.pair_body_limit,
+                                          "/api/admin/shop/designs/pair-check": shop_designs.pair_body_limit})
 # Gamertag-Druckdatei (#1711): Vorschau, Testdatei und Regeln nehmen nur kleine Anfragen an.
 app.add_middleware(BodySizeLimit, limits=shop_gamertag.body_limits())
 

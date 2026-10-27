@@ -3,22 +3,27 @@
 Wie alle Shop-Adminrouten nur der Bereich „Finanzen“ mit Zwei-Faktor (``require_area("finance")``, Regel 3 in
 ``scripts/check-code-patterns.py``). Jede Änderung braucht einen Grund und steht im Protokoll der Adminaktionen
 (``shop.design.add``, ``shop.design.profile``, ``shop.design.placement``, seit #2069 ``shop.design.light`` und
-``shop.motif.settings``); Lesen ist keine Adminaktion. Die Logik steht in ``services/shop_designs.py`` und
-``services/shop_motifs.py`` (Motive mit Fassungen für dunkle und helle Shirts); die öffentliche Adresse für Printful in
-``routes/shop_print_file_routes.py``.
+``shop.motif.settings``, seit #2084 ``shop.design.pair``); Lesen ist keine Adminaktion. Die Logik steht in
+``services/shop_designs.py`` und ``services/shop_motifs.py`` (Motive mit Fassungen für dunkle und helle Shirts, als
+Paar mit Paar-Prüfung); die öffentliche Adresse für Printful in ``routes/shop_print_file_routes.py``.
 """
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
 from auth import require_area
 from database import get_db
 from services import shop_designs, shop_motifs
 from services.image_upload import _read_upload_limited
+from services.rate_limit import enforce_rate_limit
 from services.shop_common import ShopConflict, ShopError
 
 router = APIRouter(prefix="/api/admin/shop", tags=["shop"])
+# Paar prüfen bzw. hochladen (#2084): je Anfrage zwei Dateien bereinigen und rastern - so oft je Minute und Person.
+PAIR_CHECKS_PER_MINUTE = 20
+_PAIR = shop_motifs.PAIR_SETTINGS
 
 
 class Reasoned(BaseModel):
@@ -45,6 +50,12 @@ class ProfileUpdate(Reasoned):
 class MotifSettings(Reasoned):
     light_ink: str | None = Field(None, min_length=7, max_length=7)
     threshold: float | None = Field(None, ge=shop_motifs.MIN_THRESHOLD, le=shop_motifs.MAX_THRESHOLD)
+    # Schwellen der Paar-Prüfung (#2084)
+    pair_aspect_tolerance: float | None = Field(None, ge=_PAIR["pair_aspect_tolerance"][1],
+                                                le=_PAIR["pair_aspect_tolerance"][2])
+    pair_min_overlap: float | None = Field(None, ge=_PAIR["pair_min_overlap"][1], le=_PAIR["pair_min_overlap"][2])
+    pair_contrast_share: float | None = Field(None, ge=_PAIR["pair_contrast_share"][1],
+                                              le=_PAIR["pair_contrast_share"][2])
 
 
 class PlacementUpdate(Reasoned):
@@ -93,7 +104,65 @@ async def upload_design(file: UploadFile = File(...), design_key: str = Form(...
         raise _refused(exc) from exc
     return {"uploaded": {"design_key": design["design_key"], "version": design["version"],
                          "variant": design.get("variant"), "sha256": design["sha256"],
-                         "warnings": design["warnings"], "light": design.get("light")},
+                         "warnings": design["warnings"], "light": design.get("light"),
+                         "pair": design.get("pair")},
+            **await shop_motifs.admin_view(db)}
+
+
+def _pair_refused(exc: Exception):
+    """Paar-Prüfung Rot (400) bzw. Gelb ohne Bestätigung (409): die Meldung und der Prüfbericht für die Ampel."""
+    if isinstance(exc, shop_motifs.PairRefused):
+        return JSONResponse({"detail": str(exc), "pair": exc.report}, status_code=exc.status)
+    raise _refused(exc) from exc
+
+
+async def _pair_files(file_dark: UploadFile, file_light: UploadFile) -> tuple[tuple, tuple]:
+    out = []
+    for upload in (file_dark, file_light):
+        data = await _read_upload_limited(upload, shop_designs.MAX_BYTES, shop_designs.MAX_UPLOAD_MB)
+        out.append((data, upload.filename or "", upload.content_type or ""))
+    return out[0], out[1]
+
+
+@router.post("/designs/pair-check")
+async def check_design_pair(request: Request, file_dark: UploadFile = File(...), file_light: UploadFile = File(...),
+                            design_key: str | None = Form(None, max_length=60),
+                            placement: str | None = Form(None, max_length=40), auto_assign: bool = Form(False),
+                            me: dict = Depends(require_area("finance"))):
+    """Motiv als Paar nur prüfen (#2084): Ampel mit Klartext, Vorschau beider Fassungen, Markierungen - speichert
+    nichts. Gebremst, weil jede Prüfung zwei Dateien bereinigt und rastert."""
+    await enforce_rate_limit(request, "shop_pair_check", PAIR_CHECKS_PER_MINUTE, 60, subject=me["id"])
+    dark, light = await _pair_files(file_dark, file_light)
+    try:
+        return await shop_motifs.check_pair(get_db(), dark_file=dark, light_file=light, design_key=design_key or None,
+                                            placement=placement or None, auto_assign=auto_assign)
+    except (ShopError, LookupError) as exc:
+        return _pair_refused(exc)
+
+
+@router.post("/designs/upload-pair")
+async def upload_design_pair(request: Request, file_dark: UploadFile = File(...), file_light: UploadFile = File(...),
+                             design_key: str = Form(..., max_length=60), reason: str = Form("", max_length=500),
+                             title: str | None = Form(None, max_length=120),
+                             placement: str | None = Form(None, max_length=40),
+                             garment_colors: str | None = Form(None, max_length=1000),
+                             auto_assign: bool = Form(False), confirm_warnings: bool = Form(False),
+                             me: dict = Depends(require_area("finance"))):
+    """Motiv als Paar hochladen (#2084): Hauptdatei (für dunkle Shirts) und eigene Datei für helle Shirts in einem
+    Schritt - Paar-Prüfung, dann beide oder keine. Rot 400, Gelb ohne ``confirm_warnings`` 409, jeweils mit Bericht."""
+    await enforce_rate_limit(request, "shop_pair_check", PAIR_CHECKS_PER_MINUTE, 60, subject=me["id"])
+    dark, light = await _pair_files(file_dark, file_light)
+    db = get_db()
+    try:
+        saved = await shop_motifs.upload_pair(db, design_key=design_key, dark_file=dark, light_file=light,
+                                              actor_id=me["id"], reason=reason, title=title,
+                                              placement=placement or None, garment_colors=garment_colors,
+                                              auto_assign=auto_assign, confirm_warnings=confirm_warnings)
+    except (ShopError, LookupError) as exc:
+        return _pair_refused(exc)
+    return {"uploaded_pair": {"design_key": saved["dark"]["design_key"], "dark_version": saved["dark"]["version"],
+                              "light_version": saved["light"]["version"], "warnings": saved["warnings"],
+                              "pair": saved["pair"]},
             **await shop_motifs.admin_view(db)}
 
 

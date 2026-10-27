@@ -205,6 +205,11 @@ def upload_body_limit() -> tuple[int, str]:
     return MAX_BYTES + FORM_OVERHEAD_BYTES, f"Datei zu groß (höchstens {MAX_UPLOAD_MB} MB)."
 
 
+def pair_body_limit() -> tuple[int, str]:
+    """Paar (#2084): zwei Dateien in einer Anfrage (Prüfen bzw. Hochladen) - je Datei dieselbe Grenze."""
+    return 2 * MAX_BYTES + FORM_OVERHEAD_BYTES, f"Dateien zu groß (je Datei höchstens {MAX_UPLOAD_MB} MB)."
+
+
 # 12 × 16 Zoll bei 300 DPI sind gut 17 Millionen; 40 Millionen lassen Luft und halten den Speicher beim Neukodieren
 # (RGBA: 4 Byte je Pixel, zwei Bilder gleichzeitig) unter etwa 350 MB.
 MAX_PIXELS = 40_000_000
@@ -604,9 +609,11 @@ async def _latest_of(db, key: str, variant: str) -> dict | None:
 
 async def save_version(db, key: str, *, image: Image.Image, spec: dict, placement: str, source_format: str,
                        variant: str, origin: str, actor_id: str, reason: str, svg_bytes: bytes | None = None,
-                       extra: dict | None = None, before_insert=None) -> tuple[dict, dict]:
+                       extra: dict | None = None, before_insert=None,
+                       reuse_same: bool = False) -> tuple[dict, dict]:
     """Prüfen gegen den Druckbereich, Druckdatei (und bei SVG das bereinigte SVG) neu ablegen, Version anlegen. Scheitert
-    etwas, bleibt keine Datei ohne Version liegen."""
+    etwas, bleibt keine Datei ohne Version liegen. Dieselbe Datei wie die aktuelle derselben Fassung ist ein 409 - mit
+    ``reuse_same`` (Paar, #2084) bleibt stattdessen die aktuelle, mit ``"reused": True``."""
     fit = check_fit(image.width, image.height, spec)
     if fit["problems"]:
         raise ShopError(fit["text"])
@@ -615,6 +622,8 @@ async def save_version(db, key: str, *, image: Image.Image, spec: dict, placemen
     if origin == "upload":
         latest = await _latest_of(db, key, variant)
         if latest and latest.get("sha256") == checksum:
+            if reuse_same:
+                return {**latest, "reused": True}, fit
             raise ShopConflict(f"Diese Datei ist schon die aktuelle Version (v{latest['version']}) - keine neue nötig.")
     file_ref, path = _store(payload)
     svg_path = None
@@ -651,6 +660,7 @@ def _version_view(row: dict, spec: dict, names: dict[str, str]) -> dict:
     view["variant"] = row.get("variant") or "dark"
     view["origin"] = row.get("origin") or "upload"
     view["derived_from"] = row.get("derived_from")
+    view["pair_of"] = row.get("pair_of")  # Paar (#2084): mit dieser Hauptdatei zusammen hochgeladen
     view["is_vector"] = bool(row.get("svg_ref"))
     view["colors"] = list(row.get("colors") or [])
     box = row.get("view_box")
