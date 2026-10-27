@@ -320,8 +320,8 @@ Mockups (#1710) und das Hochladen zu Printful (#1705).
 ## Motive (#2069)
 
 Code: `backend/services/svg_safe.py` (gemeinsamer SVG-Baustein, auch für das Branding), `backend/services/shop_motifs.py`
-(Fassungen, Shirtfarbe → Fassung, Schnittstelle für Druckdateien, Migration 14), Upload und Ansicht weiter in
-`shop_designs.py`, Seite `AdminShopDesignsPage.jsx` (Reiter **Motive**). Ziel des Obmanns (27.10.2026): die
+(Fassungen, Shirtfarbe → Fassung, Upload und Ansicht für den Admin, Schnittstelle für Druckdateien, Migration 14) auf
+den Bausteinen in `shop_designs.py` (Ablage, Prüfung, Versionen), Seite `AdminShopDesignsPage.jsx` (Reiter **Motive**). Ziel des Obmanns (27.10.2026): die
 Vereinslogos als echte Vektor-SVGs einmal hochladen, die Fassung für helle Shirts entsteht automatisch. Mitglieder und
 Benutzer laden weiter nur PNG/JPG (Bild-Uploads ohne SVG, [BETRIEB.md](BETRIEB.md)).
 

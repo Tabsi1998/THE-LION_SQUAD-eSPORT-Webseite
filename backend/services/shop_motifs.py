@@ -26,20 +26,21 @@ import io
 import logging
 import math
 import re
-import uuid
 from pathlib import Path
 from typing import Any
 
 from PIL import Image, ImageChops
 
-import storage
 from models import now_utc
 from services import shop_catalog, shop_designs, svg_safe
 from services.shop_common import ShopError, clean_reason, record_admin_action
 
 logger = logging.getLogger("tls-arena.shop-motifs")
 
-VARIANTS = ("dark", "light")
+# Fassungen, Ausnahmen und ihre Prüfung stehen in shop_designs (ohne Import-Kreis), hier dieselben Namen.
+VARIANTS = shop_designs.VARIANTS
+MAX_EXCEPTIONS = shop_designs.MAX_EXCEPTIONS
+clean_exceptions = shop_designs.clean_exceptions
 VARIANT_LABELS = {"dark": "für dunkle Shirts", "light": "für helle Shirts"}
 SETTINGS_ID = "shop_motifs"
 REPLACED_COLOR = "#ffffff"
@@ -49,8 +50,6 @@ DEFAULT_LIGHT_INK = "#111111"
 DEFAULT_THRESHOLD = 0.18
 MIN_THRESHOLD, MAX_THRESHOLD = 0.02, 0.9
 HEX6 = re.compile(r"^#[0-9a-fA-F]{6}$")
-MAX_EXCEPTIONS = 40
-SVG_REF = re.compile(r"^shop-designs/([0-9a-f]{32})\.svg$")
 # SVG wird für die Druckdatei mindestens so fein gerastert, dass die Ampel „gut“ zeigt.
 SVG_DPI_FLOOR = 300
 
@@ -101,31 +100,6 @@ def variant_for_garment(color_hex: Any, *, color: Any = None, threshold: float =
     if luminance is None:
         return None
     return "light" if luminance >= threshold else "dark"
-
-
-def clean_exceptions(raw: Any) -> list[dict]:
-    """Ausnahmen je Shirtfarbe: ``[{"color": "Navy", "variant": "light"}, …]`` - ohne Doppelte (nach Name)."""
-    if raw is None:
-        return []
-    if not isinstance(raw, list):
-        raise ShopError("Ausnahmen als Liste angeben.")
-    out: list[dict] = []
-    seen: set[str] = set()
-    for item in raw:
-        if not isinstance(item, dict) or set(item) - {"color", "variant"}:
-            raise ShopError("Ausnahme: Farbe und Fassung (dunkel oder hell).")
-        color = " ".join(str(item.get("color") or "").split())
-        if not color or len(color) > 40:
-            raise ShopError("Ausnahme: Farbname fehlt oder ist zu lang (höchstens 40 Zeichen).")
-        if item.get("variant") not in VARIANTS:
-            raise ShopError("Ausnahme: Fassung „dark“ (für dunkle Shirts) oder „light“ (für helle Shirts).")
-        if color.casefold() in seen:
-            continue
-        seen.add(color.casefold())
-        out.append({"color": color, "variant": item["variant"]})
-    if len(out) > MAX_EXCEPTIONS:
-        raise ShopError(f"Höchstens {MAX_EXCEPTIONS} Ausnahmen je Motiv.")
-    return out
 
 
 # ---------------------------------------------------------------- Einstellungen
@@ -189,22 +163,6 @@ async def set_settings(db, fields: dict, *, actor_id: str, reason: Any) -> tuple
 
 
 # ---------------------------------------------------------------- Dateien
-
-def _svg_path_of(svg_ref: Any) -> Path | None:
-    match = SVG_REF.fullmatch(str(svg_ref or ""))
-    return shop_designs.design_dir() / f"{match.group(1)}.svg" if match else None
-
-
-def store_svg(clean: bytes) -> tuple[str, Path]:
-    """Das bereinigte SVG neben die Druckdateien - neuer Name, ``xb`` scheitert statt zu überschreiben. Nie öffentlich:
-    die Adresse für Printful liefert nur ``*.png``."""
-    storage.ensure_directory(shop_designs.design_dir())
-    name = uuid.uuid4().hex
-    path = shop_designs.design_dir() / f"{name}.svg"
-    with path.open("xb") as handle:
-        handle.write(clean)
-    return f"{shop_designs.DESIGN_FOLDER}/{name}.svg", path
-
 
 def print_dpi(spec: dict) -> int:
     return max(SVG_DPI_FLOOR, math.ceil(float(spec["min_dpi"]) * shop_designs.SNUG_FACTOR - 1e-9))
@@ -369,7 +327,7 @@ async def refresh_auto_light(db, motif_key: str, *, actor_id: str, reason: Any) 
     image = None
     svg_bytes = None
     if dark.get("svg_ref"):
-        path = _svg_path_of(dark["svg_ref"])
+        path = shop_designs.svg_path_of(dark["svg_ref"])
         if path is None or not path.is_file():
             state["reason"] = "file"
         else:
@@ -452,6 +410,90 @@ async def set_light_mode(db, motif_key: str, mode: str, *, actor_id: str, reason
                               data={"before": before, "after": mode})
 
 
+# ---------------------------------------------------------------- Upload und Ansicht für den Admin
+
+async def upload(db, *, design_key: Any, data: bytes, filename: str, content_type: str, actor_id: str, reason: Any,
+                 title: Any = None, placement: str | None = None, garment_colors: Any = None,
+                 variant: str = "dark") -> dict:
+    """Eine neue Datei eines Motivs: prüfen, neu kodieren, als neue Version ablegen (#1708). ``variant`` „dark“ ist die
+    Hauptdatei (für dunkle Shirts), „light“ die eigene Datei für helle Shirts (hat Vorrang vor der automatischen).
+    SVG wird streng bereinigt und gerastert, PNG/JPG neu kodiert. Ein neues Motiv braucht Titel und Platzierung; ein
+    bestehendes behält seine Platzierung. Nach einer neuen Hauptdatei entsteht die automatische Fassung."""
+    reason = clean_reason(reason)
+    if variant not in VARIANTS:
+        raise ShopError("Fassung: für dunkle Shirts (dark) oder für helle Shirts (light).")
+    key = shop_designs._design_key(design_key)
+    profile = await shop_designs.get_profile(db, key)
+    if profile:
+        if placement and placement != profile["placement"]:
+            raise ShopError(f"Dieses Design gehört zu „{shop_designs.PLACEMENT_LABELS[profile['placement']]}“. Für "
+                            "eine andere Platzierung bitte ein eigenes Design anlegen.")
+        placement = profile["placement"]
+    else:
+        if variant == "light":
+            raise ShopError("Eine Datei für helle Shirts gehört zu einem bestehenden Motiv - zuerst die Hauptdatei "
+                            "(für dunkle Shirts) hochladen.")
+        if placement not in shop_catalog.PLACEMENTS:
+            raise ShopError("Neues Design: bitte die Platzierung wählen.")
+        shop_designs._line(title, "Titel", 120, required=True)
+        await shop_designs._check_colors_free(db, key, placement, shop_designs.clean_colors(garment_colors))
+    if len(data) > shop_designs.MAX_BYTES:
+        raise ShopError(f"Datei zu groß (höchstens {shop_designs.MAX_UPLOAD_MB} MB).")
+    if not data:
+        raise ShopError("Die Datei ist leer.")
+
+    spec = (await shop_designs.placement_specs(db))[placement]
+    extra: dict[str, Any] = {}
+    svg_bytes = None
+    if shop_designs.looks_like_svg(Path(filename or "").suffix.lower(), content_type or "", data[:8192]):
+        image, svg_bytes, info = await prepare_svg(data, spec)
+        source_format = "SVG"
+        extra = {"colors": [item["hex"] for item in info["colors"]][:24], "view_box": info["view_box"]}
+    else:
+        image, source_format = shop_designs.prepare(data, filename, content_type)
+
+    async def create() -> None:
+        await shop_designs.create_profile(db, key, title=title, placement=placement, garment_colors=garment_colors,
+                                          actor_id=actor_id, reason=reason)
+
+    design, fit = await shop_designs.save_version(
+        db, key, image=image, spec=spec, placement=placement, source_format=source_format, variant=variant,
+        origin="upload", actor_id=actor_id, reason=reason, svg_bytes=svg_bytes, extra=extra,
+        before_insert=None if profile else create)
+    warnings = []
+    if not design["has_alpha"]:
+        warnings.append("Kein durchsichtiger Hintergrund: die Fläche um das Motiv wird mitgedruckt."
+                        + (" JPG kann keine Transparenz - für Logos besser PNG." if source_format == "JPG" else ""))
+    if fit["level"] == "snug":
+        warnings.append(fit["text"])
+    if variant == "light":
+        await set_light_mode(db, key, "file", actor_id=actor_id, reason=reason)
+        light = light_state(await shop_designs.get_profile(db, key), await _rows(db, key), await load_settings(db))
+    else:
+        try:
+            light = await refresh_auto_light(db, key, actor_id=actor_id, reason=reason)
+        except ShopError as exc:  # die Hauptdatei gilt; die Hell-Variante lässt sich später erzeugen
+            light = {"state": "pending", "version": None, "hint": str(exc)}
+        if light["state"] in ("missing", "pending"):
+            warnings.append(light["hint"])
+    return {**design, "warnings": warnings, "light": light}
+
+
+async def admin_view(db) -> dict:
+    """Die Ansicht aus ``shop_designs.admin_view``, ergänzt um den Zustand für helle Shirts je Motiv (mit der Fassung,
+    die gilt) und die Einstellungen."""
+    view = await shop_designs.admin_view(db)
+    settings = await load_settings(db)
+    profiles = {profile["design_key"]: profile
+                async for profile in db.shop_design_profiles.find({}, {"_id": 0, "design_key": 1, "light_mode": 1,
+                                                                        "light_auto": 1})}
+    for design in view["designs"]:
+        light = light_state(profiles.get(design["design_key"]), design["versions"], settings)
+        light["latest"] = next((item for item in design["versions"] if item["version"] == light["version"]), None)
+        design["light"] = light
+    return {**view, "motif_settings": settings}
+
+
 # ---------------------------------------------------------------- Schnittstelle für Teil B: Motiv rastern
 
 MAX_RENDER_WIDTH = 20000
@@ -502,7 +544,7 @@ async def render_motif_png(db, motif_key: str, variant: str, *, width_px: int, d
         raise ValueError("dpi: ganze Zahl von 1 bis 2400")
     row = await _row_for(db, motif_key, variant, version)
     if row.get("svg_ref"):
-        path = _svg_path_of(row["svg_ref"])
+        path = shop_designs.svg_path_of(row["svg_ref"])
         if path is None or not path.is_file():
             raise LookupError(f"Motiv {motif_key}: Datei von Version {row['version']} fehlt.")
         try:

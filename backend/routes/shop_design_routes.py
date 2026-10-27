@@ -70,7 +70,7 @@ def _refused(exc: Exception) -> HTTPException:
 @router.get("/designs")
 async def list_designs(me: dict = Depends(require_area("finance"))):
     """Designs mit allen Versionen, Ampel gegen die geltende Vorgabe, Druckbereiche je Platzierung."""
-    return await shop_designs.admin_view(get_db())
+    return await shop_motifs.admin_view(get_db())
 
 
 @router.post("/designs/upload")
@@ -85,7 +85,7 @@ async def upload_design(file: UploadFile = File(...), design_key: str = Form(...
     data = await _read_upload_limited(file, shop_designs.MAX_BYTES, shop_designs.MAX_UPLOAD_MB)
     db = get_db()
     try:
-        design = await shop_designs.upload(db, design_key=design_key, data=data, filename=file.filename or "",
+        design = await shop_motifs.upload(db, design_key=design_key, data=data, filename=file.filename or "",
                                            content_type=file.content_type or "", actor_id=me["id"], reason=reason,
                                            title=title, placement=placement or None, garment_colors=garment_colors,
                                            variant=variant)
@@ -94,7 +94,7 @@ async def upload_design(file: UploadFile = File(...), design_key: str = Form(...
     return {"uploaded": {"design_key": design["design_key"], "version": design["version"],
                          "variant": design.get("variant"), "sha256": design["sha256"],
                          "warnings": design["warnings"], "light": design.get("light")},
-            **await shop_designs.admin_view(db)}
+            **await shop_motifs.admin_view(db)}
 
 
 @router.post("/designs/{design_key}/light-auto")
@@ -105,7 +105,7 @@ async def use_auto_light(design_key: str, body: Reasoned, me: dict = Depends(req
         light = await shop_motifs.use_auto_light(db, design_key, actor_id=me["id"], reason=body.reason)
     except (ShopError, LookupError) as exc:
         raise _refused(exc) from exc
-    return {"light": light, **await shop_designs.admin_view(db)}
+    return {"light": light, **await shop_motifs.admin_view(db)}
 
 
 @router.put("/designs/motif-settings")
@@ -117,7 +117,7 @@ async def update_motif_settings(body: MotifSettings, me: dict = Depends(require_
         _, changed = await shop_motifs.set_settings(db, _fields(body), actor_id=me["id"], reason=body.reason)
     except (ShopError, LookupError) as exc:
         raise _refused(exc) from exc
-    return {"changed": changed, **await shop_designs.admin_view(db)}
+    return {"changed": changed, **await shop_motifs.admin_view(db)}
 
 
 @router.patch("/designs/{design_key}")
@@ -129,7 +129,7 @@ async def update_design(design_key: str, body: ProfileUpdate, me: dict = Depends
                                                        reason=body.reason)
     except (ShopError, LookupError) as exc:
         raise _refused(exc) from exc
-    return {"changed": changed, **await shop_designs.admin_view(db)}
+    return {"changed": changed, **await shop_motifs.admin_view(db)}
 
 
 @router.put("/designs/placements/{placement}")
@@ -141,4 +141,4 @@ async def update_placement(placement: str, body: PlacementUpdate, me: dict = Dep
                                                       reason=body.reason)
     except (ShopError, LookupError) as exc:
         raise _refused(exc) from exc
-    return {"changed": changed, **await shop_designs.admin_view(db)}
+    return {"changed": changed, **await shop_motifs.admin_view(db)}
