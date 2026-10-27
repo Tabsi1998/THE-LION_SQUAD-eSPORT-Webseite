@@ -1,8 +1,9 @@
 # Vereinsshop
 
-Stand: Fundament aus #1703 (Datenmodell) und #1704 (Rechte, Protokoll), Teil des Epics #1699. Der Shop ist **von
-außen unsichtbar**: Es gibt keine öffentlichen Routen, keine Seiten für Mitglieder und keinen Menüeintrag. Printful
-(#1705), Konfiguration und Betriebsarten (#1706), Steuer (#1701) und die Shop-Seiten (#1712 ff.) folgen.
+Stand: Fundament aus #1703 (Datenmodell) und #1704 (Rechte, Protokoll), dazu Stufen, Notschalter und Preise aus
+#1706 (Abschnitt „Einstellungen“ unten), Teil des Epics #1699. Der Shop ist **von außen unsichtbar**: Es gibt keine
+öffentlichen Routen und keine Seiten für Mitglieder; im Admin steht er unter Finanzen → Shop. Printful (#1705), Steuer
+(#1701) und die Shop-Seiten (#1712 ff.) folgen.
 
 Code: `backend/services/shop_common.py` (Fehler, Anschriften, Protokoll, personenbezogene Felder),
 `shop_catalog.py` (Katalog), `shop_orders.py` (Bestellungen, Ereignisse, Warenkorb), `shop_schema.py` (Indizes,
@@ -133,8 +134,55 @@ ohne Änderung schreibt nichts.
 | `shop.design.add`, `shop.printful_variant.set` | Druckdatei-Fassung, Printful-Zuordnung |
 | `shop.order.release`, `shop.order.printful_confirm`, `shop.order.cancel` | vorgesehen für #1718, #1721 |
 | `shop.order.club`, `shop.order.prize` | vorgesehen für #1724, #1726 |
-| `shop.config` | vorgesehen für #1706 |
+| `shop.config` | Einstellungen geändert (#1706): Stufe, Freigabe „Steuer geklärt“, Notschalter, Preise, Printful-Schlüssel – mit vorher und nachher, nie mit Schlüssel |
 
-**Menü:** Einen Eintrag „Shop“ unter Finanzen gibt es noch nicht – es gibt keine Seite dafür (die Produktverwaltung
-kommt mit #1707). Mit der ersten Seite kommen Menüeintrag, `e2e/admin-navigation.spec.js` und
-`permissions.parity.test.js` dazu.
+**Menü:** Verwaltung → Finanzen → **Shop** (`/admin/shop`, #1706). Die Produktverwaltung (#1707) kommt auf dieselbe
+Seite oder daneben.
+
+## Einstellungen, Stufen und Notschalter (#1706)
+
+Code: `backend/services/shop_config.py` (ein Dokument `settings` mit `id = "shop"`), `shop_access.py` (wer sieht den
+Shop), `shop_printful_probe.py` (Verbindungstest). Entscheidung des Obmanns vom 27.10.2026: **Stufen statt
+„Aus/Vorschau/Live“.**
+
+| Stufe | Wer sieht den Shop | Wer darf sie einschalten |
+| --- | --- | --- |
+| Aus (Vorgabe) | niemand | Finanzen |
+| Nur Admins (Test) | Finanzen, Club-Admin, Superadmin (mit Zwei-Faktor) | Finanzen |
+| Vereinsmitglieder | aktive Mitgliedschaft (auch Ehrenmitglieder) und die Finanzen | Finanzen |
+| Öffentlich | alle, auch ohne Anmeldung | nur Superadmin, nur mit „Steuer geklärt“ |
+
+- **„Steuer geklärt“** (#1701) ist ein eigener Schalter, nur Superadmin, mit Pflicht-Grund. Fehlt er, ist „Öffentlich“
+  im Admin gesperrt (mit Hinweis) und die Route antwortet 409 (Finanzen ohne Superadmin: 403). Zurücknehmen geht nur,
+  wenn der Shop nicht öffentlich ist. Absenken der Stufe ist nie gesperrt.
+- **Sicher bei Unsinn:** eine unbekannte Stufe in der Datenbank und „Öffentlich“ ohne Freigabe gelten als „Aus“.
+- **Helfer für die Shop-Seiten (#1712):** `shop_access.can_view_shop(db, user)`; als Wächter
+  `Depends(shop_access.require_shop_viewer())` – wer nicht darf, bekommt 404. Öffentliche Shop-Routen brauchen dann
+  eine bewusste Erweiterung von Regel 3 in `scripts/check-code-patterns.py`.
+- **Notschalter „Bestellungen an Printful senden“** (Vorgabe aus) hängt nicht an der Stufe. Jeder schreibende Aufruf
+  bei Printful (Adapter #1705) ruft vorher `shop_config.require_printful_writes(db)`; aus heißt `PrintfulWritesBlocked`,
+  nichts geht hinaus. Einschalten nur mit lesbarem Schlüssel; wer den Schlüssel entfernt, schaltet ihn mit aus.
+- **Preise:** Mitglieder zahlen den Selbstkostenpreis (Einkauf plus Versand), ihr Aufschlag ist fest 0. Der
+  öffentliche Aufschlag ist ein fester Betrag je Artikel (Vorgabe 0, höchstens 100 €) und greift nur bei der Kaufart
+  `public`; trägt ein Produkt einen eigenen Aufschlag, kommt der dazu. `place_order` friert den Betrag ein.
+- **Versand:** nur nach Österreich (`SHIPPING_COUNTRIES = ("AT",)`, `place_order` lehnt andere Lieferländer ab).
+  `shipping_cents(config, schätzung)` nimmt die Schätzung von Printful, sonst die **Ersatzpauschale**; fehlt auch die
+  (Vorgabe: keine), wird nicht bestellt – kein Versand zum Nulltarif.
+- **Printful-Zugang:** Schlüssel verschlüsselt mit `SETTINGS_ENCRYPTION_KEY` (`secret_store`), nie wieder angezeigt –
+  nur „hinterlegt seit … von …“. Hinterlegen und Entfernen braucht zusätzlich den Bereich System. „Verbindung testen“
+  ruft genau einmal lesend `GET https://api.printful.com/stores` auf und merkt sich Zeitpunkt, ja/nein und Ursache. Der
+  Adapter (#1705) übernimmt den Test später.
+- **Betrieb → Checks** zeigt „Shop“: Stufe, Notschalter, Schlüssel (hinterlegt, fehlt, nicht lesbar) und die Ursache
+  eines gescheiterten Verbindungstests. Rot nur, wenn Bestellungen hinausgehen sollen, es aber nicht können.
+
+| Route (alle `require_area("finance")`) | Zweck |
+| --- | --- |
+| `GET /api/admin/shop/config` | Einstellungen, Stufen mit Sperre, Rechte – ohne Schlüssel |
+| `PATCH /api/admin/shop/config` | Stufe, Notschalter, öffentlicher Aufschlag, Ersatzpauschale (mit Grund) |
+| `PUT /api/admin/shop/config/tax-clearance` | „Steuer geklärt“ setzen oder zurücknehmen (nur Superadmin, mit Grund) |
+| `PUT /api/admin/shop/config/printful-key` | Schlüssel hinterlegen (zusätzlich System, mit Grund) |
+| `POST /api/admin/shop/config/printful-key/remove` | Schlüssel entfernen (zusätzlich System, mit Grund) |
+| `POST /api/admin/shop/config/printful-test` | Verbindung testen (nur lesen) |
+
+Neue Umgebungswerte braucht es nicht: der Schlüssel liegt verschlüsselt in der Datenbank. Offen aus #1706: der
+Abschnitt „Zahlungsbedingungen für den Shop“ (Dolibarr-Zahlungsbedingungen, Erinnerungen) folgt in einem eigenen Paket.

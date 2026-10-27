@@ -83,6 +83,8 @@ Schlüssel tatsächlich.
 - Discord: eigenen Webhook anlegen, im Adminbereich speichern und Testnachricht senden.
 - Twitch: eigene Client-ID und eigenes Client-Secret verwenden; anschließend Verbindung testen.
 - Gameserver: Zugangskennwörter nur im geschützten Adminbereich pflegen.
+- Printful (Vereinsshop, #1706): API-Schlüssel unter Verwaltung → Finanzen → Shop hinterlegen (braucht den Bereich
+  System), danach „Verbindung testen“. Keine Umgebungsvariable nötig; der Schlüssel wird nie wieder angezeigt.
 
 Diese Geheimnisse liegen verschlüsselt in MongoDB. `SETTINGS_ENCRYPTION_KEY` muss deshalb stabil
 bleiben und separat gesichert werden.
