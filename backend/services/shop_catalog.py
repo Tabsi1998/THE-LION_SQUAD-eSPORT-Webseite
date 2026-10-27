@@ -19,8 +19,19 @@ from models import new_id, now_utc
 from services.pricing import TAX_PROFILES
 from services.shop_common import MODEL_FIELDS, ShopConflict, ShopError, record_admin_action
 
-STATUSES = ("draft", "active", "archived")
+# Stand (#1707): Entwurf → geprüft → veröffentlicht (``active``) → archiviert. Den Stand ändert nur
+# ``shop_products.set_status`` nach der Vorab-Prüfung - nie ein gewöhnliches Speichern.
+STATUSES = ("draft", "reviewed", "active", "archived")
+STATUS_LABELS = {"draft": "Entwurf", "reviewed": "geprüft", "active": "veröffentlicht", "archived": "archiviert"}
 VISIBILITIES = ("hidden", "members", "public")
+VISIBILITY_LABELS = {"public": "öffentlich (mit Konto)", "members": "nur Mitglieder", "hidden": "nur intern"}
+# Personalisierung je Produkt (#1707). Öffentliche Produkte haben nie eine - der Server lehnt die Kombination ab.
+PERSONALIZATIONS = ("none", "gamertag", "member_number", "both")
+PERSONALIZATION_LABELS = {"none": "keine", "gamertag": "Gamertag", "member_number": "Vereinsnummer",
+                          "both": "Gamertag und Vereinsnummer"}
+PUBLIC_WITHOUT_PERSONALIZATION = ("Öffentliche Produkte haben keine Personalisierung - entweder „nur Mitglieder“ "
+                                  "bzw. „nur intern“ wählen oder die Personalisierung auf „keine“ setzen.")
+STATUS_ONLY_BY_CHECK = "Den Stand ändert nur die Prüfung (Schritt „Prüfen und veröffentlichen“)."
 MAX_PRICE_CENTS = 100_000  # 1000 Euro je Artikel - alles darüber ist ein Tippfehler
 MAX_MARKUP_CENTS = 10_000
 SLUG = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
@@ -28,10 +39,32 @@ SKU = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
 DESIGN_KEY = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 SHA256 = re.compile(r"^[0-9a-f]{64}$")
 PLACEMENTS = ("front", "front_left", "front_right", "back", "sleeve_left", "sleeve_right", "label")
-PRODUCT_FIELDS = ("slug", "title", "description", "status", "visibility", "base_price_cents", "markup_cents",
-                  "gamertag_allowed", "tax_profile", "design_key")
+PRODUCT_FIELDS = ("slug", "title", "description", "visibility", "base_price_cents", "markup_cents",
+                  "personalization", "tax_profile", "design_key")
 VARIANT_FIELDS = ("sku", "label", "size", "color", "price_cents", "active")
 PRICE_FIELDS = ("base_price_cents", "markup_cents", "price_cents")
+# Was der Produktaufbau (``services/shop_products.py``) schreibt - nur über ``save_setup``.
+SETUP_FIELDS = ("printful", "technique", "offer", "placements", "included_placement", "status", "review",
+                "published_at", "archived_at")
+_UMLAUTS = str.maketrans({"ä": "ae", "ö": "oe", "ü": "ue", "ß": "ss", "Ä": "ae", "Ö": "oe", "Ü": "ue"})
+
+
+def slugify(text: str) -> str:
+    """„Löwen-Shirt Größe“ → ``loewen-shirt-groesse``."""
+    plain = str(text or "").translate(_UMLAUTS).lower()
+    return "-".join(re.findall(r"[a-z0-9]+", plain))[:80].strip("-")
+
+
+def allows_gamertag(product: dict) -> bool:
+    """Gamertag bestellbar? Aus der Personalisierung; ältere Produkte ohne sie aus ``gamertag_allowed``."""
+    if product.get("personalization") in PERSONALIZATIONS:
+        return product["personalization"] in ("gamertag", "both")
+    return bool(product.get("gamertag_allowed"))
+
+
+def _check_personalization(product: dict) -> None:
+    if product.get("visibility") == "public" and product.get("personalization", "none") != "none":
+        raise ShopError(PUBLIC_WITHOUT_PERSONALIZATION)
 
 
 def _text(value: Any, label: str, limit: int, *, required: bool = False) -> str | None:
@@ -63,23 +96,20 @@ def _product_value(key: str, value: Any) -> Any:
         return _text(value, "Titel", 120, required=True)
     if key == "description":
         return _text(value, "Beschreibung", 2000)
-    if key == "status":
-        if value not in STATUSES:
-            raise ShopError("Unbekannter Stand.")
+    if key == "personalization":
+        if value not in PERSONALIZATIONS:
+            raise ShopError("Unbekannte Personalisierung.")
         return value
     if key == "visibility":
         if value not in VISIBILITIES:
             raise ShopError("Unbekannte Sichtbarkeit.")
         return value
     if key == "base_price_cents":
-        return _cents(value, "Preis", MAX_PRICE_CENTS)
+        # Ohne Printful von Hand; mit Printful trägt jede Variante ihren Preis aus dem Einkauf (#1707).
+        return _cents(value, "Preis", MAX_PRICE_CENTS, optional=True)
     if key == "markup_cents":
         # Leer heißt „der allgemeine öffentliche Aufschlag gilt“; ein Wert (auch 0) ersetzt ihn (#1707).
         return _cents(value, "Vereinsaufschlag", MAX_MARKUP_CENTS, optional=True)
-    if key == "gamertag_allowed":
-        if not isinstance(value, bool):
-            raise ShopError("Gamertag: ja oder nein.")
-        return value
     if key == "tax_profile":
         if value is not None and value not in TAX_PROFILES:
             raise ShopError("Unbekanntes Steuerprofil.")
@@ -113,6 +143,8 @@ def _variant_value(key: str, value: Any) -> Any:
 
 
 def _clean(fields: dict, allowed: tuple[str, ...], convert) -> dict:
+    if "status" in fields and allowed is PRODUCT_FIELDS:
+        raise ShopError(STATUS_ONLY_BY_CHECK)
     unknown = sorted(set(fields) - set(allowed))
     if unknown:
         raise ShopError(f"Unbekannte Felder: {', '.join(unknown)}.")
@@ -122,21 +154,27 @@ def _clean(fields: dict, allowed: tuple[str, ...], convert) -> dict:
 # ---------------------------------------------------------------- Produkte
 
 async def create_product(db, fields: dict, *, actor_id: str, reason: str) -> dict:
+    """Neues Produkt - immer als Entwurf. Nur der Titel ist Pflicht; der Slug folgt sonst aus dem Titel."""
     values = _clean(fields, PRODUCT_FIELDS, _product_value)
-    for required in ("slug", "title", "base_price_cents"):
-        if required not in values:
-            raise ShopError(f"{required} fehlt.")
+    if "title" not in values:
+        raise ShopError("title fehlt.")
+    if "slug" not in values:
+        values["slug"] = _product_value("slug", slugify(values["title"]) or "produkt")
     now = now_utc().isoformat()
     product = {"id": new_id(), "description": None, "status": "draft", "visibility": "hidden", "markup_cents": None,
-               "gamertag_allowed": False, "tax_profile": None, "design_key": None, **values, "currency": "EUR",
-               "version": 1, "created_at": now, "created_by": actor_id, "updated_at": now, "updated_by": actor_id}
+               "base_price_cents": None, "personalization": "none", "tax_profile": None, "design_key": None, **values,
+               "currency": "EUR", "version": 1, "created_at": now, "created_by": actor_id, "updated_at": now,
+               "updated_by": actor_id}
+    product["gamertag_allowed"] = allows_gamertag(product)
+    _check_personalization(product)
     try:
         await db.shop_products.insert_one(dict(product))
     except DuplicateKeyError:
         raise ShopConflict("Diesen Slug gibt es schon.")
     await record_admin_action(db, "shop.product.create", actor_id=actor_id, target_id=product["id"], reason=reason,
                               data={"slug": product["slug"], "base_price_cents": product["base_price_cents"],
-                                    "markup_cents": product["markup_cents"], "visibility": product["visibility"]})
+                                    "markup_cents": product["markup_cents"], "visibility": product["visibility"],
+                                    "personalization": product["personalization"]})
     return product
 
 
@@ -181,16 +219,52 @@ async def update_product(db, product_id: str, fields: dict, *, actor_id: str, re
         return product, []
     now = now_utc().isoformat()
     update = {key: values[key] for key in changed}
+    merged = {**product, **update}
+    _check_personalization(merged)
+    extra_set: dict = {}
+    if "personalization" in update:
+        # Die Personalisierung bestimmt die Platzierungen (Gamertag-Feld) - also wie ein Umbau des Produkts.
+        if product.get("status") == "active":
+            raise ShopConflict("Veröffentlicht: zum Ändern der Personalisierung das Produkt erst zurückziehen.")
+        extra_set["gamertag_allowed"] = allows_gamertag(merged)
+        if product.get("status") == "reviewed":
+            extra_set["status"] = "draft"
     try:
         result = await db.shop_products.update_one(
             {"id": product_id, "version": product.get("version", 1)},
-            {"$set": {**update, "updated_at": now, "updated_by": actor_id}, "$inc": {"version": 1}})
+            {"$set": {**update, **extra_set, "updated_at": now, "updated_by": actor_id}, "$inc": {"version": 1}})
     except DuplicateKeyError:
         raise ShopConflict("Diesen Slug gibt es schon.")
     if getattr(result, "matched_count", 0) != 1:
         raise ShopConflict("Das Produkt wurde gerade geändert - bitte neu laden.")
     await _log_changes(db, "product", product_id, product, changed, actor_id=actor_id, reason=reason, extra=update)
+    if extra_set.get("status"):
+        await record_admin_action(db, "shop.product.status", actor_id=actor_id, target_id=product_id, reason=reason,
+                                  data={"before": {"status": product["status"]}, "after": {"status": "draft"},
+                                        "cause": "Personalisierung geändert"})
     return await get_product(db, product_id), changed
+
+
+async def save_setup(db, product: dict, update: dict, *, actor_id: str) -> dict:
+    """Schreibt den Produktaufbau (#1707) - nur ``SETUP_FIELDS``, geprüft und protokolliert von
+    ``services/shop_products.py``. Mit Versionsprüfung: wer gleichzeitig ändert, bekommt 409."""
+    unknown = sorted(set(update) - set(SETUP_FIELDS))
+    if unknown:
+        raise ShopError(f"Unbekannte Felder: {', '.join(unknown)}.")
+    if "status" in update and update["status"] not in STATUSES:
+        raise ShopError("Unbekannter Stand.")
+    result = await db.shop_products.update_one(
+        {"id": product["id"], "version": product.get("version", 1)},
+        {"$set": {**update, "updated_at": now_utc().isoformat(), "updated_by": actor_id}, "$inc": {"version": 1}})
+    if getattr(result, "matched_count", 0) != 1:
+        raise ShopConflict("Das Produkt wurde gerade geändert - bitte neu laden.")
+    return await get_product(db, product["id"])
+
+
+async def record_catalog_sync(db, product_id: str, state: dict) -> None:
+    """Stand des letzten Abgleichs mit Printful (#1709) - ohne Versionssprung: er ändert keine Entscheidung der
+    Finanzen, und ein gleichzeitiges Speichern im Admin soll daran nicht scheitern."""
+    await db.shop_products.update_one({"id": product_id}, {"$set": {"catalog_sync": state}})
 
 
 # ---------------------------------------------------------------- Varianten
@@ -295,8 +369,17 @@ async def set_printful_variant(db, variant_id: str, *, printful_variant_id: int,
     for label, value in (("Printful-Variante", printful_variant_id), ("Printful-Produkt", printful_product_id)):
         if value is not None and (isinstance(value, bool) or not isinstance(value, int) or value <= 0):
             raise ShopError(f"{label}: positive Zahl.")
-    if not await get_variant(db, variant_id):
+    variant = await get_variant(db, variant_id)
+    if not variant:
         raise LookupError("Variante nicht gefunden.")
+    product = await get_product(db, variant["product_id"]) or {}
+    printful = product.get("printful") or {}
+    if printful:
+        # Gegen Verwechslungen (#1709): nur Nummern aus dem geladenen Katalog genau dieses Produkts.
+        known = {row.get("id") for row in printful.get("variants") or []}
+        if printful_product_id != printful.get("product_id") or printful_variant_id not in known:
+            raise ShopError("Diese Printful-Nummer gehört nicht zum gewählten Printful-Produkt "
+                            f"({printful.get('product_id')}) - Produkt- und Variantennummer prüfen.")
     row = {"provider": "printful", "variant_id": variant_id, "printful_variant_id": printful_variant_id,
            "printful_product_id": printful_product_id, "updated_at": now_utc().isoformat(), "updated_by": actor_id}
     await db.shop_printful_variants.update_one({"provider": "printful", "variant_id": variant_id}, {"$set": row},
@@ -309,3 +392,67 @@ async def set_printful_variant(db, variant_id: str, *, printful_variant_id: int,
 
 async def printful_variant_for(db, variant_id: str) -> dict | None:
     return await db.shop_printful_variants.find_one({"provider": "printful", "variant_id": variant_id}, {"_id": 0})
+
+
+async def printful_variants_for(db, variant_ids: list[str]) -> dict[str, dict]:
+    rows = await db.shop_printful_variants.find({"provider": "printful", "variant_id": {"$in": list(variant_ids)}},
+                                                {"_id": 0}).to_list(len(variant_ids) or 1)
+    return {row["variant_id"]: row for row in rows}
+
+
+# ---------------------------------------------------------------- Varianten aus dem Printful-Katalog (#1707, #1709)
+# Schreiben nur ``services/shop_products.py`` (Angebot, Preise übernehmen) und ``services/shop_catalog_sync.py``
+# (Abgleich). Sie protokollieren je Schritt einen Eintrag mit Grund - nicht je Variante.
+
+MAPPING_FIELDS = ("printful_variant_id", "printful_product_id", "technique", "currency", "base_cost_cents",
+                  "placement_costs", "availability", "in_stock", "synced_at", "price_warning")
+VARIANT_STATE_FIELDS = ("active", "price_cents", "blocked_reason", "blocked_at", "label", "size", "color",
+                        "color_code")
+
+
+def catalog_sku(product_id: str, printful_variant_id: int) -> str:
+    """Stabil, auch wenn sich der Slug ändert; dieselbe Printful-Variante darf in zwei Produkten stecken."""
+    return f"PF{printful_variant_id}-{str(product_id).replace('-', '')[:8]}"
+
+
+async def ensure_catalog_variant(db, product_id: str, *, printful_variant_id: int, label: str, size: str,
+                                 color: str, color_code: str | None, actor_id: str) -> dict:
+    sku = catalog_sku(product_id, printful_variant_id)
+    existing = await db.shop_variants.find_one({"product_id": product_id, "sku": sku}, {"_id": 0})
+    if existing:
+        return existing
+    now = now_utc().isoformat()
+    variant = {"id": new_id(), "product_id": product_id, "sku": sku, "label": _text(label, "Bezeichnung", 80),
+               "size": _text(size, "Größe", 40), "color": _text(color, "Farbe", 40), "color_code": color_code,
+               "price_cents": None, "active": False, "blocked_reason": None, "blocked_at": None, "version": 1,
+               "created_at": now, "created_by": actor_id, "updated_at": now, "updated_by": actor_id}
+    try:
+        await db.shop_variants.insert_one(dict(variant))
+    except DuplicateKeyError:
+        raise ShopConflict("Diese Variante wurde gerade angelegt - bitte neu laden.")
+    return variant
+
+
+async def set_variant_state(db, variant_id: str, fields: dict, *, actor_id: str) -> None:
+    unknown = sorted(set(fields) - set(VARIANT_STATE_FIELDS))
+    if unknown:
+        raise ShopError(f"Unbekannte Felder: {', '.join(unknown)}.")
+    if "price_cents" in fields:
+        _cents(fields["price_cents"], "Preis", MAX_PRICE_CENTS, optional=True)
+    await db.shop_variants.update_one(
+        {"id": variant_id}, {"$set": {**fields, "updated_at": now_utc().isoformat(), "updated_by": actor_id},
+                             "$inc": {"version": 1}})
+
+
+async def set_catalog_mapping(db, variant_id: str, fields: dict, *, actor_id: str) -> None:
+    unknown = sorted(set(fields) - set(MAPPING_FIELDS))
+    if unknown:
+        raise ShopError(f"Unbekannte Felder: {', '.join(unknown)}.")
+    for label in ("printful_variant_id", "printful_product_id"):
+        value = fields.get(label)
+        if label in fields and (isinstance(value, bool) or not isinstance(value, int) or value <= 0):
+            raise ShopError(f"{label}: positive Zahl.")
+    await db.shop_printful_variants.update_one(
+        {"provider": "printful", "variant_id": variant_id},
+        {"$set": {**fields, "provider": "printful", "variant_id": variant_id, "updated_at": now_utc().isoformat(),
+                  "updated_by": actor_id}}, upsert=True)

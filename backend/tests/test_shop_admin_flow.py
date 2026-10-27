@@ -13,12 +13,13 @@ import pytest_asyncio
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 
 from flow_harness import make_flow  # noqa: E402
+from shop_testdata import publish_unchecked  # noqa: E402
 
 BASE = "/api/admin/shop"
 BY = {"actor_id": "test", "reason": "Testdaten"}
 SHOP_ACTIONS = {"action": {"$regex": "^shop\\."}}
 PRODUCT = {"slug": "loewen-shirt", "title": "Löwen-Shirt", "base_price_cents": 2490, "markup_cents": 500,
-           "gamertag_allowed": True, "reason": "Erstes Vereinsshirt anlegen"}
+           "personalization": "gamertag", "reason": "Erstes Vereinsshirt anlegen"}
 BILLING = {"name": "Testperson Eins", "street": "Probegasse 1", "zip": "1010", "city": "Wien", "country": "AT",
            "source": "dolibarr"}
 SHIPPING = {"recipient": "Testperson Zwei", "street": "Musterweg 2", "zip": "8010", "city": "Graz", "country": "AT",
@@ -63,8 +64,9 @@ REFUSED = ("spieler", "mitglied", "turnierleitung")
 async def seeded_order(flow) -> dict:
     from services import shop_catalog, shop_orders
 
-    fields = {"slug": "bestellt", "title": "Bestellt", "base_price_cents": 2000, "status": "active"}
+    fields = {"slug": "bestellt", "title": "Bestellt", "base_price_cents": 2000}
     product = await shop_catalog.create_product(flow.db, fields, **BY)
+    await publish_unchecked(flow.db, product["id"])
     variant = await shop_catalog.create_variant(flow.db, product["id"], {"sku": "B-1", "label": "M"}, **BY)
     order, _ = await shop_orders.place_order(
         flow.db, user_id="konto-test", idempotency_key="flow-0001", buyer_kind="member",

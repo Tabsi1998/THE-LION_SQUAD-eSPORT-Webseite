@@ -3,10 +3,16 @@ eindeutig, Rechnungs- und Lieferanschrift stehen getrennt mit Quelle und Zeitpun
 Auskunft und Löschung markiert, und im Modell gibt es keinen Platz für Bank- oder Zugangsdaten.
 
 Gegen mongomock mit den echten Indizes aus ``services/shop_schema``. Erfundene Testdaten, keine echten Personen."""
+import pathlib
+import sys
+
 import pytest
 from mongomock_motor import AsyncMongoMockClient
 
-from services import shop_catalog, shop_common, shop_orders, shop_schema
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+
+from services import shop_catalog, shop_common, shop_orders, shop_schema  # noqa: E402
+from shop_testdata import publish_unchecked  # noqa: E402
 
 ACTOR = "finanzen-test"
 BY = {"actor_id": ACTOR, "reason": "Testdaten anlegen"}
@@ -21,18 +27,18 @@ def db():
     return AsyncMongoMockClient()["shop_modell"]
 
 
-async def catalog(db, *, gamertag_allowed=True, markup_cents=500, tax_profile=None):
+async def catalog(db, *, personalization="gamertag", markup_cents=500, tax_profile=None):
     await shop_schema.apply(db)
     product = await shop_catalog.create_product(db, {
         "slug": "loewen-shirt", "title": "Löwen-Shirt", "base_price_cents": 2490, "markup_cents": markup_cents,
-        "gamertag_allowed": gamertag_allowed, "tax_profile": tax_profile, "design_key": "loewe-vorne"}, **BY)
+        "personalization": personalization, "tax_profile": tax_profile, "design_key": "loewe-vorne"}, **BY)
     variant = await shop_catalog.create_variant(db, product["id"], {"sku": "SHIRT-M-SCHWARZ", "label": "M, Schwarz",
                                                                     "size": "M", "color": "Schwarz"}, **BY)
     await shop_catalog.add_design_version(db, "loewe-vorne", file_ref="designs/loewe-v1.png", sha256="a" * 64,
                                           placement="front_right", **BY)
     await shop_catalog.set_printful_variant(db, variant["id"], printful_variant_id=4012, printful_product_id=71,
                                             **BY)
-    await shop_catalog.update_product(db, product["id"], {"status": "active"}, **BY)
+    await publish_unchecked(db, product["id"])
     return product, variant
 
 
@@ -127,7 +133,7 @@ async def test_the_gamertag_is_only_for_members_on_products_that_allow_it(db):
                                                       **BY)
     plain = await shop_catalog.create_variant(db, plain_product["id"], {"sku": "KAPPE-1", "label": "Einheitsgröße"},
                                               **BY)
-    await shop_catalog.update_product(db, plain_product["id"], {"status": "active"}, **BY)
+    await publish_unchecked(db, plain_product["id"])
     with pytest.raises(shop_common.ShopError):
         await place(db, plain, key="bestellung-0005", gamertag="Testlöwe")
     member_without, _ = await place(db, plain, key="bestellung-0006", gamertag=None)

@@ -42,21 +42,21 @@ class Reasoned(BaseModel):
 
 
 class ProductFields(Reasoned):
+    """Den Stand gibt es hier nicht: ihn ändert nur die Prüfung (``POST /products/{id}/status``, #1707).
+    ``markup_cents: null`` heißt „der allgemeine öffentliche Aufschlag gilt“; ein Wert (auch 0) ersetzt ihn."""
     title: str | None = Field(None, min_length=1, max_length=120)
     description: str | None = Field(None, max_length=2000)
-    status: Literal["draft", "active", "archived"] | None = None
     visibility: Literal["hidden", "members", "public"] | None = None
+    personalization: Literal["none", "gamertag", "member_number", "both"] | None = None
     base_price_cents: int | None = Field(None, ge=0, le=shop_catalog.MAX_PRICE_CENTS)
     markup_cents: int | None = Field(None, ge=0, le=shop_catalog.MAX_MARKUP_CENTS)
-    gamertag_allowed: bool | None = None
     tax_profile: str | None = Field(None, max_length=20)
     design_key: str | None = Field(None, max_length=80)
 
 
 class ProductCreate(ProductFields):
-    slug: str = Field(..., min_length=1, max_length=80)
+    slug: str | None = Field(None, min_length=1, max_length=80)
     title: str = Field(..., min_length=1, max_length=120)
-    base_price_cents: int = Field(..., ge=0, le=shop_catalog.MAX_PRICE_CENTS)
 
 
 class ProductUpdate(ProductFields):
