@@ -143,7 +143,9 @@ def test_privacy_facts_are_computed_from_the_real_switches_without_secrets():
         "hosting": {"provider": "Eigenhosting", "country": "Österreich"},
         "media_scan": {"enabled": False, "provider": "off"},
         "platforms": [],
+        "spam_turnstile": False,
     }
+    assert privacy_facts.facts_from({}, {}, {}, {}, {}, spam_turnstile=True)["spam_turnstile"] is True
     assert privacy_facts.facts_from({}, {}, {}, {}, {}, media_scan={"provider": "local"})["media_scan"] == {"enabled": True, "provider": "local"}
     # Plattformen (#545): nur eingerichtete, mit Betreiber - nie Client-ID oder Secret.
     rows = privacy_facts.platform_facts({"discord_client_id": "id", "discord_client_secret": "enc", "twitch_client_id": "id"})
@@ -164,7 +166,7 @@ async def test_public_settings_carry_the_privacy_facts(flow):
     public = (await flow.get("/api/settings/public")).json()
     facts = public["privacy_facts"]
     assert facts["email_provider"] == "smtp" and facts["discord"] == {"channels": False, "bot": True} and facts["dolibarr"] is False
-    assert set(facts) == {"analytics", "google_login", "passkeys", "discord", "twitch_embed", "steam_status", "email_provider", "dolibarr", "dolibarr_billing", "app", "hosting", "media_scan", "platforms"}
+    assert set(facts) == {"analytics", "google_login", "passkeys", "discord", "twitch_embed", "steam_status", "email_provider", "dolibarr", "dolibarr_billing", "app", "hosting", "media_scan", "platforms", "spam_turnstile"}
     # Bildprüfung (#415): im Testbetrieb läuft der Testanbieter - das steht ehrlich so drin.
     assert facts["media_scan"]["enabled"] is True and "google_api_key" not in str(facts)
 
