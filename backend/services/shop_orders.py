@@ -27,7 +27,7 @@ from typing import Any
 from pymongo.errors import DuplicateKeyError
 
 from models import new_id, now_utc
-from services import shop_catalog, shop_common, shop_config
+from services import shop_catalog, shop_common, shop_config, shop_motifs
 from services.shop_common import ShopConflict, ShopError, assert_no_address
 
 BUYER_KINDS = ("member", "public")
@@ -101,7 +101,10 @@ async def _freeze_designs(db, product: dict, variant: dict, line: dict, position
         if row["kind"] == "design":
             key = next((cell["design_key"] for cell in row.get("designs") or []
                         if str(cell.get("color") or "").casefold() == color), None)
-            latest = await shop_catalog.latest_design(db, key) if key else None
+            # Die Fassung des Motivs für die Shirtfarbe (#2069): für dunkle oder helle Shirts nach Helligkeit bzw.
+            # Ausnahme; ohne Farbwert die Hauptdatei wie bisher.
+            latest = await shop_motifs.file_for_garment(db, key, color=variant.get("color"),
+                                                        color_hex=variant.get("color_code")) if key else None
             if not latest:
                 raise ShopError(f"Position {position}: für diese Farbe fehlt eine Druckdatei.")
             entry.update(design_key=latest["design_key"], version=latest["version"], sha256=latest["sha256"])

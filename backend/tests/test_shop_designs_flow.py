@@ -36,12 +36,16 @@ async def flow(tmp_path, monkeypatch):
         await shutdown()
 
 
-def logo(width: int, height: int, *, mode: str = "RGBA", fmt: str = "PNG", **save) -> bytes:
-    """Ein weißes Rechteck mit Rand als „Logo“ - mit durchsichtigem Hintergrund, solange der Modus es kann."""
+BLUE = (39, 170, 225)
+
+
+def logo(width: int, height: int, *, mode: str = "RGBA", fmt: str = "PNG", fill=BLUE, **save) -> bytes:
+    """Ein Rechteck mit Rand als „Logo“ - mit durchsichtigem Hintergrund, solange der Modus es kann. Vorgabe Vereinsblau:
+    ohne Weiß gilt die Datei auch für helle Shirts (#2069), es entsteht keine zweite Fassung."""
     background = (0, 0, 0, 0) if mode == "RGBA" else (40, 40, 40)
     img = Image.new(mode, (width, height), background)
     ImageDraw.Draw(img).rectangle((width // 8, height // 8, width * 7 // 8, height * 7 // 8),
-                                  fill=(255, 255, 255, 255) if mode == "RGBA" else (255, 255, 255))
+                                  fill=(*fill, 255) if mode == "RGBA" else tuple(fill))
     out = BytesIO()
     img.save(out, format=fmt, **save)
     return out.getvalue()
@@ -142,7 +146,7 @@ async def test_metadata_is_stripped_and_transparency_is_kept(flow):
     with Image.open(path) as stored:
         assert stored.format == "PNG" and stored.mode == "RGBA"
         assert "exif" not in stored.info and "Comment" not in stored.info
-        assert stored.getpixel((0, 0))[3] == 0 and stored.getpixel((600, 600)) == (255, 255, 255, 255)
+        assert stored.getpixel((0, 0))[3] == 0 and stored.getpixel((600, 600)) == (*BLUE, 255)
     latest = design(answer)["latest"]
     assert latest["has_alpha"] is True
     assert latest["sha256"] == hashlib.sha256(raw).hexdigest() and latest["sha256_short"] == latest["sha256"][:12]
@@ -167,9 +171,10 @@ async def test_a_jpg_with_exif_is_accepted_as_png_without_metadata_and_with_a_wa
 @pytest.mark.asyncio
 @pytest.mark.parametrize("name, data, content_type, expected", [
     ("loewe.svg", b'<?xml version="1.0"?><svg xmlns="http://www.w3.org/2000/svg" width="4000" height="4000">'
-                  b'<script>alert(1)</script></svg>', "image/svg+xml", "SVG geht für Druckdateien nicht"),
+                  b'<script>alert(1)</script></svg>', "image/svg+xml", "Gefunden: Skript (<script> oder javascript:)"),
+    # Als PNG getarnt: trotzdem als SVG geprüft (#2069) - hier fehlt die Größe.
     ("getarnt.png", b'<svg xmlns="http://www.w3.org/2000/svg"><rect width="9" height="9"/></svg>', "image/png",
-     "SVG geht für Druckdateien nicht"),
+     "Dem SVG fehlt die Größe"),
     ("loewe.gif", None, "image/gif", "Erkannt: GIF"),
     ("loewe.webp", None, "image/webp", "Erkannt: WEBP"),
     ("text.png", b"kein Bild, nur Text", "image/png", "nur als PNG"),
