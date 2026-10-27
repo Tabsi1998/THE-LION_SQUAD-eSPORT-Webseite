@@ -61,7 +61,7 @@ async def test_the_preview_is_exactly_what_is_sent_and_printful_saves_nothing_be
     assert fake.calls_to("createOrder") == [] and fake.orders == {}, "die Vorschau legt bei Printful nichts an"
     assert len(fake.calls_to("createOrderEstimationTask")) == 1
     assert shown["state"] == "preview" and shown["kind"] == "test_draft"
-    assert shown["external_id"].startswith("lsw-test-") and shown["payload"]["external_id"] == shown["external_id"]
+    assert shown["external_id"].startswith("lsw-testentwurf-") and shown["payload"]["external_id"] == shown["external_id"]
     assert set(shown["payload"]) == {"external_id", "shipping", "recipient", "order_items"}, "kein Feld zum Bestätigen"
     assert shown["payload"]["recipient"] == {"name": "Testverein Löwen", "address1": "Vereinsgasse 1", "city": "Innsbruck",
                                              "zip": "6020", "country_code": "AT"}
@@ -274,6 +274,182 @@ async def test_only_so_many_test_drafts_lie_at_printful(db, provider, fake, monk
     other = await preview(db, provider, product, variant)
     with pytest.raises(ShopConflict, match="erst einen löschen"):
         await shop_test_drafts.send(db, other["id"], idempotency_key="klick-0015", actor_id=ACTOR, provider=provider)
+
+
+# ---------------------------------------------------------------- Review: unklarer Ausgang, Rennen, hängende Stände
+
+def timeout_after_creating(fake):
+    """Printful legt den Auftrag an, die Antwort geht aber verloren (Zeitüberschreitung nach dem Anlegen)."""
+    import httpx
+
+    original = fake._op_createOrder
+
+    def create_then_time_out(args, params, body):
+        original(args, params, body)
+        fake._op_createOrder = original
+        raise httpx.ReadTimeout("Antwort verloren (Test)")
+
+    fake._op_createOrder = create_then_time_out
+
+
+async def age_claim(db, external_id: str) -> None:
+    from models import now_utc
+
+    await db.shop_printful_drafts.update_one({"external_id": external_id}, {"$set": {
+        "claimed_at": (now_utc() - timedelta(minutes=5)).isoformat()}})
+
+
+@pytest.mark.asyncio
+async def test_a_timeout_after_creating_keeps_the_draft_traceable_and_deletable(db, provider, fake):
+    from services.shop_fulfillment import FulfillmentTransient
+
+    product, variant = await prepared(db, provider)
+    shown = await preview(db, provider, product, variant)
+    timeout_after_creating(fake)
+    with pytest.raises(FulfillmentTransient):
+        await shop_test_drafts.send(db, shown["id"], idempotency_key="klick-0020", actor_id=ACTOR, provider=provider)
+    assert len(fake.orders) == 1, "Printful hat den Entwurf trotzdem angelegt"
+    record = await db.shop_test_drafts.find_one({"id": shown["id"]}, {"_id": 0})
+    assert record["state"] == "unclear" and record["send_attempted_at"] and record["last_error"]["reason"] == "timeout"
+    # Eine neue Vorschau (Aufräumen) und eine abgelaufene Frist verwerfen ihn nicht.
+    await db.shop_test_drafts.update_one({"id": shown["id"]}, {"$set": {"expires_at": "2000-01-01T00:00:00+00:00"}})
+    await preview(db, provider, product, variant)
+    assert await db.shop_test_drafts.count_documents({"id": shown["id"]}) == 1
+    assert await db.shop_print_files.count_documents({"order_id": shown["id"]}) == 1, "die Datei mit Gamertag bleibt"
+    (listed,) = [row for row in await shop_test_drafts.list_drafts(db) if row["id"] == shown["id"]]
+    assert listed["actions"] == {"resend": True, "delete": False}
+    with pytest.raises(ShopConflict, match="Erneut senden"):
+        await shop_test_drafts.delete(db, shown["id"], actor_id=ACTOR, provider=provider)
+    # „Erneut senden / nachsehen“: derselbe Rumpf, der Claim findet den Auftrag über die external_id - kein zweiter.
+    await age_claim(db, shown["external_id"])
+    again = await shop_test_drafts.send(db, shown["id"], idempotency_key="klick-0021", actor_id=ACTOR, provider=provider)
+    assert again["state"] == "sent" and len(fake.calls_to("createOrder")) == 1 and len(fake.orders) == 1
+    assert again["actions"] == {"resend": False, "delete": True}
+    gone = await shop_test_drafts.delete(db, shown["id"], actor_id=ACTOR, provider=provider)
+    assert gone["state"] == "deleted" and fake.orders == {}
+
+
+@pytest.mark.asyncio
+async def test_a_failed_read_after_creating_is_unclear_and_found_again(db, provider, fake):
+    from services.shop_fulfillment import FulfillmentTransient
+
+    product, variant = await prepared(db, provider)
+    shown = await preview(db, provider, product, variant)
+    original = fake._op_createOrder
+
+    def create_then_break_reading(args, params, body):
+        fake._op_createOrder = original
+        fake.fail(503, operation="getOrder", times=3)  # das Nachlesen nach dem Anlegen scheitert dreimal
+        return original(args, params, body)
+
+    fake._op_createOrder = create_then_break_reading
+    with pytest.raises(FulfillmentTransient):
+        await shop_test_drafts.send(db, shown["id"], idempotency_key="klick-0022", actor_id=ACTOR, provider=provider)
+    assert (await db.shop_test_drafts.find_one({"id": shown["id"]}))["state"] == "unclear"
+    again = await shop_test_drafts.send(db, shown["id"], idempotency_key="klick-0023", actor_id=ACTOR, provider=provider)
+    assert again["state"] == "sent" and len(fake.calls_to("createOrder")) == 1
+
+
+@pytest.mark.asyncio
+async def test_unclear_and_hanging_entries_do_not_block_the_limit_and_a_hanging_delete_is_taken_over(
+        db, provider, fake, monkeypatch):
+    from models import now_utc
+
+    monkeypatch.setenv("SHOP_TEST_DRAFT_MAX_OPEN", "1")
+    product, variant = await prepared(db, provider)
+    stuck = await preview(db, provider, product, variant)
+    timeout_after_creating(fake)
+    with pytest.raises(Exception):
+        await shop_test_drafts.send(db, stuck["id"], idempotency_key="klick-0024", actor_id=ACTOR, provider=provider)
+    shown = await preview(db, provider, product, variant)
+    sent = await shop_test_drafts.send(db, shown["id"], idempotency_key="klick-0025", actor_id=ACTOR, provider=provider)
+    assert sent["state"] == "sent", "ein unklarer Eintrag blockiert die Obergrenze nicht"
+    # Ein frisches „wird gelöscht“ wartet; ein altes übernimmt der nächste Klick.
+    await db.shop_test_drafts.update_one({"id": shown["id"]}, {"$set": {
+        "state": "deleting", "deleting_at": now_utc().isoformat()}})
+    with pytest.raises(ShopConflict, match="gerade gelöscht"):
+        await shop_test_drafts.delete(db, shown["id"], actor_id=ACTOR, provider=provider)
+    old = (now_utc() - timedelta(minutes=5)).isoformat()
+    await db.shop_test_drafts.update_one({"id": shown["id"]}, {"$set": {"deleting_at": old}})
+    assert (await shop_test_drafts.get_view(db, shown["id"]))["actions"]["delete"] is True
+    gone = await shop_test_drafts.delete(db, shown["id"], actor_id=ACTOR, provider=provider)
+    assert gone["state"] == "deleted" and sent["printful_order_id"] not in fake.orders
+    # Ein altes „wird gesendet“ bietet „Erneut senden“ an.
+    await db.shop_test_drafts.update_one({"id": stuck["id"]}, {"$set": {"state": "sending", "sending_at": old}})
+    assert (await shop_test_drafts.get_view(db, stuck["id"]))["actions"]["resend"] is True
+
+
+@pytest.mark.asyncio
+async def test_discarding_a_preview_that_is_being_sent_keeps_everything(db, provider, fake, monkeypatch):
+    product, variant = await prepared(db, provider)
+    shown = await preview(db, provider, product, variant)
+    stale = await db.shop_test_drafts.find_one({"id": shown["id"]}, {"_id": 0})
+    await db.shop_test_drafts.update_one({"id": shown["id"]}, {"$set": {"state": "sending"}})
+    assert await shop_test_drafts._discard(db, stale) is False
+    assert await db.shop_print_files.count_documents({"order_id": shown["id"]}) == 1
+    # Der Lösch-Knopf auf einer Vorschau, die gerade jemand sendet: 409, nichts verworfen.
+
+    async def stale_get(_db, _draft_id):
+        return dict(stale)
+
+    monkeypatch.setattr(shop_test_drafts, "_get", stale_get)
+    with pytest.raises(ShopConflict, match="gerade gesendet"):
+        await shop_test_drafts.delete(db, shown["id"], actor_id=ACTOR, provider=provider)
+    assert await db.shop_test_drafts.count_documents({"id": shown["id"]}) == 1
+    assert await db.shop_print_files.count_documents({"order_id": shown["id"]}) == 1
+
+
+@pytest.mark.asyncio
+async def test_a_preview_with_a_claim_at_printful_is_never_discarded(db, provider, fake):
+    product, variant = await prepared(db, provider)
+    shown = await preview(db, provider, product, variant)
+    await db.shop_printful_drafts.insert_one({"external_id": shown["external_id"], "state": "created",
+                                              "printful_order_id": 9999})
+    await preview(db, provider, product, variant)
+    record = await db.shop_test_drafts.find_one({"id": shown["id"]}, {"_id": 0})
+    assert record["state"] == "unclear"
+    assert await db.shop_print_files.count_documents({"order_id": shown["id"]}) == 1
+
+
+@pytest.mark.asyncio
+async def test_open_test_drafts_can_be_deleted_with_the_shop_off_but_real_drafts_cannot(db, provider, fake):
+    from services.shop_config import PrintfulDraftsBlocked as Blocked
+
+    product, variant = await prepared(db, provider)
+    shown = await preview(db, provider, product, variant)
+    sent = await shop_test_drafts.send(db, shown["id"], idempotency_key="klick-0026", actor_id=ACTOR, provider=provider)
+    await shop_ready(db, stage="off")
+    with pytest.raises(Blocked):
+        await preview(db, provider, product, variant)
+    # Ein echter Entwurf (ohne Test-Präfix) bleibt hinter der Stufe - auch der Adapter-Weg für Testentwürfe lehnt ihn ab.
+    await shop_ready(db)
+    real = await provider.create_draft(db, shop_test_drafts.draft_from_payload(
+        {**sent["payload"], "external_id": "lsw-auftrag-0001"}))
+    await shop_ready(db, stage="off")
+    with pytest.raises(Blocked):
+        await provider.delete_draft(db, real.id)
+    with pytest.raises(FulfillmentInvalid) as refused:
+        await provider.delete_draft(db, real.id, test_draft=True)
+    assert refused.value.reason == "not_test_draft" and real.id.value in fake.orders
+    gone = await shop_test_drafts.delete(db, shown["id"], actor_id=ACTOR, provider=provider)
+    assert gone["state"] == "deleted" and sent["printful_order_id"] not in fake.orders
+    # Ohne Schlüssel geht auch das Aufräumen nicht.
+    await shop_ready(db, stage="off", key=False)
+    with pytest.raises(Blocked):
+        await provider.delete_draft(db, real.id, test_draft=True)
+
+
+@pytest.mark.asyncio
+async def test_confirm_refuses_every_test_external_id_even_without_a_record(db, provider, fake):
+    product, variant = await prepared(db, provider)
+    shown = await preview(db, provider, product, variant)
+    order = await provider.create_draft(db, shop_test_drafts.draft_from_payload(shown["payload"]))
+    await db.shop_test_drafts.delete_many({})  # die Protokollzeile fehlt - der Präfix allein reicht
+    await shop_ready(db, switch=True)
+    with pytest.raises(FulfillmentInvalid) as refused:
+        await provider.confirm_order(db, order.id, idempotency_key="bestaetigen-02")
+    assert refused.value.reason == "test_draft" and fake.calls_to("confirmOrder") == []
+    assert await db.shop_printful_confirmations.count_documents({}) == 0
 
 
 def test_deviations_are_marked_by_level():

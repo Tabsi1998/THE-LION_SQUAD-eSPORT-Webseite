@@ -18,7 +18,7 @@ from services import shop_test_drafts
 from services.printful_client import PrintfulClient
 from services.rate_limit import enforce_rate_limit
 from services.shop_common import ShopConflict, ShopError
-from services.shop_config import PrintfulDraftsBlocked
+from services.shop_config import PrintfulDraftsBlocked, PrintfulKeyMissing
 from services.shop_fulfillment import ERROR_TEXTS, FulfillmentError, FulfillmentInvalid, FulfillmentTransient
 
 router = APIRouter(prefix="/api/admin/shop/test-drafts", tags=["shop"])
@@ -58,6 +58,8 @@ def _refused(exc: Exception) -> HTTPException:
     Tabelle der Ursachen."""
     if isinstance(exc, LookupError):
         return HTTPException(404, "Nicht gefunden.")
+    if isinstance(exc, PrintfulKeyMissing):
+        return HTTPException(409, NO_KEY)
     if isinstance(exc, PrintfulDraftsBlocked):
         return HTTPException(409, "Testentwürfe an Printful erst ab der Stufe „Nur Admins (Test)“ und mit hinterlegtem "
                                   "Schlüssel (Shop → Einstellungen).")
@@ -106,6 +108,15 @@ async def preview(body: PreviewRequest, request: Request, me: dict = Depends(req
                                               gamertag=body.gamertag, address=body.address.model_dump(),
                                               actor_id=me["id"], provider=provider)
     except (ShopError, LookupError, FulfillmentError) as exc:
+        raise _refused(exc) from exc
+
+
+@router.get("/{draft_id}")
+async def detail(draft_id: str, me: dict = Depends(require_area("finance"))):
+    """Ein Testentwurf mit aktuellem Stand und letzter Ursache - etwa nach einem gescheiterten Senden."""
+    try:
+        return await shop_test_drafts.get_view(get_db(), draft_id)
+    except LookupError as exc:
         raise _refused(exc) from exc
 
 

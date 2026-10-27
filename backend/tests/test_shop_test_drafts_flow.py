@@ -85,7 +85,7 @@ def preview_body(product: dict, variant: dict, **extra) -> dict:
 async def test_only_finance_with_second_factor_reaches_the_test_drafts(flow, fake):
     await shop_ready(flow)
     who = await people(flow)
-    routes = [("get", BASE, None), ("post", f"{BASE}/preview", {"product_id": "x", "variant_id": "y", "address": ADDRESS}),
+    routes = [("get", BASE, None), ("get", f"{BASE}/x", None), ("post", f"{BASE}/preview", {"product_id": "x", "variant_id": "y", "address": ADDRESS}),
               ("post", f"{BASE}/x/send", {"idempotency_key": "klick-0001"}), ("post", f"{BASE}/x/delete", None)]
     for name in REFUSED:
         flow.act_as(who[name])
@@ -165,6 +165,10 @@ async def test_errors_carry_fixed_sentences_without_internals(flow, fake):
     detail = answer.json()["detail"]
     assert detail.startswith("Printful: Der Anbieter lehnt die Daten ab")
     assert "Fehler (Test)" not in detail and "Traceback" not in answer.text and API_KEY not in answer.text
+    # Die Seite holt danach den Stand: wieder Vorschau, mit Ursache (die Begründung von Printful nur hier, gekürzt).
+    current = (await flow.get(f"{BASE}/{draft['id']}")).json()
+    assert current["state"] == "preview" and current["last_error"]["reason"] == "bad_request"
+    assert "send_key" not in current and current["actions"] == {"resend": False, "delete": False}
     fake.fail(503, operation="createOrder")
     answer = await flow.post(f"{BASE}/{draft['id']}/send", json={"idempotency_key": "klick-0003"})
     assert answer.status_code == 503 and "noch einmal" in answer.json()["detail"]

@@ -46,7 +46,7 @@ from services.shop_fulfillment import (
     CatalogCategory, CatalogEntry, CatalogProduct, CatalogProductId, CatalogVariant, CatalogVariantId, Costs, DraftLine, DraftOrder,
     FulfillmentError, FulfillmentInvalid, FulfillmentOrder, FulfillmentPermanent, FulfillmentTransient, MockupImage,
     MockupTask, MockupTemplate, OrderItem, PLACEMENT_RE, PlacedFile, Placement, PrintArea, PrintFile, PrintfulOrderId,
-    ProductPlacementInfo, TECHNIQUE_RE, check_external_id, check_https_url, require)
+    ProductPlacementInfo, TECHNIQUE_RE, check_external_id, check_https_url, is_test_external_id, require)
 
 logger = logging.getLogger("tls.printful")
 
@@ -766,12 +766,24 @@ class PrintfulClient:
                                                             "seen_at": datetime.now(timezone.utc).isoformat()}})
         return await self.get_order(order_id)
 
-    async def delete_draft(self, db, order_id: PrintfulOrderId) -> None:
+    async def delete_draft(self, db, order_id: PrintfulOrderId, *, test_draft: bool = False) -> None:
         """Einen Entwurf löschen. Was kein Entwurf mehr ist, bleibt unberührt (``not_draft``) - storniert wird ein
-        bestätigter Auftrag nur über einen eigenen Weg hinter dem Notschalter (#1721)."""
+        bestätigter Auftrag nur über einen eigenen Weg hinter dem Notschalter (#1721).
+
+        ``test_draft=True`` (#2062): Aufräumen eines Testentwurfs geht auch bei Stufe „Aus“, solange der Schlüssel
+        lesbar ist - aber nur für Aufträge, deren external_id mit ``lsw-testentwurf-`` beginnt (sonst
+        ``not_test_draft``).
+        Für echte Bestellungen gilt weiter ``require_printful_drafts``."""
         require(order_id, PrintfulOrderId, "order_id")
-        await shop_config.require_printful_drafts(db)
+        if type(test_draft) is not bool:
+            raise TypeError("test_draft ist True oder False")
+        if test_draft:
+            await shop_config.require_printful_key(db)
+        else:
+            await shop_config.require_printful_drafts(db)
         current = await self.get_order(order_id)
+        if test_draft and not is_test_external_id(current.external_id):
+            raise FulfillmentInvalid("not_test_draft")
         if current.status != "draft":
             raise FulfillmentInvalid("not_draft")
         # Erst den Claim auf „deleting“, dann DELETE, dann Claim weg. Bricht es dazwischen ab, prüft das nächste
@@ -804,6 +816,8 @@ class PrintfulClient:
         if state == "sending" and self._fresh(earlier.get("claimed_at"), CONFIRM_CLAIM_SECONDS, now):
             raise FulfillmentTransient("confirm_in_progress")
         current = await self.get_order(order_id)
+        if is_test_external_id(current.external_id):
+            raise FulfillmentInvalid("test_draft")
         if current.status != "draft":
             await store.update_one({"_id": earlier["_id"]}, {"$set": {"state": "confirmed", "status": current.status}})
             return None, current
@@ -864,6 +878,11 @@ class PrintfulClient:
                 # Nichts gesendet: Claim wieder frei.
                 await store.delete_one({"_id": claim_id, "state": "sending"})
                 raise
+            if is_test_external_id(current.external_id):
+                # Ein Testentwurf (#2062, external_id „lsw-testentwurf-…“) wird nie bestätigt - auch ohne
+                # Protokollzeile.
+                await store.delete_one({"_id": claim_id, "state": "sending"})
+                raise FulfillmentInvalid("test_draft")
             if current.status != "draft":
                 await store.update_one({"_id": claim_id}, {"$set": {"state": "confirmed", "status": current.status}})
                 return current

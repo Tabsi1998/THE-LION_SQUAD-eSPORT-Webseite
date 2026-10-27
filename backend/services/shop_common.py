@@ -102,7 +102,7 @@ MODEL_FIELDS: dict[str, tuple[str, ...]] = {
                          "estimate_error", "price_check", "warnings", "mockup", "created_by", "created_at",
                          "expires_at", "send_key", "sending_at", "sent_by", "last_error", "printful_order_id",
                          "printful_status", "response", "deviations", "sent_at", "deleting_at", "deleted_at",
-                         "deleted_by", "delete_note"),
+                         "deleted_by", "delete_note", "send_attempted_at"),
 }
 FORBIDDEN_FIELD_PARTS = ("iban", "bic", "bank", "account_number", "card", "cvv", "password", "passwort", "secret",
                          "token", "api_key", "apikey")

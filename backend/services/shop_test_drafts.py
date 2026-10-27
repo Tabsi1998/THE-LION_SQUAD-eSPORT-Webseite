@@ -39,15 +39,19 @@ from services.mutation_lock import MutationLockBusy, mutation_lock
 from services.printful_client import order_payload
 from services.shop_common import ShopConflict, ShopError, record_admin_action
 from services.shop_fulfillment import (
-    ERROR_TEXTS, CatalogVariantId, DraftLine, DraftOrder, FulfillmentError, FulfillmentInvalid, FulfillmentOrder,
-    FulfillmentPermanent, FulfillmentProvider, Placement, PrintfulOrderId, Recipient)
+    ERROR_TEXTS, TEST_EXTERNAL_PREFIX, CatalogVariantId, DraftLine, DraftOrder, FulfillmentError, FulfillmentInvalid,
+    FulfillmentOrder, FulfillmentPermanent, FulfillmentProvider, Placement, PrintfulOrderId, Recipient)
 
 COLLECTION = "shop_test_drafts"
 KIND = "test_draft"
-EXTERNAL_PREFIX = "lsw-test-"
-STATES = ("preview", "sending", "sent", "deleting", "deleted")
-STATE_LABELS = {"preview": "Vorschau", "sending": "wird gesendet", "sent": "Entwurf bei Printful",
-                "deleting": "wird gelöscht", "deleted": "gelöscht"}
+EXTERNAL_PREFIX = TEST_EXTERNAL_PREFIX
+# „unclear“: das Senden brach ab, ohne dass klar ist, ob Printful den Entwurf angelegt hat (Zeitüberschreitung, 5xx,
+# Abbruch nach dem Anlegen). So ein Testentwurf wird nie verworfen - „Erneut senden / nachsehen“ schickt denselben
+# Rumpf, und der Claim des Adapters findet einen schon angelegten Auftrag über die external_id.
+STATES = ("preview", "sending", "unclear", "sent", "deleting", "deleted")
+STATE_LABELS = {"preview": "Vorschau", "sending": "wird gesendet", "unclear": "Ausgang unklar - erneut senden",
+                "sent": "Entwurf bei Printful", "deleting": "wird gelöscht", "deleted": "gelöscht"}
+DRAFT_CLAIMS = "shop_printful_drafts"
 MOCKUP_PENDING = "Mockup folgt (#1710)."
 NO_PUBLIC_URL = ("Die Druckdateien haben keine öffentliche https-Adresse - Printful kann sie so nicht holen. "
                  "PUBLIC_BACKEND_URL (oder PUBLIC_BASE_URL) in der .env auf die https-Adresse der Website setzen.")
@@ -73,7 +77,8 @@ def limits() -> dict:
     - ``SHOP_TEST_DRAFT_PREVIEW_MINUTES`` (60): so lange darf eine Vorschau gesendet werden,
     - ``SHOP_TEST_DRAFT_MAX_OPEN`` (5): so viele Testentwürfe dürfen gleichzeitig bei Printful liegen,
     - ``SHOP_TEST_DRAFT_SENDING_SECONDS`` (120): ein hängendes „wird gesendet“ darf danach erneut senden (der Claim des
-      Adapters findet einen schon angelegten Auftrag über die ``external_id``)."""
+      Adapters findet einen schon angelegten Auftrag über die ``external_id``),
+    - ``SHOP_TEST_DRAFT_DELETING_SECONDS`` (120): ein hängendes „wird gelöscht“ darf danach erneut löschen."""
     return {
         "preview_limit": _env_int("SHOP_TEST_DRAFT_PREVIEW_LIMIT", 20, 1, 1000),
         "send_limit": _env_int("SHOP_TEST_DRAFT_SEND_LIMIT", 5, 1, 1000),
@@ -81,6 +86,7 @@ def limits() -> dict:
         "preview_minutes": _env_int("SHOP_TEST_DRAFT_PREVIEW_MINUTES", 60, 1, 7 * 24 * 60),
         "max_open": _env_int("SHOP_TEST_DRAFT_MAX_OPEN", 5, 1, 100),
         "sending_seconds": _env_int("SHOP_TEST_DRAFT_SENDING_SECONDS", 120, 30, 3600),
+        "deleting_seconds": _env_int("SHOP_TEST_DRAFT_DELETING_SECONDS", 120, 30, 3600),
     }
 
 
@@ -248,14 +254,31 @@ async def _placements(db, files: list[dict]) -> tuple[tuple[Placement, ...], lis
     return tuple(places), shown
 
 
-async def _discard(db, record: dict) -> None:
-    """Eine Vorschau, die nie hinausging: ihre eigenen Druckdateien (mit Gamertag) und die Zeile weg."""
+async def _claimed_at_printful(db, external_id: str) -> bool:
+    """Gibt es beim Adapter einen Claim für diese external_id, der nicht eindeutig abgelehnt ist? Dann kann bei Printful
+    ein Entwurf liegen - der Testentwurf darf nicht verworfen werden."""
+    claim = await db[DRAFT_CLAIMS].find_one({"external_id": external_id}, {"_id": 0, "state": 1})
+    return bool(claim and claim.get("state") != "failed")
+
+
+async def _discard(db, record: dict) -> bool:
+    """Eine Vorschau, die nie hinausging: erst die Zeile (nur, solange sie noch Vorschau ist), dann ihre eigenen
+    Druckdateien (mit Gamertag). Liefert ``False``, wenn ein anderer Aufruf sie gerade sendet - dann bleibt alles.
+    Hat der Adapter schon einen Claim für die external_id, wird sie nie verworfen, sondern ``unclear``."""
+    if await _claimed_at_printful(db, record["external_id"]):
+        await _collection(db).update_one({"id": record["id"], "state": "preview"},
+                                         {"$set": {"state": "unclear", "send_attempted_at": _now().isoformat()}})
+        return False
+    removed = await _collection(db).delete_one({"id": record["id"], "state": "preview"})
+    if removed.deleted_count != 1:
+        return False
     await shop_print_files.discard_order_files(db, record["id"])
-    await _collection(db).delete_one({"id": record["id"], "state": "preview"})
+    return True
 
 
 async def _sweep_previews(db, actor_id: str) -> None:
-    """Alte Vorschauen dieser Person und abgelaufene aller Personen aufräumen - es entstehen keine Dateileichen."""
+    """Alte Vorschauen dieser Person und abgelaufene aller Personen aufräumen - es entstehen keine Dateileichen. Nur
+    Stand ``preview``: ein ``unclear`` (Printful hat vielleicht angelegt) bleibt immer."""
     cutoff = (_now() - timedelta(minutes=limits()["preview_minutes"])).isoformat()
     query = {"state": "preview", "$or": [{"created_by": actor_id}, {"created_at": {"$lt": cutoff}}]}
     stale = await _collection(db).find(query, {"_id": 0}).to_list(200)
@@ -474,6 +497,20 @@ async def _get(db, draft_id: str) -> dict:
 IDEMPOTENCY_RE = re.compile(r"[A-Za-z0-9:_-]{8,128}")
 
 
+async def _after_failed_send(db, record: dict, exc: BaseException) -> None:
+    """Das Senden ist gescheitert. Eindeutig abgelehnt (der Adapter hat seinen Claim auf „failed“ gesetzt oder gar
+    keinen angelegt): zurück auf Vorschau. Sonst ist offen, ob Printful den Entwurf angelegt hat (Zeitüberschreitung,
+    5xx, Abbruch nach dem Anlegen): Stand ``unclear`` - nie verworfen, „Erneut senden / nachsehen“ findet ihn über die
+    external_id."""
+    unclear = await _claimed_at_printful(db, record["external_id"])
+    update: dict = {"state": "unclear" if unclear else "preview", "send_key": None}
+    if unclear:
+        update["send_attempted_at"] = _now().isoformat()
+    if isinstance(exc, FulfillmentError):
+        update["last_error"] = _error_view(exc)
+    await _collection(db).update_one({"id": record["id"], "state": "sending"}, {"$set": update})
+
+
 async def send(db, draft_id: str, *, idempotency_key: Any, actor_id: str, provider: FulfillmentProvider) -> dict:
     """Die Vorschau **als Entwurf** an Printful senden - nie bestätigen. Derselbe Schlüssel noch einmal liefert
     dasselbe Ergebnis (Doppelklick); ein anderer Schlüssel nach dem Senden ist ein Konflikt."""
@@ -489,22 +526,27 @@ async def send(db, draft_id: str, *, idempotency_key: Any, actor_id: str, provid
     stuck = (now - timedelta(seconds=settings["sending_seconds"])).isoformat()
     if record["state"] == "sending" and record.get("sending_at", "") >= stuck:
         raise ShopConflict("Der Testentwurf wird gerade gesendet - Ergebnis abwarten.")
-    if record["state"] not in ("preview", "sending"):
+    if record["state"] not in ("preview", "sending", "unclear"):
         raise ShopConflict("Dieser Testentwurf wurde schon gesendet.")
+    # Ein erneuter Versuch nach unklarem oder hängendem Senden schickt denselben, eingefrorenen Rumpf - ohne Ablauf
+    # und ohne Obergrenze: der Entwurf liegt vielleicht schon bei Printful und muss nachverfolgbar bleiben.
+    retry = record["state"] != "preview"
     expires = _parse(record.get("expires_at"))
-    if record["state"] == "preview" and (expires is None or expires <= now):
+    if not retry and (expires is None or expires <= now):
         raise ShopError("Die Vorschau ist abgelaufen - bitte neu erstellen, damit Dateien und Preise aktuell sind.")
     draft = draft_from_payload(record["payload"])
-    open_drafts = await _collection(db).count_documents({"kind": KIND, "state": {"$in": ["sent", "deleting"]}})
-    if open_drafts >= settings["max_open"]:
-        raise ShopConflict(f"Bei Printful liegen schon {open_drafts} Testentwürfe (höchstens {settings['max_open']}) - "
-                           "bitte erst einen löschen.")
+    if not retry:
+        open_drafts = await _collection(db).count_documents({"kind": KIND, "state": {"$in": ["sent", "deleting"]}})
+        if open_drafts >= settings["max_open"]:
+            raise ShopConflict(f"Bei Printful liegen schon {open_drafts} Testentwürfe (höchstens "
+                               f"{settings['max_open']}) - bitte erst einen löschen.")
     for item in record["files"]:
         row = await db.shop_print_files.find_one({"id": item["file_id"]}, {"_id": 0})
         if not row or row.get("public_disabled_at") or not shop_print_files.file_exists(row):
             raise ShopError("Eine Druckdatei der Vorschau ist nicht mehr da - bitte die Vorschau neu erstellen.")
     claimed = await _collection(db).update_one(
-        {"id": record["id"], "$or": [{"state": "preview"}, {"state": "sending", "sending_at": {"$lt": stuck}}]},
+        {"id": record["id"], "$or": [{"state": "preview"}, {"state": "unclear"},
+                                     {"state": "sending", "sending_at": {"$lt": stuck}}]},
         {"$set": {"state": "sending", "send_key": key, "sending_at": now.isoformat(), "sent_by": actor_id}})
     if claimed.modified_count != 1:
         current = await _get(db, draft_id)
@@ -514,12 +556,7 @@ async def send(db, draft_id: str, *, idempotency_key: Any, actor_id: str, provid
     try:
         order = await provider.create_draft(db, draft)
     except BaseException as exc:
-        # Nichts oder Unklares bei Printful: zurück auf Vorschau. Ein neuer Versuch ist sicher - der Claim des Adapters
-        # findet einen schon angelegten Auftrag über die external_id, statt einen zweiten anzulegen.
-        update: dict = {"state": "preview", "send_key": None}
-        if isinstance(exc, FulfillmentError):
-            update["last_error"] = _error_view(exc)
-        await _collection(db).update_one({"id": record["id"], "state": "sending"}, {"$set": update})
+        await _after_failed_send(db, record, exc)
         raise
     answer = _order_view(order)
     deviations = compare(record, answer)
@@ -539,23 +576,33 @@ async def send(db, draft_id: str, *, idempotency_key: Any, actor_id: str, provid
 
 async def delete(db, draft_id: str, *, actor_id: str, provider: FulfillmentProvider) -> dict:
     """Den Entwurf bei Printful löschen (``delete_draft``: nur, solange er ein Entwurf ist) und die eigenen
-    Druckdateien vom Netz nehmen. Eine Vorschau, die nie hinausging, wird einfach verworfen."""
-    await shop_config.require_printful_drafts(db)
+    Druckdateien vom Netz nehmen. Eine Vorschau, die nie hinausging, wird einfach verworfen.
+
+    Aufräumen geht auch, wenn der Shop inzwischen wieder auf „Aus“ steht - es reicht ein lesbarer Schlüssel
+    (``shop_config.require_printful_key``); der Adapter löscht dann nur Aufträge mit external_id
+    ``lsw-testentwurf-…``. Ein
+    hängendes „wird gelöscht“ darf nach ``SHOP_TEST_DRAFT_DELETING_SECONDS`` übernommen werden."""
+    await shop_config.require_printful_key(db)
     record = await _get(db, draft_id)
     if record["state"] == "deleted":
         return view(record)
     if record["state"] == "preview":
-        await _discard(db, record)
+        if not await _discard(db, record):
+            raise ShopConflict("Der Testentwurf wird gerade gesendet - Ergebnis abwarten.")
         return {**view(record), "state": "deleted", "state_label": STATE_LABELS["deleted"], "discarded": True}
-    if record["state"] != "sent" or not record.get("printful_order_id"):
-        raise ShopConflict("Der Testentwurf wird gerade gesendet oder gelöscht - Ergebnis abwarten.")
-    claimed = await _collection(db).update_one({"id": record["id"], "state": "sent"},
-                                               {"$set": {"state": "deleting", "deleting_at": _now().isoformat()}})
+    if record["state"] in ("sending", "unclear"):
+        raise ShopConflict("Der Ausgang des Sendens ist noch offen - erst „Erneut senden / nachsehen“, dann löschen.")
+    if record["state"] not in ("sent", "deleting") or not record.get("printful_order_id"):
+        raise ShopConflict("Der Testentwurf wird gerade gelöscht - Ergebnis abwarten.")
+    stuck = (_now() - timedelta(seconds=limits()["deleting_seconds"])).isoformat()
+    claimed = await _collection(db).update_one(
+        {"id": record["id"], "$or": [{"state": "sent"}, {"state": "deleting", "deleting_at": {"$lt": stuck}}]},
+        {"$set": {"state": "deleting", "deleting_at": _now().isoformat()}})
     if claimed.modified_count != 1:
         raise ShopConflict("Der Testentwurf wird gerade gelöscht - Ergebnis abwarten.")
     note = None
     try:
-        await provider.delete_draft(db, PrintfulOrderId(int(record["printful_order_id"])))
+        await provider.delete_draft(db, PrintfulOrderId(int(record["printful_order_id"])), test_draft=True)
     except FulfillmentPermanent as exc:
         if exc.reason != "not_found":
             await _back_to_sent(db, record, exc)
@@ -599,11 +646,33 @@ def view(record: dict) -> dict:
     deviations = record.get("deviations") or []
     out["deviation_summary"] = {level: sum(1 for row in deviations if row["level"] == level)
                                 for level in ("ok", "warn", "error")}
+    out["actions"] = actions(record)
     return out
 
 
+def actions(record: dict, now: datetime | None = None) -> dict:
+    """Was die Seite anbietet: „Erneut senden / nachsehen“ bei unklarem oder hängendem Senden (derselbe Rumpf),
+    „Löschen“ bei einem Entwurf bei Printful oder einem hängenden Löschen."""
+    now = now or _now()
+    settings = limits()
+    state = record.get("state")
+    sending_at, deleting_at = _parse(record.get("sending_at")), _parse(record.get("deleting_at"))
+    stuck_sending = state == "sending" and (
+        sending_at is None or now - sending_at >= timedelta(seconds=settings["sending_seconds"]))
+    stuck_deleting = state == "deleting" and (
+        deleting_at is None or now - deleting_at >= timedelta(seconds=settings["deleting_seconds"]))
+    return {"resend": state == "unclear" or stuck_sending,
+            "delete": bool(record.get("printful_order_id")) and (state == "sent" or stuck_deleting)}
+
+
+async def get_view(db, draft_id: str) -> dict:
+    """Ein Testentwurf mit aktuellem Stand - etwa nach einem gescheiterten Senden (Ursache in ``last_error``)."""
+    return view(await _get(db, draft_id))
+
+
 async def list_drafts(db, *, limit: int = 20) -> list[dict]:
-    """Die gesendeten Testentwürfe (neueste zuerst) mit Printful-Nummer und Dashboard-Link - ohne Vorschauen."""
+    """Die gesendeten Testentwürfe (neueste zuerst) mit Printful-Nummer und Dashboard-Link - ohne Vorschauen. Auch
+    unklare und hängende, damit nichts bei Printful ohne Protokoll liegen bleibt."""
     rows = await _collection(db).find({"kind": KIND, "state": {"$ne": "preview"}}, {"_id": 0}).sort(
         "created_at", -1).to_list(limit)
     return [view(row) for row in rows]
