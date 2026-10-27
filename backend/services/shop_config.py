@@ -129,11 +129,15 @@ async def printful_api_key(db) -> str | None:
 # ---------------------------------------------------------------- Preise und Versand
 
 def markup_cents(config: dict, buyer_kind: str, product: dict) -> int:
-    """Aufschlag je Artikel: Mitglieder zahlen den Selbstkostenpreis (0). Öffentlich der Aufschlag des Shops plus ein
-    eigener Aufschlag des Produkts, falls die Finanzen einem Produkt einen geben."""
+    """Aufschlag je Artikel: Mitglieder zahlen den Selbstkostenpreis (0). Öffentlich gilt der eigene Aufschlag des
+    Produkts, **falls gesetzt** - er ersetzt den allgemeinen Aufschlag des Shops (Entscheidung zu #1707), auch wenn er
+    0 ist. Nicht gesetzt (``None``) heißt: der allgemeine gilt."""
     if buyer_kind != "public":
         return MEMBER_MARKUP_CENTS
-    return int(config.get("public_markup_cents") or 0) + int(product.get("markup_cents") or 0)
+    own = product.get("markup_cents")
+    if isinstance(own, int) and not isinstance(own, bool):
+        return own
+    return int(config.get("public_markup_cents") or 0)
 
 
 def check_shipping_country(country: str) -> None:

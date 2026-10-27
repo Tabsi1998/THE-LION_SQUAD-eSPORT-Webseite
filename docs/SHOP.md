@@ -178,7 +178,9 @@ Shop), Verbindungstest über den Printful-Adapter (`printful_client.py`, unten).
   `PrintfulDraftsBlocked` - auch bei ausgeschaltetem Notschalter (#2062).
 - **Preise:** Mitglieder zahlen den Selbstkostenpreis (Einkauf plus Versand), ihr Aufschlag ist fest 0. Der
   öffentliche Aufschlag ist ein fester Betrag je Artikel (Vorgabe 0, höchstens 100 €) und greift nur bei der Kaufart
-  `public`; trägt ein Produkt einen eigenen Aufschlag, kommt der dazu. `place_order` friert den Betrag ein.
+  `public`. Trägt ein Produkt einen eigenen Aufschlag, **ersetzt** er den allgemeinen (Entscheidung zu #1707, vorher
+  wurden beide addiert) - auch ein eigener Aufschlag von 0 €; leer heißt „der allgemeine gilt“. `place_order` friert
+  den Betrag ein.
 - **Versand:** nur nach Österreich (`SHIPPING_COUNTRIES = ("AT",)`, `place_order` lehnt andere Lieferländer ab).
   Den Versand bestimmt `place_order` selbst: der Aufrufer gibt nur `shipping_estimate_cents` (die Schätzung von
   Printful oder `None`), `shipping_cents(config, schätzung)` nimmt die Schätzung, sonst die **Ersatzpauschale**; fehlt

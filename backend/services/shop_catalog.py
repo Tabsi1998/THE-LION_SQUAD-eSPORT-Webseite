@@ -74,7 +74,8 @@ def _product_value(key: str, value: Any) -> Any:
     if key == "base_price_cents":
         return _cents(value, "Preis", MAX_PRICE_CENTS)
     if key == "markup_cents":
-        return _cents(value, "Vereinsaufschlag", MAX_MARKUP_CENTS)
+        # Leer heißt „der allgemeine öffentliche Aufschlag gilt“; ein Wert (auch 0) ersetzt ihn (#1707).
+        return _cents(value, "Vereinsaufschlag", MAX_MARKUP_CENTS, optional=True)
     if key == "gamertag_allowed":
         if not isinstance(value, bool):
             raise ShopError("Gamertag: ja oder nein.")
@@ -126,7 +127,7 @@ async def create_product(db, fields: dict, *, actor_id: str, reason: str) -> dic
         if required not in values:
             raise ShopError(f"{required} fehlt.")
     now = now_utc().isoformat()
-    product = {"id": new_id(), "description": None, "status": "draft", "visibility": "hidden", "markup_cents": 0,
+    product = {"id": new_id(), "description": None, "status": "draft", "visibility": "hidden", "markup_cents": None,
                "gamertag_allowed": False, "tax_profile": None, "design_key": None, **values, "currency": "EUR",
                "version": 1, "created_at": now, "created_by": actor_id, "updated_at": now, "updated_by": actor_id}
     try:
