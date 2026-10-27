@@ -516,6 +516,35 @@ async def check_shop(db) -> dict:
     return result("shop", label, "ok", value, where)
 
 
+async def check_spam_guard(db) -> dict:
+    """Spamschutz (#2067): abgefangen heute, Spam-Quote der letzten 7 Tage und die stärkste Stunde der letzten 24
+    Stunden. Gelb bei einer Spitze über der Schwelle, bei Turnstile-Ausfällen und bei einem unlesbaren Secret Key."""
+    label = "Spamschutz"
+    try:
+        from services import spam_guard
+
+        config = await spam_guard.load(db)
+        stats = await spam_guard.stats_view(db)
+    except Exception as exc:  # noqa: BLE001
+        return failed("spam_guard", label, exc)
+    where = "Verwaltung → Kontakt-Inbox, Einstellungen → Spamschutz"
+    quote = stats["quote_week"]
+    value = f"{stats['today']['caught']} abgefangen heute · Quote {quote if quote is not None else '–'} % (7 Tage)"
+    if not config["enabled"]:
+        return result("spam_guard", label, "warn", "aus", f"Der Spamschutz ist ausgeschaltet – nur die Limits wirken ({where}).")
+    problems = []
+    peak = stats["peak_24h"]
+    if peak["count"] >= config["peak_per_hour"]:
+        problems.append(f"Spitze: {peak['count']} abgefangen in einer Stunde ({peak['hour']}), Schwelle {config['peak_per_hour']}")
+    if stats["turnstile_unavailable_24h"]:
+        problems.append(f"Turnstile {stats['turnstile_unavailable_24h']}× nicht erreichbar in 24 h – es wirkten nur die eigenen Stufen")
+    if config["turnstile"]["enabled"] and spam_guard.secret_state(config) != "ok":
+        problems.append("Turnstile ist an, aber der Secret Key fehlt oder ist nicht lesbar")
+    if problems:
+        return result("spam_guard", label, "warn", value, "; ".join(problems) + f" ({where}).")
+    return result("spam_guard", label, "ok", value, where)
+
+
 CheckRunner = Callable[[Any], Awaitable[dict]]
 
 
@@ -537,6 +566,7 @@ def default_checks(db) -> list[tuple[str, str, Callable[[], Awaitable[dict]]]]:
         ("file_cleanups", "Datei-Nacharbeit", lambda: check_file_cleanups(db)),
         ("image_reading", "Bild-Erkennung", check_image_reading),
         ("shop", "Shop", lambda: check_shop(db)),
+        ("spam_guard", "Spamschutz", lambda: check_spam_guard(db)),
     ]
 
 
