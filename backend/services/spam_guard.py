@@ -155,7 +155,9 @@ TURNSTILE_MODES = ("always", "suspect")
 TURNSTILE_MODE_LABELS = {"always": "Immer", "suspect": "Nur bei Verdacht"}
 # „Nur bei Verdacht“: zusätzlich ein Zufallsanteil unauffälliger Anfragen - sonst verrät die Rückfrage (428) einem
 # Bot, dass er aufgefallen ist. (Vorgabe, kleinster, größter Wert in Prozent.)
-SAMPLE_PERCENT = (10, 0, 100)
+# Höchstens 50 %: lädt Turnstile bei jemandem nicht, soll nicht fast jede Anfrage erst eine Rückfrage bekommen.
+SAMPLE_PERCENT = (10, 0, 50)
+TURNSTILE_NOT_LOADED = "Die Sicherheitsprüfung konnte nicht geladen werden – bitte Werbeblocker prüfen oder später erneut versuchen."
 SITEVERIFY_URL = "https://challenges.cloudflare.com/turnstile/v0/siteverify"
 TIMEOUT_SECONDS = 5.0
 # Für Tests: ein httpx-Transport statt des Netzes. Ein echter Aufruf an Cloudflare passiert in Tests nie.
@@ -387,9 +389,25 @@ def verify_token(config: dict, token: Any, form: str, *, now: float | None = Non
     return True, "ok"
 
 
+def _token_key(token: str) -> str:
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()[:32]
+
+
+async def _was_challenged(db, token: str) -> bool:
+    """Hat dieses Formular-Token schon eine Turnstile-Rückfrage (428) bekommen?"""
+    if not token:
+        return False
+    return bool((await db.spam_guard_tokens.find_one({"_id": _token_key(token)}, {"challenged_at": 1}) or {}).get("challenged_at"))
+
+
+async def _mark_challenged(db, token: str) -> None:
+    if token:
+        await db.spam_guard_tokens.update_one({"_id": _token_key(token)}, {"$set": {"challenged_at": datetime.now(timezone.utc)}})
+
+
 async def _token_use_allowed(db, config: dict, token: str) -> bool:
     """Ein Token gilt für ein paar Versuche (Tippfehler, „Name vergeben“), nicht für eine Flut."""
-    key = hashlib.sha256(token.encode("utf-8")).hexdigest()[:32]
+    key = _token_key(token)
     row = await db.spam_guard_tokens.find_one_and_update(
         {"_id": key},
         {"$inc": {"uses": 1}, "$setOnInsert": {"expires_at": datetime.now(timezone.utc) + timedelta(minutes=config["max_age_minutes"] + 60)}},
@@ -923,11 +941,22 @@ async def screen(request: Request, form: str, *, token: Any = None, honeypot: An
     suspect = is_suspect(config, reasons, score)
     # „Nur bei Verdacht“: auch ein Zufallsanteil unauffälliger Anfragen muss bestätigen, und eine mitgeschickte
     # Antwort wird immer geprüft - so ist die Rückfrage für einen Bot kein sicheres Zeichen, aufgefallen zu sein.
-    if turnstile and mode == "suspect" and (suspect or turnstile_token or _sampled(config)):
+    challenged_before = await _was_challenged(db, token_value) if turnstile and mode == "suspect" else False
+    if turnstile and mode == "suspect" and (suspect or turnstile_token or challenged_before or _sampled(config)):
         result = await check_turnstile(db, config, form, turnstile_token)
-        if result == "missing":
+        if result == "missing" and not challenged_before:
+            await _mark_challenged(db, token_value)
             await record(db, stats_form, "challenged", reasons[0] if reasons else None)
             raise turnstile_required_error(config, form)
+        if result == "missing":
+            # Dieselbe Anfrage kommt nach der Rückfrage ohne Antwort wieder - Turnstile lädt bei dieser Person nicht
+            # (Werbeblocker, Netz). Nie dauerhaft blockieren: Kontakt als Verdacht, Registrierung mit sichtbarer Meldung.
+            if form in STALE_PAGE_FORMS:
+                await record(db, stats_form, "refused", "turnstile_missing")
+                raise HTTPException(400, TURNSTILE_NOT_LOADED)
+            reasons.append("turnstile_missing")
+            await record(db, stats_form, "suspect", reasons[0])
+            return Verdict(form, SUSPECT, reasons, score)
         if result == "invalid":
             return await _drop(db, stats_form, "turnstile_invalid")
         if result == "ok":

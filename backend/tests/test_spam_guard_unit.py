@@ -115,6 +115,9 @@ def test_turnstile_defaults_to_always_and_samples_ten_percent():
     assert turnstile["mode"] == "always"
     assert turnstile["sample_percent"] == 10
     assert spam_guard.normalized({"turnstile": {"sample_percent": 150}})["turnstile"]["sample_percent"] == 10
+    # Höchstens die Hälfte - sonst blockiert „nur bei Verdacht“ fast jeden, bei dem Turnstile nicht lädt (Codex-Befund).
+    assert spam_guard.normalized({"turnstile": {"sample_percent": 60}})["turnstile"]["sample_percent"] == 10
+    assert spam_guard.normalized({"turnstile": {"sample_percent": 50}})["turnstile"]["sample_percent"] == 50
 
 
 def test_one_link_is_fine():

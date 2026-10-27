@@ -111,12 +111,14 @@ export function useSpamGuard(form) {
 
   // Nach jedem Versuch, ob Erfolg oder Fehler: ein neues Formular-Token (ein Token gilt nur für wenige Versuche) und
   // ein frisches Widget (eine Turnstile-Antwort gilt nur einmal). `prepare()` wartet beim nächsten Senden die
-  // Mindestzeit ab, falls nötig.
-  const afterAttempt = useCallback(() => {
+  // Mindestzeit ab, falls nötig. Ausnahme: nach der Turnstile-Rückfrage (428) bleibt das Token - lädt Turnstile nicht,
+  // erkennt der Server die wiederholte Anfrage daran und blockiert sie nicht noch einmal.
+  const afterAttempt = useCallback((error) => {
     setTurnstileToken("");
     setTurnstileError(false);
     setWidgetKey((key) => key + 1);
-    load();
+    const challenged = error?.response?.status === 428 && error?.response?.data?.detail?.code === "turnstile_required";
+    if (!challenged) load();
   }, [load, setTurnstileError, setTurnstileToken]);
 
   // „Nur bei Verdacht“: der Server verlangt Turnstile nachträglich (428). Dann zeigt das Formular das Widget.

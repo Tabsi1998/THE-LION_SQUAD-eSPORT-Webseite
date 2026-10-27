@@ -82,7 +82,7 @@ export default function ContactPage() {
     setSubmitError("");
     const attempt = await submitOnce(async () => api.post("/contact/submit", { ...payload, ...(await guard.prepare()) }));
     if (!attempt.started) return;
-    guard.afterAttempt();
+    guard.afterAttempt(attempt.error);
     if (!attempt.error) {
       setDone(true);
       guard.reset();

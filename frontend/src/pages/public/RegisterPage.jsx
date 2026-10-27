@@ -123,7 +123,7 @@ export default function RegisterPage() {
     };
     const attempt = await submitOnce(async () => register({ ...payload, ...(await guard.prepare()) }));
     if (!attempt.started) return;
-    guard.afterAttempt();
+    guard.afterAttempt(attempt.error || attempt.value?.cause);
     if (attempt.error) {
       setErr("Registrierung konnte nicht abgeschlossen werden. Bitte versuche es erneut.");
       return;

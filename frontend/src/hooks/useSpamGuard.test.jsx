@@ -73,6 +73,18 @@ test("nach jedem Absenden - Erfolg oder Fehler - kommt ein neues Token", async (
   expect(fields.form_token).toBe("zweites");
 });
 
+test("nach der Turnstile-Rückfrage (428) bleibt das Token - der Server erkennt die Wiederholung", async () => {
+  apiMock.get.mockResolvedValueOnce({ data: token({ token: "erstes" }) }).mockResolvedValue({ data: token({ token: "zweites" }) });
+  const { result } = renderHook(() => useSpamGuard("contact"));
+  await waitFor(() => expect(result.current.ready).toBe(true));
+  const challenge = { response: { status: 428, data: { detail: { code: "turnstile_required", turnstile: { site_key: "0x4AAAAAAAoeffentlich", mode: "suspect", action: "contact" } } } } };
+  await act(async () => { result.current.afterAttempt(challenge); });
+  let fields;
+  await act(async () => { fields = await result.current.prepare(); });
+  expect(fields.form_token).toBe("erstes");
+  expect(apiMock.get).toHaveBeenCalledTimes(1);
+});
+
 function Form({ form }) {
   const guard = useSpamGuard(form);
   return <form><SpamGuardFields guard={guard} idPrefix="test" /></form>;
