@@ -1,15 +1,18 @@
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 
 // Produktverwaltung (#1707) mit Katalogabgleich (#1709): Liste und Anlegen, geführte Schritte, Farben und Größen,
-// Designs je Platzierung und Farbe, Preise mit Warnung, Prüfen und Veröffentlichen - jede Änderung nur mit Grund.
+// Druckflächen mit Motiv, Vorgabe und Größe (#2069), Preise mit Warnung, Prüfen und Veröffentlichen - jede Änderung nur mit Grund.
 // Erfundene Daten: Produkt- und Variantennummern, Designs und Personen gibt es so nicht.
 
 const apiMock = { get: vi.fn(), post: vi.fn(), put: vi.fn(), patch: vi.fn() };
+const uploadApiMock = { post: vi.fn() };
 const toastMock = { success: vi.fn(), error: vi.fn(), warning: vi.fn() };
 vi.mock("@/lib/api", () => ({
   api: apiMock,
+  uploadApi: uploadApiMock,
+  resolveMediaUrl: (url) => url,
   formatRequestError: (failure, fallback) => failure?.response?.data?.detail || fallback,
 }));
 vi.mock("@/components/tls/AdminLayout", () => ({ AdminLayout: ({ children }) => <div>{children}</div> }));
@@ -21,8 +24,18 @@ const LABELS = {
   statuses: { draft: "Entwurf", reviewed: "geprüft", active: "veröffentlicht", archived: "archiviert" },
   visibilities: { public: "öffentlich (mit Konto)", members: "nur Mitglieder", hidden: "nur intern" },
   personalizations: { none: "keine", gamertag: "Gamertag", member_number: "Vereinsnummer", both: "Gamertag und Vereinsnummer" },
-  kinds: { design: "Design des Vereins", gamertag: "Gamertag (Datei je Bestellung, #1711)", member_number: "Vereinsnummer" },
+  kinds: { motif: "Motiv", gamertag: "Gamertag (Datei je Bestellung)", member_number: "Vereinsnummer (Datei je Bestellung, #1727)" },
+  modes: { layout: "Motiv und Position", upload: "Fertige Druckdatei (für Profis)" },
 };
+
+const AREA_FILE = { group: "all", variant_ids: null, width_px: 1800, height_px: 2400, dpi: 150, width_in: 12, height_in: 16, width_cm: 30.48, height_cm: 40.64, aspect_ok: true };
+const PRESETS = [
+  { key: "chest_right", label: "Brust rechts (vom Träger aus)", hint: "Von vorne gesehen links.", kind: "motif", families: ["front"], center_x: 0.27, anchor: "top", top_cm: 5, width_cm: 8.9 },
+  { key: "front_large", label: "Vorne groß", hint: "", kind: "motif", families: ["front"], center_x: 0.5, anchor: "top", top_cm: 2.5, width_cm: 28 },
+  { key: "back_large", label: "Rücken groß", hint: "", kind: "motif", families: ["back"], center_x: 0.5, anchor: "top", top_cm: 5, width_cm: 28 },
+  { key: "text_opposite", label: "Brust gegenüber dem Motiv", hint: "Gespiegelt zum ersten Motiv.", kind: "text", families: ["front"], follow: "opposite", center_x: 0.5, anchor: "top", top_cm: 0 },
+  { key: "text_center", label: "Mittig (Name)", hint: "", kind: "text", families: ["front", "back"], follow: null, center_x: 0.5, anchor: "middle", top_cm: 0 },
+];
 
 function variant(label, sku, overrides = {}) {
   const [color, size] = label.split(" / ");
@@ -60,30 +73,45 @@ function view(overrides = {}) {
     labels: LABELS,
     variants: overrides.variants || [variant("Black / M", "PF1"), variant("Black / L", "PF2"), variant("White / M", "PF3"), variant("White / L", "PF4")],
     placements: overrides.placements || [
-      { key: "front_right", label: "Brust rechts (vom Träger aus) – Löwe", kind: "design", kind_label: "Design des Vereins", printful_placement: "front",
-        position: { left_in: 1.49, top_in: 1, width_in: 3.5, height_in: 3.5 }, position_text: { width: "3,5 Zoll (8,9 cm)" }, included: true, surcharge_cents: 525,
-        designs: { Black: { design_key: "loewe-weiss", title: "Löwe weiß", version: 2, level: "good", text: "Gut" } },
-        suggestions: { Black: "loewe-weiss", White: "loewe-schwarz" } },
-      { key: "front_left", label: "Brust links (vom Träger aus) – Namensfeld", kind: "gamertag", kind_label: "Gamertag (Datei je Bestellung, #1711)", printful_placement: "front",
-        position: { left_in: 7, top_in: 1, width_in: 3.5, height_in: 3.5 }, position_text: { width: "3,5 Zoll (8,9 cm)" }, included: true, surcharge_cents: 525, designs: {}, suggestions: {} },
+      { key: "front", label: "Vorderseite", mode: "layout", printful_placement: "front", included: true, surcharge_cents: 525,
+        layers: [
+          { kind: "motif", preset: "chest_right", width_cm: 8.9, offset_x_cm: 0, offset_y_cm: 0, motif: { key: "loewe-weiss", by_color: {} } },
+          { kind: "gamertag", preset: "text_opposite", offset_x_cm: 0, offset_y_cm: 0 },
+        ],
+        files: [
+          { placement: "front", color: "Black", group: "all", state: "ok", detail: "", file: { id: "f1", version: 1, warnings: [] },
+            plan: { layers: [{ index: 0, kind: "motif", source: { design_key: "loewe-weiss", variant: "dark", version: 1 }, image_path: "/api/shop/print-files/k1/loewe-weiss-v1.png", aspect: 1 }] } },
+          { placement: "front", color: "White", group: "all", state: "outdated", detail: "Aufbau, Motiv oder Vorlage geändert - neu erzeugen.", file: { id: "f2", version: 1, warnings: [] },
+            plan: { layers: [{ index: 0, kind: "motif", source: { design_key: "loewe-weiss", variant: "light", version: 2 }, image_path: "/api/shop/print-files/k3/loewe-weiss-v2.png", aspect: 1 }] } },
+        ] },
     ],
     available_placements: [
-      { key: "front_right", label: "Brust rechts (vom Träger aus) – Löwe", printful_placement: "front", area: { width_in: 12, height_in: 16 },
-        area_text: { width_in: "12 Zoll (30,5 cm)", height_in: "16 Zoll (40,6 cm)" }, default_position: { left_in: 1.49, top_in: 1, width_in: 3.5, height_in: 3.5 } },
-      { key: "front_left", label: "Brust links (vom Träger aus) – Namensfeld", printful_placement: "front", area: { width_in: 12, height_in: 16 },
-        area_text: { width_in: "12 Zoll (30,5 cm)", height_in: "16 Zoll (40,6 cm)" }, default_position: { left_in: 7, top_in: 1, width_in: 3.5, height_in: 3.5 } },
-      { key: "back", label: "Rücken", printful_placement: "back", area: { width_in: 12, height_in: 16 },
-        area_text: { width_in: "12 Zoll (30,5 cm)", height_in: "16 Zoll (40,6 cm)" }, default_position: { left_in: 1, top_in: 1, width_in: 10, height_in: 10 } },
+      { key: "front", label: "Vorderseite", family: "front", family_label: "Vorderseite", technique: "dtg", safe_margin_cm: 0,
+        file: AREA_FILE, groups: [AREA_FILE],
+        preview: { image_path: "/api/admin/shop/print-templates/71/images/0", background_path: null, background_color: null, positioning: "overlay",
+          template_width: 1000, template_height: 1000, area: { left: 275, top: 200, width: 450, height: 600 }, orientation: "any" },
+        presets: { motif: ["chest_right", "front_large"], text: ["text_opposite", "text_center"] } },
+      { key: "back", label: "Rückseite", family: "back", family_label: "Rückseite", technique: "dtg", safe_margin_cm: 0,
+        file: AREA_FILE, groups: [AREA_FILE], preview: null,
+        presets: { motif: ["back_large"], text: ["text_center"] } },
     ],
     included_placement: "front",
-    design_suggestions: [{ placement: "front_right", color: "Black", design_key: "loewe-weiss" }, { placement: "front_right", color: "White", design_key: "loewe-schwarz" }],
-    design_options: { front_right: [{ design_key: "loewe-weiss", title: "Löwe weiß" }, { design_key: "loewe-schwarz", title: "Löwe schwarz" }] },
+    layout_converted: false,
+    print_template: { printful_product_id: 71, checked_at: "2026-10-27T05:20:00+00:00", changed_at: null, changes: [], last_error: null, loaded: true },
+    presets: PRESETS,
+    preset_rules: { safe_margin_cm: { front: 0, back: 0, sleeve: 0, label: 0, other: 0 }, min_dpi_ratio: 0.66, warn_dpi_ratio: 1, min_width_cm: 1 },
+    motif_options: [
+      { key: "loewe-weiss", title: "Löwe weiß", width_px: 1200, height_px: 1200, image_path: "/api/shop/print-files/k1/loewe-weiss-v1.png" },
+      { key: "loewe-schwarz", title: "Löwe schwarz", width_px: 1200, height_px: 1300, image_path: "/api/shop/print-files/k2/loewe-schwarz-v1.png" },
+      { key: "ruecken-weiss", title: "Rücken weiß", width_px: 3000, height_px: 3000, image_path: null },
+    ],
+    gamertag_canvas: { width_in: 3.5, height_in: 0.75, anchor_y_in: 0.375 },
     pricing: { general_markup_cents: 300, product_markup_cents: null, effective_markup_cents: 300, source: "general", member_markup_cents: 0 },
     check: { items, review_ready: items.filter((item) => item.for_review).every((item) => item.ok), publish_ready: items.every((item) => item.ok) },
     sync: { at: "2026-10-27T05:20:00+00:00", ok: true, detail: "4 Varianten abgeglichen.", last_ok_at: "2026-10-27T05:20:00+00:00" },
     transitions: ["reviewed", "archived"],
     editable: true,
-    limits: { max_variants: 80, min_size_in: 0.5, max_size_in: 25 },
+    limits: { max_variants: 80, max_placements: 12, max_layers: 6, min_width_cm: 1, max_offset_cm: 300 },
     ...overrides.extra,
   };
 }
@@ -157,7 +185,7 @@ test("der Editor führt durch fünf Schritte und zeigt den Abgleich mit Datum", 
   show("/admin/shop/products/p1");
   const steps = await screen.findByTestId("shop-steps");
   expect(within(steps).getAllByRole("button").map((button) => button.textContent)).toEqual([
-    "1.Produkt wählen", "2.Farben und Größen", "3.Designs je Platzierung", "4.Preise", "5.Prüfen und veröffentlichen"]);
+    "1.Produkt wählen", "2.Farben und Größen", "3.Druckflächen", "4.Preise", "5.Prüfen und veröffentlichen"]);
   expect(screen.getByTestId("shop-step-product")).toHaveAttribute("data-state", "ok");
   expect(screen.getByTestId("shop-step-publish")).toHaveAttribute("data-state", "open");
   expect(screen.getByTestId("shop-sync")).toHaveTextContent("4 Varianten abgeglichen.");
@@ -197,42 +225,108 @@ test("Farben und Größen wählen zählt die Varianten und schickt Technik, Farb
   expect(screen.getByTestId("shop-variant-PF1")).toHaveTextContent("lieferbar");
 });
 
-test("Platzierungen zeigen cm zu den Zoll und schicken Art und Position", async () => {
+test("Druckflächen: exakte Größe von Printful, Vorlagenbild, Motiv mit Vorgabe und Größe in cm und Zoll", async () => {
   apiMock.put.mockResolvedValue({ data: view() });
   const user = userEvent.setup();
   show("/admin/shop/products/p1");
   await user.click(await screen.findByTestId("shop-step-designs"));
-  await user.click(screen.getByTestId("shop-placement-use-back"));
-  const width = screen.getByTestId("shop-placement-back-width_in");
+  expect(screen.getByTestId("shop-template-status")).toHaveTextContent("Druckvorlage von Printful, abgeglichen");
+  expect(screen.getByTestId("shop-area-size-front")).toHaveTextContent("1800 × 2400 px · 30,5 cm (12 Zoll) × 40,6 cm (16 Zoll) · 150 DPI");
+  expect(screen.getByTestId("shop-preview-front").querySelector("img[src='/api/admin/shop/print-templates/71/images/0']")).not.toBeNull();
+  // Löwe: Brust rechts vom Träger aus, 8,9 cm - in der Vorschau bei 223/1800 der Fläche (wie der Server).
+  const lion = screen.getByTestId("shop-preview-front-layer-0");
+  expect(parseFloat(lion.style.left)).toBeCloseTo((223.18 / 1800) * 100, 1);
+  expect(screen.getByTestId("shop-layer-front-0-width-text")).toHaveTextContent("8,9 cm (3,5 Zoll)");
+  // Der Gamertag ist ein Platzhalter gegenüber dem Löwen.
+  const name = screen.getByTestId("shop-preview-front-layer-1");
+  expect(parseFloat(name.style.left) + parseFloat(name.style.width) / 2).toBeCloseTo(100 - (parseFloat(lion.style.left) + parseFloat(lion.style.width) / 2), 1);
+  // Rücken dazu: eine Fläche wählen, Motiv hinzufügen, Größe per Regler.
+  await user.click(screen.getByTestId("shop-area-use-back"));
+  await user.click(screen.getByTestId("shop-area-add-motif-back"));
+  await user.selectOptions(screen.getByTestId("shop-layer-back-0-motif"), "ruecken-weiss");
+  const width = screen.getByTestId("shop-layer-back-0-width-cm");
   await user.clear(width);
-  await user.type(width, "9,5");
-  expect(screen.getByTestId("shop-placement-row-back")).toHaveTextContent("= 24,1 cm");
-  expect(screen.getByTestId("shop-placement-included-front")).toHaveAttribute("aria-checked", "true");
-  await user.type(screen.getByTestId("shop-placements-reason"), "Rückenlogo dazu");
-  await user.click(screen.getByTestId("shop-placements-submit"));
+  await user.type(width, "25");
+  expect(screen.getByTestId("shop-layer-back-0-width-text")).toHaveTextContent("25 cm (9,84 Zoll)");
+  expect(screen.getByTestId("shop-layout-included-front")).toHaveAttribute("aria-checked", "true");
+  await user.click(screen.getByTestId("shop-layout-submit"));
   const [url, body] = apiMock.put.mock.calls[0];
-  expect(url).toBe("/admin/shop/products/p1/placements");
+  expect(url).toBe("/admin/shop/products/p1/layout");
   expect(body.included_placement).toBe("front");
-  expect(body.placements.map((row) => [row.key, row.kind])).toEqual([["front_right", "design"], ["front_left", "gamertag"], ["back", "design"]]);
-  expect(body.placements[2].position).toEqual({ left_in: 1, top_in: 1, width_in: 9.5, height_in: 10 });
+  expect(body.reason).toBe("");
+  expect(body.placements).toEqual([
+    { key: "front", mode: "layout", layers: [
+      { kind: "motif", preset: "chest_right", offset_x_cm: 0, offset_y_cm: 0, width_cm: 8.9, motif: { key: "loewe-weiss", by_color: {} } },
+      { kind: "gamertag", preset: "text_opposite", offset_x_cm: 0, offset_y_cm: 0 }] },
+    { key: "back", mode: "layout", layers: [
+      { kind: "motif", preset: "back_large", offset_x_cm: 0, offset_y_cm: 0, width_cm: 25, motif: { key: "ruecken-weiss", by_color: {} } }] },
+  ]);
 });
 
-test("Vorschläge übernehmen füllt leere Felder; gespeichert wird nur, was sich ändert", async () => {
+test("Feinjustieren mit Pfeiltasten; was aus der Fläche ragt, sagt die Vorschau", async () => {
   apiMock.put.mockResolvedValue({ data: view() });
   const user = userEvent.setup();
   show("/admin/shop/products/p1");
   await user.click(await screen.findByTestId("shop-step-designs"));
-  expect(screen.getByTestId("shop-design-cell-front_right-White")).toHaveValue("");
-  expect(screen.getByTestId("shop-designs-placeholders")).toHaveTextContent("Gamertag (Datei je Bestellung, #1711)");
-  await user.click(screen.getByTestId("shop-designs-submit"));
-  expect(screen.getByTestId("shop-designs-hint")).toHaveTextContent("Noch keine Zuordnung geändert.");
-  await user.click(screen.getByTestId("shop-designs-suggest"));
-  expect(screen.getByTestId("shop-design-cell-front_right-White")).toHaveValue("loewe-schwarz");
-  // Ohne Grund geht es (Entscheidung Obmann 27.10.2026).
-  await user.click(screen.getByTestId("shop-designs-submit"));
-  expect(apiMock.put).toHaveBeenCalledWith("/admin/shop/products/p1/designs", {
-    assignments: [{ placement: "front_right", color: "White", design_key: "loewe-schwarz" }], reason: "",
-  });
+  const lion = screen.getByTestId("shop-preview-front-layer-0");
+  lion.focus();
+  await user.keyboard("{Shift>}{ArrowLeft}{ArrowLeft}{/Shift}{ArrowDown}");
+  expect(screen.getByTestId("shop-layer-front-0-offset")).toHaveTextContent("-2 / 0,1 cm");
+  await user.keyboard("{Shift>}{ArrowLeft}{ArrowLeft}{ArrowLeft}{ArrowLeft}{/Shift}");
+  expect(screen.getByTestId("shop-preview-front-layer-0")).toHaveAttribute("data-outside", "links");
+  expect(screen.getByTestId("shop-layer-front-0-outside")).toHaveTextContent("Ragt links aus der Fläche");
+  await user.click(screen.getByTestId("shop-layer-front-0-reset"));
+  expect(screen.queryByTestId("shop-layer-front-0-outside")).not.toBeInTheDocument();
+  // Die Vorschau zeigt je Farbe die Fassung, die gedruckt wird (#2069 Teil A): auf Weiß die Fassung für helle Shirts.
+  await user.click(screen.getByTestId("shop-preview-color-White"));
+  expect(screen.getByTestId("shop-preview-front").style.backgroundColor).toBe("rgb(255, 255, 255)");
+  expect(screen.getByTestId("shop-preview-front-layer-0").querySelector("img").getAttribute("src")).toContain("loewe-weiss-v2");
+  // Eine Ausnahme je Farbe zeigt sofort das gewählte Motiv.
+  await user.click(screen.getByTestId("shop-layer-front-0-exceptions-toggle"));
+  await user.selectOptions(screen.getByTestId("shop-layer-front-0-exception-White"), "loewe-schwarz");
+  expect(screen.getByTestId("shop-preview-front-layer-0").querySelector("img").getAttribute("src")).toContain("loewe-schwarz");
+});
+
+test("Ausnahme je Farbe und Druckdateien je Farbe; erzeugen geht erst nach dem Speichern", async () => {
+  apiMock.put.mockResolvedValue({ data: view() });
+  apiMock.post.mockResolvedValue({ data: { ...view(), result: { created: [{ placement: "front", color: "White" }], unchanged: 1, failed: [] } } });
+  const user = userEvent.setup();
+  show("/admin/shop/products/p1");
+  await user.click(await screen.findByTestId("shop-step-designs"));
+  expect(screen.getByTestId("shop-file-front-Black")).toHaveAttribute("data-state", "ok");
+  expect(screen.getByTestId("shop-file-front-White")).toHaveTextContent("veraltet");
+  expect(screen.getByTestId("shop-file-front-White-preview").getAttribute("href")).toContain("/api/admin/shop/products/p1/preview?placement=front&color=White");
+  expect(screen.getByTestId("shop-generate")).toHaveTextContent("1 Druckdatei fehlen oder sind veraltet");
+  await user.click(screen.getByTestId("shop-generate-submit"));
+  expect(apiMock.post).toHaveBeenCalledWith("/admin/shop/products/p1/print-files", { reason: "" });
+  expect(toastMock.success).toHaveBeenCalledWith("1 Druckdatei erzeugt.");
+  await user.click(screen.getByTestId("shop-layer-front-0-exceptions-toggle"));
+  await user.selectOptions(screen.getByTestId("shop-layer-front-0-exception-White"), "loewe-schwarz");
+  await user.click(screen.getByTestId("shop-generate-submit"));
+  expect(screen.getByTestId("shop-generate-hint")).toHaveTextContent("Erst die Druckflächen speichern");
+  await user.click(screen.getByTestId("shop-layout-submit"));
+  expect(apiMock.put.mock.calls[0][1].placements[0].layers[0].motif).toEqual({ key: "loewe-weiss", by_color: { White: "loewe-schwarz" } });
+});
+
+test("für Profis: fertige Druckdatei je Farbe hochladen", async () => {
+  const uploadView = view({ placements: [{ key: "front", label: "Vorderseite", mode: "upload", printful_placement: "front", included: true, layers: [],
+    files: [{ placement: "front", color: "Black", group: "all", state: "missing", detail: "Noch keine fertige Druckdatei hochgeladen.", file: null, plan: { layers: [] } }] }] });
+  apiMock.get.mockResolvedValue({ data: uploadView });
+  uploadApiMock.post.mockResolvedValue({ data: uploadView });
+  const user = userEvent.setup();
+  show("/admin/shop/products/p1");
+  await user.click(await screen.findByTestId("shop-step-designs"));
+  expect(screen.getByTestId("shop-area-mode-front-upload")).toHaveAttribute("aria-checked", "true");
+  expect(screen.getByTestId("shop-area-upload-hint-front")).toHaveTextContent("1800 × 2400 px");
+  const file = new File(["png"], "vorne.png", { type: "image/png" });
+  await user.upload(screen.getByTestId("shop-upload-front-Black"), file);
+  await user.click(screen.getByTestId("shop-upload-front-Black-submit"));
+  const [url, form] = uploadApiMock.post.mock.calls[0];
+  expect(url).toBe("/admin/shop/print-files/upload");
+  expect(form.get("product_id")).toBe("p1");
+  expect(form.get("placement")).toBe("front");
+  expect(form.get("color")).toBe("Black");
+  expect(form.get("file").name).toBe("vorne.png");
 });
 
 test("Preise: Warnung bei Preisänderung, Übernehmen und eigener Aufschlag nur mit Grund", async () => {
@@ -326,4 +420,70 @@ test("Veröffentlichen geht live: dafür ist der Grund Pflicht, der Knopf sagt e
   await user.type(reason, "Testshirt geht live");
   await user.click(screen.getByTestId("shop-status-active-submit"));
   expect(apiMock.post).toHaveBeenCalledWith("/admin/shop/products/p1/status", { status: "active", reason: "Testshirt geht live" });
+});
+
+test("Produktsuche: über den Namen oder einen Dashboard-Link - „Übernehmen“ setzt die Nummer", async () => {
+  const CATALOG = {
+    results: [{ id: 71, name: "Unisex Classic Tee | Gildan 5000", techniques: ["dtg", "dtfilm"], colors: 50, sizes: 8, image: "https://files.cdn.printful.com/products/71.jpg", is_discontinued: false }],
+    total: 1, link: null, categories: [{ id: 1, title: "Men's clothing", depth: 0 }, { id: 24, title: "T-shirts", depth: 1 }],
+    fetched_at: "2026-10-27T08:00:00+00:00", stale: false, products_total: 400,
+  };
+  apiMock.get.mockImplementation((url) => Promise.resolve({ data: url === "/admin/shop/printful-catalog" ? CATALOG : view() }));
+  apiMock.post.mockResolvedValue({ data: view() });
+  const user = userEvent.setup();
+  show("/admin/shop/products/p1");
+  const search = await screen.findByTestId("shop-product-search");
+  expect(search).toHaveTextContent("Ein Produkt je Modell – Farben und Größen wählst du im nächsten Schritt.");
+  await user.type(screen.getByTestId("shop-search-query"), "Gildan 5000");
+  await user.click(screen.getByTestId("shop-search-submit"));
+  expect(apiMock.get).toHaveBeenCalledWith("/admin/shop/printful-catalog", { params: { q: "Gildan 5000" } });
+  const hit = await screen.findByTestId("shop-search-hit-71");
+  expect(hit).toHaveTextContent("dtg, dtfilm · 50 Farben · 8 Größen");
+  expect(screen.getByTestId("shop-search-pick-71")).toHaveTextContent("Gewählt");
+  await user.selectOptions(screen.getByTestId("shop-search-category"), "24");
+  await user.click(screen.getByTestId("shop-search-submit"));
+  expect(apiMock.get).toHaveBeenLastCalledWith("/admin/shop/printful-catalog", { params: { q: "Gildan 5000", category_id: 24 } });
+  await user.clear(screen.getByTestId("shop-printful-number"));
+  await user.click(screen.getByTestId("shop-search-pick-71"));
+  expect(screen.getByTestId("shop-printful-number")).toHaveValue("71");
+  const link = "https://www.printful.com/dashboard/custom/mens/shirts/unisex-classic-tee-gildan-5000?technique=DTFILM";
+  await user.type(screen.getByTestId("shop-search-link"), link);
+  await user.click(screen.getByTestId("shop-search-link-submit"));
+  expect(apiMock.get).toHaveBeenLastCalledWith("/admin/shop/printful-catalog", { params: { link } });
+});
+
+test("ungespeicherte Ausnahme: die Vorschau fragt den Server nach der Fassung und ist bis dahin ausgegraut", async () => {
+  const drafted = view().placements.map((row) => ({ key: row.key, files: row.files.map((state) => (state.color !== "White" ? state : {
+    ...state, plan: { layers: [{ index: 0, kind: "motif", source: { design_key: "loewe-schwarz", variant: "light", version: 3 }, image_path: "/api/shop/print-files/k9/loewe-schwarz-v3.png", aspect: 1.25 }] },
+  })) }));
+  let answer;
+  apiMock.post.mockImplementation((url) => (url.endsWith("/layout/preview") ? new Promise((resolve) => { answer = () => resolve({ data: { placements: drafted } }); }) : Promise.resolve({ data: view() })));
+  const user = userEvent.setup();
+  show("/admin/shop/products/p1");
+  await user.click(await screen.findByTestId("shop-step-designs"));
+  await user.click(screen.getByTestId("shop-preview-color-White"));
+  await user.click(screen.getByTestId("shop-layer-front-0-exceptions-toggle"));
+  await user.selectOptions(screen.getByTestId("shop-layer-front-0-exception-White"), "loewe-schwarz");
+  expect(screen.getByTestId("shop-preview-front")).toHaveAttribute("data-stale", "true");
+  expect(screen.getByTestId("shop-layout-draft-preview")).toHaveTextContent("Vorschau wird berechnet");
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/admin/shop/products/p1/layout/preview", expect.objectContaining({
+    placements: expect.arrayContaining([expect.objectContaining({ key: "front", layers: expect.arrayContaining([expect.objectContaining({ motif: { key: "loewe-weiss", by_color: { White: "loewe-schwarz" } } })]) })]),
+  })));
+  answer();
+  await waitFor(() => expect(screen.getByTestId("shop-preview-front")).not.toHaveAttribute("data-stale"));
+  const image = screen.getByTestId("shop-preview-front-layer-0");
+  expect(image.querySelector("img").getAttribute("src")).toContain("loewe-schwarz-v3");
+  // Seitenverhältnis der Fassung vom Server (1,25): der Rahmen ist höher als breit.
+  expect(parseFloat(image.style.height) * 2400).toBeGreaterThan(parseFloat(image.style.width) * 1800);
+});
+
+test("nicht abbildbare alte Platzierungen: rote Meldung, Produkt nicht bestellbar", async () => {
+  apiMock.get.mockResolvedValue({ data: view({ extra: { layout_converted: true, layout_blocked: ["„Ärmel links“ bleibt unverändert: die Fläche sleeve_left hat keine Druckvorgabe bei Printful."] } }) });
+  const user = userEvent.setup();
+  show("/admin/shop/products/p1");
+  await user.click(await screen.findByTestId("shop-step-designs"));
+  const box = screen.getByTestId("shop-layout-blocked");
+  expect(box).toHaveTextContent("Nicht bestellbar");
+  expect(box).toHaveTextContent("Ärmel links");
+  expect(box.className).toContain("text-live");
 });

@@ -265,6 +265,10 @@ async def _user_data_sections(db, user_id: str) -> list[tuple[str, tuple]]:
         ("shop_gamertag_files", _rows(db.shop_gamertag_files, me, _pick(
             "id", "purpose", "order_id", "order_item_id", "sha256", "width_px", "height_px", "dpi", "text_height_in",
             "color_key", "created_at", "public_disabled_at", "erase_pending_at", "file_deleted_at"))),
+        # Druckdateien der eigenen Bestellungen mit Gamertag (#2069) - ohne Zufallsschlüssel und Ablageort.
+        ("shop_print_files", _rows(db.shop_print_files, me, _pick(
+            "id", "purpose", "order_id", "order_item_id", "placement", "color", "sha256", "width_px", "height_px",
+            "dpi", "created_at", "public_disabled_at", "erase_pending_at", "file_deleted_at"))),
         ("match_reports", _rows(db.match_reports_v2, {"reporter_user_id": user_id})),
         ("schedule_proposals", _rows(db.match_schedule_proposals, {"actor_user_id": user_id}, _pick(*PROPOSAL))),
         ("match_proof_photos", _rows(db.match_proof_photos, {"owner_id": user_id}, _pick(*PROOF_PHOTO))),
@@ -386,6 +390,9 @@ async def _anonymize_user_data(db, user_id: str, actor_id: str, action: str) -> 
     # Gamertag-Druckdateien (#1711): das PNG zeigt den Namen - Adresse aus und Datei weg, sobald Printful sie nicht braucht.
     from services.shop_gamertag import erase_for_user as erase_gamertag_files
     await erase_gamertag_files(db, user_id)
+    # Druckdateien mit Gamertag (#2069): dasselbe für die zusammengesetzte Datei je Bestellposition.
+    from services.shop_print_files import erase_for_user as erase_print_files
+    await erase_print_files(db, user_id)
     # Alles außerhalb des Kontos (#928): Verzeichnis, Anträge, Anmeldungen, XP, Zugänge und die eigenen Bilder.
     erased = await account_erasure.erase_related(db, user, now)
     # Kontaktanfragen ohne Konto mit derselben Adresse bleiben unberührt (nicht sicher zuzuordnen) - die Zahl steht hier,

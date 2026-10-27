@@ -612,6 +612,12 @@ AUDIT_UNIQUE_INDEXES: tuple[tuple[str, Any, str, dict], ...] = (
     ("shop_printful_drafts", "external_id", "external_id", {}),
     ("shop_printful_confirmations", "order_id", "order", {}),
     ("shop_printful_confirmations", "idempotency_key", "idempotency_key", {}),
+    # Druckvorlagen und Druckdateien (#2069): je Printful-Produkt eine Vorlage; je Druckdatei ein eigener
+    # Zufallsschlüssel; je Produkt, Fläche, Gruppe und Farbe zählt die Version der Grunddatei eindeutig hoch.
+    ("shop_print_templates", "printful_product_id", "printful_product", {}),
+    ("shop_print_files", "public_id", "public_id", {}),
+    ("shop_print_files", [("product_id", 1), ("placement", 1), ("group", 1), ("color_key", 1), ("version", 1)],
+     "base_version", {"partialFilterExpression": {"purpose": "base"}}),
 )
 AUDIT_INDEXES: tuple[tuple[str, Any], ...] = (
     ("platform_links", "user_id"),
@@ -659,6 +665,8 @@ AUDIT_INDEXES: tuple[tuple[str, Any], ...] = (
     ("shop_orders", "id"),
     ("shop_orders", "user_id"),
     ("shop_gamertag_files", "user_id"),  # Kontolöschung und Auskunft (#1711)
+    ("shop_print_files", "user_id"),  # Bestelldateien mit Gamertag: Kontolöschung und Auskunft (#2069)
+    ("shop_print_files", "order_id"),
     ("shop_orders", [("status", 1), ("created_at", -1)]),
     ("shop_order_items", "user_id"),
     ("shop_order_events", [("order_id", 1), ("at", 1)]),

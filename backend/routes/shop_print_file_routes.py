@@ -17,7 +17,7 @@ from fastapi import APIRouter, HTTPException
 from fastapi.responses import FileResponse
 
 from database import get_db
-from services import shop_designs
+from services import shop_designs, shop_print_files
 
 # Als Text, nicht als Konstante: Regel 3 liest das Präfix aus dem Quelltext (shop_designs.PUBLIC_PREFIX ist dasselbe).
 router = APIRouter(prefix="/api/shop/print-files", tags=["shop"])
@@ -34,7 +34,10 @@ HEADERS = {
 
 @router.get("/{public_id}/{filename}")
 async def print_file(public_id: str, filename: str):
-    path = await shop_designs.public_file(get_db(), public_id, filename)
+    db = get_db()
+    path = await shop_designs.public_file(db, public_id, filename)
+    if path is None:  # erzeugte bzw. hochgeladene Druckdateien je Produkt und Bestellung (#2069)
+        path = await shop_print_files.public_file(db, public_id, filename)
     if path is None:
         raise HTTPException(404, NOT_FOUND)
     return FileResponse(path, media_type="image/png",

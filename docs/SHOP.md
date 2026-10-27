@@ -3,7 +3,8 @@
 Stand: Fundament aus #1703 (Datenmodell) und #1704 (Rechte, Protokoll), dazu Stufen, Notschalter und Preise aus
 #1706 (Abschnitt „Einstellungen“ unten), Designs/Druckdateien aus #1708 (Abschnitt „Designs und Druckdateien“) und
 der Printful-Adapter aus #1705 (Abschnitt „Printful-Adapter“), die Produktverwaltung aus #1707 mit dem Katalogabgleich
-aus #1709 (Abschnitt „Produktverwaltung und Katalogabgleich“), Teil des Epics #1699. Der Shop ist **von außen
+aus #1709 (Abschnitt „Produktverwaltung und Katalogabgleich“) und die Druckvorlagen von Printful mit selbst erzeugten
+Druckdateien aus #2069 (Abschnitt „Druckvorlagen und Druckdateien“), Teil des Epics #1699. Der Shop ist **von außen
 unsichtbar**: Es gibt keine Seiten für Mitglieder und nur eine öffentliche Route - die Druckdateien für Printful hinter
 einem Zufallsschlüssel; im Admin steht er unter Finanzen → Shop. Steuer (#1701) und die Shop-Seiten (#1712 ff.) folgen.
 
@@ -26,6 +27,9 @@ die Sammlungen direkt. Jede Katalogänderung ist eine Adminaktion mit Person und
 | `shop_designs` | Druckdatei des Vereins je Fassung: `design_key`, `version` (zählt hoch), `file_ref`, `sha256`, Druckposition; seit #1708 dazu `public_id` (Zufallsschlüssel der öffentlichen Adresse), Pixel, DPI und Druckmaße in Zoll, mit denen sie geprüft wurde, Transparenz, Ausgangsformat und `public_disabled_at` (Aufbewahrung); seit #2069 die Fassung (`variant`: `dark` für dunkle, `light` für helle Shirts), Herkunft (`origin`: `upload` oder `auto_light`), bei SVG das bereinigte SVG (`svg_ref`, nie öffentlich), erkannte Farben (`colors`) und `view_box`, bei einer umgefärbten Fassung `derived_from` und `recolor`. Alte Fassungen bleiben | `design_key` + `version`; `public_id` |
 | `shop_design_profiles` | Design bzw. Motiv (#1708, #2069): Titel, Platzierung, feste **Shirtfarben** (`garment_colors`, freiwillig), Notiz, `version`; seit #2069 `light_mode` (`auto` oder `file`), `light_auto` (Stand der automatischen Fassung) und Ausnahmen je Shirtfarbe (`color_variants`) | `design_key` |
 | `shop_gamertag_files` | Gamertag-Druckdatei (#1711): Herkunft `gamertag`, Zweck (`test`, `order`), `sha256`, `file_ref`, `public_id`, Maße, Anker, Farbe, `rules_hash`; bei Bestelldateien Konto, Bestellung und Position (personenbezogen: das PNG zeigt den Namen) - nie der Name als Text | `purpose` + `sha256` (nur Testdateien); `public_id` |
+| `shop_print_templates` | Druckvorlage je Printful-Produkt (#2069): Maße je Fläche, Technik und Gruppe (`entries`), Vorlagenbilder (`previews`), `hash` der Maße, `changes` mit `changed_at`, `checked_at`, `last_error` | `printful_product_id` |
+| `shop_print_files` | Druckdatei je Produkt, Fläche, Farbe und Gruppe (#2069): Herkunft (`composed`, `upload`), Zweck (`base` mit `version`, `order` je Bestellposition), `sha256`, `file_ref`, `public_id`, Maße, `layout_hash`, `template_hash`, Quellen; bei Bestelldateien Konto, Bestellung und Position (personenbezogen) | `public_id`; Produkt + Fläche + Gruppe + Farbe + Version (nur `base`) |
+| `shop_printful_catalog` | Zwischenstand des Printful-Katalogs für die Produktsuche (#2069): Produkte, Kategorien, `fetched_at` - keine Person | `id` |
 | `shop_design_colors` | Belegung einer Shirtfarbe je Platzierung durch ein Design (#1708): `placement`, `color_key` (kleingeschrieben), `color`, `design_key` - macht „eine Farbe, ein Design“ atomar | `placement` + `color_key` |
 | `shop_printful_variants` | Zuordnung Variante → Printful-Variante und -Produkt (Anbieter `printful`); seit #1709 Technik, Einkauf (`base_cost_cents`), Aufpreis je Druckfläche (`placement_costs`), Lager (`availability`, `in_stock`), `synced_at` und eine offene Preiswarnung (`price_warning`) | `provider` + `variant_id` |
 | `shop_carts` | Warenkorb je Konto: Variante, Menge, Gamertag – keine Preise | `user_id` |
@@ -50,7 +54,7 @@ Variante, Druckdatei, Printful-Zuordnung, Profil oder Dolibarr wirkt nie zurück
   Erinnerungstage, Überfälligkeit, Stornoverfahren – ohne Vorgabe, ohne automatisches Storno).
 - je Position: Produkt- und Variantenname, SKU, Menge, Einzelpreis, Aufschlag, Zeilensumme, **Gamertag** (nur
   Mitglieder bei Produkten mit Gamertag), **Druckdatei-Fassung** mit Prüfsumme, **Printful-Nummern**, Steuerprofil.
-  Seit #1707 je Platzierung (`designs`): Platzierung, Art, Printful-Druckfläche, Technik, Position in Zoll und die
+  Seit #2069 je Druckfläche genau eine Druckdatei (`print_files`: Grunddatei oder eigene mit Gamertag, Abschnitt „Druckvorlagen und Druckdateien“), dazu die Motiv-Fassungen (`designs`). Bis #2069 je Platzierung (`designs`): Platzierung, Art, Printful-Druckfläche, Technik, Position in Zoll und die
   Fassung des Designs für die Farbe der Variante (`design_key`, `version`, `sha256`) - **alle** Platzierungen, nicht
   nur eine. Gamertag- und Vereinsnummer-Felder stehen als Platzhalter darin (Datei je Bestellung, #1711); ein Produkt
   mit Gamertag-Feld verlangt einen Gamertag. `design` bleibt als Kurzform (erstes Design). Gesperrte Varianten und
@@ -135,7 +139,8 @@ die Rolle, andere über eine Freigabe. Matrix: [docs/ROLLEN.md](ROLLEN.md#shop-1
 
 `scripts/check-code-patterns.py` (Regel 3) hält fest: Jede Route mit `shop` im Pfad liegt unter `/api/admin/shop`
 und hängt an `require_area("finance")`. Öffentlich ist nur, was in `PUBLIC_SHOP_ROUTES` mit Methode, genauem Pfad,
-Datei und Begründung steht - bisher allein `GET /api/shop/print-files/{public_id}/{filename}` (#1708). Jede andere
+Datei und Begründung steht - bisher allein `GET /api/shop/print-files/{public_id}/{filename}` (#1708; seit #2069
+liefert sie auch die erzeugten Druckdateien aus `shop_print_files`). Jede andere
 öffentliche Shop-Route schlägt fehl, bis sie dort bewusst freigegeben wird (Shop-Seiten #1712).
 
 **Protokoll** (Betrieb → Ereignisse, Quelle Adminaktionen): `shop_common.record_admin_action` schreibt jede Aktion
@@ -156,6 +161,8 @@ ohne Änderung schreibt nichts.
 | `shop.product.catalog`, `shop.product.offer` | Printful-Produkt gewählt (vorher/nachher), Farben und Größen angeboten (#1707) |
 | `shop.product.placements`, `shop.product.designs` | Platzierungen mit Position (vorher/nachher), Design je Platzierung und Farbe (#1707) |
 | `shop.product.status` | Stand vorher/nachher mit Prüfergebnis; auch „zurück auf Entwurf“ nach einer Änderung (#1707) |
+| `shop.product.layout`, `shop.print_file.add` | Druckflächen geändert bzw. Umstellung (vorher/nachher); Druckdatei erzeugt oder hochgeladen (#2069) |
+| `shop.print_template.change`, `shop.print.presets` | Printful hat Maße einer Fläche geändert; Positions-Vorgaben oder Regeln geändert (#2069) |
 | `shop.catalog.sync` | Abgleich mit Printful: gesperrte, freigegebene Varianten, Preisänderungen - nur wenn sich etwas ändert (#1709) |
 | `shop.gamertag.rules`, `shop.gamertag.file` | Regeln der Gamertag-Druckdatei (vorher/nachher) bzw. Testdatei mit Prüfsumme und Maßen - nie mit dem Namen (#1711) |
 | `shop.order.release`, `shop.order.printful_confirm`, `shop.order.cancel` | vorgesehen für #1718, #1721 |
@@ -449,20 +456,19 @@ Beispiel aus #2062: Gildan 5000 schwarz mit Löwe vorne rechts, Gamertag vorne l
 Grund ist optional, **Pflicht nur beim Veröffentlichen** - dann geht das Produkt live (Entscheidung Obmann 27.10.2026):
 
 1. **Produkt wählen:** Grunddaten (Titel, Beschreibung - bereinigt -, Sichtbarkeit, Personalisierung) und die
-   Printful-Produktnummer. Die Website lädt über den Adapter Produkt und Varianten (Größe, Farbe, Variantennummer,
-   Lager, Druckflächen mit Maßen) und speichert einen Abzug - **ohne Preise**. Eine Textsuche bietet Printful v2 nicht
-   (nur Filter nach Kategorie); die Nummer kommt aus dem Printful-Katalog. Eine Variantennummer als Produktnummer findet
+   Printful-Produkt - gefunden über die **Produktsuche** (Name, Marke, Modell, Kategorie oder Dashboard-Link, #2069),
+   die Nummer von Hand nur im Notfall. Ein Produkt je Modell; Farben und Größen kommen in Schritt 2. Die Website lädt
+   über den Adapter Produkt und Varianten (Größe, Farbe, Variantennummer, Lager, Druckflächen mit Maßen) und speichert
+   einen Abzug - **ohne Preise** -, dazu die Druckvorlagen (#2069). Eine Variantennummer als Produktnummer findet
    Printful nicht - die Meldung sagt das. Ein anderes Printful-Produkt setzt Angebot und Technik zurück; vorhandene
    Varianten bleiben (Bestellungen zeigen auf sie), werden aber inaktiv.
 2. **Farben und Größen:** Technik, Farben, Größen. Je Farbe × Größe eine Variante (SKU `PF<Printful-Variante>-<Produkt>`)
    mit Zuordnung zur Printful-Variante; danach holt der Abgleich die Einkaufspreise **nur für diese** (höchstens 80 je
    Produkt - je Variante ein Preisaufruf).
-3. **Designs je Platzierung:** Platzierungen aus den Druckflächen des Printful-Produkts. Brust links/rechts und
-   „Vorderseite groß“ liegen auf der Printful-Fläche `front`, die Rückseite auf `back` (eigener Aufpreis). Position,
-   Breite und Höhe in Zoll (Anzeige mit cm), von vorne gesehen ab links oben im Druckbereich; die Vorlage kommt aus den
-   Druckbereichen der Designs (#1708), „Brust rechts vom Träger aus“ liegt von vorne gesehen links. Je Platzierung und
-   angebotener Farbe ein Design dieser Platzierung, vorgeschlagen über `design_for_color`. Art **Gamertag** bzw.
-   **Vereinsnummer** ist ein Platzhalter (Datei je Bestellung, #1711) und nur mit passender Personalisierung erlaubt.
+3. **Druckflächen** (seit #2069, Abschnitt „Druckvorlagen und Druckdateien“): je Printful-Fläche aus der Druckvorlage
+   Motiv, Vorgabe-Position aus der Liste und Größe in cm; Gamertag bzw. Vereinsnummer als Platzhalter (Datei je
+   Bestellung) nur mit passender Personalisierung. „Druckdateien erzeugen“ baut je Farbe die Datei in der exakten
+   Pixelgröße von Printful. Die festen Zoll-Positionen von #1707 sind abgelöst.
 4. **Preise:** Mitgliederpreis = **Selbstkostenpreis**: Einkauf der Variante (Technik) plus Aufpreis jeder weiteren
    Printful-Druckfläche; eine Fläche steckt im Grundpreis (`included_placement`, Vorgabe `front`). Ohne Aufschlag.
    Öffentlicher Preis = Einkauf plus Aufschlag als Vorschlag; der eigene Aufschlag des Produkts ersetzt den
@@ -471,9 +477,9 @@ Grund ist optional, **Pflicht nur beim Veröffentlichen** - dann geht das Produk
 5. **Prüfen und veröffentlichen:** Entwurf → **geprüft** → **veröffentlicht** → archiviert.
 
 **Vorab-Prüfung** (`run_check`): Printful-Produkt geladen und nicht eingestellt; Farben und Größen gewählt;
-Sichtbarkeit und Personalisierung passen zu den Platzierungen; mindestens eine Platzierung mit Design; **jede
-angebotene Farbe hat an jeder Design-Platzierung eine gültige, öffentliche Datei** (sonst nennt die Prüfung Platzierung
-und Farbe); alle angebotenen Varianten lieferbar; Preis berechnet und übernommen, ohne offene Preiswarnung und nicht
+Druckvorlage geladen und aktuell; Sichtbarkeit und Personalisierung passen zu den Platzhaltern; mindestens eine Fläche
+mit Motiv; **jede angebotene Farbe hat an jeder Fläche eine gültige Druckdatei zum aktuellen Aufbau und zur aktuellen
+Vorlage** (sonst nennt die Prüfung Fläche und Farbe, #2069); alle angebotenen Varianten lieferbar; Preis berechnet und übernommen, ohne offene Preiswarnung und nicht
 unter dem **Mindestpreis** (Einstellung `min_price_cents`, Vorgabe 1 €, unter Shop → Einstellungen → Preise). Dazu die
 **Mockup-Prüfung**: bis #1710 „offen“. „Geprüft“ braucht alles außer den Mockups, „veröffentlicht“ alles - bis #1710
 lässt sich also nichts veröffentlichen.
@@ -518,15 +524,185 @@ Produkts.
 | --- | --- |
 | `POST /api/admin/shop/products/{id}/printful` | Schritt 1: Printful-Produkt laden (`printful_product_id`) |
 | `PUT /api/admin/shop/products/{id}/offer` | Schritt 2: Technik, Farben, Größen - danach Preise |
-| `PUT /api/admin/shop/products/{id}/placements` | Schritt 3: Platzierungen mit Art und Position, Fläche im Grundpreis |
-| `PUT /api/admin/shop/products/{id}/designs` | Schritt 3: Design je Platzierung und Farbe, `null` entfernt |
+| `GET /api/admin/shop/printful-catalog` | Schritt 1: Produktsuche (`q`, `category_id`, `link`, `refresh`, #2069) |
+| `PUT /api/admin/shop/products/{id}/layout` | Schritt 3: Druckflächen mit Motiv, Vorgabe, Größe und Platzhaltern, Fläche im Grundpreis (#2069) |
+| `POST /api/admin/shop/products/{id}/layout/preview` | Schritt 3: Pläne für den ungespeicherten Aufbau (Fassung je Farbe, Bild, Rahmen) - speichert nichts; je Konto höchstens `SHOP_LAYOUT_PREVIEW_LIMIT` Aufrufe (Vorgabe 60) je `SHOP_LAYOUT_PREVIEW_WINDOW_SECONDS` (Vorgabe 60 s), darüber 429 (#2069) |
+| `POST /api/admin/shop/products/{id}/print-files` | Schritt 3: Druckdateien erzeugen (#2069) |
+| `POST /api/admin/shop/products/{id}/print-templates/refresh` | Druckvorlagen neu von Printful (#2069) |
+| `GET /api/admin/shop/products/{id}/preview` | Vorschau einer Fläche je Farbe als PNG (#2069) |
+| `GET /api/admin/shop/products/{id}/print-files/{file_id}` | Grunddatei ansehen (#2069) |
+| `POST /api/admin/shop/print-files/upload` | Fertige Druckdatei für Profis (#2069) |
+| `GET`/`PUT /api/admin/shop/print-presets` | Positions-Vorgaben und Regeln (#2069) |
+| `GET /api/admin/shop/print-templates/{printful_product_id}/images/{index}` | Vorlagenbild über die Website (#2069) |
 | `POST /api/admin/shop/products/{id}/prices/accept` | Schritt 4: Selbstkosten als Mitgliederpreis übernehmen |
 | `POST /api/admin/shop/products/{id}/sync` | Mit Printful abgleichen (Person im Protokoll) |
 | `POST /api/admin/shop/products/{id}/status` | Schritt 5: `reviewed`, `active` (Grund Pflicht), `draft`, `archived` |
 
-Offen für spätere Pakete: Mockups und ihre Prüfung (#1710), die Gamertag- bzw. Vereinsnummer-Datei (#1711) - ob
-Printful zwei Ebenen auf `front` annimmt oder Löwe und Gamertag zu einer Front-Datei zusammengesetzt werden müssen,
-klärt der Testentwurf (#2062) -, Fotos, Galerie und Größentabelle, der visuelle Editor (Ergänzung vom 15.10.).
+Offen für spätere Pakete: Mockups und ihre Prüfung (#1710), die Vereinsnummer-Datei (#1727), Fotos, Galerie und
+Größentabelle. Löwe und Gamertag sind seit #2069 **eine** Datei je Fläche - der Testentwurf (#2062) schickt genau sie.
+
+## Druckvorlagen und Druckdateien (#2069)
+
+Code: `backend/services/shop_print_templates.py` (Vorlagen von Printful, Vorlagenbilder, Positions-Vorgaben),
+`shop_print_files.py` (Motive, Generator, Ablage, Bestellung, Umstellung), `shop_catalog_search.py` (Produktsuche),
+Routen `backend/routes/shop_print_template_routes.py` und `shop_product_routes.py`, Seite
+`frontend/src/pages/admin/ShopLayoutStep.jsx` (Schritt 3) und `ShopProductSearch.jsx` (Schritt 1), Vorschau-Rechnung
+`frontend/src/lib/shopLayout.js` (Spiegel der Server-Rechnung). Ziel: Druckdateien passen **zu 100 % zu Printful** - für
+jedes Produkt, auch neue -, ohne eigenes Grafikprogramm.
+
+**Eine Printful-Druckdatei ist immer die ganze Fläche einer Platzierung** in exakter Pixelgröße; das Motiv liegt darin,
+der Rest ist transparent. Abgeglichen mit den offiziellen Vorlagen (Maße in `manifest.json`, „print_templates“):
+
+| Produkt | Fläche | Druckdatei |
+| --- | --- | --- |
+| T-Shirt Gildan 5000 (DTG/DTF) | vorne bzw. hinten | 1800 × 2400 px bei 150 DPI = 30,48 × 40,64 cm |
+| Gildan 5000 | Ärmel / Innenetikett | 600 × 525 bzw. 450 × 450 px bei 150 DPI |
+| Trikot Allover | vorne bzw. hinten / Ärmel | 4950 × 6750 bzw. 4950 × 2250 px bei 150 DPI |
+| Snapback (DTF) | vorne | 1350 × 705 px bei 300 DPI - die Produktseite nennt 13,97 × 6,35 cm, die API gilt |
+| Tasse | 11 oz / 15 oz | 2250 × 925 bzw. 2253 × 1084 px bei 300 DPI (je Größe eine eigene Fläche) |
+| Badetuch | 30×60 / 36×72 | 9300 × 4800 bzw. 11100 × 5700 px bei 150 DPI |
+
+### Vorlagen von Printful
+
+- **Maße:** `GET /v2/catalog-products/{id}/mockup-styles` - je Platzierung und Technik Druckbereich in Zoll und DPI;
+  Druckdatei = `round(Zoll × DPI)` Pixel. Sind alle Ansichten einer Zeile auf Varianten beschränkt
+  (`restricted_to_variants`), gilt die Fläche nur für diese - so bekommt die 15-oz-Tasse ihre eigene Datei (Gruppe).
+- **Vorlagenbild:** `GET /v2/catalog-products/{id}/mockup-templates` - halbdurchsichtiges Bild mit Sicherheitslinien
+  und die Lage des Druckbereichs darin (Pixel des Bilds), dazu `overlay` oder `background`.
+- Gespeichert in `shop_print_templates` (eine Zeile je Printful-Produkt). Geholt in Schritt 1, bei „Mit Printful
+  abgleichen“, im täglichen Abgleich und mit „Vorlagen neu laden“. Die Prüfsumme (`hash`) deckt nur die Maße ab. Ändert
+  Printful eine Fläche, stehen die Sätze in `changes` und im Protokoll (`shop.print_template.change`), und alle Dateien
+  dieser Fläche gelten als **veraltet**. Scheitert Printful, bleibt der letzte Stand (`last_error`).
+- Ein Sicherheitsbereich als Zahl steht nicht in v2 (er ist ins Vorlagenbild gezeichnet) - dafür gibt es einen
+  einstellbaren **Sicherheitsrand** je Art der Fläche (Vorgabe 0 cm).
+- **Vorlagenbilder über die Website:** `GET /api/admin/shop/print-templates/{printful_product_id}/images/{index}` holt
+  nur Adressen aus der gespeicherten Vorlage, nur von festen Printful-Hosts (`IMAGE_HOSTS`, https, Port 443, ohne
+  Anmeldedaten), ohne Weiterleitung, höchstens 8 MB und 30 Millionen Pixel, neu kodiert als PNG ohne Metadaten,
+  zwischengespeichert unter `UPLOAD_DIR/shop-templates/`. Eine Adresse aus der Anfrage gibt es nicht - keine offene
+  Weiterleitung.
+
+### Positions-Vorgaben (einstellbar)
+
+Dokument `settings` mit `id = "shop_print_presets"` (Finanzen, Grund optional, Protokoll `shop.print.presets` mit
+hinzugefügt/entfernt/geändert und den Regeln vorher/nachher). Jede Vorgabe ist **relativ zur Fläche**: waagrechte Mitte
+als Anteil der Breite, Anker oben/mittig/unten, Abstand oben in cm, Standardbreite in cm - und gilt für Arten von
+Flächen (Vorderseite, Rückseite, Ärmel, Etikett, Sonstige). Eine Vorgabe ist eine Empfehlung: sie bleibt in der Fläche
+(und im Sicherheitsrand); danach kommt die Feinjustierung als Versatz in cm.
+
+| Vorgabe | Fläche | Mitte / Anker / oben / Breite |
+| --- | --- | --- |
+| Brust rechts (vom Träger aus) - von vorne gesehen links, hier sitzt der Löwe | vorne | 27 % / oben / 5 cm / 8,9 cm |
+| Brust links (vom Träger aus) | vorne | 73 % / oben / 5 cm / 8,9 cm |
+| Vorne mittig, Vorne groß | vorne | 50 % / oben / 7,5 bzw. 2,5 cm / 20 bzw. 28 cm |
+| Rücken groß, Rücken oben, Nacken | hinten | 50 % / oben / 5, 2,5, 0 cm / 28, 12, 7 cm |
+| Ärmel, Etikett | Ärmel, Etikett | 50 % / mittig / 7,5 bzw. 6 cm |
+| Kappe vorne | vorne | 50 % / mittig / 10 cm |
+| Tasse umlaufend, Tasse einseitig, Tuch mittig | sonstige | 50 % bzw. 25 % / mittig / ganze Fläche, 8 cm, 40 cm |
+| Brust gegenüber dem Motiv (Name) | vorne | gespiegelt zum ersten Motiv, senkrechte Mitte des Namens auf dessen Mitte |
+| Unter dem Motiv, Rücken oben (Name), Mittig (Name) | alle bzw. hinten | unter dem ersten Motiv (1 cm Abstand), oben 3 cm, mittig |
+
+**Regeln** im selben Dokument: Sicherheitsrand je Art der Fläche (cm), Auflösung eines Rastermotivs als Anteil der DPI
+der Vorlage (darunter abgelehnt: Vorgabe 0,66 - also unter 100 DPI bei 150; darunter gewarnt: Vorgabe 1,0) und die
+kleinste Breite eines Motivs (Vorgabe 1 cm). Routen: `GET`/`PUT /api/admin/shop/print-presets`.
+
+### Aufbau je Produkt (Schritt 3)
+
+`product.placements` je Printful-Fläche: `key` (= Printful-Platzierung), `technique`, `mode` (`layout` - Motiv und
+Position; `upload` - fertige Datei für Profis) und `layers`:
+
+- `motif`: Vorgabe, Breite in cm (der Regler endet an der Fläche), Versatz in cm, Motiv (`motif.key`) und - nur wenn
+  nötig - eine **Ausnahme je Farbe** (`motif.by_color`: für diese Farbe ein anderes Motiv). Sonst gilt je Shirtfarbe
+  automatisch die passende Fassung des Motivs (Abschnitt „Motive“: Hauptdatei für dunkle, Fassung für helle Shirts nach
+  dem Farbwert von Printful; eine Ausnahme am Motiv geht vor).
+- `gamertag`, `member_number`: Platzhalter mit Vorgabe (etwa „Brust gegenüber dem Motiv“); ihre Datei entsteht je
+  Bestellung. Höchstens einer je Fläche, nur mit passender Personalisierung. Die Größe ist die Leinwand der
+  Gamertag-Datei (`shop_gamertag.canvas`), ihr Anker (`anchor_y_in`) liegt auf der halben Höhe.
+
+`PUT /api/admin/shop/products/{id}/layout` prüft für **jede angebotene Farbe und jede Größe mit eigener Fläche**, dass
+alles ganz in der Fläche liegt - sonst 400 mit px, cm und Zoll. Protokoll `shop.product.layout` mit vorher/nachher.
+
+**Umstellung alter Produkte** (feste Zoll-Positionen aus #1707): beim Lesen rechnet die Website sie um (nächste Vorgabe
+nach der waagrechten Mitte, Breite in cm, der Rest als Versatz - die Lage bleibt). Gespeichert wird beim nächsten
+Speichern in Schritt 3 oder mit dem Werkzeug:
+
+```bash
+docker compose exec backend python scripts/shop_print_layout.py                       # Trockenlauf: was würde
+docker compose exec backend python scripts/shop_print_layout.py --anwenden            # speichern, alte Platzierungen in placements_legacy, Dateien erzeugen
+docker compose exec backend python scripts/shop_print_layout.py --abbauen             # Rückweg ansehen
+docker compose exec backend python scripts/shop_print_layout.py --abbauen --anwenden  # alte Platzierungen wieder einsetzen
+```
+
+Ein Produkt ohne gespeicherte Vorlage überspringt das Werkzeug (erst abgleichen). Der Stand eines Produkts bleibt.
+Lässt sich auch nur **eine** alte Platzierung nicht abbilden, ist das ganze Produkt **nicht bestellbar** (fail-closed):
+`place_order` sagt nur „Dieses Produkt ist gerade nicht bestellbar.“ (ebenso bei allem, was die Kundschaft nicht selbst lösen kann: Produkt nicht aktiv oder gesperrt, nicht lieferbar, kein Preis, unter dem Mindestpreis, fehlende Druckvorlage oder Druckdatei, unpassender Aufbau, fehlende Gamertag-Datei - der Grund steht mit Produkt und Variante als Warnung im Log und, wo er zum Aufbau gehört, in der Vorab-Prüfung; ein fehlender Gamertag oder ein Gamertag ohne Mitgliedschaft bleiben eigene Meldungen), die Vorab-Prüfung zeigt den Punkt „Druckflächen
+umgestellt“ rot mit Fläche und Grund, bis Schritt 3 neu gespeichert ist.
+
+### Generator und Ablage
+
+`compose_print_file(width_px, height_px, dpi, layers)` ist rein (ohne Datenbank): genau ein PNG in der Pixelgröße der
+Vorlage, transparent, sRGB-Pixel, im PNG **nur die DPI** als Metadatum, **deterministisch** (gleiche Eingaben = gleiche
+Prüfsumme). Abgelehnt wird mit Zahlen in px, cm und Zoll: ein Motiv außerhalb der Fläche bzw. des Sicherheitsrands, ein
+Rastermotiv mit zu wenig DPI bei der gewählten Größe (mit der nötigen Pixelbreite), mehr als 80 Millionen Pixel, eine
+Grunddatei in anderer Größe. Unter der Warnschwelle gibt es einen Hinweis.
+
+**Motive an einer Stelle:** `shop_print_files._motif_source` nimmt für die Shirtfarbe die Fassung über
+`shop_motifs.file_for_garment` (hell oder dunkel samt Version; Seitenverhältnis aus der viewBox bzw. den Pixeln; bei SVG
+keine DPI-Grenze), `_motif_png` rastert genau diese Fassung mit `shop_motifs.render_motif_png(…, version=…)` in der
+Breite des Rahmens - SVG scharf, ein altes PNG wie bisher skaliert. Die Fassung samt Version steckt im `layout_hash`
+(neue Version = neue Druckdatei), Schritt 3 zeigt in der Vorschau das Bild genau dieser Fassung, und die Bestellung
+friert sie ein (`designs` mit `variant` und `version`). Tests ersetzen beide Funktionen durch einen Fake.
+
+**„Druckdateien erzeugen“** (`POST /api/admin/shop/products/{id}/print-files`) erzeugt je Fläche, Farbe und Gruppe nur,
+was fehlt oder veraltet ist (`layout_hash`: Maße der Vorlage, Rahmen, Motiv-Fassung, Generator-Version). Dieselben
+Pixel ergeben keine neue Version. Eine Sperre je Produkt verhindert doppeltes Erzeugen. Protokoll `shop.print_file.add`.
+
+**Ablage** `shop_print_files` wie die Designs: eigene Datei (`UPLOAD_DIR/shop-designs/`), SHA-256, Zufallsschlüssel mit
+256 Bit, öffentlich unter `/api/shop/print-files/<schlüssel>/<name>.png` (Name der Grunddatei:
+`<produkt>-<fläche>-<farbe>-v<version>.png`, einer Bestelldatei: `druck-<prüfsumme16>.png` - nie ein Name).
+Grunddateien (`purpose = "base"`) zählen je Produkt, Fläche, Gruppe und Farbe hoch (eindeutiger Index).
+
+**Für Profis:** `POST /api/admin/shop/print-files/upload` (Formular `file`, `product_id`, `placement`, `color`, optional
+`group`) - wird **exakt** gegen die Vorlage geprüft: genau die Pixel der Vorlage, oder dasselbe Seitenverhältnis mit
+mehr Pixeln (dann auf die exakte Größe verkleinert); kleiner oder anderes Seitenverhältnis wird mit px, cm und Zoll
+abgelehnt. Neu kodiert wie ein Design (#1708). Höchstens 50 MB am Eingang (`body_limits`, nginx 51 MB).
+
+**Vorschau:** `GET /api/admin/shop/products/{id}/preview?placement=&color=` - die Druckdatei über dem Vorlagenbild
+(Sicherheitslinien) auf der Shirtfarbe von Printful, mit einem Beispielnamen im Platzhalter, als PNG (900 px breit).
+Im Admin rechnet die Seite dieselbe Lage live (`shopLayout.js`), Feinjustieren per Ziehen oder Pfeiltasten (Umschalt:
+1 cm). `GET /api/admin/shop/products/{id}/print-files/{file_id}` zeigt eine Grunddatei.
+
+### Bestellung
+
+`place_order` friert je Position **je Fläche genau eine Datei** ein (`print_files`): ohne Namen die geltende Grunddatei
+(die zum Aufbau und zur Vorlage passen muss, sonst „nicht bestellbar“); mit Gamertag eine **eigene** Datei für genau
+diese Position: Grunddatei plus Gamertag am Anker (`shop_gamertag.store` legt den Namen als Bestelldatei ab, Farbe nach
+`inks_for_garment`). Die Motiv-Fassungen stehen weiter in `designs` (für die Aufbewahrung ihrer Adressen). Kommt die
+Bestellung nicht zustande (gleichzeitiger Aufruf, spätere Position nicht bestellbar), sind die eigenen Dateien wieder
+weg. Die Vereinsnummer bleibt Platzhalter bis #1727.
+
+**Datenschutz:** Eine Bestelldatei mit Gamertag ist personenbezogen (das PNG zeigt den Namen) - `user_id`, Bestellung und
+Position an der Zeile, nie der Name als Text. Auskunft unter `shop_print_files` (ohne Schlüssel und Ablageort),
+Kontolöschung wie bei den Gamertag-Dateien (`shop_print_files.erase_for_user`, Abschluss im Job `ops_retention`).
+Grunddateien gehören zum Katalog.
+
+### Vorab-Prüfung
+
+Neu: **Druckvorlage von Printful** (geladen, höchstens 14 Tage alt, letzte Änderung mit Sätzen) und **Druckdateien je
+Farbe**: jede Fläche mit Motiv (bzw. fertiger Datei) hat für jede angebotene Farbe (und Gruppe) eine gültige Datei zum
+aktuellen Aufbau und zur aktuellen Vorlage; fehlt sie oder ist sie veraltet, nennt die Prüfung Fläche und Farbe.
+
+### Produktsuche (Schritt 1)
+
+Die Nummer eines Katalogprodukts steht im Printful-Dashboard nirgends. `GET /api/admin/shop/printful-catalog` sucht im
+Katalog: geladen über `GET /v2/catalog-products` (seitenweise je 100, Verkaufsregion Europa) und
+`GET /v2/catalog-categories`, zwischengespeichert in `shop_printful_catalog` (ein Tag; Sperre gegen doppeltes Laden;
+scheitert Printful, bleibt der letzte Stand). **Printful v2 hat keinen Textfilter** - gesucht wird lokal über Name,
+Marke, Modell und Art (deutsche Wörter wie „Trikot“, „Tasse“, „Kappe“ finden die englischen Namen), mit Filter nach
+Kategorie samt Unterkategorien. Ein eingefügter **Dashboard-Link** (`…/dashboard/custom/mens/shirts/unisex-classic-tee-gildan-5000?…`)
+findet das Produkt über den Namen in Kleinbuchstaben mit Bindestrichen - die API liefert keinen Slug, darum zählt nur
+ein eindeutiger Treffer. Die Nummer von Hand bleibt als Notfall. Ein Produkt je Modell: Farben und Größen kommen in
+Schritt 2.
+
 ## Gamertag-Druckdatei (#1711)
 
 Code: `backend/services/shop_gamertag.py`, Routen `backend/routes/shop_gamertag_routes.py`, Seite
@@ -642,6 +818,8 @@ Betrieb freigegeben). Gründe:
 | --- | --- | --- | --- |
 | `check_connection` | `GET /v2/stores` | – | nein (ein Aufruf) |
 | `catalog_product` | `GET /v2/catalog-products/{id}` | – | ja |
+| `catalog_products`, `catalog_categories` | `GET /v2/catalog-products` (seitenweise), `GET /v2/catalog-categories` (#2069, Produktsuche) | – | ja |
+| `print_areas`, `mockup_templates` | `GET /v2/catalog-products/{id}/mockup-styles`, `…/mockup-templates` (#2069) | – | ja |
 | `catalog_variants` | `GET /v2/catalog-products/{id}/catalog-variants`, `…/availability`, `GET /v2/catalog-variants/{id}/prices` | – | ja |
 | `estimate_costs` | `POST /v2/order-estimation-tasks`, dann `GET /v2/order-estimation-tasks?id=` | – | Anlegen nein, Abfragen ja |
 | `create_draft` | `GET /v2/orders/@{external_id}`, dann `POST /v2/orders` | Entwurf | nein |

@@ -83,6 +83,7 @@ from routes.shop_design_routes import router as shop_design_router
 from routes.shop_product_routes import router as shop_product_router
 from routes.shop_gamertag_routes import router as shop_gamertag_router
 from routes.shop_print_file_routes import router as shop_print_file_router
+from routes.shop_print_template_routes import router as shop_print_template_router
 from routes.platform_link_routes import router as platform_link_router
 from routes.discord_bot_routes import router as discord_bot_router
 from routes.discord_forward_routes import router as discord_forward_router
@@ -248,7 +249,9 @@ async def request_validation_error(_request: Request, exc: RequestValidationErro
 # Logos als SVG (#1952): ein SVG nur in Logo-Feldern, die PNG-Fassung eines SVG-Logos bleibt beim Speichern das SVG.
 app.add_middleware(svg_logo.SvgFieldGate)
 # Druckdateien (#1708): das Limit greift am Eingang, bevor FastAPI das Formular in eine Zwischendatei liest.
-app.add_middleware(BodySizeLimit, limits={"/api/admin/shop/designs/upload": shop_designs.upload_body_limit})
+app.add_middleware(BodySizeLimit, limits={"/api/admin/shop/designs/upload": shop_designs.upload_body_limit,
+                                          # fertige Druckdatei je Fläche (#2069): dieselbe Grenze
+                                          "/api/admin/shop/print-files/upload": shop_designs.upload_body_limit})
 # Gamertag-Druckdatei (#1711): Vorschau, Testdatei und Regeln nehmen nur kleine Anfragen an.
 app.add_middleware(BodySizeLimit, limits=shop_gamertag.body_limits())
 
@@ -378,6 +381,7 @@ app.include_router(shop_admin_router)  # Shop (#1704): nur Finanzen
 app.include_router(shop_design_router)  # Designs und Druckdateien (#1708): nur Finanzen
 app.include_router(shop_product_router)  # Produktverwaltung und Katalogabgleich (#1707, #1709): nur Finanzen
 app.include_router(shop_gamertag_router)  # Gamertag-Druckdatei (#1711): nur Finanzen
+app.include_router(shop_print_template_router)  # Druckvorlagen und Vorgaben (#2069): nur Finanzen
 app.include_router(shop_print_file_router)  # Druckdateien für Printful (#1708): bewusst öffentlich, Regel 3
 app.include_router(platform_link_router)
 app.include_router(discord_bot_router)

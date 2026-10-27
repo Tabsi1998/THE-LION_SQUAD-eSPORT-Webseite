@@ -209,6 +209,73 @@ class CatalogVariant:
 
 
 @dataclass(frozen=True, slots=True)
+class CatalogEntry:
+    """Ein Produkt aus der Katalogliste (#2069, Produktsuche) - ohne Varianten und Preise."""
+    id: CatalogProductId
+    name: str
+    brand: str | None
+    model: str | None
+    type: str
+    main_category_id: int | None
+    image: str | None
+    techniques: tuple[str, ...]
+    colors: int
+    sizes: int
+    is_discontinued: bool
+
+
+@dataclass(frozen=True, slots=True)
+class CatalogCategory:
+    id: int
+    parent_id: int | None
+    title: str
+
+
+@dataclass(frozen=True, slots=True)
+class PrintArea:
+    """Die Druckvorgabe einer Platzierung (#2069): Druckbereich in Zoll und die DPI, mit der Printful die Druckdatei
+    erwartet - Druckdatei = ``round(width_in × dpi)`` × ``round(height_in × dpi)`` Pixel. ``variant_ids`` ist ``None``,
+    wenn die Vorgabe für alle Varianten gilt, sonst nur für diese (etwa je Tassen- oder Tuchgröße)."""
+    placement: str
+    technique: str
+    display_name: str
+    width_in: float
+    height_in: float
+    dpi: int
+    area_type: str | None = None
+    variant_ids: tuple[int, ...] | None = None
+
+    @property
+    def width_px(self) -> int:
+        return int(round(self.width_in * self.dpi))
+
+    @property
+    def height_px(self) -> int:
+        return int(round(self.height_in * self.dpi))
+
+
+@dataclass(frozen=True, slots=True)
+class MockupTemplate:
+    """Vorlagenbild einer Platzierung (#2069): das halbdurchsichtige Bild mit Sicherheitslinien und wo darin der
+    Druckbereich liegt (Pixel des Vorlagenbilds). ``positioning`` sagt, ob das Bild über (``overlay``) oder unter
+    (``background``) der Druckdatei liegt."""
+    variant_ids: tuple[int, ...]
+    placement: str
+    technique: str
+    image_url: str
+    background_url: str | None
+    background_color: str | None
+    template_width: int
+    template_height: int
+    area_left: int
+    area_top: int
+    area_width: int
+    area_height: int
+    positioning: str
+    orientation: str
+
+
+@dataclass(frozen=True, slots=True)
 class Costs:
     currency: str | None
     calculation_status: str
@@ -354,6 +421,14 @@ class FulfillmentProvider(Protocol):
     async def catalog_variants(self, product_id: CatalogProductId, *, currency: str = "EUR",
                                region: str = "europe",
                                price_for: tuple[CatalogVariantId, ...] | None = None) -> tuple[CatalogVariant, ...]: ...
+
+    async def catalog_products(self, *, region: str = "europe") -> tuple[CatalogEntry, ...]: ...
+
+    async def catalog_categories(self) -> tuple[CatalogCategory, ...]: ...
+
+    async def print_areas(self, product_id: CatalogProductId) -> tuple[PrintArea, ...]: ...
+
+    async def mockup_templates(self, product_id: CatalogProductId) -> tuple[MockupTemplate, ...]: ...
 
     async def estimate_costs(self, lines: tuple[DraftLine, ...], *, country_code: str, zip_code: str,
                              state_code: str = "") -> Costs: ...

@@ -52,6 +52,12 @@ MANUAL = {
     **{f"shop_gamertag_files.{index}": "Doppelte Gamertag-Druckdatei - prüfen, auf welche Zeile Bestellungen zeigen, "
                                        "und die andere von Hand entfernen (docs/SHOP.md)."
        for index in ("test_sha256", "public_id")},
+    # Druckvorlagen und Druckdateien (#2069): Bestellungen zeigen auf eine Druckdatei - von Hand klären.
+    "shop_print_templates.printful_product": "Doppelte Druckvorlage zu einem Printful-Produkt - die neuere behalten "
+                                             "und mit Printful abgleichen (docs/SHOP.md).",
+    **{f"shop_print_files.{index}": "Doppelte Druckdatei - prüfen, auf welche Zeile Bestellungen zeigen, und die "
+                                    "andere von Hand entfernen (docs/SHOP.md)."
+       for index in ("public_id", "base_version")},
     # Printful-Adapter (#1705): ein Claim belegt, dass etwas an Printful ging oder geht - nie automatisch löschen.
     **{f"shop_{index}": "Doppelter Claim zu einem Printful-Auftrag - in Printful nachsehen, welcher Auftrag gilt, und den "
                         "überzähligen Claim von Hand entfernen (docs/SHOP.md, Printful-Adapter)."
