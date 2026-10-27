@@ -192,7 +192,7 @@ function main(argv) {
   const [command, ...rest] = argv;
   if (command === "plan") return plan(rest[0], rest[1]);
   if (command === "durations") {
-    const reports = rest.map((file) => JSON.parse(fs.readFileSync(file, "utf8").replace(/^﻿/, "")));
+    const reports = rest.map((file) => JSON.parse(fs.readFileSync(file, "utf8").replace(/^\uFEFF/, "")));
     return process.stdout.write(`${JSON.stringify(durationsFromReports(reports), null, 2)}\n`);
   }
   console.error("Aufruf: e2e-shards.mjs plan <n/gesamt> <datei> | durations <bericht.json>...");

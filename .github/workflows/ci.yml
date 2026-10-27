@@ -199,7 +199,7 @@ jobs:
         run: |
           coverage combine --keep test-results/backend-coverage-*
           coverage xml -o test-results/backend-coverage.xml
-          echo "Coverage des ganzen Backends: $(coverage report --format=total)%"
+          echo "Coverage des ganzen Backends: $(coverage report --format=total --precision=2)%"
           coverage report --fail-under=35 --format=total
       - name: Upload combined backend coverage
         if: ${{ !cancelled() }}
